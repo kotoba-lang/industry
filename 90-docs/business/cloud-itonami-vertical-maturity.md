@@ -1,6 +1,6 @@
 # cloud-itonami — vertical maturity (design vs implementation)
 
-**As-of**: 2026-07-16  
+**As-of**: 2026-07-17  
 **Product**: `cloud-itonami`  
 **正本 (structured)**: `cloud-itonami-vertical-maturity.edn`  
 **Portfolio scores**: `maturity-facts.edn` + generated `maturity-scores.md` (ADR-2607021700)  
@@ -49,7 +49,7 @@ Local ISIC checkouts under `orgs/cloud-itonami/cloud-itonami-isic-*` (**n=165**)
 |---|---:|---:|---:|---:|---|
 | **6399 Meta job-search** | 5 | 5 | 5 | **2** | Indeed replacement; 6 jurisdictions; live demo; aozora.app actor + first promo post (ADR-2607161930); Stripe Payment Link live for Managed Starter tier (ADR-2607161745), no paid org yet |
 | **6310 Talent** | 5 | 5 | 5 | **2** | kaonavi replacement; assignment op; live demo; aozora.app actor + first promo post (ADR-2607161930); Stripe Payment Link live for Managed Starter tier (ADR-2607161745), no paid org yet |
-| **7810 Employment/placement** | 4 | 4 | 4 | **2** | Near-flagship (demo + quickstart); aozora.app actor + first promo post (ADR-2607161940, parity with 6399/6310); Stripe Payment Link live for Managed Starter tier (ADR-2607161745), no paid org yet |
+| **7810 Employment/placement** | 4 | 4 | 4 | **2** | Near-flagship (demo + quickstart); Stripe Payment Link live for Managed Starter tier (ADR-2607161745), no paid org yet |
 | **Insurance / finance** | 4 | 4 | 1 | 0 | Full modules; almost no storefront |
 | **Real estate** | 4 | 4 | 1 | 0 | Same pattern |
 | **Health / care / hospital** | 5 | 4 | 1 | 0 | Strong clinical scope exclusion; thin product face |
@@ -59,9 +59,9 @@ Local ISIC checkouts under `orgs/cloud-itonami/cloud-itonami-isic-*` (**n=165**)
 | **Software/IT 5820/620x** | 4 | — | — | 0 | Registry implemented; **local checkout missing** in this snapshot |
 | **ISO3166 countries** | 4 | 4 | 1 | 0 | Country coordinators; no GTM surface |
 | **ISO3166 JPN agencies** | 4 | 0 | 1 | 0 | blueprint + docs; essentially no src |
-| **ISCO occupations** | 3 | 1 | 0 | 0 | Thin tests / partial modules |
+| **ISCO occupations** | 4 | 4 | 1 | 0 | open-occupation 88/88 :implemented (PR #427); product face still thin |
 | **Catalog / org surface** | 4 | 4 | 4 | 1 | github.io from registry SSoT |
-| **itonami.cloud cockpit** | 4 | 3 | 4 | 2 | free path mature productSurface 12/12; freePath tenants=2; Stripe live-wired (ADR-2607161620), E2E checkout unverified, no paid org yet |
+| **itonami.cloud cockpit** | 4 | 4 | 5 | 2 | free-path productSurface 5716/5716; free tenants=4; agentRuns7d~22k; Stripe readyForLiveCheckout (live); hyp/itonami-smb-pay measuring; no paid org yet |
 
 ## Reading
 
@@ -95,7 +95,6 @@ productSurface 7/7); business has not cleared a paid gate on any vertical.
 - Portfolio rescore note: `maturity-facts.edn` `:cloud-itonami` (2026-07-16)
 - Stripe billing go-live: ADR-2607161620
 - 6399/6310 aozora.app distribution actors: ADR-2607161930
-- 7810 aozora.app distribution actor (parity with 6399/6310): ADR-2607161940
 - 6399/6310/7810 flagship Managed-tier Stripe Payment Links + pricing-intelligence: ADR-2607161745
 - Metrics: `metrics/cloud-itonami.edn` (cockpit traffic)
 - Flagship depth: ADR-2607122300

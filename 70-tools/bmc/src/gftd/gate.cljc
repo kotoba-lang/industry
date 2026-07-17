@@ -6,7 +6,8 @@
    - machine-measurable — {:metric [path...] :op :>= :threshold N} over the
      product's metrics edn. When satisfied → propose `hyp/status :validated`
      with the measured value as evidence (auto-advance). When measurable but
-     not yet met → emit a 'gate distance' observation (measuring), hyp stays untested.
+     not yet met → promote hyp to :measuring once + emit a 'gate distance'
+     observation (hyp no longer stays untested when the instrument is live).
    - instrument-blocked — {:needs [\"missing instrument\" ...]}. The gate can't be
      measured until those are prepared, so propose a concrete '準備:' item into
      the solution block (actionable to-do) and record the gate as :blocked.
@@ -207,7 +208,8 @@
    proposals that advance the BMC cycle:
    - :validated → hyp/status :validated (evidence attached)
    - :blocked   → 準備 to-do item into the solution block (dedup'd)
-   - :measuring → gate-distance observation into key-metrics (dedup'd)"
+   - :measuring → hyp/status :measuring once (instrument live) + gate-distance
+                  observation into key-metrics (dedup'd)"
   [idx product metrics]
   (let [hyps (canvas/product-hyps idx product)]
     (mapcat
@@ -236,13 +238,24 @@
                 :event/value txt
                 :proposal/reason "gate 測定に必要な計器/前提が未整備 — 準備項目として提案"}))
            :measuring
+           ;; 計器が読めて未到達なら hyp を :measuring に昇格（一度きり）し、
+           ;; gate 距離を key-metrics に載せる。:validated と同様に既に
+           ;; :measuring の hyp は status 再提案しない。
            (let [metrics-items (block-items-set idx (block-id product "metrics"))
-                 txt (str "gate 距離 (" (name hid) "): " (:distance r))]
-             (if (contains? metrics-items txt)
-               []
-               [{:proposal/action :canvas/add-item
-                 :canvas/id (block-id product "metrics")
-                 :event/value txt
-                 :proposal/reason "gate は機械測定可能・未到達 — 距離を運用指標に反映"}]))
+                 txt (str "gate 距離 (" (name hid) "): " (:distance r))
+                 status-up (when (and (not= :measuring (:hyp/status h))
+                                      (not= :validated (:hyp/status h)))
+                             [{:proposal/action :hyp/status :hyp/id hid
+                               :event/value :measuring
+                               :event/evidence (or (:distance r) (:evidence r)
+                                                   "gate instrumented, threshold not met")
+                               :proposal/reason "gate 計器稼働・未到達 — measuring に昇格"}])
+                 dist-item (if (contains? metrics-items txt)
+                             []
+                             [{:proposal/action :canvas/add-item
+                               :canvas/id (block-id product "metrics")
+                               :event/value txt
+                               :proposal/reason "gate は機械測定可能・未到達 — 距離を運用指標に反映"}])]
+             (concat status-up dist-item))
            [])))))
      hyps)))

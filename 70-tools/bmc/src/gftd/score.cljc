@@ -37,11 +37,17 @@
       :else 0.0)))
 
 (defn validation
-  "検証状態 (ledger fold 済の hyp status)。untested=0 / refuted=2 (学習) /
-   validated=5。複数仮説は平均。"
+  "検証状態 (ledger fold 済の hyp status)。untested=0 / measuring=1.5
+   (計器稼働・未到達) / blocked=0 / moot=0 / refuted=2 (学習) /
+   validated=5。複数仮説は平均。
+
+   measuring は 2026-07-17 追加: gate が機械測定可能で距離を読み続けている
+   状態は untested より前進（計器なしと同じ 0 にするのは不誠実）。validated
+   に届かない限り 5 には上げない。"
   [idx product]
   (let [hyps (canvas/product-hyps idx product)
-        s {:untested 0.0 :blocked 0.0 :moot 0.0 :refuted 2.0 :validated 5.0}]
+        s {:untested 0.0 :measuring 1.5 :blocked 0.0 :moot 0.0
+           :refuted 2.0 :validated 5.0}]
     (if (seq hyps)
       (/ (reduce + (map #(get s (:hyp/status %) 0.0) hyps)) (count hyps))
       0.0)))

@@ -12,8 +12,8 @@
 | club-shinshi | 68 | 68.3 | 0 | validation=0, distribution=2 |
 | etzhayyim | 64 | 60 | 0 | revenue=0, validation=0 |
 | net-kotobase | 76 | 58.3 | 0 | validation=0, revenue=1 |
+| cloud-itonami | 78 | 56.7 | 1.5 | revenue=1, validation=1.5 |
 | cloud-murakumo | 84 | 51.7 | 5 | revenue=0, pricing=1 |
-| cloud-itonami | 64 | 50 | 0 | revenue=0, validation=0 |
 | network-isekai | 60 | 50 | 0 | revenue=0, validation=0 |
 | app-aozora | 64 | 46.7 | 0 | revenue=0, validation=0 |
 | ai-gftd-apex | 60 | 45 | 0 | revenue=0, validation=0 |
@@ -50,9 +50,9 @@
 
 ### cloud-itonami
 
-- BMC: completeness=5, hypothesis=5, validation=0, pricing=2, grounding=4
-- YC: acute-problem=4, wedge=3, tenx=4, founder-fit=5, distribution=2, defensibility=4, launched=3, users=1, revenue=0
-- note: 2026-07-16: free path production-mature — productSurface 12/12, free_path_smoke 9/9, /api/metrics freePath + /api/health for BMC. external=2 selfReg=2 agentRuns live. pricing 2 grounding 4 users 1 revenue 0 据置. Only owner STRIPE_* (sk_test_ ok) blocks paid path.
+- BMC: completeness=5, hypothesis=5, validation=1.5, pricing=3, grounding=5
+- YC: acute-problem=4, wedge=3, tenx=4, founder-fit=5, distribution=2, defensibility=4, launched=3, users=2, revenue=1
+- note: 2026-07-17: free-path productSurface 5716/5716 (100%)、external free tenants 4 / selfRegisteredOwners 4、agentRuns7d ~22k、/api/billing/status readyForLiveCheckout+webhookReady true (mode live)、open-occupation 公開 registry 88/88 :implemented (PR #427 haiku-loops coverage landed)。grounding 4→5 (常時公開実運転 + billing 配線 + occupation 全消化)、users 1→2 (外部 free tenant が 0→4 で dogfood 外の利用が存在する — 有償はまだ 0)。revenue 1 据置 (externalPaid=0、hyp/itonami-smb-pay gate = external-paid>=1 未達)。distribution 2 据置 (24h 上位 path が robots.txt 中心、有効な獲得チャネル未実証)。2026-07-16 Stripe live 化 (ADR-2607161620) は前提として維持。
 
 ### cloud-manimani
 

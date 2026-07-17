@@ -5,7 +5,7 @@
      手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->
 
 **Layer**: L3 business operator（全業種・職種 SaaS + investment platform）  
-**As-of**: 2026-07-16  
+**As-of**: 2026-07-17  
 **Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`
 
 ## Problem
@@ -92,4 +92,4 @@
 
 | id | risk | status | claim | gate | evidence |
 |---|---|---|---|---|---|
-| `:hyp/itonami-smb-pay` | riskiest | untested | 中小 operator が監査台帳つき agent に per-seat で払う | gftdcojp 外の初期 10 org の有償転換 | — |
+| `:hyp/itonami-smb-pay` | riskiest | measuring | 中小 operator が監査台帳つき agent に per-seat で払う | gftdcojp 外の初期 10 org の有償転換 | gate instrumented: tenants.external-paid=0 via /api/fleet/metrics; readyForLiveCheckout true (live Stripe); freePath productSurface 5716/5716 |
