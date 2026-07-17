@@ -1,0 +1,38 @@
+[{:db/id -1
+  :adr/id "adr-2607177500-kotobase-protocols-real-datom-plane-backend"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607177500: kotobase-protocols-worker を real kotobase-peer datom plane backend に切替（R2 content-addressed blocks + verifiable commit chain、fold 必須・git.kotobase.net 所有権衝突・git.cljc HEAD バグの3件のインシデントを含む）"
+  :adr/topic "kotobase-protocols-real-datom-plane-backend"
+  :adr/status "accepted"
+  :adr/date "2026-07-17"
+  :adr/last_verified "2026-07-17"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotobase-protocols-worker の永続化backend: 単一 R2 EDN blob（v0.2、ADR-2607174500/2607176000）から、real kotobase-peer content-addressed engine（prolly-tree index + verifiable append-only commit chain、R2 上の blocks/head 構造）への切替。gap分析で洗い出した①（real datom plane 配線）の解決"
+   "kotobase.protocols.* の synchronous pure handler 契約（public library、他 consumer が依存し得る）を変更しないという設計判断: async 化する代わりに、hydrate-run-persist! が同期 router 実行の前後で hydrate/commit を挟む「サンドイッチ」構成にする。この境界線は kotobase-protocols 自体には一切手を入れないという恒久的な設計制約として以後も維持する"
+   "commit ごとの fold 必須化: kotobase-peer の commit!/hot-datoms を使う任意の呼び出し元は、novelty が engine の default-fold-threshold（64）を超えたら必ず fold! を呼ぶこと。呼ばなかった場合の実害（>30秒のread劣化）を本 ADR が実測で記録する"
+   "git.kotobase.net の所有権: 本 worker はこのホスト名を主張しない（別セッションの Worker kotobase-git が保持）。git surface 自体の正しさは workers.dev の /git/* で検証済みであり、ホスト名の欠如とは独立している"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["90-docs/adr/2607171700-kotobase-storage-protocol-layers.edn"
+   "90-docs/adr/2607174500-kotobase-protocols-worker-deploy.edn"
+   "90-docs/adr/2607176000-kotobase-protocols-v0-2-sigv4-git-cid.edn"
+   "90-docs/adr/2607177000-kotobase-protocols-per-did-cacao-auth.edn"
+   "orgs/kotoba-lang/kotobase-protocols-worker (pin 12d8000, 実装+3件のインシデント修正)"
+   "orgs/kotoba-lang/kotobase-protocols (git.cljc HEAD分岐バグ修正 pin 026b42c)"
+   "orgs/kotoba-lang/kotobase-peer (engine 本体、commit!/hot-datoms/fold!/hydrate-chain)"
+   "orgs/kotoba-lang/kotobase-cljc-worker (r2.cljs/crypto.cljc の移植元、authorized?/canonical-graph 設計の先例)"]
+  :adr/problem
+  "gap分析（本会話 2026-07-17）で洗い出した「① 最大の gap — real kotobase datom plane にまだ乗っていない」を解決する。v0.2 backend（ADR-2607174500/2607176000）は kotobase.store/IStore の**インターフェース**は使うが実体は LocalStore を単一 R2 EDN blob にシリアライズしただけで、kotobase 本体（content-addressed prolly-tree + 検証可能な commit chain の datom DB）には一切触れていなかった。kotobase-peer の commit!/hot-datoms 等の永続化 API は crypto seam（ADR-2607051000）により cljs 上で Promise 返却だが、kotobase.protocols.* の全 handler は IStore を同期呼び出し前提で書かれている（public library、他 consumer が依存し得る「pure synchronous handler」という明記された設計不変条件）。この非同期/同期の境界をどう解決するかが本 ADR の中心課題。"
+  :adr/decision
+  "kotobase.protocols の同期契約は一切変更せず、Worker 層に『サンドイッチ』構成の bridge（kotobase-protocols-worker.kotobase-store）を追加する: ①hydrate!（非同期）が hot-datoms で graph の現在状態を LocalStore 形状の plain map に復元 ②その seed で kotobase.local/LocalStore を作り、既存の make-store→router/handle を**そのまま同期実行** ③commit-changes!（非同期）が before/after を diff し、変化した doc/event だけを datom quad として commit!、engine の default 閾値（64 tx-block）を超えたら fold! も呼ぶ ④新しい chain-cid を R2 head へ etag-CAS。R2 block-store trampoline（with-blocks）と head-CAS（r2-get-head/r2-put-head-if-match）は kotobase-cljc-worker の r2.cljs を逐語移植（kotobase-r2.cljs）、crypto fn は同じく plaintext-passthrough を逐語移植（kotobase-crypto.cljc、ADR-2607051000 準拠）。IStore の doc/stream を datom quad にマップするエンティティモデル・エンコーディングは新規設計（kotobase-store.cljs docstring 参照）。"
+  :adr/consequences
+  ["**インシデント1: fold 未配線による性能劣化（実測・本番で発生）。** 初回実装では commit-changes! が fold! を一度も呼ばず、本セッションのテスト全体（s3/atproto/pinning/git への多数の書き込み）で novelty が~150 commit 相当に蓄積、単純な list read が 30.3 秒に劣化（実測）。原因特定後、should-fold?/fold! を commit ごとに条件判定するよう修正し、fold テスト（70 commit 投入 → novelty-size が閾値未満に戻ることを確認）を追加。汚染された旧 graph（kotobase-protocols-v1）は fold 自体が O(graph_shard) の重い操作になり得るため復旧を試みず放棄し、fold 込みの実装で新しい graph（kotobase-protocols-v2）に切替。修正後は同等の書き込み+読み取りが 0.7〜0.8 秒に復帰（実測）。教訓: kotobase-peer の commit!/hot-datoms を直接使う任意の呼び出し元は fold を自前で配線する責務があり、engine 側は強制しない（ADR外の教訓だが記録に値する）"
+   "**インシデント2: git.kotobase.net の所有権を並行セッションに奪われた。** git PUT が git.kotobase.net で 405 を返す事象を追跡した結果、Cloudflare Workers custom domain API（accounts/.../workers/domains）で該当ホストが本 worker ではなく別セッションが本日作成した Worker『kotobase-git』（作成 08:23、最終更新 10:02、本セッションの以前の成功テストより後）に紐付いていることを確認。firewallEventsAdaptive ログで git.kotobase.net 関連イベントがゼロであることも確認し、WAF 由来ではないと確定。Cloudflare custom domain は単一所有者制で、最後に wrangler deploy で route 宣言した側が無警告で奪う。並行エージェント運用（CLAUDE.md）の観点から強制奪還はせず、wrangler.jsonc から git.kotobase.net の route を除去、git surface の正しさは workers.dev の /git/* で検証（完全成功: seed 85 objects/3 refs → clone → 元リポジトリと diff -rq でバイト完全一致）"
+   "**インシデント3: kotobase.protocols.git の PUT HEAD 分岐バグ（実運用で発見・upstream 修正）。** handle-put の HEAD 分岐が `(= \"HEAD\" (peek segs))` のみで判定していたため、`refs/remotes/origin/HEAD`（実際の git checkout の for-each-ref が返す本物の ref、40-hex sha を持つ）への書き込みを『リポジトリ自身の HEAD symref』と誤認し、symref 形式でない body を 400 で拒否していた。kotoba-lang/kotobase-protocols 側で『path 中に refs セグメントが無い場合のみ』の guard を追加して修正（pin 026b42c）、再現テストを追加（38 tests/154 assertions green）。この修正は本 worker が消費する public library 側の正当なバグ修正であり、他の kotobase-protocols consumer 全員に恩恵がある"
+   "実測 e2e（2026-07-17、修正後の本番 v2 backend）: s3 write/read 0.668s/0.825s（v1 汚染時の 30s+ から復帰）、atproto putRecord/getRecord round-trip、git（workers.dev 経由）で 85 objects + 3 refs 完全 seed → git clone → 元リポジトリと diff -rq ゼロ差分。node-test: kotobase-protocols-worker 15 tests/53 assertions（equivalence/empty-graph/CAS-race/fold の4シナリオ）、kotobase-protocols 38 tests/154 assertions、両方 green"
+   "not-decided（follow-up）: 単一 shared graph（テナント分離なし、CACAO の per-DID auth（ADR-2607177000）と組み合わせて graph を signer DID から derive するのが自然な次の一歩）。git.kotobase.net の所有権回復（別セッションとの調整が必要、本 ADR の範囲外）。R2 block cache のメモリ予算調整、fold! の cron 化（現状は commit ごとの should-fold? チェックのみ、明示的スケジュールなし）"]
+  :adr/body
+  "# ADR-2607177500: real datom-plane backend への切替\n\n## Status\naccepted — 2026-07-17（実装・3件のインシデント発見と修正・デプロイ・e2e 検証済み）\n\n## Decision\nkotobase.protocols の同期契約を変えず、Worker 層に非同期 hydrate/commit のサンドイッチを追加（kotobase-store.cljs）。R2 bridge（kotobase-r2.cljs）と crypto passthrough（kotobase-crypto.cljc）は kotobase-cljc-worker から逐語移植。\n\n## Incidents（すべて実運用で発見、本番でリアルタイムに修正）\n1. fold! 未配線 → novelty 肥大化 → read が 30s+ に劣化。fold-if-due! を commit-changes! に配線、graph を v1→v2 に切替して修正。\n2. git.kotobase.net の custom domain を並行セッションの Worker に奪われていた（Cloudflare API で確認、WAF ではないと firewall ログで確認）。強制奪還せず route を撤去、workers.dev で代替検証。\n3. kotobase.protocols.git の handle-put が refs/remotes/origin/HEAD を誤って repo 自身の HEAD として扱うバグ。upstream で修正（pin 026b42c）。\n\n## Verification\n- s3 write/read: 0.668s/0.825s（修正後）\n- git: 85 objects + 3 refs 完全 seed → clone → diff -rq ゼロ差分（バイト完全一致）\n- node-test: worker 15/53、library 38/154、いずれも green\n"}]
