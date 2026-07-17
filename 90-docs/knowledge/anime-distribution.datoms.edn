@@ -121,9 +121,9 @@
 
  {:release/id :rel.shinchan.in.hungama :release/work [:work/id :crayon-shinchan]
   :release/country [:country/id :in] :release/network [:network/id :hungama-tv]
-  :release/medium :tv-anime :release/edit-status :censored
-  :release/note "2008年の放送禁止後、大幅カット版のみ再開が許された（詳細は childrens-content-crude-humor の :shinchan.in）"
-  :release/confidence :medium}
+  :release/medium :tv-anime :release/year-start 2006 :release/edit-status :censored
+  :release/note "ヒンディー語ダブが 2006-06-19 開始、チャンネルシェアの 60% に達する看板に。情報放送省が 2008-09-23 に内容照会（ヌード・不敬表現）→ 放送禁止。2009-03-27 に大幅検閲版で再開: ヌード・冒とく表現を除去、大人向けジョークを子供向けに書き換え、『酒』は『ジュース』に置換"
+  :release/source "https://www.animenewsnetwork.com/news/2008-12-05/india-reportedly-bans-crayon-shin-chan-from-tv" :release/confidence :high}
 
  {:release/id :rel.shinchan.kr.tooniverse :release/work [:work/id :crayon-shinchan]
   :release/country [:country/id :kr] :release/network [:network/id :tooniverse]
@@ -452,4 +452,72 @@
   :release/medium :tv-anime :release/year-start 1993
   :release/note "1993-12 開始。スペインと並び日本国外初の放送国（en.wikipedia 本記事は具体局を挙げていないため :release/network 省略）"
   :release/source "https://en.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ ;; ==================================================================================
+ ;; tranche 5 (2026-07-17): イタリア (Mediaset)・ドイツ (RTL II)・中国の具体局
+ ;; ==================================================================================
+
+ ;; ---- countries (追加) ------------------------------------------------------------
+ {:country/id :it :country/name-ja "イタリア" :country/name-en "Italy" :country/region :europe}
+ {:country/id :de :country/name-ja "ドイツ" :country/name-en "Germany" :country/region :europe}
+
+ ;; ---- networks (追加) -------------------------------------------------------------
+ {:network/id :italia-1 :network/name "Italia 1 (Mediaset)" :network/country [:country/id :it]
+  :network/type :terrestrial
+  :network/note "Mediaset の若年層向け民放。日本アニメを子供帯に大量編成し、血・ヌード・台詞の恒常的検閲で知られる（後年の姉妹ch Italia 2 はほぼ無検閲・日本語 OP のまま放送）"}
+ {:network/id :rtl-2 :network/name "RTL II (RTL Zwei)" :network/country [:country/id :de]
+  :network/type :terrestrial
+  :network/note "ドイツ語圏 free-TV 最大のアニメ編成（80 本超）。平日午後の子供枠「Pokito」。自社考査が子供番組に特に敏感で、FSK 6 済みエピソードすら追加編集した事例あり。2013-04 に子供番組編成を終了"}
+ {:network/id :kaku-kids :network/name "卡酷少儿 (Kaku Children's TV、北京)" :network/country [:country/id :cn]
+  :network/type :kids-channel}
+ {:network/id :cctv-6 :network/name "CCTV-6 (電影頻道)" :network/country [:country/id :cn]
+  :network/type :cable-satellite}
+ {:network/id :iqiyi :network/name "愛奇芸 (iQiyi)" :network/country [:country/id :cn]
+  :network/type :streaming}
+
+ ;; ---- releases — イタリア ----------------------------------------------------------
+ {:release/id :rel.onepiece.it.italia1 :release/work [:work/id :one-piece]
+  :release/country [:country/id :it] :release/network [:network/id :italia-1]
+  :release/medium :tv-anime :release/year-start 2001 :release/title-local "All'arrembaggio! / Tutti all'arrembaggio!"
+  :release/edit-status :censored
+  :release/note "2001-11-05 に最初の53話を放送開始。血の隠蔽・ヌードカット・暴力的台詞の軟化、主人公名 Rufy→Rubber 改名、アラバスタの入浴シーン全削除等。453話以降は原版に忠実になり、Italia 2 移行後の後期はほぼ無検閲"
+  :release/source "https://it.wikipedia.org/wiki/Episodi_di_One_Piece" :release/confidence :high}
+
+ ;; ---- releases — ドイツ (RTL II「Pokito」枠) ---------------------------------------
+ {:release/id :rel.onepiece.de.rtl2 :release/work [:work/id :one-piece]
+  :release/country [:country/id :de] :release/network [:network/id :rtl-2]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "平日午後の子供枠で放送。自社考査によるシーンカットあり（放送年の特定は一次ソース未確認のため省略）"
+  :release/source "https://en.wikipedia.org/wiki/RTL_Zwei" :release/confidence :high}
+
+ {:release/id :rel.conan.de.rtl2 :release/work [:work/id :detective-conan]
+  :release/country [:country/id :de] :release/network [:network/id :rtl-2]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "Pokito 枠。FSK 6 判定済みエピソードにも追加編集をかけた事例が言及されている"
+  :release/source "https://en.wikipedia.org/wiki/RTL_Zwei" :release/confidence :high}
+
+ {:release/id :rel.pokemon.de.rtl2 :release/work [:work/id :pokemon]
+  :release/country [:country/id :de] :release/network [:network/id :rtl-2]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "子供枠の名称「Pokito」が示す通り同枠の看板コンテンツ"
+  :release/source "https://en.wikipedia.org/wiki/RTL_Zwei" :release/confidence :high}
+
+ ;; ---- releases — 中国（具体局。汎用プライムタイム禁止は :rel.pokemon.cn.primetime-ban）
+ {:release/id :rel.pokemon.cn.kaku :release/work [:work/id :pokemon]
+  :release/country [:country/id :cn] :release/network [:network/id :kaku-kids]
+  :release/medium :tv-anime :release/year-start 2005 :release/title-local "神奇宝贝" :release/edit-status :censored
+  :release/note "2005 に卡酷少儿等の地方局が導入。台湾・群英社の中国語ダブを使用"
+  :release/source "https://wiki.52poke.com/wiki/宝可梦动画各地播放情况" :release/confidence :high}
+
+ {:release/id :rel.pokemon.cn.cctv6 :release/work [:work/id :pokemon]
+  :release/country [:country/id :cn] :release/network [:network/id :cctv-6]
+  :release/medium :tv-anime :release/year-start 2008 :release/title-local "神奇宝贝III 橘子联盟"
+  :release/note "2008-10 から第105-157話（オレンジ諸島編）を大陸ダブで放送"
+  :release/source "https://wiki.52poke.com/wiki/宝可梦动画各地播放情况" :release/confidence :high}
+
+ {:release/id :rel.pokemon.cn.iqiyi :release/work [:work/id :pokemon]
+  :release/country [:country/id :cn] :release/network [:network/id :iqiyi]
+  :release/medium :streaming :release/year-start 2011 :release/title-local "精灵宝可梦"
+  :release/note "2011 に迪美文化がイッシュ編までをライセンスし複数動画サイトへ配信。初出は台湾ダブ+繁体字幕の273話。公式中文タイトルが 神奇宝贝→精灵宝可梦 に変更"
+  :release/source "https://wiki.52poke.com/wiki/宝可梦动画各地播放情况" :release/confidence :high}
 ]
