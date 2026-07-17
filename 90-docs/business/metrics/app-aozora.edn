@@ -1,35 +1,36 @@
 {:engagement
  {:dau nil,
-  :active-authors-window {:window 200, :distinct-authors 21},
-  :posts 29,
-  :human {:posts 29, :engagement 0},
+  :active-authors-window {:window 200, :distinct-authors 35},
+  :posts 43,
+  :human {:posts 43, :engagement 0},
   :organism {:posts 0, :engagement 0},
   :organism-engagement-ratio nil},
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4035, "app-aozora-appview" 4063},
+ {"app-aozora-pds" 4155, "app-aozora-appview" 4123},
  :zone
- {:requests-7d 24261,
-  :pageviews-7d 6375,
-  :uniques-7d-sum 683,
+ {:requests-7d 24503,
+  :pageviews-7d 6392,
+  :uniques-7d-sum 691,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 7525}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2798}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 284}
-   {:path "/xrpc/com.atproto.sync.getBlob", :requests 96}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 79}
-   {:path "/xrpc/app.aozora.creator.getTicks", :requests 63}
-   {:path "/xrpc/com.etzhayyim.yoro.feed.getVideoFeed", :requests 44}
-   {:path "/xrpc/app.bsky.feed.getPostThread", :requests 35}],
-  :status-mix {:ok 12754, :client-error 645, :server-error 46},
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4935}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2921}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 283}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
+    :requests 130}
+   {:path "/xrpc/com.atproto.sync.getBlob", :requests 80}
+   {:path "/xrpc/app.aozora.creator.getTicks", :requests 58}
+   {:path "/xrpc/com.etzhayyim.yoro.feed.getVideoFeed", :requests 41}
+   {:path "/robots.txt", :requests 33}],
+  :status-mix {:ok 10273, :client-error 687, :server-error 46},
   :window "24h"},
  :as-of "2026-07-17",
- :traffic-quality {:window "24h", :probe-4xx-pct 5, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 7525 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2798 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 284 · /xrpc/com.atproto.sync.getBlob 96 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 79 | 4xx(probe) 5% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4935 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2921 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 283 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 130 · /xrpc/com.atproto.sync.getBlob 80 | 4xx(probe) 6% · 5xx 0%",
  :signal
- "aozora.app 実測 24261 req/7d・683 uniques(日次和)・うち4xx probe 5%(24h)、workers 8098 inv/7d"}
+ "aozora.app 実測 24503 req/7d・691 uniques(日次和)・うち4xx probe 6%(24h)、workers 8278 inv/7d"}

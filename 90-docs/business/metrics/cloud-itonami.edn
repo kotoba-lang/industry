@@ -1,6 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :health-status 200,
- :asOf "2026-07-17T10:07:47.953Z",
+ :asOf "2026-07-17T11:09:20.295Z",
+ :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
  {:url "/api/status",
@@ -11,7 +12,7 @@
   :pageviews-7d 18,
   :uniques-7d-sum 79,
   :zone "itonami.cloud"},
- :agentRuns7d 24079,
+ :agentRuns7d 24436,
  :sources [:cloudflare :health :emitter :itonami-free-path],
  :nextOwnerActions
  [{:id "first-paid-checkout",
@@ -24,12 +25,13 @@
    "Complete Stripe Checkout at /isco-1212/ (passkey then Subscribe). paid stays 0 until checkout + webhook. Machine-readable gate: GET /isco-1212/agent.json.",
    :verify
    "curl -sS -A 'owner/1' https://itonami.cloud/api/fleet/metrics | jq '.tenants.externalPaid'"}],
+ :freeClaimUi "/isco-1212/",
  :agentNote
  "CF may 403 Python-urllib/* (error 1010) — set an explicit User-Agent.",
  :health-live
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
-  :asOf "2026-07-17T10:07:48.811Z",
+  :asOf "2026-07-17T11:09:20.997Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:docs "/docs/go-live.md",
@@ -45,6 +47,7 @@
     :href "/isco-1212/",
     :detail
     "Sign in (passkey) then Subscribe via Stripe Checkout — externalPaid must become ≥1"}],
+  :freeClaimUi "/isco-1212/",
   :agentNote
   "CF may 403 Python-urllib/* (error 1010) — set an explicit User-Agent for agents.",
   :source "itonami-data-kv-list",
@@ -57,12 +60,13 @@
    :externalTenants 4,
    :selfRegisteredOwners 4,
    :registryEntries 4,
-   :agentRuns7d 24079,
+   :agentRuns7d 24436,
    :externalPaid 0},
   :freeClaimAgent "/isco-1212/agent.json",
   :ok true,
+  :freeClaimDocs "/docs/free-path.md",
   :live true,
-  :version "0.1.889",
+  :version "0.1.906",
   :links
   {:freeClaim "/isco-1212/",
    :distributionDrafts "/docs/distribution-drafts.md",
@@ -114,26 +118,28 @@
   :externalTenants 4,
   :selfRegisteredOwners 4,
   :registryEntries 4,
-  :agentRuns7d 24079,
+  :agentRuns7d 24436,
   :externalPaid 0},
+ :freeClaimAgent "/isco-1212/agent.json",
  :free-path
  {:ok true,
   :externalTenants 4,
   :selfRegisteredOwners 4,
   :registryEntries 4,
-  :agentRuns7d 24079,
+  :agentRuns7d 24436,
   :externalPaid 0},
  :ok true,
  :traffic-quality {:window "24h", :probe-4xx-pct 87, :error-5xx-pct 0},
  :top-paths
  "上位 page (24h, 2xx/3xx): /robots.txt 3 · /itonami 2 · /itonami/verticals 1 · /join/browser 1 | 4xx(probe) 87%",
+ :freeClaimDocs "/docs/free-path.md",
  :funnel
  {:trials 4,
   :freeClaims 4,
-  :agentRuns7d 24079,
+  :agentRuns7d 24436,
   :externalTenants 4,
   :paid 0},
- :version "0.1.889",
+ :version "0.1.906",
  :signal
  "itonami.cloud 実測 262 req/7d・79 uniques(日次和)・うち4xx probe 87%(24h)",
  :tenants
@@ -148,6 +154,7 @@
  {:freeClaim "/isco-1212/",
   :distributionDrafts "/docs/distribution-drafts.md",
   :webauthn "/api/webauthn",
+  :freeClaimUi "/isco-1212/",
   :fleetMetrics "/api/fleet/metrics",
   :freepath "/api/freepath",
   :billing "/api/billing/status",
@@ -162,6 +169,7 @@
   :maturity "/api/maturity",
   :agentRuns "/api/agent-runs",
   :orgIndex "/api/org",
+  :freeClaimDocs "/docs/free-path.md",
   :openapi "/openapi-free-path.json",
   :badge "/api/badge",
   :metrics "/api/metrics",

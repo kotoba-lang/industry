@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6742, "ai-gftd-chat-shell" 1262},
+ {"magatama-sh1n5h1x" 6750, "ai-gftd-chat-shell" 1262},
  :zone
- {:requests-7d 412301,
-  :pageviews-7d 7088,
-  :uniques-7d-sum 4835,
+ {:requests-7d 415002,
+  :pageviews-7d 7137,
+  :uniques-7d-sum 4848,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/", :requests 888}
-   {:path "/.env", :requests 149}
-   {:path "/favicon.ico", :requests 139}
+  [{:path "/", :requests 900}
+   {:path "/.env", :requests 146}
+   {:path "/favicon.ico", :requests 142}
    {:path "/license.txt", :requests 46}
    {:path "/index.php", :requests 37}
-   {:path "/8.php", :requests 32}
    {:path "/155.php", :requests 26}
-   {:path "/wp-ppoxua4.php", :requests 21}],
-  :status-mix {:client-error 23500, :server-error 17105, :ok 2079},
+   {:path "/8.php", :requests 22}
+   {:path "/audio_query", :requests 19}],
+  :status-mix {:client-error 23463, :ok 2039, :server-error 16940},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,8 +33,8 @@
  :traffic-quality
  {:window "24h", :probe-4xx-pct 55, :error-5xx-pct 40},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 888 · /.env 149 · /favicon.ico 139 · /license.txt 46 · /index.php 37 | 4xx(probe) 55% · 5xx 40%",
+ "上位 page (24h, 2xx/3xx): / 900 · /.env 146 · /favicon.ico 142 · /license.txt 46 · /index.php 37 | 4xx(probe) 55% · 5xx 40%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 412301 req/7d・4835 uniques(日次和)・うち4xx probe 55%(24h)、workers 8004 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 415002 req/7d・4848 uniques(日次和)・うち4xx probe 55%(24h)、workers 8012 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
