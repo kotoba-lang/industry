@@ -15,6 +15,34 @@ merge conflicts in this superproject and its `orgs/` child repos.
 - Prefer a new branch from current `origin/main` when an old branch is stale or shallow ancestry is unreliable.
 - Treat `manifest/west.yml` as generated output. Resolve source files and regenerate it; do not hand-edit conflict markers.
 - Keep failed `stash pop` entries. Git keeps the stash on failed pop; inspect it before applying manually.
+- **GitHub push alone is not registration.** Repos under `orgs/` that consumers resolve via `:local/root` (or that are intentional fleet members) must also appear in west (`repos.edn` `:extra-projects` + `gen-west-manifest.cljs --entry`). See skill `new-project-scaffold`.
+
+## West orphan inventory
+
+`orgs/<org>/<repo>` can exist locally without being in west, or exist on GitHub without local/west. Mixing path-override leftovers with true orphans causes false registrations.
+
+```bash
+nbb scripts/west-orphan-audit.cljs
+nbb scripts/west-orphan-audit.cljs --blocking
+nbb scripts/west-orphan-audit.cljs --all
+```
+
+| Class | Action |
+|---|---|
+| `:local-root-broken` | **Blocking** — register the missing project or retarget the dep. |
+| `:true-orphan-git` | Register or retire; report, never silent-delete. |
+| `:path-override-leftover` | Do not re-register old path (new path is already in west). |
+| `:worktree-scratch` | Session debris; remove only after unpushed-WIP check. |
+| `:personal` | Out of west scope. |
+| `:true-orphan-nongit` | Report; register only if it becomes a real repo. |
+
+Incident reference (2026-07-12→17): `kotoba-lang/crm` pushed to GitHub; consumers
+`cloud-itonami-isic-5820` / `-6201` / `-6202` use `{:local/root "../../kotoba-lang/crm"}`;
+crm missing from west and often from the local tree → fresh checkout breaks.
+
+**Repair / keep current (three planes):** see
+[`manifest/west-triple-sync-workflow.md`](west-triple-sync-workflow.md) and
+`nbb scripts/west-triple-sync.cljs` (ADR-2607173200).
 
 ## Standard Cleanup
 
@@ -26,6 +54,7 @@ merge conflicts in this superproject and its `orgs/` child repos.
    git stash list
    git status --short --branch
    gh pr list --state open --json number,title,headRefName,baseRefName,url,mergeable,statusCheckRollup
+   nbb scripts/west-orphan-audit.cljs
    ```
 
 2. Classify what remains:
@@ -34,6 +63,7 @@ merge conflicts in this superproject and its `orgs/` child repos.
    - Stash only: inspect, then apply only if it will not overwrite dirty files.
    - Placeholder repo with no commits or missing remote: report as blocked, do not invent a PR.
    - Generated-file change: regenerate from source of truth before committing.
+   - West orphan / `:local/root` broken edge: classify per table above; fix blocking edges before claiming cleanup done.
 
 3. For stale branches, prefer a clean branch:
 
@@ -168,6 +198,9 @@ git worktree list --porcelain
 git branch --show-current
 git stash list
 git status --short -- <relevant-paths>
+nbb scripts/west-orphan-audit.cljs --blocking
 ```
 
-Report merged PRs, closed/superseded PRs, deleted remote branches, preserved stashes, and untracked placeholder repos.
+Report merged PRs, closed/superseded PRs, deleted remote branches, preserved stashes,
+untracked placeholder repos, and **west-orphan summary** (blocking count +
+true-orphan-git count, with any intentional deferrals named).
