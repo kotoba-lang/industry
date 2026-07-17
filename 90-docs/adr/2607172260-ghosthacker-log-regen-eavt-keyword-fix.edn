@@ -1,0 +1,82 @@
+[{:db/id -1
+  :adr/id "adr-2607172260-ghosthacker-log-regen-eavt-keyword-fix"
+  :adr/title "ADR-2607172260: entity->eavt のキーワード値バグ修正 + ghosthacker-manga-log.edn 再生成(nbb 経由)"
+  :adr/status "accepted"
+  :adr/date "2026-07-17"
+  :adr/last_verified "2026-07-17"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "ghosthacker-log-regen-eavt-keyword-fix"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2607172230" "adr-2607172250" "adr-2607141700"]
+  :adr/body "## Context
+
+ADR-2607172230 は『ghosthacker-manga-log.edn は消費者なしのため再生成せず
+据え置き、kotoba.datom は app-aozora@00e040c1 で復旧済みなので follow-up
+として可能』と記録していた。本 ADR はその follow-up を実施した記録。
+
+## Decision
+
+1. **実装のバグを発見・修正**: `aozora.appview.manga/entity->eavt` の
+   出力値をそのまま `kotoba.datom/canonical-json`(CID 計算に使う正規化
+   JSON エンコーダ)に渡すと、docstring が明記する『map はキーが文字列』
+   という契約に違反するデータで実際にクラッシュした —
+   `:gh.manga/dialogue` の構造化行(ADR-2607141700 addendum 3、
+   `{:text .. :speaker ..}`、キーワードキー)を実データに対して
+   `write-log-file!` に初めて通した瞬間に発現(`json-escape` が map key に
+   `map` を適用し ISeq エラー)。さらに調査すると `canonical-json` は
+   キーワード**値**の分岐も持たない(`:else` で `unsupported value` を
+   throw)ため、`:gh.manga/tone`(キーワード値。genko 経由の投影が
+   ADR-2607172240 で新設済み)が乗った瞬間にも同じクラスのバグを踏む
+   ことが分かった。`entity->eavt` に `eavt-value`(`clojure.walk/postwalk`
+   で任意深さの全キーワードを `kotoba.datom/normalize-datoms` と同じ
+   `:ns/name` 文字列規約へ変換)を追加して解消 —
+   `manga-work-projects-to-eavt-datoms` テストが検証するプレーン文字列値は
+   無変化。
+2. **`ghosthacker-manga-log.edn` を再生成**: ADR-2607172230/2607172250 の
+   最新 `resources/aozora-manga-work.edn`(213 pages / 968 panels / 968
+   rect / 55 tilt / 592 dialogue)から。旧版は 2026-07-03 の stale
+   `app-aozora-svelte` 由来データのまま長期間更新されていなかった。
+   7880 datoms、CID
+   `b496dc39d6fe6d5d3a0881e4c954d3847380591689f0b7f872d2d7e425566a0be`。
+3. **再生成の実行系は nbb**(オーナー指示: JVM は対象外、
+   `kotoba-lang/kotoba`/`kototama`/kotoba CLI のエコシステムを想定)。
+   `kotoba.datom.cljc`/`aozora.appview.manga.cljc` は共に host 非依存の
+   portable `.cljc` — `kotoba.datom/*sha256-hex*`(dynamic var、既定は
+   JVM の `MessageDigest`、他 host は要 rebind)だけを Node の
+   `node:crypto` へ再バインドして nbb で完結させた(`clojure.java.io` に
+   依存する `work-file->log-file!`/`append-tx!` 自体は `#?(:clj ...)`
+   ゲートで JVM 専用のため、そのラッパーは使わず `manga/work->tx` →
+   `manga/tx->eavt` → `datom/make-tx` → `datom/tx->edn-line` を直接呼び
+   `fs/writeFileSync` で書き出した)。副検証として同じ入力を JVM
+   (`clojure -M -e`)でも一度生成し、CID・バイト数(1090909)が
+   完全一致することを確認 — `kotoba.datom` の『host 間 byte-compatible』
+   という docstring の主張を実測で裏付けた。
+
+## Consequences
+
+- `ghosthacker-manga-log.edn` は最新データを反映し、CID による改竄検知が
+  正しく機能する状態になった。
+- `entity->eavt` のキーワード安全化は ghosthacker 固有ではなく
+  `aozora.appview.manga` 全体に効くため、他の manga work(genko 由来の
+  `:gh.manga/tone` を持つものを含む)が将来この log 生成路を通っても
+  同じクラスのバグを再発しない。
+- **既知の残課題(本修正の対象外)**: `kotoba.datom/tx->edn-line` の
+  `edn-val` は map 値の専用分岐を持たず `:else (pr-str (str v))` で
+  二重文字列化する — `:gh.manga/dialogue` の各行は『map を pr-str した
+  文字列』として保存され、構造的には正しく EDN として読めるが最適な
+  入れ子表現ではない。これは `canonical-json`(CID 計算、今回修正した
+  クラッシュの発生源)とは別の関数・別の経路で、log ファイルの現状の
+  消費者がゼロのため実害はない。`kotoba.datom` 側で map 値の
+  ネイティブ表現を持たせるかは別途 kotoba-datom リポジトリ側の設計判断。
+- 検証: nbb 生成の log を nbb reader で再読込し `:tx/count` 7880 /
+  `:gh.manga/rect` 968 / `:gh.manga/tilt` 55 / `:gh.manga/dialogue` 592
+  を確認、JVM 生成版とバイト完全一致。"
+  :adr/authoritative_for
+  ["aozora.appview.manga/entity->eavt は出力値に eavt-value(clojure.walk/postwalk で任意深さの全キーワードを :ns/name 文字列化)を通す — kotoba.datom/canonical-json の『map はキーが文字列』契約とキーワード値非対応の両方を満たすため。将来 :gh.manga/tone 等キーワード値を持つ新規属性を manga tx に足しても、この安全化により log/CID 生成が自動的に守られる"
+   "ghosthacker-manga-log.edn は resources/aozora-manga-work.edn から aozora.appview.manga(work->tx/tx->eavt)+ kotoba.datom(make-tx/tx->edn-line)で再生成する生成物(手編集しない)。実行系は nbb(kotoba.datom/*sha256-hex* を node:crypto へ再バインド)を正とする — work-file->log-file!/append-tx! 自体は clojure.java.io 依存で #?(:clj ...) ゲートされ JVM 専用のため、nbb からは manga/tx->eavt → datom/make-tx → datom/tx->edn-line を直接呼び fs/writeFileSync で書く"
+   "kotoba.datom/tx->edn-line の edn-val は map 値をネイティブ表現せず (pr-str (str v)) で二重文字列化する既知の制約(:gh.manga/dialogue で発現) — 消費者ゼロのため据え置き、canonical-json 側のキーワード安全化(今回の修正)とは別問題"]
+  :adr/artifacts "{:app-aozora \"gftdcojp/app-aozora@232b63bc (merge of agent/ghosthacker-log-regen)\"}"}]
