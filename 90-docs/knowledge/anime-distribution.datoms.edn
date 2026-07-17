@@ -127,9 +127,9 @@
 
  {:release/id :rel.shinchan.kr.tooniverse :release/work [:work/id :crayon-shinchan]
   :release/country [:country/id :kr] :release/network [:network/id :tooniverse]
-  :release/medium :tv-anime :release/title-local "짱구는 못말려" :release/edit-status :censored
-  :release/note "臀部・露出関連シーンをカット・修正した編集版"
-  :release/confidence :medium}
+  :release/medium :tv-anime :release/year-start 2003 :release/title-local "짱구는 못말려" :release/edit-status :censored
+  :release/note "2003 に SBS 未放映分を独自ダビングした「짱구는 못말려 3」から参入、2008 以降本格移行。ケーブル審議強化に伴い臀部・性器をモザイク・立て札・白塗り（パンツ着用に見せる加工）で検閲、画面・台詞も修正"
+  :release/source "https://namu.wiki/w/짱구는 못말려/국내 방영" :release/confidence :high}
 
  {:release/id :rel.shinchan.es.tv3 :release/work [:work/id :crayon-shinchan]
   :release/country [:country/id :es] :release/network [:network/id :tv3-k3]
@@ -246,7 +246,8 @@
  {:release/id :rel.sailormoon.jp.tv-asahi :release/work [:work/id :sailor-moon]
   :release/country [:country/id :jp] :release/network [:network/id :tv-asahi]
   :release/medium :tv-anime :release/year-start 1992 :release/year-end 1997 :release/edit-status :uncut
-  :release/confidence :medium}
+  :release/note "1992-03-07〜1997-02-08、全200話"
+  :release/source "https://en.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
 
  {:release/id :rel.sailormoon.ca.ytv :release/work [:work/id :sailor-moon]
   :release/country [:country/id :ca] :release/network [:network/id :ytv]
@@ -401,4 +402,54 @@
   :release/medium :tv-anime
   :release/note "K3/Canal Super3・Canal 2 Andalucía・Fox Kids España でも放送"
   :release/source "https://es.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ ;; ==================================================================================
+ ;; tranche 4 (2026-07-17): 韓国 SBS/Tooniverse 詳細化・ブラジル・フィリピン・フランス
+ ;; ==================================================================================
+
+ ;; ---- countries (追加) ------------------------------------------------------------
+ {:country/id :br :country/name-ja "ブラジル" :country/name-en "Brazil" :country/region :latin-america}
+ {:country/id :ph :country/name-ja "フィリピン" :country/name-en "Philippines" :country/region :southeast-asia}
+
+ ;; ---- networks (追加) -------------------------------------------------------------
+ {:network/id :sbs-kr :network/name "SBS（서울방송）" :network/country [:country/id :kr]
+  :network/type :terrestrial :network/note "韓国地上波民放。ケーブルの Tooniverse より審議基準が厳しい"}
+ {:network/id :rede-manchete :network/name "Rede Manchete" :network/country [:country/id :br]
+  :network/type :terrestrial :network/note "1990年代にセーラームーン・聖闘士星矢等でブラジルのアニメブームを牽引（1999 廃局）"}
+ {:network/id :cartoon-network-br :network/name "Cartoon Network Brasil" :network/country [:country/id :br]
+  :network/type :kids-channel}
+ {:network/id :tv5-ph :network/name "TV5 (Philippines)" :network/country [:country/id :ph]
+  :network/type :terrestrial}
+
+ ;; ---- releases — しんちゃん韓国 SBS（定義済み network を参照するためここに配置）----
+ {:release/id :rel.shinchan.kr.sbs :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :kr] :release/network [:network/id :sbs-kr]
+  :release/medium :tv-anime :release/year-start 1999 :release/year-end 2007 :release/title-local "짱구는 못말려" :release/edit-status :censored
+  :release/note "地上波 SBS 版。相当数のシーンをカット・削除し、銃器登場回など放送委員会審議への抵触を懸念して丸ごと未放映にしたエピソードも多数"
+  :release/source "https://namu.wiki/w/짱구는 못말려/국내 방영" :release/confidence :high}
+
+ ;; ---- releases — Sailor Moon（ブラジル・フィリピン・フランス）---------------------
+ {:release/id :rel.sailormoon.br.manchete :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :br] :release/network [:network/id :rede-manchete]
+  :release/region :latin-america :release/medium :tv-anime :release/year-start 1996 :release/edit-status :censored
+  :release/note "Gota Mágica スタジオのダブ（ファンに高評価）。放送時間短縮のためのカットに苦情が出て 1996 年の放送は終了"
+  :release/source "https://pt.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.br.cartoon-network :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :br] :release/network [:network/id :cartoon-network-br]
+  :release/region :latin-america :release/medium :tv-anime :release/year-start 2000 :release/year-end 2002
+  :release/note "R/S/SuperS/Sailor Stars を BKS の新ダブで放送。旧キャスト総入れ替えがファンの反発を招いたが視聴率は初期数か月で 7pt"
+  :release/source "https://pt.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.ph.tv5 :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :ph] :release/network [:network/id :tv5-ph]
+  :release/medium :tv-anime
+  :release/note "en.wikipedia 本記事で「キャリア局 TV5 Network の主要な看板となり同局を国内第3位に押し上げた」と言及。放送年・編集詳細は未確認"
+  :release/source "https://en.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.fr :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :fr]
+  :release/medium :tv-anime :release/year-start 1993
+  :release/note "1993-12 開始。スペインと並び日本国外初の放送国（en.wikipedia 本記事は具体局を挙げていないため :release/network 省略）"
+  :release/source "https://en.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
 ]
