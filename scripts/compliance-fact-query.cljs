@@ -46,7 +46,400 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-jpn-tokyo/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-6419-jpn-zenginkyo association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-usa statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-usa/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-usa/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6512-jpn-sonpo association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6512-jpn-sonpo/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6512-jpn-sonpo/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-gbr statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-gbr/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-gbr/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6612-jpn-jsda association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6612-jpn-jsda/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6612-jpn-jsda/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-deu statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-deu/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-deu/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-fra statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-fra/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-fra/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-deu-bankenverband association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-deu-bankenverband/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-deu-bankenverband/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-can statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-can/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-can/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6612-usa-finra association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6612-usa-finra/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6612-usa-finra/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6512-usa-naic association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6512-usa-naic/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6512-usa-naic/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-aus statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-aus/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-aus/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6920-jpn-jicpa association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6920-jpn-jicpa/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6920-jpn-jicpa/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-kor statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-kor/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-kor/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6920-usa-aicpa association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6920-usa-aicpa/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6920-usa-aicpa/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-fra-fbf association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-fra-fbf/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-fra-fbf/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-usa-washington-dc ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-usa-washington-dc/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-usa-washington-dc/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6511-jpn-seiho association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6511-jpn-seiho/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6511-jpn-seiho/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-nld statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-nld/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nld/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6910-jpn-nichibenren association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6910-jpn-nichibenren/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6910-jpn-nichibenren/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-ita statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ita/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ita/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6810-jpn-recaj association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6810-jpn-recaj/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6810-jpn-recaj/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-esp statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-esp/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-esp/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6411-jpn-boj association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6411-jpn-boj/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6411-jpn-boj/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-gbr-london ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-gbr-london/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-gbr-london/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-swe statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-swe/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-swe/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6120-usa-ctia association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6120-usa-ctia/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6120-usa-ctia/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-can-toronto ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-can-toronto/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-can-toronto/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-nor statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-nor/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nor/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-5110-usa-a4a association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-5110-usa-a4a/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-5110-usa-a4a/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-dnk statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-dnk/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-dnk/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-deu-berlin ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-deu-berlin/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-deu-berlin/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-3510-usa-eei association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-3510-usa-eei/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-3510-usa-eei/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-fin statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-fin/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-fin/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-2910-deu-vda association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-2910-deu-vda/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-2910-deu-vda/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-fra-paris ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-fra-paris/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-fra-paris/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-prt statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-prt/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-prt/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-5510-usa-ahla association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-5510-usa-ahla/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-5510-usa-ahla/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-nld-amsterdam ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-nld-amsterdam/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-nld-amsterdam/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-bel statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-bel/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-bel/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-2100-usa-phrma association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-2100-usa-phrma/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-2100-usa-phrma/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-esp-madrid ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-esp-madrid/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-esp-madrid/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-bra statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-bra/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-bra/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-4719-usa-nrf association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-4719-usa-nrf/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-4719-usa-nrf/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-kor-seoul ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-kor-seoul/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-kor-seoul/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-mex statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-mex/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-mex/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-4100-usa-agc association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-4100-usa-agc/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-4100-usa-agc/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-ita-roma ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-ita-roma/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ita-roma/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-chl statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-chl/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-chl/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6020-usa-nab association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6020-usa-nab/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6020-usa-nab/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-aus-sydney ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-aus-sydney/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-aus-sydney/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-arg statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-arg/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-arg/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-3600-usa-awwa association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-3600-usa-awwa/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-3600-usa-awwa/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-arg-buenos-aires ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-arg-buenos-aires/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-arg-buenos-aires/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-zaf statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-zaf/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-zaf/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-fin-helsinki ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-fin-helsinki/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-fin-helsinki/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-4923-usa-ata association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-4923-usa-ata/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-4923-usa-ata/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-dnk-copenhagen ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-dnk-copenhagen/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-dnk-copenhagen/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-col statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-col/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-col/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-nor-oslo ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-nor-oslo/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-nor-oslo/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-5610-usa-nra association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-5610-usa-nra/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-5610-usa-nra/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-bel-brussels ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-bel-brussels/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-bel-brussels/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-ury statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ury/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ury/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-chl-santiago ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-chl-santiago/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-chl-santiago/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-2011-usa-acc association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-2011-usa-acc/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-2011-usa-acc/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-col-bogota ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-col-bogota/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-col-bogota/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-cri statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-cri/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-cri/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-cri-san-jose ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-cri-san-jose/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-cri-san-jose/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-8621-usa-ama association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-8621-usa-ama/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-8621-usa-ama/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-bra-sao-paulo ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-bra-sao-paulo/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-bra-sao-paulo/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-pan statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-pan/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-pan/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-ury-montevideo ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-ury-montevideo/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ury-montevideo/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6201-usa-gtia association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6201-usa-gtia/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6201-usa-gtia/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-zaf-cape-town ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-zaf-cape-town/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-zaf-cape-town/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-ecu statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ecu/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ecu/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-ecu-quito ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-ecu-quito/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ecu-quito/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-0610-usa-api association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-0610-usa-api/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-0610-usa-api/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-swe-gothenburg ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-swe-gothenburg/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-swe-gothenburg/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-pry statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-pry/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-pry/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-pry-asuncion ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-pry-asuncion/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-pry-asuncion/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-mex-guadalajara ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-mex-guadalajara/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-mex-guadalajara/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-gtm statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-gtm/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-gtm/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-fra-lyon ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-fra-lyon/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-fra-lyon/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-0150-usa-afbf association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-0150-usa-afbf/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-0150-usa-afbf/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-hnd statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-hnd/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-hnd/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-ind-new-delhi ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-ind-new-delhi/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ind-new-delhi/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-2910-gbr-smmt association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-2910-gbr-smmt/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-2910-gbr-smmt/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-pol-warsaw ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-pol-warsaw/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-pol-warsaw/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-ind statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ind/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ind/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-ken-nairobi ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-ken-nairobi/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ken-nairobi/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-aus-aba association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-aus-aba/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-aus-aba/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-ken statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ken/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ken/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-tha-bangkok ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-tha-bangkok/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-tha-bangkok/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-5010-nor-rederiforbundet association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-5010-nor-rederiforbundet/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-5010-nor-rederiforbundet/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-tha statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-tha/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-tha/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-are-abu-dhabi ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-are-abu-dhabi/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-are-abu-dhabi/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-are-ubf association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-are-ubf/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-are-ubf/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-are statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-are/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-are/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-vnm-hanoi ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-vnm-hanoi/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-vnm-hanoi/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-vnm-vnba association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-vnm-vnba/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-vnm-vnba/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-vnm statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-vnm/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-vnm/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-idn-jakarta ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-idn-jakarta/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-idn-jakarta/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-0126-idn-gapki association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-0126-idn-gapki/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-0126-idn-gapki/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-idn statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-idn/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-idn/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-phl-manila ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-phl-manila/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-phl-manila/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-phl-bap association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-phl-bap/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-phl-bap/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-phl statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-phl/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-phl/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-egy-cairo ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-egy-cairo/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-egy-cairo/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-egy statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-egy/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-egy/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-esp-aeb association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-esp-aeb/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-esp-aeb/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-tur-ankara ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-tur-ankara/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-tur-ankara/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-tur statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-tur/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-tur/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-tur-tbb association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-tur-tbb/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-tur-tbb/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-nga-abuja ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-nga-abuja/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-nga-abuja/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-nga statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-nga/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nga/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-nga-cibn association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-nga-cibn/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-nga-cibn/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-sau-riyadh ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-sau-riyadh/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-sau-riyadh/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-sau statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-sau/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-sau/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-sau-fsc association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-sau-fsc/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-sau-fsc/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-mys-kuala-lumpur ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-mys-kuala-lumpur/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-mys-kuala-lumpur/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-mys statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-mys/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-mys/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-0126-mys-mpoa association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-0126-mys-mpoa/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-0126-mys-mpoa/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-aut-vienna ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-aut-vienna/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-aut-vienna/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-aut statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-aut/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-aut/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-aut-wko association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-aut-wko/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-aut-wko/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-che-bern ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-che-bern/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-che-bern/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-che statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-che/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-che/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-6419-che-sba association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-6419-che-sba/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-6419-che-sba/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-irl-dublin ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-irl-dublin/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-irl-dublin/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-irl statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-irl/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-irl/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-irl-ibec association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-irl-ibec/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-irl-ibec/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-nzl-wellington ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-nzl-wellington/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-nzl-wellington/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
