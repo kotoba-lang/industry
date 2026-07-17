@@ -1,24 +1,25 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6992, "ai-gftd-chat-shell" 1262},
+ {"magatama-sh1n5h1x" 7000, "ai-gftd-chat-shell" 1262},
  :zone
- {:requests-7d 441992,
-  :pageviews-7d 7304,
-  :uniques-7d-sum 5005,
+ {:requests-7d 445150,
+  :pageviews-7d 7311,
+  :uniques-7d-sum 5015,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/", :requests 1066}
-   {:path "/favicon.ico", :requests 143}
-   {:path "/license.txt", :requests 46}
-   {:path "/.env", :requests 23}
-   {:path "/index.php", :requests 20}
-   {:path "/inputs.php", :requests 19}
-   {:path "/155.php", :requests 19}
-   {:path "/stdin.php", :requests 19}],
-  :status-mix {:ok 1889, :client-error 1288, :server-error 16842},
+  [{:path "/v1/generation/jobs/02ee5769b9b3494389f5726014b72ce7",
+    :requests 38}
+   {:path "/api/.env", :requests 27}
+   {:path "/term.php", :requests 24}
+   {:path "/footer.php", :requests 19}
+   {:path "//wp.php", :requests 14}
+   {:path "/ms-edit.php", :requests 14}
+   {:path "/assets/main.js", :requests 13}
+   {:path "/shell.php", :requests 12}],
+  :status-mix {:client-error 863, :ok 658, :server-error 16822},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +31,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-17",
- :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 84},
+ :traffic-quality {:window "24h", :probe-4xx-pct 5, :error-5xx-pct 92},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 1066 · /favicon.ico 143 · /license.txt 46 · /.env 23 · /index.php 20 | 4xx(probe) 6% · 5xx 84%",
+ "上位 page (24h, 2xx/3xx): /v1/generation/jobs/02ee5769b9b3494389f5… 38 · /api/.env 27 · /term.php 24 · /footer.php 19 · //wp.php 14 | 4xx(probe) 5% · 5xx 92%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 441992 req/7d・5005 uniques(日次和)・うち4xx probe 6%(24h)、workers 8254 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 445150 req/7d・5015 uniques(日次和)・うち4xx probe 5%(24h)、workers 8262 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
