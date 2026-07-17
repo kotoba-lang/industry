@@ -207,8 +207,8 @@
  {:release/id :rel.pokemon.cn.primetime-ban :release/work [:work/id :pokemon]
   :release/country [:country/id :cn]
   :release/medium :tv-anime :release/year-start 2006 :release/edit-status :censored
-  :release/note "2006-09-01 以降、海外アニメのプライムタイム (17:00-20:00、のち21:00まで) 放送禁止の対象。中国側の具体的放送局は未確認のため :release/network を省略"
-  :release/source "https://en.wikipedia.org/wiki/Pok%C3%A9mon_(TV_series)" :release/confidence :medium}
+  :release/note "国家広電総局 (SARFT) の通知により 2006-09-01 から全 TV 局で海外アニメのプライムタイム (17:00-20:00) 放送を禁止（2008-02 に 21:00 まで延長）。ポケモン・シンプソンズ・テレタビーズ等が対象。2004 年の「国産アニメ比率 60% 以上」クォータ政策の延長線。特定局でなく全国一律規制のため :release/network 省略"
+  :release/source "https://www.france24.com/en/20080220-china-extends-prime-time-ban-foreign-cartoons-china-cartoons" :release/confidence :high}
 
  ;; ==================================================================================
  ;; tranche 2 (2026-07-17): セーラームーン・ドラゴンボールZ・ワンピース + フランス等
@@ -230,7 +230,8 @@
  {:network/id :ytv :network/name "YTV" :network/country [:country/id :ca]
   :network/type :kids-channel}
  {:network/id :crunchyroll :network/name "Crunchyroll" :network/country [:country/id :us]
-  :network/type :streaming :network/note "アニメ専門 global streaming（本拠 US）"}
+  :network/type :streaming
+  :network/note "アニメ専門 global streaming（本拠 US）。全世界配信だがアジア一部・ロシア・ベラルーシは対象外、21 言語。加入者 70万 (2015) → 500万 (2021) → 2100万 (2026)。EMEA 展開 2020 (旧 Viz Media Europe 買収)、インド語ダブ/字幕 2022-03-01、インドネシア公式ローンチ 2024-08-15。日本での放送と同時のサイマル配信モデルで、地域可用性は作品ごとのライセンスに依存"}
  {:network/id :global-tv-id :network/name "Global TV (Indonesia)" :network/country [:country/id :id]
   :network/type :terrestrial}
 
