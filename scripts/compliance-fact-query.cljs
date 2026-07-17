@@ -469,7 +469,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-ken-kam/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-9411-can-chamber association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-can-chamber/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-can-chamber/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-can-chamber/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-mex-coparmex association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-mex-coparmex/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-mex-coparmex/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
