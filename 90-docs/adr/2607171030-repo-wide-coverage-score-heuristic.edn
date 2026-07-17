@@ -1,0 +1,21 @@
+[{:adr/authoritative_for
+  ["scripts/repo-maturity.cljs に :maturity/coverage-score（test coverage ヒューリスティック）を第5軸として追加し、composite を5軸化する決定"
+   "coverage-score の3層フォールバック定義: README/CLAUDE.md の coverage 宣言パース（high）→ REST git/trees/HEAD?recursive=1 の src/test ファイル比（mid）→ nil（捏造ゼロ）"
+   "全件再生成は GraphQL rate limit（5000 points/h）で1回では終わらないため CI cron で段階的に実行し、--merge-existing でスキップ分は古い値を保持する方針"
+   "declared 層は README/CLAUDE.md の宣言のみ（deps.edn の fail-threshold は拡張しない）という Phase 1 のスコープ決定"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/topic "repo-wide-coverage-score-heuristic"
+  :adr/related
+  ["scripts/repo-maturity.cljs（4軸 maturity システム、専用 ADR 無し・冒頭コメントが doc）"]
+  :adr/status "accepted, pending full-fleet regen via CI"
+  :adr/id "adr-2607171030-repo-wide-coverage-score-heuristic"
+  :adr/doc_type "adr"
+  :adr/last_verified "2026-07-17"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/date "2026-07-17"
+  :adr/decision-summary
+  "{:goal \"全 repo（west.yml 約2910）の test coverage を可視化\", :phase-1 {:axis :maturity/coverage-score :fallback [:declared-readme :file-ratio-rest-git-trees :nil] :note '捏造ゼロ・impl-score と同じ HEURISTIC PROXY 明記文化'}, :composite {:weights {:stage 0.30 :structural 0.15 :activity 0.15 :impl 0.20 :coverage 0.20} :note '既存の全エントリの composite が再計算される（時系列比較は :maturity/computed-at で区別）'}, :declared-scope {:decision :readme-only-B :reason 'Phase 2 の cloverage 実行で全 repo の実カバレッジを取るので Phase 1 の declared は README 運用を待つ。実測: crdt/slides は README に数値宣言なし'}, :full-regen {:decision :ci-cron-merge-Z :reason '2910 repo は GraphQL 5000 points/h を超え1回で終わらない。CI が --merge-existing でスキップ分を保持しつつ毎日進める'}, :phase-2 {:followup 'cloverage 外部注入で LCOV 実カバレッジを別軸 :maturity/coverage-actual で集計・別 ADR'}, :alternatives-rejected [:graphql-depth-1-tree-entries 'Clojure repo の src/<ns>/file 構造でファイル比が取れない' :deps-edn-fail-threshold-extension '実行時間増・Phase 2 で obsolete' :one-shot-full-regen 'rate limit で不可']}"
+  :db/id -1
+  :adr/authoritative true
+  :adr/title "ADR-2607171030: repo-maturity に coverage-score ヒューリスティック軸を追加（Phase 1）"}]
