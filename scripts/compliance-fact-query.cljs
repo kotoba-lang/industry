@@ -487,7 +487,288 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-arg-uia/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-9411-bel-feb association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-bel-feb/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-bel-feb/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-bel-feb/data/datascript-tx.edn"}
+   ;; culture.facts (ADR-2607171400: cloud-itonami-municipality-culture-catalog,
+   ;; addendum 2/3 Wave 1 + 1b). One entry per SOURCES repo above that also
+   ;; carries a culture catalog (country-level or municipality-level) -- a
+   ;; curated subset of the full 188-country + 54-city family, matching this
+   ;; script's existing "sample, not exhaustive" convention. Generated from a
+   ;; sweep of this file's own SOURCES repo list on 2026-07-17; extend by
+   ;; adding a repo above AND (if it has schema/culture.edn + data/culture-tx.edn)
+   ;; an entry here.
+   {:label "cloud-itonami-iso3166-are culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-are/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-are/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-arg culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-arg/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-arg/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-aus culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-aus/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-aus/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-aut culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-aut/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-aut/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-bel culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-bel/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-bel/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-bra culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-bra/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-bra/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-can culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-can/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-can/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-che culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-che/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-che/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-chl culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-chl/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-chl/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-col culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-col/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-col/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-cri culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-cri/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-cri/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-cze culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-cze/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-cze/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-deu culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-deu/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-deu/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-dnk culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-dnk/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-dnk/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-ecu culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ecu/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ecu/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-egy culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-egy/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-egy/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-esp culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-esp/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-esp/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-fin culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-fin/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-fin/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-fra culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-fra/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-fra/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-gbr culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-gbr/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-gbr/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-gtm culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-gtm/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-gtm/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-hnd culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-hnd/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-hnd/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-idn culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-idn/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-idn/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-ind culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ind/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ind/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-irl culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-irl/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-irl/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-ita culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ita/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ita/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-jpn culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-jpn/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-jpn/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-ken culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ken/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ken/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-kor culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-kor/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-kor/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-mex culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-mex/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-mex/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-mys culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-mys/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-mys/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-nga culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-nga/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nga/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-nld culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-nld/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nld/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-nor culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-nor/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nor/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-nzl culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-nzl/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nzl/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-pan culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-pan/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-pan/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-phl culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-phl/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-phl/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-prt culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-prt/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-prt/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-pry culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-pry/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-pry/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-sau culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-sau/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-sau/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-swe culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-swe/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-swe/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-tha culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-tha/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-tha/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-tur culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-tur/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-tur/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-ury culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-ury/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-ury/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-usa culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-usa/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-usa/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-vnm culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-vnm/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-vnm/data/culture-tx.edn"}
+   {:label "cloud-itonami-iso3166-zaf culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-zaf/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-zaf/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-are-abu-dhabi culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-are-abu-dhabi/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-are-abu-dhabi/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-arg-buenos-aires culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-arg-buenos-aires/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-arg-buenos-aires/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-aus-sydney culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-aus-sydney/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-aus-sydney/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-aut-vienna culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-aut-vienna/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-aut-vienna/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-bel-brussels culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-bel-brussels/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-bel-brussels/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-bra-sao-paulo culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-bra-sao-paulo/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-bra-sao-paulo/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-can-toronto culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-can-toronto/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-can-toronto/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-che-bern culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-che-bern/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-che-bern/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-chl-santiago culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-chl-santiago/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-chl-santiago/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-col-bogota culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-col-bogota/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-col-bogota/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-cri-san-jose culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-cri-san-jose/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-cri-san-jose/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-deu-berlin culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-deu-berlin/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-deu-berlin/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-dnk-copenhagen culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-dnk-copenhagen/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-dnk-copenhagen/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-ecu-quito culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-ecu-quito/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ecu-quito/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-egy-cairo culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-egy-cairo/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-egy-cairo/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-esp-madrid culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-esp-madrid/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-esp-madrid/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-fin-helsinki culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-fin-helsinki/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-fin-helsinki/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-fra-lyon culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-fra-lyon/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-fra-lyon/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-fra-paris culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-fra-paris/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-fra-paris/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-gbr-london culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-gbr-london/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-gbr-london/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-idn-jakarta culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-idn-jakarta/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-idn-jakarta/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-ind-new-delhi culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-ind-new-delhi/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ind-new-delhi/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-irl-dublin culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-irl-dublin/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-irl-dublin/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-ita-roma culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-ita-roma/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ita-roma/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-jpn-tokyo culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-jpn-tokyo/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-jpn-tokyo/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-ken-nairobi culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-ken-nairobi/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ken-nairobi/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-kor-seoul culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-kor-seoul/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-kor-seoul/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-mex-guadalajara culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-mex-guadalajara/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-mex-guadalajara/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-mys-kuala-lumpur culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-mys-kuala-lumpur/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-mys-kuala-lumpur/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-nga-abuja culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-nga-abuja/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-nga-abuja/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-nld-amsterdam culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-nld-amsterdam/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-nld-amsterdam/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-nor-oslo culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-nor-oslo/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-nor-oslo/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-nzl-wellington culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-nzl-wellington/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-nzl-wellington/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-phl-manila culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-phl-manila/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-phl-manila/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-pol-warsaw culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-pol-warsaw/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-pol-warsaw/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-pry-asuncion culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-pry-asuncion/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-pry-asuncion/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-sau-riyadh culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-sau-riyadh/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-sau-riyadh/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-swe-gothenburg culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-swe-gothenburg/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-swe-gothenburg/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-tha-bangkok culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-tha-bangkok/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-tha-bangkok/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-tur-ankara culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-tur-ankara/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-tur-ankara/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-ury-montevideo culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-ury-montevideo/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-ury-montevideo/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-usa-washington-dc culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-usa-washington-dc/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-usa-washington-dc/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-vnm-hanoi culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-vnm-hanoi/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-vnm-hanoi/data/culture-tx.edn"}
+   {:label "cloud-itonami-municipality-zaf-cape-town culture.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-zaf-cape-town/schema/culture.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-zaf-cape-town/data/culture-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
@@ -583,7 +864,14 @@
                        [?e \"legal-source/jurisdiction\" ?j]
                        [?e \"legal-source/name\" ?name] [?e \"legal-source/url\" ?url]]")
                 iso3)]
-    (doseq [[name url] rows] (println (str "  " name "  <" url ">")))))
+    (doseq [[name url] rows] (println (str "  " name "  <" url ">"))))
+  (println (str "== " iso3 " (culture.facts) =="))
+  (let [rows (q (str "[:find ?id ?kind ?name ?url :in $ ?c :where
+                       [?e \"culture/country\" ?c]
+                       [?e \"culture/id\" ?id] [?e \"culture/kind\" ?kind]
+                       [?e \"culture/name\" ?name] [?e \"culture/url\" ?url]]")
+                iso3)]
+    (doseq [[id kind name url] rows] (println (str "  " id "  [" kind "] " name "  <" url ">")))))
 
 (defn print-municipality [muni]
   (println (str "== " muni " (ordinance.facts) =="))
@@ -592,7 +880,14 @@
                        [?e \"ordinance/id\" ?id] [?e \"ordinance/title\" ?title]
                        [?e \"ordinance/url\" ?url]]")
                 muni)]
-    (doseq [[id title url] rows] (println (str "  " id "  " title "  <" url ">")))))
+    (doseq [[id title url] rows] (println (str "  " id "  " title "  <" url ">"))))
+  (println (str "== " muni " (culture.facts) =="))
+  (let [rows (q (str "[:find ?id ?kind ?name ?url :in $ ?m :where
+                       [?e \"culture/municipality\" ?m]
+                       [?e \"culture/id\" ?id] [?e \"culture/kind\" ?kind]
+                       [?e \"culture/name\" ?name] [?e \"culture/url\" ?url]]")
+                muni)]
+    (doseq [[id kind name url] rows] (println (str "  " id "  [" kind "] " name "  <" url ">")))))
 
 (defn print-association [assoc-slug]
   (println (str "== " assoc-slug " (association.facts) =="))
