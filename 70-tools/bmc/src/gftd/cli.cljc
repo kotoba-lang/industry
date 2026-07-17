@@ -462,12 +462,12 @@
         api.murakumo.cloud / qwen-gad.gftd.ai 経由で死ぬ。streaming なら
         最初の delta が即座に流れ 524 に当たらない。SSE でない応答が返る
         endpoint には従来の JSON parse に fallback する。
-        env: GFTD_LLM_MODEL (default qwen3.6-35b-a3b、murakumo fleet の既定) /
+        env: GFTD_LLM_MODEL (default murakumo-main = fleet main の SSoT alias、ADR-2607173100 — concrete な model id を焼かない) /
         GFTD_LLM_TOKEN (optional Bearer) / GFTD_LLM_MAX_TOKENS (default 3000 —
         qwen3.6 は thinking モデルで reasoning にも token 予算を使う) /
         GFTD_LLM_NO_STREAM=1 (streaming を無効化)。"
        [url]
-       (let [model (or (nc/getenv "GFTD_LLM_MODEL") "qwen3.6-35b-a3b")
+       (let [model (or (nc/getenv "GFTD_LLM_MODEL") "murakumo-main")
              token (nc/getenv "GFTD_LLM_TOKEN")
              max-tokens (or (some-> (nc/getenv "GFTD_LLM_MAX_TOKENS") js/parseInt) 3000)
              stream? (not (nc/getenv "GFTD_LLM_NO_STREAM"))
