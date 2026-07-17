@@ -78,3 +78,23 @@ Live 実測（公開 gh-arc0-1 p01、api.murakumo.cloud gemma4、n=3）: total 5
 依存する実測知見)。旧 v10 の 77.4 は judge（gemma3:4b）も合成式も別物なので
 直接比較不可。lib 6 tests / 42 assertions、mangaka 118 tests / 737 assertions
 green。pin: kami-mangaka-qa → df897eb、ai-gftd-mangaka → 30c7b5f。
+
+## Addendum 2 (2026-07-17) — 審査→改善→再審査の kaizen サイクル接続
+
+オーナー指示「接続して」を受け、jumpBenchmarkQa と coscientist を双方向に接続:
+
+1. **審査 → 改善（種まき）**: coscientist の入力に `:issues`（明示）/
+   `:kaizen-from-panel`（当該 panel の `:panel/jump-qa` datom から issues を
+   読む）を追加。`issue->directive`（決定論変換: "Lack of X"→"strong X"、
+   "Static X"→"dynamic X"、"Weak X"→"strong X"、他は `fix:` 前置）で改善
+   指令化し、**全候補の base spec に畳み込む** — 是正を共有しつつ方向性
+   （composition/lighting）は従来どおり多様化。LLM generate 経路は
+   augmented prompt 越しに弱点是正込みの方向性を提案する。
+2. **改善 → 再審査（サイクル閉包）**: `:judge? true`（opt-in、judge-fn 注入
+   可）で勝者を `jump-qa/judge-image`（public 化）で再審査し、新パネルの
+   `:panel/jump-qa` に永続化 — **その panel がそのまま次イテレーションの
+   `:kaizen-from-panel` 種になる**。chat agent の coscientist_panel tool にも
+   `kaizen_from` / `judge` パラメータを追加（対話 agent からの kaizen 運転）。
+
+tests +3（変換 / 種まき / サイクル閉包）、suite 121 tests / 754 assertions
+green。pin: ai-gftd-mangaka → b138415。
