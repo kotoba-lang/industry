@@ -209,4 +209,121 @@
   :release/medium :tv-anime :release/year-start 2006 :release/edit-status :censored
   :release/note "2006-09-01 以降、海外アニメのプライムタイム (17:00-20:00、のち21:00まで) 放送禁止の対象。中国側の具体的放送局は未確認のため :release/network を省略"
   :release/source "https://en.wikipedia.org/wiki/Pok%C3%A9mon_(TV_series)" :release/confidence :medium}
+
+ ;; ==================================================================================
+ ;; tranche 2 (2026-07-17): セーラームーン・ドラゴンボールZ・ワンピース + フランス等
+ ;; ==================================================================================
+
+ ;; ---- countries (追加) ------------------------------------------------------------
+ {:country/id :fr :country/name-ja "フランス" :country/name-en "France" :country/region :europe}
+
+ ;; ---- networks (追加) -------------------------------------------------------------
+ {:network/id :fuji-tv :network/name "フジテレビ (FNS)" :network/country [:country/id :jp]
+  :network/type :terrestrial :network/note "DBZ・ワンピースの本国ネットワーク"}
+ {:network/id :tf1-club-dorothee :network/name "TF1 Club Dorothée" :network/country [:country/id :fr]
+  :network/type :kids-block
+  :network/note "1987-09-02〜1997-08-31。週30時間規模の子供向け枠で日本アニメを大量放送しフランスのマンガ文化受容の起点に。暴力表現をめぐり CSA・政治家から批判が継続"}
+ {:network/id :toonami-us :network/name "Toonami (Cartoon Network アクション枠)" :network/country [:country/id :us]
+  :network/type :kids-block :network/note "2012 以降は Adult Swim 内の深夜枠として復活"}
+ {:network/id :fox-box :network/name "FoxBox (4Kids の土曜朝枠、後の 4Kids TV)" :network/country [:country/id :us]
+  :network/type :kids-block}
+ {:network/id :ytv :network/name "YTV" :network/country [:country/id :ca]
+  :network/type :kids-channel}
+ {:network/id :crunchyroll :network/name "Crunchyroll" :network/country [:country/id :us]
+  :network/type :streaming :network/note "アニメ専門 global streaming（本拠 US）"}
+ {:network/id :global-tv-id :network/name "Global TV (Indonesia)" :network/country [:country/id :id]
+  :network/type :terrestrial}
+
+ ;; ---- works (追加) ----------------------------------------------------------------
+ {:work/id :sailor-moon :work/title-ja "美少女戦士セーラームーン" :work/title-en "Sailor Moon"
+  :work/origin [:country/id :jp] :work/year-start 1992}
+ {:work/id :dragon-ball-z :work/title-ja "ドラゴンボールZ" :work/title-en "Dragon Ball Z"
+  :work/origin [:country/id :jp] :work/year-start 1989}
+ {:work/id :one-piece :work/title-ja "ワンピース" :work/title-en "One Piece"
+  :work/origin [:country/id :jp] :work/year-start 1999}
+
+ ;; ---- releases — Sailor Moon ------------------------------------------------------
+ {:release/id :rel.sailormoon.jp.tv-asahi :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :jp] :release/network [:network/id :tv-asahi]
+  :release/medium :tv-anime :release/year-start 1992 :release/year-end 1997 :release/edit-status :uncut
+  :release/confidence :medium}
+
+ {:release/id :rel.sailormoon.ca.ytv :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :ca] :release/network [:network/id :ytv]
+  :release/medium :tv-anime :release/year-start 1995 :release/edit-status :localized
+  :release/note "DiC 版。うさぎ→Serena 等の改名、暴力・ヌードのカット、車線の左右反転、レズビアンカップルを「いとこ」に改変、日本文化への言及を除去"
+  :release/source "https://en.wikipedia.org/wiki/Sailor_Moon_(English_adaptations)" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.us.dic :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :us]
+  :release/medium :tv-anime :release/year-start 1995 :release/edit-status :localized
+  :release/note "DiC/Cloverway 版（初出網は syndication で単一局に帰属しないため :release/network 省略）。改変内容は YTV 行と同一。2014 以降 Viz Media が無検閲で再ライセンス"
+  :release/source "https://en.wikipedia.org/wiki/Sailor_Moon_(English_adaptations)" :release/confidence :high}
+
+ ;; ---- releases — Dragon Ball Z ----------------------------------------------------
+ {:release/id :rel.dbz.jp.fuji-tv :release/work [:work/id :dragon-ball-z]
+  :release/country [:country/id :jp] :release/network [:network/id :fuji-tv]
+  :release/medium :tv-anime :release/year-start 1989 :release/year-end 1996 :release/edit-status :uncut
+  :release/source "https://en.wikipedia.org/wiki/Dragon_Ball_Z" :release/confidence :high}
+
+ {:release/id :rel.dbz.us.syndication :release/work [:work/id :dragon-ball-z]
+  :release/country [:country/id :us]
+  :release/medium :tv-anime :release/year-start 1996 :release/year-end 1998 :release/edit-status :censored
+  :release/note "Saban 経由の first-run syndication（単一局に帰属しないため :release/network 省略）。Mr.サタン→Hercule 改名、『死』への言及を『別次元に送られた』に置換等の重編集"
+  :release/source "https://en.wikipedia.org/wiki/Dragon_Ball_Z" :release/confidence :high}
+
+ {:release/id :rel.dbz.us.toonami :release/work [:work/id :dragon-ball-z]
+  :release/country [:country/id :us] :release/network [:network/id :toonami-us]
+  :release/medium :tv-anime :release/year-start 1998 :release/year-end 2003 :release/edit-status :censored
+  :release/note "1998-08-31 開始。1999 以降の FUNimation 自社ダブはケーブル基準のため検閲が緩和。再放送は 2008 まで"
+  :release/source "https://en.wikipedia.org/wiki/Dragon_Ball_Z" :release/confidence :high}
+
+ {:release/id :rel.dbz.fr.club-dorothee :release/work [:work/id :dragon-ball-z]
+  :release/country [:country/id :fr] :release/network [:network/id :tf1-club-dorothee]
+  :release/medium :tv-anime :release/year-start 1990 :release/year-end 1996 :release/edit-status :censored
+  :release/note "検閲版で放送。子供枠での放送に「暴力的」との批判が噴出（開始年は 1988=無印 Dragon Ball と 1990=Z で資料に揺れ。1996 に全話消化前に打ち切り）"
+  :release/source "https://fr.wikipedia.org/wiki/Club_Doroth%C3%A9e" :release/confidence :high}
+
+ {:release/id :rel.dbz.au.network-ten :release/work [:work/id :dragon-ball-z]
+  :release/country [:country/id :au] :release/network [:network/id :network-ten]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "朝の Cheez TV 枠で放送（Cartoon Network AU でも放送）"
+  :release/source "https://en.wikipedia.org/wiki/Dragon_Ball_Z" :release/confidence :high}
+
+ ;; ---- releases — One Piece --------------------------------------------------------
+ {:release/id :rel.onepiece.jp.fuji-tv :release/work [:work/id :one-piece]
+  :release/country [:country/id :jp] :release/network [:network/id :fuji-tv]
+  :release/medium :tv-anime :release/year-start 1999 :release/edit-status :uncut
+  :release/note "1999-10-20 開始、継続中"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.onepiece.us.fox-box :release/work [:work/id :one-piece]
+  :release/country [:country/id :us] :release/network [:network/id :fox-box]
+  :release/medium :tv-anime :release/year-start 2004 :release/year-end 2006 :release/edit-status :censored
+  :release/note "4Kids 版。内容と尺の編集を強制され最初の 143 話を 104 話に圧縮（銃の置換等の改変で悪名高い）。2005 以降 Cartoon Network (Toonami/Miguzi) でも放送"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.onepiece.us.adult-swim :release/work [:work/id :one-piece]
+  :release/country [:country/id :us] :release/network [:network/id :adult-swim]
+  :release/medium :tv-anime :release/year-start 2013 :release/edit-status :uncut
+  :release/note "FUNimation 版を Adult Swim 内 Toonami で 2013-05-18 開始（2017-03 離脱 → 2022-01-22 復帰）。それ以前に Cartoon Network で 2007-09〜2008-03"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.onepiece.us.crunchyroll :release/work [:work/id :one-piece]
+  :release/country [:country/id :us] :release/network [:network/id :crunchyroll]
+  :release/medium :streaming :release/year-start 2013 :release/edit-status :uncut
+  :release/note "2013-11-02 開始。2020-02-22 に UK・アイルランド・欧州域へ拡大"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.onepiece.us.netflix :release/work [:work/id :one-piece]
+  :release/country [:country/id :us] :release/network [:network/id :netflix]
+  :release/medium :streaming :release/year-start 2020 :release/edit-status :uncut
+  :release/note "2020-06 開始（US・カナダ・オーストラリア・ニュージーランド）"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.onepiece.id.global-tv :release/work [:work/id :one-piece]
+  :release/country [:country/id :id] :release/network [:network/id :global-tv-id]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "インドネシア放送委員会 (KPI) から regulatory concern の対象になった"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
 ]
