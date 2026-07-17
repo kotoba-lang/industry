@@ -795,7 +795,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-ecu-cip/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-9411-egy-fei association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-egy-fei/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-egy-fei/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-egy-fei/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-pry-uip association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-pry-uip/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-pry-uip/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
