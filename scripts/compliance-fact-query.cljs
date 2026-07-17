@@ -439,7 +439,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-irl-ibec/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-nzl-wellington ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-nzl-wellington/schema/ordinance.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-nzl-wellington/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-nzl-wellington/data/datascript-tx.edn"}
+   {:label "cloud-itonami-iso3166-nzl statute.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-iso3166-nzl/schema/statute.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-nzl/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
