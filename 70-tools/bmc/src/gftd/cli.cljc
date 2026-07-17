@@ -431,36 +431,67 @@
                (str/replace #"\s*```\s*$" ""))
            s)))
 
+     (defn sse-collect
+       "SSE stream body → 最終 text (thinking/reasoning delta は捨てる)。
+        OpenAI delta (choices[0].delta.content) と Anthropic
+        content_block_delta (:delta :text) の両形を受ける。SSE に見えない
+        body には nil を返す(非 streaming fallback 用)。ADR-2607172800。"
+       [out]
+       (when (str/includes? (str out) "data:")
+         (let [texts (for [line (str/split-lines (str out))
+                           :let [line (str/trim line)]
+                           :when (str/starts-with? line "data:")
+                           :let [payload (str/trim (subs line 5))]
+                           :when (and (seq payload) (not= payload "[DONE]")
+                                      (str/starts-with? payload "{"))
+                           :let [d (try (js->clj (js/JSON.parse payload) :keywordize-keys true)
+                                        (catch :default _ nil))]
+                           :when d]
+                       (or (get-in d [:choices 0 :delta :content])
+                           (when (= "content_block_delta" (:type d))
+                             (get-in d [:delta :text]))))]
+           (apply str (remove nil? texts)))))
+
      (defn- llm-complete-fn
        "GFTD_LLM_URL への同期 chat completion (fn [prompt] -> string)。
         react/tick は同期パイプラインなので js/fetch(async)ではなく
         curl execFileSync で待つ(nbb=Node)。OpenAI 互換 /v1/chat/completions と
         Anthropic 互換 /v1/messages の両応答形を受ける。ADR-2607172700。
+        既定で stream:true を送る(ADR-2607172800): Cloudflare は非 streaming
+        応答を TTFB 100 秒で切る(524)ため、qwen3.6 の長い thinking 生成が
+        api.murakumo.cloud / qwen-gad.gftd.ai 経由で死ぬ。streaming なら
+        最初の delta が即座に流れ 524 に当たらない。SSE でない応答が返る
+        endpoint には従来の JSON parse に fallback する。
         env: GFTD_LLM_MODEL (default qwen3.6-35b-a3b、murakumo fleet の既定) /
         GFTD_LLM_TOKEN (optional Bearer) / GFTD_LLM_MAX_TOKENS (default 3000 —
-        qwen3.6 は thinking モデルで reasoning にも token 予算を使う)。"
+        qwen3.6 は thinking モデルで reasoning にも token 予算を使う) /
+        GFTD_LLM_NO_STREAM=1 (streaming を無効化)。"
        [url]
        (let [model (or (nc/getenv "GFTD_LLM_MODEL") "qwen3.6-35b-a3b")
              token (nc/getenv "GFTD_LLM_TOKEN")
              max-tokens (or (some-> (nc/getenv "GFTD_LLM_MAX_TOKENS") js/parseInt) 3000)
+             stream? (not (nc/getenv "GFTD_LLM_NO_STREAM"))
              cp (js/require "child_process")]
          (fn [prompt]
-           (let [payload {:model model :max_tokens max-tokens
-                          :messages [{:role "user" :content prompt}]}
-                 args (cond-> ["-sS" "-m" "600" "-X" "POST" url
+           (let [payload (cond-> {:model model :max_tokens max-tokens
+                                  :messages [{:role "user" :content prompt}]}
+                           stream? (assoc :stream true))
+                 args (cond-> ["-sS" "-N" "-m" "600" "-X" "POST" url
                                "-H" "content-type: application/json"
                                "--data-binary" "@-"]
                         token (into ["-H" (str "authorization: Bearer " token)]))
                  out (.execFileSync cp "curl" (clj->js args)
                                     #js {:input (js/JSON.stringify (clj->js payload))
                                          :encoding "utf8"
-                                         :maxBuffer (* 32 1024 1024)})
-                 d (js->clj (js/JSON.parse out) :keywordize-keys true)]
-             (when-let [err (:error d)]
-               (throw (ex-info (str "LLM endpoint error: " (or (:message err) (pr-str err))) {:url url})))
-             (strip-fences
-              (or (get-in d [:choices 0 :message :content])          ; OpenAI 形
-                  (some :text (:content d))))))))                     ; Anthropic 形
+                                         :maxBuffer (* 32 1024 1024)})]
+             (if-let [streamed (sse-collect out)]
+               (strip-fences streamed)
+               (let [d (js->clj (js/JSON.parse out) :keywordize-keys true)]
+                 (when-let [err (:error d)]
+                   (throw (ex-info (str "LLM endpoint error: " (or (:message err) (pr-str err))) {:url url})))
+                 (strip-fences
+                  (or (get-in d [:choices 0 :message :content])          ; OpenAI 形
+                      (some :text (:content d))))))))))                   ; Anthropic 形
 
      (defn normalize-llm-proposal
        "LLM が :canvas/id / :hyp/id / :proposal/action を string で出す揺れを
@@ -470,6 +501,7 @@
        [p]
        (let [kw #(cond (keyword? %) %
                        (string? %) (keyword (str/replace % #"^:" ""))
+                       (symbol? %) (keyword (str %))   ; qwen3.6 実測: quote 無し
                        :else %)]
          (cond-> p
            (contains? p :canvas/id) (update :canvas/id kw)
