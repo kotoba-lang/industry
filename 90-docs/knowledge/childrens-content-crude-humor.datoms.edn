@@ -1,0 +1,164 @@
+;; 子供向けコンテンツにおける下ネタ（crude/toilet humor・露出）規制の国別ナレッジ
+;; + クレヨンしんちゃん (Crayon Shin-chan) の国別取り扱い事例
+;; as-of 2026-07-17 / 会話由来の一般知識を構造化したもの（一次ソース未検証の行は
+;; :confidence :medium 以下を付す。値の捏造禁止 — 不明は attribute ごと省略する）
+;; 形式は 90-docs/adr/2607021500-portfolio-bmc-lean.datoms.edn の先行例と同じ
+;; kotoba-datomic / DataScript / Datomic transaction 互換 EDN vector。
+;; transact: (d/transact! conn <this-vector>)  ; DataScript は schema map へ変換して conn 作成
+;; example queries は同 dir の README.md を参照。
+[
+ ;; ---- schema: country ---------------------------------------------------------
+ {:db/ident :country/id          :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :country/name-ja     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :country/name-en     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :country/region      :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ ;; 子供向け枠での下ネタ・露出への厳格度:
+ ;;   :prohibited  = 子供向けとしては事実上不可（禁止・成人枠送り・大幅検閲が既定）
+ ;;   :strict      = 大幅カット・編集を条件に子供向けが成立
+ ;;   :moderate    = 部分的な修正はあるが概ね子供向けとして流通
+ ;;   :permissive  = ほぼ無修正で子供向けとして流通
+ {:db/ident :country/crude-humor-policy :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ ;; 規制の根拠となる構造（複数可):
+ ;;   :broadcast-regulation 放送規制当局 / :religious-norms 宗教・道徳規範
+ ;;   :state-censorship 国家による内容審査 / :litigation-social-pressure 訴訟・社会圧力
+ ;;   :industry-self-regulation 業界自主規制
+ {:db/ident :country/policy-basis :db/valueType :db.type/keyword :db/cardinality :db.cardinality/many}
+ {:db/ident :country/regulator    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :country/note         :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; ---- schema: work（対象作品）--------------------------------------------------
+ {:db/ident :work/id       :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :work/title-ja :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :work/title-en :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :work/origin   :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+
+ ;; ---- schema: case（作品 × 国の取り扱い事例）-----------------------------------
+ {:db/ident :case/id        :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :case/work      :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :case/country   :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ ;; 取り扱い区分:
+ ;;   :banned              一時的・恒久的な放送/出版禁止
+ ;;   :adult-rated         成人・深夜枠として流通（子供向けでない判定）
+ ;;   :censored-for-kids   検閲・編集を経て子供向けとして流通
+ ;;   :publication-halted  出版停止（漫画等）
+ ;;   :restricted          配信・放送対象からの除外（明示的 rating ではない）
+ ;;   :aired-as-kids       概ね原型のまま子供向けとして流通
+ {:db/ident :case/treatment :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :case/medium    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :tv-anime / :manga / :streaming
+ {:db/ident :case/year      :db/valueType :db.type/long    :db/cardinality :db.cardinality/one} ; 事象の起点年（不明なら省略）
+ {:db/ident :case/rating    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; 現地レーティング表記（不明なら省略）
+ {:db/ident :case/detail    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ ;; 出典の確からしさ: :high = 広く報道された事実 / :medium = 一般知識だが一次ソース未確認
+ {:db/ident :case/confidence :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+
+ ;; ==================================================================================
+ ;; countries
+ ;; ==================================================================================
+ {:country/id :jp :country/name-ja "日本" :country/name-en "Japan" :country/region :east-asia
+  :country/crude-humor-policy :permissive
+  :country/policy-basis [:industry-self-regulation]
+  :country/regulator "BPO（放送倫理・番組向上機構、自主規制）"
+  :country/note "基準線。ゴールデンタイムの子供・家族向け枠で下ネタギャグが成立する（近年は原作初期よりマイルド化）"}
+
+ {:country/id :us :country/name-ja "アメリカ" :country/name-en "United States" :country/region :north-america
+  :country/crude-humor-policy :prohibited
+  :country/policy-basis [:broadcast-regulation :litigation-social-pressure]
+  :country/regulator "FCC（地上波 indecency 規制）+ TV Parental Guidelines"
+  :country/note "暴力より性・排泄表現に厳しい。子供向け枠での臀部露出・性的ジョークは放送基準的にほぼ不可能で、該当作品は深夜の成人枠へ送られる"}
+
+ {:country/id :in :country/name-ja "インド" :country/name-en "India" :country/region :south-asia
+  :country/crude-humor-policy :prohibited
+  :country/policy-basis [:broadcast-regulation :religious-norms :litigation-social-pressure]
+  :country/regulator "Ministry of Information and Broadcasting"
+  :country/note "親からの苦情を契機に省庁が直接放送禁止を発動しうる。復活には大幅検閲が条件"}
+
+ {:country/id :kr :country/name-ja "韓国" :country/name-en "South Korea" :country/region :east-asia
+  :country/crude-humor-policy :strict
+  :country/policy-basis [:broadcast-regulation :industry-self-regulation]
+  :country/regulator "방송통신심의위원회（放送通信審議委員会）"
+  :country/note "大幅カット・修正を施した編集版なら子供向けが成立するパターンの代表例"}
+
+ {:country/id :vn :country/name-ja "ベトナム" :country/name-en "Vietnam" :country/region :southeast-asia
+  :country/crude-humor-policy :prohibited
+  :country/policy-basis [:state-censorship :litigation-social-pressure]
+  :country/regulator "文化・スポーツ・観光省（出版管理）"
+  :country/note "「子供に不適切」との社会的批判が出版停止まで到達した事例を持つ"}
+
+ {:country/id :id :country/name-ja "インドネシア" :country/name-en "Indonesia" :country/region :southeast-asia
+  :country/crude-humor-policy :prohibited
+  :country/policy-basis [:broadcast-regulation :religious-norms]
+  :country/regulator "KPI（インドネシア放送委員会）"
+  :country/note "KPI が反復的に警告・指導。イスラム圏の道徳規範が放送規制に直結する"}
+
+ {:country/id :my :country/name-ja "マレーシア" :country/name-en "Malaysia" :country/region :southeast-asia
+  :country/crude-humor-policy :strict
+  :country/policy-basis [:broadcast-regulation :religious-norms]
+  :country/regulator "MCMC / 検閲当局"
+  :country/note "露出シーンは基本的にカット。イスラム圏の規範ベース"}
+
+ {:country/id :cn :country/name-ja "中国" :country/name-en "China" :country/region :east-asia
+  :country/crude-humor-policy :strict
+  :country/policy-basis [:state-censorship]
+  :country/regulator "国家広播電視総局 (NRTA)"
+  :country/note "当局の内容審査。2015年前後の日本アニメ規制強化で配信除外が発生した時期がある"}
+
+ {:country/id :es :country/name-ja "スペイン" :country/name-en "Spain" :country/region :europe
+  :country/crude-humor-policy :permissive
+  :country/policy-basis [:industry-self-regulation]
+  :country/regulator "CNMC（視聴覚規制）"
+  :country/note "対照例。ほぼ無修正の子供向け放送で国民的人気に到達（カタルーニャ語圏等）"}
+
+ ;; ==================================================================================
+ ;; work
+ ;; ==================================================================================
+ {:work/id :crayon-shinchan :work/title-ja "クレヨンしんちゃん" :work/title-en "Crayon Shin-chan"
+  :work/origin [:country/id :jp]}
+
+ ;; ==================================================================================
+ ;; cases — クレヨンしんちゃんの国別取り扱い
+ ;; ==================================================================================
+ {:case/id :shinchan.jp :case/work [:work/id :crayon-shinchan] :case/country [:country/id :jp]
+  :case/treatment :aired-as-kids :case/medium :tv-anime :case/year 1992
+  :case/detail "テレビ朝日系で家族・子供向けゴールデン帯の長寿枠。基準線"
+  :case/confidence :high}
+
+ {:case/id :shinchan.us :case/work [:work/id :crayon-shinchan] :case/country [:country/id :us]
+  :case/treatment :adult-rated :case/medium :tv-anime :case/year 2006 :case/rating "TV-MA"
+  :case/detail "FUNimation 英語版は Cartoon Network の深夜成人枠 Adult Swim で放送。翻訳は下ネタを薄めるどころか大人向けコメディとして際どく再ローカライズ"
+  :case/confidence :high}
+
+ {:case/id :shinchan.in :case/work [:work/id :crayon-shinchan] :case/country [:country/id :in]
+  :case/treatment :banned :case/medium :tv-anime :case/year 2008
+  :case/detail "情報放送省が親の苦情（露出・大人への無礼・性的ほのめかし）を受け放送禁止。のち大幅カット版のみ Hungama TV で再開"
+  :case/confidence :high}
+
+ {:case/id :shinchan.vn :case/work [:work/id :crayon-shinchan] :case/country [:country/id :vn]
+  :case/treatment :publication-halted :case/medium :manga :case/year 2006
+  :case/detail "漫画版が「子供に不適切」との社会的批判で出版一時停止に追い込まれた"
+  :case/confidence :medium}
+
+ {:case/id :shinchan.id :case/work [:work/id :crayon-shinchan] :case/country [:country/id :id]
+  :case/treatment :censored-for-kids :case/medium :tv-anime
+  :case/detail "KPI が反復的に警告・指導。「子供向けとして放送すべきでない」との批判が継続"
+  :case/confidence :medium}
+
+ {:case/id :shinchan.my :case/work [:work/id :crayon-shinchan] :case/country [:country/id :my]
+  :case/treatment :censored-for-kids :case/medium :tv-anime
+  :case/detail "露出シーンをカットした編集版で放送"
+  :case/confidence :medium}
+
+ {:case/id :shinchan.kr :case/work [:work/id :crayon-shinchan] :case/country [:country/id :kr]
+  :case/treatment :censored-for-kids :case/medium :tv-anime
+  :case/detail "「짱구는 못말려」として子供に大人気だが、臀部・露出関連シーンをかなりカット・修正した編集版での放送"
+  :case/confidence :high}
+
+ {:case/id :shinchan.cn :case/work [:work/id :crayon-shinchan] :case/country [:country/id :cn]
+  :case/treatment :restricted :case/medium :streaming :case/year 2015
+  :case/detail "2015年前後の日本アニメ規制強化の際、配信対象から外された時期がある"
+  :case/confidence :medium}
+
+ {:case/id :shinchan.es :case/work [:work/id :crayon-shinchan] :case/country [:country/id :es]
+  :case/treatment :aired-as-kids :case/medium :tv-anime
+  :case/detail "ほぼ無修正で子供向けとして放送され国民的人気（対照例。「しんちゃん=大人向け」判定は英語圏・南アジア圏に偏る）"
+  :case/confidence :high}
+]
