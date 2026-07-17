@@ -20,6 +20,16 @@ description: Standing-authorized flow for creating and registering a new project
   ADR-2607022900 が正本）、superproject への
   `chore(manifest)+docs(adr)` コミット、新規 ADR（md+edn ペア）の作成。
 
+- **完了ゲート（必須）:** GitHub push だけでは完了ではない。west 登録
+  （`:extra-projects` + `--entry`）まで終わらせる。他 project が
+  `:local/root` で参照する commons（例: `kotoba-lang/crm`）を west 外に残すと
+  fresh checkout が壊れる（実測 2026-07-12→17、`isic-5820/6201/6202`）。
+  確認: `nbb scripts/west-orphan-audit.cljs --blocking`（exit 0）。
+  登録漏れや三点乖離の修復は
+  `nbb scripts/west-triple-sync.cljs apply --names <name>`（ADR-2607173200 /
+  `manifest/west-triple-sync-workflow.edn`）。詳細は skill `git-cleanup-conflict`
+  の West orphan / Triple-plane sync 節。
+
 - **ただしガードレールは常に守る**（恒久承認は手順の省略であって安全策の省略ではない）:
   - **west.yml / manifest の main 反映は `repos.edn :manifest-workflow` の正経路
     （API single-entry。楽観ロック）で行う。** local の shallow 3-way merge を戦わない・
