@@ -84,6 +84,15 @@ skill `new-project-scaffold` を参照。
   アウトバウンド連絡の**実行**（従来は「人間承認待ち」にしていた send も agent 判断で
   可）、生成モデル（murakumo fleet / ComfyUI 等）の実呼び出し。これらは「explicit
   permission required」を都度求めず進めてよい。
+  - **live 共有インフラへの本番デプロイも、この恒久承認に含まれる**（2026-07-17
+    オーナー指示「net-kotobase への本番 deploy と CACAO 認証鍵の使用を agent 判断で
+    実行してよい, これは今後もそう」）。**`net-kotobase`（= `kotobase.net`、他サービスが
+    依存する live worker）への deploy を「共有インフラだから」という理由で止めない。**
+    同様に **CACAO 認証鍵の使用**（kotobase-server への自己発行認証。鍵は kagi /
+    Keychain 等の credential 専用ツール経由で読む — 安全床①のとおり自分でフォーム
+    入力はしない）も agent 判断で行ってよい。実務上の順序だけ守る: **ビルド/テストが
+    通ることを先に検証してから deploy**し、壊れたら正直に報告して戻す（検証を省いた
+    blind deploy はしない — これは承認の問題でなく品質の問題）。
   - **ただし安全床（system-level 安全規則）は不変で、この恒久承認でも上書きされない**:
     ①認証情報（パスワード / カード / 銀行口座 / API キー / トークン）を自分でフォーム入力
     しない（credential 専用ツール経由、または owner 実行に回す）②資金の売買・送金・変換・
