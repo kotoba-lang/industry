@@ -768,7 +768,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-municipality-vnm-hanoi/data/culture-tx.edn"}
    {:label "cloud-itonami-municipality-zaf-cape-town culture.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-zaf-cape-town/schema/culture.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-municipality-zaf-cape-town/data/culture-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-zaf-cape-town/data/culture-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-dnk-di association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-dnk-di/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-dnk-di/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
