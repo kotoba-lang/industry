@@ -92,5 +92,9 @@ ADR-2607166600 の残 follow-up のうち「kotobase リクエスト単価 ~1.2s
 
 ## Follow-ups
 
-- zone Browser Cache TTL → Respect Existing Headers（オーナー確認の上で）。
+- ~~zone Browser Cache TTL~~ — **closed 2026-07-17（worker 側で解消・zone 設定変更不要）**:
+  CDN-Cache-Control でも zone の 4h 書き換えは残ると実測 → 送出応答を常に
+  `private, max-age=15` に正規化し zone 前面キャッシュに保存させず、鮮度
+  キャッシュは caches.default のみに保持（保存コピーは public s-maxage=60）。
+  実測 hit 0.09〜0.11s / miss 0.65s、書き換え消滅（app-aozora PR #85）。
 - （継承）O(Δ) view 維持 / chunked rows — 上記トリガ到達時。
