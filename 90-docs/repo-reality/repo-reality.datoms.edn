@@ -118,7 +118,7 @@
 
  {:claim/id :claim/aiueos-fuel-metering,
   :claim/project :project/aiueos,
-  :claim/source "orgs/kotoba-lang/aiueos/README.md:52-60; src/aiueos/execute.cljc:20-35,304",
+  :claim/source "orgs/kotoba-lang/aiueos/README.edn:52-60; src/aiueos/execute.cljc:20-35,304",
   :claim/text "':aiueos/limits :fuel' is enforced via real instruction-level metering (Chicory's withUnsafeExecutionListener), but the README itself calls the API 'unsafe'/'experimental'/'possibly removed later' and says to treat it as a working prototype, not a permanent guarantee.",
   :claim/self-reported-level "",
   :claim/self-caveat true,
@@ -126,7 +126,7 @@
 
  {:claim/id :claim/aiueos-memory-limit,
   :claim/project :project/aiueos,
-  :claim/source "orgs/kotoba-lang/aiueos/README.md:61-66; src/aiueos/execute.cljc:34-35,305",
+  :claim/source "orgs/kotoba-lang/aiueos/README.edn:61-66; src/aiueos/execute.cljc:34-35,305",
   :claim/text "':aiueos/limits :memory-pages' is enforced via Chicory's withMemoryLimits, explicitly called out as a STABLE API (unlike the fuel listener).",
   :claim/self-reported-level "",
   :claim/self-caveat false,
@@ -134,7 +134,7 @@
 
  {:claim/id :claim/aiueos-device-access-stub,
   :claim/project :project/aiueos,
-  :claim/source "orgs/kotoba-lang/aiueos/README.md:13-17,47-49; src/aiueos/execute.cljc:6,152-158,260-267",
+  :claim/source "orgs/kotoba-lang/aiueos/README.edn:13-17,47-49; src/aiueos/execute.cljc:6,152-158,260-267",
   :claim/text "The device-access quartet (pci-config/dma-map/irq-subscribe/mmio-map) 'stays a deterministic stub pending real hardware access' -- explicitly named as out of scope, not hidden.",
   :claim/self-reported-level "",
   :claim/self-caveat true,
@@ -142,7 +142,7 @@
 
  {:claim/id :claim/aiueos-deadline-cycles,
   :claim/project :project/aiueos,
-  :claim/source "orgs/kotoba-lang/aiueos/README.md:85-87; src/aiueos/manifest.cljc:210-217; src/aiueos/launcher.cljc:186",
+  :claim/source "orgs/kotoba-lang/aiueos/README.edn:85-87; src/aiueos/manifest.cljc:210-217; src/aiueos/launcher.cljc:186",
   :claim/text "':aiueos/schedule''s :deadline-cycles is NOT enforced -- README states this directly, and manifest.cljc's due-this-cycle? docstring has an explicit 'NOTE what this does NOT do' section naming the same gap.",
   :claim/self-reported-level "",
   :claim/self-caveat true,
@@ -159,7 +159,7 @@
 
  {:claim/id :claim/kotoba-rust-removed,
   :claim/project :project/kotoba,
-  :claim/source "orgs/kotoba-lang/kotoba/README.md:31-34,68-71 (commit 604896171b, 2026-07-01)",
+  :claim/source "orgs/kotoba-lang/kotoba/README.edn:31-34,68-71 (commit 604896171b, 2026-07-01)",
   :claim/text "The earlier Rust workspace (crates/kotoba-kotodama and the rest of crates/) 'has been fully removed'; current implementation is JVM Clojure/ClojureScript (.cljc).",
   :claim/self-reported-level "",
   :claim/self-caveat false,
@@ -175,7 +175,7 @@
 
  {:claim/id :claim/kotoba-shell-not-wired,
   :claim/project :project/kotoba,
-  :claim/source "orgs/kotoba-lang/kotoba/README.md:430-437 ('kotoba-shell release pipeline (design, not yet shipped)'); src/kotoba/launcher.clj",
+  :claim/source "orgs/kotoba-lang/kotoba/README.edn:430-437 ('kotoba-shell release pipeline (design, not yet shipped)'); src/kotoba/launcher.clj",
   :claim/text "kotoba-shell is DESIGNED (docs/ADR-kotoba-shell-aiueos-safe-kotoba.md) but README explicitly says 'There is no kotoba shell subcommand wired up in this repo's launcher yet ... treat the ADR as the design record, not a usable CLI.'",
   :claim/self-reported-level "",
   :claim/self-caveat true,
@@ -192,7 +192,7 @@
 
  {:claim/id :claim/kotoba-lang-rust-retired,
   :claim/project :project/kotoba-lang,
-  :claim/source "orgs/kotoba-lang/kotoba-lang/README.md:20-24; docs/rust-migration-inventory.md",
+  :claim/source "orgs/kotoba-lang/kotoba-lang/README.edn:20-24; docs/rust-migration-inventory.md",
   :claim/text "'An earlier Rust implementation was fully retired in favor of this CLJC authority' -- with a dedicated rust-migration-inventory.md tracking the migration state repo-by-repo (kotoba-v2025 named as an explicit, intentional legacy exception).",
   :claim/self-reported-level "",
   :claim/self-caveat true,
@@ -200,7 +200,7 @@
 
  {:claim/id :claim/kotoba-lang-cli-contract,
   :claim/project :project/kotoba-lang,
-  :claim/source "orgs/kotoba-lang/kotoba-lang/README.md:48 (kotoba/README.md); src/kotoba/cli.cljc",
+  :claim/source "orgs/kotoba-lang/kotoba-lang/README.edn:48 (kotoba/README.edn); src/kotoba/cli.cljc",
   :claim/text "kotoba-lang 'owns the standalone language and public CLI contract' via src/kotoba/cli.cljc, mirrored by aiueos's own cli.cljc pattern per aiueos's README.",
   :claim/self-reported-level "",
   :claim/self-caveat false,
@@ -208,7 +208,7 @@
 
  {:claim/id :claim/kotoba-lang-packages-deferred,
   :claim/project :project/kotoba-lang,
-  :claim/source "orgs/kotoba-lang/kotoba-lang/docs/lang/README.md:207; docs/lang/stdlib-versioning.md:79-84; docs/lang/stdlib-gates.md:50; src/kotoba/lang/package_contract.cljc; src/kotoba/cli.cljc",
+  :claim/source "orgs/kotoba-lang/kotoba-lang/docs/lang/README.edn:207; docs/lang/stdlib-versioning.md:79-84; docs/lang/stdlib-gates.md:50; src/kotoba/lang/package_contract.cljc; src/kotoba/cli.cljc",
   :claim/text "The ':packages' (CID-lock) track -- a package registry -- is explicitly 'deferred' / 'Out of scope' in 3 separate stdlib docs; only a package_contract.cljc CONTRACT exists (the data shape), no 'registry' subcommand is wired into the public CLI.",
   :claim/self-reported-level "",
   :claim/self-caveat true,
@@ -217,7 +217,7 @@
  ;; ---- claim catalog: kotobase (extended 2026-07-15) ---------------------------------------
  {:claim/id :claim/kotobase-istore-seam,
   :claim/project :project/kotobase,
-  :claim/source "orgs/kotoba-lang/kotobase/README.md:33-36; src/kotobase/store.cljc:17 (defprotocol IStore); src/kotobase/local.cljc",
+  :claim/source "orgs/kotoba-lang/kotobase/README.edn:33-36; src/kotobase/store.cljc:17 (defprotocol IStore); src/kotobase/local.cljc",
   :claim/text "'This repo (kotobase-clj) is kotobase's client seam -- the IStore port', with LocalStore as one concrete implementation.",
   :claim/self-reported-level "",
   :claim/self-caveat false,
@@ -225,7 +225,7 @@
 
  {:claim/id :claim/kotobase-datomic-analogy,
   :claim/project :project/kotobase,
-  :claim/source "orgs/kotoba-lang/kotobase/README.md:6-10 (ADR-2607032500)",
+  :claim/source "orgs/kotoba-lang/kotobase/README.edn:6-10 (ADR-2607032500)",
   :claim/text "kotobase is pitched as 'the Datomic to kotoba's Clojure' -- content-addressed/network-native reimagining of Datomic's datom/EAVT/Datalog model (Prolly Tree instead of B-tree, commit DAG instead of a single log, CACAO-authed edge runtime instead of a JVM transactor peer).",
   :claim/self-reported-level "",
   :claim/self-caveat false,

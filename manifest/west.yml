@@ -6318,10 +6318,22 @@ manifest:
       groups: [etzhayyim]
     - name: root
       remote: etzhayyim
-      revision: e1b0bd28a2d278dc8c6d9848b1aea5827e0fa8ab
+      revision: b56fe9bbfc80c194f9d661e7ff76f030935a6ad4
       path: orgs/etzhayyim/root
       clone-depth: 1
       groups: [etzhayyim]
+      submodules:
+        - path: 50-infra/etzhayyim-chain-contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-paymaster/lib/account-abstraction
+        - path: 50-infra/etzhayyim-paymaster/lib/openzeppelin-contracts
+        - path: 50-infra/etzhayyim-yobel-contract/lib/forge-std
+        - path: 50-infra/etzhayyim-authz/contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-k2/contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-fiat-bridge/contracts/lib/forge-std
+        - path: 50-infra/l2-anchor-contract/lib/forge-std
+        - path: 50-infra/openmail-postage/lib/forge-std
+        - path: 50-infra/etzhayyim-membership-contract/lib/forge-std
+        - path: 50-infra/etzhayyim-paymaster/lib/forge-std
     - name: adserver
       remote: gftdcojp
       revision: 3242aa57dc9e563883a38194e7f85c52b6179a40
@@ -6334,7 +6346,7 @@ manifest:
       groups: [gftdcojp]
     - name: ai-gftd-animeka
       remote: gftdcojp
-      revision: 3331ce4c2f07986bd549302a4e0331523bf61465
+      revision: 01d4846133d77c4c9cbf581ecf4ae16137b65799
       path: orgs/gftdcojp/ai-gftd-animeka
       groups: [gftdcojp]
     - name: ai-gftd-apex
@@ -6344,7 +6356,7 @@ manifest:
       groups: [gftdcojp]
     - name: ai-gftd-apps-gftdcojp
       remote: gftdcojp
-      revision: 150305c13c77f2b986db82b5cc25209dce107aa4
+      revision: 5518815b507af7c3f356b7e4ff404b7f377d2e0b
       path: orgs/gftdcojp/ai-gftd-apps-gftdcojp
       clone-depth: 1
       groups: [gftdcojp]
@@ -6376,7 +6388,7 @@ manifest:
       groups: [gftdcojp]
     - name: ai-gftd-dougaka-kagaku
       remote: gftdcojp
-      revision: 50c4c08302d04b36e6de462d8ad988c9ccd06dd6
+      revision: 5c2330c03f2a8a89cafaf2ae421e74d55981fc11
       path: orgs/gftdcojp/ai-gftd-dougaka-kagaku
       groups: [gftdcojp]
     - name: ai-gftd-dougaka-kodomo
@@ -6487,7 +6499,7 @@ manifest:
       groups: [gftdcojp]
     - name: ai-gftd-mangaka
       remote: gftdcojp
-      revision: 50c1fe1c46917e0c6d7accd3b9d083b2491ac152
+      revision: d2a33c3d9cfa66f3a732648dc2514cbf9d487ff4
       path: orgs/gftdcojp/ai-gftd-mangaka
       groups: [gftdcojp]
     - name: ai-gftd-manimani
@@ -6739,7 +6751,7 @@ manifest:
       groups: [gftdcojp]
     - name: network-isekai
       remote: gftdcojp
-      revision: 8ef559ce75a6423cc8c550ca8e1dee41d9de5778
+      revision: 85ff4226f44cf7d27a710f014407f92896cedd73
       path: orgs/gftdcojp/network-isekai
       clone-depth: 1
       groups: [gftdcojp]
@@ -6770,7 +6782,7 @@ manifest:
       groups: [jk-luxury]
     - name: net-babiniku
       remote: jk-luxury
-      revision: bd145484437a162e542b1211157e0ae447583117
+      revision: 3d1b08bb1827b530d284e0a8be98683fe7a4b8b0
       path: orgs/jk-luxury/net-babiniku
       groups: [jk-luxury]
     - name: actor-ipc
@@ -6785,7 +6797,7 @@ manifest:
       groups: [kotoba-lang]
     - name: aiueos
       remote: kotoba-lang
-      revision: 93f0ddb344b54a0025f3a14feef371262675245b
+      revision: 5733648d29d59e97c84bea7a050c70c74e2e6763
       path: orgs/kotoba-lang/aiueos
       groups: [kotoba-lang]
     - name: aml
@@ -11313,6 +11325,11 @@ manifest:
       revision: 36e8e1174ba8fa05ec3f5c6b4bc837f681b8eec3
       path: orgs/kotoba-lang/com-snowflake
       groups: [kotoba-lang]
+    - name: kotobase-protocols
+      remote: kotoba-lang
+      revision: 0f098aa581734059444712fe545dd4a52f8d827e
+      path: orgs/kotoba-lang/kotobase-protocols
+      groups: [kotoba-lang]
     - name: murakumo-langchain
       remote: kotoba-lang
       revision: 3c93118adeb8ffebe3460d9b0c7f4ae13c0c238c
@@ -13090,7 +13107,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kami-mangaka-qa
       remote: kotoba-lang
-      revision: ccd30d2955a903f4955d2800c68ac5e58867e7e8
+      revision: 61c885857391fa9595586580b0fdc6d5af03282b
       path: orgs/kotoba-lang/kami-mangaka-qa
       groups: [kotoba-lang]
     - name: kami-mangaka-reader
@@ -13387,7 +13404,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kotobase-cljc-worker
       remote: kotoba-lang
-      revision: 1f07596da6504920d9bdbbe30a597f25021fdeef
+      revision: 3b07f998f3a82990ed54c46d8f3c4b6522f88256
       path: orgs/kotoba-lang/kotobase-cljc-worker
       groups: [kotoba-lang]
     - name: kotobase-messenger
@@ -13397,12 +13414,12 @@ manifest:
       groups: [kotoba-lang]
     - name: kotobase-peer
       remote: kotoba-lang
-      revision: 146264c0c1f2242e2d535772505f16a4fbd9275e
+      revision: 6e6b8c798266033c2301b8a95b84e9c99f4ae0bb
       path: orgs/kotoba-lang/kotobase-peer
       groups: [kotoba-lang]
     - name: kotobase-server
       remote: kotoba-lang
-      revision: 5a90a692f6dff39ccc5f78b79d1b9e16a8c335d0
+      revision: 68b3983e01f3d576c4f2a66b7446802281f8038b
       path: orgs/kotoba-lang/kotobase-server
       groups: [kotoba-lang]
     - name: kotoba-lang-kotodama
@@ -14389,7 +14406,7 @@ manifest:
       groups: [kotoba-lang]
     - name: shell
       remote: kotoba-lang
-      revision: 7aa1609ff6e5962f149d804fb2274e7ae7904baf
+      revision: 000fcfffe1a80384525a79aaedfb735eb13a484e
       path: orgs/kotoba-lang/shell
       groups: [kotoba-lang]
     - name: shitsuke

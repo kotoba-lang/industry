@@ -5,7 +5,7 @@
 ;; 形式は 90-docs/adr/2607021500-portfolio-bmc-lean.datoms.edn の先行例と同じ
 ;; kotoba-datomic / DataScript / Datomic transaction 互換 EDN vector。
 ;; transact: (d/transact! conn <this-vector>)  ; DataScript は schema map へ変換して conn 作成
-;; example queries は同 dir の README.md を参照。
+;; example queries は同 dir の README.edn を参照。
 [
  ;; ---- schema: country ---------------------------------------------------------
  {:db/ident :country/id          :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}

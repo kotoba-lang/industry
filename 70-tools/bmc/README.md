@@ -6,7 +6,7 @@ ADR-2607021500 の 7 レイヤー lean canvas を CLI で扱い、進化・成�
 ```
 正本:   90-docs/adr/2607021500-portfolio-bmc-lean.datoms.edn   (base、書き換えない)
       + 90-docs/business/canvas-ledger.edn                      (append-only events)
-生成物: 90-docs/business/<product>-business-model.md            (gftd canvas md --all)
+生成物: 90-docs/business/<product>-business-model.edn           (gftd canvas md --all; EDN projection, ADR-2607171600)
 ```
 
 ## 7 CLI（同一 .cljc engine の product 束縛違い）
@@ -30,7 +30,7 @@ ADR-2607021500 の 7 レイヤー lean canvas を CLI で扱い、進化・成�
 70-tools/bmc/bin/murakumo react tick                  # ReAct 1 tick（有界）
 70-tools/bmc/bin/aozora react loop --max-ticks 5      # dry まで反復
 70-tools/bmc/bin/gftd score                           # BMC/YC bench 成熟度スコア表
-70-tools/bmc/bin/gftd score md                        # maturity-scores.md 再生成
+70-tools/bmc/bin/gftd score md                        # maturity-scores.edn 再生成
 70-tools/bmc/bin/gftd ledger show --tail 20
 nbb 70-tools/bmc/run-tests.cljs                       # tests
 ```

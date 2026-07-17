@@ -1,6 +1,6 @@
 ;; pricing-intelligence.datoms.edn — cloud-itonami vertical pricing intelligence, base (schema + catalog).
 ;; Generated from the pilot competitor-pricing research (28 of 295 ISIC+ISCO verticals cloud-itonami
-;; has blueprinted; see orgs/cloud-itonami/cloud-itonami-isic-*/isco-* and 90-docs/business/cloud-itonami-business-model.md).
+;; has blueprinted; see orgs/cloud-itonami/cloud-itonami-isic-*/isco-* and 90-docs/business/cloud-itonami-business-model.edn).
 ;; Schema + catalog is DataScript/Datomic-transactable EDN, following the same convention as
 ;; 90-docs/design-quality/design-quality.datoms.edn and 90-docs/adr/2607021500-portfolio-bmc-lean.datoms.edn:
 ;; this file declares schema + the stable :cluster/*, :vertical/*, :product/* catalog entities (identified by
@@ -169,7 +169,7 @@
 
  ;; flagship addition (2026-07-16, ADR-2607121700 follow-up): 6399 was excluded from the original 28-vertical
  ;; pilot batch (see README "Scope") but is one of the two flagship verticals the maturity doc flags as
- ;; "prefer product -> business over new verticals" (90-docs/business/cloud-itonami-vertical-maturity.md).
+ ;; "prefer product -> business over new verticals" (90-docs/business/cloud-itonami-vertical-maturity.edn).
  {:vertical/id :vertical/isic-6399 :vertical/code "6399" :vertical/code-system :code-system/isic-rev5
   :vertical/name "Other information service activities n.e.c. — meta job-search (Indeed replacement)"
   :vertical/cluster [:cluster/id :cluster/media-recruitment]
