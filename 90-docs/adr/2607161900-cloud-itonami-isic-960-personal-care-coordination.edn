@@ -1,0 +1,60 @@
+{:adr/id "2607161900"
+ :adr/title "cloud-itonami ISIC-960 (Personal-Care Salon/Service Administrative Coordination) actor scaffold & registry promotion"
+ :adr/date "2026-07-15"
+ :adr/status "accepted"
+ :adr/deciders ["Jun Kawasaki"]
+ :adr/scope ["orgs/cloud-itonami/cloud-itonami-isic-960" "orgs/kotoba-lang/industry registry" "Wave 4 personal-services fleet completion"]
+
+ :context
+ {:wave-context "ADR-2607152500 Wave 4 amendment authorizes parallel Wave 3/4 rollout with small-batch verified-redo pattern (ADR-2607152100/2607152300). ISIC-960 completes the ISIC-95/96 personal-services cluster alongside isic-952 (repair-shop coordination)."
+  :domain "Personal-care salon/service administrative coordination (hairdressing, beauty treatments, laundry, funeral services, etc.). Appointment scheduling, service-status logistics, supply coordination, staff shift proposals, and safety escalation. Administrative coordination only — never service-technique decisions, health/allergy-risk clinical judgments, or safety-authority overrides."
+  :actor-pattern "langgraph-clj StateGraph, langgraph-clj Governor (three HARD checks), append-only audit ledger, deterministic demo/tests runnable offline via nbb."}
+
+ :decision
+ {:module-id "cloud-itonami-isic-960"
+  :isic-code "960"
+  :operations
+  [{:id :schedule-service-appointment :title "Schedule Service Appointment" :scope "Appointment scheduling logistics (administrative only)"}
+   {:id :coordinate-service-status-update :title "Coordinate Service Status Update" :scope "Administrative status tracking (administrative only)"}
+   {:id :coordinate-supply-request :title "Coordinate Supply Request" :scope "Non-service-critical consumables (office supplies only)"}
+   {:id :schedule-staff-shift-proposal :title "Schedule Staff Shift Proposal" :scope "Administrative shift proposal (proposal only, never binding)"}
+   {:id :flag-safety-concern :title "Flag Safety Concern" :scope "Facility/sanitation/client-welfare escalation to human review (always escalates)"}]
+
+  :governor-three-hard-checks
+  [{:check "Client/appointment-record unverified" :rule "Target client must exist and be :registered? AND :verified? (re-derived from store every proposal). Exception: :flag-safety-concern (facility-level) doesn't require client verification."}
+   {:check "Effect not :propose" :rule "All proposals must have effect :propose. No other effects accepted."}
+   {:check "Scope exclusion" :rule "Blocked: service-technique, health/sanitation-compliance, client health/allergy-risk clinical judgments, safety-authority overrides. Allowed (allowlist): above 5 operations only. :flag-safety-concern can mention safety without self-blocking."}]
+
+  :phase-progression
+  [{:phase 0 :name "read-only" :auto-commit #{}}
+   {:phase 1 :name "appointment + status-update" :auto-commit #{:schedule-service-appointment :coordinate-service-status-update}}
+   {:phase 2 :name "+ supply + shift-proposals" :auto-commit #{:schedule-service-appointment :coordinate-service-status-update :coordinate-supply-request :schedule-staff-shift-proposal}}
+   {:phase 3 :name "auto-commit with escalation" :auto-commit #{:schedule-service-appointment :coordinate-service-status-update :coordinate-supply-request :schedule-staff-shift-proposal} :always-escalate #{:flag-safety-concern}}]
+
+  :deliverables
+  {:public-repo "https://github.com/cloud-itonami/cloud-itonami-isic-960"
+   :files {:src "src/personalcareops/{store,advisor,governor,operation,phase,sim}.cljc"
+           :test "test/personalcareops/test.cljc"
+           :governance "LICENSE CODE_OF_CONDUCT.md CONTRIBUTING.md GOVERNANCE.md SECURITY.md README.md blueprint.edn"
+           :config "deps.edn run-demo.clj run-tests.cljs .gitignore"}
+   :verification "Tests all pass via nbb (store, governor, operations, phases). Demo runs completely offline."
+   :registry-update "kotoba-lang/industry registry.edn: ISIC 960 from :spec to :implemented, repo added, business-id set, :robotics stripped"}}
+
+ :consequences
+ {:positive ["ISIC-95/96 personal-services Wave 4 cluster now complete (952 + 960)"
+             "Coordination-only actor pattern (Governor + allowlist) reusable for related domains"
+             "No clinical judgment authority — permanently hardcoded at Governor level"
+             "Small verified-redo batch (ADR-2607152500) pattern successfully extended to personal-care domain"]
+  :risks ["Personal-care service regulation varies by jurisdiction — actor designed for coordination only, deployment needs local compliance review"
+          "Safety escalations require qualified human review — actor never auto-commits safety decisions"]
+  :next-steps ["Parallel continuation: Wave 4 batches (isic-873, isic-880, etc.)"
+               "Wave 3 quality audit branch (ADR-2607152500 call-out)"]}
+
+ :references
+ ["ADR-2607121000 (wave definition, value function)"
+  "ADR-2607152500 (Wave 4 amendment, verified-redo pattern)"
+  "ADR-2607152100 (isic-0510 hard coal, verified-redo module shape)"
+  "ADR-2607152300 (isic-0520 lignite, 61% defect recovery pattern)"
+  "ADR-2607154304 (isic-952 repair-shop coordination, sibling ISIC-95/96 cluster member)"
+  "Skill: build-actor (actor pattern, langgraph-clj StateGraph, Governor, audit ledger)"
+  "Skill: new-project-scaffold (repo lifecycle: ADR→scaffold→GitHub→registry)"]}
