@@ -590,20 +590,40 @@
                   unexpected)))))
 
 (defn test-command [repo]
+  ;; Prefer nbb / package.json / deps.edn; bb.edn is retired (ADR-2607173000).
   (cond
-    (exists-rel? repo "bb.edn") ["bb" "test"]
+    (exists-rel? repo "package.json")
+    (let [pkg (try (js/JSON.parse (scripts.nbb-compat/slurp (str root "/" repo "/package.json")))
+                   (catch :default _ nil))
+          scripts (when pkg (js->clj (.-scripts pkg) :keywordize-keys false))]
+      (cond
+        (get scripts "test") ["npm" "test"]
+        (exists-rel? repo "nbb.edn") ["nbb" "-e" "(println :nbb-edn-present)"]
+        (exists-rel? repo "deps.edn") ["clojure" "-M:test"]
+        :else nil))
+    (exists-rel? repo "nbb.edn") ["nbb" "--classpath" "src:test" "-e" "(require 'clojure.test)"]
     (exists-rel? repo "deps.edn") ["clojure" "-M:test"]
+    (exists-rel? repo "bb.edn") ["bb" "test"] ; legacy residual until Wave 2/3 complete
     :else nil))
 
 (defn declared-test-command? [repo]
   (let [bb-file (io/file root repo "bb.edn")
+        nbb-file (io/file root repo "nbb.edn")
+        pkg-file (io/file root repo "package.json")
         deps-file (io/file root repo "deps.edn")]
     (cond
-      (.exists bb-file)
-      (contains? (:tasks (read-edn-file bb-file)) 'test)
+      (.exists pkg-file)
+      (let [pkg (try (js/JSON.parse (scripts.nbb-compat/slurp (str root "/" repo "/package.json")))
+                     (catch :default _ nil))]
+        (boolean (and pkg (aget (.-scripts pkg) "test"))))
+
+      (.exists nbb-file) true
 
       (.exists deps-file)
       (contains? (:aliases (read-edn-file deps-file)) :test)
+
+      (.exists bb-file)
+      (contains? (:tasks (read-edn-file bb-file)) 'test)
 
       :else false)))
 
@@ -699,7 +719,7 @@
      :command nil
      :exit 1
      :ok? false
-     :err "no bb.edn or deps.edn test command"}))
+     :err "no package.json/nbb.edn/deps.edn/bb.edn test command"}))
 
 (defn webgpu-origin-path? [path]
   (str/starts-with? path "orgs/kotoba-lang/webgpu/"))
@@ -784,7 +804,7 @@
               (when (empty? tests)
                 (assoc entry :message "test source files are missing under test/"))
               (when-not (declared-test-command? repo)
-                (assoc entry :message "test command is missing from bb.edn or deps.edn"))
+                (assoc entry :message "test command is missing from package.json/nbb.edn/deps.edn"))
               (when (and ns (not-any? #(exists-rel? repo %) ns-files))
                 (assoc entry :message (str "expected namespace source is missing: " (str/join " or " ns-files))))
               (when (and ns (not (has-declared-ns? repo ns)))
