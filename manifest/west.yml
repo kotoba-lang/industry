@@ -6318,10 +6318,22 @@ manifest:
       groups: [etzhayyim]
     - name: root
       remote: etzhayyim
-      revision: bcb3b396bc25ac24486b802b2dee2273f03c37c2
+      revision: b56fe9bbfc80c194f9d661e7ff76f030935a6ad4
       path: orgs/etzhayyim/root
       clone-depth: 1
       groups: [etzhayyim]
+      submodules:
+        - path: 50-infra/etzhayyim-chain-contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-paymaster/lib/account-abstraction
+        - path: 50-infra/etzhayyim-paymaster/lib/openzeppelin-contracts
+        - path: 50-infra/etzhayyim-yobel-contract/lib/forge-std
+        - path: 50-infra/etzhayyim-authz/contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-k2/contracts/lib/forge-std
+        - path: 50-infra/etzhayyim-fiat-bridge/contracts/lib/forge-std
+        - path: 50-infra/l2-anchor-contract/lib/forge-std
+        - path: 50-infra/openmail-postage/lib/forge-std
+        - path: 50-infra/etzhayyim-membership-contract/lib/forge-std
+        - path: 50-infra/etzhayyim-paymaster/lib/forge-std
     - name: adserver
       remote: gftdcojp
       revision: 3242aa57dc9e563883a38194e7f85c52b6179a40
@@ -6344,7 +6356,7 @@ manifest:
       groups: [gftdcojp]
     - name: ai-gftd-apps-gftdcojp
       remote: gftdcojp
-      revision: 9d876b21839f722d3e4d76e8ed21a25ff677b4a0
+      revision: 5518815b507af7c3f356b7e4ff404b7f377d2e0b
       path: orgs/gftdcojp/ai-gftd-apps-gftdcojp
       clone-depth: 1
       groups: [gftdcojp]
