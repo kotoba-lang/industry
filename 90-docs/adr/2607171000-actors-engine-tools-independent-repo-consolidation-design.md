@@ -24,6 +24,18 @@ Proposed（設計・実現性評価）。オーナー指示「20-actors は全�
 
 → **Phase 2 の残りは「bulk prune」でなく「per-tool nbb 移植（owner が対象を指定 + 実 node テスト）」。** 無人 bulk 削除は production を壊すため行わない。
 
+### engine/tools split-now 実行ログ + 結合の実態（2026-07-16）
+
+| leaf | 判定 | commit |
+|---|---|---|
+| **kami-apps** → `etzhayyim/kami-apps` | ✅ split 済み（消費者ゼロ、kami-engine を git rev 依存＝location 非依存） | etz `1828d2b` / pin `88a4f89` |
+| **clj/murakumo-langchain** → `kotoba-lang/murakumo-langchain` | ✅ split 済み（自己完結 bb project、外部 require ゼロ、root 非配線） | etz `e1b0bd2` / pin `a90f3a1` |
+| legal-aid/comms-wasm-guest | ❌ standalone 化しない | package 名 `chigiri-*` + chigiri は既に独立リポ → **chigiri repo へ統合**が正（deploy.json 再ポイント要） |
+| **baien-wasm-ternary** | ❌ split 不可（要 re-point） | **ameno が Vite `?raw` で `40-engine/baien-wasm-ternary/shaders/*.wgsl` を相対パス build-time import**（bitnet-packed-dequant.ts:52 / bitlinear-forward.ts:115）— shader は Rust `include_str!` と ameno `?raw` の single-source-of-truth。split には ameno 側 import の再設計が要る |
+| kotoba_iso20022 | ⏸ 保留 | Python（owner: py deprecated）+ docs registry が「canonical location = kotoba submodule py/」と示唆 → 重複の可能性。split 前に canonical 確認が要る |
+
+**教訓**: Agent C が split-now と分類した engine leaf の多くは、近接調査で実結合を持つ（chigiri identity・ameno `?raw` shader import・py canonical 重複）。**真に無結合だったのは kami-apps と murakumo-langchain の2つ**。残りは per-leaf の再ポイント/統合判断が要り、無人 bulk split はしない。次の clean 候補が尽きたら engine/tools split はここで一旦停止し、owner 判断（baien の ameno 結合をどう解くか、legal guest の chigiri 統合、kotoba_iso20022 の canonical 確認）を仰ぐ。
+
 **Phase 1 完了**: compat 1027 のうち **1025 を consolidate**（844 除去 + 181 migrate）。残るは hand-deepened `salesforce-compat`/`stripe-compat` 2 件のみ（個別レビューのため意図的保持）。全 compat が kotoba-lang `com-<base>` 独立リポ + west 登録済みが source of truth。
 
 **方針転換（オーナー指示 2026-07-16）**: Python は deprecated・prune 対象、load-bearing なものは cljs(nbb) で再実装。
