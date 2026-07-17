@@ -3971,6 +3971,43 @@ ibec.ie自身の"About us"ページには正確な設立日の記載が無かっ
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 134 — 自治体軸44件目(Wellington, NZL) — ニュージーランド初参入、シンガポールは都市国家という構造不適合のため断念)
+
+`cloud-itonami-municipality-nzl-wellington`を新規GitHubリポジトリ
+として scaffold・push
+([commit 895452c](https://github.com/cloud-itonami/cloud-itonami-municipality-nzl-wellington/commit/895452c))：
+
+ニュージーランドの首都ウェリントン——3軸いずれもニュージーランド
+初参入。
+
+**本tick当初はシンガポールを検討したが断念**——都市国家である
+シンガポールは、本catalogの他の全自治体エントリと異なり、国家
+政府から独立した自治体政府層を持たないため、この軸の構造に
+適合しないと判断。
+
+wellington.govt.nz自身の歴史ページはHTTP 403、代わりに
+en.wikipedia.orgのWellington City Councilページを実際にWebFetchで
+読み2件を直接確認:
+
+- **1870年9月16日、ウェリントン市に法人格付与**——1886年
+  Municipal Corporations Actが遡及的にこの日付を確認、原文
+  引用: "Wellington's city status was formally recognized through
+  the Municipal Corporations Act 1886, which 'retroactively
+  recognising it to have been such since 16 September 1870.'"
+- **1989年、1989年ニュージーランド地方自治改革により現行の
+  Wellington City Council設立**——原文引用: "It was established
+  in 1989, replacing a borough council of the same name that had
+  existed since 1870."
+
+4 tests/11 assertions green。154リポジトリ・860 factを統合。
+`municipality wellington`クエリで2件とも正しく取得、タイトル/
+番号の横断query（`[?e "ordinance/municipality" "wellington"]`）
+でも一致確認。
+
+現状: 国軸45件・業界団体軸45件(28業種)・自治体軸44件——134 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
