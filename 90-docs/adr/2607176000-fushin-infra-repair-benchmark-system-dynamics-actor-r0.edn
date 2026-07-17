@@ -1,0 +1,52 @@
+[{:db/id -1
+  :adr/id "2607176000"
+  :adr/doc_type "adr"
+  :adr/status :accepted
+  :adr/date "2026-07-17"
+  :adr/title "fushin 普請 — インフラ対応ベンチマーク + system-dynamics シナリオアクター（R0 scaffold）"
+  :adr/source-format "edn"
+  :adr/related ["2605192100" "2605192200" "2605192300" "2605215000"
+                "2605301600" "2606021600" "2605250800" "2607072630"
+                "2607101558" "2607122100" "2607171600"]
+  :adr/authoritative_for ["orgs/etzhayyim/com-etzhayyim-fushin/*"]
+  :adr/origin "オーナーからの質問: cloud-itonami/etzhayyim で、日本の自治体（道路・水道・建築の修繕対応）の品質・対応速度は既に分析済みか、それを効率化する system dynamics agent は repo として設計されているか。調査の結果、両方とも未着手（cloud-itonami の ISIC repair 系 ADR は業種コード登録のみ、com-etzhayyim-ooyake/yosoku は汎用テンプレートで日本自治体比較データを持たない）と判明し、本ADRで新規に着手する。"
+  :adr/context "国土交通省道路局『道路メンテナンス年報（令和5年度版、2024年8月）』は、判定区分III・IVの橋梁を管理する全国1,712地方公共団体のうち、修繕等措置の着手率100%が894団体(52%)である一方、着手率50%未満の団体が159団体(9%)、2023年度末時点で措置完了率0%の団体が436団体(24%)存在すると報告しており、自治体間の対応速度に実在する有意な差を示す一次データが既に公開されている。水道管路についても厚生労働省FY2022データ（EY Japan・日本水道セキュリティ戦略機構2024年分析）で、基幹管路耐震適合率が都道府県間で神奈川県73.6%〜高知県24.8%とばらつくことが報告済み。建築確認処理日数の比較データは調査時点で発見できなかった（:building-permit domain は :data/status :unknown として明記し、捏造しない）。\n\n一方で etzhayyim には既に憲章化された統治規約がある: ooyake（公）はG11で「政府をランキングしない・target-listを作らない」civic wayfinding 専用の観測ミラーであり、この用途には使えない。danjo（弾正）が『公開政府データを事実ベースで監査する』という、まさに本件の性質に合致するアクターだが、danjo自身がまだ R0 scaffold（Council Lv6+ 批准 + JP corpus fetcher健全性確認等の R1 activation trigger 未達成）であり、かつ特定主体を名指しする「named-party publication」はG10/G11でSBT投票ゲート済み。yosoku（予測）はXMILEベースのシナリオシミュレーションアクターだが v1 mock-advisor のみでドメインモデル未搭載。"
+  :adr/decision "danjo の非裁定・aggregate-only・source-provenance discipline（G3-G6/G10/G11相当）と、yosoku のシナリオシミュレーション性格を組み合わせた新規アクター fushin（普請 — 江戸期の公共普請＝道普請・堤防普請等の維持修繕役務の呼称）を、danjo/gov-municipality と同型の R0 scaffold として作成する。R0 で実装するのは (a) 実引用済み集計統計（都道府県・全国レベル、個別自治体を名指ししない）の registry seed、(b) Little's Law + Sterman stock-management feedback による system-dynamics コア（backlog/completion-rate/quality、cloud-itonami ADR-2607101558/2607122100 と同型の教科書パターンを新規実装、cross-org depsは作らない）、(c) 集計統計から導いた『速い/遅い』の2つのイラストレーティブ archetype（実在自治体ではない）に対するシナリオ実行、(d) オフラインのローカル専用 heartbeat（外部publishなし）。実在自治体を名指しした observation/audit機能・LLM policy advisor は Council Lv6+ 批准まで実装しない（danjo と同じ activation gate）。"
+  :adr/gates [{:gate/id "G1" :gate/name "aggregate-only-ingestion" :gate/rule "個別自治体を名指しした record は作らない。国・都道府県レベルの集計統計のみ registry に置く。named-party 化は Council Lv6+ 批准後の別ゲート。"}
+              {:gate/id "G2" :gate/name "source-provenance-mandatory" :gate/rule "すべての統計値は一次資料（発行機関・レポート名・発行年月・URL・データ基準日）を registry に併記する。"}
+              {:gate/id "G3" :gate/name "non-adjudicating" :gate/rule "『対応が遅い/怠慢』等の評価的主張をしない。分布・比率の記述と、archetype に対するシナリオの what-if 結果のみを出力する。"}
+              {:gate/id "G4" :gate/name "no-named-party-scenario" :gate/rule "system-dynamics シナリオは registry の集計統計から較正した archetype（fast-cohort/slow-cohort）に対してのみ実行する。実在自治体名をシナリオ入力に使わない。"}
+              {:gate/id "G5" :gate/name "open-method" :gate/rule "SD モデルの式・較正方法は versioned な docstring として公開し、閉じたスコアリングにしない。"}
+              {:gate/id "G6" :gate/name "passive-only-ingestion" :gate/rule "官公庁の既公開レポート（PDF等）の引用のみ。ライブポータルスクレイピング・非公開データ取得はしない。"}
+              {:gate/id "G7" :gate/name "murakumo-only-deferred" :gate/rule "R3でLLM advisorを追加する場合はMurakumo-only推論とする（R0では advisor 未実装）。"}]
+  :adr/non-goals ["N1: 実在自治体の監査・格付け・named-party publication（danjo R1+ 以降のゲート付き別スコープ）"
+                   "N2: civic wayfinding / 窓口案内（ooyake のスコープ）"
+                   "N3: 個別自治体データのライブ収集・スクレイピング"
+                   "N4: LLM policy advisor の実稼働（R0はdeterministic SDのみ）"
+                   "N5: 建築確認処理日数ドメイン（データ未発見のため:unknown、follow-up）"]
+  :adr/boundary "ooyake=構造の地図（civic wayfinding、ランキング禁止）。danjo=国会会議録/予算書/政府調達を対象にした事実ベース非裁定監査（R0 scaffold、Council 批准待ち）。yosoku=ドメイン非依存のXMILEシナリオ実行基盤（v1 mock-advisor）。fushin=道路メンテナンス年報・水道統計などインフラ維持管理レポートを対象にした、集計限定の観測 + system-dynamics シナリオという、danjo・yosoku のどちらの既存スコープにも完全には収まらない新規の狭いドメイン専用アクター。"
+  :adr/data-sources [{:domain :road-bridge-repair
+                      :agency "国土交通省道路局"
+                      :report "道路メンテナンス年報（令和5年度版）"
+                      :published "2024-08"
+                      :as-of "2024-03-31 (2023年度末)"
+                      :url "https://www.mlit.go.jp/road/sisaku/yobohozen/pdf/r05/r05_08maint.pdf"}
+                     {:domain :water-pipe-renewal
+                      :agency "厚生労働省 (現 国土交通省水道整備・管理行政) / EY Japan・日本水道セキュリティ戦略機構 / 財務省政策研究所"
+                      :report "水道管路経年化・更新率・耐震適合率 FY2022集計 + 2024/2025分析"
+                      :published "2024-2025"
+                      :as-of "2022年度 (経年化率・更新率) / FY2022 (耐震適合率)"
+                      :url "https://isvd.or.jp/en/columns/water-infrastructure-aging-crisis"}
+                     {:domain :building-permit
+                      :status :unknown
+                      :note "比較可能な一次統計を調査時点で発見できず。捏造せず follow-up として明記。"}]
+  :adr/phases [{:id :r0 :scope "本commit: registry seed（集計・引用付き）+ SD core（.cljc）+ archetype較正 + テスト + オフラインlocal-only heartbeat + path-reserved cells（import時RuntimeError）"}
+               {:id :r1 :scope "Council Lv6+ 批准 + JP corpus fetcher 健全性確認後、danjoパターンに準じた ingest cell 活性化（依然 aggregate-only）"}
+               {:id :r2 :scope "named-party path の battle-test（SBT投票、danjo G10/G11相当）"}
+               {:id :r3 :scope "Murakumo-only LLM scenario advisor 追加、building-permit domain データ確保でき次第追加"}]
+  :adr/never ["実在自治体名を用いた事実主張・ランキング公開"
+              "官公庁ポータルのライブスクレイピング"
+              "SDシナリオ結果を事実であるかのように提示すること"
+              "Council Lv6+ 批准前の named-party publication"
+              "捏造データでの building-permit domain 補完"]
+  :adr/body "# ADR-2607176000: fushin 普請 — インフラ対応ベンチマーク + system-dynamics シナリオアクター（R0）\n\n- Status: Accepted (2026-07-17)\n- 関連: ADR-2605301600 (danjo R0) / ADR-2606021600 (ooyake) / ADR-2607072630 (yosoku) /\n  ADR-2605250800 (gov-municipality) / ADR-2607101558・2607122100 (cloud-itonami system-dynamics prior art) /\n  ADR-2605192100 (Mission Charter) / ADR-2607171600 (docs EDN-only)\n\n## Context\n\nオーナーから「日本の自治体インフラ対応の分析・効率化エージェントは既にあるか」という質問があり、\n調査の結果 (1) 実データは既に国交省・厚労省が公開しているが本ワークスペースには未取り込み、\n(2) それを扱うのに適した既存アクター ooyake は G11 で「政府をランキングしない」憲章上の制約があり\n不適、(3) danjo は性質的に最も近いが自身が R0 未稼働で、しかも named-party 公開は SBT 投票ゲート済み、\n(4) yosoku はドメインモデル未搭載の汎用シナリオ基盤、という間隙が判明した。\n\n## Decision\n\ndanjo の discipline（非裁定・集計限定・出典必須）を借用しつつ、danjo の named-party ゲートとは独立に、\n**集計統計 + イラストレーティブ archetype に対する what-if シナリオ**という、実在自治体を一切名指し\nしない狭いスコープの新規アクター fushin を R0 scaffold として作成する。\n\nSD コアは cloud-itonami の Forrester/Sterman stock-flow パターン（ADR-2607101558/2607122100）を\nプライアーアートとして参照しつつ、ドメインを backlog（未対応の通報・判定III/IV施設）/\ncompletion-rate（backlog/mean-repair-days, Little's Law）/ Sterman stock-management feedback\n（backlog-target への収束）に翻訳した新規実装とする（cross-org depsは作らない）。\n\narchetype 較正は、道路メンテナンス年報の『着手率100%が52%』『着手率50%未満が9%』という実分布から\n『fast-cohort』『slow-cohort』の2つの illustrative parameter set を作るのみで、個別自治体データでは\nない。\n\n## Consequences\n\n- (+) 実データに基づく、憲章と整合した最小スコープの一歩が踏める\n- (+) danjo が将来 R1+ 化した際、fushin の集計 registry パターンをそのまま輸入できる\n- (-) 個別自治体を名指しした本当の意味での『どの自治体が遅いか』への回答は、Council 批准まで\n  提供できない（意図的な制約）\n- (-) building-permit ドメインは follow-up のまま\n\n## References\n\n- `orgs/etzhayyim/com-etzhayyim-fushin/README.md` / `CLAUDE.md`\n- `orgs/etzhayyim/com-etzhayyim-fushin/registry/benchmark-seed.edn`\n- `orgs/etzhayyim/com-etzhayyim-fushin/src/fushin/infra_dynamics.cljc`"}]
