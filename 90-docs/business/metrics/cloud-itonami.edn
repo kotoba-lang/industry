@@ -1,37 +1,47 @@
 {:health-status 200,
- :asOf "2026-07-17T01:07:18.290Z",
+ :asOf "2026-07-17T05:07:53.908Z",
  :zone-name "itonami.cloud",
  :productSurfaceHint
  {:url "/api/status",
   :note
-  "scores.productSurface should be 5924/5924 when free path is live"},
+  "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 243,
-  :pageviews-7d 16,
-  :uniques-7d-sum 72,
+ {:requests-7d 260,
+  :pageviews-7d 18,
+  :uniques-7d-sum 77,
   :zone "itonami.cloud"},
- :agentRuns7d 22291,
+ :agentRuns7d 23293,
  :sources [:cloudflare :health :emitter :itonami-free-path],
  :agentNote
  "CF may 403 Python-urllib/* (error 1010) — set an explicit User-Agent.",
  :health-live
  {:bottleneck
-  "free path live — paid path needs owner STRIPE_* secrets",
-  :asOf "2026-07-17T01:07:19.062Z",
+  "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
+  :asOf "2026-07-17T05:07:54.593Z",
+  :nextOwnerActions
+  [{:id "first-paid-checkout",
+    :href "/isco-1212/",
+    :doc "/docs/checkout-preflight.md",
+    :gate "hyp/itonami-smb-pay",
+    :detail
+    "Sign in (passkey) then Subscribe via Stripe Checkout — externalPaid must become ≥1"}],
   :agentNote
   "CF may 403 Python-urllib/* (error 1010) — set an explicit User-Agent for agents.",
   :source "itonami-data-kv-list",
-  :stripe {:activeSubscriptions 0, :customerBindings 0},
+  :stripe
+  {:activeSubscriptions 0,
+   :customerBindings 0,
+   :secretsConfigured true},
   :freePath
   {:ok true,
    :externalTenants 4,
    :selfRegisteredOwners 4,
    :registryEntries 4,
-   :agentRuns7d 22291,
+   :agentRuns7d 23293,
    :externalPaid 0},
   :ok true,
   :live true,
-  :version "0.1.818",
+  :version "0.1.870",
   :links
   {:freeClaim "/isco-1212/",
    :openBusiness "/api/open-business",
@@ -41,11 +51,13 @@
    :billing "/api/billing/status",
    :freePathDocs "/docs/free-path.md",
    :securityTxt "/.well-known/security.txt",
+   :checkoutPreflight "/docs/checkout-preflight.md",
    :digest "/api/freepath",
    :marketEntry "/api/market-entry",
    :jobs "/api/jobs",
    :staticHealth "/health.json",
    :status "/api/status",
+   :wedgePages "/docs/wedge-pages.md",
    :maturity "/api/maturity",
    :goLive "/#go-live",
    :agentRuns "/api/agent-runs",
@@ -58,10 +70,11 @@
    :llms "/llms.txt"}},
  :paths
  {:ok
-  [{:path "/itonami/verticals", :requests 1}
-   {:path "/join/browser", :requests 1}
-   {:path "/robots.txt", :requests 1}],
-  :status-mix {:client-error 32, :ok 3},
+  [{:path "/robots.txt", :requests 4}
+   {:path "/itonami", :requests 2}
+   {:path "/itonami/verticals", :requests 1}
+   {:path "/join/browser", :requests 1}],
+  :status-mix {:client-error 43, :ok 8},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
@@ -72,28 +85,28 @@
   :externalTenants 4,
   :selfRegisteredOwners 4,
   :registryEntries 4,
-  :agentRuns7d 22291,
+  :agentRuns7d 23293,
   :externalPaid 0},
  :free-path
  {:ok true,
   :externalTenants 4,
   :selfRegisteredOwners 4,
   :registryEntries 4,
-  :agentRuns7d 22291,
+  :agentRuns7d 23293,
   :externalPaid 0},
  :ok true,
- :traffic-quality {:window "24h", :probe-4xx-pct 91, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 84, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /itonami/verticals 1 · /join/browser 1 · /robots.txt 1 | 4xx(probe) 91%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 4 · /itonami 2 · /itonami/verticals 1 · /join/browser 1 | 4xx(probe) 84%",
  :funnel
  {:trials 4,
   :freeClaims 4,
-  :agentRuns7d 22291,
+  :agentRuns7d 23293,
   :externalTenants 4,
   :paid 0},
- :version "0.1.818",
+ :version "0.1.870",
  :signal
- "itonami.cloud 実測 243 req/7d・72 uniques(日次和)・うち4xx probe 91%(24h)",
+ "itonami.cloud 実測 260 req/7d・77 uniques(日次和)・うち4xx probe 84%(24h)",
  :tenants
  {:active 4,
   :external-paid 0,
