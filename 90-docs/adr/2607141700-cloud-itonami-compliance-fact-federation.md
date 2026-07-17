@@ -3935,6 +3935,42 @@ assertionsと合わせ全28 tests/90 assertions green）。152リポジトリ・
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。アイルランドの業界団体軸の空白は今後のtickに持ち越し。
 
+## Addendum (2026-07-17, /loop tick 133 — 業界団体軸45件目(Ibec, IRL, ISIC 9411) — アイルランドが3tick窓で3軸完成、11カ国目)
+
+`cloud-itonami-assoc-9411-irl-ibec`を新規GitHubリポジトリとして
+scaffold・push
+([commit e912ee6](https://github.com/cloud-itonami/cloud-itonami-assoc-9411-irl-ibec/commit/e912ee6))：
+
+Ibec（Irish Business and Employers Confederation）。ISIC 9411の
+3件目——サウジアラビアFSC（tick121）・オーストリアWKÖ（tick127）
+に続く。tick132で正直に指摘したアイルランドの業界団体軸の空白を
+埋める。
+
+ibec.ie自身の"About us"ページには正確な設立日の記載が無かった
+（"over 30 years"という曖昧な言及のみ）ため、en.wikipedia.orgを
+実際にWebFetchで読み2件を直接確認:
+
+- **1993年、FIE（Federation of Irish Employers）とCII
+  （Confederation of Irish Industry）の合併によりIbec設立**
+- **1911年、Ibec最古の前身団体Dublin Employers' Federation
+  設立**（1928年Federated Employers Ltdとして法人化、1942年
+  Federated Union of Employers (FUE)へ改称、1989年FIEへ改称）
+
+4 tests/11 assertions green。153リポジトリ・858 factを統合。
+
+3軸横断query（`statute/jurisdiction`・`ordinance/country`・
+`association-rule/country`いずれも`"IRL"`）で全て正しく取得を
+確認——**アイルランドがtick131(自治体)→132(国)→133(業界団体)の
+3tick窓で3軸完成、UAE(tick100)・ベトナム(tick103)・
+インドネシア(tick106)・フィリピン(tick109)・トルコ(tick115)・
+ナイジェリア(tick118)・サウジアラビア(tick121)・
+マレーシア(tick124)・オーストリア(tick127)・
+スイス(tick130)に続く11カ国目**。
+
+現状: 国軸45件・業界団体軸45件(28業種)・自治体軸43件——133 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
