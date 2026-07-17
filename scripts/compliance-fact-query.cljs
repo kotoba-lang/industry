@@ -804,7 +804,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-ury-ciu/data/datascript-tx.edn"}
    {:label "cloud-itonami-iso3166-pol statute.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-iso3166-pol/schema/statute.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-iso3166-pol/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-iso3166-pol/data/datascript-tx.edn"}
+   {:label "cloud-itonami-municipality-prt-lisbon ordinance.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-municipality-prt-lisbon/schema/ordinance.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-municipality-prt-lisbon/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
