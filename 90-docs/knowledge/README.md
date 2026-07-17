@@ -17,6 +17,13 @@ EDN transaction として蓄積するディレクトリ。形式の先行例は
 | file | 内容 |
 |---|---|
 | `childrens-content-crude-humor.datoms.edn` | 子供向けコンテンツの下ネタ・露出規制の国別比較 + クレヨンしんちゃんの国別取り扱い事例 |
+| `anime-distribution.datoms.edn` | アニメ作品の国際配信: 国 × 放送局/プラットフォーム (`:network/*`) × 作品 × リリース (`:release/*`)。裏取り済み行は `:release/source` に URL |
+
+`:country/*` / `:work/*` の attribute 定義は両ファイルで同一なので、**2ファイルを同じ DB に
+transact して横断クエリできる**（`:country/id` / `:work/id` が `:db.unique/identity` の
+ため同一 entity は upsert でマージされる）。例: 「`:country/crude-humor-policy` が
+`:prohibited` の国で、実際にどの放送局がどの作品をどの `:release/edit-status` で流したか」
+という規制×配信の join が可能。
 
 ## DataScript での使い方
 
