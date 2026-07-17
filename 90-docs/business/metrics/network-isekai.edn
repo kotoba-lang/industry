@@ -1,27 +1,27 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 9400,
-  :pageviews-7d 4327,
-  :uniques-7d-sum 434,
+ {:requests-7d 9412,
+  :pageviews-7d 4333,
+  :uniques-7d-sum 435,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 67}
-   {:path "//avcqlevnbk.php", :requests 28}
+  [{:path "/", :requests 68}
    {:path "/wp-admin/css/colors/index.php", :requests 22}
-   {:path "/feed/fork-stats.edn", :requests 22}
+   {:path "/feed/fork-stats.edn", :requests 21}
    {:path "/react/.env", :requests 18}
    {:path "/wk/index.php", :requests 18}
    {:path "/transactional/.env", :requests 18}
-   {:path "/wp-admin/css/index.php", :requests 18}],
-  :status-mix {:ok 1311, :server-error 15, :client-error 4},
+   {:path "/wp-admin/css/index.php", :requests 18}
+   {:path "/sendgrid/.env", :requests 15}],
+  :status-mix {:ok 1089, :server-error 15, :client-error 5},
   :window "24h"},
  :as-of "2026-07-17",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 67 · //avcqlevnbk.php 28 · /wp-admin/css/colors/index.php 22 · /feed/fork-stats.edn 22 · /react/.env 18 | 4xx(probe) 0% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): / 68 · /wp-admin/css/colors/index.php 22 · /feed/fork-stats.edn 21 · /react/.env 18 · /wk/index.php 18 | 4xx(probe) 0% · 5xx 1%",
  :signal
- "isekai.network 実測 9400 req/7d・434 uniques(日次和)・うち4xx probe 0%(24h)",
+ "isekai.network 実測 9412 req/7d・435 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
