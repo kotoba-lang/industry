@@ -299,12 +299,28 @@
        (is (= "[{:a 1}]" (cli/strip-fences "[{:a 1}]"))))))
 
 #?(:cljs
+   (deftest sse-collect-reassembles-stream
+     (testing "OpenAI delta stream"
+       (is (= "[{:a 1}]"
+              (cli/sse-collect "data: {\"choices\":[{\"delta\":{\"content\":\"[{:a\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\" 1}]\"}}]}\n\ndata: [DONE]\n"))))
+     (testing "Anthropic content_block_delta stream (thinking delta は無視)"
+       (is (= "[{:b 2}]"
+              (cli/sse-collect (str "event: content_block_delta\n"
+                                    "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"hmm\"}}\n\n"
+                                    "event: content_block_delta\n"
+                                    "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"[{:b 2}]\"}}\n\n")))))
+     (testing "SSE でない body は nil (JSON fallback へ)"
+       (is (nil? (cli/sse-collect "{\"choices\":[{\"message\":{\"content\":\"x\"}}]}"))))))
+
+#?(:cljs
    (deftest normalize-llm-proposal-keywordizes-string-ids
      (testing "string の canvas/id・hyp/id・action を keyword 化 (qwen3.6 実測の揺れ)"
        (is (= {:proposal/action :canvas/add-item :canvas/id :cloud-itonami.metrics :event/value "v"}
               (cli/normalize-llm-proposal
                {:proposal/action "canvas/add-item" :canvas/id "cloud-itonami.metrics" :event/value "v"})))
        (is (= :hyp/itonami-smb-pay
-              (:hyp/id (cli/normalize-llm-proposal {:hyp/id ":hyp/itonami-smb-pay"})))))
+              (:hyp/id (cli/normalize-llm-proposal {:hyp/id ":hyp/itonami-smb-pay"}))))
+       (is (= :cloud-itonami.problem
+              (:canvas/id (cli/normalize-llm-proposal {:canvas/id (symbol "cloud-itonami.problem")})))))
      (testing "keyword はそのまま素通し"
        (is (= {:canvas/id :a.b} (cli/normalize-llm-proposal {:canvas/id :a.b}))))))
