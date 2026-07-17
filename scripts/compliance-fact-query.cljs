@@ -777,7 +777,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-swe-sn/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-9411-fin-ek association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-fin-ek/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-fin-ek/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-fin-ek/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-tha-fti association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-tha-fti/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-tha-fti/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
