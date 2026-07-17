@@ -215,3 +215,55 @@ Addendum 2 で残った「production の chat gate が secondary secret を受�
    これで ADR 本文の follow-up「storyboard 生成 actor の live 実行」が閉じた。
 
 残 follow-up: ongakuka/murakumo audio の実合成配線、publisher 実配線、template 追加。
+
+## Addendum 4 — aozora-primary publisher（作品=1 actor DID + YouTube 連携、2026-07-17）
+
+オーナー指示（「作品 = 1 actor did, aozora を主にして, youtube も aozora から連携投稿可能に」）
+を受け、publish 経路を YouTube 直投稿の follow-up 計画から **aozora.app 主 + YouTube 連携**へ
+再設計・実装した。3 並行調査（aozora publish surface / CACAO 自己発行 + kotobase write /
+youtube exec + blob）で実際の連携点を確定してから書いた。
+
+**確定した事実（調査で判明、捏造なし）**:
+- aozora.app は標準 AT Protocol PDS（`pds.aozora.app`、DID `did:web:aozora.app`）。**backing
+  store が kotobase.net（db `yoro-social`）** なので、aozora に publish すればデータは自動的に
+  kotobase.net に載る（要件③は別途書き込み不要で充足）。
+- publish は標準 XRPC: self-CACAO で `createSession`/`createAccount` → `uploadBlob` →
+  `createRecord`。profile は `app.bsky.actor.profile`（rkey `self`）、動画は
+  `app.bsky.feed.post` + `app.aozora.embed.video`（direct-URL embed = getBlob URL）。
+- DID は `did:key`（PLC 無し）。**作品=1 DID は暗号的にタダ**（work ごとに新規 Ed25519 seed →
+  did:key 導出）。手本: `dougaka-actor`（JVM）と `ai-gftd-dougaka-kodomo/tools/publish_aozora.cljs`
+  （nbb/cljs、`kotobase.cacao`/`kotobase.cid` + `@noble/curves`）。
+- **runtime は nbb**（dougaka-vector と一致、cljs publish 先例あり）。JVM の com-youtube/cacao
+   port ではなく、`kotobase-client` の cljs cacao/cid を消費し、YouTube resumable upload も node
+  fetch で再実装（repo runtime priority に従う）。
+
+**実装（子 repo pin `2257c49`）**:
+- `src/dougaka_vector/publish.cljc`（純関数）: work-slug/handle、profile/video-post/catalog
+  record、youtube metadata + aozora backlink description。
+- `bin/publish.cljs`（nbb）: **作品=1 DID keyring**（work ごとに新規 seed → did:key、
+  `.dougaka-vector-keyring/<slug>.edn` に gitignore 永続、再 publish は同一 DID 再利用）→
+  self-CACAO（owner creds 不要）→ createAccount(`<slug>.aozora.app`) → uploadBlob(mp4) →
+  profile(self) + video post + 自前 catalog(`app.gftd.dougakaVector.video`) を createRecord。
+  `--dry-run` でオフライン検証可。
+- `bin/youtube.cljs`（nbb）: aozora record からの **syndication** — node fetch で resumable
+  upload（operator OAuth env が要る、無ければ skip）→ `youtubeUrl` を aozora catalog に
+  `putRecord` で書き戻し、aozora を canonical source に保つ。
+- `render.cljs` が `storyboard.edn` を出力（publish が title/summary/copy を導出できるよう）。
+- テスト +8（計 20 tests / 104 assertions green）。
+
+**live 実証**: この repo の SQL-injection ja 作品を aozora.app に **実 publish 成功**。
+actor did `did:key:z6MkenJpFZekGBaRuJNsBCw1nsQLg72mrEREMkJgMkUvyG7b`、handle
+`sql-injection-2026.aozora.app`。getRecord で profile・video post(`app.aozora.embed.video`
+埋め込み)・catalog が読み戻せ、getBlob が 634538 byte の mp4 実体を 206 で返すことを確認。
+records は aozora PDS 経由で kotobase.net(yoro-social) に格納。self-sovereign CACAO なので
+owner creds 無しでエージェント単独実行（恒久承認の公開範囲内）。
+
+**要件の充足状況**:
+- ✅ 作品 = 1 actor DID（per-work keyring、live で1作品=1 did:key を実証）
+- ✅ aozora を主に（profile + video post + catalog を aozora に publish、live 確認）
+- ✅ データは kotobase.net（aozora PDS の backing store = yoro-social、自動）
+- ⚠ YouTube 連携（実装 + dry-run 済み。**実投稿は operator OAuth creds 待ち** —
+  `YOUTUBE_CLIENT_ID/_SECRET/_REFRESH_TOKEN`。yukkuri `docs/youtube-upload-setup.md` 参照）
+
+残 follow-up: YouTube OAuth creds のオーナー投入 → live syndication、AppView の
+getVideoFeed indexer が新 catalog collection を拾うかの確認、ongakuka/murakumo audio 実合成配線。
