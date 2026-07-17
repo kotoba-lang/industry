@@ -122,3 +122,30 @@ green。pin: ai-gftd-mangaka → b138415。
 閲覧: https://manga.gftd.ai/work/gh-arc0-1-v11 (バーで v10 ⇄ v11 切替)。
 全 45p の v11 再生成は別バッチ (versions.edn の note に明記)。
 pin: ai-gftd-mangaka → 4bae02e。
+
+## Addendum 4 (2026-07-17) — storyboard 逆抽出（PNG → EDN 正本化）
+
+45p の v11 全ページ化を阻む事実が確定した: **storyboard 源は退役 Python
+パイプラインと共に失われている**（D1 は最終 PNG への参照のみ・panel 行なし、
+mangaka-data は採点物と xdts のみ、page.json は 4p のレイアウトデモ）。
+回答として「完成ページ画像から storyboard を復元する」経路を実装:
+
+1. **lib**: `kami.mangaka.qa.recover` — page-script 抽出 prompt/parser
+   （cast 照合で名前を ground、未知は "unknown"（捏造キャラを正本に混ぜ
+   ない）、shot 語彙丸め）+ コマ矩形×脚本の読み順 zip（数の食い違いは
+   `:mismatch` で明示 — silent truncation にしない）。
+2. **graph**: `ai.gftd.mangaka.recoverStoryboard` — detect-panels →
+   page-script 抽出 → storyboard doc 組み上げ（`:page/recovered-from` を
+   焼き込み、**復元は推定であり原本ではない**）→ 永続化 + lint。offline は
+   applied false で何も書かない。
+3. **round-trip**: 復元 doc はそのまま doc-aware 生成（品質ループ /
+   coscientist）の入力になる — これが「v10 公開 PNG → EDN 復元 → v11
+   再生成 → 版切替公開」の全ページ化パイプラインの入口。
+
+lib 8 tests / 55 assertions、mangaka 123 tests / 767 assertions green。
+pin: kami-mangaka-qa → ccd30d2、ai-gftd-mangaka → 34ba751。
+
+補足（同日調査）: superproject CI の慢性赤は **GitHub Actions の課金失敗**
+（全ジョブが起動前に "account payments have failed" で死んでいる）— コード
+起因ではない。pin 検証はローカル実行で green を確認済み。オーナーの
+Billing 設定確認待ち。

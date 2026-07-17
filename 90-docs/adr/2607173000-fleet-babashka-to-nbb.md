@@ -109,3 +109,20 @@ has the nbb files; superproject pins still point at pre-migration SHAs until
 - Wave 3: `cloud-itonami` bb.edn → `scripts/tasks.edn` + `run-task.cljs` (164 shellable tasks) landed on main.
 - Wave 3 batch: ~25 additional project-root bb.edn converted+merged; remaining project-root bb.edn ≈ worktree/fork/etzhayyim-root only.
 - Helper: `scripts/bb_edn_to_nbb_tasks.cljs` for large bb.edn conversion.
+
+## Progress addendum (2026-07-17 — next wave)
+
+- Clean-base re-land of conflicted remotes: freeboard, murakumo, kami-webgpu, kami-genko, io-multiformats, org-chainagnostic-cacao, org-ietf-turn, kawaraban, …
+- `edn-datomize.bb` fan-out: ~19 child repos → standalone nbb `edn-datomize.cljs` (schema at repo-root `schema.edn`)
+- `publish.bb` runtime: `com-junkawasaki/kototama` + `kotoba-lang/kototama` → `publish.cljs`
+- `etzhayyim/root` bb.edn retired on main (3 shellable + 95 complex catalogued in tasks-complex.edn)
+- Project-root `bb.edn` remaining: worktree/fork only (`_wt-pr427`, `cloud-itonami-current`)
+- Helpers: `scripts/edn_datomize_standalone.cljs`, `scripts/publish_actor_standalone.cljs`
+
+## Progress addendum (2026-07-17 — final fan-out)
+
+- Nested `edn-datomize.bb` under `etzhayyim/root/20-actors/*` → nbb (14 files)
+- Remaining standalone edn-datomize for subaru/sanae
+- All 10 etzhayyim actor `methods/publish.cljs` wrappers on main
+- `etzhayyim/root`: 54 require/-main tasks promoted to `nbb -m` / nbb -e; 41 remain in tasks-complex (python shells, multi-require test suites, etc.)
+- Helper: `scripts/wire_tasks_complex.cljs`
