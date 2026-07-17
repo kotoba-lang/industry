@@ -8,29 +8,29 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4320, "app-aozora-appview" 4610},
+ {"app-aozora-pds" 4330, "app-aozora-appview" 4679},
  :zone
- {:requests-7d 26109,
-  :pageviews-7d 6572,
-  :uniques-7d-sum 717,
+ {:requests-7d 26275,
+  :pageviews-7d 6578,
+  :uniques-7d-sum 721,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2960}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 1066}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2961}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 1046}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 284}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
     :requests 168}
-   {:path "/", :requests 91}
-   {:path "/xrpc/com.atproto.repo.listRecords", :requests 82}
+   {:path "/", :requests 87}
    {:path "/xrpc/com.atproto.sync.getBlob", :requests 80}
+   {:path "/xrpc/com.atproto.repo.listRecords", :requests 78}
    {:path "/xrpc/app.bsky.actor.getProfile", :requests 50}],
-  :status-mix {:ok 6688, :client-error 128, :server-error 51},
+  :status-mix {:ok 6465, :client-error 122, :server-error 51},
   :window "24h"},
  :as-of "2026-07-17",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2960 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 1066 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 284 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 168 · / 91 | 4xx(probe) 2% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2961 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 1046 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 284 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 168 · / 87 | 4xx(probe) 2% · 5xx 1%",
  :signal
- "aozora.app 実測 26109 req/7d・717 uniques(日次和)・うち4xx probe 2%(24h)、workers 8930 inv/7d"}
+ "aozora.app 実測 26275 req/7d・721 uniques(日次和)・うち4xx probe 2%(24h)、workers 9009 inv/7d"}
