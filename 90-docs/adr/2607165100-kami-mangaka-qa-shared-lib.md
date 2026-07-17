@@ -98,3 +98,27 @@ green。pin: kami-mangaka-qa → df897eb、ai-gftd-mangaka → 30c7b5f。
 
 tests +3（変換 / 種まき / サイクル閉包）、suite 121 tests / 754 assertions
 green。pin: ai-gftd-mangaka → b138415。
+
+## Addendum 3 (2026-07-17) — CLJ/EDN チェーン産ページの公開 + バージョン切替
+
+オーナー指示「最新の clj, edn チェーンで作成したものを公開して。また この
+バージョンごとに切り替えられるようにしたい」を実装:
+
+1. **v11 公開** — 初の現行チェーン end-to-end ページを manga.gftd.ai に公開
+   (`gh-arc0-1-v11`): storyboard datoms → 品質ループ 4 パネル (rubric
+   76/73/77/67、facePresence 1.0×3 — splash のキャラ出現は引き続き LoRA
+   領域の課題) → komawari 合成 (kami-mangaka-page、吹き出し/SFX/トーン込み
+   B5) → **page-level jumpBenchmarkQa 70.0**。同一 judge (gemma4 n=3) で
+   v10 公開 p01 は 52.0 — ステージ整合後の同条件比較で +18。R2 blobKey
+   `gh-arc0-1-v11-p01` + D1 work/page 行。
+2. **バージョン切替** — 正本は ai-gftd-mangaka repo 直下の `versions.edn`
+   (append-only レジストリ)。D1 work props {versionGroup, versionLabel,
+   pipeline, jumpQa} はその projection。reader (worker `versions-of` +
+   render `version-nav`) が同 group の work 群から切替バーを `/work/<rkey>`
+   HTML と `/api/work/<rkey>` `:versions` に描く。v10 側 work props にも
+   versionGroup を追記 (45p の内容は不変)。version 未設定の既存作品は
+   完全無変化 (reader tests 8/38 green)。reader deploy 済み (efacba55)。
+
+閲覧: https://manga.gftd.ai/work/gh-arc0-1-v11 (バーで v10 ⇄ v11 切替)。
+全 45p の v11 再生成は別バッチ (versions.edn の note に明記)。
+pin: ai-gftd-mangaka → 4bae02e。
