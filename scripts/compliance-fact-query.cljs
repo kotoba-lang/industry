@@ -475,7 +475,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-mex-coparmex/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-9411-ita-confindustria association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-ita-confindustria/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-ita-confindustria/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-ita-confindustria/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-nld-vnoncw association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-nld-vnoncw/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-nld-vnoncw/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
