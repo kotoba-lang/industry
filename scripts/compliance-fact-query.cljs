@@ -485,6 +485,9 @@
    {:label "cloud-itonami-assoc-9411-arg-uia association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-arg-uia/schema/association-rule.edn"
     :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-arg-uia/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-bel-feb association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-bel-feb/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-bel-feb/data/datascript-tx.edn"}
    ;; culture.facts (ADR-2607171400: cloud-itonami-municipality-culture-catalog,
    ;; addendum 2/3 Wave 1 + 1b). One entry per SOURCES repo above that also
    ;; carries a culture catalog (country-level or municipality-level) -- a
