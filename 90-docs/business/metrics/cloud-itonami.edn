@@ -1,6 +1,6 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :health-status 200,
- :asOf "2026-07-17T09:07:57.974Z",
+ :asOf "2026-07-17T10:07:47.953Z",
  :zone-name "itonami.cloud",
  :productSurfaceHint
  {:url "/api/status",
@@ -11,16 +11,17 @@
   :pageviews-7d 18,
   :uniques-7d-sum 79,
   :zone "itonami.cloud"},
- :agentRuns7d 23862,
+ :agentRuns7d 24079,
  :sources [:cloudflare :health :emitter :itonami-free-path],
  :nextOwnerActions
  [{:id "first-paid-checkout",
    :ui "/isco-1212/",
+   :agent "/isco-1212/agent.json",
    :docs "/docs/go-live.md",
    :preflight "/docs/checkout-preflight.md",
    :gate "hyp/itonami-smb-pay",
    :note
-   "Complete Stripe Checkout at /isco-1212/ (passkey then Subscribe). paid stays 0 until checkout + webhook.",
+   "Complete Stripe Checkout at /isco-1212/ (passkey then Subscribe). paid stays 0 until checkout + webhook. Machine-readable gate: GET /isco-1212/agent.json.",
    :verify
    "curl -sS -A 'owner/1' https://itonami.cloud/api/fleet/metrics | jq '.tenants.externalPaid'"}],
  :agentNote
@@ -28,7 +29,8 @@
  :health-live
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
-  :asOf "2026-07-17T09:07:58.666Z",
+  :asOf "2026-07-17T10:07:48.811Z",
+  :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:docs "/docs/go-live.md",
     :note
@@ -55,11 +57,12 @@
    :externalTenants 4,
    :selfRegisteredOwners 4,
    :registryEntries 4,
-   :agentRuns7d 23862,
+   :agentRuns7d 24079,
    :externalPaid 0},
+  :freeClaimAgent "/isco-1212/agent.json",
   :ok true,
   :live true,
-  :version "0.1.876",
+  :version "0.1.889",
   :links
   {:freeClaim "/isco-1212/",
    :distributionDrafts "/docs/distribution-drafts.md",
@@ -111,14 +114,14 @@
   :externalTenants 4,
   :selfRegisteredOwners 4,
   :registryEntries 4,
-  :agentRuns7d 23862,
+  :agentRuns7d 24079,
   :externalPaid 0},
  :free-path
  {:ok true,
   :externalTenants 4,
   :selfRegisteredOwners 4,
   :registryEntries 4,
-  :agentRuns7d 23862,
+  :agentRuns7d 24079,
   :externalPaid 0},
  :ok true,
  :traffic-quality {:window "24h", :probe-4xx-pct 87, :error-5xx-pct 0},
@@ -127,10 +130,10 @@
  :funnel
  {:trials 4,
   :freeClaims 4,
-  :agentRuns7d 23862,
+  :agentRuns7d 24079,
   :externalTenants 4,
   :paid 0},
- :version "0.1.876",
+ :version "0.1.889",
  :signal
  "itonami.cloud 実測 262 req/7d・79 uniques(日次和)・うち4xx probe 87%(24h)",
  :tenants
