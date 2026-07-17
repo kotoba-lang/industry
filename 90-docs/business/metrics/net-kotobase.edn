@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 3520, "kotobase-cf-wasm-staging" 193},
+ {"net-kotobase" 3593, "kotobase-cf-wasm-staging" 249},
  :zone
- {:requests-7d 4455,
-  :pageviews-7d 483,
-  :uniques-7d-sum 661,
+ {:requests-7d 4723,
+  :pageviews-7d 486,
+  :uniques-7d-sum 665,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 143}
+  [{:path "/", :requests 142}
+   {:path "/xrpc/kotobase.git.object.put", :requests 108}
    {:path "/xrpc/net.kotobase.store.get", :requests 93}
-   {:path "/xrpc/net.kotobase.store.put", :requests 81}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 46}
-   {:path "/health", :requests 44}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 60}
+   {:path "/health", :requests 49}
    {:path
     "/kotobase-cf-wasm-production/ipns/bafyreibq7zbruf4ug4sy43fao2wcxti67f2p6ehu5yteil74xyk76xdemy.json",
     :requests 31}
-   {:path "/robots.txt", :requests 30}
-   {:path "/api/funnel", :requests 22}],
-  :status-mix {:client-error 1335, :ok 899, :server-error 6},
+   {:path "/api/funnel", :requests 22}
+   {:path "/xrpc/kotobase.git.ref.set", :requests 22}],
+  :status-mix {:client-error 1228, :ok 1228, :server-error 6},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,9 +32,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-17",
- :traffic-quality {:window "24h", :probe-4xx-pct 60, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 50, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 143 · /xrpc/net.kotobase.store.get 93 · /xrpc/net.kotobase.store.put 81 · /xrpc/ai.gftd.apps.kotobase.datomic.q 46 · /health 44 | 4xx(probe) 60% · 5xx 0%",
- :funnel {:visitors 760, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 142 · /xrpc/kotobase.git.object.put 108 · /xrpc/net.kotobase.store.get 93 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 60 · /health 49 | 4xx(probe) 50% · 5xx 0%",
+ :funnel {:visitors 762, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 4455 req/7d・661 uniques(日次和)・うち4xx probe 60%(24h)、workers 3713 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 4723 req/7d・665 uniques(日次和)・うち4xx probe 50%(24h)、workers 3842 inv/7d、Stripe active subs 0"}
