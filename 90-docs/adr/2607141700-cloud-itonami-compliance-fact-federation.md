@@ -3869,6 +3869,37 @@ Bankiervereinigung）。ISIC 6419（銀行業）の11カ国目。tick129で
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 131 — 自治体軸43件目(Dublin, IRL) — アイルランド初参入、公式ドメイン全滅のためWikipediaを直接確認)
+
+`cloud-itonami-municipality-irl-dublin`を新規GitHubリポジトリとして
+scaffold・push
+([commit dc6e6f7](https://github.com/cloud-itonami/cloud-itonami-municipality-irl-dublin/commit/dc6e6f7))：
+
+アイルランドの首都ダブリン——3軸いずれもアイルランド初参入。
+
+アイルランドの公式政府ドメイン（irishstatutebook.ie、
+dublincity.ie、gov.ie）は試した全URLでHTTP 403、全滅。代わりに
+en.wikipedia.orgのDublin City Councilページを実際にWebFetchで
+読み（WebSearch要約経由ではなく）、2件を直接確認:
+
+- **Municipal Corporations (Ireland) Act 1840**— 現行の一院制
+  評議会を設立、原文引用: "Under the Municipal Corporations
+  (Ireland) Act 1840, they were replaced by a unicameral assembly.
+  The name Dublin City Council was adopted for the unicameral
+  assembly." 初の選挙は1841年10月。
+- **Local Government Act 2001**— 現行の統治法、原文引用: "Local
+  government in Dublin is regulated by the Local Government Act
+  2001." Dublin CorporationからDublin City Councilへの改称は
+  2002年1月1日。
+
+4 tests/11 assertions green。152リポジトリ・854 factを統合。
+`municipality dublin`クエリで2件とも正しく取得、タイトル/番号の
+横断query（`[?e "ordinance/municipality" "dublin"]`）でも一致確認。
+
+現状: 国軸44件・業界団体軸44件(28業種)・自治体軸43件——131 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
