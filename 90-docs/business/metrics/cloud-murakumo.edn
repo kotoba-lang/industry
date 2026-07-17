@@ -1,25 +1,25 @@
 {:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 150204},
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 151295},
  :zone
- {:requests-7d 69426,
-  :pageviews-7d 628,
-  :uniques-7d-sum 602,
+ {:requests-7d 69811,
+  :pageviews-7d 632,
+  :uniques-7d-sum 606,
   :zone "murakumo.cloud"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/infer/hwmetrics", :requests 8020}
+  [{:path "/infer/hwmetrics", :requests 8036}
    {:path "/v1/chat/completions", :requests 222}
-   {:path "/", :requests 115}
+   {:path "/", :requests 111}
    {:path "/api/v1/generation/jobs/02ee5769b9b3494389f5726014b72ce7",
     :requests 76}
-   {:path "/infer/cost", :requests 22}
+   {:path "/infer/cost", :requests 23}
    {:path "/organism/pulse.json", :requests 22}
+   {:path "/robots.txt", :requests 19}
    {:path "/api/v1/generation/jobs/bb7ebb87eeb24491835ea035a2668cc7",
-    :requests 18}
-   {:path "/js/main.js", :requests 16}],
-  :status-mix {:client-error 1092, :ok 8696, :server-error 12},
+    :requests 18}],
+  :status-mix {:client-error 1046, :ok 8705, :server-error 12},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,7 +33,7 @@
  :as-of "2026-07-17",
  :traffic-quality {:window "24h", :probe-4xx-pct 11, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8020 · /v1/chat/completions 222 · / 115 · /api/v1/generation/jobs/02ee5769b9b34943… 76 · /infer/cost 22 | 4xx(probe) 11% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8036 · /v1/chat/completions 222 · / 111 · /api/v1/generation/jobs/02ee5769b9b34943… 76 · /infer/cost 23 | 4xx(probe) 11% · 5xx 0%",
  :cost
  {:fleet-yen-per-mtok 22.18663865575727,
   :spot-yen-per-mtok 40.55,
@@ -47,4 +47,4 @@
    :throughput-tok-s 2000,
    :fx-yen-per-usd 162.2}},
  :signal
- "murakumo.cloud 実測 69426 req/7d・602 uniques(日次和)・うち4xx probe 11%(24h)、workers 150204 inv/7d、Stripe active subs 0"}
+ "murakumo.cloud 実測 69811 req/7d・606 uniques(日次和)・うち4xx probe 11%(24h)、workers 151295 inv/7d、Stripe active subs 0"}
