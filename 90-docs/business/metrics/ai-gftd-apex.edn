@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6947, "ai-gftd-chat-shell" 1262},
+ {"magatama-sh1n5h1x" 6953, "ai-gftd-chat-shell" 1262},
  :zone
- {:requests-7d 431044,
-  :pageviews-7d 7234,
-  :uniques-7d-sum 4958,
+ {:requests-7d 433780,
+  :pageviews-7d 7239,
+  :uniques-7d-sum 4978,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/", :requests 1089}
+  [{:path "/", :requests 1122}
    {:path "/favicon.ico", :requests 144}
    {:path "/license.txt", :requests 46}
-   {:path "/.env", :requests 38}
-   {:path "/155.php", :requests 27}
+   {:path "/.env", :requests 23}
    {:path "/index.php", :requests 20}
+   {:path "/155.php", :requests 19}
    {:path "/stdin.php", :requests 19}
    {:path "/8.php", :requests 16}],
-  :status-mix {:client-error 23172, :ok 1897, :server-error 16974},
+  :status-mix {:client-error 1549, :ok 1936, :server-error 16932},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,11 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-17",
- :traffic-quality
- {:window "24h", :probe-4xx-pct 55, :error-5xx-pct 40},
+ :traffic-quality {:window "24h", :probe-4xx-pct 8, :error-5xx-pct 83},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 1089 · /favicon.ico 144 · /license.txt 46 · /.env 38 · /155.php 27 | 4xx(probe) 55% · 5xx 40%",
+ "上位 page (24h, 2xx/3xx): / 1122 · /favicon.ico 144 · /license.txt 46 · /.env 23 · /index.php 20 | 4xx(probe) 8% · 5xx 83%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 431044 req/7d・4958 uniques(日次和)・うち4xx probe 55%(24h)、workers 8209 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 433780 req/7d・4978 uniques(日次和)・うち4xx probe 8%(24h)、workers 8215 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
