@@ -1,25 +1,25 @@
 {:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 152339},
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 153374},
  :zone
- {:requests-7d 70186,
-  :pageviews-7d 633,
-  :uniques-7d-sum 606,
+ {:requests-7d 70553,
+  :pageviews-7d 636,
+  :uniques-7d-sum 608,
   :zone "murakumo.cloud"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/infer/hwmetrics", :requests 8049}
+  [{:path "/infer/hwmetrics", :requests 8063}
    {:path "/v1/chat/completions", :requests 222}
-   {:path "/", :requests 108}
+   {:path "/", :requests 101}
    {:path "/api/v1/generation/jobs/02ee5769b9b3494389f5726014b72ce7",
     :requests 76}
    {:path "/infer/cost", :requests 23}
    {:path "/organism/pulse.json", :requests 22}
-   {:path "/robots.txt", :requests 19}
+   {:path "/robots.txt", :requests 20}
    {:path "/api/v1/generation/jobs/bb7ebb87eeb24491835ea035a2668cc7",
     :requests 18}],
-  :status-mix {:client-error 1074, :ok 8715, :server-error 12},
+  :status-mix {:ok 8727, :client-error 1084, :server-error 12},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,7 +33,7 @@
  :as-of "2026-07-17",
  :traffic-quality {:window "24h", :probe-4xx-pct 11, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8049 · /v1/chat/completions 222 · / 108 · /api/v1/generation/jobs/02ee5769b9b34943… 76 · /infer/cost 23 | 4xx(probe) 11% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8063 · /v1/chat/completions 222 · / 101 · /api/v1/generation/jobs/02ee5769b9b34943… 76 · /infer/cost 23 | 4xx(probe) 11% · 5xx 0%",
  :cost
  {:fleet-yen-per-mtok 22.18663865575727,
   :spot-yen-per-mtok 40.55,
@@ -47,4 +47,4 @@
    :throughput-tok-s 2000,
    :fx-yen-per-usd 162.2}},
  :signal
- "murakumo.cloud 実測 70186 req/7d・606 uniques(日次和)・うち4xx probe 11%(24h)、workers 152339 inv/7d、Stripe active subs 0"}
+ "murakumo.cloud 実測 70553 req/7d・608 uniques(日次和)・うち4xx probe 11%(24h)、workers 153374 inv/7d、Stripe active subs 0"}
