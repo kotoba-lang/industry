@@ -90,6 +90,30 @@ ADR-2607166600 の残 follow-up のうち「kotobase リクエスト単価 ~1.2s
 - (−) 初回 read の往復単価は残る。次の一手は kotobase の compound read
   （1 リクエストに複数 index 読みを同梱、getPostThread が 4〜6 往復 → 1 往復）。
 
+## Addendum 2（2026-07-17）: kotobase.net プレーンの検証結果と queue poll 最適化
+
+「未検証」だった kotobase.net の serving 実体をコード直読 + 実測で確定:
+
+- apex `kotobase.net`（net-kotobase worker）は datomic ops を
+  `KOTOBA_BACKEND_URL = backend.kotobase.net` にプロキシし、その実体
+  **kotobase-cf-wasm は名前だけ WASM で、中身は kotobase-server の cljc
+  handler（hot-datoms、components/limit 尊重の range-pruned narrow 読み）に
+  移行済み**だった。kotobase-client の「wasm worker は components を無視」
+  警告 docstring は陳腐化していた（本調査を一度誤誘導 — PR #9 で修正）。
+- ただし **`datomic.q` は kotobase.net 側も hot-db 全再構築**（aozora 側
+  cljc-worker と同じ）で、その最大消費者は **cloud-murakumo 分散ジョブ
+  キューの 1 秒間隔 worker poll**（queued-jobs/job-by-id が Datalog q）。
+  append-only の :queue/events 履歴に比例して毎 poll のコストが成長する
+  構造だった（実測: 現状の queue graph は 0.4〜0.5s/poll と小さく無事故 —
+  成長曲線だけが問題）。
+- **修正**: poll を `:avet [":gen.job/edn"]` の narrow attr-prefix 読みに
+  置換（payload は同一、hot-db 構築ゼロ、cloud-murakumo PR #22、202 tests
+  green）。これで kotobase.net プレーンの既知の O(graph) 定常読みは解消。
+  残る q 消費者は net-kotobase 自身の geo/web search（低頻度・別スコープ）。
+- kotobase.net には `datomic.view` / 不変ブロックキャッシュは未搭載
+  （kotobase-cf-wasm の store 層は cljc-worker と別実装）— 必要になった
+  時点で cljc-worker と同じ 2 点を移植するのが次の一手。
+
 ## Follow-ups
 
 - ~~zone Browser Cache TTL~~ — **closed 2026-07-17（worker 側で解消・zone 設定変更不要）**:
