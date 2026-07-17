@@ -63,9 +63,10 @@ episodes/ep1-komawari-redesign が手書き rows-of-beats 形式(:beat/weight /
    public/kotoba/ghosthacker-manga-tx.edn を新 work.edn から再生成
    (旧 2026-07-03 版は stale app-aozora-svelte export 由来の
    arc0-1 46ページのみ・幾何なし)。ghosthacker-manga-log.edn は
-   コード上の消費者が無く、生成に必要な kotoba.datom(20-actors/kotodama)が
-   リポジトリに存在しないため今回は再生成せず据え置き(pre-existing、
-   ADR-2607172210 と同じ欠落)。
+   コード上の消費者が無いため今回は再生成せず据え置き。当初この欠落は
+   kotoba.datom(20-actors/kotodama)不在によるものだったが、本 ADR 執筆と
+   同日に app-aozora@00e040c1 が kotoba-lang/kotoba-datom 参照で main を
+   修復済み — log 再生成はその経路で可能になった(follow-up)。
 
 ## Consequences
 
@@ -84,5 +85,5 @@ episodes/ep1-komawari-redesign が手書き rows-of-beats 形式(:beat/weight /
    "exporter の実行には kami.mangaka.komawari が classpath に必須(nbb は実行時 resolve 不可のため optional dep にできない): npx nbb --classpath ../../kotoba-lang/kami-mangaka-page/src scripts/export-aozora-manga-work.cljs"
    "governor を通らないページは幾何なしでフォールバック export する(半端な rect を出さない)"
    "シアー行の全パネルは \"sheared-impact\"/\"sheared-tension\" タグを持ち、governor は行の intensity で tilt を cap し、同一シアー行ペアの bbox 重なりを overlap 検査から除外する — generator 出力は常に自分の governor を通る"
-   "public/kotoba/ghosthacker-manga-tx.edn は ghosthacker の resources/aozora-manga-work.edn から aozora.appview.manga/work->tx で再生成する生成物(手編集しない)。ghosthacker-manga-log.edn は消費者なし・kotoba.datom 欠落のため stale のまま(再生成は kotodama 復旧後)"]
+   "public/kotoba/ghosthacker-manga-tx.edn は ghosthacker の resources/aozora-manga-work.edn から aozora.appview.manga/work->tx で再生成する生成物(手編集しない)。ghosthacker-manga-log.edn は消費者なしのため stale のまま(kotoba.datom は app-aozora@00e040c1 で復旧済み — 再生成は follow-up)"]
   :adr/artifacts "{:ghosthacker \"com-junkawasaki/ghosthacker@8f3abda6 (exporter + regenerated resources/aozora-manga-work.edn)\", :kami-mangaka-page \"kotoba-lang/kami-mangaka-page@d4b578d6 (sheared-row governor fix + regression test)\", :app-aozora \"gftdcojp/app-aozora@b3e3338b (regenerated public/kotoba/ghosthacker-manga-tx.edn)\"}"}]
