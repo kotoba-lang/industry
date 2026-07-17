@@ -102,3 +102,10 @@ as the task/script host**, not JVM application code.
 **Follow-up required:** west pin advance for every landed child repo (child `main`
 has the nbb files; superproject pins still point at pre-migration SHAs until
 `gen-west-manifest.cljs --entry <name>` / fleet pin-advance).
+
+## Progress addendum (2026-07-17 continued)
+
+- Wave 2 pin advance: ~45 `kotoba-lang/com-*` pins verified and written to west.yml.
+- Wave 3: `cloud-itonami` bb.edn → `scripts/tasks.edn` + `run-task.cljs` (164 shellable tasks) landed on main.
+- Wave 3 batch: ~25 additional project-root bb.edn converted+merged; remaining project-root bb.edn ≈ worktree/fork/etzhayyim-root only.
+- Helper: `scripts/bb_edn_to_nbb_tasks.cljs` for large bb.edn conversion.
