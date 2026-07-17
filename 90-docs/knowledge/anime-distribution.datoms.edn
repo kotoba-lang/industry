@@ -133,9 +133,9 @@
 
  {:release/id :rel.shinchan.es.tv3 :release/work [:work/id :crayon-shinchan]
   :release/country [:country/id :es] :release/network [:network/id :tv3-k3]
-  :release/medium :tv-anime :release/title-local "Shin Chan" :release/edit-status :uncut
-  :release/note "カタルーニャ語吹替を起点にスペインで国民的人気。ほぼ無修正の子供向け放送"
-  :release/confidence :medium}
+  :release/medium :tv-anime :release/year-start 2001 :release/title-local "Shin Chan" :release/edit-status :uncut
+  :release/note "LUK Internacional ライセンス (2001)。K3 で 2001-04-23 初放送 → TV3・ETB1・Canal Nou・TVG・Telemadrid 等の地域局網へ拡大。一部地域で検閲例ありだがカタルーニャ・マドリード・ガリシアは無検閲"
+  :release/source "https://es.wikipedia.org/wiki/Shin_Chan" :release/confidence :high}
 
  ;; ==================================================================================
  ;; releases — Doraemon (2005)（2026-07-17 Wikipedia 裏取り済み tranche）
@@ -326,4 +326,79 @@
   :release/medium :tv-anime :release/edit-status :censored
   :release/note "インドネシア放送委員会 (KPI) から regulatory concern の対象になった"
   :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ ;; ==================================================================================
+ ;; tranche 3 (2026-07-17): MENA (Spacetoon)・ラテンアメリカ・スペイン全国網
+ ;; ==================================================================================
+
+ ;; ---- schema (追加): 単一国に帰属しない汎地域配信のための region 属性 --------------
+ ;; :release/country が特定できない pan-regional feed（Fox Kids LatAm 等）は
+ ;; :release/country を省略し :release/region で地域を示す
+ {:db/ident :release/region :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :latin-america / :mena 等
+
+ ;; ---- countries (追加) ------------------------------------------------------------
+ {:country/id :ae :country/name-ja "アラブ首長国連邦" :country/name-en "United Arab Emirates" :country/region :mena}
+ {:country/id :mx :country/name-ja "メキシコ" :country/name-en "Mexico" :country/region :latin-america}
+ {:country/id :cl :country/name-ja "チリ" :country/name-en "Chile" :country/region :latin-america}
+
+ ;; ---- networks (追加) -------------------------------------------------------------
+ {:network/id :spacetoon :network/name "Spacetoon" :network/country [:country/id :ae]
+  :network/type :kids-channel
+  :network/note "2000-03-15 開設（旧ダマスカス、現ドバイ本拠）。アラブ圏 23 か国・視聴者1.3億超の MENA 最大級子供ch。正則アラビア語ダブ。暴力シーンのクロップ、露出・性的ほのめかしの除去、宗教シンボルの改変（例: My Little Pony のダビデの星縮小）等の検閲慣行"}
+ {:network/id :antena-3 :network/name "Antena 3" :network/country [:country/id :es]
+  :network/type :terrestrial :network/note "スペイン全国民放。姉妹ch Neox でも再放送"}
+ {:network/id :azteca-7 :network/name "Azteca 7 (TV Azteca)" :network/country [:country/id :mx]
+  :network/type :terrestrial}
+ {:network/id :chilevision :network/name "Chilevisión" :network/country [:country/id :cl]
+  :network/type :terrestrial}
+ {:network/id :fox-kids-latam :network/name "Fox Kids (Latin America feed)" :network/country [:country/id :us]
+  :network/type :kids-channel :network/note "米国本拠の汎ラテンアメリカ feed"}
+
+ ;; ---- works (追加) ----------------------------------------------------------------
+ {:work/id :detective-conan :work/title-ja "名探偵コナン" :work/title-en "Case Closed / Detective Conan"
+  :work/origin [:country/id :jp] :work/year-start 1996}
+
+ ;; ---- releases — MENA (Spacetoon) -------------------------------------------------
+ {:release/id :rel.doraemon.mena.spacetoon :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :ae] :release/network [:network/id :spacetoon]
+  :release/region :mena :release/medium :tv-anime :release/edit-status :censored
+  :release/note "正則アラビア語ダブ。Spacetoon の標準検閲慣行（暴力クロップ・露出除去）の下で放送。アラブ圏 23 か国に到達"
+  :release/source "https://en.wikipedia.org/wiki/Spacetoon" :release/confidence :high}
+
+ {:release/id :rel.conan.mena.spacetoon :release/work [:work/id :detective-conan]
+  :release/country [:country/id :ae] :release/network [:network/id :spacetoon]
+  :release/region :mena :release/medium :tv-anime :release/edit-status :censored
+  :release/note "正則アラビア語ダブでアラブ圏の国民的アニメの一つに。Spacetoon 標準検閲の下で放送"
+  :release/source "https://en.wikipedia.org/wiki/Spacetoon" :release/confidence :high}
+
+ ;; ---- releases — スペイン全国網・ラテンアメリカ ------------------------------------
+ {:release/id :rel.shinchan.es.antena3 :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :es] :release/network [:network/id :antena-3]
+  :release/medium :tv-anime :release/year-start 2005 :release/title-local "Shin Chan" :release/edit-status :uncut
+  :release/note "2005-12-23 から全国独占放映権。Neox で 2006-2018 再放送・新エピソード、その後 Fox España (2019-2025) → Comedy Central España (2026-)"
+  :release/source "https://es.wikipedia.org/wiki/Shin_Chan" :release/confidence :high}
+
+ {:release/id :rel.shinchan.latam.fox-kids :release/work [:work/id :crayon-shinchan]
+  :release/network [:network/id :fox-kids-latam]
+  :release/region :latin-america :release/medium :tv-anime :release/year-start 2002 :release/edit-status :localized
+  :release/note "内容改変 + キャラクター名変更を伴うラテンアメリカ版。単一国に帰属しない汎地域 feed のため :release/country 省略"
+  :release/source "https://es.wikipedia.org/wiki/Shin_Chan" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.mx.azteca7 :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :mx] :release/network [:network/id :azteca-7]
+  :release/region :latin-america :release/medium :tv-anime
+  :release/note "ラテンアメリカ・スペイン語ダブ。放送年は一次ソース未確認のため省略"
+  :release/source "https://es.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.cl.chilevision :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :cl] :release/network [:network/id :chilevision]
+  :release/region :latin-america :release/medium :tv-anime
+  :release/note "ETC TV でも放送。アルゼンチン (Magic Kids/Telefe 等)・コロンビア・ベネズエラ・ペルー・キューバ等でも広く放送された"
+  :release/source "https://es.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.es.antena3 :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :es] :release/network [:network/id :antena-3]
+  :release/medium :tv-anime
+  :release/note "K3/Canal Super3・Canal 2 Andalucía・Fox Kids España でも放送"
+  :release/source "https://es.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
 ]
