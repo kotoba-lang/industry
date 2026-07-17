@@ -32,8 +32,8 @@
  ;; (weights placed on gad, graph未実測) / :pending-download (not on gad yet, fail-closed).
  {:model/id :ltx-2.3 :model/name "LTX-2.3 distilled (22B fp8)" :model/family :ltx
   :model/engine :comfy :model/license "LTXV open weights (non-commercial research + commercial tiers)"
-  :model/status :verified-e2e-container
-  :model/note "gad (Radeon 8060S/ROCm/ComfyUI) E2E 実測 2026-07-16 (ADR-2607171100): 768x448 / 49 frames / video+audio / 94.6s wall. text-to-video + native audio. 単段グラフが正 (2段目 upsampler は決定論的に死ぬ、原因調査 follow-up)。既定 :video model。artifact は gad ローカルのため pixel 軸 (temporal-motion/bitrate-density) は artifact 取得後にスコア。"}
+  :model/status :verified-e2e
+  :model/note "gad (Radeon 8060S/ROCm/ComfyUI) E2E 実測 2026-07-16 (ADR-2607171100): 768x448 / 49 frames / video+audio / 94.6s wall. text-to-video + native audio. 単段グラフが正 (2段目 upsampler は決定論的に死ぬ、原因調査 follow-up)。既定 :video model。2026-07-17 gad restart 後にこの Mac から ComfyUI /prompt に単段グラフを投入し実生成 (126s, 768x448/49f/2.04s/656k bps/audio, mean_YDIF 3.654) → 決定論スコア composite 0.714 (baseline placeholder 0.502 を上回る、決め手は temporal-motion 0.457/bitrate-density 1.0)。"}
  {:model/id :wan2.2-ti2v-5b :model/name "Wan 2.2 TI2V 5B (fp16)" :model/family :wan
   :model/engine :comfy :model/license "Apache-2.0 (Wan2.2 open weights)"
   :model/status :staged-unverified
