@@ -114,8 +114,9 @@
 ;; ---- render ------------------------------------------------------------------
 
 (defn render-md
-  "Render one product's lean canvas (post-fold) as markdown.
-   opts: {:as-of str}."
+  "Render one product's lean canvas (post-fold) as markdown text (embedded in EDN
+   :doc/body). opts: {:as-of str}.
+   正本は datoms+ledger。投影ファイルは .edn only（ADR-2607171600）。"
   [idx product {:keys [as-of]}]
   (let [layer (product-layer idx product)]
     (str "# " (name product) " — business model / lean canvas\n\n"
@@ -124,7 +125,7 @@
          "     手編集禁止 — `gftd canvas add|retract|note` / `gftd hyp pass|fail` で編集し再生成する。 -->\n\n"
          "**Layer**: " (get layer-labels layer (str layer)) "  \n"
          "**As-of**: " (or as-of "base") "  \n"
-         "**Prose 解説**: `90-docs/adr/2607021500-portfolio-seven-layer-business-model-lean-canvas.md`\n\n"
+         "**Prose 解説**: `90-docs/adr/2607021500-portfolio-bmc-lean.datoms.edn`\n\n"
          (apply str
                 (for [{:keys [canvas/label canvas/items canvas/note]} (product-blocks idx product)]
                   (str "## " label "\n\n"
@@ -139,6 +140,20 @@
                       (product-hyps idx product)]
                   (str "| `" id "` | " (name risk) " | " (name status) " | "
                        claim " | " gate " | " (or evidence "—") " |\n"))))))
+
+(defn render-edn
+  "DataScript-transactable projection of one product's canvas (EDN-only surface)."
+  [idx product {:keys [as-of]}]
+  [{:db/id -1
+    :doc/id (str "business-model-" (name product))
+    :doc/product product
+    :doc/doc_type "business-model-projection"
+    :doc/title (str (name product) " — business model / lean canvas")
+    :doc/path (str "90-docs/business/" (name product) "-business-model.edn")
+    :doc/as-of (or as-of "base")
+    :doc/layer (product-layer idx product)
+    :doc/source "gftd canvas (ADR-2607021600); SSoT = portfolio BMC datoms + canvas-ledger"
+    :doc/body (render-md idx product {:as-of as-of})}])
 
 (defn render-text
   "Compact terminal rendering of one product's canvas."

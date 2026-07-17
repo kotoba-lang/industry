@@ -5,7 +5,7 @@
 ;; no manual entity-id lookup needed. References :cluster/id / :vertical/id / :product/id declared in the sibling
 ;; base file pricing-intelligence.datoms.edn — load both when querying (see that file's header for example queries
 ;; and the verified query invocation). Do NOT hand-edit existing lines; only append new lines from future re-benchmark runs
-;; (run-id "pricing-intel-20260716-01" is the initial pilot; see 90-docs/pricing-intelligence/README.md).
+;; (run-id "pricing-intel-20260716-01" is the initial pilot; see 90-docs/pricing-intelligence/README.edn).
 {:obs/vertical [:vertical/id :vertical/isic-6511] :obs/product [:product/id :product/agencybloc] :obs/price-summary "~$109/user/mo (12-mo commitment), reseller-reported; vendor page publishes no figure" :obs/disclosure-tier :tier/estimated :obs/source-url "https://enrollhere.com/blogs/insurance-agency-software-pricing" :obs/run-id "pricing-intel-20260716-01" :obs/at "2026-07-16" :obs/seq 1}
 {:obs/vertical [:vertical/id :vertical/isic-6511] :obs/product [:product/id :product/insureio] :obs/price-summary "$25/mo Basic, $50/mo Marketing, $50/mo Agency Mgmt, $75/mo combo; +$10/10k emails, +$5/team member" :obs/disclosure-tier :tier/published :obs/source-url "https://insureio.com/pricing/" :obs/run-id "pricing-intel-20260716-01" :obs/at "2026-07-16" :obs/seq 2}
 {:obs/vertical [:vertical/id :vertical/isic-6511] :obs/product [:product/id :product/ipipeline-agency-integrator] :obs/price-summary "contact-sales only, no pricing disclosed" :obs/disclosure-tier :tier/opaque :obs/source-url "https://ipipeline.com/products/agency-integrator/" :obs/run-id "pricing-intel-20260716-01" :obs/at "2026-07-16" :obs/seq 3}
@@ -134,7 +134,7 @@
 {:rec/vertical [:vertical/id :vertical/isic-8550] :rec/band-low 20.0 :rec/band-high 50.0 :rec/unit "$/mo base + $0.10-0.30/automated run, stepping down with volume" :rec/rationale "Teachworks is the closest real-world precedent for cloud-itonami's own base+usage design." :rec/run-id "pricing-intel-20260716-01" :rec/at "2026-07-16" :rec/seq 118}
 
 ;; flagship addition (2026-07-16, run pricing-intel-20260716-02): isic-6399 was outside the original 28-vertical
-;; pilot (see README "Scope") but is one of the two verticals 90-docs/business/cloud-itonami-vertical-maturity.md
+;; pilot (see README "Scope") but is one of the two verticals 90-docs/business/cloud-itonami-vertical-maturity.edn
 ;; flags as "prefer product -> business over new verticals" — grounds business-model.md's "illustrative" pricing
 ;; table in real multi-tenant job-board-platform competitor pricing.
 {:obs/vertical [:vertical/id :vertical/isic-6399] :obs/product [:product/id :product/madgex] :obs/price-summary "Sales-gated enterprise plan; third-party aggregator estimate 'starting $500+/month', custom quote required; serves 17M+ monthly job views across association/publisher clients (Financial Times and professional bodies)" :obs/disclosure-tier :tier/estimated :obs/source-url "https://www.getapp.com/hr-employee-management-software/a/madgex/" :obs/run-id "pricing-intel-20260716-02" :obs/at "2026-07-16" :obs/seq 119}

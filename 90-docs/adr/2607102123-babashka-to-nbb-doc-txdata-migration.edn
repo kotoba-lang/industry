@@ -1,16 +1,1 @@
-[{:db/id -1
-  :adr/id "adr-2607102123-babashka-to-nbb-doc-txdata-migration"
-  :adr/title "ADR-2607102123: Babashka を nbb へ統一し、ADR／migration EDN を tx-data 化する"
-  :adr/status "accepted"
-  :adr/date "2026-07-10"
-  :adr/doc_type "adr"
-  :adr/topic "bb-to-nbb-doc-txdata-migration"
-  :adr/deciders ["Jun Kawasaki"]
-  :adr/authoritative true
-  :adr/authoritative_for ["Repository-wide Babashka-to-nbb documentation migration"
-                          "Datomic/DataScript transaction-data representation for ADR and migration EDN"]
-  :adr/related ["CLAUDE.md" "manifest/edn-datomize.cljs"]
-  :adr/supersedes []
-  :adr/superseded_by []
-  :adr/decision-summary "{:runtime :nbb, :documentation-scope [\"90-docs/adr\" \"90-docs/migration\"], :edn-shape \"vector of entity maps with :db/id\", :malformed-edn :raw-preserved, :schema \"manifest/schema.edn\"}"
-  :adr/verification "{:remaining-babashka-command-in-90-docs 0, :adr-edn 517, :migration-edn 5, :normalization-errors 0}"}]
+[{:adr/authoritative_for ["Repository-wide Babashka-to-nbb documentation migration" "Datomic/DataScript transaction-data representation for ADR and migration EDN"], :adr/supersedes [], :adr/superseded_by [], :adr/topic "bb-to-nbb-doc-txdata-migration", :adr/related ["CLAUDE.md" "manifest/edn-datomize.cljs"], :adr/status "accepted", :adr/id "adr-2607102123-babashka-to-nbb-doc-txdata-migration", :adr/doc_type "adr", :adr/body "# ADR-2607102123: Babashka を `nbb` へ統一し、ADR／migration EDN を tx-data 化する\n\n## Status\n\nAccepted — 2026-07-10.\n\n## Context\n\nリポジトリには Babashka を前提としたスクリプト参照が、実行コードだけでなく\nADR、migration ledger、EDN の本文にも残っていた。運用スクリプトの正本を Node 上の\n`nbb` に統一する方針と、履歴ドキュメントの実行手順が一致していなかった。\n\nまた、ADR／migration の EDN は map、既存の tx-data、構文不備の旧形式が混在していた。\nそのままでは DataScript/Datomic に一律で transact できず、横断クエリの対象にならない。\n\n## Decision\n\n1. ADR／migration を含む `90-docs/` 内の Babashka コマンド参照を `nbb` に置換する。旧\n   Babashka スクリプト参照は対応する `.cljs` に更新する。\n2. `90-docs/adr/*.edn` と `90-docs/migration/*.edn` は、トップレベルを\n   `[{ :db/id … }]` の entity-map tx-data に揃える。既存の Datomic schema transaction\n   だけから成るファイルは有効な transaction として維持する。\n3. 構文不備で機械的に変換できない旧 EDN は捨てない。` :adr/raw-edn` に原文を保存し、\n   `:adr/normalization-status :raw-preserved` とエラー情報を持つ queryable entity として\n   救済する。\n4. `manifest/edn-datomize.cljs` を nbb 互換に保ち、属性定義は\n   `manifest/schema.edn` へ追加する。Datomic 固有のインストール属性を使わないため、\n   同じ tx-data を DataScript にも渡せる。\n\n## Consequences\n\n- ADR／migration の全文・コマンド例で Babashka コマンドは残さない。\n- ADR 517 件と migration 5 件は DataScript/Datomic の transaction input として扱える。\n- 救済された旧文書は raw 本文を保持するため、内容を失わずに `:adr/id` や\n  `:adr/normalization-status` で検索できる。\n- 入れ子の複合値は既存の正規化器に従い EDN 文字列 blob として保存される。属性単位の\n  クエリは可能で、詳細値は必要に応じて `edn/read-string` で再構成する。\n\n## Verification\n\n```bash\ngit grep -I -n -w 'b''b' -- 90-docs\n# no output\n\nnbb --classpath . manifest/edn-datomize.cljs adr-dir 90-docs/adr\nnbb --classpath . manifest/edn-datomize.cljs adr-dir 90-docs/migration\n```\n\nThe normalization pass reports zero remaining parse errors.", :adr/deciders ["Jun Kawasaki"], :adr/date "2026-07-10", :db/id -1, :adr/decision-summary "{:runtime :nbb, :documentation-scope [\"90-docs/adr\" \"90-docs/migration\"], :edn-shape \"vector of entity maps with :db/id\", :malformed-edn :raw-preserved, :schema \"manifest/schema.edn\"}", :adr/authoritative true, :adr/verification "{:remaining-babashka-command-in-90-docs 0, :adr-edn 517, :migration-edn 5, :normalization-errors 0}", :adr/title "ADR-2607102123: Babashka を nbb へ統一し、ADR／migration EDN を tx-data 化する", :adr/source-format "edn"}]

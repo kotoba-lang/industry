@@ -131,7 +131,7 @@ skill `new-project-scaffold` を参照。
 
   full 履歴が必要になったら、その時だけ対象を `git fetch --unshallow`（または
   `--depth=<n>` で深掘り）して深くする。詳細は
-  `90-docs/adr/2606241600-shallow-depth1-git-default.md` を参照。
+  `90-docs/adr/2606241600-shallow-depth1-git-default.edn` を参照。
 
 - **マージ / ancestry 判定をする時は、固定 depth を当て推量で増やさず
   「merge-base を狙い撃ちで取得」する。** shallow なリポでマージや
@@ -452,6 +452,23 @@ kotoba-server（kotobase.net）向けの CACAO 自己発行の実装規約は sk
 **gftd-talent-actor**（HR-LLM ⊣ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣
 CertGovernor）。
 
+
+## docs / ADR は EDN only + DataScript query（2026-07-17、ADR-2607171600）
+
+- **`90-docs/` 配下（特に `90-docs/adr/`）の正本は `.edn` のみ。`.md` は置かない。**
+  各 ADR は `(d/transact conn (edn/read-string (slurp f)))` 可能な
+  `[{:db/id -1 :adr/id ... :adr/title ... :adr/status ... :adr/body ...}]`。
+  入れ子 map/vector は `pr-str` した string blob（`manifest/edn-datomize.cljs` と同型）。
+- **横断 query**:
+  `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs count`
+  `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
+  属性は datascript.js 向けに **裸文字列**（`"adr/id"`、コロン無し）。
+- **schema**: `manifest/schema.edn`（自動生成、手編集禁止）。
+- **検証**: `nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljs verify`。
+- **移行ツール**: `manifest/docs-edn-only.cljs`（`migrate` / `status` / `verify`）。
+- multi-entity catalog（`*.datoms.edn`）は複数 entity のまま、query ローダが全 entity を読む。
+- 新規 ADR は最初から `.edn` tx-data で書く（`.md` を起こしてから変換しない）。
+
 ## BMC / Lean Loop 反復トラッキング（business loop、2026-07-12）
 
 **新しく BMC (Business Model Canvas) / Lean Loop (build-measure-learn) の反復トラッキングを
@@ -467,7 +484,7 @@ ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics に�
 
 - **正本は `90-docs/adr/2607021500-portfolio-bmc-lean.datoms.edn`（base、書き換え禁止）+
   `90-docs/business/canvas-ledger.edn`（append-only events）。** md
-  （`90-docs/business/<product>-business-model.md`）・`maturity-scores.md` は生成物、
+  （`90-docs/business/<product>-business-model.edn`）・`maturity-scores.edn` は生成物、
   手編集禁止（`gftd canvas md --all` / `gftd score md` で再生成）。設計 ADR:
   2607021600（CLI/ReAct loop）・2607021700（成熟度スコア）・2607021800（collect/運転）・
   2607022100（gate 評価器）・2607022200（per-product gate 計器）。使い方は
@@ -485,7 +502,7 @@ ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics に�
   follow-up）— CCR agent が実行時に自己修復して動いてしまうため気付きにくい。routine の
   prompt を編集する機会があれば直す。
 - **既存 canvas/仮説の有無は `gftd products` / `gftd canvas show --product <p>` /
-  `90-docs/business/maturity-scores.md` で確認できる**（`GFTD_ROOT=<superproject root>
+  `90-docs/business/maturity-scores.edn` で確認できる**（`GFTD_ROOT=<superproject root>
   nbb 70-tools/bmc/bin/gftd.cljs products` 等）。登録済みなのに daily routine の
   `--product` ループに載っていないだけ、というギャップが起点になりやすい —
   その場合は新規登録でなく routine の対象リスト追加で足りる。
@@ -581,8 +598,8 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   として存在する。Co-Scientist loop 本体（Generate→Reflect→Rank(Elo)→Evolve→Meta）は
   `90-docs/design-quality/coscientist.cljc`（同 `isekai.ux.coscientist` 移植、
   langchain-clj依存なしのoffline/heuristic版）で、`nbb` から `kaizen-cycle` を呼ぶと
-  `90-docs/design-quality/coscientist/iteration-NN.md` を生成する。この co-scientist
-  パターン自体の原典は `90-docs/adr/2606141500-keiei-arbor-coscientist-engine.md`。
+  `90-docs/design-quality/coscientist/iteration-NN.edn` を生成する。この co-scientist
+  パターン自体の原典は `90-docs/adr/2606141500-keiei-arbor-coscientist-engine.edn`。
   **UI/UXに限らず「品質を測って改善ループを回したい」タスクでは、まず
   `orgs/gftdcojp/network-isekai` の `90-docs/coscientist/` と `ADR-0007` 系（同type の
   ADRが `ai-gftd-shinshi`/`ai-gftd-yukkuri`/`ai-gftd-apps-gftdcojp` 等にも複数存在、
@@ -594,7 +611,7 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   visualization / game）を問わず、必ず canonical な kami-engine stack を使う。**
   `kami-app-*` は UI と操作 orchestration を所有し、形状・scene・animation・simulation・
   picking・render の正本を app 内に複製しない。責任境界の authoritative source は
-  `90-docs/adr/2607102200-kami-render-stack-deps-authority-rename.md`。
+  `90-docs/adr/2607102200-kami-render-stack-deps-authority-rename.edn`。
 - **domain / guest** は `kami-engine-*` の portable `.cljc` または `.kotoba` を正本にし、
   EDN command / scene / render-IR を境界にする。browser の guest 実行は
   `wasm-webcomponent`（`kotoba wasm emit` の実 WASM）を使う。app 固有の geometry
