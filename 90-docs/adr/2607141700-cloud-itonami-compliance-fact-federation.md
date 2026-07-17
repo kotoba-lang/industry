@@ -3900,6 +3900,41 @@ en.wikipedia.orgのDublin City Councilページを実際にWebFetchで
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。
 
+## Addendum (2026-07-17, /loop tick 132 — 国軸45件目(IRL) — アイルランドが国軸+自治体軸の2軸に到達、未確認の法番号は推測せず省略)
+
+`cloud-itonami-iso3166-irl`に`statute.facts`を追加・push
+([commit d97412b](https://github.com/cloud-itonami/cloud-itonami-iso3166-irl/commit/d97412b))：
+
+tick131で検証済みの首都チェック（ダブリンは安定した首都）を
+再利用。
+
+- **Companies Act 2014**（No. 38 of 2014）— 施行日2015年6月1日を
+  enterprise.gov.ie（アイルランド企業・貿易・雇用省の公式
+  ドメイン）で直接確認("The Act came into effect on 1 June,
+  2015.")。正確な法番号はWikipediaの infobox で別途クロス
+  確認("Companies Act 2014 (No. 38 of 2014)")。同ページは2014年
+  12月23日の署名日も示すが、施行日をenacted-dateとして採用
+  （tick118のNDPA・tick123のPDPAと同型のパターン）。
+- **Data Protection Act 2018**— DLA Piperの"Data Protection Laws
+  of the World"（tick120サウジアラビアPDPL・tick129スイス
+  FADPで既出）で施行日2018年5月25日を直接確認。正確な法番号
+  （他所ではNo. 7 of 2018と言及されることが多い）はこのtickで
+  直接確認できるページが無かった（irishstatutebook.ieは
+  HTTP 403、想定タイトルのWikipedia専用ページも404）ため、
+  推測せず確認できたタイトルのみを記録。
+
+4 tests/9 assertions green（既存24 marketentry tests/81
+assertionsと合わせ全28 tests/90 assertions green）。152リポジトリ・
+856 factを統合。`jurisdiction IRL`クエリと、`ordinance/country`
+横断query（`[?e "ordinance/country" "IRL"]`）でtick131のDublin
+自治体2件が正しくクロスリンクされることを確認——アイルランドは
+今回で国軸+自治体軸の2軸に到達したが、業界団体軸はまだ未着手で
+あり、これを正直に報告する。
+
+現状: 国軸45件・業界団体軸44件(28業種)・自治体軸43件——132 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。アイルランドの業界団体軸の空白は今後のtickに持ち越し。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
