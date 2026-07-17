@@ -26,8 +26,8 @@ jobs:
       - run: npm i -g nbb
       - name: clone kotoba-fleet-vcs at its west pin
         run: |
-          PIN=$(awk '$0=="    - name: kotoba-fleet-vcs"{f=1} f&&/revision:/{print $2; exit}' manifest/west.yml)
-          git clone --depth 1 https://github.com/kotoba-lang/kotoba-fleet-vcs.git /tmp/fleet
+          PIN=$(awk '$0=="    - name: kagami"{f=1} f&&/revision:/{print $2; exit}' manifest/west.yml)
+          git clone --depth 1 https://github.com/kotoba-lang/kagami.git /tmp/fleet
           git -C /tmp/fleet fetch --depth 1 origin "$PIN" && git -C /tmp/fleet checkout --detach "$PIN"
       - name: reconcile check
         id: check
