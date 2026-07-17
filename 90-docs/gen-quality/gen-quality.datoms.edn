@@ -37,7 +37,7 @@
  {:model/id :wan2.2-ti2v-5b :model/name "Wan 2.2 TI2V 5B (fp16)" :model/family :wan
   :model/engine :comfy :model/license "Apache-2.0 (Wan2.2 open weights)"
   :model/status :verified-e2e
-  :model/note "2026-07-17 gad で graph E2E 実測 (459s, 1280x704/49f/2.04s)。解像度 0.978 (最高) だが temporal-motion 0.023 = ほぼ静止で composite 0.471 (ltx 0.714/baseline 0.502 を下回る)。低 motion の原因切り分け (2026-07-17): latent ノードを Wan22ImageToVideoLatent → EmptyHunyuanLatentVideo に差し替えても mean_YDIF 0.182 で不変 = ノード選択は原因でない。残る容疑は sampling params (ModelSamplingSD3 shift 8.0 / cfg 5.0 / uni_pc / 49f の短尺) — これらの調整が follow-up。native audio 無し。現状のこの config では creator 用途に不適。"}
+  :model/note "2026-07-17 gad で graph E2E 実測 (459s, 1280x704/49f/2.04s)。解像度 0.978 (最高) だが temporal-motion 0.023 = ほぼ静止で composite 0.471 (ltx 0.714/baseline 0.502 を下回る)。低 motion の原因切り分け (2026-07-17): latent ノードを Wan22ImageToVideoLatent → EmptyHunyuanLatentVideo に差し替えても mean_YDIF 0.182 で不変 = ノード選択は原因でない。残る容疑は sampling params (ModelSamplingSD3 shift 8.0 / cfg 5.0 / uni_pc / 49f の短尺) — これらの調整が follow-up。 motion-friendly config (shift 5.0 / 30 steps / 121f / motion prompt) を 2026-07-17 に試したが gad iGPU で >60分 未完了 → interrupt で打ち切り = この設定は fleet で非現実的に遅い。暫定結論: wan2.2-ti2v-5b は低 motion かつ motion 化には非現実的コスト、現 fleet では ltx-2.3 (126s, composite 0.714) が実用上の第一選択。wan の params 最適化は専用 follow-up (このループでのブルートフォース生成は打ち切り)。native audio 無し。現状のこの config では creator 用途に不適。"}
  {:model/id :wan-dancer-14b :model/name "Wan-Dancer 14B (i2v dance/cosplay)" :model/family :wan-dancer
   :model/engine :comfy :model/license "Wan-Dancer open weights"
   :model/status :pending-download

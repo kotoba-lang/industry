@@ -1,28 +1,27 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 8450,
-  :pageviews-7d 3583,
-  :uniques-7d-sum 372,
+ {:requests-7d 8854,
+  :pageviews-7d 3950,
+  :uniques-7d-sum 389,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 71}
+  [{:path "/", :requests 69}
    {:path "//avcqlevnbk.php", :requests 28}
-   {:path "/feed/fork-stats.edn", :requests 27}
+   {:path "/feed/fork-stats.edn", :requests 23}
    {:path "/api/murakumo-generation", :requests 22}
-   {:path "/file.php", :requests 12}
-   {:path "/wp-content/plugins/hellopress/wp_filemanager.php",
-    :requests 12}
-   {:path "/8.php", :requests 11}
-   {:path "/wicked.php", :requests 10}],
-  :status-mix {:ok 890, :server-error 35, :client-error 28},
+   {:path "/react/.env", :requests 18}
+   {:path "/transactional/.env", :requests 18}
+   {:path "/sendgrid/.env", :requests 15}
+   {:path "/preview/.env", :requests 15}],
+  :status-mix {:ok 1230, :server-error 33, :client-error 29},
   :window "24h"},
  :as-of "2026-07-17",
- :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 4},
+ :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 3},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 71 · //avcqlevnbk.php 28 · /feed/fork-stats.edn 27 · /api/murakumo-generation 22 · /file.php 12 | 4xx(probe) 3% · 5xx 4%",
+ "上位 page (24h, 2xx/3xx): / 69 · //avcqlevnbk.php 28 · /feed/fork-stats.edn 23 · /api/murakumo-generation 22 · /react/.env 18 | 4xx(probe) 2% · 5xx 3%",
  :signal
- "isekai.network 実測 8450 req/7d・372 uniques(日次和)・うち4xx probe 3%(24h)",
+ "isekai.network 実測 8854 req/7d・389 uniques(日次和)・うち4xx probe 2%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
