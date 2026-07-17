@@ -11,6 +11,18 @@ Proposed（設計・実現性評価）。オーナー指示「20-actors は全�
 | Phase 1 core | compat vendored コピー **844 件除去** + `COMPAT-MOVED.md`（844 行マッピング） | `13a9871` | ✅ landed |
 | Phase 2 #1 | 陳腐化 compat-corpus **py 装置 23 件 prune** + 死んだ bb.edn task 2 削除 | `d5969d5` | ✅ landed |
 | Phase 1 tail | 未移行 compat **181 件を kotoba-lang `com-<base>` として publish + west 登録 + vendored 除去**（149 + rate-limit 後の 32）。com-junkawasaki 登録 `96fc088`/`61d9054`/`deb10f3`、etzhayyim/root 除去 `402af5e`/`737d6a8` | pin `e959ac3` | ✅ landed |
+| Phase 2 #2 | **wave-bridges の dead py 生成器 139 件 prune**（全て存在しない絶対パスをハードコードし実行不能・参照ゼロ・生成物は 00-contracts に commit 済み） | `722059d` | ✅ landed |
+| Phase 2 #3 | **dead-hardpath py 4 件 prune**（gov ingest 3 + nsid-extractor、実行不能・参照ゼロ） | `d490dbb` | ✅ landed |
+
+### Phase 2 の境界（重要）— 安全 bulk dead-py prune は完了、残りは per-tool 判断
+
+**安全に bulk prune できる「実行不能を証明済み + 参照ゼロ」の dead py は出し尽くした**（compat 装置 23 + wave-bridges 139 + dead-hardpath 4 = **166 py**）。残り ~950 py は bulk 削除の対象にならない:
+
+- **意図的保持**: `lite_runner.py`（ADR-2606221900 の rollback runner、cljc test が byte-parity で参照）、`deploy_node.py`（両 runner を fleet node に stage する live SSH deploy）、その他 rollback/parity 系。
+- **ML/訓練系はそのまま温存**（owner 指示 2026-07-17）: `etzhayyim-py`・`e7m-*`・`baien-*` 訓練・distill 系（pyproject 付き self-contained、nbb 再実装は非現実的）。
+- **live ops/plumbing**: `70-tools/scripts` の sweep/ingest 系は grep 参照ゼロでも ad-hoc/cron 実行の可能性があり、実行不能の証明が無い限り autonomous 削除は不可（Agent C も keep-in-root 判定）。nbb 移植は per-tool に理解・移植・テスト（fleet 系は実 node 検証）を要する。
+
+→ **Phase 2 の残りは「bulk prune」でなく「per-tool nbb 移植（owner が対象を指定 + 実 node テスト）」。** 無人 bulk 削除は production を壊すため行わない。
 
 **Phase 1 完了**: compat 1027 のうち **1025 を consolidate**（844 除去 + 181 migrate）。残るは hand-deepened `salesforce-compat`/`stripe-compat` 2 件のみ（個別レビューのため意図的保持）。全 compat が kotoba-lang `com-<base>` 独立リポ + west 登録済みが source of truth。
 
