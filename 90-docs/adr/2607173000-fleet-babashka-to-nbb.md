@@ -86,4 +86,19 @@ as the task/script host**, not JVM application code.
 - Residual: `migrate-etzhayyim-compat`, kami-webgpu audit test discovery,
   design-quality workflow/skill call sites
 - Shared helpers: `scripts/nbb-run-tests.cljs`, `scripts/verify-no-babashka.cljs`,
-  `scripts/bb-to-nbb-scaffold.cljs` (classifier + emitter for Wave 2)
+  `scripts/bb_to_nbb_scaffold.cljs` (classifier + emitter for Wave 2),
+  `scripts/gen-shadow-cljs-edn.cljs` (Wave 1 shared template)
+
+## Progress (2026-07-17)
+
+| Wave | Status |
+|------|--------|
+| 0 Superproject residual + helpers | **done** (merged to main) |
+| 1 Shared `.bb` families | partial — `gen-shadow-cljs-edn.cljs` in superproject; publish/edn-datomize fan-out still open |
+| 2 Scaffold `bb.edn` | **~45** `kotoba-lang/com-*` sci-test repos landed (emit + `npm test` green + server merge). More sci-test / shell-only remaining outside that set |
+| 3 Large custom `bb.edn` | open (cloud-itonami, network-isekai, local-manimani, murakumo, etzhayyim/root, …) |
+| 4 Enforcement | open |
+
+**Follow-up required:** west pin advance for every landed child repo (child `main`
+has the nbb files; superproject pins still point at pre-migration SHAs until
+`gen-west-manifest.cljs --entry <name>` / fleet pin-advance).
