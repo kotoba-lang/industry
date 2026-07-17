@@ -1,18 +1,1 @@
-[{:db/id -1
-  :adr/id "adr-2607166000-app-aozora-appview-feed-latency-kaizen"
-  :adr/title "ADR-2607166000: app-aozora appview フィード読み系の latency kaizen — attr 単位 narrow scan + edge cache + cron warmer（p50 14.1s → 21ms）"
-  :adr/doc_type "adr"
-  :adr/topic "app-aozora-appview-feed-latency-kaizen"
-  :adr/status "accepted"
-  :adr/date "2026-07-16"
-  :adr/last_verified "2026-07-16"
-  :adr/deciders ["Jun Kawasaki"]
-  :adr/authoritative true
-  :adr/authoritative_for
-  ["appview.aozora.app フィード読み系（getTimeline/getVideoFeed/getDiscoverFeed/getRankedFeed）の読み取り戦略: attr 単位 :avet prefix scan の依存なし一括 Promise.all。entity 単位 fan-out は禁忌（kotobase リクエスト単価 ~1.2s × Workers 同時 subrequest 上限 6 で直列化し全走査と同等に遅いことを実測済み）"
-   "appview の edge cache 方針（公開・非パーソナライズ feed の Cache API s-maxage=60/max-age=15 + 毎分 cron warmer が router を in-process 実行して cache.put — Worker は自ホスト名を fetch できない）"
-   "appview 読み系レイテンシの計測手順（70-tools/appview-latency-probe.cljs、90-docs/perf/appview-latency-ledger.edn へ append-only、co-scientist kaizen の決定論 fitness）"]
-  :adr/related ["adr-2607164500" "adr-2607032300" "adr-2607022330"]
-  :adr/supersedes []
-  :adr/superseded_by []
-  :adr/body "実測: getVideoFeed/getTimeline は毎回 13.6〜18.2s（scan-yoro の全 :eavt 再水和。isolate メモリ上限 near で ~1/4 失敗の既知問題も）。第一案（getPostThread 型の entity 単位 narrow 化）は実装・デプロイの上で 14〜16.8s のまま棄却 — ~45 entity-keyed リクエストが並列上限 6 で直列化するため。採用: (1) scan-posts = フィード投影が読む 18 属性の :avet [attr] prefix scan を単一 Promise.all（~19 req ≈ 3 波）で取得し scan/scan へ。legacy :yoro.post/* は id-scan + 件数がある時だけ hydrate（v2 db ゼロ件、fixture 互換）。(2) Cache API edge cache（4 NSID、URL キー、200 のみ）。(3) 毎分 cron warmer。(4) probe + ledger（baseline p50 14,147ms / after p50 21ms、HIT 4/5、miss ~8s。402 tests green、golden test は with-redefs 罠から with-datoms へ移行）。デプロイ: app-aozora 361752b6c64、worker Version 83977bac。残課題: miss ~8s（kotobase multi-attr 一括 API で 1 req 化）、リクエスト単価 ~1.2s、per-colo cache（KV 検討）、新着反映最大 60s 遅延、record 総数線形の payload。"}]
+[{:adr/authoritative_for ["appview.aozora.app フィード読み系（getTimeline/getVideoFeed/getDiscoverFeed/getRankedFeed）の読み取り戦略: attr 単位 :avet prefix scan の依存なし一括 Promise.all。entity 単位 fan-out は禁忌（kotobase リクエスト単価 ~1.2s × Workers 同時 subrequest 上限 6 で直列化し全走査と同等に遅いことを実測済み）" "appview の edge cache 方針（公開・非パーソナライズ feed の Cache API s-maxage=60/max-age=15 + 毎分 cron warmer が router を in-process 実行して cache.put — Worker は自ホスト名を fetch できない）" "appview 読み系レイテンシの計測手順（70-tools/appview-latency-probe.cljs、90-docs/perf/appview-latency-ledger.edn へ append-only、co-scientist kaizen の決定論 fitness）"], :adr/supersedes [], :adr/superseded_by [], :adr/topic "app-aozora-appview-feed-latency-kaizen", :adr/related ["adr-2607164500" "adr-2607032300" "adr-2607022330"], :adr/status "accepted", :adr/id "adr-2607166000-app-aozora-appview-feed-latency-kaizen", :adr/doc_type "adr", :adr/last_verified "2026-07-16", :adr/body "実測: getVideoFeed/getTimeline は毎回 13.6〜18.2s（scan-yoro の全 :eavt 再水和。isolate メモリ上限 near で ~1/4 失敗の既知問題も）。第一案（getPostThread 型の entity 単位 narrow 化）は実装・デプロイの上で 14〜16.8s のまま棄却 — ~45 entity-keyed リクエストが並列上限 6 で直列化するため。採用: (1) scan-posts = フィード投影が読む 18 属性の :avet [attr] prefix scan を単一 Promise.all（~19 req ≈ 3 波）で取得し scan/scan へ。legacy :yoro.post/* は id-scan + 件数がある時だけ hydrate（v2 db ゼロ件、fixture 互換）。(2) Cache API edge cache（4 NSID、URL キー、200 のみ）。(3) 毎分 cron warmer。(4) probe + ledger（baseline p50 14,147ms / after p50 21ms、HIT 4/5、miss ~8s。402 tests green、golden test は with-redefs 罠から with-datoms へ移行）。デプロイ: app-aozora 361752b6c64、worker Version 83977bac。残課題: miss ~8s（kotobase multi-attr 一括 API で 1 req 化）、リクエスト単価 ~1.2s、per-colo cache（KV 検討）、新着反映最大 60s 遅延、record 総数線形の payload。", :adr/deciders ["Jun Kawasaki"], :adr/date "2026-07-16", :db/id -1, :adr/authoritative true, :adr/title "ADR-2607166000: app-aozora appview フィード読み系の latency kaizen — attr 単位 narrow scan + edge cache + cron warmer（p50 14.1s → 21ms）", :adr/source-format "edn"}]

@@ -212,13 +212,70 @@
     (catch :default _ nil)))
 
 ;; ---------- ADR ledger (90-docs/adr/*.edn) ----------
+;;
+;; 正本は EDN only（ADR-2607171600）。.md は置かない。
+;; 各ファイルは:
+;;   - 1 entity の tx-data `[{:db/id -1 :adr/* ...}]`（通常 ADR）
+;;   - 複数 entity の catalog（`*.datoms.edn` 等）— 全 entity をロード
+;;   - まれに bare map — in-memory で :adr/* 化
 
 (defn adr-files []
   (->> (file-seq (io/file root "90-docs" "adr"))
        (filter #(str/ends-with? (str %) ".edn"))
        (sort-by str)))
 
-(def adr-entity wrapped-entity)
+(defn adr-entities-from-file
+  "1 ADR ファイルから 0+ entity map を返す（disk は書き換えない）。"
+  [f]
+  (try
+    (let [content (slurp-edn f)]
+      (cond
+        (and (vector? content) (seq content) (every? map? content))
+        (map-indexed (fn [i e] (assoc e :db/id (- (inc i))
+                                      :source/file (str f)))
+                     content)
+
+        (map? content)
+        (let [fm (:frontmatter content)
+              base (dissoc content :frontmatter :body-file)
+              entries (concat (when (map? fm) (seq fm)) (seq base))
+              e (into {:db/id -1 :source/file (str f)}
+                      (map (fn [[k v]]
+                             [(if (and (keyword? k) (namespace k)) k (keyword "adr" (name k))) v]))
+                      entries)]
+          [e])
+
+        :else nil))
+    (catch :default _ nil)))
+
+(defn adr-entity
+  "後方互換: ファイルの先頭 entity だけ（count 用の薄い wrapper）。"
+  [f]
+  (first (adr-entities-from-file f)))
+
+;; ---------- 90-docs 配下の非-adr ドキュメント（:doc/*） ----------
+
+(defn docs-edn-files []
+  (->> (file-seq (io/file root "90-docs"))
+       (filter #(str/ends-with? (str %) ".edn"))
+       (remove #(str/includes? (str %) "/adr/"))
+       (remove #(str/includes? (str %) "/metrics/")) ; metrics は business-metrics で別ロード
+       (remove #(str/ends-with? (str %) "canvas-ledger.edn")) ; canvas-ledger で別ロード
+       (remove #(str/ends-with? (str %) "design-quality-ledger.edn"))
+       (sort-by str)))
+
+(defn doc-entities-from-file [f]
+  (try
+    (let [content (slurp-edn f)]
+      (cond
+        (and (vector? content) (seq content) (every? map? content))
+        (map-indexed (fn [i e] (assoc e :db/id (- (inc i)) :source/file (str f))) content)
+
+        (map? content)
+        [(assoc content :db/id -1 :source/file (str f))]
+
+        :else nil))
+    (catch :default _ nil)))
 
 ;; ---------- manifest/*.edn（既に tx-data 化済み。category C） ----------
 
@@ -560,10 +617,15 @@
   (let [conn (.create_conn ds (ds-schema))
         tempid (atom 0)
         next-tempid! (fn [] (swap! tempid dec))
-        adr-tx (keep (fn [f]
-                        (when-let [e (adr-entity f)]
-                          (assoc e :db/id (next-tempid!) :source/file (str f))))
-                      (adr-files))
+        ;; ADR: multi-entity catalog も含め全 entity をロード
+        adr-tx (mapcat (fn [f]
+                         (map (fn [e] (assoc e :db/id (next-tempid!)))
+                              (or (adr-entities-from-file f) [])))
+                       (adr-files))
+        docs-tx (mapcat (fn [f]
+                          (map (fn [e] (assoc e :db/id (next-tempid!)))
+                               (or (doc-entities-from-file f) [])))
+                        (docs-edn-files))
         manifest-tx (keep (fn [f]
                              (when-let [e (wrapped-entity f)]
                                (assoc e :db/id (next-tempid!) :source/file (str f))))
@@ -583,7 +645,7 @@
         working-doc-tx (working-doc-entities next-tempid!)
         narrative-tx (concat (spirit-in-physics-entities next-tempid!)
                               (ghosthacker-manga-log-entities next-tempid!))
-        all-tx (into-array (map entity->js (concat adr-tx manifest-tx foreign-adr-tx
+        all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
                                                      biz-tx canvas-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
                                                      hirameki-corpus-tx jinushi-tx
@@ -592,6 +654,7 @@
     (.transact ds conn all-tx)
     {:conn conn
      :adr-count (count adr-tx)
+     :docs-count (count docs-tx)
      :manifest-count (count manifest-tx)
      :foreign-adr-count (count foreign-adr-tx)
      :biz-count (+ (count biz-tx) (count canvas-tx))
@@ -606,26 +669,26 @@
 
 (defn -main [& args]
   (let [[mode query-str] args
-        {:keys [conn adr-count manifest-count foreign-adr-count biz-count kj-count rad-count
+        {:keys [conn adr-count docs-count manifest-count foreign-adr-count biz-count kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                 narrative-count]}
         (build-conn)
-        total (+ adr-count manifest-count foreign-adr-count biz-count kj-count rad-count
+        total (+ adr-count docs-count manifest-count foreign-adr-count biz-count kj-count rad-count
                  etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                  narrative-count)]
     (case mode
       "count"
-      (println (format (str "adr=%s manifest=%s foreign-adr=%s biz=%s kj=%s rad=%s "
+      (println (format (str "adr=%s docs=%s manifest=%s foreign-adr=%s biz=%s kj=%s rad=%s "
                              "etzhayyim-80-data=%s proc-registry=%s merged-kotoba=%s working-doc=%s "
                              "narrative=%s total=%s")
-                        adr-count manifest-count foreign-adr-count biz-count kj-count rad-count
+                        adr-count docs-count manifest-count foreign-adr-count biz-count kj-count rad-count
                         etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                         narrative-count total))
 
       "q"
       (println (pr-str (js->clj (.q ds query-str (.db ds conn)))))
 
-      (do (println "usage: nbb manifest/edn-query.cljs [count | q '<datalog-query>']")
+      (do (println "usage: nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs [count | q '<datalog-query>']")
           (scripts.nbb-compat/exit 1)))))
 
 (apply -main *command-line-args*)

@@ -11,7 +11,7 @@
    Commands:
      products                              — 扱える product 一覧
      canvas show [--product P]             — 端末表示（fold 済）
-     canvas md [--product P|--all] [--out-dir D]  — md 生成（正本は datoms+ledger）
+     canvas md|edn [--product P|--all] [--out-dir D]  — EDN 投影生成（正本は datoms+ledger; md 別名は互換）
      canvas add|retract <canvas-id> <text> — item 追加/撤回
      canvas note <canvas-id> <text>        — note 差替
      hyp list [--product P]
@@ -75,7 +75,7 @@
 (def command-help
   [{:cmd "products" :usage ["products                              — 扱える product 一覧"]}
    {:cmd "canvas"   :usage ["canvas show [--product P]             — 端末表示（fold 済）"
-                            "canvas md [--product P|--all] [--out-dir D]  — md 生成（正本は datoms+ledger）"
+                            "canvas md|edn [--product P|--all] [--out-dir D]  — EDN 投影（正本は datoms+ledger）"
                             "canvas add|retract <canvas-id> <text> — item 追加/撤回"
                             "canvas note <canvas-id> <text>        — note 差替"]}
    {:cmd "hyp"      :usage ["hyp list [--product P]"
@@ -169,9 +169,9 @@
              out-dir (or (:out-dir flags) (:md-out ps))
              as-of (str (java.time.LocalDate/now))]
          (doseq [p products]
-           (let [f (java.io.File. (str out-dir "/" (name p) "-business-model.md"))]
+           (let [f (java.io.File. (str out-dir "/" (name p) "-business-model.edn"))]
              (.mkdirs (.getParentFile f))
-             (spit f (canvas/render-md idx p {:as-of as-of}))
+             (spit f (pr-str (canvas/render-edn idx p {:as-of as-of})))
              (println "wrote" (.getPath f))))))
 
      (defn read-metrics [ps product flags]
@@ -313,8 +313,16 @@
              ["score" "md"]
              (let [facts (edn/read-string (slurp (:facts ps)))
                    scores (score/score-all idx facts (cli-products :gftd idx))
-                   f (java.io.File. (str (:md-out ps) "/maturity-scores.md"))]
-               (spit f (score/render-md scores facts))
+                   f (java.io.File. (str (:md-out ps) "/maturity-scores.edn"))
+                   body (score/render-md scores facts)
+                   tx [{:db/id -1
+                        :doc/id "maturity-scores"
+                        :doc/doc_type "maturity-scores-projection"
+                        :doc/title "Portfolio maturity scores"
+                        :doc/path "90-docs/business/maturity-scores.edn"
+                        :doc/body body
+                        :doc/source "gftd score md (ADR-2607021700); SSoT = maturity-facts.edn"}]]
+               (spit f (pr-str tx))
                (println "wrote" (.getPath f)))
 
              ["ledger" "show"]
@@ -399,10 +407,9 @@
                         (.padStart (str (inc (.getMonth now))) 2 "0") "-"
                         (.padStart (str (.getDate now)) 2 "0"))]
          (doseq [p products]
-           (let [f (nc/file (str out-dir "/" (name p) "-business-model.md"))]
-             (.mkdirs (.getParentFile f))
-             (nc/spit f (canvas/render-md idx p {:as-of as-of}))
-             (println "wrote" (.getPath f))))))
+           (let [path (str out-dir "/" (name p) "-business-model.edn")]
+             (nc/spit path (pr-str (canvas/render-edn idx p {:as-of as-of})))
+             (println "wrote" path)))))
 
      (defn read-metrics [ps product flags]
        (let [f (nc/file (str (:metrics ps) "/" (name product) ".edn"))
@@ -543,9 +550,17 @@
              ["score" "md"]
              (let [facts (edn/read-string (nc/slurp (:facts ps)))
                    scores (score/score-all idx facts (cli-products :gftd idx))
-                   f (nc/file (str (:md-out ps) "/maturity-scores.md"))]
-               (nc/spit f (score/render-md scores facts))
-               (println "wrote" (.getPath f)))
+                   f (str (:md-out ps) "/maturity-scores.edn")
+                   body (score/render-md scores facts)
+                   tx [{:db/id -1
+                        :doc/id "maturity-scores"
+                        :doc/doc_type "maturity-scores-projection"
+                        :doc/title "Portfolio maturity scores"
+                        :doc/path "90-docs/business/maturity-scores.edn"
+                        :doc/body body
+                        :doc/source "gftd score md (ADR-2607021700); SSoT = maturity-facts.edn"}]]
+               (nc/spit f (pr-str tx))
+               (println "wrote" f))
 
              ["ledger" "show"]
              (let [es (ledger/read-events (:ledger ps))
