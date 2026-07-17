@@ -273,3 +273,38 @@
     (testing "実質的観測と既存 item は無期限に残る"
       (is (some #{"観測 (2026-07-06 QA): 実質的な発見 — 残す"} items))
       (is (some #{"p1"} items)))))
+
+;; ---- LLM advisor 配線 (ADR-2607172700) ------------------------------------------
+
+(deftest llm-advisor-parses-and-fails-safe
+  (let [idx (canvas/index base)
+        obs {:idx idx :product :cloud-itonami :blocks {} :hyps [] :metrics {}}
+        good (react/llm-advisor
+              (fn [_] "[{:proposal/action :canvas/add-item :canvas/id :cloud-itonami.uvp :event/value \"LLM 提案\" :proposal/reason \"test\"}]"))
+        garbage (react/llm-advisor (fn [_] "すみません、EDN では返せません。"))
+        thrower (react/llm-advisor (fn [_] (throw (ex-info "network down" {}))))]
+    (testing "整形済み EDN vector は proposal 列になる"
+      (is (= [:canvas/add-item] (mapv :proposal/action (good obs)))))
+    (testing "非 EDN 出力は空 (fail-safe)"
+      (is (= [] (vec (garbage obs)))))
+    (testing "complete の例外も空 (fail-safe)"
+      (is (= [] (vec (thrower obs)))))))
+
+#?(:cljs
+   (deftest strip-fences-unwraps-markdown
+     (testing "```edn フェンスを剥がすと read-string 可能になる"
+       (is (= "[{:a 1}]" (cli/strip-fences "```edn\n[{:a 1}]\n```")))
+       (is (= "[{:a 1}]" (cli/strip-fences "```\n[{:a 1}]\n```"))))
+     (testing "フェンス無しはそのまま"
+       (is (= "[{:a 1}]" (cli/strip-fences "[{:a 1}]"))))))
+
+#?(:cljs
+   (deftest normalize-llm-proposal-keywordizes-string-ids
+     (testing "string の canvas/id・hyp/id・action を keyword 化 (qwen3.6 実測の揺れ)"
+       (is (= {:proposal/action :canvas/add-item :canvas/id :cloud-itonami.metrics :event/value "v"}
+              (cli/normalize-llm-proposal
+               {:proposal/action "canvas/add-item" :canvas/id "cloud-itonami.metrics" :event/value "v"})))
+       (is (= :hyp/itonami-smb-pay
+              (:hyp/id (cli/normalize-llm-proposal {:hyp/id ":hyp/itonami-smb-pay"})))))
+     (testing "keyword はそのまま素通し"
+       (is (= {:canvas/id :a.b} (cli/normalize-llm-proposal {:canvas/id :a.b}))))))

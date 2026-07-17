@@ -420,14 +420,77 @@
                                  [(keyword k) v])))]
          (merge file-m flag-m)))
 
+     (defn strip-fences
+       "LLM 出力の ```edn … ``` markdown フェンスを剥がす。react/llm-advisor は
+        出力を read-string するので、フェンスは transport 側(ここ)で除去する。"
+       [s]
+       (let [s (str/trim (str s))]
+         (if (str/starts-with? s "```")
+           (-> s
+               (str/replace #"^```[a-zA-Z0-9]*\s*" "")
+               (str/replace #"\s*```\s*$" ""))
+           s)))
+
+     (defn- llm-complete-fn
+       "GFTD_LLM_URL への同期 chat completion (fn [prompt] -> string)。
+        react/tick は同期パイプラインなので js/fetch(async)ではなく
+        curl execFileSync で待つ(nbb=Node)。OpenAI 互換 /v1/chat/completions と
+        Anthropic 互換 /v1/messages の両応答形を受ける。ADR-2607172700。
+        env: GFTD_LLM_MODEL (default qwen3.6-35b-a3b、murakumo fleet の既定) /
+        GFTD_LLM_TOKEN (optional Bearer) / GFTD_LLM_MAX_TOKENS (default 3000 —
+        qwen3.6 は thinking モデルで reasoning にも token 予算を使う)。"
+       [url]
+       (let [model (or (nc/getenv "GFTD_LLM_MODEL") "qwen3.6-35b-a3b")
+             token (nc/getenv "GFTD_LLM_TOKEN")
+             max-tokens (or (some-> (nc/getenv "GFTD_LLM_MAX_TOKENS") js/parseInt) 3000)
+             cp (js/require "child_process")]
+         (fn [prompt]
+           (let [payload {:model model :max_tokens max-tokens
+                          :messages [{:role "user" :content prompt}]}
+                 args (cond-> ["-sS" "-m" "600" "-X" "POST" url
+                               "-H" "content-type: application/json"
+                               "--data-binary" "@-"]
+                        token (into ["-H" (str "authorization: Bearer " token)]))
+                 out (.execFileSync cp "curl" (clj->js args)
+                                    #js {:input (js/JSON.stringify (clj->js payload))
+                                         :encoding "utf8"
+                                         :maxBuffer (* 32 1024 1024)})
+                 d (js->clj (js/JSON.parse out) :keywordize-keys true)]
+             (when-let [err (:error d)]
+               (throw (ex-info (str "LLM endpoint error: " (or (:message err) (pr-str err))) {:url url})))
+             (strip-fences
+              (or (get-in d [:choices 0 :message :content])          ; OpenAI 形
+                  (some :text (:content d))))))))                     ; Anthropic 形
+
+     (defn normalize-llm-proposal
+       "LLM が :canvas/id / :hyp/id / :proposal/action を string で出す揺れを
+        keyword に正規化する (transport 正規化 — 実測: qwen3.6 は
+        \"cloud-itonami.metrics\" と string で出し、gemma4 は keyword で出す)。
+        妥当性の判定は従来どおり governor に委ね、ここでは形だけ揃える。"
+       [p]
+       (let [kw #(cond (keyword? %) %
+                       (string? %) (keyword (str/replace % #"^:" ""))
+                       :else %)]
+         (cond-> p
+           (contains? p :canvas/id) (update :canvas/id kw)
+           (contains? p :hyp/id) (update :hyp/id kw)
+           (contains? p :proposal/action) (update :proposal/action kw)
+           (contains? p :event/type) (update :event/type kw))))
+
      (defn cmd-react [cli-key ps idx sub flags]
        (let [product (resolve-product cli-key idx flags)
              metrics (read-metrics ps product flags)
-             actor "advisor:gate"
+             llm-url (nc/getenv "GFTD_LLM_URL")
+             advisor (if llm-url
+                       (let [llm (react/llm-advisor (llm-complete-fn llm-url))]
+                         (fn [obs] (concat (react/gate-aware-advisor obs)
+                                           (map normalize-llm-proposal (llm obs)))))
+                       react/gate-aware-advisor)
+             actor (if llm-url "advisor:llm+gate" "advisor:gate")
              run (case sub
-                   "tick" (let [r (react/tick {:idx idx :product product :metrics metrics :actor actor})]
+                   "tick" (let [r (react/tick {:idx idx :product product :metrics metrics :actor actor :advisor advisor})]
                             {:ticks [r]})
-                   "loop" (react/run-ticks {:idx idx :product product :metrics metrics :actor actor
+                   "loop" (react/run-ticks {:idx idx :product product :metrics metrics :actor actor :advisor advisor
                                             :max-ticks (parse-long (str (or (:max-ticks flags) "5")))}))]
          (doseq [[i r] (map-indexed vector (:ticks run))]
            (ledger/append! (:ledger ps) (:events r))
