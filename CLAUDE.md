@@ -478,6 +478,21 @@ CertGovernor）。
 - multi-entity catalog（`*.datoms.edn`）は複数 entity のまま、query ローダが全 entity を読む。
 - 新規 ADR は最初から `.edn` tx-data で書く（`.md` を起こしてから変換しない）。
 
+## LLM モデル選択 — murakumo-main alias（repo-wide mandatory、2026-07-17、ADR-2607173100）
+
+- **モデルは能力がすぐ入れ替わる。concrete な model id（`qwen3.6-35b-a3b` 等）を
+  コード・スクリプト・routine prompt・設定の既定値にハードコードしない。**
+- fleet main の SSoT は murakumo KV の alias entry **`murakumo-main`**:
+  `GET https://api.murakumo.cloud/infer/models/murakumo-main` → `{endpoint, alias-for}`。
+  `api.murakumo.cloud/v1/messages` へは `model="murakumo-main"` を送ってよい（worker が KV で解決）。
+  **モデル切替 = この 1 entry の PUT（+ 対象モデルの serve）** — 全 consumer が次回実行から追従する。
+- 新しい LLM 統合の解決順: ①env/引数 override → ②`murakumo-main` alias 解決 → ③fallback は
+  「endpoint のみ」を焼く（endpoint 先の serving モデルに従う = 切替に追従。model 名は焼かない）。
+- 2026-07-17 現在の main: qwen3.6-35b-a3b（**gemma4-26b は deprecated** — オーナー指示。
+  `gemma-gad.gftd.ai` / `gemma-fleet.gftd.ai` は legacy hostname alias として main モデルを配信）。
+  実装例: `70-tools/bmc` の `GFTD_LLM_*`（ADR-2607172700/2800）、
+  `~/.gftd/run-itonami-qwen36-tick.cljs`（ADR-2607172900、alias 解決 + endpoint-only fallback）。
+
 ## BMC / Lean Loop 反復トラッキング（business loop、2026-07-12）
 
 **新しく BMC (Business Model Canvas) / Lean Loop (build-measure-learn) の反復トラッキングを
