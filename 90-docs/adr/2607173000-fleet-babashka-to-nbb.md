@@ -118,3 +118,11 @@ has the nbb files; superproject pins still point at pre-migration SHAs until
 - `etzhayyim/root` bb.edn retired on main (3 shellable + 95 complex catalogued in tasks-complex.edn)
 - Project-root `bb.edn` remaining: worktree/fork only (`_wt-pr427`, `cloud-itonami-current`)
 - Helpers: `scripts/edn_datomize_standalone.cljs`, `scripts/publish_actor_standalone.cljs`
+
+## Progress addendum (2026-07-17 — final fan-out)
+
+- Nested `edn-datomize.bb` under `etzhayyim/root/20-actors/*` → nbb (14 files)
+- Remaining standalone edn-datomize for subaru/sanae
+- All 10 etzhayyim actor `methods/publish.cljs` wrappers on main
+- `etzhayyim/root`: 54 require/-main tasks promoted to `nbb -m` / nbb -e; 41 remain in tasks-complex (python shells, multi-require test suites, etc.)
+- Helper: `scripts/wire_tasks_complex.cljs`
