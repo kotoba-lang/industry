@@ -8,29 +8,29 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4237, "app-aozora-appview" 4263},
+ {"app-aozora-pds" 4263, "app-aozora-appview" 4393},
  :zone
- {:requests-7d 24970,
-  :pageviews-7d 6405,
-  :uniques-7d-sum 698,
+ {:requests-7d 25317,
+  :pageviews-7d 6426,
+  :uniques-7d-sum 708,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2954}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 1189}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 1148}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 285}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
     :requests 168}
+   {:path "/xrpc/com.atproto.repo.listRecords", :requests 98}
+   {:path "/", :requests 95}
    {:path "/xrpc/com.atproto.sync.getBlob", :requests 80}
-   {:path "/xrpc/app.bsky.actor.getProfile", :requests 50}
-   {:path "/xrpc/app.aozora.creator.getTicks", :requests 50}
-   {:path "/xrpc/com.atproto.repo.createRecord", :requests 47}],
-  :status-mix {:ok 6364, :client-error 730, :server-error 48},
+   {:path "/xrpc/app.bsky.actor.getProfile", :requests 50}],
+  :status-mix {:ok 6680, :client-error 141, :server-error 51},
   :window "24h"},
  :as-of "2026-07-17",
- :traffic-quality {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 1},
+ :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2954 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 1189 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 285 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 168 · /xrpc/com.atproto.sync.getBlob 80 | 4xx(probe) 10% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2954 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 1148 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 285 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 168 · /xrpc/com.atproto.repo.listRecords 98 | 4xx(probe) 2% · 5xx 1%",
  :signal
- "aozora.app 実測 24970 req/7d・698 uniques(日次和)・うち4xx probe 10%(24h)、workers 8500 inv/7d"}
+ "aozora.app 実測 25317 req/7d・708 uniques(日次和)・うち4xx probe 2%(24h)、workers 8656 inv/7d"}
