@@ -3830,6 +3830,45 @@ assertionsと合わせ全28 tests/90 assertions green）。150リポジトリ・
 経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
 いる。スイスの業界団体軸の空白は今後のtickに持ち越し。
 
+## Addendum (2026-07-17, /loop tick 130 — 業界団体軸44件目(SBA, CHE, ISIC 6419) — スイスが3tick窓で3軸完成、10カ国目。origin/main乖離263コミットをshallow深掘りで解消）
+
+tickの冒頭、`git merge origin/main`が"refusing to merge unrelated
+histories"で失敗——CLAUDE.mdの手順どおりGitHub APIで比較したところ
+`status: diverged, ahead_by: 6, behind_by: 263, merge_base: 有効なSHA`
+と判明し、本物のforce-pushではなくshallow clone境界に起因する
+偽陽性と確認。`git fetch --deepen=300`でmerge-baseに到達させてから
+通常マージし解消（main側で263コミット分の並行活動があっただけ）。
+
+`cloud-itonami-assoc-6419-che-sba`を新規GitHubリポジトリとして
+scaffold・push
+([commit ca38a5a](https://github.com/cloud-itonami/cloud-itonami-assoc-6419-che-sba/commit/ca38a5a))：
+
+Swiss Bankers Association（SBA、Schweizerische
+Bankiervereinigung）。ISIC 6419（銀行業）の11カ国目。tick129で
+正直に指摘したスイスの業界団体軸の空白を埋める。
+
+- **1912年、バーゼルで設立**——en.wikipedia.orgを直接WebFetchで
+  読み確認（WebSearch要約経由ではなく実際にページ本文を読了）。
+- **2020年、CDB 20（due diligence行動規範）**——swissbanking.ch
+  自身がホストするPDF表紙をRead-toolの保存パスfallbackで直接
+  確認。WebSearchはこの協定の起源を1977年としていたが、CDB 20
+  文書自身のPreambleにその日付の記載は無かったため採用せず、
+  直接確認できた2020年版のみを記録。
+
+4 tests/11 assertions green。151リポジトリ・852 factを統合。
+
+3軸横断query（`statute/jurisdiction`・`ordinance/country`・
+`association-rule/country`いずれも`"CHE"`）で全て正しく取得を
+確認——**スイスがtick128(自治体)→129(国)→130(業界団体)の
+3tick窓で3軸完成、UAE(tick100)・ベトナム(tick103)・
+インドネシア(tick106)・フィリピン(tick109)・トルコ(tick115)・
+ナイジェリア(tick118)・サウジアラビア(tick121)・
+マレーシア(tick124)・オーストリア(tick127)に続く10カ国目**。
+
+現状: 国軸44件・業界団体軸44件(28業種)・自治体軸42件——130 tickを
+経て3軸すべてが実データ・個別検証済み・捏造なしで成長を継続して
+いる。
+
 ## References
 
 - ADR-2607141600（`cloud-itonami-real-entity-record-placement` — 自社
