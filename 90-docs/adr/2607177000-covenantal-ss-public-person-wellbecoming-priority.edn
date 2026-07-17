@@ -1,0 +1,139 @@
+[{:db/id -1
+  :adr/id "adr-2607177000-covenantal-ss-public-person-wellbecoming-priority"
+  :adr/doc_type "adr"
+  :adr/status "accepted"
+  :adr/date "2026-07-17"
+  :adr/last_verified "2026-07-17"
+  :adr/council_ratification "adr-2607177001 (etzhayyim/root) Seat-1/founder standing authorization 2026-07-17"
+  :adr/implemented_at
+  ["etzhayyim/com-etzhayyim-fuchi@f47ba29e228c"
+   "etzhayyim/root@838ead44f355 (ontology v2 + ADR-2607177001)"]
+  :adr/title "Covenantal social security: public-person as-of + wellbecoming/mago/ko priority + scores unrepresentable"
+  :adr/topic "covenantal-ss-public-person-wellbecoming-priority"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative_for
+  ["as-of derivation of public-person? for covenantal §1.16 / fuchi recipients"
+   "Tier-0 priority stack: wellbecoming > mago (孫) > ko (子) > present adherent"
+   "public surface = facts only; personal score/rank/percentile unrepresentable on public surface"
+   "disclosure-gate for recipients; hold on fail without erasing public history"
+   "fuchi implementation surface (methods/public_person.cljc + data/public-person-dynamic.edn)"]
+  :adr/related
+  ["adr-2605192100-etzhayyim-mission-charter (§1.9 multi-gen, §1.10 wellbecoming)"
+   "adr-2605261000-labor-liberation-transition-mechanism"
+   "adr-2605301020-basic-high-income-imputed-and-commons-asset-doctrine"
+   "adr-2605302357-etzhayyim-social-security-for-humanity (§1.16)"
+   "adr-2605302358-social-security-real-world-delivery-pipeline"
+   "adr-2606052300-fuchi-maintainer-sustenance-allocator-r0"
+   "adr-2606032130-displacement-dividend-tenure-weighted-basic-high-income"
+   "adr-2607122100-cloud-itonami-labor-liberation-sd-model"]
+  :adr/source-format "edn"
+  :adr/body
+  "# ADR-2607177000: Covenantal SS — public-person (as-of) + wellbecoming/mago/ko priority + scores unrepresentable
+
+**Status**: accepted
+**Date**: 2026-07-17
+**Deciders**: Jun Kawasaki (owner directives: social security for robotics/itonami displacement via etzhayyim covenant; recipients are public persons with identify/track/disclosure; privacy concern was scores not charter secrecy; priority is wellbecoming then 孫 then 子)
+
+## Context
+
+Labor liberation (cloud-itonami / robotics) reduces wage and subsistence toil. etzhayyim already designs the parallel substrate:
+
+- Liberation Ladder L0..L6 (ADR-2605261000)
+- §1.16 Social Security of Humanity, covenantal-universal (ADR-2605302357)
+- Basic High Income in-kind (ADR-2605301020)
+- fuchi 扶持 sustenance + Displacement-Dividend coupling (ADR-2606052300 / 2606032130)
+
+What was underspecified for operators and code:
+
+1. Whether benefit *recipients* are public or private at the individual level
+2. What \"individual non-public\" was protecting (charter secrecy vs ranking/scores)
+3. How that interacts with Tier-0 priorities (§1.9 / §1.10 / Charter Rider)
+
+## Decision
+
+### 1. Priority stack (Tier-0 restatement — not a new religion)
+
+```
+P0  wellbecoming          ; dynamic trajectory (§1.10) — not static wellbeing
+P1  mago-wellbecoming     ; 孫
+P2  ko-wellbecoming       ; 子
+P3  present-adherent      ; current recipient is subordinate
+```
+
+Covenantal social security exists to protect and extend **P0–P2**, not to maximize present-recipient comfort or rank. Conflicts resolve by first differing priority in this stack. Catastrophic harm to child/descendant dimensions remains veto (Charter Rider).
+
+\"幸せ\" of 孫/子 is interpreted as **wellbecoming trajectory**, never as a happiness score.
+
+### 2. public-person is derived as-of (not a static title)
+
+```
+public-person?(p, t) ≔
+  covenant?(p, t)
+  ∧ receives-covenantal-ss?(p, t)
+  ∧ ¬ exit-suspended?(p, t)
+```
+
+- **receives-covenantal-ss?** — at least one active rivalrous in-kind rail (or active ladder entitlement) at t
+- **On first entitlement** → becomes public-person; PUBLIC-SURFACE opens
+- **On disclosure fail** → entitlements **hold**; public-person remains true (status visible)
+- **On exit / no rails** → public-person? false; **public history retained** (audit of commons use, not punishment)
+- **Re-entry** resumes as-of trajectory
+
+Non-recipients and pure public-good consumers stay private (N7).
+
+### 3. Surfaces: facts public, scores unrepresentable
+
+| Surface | Contents |
+|---|---|
+| **PUBLIC** | DID, SBT/covenant, stage, active rails, imputed **facts** (amounts/bands), cohort/earmark link, disclosure-status, hold-reason-code, multi-gen care facts |
+| **SCORE** | **empty / unrepresentable** — no personal rank, percentile, wellbecoming *points*, liberation KPI per person, leaderboard UI |
+| **INTERNAL** | tenure weight / rationing order for allocate (not published as person rank); hold signals; audit notes |
+
+**Clarify prior ADRs**: ADR-2605301020's rejection of \"publish per-adherent imputed income\" targeted **leaderboard / class formation**. This ADR **allows per-adherent imputed *facts*** on the public surface for commons audit, and **still forbids score/rank/percentile presentation**. Internal `priority-rank` in fuchi allocate remains rationing machinery and **must not** appear on PUBLIC-SURFACE.
+
+### 4. Disclosure obligations (while public-person?)
+
+Required, member-signed, freshness stage-dependent:
+
+- wage-labor-band (band, not score)
+- state-benefits? (dual-recognition honesty, N4)
+- wellbecoming-attest-**fact** (submitted/pass/fail — not a points score)
+- related-party-edges
+- rider-§2 self-report
+
+`disclosure-ok?` fail → hold entitlements. Eligibility inputs are **facts and gates only** — never personal scores (`no-score-as-eligibility-input`).
+
+### 5. Implementation (this session)
+
+| Artifact | Role |
+|---|---|
+| `orgs/etzhayyim/com-etzhayyim-fuchi/data/public-person-dynamic.edn` | machine-readable SSoT of the dynamic def |
+| `orgs/etzhayyim/com-etzhayyim-fuchi/methods/public_person.cljc` | pure as-of derivation + public-surface projection |
+| fuchi analyze / tests | emit and verify PUBLIC vs SCORE separation |
+| fuchi CLAUDE.md / README | operator-facing restatement |
+
+Live mint/disbursement remains Council-gated (existing G10 / live_gate). This ADR does not turn on live payout.
+
+### 6. Explicit non-amendments
+
+- **N1** no fiat-replacement UBI (cash≡0)
+- **N4** no state safety-net replacement
+- **N6** no private patronage per adherent
+- **N7** adherent-gated rivalrous benefits
+- **N8** non-eschatological / asymptotic
+- §1.16.8 anti-coercion / right of exit (history retained ≠ penalty branding)
+
+## Consequences
+
+- Operators and code share one definition: recipients are **public persons for facts**, never **ranked subjects**.
+- Anti free-ride strengthens (identity + rails + disclosure visible) without turning SS into a social-credit scoreboard.
+- Multi-gen priority is the explicit objective; present-recipient transparency is a means to protect 孫/子 commons.
+- cloud-itonami remains the displacement/automation engine; etzhayyim/fuchi remains the covenantal sustenance plane.
+
+## Alternatives rejected
+
+1. **Universal anonymous UBI** — violates N1, N7, free-rider structure.
+2. **Full personal privacy for recipients** — cannot audit commons; fails mago/ko protection against free-riding.
+3. **Public personal scores/leaderboards** — class formation; harms relational wellbecoming of descendants.
+"}]
