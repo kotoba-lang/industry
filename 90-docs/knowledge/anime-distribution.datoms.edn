@@ -1,0 +1,212 @@
+;; アニメ作品の国際配信ナレッジ — 国 × 放送局/プラットフォーム × 作品 × リリース
+;; as-of 2026-07-17 / DataScript / Datomic / kotoba-datomic transaction 互換 EDN vector
+;; 形式先行例: 同 dir の childrens-content-crude-humor.datoms.edn（README.md 参照）
+;;
+;; :country/* の attribute 定義は childrens-content-crude-humor.datoms.edn と同一なので、
+;; 両ファイルを同じ DB に transact できる（:country/id が :db.unique/identity なので
+;; 同一国 entity は upsert でマージされる）。
+;;
+;; 捏造ゼロ: :confidence :high = 当日 Wikipedia 等で裏取り済み（:source に URL）、
+;; :medium = 一般知識で一次ソース未確認。不明な値は attribute ごと省略。
+[
+ ;; ---- schema: country（childrens-content-crude-humor.datoms.edn と同一定義）------
+ {:db/ident :country/id      :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :country/name-ja :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :country/name-en :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :country/region  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+
+ ;; ---- schema: network（放送局・チャンネル・配信プラットフォーム）-----------------
+ {:db/ident :network/id      :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :network/name    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :network/country :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; 本拠国（global streaming は運営本拠）
+ ;; :terrestrial 地上波 / :cable-satellite ケーブル・衛星 / :kids-channel 子供専門ch
+ ;; :kids-block 子供向け放送枠 / :adult-block 深夜・成人向け枠 / :streaming 配信
+ {:db/ident :network/type    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :network/note    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; ---- schema: work（childrens-content-crude-humor.datoms.edn と同一定義 + 追加）---
+ {:db/ident :work/id       :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :work/title-ja :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :work/title-en :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :work/origin   :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :work/year-start :db/valueType :db.type/long  :db/cardinality :db.cardinality/one} ; TV シリーズ開始年
+
+ ;; ---- schema: release（作品 × 国 × 放送局のリリース事実）-------------------------
+ {:db/ident :release/id          :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :release/work        :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :release/country     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :release/network     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :release/medium      :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :tv-anime / :streaming
+ {:db/ident :release/year-start  :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+ {:db/ident :release/year-end    :db/valueType :db.type/long    :db/cardinality :db.cardinality/one} ; 継続中なら省略
+ {:db/ident :release/title-local :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ ;; :uncut ほぼ無修正 / :censored カット・修正 / :localized 文化置換を含む改変 / :adult-recut 成人向け再構成
+ {:db/ident :release/edit-status :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :release/rating      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :release/note        :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :release/source      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; 裏取り URL
+ {:db/ident :release/confidence  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :high / :medium
+
+ ;; ==================================================================================
+ ;; countries（既存 9 か国は childrens-content-crude-humor.datoms.edn 側が正。
+ ;; ここでは新規の 3 か国 + upsert キーとなる最小 entity のみ定義）
+ ;; ==================================================================================
+ {:country/id :jp :country/name-ja "日本" :country/name-en "Japan" :country/region :east-asia}
+ {:country/id :us :country/name-ja "アメリカ" :country/name-en "United States" :country/region :north-america}
+ {:country/id :in :country/name-ja "インド" :country/name-en "India" :country/region :south-asia}
+ {:country/id :kr :country/name-ja "韓国" :country/name-en "South Korea" :country/region :east-asia}
+ {:country/id :cn :country/name-ja "中国" :country/name-en "China" :country/region :east-asia}
+ {:country/id :es :country/name-ja "スペイン" :country/name-en "Spain" :country/region :europe}
+ {:country/id :ca :country/name-ja "カナダ" :country/name-en "Canada" :country/region :north-america}
+ {:country/id :au :country/name-ja "オーストラリア" :country/name-en "Australia" :country/region :oceania}
+ {:country/id :uk :country/name-ja "イギリス" :country/name-en "United Kingdom" :country/region :europe}
+
+ ;; ==================================================================================
+ ;; networks
+ ;; ==================================================================================
+ {:network/id :tv-asahi :network/name "テレビ朝日 (ANN)" :network/country [:country/id :jp]
+  :network/type :terrestrial :network/note "クレヨンしんちゃん・ドラえもんの本国ネットワーク"}
+ {:network/id :tv-tokyo :network/name "テレビ東京 (TX Network)" :network/country [:country/id :jp]
+  :network/type :terrestrial :network/note "ポケモンの本国ネットワーク"}
+ {:network/id :adult-swim :network/name "Adult Swim (Cartoon Network 深夜枠)" :network/country [:country/id :us]
+  :network/type :adult-block :network/note "成人向けアニメ・コメディ枠"}
+ {:network/id :kids-wb :network/name "Kids' WB (The WB 土曜朝枠)" :network/country [:country/id :us]
+  :network/type :kids-block}
+ {:network/id :cartoon-network-us :network/name "Cartoon Network" :network/country [:country/id :us]
+  :network/type :kids-channel}
+ {:network/id :disney-xd-us :network/name "Disney XD" :network/country [:country/id :us]
+  :network/type :kids-channel}
+ {:network/id :netflix :network/name "Netflix" :network/country [:country/id :us]
+  :network/type :streaming :network/note "global streaming（本拠 US）。216 地域で配信"}
+ {:network/id :family-chrgd :network/name "Family CHRGD (旧 Disney XD Canada)" :network/country [:country/id :ca]
+  :network/type :kids-channel}
+ {:network/id :network-ten :network/name "Network Ten" :network/country [:country/id :au]
+  :network/type :terrestrial}
+ {:network/id :boomerang-uk :network/name "Boomerang UK" :network/country [:country/id :uk]
+  :network/type :kids-channel}
+ {:network/id :hungama-tv :network/name "Hungama TV" :network/country [:country/id :in]
+  :network/type :kids-channel :network/note "Disney India 系の子供専門チャンネル"}
+ {:network/id :disney-channel-in :network/name "Disney Channel India" :network/country [:country/id :in]
+  :network/type :kids-channel}
+ {:network/id :tooniverse :network/name "Tooniverse（투니버스）" :network/country [:country/id :kr]
+  :network/type :kids-channel :network/note "CJ ENM 系アニメ専門ch"}
+ {:network/id :tv3-k3 :network/name "TV3 / K3 (カタルーニャ公共放送)" :network/country [:country/id :es]
+  :network/type :terrestrial :network/note "カタルーニャ語圏でのしんちゃん人気の中心"}
+
+ ;; ==================================================================================
+ ;; works
+ ;; ==================================================================================
+ {:work/id :crayon-shinchan :work/title-ja "クレヨンしんちゃん" :work/title-en "Crayon Shin-chan"
+  :work/origin [:country/id :jp] :work/year-start 1992}
+ {:work/id :doraemon-2005 :work/title-ja "ドラえもん (2005)" :work/title-en "Doraemon (2005 series)"
+  :work/origin [:country/id :jp] :work/year-start 2005}
+ {:work/id :pokemon :work/title-ja "ポケットモンスター" :work/title-en "Pokémon (TV series)"
+  :work/origin [:country/id :jp] :work/year-start 1997}
+
+ ;; ==================================================================================
+ ;; releases — Crayon Shin-chan
+ ;; ==================================================================================
+ {:release/id :rel.shinchan.jp.tv-asahi :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :jp] :release/network [:network/id :tv-asahi]
+  :release/medium :tv-anime :release/year-start 1992 :release/edit-status :uncut
+  :release/note "1992-04-13 開始、1200話超で継続中"
+  :release/source "https://en.wikipedia.org/wiki/Crayon_Shin-chan" :release/confidence :high}
+
+ {:release/id :rel.shinchan.us.adult-swim :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :us] :release/network [:network/id :adult-swim]
+  :release/medium :tv-anime :release/year-start 2006 :release/title-local "Shin Chan"
+  :release/edit-status :adult-recut :release/rating "TV-MA"
+  :release/note "FUNimation 版。無検閲どころか大人向けジョークを足す方向の再ローカライズ"
+  :release/source "https://en.wikipedia.org/wiki/Crayon_Shin-chan" :release/confidence :high}
+
+ {:release/id :rel.shinchan.in.hungama :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :in] :release/network [:network/id :hungama-tv]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "2008年の放送禁止後、大幅カット版のみ再開が許された（詳細は childrens-content-crude-humor の :shinchan.in）"
+  :release/confidence :medium}
+
+ {:release/id :rel.shinchan.kr.tooniverse :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :kr] :release/network [:network/id :tooniverse]
+  :release/medium :tv-anime :release/title-local "짱구는 못말려" :release/edit-status :censored
+  :release/note "臀部・露出関連シーンをカット・修正した編集版"
+  :release/confidence :medium}
+
+ {:release/id :rel.shinchan.es.tv3 :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :es] :release/network [:network/id :tv3-k3]
+  :release/medium :tv-anime :release/title-local "Shin Chan" :release/edit-status :uncut
+  :release/note "カタルーニャ語吹替を起点にスペインで国民的人気。ほぼ無修正の子供向け放送"
+  :release/confidence :medium}
+
+ ;; ==================================================================================
+ ;; releases — Doraemon (2005)（2026-07-17 Wikipedia 裏取り済み tranche）
+ ;; ==================================================================================
+ {:release/id :rel.doraemon.jp.tv-asahi :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :jp] :release/network [:network/id :tv-asahi]
+  :release/medium :tv-anime :release/year-start 2005 :release/edit-status :uncut
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.doraemon.us.disney-xd :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :us] :release/network [:network/id :disney-xd-us]
+  :release/medium :tv-anime :release/year-start 2014 :release/year-end 2015
+  :release/title-local "Doraemon: Gadget Cat From the Future" :release/edit-status :localized
+  :release/note "Bang Zoom!/Viz の英語版。米国基準で検閲 + 日本文化要素を米国要素に置換（箸→フォーク等）。再放送は2018年まで"
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.doraemon.ca.family-chrgd :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :ca] :release/network [:network/id :family-chrgd]
+  :release/medium :tv-anime :release/year-start 2014 :release/year-end 2015
+  :release/edit-status :localized :release/note "米国 Disney XD 版ダブを使用"
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.doraemon.au.network-ten :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :au] :release/network [:network/id :network-ten]
+  :release/medium :tv-anime :release/year-start 2015 :release/edit-status :localized
+  :release/note "2015-01-26 開始。米国版ダブ使用（Cartoon Network / Boomerang アジアfeedでも放送）"
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.doraemon.uk.boomerang :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :uk] :release/network [:network/id :boomerang-uk]
+  :release/medium :tv-anime :release/year-start 2015 :release/year-end 2016
+  :release/edit-status :censored
+  :release/note "Red Angel Media 制作・LUK International ライセンスの英国版ダブ。米国版より原作スクリプトに忠実"
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.doraemon.in.disney-channel :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :in] :release/network [:network/id :disney-channel-in]
+  :release/medium :tv-anime :release/year-start 2020 :release/year-end 2025
+  :release/edit-status :censored
+  :release/note "牛肉・酒類への言及をミュートするなどインド放送基準対応。2023-08〜2025-05 の期間も放送"
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ ;; ==================================================================================
+ ;; releases — Pokémon（2026-07-17 Wikipedia 裏取り済み tranche）
+ ;; ==================================================================================
+ {:release/id :rel.pokemon.jp.tv-tokyo :release/work [:work/id :pokemon]
+  :release/country [:country/id :jp] :release/network [:network/id :tv-tokyo]
+  :release/medium :tv-anime :release/year-start 1997 :release/edit-status :uncut
+  :release/source "https://en.wikipedia.org/wiki/Pok%C3%A9mon_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.pokemon.us.kids-wb :release/work [:work/id :pokemon]
+  :release/country [:country/id :us] :release/network [:network/id :kids-wb]
+  :release/medium :tv-anime :release/year-start 1999 :release/edit-status :localized
+  :release/note "4Kids 版ダブ (1998-2006)。おにぎり→ドーナツ等の文化置換で知られる。9.11 とハリケーン・カトリーナ後に欠番エピソード発生"
+  :release/source "https://en.wikipedia.org/wiki/Pok%C3%A9mon_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.pokemon.us.cartoon-network :release/work [:work/id :pokemon]
+  :release/country [:country/id :us] :release/network [:network/id :cartoon-network-us]
+  :release/medium :tv-anime :release/year-start 2002 :release/edit-status :localized
+  :release/note "ライブラリ放送。2006 以降は The Pokémon Company 自社ダブ"
+  :release/source "https://en.wikipedia.org/wiki/Pok%C3%A9mon_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.pokemon.us.netflix :release/work [:work/id :pokemon]
+  :release/country [:country/id :us] :release/network [:network/id :netflix]
+  :release/medium :streaming :release/year-start 2020 :release/edit-status :localized
+  :release/note "2020-06-12 から Season 23 以降の新エピソード独占配信"
+  :release/source "https://en.wikipedia.org/wiki/Pok%C3%A9mon_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.pokemon.cn.primetime-ban :release/work [:work/id :pokemon]
+  :release/country [:country/id :cn]
+  :release/medium :tv-anime :release/year-start 2006 :release/edit-status :censored
+  :release/note "2006-09-01 以降、海外アニメのプライムタイム (17:00-20:00、のち21:00まで) 放送禁止の対象。中国側の具体的放送局は未確認のため :release/network を省略"
+  :release/source "https://en.wikipedia.org/wiki/Pok%C3%A9mon_(TV_series)" :release/confidence :medium}
+]
