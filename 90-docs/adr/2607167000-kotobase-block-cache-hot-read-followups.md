@@ -48,10 +48,21 @@ ADR-2607166600 の残 follow-up のうち「kotobase リクエスト単価 ~1.2s
    → 繰り返し閲覧 ~0.1s。往復単価そのもの（Worker 起動 + head 読み）は
    Cloudflare 基盤コストで、残る削減余地は「呼び出し回数の圧縮」= 将来の
    compound read（1 POST で複数 index 読みをバッチ）— follow-up として残す。
-2. **他ホット読みの view 化（#4）** — **不採用**。per-author / per-thread view は
-   カーディナリティが無限で「名前付き少数 view + 1 ブロック」という現設計に
-   合わない。実測上もエッジキャッシュ + 将来の compound read が同じ体感を
-   より安く達成する。フィード（少数・全員共通）だけが view の正しい適用対象。
+2. **他ホット読みの view 化（#4）** — per-actor/per-thread の「個別 view」は
+   不採用（カーディナリティ無限）のまま、**全消費者を単一の global view から
+   サーブする**形で解決（addendum、2026-07-17）: view spec に `:yoro.follow/*`
+   を追加し、`scan-yoro` 自体を view-first（attr-wave fallback、真の全走査は
+   `scan-eavt-full` として温存・消費者ゼロ）に差し替え。thread/author/profile
+   は単一 scan 化（actor 解決も scan 内 handle registry で完結。getProfile は
+   registered handle も解決するよう互換改善）。実測: 初回 2.2〜3.3s →
+   **1.2〜1.3s**（+ 60s 内の繰り返しは edge cache ~0.1s）。これにより
+   engagement/registry/push/convo/prekeys/likes/followers 等の全 scan-yoro
+   消費者から 13〜18s の全走査が消えた。compound read の必要性は解消
+   （残る 1.2s は kotobase 1 往復の単価そのもの）。付随修正: kc/view の 404 を
+   empty-success でなく reject に（view 欠落を空グラフと偽装し fallback を
+   殺す実障害）、scan-posts の同期 throw も fallback へ、テストの async
+   restore race（done 後の遅延 restore が他 ns へ resolving stub を漏らし
+   偽 view を供給）への構造的対処（決定論 baseline + call-site self-protect）。
 3. **O(Δ) view 維持（#1）— 延期**。fold は現状 full-hydrate であり、view 導出は
    その merged db からの無料フィルタ。デルタ維持を今入れても速くならず正しさ
    リスクだけ増える。**トリガ: fold 自体の incremental 化に着手した時**（保存形
@@ -81,6 +92,5 @@ ADR-2607166600 の残 follow-up のうち「kotobase リクエスト単価 ~1.2s
 
 ## Follow-ups
 
-- kotobase compound read（batched index reads、thread/author の初回 ~2.5s → ~0.6s 見込み）。
 - zone Browser Cache TTL → Respect Existing Headers（オーナー確認の上で）。
 - （継承）O(Δ) view 維持 / chunked rows — 上記トリガ到達時。
