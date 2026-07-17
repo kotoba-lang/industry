@@ -8,29 +8,29 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4341, "app-aozora-appview" 4743},
+ {"app-aozora-pds" 4352, "app-aozora-appview" 4799},
  :zone
- {:requests-7d 26552,
-  :pageviews-7d 6697,
-  :uniques-7d-sum 724,
+ {:requests-7d 26706,
+  :pageviews-7d 6700,
+  :uniques-7d-sum 727,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2962}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 1025}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2964}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 1005}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 284}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
     :requests 168}
    {:path "/", :requests 87}
    {:path "/xrpc/com.atproto.sync.getBlob", :requests 80}
-   {:path "/xrpc/com.atproto.repo.listRecords", :requests 74}
+   {:path "/xrpc/com.atproto.repo.listRecords", :requests 70}
    {:path "/xrpc/app.bsky.actor.getProfile", :requests 50}],
-  :status-mix {:ok 6538, :client-error 121, :server-error 51},
+  :status-mix {:ok 6513, :client-error 117, :server-error 51},
   :window "24h"},
  :as-of "2026-07-17",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2962 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 1025 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 284 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 168 · / 87 | 4xx(probe) 2% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2964 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 1005 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 284 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 168 · / 87 | 4xx(probe) 2% · 5xx 1%",
  :signal
- "aozora.app 実測 26552 req/7d・724 uniques(日次和)・うち4xx probe 2%(24h)、workers 9084 inv/7d"}
+ "aozora.app 実測 26706 req/7d・727 uniques(日次和)・うち4xx probe 2%(24h)、workers 9151 inv/7d"}
