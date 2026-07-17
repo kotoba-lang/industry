@@ -1,0 +1,161 @@
+;; culture-mental-model.datoms.edn — Cultural Mental Model & Gesture Catalog (schema + fixed catalog entities)
+;;
+;; This file declares schema attributes and fixed catalog entities for cross-cultural research patterns.
+;; Append-only ledger of trait & gesture facts lives in the sibling file culture-mental-model-ledger.edn.
+;;
+;; IMPORTANT DISCLAIMERS:
+;; - These are statistical patterns & cultural averages from established research frameworks
+;;   (Erin Meyer "Culture Map", Hofstede Cultural Dimensions, Edward T. Hall, Pew Research).
+;; - NOT prescriptive rules. Individual variation within cultures often exceeds variation between.
+;; - Western-centric bias: Pew & Meyer surveys draw heavily from US/Europe.
+;; - Cultures evolve; younger generations may differ significantly from observed patterns.
+;; - Power dynamics, colonial legacy, & economic factors shape observed behaviors.
+;; - Use for awareness & empathy ONLY, not stereotyping or justification.
+;;
+[
+ ;; ---- SCHEMA: Region Catalog ----
+ {:db/ident :region/id
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/unique :db.unique/identity
+  :db/doc "ISO 3166-1 alpha-3 country code (e.g., DEU, ITA, JPN, USA, BRA, FRA, IND, NLD, FIN, AE)"}
+
+ {:db/ident :region/name
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "Human-readable region name"}
+
+ {:db/ident :region/continent
+  :db/valueType :db.type/keyword
+  :db/cardinality :db.cardinality/one
+  :db/doc "Continent keyword (:europe, :asia, :africa, :americas, :oceania)"}
+
+ ;; ---- SCHEMA: Generation Catalog ----
+ {:db/ident :generation/id
+  :db/valueType :db.type/keyword
+  :db/cardinality :db.cardinality/one
+  :db/unique :db.unique/identity
+  :db/doc "Generation keyword (:gen-z, :millennial, :gen-x, :boomer)"}
+
+ {:db/ident :generation/label
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "Human-readable generation label"}
+
+ {:db/ident :generation/birth-year-start
+  :db/valueType :db.type/long
+  :db/cardinality :db.cardinality/one
+  :db/doc "Birth year range start"}
+
+ {:db/ident :generation/birth-year-end
+  :db/valueType :db.type/long
+  :db/cardinality :db.cardinality/one
+  :db/doc "Birth year range end"}
+
+ ;; ---- SCHEMA: Trait (Psychological/Cultural Pattern) ----
+ {:db/ident :trait/id
+  :db/valueType :db.type/keyword
+  :db/cardinality :db.cardinality/one
+  :db/unique :db.unique/identity
+  :db/doc "Unique trait identifier (e.g., :trait-deu-communication-directness)"}
+
+ {:db/ident :trait/kind
+  :db/valueType :db.type/keyword
+  :db/cardinality :db.cardinality/one
+  :db/doc "Trait category: :communication-style, :time-perception, :value-system, :emotional-expression, :humor-style, :conflict-style, :hospitality-norm"}
+
+ {:db/ident :trait/region
+  :db/valueType :db.type/ref
+  :db/cardinality :db.cardinality/one
+  :db/doc "Reference to :region/* entity"}
+
+ {:db/ident :trait/generation
+  :db/valueType :db.type/ref
+  :db/cardinality :db.cardinality/many
+  :db/doc "References to :generation/* entities (0 or more generations)"}
+
+ {:db/ident :trait/title
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "Short trait description (e.g., 'Directness valued in communication')"}
+
+ {:db/ident :trait/description
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "Longer explanation of the trait pattern"}
+
+ {:db/ident :trait/contrast
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "Common misconception or contrast to clarify understanding"}
+
+ {:db/ident :trait/source
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "Source attribution (author, ISBN, URL, researcher name)"}
+
+ {:db/ident :trait/caveat
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "REQUIRED: Disclaimer on individual variation, regional/generational context, limits of generalization"}
+
+ ;; ---- SCHEMA: Gesture (Physical Gesture w/ Regional Semantics) ----
+ {:db/ident :gesture/id
+  :db/valueType :db.type/keyword
+  :db/cardinality :db.cardinality/one
+  :db/unique :db.unique/identity
+  :db/doc "Unique gesture identifier (e.g., :gesture-ok-sign-deu)"}
+
+ {:db/ident :gesture/family
+  :db/valueType :db.type/keyword
+  :db/cardinality :db.cardinality/one
+  :db/doc "Gesture family grouping key (same physical gesture across regions): :thumbs-up, :ok-sign, :v-sign, :shrug, :pointing, :hand-over-heart, :nod, :eye-contact"}
+
+ {:db/ident :gesture/region
+  :db/valueType :db.type/ref
+  :db/cardinality :db.cardinality/one
+  :db/doc "Reference to :region/* entity where this gesture meaning applies"}
+
+ {:db/ident :gesture/physical-description
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "Physical description of the gesture (e.g., 'Thumb pointing upward with closed fist')"}
+
+ {:db/ident :gesture/meaning
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "Meaning in this region (e.g., 'Affirmative, positive, agreement')"}
+
+ {:db/ident :gesture/valence
+  :db/valueType :db.type/keyword
+  :db/cardinality :db.cardinality/one
+  :db/doc "Emotional valence: :positive, :negative, :neutral, :vulgar, :ambiguous"}
+
+ {:db/ident :gesture/caution
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "Cross-regional conflict warning (e.g., 'Offensive in Turkey, Greece, Iran; acceptable in most of Western Europe')"}
+
+ {:db/ident :gesture/source
+  :db/valueType :db.type/string
+  :db/cardinality :db.cardinality/one
+  :db/doc "Source attribution"}
+
+ ;; ---- CATALOG: Regions ----
+ {:region/id "DEU", :region/name "Germany", :region/continent :europe}
+ {:region/id "ITA", :region/name "Italy", :region/continent :europe}
+ {:region/id "JPN", :region/name "Japan", :region/continent :asia}
+ {:region/id "USA", :region/name "United States", :region/continent :americas}
+ {:region/id "BRA", :region/name "Brazil", :region/continent :americas}
+ {:region/id "FRA", :region/name "France", :region/continent :europe}
+ {:region/id "IND", :region/name "India", :region/continent :asia}
+ {:region/id "NLD", :region/name "Netherlands", :region/continent :europe}
+ {:region/id "FIN", :region/name "Finland", :region/continent :europe}
+ {:region/id "AE", :region/name "United Arab Emirates", :region/continent :asia}
+
+ ;; ---- CATALOG: Generations ----
+ {:generation/id :gen-z, :generation/label "Gen Z", :generation/birth-year-start 1997, :generation/birth-year-end 2012}
+ {:generation/id :millennial, :generation/label "Millennial", :generation/birth-year-start 1981, :generation/birth-year-end 1996}
+ {:generation/id :gen-x, :generation/label "Gen X", :generation/birth-year-start 1965, :generation/birth-year-end 1980}
+ {:generation/id :boomer, :generation/label "Baby Boomer", :generation/birth-year-start 1946, :generation/birth-year-end 1964}
+]
