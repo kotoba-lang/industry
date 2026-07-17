@@ -8,29 +8,29 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4214, "app-aozora-appview" 4206},
+ {"app-aozora-pds" 4237, "app-aozora-appview" 4263},
  :zone
- {:requests-7d 24802,
-  :pageviews-7d 6397,
-  :uniques-7d-sum 695,
+ {:requests-7d 24970,
+  :pageviews-7d 6405,
+  :uniques-7d-sum 698,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2957}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 1210}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 284}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2954}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 1189}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 285}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
     :requests 168}
    {:path "/xrpc/com.atproto.sync.getBlob", :requests 80}
-   {:path "/xrpc/app.aozora.creator.getTicks", :requests 54}
    {:path "/xrpc/app.bsky.actor.getProfile", :requests 50}
-   {:path "/robots.txt", :requests 34}],
-  :status-mix {:ok 6503, :client-error 707, :server-error 49},
+   {:path "/xrpc/app.aozora.creator.getTicks", :requests 50}
+   {:path "/xrpc/com.atproto.repo.createRecord", :requests 47}],
+  :status-mix {:ok 6364, :client-error 730, :server-error 48},
   :window "24h"},
  :as-of "2026-07-17",
  :traffic-quality {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2957 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 1210 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 284 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 168 · /xrpc/com.atproto.sync.getBlob 80 | 4xx(probe) 10% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2954 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 1189 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 285 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 168 · /xrpc/com.atproto.sync.getBlob 80 | 4xx(probe) 10% · 5xx 1%",
  :signal
- "aozora.app 実測 24802 req/7d・695 uniques(日次和)・うち4xx probe 10%(24h)、workers 8420 inv/7d"}
+ "aozora.app 実測 24970 req/7d・698 uniques(日次和)・うち4xx probe 10%(24h)、workers 8500 inv/7d"}
