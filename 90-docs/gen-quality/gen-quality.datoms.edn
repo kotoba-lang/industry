@@ -1,0 +1,61 @@
+;; gen-quality ledger base — murakumo self-hosted OSS video-model output-quality scoring (ADR-2607180000).
+;; Owner decision 2026-07-17 (ADR-2607171330): :video first path is the murakumo fleet (gad ComfyUI) self-hosted
+;; OSS models; hosted Seedance/fal.ai is deprioritized to an explicit opt-in. This file scores THOSE models.
+;; Schema + catalog is DataScript/Datomic-transactable EDN. Score facts (append-only, one EDN map per line) live in the
+;; sibling gen-quality-ledger.edn — this file only declares schema + the :model/* and :axis/* catalog entities that
+;; ledger events reference via :eval/model / :eval/axis. Query BOTH files together.
+;;
+;;   nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
+;;     '[:find ?m ?s :where [?e "eval/axis" "axis/composite"] [?e "eval/model" ?m] [?e "eval/score" ?s]]'
+[
+ ;; ── schema ─────────────────────────────────────────────────────────────────
+ {:db/ident :model/id     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :model/name   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :model/family :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :model/engine :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :model/license :db/valueType :db.type/string :db/cardinality :db.cardinality/one}
+ {:db/ident :model/status :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :model/note   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :axis/id      :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :axis/name    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :axis/weight  :db/valueType :db.type/double  :db/cardinality :db.cardinality/one}
+ {:db/ident :axis/norm    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :eval/model   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :eval/axis    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :eval/layer   :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :eval/score   :db/valueType :db.type/double  :db/cardinality :db.cardinality/one}
+ {:db/ident :eval/run-id  :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; ── model catalog ────────────────────────────────────────────────────────────
+ ;; :model/status — :verified-e2e (real generation observed) / :verified-e2e-container
+ ;; (only container facts measured, pixel axes await artifact) / :staged-unverified
+ ;; (weights placed on gad, graph未実測) / :pending-download (not on gad yet, fail-closed).
+ {:model/id :ltx-2.3 :model/name "LTX-2.3 distilled (22B fp8)" :model/family :ltx
+  :model/engine :comfy :model/license "LTXV open weights (non-commercial research + commercial tiers)"
+  :model/status :verified-e2e-container
+  :model/note "gad (Radeon 8060S/ROCm/ComfyUI) E2E 実測 2026-07-16 (ADR-2607171100): 768x448 / 49 frames / video+audio / 94.6s wall. text-to-video + native audio. 単段グラフが正 (2段目 upsampler は決定論的に死ぬ、原因調査 follow-up)。既定 :video model。artifact は gad ローカルのため pixel 軸 (temporal-motion/bitrate-density) は artifact 取得後にスコア。"}
+ {:model/id :wan2.2-ti2v-5b :model/name "Wan 2.2 TI2V 5B (fp16)" :model/family :wan
+  :model/engine :comfy :model/license "Apache-2.0 (Wan2.2 open weights)"
+  :model/status :staged-unverified
+  :model/note "gad に unet/vae/text-encoder 配置済みだが ComfyUI graph 未実測。text-to-video。スコア行はまだ無い (捏造しない — graph E2E 後に生成→score)。"}
+ {:model/id :wan-dancer-14b :model/name "Wan-Dancer 14B (i2v dance/cosplay)" :model/family :wan-dancer
+  :model/engine :comfy :model/license "Wan-Dancer open weights"
+  :model/status :pending-download
+  :model/note "disk-gated watcher が取得中で gad にまだ無い可能性。image-to-video (dance)。選択 fail-closed。取得+graph 配線 follow-up。"}
+ {:model/id :ffmpeg-keyframe-v0 :model/name "ffmpeg keyframe+TTS placeholder (baseline)" :model/family :baseline
+  :model/engine :ffmpeg :model/license "n/a (in-house)"
+  :model/status :verified-e2e
+  :model/note "現行 dougaka/minidrama パイプラインの実出力: keyframe PNG + TTS 音声 → ffmpeg 合成。真の生成モデルではない参照下限 — OSS モデルはこれを上回る必要がある。container は完璧だが temporal-motion≈0 (静止) が構造的下限を示す。"}
+
+ ;; ── axes (deterministic, ffprobe/ffmpeg — no LLM/browser) ─────────────────────
+ ;; weights mirror score-video.cljs axis-weight. temporal-motion + bitrate-density
+ ;; carry the most weight: they are what separate real generation from a frozen
+ ;; container that merely passes resolution/fps/duration checks.
+ {:axis/id :axis/resolution      :axis/name "解像度 (面積 / 720x1280 縦型基準)" :axis/weight 0.15 :axis/norm "min(1, w*h / (720*1280))"}
+ {:axis/id :axis/fps             :axis/name "フレームレート"                    :axis/weight 0.15 :axis/norm "min(1, fps / 24)"}
+ {:axis/id :axis/native-audio    :axis/name "ネイティブ音声トラック"            :axis/weight 0.10 :axis/norm "audio-stream? 1 : 0"}
+ {:axis/id :axis/bitrate-density :axis/name "ビット密度 (bits/pixel/sec)"       :axis/weight 0.20 :axis/norm "min(1, (vbitrate/(w*h*fps)) / 0.04)"}
+ {:axis/id :axis/temporal-motion :axis/name "時間方向の動き (mean YDIF)"        :axis/weight 0.30 :axis/norm "min(1, mean_YDIF / 8.0)"}
+ {:axis/id :axis/duration-fidelity :axis/name "尺の忠実度 (要求尺との一致)"     :axis/weight 0.10 :axis/norm "1 - min(1, |dur - target| / target)"}
+ {:axis/id :axis/composite       :axis/name "総合 (重み付き平均)"               :axis/weight 1.00 :axis/norm "Σ(score*weight)/Σweight over measured axes"}
+]
