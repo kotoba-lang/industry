@@ -822,7 +822,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-pol-lewiatan/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-9411-prt-cip association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-prt-cip/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-prt-cip/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-prt-cip/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-pan-conep association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-pan-conep/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-pan-conep/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
