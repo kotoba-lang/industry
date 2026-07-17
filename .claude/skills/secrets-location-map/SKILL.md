@@ -46,6 +46,10 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   越しの API トークンではなく、ローカルの wrangler セッションで完結）。
   `CLOUDFLARE_API_TOKEN`（Zone Analytics Read 等の狭いスコープ）は用途別に
   `wrangler secret put` で個別プロジェクトへ投入するもので、これとは別物。
+  - **kotobase-protocols-worker `WRITE_TOKEN`**（s3/atproto/git.kotobase.net の
+    write 認可 Bearer、ADR-2607174500）: Worker secret として投入済み。operator
+    copy は macOS Keychain `service=cf:kotobase-protocols-worker` /
+    `account=WRITE_TOKEN`（2026-07-17 生成）。
 - **kagi（`kotoba-lang/kagi`）**: net-kotobase / kotoba-lang 系の新規プロジェクト
   向け secrets は、1Password ではなく **こちらを正**にしていく方針（自己主権
   vault、ADR-2606272330）。**実在する vault の実体は
