@@ -1,14 +1,14 @@
 {:health-status 200,
  :zone-name "shinshi.club",
  :zone
- {:requests-7d 6915,
-  :pageviews-7d 5323,
-  :uniques-7d-sum 745,
+ {:requests-7d 6921,
+  :pageviews-7d 5327,
+  :uniques-7d-sum 747,
   :zone "shinshi.club"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 79}
+  [{:path "/", :requests 80}
    {:path "/xrpc/ai.gftd.apps.shinshi.listAuthorFeed", :requests 70}
    {:path "/config/initializers/twilio.rb", :requests 30}
    {:path "/apps/config/.env", :requests 30}
@@ -16,14 +16,14 @@
    {:path "/rails/info/properties", :requests 30}
    {:path "/stripe/webhook_secret%2eenv", :requests 30}
    {:path "/%2egithub/workflows", :requests 30}],
-  :status-mix {:ok 2346, :client-error 102},
+  :status-mix {:ok 2350, :client-error 100},
   :window "24h"},
  :source "shinshi.d1:pv_daily+chat_event_daily+pay_run",
  :window "7d",
  :as-of "2026-07-17",
  :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 79 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 70 · /config/initializers/twilio.rb 30 · /apps/config/.env 30 · /wp-admin/css/colors/sunrise/admin.php 30 | 4xx(probe) 4%",
- :funnel {:visitors 927, :chatters 14, :scenes 0, :paying 0},
+ "上位 page (24h, 2xx/3xx): / 80 · /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 70 · /config/initializers/twilio.rb 30 · /apps/config/.env 30 · /wp-admin/css/colors/sunrise/admin.php 30 | 4xx(probe) 4%",
+ :funnel {:visitors 931, :chatters 14, :scenes 0, :paying 0},
  :signal
- "shinshi.club 実測 6915 req/7d・745 uniques(日次和)・うち4xx probe 4%(24h)"}
+ "shinshi.club 実測 6921 req/7d・747 uniques(日次和)・うち4xx probe 4%(24h)"}
