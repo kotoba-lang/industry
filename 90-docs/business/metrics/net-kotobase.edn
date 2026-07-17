@@ -1,26 +1,32 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 3593, "kotobase-cf-wasm-staging" 249},
+ {"net-kotobase" 4869, "kotobase-cf-wasm-staging" 266},
  :zone
- {:requests-7d 4723,
-  :pageviews-7d 486,
-  :uniques-7d-sum 665,
+ {:requests-7d 7554,
+  :pageviews-7d 495,
+  :uniques-7d-sum 671,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 142}
-   {:path "/xrpc/kotobase.git.object.put", :requests 108}
+  [{:path "/xrpc/kotobase.git.object.put", :requests 138}
    {:path "/xrpc/net.kotobase.store.get", :requests 93}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 60}
-   {:path "/health", :requests 49}
+   {:path "/xrpc/kotobase.git.ref.set", :requests 28}
+   {:path "/xrpc/kotobase.git.ref.get", :requests 21}
    {:path
-    "/kotobase-cf-wasm-production/ipns/bafyreibq7zbruf4ug4sy43fao2wcxti67f2p6ehu5yteil74xyk76xdemy.json",
-    :requests 31}
-   {:path "/api/funnel", :requests 22}
-   {:path "/xrpc/kotobase.git.ref.set", :requests 22}],
-  :status-mix {:client-error 1228, :ok 1228, :server-error 6},
+    "/kotobase-cf-wasm-production/ipns/bafyreicch6ppoiittr3hibgguui37owb37olw22aynqg364rmwtkoe4vfy.json",
+    :requests 15}
+   {:path
+    "/kotobase-cf-wasm-production/ipns/bafyreiat2m6z7eww74kbsxpdj7jes33eoidji7aamlugatlbxpps3uyrru.json",
+    :requests 14}
+   {:path
+    "/kotobase-cf-wasm-production/ipns/bafyreifq5sjyazio5tcstm6r5ne6rtvcdpdl2skjfhw63oagx334ihcgzq.json",
+    :requests 13}
+   {:path
+    "/kotobase-cf-wasm-production/blocks/bafyreibq7zbruf4ug4sy43fao2wcxti67f2p6ehu5yteil74xyk76xdemy/bafyreiac6vkrcqwbaaworvrkqtn5lu4briehfo5lri5ynnwjaz5dltnohu",
+    :requests 13}],
+  :status-mix {:client-error 2400, :ok 841, :server-error 4},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,9 +38,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-17",
- :traffic-quality {:window "24h", :probe-4xx-pct 50, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 74, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 142 · /xrpc/kotobase.git.object.put 108 · /xrpc/net.kotobase.store.get 93 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 60 · /health 49 | 4xx(probe) 50% · 5xx 0%",
- :funnel {:visitors 762, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /xrpc/kotobase.git.object.put 138 · /xrpc/net.kotobase.store.get 93 · /xrpc/kotobase.git.ref.set 28 · /xrpc/kotobase.git.ref.get 21 · /kotobase-cf-wasm-production/ipns/bafyre… 15 | 4xx(probe) 74% · 5xx 0%",
+ :funnel {:visitors 768, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 4723 req/7d・665 uniques(日次和)・うち4xx probe 50%(24h)、workers 3842 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 7554 req/7d・671 uniques(日次和)・うち4xx probe 74%(24h)、workers 5135 inv/7d、Stripe active subs 0"}
