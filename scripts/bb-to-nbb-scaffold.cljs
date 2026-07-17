@@ -138,11 +138,13 @@
        "\n"))
 
 (defn- package-json-sci [nses]
-  (let [req-forms (str/join " " (map #(str "'" %) nses))
-        run-forms (str/join " " (map #(str "'" %) nses))
+  ;; nbb -e needs :as alias; bare clojure.test/run-tests does not resolve after
+  ;; (require 'clojure.test) the way it does on JVM/bb.
+  (let [req-nses (str/join " " (map #(str "'" %) nses))
+        run-nses (str/join " " (map #(str "'" %) nses))
         test-cmd (str "nbb --classpath src:test -e "
-                      "\"(require 'clojure.test " req-forms ") "
-                      "(let [r (clojure.test/run-tests " run-forms ")] "
+                      "\"(require '[clojure.test :as t] " req-nses ") "
+                      "(let [r (t/run-tests " run-nses ")] "
                       "(.exit js/process (if (pos? (+ (:fail r) (:error r))) 1 0)))\"")]
     (str "{\n"
          "  \"private\": true,\n"
