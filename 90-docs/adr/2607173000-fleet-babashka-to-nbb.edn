@@ -1,0 +1,11 @@
+[{:db/id -1
+  :adr/id "2607173000"
+  :adr/title "Fleet-wide Babashka → nbb (bb binary retirement)"
+  :adr/status :accepted
+  :adr/date "2026-07-17"
+  :adr/related ["2607100100-runtime-priority-apps-jvm-bb-demoted"
+                "2607124500-bmc-business-operate-daily-product-completeness-and-nbb-fix"]
+  :adr/context "Superproject tooling already on nbb (PR #336) but ~134 child bb.edn and ~86 *.bb scripts remained. Owner request 2026-07-17: Babashka を全て nbb に."
+  :adr/decision "{:script-host :nbb-only, :forbid [\"bb.edn\" \"#!/usr/bin/env bb\" \"bb binary in live call sites\"], :allow-shim-namespaces [\"babashka.fs\" \"babashka.process\" \"babashka.curl\"], :task-registry [:nbb.edn :package.json :nbb-run-tests :nbb-m], :waves {0 :superproject-residual+helpers, 1 :shared-script-families, 2 :scaffold-bb.edn-bulk, 3 :large-custom-bb.edn, 4 :enforcement+inventory}, :no-historical-adr-mass-rewrite true}"
+  :adr/exit-criteria "{:bb.edn-count 0, :dot-bb-count 0, :superproject-bb-invocations 0}"
+  :adr/helpers ["scripts/nbb-run-tests.cljs" "scripts/verify-no-babashka.cljs" "scripts/bb-to-nbb-scaffold.cljs"]}]

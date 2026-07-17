@@ -580,7 +580,7 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   regexベース、`orgs/gftdcojp/network-isekai` の `isekai.ux.audit`／ADR-0007 からの移植）
   として存在する。Co-Scientist loop 本体（Generate→Reflect→Rank(Elo)→Evolve→Meta）は
   `90-docs/design-quality/coscientist.cljc`（同 `isekai.ux.coscientist` 移植、
-  langchain-clj依存なしのoffline/heuristic版）で、`bb`から `kaizen-cycle` を呼ぶと
+  langchain-clj依存なしのoffline/heuristic版）で、`nbb` から `kaizen-cycle` を呼ぶと
   `90-docs/design-quality/coscientist/iteration-NN.md` を生成する。この co-scientist
   パターン自体の原典は `90-docs/adr/2606141500-keiei-arbor-coscientist-engine.md`。
   **UI/UXに限らず「品質を測って改善ループを回したい」タスクでは、まず
@@ -658,13 +658,14 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   実現方法を探す——それでも描画ニーズを満たせない場合、**「Rust を新規に
   書く」ことで穴を埋めない**。スコープを絞る（例: 当面は DOM/CSS の視覚
   表現に留める）か、対象を決めて別途 ADR 化しオーナー判断を仰ぐ。
-- **`bb` の降格は「app の runtime として」の話。** リポジトリ運用ツール
-  （`scripts/*.cljs`・`.claude/hooks/*.cljs`・west 拡張等）は app ではなく
-  インフラ tooling で、現状 bb が正本 — これらを一斉移行はしない（移行
-  するなら対象を決めて ADR 化。個別の新規スクリプトは nbb で書けるなら
-  nbb を優先）。2026-07-06 初版の「kototama > cljs > nbb > jvm」→
-  2026-07-07 改訂に続く 3 度目の改訂で、変更点は (1) app 互換性の順序と
-  しての明文化、(2) `bb` を JVM と並ぶ最下位に明示、の 2 点。
+- **運用 tooling の script host は nbb のみ（ADR-2607173000、2026-07-17）。**
+  `scripts/*.cljs`・`.claude/hooks/*.cljs`・west 拡張・child repo の
+  task/test オーケストレーションは **`bb` バイナリを使わない**。新規に
+  `bb.edn` / `#!/usr/bin/env bb` を置かない。残存は Wave 1–4 で削除中
+  （共有 `.bb` 族 → scaffold `bb.edn` → 大型 `bb.edn` → ゲート）。
+  `scripts/nbb_compat` の `babashka.*` **名前空間**は Node 互換シムであり、
+  `bb` 実行を意味しない。app runtime としての `bb` 降格（JVM と並ぶ最下位）
+  は従来どおり維持。
 - **Node 側の検証/テストハーネス（Playwright driver、静的サーバ、E2E
   スクリプト等）も新規に書く場合は nbb（`.cljs`）で書く — 生 JS の
   `.mjs`/`.cjs` を新規に書かない。** シェルスクリプト（`.sh`）も同様に
@@ -720,8 +721,8 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   tech-ipfs-specs-ipns` 等）は、実装当時「唯一動く経路が JVM だった」という
   正しい判断の結果なので、上位の選択肢が実在するようになった今も
   リトロアクティブに書き直さない（移行する場合は対象を決めて ADR 化して
-  から着手する）。bb も同様: 既存の repo 運用スクリプト群は温存し、app を
-  bb 前提で新規に書かない。
+  から着手する）。**script host としての bb は ADR-2607173000 で退役** —
+  app を bb 前提で新規に書かないのはもちろん、運用スクリプトも nbb に寄せる。
 - `#?(:kototama ...)` / `#?(:clojurewasm ...)` という reader-conditional は
   **コードベース全体を検索してゼロ**——Clojure 標準は `:clj`/`:cljs`/
   `:cljr`/`:default` しか認識せず、これらを feature として認識させるカスタム
