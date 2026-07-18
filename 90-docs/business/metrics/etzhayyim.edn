@@ -1,17 +1,18 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 11905, "etzhayyim-xrpc-proxy" 215},
+ {"etzhayyim-did-web" 11945, "etzhayyim-xrpc-proxy" 215},
  :zone
- {:requests-7d 62282,
-  :pageviews-7d 1818,
-  :uniques-7d-sum 1501,
+ {:requests-7d 62727,
+  :pageviews-7d 1858,
+  :uniques-7d-sum 1535,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/_shell/liquid-glass.css", :requests 48}
-   {:path "/_shell/shell.css", :requests 40}
+  [{:path "/_shell/liquid-glass.css", :requests 49}
+   {:path "/_shell/shell.css", :requests 41}
+   {:path "/_shell/liquid-glass-adapter.css", :requests 40}
    {:path "/robots.txt", :requests 15}
    {:path
     "/kotoba/blocks/bafyreia2nrm6hoj6giy4cvugjtobdftjyq2qr4mhctqwsqc4po5ioxqrdi",
@@ -22,16 +23,12 @@
     :requests 9}
    {:path
     "/kotoba/blocks/bafyreiexavd56gvh5jz6krfnzprxdww5ct6z6345myieiumit5wr7biavi",
-    :requests 8}
-   {:path
-    "/kotoba/blocks/bafyreifijo3pfjws4ds6b6mek5hojpcsg6tfdobtmmrfjoabkrz7xjllby",
-    :requests 6}],
-  :status-mix {:server-error 8009, :ok 356, :client-error 911},
+    :requests 8}],
+  :status-mix {:server-error 8040, :ok 410, :client-error 882},
   :window "24h"},
  :as-of "2026-07-18",
- :traffic-quality
- {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 86},
+ :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 86},
  :top-paths
- "上位 page (24h, 2xx/3xx): /_shell/liquid-glass.css 48 · /_shell/shell.css 40 · /robots.txt 15 · /kotoba/blocks/bafyreia2nrm6hoj6giy4cvug… 10 · /kotoba/kotoba_wasm.js 9 | 4xx(probe) 10% · 5xx 86%",
+ "上位 page (24h, 2xx/3xx): /_shell/liquid-glass.css 49 · /_shell/shell.css 41 · /_shell/liquid-glass-adapter.css 40 · /robots.txt 15 · /kotoba/blocks/bafyreia2nrm6hoj6giy4cvug… 10 | 4xx(probe) 9% · 5xx 86%",
  :signal
- "etzhayyim.com 実測 62282 req/7d・1501 uniques(日次和)・うち4xx probe 10%(24h)、workers 12120 inv/7d"}
+ "etzhayyim.com 実測 62727 req/7d・1535 uniques(日次和)・うち4xx probe 9%(24h)、workers 12160 inv/7d"}
