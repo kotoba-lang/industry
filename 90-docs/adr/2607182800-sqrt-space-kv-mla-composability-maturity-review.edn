@@ -243,8 +243,44 @@ sqrt-space-kvは『常駐させるトークン数（S次元）』を間引く。
   昇格しない。
 - HF Papers/arXiv上のアブストラクトで『90-97%』を主張する場合は必ず
   『デバイス常駐バイト数、ページング帯域コスト未計測』という限定を併記する。
-- 次の一手はP0（kvpress比較・実スループット測定）とP1（MLA合成実験・
-  タスク精度）。
+- 次の一手はP0（kvpress比較）とP1（MLA合成実験・タスク精度）。
+
+## Implementation notes (2026-07-18 M2 landed)
+
+**ホストページングありの実デコードスループット測定が完了。**
+`gftdcojp/cloud-murakumo` に `scripts/modal_sqrt_kv_throughput_bench.py`
+（新規）を追加し、Modal A100上でQwen2.5-7B-Instruct(bf16)を対象に実測した:
+
+- 非常駐部分（√S間引きで除外されるトークン）の実際のK/VテンソルをGPUから
+  実際に`.to('cpu')`で退避し、`.to('cuda')`で実際に呼び戻す、という本物の
+  データ移動を計測（帯域スペック値からの推定ではない）。
+- 実測GPU-CPU帯域: S=8192で13.3GB/s、S=16384で15.0GB/s（Modal A100基盤上
+  の実測。文献値16-32GB/sのレンジ内）。
+- ベースライン（フルKV常駐の標準デコード）とpaged版の2つのシナリオ:
+  「毎ステップ再ページング」（online-softmaxが厳密性を保つなら本来必要な
+  読み方。cross-step page cacheを実装していない現行設計ではこちらが誠実な
+  数字）と「1回だけ償却」（楽観的、cross-step page cacheの存在を仮定）。
+- 結果: S=8192で34.7→15.9tok/s（2.18倍遅い）、S=16384で43.8→12.0tok/s
+  （3.66倍遅い）。楽観ケースでも1.07-1.17倍の実コストが残る。**Sが伸びる
+  ほど悪化する**（非常駐バイト数がSにほぼ比例して増えるため）— これは
+  論文自身が「6.1節: 技術が最も意味を持つ」と主張する長文脈領域そのもの。
+- 結論: 90-97%というストレージ常駐削減の見出しは、実デコードのタダ飯では
+  ない。特に「毎ステップ再ページング」が誠実な読み方である限り、
+  スループットコストは無視できない規模で、かつ長文脈で悪化する。
+- 証跡: `gftdcojp/cloud-murakumo` commit `7574d89` (branch
+  `perf/sqrt-kv-paging-throughput-bench`, merged to main via server-side
+  merge `5cc1bac`)、`docs/benchmarks/sqrt-kv-throughput-modal-summary.md`、
+  `docs/benchmarks/sqrt-kv-throughput-modal-Qwen__Qwen2.5-7B-Instruct.json`。
+  `com-junkawasaki/sqrt-space-kv` commit `58766a2` に反映済み。
+- vLLM/SGLang/TensorRT-LLMという実サービングエンジンとの横並び比較は
+  M2の範囲から外し、本番カーネル実装が要るためM6に繰り越した（デリバラブル
+  自体を実装しないと比較のしようがないため）。
+
+未着手のまま: M3（ダウンストリームタスク精度）、M4（kvpress競合比較）、
+M5（MLA合成実験）、M6（本番カーネル + サービングエンジン比較）。これらは
+それぞれ別セッションでの継続作業が必要な規模（データセット取得・harness
+統合・大型MLAモデルのダウンロード・カーネル実装）であり、本セッションでは
+着手していない。
 
 ## References
 
