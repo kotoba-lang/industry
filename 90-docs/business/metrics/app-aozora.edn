@@ -8,28 +8,28 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4231, "app-aozora-appview" 5606},
+ {"app-aozora-pds" 4242, "app-aozora-appview" 5670},
  :zone
- {:requests-7d 27746,
-  :pageviews-7d 6812,
-  :uniques-7d-sum 722,
+ {:requests-7d 27922,
+  :pageviews-7d 6817,
+  :uniques-7d-sum 726,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2922}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 633}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2904}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 604}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 284}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 60}
-   {:path "/", :requests 57}
-   {:path "/xrpc/app.bsky.actor.getProfile", :requests 39}
-   {:path "/robots.txt", :requests 38}
-   {:path "/222.php", :requests 28}],
-  :status-mix {:ok 5199, :client-error 45, :server-error 21},
+   {:path "/", :requests 59}
+   {:path "/robots.txt", :requests 39}
+   {:path "/222.php", :requests 28}
+   {:path "/api/engagement", :requests 23}
+   {:path "/2.php", :requests 21}],
+  :status-mix {:ok 5029, :client-error 39, :server-error 3},
   :window "24h"},
  :as-of "2026-07-18",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2922 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 633 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 284 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 60 · / 57 | 4xx(probe) 1% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2904 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 604 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 284 · / 59 · /robots.txt 39 | 4xx(probe) 1% · 5xx 0%",
  :signal
- "aozora.app 実測 27746 req/7d・722 uniques(日次和)・うち4xx probe 1%(24h)、workers 9837 inv/7d"}
+ "aozora.app 実測 27922 req/7d・726 uniques(日次和)・うち4xx probe 1%(24h)、workers 9912 inv/7d"}
