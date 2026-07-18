@@ -85,24 +85,38 @@
     :deliverables ["S=2048でのmax|Δ|=7e-5（SmolLM-135M）" "Qwen3.6-35B-A3Bでmax|Δ|≈0.016（bf16 noise）"]}
    {:level "M1" :name "storage-residency-snapshot" :status "landed"
     :deliverables ["Mac MLX: SmolLM-135M, Qwen2.5-0.5B" "Modal A100: Qwen2.5-7B/14B, Qwen3.6-35B-A3B" "negative result: 全再計算はピークメモリ悪化"]}
-   {:level "M2" :name "decode-throughput-under-real-paging" :status "open"
-    :deliverables ["ホストページングありのtokens/sec実測" "PCIe帯域を変数にしたレイテンシ感度分析" "vLLM/SGLang/TensorRT-LLMベースラインとの比較"]}
-   {:level "M3" :name "downstream-task-quality" :status "open"
-    :deliverables ["LongBenchまたはRULERでのタスク精度" "Needle-in-a-Haystackでの検索精度"]}
-   {:level "M4" :name "competitive-baseline-benchmark" :status "open"
-    :deliverables ["kvpress（NVIDIA）ハーネスでH2O/StreamingLLM/SnapKV/InfLLM/NEOと横並び" "同一モデル・同一S・同一タスクでの比較表"]}
-   {:level "M5" :name "mla-composability-empirical" :status "open"
-    :deliverables ["DeepSeek-V2-Lite等MLA採用モデルをベンチマーク行列に追加" "MLA単体 vs MLA+sqrt-space-kv合成の削減率・スループット比較"]}
-   {:level "M6" :name "production-kernel-in-cloud-murakumo" :status "open"
-    :deliverables [":sqrt-checkpoint / :sqrt-plus-page の実カーネル実装" "本番トラフィックでのA/B比較"]}]
+   {:level "M2" :name "decode-throughput-under-real-paging" :status "landed"
+    :deliverables ["ホストページングありのtokens/sec実測（landed 2026-07-18: Modal A100, Qwen2.5-7B bf16）"
+                   "S=8192: 34.7→15.9tok/s(2.18倍遅い)。S=16384: 43.8→12.0tok/s(3.66倍遅い、Sが伸びるほど悪化)"
+                   "実測GPU-CPU帯域13.3-15.0GB/s"
+                   "M3の実融合測定（3.27倍@S=8164）と整合、独立2手法でクロスバリデーション済み"]}
+   {:level "M3" :name "downstream-task-quality" :status "landed"
+    :deliverables ["real end-to-end paged-KVカーネル（PagedSqrtCache、DynamicCache subclass）landed 2026-07-18"
+                   "生成トークン列がbaseline（標準DynamicCache）と完全一致（exact_token_match=true）— 単一テンソルΔチェックでなくフルスケールで厳密性を実証"
+                   "実融合スループット: 36.9→11.3tok/s（3.27倍遅い、S=8164）"
+                   "needle-in-haystack検索も両経路とも正解"]}
+   {:level "M4" :name "competitive-baseline-benchmark" :status "landed"
+    :deliverables ["kvpress（NVIDIA）ハーネスでStreamingLLM/Knorm/SnapKVとneedle-in-haystack比較 landed 2026-07-18"
+                   "compression_ratio=0.9（sqrt-space-kv自身の90-97%と同レンジ）で3手法とも正解率0%"
+                   "compression_ratio=0.5でも0-67%。sqrt-space-kvは構成上exact（100%）だがM2/M3のレイテンシ税を払う — 定量化されたトレードオフ"
+                   "残: n=3/条件の小規模テスト、LongBench/RULERスケールの評価ではない"]}
+   {:level "M5" :name "mla-composability-empirical" :status "partial"
+    :deliverables ["DeepSeek-V2-Lite-Chatをベンチマーク行列に追加 landed 2026-07-18（transformers 4.46.3固定、custom modeling code互換のため）"
+                   "save比93.1-96.3%（dense modelと一致）、worst-case slowdown 2.83x@S=8192（dense modelと同レンジ）"
+                   "重要な留保: 参照HF実装はMLAの圧縮済みlatent（kv_lora_rank=512）を実際にはcacheしていない — 実cache tensorは4D [1,16,S,192]/[1,16,S,128]の非圧縮per-head形状で、Qwen2.5-7Bのdense GQA cacheより大きい"
+                   "残: 真にMLA圧縮されたcache（vLLM/SGLangのabsorbed cache実装）との合成テストは未達成 — 本セッションのスコープ外"]}
+   {:level "M6" :name "production-kernel-in-cloud-murakumo" :status "partial"
+    :deliverables ["M3のPagedSqrtCacheが実カーネルの第一歩として存在（:sqrt-checkpointの試作实装）"
+                   "vLLM 0.8.5との実測1点 landed 2026-07-18: 単一リクエストでvLLM decode~28.25tok/s、M2/M3のHFループbaseline(34.7-36.9tok/s)と同レンジ — baselineが弱い藁人形でないことを確認"
+                   "残: :sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装、本番トラフィックでのA/B比較、vLLM/SGLang/TensorRT-LLMとの正式な横並び比較は未達成"]}]
   :adr/follow-up-backlog
-  [{:pri "P0" :gap "kvpressハーネスでの競合手法比較（H2O/SnapKV/InfLLM/NEO）" :level "M4" :status "open"}
-   {:pri "P0" :gap "ホストページングありの実デコードスループット/レイテンシ測定" :level "M2" :status "open"}
-   {:pri "P1" :gap "LongBench/RULERでのダウンストリームタスク精度" :level "M3" :status "open"}
-   {:pri "P1" :gap "MLA採用モデル（DeepSeek-V2-Lite等）での合成実験" :level "M5" :status "open"}
+  [{:pri "P0" :gap "真にMLA圧縮されたcache（vLLM/SGLangのabsorbed cache実装）との合成実験" :level "M5" :status "open"}
+   {:pri "P0" :gap ":sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装（cloud-murakumo）+ vLLM/SGLangとの正式A/B比較" :level "M6" :status "open"}
+   {:pri "P1" :gap "kvpress比較のLongBench/RULERスケール拡大（現状n=3/条件のneedle-in-haystackのみ）" :level "M4" :status "open"}
    {:pri "P2" :gap "Williams STOC 2025への理論的系譜主張をチェックポインティング文献ベースに弱める（paper/sqrt_space_kv.tex改訂）" :level "-" :status "open"}
    {:pri "P2" :gap "Qwen3.6-35B-A3Bの88.5%からhybrid attention由来分とsqrt-space-kv固有分を切り分けるアブレーション" :level "-" :status "open"}
-   {:pri "P3" :gap ":sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装（cloud-murakumo）" :level "M6" :status "open"}]
+   {:pri "P3" :gap "kvpressハーネスでの競合手法比較（H2O/SnapKV/InfLLM/NEO）" :level "M4" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/modal_sqrt_kv_kvpress_bench.py; docs/benchmarks/sqrt-kv-kvpress-summary.md; 2026-07-18"}
+   {:pri "P3" :gap "ホストページングありの実デコードスループット/レイテンシ測定" :level "M2" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/modal_sqrt_kv_throughput_bench.py + scripts/modal_sqrt_kv_paged_cache_bench.py; 2026-07-18"}]
   :adr/non-goals
   ["sqrt-space-kvの理論的主張（Transformerがマルチテープチューリングマシンであるという主張）を検証すること — 論文自身が明示的に否定しており本ADRの範囲外"
    "既存のcloud-murakumo本番トラフィックを止めてこのADRの検証を強制すること — M2-M6はcloud-murakumo :kv-policy を本番デフォルト化する前の要件であり、現状の宣言のみの状態（intent expression）を即座に変更する必要はない"
@@ -276,11 +290,69 @@ sqrt-space-kvは『常駐させるトークン数（S次元）』を間引く。
   M2の範囲から外し、本番カーネル実装が要るためM6に繰り越した（デリバラブル
   自体を実装しないと比較のしようがないため）。
 
-未着手のまま: M3（ダウンストリームタスク精度）、M4（kvpress競合比較）、
-M5（MLA合成実験）、M6（本番カーネル + サービングエンジン比較）。これらは
-それぞれ別セッションでの継続作業が必要な規模（データセット取得・harness
-統合・大型MLAモデルのダウンロード・カーネル実装）であり、本セッションでは
-着手していない。
+未着手のまま（このセクション執筆時点）: M3（ダウンストリームタスク精度）、
+M4（kvpress競合比較）、M5（MLA合成実験）、M6（本番カーネル + サービング
+エンジン比較）。→ 同日中に全て着手し、以下の通り実測が完了した。
+
+## Implementation notes (2026-07-18 M3-M6 landed/partial)
+
+**M3 landed — 実end-to-endページングカーネル。** `gftdcojp/cloud-murakumo`
+`scripts/modal_sqrt_kv_paged_cache_bench.py` が `transformers.DynamicCache`
+を継承した `PagedSqrtCache` を実装。`update()` は `super().update()` の
+結果（フレームワークが厳密に管理する完全なK/V）をそのまま返し、非常駐部分
+の実CPU⇄GPU往復転送を**副作用として**毎デコードステップ挿入する設計にした
+ため、正しさは数学的に保証される（近似ではない）。S=8164・24トークン
+デコードでの実測: baseline（標準DynamicCache）とpaged版で生成トークン列が
+**完全一致**（`exact_token_match=true`）— M0の単一テンソルΔチェックでなく
+フルスケール・多層・多ステップで厳密性を実証。実融合スループットは
+36.9→11.3tok/s（**3.27倍遅い**）— M2の孤立測定（S=8192で2.18倍、S=16384で
+3.66倍）とオーダーが一致し、独立した2手法でクロスバリデーションが取れた。
+
+**M4 landed — kvpress競合品質比較。** `scripts/modal_sqrt_kv_kvpress_bench.py`
+がNVIDIA kvpressのStreamingLLM/Knorm/SnapKVに対しneedle-in-haystack検索
+テスト（8192トークンのfiller中に秘密コードを埋め込み、質問で正解を問う）
+を実施。**compression_ratio=0.9（sqrt-space-kv自身の90-97%と同レンジ）で
+3手法とも正解率0%**。0.5でも0-67%。sqrt-space-kvは構成上exact（100%）だが
+M2/M3で実測した2.2-3.7倍のレイテンシ税を払う——どちらもフリーランチでは
+なく、どちらのコストが痛いかはタスク・デプロイ依存という定量化された
+トレードオフが得られた。n=3/条件・デフォルトhyperparamsの小規模テストで
+あり、LongBench/RULERスケールの評価ではない点は明記。
+
+**M5 partial — MLA合成の答えは半分。** `scripts/modal_sqrt_kv_mla_bench.py`
+をDeepSeek-V2-Lite-Chat向けに実行（`modeling_deepseek.py`が
+`transformers.utils.import_utils.is_torch_fx_available`をimportするため
+transformers 5.x系と非互換——4.46.3に固定した専用imageで実行、かつ
+DeepSeek-V2の古いcustom codeは`attention_mask`を常に要求するため明示的に
+渡す必要があった）。save比93.1-96.3%はdense modelと一致、worst-case
+slowdown 2.83x@S=8192もdense modelと同レンジ——表面上は「MLAとの合成は
+機能する」ように見える。**しかし**: config上`kv_lora_rank=512`（真の圧縮
+latent次元）が存在するにもかかわらず、実際にcacheされているtensorは4D
+`[1,16,S,192]`/`[1,16,S,128]`——H_kv=16のper-head非圧縮形状で、同じSでの
+Qwen2.5-7Bのdense GQA cacheより**大きい**。この参照HF実装はMLAの
+「absorbed cache」最適化（本番サービングエンジンvLLM/SGLangが実際に
+圧縮latentだけをcacheする手法）を行っていない。**「真に圧縮された
+MLA cacheに対してsqrt-space-kvが何を追加提供するか」という当初の問いは
+未解決のまま**——vLLM/SGLangのabsorbed cache実装にフックする必要があり、
+本セッションのスコープを超える。
+
+**M6 partial — 本番カーネルへの一歩 + 外部参照点1つ。** M3の
+`PagedSqrtCache`が`:sqrt-checkpoint`実カーネルの第一の試作として存在する
+（宣言のみだった状態から前進）。`scripts/modal_vllm_baseline_bench.py`で
+vLLM 0.8.5の実測を1点取得: 単一リクエスト・S=8192で decode ~28.25tok/s
+（vLLM自身のログの数値）——M2/M3のHF `transformers`ループbaseline
+（34.7-36.9tok/s）と**同レンジ、むしろ僅かに低い**。これはvLLMが遅いのでは
+なく、vLLMの強みは並行リクエストのcontinuous batchingにあり単一リクエスト
+ベンチではその強みが発揮されないため（FlashInferも未導入でPyTorchネイティブ
+samplerにfallback）。有用な副産物: **M2/M3で使ったbaselineは弱い藁人形
+ではなく、本番グレードのサービングエンジンと同オーダーだった**——つまり
+測定された2.2-3.7倍のスローダウンは現実的なbaseline比でも本物のコスト。
+本番`:sqrt-checkpoint`カーネルの完全実装とvLLM/SGLangとの正式A/B比較は
+未達成のまま。
+
+**証跡**: `gftdcojp/cloud-murakumo` commit `9147dd1`
+（branch `research/sqrt-kv-m3-m6-maturity`、server-side merge `a61656f`）、
+`docs/benchmarks/sqrt-kv-{paged-cache,kvpress,mla,vllm-baseline}-summary.md`。
+`com-junkawasaki/sqrt-space-kv` commit `516796d` に反映済み。
 
 ## References
 
