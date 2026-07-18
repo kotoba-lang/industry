@@ -1,0 +1,44 @@
+[{:db/id -1
+  :adr/id "adr-2607196900-kami-mackie-imsc-geometry"
+  :adr/title "KAMI adds Mackie channel strips and preserves IMSC region geometry"
+  :adr/date "2026-07-19"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607196800-kami-locate-automation-ttml-set"]
+  :adr/decision
+  {:daw {:control-surface :mackie-control
+         :strip-range :first-eight-project-tracks
+         :fader {:input :pitch-bend-14-bit :target :track/gain :feedback :motor-fader}
+         :buttons {:note-0x08-through-0x0f :track/solo
+                   :note-0x10-through-0x17 :track/mute}
+         :button-feedback :led-velocity-127-or-0
+         :solo-policy :live-scheduler-renders-only-soloed-tracks}
+   :nle {:caption-geometry [:caption/x-percent :caption/y-percent
+                            :caption/width-percent :caption/height-percent]
+         :imsc-input [:tts/origin :tts/extent]
+         :preview :canvas-region-clip-and-alignment
+         :imsc-output :per-caption-region
+         :timed-set-geometry true}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates
+   {:shared ["persistent directory grants" "streaming package I/O above 512 MiB"]
+    :daw ["third-party plugin SDK/isolation" "Mackie bank switching, pan and record-arm" "certified hardware profiles" "surround/Atmos"]
+    :nle ["continuous TTML animation" "writing-mode/padding/display-align" "external notification delivery" "translation memory" "OCIO/ICC/HDR"]}}
+  :adr/implementation
+  {:daw-commits ["25e6afa"]
+   :nle-commits ["1a7a9c9"]
+   :pull-requests ["kotoba-lang/kami-app-daw#27" "kotoba-lang/kami-app-nle#27"]
+   :evidence
+   ["DAW passes 33 tests and 144 assertions; NLE passes 34 tests and 171 assertions."
+    "Both production releases compiled through the repository resource guard."
+    "Chrome persisted Mackie fader, mute and solo changes and observed exact feedback bytes [225 127 127], [144 16 127] and [144 9 127]."
+    "Chrome imported IMSC origin 12.5% 7.5% and extent 70% 22% into project-authoritative caption geometry."
+    "After approval, Chrome exported the same origin/extent through geometry-0 and its caption region reference."
+    "Both browser consoles had zero errors; Chrome closed in finally and both local servers were stopped."]}
+  :adr/consequences
+  ["Common eight-channel Mackie surfaces can operate core track strips without custom CC mapping."
+   "The live audio graph now makes solo audible rather than UI-only."
+   "Authored IMSC placement and size survive import, preview and export instead of collapsing to top/bottom."
+   "Banked/extended control surfaces, third-party audio plugins and remaining TTML layout properties stay explicit gaps."]
+  :adr/source-format "edn"}]
