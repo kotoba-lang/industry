@@ -1,0 +1,32 @@
+[{:db/id -1
+  :adr/id "adr-2607183600-kami-media-punch-delivery-profiles"
+  :adr/title "KAMI media applications add bounded punch recording and delivery profiles"
+  :adr/date "2026-07-18"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607183500-kami-media-recording-production-audio-mix"]
+  :adr/decision
+  {:daw {:punch-recording {:start :current-tick :length-unit :tick :stop :automatic :clip-range :exact}
+         :authority "Tempo and PPQ convert the configured punch ticks to capture time; the resulting clip retains the exact selected musical range."}
+   :nle {:delivery-profiles {:compact {:codec :vp8 :video-bps 1000000 :audio-bps 96000}
+                             :review {:codec :vp8 :video-bps 2000000 :audio-bps 128000}
+                             :master {:codec :vp9 :video-bps 8000000 :audio-bps 192000}}
+         :fallback :vp8
+         :authority "The selected profile is project data and supplies the MediaRecorder MIME and bitrate options; unsupported VP9 falls back to VP8."}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates {:daw ["loop and comp recording" "input monitoring" "plugin hosting" "LUFS/true-peak" "stem bundle"]
+                                :nle ["pointer trim gestures" "proxy/cache" "color management" "multitrack audio EQ" "additional containers and hardware encoder control"]}}
+  :adr/implementation
+  {:daw-commits ["b1d709b"]
+   :nle-commits ["abc05bd"]
+   :evidence ["DAW and NLE CLJC suites each pass 6 tests and 16 assertions for musical punch duration and project-selected delivery profiles."
+              "Both guarded shadow-cljs production releases completed with zero compiler warnings."
+              "DAW Chrome set a 480-tick punch at tick 1440, auto-stopped without a manual Stop action, created one take at left 37.5% with exact width 12.5%, and exported a 441044-byte WAV without console errors."
+              "NLE Chrome selected Master VP9, exported a 236614-byte WebM without console errors, and ffprobe identified VP9 video plus Opus audio."
+              "Both GitHub Pages workflows completed tests, release compilation and deployment successfully."]}
+  :adr/consequences
+  ["DAW punch capture now has deterministic musical boundaries; comping multiple takes remains separate work."
+   "NLE output intent is durable project data and affects actual encoder selection and bitrate."
+   "Browser codec availability remains capability-dependent and is explicitly handled rather than assumed."]
+  :adr/source-format "edn"}]
