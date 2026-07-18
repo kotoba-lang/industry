@@ -1,0 +1,163 @@
+[{:db/id -1
+  :adr/id "adr-2607180900-kotoba-guest-authoring-maturity"
+  :adr/title "ADR-2607180900: .kotoba guest authoring maturity — safe expressiveness ladder"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-18"
+  :adr/last-verified "2026-07-18"
+  :adr/last_verified "2026-07-18"
+  :adr/last_verified "2026-07-18"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-guest-authoring-maturity"
+  :adr/authoritative-for
+  [".kotoba guest authoring maturity ladder (L1–L6) while preserving capability confinement"
+   "shared guest-grammar.edn as the sole form catalog for sugar/forbidden/limits (kotoba-lang)"
+   "rule: expressiveness grows only via desugar or capability kits, never ambient Clojure"
+   "relationship to dual-compiler diagnosis ADR-2607141600 and fleet .cljc classification ADR-2607171700"
+   "P0–P3 gap backlog for safe authoring maturity"]
+  :adr/related
+  ["adr-2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment"
+   "adr-2607171700-repo-wide-cljc-to-kotoba-source-migration"
+   "adr-2607062330-kototama-tender-chicory-execution-runtime"
+   "orgs/kotoba-lang/kotoba-lang/lang/guest-grammar.edn"
+   "orgs/kotoba-lang/kotoba"
+   "orgs/kotoba-lang/compiler"
+   "orgs/kotoba-lang/kototama"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/maturity-ladder
+  [{:level "L1" :name "single-safe-path" :status "landed"
+    :deliverables ["guest-grammar.edn catalog" "desugar-only sugar policy" "safe-default path docs"]}
+   {:level "L2" :name "author-ergonomics" :status "landed"
+    :deliverables ["string literal → str-ptr/str-len lowering" "do / multi-body when desugar" "unsupported-op diagnostics"]}
+   {:level "L3" :name "capability-values-and-packages" :status "partial"
+    :deliverables ["S4b/F-003 cap values" "F-001 package admission complete" "CID guest packages"]}
+   {:level "L4" :name "typed-hir" :status "open"
+    :deliverables ["Option/Result/no-nil (S1b)" "import arity/type at compile"]}
+   {:level "L5" :name "cross-host-conformance" :status "partial"
+    :deliverables ["JVM/Node/browser/fleet same fixtures" "missing host = capability absence"]}
+   {:level "L6" :name "signed-modules" :status "open"
+    :deliverables ["S5 signed module" "F-007 release evidence"]}]
+  :adr/non-goals
+  ["bulk rename of monorepo .cljc to .kotoba"
+   "eval require import set! atom macros interop in guest"
+   "formal verification of the compiler"
+   "Raft multi-DC fleet consensus as authoring maturity"]
+  :adr/body
+  "# ADR-2607180900: .kotoba guest authoring maturity
+
+**Status**: accepted (L1/L2 implementation started 2026-07-18)
+**Date**: 2026-07-18
+**Deciders**: Jun Kawasaki
+
+## Context
+
+Runtime maturity (kototama R3, wasm-webcomponent browser path) is ahead of
+**authoring maturity**: writers still face two grammars (`kotoba` wasm emit vs
+`compiler` KIR), low-level ptr/len ABIs, sparse diagnostics, and incomplete
+capability-value / package surfaces.
+
+ADR-2607141600 recorded dual-compiler ownership and deliberately deferred
+grammar reconciliation. ADR-2607171700 classifies fleet `.cljc` files; it does
+**not** license ambient Clojure into the guest. This ADR is the positive plan
+to raise **\"what you can write in `.kotoba`\"** without weakening confinement.
+
+## Decision
+
+### 1. Maturity means three columns, not one
+
+| Column | Meaning |
+|---|---|
+| A. Expressiveness | Useful guests can be authored |
+| B. Safety | Gates still deny ambient code/effect |
+| C. Unification | One grammar catalog; backends desugar into it |
+
+Success is never measured by \"how close to full Clojure\".
+
+### 2. Expressiveness formula (invariant)
+
+```text
+new surface = desugar to existing primitives
+            | new host capability kit (policy + negative fixture + receipt)
+≠ ambient Clojure (eval/require/atom/macros/interop)
+```
+
+### 3. Shared catalog: `lang/guest-grammar.edn`
+
+Authoritative form catalog lives in **`kotoba-lang/kotoba-lang`**:
+
+- special forms, sugar (desugar targets), forbidden heads
+- admission limits
+- diagnostic hints for common author mistakes
+- maturity level tags per feature
+
+`kotoba` and `compiler` **consume** this catalog (or an embedded copy when the
+git pin lags). They must not invent divergent forbidden/sugar sets silently.
+
+### 4. Ladder L1–L6
+
+| Level | Focus | Safety note |
+|---|---|---|
+| L1 | Single safe path + grammar catalog | default always gates |
+| L2 | Ergonomics (string sugar, do, diagnostics) | desugar only |
+| L3 | Cap values (S4b) + package admission (F-001) | least privilege for dynamic resources |
+| L4 | Typed HIR (S1b) | earlier reject, not more power |
+| L5 | Cross-host conformance | same guest, equal denial semantics |
+| L6 | Signed modules / release evidence | supply chain |
+
+### 5. Relationship to fleet `.cljc` migration
+
+ADR-2607171700 remains the classification ADR. Guest authoring maturity
+**feeds** that migration with a real compile surface; it does **not** require
+rewriting hosts, UI, or nbb scripts into `.kotoba`.
+
+### 6. Gap backlog (P0–P3)
+
+| Pri | Gap | Level |
+|---|---|---|
+| P0 | Dual grammar / dual emit | L1 |
+| P0 | Package admission residual (F-001) | L3 |
+| P1 | Cap values S4b / F-003 | L3 |
+| P1 | String/do sugar + diagnostics | L2 |
+| P1 | Host parity matrix as conformance | L5 |
+| P2 | Typed HIR S1b | L4 |
+| P2 | CID guest packages (not require) | L3 |
+| P2 | Selfhost analyzer authority shift | L1–L4 |
+| P3 | Signed modules S5 / F-007 | L6 |
+| avoid | eval/require/atom/macros/interop | — |
+
+## Implementation notes (2026-07-18 slice + P0/P1)
+
+**P0 landed**
+- strict-grammar default-on via guest-grammar.edn (unknown heads → :unknown-form)
+- compiler merges catalog forbidden-heads
+- F-001: rad scaffold + mandatory package-lock already closed; `safe-release-ready?` added
+
+**P1 landed (partial)**
+- S4b `:policy/forbid-wildcard` → `:wildcard-forbidden` on :any intersection
+- concrete-cap receipts unchanged (guard-call)
+- `lang/host-parity.edn` + score (browser linkability ≥ 0.8)
+
+## Implementation notes (2026-07-18 slice L1/L2)
+
+Landed in the same change set as this ADR:
+
+1. `kotoba-lang/lang/guest-grammar.edn` + `kotoba.lang.guest-grammar` loader
+2. `kotoba.runtime/lower-language-forms`: string-literal host-arg lowering for
+   registered string-head imports; multi-body `when` → `if`+`do`
+3. `kotoba.runtime` unsupported-op / denied-form **hints** from the catalog
+4. `compiler` frontend: `do` desugar + multi-body `when` via nested `let`
+5. Regression tests + demo program for the new sugar
+
+Follow-ups: wire both emitters to refuse forms not in the catalog under an
+explicit `:strict-grammar` flag; advance L3 package/cap-value work.
+
+## Consequences
+
+- Authors get safer ergonomics without ambient power.
+- Grammar drift becomes a catalog diff, not tribal knowledge.
+- Fleet migration (2607171700) can point at real L2+ surface for guest cells.
+"}]
