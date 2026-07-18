@@ -1,0 +1,259 @@
+[{:db/id -1
+  :adr/id "adr-2607182800-sqrt-space-kv-mla-composability-maturity-review"
+  :adr/title "ADR-2607182800: sqrt-space-kv 研究成熟度レビュー — 2026年KVキャッシュ研究地形との突合、MLA構成可能性分析"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/topic "sqrt-space-kv-research-maturity"
+  :adr/date "2026-07-18"
+  :adr/last_verified "2026-07-18"
+  :adr/last-verified "2026-07-18"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative-for
+  ["sqrt-space-kv（com-junkawasaki）を対外発信・productionize する前の成熟度基準"
+   "√S KVキャッシュ常駐ポリシーとMLA（Multi-head Latent Attention）の構成可能性の位置づけ"
+   "sqrt-space-kv の Williams STOC 2025 系譜の主張範囲"
+   "cloud-murakumo :kv-policy への昇格に必要な追加エビデンスの要件"]
+  :adr/authoritative_for
+  ["sqrt-space-kv（com-junkawasaki）を対外発信・productionize する前の成熟度基準"
+   "√S KVキャッシュ常駐ポリシーとMLA（Multi-head Latent Attention）の構成可能性の位置づけ"
+   "sqrt-space-kv の Williams STOC 2025 系譜の主張範囲"
+   "cloud-murakumo :kv-policy への昇格に必要な追加エビデンスの要件"]
+  :adr/related
+  ["orgs/com-junkawasaki/sqrt-space-kv"
+   "orgs/com-junkawasaki/sqrt-space-kv/README.md"
+   "orgs/com-junkawasaki/sqrt-space-kv/RESULTS.md"
+   "orgs/com-junkawasaki/sqrt-space-kv/paper/sqrt_space_kv.tex"
+   "orgs/com-junkawasaki/sqrt-space-kv/arxiv-status.edn"
+   "orgs/gftdcojp/cloud-murakumo"
+   "orgs/kotoba-lang/arxiv/submissions/sqrt-space-kv"
+   "huggingface.co/datasets/com-junkawasaki/sqrt-space-kv-paper"
+   "arXiv:2502.17779 (Williams, Simulating Time With Square-Root Space, STOC 2025 Best Paper)"
+   "arXiv:1604.06174 (Chen et al., Training Deep Nets with Sublinear Memory Cost)"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+  :adr/problem
+  "sqrt-space-kv は arXiv 提出済み（draft 7807366, cs.CL, 2026-07-10）で『√S 常駐で KV ストレージを90-97%削減、attentionは厳密』という見出しを掲げるが、(1) 比較対象がフルKVと『誰も使わない全再計算』の2つのみで同系統の研究（eviction/quantization/depth-share/offload-tiering/アーキテクチャ内蔵）と横並び比較していない、(2) 削減指標が『デバイス常駐バイト数のスナップショット』のみで、実際にコストがかかるホストページングの帯域・レイテンシ・スループットを一切測っていない、(3) ダウンストリームタスク精度（LongBench/RULER等）の検証がない、(4) Williams STOC 2025 との理論的つながりが売り文句として強すぎる（sqrt(N)チェックポイント+再計算パターン自体はGriewankのチェックポインティング理論やChen 2016のsublinear memory checkpointingとして既に確立済みで、Williamsの Tree Evaluation / Cook-Mertz 機構は実装に一切使われていない）、(5) 2026年時点でKVキャッシュ削減の産業本流は学習時アーキテクチャ内蔵の MLA（Multi-head Latent Attention: DeepSeek-V2/V3, Kimi K2, GLM-5 が採用、70-93%圧縮をランタイムのページングコストゼロで達成）に移っており、sqrt-space-kv がMLA採用モデルに対して何を追加で提供できるのかが未検証、という5点で研究としての成熟度が低い状態にある。この状態のまま HF Papers / arXiv での注目や cloud-murakumo への本番組み込みを進めると、過大主張・比較不能な数字の一人歩き・後日の信用毀損リスクがある。"
+  :adr/decision
+  "sqrt-space-kv の現行の90-97%という数字は『ストレージ常駐スナップショット』としてのみ有効な暫定結果として扱い、(a) 実デコードのスループット/レイテンシ測定、(b) kvpress（NVIDIA、30+手法を統一ハーネスでLongBench評価）を用いたH2O/StreamingLLM/SnapKV/InfLLM/NEO等との横並び比較、(c) LongBenchまたはRULERでのダウンストリームタスク精度、(d) MLA採用モデル（DeepSeek-V2-Lite等の小型MLAモデル）を対象に加えた構成可能性の実測、の4つを満たすまでは『検証済みの効率化手法』としての対外発信（HF Papers公開後の宣伝・cloud-murakumoでの:kv-policyデフォルト化）を保留する。Williams STOC 2025への理論的系譜の主張は『チェックポイント幅の選び方に着想を与えた』程度に弱め、チェックポインティング文献（Griewank、Chen et al. 2016）を主要な先行研究として明示する。MLAとの関係は『圧縮対象の軸が直交する（MLAは1トークンあたりのバイト幅を圧縮、sqrt-space-kvはトークン数（S次元）の常駐範囲を圧縮）ため理論上は合成可能』という仮説として明記し、実測の裏付けが取れるまでは『効果あり』と断定しない。"
+  :adr/consequences
+  ["sqrt-space-kv の README/RESULTS.md に本ADRへのポインタと未検証事項の明記を追加する"
+   "cloud-murakumo の :serve :kv-policy はこのADRのM2-M5が landed するまで実運用デフォルトに昇格しない"
+   "HF Papers / arXiv 上のアブストラクトで『90-97%』を主張する場合は必ず『デバイス常駐バイト数、ページング帯域コスト未計測』という限定を併記する"
+   "次の一手は #follow-up-backlog の P0（kvpress比較）と P1（MLA合成実験）"]
+  :adr/literature-landscape
+  [{:category "eviction (importance-based token pruning)"
+    :representative ["H2O" "StreamingLLM" "SnapKV" "PyramidKV"]
+    :reduction "3x-10x"
+    :fidelity "近似（タスク精度で実測・LongBench等）"
+    :relation-to-sqrt-space-kv "別系統。sqrt-space-kvは重要度に依らない一様間隔チェックポイントで、内容非依存な点が異なる"}
+   {:category "quantization"
+    :representative ["KIVI" "GEAR" "TurboQuant (Google, ICLR2026)"]
+    :reduction "2x-4x"
+    :fidelity "近似"
+    :relation-to-sqrt-space-kv "別軸（bit幅）。sqrt-space-kvと直交し理論上合成可能（未検証）"}
+   {:category "depth/head sharing"
+    :representative ["MiniCache" "head-level pruning (1.5% KV保持で性能97%)"]
+    :reduction "最大98.5%(save)"
+    :fidelity "近似だが精度実測あり"
+    :relation-to-sqrt-space-kv "別軸（層/ヘッド方向）。sqrt-space-kvと直交"}
+   {:category "アーキテクチャ内蔵（学習時圧縮）"
+    :representative ["MLA (DeepSeek-V2/V3)" "Kimi K2" "GLM-5"]
+    :reduction "70-93%（DeepSeek-V2: 67B dense比93.3%、Llama2-7B換算92.19%）"
+    :fidelity "ほぼ無損失。ランタイムのページング/帯域コストがゼロ"
+    :relation-to-sqrt-space-kv "本ADRの主題。次章 mla-composability 参照"}
+   {:category "offload/tiering（sqrt-space-kvが実際に属する系統）"
+    :representative ["NEO" "LMCache" "InfLLM" "FlexiCache" "KVPR" "Quest"]
+    :reduction "メモリ圧が高い時のみ有効。PCIe帯域16-32GB/sで単一リクエスト低バッチはレイテンシ2-3倍悪化しうる"
+    :fidelity "厳密（ページングで元データを取り戻す前提）"
+    :relation-to-sqrt-space-kv "直接比較すべき本来の競合。sqrt-space-kvは一様間隔の固定ポリシーで、InfLLM/FlexiCacheのような内容依存・アクセスパターン適応ポリシーより単純だが、実アクセスパターンでのページング頻度（thrashing率）が未測定"}]
+  :adr/mla-composability
+  {:axis-independence
+   "MLAは『1トークンあたりのKVバイト幅』を低ランク潜在表現への圧縮で削減する（幅の軸）。sqrt-space-kvは『常駐させるトークン数（S次元）』をWilliams由来のチェックポイント間隔で間引く（系列長の軸）。sqrt-space-kv自身のRESULTS.mdが記す『save比 ≈ |K|/S、幅に依存しない』という性質が正しければ、この2軸は独立でありMLA圧縮後の潜在KVに対しても同じ削減率で乗算的に合成できるはずというのが理論上の仮説である。"
+   :caveats
+   ["MLAは既に1トークンあたりのバイト数を大きく削っているため、GPU HBMが枯渇してオフロードが割に合うようになる系列長Sの閾値が、フルMHA/GQAモデルより遥かに長い方向へシフトする。sqrt-space-kv自身が『6.1節: S≳32k-128kで運用上意味を持つ』と明記しているこの閾値は、MLAモデルではさらに先（100k超）になる可能性が高く、現行ベンチマークの最大S=16kでは効果がほぼ測れない領域にある"
+    "MLAのデコードステップは潜在表現から各ヘッドK/Vへの up-projection を毎回行う。その上にsqrt-space-kvのホストページング+online-softmaxブロックストリーミングを重ねると、圧縮解凍とページングという2段の追加レイテンシが積み重なり、単純合成できるかはカーネル実装してみないと分からない"
+    "現行ベンチマーク行列（SmolLM-135M, Qwen2.5-0.5B/7B/14B, Qwen3.6-35B-A3B）にMLA採用モデル（DeepSeek-V2/V3, Kimi K2, GLM-5系）が一つも含まれていない。したがって『MLA採用モデルに対して何が追加で得られるか』は現時点で完全に未検証の理論的仮説であり、測定された答えではない"
+    "Qwen3.6-35B-A3Bの88.5%という数字も、モデル自体のhybrid linear+full attention（定数サイズstate）に起因する部分が大きいとRESULTS.md自身が認めており、sqrt-space-kv手法固有の寄与を切り分けられていない。これはMLAとの合成効果を見積もる際の交絡要因としても注意が必要"]
+   :recommended-experiment
+   "DeepSeek-V2-Lite（MLA採用の小型公開モデル）をMac MLXまたはModal A100のベンチマーク行列に追加し、(1) MLA単体でのフルKVバイト数、(2) その上にsqrt-space-kvの√S常駐を重ねた場合のバイト数と削減率、(3) 同一構成での実デコードtokens/sec、を測定する。削減率がMHA/GQAモデルと同じ90%超で維持されるか、MLAの潜在次元が小さすぎてチェックポイント境界のオーバーヘッド（インデックス・メタデータ）が相対的に無視できなくなるかを確認する。"}
+  :adr/maturity-ladder
+  [{:level "M0" :name "numerical-fidelity-spot-check" :status "landed"
+    :deliverables ["S=2048でのmax|Δ|=7e-5（SmolLM-135M）" "Qwen3.6-35B-A3Bでmax|Δ|≈0.016（bf16 noise）"]}
+   {:level "M1" :name "storage-residency-snapshot" :status "landed"
+    :deliverables ["Mac MLX: SmolLM-135M, Qwen2.5-0.5B" "Modal A100: Qwen2.5-7B/14B, Qwen3.6-35B-A3B" "negative result: 全再計算はピークメモリ悪化"]}
+   {:level "M2" :name "decode-throughput-under-real-paging" :status "open"
+    :deliverables ["ホストページングありのtokens/sec実測" "PCIe帯域を変数にしたレイテンシ感度分析" "vLLM/SGLang/TensorRT-LLMベースラインとの比較"]}
+   {:level "M3" :name "downstream-task-quality" :status "open"
+    :deliverables ["LongBenchまたはRULERでのタスク精度" "Needle-in-a-Haystackでの検索精度"]}
+   {:level "M4" :name "competitive-baseline-benchmark" :status "open"
+    :deliverables ["kvpress（NVIDIA）ハーネスでH2O/StreamingLLM/SnapKV/InfLLM/NEOと横並び" "同一モデル・同一S・同一タスクでの比較表"]}
+   {:level "M5" :name "mla-composability-empirical" :status "open"
+    :deliverables ["DeepSeek-V2-Lite等MLA採用モデルをベンチマーク行列に追加" "MLA単体 vs MLA+sqrt-space-kv合成の削減率・スループット比較"]}
+   {:level "M6" :name "production-kernel-in-cloud-murakumo" :status "open"
+    :deliverables [":sqrt-checkpoint / :sqrt-plus-page の実カーネル実装" "本番トラフィックでのA/B比較"]}]
+  :adr/follow-up-backlog
+  [{:pri "P0" :gap "kvpressハーネスでの競合手法比較（H2O/SnapKV/InfLLM/NEO）" :level "M4" :status "open"}
+   {:pri "P0" :gap "ホストページングありの実デコードスループット/レイテンシ測定" :level "M2" :status "open"}
+   {:pri "P1" :gap "LongBench/RULERでのダウンストリームタスク精度" :level "M3" :status "open"}
+   {:pri "P1" :gap "MLA採用モデル（DeepSeek-V2-Lite等）での合成実験" :level "M5" :status "open"}
+   {:pri "P2" :gap "Williams STOC 2025への理論的系譜主張をチェックポインティング文献ベースに弱める（paper/sqrt_space_kv.tex改訂）" :level "-" :status "open"}
+   {:pri "P2" :gap "Qwen3.6-35B-A3Bの88.5%からhybrid attention由来分とsqrt-space-kv固有分を切り分けるアブレーション" :level "-" :status "open"}
+   {:pri "P3" :gap ":sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装（cloud-murakumo）" :level "M6" :status "open"}]
+  :adr/non-goals
+  ["sqrt-space-kvの理論的主張（Transformerがマルチテープチューリングマシンであるという主張）を検証すること — 論文自身が明示的に否定しており本ADRの範囲外"
+   "既存のcloud-murakumo本番トラフィックを止めてこのADRの検証を強制すること — M2-M6はcloud-murakumo :kv-policy を本番デフォルト化する前の要件であり、現状の宣言のみの状態（intent expression）を即座に変更する必要はない"
+   "arXiv提出（draft 7807366）自体の取り下げ — 提出済みドラフトはそのままとし、今後の改訂・追加実験・アブストラクト文言の弱め方の指針として本ADRを使う"]
+  :adr/body
+  "# ADR-2607182800: sqrt-space-kv 研究成熟度レビュー
+
+**Status**: accepted — 2026-07-18
+**Deciders**: Jun Kawasaki
+
+## Context
+
+`orgs/com-junkawasaki/sqrt-space-kv` は Williams (STOC 2025 Best Paper, arXiv:2502.17779)
+の TIME[t] ⊆ SPACE[sqrt(t log t)] という結果から着想を得て、LLM の KV キャッシュに
+`b(S) = ceil(sqrt(S ln S))` 間隔のチェックポイント + 直近アクティブブロックだけを
+デバイス常駐させ、非常駐部分はホストへページングして online-softmax で厳密に
+attention を計算する、という √S 常駐ポリシーを提案する research note である。
+arXiv には 2026-07-10 に draft 7807366（primary cs.CL）として提出済み。
+
+実測（Mac MLX: SmolLM-135M / Qwen2.5-0.5B、Modal A100: Qwen2.5-7B / Qwen2.5-14B /
+Qwen3.6-35B-A3B）では、S=1k-16k の範囲でデバイス常駐 KV バイト数を 90-97% 削減し、
+S=2048 での block-stream attention の数値誤差は max|Δ|=7e-5（fp16-class ノイズ内）に
+収まっている。また『キャッシュを消してプレフィックス全体を毎トークン再計算する』
+という素朴な代替案がピークメモリではむしろ悪化するという negative result も
+正しく検出している。
+
+これらの測定自体は誠実だが、2026年7月時点の HuggingFace Papers / arXiv 上の
+KVキャッシュ最適化研究地形（eviction系のH2O/StreamingLLM/SnapKV/PyramidKV、
+quantization系のKIVI/GEAR/TurboQuant、depth-share系のMiniCache、そして産業の
+本流であるアーキテクチャ内蔵圧縮のMLA、offload/tiering系のNEO/LMCache/InfLLM/
+FlexiCache/KVPR）と突き合わせると、比較対象・評価指標の両面で成熟度が低い。
+本ADRはその評価結果と、次に何を測ればこの研究を『検証済み』と呼べるようになるかの
+ロードマップを記録する。
+
+## 主要な弱点（詳細）
+
+### 1. 理論的系譜の誇張
+
+`b ≈ sqrt(S log S)` でチェックポイントを間引き、間を再計算するというパターン自体は
+Williams 2025 以前から存在する古典的手法である（Griewankのチェックポインティング
+理論、論文自身が引用する Chen et al. 2016『Training Deep Nets with Sublinear
+Memory Cost』）。実装は Cook-Mertz の Tree Evaluation アルゴリズムも Williams の
+証明機構も一切使っておらず、『最適ブロック幅の式の形が似ている』という類推の
+レベルにとどまる。査読では誇張だと指摘される可能性が高い。
+
+### 2. 『厳密attention』のコストが未計測
+
+ページング先はホスト（CPU）RAMであり、2026年時点のPCIe帯域は16-32GB/s程度
+（arXiv:2601.19910の実測）で、単一リクエスト・低バッチではオフロードが
+レイテンシを2-3倍悪化させることが示されている。sqrt-space-kvは『常駐バイト数の
+スナップショット』しか測っておらず、実デコードのtokens/秒やレイテンシを
+一切報告していない。
+
+### 3. 比較対象が弱すぎる
+
+比較しているのは『フルKV』と『全再計算（誰も使わない藁人形ベースライン）』の
+2つだけ。同じoffload/tiering系統のNEO・InfLLM・LMCache・FlexiCacheとすら
+比較していない。NVIDIAのkvpressは30以上の手法をLongBenchで統一評価する
+標準ハーネスとして既に存在しており、これに乗せない限り90-97%という数字の
+業界的な意味を評価できない。
+
+### 4. ダウンストリームタスク精度の評価が皆無
+
+S=2048の1点でmax|Δ|を測っただけで、LongBench・RULER・Needle-in-a-Haystackの
+ような長文脈タスクでの精度検証がない。
+
+### 5. Qwen3.6-35B-A3Bの88.5%はhybrid attentionアーキテクチャ由来の交絡
+
+RESULTS.md自身が『O(1) state floors absolute residency ~36-42MB』と認めている
+通り、この数字の大部分はモデル自体のhybrid linear+full attention設計
+（既に定数サイズのstateを持つ）によるもので、sqrt-space-kv手法固有の貢献を
+切り分けられていない。
+
+### 6. 本番カーネル不在
+
+`cloud-murakumo` の `:kv-policy` は意図の宣言のみで本番カーネル未実装
+（論文6.4節に明記）。
+
+## MLA構成可能性分析（本ADRの主眼）
+
+2024年のDeepSeek-V2以降、KVキャッシュ削減の産業本流はランタイムポリシーではなく
+**学習時アーキテクチャ（MLA: Multi-head Latent Attention）** に移っている。
+MLAは低ランク潜在表現へKVを圧縮することで、DeepSeek-V2で67B denseモデル比
+93.3%、Llama2-7B換算で92.19%のKVキャッシュ削減をランタイムのページング/帯域
+コストゼロで達成しており、Kimi K2・GLM-5など主要オープンモデルが既に採用済み。
+
+`sqrt-space-kv`が本当に効いたとしても、『MLAを採用したモデルに対してさらに
+何が得られるのか』という問いへの答えが必要になる。整理すると：
+
+**理論上は直交する2軸。** MLAは『1トークンあたりのKVバイト幅』を圧縮し、
+sqrt-space-kvは『常駐させるトークン数（S次元）』を間引く。sqrt-space-kv自身の
+『save比 ≈ |K|/S、幅に依存しない』という主張が正しければ、この2軸は独立で
+あり、MLA圧縮後の潜在KVに対しても同じ削減率で乗算的に合成できるはず、という
+のが理論上の仮説である。
+
+**しかし4つの留保がある。**
+
+1. MLAは既に1トークンあたりのバイト数を大きく削っているため、GPU HBMが
+   枯渇してオフロードが割に合うようになる系列長Sの閾値が、フルMHA/GQAモデル
+   より遥かに長い方向へシフトする。sqrt-space-kv自身が『6.1節: S≳32k-128kで
+   運用上意味を持つ』と明記しているこの閾値は、MLAモデルではさらに先
+   （100k超）になる可能性が高く、現行ベンチマークの最大S=16kでは効果が
+   ほぼ測れない領域にある。
+2. MLAのデコードステップは潜在表現から各ヘッドK/Vへのup-projectionを毎回
+   行う。その上にsqrt-space-kvのホストページング+online-softmaxブロック
+   ストリーミングを重ねると、圧縮解凍とページングという2段の追加レイテンシ
+   が積み重なり、単純合成できるかはカーネル実装してみないと分からない。
+3. 現行ベンチマーク行列（SmolLM-135M, Qwen2.5-0.5B/7B/14B, Qwen3.6-35B-A3B）
+   にMLA採用モデル（DeepSeek-V2/V3, Kimi K2, GLM-5系）が一つも含まれておらず、
+   この問いは現時点で完全に未検証の理論的仮説である。
+4. Qwen3.6-35B-A3Bの88.5%という数字自体、モデルのhybrid attention設計に
+   起因する部分が大きいという交絡が既にあり、MLAとの合成効果を見積もる際も
+   同種の切り分けが必要になる。
+
+**推奨実験**: DeepSeek-V2-Lite（MLA採用の小型公開モデル）をベンチマーク行列に
+追加し、(1) MLA単体でのフルKVバイト数、(2) その上にsqrt-space-kvの√S常駐を
+重ねた場合のバイト数と削減率、(3) 同一構成での実デコードtokens/sec、を測定する。
+
+## Decision
+
+1. 現行の90-97%という数字は『ストレージ常駐スナップショット』としてのみ有効な
+   暫定結果として扱う。
+2. 以下4つを満たすまで『検証済みの効率化手法』としての対外発信を保留する:
+   - (a) ホストページングありの実デコードスループット/レイテンシ測定
+   - (b) kvpressを用いたH2O/StreamingLLM/SnapKV/InfLLM/NEO等との横並び比較
+   - (c) LongBenchまたはRULERでのダウンストリームタスク精度
+   - (d) MLA採用モデルを対象に加えた構成可能性の実測
+3. Williams STOC 2025への理論的系譜の主張は『チェックポイント幅の選び方に
+   着想を与えた』程度に弱め、Griewankのチェックポインティング理論・
+   Chen et al. 2016を主要な先行研究として明示する。
+4. MLAとの関係は『理論上は直交し合成可能という仮説』として明記し、実測の
+   裏付けが取れるまでは効果ありと断定しない。
+
+## Consequences
+
+- sqrt-space-kvのREADME/RESULTS.mdに本ADRへのポインタと未検証事項の明記を追加。
+- cloud-murakumoの`:serve :kv-policy`はM2-M5がlandedするまで本番デフォルトに
+  昇格しない。
+- HF Papers/arXiv上のアブストラクトで『90-97%』を主張する場合は必ず
+  『デバイス常駐バイト数、ページング帯域コスト未計測』という限定を併記する。
+- 次の一手はP0（kvpress比較・実スループット測定）とP1（MLA合成実験・
+  タスク精度）。
+
+## References
+
+1. R. Ryan Williams. Simulating Time With Square-Root Space. STOC 2025 Best
+   Paper. arXiv:2502.17779.
+2. T. Chen et al. Training Deep Nets with Sublinear Memory Cost. arXiv:1604.06174.
+3. NVIDIA kvpress: 30+ KV cache compression methods behind one HuggingFace API.
+4. Understanding Bottlenecks for Efficiently Serving LLM Inference With KV
+   Offloading. arXiv:2601.19910.
+5. DeepSeek-V2 Technical Report（MLA、93.3% KVキャッシュ削減）。
+6. huggingface.co/datasets/com-junkawasaki/sqrt-space-kv-paper
+"}]
