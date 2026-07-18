@@ -68,6 +68,47 @@ same last-deploy-wins mechanism that took the domain in the first place.
   test seed was not carried over — reseeding via `bin/seed_git.cljs` is a
   separate, optional follow-up, not required to prove the routing fix.)
 
+## Addendum (same day, follow-up reseed attempt): separate data-integrity bug found
+
+Attempted the optional reseed as a stronger end-to-end proof (`bin/seed_git.cljs`
+against this repo's own 74 objects/5 refs). This surfaced an unrelated,
+pre-existing bug in `kotobase-protocols-worker`'s shared content-addressed
+store (affects all surfaces — s3/atproto/git/pinning — not just git), found
+independently of the domain-routing fix above:
+
+- The bulk seed run completed all 74 object PUTs and 5 ref PUTs without any
+  reported failure (only the final local `git symbolic-ref HEAD` step failed,
+  because the shared west checkout was in detached-HEAD state — fixed by
+  PUTting the HEAD symref content directly).
+- `git clone` then failed: `Unable to find 936ce326… ` (404) for one specific
+  commit object, even though the bulk seed reported no error for it.
+- Manually re-PUTting that one object returned 200, and repeated `curl GET`
+  (including 5 concurrent requests) consistently returned the correct
+  900-byte content, which decodes to exactly the expected SHA
+  (`936ce326009f55f17dfb57f3dea30fb0ca280544`, verified by reconstructing the
+  proper `type len` + NUL byte + `content` header and hashing).
+- `git clone` still failed on retry: `has bad hash`. `GIT_TRACE_CURL=1`
+  showed why — the *exact same URL*, requested moments later in the same
+  clone attempt, returned `content-length: 91` instead of 900 (a different,
+  wrong body), while a `curl` immediately after that clone attempt again got
+  900 correct bytes. The same GET endpoint is **non-deterministically
+  returning different content for the same object key** across successive
+  requests seconds apart.
+- This is consistent with a race in the write path's CAS/fold cycle
+  (`kotobase-protocols-worker.kotobase-store`, ADR-2607177500) under
+  concurrent writes to the shared admin graph (`kotobase-protocols-v2`) —
+  e.g. a losing writer's change appears to succeed (200) but a later read
+  transiently rehydrates from a stale/incomplete chain state. This was not
+  investigated further or fixed here: it touches the shared datom-plane
+  persistence bridge used by every surface of this Worker, is live
+  production infrastructure other consumers may depend on, and a blind fix
+  attempted without dedicated time to test concurrent-write scenarios risks
+  making a live data-integrity bug worse rather than better.
+- **Recommendation for follow-up**: treat as a P1 data-integrity bug in
+  `kotobase-protocols-worker.kotobase-store`'s hydrate/commit/fold cycle,
+  not a git-surface-specific issue. Needs reproduction under controlled
+  concurrent writes before attempting a fix.
+
 ## Consequences
 
 - (+) `git.kotobase.net` now serves the intended
