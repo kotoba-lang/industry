@@ -118,7 +118,12 @@
                    "vLLM 0.8.5との実測1点 landed 2026-07-18: 単一リクエストでvLLM decode~28.25tok/s、M2/M3のHFループbaseline(34.7-36.9tok/s)と同レンジ — baselineが弱い藁人形でないことを確認"
                    "M6-mac landed 2026-07-18（Apple M4、Qwen2.5-0.5B、24層全体、実プレフィル、実process RSS計測）: mx.arrayをnumpyへ退避してもRSSは減らない（unified memoryなので当然、3/3で確認）。素朴なwrite()+del()のdiskページングもほぼ効果なし（1/3のみ、794MBスケールでの-180.8MBは大アロケーションのmmap閾値越えの可能性が高くメカニズムとして信頼できない）。**np.memmapは97/395/794MBの全スケールでRSS +0.0MB（3/3）— 実際に効くメカニズム**。1/24層だけ触れるとそのぶんだけRSSが増える=部分的常駐がちゃんと機能することも確認"
                    "actionable: cloud-murakumoの:sqrt-plus-pageはApple Siliconターゲットでmmapを使うべき（現行のModal scriptが使うserialize/deserializeパターンではなく）"
-                   "残: :sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装、本番トラフィックでのA/B比較、vLLM/SGLang/TensorRT-LLMとの正式な横並び比較は未達成"]}]
+                   "残: :sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装、本番トラフィックでのA/B比較、vLLM/SGLang/TensorRT-LLMとの正式な横並び比較は未達成"]}
+   {:level "M7" :name "cross-domain-applicability-video-image" :status "partial"
+    :deliverables ["landed 2026-07-18: 自己回帰型画像トークン生成（LlamaGen-B実仕様: dim=768/12層/12head/GQA無し/vocab=16384の画像codebook、transformers.LlamaConfigで乱数重み——重みでなく機構転移のテスト）でM3のPagedSqrtCacheをそのまま適用、S=2048/8192でexact_token_match=true、slowdown 1.80-1.83x（テキストモデルのCUDA実測と同オーダー）——機構はコード変更ゼロでvocabドメインを超えて転移することを確認"
+                   "grounded projection（ローカル/Modal実行なし、明示）: 自己回帰型動画（MAGI-1実仕様、technical reportのTable 2から: 34層/dim=3072/128head/GQA groups=8）はblock-causal+GQAで本手法の前提構造を満たすことを確認。bpt=25.5KB/token（このプロジェクトで測定した中で最も軽量）でも、公称最大コンテキスト4,000,000トークンでの full KV = 104.4GB。CUDA指向の研究コードでMacポート無く未実行"
+                   "self-correction: 会話中の『activation checkpointingがbidirectional diffusion動画/画像生成にもsqrt-space-kvと同様に効く』という当初の主張を実測で検証したところ不正確と判明——real DiT-L/2寸法・torch.utils.checkpoint・実MPS memory計測で、**推論（生成）時はcheckpointingの効果が厳密にゼロ**（backward passが無いため retain するものが無い、S=2048/8192両方でratio=1.000）。**訓練時は本物の効果**（S=8192でcheckpoint無しは42GB超要求でOOM、有りは19.5GBで収まる）——ただしこれは訓練/fine-tuning限定の話で、生成には無関係。かつこの技法自体は本ADRが既に一次系譜として引用しているGriewank/Chen 2016の既存技術であり、sqrt-space-kvの新規貢献ではない"
+                   "残: MAGI-1系の実モデルをModal A100で実行し、実K/V shapeでのM2/M3同等スループット/正確性テストは未達成"]}]
   :adr/value-proposition
   {:reframed-by "owner" :date "2026-07-18"
    :statement "この研究の優位性は速度でなく、限られたmemoryでテキスト・動画・画像生成modelを動かせることにある。速度が遅くなるのは許容されるコスト。"
@@ -134,7 +139,11 @@
    {:pri "P3" :gap "ホストページングありの実デコードスループット/レイテンシ測定" :level "M2" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/modal_sqrt_kv_throughput_bench.py + scripts/modal_sqrt_kv_paged_cache_bench.py; 2026-07-18"}
    {:pri "P3" :gap "Apple Silicon unified memoryでの実メモリ解放メカニズムの特定（mmap vs write+del vs cpu-move）" :level "M6" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_mac_memory_capability.py; docs/benchmarks/sqrt-kv-mac-memory-capability-summary.md; 2026-07-18"}
    {:pri "P3" :gap "mlx-lm DeepSeek-V2実装のMLA cache absorption有無の確認（クロスエコシステム検証）" :level "M5" :status "landed" :evidence "gftdcojp/cloud-murakumo docs/benchmarks/sqrt-kv-mac-mla-source-inspection.md; 2026-07-18"}
-   {:pri "P3" :gap "16GB/32GB Macで実際にこの手法が要る具体的モデルの特定（重みでなくKVがボトルネックになるモデル）" :level "M6" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_mac_model_suitability.py; docs/benchmarks/sqrt-kv-mac-model-suitability-summary.md; 実測: Qwen2.5-14B-Instruct-4bit(bpt=192KB/tok, native=32768, 16GBで72.6%到達)とGLM-4-9B-Chat-1M-6bit(bpt=80KB/tok, native=1048576, 16GBで6.1%/32GBで24.8%到達) — GLM-4-9B-Chat-1Mが決定的な適合例; 2026-07-18"}]
+   {:pri "P3" :gap "16GB/32GB Macで実際にこの手法が要る具体的モデルの特定（重みでなくKVがボトルネックになるモデル）" :level "M6" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_mac_model_suitability.py; docs/benchmarks/sqrt-kv-mac-model-suitability-summary.md; 実測: Qwen2.5-14B-Instruct-4bit(bpt=192KB/tok, native=32768, 16GBで72.6%到達)とGLM-4-9B-Chat-1M-6bit(bpt=80KB/tok, native=1048576, 16GBで6.1%/32GBで24.8%到達) — GLM-4-9B-Chat-1Mが決定的な適合例; 2026-07-18"}
+   {:pri "P1" :gap "MAGI-1系の実自己回帰型動画モデルをModal A100で実行し、実K/V shapeでM2/M3同等のスループット/正確性テストを行う（現状は公開仕様からの推定のみ、ローカル/Modal実行なし）" :level "M7" :status "open"}
+   {:pri "P3" :gap "自己回帰型画像トークン生成へのPagedSqrtCache機構転移確認（LlamaGen-B実仕様、乱数重み）" :level "M7" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_image_token_llamagen.py; docs/benchmarks/sqrt-kv-image-token-llamagen-summary.md; exact_token_match=true @ S=2048/8192, slowdown 1.80-1.83x; 2026-07-18"}
+   {:pri "P3" :gap "自己回帰型動画（MAGI-1）の実仕様からのgrounded projection" :level "M7" :status "landed" :evidence "gftdcojp/cloud-murakumo docs/benchmarks/sqrt-kv-autoregressive-video-magi1-projection.md; 実測ではなく公開Table 2仕様からの推定と明記; 2026-07-18"}
+   {:pri "P3" :gap "bidirectional diffusion（動画/画像生成主流）へのactivation checkpointing適用可否の自己検証" :level "M7" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_dit_activation_checkpoint.py; docs/benchmarks/sqrt-kv-dit-activation-checkpoint-summary.md; 推論時ratio=1.000（効果ゼロ）、訓練時S=8192でcheckpoint無しはOOM・有りは19.5GBで収まる; 会話中の当初主張を訂正; 2026-07-18"}]
   :adr/non-goals
   ["sqrt-space-kvの理論的主張（Transformerがマルチテープチューリングマシンであるという主張）を検証すること — 論文自身が明示的に否定しており本ADRの範囲外"
    "既存のcloud-murakumo本番トラフィックを止めてこのADRの検証を強制すること — M2-M6はcloud-murakumo :kv-policy を本番デフォルト化する前の要件であり、現状の宣言のみの状態（intent expression）を即座に変更する必要はない"
