@@ -1,0 +1,311 @@
+[{:db/id -1, :adr/id 2799008151, :adr/title "cloud-itonami-isco-8151 — Fibre Preparing, Spinning and Winding Machine Operators Mill Scheduling/Logistics Coordination Coverage", :adr/status :accepted, :adr/doc_type "adr", :adr/date "2026-07-18", :adr/source-format "edn", :adr/scope ["kotoba-lang/occupation" "cloud-itonami/cloud-itonami-isco-8151"], :adr/related ["adr-2607121000-cloud-itonami-global-isic-isco-reverse-toposort-plan" "adr-2799008122-cloud-itonami-isco-8122-metal-finishing-plating-coating-machine-operators-coverage"], :adr/references [2607121000], :adr/body "# ADR 2799008151: cloud-itonami ISCO-08 8151 Fibre Preparing, Spinning and Winding Machine Operators mill scheduling/logistics coordination coverage
+
+## Status
+
+Accepted
+
+## Context
+
+This is part of the occupation-classification track (sibling to the
+`cloud-itonami-isic-*` industry-actor rollout, same governing
+ADR-2607121000): codify every ISCO-08 occupation unit group as an
+autonomous \"actor\" (LLM/advisor behind an independent Governor, a
+`langgraph.graph` StateGraph, append-only audit ledger), modeled on a
+robotics premise -- a robot performs the occupation's physical/
+administrative work, proposing actions to an independent Governor that
+gates them, never dispatches hardware itself, always escalates
+high-stakes decisions to a human. This ADR covers **ISCO-08 class 8151
+-- Fibre Preparing, Spinning and Winding Machine Operators** only. This
+is Wave3 (production/trades); Wave0/1/2 are 100% complete, the entire
+75xx craft-trades range is complete, and this actor lands within the
+81xx plant-and-machine-operator range (`kotoba.occupation.wave/
+wave-of \"8151\"` resolves to wave 3, confirmed against a fresh clone).
+
+`gh api repos/cloud-itonami/cloud-itonami-isco-8151` returned a clean
+404 before any work began -- this was a genuinely fresh scaffold, not a
+resume of prior partial work.
+
+The `kotoba-lang/occupation` registry's live `{:id \"8151\" ...}` entry
+was verified against a fresh clone before any work began (`clojure -M
+-e \"(require 'kotoba.occupation) (println (kotoba.occupation/get-
+occupation \\\"8151\\\"))\"` from a checkout with the `kotoba-lang/
+technology` sibling present at the correct `../technology` relative
+path), and its `:name` read exactly \"Fibre Preparing, Spinning and
+Winding Machine Operators\" -- confirming the premise, no mismatch.
+Prior to this ADR the entry's `:maturity` was `:spec` with
+`:required-technologies [:robotics :identity :audit-ledger]` and no
+`:repo`/`:business-id`. This ADR and its companion registry edit
+promote the `8151` entry to `:implemented`.
+
+**Textile-machinery entanglement hazard dimension.** Fibre Preparing,
+Spinning and Winding Machine Operators run textile-mill spinning/
+carding/winding equipment -- a real entanglement hazard (rotating
+spindles, drive belts, high-speed winding mechanisms), alongside
+fibre-dust exposure. This actor does NOT model direct spinning/winding-
+equipment operation authority or mill-safety-clearance authority. It is
+deliberately restricted to MILL SCHEDULING and LOGISTICS COORDINATION
+around the occupation (production-run/inventory/progress-record
+logging, crew/shift scheduling, safety-concern escalation, and
+raw-fibre/yarn-stock procurement coordination) -- never the
+machine-operation-execution decision or the mill-safety-clearance
+decision itself, and never an override of a mill safety officer's
+judgment. The closed proposal-op allowlist structurally excludes any op
+that could directly finalize such a decision, and the governor
+independently, permanently hard-blocks any proposal whose rationale
+text names such a finalization action, regardless of the declared `:op`
+or confidence -- this is not an escalation path a human can approve
+through, it is an outright, structural refusal at every maturity level.
+
+The reference implementation mirrored for module SHAPE is
+[`cloud-itonami/cloud-itonami-isco-8122`](https://github.com/cloud-itonami/cloud-itonami-isco-8122)
+(Metal Finishing, Plating and Coating Machine Operators -- a closely
+related industrial-machine plant-operation safety pattern, itself
+already landed in this batch), independently re-cloned and read in
+full this session. Its `platingcoord.{store,advisor,governor,actor}`
+module split, `langgraph.graph` StateGraph shape, closed op-allowlist
+and scope-exclusion self-trip-guard design translate almost 1:1 onto
+this occupation's own entanglement-hazard-adjacent coordination scope,
+so this ADR's `spinningcoord.*` modules follow the same shape with
+domain terms substituted (plater -> spinner, plating facility/plant ->
+spinning mill, plant safety officer -> mill safety officer,
+plating-operation-execution -> machine-operation-execution). One
+deliberate improvement over the mirrored reference: `spinningcoord.
+advisor`'s LLM-response parser uses `clojure.edn/read-string` (required
+via `[clojure.edn :as edn]`) rather than the reference's bare, JVM-only
+`read-string` -- the newer convention already adopted by this same
+batch's `cloud-itonami-isco-8131` (`chemcoord.advisor`), which lints
+clean under `clj-kondo` and avoids unnecessary JVM `eval`-adjacent
+interop, consistent with this repo's cljs-first/no-JVM-interop mandate.
+
+## Decision
+
+Publish `cloud-itonami/cloud-itonami-isco-8151` as an OSS
+documentation/logistics-coordination actor for fibre preparing,
+spinning and winding machine operators, following the SAME
+governed-actor architecture as every prior `cloud-itonami-isco-*`
+actor in this fleet: **Fibre Preparing, Spinning and Winding Mill
+Scheduling Coordination Advisor ⊣ SpinningCoordGovernor** on a
+`langgraph.graph` StateGraph (`io.github.kotoba-lang/langgraph`,
+git-sha-pinned identically to the reference's `deps.edn` and to this
+same batch's sibling repos -- a different library coordinate from the
+`langgraph-clj` used by the unrelated `20-actors/*` actor family), with
+an independent Governor, human-in-the-loop approval via
+`interrupt-before`, and an append-only audit ledger.
+
+This actor is deliberately **mill scheduling/logistics coordination
+ONLY, never spinning/winding-equipment operation authority** -- it must
+NEVER be designed to exercise, simulate exercising, or propose
+exercising a machine-operation-execution decision or a
+mill-safety-clearance decision.
+
+### Closed proposal-op allowlist (all `:effect :propose`)
+
+- `:log-work-record` -- production-run/inventory/progress data
+  logging only
+- `:schedule-crew-operation` -- crew/shift/task scheduling proposal
+  only
+- `:flag-safety-concern` -- surface an entanglement-hazard/fibre-dust-
+  exposure/equipment-condition concern, ALWAYS escalates immediately,
+  NEVER auto-commit-eligible
+- `:coordinate-supply-order` -- raw-fibre/yarn-stock procurement
+  proposal only
+
+No op in this allowlist, and no op anywhere in this codebase,
+resembles a machine-operation-execution finalization decision or a
+mill-safety-clearance finalization decision -- these are structurally
+absent from the op-allowlist entirely, not merely gated behind
+escalation.
+
+### Five HARD governor checks (permanent, un-overridable)
+
+1. **Spinner unregistered** -- any proposal must resolve to an
+   independently registered spinner (crew member) record
+   (`:no-spinner`). Never trusts the proposal's own claim of who the
+   spinner is.
+2. **Mill unregistered** -- any proposal must resolve to an
+   independently registered spinning mill facility/line record
+   (`:no-mill`).
+3. **Effect not `:propose`** -- any other `:effect` value is a HARD
+   block (`:no-actuation`; the governor never dispatches hardware
+   itself and never operates spinning/winding equipment itself).
+4. **Op not allowed** -- any `:op` outside the closed four-op
+   allowlist is a HARD, PERMANENT block (`:unknown-op`).
+5. **Scope-excluded action** -- the proposal's `:op` or `:rationale`
+   must never name a machine-operation-execution finalization, a
+   mill-safety-clearance finalization, or a mill-safety-officer-
+   judgment override (`:scope-excluded-action`), REGARDLESS of the
+   declared `:op` or confidence. This is a hard, PERMANENT block --
+   there is no maturity level or confidence at which this actor may
+   auto-commit or human-approve its way past this rule; it is an
+   outright refusal, not an escalation.
+
+### Escalation gates (always human sign-off)
+
+- `:flag-safety-concern` -- ALWAYS escalates to a human, regardless of
+  confidence (governor's always-escalate path). The only channel by
+  which the robot may surface an entanglement-hazard/fibre-dust-
+  exposure/equipment-condition observation -- it never resolves the
+  concern itself.
+- a `:coordinate-supply-order` proposal whose `:cost` exceeds
+  `supply-cost-threshold` (2000) -- always needs human sign-off,
+  independent of confidence (boundary verified as exclusive by
+  `ok-supply-order-at-threshold-boundary`: exactly-at-threshold
+  commits, over-threshold escalates).
+- (advisor confidence below `confidence-floor` 0.6 also escalates, for
+  any op.)
+
+### Self-trip guard (fleet-known bug class, CLAUDE.md)
+
+A governor's scope-exclusion term list phrased as bare NOUNS (e.g.
+\"fibre\", \"spindle\", \"yarn\") can accidentally match inside the mock
+advisor's own default rationale text for a legitimate proposal,
+self-blocking the actor's own happy path -- and this vertical's domain
+vocabulary is an especially sharp case of that risk, because routine
+work-log/task text legitimately names spinning/winding machinery by
+name (e.g. a task literally described as \"routine spinning task with
+rotating spindles, drive belts and fibre dust on the winding frame\" --
+equipment identification, not a proposal to finalize a machine
+operation or clear the mill as safe). `spinningcoord.governor/scope-
+excluded-phrases` is phrased exclusively as finalization ACTION PHRASES
+(\"proceed with the spinning run\", \"finalize the spinning operation\",
+\"declare the mill safety cleared\", \"override the mill safety officer's
+judgment\"), never bare nouns, and is checked only against the
+proposal's `:rationale` field (the advisor's own generated text), never
+against raw `:task` input text. `spinningcoord.governor-test/default-
+mock-advisor-proposals-never-self-trip-on-scope-exclusion` is a
+dedicated regression test driving the default mock-advisor across all
+four allowed ops with a task field containing exactly those bare
+textile nouns, asserting none of them ever hard-trip the finalization-
+scope rule. Green on first run.
+
+## Consequences
+
+- `kotoba-lang/occupation` registry's `{:id \"8151\" ...}` entry promoted
+  from `:spec` to `:implemented`, with `:repo`/`:business-id` set to
+  the real repository
+  (`https://github.com/cloud-itonami/cloud-itonami-isco-8151` /
+  `cloud-itonami-isco-8151`), via a targeted Contents-API PUT with
+  blob-SHA CAS (fetch fresh blob -> exact single-entry string replace
+  -> PUT with the fetched SHA; succeeded on the first attempt, no 409).
+- `kotoba-lang/occupation`'s `test/kotoba/occupation_test.clj` gained a
+  dedicated `fibre-preparing-spinning-winding-machine-operators-8151-
+  implemented` deftest (race-safe convention: asserts this
+  occupation's own `maturity`/`repo`/`business-id` only, appended via
+  the same CAS-PUT discipline). This deftest deliberately does NOT
+  touch the shared `maturity-tier` aggregate count assertion
+  (`:spec`/`:implemented` exact-count `is` forms at the top of that
+  namespace): `maturity-summary` was recomputed live immediately before
+  each edit (123 spec / 313 implemented right before the registry PUT;
+  122 spec / 314 implemented right before the test-file PUT), showing
+  concurrent sibling promotions landing within this same 6-agent batch
+  faster than any single agent could safely chase with a hand-bumped
+  assertion. The aggregate assertion was reset to the batch's `{:spec
+  125 :implemented 311}` baseline immediately before this batch began
+  and, per this batch's documented convention (already followed by
+  every other Wave3-batch sibling deftest in that file), is left
+  exactly as found rather than fought over -- a later agent landing
+  last in the batch, or a dedicated resync pass, is expected to true it
+  up. Confirmed by fresh-clone re-run: `clojure -M:test` in
+  `kotoba-lang/occupation` reports 101 tests / 1209 assertions with
+  exactly 2 failures, both on the stale aggregate `:spec`/`:implemented`
+  exact-count assertions (not on this occupation's own dedicated
+  deftest, which passes in isolation: 1 test / 3 assertions, 0
+  failures, 0 errors, run standalone via `clojure -M:test --var
+  kotoba.occupation-test/fibre-preparing-spinning-winding-machine-
+  operators-8151-implemented`).
+- Full `cloud-itonami-isco-8151` test suite (`clojure -M:test`): 33
+  tests, 71 assertions, 0 failures, 0 errors -- raw output captured in
+  this ADR's `:test/counts` and independently re-verified against a
+  brand-new fresh clone of the pushed repository (not just the local
+  working copy). `clj-kondo` (`clojure -M:lint`): 0 errors, 0 warnings.
+  No mojibake in the Japanese violation-detail strings (only the
+  expected em-dash and Japanese text found in a fresh-clone byte scan).
+- No `manifest/west.yml` changes -- this actor is registered purely via
+  the `kotoba-lang/occupation` capability registry, consistent with
+  sibling `cloud-itonami-isco-*`/`cloud-itonami-isic-*` actors.
+- No `kotoba-lang/technology` dependency was added to the actor's
+  `deps.edn` -- only the central `kotoba-lang/occupation` registry
+  itself depends on it, to resolve `:required-technologies` stacks.
+- This ADR is EDN-only, matching the live `90-docs/adr` convention
+  (commit `6d2d0eeda658`) -- a single-entity EDN vector with an
+  `:adr/body` string blob rather than a paired `.md`+`.edn`.
+
+## Alternatives considered
+
+- Giving the actor an op like `:approve-spinning-run`/`:approve-mill-
+  safety-clearance` that is merely gated behind an always-escalate
+  path: rejected outright per the task's explicit guidance -- an
+  always-escalate op still means the *capability* to finalize a
+  machine operation or a mill-safety clearance exists in the code path
+  and is merely deferred to a human gate. For a decision whose failure
+  mode is entanglement injury or fibre-dust-exposure harm, the
+  capability itself must not exist in this actor at all.
+- A bare-noun scope-exclusion term list (e.g. `[\"fibre\" \"spindle\"
+  \"yarn\"]`): rejected outright per the fleet-known self-trip bug class
+  described above -- this domain's own vocabulary necessarily discusses
+  spinning/winding machinery by name to do its logging/scheduling job,
+  so a bare-noun list would self-block the actor's own legitimate
+  proposals whenever a task description mentions that equipment.
+- Naming the crew-member field `:operator-id` (matching the ISCO title
+  literally, \"...Machine Operators\"): rejected -- `docs/operator-
+  guide.md` and this fleet's convention already use \"operator\" to mean
+  the deploying business/entity running the actor, so reusing the same
+  word for the individual crew member would create a confusing
+  collision; `:spinner-id` (mirroring the reference's `:plater-id`
+  pattern) keeps the two senses distinct.
+- Hand-bumping the shared `maturity-tier` aggregate `:spec`/
+  `:implemented` exact-count assertion to this edit's own live snapshot:
+  rejected -- with 6 sibling agents landing concurrently in this same
+  batch, any hand-bumped exact count is stale within moments of the
+  next sibling's promotion, and fighting over that single hot line
+  across agents risks 409 thrash without ever landing a durable
+  correct value; the batch's own established convention (visible in
+  every recent sibling deftest's comments in that file) is to leave it
+  for a dedicated resync pass instead.
+
+## Test verification
+
+`cloud-itonami-isco-8151` fresh clone re-run immediately before writing
+this ADR:
+
+```text
+Running tests in #{\"test\"}
+
+Testing spinningcoord.actor-test
+
+Testing spinningcoord.governor-test
+
+Ran 33 tests containing 71 assertions.
+0 failures, 0 errors.
+```
+
+`kotoba-lang/occupation` fresh clone re-run immediately after the
+registry promotion and the dedicated deftest addition:
+
+```text
+Running tests in #{\"test\"}
+
+Testing kotoba.occupation-test
+
+FAIL in (maturity-tier) (occupation_test.clj:1234)
+maturity-summary counts tiers
+expected: (= 125 (:spec m))
+  actual: (not (= 125 122))
+
+FAIL in (maturity-tier) (occupation_test.clj:1235)
+maturity-summary counts tiers
+expected: (= 311 (:implemented m))
+  actual: (not (= 311 314))
+
+Testing kotoba.occupation-wave-test
+
+Ran 101 tests containing 1209 assertions.
+2 failures, 0 errors.
+```
+
+Both failures are the pre-existing, shared `maturity-tier` aggregate
+exact-count assertion going stale from concurrent sibling landings in
+this batch (see Consequences above), not a defect in this ADR's own
+registry edit or deftest -- this occupation's own dedicated deftest
+passes standalone (1 test / 3 assertions, 0 failures, 0 errors).
+", :actor/id :cloud-itonami-isco-8151, :actor/name "Fibre Preparing, Spinning and Winding Plant Scheduling and Logistics Coordination Practice", :actor/isco-08 "8151", :actor/domain :manufacturing/fibre-preparing-spinning-winding-machine-operators-scheduling-logistics-coordination, :actor/wave 3, :actor/robotics? true, :actor/coordination? true, :actor/proposal-ops [:log-work-record :schedule-crew-operation :flag-safety-concern :coordinate-supply-order], :actor/hard-checks [:no-spinner :no-mill :no-actuation :unknown-op :scope-excluded-action], :actor/always-escalate-ops [:flag-safety-concern], :actor/scope-excluded-ops [:finalize-spinning-decision :finalize-spinning-operation :finalize-winding-operation :authorize-spinning-run :authorize-winding-run :proceed-with-spinning-run :proceed-with-winding-run :finalize-mill-safety-clearance :declare-mill-safety-cleared :declare-mill-area-safe :override-mill-safety-officer-judgment :override-safety-officer-judgment], :actor/scope-excluded-terms ["proceed with the spinning run" "proceed with the winding run" "authorize the spinning run" "authorize the winding run" "finalize the spinning decision" "finalize the spinning operation" "finalize the winding operation" "declare the mill safety cleared" "declare mill safety cleared" "finalize the mill safety clearance" "finalize the mill-safety clearance" "override the mill safety officer's judgment" "override the safety officer's judgment" "override mill safety officer judgment"], :registry/maturity :implemented, :registry/required-technologies [:robotics :identity :audit-ledger], :registry/operating-states [:intake :propose :approve :execute :audit], :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isco-8151", :registry/business-id "cloud-itonami-isco-8151", :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold], :operation/entry-point :intake, :phase/rollout {0 {:label "read-only", :writes #{}, :auto #{}}, 1 {:label "assisted-logging", :writes #{:log-work-record}, :auto #{}}, 2 {:label "assisted-coordination", :writes #{:log-work-record :schedule-crew-operation :coordinate-supply-order}, :auto #{}}, 3 {:label "supervised-auto", :writes #{:log-work-record :flag-safety-concern :schedule-crew-operation :coordinate-supply-order}, :auto #{:log-work-record :schedule-crew-operation}}}, :test/counts {:total 33, :assertions 71, :failures 0, :errors 0}, :test/simulator :spinningcoord.actor-test, :test/coverage [:governor-hard-checks :advisor-shapes :integration :store-contract :scope-exclusion-self-trip-regression :spinner-verification :mill-verification :closed-op-allowlist :supply-cost-threshold-escalation :machine-operation-execution-mill-safety-clearance-finalization-forbidden :mill-safety-officer-override-forbidden]}]
