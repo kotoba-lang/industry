@@ -11,8 +11,9 @@
    :gftdcojp #{:public-hostname :deploy-shell :cloud-binding :secret-reference :migration-runbook :rollback :operational-receipt}}
   :kotobase
   {:public-owner "gftdcojp/net-kotobase"
-   :retired-deployers ["kotoba-lang/kotobase-protocols-worker"
-                       "kotoba-lang/kotobase-cljc-worker"]}
+   :retired-deployers ["kotoba-lang/kotobase-protocols-worker"]
+   :archived-predecessor "kotoba-lang/kotobase-cljc-worker"
+   :legacy-migration-owner "gftdcojp/net-kotobase/migrations/cljc-worker-v2-v3"}
   :product-snapshots
   {:canonical "standalone gftdcojp product repository"
    :historical "ai-gftd-apps-gftdcojp/60-apps"
