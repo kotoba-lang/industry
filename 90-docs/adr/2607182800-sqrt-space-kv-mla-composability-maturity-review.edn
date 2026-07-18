@@ -104,19 +104,29 @@
     :deliverables ["DeepSeek-V2-Lite-Chatをベンチマーク行列に追加 landed 2026-07-18（transformers 4.46.3固定、custom modeling code互換のため）"
                    "save比93.1-96.3%（dense modelと一致）、worst-case slowdown 2.83x@S=8192（dense modelと同レンジ）"
                    "重要な留保: 参照HF実装はMLAの圧縮済みlatent（kv_lora_rank=512）を実際にはcacheしていない — 実cache tensorは4D [1,16,S,192]/[1,16,S,128]の非圧縮per-head形状で、Qwen2.5-7Bのdense GQA cacheより大きい"
-                   "残: 真にMLA圧縮されたcache（vLLM/SGLangのabsorbed cache実装）との合成テストは未達成 — 本セッションのスコープ外"]}
+                   "M5-mac landed 2026-07-18（ソース調査のみ、ダウンロード無し — このMacは空きディスクが限られDeepSeek-V2-Liteが入らない）: mlx-lm/models/deepseek_v2.pyもkv_b_projでdecompressしてからcache.update_and_fetchに渡す同一パターンを確認 — HF参照実装だけのCUDA固有の癖ではなく、クロスエコシステムで確認された事実。absorbed cache最適化はvLLM/SGLang（CUDA限定）のみが実装する特殊systems手法"
+                   "残: 真にMLA圧縮されたcache（vLLM/SGLangのabsorbed cache実装）との合成テストは未達成 — CUDA限定でMacでは原理的に検証不能、本セッションのスコープ外"]}
    {:level "M6" :name "production-kernel-in-cloud-murakumo" :status "partial"
     :deliverables ["M3のPagedSqrtCacheが実カーネルの第一歩として存在（:sqrt-checkpointの試作实装）"
                    "vLLM 0.8.5との実測1点 landed 2026-07-18: 単一リクエストでvLLM decode~28.25tok/s、M2/M3のHFループbaseline(34.7-36.9tok/s)と同レンジ — baselineが弱い藁人形でないことを確認"
+                   "M6-mac landed 2026-07-18（Apple M4、Qwen2.5-0.5B、24層全体、実プレフィル、実process RSS計測）: mx.arrayをnumpyへ退避してもRSSは減らない（unified memoryなので当然、3/3で確認）。素朴なwrite()+del()のdiskページングもほぼ効果なし（1/3のみ、794MBスケールでの-180.8MBは大アロケーションのmmap閾値越えの可能性が高くメカニズムとして信頼できない）。**np.memmapは97/395/794MBの全スケールでRSS +0.0MB（3/3）— 実際に効くメカニズム**。1/24層だけ触れるとそのぶんだけRSSが増える=部分的常駐がちゃんと機能することも確認"
+                   "actionable: cloud-murakumoの:sqrt-plus-pageはApple Siliconターゲットでmmapを使うべき（現行のModal scriptが使うserialize/deserializeパターンではなく）"
                    "残: :sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装、本番トラフィックでのA/B比較、vLLM/SGLang/TensorRT-LLMとの正式な横並び比較は未達成"]}]
+  :adr/value-proposition
+  {:reframed-by "owner" :date "2026-07-18"
+   :statement "この研究の優位性は速度でなく、限られたmemoryでテキスト・動画・画像生成modelを動かせることにある。速度が遅くなるのは許容されるコスト。"
+   :implication "M2/M3で測定した2.2x-3.7xのデコード遅延は『欠陥』ではなく『その容量拡張の対価』として読む。M6-macの実験はこのフレーミングを踏まえ、実際に使えるメカニズム（np.memmap）と使えないメカニズム（write+del、CPU move）を実測で切り分けた。"}
   :adr/follow-up-backlog
-  [{:pri "P0" :gap "真にMLA圧縮されたcache（vLLM/SGLangのabsorbed cache実装）との合成実験" :level "M5" :status "open"}
-   {:pri "P0" :gap ":sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装（cloud-murakumo）+ vLLM/SGLangとの正式A/B比較" :level "M6" :status "open"}
+  [{:pri "P0" :gap "真にMLA圧縮されたcache（vLLM/SGLangのabsorbed cache実装、CUDA限定でMacでは検証不能）との合成実験" :level "M5" :status "open"}
+   {:pri "P0" :gap ":sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装（cloud-murakumo、Apple Siliconターゲットではmmapベース）+ vLLM/SGLangとの正式A/B比較" :level "M6" :status "open"}
    {:pri "P1" :gap "kvpress比較のLongBench/RULERスケール拡大（現状n=3/条件のneedle-in-haystackのみ）" :level "M4" :status "open"}
+   {:pri "P1" :gap "mmap partial-touch時の~2倍オーバーヘッドの原因切り分け（np.array(mm[:n])のコピーが疑わしい）+ より大きなモデル/より長い文脈での実容量アンロック実証（現状このMacの空きディスク制約で未達成）" :level "M6" :status "open"}
    {:pri "P2" :gap "Williams STOC 2025への理論的系譜主張をチェックポインティング文献ベースに弱める（paper/sqrt_space_kv.tex改訂）" :level "-" :status "open"}
    {:pri "P2" :gap "Qwen3.6-35B-A3Bの88.5%からhybrid attention由来分とsqrt-space-kv固有分を切り分けるアブレーション" :level "-" :status "open"}
    {:pri "P3" :gap "kvpressハーネスでの競合手法比較（H2O/SnapKV/InfLLM/NEO）" :level "M4" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/modal_sqrt_kv_kvpress_bench.py; docs/benchmarks/sqrt-kv-kvpress-summary.md; 2026-07-18"}
-   {:pri "P3" :gap "ホストページングありの実デコードスループット/レイテンシ測定" :level "M2" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/modal_sqrt_kv_throughput_bench.py + scripts/modal_sqrt_kv_paged_cache_bench.py; 2026-07-18"}]
+   {:pri "P3" :gap "ホストページングありの実デコードスループット/レイテンシ測定" :level "M2" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/modal_sqrt_kv_throughput_bench.py + scripts/modal_sqrt_kv_paged_cache_bench.py; 2026-07-18"}
+   {:pri "P3" :gap "Apple Silicon unified memoryでの実メモリ解放メカニズムの特定（mmap vs write+del vs cpu-move）" :level "M6" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_mac_memory_capability.py; docs/benchmarks/sqrt-kv-mac-memory-capability-summary.md; 2026-07-18"}
+   {:pri "P3" :gap "mlx-lm DeepSeek-V2実装のMLA cache absorption有無の確認（クロスエコシステム検証）" :level "M5" :status "landed" :evidence "gftdcojp/cloud-murakumo docs/benchmarks/sqrt-kv-mac-mla-source-inspection.md; 2026-07-18"}]
   :adr/non-goals
   ["sqrt-space-kvの理論的主張（Transformerがマルチテープチューリングマシンであるという主張）を検証すること — 論文自身が明示的に否定しており本ADRの範囲外"
    "既存のcloud-murakumo本番トラフィックを止めてこのADRの検証を強制すること — M2-M6はcloud-murakumo :kv-policy を本番デフォルト化する前の要件であり、現状の宣言のみの状態（intent expression）を即座に変更する必要はない"
@@ -353,6 +363,64 @@ samplerにfallback）。有用な副産物: **M2/M3で使ったbaselineは弱い
 （branch `research/sqrt-kv-m3-m6-maturity`、server-side merge `a61656f`）、
 `docs/benchmarks/sqrt-kv-{paged-cache,kvpress,mla,vllm-baseline}-summary.md`。
 `com-junkawasaki/sqrt-space-kv` commit `516796d` に反映済み。
+
+## Value proposition reframing（オーナー指示、2026-07-18）
+
+「ちなみにこの研究は速度より、限られたmemoryでテキスト、動画、画像生成model
+を動かすのが優位性。速度は遅れてもよき」— この一文で、M2/M3が測定した
+2.2-3.7倍のデコード遅延の意味付けが変わる。それは「欠陥」ではなく
+「限られたmemoryで動かす能力の対価」として読むべきものである。以降の
+M5-mac/M6-macはこのフレーミングを前提に設計・実施した。
+
+## Implementation notes (2026-07-18 M5-mac/M6-mac — Mac-native, memory-capability framing)
+
+**M6-mac landed — Apple Silicon unified memoryでの実メモリ解放メカニズム
+の特定。** M2/M3/M4/M6の数値はすべて discrete NVIDIA GPU（CPU-GPU間に
+実PCIeバスがある）上のもの。Apple Siliconは CPU/GPU が単一の物理メモリ
+プールを共有するunified memoryアーキテクチャで、GPU管理下メモリプール
+から退避すれば実際に使えるメモリが増えるのか、という discrete GPU の
+実験では答えられない問いが生じる。このMac（M4、32GB unified memory）で
+`gftdcojp/cloud-murakumo` `scripts/bench_sqrt_kv_mac_memory_capability.py`
+を実行（Qwen2.5-0.5B、24層全体、実プレフィルから得た実K/V、`ps -o rss=`
+による実process RSS計測——`resource.getrusage`の単調増加のhigh-water-mark
+ではない）:
+
+- 非常駐分をmx.arrayからnumpyへ退避（"cpu-move"）: RSSは3スケール
+  （97/395/794MB）すべてで**増加**（+94.6/+377.2/+869.6MB）——unified
+  memoryでは当然の結果で、CPU側への退避は実際のメモリ節約にならない。
+- 素朴な `write()` + `del()` によるdisk退避: ほぼ効果なし（3中1のみ
+  freed判定）。794MBスケールでの-180.8MBの例外は、大アロケーションが
+  allocatorのmmap閾値を超えて即座にmunmapされた可能性が高く、狙って
+  再現できるメカニズムではない。
+- **`np.memmap`（未タッチ）: 97/395/794MBの全スケールでRSS +0.0MB
+  （3中3で確認）。** さらに24層中1層分だけアクセスすると、そのぶんだけ
+  RSSが増える（全体でなく部分）——オンデマンドの部分常駐が実際に機能する
+  ことも確認。読み戻しはSHA-256ハッシュ一致で全数正確（3/3）。
+
+**結論: Apple Silicon上でsqrt-space-kvが実際にメモリ容量の恩恵を出すには
+`mmap`ベースの実装が必須で、この研究のModal系スクリプトが使ってきた
+serialize/deserialize（write+read+del）パターンでは機能しない。**
+`cloud-murakumo`の`:sqrt-plus-page`実装は、Apple Siliconターゲットでは
+mmapベースの非常駐層を採用すべきという、具体的で実行可能な実装要件が
+この実験から得られた。
+
+**M5-mac landed — MLA cache absorption欠如がクロスエコシステムで確認。**
+ダウンロード不要（このMacは空きディスクが限られDeepSeek-V2-Liteが入らない
+ため、ソースコード調査のみ）。`mlx-lm`（このプロジェクトが既存のMac
+benchmarkすべてで使っているローカル推論ライブラリ）の
+`mlx_lm/models/deepseek_v2.py`を確認したところ、`kv_b_proj`による
+decompressionが`cache.update_and_fetch(...)`呼び出しより**前**に行われ、
+HF参照実装と全く同じ非圧縮per-head形状をcacheしていることを確認。
+これはCUDA固有の癖ではなく、**PyTorch/HFとMLXの両エコシステムで
+確認された事実**——absorbed cache最適化はvLLM/SGLang（CUDA限定、Metal
+非対応）のような専門的サービングエンジンだけが実装する特殊技法である
+ことが裏付けられた。M5の残課題（真にMLA圧縮されたcacheとの合成）は
+このMacでは原理的に検証不能であることが明確になった。
+
+**証跡**: `gftdcojp/cloud-murakumo` commit `9acd160`
+（branch `research/sqrt-kv-mac-memory-capability`、server-side merge
+`44ebabd`）、`docs/benchmarks/sqrt-kv-mac-{memory-capability,mla-source-inspection}*`。
+`com-junkawasaki/sqrt-space-kv` commit `6d7adff` に反映済み。
 
 ## References
 
