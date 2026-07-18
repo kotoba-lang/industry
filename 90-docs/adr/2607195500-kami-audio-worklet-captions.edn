@@ -1,0 +1,47 @@
+[{:db/id -1
+  :adr/id "adr-2607195500-kami-audio-worklet-captions"
+  :adr/title "KAMI makes audio plugins and captions project-authoritative"
+  :adr/date "2026-07-19"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607195400-kami-stereo-capability-container"]
+  :adr/decision
+  {:daw {:plugin-authority :project/plugins
+         :plugin-identity :plugin/id
+         :processor-authority :plugin/processor
+         :parameter-authority :plugin/parameters
+         :reference-processor "kami-saturator"
+         :runtime :audio-worklet-node
+         :consumers [:realtime-playback :master-wav :normalized-master-wav :track-stems :stem-bundle]}
+   :nle {:caption-authority :project/captions
+         :caption-timebase :project-frames
+         :preview-renderer :decoded-video-canvas
+         :production-renderer :same-captured-canvas
+         :sidecar-format :webvtt}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates
+   {:shared ["persistent directory grants" "streaming package I/O above 512 MiB"]
+    :daw ["third-party plugin SDK, signed distribution and processor isolation" "certified broadcast loudness conformance" "surround/Atmos buses"]
+    :nle ["styled and localized TTML/IMSC captions" "OCIO/ICC/HDR and container color tagging" "certified broadcast conformance" "persistent/background proxy jobs" "MOV/MXF/IMF delivery" "explicit hardware encoder control"]}}
+  :adr/implementation
+  {:daw-commits ["af6addcf918713d99a9c8b78d4f875c8b86cff04"]
+   :nle-commits ["011de5215c6e09d7770e312c30d892b143d0e4fd"]
+   :pull-requests ["kotoba-lang/kami-app-daw#12" "kotoba-lang/kami-app-nle#12"]
+   :evidence
+   ["DAW passes 20 tests and 78 assertions; NLE passes 21 tests and 88 assertions, including plugin/caption validation and deterministic WebVTT timing."
+    "Both shadow-cljs production releases completed through the repository resource guard with zero compiler warnings."
+    "Instrumented Chrome created the same kami-saturator AudioWorkletNode once for realtime playback and three times while rendering the complete aligned stem bundle."
+    "The downloaded stem package contained project.edn, stems.edn and three 882044-byte WAV stems, proving the offline plugin path completed."
+    "Instrumented Chrome painted Hello caption on the Decoded video preview canvas and production captureStream consumed that same canvas."
+    "The deterministic WebVTT sidecar contained a 00:00:00.000 to 00:00:02.000 cue matching the 60-frame project caption at 30 fps."
+    "External ffprobe identified the captioned production artifact as 320x180 VP8 video with 48 kHz two-channel Opus audio."
+    "Automated Chrome contexts and both local HTTP servers were closed after verification."
+    "Both application pull requests were reviewed and merged."
+    "The prescribed freshness and ledger verifier scripts are absent from this root revision; direct EDN parsing verifies accepted status, supersedes authority and both project-authoritative contracts."]}
+  :adr/consequences
+  ["Plugin identity, enablement and parameters survive EDN project/package round trips and affect realtime and offline audio consistently."
+   "The built-in processor proves AudioWorklet hosting but does not claim compatibility with commercial third-party plugin formats."
+   "Caption timing and text survive EDN round trips, appear in preview and production burn-in, and are independently deliverable as WebVTT."
+   "Advanced caption styling, localization and broadcast interchange remain visible gaps rather than implied capabilities."]
+  :adr/source-format "edn"}]
