@@ -1,0 +1,42 @@
+[{:db/id -1
+  :adr/id "adr-2607197000-kami-mackie-bank-imsc-layout"
+  :adr/title "KAMI extends Mackie banking and preserves IMSC region layout"
+  :adr/date "2026-07-19"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607196900-kami-mackie-imsc-geometry"]
+  :adr/decision
+  {:daw {:mackie-banks {:size 8 :navigation-notes {:left 0x2E :right 0x2F}
+                        :bounds :project-track-count :reset-on-load true}
+         :pan {:input :relative-v-pot-cc-0x10-through-0x17 :step 0.02 :feedback :pan-ring}
+         :record-arm {:input :note-0x00-through-0x07 :project-key :track/armed? :feedback :led}
+         :banked-feedback :local-strip-address
+         :ui :record-arm-indicator}
+   :nle {:layout-properties [:tts/writingMode :tts/padding :tts/displayAlign]
+         :writing-modes [:lrtb :rltb :tbrl :tblr]
+         :padding :one-to-four-percentage-values-expanded-to-four-sides
+         :display-align [:before :center :after]
+         :preview [:region-padding :vertical-alignment :rtl-direction :vertical-glyph-stack]
+         :authority [:project-caption-style :timed-set-segment :imsc-region-export]}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates
+   {:shared ["persistent directory grants" "streaming package I/O above 512 MiB"]
+    :daw ["third-party plugin SDK/isolation" "Mackie channel labels/time display/touch sensing" "certified hardware profiles" "surround/Atmos"]
+    :nle ["continuous/interpolated TTML animation" "advanced line breaking and ruby" "external notification delivery" "translation memory" "OCIO/ICC/HDR"]}}
+  :adr/implementation
+  {:daw-commits ["6effa9d"]
+   :nle-commits ["f7dcb6c"]
+   :pull-requests ["kotoba-lang/kami-app-daw#28" "kotoba-lang/kami-app-nle#28"]
+   :evidence
+   ["DAW passes 34 tests and 151 assertions; NLE passes 35 tests and 175 assertions."
+    "Both guarded production releases completed with zero compiler warnings."
+    "Chrome banked to project track 9, persisted gain 1, pan 0.1 and record-arm true, and observed exact fader/pan-ring/arm feedback."
+    "Chrome imported rltb writing mode, padding 2/3/4/5 and center display alignment into project authority."
+    "After approval, Chrome exported matching writingMode, padding and displayAlign attributes on a per-caption IMSC region."
+    "Both browser consoles had zero errors; Chrome closed in finally and both local servers were stopped."]}
+  :adr/consequences
+  ["Mackie control surfaces can navigate projects larger than eight tracks and operate gain, pan, arm, solo and mute in each bank."
+   "IMSC region content flow survives import, timed segmentation, preview and delivery instead of reducing to geometry alone."
+   "Continuous animation, advanced typography and third-party audio plugin isolation remain explicit gaps."]
+  :adr/source-format "edn"}]
