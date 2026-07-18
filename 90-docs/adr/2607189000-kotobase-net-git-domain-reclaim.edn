@@ -109,6 +109,64 @@ independently of the domain-routing fix above:
   not a git-surface-specific issue. Needs reproduction under controlled
   concurrent writes before attempting a fix.
 
+### Addendum 2 (same session): root-cause investigation, inconclusive
+
+Read the full pipeline end to end — `kotobase.protocols.git`
+(`kotobase-protocols/src/kotobase/protocols/git.cljc`: `loose-object`/
+`handle-put`), `kotobase-protocols-worker.kotobase-store`
+(`hydrate!`/`diff->tx-data!`/`commit-changes!`/`fold-if-due!`/
+`hydrate-run-persist!`), `kotobase-protocols-worker.kotobase-r2` (the
+isolate-lifetime `block-cache`, `with-blocks` trampoline,
+`r2-get-head`/`r2-put-head-if-match` CAS), and `kotobase-peer.core`
+(`commit!`, `fold!`, `chain.core/commit!`). Findings:
+
+- The write-side OCC design is structurally sound as written: the R2 head
+  pointer is read fresh every request (never cached), blocks are
+  content-addressed and flushed to R2 *before* the head CAS, a CAS loss
+  (`persisted false`) triggers a full re-hydrate-and-retry (≤3 attempts,
+  `worker.cljs`'s `with-retries`), and `crypto/encrypt-fn` here is a
+  deterministic plaintext passthrough — the exact precondition `fold!`'s
+  own docstring requires for concurrent folds to converge and never lose
+  data.
+  No single-line logic bug was found in this pass.
+- Confirmed via `_diag/health` that no concurrent writer is active on the
+  shared graph right now (`novelty_size` held at 3 across 3 checks, several
+  seconds apart) — ruling out an *ongoing* external writer as the cause of
+  what was observed.
+- Attempted reproduction twice, both failed to reproduce:
+  1. 20 concurrent `GET`s for the same already-corrupted-then-fixed object
+     → 20/20 consistent, correct 900 bytes.
+  2. One `PUT` immediately followed by 20 concurrent `GET`s of that same
+     new key → 20/20 consistent, correct content.
+  Both used `wrangler tail` in parallel; zero exceptions, zero suspicious
+  log lines were captured in either run.
+- The object that actually broke was written partway through a **74-object
+  sequential seed burst**, well past the engine's 64-tx-block fold
+  threshold (`kotobase-peer.core/should-fold?`) — meaning exactly one
+  `fold!` (`kotobase-peer/src/kotobase_peer/core.cljc:2050`, the single
+  most complex, least-frequently-exercised path in this pipeline: a full
+  snapshot rehydrate + novelty reduce + resnapshot, vs. every other path's
+  simple point read/write) almost certainly ran mid-burst. Neither repro
+  attempt above involved enough writes to cross that threshold, which is
+  the most likely reason both came back clean — a plain point-write/read
+  race was not reproducible, but the fold path itself was never actually
+  exercised by either repro.
+- **Net assessment**: no confirmed root cause. The strongest remaining
+  hypothesis, unconfirmed, is a `fold!`-cycle correctness bug specific to
+  folding a large novelty backlog written by a rapid, purely-sequential
+  (not concurrently-racing) single client — i.e. the bug may not require
+  concurrent *writers* at all, only enough sequential volume to cross the
+  fold threshold once. Confirming this needs a repro of ≥65 sequential
+  writes to a scratch graph/repo with `wrangler tail` attached and,
+  ideally, an assertion in `fold!` that every pre-fold novelty quad is
+  present in the post-fold indexed snapshot (a property `verify-chain`,
+  `kotobase-peer/src/kotobase_peer/core.cljc:2179`, does not currently
+  check). Not attempted here — a ≥65-write repro takes the store's current
+  ~1s+/write cost past 10 minutes per attempt (matches this session's own
+  74-object seed, which took roughly that long), and iterating on a fix
+  hypothesis at that cost per cycle was judged better handed to a
+  dedicated follow-up than continued in this session.
+
 ## Consequences
 
 - (+) `git.kotobase.net` now serves the intended
