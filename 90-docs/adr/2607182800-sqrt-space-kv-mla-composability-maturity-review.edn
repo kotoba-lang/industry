@@ -126,7 +126,8 @@
    {:pri "P3" :gap "kvpressハーネスでの競合手法比較（H2O/SnapKV/InfLLM/NEO）" :level "M4" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/modal_sqrt_kv_kvpress_bench.py; docs/benchmarks/sqrt-kv-kvpress-summary.md; 2026-07-18"}
    {:pri "P3" :gap "ホストページングありの実デコードスループット/レイテンシ測定" :level "M2" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/modal_sqrt_kv_throughput_bench.py + scripts/modal_sqrt_kv_paged_cache_bench.py; 2026-07-18"}
    {:pri "P3" :gap "Apple Silicon unified memoryでの実メモリ解放メカニズムの特定（mmap vs write+del vs cpu-move）" :level "M6" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_mac_memory_capability.py; docs/benchmarks/sqrt-kv-mac-memory-capability-summary.md; 2026-07-18"}
-   {:pri "P3" :gap "mlx-lm DeepSeek-V2実装のMLA cache absorption有無の確認（クロスエコシステム検証）" :level "M5" :status "landed" :evidence "gftdcojp/cloud-murakumo docs/benchmarks/sqrt-kv-mac-mla-source-inspection.md; 2026-07-18"}]
+   {:pri "P3" :gap "mlx-lm DeepSeek-V2実装のMLA cache absorption有無の確認（クロスエコシステム検証）" :level "M5" :status "landed" :evidence "gftdcojp/cloud-murakumo docs/benchmarks/sqrt-kv-mac-mla-source-inspection.md; 2026-07-18"}
+   {:pri "P3" :gap "16GB/32GB Macで実際にこの手法が要る具体的モデルの特定（重みでなくKVがボトルネックになるモデル）" :level "M6" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_mac_model_suitability.py; docs/benchmarks/sqrt-kv-mac-model-suitability-summary.md; 実測: Qwen2.5-14B-Instruct-4bit(bpt=192KB/tok, native=32768, 16GBで72.6%到達)とGLM-4-9B-Chat-1M-6bit(bpt=80KB/tok, native=1048576, 16GBで6.1%/32GBで24.8%到達) — GLM-4-9B-Chat-1Mが決定的な適合例; 2026-07-18"}]
   :adr/non-goals
   ["sqrt-space-kvの理論的主張（Transformerがマルチテープチューリングマシンであるという主張）を検証すること — 論文自身が明示的に否定しており本ADRの範囲外"
    "既存のcloud-murakumo本番トラフィックを止めてこのADRの検証を強制すること — M2-M6はcloud-murakumo :kv-policy を本番デフォルト化する前の要件であり、現状の宣言のみの状態（intent expression）を即座に変更する必要はない"
