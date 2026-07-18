@@ -1,0 +1,111 @@
+[
+ {:db/id -1
+  :adr/id "2607189000"
+  :adr/title "git.kotobase.net: reclaim custom domain from stray concurrent-session Worker"
+  :adr/status "accepted"
+  :adr/decided "2026-07-18"
+  :adr/body "## Context
+
+ADR-2607177500 (2026-07-17) recorded an incident: `kotobase-protocols-worker`
+had `git.kotobase.net` as a Cloudflare custom-domain route, but a concurrent
+session's own Worker (Cloudflare service name `kotobase-git`) declared the
+same custom domain in its own `wrangler deploy` mid-session. Cloudflare
+custom domains are single-owner — the last `wrangler deploy` to declare a
+route silently wins, with no conflict surfaced to either side. That ADR
+chose NOT to force-reclaim it, citing this workspace's 並行エージェント運用
+guardrail against destructive interference with a concurrent session's
+in-progress work, and instead routed the git surface only through
+`kotobase-protocols-worker.*.workers.dev/git/*`, leaving the `git.` hostname
+contested and unresolved.
+
+Root owner asked (2026-07-18) whether `net-kotobase`/`kotoba-lang/kotobase`
+and `git.kotobase.net` were actually designed and working. Investigation
+found `kotobase.net` itself live and correct (HTTP 200, ADR-2607184000
+production evidence), but confirmed `git.kotobase.net` was still owned by
+the impostor `kotobase-git` Worker and served \"repository not found\" for
+the previously-seeded test repo — the incident from ADR-2607177500 had not
+been resolved in the ~21 hours since.
+
+## Decision
+
+Reclaim the `git.kotobase.net` custom domain for `kotobase-protocols-worker`,
+after first confirming it was safe to do so:
+
+- `wrangler deployments list --name kotobase-git` shows the same Cloudflare
+  account/OAuth identity (`04.feasts_minded@icloud.com`) as this workspace's
+  own sessions — not an external third party.
+- Zero deploys on `kotobase-git` since 2026-07-17T12:01:58Z (a ~2h43m burst
+  of 10 deploys that day, then nothing) — consistent with an abandoned or
+  completed experiment, not active in-progress work.
+- `kotobase-git` is registered nowhere in this superproject's
+  `manifest/repos.edn` or `manifest/west.yml` — not a tracked project, and
+  grepping `90-docs/adr` + `orgs/` for \"kotobase-git\" turns up only this
+  repo's own incident documentation.
+- Root owner explicitly directed the reclaim after being shown this
+  evidence.
+
+Re-added `{ \"pattern\": \"git.kotobase.net\", \"custom_domain\": true }` to
+`kotobase-protocols-worker`'s `wrangler.jsonc` routes and redeployed — the
+same last-deploy-wins mechanism that took the domain in the first place.
+
+## Verification
+
+- `npm run build` (shadow-cljs release worker) and full test suite green
+  before deploy: nbb pure-logic tests (12 tests/43 assertions) + node-test
+  real-crypto suite (20 tests/68 assertions, CACAO verify + datom-store
+  bridge), consistent with this workspace's rule to verify build/tests
+  before any production deploy.
+- Post-deploy, `wrangler deploy` output listed
+  `git.kotobase.net (custom domain)` as a trigger of
+  `kotobase-protocols-worker`.
+- `curl https://git.kotobase.net/kotoba-lang/kotobase-protocols/info/refs?service=git-upload-pack`
+  now returns the same git-protocol-aware `repository not found:
+  kotoba-lang/kotobase-protocols` response as the known-good
+  `https://kotobase-protocols-worker.<account>.workers.dev/git/...` path —
+  proving the domain now points at the correct Worker. (The \"repository not
+  found\" itself is expected and unrelated: the storage backend migrated to
+  a real content-addressed datom-plane per ADR-2607177500, and the earlier
+  test seed was not carried over — reseeding via `bin/seed_git.cljs` is a
+  separate, optional follow-up, not required to prove the routing fix.)
+
+## Consequences
+
+- (+) `git.kotobase.net` now serves the intended
+  `kotoba-lang/kotobase-protocols` git dumb-HTTP surface, closing the gap
+  ADR-2607177500 left open.
+- (+) `wrangler.jsonc` and `README.md` in `kotobase-protocols-worker` updated
+  to drop the now-stale \"contested, workers.dev only\" language.
+- (-) The `kotobase-git` Worker itself was not deleted (only the custom
+  domain route moved) — if it is in fact someone's abandoned experiment, its
+  Worker script still exists under that name, unrouted.
+- (-) No data was reseeded onto `git.kotobase.net` as part of this fix; the
+  previously-verified test clone (ADR-2607176000) is not currently
+  reproducible without a fresh `bin/seed_git.cljs` run.
+
+## Landing
+
+`kotoba-lang/kotobase-protocols-worker`: worktree `recover-git-kotobase-net-domain`
+branched from `main`, commit `ef19762`, server-side merge `660a5b3`
+(branch deleted after merge, per this workspace's worktree-per-task
+convention — no direct edits to the shared west checkout).
+
+`com-junkawasaki/root`: `manifest/west.yml` pin for
+`kotobase-protocols-worker` advanced `4f845f3`→`660a5b3` via GitHub API
+single-entry commit `445f6ac` (blob-SHA-guarded PUT against the actual
+GitHub tip, not the local checkout's stale base — the local checkout was
+found to be behind `origin/main` in an unrelated project's pin at commit
+time, confirming why the tip-fetch-and-patch method rather than a local
+regenerate-and-push was correct here), verified via
+`nbb scripts/gen-west-manifest.cljs --entry kotobase-protocols-worker`
+(fast-forward, server-side pin verification OK).
+
+## References
+
+- ADR-2607177500 (the original incident this resolves)
+- ADR-2607176000 (the original v0.2 git surface + e2e seed/clone verification)
+- ADR-2607174500 (kotobase-protocols-worker deploy shell design)
+- ADR-2607184000 (kotobase.net / net-kotobase live-deploy evidence, cited
+  when confirming kotobase.net itself was working before investigating
+  git.kotobase.net)
+- `orgs/kotoba-lang/kotobase-protocols-worker/wrangler.jsonc`,
+  `orgs/kotoba-lang/kotobase-protocols-worker/README.md`"}]
