@@ -1,0 +1,49 @@
+[{:db/id -1
+  :adr/id "adr-2607197400-kami-plugin-isolation-caption-spline"
+  :adr/title "KAMI bounds third-party audio processors and preserves TTML easing"
+  :adr/date "2026-07-19"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607197300-kami-hardware-profiles-ttml-animation"]
+  :adr/decision
+  {:daw
+   {:third-party-audio-worklet
+    {:package-format :bounded-json
+     :maximum-source-bytes 65536
+     :maximum-parameters 32
+     :project-authority [:package-id :package-version :processor :descriptor :source :parameters]
+     :render-paths [:live :offline]
+     :startup-handshake {:message-type "kami-ready" :deadline-ms 750}
+     :fault-policy :unity-dry-and-zero-wet
+     :execution-boundary :browser-audio-rendering-thread}}
+   :nle
+   {:continuous-animation
+    {:properties [:tts/opacity :tts/fontSize]
+     :interpolation [:linear :discrete :spline]
+     :spline :cubic-bezier
+     :ttml-authority [:calcMode :keySplines]
+     :bounds {:maximum-animations 16 :control-points [0.0 1.0]}
+     :consumers [:project-caption-style :frame-preview :production-capture :imsc-export]}}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates
+   {:shared ["persistent directory grants" "streaming package I/O above 512 MiB"]
+    :daw ["signed plugin distribution" "explicit plugin permission capabilities"
+          "formal vendor hardware certification" "surround/Atmos"]
+    :nle ["advanced multi-keyframe animation" "dictionary-grade morphological line breaking"
+          "translation memory" "OCIO/ICC/HDR" "MOV/MXF/IMF delivery"]}}
+  :adr/implementation
+  {:daw-commits ["97854ff"]
+   :nle-commits ["8710001"]
+   :pull-requests ["kotoba-lang/kami-app-daw#32" "kotoba-lang/kami-app-nle#32"]
+   :evidence
+   ["DAW passes 38 tests and 180 assertions; NLE passes 39 tests and 195 assertions."
+    "Both guarded optimized releases generated non-empty main.js artifacts."
+    "Chrome imported a third-party AudioWorklet package, persisted its exact source and manifest to EDN, and observed automatic unity-dry bypass after the processor failed to acknowledge startup."
+    "Chrome imported spline and discrete TTML animations, preserved interpolation in EDN and editorial summaries, and re-exported calcMode and canonical keySplines."
+    "All six browser assertions passed with zero console errors; Chrome closed in finally and both local servers were stopped."]}
+  :adr/consequences
+  ["External audio processors now have a bounded reproducible package contract and cannot leave a fully-wet master silent after a reported or startup-detected fault."
+   "Linear, discrete and single-interval cubic Bézier caption timing survive ingest, persistence, preview, production capture and IMSC delivery."
+   "Code signing, explicit plugin permissions, advanced multi-keyframe animation and formal certification remain explicit commercial gates."]
+  :adr/source-format "edn"}]
