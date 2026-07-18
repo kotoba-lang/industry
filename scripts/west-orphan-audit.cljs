@@ -26,9 +26,8 @@
 ;; exit 0: blocking なし
 ;; exit 1: :local-root-broken が1件以上（登録漏れが consumer を壊している）
 
-(require '[scripts.nbb-compat :refer [slurp]]
+(require '[scripts.nbb-compat :refer [slurp sh]]
          '[clojure.string :as str]
-         '[clojure.java.shell :refer [sh]]
          '[clojure.edn :as edn])
 
 (def node-fs (js/require "node:fs"))
