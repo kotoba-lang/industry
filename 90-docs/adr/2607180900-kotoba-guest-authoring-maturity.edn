@@ -35,12 +35,12 @@
     :deliverables ["string literal → str-ptr/str-len lowering" "do / multi-body when desugar" "unsupported-op diagnostics"]}
    {:level "L3" :name "capability-values-and-packages" :status "landed"
     :deliverables ["S4b/F-003 cap values" "F-001 package admission complete" "CID guest packages + component-cid"]}
-   {:level "L4" :name "typed-hir" :status "open"
-    :deliverables ["Option/Result/no-nil (S1b)" "import arity/type at compile"]}
+   {:level "L4" :name "typed-hir" :status "landed"
+    :deliverables ["Option/Result/no-nil (S1b)" "import arity/type at compile" "typed-hir-module"]}
    {:level "L5" :name "cross-host-conformance" :status "landed"
     :deliverables ["JVM/Node/browser same fixtures" "missing host = capability absence" "guard-host-import"]}
-   {:level "L6" :name "signed-modules" :status "open"
-    :deliverables ["S5 signed module" "F-007 release evidence"]}]
+   {:level "L6" :name "signed-modules" :status "landed"
+    :deliverables ["S5 signed module" "F-007 release evidence gate"]}]
   :adr/non-goals
   ["bulk rename of monorepo .cljc to .kotoba"
    "eval require import set! atom macros interop in guest"
@@ -49,7 +49,7 @@
   :adr/body
   "# ADR-2607180900: .kotoba guest authoring maturity
 
-**Status**: accepted (L1–L3 + L5 landed 2026-07-18; L4/L6 open)
+**Status**: accepted (L1–L6 landed 2026-07-18)
 **Date**: 2026-07-18
 **Deciders**: Jun Kawasaki
 
@@ -128,6 +128,27 @@ rewriting hosts, UI, or nbb scripts into `.kotoba`.
 | P2 | Selfhost analyzer authority shift | L1–L4 |
 | P3 | Signed modules S5 / F-007 | L6 |
 | avoid | eval/require/atom/macros/interop | — |
+
+## Implementation notes (2026-07-18 L4 + L6)
+
+**L4 landed (typed HIR / S1b)**
+- `type-system`: `[:option T]` type; bare `:nil` public returns rejected
+  (`:type/no-nil-return`); prefer `[:option T]` / `[:result Ok Err]`
+- `typed-hir-module` collects portable `:typed-defn` entries
+- `validate-host-import-calls` + runtime surface-arity catalog (opt-in
+  `:kotoba.policy/check-import-arity` / `:typed-hir`; WASM ABI params are not
+  source arities)
+- `require-signatures` when `:kotoba.policy/typed-hir` or
+  `:kotoba.policy/require-signatures`
+- type-conformance fixtures: option_result_signature, bare_nil_return
+
+**L6 landed (signed modules / F-007)**
+- `kotoba.signed-module`: Ed25519 sign/verify of guest component bytes
+  (`:kotoba.signed-module/v1`); content CID+SHA256 binding; trust/revocation
+- `kotoba.release-evidence`: F-007 safe-release gate requires package receipt
+  + signed module + trust + key-register; SBOM/provenance required unless
+  exception-register entry has `:owner` and unexpired `:expires`
+- tests: `guest_maturity_l4_l6_test`
 
 ## Implementation notes (2026-07-18 L3 + L5)
 
