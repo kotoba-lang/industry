@@ -128,7 +128,7 @@
    {:pri "P0" :gap ":sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装（cloud-murakumo、Apple Siliconターゲットではmmapベース）+ vLLM/SGLangとの正式A/B比較" :level "M6" :status "open"}
    {:pri "P1" :gap "kvpress比較のLongBench/RULERスケール拡大（現状n=3/条件のneedle-in-haystackのみ）" :level "M4" :status "open"}
    {:pri "P1" :gap "mmap partial-touch時の~2倍オーバーヘッドの原因切り分け（np.array(mm[:n])のコピーが疑わしい）+ より大きなモデル/より長い文脈での実容量アンロック実証（現状このMacの空きディスク制約で未達成）" :level "M6" :status "open"}
-   {:pri "P1" :gap "Williams STOC 2025への理論的系譜主張をチェックポインティング文献ベースに弱める（paper/sqrt_space_kv.tex改訂）— 2026-07-18 owner確認: arXiv投稿（draft 7807366）はモデレーションでON HOLD中（提出から8日、通常の処理待ちより長い）。具体的な保留理由は未取得だが、本ADR自身が指摘したWilliams系譜の誇張的フレーミングが要因である可能性があり、P2からP1に格上げ" :level "-" :status "open"}
+   {:pri "P1" :gap "Williams STOC 2025への理論的系譜主張をチェックポインティング文献ベースに弱める（paper/sqrt_space_kv.tex改訂）" :level "-" :status "landed" :evidence "com-junkawasaki/sqrt-space-kv commit 832f0b6（Williamsを『stride式のinspiration』のみに後退、Griewank-Walther 2000/Chen et al. 2016を主系譜に、M2-M6の実測知見を本文に追加、tectonicで再ビルド）。kotoba-lang/arxiv commit ccd0ba3（保留中のarXiv投稿source/abstract/PDFを改訂版で準備——ただし実際の再投稿はarxiv.org/userへの人間ログインが必要でまだ未実施）。HFデータセットcom-junkawasaki/sqrt-space-kv-paperにも改訂版を公開済み。2026-07-18"}
    {:pri "P2" :gap "Qwen3.6-35B-A3Bの88.5%からhybrid attention由来分とsqrt-space-kv固有分を切り分けるアブレーション" :level "-" :status "open"}
    {:pri "P3" :gap "kvpressハーネスでの競合手法比較（H2O/SnapKV/InfLLM/NEO）" :level "M4" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/modal_sqrt_kv_kvpress_bench.py; docs/benchmarks/sqrt-kv-kvpress-summary.md; 2026-07-18"}
    {:pri "P3" :gap "ホストページングありの実デコードスループット/レイテンシ測定" :level "M2" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/modal_sqrt_kv_throughput_bench.py + scripts/modal_sqrt_kv_paged_cache_bench.py; 2026-07-18"}
