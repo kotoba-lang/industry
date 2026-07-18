@@ -8,7 +8,6 @@
   :adr/date "2026-07-18"
   :adr/last-verified "2026-07-18"
   :adr/last_verified "2026-07-18"
-  :adr/last_verified "2026-07-18"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "kotoba-guest-authoring-maturity"
@@ -17,17 +16,29 @@
    "shared guest-grammar.edn as the sole form catalog for sugar/forbidden/limits (kotoba-lang)"
    "rule: expressiveness grows only via desugar or capability kits, never ambient Clojure"
    "relationship to dual-compiler diagnosis ADR-2607141600 and fleet .cljc classification ADR-2607171700"
+   "package-registry name@version resolve (post-ladder follow-up)"
    "P0–P3 gap backlog for safe authoring maturity"]
   :adr/related
   ["adr-2607141600-kotoba-kotoba-lang-compiler-kototama-aiueos-consolidation-experiment"
    "adr-2607171700-repo-wide-cljc-to-kotoba-source-migration"
    "adr-2607062330-kototama-tender-chicory-execution-runtime"
    "orgs/kotoba-lang/kotoba-lang/lang/guest-grammar.edn"
+   "orgs/kotoba-lang/kotoba-lang/lang/package-registry/"
    "orgs/kotoba-lang/kotoba"
    "orgs/kotoba-lang/compiler"
    "orgs/kotoba-lang/kototama"]
   :adr/supersedes []
   :adr/superseded-by []
+  :adr/session-close
+  {:date "2026-07-18"
+   :ladder "L1–L6 landed"
+   :follow-ups-landed ["package-registry m5 first slice" "kotoba#281 rad package-lock closed"]
+   :open-follow-ups ["selfhost analyzer authority shift" "network package registry backend"]
+   :evidence
+   {:kotoba-lang "9dc47434fa21d3c5eb05c3f0f683002f8d840602"
+    :kotoba "c9d61ab64dba7e44aea1e3396184f18e1d90a866"
+    :issues-closed ["kotoba-lang/kotoba#281" "kotoba-lang/kotoba#262 (F-001)"
+                    "kotoba-lang/kotoba#263 (F-003)" "kotoba-lang/kotoba#265 (F-007)"]}}
   :adr/maturity-ladder
   [{:level "L1" :name "single-safe-path" :status "landed"
     :deliverables ["guest-grammar.edn catalog" "desugar-only sugar policy" "safe-default path docs"]}
@@ -49,7 +60,7 @@
   :adr/body
   "# ADR-2607180900: .kotoba guest authoring maturity
 
-**Status**: accepted (L1–L6 landed 2026-07-18)
+**Status**: accepted (L1–L6 landed; package-registry follow-up landed; session closed 2026-07-18)
 **Date**: 2026-07-18
 **Deciders**: Jun Kawasaki
 
@@ -114,20 +125,35 @@ ADR-2607171700 remains the classification ADR. Guest authoring maturity
 **feeds** that migration with a real compile surface; it does **not** require
 rewriting hosts, UI, or nbb scripts into `.kotoba`.
 
-### 6. Gap backlog (P0–P3)
+### 6. Gap backlog (P0–P3) — session close
 
-| Pri | Gap | Level |
-|---|---|---|
-| P0 | Dual grammar / dual emit | L1 |
-| P0 | Package admission residual (F-001) | L3 |
-| P1 | Cap values S4b / F-003 | L3 |
-| P1 | String/do sugar + diagnostics | L2 |
-| P1 | Host parity matrix as conformance | L5 |
-| P2 | Typed HIR S1b | L4 |
-| P2 | CID guest packages (not require) | L3 |
-| P2 | Selfhost analyzer authority shift | L1–L4 |
-| P3 | Signed modules S5 / F-007 | L6 |
-| avoid | eval/require/atom/macros/interop | — |
+| Pri | Gap | Level | Status |
+|---|---|---|---|
+| P0 | Dual grammar / dual emit | L1 | **landed** (guest-grammar catalog + consumers) |
+| P0 | Package admission residual (F-001) | L3 | **landed** (#262 closed; rad #281 closed) |
+| P1 | Cap values S4b / F-003 | L3 | **landed** (#263 closed; forbid-wildcard) |
+| P1 | String/do sugar + diagnostics | L2 | **landed** |
+| P1 | Host parity matrix as conformance | L5 | **landed** |
+| P2 | Typed HIR S1b | L4 | **landed** |
+| P2 | CID guest packages (not require) | L3 | **landed** (component-cid + guest-package) |
+| P2 | Package registry (name@version resolve) | post-L | **landed** (I/O-free m5 first slice) |
+| P2 | Selfhost analyzer authority shift | L1–L4 | **open** |
+| P3 | Signed modules S5 / F-007 | L6 | **landed** (#265 closed) |
+| P3 | Network package registry backend | post-L | **open** |
+| avoid | eval/require/atom/macros/interop | — | still forbidden |
+
+### 7. Session close evidence (2026-07-18)
+
+Child repos on default branch:
+
+- `kotoba-lang/kotoba-lang` @ `9dc47434fa21` — grammar, type-system L4, host-parity L5, package-registry
+- `kotoba-lang/kotoba` @ `c9d61ab64dba` — admission, signed-module, release-evidence, registry wire, rad lock scaffold
+- Issues closed with implementation evidence: #262 F-001, #263 F-003, #265 F-007, #281 rad lock
+
+Remaining deliberate open work (not blocking ladder close):
+
+1. selfhost analyzer authority shift (bootstrap seed → Kotoba analyzer as SSoT)
+2. network/IPFS package registry backend (local EDN registry is the kernel)
 
 ## Implementation notes (2026-07-18 package registry follow-up)
 
@@ -202,12 +228,16 @@ Landed in the same change set as this ADR:
 4. `compiler` frontend: `do` desugar + multi-body `when` via nested `let`
 5. Regression tests + demo program for the new sugar
 
-Follow-ups: wire both emitters to refuse forms not in the catalog under an
-explicit `:strict-grammar` flag; advance L3 package/cap-value work.
+Follow-ups (historical, now closed for L1–L6): strict-grammar opt-in landed;
+L3–L6 and package-registry first slice landed. See §7 session close.
 
 ## Consequences
 
 - Authors get safer ergonomics without ambient power.
 - Grammar drift becomes a catalog diff, not tribal knowledge.
 - Fleet migration (2607171700) can point at real L2+ surface for guest cells.
+- L1–L6 ladder is **closed for this session**: expressiveness grew only via
+  desugar, capability kits, typed contracts, and supply-chain pins — never
+  ambient Clojure. Remaining work is selfhost analyzer authority and network
+  registry backends, not ladder levels.
 "}]
