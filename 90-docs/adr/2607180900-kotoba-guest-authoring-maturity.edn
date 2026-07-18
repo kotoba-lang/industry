@@ -129,6 +129,17 @@ rewriting hosts, UI, or nbb scripts into `.kotoba`.
 | P3 | Signed modules S5 / F-007 | L6 |
 | avoid | eval/require/atom/macros/interop | — |
 
+## Implementation notes (2026-07-18 package registry follow-up)
+
+**Package registry (m5 first slice)**
+- `kotoba.lang.package-registry`: I/O-free name@version → registry record →
+  full lock dep (CID pins + signers + capabilities); `lock-from-requests`
+  fail-closed
+- `package-admission/resolve-lock-with-registry` admits the resolved lock
+- Version-only deps still fail direct admission (registry is the only safe
+  path to fill pins)
+- F-001 rad scaffolding confirmed landed; kotoba#281 closed with evidence
+
 ## Implementation notes (2026-07-18 L4 + L6)
 
 **L4 landed (typed HIR / S1b)**
