@@ -1,23 +1,23 @@
 {:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 163171},
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 164258},
  :zone
- {:requests-7d 69886,
-  :pageviews-7d 639,
-  :uniques-7d-sum 638,
+ {:requests-7d 70423,
+  :pageviews-7d 641,
+  :uniques-7d-sum 643,
   :zone "murakumo.cloud"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/infer/hwmetrics", :requests 8216}
-   {:path "/robots.txt", :requests 30}
+  [{:path "/infer/hwmetrics", :requests 8217}
+   {:path "/robots.txt", :requests 26}
    {:path "/infer/cost", :requests 24}
    {:path "/v1/chat/completions", :requests 16}
-   {:path "/js/main.js", :requests 12}
-   {:path "/health/fabric.json", :requests 6}
-   {:path "/cdn-cgi/rum", :requests 5}
-   {:path "/murakumo.edn", :requests 3}],
-  :status-mix {:client-error 2119, :ok 8328},
+   {:path "/js/main.js", :requests 9}
+   {:path "/cdn-cgi/rum", :requests 3}
+   {:path "/health/fabric.json", :requests 2}
+   {:path "/murakumo.edn", :requests 2}],
+  :status-mix {:client-error 2188, :ok 8310},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -29,9 +29,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-18",
- :traffic-quality {:window "24h", :probe-4xx-pct 20, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 21, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8216 · /robots.txt 30 · /infer/cost 24 · /v1/chat/completions 16 · /js/main.js 12 | 4xx(probe) 20%",
+ "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8217 · /robots.txt 26 · /infer/cost 24 · /v1/chat/completions 16 · /js/main.js 9 | 4xx(probe) 21%",
  :cost
  {:fleet-yen-per-mtok 21.513565042263092,
   :spot-yen-per-mtok 40.55,
@@ -45,4 +45,4 @@
    :throughput-tok-s 2000,
    :fx-yen-per-usd 162.2}},
  :signal
- "murakumo.cloud 実測 69886 req/7d・638 uniques(日次和)・うち4xx probe 20%(24h)、workers 163171 inv/7d、Stripe active subs 0"}
+ "murakumo.cloud 実測 70423 req/7d・643 uniques(日次和)・うち4xx probe 21%(24h)、workers 164258 inv/7d、Stripe active subs 0"}

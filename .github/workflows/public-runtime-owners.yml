@@ -1,0 +1,27 @@
+name: public runtime owners
+
+on:
+  pull_request:
+    paths:
+      - "manifest/public-runtime-owners.json"
+      - "orgs/**/wrangler.jsonc"
+      - "orgs/**/wrangler.json"
+      - "orgs/**/wrangler.toml"
+      - "scripts/verify-public-runtime-owners.mjs"
+  push:
+    paths:
+      - "manifest/public-runtime-owners.json"
+      - "orgs/**/wrangler.jsonc"
+      - "orgs/**/wrangler.json"
+      - "orgs/**/wrangler.toml"
+      - "scripts/verify-public-runtime-owners.mjs"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/verify-public-runtime-owners.mjs
