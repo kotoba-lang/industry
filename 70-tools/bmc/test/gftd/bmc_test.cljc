@@ -7,7 +7,9 @@
             [gftd.react :as react]
             [gftd.gate :as gate]
             [gftd.funnel :as funnel]
-            [gftd.score :as score]))
+            [gftd.score :as score]
+            [gftd.murakumo :as murakumo]
+            [gftd.kotobase :as kbase]))
 
 (def base
   [{:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
@@ -248,6 +250,47 @@
   (testing "every registry cli-key renders without throwing, using its own desc"
     (doseq [[cli-key {:keys [desc]}] cli/registry]
       (is (str/includes? (cli/help-text cli-key nil) desc)))))
+
+(deftest murakumo-complete-from-http
+  (testing "extracts OpenAI content; empty content falls back to reasoning"
+    (is (= "[{:x 1}]"
+           (murakumo/extract-content
+            {"choices" [{"message" {"content" "[{:x 1}]"}}]})))
+    (is (= "fallback"
+           (murakumo/extract-content
+            {"choices" [{"message" {"content" "" "reasoning_content" "fallback"}}]}))))
+  (testing "make-complete is fail-soft on HTTP errors"
+    (let [complete (murakumo/make-complete (fn [_] {:status 500 :body "nope"}) {})]
+      (is (nil? (complete "hi")))))
+  (testing "make-complete returns content on 200"
+    (let [body "{\"choices\":[{\"message\":{\"content\":\"[{:ok true}]\"}}]}"
+          complete (murakumo/make-complete (fn [_] {:status 200 :body body}) {})]
+      (is (= "[{:ok true}]" (complete "hi"))))))
+
+(deftest kotobase-event-projection
+  (let [evs [{:event/seq 42 :event/type :canvas/add-item :event/actor "advisor:auto"
+              :event/at "t" :canvas/id :cloud-itonami.problem :event/value "v"
+              :event/reason "r"}]
+        tx (kbase/events->tx-data evs)]
+    (is (= 1 (count tx)))
+    (is (= "bmc.event/42" (:db/id (first tx))))
+    (is (= ":cloud-itonami.problem" (:bmc.event/canvas-id (first tx))))
+    (is (str/includes? (kbase/events->tx-edn evs) "bmc.event/42")))
+  (testing "enabled? respects env and flags"
+    (is (true? (kbase/enabled? (constantly nil) {})))
+    (is (false? (kbase/enabled? (constantly "0") {})))
+    (is (false? (kbase/enabled? (constantly nil) {:no-kotobase true})))))
+
+(deftest compose-advisors-concat
+  (let [a (fn [_] [{:proposal/action :canvas/add-item :event/value "a"}])
+        b (fn [_] [{:proposal/action :canvas/add-item :event/value "b"}])
+        c (react/compose-advisors a b)]
+    (is (= ["a" "b"] (mapv :event/value (c {}))))))
+
+(deftest advisor-mode-resolution
+  (is (= "auto" (cli/advisor-mode {} (constantly nil))))
+  (is (= "gate" (cli/advisor-mode {:advisor "gate"} (constantly "auto"))))
+  (is (= "murakumo" (cli/advisor-mode {} (constantly "murakumo")))))
 
 (deftest cli-command-help-covers-every-documented-command
   ;; command-help は ns docstring の一覧と対応させる運用なので、両者がズレたら

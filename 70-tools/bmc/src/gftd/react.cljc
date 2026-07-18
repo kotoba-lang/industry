@@ -106,8 +106,14 @@
           out (try (complete prompt) (catch #?(:clj Exception :cljs :default) _ nil))]
       (try
         (let [v (#?(:clj clojure.edn/read-string :cljs cljs.reader/read-string) (str out))]
-          (if (vector? v) (filter map? v) []))
+          (if (vector? v) (vec (filter map? v)) []))
         (catch #?(:clj Exception :cljs :default) _ [])))))
+
+(defn compose-advisors
+  "Concatenate proposals from multiple advisors (gate then LLM, etc.)."
+  [& advisors]
+  (fn [obs]
+    (into [] (mapcat (fn [a] (or (a obs) [])) advisors))))
 
 ;; ---- act (governor — 検閲) ------------------------------------------------------
 

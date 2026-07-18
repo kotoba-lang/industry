@@ -1,0 +1,65 @@
+[{:db/id -1
+  :adr/source-format "edn"
+  :adr/id "adr-2607180400-bmc-murakumo-llm-kotobase-dual-write"
+  :adr/doc_type "adr"
+  :adr/status "accepted"
+  :adr/date "2026-07-18"
+  :adr/title "BMC business ReAct loop: murakumo LLM advisor + kotobase dual-write"
+  :adr/topic "portfolio-bmc-murakumo-kotobase-runtime"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/last_verified "2026-07-18"
+  :adr/related ["adr-2607021600" "adr-2607021700" "adr-2607021800" "adr-2607022100"
+                "adr-2607151900" "adr-2607124500"]
+  :adr/authoritative_for
+  ["70-tools/bmc react default advisor = gate-aware + cloud-murakumo chat/completions (auto)"
+   "canvas-ledger.edn remains local SSoT; every append best-effort dual-writes entity maps to kotobase db portfolio-bmc-ledger"
+   "CLI flags --advisor auto|gate|murakumo and --no-kotobase / BMC_KOTOBASE_DUAL_WRITE / BMC_ADVISOR"]
+  :adr/body
+  "# ADR-2607180400: BMC loop closes murakumo inference + kotobase dual-write
+
+**Status**: accepted
+**Date**: 2026-07-18
+
+## Context
+
+Portfolio BMC ReAct (`70-tools/bmc`) was already driving canvas growth for
+cloud-itonami / cloud-murakumo / net-kotobase as *subjects*, but the runtime
+was not the three-layer stack:
+
+- think = deterministic `advisor:gate` only (no murakumo LLM)
+- persist = git file `canvas-ledger.edn` only (no kotobase)
+
+Owner asked whether the loop was `itonami-defined × murakumo inference ×
+kotobase storage`. Answer was no; this ADR lands the missing two edges.
+
+## Decision
+
+1. **Default advisor mode `auto`**: compose `gate-aware-advisor` with
+   `llm-advisor` whose `complete` POSTs to
+   `https://api.murakumo.cloud/v1/chat/completions` (model
+   `qwen3.6-35b-a3b`, `chat_template_kwargs.enable_thinking=false`). LLM
+   failure/empty content → gate-only proposals (fail-soft). `--advisor gate`
+   keeps the old path; actor names `advisor:auto` / `advisor:murakumo` /
+   `advisor:gate` stamp ledger provenance.
+
+2. **Dual-write after every local ledger append**: git ledger remains SSoT for
+   fold/score. Stamped events are projected as entity maps
+   (`:db/id \"bmc.event/<seq>\"` + `:bmc.event/*` attrs) and transacted into
+   kotobase db `portfolio-bmc-ledger` via
+   `70-tools/bmc/bin/kotobase-dual-write.cljs` (kotobase-client CACAO apex
+   profile). Identity seed: `70-tools/bmc/.bmc-kotobase-identity.hex`
+   (gitignored). Fail-open: remote failure never blocks local append.
+   Disable with `--no-kotobase` or `BMC_KOTOBASE_DUAL_WRITE=0`.
+
+3. **Modules**: `gftd.murakumo`, `gftd.kotobase`, CLI `persist-events!` /
+   `resolve-advisor` (nbb primary; JVM Bearer path if `KOTOBASE_TOKEN`).
+
+## Consequences
+
+- Live react ticks can use fleet inference and leave an auditable graph on
+  kotobase without abandoning git as the portfolio fold SSoT.
+- First dual-write mints a new operator DID graph; back up the identity hex.
+- Routines (`itonami-react-growth-hourly` / `bmc-business-operate-daily`)
+  inherit `auto` + dual-write on next deploy of this superproject path;
+  set `BMC_ADVISOR=gate` if a host cannot reach murakumo.
+"}]
