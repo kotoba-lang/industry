@@ -1,0 +1,50 @@
+[{:db/id -1
+  :adr/id "adr-2607195700-kami-plugin-automation-caption-localization"
+  :adr/title "KAMI automates plugin parameters and localizes caption delivery"
+  :adr/date "2026-07-19"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607195600-kami-plugin-manifest-styled-captions"]
+  :adr/decision
+  {:daw {:plugin-authority :project/plugins
+         :automation-authority :plugin/automation
+         :automation-point-fields [:automation/tick :automation/value]
+         :timebase :project-musical-ticks
+         :interpolation :linear-ramp
+         :bounds-authority :kami.app-daw.core/plugin-types
+         :render-consumers [:realtime-playback :master-wav :normalized-master-wav :track-stems :stem-bundle]}
+   :nle {:caption-authority :project/captions
+         :caption-language-authority :caption/language
+         :delivery-language-authority :project/caption-language
+         :language-syntax :bcp47-subset
+         :legacy-caption-language "en"
+         :render-filter :active-language-only
+         :delivery-filename "kami-nle-captions-{language}.vtt"
+         :render-consumers [:decoded-preview-canvas :production-capture :webvtt-sidecar]}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates
+   {:shared ["persistent directory grants" "streaming package I/O above 512 MiB"]
+    :daw ["third-party plugin discovery/SDK, signed distribution and processor isolation" "sample-accurate gesture recording and curve editors" "surround/Atmos"]
+    :nle ["translation memory and review workflow" "TTML/IMSC" "OCIO/ICC/HDR" "MOV/MXF/IMF" "hardware encoder control"]}}
+  :adr/implementation
+  {:daw-commits ["9e55a941d128cdd458c072f08ce7e9d7cf49a43f"]
+   :nle-commits ["5cb07f59f0c6928427e4668672a2812d2daea33e"]
+   :pull-requests ["kotoba-lang/kami-app-daw#14" "kotoba-lang/kami-app-nle#14"]
+   :evidence
+   ["DAW passes 22 tests and 85 assertions; NLE passes 23 tests and 101 assertions."
+    "Both guarded shadow-cljs production releases completed with zero compiler warnings."
+    "Instrumented Chrome observed compressor threshold base -18 dB, then linear ramps to -30 dB at 0.05 seconds and -10 dB at 4.05 seconds in realtime and each of three offline stem graphs."
+    "The aligned automated stem package contained project.edn, stems.edn and three 882044-byte WAV files."
+    "Chrome switched the active caption language to ja and painted only こんにちは; the English Hello cue was excluded from preview and production capture."
+    "The downloaded sidecar was named kami-nle-captions-ja.vtt and contained only the Japanese two-second cue."
+    "External ffprobe identified the localized production artifact as 320x180 VP8 plus 48 kHz two-channel Opus."
+    "Automated Chrome and both local servers were closed after verification."
+    "Both application PRs were reviewed and merged."
+    "The prescribed freshness and ledger verifier scripts are absent from this root revision; direct EDN assertions verify accepted status, supersedes and both current authorities."]}
+  :adr/consequences
+  ["Plugin automation is persistent musical data rather than transient UI state and follows the same graph into offline delivery."
+   "Caption languages coexist in one project while preview, burn-in and WebVTT delivery select exactly one language."
+   "Legacy captions without language remain English-compatible."
+   "Automation curve editing and full localization workflow remain visible commercial-product gaps."]
+  :adr/source-format "edn"}]
