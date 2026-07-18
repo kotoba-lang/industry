@@ -11,6 +11,13 @@
   :adr/last-verified "2026-07-18"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
+  :adr/impact-summary
+  ["headline: GLM-4-9B-Chat-1M（native 1,048,576トークン）は16GB Macで素朴実装だとnative contextの6.1%しか使えない。√S residency + mmap pagingで常駐セットは常にO(√S)（数十MB）——実測で容量アンロックを確認（重みは実測7.73GB、bptは実測80KB/token、いずれも推定でなく実測）"
+   "正しさ: M3で実装した本物のCache subclassを実generate()ループに組み込み、生成トークン列がbaseline（標準DynamicCache）と完全一致（exact_token_match=true）——単一テンソルのΔチェックでなくフルスケール・多層・多ステップで証明"
+   "コスト: 2.2〜3.7倍のデコード減速（Modal A100、孤立転送測定と実融合generate測定の2つの独立手法でクロスバリデーション済み）——これは『欠陥』でなく『容量拡張の対価』（オーナーによるvalue proposition reframing）"
+   "競合との比較: sqrt-space-kv自身の圧縮率レンジ（~90%）でNVIDIA kvpressのStreamingLLM/Knorm/SnapKVはneedle検索精度0%。sqrt-space-kvは構成上exactだが上記のレイテンシ税を払う——定量化された実トレードオフ"
+   "Apple Silicon固有の発見: unified memoryでは素朴なCPU退避/write+delはRAMを解放しない（実測でRSSはむしろ増加）。np.memmapだけが実際に効く（6.3GBの非常駐データでRSS変化+0.1MB）——理論的脚注でなく:sqrt-plus-pageの具体的な実装要件"
+   "正直な残課題: 真にMLA圧縮されたcache（vLLM/SGLang限定、CUDA限定でMacでは検証不能）との合成、本番`:sqrt-checkpoint`カーネル実装は未達成——誇張せず明記"]
   :adr/authoritative-for
   ["sqrt-space-kv（com-junkawasaki）を対外発信・productionize する前の成熟度基準"
    "√S KVキャッシュ常駐ポリシーとMLA（Multi-head Latent Attention）の構成可能性の位置づけ"
@@ -161,6 +168,26 @@ quantization系のKIVI/GEAR/TurboQuant、depth-share系のMiniCache、そして�
 FlexiCache/KVPR）と突き合わせると、比較対象・評価指標の両面で成熟度が低い。
 本ADRはその評価結果と、次に何を測ればこの研究を『検証済み』と呼べるようになるかの
 ロードマップを記録する。
+
+## Impact summary（要点、詳細な弱点分析より先に読むもの）
+
+- **容量アンロックを実測で確認**: GLM-4-9B-Chat-1M（native 1,048,576トークン）は
+  素朴実装だと16GB Macでnative contextの**6.1%**しか使えない（重み7.73GB・
+  bpt=80KB/tokenいずれも実測）。√S residency + mmap pagingなら常駐セットは
+  常にO(√S)（数十MB）——容量が実際に拡張できることを実測で証明した。
+- **正しさをフルスケールで証明**: 実装したCache subclassを実generate()ループに
+  組み込み、生成トークン列がbaselineと完全一致（単一テンソルのΔチェックでなく）。
+- **コストは正直に2.2〜3.7倍**（Modal A100、独立した2手法でクロスバリデーション
+  済み）——『欠陥』でなく『容量拡張の対価』と読む（オーナーのvalue proposition
+  reframing）。
+- **競合（kvpress: StreamingLLM/Knorm/SnapKV）はsqrt-space-kv自身の圧縮率
+  レンジでneedle検索精度0%**——sqrt-space-kvはexactだが上記のレイテンシ税を払う、
+  という定量化されたトレードオフが得られた。
+- **Apple Silicon固有の実装要件を発見**: unified memoryでは素朴なwrite+delは
+  RAMを解放しない（RSSはむしろ増加）。np.memmapだけが実際に効く（6.3GBの
+  非常駐データでRSS変化ほぼゼロ）——`:sqrt-plus-page`の具体的な実装要件。
+- **残課題は誇張せず明記**: 真にMLA圧縮されたcacheとの合成（CUDA限定）、
+  本番カーネル実装は未達成。
 
 ## 主要な弱点（詳細）
 
