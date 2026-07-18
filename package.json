@@ -4,7 +4,11 @@
     "nbb": "1.4.208"
   },
   "scripts": {
-    "nbb": "nbb"
+    "nbb": "nbb",
+    "fabric:health": "nbb scripts/artificial-organism-health.cljs",
+    "fabric:health:live": "nbb scripts/artificial-organism-health.cljs live strict",
+    "fabric:wasm:verify": "node scripts/verify-fabric-wasm.mjs",
+    "fabric:fleet:witness": "node scripts/collect-fleet-witness.mjs"
   },
   "dependencies": {
     "datascript": "^1.7.8"
