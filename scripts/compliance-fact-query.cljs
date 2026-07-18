@@ -834,7 +834,10 @@
     :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-hnd-cohep/data/datascript-tx.edn"}
    {:label "cloud-itonami-assoc-9411-deu-bdi association.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-deu-bdi/schema/association-rule.edn"
-    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-deu-bdi/data/datascript-tx.edn"}])
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-deu-bdi/data/datascript-tx.edn"}
+   {:label "cloud-itonami-assoc-9411-fra-medef association.facts"
+    :schema "orgs/cloud-itonami/cloud-itonami-assoc-9411-fra-medef/schema/association-rule.edn"
+    :data "orgs/cloud-itonami/cloud-itonami-assoc-9411-fra-medef/data/datascript-tx.edn"}])
 
 ;; ---------- keyword → 裸文字列変換（labor-liberation-sd.cljs と同一方針） ----------
 
