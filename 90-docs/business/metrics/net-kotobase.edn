@@ -1,17 +1,16 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 4722, "kotobase-cf-wasm-staging" 285},
+ {"net-kotobase" 4759, "kotobase-cf-wasm-staging" 285},
  :zone
- {:requests-7d 7724,
-  :pageviews-7d 509,
-  :uniques-7d-sum 695,
+ {:requests-7d 8035,
+  :pageviews-7d 520,
+  :uniques-7d-sum 702,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/kotobase.git.object.put", :requests 164}
-   {:path "/xrpc/net.kotobase.store.get", :requests 93}
+  [{:path "/xrpc/net.kotobase.store.get", :requests 93}
    {:path "/xrpc/kotobase.git.ref.set", :requests 34}
    {:path "/xrpc/kotobase.git.ref.get", :requests 26}
    {:path
@@ -25,8 +24,11 @@
     :requests 13}
    {:path
     "/kotobase-cf-wasm-production/blocks/bafyreibq7zbruf4ug4sy43fao2wcxti67f2p6ehu5yteil74xyk76xdemy/bafyreiac6vkrcqwbaaworvrkqtn5lu4briehfo5lri5ynnwjaz5dltnohu",
+    :requests 13}
+   {:path
+    "/kotobase-cf-wasm-production/blocks/bafyreibq7zbruf4ug4sy43fao2wcxti67f2p6ehu5yteil74xyk76xdemy/bafyreibwyarqbc6i3u4h4im7aa2lnu5lhe6hlpxalam3wuersrpunxb7bu",
     :requests 13}],
-  :status-mix {:client-error 2412, :ok 890, :server-error 3},
+  :status-mix {:client-error 2239, :ok 646, :server-error 2},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -38,9 +40,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-18",
- :traffic-quality {:window "24h", :probe-4xx-pct 73, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 78, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/kotobase.git.object.put 164 · /xrpc/net.kotobase.store.get 93 · /xrpc/kotobase.git.ref.set 34 · /xrpc/kotobase.git.ref.get 26 · /kotobase-cf-wasm-production/ipns/bafyre… 15 | 4xx(probe) 73% · 5xx 0%",
- :funnel {:visitors 816, :signups 0, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /xrpc/net.kotobase.store.get 93 · /xrpc/kotobase.git.ref.set 34 · /xrpc/kotobase.git.ref.get 26 · /kotobase-cf-wasm-production/ipns/bafyre… 15 · /kotobase-cf-wasm-production/ipns/bafyre… 14 | 4xx(probe) 78% · 5xx 0%",
+ :funnel {:visitors 825, :signups 0, :checkouts 0},
  :signal
- "kotobase.net 実測 7724 req/7d・695 uniques(日次和)・うち4xx probe 73%(24h)、workers 5007 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 8035 req/7d・702 uniques(日次和)・うち4xx probe 78%(24h)、workers 5044 inv/7d、Stripe active subs 0"}
