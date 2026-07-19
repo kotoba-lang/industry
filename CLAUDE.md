@@ -795,3 +795,41 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   jvm / bb））で「今実際に動く経路はどれか」を確認してから選ぶ——ただし
   目の前のタスクを止めてまで存在しない統合（例: `clojurewasm` の新規導入）を
   今から作ることはしない（別スコープの ADR とプロジェクトとして切り出す）。
+
+## kotoba の実行は最終的に JVM/Node/Rust を経由しない（ADR-2607198300、2026-07-19）
+
+**kotoba-lang における「実行時に JVM/Node/Rust を迂回しない」とは、kotoba 自身の
+コンパイラ（cljc）が AOT コンパイルを、独立して直接実行可能なネイティブ artifact
+まで最後まで面倒を見ることを意味する。** 配布される実行成果物が JVM/Chicory ホスト・
+JS エンジン（Node/browser）ホスト・新規 Rust 実行エンジンのいずれにも依存しては
+ならない。コンパイラ**ツール自体**が JVM 上で動くこと（gcc がどこかで動く必要が
+あるのと同じビルド時の話）は問わない——問題なのは実行成果物のランタイム依存。
+
+- **kototama 自身の maturity ladder（`orgs/kotoba-lang/kototama/docs/maturity.md`）
+  には JVM/JS 以外の層が無いことを直接確認済み**: R0 contract → **R1 JVM/Chicory
+  (stable)** → **R2 browser-native (advanced-partial)** → R3 fleet-on-R1。
+  R2 は「browser-*native*」であって machine-native ではない——JVM でも Node でも
+  ないことを理由に R2（`wasm-webcomponent`/`kgraph.js`）で妥協しない。
+- **Rust は書かない（新規の実行エンジンとして）。** `90-docs/adr/2607072000` が
+  kotoba-lang 全体に「Rust が必要な実装は全て cljc」を明文化済み
+  （kotoba-lang/kotoba 自身の旧 ~38万行 Rust crate 群を撤去した実績が根拠）。
+  wasmtime 埋め込みホスト等を新規 Rust で書くのはこの accepted ADR に反する。
+- **唯一許容される非 cljc コードは、OS 実行ファイル形式が要求する最小限の
+  エントリポイント（crt0 相当）シムだけ**（`kotoba-lang/aiueos` の `os/aiueos`
+  ベアメタル profile が先例——Rust runtime crate は持たないが C+asm は境界で
+  許容）。汎用ランタイムやRust代替としてのC導入はこの例外に含まれない。
+- **`kotoba-lang/compiler` に、まさにこれを実現するネイティブ AOT バックエンドが
+  既に実在する**: `src/kotoba/compiler/backend/x86_64.clj`（289行）/
+  `backend/aarch64.clj`（186行）——生の機械語オペコードを直接 cljc で手書き
+  emit（SysV/AAPCS64 ABI、fuel計測、末尾自己再帰最適化、`pair`ヒープアリーナ）。
+  `test/kotoba/compiler/native_executor_test.clj` で実ネイティブプロセス実行
+  （`result 42`・trap/signal検知・ヒープアリーナ動作）を証明済み。非cljcコードは
+  `tools/kexe_loader.c`（+ `_windows.c`、SHA256ピン留め・レビュー済み）という
+  crt0相当シムのみ。**新しいネイティブ実行経路を探す前に、まずこのバックエンドを
+  確認する（ゼロから設計しない）。**
+- 現状のギャップ: この native backend は `kgraph-assert!`/`kgraph-query`
+  （EAVT datom-store capability）をまだサポートしない——`pair`/ヒープアリーナと
+  純計算のみ（同 repo の `backend/wasm.cljc` と同じ限定的 op-surface）。
+  この capability を必要とする guest を真にネイティブ実行で証明するには、
+  同じ `pair`-arena のパターンを踏襲して native backend に移植する必要がある。
+  詳細・調査経緯は ADR-2607198300 / ADR-2607198200 を参照。

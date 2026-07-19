@@ -167,4 +167,45 @@
   :iteration/diagnosis "Readiness CONFIRMED: node fetch to backend.kotobase.net OK (200), @noble/curves v1.9.7 (correct, package.json requires v1), 5 new repos enumerable via gh api + fetchable via raw.githubusercontent. Ruled OUT: node network sandbox, noble/curves version, repo enumeration. SUSPECT: nbb compile of kotobase-client ns, OR client/make-client did:web:kotobase.net resolution / XRPC handshake with no timeout (low-CPU blocked state fits a hanging network init)."
   :iteration/next "ITERATION 5: debug ingest startup — add (println) before requires + time a standalone (client/make-client {...}) call to isolate ns-load vs make-client; add fetch timeouts; if fixed, run live ingest = 連携統合 of the 5 JP-UTIL-1 repos (+ existing) into kotobase.net cloud-itonami-lei-catalog graph. In parallel: NTT retry via group.ntt, Kansai alt-URL, start EU-UTIL-1 acquisition. NOTE: manifest/fleet-db registration of the 5 repos still pending (needed for west checkout but NOT for ingest, which reads raw.githubusercontent directly)."}
 
+ {:iteration/num 6
+  :iteration/date "2026-07-19"
+  :iteration/phase :catalog-v2-design
+  :iteration/summary "OWNER SCOPE EXPANSION (2026-07-19): beyond ToS/policy archives, also record 子会社関係 (subsidiaries), IR, 株主/大株主 (shareholders/major shareholders), 主要商品 (main products), balance sheet. Designed catalog v2 data model + source strategy. GLEIF structure data is NULL for all 8 JP-UTIL-1 (apex listed companies, JP cos don't report GLEIF hierarchy) -> v2 structure/financials MUST come from regulatory filings (EDINET 有価証券報告書 for JP, SEC EDGAR 10-K for US). This is the resume point."
+  :v2/data-model
+   {:blueprint.edn-extends "add :company/edinet-code (JP FSA filer), :company/listed-exchange, :company/direct-parent-lei, :company/ultimate-parent-lei (GLEIF, null for these)"
+    :structure.edn-new "80-data/public/structure.edn — :company/subsidiaries [{:lei :name :jurisdiction :ownership-pct}] + :company/parent, provenance {:source :edinet|:gleif :document-id :filed-date :url}"
+    :shareholders.journal.edn-new "major shareholders top-10 [{:name :address :shares :percent :type}], provenance"
+    :balance-sheet.journal.edn-new "assets/liabilities/equity (current/non-current) by period, provenance {:filing :period-end :unit :currency}"
+    :products.journal.edn-new "main business segments/products [{:segment :description :revenue :segment-pct}], provenance"}
+  :v2/source-strategy "JP listed -> EDINET 有価証券報告書 (XBRL via EDINET API v2, single source covers 連結子会社/大株主/財務諸表/事業内容); US listed -> SEC EDGAR 10-K XBRL; GLEIF -> identity + sparse parent LEI; company IR pages -> fallback/supplementary."
+  :v2/finding-gleif "GLEIF directParent/ultimateParent = NULL for all 8 JP-UTIL-1 LEIs (5299004EMJ3R4RVR5Y75, 353800PFUKP5ONPJNZ86, 529900A76GOP0PGNHT63, 353800678EIJLOQSWZ83, 353800024KMNOPQRWZ02, 5299003FU7V4I45FU310, 5493003BZYYYCDIO0R13, 353800VHQU5VIXVUA841) — all apex listed holdings/operating companies; relationship-records empty. GLEIF identity already captured in blueprint.edn; structure/financials need EDINET."
+  :iteration/next "ITERATION 7+: (1) ingest verification (background bqo2hwduj, 129 repos); (2) set up EDINET API v2 pipeline (key via secrets-location-map skill, XBRL parse for 子会社/大株主/BS/事業) and pilot on TEPCO (有価証券報告書); (3) fix ingest script argv[2] bug (identity path -> scripts/); (4) manifest registration of 7 repos; (5) 関西/大阪 retry; (6) EU-UTIL-1 acquisition."}
+
+ {:iteration/num 7
+  :iteration/date "2026-07-19"
+  :iteration/phase :integration-identity-blocker
+  :iteration/summary "CRITICAL FINDING: canonical LEI ingest identity (CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED, ADR-2607113500) is NOT available in this environment. Therefore the canonical 連携統合 ingest (into the canonical kotobase.net cloud-itonami-lei-catalog graph) CANNOT be run locally — any local run mints a FRESH divergent identity -> divergent graph. My iter5 background ingest did exactly this and was STOPPED. This is the resume point."
+  :identity/availability "NOT AVAILABLE locally: (1) local kagi vault has ISIC/fleet keys but NOT CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED (item missing); (2) op CLI is signed in as jun784@gmail.com (personal my.1password.com) which lacks the gftdcojp vault -> op://gftdcojp/gftd.kotobase/... unreadable; (3) no filesystem mirror of scripts/.kotobase-ingest-...hex exists anywhere on disk."
+  :identity/divergent-graph-created "iter5 background ingest (bqo2hwduj) minted a NEW identity did:key:z6Mkj49YuUBKMfnV8PLYy1TELM2jy8owGQCQ74DYGjzHk3FS and transacted ~50/129 repos into a DIVERGENT graph on kotobase.net (STOPPED before completion). The divergent seed is preserved at ./.kotobase-ingest-cloud-itonami-lei-identity.hex (root, due to argv[2] bug) for potential retraction. The CANONICAL graph was NOT touched (different did)."
+  :edinet/key-unavailable "Separately: no EDINET API key in secrets-location-map -> v2 data acquisition (subsidiaries/major-shareholders/balance-sheet/business via 有価証券報告書) is BLOCKED pending owner-provided EDINET API key (free, FSA registration) or a fallback no-key source."
+  :iteration/correction "連携統合 ingest is the CANONICAL ROUTINE's job (murakumo cell with the provisioned identity, ADR-2607182400); it enumerates GitHub via gh api and will pick up the 7 new repos. DO NOT run ingest locally again until the canonical identity is provisioned (kagi add CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED to net-kotobase compartment, or op signed into the gftdcojp account). Iter5 claims of '連携統合 実行' into kotobase.net were a divergent-graph mistake, corrected here."
+  :iteration/next "PIVOT to the 取得 pillar (race-free, my actual job): EU-UTIL-1 acquisition (EDF/Engie/Iberdrola/National Grid/RWE/Enel/SSE/E.ON), 関西/大阪 retry. Owner/ops follow-ups: provision canonical ingest identity locally + EDINET key for v2 data + retract the divergent graph (using the preserved divergent seed). manifest registration of 7 repos still pending."}
+
+ {:iteration/num 8
+  :iteration/date "2026-07-19"
+  :iteration/phase :acquisition
+  :iteration/batch "EU-UTIL-1"
+  :iteration/summary "Acquired EU-UTIL-1 batch: 6 European electric-utility parent-entity LEIs GLEIF-verified, 2 honestly recorded as lei-lookup-failed (parent LEI not surfaced via name search, only subsidiaries — same no-subsidiary-substitution policy as isic-0610 Chevron / isic-3020 CRRC). This is the resume point."
+  :batch/acquired
+   #{{:company/legal-name "ELECTRICITE DE FRANCE" :company/lei "549300X3UK4GG3FNMO06" :company/jurisdiction "FR" :company/isic-rev5 "3510" :company/candidate-website "https://www.edf.fr" :company/status :lei-verified}
+     {:company/legal-name "IBERDROLA SA" :company/lei "5QK37QC7NWOJ8D7WVQ45" :company/jurisdiction "ES" :company/isic-rev5 "3510" :company/candidate-website "https://www.iberdrola.com" :company/status :lei-verified}
+     {:company/legal-name "NATIONAL GRID PLC" :company/lei "8R95QZMKZLJX5Q2XR704" :company/jurisdiction "GB" :company/isic-rev5 "3510" :company/candidate-website "https://www.nationalgrid.com" :company/status :lei-verified}
+     {:company/legal-name "ENEL SPA" :company/lei "WOCMU6HCI0OJWNPRZS33" :company/jurisdiction "IT" :company/isic-rev5 "3510" :company/candidate-website "https://www.enel.com" :company/status :lei-verified}
+     {:company/legal-name "SSE PLC" :company/lei "549300KI75VYLLMSK856" :company/jurisdiction "GB" :company/isic-rev5 "3510" :company/candidate-website "https://www.sse.com" :company/status :lei-verified}
+     {:company/legal-name "E.ON SE" :company/lei "Q9MAIUP40P25UFBFG033" :company/jurisdiction "DE" :company/isic-rev5 "3510" :company/candidate-website "https://www.eon.com" :company/status :lei-verified}}
+  :batch/lookup-failed
+   #{{:company/legal-name "ENGIE SA" :company/jurisdiction "FR" :company/reason "GLEIF name search (fulltext + exact legalName, jur=FR) surfaces only subsidiaries (ENGIE ALLIANCE, ENGIE FINANCE, ENGIE E&P INTERNATIONAL, etc.); parent 'ENGIE SA' LEI not surfaced — not fabricated, not substituted with a subsidiary LEI"}
+     {:company/legal-name "RWE AG" :company/jurisdiction "DE" :company/reason "GLEIF name search (fulltext + exact legalName, jur=DE) surfaces only subsidiaries (RWE Renewables, RWE Generation, RWE Offshore Wind, RWE Pensionsfonds, etc.); parent 'RWE AG' LEI not surfaced — not fabricated"}}
+  :iteration/next "ITERATION 9+: scaffold the 6 verified EU-UTIL-1 cloud-itonami-lei-* repos (ToS/legal gate + blueprint/README/NOTICE/tos.journal, same recipe as JP-UTIL-1). EU corporate sites are often bot-protected (cf isic-3510 National Grid/Duke were 403 in the US rollout) — expect mixed gate results, record honestly. Continue with ASIA-UTIL-1 (KEPCO/CLP/Tenaga/State Grid). Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract divergent graph + manifest registration of 7 JP repos."}
+
 ]
