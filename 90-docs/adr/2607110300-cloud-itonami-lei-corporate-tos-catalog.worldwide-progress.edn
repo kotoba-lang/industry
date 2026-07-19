@@ -253,4 +253,18 @@
   :iteration/incident-kepco "KEPCO initial scaffold produced a 0-byte empty tos.journal.edn full-text — the .do action URL returned empty body on a plain repeat fetch (worked in the gate pass). Re-fetched with a Referer header -> real ~6.8kch 법적고지 content; overwrote the repo's journal via GitHub API (commit on repo main). Lesson recorded: dynamic .do/.action pages may require Referer/session; VERIFY non-empty text before push (the scaffold pipeline now should assert len>0)."
   :iteration/next "ITERATION 12+: further regional acquisition (AU Origin/AGL Energy, LATAM Eletrobras/Enel Americas, Middle East DEWA/SEC). Defer bot-blocked repos to JS-capable fetch path. Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract iter5 divergent graph + manifest registration of 12 scaffolded repos (7 JP + 3 EU + 2 ASIA)."}
 
+ {:iteration/num 12
+  :iteration/date "2026-07-19"
+  :iteration/phase :acquisition
+  :iteration/batch "AU-ME-UTIL-1"
+  :iteration/summary "Acquired AU-ME-UTIL-1 batch: 3 parent-entity LEIs GLEIF-verified (Origin Energy AU, AGL Energy AU, DEWA AE), 2 honestly lei-lookup-failed (Eletrobras BR parent name not surfaced; Saudi Electricity Company has no GLEIF LEI — الشركة السعودية للطاقة is a DIFFERENT entity 'Saudi Energy' not 'Saudi Electricity لكهرباء', not substituted). Worldwide coverage now spans JP/EU/Asia-Pacific/AU/ME. This is the resume point."
+  :batch/acquired
+   #{{:company/legal-name "ORIGIN ENERGY LIMITED" :company/lei "ZSN2LWNPYW6ISMRUC664" :company/jurisdiction "AU" :company/isic-rev5 "3510" :company/candidate-website "https://www.originenergy.com.au" :company/status :lei-verified}
+     {:company/legal-name "AGL ENERGY LIMITED" :company/lei "549300QAZ8A74DEDXO80" :company/jurisdiction "AU" :company/isic-rev5 "3510" :company/candidate-website "https://www.agl.com.au" :company/status :lei-verified}
+     {:company/legal-name "DUBAI ELECTRICITY AND WATER AUTHORITY (DEWA)" :company/lei "213800K4OJF8DKATLT41" :company/jurisdiction "AE" :company/isic-rev5 "3510/3600" :company/candidate-website "https://www.dewa.gov.ae" :company/reg-status "LAPSED" :company/reg-note "real GLEIF entity-verified LEI, not annually renewed (government authority); same convention as Discover/TEPCO" :company/status :lei-verified}}
+  :batch/lookup-failed
+   #{{:company/legal-name "Eletrobras (Centrais Elétricas Brasileiras SA)" :company/jurisdiction "BR" :company/reason "exact legalName 'CENTRAIS ELETRICAS BRASILEIRAS' jur=BR returned no results; fulltext surfaces only unrelated 'AXIA ENERGIA S.A.'. Parent LEI not cleanly surfaced — not fabricated."}
+     {:company/legal-name "Saudi Electricity Company" :company/jurisdiction "SA" :company/reason "no GLEIF LEI for 'Saudi Electricity Company' / 'الشركة السعودية للكهرباء' (exact, jur=SA). LEI 549300FXO4ZXUIAXGP41 'الشركة السعودية للطاقة' is a DIFFERENT entity ('Saudi Energy/Power', طاقة ≠ كهرباء/electricity) — correctly NOT substituted."}}
+  :iteration/next "ITERATION 13+: scaffold backlog — 8 acquired-but-not-scaffolded LEIs across EU (Iberdrola/NG/E.ON bot-blocked, need JS path) + ASIA (CLP/PowerGrid/NTPC bot-blocked, KEPCO/Tenaga done) + AU-ME (Origin/AGL/DEWA pending scaffold, likely AU sites reachable). Owner/ops follow-ups unchanged: canonical ingest identity + EDINET key + retract iter5 divergent graph + manifest registration of 12 repos."}
+
 ]
