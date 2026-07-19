@@ -1,0 +1,26 @@
+;; budget-supply.edn — オーナー入力のポートフォリオ予算（supply side, ADR-2607194500）
+;; maturity-facts.edn と同じ運用: 手で編集する主観/事実入力（生成物ではない）。
+;; demand 側（90-docs/business/maturity-scores.edn、gftd score md の生成物）と
+;; 合わせて `gftd allocate` / `gftd allocate md` の入力になる。
+;;
+;; 単一 supply node（:supply/total-amount 1 個）— 現行の gftd.allocate はこれを
+;; entropic OT (Sinkhorn) の退化ケース（供給側ノードが 1 個）として扱い、需要
+;; 比例配分に還元する（詳細は src/gftd/allocate.cljc の ns docstring、
+;; ADR-2607194500）。将来、予算を tranche（例: growth/infra/runway）に分けて
+;; 複数 supply node にしたくなったら、ここに :supply/tranches のような形で
+;; 追加する拡張点はあるが、2026-07-19 時点では未実装（意図的な v1 スコープ外
+;; — 中途半端な多 tranche 対応はしない、README/ADR 参照）。
+;;
+;; フィールド:
+;;   :as-of              予算の as-of 日付
+;;   :supply/currency     通貨コード（表示用。換算はしない）
+;;   :supply/total-amount 単一予算プールの総額（1 期間分。期間の解釈は :supply/note で明記）
+;;   :supply/floors       {product amount} — product ごとの最低配分額（任意、空 map 可）
+;;   :supply/caps         {product amount} — product ごとの最大配分額（任意、空 map 可）
+;;   :supply/note         注記。捏造ゼロの原則どおり、実額が未確定なら placeholder と明記する
+{:as-of "2026-07-19"
+ :supply/currency "JPY"
+ :supply/total-amount 10000000
+ :supply/floors {}
+ :supply/caps {}
+ :supply/note "placeholder — owner should replace with real portfolio budget figures. 2026-07-19 時点: 実際の予算プール額・期間（月次/四半期）ともオーナー未確定のため、10,000,000 JPY を仮の月次予算として置いている。floors/caps も未設定（空 map = 全 product が需要比例のみで配分される）。"}

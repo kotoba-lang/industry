@@ -247,7 +247,7 @@
   ;; command-help は ns docstring の一覧と対応させる運用なので、両者がズレたら
   ;; help がサイレントに古びる。docstring 側に出てくる各コマンド語がここにも
   ;; 出てくることをスモークチェックする。
-  (doseq [cmd ["products" "canvas" "hyp" "react" "gate" "funnel" "score" "ledger"]]
+  (doseq [cmd ["products" "canvas" "hyp" "react" "gate" "funnel" "score" "allocate" "ledger"]]
     (is (some? (cli/find-command-help cmd)) (str cmd " missing from command-help"))))
 
 (deftest rolling-observation-retention

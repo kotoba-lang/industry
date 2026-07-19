@@ -21,6 +21,10 @@
      gate [--product P|--all]                     — 仮説 gate の現況（測定/距離/需）
      funnel show [--product P]                    — 獲得→収益ファネルの現況
      funnel analyze [--product P|--all]           — bottleneck に GTM 提案（governor 経由 ledger）
+     allocate [--budget N] [--epsilon E] [--iters K] [--score-key bmc|yc]
+                                                    — OT (Sinkhorn) 予算配分表示（ADR-2607194500）
+     allocate md                                   — portfolio-allocation.edn 再生成
+     allocate write                                — 配分結果を governor 経由で ledger へ記録（任意）
      ledger show [--tail N]"
   (:require [clojure.string :as str]
             #?(:clj [clojure.edn :as edn]
@@ -31,7 +35,8 @@
             [gftd.react :as react]
             [gftd.gate :as gate]
             [gftd.funnel :as funnel]
-            [gftd.score :as score]))
+            [gftd.score :as score]
+            [gftd.allocate :as allocate]))
 
 (def registry
   {:itonami  {:products [:cloud-itonami]                :desc "business operator (L3)"}
@@ -51,6 +56,7 @@
 (def md-out-rel "90-docs/business")
 (def metrics-rel "90-docs/business/metrics")
 (def facts-rel  "90-docs/business/maturity-facts.edn")
+(def budget-supply-rel "90-docs/business/budget-supply.edn")
 
 ;; ---- arg parsing ---------------------------------------------------------------
 
@@ -86,6 +92,10 @@
    {:cmd "funnel"   :usage ["funnel show [--product P]                    — 獲得→収益ファネルの現況"
                             "funnel analyze [--product P|--all]           — bottleneck に GTM 提案（governor 経由 ledger）"]}
    {:cmd "score"    :usage ["score [md]                                   — 成熟度スコア表示 / md 出力"]}
+   {:cmd "allocate" :usage ["allocate [--budget N] [--epsilon E] [--iters K] [--score-key bmc|yc]"
+                            "                                              — OT (Sinkhorn) 予算配分表示（ADR-2607194500）"
+                            "allocate md                                   — portfolio-allocation.edn 再生成"
+                            "allocate write                                — 配分結果を governor 経由で ledger へ記録（任意）"]}
    {:cmd "ledger"   :usage ["ledger show [--tail N]"]}])
 
 (defn find-command-help [cmd]
@@ -101,7 +111,8 @@
     (str/join "\n" (concat [(str (name cli-key) " cli — " (get-in registry [cli-key :desc]))
                             "commands:"]
                            (map #(str "  " %) (mapcat :usage command-help))
-                           [(str "flags: --product P --all --out-dir D --evidence \"…\" --metrics k=v,… --max-ticks N --tail N")
+                           [(str "flags: --product P --all --out-dir D --evidence \"…\" --metrics k=v,… --max-ticks N --tail N"
+                                 " --budget N --epsilon E --iters K --score-key bmc|yc")
                             (str "run `" (name cli-key) " <command> --help` for command-specific usage.")]))))
 
 #?(:clj
@@ -123,7 +134,8 @@
        (let [root (find-root)
              j (fn [rel] (str root "/" rel))]
          {:root root :base (j base-rel) :ledger (j ledger-rel)
-          :md-out (j md-out-rel) :metrics (j metrics-rel) :facts (j facts-rel)}))
+          :md-out (j md-out-rel) :metrics (j metrics-rel) :facts (j facts-rel)
+          :budget-supply (j budget-supply-rel)}))
 
      (defn load-idx [{:keys [base ledger]}]
        (canvas/load-index base (ledger/read-events ledger)))
@@ -243,6 +255,31 @@
                (doseq [{:keys [proposal reason]} rejected]
                  (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))))))
 
+     ;; ---- allocate (ADR-2607194500) ------------------------------------------
+     (defn allocate-inputs
+       "score.edn (demand) + budget-supply.edn (supply) + flags → {:result
+        :budget-supply :score-key}。allocate/allocate md/allocate write の
+        3 コマンド共通の計算 — 常に全ポートフォリオ（cli-products :gftd idx）を
+        対象にする（呼び出し元 CLI が単一 product 束縛でも無視する。予算配分は
+        本質的にポートフォリオ横断の意思決定であって、部分集合の split は
+        実際の予算決定を表さないため — score md が :gftd 固定なのと同じ流儀）。"
+       [ps idx flags]
+       (let [facts (edn/read-string (slurp (:facts ps)))
+             scores (score/score-all idx facts (cli-products :gftd idx))
+             budget-supply (edn/read-string (slurp (:budget-supply ps)))
+             score-key (keyword (or (:score-key flags) "yc"))
+             budget (if (:budget flags)
+                      (parse-double (str (:budget flags)))
+                      (double (:supply/total-amount budget-supply)))
+             epsilon (if (:epsilon flags) (parse-double (str (:epsilon flags))) 0.05)
+             max-iters (if (:iters flags) (parse-long (str (:iters flags))) 200)
+             demand (into {} (for [[p s] scores] [p (get-in s [score-key :score])]))
+             floors (or (:supply/floors budget-supply) {})
+             caps (or (:supply/caps budget-supply) {})
+             result (allocate/allocate demand budget {:epsilon epsilon :max-iters max-iters
+                                                       :floors floors :caps caps})]
+         {:result result :budget-supply budget-supply :score-key score-key}))
+
      (defn -main-for
        "Entry point shared by the 7 wrappers. `--help` / `help` (グローバルまたは
         `<cmd> --help` / `help <cmd>`) は repo root 解決や datoms 読込より前に
@@ -325,6 +362,38 @@
                (spit f (pr-str tx))
                (println "wrote" (.getPath f)))
 
+             ["allocate" nil]
+             (let [{:keys [result]} (allocate-inputs ps idx flags)]
+               (print (allocate/render-table result)))
+             ["allocate" "md"]
+             (let [{:keys [result budget-supply score-key]} (allocate-inputs ps idx flags)
+                   f (java.io.File. (str (:md-out ps) "/portfolio-allocation.edn"))
+                   body (allocate/render-md result budget-supply score-key)
+                   tx [{:db/id -1
+                        :doc/id "portfolio-allocation"
+                        :doc/doc_type "portfolio-allocation-projection"
+                        :doc/title "Portfolio budget allocation (entropic OT / Sinkhorn)"
+                        :doc/path "90-docs/business/portfolio-allocation.edn"
+                        :doc/body body
+                        :doc/source "gftd allocate md; SSoT = maturity-scores.edn + budget-supply.edn"}]]
+               (spit f (pr-str tx))
+               (println "wrote" (.getPath f)))
+             ["allocate" "write"]
+             (let [{:keys [result]} (allocate-inputs ps idx flags)
+                   props (allocate/proposals result)
+                   {:keys [approved rejected]} (react/governor idx props)
+                   actor "cli:allocate"
+                   events (concat (map #(react/proposal->event 0 actor %) approved)
+                                  (for [{:keys [proposal reason]} rejected]
+                                    {:event/type :governor/rejected :event/actor "governor"
+                                     :event/value (select-keys proposal [:proposal/action :canvas/id :event/value])
+                                     :event/reason reason}))]
+               (ledger/append! (:ledger ps) events)
+               (println "allocate write:" (count approved) "approved," (count rejected) "rejected")
+               (doseq [a approved] (println "  +" (:canvas/id a) (pr-str (:event/value a))))
+               (doseq [{:keys [proposal reason]} rejected]
+                 (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))
+
              ["ledger" "show"]
              (let [es (ledger/read-events (:ledger ps))
                    n (parse-long (str (or (:tail flags) "20")))]
@@ -355,7 +424,8 @@
        (let [root (find-root)
              j (fn [rel] (str root "/" rel))]
          {:root root :base (j base-rel) :ledger (j ledger-rel)
-          :md-out (j md-out-rel) :metrics (j metrics-rel) :facts (j facts-rel)}))
+          :md-out (j md-out-rel) :metrics (j metrics-rel) :facts (j facts-rel)
+          :budget-supply (j budget-supply-rel)}))
 
      (defn load-idx [{:keys [base ledger]}]
        (canvas/load-index base (ledger/read-events ledger)))
@@ -575,6 +645,31 @@
                (doseq [{:keys [proposal reason]} rejected]
                  (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))))))
 
+     ;; ---- allocate (ADR-2607194500) ------------------------------------------
+     (defn allocate-inputs
+       "score.edn (demand) + budget-supply.edn (supply) + flags → {:result
+        :budget-supply :score-key}。allocate/allocate md/allocate write の
+        3 コマンド共通の計算 — 常に全ポートフォリオ（cli-products :gftd idx）を
+        対象にする（呼び出し元 CLI が単一 product 束縛でも無視する。予算配分は
+        本質的にポートフォリオ横断の意思決定であって、部分集合の split は
+        実際の予算決定を表さないため — score md が :gftd 固定なのと同じ流儀）。"
+       [ps idx flags]
+       (let [facts (edn/read-string (nc/slurp (:facts ps)))
+             scores (score/score-all idx facts (cli-products :gftd idx))
+             budget-supply (edn/read-string (nc/slurp (:budget-supply ps)))
+             score-key (keyword (or (:score-key flags) "yc"))
+             budget (if (:budget flags)
+                      (parse-double (str (:budget flags)))
+                      (double (:supply/total-amount budget-supply)))
+             epsilon (if (:epsilon flags) (parse-double (str (:epsilon flags))) 0.05)
+             max-iters (if (:iters flags) (parse-long (str (:iters flags))) 200)
+             demand (into {} (for [[p s] scores] [p (get-in s [score-key :score])]))
+             floors (or (:supply/floors budget-supply) {})
+             caps (or (:supply/caps budget-supply) {})
+             result (allocate/allocate demand budget {:epsilon epsilon :max-iters max-iters
+                                                       :floors floors :caps caps})]
+         {:result result :budget-supply budget-supply :score-key score-key}))
+
      (defn -main-for
        "Entry point shared by the 7 wrappers. `--help` / `help` (グローバルまたは
         `<cmd> --help` / `help <cmd>`) は repo root 解決や datoms 読込より前に
@@ -656,6 +751,38 @@
                         :doc/source "gftd score md (ADR-2607021700); SSoT = maturity-facts.edn"}]]
                (nc/spit f (pr-str tx))
                (println "wrote" f))
+
+             ["allocate" nil]
+             (let [{:keys [result]} (allocate-inputs ps idx flags)]
+               (print (allocate/render-table result)))
+             ["allocate" "md"]
+             (let [{:keys [result budget-supply score-key]} (allocate-inputs ps idx flags)
+                   f (str (:md-out ps) "/portfolio-allocation.edn")
+                   body (allocate/render-md result budget-supply score-key)
+                   tx [{:db/id -1
+                        :doc/id "portfolio-allocation"
+                        :doc/doc_type "portfolio-allocation-projection"
+                        :doc/title "Portfolio budget allocation (entropic OT / Sinkhorn)"
+                        :doc/path "90-docs/business/portfolio-allocation.edn"
+                        :doc/body body
+                        :doc/source "gftd allocate md; SSoT = maturity-scores.edn + budget-supply.edn"}]]
+               (nc/spit f (pr-str tx))
+               (println "wrote" f))
+             ["allocate" "write"]
+             (let [{:keys [result]} (allocate-inputs ps idx flags)
+                   props (allocate/proposals result)
+                   {:keys [approved rejected]} (react/governor idx props)
+                   actor "cli:allocate"
+                   events (concat (map #(react/proposal->event 0 actor %) approved)
+                                  (for [{:keys [proposal reason]} rejected]
+                                    {:event/type :governor/rejected :event/actor "governor"
+                                     :event/value (select-keys proposal [:proposal/action :canvas/id :event/value])
+                                     :event/reason reason}))]
+               (ledger/append! (:ledger ps) events)
+               (println "allocate write:" (count approved) "approved," (count rejected) "rejected")
+               (doseq [a approved] (println "  +" (:canvas/id a) (pr-str (:event/value a))))
+               (doseq [{:keys [proposal reason]} rejected]
+                 (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))
 
              ["ledger" "show"]
              (let [es (ledger/read-events (:ledger ps))
