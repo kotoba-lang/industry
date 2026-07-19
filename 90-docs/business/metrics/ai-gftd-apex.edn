@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 8621, "ai-gftd-chat-shell" 721},
+ {"magatama-sh1n5h1x" 8576, "ai-gftd-chat-shell" 33},
  :zone
- {:requests-7d 488426,
-  :pageviews-7d 7364,
-  :uniques-7d-sum 5164,
+ {:requests-7d 442815,
+  :pageviews-7d 6592,
+  :uniques-7d-sum 4758,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
@@ -15,10 +15,10 @@
    {:path "/ms-edit.php", :requests 19}
    {:path "/wpxml.php", :requests 18}
    {:path "/wp-link-szoppm.php", :requests 18}
+   {:path "/wp-includes/IXR/shell.php", :requests 16}
    {:path "/wp-der.php", :requests 12}
-   {:path "/current/.env", :requests 12}
-   {:path "//wp-x7.php", :requests 11}],
-  :status-mix {:ok 573, :client-error 648, :server-error 16002},
+   {:path "/current/.env", :requests 12}],
+  :status-mix {:ok 593, :client-error 669, :server-error 16068},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -29,11 +29,11 @@
   :murakumo-paid-amount-minor 0,
   :charges-total 90,
   :last-charge-epoch 1604224274},
- :as-of "2026-07-18",
+ :as-of "2026-07-19",
  :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 93},
  :top-paths
  "上位 page (24h, 2xx/3xx): /payment/stripe.json 36 · /config.js 20 · /ms-edit.php 19 · /wpxml.php 18 · /wp-link-szoppm.php 18 | 4xx(probe) 4% · 5xx 93%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 488426 req/7d・5164 uniques(日次和)・うち4xx probe 4%(24h)、workers 9342 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 442815 req/7d・4758 uniques(日次和)・うち4xx probe 4%(24h)、workers 8609 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
