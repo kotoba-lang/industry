@@ -33,7 +33,26 @@ def test_root_owned_priority_conformance_attestation():
     assert "com.etzhayyim.apps.etzhayyim.priorityConformanceAttestation" in audit.root_owned_nsids()
 
 
-def test_yamabiko_live_contracts_are_not_orphans():
+def test_yamabiko_canonical_edn_contract_is_not_an_orphan(tmp_path, monkeypatch):
+    super_root = tmp_path
+    owner = super_root / "orgs/etzhayyim/com-etzhayyim-yamabiko"
+    wire = owner / "wire/contracts/lexicons"
+    wire.mkdir(parents=True)
+    (owner / "manifest.edn").write_text(
+        '{:actor/lexicons ["com.etzhayyim.yamabiko.trainsetManufactureRecord"]}'
+    )
+    (wire / "trainsetManufactureRecord.json").write_text(
+        json.dumps({"lexicon": 1, "id": "com.etzhayyim.yamabiko.trainsetManufactureRecord", "defs": {}})
+    )
+    west = super_root / "manifest/west.yml"
+    west.parent.mkdir()
+    west.write_text(
+        "projects:\n  - name: com-etzhayyim-yamabiko\n"
+        "    path: orgs/etzhayyim/com-etzhayyim-yamabiko\n"
+    )
+    monkeypatch.setattr(audit, "WEST_ROOT", super_root)
+    monkeypatch.setattr(audit, "WEST_MANIFEST", west)
+    monkeypatch.setattr(audit, "ROOT_COMPAT_LEXICONS", super_root / "root-compat")
     result = audit.audit()
-    assert any(path.parent.name == "com-etzhayyim-yamabiko" for path in result["manifests"])
-    assert not any("yamabiko" in nsid for nsid in result["orphans"])
+    assert result["missing"] == []
+    assert result["orphans"] == set()
