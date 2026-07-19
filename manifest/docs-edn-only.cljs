@@ -86,11 +86,6 @@
                "\n"))
     merged))
 
-(defn schema-attrs-for [entity]
-  (for [[k v] (dissoc entity :db/id)]
-    (let [{:keys [type card]} (classify v)]
-      {:db/ident k :db/valueType type :db/cardinality card})))
-
 (defn safe-name
   "EDN keyword name は先頭数字不可。不正文字は - に潰す。"
   [s]
@@ -98,6 +93,14 @@
               (str/replace #"[^A-Za-z0-9*+!\-_\'.?]" "-")
               (str/replace #"^-+" ""))]
     (if (re-matches #"[0-9].*" n) (str "n-" n) n)))
+
+(defn schema-attrs-for [entity]
+  (for [[k v] (dissoc entity :db/id)]
+    (let [{:keys [type card]} (classify v)
+          ident (if (and (keyword? k) (namespace k))
+                  (keyword (namespace k) (safe-name (name k)))
+                  k)]
+      {:db/ident ident :db/valueType type :db/cardinality card})))
 
 (defn ns-key [ns-name k]
   (if (and (keyword? k) (namespace k))
