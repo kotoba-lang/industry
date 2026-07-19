@@ -650,3 +650,58 @@ charter ADR-2607189200 は revision 済み (本 iter の finding に pivot)。
 **Next:** 次回 cron 発火時、Wave5 の最新状態と本ログを再確認した上で、
   ISCO batch をさらに継続する (残り96件) か、cockpit-isic-5820 統合の
   設計スコーピングに切り替えるかを判断。
+
+---
+
+## Iteration 16 — 2026-07-19 (ISCO batch継続、10件狙いが内部分割で5件着地)
+
+**Target:** iter15 の10件batchを踏襲し規模を維持 (これ以上の拡大はせず)。
+
+**運用ノート (agent内部分割):** 今回の agent は自身を "Group A"/"Group B" に
+  内部分割して並行screeningした模様。Group B (65候補中10件を実test suite
+  screening、5件を選定・着地) からは完全な最終レポートが届いたが、
+  Group A 側の結果は本セッションには届かなかった (agent自身が
+  "Could not reach that peer directly via SendMessage" と報告 — 内部
+  orchestrationの不具合と判断)。**正直な判断**: 届いた確実な証拠 (Group B
+  の5件) のみを本iterationの成果として処理し、Group A 分は「不明」として
+  扱う (捏造しない — 存在するかもしれない追加成果を憶測で報告しない)。
+
+**Did (Group B の5件、全て独立検証済み):**
+- 65候補を grep で stub/langgraph 参照チェック (全件 stub なし)、うち10件
+  (major-group 4分野にまたがる) で実 test suite 実行 — 全10件 green。
+- 選定5件 (domain多様性重視): **isco-2413**(finanalyst, 2xxx)/**isco-2611**
+  (legalpractice, 2xxx)/**isco-3511**(ictops, 3xxx)/**isco-4311**
+  (bookkeeping, 4xxx、7/9 governor条件到達で今batch最豊富)/**isco-9313**
+  (construction labour, 9xxx)。全て既存 test fixture から実 seed データ
+  流用 + 追加分は実 API 経由と docstring 開示 (従来と同水準)。バグは
+  今回0件 (5件とも commit-node が正しく store 記録済みを事前確認)。
+- 4段階検証を独立実施、**本セッションが5件とも `curl` で再検証** — 全て
+  HTTP 200、sha256 が agent 報告値と完全一致。isco-9313 は Pages ビルドが
+  一時不安定 (agent が再トリガして解決、最終的に一致) だったことが正直に
+  報告された。
+- commit→merge: isco-2413(`5bab5b4d`)、isco-2611(`7ae56eab`)、
+  isco-3511(`58bd2c9b`)、isco-4311(`84c293b0`)、isco-9313(`06cec974`)。
+  feature branch は全て merge 後に削除確認済み。
+- west.yml pin 前進: 初回 PUT が 409 (別セッションとの race — blob sha
+  が読み取り後に他プロセスにより変わっていた) で失敗、fresh に west.yml
+  を再取得 → 自分の対象5件が無事なことを確認 → 再試行で成功
+  (superproject commit `ebdbc645b5a9`)。
+
+**保留 (未実装の予備候補、Group B が明記)**: isco-2521(dbadmin)/
+  isco-3112(civeng、domainは薄いと判明)/isco-3311(brokerage)/
+  isco-4416(personnelclerk)/isco-9334(merchandising) — test green 確認済みだが
+  未実装。65候補中55件は今回一切未 screening (stub/バグ有無とも不明)。
+
+**Finding:** ISCO 側 no-demo backlog: 96 → 91 (このセッション累計35件)。
+  agent の自己並列化 (Group A/B分割) は今回一部通信不調があったため、
+  次回 iteration では単一 agent 構成に戻すか、分割時は各グループの
+  レポートを個別に追跡する前提で臨むこと。
+
+**Did NOT (honest):** Group A の作業内容は不明 (届いていない、存在した
+  かどうかも確定できない)。`cloud-itonami-flagship-checklist-scan.edn`/
+  `-rollout-ledger.edn` への追記はしていない。portfolio score・ISIC 側
+  スコアとも据え置き。
+
+**Next:** 次回 cron 発火時、Wave5 の最新状態と本ログを再確認。ISCO batch
+  を単一agent構成で継続する (残り91件、うち5件は screen済み予備あり) か、
+  cockpit-isic-5820 統合の設計スコーピングに切り替えるかを判断。
