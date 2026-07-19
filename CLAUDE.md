@@ -477,6 +477,22 @@ CertGovernor）。
 - **移行ツール**: `manifest/docs-edn-only.cljs`（`migrate` / `status` / `verify`）。
 - multi-entity catalog（`*.datoms.edn`）は複数 entity のまま、query ローダが全 entity を読む。
 - 新規 ADR は最初から `.edn` tx-data で書く（`.md` を起こしてから変換しない）。
+- **status `accepted` の既存 ADR を修正するときは、`:adr/body`（や他の attribute）を直接
+  上書きしない。** `nbb --classpath ".:scripts/nbb_compat" scripts/adr-ledger-append.cljs
+  --adr <id> --type <amend|status-change|supersede|note> --summary "..." [--body "..."]
+  [--related id1,id2]` で `90-docs/adr-ledger/adr-ledger.edn`（append-only、1行1EDN map、
+  `manifest/edn-query.cljs` が `adr/id` で base ADR と join してロードする）に追記する
+  （ADR-2607181900、詳細は ADR-2607173000 decision item 6「Historical ADR prose is not
+  mass-rewritten」の理由節）。理由: DataScript（`manifest/edn-query.cljs` が使う実装）には
+  Datomic の `d/as-of`/`d/history` に相当する transaction-history API が無く、各 query 実行は
+  その時点のファイル内容を毎回新しく transact するだけなので、本文を上書きすると
+  git 履歴にバイトは残っても query 可能な形では失われる（ledger append.script 自身の
+  header comment に詳細）。**例外**: まだ `accepted` になっていない draft の推敲、
+  typo/parse エラーなど非実質的な訂正、および ADR 内の既存「Progress addendum」節への
+  地の文追記（2607173000 のように元々その様式で運用されているファイルへの追加のみ、
+  新規にこの様式を始めない）はこの限りでない。`90-docs/adr-ledger/adr-ledger.edn` 自体も
+  手編集禁止 — 追記は必ず `scripts/adr-ledger-append.cljs` 経由（`:event/seq` の単調性を
+  保証するのはこのスクリプトだけ）。
 
 ## LLM モデル選択 — murakumo-main alias（repo-wide mandatory、2026-07-17、ADR-2607173100）
 
@@ -699,7 +715,11 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   実現方法を探す——それでも描画ニーズを満たせない場合、**「Rust を新規に
   書く」ことで穴を埋めない**。スコープを絞る（例: 当面は DOM/CSS の視覚
   表現に留める）か、対象を決めて別途 ADR 化しオーナー判断を仰ぐ。
-- **運用 tooling の script host は nbb のみ（ADR-2607173000、2026-07-17）。**
+- **運用 tooling の script host は nbb のみ（ADR-2607173000、2026-07-17）— ただし将来
+  優先順位は `kbb`（Kotoba script host）→ `nbb` →（退役: `bb`）（ADR-2607181900、
+  2026-07-18 roadmap 決定）。`kbb` は 2026-07-18 時点で未実装のコードが存在しない
+  target であり、ADR-2607181900 の readiness gate を通過するまでは以下の nbb-only
+  ルールがそのまま正本のまま変わらない。kbb の存在を前提にしたスクリプトを書かない。**
   `scripts/*.cljs`・`.claude/hooks/*.cljs`・west 拡張・child repo の
   task/test オーケストレーションは **`bb` バイナリを使わない**。新規に
   `bb.edn` / `#!/usr/bin/env bb` を置かない。残存は Wave 1–4 で削除中
