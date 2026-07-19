@@ -15,10 +15,9 @@
 ;; exit 1: verify 失敗 or apply 中に fatal
 ;; exit 2: 引数エラー
 
-(require '[scripts.nbb-compat :refer [slurp spit]]
+(require '[scripts.nbb-compat :refer [slurp spit sh]]
          '[clojure.string :as str]
-         '[clojure.edn :as edn]
-         '[clojure.java.shell :refer [sh]])
+         '[clojure.edn :as edn])
 
 (def node-fs (js/require "node:fs"))
 (def node-path (js/require "node:path"))
