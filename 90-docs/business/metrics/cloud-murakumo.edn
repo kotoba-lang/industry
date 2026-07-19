@@ -1,23 +1,23 @@
 {:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 175220},
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 176369},
  :zone
- {:requests-7d 70279,
-  :pageviews-7d 677,
-  :uniques-7d-sum 664,
+ {:requests-7d 70687,
+  :pageviews-7d 687,
+  :uniques-7d-sum 668,
   :zone "murakumo.cloud"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/infer/hwmetrics", :requests 8213}
-   {:path "/", :requests 78}
-   {:path "/infer/cost", :requests 27}
-   {:path "/robots.txt", :requests 15}
+  [{:path "/infer/hwmetrics", :requests 8212}
+   {:path "/", :requests 83}
+   {:path "/infer/cost", :requests 28}
+   {:path "/robots.txt", :requests 16}
    {:path "/infer/models/murakumo-main", :requests 6}
-   {:path "/v1/cdci/execute", :requests 4}
-   {:path "/v1/chat/completions", :requests 4}
-   {:path "/js/main.js", :requests 3}],
-  :status-mix {:ok 8365, :client-error 169, :server-error 2},
+   {:path "/js/main.js", :requests 6}
+   {:path "/cdn-cgi/rum", :requests 6}
+   {:path "/v1/chat/completions", :requests 6}],
+  :status-mix {:ok 8394, :client-error 207, :server-error 2},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -31,18 +31,18 @@
  :as-of "2026-07-19",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8213 · / 78 · /infer/cost 27 · /robots.txt 15 · /infer/models/murakumo-main 6 | 4xx(probe) 2% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8212 · / 83 · /infer/cost 28 · /robots.txt 16 · /infer/models/murakumo-main 6 | 4xx(probe) 2% · 5xx 0%",
  :cost
- {:fleet-yen-per-mtok 21.513565042263092,
+ {:fleet-yen-per-mtok 21.51778398242107,
   :spot-yen-per-mtok 40.55,
-  :ratio 0.5305441440755387,
+  :ratio 0.5306481869894222,
   :pass? true,
   :runs-count 200,
-  :fleet-tokens 41994,
+  :fleet-tokens 41968,
   :coeffs {:load-w 64.1, :yen-per-kwh 40.49},
   :spot-ref
   {:spot-usd-per-hour 1.8,
    :throughput-tok-s 2000,
    :fx-yen-per-usd 162.2}},
  :signal
- "murakumo.cloud 実測 70279 req/7d・664 uniques(日次和)・うち4xx probe 2%(24h)、workers 175220 inv/7d、Stripe active subs 0"}
+ "murakumo.cloud 実測 70687 req/7d・668 uniques(日次和)・うち4xx probe 2%(24h)、workers 176369 inv/7d、Stripe active subs 0"}
