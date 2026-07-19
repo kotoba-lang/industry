@@ -119,23 +119,26 @@
    (do
      ;; ---- paths ---------------------------------------------------------------
      (defn find-root
-       "GFTD_ROOT env か、cwd から上方向に base datoms を探して repo root を決める。"
-       []
-       (or (System/getenv "GFTD_ROOT")
+       "明示 root、または cwd から上方向に base datoms を探して repo root を決める。"
+       ([] (find-root nil))
+       ([configured-root]
+       (or configured-root
            (loop [d (.getCanonicalFile (java.io.File. ".")) n 0]
              (cond
                (.exists (java.io.File. d ^String base-rel)) (.getPath d)
                (or (nil? (.getParentFile d)) (>= n 8))
                (throw (ex-info (str "repo root not found (looked for " base-rel
                                     "). run from repo root or set GFTD_ROOT.") {}))
-               :else (recur (.getParentFile d) (inc n))))))
+               :else (recur (.getParentFile d) (inc n)))))))
 
-     (defn paths []
-       (let [root (find-root)
+     (defn paths
+       ([] (paths nil))
+       ([configured-root]
+       (let [root (find-root configured-root)
              j (fn [rel] (str root "/" rel))]
          {:root root :base (j base-rel) :ledger (j ledger-rel)
           :md-out (j md-out-rel) :metrics (j metrics-rel) :facts (j facts-rel)
-          :budget-supply (j budget-supply-rel)}))
+          :budget-supply (j budget-supply-rel)})))
 
      (defn load-idx [{:keys [base ledger]}]
        (canvas/load-index base (ledger/read-events ledger)))
@@ -284,7 +287,8 @@
        "Entry point shared by the 7 wrappers. `--help` / `help` (グローバルまたは
         `<cmd> --help` / `help <cmd>`) は repo root 解決や datoms 読込より前に
         処理し、help-text を印字するだけで終える。"
-       [cli-key args]
+       ([cli-key args] (-main-for cli-key args nil))
+       ([cli-key args configured-root]
        (let [[pos flags] (parse-args args)
              [c1 c2 c3 c4] pos
              help? (or (:help flags) (= c1 "help") (= c1 "--help"))
@@ -294,7 +298,7 @@
                               :else nil)]
         (if help?
           (println (help-text cli-key help-topic))
-          (let [ps (paths)
+          (let [ps (paths configured-root)
                 idx (load-idx ps)]
            (try
            (case [c1 c2]
@@ -403,29 +407,32 @@
              (println (help-text cli-key nil)))
            (catch clojure.lang.ExceptionInfo e
              (println "error:" (ex-message e))
-             (System/exit 1))))))))
+             (System/exit 1)))))))))
 
    :cljs
    (do
      ;; ---- paths ---------------------------------------------------------------
      (defn find-root
-       "GFTD_ROOT env か、cwd から上方向に base datoms を探して repo root を決める。"
-       []
-       (or (nc/getenv "GFTD_ROOT")
+       "明示 root、または cwd から上方向に base datoms を探して repo root を決める。"
+       ([] (find-root nil))
+       ([configured-root]
+       (or configured-root
            (loop [d (.getCanonicalFile (nc/file ".")) n 0]
              (cond
                (.exists (nc/file d base-rel)) (.getPath d)
                (or (nil? (.getParentFile d)) (>= n 8))
                (throw (ex-info (str "repo root not found (looked for " base-rel
                                     "). run from repo root or set GFTD_ROOT.") {}))
-               :else (recur (.getParentFile d) (inc n))))))
+               :else (recur (.getParentFile d) (inc n)))))))
 
-     (defn paths []
-       (let [root (find-root)
+     (defn paths
+       ([] (paths nil))
+       ([configured-root]
+       (let [root (find-root configured-root)
              j (fn [rel] (str root "/" rel))]
          {:root root :base (j base-rel) :ledger (j ledger-rel)
           :md-out (j md-out-rel) :metrics (j metrics-rel) :facts (j facts-rel)
-          :budget-supply (j budget-supply-rel)}))
+          :budget-supply (j budget-supply-rel)})))
 
      (defn load-idx [{:keys [base ledger]}]
        (canvas/load-index base (ledger/read-events ledger)))
@@ -674,7 +681,8 @@
        "Entry point shared by the 7 wrappers. `--help` / `help` (グローバルまたは
         `<cmd> --help` / `help <cmd>`) は repo root 解決や datoms 読込より前に
         処理し、help-text を印字するだけで終える。"
-       [cli-key args]
+       ([cli-key args] (-main-for cli-key args nil))
+       ([cli-key args configured-root]
        (let [[pos flags] (parse-args args)
              [c1 c2 c3 c4] pos
              help? (or (:help flags) (= c1 "help") (= c1 "--help"))
@@ -684,7 +692,7 @@
                               :else nil)]
         (if help?
           (println (help-text cli-key help-topic))
-          (let [ps (paths)
+          (let [ps (paths configured-root)
                 idx (load-idx ps)]
            (try
            (case [c1 c2]
@@ -796,4 +804,4 @@
            ;; into a generic "error: ..." + exit 1 instead of surfacing them.
            (catch ExceptionInfo e
              (println "error:" (ex-message e))
-             (nc/exit 1)))))))))
+             (nc/exit 1))))))))))

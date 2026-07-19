@@ -25,6 +25,12 @@
    {:hyp/id :hyp/t1 :hyp/product :cloud-itonami :hyp/risk :riskiest :hyp/status :untested
     :hyp/claim "claim-1" :hyp/gate "gate-1"}])
 
+(deftest explicit-root-configuration
+  (testing "portable CLI path resolution prefers the closed value supplied by its host"
+    (is (= "/explicit/repository" (cli/find-root "/explicit/repository")))
+    (is (= "/explicit/repository/90-docs/business/canvas-ledger.edn"
+           (:ledger (cli/paths "/explicit/repository"))))))
+
 (deftest fold-events
   (let [idx (canvas/index base)
         idx' (canvas/fold idx [{:event/type :canvas/add-item :canvas/id :cloud-itonami.problem :event/value "p2"}

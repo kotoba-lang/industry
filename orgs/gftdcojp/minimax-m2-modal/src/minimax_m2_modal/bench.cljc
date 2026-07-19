@@ -33,20 +33,20 @@
                        (:prompt_tokens usage) (:completion_tokens usage))))
     msg))
 
-(defn reasoning []
+(defn reasoning [config]
   (timed "reasoning"
          #(show "1) REASONING"
-                (openai/post-chat {:temperature 1.0
+                (openai/post-chat config {:temperature 1.0
                                    :top_p 0.95
                                    :max_tokens 1500
                                    :messages [{:role "user" :content (:reasoning prompts)}]}))))
 
-(defn tool-call []
+(defn tool-call [config]
   (let [messages [{:role "user"
                    :content "What's the weather in Tokyo? Use the tool, then answer in Celsius."}]]
     (timed "tools"
            (fn []
-             (let [resp (openai/post-chat {:messages messages :tools [weather-tool] :temperature 1.0})
+             (let [resp (openai/post-chat config {:messages messages :tools [weather-tool] :temperature 1.0})
                    msg (show "2) TOOL CALL (round 1)" resp)]
                (if-not (seq (:tool_calls msg))
                  (println ">>> MODEL DID NOT CALL THE TOOL")
@@ -63,23 +63,23 @@
                         (conj messages msg)
                         (:tool_calls msg))]
                    (show "2) TOOL CALL (final)"
-                         (openai/post-chat {:messages with-tools
+                         (openai/post-chat config {:messages with-tools
                                             :tools [weather-tool]
                                             :temperature 1.0})))))))))
 
-(defn coding []
+(defn coding [config]
   (timed "coding"
          #(show "3) CODING"
-                (openai/post-chat {:temperature 1.0
+                (openai/post-chat config {:temperature 1.0
                                    :top_p 0.95
                                    :max_tokens 2000
                                    :messages [{:role "user" :content (:coding prompts)}]}))))
 
-(defn -main [& _]
-  (println (str "### TARGET: " (openai/model) " @ " (or (System/getenv "LLM_URL")
-                                                        (System/getenv "MINIMAX_URL"))))
-  (reasoning)
-  (tool-call)
-  (coding)
+(defn run [config]
+  (let [{:keys [url] :as config} (openai/normalize-config config)]
+  (println (str "### TARGET: " (openai/model config) " @ " url))
+  (reasoning config)
+  (tool-call config)
+  (coding config)
   (println)
-  (println "### DONE"))
+  (println "### DONE")))
