@@ -296,4 +296,18 @@
      {:company/legal-name "Dubai Electricity and Water Authority (DEWA)" :company/lei "213800K4OJF8DKATLT41" :company/reason "dewa.gov.ae home returns HTTP 403 (bot-block); no evasion"}}
   :iteration/next "ITERATION 16+: continue breadth acquisition (LATAM Eletrobras-name-retry, Middle East, Africa) or scaffold more from backlog. The two owner-blockers persist: (1) canonical ingest identity for 連携統合 (local provisioning needed); (2) v2 reliable extraction (有報 PDF/XBRL route). Bot-blocked repos (AGL/DEWA/Iberdrola/NG/E.ON/CLP/PowerGrid/NTPC/関西/大阪) accumulate — collectively need a JS-capable fetch path not present in this env."}
 
+ {:iteration/num 16
+  :iteration/date "2026-07-19"
+  :iteration/phase :acquisition
+  :iteration/batch "LATAM-UTIL-1"
+  :iteration/summary "Acquired LATAM-UTIL-1: 2 parent LEIs (Cemig BR, ISA Colombia), 2 lookup-failed (Eletrobras — no GLEIF LEI under CENTRAIS ELETRICAS BRASILEIRAS/ELETROBRAS exact; EDP Energia do Brasil — no result). Worldwide coverage now 6 continents. ACQUISITION PILLAR APPROACHING DIMINISHING RETURNS without owner unblocks. This is the resume point."
+  :batch/acquired
+   #{{:company/legal-name "COMPANHIA ENERGETICA DE MINAS GERAIS-CEMIG" :company/lei "254900W703PXLDSEM056" :company/jurisdiction "BR" :company/candidate-website "https://www.cemig.com.br" :company/status :lei-verified}
+     {:company/legal-name "INTERCONEXION ELECTRICA S.A. E.S.P. (ISA)" :company/lei "5493007GMWK7ZHVQ5362" :company/jurisdiction "CO" :company/reg-status "LAPSED" :company/candidate-website "https://www.isa.co" :company/status :lei-verified}}
+  :batch/lookup-failed
+   #{{:company/legal-name "Eletrobras (Centrais Elétricas Brasileiras)" :company/reason "no GLEIF result for 'CENTRAIS ELETRICAS BRASILEIRAS' or 'ELETROBRAS' exact in BR — parent LEI not registered/surfaced; not fabricated"}
+     {:company/legal-name "EDP Energia do Brasil" :company/reason "no GLEIF result; name may differ (EDP São Paulo etc.) — not fabricated"}}
+  :loop/status-note "16 iterations in. 取得 (acquisition) pillar is well-developed (24 entities across 6 continents, 13 repos live, 1 v2 pilot). The 連携統合 (integration) half remains owner-blocked (canonical ingest identity not locally available). v2 uniform extraction needs 有報-PDF/XBRL build (multi-tick). Without owner unblocks, autonomous progress narrows to incremental acquisition + per-company v2 scraping. Decision point surfaced for owner."}
+  :iteration/next "OWNER DECISION POINT: (a) provision canonical ingest identity locally -> unblocks 連携統合 for 13+ repos; (b) authorize 有報-PDF/XBRL extraction build -> uniform v2 data; (c) continue incremental acquisition (Africa/Middle East remaining utilities). Bot-blocked backlog (10 companies) needs JS-capable fetch path (separate from this env)."}
+
 ]
