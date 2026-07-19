@@ -373,4 +373,62 @@ charter ADR-2607189200 は revision 済み (本 iter の finding に pivot)。
   を検討するかを、その時点の状況で判断する。cron は 15分毎で発火し続ける
   ため、前 iteration の background agent がまだ動いている場合は新規agent
   を重複起動せず待機すること。
-  進めること。
+
+---
+
+## Iteration 11 — 2026-07-19 (first ISCO-side batch: 3 repos in one pass)
+
+**Target:** iter9/10 で2件実証済み (isic 側の isic-851→isic-6820 と同型の
+  節目) に到達したため、ISIC 側 Wave5 が batch 化に移行したのと同じ判断で、
+  ISCO 側でも初の batch (3件、Wave5 の 6件よりまず小さく) を試行。
+
+**運用ノート (cron との整合):** cron (15分毎) が iteration 11 のバッチ実行中
+  にも発火し、background agent がまだ完了通知を返していなかったため、
+  その回は新規 agent を起動せず待機のみで応答 (重複起動回避、正しく機能した)。
+
+**Did (fresh agent, isolation:worktree, background, ~20分):**
+- 起動前に Wave5 rollout ledger を再確認 (`isco-1211`/`isco-1212` のみ、
+  Wave5 は iter9 の isco-1211 を「別セッションの進行中作業」として認識・
+  非干渉と明記) — 衝突なしを再確認。
+- 24候補中5件で実 JVM test suite を走らせて screening。
+  **`cloud-itonami-isco-2111`(physics) は3/14 test が既存の実バグ
+  (advisor が `:finalized?` を伝播しない) で fail することを発見** —
+  このバッチでは無理に含めず正直に対象外とした (低品質を避けるため
+  "3件必達" より品質を優先、指示通り)。
+  代わりに **isco-2113(chemistry) / isco-1213(policyplan) /
+  isco-1112(administration)** の3件、全て test green を選定。
+- 3件とも: 既存 test fixture から実 seed データを流用 + 追加エンティティは
+  実 API 経由で追加したことを docstring に明記（iter9/10 と同じ開示水準）。
+  isco-1112 では governor の docstring と実装コードの不一致
+  ("registered AND verified" と書いてあるが実装は存在確認のみ) も発見・
+  正直に開示。
+- 3件それぞれに render-html + regenerate.yml + operator-console.html を実装、
+  GitHub Pages を有効化 (未設定だったため)。
+- 検証 (iter9/10 と同一4基準、3件それぞれ独立に実施): 全件 idempotent、
+  clean-checkout byte-match、live workflow_dispatch success + "console
+  unchanged"、live Pages 配信確認。**本セッションが3件とも `curl` で
+  再検証** — sha256 が全て agent 報告値と完全一致
+  (`767b1658...`/`63d5ec31...`/`0ae2d67c...`)。
+- commit `d4cc4e7`→merge `9c2bda2fe3ff` (isco-2113)、`c82accf`→merge
+  `ca9ca834f535` (isco-1213)、`8f642b0`→merge `b8f73c3d3246` (isco-1112)。
+  feature branch は全て merge 後に削除。
+- 続けて本セッションが3件分の west.yml pin を**1コミットにまとめて**前進
+  (各 diff 1行のみ、ff clean 個別検証済み、superproject commit `0dd51139e7dc`)。
+
+**Finding:** ISCO 側で batch (3件同時) が単発実証と同じ品質規律
+  (screening・実データ・正直な開示・4段階検証) を保ったまま機能することを
+  確認。実バグ発見時に無理に batch 数を埋めず対象外にする判断も機能した
+  (isic 側の isic-2100/isic-1101 screen-out と同型の規律)。ISCO 側の
+  no-demo backlog: 126 → 121 (このセッション累計5件: isco-1211/1111/2113/
+  1213/1112)。
+
+**Did NOT (honest):** `cloud-itonami-flagship-checklist-scan.edn`/
+  `-rollout-ledger.edn` への追記はしていない (Wave5 自身の管轄と判断)。
+  isco-2111 の実バグ (advisor が `:finalized?` 未伝播) は発見のみで未修正
+  (このバッチのスコープ外、将来 isco-2111 に取り組む際の前提条件として
+  残す)。portfolio score・ISIC 側スコアとも据え置き。
+
+**Next:** 次回 cron 発火時、まず Wave5 の最新状態と本ログを再確認。ISCO
+  batch をさらに大きくする (Wave5 の6件相当に近づける) か、isco-2111 の
+  実バグ修正に取り組むか、別の切り口 (cockpit 統合設計など) に移るかを、
+  その時点の状況で判断すること。
