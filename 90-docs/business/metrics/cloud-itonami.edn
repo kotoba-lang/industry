@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-07-19T15:07:36.228Z",
+ :asOf "2026-07-19T16:08:01.337Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,9 +9,9 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 666,
+ {:requests-7d 667,
   :pageviews-7d 13,
-  :uniques-7d-sum 76,
+  :uniques-7d-sum 77,
   :zone "itonami.cloud"},
  :agentRuns7d 34377,
  :sources [:cloudflare :health :emitter :itonami-free-path],
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-07-19T15:07:37.023Z",
+  :asOf "2026-07-19T16:08:02.275Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -140,10 +140,10 @@
  :freePathDocs "/docs/free-path.md",
  :paths
  {:ok
-  [{:path "/itonami/verticals", :requests 1}
-   {:path "/join/browser", :requests 1}
-   {:path "/robots.txt", :requests 1}],
-  :status-mix {:ok 3, :client-error 7},
+  [{:path "/robots.txt", :requests 2}
+   {:path "/itonami/verticals", :requests 1}
+   {:path "/join/browser", :requests 1}],
+  :status-mix {:ok 4, :client-error 7},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
@@ -184,9 +184,9 @@
   :externalPaid 0,
   :freePathApiAlias "/api/free-path"},
  :ok true,
- :traffic-quality {:window "24h", :probe-4xx-pct 70, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 64, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /itonami/verticals 1 · /join/browser 1 · /robots.txt 1 | 4xx(probe) 70%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 2 · /itonami/verticals 1 · /join/browser 1 | 4xx(probe) 64%",
  :freeClaimDocs "/docs/free-path.md",
  :funnel
  {:trials 4,
@@ -196,7 +196,7 @@
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 666 req/7d・76 uniques(日次和)・うち4xx probe 70%(24h)",
+ "itonami.cloud 実測 667 req/7d・77 uniques(日次和)・うち4xx probe 64%(24h)",
  :tenants
  {:active 4,
   :external-paid 0,
