@@ -432,3 +432,66 @@ charter ADR-2607189200 は revision 済み (本 iter の finding に pivot)。
   batch をさらに大きくする (Wave5 の6件相当に近づける) か、isco-2111 の
   実バグ修正に取り組むか、別の切り口 (cockpit 統合設計など) に移るかを、
   その時点の状況で判断すること。
+
+---
+
+## Iteration 12 — 2026-07-19 (ISCO batch を6件に拡大 + isco-2111 バグ修正を並行着手)
+
+**Target:** iter11 の3件 batch が正常に機能したため、Wave5 の cadence (6件)
+  に合わせて拡大。同時に、cron 発火の待機時間を無駄にしないため、iter11 で
+  見つけた isco-2111 の実バグ修正を**別リポジトリ対象の非衝突タスク**として
+  並行起動。
+
+**Did (fresh agent#1, isolation:worktree, background, ~29分 — ISCO 6件batch):**
+- 40候補を2並列 read-only agent で screening (test suite 実行)。stub 2件を
+  新規発見: **isco-1322**(mining_managers)、**isco-2146**(mining_engineers、
+  コード中に "Simplified stub" と明記された偽実装、`langgraph.graph` 未
+  require)。残り38件は実 StateGraph、全 green。
+- 38件中もっとも豊かな fixture を持つ6件を選定:
+  **isco-2112**(meteorology)/**isco-2131**(biosciences)/**isco-1346**
+  (branch_manager)/**isco-2133**(envpro)/**isco-2423**(careers)/**isco-2424**
+  (training)。全て既存 test fixture から実 seed データを流用 + 追加分は
+  実 API 経由と docstring に開示 (iter9-11 と同水準)。到達不能な governor
+  rule も正直に開示 (isco-2133 の context 未読み込み、isco-2424 の
+  `:hours-mismatch` 到達不能、isco-2423 の fixture 間 skill-set 不一致)。
+- 6件それぞれ render-html + regenerate.yml + operator-console.html を実装、
+  4段階検証を独立実施。**本セッションが6件とも `curl` で再検証** — 全て
+  HTTP 200、sha256 prefix が agent 報告値と完全一致
+  (`59f06097`/`97ea3184`/`4209f000`/`28f8ce57`/`1a59158f`/`7d2dc4ae`)。
+- commit→merge: isco-2112(`088118c1`→`09d98977`)、isco-2131(`13708832`→
+  `35cdb2a6`)、isco-1346(`50b01d14`→`0cfd5ab1`)、isco-2133(`e0c5da0f`→
+  `c6591a3a`)、isco-2423(`048ae0f4`→`96e49e5d`)、isco-2424(`a159a5fb`→
+  `55478bc3`)。feature branch は全て merge 後に削除確認済み。
+- 続けて本セッションが6件分の west.yml pin を1コミットにまとめて前進
+  (各 diff 1行、ff clean 個別検証済み、superproject commit `ebaba8f0e2f2`)。
+- **正直な未解決事項 (agent報告)**: `isolation:"worktree"` の入れ子 agent
+  worktree 2件 (`.claude/worktrees/agent-a6f97cac6a30acc2d/.claude/
+  worktrees/{agent-a693cec6b1d088112,agent-a6aff8a9b7b45e8a8}`) が
+  非標準の `.git` シンボリックリンク構造のため `git worktree remove` に
+  失敗、無理な force削除はせず正直に報告 (harness 管理領域の cleanup は
+  本セッションでも同じ症状に度々遭遇 — 無理に触らず harness に委ねる方針
+  を継続)。
+
+**Did (fresh agent#2, isolation:worktree, background — 並行、isco-2111 のみ対象、
+  上記batchと非衝突 — 完了はまだ通知されておらず、次 iteration で処理予定):**
+- isco-2111 の実バグ (advisor が `:finalized?` 未伝播) の根本原因確認・
+  修正・再検証を委託。対象は isco-2111 単体のみで、上記6件 batch とも
+  超過候補4件 (isco-1113/2114/2412/1114) とも repo が重複しないため
+  衝突なしと判断して同時実行。
+
+**Finding:** ISCO 側 batch は6件規模でも同じ品質規律 (screening・実データ・
+  正直な開示・4段階検証) を保って機能。stub 検出も2件目3件目のパターンを
+  発見 (isic 側と同様、"ファイル名は揃っているが実装が偽" のケースが
+  一定確率で混在する)。ISCO 側 no-demo backlog: 121 → 115
+  (このセッション累計11件: isco-1211/1111/2113/1213/1112/2112/2131/1346/
+  2133/2423/2424)。
+
+**Did NOT (honest):** `cloud-itonami-flagship-checklist-scan.edn`/
+  `-rollout-ledger.edn` への追記はしていない。isco-2111 のバグ修正結果は
+  並行 agent がまだ完了通知を返しておらず、本 iteration ではまだ処理して
+  いない (次 iteration で検証・pin前進・ログ化を行う)。portfolio score・
+  ISIC 側スコアとも据え置き。
+
+**Next:** 次回 cron 発火時 (または isco-2111 修正 agent の完了通知が先に
+  届いた場合): (1) isco-2111 修正結果を検証・着地処理、(2) ISCO 側 batch
+  をさらに継続するか、cockpit 統合設計等の別の切り口に移るかを判断。
