@@ -1,6 +1,6 @@
 [
  {:progress/schema-note "cloud-itonami-lei rollout progress tracker, per ADR-2607110300. One row per cloud-itonami-isic-<code> industry. :industry/applicable? true means a coherent real global/listed top-3-company concept exists for this ISIC vertical; false means fragmented/local/non-corporate and this vertical is deliberately skipped for the lei-catalog family (the isic blueprint itself is unaffected). This file is the resume point for the next /loop iteration."
-  :progress/resume-from "ROLLOUT COMPLETE -- isic-9603 (funeral and related activities) was the LAST :industry/applicable? true :industry/status :pending row in the entire 144-row cloud-itonami-isic-* fleet; it is now :done (0/3, all fetch-failed, honestly recorded). This tick did isic-8610 hospital activities (HCA Healthcare 1/3, Community Health Systems' 200-status page was actually a soft-404 error page on inspection and UHS was 403-blocked), isic-8710 residential nursing care (Brookdale Senior Living 1/3, Ensign Group + National HealthCare Corporation both terms-page-undiscoverable), isic-9000 creative/arts/entertainment (0/3 -- Endeavor Group Holdings and TKO Group Holdings have no discoverable parent-entity GLEIF record so were substituted with Cinemark Holdings + AMC Entertainment Holdings, but Live Nation's terms page was a JS-rendered Next.js shell with zero server-rendered text and both substitutes were 403-blocked), isic-9200 gambling/betting (Flutter Entertainment 1/3, Las Vegas Sands returned HTTP 400 and MGM Resorts' domain would not connect), isic-9312 sports clubs (Manchester United plc + Borussia Dortmund 2/3, Juventus terms page undiscoverable), isic-9321 amusement/theme parks (The Walt Disney Company + Six Flags Entertainment 2/3, Comcast Corporation terms page undiscoverable), isic-9603 funeral (0/3 -- Carriage Services, Inc. itself has no parent-entity GLEIF record (only a subsidiary, Carriage Services Investment Advisors, Inc.), Service Corporation International was 403-blocked on both sci-corp.com and its dignitymemorial.com consumer brand, Matthews International's domains would not connect). Every remaining cloud-itonami-isic-* row is now either :done or :skipped (:applicable? false) -- there is no further isic-family resume point. A genuinely new tick would need either (a) revisiting one of the many exhausted-list companies with a JS-capable fetch tool this environment never had, or (b) the owner directing a new scope (e.g. isco-<code> occupation blueprints, or expanding an already-:done industry beyond its top-3)."
+  :progress/resume-from "SUPERSEDED by ADR-2607199960 (2026-07-19): target depth raised from top-3 to top-10 per :industry/applicable? true row, AND every :industry/applicable? false (skipped) row must be re-evaluated against the 10-slot bar rather than left permanently skipped. First top-up pass done this session on isic-3510 (now 6/10: added Dominion Energy, Exelon, WEC Energy Group) and isic-4950 (now 5/10: added ONEOK, TC Energy Corporation) -- see those rows' :industry/note for the honest failures alongside the successes. No other row has been top-10'd or re-evaluated yet. Resume order: (1) top-up pass -- continue walking :industry/status :done rows in file order (isic-3510/isic-4950 partially done this session, continue there or move to the next :done row), adding real companies toward 10 per row using the exact existing discipline (real GLEIF LEI only, real ToS fetch, never fabricate, never substitute a subsidiary LEI for a parent, record fetch/lookup failures honestly, dedup against LEIs already registered anywhere in this file, .isco-progress.edn, or 2607199960-cloud-itonami-lei-universe-progress.edn before creating a new repo -- this superproject checkout has HEAVY concurrent multi-session activity as of 2026-07-19, always re-fetch the live GitHub repo list and re-read this file fresh immediately before creating any repo or editing this file, and prefer a worktree outside the superproject + feature-branch + `gh api .../merges` server-side merge over direct edits in the shared checkout, since direct local edits here have been observed to be silently reverted by concurrent sessions' git syncs); (2) re-evaluation pass -- walk :industry/status :skipped rows in file order, re-judging :industry/applicable? against the 10-slot bar (update :industry/skip-reason to note '10-slot re-evaluated 2026-07-19+, still not applicable' if it still fails, or flip to applicable? true and populate :industry/companies if a coherent top-10 concept now exists). A SEPARATE, parallel long-term track (real stock-index constituent lists, not ISIC/ISCO classification sampling) toward literal global listed-company coverage lives in 90-docs/adr/2607199960-cloud-itonami-lei-universe-progress.edn -- do not conflate its resume point with this file's. See ADR-2607199960 for full rationale. [Prior top-3 completion note, retained for history: isic-9603 (funeral and related activities) was the LAST :industry/applicable? true :industry/status :pending row in the entire 144-row cloud-itonami-isic-* fleet; it is now :done (0/3, all fetch-failed, honestly recorded). Detail per-company notes are preserved in each row below.]"
   :db/id -1}
  {:industry/code "isic-0162"
   :industry/description ""
@@ -358,7 +358,11 @@
   :industry/status :done
   :industry/note "National Grid plc and Duke Energy Corporation both bot-blocked (HTTP 403,
                   no evasion attempted per CLAUDE.md safety floor); substituted The Southern
-                  Company and NextEra Energy, Inc."
+                  Company and NextEra Energy, Inc. Top-up pass 2026-07-19 (ADR-2607199960, top-3
+                  -> top-10): added Dominion Energy, Exelon Corporation, WEC Energy Group (now
+                  6/10); Sempra (403) and Edison International (real domain unreachable/timed
+                  out, a differently-named utility's domain was reachable but is a distinct
+                  company so not substituted) both fetch-failed this pass."
   :industry/companies
   [{:company/legal-name "American Electric Power Company, Inc."
     :company/lei "1B4S6S7G0TW5EE83BO58"
@@ -381,6 +385,33 @@
     :company/status :done
     :company/tos-doc-count 1
     :company/tos-source-url "https://www.nexteraenergy.com/legal-notice.html"}
+   {:company/legal-name "Dominion Energy, Inc."
+    :company/lei "ILUL7B6Z54MRYCF6H308"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Dominion Energy"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-ilul7b6z54mrycf6h308"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/note "added 2026-07-19 top-up pass (ADR-2607199960)"}
+   {:company/legal-name "Exelon Corporation"
+    :company/lei "3SOUA6IRML7435B56G12"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Exelon Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-3soua6irml7435b56g12"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/note "added 2026-07-19 top-up pass (ADR-2607199960)"}
+   {:company/legal-name "WEC Energy Group, Inc."
+    :company/lei "549300IGLYTZUK3PVP70"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=WEC Energy Group"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300iglytzuk3pvp70"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/note "added 2026-07-19 top-up pass (ADR-2607199960)"}
+   {:company/legal-name "Sempra"
+    :company/status :tos-fetch-failed
+    :company/note "added 2026-07-19 top-up pass -- site-wide HTTP 403, no evasion attempted"}
+   {:company/legal-name "Edison International"
+    :company/status :tos-fetch-failed
+    :company/note "added 2026-07-19 top-up pass -- edisoninternational.com timed out twice; a same-named-brand but distinct utility (Con Edison of NY) domain was reachable but is a different legal entity, not substituted"}
    {:company/legal-name "National Grid plc"
     :company/lei "8R95QZMKZLJX5Q2XR704"
     :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=National Grid plc"
@@ -614,7 +645,7 @@
   :industry/description "Transport via pipeline (ISIC Rev.5 4950) — :pipeline-integrity-governor. Open Business Blueprint, cloud-itonami fleet."
   :industry/applicable? true
   :industry/status :done
-  :industry/note "Landed 3/3: Enbridge Inc., Kinder Morgan Inc., The Williams Companies Inc. -- all real parent-entity GLEIF-verified LEIs, all real fetchable policy/terms pages found via homepage footer scan after direct-guessed URLs 404'd."
+  :industry/note "Landed 3/3: Enbridge Inc., Kinder Morgan Inc., The Williams Companies Inc. -- all real parent-entity GLEIF-verified LEIs, all real fetchable policy/terms pages found via homepage footer scan after direct-guessed URLs 404'd. Top-up pass 2026-07-19 (ADR-2607199960, top-3 -> top-10): added ONEOK, Inc. and TC Energy Corporation (now 5/10); Plains All American Pipeline (legal-notices page had only nav chrome, no body text), Targa Resources (HTTP/2 connection error), and MPLX LP (site-wide HTTP 403) all fetch-failed this pass."
   :industry/companies
   [{:company/legal-name "Enbridge Inc."
     :company/lei "98TPTUM4IVMFCZBCUR27"
@@ -638,7 +669,30 @@
     :company/status :done
     :company/tos-doc-count 1
     :company/tos-source-url "https://www.williams.com/vendor-terms-conditions/"
-    :company/note "only a Vendor Terms & Conditions page was discoverable (no general consumer ToS on this B2B/infrastructure site); doc-type recorded as :vendor-terms-and-conditions, not mislabeled as general ToS"}]}
+    :company/note "only a Vendor Terms & Conditions page was discoverable (no general consumer ToS on this B2B/infrastructure site); doc-type recorded as :vendor-terms-and-conditions, not mislabeled as general ToS"}
+   {:company/legal-name "ONEOK, Inc."
+    :company/lei "2T3D6M0JSY48PSZI1Q41"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=ONEOK"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-2t3d6m0jsy48pszi1q41"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/note "added 2026-07-19 top-up pass (ADR-2607199960)"}
+   {:company/legal-name "TC Energy Corporation"
+    :company/lei "549300UGKOFV2IWJJG27"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=TC Energy Corporation"
+    :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300ugkofv2iwjjg27"
+    :company/status :done
+    :company/tos-doc-count 1
+    :company/note "added 2026-07-19 top-up pass (ADR-2607199960)"}
+   {:company/legal-name "Plains All American Pipeline, L.P."
+    :company/status :tos-fetch-failed
+    :company/note "added 2026-07-19 top-up pass -- legal-notices page had only nav chrome, no server-rendered body text"}
+   {:company/legal-name "Targa Resources Corp."
+    :company/status :tos-fetch-failed
+    :company/note "added 2026-07-19 top-up pass -- HTTP/2 connection error on both WebFetch and curl"}
+   {:company/legal-name "MPLX LP"
+    :company/status :tos-fetch-failed
+    :company/note "added 2026-07-19 top-up pass -- site-wide HTTP 403"}]}
  {:industry/code "isic-5011"
   :industry/description "Open Business Blueprint for ISIC Rev.5 5011: sea and coastal passenger water transport (robotics-premised)"
   :industry/applicable? true
