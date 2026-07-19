@@ -1,0 +1,214 @@
+[{:db/id -1
+  :adr/id "adr-2607198300-kotoba-native-aot-execution-tier-discovery-and-no-bypass-policy"
+  :adr/title "ADR-2607198300: kotoba must own AOT compilation to a standalone artifact — no JVM/Node/Rust bypass; kotoba-lang/compiler already has a working native x86_64/aarch64 codegen backend"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-19"
+  :adr/last-verified "2026-07-19"
+  :adr/last_verified "2026-07-19"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-wide-cljc-to-kotoba-source-migration"
+  :adr/authoritative-for
+  ["kotoba execution-tier policy: no JVM/Node/Rust bypass at runtime"
+   "kotoba-lang/compiler's existing native x86_64/aarch64 AOT backend as the canonical machine-native execution path"
+   "scope of the pending kgraph-assert!/kgraph-query native port"]
+  :adr/related
+  ["adr-2607198200-kotoba-guest-grammar-no-runtime-string-interpolation-stripe-pilot"
+   "orgs/kotoba-lang/kotobase (irrelevant to wasm hosting; pure datom store)"
+   "90-docs/adr/2607072000-kotoba-rust-avoidance-policy-and-kotoba-server-gap.edn"
+   "orgs/kotoba-lang/kototama/docs/maturity.md"
+   "orgs/kotoba-lang/kototama/90-docs/adr/0005-maturity-r1-session-report-and-host-free-guests (md)"
+   "orgs/kotoba-lang/kototama/90-docs/adr/0006-maturity-r2-browser-parity-r3-fleet-skeleton (md)"
+   "orgs/kotoba-lang/aiueos/README.md"
+   "orgs/kotoba-lang/aiueos/os"
+   "orgs/kotoba-lang/compiler/src/kotoba/compiler/target.clj"
+   "orgs/kotoba-lang/compiler/src/kotoba/compiler/backend/x86_64.clj"
+   "orgs/kotoba-lang/compiler/src/kotoba/compiler/backend/aarch64.clj"
+   "orgs/kotoba-lang/compiler/src/kotoba/compiler/native_executor.clj"
+   "orgs/kotoba-lang/compiler/src/kotoba/compiler/runtime_identity.clj"
+   "orgs/kotoba-lang/compiler/test/kotoba/compiler/native_executor_test.clj"
+   "orgs/kotoba-lang/compiler/tools/kexe_loader.c"
+   "orgs/kotoba-lang/compiler/tools/kexe_loader_windows.c"
+   "orgs/kotoba-lang/compiler/scripts/wasmtime_tool.cljs"
+   "orgs/kotoba-lang/compiler/docs/adr/0004-nbb-native-wasm32-compile-path.md"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/decision-summary
+  {:context
+   "Following ADR-2607198200's com-stripe Customer pilot (verified via JVM/Chicory
+    then via Node-native WebAssembly against wasm-webcomponent's kgraph.js), the
+    owner asked to raise kotoba's own AOT-compilation maturity so execution needs
+    no JVM, no Node, no browser JS engine, and no new Rust or C runtime -- kotoba's
+    own compiler must own the whole path from source to a directly-runnable,
+    standalone artifact."
+   :ruled-out
+   {:jvm "kototama R1 (kotoba.wasm-exec / com.dylibso.chicory) -- owner-flagged deprecated for this purpose."
+    :js-engine "kototama R2 (browser-native kgraph.js/actor-host.js) is genuinely browser-native, not machine-native; kototama's own docs/maturity.md ladder (R0 contract -> R1 JVM stable -> R2 browser-native advanced-partial -> R3 fleet-on-R1) has no tier beyond R1/R2 -- confirmed directly, not inferred."
+    :clojurewasm "Still import-free-module-only FFI as of 2026-07-19 (no newer notes found anywhere in the workspace); upstream's fuller host-import FFI is its own future 'Phase-16', not something this org controls or contributes to."
+    :new-rust "90-docs/adr/2607072000 (accepted) already states org-wide for kotoba-lang: 'anything that would need Rust: implement in cljc instead', citing kotoba-lang/kotoba's own ~380k-line Rust crate tree (former kotoba-server engine) having been deleted (PR #259) in favor of the current thin CLJ launcher. A new Rust-embedded wasmtime host would directly contradict this accepted policy."}
+   :precedent-for-minimal-C
+   "kotoba-lang/aiueos's own README states it 'no longer owns a Rust runtime crate'
+    (Chicory covers JVM Wasm execution) while its os/aiueos bare-metal profile (16
+    .c + 4 .S files) owns the native bootloader/kernel implementation -- i.e. this
+    org already treats C as acceptable ONLY at the true OS-executable-format
+    boundary (entry-point/crt0-equivalent shims), never as a general execution
+    engine or Rust substitute."
+   :discovery
+   "kotoba-lang/compiler already implements almost exactly what was asked for:
+    backend/x86_64.clj (289 lines) and backend/aarch64.clj (186 lines) hand-emit
+    raw machine-code opcodes directly in pure cljc -- SysV/AAPCS64 ABI, fuel/gas
+    metering, tail-self-call optimization, and a working `pair`/heap-arena
+    construct. native_executor_test.clj proves genuine native process execution
+    end-to-end (deftest verified-native-execution-produces-measured-evidence:
+    real result 42; native-trap-is-returned-as-measured-evidence: real
+    signal/trap detection; bounded-pair-arena-executes-and-rejects-forged-handles:
+    real heap-arena semantics) -- via ProcessBuilder-invoked, then directly
+    OS-executed, native binaries; no JVM/Node/browser present once the artifact
+    is produced. The ONLY non-cljc code anywhere in this pipeline is
+    tools/kexe_loader.c (+ _windows.c): a minimal, SHA256-pinned, 'reviewed POSIX
+    native loader source' (runtime_identity.clj) -- a crt0-equivalent OS
+    entry-point stub, compiled by the system's own cc/clang via native_executor.clj,
+    not a general-purpose runtime. target.clj additionally declares (as data,
+    not yet all implemented) :x86_64-aiueos-kernel-v1/:x86_64-aiueos-user-v1
+    profiles with :runtime :none and :host-imports false -- genuinely
+    runtime-free freestanding artifacts for the aiueos bare-metal context."
+   :gap
+   "This native backend does not yet support kgraph-assert!/kgraph-query (the
+    EAVT datom-store capability ADR-2607198200's Customer pilot exercised) --
+    only pure computation plus the pair/heap-arena construct, the same limited
+    op-surface as this same repo's own backend/wasm.cljc (190 lines, hardcodes
+    exactly pair/pair-first/pair-second under module 'kotoba:heap'; no generic
+    host-import declaration/dispatch table exists yet to extend). Porting
+    kgraph-assert!/kgraph-query into backend/aarch64.clj (this development
+    machine is Apple Silicon/arm64) following the same pattern as the existing
+    pair-arena, then re-running the Customer create/get/list pilot targeting
+    :aarch64-macos-kotoba-v1, is the next concrete step (in progress as of this
+    ADR's authoring) to prove the Customer pilot genuinely native end to end."
+   :policy
+   "For kotoba-lang: 'avoid JVM/Node/Rust at runtime' means kotoba's own compiler
+    (cljc) must own AOT compilation all the way to a standalone, directly-runnable
+    native artifact -- the delivered EXECUTION must not depend on a
+    JVM/Chicory host, a JS engine (Node or browser) host, or a new Rust
+    execution engine. The compiler TOOLING itself may still run on the JVM
+    today (a build-time concern, like any compiler needing some host to run on
+    -- not a runtime dependency of the produced artifact). The sole sanctioned
+    non-cljc component anywhere in this path is a minimal, reviewed,
+    hash-pinned OS entry-point loader shim (crt0-equivalent), exactly the
+    aiueos os/ precedent -- never a general-purpose C/Rust runtime or execution
+    engine standing in for kotoba's own codegen."}
+  :adr/body
+  "# ADR-2607198300: kotoba must own AOT compilation to a standalone artifact — no JVM/Node/Rust bypass; kotoba-lang/compiler already has a working native x86_64/aarch64 codegen backend
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Context
+
+ADR-2607198200 (same day, same session) proved the compile -> `kotoba wasm emit`
+-> execute loop works for a Stripe Customer create/get/list actor, first via
+JVM/Chicory then via Node-native WebAssembly against
+`kotoba-lang/wasm-webcomponent`'s browser-native `kgraph.js`. The owner then
+asked to raise kotoba's own AOT-compilation maturity so execution needs no
+JVM, no Node, no browser JS engine, and no new Rust or C runtime — kotoba's
+own compiler must own the whole path from source to a directly-runnable,
+standalone artifact ('kotoba が AOT compile を最後まで面倒を見る').
+
+## What was ruled out, and why
+
+- **JVM** (`kototama.tender` / `kotoba.wasm-exec` via com.dylibso.chicory) —
+  owner-flagged deprecated for this purpose.
+- **A JS engine** (Node or a real browser tab running
+  `wasm-webcomponent`'s `kgraph.js`/`actor-host.js`) — this is
+  `kototama`'s own R2, and `kototama`'s own `docs/maturity.md` ladder
+  (R0 contract → **R1 JVM/Chicory, stable** → **R2 browser-native, advanced-partial**
+  → R3 fleet-on-R1) confirms directly (not inferred) that there is no tier
+  beyond R1/R2 today — R2 is browser-*native*, not machine-native.
+- **`clojurewasm`** — still import-free-module-only FFI as of 2026-07-19; no
+  newer notes anywhere in this workspace suggest upstream's promised fuller
+  host-import FFI ('Phase-16') has landed. Out of this org's control.
+- **A new Rust-embedded execution engine** (e.g. wasmtime-via-Rust) — directly
+  contradicts the already-accepted org-wide policy in
+  `90-docs/adr/2607072000-kotoba-rust-avoidance-policy-and-kotoba-server-gap.edn`
+  ('anything that would need Rust: implement in cljc instead'), grounded in
+  this org's own history of deleting kotoba-lang/kotoba's ~380k-line Rust
+  crate tree (former kotoba-server engine, PR #259) in favor of the current
+  thin CLJ launcher.
+
+## Precedent for the one narrow exception
+
+`kotoba-lang/aiueos`'s own README states it 'no longer owns a Rust runtime
+crate' (JVM/Chicory covers its hosted Wasm execution), while its
+`os/aiueos` bare-metal profile (16 `.c` + 4 `.S` files) owns the native
+bootloader/kernel implementation. This org already treats **C as acceptable
+only at the true OS-executable-format boundary** (an entry-point/crt0-equivalent
+shim) — never as a general execution engine or a Rust substitute.
+
+## Discovery: kotoba-lang/compiler already has almost exactly what was asked for
+
+`kotoba-lang/compiler` — a separate git dependency from `kotoba-lang/kotoba`,
+containing the canonical `guest-grammar.edn` and a stricter compile backend —
+already implements:
+
+- `src/kotoba/compiler/backend/x86_64.clj` (289 lines) and
+  `backend/aarch64.clj` (186 lines): hand-written native machine-code
+  generators in **pure cljc** — direct raw x86-64/AArch64 opcode emission,
+  SysV/AAPCS64 calling convention, fuel/gas metering, tail-self-call
+  optimization, and a working `pair`/heap-arena construct. No LLVM, no Rust,
+  no wasmtime anywhere in this codegen path.
+- `test/kotoba/compiler/native_executor_test.clj`: proves genuine, real
+  native execution end to end —
+  `verified-native-execution-produces-measured-evidence` (real result `42`),
+  `native-trap-is-returned-as-measured-evidence` (real OS
+  signal/trap detection), `bounded-pair-arena-executes-and-rejects-forged-handles`
+  (real heap-arena semantics) — via `ProcessBuilder`-invoked, then
+  natively-OS-executed binaries. Once the artifact exists, no JVM/Node/browser
+  is present at all.
+- The **only** non-cljc code in this entire pipeline is
+  `tools/kexe_loader.c` (+ `_windows.c`): a minimal, SHA256-pinned,
+  'reviewed POSIX native loader source' (`runtime_identity.clj`) — a
+  crt0-equivalent OS entry-point stub compiled by the system's own `cc`/`clang`.
+  Not a runtime, not a Rust substitute — the same narrow exception aiueos
+  already established.
+- `target.clj` additionally declares (as target-profile *data*, not yet
+  all implemented) `:x86_64-aiueos-kernel-v1`/`:x86_64-aiueos-user-v1`
+  profiles with `:runtime :none` and `:host-imports false` — genuinely
+  runtime-free freestanding artifacts for the aiueos bare-metal context.
+
+`kotoba-lang/kotobase` was also checked and found irrelevant to this
+question: it is a Datomic-analog datom database built *on* the kotoba
+language's `[e a v]` model, with no WASM-hosting concern of its own.
+
+## Gap and next step
+
+This native backend does not yet support `kgraph-assert!`/`kgraph-query`
+(the EAVT datom-store capability ADR-2607198200's Customer pilot exercised)
+— only pure computation plus the `pair`/heap-arena construct, the same
+limited op-surface as this same repo's own `backend/wasm.cljc` (190 lines,
+hardcodes exactly `pair`/`pair-first`/`pair-second` under module
+`'kotoba:heap'`; no generic host-import declaration/dispatch table exists
+yet to extend).
+
+**Next step (in progress as of this ADR's authoring):** port
+`kgraph-assert!`/`kgraph-query` into `backend/aarch64.clj` (this development
+machine is Apple Silicon/arm64) following the same pattern as the existing
+`pair`-arena, then re-run the Customer create/get/list pilot
+(ADR-2607198200) targeting `:aarch64-macos-kotoba-v1` to prove it genuinely
+native end to end — no JVM, no Node, no browser, no new Rust, only the
+existing reviewed C loader shim.
+
+## Policy (durable, recorded here and in root CLAUDE.md)
+
+For kotoba-lang: 'avoid JVM/Node/Rust at runtime' means **kotoba's own
+compiler (cljc) must own AOT compilation all the way to a standalone,
+directly-runnable native artifact** — the delivered EXECUTION must not
+depend on a JVM/Chicory host, a JS engine (Node or browser) host, or a new
+Rust execution engine. The compiler TOOLING itself may still run on the JVM
+today (a build-time concern, like any compiler needing some host to run on
+— not a runtime dependency of the produced artifact). The sole sanctioned
+non-cljc component anywhere in this path is a minimal, reviewed,
+hash-pinned OS entry-point loader shim (crt0-equivalent), exactly the
+aiueos `os/` precedent — never a general-purpose C/Rust runtime or
+execution engine standing in for kotoba's own codegen."}]
