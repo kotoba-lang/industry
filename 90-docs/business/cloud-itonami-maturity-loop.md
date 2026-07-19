@@ -495,3 +495,57 @@ charter ADR-2607189200 は revision 済み (本 iter の finding に pivot)。
 **Next:** 次回 cron 発火時 (または isco-2111 修正 agent の完了通知が先に
   届いた場合): (1) isco-2111 修正結果を検証・着地処理、(2) ISCO 側 batch
   をさらに継続するか、cockpit 統合設計等の別の切り口に移るかを判断。
+
+---
+
+## Iteration 13 — 2026-07-19 (isco-2111 バグ修正 着地処理)
+
+**Target:** iter12 で並行起動した isco-2111 バグ修正 agent の完了通知を処理。
+
+**Did:**
+- agent が根本原因を精査: 実際は **2つの複合欠陥**だった。(1)
+  `physics.advisor/infer`（mock-advisor の決定的推論fn）が `:op`/`:stake`
+  以外のリクエストキーを全て握りつぶしており、`governor/check` が見る
+  `:finalized?`/`:novel?` フラグが伝播していなかった（報告通りの根本原因）。
+  (2) 失敗していたテスト自身にも配線バグがあり、`:finalized? true` が
+  実際には未使用のローカル変数 `proposal` にしか存在せず、実際の
+  `request` map には渡っていなかった（advisor を直しただけではこの
+  test は救えなかった、test 側も要修正だった）。
+- 修正はテストの削除/緩和ではなく根本修正: `advisor.cljc` の `infer` に
+  `cond->` で `:finalized?`/`:novel?` をリクエストから proposal へ伝播する
+  処理を追加、テスト自身の配線バグも修正、さらに `:novel?` の伝播を
+  証明する e2e テストを新規追加。
+- test 結果: 修正前 14 tests/48 assertions・3 failures → 修正後
+  **15 tests/53 assertions・0 failures**（本人の worktree + 独立の
+  clean clone 両方で確認済み）。
+- ついでに (低い追加コストと判断、バグ修正で全ソース読了済みのため)
+  build-time demo generator も同時実装: 既存 fixture (`proj-1`/`ds-1`/
+  `inst-1`) を流用 + `proj-2` を実 API 経由で追加 (docstring 開示)。
+  修正により初めて `:no-finalized-claims` hard rule も実 advisor 経由で
+  到達可能になったことを確認・デモに反映。
+- commit `7e5aff9bbefe` (fix+demo) → server-side merge `8d96aea8e53b`
+  → isco-2111 main に landed。
+- 検証: (a) idempotent (sha256 `19c717fe...`)、(b) clean-checkout byte一致、
+  (c) live workflow_dispatch run `29678940878` success + unchanged、
+  (d) live Pages — **本セッションが `curl` で再検証**、HTTP 200、sha256
+  `19c717fe59f3bc80544357ec945ca06f919818419f6f9acb54330001829dfd51` が
+  agent 報告値と完全一致。
+- west.yml pin 前進 (`9d6088ab`→`8d96aea8e53b44fb354b037752b7386f9a85ffcd`、
+  ff clean 検証済み、superproject commit `cf29c573ea3f`)。
+
+**Finding:** 実バグを screening で発見 → 対象外化せず正面から修正 → 修正の
+  副産物として demo generator も追加、という流れが機能した。ISCO 側
+  no-demo backlog: 115 → 114 (isco-2111 追加、累計12件)。「stub/バグを
+  見つけたら黙って回避せず、可能なら根本修正する」という規律の実例が
+  ISCO 側にも1件でき、isic 側の同種の規律 (screen-out はするが、
+  直せるバグは直す) と揃った。
+
+**Did NOT (honest):** `cloud-itonami-flagship-checklist-scan.edn`/
+  `-rollout-ledger.edn` への追記はしていない。isco-2111 の
+  `physics.governor/check` が未使用の `context` param を持つ点は
+  agent が発見したが未修正 (スコープ外、次の課題として残す)。portfolio
+  score・ISIC 側スコアとも据え置き。
+
+**Next:** 次回 cron 発火時、Wave5 の最新状態と本ログを再確認した上で、
+  ISCO batch を継続するか (次候補プールから選定)、cockpit-isic-5820
+  統合の設計スコーピング (iter8 で保留した課題) に切り替えるかを判断。
