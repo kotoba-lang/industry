@@ -549,3 +549,49 @@ charter ADR-2607189200 は revision 済み (本 iter の finding に pivot)。
 **Next:** 次回 cron 発火時、Wave5 の最新状態と本ログを再確認した上で、
   ISCO batch を継続するか (次候補プールから選定)、cockpit-isic-5820
   統合の設計スコーピング (iter8 で保留した課題) に切り替えるかを判断。
+
+---
+
+## Iteration 14 — 2026-07-19 (ISCO batch を8件に拡大)
+
+**Target:** iter12/13 の6件batch + バグ修正1件が順調だったため、batch を
+  さらに8件に拡大して継続。
+
+**Did (fresh agent, isolation:worktree, background, ~30分 — ISCO 8件batch):**
+- 起動前に Wave5 rollout ledger を再確認 (`isco-1211`/`isco-1212` のみ) —
+  衝突なし確認。
+- 50候補を3並列 read-only agent で screening (test suite 実行)。
+  **今回は stub もバグも0件** — 全50件が実装済み・test green の real actor
+  だった。選定は governor-rule/fixture の豊かさと domain 多様性のみで判断
+  (1311/1312/2132 の類似トリオ、3112/3113/3114 の薄いトリオを意図的に回避)。
+- 選定8件: **isco-1323**(construction)/**isco-1222**(advertpr)/
+  **isco-2153**(telecomeng)/**isco-2412**(finadvisory)/**isco-2514**
+  (appsdev)/**isco-3111**(chemistry)/**isco-2522**(sysadmin)/**isco-2141**
+  (indprod)。全て既存 test fixture から実 seed データ流用 + 追加分は実 API
+  経由と docstring に開示 (iter9-13 と同水準)。全件 test green 前後維持
+  (14-15 tests / 27-47 assertions、regression なし)。
+- 8件それぞれ render-html + regenerate.yml + operator-console.html を実装、
+  4段階検証を独立実施。**本セッションが8件とも `curl` で再検証** — 全て
+  HTTP 200、sha256 prefix が agent 報告値と完全一致。
+- commit→merge: isco-1323(`f2b94015`)、isco-1222(`30cb1fd2`)、
+  isco-2153(`56ee05d6`)、isco-2412(`122f0308`)、isco-2514(`c6b66cba`)、
+  isco-3111(`9f577c13`)、isco-2522(`71d7e304`)、isco-2141(`868c54db`)。
+  feature branch は全て merge 後に削除確認済み。
+- 続けて本セッションが8件分の west.yml pin を1コミットにまとめて前進
+  (各 diff 1行、ff clean 個別検証済み、superproject commit `dc3612e8dee9`)。
+- agent が正直に報告: 自身の isolation worktree 内に無関係な未コミット差分
+  (`cloud-itonami-iso3166-usa-*` の pin 2件) を発見したが、自分/sub-agent
+  が触っていないことを確認し、スコープ外として不介入 (触らない判断は
+  正しい — このセッションの並行churn観測パターンと整合)。
+
+**Finding:** ISCO 側 batch が8件規模でも同じ品質規律を保って機能 (今回は
+  stub/バグ0件で選定が純粋に多様性判断になった点が新しい)。ISCO 側
+  no-demo backlog: 114 → 106 (このセッション累計20件)。
+
+**Did NOT (honest):** `cloud-itonami-flagship-checklist-scan.edn`/
+  `-rollout-ledger.edn` への追記はしていない。portfolio score・ISIC 側
+  スコアとも据え置き。
+
+**Next:** 次回 cron 発火時、Wave5 の最新状態と本ログを再確認した上で、
+  ISCO batch をさらに継続する (残り106件) か、cockpit-isic-5820 統合の
+  設計スコーピングに切り替えるかを判断。
