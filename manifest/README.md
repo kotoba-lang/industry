@@ -72,6 +72,23 @@ nbb scripts/gen-west-manifest.cljs                         # pin 前進後に再
 nbb scripts/gen-west-manifest.cljs --check                 # CI: 乖離で exit 1
 ```
 
+### actor manifest / Lexicon boundary audit
+
+`scripts/audit-manifest-lexicon-drift.py` は生成済み `west.yml` の exact
+`orgs/etzhayyim/com-etzhayyim-*` path だけを走査し、各 standalone owner の
+manifest 宣言を owner wire contract（移行中は root compatibility contract も可）と
+照合する。root governance 固有 contract の正本は
+`manifest/lexicon-root-ownership.edn` とする。
+
+```bash
+python3 scripts/audit-manifest-lexicon-drift.py
+python3 scripts/audit-manifest-lexicon-drift.py --strict
+python3 -m pytest -q scripts/test_audit_manifest_lexicon_drift.py
+```
+
+別 worktree から実 workspace を検査するときだけ
+`COM_JUNKAWASAKI_WEST_ROOT=/path/to/west-root` を指定する。
+
 > west 1.5 の `west update` は `-j` 非対応（直列）。fetch は `smart` で差分のみ。
 > zsh は引用なし変数を単語分割しないため、複数 project 指定は `xargs` を使う。
 
