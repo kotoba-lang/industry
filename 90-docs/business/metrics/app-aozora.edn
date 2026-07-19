@@ -1,0 +1,35 @@
+{:engagement
+ {:dau nil,
+  :active-authors-window {:window 200, :distinct-authors 37},
+  :posts 66,
+  :human {:posts 66, :engagement 0},
+  :organism {:posts 0, :engagement 0},
+  :organism-engagement-ratio nil},
+ :health-status 200,
+ :zone-name "aozora.app",
+ :workers-invocations-7d
+ {"app-aozora-pds" 2791, "app-aozora-appview" 6752},
+ :zone
+ {:requests-7d 28107,
+  :pageviews-7d 5925,
+  :uniques-7d-sum 695,
+  :zone "aozora.app"},
+ :sources [:cloudflare :health :emitter],
+ :paths
+ {:ok
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2905}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 604}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 285}
+   {:path "/", :requests 74}
+   {:path "/robots.txt", :requests 46}
+   {:path "/api/engagement", :requests 24}
+   {:path "/fw.php", :requests 14}
+   {:path "/wp-admin/network/wp-conflg.php", :requests 13}],
+  :status-mix {:ok 4692, :client-error 104, :server-error 2},
+  :window "24h"},
+ :as-of "2026-07-19",
+ :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 0},
+ :top-paths
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2905 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 604 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 285 · / 74 · /robots.txt 46 | 4xx(probe) 2% · 5xx 0%",
+ :signal
+ "aozora.app 実測 28107 req/7d・695 uniques(日次和)・うち4xx probe 2%(24h)、workers 9543 inv/7d"}

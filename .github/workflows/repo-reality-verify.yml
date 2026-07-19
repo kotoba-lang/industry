@@ -1,0 +1,115 @@
+# doc-vs-code drift check for the 5 kotoba-lang core projects (kotoba, kotoba-lang, kotobase,
+# aiueos, kototama) — 90-docs/repo-reality/ (design discussed 2026-07-15, methods 1/4/5:
+# executable claims + claim-to-evidence linkage + append-only drift ledger).
+# - schedule: catches drift that no push to THIS repo would trigger (e.g. a kotoba-lang/aiueos
+#   README loses its own disclosed-gap caveat, or a cited test/fixture file quietly disappears
+#   upstream) — same rationale as foundation-deps-verify.yml.
+# - push to main: sanity-check whenever the claim schema/verify scripts themselves change.
+# - workflow_dispatch: manual.
+# Regression policy: a claim scoring low (e.g. aiueos's known device-access-stub gap at 0.2) is
+# NOT a failure by itself — many claims here intentionally score low because they cite a real,
+# disclosed, still-open gap. ci_gate.cljs only fails the job when a claim's score DROPS versus
+# its last recorded ledger entry — that is the actual "something changed for the worse" signal.
+# The orgs/<repo> checkouts are NOT this repo's git history (west-managed, not submodules) — CI
+# shallow-clones them directly from the public kotoba-lang GitHub org each run.
+#
+# kagami (kotoba-lang/kagami, formerly kotoba-fleet-vcs, ADR-2607160005) folding, 2026-07-16:
+# kagami's native CI subsystem (`fleet ci-verify --gate 'name=cmd'`, src/fleet/ci.cljc) can run
+# this exact ci_gate.cljs invocation as a named gate and emit a signed, content-addressed
+# verification receipt into manifest/fleet-ci.edn (verdict = required ⊆ passed) — but
+# `ci-verify` HARD-REQUIRES a signing key (`--key PEM` or `--kagi NAME`; bin/fleet.cljs:591
+# `(when-not (and db repos (or key kagi)) (die ...))`, no code path runs without one) and CI
+# holds no kagi key, same constraint documented in .github/workflows/fleet-projection-verify.yml
+# ("CI 側は report-only"). So this job still runs ci_gate.cljs directly (below) and reports,
+# report-only, the equivalent signed-gate command an owner-side run would use.
+name: repo-reality-verify
+
+on:
+  schedule:
+    - cron: "43 7 * * *"   # 毎日 07:43 UTC
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: [90-docs/repo-reality/**, .github/workflows/repo-reality-verify.yml]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nbb + datascript
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Shallow-clone the 5 kotoba-lang projects under verification
+        run: |
+          for repo in kotoba kotoba-lang kotobase aiueos kototama; do
+            git clone --depth 1 "https://github.com/kotoba-lang/$repo.git" "orgs/kotoba-lang/$repo"
+          done
+
+      - name: Clone kagami at its west pin
+        run: |
+          PIN=$(awk '$0=="    - name: kagami"{f=1} f&&/revision:/{print $2; exit}' manifest/west.yml)
+          git clone --depth 1 https://github.com/kotoba-lang/kagami.git /tmp/kagami
+          git -C /tmp/kagami fetch --depth 1 origin "$PIN" && git -C /tmp/kagami checkout --detach "$PIN"
+
+      - name: Run repo-reality CI gate (verify claims, append ledger, fail on regression)
+        id: gate
+        run: npx nbb 90-docs/repo-reality/ci_gate.cljs
+
+      - name: Native CI receipt via kagami (report-only; signing key is owner-side)
+        if: always()
+        run: |
+          # The signed, content-addressed receipt for this exact gate would be produced by
+          # (owner-side, with the kagi key CI doesn't hold):
+          #   nbb --classpath /tmp/kagami/src /tmp/kagami/bin/fleet.cljs ci-verify \
+          #     --db manifest/fleet-db.edn --repos kotoba-lang/kotoba,kotoba-lang/kotoba-lang,kotoba-lang/kotobase,kotoba-lang/aiueos,kotoba-lang/kototama \
+          #     --gate 'repo-reality=nbb 90-docs/repo-reality/ci_gate.cljs' --kagi <key>
+          # appended to manifest/fleet-ci.edn (verdict = required ⊆ passed). CI can only report
+          # this command and this run's exit code, not sign it. See fleet-projection-verify.yml
+          # for the same pattern applied to pin-reachability instead of repo-reality's gate.
+          echo "kagami native CI: gate 'repo-reality' exit=${{ steps.gate.outcome }}" \
+               "-- signed receipt requires an owner-side 'fleet ci-verify --kagi <key>' run;" \
+               "see manifest/fleet-ci.edn (append-only receipt log) once provisioned."
+
+      - name: Commit ledger append (even on regression — the run IS the record)
+        if: always()
+        run: |
+          if git diff --quiet -- 90-docs/repo-reality/repo-reality-ledger.edn; then
+            echo "no ledger changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add 90-docs/repo-reality/repo-reality-ledger.edn
+          git commit -m "$(printf 'repo-reality: verify run %s\n\nAutomated append from .github/workflows/repo-reality-verify.yml (run %s).' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${{ github.run_id }}")"
+          for attempt in 1 2 3; do
+            git pull --rebase --autostash origin main && git push origin HEAD:main && break
+            echo "push attempt $attempt failed, retrying after fetch+rebase..."
+            sleep 5
+          done
+
+      - name: Open issue on regression
+        if: failure() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          MARKER="repo-reality drift regression detected"
+          EXISTING=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$MARKER\" in:title" --json number --jq 'length')
+          if [ "$EXISTING" = "0" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$MARKER ($(date -u +%Y-%m-%d))" \
+              --body "$(printf 'A claim in 90-docs/repo-reality/ scored LOWER than its last recorded ledger entry — something got worse (a disclosed gap regressed further, a cited caveat was silently removed while the underlying issue remains, or cited evidence disappeared).\n\nSee the run log for which claim(s) regressed and why: %s/%s/actions/runs/%s\n\nRe-run locally:\n\n    npm ci\n    for repo in kotoba kotoba-lang kotobase aiueos kototama; do git clone --depth 1 https://github.com/kotoba-lang/$repo.git orgs/kotoba-lang/$repo; done\n    nbb 90-docs/repo-reality/ci_gate.cljs\n\nPolicy: doc-vs-code drift verification discussed 2026-07-15, methods 1 (executable claims) + 4 (claim-to-evidence linkage) + 5 (append-only ledger).' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+          else
+            echo "open issue already exists — not duplicating"
+          fi

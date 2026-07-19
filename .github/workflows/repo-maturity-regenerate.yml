@@ -1,0 +1,54 @@
+# Regenerate manifest/repo-maturity.edn (maturity scoring incl. :maturity/coverage-score,
+# ADR-2607171030). 2910 repo は GitHub GraphQL rate limit (5000 points/h) + REST git/trees で
+# 1回の実行で終わらないため、毎日 cron で --merge-existing により前回スコア化できなかった
+# repo を持ち越しつつ、少しずつ全 repo を最新化する（Phase 1 の Z 方針）。
+# repo-reality-verify.yml の bot push (HEAD:main, retry 付き) パターンを踏襲。
+#
+# gh 認証: runner の GITHUB_TOKEN を gh CLI が自動検出。オーナーのローカル gh ほど広い
+# private-org 可視性は無い場合があり、見えない repo は WARN で nil（repo-maturity.cljs 既存仕様）。
+name: repo-maturity-regenerate
+
+on:
+  schedule:
+    - cron: "17 1 * * *"   # 毎日 01:17 UTC (10:17 JST)。fleet/repo-reality の cron (07:43) を避ける。
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: [scripts/repo-maturity.cljs, .github/workflows/repo-maturity-regenerate.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nbb
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Regenerate repo-maturity.edn (--merge-existing --batch-size 10)
+        run: npx nbb scripts/repo-maturity.cljs --merge-existing --batch-size 10
+
+      - name: Commit & push manifest/repo-maturity.edn if changed
+        run: |
+          if git diff --quiet -- manifest/repo-maturity.edn; then
+            echo "no changes to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add manifest/repo-maturity.edn
+          git commit -m "$(printf 'repo-maturity: regenerate %s\n\nAutomated maturity/coverage-score refresh from .github/workflows/repo-maturity-regenerate.yml (ADR-2607171030, run %s). --merge-existing: GraphQL rate-limit-skipped repos retained from prior run.' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${{ github.run_id }}")"
+          for attempt in 1 2 3; do
+            git pull --rebase --autostash origin main && git push origin HEAD:main && break
+            echo "push attempt $attempt failed, retrying after fetch+rebase..."
+            sleep 5
+          done

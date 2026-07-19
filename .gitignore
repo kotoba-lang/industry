@@ -1,0 +1,75 @@
+.pnpm-store
+.pnpm-lock.yaml
+.pnpm-workspace.yaml
+
+.DS_Store
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+orgs/kawasakijun/.venv/
+orgs/kawasakijun/.sensors_cache/
+orgs/kawasakijun/living/.audit.jsonl
+orgs/personal/bin/datomic/.cpcache/
+orgs/personal/bin/datomic/.clj-kondo/
+
+# Local-only workspace / build artifacts / unregistered repos (not part of the superproject)
+# Kept out of git to avoid bloat and accidental commits; real content lives locally only.
+/projects/
+/_deploy-goriketsu/
+/_deploy-goriketsu-proxy/
+/kami-webgpu/
+/kotoba-pr-ci-fix/
+/kotoba-pr-shell/
+
+# Cloudflare Wrangler local cache
+.wrangler/
+
+# west workspace (local; not tracked)
+.west/
+
+# west-managed cloud-itonami-isic-* fleet checkouts (heavy-industry ISIC registration,
+# com-junkawasaki/root manifest); real content lives on GitHub under cloud-itonami org
+/orgs/cloud-itonami/
+
+# west-managed project checkouts (ADR-2607052200); real content lives on GitHub
+/orgs/kotoba-lang/org-ros/
+/orgs/kotoba-lang/com-sony-dualsense/
+/orgs/kotoba-lang/teleop/
+
+# west-managed project checkout accidentally left as a superproject gitlink
+# pre-west-migration (missed when neighboring identify/identity were cleaned
+# up above); real content lives on GitHub
+/orgs/kotoba-lang/industry/
+
+# west-managed project checkout (ADR-2607052300); real content lives on GitHub
+/orgs/kotoba-lang/swarm-choreo/
+
+# west-managed authentication-cluster project checkouts accidentally committed to
+# the superproject index pre-west-migration; real content lives on GitHub
+/orgs/kotoba-lang/aml/
+/orgs/kotoba-lang/authentication/
+/orgs/kotoba-lang/authorization/
+/orgs/kotoba-lang/ctf/
+/orgs/kotoba-lang/ekyc/
+/orgs/kotoba-lang/faceid/
+/orgs/kotoba-lang/identify/
+/orgs/kotoba-lang/identity/
+/orgs/kotoba-lang/mfa/
+/orgs/kotoba-lang/oauth/
+/orgs/kotoba-lang/oidc/
+/orgs/kotoba-lang/onetime/
+/orgs/kotoba-lang/saml/
+/orgs/kotoba-lang/session/
+/orgs/kotoba-lang/touchid/
+/orgs/kotoba-lang/webauthn/
+
+# Clojure compile cache (superproject root)
+/.cpcache/
+
+# Local-only AI tool workspaces (not part of the superproject)
+/.claire/
+/.cursor/
+/.opencode/

@@ -1,0 +1,43 @@
+[{:db/id -1
+  :adr/id "adr-2607197800-kami-immersive-hdr-professional-delivery"
+  :adr/title "KAMI establishes immersive, HDR, revocation, and professional delivery boundaries"
+  :adr/date "2026-07-19"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607197700-kami-key-rotation-curve-canvas"]
+  :adr/decision
+  {:daw {:immersive {:layouts [:stereo :surround-5.1 :surround-7.1.4]
+                      :metadata :adm-bs.2076-3
+                      :object-position-range [-1.0 1.0]
+                      :certified-atmos-renderer :external}
+         :distributed-revocation {:signature :ecdsa-p256-sha256
+                                  :trust-anchor :publisher-fingerprint
+                                  :freshness [:issued-at :next-update]
+                                  :rollback-policy :reject
+                                  :revoked-publisher-action [:remove-trust :disable-plugins]}}
+   :nle {:color {:authority [:builtin :ocio] :transfers [:srgb :bt1886 :pq :hlg]
+                :primaries [:rec709 :display-p3 :rec2020]
+                :hdr-mastering-metadata :required}
+         :delivery {:profiles [:mov-hdr :mxf-op1a :imf-app2e]
+                    :capability-negotiation :explicit
+                    :silent-codec-substitution :forbidden
+                    :imf-validation [:edit-rate :asset-id :sha256 :composition-reference]}}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates
+   {:daw ["ADM BWF PCM chunk muxing" "object automation renderer" "Dolby Atmos certification"]
+    :nle ["arbitrary OCIO config evaluation" "reference HDR monitoring" "licensed MOV/MXF codecs" "complete IMF CPL/PKL/AssetMap emission"]}}
+  :adr/implementation
+  {:daw-commits ["4457a57"] :nle-commits ["b1664c2"]
+   :pull-requests ["kotoba-lang/kami-app-daw#36" "kotoba-lang/kami-app-nle#36"]
+   :evidence
+   ["DAW passes 42 tests and 198 assertions; NLE passes 43 tests and 209 assertions."
+    "Both guarded optimized builds produced non-empty main.js artifacts."
+    "Chrome detected immersive/ADM and HDR/professional-delivery controls with zero console or page errors."
+    "External codecs and certified renderers remain explicit unavailable capabilities rather than browser substitutions."]}
+  :adr/consequences
+  ["Immersive intent and HDR mastering metadata survive as validated project authority."
+   "A compromised or retired publisher can be disabled by a signed, fresh, monotonic revocation list."
+   "Professional containers are selectable only as capability-negotiated delivery boundaries."
+   "Certification, licensed essence encoding, reference monitoring and complete IMF package emission remain explicit gates."]
+  :adr/source-format "edn"}]

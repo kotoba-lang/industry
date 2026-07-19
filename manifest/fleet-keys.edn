@@ -1,0 +1,36 @@
+;; kagami keyring + governance policy (ADR-2607160005).
+;; Phase 1: :keys — single-key pin-advance grants (trailing-* wildcard paths).
+;; Phase 2: :roots — trust anchors for delegation chains (fleet grant);
+;;          :canonical — Radicle-crefs-style quorum policy for canonical
+;;          advances (fleet govern): >= :threshold distinct signatures from
+;;          :allow. Private keys now live in kagi (OS-Keychain unlock, no
+;;          interactive prompt — the kotoba-native store, ADR-2606272330),
+;;          NOT 1Password (op CLI timed out on interactive auth). Retrieve
+;;          with `fleet ... --kagi <name>` (compartment personal). CAIP-122
+;;          CACAO wire format alignment remains a Phase 2 follow-up.
+;;
+;; ROTATED 2026-07-17 (ADR-2607170500): the 2026-07-16 keys were lost when the
+;; kagi vault lived in a repo checkout that a concurrent session clobbered. The
+;; vault now lives at ~/.kagi (repo-external, init-guarded) AND is cloud-backed
+;; to kotobase.net (`kagi push`/`pull`), so this loss class cannot recur. All
+;; five keys below are fresh; the old ed25519:7414dd47 / did:key:z6Mkk13t /
+;; z6MkqmFd / z6MkqZim material is unrecoverable and now untrusted.
+;;
+;; kagi key names (compartment personal, in ~/.kagi):
+;;   fleet-owner-key   -> ed25519:36e96151...  (single-key pin-advance signer)
+;;   fleet-owner-root  -> :roots trust anchor + quorum member
+;;   fleet-gov1/gov2   -> :canonical quorum governors
+;;   fleet-agent1      -> delegated land-back agent
+{:keys
+ {"ed25519:36e96151c7181dc7fcbc1057f09799ec312cb2ee38efda0b65301dc7966615cc"
+  {:grants #{"orgs/*"}
+   :note "2026-07-17 rotation: Phase 1 pin-advance signer (owner-approved, ADR-2607170500)"}}
+
+ :roots #{"did:key:z6MkgaYKLVojxB2iUV13jubQoivUbHM34bBkSXLVo7iY633p"}
+
+ :canonical
+ {:allow #{"did:key:z6Mki4zQ9MMwufb8Vj51Z11EERBVHGDRxNtoKe5KYGqopUPs"
+           "did:key:z6MkiaTK4it22bog8TVeuvCQZFLST6zpTBK4tdgSik8R49bD"
+           "did:key:z6MkgaYKLVojxB2iUV13jubQoivUbHM34bBkSXLVo7iY633p"}
+  :threshold 2
+  :note "2026-07-17 rotation: gov1, gov2, owner-root; 2-of-3"}}

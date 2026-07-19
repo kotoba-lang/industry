@@ -1,0 +1,35 @@
+disable-default-queries: false
+
+queries:
+  - uses: security-and-quality
+  - uses: security-experimental
+
+paths-ignore:
+  - node_modules
+  - target
+  - dist
+  - build
+  - .next
+  - out
+  - __pycache__
+  - "*.min.js"
+  - "*.min.css"
+  - "*.bundle.js"
+  - "*.bundle.css"
+  - "apps/*/node_modules"
+  - "apps/*/target"
+  - "apps/*/dist"
+  - "apps/*/.next"
+  - "apps/*/out"
+  - "apps/*/build"
+  - "emotion_env"
+  - "hottgraph/target"
+  - "crates/*/target"
+  - "orgs/personal/takeout"
+  - "orgs/personal/models"
+
+paths:
+  - 70-tools/scripts
+  - manifest
+  - orgs
+  - scripts

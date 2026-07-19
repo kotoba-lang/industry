@@ -1,0 +1,64 @@
+{:kotoba/spec-version 1
+ :kotoba/domain :llm/modal-vllm
+ :defaults
+ {:cache-dir "/root/.cache/huggingface"
+  :vllm-port 8000
+  :host "0.0.0.0"
+  :max-model-len 65536
+  :gpu-memory-utilization 0.92}
+ :models
+ {:minimax-m27
+  {:model/id "MiniMaxAI/MiniMax-M2.7"
+   :served-name "MiniMaxAI/MiniMax-M2.7"
+   :api-key-env "LLM_KEY"
+   :default-api-key "minimax-m2-7-testkey-7f3a"
+   :modal/app "minimax-m2-7"
+   :modal/gpu "H100:4"
+   :modal/volume "hf-cache-minimax"
+   :vllm/tensor-parallel-size 4
+   :vllm/tool-call-parser "minimax_m2"
+   :vllm/reasoning-parser "minimax_m2_append_think"
+   :vllm/extra-args ["--enable-auto-tool-choice"
+                     "--safetensors-load-strategy" "prefetch"
+                     "--enforce-eager"]}
+  :minimax-m27-w4a16
+  {:model/id "bullerwins/MiniMax-M2.7-W4A16"
+   :served-name "MiniMaxAI/MiniMax-M2.7"
+   :api-key-env "LLM_KEY"
+   :default-api-key "minimax-m27-api-key-7f3a"
+   :modal/app "minimax-m27-api"
+   :modal/gpu "H200"
+   :modal/volume "hf-cache-m27-w4a16"
+   :vllm/tensor-parallel-size 1
+   :vllm/max-model-len 16384
+   :vllm/tool-call-parser "minimax_m2"
+   :vllm/reasoning-parser "minimax_m2_append_think"
+   :vllm/extra-args ["--enable-auto-tool-choice"
+                     "--safetensors-load-strategy" "prefetch"
+                     "--enforce-eager"
+                     "--enable-sleep-mode"]}
+  :kimi-k27-code
+  {:model/id "moonshotai/Kimi-K2.7-Code"
+   :served-name "moonshotai/Kimi-K2.7-Code"
+   :api-key-env "LLM_KEY"
+   :default-api-key "kimi-k27-code-testkey-7f3a"
+   :modal/app "kimi-k27-code"
+   :modal/gpu "H200:8"
+   :modal/volume "hf-cache-kimi"
+   :vllm/tensor-parallel-size 8
+   :vllm/tool-call-parser "kimi_k2"
+   :vllm/reasoning-parser "kimi_k2"
+   :vllm/extra-args ["--mm-encoder-tp-mode" "data"
+                     "--enable-auto-tool-choice"
+                     "--safetensors-load-strategy" "prefetch"
+                     "--enforce-eager"]}}
+ :bench
+ {:reasoning "A farmer has 17 sheep. All but 9 run away. Then he buys 5 more, and twice as many goats as the sheep he now has. How many animals total? Show your reasoning step by step, then give the final number."
+  :coding "Write a Clojure function `merge-intervals` that merges overlapping intervals represented as [start end] vectors. Include 3 clojure.test examples and state the time complexity."
+  :tool {:type "function"
+         :function {:name "get_weather"
+                    :description "Get current weather for a city."
+                    :parameters {:type "object"
+                                 :properties {:city {:type "string"}
+                                              :unit {:type "string" :enum ["c" "f"]}}
+                                 :required ["city"]}}}}}

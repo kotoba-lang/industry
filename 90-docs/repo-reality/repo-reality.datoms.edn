@@ -1,0 +1,274 @@
+;; repo-reality base — doc-vs-code drift verification for kotoba-lang core projects
+;; (kotoba, kotoba-lang, kotobase, aiueos, kototama). Combines 3 methods discussed
+;; 2026-07-15: (1) executable maturity claims, (4) claim-to-evidence linkage,
+;; (5) append-only ledger for drift detection over time. Schema + catalog is
+;; DataScript/Datomic-transactable EDN, same shape as
+;; 90-docs/design-quality/design-quality.datoms.edn (that system scores UI libs;
+;; this one scores doc/ADR claims against actual repo code — different domain,
+;; same pattern). Score facts (append-only, one EDN map per line) live in the
+;; sibling file repo-reality-ledger.edn — this file only declares schema + the
+;; :project/*, :axis/*, :claim/* catalog entities that ledger events reference
+;; via :eval/claim.
+;;
+;; Scope (2026-07-15): all 5 kotoba-lang core projects (kotoba, kotoba-lang,
+;; kotobase, aiueos, kototama) now have :claim/* entries + a verify_<project>.cljs
+;; sibling script (3-6 claims each, 17 total). First pass covered aiueos only;
+;; extended same day to the other 4. Adding a 6th project means: read its
+;; README/ADR/coverage.edn or maturity.md, add :claim/* entries here, write
+;; verify_<project>.cljs, run it, append output to repo-reality-ledger.edn.
+;;
+;; example DataScript query — claims with low doc-code-drift (i.e. real drift risk):
+;;   (d/q '[:find ?claim ?score ?note
+;;          :where [?e :eval/claim ?claim] [?e :eval/axis :axis/doc-code-drift]
+;;                 [?e :eval/score ?score] [?e :eval/note ?note] [(< ?score 0.6)]]
+;;        db)
+;; example — functional-completeness vs doc-code-drift side by side per claim
+;; (the point of the two-axis split: a claim can be HONESTLY disclosed as
+;; incomplete — high drift score, low completeness score — vs SILENTLY wrong,
+;; which is high-severity: low drift score regardless of completeness):
+;;   (d/q '[:find ?claim ?axis ?score
+;;          :where [?e :eval/claim ?claim] [?e :eval/axis ?axis] [?e :eval/score ?score]
+;;                 [(contains? #{:axis/functional-completeness :axis/doc-code-drift} ?axis)]]
+;;        db)
+
+[
+ ;; ---- schema -----------------------------------------------------------------
+ {:db/ident :project/id     :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :project/name   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :project/repo   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :project/own-scale :db/valueType :db.type/string :db/cardinality :db.cardinality/one} ; project's own internal maturity vocabulary, e.g. "M0-M6" / "R1-R3"
+
+ {:db/ident :axis/id          :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :axis/label       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :axis/scale       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :axis/description :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; a claim = one factual assertion pulled verbatim/near-verbatim from a doc (ADR/README/
+ ;; coverage.edn/maturity.md), pinned to its source location, so it can be independently
+ ;; re-checked against the actual repo state without re-reading prose every time.
+ {:db/ident :claim/id             :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :claim/project        :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; -> :project/id
+ {:db/ident :claim/source         :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; file path (+ :line / section) the claim was pulled from
+ {:db/ident :claim/text           :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; the claim itself, close-paraphrase or verbatim quote
+ {:db/ident :claim/self-reported-level :db/valueType :db.type/string :db/cardinality :db.cardinality/one} ; project's own vocabulary value, e.g. "M6", "R3 stable" ("" if the claim isn't a level claim)
+ {:db/ident :claim/self-caveat    :db/valueType :db.type/boolean :db/cardinality :db.cardinality/one} ; true if the SAME source doc already discloses a gap/caveat for this claim (honest disclosure vs silent claim)
+ {:db/ident :claim/axis           :db/valueType :db.type/ref     :db/cardinality :db.cardinality/many} ; -> :axis/id, which normalized axis/axes this claim bears on
+
+ ;; verification events (append-only, in repo-reality-ledger.edn)
+ {:db/ident :eval/claim    :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; -> :claim/id (curated-claim events)
+ {:db/ident :eval/repo     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; "org/repo" string, e.g. "kotoba-lang/kototama" -- used INSTEAD of :eval/claim for org-wide generic checks (orgwide_scan.cljs, 2026-07-16). No per-repo hand-curated :claim/* entity exists for these (would not scale to 1000+ repos); the repo name string is the identifier. A ledger line has exactly one of :eval/claim or :eval/repo, never both.
+ {:db/ident :eval/axis     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; -> :axis/id
+ {:db/ident :eval/layer    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :claim-extraction | :lint | :evidence-link | :ledger-reconcile
+ {:db/ident :eval/score    :db/valueType :db.type/double  :db/cardinality :db.cardinality/one} ; 0..1, normalized regardless of axis/project scale
+ {:db/ident :eval/judge    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; "lint-script" | "evidence-link-script" | agent/human id
+ {:db/ident :eval/run-id   :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :eval/at       :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :eval/seq      :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+ {:db/ident :eval/note     :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; ---- project catalog (scope: the 5 kotoba-lang core projects surveyed 2026-07-15) ------
+ {:project/id :project/kotoba, :project/name "kotoba-lang/kotoba", :project/repo "kotoba-lang/kotoba",
+  :project/own-scale "M0-M6 (docs/lang/coverage.edn)"}
+ {:project/id :project/kotoba-lang, :project/name "kotoba-lang/kotoba-lang", :project/repo "kotoba-lang/kotoba-lang",
+  :project/own-scale "n/a (org-shape ADR-2607151800, no coverage.edn of its own found)"}
+ {:project/id :project/kotobase, :project/name "kotoba-lang/kotobase", :project/repo "kotoba-lang/kotobase",
+  :project/own-scale "n/a (no coverage.edn found; status tracked via ADRs, e.g. ADR-2607150000)"}
+ {:project/id :project/aiueos, :project/name "kotoba-lang/aiueos", :project/repo "kotoba-lang/aiueos",
+  :project/own-scale "M0-M6 (docs/coverage.edn, template borrowed from kotoba-lang/kotoba-lang)"}
+ {:project/id :project/kototama, :project/name "kotoba-lang/kototama", :project/repo "kotoba-lang/kototama",
+  :project/own-scale "R1-R3 (docs/maturity.md)"}
+
+ ;; ---- axis catalog (common 1-5-normalized-to-0..1 axes, project-scale-agnostic) ----------
+ {:axis/id :axis/functional-completeness, :axis/label "Functional completeness", :axis/scale "0-1 (~ 1-5 normalized)",
+  :axis/description "how much of the claimed capability is actually implemented (not a stub/TODO/not-yet-wired), independent of whether the gap is disclosed"}
+ {:axis/id :axis/safety-enforcement, :axis/label "Safety/policy enforcement", :axis/scale "0-1 (~ 1-5 normalized)",
+  :axis/description "whether a claimed safety/capability constraint is actually code-enforced at runtime vs merely documented/aspirational, and how solid the enforcement mechanism itself is (stable API vs unsafe/experimental hook)"}
+ {:axis/id :axis/evidence-linkage, :axis/label "Evidence linkage", :axis/scale "0-1 (~ 1-5 normalized)",
+  :axis/description "whether the claim cites a concrete, independently-checkable artifact (test file+fn, CI run, commit) vs unverifiable prose; degrades over time if the cited artifact goes stale (see :axis/doc-code-drift for the time-decay case)"}
+ {:axis/id :axis/doc-code-drift, :axis/label "Doc-code drift (honesty)", :axis/scale "0-1, 1=no drift/fully honest, 0=silently wrong",
+  :axis/description "does the doc's OWN account match what the code actually does right now. A claim that discloses its own gap (:claim/self-caveat true) and the gap is confirmed real scores HIGH here (the doc is honest) even though :axis/functional-completeness for that same claim may be low — the two axes intentionally diverge; a claim with no caveat that turns out wrong scores LOW here regardless of completeness"}
+ {:axis/id :axis/production-readiness, :axis/label "Production readiness", :axis/scale "0-1 (~ 1-5 normalized)",
+  :axis/description "overall real-world usage signal — is this actually consumed by another repo/app in this monorepo today, not just internally tested"}
+
+ ;; ---- org-wide generic axes (2026-07-16, kotoba-lang org scan — no hand-curated :claim/*) --
+ ;; kotoba-lang org has ~1410 non-archived repos, too many for the per-repo README/ADR reading
+ ;; the 5 curated projects above got. These 2 axes are computed by orgwide_scan.cljs uniformly
+ ;; via the GitHub API (git tree + selective file content), tagged via :eval/repo not :eval/claim.
+ {:axis/id :axis/doc-internal-coherence, :axis/label "Doc-internal coherence (org-wide, generic)", :axis/scale "0-1",
+  :axis/description "generic, claim-free extension of :axis/doc-code-drift's intent: does a repo's own maturity/coverage doc (coverage.edn / maturity.md, wherever present) agree with (a) the files it cites as evidence actually existing, and (b) any OTHER status-bearing doc in the same repo (e.g. versioning.md vs coverage.edn disagreeing, the exact pattern found by hand in kotoba-lang/kotobase — see claim/kotobase-m5-doc-inconsistency). Repos with no maturity/coverage doc at all are not scored on this axis (absence of the doc is not the same as an incoherent one)."}
+ {:axis/id :axis/repo-hygiene, :axis/label "Repo hygiene (org-wide, generic)", :axis/scale "0-1",
+  :axis/description "generic housekeeping signal independent of any specific claim or architectural importance: README substance (not a 1-line placeholder), CI config presence (.github/workflows), test-file presence. A small legitimate single-purpose tool repo can and should score high here — this is NOT a maturity/completeness judgment, just basic upkeep."}
+
+ ;; ---- claim catalog: aiueos (prototype repo, 2026-07-15) ---------------------------------
+ {:claim/id :claim/aiueos-maturity-m6,
+  :claim/project :project/aiueos,
+  :claim/source "orgs/kotoba-lang/aiueos/docs/coverage.edn:2,57-66 (stage :m6)",
+  :claim/text "Self-reported :maturity :m6 (top of the M0-M6 ladder), but the m6 stage's own note says 'Still pre-1.0 (Phase-0)' and names ADR-0005/0006 as having not-yet-implemented phases.",
+  :claim/self-reported-level "M6",
+  :claim/self-caveat true,
+  :claim/axis [:axis/functional-completeness :axis/doc-code-drift]}
+
+ {:claim/id :claim/aiueos-ci-tests-green,
+  :claim/project :project/aiueos,
+  :claim/source "orgs/kotoba-lang/aiueos/docs/coverage.edn:41,55 (stages :m4/:m5)",
+  :claim/text "'clojure -M:test / bb test:cljc: 190 tests, 525 assertions green (2026-07-08)' -- a dated, specific evidence citation.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/evidence-linkage]}
+
+ {:claim/id :claim/aiueos-fuel-metering,
+  :claim/project :project/aiueos,
+  :claim/source "orgs/kotoba-lang/aiueos/README.edn:52-60; src/aiueos/execute.cljc:20-35,304",
+  :claim/text "':aiueos/limits :fuel' is enforced via real instruction-level metering (Chicory's withUnsafeExecutionListener), but the README itself calls the API 'unsafe'/'experimental'/'possibly removed later' and says to treat it as a working prototype, not a permanent guarantee.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/safety-enforcement :axis/doc-code-drift]}
+
+ {:claim/id :claim/aiueos-memory-limit,
+  :claim/project :project/aiueos,
+  :claim/source "orgs/kotoba-lang/aiueos/README.edn:61-66; src/aiueos/execute.cljc:34-35,305",
+  :claim/text "':aiueos/limits :memory-pages' is enforced via Chicory's withMemoryLimits, explicitly called out as a STABLE API (unlike the fuel listener).",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/safety-enforcement]}
+
+ {:claim/id :claim/aiueos-device-access-stub,
+  :claim/project :project/aiueos,
+  :claim/source "orgs/kotoba-lang/aiueos/README.edn:13-17,47-49; src/aiueos/execute.cljc:6,152-158,260-267",
+  :claim/text "The device-access quartet (pci-config/dma-map/irq-subscribe/mmio-map) 'stays a deterministic stub pending real hardware access' -- explicitly named as out of scope, not hidden.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/functional-completeness :axis/doc-code-drift]}
+
+ {:claim/id :claim/aiueos-deadline-cycles,
+  :claim/project :project/aiueos,
+  :claim/source "orgs/kotoba-lang/aiueos/README.edn:85-87; src/aiueos/manifest.cljc:210-217; src/aiueos/launcher.cljc:186",
+  :claim/text "':aiueos/schedule''s :deadline-cycles is NOT enforced -- README states this directly, and manifest.cljc's due-this-cycle? docstring has an explicit 'NOTE what this does NOT do' section naming the same gap.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/safety-enforcement :axis/doc-code-drift]}
+
+ ;; ---- claim catalog: kotoba (extended 2026-07-15) -----------------------------------------
+ {:claim/id :claim/kotoba-maturity-m6,
+  :claim/project :project/kotoba,
+  :claim/source "orgs/kotoba-lang/kotoba/docs/lang/coverage.edn:1 (:kotoba.lang.coverage/maturity :m6)",
+  :claim/text "Self-reported top-of-ladder maturity :m6, same M0-M6 template as aiueos/kotoba-lang.",
+  :claim/self-reported-level "M6",
+  :claim/self-caveat false,
+  :claim/axis [:axis/functional-completeness]}
+
+ {:claim/id :claim/kotoba-rust-removed,
+  :claim/project :project/kotoba,
+  :claim/source "orgs/kotoba-lang/kotoba/README.edn:31-34,68-71 (commit 604896171b, 2026-07-01)",
+  :claim/text "The earlier Rust workspace (crates/kotoba-kotodama and the rest of crates/) 'has been fully removed'; current implementation is JVM Clojure/ClojureScript (.cljc).",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/doc-code-drift]}
+
+ {:claim/id :claim/kotoba-cljs-reinstated,
+  :claim/project :project/kotoba,
+  :claim/source "orgs/kotoba-lang/kotoba/CHANGELOG.md:Unreleased ('.cljs' bullet); src/demo.cljs",
+  :claim/text "'.cljs' reinstated as a directly-runnable source extension, defaulting to the :cljs reader target with no --reader-target flag; src/demo.cljs is cited as the proof file.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/evidence-linkage]}
+
+ {:claim/id :claim/kotoba-shell-not-wired,
+  :claim/project :project/kotoba,
+  :claim/source "orgs/kotoba-lang/kotoba/README.edn:430-437 ('kotoba-shell release pipeline (design, not yet shipped)'); src/kotoba/launcher.clj",
+  :claim/text "kotoba-shell is DESIGNED (docs/ADR-kotoba-shell-aiueos-safe-kotoba.md) but README explicitly says 'There is no kotoba shell subcommand wired up in this repo's launcher yet ... treat the ADR as the design record, not a usable CLI.'",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/functional-completeness :axis/doc-code-drift]}
+
+ ;; ---- claim catalog: kotoba-lang (extended 2026-07-15) ------------------------------------
+ {:claim/id :claim/kotoba-lang-maturity-m6,
+  :claim/project :project/kotoba-lang,
+  :claim/source "orgs/kotoba-lang/kotoba-lang/docs/lang/coverage.edn (:maturity :m6, appears 3x across stage entries)",
+  :claim/text "Self-reported top-of-ladder maturity :m6, same M0-M6 template shared with kotoba/aiueos.",
+  :claim/self-reported-level "M6",
+  :claim/self-caveat false,
+  :claim/axis [:axis/functional-completeness]}
+
+ {:claim/id :claim/kotoba-lang-rust-retired,
+  :claim/project :project/kotoba-lang,
+  :claim/source "orgs/kotoba-lang/kotoba-lang/README.edn:20-24; docs/rust-migration-inventory.md",
+  :claim/text "'An earlier Rust implementation was fully retired in favor of this CLJC authority' -- with a dedicated rust-migration-inventory.md tracking the migration state repo-by-repo (kotoba-v2025 named as an explicit, intentional legacy exception).",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/doc-code-drift]}
+
+ {:claim/id :claim/kotoba-lang-cli-contract,
+  :claim/project :project/kotoba-lang,
+  :claim/source "orgs/kotoba-lang/kotoba-lang/README.edn:48 (kotoba/README.edn); src/kotoba/cli.cljc",
+  :claim/text "kotoba-lang 'owns the standalone language and public CLI contract' via src/kotoba/cli.cljc, mirrored by aiueos's own cli.cljc pattern per aiueos's README.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/functional-completeness]}
+
+ {:claim/id :claim/kotoba-lang-packages-deferred,
+  :claim/project :project/kotoba-lang,
+  :claim/source "orgs/kotoba-lang/kotoba-lang/docs/lang/README.edn:207; docs/lang/stdlib-versioning.md:79-84; docs/lang/stdlib-gates.md:50; src/kotoba/lang/package_contract.cljc; src/kotoba/cli.cljc",
+  :claim/text "The ':packages' (CID-lock) track -- a package registry -- is explicitly 'deferred' / 'Out of scope' in 3 separate stdlib docs; only a package_contract.cljc CONTRACT exists (the data shape), no 'registry' subcommand is wired into the public CLI.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/functional-completeness :axis/doc-code-drift]}
+
+ ;; ---- claim catalog: kotobase (extended 2026-07-15) ---------------------------------------
+ {:claim/id :claim/kotobase-istore-seam,
+  :claim/project :project/kotobase,
+  :claim/source "orgs/kotoba-lang/kotobase/README.edn:33-36; src/kotobase/store.cljc:17 (defprotocol IStore); src/kotobase/local.cljc",
+  :claim/text "'This repo (kotobase-clj) is kotobase's client seam -- the IStore port', with LocalStore as one concrete implementation.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/functional-completeness]}
+
+ {:claim/id :claim/kotobase-datomic-analogy,
+  :claim/project :project/kotobase,
+  :claim/source "orgs/kotoba-lang/kotobase/README.edn:6-10 (ADR-2607032500)",
+  :claim/text "kotobase is pitched as 'the Datomic to kotoba's Clojure' -- content-addressed/network-native reimagining of Datomic's datom/EAVT/Datalog model (Prolly Tree instead of B-tree, commit DAG instead of a single log, CACAO-authed edge runtime instead of a JVM transactor peer).",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/doc-code-drift]}
+
+ {:claim/id :claim/kotobase-m5-doc-inconsistency,
+  :claim/project :project/kotobase,
+  :claim/source "orgs/kotoba-lang/kotobase/docs/versioning.md:33-38 vs docs/coverage.edn (:stage :m5 note); fixed via kotoba-lang/kotobase PR #6 (2026-07-16)",
+  :claim/text "FIXED 2026-07-16 (kotobase PR #6): docs/versioning.md previously said 'including an open M5 gap: no confirmed external consumer names this repo by package identity today', disagreeing with docs/coverage.edn's :m5 stage note which already said 'Resolved 2026-07-08'. versioning.md now states the same resolved status (cloud-manimani + local-murakumo depend on kotoba-lang/kotobase directly). Originally found 2026-07-15 by the repo-reality doc-vs-code drift check as real doc-vs-doc drift (not self-disclosed -- neither doc cross-referenced the other's conflicting status); kept in the catalog (rather than deleted) so the ledger's before/after history stays visible.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/doc-code-drift]}
+
+ ;; ---- claim catalog: kototama (extended 2026-07-15) ---------------------------------------
+ {:claim/id :claim/kototama-r3-stable,
+  :claim/project :project/kototama,
+  :claim/source "orgs/kotoba-lang/kototama/docs/maturity.md:15 ('Current declared level: R3 stable')",
+  :claim/text "Current declared level is R3 stable (ops-ready local/shared-store fleet under automated gates + staging-smoke), with R1 stable underneath and R2 explicitly 'advanced-partial'.",
+  :claim/self-reported-level "R3 stable",
+  :claim/self-caveat true,
+  :claim/axis [:axis/functional-completeness :axis/doc-code-drift]}
+
+ {:claim/id :claim/kototama-r2-browser-parity,
+  :claim/project :project/kototama,
+  :claim/source "orgs/kotoba-lang/kototama/docs/maturity.md:54; src/kototama/browser.cljc:8-11,29-33",
+  :claim/text "Browser import parity is 8/9 -- llm-infer is explicitly 'browser: no sync network; node: opts.llmInfer inject', named as the one gap in the parity matrix, not silently omitted.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/functional-completeness :axis/doc-code-drift]}
+
+ {:claim/id :claim/kototama-fencing-not-raft,
+  :claim/project :project/kototama,
+  :claim/source "orgs/kotoba-lang/kototama/docs/maturity.md:71,93-113; src/kototama/fleet_fence.cljc:1-13",
+  :claim/text "R3 fleet fencing uses epoch-based lease claiming (higher epoch wins on a shared store), explicitly 'not Raft/Paxos' / 'does NOT implement network consensus, leader election, or clock sync' -- multi-datacenter consensus stays out of scope by design, not by omission.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/safety-enforcement :axis/doc-code-drift]}
+
+ {:claim/id :claim/kototama-fleet-broker-partial,
+  :claim/project :project/kototama,
+  :claim/source "orgs/kotoba-lang/kototama/src/kototama/fleet.cljc:302,326-333 (r3-report :landed / :not-yet)",
+  :claim/text "fleet.cljc's own r3-report fn lists 'aiueos GRANT/DENY E2E through fleet-exec + tender' as :landed, but ':not-yet' still names 'full aiueos fleet broker (all actor:host kinds as first-class policy)' -- basic grant/deny works, the FULL policy surface across all actor:host kinds does not, and the code's own report function says so.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/functional-completeness :axis/doc-code-drift]}
+]

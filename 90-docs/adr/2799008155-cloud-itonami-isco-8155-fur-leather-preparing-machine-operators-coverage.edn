@@ -1,0 +1,311 @@
+[{:db/id -1
+  :adr/id 2799008155
+  :adr/title "cloud-itonami-isco-8155 — Fur and Leather Preparing Machine Operators Plant Scheduling/Logistics Coordination Coverage"
+  :adr/status :accepted
+  :adr/date "2026-07-18"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/scope [:kotoba-lang/occupation :cloud-itonami/cloud-itonami-isco-8155]
+  :adr/references [2607121000]
+  :adr/related ["adr-2607121000-cloud-itonami-global-isic-isco-reverse-toposort-plan"
+                "adr-2799008122-cloud-itonami-isco-8122-metal-finishing-plating-coating-machine-operators-coverage"]
+  :actor/id :cloud-itonami-isco-8155
+  :actor/name "Fur and Leather Preparing Plant Scheduling and Logistics Coordination Practice"
+  :actor/isco-08 "8155"
+  :actor/domain :manufacturing/fur-leather-preparing-scheduling-logistics-coordination
+  :actor/wave 3
+  :actor/robotics? true
+  :actor/coordination? true
+  :actor/proposal-ops [:log-work-record :schedule-crew-operation :flag-safety-concern :coordinate-supply-order]
+  :actor/hard-checks [:no-operator :no-plant :no-actuation :unknown-op :scope-excluded-action]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/scope-excluded-ops [:finalize-processing-decision :finalize-processing-operation
+                              :finalize-tanning-operation
+                              :authorize-processing-run :proceed-with-processing-run
+                              :finalize-chemical-safety-clearance
+                              :declare-plant-safety-cleared
+                              :declare-batch-safe-for-handling :declare-batch-safe-for-shipment
+                              :clear-batch-for-shipment
+                              :override-plant-safety-officer-judgment :override-safety-officer-judgment]
+  :actor/scope-excluded-terms ["proceed with the tanning run" "proceed with the processing run"
+                                "authorize the tanning run" "authorize the processing run"
+                                "finalize the tanning decision" "finalize the tanning operation"
+                                "finalize the processing decision" "finalize the processing operation"
+                                "declare the batch safe for handling" "declare the dressed batch safe for handling"
+                                "declare the batch safe for shipment" "declare the dressed batch safe for shipment"
+                                "clear the batch for shipment" "clear the dressed batch for handling"
+                                "finalize the chemical safety clearance" "finalize the chemical-safety clearance"
+                                "declare the plant safety cleared" "declare the chemical bath safety cleared"
+                                "override the plant safety officer's judgment"
+                                "override the safety officer's judgment"
+                                "override plant safety officer judgment"]
+  :registry/operating-states [:intake :propose :approve :execute :audit]
+  :registry/required-technologies [:robotics :identity :audit-ledger]
+  :registry/maturity :implemented
+  :registry/business-id "cloud-itonami-isco-8155"
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isco-8155"
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+  :operation/entry-point :intake
+  :phase/rollout "{0 {:label \"read-only\", :writes #{}, :auto #{}}, 1 {:label \"assisted-logging\", :writes #{:log-work-record}, :auto #{}}, 2 {:label \"assisted-coordination\", :writes #{:log-work-record :schedule-crew-operation :coordinate-supply-order}, :auto #{}}, 3 {:label \"supervised-auto\", :writes #{:log-work-record :flag-safety-concern :schedule-crew-operation :coordinate-supply-order}, :auto #{:log-work-record :schedule-crew-operation}}}"
+  :test/counts "{:total 34, :assertions 73, :failures 0, :errors 0}"
+  :test/simulator :furleathercoord.actor-test
+  :test/coverage [:governor-hard-checks :advisor-shapes :integration :store-contract
+                   :scope-exclusion-self-trip-regression :operator-verification :plant-verification
+                   :closed-op-allowlist :supply-cost-threshold-escalation
+                   :processing-operation-chemical-safety-clearance-finalization-forbidden
+                   :plant-safety-officer-override-forbidden]
+  :adr/authoritative false
+  :adr/body "# ADR 2799008155: cloud-itonami ISCO-08 8155 Fur and Leather Preparing Machine Operators plant scheduling/logistics coordination coverage
+
+## Status
+
+Accepted
+
+## Context
+
+This is part of the occupation-classification track (sibling to the
+`cloud-itonami-isic-*` industry-actor rollout, same governing
+ADR-2607121000): codify every ISCO-08 occupation unit group as an
+autonomous \"actor\" (LLM/advisor behind an independent Governor, a
+`langgraph.graph` StateGraph, append-only audit ledger), modeled on a
+robotics premise -- a robot performs the occupation's physical/
+administrative work, proposing actions to an independent Governor that
+gates them, never dispatches hardware itself, always escalates
+high-stakes decisions to a human. This ADR covers **ISCO-08 class 8155
+-- Fur and Leather Preparing Machine Operators** only. This is Wave3
+(production/trades); Wave0/1/2 are 100% complete, and this actor
+continues the 81xx plant-and-machine-operator range
+(`kotoba.occupation.wave/wave-of \"8155\"` resolves to wave 3).
+
+`gh api repos/cloud-itonami/cloud-itonami-isco-8155` returned a clean
+404 before any work began -- this was a genuinely fresh scaffold, not a
+resume of prior partial work.
+
+The `kotoba-lang/occupation` registry's live `{:id \"8155\" ...}` entry
+was verified against a fresh clone before any work began (`clojure -M
+-e \"(require 'kotoba.occupation) (println (kotoba.occupation/get-
+occupation \\\"8155\\\"))\"` from a checkout with the `kotoba-lang/
+technology` sibling present at the correct `../technology` relative
+path), and its `:name` read exactly \"Fur and Leather Preparing Machine
+Operators\" -- confirming the premise, no mismatch. Prior to this ADR
+the entry's `:maturity` was `:spec` with `:required-technologies
+[:robotics :identity :audit-ledger]` and no `:repo`/`:business-id`.
+This ADR and its companion registry edit promote the `8155` entry to
+`:implemented`.
+
+**Chemical tanning-machine hazard dimension.** Fur and Leather
+Preparing Machine Operators run tanning/dressing machinery (fleshing,
+tanning-drum, dyeing, splitting and staking machines) using chemical
+processing agents -- a real chemical-exposure hazard, alongside
+heavy-machinery hazard (crush/entanglement injury from rollers and
+drums). This actor does NOT model direct processing-machine operation
+authority or chemical-safety-clearance authority. It is deliberately
+restricted to PLANT SCHEDULING and LOGISTICS COORDINATION around the
+occupation (production-run/inventory/progress-record logging,
+crew/shift scheduling, safety-concern escalation, and
+processing-chemicals/raw-hide procurement coordination) -- never the
+processing-operation-execution decision or the chemical-safety-
+clearance decision itself, and never an override of a plant safety
+officer's judgment. The closed proposal-op allowlist structurally
+excludes any op that could directly finalize such a decision, and the
+governor independently, permanently hard-blocks any proposal whose
+rationale text names such a finalization action, regardless of the
+declared `:op` or confidence -- this is not an escalation path a human
+can approve through, it is an outright, structural refusal at every
+maturity level.
+
+The reference implementation mirrored closely for module SHAPE is
+[`cloud-itonami/cloud-itonami-isco-8122`](https://github.com/cloud-itonami/cloud-itonami-isco-8122)
+(Metal Finishing, Plating and Coating Machine Operators -- a closely
+related chemical-processing industrial-machine safety pattern),
+independently re-cloned and read in full this session, and
+independently re-verified as green (fresh clone, `clojure -M:test`)
+before being used as a template. `cloud-itonami-isco-7535` (Pelt
+Dressers, Tanners and Fellmongers -- the craft-occupation sibling of
+this same fur/leather domain, `tannerycoord.*`) was also cloned and
+read for domain vocabulary, since it is the closer domain match, but
+8122's module SHAPE was mirrored per the task's explicit reference
+pointer. Both references' `{store,advisor,governor,actor}` module
+split, `langgraph.graph` StateGraph shape, closed op-allowlist and
+scope-exclusion self-trip-guard design translate almost 1:1 onto this
+occupation's own chemical-hazard-adjacent coordination scope, so this
+ADR's `furleathercoord.*` modules follow the same shape with domain
+terms substituted (plater -> operator, plating facility/plant -> fur
+and leather preparing plant, plating-operation-execution ->
+processing-operation-execution).
+
+## Decision
+
+Publish `cloud-itonami/cloud-itonami-isco-8155` as an OSS
+documentation/logistics-coordination actor for fur and leather
+preparing machine operators, following the SAME governed-actor
+architecture as every prior `cloud-itonami-isco-*` actor in this
+fleet: **Fur and Leather Preparing Plant Scheduling Coordination
+Advisor ⊣ FurLeatherCoordGovernor** on a `langgraph.graph` StateGraph
+(`io.github.kotoba-lang/langgraph`, git-sha-pinned identically to the
+reference's `deps.edn` -- a different library coordinate from the
+`langgraph-clj` used by the unrelated `20-actors/*` actor family),
+with an independent Governor, human-in-the-loop approval via
+`interrupt-before`, and an append-only audit ledger.
+
+This actor is deliberately **plant scheduling/logistics coordination
+ONLY, never processing-machine operation authority** -- it must NEVER
+be designed to exercise, simulate exercising, or propose exercising a
+processing-operation-execution decision or a chemical-safety-clearance
+decision.
+
+### Closed proposal-op allowlist (all `:effect :propose`)
+
+- `:log-work-record` -- production-run/inventory/progress data
+  logging only
+- `:schedule-crew-operation` -- crew/shift/task scheduling proposal
+  only
+- `:flag-safety-concern` -- surface a chemical-exposure/
+  heavy-machinery(crush/entanglement from rollers and drums)/
+  equipment-condition concern, ALWAYS escalates immediately, NEVER
+  auto-commit-eligible
+- `:coordinate-supply-order` -- processing-chemicals/raw-hide
+  procurement proposal only
+
+No op in this allowlist, and no op anywhere in this codebase,
+resembles a processing-operation-execution finalization decision or a
+chemical-safety-clearance finalization decision -- these are
+structurally absent from the op-allowlist entirely, not merely gated
+behind escalation.
+
+### Five HARD governor checks (permanent, un-overridable)
+
+1. **Operator unregistered** -- any proposal must resolve to an
+   independently registered operator (crew member) record
+   (`:no-operator`). Never trusts the proposal's own claim of who the
+   operator is.
+2. **Plant unregistered** -- any proposal must resolve to an
+   independently registered fur/leather preparing plant/line record
+   (`:no-plant`).
+3. **Effect not `:propose`** -- any other `:effect` value is a HARD
+   block (`:no-actuation`; the governor never dispatches hardware
+   itself and never operates fur/leather preparing machinery itself).
+4. **Op not allowed** -- any `:op` outside the closed four-op
+   allowlist is a HARD, PERMANENT block (`:unknown-op`).
+5. **Scope-excluded action** -- the proposal's `:op` or `:rationale`
+   must never name a processing-operation-execution finalization, a
+   chemical-safety-clearance finalization, or a plant-safety-officer-
+   judgment override (`:scope-excluded-action`), REGARDLESS of the
+   declared `:op` or confidence. This is a hard, PERMANENT block --
+   there is no maturity level or confidence at which this actor may
+   auto-commit or human-approve its way past this rule; it is an
+   outright refusal, not an escalation.
+
+### Escalation gates (always human sign-off)
+
+- `:flag-safety-concern` -- ALWAYS escalates to a human, regardless of
+  confidence (governor's always-escalate path). The only channel by
+  which the robot may surface a chemical-exposure/machinery-crush-
+  entanglement/equipment-condition observation -- it never resolves
+  the concern itself.
+- a `:coordinate-supply-order` proposal whose `:cost` exceeds
+  `supply-cost-threshold` (2000) -- always needs human sign-off,
+  independent of confidence (boundary verified as exclusive by
+  `ok-supply-order-at-threshold-boundary`: exactly-at-threshold
+  commits, over-threshold escalates).
+- (advisor confidence below `confidence-floor` 0.6 also escalates, for
+  any op.)
+
+### Self-trip guard (fleet-known bug class, CLAUDE.md)
+
+A governor's scope-exclusion term list phrased as bare NOUNS (e.g.
+\"pelt\", \"fur\", \"chemical\") can accidentally match inside the mock
+advisor's own default rationale text for a legitimate proposal,
+self-blocking the actor's own happy path -- and this vertical's domain
+vocabulary is an especially sharp case of that risk, because routine
+work-log/task text legitimately names tanning/dressing machinery and
+its chemistry by name (e.g. a task literally described as \"routine fur
+and leather preparing task with tanning drum rollers and chemical
+processing agents\" -- equipment/chemical identification, not a
+proposal to finalize a processing operation or clear the plant as
+safe). `furleathercoord.governor/scope-excluded-phrases` is phrased
+exclusively as finalization ACTION PHRASES (\"finalize the tanning
+operation\", \"declare the plant safety cleared\", \"override the plant
+safety officer's judgment\" -- the exact three phrases specified by the
+task, plus their closely-related variants), never bare nouns, and is
+checked only against the proposal's `:rationale` field (the advisor's
+own generated text), never against raw `:task` input text.
+`furleathercoord.governor-test/default-mock-advisor-proposals-never-
+self-trip-on-scope-exclusion` is a dedicated regression test driving
+the default mock-advisor across all four allowed ops with a task field
+containing exactly those bare domain nouns, asserting none of them
+ever hard-trip the finalization-scope rule. Green on first run.
+
+## Consequences
+
+- `kotoba-lang/occupation` registry's `{:id \"8155\" ...}` entry
+  promoted from `:spec` to `:implemented`, with `:repo`/`:business-id`
+  set to the real repository
+  (`https://github.com/cloud-itonami/cloud-itonami-isco-8155` /
+  `cloud-itonami-isco-8155`), and `maturity-summary`'s implemented
+  count bumped accordingly (recomputed live via
+  `kotoba.occupation/maturity-summary` immediately before the edit,
+  not assumed, to account for concurrent sibling landings in this same
+  batch).
+- Full test suite (`clojure -M:test`): 34 tests, 73 assertions, 0
+  failures, 0 errors -- raw output captured in this ADR's `:test/
+  counts` and independently re-verified against a brand-new fresh
+  clone of the pushed repository (not just the local working copy). No
+  mojibake in the Japanese violation-detail strings (0
+  replacement-byte instances grepped in the fresh clone).
+- No `manifest/west.yml` changes -- this actor is registered purely
+  via the `kotoba-lang/occupation` capability registry, consistent
+  with sibling `cloud-itonami-isco-*`/`cloud-itonami-isic-*` actors.
+- No `kotoba-lang/technology` dependency was added to the actor's
+  `deps.edn` -- only the central `kotoba-lang/occupation` registry
+  itself depends on it, to resolve `:required-technologies` stacks.
+- This ADR is EDN-only, matching the live `90-docs/adr` convention
+  (commit `6d2d0eeda658`) -- a single-entity EDN vector with an
+  `:adr/body` string blob rather than a paired `.md`+`.edn`.
+
+## Alternatives considered
+
+- Giving the actor an op like `:approve-processing-run`/
+  `:approve-chemical-safety-clearance` that is merely gated behind an
+  always-escalate path: rejected outright per the task's explicit
+  guidance -- an always-escalate op still means the *capability* to
+  finalize a processing operation or a chemical-safety clearance
+  exists in the code path and is merely deferred to a human gate. For
+  a decision whose failure mode is chemical exposure or
+  crush/entanglement injury, the capability itself must not exist in
+  this actor at all.
+- A bare-noun scope-exclusion term list (e.g. `[\"pelt\" \"fur\"
+  \"chemical\"]`): rejected outright per the task's explicit
+  instruction and the fleet-known self-trip bug class described above
+  -- this domain's own vocabulary necessarily discusses tanning/
+  dressing machinery and processing agents by name to do its
+  logging/scheduling job, so a bare-noun list would self-block the
+  actor's own legitimate proposals whenever a task description
+  mentions pelt, fur or chemical agents.
+- Naming the crew-member field `:plater-id` (mirroring
+  `cloud-itonami-isco-8122`'s own field name literally, which itself
+  deliberately avoided \"operator\" to sidestep a naming collision with
+  that repo's deploying-business sense of \"operator\"): rejected --
+  the task's own domain design explicitly specifies \"operator/plant
+  record\" (matching the ISCO title \"...Machine Operators\" literally
+  and mirroring the more recent `cloud-itonami-isco-8156` sibling's
+  same resolution), and this repo's own docs do not create the same
+  collision, so `:operator-id`/`:plant-id` is used instead of a
+  borrowed domain-specific term.
+
+## Test verification
+
+Fresh local run immediately before pushing, and independently
+reproduced against a brand-new fresh clone of the pushed repository:
+
+```text
+Running tests in #{\"test\"}
+
+Testing furleathercoord.actor-test
+
+Testing furleathercoord.governor-test
+
+Ran 34 tests containing 73 assertions.
+0 failures, 0 errors.
+```
+"}]

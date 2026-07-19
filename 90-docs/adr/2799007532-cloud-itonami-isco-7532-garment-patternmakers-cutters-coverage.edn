@@ -1,0 +1,381 @@
+[{:adr/id 2799007532
+  :adr/title "cloud-itonami-isco-7532 — Garment and Related Patternmakers and Cutters Cutting-Workshop Scheduling/Logistics Coordination Coverage"
+  :adr/status :accepted
+  :adr/date "2026-07-18"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/references [2607121000]
+  :adr/related ["2799007319-cloud-itonami-isco-7319-handicraft-workers-nec-coverage"
+                "2799007317-cloud-itonami-isco-7317-handicraft-workers-wood-basketry-coverage"
+                "2799007521-cloud-itonami-isco-7521-wood-treaters-coverage"]
+  :adr/scope [:kotoba-lang/occupation :cloud-itonami/cloud-itonami-isco-7532]
+  :actor/id :cloud-itonami-isco-7532
+  :actor/name "Garment Cutting Workshop Scheduling and Logistics Coordination Practice"
+  :actor/isco-08 "7532"
+  :actor/domain :manufacturing/garment-cutting-workshop-scheduling-logistics-coordination
+  :actor/coordination? true
+  :actor/robotics? true
+  :actor/proposal-ops [:log-work-record :schedule-crew-operation :flag-safety-concern :coordinate-supply-order]
+  :actor/always-escalate-ops [:flag-safety-concern]
+  :actor/cost-threshold-escalate-ops "{:coordinate-supply-order 2000}"
+  :actor/hard-checks [:cutter-verified :workshop-verified :effect-propose :op-not-allowed :scope-exclusion]
+  :actor/scope-excluded-ops [:finalize-pattern-cutting-execution-decision :finalize-cutting-operation
+                              :declare-workshop-safety-clearance :declare-safety-clearance
+                              :override-shop-safety-officer-judgment :override-safety-officer-judgment]
+  :actor/scope-excluded-terms ["finalize the pattern-cutting execution decision"
+                                "finalize the pattern cutting execution decision"
+                                "finalize the cutting operation" "finalize the cutting execution"
+                                "proceed with the cutting execution" "authorize the cutting execution"
+                                "declare the workshop safety cleared" "declare the workshop safety-cleared"
+                                "declare workshop safety clearance" "declare safety-cleared"
+                                "declare the shop safety cleared"
+                                "override the shop safety officer's judgment"
+                                "override the safety officer's judgment"
+                                "override shop safety officer judgment"]
+  :operation/nodes [:intake :advise :govern :decide :request-approval :commit :hold]
+  :operation/entry-point :intake
+  :phase/rollout "{0 {:label \"read-only\", :writes #{}, :auto #{}}, 1 {:label \"assisted-logging\", :writes #{:log-work-record}, :auto #{}}, 2 {:label \"assisted-coordination\", :writes #{:schedule-crew-operation :coordinate-supply-order :log-work-record}, :auto #{}}, 3 {:label \"supervised-auto\", :writes #{:flag-safety-concern :schedule-crew-operation :coordinate-supply-order :log-work-record}, :auto #{:schedule-crew-operation :coordinate-supply-order :log-work-record}}}"
+  :registry/maturity :implemented
+  :registry/repo "https://github.com/cloud-itonami/cloud-itonami-isco-7532"
+  :registry/business-id "cloud-itonami-isco-7532"
+  :registry/required-technologies [:robotics :identity :audit-ledger]
+  :registry/operating-states [:intake :propose :approve :execute :audit]
+  :test/simulator :cutcoord.actor-test
+  :test/counts "{:total 25, :assertions 55, :failures 0, :errors 0}"
+  :test/coverage [:governor-hard-checks :advisor-shapes :integration :store-contract
+                  :scope-exclusion-self-trip-regression :cutter-verification :workshop-verification
+                  :closed-op-allowlist :supply-cost-threshold-escalation]
+  :db/id -1
+  :adr/body "# ADR 2799007532: cloud-itonami ISCO-08 7532 Garment and Related Patternmakers and Cutters cutting-workshop scheduling/logistics coordination coverage
+
+## Status
+
+Accepted
+
+## Context
+
+This is part of the occupation-classification track (sibling to the
+`cloud-itonami-isic-*` industry-actor rollout, same governing
+ADR-2607121000): codify every ISCO-08 occupation unit group as an
+autonomous actor (LLM/advisor behind an independent Governor, a
+`langgraph.graph` StateGraph, append-only audit ledger), modeled on a
+robotics premise -- a robot performs the occupation's physical/
+administrative work, proposing actions to an independent Governor
+that gates them, never dispatches hardware itself, always escalates
+high-stakes decisions to a human. This ADR covers **ISCO-08 class
+7532 -- Garment and Related Patternmakers and Cutters** only, Wave3
+(production/trades) of the rollout (Wave0/1/2 100% complete; per the
+live git-trees listing immediately before this ADR, 65 sibling
+`2799xxxxxx`-prefixed coverage ADRs had already landed on
+`origin/main`, with additional sibling agents landing concurrently in
+this same batch, so exact totals move faster than any single snapshot).
+
+The `kotoba-lang/occupation` registry's live `{:id 7532 ...}` entry
+was verified against a fresh clone before any work began (`clojure -M
+-e \"(require 'kotoba.occupation) (println
+(kotoba.occupation/get-occupation \\\"7532\\\"))\"` from a checkout with
+the `kotoba-lang/technology` sibling present at the correct
+`../technology` relative path), and its `:name` read exactly Garment
+and Related Patternmakers and Cutters -- confirming the premise, no
+mismatch. Prior to this ADR the entry's `:maturity` was `:spec` with
+`:required-technologies [:robotics :identity :audit-ledger]` and no
+`:repo`/`:business-id`; no repository existed at
+`cloud-itonami/cloud-itonami-isco-7532` (`gh api` 404 confirmed before
+scaffolding). This ADR and its companion registry edit promote the
+`7532` entry to `:implemented`.
+
+Garment and related patternmakers and cutters operate rotary cutters,
+cutting machines and shears on fabric -- a standard workshop
+cutting-tool hazard. The controlling constraint for this vertical is
+that the closed op allowlist must NEVER include any op that directly
+finalizes a pattern-cutting-execution decision or a
+workshop-safety-clearance decision, nor override a shop safety
+officer's judgment -- those decisions must always be a hard permanent
+block, never auto-commit-eligible. This actor is deliberately scoped
+to WORKSHOP SCHEDULING/LOGISTICS COORDINATION ONLY -- it never
+performs cutting work or makes workshop-safety-clearance decisions
+itself.
+
+The reference implementation mirrored for module SHAPE and the
+closed-allowlist + independently-verified-provenance safety pattern is
+[`cloud-itonami/cloud-itonami-isco-7319`](https://github.com/cloud-itonami/cloud-itonami-isco-7319)
+(Handicraft Workers Not Elsewhere Classified: `store`/`advisor`/
+`governor`/`actor` split, `langgraph.graph` StateGraph, full doc set,
+same wave, a closely-related generic workshop scheduling/logistics
+coordination pattern) -- cloned and read in full in this session. The
+originally-nominated closer-domain reference,
+`cloud-itonami/cloud-itonami-isco-7531` (Tailors, Dressmakers,
+Furriers and Hatters), did not yet exist on GitHub at the time this
+work began (confirmed via `gh api` 404), so the fallback reference was
+used per the task's own contingency instruction.
+
+## Decision
+
+Publish `cloud-itonami/cloud-itonami-isco-7532` as an OSS workshop
+scheduling/logistics-coordination actor for garment patternmakers and
+cutters, following the SAME governed-actor architecture as every
+prior `cloud-itonami-isco-*` actor in this fleet: **Cut Coordination
+Advisor ⊣ CutCoordGovernor** on a `langgraph.graph` StateGraph
+(`io.github.kotoba-lang/langgraph`, git-sha-pinned identically to the
+reference's `deps.edn` -- a different library coordinate from the
+`langgraph-clj` used by the unrelated `20-actors/*` actor family),
+with an independent Governor, human-in-the-loop approval via
+`interrupt-before`, and an append-only audit ledger.
+
+This actor is deliberately **workshop scheduling/logistics
+coordination ONLY, never direct pattern-cutting-execution or
+workshop-safety-clearance authority** -- it must NEVER be designed to
+exercise, simulate exercising, or propose exercising a
+pattern-cutting-execution decision, a workshop-safety-clearance
+decision, or any override of a shop safety officer's judgment. These
+are not merely gated behind escalation -- they are structurally
+absent from the op-allowlist entirely.
+
+### Closed proposal-op allowlist (all `:effect :propose`)
+
+- `:log-work-record` -- job/pattern/progress data logging
+- `:schedule-crew-operation` -- crew/task scheduling proposal
+- `:flag-safety-concern` -- surface a cutting-tool-hazard/
+  equipment-condition concern, ALWAYS escalates, NEVER auto-commit
+  eligible
+- `:coordinate-supply-order` -- fabric/pattern-materials procurement
+  proposal
+
+This actor has **NO op, anywhere in its allowlist, that resembles** a
+pattern-cutting-execution decision, a workshop-safety-clearance
+decision, or a shop-safety-officer-judgment override. These are
+**structurally absent from the op-allowlist entirely**, not merely
+gated behind escalation -- an op such as
+`:finalize-pattern-cutting-execution-decision` or
+`:declare-workshop-safety-clearance` cannot even be proposed by the
+reference mock advisor (its `infer`/`rationale-for` functions only
+ever emit one of the four allowlist ops), and if any code path (a
+forged proposal, a future LLM advisor, a misbehaving fork) ever
+produced such an op, the governor's closed-allowlist HARD check
+(`:unknown-op`) rejects it unconditionally and permanently. A second,
+independent HARD check (`:scope-excluded-action`) names six
+concretely-forbidden ops (`cutcoord.governor/scope-excluded-ops`:
+`:finalize-pattern-cutting-execution-decision`,
+`:finalize-cutting-operation`, `:declare-workshop-safety-clearance`,
+`:declare-safety-clearance`, `:override-shop-safety-officer-judgment`,
+`:override-safety-officer-judgment`) as defense-in-depth, and is
+verified by dedicated unit tests
+(`cutcoord.governor-test/hard-on-scope-excluded-op-finalize-pattern-cutting-execution-decision`,
+`.../hard-on-scope-excluded-op-finalize-cutting-operation`,
+`.../hard-on-scope-excluded-op-declare-workshop-safety-clearance`,
+`.../hard-on-scope-excluded-op-declare-safety-clearance`,
+`.../hard-on-scope-excluded-op-override-shop-safety-officer-judgment`),
+plus actor-level integration coverage
+(`cutcoord.actor-test/holds-a-scope-excluded-op-even-at-high-confidence`,
+`.../holds-a-workshop-safety-clearance-op-even-at-high-confidence`,
+`.../holds-a-safety-officer-override-op-even-at-high-confidence`).
+
+### Four HARD governor checks (permanent, un-overridable, plus the closed-allowlist check)
+
+1. **Cutter unregistered** -- any proposal must resolve to an
+   independently registered cutter (patternmaker/cutter) record
+   (`:no-cutter`). Never trusts the proposal's own claim of who the
+   cutter is.
+2. **Workshop unregistered** -- any proposal must cite an
+   independently registered garment cutting workshop site
+   (`:no-workshop`). Together with check 1, this directly implements
+   the CRITICAL invariant that a worker/workshop record must be
+   independently verified/registered before any action.
+3. **Effect not `:propose`** -- any other `:effect` value is a HARD
+   block (a claim to directly actuate outside governance)
+   (`:no-actuation`).
+4. **Op not allowed / scope-excluded action** -- any `:op` outside the
+   closed four-op allowlist is a HARD, PERMANENT block (`:unknown-op`),
+   and independently, any proposal whose `:op` names one of the six
+   concretely-forbidden ops above, OR whose free-text `:rationale`
+   names a finalization/execution action for finalizing a
+   pattern-cutting-execution decision, declaring the workshop
+   safety-cleared, or overriding a shop safety officer's judgment, is
+   a second HARD, PERMANENT block (`:scope-excluded-action`),
+   evaluated unconditionally on content -- defense-in-depth on top of
+   the allowlist check: even if a future change somehow widened the
+   allowlist, content-based rejection still independently blocks
+   pattern-cutting-execution/workshop-safety-clearance/safety-override
+   language wherever it appears in free text.
+
+### One always-escalate (SOFT) gate, one threshold gate, plus the general confidence floor
+
+- `:flag-safety-concern` -- ALWAYS escalates to a human, regardless of
+  confidence (governor's implicit always-risky check). This is the
+  ONLY channel by which the robot may surface a cutting-tool-hazard/
+  material-handling/equipment-condition observation -- it never
+  resolves the concern itself, and the robot's role ends at here is
+  the hazard data, never here is what I recommend doing about shop
+  safety or workshop clearance.
+- a `:coordinate-supply-order` proposal whose `:cost` exceeds
+  `supply-cost-threshold` (2000, inclusive boundary verified by
+  `ok-supply-order-at-threshold-boundary`) -- always needs human
+  sign-off, independent of confidence. This is an ESCALATION, not a
+  hard block, per the task's explicit domain design: an
+  over-threshold fabric/pattern-materials order is not itself unsafe,
+  unlike a pattern-cutting-execution or workshop-safety-clearance
+  attempt, which is why it is handled by a different mechanism (soft
+  escalate vs. structural absence).
+- (advisor confidence below `confidence-floor` 0.6 also escalates, for
+  any op.)
+
+### Self-trip guard (fleet-known bug class, carried over from the sibling ISIC/ISCO tracks)
+
+A governor's scope-exclusion term list phrased as a bare noun (e.g.
+cutter, pattern, fabric, cutting) can accidentally match inside the
+mock advisor's own default rationale text for a legitimate proposal,
+self-blocking the actor's own happy path -- this is exactly the risk
+this vertical's own vocabulary (a workshop coordination actor working
+adjacent to garment cutting necessarily discusses those concepts to
+do its scheduling/logging job) could trigger if phrased carelessly.
+`cutcoord.governor/scope-excluded-phrases` is phrased exclusively as
+finalization/execution ACTIONS (e.g. finalize the pattern-cutting
+execution decision, finalize the cutting operation, declare the
+workshop safety cleared, override the shop safety officer's judgment
+-- matching the task's own worked example phrasing), never bare
+nouns, and
+`cutcoord.governor-test/default-mock-advisor-proposals-never-self-trip-on-scope-exclusion`
+is a dedicated regression test asserting every op in the closed
+allowlist, driven through the default mock advisor, never trips
+`:scope-excluded-action`. The mock advisor's own default rationale
+template was deliberately written to contain the bare nouns (logged
+work record for cutter ..., scheduled crew operation for garment
+cutting task ..., ...routed for shop safety officer review) WITHOUT
+containing any of the full finalization-action phrases, so the
+regression test is a genuine stress test of the bare-noun-vs-action-
+phrase distinction, not a vacuous pass. Green on first run in this
+session -- the scope-exclusion self-trip guard itself was never
+tripped during development.
+`cutcoord.actor-test/holds-a-scope-excluded-op-even-at-high-confidence`
+and its workshop-safety-clearance/safety-officer-override siblings
+additionally exercise the same invariant through the full graph run,
+confirming a scope-excluded proposal never reaches `commit-record!`
+regardless of disposition path.
+
+## Consequences
+
+- `kotoba-lang/occupation` registry's `{:id 7532 ...}` entry promoted
+  from `:spec` to `:implemented`, with `:repo`/`:business-id` set to
+  the real repository
+  (`https://github.com/cloud-itonami/cloud-itonami-isco-7532` /
+  `cloud-itonami-isco-7532`), and `maturity-summary`'s implemented
+  count bumped accordingly (recomputed live from the registry via
+  `kotoba.occupation/maturity-summary`, not assumed, immediately
+  before the edit).
+- Full test suite (`clojure -M:test`): 25 tests, 55 assertions, 0
+  failures, 0 errors -- raw output captured in this ADR's
+  `:test/counts` and in the task report, independently re-verified
+  against a brand-new fresh clone of the pushed repository (not just
+  the local working copy).
+- No `manifest/west.yml` changes -- this actor is registered purely via
+  the `kotoba-lang/occupation` capability registry, consistent with
+  sibling `cloud-itonami-isco-*`/`cloud-itonami-isic-*` actors.
+- No `kotoba-lang/technology` dependency was added to the actor's
+  `deps.edn` -- only the central `kotoba-lang/occupation` registry
+  itself depends on it, to resolve `:required-technologies` stacks.
+- This ADR is EDN-only, matching the live `90-docs/adr` convention
+  (commit `6d2d0eeda658`, Remove all .md, normalize ADRs to tx-data)
+  -- a single-entity EDN vector with an `:adr/body` string blob
+  rather than a paired `.md`+`.edn`.
+
+## Alternatives considered
+
+- Giving the actor an op like `:approve-workshop-clearance` that is
+  merely gated behind an always-escalate list: rejected outright per
+  the task's explicit domain-design guidance -- an always-escalate op
+  still means the *capability* to finalize a workshop-safety-clearance
+  decision exists in the code path and is merely deferred to a human
+  gate. For a decision this severe (cutting-tool workshop hazard from
+  rotary cutters, cutting machines and shears), the capability itself
+  must not exist. The only op related to shop-safety escalation is
+  `:flag-safety-concern`, which surfaces the need for human/shop-
+  safety-officer attention and never itself decides, authorizes, or
+  defers a pattern-cutting-execution or workshop-safety-clearance
+  decision for later automatic execution.
+- Making the supply-cost ceiling a HARD block (mirroring the
+  transaction-amount-ceiling HARD check used by some sibling actors):
+  rejected per the task's explicit domain design -- an over-threshold
+  fabric/pattern-materials order is not itself unsafe, so it is
+  handled as a soft escalate gate, not a hard block; only the
+  pattern-cutting-execution/workshop-safety-clearance/safety-officer-
+  override class is a hard, unconditional block.
+- A bare-noun scope-exclusion term list (e.g. cutter, pattern,
+  fabric): rejected outright per the fleet-known self-trip bug class
+  described above (and CLAUDE.md's own worked example for this exact
+  task), and per the explicit instruction to phrase scope-exclusion
+  terms as finalization/execution ACTIONS, never bare nouns -- this
+  actor's own domain necessarily discusses cutter/pattern/fabric/
+  cutting/safety-officer concepts to do its scheduling/logging job,
+  so a bare-noun list would risk self-blocking the actor's own
+  legitimate proposals (regression-tested directly against rationale
+  text that deliberately contains those bare nouns).
+- Naming only a single pattern-cutting-execution-finalization op
+  family (mirroring a narrower single-category exclusion shape used
+  by some sibling actors): rejected -- the task's domain design names
+  two distinct excluded decision categories
+  (pattern-cutting-execution, workshop-safety-clearance) plus a
+  shop-safety-officer-judgment override, so this ADR and the
+  governor's `scope-excluded-ops`/`scope-excluded-phrases` name all
+  three explicitly rather than conflating them, giving each its own
+  dedicated unit test.
+- Merging `cutter` and `workshop` into a single entity (only checking
+  one provenance record): rejected -- the two-entity provenance shape
+  (independently-registered cutter AND independently-registered
+  workshop) matches the CRITICAL invariant that a worker/workshop
+  record must be independently verified/registered before any action
+  and the established pattern from prior `cloud-itonami-isco-*`
+  actors with two-sided provenance checks.
+
+## Itemized safety confirmation
+
+Every op in this actor's closed proposal-op allowlist, and why it is
+safe under the constraints above:
+
+1. **`:log-work-record`** -- job/pattern/progress data logging only.
+   Requires an independently registered cutter AND workshop
+   (`:no-cutter`/`:no-workshop`). Not a pattern-cutting-execution or
+   workshop-safety-clearance decision in any respect -- it is a
+   records-management action.
+2. **`:schedule-crew-operation`** -- crew/task scheduling proposal
+   only. Cannot carry a pattern-cutting-execution or
+   workshop-safety-clearance decision (structurally absent from the
+   op's field shape; any such attempt via free text is caught by the
+   `:scope-excluded-action` content check). Does not authorize,
+   finalize, or draw any conclusion about a specific cut or workshop
+   clearance -- it is a calendar/logistics action.
+3. **`:flag-safety-concern`** -- surfaces a cutting-tool-hazard/
+   material-handling/equipment-condition concern to a human/shop
+   safety officer; ALWAYS escalates, unconditionally, at every
+   confidence level, NEVER auto-commit eligible. This is the ONLY
+   channel through which a safety observation may be surfaced, and it
+   explicitly never resolves, decides, or acts on anything itself --
+   the shop safety officer reviews and acts entirely on their own
+   authority, including any workshop-safety-clearance decision.
+4. **`:coordinate-supply-order`** -- fabric/pattern-materials
+   procurement proposal only (item, cost). Not a
+   pattern-cutting-execution, workshop-safety-clearance or
+   authorization decision of any kind -- it is a purchasing-logistics
+   action, gated by ordinary cost-ceiling escalation (above 2000
+   always escalates).
+
+No op in this allowlist, and no op anywhere in this codebase,
+resembles a pattern-cutting-execution decision (e.g. deciding a cut is
+complete/final), a workshop-safety-clearance decision (e.g. declaring
+the workshop safety-cleared), or a shop-safety-officer-judgment
+override -- these categories are structurally absent, not gated,
+confirmed by: (a) the closed four-op allowlist itself
+(`cutcoord.governor/allowed-ops`), (b) six concretely-named
+forbidden-op fixtures rejected at the governor-unit level
+(`cutcoord.governor/scope-excluded-ops`,
+`cutcoord.governor-test/hard-on-scope-excluded-op-finalize-pattern-cutting-execution-decision`
+and four sibling tests), and (c) a content-based scope-exclusion check
+independent of the `:op` field
+(`cutcoord.governor/scope-excluded-phrases`,
+`.../contains-excluded-phrase?`), tested directly against a rationale
+that attempts to finalize the pattern-cutting execution, declare the
+workshop safety cleared, or override a shop safety officer's judgment
+even via an otherwise-allowlisted op
+(`cutcoord.governor-test/hard-on-scope-excluded-rationale-even-with-allowlisted-op`,
+`.../hard-on-scope-excluded-rationale-declare-workshop-safety-cleared`,
+`.../hard-on-scope-excluded-rationale-override-shop-safety-officer`).
+"}]

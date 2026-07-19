@@ -1,0 +1,94 @@
+[{:adr-id "2607153000"
+ :title "cloud-itonami-isic-879 — Other Residential Care Operations Coordination"
+ :status :accepted
+ :date "2026-07-15"
+ :deciders ["Jun Kawasaki"]
+ :scope ["orgs/cloud-itonami" "orgs/kotoba-lang/industry"]
+
+ :context
+ {:summary "ISIC Rev.4 879 (Other residential care activities not elsewhere classified) is Wave 4's second residential-care actor. Unlike 873's focus on elderly/disabled care, 879 spans broader populations potentially including minors in state custody or protective settings. Third Wave-4 actor scaffold (following 873 and 889) built under verified-redo discipline."
+
+  :isic "879"
+  :isic-rev4 "Rev.4"
+  :name "Other residential care activities"
+  :domain :services/residential-care-not-elsewhere-classified
+  :domain-note "Children's homes, shelters, halfway houses, non-medical residential rehabilitation facilities, may include minors"
+  :wave 4}
+
+ :decision
+ {:module-shape :same-as-873
+  :coordinator-only? true
+  :robotics? false
+
+  :proposal-ops
+  [{:op :log-resident-note
+    :effect :propose
+    :description "Routine daily observation logging (meals, mood, activity, hygiene)"}
+   {:op :schedule-family-or-guardian-visit
+    :effect :propose
+    :description "Family/visitor OR guardian visit scheduling (adapted for minors in state care)"}
+   {:op :coordinate-supply-request
+    :effect :propose
+    :description "Non-medication consumable resupply (linens, mobility aids, food, clothing, hygiene)"}
+   {:op :schedule-staff-shift-proposal
+    :effect :propose
+    :description "Shift-roster PROPOSAL only, never a final binding assignment"}
+   {:op :flag-safety-concern
+    :effect :propose
+    :escalate? :always
+    :description "Falls, wellbeing concerns, child protection incidents — ALWAYS escalates"}]
+
+  :governor-hard-checks
+  [{:rule :resident-unverified
+    :description "Target resident record must exist AND be independently :registered?/:verified? in store"}
+   {:rule :effect-not-propose
+    :description "Any proposal whose :effect is not :propose is a claim to directly actuate outside governance"}
+   {:rule :scope-exclusion
+    :description "Proposals touching medication/clinical-diagnosis/care-plan-changes/physical-restraint/guardianship-custody/disciplinary-action/end-of-life/safety-authority are permanently blocked"
+    :note "Scope-excluded terms carefully qualified to avoid false positives on legitimate safety observations (e.g. 'physical restraint' not bare 'restraint')"}]
+
+  :phase-table
+  {0 {:auto-commit #{}
+      :description "read-only — all proposals escalate"}
+   1 {:auto-commit #{:log-resident-note}
+      :description "resident-notes only (approval-gated)"}
+   2 {:auto-commit #{:log-resident-note :schedule-family-or-guardian-visit :coordinate-supply-request :schedule-staff-shift-proposal}
+      :description "add visits, supply, shifts (approval-gated)"}
+   3 {:auto-commit #{:log-resident-note :schedule-family-or-guardian-visit :coordinate-supply-request :schedule-staff-shift-proposal}
+      :description "full except safety — all four non-safety ops auto-commit; safety always escalates"}}
+
+  :test-suite
+  {:total-tests 32
+   :total-assertions 109
+   :failures 0
+   :errors 0
+   :modules
+   [:rescare/store-contract-test
+    :rescare/advisor-test
+    :rescare/governor-test
+    :rescare/phase-test
+    :rescare/governor-contract-test]
+   :coverage
+   ["governor HARD checks and scope exclusion"
+    "advisor proposal shape and consistency"
+    "rollout phase logic"
+    "full graph integration and audit trail"
+    "Store protocol and MemStore implementation"
+    "legitimate safety-concern observations not scope-blocked"]}}
+
+ :consequences
+ [{:action :registry-update
+   :details "Registry entry corrected in place: :repo/:business-id updated from nil, :maturity :spec→:implemented, :robotics removed from :required-technologies, :operating-states updated to actor state machine"}
+  {:action :repo-creation
+   :repo-url "https://github.com/cloud-itonami/cloud-itonami-isic-879"
+   :pushed-to "main"
+   :status "production-ready"}]
+
+ :references
+ ["ADR-2607152700 (cloud-itonami-isic-873 first Wave-4 landing, module-shape mirror)"
+  "ADR-2607152900 (cloud-itonami-isic-889 parallel Wave-4 landing)"
+  "ADR-2607152500 (Wave 4 rollout amendment, quality guardrails)"
+  "ADR-2607121000 (Wave definition, ISIC 879 as Wave 4 target)"
+  "ADR-2607152300 (ISIC-0520 lignite, verified-redo pattern precedent)"]
+
+ :db/id -1}]

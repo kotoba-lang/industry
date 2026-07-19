@@ -1,0 +1,622 @@
+;; アニメ作品の国際配信ナレッジ — 国 × 放送局/プラットフォーム × 作品 × リリース
+;; as-of 2026-07-17 / DataScript / Datomic / kotoba-datomic transaction 互換 EDN vector
+;; 形式先行例: 同 dir の childrens-content-crude-humor.datoms.edn（README.edn 参照）
+;;
+;; :country/* の attribute 定義は childrens-content-crude-humor.datoms.edn と同一なので、
+;; 両ファイルを同じ DB に transact できる（:country/id が :db.unique/identity なので
+;; 同一国 entity は upsert でマージされる）。
+;;
+;; 捏造ゼロ: :confidence :high = 当日 Wikipedia 等で裏取り済み（:source に URL）、
+;; :medium = 一般知識で一次ソース未確認。不明な値は attribute ごと省略。
+[
+ ;; ---- schema: country（childrens-content-crude-humor.datoms.edn と同一定義）------
+ {:db/ident :country/id      :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :country/name-ja :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :country/name-en :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :country/region  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+
+ ;; ---- schema: network（放送局・チャンネル・配信プラットフォーム）-----------------
+ {:db/ident :network/id      :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :network/name    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :network/country :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one} ; 本拠国（global streaming は運営本拠）
+ ;; :terrestrial 地上波 / :cable-satellite ケーブル・衛星 / :kids-channel 子供専門ch
+ ;; :kids-block 子供向け放送枠 / :adult-block 深夜・成人向け枠 / :streaming 配信
+ {:db/ident :network/type    :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :network/note    :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+
+ ;; ---- schema: work（childrens-content-crude-humor.datoms.edn と同一定義 + 追加）---
+ {:db/ident :work/id       :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :work/title-ja :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :work/title-en :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :work/origin   :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :work/year-start :db/valueType :db.type/long  :db/cardinality :db.cardinality/one} ; TV シリーズ開始年
+
+ ;; ---- schema: release（作品 × 国 × 放送局のリリース事実）-------------------------
+ {:db/ident :release/id          :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one :db/unique :db.unique/identity}
+ {:db/ident :release/work        :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :release/country     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :release/network     :db/valueType :db.type/ref     :db/cardinality :db.cardinality/one}
+ {:db/ident :release/medium      :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :tv-anime / :streaming
+ {:db/ident :release/year-start  :db/valueType :db.type/long    :db/cardinality :db.cardinality/one}
+ {:db/ident :release/year-end    :db/valueType :db.type/long    :db/cardinality :db.cardinality/one} ; 継続中なら省略
+ {:db/ident :release/title-local :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ ;; :uncut ほぼ無修正 / :censored カット・修正 / :localized 文化置換を含む改変 /
+ ;; :adult-recut 成人向け再構成 / :banned 配信・放送の全面禁止（tranche 7 で追加）
+ {:db/ident :release/edit-status :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one}
+ {:db/ident :release/rating      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :release/note        :db/valueType :db.type/string  :db/cardinality :db.cardinality/one}
+ {:db/ident :release/source      :db/valueType :db.type/string  :db/cardinality :db.cardinality/one} ; 裏取り URL
+ {:db/ident :release/confidence  :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :high / :medium
+
+ ;; ==================================================================================
+ ;; countries（既存 9 か国は childrens-content-crude-humor.datoms.edn 側が正。
+ ;; ここでは新規の 3 か国 + upsert キーとなる最小 entity のみ定義）
+ ;; ==================================================================================
+ {:country/id :jp :country/name-ja "日本" :country/name-en "Japan" :country/region :east-asia}
+ {:country/id :us :country/name-ja "アメリカ" :country/name-en "United States" :country/region :north-america}
+ {:country/id :in :country/name-ja "インド" :country/name-en "India" :country/region :south-asia}
+ {:country/id :kr :country/name-ja "韓国" :country/name-en "South Korea" :country/region :east-asia}
+ {:country/id :cn :country/name-ja "中国" :country/name-en "China" :country/region :east-asia}
+ {:country/id :es :country/name-ja "スペイン" :country/name-en "Spain" :country/region :europe}
+ {:country/id :ca :country/name-ja "カナダ" :country/name-en "Canada" :country/region :north-america}
+ {:country/id :au :country/name-ja "オーストラリア" :country/name-en "Australia" :country/region :oceania}
+ {:country/id :uk :country/name-ja "イギリス" :country/name-en "United Kingdom" :country/region :europe}
+ {:country/id :id :country/name-ja "インドネシア" :country/name-en "Indonesia" :country/region :southeast-asia}
+ {:country/id :my :country/name-ja "マレーシア" :country/name-en "Malaysia" :country/region :southeast-asia}
+
+ ;; ==================================================================================
+ ;; networks
+ ;; ==================================================================================
+ {:network/id :tv-asahi :network/name "テレビ朝日 (ANN)" :network/country [:country/id :jp]
+  :network/type :terrestrial :network/note "クレヨンしんちゃん・ドラえもんの本国ネットワーク"}
+ {:network/id :tv-tokyo :network/name "テレビ東京 (TX Network)" :network/country [:country/id :jp]
+  :network/type :terrestrial :network/note "ポケモンの本国ネットワーク"}
+ {:network/id :adult-swim :network/name "Adult Swim (Cartoon Network 深夜枠)" :network/country [:country/id :us]
+  :network/type :adult-block :network/note "成人向けアニメ・コメディ枠"}
+ {:network/id :kids-wb :network/name "Kids' WB (The WB 土曜朝枠)" :network/country [:country/id :us]
+  :network/type :kids-block}
+ {:network/id :cartoon-network-us :network/name "Cartoon Network" :network/country [:country/id :us]
+  :network/type :kids-channel}
+ {:network/id :disney-xd-us :network/name "Disney XD" :network/country [:country/id :us]
+  :network/type :kids-channel}
+ {:network/id :netflix :network/name "Netflix" :network/country [:country/id :us]
+  :network/type :streaming :network/note "global streaming（本拠 US）。216 地域で配信"}
+ {:network/id :family-chrgd :network/name "Family CHRGD (旧 Disney XD Canada)" :network/country [:country/id :ca]
+  :network/type :kids-channel}
+ {:network/id :network-ten :network/name "Network Ten" :network/country [:country/id :au]
+  :network/type :terrestrial}
+ {:network/id :boomerang-uk :network/name "Boomerang UK" :network/country [:country/id :uk]
+  :network/type :kids-channel}
+ {:network/id :hungama-tv :network/name "Hungama TV" :network/country [:country/id :in]
+  :network/type :kids-channel :network/note "Disney India 系の子供専門チャンネル"}
+ {:network/id :disney-channel-in :network/name "Disney Channel India" :network/country [:country/id :in]
+  :network/type :kids-channel}
+ {:network/id :tooniverse :network/name "Tooniverse（투니버스）" :network/country [:country/id :kr]
+  :network/type :kids-channel :network/note "CJ ENM 系アニメ専門ch"}
+ {:network/id :tv3-k3 :network/name "TV3 / K3 (カタルーニャ公共放送)" :network/country [:country/id :es]
+  :network/type :terrestrial :network/note "カタルーニャ語圏でのしんちゃん人気の中心"}
+
+ ;; ==================================================================================
+ ;; works
+ ;; ==================================================================================
+ {:work/id :crayon-shinchan :work/title-ja "クレヨンしんちゃん" :work/title-en "Crayon Shin-chan"
+  :work/origin [:country/id :jp] :work/year-start 1992}
+ {:work/id :doraemon-2005 :work/title-ja "ドラえもん (2005)" :work/title-en "Doraemon (2005 series)"
+  :work/origin [:country/id :jp] :work/year-start 2005}
+ {:work/id :pokemon :work/title-ja "ポケットモンスター" :work/title-en "Pokémon (TV series)"
+  :work/origin [:country/id :jp] :work/year-start 1997}
+
+ ;; ==================================================================================
+ ;; releases — Crayon Shin-chan
+ ;; ==================================================================================
+ {:release/id :rel.shinchan.jp.tv-asahi :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :jp] :release/network [:network/id :tv-asahi]
+  :release/medium :tv-anime :release/year-start 1992 :release/edit-status :uncut
+  :release/note "1992-04-13 開始、1200話超で継続中"
+  :release/source "https://en.wikipedia.org/wiki/Crayon_Shin-chan" :release/confidence :high}
+
+ {:release/id :rel.shinchan.us.adult-swim :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :us] :release/network [:network/id :adult-swim]
+  :release/medium :tv-anime :release/year-start 2006 :release/title-local "Shin Chan"
+  :release/edit-status :adult-recut :release/rating "TV-MA"
+  :release/note "FUNimation 版。無検閲どころか大人向けジョークを足す方向の再ローカライズ"
+  :release/source "https://en.wikipedia.org/wiki/Crayon_Shin-chan" :release/confidence :high}
+
+ {:release/id :rel.shinchan.in.hungama :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :in] :release/network [:network/id :hungama-tv]
+  :release/medium :tv-anime :release/year-start 2006 :release/edit-status :censored
+  :release/note "ヒンディー語ダブが 2006-06-19 開始、チャンネルシェアの 60% に達する看板に。情報放送省が 2008-09-23 に内容照会（ヌード・不敬表現）→ 放送禁止。2009-03-27 に大幅検閲版で再開: ヌード・冒とく表現を除去、大人向けジョークを子供向けに書き換え、『酒』は『ジュース』に置換"
+  :release/source "https://www.animenewsnetwork.com/news/2008-12-05/india-reportedly-bans-crayon-shin-chan-from-tv" :release/confidence :high}
+
+ {:release/id :rel.shinchan.kr.tooniverse :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :kr] :release/network [:network/id :tooniverse]
+  :release/medium :tv-anime :release/year-start 2003 :release/title-local "짱구는 못말려" :release/edit-status :censored
+  :release/note "2003 に SBS 未放映分を独自ダビングした「짱구는 못말려 3」から参入、2008 以降本格移行。ケーブル審議強化に伴い臀部・性器をモザイク・立て札・白塗り（パンツ着用に見せる加工）で検閲、画面・台詞も修正"
+  :release/source "https://namu.wiki/w/짱구는 못말려/국내 방영" :release/confidence :high}
+
+ {:release/id :rel.shinchan.es.tv3 :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :es] :release/network [:network/id :tv3-k3]
+  :release/medium :tv-anime :release/year-start 2001 :release/title-local "Shin Chan" :release/edit-status :uncut
+  :release/note "LUK Internacional ライセンス (2001)。K3 で 2001-04-23 初放送 → TV3・ETB1・Canal Nou・TVG・Telemadrid 等の地域局網へ拡大。一部地域で検閲例ありだがカタルーニャ・マドリード・ガリシアは無検閲"
+  :release/source "https://es.wikipedia.org/wiki/Shin_Chan" :release/confidence :high}
+
+ ;; ==================================================================================
+ ;; releases — Doraemon (2005)（2026-07-17 Wikipedia 裏取り済み tranche）
+ ;; ==================================================================================
+ {:release/id :rel.doraemon.jp.tv-asahi :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :jp] :release/network [:network/id :tv-asahi]
+  :release/medium :tv-anime :release/year-start 2005 :release/edit-status :uncut
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.doraemon.us.disney-xd :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :us] :release/network [:network/id :disney-xd-us]
+  :release/medium :tv-anime :release/year-start 2014 :release/year-end 2015
+  :release/title-local "Doraemon: Gadget Cat From the Future" :release/edit-status :localized
+  :release/note "Bang Zoom!/Viz の英語版。米国基準で検閲 + 日本文化要素を米国要素に置換（箸→フォーク等）。再放送は2018年まで"
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.doraemon.ca.family-chrgd :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :ca] :release/network [:network/id :family-chrgd]
+  :release/medium :tv-anime :release/year-start 2014 :release/year-end 2015
+  :release/edit-status :localized :release/note "米国 Disney XD 版ダブを使用"
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.doraemon.au.network-ten :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :au] :release/network [:network/id :network-ten]
+  :release/medium :tv-anime :release/year-start 2015 :release/edit-status :localized
+  :release/note "2015-01-26 開始。米国版ダブ使用（Cartoon Network / Boomerang アジアfeedでも放送）"
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.doraemon.uk.boomerang :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :uk] :release/network [:network/id :boomerang-uk]
+  :release/medium :tv-anime :release/year-start 2015 :release/year-end 2016
+  :release/edit-status :censored
+  :release/note "Red Angel Media 制作・LUK International ライセンスの英国版ダブ。米国版より原作スクリプトに忠実"
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.doraemon.in.disney-channel :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :in] :release/network [:network/id :disney-channel-in]
+  :release/medium :tv-anime :release/year-start 2020 :release/year-end 2025
+  :release/edit-status :censored
+  :release/note "牛肉・酒類への言及をミュートするなどインド放送基準対応。2023-08〜2025-05 の期間も放送"
+  :release/source "https://en.wikipedia.org/wiki/Doraemon_(2005_TV_series)" :release/confidence :high}
+
+ ;; ==================================================================================
+ ;; releases — Pokémon（2026-07-17 Wikipedia 裏取り済み tranche）
+ ;; ==================================================================================
+ {:release/id :rel.pokemon.jp.tv-tokyo :release/work [:work/id :pokemon]
+  :release/country [:country/id :jp] :release/network [:network/id :tv-tokyo]
+  :release/medium :tv-anime :release/year-start 1997 :release/edit-status :uncut
+  :release/source "https://en.wikipedia.org/wiki/Pok%C3%A9mon_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.pokemon.us.kids-wb :release/work [:work/id :pokemon]
+  :release/country [:country/id :us] :release/network [:network/id :kids-wb]
+  :release/medium :tv-anime :release/year-start 1999 :release/edit-status :localized
+  :release/note "4Kids 版ダブ (1998-2006)。おにぎり→ドーナツ等の文化置換で知られる。9.11 とハリケーン・カトリーナ後に欠番エピソード発生"
+  :release/source "https://en.wikipedia.org/wiki/Pok%C3%A9mon_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.pokemon.us.cartoon-network :release/work [:work/id :pokemon]
+  :release/country [:country/id :us] :release/network [:network/id :cartoon-network-us]
+  :release/medium :tv-anime :release/year-start 2002 :release/edit-status :localized
+  :release/note "ライブラリ放送。2006 以降は The Pokémon Company 自社ダブ"
+  :release/source "https://en.wikipedia.org/wiki/Pok%C3%A9mon_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.pokemon.us.netflix :release/work [:work/id :pokemon]
+  :release/country [:country/id :us] :release/network [:network/id :netflix]
+  :release/medium :streaming :release/year-start 2020 :release/edit-status :localized
+  :release/note "2020-06-12 から Season 23 以降の新エピソード独占配信"
+  :release/source "https://en.wikipedia.org/wiki/Pok%C3%A9mon_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.pokemon.cn.primetime-ban :release/work [:work/id :pokemon]
+  :release/country [:country/id :cn]
+  :release/medium :tv-anime :release/year-start 2006 :release/edit-status :censored
+  :release/note "国家広電総局 (SARFT) の通知により 2006-09-01 から全 TV 局で海外アニメのプライムタイム (17:00-20:00) 放送を禁止（2008-02 に 21:00 まで延長）。ポケモン・シンプソンズ・テレタビーズ等が対象。2004 年の「国産アニメ比率 60% 以上」クォータ政策の延長線。特定局でなく全国一律規制のため :release/network 省略"
+  :release/source "https://www.france24.com/en/20080220-china-extends-prime-time-ban-foreign-cartoons-china-cartoons" :release/confidence :high}
+
+ ;; ==================================================================================
+ ;; tranche 2 (2026-07-17): セーラームーン・ドラゴンボールZ・ワンピース + フランス等
+ ;; ==================================================================================
+
+ ;; ---- countries (追加) ------------------------------------------------------------
+ {:country/id :fr :country/name-ja "フランス" :country/name-en "France" :country/region :europe}
+
+ ;; ---- networks (追加) -------------------------------------------------------------
+ {:network/id :fuji-tv :network/name "フジテレビ (FNS)" :network/country [:country/id :jp]
+  :network/type :terrestrial :network/note "DBZ・ワンピースの本国ネットワーク"}
+ {:network/id :tf1-club-dorothee :network/name "TF1 Club Dorothée" :network/country [:country/id :fr]
+  :network/type :kids-block
+  :network/note "1987-09-02〜1997-08-31。週30時間規模の子供向け枠で日本アニメを大量放送しフランスのマンガ文化受容の起点に。暴力表現をめぐり CSA・政治家から批判が継続"}
+ {:network/id :toonami-us :network/name "Toonami (Cartoon Network アクション枠)" :network/country [:country/id :us]
+  :network/type :kids-block :network/note "2012 以降は Adult Swim 内の深夜枠として復活"}
+ {:network/id :fox-box :network/name "FoxBox (4Kids の土曜朝枠、後の 4Kids TV)" :network/country [:country/id :us]
+  :network/type :kids-block}
+ {:network/id :ytv :network/name "YTV" :network/country [:country/id :ca]
+  :network/type :kids-channel}
+ {:network/id :crunchyroll :network/name "Crunchyroll" :network/country [:country/id :us]
+  :network/type :streaming
+  :network/note "アニメ専門 global streaming（本拠 US）。全世界配信だがアジア一部・ロシア・ベラルーシは対象外、21 言語。加入者 70万 (2015) → 500万 (2021) → 2100万 (2026)。EMEA 展開 2020 (旧 Viz Media Europe 買収)、インド語ダブ/字幕 2022-03-01、インドネシア公式ローンチ 2024-08-15。日本での放送と同時のサイマル配信モデルで、地域可用性は作品ごとのライセンスに依存"}
+ {:network/id :global-tv-id :network/name "Global TV (Indonesia)" :network/country [:country/id :id]
+  :network/type :terrestrial}
+
+ ;; ---- works (追加) ----------------------------------------------------------------
+ {:work/id :sailor-moon :work/title-ja "美少女戦士セーラームーン" :work/title-en "Sailor Moon"
+  :work/origin [:country/id :jp] :work/year-start 1992}
+ {:work/id :dragon-ball-z :work/title-ja "ドラゴンボールZ" :work/title-en "Dragon Ball Z"
+  :work/origin [:country/id :jp] :work/year-start 1989}
+ {:work/id :one-piece :work/title-ja "ワンピース" :work/title-en "One Piece"
+  :work/origin [:country/id :jp] :work/year-start 1999}
+
+ ;; ---- releases — Sailor Moon ------------------------------------------------------
+ {:release/id :rel.sailormoon.jp.tv-asahi :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :jp] :release/network [:network/id :tv-asahi]
+  :release/medium :tv-anime :release/year-start 1992 :release/year-end 1997 :release/edit-status :uncut
+  :release/note "1992-03-07〜1997-02-08、全200話"
+  :release/source "https://en.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.ca.ytv :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :ca] :release/network [:network/id :ytv]
+  :release/medium :tv-anime :release/year-start 1995 :release/edit-status :localized
+  :release/note "DiC 版。うさぎ→Serena 等の改名、暴力・ヌードのカット、車線の左右反転、レズビアンカップルを「いとこ」に改変、日本文化への言及を除去"
+  :release/source "https://en.wikipedia.org/wiki/Sailor_Moon_(English_adaptations)" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.us.dic :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :us]
+  :release/medium :tv-anime :release/year-start 1995 :release/edit-status :localized
+  :release/note "DiC/Cloverway 版（初出網は syndication で単一局に帰属しないため :release/network 省略）。改変内容は YTV 行と同一。2014 以降 Viz Media が無検閲で再ライセンス"
+  :release/source "https://en.wikipedia.org/wiki/Sailor_Moon_(English_adaptations)" :release/confidence :high}
+
+ ;; ---- releases — Dragon Ball Z ----------------------------------------------------
+ {:release/id :rel.dbz.jp.fuji-tv :release/work [:work/id :dragon-ball-z]
+  :release/country [:country/id :jp] :release/network [:network/id :fuji-tv]
+  :release/medium :tv-anime :release/year-start 1989 :release/year-end 1996 :release/edit-status :uncut
+  :release/source "https://en.wikipedia.org/wiki/Dragon_Ball_Z" :release/confidence :high}
+
+ {:release/id :rel.dbz.us.syndication :release/work [:work/id :dragon-ball-z]
+  :release/country [:country/id :us]
+  :release/medium :tv-anime :release/year-start 1996 :release/year-end 1998 :release/edit-status :censored
+  :release/note "Saban 経由の first-run syndication（単一局に帰属しないため :release/network 省略）。Mr.サタン→Hercule 改名、『死』への言及を『別次元に送られた』に置換等の重編集"
+  :release/source "https://en.wikipedia.org/wiki/Dragon_Ball_Z" :release/confidence :high}
+
+ {:release/id :rel.dbz.us.toonami :release/work [:work/id :dragon-ball-z]
+  :release/country [:country/id :us] :release/network [:network/id :toonami-us]
+  :release/medium :tv-anime :release/year-start 1998 :release/year-end 2003 :release/edit-status :censored
+  :release/note "1998-08-31 開始。1999 以降の FUNimation 自社ダブはケーブル基準のため検閲が緩和。再放送は 2008 まで"
+  :release/source "https://en.wikipedia.org/wiki/Dragon_Ball_Z" :release/confidence :high}
+
+ {:release/id :rel.dbz.fr.club-dorothee :release/work [:work/id :dragon-ball-z]
+  :release/country [:country/id :fr] :release/network [:network/id :tf1-club-dorothee]
+  :release/medium :tv-anime :release/year-start 1990 :release/year-end 1996 :release/edit-status :censored
+  :release/note "検閲版で放送。子供枠での放送に「暴力的」との批判が噴出（開始年は 1988=無印 Dragon Ball と 1990=Z で資料に揺れ。1996 に全話消化前に打ち切り）"
+  :release/source "https://fr.wikipedia.org/wiki/Club_Doroth%C3%A9e" :release/confidence :high}
+
+ {:release/id :rel.dbz.au.network-ten :release/work [:work/id :dragon-ball-z]
+  :release/country [:country/id :au] :release/network [:network/id :network-ten]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "朝の Cheez TV 枠で放送（Cartoon Network AU でも放送）"
+  :release/source "https://en.wikipedia.org/wiki/Dragon_Ball_Z" :release/confidence :high}
+
+ ;; ---- releases — One Piece --------------------------------------------------------
+ {:release/id :rel.onepiece.jp.fuji-tv :release/work [:work/id :one-piece]
+  :release/country [:country/id :jp] :release/network [:network/id :fuji-tv]
+  :release/medium :tv-anime :release/year-start 1999 :release/edit-status :uncut
+  :release/note "1999-10-20 開始、継続中"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.onepiece.us.fox-box :release/work [:work/id :one-piece]
+  :release/country [:country/id :us] :release/network [:network/id :fox-box]
+  :release/medium :tv-anime :release/year-start 2004 :release/year-end 2006 :release/edit-status :censored
+  :release/note "4Kids 版。内容と尺の編集を強制され最初の 143 話を 104 話に圧縮（銃の置換等の改変で悪名高い）。2005 以降 Cartoon Network (Toonami/Miguzi) でも放送"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.onepiece.us.adult-swim :release/work [:work/id :one-piece]
+  :release/country [:country/id :us] :release/network [:network/id :adult-swim]
+  :release/medium :tv-anime :release/year-start 2013 :release/edit-status :uncut
+  :release/note "FUNimation 版を Adult Swim 内 Toonami で 2013-05-18 開始（2017-03 離脱 → 2022-01-22 復帰）。それ以前に Cartoon Network で 2007-09〜2008-03"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.onepiece.us.crunchyroll :release/work [:work/id :one-piece]
+  :release/country [:country/id :us] :release/network [:network/id :crunchyroll]
+  :release/medium :streaming :release/year-start 2013 :release/edit-status :uncut
+  :release/note "2013-11-02 開始。2020-02-22 に UK・アイルランド・欧州域へ拡大"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.onepiece.us.netflix :release/work [:work/id :one-piece]
+  :release/country [:country/id :us] :release/network [:network/id :netflix]
+  :release/medium :streaming :release/year-start 2020 :release/edit-status :uncut
+  :release/note "2020-06 開始（US・カナダ・オーストラリア・ニュージーランド）"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ {:release/id :rel.onepiece.id.global-tv :release/work [:work/id :one-piece]
+  :release/country [:country/id :id] :release/network [:network/id :global-tv-id]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "インドネシア放送委員会 (KPI) から regulatory concern の対象になった"
+  :release/source "https://en.wikipedia.org/wiki/One_Piece_(1999_TV_series)" :release/confidence :high}
+
+ ;; ==================================================================================
+ ;; tranche 3 (2026-07-17): MENA (Spacetoon)・ラテンアメリカ・スペイン全国網
+ ;; ==================================================================================
+
+ ;; ---- schema (追加): 単一国に帰属しない汎地域配信のための region 属性 --------------
+ ;; :release/country が特定できない pan-regional feed（Fox Kids LatAm 等）は
+ ;; :release/country を省略し :release/region で地域を示す
+ {:db/ident :release/region :db/valueType :db.type/keyword :db/cardinality :db.cardinality/one} ; :latin-america / :mena 等
+
+ ;; ---- countries (追加) ------------------------------------------------------------
+ {:country/id :ae :country/name-ja "アラブ首長国連邦" :country/name-en "United Arab Emirates" :country/region :mena}
+ {:country/id :mx :country/name-ja "メキシコ" :country/name-en "Mexico" :country/region :latin-america}
+ {:country/id :cl :country/name-ja "チリ" :country/name-en "Chile" :country/region :latin-america}
+
+ ;; ---- networks (追加) -------------------------------------------------------------
+ {:network/id :spacetoon :network/name "Spacetoon" :network/country [:country/id :ae]
+  :network/type :kids-channel
+  :network/note "2000-03-15 開設（旧ダマスカス、現ドバイ本拠）。アラブ圏 23 か国・視聴者1.3億超の MENA 最大級子供ch。正則アラビア語ダブ。暴力シーンのクロップ、露出・性的ほのめかしの除去、宗教シンボルの改変（例: My Little Pony のダビデの星縮小）等の検閲慣行"}
+ {:network/id :antena-3 :network/name "Antena 3" :network/country [:country/id :es]
+  :network/type :terrestrial :network/note "スペイン全国民放。姉妹ch Neox でも再放送"}
+ {:network/id :azteca-7 :network/name "Azteca 7 (TV Azteca)" :network/country [:country/id :mx]
+  :network/type :terrestrial}
+ {:network/id :chilevision :network/name "Chilevisión" :network/country [:country/id :cl]
+  :network/type :terrestrial}
+ {:network/id :fox-kids-latam :network/name "Fox Kids (Latin America feed)" :network/country [:country/id :us]
+  :network/type :kids-channel :network/note "米国本拠の汎ラテンアメリカ feed"}
+
+ ;; ---- works (追加) ----------------------------------------------------------------
+ {:work/id :detective-conan :work/title-ja "名探偵コナン" :work/title-en "Case Closed / Detective Conan"
+  :work/origin [:country/id :jp] :work/year-start 1996}
+
+ ;; ---- releases — MENA (Spacetoon) -------------------------------------------------
+ {:release/id :rel.doraemon.mena.spacetoon :release/work [:work/id :doraemon-2005]
+  :release/country [:country/id :ae] :release/network [:network/id :spacetoon]
+  :release/region :mena :release/medium :tv-anime :release/edit-status :censored
+  :release/note "正則アラビア語ダブ。Spacetoon の標準検閲慣行（暴力クロップ・露出除去）の下で放送。アラブ圏 23 か国に到達"
+  :release/source "https://en.wikipedia.org/wiki/Spacetoon" :release/confidence :high}
+
+ {:release/id :rel.conan.mena.spacetoon :release/work [:work/id :detective-conan]
+  :release/country [:country/id :ae] :release/network [:network/id :spacetoon]
+  :release/region :mena :release/medium :tv-anime :release/edit-status :censored
+  :release/note "正則アラビア語ダブでアラブ圏の国民的アニメの一つに。Spacetoon 標準検閲の下で放送"
+  :release/source "https://en.wikipedia.org/wiki/Spacetoon" :release/confidence :high}
+
+ ;; ---- releases — スペイン全国網・ラテンアメリカ ------------------------------------
+ {:release/id :rel.shinchan.es.antena3 :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :es] :release/network [:network/id :antena-3]
+  :release/medium :tv-anime :release/year-start 2005 :release/title-local "Shin Chan" :release/edit-status :uncut
+  :release/note "2005-12-23 から全国独占放映権。Neox で 2006-2018 再放送・新エピソード、その後 Fox España (2019-2025) → Comedy Central España (2026-)"
+  :release/source "https://es.wikipedia.org/wiki/Shin_Chan" :release/confidence :high}
+
+ {:release/id :rel.shinchan.latam.fox-kids :release/work [:work/id :crayon-shinchan]
+  :release/network [:network/id :fox-kids-latam]
+  :release/region :latin-america :release/medium :tv-anime :release/year-start 2002 :release/edit-status :localized
+  :release/note "内容改変 + キャラクター名変更を伴うラテンアメリカ版。単一国に帰属しない汎地域 feed のため :release/country 省略"
+  :release/source "https://es.wikipedia.org/wiki/Shin_Chan" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.mx.azteca7 :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :mx] :release/network [:network/id :azteca-7]
+  :release/region :latin-america :release/medium :tv-anime
+  :release/note "ラテンアメリカ・スペイン語ダブ。放送年は一次ソース未確認のため省略"
+  :release/source "https://es.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.cl.chilevision :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :cl] :release/network [:network/id :chilevision]
+  :release/region :latin-america :release/medium :tv-anime
+  :release/note "ETC TV でも放送。アルゼンチン (Magic Kids/Telefe 等)・コロンビア・ベネズエラ・ペルー・キューバ等でも広く放送された"
+  :release/source "https://es.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.es.antena3 :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :es] :release/network [:network/id :antena-3]
+  :release/medium :tv-anime
+  :release/note "K3/Canal Super3・Canal 2 Andalucía・Fox Kids España でも放送"
+  :release/source "https://es.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ ;; ==================================================================================
+ ;; tranche 4 (2026-07-17): 韓国 SBS/Tooniverse 詳細化・ブラジル・フィリピン・フランス
+ ;; ==================================================================================
+
+ ;; ---- countries (追加) ------------------------------------------------------------
+ {:country/id :br :country/name-ja "ブラジル" :country/name-en "Brazil" :country/region :latin-america}
+ {:country/id :ph :country/name-ja "フィリピン" :country/name-en "Philippines" :country/region :southeast-asia}
+
+ ;; ---- networks (追加) -------------------------------------------------------------
+ {:network/id :sbs-kr :network/name "SBS（서울방송）" :network/country [:country/id :kr]
+  :network/type :terrestrial :network/note "韓国地上波民放。ケーブルの Tooniverse より審議基準が厳しい"}
+ {:network/id :rede-manchete :network/name "Rede Manchete" :network/country [:country/id :br]
+  :network/type :terrestrial :network/note "1990年代にセーラームーン・聖闘士星矢等でブラジルのアニメブームを牽引（1999 廃局）"}
+ {:network/id :cartoon-network-br :network/name "Cartoon Network Brasil" :network/country [:country/id :br]
+  :network/type :kids-channel}
+ {:network/id :tv5-ph :network/name "TV5 (Philippines)" :network/country [:country/id :ph]
+  :network/type :terrestrial}
+
+ ;; ---- releases — しんちゃん韓国 SBS（定義済み network を参照するためここに配置）----
+ {:release/id :rel.shinchan.kr.sbs :release/work [:work/id :crayon-shinchan]
+  :release/country [:country/id :kr] :release/network [:network/id :sbs-kr]
+  :release/medium :tv-anime :release/year-start 1999 :release/year-end 2007 :release/title-local "짱구는 못말려" :release/edit-status :censored
+  :release/note "地上波 SBS 版。相当数のシーンをカット・削除し、銃器登場回など放送委員会審議への抵触を懸念して丸ごと未放映にしたエピソードも多数"
+  :release/source "https://namu.wiki/w/짱구는 못말려/국내 방영" :release/confidence :high}
+
+ ;; ---- releases — Sailor Moon（ブラジル・フィリピン・フランス）---------------------
+ {:release/id :rel.sailormoon.br.manchete :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :br] :release/network [:network/id :rede-manchete]
+  :release/region :latin-america :release/medium :tv-anime :release/year-start 1996 :release/edit-status :censored
+  :release/note "Gota Mágica スタジオのダブ（ファンに高評価）。放送時間短縮のためのカットに苦情が出て 1996 年の放送は終了"
+  :release/source "https://pt.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.br.cartoon-network :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :br] :release/network [:network/id :cartoon-network-br]
+  :release/region :latin-america :release/medium :tv-anime :release/year-start 2000 :release/year-end 2002
+  :release/note "R/S/SuperS/Sailor Stars を BKS の新ダブで放送。旧キャスト総入れ替えがファンの反発を招いたが視聴率は初期数か月で 7pt"
+  :release/source "https://pt.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.ph.tv5 :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :ph] :release/network [:network/id :tv5-ph]
+  :release/medium :tv-anime
+  :release/note "en.wikipedia 本記事で「キャリア局 TV5 Network の主要な看板となり同局を国内第3位に押し上げた」と言及。放送年・編集詳細は未確認"
+  :release/source "https://en.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ {:release/id :rel.sailormoon.fr :release/work [:work/id :sailor-moon]
+  :release/country [:country/id :fr]
+  :release/medium :tv-anime :release/year-start 1993
+  :release/note "1993-12 開始。スペインと並び日本国外初の放送国（en.wikipedia 本記事は具体局を挙げていないため :release/network 省略）"
+  :release/source "https://en.wikipedia.org/wiki/Sailor_Moon" :release/confidence :high}
+
+ ;; ==================================================================================
+ ;; tranche 5 (2026-07-17): イタリア (Mediaset)・ドイツ (RTL II)・中国の具体局
+ ;; ==================================================================================
+
+ ;; ---- countries (追加) ------------------------------------------------------------
+ {:country/id :it :country/name-ja "イタリア" :country/name-en "Italy" :country/region :europe}
+ {:country/id :de :country/name-ja "ドイツ" :country/name-en "Germany" :country/region :europe}
+
+ ;; ---- networks (追加) -------------------------------------------------------------
+ {:network/id :italia-1 :network/name "Italia 1 (Mediaset)" :network/country [:country/id :it]
+  :network/type :terrestrial
+  :network/note "Mediaset の若年層向け民放。日本アニメを子供帯に大量編成し、血・ヌード・台詞の恒常的検閲で知られる（後年の姉妹ch Italia 2 はほぼ無検閲・日本語 OP のまま放送）"}
+ {:network/id :rtl-2 :network/name "RTL II (RTL Zwei)" :network/country [:country/id :de]
+  :network/type :terrestrial
+  :network/note "ドイツ語圏 free-TV 最大のアニメ編成（80 本超）。平日午後の子供枠「Pokito」。自社考査が子供番組に特に敏感で、FSK 6 済みエピソードすら追加編集した事例あり。2013-04 に子供番組編成を終了"}
+ {:network/id :kaku-kids :network/name "卡酷少儿 (Kaku Children's TV、北京)" :network/country [:country/id :cn]
+  :network/type :kids-channel}
+ {:network/id :cctv-6 :network/name "CCTV-6 (電影頻道)" :network/country [:country/id :cn]
+  :network/type :cable-satellite}
+ {:network/id :iqiyi :network/name "愛奇芸 (iQiyi)" :network/country [:country/id :cn]
+  :network/type :streaming}
+
+ ;; ---- releases — イタリア ----------------------------------------------------------
+ {:release/id :rel.onepiece.it.italia1 :release/work [:work/id :one-piece]
+  :release/country [:country/id :it] :release/network [:network/id :italia-1]
+  :release/medium :tv-anime :release/year-start 2001 :release/title-local "All'arrembaggio! / Tutti all'arrembaggio!"
+  :release/edit-status :censored
+  :release/note "2001-11-05 に最初の53話を放送開始。血の隠蔽・ヌードカット・暴力的台詞の軟化、主人公名 Rufy→Rubber 改名、アラバスタの入浴シーン全削除等。453話以降は原版に忠実になり、Italia 2 移行後の後期はほぼ無検閲"
+  :release/source "https://it.wikipedia.org/wiki/Episodi_di_One_Piece" :release/confidence :high}
+
+ ;; ---- releases — ドイツ (RTL II「Pokito」枠) ---------------------------------------
+ {:release/id :rel.onepiece.de.rtl2 :release/work [:work/id :one-piece]
+  :release/country [:country/id :de] :release/network [:network/id :rtl-2]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "平日午後の子供枠で放送。自社考査によるシーンカットあり（放送年の特定は一次ソース未確認のため省略）"
+  :release/source "https://en.wikipedia.org/wiki/RTL_Zwei" :release/confidence :high}
+
+ {:release/id :rel.conan.de.rtl2 :release/work [:work/id :detective-conan]
+  :release/country [:country/id :de] :release/network [:network/id :rtl-2]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "Pokito 枠。FSK 6 判定済みエピソードにも追加編集をかけた事例が言及されている"
+  :release/source "https://en.wikipedia.org/wiki/RTL_Zwei" :release/confidence :high}
+
+ {:release/id :rel.pokemon.de.rtl2 :release/work [:work/id :pokemon]
+  :release/country [:country/id :de] :release/network [:network/id :rtl-2]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "子供枠の名称「Pokito」が示す通り同枠の看板コンテンツ"
+  :release/source "https://en.wikipedia.org/wiki/RTL_Zwei" :release/confidence :high}
+
+ ;; ---- releases — 中国（具体局。汎用プライムタイム禁止は :rel.pokemon.cn.primetime-ban）
+ {:release/id :rel.pokemon.cn.kaku :release/work [:work/id :pokemon]
+  :release/country [:country/id :cn] :release/network [:network/id :kaku-kids]
+  :release/medium :tv-anime :release/year-start 2005 :release/title-local "神奇宝贝" :release/edit-status :censored
+  :release/note "2005 に卡酷少儿等の地方局が導入。台湾・群英社の中国語ダブを使用"
+  :release/source "https://wiki.52poke.com/wiki/宝可梦动画各地播放情况" :release/confidence :high}
+
+ {:release/id :rel.pokemon.cn.cctv6 :release/work [:work/id :pokemon]
+  :release/country [:country/id :cn] :release/network [:network/id :cctv-6]
+  :release/medium :tv-anime :release/year-start 2008 :release/title-local "神奇宝贝III 橘子联盟"
+  :release/note "2008-10 から第105-157話（オレンジ諸島編）を大陸ダブで放送"
+  :release/source "https://wiki.52poke.com/wiki/宝可梦动画各地播放情况" :release/confidence :high}
+
+ {:release/id :rel.pokemon.cn.iqiyi :release/work [:work/id :pokemon]
+  :release/country [:country/id :cn] :release/network [:network/id :iqiyi]
+  :release/medium :streaming :release/year-start 2011 :release/title-local "精灵宝可梦"
+  :release/note "2011 に迪美文化がイッシュ編までをライセンスし複数動画サイトへ配信。初出は台湾ダブ+繁体字幕の273話。公式中文タイトルが 神奇宝贝→精灵宝可梦 に変更"
+  :release/source "https://wiki.52poke.com/wiki/宝可梦动画各地播放情况" :release/confidence :high}
+
+ ;; ==================================================================================
+ ;; tranche 7 (2026-07-17): 進撃の巨人・NARUTO — 配信時代の作品と国家レベル禁止
+ ;; ==================================================================================
+
+ ;; ---- countries (追加) ------------------------------------------------------------
+ {:country/id :ru :country/name-ja "ロシア" :country/name-en "Russia" :country/region :europe}
+
+ ;; ---- networks (追加) -------------------------------------------------------------
+ {:network/id :mbs :network/name "毎日放送 (MBS)" :network/country [:country/id :jp]
+  :network/type :terrestrial}
+ {:network/id :nhk-g :network/name "NHK 総合" :network/country [:country/id :jp]
+  :network/type :terrestrial :network/note "公共放送。進撃の巨人 Season 3 以降の移籍先"}
+ {:network/id :jetix-uk :network/name "Jetix (UK)" :network/country [:country/id :uk]
+  :network/type :kids-channel}
+
+ ;; ---- works (追加) ----------------------------------------------------------------
+ {:work/id :attack-on-titan :work/title-ja "進撃の巨人" :work/title-en "Attack on Titan"
+  :work/origin [:country/id :jp] :work/year-start 2013}
+ {:work/id :naruto :work/title-ja "NARUTO -ナルト-" :work/title-en "Naruto"
+  :work/origin [:country/id :jp] :work/year-start 2002}
+
+ ;; ---- releases — 進撃の巨人 --------------------------------------------------------
+ {:release/id :rel.aot.jp.mbs :release/work [:work/id :attack-on-titan]
+  :release/country [:country/id :jp] :release/network [:network/id :mbs]
+  :release/medium :tv-anime :release/year-start 2013 :release/year-end 2017 :release/edit-status :uncut
+  :release/note "Season 1 (2013-04-07〜09-29)・Season 2 (2017-04-01〜06-17)"
+  :release/source "https://en.wikipedia.org/wiki/Attack_on_Titan_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.aot.jp.nhk :release/work [:work/id :attack-on-titan]
+  :release/country [:country/id :jp] :release/network [:network/id :nhk-g]
+  :release/medium :tv-anime :release/year-start 2018 :release/year-end 2023 :release/edit-status :uncut
+  :release/note "Season 3 以降 NHK 総合へ移籍 (2018-07-23〜2023-11-05 完結編後編)。深夜アニメが公共放送へ移る珍しい例"
+  :release/source "https://en.wikipedia.org/wiki/Attack_on_Titan_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.aot.us.adult-swim :release/work [:work/id :attack-on-titan]
+  :release/country [:country/id :us] :release/network [:network/id :adult-swim]
+  :release/medium :tv-anime :release/year-start 2014 :release/year-end 2024 :release/edit-status :uncut
+  :release/note "Toonami 枠で 2014-05-03〜2024-01-07。配信は Crunchyroll・Funimation・Hulu"
+  :release/source "https://en.wikipedia.org/wiki/Attack_on_Titan_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.aot.cn.blacklist :release/work [:work/id :attack-on-titan]
+  :release/country [:country/id :cn]
+  :release/medium :streaming :release/year-start 2015 :release/edit-status :banned
+  :release/note "文化部が 2015-06 に「暴力・ポルノ・テロリズム・公序良俗に反する犯罪」を理由に日本アニメ・漫画 38 作品をブラックリスト化（デスノート・黒執事・東京喰種等も対象）。配信サイト 8 つを閉鎖、29 サイトを処分。全国一律規制のため :release/network 省略"
+  :release/source "https://www.animenewsnetwork.com/news/2015-06-09/china-blacklists-attack-on-titan-death-note-36-more-anime-manga/.89055" :release/confidence :high}
+
+ {:release/id :rel.aot.ru.ban :release/work [:work/id :attack-on-titan]
+  :release/country [:country/id :ru]
+  :release/medium :streaming :release/year-start 2021 :release/edit-status :banned
+  :release/note "2021-07 に政府が配信禁止。2022 のウクライナ侵攻後は Crunchyroll 自体がロシアでの営業を停止"
+  :release/source "https://en.wikipedia.org/wiki/Attack_on_Titan_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.aot.my.censored :release/work [:work/id :attack-on-titan]
+  :release/country [:country/id :my]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "不適切な身体部位の検閲を要求された（具体局は出典未記載のため :release/network 省略）"
+  :release/source "https://en.wikipedia.org/wiki/Attack_on_Titan_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.aot.sea.netflix :release/work [:work/id :attack-on-titan]
+  :release/network [:network/id :netflix]
+  :release/region :southeast-asia :release/medium :streaming :release/year-start 2020 :release/edit-status :uncut
+  :release/note "2020-12 から東南アジア域で配信（iQIYI も同域で字幕版を配信）。汎地域配信のため :release/country 省略"
+  :release/source "https://en.wikipedia.org/wiki/Attack_on_Titan_(TV_series)" :release/confidence :high}
+
+ ;; ---- releases — NARUTO ------------------------------------------------------------
+ {:release/id :rel.naruto.jp.tv-tokyo :release/work [:work/id :naruto]
+  :release/country [:country/id :jp] :release/network [:network/id :tv-tokyo]
+  :release/medium :tv-anime :release/year-start 2002 :release/year-end 2017 :release/edit-status :uncut
+  :release/note "無印 2002-10-03〜2007-02-08、疾風伝 2007-02-15〜2017-03-23"
+  :release/source "https://en.wikipedia.org/wiki/Naruto_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.naruto.us.toonami :release/work [:work/id :naruto]
+  :release/country [:country/id :us] :release/network [:network/id :cartoon-network-us]
+  :release/medium :tv-anime :release/year-start 2005 :release/year-end 2009 :release/edit-status :censored
+  :release/note "Toonami で 2005-09-10〜2009-01-31 (209話)。酒・日本文化・性的ほのめかし・血と死の描写を編集。疾風伝は Disney XD (2009-2011、1-98話) → Neon Alley → Adult Swim/Toonami (2014-2024)"
+  :release/source "https://en.wikipedia.org/wiki/Naruto_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.naruto.ca.ytv :release/work [:work/id :naruto]
+  :release/country [:country/id :ca] :release/network [:network/id :ytv]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "Bionix 枠で英語ダブを放送"
+  :release/source "https://en.wikipedia.org/wiki/Naruto_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.naruto.uk.jetix :release/work [:work/id :naruto]
+  :release/country [:country/id :uk] :release/network [:network/id :jetix-uk]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "英語ダブ版を放送。豪 (Network Ten/ABC3)・南ア (SABC 2)・東南アジア (Animax/Cartoon Network) でも放送"
+  :release/source "https://en.wikipedia.org/wiki/Naruto_(TV_series)" :release/confidence :high}
+
+ {:release/id :rel.naruto.de.rtl2 :release/work [:work/id :naruto]
+  :release/country [:country/id :de] :release/network [:network/id :rtl-2]
+  :release/medium :tv-anime :release/edit-status :censored
+  :release/note "Pokito 枠のアニメ編成の一つとして放送、自社考査によるシーンカットあり"
+  :release/source "https://en.wikipedia.org/wiki/RTL_Zwei" :release/confidence :high}
+]

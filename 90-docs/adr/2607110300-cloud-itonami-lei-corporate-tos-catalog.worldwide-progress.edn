@@ -1,0 +1,132 @@
+[
+ {:progress/schema-note "cloud-itonami-lei WORLDWIDE-scope extension progress tracker. Sibling to 2607110300-cloud-itonami-lei-corporate-tos-catalog.{progress,isco-progress}.edn. The original .progress.edn ISIC top-3 rollout is COMPLETE (see its :progress/resume-from) and is heavily US-skewed. This file tracks the OWNER-DIRECTED new scope (2026-07-19, /loop '全世界の法人情報を取得して、連携統合'): broaden the catalog toward genuine worldwide coverage by acquiring real GLEIF parent-entity LEIs for global leaders BEYOND the already-done top-3, prioritizing the jurisdictional gaps (JP/EU/Asia utilities flagged absent), then run the existing 連携統合 pipeline (scripts/kotobase-ingest-cloud-itonami-lei.cljs fold into kotobase.net + scripts/lei-site-enrich.cljs). Same no-fabrication policy: real GLEIF parent-entity LEI + real fetchable ToS/legal page only; LEIs verified but reg.status LAPSED are still real and on-record (same convention as isic-6492 Discover Financial). This file is the resume point for the next /loop tick."
+  :progress/scope "worldwide-broadening"
+  :progress/owner-direction "2026-07-19 /loop 全世界の法人情報を取得して、連携統合"
+  :progress/resume-from "ITERATION 1 (2026-07-19) COMPLETED ACQUISITION for batch JP-UTIL-1 (8 Japanese electric/gas/telecom parent entities, all real GLEIF-verified, JP jurisdiction, correct parent not subsidiary). All 8 are :lei-verified, NONE yet ToS-fetched/scaffolded. NEXT TICK: (1) ToS/legal-page fetch gate for each (JP corporate sites are mostly server-rendered, unlike US consumer SPAs, so success rate expected higher than the isic-6110/4711 consumer-retail verticals); (2) scaffold cloud-itonami-lei-<lei-lowercased> repos for successes via the existing pattern; (3) register in manifest/fleet-db.edn; (4) run scripts/kotobase-ingest-cloud-itonami-lei.cljs to fold into kotobase.net (= 連携統合). Then proceed to next worldwide batch (EU utilities: EDF/Engie/Iberdrola/National Grid/RWE/Enel; Asia: KEPCO/CLP)."
+  :db/id -1}
+ {:batch/id "JP-UTIL-1"
+  :batch/jurisdiction "JP"
+  :batch/theme "Japanese electric / gas / telecom utility parents (fills the '0 JP utilities' gap flagged 2026-07-19)"
+  :batch/acquired "2026-07-19"
+  :batch/status :lei-verified
+  :batch/next-step :tos-fetch-gate
+  :batch/companies
+  [{:company/legal-name "東京電力ホールディングス株式会社"
+    :company/legal-name-en "Tokyo Electric Power Company Holdings, Incorporated"
+    :company/lei "5299004EMJ3R4RVR5Y75"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/5299004EMJ3R4RVR5Y75"
+    :company/jurisdiction "JP"
+    :company/hq "東京都"
+    :company/isic-rev5 "3510"
+    :company/sector :electric-utility
+    :company/reg-status "LAPSED"
+    :company/reg-note "real GLEIF-issued entity-verified LEI, not annually renewed; same convention as isic-6492 Discover Financial"
+    :company/candidate-website "https://www.tepco.co.jp"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "関西電力株式会社"
+    :company/legal-name-en "The Kansai Electric Power Company, Incorporated"
+    :company/lei "353800PFUKP5ONPJNZ86"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/353800PFUKP5ONPJNZ86"
+    :company/jurisdiction "JP"
+    :company/hq "大阪府大阪市北区"
+    :company/isic-rev5 "3510"
+    :company/sector :electric-utility
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.kepco.co.jp"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "中部電力株式会社"
+    :company/legal-name-en "Chubu Electric Power Company, Inc."
+    :company/lei "529900A76GOP0PGNHT63"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/529900A76GOP0PGNHT63"
+    :company/jurisdiction "JP"
+    :company/hq "愛知県名古屋市東区"
+    :company/isic-rev5 "3510"
+    :company/sector :electric-utility
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.chuden.co.jp"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "東京瓦斯株式会社"
+    :company/legal-name-en "Tokyo Gas Co., Ltd."
+    :company/lei "353800678EIJLOQSWZ83"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/353800678EIJLOQSWZ83"
+    :company/jurisdiction "JP"
+    :company/hq "東京都港区"
+    :company/isic-rev5 "3520"
+    :company/sector :gas-utility
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.tokyo-gas.co.jp"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "大阪瓦斯株式会社"
+    :company/legal-name-en "Osaka Gas Co., Ltd."
+    :company/lei "353800024KMNOPQRWZ02"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/353800024KMNOPQRWZ02"
+    :company/jurisdiction "JP"
+    :company/hq "大阪府大阪市中央区"
+    :company/isic-rev5 "3520"
+    :company/sector :gas-utility
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.osakagas.co.jp"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "KDDI株式会社"
+    :company/legal-name-en "KDDI CORPORATION"
+    :company/lei "5299003FU7V4I45FU310"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/5299003FU7V4I45FU310"
+    :company/jurisdiction "JP"
+    :company/hq "東京都新宿区"
+    :company/isic-rev5 "6110"
+    :company/sector :telecom-wired
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.kddi.com"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "ソフトバンクグループ株式会社"
+    :company/legal-name-en "SoftBank Group Corp."
+    :company/lei "5493003BZYYYCDIO0R13"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/5493003BZYYYCDIO0R13"
+    :company/jurisdiction "JP"
+    :company/hq "東京都港区"
+    :company/isic-rev5 "6120"
+    :company/sector :telecom-wireless
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.softbankgroup.com"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}
+   {:company/legal-name "ＮＴＴ株式会社"
+    :company/legal-name-en "Nippon Telegraph and Telephone Corporation (NTT)"
+    :company/lei "353800VHQU5VIXVUA841"
+    :company/lei-source-url "https://api.gleif.org/api/v1/lei-records/353800VHQU5VIXVUA841"
+    :company/jurisdiction "JP"
+    :company/hq "東京都"
+    :company/isic-rev5 "6110"
+    :company/sector :telecom-wired
+    :company/reg-status "ISSUED"
+    :company/candidate-website "https://www.ntt.co.jp"
+    :company/note "disambiguated from JP subsidiary entities (NTTセキュリティ, NTTリミテッド・ジャパン, NTTアノードエナジー) which were correctly excluded per the no-subsidiary-substitution policy"
+    :company/status :lei-verified
+    :company/next-step :tos-fetch-gate}]}
+ {:batch/id "EU-UTIL-1"
+  :batch/jurisdiction "EU/GB"
+  :batch/theme "European electric/gas utility parents (next worldwide batch, NOT YET ACQUIRED)"
+  :batch/status :queued
+  :batch/candidates ["Électricité de France SA (EDF)"
+                     "Engie SA"
+                     "Iberdrola SA"
+                     "National Grid plc"
+                     "RWE AG"
+                     "Enel SpA"
+                     "SSE plc"
+                     "E.ON SE"]}
+ {:batch/id "ASIA-UTIL-1"
+  :batch/jurisdiction "KR/CN/HK/SG"
+  :batch/theme "Asia-Pacific electric utilities (later batch, NOT YET ACQUIRED)"
+  :batch/status :queued
+  :batch/candidates ["Korea Electric Power Corporation (KEPCO)"
+                     "CLP Holdings Limited"
+                     "Tenaga Nasional Berhad"
+                     "State Grid Corporation of China (note: may have no GLEIF parent LEI like CRRC/Gazprom — verify, do not fabricate)"]}
+]

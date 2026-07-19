@@ -1,0 +1,157 @@
+[{:db/id -1
+  :adr/id "adr-2607181200-fuchi-itonami-offline-ss-priority-stack-closing"
+  :adr/doc_type "adr"
+  :adr/status "accepted-code-complete-unlanded"
+  :adr/date "2026-07-18"
+  :adr/last_verified "2026-07-18"
+  :adr/addendum
+  "2026-07-18 gap-fill: priority_stack (3) full + ss_offline embeds SSoT + nbb.edn/deps dual classpath; still unlanded (shell ENOENT)."
+  :adr/title "Closing: fuchi itonami offline SS priority-stack (1)(2)(3) + nbb host — merge inventory"
+  :adr/topic "fuchi-itonami-offline-ss-priority-stack-closing"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative_for
+  ["closing inventory of robotics/itonami job-loss × etzhayyim covenantal SS offline gap-fill in com-etzhayyim-fuchi"
+   "priority order (1) L0 enroll (2) disclosure hold/continuity + held-stress (3) mitsuho R1→gated DESIGN care/housing first"
+   "merge status of each tranche vs GitHub main / west pin / local WIP"
+   "nbb-only land path for fuchi offline stack (ADR-2607173000)"]
+  :adr/related
+  ["adr-2607177000-covenantal-ss-public-person-wellbecoming-priority"
+   "adr-2606052300-fuchi-maintainer-sustenance-allocator-r0"
+   "adr-2606032130-displacement-dividend-tenure-weighted-basic-high-income"
+   "adr-2607173000-fleet-babashka-to-nbb"
+   "data/itonami-offline-ss-readiness.edn in etzhayyim/com-etzhayyim-fuchi"]
+  :adr/repo "etzhayyim/com-etzhayyim-fuchi"
+  :adr/shas
+  {:local-checkout-head "d6400f3487de0e2270857fc49c36f9e1ed3cf273"
+   :github-main-tip "bb449eddf1c525d259457389ee59edecb668fdf2"
+   :west-pin "d647f062a7df6bca92ee61da5a68c0db6ddf678e"
+   :housing-tranche-merged "d6400f3487de0e2270857fc49c36f9e1ed3cf273"
+   :standalone-migration-on-main ["f9d161ec8c2ed4548b3b3f943194acda2428ae99"
+                                  "bb449eddf1c525d259457389ee59edecb668fdf2"]}
+  :adr/merge_inventory
+  [{:tranche "A. covenantal public-person + Tier-0 priority (ADR-2607177000)"
+    :merged? true
+    :evidence "accepted ADR; public_person + seed on main lineage"}
+   {:tranche "B. L0 enroll offline + disclosure hold/continuity SM"
+    :merged? true
+    :evidence "on main ancestor chain through d6400f34 and re-homed under src/fuchi/methods/"}
+   {:tranche "C. held-stress embed on L0 ladder / displacement L0→L6→G7"
+    :merged? true
+    :evidence "displacement_* + pipeline audit keys on main lineage"}
+   {:tranche "D. all-seven rails R1→gated-live DESIGN (care→housing→mitsuho→hikari→tooling→compute→liquidity)"
+    :merged? true
+    :evidence "rail_* + design EDN + ss_offline_path on main; housing gated receive/produce = d6400f34"}
+   {:tranche "E. scorecard / public surface / pipeline audit / pages plan-only surfaces for SS path"
+    :merged? true
+    :evidence "public/* + scorecard/audit modules on main tip"}
+   {:tranche "F. standalone layout migration methods/ → src/fuchi/methods/ + test/"
+    :merged? true
+    :evidence "main tip bb449edd (ahead of d6400f34 by 2 commits); local checkout still at d6400f34 methods/ layout"}
+   {:tranche "G. priority_stack.cljc SSoT run-offline (1)(2)(3) + design EDN + public-facts"
+    :merged? false
+    :evidence "methods/priority_stack.cljc 404 on GitHub main; local WIP only"}
+   {:tranche "H. nbb entrypoints (run_tests.cljs, write_all.cljs, readiness_check, land, publish.cljs, smoke)"
+    :merged? false
+    :evidence "not on main tip tree; main still documents bb test / residual bb.edn; local nbb files unlanded"}
+   {:tranche "I. portable nbb test suite unwrap + dual-key fact-get + assert-public-facts!"
+    :merged? false
+    :evidence "local WIP atop d6400f34; not rebased onto bb449edd src/ layout"}
+   {:tranche "J. west pin com-etzhayyim-fuchi advance"
+    :merged? false
+    :evidence "manifest/west.yml revision d647f062 (behind github main bb449edd and behind housing d6400f34)"}
+   {:tranche "K. live produce / land-grant / loan / Pages wrangler deploy"
+    :merged? false
+    :evidence "explicitly not-in-scope; default refuse forever until Council gate"}]
+  :adr/source-format "edn"
+  :adr/body
+  "# ADR-2607181200: Closing — fuchi itonami offline SS priority-stack + merge inventory
+
+**Status**: accepted (code-complete-unlanded for G–J)  
+**Date**: 2026-07-18  
+**Deciders**: Jun Kawasaki  
+**Repo**: `etzhayyim/com-etzhayyim-fuchi`  
+**Depends on**: ADR-2607177000 (public-person + Tier-0), ADR-2606052300 (fuchi R0), ADR-2607173000 (nbb-only script host)
+
+## Context
+
+Continuous gap-fill for **robotics/itonami job-loss × etzhayyim covenantal SS offline** pipeline in fuchi, with fixed priorities:
+
+1. **L0 enroll offline**
+2. **disclosure hold + continuity SM + held-stress**
+3. **rails R1→gated DESIGN** — care/housing first (孫/子), then food/energy (mitsuho/hikari), then vocation/residual
+
+Invariants (unchanged): wellbecoming > 孫 > 子; public-person **facts only**; no scores; cash≡0; live default refuse; no live deploy.
+
+Owner also required **nbb not bash** for land/test entrypoints (ADR-2607173000).
+
+This ADR is the **closing inventory**: what landed on GitHub `main`, what remains local WIP, and west pin lag.
+
+## Decision (closing facts)
+
+### Priority stack SSoT (design, when landed)
+
+```
+(1) L0 enroll offline scaffold
+(2) disclosure hold + continuity + held-stress
+(3) mitsuho (care-first path) R1 → gated-live DESIGN
+    care → housing → mitsuho → hikari → tooling → compute → liquidity
+```
+
+Machine-readable design (local): `data/priority-stack-design.edn` + `methods/priority_stack.cljc` (`run-offline`, `public-facts`, `assert-public-facts!`).  
+Readiness SSoT: `data/itonami-offline-ss-readiness.edn` status **`:code-complete-unlanded`**.
+
+### SHA snapshot (verified 2026-07-18 via GitHub API)
+
+| Ref | SHA | Note |
+|---|---|---|
+| Local checkout HEAD | `d6400f34…` | last local commit: housing gated-receive/produce |
+| GitHub `main` tip | `bb449edd…` | **ahead of local by 2**: standalone migration |
+| West pin (`manifest/west.yml`) | `d647f062…` | **behind** both housing and main tip |
+| Housing tranche (merged into main ancestry) | `d6400f34…` | merge-base with main tip |
+
+Compare `d6400f34...bb449edd`: status **ahead**, ahead_by **2**, behind_by **0** — pure forward from housing; main re-homed sources under `src/fuchi/methods/` + `test/fuchi/methods/`.
+
+### Merge inventory (answer: それぞれは merge ずみ?)
+
+| Tranche | Merged to GitHub `main`? | West pin? | Notes |
+|---|---|---|---|
+| A. ADR-2607177000 public-person / Tier-0 | **yes** | pin lag | policy accepted |
+| B. L0 enroll + disclosure SM | **yes** | pin lag | under `src/fuchi/methods/` on tip |
+| C. held-stress L0→L6→G7 | **yes** | pin lag | |
+| D. all-seven rails R1→gated DESIGN through housing | **yes** | pin lag | through `d6400f34` |
+| E. scorecard / public / audit / pages plan-only | **yes** | pin lag | |
+| F. standalone layout (`methods/`→`src/fuchi/…`) | **yes** | pin lag | tip `bb449edd`; **local checkout not pulled** |
+| G. `priority_stack` SSoT + offline.edn surfaces | **no** | no | 404 on main; local WIP |
+| H. nbb land/test/publish entrypoints | **no** | no | main still has `bb.edn` / `bb test` docs |
+| I. portable nbb suite + dual-key facts | **no** | no | must re-home onto `src/` layout |
+| J. west pin advance | **no** | **no** | still `d647f062` |
+| K. live produce / grant / loan / wrangler | **n/a refuse** | n/a | never in this closing |
+
+**Short answer:** offline SS **through housing full-chain refuse is on GitHub main**. The **priority_stack SSoT + nbb land path is not merged**. Superproject **west pin has not caught up** even to the already-merged housing tip.
+
+## Consequences
+
+1. **Closing this loop as documentation**: this ADR + readiness file are the SSoT for “what is done vs unlanded.”
+2. **Next land path** (when terminal works; agent shell was ENOENT this session):
+   - `git fetch` fuchi; reconcile local WIP onto `origin/main` (`bb449edd`, `src/fuchi/` layout) without force-push
+   - port G–I files into `src/fuchi/methods/` + nbb entrypoints at repo root
+   - `nbb methods/readiness_check.cljs` → `priority_stack_smoke` → `run_tests` → `write_all`
+   - commit/push ff-only to `main`
+   - west/fleet pin advance `com-etzhayyim-fuchi` to new tip (single-entry; verify remote)
+3. **Do not** treat local `methods/` tree as main tip after standalone migration.
+4. Live disbursement remains out of scope.
+
+## Alternatives rejected
+
+1. **Declare fully merged** — false; G–J open.
+2. **Force-push local d6400f34 over bb449edd** — forbidden; would drop standalone migration.
+3. **Advance west pin without landing G–I** — optional for A–F only; prefer pin to true tip after G–I land.
+
+## Not in scope
+
+- live mitsuho/hikari produce
+- live land-grant / loan / wrangler Pages deploy
+- personal scores / ranks
+- cash disbursement
+"}]

@@ -1,0 +1,89 @@
+# fleet-db projection consistency (ADR-2607160005 Phase 1.5).
+# west.yml is a projection of manifest/fleet-db.edn. Legacy writers
+# (gen --entry / API single-entry) may still advance west.yml directly;
+# this workflow absorbs that drift into fleet-db as attributed ledger
+# events (reconcile), keeping fleet-db lossless until the hard flip.
+# The signed fleet head (manifest/fleet-head.edn) is NOT re-announced here
+# (CI holds no signing key) — `fleet head --verify` drift is reported only.
+name: fleet-projection-verify
+on:
+  push:
+    branches: [main]
+    paths: ["manifest/**"]
+permissions:
+  contents: write
+concurrency:
+  group: fleet-projection-verify
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 1}
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - run: npm i -g nbb
+      - name: clone kotoba-fleet-vcs at its west pin
+        run: |
+          PIN=$(awk '$0=="    - name: kagami"{f=1} f&&/revision:/{print $2; exit}' manifest/west.yml)
+          git clone --depth 1 https://github.com/kotoba-lang/kagami.git /tmp/fleet
+          git -C /tmp/fleet fetch --depth 1 origin "$PIN" && git -C /tmp/fleet checkout --detach "$PIN"
+      - name: reconcile check
+        id: check
+        run: |
+          if nbb --classpath /tmp/fleet/src /tmp/fleet/bin/fleet.cljs reconcile \
+               --db manifest/fleet-db.edn --west manifest/west.yml --check; then
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: absorb drift into fleet-db (ledger events)
+        if: steps.check.outputs.drift == 'true'
+        run: |
+          nbb --classpath /tmp/fleet/src /tmp/fleet/bin/fleet.cljs reconcile \
+            --db manifest/fleet-db.edn --west manifest/west.yml
+          git config user.name "fleet-projection-bot"
+          git config user.email "noreply@github.com"
+          git add manifest/fleet-db.edn manifest/fleet-db.ledger.edn
+          git commit -m "chore(fleet): reconcile legacy west.yml writes into fleet-db (ADR-2607160005 P1.5)"
+          git push origin HEAD:main
+      - name: verify pins reachable (public only; private is owner-side/sovereign)
+        if: always()
+        run: |
+          # Reachability now has a SOVEREIGN provider (fleet verify-pins
+          # --reach local-git): it materializes the repo's own commit graph
+          # (treeless clone via git/SSH) and answers ancestry locally — NO gh
+          # API, NO PAT. The FLEET_PIN_TOKEN org-read PAT is therefore NOT
+          # needed. Strict PRIVATE pin verification runs OWNER-SIDE (the owner
+          # has git access to private children), as part of native CI
+          # (fleet ci-verify). In GHA, without SSH keys to private cross-org
+          # children, local-git clone fails -> :unknown -> WARN; public pins
+          # still verify here best-effort with the default github.token.
+          git show HEAD^:manifest/west.yml > /tmp/prev.yml 2>/dev/null || : > /tmp/prev.yml
+          CHANGED=$(diff <(grep -A1 '^    - name:' /tmp/prev.yml) \
+                         <(grep -A1 '^    - name:' manifest/west.yml) \
+                    | grep 'name:' | sed 's/.*name: //' | sort -u | paste -sd, -)
+          if [ -n "$CHANGED" ]; then
+            nbb --classpath /tmp/fleet/src /tmp/fleet/bin/fleet.cljs verify-pins \
+              --db manifest/fleet-db.edn --repos "$CHANGED" --reach github \
+              || echo "::error::a changed public pin is CONFIRMED unreachable"
+          else
+            echo "no pin changes to verify"
+          fi
+      - name: native CI receipt (report-only; signing key is owner-side)
+        if: always()
+        run: |
+          # The signed receipt is produced locally by the owner (kagi key);
+          # CI can only report reachability, not sign. This step documents the
+          # native-CI verdict shape (required subset of passed) without a key.
+          # When FLEET_CI_KEY is provisioned, replace this with `fleet ci-verify`.
+          echo "native CI: pin-reachability verdict is emitted as a signed" \
+               "content-addressed receipt by 'fleet ci-verify' (owner-side);" \
+               "see manifest/fleet-ci.edn (append-only receipt log)."
+      - name: verify signed fleet head (report-only)
+        if: always()
+        run: |
+          nbb --classpath /tmp/fleet/src /tmp/fleet/bin/fleet.cljs head \
+            --db manifest/fleet-db.edn --out manifest/fleet-head.edn --verify \
+            || echo "::warning::fleet head is behind fleet-db — re-announce with 'fleet head' (signing key required)"

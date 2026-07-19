@@ -1,0 +1,91 @@
+[{:db/id -1
+  :adr/id "adr-2607172230-ghosthacker-export-komawari-geometry"
+  :adr/title "ADR-2607172230: ghosthacker exporter の komawari 幾何計算 — :shot/:gh/pageLayout からの beat 導出 + sheared-row governor 修正"
+  :adr/status "accepted"
+  :adr/date "2026-07-17"
+  :adr/last_verified "2026-07-17"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "ghosthacker-export-komawari-geometry"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2607141700" "adr-2607172200" "adr-2607172210" "adr-2607051520"]
+  :adr/body "## Context
+
+ADR-2607141700 の最後の大きな残ギャップ:『ghosthacker 自身の export
+スクリプト(scripts/export-aozora-manga-work.cljs)は komawari を一切呼ばず、
+実際に export される Ghost Hacker の tx には geometry が乗らない。:shot /
+:gh/pageLayout から :beat/weight / :beat/intensity をどう導出するかは未設計』。
+受け側のスキーマ(:gh.manga/rect / :gh.manga/tilt、panel-entity の
+optional-assoc)と manga-viewer の composed-page レンダラは addendum 2/4 で
+実装済みで、視覚検証は合成データ止まりだった。
+
+データ調査: 実 episode(6本・213ページ・968パネル)は全パネルに :shot
+(film-grammar の距離語彙: Wide Shot / Close Up / Insert / Full Page 等11種)、
+全ページに :gh/pageLayout {:gh/category (action/impact/dialogue/climax/
+transition/establishing) :gh/templateName :gh/layoutNote} を持つ。また
+episodes/ep1-komawari-redesign が手書き rows-of-beats 形式(:beat/weight /
+:beat/intensity / :beat/vector)の設計デモとして既に存在し、導出のターゲット
+形式はこれに揃えた。
+
+## Decision
+
+1. **決定論的 beat 導出**(exporter 内、ghosthacker 語彙 → komawari 語彙):
+   - :beat/weight ← panel :shot。Full Page → :splash、Wide/Extreme Wide/
+     Establishing → :large、Insert/Extreme Close Up → :small、他 → :medium。
+   - :beat/intensity ← page :gh/pageLayout :gh/category。impact/climax →
+     :impact、action → :tension を **そのページ最強 weight の beat 1つ**
+     にだけ付与(tie は最後の beat = ページ末 = ページめくりフック側。
+     ADR-2607172200 の荒木 primary 根拠と整合)。dialogue/establishing/
+     transition は calm のまま。
+   - :beat/vector ← 定数 20°(データに打撃方向フィールドが無いため、
+     パネル毎の推測でなく一貫した house force-line とする設計値)。
+   - rows ← :splash/:large beat は単独 tier、残りは2つずつ
+     (:gh/templateName の Jump Hero-Top / rhythm 系テンプレの決定論近似)。
+   - style は :toriyama(同じ Arc0-1 パネル群で実証済みプリセット、
+     ADR-2607051520)。governor を通らないページは幾何なしで従来出力に
+     フォールバック(半端な rect を出さない)。
+2. **エンジン修正(sheared-row governor、kami-mangaka-page)**: 実データが
+   即座に露出させた governor の実バグ2件を修正 —『generator の出力は必ず
+   自分の governor を通る』という既存設計特性の回復:
+   - force-line は行全体で1つの tilt を共有する仕様なのに、tilt cap 検査は
+     impact タグの無い行仲間を tension 上限(10°)で弾いていた →
+     propose-page-layout がシアー行の全パネルに \"sheared-impact\" /
+     \"sheared-tension\" タグを付け、governor は行の intensity で cap する。
+   - 平行四辺形同士は構成上重ならないのに bbox 近似が同一行ペアを
+     :panel-overlap 誤検出(20° × 背の高い tier で tolerance 0.015 超) →
+     『両方 sheared タグ + tilt 一致 + 同一 y band』のペアだけ overlap 検査
+     から除外(異なる行の本物の重なりは引き続き弾く。回帰テスト追加)。
+3. **成果(実測)**: 213ページ / 968パネル全てに :rect(シアー行には :tilt)が
+   付与され、全ページが governor 通過。app-aozora の
+   public/kotoba/ghosthacker-manga-tx.edn を新 work.edn から再生成
+   (旧 2026-07-03 版は stale app-aozora-svelte export 由来の
+   arc0-1 46ページのみ・幾何なし)。ghosthacker-manga-log.edn は
+   コード上の消費者が無いため本 ADR 時点では再生成せず据え置いた。当初
+   この欠落は kotoba.datom(20-actors/kotodama)不在によるものだったが、
+   本 ADR 執筆と同日に app-aozora@00e040c1 が kotoba-lang/kotoba-datom
+   参照で main を修復済みだった — log 再生成はその経路で可能になり、
+   **ADR-2607172260 で実施**(entity->eavt のキーワード値バグも同時に
+   発見・修正。詳細は同 ADR)。
+
+## Consequences
+
+- aozora-studio / manga-viewer で Ghost Hacker 全ページが komawari
+  レイアウト付きで描画可能になる — ADR-2607141700 Phase 4 の前提
+  (『studio 側での編集・閲覧が実際に動く』)への最後の構造的ブロッカーが
+  解消。視覚同等性の確認は follow-up。
+- 導出はヒューリスティック(特に rows の2個ずつ tier 化と :beat/vector
+  定数)。episode 側が ep1-komawari-redesign 形式の手書き rows を持つ場合の
+  直接使用は未実装の follow-up。
+- 検証: kami-mangaka-page JVM 24 tests / 98 assertions / 0 failures +
+  nbb 実行検証。exporter 実行ログ『213 pages, 968 panels, 213 pages /
+  968 panels with komawari :rect』。"
+  :adr/authoritative_for
+  ["ghosthacker → aozora export の beat 導出規則: :shot→:beat/weight(Full Page=splash / Wide系=large / Insert・ECU=small / 他=medium)、:gh/pageLayout :gh/category→:beat/intensity(impact・climax=impact / action=tension、ページ最強 beat 1つのみ、tie は最後=ページめくり側)、:beat/vector=定数20°(設計値)、rows=splash・large 単独 tier + 残り2個ずつ"
+   "exporter の実行には kami.mangaka.komawari が classpath に必須(nbb は実行時 resolve 不可のため optional dep にできない): npx nbb --classpath ../../kotoba-lang/kami-mangaka-page/src scripts/export-aozora-manga-work.cljs"
+   "governor を通らないページは幾何なしでフォールバック export する(半端な rect を出さない)"
+   "シアー行の全パネルは \"sheared-impact\"/\"sheared-tension\" タグを持ち、governor は行の intensity で tilt を cap し、同一シアー行ペアの bbox 重なりを overlap 検査から除外する — generator 出力は常に自分の governor を通る"
+   "public/kotoba/ghosthacker-manga-tx.edn / ghosthacker-manga-log.edn は ghosthacker の resources/aozora-manga-work.edn から aozora.appview.manga(work->tx / tx->eavt)で再生成する生成物(手編集しない)。log の再生成手順とその過程で発見・修正した entity->eavt のキーワード値バグは ADR-2607172260 が正本"]
+  :adr/artifacts "{:ghosthacker \"com-junkawasaki/ghosthacker@8f3abda6 (exporter + regenerated resources/aozora-manga-work.edn)\", :kami-mangaka-page \"kotoba-lang/kami-mangaka-page@d4b578d6 (sheared-row governor fix + regression test)\", :app-aozora \"gftdcojp/app-aozora@b3e3338b (regenerated public/kotoba/ghosthacker-manga-tx.edn)\"}"}]

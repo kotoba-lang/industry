@@ -1,0 +1,34 @@
+[{:db/id -1
+  :adr/id "adr-2607183800-kami-media-versioned-autosave-recovery"
+  :adr/title "KAMI media applications add versioned autosave and crash recovery"
+  :adr/date "2026-07-18"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607183700-kami-media-validated-project-persistence"]
+  :adr/decision
+  {:shared {:storage :browser-local-storage
+            :trigger :project-value-change
+            :envelope-version 1
+            :restore :application-initialization
+            :invalid-policy :discard
+            :runtime-state-excluded true}
+   :daw {:recovery-key "kami-app-daw/recovery/v1" :project-schema "kami.ongaku-project/v1"}
+   :nle {:recovery-key "kami-app-nle/recovery/v1" :project-schema "kami.eizo-project/v1"}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates {:shared ["recovery history" "automatic media relinking" "cross-device sync" "schema migration"]
+                                :daw ["loop and comp recording" "plugin hosting" "LUFS/true-peak"]
+                                :nle ["pointer trim gestures" "proxy/cache" "color management" "additional containers"]}}
+  :adr/implementation
+  {:daw-commits ["e376b2b"]
+   :nle-commits ["843d88a"]
+   :evidence ["DAW and NLE CLJC suites each pass 8 tests and 22 assertions, including valid recovery, future-version rejection and foreign-schema rejection."
+              "Both guarded shadow-cljs production releases completed with zero compiler warnings."
+              "DAW Chrome autosaved the name Autosaved DAW, restored it after reload with a recovery banner, then rejected and removed an injected version-999 envelope without console errors."
+              "NLE Chrome autosaved the Master delivery profile and restored it after reload with a recovery banner and no console errors."
+              "Both GitHub Pages workflows completed tests, release compilation and deployment successfully."]}
+  :adr/consequences
+  ["A reload or browser crash no longer necessarily loses project edits."
+   "High-frequency runtime meter changes do not write storage because autosave compares only project values."
+   "Recovery is a single local snapshot; history, cross-device durability and media recovery remain separate gates."]
+  :adr/source-format "edn"}]

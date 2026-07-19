@@ -1,0 +1,33 @@
+{:health-status 200,
+ :zone-name "etzhayyim.com",
+ :workers-invocations-7d
+ {"etzhayyim-did-web" 11753, "etzhayyim-xrpc-proxy" 206},
+ :zone
+ {:requests-7d 59052,
+  :pageviews-7d 1897,
+  :uniques-7d-sum 1555,
+  :zone "etzhayyim.com"},
+ :sources [:cloudflare :health],
+ :paths
+ {:ok
+  [{:path "/", :requests 66}
+   {:path "/_shell/liquid-glass.css", :requests 49}
+   {:path "/_shell/liquid-glass-adapter.css", :requests 40}
+   {:path "/_shell/shell.css", :requests 40}
+   {:path "/robots.txt", :requests 17}
+   {:path
+    "/kotoba/blocks/bafyreia2nrm6hoj6giy4cvugjtobdftjyq2qr4mhctqwsqc4po5ioxqrdi",
+    :requests 10}
+   {:path "/kotoba/kotoba_wasm.js", :requests 9}
+   {:path
+    "/kotoba/blocks/bafyreia4cj5udtfxcehnvr3b2x5epkpb57lfzcehubrms7ea5ut4tfm52m",
+    :requests 9}],
+  :status-mix {:server-error 7927, :ok 500, :client-error 886},
+  :window "24h"},
+ :as-of "2026-07-19",
+ :traffic-quality
+ {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 85},
+ :top-paths
+ "上位 page (24h, 2xx/3xx): / 66 · /_shell/liquid-glass.css 49 · /_shell/liquid-glass-adapter.css 40 · /_shell/shell.css 40 · /robots.txt 17 | 4xx(probe) 10% · 5xx 85%",
+ :signal
+ "etzhayyim.com 実測 59052 req/7d・1555 uniques(日次和)・うち4xx probe 10%(24h)、workers 11959 inv/7d"}
