@@ -1,23 +1,23 @@
 {:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 178638},
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 180886},
  :zone
- {:requests-7d 71667,
-  :pageviews-7d 698,
-  :uniques-7d-sum 678,
+ {:requests-7d 72498,
+  :pageviews-7d 705,
+  :uniques-7d-sum 686,
   :zone "murakumo.cloud"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/infer/hwmetrics", :requests 8208}
-   {:path "/", :requests 87}
+  [{:path "/infer/hwmetrics", :requests 8206}
+   {:path "/", :requests 86}
    {:path "/infer/cost", :requests 28}
-   {:path "/robots.txt", :requests 19}
+   {:path "/robots.txt", :requests 18}
    {:path "/js/main.js", :requests 10}
-   {:path "/infer/models/murakumo-main", :requests 6}
-   {:path "/cdn-cgi/rum", :requests 6}
-   {:path "/v1/chat/completions", :requests 6}],
-  :status-mix {:ok 8402, :client-error 433, :server-error 2},
+   {:path "/infer/models/murakumo-main", :requests 7}
+   {:path "/v1/chat/completions", :requests 7}
+   {:path "/cdn-cgi/rum", :requests 6}],
+  :status-mix {:ok 8399, :client-error 564, :server-error 2},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -29,9 +29,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-19",
- :traffic-quality {:window "24h", :probe-4xx-pct 5, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8208 · / 87 · /infer/cost 28 · /robots.txt 19 · /js/main.js 10 | 4xx(probe) 5% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8206 · / 86 · /infer/cost 28 · /robots.txt 18 · /js/main.js 10 | 4xx(probe) 6% · 5xx 0%",
  :cost
  {:fleet-yen-per-mtok 21.51778398242107,
   :spot-yen-per-mtok 40.55,
@@ -45,4 +45,4 @@
    :throughput-tok-s 2000,
    :fx-yen-per-usd 162.2}},
  :signal
- "murakumo.cloud 実測 71667 req/7d・678 uniques(日次和)・うち4xx probe 5%(24h)、workers 178638 inv/7d、Stripe active subs 0"}
+ "murakumo.cloud 実測 72498 req/7d・686 uniques(日次和)・うち4xx probe 6%(24h)、workers 180886 inv/7d、Stripe active subs 0"}
