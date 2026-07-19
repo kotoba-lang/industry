@@ -238,4 +238,19 @@
    #{{:company/legal-name "State Grid Corporation of China" :company/jurisdiction "CN" :company/reason "no self-registered parent-entity LEI in GLEIF (fulltext 'State Grid Corporation of China' = 0 results globally; 'STATE GRID' only returns unrelated National Grid Corporate Services LLC). Same pattern as isic-3020 CRRC / isic-0610 Gazprom — not fabricated, not substituted with a subsidiary."}}
   :iteration/next "ITERATION 11+: scaffold the 5 verified ASIA-UTIL-1 repos (ToS/legal gate — KR/HK/MY/IN corporate sites, expect mixed bot-protection; record honestly). Then consider further regional batches (AU Origin/AGL, JP-secondary, LATAM). Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract iter5 divergent graph + manifest registration of 10 scaffolded repos (7 JP + 3 EU)."}
 
+ {:iteration/num 11
+  :iteration/date "2026-07-19"
+  :iteration/phase :repo-scaffold
+  :iteration/batch "ASIA-UTIL-1"
+  :iteration/summary "Scaffolded 2 of 5 ASIA-UTIL-1 repos (KEPCO, Tenaga Nasional). 3 tos-fetch-failed (CLP 403, Power Grid India conn-fail, NTPC Radware CAPTCHA — no evasion per safety floor ④). Fixed a KEPCO empty-text incident. This is the resume point."
+  :repo/created
+   #{{:company/legal-name "KEPCO (Korea Electric Power Corporation)" :company/lei "988400QG33WS7JEIV602" :repo/name "cloud-itonami-lei-988400qg33ws7jeiv602" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-988400qg33ws7jeiv602" :company/doc-type :legal-notice :company/tos-source-url "https://www.kepco.co.kr/home/service/legalnotice/conts.do" :company/jurisdiction "KR"}
+     {:company/legal-name "Tenaga Nasional Berhad" :company/lei "549300FV8X6UID6I1413" :repo/name "cloud-itonami-lei-549300fv8x6uid6i1413" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-549300fv8x6uid6i1413" :company/doc-type :terms-of-service :company/tos-source-url "https://www.tnb.com.my/terms-policy" :company/jurisdiction "MY"}}
+  :gate/failed
+   #{{:company/legal-name "CLP Holdings Limited" :company/lei "25490002BUTSMP94GO68" :company/reason "clpgroup.com home returns HTTP 403 (bot-block); no evasion"}
+     {:company/legal-name "Power Grid Corporation of India Limited" :company/lei "3358009SHWZ3DZEQ4Z56" :company/reason "powergrid.in home connection failed (HTTP 000); no evasion"}
+     {:company/legal-name "NTPC Limited" :company/lei "335800Q4TRGJXNLVMB81" :company/reason "ntpc.co.in legal page is a Radware CAPTCHA interstitial (not real content); no CAPTCHA evasion per safety floor ④"}}
+  :iteration/incident-kepco "KEPCO initial scaffold produced a 0-byte empty tos.journal.edn full-text — the .do action URL returned empty body on a plain repeat fetch (worked in the gate pass). Re-fetched with a Referer header -> real ~6.8kch 법적고지 content; overwrote the repo's journal via GitHub API (commit on repo main). Lesson recorded: dynamic .do/.action pages may require Referer/session; VERIFY non-empty text before push (the scaffold pipeline now should assert len>0)."
+  :iteration/next "ITERATION 12+: further regional acquisition (AU Origin/AGL Energy, LATAM Eletrobras/Enel Americas, Middle East DEWA/SEC). Defer bot-blocked repos to JS-capable fetch path. Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract iter5 divergent graph + manifest registration of 12 scaffolded repos (7 JP + 3 EU + 2 ASIA)."}
+
 ]
