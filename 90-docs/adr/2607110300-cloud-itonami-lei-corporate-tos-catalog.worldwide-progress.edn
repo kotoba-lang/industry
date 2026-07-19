@@ -223,4 +223,19 @@
      {:company/legal-name "E.ON SE" :company/lei "Q9MAIUP40P25UFBFG033" :company/reason "eon.com home returns HTTP 403; no evasion"}}
   :iteration/next "ITERATION 10+: ASIA-UTIL-1 acquisition (KEPCO/CLP/Tenaga Nasional/State Grid — verify parent LEIs, do not fabricate). Defer EU 403s to a JS-capable fetch path (not in this env). Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract iter5 divergent graph + manifest registration of 10 repos (7 JP + 3 EU)."}
 
+ {:iteration/num 10
+  :iteration/date "2026-07-19"
+  :iteration/phase :acquisition
+  :iteration/batch "ASIA-UTIL-1"
+  :iteration/summary "Acquired ASIA-UTIL-1 batch: 5 Asia-Pacific electric-utility parent-entity LEIs GLEIF-verified (KEPCO, CLP Holdings, Tenaga Nasional, Power Grid Corp of India, NTPC Limited), 1 honestly lei-lookup-failed (State Grid Corporation of China — no self-registered parent LEI in GLEIF, same as isic-3020 CRRC). This is the resume point."
+  :batch/acquired
+   #{{:company/legal-name "한국전력공사 (Korea Electric Power Corporation, KEPCO)" :company/lei "988400QG33WS7JEIV602" :company/jurisdiction "KR" :company/isic-rev5 "3510" :company/candidate-website "https://www.kepco.co.kr" :company/status :lei-verified}
+     {:company/legal-name "中電控股有限公司 (CLP Holdings Limited)" :company/lei "25490002BUTSMP94GO68" :company/jurisdiction "HK" :company/isic-rev5 "3510" :company/candidate-website "https://www.clpgroup.com" :company/status :lei-verified}
+     {:company/legal-name "TENAGA NASIONAL BERHAD" :company/lei "549300FV8X6UID6I1413" :company/jurisdiction "MY" :company/isic-rev5 "3510" :company/candidate-website "https://www.tnb.com.my" :company/status :lei-verified}
+     {:company/legal-name "POWER GRID CORPORATION OF INDIA LIMITED" :company/lei "3358009SHWZ3DZEQ4Z56" :company/jurisdiction "IN" :company/isic-rev5 "3510" :company/candidate-website "https://www.powergrid.in" :company/status :lei-verified}
+     {:company/legal-name "NTPC LIMITED" :company/lei "335800Q4TRGJXNLVMB81" :company/jurisdiction "IN" :company/isic-rev5 "3510" :company/candidate-website "https://www.ntpc.co.in" :company/status :lei-verified}}
+  :batch/lookup-failed
+   #{{:company/legal-name "State Grid Corporation of China" :company/jurisdiction "CN" :company/reason "no self-registered parent-entity LEI in GLEIF (fulltext 'State Grid Corporation of China' = 0 results globally; 'STATE GRID' only returns unrelated National Grid Corporate Services LLC). Same pattern as isic-3020 CRRC / isic-0610 Gazprom — not fabricated, not substituted with a subsidiary."}}
+  :iteration/next "ITERATION 11+: scaffold the 5 verified ASIA-UTIL-1 repos (ToS/legal gate — KR/HK/MY/IN corporate sites, expect mixed bot-protection; record honestly). Then consider further regional batches (AU Origin/AGL, JP-secondary, LATAM). Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract iter5 divergent graph + manifest registration of 10 scaffolded repos (7 JP + 3 EU)."}
+
 ]
