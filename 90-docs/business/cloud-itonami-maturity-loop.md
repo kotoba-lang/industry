@@ -595,3 +595,58 @@ charter ADR-2607189200 は revision 済み (本 iter の finding に pivot)。
 **Next:** 次回 cron 発火時、Wave5 の最新状態と本ログを再確認した上で、
   ISCO batch をさらに継続する (残り106件) か、cockpit-isic-5820 統合の
   設計スコーピングに切り替えるかを判断。
+
+---
+
+## Iteration 15 — 2026-07-19 (ISCO batch を10件に拡大 + domain多様性を意識した選定 + バグ2件修正)
+
+**Target:** iter14 まで一貫して batch 規模を拡大 (3→6→8) してきたのを継続。
+  今回は選定時に ISCO の major-group prefix (1xxx 管理職〜9xxx 単純作業まで)
+  を意図的に分散させ、同系統への偏りを避けた。
+
+**Did (fresh agent, isolation:worktree, background, ~32分 — ISCO 10件batch):**
+- 起動前に Wave5 ledger 再確認 (`isco-1211`/`isco-1212` のみ) — 衝突なし。
+- 17候補を screening。**新規 stub 発見: isco-3121**(mining_supervisors、
+  isco-2146 と同型の "Simplified stub" コメント)。**新規 shape 不一致発見:
+  isco-3134**(refinery、旧5ファイル構成 `advisor/governor/phase/sim/store`
+  で `actor.cljc` が無く `langgraph.graph` 参照ゼロ) — 4ファイル template
+  に無理に当てはめず対象外化。
+- major-group 0/1/2/3(×2)/4/5/8/9(×2) にまたがる10件を選定: **isco-0110**
+  (officer_admin)/**isco-1345**(eduman)/**isco-2434**(ictsales)/
+  **isco-3151**(marine)/**isco-3331**(customsclearing)/**isco-4214**
+  (debtcollection)/**isco-5419**(protective_services)/**isco-8343**
+  (craneoperations、バグ修正込み)/**isco-9321**(packingfulfillment)/
+  **isco-9329**(manufacturing_labour、バグ修正込み)。
+- **実バグ2件を根本修正 (isic-2111/iter13 と同型の規律)**: isco-8343 と
+  isco-9329 で `commit-node`/`approve!` が `store` を受け取りながら
+  `store/add-record!` を一度も呼んでおらず、docstring が謳う append-only
+  audit ledger が実際には一切記録されていなかった。isco-9321/isco-5419
+  の正しい実装パターンを参考に修正 + `store/records` を直接検証する
+  regression test を追加。**agent 自身が修正後の2リポを再度独立 clone
+  して test suite を再実行し確認済み** (35/100, 33/82、共に0 failures)。
+- 全10件それぞれ render-html + regenerate.yml + operator-console.html を
+  実装、4段階検証を独立実施。**本セッションが10件とも `curl` で再検証** —
+  全て HTTP 200、sha256 prefix が agent 報告値と完全一致。
+- commit→merge (最終SHA): isco-0110(`1598035e`)、isco-1345(`bae88f89`)、
+  isco-2434(`2c6239bf`)、isco-3151(`198249a2`)、isco-3331(`86926752`)、
+  isco-4214(`a79c0ae2`)、isco-5419(`27eb1770`)、isco-8343(`02ef416c`)、
+  isco-9321(`a043f5be`)、isco-9329(`f8b91af3`)。feature branch は全て
+  merge 後に削除確認済み。
+- 続けて本セッションが10件分の west.yml pin を1コミットにまとめて前進
+  (各 diff 1行、ff clean 個別検証済み — isco-8343/9329 のみ ahead_by 3
+  (バグ修正+demo の2commit分)、他は ahead_by 2。superproject commit
+  `7a64c69cd38`)。
+
+**Finding:** ISCO 側 batch が10件規模でも同じ品質規律 (stub/shape不一致の
+  screen-out、実バグの根本修正、4段階検証) を保って機能。domain 多様性を
+  意図的に broaden した選定も機能した。ISCO 側 no-demo backlog: 106 → 96
+  (このセッション累計30件)。実バグ根本修正の累計は isco-2111(iter13)含め
+  3件に到達。
+
+**Did NOT (honest):** `cloud-itonami-flagship-checklist-scan.edn`/
+  `-rollout-ledger.edn` への追記はしていない。portfolio score・ISIC 側
+  スコアとも据え置き。
+
+**Next:** 次回 cron 発火時、Wave5 の最新状態と本ログを再確認した上で、
+  ISCO batch をさらに継続する (残り96件) か、cockpit-isic-5820 統合の
+  設計スコーピングに切り替えるかを判断。
