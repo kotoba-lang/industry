@@ -8,28 +8,28 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4770, "app-aozora-appview" 8440},
+ {"app-aozora-pds" 4783, "app-aozora-appview" 8499},
  :zone
- {:requests-7d 35130,
-  :pageviews-7d 6592,
-  :uniques-7d-sum 764,
+ {:requests-7d 35303,
+  :pageviews-7d 6597,
+  :uniques-7d-sum 766,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2840}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2838}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 640}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 274}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 273}
    {:path "/1.php", :requests 29}
    {:path "/hosty.php", :requests 28}
    {:path "/robots.txt", :requests 28}
    {:path "/api/engagement", :requests 25}
    {:path "/eee.php", :requests 14}],
-  :status-mix {:client-error 1082, :ok 4329, :server-error 7},
+  :status-mix {:client-error 1082, :ok 4327, :server-error 7},
   :window "24h"},
  :as-of "2026-07-19",
  :traffic-quality {:window "24h", :probe-4xx-pct 20, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2840 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 640 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 274 · /1.php 29 · /hosty.php 28 | 4xx(probe) 20% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2838 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 640 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 273 · /1.php 29 · /hosty.php 28 | 4xx(probe) 20% · 5xx 0%",
  :signal
- "aozora.app 実測 35130 req/7d・764 uniques(日次和)・うち4xx probe 20%(24h)、workers 13210 inv/7d"}
+ "aozora.app 実測 35303 req/7d・766 uniques(日次和)・うち4xx probe 20%(24h)、workers 13282 inv/7d"}
