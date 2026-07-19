@@ -191,4 +191,21 @@
   :iteration/correction "連携統合 ingest is the CANONICAL ROUTINE's job (murakumo cell with the provisioned identity, ADR-2607182400); it enumerates GitHub via gh api and will pick up the 7 new repos. DO NOT run ingest locally again until the canonical identity is provisioned (kagi add CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED to net-kotobase compartment, or op signed into the gftdcojp account). Iter5 claims of '連携統合 実行' into kotobase.net were a divergent-graph mistake, corrected here."
   :iteration/next "PIVOT to the 取得 pillar (race-free, my actual job): EU-UTIL-1 acquisition (EDF/Engie/Iberdrola/National Grid/RWE/Enel/SSE/E.ON), 関西/大阪 retry. Owner/ops follow-ups: provision canonical ingest identity locally + EDINET key for v2 data + retract the divergent graph (using the preserved divergent seed). manifest registration of 7 repos still pending."}
 
+ {:iteration/num 8
+  :iteration/date "2026-07-19"
+  :iteration/phase :acquisition
+  :iteration/batch "EU-UTIL-1"
+  :iteration/summary "Acquired EU-UTIL-1 batch: 6 European electric-utility parent-entity LEIs GLEIF-verified, 2 honestly recorded as lei-lookup-failed (parent LEI not surfaced via name search, only subsidiaries — same no-subsidiary-substitution policy as isic-0610 Chevron / isic-3020 CRRC). This is the resume point."
+  :batch/acquired
+   #{{:company/legal-name "ELECTRICITE DE FRANCE" :company/lei "549300X3UK4GG3FNMO06" :company/jurisdiction "FR" :company/isic-rev5 "3510" :company/candidate-website "https://www.edf.fr" :company/status :lei-verified}
+     {:company/legal-name "IBERDROLA SA" :company/lei "5QK37QC7NWOJ8D7WVQ45" :company/jurisdiction "ES" :company/isic-rev5 "3510" :company/candidate-website "https://www.iberdrola.com" :company/status :lei-verified}
+     {:company/legal-name "NATIONAL GRID PLC" :company/lei "8R95QZMKZLJX5Q2XR704" :company/jurisdiction "GB" :company/isic-rev5 "3510" :company/candidate-website "https://www.nationalgrid.com" :company/status :lei-verified}
+     {:company/legal-name "ENEL SPA" :company/lei "WOCMU6HCI0OJWNPRZS33" :company/jurisdiction "IT" :company/isic-rev5 "3510" :company/candidate-website "https://www.enel.com" :company/status :lei-verified}
+     {:company/legal-name "SSE PLC" :company/lei "549300KI75VYLLMSK856" :company/jurisdiction "GB" :company/isic-rev5 "3510" :company/candidate-website "https://www.sse.com" :company/status :lei-verified}
+     {:company/legal-name "E.ON SE" :company/lei "Q9MAIUP40P25UFBFG033" :company/jurisdiction "DE" :company/isic-rev5 "3510" :company/candidate-website "https://www.eon.com" :company/status :lei-verified}}
+  :batch/lookup-failed
+   #{{:company/legal-name "ENGIE SA" :company/jurisdiction "FR" :company/reason "GLEIF name search (fulltext + exact legalName, jur=FR) surfaces only subsidiaries (ENGIE ALLIANCE, ENGIE FINANCE, ENGIE E&P INTERNATIONAL, etc.); parent 'ENGIE SA' LEI not surfaced — not fabricated, not substituted with a subsidiary LEI"}
+     {:company/legal-name "RWE AG" :company/jurisdiction "DE" :company/reason "GLEIF name search (fulltext + exact legalName, jur=DE) surfaces only subsidiaries (RWE Renewables, RWE Generation, RWE Offshore Wind, RWE Pensionsfonds, etc.); parent 'RWE AG' LEI not surfaced — not fabricated"}}
+  :iteration/next "ITERATION 9+: scaffold the 6 verified EU-UTIL-1 cloud-itonami-lei-* repos (ToS/legal gate + blueprint/README/NOTICE/tos.journal, same recipe as JP-UTIL-1). EU corporate sites are often bot-protected (cf isic-3510 National Grid/Duke were 403 in the US rollout) — expect mixed gate results, record honestly. Continue with ASIA-UTIL-1 (KEPCO/CLP/Tenaga/State Grid). Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract divergent graph + manifest registration of 7 JP repos."}
+
 ]
