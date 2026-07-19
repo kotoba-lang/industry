@@ -55,4 +55,4 @@ def test_yamabiko_canonical_edn_contract_is_not_an_orphan(tmp_path, monkeypatch)
     monkeypatch.setattr(audit, "ROOT_COMPAT_LEXICONS", super_root / "root-compat")
     result = audit.audit()
     assert result["missing"] == []
-    assert result["orphans"] == []
+    assert result["orphans"] == set()
