@@ -12,7 +12,13 @@ clj -M:kotoba models
 clj -M:kotoba vllm minimax-m27
 LLM_URL=https://example.modal.run LLM_MODEL=MiniMaxAI/MiniMax-M2.7 LLM_KEY=... clj -M:client chat
 LLM_URL=https://example.modal.run LLM_MODEL=MiniMaxAI/MiniMax-M2.7 LLM_KEY=... clj -M:bench
+clj -M:test
 ```
+
+`client-main.clj` and `bench-main.clj` are the CLJ host adapters: only
+`host-config.clj` reads process environment variables. The reusable `.cljc`
+client, benchmark, and HTTP namespaces receive a closed configuration map and
+never acquire ambient process configuration themselves.
 
 Modal deployment is intentionally data-first here: the vLLM command, GPU shape,
 volume name, parser choices, and API key env are EDN values instead of Python

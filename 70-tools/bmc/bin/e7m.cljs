@@ -3,4 +3,4 @@
 (require '[scripts.nbb-compat :refer [slurp spit file-seq format]]
          '[babashka.fs :as fs])
 (require '[gftd.cli :as cli])
-(cli/-main-for :e7m *command-line-args*)
+(cli/-main-for :e7m *command-line-args* (scripts.nbb-compat/getenv "GFTD_ROOT"))
