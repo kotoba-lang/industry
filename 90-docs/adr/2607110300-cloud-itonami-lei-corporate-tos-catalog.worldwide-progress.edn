@@ -284,4 +284,16 @@
   :v2/finding "v2 IR-scraping is per-company-variable (TEPCO clean, Kansai shareholders-only, Chubu/TG not found). The RELIABLE v2 path is the 有価証券報告書 (issuer self-published, e.g. TEPCO /about/ir/library/securities_report/) which standardizes 大株主/連結子会社/財務諸記 — but those are PDF/XBRL (parse setup needed), not HTML tables. Recommend building a 有報-PDF/XBRL extraction step for uniform v2 data."
   :iteration/next "ITERATION 15+: either (a) build the 有報 PDF/XBRL extraction for reliable uniform v2 data (大株主/連結子会社/財務), or (b) continue per-company IR adaptation. Also continue 取得 breadth. Owner/ops unchanged: canonical ingest identity (連携統合) + manifest registration + retract iter5 divergent graph."}
 
+ {:iteration/num 15
+  :iteration/date "2026-07-19"
+  :iteration/phase :repo-scaffold
+  :iteration/batch "AU-ME-UTIL-1"
+  :iteration/summary "Scaffolded 1 of 3 AU-ME-UTIL-1 repos (Origin Energy AU — Terms of Use 26kch). 2 bot-blocked (AGL 403, DEWA 403). Catalog now 13 worldwide repos. This is the resume point."
+  :repo/created
+   #{{:company/legal-name "Origin Energy Limited" :company/lei "ZSN2LWNPYW6ISMRUC664" :repo/name "cloud-itonami-lei-zsn2lwnpyw6ismruc664" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-zsn2lwnpyw6ismruc664" :company/doc-type :legal-notice :company/tos-source-url "https://www.originenergy.com.au/terms-of-use" :company/jurisdiction "AU"}}
+  :gate/failed-bot-blocked
+   #{{:company/legal-name "AGL Energy Limited" :company/lei "549300QAZ8A74DEDXO80" :company/reason "agl.com.au home returns HTTP 403 (bot-block); no evasion"}
+     {:company/legal-name "Dubai Electricity and Water Authority (DEWA)" :company/lei "213800K4OJF8DKATLT41" :company/reason "dewa.gov.ae home returns HTTP 403 (bot-block); no evasion"}}
+  :iteration/next "ITERATION 16+: continue breadth acquisition (LATAM Eletrobras-name-retry, Middle East, Africa) or scaffold more from backlog. The two owner-blockers persist: (1) canonical ingest identity for 連携統合 (local provisioning needed); (2) v2 reliable extraction (有報 PDF/XBRL route). Bot-blocked repos (AGL/DEWA/Iberdrola/NG/E.ON/CLP/PowerGrid/NTPC/関西/大阪) accumulate — collectively need a JS-capable fetch path not present in this env."}
+
 ]
