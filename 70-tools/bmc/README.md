@@ -31,6 +31,9 @@ ADR-2607021500 の 7 レイヤー lean canvas を CLI で扱い、進化・成�
 70-tools/bmc/bin/aozora react loop --max-ticks 5      # dry まで反復
 70-tools/bmc/bin/gftd score                           # BMC/YC bench 成熟度スコア表
 70-tools/bmc/bin/gftd score md                        # maturity-scores.edn 再生成
+70-tools/bmc/bin/gftd allocate                        # OT (Sinkhorn) 予算配分表（ADR-2607194500）
+70-tools/bmc/bin/gftd allocate md                     # portfolio-allocation.edn 再生成
+70-tools/bmc/bin/gftd allocate write                  # 配分結果を governor 経由で ledger へ記録（任意）
 70-tools/bmc/bin/gftd ledger show --tail 20
 nbb 70-tools/bmc/run-tests.cljs                       # tests
 ```
@@ -63,9 +66,12 @@ repo root 以外から動かすときは `GFTD_ROOT=<superproject root>`。
 src/gftd/canvas.cljc   # datoms index / event fold / md・text render（純 cljc）
 src/gftd/ledger.cljc   # append-only ledger（1 行 1 EDN event）
 src/gftd/react.cljc    # observe→think→act、advisor ⊣ governor、run-ticks
+src/gftd/score.cljc    # BMC/YC bench 成熟度スコア（demand 側の入力にもなる）
+src/gftd/allocate.cljc # OT (Sinkhorn) 予算配分（ADR-2607194500）
 src/gftd/cli.cljc      # 共有 dispatch + 7 CLI registry
 bin/{itonami,manimani,murakumo,kotoba,aozora,e7m,gftd}   # nbb wrapper
 test/gftd/bmc_test.cljc
+test/gftd/allocate_test.cljc
 ```
 
 将来分割: 三組織タクソノミ（ADR-0020）上は再利用部品 = com-junkawasaki 子リポ
@@ -92,3 +98,45 @@ ReAct loop のデフォルト advisor は `gate-aware-advisor` (mock + gate 評�
 `{:needs [...]}` を Solution ブロックに「準備:」to-do として提案する。これで schedule は dry でなく
 毎朝「gate 測定 → 昇格 or 不足計器 surface」する kaizen サイクルになる。LLM advisor は
 `react/llm-advisor` に `(fn [prompt]->string)` (langchain.model / murakumo text) を注入して差し替え。
+
+## portfolio 予算配分 — entropic OT / Sinkhorn (ADR-2607194500)
+
+```bash
+70-tools/bmc/bin/gftd allocate                          # 端末表示（budget-supply.edn の総額を使用）
+70-tools/bmc/bin/gftd allocate --budget 5000000          # 総額を上書き
+70-tools/bmc/bin/gftd allocate --epsilon 0.1 --iters 100 # sinkhorn の epsilon / max-iters を上書き
+70-tools/bmc/bin/gftd allocate --score-key bmc           # demand を BMC 成熟度スコアに差し替え（既定は yc）
+70-tools/bmc/bin/gftd allocate md                        # portfolio-allocation.edn 再生成
+70-tools/bmc/bin/gftd allocate write                     # 配分結果を <product>.metrics へ governor 経由で記録（任意）
+```
+
+正直な立ち位置（誇張しない）: 供給側は単一の予算プール（`90-docs/business/
+budget-supply.edn` の `:supply/total-amount` 1 個）しか無いので、これは
+optimal transport としては**退化ケース**（supply node が 1 個）— 数学的には
+唯一の実行可能解が需要（`maturity-scores.edn` の `:yc`/`:bmc` スコア）に比例した
+配分に一致し、cost 行列や epsilon は最終結果に影響しない。それでも
+`gftd.allocate/sinkhorn` は log-domain stabilized な**一般 n×m Sinkhorn 解法**として
+実装してあり（n=1 専用のハックではない）、floor/cap 制約は
+water-filling（制約に触れた product を fix → 残りを再配分…を収束するまで
+繰り返す）で解く。将来、予算を tranche（growth/infra/runway 等）に分けて複数
+supply node にすれば非自明な輸送構造にそのまま拡張できるが、2026-07-19 時点では
+**未実装**（意図的な v1 スコープ外 — 中途半端な多 tranche 対応はしない）。
+
+demand 側の入力（`--score-key`）は `gftd.score` の成熟度スコアを流用している —
+これは「現状手に入る中で最良の数値プロキシ」であって opportunity size（市場機会の
+大きさ）の直接計測ではない。YC bench スコアは de-risked-ness（検証の進み具合）と
+opportunity size を混同しうる注意点があり、より良い需要指標が出てきたら
+`--score-key` を差し替えるだけで良いように設計してある。
+
+正本:
+```
+90-docs/business/budget-supply.edn        (supply 側、maturity-facts.edn と同じ
+                                            オーナー手編集ファイル。手で更新する)
+90-docs/business/maturity-scores.edn      (demand 側、gftd score md の生成物)
+生成物: 90-docs/business/portfolio-allocation.edn  (gftd allocate md; 手編集禁止)
+```
+
+`gftd allocate write` は任意の follow-up: 配分結果を funnel/proposals の
+スナップショット方式と同じ dedup 挙動で `<product>.metrics` block へ
+`:canvas/add-item` として記録する（governor 側の変更は不要 — `:canvas/add-item`
+は既に allowed-actions に含まれている）。
