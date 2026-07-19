@@ -306,4 +306,71 @@ charter ADR-2607189200 は revision 済み (本 iter の finding に pivot)。
   fleet 全体の可視性が上がる、(b) ISCO 側 no-demo 126件への batch 展開
   (Wave5 の ISIC batch 化と同型) は次の判断だが、対象が multiple agent の並行
   作業と衝突しやすいので、次回起動時も必ず最新状態を再確認してから 1 repo ずつ
+  進めること (→ iter10 で isco-1211 の pin 前進を実施、続けて2件目の実証も実施)。
+
+---
+
+## Iteration 10 — 2026-07-19 (local cron loop へ移行 + ISCO 2件目実証: isco-1111)
+
+**運用変更:** ユーザー指示で dynamic ScheduleWakeup 自己ペースから、
+  **local cron job（`*/15 * * * *`, session-only, 7日で自動失効）**に切替。
+  以後の iteration はこの cron 発火で起動する。
+
+**Did (superproject 側、直接実施):**
+- iter9 の "Did NOT" だった **isco-1211 の west.yml pin 前進**を実施
+  (`aa96640c`→`f7260701fbde452772d1c587c4db44356e65`、GitHub API 単一 entry
+  commit、ff clean 検証済み、superproject commit `86f2755cac36`)。
+
+**Did (fresh agent, isolation:worktree, background — ISCO 2件目実証):**
+- 起動前に Wave5 rollout ledger を再確認 (`grep isco- ledger.edn` = 依然
+  `isco-1212` のみ) — 衝突なしを確認済み。
+- agent が isco-1111/1112/1213/2111/2112/1312/1322/2131 の8候補を screening
+  (stub でない実 StateGraph 実装であることを個別確認)。
+  **`cloud-itonami-isco-1111`**（ISCO-08 1111 Legislators, `legislature` ドメイン）
+  を選定。
+- seed データは既存 `test/legislature/{actor,governor}_test.clj` の
+  `fresh-store` fixture (`constituent-1` "Alice Voter" + `bill-2024-042`
+  "Education Reform Act") をそのまま流用。2人目 (`constituent-2` "Jordan Reyes")
+  は実 API (`register-constituent!`) 経由で追加したことを docstring に明記
+  (捏造ゼロ、iter9 と同じ開示水準)。
+- governor 7 rule 中 5 rule を実 mock-advisor 経由で実際にトリガ (8-request
+  シナリオ)。残り2つ (`:no-actuation`, `escalates-on-low-confidence`) は
+  実 advisor の confidence floor (0.7) が governor 閾値 (0.6) を下回らない
+  ため構造的に到達不能と正直に docstring に記載。
+- `src/legislature/render_html.clj` + `.github/workflows/regenerate.yml` +
+  `docs/samples/operator-console.html` を実装。GitHub Pages は未設定だった
+  ため API 経由で有効化 (`main`/`/docs`, legacy Jekyll, iter9 と同型)。
+- 検証 (iter9 と同一4基準): (a) ローカル2回連続実行 sha256 一致
+  (`d24310b7aadf...`)、(b) `.cpcache` 無し clean clone 再実行が byte 一致、
+  (c) 実 `workflow_dispatch` run `29676896454` が `conclusion=success`、CI 自身の
+  regenerate ステップも "console unchanged"、(d) live Pages
+  (`cloud-itonami.github.io/cloud-itonami-isco-1111/samples/operator-console.html`)
+  — **本セッションが `curl` で直接再検証**: HTTP 200、sha256
+  `d24310b7aadfd29406819aeef3b177e78e125ca7f83b3823697c061d8abc2111` が
+  agent 報告値と完全一致。既存 test suite 12 tests/31 assertions 前後とも green。
+- commit `b9a9351aac28` (feat) → server-side merge `cbbf9b78ff32` → isco-1111
+  main に landed。feature branch は merge 後に削除。superproject `orgs/`
+  共有 checkout は未変更 (read-only のまま、agent 自身も確認済み)。
+- 続けて本セッションが isco-1111 の west.yml pin も前進
+  (`43cea993`→`cbbf9b78ff327b25d491cc3b6fd0fd42930fa657`、ff clean 検証済み、
+  superproject commit `68c44e5117`)。
+
+**Finding:** ISCO 側の実証が2件目 (isic 側の isic-851→isic-6820 と同型の
+  "2件実証してから batch 化検討" 段階に到達)。2件とも: stub でない real
+  actor を screening で見分ける、既存 test fixture から seed データを流用する
+  (捏造ゼロ)、advisor の到達不能ルールを正直に開示する、という同じ規律で
+  再現できることを確認 — 手法が repeatable であることの追加証拠。
+
+**Did NOT (honest):** ISCO 側 batch 展開 (Wave5 の ISIC 6-at-a-time 相当) は
+  まだ着手していない — 2件では batch 化を正当化するにはまだ早いと判断
+  (ISIC 側も2件確認後すぐには batch 化していない)。
+  `cloud-itonami-flagship-checklist-scan.edn`/`-rollout-ledger.edn` への
+  追記はしていない (Wave5 自身の管轄、衝突回避のため引き続き非関与)。
+  portfolio score・ISIC 側スコアとも据え置き。
+
+**Next:** 次回 cron 発火時、まず Wave5 の最新状態と本ログを再確認。ISCO
+  側3件目の単発実証を続けるか、この2件を元に batch 展開 (テンプレート化)
+  を検討するかを、その時点の状況で判断する。cron は 15分毎で発火し続ける
+  ため、前 iteration の background agent がまだ動いている場合は新規agent
+  を重複起動せず待機すること。
   進めること。
