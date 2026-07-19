@@ -167,6 +167,104 @@ isolate-lifetime `block-cache`, `with-blocks` trampoline,
   hypothesis at that cost per cycle was judged better handed to a
   dedicated follow-up than continued in this session.
 
+### Addendum 3 (2026-07-19): root cause fixed, structural prohibition, live deploy
+
+Follow-up session picked up where addendum 2 left off (root cause unconfirmed,
+but a strong `fold!`-cycle hypothesis) and, separately, root-owner asked
+whether the underlying full-graph-scan pattern (`hydrate!` calling
+`kotobase-peer.core/hot-datoms` with an unscoped `:aevt` scan over a
+synchronous `with-blocks` cache-miss trampoline) could be structurally
+prohibited, not just documented. Work done, in order:
+
+1. **Issues filed** to track the performance/correctness class of bug
+   separately from this ADR: kotoba-lang/kotobase-protocols-worker#1 (fold!
+   missing async-get-fn), kotoba-lang/kotobase-cljc-worker#14 (possible
+   latent unbuffered-async-get-fn bug in the reference implementation,
+   unconfirmed, not fixed), kotoba-lang/kotobase-peer#21 (hot-datoms has no
+   async-get-fn variant at all — closed once fixed, see 3 below).
+2. **kotoba-lang/kotobase-protocols-worker#1 fixed**: `fold-if-due!`
+   threaded a buffer-aware `async-get-fn` into `eng/fold!` (commit
+   `61ad1cd`) — deliberately buffer-aware unlike the reference
+   implementation's version (see #14), because an unbuffered fetch would
+   miss a tx-block this same request just wrote but hasn't flushed to R2
+   yet. Added `bin/lint_engine_calls.cljs`, wired into CI, failing the
+   build if any `eng/fold!` call site regresses below the arity that
+   threads `async-get-fn` — verified it actually catches the original bug.
+3. **kotoba-lang/kotobase-peer#21 fixed**: added a 7-arg `async-get-fn`
+   arity to `hot-datoms` itself (commit `d2678b3`) — the function EVERY
+   regular read goes through (`do-q`/`do-pull`/any store bridge's
+   `hydrate!`), not just `fold!`'s own maintenance-operation hydrate. New
+   test proves byte-identical results to the sync path across both the
+   cold-snapshot half (`cold-datoms-async`) and novelty half
+   (`read-tx-block-async`). Purely additive — omitted arity is unchanged
+   behavior.
+4. **kotoba-lang/kotobase-cljc-worker migrated** (commit `97697b9`): every
+   `eng/hot-datoms` call in `handler.cljc` (8 sites) now threads
+   `(:async-get-fn store)` — most significantly `hot-db` (backs `do-q`),
+   the one genuinely unscoped full-graph read in that file, same O(graph)
+   class as this repo's `hydrate!`. Added an equivalent
+   `bin/lint_hot_datoms_calls.cljs` CI guardrail. This repo is
+   migration-only per ADR-2607189100 (below) but retained as a test
+   harness, where the fix still has value.
+5. **Governance discovery mid-session**: a concurrent session landed
+   ADR-2607189100 (\"Public runtime and reusable library responsibility
+   boundary\", accepted 2026-07-18) declaring `kotoba-lang/
+   kotobase-protocols-worker` AND `kotoba-lang/kotobase-cljc-worker` both
+   retired deployers — sole public deployment owner is now
+   `gftdcojp/net-kotobase`. `kotoba-lang/kotobase-protocols-worker`'s
+   `wrangler.jsonc` routes were emptied and `workers_dev` disabled in that
+   same wave (commit `9bef1c0`), meaning steps 2 and 4's fixes, though
+   correctly merged, were NOT deployable from their own repos going
+   forward. Found `gftdcojp/net-kotobase/protocols-worker` mid-port by
+   another concurrent session (uncommitted WIP, timestamps minutes old) —
+   deliberately did not touch it that session, per this workspace's
+   parallel-agent guardrail, and reported the situation back to the owner
+   instead of racing it.
+6. **Live fix landed** once that port settled (commit `53cd5cb`,
+   \"make protocols worker deployment self-contained\"): applied the SAME
+   `hydrate!` async-get-fn fix (step 3's capability, step 2's pattern) to
+   `gftdcojp/net-kotobase/protocols-worker/src/kotobase_protocols_worker/
+   kotobase_store.cljs` (commit `42ab365`) — this is the actual, current,
+   sole `git.kotobase.net`/`s3.kotobase.net`/`atproto.kotobase.net`/
+   `pinning.kotobase.net` deploy owner. Built (`shadow-cljs release
+   worker`, 0 warnings) and 22 existing tests (75 assertions) verified
+   green BEFORE deploying, per this workspace's build-then-deploy rule.
+   Deployed live via `wrangler deploy` (Version `13d55719`) — caught and
+   corrected a real mistake first: the first `wrangler deploy` attempt ran
+   from the shared checkout, which was still on the OLD pinned commit
+   (pre-fix) and would have deployed a stale `out/worker.js` had it not
+   been caught by diffing the deployed bundle's source hash against the
+   worktree's — synced the shared checkout to the merged commit,
+   rebuilt fresh, redeployed, confirmed a genuinely new Version ID.
+7. **Post-deploy measurement, honestly reported**: 15 timed requests
+   against the live endpoint averaged ~1.0-2.2s, not obviously faster than
+   the pre-fix ~0.8s baseline measured earlier in this investigation.
+   `_diag/health` showed `novelty_size` 4 on this graph — small. The
+   O(N²)→O(N) block-discovery fix (the actual, structural improvement)
+   only dominates wall-clock once N (distinct blocks touched) is large
+   enough for the quadratic term to matter — the original app-aozora
+   incident this pattern was first diagnosed against needed 5130 leaf
+   entries before the sync path blew its CPU budget (300s+) vs 806ms
+   async. On this graph's current small size, wall-clock is dominated by
+   fixed costs (edge network RTT, R2 round-trips, crypto/JS overhead) the
+   fix doesn't touch. The fix is verified correct (tests) and now live;
+   its wall-clock benefit will show as this graph's write volume grows,
+   not necessarily today.
+
+**Structural prohibition — final answer to the original question**: partially
+achieved. `fold!` calls without `async-get-fn` are now CI-blocked in the one
+repo that had the bug (kotoba-lang/kotobase-protocols-worker). `hot-datoms`
+calls without `async-get-fn` are CI-blocked in `kotoba-lang/
+kotobase-cljc-worker`. Neither guardrail yet exists in
+`gftdcojp/net-kotobase/protocols-worker` itself — the actual live deploy
+target has the FIX but not yet the LINT preventing its regression. Also
+unresolved: `kotoba-lang/kotobase-cljc-worker`'s own `:async-get-fn` remains
+unbuffered (issue #14, unconfirmed but plausible latent bug, not this
+session's to fix); `gftdcojp/net-kotobase/clj-edge`'s `datomic.q`/`pull`
+proxies to a separate backend (`kotobase-server`, a distinct git dependency)
+that was not investigated — the `hot-datoms` full-scan class of bug may or
+may not apply there at all, unknown.
+
 ## Consequences
 
 - (+) `git.kotobase.net` now serves the intended
@@ -206,5 +304,15 @@ regenerate-and-push was correct here), verified via
 - ADR-2607184000 (kotobase.net / net-kotobase live-deploy evidence, cited
   when confirming kotobase.net itself was working before investigating
   git.kotobase.net)
+- ADR-2607189100 (com-junkawasaki/root — public runtime and reusable
+  library responsibility boundary; retires kotoba-lang/
+  kotobase-protocols-worker and kotoba-lang/kotobase-cljc-worker as
+  deployers, mid-session, addendum 3 above)
+- kotoba-lang/kotobase-protocols-worker#1, kotoba-lang/kotobase-peer#21
+  (closed), kotoba-lang/kotobase-cljc-worker#14 (open, unconfirmed)
 - `orgs/kotoba-lang/kotobase-protocols-worker/wrangler.jsonc`,
-  `orgs/kotoba-lang/kotobase-protocols-worker/README.md`"}]
+  `orgs/kotoba-lang/kotobase-protocols-worker/README.md`,
+  `orgs/kotoba-lang/kotobase-peer/src/kotobase_peer/core.cljc`
+  (`hot-datoms`), `orgs/kotoba-lang/kotobase-cljc-worker/src/kotobase/
+  cljc_worker/handler.cljc`, `orgs/gftdcojp/net-kotobase/protocols-worker/
+  src/kotobase_protocols_worker/kotobase_store.cljs` (the live fix)"}]
