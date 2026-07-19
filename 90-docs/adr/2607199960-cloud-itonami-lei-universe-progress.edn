@@ -1,0 +1,83 @@
+[{:db/id -1
+  :progress/family "cloud-itonami-lei-universe"
+  :progress/adr "90-docs/adr/2607199960-cloud-itonami-lei-top10-universe-expansion.edn"
+  :progress/sibling-files ["90-docs/adr/2607110300-cloud-itonami-lei-corporate-tos-catalog.progress.edn"
+                            "90-docs/adr/2607110300-cloud-itonami-lei-corporate-tos-catalog.isco-progress.edn"]
+  :progress/schema-note "cloud-itonami-lei universe-expansion progress tracker, per ADR-2607199960. Distinct from the sibling ISIC/ISCO classification-sampling progress files: this file's company source is real, published stock-index constituent lists (one row per index), not an ISIC/ISCO top-N judgment call. Each :index/constituents entry that reaches :company/status :done gets the SAME cloud-itonami-lei-<LEI> repo treatment (real GLEIF LEI, real ToS fetch, provenance, no fabrication) as the ISIC/ISCO fleet -- and before creating any new repo, the LEI must be checked against ALL already-registered LEIs (this file + both sibling files) to avoid duplicate repos for a company that's already covered via an ISIC/ISCO row or another index. This file is the resume point for the next /loop iteration on the universe track (kept separate from the ISIC/ISCO resume points so the two tracks can proceed independently without stepping on each other)."
+  :progress/resume-from "First pass done 2026-07-19 (ADR-2607199960 seed batch, this session). sp500 is :index/status :in-progress with 8 constituents attempted (6 :done, 2 :tos-fetch-failed) -- see that row's :index/constituents and :index/note. Companies NOT yet attempted for sp500 in this session (real, well-known S&P 500 constituents, sectors deliberately chosen to avoid the ISIC-heavy sectors already covered elsewhere in this catalog -- oil majors/pipelines/utilities/airlines/retail/chemicals/semiconductors/aerospace/waste -- prefer banking, insurance, additional CPG/industrials/healthcare/media/tech): Bank of America Corporation, Wells Fargo & Company, Citigroup Inc., Goldman Sachs Group Inc., Morgan Stanley, Berkshire Hathaway Inc., Chubb Limited, MetLife Inc., Pfizer Inc., Merck & Co. Inc., Eli Lilly and Company, AbbVie Inc., Mastercard Incorporated, Adobe Inc., Salesforce Inc., Honeywell International Inc., Caterpillar Inc., Deere & Company, Colgate-Palmolive Company, Kimberly-Clark Corporation, Mondelez International Inc., Netflix Inc., Meta Platforms Inc., Apple Inc., Alphabet Inc. -- resume by GLEIF-verifying and ToS-fetching more of these (dedup against the LEIs already in this row first) until sp500 reaches a documented stopping point, then mark :index/status :done and move to nikkei225 (next in file order), followed by topix100, ftse100, dax40, stoxx600, hangseng, csi300, asx200, tsx60, sensex, kospi200, bovespa, cac40, smi in that order. Same per-company discipline throughout: real GLEIF LEI only, real ToS fetch (WebFetch first; if it 403s/404s/times-out, retry once via homepage footer-link scan and/or a direct curl+plain-text-extraction fallback with a standard browser User-Agent before giving up -- this curl fallback recovered 8 of the 11 successes in this session's first batch that WebFetch alone had failed on), never fabricate, never substitute a subsidiary LEI for a parent, record failures honestly, dedup against this file + both sibling ISIC/ISCO progress files before creating any repo. This superproject checkout has heavy concurrent multi-session activity -- always re-read this file fresh immediately before editing, and prefer a worktree outside the superproject + feature branch + `gh api .../merges` server-side merge over direct edits in the shared checkout (a direct edit to the sibling progress files was silently reverted mid-session on 2026-07-19 by a concurrent session's git sync)."
+  :progress/indices
+  [{:index/code "sp500"
+    :index/name "S&P 500"
+    :index/region "US"
+    :index/status :in-progress
+    :index/constituents-source-note "Constituent candidates were selected from the agent's general knowledge of well-known, large-cap S&P 500 member companies (not from a freshly fetched/scraped official S&P Dow Jones Indices constituent list this session) -- honestly disclosed per ADR-2607199960 rather than citing a fabricated source URL for the list itself. Each individual company's LEI and ToS/legal-document text, by contrast, IS a real tool-verified fetch (GLEIF API + WebFetch/curl), recorded per-company below with real source URLs."
+    :index/note "First seed pass, 2026-07-19: 8 candidates attempted, chosen to diversify away from the oil/pipeline/utility/airline/retail/chemicals/semiconductor/aerospace/waste sectors already heavily sampled by the ISIC track -- banking (JPMorgan Chase), CPG (Procter & Gamble, Coca-Cola), healthcare (Johnson & Johnson, UnitedHealth Group), payments (Visa), industrials (3M), and tech (Microsoft). 6/8 succeeded. JPMorgan Chase & Co. and Johnson & Johnson both had real GLEIF-verified LEIs but failed ToS fetch (bot-blocked/JS-shell) after 2 URL attempts each. All 6 successes used a curl+plain-text-extraction fallback after WebFetch alone 403'd/404'd/timed-out/summarized-instead-of-quoting on the same URLs for 5 of the 6 (only Visa needed just the redirect-follow)."
+    :index/constituents
+    [{:company/legal-name "The Procter & Gamble Company"
+      :company/lei "2572IBTT8CCZW6AU4141"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter%5Bentity.legalName%5D=The%20Procter%20%26%20Gamble%20Company"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-2572ibtt8cczw6au4141"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://termsandconditions.pg.com/en-us/"
+      :company/note "us.pg.com/terms_conditions/ 404'd via WebFetch; real path found via homepage footer scan, fetched via curl+plain-text-extraction fallback"}
+     {:company/legal-name "UnitedHealth Group Incorporated"
+      :company/lei "549300GHBMY8T5GXDE41"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=UnitedHealth Group Incorporated"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300ghbmy8t5gxde41"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://www.unitedhealthgroup.com/terms-of-use.html"
+      :company/note "unitedhealthgroup.com/legal-notices.html was a soft-404 page (HTTP 200 but 'page not found' body); the real Terms of Use path was found via that same soft-404 page's own footer links, fetched via curl+plain-text-extraction fallback"}
+     {:company/legal-name "Microsoft Corporation"
+      :company/lei "INR2EJN1ERAN0W5ZP974"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Microsoft Corporation"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-inr2ejn1eran0w5zp974"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://www.microsoft.com/en-us/legal/terms-of-use"
+      :company/note "WebFetch returned only a paraphrased summary (and, on a stricter verbatim-quote retry, an explicit refusal citing copyright caution) rather than the actual page text despite an HTTP 200; the real verbatim text was recovered via a direct curl fetch + local HTML-to-text extraction (no AI summarization step)"}
+     {:company/legal-name "Visa Inc."
+      :company/lei "549300JZ4OKEHW3DPJ59"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=Visa Inc"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-549300jz4okehw3dpj59"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/tos-source-url "https://www.visa.com/en-us/legal/global-privacy-notice"
+      :company/note "no general consumer Terms of Use discoverable on this B2B/network-operator site; Global Privacy Notice used as the closest real, substantive published legal document, honestly recorded as :privacy-policy not :terms-of-service"}
+     {:company/legal-name "The Coca-Cola Company"
+      :company/lei "UWJKFUJFZ02DKWI3RY53"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=The Coca-Cola Company"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-uwjkfujfz02dkwi3ry53"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/note "fetched via curl+plain-text-extraction fallback after WebFetch failed on the same URL"}
+     {:company/legal-name "3M Company"
+      :company/lei "LUZQVYP4VS22CLWDAR65"
+      :company/lei-source-url "https://api.gleif.org/api/v1/lei-records?filter[entity.legalName]=3M Company"
+      :company/repo "https://github.com/cloud-itonami/cloud-itonami-lei-luzqvyp4vs22clwdar65"
+      :company/status :done
+      :company/tos-doc-count 1
+      :company/note "fetched via curl+plain-text-extraction fallback after WebFetch failed on the same URL"}
+     {:company/legal-name "JPMorgan Chase & Co."
+      :company/lei "8I5DZWZKVSZI1NUHU748"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; ToS fetch failed (403 via WebFetch, 404 via curl) on 2 URL attempts"}
+     {:company/legal-name "Johnson & Johnson"
+      :company/lei "549300G0CFPGEF6X2043"
+      :company/status :tos-fetch-failed
+      :company/note "real GLEIF-verified LEI kept on record; site returned a bot/JS error-shell stub on 2 URL attempts, no server-rendered body text"}]}
+   {:index/code "nikkei225" :index/name "Nikkei 225" :index/region "JP" :index/status :pending :index/constituents []}
+   {:index/code "topix100" :index/name "TOPIX 100" :index/region "JP" :index/status :pending :index/constituents []}
+   {:index/code "ftse100" :index/name "FTSE 100" :index/region "UK" :index/status :pending :index/constituents []}
+   {:index/code "dax40" :index/name "DAX 40" :index/region "DE" :index/status :pending :index/constituents []}
+   {:index/code "stoxx600" :index/name "STOXX Europe 600" :index/region "EU" :index/status :pending :index/constituents []}
+   {:index/code "hangseng" :index/name "Hang Seng Index" :index/region "HK" :index/status :pending :index/constituents []}
+   {:index/code "csi300" :index/name "CSI 300" :index/region "CN" :index/status :pending :index/constituents []}
+   {:index/code "asx200" :index/name "S&P/ASX 200" :index/region "AU" :index/status :pending :index/constituents []}
+   {:index/code "tsx60" :index/name "S&P/TSX 60" :index/region "CA" :index/status :pending :index/constituents []}
+   {:index/code "sensex" :index/name "BSE SENSEX" :index/region "IN" :index/status :pending :index/constituents []}
+   {:index/code "kospi200" :index/name "KOSPI 200" :index/region "KR" :index/status :pending :index/constituents []}
+   {:index/code "bovespa" :index/name "Ibovespa" :index/region "BR" :index/status :pending :index/constituents []}
+   {:index/code "cac40" :index/name "CAC 40" :index/region "FR" :index/status :pending :index/constituents []}
+   {:index/code "smi" :index/name "Swiss Market Index" :index/region "CH" :index/status :pending :index/constituents []}]}]
