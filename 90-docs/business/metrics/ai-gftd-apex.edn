@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 8704, "ai-gftd-chat-shell" 33},
+ {"magatama-sh1n5h1x" 8710, "ai-gftd-chat-shell" 33},
  :zone
- {:requests-7d 469890,
-  :pageviews-7d 6722,
-  :uniques-7d-sum 4974,
+ {:requests-7d 473184,
+  :pageviews-7d 6730,
+  :uniques-7d-sum 4984,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
   [{:path "/wp-includes/IXR/shell.php", :requests 23}
    {:path "/wp-admin/user/admin.php", :requests 18}
-   {:path "/ms-edit.php", :requests 14}
+   {:path "/ms-edit.php", :requests 17}
+   {:path "/xmrlpc.php", :requests 13}
    {:path "/wp-admin/css/colors/blue/atomlib.php", :requests 12}
-   {:path "/xmrlpc.php", :requests 12}
    {:path "/wp-admin/user/chosen.php", :requests 11}
    {:path "/wp-includes/php-compat/content.php", :requests 10}
-   {:path "/xstelth.php", :requests 7}],
-  :status-mix {:ok 381, :client-error 636, :server-error 16256},
+   {:path "/wp-admin/js/chosen.php", :requests 7}],
+  :status-mix {:ok 395, :client-error 640, :server-error 16241},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,8 +32,8 @@
  :as-of "2026-07-19",
  :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 94},
  :top-paths
- "上位 page (24h, 2xx/3xx): /wp-includes/IXR/shell.php 23 · /wp-admin/user/admin.php 18 · /ms-edit.php 14 · /wp-admin/css/colors/blue/atomlib.php 12 · /xmrlpc.php 12 | 4xx(probe) 4% · 5xx 94%",
+ "上位 page (24h, 2xx/3xx): /wp-includes/IXR/shell.php 23 · /wp-admin/user/admin.php 18 · /ms-edit.php 17 · /xmrlpc.php 13 · /wp-admin/css/colors/blue/atomlib.php 12 | 4xx(probe) 4% · 5xx 94%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 469890 req/7d・4974 uniques(日次和)・うち4xx probe 4%(24h)、workers 8737 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 473184 req/7d・4984 uniques(日次和)・うち4xx probe 4%(24h)、workers 8743 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
