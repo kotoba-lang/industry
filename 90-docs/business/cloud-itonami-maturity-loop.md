@@ -241,3 +241,69 @@ charter ADR-2607189200 は revision 済み (本 iter の finding に pivot)。
   (iter8 時点で iteration 15 まで確認) ため、本セッションが同じ対象を選ぶと衝突する
   リスクが高い。次に本セッションが継続する場合は、Wave5 の最新状態を必ず再確認してから
   重複しない対象を選ぶこと。
+
+---
+
+## Iteration 9 — 2026-07-19 (first ISCO-side demo: cloud-itonami-isco-1211)
+
+**Target:** iter8 の教訓通り、再開時に Wave5 の最新状態を確認したところ iteration 17
+  まで進行 (56 業種、ISIC 側 ~290-repo cluster を対象)。ただし
+  `cloud-itonami-flagship-rollout-ledger.edn` を grep した結果、**`isco-` (ISCO 職業
+  repo, 216件) は Wave5 が一度も閉じていない**(唯一の "isco-1212" 言及はフラグシップ
+  テナントページで無関係)ことを確認。`cloud-itonami-flagship-checklist-scan.edn` では
+  ISCO 216件中 **126件が `:item2/classification "unknown-no-demo"`**（デモ皆無）—
+  Wave5 が触っていない、衝突しない独立領域と判断。
+
+**Did (fresh agent, isolation:worktree, background):**
+- ISCO repo の実際の src 形状を先に自分でサンプル確認: `isco-1111`/`isco-2111`/
+  `isco-1211`/`isco-1311`/`isco-0110` はすべて `src/<domain>/{governor,actor,
+  advisor,store}.cljc` の**4ファイル構成**で完全一致 — ISIC 側テンプレートの
+  7ファイル構成 (`facts/phase/sim/governor/operation/advisor/store`) とは異なる、
+  ISCO 固有の一貫した形状と確認。
+- fresh agent に、ISIC 側の実証済み template 仕様 (`cloud-itonami-flagship-
+  generator-template.edn`) を読ませた上で、ISCO 固有形状に合わせた bespoke
+  render 実装を1 repo で実証させた（"batch 6件" の Wave5 段階ではなく "1件で
+  実証" の isic-851/6820 段階に相当）。
+- agent が **`cloud-itonami-isco-0210`/`0310` を stub と正しく screen-out**
+  (`run-request!` が `{:stub true ...}` を返すだけで実 StateGraph 呼び出しが
+  存在しないことを確認、ISIC 側の isic-2100/isic-1101 screen-out と同型の判断)。
+  **`cloud-itonami-isco-1211`**（ISCO-08 1211 Finance Managers、`finmgmt` ドメイン）
+  を選定 — 実 StateGraph (intake→advise→govern→decide→commit/hold) + governor
+  7-rule + 既存 test (`fresh-store` fixture, 14 tests/36 assertions) を確認。
+- seed データは既存 `finmgmt.actor-test` の `fresh-store` fixture (client-1
+  "Kobo Works" + budget-line L-ops 100000 + 80000→30000 支出シーケンス) をそのまま
+  流用 — 捏造ゼロ。2人目クライアント (client-2) は実 API (`register-client!` 等)
+  経由で追加したことを docstring に明記 (既存 fixture への上乗せと正直に開示)。
+- `src/finmgmt/render_html.clj` (11-request シナリオ、governor 7理由中6理由を
+  実際にトリガ、7つ目 `:no-actuation` は実 mock-advisor 経由では到達不能と正直に
+  記載) + `.github/workflows/regenerate.yml` + `docs/samples/operator-console.html`
+  を実装。
+- 検証 (ISIC 側と同じ基準): (a) ローカル2回連続実行が同一 sha256、(b) `.cpcache`
+  無しの from-scratch clone での再実行が dev run と byte-diff ゼロ、(c) 実
+  `workflow_dispatch` run `29676202519` が `conclusion=success`、CI 自身の
+  regenerate ステップも "console unchanged" (=byte一致)、(d) live GitHub Pages
+  (`cloud-itonami.github.io/cloud-itonami-isco-1211/samples/operator-console.html`)
+  が HTTP 200 + 同一 sha256 で配信されていることを `curl` で実測確認。既存
+  test suite も前後とも 14/36 green。
+- commit `e6d500de9579` (feat) → server-side merge `f72607011590` → isco-1211
+  main に landed。feature branch は merge 後に削除。superproject `orgs/` 共有
+  checkout は未変更 (read-only のまま)。
+
+**Finding:** ISIC 側で証明されたパターン（build-time 生成デモ + regenerate.yml +
+  4段階検証）は、形状の異なる ISCO 側にも**手法として移植可能**（コード形状は
+  移植不可、都度実データを読んで適応が必要）ことを実証。ISCO 126件の no-demo
+  backlog に対して "isic-851/isic-6820" 相当の一番目の実証が完了 — 今後 Wave5
+  同様の batch 展開ができる可能性がある (ただし batch 化はこの iteration の
+  スコープ外、次の判断)。
+
+**Did NOT (honest):** superproject `manifest/west.yml` は未変更（isco-1211 の
+  pin 前進は別途必要、本 iteration のスコープ外と明示）。`cloud-itonami-
+  flagship-checklist-scan.edn` / `-rollout-ledger.edn` への追記もしていない
+  (Wave5 自身の生成物であり、並行実行中の別プロセスの管轄と判断、衝突回避)。
+  portfolio score・ISIC 側スコアとも据え置き。
+
+**Next:** (a) 誰かが isco-1211 の pin を superproject west.yml に反映すれば
+  fleet 全体の可視性が上がる、(b) ISCO 側 no-demo 126件への batch 展開
+  (Wave5 の ISIC batch 化と同型) は次の判断だが、対象が multiple agent の並行
+  作業と衝突しやすいので、次回起動時も必ず最新状態を再確認してから 1 repo ずつ
+  進めること。
