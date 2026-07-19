@@ -208,4 +208,19 @@
      {:company/legal-name "RWE AG" :company/jurisdiction "DE" :company/reason "GLEIF name search (fulltext + exact legalName, jur=DE) surfaces only subsidiaries (RWE Renewables, RWE Generation, RWE Offshore Wind, RWE Pensionsfonds, etc.); parent 'RWE AG' LEI not surfaced — not fabricated"}}
   :iteration/next "ITERATION 9+: scaffold the 6 verified EU-UTIL-1 cloud-itonami-lei-* repos (ToS/legal gate + blueprint/README/NOTICE/tos.journal, same recipe as JP-UTIL-1). EU corporate sites are often bot-protected (cf isic-3510 National Grid/Duke were 403 in the US rollout) — expect mixed gate results, record honestly. Continue with ASIA-UTIL-1 (KEPCO/CLP/Tenaga/State Grid). Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract divergent graph + manifest registration of 7 JP repos."}
 
+ {:iteration/num 9
+  :iteration/date "2026-07-19"
+  :iteration/phase :repo-scaffold
+  :iteration/batch "EU-UTIL-1"
+  :iteration/summary "Scaffolded 3 of 6 EU-UTIL-1 repos (the 3 gate-passes). 3 bot-blocked at home page (HTTP 403, no evasion). This is the resume point."
+  :repo/created
+   #{{:company/legal-name "Electricité de France SA" :company/lei "549300X3UK4GG3FNMO06" :repo/name "cloud-itonami-lei-549300x3uk4gg3fnmo06" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-549300x3uk4gg3fnmo06" :company/doc-type :legal-notice :company/tos-source-url "https://www.edf.fr/mentions-legales" :company/jurisdiction "FR"}
+     {:company/legal-name "Enel S.p.A." :company/lei "WOCMU6HCI0OJWNPRZS33" :repo/name "cloud-itonami-lei-wocmu6hci0ojwnprzs33" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-wocmu6hci0ojwnprzs33" :company/doc-type :legal-disclaimer :company/tos-source-url "https://www.enel.com/legal-disclaimers" :company/jurisdiction "IT"}
+     {:company/legal-name "SSE plc" :company/lei "549300KI75VYLLMSK856" :repo/name "cloud-itonami-lei-549300ki75vyllmsk856" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-549300ki75vyllmsk856" :company/doc-type :privacy-policy :company/tos-source-url "https://www.sse.com/privacy-notice/" :company/jurisdiction "GB"}}
+  :gate/failed-bot-blocked
+   #{{:company/legal-name "Iberdrola SA" :company/lei "5QK37QC7NWOJ8D7WVQ45" :company/reason "iberdola.com home returns HTTP 403 to plain HTTP client; no evasion attempted per CLAUDE.md safety floor ④"}
+     {:company/legal-name "National Grid plc" :company/lei "8R95QZMKZLJX5Q2XR704" :company/reason "nationalgrid.com home returns HTTP 403 (same as isic-3510 US rollout National Grid/Duke); no evasion"}
+     {:company/legal-name "E.ON SE" :company/lei "Q9MAIUP40P25UFBFG033" :company/reason "eon.com home returns HTTP 403; no evasion"}}
+  :iteration/next "ITERATION 10+: ASIA-UTIL-1 acquisition (KEPCO/CLP/Tenaga Nasional/State Grid — verify parent LEIs, do not fabricate). Defer EU 403s to a JS-capable fetch path (not in this env). Owner/ops follow-ups unchanged: canonical ingest identity provisioning + EDINET key + retract iter5 divergent graph + manifest registration of 10 repos (7 JP + 3 EU)."}
+
 ]
