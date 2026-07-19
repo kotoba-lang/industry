@@ -1,7 +1,7 @@
 [{:db/id -1
   :manifest.west-triple-sync/id :com-junkawasaki.root/west-triple-sync
   :manifest.west-triple-sync/version 1
-  :manifest.west-triple-sync/updated "2026-07-17"
+  :manifest.west-triple-sync/updated "2026-07-19"
   :manifest.west-triple-sync/adr "2607173200"
   :manifest.west-triple-sync/purpose "Keep GitHub remotes, local orgs/*/* checkouts, and west.yml pins consistent and current for a managed project set — without wholesale west regen or mass clone."
   :manifest.west-triple-sync/planes
@@ -42,6 +42,7 @@
    {:step :apply
     :guard "require --apply; skip dirty trees; skip missing GitHub; skip unpushed HEAD for pin"
     :register ["surgical insert into manifest/repos.edn :extra-projects"
+               "preserve escaped quotes when inserting into the EDN blob string"
                "nbb scripts/gen-west-manifest.cljs --entry <name>"]
     :clone ["git clone --depth 1 <url> orgs/<org>/<name>"]
     :align ["git fetch --depth 1 origin"

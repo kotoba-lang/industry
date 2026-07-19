@@ -426,7 +426,9 @@
 (defn ensure-extra-project! [path]
   (let [f (node-path.join root "manifest/repos.edn")
         text (slurp f)
-        token (str "\"" path "\"")]
+        ;; repos.edn stores :extra-projects as an EDN blob string, so entries
+        ;; must retain the escaped quotes of the vector encoded in that blob.
+        token (str "\\\"" path "\\\"")]
     (if (str/includes? text token)
       :already
       (let [key-idx (.indexOf text ":manifest.repos/extra-projects")
@@ -473,9 +475,11 @@
     (println (str "  register " path " (--entry " name ")"))
     (let [ins (ensure-extra-project! path)]
       (println (str "    extra-projects: " ins))
-      (let [{:keys [ok? err out]}
-            (sh-ok "nbb" (node-path.join root "scripts/gen-west-manifest.cljs")
-                   "--entry" name)]
+      (let [skip-remote? (= "1" (aget js/process.env "WEST_PIN_VERIFY_SKIP"))
+            args (cond-> ["nbb" (node-path.join root "scripts/gen-west-manifest.cljs")
+                          "--entry" name]
+                   skip-remote? (conj "--no-verify-remote"))
+            {:keys [ok? err out]} (apply sh-ok args)]
         (if ok?
           {:ok? true :op :register :path path :name name :out out}
           {:ok? false :op :register :path path :err (str err "\n" out)})))))
