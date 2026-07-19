@@ -160,4 +160,11 @@
   :iteration/cleanup "Deleted my own just-created typo repo cloud-itonami-lei-5493003bzyycdio0r13 (LEI lowercase misspelled 2-Y vs correct 3-Y; contained KDDI content via a cd-failure mishap). Own erroneous artifact created seconds earlier, not others' data."
   :iteration/next "ITERATION 4: (1) register 5 new repos in manifest/fleet-db.edn (shared/main-racing — API single-entry commit via parents:[MAIN] FF recipe); (2) run scripts/kotobase-ingest-cloud-itonami-lei.cljs (= 連携統合); (3) retry NTT via group.ntt + Kansai alt URL; (4) start EU-UTIL-1 acquisition."}
 
+ {:iteration/num 4
+  :iteration/date "2026-07-19"
+  :iteration/phase :integration-ingest-attempt
+  :iteration/summary "連携統合 ingest ATTEMPTED but the live run (scripts/kotobase-ingest-cloud-itonami-lei.cljs) hung at startup — did not reach identity generation or -main, 0 bytes output, ~0 CPU over 10+ min, killed. This is the resume point."
+  :iteration/diagnosis "Readiness CONFIRMED: node fetch to backend.kotobase.net OK (200), @noble/curves v1.9.7 (correct, package.json requires v1), 5 new repos enumerable via gh api + fetchable via raw.githubusercontent. Ruled OUT: node network sandbox, noble/curves version, repo enumeration. SUSPECT: nbb compile of kotobase-client ns, OR client/make-client did:web:kotobase.net resolution / XRPC handshake with no timeout (low-CPU blocked state fits a hanging network init)."
+  :iteration/next "ITERATION 5: debug ingest startup — add (println) before requires + time a standalone (client/make-client {...}) call to isolate ns-load vs make-client; add fetch timeouts; if fixed, run live ingest = 連携統合 of the 5 JP-UTIL-1 repos (+ existing) into kotobase.net cloud-itonami-lei-catalog graph. In parallel: NTT retry via group.ntt, Kansai alt-URL, start EU-UTIL-1 acquisition. NOTE: manifest/fleet-db registration of the 5 repos still pending (needed for west checkout but NOT for ingest, which reads raw.githubusercontent directly)."}
+
 ]
