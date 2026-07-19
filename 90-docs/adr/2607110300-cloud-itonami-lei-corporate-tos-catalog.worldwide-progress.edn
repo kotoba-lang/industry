@@ -146,4 +146,18 @@
      {:company/legal-name "ＮＴＴ株式会社" :company/lei "353800VHQU5VIXVUA841" :company/reason "www.ntt.co.jp returns HTTP 410 Gone (site migrated to group.ntt); group.ntt policy page not located this pass — retry with corrected URL next tick"}}
   :iteration/next "ITERATION 3: scaffold cloud-itonami-lei-<lei-lowercased> repos for the 5 :gate/pass companies (fetch full ToS/privacy text -> 80-data/public/tos.journal.edn + blueprint.edn + README.md + NOTICE, following the exact pattern in e.g. cloud-itonami-lei-2138004jbxwwjkiurc57), then register in manifest/fleet-db.edn and run scripts/kotobase-ingest-cloud-itonami-lei.cljs (= 連携統合). Also retry NTT via group.ntt. Then proceed to EU-UTIL-1 acquisition."}
 
+ {:iteration/num 3
+  :iteration/date "2026-07-19"
+  :iteration/phase :repo-scaffold
+  :iteration/batch "JP-UTIL-1"
+  :iteration/summary "Scaffolded + pushed all 5 gate-passing cloud-itonami-lei-* repos to GitHub (TEPCO terms-of-service + Chubu/Tokyo Gas/KDDI/SoftBank privacy-policy archives), each with blueprint.edn + README.md + NOTICE + LICENSE(AGPL) + 80-data/public/tos.journal.edn (5 quads: full-text/source-url/retrieved-at/sha256/doc-type). This is the resume point."
+  :repo/created
+   #{{:company/legal-name "東京電力ホールディングス株式会社" :company/lei "5299004EMJ3R4RVR5Y75" :repo/name "cloud-itonami-lei-5299004emj3r4rvr5y75" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-5299004emj3r4rvr5y75" :company/doc-type :terms-of-service :company/tos-source-url "https://www.tepco.co.jp/legal/"}
+     {:company/legal-name "中部電力株式会社" :company/lei "529900A76GOP0PGNHT63" :repo/name "cloud-itonami-lei-529900a76gop0pgnht63" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-529900a76gop0pgnht63" :company/doc-type :privacy-policy :company/tos-source-url "https://www.chuden.co.jp/privacy/"}
+     {:company/legal-name "東京瓦斯株式会社" :company/lei "353800678EIJLOQSWZ83" :repo/name "cloud-itonami-lei-353800678eijloqswz83" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-353800678eijloqswz83" :company/doc-type :privacy-policy :company/tos-source-url "https://www.tokyo-gas.co.jp/utility/privacy/index.html"}
+     {:company/legal-name "KDDI株式会社" :company/lei "5299003FU7V4I45FU310" :repo/name "cloud-itonami-lei-5299003fu7v4i45fu310" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-5299003fu7v4i45fu310" :company/doc-type :privacy-policy :company/tos-source-url "https://www.kddi.com/corporate/kddi/public/privacy-portal/"}
+     {:company/legal-name "ソフトバンクグループ株式会社" :company/lei "5493003BZYYYCDIO0R13" :repo/name "cloud-itonami-lei-5493003bzyyycdio0r13" :repo/url "https://github.com/cloud-itonami/cloud-itonami-lei-5493003bzyyycdio0r13" :company/doc-type :privacy-policy :company/tos-source-url "https://www.softbankgroup.com/en/privacy"}}
+  :iteration/cleanup "Deleted my own just-created typo repo cloud-itonami-lei-5493003bzyycdio0r13 (LEI lowercase misspelled 2-Y vs correct 3-Y; contained KDDI content via a cd-failure mishap). Own erroneous artifact created seconds earlier, not others' data."
+  :iteration/next "ITERATION 4: (1) register 5 new repos in manifest/fleet-db.edn (shared/main-racing — API single-entry commit via parents:[MAIN] FF recipe); (2) run scripts/kotobase-ingest-cloud-itonami-lei.cljs (= 連携統合); (3) retry NTT via group.ntt + Kansai alt URL; (4) start EU-UTIL-1 acquisition."}
+
 ]
