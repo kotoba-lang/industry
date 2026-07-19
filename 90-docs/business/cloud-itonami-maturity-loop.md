@@ -154,3 +154,90 @@ charter ADR-2607189200 は revision 済み (本 iter の finding に pivot)。
 
 **Did NOT (honest):** 5820 Impl-product score の再計算は未実施 (seed 適用 + endpoint
   実装が land してから)。実コード (endpoint) は iter5。portfolio score 据え置き。
+
+---
+
+## Iterations 5–7 — backfill note (2026-07-19)
+
+**⚠ この session log ファイル自体が、共有 superproject checkout に対する激しい並行
+  更新の影響で iteration 5/6/7 の本文を一度失っていた** (iter8 セッションが確認: ローカル
+  disk 上で 232 行/6 iteration まで見えていた版が、後続の並行 fast-forward 更新で
+  156 行/4 iteration の commit 済み版に置き換わっており、その間の working-tree 差分
+  (未 commit) が回収不能になっていた — 中身のコード成果自体は各子リポの git 履歴に
+  実在するため実害はコードになく、この session log の narrative のみが欠落)。以下は
+  git 履歴 (`gh api` で直接検証済み) から再構成した要約 — 詳細な逐語ログは失われたため
+  簡潔に記す:
+
+- **iter5 (2026-07-19)**: `cloud-itonami-isic-5820` の `crm/http.clj` に
+  `approve-decision` fn + `POST /approve` route を実装 (escalate → approve/reject で
+  `g/run*` を `{:thread-id .. :resume? true}` 再開)。sibling worktree で実装し、
+  test 5件追加・15/15 pass 確認後、commit `6755118` → server-side merge →
+  isic-5820 main = `8de59cb9`。
+- **iter6 (2026-07-19)**: superproject `manifest/west.yml` の isic-5820 pin を
+  `cfd1542`→`8de59cb9` に前進 (GitHub API single-entry commit、pin 検証 clean ff
+  確認済み)。superproject main commit `d1a841eb`。
+- **iter7 (2026-07-19, 別セッション/並行実行と推測)**: isic-5820 の `docs/api.md`
+  の stale な "no approval endpoint" 記述を修正 (commit `f8b7fc3d` → `bdf54dd0`)。
+  superproject 側 pin もこれに追従して `bdf54dd0` まで前進済み (現在の west.yml で確認)。
+  本セッションはこの iter7 を**実行していない** — 気づいた時には他プロセスが既に
+  landed 済みだった。
+
+**教訓 (iter8 が明示的に記録)**: この charter の作業は、この 1 session だけでなく
+  複数の並行 Claude Code セッション/自動化 (`Wave5` 系の flagship-checklist-scan
+  iteration も同時並行で iteration 15 まで進行中を iter8 で確認) が同時に触っている。
+  以後この log に書く内容は「このセッションが観測した時点の事実」に限定し、
+  「次にやるべきこと」の断定は避ける (他セッションが既にやっている可能性が高いため)。
+
+---
+
+## Iteration 8 — 2026-07-19 (diagnosis: "deploy 5820 live" is not a valid next step)
+
+**Target:** iter6 の "Next (iter7 候補)" (a) 「5820 endpoint を live itonami.cloud/
+  isic-5820/ に deploy」を検証しようとした。
+
+**Did (diagnosis only, isolated worktree, no live mutation):**
+- `orgs/cloud-itonami/cloud-itonami-isic-5820/README.md` (~L147) を読み、この repo が
+  **self-host-only の OSS business-in-a-box** であり、自身では deploy しない設計
+  であることを確認 ("no docker push/registry step and no cloud-deploy automation ...
+  out of scope here" と明記)。
+- fresh agent (isolation: worktree) に、cockpit repo (`gftdcojp/cloud-itonami`,
+  west 名 `cloud-itonami`, pin `d907064...`) を fetch させ、`/isic-5820/` がどう
+  ライブになっているか調査させた。結果:
+  - cockpit の `deps.edn` に isic-5820 への依存 (`:local/root` 等) は **ゼロ**。
+  - cockpit の `public/_redirects` / `functions/api/open-business/[isic].js` の
+    静的レジストリにも 5820 は **登録されていない**（登録済みは 3512/3600/3830/
+    6310/7810/6399/6810/8569/8691/8810/3011/2811/2410 + UNSPSC 5件のみ）。
+  - `cloud-itonami-vertical-maturity.edn` が言う "live face /isic-5820/" の正体は
+    `public/marketplace.json` の単なる **リンクアウト**（`demo:
+    https://cloud-itonami.github.io/cloud-itonami-isic-5820/`）で、これは
+    **isic-5820 repo 自身の GitHub Pages**（`gh api .../pages` で `status: built`
+    確認済み、Jekyll 静的ビルド）— cockpit の build/deploy パイプラインとは無関係。
+  - GitHub Pages は静的ファイルのみ配信するため、`crm/http.clj` の Clojure サーバ
+    (= 今回の `POST /approve`) は **構造的に絶対にそこでは動かない**。
+  - cockpit 自身の deploy pipeline も確認したところ **死んでいる**
+    (`gh api repos/gftdcojp/cloud-itonami/actions/permissions` → `enabled:false`、
+    実 deploy は `lefthook` の `post-merge` hook 経由 `wrangler pages deploy` で、
+    誰かのローカル checkout が `origin/main` を pull した時にしか発火しない)。
+
+**Finding (honest — corrects iter6's own assumption):**
+- **「5820 pin を bump して cockpit を redeploy すれば live になる」は誤った前提
+  だった** — bump すべき pin が cockpit 側に存在しない。redeploy しても
+  isic-5820 の GitHub Pages 静的内容は一切変わらない。
+- `POST /approve` を真に reachable にするには、(a) isic-5820 は self-host 専用と
+  割り切り "live face" は静的デモ止まりと認める、または (b) cockpit に新規 proxy
+  route を足す/isic-5820 自身に実 Cloudflare Workers deploy 経路を作る、という
+  設計判断が要る — これは 1 iteration の bounded bump では済まない scope で、
+  owner 判断が必要 (本 iteration では設計しない)。
+
+**Did NOT (honest):** cockpit repo への変更・deploy は一切行っていない
+  (diagnosis-only)。cockpit の test suite はフル実行できず (25+ sibling repo
+  依存で classpath 解決不可、ci.yml 自身が `continue-on-error: true` にしている
+  既知の制約を再現しただけ)。portfolio score・5820 score とも据え置き。
+
+**Next:** cockpit 統合の設計判断は owner に投げる。within-product 側の code-actionable
+  な次の一手としては、iter6 の wave5 系 (`cloud-itonami-flagship-generator-template.edn`)
+  が既に証明済みの「no-demo repo にテンプレートを適用」パターンを別 repo に展開する方が
+  安全 — ただし前述の通り Wave5 系の並行 iteration が既にこれを高頻度で進めている
+  (iter8 時点で iteration 15 まで確認) ため、本セッションが同じ対象を選ぶと衝突する
+  リスクが高い。次に本セッションが継続する場合は、Wave5 の最新状態を必ず再確認してから
+  重複しない対象を選ぶこと。
