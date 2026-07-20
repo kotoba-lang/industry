@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 11252, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 11264, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 460574,
-  :pageviews-7d 5958,
-  :uniques-7d-sum 4941,
+ {:requests-7d 463591,
+  :pageviews-7d 5962,
+  :uniques-7d-sum 4961,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
@@ -13,20 +13,18 @@
   [{:path
     "/blobs/anonymous/bafkreigbo3mvfmtes5imfl5c3dyegm5eowhkt3d5fnxm56bdhcfswjvpiy",
     :requests 16}
+   {:path "/lib.php", :requests 15}
    {:path "/wp-admin/css/colors/blue/file.php", :requests 15}
    {:path "/ms-edit.php", :requests 14}
-   {:path "/edit.php", :requests 13}
+   {:path "/edit.php", :requests 14}
+   {:path "/link.php", :requests 13}
    {:path
     "/ai-gftd-cdn/blobs/anonymous/bafkreibjwnac37q6tak3fegbvrum7bhhhhxyouc537377vxhtd6w5gprra",
     :requests 13}
    {:path
     "/ai-gftd-cdn/blobs/anonymous/bafkreidztiea2oihjlnkxsan5t32rx6r5l5mnbmzel62gysxnourl6qwwa",
-    :requests 12}
-   {:path
-    "/ai-gftd-cdn/blobs/anonymous/bafkreihtyjjdwl2p2lks6psgzyoev4rnxvlkdfrxvaba74tsyjinp53fue",
-    :requests 12}
-   {:path "/lib.php", :requests 12}],
-  :status-mix {:ok 506, :client-error 953, :server-error 15851},
+    :requests 12}],
+  :status-mix {:ok 523, :client-error 971, :server-error 15808},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -38,10 +36,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-20",
- :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 92},
+ :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 91},
  :top-paths
- "上位 page (24h, 2xx/3xx): /blobs/anonymous/bafkreigbo3mvfmtes5imfl… 16 · /wp-admin/css/colors/blue/file.php 15 · /ms-edit.php 14 · /edit.php 13 · /ai-gftd-cdn/blobs/anonymous/bafkreibjwn… 13 | 4xx(probe) 6% · 5xx 92%",
+ "上位 page (24h, 2xx/3xx): /blobs/anonymous/bafkreigbo3mvfmtes5imfl… 16 · /lib.php 15 · /wp-admin/css/colors/blue/file.php 15 · /ms-edit.php 14 · /edit.php 14 | 4xx(probe) 6% · 5xx 91%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 460574 req/7d・4941 uniques(日次和)・うち4xx probe 6%(24h)、workers 11253 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 463591 req/7d・4961 uniques(日次和)・うち4xx probe 6%(24h)、workers 11265 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
