@@ -1,28 +1,28 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 6989, "kotobase-cf-wasm-staging" 583},
+ {"net-kotobase" 7017, "kotobase-cf-wasm-staging" 583},
  :zone
- {:requests-7d 13951,
-  :pageviews-7d 614,
-  :uniques-7d-sum 921,
+ {:requests-7d 14057,
+  :pageviews-7d 617,
+  :uniques-7d-sum 929,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/kotobase.git.object.put", :requests 737}
+  [{:path "/xrpc/kotobase.git.object.put", :requests 727}
    {:path
     "/kotobase-cf-wasm-production/ipns/bafyreifwqhbid7bubcts3ym25fnijd4yic62ese4m3aoclffz6lthdxylu.json",
-    :requests 108}
+    :requests 99}
    {:path "/", :requests 85}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 70}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 53}
-   {:path "/gftdcojp/manimani-operations/info/refs", :requests 52}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 57}
+   {:path "/gftdcojp/manimani-operations/info/refs", :requests 50}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 48}
+   {:path "/cdn-cgi/rum", :requests 45}
    {:path
     "/kotobase-cf-wasm-production/blocks/bafyreifwqhbid7bubcts3ym25fnijd4yic62ese4m3aoclffz6lthdxylu/bafyreibyfbwei3hl5kuneapqz3r4x2gru2pcp6fryvimkldycoxqujmcfq",
-    :requests 50}
-   {:path "/cdn-cgi/rum", :requests 45}],
-  :status-mix {:server-error 8, :client-error 723, :ok 2356},
+    :requests 43}],
+  :status-mix {:server-error 8, :client-error 674, :ok 2274},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -36,7 +36,7 @@
  :as-of "2026-07-20",
  :traffic-quality {:window "24h", :probe-4xx-pct 23, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/kotobase.git.object.put 737 · /kotobase-cf-wasm-production/ipns/bafyre… 108 · / 85 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 70 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 53 | 4xx(probe) 23% · 5xx 0%",
- :funnel {:visitors 1031, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /xrpc/kotobase.git.object.put 727 · /kotobase-cf-wasm-production/ipns/bafyre… 99 · / 85 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 57 · /gftdcojp/manimani-operations/info/refs 50 | 4xx(probe) 23% · 5xx 0%",
+ :funnel {:visitors 1034, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 13951 req/7d・921 uniques(日次和)・うち4xx probe 23%(24h)、workers 7572 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 14057 req/7d・929 uniques(日次和)・うち4xx probe 23%(24h)、workers 7600 inv/7d、Stripe active subs 0"}
