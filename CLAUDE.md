@@ -276,7 +276,10 @@ skill `new-project-scaffold` を参照。
   非ゼロなら軽量に表示、失敗時は fail-open でセッション開始をブロックしない）。
   乖離を見つけたら rebase せず、この節の手順か `git-cleanup-conflict` skill
   （848 commits 級の乖離は content-containment 判定 → 新しい clean branch を
-  origin/main から切って必要な差分だけ移植、が正解）で解消する。
+  origin/main から切って必要な差分だけ移植、が正解）で解消する。この実インシデントの
+  詳細（`projects/` 旧 submodule クローン削除・各リポの actor 外部化検証・
+  848 commits 乖離の解消経緯）は `90-docs/adr/2607206700-west-multirepo-monorepo-era-cleanup-audit.edn`
+  に記録している。
 
 - **`git push` の前に必ず `origin/main` との遅れを解消する。** push しようとする
   リポ（superproject / 各 project とも）が `origin/main`（既定ブランチ）より遅れて
