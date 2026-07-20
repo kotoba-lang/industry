@@ -7,23 +7,27 @@
   :adr/source-format "edn"
   :adr/topic "sqrt-space-kv-python-rust-port"
   :adr/date "2026-07-19"
-  :adr/last_verified "2026-07-19"
-  :adr/last-verified "2026-07-19"
+  :adr/last_verified "2026-07-20"
+  :adr/last-verified "2026-07-20"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative-for
   ["sqrt-space-kv の Python/Rust ポートの配置先 org・repo（kotoba-lang ではなく既存の com-junkawasaki/sqrt-space-kv に統合）"
    "canonical .cljc とのクロス言語 conformance を golden-fixture テストで担保する方式（Rust core + PyO3/FFI・WASM-as-SSoT を採らない理由）"
-   "新規公開ライブラリのドキュメントにおける対外メッセージング制約（誇大な数値なしの中立的ユーティリティとして公開）"]
+   "新規公開ライブラリのドキュメントにおける対外メッセージング制約（誇大な数値なしの中立的ユーティリティとして公開）"
+   "PyPI Trusted Publishing（トークン非保存）を Python 側の正経路にする方針"]
   :adr/authoritative_for
   ["sqrt-space-kv の Python/Rust ポートの配置先 org・repo（kotoba-lang ではなく既存の com-junkawasaki/sqrt-space-kv に統合）"
    "canonical .cljc とのクロス言語 conformance を golden-fixture テストで担保する方式（Rust core + PyO3/FFI・WASM-as-SSoT を採らない理由）"
-   "新規公開ライブラリのドキュメントにおける対外メッセージング制約（誇大な数値なしの中立的ユーティリティとして公開）"]
+   "新規公開ライブラリのドキュメントにおける対外メッセージング制約（誇大な数値なしの中立的ユーティリティとして公開）"
+   "PyPI Trusted Publishing（トークン非保存）を Python 側の正経路にする方針"]
   :adr/related
   ["orgs/com-junkawasaki/sqrt-space-kv"
    "orgs/com-junkawasaki/sqrt-space-kv/python"
    "orgs/com-junkawasaki/sqrt-space-kv/rust"
    "orgs/com-junkawasaki/sqrt-space-kv/tests/fixtures/golden.json"
+   "orgs/com-junkawasaki/sqrt-space-kv/.github/workflows/publish.yml"
+   "orgs/com-junkawasaki/sqrt-space-kv/RELEASE.md"
    "orgs/com-junkawasaki/sqrt-space-kv/90-docs/adr/2607190900-python-rust-library-port.md"
    "orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/sqrt_space.cljc"
    "orgs/gftdcojp/cloud-murakumo/src/cloud_murakumo/kv_runtime.cljc"
@@ -31,7 +35,8 @@
    "90-docs/adr/2607182800-sqrt-space-kv-mla-composability-maturity-review.edn"
    "90-docs/adr/2606302300-org-taxonomy-4-orgs.edn"
    "90-docs/adr/2607021330-org-repo-visibility-policy.edn"
-   "90-docs/adr/2607010930-clj-wgsl-migration.edn"]
+   "90-docs/adr/2607010930-clj-wgsl-migration.edn"
+   "https://pypi.org/project/sqrt-space-kv/"]
   :adr/supersedes []
   :adr/superseded-by []
   :adr/superseded_by []
@@ -67,11 +72,15 @@
    ADR-2607182800 が対外発信をゲートしている（host paging 下で
    2.2-3.7倍のデコード減速という未解決のトレードオフがあるため）。既存の
    リポジトリ trunk README.md（既存の研究報告、今回新規に追加したものでは
-   ない）はそのまま維持した。"
+   ない）はそのまま維持した。
+
+   Python の実配布は PyPI Trusted Publishing（GitHub Actions OIDC、
+   tag push トリガー）を正経路にし、APIトークンを一切保存しない。crates.io
+   側は同等の仕組みがないため、手動 `cargo login`/`cargo publish`（token は
+   1Password + macOS Keychain に保管、値は非コミット）で運用する。"
   :adr/consequences
-  ["com-junkawasaki/sqrt-space-kv に python/（PyPI 未公開）・rust/
-    （crates.io 未公開）パッケージが追加された。両パッケージとも
-    LICENSE（MIT、両 repo とも従来存在しなかった）付き"
+  ["com-junkawasaki/sqrt-space-kv に python/・rust/ パッケージが追加された。
+    両パッケージとも LICENSE（MIT、両 repo とも従来存在しなかった）付き"
    "cloud-murakumo に golden-fixture ダンプスクリプトが追加された
     （sqrt_space_kv_fixtures.clj、:sqrt-kv-fixtures エイリアス）"
    "初回ポート時に Python 版 block_stream_attn に実バグ（ループ間で m を
@@ -81,16 +90,28 @@
     com-junkawasaki）は org を跨ぐため、fixture 同期は CI 自動化できず
     手動運用（CONTRIBUTING.md に手順を記載）"
    "west.yml の既存 sqrt-space-kv エントリ（com-junkawasaki）はリネーム
-    不要 — 通常の pin 前進のみ"
-   "PyPI/crates.io への実際の公開はまだ行っていない — RELEASE.md の
-    事前確認（名前の空き状況）を経てから別途実行する"]
+    不要 — 通常の pin 前進のみ実施済み"
+   "PyPI: `pip install sqrt-space-kv` で公開済み・動作確認済み（v0.1.0、
+    2026-07-19、Trusted Publishing 経由・トークン非保存）"
+   "crates.io: `cargo add sqrt-space-kv` はまだ使えない — publish が
+    403 Forbidden（authentication failed）でブロック中。原因未特定
+    （トークンの publish-new スコープ不足 / アカウントのメール未検証の
+    いずれかが濃厚）。crates.io API トークンは 1Password（item
+    \"crates.io API Token\"、Private vault）と macOS Keychain
+    （service=crates.io, account=CRATES_API_KEY）に保管済み（値はここには
+    書かない）"]
   :adr/open-questions
   ["golden-fixture の attention 出力に対するクロス言語許容誤差（現状
    1e-6、言語内は1e-9）は初期値であり、実運用で緩すぎ/厳しすぎが判明したら
    見直す"
    "cloud-murakumo の .cljc が将来変更された場合の同期タイミング/
    バージョニング規約は「手動、CONTRIBUTING.md に記載」以上に厳密化されて
-   いない"]
+   いない"
+   "crates.io publish の 403 Forbidden の根本原因未特定 — 次セッションで
+   https://crates.io/settings/tokens のスコープと
+   https://crates.io/settings/profile のメール検証状況を確認し、必要なら
+   publish-new スコープ付きの新トークンを再発行してから
+   `cargo login`→`cargo publish` を再試行する"]
   :adr/body
 "# ADR-2607190945: sqrt-space-kv を Python + Rust から使えるコミュニティ向けライブラリとして com-junkawasaki/sqrt-space-kv に追加
 
@@ -170,8 +191,38 @@ Python/Rust への配布方式については、以下を比較検討した:
   スモークテスト成功、`cargo publish --dry-run --allow-dirty` 成功。
   いずれも GitHub Actions CI（push 時）で green を確認済み。
 
-## 未実施（別途オーナー確認の上で実行）
+## Addendum 1（2026-07-19〜20）: PyPI 公開完了・crates.io は認証で保留
 
-PyPI（`sqrt-space-kv`）・crates.io（`sqrt-space-kv`）への実際の公開は
-未実施。`RELEASE.md` に記載の通り、名前の空き状況確認（`curl` での 404
-確認）を最初のステップとする手動リリース手順に従い、別途実行する。"}]
+**PyPI**: 名前空き確認（`pypi.org/pypi/sqrt-space-kv/json` → 404）を経て、
+`.github/workflows/publish.yml`（tag push トリガー、test→build→
+`pypa/gh-action-pypi-publish` の3ジョブ構成）を追加、server-side merge で
+main に着地（commit `ed19662`）。オーナーが
+https://pypi.org/manage/account/publishing/ で pending publisher
+（owner=com-junkawasaki, repo=sqrt-space-kv, workflow=publish.yml,
+environment=pypi）を登録後、`v0.1.0` タグを push して実行 —
+test/build/publish 全ジョブ green、**PyPI に公開完了**
+（https://pypi.org/project/sqrt-space-kv/）。クリーン venv での
+`pip install sqrt-space-kv` → import → `keep_indices(4096)` 呼び出しまで
+実機で確認済み。APIトークンは一切保存していない（OIDC のみ）。
+
+**crates.io**: 名前空き確認（`crates.io/api/v1/crates/sqrt-space-kv` →
+404、User-Agent 必須）は完了。`cargo login` は crates.io/me での
+ブラウザ発行トークンが必須で CLI 単体では完結しないことを確認
+（`gh auth login` 型の自動コールバックは crates.io には無い）。オーナーが
+トークンを発行・共有し、`cargo login` は成功（`~/.cargo/credentials.toml`
+に保存）。同トークンは 1Password（item \"crates.io API Token\"、Private
+vault、フィールド `credential`/`username=CRATES_API_KEY`）と macOS
+Keychain（`security add-generic-password -a CRATES_API_KEY -s crates.io`）
+にも保管した（オーナー指示）。ただし `cargo publish`（rust/ v0.1.0）は
+**403 Forbidden（authentication failed）で失敗** — トークン文字列自体は
+保存値と一致確認済みなので、原因はトークンのスコープ不足（新規 crate
+公開には `publish-new` スコープが必要）かアカウントのメール未検証の
+いずれかと推定、未確定のまま次セッションに持ち越し（open-questions 参照）。
+
+## 未実施
+
+crates.io への実際の公開（`cargo publish`）が 403 で未完了。オーナーが
+https://crates.io/settings/tokens のスコープと
+https://crates.io/settings/profile のメール検証状況を確認し、必要なら
+`publish-new` スコープ付きの新トークンを発行 → 1Password/Keychain 更新 →
+`cargo login`→`cargo publish` を再試行する。"}]
