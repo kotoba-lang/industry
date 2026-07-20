@@ -8,30 +8,29 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 5523, "app-aozora-appview" 9596},
+ {"app-aozora-pds" 5611, "app-aozora-appview" 9661},
  :zone
- {:requests-7d 38894,
-  :pageviews-7d 7151,
-  :uniques-7d-sum 792,
+ {:requests-7d 39132,
+  :pageviews-7d 7154,
+  :uniques-7d-sum 795,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 115288}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2901}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 693}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 280}
-   {:path "/xrpc/com.atproto.server.describeServer", :requests 80}
-   {:path "/", :requests 70}
-   {:path "/robots.txt", :requests 30}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
-    :requests 30}],
-  :status-mix {:ok 120631, :client-error 269, :server-error 21},
+    :requests 124672}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2899}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 770}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 279}
+   {:path "/xrpc/com.atproto.server.describeServer", :requests 82}
+   {:path "/", :requests 69}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 30}
+   {:path "/robots.txt", :requests 28}],
+  :status-mix {:ok 130021, :client-error 271, :server-error 21},
   :window "24h"},
  :as-of "2026-07-20",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 115288 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2901 · /xrpc/com.atproto.sync.subscribeRepos 693 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 280 · /xrpc/com.atproto.server.describeServer 80 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 124672 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2899 · /xrpc/com.atproto.sync.subscribeRepos 770 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 279 · /xrpc/com.atproto.server.describeServer 82 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 38894 req/7d・792 uniques(日次和)・うち4xx probe 0%(24h)、workers 15119 inv/7d"}
+ "aozora.app 実測 39132 req/7d・795 uniques(日次和)・うち4xx probe 0%(24h)、workers 15272 inv/7d"}
