@@ -686,6 +686,32 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
 
 ## `.cljc` / `.kotoba` ランタイム優先順位（2026-07-10 改訂。2026-07-07 改訂・初版は2026-07-06）
 
+### Kotoba は safe application language とする（repo-wide mandatory rule、2026-07-20）
+
+- **`.kotoba` を純粋な narrow-slice decision function だけに限定しない。**
+  ADR-2607201300 に従い、`kotoba/pure`、`kotoba/cell`、`kotoba/app`、
+  `kotoba/host` の4 profile を区別する。新規アプリの product logic、workflow、
+  UI view/event reducer、LLM/tool loop、明示的 state machine、actor behavior、
+  supervision policy は、必要な capability が実装済みなら `kotoba/app` を
+  第一候補にする。ADR-2607141900 は削除済みであり、ADR-2607150000/
+  2607151500 内の narrow-slice/general-application exclusion も superseded である。
+  これらを active policy や application-scope ceiling として引用してはならない。
+- **安全性の境界は purity ではなく ambient authority の排除である。** 外部から
+  観測可能な effect は、型付き capability value、静的 effect set、package lock、
+  deny-by-default policy、quota/fuel/memory、audit を必ず通す。`atom`/`ref`、process
+  global、任意 `require`、`eval`、reflection、Java/JS interop、直接 DOM/SDK/socket/
+  credential access を application code に追加して穴を埋めない。
+- **状態は `state + event -> next-state + effects` として記述する。** 永続化、
+  transaction、queue、timer、actor placement/recovery、DOM/WebGPU/native mutation、
+  LLM provider transport は `kotoba/host` provider が担当し、結果を typed event として
+  app に戻す。host が機構を所有しても product semantics は `.kotoba` が正本である。
+- **UI/LLM/state/actor/lifecycle capability は descriptor、effect inference、compiler
+  admission、policy-gated provider、positive/deny fixtures、quota/audit、2 runtime parity
+  が揃うまで「実装済み」と扱わない。** unrestricted interop や doc だけで readiness
+  を宣言しない。最初の vertical proving slice は shiropico の
+  state → LLM/ComfyUI effect → result event → governor → UI → checkpoint とする。
+- 言語側の詳細規則は `orgs/kotoba-lang/kotoba/docs/lang/application-profile.md` を参照。
+
 - **repo wide のルール: app の互換性と「第一の runtime」の順序は
   `kotoba wasm runtime` > `clojurewasm` > `ClojureScript` > `nbb` とし、
   `JVM` と `bb`（babashka）はその下に降格する（どちらも最後の手段。
@@ -740,10 +766,11 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   可用性チェック等）は参照してよいが、新規に書く実装は必ず nbb に翻訳
   する（実例: ADR-2607100100 M2、2026-07-10 owner 指摘で `.mjs` harness
   を nbb 版に置き換え）。
-- **`kotoba wasm`** — `.kotoba` 拡張子（kotoba 言語の極小サブセット —
+- **`kotoba wasm`** — `.kotoba` 拡張子（legacy emitter の基礎サブセット —
   `def`/`defn`/`ns`/`if`/`when`/`let`/`do`/算術/比較/`and`/`or`/`not`/
   文字列基本操作 + 再帰のみ、Java/JS interop 一切なし、サードパーティ lib
-  不可）を `kotoba wasm emit` で WASM にコンパイルし、`kototama` の
+  不可。Application Profile の effect は閉じた capability import として段階追加）を
+  `kotoba wasm emit` で WASM にコンパイルし、`kototama` の
   `actor:host` ABI（`kototama.contract`/`kototama.tender`, ADR-2607062330/
   2607062400）でホストする経路。**2026-07-06 版と異なり、これは今や実在し
   E2E で動作確認済み**（ADR-2607062330 addendum 5、2026-07-06〜07）:
