@@ -8,30 +8,30 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 5101, "app-aozora-appview" 9231},
+ {"app-aozora-pds" 5194, "app-aozora-appview" 9353},
  :zone
- {:requests-7d 37219,
-  :pageviews-7d 6741,
-  :uniques-7d-sum 765,
+ {:requests-7d 37596,
+  :pageviews-7d 6813,
+  :uniques-7d-sum 771,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 66468}
+    :requests 76866}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2907}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 325}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 278}
-   {:path "/", :requests 81}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 404}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 279}
+   {:path "/", :requests 80}
    {:path "/xrpc/com.atproto.server.describeServer", :requests 78}
    {:path "/robots.txt", :requests 32}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
     :requests 30}],
-  :status-mix {:ok 71099, :client-error 171, :server-error 24},
+  :status-mix {:ok 81641, :client-error 228, :server-error 23},
   :window "24h"},
  :as-of "2026-07-20",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 66468 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2907 · /xrpc/com.atproto.sync.subscribeRepos 325 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 278 · / 81 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 76866 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2907 · /xrpc/com.atproto.sync.subscribeRepos 404 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 279 · / 80 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 37219 req/7d・765 uniques(日次和)・うち4xx probe 0%(24h)、workers 14332 inv/7d"}
+ "aozora.app 実測 37596 req/7d・771 uniques(日次和)・うち4xx probe 0%(24h)、workers 14547 inv/7d"}
