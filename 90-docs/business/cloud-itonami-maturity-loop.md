@@ -705,3 +705,45 @@ charter ADR-2607189200 は revision 済み (本 iter の finding に pivot)。
 **Next:** 次回 cron 発火時、Wave5 の最新状態と本ログを再確認。ISCO batch
   を単一agent構成で継続する (残り91件、うち5件は screen済み予備あり) か、
   cockpit-isic-5820 統合の設計スコーピングに切り替えるかを判断。
+
+---
+
+## Iteration 17 — 2026-07-19/20 (agentがweekly limitで途中終了 → 部分着地の回収)
+
+**運用上の重大イベント:** iter16 の教訓通り単一agent構成で10件batchを
+  起動したが、**agentが session の weekly usage limit に到達し途中終了**
+  (`"You've hit your weekly limit · resets 12pm (Asia/Tokyo)"`)。
+  最後の進捗報告は「repo 4 (isco-4416) 完了、repo 5 (isco-9334) に着手中」
+  だった。
+
+**Did (正直な回収作業):** agent の最終報告を鵜呑みにせず、GitHub を直接
+  確認して**実際に何が着地したか**を検証:
+  - isco-2521(dbadmin)/isco-3112(civeng)/isco-3311(brokerage)/
+    isco-4416(personnelclerk) の4件: 全て `main` に merge 済み、
+    feature branch 削除済み、GitHub Pages `status:"built"` を確認。
+    **本セッションが4件とも `curl` で再検証** — 全て HTTP 200
+    (`45f54607...`/`ac88f83c...`/`ad009b47...`/`9777c050...`)。
+  - isco-9334(merchandising): Pages 未設定 (404) — **未完了と確定**、
+    feature branch も残っていない (agentが push する前に力尽きたと推測)。
+    何も失われていない (branch も commit も存在しないため rescue 不要)。
+  - この4件分の west.yml pin を1コミットにまとめて前進 (ff clean
+    個別検証済み、superproject commit `ed543950aa1a`)。
+  - agent の詳細レポート (seed データ出典、governor rule 到達性等) は
+    途中終了のため入手できず — pin/live-Pages の実在確認のみで着地とした
+    (従来より検証密度は下がるが、実在確認自体は独立して行った)。
+
+**Finding:** weekly usage limit は 2026-07-20 12:00 (Asia/Tokyo) にリセット
+  予定。**それまでは新規 background agent の起動を控える** — 直前の
+  失敗直後に再起動しても同じ制限に即座に再度ぶつかる可能性が高く、
+  限られたリソースの浪費になる。ISCO 側 no-demo backlog: 91 → 87
+  (このセッション累計39件)。
+
+**Did NOT (honest):** isco-9334 は次の機会に持ち越し (今回未着手)。
+  agent 詳細レポート不在のため、この4件については seed データ出典等の
+  詳細な監査証跡が他の iteration より薄い (要 follow-up での確認)。
+  `cloud-itonami-flagship-checklist-scan.edn`/`-rollout-ledger.edn` への
+  追記はしていない。portfolio score・ISIC 側スコアとも据え置き。
+
+**Next:** weekly limit のリセット (2026-07-20 12:00 JST) まで、cron 発火
+  ごとに新規 agent は起動せず sync 確認のみに留める。リセット後、
+  ISCO batch を再開する。
