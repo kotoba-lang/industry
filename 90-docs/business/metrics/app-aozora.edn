@@ -8,30 +8,30 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 5194, "app-aozora-appview" 9353},
+ {"app-aozora-pds" 5291, "app-aozora-appview" 9413},
  :zone
- {:requests-7d 37596,
-  :pageviews-7d 6813,
-  :uniques-7d-sum 771,
+ {:requests-7d 37892,
+  :pageviews-7d 6858,
+  :uniques-7d-sum 772,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 76866}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2907}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 404}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 279}
-   {:path "/", :requests 80}
-   {:path "/xrpc/com.atproto.server.describeServer", :requests 78}
-   {:path "/robots.txt", :requests 32}
+    :requests 86823}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2903}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 489}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 280}
+   {:path "/xrpc/com.atproto.server.describeServer", :requests 80}
+   {:path "/", :requests 68}
+   {:path "/robots.txt", :requests 31}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
     :requests 30}],
-  :status-mix {:ok 81641, :client-error 228, :server-error 23},
+  :status-mix {:ok 91644, :client-error 225, :server-error 22},
   :window "24h"},
  :as-of "2026-07-20",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 76866 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2907 · /xrpc/com.atproto.sync.subscribeRepos 404 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 279 · / 80 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 86823 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2903 · /xrpc/com.atproto.sync.subscribeRepos 489 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 280 · /xrpc/com.atproto.server.describeServer 80 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 37596 req/7d・771 uniques(日次和)・うち4xx probe 0%(24h)、workers 14547 inv/7d"}
+ "aozora.app 実測 37892 req/7d・772 uniques(日次和)・うち4xx probe 0%(24h)、workers 14704 inv/7d"}
