@@ -1,0 +1,38 @@
+{:schema "kotoba-migration-evidence/v1"
+ :recorded-on "2026-07-20"
+ :repository "orgs/com-junkawasaki/ghosthacker-memorize"
+ :profile :ghosthacker-memorize/first-case-file-v1
+ :source
+ {:pr "https://github.com/com-junkawasaki/ghosthacker-memorize/pull/1"
+  :merge-commit "c2d5a2cb6fbc6f79d4abdf61b6f07d3c223ca92c"
+  :legacy-engine "src/ghosthacker_memorize/core.cljc"
+  :legacy-fixture "src/ghosthacker_memorize/deck.cljc"
+  :engine "src/ghosthacker_memorize/bounded.kotoba"
+  :conformance "test/ghosthacker_memorize/bounded_conformance.kotoba"}
+ :domain
+ {:grid :first-case-file :cards 8 :pairs 4 :maximum-turns 16
+  :pick-encoding :flat-index-pairs
+  :complete-encoding :strict-zero-or-one-i64
+  :efficiency :exact-rational-fields}
+ :verification
+ {:legacy {:tests 16 :assertions 57 :failures 0 :errors 0}
+  :positive-cases [:perfect :one-miss :invalid-no-op :partial :unplayed]
+  :negative-cases [:unpaired-pick :negative-index :large-index :too-many-picks]
+  :project-digest "c9a814c77830445b1690acb012d319e96ed84b6c9114a749d07c4e2fde7a8a2a"
+  :web {:main 42 :summary-check 42 :reject-check 42
+        :artifact-sha256 "bab88f89922ce2cf9e95d592edff701a2772fa3ac60d454d59439931fe587aa0"}
+  :wasm {:main 42 :summary-check 42 :reject-check 42
+         :artifact-sha256 "da11497cfbbaa072418bbcd0e8e7a901c450b663d9a05af8a47d68b21f4507b1"}
+  :required-capabilities []
+  :hosted-ci
+  {:status :runner-billing-blocked
+   :run "https://github.com/com-junkawasaki/ghosthacker-memorize/actions/runs/29697371066"
+   :jdks [17 21] :jobs-started 0 :workflow-steps-executed 0
+   :code-failure-evidence false :reverification-required true}}
+ :excluded-open-domain
+ [:arbitrary-grids :shuffle :floating-point-efficiency
+  :terminal-input :browser-state :persistence]
+ :cutover
+ {:bounded-profile-authorized true
+  :general-cljc-oracle-retained true
+  :hosted-reverification-pending true}}

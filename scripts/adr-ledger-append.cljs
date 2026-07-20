@@ -40,7 +40,7 @@
 ;;       failure.
 ;;
 ;; :event/type is free-form but by convention one of:
-;;   amend | status-change | supersede | note
+;;   amend | status-change | supersede | note | correction
 
 (require '[scripts.nbb-compat :refer [slurp spit-append file file-seq exit format sleep!]]
          '[clojure.edn :as edn]
@@ -154,7 +154,7 @@
 
 ;; ---------- append ----------
 
-(defn append-event! [{:keys [adr type summary body related actor agent]}]
+(defn append-event! [{:keys [adr type summary body related actor agent corrects-seq]}]
   (with-lock*
     (fn []
       (let [f (file ledger-path)
@@ -168,7 +168,9 @@
                            :event/summary summary}
                     (not (str/blank? body)) (assoc :event/body body)
                     (not (str/blank? related))
-                    (assoc :adr/related (vec (remove str/blank? (str/split related #",")))))]
+                    (assoc :adr/related (vec (remove str/blank? (str/split related #","))))
+                    (not (str/blank? corrects-seq))
+                    (assoc :event/corrects-seq (js/parseInt corrects-seq 10)))]
         (when-not (.isFile f)
           (spit-append ledger-path header))
         (spit-append ledger-path (str (pr-str event) "\n"))
@@ -200,7 +202,14 @@
         dup-seqs (->> (frequencies seqs) (filter (fn [[_ n]] (> n 1))) (map first))
         missing-seq (filter (comp nil? :event/seq) events)
         known-adrs (adr-ids-on-disk)
-        orphan-events (remove (fn [e] (contains? known-adrs (:adr/id e))) events)
+        corrected-seqs (set (keep :event/corrects-seq events))
+        invalid-corrections (filter (fn [e]
+                                      (when-let [target (:event/corrects-seq e)]
+                                        (or (>= target (:event/seq e))
+                                            (not (some #(= target (:event/seq %)) events)))))
+                                    events)
+        effective-events (remove #(contains? corrected-seqs (:event/seq %)) events)
+        orphan-events (remove (fn [e] (contains? known-adrs (:adr/id e))) effective-events)
         sorted-seqs (sort (remove nil? seqs))
         non-monotonic? (not= sorted-seqs (range 1 (inc (count sorted-seqs))))
         problems (cond-> []
@@ -208,6 +217,9 @@
                    (seq missing-seq) (conj (str (count missing-seq) " event(s) missing :event/seq"))
                    non-monotonic? (conj (str "seqs not a contiguous 1.." (count sorted-seqs)
                                               " run (race condition or hand-edit?): " (pr-str sorted-seqs)))
+                   (seq invalid-corrections)
+                   (conj (str "invalid correction event(s): "
+                              (pr-str (map :event/seq invalid-corrections))))
                    (seq orphan-events)
                    (conj (str (count orphan-events) " event(s) reference an adr/id with no matching "
                               "90-docs/adr/*.edn: "

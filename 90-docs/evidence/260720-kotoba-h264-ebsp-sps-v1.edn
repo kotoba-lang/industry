@@ -1,0 +1,35 @@
+{:schema "kotoba-migration-evidence/v1"
+ :recorded-on "2026-07-20"
+ :repository "orgs/kotoba-lang/org-iso-h264"
+ :profile :h264.rbsp/canonical-ebsp-bounded-v1
+ :source
+ {:pr "https://github.com/kotoba-lang/org-iso-h264/pull/3"
+  :merge-commit "0939fb5695747457dadf3473544c2f066e6913ef"
+  :rbsp "src/h264/rbsp.kotoba"
+  :sps "src/h264/sps.kotoba"
+  :legacy-oracle "src/h264/rbsp.cljc"}
+ :domain
+ {:maximum-nal-bytes 128
+  :transformation :canonical-ebsp-to-rbsp
+  :consumer :h264.sps/baseline-poc0-or-2-bounded-v1}
+ :fixture
+ {:origin :real-mp4-avcc
+  :sps-bytes 23
+  :profile-idc 66
+  :dimensions [64 48]}
+ :verification
+ {:legacy {:tests 116 :assertions 910 :failures 0 :errors 0}
+  :project-digest "5f5642fd47cc32fbe84259b472fa1ed1bda2eac68d35d53fa144332af2a8121b"
+  :web {:runtime-main 42
+        :artifact-sha256 "038b55096fff0ee5ddb6ca79d8076169aa61112294fa033faf49991157c3ec3e"}
+  :wasm {:runtime-main 42
+         :artifact-sha256 "f978aec1bc1286958433c0aa26a7b48e3ba77e73d712778841fcf0c5c22cfdf6"}
+  :required-capabilities []
+  :hosted-jdks [17 21]
+  :hosted-ci :passed}
+ :negative-boundaries
+ [:invalid-byte :oversized-nal :truncated-emulation-prevention
+  :noncanonical-emulation-prevention :forbidden-unescaped-start-code-byte]
+ :cutover
+ {:bounded-profile-authorized true
+  :general-rbsp-cljc-oracle-retained true}}

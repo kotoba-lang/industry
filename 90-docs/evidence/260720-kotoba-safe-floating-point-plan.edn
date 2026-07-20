@@ -1,0 +1,145 @@
+{:schema "kotoba-language-maturity-plan/v1"
+ :recorded-on "2026-07-20"
+ :priority :safety-first
+ :objective "Add first-class f64 and f32 values without delegating Kotoba semantics to JavaScript or silently narrowing physical domains."
+ :foundation
+ {:repository "orgs/kotoba-lang/compiler"
+  :branch "agent/f64-typed-values-v2"
+  :working-tree :phase-1-merged
+  :compiler {:pr "https://github.com/kotoba-lang/compiler/pull/118"
+             :commit "5b4395411ebef24f6401a8ec8af5e030a78cda25"
+             :merge-commit "201a80edc5638936e156d5fd111effc145d1c316"
+             :arithmetic-pr "https://github.com/kotoba-lang/compiler/pull/119"
+             :arithmetic-merge-commit "6dc5ddcf03b6f92d0e5f9b29dfe1dd2d7c67debb"
+             :conversion-pr "https://github.com/kotoba-lang/compiler/pull/120"
+             :conversion-merge-commit "e9dd1351a30770b8a970adcd3971371040f03ac9"
+             :f32-pr "https://github.com/kotoba-lang/compiler/pull/121"
+             :f32-commit "64f115339bb344904f7dbf504b345d369d8956b6"
+             :f32-merge-commit "cb03c31dce3b32cb858d70f318f929159d572ddc"
+             :sqrt-min-max-pr "https://github.com/kotoba-lang/compiler/pull/122"
+             :sqrt-min-max-merge "c72dfbf9aac9ac94c066336f0ee9aca6afd44285"
+             :bounded-trig-pr "https://github.com/kotoba-lang/compiler/pull/123"
+             :bounded-trig-merge "a9caff4f0acf8937056f06d5f3e52d8f0e6fa47c"
+             :wide-trig-pr "https://github.com/kotoba-lang/compiler/pull/124"
+             :wide-trig-merge "61430a35bed00460a237577cfc757ab1ef8a0a35"
+             :bounded-exp-log-pr "https://github.com/kotoba-lang/compiler/pull/125"
+             :bounded-exp-log-merge "b3a316dd37f7b60117699ac3fefef7a6473f1239"
+             :bounded-atan2-pr "https://github.com/kotoba-lang/compiler/pull/126"
+             :bounded-atan2-merge "6f955d55c90307409b5415b38169d0c62e1b3111"
+             :wide-exp-log-pr "https://github.com/kotoba-lang/compiler/pull/127"
+             :wide-exp-log-merge "295e486844100622e895d3a987e183671ae93fc0"
+             :typed-wasm-local-guard-pr "https://github.com/kotoba-lang/compiler/pull/128"
+             :typed-wasm-local-guard-merge "df4ff087cb9d1f4e81dd103362007f8e3b696470"
+             :typed-wasm-bool-sealing-pr "https://github.com/kotoba-lang/compiler/pull/129"
+             :typed-wasm-bool-sealing-merge "243dfccd561c575b66f82b58c469e66f902951f5"
+             :typed-wasm-local-uleb128-pr "https://github.com/kotoba-lang/compiler/pull/130"
+             :typed-wasm-local-uleb128-merge "3dca1771633fa343976392e2d0d69c64ce4a6f88"
+             :structured-floating-pr "https://github.com/kotoba-lang/compiler/pull/131"
+             :structured-floating-merge "15f714e560f9492f86886ef8b3e5911974dcefe4"}
+  :typed-value-profile :kotoba.value/typed-v1
+  :verification {:command "resource-guard run build -- clojure -M:test"
+                 :tests 308 :assertions 3922 :failures 0 :errors 0
+                 :focused {:tests 2 :assertions 38 :failures 0 :errors 0}
+                 :nbb-golden {:cases 18 :failures 0}}
+  :kotoba-script {:pr "https://github.com/kotoba-lang/kotoba-script/pull/29"
+                  :merge-commit "bf731bf55080364a3777ea0b18c837475631eafa"
+                  :arithmetic-pr "https://github.com/kotoba-lang/kotoba-script/pull/30"
+                  :arithmetic-merge-commit "831cbbd688cdaa387bc9e4cd19a907d6d7ac2713"
+                  :conversion-pr "https://github.com/kotoba-lang/kotoba-script/pull/31"
+                  :conversion-merge-commit "c75d9ad939a4159bbe868a4b4732b46f86afb8b6"
+                  :f32-pr "https://github.com/kotoba-lang/kotoba-script/pull/32"
+                  :f32-merge-commit "b36d0f6dfb451ae2e64db5756a1274f07f804372"
+                  :sqrt-min-max-pr "https://github.com/kotoba-lang/kotoba-script/pull/33"
+                  :sqrt-min-max-merge "19e2978c82fef48f630f98eaa57ad46496e72ec8"
+                  :bounded-trig-pr "https://github.com/kotoba-lang/kotoba-script/pull/34"
+                  :bounded-trig-merge "3da6ff75859f41415aaac5f9c54ba35feb0b265c"
+                  :wide-trig-pr "https://github.com/kotoba-lang/kotoba-script/pull/35"
+                  :wide-trig-merge "aacb547b4e51ead4683dedbc7b7cf0e80df5a9bd"
+                  :bounded-exp-log-pr "https://github.com/kotoba-lang/kotoba-script/pull/36"
+                  :bounded-exp-log-merge "6f5f8a7222a2e094befadd772c9bbf7c5f71559a"
+                  :bounded-atan2-pr "https://github.com/kotoba-lang/kotoba-script/pull/37"
+                  :bounded-atan2-merge "e8abd26fe0e034e8a8fa79bf7f6a1bffbbda6f41"
+                  :atan2-threshold-parity-pr "https://github.com/kotoba-lang/kotoba-script/pull/38"
+                  :atan2-threshold-parity-merge "9c2293dd0844f19514d6f117acf31d20cb5263a0"
+                  :wide-exp-log-pr "https://github.com/kotoba-lang/kotoba-script/pull/39"
+                  :wide-exp-log-merge "e6383296805ee6b3830e4b5242afb84fd037ff59"
+                  :structured-floating-pr "https://github.com/kotoba-lang/kotoba-script/pull/40"
+                  :structured-floating-merge "f48942d76f0a2e8bc867df9ea89cc3d403a3f506"
+                  :ordered-floating-boundary-pr "https://github.com/kotoba-lang/kotoba-script/pull/41"
+                  :ordered-floating-boundary-merge "a266a5a96139210eb06ac2be1c639e037ff2a16a"
+                  :tests 36 :assertions 121}
+  :integration-rule "Floats extend the reviewed typed-value KIR and preserve fail-closed target boundaries."}
+ :semantic-contract
+ {:types [:f64 :f32]
+  :values [:finite :positive-zero :negative-zero :positive-infinity
+           :negative-infinity :nan]
+  :nan {:payload-observable false :canonical-class true
+        :comparison :ieee-unordered}
+  :integer-conversion [:checked-f64-to-i64 :checked-f32-to-i64
+                       :explicitly-named-truncating-or-saturating-conversions]
+  :forbidden [:implicit-float-to-i64 :implicit-i64-to-float
+              :silent-nan-normalization :silent-infinity-clamp
+              :javascript-only-reference-semantics]
+  :transcendentals "Remain unavailable or explicit qualified providers until deterministic/error-bounded JS/Wasm parity is proven."}
+ :structured-floating-profile
+ {:status :bounded-fixed-and-dynamic-structures-complete
+  :admitted [:heterogeneous-vector-fields :nominal-record-fields
+             :option-result-and-variant-payloads
+             :typed-map-reference-shaped-values
+             :dynamic-homogeneous-f64-vectors]
+  :targets [:reference-executor :kotoba-script-js :typed-wasm]
+  :preserves [:signed-zero :canonical-nan-class :f32-rounding]
+  :fail-closed [:direct-floating-set-items
+                :direct-floating-map-keys-or-values]
+  :dynamic-vector-contract {:items 16384 :persistent true :lazy-get-fallback true
+                            :typed-wasm-abi 5
+                            :kotoba-script-pr 42 :compiler-pr 132}
+  :remaining []}
+ :implementation-phases
+ [{:phase 0 :name :land-typed-value-and-component-abi-foundation :status :complete
+   :gate [:clean-reviewable-commit :full-hosted-suite :web-string-runtime
+          :no-regression-for-i64-wasm-and-native-targets]}
+  {:phase 1 :name :f64-literals-types-and-bit-observation :status :complete
+   :gate [:bounded-reader-grammar :typed-hir-kir :js-number-emission
+          :wasm-f64-emission :classification :sign-bit :bit-roundtrip]}
+  {:phase 2 :name :f64-core-arithmetic :status :complete
+   :gate [:add-sub-mul-div :neg-abs :ordered-and-unordered-comparisons
+          :nan-infinity-signed-zero-matrix :js-wasm-bit-conformance]}
+  {:phase 3 :name :checked-conversions-and-f32 :status :complete
+   :completed [:checked-i64-f64-conversions :explicit-truncating-conversions
+               :f32-rounding-points :boundary-and-overflow-negative-tests-for-f32]
+   :remaining []
+   :gate [:checked-i64-f64-conversions :explicit-truncating-conversions
+          :f32-rounding-points :boundary-and-overflow-negative-tests]}
+  {:phase 4 :name :sqrt-min-max-and-qualified-transcendentals :status :complete
+   :completed [:specified-min-max-zero-and-nan-behavior :sqrt-special-values
+               :bounded-quarter-turn-sin-cos :bounded-wide-angle-range-reduction
+               :bounded-near-zero-exp :bounded-near-one-log
+               :bounded-finite-coordinate-atan2
+               :bounded-wide-exp-log-scaling
+               :deterministic-implementation-or-error-contract
+               :cross-engine-goldens]
+   :remaining []
+   :gate [:specified-min-max-zero-and-nan-behavior :sqrt-special-values
+          :deterministic-implementation-or-error-contract
+          :cross-engine-goldens]}
+  {:phase 5 :name :kami-domain-requalification :status :complete
+   :completed [:cartpole-goldens :geo-projection-and-mesh-goldens
+               :terrain-water-noise-goldens :vegetation-spatial-goldens
+               :cad-and-articulated-transform-goldens]
+   :remaining []
+   :gate [:cartpole-goldens :geo-projection-and-mesh-goldens
+          :terrain-water-noise-goldens :vegetation-spatial-goldens
+          :cad-and-articulated-transform-goldens]}]
+ :required-target-evidence
+ [:reference-executor :kotoba-script-js :typed-wasm
+  :raw-bit-pattern-fixtures :negative-special-value-fixtures
+  :resource-and-fuel-bounds :artifact-provenance]
+ :release-policy
+ {:no-jvm-runtime true
+  :jvm-compiler-host-is-not-runtime-semantics true
+  :fleet-cutover-before-phase-5 false
+  :typed-wasm-local-index-profile
+  {:status :canonical-uleb128-complete
+   :maximum-parameters-plus-locals :bounded-by-frontend-resource-profile
+   :remaining nil}}}
