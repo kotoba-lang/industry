@@ -35,8 +35,8 @@
 
 (defn already-tx-data?
   [content]
-  (and (vector? content) (seq content) (map? (first content))
-       (contains? (first content) :db/id)))
+  (and (vector? content) (seq content) (every? map? content)
+       (every? #(contains? % :db/id) content)))
 
 (defn multi-entity-tx?
   "schema 行や catalog 多数 entity の datoms ファイル（単一 ADR ではない）。
