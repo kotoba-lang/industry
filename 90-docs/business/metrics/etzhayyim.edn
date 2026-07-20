@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 12299, "etzhayyim-xrpc-proxy" 344},
+ {"etzhayyim-did-web" 12402, "etzhayyim-xrpc-proxy" 344},
  :zone
- {:requests-7d 58709,
-  :pageviews-7d 1786,
-  :uniques-7d-sum 1627,
+ {:requests-7d 59108,
+  :pageviews-7d 1791,
+  :uniques-7d-sum 1633,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 16}
+  [{:path "/robots.txt", :requests 15}
    {:path "/sitemap.xml", :requests 10}
    {:path "/tomoshibi", :requests 4}
    {:path "/terms", :requests 4}
    {:path "/help", :requests 4}
-   {:path "/privacy", :requests 4}
    {:path "/.well-known/did.json", :requests 4}
-   {:path "/sid3.php", :requests 4}],
-  :status-mix {:ok 186, :client-error 1332, :server-error 8600},
+   {:path "/.well-known/actors.json", :requests 3}
+   {:path "/fs.php", :requests 2}],
+  :status-mix {:ok 173, :client-error 1365, :server-error 8629},
   :window "24h"},
  :as-of "2026-07-20",
  :traffic-quality
  {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 85},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 16 · /sitemap.xml 10 · /tomoshibi 4 · /terms 4 · /help 4 | 4xx(probe) 13% · 5xx 85%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 15 · /sitemap.xml 10 · /tomoshibi 4 · /terms 4 · /help 4 | 4xx(probe) 13% · 5xx 85%",
  :signal
- "etzhayyim.com 実測 58709 req/7d・1627 uniques(日次和)・うち4xx probe 13%(24h)、workers 12643 inv/7d"}
+ "etzhayyim.com 実測 59108 req/7d・1633 uniques(日次和)・うち4xx probe 13%(24h)、workers 12746 inv/7d"}
