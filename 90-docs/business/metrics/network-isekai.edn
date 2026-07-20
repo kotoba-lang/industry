@@ -1,27 +1,27 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 9797,
-  :pageviews-7d 5077,
-  :uniques-7d-sum 452,
+ {:requests-7d 9809,
+  :pageviews-7d 5083,
+  :uniques-7d-sum 455,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 85}
-   {:path "/1.php", :requests 42}
+  [{:path "/", :requests 83}
    {:path "/ops.php", :requests 38}
+   {:path "/1.php", :requests 32}
    {:path "/inputs.php", :requests 30}
    {:path "/feed/fork-stats.edn", :requests 26}
-   {:path "/wp.php", :requests 24}
-   {:path "/wp-admin/js/widgets/", :requests 22}
-   {:path "/wp-content/uploads/", :requests 22}],
-  :status-mix {:ok 2218, :server-error 6, :client-error 6},
+   {:path "/wp-content/uploads/", :requests 22}
+   {:path "/wp.php", :requests 22}
+   {:path "/8.php", :requests 22}],
+  :status-mix {:ok 2092, :client-error 6, :server-error 5},
   :window "24h"},
  :as-of "2026-07-20",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 85 · /1.php 42 · /ops.php 38 · /inputs.php 30 · /feed/fork-stats.edn 26 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): / 83 · /ops.php 38 · /1.php 32 · /inputs.php 30 · /feed/fork-stats.edn 26 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "isekai.network 実測 9797 req/7d・452 uniques(日次和)・うち4xx probe 0%(24h)",
+ "isekai.network 実測 9809 req/7d・455 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
