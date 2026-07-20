@@ -24,6 +24,7 @@
 (def aiueos-root "orgs/kotoba-lang/aiueos/")
 
 (defn slurp* [rel-path] (.readFileSync fs (str aiueos-root rel-path) "utf8"))
+(defn exists? [rel-path] (.existsSync fs (str aiueos-root rel-path)))
 
 (defn has? [s re] (boolean (re-find re s)))
 
@@ -145,7 +146,63 @@
             (if (and (has? manifest #"NOTE what this does NOT do")
                      (has? launcher #"(?i)deadline-cycles.*NOT"))
               {:score 1.0 :note "confirmed: the deadline-cycles-not-enforced gap is named in BOTH manifest.cljc's docstring and launcher.cljc, not hidden -- high doc-code-drift score even though safety-enforcement (0.1, tracked separately) is very low."}
-              {:score 0.3 :note "expected disclosure language no longer found in one or both files -- re-verify by hand."})))}])
+              {:score 0.3 :note "expected disclosure language no longer found in one or both files -- re-verify by hand."})))}
+
+   ;; ---- 2026-07-20 weekly claim-discovery additions: ADR-0014 self-owned VMM ("hvt tender"),
+   ;; a distinct new subsystem from the WASM-component broker the checks above cover. ----------
+   {:claim :claim/aiueos-hvt-guest-path-kotoba-first :axis :axis/functional-completeness :layer :lint
+    :fn (fn []
+          (let [adr (slurp* "90-docs/adr/0014-self-owned-vmm-hvt-tender.md")
+                guests ["guest-serial.kotoba" "guest-virtio-probe.kotoba" "guest-virtio-handshake.kotoba"
+                        "guest-virtqueue-tx.kotoba" "guest-virtqueue-rx.kotoba"]
+                present (filter #(exists? (str "resources/hvt/" %)) guests)]
+            (cond
+              (not (has? adr #"entire hvt guest path is now written in Kotoba"))
+              {:score 0.3 :note "expected 'entire hvt guest path is now written in Kotoba' no longer found verbatim in ADR-0014 -- claim text may have moved/reworded; re-verify."}
+              (< (count present) 5)
+              {:score 0.5 :note (str "ADR-0014 still claims the guest path is fully Kotoba, but only " (count present) "/5 of the cited resources/hvt/*.kotoba guest sources exist on disk -- evidence has partially disappeared even though the doc's claim is unchanged.")}
+              :else
+              {:score 1.0 :note (str "confirmed: ADR-0014 states the hvt guest path is fully written in Kotoba, and all 5 cited resources/hvt/*.kotoba guest sources (" (str/join ", " present) ") exist on disk.")})))}
+
+   {:claim :claim/aiueos-hvt-psci-shutdown-unsupported :axis :axis/safety-enforcement :layer :lint
+    :fn (fn []
+          (if (exists? "src/aiueos/hvt.cljc")
+            (let [adr (slurp* "90-docs/adr/0014-self-owned-vmm-hvt-tender.md")
+                  hvt (slurp* "src/aiueos/hvt.cljc")]
+              (if (and (has? adr #"PSCI_RET_NOT_SUPPORTED")
+                       (has? hvt #"(?i)mmio.*poweroff|poweroff.*mmio"))
+                {:score 1.0 :note "confirmed: ADR-0014 still documents PSCI SYSTEM_OFF returning PSCI_RET_NOT_SUPPORTED on this KVM environment, and hvt.cljc still implements the MMIO poweroff fallback the ADR names as the actual working halt mechanism -- honestly disclosed at both doc and source layer."}
+                {:score 0.3 :note "expected PSCI_RET_NOT_SUPPORTED language in the ADR or the MMIO poweroff fallback in hvt.cljc no longer found verbatim -- either a real PSCI SYSTEM_OFF path landed (re-verify, would be a genuine improvement) or wording/implementation changed; re-verify by hand."}))
+            {:score 0.0 :note "src/aiueos/hvt.cljc no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   {:claim :claim/aiueos-hvt-jvm-vcpu-loop-unproven-beyond-boot :axis :axis/production-readiness :layer :lint
+    :fn (fn []
+          (let [adr (slurp* "90-docs/adr/0014-self-owned-vmm-hvt-tender.md")]
+            (if (has? adr #"unproven for anything beyond boot")
+              {:score 1.0 :note "confirmed: ADR-0014's Consequences section still discloses the JVM-in-vcpu-exit-loop path as 'unproven for anything beyond boot gates', deferring production I/O claims to V2 -- an honestly-scoped limitation, not an overclaim."}
+              {:score 0.4 :note "expected 'unproven for anything beyond boot' language no longer found verbatim in ADR-0014 -- either V2 measurement landed (re-verify, would be real progress) or the wording changed; re-verify by hand."})))}
+
+   {:claim :claim/aiueos-hvt-macos-hvf-unsupported :axis :axis/production-readiness :layer :lint
+    :fn (fn []
+          (if (exists? "src/aiueos/hvt.cljc")
+            (let [adr (slurp* "90-docs/adr/0014-self-owned-vmm-hvt-tender.md")
+                  hvt (slurp* "src/aiueos/hvt.cljc")
+                  hvf-in-code? (has? hvt #"(?i)hv_vm_create|Hypervisor\.framework")]
+              (cond
+                (not (has? adr #"(?i)macOS/HVF.*daily-driver"))
+                {:score 0.3 :note "expected 'macOS/HVF (the actual daily-driver host)' disclosure no longer found verbatim in ADR-0014 -- re-verify whether macOS/HVF support landed or the wording changed."}
+                hvf-in-code?
+                {:score 0.5 :note "ADR-0014 still frames macOS/HVF as deferred, but hvt.cljc now references hv_vm_create/Hypervisor.framework -- possible the HVF backend has started landing and the ADR's disclosure is going stale; re-verify by hand."}
+                :else
+                {:score 1.0 :note "confirmed: ADR-0014 still discloses macOS/HVF support as deferred behind the entitlement/codesigning question, and hvt.cljc has no hv_vm_create/Hypervisor.framework code path -- the self-owned VMM genuinely only runs on Linux/KVM today, matching the doc's own limitation."}))
+            {:score 0.0 :note "src/aiueos/hvt.cljc no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   {:claim :claim/aiueos-hvt-x86-kernel-direct-load-unverified :axis :axis/evidence-linkage :layer :lint
+    :fn (fn []
+          (let [adr (slurp* "90-docs/adr/0014-self-owned-vmm-hvt-tender.md")]
+            (if (has? adr #"needs an x86_64 KVM host, which the dev\s+machine is not")
+              {:score 1.0 :note "confirmed: ADR-0014's own Finding 1 still discloses that direct-loading the real ADR-0013 (x86_64) kernel through the self-owned VMM needs an x86_64 KVM host the aarch64 dev machine does not have -- the headline V0/V1 goal remains explicitly unverified, only the arch-independent ELF-loader mechanism itself is proven."}
+              {:score 0.4 :note "expected Finding 1 language ('needs an x86_64 KVM host, which the dev machine is not') no longer found verbatim in ADR-0014 -- either an x86_64 host became available and the real kernel was booted (re-verify, would be major progress) or wording changed; re-verify by hand."})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

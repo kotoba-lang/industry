@@ -71,7 +71,40 @@
               (has? launcher #"\"shell\"")
               {:score 0.4 :note "README still says kotoba-shell is not wired up, but launcher.clj now has a 'shell' string literal -- possible the subcommand landed and the README caveat is now STALE (undisclosed drift); re-verify by hand whether this is a real subcommand or an unrelated string."}
               :else
-              {:score 1.0 :note "confirmed: README still says no 'kotoba shell' subcommand is wired, and launcher.clj has no \"shell\" string literal at all -- the disclosed gap matches the code, i.e. this is an honestly-reported incompleteness, not silent drift."})))}])
+              {:score 1.0 :note "confirmed: README still says no 'kotoba shell' subcommand is wired, and launcher.clj has no \"shell\" string literal at all -- the disclosed gap matches the code, i.e. this is an honestly-reported incompleteness, not silent drift."})))}
+
+   ;; 2026-07-20 weekly claim-discovery addition.
+   {:claim :claim/kotoba-security-non-claims-disclosed :axis :axis/safety-enforcement :layer :lint
+    :fn (fn []
+          (if (exists? "docs/ADR-security-kaizen-20260717.md")
+            (let [adr (slurp* "docs/ADR-security-kaizen-20260717.md")]
+              (if (has? adr #"Side channels, formal verification, FIPS, PQC production")
+                {:score 1.0 :note "confirmed: docs/ADR-security-kaizen-20260717.md still lists 'Side channels, formal verification, FIPS, PQC production, and complete signer lifecycle' as explicit non-claims, right after describing the fail-closed kgraph/allowlist/consume-on-use hardening it DOES ship -- an honestly-scoped boundary, not a silent overclaim."}
+                {:score 0.4 :note "expected 'Side channels, formal verification, FIPS, PQC production' non-claims language no longer found verbatim -- either scope was widened (re-verify what's now claimed) or the ADR was reworded; re-verify by hand."}))
+            {:score 0.0 :note "docs/ADR-security-kaizen-20260717.md no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   {:claim :claim/kotoba-cond-loop-recur-interpreter-gap :axis :axis/functional-completeness :layer :lint
+    :fn (fn []
+          (let [rt (slurp* "src/kotoba/runtime.clj")
+                wasm-has-loop? (has? rt #"loop \(let \[\[bindings")
+                interp-case (or (re-find #"(?s)\(case op\s+ns nil.*?call-fn \(eval-form op" rt) "")
+                interp-has-cond-loop-recur? (has? (str interp-case) #"(?m)^\s+(cond|loop|recur)\s")]
+            (cond
+              (not wasm-has-loop?)
+              {:score 0.4 :note "expected WASM-codegen 'loop (let [[bindings ...' transform case no longer found verbatim in runtime.clj -- codegen support for loop may have been restructured; re-verify."}
+              interp-has-cond-loop-recur?
+              {:score 0.9 :note "eval-form's case-op dispatch now appears to have a cond/loop/recur clause -- the interpreter-side gap this claim tracks may have closed; re-verify by hand and update claim/self-caveat if confirmed."}
+              :else
+              {:score 0.3 :note "confirmed: the WASM codegen's transform fn still has a real 'loop' case, but eval-form's case-op dispatch still has no cond/loop/recur clause -- the interpreter-side gap the 2026-07-13 roadmap ADR named (for both backends) persists on this one backend only, while the ADR text itself has not been updated to reflect the WASM-side fix."})))}
+
+   {:claim :claim/kotoba-native-jvm-free-cli :axis :axis/production-readiness :layer :lint
+    :fn (fn []
+          (let [readme (slurp* "README.md")]
+            (if (and (has? readme #"Neither a JVM nor Clojure CLI is required at runtime")
+                     (has? readme #"authoritative JVM-free distribution paths")
+                     (exists? ".github/workflows/native-release.yml"))
+              {:score 1.0 :note "confirmed: README.md still states the native installer requires 'Neither a JVM nor Clojure CLI ... at runtime' and calls Homebrew/shell installs 'the authoritative JVM-free distribution paths', and .github/workflows/native-release.yml (GraalVM native-image build) still exists -- the JVM-free distribution claim is backed by a real release pipeline, not just README prose."}
+              {:score 0.4 :note "expected JVM-free distribution language in README.md or .github/workflows/native-release.yml no longer found -- either the native release pipeline was removed/renamed or wording changed; re-verify by hand."})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]
