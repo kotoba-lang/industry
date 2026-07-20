@@ -8,28 +8,28 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 4565, "app-aozora-appview" 8779},
+ {"app-aozora-pds" 4695, "app-aozora-appview" 8835},
  :zone
- {:requests-7d 35482,
-  :pageviews-7d 6620,
-  :uniques-7d-sum 720,
+ {:requests-7d 35759,
+  :pageviews-7d 6623,
+  :uniques-7d-sum 728,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2836}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 920}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 270}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 7178}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2838}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 269}
    {:path "/hosty.php", :requests 28}
    {:path "/1.php", :requests 28}
-   {:path "/api/engagement", :requests 25}
    {:path "/robots.txt", :requests 24}
+   {:path "/api/engagement", :requests 24}
    {:path "/eee.php", :requests 14}],
-  :status-mix {:client-error 1127, :ok 4510, :server-error 9},
+  :status-mix {:client-error 1117, :ok 10788, :server-error 10},
   :window "24h"},
  :as-of "2026-07-20",
- :traffic-quality {:window "24h", :probe-4xx-pct 20, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.view 2836 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 920 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 270 · /hosty.php 28 · /1.php 28 | 4xx(probe) 20% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 7178 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2838 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 269 · /hosty.php 28 · /1.php 28 | 4xx(probe) 9% · 5xx 0%",
  :signal
- "aozora.app 実測 35482 req/7d・720 uniques(日次和)・うち4xx probe 20%(24h)、workers 13344 inv/7d"}
+ "aozora.app 実測 35759 req/7d・728 uniques(日次和)・うち4xx probe 9%(24h)、workers 13530 inv/7d"}
