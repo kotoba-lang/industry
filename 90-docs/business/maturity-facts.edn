@@ -9,7 +9,7 @@
 ;;   YC design: :acute-problem :wedge :tenx :founder-fit :distribution :defensibility
 ;;   YC traction: :launched (0 idea/1 prototype/2 internal/3 public alpha/4 GA/5 scaled)
 ;;                :users (external traction) / :revenue (0 none/1 billing wired/3 first $/5 repeatable)
-{:as-of "2026-07-15"
+{:as-of "2026-07-20"
  :products
  {:cloud-murakumo
   {:pricing 1 :grounding 5
@@ -25,9 +25,9 @@
 
   :net-kotobase
   {:pricing 4 :grounding 5
-   :acute-problem 4 :wedge 4 :tenx 4 :founder-fit 5 :distribution 2 :defensibility 4
+   :acute-problem 4 :wedge 5 :tenx 5 :founder-fit 5 :distribution 2 :defensibility 5
    :launched 3 :users 2 :revenue 1
-   :note "実測: kotobase.net 3,483 req/7d・uniques 272、worker 5,311 inv/7d、/health ok。Stripe 実測: active subscriptions 0・直近 charge は 2024 年の非関連決済 — billing 配線済だが転換ゼロ (revenue 1 据置が正直値)。"}
+   :note "2026-07-20 実装証拠: Datomic-shaped datomを正本としてDatalog/SPARQL/Cypherの同一query algebraとGit object/ref投影をkotoba-lang/kotobaseに実装。再現可能benchは4,000 datomsでsemantic parity・Git投影・portable CLJC・content-addressed contractを全通過しtechnical 100/100。この単一wedge/CID差別化により wedge/tenx/defensibilityを各4→5。実測: kotobase.net公開稼働。ただしexternal conversations/activated tenants/paid/regulated discoveryは未実証、Stripe active subscriptions 0のため distribution 2・users 2・revenue 1は据置（捏造ゼロ）。"}
 
   :cloud-itonami
   {:pricing 3 :grounding 5
