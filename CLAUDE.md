@@ -535,6 +535,36 @@ CertGovernor）。
   実装例: `70-tools/bmc` の `GFTD_LLM_*`（ADR-2607172700/2800）、
   `~/.gftd/run-itonami-qwen36-tick.cljs`（ADR-2607172900、alias 解決 + endpoint-only fallback）。
 
+## System dynamics loop 分析 — 全 entity 対象・kotoba-lang/dynamics（repo-wide mandatory rule、2026-07-20、ADR-2607203000）
+
+- **system dynamics（stock-flow-loop / Meadows leverage-point）分析において、
+  いかなる entity・組織も「対象外」として categorical に除外しない。** モデルの
+  スキーマは常にどんな entity も受け入れられるよう設計し、**「計算済み」と称する
+  数値は必ず実データ（日付・出典付き）に基づく** — 捏造したグローバル総計を
+  測定値として提示しない。今日数値を持たない entity は「カバレッジが未達」で
+  あって「対象外」ではない。「全世界の全組織を文字通り列挙する」ことと
+  「どの entity も原理上排除しないモデルを作り、持っているデータで誠実に計算する」
+  ことは別物であり、後者を常に行う。
+- **計算そのものは `kotoba-lang/dynamics`（stock/flow/loop primitives + Meadows
+  leverage-point scoring、pure `.cljc`、no-prefix library）を使う。ゼロから
+  再発明しない。** pool-tap 型の介入（外部 pool の規模に依存する打ち手）は、
+  conversion-rate が未計測なら `:expected-yield` を
+  `:uncomputable-until-measured` として明示する — 大きな pool に未計測の
+  変換率を掛けて期待値を捏造しない。
+- **実 entity データに対して継続的に回す orchestrator は
+  `kotoba-lang/loop-system-dynamics`（`loop-*` prefix、
+  `kotoba-lang/loop-ux-kaizen` の `resources/repository-rules.edn` taxonomy
+  準拠: observe → evaluate → decide → act → record-evidence、domain scoring
+  truth は `dynamics` に委譲し自前で持たない）を使う。** 新しい `loop-*` repo を
+  作る前に、必ず `resources/repository-rules.edn` 規約（`loop-*` は
+  continuous orchestrator、prefix 無しは reusable library、`skill-*`/`action-*`
+  は別役割）を確認してから命名する。
+- entity の追加は `kotoba-lang/loop-system-dynamics` の
+  `resources/entities-seed.edn` に日付・出典付きの map を 1 つ足すだけでよい
+  設計になっている——コードの再設計は不要。詳細・実例（etzhayyim/kotoba-lang/
+  cloud-itonami/gftdcojp + 外部参照 6 組織の第1回計算、「なぜ資本主義・投機・
+  搾取的構造が実際に強いか」の構造的分析）は ADR-2607203000 を参照。
+
 ## BMC / Lean Loop 反復トラッキング（business loop、2026-07-12）
 
 **新しく BMC (Business Model Canvas) / Lean Loop (build-measure-learn) の反復トラッキングを
