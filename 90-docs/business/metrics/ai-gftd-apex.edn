@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 11409, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 11416, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 495775,
-  :pageviews-7d 6119,
-  :uniques-7d-sum 5153,
+ {:requests-7d 498245,
+  :pageviews-7d 6123,
+  :uniques-7d-sum 5171,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
@@ -16,13 +16,11 @@
    {:path "/sx.php", :requests 13}
    {:path "/promma.php", :requests 13}
    {:path
-    "/ai-gftd-cdn/blobs/anonymous/bafkreidztiea2oihjlnkxsan5t32rx6r5l5mnbmzel62gysxnourl6qwwa",
-    :requests 12}
-   {:path
     "/ai-gftd-cdn/blobs/anonymous/bafkreihtyjjdwl2p2lks6psgzyoev4rnxvlkdfrxvaba74tsyjinp53fue",
     :requests 12}
-   {:path "/link.php", :requests 12}],
-  :status-mix {:ok 538, :client-error 1010, :server-error 15563},
+   {:path "/link.php", :requests 12}
+   {:path "/ccc.php", :requests 12}],
+  :status-mix {:ok 538, :client-error 1001, :server-error 15579},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -39,5 +37,5 @@
  "上位 page (24h, 2xx/3xx): /gettest.php 18 · /tires.php 17 · /edit.php 14 · /sx.php 13 · /promma.php 13 | 4xx(probe) 6% · 5xx 91%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 495775 req/7d・5153 uniques(日次和)・うち4xx probe 6%(24h)、workers 11410 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 498245 req/7d・5171 uniques(日次和)・うち4xx probe 6%(24h)、workers 11417 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
