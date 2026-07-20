@@ -265,6 +265,19 @@ skill `new-project-scaffold` を参照。
   west update --fetch smart                          # project 群を pin に合わせて同期
   ```
 
+  **これは prose instruction だけに頼らず、SessionStart hook
+  （`.claude/hooks/session-start-branch-sync-check.cljs`、`.claude/settings.json`
+  に登録済み）で毎セッション開始時に自動チェックする。** 実測インシデント
+  （2026-07-20）: `agent/pin-docs-edn-only` ブランチが誰も気づかないまま
+  `origin/main` から 848 commits ahead / 1607 commits behind まで積み上がった
+  （592 ファイル・56万行超の diff）。agent が都度思い出して確認する運用は
+  機能しなかったため、hook で ahead/behind を強制的に可視化する
+  （閾値超過時は `systemMessage` + `additionalContext` で警告、閾値内でも
+  非ゼロなら軽量に表示、失敗時は fail-open でセッション開始をブロックしない）。
+  乖離を見つけたら rebase せず、この節の手順か `git-cleanup-conflict` skill
+  （848 commits 級の乖離は content-containment 判定 → 新しい clean branch を
+  origin/main から切って必要な差分だけ移植、が正解）で解消する。
+
 - **`git push` の前に必ず `origin/main` との遅れを解消する。** push しようとする
   リポ（superproject / 各 project とも）が `origin/main`（既定ブランチ）より遅れて
   いる場合は、先に同期してから push する:
