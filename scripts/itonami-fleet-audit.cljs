@@ -5,22 +5,51 @@
 ;; orgs/cloud-itonami/cloud-itonami-* の各リポジトリについて、blueprint.edn の
 ;; 宣言的メタデータ(maturity/domain/governor)と、実測シグナル(直近コミット日時・
 ;; dirty 状態・未push コミット数・src/test ファイル数・facts.cljc の法域カバレッジ数・
-;; governed-actor 構成要素の有無)を集め、
+;; governed-actor 構成要素の有無)を集め、そこから2つの派生判定を計算する:
+;;   :itonami.fleet-audit/prod-ready?            status が :active(実装済+直近
+;;                                                 メンテ) か :archive(アーカイブ
+;;                                                 として実コンテンツを保持)である
+;;                                                 場合のみ true。:stub/:no-commits/
+;;                                                 :stale/:dormant はまだ prod に
+;;                                                 達していない。
+;;   :itonami.fleet-audit/real-world-ingest-signal どの実世界データ経路で実測した
+;;                                                 か — :facts-citations
+;;                                                 (facts.cljc 内の実 URL 引用数。
+;;                                                 isic/isco の国別カタログだけで
+;;                                                 なく municipality の条例別
+;;                                                 カタログ等、キー形が違っても
+;;                                                 拾える汎化版) / :archive-content
+;;                                                 (80-data/ 配下の実ファイル) /
+;;                                                 :none-measured(どちらの経路も
+;;                                                 存在しない)。
+;;   :itonami.fleet-audit/real-world-ingest-gap?  対応する count が 0、または
+;;                                                 経路が :none-measured なら true
+;;                                                 (未測定は「対象外」ではなく
+;;                                                 「未達」— ADR-2607203000 の
+;;                                                 「今日数値を持たない entity は
+;;                                                 対象外でなくカバレッジ未達」原則
+;;                                                 に合わせる)。
+;; 集めた結果を:
 ;;   1. 人間可読なサマリ+「要対応」表を標準出力に表示
 ;;   2. manifest/edn-datomize.cljs の tx-entities モード経由で、そのまま
 ;;      Datomic/Datascript に transact できる tx-data を生成し、
 ;;      manifest/schema.edn に :itonami.fleet-audit/* 属性を登録
-;; の両方を行う。実際のアクターリポジトリは読むだけで一切書き換えない
+;;   3. manifest/itonami-fleet-audit.edn へ(:db/id 無しの flat map ベクタ、
+;;      manifest/repo-maturity.edn と同じ規約で)毎回上書き保存
+;; の3つを行う。実際のアクターリポジトリは読むだけで一切書き換えない
 ;; (blueprint.edn 自体を tx-data 化したい場合は
 ;; `nbb manifest/edn-datomize.cljs wrap-map-glob orgs/cloud-itonami blueprint.edn
 ;; itonami.blueprint` を別途、意図して実行すること — 380個の別 git repo を書き換える
 ;; 操作なので、このスクリプトからは絶対に自動実行しない)。
 ;;
 ;; 使い方:
-;;   nbb scripts/itonami-fleet-audit.cljs           — 人間可読なサマリ+「要対応」表
-;;   nbb scripts/itonami-fleet-audit.cljs --all      — 全リポジトリの表を表示
-;;   nbb scripts/itonami-fleet-audit.cljs --edn       — tx-data 全件を EDN で標準出力へ
-;;                                                       (リダイレクトで保存: ... > report.edn)
+;;   nbb scripts/itonami-fleet-audit.cljs             — 人間可読なサマリ+「要対応」表
+;;   nbb scripts/itonami-fleet-audit.cljs --all        — 全リポジトリの表を表示
+;;   nbb scripts/itonami-fleet-audit.cljs --not-prod    — prod-ready? false の repo だけ表示
+;;   nbb scripts/itonami-fleet-audit.cljs --ingest-gap  — real-world-ingest-gap? true の repo だけ表示
+;;   nbb scripts/itonami-fleet-audit.cljs --edn         — tx-data 全件を EDN で標準出力へ
+;;                                                        (リダイレクトで保存: ... > report.edn)
+;;   毎回の実行で manifest/itonami-fleet-audit.edn を上書き生成する(下記 DataScript 例参照)。
 
 (require '[scripts.nbb-compat :refer [slurp spit file-seq format relative-path]]
          '[clojure.edn :as edn]
@@ -88,6 +117,26 @@
   (when-let [f (find-facts-file dir)]
     (count (re-seq jurisdiction-re (slurp f)))))
 
+(def url-re #"https?://")
+
+(defn facts-citation-count
+  "Real-world source citations inside facts.cljc specifically(not the whole
+   src/ tree). Generalizes jurisdiction-coverage beyond the isic/isco
+   per-country `\"XXX\" {` catalog shape -- e.g. cloud-itonami-municipality-*
+   keys its catalog by municipality slug, not country code, so
+   jurisdiction-coverage reads 0 there even though every ordinance entry
+   cites a real :ordinance/url (verified 2026-07-21 against
+   cloud-itonami-municipality-jpn-tokyo, which has 2 official
+   reiki.metro.tokyo.lg.jp citations and 0 jurisdiction-re matches).
+   Deliberately scoped to facts.cljc, NOT all of src/ -- src/registry.cljc
+   commonly embeds a `https://www.w3.org/ns/credentials/v2` JSON-LD
+   `@context` boilerplate (verifiable-credential issuance scaffolding, not
+   domain data), which would contaminate a whole-src/ URL count into a false
+   non-gap for repos with zero real facts."
+  [dir]
+  (when-let [f (find-facts-file dir)]
+    (count (re-seq url-re (slurp f)))))
+
 (def component-patterns
   {:governor #"governor\.cljc$"
    :store #"store\.cljc$"
@@ -139,6 +188,27 @@
     (> days-since-commit 30) :dormant
     :else :active))
 
+(def known-families
+  "cloud-itonami-<family>-<rest> の <family> 語彙(実測: isic 429 / isco 216 /
+   lei 143 / assoc 78 / municipality 49 / unspsc 5 / cofog 5 / gtin 3 /
+   regulatory 1, 2026-07-21 時点)。未知語は fallback で repo 名の残り全体を
+   family として使う(cloud-itonami-partners のような単発 repo 用)。"
+  #{"isic" "isco" "lei" "assoc" "municipality" "iso3166" "unspsc" "cofog" "gtin" "regulatory"})
+
+(defn family-of [repo-name]
+  (let [rest-name (subs repo-name (count "cloud-itonami-"))
+        seg (first (str/split rest-name #"-"))]
+    (keyword (if (contains? known-families seg) seg rest-name))))
+
+(defn prod-ready? [status]
+  (contains? #{:active :archive} status))
+
+(defn real-world-ingest [{:keys [has-facts-file? citation-count archive-count]}]
+  (cond
+    has-facts-file? {:signal :facts-citations :count citation-count}
+    (pos? archive-count) {:signal :archive-content :count archive-count}
+    :else {:signal :none-measured :count 0}))
+
 (defn actor-facts [dir]
   (let [name (.getName dir)
         bp (read-blueprint dir)
@@ -147,30 +217,44 @@
         src-count (count-files dir "src")
         archive-count (archive-file-count dir)
         comps (components dir)
+        has-facts? (boolean (find-facts-file dir))
+        juri-count (or (jurisdiction-coverage dir) 0)
+        citation-count (or (facts-citation-count dir) 0)
         maturity (cond
                    (:itonami.blueprint/maturity bp) (:itonami.blueprint/maturity bp)
                    (nil? bp) :no-blueprint
                    :else :maturity-unset)
-        base {:itonami.fleet-audit/repo name
-              :itonami.fleet-audit/isic (or (:itonami.blueprint/isic-rev5 bp) "")
-              :itonami.fleet-audit/domain (or (:itonami.blueprint/domain bp) :unknown)
-              :itonami.fleet-audit/governor (or (:itonami.blueprint/governor bp) :none)
-              :itonami.fleet-audit/maturity maturity
-              :itonami.fleet-audit/repo-url (or (repo-url dir) "")
-              :itonami.fleet-audit/last-commit-at (or commit-at "")
-              :itonami.fleet-audit/days-since-commit days
-              :itonami.fleet-audit/dirty? (dirty? dir)
-              :itonami.fleet-audit/unpushed-commit-count (or (unpushed-count dir) 0)
-              :itonami.fleet-audit/src-file-count src-count
-              :itonami.fleet-audit/archive-file-count archive-count
-              :itonami.fleet-audit/test-file-count (count-files dir "test")
-              :itonami.fleet-audit/jurisdiction-coverage-count (or (jurisdiction-coverage dir) 0)
-              :itonami.fleet-audit/component-count (count comps)
-              :itonami.fleet-audit/components (vec (sort comps))}]
-    (assoc base :itonami.fleet-audit/status (actor-status {:src-file-count src-count
-                                                            :archive-file-count archive-count
-                                                            :last-commit-at commit-at
-                                                            :days-since-commit days}))))
+        status (actor-status {:src-file-count src-count
+                              :archive-file-count archive-count
+                              :last-commit-at commit-at
+                              :days-since-commit days})
+        ingest (real-world-ingest {:has-facts-file? has-facts?
+                                   :citation-count citation-count
+                                   :archive-count archive-count})
+        ingest-signal (:signal ingest)
+        ingest-count (:count ingest)]
+    {:itonami.fleet-audit/repo name
+     :itonami.fleet-audit/family (family-of name)
+     :itonami.fleet-audit/isic (or (:itonami.blueprint/isic-rev5 bp) "")
+     :itonami.fleet-audit/domain (or (:itonami.blueprint/domain bp) :unknown)
+     :itonami.fleet-audit/governor (or (:itonami.blueprint/governor bp) :none)
+     :itonami.fleet-audit/maturity maturity
+     :itonami.fleet-audit/repo-url (or (repo-url dir) "")
+     :itonami.fleet-audit/last-commit-at (or commit-at "")
+     :itonami.fleet-audit/days-since-commit days
+     :itonami.fleet-audit/dirty? (dirty? dir)
+     :itonami.fleet-audit/unpushed-commit-count (or (unpushed-count dir) 0)
+     :itonami.fleet-audit/src-file-count src-count
+     :itonami.fleet-audit/archive-file-count archive-count
+     :itonami.fleet-audit/test-file-count (count-files dir "test")
+     :itonami.fleet-audit/jurisdiction-coverage-count juri-count
+     :itonami.fleet-audit/component-count (count comps)
+     :itonami.fleet-audit/components (vec (sort comps))
+     :itonami.fleet-audit/status status
+     :itonami.fleet-audit/prod-ready? (prod-ready? status)
+     :itonami.fleet-audit/real-world-ingest-signal ingest-signal
+     :itonami.fleet-audit/real-world-ingest-count ingest-count
+     :itonami.fleet-audit/real-world-ingest-gap? (or (= ingest-signal :none-measured) (zero? ingest-count))}))
 
 (defn build-entities []
   (mapv actor-facts (actor-dirs)))
@@ -193,12 +277,16 @@
 
 (defn summary [entities]
   {:total (count entities)
+   :by-family (into (sorted-map) (frequencies (map :itonami.fleet-audit/family entities)))
    :by-maturity (into (sorted-map) (frequencies (map :itonami.fleet-audit/maturity entities)))
    :by-status (into (sorted-map) (frequencies (map :itonami.fleet-audit/status entities)))
    :dirty (count (filter :itonami.fleet-audit/dirty? entities))
    :with-unpushed-commits (count (filter #(pos? (:itonami.fleet-audit/unpushed-commit-count %)) entities))
    :with-jurisdiction-coverage (count (filter #(pos? (:itonami.fleet-audit/jurisdiction-coverage-count %)) entities))
-   :total-jurisdiction-coverage (reduce + (map :itonami.fleet-audit/jurisdiction-coverage-count entities))})
+   :total-jurisdiction-coverage (reduce + (map :itonami.fleet-audit/jurisdiction-coverage-count entities))
+   :not-prod-ready (count (remove :itonami.fleet-audit/prod-ready? entities))
+   :real-world-ingest-gap (count (filter :itonami.fleet-audit/real-world-ingest-gap? entities))
+   :by-ingest-signal (into (sorted-map) (frequencies (map :itonami.fleet-audit/real-world-ingest-signal entities)))})
 
 (defn needs-attention [entities]
   (filter (fn [e] (or (= :stale (:itonami.fleet-audit/status e))
@@ -206,38 +294,118 @@
                       (pos? (:itonami.fleet-audit/unpushed-commit-count e))))
           entities))
 
-(defn print-row [{:itonami.fleet-audit/keys [repo maturity status days-since-commit
+(defn not-prod-ready [entities]
+  (remove :itonami.fleet-audit/prod-ready? entities))
+
+(defn ingest-gap [entities]
+  (filter :itonami.fleet-audit/real-world-ingest-gap? entities))
+
+(defn print-row [{:itonami.fleet-audit/keys [repo family maturity status days-since-commit
                                               src-file-count test-file-count
                                               jurisdiction-coverage-count
+                                              prod-ready? real-world-ingest-gap?
                                               dirty? unpushed-commit-count]}]
-  (println (format "%-38s %-12s %-11s %5s %4s %4s %4s %-5s %s"
-                    repo (name maturity) (name status)
+  (println (format "%-38s %-13s %-12s %-11s %5s %4s %4s %4s %-5s %-5s %-5s %s"
+                    repo (name family) (name maturity) (name status)
                     (if (neg? days-since-commit) "n/a" (str days-since-commit "d"))
                     src-file-count test-file-count jurisdiction-coverage-count
+                    (if prod-ready? "-" "NOT-PROD")
+                    (if real-world-ingest-gap? "GAP" "-")
                     (if dirty? "dirty" "-")
                     (if (pos? unpushed-commit-count) (str unpushed-commit-count " unpushed") ""))))
 
 (defn print-header []
-  (println (format "%-38s %-12s %-11s %5s %4s %4s %4s %-5s %s"
-                    "repo" "maturity" "status" "days" "src" "test" "juri" "" ""))
-  (println (str/join (repeat 110 "-"))))
+  (println (format "%-38s %-13s %-12s %-11s %5s %4s %4s %4s %-5s %-5s %-5s %s"
+                    "repo" "family" "maturity" "status" "days" "src" "test" "juri"
+                    "prod" "ingest" "" ""))
+  (println (str/join (repeat 135 "-"))))
+
+(def edn-header
+  (str ";; manifest/itonami-fleet-audit.edn — generated by scripts/itonami-fleet-audit.cljs.\n"
+       ";; DO NOT EDIT BY HAND. Regenerate: nbb scripts/itonami-fleet-audit.cljs\n"
+       ";;\n"
+       ";; A vector of DataScript/Datomic-transactable entity-maps, one per\n"
+       ";; orgs/cloud-itonami/cloud-itonami-* repo. Each map is directly usable as a\n"
+       ";; tx-data entry (no :db/id — DataScript assigns a tempid per map on transact):\n"
+       ";;\n"
+       ";;   (require '[datascript.core :as d])\n"
+       ";;   (def conn (d/create-conn {}))\n"
+       ";;   (d/transact! conn (clojure.edn/read-string (slurp \"manifest/itonami-fleet-audit.edn\")))\n"
+       ";;\n"
+       ";;   ;; repos that have not reached prod maturity yet:\n"
+       ";;   (d/q '[:find ?repo ?status :where\n"
+       ";;          [?e :itonami.fleet-audit/repo ?repo]\n"
+       ";;          [?e :itonami.fleet-audit/status ?status]\n"
+       ";;          [?e :itonami.fleet-audit/prod-ready? false]] @conn)\n"
+       ";;\n"
+       ";;   ;; repos where real-world information ingestion is incomplete:\n"
+       ";;   (d/q '[:find ?repo ?signal ?count :where\n"
+       ";;          [?e :itonami.fleet-audit/repo ?repo]\n"
+       ";;          [?e :itonami.fleet-audit/real-world-ingest-signal ?signal]\n"
+       ";;          [?e :itonami.fleet-audit/real-world-ingest-count ?count]\n"
+       ";;          [?e :itonami.fleet-audit/real-world-ingest-gap? true]] @conn)\n"
+       ";;\n"
+       ";; Fields:\n"
+       ";;   :itonami.fleet-audit/family              parsed from repo name (isic/isco/lei/\n"
+       ";;                                             assoc/municipality/iso3166/unspsc/cofog/\n"
+       ";;                                             gtin/regulatory/other).\n"
+       ";;   :itonami.fleet-audit/status               :stub / :no-commits / :stale (>180d) /\n"
+       ";;                                             :dormant (30-180d) / :active / :archive\n"
+       ";;                                             (read-only 80-data/ archive, e.g. lei ToS).\n"
+       ";;   :itonami.fleet-audit/prod-ready?          true only for :active / :archive status —\n"
+       ";;                                             the fleet's only two \"doing its job\" states.\n"
+       ";;   :itonami.fleet-audit/real-world-ingest-signal  which real-world data channel was\n"
+       ";;                                             measured: :facts-citations (real https:// URL\n"
+       ";;                                             citations inside facts.cljc — generalizes past\n"
+       ";;                                             the isic/isco per-country catalog shape to\n"
+       ";;                                             municipality's per-ordinance shape etc.) /\n"
+       ";;                                             :archive-content (80-data/ real files) /\n"
+       ";;                                             :none-measured (no channel present at all).\n"
+       ";;   :itonami.fleet-audit/real-world-ingest-gap?  true when the measured count is 0 OR the\n"
+       ";;                                             signal is :none-measured — an entity with no\n"
+       ";;                                             measurement is a coverage gap, not \"n/a\"\n"
+       ";;                                             (ADR-2607203000 principle).\n"
+       ";;\n"
+       ";; Generated: " (.toISOString (js/Date.)) "\n\n"))
+
+(defn write-edn! [entities out-path]
+  (spit (io/file root out-path)
+        (str edn-header "[\n" (str/join "\n" (map #(str " " (pr-str %)) entities)) "\n]\n")))
 
 (let [entities (build-entities)
       args (set *command-line-args*)
       edn? (contains? args "--edn")
-      all? (contains? args "--all")]
+      all? (contains? args "--all")
+      not-prod? (contains? args "--not-prod")
+      ingest-gap? (contains? args "--ingest-gap")]
+  ;; schema 登録 + manifest/itonami-fleet-audit.edn への保存は毎回の副作用として
+  ;; 常に行う(--edn の有無に関わらず。kotoba-boundary-audit.cljs 同様「標準出力に
+  ;; 出すかは呼び出し側が選ぶ」流儀を保ちつつ、永続化とschema蓄積だけは常時行う)。
+  (to-tx-data! entities)
+  (write-edn! entities "manifest/itonami-fleet-audit.edn")
   (if edn?
-    (prn (to-tx-data! entities))
+    (prn entities)
     (do
-      ;; schema 登録は毎回の副作用として行う(--edn の有無に関わらず、
-      ;; kotoba-boundary-audit.cljs 同様「保存するかは呼び出し側が redirect で選ぶ」
-      ;; 流儀を保ちつつ、schema.edn への蓄積だけは常時行う)。
-      (to-tx-data! entities)
       (println "cloud-itonami fleet audit --" (count entities) "repos under" (relative-path root fleet-dir))
       (println "summary:" (pr-str (summary entities)))
+      (println "wrote manifest/itonami-fleet-audit.edn")
       (println)
-      (if all?
-        (do (print-header) (doseq [e entities] (print-row e)))
+      (cond
+        all? (do (print-header) (doseq [e entities] (print-row e)))
+
+        not-prod? (let [rows (vec (not-prod-ready entities))]
+                    (println (count rows) "repos not yet prod-ready:")
+                    (println)
+                    (print-header)
+                    (doseq [e rows] (print-row e)))
+
+        ingest-gap? (let [rows (vec (ingest-gap entities))]
+                      (println (count rows) "repos with a real-world-ingest gap:")
+                      (println)
+                      (print-header)
+                      (doseq [e rows] (print-row e)))
+
+        :else
         (let [attn (vec (needs-attention entities))]
           (println (count attn) "repos need attention (stale / dirty / unpushed commits):")
           (println)
