@@ -180,6 +180,8 @@ host adapterはR2 native rangeとgeneric S3 HTTP Rangeを実装し、Cloudflare 
 
 続くrequest-amplification passで、物理的に隣接するlogical blocksをdefault最大1MiBの単一object rangeへcoalesceするplannerを追加した。responseはlogical offsetで再分割し、各block CIDを独立検証してからdecodeするためIPLD integrityは弱めない。10,000-row viewの2,001-row rangeでは4 logical blocksを1 R2 request、185,911 bytesへ縮約した。local query kernel 50 samplesはp50 51.40ms、p95 91.63ms、p99 93.80ms、実R2 185,911-byte Range GET 50 samplesはp50 22ms、p95 32ms、p99 38msだった。CLJS累計159 tests/414 assertions、lint errors 0。これでgap 3のadjacent range coalescingは完了、prefetch、HTTP/CDN immutable cache、negative filterは未完了として残す。
 
+negative lookup passでは各logical block descriptorへportable deterministic Bloom v1（10 bits/key、7 hashes）を埋め込んだ。exact lower=upper queryだけに適用し、falseはdefinite miss、missing legacy filterまたはfalse positiveは従来どおりCID-verified block readへfallbackする。range queryにはexact filterを適用しない。10,000 rows/20 blocks、in-range exact miss 1,000 samplesで984件（98.4%）がdata request 0、false-positive requestは16件（1.6%）、planner p50 0.030ms、p95 0.116msだった。query bundleは2,784 bytesから16,484 bytesへ増加した。present key testにfalse negativeはなく、CLJS累計160 tests/419 assertions、lint errors 0。これでP1 point missのdata-block GET中央値0 gateをbrowser materialized-view pathで満たした。CDN cacheとremote base-index filterは別gateとして残る。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
