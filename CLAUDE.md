@@ -19,7 +19,7 @@
 ```bash
 # 初回
 west init -l manifest
-# 取得/同期（shallow 既定。zsh は変数を単語分割しないので複数指定は xargs）
+# 取得/同期（既定 full clone。west heavy リポ（repos.edn :heavy）だけ shallow。zsh は変数を単語分割しないので複数指定は xargs）
 west update --fetch smart
 west list -f '{name}' | grep -v '^manifest$' | xargs west update --fetch smart
 # DataLad の実体だけ別途（B2 creds は環境変数）
@@ -58,8 +58,9 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
 - これでも防げないのは **上流の force-push 系**（`origin/main` の force-rewrite /
   子 repo remote の force-rewrite による pin 退行）。worktree 分離は作業 tree の
   WIP 衝突しか防ぐ。force-push は上流の運用で撲滅するしかない。
-- 大容量 repo は worktree ごとに重複取得される。`--fetch smart` + shallow 既定で
-  軽減、heavy は DataLad/B2 経路（`nbb manifest/west_annex.cljs annex-get`）。
+- 大容量 repo は worktree ごとに重複取得される。`--fetch smart` + heavy リポの
+  shallow（`repos.edn` `:heavy`）で軽減、より本筋には DataLad/B2 経路
+  （`nbb manifest/west_annex.cljs annex-get`）。
 
 
 ## Repo naming — no `-clj` suffix (2026-07-10)
@@ -137,23 +138,33 @@ skill `new-project-scaffold` を参照。
 
 ## Git operations
 
-- **shallow（`--depth 1`）をデフォルトにする。** 巨大 superproject + 多数のネスト
-  リポで全履歴を取得すると時間・帯域・ディスクを浪費するため、明示的に full 履歴が
-  必要な場合（`git bisect` / 古いコミットへの `git blame` / 履歴を跨ぐ調査）を除き、
-  常に `--depth 1` を付ける。west も clone-depth: 1 を既定にしてある:
+- **shallow（`--depth 1`）はもうデフォルトにしない。repo wide で full 履歴を既定にする**
+  （ADR-2607211500 が ADR-2606241600「shallow を既定にする」を repeal）。superproject
+  本体・west が管理する project の大半（light repo）は、通常の `git fetch` / `git pull`
+  / `west update` で **full clone** になる:
 
   ```bash
-  git fetch --depth 1 origin
-  git pull --ff-only --depth 1
-  west update --fetch smart        # 各 project を shallow 取得（旧 submodule update 相当）
+  git fetch origin
+  git pull --ff-only
+  west update --fetch smart        # 各 project を同期（heavy だけ manifest 側 clone-depth:1 で shallow）
   ```
 
-  full 履歴が必要になったら、その時だけ対象を `git fetch --unshallow`（または
-  `--depth=<n>` で深掘り）して深くする。詳細は
-  `90-docs/adr/2606241600-shallow-depth1-git-default.edn` を参照。
+  **唯一の例外は west が管理する「heavy」大容量リポ**（`manifest/repos.edn`
+  `:manifest.repos/heavy`、モデル重み/画像/動画等のバイナリ同梱リポ 17 件）——
+  こちらは `scripts/gen-west-manifest.cljs` が `west.yml` にそのリポだけ
+  `clone-depth: 1` を出力し続ける（ADR-2606302100 のハイブリッド実装はそのまま
+  変更なし。full 化するとバイナリ全世代が `.git` に積もり破滅的に肥大するため）。
+  heavy リポで bisect/blame 等 full 履歴が必要になったら、その時だけ
+  `git fetch --unshallow`（または `--depth=<n>` で深掘り）する。詳細は
+  `90-docs/adr/2607211500-git-shallow-default-repeal-full-clone-except-west-heavy.edn`
+  （repeal 対象の旧方針は `90-docs/adr/2606241600-shallow-depth1-git-default.edn`、
+  heavy/light split の原典は `90-docs/adr/2606302100-shallow-depth-west-hybrid-amendment.edn`）
+  を参照。
 
 - **マージ / ancestry 判定をする時は、固定 depth を当て推量で増やさず
-  「merge-base を狙い撃ちで取得」する。** shallow なリポでマージや
+  「merge-base を狙い撃ちで取得」する。**（shallow が既定でなくなった今は主に
+  west heavy リポや、まだ unshallow していない古い checkout が対象）shallow な
+  リポでマージや
   `merge-base` / `--is-ancestor` / `rev-list --count` を行うと、共通祖先が
   graft 境界の外にある場合に **`no merge base` で失敗するだけでなく、ancestry を
   静かに誤判定する**（例: 純粋な前進を「系統分岐」と誤検出する）。`--depth 30`
@@ -175,7 +186,8 @@ skill `new-project-scaffold` を参照。
 
 - **`git fetch` の `(forced update)` 表示や `git merge` の
   `fatal: refusing to merge unrelated histories` は、それ単独では本物の
-  force-push と断定しない。** shallow clone は `--depth 1` フェッチのたびに
+  force-push と断定しない。**（同様に、shallow が既定でなくなった今は主に
+  west heavy リポや unshallow 前の古い checkout の話）shallow clone は `--depth 1` フェッチのたびに
   新しい shallow graft（親情報を持たない境界コミット）を作るため、upstream が
   **純粋な fast-forward で前進しただけ**でも、ローカルの祖先証明が古い graft の
   壁で止まり同じ症状（`(forced update)` 表示・`unrelated histories` エラー）が出る。
@@ -260,8 +272,8 @@ skill `new-project-scaffold` を参照。
   新しい作業を積み上げない。fast-forward 可能なら `--ff-only` で取り込む:
 
   ```bash
-  git fetch --depth 1 origin
-  git pull --ff-only --depth 1                       # 乖離していなければ FF で取り込む
+  git fetch origin
+  git pull --ff-only                                 # 乖離していなければ FF で取り込む
   west update --fetch smart                          # project 群を pin に合わせて同期
   ```
 
@@ -339,7 +351,7 @@ skill `new-project-scaffold` を参照。
   逐次・省略せず、以下を必ず実行してから push/PR する:
 
   ```bash
-  git fetch --depth 1 origin                       # origin/main 他を取得
+  git fetch origin                                  # origin/main 他を取得
   git merge --ff-only origin/main                  # superproject を main に同期（FF 不可なら停止。rebase しない）
   west update --fetch smart                        # 子リポ群を manifest の pin に合わせて同期
   nbb scripts/gen-west-manifest.cljs --check          # west.yml が canonical か（生成器と一致か）確認

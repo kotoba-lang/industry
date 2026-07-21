@@ -3,10 +3,11 @@
 ;; manifest/west.yml を持つ repo）で plain `git pull` を実行しようとした時に deny する。
 ;;
 ;; 理由 (CLAUDE.md 「Git operations」): このリポジトリの正しい同期手順は
-;;   git fetch --depth 1 origin && git merge --ff-only origin/main && west update --fetch smart
-;; の3ステップで、shallow(--depth 1) を保ち、かつ子リポの pin を west update で追従させる。
-;; `git pull`(単体)はこのどちらも満たさない(depth 指定なしで履歴を伸ばし、west update も
-;; 走らない)ため、実行を許さず代替コマンドを提示する。
+;;   git fetch origin && git merge --ff-only origin/main && west update --fetch smart
+;; の3ステップで、子リポの pin を west update で追従させる(shallow はもう既定ではない
+;; — ADR-2607211500。west heavy リポだけ manifest 側 clone-depth:1 で例外的に shallow)。
+;; `git pull`(単体)はこれを満たさない(west update が走らず子リポの pin が追従しない)
+;; ため、実行を許さず代替コマンドを提示する。
 ;;
 ;; west 管理下でない repo（.west/ も manifest/west.yml も無い）は対象外で素通りさせる
 ;; （この規約は superproject 固有であり、無関係な repo の plain pull を妨げない）。
@@ -73,7 +74,7 @@
         (str "west manifest 管理下のこの repo では plain `git pull` を使わないでください "
              "(CLAUDE.md: Git operations)。west update を経由しないと子リポの pin が manifest と "
              "食い違ったままになります。代わりに次を実行してください:\n\n"
-             "  git fetch --depth 1 origin && git merge --ff-only origin/main "
+             "  git fetch origin && git merge --ff-only origin/main "
              "&& west update --fetch smart\n\n"
              "(FF 不可なら乖離あり。rebase せず、乖離解消の方針は CLAUDE.md を参照。)"))))
   (catch :default _ (compat/exit 0)))

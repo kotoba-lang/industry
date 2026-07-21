@@ -45,8 +45,10 @@
     (let [branch (git top "rev-parse" "--abbrev-ref" "HEAD")]
       (when (or (str/blank? branch) (= branch "HEAD")) (done!)) ; detached HEAD は対象外
 
-      ;; --depth 1 で既定ブランチだけ軽量 fetch(shallow 既定ポリシーに準拠)。
-      (git top "fetch" "-q" "--depth" "1" "origin" "main")
+      ;; 既定ブランチだけ軽量 fetch(shallow はもう既定ではない — ADR-2607211500。
+      ;; --depth を付けると origin/main だけ shallow graft が入り ancestry 判定を
+      ;; 誤らせるので付けない)。
+      (git top "fetch" "-q" "origin" "main")
       (let [ref (if (git top "rev-parse" "--verify" "-q" "origin/main")
                   "origin/main"
                   (some-> (git top "symbolic-ref" "-q" "refs/remotes/origin/HEAD")

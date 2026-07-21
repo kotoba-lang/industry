@@ -68,13 +68,15 @@ crm missing from west and often from the local tree → fresh checkout breaks.
 3. For stale branches, prefer a clean branch:
 
    ```bash
-   git fetch --depth 1 origin main
+   git fetch origin main
    git switch -c cleanup-<date> origin/main
    git cherry-pick <needed-commit>
    ```
 
-   If shallow history turns a small cherry-pick into add/add conflicts, abort and apply the small diff manually.
-   Do not switch to rebase to solve the conflict.
+   Shallow is no longer the default (ADR-2607211500); this should be a normal full-history
+   fetch. If you do hit a still-shallow west heavy repo and shallow history turns a small
+   cherry-pick into add/add conflicts, `git fetch --unshallow` (or abort and apply the small
+   diff manually). Do not switch to rebase to solve the conflict.
 
 4. Commit cleanup work with:
 
