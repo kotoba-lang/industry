@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 13683, "etzhayyim-xrpc-proxy" 696},
+ {"etzhayyim-did-web" 11704, "etzhayyim-xrpc-proxy" 688},
  :zone
- {:requests-7d 66714,
-  :pageviews-7d 2362,
-  :uniques-7d-sum 1912,
+ {:requests-7d 57650,
+  :pageviews-7d 2249,
+  :uniques-7d-sum 1810,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 17}
-   {:path "/_shell/home-feed.js", :requests 14}
+  [{:path "/robots.txt", :requests 18}
+   {:path "/_shell/home-feed.js", :requests 15}
+   {:path "/system-dynamics", :requests 12}
    {:path "/app/.env", :requests 12}
-   {:path "/system-dynamics", :requests 11}
    {:path "/_app/immutable/chunks/LlKFzbX9.js", :requests 10}
    {:path "/.env", :requests 10}
    {:path "/api/.env", :requests 9}
    {:path "/_app/immutable/chunks/Bbq_zH8H.js", :requests 9}],
-  :status-mix {:ok 535, :server-error 632, :client-error 577},
+  :status-mix {:ok 527, :server-error 711, :client-error 608},
   :window "24h"},
- :as-of "2026-07-20",
+ :as-of "2026-07-21",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 33, :error-5xx-pct 36},
+ {:window "24h", :probe-4xx-pct 33, :error-5xx-pct 39},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 17 · /_shell/home-feed.js 14 · /app/.env 12 · /system-dynamics 11 · /_app/immutable/chunks/LlKFzbX9.js 10 | 4xx(probe) 33% · 5xx 36%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 18 · /_shell/home-feed.js 15 · /system-dynamics 12 · /app/.env 12 · /_app/immutable/chunks/LlKFzbX9.js 10 | 4xx(probe) 33% · 5xx 39%",
  :signal
- "etzhayyim.com 実測 66714 req/7d・1912 uniques(日次和)・うち4xx probe 33%(24h)、workers 14379 inv/7d"}
+ "etzhayyim.com 実測 57650 req/7d・1810 uniques(日次和)・うち4xx probe 33%(24h)、workers 12392 inv/7d"}
