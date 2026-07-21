@@ -1,0 +1,42 @@
+{:schema "kotoba-migration-evidence/v1"
+ :recorded-on "2026-07-20"
+ :repository "orgs/kotoba-lang/kyoninka"
+ :profile :kyoninka/human-gate-v1
+ :status :qualified
+ :source
+ {:implementation-pr "https://github.com/kotoba-lang/kyoninka/pull/1"
+  :implementation-merge "444591043fa1193cb1509741429cbd5f5838a075"
+  :qualification-pr "https://github.com/kotoba-lang/kyoninka/pull/2"
+  :qualification-merge "92a34cd0ce7bad39a3972e7c87e252ec57dec1dd"
+  :legacy-gate "src/kyoninka/schema.cljc"
+  :legacy-execution "src/kyoninka/progress.cljc"
+  :kernel "src/kyoninka/human_gate.kotoba"
+  :cljc-oracle "test/kyoninka/human_gate_matrix_test.clj"
+  :conformance "test/kyoninka/human_gate_conformance.kotoba"
+  :verifier "scripts/verify-kotoba-human-gate.mjs"}
+ :boundary
+ {:statuses [:not-started :preparing :ready-to-submit :submitted
+             :under-review :granted :rejected :withdrawn]
+  :valid-transition-pairs 64 :valid-approval-cases 128
+  :verified-boundary-cases-per-target 576
+  :invalid-transition-policy :deny
+  :human-transition-policy :deny-without-exact-explicit-approval
+  :excluded [:procedure-data :legal-advice :authority-data :fees :documents
+             :steps :case-storage :event-ledger :external-actions]}
+ :verification
+ {:legacy-suite {:tests 18 :assertions 348 :failures 0 :errors 0}
+  :lint {:errors 0 :pre-existing-warnings 1}
+  :required-capabilities []
+  :web-artifact-sha256
+  "ebd39fa4f99dd1eb9547fb084f29097b1e94aa15c93557aae21a3fbcb11b2160"
+  :wasm-artifact-sha256
+  "4a779830fa2b8f454284f5eb6421aeb1024dd555a1e0f033c5943dbe8c1c762f"
+  :hosted-ci
+  [{:run "https://github.com/kotoba-lang/kyoninka/actions/runs/29700654335"
+    :jdk [17 21] :status :passed}
+   {:run "https://github.com/kotoba-lang/kyoninka/actions/runs/29700720290"
+    :jdk [17 21] :status :passed}]}
+ :cutover
+ {:closed-human-gate-authorized true
+  :cljc-oracle-retained true
+  :procedure-and-external-action-cutover-authorized false}}
