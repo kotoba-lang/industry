@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 10475, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 10480, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 474113,
-  :pageviews-7d 5242,
-  :uniques-7d-sum 5153,
+ {:requests-7d 477057,
+  :pageviews-7d 5462,
+  :uniques-7d-sum 5167,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
@@ -15,12 +15,12 @@
    {:path "/wp-trackback.php", :requests 20}
    {:path "/wp-der.php", :requests 20}
    {:path "/gettest.php", :requests 20}
-   {:path "/ms-edit.php", :requests 13}
+   {:path "/ms-edit.php", :requests 19}
+   {:path "/api/openapi.json", :requests 14}
    {:path
     "/ai-gftd-cdn/blobs/anonymous/bafkreihtyjjdwl2p2lks6psgzyoev4rnxvlkdfrxvaba74tsyjinp53fue",
-    :requests 12}
-   {:path "/puc.php", :requests 12}],
-  :status-mix {:client-error 771, :ok 507, :server-error 15692},
+    :requests 12}],
+  :status-mix {:client-error 766, :ok 512, :server-error 15697},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -37,5 +37,5 @@
  "上位 page (24h, 2xx/3xx): /application.yml 21 · /lib.php 21 · /wp-trackback.php 20 · /wp-der.php 20 · /gettest.php 20 | 4xx(probe) 5% · 5xx 92%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 474113 req/7d・5153 uniques(日次和)・うち4xx probe 5%(24h)、workers 10476 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 477057 req/7d・5167 uniques(日次和)・うち4xx probe 5%(24h)、workers 10481 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
