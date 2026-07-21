@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 10487, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 10494, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 483761,
-  :pageviews-7d 6338,
-  :uniques-7d-sum 5199,
+ {:requests-7d 487014,
+  :pageviews-7d 6560,
+  :uniques-7d-sum 5203,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
@@ -16,9 +16,9 @@
    {:path "/application.yml", :requests 21}
    {:path "/lib.php", :requests 21}
    {:path "/storage/logs/laravel.log", :requests 21}
-   {:path "/wp-der.php", :requests 20}
-   {:path "/ms-edit.php", :requests 19}],
-  :status-mix {:client-error 803, :ok 590, :server-error 15726},
+   {:path "/ms-edit.php", :requests 20}
+   {:path "/wp-der.php", :requests 20}],
+  :status-mix {:client-error 847, :ok 618, :server-error 15726},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-21",
- :traffic-quality {:window "24h", :probe-4xx-pct 5, :error-5xx-pct 92},
+ :traffic-quality {:window "24h", :probe-4xx-pct 5, :error-5xx-pct 91},
  :top-paths
- "上位 page (24h, 2xx/3xx): /.git-credentials 24 · /config.env 22 · /.claude.json 21 · /application.yml 21 · /lib.php 21 | 4xx(probe) 5% · 5xx 92%",
+ "上位 page (24h, 2xx/3xx): /.git-credentials 24 · /config.env 22 · /.claude.json 21 · /application.yml 21 · /lib.php 21 | 4xx(probe) 5% · 5xx 91%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 483761 req/7d・5199 uniques(日次和)・うち4xx probe 5%(24h)、workers 10488 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 487014 req/7d・5203 uniques(日次和)・うち4xx probe 5%(24h)、workers 10495 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
