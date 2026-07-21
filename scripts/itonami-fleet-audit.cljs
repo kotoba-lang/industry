@@ -118,12 +118,16 @@
    2026-07-21 correction: 143/143 cloud-itonami-lei-* repos were previously
    flagged :stub by this script; a sample (cloud-itonami-lei-
    ilul7b6z54mrycf6h308) has a real 248-line 80-data/public/tos.journal.edn.
-   `(pos? (.length %))` excludes zero-byte placeholder files from counting
-   as real content."
+   Checks real file size via node:fs `statSync` (bound to `node-fs` below),
+   NOT `.length` -- `scripts.nbb-compat`'s `io/file` shim object has no
+   `.length` method (only `isFile`/`isDirectory`/`getPath`/`getName`/etc,
+   see scripts/nbb_compat.cljs's own `file` fn), unlike real java.io.File.
+   Excludes zero-byte placeholder files from counting as real content."
   [dir]
   (let [d (io/file dir "80-data")]
     (if (.exists d)
-      (count (filter #(and (.isFile %) (pos? (.length %))) (file-seq d)))
+      (count (filter #(and (.isFile %) (pos? (.-size (.statSync node-fs (.getPath %)))))
+                     (file-seq d)))
       0)))
 
 (defn actor-status [{:keys [src-file-count archive-file-count last-commit-at days-since-commit]}]
