@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 13256, "etzhayyim-xrpc-proxy" 1141},
+ {"etzhayyim-did-web" 14598, "etzhayyim-xrpc-proxy" 1209},
  :zone
- {:requests-7d 66120,
-  :pageviews-7d 2652,
-  :uniques-7d-sum 2039,
+ {:requests-7d 68152,
+  :pageviews-7d 2682,
+  :uniques-7d-sum 2070,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 28}
+  [{:path "/robots.txt", :requests 29}
    {:path "/actor/danjo/did.json", :requests 23}
    {:path "/actor/tomoshibi/did.json", :requests 22}
    {:path "/sitemap.xml", :requests 15}
-   {:path "/actor/kabuto/did.json", :requests 15}
-   {:path "/actor/tsumugi/did.json", :requests 14}
-   {:path "/system-dynamics", :requests 13}
-   {:path "/.git/config", :requests 11}],
-  :status-mix {:client-error 503, :ok 844, :server-error 420},
+   {:path "/system-dynamics", :requests 14}
+   {:path "/api/v3/.env", :requests 10}
+   {:path "/postmark/.env", :requests 10}
+   {:path "/var/www/html/.env", :requests 10}],
+  :status-mix {:client-error 826, :server-error 659, :ok 637},
   :window "24h"},
  :as-of "2026-07-21",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 28, :error-5xx-pct 24},
+ {:window "24h", :probe-4xx-pct 39, :error-5xx-pct 31},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 28 · /actor/danjo/did.json 23 · /actor/tomoshibi/did.json 22 · /sitemap.xml 15 · /actor/kabuto/did.json 15 | 4xx(probe) 28% · 5xx 24%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 29 · /actor/danjo/did.json 23 · /actor/tomoshibi/did.json 22 · /sitemap.xml 15 · /system-dynamics 14 | 4xx(probe) 39% · 5xx 31%",
  :signal
- "etzhayyim.com 実測 66120 req/7d・2039 uniques(日次和)・うち4xx probe 28%(24h)、workers 14397 inv/7d"}
+ "etzhayyim.com 実測 68152 req/7d・2070 uniques(日次和)・うち4xx probe 39%(24h)、workers 15807 inv/7d"}
