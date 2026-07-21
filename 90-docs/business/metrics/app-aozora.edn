@@ -8,29 +8,29 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 6643, "app-aozora-appview" 9476},
+ {"app-aozora-pds" 6723, "app-aozora-appview" 9544},
  :zone
- {:requests-7d 41813,
-  :pageviews-7d 7148,
-  :uniques-7d-sum 782,
+ {:requests-7d 42076,
+  :pageviews-7d 7152,
+  :uniques-7d-sum 788,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 239512}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2902}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1382}
+    :requests 239531}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2906}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1370}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 270}
-   {:path "/", :requests 83}
+   {:path "/", :requests 85}
    {:path "/api/engagement", :requests 28}
-   {:path "/robots.txt", :requests 25}
+   {:path "/robots.txt", :requests 27}
    {:path "/webroot/index.php/_environment", :requests 24}],
-  :status-mix {:ok 245487, :client-error 761, :server-error 16},
+  :status-mix {:ok 245456, :client-error 778, :server-error 16},
   :window "24h"},
  :as-of "2026-07-21",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 239512 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2902 · /xrpc/com.atproto.sync.subscribeRepos 1382 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 270 · / 83 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 239531 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2906 · /xrpc/com.atproto.sync.subscribeRepos 1370 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 270 · / 85 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 41813 req/7d・782 uniques(日次和)・うち4xx probe 0%(24h)、workers 16119 inv/7d"}
+ "aozora.app 実測 42076 req/7d・788 uniques(日次和)・うち4xx probe 0%(24h)、workers 16267 inv/7d"}
