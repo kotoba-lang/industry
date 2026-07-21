@@ -107,8 +107,28 @@
               component-patterns))
       #{})))
 
-(defn actor-status [{:keys [src-file-count last-commit-at days-since-commit]}]
+(defn archive-file-count
+  "Real, non-empty file count under `80-data/` -- the read-only-archive repo
+   pattern (cloud-itonami-lei-*, ADR-2607110300/2607199960: 'archives
+   publicly published legal/policy documents ... does not act, propose, or
+   execute anything ... not a governed Advisor/Governor actor'). These repos
+   are BY DESIGN not shaped like the src/-based actor repos `components`/
+   `find-facts-file` above check for -- a src-file-count of 0 there does not
+   mean empty, it means 'this is a different, real, non-actor repo kind.'
+   2026-07-21 correction: 143/143 cloud-itonami-lei-* repos were previously
+   flagged :stub by this script; a sample (cloud-itonami-lei-
+   ilul7b6z54mrycf6h308) has a real 248-line 80-data/public/tos.journal.edn.
+   `(pos? (.length %))` excludes zero-byte placeholder files from counting
+   as real content."
+  [dir]
+  (let [d (io/file dir "80-data")]
+    (if (.exists d)
+      (count (filter #(and (.isFile %) (pos? (.length %))) (file-seq d)))
+      0)))
+
+(defn actor-status [{:keys [src-file-count archive-file-count last-commit-at days-since-commit]}]
   (cond
+    (and (zero? src-file-count) (pos? archive-file-count)) :archive
     (zero? src-file-count) :stub
     (nil? last-commit-at) :no-commits
     (> days-since-commit 180) :stale
@@ -121,6 +141,7 @@
         commit-at (last-commit-at dir)
         days (or (days-since commit-at) -1)
         src-count (count-files dir "src")
+        archive-count (archive-file-count dir)
         comps (components dir)
         maturity (cond
                    (:itonami.blueprint/maturity bp) (:itonami.blueprint/maturity bp)
@@ -137,11 +158,13 @@
               :itonami.fleet-audit/dirty? (dirty? dir)
               :itonami.fleet-audit/unpushed-commit-count (or (unpushed-count dir) 0)
               :itonami.fleet-audit/src-file-count src-count
+              :itonami.fleet-audit/archive-file-count archive-count
               :itonami.fleet-audit/test-file-count (count-files dir "test")
               :itonami.fleet-audit/jurisdiction-coverage-count (or (jurisdiction-coverage dir) 0)
               :itonami.fleet-audit/component-count (count comps)
               :itonami.fleet-audit/components (vec (sort comps))}]
     (assoc base :itonami.fleet-audit/status (actor-status {:src-file-count src-count
+                                                            :archive-file-count archive-count
                                                             :last-commit-at commit-at
                                                             :days-since-commit days}))))
 
