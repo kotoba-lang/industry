@@ -8,29 +8,29 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 6571, "app-aozora-appview" 9412},
+ {"app-aozora-pds" 6643, "app-aozora-appview" 9476},
  :zone
- {:requests-7d 41584,
-  :pageviews-7d 7146,
-  :uniques-7d-sum 775,
+ {:requests-7d 41813,
+  :pageviews-7d 7148,
+  :uniques-7d-sum 782,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 239431}
+    :requests 239512}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2902}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1411}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 272}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1382}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 270}
    {:path "/", :requests 83}
-   {:path "/.env.bak", :requests 29}
    {:path "/api/engagement", :requests 28}
-   {:path "/robots.txt", :requests 26}],
-  :status-mix {:ok 245518, :client-error 804, :server-error 15},
+   {:path "/robots.txt", :requests 25}
+   {:path "/webroot/index.php/_environment", :requests 24}],
+  :status-mix {:ok 245487, :client-error 761, :server-error 16},
   :window "24h"},
  :as-of "2026-07-21",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 239431 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2902 · /xrpc/com.atproto.sync.subscribeRepos 1411 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 272 · / 83 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 239512 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2902 · /xrpc/com.atproto.sync.subscribeRepos 1382 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 270 · / 83 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 41584 req/7d・775 uniques(日次和)・うち4xx probe 0%(24h)、workers 15983 inv/7d"}
+ "aozora.app 実測 41813 req/7d・782 uniques(日次和)・うち4xx probe 0%(24h)、workers 16119 inv/7d"}
