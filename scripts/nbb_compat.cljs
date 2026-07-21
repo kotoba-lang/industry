@@ -19,6 +19,7 @@
      "exists" #(try (.existsSync fs p) (catch :default _ false))
      "isFile" #(try (.isFile (.statSync fs p)) (catch :default _ false))
      "isDirectory" #(try (.isDirectory (.statSync fs p)) (catch :default _ false))
+     "length" #(try (.-size (.statSync fs p)) (catch :default _ 0))
      "getPath" #(str p)
      "getCanonicalPath" #(str (.realpathSync fs p))
      "getCanonicalFile" #(file (.realpathSync fs p))
