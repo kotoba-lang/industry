@@ -24,6 +24,14 @@ orgs/personal/bin/datomic/.clj-kondo/
 /kotoba-pr-ci-fix/
 /kotoba-pr-shell/
 
+# local manimani fleet tool runtime/cache state (not source)
+/.manimani/
+/orgs/.manimani/
+
+# vendored third-party source + local build output (not DataLad/B2-managed;
+# flagged during 2026-07-21 cleanup for owner decision on discard vs relocate)
+/vendor/
+
 # Cloudflare Wrangler local cache
 .wrangler/
 
