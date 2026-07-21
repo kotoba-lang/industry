@@ -82,6 +82,54 @@
             :else nil))
         (catch :default _ nil)))))
 
+(defn- read-industry-maturity-registry
+  "kotoba-lang/industry's own registry.edn -- a plain (not pr-str-blob-
+   encoded) top-level map, :industries a real EDN vector of {:id
+   :maturity ...} per ISIC code, authoritative per ADR-2607121000.
+   2026-07-21 finding: EVERY sampled maturity-unset isic repo (62/62) has a
+   real entry here -- the gap this fn closes is a cross-reference gap, not
+   a missing-data gap."
+  []
+  (let [f (io/file root "orgs" "kotoba-lang" "industry" "resources" "kotoba" "industry" "registry.edn")]
+    (if (.exists f)
+      (try
+        (into {} (map (juxt :id :maturity)) (:industries (edn/read-string (slurp f))))
+        (catch :default _ {}))
+      {})))
+
+(defn- read-occupation-maturity-registry
+  "kotoba-lang/occupation's own registry.edn -- unlike industry's, the
+   top-level is a vector-of-one-map (tx-data shape) whose
+   :kotoba.occupation/occupations value is itself a pr-str-encoded EDN
+   STRING (double-parse required; same nested-string-blob convention
+   documented in this workspace's own docs/ADR edn tooling). 2026-07-21
+   finding: 216/216 sampled maturity-unset isco repos have a real entry
+   here too."
+  []
+  (let [f (io/file root "orgs" "kotoba-lang" "occupation" "resources" "kotoba" "occupation" "registry.edn")]
+    (if (.exists f)
+      (try
+        (let [outer (edn/read-string (slurp f))
+              occs-str (:kotoba.occupation/occupations (first outer))
+              occs (edn/read-string occs-str)]
+          (into {} (map (juxt :id :maturity)) occs))
+        (catch :default _ {}))
+      {})))
+
+(def industry-maturity-registry (read-industry-maturity-registry))
+(def occupation-maturity-registry (read-occupation-maturity-registry))
+
+(defn canonical-maturity
+  "Cross-references the canonical kotoba-lang/industry or
+   kotoba-lang/occupation registry by numeric code, parsed from the repo's
+   own real name -- nil (not a guess) when the repo isn't an isic/isco
+   code or the code isn't in either registry."
+  [repo-name]
+  (or (when-let [code (second (re-find #"^cloud-itonami-isic-(\d+)" repo-name))]
+        (get industry-maturity-registry code))
+      (when-let [code (second (re-find #"^cloud-itonami-isco-(\d+)" repo-name))]
+        (get occupation-maturity-registry code))))
+
 (defn git-out [dir & args]
   (let [{:keys [exit out]} (apply sh "git" "-C" (.getPath dir) args)]
     (when (zero? exit) (not-empty (str/trim out)))))
@@ -220,10 +268,17 @@
         has-facts? (boolean (find-facts-file dir))
         juri-count (or (jurisdiction-coverage dir) 0)
         citation-count (or (facts-citation-count dir) 0)
+        own-maturity (:itonami.blueprint/maturity bp)
+        registry-maturity (when-not own-maturity (canonical-maturity name))
         maturity (cond
-                   (:itonami.blueprint/maturity bp) (:itonami.blueprint/maturity bp)
+                   own-maturity own-maturity
+                   registry-maturity registry-maturity
                    (nil? bp) :no-blueprint
                    :else :maturity-unset)
+        maturity-source (cond
+                          own-maturity :own-blueprint
+                          registry-maturity :canonical-registry
+                          :else :unknown)
         status (actor-status {:src-file-count src-count
                               :archive-file-count archive-count
                               :last-commit-at commit-at
@@ -239,6 +294,7 @@
      :itonami.fleet-audit/domain (or (:itonami.blueprint/domain bp) :unknown)
      :itonami.fleet-audit/governor (or (:itonami.blueprint/governor bp) :none)
      :itonami.fleet-audit/maturity maturity
+     :itonami.fleet-audit/maturity-source maturity-source
      :itonami.fleet-audit/repo-url (or (repo-url dir) "")
      :itonami.fleet-audit/last-commit-at (or commit-at "")
      :itonami.fleet-audit/days-since-commit days
@@ -279,6 +335,7 @@
   {:total (count entities)
    :by-family (into (sorted-map) (frequencies (map :itonami.fleet-audit/family entities)))
    :by-maturity (into (sorted-map) (frequencies (map :itonami.fleet-audit/maturity entities)))
+   :by-maturity-source (into (sorted-map) (frequencies (map :itonami.fleet-audit/maturity-source entities)))
    :by-status (into (sorted-map) (frequencies (map :itonami.fleet-audit/status entities)))
    :dirty (count (filter :itonami.fleet-audit/dirty? entities))
    :with-unpushed-commits (count (filter #(pos? (:itonami.fleet-audit/unpushed-commit-count %)) entities))
