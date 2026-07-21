@@ -1,28 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 6702, "kotobase-cf-wasm-staging" 554},
+ {"net-kotobase" 6705, "kotobase-cf-wasm-staging" 554},
  :zone
- {:requests-7d 13861,
-  :pageviews-7d 609,
-  :uniques-7d-sum 920,
+ {:requests-7d 13864,
+  :pageviews-7d 610,
+  :uniques-7d-sum 921,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 80}
+  [{:path "/", :requests 77}
    {:path "/api/funnel", :requests 27}
    {:path "/health", :requests 27}
-   {:path "/xrpc/kotobase.git.object.put", :requests 25}
-   {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreifwqhbid7bubcts3ym25fnijd4yic62ese4m3aoclffz6lthdxylu/bafyreigtfjqhkesywryduvicbtm6xgtogvlubixu6lv5tnizd42fpmiizy",
-    :requests 19}
    {:path "/robots.txt", :requests 18}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 14}
-   {:path
-    "/kotobase-cf-wasm-production/ipns/bafyreianiwmine4b3pajmdod63tvackzrkxl53vs7yzcmwdlgztrx63xsu.json",
-    :requests 14}],
-  :status-mix {:client-error 498, :ok 470},
+   {:path "/llms.txt", :requests 4}
+   {:path "/llms-full.txt", :requests 4}
+   {:path "/xmlrpc.php", :requests 3}
+   {:path "/feed/", :requests 2}],
+  :status-mix {:client-error 450, :ok 171},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -34,9 +30,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-21",
- :traffic-quality {:window "24h", :probe-4xx-pct 51, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 72, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 80 · /api/funnel 27 · /health 27 · /xrpc/kotobase.git.object.put 25 · /kotobase-cf-wasm-production/blocks/bafy… 19 | 4xx(probe) 51%",
- :funnel {:visitors 1085, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 77 · /api/funnel 27 · /health 27 · /robots.txt 18 · /llms.txt 4 | 4xx(probe) 72%",
+ :funnel {:visitors 1087, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 13861 req/7d・920 uniques(日次和)・うち4xx probe 51%(24h)、workers 7256 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 13864 req/7d・921 uniques(日次和)・うち4xx probe 72%(24h)、workers 7259 inv/7d、Stripe active subs 0"}
