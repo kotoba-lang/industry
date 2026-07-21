@@ -1,23 +1,23 @@
 {:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 171315},
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 173448},
  :zone
- {:requests-7d 69264,
-  :pageviews-7d 692,
-  :uniques-7d-sum 642,
+ {:requests-7d 69942,
+  :pageviews-7d 699,
+  :uniques-7d-sum 646,
   :zone "murakumo.cloud"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
   [{:path "/infer/hwmetrics", :requests 8220}
-   {:path "/", :requests 100}
+   {:path "/", :requests 95}
    {:path "/infer/cost", :requests 29}
-   {:path "/health", :requests 11}
-   {:path "/itonami/trial", :requests 11}
-   {:path "/search", :requests 6}
-   {:path "/robots.txt", :requests 5}
-   {:path "/infer/models/murakumo-main", :requests 4}],
-  :status-mix {:ok 8409, :client-error 310, :server-error 1},
+   {:path "/health", :requests 9}
+   {:path "/robots.txt", :requests 6}
+   {:path "/infer/models/murakumo-main", :requests 4}
+   {:path "/search", :requests 4}
+   {:path "/v1/chat/completions", :requests 4}],
+  :status-mix {:ok 8387, :client-error 188, :server-error 1},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -29,9 +29,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-21",
- :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8220 · / 100 · /infer/cost 29 · /health 11 · /itonami/trial 11 | 4xx(probe) 4% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8220 · / 95 · /infer/cost 29 · /health 9 · /robots.txt 6 | 4xx(probe) 2% · 5xx 0%",
  :cost
  {:fleet-yen-per-mtok 21.51778398242107,
   :spot-yen-per-mtok 40.55,
@@ -45,4 +45,4 @@
    :throughput-tok-s 2000,
    :fx-yen-per-usd 162.2}},
  :signal
- "murakumo.cloud 実測 69264 req/7d・642 uniques(日次和)・うち4xx probe 4%(24h)、workers 171315 inv/7d、Stripe active subs 0"}
+ "murakumo.cloud 実測 69942 req/7d・646 uniques(日次和)・うち4xx probe 2%(24h)、workers 173448 inv/7d、Stripe active subs 0"}
