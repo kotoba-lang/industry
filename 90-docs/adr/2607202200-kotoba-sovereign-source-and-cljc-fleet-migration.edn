@@ -1,0 +1,124 @@
+{:adr/id "2607202200-kotoba-sovereign-source-and-cljc-fleet-migration"
+ :adr/status :accepted
+ :adr/date "2026-07-20"
+ :adr/title "Kotoba sovereign source and CLJC fleet migration"
+
+ :decision
+ {:runtime-priority [:safety :determinism :bounded-resources :portability]
+  :production-jvm :forbidden
+  :extensions
+  {".clj" {:language :clojure :role :compatibility-source}
+   ".cljs" {:language :clojurescript :role :compatibility-source}
+   ".cljc" {:languages [:clojure :clojurescript :kotoba]
+            :role :shared-migration-source}
+   ".cljk" {:language :kotoba :role :clj-to-kotoba-correspondence}
+   ".kotoba" {:language :kotoba :role :sovereign-source}
+   ".kotobas" {:language :kotoba-script :role :browser-script-source}}
+  :pipelines
+  [{:source [".kotoba" ".cljk"]
+    :compiler :kotoba-lang/compiler
+    :runtime :kototama
+    :targets [:reference :wasm32-browser :native-aot]}
+   {:source [".kotoba" ".kotobas"]
+    :compiler :kotoba-lang/kotoba-script
+    :target :restricted-javascript}]
+  :web-rule "JavaScript is an untrusted host target; capability admission, bounded values, and fail-closed host validation remain Kotoba authority."
+  :migration-rule "Do not rename .cljc mechanically. Admit source through the Kotoba grammar/type/effect/resource gates, add cross-target evidence, then change the extension and authority declaration."
+  :kami-placement "Kami owns 3D, physics, rendering, simulation, and game-engine providers. Kotoba owns language, compiler, values, capability admission, and portable domain programs."
+  :cross-host-conformance "Require valid and instantiable Wasm plus observable semantic, ABI, resource-bound, and fail-closed rejection conformance across compiler hosts. Byte layout is diagnostic evidence only, never a language-compatibility gate."}
+
+ :qualified-evidence
+ [{:repo "kotoba-lang/kotoba-script"
+   :pr 49
+   :sha "fa47c5f7cb24a7ac94de4eb51edaac37809dd5ce"
+   :evidence "restricted JavaScript compact string-index and disjoint-set operations; 42 tests / 142 assertions"}
+  {:repo "kotoba-lang/compiler"
+   :pr 151
+   :sha "899ae1da92d6d74e1ae68640b5adea3edbec46a3"
+   :evidence "typed ABI v10, reference/JS/Wasm/browser-host compact graph values; 340 tests / 4057 assertions locally and all CI platforms green"}
+  {:repo "kotoba-lang/kami-articulated"
+   :pr 7
+   :sha "4cca28739aea0b44ccacf2efa1c2eb944e3bec5c"
+   :evidence "128-link/127-joint arbitrary-order graph admitted; 129-link, cycles, duplicates, missing references, and multiple parents rejected across reference, restricted JS, and typed Wasm; 12 tests / 63 assertions"}
+  {:repo "kotoba-lang/kotoba-script"
+   :pr 50
+   :sha "6b918ee5d2ebb676f6c24d36be72e23f9667d4e5"
+   :evidence "bounded canonical :document runtime and pure constructors/lookups/persistent updates; 43 tests / 145 assertions"}
+  {:repo "kotoba-lang/kotoba-script"
+   :pr 51
+   :sha "63c08537f47660cef3fb31a2cc395fef94a39c1a"
+   :evidence "bounded keyword-from-string supports exact W3C @context without ambient keyword construction; 44 tests / 147 assertions"}
+  {:repo "kotoba-lang/compiler"
+   :pr 159
+   :sha "e4dfcbc006f0749d88db8f2d710446a2d4459808"
+   :evidence "bounded canonical :document across frontend, reference evaluator, restricted JavaScript, typed Wasm ABI v11 tag 18, and hostile browser host; 349 tests / 4083 assertions locally and 18/18 CI jobs green"}
+  {:repo "kotoba-lang/annotation"
+   :pr 1
+   :sha "775081a4cdca8f25d8ab60f5a7f8e27f4a09a099"
+   :evidence "first real fleet migration: core.cljc removed, core.kotoba admitted, exact W3C @context preserved, reference/restricted-JS/typed-Wasm behavior executed, no JVM production runtime, GitHub CI green"}
+  {:repo "kotoba-lang/cartpole-math"
+   :pr 2
+   :sha "7c6cb3076689165b9aa63487e39ef119841beca4"
+   :evidence "second real fleet migration: both production CLJC files removed; fixed golden replaced by parameterized Kotoba physics over bounded vector-f64 configuration/state; reference/restricted-JS/typed-Wasm semantic parity, force clamping, short-vector rejection, forged-externref rejection, no ClojureScript dependency, extension-authority CI, and both GitHub CI jobs green"}
+  {:repo "kotoba-lang/rtx-native"
+   :pr 1
+   :sha "c5e3c1584fc5b2f03066f4ec0e9df5eaad1c3ec9"
+   :evidence "third real fleet migration: production rtx_native.cljc removed; reservation metadata exposed through typed Kotoba string getters and explicit :bool activation contract; exact reference/restricted-JS/typed-Wasm parity; no ClojureScript production path; extension-authority CI and both GitHub CI jobs green"}
+  {:repo "kotoba-lang/compiler"
+   :pr 166
+   :sha "d4d3cd8605712134c9b6ff5ef4a3ae5d52f4ee45"
+   :evidence "closed f64 top-level constants lower through canonical IEEE-754 bits; compatibility gates use semantic/ABI/resource/rejection conformance rather than Wasm byte identity; 366 tests / 4163 assertions locally and all 24 CI checks green"}
+  {:repo "kotoba-lang/compiler"
+   :pr 167
+   :sha "6309aefa02e22f06cce11b0ae145e5a47eaf1093"
+   :evidence "bounded non-empty keyword-set constants lower to canonical typed-set values; empty, heterogeneous, oversized, computed, and host-derived sets reject; 371 tests / 4153 assertions, 25 JVM-free cases, all 24 CI checks green, and 8 fleet target probes advance"}
+  {:repo "kotoba-lang/compiler"
+   :pr 168
+   :sha "abf9e5b8125040b1c32956ed5af133f5f962298b"
+   :evidence "declared-only nested constant aliases resolve without evaluation or host lookup; unknown, namespaced host, and cyclic references reject; 372 tests / 4160 assertions, 26 JVM-free cases, all 24 CI checks green, and ghosthacker-echoes advances on Web and Wasm"}
+  {:repo "kotoba-lang/pbrt"
+   :pr 1
+   :sha "17bcaf807eb0fcd548d861d283fd10a0427e2502"
+   :evidence "fourth real fleet migration: production pbrt.cljc removed and one sovereign pbrt.kotoba metadata contract added; reference/restricted-JS/instantiated-Wasm values agree; Kami retains rendering/WebGPU/Dr.Jit authority; 3 tests / 10 assertions, lint clean, and both CI jobs green"}
+  {:repo "kotoba-lang/kami-usd-native"
+   :pr 1
+   :sha "e56fffc291406a5871ee4cd11969a42e8ece3bd2"
+   :evidence "fifth real fleet migration: production usd_native.cljc removed; all scalar and former vector metadata preserved by 11 typed string getters through reference/restricted-JS/instantiated-Wasm; inactive USD/native/device work remains a gated Kami provider; 3 tests / 15 assertions, lint clean, and both CI jobs green"}
+  {:repo "kotoba-lang/app"
+   :pr 1
+   :sha "f57bfb3cfd3d94ece0bcfa94ae95ff56e20780f1"
+   :evidence "first verified empty-shell retirement: the production CLJC contained only ns and no behavior, so source, smoke test, and JVM project configuration were removed without creating a misleading empty .kotoba file; docs-only authority ADR and both CI jobs green"}
+  {:repo "kotoba-lang/bridge" :pr 1
+   :sha "650ca7a27dcfbf3b4c08e2320b24ad445c3e8c6e"
+   :evidence "verified ns-only CLJC retirement; no empty .kotoba replacement; bridge/runtime authority remains Kami; JVM config removed and both docs-only CI checks green"}
+  {:repo "kotoba-lang/demo" :pr 1
+   :sha "a73aca78646e7f9260660a24058839ac846f8edb"
+   :evidence "verified ns-only CLJC retirement; no empty .kotoba replacement; demo/application authority remains Kami; JVM config removed and both docs-only CI checks green"}
+  {:repo "kotoba-lang/kami-app" :pr 1
+   :sha "4ae4615811e1320f96fbeea2c20a550207aacc5e"
+   :evidence "verified ns-only CLJC retirement; no empty .kotoba replacement; application/engine authority remains Kami; JVM config removed and both docs-only CI checks green"}
+  {:repo "kotoba-lang/replicator" :pr 1
+   :sha "d875a29eeea27299bb778201ca277b07a7e3e866"
+   :evidence "sixth real fleet migration: production reservation metadata CLJC removed and replaced by four typed Kotoba getters; reference/restricted-JS/instantiated-Wasm observable values agree, production source authority is enforced, synthetic-data and randomization execution remains a future capability-gated Kami provider, and both CI jobs are green"}
+  {:repo "kotoba-lang/kami-app-quarry-walk" :pr 1
+   :sha "b55cf842993bf11670a2b9c917463ef2f0c55e9b"
+   :evidence "seventh real fleet migration: open-ended CLJC configuration maps replaced by 17 closed typed Kotoba exports; reference/restricted-JS/instantiated-Wasm behavior passes 3 tests / 21 assertions, rendering/input/terrain/WebGPU/physics/game-loop authority remains capability-gated Kami, and both CI jobs are green"}]
+
+ :remaining-gaps
+ [:fresh-default-branch-source-snapshots
+  :reviewed-per-namespace-dispositions
+  :portable-source-admission-matrix
+  :production-jvm-launch-path-audit
+  :macro-and-host-branch-replacement
+  :hostile-browser-and-csp-qualification
+  :fleet-wide-extension-and-runtime-ci]
+
+ :completion-criteria
+ [:canonical-repository-inventory
+  :per-repo-authority-classification
+  :no-production-jvm
+  :kotoba-admission-before-extension-change
+  :reference-js-wasm-conformance-for-portable-code
+  :capability-manifest-for-effects
+  :bounded-resource-profile
+  :fleet-ci-enforces-no-regression]}

@@ -1,0 +1,270 @@
+{
+  "schema": "kotoba.cljc-canonical-compile-probes/v1",
+  "generated_on": "2026-07-20T12:56:35.334Z",
+  "authority": "current-default-branch-local-snapshot-plus-current-compiler-core-batch",
+  "matrix_sha256": "9a7ec6577f5a04561397ec3a1090ea0d55125e020a7d094b581a239b46c57c70",
+  "compiler_cli": "/tmp/kotoba-compiler-evidence.32lUPh/repo/bin/kotoba",
+  "compiler_cli_sha256": "5530089f828bfccfcade08fef284e7e0c243a0eb40ea4ddedd9a19dab3847d1e",
+  "compiler_git_revision": "abf9e5b8125040b1c32956ed5af133f5f962298b",
+  "compiler_git_dirty": false,
+  "repository_count": 3,
+  "probe_count": 6,
+  "direct_accepted": 0,
+  "remediated_accepted": 0,
+  "rejected": 6,
+  "rejection_counts": {
+    "subset:entryless library requires an explicit non-empty namespace export list": 2,
+    "subset:only a bounded :export vector is admitted in namespace clauses": 2,
+    "subset:some requires one i64 operand": 2
+  },
+  "probes": [
+    {
+      "repository": "kotoba-lang/async",
+      "path": "src/kotoba/lang/async.cljc",
+      "source_sha256": "c657a5d62adfb9dad6b8fdd7699eadfd7b1b70869147cdb4c08d4479c1617ead",
+      "target": "wasm",
+      "has_callable_api": true,
+      "direct": {
+        "artifact_sha256": null,
+        "operation": null,
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": false,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "(:refer-clojure :exclude [chan put take close empty?])",
+        "message": "only a bounded :export vector is admitted in namespace clauses",
+        "span": {
+          "line": 21,
+          "column": 3,
+          "end-line": 21,
+          "end-column": 57
+        }
+      },
+      "explicit_export_remediation": {
+        "artifact_sha256": null,
+        "operation": "number?",
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": false,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "(number? buf-type)",
+        "message": "operation has no admitted lowering",
+        "span": {
+          "line": 11,
+          "column": 17,
+          "end-line": 11,
+          "end-column": 35
+        }
+      }
+    },
+    {
+      "repository": "kotoba-lang/async",
+      "path": "src/kotoba/lang/async.cljc",
+      "source_sha256": "c657a5d62adfb9dad6b8fdd7699eadfd7b1b70869147cdb4c08d4479c1617ead",
+      "target": "web",
+      "has_callable_api": true,
+      "direct": {
+        "artifact_sha256": null,
+        "operation": null,
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": false,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "(:refer-clojure :exclude [chan put take close empty?])",
+        "message": "only a bounded :export vector is admitted in namespace clauses",
+        "span": {
+          "line": 21,
+          "column": 3,
+          "end-line": 21,
+          "end-column": 57
+        }
+      },
+      "explicit_export_remediation": {
+        "artifact_sha256": null,
+        "operation": "number?",
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": false,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "(number? buf-type)",
+        "message": "operation has no admitted lowering",
+        "span": {
+          "line": 11,
+          "column": 17,
+          "end-line": 11,
+          "end-column": 35
+        }
+      }
+    },
+    {
+      "repository": "kotoba-lang/postfx",
+      "path": "src/postfx.cljc",
+      "source_sha256": "ff58913f50ec830955e8d41d27181630f2b4ddf6b067cae2ce9a076155c6b3cd",
+      "target": "wasm",
+      "has_callable_api": true,
+      "direct": {
+        "artifact_sha256": null,
+        "operation": null,
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": true,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "((defn bloom \"Bloom: bright pixel bleed. Nintendo: Splatoon ink glow.\" [{:keys [threshold intensity radius]}] {:type :bloom, :threshold threshold, :intensity intensity, :radius radius}) (defn outline \"Outline: edge detection (Sobel). Nintendo: cel-shading / Zelda Wind Waker.\" [{:keys [color width depth-threshold]}] {:type :outline, :color color, :width width, :depth-threshold depth-threshold}) (defn vignette \"Vignette: dark corners.\" [{:keys [intensity radius]}] {:type :vignette, :intensity intensity, :radi",
+        "message": "entryless library requires an explicit non-empty namespace export list",
+        "span": null
+      },
+      "explicit_export_remediation": {
+        "artifact_sha256": null,
+        "operation": "update",
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": false,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "(update pipeline :effects conj effect)",
+        "message": "operation has no admitted lowering",
+        "span": {
+          "line": 99,
+          "column": 3,
+          "end-line": 99,
+          "end-column": 41
+        }
+      }
+    },
+    {
+      "repository": "kotoba-lang/postfx",
+      "path": "src/postfx.cljc",
+      "source_sha256": "ff58913f50ec830955e8d41d27181630f2b4ddf6b067cae2ce9a076155c6b3cd",
+      "target": "web",
+      "has_callable_api": true,
+      "direct": {
+        "artifact_sha256": null,
+        "operation": null,
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": true,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "((defn bloom \"Bloom: bright pixel bleed. Nintendo: Splatoon ink glow.\" [{:keys [threshold intensity radius]}] {:type :bloom, :threshold threshold, :intensity intensity, :radius radius}) (defn outline \"Outline: edge detection (Sobel). Nintendo: cel-shading / Zelda Wind Waker.\" [{:keys [color width depth-threshold]}] {:type :outline, :color color, :width width, :depth-threshold depth-threshold}) (defn vignette \"Vignette: dark corners.\" [{:keys [intensity radius]}] {:type :vignette, :intensity intensity, :radi",
+        "message": "entryless library requires an explicit non-empty namespace export list",
+        "span": null
+      },
+      "explicit_export_remediation": {
+        "artifact_sha256": null,
+        "operation": "update",
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": false,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "(update pipeline :effects conj effect)",
+        "message": "operation has no admitted lowering",
+        "span": {
+          "line": 99,
+          "column": 3,
+          "end-line": 99,
+          "end-column": 41
+        }
+      }
+    },
+    {
+      "repository": "kotoba-lang/tilemap",
+      "path": "src/tilemap.cljc",
+      "source_sha256": "de0205d6f8c46a488a089e0838449b742476161317a462b4c1a2901a25668ede",
+      "target": "wasm",
+      "has_callable_api": true,
+      "direct": {
+        "artifact_sha256": null,
+        "operation": "some",
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": false,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "(some (fn [l] (tile-solid? (layer-get l tx ty))) (:layers tm))",
+        "message": "some requires one i64 operand",
+        "span": {
+          "line": 76,
+          "column": 17,
+          "end-line": 76,
+          "end-column": 79
+        }
+      },
+      "explicit_export_remediation": {
+        "artifact_sha256": null,
+        "operation": "some",
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": false,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "(some (fn [l] (tile-solid? (layer-get l tx ty))) (:layers tm))",
+        "message": "some requires one i64 operand",
+        "span": {
+          "line": 63,
+          "column": 17,
+          "end-line": 63,
+          "end-column": 79
+        }
+      }
+    },
+    {
+      "repository": "kotoba-lang/tilemap",
+      "path": "src/tilemap.cljc",
+      "source_sha256": "de0205d6f8c46a488a089e0838449b742476161317a462b4c1a2901a25668ede",
+      "target": "web",
+      "has_callable_api": true,
+      "direct": {
+        "artifact_sha256": null,
+        "operation": "some",
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": false,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "(some (fn [l] (tile-solid? (layer-get l tx ty))) (:layers tm))",
+        "message": "some requires one i64 operand",
+        "span": {
+          "line": 76,
+          "column": 17,
+          "end-line": 76,
+          "end-column": 79
+        }
+      },
+      "explicit_export_remediation": {
+        "artifact_sha256": null,
+        "operation": "some",
+        "phase": "subset",
+        "exit_status": 1,
+        "form_truncated": false,
+        "status": "rejected",
+        "code": "compile-rejected",
+        "provenance_manifest": false,
+        "form": "(some (fn [l] (tile-solid? (layer-get l tx ty))) (:layers tm))",
+        "message": "some requires one i64 operand",
+        "span": {
+          "line": 63,
+          "column": 17,
+          "end-line": 63,
+          "end-column": 79
+        }
+      }
+    }
+  ]
+}
