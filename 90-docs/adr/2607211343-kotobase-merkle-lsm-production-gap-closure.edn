@@ -1,0 +1,185 @@
+[{:adr/authoritative_for
+  ["ADR-2607201600以後のkotobase Merkle-LSM実装済み範囲と残存gapの正本"
+   "R2-backed productionを実用判定するためのP0〜P3優先順位とrelease gate"
+   "IStoreを再導入せずdatom/IPLD/HeadCASの純粋性を維持するgap closure方針"
+   "10^7 datom、MVCC retention、GC、汎用query、observabilityの完了条件"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["adr-2607201600-kotobase-merkle-lsm-istore-retirement"]
+  :adr/topic "kotobase-merkle-lsm-production-gap-closure"
+  :adr/related
+  ["adr-2607201600-kotobase-merkle-lsm-istore-retirement"
+   "adr-2607061200-arrangement-datalog-join-staged-roadmap"
+   "adr-2607051000-ciphertext-over-cid-persistence-design"
+   "adr-2607177500-kotobase-protocols-real-datom-plane-backend"]
+  :adr/status "accepted"
+  :adr/id "adr-2607211343-kotobase-merkle-lsm-production-gap-closure"
+  :adr/doc_type "adr"
+  :adr/date "2026-07-21"
+  :adr/last_verified "2026-07-21"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/title "ADR-2607211343: kotobase Merkle-LSM production gap closure — 10M scale、MVCC/GC、query、R2運用"
+  :adr/decision-summary
+  "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
+  :adr/artifacts
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-prs [22 23 24 25 26 27 29 30 31], :latest-peer-main \"6a823c449ba6419fe0a86609b1f2dc243b29a18a\", :latest-worker-version \"ae31476a-7efd-4c62-b5ce-e0dace763471\"}"
+  :adr/body
+  "# Context
+
+ADR-2607201600は、kotobaseをDatomic型datom modelのままimmutable sorted runのMerkle-LSMへ移し、IStoreという第二の論理DBモデルを廃止する方針を定めた。2026-07-20〜21にM1 kernelからR2 productionまでを実装し、IStore adapterが別変更で再導入された事象もPR #30で再度削除した。現在の`kotobase-peer`ではIStore参照は0件であり、production WorkerはCloudflare KVを使わずR2 bucket `kotobase-merkle-lsm`を正とする。
+
+一方、productionへdeploy済みであることと、任意規模・任意query・障害条件で実用性が証明済みであることは同義ではない。100k harnessでは正しさを保ったが、range partition導入後も総時間268.45秒、throughput約372.5 rows/s、peak RSS約4.88GBだった。導入前の415.84秒、約240.5 rows/s、約5.52GBから改善したものの、10M datom gateは未実行であり、このまま線形外挿して実用性を宣言してはならない。
+
+本ADRは実装済み事項と残存gapを分離し、残りをどの順序・どの数値gateで閉じるかを決定する。これはADR-2607201600を置き換えず、production closureを追補する。
+
+# Implemented baseline
+
+2026-07-21時点で以下は完了している。
+
+1. canonical MerkleRun/VersionManifest、EAVT/AEVT/AVETとsparse VAET、reverse epoch、assert/retract tombstone、CLJ/CLJS CID determinism。
+2. R2-backed BlockGet/BlockPutとconditional HeadCAS。block publish後にmanifest/headを公開する順序、CAS retry内のunique grant検証。
+3. flush時のlogical-key-aligned L0 range partition、lazy sorted-run merge、最大4,096 rowsを既定とするL1 output partition。
+4. min/max overlap componentごとの逐次R2 load→compact→upload。index間も逐次化し、manifestには軽量run-refだけを保持する。
+5. first-component min/maxによるexact/prefix read pruning。旧run metadata欠損時はfalse negativeを避けるため候補に残す。
+6. immutable checkpoint range-directory、checkpoint inheritance、exact/prefix/list readからの利用。covered checkpoint tailは継承後に切り離せる。
+7. linked-CID reachability walker、R2 GC dry-run、日次schedule、local/murakumo CDCI runnerとreceipt、GitHub Actionsへの必須依存の撤去。
+8. local-murakumoのdocument catalog v2 shard、event daily range、materialized search。production smokeでhealth/write/read/searchとunauthorized generation contractを継続確認。
+9. IStore source/test/benchmark/documentation依存を削除。新しいstorage APIはdatom/IPLD/Block+Head effectだけとする。
+
+# Decision
+
+残存gapを以下の順序で閉じる。P0を満たす前にscale値だけをもってGAと呼ばず、P1を満たす前に10M対応と呼ばない。
+
+## P0 — correctness, snapshot retention, publication
+
+### P0.1 MVCC safe epochをhostへ配線
+
+現在のwindow compactorは実質的に最新epochをsafe epochとして使う経路があり、active reader、replica lag、legal hold、release rootのpinがproduction hostのcompaction/GC判断へ統合されていない。pure helperの存在だけでは完了としない。
+
+head read時にsnapshot leaseを発行し、reader/replica/legal holdのminimumをsafe epoch oracleへ集約する。compaction taskはoracleが確定したsafe epochを入力に持ち、host clockや暗黙global stateをkernelへ持ち込まない。lease expiry、clock skew、crashしたreaderの回収をtestする。
+
+### P0.2 checkpoint inheritanceの意味論を固定
+
+checkpoint directoryは新旧run-refを継承できるが、重複range、tombstone、同epoch retry、partial legacy tailを含むend-to-end equivalenceをさらに証明する。2回以上の連続checkpoint、checkpoint直後のdelta write、concurrent compactor、HeadCAS loser、古いreader pinを網羅し、全snapshot `>= safe-epoch` でuncompacted chainと同じvisible resultになることをproperty testする。
+
+directoryは無制限にstale refsを連結しない。継承時にlevel/range置換規則を適用し、同じinput rootからcanonical directory CIDへ収束させる。manifest/run/directory formatの互換versionとmigration ruleを明記する。
+
+### P0.3 GC delete gate
+
+GCはmarkとdeleteを分離する。削除対象はhead、checkpoint directory、manifest tail、run内IPLD Link、pin root、release/backup rootから到達不能であり、かつgrace periodを過ぎたCIDに限定する。dry-run inventoryと二回連続一致をdelete条件にし、CAS loser block、途中失敗、再実行の冪等性をtestする。
+
+production deleteを有効化する前にR2 inventory snapshot、restore手順、誤削除simulationを通す。到達不能であるという単一processの計算だけではdeleteしない。
+
+### P0 release gate
+
+- CLJ/CLJSの同一property seedでMVCC/checkpoint/GC結果が一致する。
+- 32 concurrent writers + concurrent compactorでacknowledged write loss 0、duplicate unique grant 0。
+- fault injection各点（block put、directory put、manifest put、HeadCAS、retry）で公開headから常に完全なDAGだけが見える。
+- pinned snapshotはcompactionとGC後もread可能、lease解放後だけ回収可能。
+
+## P1 — bounded memory and remote-object performance
+
+### P1.1 true streaming compaction
+
+現在のkernelは全件`group-by`を廃止したが、overlap component内のdecoded input runsと生成output objectsはtask単位で保持する。広いL0 runが残るlegacy dataやhot rangeではcomponentが巨大化し得る。runをrow/block chunksへ分け、async iteratorまたはresumable `:need` state machineでR2 blockを順に読み、output blockを逐次putしてbytesを解放する。manifest constructionはrun-refだけを保持する。
+
+memory上限はdatom総数でなく`input fan-in + target block + hot logical key`に比例させる。hot keyがtarget rowsを超える例外は別metricとして検出し、無制限に黙認しない。
+
+### P1.2 block index, filter, cache, prefetch
+
+first-component range metadataだけではnegative lookupと高cardinality attribute/value queryのR2 GETを十分に減らせない。runを複数data block + block indexにし、schema-aware BloomまたはXor filterをrun metadataへ追加する。false negativeは0、false positive率は計測値としてmanifest statisticsへ記録する。
+
+host cacheはmanifest、directory、run metadata、decoded/decompressed block、negative filterを分ける。range scanはbounded concurrent GETと次block prefetchを持ち、cache hitでもCID verificationとvisibility policyを省略しない。
+
+### P1.3 scale harness
+
+10^3、10^5、10^7 datomを同じseedで実行し、1/32/321 writers、cold/warm cache、point hit/miss、prefix range、join、compaction backlogを分離する。in-memory JVM値とreal R2値を混ぜない。少なくともwall time、p50/p95/p99、peak RSS、Worker CPU、R2 GET/PUT/list回数、bytes、read/write amplification、output run/block数をreceipt化する。
+
+### P1 release gate
+
+- 10^7 datom compactionのpeak RSSが設定budget内でdatom総数に対してsub-linearである。
+- 1 taskがWorker CPU/time limitを越えず、timeout後に同じtaskを冪等resumeできる。
+- point missのR2 data-block GET中央値0、point hitはdirectory/metadata cache後に必要blockだけを読む。
+- production workloadのp95/p99をSLOとしてADR addendumへ固定する。測定前に任意の数値を捏造しない。
+
+## P2 — canonical query and derived indexes
+
+### P2.1 on-disk q/pull/datoms
+
+local-murakumoのdocument互換APIとmaterialized catalogがR2で動くことは、汎用Datalog `q`/`pull`がMerkle runsを直接queryできることの証明ではない。query plannerをbound componentsからEAVT/AEVT/AVET/VAET rangeへcompileし、一つのpinned manifest/directoryに対するresumable iteratorとしてhostへ配線する。query途中でheadを再読しない。
+
+### P2.2 statistics and arrangements
+
+cardinality metadata helperやdelta arrangement descriptorを置くだけで完了としない。statisticsはdecoded rowsの全scanではなくflush/compaction deltaから更新し、base refsと同じmanifest epochでatomic publishする。join orderは実測cardinality/selectivityに基づき、stale stats時のconservative fallbackを持つ。
+
+全文検索、BM25、形態素解析、vector searchは4-covering indexesへ混ぜず、datom deltaから作るderived indexとする。derived indexはsource manifest CID/epochを持ち、遅延・再構築・削除を明示する。
+
+### P2 release gate
+
+- legacy/in-memory oracleとon-disk q/pullのresult equivalenceを固定corpusとproperty corpusで確認する。
+- multi-clause join、negation、retraction、historical snapshot、VAET link queryを含む。
+- derived indexが遅延してもbase datom queryのcorrectnessは変わらない。
+
+## P3 — durability, security, operations
+
+### P3.1 backup/replication/provider portability
+
+production primaryはR2とする。Cloudflare KVへ戻さない。B2/S3互換codeはoptional portability portに留め、conditional PutObjectが検証できないproviderをmutable head backendとして有効化しない。
+
+R2 bucket inventory、manifest root export、別account/bucketへのcopy、point-in-time restore、region/account loss drillを定期実行する。backupはblockの存在だけでなくCID verificationとhead/directory traversalで復元可能性を証明する。
+
+### P3.2 encryption and authorization
+
+provider at-rest encryptionだけをADR-2607051000のenvelope完了とみなさない。canonical plaintext CIDと暗号envelope/locationの対応、key rotation、tenant separationをhost portへ実装する。CID possessionはread authorityにせず、CACAO/ABAC/visibility policyをqueryとraw block gatewayの双方で適用する。
+
+### P3.3 observability and sovereign CI/CD
+
+compaction queue depth、oldest L0 age、range size、read/write amplification、filter hit/miss、cache hit、CAS conflict、orphan bytes、GC candidate/delete、pin ageをmetrics/receiptにする。alert thresholdとrunbookを持つ。
+
+canonical gateはlocalまたはmurakumo.cloud runnerで実行し、GitHub Actionsを必須実行基盤にしない。ただしcommit SHA、toolchain lock、input seed、R2 target、result CIDをreceiptへ含め、第三者が同じsource/inputから再検証できるようにする。
+
+# Explicit non-goals
+
+1. IStore、docs/streams/revisionという第二のstorage modelを再導入しない。migration adapterもkernel repoへ戻さない。
+2. Cloudflare KVをhead/catalog/cacheの正本にしない。R2固有bindingはhost adapterに閉じ、kernelをCloudflare固有化しない。
+3. Git、SQL、ATProtoのprotocol semanticsをMerkle-LSM kernelへ直書きしない。それぞれはdatom schema、query compiler、raw CID blockのconsumerである。
+4. 10M harness未通過の状態をscale complete、dry-runだけのGCをretention complete、document searchだけをDatalog completeと表現しない。
+
+# Execution order
+
+1. P0.1 snapshot lease/safe epoch host integration。
+2. P0.2 checkpoint property/fault testsとdirectory replacement semantics。
+3. P0.3 GC delete/restore drill。
+4. P1.1 block-streaming compactor、続いてP1.2 filter/cache/prefetch。
+5. P1.3 10M real R2 scale sweep。ここで初めてproduction SLOを確定する。
+6. P2 on-disk query/statistics/derived index。
+7. P3 backup/encryption/observabilityをGA運用gateとして閉じる。
+
+# Verification addendum — browser materialized-view serving (2026-07-21)
+
+`kotoba-lang/kotobase-peer`へbrowser/no-local-disk向けの縦切りを実装した。canonical datomから得た既存`view-rows`をprojectionし、512 rows単位の独立CID付きDAG-CBOR view blockへ分割する。複数blockは一つのimmutable packed objectへ連結し、小さなquery bundle CIDが各blockのmin/max key、CID、offset、length、source manifest/epoch、optional plan CIDを保持する。logical block CIDとR2 object粒度を分離し、queryはbundleのsparse indexをbinary seekして必要rangeだけを`:object/range-get` effectとして要求する。返却rangeはdecode前にblock CIDを検証する。
+
+host adapterはR2 native rangeとgeneric S3 HTTP Rangeを実装し、Cloudflare KVは使わない。materialized viewは再生成可能なderived accelerationであり、canonical authorityはdatomのままである。benchmark Worker `kotobase-view-bench`を`kotobase-merkle-lsm` R2 bucketへ接続し、production headと既存datomを変更しない専用immutable objectで測定した。
+
+100,000 rows、512 rows/blockの実測は196 blocks、packed object 8,346,444 bytes、query bundle 25,832 bytes。materializeは136,551.01ms、732.33 rows/s。1,000 point queryは1 request相当42,207 bytesで、local binary seek + byte slice + CID verification + DAG-CBOR decodeがp50 13.10ms、p95 65.28ms、p99 99.51ms。20-row range 200 samplesはp50 21.34ms、p95 86.59ms、p99 137.75msだった。
+
+実R2 Range GET 50 samplesは42,207 bytesでp50 21ms、p95 27ms、p99 30ms、262,144 bytesでp50 22ms、p95 28ms、p99 34msだった。R2 rangeとlocal query kernelのp50単純和は約34msだが、これは分離測定でありbrowser end-to-end percentileまたはCDN cache hit値とは表現しない。receiptは`kotobase-peer/bench/results/2026-07-21-materialized-view-100k.edn`をauthorityとする。
+
+検証はJVM 162 tests/405 assertions、追加projection test 5 tests/16 assertions、CLJS 157 tests/402 assertions、lint errors 0。これにより「browserはfull viewや永続local DBを持たず、bounded immutable rangeを検証してqueryできる」縦切りは完了した。一方、次を未解消gapとしてP2の先頭へ追加する。
+
+1. fold時の全view再構築をdatom epoch deltaからのincremental view maintenanceへ置換する。
+2. DAG-CBOR row payloadをcanonical columnar blockへ変更し、projection decodeとallocationを削減する。
+3. 隣接block range coalescing、prefetch、HTTP/CDN immutable cache、negative filterをbrowser plannerへ統合する。
+4. 実browserからlatest pointer、bundle、R2/CDN range、CID verify、renderまでのp50/p95/p99を測る。
+5. entity projection、ordered feed、incoming/outgoing adjacency、equality/range lookupを正式なview typeとしてcompileする。
+6. concurrent browser、cold object、tenant authorization、encrypted range blockを含む負荷・security gateを実行する。
+
+# Consequences
+
+短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
+
+range-partitioned flush、overlap compaction、checkpoint directoryは捨てず、block streamingとquery iteratorの土台として発展させる。IStoreをpruneした純粋性は、APIを減らしたこと自体ではなく、immutable datom/CID graphと明示effect、単一HeadCAS、再現可能なreceiptによって維持する。
+
+10M scale、historical snapshots、delete GC、on-disk q/pull、restore drillのevidenceが揃った時点で本ADRへverification addendumを追加し、`:production-partial`から`:production-ready`への変更を別decisionとして記録する。"}]
