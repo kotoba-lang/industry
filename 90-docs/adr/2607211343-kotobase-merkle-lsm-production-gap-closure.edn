@@ -176,6 +176,8 @@ host adapterはR2 native rangeとgeneric S3 HTTP Rangeを実装し、Cloudflare 
 5. entity projection、ordered feed、incoming/outgoing adjacency、equality/range lookupを正式なview typeとしてcompileする。
 6. concurrent browser、cold object、tenant authorization、encrypted range blockを含む負荷・security gateを実行する。
 
+同日follow-upでgap 1のkernel vertical sliceを追加した。`build-view-delta`はprevious bundle CIDへlinkしたepoch delta packをassert/retract tombstoneとして生成し、`query-packed-chain`はnewest-first key mergeで古いassertionを抑止する。`compact-packed-chain`はbounded generation chainをdeterministicな単一base packへ戻す。10,000-row baseに対する1,000-row deltaは1,343.13ms、744.53 rows/s、49,269 bytes、2 blocks。2-generation point query 500 samplesはp50 15.18ms、p95 71.52ms、p99 96.53ms、推定2 range requests/53,763 bytesだった。JVM 6 tests/23 assertions、CLJS累計158 tests/409 assertionsがgreenである。これによりforeground deltaが全view rebuildを必須とするgapはkernel上解消したが、remote packed-chain compactionはまだin-memory oracleであり、bounded streaming host executorは未完了とする。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
