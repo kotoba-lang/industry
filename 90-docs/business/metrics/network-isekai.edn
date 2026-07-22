@@ -1,28 +1,28 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 8338,
-  :pageviews-7d 4823,
-  :uniques-7d-sum 409,
+ {:requests-7d 8370,
+  :pageviews-7d 4837,
+  :uniques-7d-sum 420,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 79}
+  [{:path "/", :requests 74}
+   {:path "/robots.txt", :requests 28}
    {:path "/feed/fork-stats.edn", :requests 27}
-   {:path "/robots.txt", :requests 26}
    {:path "/1c.php", :requests 26}
    {:path "/min.php", :requests 20}
    {:path "/uiuvs58l.update.php", :requests 20}
    {:path "/games/gftd/ghosthacker-flow/thumbnail.svg", :requests 18}
    {:path "/games/gftd/ghosthacker-tuning/thumbnail.svg",
     :requests 18}],
-  :status-mix {:ok 996, :server-error 57, :client-error 1},
+  :status-mix {:ok 931, :server-error 56, :client-error 1},
   :window "24h"},
  :as-of "2026-07-22",
- :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 5},
+ :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 6},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 79 · /feed/fork-stats.edn 27 · /robots.txt 26 · /1c.php 26 · /min.php 20 | 4xx(probe) 0% · 5xx 5%",
+ "上位 page (24h, 2xx/3xx): / 74 · /robots.txt 28 · /feed/fork-stats.edn 27 · /1c.php 26 · /min.php 20 | 4xx(probe) 0% · 5xx 6%",
  :signal
- "isekai.network 実測 8338 req/7d・409 uniques(日次和)・うち4xx probe 0%(24h)",
+ "isekai.network 実測 8370 req/7d・420 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
