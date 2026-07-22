@@ -5,6 +5,10 @@
   },
   "scripts": {
     "nbb": "nbb",
+    "fabric:health": "nbb scripts/artificial-organism-health.cljs",
+    "fabric:health:live": "nbb scripts/artificial-organism-health.cljs live strict",
+    "fabric:wasm:verify": "node scripts/verify-fabric-wasm.mjs",
+    "fabric:fleet:witness": "node scripts/collect-fleet-witness.mjs",
     "browser:cleanup": "node scripts/resource-guard.mjs cleanup-browser 60"
   },
   "dependencies": {

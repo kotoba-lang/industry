@@ -1,0 +1,4 @@
+#!/bin/zsh
+set -euo pipefail
+cd /Users/junkawasaki/github/com-junkawasaki
+exec /opt/homebrew/bin/clojure -Sdeps '{:paths ["scripts"] :deps {org.clojure/data.json {:mvn/version "2.5.1"} io.github.kotoba-lang/cacao {:local/root "orgs/kotoba-lang/org-chainagnostic-cacao"}}}' -M -m publish-fabric-actor-status
