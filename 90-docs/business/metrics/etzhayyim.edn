@@ -1,33 +1,33 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 15937, "etzhayyim-xrpc-proxy" 1075},
+ {"etzhayyim-did-web" 15970, "etzhayyim-xrpc-proxy" 1075},
  :zone
- {:requests-7d 68563,
-  :pageviews-7d 2679,
-  :uniques-7d-sum 2231,
+ {:requests-7d 69208,
+  :pageviews-7d 2698,
+  :uniques-7d-sum 2255,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/system-dynamics", :requests 29}
-   {:path "/robots.txt", :requests 12}
+  [{:path "/", :requests 71}
+   {:path "/system-dynamics", :requests 26}
+   {:path "/robots.txt", :requests 20}
    {:path "/_shell/liquid-glass.css", :requests 9}
+   {:path "/_shell/liquid-glass-adapter.css", :requests 6}
+   {:path
+    "/kotoba/blocks/bafyreicae756jlrnhsg6aedw5ythqnoksjsexdcxs2uul4qljyolnis7ny",
+    :requests 6}
    {:path "/kotoba/kotoba_wasm.js", :requests 6}
    {:path
-    "/kotoba/blocks/bafyreibngrioir7tfj33lkdbgcledi5rkdeh6yei3zuoyjcbsvvcxsvswi",
-    :requests 6}
-   {:path "/_app/immutable/chunks/Bp50ef7X.js", :requests 4}
-   {:path
-    "/kotoba/blocks/bafyreih7txmeuvxi75xss5nhw3kjqa5n62mndi3yb76xesrc7x33s4kpfe",
-    :requests 4}
-   {:path "/_app/immutable/entry/app.2eRXPsBl.js", :requests 4}],
-  :status-mix {:client-error 1747, :server-error 1811, :ok 153},
+    "/kotoba/blocks/bafyreiaywrbpwyfpu6mcdlgmhonjsc55syd4rcoaaw5ebj3kgpjxpxtf34",
+    :requests 5}],
+  :status-mix {:client-error 2387, :ok 239, :server-error 9343},
   :window "24h"},
  :as-of "2026-07-22",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 47, :error-5xx-pct 49},
+ {:window "24h", :probe-4xx-pct 20, :error-5xx-pct 78},
  :top-paths
- "上位 page (24h, 2xx/3xx): /system-dynamics 29 · /robots.txt 12 · /_shell/liquid-glass.css 9 · /kotoba/kotoba_wasm.js 6 · /kotoba/blocks/bafyreibngrioir7tfj33lkdb… 6 | 4xx(probe) 47% · 5xx 49%",
+ "上位 page (24h, 2xx/3xx): / 71 · /system-dynamics 26 · /robots.txt 20 · /_shell/liquid-glass.css 9 · /_shell/liquid-glass-adapter.css 6 | 4xx(probe) 20% · 5xx 78%",
  :signal
- "etzhayyim.com 実測 68563 req/7d・2231 uniques(日次和)・うち4xx probe 47%(24h)、workers 17012 inv/7d"}
+ "etzhayyim.com 実測 69208 req/7d・2255 uniques(日次和)・うち4xx probe 20%(24h)、workers 17045 inv/7d"}
