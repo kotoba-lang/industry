@@ -213,28 +213,67 @@
    :evidence "backfilled 2026-07-21 entry: sole production association_facts.kotoba preserves year-only revision 2014, year-only founding 1923, and their distinct absent fields through bounded typed field/topic access; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
   {:repo "cloud-itonami/cloud-itonami-assoc-6612-usa-finra" :pr 1
    :sha "612b69cb66d8da19db876a9b0edba19364ab37ea"
-   :evidence "sole production association_facts.kotoba preserves both entries' absent establishment/revision dates, official finra.org citations, and the asymmetric ordered topic sets (three for the rulebook, one for the by-laws); this closes the cloud-itonami-assoc-* wave — every pre-ADR-2607202200 CLJC-origin association repo is now sovereign Kotoba and all post-ADR repos in the family were scaffolded Kotoba-native; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 16 assertions, clj-kondo lint is clean, committed compiler caches removed, and all four JDK 17/21 push/PR CI jobs green"}]
+   :evidence "sole production association_facts.kotoba preserves both entries' absent establishment/revision dates, official finra.org citations, and the asymmetric ordered topic sets (three for the rulebook, one for the by-laws); this closes the cloud-itonami-assoc-* wave — every pre-ADR-2607202200 CLJC-origin association repo is now sovereign Kotoba and all post-ADR repos in the family were scaffolded Kotoba-native; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 16 assertions, clj-kondo lint is clean, committed compiler caches removed, and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "kotoba-lang/app" :pr :already-merged
+   :sha "f57bfb3cfd3d94ece0bcfa94ae95ff56e20780f1"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC (the prior verified empty-shell retirement had never been retired from the canonical admission matrix); retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/bridge" :pr :already-merged
+   :sha "650ca7a27dcfbf3b4c08e2320b24ad445c3e8c6e"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC; retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/demo" :pr :already-merged
+   :sha "a73aca78646e7f9260660a24058839ac846f8edb"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC; retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/kami-app" :pr :already-merged
+   :sha "4ae4615811e1320f96fbeea2c20a550207aacc5e"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC; retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/kami-usd-native" :pr :already-merged
+   :sha "e56fffc291406a5871ee4cd11969a42e8ece3bd2"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC (the earlier count in the local matrix predated this fifth fleet migration's actual retirement); retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/pbrt" :pr :already-merged
+   :sha "17bcaf807eb0fcd548d861d283fd10a0427e2502"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC; retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/rtx-native" :pr :already-merged
+   :sha "c5e3c1584fc5b2f03066f4ec0e9df5eaad1c3ec9"
+   :evidence "matrix-retirement backfill 2026-07-22: fresh clone at the exact recorded merge head confirmed zero tracked CLJC; retired via scripts/retire-kotoba-cljc-canonical-repositories.mjs"}
+  {:repo "kotoba-lang/kami-engine-core" :pr 1
+   :sha "97c64f48b97b7c6e4946b79067d15f2050852204"
+   :evidence "eighth real fleet migration, empty-shell class: the production kami_engine_core.cljc contained only an ns declaration and docstring (already documented as an archived clj-wgsl migration placeholder, ADR-2607102200 addendum 8-9, not the implementation SSoT), so source, smoke test, and JVM project configuration were removed without creating a misleading empty .kotoba file; docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "kotoba-lang/kami-engine-engine" :pr 1
+   :sha "8ba8080ec2d413568d03ec25cad3fbd814fb85bf"
+   :evidence "same empty-shell class as kami-engine-core (ADR-2607102200 addendum 8-11); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "kotoba-lang/kami-engine-io" :pr 1
+   :sha "046bc379926a4b2e54704e5eaf24a61c04bbe8ac"
+   :evidence "same empty-shell class as kami-engine-core (ADR-2607102200 addendum 8-11); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "kotoba-lang/kami-engine-render" :pr 1
+   :sha "93a7f0352adb0d8de2975adf5a558031c2dc65db"
+   :evidence "same empty-shell class as kami-engine-core (ADR-2607102200 addendum 8-9); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "kotoba-lang/kami-engine-script-runtime" :pr 1
+   :sha "9341cfb735ad96e95170acb897c80669915871e6"
+   :evidence "same empty-shell class as kami-engine-core (ADR-2607102200 addendum 8-9); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "kotoba-lang/kami-engine-web" :pr 1
+   :sha "6c019a9b256b510979a8a3340b9069192c622f6b"
+   :evidence "same empty-shell class as kami-engine-core; canonical implementation lives in webgpu/kami-web (ADR-2607102200); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}]
 
  :canonical-snapshot
  {:artifact "90-docs/migration/kotoba-cljc-canonical-admission-matrix.json"
   :authority :verified-retirement-delta-plus-live-github-repository-metadata
-  :canonical-repositories 2039
-  :local-checkouts 2456
+  :canonical-repositories 2026
+  :local-checkouts 2443
   :duplicate-checkouts 417
-  :tracked-cljc-files 12481
-  :production-cljc-files 8385
-  :github-verified 2038
+  :tracked-cljc-files 12455
+  :production-cljc-files 8372
+  :github-verified 2025
   :github-inaccessible 1
-  :current-default-branch 889
-  :stale-against-default-branch 1148
+  :current-default-branch 844
+  :stale-against-default-branch 1180
   :incomplete-worktree 1
   :github-unverified 1
   :classification-counts {:capability-bound 315 :generated 6 :host-adapter 2763
-                          :macro-compiler-time 9 :portable-direct-candidate 604
+                          :macro-compiler-time 9 :portable-direct-candidate 591
                           :portable-refactor-required 4467 :security-host-bound 227
-                          :test-only 4088}
+                          :test-only 4075}
   :direct-probes {:repositories 0 :probes 0}
-  :note "FINRA retired from a clean exact-live-head zero-CLJC fresh clone via scripts/retire-kotoba-cljc-canonical-repositories.mjs, removing exactly one repository and one production CLJC file. Separately, 18 more cloud-itonami-assoc-* repositories (gapki/mpoa/afbf/api/acc/phrma/vda/smmt/eei/awwa/agc/nrf/ata/rederiforbundet/a4a/ahla/nra/nab) were discovered already migrated to sovereign Kotoba on 2026-07-20/21 by prior unlogged sessions and are now backfilled into :qualified-evidence; their local checkouts were never canonical-matrix entries (some were Kotoba-native from repository creation, matching the post-ADR-2607202200 scaffold default) so this backfill does not change the matrix counts above beyond the FINRA retirement. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale. Hashes are provenance/integrity evidence, not semantic conformance gates."}
+  :note "FINRA retired from a clean exact-live-head zero-CLJC fresh clone via scripts/retire-kotoba-cljc-canonical-repositories.mjs, removing exactly one repository and one production CLJC file. Separately, 18 more cloud-itonami-assoc-* repositories (gapki/mpoa/afbf/api/acc/phrma/vda/smmt/eei/awwa/agc/nrf/ata/rederiforbundet/a4a/ahla/nra/nab) were discovered already migrated to sovereign Kotoba on 2026-07-20/21 by prior unlogged sessions and are now backfilled into :qualified-evidence; their local checkouts were never canonical-matrix entries (some were Kotoba-native from repository creation, matching the post-ADR-2607202200 scaffold default) so that backfill did not change matrix counts. 2026-07-22 second pass: 7 kotoba-lang repositories (app/bridge/demo/kami-app/kami-usd-native/pbrt/rtx-native) were already merged-and-empty on GitHub but stale (never retired) in the local matrix -- confirmed via fresh clone at their recorded merge heads and retired. A further 6 kotoba-lang/kami-engine-{core,engine,io,render,script-runtime,web} repositories were reviewed, found to be ns-only empty-shell CLJC in packages already documented as archived clj-wgsl placeholders (ADR-2607102200 addendum 8-9/8-11, not the implementation SSoT), migrated via the same verified-empty-shell-retirement pattern as kotoba-lang/app, PR'd, CI-qualified, merged, and retired from the matrix. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale. Hashes are provenance/integrity evidence, not semantic conformance gates."}
 
  :remaining-gaps
  [:fresh-default-branch-source-snapshots
@@ -249,8 +288,9 @@
  :session-closeout
  {:as-of "2026-07-22"
   :state :safe-to-resume
-  :last-retired "cloud-itonami/cloud-itonami-assoc-6612-usa-finra"
-  :last-merge "612b69cb66d8da19db876a9b0edba19364ab37ea"
+  :last-retired "kotoba-lang/kami-engine-web"
+  :last-merge "6c019a9b256b510979a8a3340b9069192c622f6b"
+  :second-pass-2026-07-22 "Ninth through fourteenth real fleet migrations plus a 7-repository stale-matrix backfill, all logged above: (1) kotoba-lang/app, bridge, demo, kami-app, kami-usd-native, pbrt, rtx-native were already merged-and-empty on GitHub (some since the ADR's original session) but had never been retired from the local canonical matrix -- fresh-cloned at their recorded merge heads, confirmed zero tracked CLJC, retired. (2) kotoba-lang/kami-engine-{core,engine,io,render,script-runtime,web} were reviewed, found ns-only empty-shell CLJC in packages already documented as archived clj-wgsl placeholders (ADR-2607102200 addendum 8-9/8-11), migrated via the verified-empty-shell-retirement pattern (PR/CI/merge per repo, all green), and retired from the matrix. Source: 90-docs/migration/kotoba-cljc-canonical-admission-matrix.json classification_counts.portable-direct-candidate, sorted by production_cljc_count ascending -- the smallest, most tractable unreviewed candidates surfaced these 13 as either already-done or trivially retirable, rather than requiring new design work like the wave-2 actor pattern."
   :cloud-itonami-assoc-wave :complete
   :cloud-itonami-assoc-wave-note "All 37 cloud-itonami-assoc-* repositories (gh repo list, 2026-07-21) now carry a sole production src/association_facts.kotoba with zero tracked CLJC; every entry is logged in :qualified-evidence. No further :next-reviewed-wave-candidate exists within this sub-family."
   :next-wave-survey-candidate "cloud-itonami org isic-*/isco-*/lei-*/iso3166-*/unspsc-*/cofog-*/gtin-* families: full census (356 repositories, every one queried live via GitHub API for src/*.cljc|*.kotoba, 2026-07-22, zero API errors). 294 repositories still carry production CLJC and zero Kotoba (isic 133 repos/997 files, isco 68 repos/264 files, iso3166 81 repos/777 files, unspsc 5 repos/37 files, cofog 5 repos/37 files, gtin 2 repos/8 files -- 2120 production CLJC files total, none migrated, none already sovereign). 62 repositories (lei 46, iso3166 15, gtin 1) have no src/ at all -- pure-data or scaffold-only repos and are explicitly out of scope, not remaining work. review-source-semantics has now run on two exemplars (cloud-itonami-isco-8114 mineralplant and its origin template cloud-itonami-isco-7211 foundrycoord, full-file read, 2026-07-22) and the class is NOT YET ACTIONABLE: these are langgraph.graph Advisor/Governor actor repos requiring the kotoba/app capability profile (LLM effect, actor/state-machine effect, mutable-store provider), whose fleet-wide completion gate (docs/lang/application-profile.md) has not passed -- the named proving slice gftdcojp/ai-gftd-ghosthacker-shiropico has migrated exactly one pure decision function and still carries its actor/advisor/store loop as CLJC. Independently, mineralplant.governor's safety-critical defense-in-depth check does case-folded substring search over free text, and kotoba-lang/compiler's string-operations set (string-byte-length/string=?/string-concat/string-replace-all/keyword-from-string/keyword-name) has no substring-search or case-fold primitive, so even a bounded pure-kernel extraction would have to silently drop that safety layer -- forbidden by :policy. Full finding recorded as a :dispositions entry (:kind :retain-cljc-pending-application-profile-and-string-search-gates) in kotoba-cljc-project-gap-dispositions.edn. Do not attempt migration in this wave until both gates are tracked as landed; re-run review-source-semantics per repo even then, since the 292 unreviewed repositories are only expected (not proven) to share this shape."
