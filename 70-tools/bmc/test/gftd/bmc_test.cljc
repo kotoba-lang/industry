@@ -7,7 +7,9 @@
             [gftd.react :as react]
             [gftd.gate :as gate]
             [gftd.funnel :as funnel]
-            [gftd.score :as score]))
+            [gftd.score :as score]
+            [gftd.murakumo :as murakumo]
+            [gftd.kotobase :as kbase]))
 
 (def base
   [{:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
@@ -249,6 +251,55 @@
     (doseq [[cli-key {:keys [desc]}] cli/registry]
       (is (str/includes? (cli/help-text cli-key nil) desc)))))
 
+(deftest murakumo-complete-from-http
+  (testing "extracts OpenAI content; empty content falls back to reasoning"
+    (is (= "[{:x 1}]"
+           (murakumo/extract-content
+            {"choices" [{"message" {"content" "[{:x 1}]"}}]})))
+    (is (= "fallback"
+           (murakumo/extract-content
+            {"choices" [{"message" {"content" "" "reasoning_content" "fallback"}}]}))))
+  (testing "make-complete is fail-soft on HTTP errors"
+    (let [complete (murakumo/make-complete (fn [_] {:status 500 :body "nope"}) {})]
+      (is (nil? (complete "hi")))))
+  (testing "make-complete returns content on 200"
+    (let [body "{\"choices\":[{\"message\":{\"content\":\"[{:ok true}]\"}}]}"
+          complete (murakumo/make-complete (fn [_] {:status 200 :body body}) {})]
+      (is (= "[{:ok true}]" (complete "hi")))))
+  (testing "```edn フェンスを剥がすと read-string 可能になる (react/llm-advisor は read-string するため)"
+    (is (= "[{:a 1}]" (murakumo/strip-fences "```edn\n[{:a 1}]\n```")))
+    (is (= "[{:a 1}]" (murakumo/strip-fences "```\n[{:a 1}]\n```")))
+    (is (= "[{:a 1}]" (murakumo/strip-fences "[{:a 1}]"))))
+  (testing "extract-content strips a fence around the message content"
+    (is (= "[{:x 1}]"
+           (murakumo/extract-content
+            {"choices" [{"message" {"content" "```edn\n[{:x 1}]\n```"}}]})))))
+
+(deftest kotobase-event-projection
+  (let [evs [{:event/seq 42 :event/type :canvas/add-item :event/actor "advisor:auto"
+              :event/at "t" :canvas/id :cloud-itonami.problem :event/value "v"
+              :event/reason "r"}]
+        tx (kbase/events->tx-data evs)]
+    (is (= 1 (count tx)))
+    (is (= "bmc.event/42" (:db/id (first tx))))
+    (is (= ":cloud-itonami.problem" (:bmc.event/canvas-id (first tx))))
+    (is (str/includes? (kbase/events->tx-edn evs) "bmc.event/42")))
+  (testing "enabled? respects env and flags"
+    (is (true? (kbase/enabled? (constantly nil) {})))
+    (is (false? (kbase/enabled? (constantly "0") {})))
+    (is (false? (kbase/enabled? (constantly nil) {:no-kotobase true})))))
+
+(deftest compose-advisors-concat
+  (let [a (fn [_] [{:proposal/action :canvas/add-item :event/value "a"}])
+        b (fn [_] [{:proposal/action :canvas/add-item :event/value "b"}])
+        c (react/compose-advisors a b)]
+    (is (= ["a" "b"] (mapv :event/value (c {}))))))
+
+(deftest advisor-mode-resolution
+  (is (= "auto" (cli/advisor-mode {} (constantly nil))))
+  (is (= "gate" (cli/advisor-mode {:advisor "gate"} (constantly "auto"))))
+  (is (= "murakumo" (cli/advisor-mode {} (constantly "murakumo")))))
+
 (deftest cli-command-help-covers-every-documented-command
   ;; command-help は ns docstring の一覧と対応させる運用なので、両者がズレたら
   ;; help がサイレントに古びる。docstring 側に出てくる各コマンド語がここにも
@@ -296,27 +347,12 @@
     (testing "complete の例外も空 (fail-safe)"
       (is (= [] (vec (thrower obs)))))))
 
-#?(:cljs
-   (deftest strip-fences-unwraps-markdown
-     (testing "```edn フェンスを剥がすと read-string 可能になる"
-       (is (= "[{:a 1}]" (cli/strip-fences "```edn\n[{:a 1}]\n```")))
-       (is (= "[{:a 1}]" (cli/strip-fences "```\n[{:a 1}]\n```"))))
-     (testing "フェンス無しはそのまま"
-       (is (= "[{:a 1}]" (cli/strip-fences "[{:a 1}]"))))))
-
-#?(:cljs
-   (deftest sse-collect-reassembles-stream
-     (testing "OpenAI delta stream"
-       (is (= "[{:a 1}]"
-              (cli/sse-collect "data: {\"choices\":[{\"delta\":{\"content\":\"[{:a\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\" 1}]\"}}]}\n\ndata: [DONE]\n"))))
-     (testing "Anthropic content_block_delta stream (thinking delta は無視)"
-       (is (= "[{:b 2}]"
-              (cli/sse-collect (str "event: content_block_delta\n"
-                                    "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"hmm\"}}\n\n"
-                                    "event: content_block_delta\n"
-                                    "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"[{:b 2}]\"}}\n\n")))))
-     (testing "SSE でない body は nil (JSON fallback へ)"
-       (is (nil? (cli/sse-collect "{\"choices\":[{\"message\":{\"content\":\"x\"}}]}"))))))
+;; strip-fences moved to gftd.murakumo (transport-layer concern for the
+;; murakumo-based advisor); see `murakumo-complete-from-http` above.
+;; sse-collect had no replacement: it existed only to reassemble the old
+;; GFTD_LLM_URL curl/SSE transport (ADR-2607172800), which this PR's
+;; murakumo.cljc-based `make-complete` (plain HTTP, injected http-post!)
+;; replaces outright — there is no streaming path to test here anymore.
 
 #?(:cljs
    (deftest normalize-llm-proposal-keywordizes-string-ids

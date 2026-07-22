@@ -29,6 +29,9 @@ ADR-2607021500 の 7 レイヤー lean canvas を CLI で扱い、進化・成�
 70-tools/bmc/bin/murakumo hyp pass :hyp/murakumo-tok-price --evidence "run ledger 実測 …"
 70-tools/bmc/bin/murakumo react tick                  # ReAct 1 tick（有界）
 70-tools/bmc/bin/aozora react loop --max-ticks 5      # dry まで反復
+70-tools/bmc/bin/itonami react tick --advisor auto    # gate + murakumo LLM (default)
+70-tools/bmc/bin/itonami react tick --advisor gate    # deterministic only
+70-tools/bmc/bin/itonami react tick --no-kotobase     # skip kotobase dual-write
 70-tools/bmc/bin/gftd score                           # BMC/YC bench 成熟度スコア表
 70-tools/bmc/bin/gftd score md                        # maturity-scores.edn 再生成
 70-tools/bmc/bin/gftd allocate                        # OT (Sinkhorn) 予算配分表（ADR-2607194500）
@@ -50,12 +53,19 @@ repo root 以外から動かすときは `GFTD_ROOT=<superproject root>`。
 
 - **observe** — canvas（fold 済）+ hypotheses + metrics（`90-docs/business/metrics/<product>.edn`
   または `--metrics k=v`）を読む
-- **think** — advisor は *proposal のみ* 返す。既定は deterministic mock
-  （untested riskiest 仮説 → gate を Key Metrics へ昇格 / refuted → UVP に pivot 検討 /
-  `:signal` metric → Problem へ観測事実）。**LLM advisor（langchain.model）は
-  `(fn [observation] proposals)` を `:advisor` に注入するだけで差し替わる**
+- **think** — advisor は *proposal のみ* 返す。**既定 `auto`（ADR-2607180400）**:
+  `gate-aware-advisor`（決定論 gate 進行）+ **cloud-murakumo** LLM
+  (`POST https://api.murakumo.cloud/v1/chat/completions`、`enable_thinking` off)。
+  LLM 失敗時は gate のみで続行（fail-soft）。`--advisor gate` で決定論のみ、
+  `--advisor murakumo` / `BMC_ADVISOR=murakumo` でも同じ compose（LLM 必須意図を
+  actor 名に残す）。
 - **act** — 独立 governor が検閲（重複 / 最終 item の retract / evidence 無しの
   hyp 遷移 / etzhayyim 非営利不変条件 などを拒否）。可決・拒否とも ledger に積む
+- **persist** — ① local SSoT `90-docs/business/canvas-ledger.edn` へ append
+  ② **net-kotobase dual-write**（best-effort、CACAO via
+  `70-tools/bmc/bin/kotobase-dual-write.cljs` + `kotobase-client`、db
+  `portfolio-bmc-ledger`）。`--no-kotobase` / `BMC_KOTOBASE_DUAL_WRITE=0` で無効。
+  identity: `70-tools/bmc/.bmc-kotobase-identity.hex`（gitignore、初回 mint）
 - 1 run = 1 tick（有界）。`react loop` は budget（`--max-ticks`）内で dry まで反復する
   durable outer loop。**人手の `canvas add` 等も同じ governor を通る**
   （「governor が拒否する書込を actor は決して行わない」）

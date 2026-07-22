@@ -16,8 +16,8 @@
      canvas note <canvas-id> <text>        — note 差替
      hyp list [--product P]
      hyp pass|fail <hyp-id> --evidence \"…\"
-     react tick [--product P] [--metrics k=v…]    — ReAct 1 tick（有界）
-     react loop [--product P] [--max-ticks N]     — dry まで反復（budget 有界）
+     react tick [--product P] [--metrics k=v…] [--advisor auto|gate|murakumo]
+     react loop [--product P] [--max-ticks N] [--advisor auto|gate|murakumo]
      gate [--product P|--all]                     — 仮説 gate の現況（測定/距離/需）
      funnel show [--product P]                    — 獲得→収益ファネルの現況
      funnel analyze [--product P|--all]           — bottleneck に GTM 提案（governor 経由 ledger）
@@ -25,7 +25,8 @@
                                                     — OT (Sinkhorn) 予算配分表示（ADR-2607194500）
      allocate md                                   — portfolio-allocation.edn 再生成
      allocate write                                — 配分結果を governor 経由で ledger へ記録（任意）
-     ledger show [--tail N]"
+     ledger show [--tail N]
+     (ADR-2607180400: default advisor=auto → murakumo LLM + gate; ledger dual-writes to kotobase)"
   (:require [clojure.string :as str]
             #?(:clj [clojure.edn :as edn]
                :cljs [cljs.reader :as edn])
@@ -36,7 +37,9 @@
             [gftd.gate :as gate]
             [gftd.funnel :as funnel]
             [gftd.score :as score]
-            [gftd.allocate :as allocate]))
+            [gftd.allocate :as allocate]
+            [gftd.murakumo :as murakumo]
+            [gftd.kotobase :as kbase]))
 
 (def registry
   {:itonami  {:products [:cloud-itonami]                :desc "business operator (L3)"}
@@ -86,8 +89,9 @@
                             "canvas note <canvas-id> <text>        — note 差替"]}
    {:cmd "hyp"      :usage ["hyp list [--product P]"
                             "hyp pass|fail <hyp-id> --evidence \"…\""]}
-   {:cmd "react"    :usage ["react tick [--product P] [--metrics k=v…]    — ReAct 1 tick（有界）"
-                            "react loop [--product P] [--max-ticks N]     — dry まで反復（budget 有界）"]}
+   {:cmd "react"    :usage ["react tick [--product P] [--metrics k=v…] [--advisor auto|gate|murakumo]"
+                            "react loop [--product P] [--max-ticks N] [--advisor auto|gate|murakumo]"
+                            "  auto (default)=gate + murakumo LLM; gate=deterministic only; murakumo=require LLM"]}
    {:cmd "gate"     :usage ["gate [--product P|--all]                     — 仮説 gate の現況（測定/距離/需）"]}
    {:cmd "funnel"   :usage ["funnel show [--product P]                    — 獲得→収益ファネルの現況"
                             "funnel analyze [--product P|--all]           — bottleneck に GTM 提案（governor 経由 ledger）"]}
@@ -96,7 +100,7 @@
                             "                                              — OT (Sinkhorn) 予算配分表示（ADR-2607194500）"
                             "allocate md                                   — portfolio-allocation.edn 再生成"
                             "allocate write                                — 配分結果を governor 経由で ledger へ記録（任意）"]}
-   {:cmd "ledger"   :usage ["ledger show [--tail N]"]}])
+   {:cmd "ledger"   :usage ["ledger show [--tail N]  (local SSoT; dual-write → kotobase unless --no-kotobase)"]}])
 
 (defn find-command-help [cmd]
   (some #(when (= (:cmd %) cmd) %) command-help))
@@ -113,7 +117,46 @@
                            (map #(str "  " %) (mapcat :usage command-help))
                            [(str "flags: --product P --all --out-dir D --evidence \"…\" --metrics k=v,… --max-ticks N --tail N"
                                  " --budget N --epsilon E --iters K --score-key bmc|yc")
+                            (str "       --advisor auto|gate|murakumo  --no-kotobase  (BMC_ADVISOR / BMC_KOTOBASE_DUAL_WRITE env)")
                             (str "run `" (name cli-key) " <command> --help` for command-specific usage.")]))))
+
+(defn advisor-mode
+  "Resolve advisor mode: flag --advisor > BMC_ADVISOR env > auto."
+  [flags env-get]
+  (let [raw (or (:advisor flags)
+                (when env-get (env-get "BMC_ADVISOR"))
+                "auto")
+        m (str/lower-case (str raw))]
+    (if (contains? #{"auto" "gate" "murakumo"} m) m "auto")))
+
+(defn actor-for-mode [mode]
+  (case mode
+    "gate" "advisor:gate"
+    "murakumo" "advisor:murakumo"
+    "advisor:auto"))
+
+(defn normalize-llm-proposal
+  "LLM が :canvas/id / :hyp/id / :proposal/action を string で出す揺れを
+   keyword に正規化する (transport 正規化 — 実測: qwen3.6 は
+   \"cloud-itonami.metrics\" と string で出し、gemma4 は keyword で出す)。
+   妥当性の判定は従来どおり governor に委ね、ここでは形だけ揃える。"
+  [p]
+  (let [kw #(cond (keyword? %) %
+                  (string? %) (keyword (str/replace % #"^:" ""))
+                  (symbol? %) (keyword (str %))   ; qwen3.6 実測: quote 無し
+                  :else %)]
+    (cond-> p
+      (contains? p :canvas/id) (update :canvas/id kw)
+      (contains? p :hyp/id) (update :hyp/id kw)
+      (contains? p :proposal/action) (update :proposal/action kw)
+      (contains? p :event/type) (update :event/type kw))))
+
+(defn normalizing-advisor
+  "Wrap an LLM-backed advisor so its proposals go through
+   `normalize-llm-proposal` before reaching the governor."
+  [llm-advisor]
+  (fn [obs] (map normalize-llm-proposal (llm-advisor obs))))
+
 
 #?(:clj
    (do
@@ -161,22 +204,74 @@
            :else (throw (ex-info (str "--product required (one of " (str/join ", " (map name ps)) ")") {})))))
 
      ;; ---- governed writes ---------------------------------------------------------
+     (defn jvm-http-post!
+       "Minimal POST for murakumo / kotobase on the JVM branch."
+       [{:keys [url headers body]}]
+       (try
+         (let [conn (doto (.openConnection (java.net.URL. url))
+                      (.setRequestMethod "POST")
+                      (.setDoOutput true)
+                      (.setConnectTimeout 15000)
+                      (.setReadTimeout 120000))]
+           (doseq [[k v] headers] (.setRequestProperty conn k v))
+           (with-open [os (.getOutputStream conn)]
+             (.write os (.getBytes ^String body "UTF-8")))
+           (let [code (.getResponseCode conn)
+                 b (try (slurp (.getInputStream conn))
+                        (catch Exception _
+                          (try (slurp (.getErrorStream conn))
+                               (catch Exception _ ""))))]
+             {:status code :body b}))
+         (catch Exception e {:status 0 :body (.getMessage e)})))
+
+     (defn dual-write-kotobase!
+       "Best-effort dual-write. JVM path: HTTP Bearer if KOTOBASE_TOKEN set; else skip."
+       [ps flags events]
+       (when (and (seq events) (kbase/enabled? #(System/getenv %) flags))
+         (if-let [token (System/getenv "KOTOBASE_TOKEN")]
+           (let [r (kbase/dual-write-via-http! jvm-http-post! events
+                                               {:endpoint (or (System/getenv "BMC_KOTOBASE_ENDPOINT")
+                                                              kbase/default-endpoint)
+                                                :db-name (or (System/getenv "BMC_KOTOBASE_DB")
+                                                             kbase/default-db-name)
+                                                :token token})]
+             (println "kotobase dual-write:" (pr-str r)))
+           (println "kotobase dual-write: skipped (set KOTOBASE_TOKEN or use nbb CACAO helper)"))))
+
+     (defn persist-events!
+       "Local ledger append (SSoT) + optional kotobase dual-write."
+       [ps flags events]
+       (let [stamped (ledger/append! (:ledger ps) events)]
+         (dual-write-kotobase! ps flags stamped)
+         stamped))
+
      (defn governed-append!
        "proposals → governor → 可決分+拒否記録を ledger へ。拒否があれば表示して exit 1。"
-       [cli-key {:keys [ledger] :as ps} idx proposals]
-       (let [{:keys [approved rejected]} (react/governor idx proposals)
-             actor (str "cli:" (name cli-key))
-             events (concat (map #(react/proposal->event 0 actor %) approved)
-                            (for [{:keys [proposal reason]} rejected]
-                              {:event/type :governor/rejected :event/actor "governor"
-                               :event/value (select-keys proposal [:proposal/action :canvas/id :hyp/id :event/value])
-                               :event/reason reason}))]
-         (ledger/append! ledger events)
-         (doseq [p approved]
-           (println "ok:" (name (:proposal/action p)) (or (:canvas/id p) (:hyp/id p)) (pr-str (:event/value p))))
-         (doseq [{:keys [proposal reason]} rejected]
-           (println "REJECTED by governor:" reason "--" (pr-str (:event/value proposal))))
-         (when (seq rejected) (System/exit 1))))
+       ([cli-key ps idx proposals] (governed-append! cli-key ps idx proposals {}))
+       ([cli-key ps idx proposals flags]
+        (let [{:keys [approved rejected]} (react/governor idx proposals)
+              actor (str "cli:" (name cli-key))
+              events (concat (map #(react/proposal->event 0 actor %) approved)
+                             (for [{:keys [proposal reason]} rejected]
+                               {:event/type :governor/rejected :event/actor "governor"
+                                :event/value (select-keys proposal [:proposal/action :canvas/id :hyp/id :event/value])
+                                :event/reason reason}))]
+          (persist-events! ps (or flags {}) events)
+          (doseq [p approved]
+            (println "ok:" (name (:proposal/action p)) (or (:canvas/id p) (:hyp/id p)) (pr-str (:event/value p))))
+          (doseq [{:keys [proposal reason]} rejected]
+            (println "REJECTED by governor:" reason "--" (pr-str (:event/value proposal))))
+          (when (seq rejected) (System/exit 1)))))
+
+     (defn resolve-advisor [flags]
+       (let [mode (advisor-mode flags #(System/getenv %))]
+         (if (= mode "gate")
+           {:mode mode :advisor react/gate-aware-advisor :actor (actor-for-mode mode)}
+           (let [complete (murakumo/make-complete jvm-http-post! {})
+                 llm (normalizing-advisor (react/llm-advisor complete))]
+             {:mode mode
+              :advisor (react/compose-advisors react/gate-aware-advisor llm)
+              :actor (actor-for-mode mode)}))))
 
      ;; ---- commands ---------------------------------------------------------------
      (defn cmd-canvas-md [cli-key ps idx [_ _] flags]
@@ -201,14 +296,17 @@
      (defn cmd-react [cli-key ps idx sub flags]
        (let [product (resolve-product cli-key idx flags)
              metrics (read-metrics ps product flags)
-             actor "advisor:gate"
+             {:keys [mode advisor actor]} (resolve-advisor flags)
+             _ (println "advisor:" mode "actor:" actor)
              run (case sub
-                   "tick" (let [r (react/tick {:idx idx :product product :metrics metrics :actor actor})]
+                   "tick" (let [r (react/tick {:idx idx :product product :metrics metrics
+                                               :advisor advisor :actor actor})]
                             {:ticks [r]})
-                   "loop" (react/run-ticks {:idx idx :product product :metrics metrics :actor actor
+                   "loop" (react/run-ticks {:idx idx :product product :metrics metrics
+                                            :advisor advisor :actor actor
                                             :max-ticks (parse-long (str (or (:max-ticks flags) "5")))}))]
          (doseq [[i r] (map-indexed vector (:ticks run))]
-           (ledger/append! (:ledger ps) (:events r))
+           (persist-events! ps flags (:events r))
            (println (str "tick " (inc i) ": " (count (:proposals r)) " proposal(s), "
                          (count (:approved r)) " approved, " (count (:rejected r)) " rejected"))
            (doseq [p (:approved r)] (println "  +" (or (:canvas/id p) (:hyp/id p)) (pr-str (:event/value p))))
@@ -252,7 +350,7 @@
                                     {:event/type :governor/rejected :event/actor "governor"
                                      :event/value (select-keys proposal [:proposal/action :canvas/id :hyp/id :event/value])
                                      :event/reason reason}))]
-               (ledger/append! (:ledger ps) events)
+               (persist-events! ps flags events)
                (println (name p) "funnel:" (count approved) "approved," (count rejected) "rejected")
                (doseq [a approved] (println "  +" (:canvas/id a) (pr-str (:event/value a))))
                (doseq [{:keys [proposal reason]} rejected]
@@ -314,15 +412,18 @@
              ["canvas" "add"]
              (governed-append! cli-key ps idx
                                [{:proposal/action :canvas/add-item :canvas/id (->kw c3)
-                                 :event/value c4 :proposal/reason "manual edit"}])
+                                 :event/value c4 :proposal/reason "manual edit"}]
+                               flags)
              ["canvas" "retract"]
              (governed-append! cli-key ps idx
                                [{:proposal/action :canvas/retract-item :canvas/id (->kw c3)
-                                 :event/value c4 :proposal/reason "manual edit"}])
+                                 :event/value c4 :proposal/reason "manual edit"}]
+                               flags)
              ["canvas" "note"]
              (governed-append! cli-key ps idx
                                [{:proposal/action :canvas/note :canvas/id (->kw c3)
-                                 :event/value c4 :proposal/reason "manual edit"}])
+                                 :event/value c4 :proposal/reason "manual edit"}]
+                               flags)
 
              ["hyp" "list"]
              (let [p (resolve-product cli-key idx flags)]
@@ -331,11 +432,13 @@
              ["hyp" "pass"]
              (governed-append! cli-key ps idx
                                [{:proposal/action :hyp/status :hyp/id (->kw c3) :event/value :validated
-                                 :event/evidence (:evidence flags) :proposal/reason "gate passed"}])
+                                 :event/evidence (:evidence flags) :proposal/reason "gate passed"}]
+                               flags)
              ["hyp" "fail"]
              (governed-append! cli-key ps idx
                                [{:proposal/action :hyp/status :hyp/id (->kw c3) :event/value :refuted
-                                 :event/evidence (:evidence flags) :proposal/reason "gate failed"}])
+                                 :event/evidence (:evidence flags) :proposal/reason "gate failed"}]
+                               flags)
 
              ["react" "tick"] (cmd-react cli-key ps idx "tick" flags)
              ["react" "loop"] (cmd-react cli-key ps idx "loop" flags)
@@ -454,23 +557,88 @@
            (= 1 (count ps)) (first ps)
            :else (throw (ex-info (str "--product required (one of " (str/join ", " (map name ps)) ")") {})))))
 
-     ;; ---- governed writes ---------------------------------------------------------
+     ;; ---- governed writes / murakumo+kotobase I/O (nbb) -------------------------
+     (defn nbb-http-post!
+       "POST via sync curl (same strategy as babashka.curl). Returns {:status :body}."
+       [{:keys [url headers body]}]
+       (let [hdr-args (mapcat (fn [[k v]] ["-H" (str k ": " v)]) headers)
+             args (cond-> (into ["curl" "-sS" "-L" "-X" "POST" "-w" "\n%{http_code}"
+                                 "--max-time" "120"]
+                                hdr-args)
+                    body (into ["--data-binary" body])
+                    true (conj url))
+             r (apply nc/sh args)
+             out (str (:out r))
+             idx (str/last-index-of out "\n")
+             [b status-str] (if idx
+                              [(subs out 0 idx) (subs out (inc idx))]
+                              ["" out])
+             status (js/parseInt status-str 10)]
+         {:status (if (js/isNaN status) (or (:exit r) 0) status)
+          :body b}))
+
+     (defn dual-write-kotobase!
+       "Best-effort: spawn kotobase-dual-write.cljs (CACAO via kotobase-client).
+        Fail-open — never throws into the local ledger path."
+       [ps flags events]
+       (when (and (seq events) (kbase/enabled? nc/getenv flags))
+         (try
+           (let [root (:root ps)
+                 tmp (str "/tmp/bmc-kotobase-events-" (js/Date.now) ".edn")
+                 helper (str root "/70-tools/bmc/bin/kotobase-dual-write.cljs")
+                 cp (str root "/orgs/kotoba-lang/kotobase-client/src:"
+                         root "/70-tools/bmc/src:"
+                         root "/scripts/nbb_compat:"
+                         root)
+                 _ (nc/spit tmp (pr-str (vec events)))
+                 node-path (str root "/orgs/kotoba-lang/kotobase-client/node_modules"
+                                (when-let [p (nc/getenv "NODE_PATH")] (str ":" p)))
+                 ;; nbb-compat/sh merges options into spawnSync; set env so
+                 ;; @noble/curves resolves from kotobase-client's node_modules.
+                 _ (aset (.-env js/process) "NODE_PATH" node-path)
+                 r (nc/sh "nbb" "--classpath" cp helper tmp)]
+             (if (zero? (:exit r))
+               (println "kotobase dual-write:" (str/trim (str (:out r))))
+               (println "kotobase dual-write: FAILED exit" (:exit r)
+                        (str/trim (str (:err r) " " (:out r)))))
+             (try (.unlinkSync (js/require "node:fs") tmp) (catch :default _)))
+           (catch :default e
+             (println "kotobase dual-write: error" (or (.-message e) (str e)))))))
+
+     (defn persist-events!
+       "Local ledger append (SSoT) + optional kotobase dual-write."
+       [ps flags events]
+       (let [stamped (ledger/append! (:ledger ps) events)]
+         (dual-write-kotobase! ps flags stamped)
+         stamped))
+
      (defn governed-append!
        "proposals → governor → 可決分+拒否記録を ledger へ。拒否があれば表示して exit 1。"
-       [cli-key {:keys [ledger] :as ps} idx proposals]
-       (let [{:keys [approved rejected]} (react/governor idx proposals)
-             actor (str "cli:" (name cli-key))
-             events (concat (map #(react/proposal->event 0 actor %) approved)
-                            (for [{:keys [proposal reason]} rejected]
-                              {:event/type :governor/rejected :event/actor "governor"
-                               :event/value (select-keys proposal [:proposal/action :canvas/id :hyp/id :event/value])
-                               :event/reason reason}))]
-         (ledger/append! ledger events)
-         (doseq [p approved]
-           (println "ok:" (name (:proposal/action p)) (or (:canvas/id p) (:hyp/id p)) (pr-str (:event/value p))))
-         (doseq [{:keys [proposal reason]} rejected]
-           (println "REJECTED by governor:" reason "--" (pr-str (:event/value proposal))))
-         (when (seq rejected) (nc/exit 1))))
+       ([cli-key ps idx proposals] (governed-append! cli-key ps idx proposals {}))
+       ([cli-key ps idx proposals flags]
+        (let [{:keys [approved rejected]} (react/governor idx proposals)
+              actor (str "cli:" (name cli-key))
+              events (concat (map #(react/proposal->event 0 actor %) approved)
+                             (for [{:keys [proposal reason]} rejected]
+                               {:event/type :governor/rejected :event/actor "governor"
+                                :event/value (select-keys proposal [:proposal/action :canvas/id :hyp/id :event/value])
+                                :event/reason reason}))]
+          (persist-events! ps (or flags {}) events)
+          (doseq [p approved]
+            (println "ok:" (name (:proposal/action p)) (or (:canvas/id p) (:hyp/id p)) (pr-str (:event/value p))))
+          (doseq [{:keys [proposal reason]} rejected]
+            (println "REJECTED by governor:" reason "--" (pr-str (:event/value proposal))))
+          (when (seq rejected) (nc/exit 1)))))
+
+     (defn resolve-advisor [flags]
+       (let [mode (advisor-mode flags nc/getenv)]
+         (if (= mode "gate")
+           {:mode mode :advisor react/gate-aware-advisor :actor (actor-for-mode mode)}
+           (let [complete (murakumo/make-complete nbb-http-post! {})
+                 llm (normalizing-advisor (react/llm-advisor complete))]
+             {:mode mode
+              :advisor (react/compose-advisors react/gate-aware-advisor llm)
+              :actor (actor-for-mode mode)}))))
 
      ;; ---- commands ---------------------------------------------------------------
      (defn cmd-canvas-md [cli-key ps idx [_ _] flags]
@@ -497,112 +665,20 @@
                                  [(keyword k) v])))]
          (merge file-m flag-m)))
 
-     (defn strip-fences
-       "LLM 出力の ```edn … ``` markdown フェンスを剥がす。react/llm-advisor は
-        出力を read-string するので、フェンスは transport 側(ここ)で除去する。"
-       [s]
-       (let [s (str/trim (str s))]
-         (if (str/starts-with? s "```")
-           (-> s
-               (str/replace #"^```[a-zA-Z0-9]*\s*" "")
-               (str/replace #"\s*```\s*$" ""))
-           s)))
-
-     (defn sse-collect
-       "SSE stream body → 最終 text (thinking/reasoning delta は捨てる)。
-        OpenAI delta (choices[0].delta.content) と Anthropic
-        content_block_delta (:delta :text) の両形を受ける。SSE に見えない
-        body には nil を返す(非 streaming fallback 用)。ADR-2607172800。"
-       [out]
-       (when (str/includes? (str out) "data:")
-         (let [texts (for [line (str/split-lines (str out))
-                           :let [line (str/trim line)]
-                           :when (str/starts-with? line "data:")
-                           :let [payload (str/trim (subs line 5))]
-                           :when (and (seq payload) (not= payload "[DONE]")
-                                      (str/starts-with? payload "{"))
-                           :let [d (try (js->clj (js/JSON.parse payload) :keywordize-keys true)
-                                        (catch :default _ nil))]
-                           :when d]
-                       (or (get-in d [:choices 0 :delta :content])
-                           (when (= "content_block_delta" (:type d))
-                             (get-in d [:delta :text]))))]
-           (apply str (remove nil? texts)))))
-
-     (defn- llm-complete-fn
-       "GFTD_LLM_URL への同期 chat completion (fn [prompt] -> string)。
-        react/tick は同期パイプラインなので js/fetch(async)ではなく
-        curl execFileSync で待つ(nbb=Node)。OpenAI 互換 /v1/chat/completions と
-        Anthropic 互換 /v1/messages の両応答形を受ける。ADR-2607172700。
-        既定で stream:true を送る(ADR-2607172800): Cloudflare は非 streaming
-        応答を TTFB 100 秒で切る(524)ため、qwen3.6 の長い thinking 生成が
-        api.murakumo.cloud / qwen-gad.gftd.ai 経由で死ぬ。streaming なら
-        最初の delta が即座に流れ 524 に当たらない。SSE でない応答が返る
-        endpoint には従来の JSON parse に fallback する。
-        env: GFTD_LLM_MODEL (default murakumo-main = fleet main の SSoT alias、ADR-2607173100 — concrete な model id を焼かない) /
-        GFTD_LLM_TOKEN (optional Bearer) / GFTD_LLM_MAX_TOKENS (default 3000 —
-        qwen3.6 は thinking モデルで reasoning にも token 予算を使う) /
-        GFTD_LLM_NO_STREAM=1 (streaming を無効化)。"
-       [url]
-       (let [model (or (nc/getenv "GFTD_LLM_MODEL") "murakumo-main")
-             token (nc/getenv "GFTD_LLM_TOKEN")
-             max-tokens (or (some-> (nc/getenv "GFTD_LLM_MAX_TOKENS") js/parseInt) 3000)
-             stream? (not (nc/getenv "GFTD_LLM_NO_STREAM"))
-             cp (js/require "child_process")]
-         (fn [prompt]
-           (let [payload (cond-> {:model model :max_tokens max-tokens
-                                  :messages [{:role "user" :content prompt}]}
-                           stream? (assoc :stream true))
-                 args (cond-> ["-sS" "-N" "-m" "600" "-X" "POST" url
-                               "-H" "content-type: application/json"
-                               "--data-binary" "@-"]
-                        token (into ["-H" (str "authorization: Bearer " token)]))
-                 out (.execFileSync cp "curl" (clj->js args)
-                                    #js {:input (js/JSON.stringify (clj->js payload))
-                                         :encoding "utf8"
-                                         :maxBuffer (* 32 1024 1024)})]
-             (if-let [streamed (sse-collect out)]
-               (strip-fences streamed)
-               (let [d (js->clj (js/JSON.parse out) :keywordize-keys true)]
-                 (when-let [err (:error d)]
-                   (throw (ex-info (str "LLM endpoint error: " (or (:message err) (pr-str err))) {:url url})))
-                 (strip-fences
-                  (or (get-in d [:choices 0 :message :content])          ; OpenAI 形
-                      (some :text (:content d))))))))))                   ; Anthropic 形
-
-     (defn normalize-llm-proposal
-       "LLM が :canvas/id / :hyp/id / :proposal/action を string で出す揺れを
-        keyword に正規化する (transport 正規化 — 実測: qwen3.6 は
-        \"cloud-itonami.metrics\" と string で出し、gemma4 は keyword で出す)。
-        妥当性の判定は従来どおり governor に委ね、ここでは形だけ揃える。"
-       [p]
-       (let [kw #(cond (keyword? %) %
-                       (string? %) (keyword (str/replace % #"^:" ""))
-                       (symbol? %) (keyword (str %))   ; qwen3.6 実測: quote 無し
-                       :else %)]
-         (cond-> p
-           (contains? p :canvas/id) (update :canvas/id kw)
-           (contains? p :hyp/id) (update :hyp/id kw)
-           (contains? p :proposal/action) (update :proposal/action kw)
-           (contains? p :event/type) (update :event/type kw))))
-
      (defn cmd-react [cli-key ps idx sub flags]
        (let [product (resolve-product cli-key idx flags)
              metrics (read-metrics ps product flags)
-             llm-url (nc/getenv "GFTD_LLM_URL")
-             advisor (if llm-url
-                       (let [llm (react/llm-advisor (llm-complete-fn llm-url))]
-                         (fn [obs] (concat (react/gate-aware-advisor obs)
-                                           (map normalize-llm-proposal (llm obs)))))
-                       react/gate-aware-advisor)
-             actor (if llm-url "advisor:llm+gate" "advisor:gate")
+             {:keys [mode advisor actor]} (resolve-advisor flags)
+             _ (println "advisor:" mode "actor:" actor)
              run (case sub
-                   "tick" (let [r (react/tick {:idx idx :product product :metrics metrics :actor actor :advisor advisor})]
+                   "tick" (let [r (react/tick {:idx idx :product product :metrics metrics
+                                               :advisor advisor :actor actor})]
                             {:ticks [r]})
-                   "loop" (react/run-ticks {:idx idx :product product :metrics metrics :actor actor :advisor advisor
+                   "loop" (react/run-ticks {:idx idx :product product :metrics metrics
+                                            :advisor advisor :actor actor
                                             :max-ticks (parse-long (str (or (:max-ticks flags) "5")))}))]
          (doseq [[i r] (map-indexed vector (:ticks run))]
-           (ledger/append! (:ledger ps) (:events r))
+           (persist-events! ps flags (:events r))
            (println (str "tick " (inc i) ": " (count (:proposals r)) " proposal(s), "
                          (count (:approved r)) " approved, " (count (:rejected r)) " rejected"))
            (doseq [p (:approved r)] (println "  +" (or (:canvas/id p) (:hyp/id p)) (pr-str (:event/value p))))
@@ -646,7 +722,7 @@
                                     {:event/type :governor/rejected :event/actor "governor"
                                      :event/value (select-keys proposal [:proposal/action :canvas/id :hyp/id :event/value])
                                      :event/reason reason}))]
-               (ledger/append! (:ledger ps) events)
+               (persist-events! ps flags events)
                (println (name p) "funnel:" (count approved) "approved," (count rejected) "rejected")
                (doseq [a approved] (println "  +" (:canvas/id a) (pr-str (:event/value a))))
                (doseq [{:keys [proposal reason]} rejected]
@@ -708,15 +784,18 @@
              ["canvas" "add"]
              (governed-append! cli-key ps idx
                                [{:proposal/action :canvas/add-item :canvas/id (->kw c3)
-                                 :event/value c4 :proposal/reason "manual edit"}])
+                                 :event/value c4 :proposal/reason "manual edit"}]
+                               flags)
              ["canvas" "retract"]
              (governed-append! cli-key ps idx
                                [{:proposal/action :canvas/retract-item :canvas/id (->kw c3)
-                                 :event/value c4 :proposal/reason "manual edit"}])
+                                 :event/value c4 :proposal/reason "manual edit"}]
+                               flags)
              ["canvas" "note"]
              (governed-append! cli-key ps idx
                                [{:proposal/action :canvas/note :canvas/id (->kw c3)
-                                 :event/value c4 :proposal/reason "manual edit"}])
+                                 :event/value c4 :proposal/reason "manual edit"}]
+                               flags)
 
              ["hyp" "list"]
              (let [p (resolve-product cli-key idx flags)]
@@ -725,11 +804,13 @@
              ["hyp" "pass"]
              (governed-append! cli-key ps idx
                                [{:proposal/action :hyp/status :hyp/id (->kw c3) :event/value :validated
-                                 :event/evidence (:evidence flags) :proposal/reason "gate passed"}])
+                                 :event/evidence (:evidence flags) :proposal/reason "gate passed"}]
+                               flags)
              ["hyp" "fail"]
              (governed-append! cli-key ps idx
                                [{:proposal/action :hyp/status :hyp/id (->kw c3) :event/value :refuted
-                                 :event/evidence (:evidence flags) :proposal/reason "gate failed"}])
+                                 :event/evidence (:evidence flags) :proposal/reason "gate failed"}]
+                               flags)
 
              ["react" "tick"] (cmd-react cli-key ps idx "tick" flags)
              ["react" "loop"] (cmd-react cli-key ps idx "loop" flags)
