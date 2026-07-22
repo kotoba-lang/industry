@@ -19,7 +19,8 @@
 ```bash
 # 初回
 west init -l manifest
-# 取得/同期（shallow 既定。zsh は変数を単語分割しないので複数指定は xargs）
+# 取得/同期（full history がデフォルト。shallow は使わない — ADR-2607211600。
+# zsh は変数を単語分割しないので複数指定は xargs）
 west update --fetch smart
 west list -f '{name}' | grep -v '^manifest$' | xargs west update --fetch smart
 # DataLad の実体だけ別途（B2 creds は環境変数）
@@ -58,8 +59,9 @@ west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独�
 - これでも防げないのは **上流の force-push 系**（`origin/main` の force-rewrite /
   子 repo remote の force-rewrite による pin 退行）。worktree 分離は作業 tree の
   WIP 衝突しか防ぐ。force-push は上流の運用で撲滅するしかない。
-- 大容量 repo は worktree ごとに重複取得される。`--fetch smart` + shallow 既定で
-  軽減、heavy は DataLad/B2 経路（`nbb manifest/west_annex.cljs annex-get`）。
+- 大容量 repo は worktree ごとに重複取得される（full history 既定のため軽減策は
+  無い。恒久対応は DataLad/B2 経路への移行、`nbb manifest/west_annex.cljs
+  annex-get`）。
 
 
 ## Repo naming — no `-clj` suffix (2026-07-10)
@@ -137,64 +139,61 @@ skill `new-project-scaffold` を参照。
 
 ## Git operations
 
-- **shallow（`--depth 1`）をデフォルトにする。** 巨大 superproject + 多数のネスト
-  リポで全履歴を取得すると時間・帯域・ディスクを浪費するため、明示的に full 履歴が
-  必要な場合（`git bisect` / 古いコミットへの `git blame` / 履歴を跨ぐ調査）を除き、
-  常に `--depth 1` を付ける。west も clone-depth: 1 を既定にしてある:
+- **shallow（`--depth 1`）は使わない。full 履歴がデフォルト**（2026-07-21、
+  ADR-2607211600。ADR-2606241600/2606302100 の shallow 既定を reverse）。
+  west が `clone-depth` を fetch のたびに再適用し、触るたびに新しい shallow
+  graft（親情報を持たない境界コミット）を作り続けていたことが、下記の
+  「forced update」偽陽性・pin 到達失敗を繰り返し引き起こす根本原因だった
+  （実測: superproject `.git` が 226 shallow boundary / 18GB に肥大していたのに
+  reachable commit はわずか2件）。
 
   ```bash
-  git fetch --depth 1 origin
-  git pull --ff-only --depth 1
-  west update --fetch smart        # 各 project を shallow 取得（旧 submodule update 相当）
+  git fetch origin
+  git pull --ff-only
+  west update --fetch smart        # 各 project を full 履歴で取得
   ```
 
-  full 履歴が必要になったら、その時だけ対象を `git fetch --unshallow`（または
-  `--depth=<n>` で深掘り）して深くする。詳細は
-  `90-docs/adr/2606241600-shallow-depth1-git-default.edn` を参照。
+  大容量バイナリを含む heavy project（旧 `manifest/repos.edn` `:heavy`）も
+  含め、2026-07-21 にオーナー判断で全 unshallow 済み。disk/帯域コストより
+  ancestry の正しさを優先する。恒久的な disk 対策は shallow ではなく
+  B2 + DataLad への移行（skill `large-binary-datalad`）。
 
-- **マージ / ancestry 判定をする時は、固定 depth を当て推量で増やさず
-  「merge-base を狙い撃ちで取得」する。** shallow なリポでマージや
-  `merge-base` / `--is-ancestor` / `rev-list --count` を行うと、共通祖先が
-  graft 境界の外にある場合に **`no merge base` で失敗するだけでなく、ancestry を
-  静かに誤判定する**（例: 純粋な前進を「系統分岐」と誤検出する）。`--depth 30`
-  等の固定値は「当たれば速い／外れると誤答 or 失敗」の博打で、誤答は depth 1 の
-  明示エラーより厄介。代わりに base を直接取る:
+- **マージ / ancestry 判定（full 履歴なら通常は素直に解決する）。**
+  `merge-base` / `--is-ancestor` / `rev-list --count` はローカルでそのまま
+  正しく解決する（旧 shallow 既定では graft 境界の外に共通祖先があると
+  誤判定した）。外部から持ち込まれた一時的な shallow clone と比較する必要が
+  生じた時だけ、その場で GitHub 側に計算させる:
 
   ```bash
-  # GitHub に full 履歴で merge-base を計算させ、その SHA だけピンポイント取得
   BASE=$(gh api repos/<org>/<repo>/compare/main...<branch> --jq .merge_base_commit.sha)
-  git fetch --depth 1 origin "$BASE"      # 履歴が繋がり、判定が正しくなる
-  # 足りなければ --deepen=<n> / --shallow-since=<date> / 対象 ref だけ --unshallow
+  git fetch origin "$BASE"      # full 履歴なのでそのまま繋がる
   ```
 
-  さらに、**manifest の pin 前進のような単純更新は、ローカルで shallow マージを
-  戦うより GitHub API でサーバ側（full 履歴）に commit を起こす方が確実かつ安い**
-  （merge-base も ancestry もサーバが計算するため shallow 問題に触れない）。
-  実例: PR #61 / #62 / #86 は main の tree をベースにクリーン commit を API で
-  作成してマージした（#86 は 31 リポの west 移行を regression なしで取り込み）。
+  さらに、**manifest の pin 前進のような単純更新は、ローカルでマージを戦うより
+  GitHub API でサーバ側にクリーン commit を起こす方が確実かつ安い**（optimistic
+  lock で conflict が構造的に発生しない）。実例: PR #61 / #62 / #86 は main の
+  tree をベースにクリーン commit を API で作成してマージした（#86 は 31 リポの
+  west 移行を regression なしで取り込み）。
 
 - **`git fetch` の `(forced update)` 表示や `git merge` の
   `fatal: refusing to merge unrelated histories` は、それ単独では本物の
-  force-push と断定しない。** shallow clone は `--depth 1` フェッチのたびに
-  新しい shallow graft（親情報を持たない境界コミット）を作るため、upstream が
-  **純粋な fast-forward で前進しただけ**でも、ローカルの祖先証明が古い graft の
-  壁で止まり同じ症状（`(forced update)` 表示・`unrelated histories` エラー）が出る。
-  実測（2026-07-01、`root` superproject）: ローカル HEAD が 6 commit 遅れていた
-  だけの純前進で両症状が発生。**本物の force-push か判定するには GitHub API で
-  比較する**（ローカルの ancestry 判定を信用しない）:
+  force-push と断定しない。** 旧 shallow 既定では `--depth 1` フェッチのたびに
+  新しい shallow graft ができ、upstream が**純粋な fast-forward で前進しただけ**
+  でも同じ症状（`(forced update)` 表示・`unrelated histories` エラー）が出て
+  いた（実測 2026-07-01、`root` superproject: 6 commit 遅れの純前進で両症状が
+  発生。これが ADR-2607211600 で shallow 既定を撤回した主因）。full 履歴の今は
+  この graft 由来の偽陽性は構造的に起きないが、判定に迷ったら GitHub API で
+  比較する:
 
   ```bash
   gh api repos/<org>/<repo>/compare/<old-local-tip>...<new-origin-tip> \
     --jq '{status, ahead_by, behind_by, merge_base_commit: .merge_base_commit.sha}'
   # status:"ahead" かつ behind_by:0 かつ merge_base_commit == old-local-tip なら
-  # 純粋な fast-forward（shallow の偽陽性）。diverged や merge_base が別物なら本物の force-push。
+  # 純粋な fast-forward。diverged や merge_base が別物なら本物の force-push。
   ```
 
-  偽陽性と判明したら `git fetch --deepen=<n>`（10〜30 程度）でローカルの祖先鎖を
-  修復してから `git merge --ff-only` を再試行する（未コミット WIP がブロックする
-  場合は上述の通り `git stash push -- <paths>` で退避、drop しない）。それでも
-  `upload-pack: not our ref` で失敗する場合のみ、本物の force-push として下記
-  「force-push は禁止」節の対応（ユーザーへの報告）に進む。
+  本物の force-push と判明した場合は、下記「force-push は禁止」節の対応
+  （ユーザーへの報告）に進む。
 
 - **`manifest/west.yml` への変更（登録 / rename / pin 前進）は GitHub API の
   サーバ側 single-entry commit を「唯一の正経路」にする。** west.yml は生成物
@@ -219,7 +218,7 @@ skill `new-project-scaffold` を参照。
   commit」だけ: ①存在（= push 済み。未 push のローカル HEAD の pin 化は禁止）、
   ②default branch 到達性（rewrite されうる未 merge branch 上の commit は不可）、
   ③旧 pin からの前進（behind = 静かな pin 退行 / diverged を弾く）。判定はすべて
-  GitHub API（サーバ側 full 履歴）で行い、**ローカル shallow の ancestry を信用しない**。
+  GitHub API（サーバ側 full 履歴）で行い、**ローカルの ancestry 判定だけに頼らない**。
   `gen-west-manifest.cljs` は生成時に自動でこの検証を行い、失敗したら west.yml を
   書かない（緊急スキップ: `--no-verify-remote` / `WEST_PIN_VERIFY_SKIP=1`。使ったら
   理由を commit message に残す）。**登録・rename・pin 前進は `--entry <name>` で当該
@@ -260,8 +259,8 @@ skill `new-project-scaffold` を参照。
   新しい作業を積み上げない。fast-forward 可能なら `--ff-only` で取り込む:
 
   ```bash
-  git fetch --depth 1 origin
-  git pull --ff-only --depth 1                       # 乖離していなければ FF で取り込む
+  git fetch origin
+  git pull --ff-only                                 # 乖離していなければ FF で取り込む
   west update --fetch smart                          # project 群を pin に合わせて同期
   ```
 
@@ -303,21 +302,19 @@ skill `new-project-scaffold` を参照。
   fleet 活動中など `origin/main` が逐次前進して `git push main` が race する時は、変更を
   feature branch に push し（push 同期ガードは非-main を許可）、`gh api repos/<org>/<repo>/merges
   -f base=main -f head=<branch> -f commit_message=...` で **サーバ側マージ commit** を作る。
-  ローカル shallow・push race に触れず、409(conflict/race) で再試行。実績: ADR-2606302300 の
+  push race に触れず、409(conflict/race) で再試行。実績: ADR-2606302300 の
   doc commit をこの経路で main 化（rebase も force-push も使わず）。
 
 - **force-push は禁止（`git push --force` / `--force-with-lease` / `+refs` を使わない）。**
   共有リポ（superproject / 各 project）のいかなるブランチに対しても、履歴を書き換えて
   上流を上書きする push をしてはならない。force-push は他の clone・west pin・
-  ancestry 判定を静かに壊し（shallow 環境では「前進」を「分岐」と誤検出する原因にも
-  なる）、`upload-pack: not our ref` 由来の checkout 失敗を引き起こす。**逆に
-  `(forced update)` 表示や `unrelated histories` エラーだけでは本物の force-push と
-  断定できない**（shallow の偽陽性が多い。判別法は上述「マージ / ancestry 判定」節）。
+  ancestry 判定を静かに壊し、`upload-pack: not our ref` 由来の checkout 失敗を引き起こす。
+  **逆に `(forced update)` 表示や `unrelated histories` エラーだけでは本物の force-push と
+  断定できない**（判別法は上述「マージ / ancestry 判定」節）。
   確度の高い実サインは `upload-pack: not our ref` によるチェックアウト失敗。乖離は
   **force-push ではなく fast-forward できる clean branch / clean commit** で解消し、
   それが不可能な場合（既に push 済みの履歴を変えたい等）は**勝手に強制せず必ずユーザーに報告**する。
-  履歴書き換えが本当に必要なときも、shallow 化に伴う rewrite と同様に**行わない**
-  （skill `large-binary-datalad` の方針と整合）。upstream を進めたいだけの単純更新は、ローカルで
+  履歴書き換えが本当に必要なときも**行わない**。upstream を進めたいだけの単純更新は、ローカルで
   戦うより GitHub API でサーバ側にクリーン commit を起こす（PR #61/#62/#86 の実績）。
 
 - **`main` への同期が未コミット/未追跡のローカル変更でブロックされた場合**、
@@ -339,7 +336,7 @@ skill `new-project-scaffold` を参照。
   逐次・省略せず、以下を必ず実行してから push/PR する:
 
   ```bash
-  git fetch --depth 1 origin                       # origin/main 他を取得
+  git fetch origin                                 # origin/main 他を取得
   git merge --ff-only origin/main                  # superproject を main に同期（FF 不可なら停止。rebase しない）
   west update --fetch smart                        # 子リポ群を manifest の pin に合わせて同期
   nbb scripts/gen-west-manifest.cljs --check          # west.yml が canonical か（生成器と一致か）確認
@@ -469,8 +466,10 @@ fork がそちらを実行許可として拾い、指示範囲を超えて実装
 
 モデル重み/wasm/動画/画像データセット等の大容量バイナリを git 履歴に直接
 コミットしない方針、DataLad + git-annex + Backblaze B2 special remote での
-扱い、既存の重い project の shallow 運用は skill `large-binary-datalad` を参照
-（最優先事項）。
+扱いは skill `large-binary-datalad` を参照（最優先事項）。**既存の重い project
+の shallow 運用は 2026-07-21 に廃止し full history 化した**（ADR-2607211600）。
+disk/帯域を抑えたい大容量バイナリは shallow ではなく B2 + DataLad へ移行する
+（`m365-archive` が先行例）。
 
 ## 秘密情報の保管場所マップ
 
