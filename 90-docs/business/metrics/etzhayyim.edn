@@ -1,33 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 15970, "etzhayyim-xrpc-proxy" 1075},
+ {"etzhayyim-did-web" 16075, "etzhayyim-xrpc-proxy" 1400},
  :zone
- {:requests-7d 69208,
-  :pageviews-7d 2698,
-  :uniques-7d-sum 2255,
+ {:requests-7d 69621,
+  :pageviews-7d 2723,
+  :uniques-7d-sum 2269,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/", :requests 71}
-   {:path "/system-dynamics", :requests 26}
-   {:path "/robots.txt", :requests 20}
-   {:path "/_shell/liquid-glass.css", :requests 9}
-   {:path "/_shell/liquid-glass-adapter.css", :requests 6}
-   {:path
-    "/kotoba/blocks/bafyreicae756jlrnhsg6aedw5ythqnoksjsexdcxs2uul4qljyolnis7ny",
-    :requests 6}
-   {:path "/kotoba/kotoba_wasm.js", :requests 6}
-   {:path
-    "/kotoba/blocks/bafyreiaywrbpwyfpu6mcdlgmhonjsc55syd4rcoaaw5ebj3kgpjxpxtf34",
-    :requests 5}],
-  :status-mix {:client-error 2387, :ok 239, :server-error 9343},
+  [{:path "/system-dynamics", :requests 29}
+   {:path "/robots.txt", :requests 21}
+   {:path "/backup.tar.gz", :requests 18}
+   {:path "/database.yml.bak", :requests 14}
+   {:path "/.github/workflows/build.yml", :requests 14}
+   {:path "/wp-config.txt", :requests 14}
+   {:path "/vendor/phpunit/src/Util/PHP/eval-stdin.php", :requests 12}
+   {:path "/.vscode/settings.json", :requests 12}],
+  :status-mix {:client-error 2313, :ok 345, :server-error 9268},
   :window "24h"},
  :as-of "2026-07-22",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 20, :error-5xx-pct 78},
+ {:window "24h", :probe-4xx-pct 19, :error-5xx-pct 78},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 71 · /system-dynamics 26 · /robots.txt 20 · /_shell/liquid-glass.css 9 · /_shell/liquid-glass-adapter.css 6 | 4xx(probe) 20% · 5xx 78%",
+ "上位 page (24h, 2xx/3xx): /system-dynamics 29 · /robots.txt 21 · /backup.tar.gz 18 · /database.yml.bak 14 · /.github/workflows/build.yml 14 | 4xx(probe) 19% · 5xx 78%",
  :signal
- "etzhayyim.com 実測 69208 req/7d・2255 uniques(日次和)・うち4xx probe 20%(24h)、workers 17045 inv/7d"}
+ "etzhayyim.com 実測 69621 req/7d・2269 uniques(日次和)・うち4xx probe 19%(24h)、workers 17475 inv/7d"}
