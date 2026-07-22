@@ -25,9 +25,22 @@
    ;; qwen3.x otherwise fills reasoning_content and leaves content blank
    :chat_template_kwargs {:enable_thinking false}})
 
+(defn strip-fences
+  "Strip a ```edn … ``` (or bare ```) markdown fence from LLM output.
+   react/llm-advisor read-strings the returned content, so fences are
+   removed here at the transport layer rather than at the parse site."
+  [s]
+  (let [s (str/trim (str s))]
+    (if (str/starts-with? s "```")
+      (-> s
+          (str/replace #"^```[a-zA-Z0-9]*\s*" "")
+          (str/replace #"\s*```\s*$" ""))
+      s)))
+
 (defn extract-content
-  "Pull assistant text from an OpenAI-style response map.
-   Prefers :content; falls back to :reasoning_content (thinking models)."
+  "Pull assistant text from an OpenAI-style response map, with any markdown
+   code fence stripped. Prefers :content; falls back to :reasoning_content
+   (thinking models)."
   [response]
   (let [msg (or (get-in response ["choices" 0 "message"])
                 (get-in response [:choices 0 :message])
@@ -35,7 +48,7 @@
         content (or (get msg "content") (:content msg) "")
         reasoning (or (get msg "reasoning_content") (:reasoning_content msg) "")]
     (let [c (str/trim (str content))]
-      (if (seq c) c (str/trim (str reasoning))))))
+      (strip-fences (if (seq c) c (str/trim (str reasoning)))))))
 
 (defn parse-json-body
   "Parse JSON body string → cljs/clj map. nil on failure."

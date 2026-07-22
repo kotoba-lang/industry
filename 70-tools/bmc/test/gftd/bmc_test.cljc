@@ -265,7 +265,15 @@
   (testing "make-complete returns content on 200"
     (let [body "{\"choices\":[{\"message\":{\"content\":\"[{:ok true}]\"}}]}"
           complete (murakumo/make-complete (fn [_] {:status 200 :body body}) {})]
-      (is (= "[{:ok true}]" (complete "hi"))))))
+      (is (= "[{:ok true}]" (complete "hi")))))
+  (testing "```edn フェンスを剥がすと read-string 可能になる (react/llm-advisor は read-string するため)"
+    (is (= "[{:a 1}]" (murakumo/strip-fences "```edn\n[{:a 1}]\n```")))
+    (is (= "[{:a 1}]" (murakumo/strip-fences "```\n[{:a 1}]\n```")))
+    (is (= "[{:a 1}]" (murakumo/strip-fences "[{:a 1}]"))))
+  (testing "extract-content strips a fence around the message content"
+    (is (= "[{:x 1}]"
+           (murakumo/extract-content
+            {"choices" [{"message" {"content" "```edn\n[{:x 1}]\n```"}}]})))))
 
 (deftest kotobase-event-projection
   (let [evs [{:event/seq 42 :event/type :canvas/add-item :event/actor "advisor:auto"
@@ -339,27 +347,12 @@
     (testing "complete の例外も空 (fail-safe)"
       (is (= [] (vec (thrower obs)))))))
 
-#?(:cljs
-   (deftest strip-fences-unwraps-markdown
-     (testing "```edn フェンスを剥がすと read-string 可能になる"
-       (is (= "[{:a 1}]" (cli/strip-fences "```edn\n[{:a 1}]\n```")))
-       (is (= "[{:a 1}]" (cli/strip-fences "```\n[{:a 1}]\n```"))))
-     (testing "フェンス無しはそのまま"
-       (is (= "[{:a 1}]" (cli/strip-fences "[{:a 1}]"))))))
-
-#?(:cljs
-   (deftest sse-collect-reassembles-stream
-     (testing "OpenAI delta stream"
-       (is (= "[{:a 1}]"
-              (cli/sse-collect "data: {\"choices\":[{\"delta\":{\"content\":\"[{:a\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\" 1}]\"}}]}\n\ndata: [DONE]\n"))))
-     (testing "Anthropic content_block_delta stream (thinking delta は無視)"
-       (is (= "[{:b 2}]"
-              (cli/sse-collect (str "event: content_block_delta\n"
-                                    "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"thinking_delta\",\"thinking\":\"hmm\"}}\n\n"
-                                    "event: content_block_delta\n"
-                                    "data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"[{:b 2}]\"}}\n\n")))))
-     (testing "SSE でない body は nil (JSON fallback へ)"
-       (is (nil? (cli/sse-collect "{\"choices\":[{\"message\":{\"content\":\"x\"}}]}"))))))
+;; strip-fences moved to gftd.murakumo (transport-layer concern for the
+;; murakumo-based advisor); see `murakumo-complete-from-http` above.
+;; sse-collect had no replacement: it existed only to reassemble the old
+;; GFTD_LLM_URL curl/SSE transport (ADR-2607172800), which this PR's
+;; murakumo.cljc-based `make-complete` (plain HTTP, injected http-post!)
+;; replaces outright — there is no streaming path to test here anymore.
 
 #?(:cljs
    (deftest normalize-llm-proposal-keywordizes-string-ids

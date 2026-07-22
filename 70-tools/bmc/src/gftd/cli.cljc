@@ -135,6 +135,28 @@
     "murakumo" "advisor:murakumo"
     "advisor:auto"))
 
+(defn normalize-llm-proposal
+  "LLM が :canvas/id / :hyp/id / :proposal/action を string で出す揺れを
+   keyword に正規化する (transport 正規化 — 実測: qwen3.6 は
+   \"cloud-itonami.metrics\" と string で出し、gemma4 は keyword で出す)。
+   妥当性の判定は従来どおり governor に委ね、ここでは形だけ揃える。"
+  [p]
+  (let [kw #(cond (keyword? %) %
+                  (string? %) (keyword (str/replace % #"^:" ""))
+                  (symbol? %) (keyword (str %))   ; qwen3.6 実測: quote 無し
+                  :else %)]
+    (cond-> p
+      (contains? p :canvas/id) (update :canvas/id kw)
+      (contains? p :hyp/id) (update :hyp/id kw)
+      (contains? p :proposal/action) (update :proposal/action kw)
+      (contains? p :event/type) (update :event/type kw))))
+
+(defn normalizing-advisor
+  "Wrap an LLM-backed advisor so its proposals go through
+   `normalize-llm-proposal` before reaching the governor."
+  [llm-advisor]
+  (fn [obs] (map normalize-llm-proposal (llm-advisor obs))))
+
 
 #?(:clj
    (do
@@ -246,7 +268,7 @@
          (if (= mode "gate")
            {:mode mode :advisor react/gate-aware-advisor :actor (actor-for-mode mode)}
            (let [complete (murakumo/make-complete jvm-http-post! {})
-                 llm (react/llm-advisor complete)]
+                 llm (normalizing-advisor (react/llm-advisor complete))]
              {:mode mode
               :advisor (react/compose-advisors react/gate-aware-advisor llm)
               :actor (actor-for-mode mode)}))))
@@ -613,7 +635,7 @@
          (if (= mode "gate")
            {:mode mode :advisor react/gate-aware-advisor :actor (actor-for-mode mode)}
            (let [complete (murakumo/make-complete nbb-http-post! {})
-                 llm (react/llm-advisor complete)]
+                 llm (normalizing-advisor (react/llm-advisor complete))]
              {:mode mode
               :advisor (react/compose-advisors react/gate-aware-advisor llm)
               :actor (actor-for-mode mode)}))))
