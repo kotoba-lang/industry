@@ -1,0 +1,422 @@
+[{:doc/type :canary-execution-timeline
+  :doc/id "month-3-canary-execution-timeline"
+  :doc/title "Month 3 Canary Execution Timeline — Detailed Stages (2026-09-11 to 2026-09-14)"
+  :doc/date "2026-07-21"
+  :doc/author "Claude Code Agent"
+  :doc/status "ACTIVE"
+
+  :canary/event
+  {:decision-gate-date "2026-09-08"
+   :decision-gate-time "16:00 JST"
+   :canary-start-date "2026-09-11"
+   :canary-start-time "09:00 JST"
+   :cutover-target-date "2026-09-14"
+   :cutover-target-time "22:00 JST"
+   :duration-days 4}
+
+  :canary/overview
+  "Month 3 canary traffic migration executes in 3 stages over 4 days (2026-09-11 to 2026-09-14).
+   Each stage ramps traffic from baseline (50% cljc from Phase 2) toward 100% cljc fleet cutover.
+   Automatic rollback triggers guard against latency regression, parity divergence, reliability failures,
+   and memory exhaustion. Stage gates require manual approval before proceeding to next stage."
+
+  :canary/stage-1-canary
+  {:seq 1
+   :name "Stage 1: Canary (50% → 75% traffic)"
+   :date "2026-09-11"
+   :start-time "09:00 JST"
+   :duration-hours 4
+   :status-at-start "Phase 2 stable at 50% traffic (7-day pre-flight sentinel complete)"
+
+   :traffic-transition
+   {:from "50% cljc (6 nodes) / 50% Rust (9 nodes)"
+    :to "75% cljc (6 nodes, scaled up if needed) / 25% Rust (9 nodes)"
+    :ramp-duration-minutes 30}
+
+   :phase-1a-ramp
+   {:time-slot "09:00 to 09:30 JST"
+    :action "Traffic ramp: 50% → 60% → 70% → 75% (smooth curve, 5 min per increment)"
+    :owner "murakumo-ops-lead (traffic controller)"
+    :monitoring "Real-time dashboard: latency, parity, error rate"
+    :alert-threshold "p99 > 100ms or parity > 0.5% → pause ramp"}
+
+   :phase-1b-stabilization
+   {:time-slot "09:30 to 13:00+ JST"
+    :duration-minutes 210
+    :action "Hold 75% traffic steady, monitor SLOs"
+    :owner "murakumo-metrics-lead (monitoring lead)"
+    :monitoring-interval-minutes 5
+    :key-metrics
+    ["p50 latency (target ≤ 70ms)"
+     "p95 latency (target ≤ 95ms)"
+     "p99 latency (target ≤ 100ms, hard gate)"
+     "parity failure rate (target < 0.01%)"
+     "HTTP 5xx rate (target ≤ 0.01%)"
+     "per-instance memory (target ≤ 256MB)"
+     "GC pause p99 (target ≤ 30ms)"]
+    :escalation-triggers
+    {:latency-spike "p99 > 100ms sustained > 5 min → auto rollback to 50%"
+     :parity-divergence "failure > 1% sustained > 1 min → auto rollback to Phase 2"
+     :reliability-spike "5xx > 1% sustained > 2 min → auto rollback to 50%"
+     :memory-exhaustion "per-instance > 512MB → auto rollback + investigate"}}
+
+   :phase-1-success-criteria
+   ["✓ Traffic ramp 50% → 75% completed without manual intervention"
+    "✓ Parity failure rate < 0.01% (< 10 divergence per 1M requests)"
+    "✓ Latency p99 ≤ 100ms sustained (no regression from Phase 2 baseline)"
+    "✓ Reliability: HTTP 5xx rate ≤ 0.01%, no unhandled exceptions"
+    "✓ Memory: per-instance heap < 256MB post-GC, no leaks detected"
+    "✓ No automatic rollback triggers activated"
+    "✓ Team confidence high (no yellow/red alerts)"]
+
+   :phase-1-gate
+   {:time "2026-09-12 09:00 JST"
+    :decision-required true
+    :decision-maker "murakumo-owner"
+    :options ["PROCEED to Stage 2 (75% → 90%)"
+              "HOLD (extend Stage 1 stabilization, delay Stage 2)"
+              "ROLLBACK (return to Phase 2, 50% traffic)"]
+    :decision-criteria
+    {:proceed "All success criteria met, SLOs passing, no blocking issues"
+     :hold "Borderline metric (e.g., parity trending toward 0.02%), needs 4h more data"
+     :rollback "Any success criterion failed, blocking issue found, team recommends pause"}}
+
+   :team-roles
+   [{:role "Traffic Controller" :action "Execute ramp script, monitor load balancer configs"}
+    {:role "Monitoring Lead" :action "Dashboard watch, alert response, SLO verification"}
+    {:role "Escalation Lead" :action "Document decisions, notify team of status changes"}
+    {:role "On-Call Engineer" :action "Standby for manual intervention if auto-rollback triggers"}]}
+
+  :canary/stage-2-ramp
+  {:seq 2
+   :name "Stage 2: Ramp (75% → 90% traffic)"
+   :date "2026-09-12"
+   :start-time "09:00 JST"
+   :duration-hours 4
+   :gating-condition "Stage 1 gate decision = PROCEED"
+   :status-at-start "75% cljc stable (4+ hours from Stage 1)"
+
+   :traffic-transition
+   {:from "75% cljc / 25% Rust"
+    :to "90% cljc / 10% Rust"
+    :ramp-duration-minutes 20}
+
+   :phase-2a-ramp
+   {:time-slot "09:00 to 09:20 JST"
+    :action "Traffic ramp: 75% → 80% → 85% → 90% (5 min per 5% increment)"
+    :owner "murakumo-ops-lead"
+    :monitoring "Real-time dashboard"
+    :alert-threshold "p99 > 100ms or parity > 0.5% → pause ramp"}
+
+   :phase-2b-stabilization
+   {:time-slot "09:20 to 13:00+ JST"
+    :duration-minutes 220
+    :action "Hold 90% traffic steady, monitor SLOs (same as Stage 1)"
+    :owner "murakumo-metrics-lead"
+    :monitoring-interval-minutes 5}
+
+   :phase-2-success-criteria
+   ["✓ Traffic ramp 75% → 90% completed without manual intervention"
+    "✓ Same SLO targets met (parity < 0.01%, p99 ≤ 100ms, 5xx ≤ 0.01%)"
+    "✓ No sign of degradation as load increases"
+    "✓ Rust pool still responsive (monitoring 10% traffic handling gracefully)"
+    "✓ No automatic rollback triggers activated"]
+
+   :phase-2-gate
+   {:time "2026-09-13 09:00 JST"
+    :decision-required true
+    :decision-maker "murakumo-owner"
+    :options ["PROCEED to Stage 3a (90% → 99%)"
+              "HOLD (extend Stage 2 stabilization)"
+              "ROLLBACK (return to Stage 1, 75% traffic)"]
+    :decision-criteria
+    {:proceed "All success criteria met, confidence high for final push"
+     :hold "Metric trending, needs 4h more observation"
+     :rollback "Issue detected, needs investigation"}}
+
+   :team-roles
+   [{:role "Traffic Controller" :action "Execute ramp, monitor load balance across nodes"}
+    {:role "Monitoring Lead" :action "Watch for p99 creep as load increases"}
+    {:role "Escalation Lead" :action "Prepare final cutover procedures if proceeding"}]}
+
+  :canary/stage-3a-final-ramp
+  {:seq 3
+   :name "Stage 3a: Final Ramp (90% → 99% traffic)"
+   :date "2026-09-13"
+   :start-time "09:00 JST"
+   :duration-hours 4
+   :gating-condition "Stage 2 gate decision = PROCEED"
+   :status-at-start "90% cljc stable (4+ hours from Stage 2)"
+
+   :traffic-transition
+   {:from "90% cljc / 10% Rust"
+    :to "99% cljc / 1% Rust"
+    :ramp-duration-minutes 15}
+
+   :phase-3a-ramp
+   {:time-slot "09:00 to 09:15 JST"
+    :action "Traffic ramp: 90% → 95% → 99% (5 min per increment)"
+    :owner "murakumo-ops-lead"
+    :note "At 1% Rust, very few requests hit Rust pool; high visibility into edge cases"
+    :alert-threshold "Same as before (p99 > 100ms or parity > 0.5%)"}
+
+   :phase-3a-stabilization
+   {:time-slot "09:15 to 13:00+ JST"
+    :duration-minutes 225
+    :action "Hold 99% traffic steady; Rust pool in canary mode (1% traffic only)"
+    :owner "murakumo-metrics-lead"
+    :special-focus
+    ["Edge cases: 1% of traffic may expose rare code paths not hit in Phase 2"
+     "Rust pool health: confirm it can still handle 1% gracefully"
+     "Any divergence at 99% is highly suspicious (data consistency issue)"]
+    :monitoring-interval-minutes 5}
+
+   :phase-3a-success-criteria
+   ["✓ Traffic ramp 90% → 99% completed"
+    "✓ SLOs still holding (parity < 0.01%, p99 ≤ 100ms, 5xx ≤ 0.01%)"
+    "✓ Rust pool health confirmed (1% traffic, no errors)"
+    "✓ No edge-case failures from 99% load distribution"]
+
+   :phase-3a-gate
+   {:time "2026-09-13 14:00 JST"
+    :decision-required true
+    :decision-maker "murakumo-owner"
+    :options ["PROCEED to Stage 3b (99% → 100% explicit cutover)"
+              "HOLD (stay at 99%, delay final cutover to next day)"
+              "ROLLBACK (return to Stage 2, 90% traffic)"]
+    :decision-criteria
+    {:proceed "Ready for final cutover, all SLOs green, team confident"
+     :hold "Minor concern (e.g., GC pause trending up), extend observation"
+     :rollback "Issue found, abort canary"}}
+
+  :canary/stage-3b-cutover
+  {:seq 4
+   :name "Stage 3b: Explicit Cutover (99% → 100%)"
+   :date "2026-09-13"
+   :start-time "14:00 JST"
+   :duration-minutes 120
+   :gating-condition "Stage 3a gate decision = PROCEED"
+   :status-at-start "99% cljc stable (4+ hours from Stage 3a)"
+
+   :traffic-transition
+   {:from "99% cljc / 1% Rust"
+    :to "100% cljc / 0% Rust (explicit cutover, NOT gradual ramp)"
+    :note "Unlike previous stages, this is a one-shot 99%→100% switch, not gradual"
+    :ramp-duration-seconds 10}
+
+   :phase-3b-cutover-execution
+   {:time-slot "14:00 JST"
+    :action "Execute cutover: 99% → 100% traffic to cljc fleet"
+    :owner "murakumo-ops-lead (traffic controller)"
+    :duration-seconds 10
+    :procedure
+    ["1. Notify team on #prod-gates-wave5 (Slack): 'Cutover starting 14:00 JST'"
+     "2. Execute load balancer rule change: direct 100% traffic to cljc nodes"
+     "3. Monitor Prometheus metrics for spike or error (first 30 seconds critical)"
+     "4. If latency spike or error spike detected in first 30s → immediate rollback to 99%"
+     "5. If no immediate error → declare cutover safe"]}
+
+   :phase-3b-post-cutover
+   {:time-slot "14:00 to 15:00 JST"
+    :duration-minutes 60
+    :action "Monitor 100% traffic on cljc fleet (all Rust traffic should be 0%)"
+    :owner "murakumo-metrics-lead"
+    :critical-watch
+    ["Latency: p99 should remain ≤ 100ms (may spike ±5ms on cutover, then stabilize)"
+     "Parity: should continue to show 0% failure (N/A once Rust is offline, but last parity checks at 99% should all pass)"
+     "Reliability: 5xx rate should remain ≤ 0.01%"
+     "Memory: no sudden spike from cljc fleet taking 100% load"
+     "Connection pool: verify cljc pool is healthy (connection count stable)"]
+    :auto-rollback-trigger
+    {:condition "p99 latency > 120ms sustained > 3 min after cutover"
+     :action "Automatic rollback to 99% cljc / 1% Rust (if Rust pool still available)"
+     :note "At this late stage, rollback may be risky if Rust pool was already draining. See Graceful Drain procedure."}}
+
+   :phase-3b-success-criteria
+   ["✓ Cutover 99% → 100% executed without error"
+    "✓ No immediate spike or cascading failure"
+    "✓ 100% cljc fleet handling all traffic"
+    "✓ SLOs stable post-cutover (parity N/A, p99 ≤ 100ms, 5xx ≤ 0.01%)"
+    "✓ No manual rollback needed"]
+
+   :phase-3b-gate
+   {:time "2026-09-13 15:00 JST"
+    :decision-required true
+    :decision-maker "murakumo-owner"
+    :options ["PROCEED to Graceful Rust Drain"
+              "HOLD (keep 1% traffic on Rust, delay drain)"
+              "ROLLBACK (revert to 99% / 1% or earlier)"]
+    :decision-criteria
+    {:proceed "Cutover successful, 100% cljc stable, ready to drain Rust pool"
+     :hold "Want more observation time, delay drain to next day"
+     :rollback "Issue detected, abort to 99%"}}
+
+  :canary/graceful-rust-drain
+  {:seq 5
+   :name "Graceful Rust Fleet Drain"
+   :date "2026-09-13"
+   :start-time "15:00 JST"
+   :duration-minutes 60
+   :gating-condition "Stage 3b gate decision = PROCEED"
+   :status-at-start "100% cljc fleet handling traffic, Rust fleet at 0% new connections"
+
+   :phase-drain-step-1
+   {:step 1
+    :name "Stop Accepting New Connections on Rust Fleet"
+    :time-slot "15:00 JST"
+    :duration-seconds 30
+    :action
+    ["1. Set Rust pool drain flag (no new connections accepted)"
+     "2. Stop Rust load balancer targets from receiving new requests"
+     "3. In-flight requests continue to completion (graceful, not abrupt)"
+     "4. Configure 30-second connection timeout (failsafe)"]
+    :owner "murakumo-ops-lead"
+    :monitoring "Rust pool: active connection count should decrease over 30-60s"}
+
+   :phase-drain-step-2
+   {:step 2
+    :name "Drain In-Flight Requests (Grace Period: 60 seconds)"
+    :time-slot "15:00 to 16:00 JST"
+    :duration-seconds 3600
+    :action
+    ["1. Monitor Rust pool: active connections → 0"
+     "2. Expected: 99% of in-flight requests complete within 30s (high percentile)"
+     "3. Tail requests (p99 latency ~100ms): allow full grace period (60s)"
+     "4. Any request exceeding grace period → force timeout + close connection"
+     "5. Log: final connection drops, reason (completed vs timeout)"]
+    :owner "murakumo-ops-lead"
+    :monitoring-interval-seconds 10
+    :critical-watch
+    ["Are connections draining smoothly?"
+     "Are there hanging requests (p99.9+ tail waiting indefinitely)?"
+     "Is cljc fleet handling dropped Rust connections gracefully (no cascading failure)?"]
+    :escalation
+    {:condition "Rust pool connections still > 10% of peak after 30s"
+     :action "Investigate: are requests truly in-flight or stuck?"
+     :decision "If hung > 60s grace period, force shutdown (already acceptable per SLA)"}
+    :success-condition "Rust pool: 0 active connections by T+60s"}
+
+   :phase-drain-step-3
+   {:step 3
+    :name "Verify Session Data Migration"
+    :time-slot "16:00 JST (after drain)"
+    :duration-minutes 10
+    :action
+    ["1. Cross-check: are all user sessions now tracked in cljc fleet?"
+     "2. Verify: no session loss (parity checker confirms same data)"
+     "3. Confirm: cljc fleet session map identical to Rust baseline"
+     "4. If discrepancy: rollback before proceeding (rare, but critical)"]
+    :owner "murakumo-metrics-lead"
+    :critical-gate "Session data must be 100% migrated before Rust pool deactivation"}
+
+   :phase-drain-step-4
+   {:step 4
+    :name "Deactivate Rust Pool (Standby 7-day Hold)"
+    :time-slot "16:10 JST"
+    :action
+    ["1. Drain complete: set Rust pool to STANDBY (not accepting ANY traffic)"
+     "2. Keep Rust pool infrastructure alive (nodes up, services running)"
+     "3. Reason: emergency rollback window (7 days after cutover)"
+     "4. Document: final timestamp when Rust pool went 0% traffic"
+     "5. Alert: if needed to restore, full restore takes ~5 min (pre-flight gate 7 days before)"]
+    :standby-duration-days 7
+    :owner "murakumo-ops-lead"
+    :note "After 7 days (2026-09-21), Rust pool can be decommissioned (if no rollbacks triggered)"}
+
+  :canary/post-cutover-validation
+  {:seq 6
+   :name "Post-Cutover Validation (2026-09-14)"
+   :date "2026-09-14"
+   :start-time "22:00 JST"
+   :duration-hours 2
+   :owner "murakumo-metrics-lead"
+
+   :validation-checklist
+   ["✓ 100% cljc fleet live, handling all traffic"
+    "✓ p99 latency ≤ 100ms (sustained 4+ hours)"
+    "✓ Parity N/A (no Rust baseline to compare), data integrity confirmed"
+    "✓ 5xx rate ≤ 0.01% (no application errors)"
+    "✓ Memory stable: per-instance ≤ 256MB post-GC"
+    "✓ GC pause p99 ≤ 30ms (no GC regression with 100% load)"
+    "✓ No connection resets or timeouts"
+    "✓ Rust pool: 0% traffic, STANDBY mode active"
+    "✓ Session data: 100% migrated, no data loss"
+    "✓ Alert noise < 1 per hour (no false positives)"]
+
+   :final-decision
+   {:time "2026-09-14 22:00 JST"
+    :decision-maker "murakumo-owner"
+    :options
+    ["✓ DECLARE CUTOVER COMPLETE: Full production transition to cljc fleet (Month 3 complete)"
+     "⚠ DECLARE WITH CAVEATS: Cutover complete but issue found (document issue, SLA for fix)"
+     "✗ DECLARE ROLLBACK: Critical issue found, revert to 1% Rust standby, extend investigation"]
+    :success-criteria "DECLARE CUTOVER COMPLETE if all validation items pass"
+    :fallback "If issue found: document in `90-docs/adr/` (parity divergence root cause, latency regression investigation, etc.)"}
+
+   :documentation
+   ["Cutover summary: `90-docs/deployment/MONTH-3-CUTOVER-VALIDATION-RECORD.edn` (append-only)"
+    "Incident review (if rollback): `90-docs/adr/MONTH-3-INCIDENT-*.edn` (post-mortem)"
+    "Success summary: `90-docs/deployment/MONTH-3-CUTOVER-COMPLETE.edn`"]}
+
+  :canary/rollback-guard
+  {:automatic-triggers
+   ["Latency: p99 > 100ms sustained > 5 min → auto rollback to previous stage"
+    "Parity: > 1% divergence sustained > 1 min → auto rollback to Phase 2 (full)"
+    "Reliability: 5xx > 1% sustained > 2 min → auto rollback to previous stage"
+    "Memory: per-instance > 512MB → auto rollback + investigate"
+    "Rust drain: > 10% connections hung > 60s → force shutdown (acceptable)"]
+
+   :manual-override
+   {:trigger "Owner sees acceptable trade-off (e.g., p99 = 105ms due to load distribution)"
+    :process "Owner documents decision in Slack (#prod-gates-wave5) with SLA (e.g., 'Delay rollback 15 min, deploy fix')"
+    :max-delay 900
+    :note "Override delays automatic rollback, but does NOT disable subsequent triggers"}}
+
+  :canary/on-call-rotation
+  {:schedule "24/7 coverage: 2026-09-11 09:00 to 2026-09-14 22:00 JST"
+   :shift-1
+   {:date "2026-09-11"
+    :time-slot "09:00 to 17:00 JST"
+    :duration-hours 8
+    :role "Stage 1 canary lead (traffic + metrics monitoring)"
+    :team-size 3}
+   :shift-2
+   {:date "2026-09-11 17:00 to 2026-09-12 09:00 JST"
+    :duration-hours 16
+    :role "Overnight standby (alert response, emergency rollback if needed)"
+    :team-size 2}
+   :shift-3
+   {:date "2026-09-12 09:00 to 17:00 JST"
+    :duration-hours 8
+    :role "Stage 2 ramp lead"
+    :team-size 3}
+   :shift-4
+   {:date "2026-09-12 17:00 to 2026-09-13 09:00 JST"
+    :duration-hours 16
+    :role "Overnight standby"
+    :team-size 2}
+   :shift-5
+   {:date "2026-09-13 09:00 to 18:00 JST"
+    :duration-hours 9
+    :role "Stage 3a/3b final cutover lead + Rust drain"
+    :team-size 4}
+   :shift-6
+   {:date "2026-09-13 18:00 to 2026-09-14 22:00 JST"
+    :duration-hours 28
+    :role "Post-cutover stabilization + overnight watch"
+    :team-size 2}}
+
+  :canary/communication-plan
+  {:primary-channel "#prod-gates-wave5 (Slack)"
+   :alert-channel "PagerDuty (escalation)"
+   :decision-log "This file + `MONTH-3-GO-NO-GO-DECISION.edn`"
+   :status-updates-frequency "every 1 hour during active stages"
+   :critical-updates
+   ["Stage gate decisions (proceed / hold / rollback)"
+    "Automatic rollback triggers (immediate alert)"
+    "SLO violations (threshold breaches)"
+    "Rust drain progress (connection count → 0)"]
+   :all-clear-message "100% cljc fleet stable, cutover complete"}
+
+  :adr/related ["2607072100-kotoba-server-fleet-deployment-strangler-fig.edn"
+                "2607072400-kaisha-pod-murakumo-fleet-deployment.edn"]}]

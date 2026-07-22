@@ -1,0 +1,154 @@
+{:doc/type :execution-kickoff
+ :doc/id "wave5-m5m6-kickoff-20260720"
+ :doc/title "Wave 5 M5–M6 Production Gates Execution Kickoff"
+ :doc/date "2026-07-20"
+ :doc/author "Claude Code Agent"
+ :doc/status "ACTIVE"
+
+ :schedule/period
+ {:start-date "2026-08-18"
+  :end-date "2026-09-29"
+  :phase "M5–M6 Execution"
+  :total-weeks 6
+  :gate-waves
+  [{:week 11 :date "2026-08-18" :phase "M5" :label "Week 11 M5 Gate — Critical Path Baseline"}
+   {:week 12 :date "2026-08-25" :phase "M5" :label "Week 12 M5 Gate — First Sync Point"}
+   {:week 13 :date "2026-09-01" :phase "M5" :label "Week 13 M5 Gate — Mid-Phase Checkpoint"}
+   {:week 14 :date "2026-09-08" :phase "M5" :label "Week 14 M5 Gate — M5 Close / M6 Prep"}
+   {:week 15 :date "2026-09-15" :phase "M6" :label "Week 15 M6 Gate — M6 Launch"}
+   {:week 16 :date "2026-09-22" :phase "M6" :label "Week 16 M6 Gate — M6 Final Sync"}]}
+
+ :kickoff/meeting
+ {:date "2026-08-18"
+  :time "09:00 AM"
+  :duration-min 60
+  :timezone "JST (Asia/Tokyo)"
+  :decision-rule "consensus"
+  :attendees ["team-lead-m5" "team-lead-m6" "platform-owner" "metrics-lead" "escalation-lead"]
+  :agenda
+  ["(10 min) Gate schedule review — weeks 11–16, sync points, SLA expectations"
+   "(15 min) Metrics pipeline walkthrough — Prometheus setup, CI bot triggers, alert routing"
+   "(15 min) Escalation protocol handoff — 4h/2h SLAs, response channels, escalation tree"
+   "(10 min) Weekly checkpoint rhythm — Monday review (9 AM), Friday gate review (4 PM), 48h window"
+   "(10 min) Team board access & sync confirmation — Trello/Jira read + governance"]}
+
+ :execution/boards
+ {:trello-per-team
+  [{:team "M5 Core" :board-id "trello-m5-core-wave5" :template "standard-gate"}
+   {:team "M5 Integration" :board-id "trello-m5-integration-wave5" :template "standard-gate"}
+   {:team "M6 Platform" :board-id "trello-m6-platform-wave5" :template "standard-gate"}]
+  :jira-per-team
+  [{:team "M5 Core" :project-key "M5W5" :template "gate-workflow"}
+   {:team "M5 Integration" :project-key "M5IW5" :template "gate-workflow"}
+   {:team "M6 Platform" :project-key "M6W5" :template "gate-workflow"}]
+  :shared-dashboard "gates-wave5-m5m6-live"}
+
+ :metrics/pipeline
+ {:status "DEPLOYMENT_READY"
+  :components
+  [{:name "prometheus-collector" :status "staged" :deploy-target "monitoring-cluster"}
+   {:name "ci-gate-bot" :status "tested" :deploy-target "github-workflows"}
+   {:name "alert-router" :status "configured" :deploy-target "slack-ops-channel"}
+   {:name "dashboard-exporter" :status "ready" :deploy-target "grafana-instance"}]
+  :collection-cadence
+  [{:metric "build-times" :interval "15min" :slo "p99 < 12m"}
+   {:metric "test-coverage" :interval "1h" :slo "coverage >= 92%"}
+   {:metric "deployment-success" :interval "1h" :slo "success >= 99.5%"}
+   {:metric "gate-blockers" :interval "5min" :slo "reported < 2m after detection"}
+   {:metric "team-velocity" :interval "1h" :slo "burndown tracked"}]
+  :dashboards
+  [{:name "metrics-live" :url "https://grafana.internal/d/wave5-m5m6" :refresh "30s"}
+   {:name "gate-status-board" :url "https://ci.internal/gates/wave5" :refresh "1m"}
+   {:name "team-scorecards" :url "https://scorecard.internal/wave5-m5m6" :refresh "5m"}]}
+
+ :escalation/protocol
+ {:status "ARMED"
+  :sla
+  {:alert-response-time "4 hours"
+   :critical-blocker-response "2 hours"
+   :gate-failure-decision "same-checkpoint"}
+  :channels
+  [{:type "slack" :channel "#prod-gates-wave5" :priority "P0"}
+   {:type "email" :group "gates-escalation@" :priority "P1"}
+   {:type "pagerduty" :service "prod-gates" :priority "P0-critical"}]
+  :escalation-tree
+  [{:level 1 :role "team-lead" :response-window "1h"}
+   {:level 2 :role "phase-owner" :response-window "2h"}
+   {:level 3 :role "platform-lead" :response-window "4h"}]
+  :gate-halt-protocol
+  {:trigger "2+ teams blocked on same critical path item"
+   :decision-maker "phase-owner + platform-lead"
+   :timeline "15 min consensus call"
+   :escalation-on-no-consensus "platform-lead + main coordinator"}
+
+ :checkpoints/weekly
+ {:monday-reviews
+  {:time "09:00 AM JST"
+   :duration "30 min"
+   :attendees "team-leads + metrics-lead"
+   :agenda
+   ["Progress review (vs. burndown forecast)"
+    "Blocker triage (new + aging)"
+    "Team velocity trending"
+    "Metrics health check"]}
+  :friday-gate-reviews
+  {:time "16:00 (4 PM) JST"
+   :duration "45 min"
+   :decision-rule "consensus"
+   :agenda
+   ["Gate readiness assessment (all teams)"
+    "Critical path verification"
+    "Dependency check (cross-team)"
+    "Go/no-go decision + next week prep"]}
+  :escalation-response-window
+  {:deadline "48 hours after alert"
+   :checkpoint "every Mon 9 AM + Fri 4 PM"
+   :tracking "escalation board (Jira)"}
+
+ :deployment/activation
+ {:metrics-pipeline-live "2026-08-10 (pre-kickoff staging)"
+  :execution-boards-published "2026-08-15 (pre-kickoff)"
+  :team-sync-confirmation "2026-08-16 (pre-kickoff sync call)"
+  :kickoff-meeting "2026-08-18 09:00 AM"
+  :gate-execution-start "2026-08-18 (week 11)"}
+
+ :concurrent-activities
+ [{:name "Wave 5 staging validation" :weeks "11–15" :lead "staging-lead"}
+  {:name "Month 3 preflight preparation" :weeks "11–15" :target-date "2026-09-08"}
+  {:name "Weekly metrics collection" :weeks "11–16" :cadence "continuous"}
+  {:name "Team onboarding completion" :deadline "2026-08-17"}]
+
+ :success-criteria
+ {:execution
+  ["Kickoff meeting held 2026-08-18 with consensus decision"
+   "All execution boards (Trello + Jira) live and team-accessible by 2026-08-18"
+   "Metrics pipeline collecting data (Prometheus, CI bot, Grafana) by 2026-08-18"
+   "First weekly checkpoints completed: Mon 2026-08-19 09:00 + Fri 2026-08-22 16:00"
+   "Zero gate halts due to missing metrics/escalation infrastructure in week 11"
+   "All team leads trained on checkpoint rhythm + escalation protocol by 2026-08-17"]
+  :metrics
+  ["All 5 core metrics (build-times, test-coverage, deployment-success, gate-blockers, velocity) live"
+   "Dashboard refresh < 1 min (Grafana p99 < 30s)"
+   "Alert detection latency < 2 min (Prometheus → Slack routing)"
+   "Weekly reports auto-generated (no manual compilation)"
+   "SLA compliance tracked (response times, gate decision latency)"]
+  :gates
+  ["Week 11 M5 gate (2026-08-18) produces decision artifacts"
+   "Week 12–16 gates follow standard checkpoint rhythm (Mon 9 AM + Fri 4 PM)"
+   "Zero rollback due to gate misinterpretation (escalation protocol clarity)"
+   "Monthly gate sync (post-M5, pre-M6) completed by 2026-09-08"]}
+
+ :reporting
+ {:weekly-report-format
+  "Execution Report (Week N) — metrics snapshot + gate decision + team status + blockers + next-week forecast"
+  :audience ["main-coordinator" "platform-lead" "team-leads" "stakeholders"]
+  :distribution "email + Slack #prod-gates-wave5 + dashboard.internal"
+  :report-generation "automated (CI job) + human narrative"
+  :archive "90-docs/gates/weekly-reports/wave5-m5m6/"}
+
+ :contact-and-handoff
+ {:execution-lead "Claude Code Agent (Haiku 4.5)"
+  :main-coordinator-contact "report weekly to main coordinator"
+  :escalation-contact "#prod-gates-wave5 (Slack)"
+  :metrics-queries "metrics-lead@gftd.group"
+  :next-review "2026-07-25 (pre-kickoff readiness check)"}}

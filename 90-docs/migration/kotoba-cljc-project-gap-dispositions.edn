@@ -1,5 +1,5 @@
 {:schema "kotoba-cljc-project-gap-dispositions/v1"
- :generated-on "2026-07-19"
+ :generated-on "2026-07-22"
  :basis
  {:project-probes "90-docs/migration/kotoba-cljc-project-probes.json"
   :project-probes-sha256 "41a808c1409132b67ce0db4fe88a26a6e9b860162dc3cbd910c0322bacba87cf"
@@ -853,7 +853,27 @@
    :retained-boundaries
    [:string-ids :names :trades :zones :durations :factory-geometry
     :clash-coordinates :robot-physics :rendering :source-json-loading]
-   :next-action :retain-cljc-oracle-and-kami-engine-physical-domain}]
+   :next-action :retain-cljc-oracle-and-kami-engine-physical-domain}
+  {:root "orgs/cloud-itonami/cloud-itonami-isco-8114/src/mineralplant/{actor,advisor,governor,store}.cljc"
+   :repository :cloud-itonami-isic-isco-iso3166-unspsc-cofog-gtin-actor-wave
+   :repositories-reviewed
+   ["cloud-itonami/cloud-itonami-isco-8114" "cloud-itonami/cloud-itonami-isco-7211"]
+   :repositories-in-class-not-yet-individually-reviewed 292
+   :class-size-note "Full live census 2026-07-22 (356 repositories queried, zero API errors): 294 cloud-itonami isic-*/isco-*/iso3166-*/unspsc-*/cofog-*/gtin-* repositories carry production CLJC and zero Kotoba (isic 133/997 files, isco 68/264 files, iso3166 81/777 files, unspsc 5/37 files, cofog 5/37 files, gtin 2/8 files -- 2120 production CLJC files, none migrated). isco-8114 (mineralplant) and its origin template isco-7211 (foundrycoord) were read in full as the reviewed exemplar; every file's docstring states it is 'Modeled closely on cloud-itonami-isco-7211' for this industrial-plant-safety-domain shape, so the finding below is expected to generalize across the actor/advisor/governor/store archetype, not proven for all 294 without per-repo review."
+   :kind :retain-cljc-pending-application-profile-and-string-search-gates
+   :review-status :reviewed-not-migratable-today
+   :migration-authorized false
+   :reason "Two independent blockers, both verified against upstream source rather than assumed. (1) Application-profile capability gate: this is a langgraph.graph state-graph actor (intake->advise->govern->decide->commit/hold, human-approval interrupt, checkpointed) with an LLM-swappable advisor and a mutable-atom Store -- kotoba/app territory per orgs/kotoba-lang/kotoba/docs/lang/application-profile.md's completion gate (typed descriptors, effect inference/admission, policy-gated provider, positive/denial fixtures, quota/audit, 2-runtime parity). That gate has not passed for LLM/actor/state effects: the doc's own named proving slice, gftdcojp/ai-gftd-ghosthacker-shiropico, has migrated exactly one pure decision function (src/shiropico/publish_decision.kotoba) and still carries advisor.cljc/operation.cljc/phase.cljc/policy.cljc/render.cljc/store.cljc as CLJC -- the full state/LLM/actor loop is not yet capability-complete anywhere in the fleet, so no actor repository in this wave can have Kotoba as its sole production authority yet. (2) Even the pure sub-computation is not fully portable: mineralplant.governor/check's hard-violations includes a defense-in-depth free-text scope-exclusion check (case-folded substring search of the proposal rationale against ~11 finalization/execution phrases) alongside its closed-set op-allowlist check. orgs/kotoba-lang/compiler's frontend.cljc string-operations set is exactly {string-byte-length string=? string-concat string-replace-all keyword-from-string keyword-name} -- no substring search, no case-fold, no index-of. Porting only the op-allowlist half and dropping the phrase half would be a silent domain-narrowing of a safety-critical governor invariant, forbidden by this file's :policy. Extracting a governor pure-kernel is therefore blocked on the same string-search primitive gap independently of the application-profile gate."
+   :required-language-gates
+   [:kotoba-app-llm-effect-completion-gate :kotoba-app-actor-state-machine-completion-gate
+    :kotoba-app-mutable-store-provider-completion-gate :string-substring-search-primitive
+    :string-case-fold-primitive]
+   :verification
+   {:mineralplant-files-read [:actor.cljc :advisor.cljc :governor.cljc :store.cljc]
+    :foundrycoord-files-confirmed-same-shape [:actor.cljc :advisor.cljc :governor.cljc :store.cljc]
+    :compiler-string-operations-checked "orgs/kotoba-lang/compiler src/kotoba/compiler/frontend.cljc string-operations def"
+    :shiropico-migration-state-checked "gftdcojp/ai-gftd-ghosthacker-shiropico main tree, 2026-07-22"}
+   :next-action :retain-cljc-and-revisit-per-repo-after-shiropico-completion-gate-and-string-search-primitive-land}]
  :language-maturity
  {:safe-f64-phase-3a
   {:status :merged-qualified
@@ -1186,10 +1206,105 @@
   :verification {:compiler-tests 306 :compiler-assertions 3913
                  :typed-and-untyped-executed-local-index 130
                  :nbb-golden-cases 18 :failures 0 :errors 0}}
+ :canonical-fleet-snapshot
+ {:as-of "2026-07-22"
+  :matrix "90-docs/migration/kotoba-cljc-canonical-admission-matrix.json"
+  :probes "90-docs/migration/kotoba-cljc-canonical-compile-probes.json"
+  :counts {:canonical-repositories 2039 :local-checkouts 2456
+           :duplicate-checkouts 417 :tracked-cljc-files 12481
+           :production-cljc-files 8385}
+  :source-state {:current-default-branch 889 :stale-against-default-branch 1148
+                 :incomplete-worktree 1 :github-unverified 1}
+  :github {:verified 2038 :not-found-or-inaccessible 1}
+  :classifications {:capability-bound 315 :generated 6 :host-adapter 2763
+                    :macro-compiler-time 9 :portable-direct-candidate 604
+                    :portable-refactor-required 4467 :security-host-bound 227
+                    :test-only 4088}
+  :direct-probes {:repositories 0 :probes 0}
+  :next-wave-census
+  {:as-of "2026-07-22"
+   :scope "cloud-itonami isic-*/isco-*/lei-*/iso3166-*/unspsc-*/cofog-*/gtin-*"
+   :repositories-queried 356
+   :api-errors 0
+   :repositories-with-production-cljc-zero-kotoba 294
+   :production-cljc-files-in-those 2120
+   :by-prefix {:isic {:repositories 133 :cljc-files 997}
+               :isco {:repositories 68 :cljc-files 264}
+               :iso3166 {:repositories 81 :cljc-files 777}
+               :unspsc {:repositories 5 :cljc-files 37}
+               :cofog {:repositories 5 :cljc-files 37}
+               :gtin {:repositories 2 :cljc-files 8}}
+   :repositories-with-no-src-out-of-scope
+   {:count 62 :by-prefix {:lei 46 :iso3166 15 :gtin 1}
+    :note "pure-data or scaffold-only repositories (append-only ledgers, docs-only), not remaining migration work"}
+   :repositories-already-sovereign 0
+   :disposition "See :dispositions entry :kind :retain-cljc-pending-application-profile-and-string-search-gates -- not authorized for migration attempts until both the kotoba/app completion gate and a string substring/case-fold primitive land."}
+  :reviewed-association-wave
+  [{:repository "cloud-itonami/cloud-itonami-assoc-6419-are-ubf"
+    :merge "ff157a754293d376782eb6fefb112c60c377051f"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-aus-aba"
+    :merge "5701e10f893ab6adb31d075c272e0094843bc3d5"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-che-sba"
+    :merge "3d15430d0f189b3c83e875a2f32805b77506fb5a"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-deu-bankenverband"
+    :merge "b9293b9b8801eb3e2a416e8dd8966ba414626ded"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-fra-fbf"
+    :merge "e7fcce22ae44a33e861657b190b7d8f78e730b71"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-esp-aeb"
+    :merge "e8e467d169830853ad0e5b42dbce38bd2038d1dc"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo"
+    :merge "7857f218a9879cda9ff1dbef99159be8c077b41a"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-phl-bap"
+    :merge "c6b4ee6b65b0db024a398dd8f874b98ef7cc14f5"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-vnm-vnba"
+    :merge "2ace31cd6e9d01855dd573179fb9dca151b5b1aa"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-nga-cibn"
+    :merge "593352bc5872986f5bcff136ef3b7a2338740e29"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-tur-tbb"
+    :merge "7810acc58d3055f6904c3d056dd3180a13556971"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6511-jpn-seiho"
+    :merge "cb9c43a8ead5e6f4396e51d7cfd1c3d6cd9e2d65"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6512-jpn-sonpo"
+    :merge "c9588469421d3a87386cf9fc615891a458ce2950"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6512-usa-naic"
+    :merge "c824e3f2a8a8b15a0f7a985dfc8bcc9e12690e4d"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6612-jpn-jsda"
+    :merge "9e1112ec4f6b4a3426914b94ebc521aa00a04e45"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6612-usa-finra"
+    :merge "612b69cb66d8da19db876a9b0edba19364ab37ea"
+    :result :semantic-conformance-and-zero-cljc-retired}]
+  :backfilled-unlogged-migrations
+  ["cloud-itonami/cloud-itonami-assoc-0126-idn-gapki" "cloud-itonami/cloud-itonami-assoc-0126-mys-mpoa"
+   "cloud-itonami/cloud-itonami-assoc-0150-usa-afbf" "cloud-itonami/cloud-itonami-assoc-0610-usa-api"
+   "cloud-itonami/cloud-itonami-assoc-2011-usa-acc" "cloud-itonami/cloud-itonami-assoc-2100-usa-phrma"
+   "cloud-itonami/cloud-itonami-assoc-2910-deu-vda" "cloud-itonami/cloud-itonami-assoc-2910-gbr-smmt"
+   "cloud-itonami/cloud-itonami-assoc-3510-usa-eei" "cloud-itonami/cloud-itonami-assoc-3600-usa-awwa"
+   "cloud-itonami/cloud-itonami-assoc-4100-usa-agc" "cloud-itonami/cloud-itonami-assoc-4719-usa-nrf"
+   "cloud-itonami/cloud-itonami-assoc-4923-usa-ata" "cloud-itonami/cloud-itonami-assoc-5010-nor-rederiforbundet"
+   "cloud-itonami/cloud-itonami-assoc-5110-usa-a4a" "cloud-itonami/cloud-itonami-assoc-5510-usa-ahla"
+   "cloud-itonami/cloud-itonami-assoc-5610-usa-nra" "cloud-itonami/cloud-itonami-assoc-6020-usa-nab"]
+  :assoc-wave-status :complete
+  :assoc-wave-note "All 37 cloud-itonami-assoc-* repositories (gh repo list, 2026-07-22) carry a sole production association_facts.kotoba with zero tracked CLJC. finra closed the reviewed retirement queue; the 18 repositories in :backfilled-unlogged-migrations were found already migrated by prior unlogged sessions (2026-07-20/21), verified against their merge commits and green CI, and logged into the ADR's :qualified-evidence -- their local checkouts were never canonical-matrix entries so they do not appear in :reviewed-association-wave above. No further next-reviewed-wave-candidate exists inside cloud-itonami-assoc-*; see :next-wave-census for the surveyed successor scope and the new :dispositions entry for why it is not yet actionable."
+  :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA and FINRA retirement each removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; the assoc-* wave is closed, so resume with per-repo review inside the isic/isco/iso3166/unspsc/cofog/gtin census once the application-profile and string-search gates are tracked as landed."}
  :completion
- {:reviewed-project-roots 41
+ {:reviewed-project-roots 42
   :authorized-migrations 19
-  :retained-oracles 3
+  :retained-oracles 4
   :typed-refactors-pending 0
   :typed-refactors-in-review 0
   :typed-refactors-merged-awaiting-cutover 3}}}

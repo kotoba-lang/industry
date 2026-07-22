@@ -1,0 +1,513 @@
+name: Production Gates Bot — Metrics Collection & Gate Decision
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/production-gates-bot.yml'
+      - 'scripts/collect-*.cljs'
+      - 'deploy/prometheus*.yml'
+  schedule:
+    # Build metrics collection (every 15 min)
+    - cron: '*/15 * * * *'
+    # Coverage metrics collection (daily at 02:00 JST)
+    - cron: '0 2 * * *'
+    # Deployment metrics (hourly)
+    - cron: '0 * * * *'
+    # Blocker metrics (every 5 min)
+    - cron: '*/5 * * * *'
+    # Weekly metrics report (Monday 9 AM JST = 0:00 UTC)
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      metric_type:
+        description: 'Metric type to collect'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - build-times
+          - test-coverage
+          - deployment-success
+          - gate-blockers
+          - team-velocity
+
+env:
+  PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
+  GRAFANA_API_KEY: ${{ secrets.GRAFANA_API_KEY }}
+  JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+  CI_API_TOKEN: ${{ secrets.CI_API_TOKEN }}
+  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+  PAGERDUTY_KEY: ${{ secrets.PAGERDUTY_KEY }}
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  METRICS_DB_URL: ${{ secrets.METRICS_DB_URL }}
+  WAVE: 'wave5-m5m6'
+  GATE_PROJECTS: 'M5W5,M5IW5,M6W5'
+
+jobs:
+  # Collect build metrics every 15 minutes
+  collect-build-metrics:
+    if: |
+      github.event_name == 'schedule' &&
+      (github.event.schedule == '*/15 * * * *' || github.event_name == 'workflow_dispatch') ||
+      github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+        working-directory: ./
+
+      - name: Install nbb (ClojureScript on Node)
+        run: npm install -g nbb
+
+      - name: Collect build times from CI
+        id: build-metrics
+        run: |
+          nbb scripts/collect-build-metrics.cljs
+        env:
+          CI_API_URL: 'https://api.github.com'
+          CI_TOKEN: ${{ env.CI_API_TOKEN }}
+          OWNER: 'com-junkawasaki'
+          REPO: 'root'
+
+      - name: Post to Prometheus
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            ${{ env.PROMETHEUS_URL }}/api/v1/write \
+            --data-binary "@metrics-build.txt"
+        if: success()
+        continue-on-error: true
+
+      - name: Update Grafana dashboard
+        run: |
+          curl -X PATCH \
+            -H "Authorization: Bearer ${{ env.GRAFANA_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"refresh": true}' \
+            https://grafana.internal/api/dashboards/uid/wave5-m5m6
+        if: success()
+        continue-on-error: true
+
+      - name: Check for build timeout alert
+        if: failure()
+        run: |
+          curl -X POST \
+            -H 'Content-type: application/json' \
+            --data '{"text":"⚠️ Build Metrics Collection Failed\n'${{ job.status }}'\nCheck: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
+            ${{ env.SLACK_WEBHOOK_URL }}
+
+  # Collect coverage metrics daily
+  collect-coverage-metrics:
+    if: |
+      github.event_name == 'schedule' &&
+      github.event.schedule == '0 2 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install nbb
+        run: npm install -g nbb
+
+      - name: Collect coverage from latest build
+        id: coverage
+        run: |
+          nbb scripts/collect-coverage-metrics.cljs
+        env:
+          COVERAGE_SOURCE: 'ci-artifacts'
+          CI_TOKEN: ${{ env.CI_API_TOKEN }}
+
+      - name: Parse coverage report
+        id: parse-coverage
+        run: |
+          if [ -f coverage-report.json ]; then
+            COVERAGE=$(jq '.coverage' coverage-report.json)
+            echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post coverage to Prometheus
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            ${{ env.PROMETHEUS_URL }}/api/v1/write \
+            --data-binary "@metrics-coverage.txt"
+        if: success()
+        continue-on-error: true
+
+      - name: Alert if coverage drops below 92%
+        if: failure() || steps.parse-coverage.outputs.coverage < 92
+        run: |
+          curl -X POST \
+            -H 'Content-type: application/json' \
+            --data '{"text":"⚠️ Test Coverage Alert\nCoverage: ${{ steps.parse-coverage.outputs.coverage }}%\nTarget: >=92%\nAction: Review CI logs"}' \
+            ${{ env.SLACK_WEBHOOK_URL }}
+
+  # Collect deployment success metrics
+  collect-deployment-metrics:
+    if: |
+      github.event_name == 'schedule' &&
+      github.event.schedule == '0 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install nbb
+        run: npm install -g nbb
+
+      - name: Collect deployment metrics
+        id: deploy-metrics
+        run: |
+          nbb scripts/collect-deploy-metrics.cljs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_API_TOKEN }}
+          DEPLOYMENT_SOURCE: 'cloudflare-api'
+
+      - name: Post to Prometheus
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            ${{ env.PROMETHEUS_URL }}/api/v1/write \
+            --data-binary "@metrics-deployment.txt"
+        if: success()
+        continue-on-error: true
+
+      - name: Alert on deployment failure
+        if: steps.deploy-metrics.outputs.success_rate < 0.995
+        run: |
+          curl -X POST \
+            -H 'Content-type: application/json' \
+            --data '{"text":"🚨 CRITICAL: Deployment Success Rate Below SLA\nRate: ${{ steps.deploy-metrics.outputs.success_rate }}\nTarget: 99.5%\nEscalating to PagerDuty"}' \
+            ${{ env.SLACK_WEBHOOK_URL }}
+
+  # Collect gate blocker metrics every 5 minutes
+  collect-blocker-metrics:
+    if: |
+      github.event_name == 'schedule' &&
+      github.event.schedule == '*/5 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install nbb
+        run: npm install -g nbb
+
+      - name: Query Jira for blockers
+        id: blockers
+        run: |
+          nbb scripts/collect-blocker-metrics.cljs
+        env:
+          JIRA_URL: 'https://jira.internal'
+          JIRA_USER: 'gates-bot'
+          JIRA_TOKEN: ${{ env.JIRA_API_TOKEN }}
+          JQL: 'project in (${{ env.GATE_PROJECTS }}) AND status = Blocked'
+
+      - name: Post blocker metrics to Prometheus
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            ${{ env.PROMETHEUS_URL }}/api/v1/write \
+            --data-binary "@metrics-blockers.txt"
+        if: success()
+        continue-on-error: true
+
+      - name: Check SLA breach
+        if: steps.blockers.outputs.p1_count > 0 && steps.blockers.outputs.oldest_age_hours > 4
+        run: |
+          curl -X POST \
+            -H 'Content-type: application/json' \
+            --data '{"text":"🔴 ESCALATION PROTOCOL ARMED - P1 Blocker SLA Breach\nP1 Blockers: ${{ steps.blockers.outputs.p1_count }}\nOldest: ${{ steps.blockers.outputs.oldest_age_hours }}h (SLA: 4h)\nAction: Initiate escalation protocol"}' \
+            ${{ env.SLACK_WEBHOOK_URL }}
+
+  # Collect team velocity metrics
+  collect-velocity-metrics:
+    if: |
+      github.event_name == 'schedule' &&
+      github.event.schedule == '0 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install nbb
+        run: npm install -g nbb
+
+      - name: Query Jira for velocity data
+        id: velocity
+        run: |
+          nbb scripts/collect-velocity-metrics.cljs
+        env:
+          JIRA_URL: 'https://jira.internal'
+          JIRA_USER: 'gates-bot'
+          JIRA_TOKEN: ${{ env.JIRA_API_TOKEN }}
+          JQL: 'project in (${{ env.GATE_PROJECTS }}) AND issuetype in (Story, Task) AND status = Done'
+
+      - name: Post velocity metrics
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            ${{ env.PROMETHEUS_URL }}/api/v1/write \
+            --data-binary "@metrics-velocity.txt"
+        if: success()
+        continue-on-error: true
+
+  # Generate weekly metrics report
+  generate-weekly-report:
+    if: |
+      github.event_name == 'schedule' &&
+      github.event.schedule == '0 0 * * 1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Install nbb
+        run: npm install -g nbb
+
+      - name: Query Prometheus for week-to-date metrics
+        id: query
+        run: |
+          nbb scripts/generate-weekly-report.cljs
+        env:
+          PROMETHEUS_URL: ${{ env.PROMETHEUS_URL }}
+          START_TIME: '7d'
+          END_TIME: 'now'
+
+      - name: Generate markdown report
+        id: report
+        run: |
+          nbb scripts/format-metrics-report.cljs
+        env:
+          REPORT_INPUT: 'weekly-metrics.json'
+          REPORT_FORMAT: 'markdown'
+
+      - name: Post report to Jira
+        if: success()
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ env.JIRA_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d @jira-weekly-report.json \
+            https://jira.internal/rest/api/2/issues
+        continue-on-error: true
+
+      - name: Post report to Slack
+        if: success()
+        run: |
+          curl -X POST \
+            -H 'Content-type: application/json' \
+            --data-binary @slack-weekly-report.json \
+            ${{ env.SLACK_WEBHOOK_URL }}
+
+      - name: Update dashboard with report
+        if: success()
+        run: |
+          curl -X PATCH \
+            -H "Authorization: Bearer ${{ env.GRAFANA_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d @grafana-weekly-update.json \
+            https://grafana.internal/api/dashboards/uid/wave5-m5m6
+        continue-on-error: true
+
+      - name: Archive report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-metrics-report
+          path: |
+            weekly-metrics.json
+            weekly-report.md
+          retention-days: 60
+
+  # Gate readiness check (runs before Friday 4 PM for gate decision)
+  gate-readiness-check:
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.metric_type == 'all'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      gate_status: ${{ steps.check.outputs.gate_status }}
+      blockers_count: ${{ steps.check.outputs.blockers_count }}
+      build_p99: ${{ steps.check.outputs.build_p99 }}
+      coverage: ${{ steps.check.outputs.coverage }}
+      deploy_rate: ${{ steps.check.outputs.deploy_rate }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install nbb
+        run: npm install -g nbb
+
+      - name: Perform gate readiness check
+        id: check
+        run: |
+          nbb scripts/gate-readiness-check.cljs
+        env:
+          PROMETHEUS_URL: ${{ env.PROMETHEUS_URL }}
+          JIRA_URL: 'https://jira.internal'
+          JIRA_TOKEN: ${{ env.JIRA_API_TOKEN }}
+          GATE_PROJECTS: ${{ env.GATE_PROJECTS }}
+
+      - name: Post gate status to Jira
+        if: success()
+        run: |
+          curl -X POST \
+            -H "Authorization: Bearer ${{ env.JIRA_API_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{"fields":{"summary":"Gate Readiness Check — Week N","description":"Status: ${{ steps.check.outputs.gate_status }}\nBlockers: ${{ steps.check.outputs.blockers_count }}\nBuild P99: ${{ steps.check.outputs.build_p99 }}s\nCoverage: ${{ steps.check.outputs.coverage }}%\nDeployment Success: ${{ steps.check.outputs.deploy_rate }}%"}}' \
+            https://jira.internal/rest/api/2/issues
+        continue-on-error: true
+
+      - name: Notify gates team
+        run: |
+          curl -X POST \
+            -H 'Content-type: application/json' \
+            --data '{"text":"📊 Gate Readiness Status\nStatus: ${{ steps.check.outputs.gate_status }}\nActive Blockers: ${{ steps.check.outputs.blockers_count }}\nBuild P99: ${{ steps.check.outputs.build_p99 }}s\nCoverage: ${{ steps.check.outputs.coverage }}%\nDeployment Success Rate: ${{ steps.check.outputs.deploy_rate }}%"}' \
+            ${{ env.SLACK_WEBHOOK_URL }}
+
+  # Health check (runs every Monday 9 AM to verify pipeline health)
+  metrics-pipeline-health-check:
+    if: |
+      github.event_name == 'schedule' &&
+      github.event.schedule == '0 0 * * 1'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check Prometheus scrape success rate
+        id: prometheus
+        run: |
+          SCRAPE_SUCCESS=$(curl -s "${{ env.PROMETHEUS_URL }}/api/v1/query?query=up" | jq '.data.result | map(select(.value[1]=="1")) | length')
+          SCRAPE_TOTAL=$(curl -s "${{ env.PROMETHEUS_URL }}/api/v1/query?query=up" | jq '.data.result | length')
+          SUCCESS_RATE=$((SCRAPE_SUCCESS * 100 / SCRAPE_TOTAL))
+          echo "success_rate=$SUCCESS_RATE" >> $GITHUB_OUTPUT
+          if [ $SUCCESS_RATE -lt 99 ]; then
+            echo "status=⚠️  WARNING" >> $GITHUB_OUTPUT
+          else
+            echo "status=✅ HEALTHY" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for data freshness
+        id: freshness
+        run: |
+          LATEST_BUILD=$(curl -s "${{ env.PROMETHEUS_URL }}/api/v1/query?query=build_duration_seconds" | jq '.data.result[0].value[0]')
+          NOW=$(date +%s)
+          AGE=$((NOW - LATEST_BUILD))
+          if [ $AGE -gt 1200 ]; then
+            echo "status=🔴 STALE" >> $GITHUB_OUTPUT
+          elif [ $AGE -gt 900 ]; then
+            echo "status=⚠️  AGING" >> $GITHUB_OUTPUT
+          else
+            echo "status=✅ FRESH" >> $GITHUB_OUTPUT
+          fi
+          echo "age_minutes=$((AGE / 60))" >> $GITHUB_OUTPUT
+
+      - name: Verify Grafana dashboard
+        id: grafana
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ env.GRAFANA_API_KEY }}" \
+            https://grafana.internal/d/wave5-m5m6)
+          if [ $STATUS -eq 200 ]; then
+            echo "status=✅ UP" >> $GITHUB_OUTPUT
+          else
+            echo "status=🔴 DOWN (HTTP $STATUS)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Verify alert routing
+        id: alerts
+        run: |
+          # Test Slack message delivery
+          RESPONSE=$(curl -s -X POST \
+            -H 'Content-type: application/json' \
+            --data '{"text":"🧪 Metrics Pipeline Health Check — Test Message"}' \
+            ${{ env.SLACK_WEBHOOK_URL }})
+          if echo "$RESPONSE" | grep -q "ok"; then
+            echo "status=✅ WORKING" >> $GITHUB_OUTPUT
+          else
+            echo "status=🔴 FAILED" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post health report
+        run: |
+          curl -X POST \
+            -H 'Content-type: application/json' \
+            --data '{
+              "blocks": [
+                {"type": "header", "text": {"type": "plain_text", "text": "📊 Metrics Pipeline Health Check"}},
+                {"type": "section", "fields": [
+                  {"type": "mrkdwn", "text": "*Prometheus*\n${{ steps.prometheus.outputs.status }}\nSuccess: ${{ steps.prometheus.outputs.success_rate }}%"},
+                  {"type": "mrkdwn", "text": "*Data Freshness*\n${{ steps.freshness.outputs.status }}\nAge: ${{ steps.freshness.outputs.age_minutes }}m"},
+                  {"type": "mrkdwn", "text": "*Grafana Dashboard*\n${{ steps.grafana.outputs.status }}"},
+                  {"type": "mrkdwn", "text": "*Alert Routing*\n${{ steps.alerts.outputs.status }}"}
+                ]},
+                {"type": "section", "text": {"type": "mrkdwn", "text": "_Next check: Monday 09:00 JST_"}}
+              ]
+            }' \
+            ${{ env.SLACK_WEBHOOK_URL }}
