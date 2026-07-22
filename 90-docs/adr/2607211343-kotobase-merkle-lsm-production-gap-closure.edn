@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61], :merged-host-prs [57 58], :latest-peer-main \"eb29ed38ed21b445679c46aa19bf816eac550412\", :latest-host-main \"1ade781cdc8029af7d5eb3d8dd953ea9c80040a5\", :latest-worker-version \"remote-preview-2026-07-23-subblock-v2\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63], :merged-host-prs [57 58 59], :latest-peer-main \"975f78d3949687236772745ef8c1651ad77fee2e\", :latest-host-main \"fec2b6b3b2b6d1d18d27c07e6fb7a169aed3e8d0\", :latest-worker-version \"remote-preview-2026-07-23-terminal-spill-v4\"}"
   :adr/body
   "# Context
 
@@ -304,6 +304,16 @@ host PR #57は各prefix pageのselected run数とphysical block GET数をimmutab
 同じ511 teams、1,024 datom request ceiling、64 rows/pageを実R2隔離prefix `codex/2026-07-23/large-prefix-subblocks-511-v2`で再測定した。seed 9,819.3 ms、accept 2,170.0 ms、driver 10 calls/38 pending partitions/1 completed partition、合計84,926.8 ms、durable replay 217.4 msだった。terminal metricsは9 scans、9 selected runs、25 physical block GET、512 rows、max 64 statesを記録した。correctness、bounded resume、observabilityは通過したが、inline baseline 77,608.0 msに対して9.43%遅化した。
 
 したがってphysical subblockはmemory/read-amplification boundを閉じるが、現時点でlatency optimization完了とはしない。このcardinalityでは1 monolithic run GET/pageより2〜3 small block GET/pageのR2 RTTが支配した。次のP1 gateは、current blockの未消費remainderをfrontier workへbyte-boundedに保持して再GETをなくすこと、または必要blockをbounded waveで並列prefetchすること、row countでなくbytes/RTT/cache hitを使うadaptive block sizingである。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-subblock-prefix-join.edn`、host receipt PR #58 merge commitは`1ade781cdc8029af7d5eb3d8dd953ea9c80040a5`である。stale compiler basisにより`scanned-blocks=0`となった初回probeはreceiptでinvalidと明示し、比較から除外した。
+
+# Verification addendum — demand-only blocks and spill-streamed terminal evaluation (2026-07-23)
+
+peer PR #62はcontinuation cursorを含むblockと直後のsuccessorを二要求waveで先読みしたが、同じ511-team実R2 fixtureでdriver wall 102,359.4 ms、physical block GET 28となり、逐次subblockの84,926.8 ms/25 GETからさらに悪化した。結果512 rows、9 steps、replay 255.8 msのcorrectnessは通過したものの、cutoff後に不要となるsuccessor GETと同一run内R2 contentionを増やしたためlatency/read optimizationとしてrejectした。merge commitは`ac00b77515794f107a3dd7671a5508b7a96af43e`である。
+
+peer PR #63は同一run successor speculationを撤去し、descriptorと現在page cutoffで必要と確定したblockだけを読むdemand-only scanへ戻した。LIMIT+1 candidate、CID/descriptor verification、logical cursor semanticsは維持し、async contractは同時data GET最大1、既存fixtureの総required GET 7を固定した。JVM 219 tests/655 assertions、CLJS 216 tests/724 assertions、lint errors 0。merge commitは`975f78d3949687236772745ef8c1651ad77fee2e`である。将来のparallelismは、同一runの未確定successorではなくplanとcutoffが必要と証明済みの独立block/runに限定する。
+
+host PR #59はterminal completionで全spill row chunkを`Promise.all`し一つのin-memory setへ戻す経路を削除した。各checkpoint cursorがsteps/index batches/rows read/scanned runs/blocks/max statesを累積し、terminal resultはrow再読なしにmetricsを固定する。completed taskはimmutable spill-headを返し、phase A/B evaluatorはspillを一件、row chunkを一件ずつ読みhot Arrangementへ直接適用する。旧terminal resultにmetricsがない場合はrow chunkを読まずspill metadataだけをwalkし、row自体は同じstreaming evaluatorで処理する。これによりterminal input memoryは全result cardinalityでなく一spill descriptor＋一byte-bounded chunkへ制限された。alternative proof保持時delta 0、最後のproof削除時171-byte tombstone、crash/CAS/replay smokeを含むhost 75 tests/403 assertions、Worker release、lint errors 0を通過した。merge commitは`fec2b6b3b2b6d1d18d27c07e6fb7a169aed3e8d0`である。
+
+最新demand-only＋spill-streamingを実R2隔離prefix `codex/2026-07-23/large-prefix-terminal-spill-511-v4`で測定した。seed 12,577.1 ms、accept 2,607.7 ms、driver 10 calls/合計123,816.7 ms、replay 298.8 ms。taskは512 rows、9 steps、9 runs、25 blocks、max 64 statesで完了し、speculative版の28 block GETを25へ戻した。remote latencyは過去二probeより大きく、latency改善とは宣言しない。このpassが閉じたのはterminal全件再構築と不要successor GETであり、次のP1 gapはunconsumed current-block remainder、plan-proven independent GET concurrency、byte/RTT/cache-aware block sizing、10^5/10^7 scale/RSS/CPU gateである。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-subblock-prefix-join.edn`である。
 
 # Consequences
 
