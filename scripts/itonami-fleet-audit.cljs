@@ -20,7 +20,14 @@
 ;;                                                 カタログ等、キー形が違っても
 ;;                                                 拾える汎化版) / :archive-content
 ;;                                                 (80-data/ 配下の実ファイル) /
-;;                                                 :none-measured(どちらの経路も
+;;                                                 :actor-blueprint-structure
+;;                                                 (isco family 限定。governor.cljc+
+;;                                                 store.cljc の governed-actor
+;;                                                 blueprint 構成要素があるが、これは
+;;                                                 facts.cljc を持つ設計ではない
+;;                                                 ADR-2607012000 の別種の repo なので
+;;                                                 :none-measured に落とさない) /
+;;                                                 :none-measured(どの経路も
 ;;                                                 存在しない)。
 ;;   :itonami.fleet-audit/real-world-ingest-gap?  対応する count が 0、または
 ;;                                                 経路が :none-measured なら true
@@ -227,6 +234,46 @@
                      (file-seq d)))
       0)))
 
+(def actor-blueprint-file-names
+  "The governed-actor blueprint component vocabulary cloud-itonami-isco-*
+   repos are scaffolded with (ADR-2607012000: 'a sole-proprietor operator
+   simulation -- an autonomous advisor proposing operations, gated by a
+   governor, backed by a Store protocol'). Deliberately a separate,
+   narrower vocabulary from `component-patterns` above (not folded into
+   it) -- scoped only to the :actor-blueprint-structure real-world-ingest
+   signal below (see `real-world-ingest`), so this addition can't perturb
+   the generic :itonami.fleet-audit/components / :component-count fields
+   used across every other family. 2026-07-21 finding across all 216
+   cloud-itonami-isco-* repos: governor.cljc + store.cljc are universal
+   (216/216, always substantive content -- min observed sizes 47/86 lines,
+   never a stub) and always nested one level under src/ (e.g.
+   src/officer_admin/governor.cljc, not directly in src/ -- basename match
+   below handles this via file-seq regardless of depth). advisor.cljc /
+   actor.cljc are real too but only 191/216 -- present together or absent
+   together in every repo checked, so they count toward this signal's
+   strength but are not required for the floor."
+  #{"governor.cljc" "store.cljc" "advisor.cljc" "actor.cljc"})
+
+(defn actor-blueprint-components
+  "Which of the 4 actor-blueprint component files (see
+   `actor-blueprint-file-names`) exist anywhere under src/, by basename,
+   at any nesting depth."
+  [dir]
+  (let [src (io/file dir "src")]
+    (if (.exists src)
+      (let [names (map #(.getName %) (filter #(.isFile %) (file-seq src)))]
+        (into #{} (filter actor-blueprint-file-names) names))
+      #{})))
+
+(defn actor-blueprint-structure?
+  "true when both governor.cljc and store.cljc are present -- the minimal
+   floor empirically true for 216/216 cloud-itonami-isco-* repos (see
+   `actor-blueprint-file-names` docstring; advisor.cljc/actor.cljc are
+   real but only 191/216 so aren't required for the floor)."
+  [blueprint-components]
+  (and (contains? blueprint-components "governor.cljc")
+       (contains? blueprint-components "store.cljc")))
+
 (defn actor-status [{:keys [src-file-count archive-file-count last-commit-at days-since-commit]}]
   (cond
     (and (zero? src-file-count) (pos? archive-file-count)) :archive
@@ -251,20 +298,39 @@
 (defn prod-ready? [status]
   (contains? #{:active :archive} status))
 
-(defn real-world-ingest [{:keys [has-facts-file? citation-count archive-count]}]
+(defn real-world-ingest
+  "Precedence: real facts.cljc citations first (strongest evidence, wins
+   even for isco family repos that happen to have one), then archive
+   content, then (isco family only) the governed-actor blueprint
+   component-structure signal, else none-measured.
+
+   The :actor-blueprint-structure branch is deliberately gated on
+   `(= family :isco)` and NOT applied family-agnostically: 2026-07-21
+   measurement shows 164/429 cloud-itonami-isic-* repos also have both
+   governor.cljc + store.cljc under src/ without a facts.cljc (isic's
+   governor/store naming is not evidence of the same isco governed-actor
+   blueprint pattern per ADR-2607012000 -- it would be a scope-widening
+   false fix, not the same correction, to let those flip signal here).
+   Ungating this check would silently change the isic family's
+   real-world-ingest-signal distribution, which this fix must not do."
+  [{:keys [has-facts-file? citation-count archive-count family blueprint-components]}]
   (cond
     has-facts-file? {:signal :facts-citations :count citation-count}
     (pos? archive-count) {:signal :archive-content :count archive-count}
+    (and (= family :isco) (actor-blueprint-structure? blueprint-components))
+    {:signal :actor-blueprint-structure :count (count blueprint-components)}
     :else {:signal :none-measured :count 0}))
 
 (defn actor-facts [dir]
   (let [name (.getName dir)
+        family (family-of name)
         bp (read-blueprint dir)
         commit-at (last-commit-at dir)
         days (or (days-since commit-at) -1)
         src-count (count-files dir "src")
         archive-count (archive-file-count dir)
         comps (components dir)
+        blueprint-comps (actor-blueprint-components dir)
         has-facts? (boolean (find-facts-file dir))
         juri-count (or (jurisdiction-coverage dir) 0)
         citation-count (or (facts-citation-count dir) 0)
@@ -285,11 +351,13 @@
                               :days-since-commit days})
         ingest (real-world-ingest {:has-facts-file? has-facts?
                                    :citation-count citation-count
-                                   :archive-count archive-count})
+                                   :archive-count archive-count
+                                   :family family
+                                   :blueprint-components blueprint-comps})
         ingest-signal (:signal ingest)
         ingest-count (:count ingest)]
     {:itonami.fleet-audit/repo name
-     :itonami.fleet-audit/family (family-of name)
+     :itonami.fleet-audit/family family
      :itonami.fleet-audit/isic (or (:itonami.blueprint/isic-rev5 bp) "")
      :itonami.fleet-audit/domain (or (:itonami.blueprint/domain bp) :unknown)
      :itonami.fleet-audit/governor (or (:itonami.blueprint/governor bp) :none)
@@ -417,6 +485,13 @@
        ";;                                             the isic/isco per-country catalog shape to\n"
        ";;                                             municipality's per-ordinance shape etc.) /\n"
        ";;                                             :archive-content (80-data/ real files) /\n"
+       ";;                                             :actor-blueprint-structure (isco family only:\n"
+       ";;                                             governor.cljc + store.cljc governed-actor\n"
+       ";;                                             blueprint components per ADR-2607012000 — these\n"
+       ";;                                             repos are a structurally different, by-design\n"
+       ";;                                             non-facts.cljc repo kind, not an unmeasured gap;\n"
+       ";;                                             see `real-world-ingest` for why this is gated to\n"
+       ";;                                             isco and not applied to other families) /\n"
        ";;                                             :none-measured (no channel present at all).\n"
        ";;   :itonami.fleet-audit/real-world-ingest-gap?  true when the measured count is 0 OR the\n"
        ";;                                             signal is :none-measured — an entity with no\n"
