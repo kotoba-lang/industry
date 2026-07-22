@@ -1,0 +1,336 @@
+[{:doc/type :post-cutover-validation
+  :doc/id "month-3-post-cutover-validation"
+  :doc/title "Month 3 Post-Cutover Validation Checklist (2026-09-14 onwards)"
+  :doc/date "2026-07-21"
+  :doc/author "Claude Code Agent"
+  :doc/status "ACTIVE"
+
+  :validation/overview
+  "Post-cutover validation begins immediately after cljc fleet reaches 100% traffic (2026-09-13 14:00 JST)
+   and continues for 48+ hours (2026-09-15 14:00+ JST). This checklist ensures production stability
+   before declaring Month 3 canary complete and scheduling Rust pool decommission."
+
+  :validation/timeline
+  {:phase-1-immediate "2026-09-13 14:00 to 16:30 JST (2.5 hours) — cutover + graceful drain"
+   :phase-2-early-validation "2026-09-13 16:30 to 2026-09-14 10:00 JST (17.5 hours) — first overnight window"
+   :phase-3-extended-validation "2026-09-14 10:00 to 2026-09-15 14:00 JST (28 hours) — full 48h post-cutover"
+   :final-decision "2026-09-15 14:00 JST — go / no-go on Rust decommission"}
+
+  :validation/phase-1-immediate-checks
+  {:seq 1
+   :name "Phase 1: Immediate Cutover Checks (T+0 to T+2.5h)"
+   :time-window "2026-09-13 14:00 to 16:30 JST"
+   :owner "murakumo-metrics-lead + murakumo-ops-lead"
+
+   :check-1-traffic-migration
+   {:name "100% Traffic on cljc Fleet"
+    :measurement "Dashboard: load balancer traffic distribution"
+    :target "cljc fleet ≥ 99.5% (allow ±0.5% variance from rounding)"
+    :failure-criteria "cljc < 99% or Rust still receiving traffic"
+    :action-if-fail "Escalate to traffic-controller, investigate routing rules"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-2-no-immediate-errors
+   {:name "No Immediate Error Spike Post-Cutover"
+    :measurement "5xx error rate in first 5 minutes"
+    :target "5xx rate ≤ 0.01% (same as pre-cutover)"
+    :failure-criteria "5xx rate > 0.05% at T+5min (possible cascade)"
+    :action-if-fail "Immediate alert to canary-lead, investigate"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-3-latency-post-cutover
+   {:name "Latency Stable Post-Cutover"
+    :measurement "p99 latency in first 5 minutes"
+    :target "p99 ≤ 110ms (allow ±10ms spike for cutover transition)"
+    :baseline "p99 was ~95-100ms in Stage 3a"
+    :failure-criteria "p99 > 120ms sustained > 1 min (possible backlog)"
+    :action-if-fail "Investigate: is load actually 100%? Connection pool health?"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-4-memory-post-cutover
+   {:name "Memory Not Spiking Post-Cutover"
+    :measurement "JVM heap peak in first 10 minutes"
+    :target "Per-instance heap ≤ 280MB (slightly higher than 256MB baseline due to 100% load)"
+    :failure-criteria "Heap > 400MB peak"
+    :action-if-fail "Investigate: memory leak or normal pressure from 100% load?"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-5-rust-drain-progress
+   {:name "Rust Pool Drain Progressing"
+    :measurement "Rust pool active connection count (during drain phase 2)"
+    :target "Connections decreasing steadily (target: 0 by T+60min from drain start)"
+    :failure-criteria "Connections stalled (not decreasing for > 10 min)"
+    :action-if-fail "Investigate: hung requests? Network issues?"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-6-session-migration-started
+   {:name "Session Migration Verification (Preliminary)"
+    :measurement "Query cljc: session count in fleet"
+    :target "Session count ≥ (Rust baseline - 10)"
+    :failure-criteria "Missing sessions (< baseline - 50 would indicate data loss)"
+    :action-if-fail "Escalate: stop drain, investigate session data"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :phase-1-gate
+   {:time "2026-09-13 16:30 JST (end of Phase 1)"
+    :decision "All 6 checks must PASS to proceed to Phase 2"
+    :if-all-pass "Proceed to extended validation (Phase 2)"
+    :if-any-fail "Escalate to canary-lead for decision (rollback or continue with caveats)"
+    :owner-contact "murakumo-owner + platform-lead"}
+
+  :validation/phase-2-early-validation
+  {:seq 2
+   :name "Phase 2: Early Validation (First Overnight Window)"
+   :time-window "2026-09-13 16:30 to 2026-09-14 10:00 JST (17.5 hours)"
+   :owner "on-call-engineer-overnight + murakumo-metrics-lead (morning)"
+
+   :check-1-slo-sustained
+   {:name "SLOs Sustained Over First 17+ Hours"
+    :measurements
+    ["p99 latency: sustained ≤ 100ms (all 17 hours)"
+     "p95 latency: sustained ≤ 95ms"
+     "5xx error rate: sustained ≤ 0.01%"
+     "Memory: per-instance ≤ 256MB (stable pattern)"]
+    :data-collection "Prometheus: 5-minute averages over 17h window"
+    :failure-criteria "Any SLO violated for > 10 min sustained"
+    :action-if-fail "Escalate: investigate root cause, determine if critical"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-2-no-errors-overnight
+   {:name "No Errors or Alerts Overnight"
+    :measurement "Alert count (Slack #prod-gates-wave5, PagerDuty)"
+    :target "< 2 alerts (acceptable: one transient spike, one GC blip)"
+    :failure-criteria "> 5 alerts or repeated pattern (e.g., latency spike every 2h)"
+    :action-if-fail "Retrieve logs from overnight, analyze patterns"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-3-gc-pattern-normal
+   {:name "GC Collection Pattern Normal"
+    :measurement "GC frequency (collections per hour)"
+    :target "< 30 collections per hour (roughly 1 collection per 2 min, acceptable)"
+    :baseline "Phase 2 baseline: ~20-25 collections per hour"
+    :failure-criteria "> 50 collections per hour (pathological)"
+    :action-if-fail "Investigate: ZGC tuning needed? Heap pressure?"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-4-connection-pool-health
+   {:name "Connection Pool Health (cljc Fleet)"
+    :measurement "Pool metrics: active connections, pool wait time"
+    :target "Active connections stable (not growing), wait time < 1ms"
+    :failure-criteria "Active connections growing (leak?), wait time > 10ms (exhaustion)"
+    :action-if-fail "Investigate: pool size adequate? Connection leak?"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-5-data-consistency-spot-check
+   {:name "Data Consistency Spot-Check (500 random sessions)"
+    :measurement "Query sample of sessions, verify field integrity"
+    :target "All 500 sessions intact, no missing fields"
+    :failure-criteria "Any session with missing critical field (id, user_id, token, etc.)"
+    :action-if-fail "Investigate: data corruption? Migration issue?"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-6-rust-pool-drain-complete
+   {:name "Rust Pool Drain Completed"
+    :measurement "Rust pool active connections"
+    :target "0 (all connections drained)"
+    :failure-criteria "Connections > 10 (possible hung requests)"
+    :action-if-fail "If > 60 min from drain start: force shutdown (acceptable per SLA)"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :phase-2-gate
+   {:time "2026-09-14 10:00 JST (morning review)"
+    :decision "Monitoring-lead reviews overnight data"
+    :if-all-pass "Proceed to Phase 3 (extended 48h validation)"
+    :if-any-fail "Escalate: investigate, determine if critical or acceptable caveat"
+    :morning-briefing "Monitoring-lead prepares handoff: SLO graph, alert summary, any issues"
+    :owner-contact "murakumo-owner for morning review call"}
+
+  :validation/phase-3-extended-validation
+  {:seq 3
+   :name "Phase 3: Extended 48+ Hour Validation"
+   :time-window "2026-09-14 10:00 to 2026-09-15 14:00 JST (28 hours)"
+   :owner "murakumo-metrics-lead"
+
+   :check-1-slo-across-full-48h
+   {:name "SLOs Sustained Across Full 48-Hour Window"
+    :measurements
+    ["p99 latency: ≤ 100ms (97th percentile of 5-min windows)"
+     "p95 latency: ≤ 95ms"
+     "5xx error rate: ≤ 0.01%"
+     "Memory: no sustained growth > 50MB over 48h"]
+    :data-period "Full 48h from T+0 (2026-09-13 14:00) to T+48h (2026-09-15 14:00)"
+    :acceptable-violations "Transient spike < 5 min (caused by GC, traffic spike, etc.)"
+    :failure-criteria "Sustained violation > 10 min or repeated pattern (e.g., degradation every 12h)"
+    :analysis "Generate dashboard summary: hourly SLO trends"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-2-no-cascading-failures
+   {:name "No Cascading Failures (Connection Pool, Resource Exhaustion)"
+    :measurement "Escalation events in logs"
+    :target "0 cascading failures (system gracefully handles load)"
+    :failure-criteria "Any event where one component failure cascades (e.g., pool exhaustion → 5xx spike)"
+    :action-if-fail "Investigate: system architecture, circuit breaker patterns"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-3-user-impact-zero
+   {:name "Zero User Impact (No Customer Complaints)"
+    :measurement "Support tickets, customer feedback"
+    :target "0 reports of outage or degradation (during 48h window)"
+    :failure-criteria "Any user-facing incident report"
+    :action-if-fail "Investigate: what went wrong? How do we prevent?"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-4-data-migration-final
+   {:name "Final Data Migration Verification (1000 sessions)"
+    :measurement "Deep spot-check of 1000 random sessions"
+    :verification
+    ["Field count: all sessions have same field count as Rust"
+     "Data types: all fields have correct types (not string-ified)"
+     "Business logic: test critical business flows (e.g., order placement, payment)"
+     "Audit trail: session history intact (no lost events)"]
+    :target "100% of sessions verified correct"
+    :failure-criteria "Any discrepancy or corruption"
+    :action-if-fail "Investigate: root cause of data issue. Decide: accept or rollback?"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-5-performance-regression-test
+   {:name "Performance Regression Test (Synthetic Load)"
+    :procedure
+    ["1. Run: synthetic load test (10K requests/sec for 5 min) against cljc fleet"
+     "2. Measure: p99 latency, throughput, error rate"
+     "3. Compare: against Phase 2 baseline at same load (10K req/sec)"
+     "4. Tolerance: ±5% regression acceptable (±10% is concerning)"]
+    :target "p99 latency at 10K req/sec ≤ 120ms (Phase 2 baseline ~110ms)"
+    :failure-criteria "p99 > 130ms (> 10% regression)"
+    :action-if-fail "Investigate: what changed? Code path optimization needed?"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-6-capacity-headroom
+   {:name "Capacity Headroom Analysis (50% load margin)"
+    :analysis
+    ["1. Measure: current cljc fleet resource utilization at 100% production traffic"
+     "2. Extrapolate: what utilization would be at 150% traffic? 200%?"
+     "3. Target: at 100% traffic, should use < 50% of available capacity (headroom)"]
+    :measurements
+    ["CPU utilization per-instance: target ≤ 50% at 100% traffic"
+     "Memory per-instance: target ≤ 256MB at 100% traffic"
+     "Connection pool utilization: target ≤ 70% at 100% traffic"
+     "Disk I/O: target ≤ 40% saturation"]
+    :failure-criteria "Any metric > 80% (insufficient headroom for traffic spikes)"
+    :action-if-fail "Investigate: need to scale fleet? Add more nodes?"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :check-7-rust-standby-readiness
+   {:name "Rust Pool Standby Readiness (Emergency Restore Test)"
+    :procedure
+    ["1. Verify: Rust pool infrastructure still operational (nodes up, services running)"
+     "2. Test: restore routing rule (traffic: 0% → 100% Rust, 100% → 0% cljc)"
+     "3. Measure: time to restore (target: < 5 min)"
+     "4. Verify: Rust pool can handle 100% traffic (should work, if nothing changed)"]
+    :target "Emergency restore is possible, time < 5 min"
+    :failure-criteria "Rust pool degraded or cannot be restored"
+    :action-if-fail "Investigate: can Rust be restored? If not, must decommission anyway (accept risk)"
+    :result "[ ] PASS / [ ] FAIL"}
+
+   :phase-3-gate
+   {:time "2026-09-15 14:00 JST (end of 48h validation)"
+    :decision-maker "murakumo-owner"
+    :options
+    ["✓ PASS: All checks green. Proceed to cutover declaration."
+     "⚠ PASS WITH CAVEATS: Minor issue found but acceptable (document SLA, proceed with risk acceptance)"
+     "✗ FAIL: Critical issue found. Cannot declare cutover complete. Investigate or rollback."]
+    :decision-criteria
+    {:pass "Checks 1-7 all PASS, SLOs stable, no user impact, data integrity verified"
+     :pass-with-caveats "1-2 checks have acceptable violations (e.g., transient latency spike, known limitation documented)"
+     :fail "Any critical failure (data loss, user impact, SLO sustained violation, cascading failure)"}
+    :owner-contact "murakumo-owner makes final decision"}
+
+  :validation/final-decision
+  {:seq 4
+   :name "Final Decision & Cutover Completion (2026-09-15 14:00 JST)"
+   :time-window "2026-09-15 14:00 to 14:30 JST"
+   :owner "murakumo-owner"
+
+   :decision-1-declare-cutover-complete
+   {:option "✓ DECLARE CUTOVER COMPLETE"
+    :criteria "All validation checks PASS (or PASS WITH ACCEPTABLE CAVEATS)"
+    :announcement "Slack #prod-gates-wave5: 'CUTOVER COMPLETE: Month 3 canary successful. cljc fleet is now sole production. Rust standby: 7 days.'"
+    :next-step "Schedule Rust decommission for 2026-09-20 16:15 JST"
+    :documentation "Create 90-docs/deployment/MONTH-3-CUTOVER-COMPLETE.edn (success record)"}
+
+   :decision-2-declare-with-caveats
+   {:option "⚠ DECLARE CUTOVER COMPLETE WITH CAVEATS"
+    :scenario "1-2 checks have acceptable violations (e.g., GC tuning note, transient latency spike)"
+    :process
+    ["1. Document: which check(s) have caveats?"
+     "2. SLA: define follow-up work and timeline (e.g., 'GC tuning follow-up by 2026-09-22')"
+     "3. Risk acceptance: owner formally accepts remaining risk"
+     "4. Announcement: Slack message with details and follow-up plan"
+     "5. Next step: Rust standby continues (schedule decommission after follow-up resolved)"]
+    :follow-up-items "Create ADR or task: track follow-up work (improvement, not blocking)"
+    :documentation "90-docs/deployment/MONTH-3-CUTOVER-COMPLETE-WITH-CAVEATS.edn"}
+
+   :decision-3-abort-cutover
+   {:option "✗ ABORT CUTOVER (Rollback or Investigate)"
+    :scenario "Critical validation failure (data loss, cascading failure, repeated SLO violation, user impact)"
+    :process
+    ["1. Escalate: immediate call with platform-lead + team"
+     "2. Decision: restore Rust? Or investigate cljc?"
+     "3. If restore: emergency rollback within 5 min (Rust pool standby ready)"
+     "4. If investigate: keep cljc at 100%, debug for < 24 hours"
+     "5. Post-incident: ADR documenting root cause and prevention"]
+    :documentation "90-docs/adr/MONTH-3-INCIDENT-CUTOVER-ABORT-<date>.edn"}
+
+  :validation/rollback-to-rust-procedure
+  {:scenario "At any point during Phase 1-3, critical issue forces rollback"
+   :procedure
+   ["1. Owner: decision to rollback"
+    "2. Traffic-controller: execute restore (traffic: 0% → 100% Rust, 100% → 0% cljc)"
+    "3. Monitoring: verify Rust pool stable (p99, 5xx, memory)"
+    "4. Escalation-lead: announce rollback (Slack + email)"
+    "5. Investigation: root cause analysis (what failed in cljc?)"
+    "6. Decision: retry canary after fix, or abort Month 3?"]
+   :restore-time "< 2 minutes (load balancer rule change)"
+   :data-safety "All session data in cljc remains available (can restore later if needed)"}
+
+  :validation/post-validation-artifacts
+  {:success-record "90-docs/deployment/MONTH-3-CUTOVER-COMPLETE.edn"
+   :success-record-includes
+   ["Timestamp of completion"
+    "All validation check results (PASS/FAIL/CAVEAT)"
+    "SLO metrics (p99, 5xx, memory over 48h)"
+    "User impact summary (0 incidents)"
+    "Data migration verification result"
+    "Capacity analysis (headroom confirmed)"
+    "Rust standby status (7-day grace period)"
+    "Known issues or caveats (if any)"
+    "Next steps: Rust decommission date, follow-up work"]
+
+   :incident-record "90-docs/adr/MONTH-3-INCIDENT-*.edn (if rollback or critical issue)"
+   :incident-record-includes
+   ["Root cause analysis"
+    "Timeline of events"
+    "Actions taken (rollback, investigate, fix)"
+    "Prevention measures (how to avoid next time)"
+    "Post-incident follow-up"]
+
+   :metrics-archive "Backblaze B2: murakumo/canary-metrics/month-3-validation-48h.json"
+   :metrics-archive-includes
+   ["Prometheus time-series data (p99, 5xx, memory)"
+    "Alert logs (all fired alerts during 48h)"
+    "Validation check results"]}
+
+  :validation/team-sign-off
+  {:canary-lead "Approves final decision (GO or ABORT)"
+   :monitoring-lead "Verifies all SLO gates (data integrity, no anomalies)"
+   :traffic-controller "Confirms Rust standby operational (emergency restore ready)"
+   :escalation-lead "Documents decision + artifacts in deployment record"
+   :owner "Final authority on cutover completion declaration"}
+
+  :validation/communication-template
+  {:if-success "CUTOVER COMPLETE: Month 3 canary successful. cljc kotoba-server fleet now live (100% production traffic). Rust fleet on 7-day standby (2026-09-20 decommission planned). All SLOs stable. Zero user impact. Data integrity verified. See 90-docs/deployment/MONTH-3-CUTOVER-COMPLETE.edn for full report."
+   :if-caveat "CUTOVER COMPLETE WITH CAVEATS: Month 3 canary successful with noted follow-up items. See documentation for details. Rust standby continues until caveats resolved."
+   :if-abort "CUTOVER ABORTED: Critical issue detected during validation. Rolled back to Rust fleet. See incident report for root cause analysis. Investigating: [root cause summary]. Retry scheduled: [date]."}
+
+  :adr/related ["2607072100-kotoba-server-fleet-deployment-strangler-fig.edn"
+                "2607072400-kaisha-pod-murakumo-fleet-deployment.edn"]}]

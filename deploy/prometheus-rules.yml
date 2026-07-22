@@ -1,0 +1,218 @@
+# Prometheus Alert Rules for Wave 5 M5-M6 Gates
+# Status: PRODUCTION_READY
+# Evaluation interval: 15 seconds
+
+groups:
+  - name: wave5_m5m6_gates
+    interval: 15s
+    rules:
+      # BUILD TIME ALERTS
+      - alert: BuildTimeP99Exceeded
+        expr: build_duration_seconds{quantile="p99"} > 720
+        for: 2m
+        labels:
+          severity: warning
+          team: m5-core
+          gate: production
+        annotations:
+          summary: 'Build p99 latency exceeds 12 min'
+          description: 'Build p99 = {{ $value }}s (threshold: 720s). Assigned to: team-lead-m5'
+          runbook: 'https://wiki.internal/gates/runbook/build-timeout'
+          slack_channel: '#prod-gates-wave5'
+
+      - alert: BuildFailureRateHigh
+        expr: build_failure_rate > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: m5-core
+          gate: production
+        annotations:
+          summary: 'Build failure rate exceeds 5%'
+          description: 'Failure rate = {{ $value | humanizePercentage }} (threshold: 5%). Escalating to team-lead-m5'
+          runbook: 'https://wiki.internal/gates/runbook/build-failures'
+          slack_channel: '#prod-gates-wave5'
+
+      # TEST COVERAGE ALERTS
+      - alert: TestCoverageDrop
+        expr: code_coverage_percent < 92
+        for: 10m
+        labels:
+          severity: warning
+          team: m5-core
+          gate: production
+        annotations:
+          summary: 'Test coverage below target threshold'
+          description: 'Coverage = {{ $value }}% (target: >=92%). Notifying team-lead-m5'
+          runbook: 'https://wiki.internal/gates/runbook/coverage-drop'
+          slack_channel: '#prod-gates-wave5'
+
+      - alert: TestCoverageTrendDecreasing
+        expr: rate(code_coverage_percent[1h]) < -0.1
+        for: 30m
+        labels:
+          severity: warning
+          team: m5-core
+          gate: production
+        annotations:
+          summary: 'Test coverage trending downward'
+          description: 'Coverage trend: {{ $value | humanizePercentage }}/hour. Requires immediate action'
+          runbook: 'https://wiki.internal/gates/runbook/coverage-trend'
+          slack_channel: '#prod-gates-wave5'
+
+      # DEPLOYMENT SUCCESS ALERTS
+      - alert: DeploymentSuccessRateLow
+        expr: deployment_success_rate < 0.995
+        for: 5m
+        labels:
+          severity: critical
+          team: m6-platform
+          gate: production
+        annotations:
+          summary: 'Deployment success rate below SLA threshold'
+          description: 'Success rate = {{ $value | humanizePercentage }} (SLA: >=99.5%). CRITICAL: escalating to PagerDuty'
+          runbook: 'https://wiki.internal/gates/runbook/deployment-failures'
+          slack_channel: '#prod-gates-wave5'
+          pagerduty_service: 'prod-gates'
+
+      - alert: RollbackCountHigh
+        expr: increase(rollback_count[1h]) > 2
+        for: 5m
+        labels:
+          severity: critical
+          team: m6-platform
+          gate: production
+        annotations:
+          summary: 'High number of rollbacks in last hour'
+          description: 'Rollback count (1h): {{ $value }} (threshold: 2). Escalating'
+          runbook: 'https://wiki.internal/gates/runbook/rollbacks'
+          slack_channel: '#prod-gates-wave5'
+
+      - alert: DeploymentLatencyHigh
+        expr: time_to_production > 300
+        for: 10m
+        labels:
+          severity: warning
+          team: m6-platform
+          gate: production
+        annotations:
+          summary: 'Deployment latency exceeds 5 minutes'
+          description: 'Time to production = {{ $value }}s (target: <300s). Assigned to: platform-lead'
+          runbook: 'https://wiki.internal/gates/runbook/deployment-latency'
+          slack_channel: '#prod-gates-wave5'
+
+      # GATE BLOCKER ALERTS
+      - alert: BlockerCountHigh
+        expr: blocker_count > 5
+        for: 10m
+        labels:
+          severity: warning
+          team: all
+          gate: production
+        annotations:
+          summary: 'Gate blockers exceeded threshold'
+          description: 'Active blockers: {{ $value }} (threshold: 5). Review: Jira M5W5, M5IW5, M6W5'
+          runbook: 'https://wiki.internal/gates/runbook/blockers'
+          slack_channel: '#prod-gates-wave5'
+
+      - alert: BlockerSLABreach
+        expr: (blocker_age_hours > 4) AND (blocker_severity_p1_count > 0)
+        for: 5m
+        labels:
+          severity: critical
+          team: escalation
+          gate: production
+        annotations:
+          summary: 'P1 blocker SLA breach - ESCALATION PROTOCOL ARMED'
+          description: 'P1 blockers aged {{ $value }}h (SLA: 4h). Launching escalation protocol'
+          runbook: 'https://wiki.internal/gates/escalation-protocol'
+          slack_channel: '#prod-gates-wave5'
+          pagerduty_service: 'prod-gates'
+
+      - alert: BlockerAgeWarning
+        expr: blocker_age_hours > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: all
+          gate: production
+        annotations:
+          summary: 'Blocker aging - approaching SLA'
+          description: 'Oldest blocker age: {{ $value }}h (SLA: 4h). Notify team-lead'
+          runbook: 'https://wiki.internal/gates/runbook/blocker-sla'
+          slack_channel: '#prod-gates-wave5'
+
+      # METRICS PIPELINE HEALTH ALERTS
+      - alert: PrometheusScrapeFail
+        expr: up{job="ci-build-times"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: prometheus
+          gate: production
+        annotations:
+          summary: 'Prometheus scrape target down'
+          description: 'Target {{ $labels.job }} ({{ $labels.instance }}) unreachable for 5+ min'
+          runbook: 'https://wiki.internal/gates/runbook/prometheus-scrape'
+          slack_channel: '#prod-gates-wave5'
+
+      - alert: MetricsDataGap
+        expr: (time() - timestamp(build_duration_seconds) > 1200)
+        for: 5m
+        labels:
+          severity: critical
+          component: metrics-pipeline
+          gate: production
+        annotations:
+          summary: 'Metrics data gap detected'
+          description: 'Build metrics not updated for {{ $value | humanizeDuration }}. Last update: {{ $value }}'
+          runbook: 'https://wiki.internal/gates/runbook/data-gap'
+          slack_channel: '#prod-gates-wave5'
+
+      - alert: GrafanaDashboardDown
+        expr: up{job="grafana"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: grafana
+          gate: production
+        annotations:
+          summary: 'Grafana dashboard unavailable'
+          description: 'Grafana instance down for 5+ minutes. Check: https://grafana.internal/d/wave5-m5m6'
+          runbook: 'https://wiki.internal/gates/runbook/grafana-down'
+          slack_channel: '#prod-gates-wave5'
+
+  # SLA Compliance Rules
+  - name: wave5_sla_compliance
+    interval: 30s
+    rules:
+      - record: gate:alert_response_sla:minutes
+        expr: (time() - ALERTS_FOR_STATE_CHANGE) / 60
+        labels:
+          sla_name: alert_response
+
+      - record: gate:blocker_response_sla:minutes
+        expr: (time() - blocker_created_timestamp) / 60
+        labels:
+          sla_name: blocker_response
+
+      - record: gate:decision_latency:minutes
+        expr: (time() - gate_decision_initiated_timestamp) / 60
+        labels:
+          sla_name: gate_decision
+
+  # Velocity & Trend Rules
+  - name: wave5_team_metrics
+    interval: 1m
+    rules:
+      - record: velocity:points_completed:1h
+        expr: increase(story_points_completed[1h])
+
+      - record: velocity:burndown_rate:daily
+        expr: rate(story_points_completed[24h])
+
+      - record: blocker:mean_age:hours
+        expr: avg(blocker_age_hours)
+
+      - record: deployment:success_rate:1h
+        expr: rate(deployment_success_total[1h]) / rate(deployment_total[1h])
