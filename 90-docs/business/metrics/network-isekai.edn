@@ -1,27 +1,27 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 8382,
-  :pageviews-7d 4842,
-  :uniques-7d-sum 422,
+ {:requests-7d 8641,
+  :pageviews-7d 4977,
+  :uniques-7d-sum 425,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 70}
+  [{:path "/", :requests 71}
    {:path "/feed/fork-stats.edn", :requests 27}
-   {:path "/robots.txt", :requests 26}
    {:path "/1c.php", :requests 26}
+   {:path "/w.php", :requests 25}
+   {:path "/robots.txt", :requests 24}
+   {:path "/this_is_a_new_hello_world.php", :requests 20}
    {:path "/uiuvs58l.update.php", :requests 20}
-   {:path "/.well-known/about.php", :requests 18}
-   {:path "/sitemap.xml", :requests 16}
-   {:path "/ssixta.php", :requests 15}],
-  :status-mix {:ok 578, :server-error 54, :client-error 1},
+   {:path "/bolt.php", :requests 18}],
+  :status-mix {:ok 831, :server-error 54, :client-error 2},
   :window "24h"},
  :as-of "2026-07-22",
- :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 9},
+ :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 6},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 70 · /feed/fork-stats.edn 27 · /robots.txt 26 · /1c.php 26 · /uiuvs58l.update.php 20 | 4xx(probe) 0% · 5xx 9%",
+ "上位 page (24h, 2xx/3xx): / 71 · /feed/fork-stats.edn 27 · /1c.php 26 · /w.php 25 · /robots.txt 24 | 4xx(probe) 0% · 5xx 6%",
  :signal
- "isekai.network 実測 8382 req/7d・422 uniques(日次和)・うち4xx probe 0%(24h)",
+ "isekai.network 実測 8641 req/7d・425 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
