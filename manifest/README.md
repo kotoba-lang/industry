@@ -26,7 +26,8 @@
 - topdir は「manifest ディレクトリの親」として導出されるため、チェックアウトの
   ディレクトリ名に依存しない。
 - project の `path:` は旧 submodule と同一なので、ツール・CI のパス前提を変えずに済む。
-- 全 project に `clone-depth: 1`（CLAUDE.md の shallow 既定）。
+- 全 project が full history（shallow は使わない。2026-07-21、ADR-2607211600 で
+  旧 `clone-depth: 1` 既定を撤回）。
 - ネスト submodule を持つ repo（`ghosthacker` / `kami-engine` / `root` /
   `ai-gftd-apps-gftdcojp`）は `submodules: true` で git の再帰取得に委ねる。
 
@@ -71,6 +72,23 @@ west list ; west status
 nbb scripts/gen-west-manifest.cljs                         # pin 前進後に再生成（手書き禁止）
 nbb scripts/gen-west-manifest.cljs --check                 # CI: 乖離で exit 1
 ```
+
+### actor manifest / Lexicon boundary audit
+
+`scripts/audit-manifest-lexicon-drift.py` は生成済み `west.yml` の exact
+`orgs/etzhayyim/com-etzhayyim-*` path だけを走査し、各 standalone owner の
+manifest 宣言を owner wire contract（移行中は root compatibility contract も可）と
+照合する。root governance 固有 contract の正本は
+`manifest/lexicon-root-ownership.edn` とする。
+
+```bash
+python3 scripts/audit-manifest-lexicon-drift.py
+python3 scripts/audit-manifest-lexicon-drift.py --strict
+python3 -m pytest -q scripts/test_audit_manifest_lexicon_drift.py
+```
+
+別 worktree から実 workspace を検査するときだけ
+`COM_JUNKAWASAKI_WEST_ROOT=/path/to/west-root` を指定する。
 
 > west 1.5 の `west update` は `-j` 非対応（直列）。fetch は `smart` で差分のみ。
 > zsh は引用なし変数を単語分割しないため、複数 project 指定は `xargs` を使う。

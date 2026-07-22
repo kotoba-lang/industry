@@ -262,6 +262,7 @@
        (remove #(str/includes? (str %) "/metrics/")) ; metrics は business-metrics で別ロード
        (remove #(str/ends-with? (str %) "canvas-ledger.edn")) ; canvas-ledger で別ロード
        (remove #(str/ends-with? (str %) "design-quality-ledger.edn"))
+       (remove #(str/ends-with? (str %) "adr-ledger.edn")) ; adr-ledger で別ロード
        (sort-by str)))
 
 (defn doc-entities-from-file [f]
@@ -356,6 +357,27 @@
 
 (defn canvas-ledger-entities [next-tempid!]
   (let [f (canvas-ledger-file)]
+    (if (.exists f)
+      (map (fn [e] (assoc e :db/id (next-tempid!) :source/file (str f)))
+           (line-map-entities f))
+      [])))
+
+;; ---------- ADR amendment ledger (90-docs/adr-ledger/adr-ledger.edn) ----------
+;;
+;; append-only :event/* records that amend an already-accepted 90-docs/adr/*.edn
+;; entry without rewriting its :adr/body (ADR-2607173000 decision item 6 /
+;; ADR-2607181900). Deliberately lives outside 90-docs/adr/ so adr-files
+;; (tx-data-only loader) and docs-edn-only.cljs verify's /adr/-scoped tx-data
+;; check never see it. Join to the base ADR entity on the shared `adr/id`
+;; value, e.g.:
+;;   [:find ?summary ?at :where
+;;    [?adr "adr/id" "2607173000"] [?ev "adr/id" "2607173000"]
+;;    [?ev "event/summary" ?summary] [?ev "event/at" ?at]]
+
+(defn adr-ledger-file [] (io/file root "90-docs" "adr-ledger" "adr-ledger.edn"))
+
+(defn adr-ledger-entities [next-tempid!]
+  (let [f (adr-ledger-file)]
     (if (.exists f)
       (map (fn [e] (assoc e :db/id (next-tempid!) :source/file (str f)))
            (line-map-entities f))
@@ -633,6 +655,7 @@
         foreign-adr-tx (foreign-adr-entities next-tempid!)
         biz-tx (business-metrics-entities next-tempid!)
         canvas-tx (canvas-ledger-entities next-tempid!)
+        adr-ledger-tx (adr-ledger-entities next-tempid!)
         kj-tx (kawasakijun-entities next-tempid!)
         rad-tx (rad-entities next-tempid!)
         journal-tx (journal-tuple-entities next-tempid!)
@@ -646,7 +669,7 @@
         narrative-tx (concat (spirit-in-physics-entities next-tempid!)
                               (ghosthacker-manga-log-entities next-tempid!))
         all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
-                                                     biz-tx canvas-tx kj-tx rad-tx
+                                                     biz-tx canvas-tx adr-ledger-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
                                                      hirameki-corpus-tx jinushi-tx
                                                      proc-registry-tx merged-kotoba-tx
@@ -658,6 +681,7 @@
      :manifest-count (count manifest-tx)
      :foreign-adr-count (count foreign-adr-tx)
      :biz-count (+ (count biz-tx) (count canvas-tx))
+     :adr-ledger-count (count adr-ledger-tx)
      :kj-count (count kj-tx)
      :rad-count (count rad-tx)
      :etzhayyim-80-data-count (+ (count journal-tx) (count genome-tx) (count datoms-tx)
@@ -669,19 +693,22 @@
 
 (defn -main [& args]
   (let [[mode query-str] args
-        {:keys [conn adr-count docs-count manifest-count foreign-adr-count biz-count kj-count rad-count
+        {:keys [conn adr-count docs-count manifest-count foreign-adr-count biz-count adr-ledger-count
+                kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                 narrative-count]}
         (build-conn)
-        total (+ adr-count docs-count manifest-count foreign-adr-count biz-count kj-count rad-count
+        total (+ adr-count docs-count manifest-count foreign-adr-count biz-count adr-ledger-count
+                 kj-count rad-count
                  etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                  narrative-count)]
     (case mode
       "count"
-      (println (format (str "adr=%s docs=%s manifest=%s foreign-adr=%s biz=%s kj=%s rad=%s "
+      (println (format (str "adr=%s docs=%s manifest=%s foreign-adr=%s biz=%s adr-ledger=%s kj=%s rad=%s "
                              "etzhayyim-80-data=%s proc-registry=%s merged-kotoba=%s working-doc=%s "
                              "narrative=%s total=%s")
-                        adr-count docs-count manifest-count foreign-adr-count biz-count kj-count rad-count
+                        adr-count docs-count manifest-count foreign-adr-count biz-count adr-ledger-count
+                        kj-count rad-count
                         etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                         narrative-count total))
 

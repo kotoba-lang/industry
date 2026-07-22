@@ -1,0 +1,251 @@
+{:doc/type :escalation-protocol
+ :doc/id "escalation-protocol-wave5-armed"
+ :doc/title "Wave 5 M5–M6 Escalation Protocol (ARMED)"
+ :doc/status "ACTIVE"
+ :doc/effective-date "2026-08-18"
+
+ :protocol/overview
+ {:name "Production Gates Escalation Protocol"
+  :scope "Wave 5 (M5–M6), Weeks 11–16"
+  :decision-rule "Consensus-first with escalation if blocked"
+  :sla-targets
+  {:alert-response "4 hours"
+   :critical-blocker-response "2 hours"
+   :gate-failure-decision "same checkpoint (within 4h)"
+   :p1-escalation-launch "1 hour"}}
+
+ :escalation/tree
+ [{:level 1
+   :title "Team Lead (First Responder)"
+   :roles ["M5-Core-TeamLead" "M5-Integration-TeamLead" "M6-Platform-TeamLead"]
+   :sla "1 hour response"
+   :responsibilities
+   ["Triage alert (false positive vs. real issue)"
+    "Attempt local fix (if <= 30 min)"
+    "Update Jira blocker issue (status, ETA)"
+    "Notify team (async: Slack #prod-gates-wave5)"
+    "Escalate to L2 if unresolved after 1h"]
+   :escalation-trigger "Blocker unresolved after 1h OR decision needed immediately"}
+
+  {:level 2
+   :title "Phase Owner (Escalation Authority)"
+   :roles ["M5-Phase-Owner" "M6-Phase-Owner"]
+   :sla "2 hour response (from initial alert)"
+   :responsibilities
+   ["Review team lead assessment"
+    "Check cross-team impact (is it single-team or multi-team blocker?)"
+    "Authorize emergency mitigations (e.g., skip test, partial deploy)"
+    "Decide: retry / workaround / escalate to L3"
+    "Update gate decision (Go/No-Go impact)"]
+   :escalation-trigger "Multi-team blocker OR decision overrides SLA"}
+
+  {:level 3
+   :title "Platform Lead (Final Authority)"
+   :roles ["Platform-Lead"]
+   :sla "4 hour response (from initial alert)"
+   :responsibilities
+   ["Final decision on gate halt or continuation"
+    "Activate contingency plans (if needed)"
+    "Communicate delay/risk to stakeholders"
+    "Approve budget/resource exceptions (if applicable)"
+    "Document decision in escalation ledger"]
+   :escalation-trigger "L2 cannot decide OR gate-halt imminent"}]
+
+ :alert/routing
+ {:channels
+  [{:name "#prod-gates-wave5" :type "slack-channel" :priority "P0"
+    :message-format "[ALERT] [SEVERITY] — [Metric/Blocker] — SLA: [deadline] — Responder: @[team-lead]"}
+   {:name "gates-escalation@gftd.group" :type "email-list" :priority "P1"
+    :triggers ["P1 escalation initiated" "L2 escalation needed"]}
+   {:name "prod-gates PagerDuty" :type "pagerduty-service" :priority "P0-critical"
+    :triggers ["deployment-success < 99.5%" "P1 blocker SLA breach" "gate-halt signal"]}]
+  :routing-rules
+  [{:alert-type "build-times-p99-exceed"
+    :severity "warning"
+    :primary-channel "#prod-gates-wave5"
+    :secondary ["team-lead-m5 (DM)" "metrics-lead (DM)"]
+    :sla "4 hours response"
+    :escalate-if "Unresolved after 2h"}
+   {:alert-type "test-coverage-drop"
+    :severity "warning"
+    :primary-channel "#prod-gates-wave5"
+    :secondary ["team-lead-m5 (DM)"]
+    :sla "4 hours response"
+    :escalate-if "Coverage < 90%"}
+   {:alert-type "deployment-failure-spike"
+    :severity "critical"
+    :primary-channel ["PagerDuty" "#prod-gates-wave5"]
+    :secondary ["team-lead-m6 (DM)" "phase-owner-m6"]
+    :sla "2 hours response + decision"
+    :escalate-if "Unresolved after 30 min OR cascading failures"}
+   {:alert-type "blocker-p1-sla-breach"
+    :severity "critical"
+    :primary-channel ["PagerDuty" "#prod-gates-wave5" "email"]
+    :secondary ["escalation-lead" "phase-owner"]
+    :sla "1 hour escalation-protocol-launch"
+    :escalate-if "Immediate (breaches SLA)"
+    :action "Activate L1 → L2 → L3 chain"}
+   {:alert-type "gate-halt-signal"
+    :severity "critical"
+    :trigger "2+ teams blocked on same critical-path item"
+    :primary-channel ["PagerDuty critical" "platform-lead (call)"]
+    :sla "15 min escalation call"
+    :decision-window "30 min (extended to 60 min if complex)"
+    :action "Phase-owner + platform-lead consensus"}]}
+
+ :blocker/taxonomy
+ {:critical-path-blocker
+  {:description "Blocks current week's gate deliverable"
+   :sla-response "4h (or 2h if P1)"
+   :example "upstream repo pin not advanced, integration test hangs"}
+
+  {:dependency-blocker
+   :description "Blocks cross-team synchronization (affects multi-team)"
+   :sla-response "2h"
+   :escalate-to "L2 (phase-owner)"
+   :example "M5 blocks M6 preflight check"}
+
+  {:infrastructure-blocker
+   :description "CI/metrics/deploy infrastructure failure"
+   :sla-response "1h"
+   :escalate-to "L2 immediately (platform-lead)"
+   :example "Prometheus down, Grafana unavailable, CI job timeout"}}
+
+ :decision-rules
+ {:consensus-go
+  {:description "All teams report: critical path complete, blockers resolved, metrics healthy"
+   :decision "Go (advance to next week)"
+   :documentation "Gate decision memo (Jira issue)"}
+
+  {:consensus-no-go
+   :description "Multi-team agreement: blocker unresolved OR metric breach critical"
+   :decision "No-Go (extend gate until blocker cleared)"
+   :timeline-extension "48h max (then escalate to platform-lead)"
+   :documentation "Gate decision + mitigation plan (Jira)"}
+
+  {:escalation-override
+   :description "Teams cannot reach consensus after 1h discussion"
+   :decision "Phase-owner + platform-lead decide (majority or L3 authority)"
+   :process "15 min escalation call → decision memo"
+   :documentation "Escalation decision + justification (Jira)"}
+
+  {:gate-halt
+   :description "2+ teams critical-path blocked on same item, unresolvable in 4h"
+   :decision "Halt gate execution (freeze all deployments until resolved)"
+   :process "15 min critical call (phase-owner + platform-lead)"
+   :window "30 min to decision (extended if multi-phase impact)"
+   :communication "Notify stakeholders + #prod-gates-wave5"
+   :documentation "Gate halt memo + contingency plan (Jira + Slack)"}}
+
+ :escalation-ledger
+ {:location "90-docs/gates/wave5-escalation-ledger.edn"
+   :format "append-only (1 event per line, EDN map)"
+   :fields
+   ["event-id" "timestamp" "alert-type" "severity" "blocker-id" "team"
+    "responder (L1/L2/L3)" "decision" "resolution-time" "outcome"]
+   :retention "Archived post-month for analysis"}
+
+ :on-call-rotation
+ {:alerts-lead "metrics-lead"
+  :week-11 {:team-lead-m5 "alice@" :team-lead-m6 "bob@" :phase-owner-m5 "charlie@"}
+  :week-12 {:team-lead-m5 "bob@" :team-lead-m6 "alice@" :phase-owner-m6 "diana@"}
+  :escalation-lead "escalation-lead@gftd.group (shared mailbox)"}
+
+ :protocols/by-scenario
+ [{:scenario "Build times exceed 12 min (p99)"
+   :severity "warning"
+   :responder-l1 "team-lead-m5"
+   :steps
+   ["1. Notification to #prod-gates-wave5 (auto + human)"
+    "2. Check latest CI job (are they still running slow?)"
+    "3. Identify root cause: code complexity, infrastructure lag, or both?"
+    "4. Attempt fix: optimize tests OR add CI capacity"
+    "5. ETA update: commit to #prod-gates-wave5 (1h response)"
+    "6. If unresolved after 2h, escalate to L2 (phase-owner-m5)"]
+   :escalation-criteria "Unresolved after 2h OR multiple consecutive runs exceed threshold"}
+
+  {:scenario "Test coverage drops below 92%"
+   :severity "warning"
+   :responder-l1 "team-lead-m5"
+   :steps
+   ["1. Notification to #prod-gates-wave5"
+    "2. Identify commit(s) that dropped coverage (git blame + coverage.json)"
+    "3. Decision: add tests (preferred) OR document exclusion (code review)"
+    "4. Block gate advancement until coverage restored (Jira: Ready for Gate → Blocked)"
+    "5. Update team: post ETA to #prod-gates-wave5"]
+   :escalation-criteria "Coverage < 90% (automatic L2 escalation)"}
+
+  {:scenario "Deployment success rate < 99.5%"
+   :severity "critical"
+   :responder-l1 "team-lead-m6"
+   :steps
+   ["1. PagerDuty + Slack alert (auto)"
+    "2. Check latest deployment logs (CloudFlare Workers, K8s, or target service)"
+    "3. Root cause: code defect OR infrastructure issue?"
+    "4. Decision: rollback OR hotfix"
+    "5. Execute (4. Deploy rollback or merged hotfix within 30 min)"
+    "6. Post-incident review (document in escalation ledger)"]
+   :escalation-criteria "Cascading failures (2+ services affected) OR fix > 1h"}
+
+  {:scenario "Blocker SLA breach (P1 > 2 hours unresolved)"
+   :severity "critical"
+   :responder-l1 "team-lead (owner of blocker)"
+   :responder-l2 "phase-owner"
+   :steps
+   ["1. System detects blocker age > 2h (automated alert)"
+    "2. PagerDuty alert + Slack escalation to phase-owner"
+    "3. Phase-owner joins call (within 30 min)"
+    "4. Decide: escalate to L3 OR authorize workaround (skip test, partial deploy, etc.)"
+    "5. Document decision (Jira: blocker-escalation issue)"
+    "6. If L3 needed, platform-lead joins (within 2h of original alert)"]
+   :escalation-criteria "Automatic (SLA breach itself is trigger)"}
+
+  {:scenario "Gate halt imminent (2+ teams critical-path blocked)"
+   :severity "critical-red"
+   :responder-l2 "phase-owner"
+   :responder-l3 "platform-lead"
+   :steps
+   ["1. Automated detection: 2+ teams report critical-path blocker"
+    "2. PagerDuty critical + voice call initiated"
+    "3. Phase-owners present root cause (5 min)"
+    "4. Platform-lead decides: halt OR continue with risk (15 min)"
+    "5. If halt: freeze deployments + activate contingency"
+    "6. Post decision memo to #prod-gates-wave5 + stakeholders"]
+   :escalation-criteria "Automatic (gate-halt logic triggers)"}]
+
+ :communication-templates
+ {:slack-alert-template
+  "🚨 [SEVERITY] [MetricName/Blocker]\nSLA Deadline: [deadline]\nResponder: @[team-lead]\nDetails: [link to dashboard / Jira]"}
+
+  {:escalation-template
+   "[ESCALATION] Week [N] Blocker — [BlockerTitle]\nTeam: [M5/M6]\nAge: [Xh Xm]\nAssignee L1: @[team-lead]\nEscalation to L2: @[phase-owner]\nDecision needed by: [timestamp]\nContext: [link to Jira blocker issue]"}
+
+  {:decision-memo-template
+   "Gate Decision Memo — Week [N]\nDecision: [Go/No-Go/Halt]\nReasoning: [summary of critical path + metrics + blocker status]\nImpact: [on next week's forecast]\nApprovals: @[phase-owner] @[platform-lead (if L3)]"}}
+
+ :training
+ {:on-boarding-checklist
+  ["[ ] Read this escalation protocol (15 min)"
+   "[ ] Join Slack #prod-gates-wave5"
+   "[ ] Add yourself to PagerDuty rotation (if applicable)"
+   "[ ] Access Jira + Grafana (test read + alert settings)"
+   "[ ] Participate in kickoff meeting (2026-08-18 09:00)"
+   "[ ] Simulate escalation scenario (dry run with teams, 30 min)"
+   "[ ] Confirm readiness (reply to team-lead)"]
+  :dry-run-scenario
+  "Week 11 simulation: Team M5 reports blocker (mock), escalate through L1 → L2 → decision. Teams practice routing, timing, documentation."}}
+
+ :post-implementation
+ {:review-interval "Weekly (Monday 09:00 team review)"
+  :feedback-collection
+  ["Did escalation protocol deliver SLA?"
+   "Were teams clear on next steps?"
+   "Any false positives / over-alerting?"
+   "Did documentation flow support decision?"]}
+
+ :success-criteria
+ ["All escalations tracked in ledger (100% logging)"
+  "SLA compliance: 95%+ (response times met)"
+  "Zero gate-halt due to miscommunication (clarity)"
+  "Post-implementation NPS > 3/5 (team satisfaction)"]
+}

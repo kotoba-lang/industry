@@ -1,0 +1,2179 @@
+[{:db/id -1
+  :adr/id "adr-2607183900-kotoba-component-language-runtime-roles"
+  :adr/title "ADR-2607183900: Kotoba component language and relative runtime roles"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-18"
+  :adr/last-verified "2026-07-20"
+  :adr/last_verified "2026-07-20"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-wide-cljc-to-kotoba-source-migration"
+  :adr/authoritative-for
+  ["Kotoba source language versus runtime role separation"
+   "Kotoba-written capability provider components"
+   "kototama component tender and linker role"
+   "Q9 component-oriented CLJC migration boundary"]
+  :adr/related
+  ["orgs/kotoba-lang/kotoba-lang/lang/component-role-model.edn"
+   "orgs/kotoba-lang/kotoba-lang/lang/safety-qualification.edn"
+   "orgs/kotoba-lang/kotoba-lang/lang/q9-migration.edn"
+   "orgs/kotoba-lang/kototama/README.md"
+   "90-docs/migration/kotoba-cljc-inventory.json"
+   "90-docs/migration/kotoba-cljc-preclassification.json"
+   "90-docs/migration/kotoba-cljc-compile-probes.json"
+   "90-docs/migration/kotoba-cljc-project-graphs.json"
+   "90-docs/migration/kotoba-cljc-project-probes.json"
+   "90-docs/migration/kotoba-cljc-project-gap-dispositions.edn"
+   "90-docs/migration/kotoba-cljc-security-dispositions.json"
+   "90-docs/migration/kotoba-cljc-security-remediations.edn"
+   "90-docs/migration/kotoba-cljc-host-boundary-remediations.edn"
+   "90-docs/migration/kotoba-cljc-pilots.edn"
+   "90-docs/evidence/260719-kotoba-v0.6.24-installed-release.edn"
+   "90-docs/evidence/260719-kotoba-v0.6.25-installed-release.edn"
+   "90-docs/evidence/260719-kotoba-v0.6.26-installed-release.edn"
+   "90-docs/evidence/260719-kotoba-v0.6.27-installed-release.edn"
+   "90-docs/evidence/260719-kotoba-v0.6.28-nested-option-release.edn"
+   "90-docs/evidence/260719-kotoba-lab-typed-project.edn"
+   "90-docs/evidence/260719-kotoba-fsm-player-v1.edn"
+   "90-docs/evidence/260720-kotoba-h264-ebsp-sps-v1.edn"
+   "90-docs/evidence/260720-kotoba-isobmff-avcc-h264-integration-v1.edn"
+   "90-docs/evidence/260720-kotoba-isobmff-image-meta-v1.edn"
+   "90-docs/evidence/260720-kotoba-ghosthacker-timemachine-inherited-server-v1.edn"
+   "90-docs/evidence/260720-kotoba-ghosthacker-memorize-first-case-file-v1.edn"
+   "90-docs/evidence/260720-kotoba-ghosthacker-family-opening-week-v1.edn"
+   "90-docs/evidence/260720-kotoba-kagi-phase-gate-v1.edn"
+   "90-docs/evidence/260720-kotoba-bpmn-bounded-structural-v1.edn"
+   "90-docs/evidence/260720-kotoba-ddl-bounded-schema-v1.edn"
+   "90-docs/evidence/260720-kotoba-sha256d-round-primitives-v1.edn"
+   "90-docs/evidence/260720-kotoba-kyoninka-human-gate-v1.edn"
+   "90-docs/evidence/260720-kotoba-fleet-bounded-lease-holder-v1.edn"
+   "90-docs/evidence/260720-kotoba-koe-booking-delegation-gate-v1.edn"
+   "90-docs/evidence/260720-kotoba-float-domain-retentions.edn"
+   "90-docs/evidence/260720-webgl-generated-glsl-facade-retention.edn"
+   "90-docs/evidence/260720-kotoba-giemon-construction-safety-v1.edn"
+   "90-docs/evidence/260720-kami-engine-physical-render-retentions.edn"
+   "90-docs/evidence/260720-kotoba-safe-floating-point-plan.edn"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/decision-summary
+  {:kotoba-extension :capability-safe-component-source
+   :guest-host :relative-runtime-roles
+   :kotoba-providers-allowed true
+   :http-and-database-components-allowed true
+   :kototama :component-tender-and-linker
+   :native-tcb :minimal-explicit
+   :ambient-authority false
+   :q9-consumer-cutover false
+   :language-maturity :in-progress
+   :fleet-migration :not-complete}
+  :adr/completion-gates
+  [{:gate/id :g1-language-semantics
+    :gate/status :complete
+    :gate/remaining []}
+   {:gate/id :g2-backend-parity
+    :gate/status :complete
+    :gate/remaining []}
+   {:gate/id :g3-toolchain-supply-chain
+    :gate/status :complete
+    :gate/remaining []}
+   {:gate/id :g4-fleet-migration
+    :gate/status :partial
+    :gate/remaining [:obtain-crdt-consumer-domain-mapping-authorization
+                     :complete-path-dispositions
+                     :dependency-ordered-fleet-rollout
+                     :restore-five-hosted-ci-evidence-paths
+                     :cross-target-fleet-conformance
+                     :consumer-cutover-approvals]}]
+  :adr/body
+  "# ADR-2607183900: Kotoba component language and relative runtime roles
+
+**Status**: accepted
+**Date**: 2026-07-18
+**Deciders**: Jun Kawasaki
+
+## Context
+
+The initial qualification shorthand conflated `.kotoba` source, component
+trust, and the runtime relationship between an importer and exporter. It would
+unnecessarily keep HTTP, database, orchestration and policy logic in CLJC even
+when those implementations can remain capability-safe.
+
+## Decision
+
+`.kotoba` denotes canonical capability-safe component source. It does not
+denote guest-only or pure-only code. Every external effect remains explicit in
+the source effect closure and emitted imports; there is no ambient eval,
+require, host interop, syscall or self-minted grant.
+
+Host and guest are relative runtime roles. A component is a guest of the
+runtime or provider supplying its imports, and it is a host to a downstream
+component whose imports it implements. A `.kotoba` provider may therefore
+import lower-level capabilities and export a narrower higher-level
+capability. HTTP and database components may be written in Kotoba, but writing
+a provider in the same language never bypasses its declared imports.
+
+Kototama is the component tender and linker. It admits emitted artifacts,
+instantiates components, links declared imports and exports, binds grants and
+enforces resource limits. Aiueos remains the grant-policy broker. The minimal
+native TCB still owns Wasm engine control, raw syscall binding, root secret
+custody and grant-verification roots.
+
+Q9 migrations classify logic by imports, exports and TCB boundary. Domain,
+orchestration, validation, protocol and provider logic may move to `.kotoba`;
+CLJC may remain temporarily as oracle, compatibility adapter or native
+primitive. Existing CI, soak, rollback and explicit consumer-cutover gates are
+unchanged.
+
+## Language safety maturity checkpoint
+
+The restricted Web path now owns bounded parametric algebraic values rather
+than delegating their semantics to JavaScript shape conventions.
+
+- Kotoba-script PR 14 (`d57ec04f`) and compiler PR 73 (`ec4dcbf1`) introduced
+  canonical `[:result ok-type err-type]` descriptors with depth-8/node-64
+  type and runtime budgets.
+- Kotoba-script PR 15 (`f9b342a8`) and compiler PR 74 (`a152314f`) introduced
+  exhaustive `match-result`: one typed ok branch and one typed err branch are
+  mandatory and only the selected branch executes.
+- Kotoba-script PR 16 (`8366a2db`) and compiler PR 76 (`9d36d887`) introduced
+  user-defined closed variants:
+  `[:variant :qualified/type [[:case payload-type] ...]]`. Variants admit at
+  most 32 unique cases inside the same depth/node budget. Every runtime value
+  carries the complete descriptor, case tag and payload, so a same-named case
+  from another schema cannot substitute across a boundary. `match-variant`
+  requires every declared case exactly once in declaration order and admits no
+  wildcard that could silently absorb schema expansion.
+- Kotoba-script PR 17 (`3508a7e7dbff4a7257ce2ac356eb118e3afd2113`)
+  and compiler PR 77 (`2d53a28f5e401a6240d2b1df48455cd697acd29b`)
+  completed reference and restricted-JavaScript semantics for generic
+  `[:option payload-type]`. `none` is represented as `[descriptor false]` and
+  therefore retains its complete type identity instead of using JavaScript
+  null/undefined or an untyped sentinel; `some` is
+  `[descriptor true payload]`. Exact descriptor equality, payload validation,
+  lazy fallback and exhaustive `match-option` are covered in kotoba-script by
+  19 tests / 74 assertions and in the compiler target corpus by 46 tests / 391
+  assertions.
+- Kotoba-script PR 18 (`cfc9edcd6cd8c7662ae327972939f3060479e195`)
+  and compiler PR 78 (`19c4e02f0b531b811a0d3071aa60b25f2fbaa8de`)
+  introduced fixed heterogeneous vectors as
+  `[:vector [item-type ...]]`. At most 32 statically typed positions fit
+  inside the shared descriptor budget. Canonical values carry the complete
+  descriptor followed by the exact item sequence; construction, literal-index
+  projection, persistent replacement and structural equality revalidate the
+  descriptor, length and every position. Dynamic indexes, sparse values,
+  append/drop and host mutation are not admitted.
+- Kotoba-script PR 19 (`57046fa5ce5a7fa05bba6b967cf2389e613e4336`)
+  and compiler PR 79 (`db45bb82d8df9893b662bf10071db579f26d7f84`)
+  introduced bounded typed sets as `[:set item-type]`, with at most 32
+  recursively validated values. Their canonical ABI is
+  `[descriptor, sorted-items]`; sorting uses a Kotoba-owned total order over
+  every admitted value family, and duplicate boundary or constructor inputs
+  fail closed instead of inheriting JavaScript collection behavior. Count,
+  membership, persistent insertion/removal and structural equality preserve
+  exact descriptor identity. Nested sets and algebraic payloads are covered.
+- Kotoba-script PR 20 (`b2437c76c5ba44e0644203141cd87ab50d23aaf3`)
+  and compiler PR 80 (`0dcdb34bd4a28328106ec8c0ab35ca94dfbe3b84`)
+  introduced nominal bounded records as
+  `[:record :qualified/type [[:field field-type] ...]]`. Canonical values are
+  `[descriptor, field-value ...]`, with 1--32 unique keyword fields in
+  declaration order under the shared descriptor budget. Construction requires
+  exact arity; projection and persistent replacement require a declared
+  keyword literal; every boundary validates nominal schema identity, arity and
+  field values recursively. Cross-schema substitution, dynamic/unknown fields,
+  sparse host objects, prototype behavior, mutation and object identity remain
+  outside the language ABI.
+- Kotoba-script PR 21 (`dbda10bf9606f9ac6a09cf38005831128bf6e366`)
+  and compiler PR 81 (`c802d234f81de7c468e227512d7874c6e7c7b280`)
+  sealed floating point as the versioned fail-closed policy
+  `:kotoba.floating-point/forbidden-v1` and the Web artifact field
+  `floatingPointPolicy: 'forbidden-v1'`. Every compilation result carries the
+  policy. Floating literals, descriptors, parameters, results, operations,
+  NaN, infinity and boundary values are rejected before lowering; JavaScript
+  numbers, signed zero, implicit rounding and integer-to-double conversion
+  cannot silently become Kotoba semantics. Any future floating profile requires
+  a new ABI version and explicit cross-backend conformance evidence.
+- Compiler PR 82 (`c7358bbeb0410dd082ab16d49dff8dffcc763a82`)
+  established one versioned machine-readable typed-value conformance corpus.
+  The same six positive vectors and eight negative vectors now qualify generic
+  options, parametric results, closed variants, heterogeneous vectors, typed
+  sets, nominal records and floating-point denial across the reference
+  interpreter and restricted Web emitter. `.cljk` is confirmed as a Kotoba
+  source extension selecting this compiler, not a JVM runtime or an independent
+  typed-value ABI.
+- Compiler PR 83 (`0246c205eb2f7dba2a3be303b16ca653f3a9f83f`)
+  sealed `kotoba.typed/v1` into the Wasm artifact and made the browser host
+  parse and validate it before instantiation. Forged and cross-schema
+  externrefs fail closed at exported parameter and result boundaries.
+- Compiler PR 84 (`bab9d7f1f73a629584652ccf585b2b96e320b980`)
+  qualified the first `kotoba.typed/externref-v1` Wasm subset for generic
+  option/result matching, closed variants, heterogeneous vectors, typed sets
+  and nominal records. The shared positive corpus now executes on reference,
+  restricted Web and Wasm; malformed duplicate sets and boundary substitution
+  remain rejected. Unsupported typed Wasm operations fail during lowering.
+- Compiler PR 85 (`36c0fd2a4dfa606f670d69e7634881fa8361b792`)
+  adds predicates, lazy option/result fallback extraction, heterogeneous-vector
+  and record update/equality, and typed-set contains/conj/disj/equality. Its
+  guarded gate passed 250 tests / 3,649 assertions, including real Node
+  WebAssembly execution. All non-Windows CI passed; Windows stopped at the
+  pre-existing fail-closed WFP admission probe before feature tests.
+- Compiler PR 86 (`bb633435309cf4781b82e5e48c1225bc02570a20`)
+  defines one closed discovery
+  contract for `.kotoba`, `.cljk`, and `.cljc`. JVM tooling and the JVM-free nbb
+  path share it; extensions do not select a runtime. Explicit JS and Wasm target
+  tests passed locally (252 tests / 3,669 assertions), and real nbb probes
+  compiled `.cljk` to a valid Wasm module and admitted `.cljc` without JVM use.
+  All non-Windows CI passed twice; Windows remained fail-closed at the known
+  WFP admission probe before feature tests. This closes G2.
+- Compiler PR 87 (`2553fbda255c4711b60a33e030734b9c83f49568`)
+  starts G3 with
+  `kotoba.diagnostic/v1`: stable phase codes, error severity, redacted source
+  basename and bounded source spans. JVM tools.reader and the JVM-free nbb
+  reader preserve locations through constant substitution and desugaring.
+  The guarded JVM gate passes 253 tests / 3,673 assertions; the nbb diagnostic
+  probe reports the same `:kotoba/source-rejected` code at line 2, column 3.
+  All non-Windows CI, including the full nbb corpus, passed twice. Structured
+  diagnostics are complete for G3.
+- Compiler PR 88 (`2603952bc6e5af9cf76fdd57aedb9a1541b6a3fe`) adds sealed
+  `kotoba.interface/v1` inspection for `.kotoba`, `.cljk`, and `.cljc`.
+  Only public names, arities, parameter/result types and effects are exposed;
+  private functions, bodies, constants, source and local paths are excluded.
+  Local guarded verification passed 255 tests / 3,681 assertions, and all
+  non-Windows CI passed twice. Windows remained fail-closed at the known WFP
+  admission probe. Interface inspection is complete for G3.
+- Compiler PR 89 (`6d7b93277323920fb53cd10012f1572e562cd442`) adds
+  `kotoba.compatibility/v1` to JS manifests, Wasm custom sections and sealed
+  native artifacts. It binds compiler, language, KIR, selected target, runtime,
+  value ABI and kototama tender contract identities. Browser/WASI hosts reject
+  duplicate, malformed and mismatched metadata before instantiation, and the
+  native verifier recomputes and checks the descriptor. Guarded verification
+  passes 257 tests / 3,690 assertions, the 15-case nbb corpus, browser-host
+  tests and syntax validation. The public browser/WASI runtime now requires
+  metadata and rejects its absence; hand-authored test modules receive an
+  explicit sealed fixture section rather than a production bypass.
+- Kototama PR 38 (`423ab57d5813cc07a55e9a2a953dbe0f28b1e011`) parses the bounded compatibility
+  section before Chicory instantiation and validates compiler, language, KIR,
+  generic Wasm target, runtime, value ABI, tender role and tender contract.
+  Sessions declaring a Kotoba compiler artifact reject missing metadata.
+  Its guarded main-branch suite passes 105 tests / 327 assertions and both CI
+  gates passed. Compiler PR 89 passed all repeated Linux, Linux arm64, Safari,
+  Android, server-kind and one macOS run; one duplicate macOS run encountered a
+  transient native compiler-tool query failure, and Windows remained at the
+  known WFP admission probe. Compatibility metadata is complete for G3.
+- Compiler PR 90 (`c77da1c6e842ecdee571f8b576a9b26b5e3e2229`) adds sealed
+  `kotoba.provenance/v1`. It binds source, policy, build metadata, HIR, KIR,
+  target profile, compatibility and every primary/binary/object output digest.
+  JS manifests embed it and every CLI target writes a provenance sidecar.
+  Guarded verification passes 258 tests / 3,725 assertions. All repeated
+  non-Windows CI passed; Windows stayed at the known WFP probe. Artifact
+  provenance is complete for G3.
+- Compiler PR 91 (`b2ecdbdaa1bab85ca639577d8a63204b7877fb1a`) adds signed
+  `kotoba.incremental-cache/v1` admission. Cache hits require exact current
+  input, target, provenance and payload identities plus trusted non-revoked
+  signer and validity window. Rejected hits never silently fall back to a fresh
+  compile. Guarded verification passes 260 tests / 3,738 assertions. All
+  repeated non-Windows CI passed and Windows stayed at the known WFP probe.
+  Safe incremental-cache admission is complete for G3.
+- Installed-release evidence
+  `90-docs/evidence/260719-kotoba-v0.6.1-installed-release.edn` records the
+  published Darwin arm64 asset and checksum. The isolated shell install and the
+  Homebrew Cellar binary both run the same `.kotoba`, `.cljk`, and `.cljc`
+  corpus to 42; the shell binary rejects `eval`. This does not close the gate:
+  a pre-existing non-Homebrew `/opt/homebrew/bin/kotoba` prevents formula
+  linking and `brew test`, the negative path emits an unstructured JVM stack
+  trace, and v0.6.1 predates compiler PR 90/91.
+- Kotoba PR 360 (`985fea6c13ee127db2651e6092a7e8a1f1dce50f`) closes the observed negative-path
+  disclosure for the next release. The process boundary converts `run/failed`
+  into `kotoba.diagnostic/v1`, retains only the source basename and bounded
+  runtime problems, and excludes absolute paths, exception messages and Java
+  stack frames. Its guarded suite passes 345 tests / 1,614 assertions and both
+  CLJ launcher and Python SDK CI gates passed.
+- Kotoba PR 361 (`1c025d81e417407a1968f7108bbb89a3f8adafb0`) pins compiler PR 91 and makes native publication
+  fail closed on the full source test suite plus a JVM-free installed-binary
+  corpus. The corpus executes identical `.kotoba`, `.cljk`, and `.cljc`
+  programs to 42, requires a path-free namespaced `kotoba.diagnostic/v1` for a
+  forbidden `eval`, rejects script/JVM launchers by native executable magic,
+  binds the evidence packet to the binary SHA-256, and publishes one packet per
+  platform. It also preserves namespaced diagnostic values on the JSON wire
+  and makes successful test runs terminate deterministically. Local guarded
+  verification passes 345 tests / 1,616 assertions. The non-publishing native
+  matrix passed Darwin arm64, Darwin amd64 and Linux amd64, including the
+  JVM-free verifier and evidence packaging. The release gate is merged.
+- Release v0.6.22 publishes all three native archives, checksums and
+  per-platform evidence packets from that merged gate. The isolated shell
+  installer verifies the Darwin arm64 checksum and passes the `.kotoba`,
+  `.cljk`, `.cljc` = 42 corpus plus path-free structured `eval` rejection.
+  Kotoba PR 362 and homebrew-kotoba PR 25 update both formula copies to the
+  exact v0.6.22 resource checksums without a Clojure/JVM dependency. Homebrew
+  downloads and verifies the resource, but this host refuses installation
+  before staging because Apple Command Line Tools 26.3 is not installed.
+  Existing `/opt/homebrew/bin/kotoba` was not overwritten. Evidence is archived
+  in `90-docs/evidence/260719-kotoba-v0.6.22-installed-release.edn`.
+- Homebrew bottle workflow run 29655656220 installs and executes
+  `brew test --verbose` successfully on macOS arm64, macOS Intel and Linux
+  amd64. Homebrew-kotoba PR 26 seals the three immutable bottle digests into
+  the Formula. The local arm64 bottle installs into Cellar and passes the same
+  native three-extension and structured-rejection corpus. Linking remains
+  intentionally skipped because the unrelated pre-existing command is outside
+  this migration's authority; installed behavior is verified by exact Cellar
+  path. This closes G3.
+- Compiler PR 92 (`f529e7f594cc996d7a74dc7994c5f536ac6e780e`) closes two
+  migration defects without opening dynamic evaluation: a one-string `def`
+  is now a value rather than an implicit docstring; `(keyword "literal")` is
+  folded only for a closed literal; and `cond->` lowers to ordered,
+  single-evaluation `let`/`if` persistent updates. Dynamic keyword inputs and
+  non-call updates remain rejected. Guarded verification passes 263 tests /
+  3,745 assertions; all non-Windows CI passes, while Windows remains at the
+  known fail-closed WFP probe.
+- Etzhayyim tashikame PR 8
+  (`7f6ec41e83aee61315be9f57870ff81d954009c3`) is the first completed
+  installed-release organization pilot. Its closed two-module `.kotoba`
+  project is checked, compiled and executed with v0.6.22, carries project and
+  provenance digests, rejects forbidden `eval`, retains the CLJC rollback
+  implementation, and now matches the original unknown-phase fallback instead
+  of silently denying it.
+- The five-organization pilot set is now implemented with the installed
+  v0.6.22 release. Kotoba-lang PR 26 (`aa1fc7faa170d9d3813b4c06087b074ecb2d6524`)
+  executes the namespace-priority utility kernel to 42; cloud-itonami PR 3
+  (`60f2e0323feab5cf906e4bd854ddfbb8c35db803`) checks all 32 governor flag
+  combinations; gftdcojp cloud-mamori PR 1
+  (`6df62179dadb8db3304f2ac395b0b9a56205ee30`) checks a closed typed-keyword
+  referral boundary; and com-junkawasaki ghosthacker-lightning PR 1
+  (`87571cf46d722482933e86b3a2e14ca5d4ad38f1`) checks signed timing boundary
+  values. Every pilot has local installed-release compile, Node execution,
+  empty-capability/provenance checks and forbidden-`eval` rejection. The first
+  three organizations have hosted CI evidence. Cloud-mamori did not schedule
+  its new workflow, and ghosthacker-lightning's two jobs failed before any
+  step ran, so those two hosted evidence paths remain operational gaps rather
+  than language-test failures.
+- The com-junkawasaki pilot also exposed a defense-in-depth false positive:
+  the generated safe identifier derived from `window-ms` matched the broad
+  `window` output regex before AST verification. Renaming it to `threshold-ms`
+  produced an otherwise identical accepted artifact. Kotoba-script PR 22
+  (`4c9a594e5bfd1b794a42acc4d7c92c9212019ccf`) makes the parsed AST
+  authoritative for ambient globals, dynamic imports, property access and
+  object-literal forbidden keys. Safe identifiers, strings and comments no
+  longer collide with authority names, while escaped `globalThis`,
+  `constructor`, `__proto__` and actual ambient globals remain rejected. Its
+  guarded suite passes 24 tests / 103 assertions.
+- Compiler PR 93 (`12810ac6615bef9b54e1f11da4d452fe15c31012`)
+  pins that backend and compiles/executes the real `window-ms` timing boundary
+  to `1,0,0`. Guarded verification passes 264 tests / 3,748 assertions; every
+  non-Windows push and pull-request job passed, and Windows stopped at the
+  unchanged fail-closed WFP network-denial probe. Kotoba PR 363
+  (`e3cbae8e8b0f607a11fd19e5a75e37652e7f9eb1`) pins compiler PR 93 and adds
+  the same Web compile/runtime case to the JVM-free native release evidence.
+  Its guarded suite passes 346 tests / 1,618 assertions and both CI gates pass.
+  Release v0.6.23 passes the Darwin arm64, Darwin amd64 and Linux amd64 native
+  matrix in workflow run 29657545712. Each job passed the source suite,
+  native-image build, JVM-free verifier, syntax-aware authority-name runtime
+  probe, evidence recording and immutable asset publication. The downloaded
+  Darwin arm64 archive checksum and evidence packet were independently
+  verified, and that installed binary compiled/executed the timing pilot.
+  Homebrew-kotoba PR 27 (`bc8696155916b4d8fe97ae3905722becb4003649`)
+  updates all source/resource checksums and adds the same safe-name formula
+  test. Bottle workflow run 29657900081 passes real install/test on macOS
+  arm64, macOS Intel and Linux amd64. Homebrew-kotoba PR 28
+  (`bed3f06ad9bbf355464bdb94a36d117ecebc3d72`) seals all three bottle
+  digests, and kotoba PR 364
+  (`1f1c2b7b1024f994cf8dabe0c662548feaa5cba0`) synchronizes the in-repository
+  Formula. The local arm64 bottle installs at the exact Cellar path and passes
+  safe-name compile/runtime plus structured rejection. The unrelated existing
+  `/opt/homebrew/bin/kotoba` remains untouched. Installed v0.6.23 supply-chain
+  evidence is complete.
+
+The latest merged compiler gate passed 250 tests / 3,664 assertions locally for
+PR 83 and 250 tests / 3,649 assertions for PR 84's then-current suite. Linux,
+Linux arm64, macOS including iOS AOT/simulator, Android NDK, server-kind,
+Safari and Ubuntu browser checks passed in both push and pull-request events.
+Windows jobs encountered the pre-existing hosted-runner WFP probe failure
+(timeout or WSAECONNREFUSED instead of required WSAEACCES) before feature tests;
+the network-denial predicate was not weakened. Compiler-to-restricted-ESM-to-
+Node behavior and reference/Web positive and negative boundary corpora passed.
+
+This completes G1 and closes canonical finite variant, generic option, fixed heterogeneous
+vector, bounded typed-set and nominal record identity, bounded typed payloads,
+and generalized exhaustive matching on reference/Web. It does not complete the
+language or fleet migration.
+
+## Remaining work and completion gap
+
+Completion is divided into four ordered gates. Passing a later gate cannot
+compensate for an earlier safety gap.
+
+### G1: safe language semantics -- complete
+
+Generic option, fixed heterogeneous vectors, bounded typed sets and nominal
+bounded records are complete for the qualified reference/Web subset. Floating
+point is explicitly excluded by `forbidden-v1`; NaN, infinity, signed zero,
+rounding and conversion cannot enter through an unversioned host fallback.
+
+G1 is complete only when each admitted value family has one canonical typed
+value ABI, bounded validation, no JavaScript sentinel shortcut, lazy branch
+semantics where applicable, and matching positive/negative behavior in the
+reference interpreter and restricted Web emitter.
+
+### G2: backend parity -- complete
+
+The artifact-sealed Wasm ABI, strict boundary admission, shared corpus,
+algebraic operations and explicit `.cljk`/`.cljc` source-discovery and
+selected-target coverage now exist. `.cljk` has no separate runtime ABI: selecting Web must
+use the qualified restricted-JavaScript ABI and selecting Wasm must use the
+qualified Wasm ABI. JVM may execute build tooling but is never a Kotoba runtime
+target. Backend-specific coercion, host object identity, integer handles without
+owned lifetime semantics, or permissive fallback is a qualification failure.
+
+### G3: toolchain and supply-chain qualification -- complete
+
+Add stable structured diagnostics, source locations, interface inspection,
+compiler/runtime/kototama compatibility metadata, artifact provenance and
+safe incremental-cache admission. Produce reproducible release artifacts and
+prove both `brew install` and the shell installer by compiling and running the
+same installed-release corpus; tests against repository-local binaries do not
+count as release evidence. Compiler provenance, signed cache admission and the
+native release gate are implemented. Version v0.6.26, source/native archive
+checksums, clean-prefix shell evidence and the three-platform Homebrew bottle
+install/test matrix are complete. Release evidence also proves that safe
+identifiers such as `window-ms` execute while actual ambient authority remains
+rejected. Its native release evidence additionally compiles and executes a
+closed two-module `.cljc` source-path graph on macOS ARM64/Intel and Linux
+AMD64, including an explicitly selected root beside a confined `src/`
+dependency directory and a bounded dependency namespace docstring. The
+pre-existing unrelated `/opt/homebrew/bin/kotoba` must not be overwritten;
+Homebrew verification therefore uses an isolated clean prefix.
+
+### G4: five-organization fleet migration -- pilots complete, fleet partial
+
+Regenerate the machine-readable `.cljc` inventory for etzhayyim, kotoba-lang,
+gftdocjp, cloud-itonami and com-junkawasaki, assign every path a disposition,
+and migrate dependency-ordered pilots before widening the rollout. Each pilot
+must prove source compilation, runtime behavior, negative safety cases and
+rollback using installed artifacts. Consumer cutover stays false until those
+gates pass.
+
+The live 2026-07-19 inventory is generated by
+`scripts/inventory-kotoba-cljc.mjs` into
+`90-docs/migration/kotoba-cljc-inventory.json`: 1,865 repositories and 23,862
+`.cljc` paths (etzhayyim 2,389; kotoba-lang 9,444; gftdcojp 11,843;
+cloud-itonami 122; com-junkawasaki 64). The machine check proves summary and
+path counts agree. `kotoba-cljc-pilots.edn` records a merged installed-release
+pilot for every organization, with CLJC retained as rollback/oracle. This
+closes the five-organization pilot implementation gate, not the fleet gate.
+
+`scripts/preclassify-kotoba-cljc.mjs` deterministically binds itself to the
+inventory digest and records lexical evidence for every one of the 23,862
+paths in `kotoba-cljc-preclassification.json`. Content hashing reduces the
+semantic review set to 9,595 unique contents; 14,267 paths are exact-content
+duplicates. Test paths are routed first so test-only host/macro constructs do
+not inflate production language gaps. The provisional routing finds 400 direct
+single-source compile probes, 461 closed-project graph probes, 7,315
+language-gap/refactor reviews, 7,767 host split/retain reviews, 964 explicit
+capability-provider splits, 6,886 test-oracle retentions and 69
+security-first reviews. These are deliberately not final dispositions: lexical matches can
+occur in comments, strings or safe data readers, and each content cluster
+still requires a compiler probe or explicit reviewed retain decision. A second
+generation produced the same SHA-256
+`ce41bf30f1188df45bd592033b6255594c2c3113ae1b4234d75b569341d61863`,
+and cluster path totals equal the inventory path total.
+
+`scripts/probe-kotoba-cljc-candidates.mjs` runs one representative of each
+direct-candidate content digest through the exact installed v0.6.23 native
+compiler and propagates the result only to byte-identical paths. The 398 paths
+collapse to 151 compiler invocations. One unique path compiles with provenance;
+150 reject in the safe subset. The rejected population is now concrete rather
+than inferred: 65 unsupported closed constants, 37 missing explicit library
+exports, 31 data-only namespaces, 7 parameterized `main` entries and 10 other
+bounded frontend-shape failures. The 37 entryless libraries were additionally
+reprobed in temporary copies with explicit public exports. Only one then
+compiles, and it already has the merged canonical pilot counterpart
+`lang/migration-pilots/demo-util.kotoba`. Of the remaining 36, 20 lack an
+admitted operation lowering, 15 contain computed or namespaced calls forbidden
+by the qualified subset, and one has an `i64`/string mismatch. Two consecutive
+generations produced the same probe-ledger SHA-256
+`888080fab2cb703f2f0050eda0a1d3713c7be1c0670fa5edf0d22e1bd0d383a2`.
+The only accepted source, `kotoba/src/demo.cljc`, is already documented as a
+cross-reader conformance oracle beside canonical `demo.kotoba`; acceptance is
+therefore not misreported as authorization to delete the CLJC oracle.
+
+`scripts/analyze-kotoba-cljc-project-graphs.mjs` resolves repository-local
+namespace edges for the 509 provisional graph candidates. Its ledger SHA-256 is
+`2fc2ecdb0374cf33d7deb50134b9ad95721f6c71295189a234411fd935c6f47e`:
+249 roots have a direct external dependency and 260 have repo-closed direct
+edges, but transitive closure leaves only three provisional
+`closed-and-direct-probe-ready` roots; 47 closures contain non-direct migration
+work and 459 contain external or missing dependencies. Closed does not mean
+compilable: the three roots still use heterogeneous maps, parameterized entry
+points, or other unqualified forms and require real project-level probes.
+
+`scripts/probe-kotoba-cljc-projects.mjs` performs those installed-release
+probes against both Web and Wasm. For every closure it compiles each node alone
+and then compiles the root with its dependency sources supplied through the
+public `--prelude` surface. All six composed probes reject before dependency
+semantics with `only a bounded :export vector is admitted in namespace
+clauses`: v0.6.23 concatenates prelude text but has no qualified project
+namespace resolver/linker for `:require`. Web and Wasm agree in failing closed.
+Two generations produced the same ledger SHA-256
+`9d36e13fb34f4f9cc97dba5f17de9224f8e431945e93f6c1a342958716166033`.
+Project namespace resolution is therefore a proven tooling/language gap, not a
+source migration authorization and not something dependency files should work
+around with textual concatenation.
+
+That v0.6.23 gap is partially closed by compiler PR 94 and installed Kotoba
+v0.6.24. `compile <entry> --source-path <directory>` now loads only the bounded
+reachable closure, gives `.kotoba` priority over `.cljk` and `.cljc`, seals
+module source and graph digests, and rejects namespace/path substitution and
+dependency symlink escape. Native release, shell installer and Homebrew bottle
+evidence all compile and execute a two-module `.cljc` graph. Live repository
+probing then found one narrower layout gap: an explicitly named root beside
+`src/` was unnecessarily required to be inside `--source-path`. Compiler PR 95
+keeps dependency confinement while allowing only that explicit root placement;
+v0.6.25 supplies installed native, shell and Homebrew evidence for that layout,
+closing the qualified project namespace-resolution gate. Reprobing the same
+three live graphs through the v0.6.25 `--source-path` surface on Web and Wasm is
+deterministic at ledger SHA-256
+`41a808c1409132b67ce0db4fe88a26a6e9b860162dc3cbd910c0322bacba87cf`.
+Resolution now reaches project admission: two graphs reject for missing
+explicit exports, while the CRDT graph exposed an unnecessary mismatch where
+project modules rejected the same bounded namespace docstrings admitted by the
+single-source frontend. Compiler PR 96 and installed v0.6.26 align that bounded
+admission without widening imports or authority. Temporary explicit-export
+remediation now advances both CRDT and lab graphs to unsupported operation
+lowering, and namespace-priority to its parameterized `main`; these are the
+next concrete source/language dispositions. The reviewed disposition ledger
+retains namespace-priority as a CLJC conformance oracle: its parameterized
+`main` is test input, not a zero-arity runtime entry, so no language change is
+required. CRDT rejects `(update clock :crdt/counter inc)` and must instead use
+a bounded nominal clock/register, explicit i64 arithmetic and an explicit
+comparable-actor contract without silently narrowing its existing actor-id
+domain. Lab rejects its `every?` callback over destructured environment map
+entries and must instead define a bounded environment record, coverage set and
+explicit validation operations. General `update` or `every?` callback lowering
+is not an acceptable shortcut. Thus all three roots are reviewed, one is an
+explicit retain, CRDT awaits typed source design, and lab now has a bounded
+record/set implementation in compiler PR 97 and draft lab PR 1. The patched
+Web project compiles and its positive/negative conformance entry returns 42.
+It also exposed a narrower typed-project linker defect (incorrect i64 import
+stubs and non-idempotent structured constructors), covered by 269 compiler
+tests and 3,759 assertions after the initial fix. Compiler PR 97 then qualified
+typed Wasm control flow, string/keyword comparison and trusted nested
+descriptors without admitting forged structural copies. The final guarded
+suite has 270 tests and 3,760 assertions; both patched Web and Wasm runtimes
+return 42 for the lab conformance graph. Installed-release qualification and
+owner cutover remain, so zero migrations are yet authorized by this ledger.
+
+The release-candidate follow-up closes the imported typed-boolean condition
+case without synthesizing an unsealed boolean literal. Compiler PR 98 is merged
+at `1619c596112b951f431e4d78d40d79a4a7018ae7`; its guarded suite passes 271
+tests / 3,762 assertions. Kotoba PR 372 is merged at
+`bde11a08dd5b73985f2de061d9014273b6c18c88`, preserves typed Web/Wasm safety
+metadata through the CLI, and adds a native release fixture exercising the
+bounded multi-namespace typed project on Web and Wasm. The launcher suite
+passes 348 tests / 1,632 assertions. Tag v0.6.27 has been created, but release,
+Homebrew, shell-install and installed-lab evidence remain required before the
+lab migration can leave draft or authorize consumer cutover.
+
+The v0.6.27 native release subsequently passed on macOS ARM64, macOS Intel and
+Linux AMD64, including its typed-project native gate and JVM-free boundary.
+The checksum-verifying shell installer was then exercised into an isolated
+prefix on macOS ARM64. That installed executable compiled the real lab graph
+for Web and Wasm with the same sealed project digest; the installed Web artifact
+executed `main` as 42. Homebrew formula PR 35 is merged and its three-platform
+bottle workflow is the remaining distribution gate. Installed Wasm execution
+through a released, provenance-bound host remains required before lab cutover;
+successful Wasm emission alone is not runtime evidence.
+
+The corrected v0.6.27 bottle run then passed actual Homebrew installation and
+the typed Web/Wasm formula test on macOS ARM64, macOS Intel and Linux AMD64.
+The immutable bottles and their digests are published; tap PR 37 and the
+in-repository formula PR 373 seal those digests. Therefore the v0.6.27 native,
+shell-install and Homebrew distribution gates are complete. The lab cutover
+gate remains false only for installed Wasm runtime evidence and owner-facing
+migration status, not for compilation or Web execution.
+
+CRDT PR 1 now establishes the previously missing comparable-actor contract as
+an explicit opt-in `registry-i64-v1` profile. It does not reinterpret arbitrary
+legacy actor values: each consumer must supply a reviewed, collision-free,
+non-reused actor-to-positive-i64 registry mapping, and unmapped domains retain
+the CLJC implementation. The canonical typed Lamport clock passes installed
+v0.6.27 Web and Wasm conformance with `main` 42 and the same project digest;
+the legacy suite remains green on JDK 17 and 21. Register/doc migration and
+consumer mapping approval remain, so CRDT consumer cutover is still false.
+
+Compiler PR 99 closes the nested generic-option matching idempotence gap found
+by the CRDT register: internal `option-match` now preserves nominal type
+descriptors across project relinking rather than converting them into runtime
+vectors. Kotoba v0.6.28 qualifies that behavior in its native release gate and
+through clean-prefix shell and three-platform Homebrew installs. CRDT PR 2 is
+merged with an explicit `string-v1` LWW register, typed option emptiness and
+installed Web/Wasm `main` 42 evidence. Arbitrary-value legacy registers remain
+CLJC; document operations and reviewed consumer profiles remain the next CRDT
+cutover gates.
+
+CRDT PR 3 records the document and OR-set boundary rather than presenting a
+semantically narrower implementation as a migration. The legacy document is
+an arbitrary entity-to-field-to-register map and the OR-set is an arbitrary
+element-to-observed-tag-set map. No external workspace consumer was found, but
+that does not authorize replacing either domain with fixed entities or fields.
+Both sources therefore remain CLJC until Kotoba qualifies an entry-bounded,
+descriptor-carrying typed map with canonical cross-backend key order,
+duplicate rejection, explicit get/contains/assoc/dissoc operations and typed
+option absence. OR-set and document migration must then prove commutativity,
+associativity and idempotence on reference, Web and Wasm.
+
+The compiler's older map syntax does not satisfy this gate. It desugars an
+untyped map to i64 heap-pair lists, sorts literal keys by source text, returns
+an untyped caller-provided default for absence, and uses linear recursive
+helpers under the general fuel budget. It has no key/value type descriptor,
+typed absence, boundary validation or canonical runtime ordering for computed
+keys and nested algebraic values. It remains a compatibility subset and must
+not be relabeled as the typed-map profile.
+
+Compiler PR 100 and kotoba-script PRs 23--25 implement the separate
+`[:map key-type value-type]` profile. Its canonical value carries the complete
+descriptor and key-sorted entries; duplicate keys fail closed. The 31-entry
+limit is derived from the shared 64-node budget: one map container plus 31
+key/value pairs consumes at most 63 primitive nodes. Lookup and indexed entry
+projection return descriptor-preserving options, so missing keys and traversal
+termination require no host sentinel. `typed-map-entry-at` exposes canonical
+order under the existing fuel budget, enabling explicit merge recursion
+without admitting higher-order callbacks or host iterators. The shared corpus
+executes positive map lookup/iteration and duplicate-key rejection on the
+reference evaluator, restricted Web output and real Wasm/browser host. Compiler
+PR 100 is merged as `94f29b24cdf5c5aa92b35cf2dd41c1d56b8205c1` after Ubuntu,
+Linux ARM64, macOS, Android, Safari and server-kind CI passed. The Windows jobs
+remain a disclosed infrastructure exception: their reproducible executable is
+verified before Windows Filtering Platform denies the loopback probe until its
+timeout. Kotoba v0.6.29 closes the installed-release gate: PR 376 is merged as
+`1998bc7c3463be80df529c3096e741bdae688875`, all three native-release jobs
+passed, and the checksum-verified shell installer produced a JVM-free arm64
+Mach-O executable. The installed CLI executes both CRDT Web graphs with
+`main` 42 and emits typed-v1/externref-v1 Wasm for both graphs. This completes
+the language/runtime qualification but does not authorize a consumer cutover.
+
+CRDT PR 4 then exercises the profile as an actual multi-module language graph.
+`orset-i64-v1` uses nominal Lamport tags and canonical typed maps for i64
+entities, observed tags and tombstones. `string-document-v1` composes it with
+the existing string register, keyword fields and a closed add/remove/set-field
+operation variant. The OR-set graph proves add-wins and CAI merge; the document
+graph proves op replay idempotence, deterministic LWW selection and CAI state
+merge. Reference, restricted Web and real Wasm/browser-host all return 42 with
+project digests `8aad8ed7...fc581c4` and `a52d176a...d4eebdac` respectively.
+The arbitrary CLJC domains remain intact for unmapped consumers.
+CRDT PR 4 is merged as `a6dbfec7db4b0b61dcd54c450ab3b4add079874e`
+after JDK 17 and JDK 21 legacy CI passed; this confirms source integration, not
+installed native CLI qualification or consumer migration authorization.
+CRDT PR 5 records installed evidence as
+`fd5ac3214a6fa6eaa23a49488853cbf5ccf0f78b`. Its installed project digests are
+`ad379779...524f0` for OR-set and `91247e64...1d99c` for document; these replace
+no source-domain contract and therefore do not authorize legacy CLJC cutover.
+
+Homebrew qualification is complete. The v0.6.29 authoritative formula and
+immutable bottles passed install, formula test and packaging on macOS arm64,
+macOS Intel and Linux amd64 in run 29667493291. The bottle test uses the exact
+native typed map/set/record/option graph after two fail-closed probes exposed a
+legacy predicate arity mismatch and an unsealed simplified Wasm descriptor.
+Bottle digests are recorded by homebrew-kotoba commit
+`9f0fced39ca93f296068efb2bd23df1c2d38a1e4`; the in-repository formula is
+synced by Kotoba commit `18cfbb7a8d3213827c9bb3e09fbde82cb665d2d2`.
+
+Lab PR 2 (`f3cb9fd2255fe673b9c300f1dbed6ed089d0cf3f`) performs the
+first owner-approved consumer reference cutover. The notebook environment
+lock, runtime UI and browser verifier now select
+`src/kotoba/lab/verification.kotoba` and its Kotoba conformance graph instead
+of the legacy CLJC paths. Workspace search found no external consumers. The
+CLJC implementations remain semantic oracles and are not deleted. A
+checksum-verified v0.6.29 native CLI reproduced project digest
+`4dfcf271...b14a`, emitted Web and Wasm artifacts, and the restricted Web
+runtime returned 42 with no capabilities. The browser flow and hosted verify
+gate passed. This authorizes the bounded Lab profile only; it is not blanket
+authorization for other CLJC paths or for CRDT consumers without reviewed
+domain mappings.
+
+FSM PR 1 (`2bb3226d22eeb71b5fce3103f9767727ea8f252a`) applies the
+same non-narrowing rule to a game-engine component. The arbitrary map-driven
+CLJC FSM remains its semantic oracle; a separately named `player-v1` profile
+uses a sealed state variant and bounded keyword event set across
+`kami.fsm.kotoba` and `kotoba.fsm.kotoba`. The compiler reference oracle,
+installed restricted Web runtime and digest-bound real Wasm browser host all
+return 42. The graph requests no capabilities and consumes no Wasm heap cells;
+the legacy five assertions and checksum-pinned hosted v0.6.29 gate pass. This
+authorizes only consumers that explicitly select `player-v1`, not automatic
+conversion of arbitrary EDN FSMs.
+
+That graph also found two compiler maturity defects now covered by compiler PR
+100: type descriptors needed an explicit, acyclic `[:alias name]` form rather
+than ambiguous parameter-position substitution, and already-lowered result and
+variant matches needed idempotent relinking just like option matches. The Wasm
+host additionally applied the 64-node descriptor budget to the whole
+descriptor table instead of each of the separately bounded 64 descriptors;
+the corrected parser resets the per-descriptor counter while retaining the
+64-descriptor table bound. A multi-descriptor real-Wasm regression test seals
+this two-level budget.
+
+The security-first inventory is now exact-call based rather than token based.
+The earlier detector incorrectly treated declarations such as `(defn resolve
+...)` as dynamic evaluation. Reclassification reduces the non-test
+security-first queue from 1,401 to 300 paths. A second semantic correction strips
+strings/comments and excludes namespaces that declare or bind a domain function
+named `resolve`; protocol methods such as `INet.resolve`, Promise callbacks and
+projection functions are not `clojure.core/resolve`. After the first explicit
+host-boundary implementations and the root actor extraction fast-forward, the
+current generated queue is 75 paths in 75 unique-content clusters: 69 retain or split
+real dynamic namespace/var resolution behind a host adapter, two locally stale reader paths are covered
+by merged remediation evidence, and four remain security test oracles through
+cutover.
+None is authorized for direct migration. The reviewed evidence is recorded in
+`kotoba-cljc-security-dispositions.json` with exact call heads and line numbers.
+
+The bounded-reader remediation subset is complete. Eight of the nine content
+clusters now use a platform EDN reader or a validated non-reader numeric parser;
+the ninth path was removed independently when its graph was extracted upstream.
+The merged evidence is cloud-itonami PR 457 (`971ff8ec348714987100802cda4b9263f7702ac5`),
+app-aozora PR 89 (`4a28ad7f0db642b9bd442d06a1db561b37a09b84`),
+ai-gftd-arms PR 3 (`687905462c521e9cfb44057441c45ba579cc888d`), and
+etzhayyim/root PR 3140 (`4d07600452bfc26ad1ab38197fda8d70ab4a507f`).
+Negative regressions prove that reader-eval forms are rejected; the etzhayyim
+PR additionally passed hosted lint-and-test, CodeQL and layer-freeze guard.
+`kotoba-cljc-security-remediations.edn` records all nine outcomes. This closes
+the unsafe-reader implementation gate but does not itself authorize extension
+rename or consumer cutover.
+
+The first dynamic-resolution boundary is merged in kotoba-lang/teian PR 2
+(`ff5ad688e69a2ef4053147b065684be5dfba9d91`). Portable
+`teian.deckport.cljc` no longer discovers `slides.office` with
+`requiring-resolve`; callers must grant an exporter function explicitly, while
+the JVM-only `teian.distribute.clj` remains the host adapter. Two regressions
+prove both explicit invocation and ambient-discovery denial. Local execution
+passed 52 tests / 172 assertions and lint; hosted test and lint also passed.
+
+The second boundary is merged in kotoba-lang/plm PR 2
+(`b7d4143010ba37b4a344c631d912aa5ac49311d0`). Portable
+`kotoba.plm.db.cljc` is now Store-protocol-only and no longer discovers Datomic
+Local dynamically. Static JVM construction lives in `kotoba.plm.db-host.clj`;
+CLJC test oracles select it only in the `:clj` reader branch. Local execution
+passed 20 tests / 73 assertions and the hosted test gate passed.
+
+The third remediated path is merged in
+etzhayyim/com-etzhayyim-hinagata PR 3
+(`1cb2f49c7e0d088ee7ba4b7cf04af526a5a64bef`). Its CLJ publish edge now
+statically requires JSON encoding and graph loading inside reader-conditional
+host branches instead of discovering vars ambiently. A newly exercised real
+filesystem publish also exposed and closed an older invalid `cid/bytes-of`
+call, replacing it with the canonical `cid/utf8-bytes`. Focused execution
+passed 2 tests / 4 assertions and parsed the emitted manifest successfully.
+The formerly duplicate embedded root copy is absent on current main after the
+flat actor extraction, so the regenerated inventory now counts only the
+standalone remediated source.
+
+The fourth remediated path is merged in
+etzhayyim/com-etzhayyim-mimamori PR 3
+(`2d8c4db6db5686ba30b18d331be06937cd3f012d`). Its canonical EDN seed edge
+now statically requires `clojure.edn` in the CLJ reader branch instead of
+discovering `read-string` through ambient namespace state. Local execution
+passed 50 tests / 239 assertions with no failures or errors. The repository has
+no hosted check configured, which remains explicit evidence debt rather than a
+silent pass.
+
+The fifth remediated path is merged in etzhayyim/com-etzhayyim-ake PR 3
+(`0898187c3ec089e97418b2e3b2f43e2da2b70aa7`). Its consistency oracle no
+longer retains an unused Cheshire `requiring-resolve` after the repository's
+EDN extraction and now statically requires the platform EDN reader. A separate
+repo-local reference contract preserves the wire manifest payload while
+removing filesystem dependence on the former superproject layout. The upstream
+baseline reproduced two extraction-drift failures; the remediated suite passed
+155 tests / 559 assertions. Hosted checks are not configured.
+
+The next codec-boundary batch is merged in etzhayyim/com-etzhayyim-maps PR 3
+(`b6c1d9daecc1c394357f34618ff1cd4f7e6359bc`). Four production sources no
+longer discover Cheshire parse/generate vars ambiently: ingest and onsen reuse
+the repository's tested canonical codec, while chunk and the external search
+response edge use a version-pinned static CLJ codec behind reader conditionals.
+The full Babashka suite passed 178 tests / 784 assertions. Two explicit HTTP
+post discovery points remain and are deliberately tracked as the next
+capability-injection change; codec cleanup is not misreported as network
+authority removal. Hosted checks are not configured.
+
+Maps PR 4 (`146ba7ffec8f5e1feb18543db0defc48475d3358`) closes the two
+remaining network-discovery boundaries. `push-batch` and `http-avet-fn` now
+require an explicit `post-fn` value; endpoint strings alone cannot activate
+network access. The capability is threaded through live BPMN execution,
+persistence, onsen ingest and hosted AVET construction, while search and
+transit accept only explicit query functions. The real local HTTP E2E passes
+through the injected capability, missing capability and endpoint-string cases
+fail closed, and the repository-wide CLJ/CLJC dynamic-resolution scan is empty.
+The full suite passed 180 tests / 787 assertions; hosted checks are not
+configured.
+
+The next five clusters are closed in etzhayyim/com-etzhayyim-sukashi PR 3
+(`57952af8e9b91a6b0e0548f59fcf01ec490fb2c9`). Seven JSON codec lookups across
+crawl, fraud bridge, ingest, transact and visualization are now static CLJ
+reader-branch dependencies. Reference execution also exposed an untracked
+direct `babashka.http-client/get` default: it was removed, and live crawl now
+requires an explicit fetcher value even when the operator gate is enabled.
+Gate-only live activation fails closed. The identical suite passed on both
+Babashka and Clojure at 74 tests / 877 assertions, and the repository authority
+scan is empty. Hosted checks are not configured.
+
+Three additional clusters are closed on remote main by
+etzhayyim/com-etzhayyim-tadori PR 2
+(`ce9507eb3394c9e37afec8f97165194721f3d2c8`). JSON parsing/generation is
+static, live transaction requires an explicit HTTP request function, and the
+Babashka network implementation terminates in `tadori.host.http.clj`. The
+network-free CLI dry-run validated 5 records into 62 datoms; the full suite
+passed 79 tests / 220 assertions and the artifact audit passed. Missing live
+request authority fails closed. The workspace checkout intentionally remains
+on the user's three-commit-ahead rescue branch, so the generated scanner still
+sees these three old calls locally; the effective remaining queue is therefore
+66, not 69. The rescue checkout was not switched, merged or otherwise mutated.
+
+One further cluster is closed on remote main by
+etzhayyim/com-etzhayyim-kanjo PR 3
+(`be22c65baac2ef786728441caf60f33b7a89fbcc`). The portable ingest namespace
+no longer dynamically resolves a JSON codec or opens a `java.net.URL`; its
+G7-gated live entry point accepts only an explicit capability that returns
+decoded JSON data and fails closed without it. The suite passed 55 tests / 248
+assertions and the changed namespace authority scan is empty. The workspace
+checkout intentionally remains on the user's one-commit-ahead `pds/aozora`
+branch, so this fourth merged path is also locally stale. The generated queue
+therefore remains 69 while the effective remaining queue is 65.
+
+The next generated cluster, etzhayyim/com-etzhayyim-himotoki's former
+`methods/request.cljc`, was removed independently by the upstream standalone
+EDN migration (`5204bcb`, followed by dependency pin `7b7798f`). Canonical
+registry data is now `registry/targets.seed.edn`; the relocated portable source
+uses a static bounded EDN reader and the repository dynamic-resolution scan is
+empty. A duplicate adapter PR was closed as superseded. After fast-forwarding
+the clean local main checkout, the authoritative suite passed 45 tests / 383
+assertions. The frozen generated disposition snapshot still counts this path,
+so its 69 generated entries now comprise four locally stale merged paths and
+one locally stale upstream-removed path: the effective remaining queue is 64.
+
+The next test-oracle host boundary is closed by
+etzhayyim/com-etzhayyim-watatsuna PR 3
+(`3a0655bd458b881cf5f76caca4fd59ca3ca197bd`). Its frozen Python/Clojure JSON
+parity oracle no longer resolves Cheshire dynamically; the already-required
+codec is statically bound only on the CLJ host branch. The complete suite
+passed 58 tests / 217 assertions, and the repository CLJ/CLJC dynamic-resolution
+scan is empty. This post-snapshot merge raises the merged-path count to nineteen
+and reduces the effective remaining queue to 63.
+
+Two production boundaries are closed by etzhayyim/com-etzhayyim-aburi PR 3
+(`69b950395a58bd39f29bf95d1bc2785158cfa5f1`). Local export ingest now binds
+its bounded JSON codec statically. The portable Kotoba transaction bridge no
+longer resolves HTTP or JSON implementations and has no ambient default
+transport: live use requires an explicit `http-post` capability and fails
+closed without it. Real Babashka HTTP/JSON authority terminates in
+`aburi.host.kotoba-bridge`. The suite passed 63 tests / 1,653 assertions, the
+host adapter load probe passed, and the repository dynamic-resolution scan is
+empty. The user's `manifest-rev` checkout was retained without mutation; work
+was integrated from an isolated remote-main worktree. Merged paths are now
+twenty-one and the effective remaining queue is 61.
+
+The WGSL test introspection boundary is closed by kotoba-lang/num PR 8
+(`df5180f40d2acb93f7c0a6df6b2b4899bc1cf3e7`). The test already statically
+requires `num.wgsl`, so runtime `resolve` of `IGpuDevice` was unnecessary
+ambient namespace authority and is replaced by the direct protocol var. The
+focused run passed 16 tests / 177 assertions, the full suite passed 85 / 446,
+and hosted JDK 17 and 21 gates passed. The user's `agent/cuda-backend` checkout
+was retained without mutation. Merged paths are now twenty-two and the
+effective remaining queue is 60.
+
+The Kotobase CLI boundary is closed by gftdcojp/net-kotobase PR 211
+(`e2cb1bdc9adc32f600bdf336f1a4923ce69bbb17`). Its portable CLI core no
+longer resolves Babashka HTTP or Cheshire implementations. Network commands
+receive explicit `request-json` and `decode-json` capabilities and fail closed
+without them; `bin/kotobase` now terminates those capabilities in the static
+Babashka `kotobase.cli-host` entrypoint. Ten tests / 32 assertions, injected
+request-shape and missing-capability cases, real `help`/`whoami` CLI probes, and
+the host adapter load probe passed. The user's `agent/tenant-transactions`
+checkout was retained without mutation. Merged paths are now twenty-three and
+the effective remaining queue is 59.
+
+Four Ibuki test-oracle boundaries are closed by
+etzhayyim/com-etzhayyim-ibuki PR 3
+(`1e8e86f2131a265258861ab45e2c4a017c088543`). Autorun queue parsing, fleet
+fixture generation, kaizen NDJSON generation and Kotoba bearer-payload parsing
+now bind Cheshire statically on the CLJ host branch rather than resolving vars
+at runtime. The complete, registry-heavy suite passed 278 tests / 1,129
+assertions, and all four changed-path scans are empty. Merged paths are now
+twenty-seven and the effective remaining queue is 55.
+
+Seven Ibuki production local-persistence boundaries are closed by
+etzhayyim/com-etzhayyim-ibuki PR 4
+(`296419924da312cba71a4611d59834475d090aed`). Receipts, delegation bundles,
+drainer queues, kaizen feedback, autorun output, health proposals and fleet
+registry/queue/checkpoint paths now bind JSON/NDJSON codecs statically on the
+CLJ reader branch. No network or subprocess authority was widened; those
+remaining boundaries stay explicit follow-up work. The full suite passed 278
+tests / 1,136 assertions, and all seven changed-path scans are empty. Merged
+paths are now thirty-four and the effective remaining queue is 48.
+
+The five remaining Ibuki outward-authority boundaries are closed by
+etzhayyim/com-etzhayyim-ibuki PR 5
+(`541170035adf8e05910f1000ace9a3cfd2e2d316`). Member PDS submission, public
+perception, Murakumo inference, Kotoba transaction push and read-only GitHub
+outcome collection no longer discover host implementations from portable
+`.cljc`. Each live path requires a purpose-bound function capability and fails
+closed when it is absent; Babashka HTTP, JSON, subprocess and `gh pr view`
+implementations terminate in `methods/host_capabilities.clj`. Explicitly
+injected provider failures retain only the previously specified deterministic
+fallbacks. The full suite passed 282 tests / 1,140 assertions, the host adapter
+load probe passed, and all five dynamic-resolution scans are empty. Merged
+paths are now thirty-nine and the effective remaining queue is 43.
+
+Three Tadori boundaries are closed by etzhayyim/com-etzhayyim-tadori PR 2
+(`ce9507eb3394c9e37afec8f97165194721f3d2c8`). JSONL ingestion and its test
+oracle bind Cheshire statically, while live Kotoba transactions receive an
+explicit HTTP request function from `src/tadori/host/http.clj`; the public CLI
+task enters through that host adapter. Remote main passed 79 tests / 220
+assertions, a missing-capability denial, host-adapter load, dry-run CLI and
+changed-path scan in an isolated detached worktree. The user's
+`rescue/murakumo-wip-20260718` checkout was not mutated. Merged paths are now
+forty-two and the effective remaining queue is 40.
+
+Seven codec-only root boundaries are closed by etzhayyim/root PR 3141
+(`f36c9b028b793c1b63b1e71014f91e360906806a`). Four Animeka graph decoders,
+one Jukyu graph decoder, the LangGraph benchmark NDJSON loader and identifier
+audit now bind Cheshire statically on the CLJ reader branch while preserving
+their CLJS branches. This batch adds no network, process, server, credential or
+write authority. Animeka passed 40 tests / 146 assertions, Jukyu 45 / 147,
+benchmark diff 11 / 41 and identifier audit 3 / 9 plus its raw JSON probe.
+Pre-commit, pre-push, hosted lint-and-test, CodeQL and layer-freeze gates passed.
+The existing root checkout was not mutated. Merged paths are now forty-nine
+and the effective remaining queue is 33.
+
+Animeka's three live-authority boundaries are closed by etzhayyim/root PR 3142
+(`899433e8c40b3c1bdc927a68c2f862b05cfaeb03`). Portable LLM, audit and server
+namespaces no longer discover HTTP/httpkit implementations or read environment
+configuration and secrets. The host supplies purpose-bound chat, optional audit
+emission and server-start capabilities, validates malformed/off-fleet inference
+targets before I/O, and binds them inside each request worker. Because
+ADR-2607171100 freezes new files under numbered layers, the existing host-only
+`run_tests.clj` is the test/server adapter rather than adding a component file;
+`bb server` enters through it. The suite passed 43 tests / 156 assertions,
+injected wire and refusal tests, host handler and real port-zero start/stop
+probes, plus hosted lint-and-test, CodeQL and layer-freeze gates. Merged paths
+are now fifty-two and the effective remaining queue is 30.
+
+Jukyu's three corresponding live-authority boundaries are closed by
+etzhayyim/root PR 3143 (`a2b529e55a606b5e35272020ed21dd1d0b9f849b`).
+Portable LLM, audit and server namespaces now receive explicit chat, audit and
+server-start capabilities; environment/API-key/secret reads and concrete HTTP
+implementations terminate in the existing host-only `run_tests.clj`, which also
+backs `bb server`. Three graph call sites pass through the checked chat boundary.
+The suite passed 48 tests / 157 assertions, including injected URL/body/auth/
+timeout shape, missing-capability and malformed/off-fleet refusals, host handler
+and real port-zero server probes. Pre-commit, pre-push, lint-and-test, CodeQL and
+layer-freeze gates passed. Merged paths are now fifty-five and the effective
+remaining queue is 27.
+
+Yukkuri's seven live-authority boundaries are closed by etzhayyim/root PR 3144
+(`d7f11216fdd3a77e9201f3a5bfa9e3a47651d63a`). Portable chat, audit, BGM,
+visual, voice, social-publish and render code no longer discovers HTTP clients
+or JSON codecs at runtime; each effect receives a purpose-bound capability and
+fails closed when it is absent. The existing host-only `run_tests.clj` binds
+all seven implementations without adding a file beneath a frozen numbered
+layer. The suite passed 37 tests / 106 assertions, missing-capability denials
+for all effect classes, malformed/off-fleet endpoint refusals, a seven-provider
+host-binding probe and an empty authority scan. Hosted lint-and-test, CodeQL and
+layer-freeze gates passed. Public endpoint/DID configuration still resides in
+portable code, so this closes dynamic implementation discovery rather than
+claiming that every environment read has moved. Merged paths are now sixty-two
+and the effective remaining queue is 20.
+
+KI's LLM and server boundaries are closed on etzhayyim/root main by commit
+`64b7a644663cb17ab21612abc22775531518e752`. Portable code now receives
+purpose-bound chat and server-start capabilities, uses a static CLJ JSON codec,
+fails closed without either capability, and leaves endpoint/model/timeout
+environment reads in the existing host-only `run_tests.clj`. The suite passed
+21 tests / 117 assertions, injected wire-shape and host-binding probes,
+malformed/off-fleet endpoint refusals, and empty portable authority scans;
+pre-commit and pre-push guards passed. The branch was configured to track
+`etzhayyim/main`, so the repository's upstream push default integrated the
+commit directly with a protection-bypass notice rather than creating a PR;
+this is recorded as integration evidence and was not hidden by a destructive
+rollback. Merged paths are now sixty-four and the effective remaining queue is
+18.
+
+Pregel's LLM and server boundaries are closed by etzhayyim/root PR 3145
+(`24a716eacd7b60e688949cea2b991f57cea53f7d`). Portable code receives explicit
+chat and server-start capabilities, binds Cheshire statically on CLJ, and no
+longer reads endpoint/model/API-key environment values. The host-only
+`run_tests.clj` owns configuration and concrete HTTP/httpkit implementations.
+The former substring loopback check was also replaced with exact `http`
+scheme plus loopback host:port validation, closing lookalike hosts such as
+`127.0.0.1.attacker.example`. The suite passed 30 tests / 79 assertions,
+missing-capability and malformed/off-fleet/lookalike refusals, injected wire
+and host-binding probes, and a real port-zero start/stop. Hosted lint-and-test,
+CodeQL and layer-freeze gates passed. Merged paths are now sixty-six and the
+effective remaining queue is 16.
+
+Lawfirm's nodes and server boundaries are closed by etzhayyim/root PR 3146
+(`483bc6307c3054a442fcc3886cbf5908ae059e32`). Portable search, invite, triage
+and server code now receives purpose-bound capabilities; endpoint/model/limit,
+API-key and internal-secret environment reads and concrete HTTP/httpkit
+implementations reside in the existing host-only `run_tests.clj`. The optional
+triage edge remains deliberately fallback-capable when no host capability/key
+is configured, while no ambient network authority is available. Its Murakumo
+target is validated by exact `http` loopback host:port matching. The suite
+passed 17 tests / 44 assertions, four missing-capability denials,
+malformed/non-http/off-fleet/lookalike endpoint refusals, injected wire and
+all-capability host probes, and a real port-zero start/stop. Hosted
+lint-and-test, CodeQL and layer-freeze gates passed. Merged paths are now
+sixty-eight and the effective remaining queue is 14.
+
+Recap's download, metadata and summarize boundaries are closed by
+etzhayyim/root PR 3147
+(`44f998dd3fc777b6f0fd2eaf1f65fe2824813860`). Portable graphs receive
+purpose-bound yt-dlp process and Murakumo HTTP capabilities, bind JSON
+statically, and no longer read cookies, credential presence, DIDs, API keys or
+LLM configuration. Those values and concrete process/network implementations
+reside in the existing host-only `run_tests.clj`. Media-platform validation was
+changed from substring matching to parsed web scheme plus exact/subdomain host
+matching, rejecting `youtube.com.attacker.example`; Murakumo validation also
+fails closed for malformed and lookalike endpoints. The suite passed 26 tests /
+78 assertions, five missing-capability denials, endpoint refusals, injected
+process/HTTP wire contracts and a host-binding probe. Hosted lint-and-test,
+CodeQL and layer-freeze gates passed. Persistence remains a deliberately
+injected no-op seam pending a host provider. Merged paths are now seventy-one
+and the effective remaining queue is 11.
+
+Hakken's generic XRPC and Kotoba Datomic boundaries are closed by
+etzhayyim/root PR 3148
+(`f9d4d60855589d29807bc998a4a19f8cdc15ed80`). Portable code now binds JSON
+statically and receives explicit XRPC GET/POST and Datomic query/transact
+capabilities; Kotoba URL, bearer and graph configuration reside in the existing
+host-only `run_tests.clj`. Generic XRPC targets are restricted to HTTPS
+Etzhayyim hosts or loopback, while bearer-bearing Kotoba calls require the exact
+Kotoba fleet host or loopback, rejecting malformed, userinfo and lookalike
+targets before I/O. The suite passed 41 tests / 135 assertions, four
+missing-capability denials, endpoint refusals, two injected wire contracts and
+a host-binding probe. Hosted lint-and-test, CodeQL and layer-freeze gates
+passed. Node-specific public endpoint settings remain portable but possess no
+network authority without the generic host binding. Merged paths are now
+seventy-three and the effective remaining queue is 9.
+
+Open Patent's inference boundary is closed by etzhayyim/root PR 3149
+(`8015569ed2beab21653d12565b3df2779ee571cb`). Portable LLM code binds JSON
+statically, receives a purpose-bound Murakumo chat capability and no longer
+reads endpoint/model/timeout environment values. Malformed, off-fleet and
+lookalike endpoints fail closed before I/O. The complete local suite, including
+deployed `langgraph.json` graph/cron parity, passed 24 tests / 58 assertions,
+plus missing-capability, injected wire and host-binding checks. Hosted
+lint-and-test, CodeQL and layer-freeze gates passed. Merged paths are now
+seventy-four and the effective remaining queue is 8.
+
+Open ISIC's direct classifier boundary is closed by etzhayyim/root PR 3150
+(`e0627f77dfe36aafd81b3e985f2d87c9819d30f6`). Portable classification code
+binds JSON statically, receives a purpose-bound classifier capability and no
+longer reads endpoint/model environment values. Malformed, off-fleet and
+lookalike Murakumo endpoints fail closed. Both graph and server suites passed
+30 tests / 64 assertions, including missing classifier/HTTP capabilities,
+injected wire and host-binding checks. Hosted lint-and-test, CodeQL and
+layer-freeze gates passed. Merged paths are now seventy-five and the effective
+remaining queue is 7.
+
+Kenkyusha's research-advisor boundary is closed by etzhayyim/root PR 3151
+(`5f39c6ff0c0a0d8d0c693817b9c58524d840ddc0`). Portable research-loop code
+binds JSON statically, receives explicit configuration and a purpose-bound
+advisor capability, and no longer reads repository, endpoint, model or timeout
+environment values. Missing capability cannot perform I/O and retains the
+existing deterministic offline hypothesis fallback. Malformed, off-fleet and
+lookalike Murakumo endpoints fail closed. The complete suite passed 28 tests /
+60 assertions, including missing advisor/raw-HTTP capability, injected wire,
+manifest-parity and host-binding checks. Hosted lint-and-test, CodeQL and
+layer-freeze gates passed. Merged paths are now seventy-six and the effective
+remaining queue is 6.
+
+Kyber's Teams notification boundary is closed by etzhayyim/root PR 3153
+(`5773c33368c4aca765fe5c54d34b7f2023b8e262`). Portable BO-ReAct code receives
+HTTP and webhook values through a purpose-bound notifier and no longer reads
+environment or resolves an HTTP implementation. Webhook authority is limited
+to exact/subdomain Teams and Azure Logic Apps hosts or explicit loopback ports;
+malformed, off-fleet and lookalike endpoints fail closed before I/O. Missing or
+rejected HTTP capability retains the injected DB-outbox fallback. The complete
+suite passed 12 tests / 67 assertions, including negative capability, injected
+wire and host-binding checks. Hosted lint-and-test, CodeQL and layer-freeze
+gates passed. Merged paths are now seventy-seven and the effective remaining
+queue is 5.
+
+Dougaka's HTTP-server boundary is closed by etzhayyim/root PR 3154
+(`8a6de0a4514d778a34c7875802dbcea40c5d0e60`). Portable server code receives a
+purpose-bound server capability, validated port and API secret; it no longer
+reads environment or resolves an HTTP-server implementation. A handler factory
+closes over the secret so request processing has no ambient credential lookup.
+Missing server capability and invalid ports fail before host invocation. The
+complete suite passed 19 tests / 40 assertions, including secret-bound handler
+and injected wire checks, and a real http-kit start/stop host probe passed.
+Hosted lint-and-test, CodeQL and layer-freeze gates passed. Merged paths are now
+seventy-eight and the effective remaining queue is 4.
+
+Observatory's member signing/publish boundary is closed by etzhayyim/root PR
+3155 (`e23aaa1830ab34e0b9283c6b4a1396ecdec52562`). Portable code receives a
+member-owned bundle for Keychain, identity loading, CACAO minting, Kotoba DB,
+HTTP, nonce and expiry, and cannot sign or publish without it. The real CLI is
+now a host adapter outside the frozen numbered layers; the portable entrypoint
+fails closed. Five tests / 18 assertions cover missing capability, the complete
+injected signing-to-transaction wire and an authority-free dry run. The host
+source parsed successfully; real dependency loading remains an explicit
+evidence exception because this checkout lacks the west local roots `kagi-clj`
+and `ed25519`. Hosted lint-and-test, CodeQL and layer-freeze gates passed. Merged
+paths are now seventy-nine and the effective remaining queue is 3.
+
+Vitals' Ibuki mood/wellbecoming boundary is closed by etzhayyim/root PR 3156
+(`995d07a3ebc25b97cf7a5a1b40371ba035d8cdca`). Portable code receives the
+baseline, fold, mood, readout and closed event vocabulary as an explicit bundle,
+and no longer discovers Ibuki implementations or an actor-root environment at
+load time. Missing capability fails closed. The existing `vitals:joucho` task is
+the host adapter and statically assembles the bundle under bb. Injected and
+negative probes passed with trajectory I/O stubbed; the extracted Ibuki west
+repository is absent locally, so real host loading remains an evidence
+exception. Hosted lint-and-test, CodeQL and layer-freeze gates passed. Merged
+paths are now eighty and the effective remaining queue is 2.
+
+Database's process/filesystem/HTTP boundary is closed by etzhayyim/root PR 3157
+(`10276f4fe121979500af8ced0c011550ff679548`). Portable code no longer acquires
+environment, process, filesystem or HTTP authority when an option is omitted.
+Environment is explicit data, and all I/O requires the existing injected
+capability interfaces; missing capabilities fail closed. The focused suite
+passed 5 tests / 20 assertions and the complete Wave 7B suite passed 46 tests /
+181 assertions. Hosted lint-and-test, CodeQL and layer-freeze gates passed.
+Merged paths are now eighty-one and the effective remaining queue is 1.
+
+Murakumo command's final host boundary is closed by etzhayyim/root PR 3159
+(`d3b83dd08fd6c1441cd91ddd70739e49d7f12f9f`). Portable code no longer acquires
+authentication, Nomad address, process environment, process execution or HTTP
+authority. Authentication and child environment are explicit data; process and
+HTTP are injected capabilities and fail closed when omitted. The focused suite
+passed 7 tests / 34 assertions and the Wave 7B suite passed 46 tests / 181
+assertions. Hosted lint-and-test, CodeQL and layer-freeze gates passed. Merged
+paths are now eighty-two and the effective dynamic-resolution host-boundary
+queue is empty.
+
+This empties the bounded 106-cluster security-disposition queue; it does not
+prove that every ambient host acquisition in remote main is closed. A fresh
+archive-based scan of `etzhayyim/root` remote main after PR 3159 found 231
+lexical `requiring-resolve` / direct `resolve` / `System/getenv` callsites across
+136 tracked `.cljc` paths. These include legitimate host/native entrypoints as
+well as portable application code and therefore require a new path-by-path
+disposition pass before claiming repository-wide ambient-authority completion.
+The follow-up queue is recorded separately rather than silently expanding or
+retroactively changing the completed 106-cluster baseline.
+
+The follow-up ambient-config wave begins with canonical Chat Shell PR 3188
+(`4293e32126a10a549dc0129540afab946a25de4d`). Five portable paths no longer
+read API, B2, LLM, tool, Sodai, server-secret or port environment values at load
+time. Host config enters through request state and remains explicit through
+graph nodes, tool dispatch and asynchronous streaming; server startup is an
+explicit capability. Thirteen tests / 33 assertions, state propagation and a
+real http-kit start/stop probe passed, followed by all hosted gates. A fresh
+remote-main archive scan decreased the follow-up surface from 231 callsites / 136
+paths to 225 callsites / 131 paths. The older `ai-gftd-chat-shell` port was kept
+as a separate migration-or-removal disposition until its status was verified.
+
+Legacy Chat Shell PR 3189
+(`a37457dafdb2ea890afa448847526cb98224a3e3`) then applied the same closed
+capability rule to that older port rather than deleting it without independent
+duplicate/removal evidence. Its four portable paths now receive LLM, tool,
+field-map, credential and irreversible-submit capabilities through explicit
+host config; absent capabilities fail closed. Sixteen tests / 38 assertions and
+all hosted gates passed. The fresh `origin/main` tree scan is now 219 callsites
+across 127 paths.
+
+Yukkuri PR 3190 (`5e11abac33612cc0175fb83f3b750c89f709ac24`)
+removed ambient configuration from all 13 portable Yukkuri CLJC paths. API
+authentication, audit secrets, Murakumo LLM, actor identities, repository DID,
+TTS/image/BGM/render/social endpoints now enter at the host adapter, flow
+through server dispatch into graph state, and are consumed as closed data by
+nodes and effect adapters. The content-review path was also corrected from
+fail-open to fail-closed: LLM or response-parse failure can no longer publish a
+video. Forty tests / 115 assertions and all hosted gates passed. The fresh
+`origin/main` scan is 185 callsites across 114 paths.
+
+Project X PR 3192 (`07dfe77ecbaf13b3e69077b63298f6c8ed0e645d`)
+removed process-global configuration from six portable paths and added the
+supporting server propagation boundary. App identity, substrate status, LLM,
+audit secret, cron enablement and endpoints now enter as host config. LLM and
+audit HTTP effects are host-bound capabilities rather than imports with ambient
+network authority; an absent LLM capability fails closed while audit retains an
+explicit best-effort no-op. Twenty-one tests / 44 assertions and all hosted
+gates passed. The fresh `origin/main` scan is 176 callsites across 108 paths.
+
+Dougaka PR 3194 (`ef6a10bc17e5657bd2eb84219e44799b78a12368`)
+removed process-global render, storage, identity, audit endpoint and secret
+configuration from its two portable paths. Server dispatch now supplies graph
+state config, while audit HTTP is a host-bound capability and defaults to an
+authority-free no-op. Twenty tests / 45 assertions and all hosted gates passed.
+The fresh `origin/main` scan is 172 callsites across 106 paths.
+
+Productivity suite PR 3196 (`9b22f0cf8e2a18ddf79562c261007462fad3a03d`)
+applied one boundary model to Calendar, Drive and Sheets. Nine portable paths no
+longer acquire Kotoba endpoint, bearer, graph, API-key, port or version from the
+process environment. Each Kotoba client record holds closed configuration;
+HTTP POST is bound explicitly for each request, and HTTP-server startup is a
+host capability. The three suites passed 43 tests / 140 assertions in total,
+followed by all hosted gates. The fresh `origin/main` scan is 152 callsites
+across 97 paths.
+
+Mangaka PR 3198 (`ad7dd1bda29e42e2682978b078d3517be2eaa84c`) removes
+process-global identity, organization, store, LLM, audit, API-key, endpoint
+and server acquisition from eleven portable paths. Server adapters now pass a
+closed host-config value and explicit store/LLM/audit/server capabilities;
+missing LLM and server capabilities fail closed, and the Murakumo endpoint
+allowlist remains enforced. The local suite passed 31 tests and 101 assertions,
+the portable authority scan was empty, and lint/test, layer guard and CodeQL
+all passed. The fresh `origin/main` follow-up is 139 callsites across 86 paths.
+
+Animeka PR 3199 (`693533acccbe2dc8865f473036e8e8c538bbcd5a`) moves store and
+checkpointer URLs plus application/repository identities out of three portable
+paths and into the existing host entrypoint. The checkpointer constructor now
+accepts its URL explicitly, portable defaults remain authority-free, 43 tests
+and 156 assertions passed, and all hosted gates passed. The fresh `origin/main`
+follow-up is 133 callsites across 83 paths.
+
+Kyber PR 3200 (`d11e2e756fd3cede7a1dfd39794a76bc205c79f4`) removes the
+portable graph's raw HTTP client plus ambient Murakumo endpoint, OpenRouter
+secret and version acquisition. An HTTP-backed LLM API can now be constructed
+only from explicit host capabilities; the portable default cannot perform
+network I/O, missing HTTP capabilities fail closed, and health version is graph
+state. The suite passed 13 tests and 71 assertions and all hosted gates passed.
+The fresh `origin/main` follow-up is 130 callsites across 81 paths.
+
+Browser-agent PR 3201 (`92397892b777452df442a11986277500a4ff90b1`)
+removes portable search/crawl/LLM endpoint, secret, raw HTTP client, CORS, port
+and server acquisition. The host supplies an explicit graph-runner closure so
+capabilities remain closed across the asynchronous SSE callback rather than
+depending on thread-local extent. Missing LLM/server capabilities fail closed
+and default tools cannot perform network I/O. The suite passed 24 tests and 67
+assertions and all hosted gates passed. The fresh `origin/main` follow-up is
+126 callsites across 78 paths.
+
+Hakken PR 3203 (`628b751f7a11ff29dfbcb57214562d0fca843023`) moves
+Okaimono, Kaimono Review, Kakaku and AliExpress endpoint acquisition out of
+seven portable nodes and into the existing host adapter. Existing explicit
+HTTP capabilities and the etzhayyim fleet endpoint allowlist remain enforced,
+and an absent AliExpress endpoint retains the deterministic supplier fallback.
+The suite passed 42 tests and 137 assertions and all hosted gates passed. The
+fresh `origin/main` follow-up is 119 callsites across 71 paths.
+
+WebMK PR 3206 (`008f3ba86fd7a4651fd37d2d57fb626780efa921`) removes
+portable store, identity, LLM, audit, website-fetch, Resend, API-key, port and
+server acquisition from seven paths. Raw HTTP/server implementations and
+environment configuration now live only in the existing host entrypoint;
+unconfigured LLM/store behavior is network-incapable, and audit/Resend secrets
+are purpose-bound capability data. The suite passed 11 tests and 36 assertions
+and all hosted gates passed. The fresh `origin/main` follow-up is 112 callsites
+across 64 paths.
+
+Media-gamers PR 3209 (`8b64d69b84d0aff52133e2bd499a9ec522294b89`)
+removes portable identity, store, LLM endpoint/key, audit secret, PDS, commit
+endpoint and raw HTTP acquisition from six paths. The existing host entrypoint
+now supplies closed configuration and HTTP capabilities; unconfigured LLM
+behavior cannot perform network I/O, audit trust is purpose-bound, and missing
+SteamSpy HTTP fails safely. The suite passed 21 tests and 61 assertions and all
+hosted gates passed. The fresh `origin/main` follow-up is 106 callsites across
+58 paths.
+
+Narou PR 3210 (`6f127b41df89c90a4dfe5d37bb93dcff517b2d79`) removes
+portable audit secret, LLM, store URL, identity, cron path/toggle, API-key, port
+and server acquisition from five paths. The host entrypoint supplies the closed
+runtime/effect capabilities; missing LLM/server authority fails closed, and the
+server validates its capability before cron or logging side effects. The suite
+passed 31 tests and 55 assertions and all hosted gates passed. The fresh
+`origin/main` follow-up is 101 callsites across 53 paths.
+
+Patent PR 3212 (`3b5402c5308bf128064a13cf7d809523b17ec1eb`) removes
+portable audit secret, cron path/toggle, PatentsView endpoint/HTTP, API-key,
+port and server acquisition from four paths. The host adapter supplies parsed
+USPTO source access and runtime capabilities; missing source HTTP is an explicit
+skip, and server capability validation precedes cron/logging effects. The suite
+passed 38 tests and 78 assertions and all hosted gates passed. The fresh
+`origin/main` follow-up is 97 callsites across 49 paths.
+
+Open-ISIC PR 3214 (`7802941363f2707eeac98ed448ec04c358e5aaa0`)
+removes portable repository-DID, cron path/toggle, API-key, port and HTTP-server
+acquisition from three paths. The existing `bb.edn` server task is the explicit
+host adapter (the numbered-layer freeze forbids adding a new adapter file), and
+the portable server rejects a missing server capability before cron or logging
+effects. The suite passed 32 tests and 67 assertions, the portable authority
+scan is empty, and all hosted gates passed. The fresh `origin/main` follow-up is
+94 callsites across 46 paths.
+
+Curpus2skill PR 3217 (`17eaed85c4a028a4203b16a3c371384c9903af47`)
+removes portable audit endpoint/secret/HTTP, store toggle, port and HTTP-server
+acquisition from three paths. Portable audit is disabled and network-incapable
+by default; the existing `bb.edn` host task binds the purpose-specific audit,
+store and server capabilities. Missing server authority fails closed before
+startup effects. The suite passed 20 tests and 44 assertions, the portable
+authority scan is empty, and all hosted gates passed. The fresh `origin/main`
+follow-up is 91 callsites across 43 paths.
+
+Docs PR 3219 (`bc1b04b906f4a05b248e1cffbe290cfb655be6c1`) removes
+portable version, Kotoba endpoint/bearer/graph/HTTP and API-key acquisition from
+three paths. Version and auth are explicit values, while the Kotoba client is
+network-incapable and fails closed until its purpose-specific HTTP capability is
+bound. The deployed Python pod remains authoritative and no cutover is claimed.
+The suite passed 27 tests and 61 assertions, both portable authority and HTTP
+implementation-import scans are empty, and all hosted gates passed. The fresh
+`origin/main` follow-up is 88 callsites across 40 paths.
+
+Kenkyusha PR 3221 (`2a45448f10628efbf874091bf8cbd34313496d4a`)
+removes portable Kotoba endpoint/bearer/graph/HTTP and internal/API-key
+acquisition from two paths. Auth authority is an explicit configuration value,
+and the Kotoba client fails closed until its purpose-specific HTTP capability is
+bound. The deployed Python pod remains authoritative and no listener cutover is
+claimed. The suite passed 31 tests and 67 assertions, portable authority and
+HTTP implementation-import scans are empty, and all hosted gates passed. The
+fresh `origin/main` follow-up is 86 callsites across 38 paths.
+
+Open-patent PR 3223 (`ce42d152d509e3a123e0c48195336e0058c7daa3`)
+removes portable Kotoba endpoint/bearer/graph/HTTP and API-key acquisition from
+two paths. API-key authority is an explicit value and the Kotoba client fails
+closed until its purpose-specific HTTP capability is bound. The deployed Python
+pod remains authoritative and no listener cutover is claimed. The suite passed
+26 tests and 62 assertions, portable authority and HTTP implementation-import
+scans are empty, and all hosted gates passed. The fresh `origin/main` follow-up
+is 84 callsites across 36 paths.
+
+Open-jpn-mynumber PR 3225
+(`663646b6dbe00b04d966fadf5028c6ab8fbe8495`) removes portable adapter-mode,
+port and HTTP-server acquisition from two paths. The portable adapter defaults
+to safe mock mode, while the existing `bb.edn` serve task binds deployment mode
+and httpkit authority. Missing server authority fails closed before startup
+effects. The suite passed 29 tests and 102 assertions, portable authority and
+HTTP implementation-import scans are empty, and all hosted gates passed. The
+fresh `origin/main` follow-up is 82 callsites across 34 paths.
+
+Karma PR 3227 (`e624f1feccd83e018b790f24a93f3050aa3026af`) removes
+portable port and HTTP-server acquisition from its server path. The existing
+`bb.edn` serve task owns environment and httpkit authority, and portable startup
+rejects a missing server capability before effects. The suite passed 22 tests
+and 176 assertions, portable authority and HTTP implementation-import scans are
+empty, and all hosted gates passed. The fresh `origin/main` follow-up is 81
+callsites across 33 paths.
+
+KI PR 3228 (`bebf463efbf1c5fd6ce6bbbbc8cd3223e2298d9e`) removes
+portable audit-disable policy acquisition from its audit path. Portable
+execution retains the append-only local ledger as the safe default, while the
+existing host runner binds deployment policy across request handling. The suite
+passed 21 tests and 117 assertions, the portable authority scan is empty, and
+all hosted gates passed. The fresh `origin/main` follow-up is 80 callsites
+across 32 paths.
+
+Maps PR 3231 (`2194aa2bd8f8ee1d994ec70a8b4391bff3def5aa`) removes
+portable substrate-mode/config environment and raw Kotoba/MST HTTP acquisition
+from the bulk-ingest substrate path. Both backends now use one explicit request
+capability; the portable default is network-incapable, while operator/auth gates
+and the RisingWave refusal remain intact. The deployed Python worker remains
+authoritative and no cutover is claimed. The suite passed 19 tests and 115
+assertions, portable authority and HTTP implementation-import scans are empty,
+and all hosted gates passed. The fresh `origin/main` follow-up is 79 callsites
+across 31 paths.
+
+Jukyu PR 3232 (`1e00338b3a25f88207d87a68363dac024cf7cb5d`)
+removes portable cron policy and LLM enrichment-limit acquisition from two
+paths. Both are explicit bounded runtime values supplied by the existing host
+runner. The suite passed 50 tests and 160 assertions, cron-disable and
+enrichment-cap behavior are covered, and all hosted gates passed. The fresh
+`origin/main` follow-up is 77 callsites across 29 paths; importantly, the
+tracked `60-apps/**/*.cljc` subset now has zero matching authority callsites.
+
+Wave-bridges PR 3233 (`1a124c06cc282c8d6139a1d98ec714db8f5c644d`)
+removes runtime namespace loading and JSON codec resolution from four generator
+paths. Each portable namespace now declares its CLJ codec dependency directly;
+the host-only entrypoint invokes that verified value without symbol lookup. All
+four files loaded, retained five actors each, and generated/pretty-encoded a
+representative lexicon. All hosted gates passed. The fresh `origin/main`
+follow-up is 73 callsites across 25 paths.
+
+IFC-export PR 3234 (`1f44036a1799b8db1bd7e6e4ef98b6cd1fb8cb41`)
+removes runtime JSON namespace discovery and codec resolution from the
+Sarutahiko exporter. Its CLJ codec is now a declared dependency and the decode
+step is directly testable. The real scene decoded and completed a no-write IFC
+conversion with 946 STEP entities and 83 elements. All hosted gates passed. The
+fresh `origin/main` follow-up is 71 callsites across 24 paths.
+
+Etzhayyim-py PR 3235 (`30cd480c0f2bf2980f1bf8315831b9fee78902dd`)
+removes PDS environment acquisition from portable Yoroshiku code. The caller
+now supplies the PDS URL explicitly; omission selects the deterministic public
+default, and trailing slashes are normalized. Default, explicit, nil, and
+normalization assertions passed, as did Analyze, CodeQL, lint/test, and the
+layer guard. Concurrent remote-main closures reduced the fresh post-merge scan
+to 6 lexical callsites across 3 paths: the GFTD CLI root adapter and the
+MiniMax benchmark/OpenAI host configuration. These are host-facing candidates
+for explicit configuration, not permission to expose environment lookup to
+portable `.kotoba` components.
+
+Com-junkawasaki root PR 771
+(`2d8803db5aca49d592efbaafe311c2e9d269047f`) closes the final lexical
+ambient-authority cohort. The shared GFTD `.cljc` CLI accepts an explicit root
+from its eight `.cljs` host wrappers, and the MiniMax `.cljc` HTTP, client, and
+benchmark layers accept an explicit endpoint/model/key map acquired only by a
+`.clj` host adapter. Guarded suites passed 29 tests / 148 assertions for GFTD
+and 1 test / 4 assertions for MiniMax. Both PR checks failed before executing
+any step, concurrently with the same one-second/zero-step failures on main, so
+this is recorded as a hosted-runner evidence exception rather than a code
+failure. Fresh `origin/main` evidence after merge is 0 callsites across 0
+tracked `.cljc` paths for the bounded `requiring-resolve`, `resolve`, and
+`System/getenv` authority scan.
+
+Compiler PR 112
+(`bef32b78852212bc096849d1ff9779c8afae4796`) closes the typed Wasm
+`:vector-i64` project-boundary gap exposed by the H.264 pilot. Typed metadata
+ABI v2 seals the descriptor and i64-indexed vector operations, rejects
+huge-index i32 wrap, enforces the 128-item bound, and adds host-issued-value
+identity so reusing a genuine descriptor cannot forge a compound externref.
+`bit-and` and `bit-xor` now have direct typed Wasm lowering. The compiler suite
+passed 289 tests and 3,825 assertions. Hosted browser-host ABI v2 coverage
+passed; other compiler jobs remained red on the pre-existing main-branch
+`kotoba.security.abac` CI classpath failure.
+
+Org-iso-h264 PR 2
+(`ec68ba3e6270dd2cc47a84dc8c0da48fe720790f`) adds the first bounded binary
+format consumer: immutable Exp-Golomb decoding and a Baseline SPS profile for
+POC type 0 or 2. EOF, invalid bytes and widths, oversized codes, invalid NAL
+headers, reserved bits, unsupported profile/POC syntax, and invalid dimensions
+are explicit typed errors; the graph requests no capability. The real libx264
+64x48 fixture, Exp-Golomb conformance, Web execution, typed Wasm execution,
+JDK 17, and JDK 21 all passed. High-profile scaling lists, POC type 1, and the
+mutable writer remain explicitly in the CLJC semantic oracle rather than being
+silently narrowed.
+
+Calendar PR 1
+(`9470229ee056442b234d8a276fe7f57e3549f89d`) closes the next repository-closed
+two-module graph with a nominal bounded profile. Calendar PR 2
+(`734bd82766452a0722c565fa0846a49bc1d35bb2`) then corrected the originally
+unproved 31-event claim: the qualified profile owns at most eight
+keyword-keyed events; each event has keyword identity and signed-i64 start/end
+coordinates, updates are persistent, duration is strictly positive, and
+overlap/lookup/full-map validation run without capabilities. Missing lookup,
+same-ID replacement, invalid duration, Web, typed Wasm, legacy tests, lint, and
+four hosted CI runs passed, including a concrete nine-event rejection on both
+backends. Arbitrary ISO strings, titles, attendees, and
+resource links remain explicitly in the open-schema CLJC oracle.
+
+Drive PR 1
+(`06fd2c9836477258f6977af3cd1450f7258b8c58`) adds a capability-free nominal
+drive tree with persistent updates and a single root. Full-map validation
+rejects dangling parents, files used as parents, parentless non-root items,
+self-links, longer cycles, unknown kinds, and the demonstrated eight-item
+limit on both Web and typed Wasm. The attempted 31-item negative fixture
+failed closed at the compiler's 64-node static ADT admission limit, so the
+qualified contract was reduced to the boundary actually demonstrated rather
+than recording an unproved larger limit. Titles, media types, object
+references, and open attribute maps remain in the CLJC oracle.
+
+Kotoba-script PR 26 (`c636ea3ac1208f7632a6995f32f0680c28cabb48`) and
+compiler PR 114 (`3579cfdb4975458eb0f434052564cd523d8a03da`) close the
+first real binary host-input gap. Source vector forms retain their 128-item
+admission limit, while checked runtime vectors are bounded at 16,384 items.
+Web copies, validates, and freezes external i64 arrays; typed Wasm exposes
+host-issued `bytes` and strict `vectorI64` factories while retaining WeakSet
+identity sealing. Non-byte, mixed numeric, forged, and 16,385-item inputs are
+rejected. The full compiler suite passed 294 tests / 3,836 assertions and all
+18 hosted jobs passed.
+
+Org-iso-isobmff PR 1
+(`4ba85338da09ba11366c0a21a9fe5d15d37f0d64`) uses that boundary for a
+capability-free top-level box parser. Normal, EOF-sized, and bounded 64-bit
+headers are admitted; invalid bytes, truncation, undersized/out-of-range or
+oversized boxes, missing required boxes, and traversal beyond 32 boxes fail
+closed. The committed 12,171-byte H.264 MP4 fixture produces the same four
+top-level boxes and media span on Web and typed Wasm. Recursive box trees,
+sample tables, metadata, demux/mux/remux, and mutation remain in CLJC.
+
+Org-iso-h264 PR 3
+(`0939fb5695747457dadf3473544c2f066e6913ef`) closes the raw NAL-input gap
+without delegating byte semantics to ClojureScript or JavaScript. The bounded
+Kotoba EBSP-to-RBSP transform validates at most 128 bytes, admits only canonical
+emulation-prevention sequences, and feeds the existing Baseline SPS parser.
+The actual 23-byte SPS from the committed MP4 fixture returns profile 66 and
+64x48 on reference, Web, and typed Wasm. Invalid bytes, oversize, truncated or
+noncanonical prevention sequences, and forbidden unescaped start-code bytes
+fail closed. The legacy general RBSP surface remains a CLJC oracle.
+
+Kotoba-script PR 27
+(`777d122019b2baa192c2b2ae1ea974c541338688`) and compiler PR 115
+(`b3a29de4d0e525e6bacd4b66dafc755a2f68536e`) establish the integration
+boundary required by real package graphs. Every execution backend now starts
+with the same fixed, private, non-replenishable 512-call fuel; the reference
+interpreter, restricted Web emitter, Wasm private global, CLJS compatibility
+backend, native ABI/loaders, iOS/Android hosts, and freestanding contexts agree.
+The 513th call traps. Repeated explicit `--source-path` roots are real-path
+confined and duplicate namespace definitions are rejected as ambiguous rather
+than resolved by search order. The compiler suite passed 296 tests and 3,841
+assertions locally; the merged change also passed its hosted platform matrix.
+Compiler PR 116 (`db6787427c9065aa1fe39147583bc94451042060`) corrected
+the two stale evidence bindings found by that audit: the attested native
+receipt now expects 509 units after three charged calls, and the coverage-fuzz
+baseline is sealed to the reviewed 512-fuel loader source. All 18 duplicate
+push/PR matrix jobs then passed across Linux x64, Linux arm64, macOS, Windows
+x64 browser, Windows arm64, Android, Safari, and server-kind profiles.
+
+Org-iso-isobmff PR 2
+(`c05964225b2a7b3f99ff7d967da7007b2b7d49d1`) proves those mechanics with a
+cross-repository `.kotoba` graph rather than copied sources. Its bounded parser
+follows `moov/first-trak/mdia/minf/stbl/stsd/avc1/avcC`, extracts one SPS no
+larger than 128 bytes, and directly invokes the pinned org-iso-h264 Kotoba
+EBSP/SPS implementation. The real 12,171-byte MP4 produces profile 66 and
+64x48 on Web and typed Wasm. Malformed configuration version/count/length,
+invalid bytes, range overflow, and oversized host input fail closed; both JDK
+17 and 21 hosted gates passed. Multi-track search, other sample entries,
+multiple SPS/PPS, sample tables, decode, and mutation remain explicitly out of
+the qualified profile.
+
+Org-iso-isobmff PR 3
+(`1b44ebb42e8b97623c4041c9aa7aaa29cbcaf980`) splits the next unique CLJC
+metadata root into an explicit bounded `.kotoba` profile. A shared validated
+nested-box scanner now serves both the existing avcC path and the fixed
+`ftyp` plus `meta/full-box/iprp/ipco/ispe` path. The metadata result preserves
+all four-byte brand codes and the entire positive unsigned-32-bit dimension
+range in signed i64 storage; it does not narrow brands to a convenient enum or
+dimensions to a fixture-sized cap. A 68-byte AVIF fixture returns brand `avif`
+and 320x240, while the open-domain check retains brand `zzzz` and
+4294967295x4294967295 on Web and typed Wasm. Missing boxes, nonzero ispe
+version/flags, zero dimensions, truncation, range overflow, non-byte values,
+sealed-Wasm host forgery, and oversized input fail closed. The graph requests
+no capabilities, legacy tests pass 8 tests / 80 assertions, and JDK 17/21 CI
+passes. Recursive discovery, optional/missing metadata, multiple property
+selection, item association, pixel decode, and mutation remain in CLJC.
+
+Ghosthacker-timemachine PR 1
+(`0a1ab06d7e2f6f64e0f50a5081c23848bac5e554`) closes the next two-file
+integer-only game graph as a deliberately bounded profile. The Kotoba engine
+owns only the fixed five-depth `inherited-server` path with difficulties
+5/9/20/24/30, explicit recruited/cleared/retreat outcomes, and integer grade
+thresholds. It returns the CLJC oracle's power 16, 2 recruited, 1 cleared,
+2 retreats, and `:rookie` summary on restricted Web and typed Wasm. Encounter
+comparison handles signed-i64 extremes without overflow-prone subtraction;
+the graph imports no capability. Existing CLJC verification passes 18 tests /
+78 assertions and local Web/Wasm conformance passes. Arbitrary logs, partial
+play, Ghost identity rosters, terminal/browser state, persistence, and
+floating point remain outside the profile. Both hosted JDK jobs were rejected
+before runner assignment because the account billing/spending limit blocked
+Actions; each had zero executed steps. This is recorded as infrastructure
+evidence, never as a passing CI result, and JDK 17/21 rerun remains required.
+
+Ghosthacker-memorize PR 1
+(`c2d5a2cb6fbc6f79d4abdf61b6f07d3c223ca92c`) closes the next fixed-data
+game graph without inheriting JavaScript floating-point behavior. Its Kotoba
+profile owns the eight-card `first-case-file` grid and at most sixteen flat
+index-pair turns. The collected set only grows; same-index and already
+collected turns remain no-ops that consume no attempt; completion ignores
+remaining turns. Efficiency is emitted as exact numerator/denominator fields,
+and the original 0.95/0.7/0.5/0.3 grade thresholds are evaluated by integer
+cross multiplication. Odd input, indexes outside 0--7, and more than sixteen
+turns fail closed. Perfect, one-miss, invalid-no-op, partial, unplayed, and all
+negative cases pass on restricted Web and typed Wasm with no capabilities;
+legacy verification passes 16 tests / 57 assertions. Arbitrary grids, shuffle,
+host state, persistence, and floating efficiency remain in CLJC. Hosted JDK
+17/21 jobs again executed zero steps because account billing blocked runner
+assignment, so both remain required reverification rather than passing proof.
+
+Ghosthacker-family PR 1
+(`11990ea8e68312711d94b1b0c336ba1e94e1ede2`) adds an integer-only Kotoba
+profile for the fixed five-day `opening-week`. Each supplied day is one
+drinks/music/staff-care triple; all values must be nonnegative and sum exactly
+to ten. Complete and partial weeks preserve mismatch thresholds, daily
+rewards, cumulative funds and family bond, bond level, and grade. Exact-needs,
+default-allocation, all-struggling, partial, and empty weeks agree on restricted
+Web and typed Wasm. Incomplete triples, negative values, invalid totals, and a
+sixth day fail closed; no capability is requested. Legacy verification passes
+12 tests / 57 assertions. Arbitrary day sets, allocation editing, terminal or
+browser state, and persistence remain in CLJC. Hosted JDK 17/21 jobs again had
+no runner and zero steps because account billing blocked them, so they are a
+fifth explicit reverification item, not passing evidence.
+
+Kagi PR 11 (`33a119f5f21dfd22d68ad86c5164badf8280a7b3`) migrates a
+security-relevant open-input gate rather than another fixed fixture. The
+capability-free Kotoba implementation covers every i64 phase input, preserving
+0--3 and the CLJC default-phase-1 fallback, every keyword operation and every
+keyword disposition. Its independent oracle matrix covers six representative
+phase values, seven known operations plus an unknown operation, and four
+dispositions: 192 combinations. CLJC passes all 192 assertions; restricted Web
+and typed Wasm each pass all 192 cases with no capabilities. Unknown writes
+hold with `:phase-disabled`, explicit hold is never relaxed, non-auto commit
+escalates with `:phase-approval`, and reads preserve the incoming disposition.
+Hosted JDK 24 compiled and executed the Web/Wasm matrix successfully in both
+push and PR runs. The job then failed at the unchanged full repository suite
+because `cbor.core` is absent on main, exactly as main run 29688347108 already
+did before this change. That repository-level dependency failure remains an
+independent restoration gate and does not erase the hosted Kotoba result.
+Kagi PR 12 (`8815e2c5103e32a5e924364aab7055f692bb37b4`) then closes
+that gate by restoring the pinned canonical DAG-CBOR dependency and routing
+incident receipt signing through the existing Provider `sign*` protocol
+instead of the nonexistent `sign-with` symbol. Receipt bytes, hybrid signature
+format, verification, and fail-closed action ordering are unchanged. The full
+suite now passes 52 tests / 334 assertions locally and on both hosted push/PR
+runs; each run also recompiles and executes all 192 Web/Wasm phase cases before
+the suite. Kagi no longer carries a repository-suite evidence exception.
+
+BPMN PR 2 (`621d38b60ac14143005632ff8b45ad87fc663771`) adds a native
+`.kotoba` structural-validation kernel beside the open `bpmn.validate` CLJC
+oracle. Its canonical integer graph covers dangling references, missing
+start/end events, node connectivity, and exclusive/inclusive indeterminacy.
+Malformed lengths, out-of-range counts and types, negative IDs, duplicate IDs,
+and invalid condition flags fail closed. Six shared semantic fixtures agree
+with the CLJC validator, and restricted Web plus typed Wasm pass sixteen
+positive/negative cases with no capabilities. An attempted 8-node/8-flow
+profile exposed the compiler's fixed 512-call fuel boundary; the qualified v1
+therefore truthfully caps input at four nodes and three flows, with a full 4/3
+dangling-reference ceiling case executed in both targets. The legacy suite
+passes 20 tests / 68 assertions. Hosted JDK 17/21 runs 29698874964 and
+29698946536 pass tests, lint, both compiles, and both-target execution. PR 3
+(`21fe12a5444f70f1aadd6b57be90970d9f8c0f2a`) records that qualification in
+the repository. String identifiers, key/id mismatch diagnostics, the open node
+taxonomy, messages, XML, and execution remain explicitly retained in CLJC.
+
+DDL PR 2 (`305a9dc5bbac8f538074c162ab61a7e36b3d2d45`) closes a
+previously non-direct project dependency by adding a native `.kotoba` schema
+validator beside the open `ddl.validate` CLJC oracle. The canonical schema
+checks duplicate columns, empty types, missing-primary-key warnings, and
+dangling foreign keys, while rejecting malformed lengths, invalid counts and
+flags, duplicate table IDs, and orphan column/FK owners before evaluation.
+Six CLJC oracle fixtures, including the full three-table/four-column/two-FK
+ceiling, agree with the kernel. Restricted Web and typed Wasm pass eighteen
+positive and rejection cases with no capabilities; the legacy suite passes 15
+tests / 51 assertions. Hosted JDK 17/21 runs 29699262753 and 29699323467 pass
+the complete gate. PR 3 (`eb2adb38d3a832cb0f6c7c94abcb5917bafd763c`)
+records qualification. SQL text, string IDs, open type syntax, PK/FK member
+lists, schema diff, and migration emission remain explicitly in CLJC.
+
+SHA256d PR 1 (`a7383d524c90eea2a0c04921db49757cd57a6d4e`) adds native
+`.kotoba` Ch and Maj round primitives over every signed-i64 bit pattern.
+Compiler PR 117 (`78f43e64125e9c4bbe2bfb3a9520ae4b767dc275`) first closes the
+parameterized typed-Wasm lowering gap for `bit-xor` and `bit-and`; all 18
+compiler checks passed. Because `bit-not` and `bit-or` are not admitted
+operations, the kernel uses exact XOR/AND bitvector identities rather than
+claiming unsupported language operations. The existing CLJ suite passes 30
+tests / 8,686 assertions, the CLJS portability proof passes eight cases, and
+restricted Web and typed Wasm each pass 686 Ch/Maj value and formulation checks
+over 343 deterministic edge tuples with no capabilities. PR 2
+(`1b5284c0ea686b91573dd4d1c1410a5c3077259c`) records immutable artifacts and
+the qualification boundary. Repository-hosted JDK 17/21 and CLJS jobs executed
+zero steps because account billing/spending limits blocked runner assignment;
+the migration therefore remains `merged-awaiting-hosted-reverification`.
+Scheduling, compression, complete digests, benchmark evolution, and platform
+fast paths remain explicitly in CLJC.
+
+Kyoninka PR 1 (`444591043fa1193cb1509741429cbd5f5838a075`) adds a native
+`.kotoba` gate for all 64 pairs in its closed eight-status permit state graph.
+The CLJC oracle covers both approval values for all pairs (128 cases), while
+restricted Web and typed Wasm each cover 576 cases including enum outsiders,
+i64 extremes, and invalid approval values. Invalid transitions fail closed;
+human transitions accept only the exact explicit approval value. The work also
+repairs the pre-existing CLJ/CLJS number-format branch so the full suite passes
+18 tests / 348 assertions. Both JDK 17/21 hosted runs compile and execute the
+complete matrix successfully with no capabilities. PR 2
+(`92a34cd0ce7bad39a3972e7c87e252ec57dec1dd`) records qualification. Legal and
+procedure text, current authority facts, fees, documents, storage, ledger
+events, and every external action remain explicitly host-owned CLJC concerns.
+
+Kotoba Fleet PR 2 (`ab7da63217ada84606bfb89cb69b87b95c7d99a0`) adds a
+native `.kotoba` holder decision for up to four claims on one host-selected
+work unit. It rejects malformed lengths, nonpositive agent IDs, negative or
+future timestamps, negative TTLs, nonbinary release flags, and duplicate
+causal ordinals before selection. Expiry uses validated elapsed subtraction,
+not potentially overflowing signed-i64 timestamp addition. Restricted Web and
+typed Wasm pass nineteen positive and fail-closed boundary cases with no
+capabilities; the full legacy suite passes 24 tests / 61 assertions. Hosted
+JDK 17/21 runs 29701110708 and 29701168374 pass the complete gate. PR 3
+(`2ca2ef742b7c19d655dac18d8b479e8312a05a2e`) records qualification. Datom
+reconstruction, work/string filtering, atomic ordinal allocation, claim and
+release append operations, and storage remain explicitly in CLJC.
+
+Koe PR 1 (`b21894789359c49d643253102aa6eab1538691db`) adds a native
+`.kotoba` booking-delegation shape gate and tightens the CLJC oracle. Only an
+ordinary turn with no booking, a held book action without confirmation, or a
+book action carrying a non-nil member signature is accepted. A booking
+fabricated on a no-action turn, a nil `signed-by`, unknown actions,
+inconsistent presence flags, and malformed scalar encodings fail closed.
+Restricted Web and typed Wasm each pass all 64 scalar combinations with no
+capabilities; the full suite passes 5 tests / 25 assertions. Hosted JDK 17/21
+runs 29701355809 and 29701413476 pass the complete gate. PR 2
+(`eb175441a6c71e3d72171f8a298a639acad386f3`) records qualification. Dialog
+state, utterance and reply handling, audio/TTS, slot proposal, cryptographic
+signature verification, confirmation, and all host ports remain in CLJC.
+
+Five additional project roots now have explicit retain dispositions rather
+than misleading integer-only pilots. `pkg` is an IC geometry, bonding, and
+thermal model using decimal constants, division, and `pow`; `cartpole-math` is
+a double-valued semi-implicit Euler model using `sin` and `cos`; `geo` is an
+f64 projection/vector/mesh/noise stack using the broader transcendental set;
+`level` applies a continuous `pow`-based zone shrink; and `web-modelb` preserves
+Rust f32-to-i64 frame-time cast behavior while its GPU/wasmi engine is host-only.
+Kotoba does not yet
+admit a safety-qualified f64 type or define NaN, infinities, signed zero,
+conversion, rounding, and cross-backend transcendental behavior. Fixed-point,
+integer-only, or JavaScript-only substitutes would silently change these
+domains and are therefore rejected. These roots remain CLJC until typed f64,
+JS/Wasm IEEE conformance, special-value negative tests, and repository-specific
+goldens are all qualified.
+
+The repeated `kotoba.webgl.glsl` candidate is one identical-content cluster
+propagated across eight WebGL repositories, not eight independent language
+implementations. Each file only re-exports `kami.webgl.glsl`; that target is a
+generated GLSL ES 3.00 fallback artifact produced by `bb gen-glsl` from the
+canonical `kami.wgsl` EDN shader through naga. Shader execution belongs to the
+GPU and generation belongs to the shader toolchain. Moving this compatibility
+facade into Kotoba guest code would duplicate authority and confuse the Kami
+engine boundary, so all eight paths receive an explicit generated-artifact
+retain disposition from the single content decision.
+
+Giemon Factory PR 1 (`d21d415a55c7eca810f608c419b742b5709a71e7`)
+places the construction-order safety decision in `.kotoba` without relocating
+Kami engine physics. Its canonical profile admits at most four steps, eight
+known elements, four known robots, and two reveals per step. It validates the
+whole encoding and unique positive ID catalogs before requiring contiguous
+one-based sequence numbers and resolving every robot and reveal. Restricted
+Web and typed Wasm pass sixteen positive and fail-closed cases, including the
+full 4/8/4 ceiling, with no capabilities; the legacy suite passes 21 tests / 73
+assertions. Four hosted JDK 17/21 jobs pass in both push and PR runs. PR 2
+(`469d2528449fdfdf31d4c84448bd11dc2f289cac`) records qualification. String
+metadata, names, trades, zones, durations, factory and clash geometry, robot
+physics, rendering, and source JSON loading remain in Kami engine/CLJC.
+
+Seven further Kami repositories have now been reviewed as eight candidate
+clusters. `kami-app-isekai`, `terrain`, and `vegetation` own continuous world,
+terrain, water, placement, culling, and rendering models. `kami-articulated`
+and `kami-cad-import` own URDF/CAD parsing and f64 physical transforms.
+`kami-isekai-assets` is the canonical generated asset catalog and contains
+higher-order composition callbacks, while `kami-nv-compat` is the USD,
+robotics, ray/path-tracing, GPU, and vendor compatibility boundary. These are
+proper Kami engine responsibilities, not misplaced Kotoba guest policy. They
+remain CLJC until typed float semantics, parser contracts, explicit provider
+interfaces, and repository-specific cross-backend goldens are qualified. A
+future bounded `.kotoba` safety gate may guard these systems, but must not
+replace, duplicate, or narrow their canonical physical or asset models.
+
+Safe floating-point maturity proceeds on the typed-value KIR foundation, not
+as an exception inside the legacy i64-only profile. Kotoba Script PR 29
+(`bf731bf55080364a3777ea0b18c837475631eafa`) and compiler PR 118
+(`201a80edc5638936e156d5fd111effc145d1c316`) implement Phase 1 under
+`:kotoba.floating-point/ieee-754-f64-bits-v1`: scalar f64 literals/types,
+canonical source NaN, exact signed-zero/infinity bit observation and
+round-trip, restricted JavaScript, and import-free scalar Wasm. Native, CLJS,
+nested f64, arithmetic, and implicit conversions fail closed. Compiler
+verification passes 301 tests / 3,860 assertions; the focused reference,
+JavaScript, Wasm, and native-rejection suite passes 4 / 18, and JVM versus
+JVM-free nbb Wasm goldens pass 16 cases with zero byte mismatches. Typed Wasm
+metadata is v3 with f64 tag 12 and scalar f64 compatibility is
+`:kotoba.typed/mixed-f64-v2`. Kotoba Script PR 30
+(`831cbbd688cdaa387bc9e4cd19a907d6d7ac2713`) and compiler PR 119
+(`6dc5ddcf03b6f92d0e5f9b29dfe1dd2d7c67debb`) complete Phase 2 with
+explicit add/subtract/multiply/divide, negate/absolute, ordered comparisons,
+unordered detection, and canonical NaN observation across reference,
+restricted JavaScript, and Wasm. The expanded compiler suite passes 302 tests
+/ 3,866 assertions and the f64 matrix passes 5 / 24. The remaining ordered
+implementation is: checked conversions and explicit
+f32 rounding; then sqrt/min/max and only qualified transcendentals. JavaScript
+is an output backend, never the normative semantics. JVM may host compiler
+tests but is not a required Kotoba runtime. Kami-domain cutover remains closed
+until reference, Kotoba Script JS, and typed Wasm agree on raw-bit and
+repository-specific physical goldens.
+
+Phase 3a is now merged through Kotoba Script PR 31
+(`c75d9ad939a4159bbe868a4b4732b46f86afb8b6`) and compiler PR 120
+(`e9dd1351a30770b8a970adcd3971371040f03ac9`). Exact and explicitly
+rounded i64-to-f64 conversion, plus checked-integral and explicitly truncating
+f64-to-i64 conversion, have distinct operation names. Inexact 2^53 boundary
+values, non-integral inputs, NaN, infinities, and signed-i64 overflow fail
+closed consistently. The compiler suite passes 302 tests / 3,870 assertions,
+the focused matrix passes 5 / 28, and JVM/nbb Wasm remains byte-identical over
+16 cases. Phase 3 remains open only for independently versioned f32 semantics.
+
+Phase 3b implements that independently versioned f32 contract. Kotoba Script
+PR 32 (`b36d0f6dfb451ae2e64db5756a1274f07f804372`) and compiler PR 121
+(`64f115339bb344904f7dbf504b345d369d8956b6`) define scalar f32 construction,
+canonical NaN observation, per-operation binary32 rounding, explicit
+f32/f64 widening or rounding, and checked versus explicitly lossy i64
+conversions. Decimal literals remain f64 and nested floating descriptors remain
+rejected. Wasm typed metadata advances to ABI v4 with f32 tag 13; native and
+legacy CLJS targets fail closed. The Kotoba Script suite passes 28 tests / 111
+assertions, the compiler suite passes 304 / 3,885, focused f32 coverage passes
+2 / 15, browser-host admission passes, and JVM/nbb Wasm bytes match across 17
+cases. Compiler PR 121 merged as
+`cb03c31dce3b32cb858d70f318f929159d572ddc`; Phase 3 has no remaining
+semantic gate. Phase 4 (`sqrt`, specified `min`/`max`, then
+qualified transcendentals) is the next language-maturity gap.
+
+Phase 4a is merged through Kotoba Script PR 33
+(`19e2978c82fef48f630f98eaa57ad46496e72ec8`) and compiler PR 122
+(`c72dfbf9aac9ac94c066336f0ee9aca6afd44285`). Floating policy v2 adds
+f32/f64 square root, minimum, and maximum without exposing a host math-library
+escape hatch. NaN propagates, square root preserves signed zero, minimum
+selects negative zero, maximum selects positive zero, and f32 rounds after the
+named operation. Reference, restricted JS, Wasm, browser admission, and all 17
+JVM/nbb byte-parity cases pass. The remaining Phase 4 language gap is now only
+the deterministic implementation or explicit error contract for qualified
+transcendentals; domain qualification remains separately gated by Kami
+physical/render golden vectors.
+
+Phase 4b is merged through Kotoba Script PR 34
+(`3da6ff75859f41415aaac5f9c54ba35feb0b265c`) and compiler PR 123
+(`a9caff4f0acf8937056f06d5f3e52d8f0e6fa47c`). Floating policy v3 introduces
+only the qualified `f64-sin-quarter-turn` and `f64-cos-quarter-turn` operations:
+finite radians in the closed `[-pi/4, pi/4]` domain, fixed coefficient bits,
+fixed degree-17/16 Horner order, FMA forbidden, signed-zero preservation, and
+absolute error no greater than `4e-15`. JavaScript calls no host sin/cos and
+Wasm imports no transcendental provider. A JVM/nbb mismatch in compiler-owned
+coefficient literals was caught during qualification and fixed by exact
+string-to-Long/BigInt construction; all 17 byte-parity cases now pass. The
+remaining transcendental gaps are qualified wide-angle range reduction and
+bounded exp/log/atan2 profiles, not an ambient `Math.*` escape hatch.
+
+Phase 4c is merged through Kotoba Script PR 35
+(`aacb547b4e51ead4683dedbc7b7cf0e80df5a9bd`) and compiler PR 124
+(`61430a35bed00460a237577cfc757ab1ef8a0a35`). Floating policy v4 extends
+sine/cosine only across the finite `[-8192*pi,8192*pi]` domain. It fixes the
+binary64 `2/pi` and split `pi/2` constants, ties-away-from-zero quadrant rule,
+subtraction order, quarter-turn kernels, and `5e-12` absolute-error ceiling.
+Non-finite and larger values trap. Qualification caught and fixed a Wasm-only
+loss of the `sin(-0)` sign after range reduction. Reference, restricted JS,
+Wasm, browser admission, and all 17 JVM/nbb byte-parity cases now agree. The
+remaining core transcendental gap is reduced to bounded exp/log/atan2.
+
+Phase 4d is merged through Kotoba Script PR 36
+(`6f5f8a7222a2e094befadd772c9bbf7c5f71559a`) and compiler PR 125
+(`b3a316dd37f7b60117699ac3fefef7a6473f1239`). Floating policy v5 adds
+`f64-exp-near-zero` over finite `[-0.5,0.5]` and `f64-log-near-one` over
+finite `[0.75,1.5]`. Their fixed degree-18 Taylor and degree-21 transformed
+odd-series kernels have a `4e-15` absolute-error ceiling, reject all values
+outside the declared domains, and neither emitted JavaScript nor Wasm imports
+host exp/log behavior. Reference, restricted JS and typed Wasm agree across
+the special, endpoint and sampled vectors; all 17 JVM/nbb artifact byte-parity
+cases pass. The remaining language-level transcendental work is qualified
+`atan2` plus explicit wide-domain exp/log scaling, followed by Kami-domain
+goldens; no ambient host-math escape hatch is authorized.
+
+Phase 4e is merged through Kotoba Script PR 37
+(`e8abd26fe0e034e8a8fa79bf7f6a1bffbbda6f41`), its exact octant-threshold
+parity correction PR 38 (`9c2293dd0844f19514d6f117acf31d20cb5263a0`),
+and compiler PR 126 (`6f955d55c90307409b5415b38169d0c62e1b3111`).
+Floating policy v6 adds `f64-atan2-bounded` for finite coordinate pairs. It
+preserves IEEE signed-zero quadrant results, rejects NaN and infinity, uses a
+fixed degree-39 odd kernel after octant reduction, and has a `2e-15` absolute
+error ceiling without host `atan2`. Qualification again caught a cross-host
+constant-construction risk: every i64 bit threshold is now constructed exactly
+on both JVM and nbb, and all 17 artifact byte-parity cases pass. The remaining
+core floating gap is explicit wide-domain exp/log scaling before Kami-domain
+requalification.
+
+Phase 4f is merged through Kotoba Script PR 39
+(`e6383296805ee6b3830e4b5242afb84fd037ff59`) and compiler PR 127
+(`295e486844100622e895d3a987e183671ae93fc0`). Floating policy v7 extends
+exponential across `[-512*ln(2),512*ln(2)]` with split-`ln(2)` reduction and
+exact normal binary scaling, and logarithm across `[2^-512,2^512]` with sealed
+exponent/mantissa extraction. The relative/absolute error ceilings are
+`1e-13`; invalid or out-of-domain values trap, and neither target imports host
+exp/log behavior. Reference, restricted JS, typed Wasm, browser admission, and
+all 17 JVM/nbb byte-parity cases agree. Phase 4's qualified floating language
+surface is therefore complete; Phase 5 must now requalify the actual Kami 3D,
+physics, terrain, vegetation and transform domains rather than inferring their
+safety from scalar kernel tests.
+
+Phase 5 begins with cartpole-math PR 1
+(`71a95a4d6f915ffe52d6165e46e758657f5a05a6`). Its canonical semi-implicit
+physics step now exists as `src/kotoba/cartpole_step.kotoba`, uses only
+explicit f64 arithmetic and qualified bounded sine/cosine, requests no
+capabilities, and agrees with the existing CLJC oracle on the reference
+executor, restricted JavaScript, and typed Wasm. Two tests / seven assertions
+pass. This qualifies the cartpole golden, not the entire parameterized engine:
+the CLJC API remains the oracle until bounded input validation and a structured
+f64 state ABI can represent arbitrary state/configuration without weakening
+the safety contract. The remaining Phase 5 gates are geo projection/mesh,
+terrain/water/noise, vegetation spatial behavior, and CAD/articulated
+transforms.
+
+Geo PR 1 (`3ed7ea5ca6466ef1f3fda18d8221efe1d6104496`) closes the next
+Phase 5 gate with a policy-v7 `.kotoba` slice for the Tokyo Web Mercator
+forward/inverse roundtrip and an outward-facing globe patch triangle. The
+CLJC projection/mesh oracle, reference executor, restricted JavaScript, and
+typed Wasm agree; 42 tests / 695 assertions pass and the component requests no
+capabilities. Qualification exposed a compiler scaling defect rather than a
+domain mismatch: a single generated Wasm function with more than 127 locals
+uses a one-byte local operand and can produce an invalid module. The Geo
+component was decomposed along projection stages so each component remains
+bounded and independently inspectable. General map/vector mesh APIs remain
+CLJC pending the structured f64 ABI, and the backend must still either encode
+all local indices as ULEB128 or reject oversized local sets before emission.
+
+Compiler PR 128 (`df4ff087cb9d1f4e81dd103362007f8e3b696470`) closes the
+immediate safety failure: typed Wasm lowering now rejects any function whose
+parameters plus generated locals exceed the 128-index one-byte profile, before
+artifact emission. The expanded suite passes 305 tests / 3,909 assertions.
+This is deliberately recorded as a fail-closed guard, not completion of the
+scalability work; canonical ULEB128 encoding at every local get/set/tee site is
+still required before the temporary limit can be removed.
+
+Terrain PR 1 (`9167368acc4264d97433aa37c7367e662756c8ee`) closes the
+terrain/water/noise Phase 5 gate with `src/terrain_golden.kotoba`. Canonical
+cosine-interpolated value noise, four-octave FBM and height shaping, plus
+wind-derived Gerstner wave parameters agree between the existing CLJC domain
+oracles, the Kotoba reference executor, restricted JavaScript, and typed Wasm.
+The component requests no capabilities and the repository suite passes 16
+tests / 11,103 assertions. This qualification deliberately begins after the
+existing lattice hash: general procedural noise remains an oracle until i32
+wrapping multiply/right-shift semantics are qualified. Structured heightmaps,
+splatmaps, chunks, and water meshes likewise remain CLJC until the structured
+f64 collection ABI is available. The remaining Phase 5 gates are vegetation
+spatial behavior and CAD/articulated transforms.
+
+Compiler PR 129 (`243dfccd561c575b66f82b58c469e66f902951f5`) fixes a
+typed-Wasm sealing defect exposed by vegetation: an f32/f64 comparison used
+only as an `if` condition inferred `:bool`, but the descriptor collector did
+not seal that intermediate type. Boolean-producing operations are now included
+in the sealed descriptor set, with an executable f64 control-flow regression;
+306 tests / 3,912 assertions pass.
+
+Vegetation PR 1 (`2346c946b7eb097fa0a7f3511106b3c214bc51eb`) closes the
+vegetation spatial Phase 5 gate. `src/vegetation_golden.kotoba` qualifies
+distance LOD boundaries, XZ distance, patch-range rejection, and scalar grass
+placement eligibility across the existing CLJC behavior, Kotoba reference,
+restricted JavaScript, and typed Wasm with no requested capabilities. The
+repository passes 26 tests / 180,995 assertions. General instance collections,
+sorting, patch/mesh construction, and GPU buffers remain CLJC pending the
+structured f64 collection ABI and explicit render provider; deterministic
+scatter remains an oracle pending qualified xorshift32 wrapping/shift
+semantics. The sole remaining Phase 5 gate is CAD/articulated transforms.
+
+CAD import PR 1 (`592e937601e6a219db2991dce7630a9dae23edd9`) and
+kami-articulated PR 1 (`af937c2124d668caa0d95ce6dc7df68f6ea9ea2d`)
+close the final Phase 5 gate. The CAD slice qualifies quaternion-derived
+scaled affine transforms and parent/child composition against its CLJC oracle
+on reference, restricted JavaScript, and typed Wasm; 54 tests / 1,188
+assertions pass. The articulated slice derives its axis, origin, and limits
+from the existing cartpole URDF parser, then qualifies bounded prismatic and
+revolute tip transforms on the same three targets; 7 tests / 34 assertions
+pass. Neither component requests capabilities. Phase 5 Kami domain
+requalification is therefore complete for its bounded golden scope. This does
+not authorize blanket parser or engine replacement: bounded XML/CAD parsers,
+structured f64 collection/record/graph ABIs, and explicit ingest/physics
+providers remain required for general APIs.
+
+Compiler PR 130 (`3dca1771633fa343976392e2d0d69c64ce4a6f88`)
+completes the Wasm local-index scalability work first exposed by Geo. Every
+local.get/local.set/local.tee emission site now carries a symbolic operand
+until the complete function stream is sealed, validates the index, and emits
+canonical ULEB128. The temporary 128-local rejection from PR 128 is removed.
+Typed and untyped modules using local index 130 both instantiate and execute;
+the compiler suite passes 306 tests / 3,913 assertions, and the JVM-free nbb
+compiler produces a byte-identical 18-case corpus including the new boundary
+fixture. This closes the local-index gap rather than weakening its fail-closed
+guard.
+
+Kotoba Script PRs 40/41
+(`f48942d76f0a2e8bc867df9ea89cc3d403a3f506`,
+`a266a5a96139210eb06ac2be1c639e037ff2a16a`) and compiler PR 131
+(`15f714e560f9492f86886ef8b3e5911974dcefe4`) establish the bounded
+structured floating ABI. f32/f64 fields now cross fixed heterogeneous vectors,
+nominal records, options/results/variants, and reference-shaped typed graph-map
+values through dedicated typed-Wasm push/get/assoc imports rather than i64 or
+unvalidated externref coercion. Reference, restricted JavaScript, and typed
+Wasm agree for mixed f32/f64 vectors, persistent point records, signed zero,
+NaN, and keyword-to-point graph lookup. The compiler passes 308 tests / 3,922
+assertions, Kotoba Script passes 36 / 121, the browser-host admission suite
+passes, and JVM/nbb remains byte-identical across 18 cases. Direct float
+set items and direct float map keys/values remain fail-closed pending a defined
+total order and scalar ordered-collection transport. Dynamic homogeneous f64
+buffers remain the structured collection gap for heightmaps, meshes, and large
+instance arrays; fixed shapes are not presented as a substitute.
+
+Kotoba Script PR 42 (`800e0d079fca2e39be8d1f8c5a6acd9a457bdb37`) and
+compiler PR 132 (`38ea9d389d5cdbc198c04d948334e0d8bd72d0ed`) close that
+gap with the bounded persistent `:vector-f64` profile. Construction, count,
+lazy-default lookup, trapping access, drop, assoc, and conj now agree across
+the reference executor, restricted JavaScript, typed Wasm, and browser host.
+The profile admits at most 16,384 binary64 items, preserves signed zero and the
+NaN class, and rejects forged, mutable, non-f64, and oversized host values.
+Typed Wasm ABI version 5 seals descriptor tag 14 and dedicated f64 vector
+imports; version 4 hosts fail closed. The compiler passes 310 tests / 3,933
+assertions, Kotoba Script passes 37 / 125, browser-host admission passes, and
+JVM/nbb artifacts are byte-identical for all 19 fixtures. ADR 0015 records
+that this does not authorize unbounded or mutable zero-copy GPU buffers.
+
+Kotoba Script PRs 43/44
+(`67fa6a044db1649de317b7962523f376db54529d`,
+`b80e2f18384cde346bea2f17fe6381cb3887b1a2`) and compiler PRs 133/134
+(`72eb0df0386f98ea348a8b0430aa2e77cf31c590`,
+`24b304f670a027a2ff34c33b55ed33d46b75259c`) establish the sealed i32
+wrapping profile. Explicit signed/unsigned wrapping, wrapping add/multiply,
+xor, signed and unsigned shifts, and xorshift32 agree across the reference
+executor, restricted JavaScript and typed Wasm. Shift counts are compile-time
+integer literals in the inclusive range 0..31; target-specific masked shifts
+are not exposed as Kotoba semantics. Terrain PRs 2/3 qualify lattice hashing,
+and vegetation PR 2 qualifies deterministic scatter RNG. Their boundary
+matrices exposed a JVM-reference high-bit promotion defect, which compiler PR
+134 corrected before qualification. The compiler passes 312 tests / 3,961
+assertions, Kotoba Script passes 38 / 130, browser-host admission passes, and
+JVM/nbb artifacts are byte-identical for all 20 fixtures. Terrain passes 17 /
+11,105 and vegetation passes 27 / 180,999. The i32 and dynamic-f64 language
+prerequisites for these two domains are therefore closed; GPU providers and
+the remaining domain algorithms are still explicit migration work.
+
+Compiler PR 135 (`b19476f19b21ce1f8fe71ec9b5b992c2e2ecdbe7`) closes
+the cross-backend multi-arity gap with bounded static overload resolution.
+Clojure-shaped fixed clauses are resolved by source name and arity before HIR;
+overloaded clauses lower to ordinary monomorphic functions with explicit
+`name$arity$N` ABI symbols. There is no JavaScript-only argument inspection,
+implicit defaulting, variadic dispatch, or backend-dependent coercion.
+Duplicate and absent arities, variadic parameters, more than eight clauses,
+and attempted ABI-marker forgery fail closed. Reference, restricted
+JavaScript, instantiated typed Wasm, browser-host admission, and the JVM-free
+21-case nbb corpus agree; the compiler passes 317 tests / 3,981 assertions.
+The initial Windows ARM64 job failed before checkout because the hosted runner
+could not execute its bundled `gh.exe`; the isolated rerun passed in 3m17s.
+com-junkawasaki/ghosthacker-lightning PR 2
+(`6e10ea87be573c80326925f8369b0abd29eb2416`) then moved the canonical
+shot-hit timing kernel to default-window and explicit-window arities while
+retaining an installed-v0.6.22 compatibility fixture. Its 27 CLJC tests / 111
+assertions, lint, pinned-compiler JavaScript generation, and Node execution
+pass locally. Hosted consumer jobs did not start because GitHub reported an
+account billing/spending-limit gate; this is recorded as external evidence
+debt rather than represented as a passing CI run.
+
+Kotoba Script PRs 45/46
+(`ed4b697b4e5aeb4c66dde63dff5a9acdcfe1a90a`,
+`86aefe1475f1c92bdef8e9ed3ee6022c59caf3b7`) and compiler PR 136
+(`52726c74e1bd77a2a845a76d860666062c1f31b7`) establish the bounded XML
+query ABI. Exact root-relative element count and typed optional attribute
+lookup are pure value transformations with fixed byte, node, depth, attribute,
+name, and path limits. DTDs, entities, processing instructions, CDATA, text,
+duplicate attributes, malformed structure, and limit exhaustion fail closed;
+there is no DOM, selector, external identifier, or I/O authority. Reference
+CLJC, restricted JavaScript, and typed Wasm ABI v6 agree, while XML imports are
+emitted only for modules that use them and the browser host retains sealed-v5
+artifact admission. The compiler passes 319 tests / 3,990 assertions, Kotoba
+Script passes 39 / 133, JVM/nbb artifacts match for all 22 cases, and the full
+hosted compiler matrix passes. kami-articulated PR 2
+(`e6324c84ef38698b82897a9050e2f962e0a72093`) then runs the same `.kotoba`
+kernel over the real cartpole and hizukue URDF fixtures. Robot, link, joint,
+topology, and mass-attribute vectors agree exactly with the existing CLJC
+oracle across reference, restricted JavaScript, and actual typed Wasm; 8 tests
+/ 38 assertions and both hosted CI runs pass. The remaining articulated
+language gap is now bounded numeric string parsing and typed record/graph
+assembly, not XML tokenization. Full physics remains an explicit Kami engine
+provider boundary.
+
+Kotoba Script PR 47 (`d2c766ead05f42233c94d588971e3956e912b824`)
+and compiler PR 137 (`48efc8aec36f7136cd0640b67a439d4f06d5d88c`)
+establish `decimal-f64-parse : string -> [:option :f64]`. The sealed grammar is
+ASCII-only and bounded to 64 bytes and three exponent digits; finite IEEE-754
+binary64 results preserve negative zero, underflow, subnormals, and the maximum
+finite value, while malformed syntax, NaN/infinity spellings, hexadecimal and
+separator forms, oversized exponents, and non-finite overflow return typed
+none. Reference CLJC, pinned restricted JavaScript, and typed Wasm ABI v7 agree;
+the new Wasm host import is conditional, and the browser host retains v5/v6
+artifact admission. Kotoba Script passes 40 tests / 136 assertions, compiler
+passes 320 / 3,995, JVM/nbb artifacts match for 23 cases, and the complete
+hosted matrix passes. kami-articulated PR 3
+(`c7413bce0bc73b6c506e86f883dcc9e3990b9ccd`) applies the operation to real
+cartpole and hizukue masses and lower/upper/effort/velocity joint limits across
+reference, restricted JavaScript, and actual typed Wasm; 9 tests / 42 assertions
+and both hosted jobs pass. Its remaining ingestion gap is now bounded
+pose/inertia vector-component parsing and typed record/graph assembly.
+
+Kotoba Script PR 48 (`213e8b3d0923ad5b0e48ce3ffcaf1c3bb9863a3f`)
+and compiler PR 138 (`d950713d7a27094371f1b3085a63df6a5b51c7de`)
+add the atomic fixed-width operation `decimal-f64x3-parse`, returning
+`[:option [:vector [:f64 :f64 :f64]]]`. Exactly three independently bounded
+finite decimal components and only explicit ASCII separators are admitted;
+wrong width, Unicode whitespace, commas, malformed/non-finite components, and
+byte-limit exhaustion return typed none without exposing a partial vector.
+Typed Wasm ABI v8 conditionally imports the operation and retains v5-v7
+admission. Kotoba Script passes 41 tests / 139 assertions, compiler passes 321
+/ 3,999, JVM/nbb artifacts match for 24 cases, and the full hosted matrix
+passes. kami-articulated PR 4
+(`b67c1ec2fceaa00d522e9e8384b600cadb6c6bf8`) validates real inertial-origin
+xyz/rpy, joint-origin xyz/rpy, and joint-axis xyz values from cartpole and
+hizukue across reference, restricted JavaScript, and actual typed Wasm; 9 tests
+/ 45 assertions and both hosted jobs pass. Its next gap is inertia tensor and
+nominal record/graph assembly, not vector tokenization.
+
+Compiler PR 139 (`f0941b0db47abe7bf00f74e69911f2cac385a815`)
+fixes transitive trust for descriptors nested in admitted frozen typed metadata;
+caller-created structural clones remain untrusted. Compiler PR 141
+(`0dc6fc7df3b8d79b7eb39649f50fb2d87e03de82`) restores the language-wide
+`string=? -> :i64` contract in typed Wasm, including recursive calls carrying
+string references and scalar counters. Compiler qualification passes 323 tests
+/ 4,001 assertions, 24 JVM/nbb artifact cases, and all 18 hosted platform jobs.
+
+kami-articulated PR 5
+(`ae40b415c171ffd27956c74c012330b5dc14262a`) composes parsed triples and
+scalars into nominal Pose, Inertia, Link-reference, and Joint-reference
+records across reference, restricted JavaScript, and real typed Wasm. Inertia
+is atomic, finite, component-bounded to `1e12`, and must satisfy nonnegative
+diagonal, second principal-minor, and determinant conditions. Its canonical
+joint-tree profile admits at most 12 topologically ordered links and 11 joints;
+duplicate identities, missing references, self-edges, multiple parents,
+cycles, disconnection, and over-limit graphs fail closed. Both real fixtures
+and the negative matrix pass 11 tests / 60 assertions and both hosted jobs.
+The former inertia/nominal-record gap is closed for this bounded profile.
+kami-articulated PR 6 (`ef846b5016693417e138473979988466558a4ba5`)
+then replaces canonical source ordering with a sealed string-to-index map and
+persistent union-find parent/rank vectors. Arbitrarily ordered declarations,
+a scrambled tree, and the maximum 20-link / 19-joint reverse-order chain pass
+reference, restricted JavaScript, and actual typed Wasm without increasing the
+31-entry typed-map, 64-node ADT, or non-replenishable 512-call fuel limits.
+Duplicate link/joint identity, duplicate child ownership, unknown references,
+self-edges, cycles, disconnection, and overflow remain fail-closed; 12 tests /
+63 assertions and both hosted jobs pass. The remaining articulated language
+gap is now a packed representation for graphs larger than 20 links; physics
+execution remains an explicit Kami provider boundary.
+
+The remaining completion gap is path-wide: confirm dispositions for all
+9,489 remaining unique-content clusters and propagate each reviewed decision to all
+23,862 paths; record
+for each path whether it migrates, splits at a capability boundary, remains a
+host adapter/native primitive, or is removed for an independently justified
+reason; implement those dispositions in dependency order; restore hosted CI
+execution for the seven evidence exceptions; run reference/Web/Wasm conformance
+where the selected target applies; and approve consumer cutover repository by
+repository. Safety-first implementation priority is: (1) preserve the now-zero
+effective dynamic-resolution authority queue and the complete bounded-reader
+remediation set; (2) preserve the now-qualified static multi-arity and bounded
+XML, decimal-f64, and fixed-width vec3 ABIs across consumer cutovers; (3) extend bounded domain profiles only with explicit
+limits and negative tests, including H.264 high-profile/POC type 1 only when
+their full semantics are represented; (4) close dependency graphs in leaf
+order while retaining CLJC test/conformance oracles; and only then (5) widen
+repository cutover. Bounded typed maps, closed project-graph compilation, and
+explicit capability-provider interfaces are now implemented foundations rather
+than open language gaps. The installed v0.6.23 identifier fix closes that former Web gap without
+weakening ambient-authority denial. Inventory count, lexical classification, a
+single-file probe or a representative pilot cannot establish semantic parity
+for an unclassified dependency graph.
+
+The regenerated current project-graph queue contains 461 candidate paths and
+249 unique graph contents. Only three are closed-and-direct probe-ready; 39
+contain non-direct migration work and 419 have external or missing
+dependencies. Thus the measurable open disposition queue is 9,489 unique
+content clusters after subtracting the 75 security clusters and the newly
+closed H.264 Exp-Golomb, H.264 RBSP, calendar, drive, ISO-BMFF framing, and
+ISO-BMFF metadata, Time Machine, Memorize, Family, Kagi phase, BPMN
+bounded-validator, DDL bounded-schema, SHA256d round-primitive, Kyoninka
+human-gate, Kotoba Fleet bounded-holder, Koe booking-gate, and five explicitly
+retained floating-domain roots, plus the propagated WebGL generated-facade
+cluster, Giemon bounded construction-safety root, and eight retained Kami
+engine physical/render/asset/provider clusters across seven repositories from
+the 9,595-content inventory. This number is a
+review workload, not a rename authorization: every dependency closure still
+needs a target-specific compile/runtime result or an explicit retain/split
+decision.
+
+Broad migration is complete only when G1 through G4 are all green, every
+baseline path is migrated or explicitly retained with a cross-platform
+disposition, reference/Web/Wasm conformance agrees, `.cljk` selects the same
+qualified target semantics, and installed
+release behavior evidence is archived. Until then `.kotoba` is usable for the
+qualified subset, not a blanket `.cljc` replacement.
+
+## Consequences
+
+The safety model composes across a graph of same-language components instead
+of treating all effects as opaque CLJC host code. The trusted base becomes
+smaller but does not disappear. Existing pure pilots remain valid as
+zero-import components; future pilots may exercise explicit provider imports
+without opening ambient authority or production cutover.
+"}]

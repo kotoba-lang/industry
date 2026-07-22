@@ -1,0 +1,280 @@
+{:doc/type :smoke-test-checklist
+ :doc/id "smoke-test-wave5-m5m6-20260810"
+ :doc/title "Wave 5 M5-M6 Metrics Pipeline Smoke Test Checklist"
+ :doc/date "2026-07-21"
+ :doc/status "READY_FOR_EXECUTION"
+ :doc/execution-date "2026-08-10"
+ :doc/prepared-by "Claude Code Agent"
+
+ :smoke-test/overview
+ {:objective "Validate all metrics pipeline components are operational and ready for gate execution"
+  :scope "Prometheus + CI bot + Grafana + Alert routing + Gate decision engine"
+  :duration-minutes 120
+  :success-criteria "All checks PASS, all 5 metrics live and fresh, alert routing confirmed"
+  :failure-escalation "Notify platform-lead + metrics-lead, hold gate kickoff to 2026-08-18 14:00"}
+
+ :smoke-test/phases
+ [{:phase 1
+   :name "Pre-Test Setup (15 min)"
+   :items
+   [{:item "1.1" :task "Verify Prometheus server is running"
+     :check "curl -s http://prometheus:9090/-/healthy → 200 OK"
+     :owner "infra-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "1.2" :task "Verify Prometheus storage has >= 50 GB free"
+     :check "du -sh /prometheus/data → output >= 50G"
+     :owner "infra-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "1.3" :task "Verify Grafana server is running"
+     :check "curl -s http://grafana:3000/api/health → status: ok"
+     :owner "infra-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "1.4" :task "Verify CI workflow secrets are configured"
+     :check "GitHub Settings → Secrets: PROMETHEUS_URL, GRAFANA_API_KEY, JIRA_API_TOKEN, CI_API_TOKEN, CLOUDFLARE_API_TOKEN, PAGERDUTY_KEY, SLACK_WEBHOOK_URL"
+     :owner "github-admin"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "1.5" :task "Verify Slack bot has channel access to #prod-gates-wave5"
+     :check "Send test message via curl to SLACK_WEBHOOK_URL"
+     :owner "slack-admin"
+     :status "[ ] PASS [ ] FAIL"}]}
+
+  {:phase 2
+   :name "Prometheus Scrape Configuration (20 min)"
+   :items
+   [{:item "2.1" :task "Verify build-times scrape job is configured"
+     :check "curl -s http://prometheus:9090/api/v1/scrape_configs | grep ci-build-times"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "2.2" :task "Verify test-coverage scrape job is configured"
+     :check "curl -s http://prometheus:9090/api/v1/scrape_configs | grep ci-test-coverage"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "2.3" :task "Verify deployment-success scrape job is configured"
+     :check "curl -s http://prometheus:9090/api/v1/scrape_configs | grep deployment-success"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "2.4" :task "Verify gate-blockers scrape job is configured"
+     :check "curl -s http://prometheus:9090/api/v1/scrape_configs | grep gate-blockers"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "2.5" :task "Verify team-velocity scrape job is configured"
+     :check "curl -s http://prometheus:9090/api/v1/scrape_configs | grep team-velocity"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "2.6" :task "Verify all scrape targets are UP"
+     :check "curl -s http://prometheus:9090/api/v1/query?query=up | jq '.data.result | length' == 5"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}]}
+
+  {:phase 3
+   :name "Metrics Collection & Data Freshness (30 min)"
+   :items
+   [{:item "3.1" :task "Run build metrics collector script"
+     :check "nbb scripts/collect-build-metrics.cljs → metrics-build.txt created"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :evidence-file "metrics-build.txt"}
+    {:item "3.2" :task "Verify build_duration_seconds metric appears in Prometheus"
+     :check "curl -s 'http://prometheus:9090/api/v1/query?query=build_duration_seconds' | jq '.data.result | length' > 0"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :timestamp-requirement "< 5 min old"}
+    {:item "3.3" :task "Run coverage metrics collector"
+     :check "nbb scripts/collect-coverage-metrics.cljs → metrics-coverage.txt created"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :evidence-file "metrics-coverage.txt"}
+    {:item "3.4" :task "Verify code_coverage_percent metric in Prometheus"
+     :check "curl -s 'http://prometheus:9090/api/v1/query?query=code_coverage_percent' | jq '.data.result | length' > 0"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :timestamp-requirement "< 1h old"}
+    {:item "3.5" :task "Run deployment metrics collector"
+     :check "nbb scripts/collect-deploy-metrics.cljs → metrics-deployment.txt created"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :evidence-file "metrics-deployment.txt"}
+    {:item "3.6" :task "Verify deployment_success_rate metric in Prometheus"
+     :check "curl -s 'http://prometheus:9090/api/v1/query?query=deployment_success_rate' | jq '.data.result | length' > 0"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "3.7" :task "Run blocker metrics collector"
+     :check "nbb scripts/collect-blocker-metrics.cljs → metrics-blockers.txt created"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :evidence-file "metrics-blockers.txt"}
+    {:item "3.8" :task "Verify blocker_count metric in Prometheus"
+     :check "curl -s 'http://prometheus:9090/api/v1/query?query=blocker_count' | jq '.data.result | length' > 0"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :timestamp-requirement "< 5 min old"}
+    {:item "3.9" :task "Run velocity metrics collector"
+     :check "nbb scripts/collect-velocity-metrics.cljs → metrics-velocity.txt created"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :evidence-file "metrics-velocity.txt"}
+    {:item "3.10" :task "Verify story_points_completed metric in Prometheus"
+     :check "curl -s 'http://prometheus:9090/api/v1/query?query=story_points_completed' | jq '.data.result | length' > 0"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}]}
+
+  {:phase 4
+   :name "Grafana Dashboard Validation (20 min)"
+   :items
+   [{:item "4.1" :task "Verify dashboard exists at /d/wave5-m5m6"
+     :check "curl -s -H 'Authorization: Bearer GRAFANA_API_KEY' https://grafana.internal/api/dashboards/uid/wave5-m5m6 → status 200"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "4.2" :task "Load dashboard in browser and verify all panels render"
+     :check "Navigate to https://grafana.internal/d/wave5-m5m6?from=now-7d&to=now"
+     :substeps
+     ["[ ] Build Times (p99) gauge displays value"
+      "[ ] Test Coverage gauge displays value"
+      "[ ] Deployment Success Rate gauge displays value"
+      "[ ] Build Times Trend line chart displays data"
+      "[ ] Gate Blockers line chart displays data"
+      "[ ] Blocker Age table displays data"
+      "[ ] Team Velocity bar chart displays data"]
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "4.3" :task "Verify dashboard refresh rate (30 seconds)"
+     :check "Observe metrics auto-refresh every 30 seconds"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :duration-seconds 60}
+    {:item "4.4" :task "Verify all queries execute without errors"
+     :check "Check browser console for GraphQL/Prometheus errors → 0 errors"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}]}
+
+  {:phase 5
+   :name "Alert Routing & Notifications (15 min)"
+   :items
+   [{:item "5.1" :task "Test Slack alert routing"
+     :check "Manually trigger warning alert via Prometheus console (e.g., silence 1 metric) → Slack notification in #prod-gates-wave5 < 2 min"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :expected-message "#prod-gates-wave5 receives: '⚠️  Build p99 latency exceeds 12 min'"}
+    {:item "5.2" :task "Test PagerDuty critical alert routing"
+     :check "Manually trigger critical alert → PagerDuty incident created < 2 min"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :expected-incident "Deployment success rate below SLA"}
+    {:item "5.3" :task "Test email alert routing"
+     :check "Trigger coverage alert → Email received at gates-escalation@gftd.group within 2 min"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "5.4" :task "Verify alert severity labels are correct"
+     :check "Slack notifications clearly indicate severity (⚠️  warning vs 🔴 critical)"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "5.5" :task "Verify alert includes runbook link"
+     :check "Slack message includes link to https://wiki.internal/gates/runbook/..."
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}]}
+
+  {:phase 6
+   :name "CI Gate-Bot Workflow Validation (10 min)"
+   :items
+   [{:item "6.1" :task "Verify .github/workflows/production-gates-bot.yml exists"
+     :check "git show HEAD:.github/workflows/production-gates-bot.yml → valid YAML"
+     :owner "ci-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "6.2" :task "Manually trigger gate-readiness-check workflow"
+     :check "GitHub Actions UI: workflow completes with status ✅"
+     :owner "ci-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :execution-time-minutes 5}
+    {:item "6.3" :task "Verify workflow outputs are correct"
+     :check "Workflow outputs contain: gate_status, blockers_count, build_p99, coverage, deploy_rate"
+     :owner "ci-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "6.4" :task "Verify workflow posts to Jira and Slack"
+     :check "Jira issue created + Slack message posted to #prod-gates-wave5"
+     :owner "ci-lead"
+     :status "[ ] PASS [ ] FAIL"}]}
+
+  {:phase 7
+   :name "End-to-End Data Flow (15 min)"
+   :items
+   [{:item "7.1" :task "Verify 15-min build metrics cadence"
+     :check "Wait 15 min from previous collection → new build_duration_seconds appears in Prometheus"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :test-time-minutes 15}
+    {:item "7.2" :task "Verify 5-min blocker metrics cadence"
+     :check "Query blocker_count every 5 min → count updates or stays same (no stale data > 5 min)"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"
+     :test-time-minutes 5}
+    {:item "7.3" :task "Verify SLA breach detection (blocker test)"
+     :check "Create test blocker in M5W5 project → metrics updated → alert fires if age > 4h"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "7.4" :task "Verify Grafana reflects new data immediately"
+     :check "After new metrics posted → Grafana panel updates within 30 sec (next refresh)"
+     :owner "metrics-lead"
+     :status "[ ] PASS [ ] FAIL"}]}
+
+  {:phase 8
+   :name "Escalation Protocol Health Check (10 min)"
+   :items
+   [{:item "8.1" :task "Verify escalation protocol runbook is accessible"
+     :check "curl -s https://wiki.internal/gates/escalation-protocol → 200 OK"
+     :owner "escalation-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "8.2" :task "Verify on-call rotation is configured"
+     :check "PagerDuty service 'prod-gates' has on-call assignment"
+     :owner "escalation-lead"
+     :status "[ ] PASS [ ] FAIL"}
+    {:item "8.3" :task "Verify escalation team contacts are up to date"
+     :check "team-lead-m5, team-lead-m6, platform-lead, escalation-lead all have valid Slack/email"
+     :owner "escalation-lead"
+     :status "[ ] PASS [ ] FAIL"}]}
+
+  :smoke-test/results
+  {:pass-criteria
+   ["All 8 phases completed with >= 90% checks PASS"
+    "All 5 metrics (build-times, coverage, deployment-success, blockers, velocity) appear in Prometheus and Grafana"
+    "Alert routing tested: Slack, PagerDuty, Email all working"
+    "Grafana dashboard loads without errors"
+    "CI gate-bot workflow executes successfully"
+    "Data freshness: all metrics < their SLA age (build: 15min, coverage: 1h, blockers: 5min)"
+    "SLA detection: at least one alert has been manually triggered and routed correctly"
+    "End-to-end latency from metric collection to alert notification < 2 min"]
+
+   :failure-handling
+   ["If Phase 1 (Setup) fails: STOP, fix infrastructure issues, re-run smoke test"
+    "If Phase 2-3 (Prometheus) fails: Check Prometheus logs, verify scrape configs, restart scraper"
+    "If Phase 4 (Grafana) fails: Verify Grafana datasource is connected to Prometheus, reload dashboard"
+    "If Phase 5 (Alerts) fails: Check Slack/PagerDuty/Email integrations, verify API keys, test manually"
+    "If Phase 6 (CI Bot) fails: Check GitHub Actions logs, verify secrets, re-run workflow"
+    "If Phase 7 (Data Flow) fails: Check timing assumptions, verify metric collection intervals"
+    "If Phase 8 (Escalation) fails: Update runbooks, verify contacts, update PagerDuty schedule"]}
+
+  :sign-off
+  [{:role "metrics-lead"
+    :responsible-for ["Phases 1-7"]
+    :sign-off "[ ] All metrics pipeline checks PASS"
+    :date "2026-08-10"}
+   {:role "escalation-lead"
+    :responsible-for ["Phase 8"]
+    :sign-off "[ ] Escalation protocol ready"
+    :date "2026-08-10"}
+   {:role "platform-lead"
+    :responsible-for ["Overall approval"]
+    :sign-off "[ ] READY FOR GATE KICKOFF 2026-08-18"
+    :date "2026-08-10"}]
+
+ :post-smoke-test-actions
+ [:if-pass
+  ["Archive this checklist with all sign-offs"
+   "Notify gates team: metrics pipeline live and healthy"
+   "Schedule pre-kickoff sync call (2026-08-16)"
+   "Activate automatic metrics collection (cron jobs ready)"
+   "Publish read-only access to Grafana dashboard for all team-leads"]
+  :if-fail
+  ["Document all failures with timestamps and error messages"
+   "File incident report with root cause analysis"
+   "Re-schedule smoke test after fixes verified in staging"
+   "Notify phase-owner if delays will affect 2026-08-18 kickoff"]}

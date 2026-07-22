@@ -1,0 +1,41 @@
+[{:db/id -1
+  :adr/id "adr-2607184600-kami-media-directory-relink-search"
+  :adr/title "KAMI media applications add deterministic verified directory relinking"
+  :adr/date "2026-07-18"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607184500-kami-media-input-monitor-verified-cache"]
+  :adr/decision
+  {:shared {:selection :recursive-browser-directory-picker
+            :candidate-order [:relative-path :filename :selection-index]
+            :hashed-asset-match :exact-sha-256-only
+            :renamed-media :match-by-sha-256
+            :legacy-hashless-match :exact-filename
+            :unmatched-candidates :ignore
+            :result-report [:matched-count :missing-asset-ids :ignored-count]}
+   :daw {:restored-runtime [:decoded-audio-buffer :waveform :source-blob]
+         :playback-after-relink true}
+   :nle {:restored-runtime [:blob-object-url :decoded-video-source]
+         :verified-cache-writeback true}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates {:shared ["persistent directory grants" "streaming package I/O above 512 MiB" "duplicate-content policy"]
+                                :daw ["clip drag handles" "plugin hosting" "LUFS/true-peak" "bus automation"]
+                                :nle ["proxy generation" "color management" "multitrack audio lanes/EQ" "additional containers"]}}
+  :adr/implementation
+  {:daw-commits ["09bd141beebac4286f43fc907f9f30f3b10ba00e"]
+   :nle-commits ["2a89fb770f6c8014d2ed4e44305b650cf2381ffb"]
+   :pull-requests ["kotoba-lang/kami-app-daw#4" "kotoba-lang/kami-app-nle#4"]
+   :evidence ["DAW passes 13 tests and 50 assertions; NLE passes 14 tests and 51 assertions, including deterministic relative-path selection, exact hash matching and legacy filename fallback."
+              "Both shadow-cljs production releases completed through the repository resource guard."
+              "Chrome directory E2E loaded projects with registered SHA-256 media, presented same-name wrong-content files beside nested renamed exact-content files, and reported 1 matched, 0 missing and 1 ignored in each application."
+              "DAW decoded the selected WAV and started real Web Audio playback; NLE rebuilt a Blob URL, reached decoder-ready state and wrote the recovered MP4 to its verified IndexedDB cache."
+              "Browser and local HTTP server lifecycles were closed after verification."
+              "Both application pull requests were reviewed and squash-merged."
+              "The required freshness and ledger verifier scripts are absent from this root revision; direct EDN parsing verified accepted status and the supersedes target."]}
+  :adr/consequences
+  ["Users can recover moved or renamed project media by selecting a parent directory instead of picking every file individually."
+   "A same-name file cannot replace a hash-bearing project asset unless its complete SHA-256 digest matches."
+   "Candidate ordering is reproducible across selection order, while unreferenced files never become project assets implicitly."
+   "Browser directory access remains user-initiated per selection; persistent directory handles are a separate follow-up capability."]
+  :adr/source-format "edn"}]

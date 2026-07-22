@@ -1,0 +1,61 @@
+{:evidence/schema :kotoba.installed-release/v1
+ :evidence/date "2026-07-19"
+ :release/tag "v0.6.24"
+ :release/commit "a054f02ae091cb9a9e4657785b7c250ffe9764cd"
+ :release/url "https://github.com/kotoba-lang/kotoba/releases/tag/v0.6.24"
+ :release/workflow-run 29659115439
+ :release/native-matrix {:darwin-arm64 :pass :darwin-amd64 :pass :linux-amd64 :pass}
+ :release/source-archive-sha256 "03c29ddb270158f643e0a50e5d9b2cdeae1e9c43443062c23f0b4882a226b850"
+ :release/archives
+ {:darwin-arm64 "35da0c32a9d5961f5c8b12eda02f25ce115f3792b5496971bb80efb752ff1a64"
+  :darwin-amd64 "e992c078eddd105ff939cc0ad3b44f24e8b487117bccc666118a202f968fa0e7"
+  :linux-amd64 "a0a5985d356f282fac578e0d51ad76ab388c97f27d788d8e02400a950706f822"}
+ :release/binary-sha256
+ {:darwin-arm64 "241d197126662ca9a6f41fc88a300b89875198d8031f78dc13cebf272f33f1b4"
+  :darwin-amd64 "bf63fd8132992e74eae205c76b9eabe6b44139b857ce806755306e490b27ad9e"
+  :linux-amd64 "617ac1195504154a3f9c78064008e64152c8852c6b19f599034e363ecd2a5219"}
+ :release/evidence
+ {:runtime :native-jvm-free
+  :source-extensions {:kotoba :pass :cljk :pass :cljc :pass}
+  :closed-cljc-project-source-path :pass
+  :structured-rejection :pass
+  :syntax-aware-authority-names :pass}
+ :compiler
+ {:public-source-path-pr 94
+  :public-source-path-merge "7e4b76866e202b180f2e4ccf0390db24117080e1"
+  :root-beside-source-path-pr 95
+  :root-beside-source-path-status :pending-release}
+ :kotoba
+ {:source-path-pr 365
+  :source-path-merge "573457c862435a9be57827ebccf6661946016dda"
+  :release-evidence-pr 366
+  :release-evidence-merge "a054f02ae091cb9a9e4657785b7c250ffe9764cd"}
+ :installed-shell
+ {:platform :darwin-arm64
+  :checksum :pass
+  :closed-cljc-project-compile :pass
+  :node-runtime-result 42
+  :binary-sha256 "241d197126662ca9a6f41fc88a300b89875198d8031f78dc13cebf272f33f1b4"}
+ :homebrew
+ {:formula-pr 29
+  :formula-merge "74f7bed538456a6d29a681e3b568aed84e94c1b2"
+  :bottle-workflow-run 29659556417
+  :bottle-matrix {:darwin-arm64 :pass :darwin-amd64 :pass :linux-amd64 :pass}
+  :brew-install-and-test-in-workflow :pass
+  :bottle-formula-pr 30
+  :bottle-formula-merge "43cc2c5801ecaadb6ed86b18d364c0fc62f667aa"
+  :bottle-digests
+  {:arm64-sequoia "fbfbd1ccaa59d39e5da0314afe1fa6adadd037d52e4587b80884555c56596a2b"
+   :sequoia "0cb15520a604b7cbacfd943ec9344a6c052b6e4d4d0811a05edde8a286af6f52"
+   :x86-64-linux "eea1767476181760cbdd60ab4c09d132e779725f9582e9ea0d852f2bdbfc5e85"}
+  :local-bottle-install :pass
+  :local-cellar-binary "/opt/homebrew/Cellar/kotoba/0.6.24/bin/kotoba"
+  :local-closed-cljc-project-compile :pass
+  :local-node-runtime-result 42
+  :linked-command :blocked-by-pre-existing-command
+  :pre-existing-shadow "/opt/homebrew/bin/kotoba"
+  :shadow-overwritten false}
+ :in-repository-formula
+ {:pr 367 :merge "ca44df200892628c3c562bf37b3ff08eb7ea2304" :ci :pass}
+ :gate/status :complete
+ :gate/remaining []}

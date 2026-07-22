@@ -3,7 +3,7 @@
             [clojure.string :as str]
             [minimax-m2-modal.openai :as openai]))
 
-(defn chat []
+(defn chat [config]
   (println "LLM chat. Ctrl-D to exit.")
   (loop [history []]
     (print "\nyou> ")
@@ -13,7 +13,7 @@
         (if (str/blank? text)
           (recur history)
           (let [messages (conj history {:role "user" :content text})
-                resp (openai/post-chat {:messages messages
+                resp (openai/post-chat config {:messages messages
                                         :temperature 1.0
                                         :top_p 0.95
                                         :max_tokens 2048})
@@ -30,10 +30,10 @@
                                         :unit {:type "string" :enum ["c" "f"]}}
                            :required ["city"]}}})
 
-(defn tools []
+(defn tools [config]
   (let [messages [{:role "user"
                    :content "What's the weather in Tokyo right now? Use the tool, then tell me in Celsius."}]
-        resp (openai/post-chat {:messages messages :tools [weather-tool] :temperature 1.0})
+        resp (openai/post-chat config {:messages messages :tools [weather-tool] :temperature 1.0})
         msg (openai/show-message resp)]
     (if-not (seq (:tool_calls msg))
       (println "(model did not call a tool)")
@@ -49,23 +49,23 @@
                             :content (json/write-str result)})))
              (conj messages msg)
              (:tool_calls msg))
-            final (openai/post-chat {:messages tool-messages :tools [weather-tool] :temperature 1.0})]
+            final (openai/post-chat config {:messages tool-messages :tools [weather-tool] :temperature 1.0})]
         (println)
         (println "[final answer]")
         (openai/show-message final)))))
 
-(defn coding []
+(defn coding [config]
   (openai/show-message
-   (openai/post-chat
+   (openai/post-chat config
     {:messages [{:role "user"
                  :content "Write a Clojure function `merge-intervals` that merges overlapping [start end] vectors. Include 3 clojure.test examples and explain the time complexity."}]
      :temperature 1.0
      :top_p 0.95
      :max_tokens 2048})))
 
-(defn -main [& [mode]]
+(defn run [config mode]
   (case (or mode "chat")
-    "tools" (tools)
-    "coding" (coding)
-    "chat" (chat)
-    (chat)))
+    "tools" (tools config)
+    "coding" (coding config)
+    "chat" (chat config)
+    (chat config)))

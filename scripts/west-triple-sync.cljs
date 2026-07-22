@@ -15,10 +15,9 @@
 ;; exit 1: verify 失敗 or apply 中に fatal
 ;; exit 2: 引数エラー
 
-(require '[scripts.nbb-compat :refer [slurp spit]]
+(require '[scripts.nbb-compat :refer [slurp spit sh]]
          '[clojure.string :as str]
-         '[clojure.edn :as edn]
-         '[clojure.java.shell :refer [sh]])
+         '[clojure.edn :as edn])
 
 (def node-fs (js/require "node:fs"))
 (def node-path (js/require "node:path"))
@@ -427,6 +426,9 @@
 (defn ensure-extra-project! [path]
   (let [f (node-path.join root "manifest/repos.edn")
         text (slurp f)
+        ;; :manifest.repos/extra-projects is a plain top-level EDN vector of
+        ;; strings in repos.edn (unlike blob-string-encoded fields such as
+        ;; :manifest.repos/datalad) -- entries use bare quotes, no escaping.
         token (str "\"" path "\"")]
     (if (str/includes? text token)
       :already
@@ -463,7 +465,7 @@
     (when-not (exists? parent)
       (.mkdirSync node-fs parent #js {:recursive true}))
     (println (str "  clone " url " -> " path))
-    (let [{:keys [ok? err out]} (sh-ok "git" "clone" "--depth" "1" url abs)]
+    (let [{:keys [ok? err out]} (sh-ok "git" "clone" url abs)]
       (if ok?
         {:ok? true :op :clone :path path}
         {:ok? false :op :clone :path path :err (or err out)}))))
@@ -474,9 +476,11 @@
     (println (str "  register " path " (--entry " name ")"))
     (let [ins (ensure-extra-project! path)]
       (println (str "    extra-projects: " ins))
-      (let [{:keys [ok? err out]}
-            (sh-ok "nbb" (node-path.join root "scripts/gen-west-manifest.cljs")
-                   "--entry" name)]
+      (let [skip-remote? (= "1" (aget js/process.env "WEST_PIN_VERIFY_SKIP"))
+            args (cond-> ["nbb" (node-path.join root "scripts/gen-west-manifest.cljs")
+                          "--entry" name]
+                   skip-remote? (conj "--no-verify-remote"))
+            {:keys [ok? err out]} (apply sh-ok args)]
         (if ok?
           {:ok? true :op :register :path path :name name :out out}
           {:ok? false :op :register :path path :err (str err "\n" out)})))))
@@ -489,7 +493,7 @@
           {:ok? true :op :fetch-ff :path path :skipped true :reason :dirty})
       (do
         (println (str "  fetch-ff " path))
-        (let [f (sh-ok "git" "-C" abs "fetch" "--depth" "1" "origin")]
+        (let [f (sh-ok "git" "-C" abs "fetch" "origin")]
           (if-not (:ok? f)
             {:ok? false :op :fetch-ff :path path :err (:err f)}
             (let [br (or (let [r (sh-ok "git" "-C" abs "rev-parse" "--abbrev-ref" "origin/HEAD")]

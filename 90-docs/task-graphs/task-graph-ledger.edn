@@ -1,0 +1,9 @@
+;; 90-docs/task-graphs/task-graph-ledger.edn — append-only progress events
+;; for 90-docs/task-graphs/task-graph.datoms.edn (one EDN map per line,
+;; DataScript/Datomic-transactable). The base catalog is topology-only and
+;; not hand-rewritten; progress is recorded here instead and folded by
+;; scripts/task-graph-query.cljs. Do NOT hand-edit existing lines; only
+;; append new lines, and only via scripts/task-graph-ledger-append.cljs so
+;; :event/seq stays monotonic. See ADR-2607202800.
+{:event/seq 1, :event/type :completed, :event/at "2026-07-20T11:59:52.832Z", :task/id "A-gitattributes-alias", :event/actor "Jun Kawasaki", :event/agent "claude-code", :event/summary "kotoba-lang/kotoba#merge 3f0ff97fb2 — .gitattributes に *.kotoba linguist-language=Clojure を追加、main へマージ済み"}
+{:event/seq 2, :event/type :dispatched, :event/at "2026-07-21T04:42:13.062Z", :task/id "G-grammar-repo", :event/actor "Jun Kawasaki", :event/agent "local-manimani/task-graph-dispatch", :event/summary "posted WorkItem taskgraph:kotoba-github-linguist-recognition:G-grammar-repo (kind=business)"}

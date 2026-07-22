@@ -1,0 +1,35 @@
+[{:db/id -1
+  :adr/id "adr-2607184100-kami-media-bounded-project-history"
+  :adr/title "KAMI media applications add bounded project undo and redo"
+  :adr/date "2026-07-18"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607184000-kami-media-content-hash-relink-missing-report"]
+  :adr/decision
+  {:shared {:history-limit 50
+            :history-scope :project-values
+            :controls [:undo-button :redo-button :command-or-control-z :shift-command-or-control-z]
+            :runtime-state-excluded true
+            :autosave-after-history-navigation true
+            :persistent-history false}
+   :daw {:history-model :bounded-past-and-future}
+   :nle {:history-model :bounded-past-and-future}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates {:shared ["persistent undo history" "search paths" "portable packaged media" "duplicate-content policy"]
+                                :daw ["loop and comp recording" "plugin hosting" "LUFS/true-peak"]
+                                :nle ["pointer trim gestures" "proxy/cache" "color management" "additional containers"]}}
+  :adr/implementation
+  {:daw-commits ["b3ae6fc"]
+   :nle-commits ["c1772ce"]
+   :evidence ["DAW passes 10 tests and 31 assertions; NLE passes 10 tests and 32 assertions, including the 50-generation history bound and redo invalidation."
+              "Both guarded shadow-cljs production releases completed with zero compiler warnings."
+              "DAW Chrome verified edit one to two, Undo to one, Redo to two, Command-Z to one, and reload recovery of one without console errors."
+              "NLE Chrome verified delivery master to compact, Undo to master, Redo to compact, Command-Z to master, and reload recovery of master without console errors."
+              "Both GitHub Pages workflows completed tests, release compilation and deployment successfully."]}
+  :adr/consequences
+  ["Project edits in both applications are now reversibly navigable for up to 50 generations through visible controls and standard keyboard shortcuts."
+   "Undo and redo operate on serializable project values only, so decoded media, object URLs, playback nodes and other runtime resources do not enter history."
+   "History navigation participates in autosave, keeping crash recovery aligned with the project state visible to the user."
+   "Undo history is session-local; durable cross-session history and the listed application-specific commercial gaps remain future work."]
+  :adr/source-format "edn"}]

@@ -40,12 +40,33 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
       （毎回 1Password 内を探索し直さない）。
   - `Backblaze`（1Password `Private` vault、2 件）— 個人用途、org のプロジェクト
     には使わない。
+- **Resend（transactional email / smtp.kotobase.net）**:
+  - **正本 = 1Password `gftdcojp` vault / item `gftd.resend`**
+    - `op://gftdcojp/gftd.resend/credential`（API Credential の credential 欄）
+    - フィールド: `username=API_KEY`、`hostname=https://api.resend.com`
+    - 用途: Worker secret `RESEND_API_KEY`（`net-kotobase` / legacy mailer）、
+      ローカル CLI、domain verify（`mail.kotobase.net` 等）
+    - 投入スクリプト: `nbb scripts/provision-resend-1password.cljs`
+      （Keychain `gftd.resend`/`API_KEY` → op item。`--update` で上書き）
+  - **Keychain ミラー**（非対話ローカル）: `service=gftd.resend` /
+    `account=API_KEY` — 1Password が biometric timeout のときのフォールバック。
+    新規取得の正経路は op; keychain は mirror 扱い。
+  - **関連ドメイン（Resend account 側）**: `email.gftd.ai`（受信可）、
+    `mail.kotobase.net`（smtp.kotobase.net 用、domain id
+    `a95782a1-dcef-4e3c-bf1b-71c865423253`）、`etzhayyim.com`、
+    `mail.itonami.cloud`、`gftd.ai`、`email.gftd.co.jp`
+  - **Worker 投入**: `op read op://gftdcojp/gftd.resend/credential | wrangler secret put RESEND_API_KEY --name net-kotobase`
+  - **MAIL_INGEST_TOKEN**（`mail.ingestInbound` service-auth）: keychain
+    `gftd.kotobase` / `MAIL_INGEST_TOKEN`（2026-07-17 生成・net-kotobase secret
+    投入済み）。1Password へも載せる場合は item `gftd.kotobase` に同名フィールド。
 - **Cloudflare**: `wrangler` の OAuth ログインセッション（ブラウザ認証、
   `npx wrangler login`）が実質の認証手段 — このセッションで R2 バケット/KV
   namespace/Worker デプロイ/Custom Domain 追加まで一括して操作できる（1Password
   越しの API トークンではなく、ローカルの wrangler セッションで完結）。
   `CLOUDFLARE_API_TOKEN`（Zone Analytics Read 等の狭いスコープ）は用途別に
   `wrangler secret put` で個別プロジェクトへ投入するもので、これとは別物。
+  DNS 編集用の zone token は keychain `gftd.cf`（DNS read/write 確認済み
+  2026-07-17）。
   - **kotobase-protocols-worker `WRITE_TOKEN`**（s3/atproto/git.kotobase.net の
     write 認可 Bearer、ADR-2607174500）: Worker secret として投入済み。operator
     copy は macOS Keychain `service=cf:kotobase-protocols-worker` /

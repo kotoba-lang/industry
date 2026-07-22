@@ -117,8 +117,14 @@
     :deliverables ["M3のPagedSqrtCacheが実カーネルの第一歩として存在（:sqrt-checkpointの試作实装）"
                    "vLLM 0.8.5との実測1点 landed 2026-07-18: 単一リクエストでvLLM decode~28.25tok/s、M2/M3のHFループbaseline(34.7-36.9tok/s)と同レンジ — baselineが弱い藁人形でないことを確認"
                    "M6-mac landed 2026-07-18（Apple M4、Qwen2.5-0.5B、24層全体、実プレフィル、実process RSS計測）: mx.arrayをnumpyへ退避してもRSSは減らない（unified memoryなので当然、3/3で確認）。素朴なwrite()+del()のdiskページングもほぼ効果なし（1/3のみ、794MBスケールでの-180.8MBは大アロケーションのmmap閾値越えの可能性が高くメカニズムとして信頼できない）。**np.memmapは97/395/794MBの全スケールでRSS +0.0MB（3/3）— 実際に効くメカニズム**。1/24層だけ触れるとそのぶんだけRSSが増える=部分的常駐がちゃんと機能することも確認"
-                   "actionable: cloud-murakumoの:sqrt-plus-pageはApple Siliconターゲットでmmapを使うべき（現行のModal scriptが使うserialize/deserializeパターンではなく）"
-                   "残: :sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装、本番トラフィックでのA/B比較、vLLM/SGLang/TensorRT-LLMとの正式な横並び比較は未達成"]}]
+                   "M6-mlxkv landed 2026-07-18: murakumo.cloudの:asherフレット（Apple Silicon）が実際にshell outするmlx-moeを調査したところ、独自cache実装を持たずmlx_lm.models.cache.KVCacheを直接再利用していることを確認（--kv-bits経由でQuantizedKVCache化）。同じKVCacheをsubclassしupdate_and_fetch()をoverrideするPagedSqrtKVCacheプロトタイプを実装（super().update_and_fetch()を先に呼びcorrectnessを構成的に保証、M6-macで実証済みのnp.memmapページングを副作用として実行）。実mlx-communityモデル(Qwen2.5-0.5B-Instruct-4bit)の実generate()ループで検証: S=2048/8192・全24層でexact_token_match=true、slowdown 3.05-3.09x（CUDA/transformers系の2.2-3.7xと同オーダー）。M3が確立した『super()を先に呼びcorrectnessを構成的に保証する』設計原則が、HFのCache API（update）ともmlx_lmの別設計のCache API（update_and_fetch）とも両方で通用することを実証"
+                   "actionable: cloud-murakumoの:sqrt-plus-pageはApple Siliconターゲットでmmapを使うべき（現行のModal scriptが使うserialize/deserializeパターンではなく）。mlx-moe側の統合点も具体化した: mlx-moeがstock KVCacheの代わりにこのPagedSqrtKVCache系のクラスをロードするようになれば、kv_runtime.cljcが既に計算しているb(S)・checkpoint/active-window keep-setをそのまま駆動パラメータとして使える"
+                   "残: :sqrt-checkpoint / :sqrt-plus-page の本番カーネル実装（mlx-moe本体へのフォーク/パッチとしての着地）、本番トラフィックでのA/B比較、vLLM/SGLang/TensorRT-LLMとの正式な横並び比較は未達成"]}
+   {:level "M7" :name "cross-domain-applicability-video-image" :status "partial"
+    :deliverables ["landed 2026-07-18: 自己回帰型画像トークン生成（LlamaGen-B実仕様: dim=768/12層/12head/GQA無し/vocab=16384の画像codebook、transformers.LlamaConfigで乱数重み——重みでなく機構転移のテスト）でM3のPagedSqrtCacheをそのまま適用、S=2048/8192でexact_token_match=true、slowdown 1.80-1.83x（テキストモデルのCUDA実測と同オーダー）——機構はコード変更ゼロでvocabドメインを超えて転移することを確認"
+                   "grounded projection（ローカル/Modal実行なし、明示）: 自己回帰型動画（MAGI-1実仕様、technical reportのTable 2から: 34層/dim=3072/128head/GQA groups=8）はblock-causal+GQAで本手法の前提構造を満たすことを確認。bpt=25.5KB/token（このプロジェクトで測定した中で最も軽量）でも、公称最大コンテキスト4,000,000トークンでの full KV = 104.4GB。CUDA指向の研究コードでMacポート無く未実行"
+                   "self-correction: 会話中の『activation checkpointingがbidirectional diffusion動画/画像生成にもsqrt-space-kvと同様に効く』という当初の主張を実測で検証したところ不正確と判明——real DiT-L/2寸法・torch.utils.checkpoint・実MPS memory計測で、**推論（生成）時はcheckpointingの効果が厳密にゼロ**（backward passが無いため retain するものが無い、S=2048/8192両方でratio=1.000）。**訓練時は本物の効果**（S=8192でcheckpoint無しは42GB超要求でOOM、有りは19.5GBで収まる）——ただしこれは訓練/fine-tuning限定の話で、生成には無関係。かつこの技法自体は本ADRが既に一次系譜として引用しているGriewank/Chen 2016の既存技術であり、sqrt-space-kvの新規貢献ではない"
+                   "残: MAGI-1系の実モデルをModal A100で実行し、実K/V shapeでのM2/M3同等スループット/正確性テストは未達成"]}]
   :adr/value-proposition
   {:reframed-by "owner" :date "2026-07-18"
    :statement "この研究の優位性は速度でなく、限られたmemoryでテキスト・動画・画像生成modelを動かせることにある。速度が遅くなるのは許容されるコスト。"
@@ -134,7 +140,12 @@
    {:pri "P3" :gap "ホストページングありの実デコードスループット/レイテンシ測定" :level "M2" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/modal_sqrt_kv_throughput_bench.py + scripts/modal_sqrt_kv_paged_cache_bench.py; 2026-07-18"}
    {:pri "P3" :gap "Apple Silicon unified memoryでの実メモリ解放メカニズムの特定（mmap vs write+del vs cpu-move）" :level "M6" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_mac_memory_capability.py; docs/benchmarks/sqrt-kv-mac-memory-capability-summary.md; 2026-07-18"}
    {:pri "P3" :gap "mlx-lm DeepSeek-V2実装のMLA cache absorption有無の確認（クロスエコシステム検証）" :level "M5" :status "landed" :evidence "gftdcojp/cloud-murakumo docs/benchmarks/sqrt-kv-mac-mla-source-inspection.md; 2026-07-18"}
-   {:pri "P3" :gap "16GB/32GB Macで実際にこの手法が要る具体的モデルの特定（重みでなくKVがボトルネックになるモデル）" :level "M6" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_mac_model_suitability.py; docs/benchmarks/sqrt-kv-mac-model-suitability-summary.md; 実測: Qwen2.5-14B-Instruct-4bit(bpt=192KB/tok, native=32768, 16GBで72.6%到達)とGLM-4-9B-Chat-1M-6bit(bpt=80KB/tok, native=1048576, 16GBで6.1%/32GBで24.8%到達) — GLM-4-9B-Chat-1Mが決定的な適合例; 2026-07-18"}]
+   {:pri "P3" :gap "16GB/32GB Macで実際にこの手法が要る具体的モデルの特定（重みでなくKVがボトルネックになるモデル）" :level "M6" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_mac_model_suitability.py; docs/benchmarks/sqrt-kv-mac-model-suitability-summary.md; 実測: Qwen2.5-14B-Instruct-4bit(bpt=192KB/tok, native=32768, 16GBで72.6%到達)とGLM-4-9B-Chat-1M-6bit(bpt=80KB/tok, native=1048576, 16GBで6.1%/32GBで24.8%到達) — GLM-4-9B-Chat-1Mが決定的な適合例; 2026-07-18"}
+   {:pri "P1" :gap "MAGI-1系の実自己回帰型動画モデルをModal A100で実行し、実K/V shapeでM2/M3同等のスループット/正確性テストを行う（現状は公開仕様からの推定のみ、ローカル/Modal実行なし）" :level "M7" :status "open"}
+   {:pri "P3" :gap "自己回帰型画像トークン生成へのPagedSqrtCache機構転移確認（LlamaGen-B実仕様、乱数重み）" :level "M7" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_image_token_llamagen.py; docs/benchmarks/sqrt-kv-image-token-llamagen-summary.md; exact_token_match=true @ S=2048/8192, slowdown 1.80-1.83x; 2026-07-18"}
+   {:pri "P3" :gap "自己回帰型動画（MAGI-1）の実仕様からのgrounded projection" :level "M7" :status "landed" :evidence "gftdcojp/cloud-murakumo docs/benchmarks/sqrt-kv-autoregressive-video-magi1-projection.md; 実測ではなく公開Table 2仕様からの推定と明記; 2026-07-18"}
+   {:pri "P3" :gap "bidirectional diffusion（動画/画像生成主流）へのactivation checkpointing適用可否の自己検証" :level "M7" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_dit_activation_checkpoint.py; docs/benchmarks/sqrt-kv-dit-activation-checkpoint-summary.md; 推論時ratio=1.000（効果ゼロ）、訓練時S=8192でcheckpoint無しはOOM・有りは19.5GBで収まる; 会話中の当初主張を訂正; 2026-07-18"}
+   {:pri "P1" :gap "murakumo.cloud採用は『モデル自体への変更が必要か、ollama/vllmと同じ範囲か』という問いに、実プロトタイプで答える（mlx-moeの実cache class族に対する実サブクラス+実generate()ループ検証）" :level "M6" :status "landed" :evidence "gftdcojp/cloud-murakumo scripts/bench_sqrt_kv_mlx_lm_paged_cache.py; docs/benchmarks/sqrt-kv-mlx-lm-paged-cache-summary.md; PagedSqrtKVCache(mlx_lm.models.cache.KVCache)、mlx-community/Qwen2.5-0.5B-Instruct-4bitの実generate()ループでexact_token_match=true@S=2048/8192、slowdown 3.05-3.09x; 答え: モデル変更は不要、かつ単純なCLIフラグ範囲でもない — engine層のcache-class差し替え（mlx-moeが既に--kv-bitsで行うQuantizedKVCache差し替えと同種の変更）; 2026-07-18"}]
   :adr/non-goals
   ["sqrt-space-kvの理論的主張（Transformerがマルチテープチューリングマシンであるという主張）を検証すること — 論文自身が明示的に否定しており本ADRの範囲外"
    "既存のcloud-murakumo本番トラフィックを止めてこのADRの検証を強制すること — M2-M6はcloud-murakumo :kv-policy を本番デフォルト化する前の要件であり、現状の宣言のみの状態（intent expression）を即座に変更する必要はない"
@@ -449,6 +460,57 @@ HF参照実装と全く同じ非圧縮per-head形状をcacheしていること�
 （branch `research/sqrt-kv-mac-memory-capability`、server-side merge
 `44ebabd`）、`docs/benchmarks/sqrt-kv-mac-{memory-capability,mla-source-inspection}*`。
 `com-junkawasaki/sqrt-space-kv` commit `6d7adff` に反映済み。
+
+## Implementation notes (2026-07-18 M6-mlxkv landed — murakumo.cloud production integration path)
+
+**Question from conversation:** 「これらの分析から murakumo.cloud に採用、
+活用すると? これは model 自体に手を入れる必要がある? それとも ollama, vllm
+と同じ範囲?」への答えを、実プロトタイプで検証した。
+
+**Step 1 — 実architectureの調査（Explore agent）。** `gftdcojp/cloud-murakumo`
+は独自の推論エンジンを持たない：`src/cloud_murakumo/vllm.cljc` /
+`mlx_moe.cljc` は `vllm serve ...` / `mlx-moe serve ...` のCLI起動コマンドを
+生成するだけのClojure/`.cljc`オーケストレーション層で、`kv_policy.cljc` が
+ポリシーをengine flag/envに翻訳する。`kv_runtime.cljc` は `b(S)`・
+checkpoint/active-window keep-setを計算し `/tmp/murakumo-kv-plan.edn` に
+書き出す「常駐ランタイム」だが、**Python/MLX側でこのplan fileを読むコードは
+現状ゼロ**（宣言のみ、確認済みギャップ）。`mlx-moe`（mu-hashmi/mlx-moe、
+MIT、モノレポ外部依存・west未登録）は`--kv-bits`フラグ経由で
+`mlx_lm.models.cache.KVCache.to_quantized()` → `QuantizedKVCache` を直接
+呼んでおり、**独自cache実装を持たずmlx_lmのcache class族をそのまま再利用**
+している。MoEエキスパート重みのSSDページング（mlx-moeの主機能）はKVキャッシュ
+ページングと直交する別軸（`sqrt_space.cljc`の既存`:expert-page`戦略と一致）。
+
+**Step 2 — 実プロトタイプで検証。** `mlx_lm.models.cache.KVCache`を実際に
+subclassし`update_and_fetch()`をoverrideする`PagedSqrtKVCache`を実装
+（`scripts/bench_sqrt_kv_mlx_lm_paged_cache.py`）。設計はM3の
+`PagedSqrtCache(DynamicCache)`と同一原則：`super().update_and_fetch()`を
+先に呼びフレームワークが管理する完全なテンソルをそのまま返す（correctness
+は実装の結果として保証される）。非常駐スライスは初回のみ実ディスクへ
+書き込み、以降の全デコードステップで`np.memmap`により実読み込みする
+（M6-macで実証済みの「Apple Siliconで実際に効くメカニズム」を再利用、
+M3のCUDA版が使ったnaiveなwrite+del往復ではない）。実際にローカルキャッシュ
+済みの`mlx-community/Qwen2.5-0.5B-Instruct-4bit`で実generate()ループを
+実行：baseline（標準`KVCache`）とpaged版で生成トークン列が
+**S=2048/8192・全24層で完全一致**（`exact_token_match=true`）。
+slowdown 3.05-3.09x——M2/M3のCUDA/`transformers`実測（2.2-3.7x）や
+M7のLlamaGen MPS実測（1.8x）と同オーダー。
+
+**答え:** モデル自体への変更は不要。かつ「ollama/vllmと同じ範囲（CLIフラグ
+だけ）」でもない——`cloud-murakumo`は現状CLI起動コマンドの生成としか
+interopしておらず、`kv_runtime.cljc`の計画は誰にも読まれていない。
+実際に必要なのは**engine層でのcache-classの差し替え**で、これは
+mlx-moeが`--kv-bits`で既に行っている`QuantizedKVCache`差し替えと**同じ種類
+の変更**（サービングエンジンのforkまたはパッチとして着地する規模感で、
+モデル重み・アーキテクチャコードには一切触れない）。GPU/vLLM側の道筋
+（MLA absorbed-cache対応、既に本ADR M5で「CUDA限定・SGLang/vLLM実装が
+必要」と特定済み）は、この Apple Silicon 側のプロトタイプよりも構造的に
+大きいエンジニアリングが要ることが対比により明確になった。
+
+**証跡**: `gftdcojp/cloud-murakumo` commit `21662f7`
+（branch `feat/paged-sqrt-kv-mlx-lm`、server-side merge）、
+`scripts/bench_sqrt_kv_mlx_lm_paged_cache.py`、
+`docs/benchmarks/sqrt-kv-mlx-lm-paged-cache-{summary.md,results.json}`。
 
 ## References
 

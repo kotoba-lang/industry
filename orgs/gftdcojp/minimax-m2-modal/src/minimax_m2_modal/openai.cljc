@@ -3,26 +3,29 @@
             [clojure.data.json :as json]
             [clojure.string :as str]))
 
-(defn endpoint []
-  (let [url (or (System/getenv "LLM_URL") (System/getenv "MINIMAX_URL"))]
+(defn normalize-config [{:keys [url model api-key]}]
+  (let [url (some-> url str str/trim)]
     (when (str/blank? url)
-      (throw (ex-info "Set LLM_URL to the OpenAI-compatible endpoint without trailing /v1."
-                      {:env ["LLM_URL" "MINIMAX_URL"]})))
-    (str (str/replace url #"/+$" "") "/v1/chat/completions")))
+      (throw (ex-info "An explicit OpenAI-compatible endpoint URL is required."
+                      {:field :url})))
+    {:url (str/replace url #"/+$" "")
+     :model (or model "MiniMaxAI/MiniMax-M2.7")
+     :api-key (or api-key "minimax-m2-7-testkey-7f3a")}))
 
-(defn model []
-  (or (System/getenv "LLM_MODEL") "MiniMaxAI/MiniMax-M2.7"))
+(defn endpoint [config]
+  (str (:url (normalize-config config)) "/v1/chat/completions"))
 
-(defn api-key []
-  (or (System/getenv "LLM_KEY") "minimax-m2-7-testkey-7f3a"))
+(defn model [config]
+  (:model (normalize-config config)))
 
-(defn post-chat [body]
-  (let [resp (http/post (endpoint)
-                        {:headers {"authorization" (str "Bearer " (api-key))
+(defn post-chat [config body]
+  (let [{:keys [model api-key] :as config} (normalize-config config)
+        resp (http/post (endpoint config)
+                        {:headers {"authorization" (str "Bearer " api-key)
                                    "content-type" "application/json"}
                          :throw false
                          :timeout 1800000
-                         :body (json/write-str (assoc body :model (model)) :escape-slash false)})
+                         :body (json/write-str (assoc body :model model) :escape-slash false)})
         parsed (json/read-str (:body resp) :key-fn keyword)]
     (when (<= 400 (:status resp))
       (throw (ex-info "LLM request failed" {:status (:status resp) :body parsed})))

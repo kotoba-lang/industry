@@ -1,0 +1,167 @@
+# Prometheus Configuration for Wave 5 M5-M6 Production Gates
+# Deploy target: monitoring-cluster
+# Status: PRODUCTION_READY
+# Deployment date: 2026-08-08
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'wave5-m5m6-gates'
+    environment: 'production'
+    region: 'asia-tokyo'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'localhost:9093'
+  alert_relabel_configs: []
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - 'rules/wave5-m5m6-alerts.yml'
+  - 'rules/wave5-sla-rules.yml'
+  - 'rules/gate-blocker-rules.yml'
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+  # Build times metrics (from CI API)
+  - job_name: 'ci-build-times'
+    scrape_interval: 15m
+    scrape_timeout: 30s
+    metrics_path: '/metrics'
+    scheme: 'https'
+    static_configs:
+      - targets: ['ci.internal:443']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'ci-api'
+      - source_labels: [__scheme__]
+        target_label: __param_scheme
+    params:
+      metric_type:
+        - 'build_times'
+    bearer_token_file: '/etc/prometheus/secrets/ci-api-token'
+    honor_timestamps: true
+    honor_labels: false
+
+  # Test coverage metrics (from CI artifacts)
+  - job_name: 'ci-test-coverage'
+    scrape_interval: 1h
+    scrape_timeout: 30s
+    metrics_path: '/metrics'
+    scheme: 'https'
+    static_configs:
+      - targets: ['ci.internal:443']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'ci-coverage'
+      - source_labels: [__scheme__]
+        target_label: __param_scheme
+    params:
+      metric_type:
+        - 'coverage'
+    bearer_token_file: '/etc/prometheus/secrets/ci-api-token'
+    honor_timestamps: true
+
+  # Deployment success metrics (from Kubernetes/CloudFlare)
+  - job_name: 'deployment-success'
+    scrape_interval: 1h
+    scrape_timeout: 30s
+    metrics_path: '/metrics'
+    scheme: 'https'
+    static_configs:
+      - targets: ['api.cloudflare.com:443']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'deployment-metrics'
+    bearer_token_file: '/etc/prometheus/secrets/cloudflare-api-token'
+    honor_timestamps: true
+
+  # Gate blockers (from Jira API)
+  - job_name: 'gate-blockers'
+    scrape_interval: 5m
+    scrape_timeout: 30s
+    metrics_path: '/metrics'
+    scheme: 'https'
+    static_configs:
+      - targets: ['jira.internal:443']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'jira-blockers'
+    params:
+      jql:
+        - 'project in (M5W5, M5IW5, M6W5) AND status = Blocked'
+    basic_auth:
+      username: 'gates-bot'
+      password_file: '/etc/prometheus/secrets/jira-api-token'
+    honor_timestamps: true
+
+  # Team velocity (from Jira burndown)
+  - job_name: 'team-velocity'
+    scrape_interval: 1h
+    scrape_timeout: 30s
+    metrics_path: '/metrics'
+    scheme: 'https'
+    static_configs:
+      - targets: ['jira.internal:443']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'jira-velocity'
+    params:
+      jql:
+        - 'project in (M5W5, M5IW5, M6W5) AND issuetype in (Story, Task)'
+    basic_auth:
+      username: 'gates-bot'
+      password_file: '/etc/prometheus/secrets/jira-api-token'
+    honor_timestamps: true
+
+  # Node Exporter (for infrastructure metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets:
+          - 'localhost:9100'
+          - 'monitoring-node-1:9100'
+          - 'monitoring-node-2:9100'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+
+# Remote write configuration (for long-term storage)
+remote_write:
+  - url: 'https://prometheus-backup.internal/api/v1/write'
+    queue_config:
+      capacity: 100000
+      max_shards: 200
+      min_shards: 1
+      max_samples_per_send: 500
+      batch_send_wait: 5s
+      min_backoff: 30ms
+      max_backoff: 100ms
+    write_relabel_configs:
+      - source_labels: [__name__]
+        regex: '(build_duration_seconds|code_coverage_percent|deployment_success_rate|blocker_count|velocity_.*)'
+        action: keep
+
+# Storage configuration
+storage:
+  tsdb:
+    path: /prometheus/data
+    retention: 30d
+    retention_size: '50GB'
+    max_block_duration: 31h
+    min_block_duration: 2h

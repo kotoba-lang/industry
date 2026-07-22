@@ -1,0 +1,50 @@
+# cloud-itonami-isic-5820 — in-house deploy manifest
+# Companion to ADR-2607199950. Live host: https://itonami-5820.etzhayyim.com
+# Owner directive: deploy WITHOUT Fly (fly は使わない前提).
+
+[service]
+name          = "cloud-itonami-isic-5820"
+domain        = "CRM / RevOps-LLM actor (Salesforce-replace, ISIC 5820)"
+runtime       = "jvm-clojure"
+entrypoint    = "clojure -M:dev:serve"
+http_port     = 8582
+api_token_ref = "kagi:ISIC5820_API_TOKEN (compartment=gftdcojp, read at launch — never baked)"
+store_file    = "~/.gftd/itonami-5820-store.edn   # durable FileStore (survives restarts)"
+
+[deploy]
+strategy             = "local-launchagent + cloudflared-named-tunnel"
+host                 = "macOS (junkawasaki) — in-house, no external compute account"
+launchagent_service  = "com.gftdcojp.itonami-5820-serve"
+launchagent_tunnel   = "com.gftdcojp.itonami-5820-tunnel"
+plist_source         = "~/.gftd/"
+boot_persistent_in   = "~/Library/LaunchAgents/   # both plists copied here for RunAtLoad"
+consistent_with      = "itonami-local pattern (every itonami routine is a macOS LaunchAgent)"
+
+[tunnel]
+name      = "itonami-5820"
+uuid      = "4962d03e-2499-4a04-b4ae-bfc6626e8bab"
+config    = "~/.gftd/itonami-5820-tunnel.yml"
+ingress   = "itonami-5820.etzhayyim.com -> http://localhost:8582"
+edge_zone = "etzhayyim.com (the cloudflared cert's zone)"
+
+[urls]
+base       = "https://itonami-5820.etzhayyim.com"
+health     = "/health"
+propose    = "/propose"
+approve    = "/approve"
+dashboard  = "/dashboard"
+
+[verification]
+as_of            = "2026-07-19"
+health           = "200 {\"status\":\"ok\",\"store\":\"reachable\"}"
+approve_roundtrip = "verified: /propose(dispute)→202 escalated→/approve→committed (thread cbb52c0a…)"
+boot_persistent  = true
+
+[alternatives_rejected]
+fly                 = "owner ruled out (fly は使わない前提)"
+cloudflare_containers = "open beta; JVM slow-startup + memory is a poor fit for serverless"
+murakumo_wasm_lattice = "5820 JVM (langgraph/http-kit/datomic) exceeds kotoba wasm subset maturity — needs platform advancement first"
+
+[next]
+dogfood = "seed the live store with the iter4 dogfood data (4 accounts / 5 deals). Account creation is store-level (not a governed op), so via ISIC5820_STORE_FILE seeding, not /propose."
+itonami_cloud_hostname = "follow-up: an itonami.cloud hostname needs cloudflared cert for that zone (different from etzhayyim.com) or wrangler-DNS management."

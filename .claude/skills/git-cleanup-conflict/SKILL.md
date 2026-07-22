@@ -47,8 +47,9 @@ you're confident is exactly the failure mode this note exists to catch.
   stop: leave the stash intact, inspect both the current diff and the stash patch
   before deciding.
 - Classify stashes/branches by **content containment** (do the added lines already
-  exist in current `main`?), not by patch-id or shallow ancestry — shallow clones give
-  false ancestry signals.
+  exist in current `main`?), not by patch-id — content containment is robust even
+  though local checkouts are full history now (shallow retired 2026-07-21,
+  ADR-2607211600).
 - **Push to GitHub alone is not done.** A repo that other west projects consume via
   `:local/root` (or that belongs under `orgs/<org>/<repo>`) must also land in
   `manifest/repos.edn` `:extra-projects` + `nbb scripts/gen-west-manifest.cljs --entry

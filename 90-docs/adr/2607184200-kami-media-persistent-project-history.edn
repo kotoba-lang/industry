@@ -1,0 +1,35 @@
+[{:db/id -1
+  :adr/id "adr-2607184200-kami-media-persistent-project-history"
+  :adr/title "KAMI media applications persist validated project history"
+  :adr/date "2026-07-18"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/topic "kotoba-lang-media-authoring"
+  :adr/supersedes ["adr-2607184100-kami-media-bounded-project-history"]
+  :adr/decision
+  {:shared {:recovery-envelope-version 2
+            :history-limit 50
+            :history-persistent true
+            :history-validation :every-project-entry
+            :legacy-v1-migration :empty-history
+            :settled-state-write :microtask
+            :redo-branch-survives-reload true
+            :runtime-state-excluded true}
+   :maturity {:kami-app-daw :逍遥 :kami-app-nle :逍遥}
+   :remaining-commercial-gates {:shared ["search paths" "portable packaged media" "duplicate-content policy"]
+                                :daw ["loop and comp recording" "input monitoring" "plugin hosting" "LUFS/true-peak"]
+                                :nle ["pointer trim gestures" "proxy/cache" "color management" "additional containers"]}}
+  :adr/implementation
+  {:daw-commits ["709edc7"]
+   :nle-commits ["b3a0d4a"]
+   :evidence ["DAW passes 10 tests and 35 assertions; NLE passes 10 tests and 36 assertions, including v1 migration, invalid-history rejection and recovery-time 50-generation clamping."
+              "Both guarded shadow-cljs production releases completed successfully."
+              "DAW Chrome recovered the undone persistent-one project and an enabled redo branch after reload, then redid to persistent-two without console errors."
+              "NLE Chrome recovered the undone master delivery profile and an enabled redo branch after reload, then redid to compact without console errors."
+              "Both GitHub Pages workflows completed tests, release compilation and deployment successfully."]}
+  :adr/consequences
+  ["Crash recovery now restores the editing position rather than only the visible project snapshot."
+   "Malformed or foreign-schema entries invalidate the complete history envelope instead of becoming latent failures during later undo."
+   "Deferred persistence reads the settled atom state, avoiding watch-order races between project mutation and history recording."
+   "History remains bounded to control browser storage growth; large portable projects and media packaging remain future work."]
+  :adr/source-format "edn"}]

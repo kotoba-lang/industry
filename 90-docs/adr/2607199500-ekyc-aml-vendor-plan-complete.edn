@@ -1,0 +1,98 @@
+[{:db/id -1
+  :adr/id "2607199500"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-19"
+  :adr/status :accepted
+  :adr/title "eKYC/AML vendor plan (Phase A-F) — complete, closing record"
+  :adr/scope [:kotoba-lang/mrz :kotoba-lang/watchlist-screen :kotoba-lang/face-liveness
+              :kotoba-lang/face-match :kotoba-lang/ekyc-native-provider
+              :cloud-itonami/cloud-itonami-isic-649]
+  :adr/related ["orgs/kotoba-lang/ekyc" "orgs/kotoba-lang/aml" "orgs/kotoba-lang/identity"
+                "orgs/gftdcojp/network-isekai" "orgs/cloud-itonami/cloud-itonami-isic-8291"]
+  :adr/references [2607198200 2607198500 2607198700 2607198900 2607199100 2607199300]
+  :adr/context
+  "This session's eKYC/AML effort started from a narrower question while
+   closing network-isekai's account-age-tier gap (that repo's own
+   ADR-0069): 'is there a real eKYC engine anywhere in kotoba-lang?' The
+   answer was no — kotoba-lang/ekyc and kotoba-lang/aml both existed
+   (R2-mature) but were, by their own docstrings, session/evidence-ledger
+   SUBSTRATES with zero verification engine behind them. The owner chose
+   to build a from-scratch verification engine in kotoba-lang rather than
+   contract a real accredited vendor (Onfido/Jumio/etc), with an explicit
+   safety constraint carried through every phase: never ship a component
+   that 'looks like it verifies but doesn't' — the false-confidence
+   failure mode that would make this effort actively harmful (enabling
+   real fraud/money-laundering, or exposing the owner to legal risk for
+   misrepresenting AML/KYC capability) rather than merely incomplete.
+
+   A pre-implementation planning pass (parallel Explore + Plan subagents)
+   scoped six phases, each independently landed, tested against real data
+   where real data existed, and honestly scoped down where it didn't:"
+  :adr/decision
+  "Phase A — kotoba-lang/mrz (ADR-2607198200). ICAO Doc 9303 MRZ decode +
+   checksum: REAL, verified against ICAO's own published TD3 worked
+   example. Optical (photo→text) capture: R1-experimental, no bundled
+   OCR-B template data (hand-authoring pixel data without a real font
+   pipeline would have been fake-looking-real data — the exact failure
+   mode this effort avoids).
+
+   Phase B — kotoba-lang/watchlist-screen (ADR-2607198500). Real OFAC SDN
+   List + UN Security Council Consolidated List data — fetched from the
+   ACTUAL LIVE government sources during development (19,169 + 1,010
+   entities), not reconstructed from memory. Real Jaro-Winkler
+   implementation, verified against Winkler's own published reference
+   vectors. EU Consolidated List: investigated and found to require a
+   registered access token (every unauthenticated fetch attempt returned
+   HTTP 500) — explicitly NOT implemented rather than guessed at.
+
+   Phase C — kotoba-lang/face-liveness (ADR-2607198700). Real, published,
+   peer-reviewed Eye Aspect Ratio algorithm (Soukupová & Čech 2016) for
+   challenge-response blink/turn/smile liveness detection, requiring a
+   genuine open→closed→open (etc) TRANSITION, not a single threshold
+   crossing (which a static photo could trivially satisfy). No bundled
+   face-landmark detector — the org has no vision-workload precedent
+   (kotoba-lang/inference is LLM-shaped only, explicitly rejecting
+   ONNX/TF.js/WebNN).
+
+   Phase D — kotoba-lang/face-match (ADR-2607198900). A DELIBERATE R0
+   stub: no face-embedding model, no comparison algorithm, always routes
+   to human review. The one component of the four engines with zero real
+   detection capability, by design — no legitimately portable open-weights
+   model + real benchmark data existed to build this responsibly.
+
+   Phase E — kotoba-lang/ekyc-native-provider (ADR-2607199100). The
+   composing ekyc.adapters.provider/IEkycProviderClient implementation,
+   genuinely wiring Phases A/C/D into kotoba-lang/ekyc's existing
+   substrate — surfaced and closed a real gap in ekyc's own abstraction
+   (no read-back protocol for evidence references) by defining
+   IEvidenceFetcher, mirroring every sibling engine's host-injection
+   pattern. Tested end-to-end against the same real ICAO fixture Phase A
+   uses.
+
+   Phase F — cloud-itonami-isic-649 (ADR-2607199300). A governed
+   langgraph-clj StateGraph actor consuming Phases A-E for real:
+   VerificationGovernor (3 HARD + 3 soft-escalate gates, including an
+   accreditation-claim-gate unique to this actor — its own honesty
+   backstop against claiming regulatory accreditation it does not hold),
+   real CACAO/did:key self-mint identity (ported from gftdcojp/
+   cloud-itonami), interrupt-before human-in-the-loop tested through
+   actual pause/resume. Deliberately does NOT use an LLM advisor (every
+   sibling cloud-itonami actor does) — an identity-verification verdict
+   should come from deterministic matching math, not language generation.
+
+   Aggregate: 6 new repos (5 kotoba-lang public MIT libraries + 1
+   cloud-itonami public AGPL actor), all registered in
+   manifest/repos.edn + manifest/west.yml + (for Phase F)
+   kotoba-lang/industry's registry. 136 tests / 327 assertions total across all six repos (19/71
+   mrz, 38/93 watchlist-screen, 24/40 face-liveness, 6/16 face-match,
+   11/17 ekyc-native-provider, 38/90 cloud-itonami-isic-649), 0 failures
+   anywhere, clj-kondo clean everywhere. Every repo's MATURITY.md enumerates its own real
+   capability boundary and honest gaps rather than letting a later reader
+   assume more was closed than actually was."
+  :adr/consequences
+  ["A concrete, working, tested, end-to-end proof exists that 'kotoba-lang has no eKYC engine' is no longer true for the specific, honestly-scoped slice this session built: ICAO-document checksum validation, real government sanctions-list screening, challenge-response liveness detection, and the governed actor wiring them together."
+   "Every remaining gap is explicit and documented at the point closest to a reader, not buried: no real accredited-vendor contract, no bundled OCR-B templates/face-landmark-detector/face-embedding-model, no EU sanctions source, no PEP data source, no live kotobase.net deployment, no DatomicStore backend, no real Privacy Policy/ToS (docs/legal/data-handling.md's [CONFIRM: ...] markers). None of these are silently implied solved by 'Phase F integrating everything.'"
+   "The accreditation-claim-gate + kyc-actor.api's disclosures block are a structural (not documentation-only) guarantee that no code path in this pipeline can represent itself as licensed/accredited — deliberately load-bearing for a domain where that distinction carries real legal weight."
+   "This closing ADR does not amend or supersede any of ADR-2607198200/198500/198700/198900/199100/199300 — each remains independently accurate as written; this is a new node referencing all six, not a correction to any of them."
+   "Not deployed, not operated as a real business, not legally reviewed — this is engineering completion of a defined scope, not a claim that cloud-itonami-isic-649 is ready to onboard a real customer."]}]

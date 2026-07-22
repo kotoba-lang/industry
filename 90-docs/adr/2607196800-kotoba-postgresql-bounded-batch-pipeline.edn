@@ -1,0 +1,73 @@
+[{:db/id -1
+  :adr/id "adr-2607196800-kotoba-postgresql-bounded-batch-pipeline"
+  :adr/title "ADR-2607196800: Bounded PostgreSQL extended batch pipeline"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-19"
+  :adr/last-verified "2026-07-19"
+  :adr/last_verified "2026-07-19"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-wide-cljc-to-kotoba-source-migration"
+  :adr/authoritative-for ["PostgreSQL bounded single-Sync batch pipeline"]
+  :adr/related
+  ["orgs/kotoba-lang/kotoba/providers/db_transport.kotoba"
+   "orgs/kotoba-lang/kotoba/providers/pg_batch_consumer.kotoba"
+   "orgs/kotoba-lang/kototama/src/kototama/linker.clj"
+   "orgs/kotoba-lang/kototama/test/kototama/postgresql_interop.clj"]
+  :adr/supersedes ["adr-2607196700-kotoba-postgresql-bounded-copy"]
+  :adr/superseded-by []
+  :adr/decision-summary
+  {:operation "pg_execute_batch"
+   :limits {:items 8 :descriptor-bytes 8192
+            :parameter-fragment-bytes-each 4096}
+   :frontend-sequence [[:bind :execute]* :sync]
+   :item {:statement-name :validated-named
+          :parameters :typed-bounded-bind-fragment}
+   :success {:bind-complete-per-item true :command-complete-per-item true}
+   :error {:postgresql-ignore-until-sync true :typed-sqlstate true
+           :ready-for-query-required true :session-recovery-proved true}
+   :released-server {:product :postgresql :version "14.19"
+                     :success-items 2 :rows [42 42]
+                     :error-item 2 :error-sqlstate "22012"
+                     :third-item-ignored-until-sync true :recovered true}
+   :executable-evidence
+   [{:cwd "orgs/kotoba-lang/kototama"
+     :command "clojure -M:postgresql-interop"
+     :result "2-item single-Sync success; mid-batch 22012; recovery; exit 0"}
+    {:cwd "orgs/kotoba-lang/kototama"
+     :command "clojure -M:test"
+     :result "descriptor count/truncation/limit negative fixtures; exit 0"}]}
+  :adr/body
+  "# ADR-2607196800: Bounded PostgreSQL extended batch pipeline
+
+**Status**: accepted
+**Date**: 2026-07-19
+
+## Decision
+
+`pg_execute_batch` accepts a bounded descriptor containing up to eight named
+statements and their independently validated typed parameter fragments. The
+provider reconstructs one Bind and Execute pair per item and emits exactly one
+Sync after the final item. Consumers cannot inject arbitrary frontend message
+types or additional Sync boundaries through the descriptor.
+
+On success, the response must contain one BindComplete and one CommandComplete
+per item and terminate at ReadyForQuery. PostgreSQL's error-until-Sync behavior
+is preserved: an ErrorResponse may terminate the remaining item responses, but
+must carry bounded SQLSTATE metadata and be followed by ReadyForQuery before
+the session is reused. Descriptor count, name, parameter fragment, aggregate
+length and exact exhaustion are checked before the first write.
+
+## Evidence
+
+Released PostgreSQL 14.19 qualification executes two prepared `select 42`
+statements through one Sync and observes two rows. A three-item batch succeeds
+on item one, fails with `22012` on item two, proves item three is ignored until
+Sync, then successfully executes a new batch on the same affine session.
+
+This closes the bounded single-connection batch pipeline slice. Cross-session
+multiplexing, connection pooling, rotation, compatibility matrices and soak
+remain open."}]

@@ -50,7 +50,28 @@
               (and (not versioning-says-open?) cov-says-resolved?)
               {:score 1.0 :note "confirmed fixed: versioning.md no longer says 'open M5 gap' and coverage.edn still says resolved -- matches the fix landed in kotobase PR #6 (2026-07-16). This check now guards against the inconsistency silently reappearing (e.g. a future edit reverting versioning.md's wording), not against the original bug."}
               :else
-              {:score 0.6 :note "one or both of the expected strings ('open M5 gap' in versioning.md, 'Resolved 2026-07-08' in coverage.edn) no longer found verbatim -- wording changed on at least one side; re-verify by hand whether the underlying inconsistency (if any) still exists."})))}])
+              {:score 0.6 :note "one or both of the expected strings ('open M5 gap' in versioning.md, 'Resolved 2026-07-08' in coverage.edn) no longer found verbatim -- wording changed on at least one side; re-verify by hand whether the underlying inconsistency (if any) still exists."})))}
+
+   ;; 2026-07-20 weekly claim-discovery addition. The code-graph module (added 2026-07-14)
+   ;; self-discloses that CID/content-addressing alone confers no authority -- checking that
+   ;; both the README prose AND the module's own docstrings still carry this caveat, not just
+   ;; one or the other.
+   {:claim :claim/kotobase-code-graph-cid-not-authority :axis :axis/safety-enforcement :layer :lint
+    :fn (fn []
+          (if (exists? "src/kotobase/code_graph.cljc")
+            (let [readme (slurp* "README.md")
+                  code (slurp* "src/kotobase/code_graph.cljc")
+                  readme-caveat? (has? readme #"CID possession is never authority")
+                  code-caveat? (and (has? code #"never grants authority by itself")
+                                     (has? code #"not authority"))]
+              (cond
+                (and readme-caveat? code-caveat?)
+                {:score 1.0 :note "confirmed: README.md still states 'CID possession is never authority' verbatim, and src/kotobase/code_graph.cljc's own docstrings (put-execution-receipt!, pin-root!) still echo the same authority-scope limit -- disclosed at both the doc and source layer, not just prose."}
+                readme-caveat?
+                {:score 0.5 :note "README still carries the 'CID possession is never authority' caveat, but the matching docstring language ('never grants authority by itself' / 'not authority') no longer found verbatim in code_graph.cljc -- re-verify whether the code-level disclosure moved or was dropped."}
+                :else
+                {:score 0.3 :note "expected 'CID possession is never authority' text no longer found verbatim in README.md -- re-verify whether the caveat was reworded or silently dropped while the underlying authorization-scope limitation still applies."}))
+            {:score 0.0 :note "src/kotobase/code_graph.cljc no longer exists -- claim's cited source file is gone; re-verify."}))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

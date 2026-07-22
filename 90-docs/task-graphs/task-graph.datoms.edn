@@ -1,0 +1,60 @@
+;; 90-docs/task-graphs/task-graph.datoms.edn — base catalog of task-dependency
+;; graphs ("workflows"), DataScript/Datomic-transactable tx-data (same shape
+;; as 90-docs/adr/*.edn). This file declares TOPOLOGY ONLY (workflow ids,
+;; task ids, :task/requires edges) — it is never hand-rewritten to reflect
+;; progress. Progress (started/completed/blocked) is recorded as append-only
+;; events in 90-docs/task-graphs/task-graph-ledger.edn (via
+;; scripts/task-graph-ledger-append.cljs) and PROJECTED against this base by
+;; scripts/task-graph-query.cljs's `ready-tasks` — the same
+;; base-file+append-only-ledger split used by 90-docs/adr-ledger/adr-ledger.edn
+;; and 90-docs/business/canvas-ledger.edn, for the same reason (DataScript has
+;; no as-of/history API; re-parsing a hand-edited base loses the trail).
+;; See ADR-2607202800.
+;;
+;; Adding a new workflow: append a new :workflow/id block + its :task/id
+;; entries to this vector (this file itself IS append-friendly at the
+;; workflow granularity — only *existing* entries must not be rewritten).
+;; :task/requires lists sibling :task/id strings within the same workflow.
+
+[{:db/id -1
+  :workflow/id "kotoba-github-linguist-recognition"
+  :workflow/title "kotoba-lang/kotoba を GitHub Linguist に言語として認識させる"
+  :workflow/created "2026-07-20"
+  :workflow/owner "Jun Kawasaki"}
+
+ {:db/id -2
+  :task/id "A-gitattributes-alias"
+  :task/workflow "kotoba-github-linguist-recognition"
+  :task/title "*.kotoba を .gitattributes で linguist-language=Clojure にエイリアスし、言語バー集計とハイライトを即時に得る"
+  :task/kind "config-change"
+  :task/repo "kotoba-lang/kotoba"
+  :task/requires []
+  :task/external-gate false}
+
+ {:db/id -3
+  :task/id "G-grammar-repo"
+  :task/workflow "kotoba-github-linguist-recognition"
+  :task/title "kotoba 専用の TextMate/tree-sitter grammar を独立リポジトリとして切り出す"
+  :task/kind "new-repo-scaffold"
+  :task/repo "kotoba-lang/kotoba-syntax"
+  :task/requires []
+  :task/external-gate false}
+
+ {:db/id -4
+  :task/id "E-editor-extension"
+  :task/workflow "kotoba-github-linguist-recognition"
+  :task/title "G の grammar を使う VS Code 拡張などエディタ向けシンタックスハイライトを整備する"
+  :task/kind "editor-extension"
+  :task/repo "kotoba-lang/kotoba-syntax"
+  :task/requires ["G-grammar-repo"]
+  :task/external-gate false}
+
+ {:db/id -5
+  :task/id "B-linguist-upstream-pr"
+  :task/workflow "kotoba-github-linguist-recognition"
+  :task/title "github-linguist/linguist の languages.yml + grammars.yml + samples に Kotoba を登録する PR を送る"
+  :task/kind "upstream-pr"
+  :task/repo "github-linguist/linguist"
+  :task/requires ["G-grammar-repo"]
+  :task/external-gate true
+  :task/gate-reason "第三者OSSへの公開PR。かつ linguist は複数の独立リポジトでの実利用実績を要求するため、G単体の完了だけでは着手可能にならない（外生条件）。"}]

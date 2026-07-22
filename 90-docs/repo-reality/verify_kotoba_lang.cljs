@@ -70,7 +70,46 @@
               registry-wired?
               {:score 0.3 :note "docs still say registry/:packages is deferred, but cli.cljc now has a \"registry\" string literal -- possible the CLI landed and docs are now STALE; re-verify by hand whether this is a real subcommand."}
               :else
-              {:score 1.0 :note "confirmed: docs still describe :packages/registry as deferred/out-of-scope, and cli.cljc has no \"registry\" subcommand -- disclosed gap matches the code exactly, i.e. this is an honestly-reported incompleteness, not silent drift."})))}])
+              {:score 1.0 :note "confirmed: docs still describe :packages/registry as deferred/out-of-scope, and cli.cljc has no \"registry\" subcommand -- disclosed gap matches the code exactly, i.e. this is an honestly-reported incompleteness, not silent drift."})))}
+
+   ;; 2026-07-20 weekly claim-discovery addition.
+   {:claim :claim/kotoba-lang-stdlib-below-1-0 :axis :axis/doc-code-drift :layer :lint
+    :fn (fn []
+          (let [cov (slurp* "docs/lang/coverage.edn")
+                versions (re-seq #":version \"([^\"]*)\"" cov)
+                not-0-1-0 (remove #(= "0.1.0" (second %)) versions)]
+            (cond
+              (not (has? cov #":one-zero\s+\{:status :not-yet"))
+              {:score 0.4 :note "expected ':one-zero {:status :not-yet ...}' no longer found verbatim in coverage.edn's :engineering-gaps -- either 1.0 cuts started (check :version values below) or the gap-tracking shape changed; re-verify by hand."}
+              (empty? not-0-1-0)
+              {:score 1.0 :note (str "confirmed: :one-zero is still :not-yet in coverage.edn, and all " (count versions) " :version entries in the stdlib catalog are still literally \"0.1.0\" -- the self-disclosed pre-1.0 status matches the actual per-lib version data, not just prose.")}
+              :else
+              {:score 0.6 :note (str "coverage.edn still discloses :one-zero :not-yet, but " (count not-0-1-0) "/" (count versions) " :version entries are no longer \"0.1.0\" -- at least one lib may have cut 1.0 already; re-verify which one(s) and whether :one-zero's :note needs updating.")})))}
+
+   {:claim :claim/kotoba-lang-kotobase-security-legacy-public :axis :axis/safety-enforcement :layer :lint
+    :fn (fn []
+          (if (exists? "docs/adr/ADR-kotobase-security-access-control.md")
+            (let [adr (slurp* "docs/adr/ADR-kotobase-security-access-control.md")]
+              (if (and (has? adr #"legacy-public.*remains the only configured deployment mode")
+                       (has? adr #"S5-auditable"))
+                {:score 1.0 :note "confirmed: the ADR's status line still says 'legacy-public remains the only configured deployment mode', and the full S0-S5 conformance ladder (through S5-auditable) is still defined -- the gap between what the code paths implement and what production may actually claim is still disclosed, not silently narrowed."}
+                {:score 0.4 :note "expected 'legacy-public remains the only configured deployment mode' language or the S5-auditable ladder tier no longer found verbatim -- either a higher deployment mode was adopted (re-verify, would be real progress) or the ADR was restructured; re-verify by hand."}))
+            {:score 0.0 :note "docs/adr/ADR-kotobase-security-access-control.md no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   {:claim :claim/kotoba-lang-q9-fleet-migration-unauthorized :axis :axis/production-readiness :layer :lint
+    :fn (fn []
+          (if (exists? "lang/q9-migration.edn")
+            (let [readme (slurp* "README.md")
+                  q9 (slurp* "lang/q9-migration.edn")
+                  not-authorized-count (count (re-seq #":status :not-authorized" q9))]
+              (cond
+                (not (has? readme #"Q9 is now authorized only for bounded Wave 1"))
+                {:score 0.4 :note "expected 'Q9 is now authorized only for bounded Wave 1' no longer found verbatim in README.md -- authorization scope may have widened (re-verify lang/q9-migration.edn's :status values) or wording changed; re-verify by hand."}
+                (< not-authorized-count 4)
+                {:score 0.6 :note (str "README still discloses Wave-1-only authorization, but only " not-authorized-count "/4 expected ':status :not-authorized' waves remain in lang/q9-migration.edn -- some later wave may have been authorized; re-verify which one(s).")}
+                :else
+                {:score 1.0 :note (str "confirmed: README still discloses Q9 as authorized only for bounded Wave 1, and lang/q9-migration.edn still marks " not-authorized-count " waves ':status :not-authorized' -- disclosed scope limit matches the migration-tracking data, not just prose.")}))
+            {:score 0.0 :note "lang/q9-migration.edn no longer exists -- claim's cited source file is gone; re-verify."}))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

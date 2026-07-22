@@ -79,8 +79,20 @@
   (let [{:keys [blob]} (classify v)]
     (if blob (pr-str v) v)))
 
+(defn safe-name
+  "EDN keyword name は先頭数字不可（nbb/cljs の edn reader が拒否する。実例:
+   manifest/schema.edn に紛れ込んだ不正 ident :adr/5、2026-07-18 修正）。
+   不正文字は - に潰す。manifest/docs-edn-only.cljs の同名関数と同じ規約。"
+  [s]
+  (let [n (-> (str s)
+              (str/replace #"[^A-Za-z0-9*+!\-_\'.?]" "-")
+              (str/replace #"^-+" ""))]
+    (if (re-matches #"[0-9].*" n) (str "n-" n) n)))
+
 (defn namespaced-key [ns-name k]
-  (keyword ns-name (name k)))
+  (if (and (keyword? k) (namespace k))
+    (keyword (namespace k) (safe-name (name k)))
+    (keyword ns-name (safe-name (name k)))))
 
 (defn entity-from-map
   "トップレベル map の各キーに ns-name の名前空間を付け、:db/id を足した 1 entity にする。"

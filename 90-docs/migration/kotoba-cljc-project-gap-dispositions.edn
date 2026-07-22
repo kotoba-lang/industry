@@ -1,0 +1,1310 @@
+{:schema "kotoba-cljc-project-gap-dispositions/v1"
+ :generated-on "2026-07-22"
+ :basis
+ {:project-probes "90-docs/migration/kotoba-cljc-project-probes.json"
+  :project-probes-sha256 "41a808c1409132b67ce0db4fe88a26a6e9b860162dc3cbd910c0322bacba87cf"
+  :installed-release "0.6.29"
+  :release-candidate nil
+  :targets [:web :wasm]}
+ :fleet-progress
+ {:security-dispositions "90-docs/migration/kotoba-cljc-security-dispositions.json"
+  :security-remediations "90-docs/migration/kotoba-cljc-security-remediations.edn"
+  :host-boundary-remediations "90-docs/migration/kotoba-cljc-host-boundary-remediations.edn"
+  :security-paths-reviewed 82
+  :security-unique-contents-reviewed 82
+  :dynamic-resolution-host-boundaries-generated 69
+  :dynamic-resolution-locally-stale-merged 68
+  :dynamic-resolution-locally-stale-removed 1
+  :dynamic-resolution-host-boundaries-remaining 0
+  :dynamic-resolution-host-boundary-paths-merged 82
+  :remote-main-ambient-authority-followup {:scope "com-junkawasaki/root tracked .cljc"
+                                            :callsites 0
+                                            :paths 0
+                                            :status :closed}
+  :security-direct-migrations-authorized 0
+  :bounded-reader-remediations
+  {:planned-unique-contents 9
+   :merged-implementations 8
+   :removed-upstream 1
+   :remaining 0
+   :evidence
+   [{:repository "orgs/gftdcojp/cloud-itonami"
+     :paths ["src/cloud_itonami/tick.cljc"
+             "src/cloud_itonami/kotoba.cljc"]
+     :change :replace-core-read-string-with-portable-edn-reader
+     :reader-eval-regressions 2
+     :test-command "clojure -Sdeps '{:paths [\"src\" \"resources\" \"test\"]}' -M:local -e <focused-runner>"
+     :test-result {:tests 20 :assertions 80 :failures 0 :errors 0}
+     :status :merged
+     :pr "https://github.com/gftdcojp/cloud-itonami/pull/457"
+     :merge-commit "971ff8ec348714987100802cda4b9263f7702ac5"}]}
+  :remaining-unique-content-clusters 9489}
+ :policy
+ {:ambient-authority false
+  :general-higher-order-callback-lowering false
+  :silent-domain-narrowing false
+  :migration-requires-owner-authorization true}
+ :dispositions
+ [{:root "orgs/kotoba-lang/kotoba-lang/lang/conformance/namespace_priority/main.cljc"
+   :repository "orgs/kotoba-lang/kotoba-lang"
+   :kind :retain-cljc-conformance-oracle
+   :review-status :reviewed
+   :migration-authorized false
+   :reason "Parameterized main is test input for namespace/source priority, not a zero-arity runtime entry point."
+   :canonical-kotoba-counterpart "orgs/kotoba-lang/kotoba-lang/lang/migration-pilots/demo-util.kotoba"
+   :language-change :none
+   :next-action :retain-through-cutover}
+  {:root "orgs/kotoba-lang/crdt/src/kotoba/crdt/register.cljc"
+   :repository "orgs/kotoba-lang/crdt"
+   :kind :typed-source-refactor
+   :review-status :clock-register-doc-orset-profiles-released-awaiting-consumer-authorization
+   :migration-authorized false
+   :rejected-form "(update clock :crdt/counter inc)"
+   :required-design
+   [:bounded-nominal-clock-and-register
+    :explicit-i64-counter-arithmetic
+    :explicit-comparable-actor-contract]
+   :forbidden-shortcut :admit-unbounded-update-callback
+   :safety-note "The existing API accepts any comparable actor id; migration must not silently narrow that domain or change its deterministic total order."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/crdt/pull/1"
+    :commit "ae7630295b35694c32a925e89c3cfb105c4e6538"
+    :register-pr "https://github.com/kotoba-lang/crdt/pull/2"
+    :register-commit "d99da793236020bcfc304f5a0a2ae12cf3905fab"
+    :doc-orset-gap-pr "https://github.com/kotoba-lang/crdt/pull/3"
+    :doc-orset-gap-commit "fc4f37eb9721e4fc4016e653794e36cca5bd48a2"
+    :doc-orset-disposition :retain-cljc-pending-consumer-domain-authorization
+    :typed-map-compiler-pr "https://github.com/kotoba-lang/compiler/pull/100"
+    :typed-map-compiler-commit "94f29b24cdf5c5aa92b35cf2dd41c1d56b8205c1"
+    :typed-map-kotoba-script-prs
+    ["https://github.com/kotoba-lang/kotoba-script/pull/23"
+     "https://github.com/kotoba-lang/kotoba-script/pull/24"
+     "https://github.com/kotoba-lang/kotoba-script/pull/25"]
+    :typed-map-status :merged-released-and-three-backend-qualified
+    :typed-map-entry-limit 31
+    :crdt-profile-pr "https://github.com/kotoba-lang/crdt/pull/4"
+    :crdt-profile-commit "a6dbfec7db4b0b61dcd54c450ab3b4add079874e"
+    :crdt-installed-evidence-pr "https://github.com/kotoba-lang/crdt/pull/5"
+    :crdt-installed-evidence-commit "fd5ac3214a6fa6eaa23a49488853cbf5ccf0f78b"
+    :orset-profile :kotoba.crdt/orset-i64-v1
+    :document-profile :kotoba.crdt/string-document-v1
+    :orset-project-digest "8aad8ed7dfab36a8963cadbe8ceb6c7d57c940a63e4863d0af8b9d102fc581c4"
+    :document-project-digest "a52d176a09e3a2cff80841f329610508f7e4c47e203e7fade5ce0cc4d4eebdac"
+    :crdt-local-runtime {:web-main 42 :wasm-main 42}
+    :installed-release "v0.6.29"
+    :installed-orset {:web-main 42
+                      :wasm-emitted true
+                      :project-digest "ad3797797db781f4922d3e3d7426c2b121c746f21ee2db7e0f89afe3a90524f0"}
+    :installed-document {:web-main 42
+                         :wasm-emitted true
+                         :project-digest "91247e64a340aeb231f956ac5ecf4a78f8c013bfe885935360f3d1ea36a1d99c"}
+    :register-profile :kotoba.crdt.register/string-v1
+    :actor-profile :kotoba.crdt.actor/registry-i64-v1
+    :legacy-unmapped-domain-retained true
+    :web {:status :installed-release-qualified :runtime-main 42}
+    :wasm {:status :installed-release-qualified :runtime-main 42}}
+   :next-action :obtain-consumer-domain-mapping-authorization-before-cutover}
+  {:root "orgs/kotoba-lang/lab/src/kotoba/lab/verification_check.cljc"
+   :repository "orgs/kotoba-lang/lab"
+   :kind :typed-source-refactor
+   :review-status :consumer-cutover-complete
+   :migration-authorized true
+   :rejected-form "(every? (fn [[k v]] (= v (get environment k))) required-environment)"
+   :required-design
+   [:bounded-environment-record
+    :bounded-contract-coverage-set
+    :explicit-validation-operations]
+   :forbidden-shortcuts
+   [:admit-unbounded-every-callback
+    :admit-unbounded-map-destructuring]
+   :implementation
+   {:compiler-pr "https://github.com/kotoba-lang/compiler/pull/97"
+    :compiler-follow-up-pr "https://github.com/kotoba-lang/compiler/pull/98"
+    :compiler-status :merged
+    :kotoba-pr "https://github.com/kotoba-lang/kotoba/pull/372"
+    :kotoba-tag "v0.6.27"
+    :migration-pr "https://github.com/kotoba-lang/lab/pull/1"
+    :migration-commit "5c8d22dc58cc870d3ad33d7c2f7172092dbe57b6"
+    :consumer-cutover-pr "https://github.com/kotoba-lang/lab/pull/2"
+    :consumer-cutover-commit "f3cb9fd2255fe673b9c300f1dbed6ed089d0cf3f"
+    :active-contract "src/kotoba/lab/verification.kotoba"
+    :active-conformance "test/kotoba/lab/verification_conformance.kotoba"
+    :legacy-role :semantic-oracle
+    :external-workspace-consumers 0
+    :installed-release "v0.6.29"
+    :web {:status :installed-release-qualified :runtime-main 42}
+    :wasm {:status :installed-release-qualified :runtime-main 42}}
+   :next-action :retain-cljc-oracle-through-fleet-cutover}
+  {:root "orgs/kotoba-lang/fsm/src/kotoba/fsm.cljc"
+   :repository "orgs/kotoba-lang/fsm"
+   :kind :bounded-profile-split
+   :review-status :bounded-player-profile-merged
+   :migration-authorized true
+   :migration-scope :kami.fsm/player-v1
+   :legacy-domain :generic-edn-fsm
+   :safety-note "The generic map-driven FSM is not reinterpreted as the closed player state/event profile."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/fsm/pull/1"
+    :commit "2bb3226d22eeb71b5fce3103f9767727ea8f252a"
+    :implementation "src/kami/fsm.kotoba"
+    :facade "src/kotoba/fsm.kotoba"
+    :conformance "test/kotoba/fsm_conformance.kotoba"
+    :installed-release "v0.6.29"
+    :project-digest "77dd631d462c0b7e3f8dad33d8eee00b6337f5b26e41efeb8c1a35adade6cf40"
+    :reference-main 42 :web-main 42 :wasm-main 42
+    :required-capabilities []
+    :legacy-tests {:tests 1 :assertions 5 :failures 0 :errors 0}
+    :hosted-ci :passed}
+   :next-action :migrate-only-consumers-that-select-player-v1}
+  {:root "orgs/kotoba-lang/org-iso-h264/src/h264/expgolomb.cljc"
+   :repository "orgs/kotoba-lang/org-iso-h264"
+   :kind :bounded-profile-split
+   :review-status :bounded-exp-golomb-and-baseline-sps-profile-merged
+   :migration-authorized true
+   :migration-scope :h264.sps/baseline-poc0-or-2-bounded-v1
+   :legacy-domain :fuller-h264-reader-writer-and-high-profile-parser
+   :safety-note "The bounded Kotoba parser does not claim high-profile scaling lists, POC type 1, or the mutable encode surface; those remain in the CLJC oracle."
+   :implementation
+   {:compiler-pr "https://github.com/kotoba-lang/compiler/pull/112"
+    :compiler-commit "bef32b78852212bc096849d1ff9779c8afae4796"
+    :typed-wasm-abi 2
+    :h264-pr "https://github.com/kotoba-lang/org-iso-h264/pull/2"
+    :h264-commit "ec68ba3e6270dd2cc47a84dc8c0da48fe720790f"
+    :implementation "src/h264/expgolomb.kotoba"
+    :consumer "src/h264/sps.kotoba"
+    :conformance ["test/h264/expgolomb_conformance.kotoba"
+                  "test/h264/sps_conformance.kotoba"]
+    :compiler-tests {:tests 289 :assertions 3825 :failures 0 :errors 0}
+    :legacy-tests {:tests 116 :assertions 910 :failures 0 :errors 0}
+    :expgolomb-project-digest "db67ea49044f581338477cd94f6b0cdb228a8d5ebc4305d6915b4c46332fa665"
+    :sps-project-digest "74c36162c913045bca8dfcad229bb21ca98d572a3231defad1b2b698811b7836"
+    :reference-main 42 :web-main 42 :wasm-main 42
+    :required-capabilities [] :hosted-ci :passed}
+   :next-action :migrate-only-baseline-poc0-or-2-consumers}
+  {:root "orgs/kotoba-lang/org-iso-h264/src/h264/rbsp.cljc"
+   :repository "orgs/kotoba-lang/org-iso-h264"
+   :kind :bounded-profile-split
+   :review-status :bounded-ebsp-to-rbsp-profile-merged
+   :migration-authorized true
+   :migration-scope :h264.rbsp/canonical-ebsp-bounded-v1
+   :legacy-domain :general-nal-and-bitstream-processing
+   :safety-note "The Kotoba transform accepts at most 128 bytes, validates every byte and canonical emulation-prevention sequence, and does not claim general NAL mutation or high-profile decoding."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/org-iso-h264/pull/3"
+    :commit "0939fb5695747457dadf3473544c2f066e6913ef"
+    :implementation "src/h264/rbsp.kotoba"
+    :consumer "src/h264/sps.kotoba"
+    :conformance "test/h264/sps_conformance.kotoba"
+    :maximum-nal-bytes 128
+    :actual-avcc-sps-bytes 23
+    :project-digest "5f5642fd47cc32fbe84259b472fa1ed1bda2eac68d35d53fa144332af2a8121b"
+    :web-artifact-sha256 "038b55096fff0ee5ddb6ca79d8076169aa61112294fa033faf49991157c3ec3e"
+    :wasm-artifact-sha256 "f978aec1bc1286958433c0aa26a7b48e3ba77e73d712778841fcf0c5c22cfdf6"
+    :legacy-tests {:tests 116 :assertions 910 :failures 0 :errors 0}
+    :reference-main 42 :web-main 42 :wasm-main 42
+    :required-capabilities [] :hosted-ci :passed}
+   :next-action :migrate-only-consumers-that-select-canonical-bounded-ebsp}
+  {:root "orgs/kotoba-lang/calendar/src/calendar/validate.cljc"
+   :repository "orgs/kotoba-lang/calendar"
+   :kind :bounded-profile-split
+   :review-status :bounded-calendar-profile-merged
+   :migration-authorized true
+   :migration-scope :calendar/bounded-events-v1
+   :legacy-domain :open-calendar-map-with-iso-strings-and-resource-data
+   :safety-note "Keyword IDs and i64 time coordinates are an explicit bounded profile; arbitrary ISO strings, titles, attendees, and resource links remain in CLJC."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/calendar/pull/1"
+    :commit "9470229ee056442b234d8a276fe7f57e3549f89d"
+    :limit-enforcement-pr "https://github.com/kotoba-lang/calendar/pull/2"
+    :limit-enforcement-commit "734bd82766452a0722c565fa0846a49bc1d35bb2"
+    :model "src/calendar/model.kotoba"
+    :validation "src/calendar/validate.kotoba"
+    :conformance "test/calendar/conformance.kotoba"
+    :compiler-commit "bef32b78852212bc096849d1ff9779c8afae4796"
+    :maximum-events 8
+    :project-digest "38ad522902ae1cb940f7c17a0ac6065ded1dce2ef71cb19188460840a440121f"
+    :reference-main 42 :web-main 42 :wasm-main 42
+    :required-capabilities []
+    :legacy-tests {:tests 1 :assertions 3 :failures 0 :errors 0}
+    :hosted-ci-runs 4 :hosted-ci :passed}
+   :next-action :migrate-only-consumers-that-select-bounded-events-v1}
+  {:root "orgs/kotoba-lang/drive/src/drive/validate.cljc"
+   :repository "orgs/kotoba-lang/drive"
+   :kind :bounded-profile-split
+   :review-status :bounded-drive-tree-profile-merged
+   :migration-authorized true
+   :migration-scope :drive/bounded-tree-v1
+   :legacy-domain :open-drive-map-with-titles-object-references-and-media-types
+   :safety-note "The eight-item nominal tree is the largest currently demonstrated negative-boundary fixture under the compiler's 64-node value admission limit; larger open drive data remains in CLJC."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/drive/pull/1"
+    :commit "06fd2c9836477258f6977af3cd1450f7258b8c58"
+    :model "src/drive/bounded.kotoba"
+    :validation "src/drive/bounded_validate.kotoba"
+    :conformance "test/drive/bounded_conformance.kotoba"
+    :compiler-commit "bef32b78852212bc096849d1ff9779c8afae4796"
+    :maximum-items 8
+    :project-digest "a2a58d821b704fe14f6858d32a84520184ca47d569c22ecd7bd82ce9fd11a217"
+    :reference-main 42 :web-main 42 :wasm-main 42
+    :required-capabilities []
+    :legacy-tests {:tests 1 :assertions 2 :failures 0 :errors 0}
+    :hosted-ci-runs 4 :hosted-ci :passed}
+   :next-action :migrate-only-consumers-that-select-bounded-tree-v1}
+  {:root "orgs/kotoba-lang/org-iso-isobmff/src/isobmff/box.cljc"
+   :repository "orgs/kotoba-lang/org-iso-isobmff"
+   :kind :bounded-profile-split
+   :review-status :bounded-top-level-and-first-track-avcc-profile-merged
+   :migration-authorized true
+   :migration-scope :isobmff/bounded-top-level-box-v1
+   :legacy-domain :recursive-isobmff-tree-metadata-demux-mux-and-remux
+   :safety-note "The Kotoba parser owns bounded top-level framing plus explicit first-trak avc1/avcC Baseline-SPS and ftyp/meta/iprp/ipco/ispe profiles; general recursive trees, multi-track selection, sample tables, optional metadata selection, and media transforms remain in CLJC."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/org-iso-isobmff/pull/1"
+    :commit "4ba85338da09ba11366c0a21a9fe5d15d37f0d64"
+    :parser "src/isobmff/bounded_box.kotoba"
+    :conformance "test/isobmff/bounded_box_conformance.kotoba"
+    :binary-input-compiler-pr "https://github.com/kotoba-lang/compiler/pull/114"
+    :compiler-pr "https://github.com/kotoba-lang/compiler/pull/115"
+    :compiler-commit "b3a29de4d0e525e6bacd4b66dafc755a2f68536e"
+    :kotoba-script-pr "https://github.com/kotoba-lang/kotoba-script/pull/27"
+    :kotoba-script-commit "777d122019b2baa192c2b2ae1ea974c541338688"
+    :maximum-input-bytes 16384 :maximum-top-level-boxes 32
+    :project-digest "671b33fc637754fd53d618e77f7f85692082f749d336a89d0b84e6ffdb0889e3"
+    :reference-main 42 :web-main 42 :wasm-main 42
+    :fixture-check 42 :required-capabilities []
+    :legacy-tests {:tests 8 :assertions 80 :failures 0 :errors 0}
+    :hosted-ci :passed}
+   :integration-pr "https://github.com/kotoba-lang/org-iso-isobmff/pull/2"
+   :integration-commit "c05964225b2a7b3f99ff7d967da7007b2b7d49d1"
+   :cross-repository-parser "src/isobmff/avc_sps.kotoba"
+   :cross-repository-dependency-commit "0939fb5695747457dadf3473544c2f066e6913ef"
+   :compiler-multiple-source-roots-pr "https://github.com/kotoba-lang/compiler/pull/115"
+   :compiler-commit "b3a29de4d0e525e6bacd4b66dafc755a2f68536e"
+   :compiler-conformance-follow-up-commit "db6787427c9065aa1fe39147583bc94451042060"
+   :fuel {:initial 512 :replenishable false}
+   :shared-nested-parser "src/isobmff/bounded_nested.kotoba"
+   :shared-parser-refactor-pr "https://github.com/kotoba-lang/org-iso-isobmff/pull/3"
+   :shared-parser-refactor-commit "1b44ebb42e8b97623c4041c9aa7aaa29cbcaf980"
+   :avcc-project-digest "1b63832e2ee69df385ef689949e612febc0afd0f847605a421ce5d993d296845"
+   :actual-sps {:bytes 23 :profile-idc 66 :width 64 :height 48}
+   :integration-hosted-ci :passed
+   :next-action :migrate-only-qualified-bounded-isobmff-consumers}
+  {:root "orgs/kotoba-lang/org-iso-isobmff/src/isobmff/meta.cljc"
+   :repository "orgs/kotoba-lang/org-iso-isobmff"
+   :kind :bounded-profile-split
+   :review-status :bounded-image-metadata-profile-merged
+   :migration-authorized true
+   :migration-scope :isobmff/bounded-image-meta-v1
+   :legacy-domain :recursive-optional-isobmff-metadata-and-property-association
+   :safety-note "The Kotoba profile follows exactly ftyp plus meta/full-box/iprp/ipco/ispe, preserves every four-byte brand and the complete positive u32 dimension domain in i64, and does not reinterpret missing/optional metadata or property association semantics."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/org-iso-isobmff/pull/3"
+    :commit "1b44ebb42e8b97623c4041c9aa7aaa29cbcaf980"
+    :nested-parser "src/isobmff/bounded_nested.kotoba"
+    :metadata-parser "src/isobmff/image_meta.kotoba"
+    :conformance "test/isobmff/image_meta_conformance.kotoba"
+    :maximum-input-bytes 16384
+    :major-brand-range [0 4294967295]
+    :dimension-range [1 4294967295]
+    :fixture {:bytes 68 :major-brand-code 1635150182 :width 320 :height 240}
+    :open-domain-check {:major-brand-code 2054847098
+                        :width 4294967295 :height 4294967295}
+    :project-digest "473945292a560fc9a643766372c174ca38b46083f6a34ca184e2d1373afc11af"
+    :web-artifact-sha256 "7de7df29cbdbd003df606398c40802a8a68070c4822d42bffe98fbe239c29bf5"
+    :wasm-artifact-sha256 "ec590a317b91f09228268501536a777e9c40806e550f428da00dfb3d9d3a33d3"
+    :legacy-tests {:tests 8 :assertions 80 :failures 0 :errors 0}
+    :reference-main 42 :web-main 42 :wasm-main 42
+    :required-capabilities [] :hosted-ci :passed}
+   :next-action :migrate-only-consumers-that-select-bounded-image-meta-v1}
+  {:root "orgs/com-junkawasaki/ghosthacker-timemachine/src/ghosthacker_timemachine/logs.cljc"
+   :repository "orgs/com-junkawasaki/ghosthacker-timemachine"
+   :kind :bounded-profile-split
+   :review-status :bounded-inherited-server-profile-merged-with-hosted-runner-exception
+   :migration-authorized true
+   :migration-scope :ghosthacker-timemachine/inherited-server-v1
+   :legacy-domain :arbitrary-log-sets-partial-play-and-ghost-rosters
+   :safety-note "The Kotoba profile owns only the fixed five-depth inherited-server integer score path. Arbitrary logs, partial play, Ghost identity rosters, terminal/browser state, persistence, and floating point remain explicitly outside it."
+   :implementation
+   {:pr "https://github.com/com-junkawasaki/ghosthacker-timemachine/pull/1"
+    :commit "0a1ab06d7e2f6f64e0f50a5081c23848bac5e554"
+    :engine "src/ghosthacker_timemachine/bounded.kotoba"
+    :conformance "test/ghosthacker_timemachine/bounded_conformance.kotoba"
+    :depths 5 :difficulties [5 9 20 24 30]
+    :expected-summary {:power 16 :recruited 2 :cleared 1
+                       :retreat 2 :grade :rookie}
+    :project-digest "cb1a8107dd90ca033089eceda8f23eb28452f694a3d352b2f6d755397f933588"
+    :web-artifact-sha256 "eef2377c01b242bfa42d74d884af3142be103fdb7412713b2913b229284c61ba"
+    :wasm-artifact-sha256 "d0a1db5edf3eb1faef77295d2582e5838e6b1a4fd9f6c2b520e2d37fcf44b289"
+    :legacy-tests {:tests 18 :assertions 78 :failures 0 :errors 0}
+    :reference-main 42 :web-main 42 :wasm-main 42
+    :required-capabilities []
+    :hosted-ci {:status :runner-billing-blocked
+                :run "https://github.com/com-junkawasaki/ghosthacker-timemachine/actions/runs/29696910704"
+                :jobs-started 0 :workflow-steps-executed 0
+                :reverification-required true}}
+   :next-action :rerun-hosted-jdk17-and-jdk21-after-billing-recovery}
+  {:root "orgs/com-junkawasaki/ghosthacker-memorize/src/ghosthacker_memorize/deck.cljc"
+   :repository "orgs/com-junkawasaki/ghosthacker-memorize"
+   :kind :bounded-profile-split
+   :review-status :bounded-first-case-file-profile-merged-with-hosted-runner-exception
+   :migration-authorized true
+   :migration-scope :ghosthacker-memorize/first-case-file-v1
+   :legacy-domain :arbitrary-card-grids-shuffle-and-floating-efficiency
+   :safety-note "The Kotoba profile owns the fixed eight-card first-case-file and at most sixteen flat index-pair turns. It preserves no-op invalid turns and monotonic collection while replacing JS-dependent floating efficiency with exact rational fields."
+   :implementation
+   {:pr "https://github.com/com-junkawasaki/ghosthacker-memorize/pull/1"
+    :commit "c2d5a2cb6fbc6f79d4abdf61b6f07d3c223ca92c"
+    :engine "src/ghosthacker_memorize/bounded.kotoba"
+    :conformance "test/ghosthacker_memorize/bounded_conformance.kotoba"
+    :cards 8 :pairs 4 :maximum-turns 16
+    :efficiency :exact-rational-fields
+    :project-digest "c9a814c77830445b1690acb012d319e96ed84b6c9114a749d07c4e2fde7a8a2a"
+    :web-artifact-sha256 "bab88f89922ce2cf9e95d592edff701a2772fa3ac60d454d59439931fe587aa0"
+    :wasm-artifact-sha256 "da11497cfbbaa072418bbcd0e8e7a901c450b663d9a05af8a47d68b21f4507b1"
+    :legacy-tests {:tests 16 :assertions 57 :failures 0 :errors 0}
+    :reference-main 42 :web-main 42 :wasm-main 42
+    :required-capabilities []
+    :hosted-ci {:status :runner-billing-blocked
+                :run "https://github.com/com-junkawasaki/ghosthacker-memorize/actions/runs/29697371066"
+                :jobs-started 0 :workflow-steps-executed 0
+                :reverification-required true}}
+   :next-action :rerun-hosted-jdk17-and-jdk21-after-billing-recovery}
+  {:root "orgs/com-junkawasaki/ghosthacker-family/src/ghosthacker_family/days.cljc"
+   :repository "orgs/com-junkawasaki/ghosthacker-family"
+   :kind :bounded-profile-split
+   :review-status :bounded-opening-week-profile-merged-with-hosted-runner-exception
+   :migration-authorized true
+   :migration-scope :ghosthacker-family/opening-week-v1
+   :legacy-domain :arbitrary-day-sets-allocation-editing-and-host-state
+   :safety-note "The Kotoba profile owns up to five complete allocation triples for the fixed opening-week. Every category is nonnegative and every day sums exactly to ten; incomplete, invalid, and oversized weeks fail closed."
+   :implementation
+   {:pr "https://github.com/com-junkawasaki/ghosthacker-family/pull/1"
+    :commit "11990ea8e68312711d94b1b0c336ba1e94e1ede2"
+    :engine "src/ghosthacker_family/bounded.kotoba"
+    :conformance "test/ghosthacker_family/bounded_conformance.kotoba"
+    :maximum-days 5 :allocation-sum 10
+    :project-digest "e91d4a412aa786c3f945609e2967236fbf7c8f73a60e1d909638022d7a020694"
+    :web-artifact-sha256 "dad37a0b719c1ee12788662803e7b218b166c2a5569c3525991673a9fe90afb3"
+    :wasm-artifact-sha256 "6af83bd35764f87a8364a045f4acc1ffd5da5d8487fdd453e9c834b89c0e59e3"
+    :legacy-tests {:tests 12 :assertions 57 :failures 0 :errors 0}
+    :reference-main 42 :web-main 42 :wasm-main 42
+    :required-capabilities []
+    :hosted-ci {:status :runner-billing-blocked
+                :run "https://github.com/com-junkawasaki/ghosthacker-family/actions/runs/29697717087"
+                :jobs-started 0 :workflow-steps-executed 0
+                :reverification-required true}}
+   :next-action :rerun-hosted-jdk17-and-jdk21-after-billing-recovery}
+  {:root "orgs/kotoba-lang/kagi/src/kagi/phase.cljc"
+   :repository "orgs/kotoba-lang/kagi"
+   :kind :typed-source-refactor
+   :review-status :typed-phase-gate-and-full-suite-host-qualified
+   :migration-authorized true
+   :migration-scope :kagi/phase-gate-v1
+   :legacy-domain :same-open-keyword-phase-gate-domain
+   :safety-note "The Kotoba gate preserves all i64 phase inputs with 0-3 plus default-phase-1 fallback, all keyword operations/dispositions, unknown-operation hold, and the invariant that phase can only add caution and never relax."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/kagi/pull/11"
+    :commit "33a119f5f21dfd22d68ad86c5164badf8280a7b3"
+    :gate "src/kagi/phase.kotoba"
+    :conformance "test/kagi/phase_conformance.kotoba"
+    :cljc-matrix "test/kagi/phase_matrix_test.clj"
+    :matrix-cases 192
+    :project-digest "8ee7bb7fbecfe058343e3ee1a9f2892c60d8c03dcde182281859012547c808bb"
+    :web-artifact-sha256 "4a40b8f7c8d831738f465281ced38932ce2ca5dc106c60a6855cf2141e8e5e35"
+    :wasm-artifact-sha256 "0545d43e5d5198c6b2622294669652a9c0654b76cfffda2a7435477d848480e0"
+    :legacy-matrix {:tests 1 :assertions 192 :failures 0 :errors 0}
+    :reference-main 42 :web-main 42 :wasm-main 42
+    :required-capabilities []
+    :hosted-ci {:run "https://github.com/kotoba-lang/kagi/actions/runs/29698277130"
+                :jdk 24 :compile-step :passed :web-wasm-matrix-step :passed
+                :restoration-pr "https://github.com/kotoba-lang/kagi/pull/12"
+                :restoration-commit "8815e2c5103e32a5e924364aab7055f692bb37b4"
+                :restored-runs
+                ["https://github.com/kotoba-lang/kagi/actions/runs/29698424076"
+                 "https://github.com/kotoba-lang/kagi/actions/runs/29698428677"]
+                :full-suite {:tests 52 :assertions 334 :status :passed}
+                :status :passed}}
+   :next-action :retain-cljc-oracle-through-consumer-cutover}
+  {:root "orgs/kotoba-lang/org-omg-bpmn/src/bpmn/validate.cljc"
+   :repository "orgs/kotoba-lang/org-omg-bpmn"
+   :kind :bounded-structural-kernel
+   :review-status :typed-bounded-kernel-host-qualified
+   :migration-authorized true
+   :migration-scope :bpmn/bounded-structural-v1
+   :legacy-domain :open-bpmn-model-retained
+   :safety-note "Canonical nonnegative i64 IDs, closed node types, exact encoding length, unique node/flow IDs, condition flags, and a 4-node/3-flow ceiling are fail-closed. The ceiling is verified against the compiler's fixed 512-call fuel rather than inferred."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/org-omg-bpmn/pull/2"
+    :commit "621d38b60ac14143005632ff8b45ad87fc663771"
+    :qualification-pr "https://github.com/kotoba-lang/org-omg-bpmn/pull/3"
+    :qualification-commit "21fe12a5444f70f1aadd6b57be90970d9f8c0f2a"
+    :kernel "src/bpmn/bounded_validate.kotoba"
+    :conformance "test/bpmn/bounded_conformance.kotoba"
+    :cljc-oracle "test/bpmn/bounded_matrix_test.clj"
+    :legacy-suite {:tests 20 :assertions 68 :failures 0 :errors 0}
+    :web-wasm-cases 16
+    :maximum-nodes 4 :maximum-flows 3
+    :web-artifact-sha256 "f4ba801000c8d235295e7336a03164f6731b4725a2a5634b26c643ba82f5a933"
+    :wasm-artifact-sha256 "320da7b75675ca5997a7486f25d9b287731ab01d71a42b711ef4cc78129a4136"
+    :required-capabilities []
+    :hosted-ci
+    {:runs ["https://github.com/kotoba-lang/org-omg-bpmn/actions/runs/29698874964"
+            "https://github.com/kotoba-lang/org-omg-bpmn/actions/runs/29698946536"]
+     :jdk [17 21] :status :passed}}
+   :retained-boundaries
+   [:string-identifiers :node-key-id-mismatch :open-node-taxonomy
+    :problem-messages :xml :execution]
+   :next-action :retain-cljc-oracle-and-open-bpmn-host-domain}
+  {:root "orgs/kotoba-lang/ddl/src/ddl/validate.cljc"
+   :repository "orgs/kotoba-lang/ddl"
+   :kind :bounded-schema-kernel
+   :review-status :typed-bounded-kernel-host-qualified
+   :migration-authorized true
+   :migration-scope :ddl/bounded-schema-v1
+   :legacy-domain :open-ddl-model-retained
+   :safety-note "Canonical table/column/FK ownership, nonnegative IDs, exact lengths, unique tables, binary flags, and a tested 3-table/4-column/2-FK ceiling fail closed before structural problem counting."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/ddl/pull/2"
+    :commit "305a9dc5bbac8f538074c162ab61a7e36b3d2d45"
+    :qualification-pr "https://github.com/kotoba-lang/ddl/pull/3"
+    :qualification-commit "eb2adb38d3a832cb0f6c7c94abcb5917bafd763c"
+    :kernel "src/ddl/bounded_validate.kotoba"
+    :conformance "test/ddl/bounded_conformance.kotoba"
+    :cljc-oracle "test/ddl/bounded_matrix_test.clj"
+    :legacy-suite {:tests 15 :assertions 51 :failures 0 :errors 0}
+    :web-wasm-cases 18
+    :maximum-tables 3 :maximum-columns 4 :maximum-foreign-keys 2
+    :web-artifact-sha256 "6d2409a1dc6d89b0c8791cb874c03f682f1f87e383cea092938bf6970dc312bd"
+    :wasm-artifact-sha256 "787d9cb2883d9bbe088a8d75714648ea6cf4f2e46fd41d0f127afc8b50f0f2c2"
+    :required-capabilities []
+    :hosted-ci
+    {:runs ["https://github.com/kotoba-lang/ddl/actions/runs/29699262753"
+            "https://github.com/kotoba-lang/ddl/actions/runs/29699323467"]
+     :jdk [17 21] :status :passed}}
+   :retained-boundaries
+   [:sql-text :string-identifiers :type-syntax :primary-key-members
+    :foreign-key-column-members :schema-diff :migration-emission]
+   :next-action :retain-cljc-oracle-and-open-ddl-host-domain}
+  {:root "orgs/com-junkawasaki/sha256d/src/sha256d/ops.cljc"
+   :repository "orgs/com-junkawasaki/sha256d"
+   :kind :typed-bitvector-kernel-split
+   :review-status :merged-awaiting-hosted-reverification
+   :migration-authorized true
+   :migration-scope :sha256d/round-primitives-v1
+   :legacy-domain :complete-sha256d-and-evolution-retained
+   :safety-note "Ch and Maj execute over every signed-i64 bit pattern. Independent CLJ and BigInt oracles check the Kotoba value, while all six formulations cross-check each other. No capabilities are requested."
+   :implementation
+   {:pr "https://github.com/com-junkawasaki/sha256d/pull/1"
+    :commit "a7383d524c90eea2a0c04921db49757cd57a6d4e"
+    :qualification-pr "https://github.com/com-junkawasaki/sha256d/pull/2"
+    :qualification-commit "1b5284c0ea686b91573dd4d1c1410a5c3077259c"
+    :compiler-pr "https://github.com/kotoba-lang/compiler/pull/117"
+    :compiler-commit "78f43e64125e9c4bbe2bfb3a9520ae4b767dc275"
+    :kernel "src/sha256d/round_primitives.kotoba"
+    :conformance "test/sha256d/round_primitives_conformance.kotoba"
+    :cljc-oracle "test/sha256d/round_primitives_matrix_test.clj"
+    :legacy-suite {:tests 30 :assertions 8686 :failures 0 :errors 0}
+    :cljs-portability {:passed 8 :failed 0}
+    :matrix-values 7 :matrix-tuples 343 :checks-per-target 686
+    :web-artifact-sha256 "55f3030767a511a00f89aed2536a8e346e3928d205ca122b9cdb01f8970b00cf"
+    :wasm-artifact-sha256 "4b298fc96cd3d532fe348c5ecb27d33cb72b62fd2206907e61622651501c6925"
+    :required-capabilities []
+    :hosted-ci
+    {:run "https://github.com/com-junkawasaki/sha256d/actions/runs/29700303356"
+     :status :runner-billing-blocked :jobs-started 0
+     :workflow-steps-executed 0 :reverification-required true}}
+   :retained-boundaries
+   [:message-schedule :compression :digest :benchmark-tournament
+    :platform-specific-fast-paths]
+   :next-action :rerun-hosted-jdk17-jdk21-and-cljs-after-billing-recovery}
+  {:root "orgs/kotoba-lang/kyoninka/src/kyoninka/schema.cljc"
+   :repository "orgs/kotoba-lang/kyoninka"
+   :kind :typed-human-approval-gate
+   :review-status :typed-closed-gate-host-qualified
+   :migration-authorized true
+   :migration-scope :kyoninka/human-gate-v1
+   :legacy-domain :open-procedure-data-and-external-actions-retained
+   :safety-note "Every pair in the closed eight-status graph is checked. Invalid statuses and transitions deny, and human transitions require the exact explicit approval value; enum outsiders and i64 extremes are negative-tested."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/kyoninka/pull/1"
+    :commit "444591043fa1193cb1509741429cbd5f5838a075"
+    :qualification-pr "https://github.com/kotoba-lang/kyoninka/pull/2"
+    :qualification-commit "92a34cd0ce7bad39a3972e7c87e252ec57dec1dd"
+    :kernel "src/kyoninka/human_gate.kotoba"
+    :conformance "test/kyoninka/human_gate_conformance.kotoba"
+    :cljc-oracle "test/kyoninka/human_gate_matrix_test.clj"
+    :legacy-suite {:tests 18 :assertions 348 :failures 0 :errors 0}
+    :valid-approval-cases 128 :boundary-cases-per-target 576
+    :web-artifact-sha256 "ebd39fa4f99dd1eb9547fb084f29097b1e94aa15c93557aae21a3fbcb11b2160"
+    :wasm-artifact-sha256 "4a779830fa2b8f454284f5eb6421aeb1024dd555a1e0f033c5943dbe8c1c762f"
+    :required-capabilities []
+    :hosted-ci
+    {:runs ["https://github.com/kotoba-lang/kyoninka/actions/runs/29700654335"
+            "https://github.com/kotoba-lang/kyoninka/actions/runs/29700720290"]
+     :jdk [17 21] :status :passed}}
+   :retained-boundaries
+   [:procedure-data :legal-advice :authority-data :fees :documents :steps
+    :case-storage :event-ledger :external-actions]
+   :next-action :retain-cljc-oracle-and-host-owned-procedure-domain}
+  {:root "orgs/kotoba-lang/kotoba-fleet/src/kotoba/fleet/core.cljc"
+   :repository "orgs/kotoba-lang/kotoba-fleet"
+   :kind :bounded-lease-holder-kernel
+   :review-status :typed-bounded-kernel-host-qualified
+   :migration-authorized true
+   :migration-scope :kotoba-fleet/bounded-lease-holder-v1
+   :legacy-domain :open-datom-storage-and-mutation-retained
+   :safety-note "For one host-selected work unit, up to four claims are fully validated before earliest-active-ordinal selection. Invalid time, TTL, release flags, IDs, encodings, or duplicate ordinals fail closed; expiry cannot overflow timestamp addition."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/kotoba-fleet/pull/2"
+    :commit "ab7da63217ada84606bfb89cb69b87b95c7d99a0"
+    :qualification-pr "https://github.com/kotoba-lang/kotoba-fleet/pull/3"
+    :qualification-commit "2ca2ef742b7c19d655dac18d8b479e8312a05a2e"
+    :kernel "src/kotoba/fleet/bounded_lease.kotoba"
+    :conformance "test/kotoba/fleet/bounded_lease_conformance.kotoba"
+    :cljc-oracle "test/kotoba/fleet/bounded_lease_matrix_test.clj"
+    :legacy-suite {:tests 24 :assertions 61 :failures 0 :errors 0}
+    :web-wasm-cases 19 :maximum-claims 4
+    :web-artifact-sha256 "3fa85fba42382869c158e0934d34cdc901e89c05610dd8d60038be1e3d16217c"
+    :wasm-artifact-sha256 "e86158ab52687f73a80f83a25ff5bf0b90dd7aaf5a47f640f90ee57fa515afdf"
+    :required-capabilities []
+    :hosted-ci
+    {:runs ["https://github.com/kotoba-lang/kotoba-fleet/actions/runs/29701110708"
+            "https://github.com/kotoba-lang/kotoba-fleet/actions/runs/29701168374"]
+     :jdk [17 21] :status :passed}}
+   :retained-boundaries
+   [:datom-reconstruction :work-filtering :string-identifiers :claim-append
+    :atomic-ordinal-allocation :release-append :storage]
+   :next-action :retain-cljc-oracle-and-host-mutation-domain}
+  {:root "orgs/kotoba-lang/koe/src/koe/session.cljc"
+   :repository "orgs/kotoba-lang/koe"
+   :kind :typed-booking-delegation-gate
+   :review-status :typed-closed-gate-host-qualified
+   :migration-authorized true
+   :migration-scope :koe/booking-delegation-gate-v1
+   :legacy-domain :dialog-audio-signature-and-host-ports-retained
+   :safety-note "Only three canonical booking shapes pass. Fabricated bookings on non-booking turns, nil signatures, inconsistent presence flags, unknown actions, and malformed encodings fail closed."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/koe/pull/1"
+    :commit "b21894789359c49d643253102aa6eab1538691db"
+    :qualification-pr "https://github.com/kotoba-lang/koe/pull/2"
+    :qualification-commit "eb175441a6c71e3d72171f8a298a639acad386f3"
+    :kernel "src/koe/booking_gate.kotoba"
+    :conformance "test/koe/booking_gate_conformance.kotoba"
+    :cljc-oracle "test/koe/booking_gate_matrix_test.clj"
+    :legacy-suite {:tests 5 :assertions 25 :failures 0 :errors 0}
+    :web-wasm-cases 64
+    :web-artifact-sha256 "c8d8d2adfd6c6d3e446d28f5c31677a19bc836fdc1f327c4e931380e43930d75"
+    :wasm-artifact-sha256 "290cb4b81e25412fc493e59366179f9fda9666077be8dc56a1254374a9c1f092"
+    :required-capabilities []
+    :hosted-ci
+    {:runs ["https://github.com/kotoba-lang/koe/actions/runs/29701355809"
+            "https://github.com/kotoba-lang/koe/actions/runs/29701413476"]
+     :jdk [17 21] :status :passed}}
+   :retained-boundaries
+   [:dialog-state :utterance :reply :tts :audio :slot-proposal
+    :signature-verification :booking-confirmation :host-ports]
+   :next-action :retain-cljc-oracle-and-host-capability-domain}
+  {:root "orgs/kotoba-lang/pkg/src/kotoba/pkg.cljc"
+   :repository "orgs/kotoba-lang/pkg"
+   :kind :retain-cljc-floating-physical-model
+   :review-status :reviewed-retain-until-safe-f64
+   :migration-authorized false
+   :reason "IC geometry, bonding and thermal estimation require decimal constants, division, pow, special-value policy, and cross-backend floating semantics; an integer-only pilot would not represent the domain."
+   :required-language-gates
+   [:typed-f64 :ieee-special-values :signed-zero :checked-conversions
+    :pow-conformance :js-wasm-rounding-contract]
+   :next-action :retain-cljc-and-revisit-after-safe-f64-qualification}
+  {:root "orgs/kotoba-lang/cartpole-math/src/kotoba/cartpole_math.cljc"
+   :repository "orgs/kotoba-lang/cartpole-math"
+   :kind :retain-cljc-floating-physics-model
+   :review-status :canonical-kotoba-golden-merged-parameterized-engine-retained
+   :migration-authorized :canonical-golden-only
+   :reason "The canonical state and Euler integration are doubles and use sin/cos, division, and cross-architecture numeric goldens; fixed-point substitution lacks a domain error proof."
+   :required-language-gates
+   [:typed-f64 :sin-cos-conformance :ieee-special-values
+    :cross-backend-error-contract :reference-goldens]
+   :implementation
+   {:pr "https://github.com/kotoba-lang/cartpole-math/pull/1"
+    :commit "71a95a4d6f915ffe52d6165e46e758657f5a05a6"
+    :kernel "src/kotoba/cartpole_step.kotoba"
+    :cljc-oracle "src/kami/cartpole_math.cljc"
+    :qualified-targets [:reference-executor :kotoba-script-js :typed-wasm]
+    :floating-policy :kotoba.floating-point/ieee-754-f32-f64-v7
+    :required-capabilities []
+    :verification {:tests 2 :assertions 7 :failures 0 :errors 0}}
+   :next-action :retain-parameterized-cljc-until-bounded-structured-f64-state-abi}
+  {:root "orgs/kotoba-lang/geo/src/kotoba/geo/vec3.cljc"
+   :repository "orgs/kotoba-lang/geo"
+   :kind :retain-cljc-floating-geometry-stack
+   :review-status :projection-and-globe-orientation-goldens-merged-structured-apis-retained
+   :migration-authorized :qualified-golden-slice-only
+   :reason "The dependency closure is an f64 projection/vector/mesh/noise stack using trigonometry, exp, log, pow, sqrt and atan2; extracting integer fragments would not close the candidate graph."
+   :required-language-gates
+   [:typed-f64 :transcendental-conformance :ieee-special-values
+    :mesh-orientation-goldens :projection-goldens]
+   :implementation
+   {:pr "https://github.com/kotoba-lang/geo/pull/1"
+    :commit "3ed7ea5ca6466ef1f3fda18d8221efe1d6104496"
+    :kernel "src/kotoba/geo_golden.kotoba"
+    :cljc-oracles ["src/kotoba/geo/projection.cljc" "src/kotoba/geo/mesh.cljc"]
+    :qualified-goldens [:tokyo-web-mercator-roundtrip
+                        :outward-globe-triangle-orientation]
+    :qualified-targets [:reference-executor :kotoba-script-js :typed-wasm]
+    :floating-policy :kotoba.floating-point/ieee-754-f32-f64-v7
+    :required-capabilities []
+    :verification {:tests 42 :assertions 695 :failures 0 :errors 0}}
+   :next-action :retain-general-map-vector-mesh-apis-until-structured-f64-abi}
+  {:root "orgs/kotoba-lang/level/src/kotoba/level.cljc"
+   :repository "orgs/kotoba-lang/level"
+   :kind :retain-cljc-floating-game-model
+   :review-status :reviewed-retain-until-safe-f64
+   :migration-authorized false
+   :reason "The facade delegates to a continuous pow-based zone-shrink model; replacing shrink with integer arithmetic would change gameplay semantics."
+   :required-language-gates
+   [:typed-f64 :pow-conformance :cross-backend-rounding-contract
+    :zone-shrink-goldens]
+   :next-action :retain-cljc-and-revisit-after-safe-f64-qualification}
+  {:root "orgs/kotoba-lang/web-modelb/src/kotoba/web_modelb.cljc"
+   :repository "orgs/kotoba-lang/web-modelb"
+   :kind :retain-cljc-float-cast-and-host-adapter-manifest
+   :review-status :reviewed-retain-until-safe-float-casts
+   :migration-authorized false
+   :reason "The only portable computation converts f32 seconds using Rust max/truncating-saturating float-to-i64 behavior, including NaN and infinities; the remaining wasmi/GPU engine is explicitly host-only."
+   :required-language-gates
+   [:typed-f32 :nan-infinity-policy :rust-compatible-saturating-i64-cast
+    :js-wasm-cast-conformance]
+   :retained-boundaries [:wasmi-wasm-in-wasm :hecs-world :wgpu :canvas-blit]
+   :next-action :retain-cljc-and-host-adapters-until-safe-float-cast-qualification}
+  {:root "orgs/kotoba-lang/webgl*/src/kotoba/webgl/glsl.cljc"
+   :repository :eight-webgl-repositories
+   :repositories
+   ["orgs/kotoba-lang/webgl-character-detail"
+    "orgs/kotoba-lang/webgl-character-exact"
+    "orgs/kotoba-lang/webgl-decal-exact"
+    "orgs/kotoba-lang/webgl-full-humanoid-exact"
+    "orgs/kotoba-lang/webgl-prod-build"
+    "orgs/kotoba-lang/webgl-ssao-dep"
+    "orgs/kotoba-lang/webgl-ssao"
+    "orgs/kotoba-lang/webgl"]
+   :kind :retain-generated-gpu-artifact-facade
+   :review-status :reviewed-propagated-to-eight-paths
+   :unique-content-sha256 "5a711ff9f2af9d3342e893ca3d614ebb3c944da41d913622d5d84815e84c27c6"
+   :migration-authorized false
+   :reason "The identical CLJC facade re-exports generated GLSL ES 3.00 shader strings. Canonical authority is kami.wgsl EDN compiled through naga; GPU shader artifacts and their CLJS WebGL compatibility facade are not Kotoba guest logic."
+   :canonical-boundary
+   {:source :kami-wgsl-edn :generator "bb gen-glsl"
+    :generated-namespace "kami.webgl.glsl" :execution :gpu}
+   :next-action :retain-and-regenerate-from-canonical-shader-source}
+  {:root "orgs/kotoba-lang/kami-app-isekai/src/kami_app_isekai.cljc"
+   :repository "orgs/kotoba-lang/kami-app-isekai"
+   :kind :retain-kami-world-and-render-engine
+   :review-status :reviewed-retain-until-safe-float-and-provider-qualification
+   :migration-authorized false
+   :unique-content-sha256 "5aaf85ae6cebbd64adb7f84a210436c75830a2b2f76d4600307c2d428a406593"
+   :reason "Voxel terrain uses floating FBM, sin and floor; USD, PhysX and wgpu are explicit engine/provider boundaries."
+   :required-language-gates [:typed-f32-and-f64 :qualified-transcendentals
+                             :cross-backend-world-goldens :explicit-engine-providers]
+   :next-action :retain-kami-engine-cljc}
+  {:root "orgs/kotoba-lang/kami-articulated/src/kami_articulated.cljc"
+   :repository "orgs/kotoba-lang/kami-articulated"
+   :kind :qualified-kotoba-articulated-transform-and-bounded-structured-urdf-slices
+   :review-status :bounded-structured-record-and-indexed-graph-qualified-retain-large-graph-and-provider
+   :migration-authorized false
+   :unique-content-sha256 "0e270991e73cd8ba4129cb629b4044d3b910e743a9771f7801a3ced757bbed02"
+   :reason "The transform kernel and bounded XML/decimal/vec3 ingestion kernel are qualified across reference, restricted JavaScript and typed Wasm. Both real URDF fixtures agree with the CLJC oracle for identity, topology, masses, limits, poses, positive-semidefinite bounded inertia tensors, Link/Joint nominal records, and an order-independent indexed joint tree through 20 links. Larger structured graphs and the downstream physics solver remain explicit boundaries."
+   :implementation
+   {:prs ["https://github.com/kotoba-lang/kami-articulated/pull/1"
+          "https://github.com/kotoba-lang/kami-articulated/pull/2"
+          "https://github.com/kotoba-lang/kami-articulated/pull/3"
+          "https://github.com/kotoba-lang/kami-articulated/pull/4"
+          "https://github.com/kotoba-lang/kami-articulated/pull/5"
+          "https://github.com/kotoba-lang/kami-articulated/pull/6"]
+    :merge-commits ["af937c2124d668caa0d95ce6dc7df68f6ea9ea2d"
+                    "e6324c84ef38698b82897a9050e2f962e0a72093"
+                    "c7413bce0bc73b6c506e86f883dcc9e3990b9ccd"
+                    "b67c1ec2fceaa00d522e9e8384b600cadb6c6bf8"
+                    "ae40b415c171ffd27956c74c012330b5dc14262a"
+                    "ef846b5016693417e138473979988466558a4ba5"]
+    :kernels ["src/articulated_transform_golden.kotoba" "src/urdf_query.kotoba"]
+    :cljc-oracle "src/kami_articulated/urdf.cljc"
+    :targets [:reference-executor :kotoba-script-js :typed-wasm]
+    :floating-point-policy :kotoba.floating-point/ieee-754-f32-f64-v8
+    :capabilities #{}
+    :verification {:tests 12 :assertions 63 :fixtures [:cartpole :hizukue]
+                   :failures 0 :errors 0}}
+   :required-language-gates [:large-structured-joint-graph
+                             :explicit-physics-provider]
+   :next-action :retain-cljc-oracle-and-provider-and-add-packed-large-joint-graph}
+  {:root "orgs/kotoba-lang/kami-cad-import/src/cad_import/{demos,ingest}.cljc"
+   :repository "orgs/kotoba-lang/kami-cad-import"
+   :kind :qualified-kotoba-cad-transform-slice
+   :review-status :policy-v7-golden-qualified-retain-asset-compiler
+   :migration-authorized false
+   :unique-content-sha256
+   ["9e6859e7b08446e5c25f0807bda07138ac1127c1d27591c2712138eb166c21ee"
+    "b6c6af02d17d43e591e1e7ac62a543e24ae2acac56e2707548a1a9a2c123e20a"]
+   :reason "Quaternion-derived scaled affine point transforms and parent/child composition are qualified across CLJC, reference, restricted JavaScript and typed Wasm. CAD/GLTF/SCAD/STEP parsing, metadata, collections and asset emission remain an asset compiler boundary."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/kami-cad-import/pull/1"
+    :merge-commit "592e937601e6a219db2991dce7630a9dae23edd9"
+    :kernel "src/cad_transform_golden.kotoba"
+    :cljc-oracle "src/cad_import/xform.cljc"
+    :targets [:reference-executor :kotoba-script-js :typed-wasm]
+    :floating-point-policy :kotoba.floating-point/ieee-754-f32-f64-v7
+    :capabilities #{}
+    :verification {:tests 54 :assertions 1188 :failures 0 :errors 0}}
+   :required-language-gates [:bounded-source-parser-contract
+                             :structured-f64-collection-and-record-abi
+                             :explicit-ingest-provider]
+   :next-action :retain-asset-toolchain-and-migrate-bounded-transforms}
+  {:root "orgs/kotoba-lang/kami-isekai-assets/src/kami/isekai/presets.cljc"
+   :repository "orgs/kotoba-lang/kami-isekai-assets"
+   :kind :retain-canonical-generated-asset-catalog
+   :review-status :reviewed-retain-canonical-authority
+   :migration-authorized false
+   :unique-content-sha256 "7841ac93ef2d625e9c0fc8ba9650ecf3947d5aa23f8d11941bfb661cc9f491e9"
+   :reason "The root is the single asset catalog authority consumed by generators and carries string/hash semantics and higher-order composition callbacks."
+   :required-language-gates [:bounded-string-and-hash-contract
+                             :qualified-higher-order-component-contract
+                             :generator-consumer-goldens]
+   :next-action :retain-and-avoid-duplicating-asset-authority}
+  {:root "orgs/kotoba-lang/kami-nv-compat/src/kotoba/lang/kami_nv_compat/kami_usd/index.cljc"
+   :repository "orgs/kotoba-lang/kami-nv-compat"
+   :kind :retain-vendor-gpu-robotics-compatibility-boundary
+   :review-status :reviewed-retain-until-provider-and-float-qualification
+   :migration-authorized false
+   :unique-content-sha256 "7bb14dad6aafccf574f78ef6c4711b502e74e248b32b646f3ba4851d52e8292a"
+   :reason "The closure spans USDA parsing, floating geometry, ray/path tracing, robotics, shaders, OptiX, Warp and Omniverse adapters."
+   :required-language-gates [:typed-f32-and-f64 :bounded-usda-parser
+                             :explicit-gpu-and-vendor-providers
+                             :raytrace-and-robotics-goldens]
+   :next-action :retain-kami-provider-and-compatibility-cljc}
+  {:root "orgs/kotoba-lang/terrain/src/terrain.cljc"
+   :repository "orgs/kotoba-lang/terrain"
+   :kind :qualified-kotoba-terrain-water-noise-slice
+   :review-status :policy-v7-i32-and-vector-qualified-retain-general-engine
+   :migration-authorized false
+   :unique-content-sha256 "d16b7fc123c546bec085258f93d003b1fcf5022c4c955d351251d790d3c8eeda"
+   :reason "Canonical value-noise/FBM/height, wind-derived Gerstner parameters, and lattice hashing are qualified across CLJC, reference, restricted JavaScript and typed Wasm. The bounded dynamic f64 vector ABI and sealed i32 wrapping/shift semantics close the language prerequisites; remaining heightmap, splatmap, chunk and water-mesh work is domain migration and explicit GPU-provider wiring."
+   :implementation
+   {:prs ["https://github.com/kotoba-lang/terrain/pull/1"
+          "https://github.com/kotoba-lang/terrain/pull/2"
+          "https://github.com/kotoba-lang/terrain/pull/3"]
+    :merge-commits ["9167368acc4264d97433aa37c7367e662756c8ee"
+                    "97f71859b11f6d78c63c67709478b798262ac566"
+                    "73b8ae27af8b376dc9b5ef73b68f631e35ca2b74"]
+    :kernel "src/terrain_golden.kotoba"
+    :cljc-oracles ["src/terrain/noise.cljc" "src/terrain/water.cljc"]
+    :targets [:reference-executor :kotoba-script-js :typed-wasm]
+    :floating-point-policy :kotoba.floating-point/ieee-754-f32-f64-v7
+    :capabilities #{}
+    :verification {:tests 17 :assertions 11105 :failures 0 :errors 0}}
+   :required-language-gates []
+   :next-action :retain-general-engine-as-oracle-and-migrate-bounded-slices}
+  {:root "orgs/kotoba-lang/vegetation/src/vegetation.cljc"
+   :repository "orgs/kotoba-lang/vegetation"
+   :kind :qualified-kotoba-vegetation-spatial-slice
+   :review-status :policy-v7-rng-and-vector-qualified-retain-domain-and-render-engine
+   :migration-authorized false
+   :unique-content-sha256 "3f7c667d9ac840a33bedf4f09d90f9123a1b9af729d05cb2ee71fab0d7bd9ee5"
+   :reason "Distance LOD, XZ distance, patch-range rejection, scalar grass eligibility, and deterministic xorshift32 scatter are qualified across CLJC, reference, restricted JavaScript and typed Wasm. The bounded dynamic f64 vector ABI and sealed i32 profile close the language prerequisites; remaining collection/sorting, patch/mesh integration and GPU-buffer work is domain migration behind an explicit provider."
+   :implementation
+   {:prs ["https://github.com/kotoba-lang/vegetation/pull/1"
+          "https://github.com/kotoba-lang/vegetation/pull/2"]
+    :merge-commits ["2346c946b7eb097fa0a7f3511106b3c214bc51eb"
+                    "101c24697f5dd2e40fd08aba288a86c1179fc08a"]
+    :kernel "src/vegetation_golden.kotoba"
+    :cljc-oracles ["src/vegetation/lod.cljc" "src/vegetation/cull.cljc"
+                   "src/vegetation/species.cljc"]
+    :targets [:reference-executor :kotoba-script-js :typed-wasm]
+    :floating-point-policy :kotoba.floating-point/ieee-754-f32-f64-v7
+    :capabilities #{}
+    :verification {:tests 27 :assertions 180999 :failures 0 :errors 0}}
+   :required-language-gates [:explicit-render-and-gpu-buffer-provider]
+   :next-action :retain-general-engine-as-oracle-and-migrate-bounded-slices}
+  {:root "orgs/kotoba-lang/kami-app-giemon-factory/src/kami_app_giemon_factory.cljc"
+   :repository "orgs/kotoba-lang/kami-app-giemon-factory"
+   :kind :bounded-construction-safety-kernel
+   :review-status :typed-bounded-kernel-host-qualified
+   :migration-authorized true
+   :migration-scope :giemon-factory/construction-safety-v1
+   :legacy-domain :open-kami-physics-geometry-and-rendering-retained
+   :safety-note "The complete bounded encoding and ID catalogs validate before contiguous sequencing and robot/reveal resolution. Malformed counts, lengths, IDs, reveal slots, duplicate catalogs, unknown robots, and unknown elements fail closed."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/kami-app-giemon-factory/pull/1"
+    :commit "d21d415a55c7eca810f608c419b742b5709a71e7"
+    :qualification-pr "https://github.com/kotoba-lang/kami-app-giemon-factory/pull/2"
+    :qualification-commit "469d2528449fdfdf31d4c84448bd11dc2f289cac"
+    :kernel "src/kami_app_giemon_factory/construction_safety.kotoba"
+    :conformance "test/kami_app_giemon_factory/construction_safety_conformance.kotoba"
+    :cljc-oracle "test/kami_app_giemon_factory/construction_safety_matrix_test.clj"
+    :legacy-suite {:tests 21 :assertions 73 :failures 0 :errors 0}
+    :maximum-steps 4 :maximum-elements 8 :maximum-robots 4
+    :web-wasm-cases 16
+    :web-artifact-sha256 "0456657fee0459bc2e9c2111420aa0a3849b23e745dbb0629ba31cc32e0fb885"
+    :wasm-artifact-sha256 "f8b5c97bfb16ce28203fd0b4a6acef0a64da92ae4100b5b2e28a2ac8ada3bed5"
+    :required-capabilities []
+    :hosted-ci
+    {:runs ["https://github.com/kotoba-lang/kami-app-giemon-factory/actions/runs/29701885439"
+            "https://github.com/kotoba-lang/kami-app-giemon-factory/actions/runs/29701887167"
+            "https://github.com/kotoba-lang/kami-app-giemon-factory/actions/runs/29701937075"
+            "https://github.com/kotoba-lang/kami-app-giemon-factory/actions/runs/29701939104"]
+     :jdk [17 21] :status :passed}}
+   :retained-boundaries
+   [:string-ids :names :trades :zones :durations :factory-geometry
+    :clash-coordinates :robot-physics :rendering :source-json-loading]
+   :next-action :retain-cljc-oracle-and-kami-engine-physical-domain}
+  {:root "orgs/cloud-itonami/cloud-itonami-isco-8114/src/mineralplant/{actor,advisor,governor,store}.cljc"
+   :repository :cloud-itonami-isic-isco-iso3166-unspsc-cofog-gtin-actor-wave
+   :repositories-reviewed
+   ["cloud-itonami/cloud-itonami-isco-8114" "cloud-itonami/cloud-itonami-isco-7211"]
+   :repositories-in-class-not-yet-individually-reviewed 292
+   :class-size-note "Full live census 2026-07-22 (356 repositories queried, zero API errors): 294 cloud-itonami isic-*/isco-*/iso3166-*/unspsc-*/cofog-*/gtin-* repositories carry production CLJC and zero Kotoba (isic 133/997 files, isco 68/264 files, iso3166 81/777 files, unspsc 5/37 files, cofog 5/37 files, gtin 2/8 files -- 2120 production CLJC files, none migrated). isco-8114 (mineralplant) and its origin template isco-7211 (foundrycoord) were read in full as the reviewed exemplar; every file's docstring states it is 'Modeled closely on cloud-itonami-isco-7211' for this industrial-plant-safety-domain shape, so the finding below is expected to generalize across the actor/advisor/governor/store archetype, not proven for all 294 without per-repo review."
+   :kind :retain-cljc-pending-application-profile-and-string-search-gates
+   :review-status :reviewed-not-migratable-today
+   :migration-authorized false
+   :reason "Two independent blockers, both verified against upstream source rather than assumed. (1) Application-profile capability gate: this is a langgraph.graph state-graph actor (intake->advise->govern->decide->commit/hold, human-approval interrupt, checkpointed) with an LLM-swappable advisor and a mutable-atom Store -- kotoba/app territory per orgs/kotoba-lang/kotoba/docs/lang/application-profile.md's completion gate (typed descriptors, effect inference/admission, policy-gated provider, positive/denial fixtures, quota/audit, 2-runtime parity). That gate has not passed for LLM/actor/state effects: the doc's own named proving slice, gftdcojp/ai-gftd-ghosthacker-shiropico, has migrated exactly one pure decision function (src/shiropico/publish_decision.kotoba) and still carries advisor.cljc/operation.cljc/phase.cljc/policy.cljc/render.cljc/store.cljc as CLJC -- the full state/LLM/actor loop is not yet capability-complete anywhere in the fleet, so no actor repository in this wave can have Kotoba as its sole production authority yet. (2) Even the pure sub-computation is not fully portable: mineralplant.governor/check's hard-violations includes a defense-in-depth free-text scope-exclusion check (case-folded substring search of the proposal rationale against ~11 finalization/execution phrases) alongside its closed-set op-allowlist check. orgs/kotoba-lang/compiler's frontend.cljc string-operations set is exactly {string-byte-length string=? string-concat string-replace-all keyword-from-string keyword-name} -- no substring search, no case-fold, no index-of. Porting only the op-allowlist half and dropping the phrase half would be a silent domain-narrowing of a safety-critical governor invariant, forbidden by this file's :policy. Extracting a governor pure-kernel is therefore blocked on the same string-search primitive gap independently of the application-profile gate."
+   :required-language-gates
+   [:kotoba-app-llm-effect-completion-gate :kotoba-app-actor-state-machine-completion-gate
+    :kotoba-app-mutable-store-provider-completion-gate :string-substring-search-primitive
+    :string-case-fold-primitive]
+   :verification
+   {:mineralplant-files-read [:actor.cljc :advisor.cljc :governor.cljc :store.cljc]
+    :foundrycoord-files-confirmed-same-shape [:actor.cljc :advisor.cljc :governor.cljc :store.cljc]
+    :compiler-string-operations-checked "orgs/kotoba-lang/compiler src/kotoba/compiler/frontend.cljc string-operations def"
+    :shiropico-migration-state-checked "gftdcojp/ai-gftd-ghosthacker-shiropico main tree, 2026-07-22"}
+   :next-action :retain-cljc-and-revisit-per-repo-after-shiropico-completion-gate-and-string-search-primitive-land}]
+ :language-maturity
+ {:safe-f64-phase-3a
+  {:status :merged-qualified
+   :policy :kotoba.floating-point/ieee-754-f64-conversions-v1
+   :kotoba-script-merge "c75d9ad939a4159bbe868a4b4732b46f86afb8b6"
+   :compiler-pr "https://github.com/kotoba-lang/compiler/pull/120"
+   :compiler-commit "e9dd1351a30770b8a970adcd3971371040f03ac9"
+   :qualified-targets [:reference-executor :kotoba-script-js :typed-wasm]
+   :fail-closed-targets [:native :cljs]
+   :verification {:compiler-tests 302 :compiler-assertions 3870
+                  :focused-tests 5 :focused-assertions 28
+                  :nbb-golden-cases 16 :failures 0}}
+  :remaining-gates
+  [:qualified-transcendentals :kami-domain-goldens]
+ :safe-f32-phase-3b
+ {:status :merged-qualified
+  :policy :kotoba.floating-point/ieee-754-f32-f64-v1
+  :kotoba-script-pr "https://github.com/kotoba-lang/kotoba-script/pull/32"
+  :kotoba-script-merge "b36d0f6dfb451ae2e64db5756a1274f07f804372"
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/121"
+  :compiler-commit "64f115339bb344904f7dbf504b345d369d8956b6"
+  :compiler-merge "cb03c31dce3b32cb858d70f318f929159d572ddc"
+  :typed-abi {:version 4 :f32-tag 13 :value-abi :kotoba.typed/mixed-f32-f64-v3}
+  :qualified-targets [:reference-executor :kotoba-script-js :typed-wasm]
+  :fail-closed-targets [:native :cljs]
+  :verification {:kotoba-script-tests 28 :kotoba-script-assertions 111
+                 :compiler-tests 304 :compiler-assertions 3885
+                 :focused-tests 2 :focused-assertions 15
+                 :nbb-golden-cases 17 :failures 0}}
+ :safe-floating-phase-4a
+ {:status :merged-qualified
+  :policy :kotoba.floating-point/ieee-754-f32-f64-v2
+  :kotoba-script-pr "https://github.com/kotoba-lang/kotoba-script/pull/33"
+  :kotoba-script-merge "19e2978c82fef48f630f98eaa57ad46496e72ec8"
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/122"
+  :compiler-merge "c72dfbf9aac9ac94c066336f0ee9aca6afd44285"
+  :operations [:f32-sqrt :f64-sqrt :f32-min :f32-max :f64-min :f64-max]
+  :verification {:kotoba-script-tests 29 :kotoba-script-assertions 112
+                 :compiler-tests 304 :compiler-assertions 3889
+                 :focused-tests 2 :focused-assertions 19
+                 :nbb-golden-cases 17 :failures 0}}
+ :safe-floating-phase-4b
+ {:status :merged-qualified
+  :policy :kotoba.floating-point/ieee-754-f32-f64-v3
+  :domain {:operation [:f64-sin-quarter-turn :f64-cos-quarter-turn]
+           :radians [-0.7853981633974483 0.7853981633974483]
+           :absolute-error-max 4.0e-15
+           :fma false}
+  :kotoba-script-pr "https://github.com/kotoba-lang/kotoba-script/pull/34"
+  :kotoba-script-merge "3da6ff75859f41415aaac5f9c54ba35feb0b265c"
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/123"
+  :compiler-merge "a9caff4f0acf8937056f06d5f3e52d8f0e6fa47c"
+  :verification {:kotoba-script-tests 30 :kotoba-script-assertions 113
+                 :compiler-tests 304 :compiler-assertions 3893
+                 :focused-tests 2 :focused-assertions 23
+                 :nbb-golden-cases 17 :failures 0}}
+ :safe-floating-phase-4c
+ {:status :merged-qualified
+  :policy :kotoba.floating-point/ieee-754-f32-f64-v4
+  :domain {:operation [:f64-sin-bounded :f64-cos-bounded]
+           :radians [-25735.927018207585 25735.927018207585]
+           :absolute-error-max 5.0e-12
+           :range-reduction :fixed-split-pi-over-two
+           :quadrant-rounding :ties-away-from-zero}
+  :kotoba-script-pr "https://github.com/kotoba-lang/kotoba-script/pull/35"
+  :kotoba-script-merge "aacb547b4e51ead4683dedbc7b7cf0e80df5a9bd"
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/124"
+  :compiler-merge "61430a35bed00460a237577cfc757ab1ef8a0a35"
+  :verification {:kotoba-script-tests 31 :kotoba-script-assertions 114
+                 :compiler-tests 304 :compiler-assertions 3896
+                 :focused-tests 2 :focused-assertions 26
+                 :nbb-golden-cases 17 :failures 0}}
+ :safe-floating-phase-4d
+ {:status :merged-qualified
+  :policy :kotoba.floating-point/ieee-754-f32-f64-v5
+  :domains {:f64-exp-near-zero {:input [-0.5 0.5]
+                                :degree 18
+                                :absolute-error-max 4.0e-15}
+            :f64-log-near-one {:input [0.75 1.5]
+                               :transform :atanh-ratio
+                               :degree 21
+                               :absolute-error-max 4.0e-15}}
+  :host-transcendental-imports false
+  :kotoba-script-pr "https://github.com/kotoba-lang/kotoba-script/pull/36"
+  :kotoba-script-merge "6f5f8a7222a2e094befadd772c9bbf7c5f71559a"
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/125"
+  :compiler-merge "b3a316dd37f7b60117699ac3fefef7a6473f1239"
+  :verification {:kotoba-script-tests 32 :kotoba-script-assertions 115
+                 :compiler-tests 304 :compiler-assertions 3900
+                 :focused-tests 2 :focused-assertions 30
+                 :nbb-golden-cases 17 :failures 0}}
+ :safe-floating-phase-4e
+ {:status :merged-qualified
+  :policy :kotoba.floating-point/ieee-754-f32-f64-v6
+  :operation :f64-atan2-bounded
+  :domain {:coordinates :finite-binary64
+           :signed-zero-quadrants :preserved
+           :nan-and-infinity :trap
+           :kernel-degree 39
+           :octant-reduction :fixed
+           :absolute-error-max 2.0e-15}
+  :host-atan2-import false
+  :kotoba-script-pr "https://github.com/kotoba-lang/kotoba-script/pull/37"
+  :kotoba-script-merge "e8abd26fe0e034e8a8fa79bf7f6a1bffbbda6f41"
+  :threshold-parity-pr "https://github.com/kotoba-lang/kotoba-script/pull/38"
+  :threshold-parity-merge "9c2293dd0844f19514d6f117acf31d20cb5263a0"
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/126"
+  :compiler-merge "6f955d55c90307409b5415b38169d0c62e1b3111"
+  :verification {:kotoba-script-tests 33 :kotoba-script-assertions 116
+                 :compiler-tests 304 :compiler-assertions 3904
+                 :focused-tests 2 :focused-assertions 34
+                 :nbb-golden-cases 17 :failures 0}}
+ :safe-floating-phase-4f
+ {:status :merged-qualified
+  :policy :kotoba.floating-point/ieee-754-f32-f64-v7
+  :operations {:f64-exp-bounded {:input [-354.891356446692 354.891356446692]
+                                  :range-reduction :split-ln2
+                                  :binary-scaling :exact-normal
+                                  :relative-error-max 1.0e-13}
+               :f64-log-bounded {:input [7.458340731200207e-155 1.3407807929942597e154]
+                                  :range-reduction :sealed-exponent-mantissa
+                                  :absolute-error-max 1.0e-13}}
+  :host-exp-log-imports false
+  :kotoba-script-pr "https://github.com/kotoba-lang/kotoba-script/pull/39"
+  :kotoba-script-merge "e6383296805ee6b3830e4b5242afb84fd037ff59"
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/127"
+  :compiler-merge "295e486844100622e895d3a987e183671ae93fc0"
+  :verification {:kotoba-script-tests 34 :kotoba-script-assertions 117
+                 :compiler-tests 304 :compiler-assertions 3908
+                 :focused-tests 2 :focused-assertions 38
+                 :nbb-golden-cases 17 :failures 0}}
+ :structured-floating-abi
+ {:status :bounded-fixed-and-dynamic-structures-complete
+  :kotoba-script-prs ["https://github.com/kotoba-lang/kotoba-script/pull/40"
+                      "https://github.com/kotoba-lang/kotoba-script/pull/41"
+                      "https://github.com/kotoba-lang/kotoba-script/pull/42"]
+  :compiler-prs ["https://github.com/kotoba-lang/compiler/pull/131"
+                 "https://github.com/kotoba-lang/compiler/pull/132"]
+  :compiler-merges ["15f714e560f9492f86886ef8b3e5911974dcefe4"
+                    "38ea9d389d5cdbc198c04d948334e0d8bd72d0ed"]
+  :qualified [:fixed-heterogeneous-float-vectors :nominal-float-records
+              :float-option-result-and-variant-payloads
+              :keyword-to-float-record-graph-maps
+              :dynamic-homogeneous-f64-vectors]
+  :fail-closed [:direct-floating-set-items :direct-floating-map-scalars]
+  :remaining []
+  :verification {:compiler-tests 310 :compiler-assertions 3933
+                 :kotoba-script-tests 37 :kotoba-script-assertions 125
+                 :browser-host :pass :nbb-golden-cases 19
+                 :failures 0 :errors 0}}
+ :i32-wrapping-profile
+ {:status :complete
+  :kotoba-script-prs ["https://github.com/kotoba-lang/kotoba-script/pull/43"
+                      "https://github.com/kotoba-lang/kotoba-script/pull/44"]
+  :kotoba-script-merges ["67fa6a044db1649de317b7962523f376db54529d"
+                         "b80e2f18384cde346bea2f17fe6381cb3887b1a2"]
+  :compiler-prs ["https://github.com/kotoba-lang/compiler/pull/133"
+                 "https://github.com/kotoba-lang/compiler/pull/134"]
+  :compiler-merges ["72eb0df0386f98ea348a8b0430aa2e77cf31c590"
+                    "24b304f670a027a2ff34c33b55ed33d46b75259c"]
+  :qualified [:i32-wrap :u32-wrap :i32-wrapping-add :i32-wrapping-mul
+              :i32-xor :i32-shift-left :i32-shift-right :u32-shift-right
+              :xorshift32]
+  :shift-contract {:count-kind :compile-time-integer-literal
+                   :inclusive-range [0 31]
+                   :masked-out-of-range-counts false}
+  :domain-consumers
+  {:terrain {:prs ["https://github.com/kotoba-lang/terrain/pull/2"
+                   "https://github.com/kotoba-lang/terrain/pull/3"]
+             :profile :lattice-hash}
+   :vegetation {:pr "https://github.com/kotoba-lang/vegetation/pull/2"
+                :profile :deterministic-scatter-rng}}
+  :remaining []
+  :verification {:compiler-tests 312 :compiler-assertions 3961
+                 :kotoba-script-tests 38 :kotoba-script-assertions 130
+                 :browser-host :pass :nbb-golden-cases 20
+                 :failures 0 :errors 0}}
+ :static-multi-arity-abi
+ {:status :complete
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/135"
+  :compiler-merge "b19476f19b21ce1f8fe71ec9b5b992c2e2ecdbe7"
+  :adr "orgs/kotoba-lang/compiler/docs/adr/0017-sealed-multi-arity-abi.md"
+  :dispatch :compile-time-source-name-and-fixed-arity
+  :canonical-abi-symbol :name$arity$decimal-count
+  :limits {:clauses-per-source-function 8
+           :parameters-per-clause 5
+           :runtime-arity-dispatch false
+           :variadic false
+           :implicit-js-defaults false}
+  :fail-closed [:duplicate-arity :missing-arity :variadic-parameters
+                :clause-limit :reserved-abi-marker-forgery]
+  :consumer
+  {:repository "orgs/com-junkawasaki/ghosthacker-lightning"
+   :pr "https://github.com/com-junkawasaki/ghosthacker-lightning/pull/2"
+   :merge-commit "6e10ea87be573c80326925f8369b0abd29eb2416"
+   :kernel "kotoba/timing.kotoba"
+   :profile :default-and-explicit-shot-hit-window
+   :released-compatibility-fixture "kotoba/timing_release_v0_6_22.kotoba"
+   :hosted-ci {:status :not-started
+               :reason :github-account-billing-or-spending-limit
+               :local-verification :passed}}
+  :remaining []
+  :verification {:compiler-tests 317 :compiler-assertions 3981
+                 :nbb-golden-cases 21 :browser-host :pass
+                 :windows-arm64-rerun :pass
+                 :consumer-cljc-tests 27 :consumer-cljc-assertions 111
+                 :consumer-lint-errors 0 :consumer-lint-warnings 0
+                 :consumer-js-execution :pass
+                 :failures 0 :errors 0}}
+ :bounded-xml-query-abi
+ {:status :complete
+  :kotoba-script-prs ["https://github.com/kotoba-lang/kotoba-script/pull/45"
+                      "https://github.com/kotoba-lang/kotoba-script/pull/46"]
+  :kotoba-script-merge "86aefe1475f1c92bdef8e9ed3ee6022c59caf3b7"
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/136"
+  :compiler-merge "52726c74e1bd77a2a845a76d860666062c1f31b7"
+  :adrs ["orgs/kotoba-lang/kotoba-script/docs/adr/0018-bounded-xml-element-subset.md"
+         "orgs/kotoba-lang/compiler/docs/adr/0018-bounded-xml-query-abi.md"
+         "orgs/kotoba-lang/kami-articulated/docs/adr/0001-kotoba-bounded-urdf-ingestion.md"]
+  :operations {:xml-path-count [:string :string :to :i64]
+               :xml-path-attr [:string :string :i64 :string :to [:option :string]]}
+  :limits {:input-utf8-bytes 65536 :elements 2048 :depth 32
+           :attributes-per-element 32 :path-segments 32 :name-chars 128}
+  :rejected [:dtd :entity :processing-instruction :cdata :text-content
+             :duplicate-attributes :mismatched-tags :malformed-utf16
+             :trailing-content :negative-index :limit-exhaustion]
+  :consumer {:repository "orgs/kotoba-lang/kami-articulated"
+             :pr "https://github.com/kotoba-lang/kami-articulated/pull/2"
+             :merge-commit "e6324c84ef38698b82897a9050e2f962e0a72093"
+             :fixtures [:cartpole :hizukue]
+             :targets [:cljc-oracle :reference-executor :kotoba-script-js :typed-wasm]}
+  :remaining [:large-structured-joint-graph]
+  :verification {:compiler-tests 319 :compiler-assertions 3990
+                 :kotoba-script-tests 39 :kotoba-script-assertions 133
+                 :nbb-golden-cases 22 :browser-host :pass
+                 :consumer-tests 8 :consumer-assertions 38
+                 :hosted-matrix :pass :failures 0 :errors 0}}
+ :bounded-decimal-f64-abi
+ {:status :complete
+  :kotoba-script-pr "https://github.com/kotoba-lang/kotoba-script/pull/47"
+  :kotoba-script-merge "d2c766ead05f42233c94d588971e3956e912b824"
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/137"
+  :compiler-merge "48efc8aec36f7136cd0640b67a439d4f06d5d88c"
+  :consumer-pr "https://github.com/kotoba-lang/kami-articulated/pull/3"
+  :consumer-merge "c7413bce0bc73b6c506e86f883dcc9e3990b9ccd"
+  :operation {:decimal-f64-parse [:string :to [:option :f64]]}
+  :limits {:input-ascii-bytes 64 :exponent-digits 3
+           :finite-only true :rounding :nearest-ties-even}
+  :rejected [:whitespace :nan-spelling :infinity-spelling :hexadecimal
+             :digit-separator :locale-syntax :oversized-exponent
+             :non-finite-overflow :malformed-utf16]
+  :preserved [:negative-zero :underflow-zero :subnormal :maximum-finite]
+  :targets [:reference-executor :kotoba-script-js :typed-wasm-v7]
+  :verification {:kotoba-script-tests 40 :kotoba-script-assertions 136
+                 :compiler-tests 320 :compiler-assertions 3995
+                 :nbb-golden-cases 23 :hosted-matrix :pass
+                 :consumer-tests 9 :consumer-assertions 42
+                 :consumer-fixtures [:cartpole :hizukue]
+                 :failures 0 :errors 0}
+  :remaining []}
+ :bounded-decimal-f64x3-abi
+ {:status :complete
+  :kotoba-script-pr "https://github.com/kotoba-lang/kotoba-script/pull/48"
+  :kotoba-script-merge "213e8b3d0923ad5b0e48ce3ffcaf1c3bb9863a3f"
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/138"
+  :compiler-merge "d950713d7a27094371f1b3085a63df6a5b51c7de"
+  :consumer-pr "https://github.com/kotoba-lang/kami-articulated/pull/4"
+  :consumer-merge "b67c1ec2fceaa00d522e9e8384b600cadb6c6bf8"
+  :operation {:decimal-f64x3-parse
+              [:string :to [:option [:vector [:f64 :f64 :f64]]]]}
+  :limits {:input-ascii-bytes 194 :components 3
+           :component-bytes 64 :finite-only true}
+  :separators [:ascii-space :ascii-tab :ascii-cr :ascii-lf]
+  :rejected [:wrong-component-count :unicode-whitespace :comma
+             :malformed-component :non-finite-component :limit-exhaustion]
+  :targets [:reference-executor :kotoba-script-js :typed-wasm-v8]
+  :verification {:kotoba-script-tests 41 :kotoba-script-assertions 139
+                 :compiler-tests 321 :compiler-assertions 3999
+                 :nbb-golden-cases 24 :hosted-matrix :pass
+                 :consumer-tests 9 :consumer-assertions 45
+                 :consumer-fixtures [:cartpole :hizukue]
+                 :failures 0 :errors 0}
+  :remaining []}
+ :bounded-structured-urdf-records
+ {:status :complete-for-indexed-bounded-profile
+  :compiler-prs ["https://github.com/kotoba-lang/compiler/pull/139"
+                 "https://github.com/kotoba-lang/compiler/pull/141"]
+  :compiler-merges ["f0941b0db47abe7bf00f74e69911f2cac385a815"
+                    "0dc6fc7df3b8d79b7eb39649f50fb2d87e03de82"]
+  :consumer-pr "https://github.com/kotoba-lang/kami-articulated/pull/5"
+  :consumer-merge "ae40b415c171ffd27956c74c012330b5dc14262a"
+  :indexed-graph-pr "https://github.com/kotoba-lang/kami-articulated/pull/6"
+  :indexed-graph-merge "ef846b5016693417e138473979988466558a4ba5"
+  :nominal-records [:kami/pose :kami/inertia-tensor
+                    :kami/link-reference :kami/joint-reference]
+  :inertia-policy {:component-absolute-max 1.0e12
+                   :finite-only true
+                   :nonnegative-diagonal true
+                   :nonnegative-second-principal-minors true
+                   :nonnegative-determinant true
+                   :atomic-none-on-invalid true}
+  :joint-graph-policy {:links-max 20 :joints-max 19
+                       :ordering :arbitrary-indexed
+                       :unique-link-and-joint-names true
+                       :single-parent true :connected true :acyclic true
+                       :cycle-algorithm :persistent-union-find-by-rank
+                       :fail-closed true}
+  :rejected [:missing-record-member :malformed-or-nonfinite-number
+             :negative-or-indefinite-inertia :over-limit-inertia
+             :duplicate-name :unknown-reference :self-edge
+             :multiple-parent :cycle :disconnected-graph :over-limit-graph]
+  :targets [:reference-executor :kotoba-script-js :typed-wasm-v8]
+  :verification {:compiler-tests 323 :compiler-assertions 4001
+                 :compiler-platform-jobs 18 :nbb-golden-cases 24
+                 :consumer-tests 12 :consumer-assertions 63
+                 :consumer-fixtures [:cartpole :hizukue]
+                 :hosted-matrix :pass :failures 0 :errors 0}
+  :remaining [:large-structured-joint-graph :explicit-physics-provider]}
+ :typed-wasm-local-index-safety
+ {:status :canonical-uleb128-complete
+  :guard-pr "https://github.com/kotoba-lang/compiler/pull/128"
+  :guard-merge "df4ff087cb9d1f4e81dd103362007f8e3b696470"
+  :compiler-pr "https://github.com/kotoba-lang/compiler/pull/130"
+  :compiler-merge "3dca1771633fa343976392e2d0d69c64ce4a6f88"
+  :trigger :geo-policy-v7-qualification
+  :temporary-limit :removed
+  :unsafe-previous-behavior :malformed-module-above-one-byte-local-index
+  :current-behavior :validated-canonical-uleb128-local-operands
+  :remaining nil
+  :verification {:compiler-tests 306 :compiler-assertions 3913
+                 :typed-and-untyped-executed-local-index 130
+                 :nbb-golden-cases 18 :failures 0 :errors 0}}
+ :canonical-fleet-snapshot
+ {:as-of "2026-07-22"
+  :matrix "90-docs/migration/kotoba-cljc-canonical-admission-matrix.json"
+  :probes "90-docs/migration/kotoba-cljc-canonical-compile-probes.json"
+  :counts {:canonical-repositories 2039 :local-checkouts 2456
+           :duplicate-checkouts 417 :tracked-cljc-files 12481
+           :production-cljc-files 8385}
+  :source-state {:current-default-branch 889 :stale-against-default-branch 1148
+                 :incomplete-worktree 1 :github-unverified 1}
+  :github {:verified 2038 :not-found-or-inaccessible 1}
+  :classifications {:capability-bound 315 :generated 6 :host-adapter 2763
+                    :macro-compiler-time 9 :portable-direct-candidate 604
+                    :portable-refactor-required 4467 :security-host-bound 227
+                    :test-only 4088}
+  :direct-probes {:repositories 0 :probes 0}
+  :next-wave-census
+  {:as-of "2026-07-22"
+   :scope "cloud-itonami isic-*/isco-*/lei-*/iso3166-*/unspsc-*/cofog-*/gtin-*"
+   :repositories-queried 356
+   :api-errors 0
+   :repositories-with-production-cljc-zero-kotoba 294
+   :production-cljc-files-in-those 2120
+   :by-prefix {:isic {:repositories 133 :cljc-files 997}
+               :isco {:repositories 68 :cljc-files 264}
+               :iso3166 {:repositories 81 :cljc-files 777}
+               :unspsc {:repositories 5 :cljc-files 37}
+               :cofog {:repositories 5 :cljc-files 37}
+               :gtin {:repositories 2 :cljc-files 8}}
+   :repositories-with-no-src-out-of-scope
+   {:count 62 :by-prefix {:lei 46 :iso3166 15 :gtin 1}
+    :note "pure-data or scaffold-only repositories (append-only ledgers, docs-only), not remaining migration work"}
+   :repositories-already-sovereign 0
+   :disposition "See :dispositions entry :kind :retain-cljc-pending-application-profile-and-string-search-gates -- not authorized for migration attempts until both the kotoba/app completion gate and a string substring/case-fold primitive land."}
+  :reviewed-association-wave
+  [{:repository "cloud-itonami/cloud-itonami-assoc-6419-are-ubf"
+    :merge "ff157a754293d376782eb6fefb112c60c377051f"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-aus-aba"
+    :merge "5701e10f893ab6adb31d075c272e0094843bc3d5"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-che-sba"
+    :merge "3d15430d0f189b3c83e875a2f32805b77506fb5a"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-deu-bankenverband"
+    :merge "b9293b9b8801eb3e2a416e8dd8966ba414626ded"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-fra-fbf"
+    :merge "e7fcce22ae44a33e861657b190b7d8f78e730b71"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-esp-aeb"
+    :merge "e8e467d169830853ad0e5b42dbce38bd2038d1dc"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo"
+    :merge "7857f218a9879cda9ff1dbef99159be8c077b41a"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-phl-bap"
+    :merge "c6b4ee6b65b0db024a398dd8f874b98ef7cc14f5"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-vnm-vnba"
+    :merge "2ace31cd6e9d01855dd573179fb9dca151b5b1aa"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-nga-cibn"
+    :merge "593352bc5872986f5bcff136ef3b7a2338740e29"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-tur-tbb"
+    :merge "7810acc58d3055f6904c3d056dd3180a13556971"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6511-jpn-seiho"
+    :merge "cb9c43a8ead5e6f4396e51d7cfd1c3d6cd9e2d65"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6512-jpn-sonpo"
+    :merge "c9588469421d3a87386cf9fc615891a458ce2950"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6512-usa-naic"
+    :merge "c824e3f2a8a8b15a0f7a985dfc8bcc9e12690e4d"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6612-jpn-jsda"
+    :merge "9e1112ec4f6b4a3426914b94ebc521aa00a04e45"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6612-usa-finra"
+    :merge "612b69cb66d8da19db876a9b0edba19364ab37ea"
+    :result :semantic-conformance-and-zero-cljc-retired}]
+  :backfilled-unlogged-migrations
+  ["cloud-itonami/cloud-itonami-assoc-0126-idn-gapki" "cloud-itonami/cloud-itonami-assoc-0126-mys-mpoa"
+   "cloud-itonami/cloud-itonami-assoc-0150-usa-afbf" "cloud-itonami/cloud-itonami-assoc-0610-usa-api"
+   "cloud-itonami/cloud-itonami-assoc-2011-usa-acc" "cloud-itonami/cloud-itonami-assoc-2100-usa-phrma"
+   "cloud-itonami/cloud-itonami-assoc-2910-deu-vda" "cloud-itonami/cloud-itonami-assoc-2910-gbr-smmt"
+   "cloud-itonami/cloud-itonami-assoc-3510-usa-eei" "cloud-itonami/cloud-itonami-assoc-3600-usa-awwa"
+   "cloud-itonami/cloud-itonami-assoc-4100-usa-agc" "cloud-itonami/cloud-itonami-assoc-4719-usa-nrf"
+   "cloud-itonami/cloud-itonami-assoc-4923-usa-ata" "cloud-itonami/cloud-itonami-assoc-5010-nor-rederiforbundet"
+   "cloud-itonami/cloud-itonami-assoc-5110-usa-a4a" "cloud-itonami/cloud-itonami-assoc-5510-usa-ahla"
+   "cloud-itonami/cloud-itonami-assoc-5610-usa-nra" "cloud-itonami/cloud-itonami-assoc-6020-usa-nab"]
+  :assoc-wave-status :complete
+  :assoc-wave-note "All 37 cloud-itonami-assoc-* repositories (gh repo list, 2026-07-22) carry a sole production association_facts.kotoba with zero tracked CLJC. finra closed the reviewed retirement queue; the 18 repositories in :backfilled-unlogged-migrations were found already migrated by prior unlogged sessions (2026-07-20/21), verified against their merge commits and green CI, and logged into the ADR's :qualified-evidence -- their local checkouts were never canonical-matrix entries so they do not appear in :reviewed-association-wave above. No further next-reviewed-wave-candidate exists inside cloud-itonami-assoc-*; see :next-wave-census for the surveyed successor scope and the new :dispositions entry for why it is not yet actionable."
+  :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA and FINRA retirement each removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; the assoc-* wave is closed, so resume with per-repo review inside the isic/isco/iso3166/unspsc/cofog/gtin census once the application-profile and string-search gates are tracked as landed."}
+ :completion
+ {:reviewed-project-roots 42
+  :authorized-migrations 19
+  :retained-oracles 4
+  :typed-refactors-pending 0
+  :typed-refactors-in-review 0
+  :typed-refactors-merged-awaiting-cutover 3}}}
