@@ -8,29 +8,29 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 8457, "app-aozora-appview" 12735},
+ {"app-aozora-pds" 8562, "app-aozora-appview" 12797},
  :zone
- {:requests-7d 51213,
-  :pageviews-7d 8541,
-  :uniques-7d-sum 811,
+ {:requests-7d 51484,
+  :pageviews-7d 8543,
+  :uniques-7d-sum 814,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 248612}
+    :requests 250355}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2899}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1242}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 259}
-   {:path "/", :requests 181}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1303}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 261}
+   {:path "/", :requests 180}
    {:path "/robots.txt", :requests 33}
    {:path "/api/engagement", :requests 23}
-   {:path "//wp-includes/assets/", :requests 21}],
-  :status-mix {:client-error 940, :ok 255128, :server-error 28},
+   {:path "/about.php", :requests 21}],
+  :status-mix {:client-error 946, :ok 256920, :server-error 26},
   :window "24h"},
  :as-of "2026-07-22",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 248612 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2899 · /xrpc/com.atproto.sync.subscribeRepos 1242 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 259 · / 181 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 250355 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2899 · /xrpc/com.atproto.sync.subscribeRepos 1303 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 261 · / 180 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 51213 req/7d・811 uniques(日次和)・うち4xx probe 0%(24h)、workers 21192 inv/7d"}
+ "aozora.app 実測 51484 req/7d・814 uniques(日次和)・うち4xx probe 0%(24h)、workers 21359 inv/7d"}
