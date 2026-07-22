@@ -25,7 +25,7 @@
   :web-rule "JavaScript is an untrusted host target; capability admission, bounded values, and fail-closed host validation remain Kotoba authority."
   :migration-rule "Do not rename .cljc mechanically. Admit source through the Kotoba grammar/type/effect/resource gates, add cross-target evidence, then change the extension and authority declaration."
   :kami-placement "Kami owns 3D, physics, rendering, simulation, and game-engine providers. Kotoba owns language, compiler, values, capability admission, and portable domain programs."
-  :cross-host-conformance "Require valid and instantiable Wasm plus observable semantic, ABI, resource-bound, and fail-closed rejection conformance across compiler hosts. Byte layout is diagnostic evidence only, never a language-compatibility gate."}
+  :cross-host-conformance "Require valid and instantiable Wasm plus observable semantic, typed-ABI, effect, resource-bound, and fail-closed rejection conformance across compiler hosts. Do not compare compiler output byte-for-byte. Exact bytes are gated only when bytes themselves are the external contract: signatures, cryptographic vectors, canonical wire encodings, and package integrity. Hashes are provenance, integrity, and cache identities, never language semantics."}
 
  :qualified-evidence
  [{:repo "kotoba-lang/kotoba-script"
@@ -63,7 +63,7 @@
   {:repo "kotoba-lang/rtx-native"
    :pr 1
    :sha "c5e3c1584fc5b2f03066f4ec0e9df5eaad1c3ec9"
-   :evidence "third real fleet migration: production rtx_native.cljc removed; reservation metadata exposed through typed Kotoba string getters and explicit :bool activation contract; exact reference/restricted-JS/typed-Wasm parity; no ClojureScript production path; extension-authority CI and both GitHub CI jobs green"}
+   :evidence "third real fleet migration: production rtx_native.cljc removed; reservation metadata exposed through typed Kotoba string getters and explicit :bool activation contract; observable reference/restricted-JS/typed-Wasm semantic parity; no ClojureScript production path; extension-authority CI and both GitHub CI jobs green"}
   {:repo "kotoba-lang/compiler"
    :pr 166
    :sha "d4d3cd8605712134c9b6ff5ef4a3ae5d52f4ee45"
@@ -102,7 +102,139 @@
    :evidence "sixth real fleet migration: production reservation metadata CLJC removed and replaced by four typed Kotoba getters; reference/restricted-JS/instantiated-Wasm observable values agree, production source authority is enforced, synthetic-data and randomization execution remains a future capability-gated Kami provider, and both CI jobs are green"}
   {:repo "kotoba-lang/kami-app-quarry-walk" :pr 1
    :sha "b55cf842993bf11670a2b9c917463ef2f0c55e9b"
-   :evidence "seventh real fleet migration: open-ended CLJC configuration maps replaced by 17 closed typed Kotoba exports; reference/restricted-JS/instantiated-Wasm behavior passes 3 tests / 21 assertions, rendering/input/terrain/WebGPU/physics/game-loop authority remains capability-gated Kami, and both CI jobs are green"}]
+   :evidence "seventh real fleet migration: open-ended CLJC configuration maps replaced by 17 closed typed Kotoba exports; reference/restricted-JS/instantiated-Wasm behavior passes 3 tests / 21 assertions, rendering/input/terrain/WebGPU/physics/game-loop authority remains capability-gated Kami, and both CI jobs are green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6120-usa-ctia" :pr 1
+   :sha "82d5eb414b1772761445e8d75f3c9c68874740de"
+   :evidence "sole production association_facts.kotoba preserves absent establishment dates, month-only versus complete revision precision, and both ordered topic sets; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6201-usa-gtia" :pr 1
+   :sha "44f33df61290cdeeeadb597fa3bc7997d433ba5b"
+   :evidence "sole production association_facts.kotoba preserves year-only founding, absent dates, governance/ethics, and rejects unsupported CompTIA certification authority; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6411-jpn-boj" :pr 1
+   :sha "ffefb7c2182ac853e83bc409f9fe7fa18619c76e"
+   :evidence "sole production association_facts.kotoba preserves both official citations, full dates, the absent second revision, and ordered governance/operations/transparency; 3 tests / 12 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-are-ubf" :pr 1
+   :sha "ff157a754293d376782eb6fefb112c60c377051f"
+   :evidence "sole production association_facts.kotoba preserves year-only 1982/2017, absent revision dates, provenance, and distinct topics; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-aus-aba" :pr 1
+   :sha "5701e10f893ab6adb31d075c272e0094843bc3d5"
+   :evidence "sole production association_facts.kotoba preserves year-only 1985/1997 milestones without inventing a founding date and returns ordered governance coverage; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-che-sba" :pr 1
+   :sha "3d15430d0f189b3c83e875a2f32805b77506fb5a"
+   :evidence "sole production association_facts.kotoba preserves year-only 1912/2020 and distinct Wikipedia/official provenance without importing the unconfirmed 1977 date; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-deu-bankenverband" :pr 1
+   :sha "b9293b9b8801eb3e2a416e8dd8966ba414626ded"
+   :evidence "sole production association_facts.kotoba preserves absent establishment dates, month-only 2024-04/2023-10 revisions, and asymmetric topic sets; committed compiler caches removed; 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-fra-fbf" :pr 1
+   :sha "e7fcce22ae44a33e861657b190b7d8f78e730b71"
+   :evidence "sole production association_facts.kotoba preserves UTF-8 French titles, both absent establishment/revision dates, official citations, and asymmetric governance versus consumer-protection/fair-transaction topics; committed compiler caches removed; semantic reference/restricted-JS/typed-Wasm conformance passes 3 tests / 13 assertions and all JDK 17/21 CI green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-esp-aeb" :pr 1
+   :sha "e8e467d169830853ad0e5b42dbce38bd2038d1dc"
+   :evidence "sole production association_facts.kotoba preserves the year-only 1977 founding and 1985 federation-entry milestones, both absent revision dates, ordered governance coverage, and exact official citation values; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo" :pr 1
+   :sha "7857f218a9879cda9ff1dbef99159be8c077b41a"
+   :evidence "sole production association_facts.kotoba preserves complete 2005-11-22/2022-09-15 dates, absent arrangement dates, Japanese titles, official citations, and distinct ordered topic sets; seven committed JVM host cache files removed; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-phl-bap" :pr 1
+   :sha "c6b4ee6b65b0db024a398dd8f874b98ef7cc14f5"
+   :evidence "sole production association_facts.kotoba preserves official complete 1949-03-29/1964-08-24 dates, both absent revision dates, and ordered governance coverage while excluding the conflicting secondary-source 1947 claim; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-vnm-vnba" :pr 1
+   :sha "2ace31cd6e9d01855dd573179fb9dca151b5b1aa"
+   :evidence "sole production association_facts.kotoba preserves official complete 1994-05-14 approval and 1995-09-29 ASEAN admission dates, both absent revision dates, and ordered governance coverage without inventing a separate launch entry; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-nga-cibn" :pr 1
+   :sha "593352bc5872986f5bcff136ef3b7a2338740e29"
+   :evidence "sole production association_facts.kotoba preserves official complete 1963-11-28 founding and 1990-05-18 chartered-status dates, both absent revision dates, and ordered governance coverage without inventing a separate 2007 reenactment entry; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6419-tur-tbb" :pr 1
+   :sha "7810acc58d3055f6904c3d056dd3180a13556971"
+   :evidence "sole production association_facts.kotoba preserves the complete 1958-10-08 founding date, year-only 2007 arbitration-board date, both absent revision dates, Turkish UTF-8 titles, official citations, and distinct governance/consumer-protection topics; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 16 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6511-jpn-seiho" :pr 1
+   :sha "cb9c43a8ead5e6f4396e51d7cfd1c3d6cd9e2d65"
+   :evidence "sole production association_facts.kotoba preserves both absent establishment dates, the first absent revision date, complete 2026-02-26 second revision date, Japanese UTF-8 titles, official citations, and distinct ordered topic sets; seven committed JVM host cache files removed; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 14 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6512-jpn-sonpo" :pr 1
+   :sha "c9588469421d3a87386cf9fc615891a458ce2950"
+   :evidence "sole production association_facts.kotoba preserves the complete 1991-10-17 establishment and 2024-03-21 revision dates, the second absent establishment date, month-only 2026-01 revision date, Japanese UTF-8 titles, official citations, and asymmetric ordered topic sets; seven committed JVM host cache files removed; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6512-usa-naic" :pr 1
+   :sha "c824e3f2a8a8b15a0f7a985dfc8bcc9e12690e4d"
+   :evidence "sole production association_facts.kotoba preserves NAIC's standard-setting/model-law distinction, both absent establishment dates, the first absent revision date, literal 2024 (Spring 2024 edition) second revision value, official citations, and asymmetric ordered topic sets; seven committed JVM host cache files removed; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6612-jpn-jsda" :pr 1
+   :sha "9e1112ec4f6b4a3426914b94ebc521aa00a04e45"
+   :evidence "sole production association_facts.kotoba preserves the first entry's absent establishment/revision dates, complete 1975-02-19 establishment and 2026-06-16 revision dates for the second entry, Japanese UTF-8 titles, official citations, and asymmetric ordered topic sets; seven committed JVM host cache files removed; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions and all four JDK 17/21 push/PR CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-0126-idn-gapki" :pr 1
+   :sha "f6d90ced5c648ad91f5c2a266d3036a0e719976a"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves every field and topic for both verified GAPKI citations through bounded count/index access; unknown associations/fields/topics/indexes fail closed with no declared effects; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 18 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-0126-mys-mpoa" :pr 1
+   :sha "43dbe2be9c2569d4c40a88e230c32f6d8973af7f"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves every field and topic for both verified MPOA citations through bounded count/index access; unknown associations/fields/topics/indexes fail closed with no declared effects; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 18 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-0150-usa-afbf" :pr 1
+   :sha "33777c38bcbcdd0f758d9be615ce8e79f7e512fd"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves every present field, the deliberately absent second established date, and distinct governance/advocacy topics; unknown values fail closed with no declared effects; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 18 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-0610-usa-api" :pr 1
+   :sha "22d9e11a5969b7c1758b575976bf692702f74135"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves every scalar field and the complete one-or-many ordered topic sets; unknown values fail closed with no declared effects; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 19 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-2011-usa-acc" :pr 1
+   :sha "ec5424b74e42341ed5c1ef31653f26dfed88b91b"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves year-only source precision, all scalar fields, kinds, and ordered topics; unknown values and indexes fail closed with no declared effects; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 16 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-2100-usa-phrma" :pr 1
+   :sha "8b88d98ebd5bc511b5561d927c81450d67f0bfd3"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both PhRMA citations, all scalar fields, and source date precision through bounded typed option access; unknown values fail closed with no declared effects; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-2910-deu-vda" :pr 1
+   :sha "44ff7fb22c1e1da22631f97fe260ca0cf0a75b52"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both VDA citations, every present scalar field, the absent unverified date, the year-only 1901 date, and all ordered topics without inventing missing source facts; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-2910-gbr-smmt" :pr 1
+   :sha "5e6efcbd3f78c310cd348c048497781501d9d0b2"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both SMMT citations, every scalar field, full-date versus year-only precision, and both distinct topics; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-3510-usa-eei" :pr 1
+   :sha "ae8f36448ad6bcca9a1c05359633cd8020302620"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both EEI citations, every present scalar field, the absent unverified date, the year-only 1933 date, and all ordered topics without inventing missing source facts; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-3600-usa-awwa" :pr 1
+   :sha "07543191511f50da1628a884e45ed86b8fcb9279"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both AWWA citations, every scalar field, all full-date values, and all ordered topics without weakening source date precision; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 16 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-4100-usa-agc" :pr 1
+   :sha "5985b98ddcb4c66273dfd64681f39e89231bd242"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both AGC citations, every present scalar field, missing versus year-only date precision, and all ordered topics without inventing missing source facts; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 16 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-4719-usa-nrf" :pr 1
+   :sha "240389f7fa032702743b3d275069755e13e56e9e"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves both NRF citations, every present scalar field, missing versus year-only date precision, and all ordered topics without inventing missing source facts; reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-4923-usa-ata" :pr 1
+   :sha "cffb64dba5ebbc27e80702a9a331139202a8ec8d"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves ATA's complete founding date and deliberately absent safety-policy date through a bounded typed ABI; unknown associations/fields/topics/indexes fail closed; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-5010-nor-rederiforbundet" :pr 1
+   :sha "433848e06ddc943165ea5d81746746acc9b2e6d2"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves the complete 1909-09-15 founding date and year-only 1999 award date through a bounded typed ABI; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 14 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-5110-usa-a4a" :pr 1
+   :sha "e967362ca044fbd92ae6e290efe1b549d2605c79"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves Spec 2000's deliberately absent date and the history profile's year-only 1936 date through a bounded typed ABI; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-5510-usa-ahla" :pr 1
+   :sha "b604a7c45bb7279bab626c3baf1973f030439e6f"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves complete establishment/revision dates, the year-only 1910 date, and absent-revision state through bounded typed field/topic access; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-5610-usa-nra" :pr 1
+   :sha "e6514a92a8ec2cad5bd435bbafcaa2a8f6406c6d"
+   :evidence "backfilled 2026-07-20 entry: sole production association_facts.kotoba preserves the complete 1919-03-13 founding date and ServSafe's deliberately absent date, disambiguating the National Restaurant Association; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 14 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6020-usa-nab" :pr 1
+   :sha "bf07efc6d37d3de7ba9f3d008ee381827a1654df"
+   :evidence "backfilled 2026-07-21 entry: sole production association_facts.kotoba preserves year-only revision 2014, year-only founding 1923, and their distinct absent fields through bounded typed field/topic access; reference/restricted-JS/typed-Wasm conformance passes 3 tests / 15 assertions, JVM-free `kotoba -M check` admits, and both JDK 17/21 CI jobs green"}
+  {:repo "cloud-itonami/cloud-itonami-assoc-6612-usa-finra" :pr 1
+   :sha "612b69cb66d8da19db876a9b0edba19364ab37ea"
+   :evidence "sole production association_facts.kotoba preserves both entries' absent establishment/revision dates, official finra.org citations, and the asymmetric ordered topic sets (three for the rulebook, one for the by-laws); this closes the cloud-itonami-assoc-* wave — every pre-ADR-2607202200 CLJC-origin association repo is now sovereign Kotoba and all post-ADR repos in the family were scaffolded Kotoba-native; observable reference/restricted-JS/instantiated-Wasm conformance passes 3 tests / 16 assertions, clj-kondo lint is clean, committed compiler caches removed, and all four JDK 17/21 push/PR CI jobs green"}]
+
+ :canonical-snapshot
+ {:artifact "90-docs/migration/kotoba-cljc-canonical-admission-matrix.json"
+  :authority :verified-retirement-delta-plus-live-github-repository-metadata
+  :canonical-repositories 2039
+  :local-checkouts 2456
+  :duplicate-checkouts 417
+  :tracked-cljc-files 12481
+  :production-cljc-files 8385
+  :github-verified 2038
+  :github-inaccessible 1
+  :current-default-branch 889
+  :stale-against-default-branch 1148
+  :incomplete-worktree 1
+  :github-unverified 1
+  :classification-counts {:capability-bound 315 :generated 6 :host-adapter 2763
+                          :macro-compiler-time 9 :portable-direct-candidate 604
+                          :portable-refactor-required 4467 :security-host-bound 227
+                          :test-only 4088}
+  :direct-probes {:repositories 0 :probes 0}
+  :note "FINRA retired from a clean exact-live-head zero-CLJC fresh clone via scripts/retire-kotoba-cljc-canonical-repositories.mjs, removing exactly one repository and one production CLJC file. Separately, 18 more cloud-itonami-assoc-* repositories (gapki/mpoa/afbf/api/acc/phrma/vda/smmt/eei/awwa/agc/nrf/ata/rederiforbundet/a4a/ahla/nra/nab) were discovered already migrated to sovereign Kotoba on 2026-07-20/21 by prior unlogged sessions and are now backfilled into :qualified-evidence; their local checkouts were never canonical-matrix entries (some were Kotoba-native from repository creation, matching the post-ADR-2607202200 scaffold default) so this backfill does not change the matrix counts above beyond the FINRA retirement. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale. Hashes are provenance/integrity evidence, not semantic conformance gates."}
 
  :remaining-gaps
  [:fresh-default-branch-source-snapshots
@@ -111,7 +243,24 @@
   :production-jvm-launch-path-audit
   :macro-and-host-branch-replacement
   :hostile-browser-and-csp-qualification
-  :fleet-wide-extension-and-runtime-ci]
+  :fleet-wide-extension-and-runtime-ci
+  :cloud-itonami-isic-isco-lei-iso3166-actor-wave-unsurveyed]
+
+ :session-closeout
+ {:as-of "2026-07-21"
+  :state :safe-to-resume
+  :last-retired "cloud-itonami/cloud-itonami-assoc-6612-usa-finra"
+  :last-merge "612b69cb66d8da19db876a9b0edba19364ab37ea"
+  :cloud-itonami-assoc-wave :complete
+  :cloud-itonami-assoc-wave-note "All 37 cloud-itonami-assoc-* repositories (gh repo list, 2026-07-21) now carry a sole production src/association_facts.kotoba with zero tracked CLJC; every entry is logged in :qualified-evidence. No further :next-reviewed-wave-candidate exists within this sub-family."
+  :next-wave-survey-candidate "cloud-itonami org isic-*/isco-*/lei-*/iso3166-* families (133+84+46+~90 repositories, spot-checked 2026-07-21): these are multi-file Advisor/Governor/StateGraph actor repos (advisor.cljc/governor.cljc/operation.cljc/phase.cljc/sim.cljc/store.cljc, some with render_html.clj), categorically larger and more design-sensitive than the two-function association_facts catalog wave -- ambient-authority, higher-order-callback-lowering, and domain-narrowing gates from :policy in kotoba-cljc-project-gap-dispositions.edn apply per-repo and have not yet been reviewed for any of them. Do not treat this list as pre-authorized; each repo needs the same review-source-semantics step as crdt/pkg/kami-articulated in the gap-dispositions ledger before implementation starts."
+  :resume-order [:fresh-clone-default-branch :review-source-semantics
+                 :implement-sovereign-kotoba :semantic-reference-js-wasm
+                 :four-way-ci :merge :exact-head-zero-cljc-retirement
+                 :regenerate-probes :update-adr-and-ledger]
+  :non-negotiable [:no-production-jvm-authority :no-mechanical-rename
+                   :fail-closed :typed-abi :bounded-resources
+                   :no-compiler-output-byte-identity-gate]}
 
  :completion-criteria
  [:canonical-repository-inventory

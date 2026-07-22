@@ -1186,6 +1186,68 @@
   :verification {:compiler-tests 306 :compiler-assertions 3913
                  :typed-and-untyped-executed-local-index 130
                  :nbb-golden-cases 18 :failures 0 :errors 0}}
+ :canonical-fleet-snapshot
+ {:as-of "2026-07-21"
+  :matrix "90-docs/migration/kotoba-cljc-canonical-admission-matrix.json"
+  :probes "90-docs/migration/kotoba-cljc-canonical-compile-probes.json"
+  :counts {:canonical-repositories 2040 :local-checkouts 2457
+           :duplicate-checkouts 417 :tracked-cljc-files 12482
+           :production-cljc-files 8386}
+  :source-state {:current-default-branch 890 :stale-against-default-branch 1148
+                 :incomplete-worktree 1 :github-unverified 1}
+  :github {:verified 2039 :not-found-or-inaccessible 1}
+  :classifications {:capability-bound 315 :generated 6 :host-adapter 2763
+                    :macro-compiler-time 9 :portable-direct-candidate 604
+                    :portable-refactor-required 4468 :security-host-bound 227
+                    :test-only 4088}
+  :direct-probes {:repositories 0 :probes 0}
+  :reviewed-association-wave
+  [{:repository "cloud-itonami/cloud-itonami-assoc-6419-are-ubf"
+    :merge "ff157a754293d376782eb6fefb112c60c377051f"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-aus-aba"
+    :merge "5701e10f893ab6adb31d075c272e0094843bc3d5"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-che-sba"
+    :merge "3d15430d0f189b3c83e875a2f32805b77506fb5a"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-deu-bankenverband"
+    :merge "b9293b9b8801eb3e2a416e8dd8966ba414626ded"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-fra-fbf"
+    :merge "e7fcce22ae44a33e861657b190b7d8f78e730b71"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-esp-aeb"
+    :merge "e8e467d169830853ad0e5b42dbce38bd2038d1dc"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo"
+    :merge "7857f218a9879cda9ff1dbef99159be8c077b41a"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-phl-bap"
+    :merge "c6b4ee6b65b0db024a398dd8f874b98ef7cc14f5"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-vnm-vnba"
+    :merge "2ace31cd6e9d01855dd573179fb9dca151b5b1aa"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-nga-cibn"
+    :merge "593352bc5872986f5bcff136ef3b7a2338740e29"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6419-tur-tbb"
+    :merge "7810acc58d3055f6904c3d056dd3180a13556971"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6511-jpn-seiho"
+    :merge "cb9c43a8ead5e6f4396e51d7cfd1c3d6cd9e2d65"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6512-jpn-sonpo"
+    :merge "c9588469421d3a87386cf9fc615891a458ce2950"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6512-usa-naic"
+    :merge "c824e3f2a8a8b15a0f7a985dfc8bcc9e12690e4d"
+    :result :semantic-conformance-and-zero-cljc-retired}
+   {:repository "cloud-itonami/cloud-itonami-assoc-6612-jpn-jsda"
+    :merge "9e1112ec4f6b4a3426914b94ebc521aa00a04e45"
+    :result :semantic-conformance-and-zero-cljc-retired}]
+  :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA retirement itself removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; resume with cloud-itonami/cloud-itonami-assoc-6612-usa-finra from a fresh default-branch clone."}
  :completion
  {:reviewed-project-roots 41
   :authorized-migrations 19
