@@ -464,7 +464,7 @@
     (when-not (exists? parent)
       (.mkdirSync node-fs parent #js {:recursive true}))
     (println (str "  clone " url " -> " path))
-    (let [{:keys [ok? err out]} (sh-ok "git" "clone" "--depth" "1" url abs)]
+    (let [{:keys [ok? err out]} (sh-ok "git" "clone" url abs)]
       (if ok?
         {:ok? true :op :clone :path path}
         {:ok? false :op :clone :path path :err (or err out)}))))
@@ -492,7 +492,7 @@
           {:ok? true :op :fetch-ff :path path :skipped true :reason :dirty})
       (do
         (println (str "  fetch-ff " path))
-        (let [f (sh-ok "git" "-C" abs "fetch" "--depth" "1" "origin")]
+        (let [f (sh-ok "git" "-C" abs "fetch" "origin")]
           (if-not (:ok? f)
             {:ok? false :op :fetch-ff :path path :err (:err f)}
             (let [br (or (let [r (sh-ok "git" "-C" abs "rev-parse" "--abbrev-ref" "origin/HEAD")]

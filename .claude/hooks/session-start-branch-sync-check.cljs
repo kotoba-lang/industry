@@ -45,8 +45,10 @@
     (let [branch (git top "rev-parse" "--abbrev-ref" "HEAD")]
       (when (or (str/blank? branch) (= branch "HEAD")) (done!)) ; detached HEAD は対象外
 
-      ;; --depth 1 で既定ブランチだけ軽量 fetch(shallow 既定ポリシーに準拠)。
-      (git top "fetch" "-q" "--depth" "1" "origin" "main")
+      ;; 既定ブランチを fetch(full history — shallow は使わない。ADR-2606241600 は
+      ;; ADR-2607211600 で reverse 済み: --depth 1 は fetch のたびに新しい graft を作り、
+      ;; ここでの merge-base 前提の ahead/behind 判定を誤検出させる原因だった)。
+      (git top "fetch" "-q" "origin" "main")
       (let [ref (if (git top "rev-parse" "--verify" "-q" "origin/main")
                   "origin/main"
                   (some-> (git top "symbolic-ref" "-q" "refs/remotes/origin/HEAD")
