@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58], :latest-peer-main \"32fe93a0a41e37a1e6cf0d129c90c026d0df8e06\", :latest-host-main \"3c0cc9edecd79dfc30ac4ae2234c300b9bc2cc7c\", :latest-worker-version \"ae31476a-7efd-4c62-b5ce-e0dace763471\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60], :latest-peer-main \"11cecf6bc30378235790bb5eb62e03e016cad6a6\", :latest-host-main \"0f4e59fcba9d0a12c9a50a058953bbd66eea9726\", :latest-worker-version \"ae31476a-7efd-4c62-b5ce-e0dace763471\"}"
   :adr/body
   "# Context
 
@@ -276,6 +276,20 @@ retryごとにreceipt epochが変わるとtask CIDが発散する問題は、vie
 実R2隔離prefix `codex/2026-07-23/resumable-join-v2`ではseed 200が1412.7 ms、retractは1288.1 msで202となった。client retryなしのdriver 1 call（4898.8 ms、pending/completed）が二段のfrontier taskを完了し、durable receipt replayは263.1 msだった。initial task statusはprocessed items 2、bytes 140、ordinal 2、completed/result CIDあり。測定後にmutable headとinitial resumable pointerを削除し、ingress jobはterminal self-delete済みである。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-resumable-join-frontier.edn`、host PR #54 merge commitは`3c0cc9edecd79dfc30ac4ae2234c300b9bc2cc7c`である。
 
 このpassでfrontier state自体のdurable spill/resume gapは完了した。ただし一つのprefix lookupは現在も一回のhost callでrowsを返し、terminalではspill row chunksをin-memory setへ再構築している。したがって「任意cardinalityのbounded-memory join」完了とは宣言しない。次のgapはprefix scanのcontinuation cursor付きRange iterator、spill-backed final membership evaluator、historical MVCC joinである。
+
+# Verification addendum — bounded prefix continuation for resumable joins (2026-07-23)
+
+peerのMerkle-LSM object-store adapterへMVCC-aware `find-index-prefix-page!`を追加した。各run blockをCID順に逐次取得し、run間に保持するstateをlogical key順の`limit+1`候補へpruneする。cursorはreverse epoch suffixを除いたcanonical physical keyで、assertionだけでなくtombstoneもpage positionを進める。このため削除だけのpageで停止せず、古いassertionを次pageで復活させない。peer PR #59 merge commitは`c78b92b1ed7e657cd30e92880c9c8b6499560513`である。
+
+join work nodeはoptionalなclause/index/after cursorを持つ。cursor clauseがremaining setに存在すること、indexがcovering indexであること、afterが非空であることをdecode/buildの双方でfail closedに検証し、byte split後の各nodeにも同じcursorを保存する。peer PR #60 merge commitは`11cecf6bc30378235790bb5eb62e03e016cad6a6`である。peer local CIはJVM 218 tests/645 assertions、CLJS 214 tests/707 assertions、R2 gateway 21 tests/67 assertions、lint errors 0で完了した。
+
+hostはmulti-clause positive frontierを最初からsnapshot-pinned resumable pathへ送り、一invocationでdeterministicな一index group・一prefix pageだけを処理する。異なるindex group、page continuation、次join waveは既存tailを書き換えずlinked work chainへprependする。after snapshotのretractionは該当pageから除き、assertionはterminal pageで一度だけ導入するためpage数に比例して同じnew datomを再展開しない。`MERKLE_FRONTIER_PREFIX_ROWS`は既定256、forced local contractは1である。
+
+local MemoryR2のalternative-proof fixtureではalice retract後もbob proofが残るためview delta bytes 0、最後のproofだけ171-byte tombstoneをpublishした。双方がpending 3回後completedとなり、host CI 75 tests/403 assertions、lint errors 0、Worker release build、ingress smokeはgreenだった。host PR #55 merge commitは`0f4e59fcba9d0a12c9a50a058953bbd66eea9726`である。
+
+実R2隔離prefix `codex/2026-07-23/bounded-prefix-join`では1 row/pageを強制し、seed 1450.8 ms、retract accept 1599.6 ms、driver 7246.2 msでpending 3回後completed、durable replay 264.2 msだった。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-bounded-prefix-join.edn`である。このfixtureは2 derivationのcontinuation correctness testであってlarge-cardinality throughput benchmarkではない。隔離prefixはaudit用に保持した。
+
+これにより「一つのprefix lookupが全visible rowsを同時に保持する」gapはlogical candidate stateについて完了した。残るbounded-memory境界は、一つの旧physical run block自体のsub-block化、terminal spillをin-memory setへ戻さないexternal evaluator、historical MVCC joinである。加えて10^5〜10^7件の同一prefixについてR2 GET/bytes、Worker CPU、p95/p99、peak memoryを測るscale gateは未実行である。
 
 # Consequences
 
