@@ -1,27 +1,27 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 12300,
-  :pageviews-7d 6799,
-  :uniques-7d-sum 438,
+ {:requests-7d 12631,
+  :pageviews-7d 6964,
+  :uniques-7d-sum 440,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 62}
+  [{:path "/", :requests 64}
    {:path "/mailer.php", :requests 54}
    {:path "/m.php", :requests 38}
    {:path "/cxc.php", :requests 38}
-   {:path "/min.php", :requests 34}
+   {:path "//abcd.php", :requests 36}
    {:path "/7.php", :requests 33}
    {:path "/122.php", :requests 31}
    {:path "/hehee.php", :requests 30}],
-  :status-mix {:ok 4334, :server-error 8, :client-error 5},
+  :status-mix {:ok 4349, :server-error 8, :client-error 5},
   :window "24h"},
  :as-of "2026-07-22",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 62 · /mailer.php 54 · /m.php 38 · /cxc.php 38 · /min.php 34 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): / 64 · /mailer.php 54 · /m.php 38 · /cxc.php 38 · //abcd.php 36 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "isekai.network 実測 12300 req/7d・438 uniques(日次和)・うち4xx probe 0%(24h)",
+ "isekai.network 実測 12631 req/7d・440 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
