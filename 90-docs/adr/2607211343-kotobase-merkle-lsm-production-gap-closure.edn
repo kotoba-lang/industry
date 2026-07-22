@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55], :latest-peer-main \"15aff041e8290d74883b9d7c460b5f232c2be5a4\", :latest-host-main \"20d2fd401dfdb907007b919a5951a31b62cd4329\", :latest-worker-version \"ae31476a-7efd-4c62-b5ce-e0dace763471\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57], :latest-peer-main \"259702be977e114031492aa03cc236d8373e7e3d\", :latest-host-main \"9523c96154076a323c476a246c631384f011d787\", :latest-worker-version \"ae31476a-7efd-4c62-b5ce-e0dace763471\"}"
   :adr/body
   "# Context
 
@@ -246,12 +246,22 @@ GCは`scheduler/ingress/**/current`もroot snapshotへ含め、deadline内のque
 
 このpass後も残るgapは次である。
 
-1. 一つのlogical key partition自体が4 MiBを越える場合はfail closedする。block内sub-partition、hot-key spill、output streamingが必要である。
+1. logical key partitionのaggregateが4 MiBを越えるgapはdescriptor Range work item、linked exact-key seen chunks、byte-bounded output segmentで完了した。残るfail-closed境界は、一つのcanonical rowまたは旧formatの分割不能なphysical block自体が上限を越える場合である。
 2. positive join frontierは10,000 binding states/100,000 rowsでboundedだがresumableではない。frontier spillとhistorical snapshot joinは未完了である。
 3. orphan block/pointer countはGC auditへ出るが、bytes、age histogram、alert threshold、restore drillは未完了である。
 4. HTTP 202のdurable job、scheduled driver、backoff、deadlineは完了した。残る運用gapはexplicit cancellation、dead-letter inspection、backlog/age/lease-loss alertとcron dispatch latency SLOである。
 5. 10^7 datom、multi-megabyte segment、32 concurrent writers+compactor、multi-region、backup/restore、encrypted rangeのrelease gateは未実行である。
 6. columnar block、CDN/browser end-to-end percentile、prefetch/cache、generic on-disk q/pullと複合form optimizerは引き続きP1/P2に残る。
+
+# Verification addendum — hot partition descriptor subblock spill (2026-07-23)
+
+logical key partition全体を一度にhydrateする実装を、physical block descriptorごとのRange work itemへ置換した。全generationの推定inputがbudget内なら従来のcoarse partition fast pathを維持し、超過時だけgeneration/descriptor rangeへspillする。各invocationは一つのconfigured input rangeだけを読み、newest-firstのexact seen-key chunk chainでassert/retractを判定する。Bloomを正しさに使わないためfalse positiveでrowを失わず、seen nodeもcanonical DAG-CBOR bytesで分割する。checkpoint cursorがlatest seen headをrootに持つのでcrash/retryとGC reachabilityを維持する。
+
+peer側では隣接するequal-key physical segmentをcanonical ordinal順で許可し、真のoverlapは引き続きrejectする。`build-view`、delta、projection、Datalog materializationへoptional `max-block-bytes`を追加し、row-count chunkをdeterministic recursive binary splitする。一つのcanonical rowが上限を越える場合だけfail closedする。peer PR #56/#57のmerge commitはそれぞれ`822f3c888e5532c537e0dd71a08852e044115a8a`、`259702be977e114031492aa03cc236d8373e7e3d`である。
+
+hostの512-byte forced contractでは旧7 coarse partitionが13 descriptor work itemとなり、最大Range GETは296 bytesだった。immutable spill後pointer CAS前のcrashを回復し、terminal publish後の次writeも200となった。host CIは75 tests/403 assertions、lint errors 0、Worker release build、datom ingress smokeがgreenである。
+
+最新版を実R2隔離prefix `codex/2026-07-23/resumable-subblocks-v2`へ接続した結果、generation 7は2218.2 msで202、taskは3 driver callsで13 work itemを完了し、同じrequestのdurable receipt replayは233.5 msだった。processed items 7、processed bytes 3432、result CIDありをstatus APIで確認した。測定後にmutable headとresumable pointerを削除し、ingress jobはterminal self-delete済みである。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-resumable-subblocks.edn`、host PR #53 merge commitは`9523c96154076a323c476a246c631384f011d787`である。
 
 # Consequences
 
