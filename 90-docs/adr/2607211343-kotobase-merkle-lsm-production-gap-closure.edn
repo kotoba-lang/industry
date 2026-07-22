@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57], :latest-peer-main \"259702be977e114031492aa03cc236d8373e7e3d\", :latest-host-main \"9523c96154076a323c476a246c631384f011d787\", :latest-worker-version \"ae31476a-7efd-4c62-b5ce-e0dace763471\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58], :latest-peer-main \"32fe93a0a41e37a1e6cf0d129c90c026d0df8e06\", :latest-host-main \"3c0cc9edecd79dfc30ac4ae2234c300b9bc2cc7c\", :latest-worker-version \"ae31476a-7efd-4c62-b5ce-e0dace763471\"}"
   :adr/body
   "# Context
 
@@ -247,7 +247,7 @@ GCは`scheduler/ingress/**/current`もroot snapshotへ含め、deadline内のque
 このpass後も残るgapは次である。
 
 1. logical key partitionのaggregateが4 MiBを越えるgapはdescriptor Range work item、linked exact-key seen chunks、byte-bounded output segmentで完了した。残るfail-closed境界は、一つのcanonical rowまたは旧formatの分割不能なphysical block自体が上限を越える場合である。
-2. positive join frontierは10,000 binding states/100,000 rowsでboundedだがresumableではない。frontier spillとhistorical snapshot joinは未完了である。
+2. positive join frontierのIPLD work/spillとserver-owned resumeは完了した。残るbounded-memory境界は一つのprefix lookupをstreaming Range iteratorへすること、terminal row setをon-disk evaluatorへ接続すること、およびhistorical snapshot joinである。
 3. orphan block/pointer countはGC auditへ出るが、bytes、age histogram、alert threshold、restore drillは未完了である。
 4. HTTP 202のdurable job、scheduled driver、backoff、deadlineは完了した。残る運用gapはexplicit cancellation、dead-letter inspection、backlog/age/lease-loss alertとcron dispatch latency SLOである。
 5. 10^7 datom、multi-megabyte segment、32 concurrent writers+compactor、multi-region、backup/restore、encrypted rangeのrelease gateは未実行である。
@@ -262,6 +262,20 @@ peer側では隣接するequal-key physical segmentをcanonical ordinal順で許
 hostの512-byte forced contractでは旧7 coarse partitionが13 descriptor work itemとなり、最大Range GETは296 bytesだった。immutable spill後pointer CAS前のcrashを回復し、terminal publish後の次writeも200となった。host CIは75 tests/403 assertions、lint errors 0、Worker release build、datom ingress smokeがgreenである。
 
 最新版を実R2隔離prefix `codex/2026-07-23/resumable-subblocks-v2`へ接続した結果、generation 7は2218.2 msで202、taskは3 driver callsで13 work itemを完了し、同じrequestのdurable receipt replayは233.5 msだった。processed items 7、processed bytes 3432、result CIDありをstatus APIで確認した。測定後にmutable headとresumable pointerを削除し、ingress jobはterminal self-delete済みである。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-resumable-subblocks.edn`、host PR #53 merge commitは`9523c96154076a323c476a246c631384f011d787`である。
+
+# Verification addendum — resumable positive Datalog join frontier (2026-07-23)
+
+peerに`kotobase/join-frontier-work` v1を追加した。symbol-keyed binding mapをvariable名でsortしたportable DAG-CBORへ変換し、explicit byte budgetを越えるvectorをdeterministic binary splitする。各work nodeは次のpending work CIDだけをLinkし、新しいjoin waveは既存chainを書き換えずheadへprependできる。一つのbindingがnode budgetを越える場合はfail closedする。JVM 215 tests/625 assertions、CLJS 211 tests/682 assertions、R2 gateway 21 tests/67 assertions、lint errors 0。peer PR #58 merge commitは`32fe93a0a41e37a1e6cf0d129c90c026d0df8e06`である。
+
+hostは同期fast pathの10,000 states/100,000 rows gateを越えたpositive frontier、または明示thresholdで強制されたfrontierをsnapshot-pinned `:join-frontier` resumable taskとして再開する。一invocationはlinked work nodeを一つだけconsumeし、index prefix batchを評価し、次waveのwork chainとexact EAV row chunksをcanonical byte limit内でimmutable putしてから既存R2 ETag-CAS checkpointを進める。terminal bindingはfinal evaluatorが消費しないため再queueせず、alternative derivationを調べるphase Bも同じsubstrateを使う。completed taskのbounded=false resultはfull fallbackへ戻すため、unbounded clauseをboundedと誤認しない。
+
+retryごとにreceipt epochが変わるとtask CIDが発散する問題は、view-enabled publication epochをpinned current publication epoch+1とするlogical epochへ修正した。同じhead/requestは同じreceipt datom、workload CID、task CIDを再現する。server-owned ingress jobは`:resumable-pending`を一般error attemptとして数えず、正当な32 work item超のprogressをdead-letter化しない。deadlineと一般errorの32-attempt上限は維持する。
+
+512-byte forced local contractでは、aliceをretractしてbobの代替証明が残る更新が202→pending/completed→200となりview delta bytesは0、最後のbobをretractする更新は171-byte tombstoneをpublishした。host CIは75 tests/403 assertions、lint errors 0、Worker release build、ingress smokeがgreenである。
+
+実R2隔離prefix `codex/2026-07-23/resumable-join-v2`ではseed 200が1412.7 ms、retractは1288.1 msで202となった。client retryなしのdriver 1 call（4898.8 ms、pending/completed）が二段のfrontier taskを完了し、durable receipt replayは263.1 msだった。initial task statusはprocessed items 2、bytes 140、ordinal 2、completed/result CIDあり。測定後にmutable headとinitial resumable pointerを削除し、ingress jobはterminal self-delete済みである。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-resumable-join-frontier.edn`、host PR #54 merge commitは`3c0cc9edecd79dfc30ac4ae2234c300b9bc2cc7c`である。
+
+このpassでfrontier state自体のdurable spill/resume gapは完了した。ただし一つのprefix lookupは現在も一回のhost callでrowsを返し、terminalではspill row chunksをin-memory setへ再構築している。したがって「任意cardinalityのbounded-memory join」完了とは宣言しない。次のgapはprefix scanのcontinuation cursor付きRange iterator、spill-backed final membership evaluator、historical MVCC joinである。
 
 # Consequences
 
