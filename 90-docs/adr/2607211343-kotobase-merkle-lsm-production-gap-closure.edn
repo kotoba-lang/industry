@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60], :latest-peer-main \"11cecf6bc30378235790bb5eb62e03e016cad6a6\", :latest-host-main \"0f4e59fcba9d0a12c9a50a058953bbd66eea9726\", :latest-worker-version \"ae31476a-7efd-4c62-b5ce-e0dace763471\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60], :latest-peer-main \"11cecf6bc30378235790bb5eb62e03e016cad6a6\", :latest-host-main \"49f8a231872e3a5c16a6fbaab984b2935be3644f\", :latest-worker-version \"ae31476a-7efd-4c62-b5ce-e0dace763471\"}"
   :adr/body
   "# Context
 
@@ -290,6 +290,10 @@ local MemoryR2のalternative-proof fixtureではalice retract後もbob proofが�
 実R2隔離prefix `codex/2026-07-23/bounded-prefix-join`では1 row/pageを強制し、seed 1450.8 ms、retract accept 1599.6 ms、driver 7246.2 msでpending 3回後completed、durable replay 264.2 msだった。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-bounded-prefix-join.edn`である。このfixtureは2 derivationのcontinuation correctness testであってlarge-cardinality throughput benchmarkではない。隔離prefixはaudit用に保持した。
 
 これにより「一つのprefix lookupが全visible rowsを同時に保持する」gapはlogical candidate stateについて完了した。残るbounded-memory境界は、一つの旧physical run block自体のsub-block化、terminal spillをin-memory setへ戻さないexternal evaluator、historical MVCC joinである。加えて10^5〜10^7件の同一prefixについてR2 GET/bytes、Worker CPU、p95/p99、peak memoryを測るscale gateは未実行である。
+
+scale follow-upではbenchmark fixtureを可変化し、実R2で256 teams/512 membership datomsと、単一request上限いっぱいの511 teams/1,022 membership datomsを64 rows/pageで測定した。256 teamsはseed 3,876.5 ms、accept 1,229.2 ms、driver 5 calls/19 pending partitions/合計32,216.8 ms、replay 319.2 ms。511 teamsはseed 8,218.9 ms、accept 1,311.7 ms、driver 10 calls/39 pending partitions/合計77,608.0 ms、replay 205.4 msだった。1024 teamsはrequest datom上限1,024によりseed前に413 fail closedとなった。
+
+全runはlost resultなくdurable completed/replayしたためbounded progress correctnessは維持した。一方、teamsを1.996倍にするとdriver wallは2.409倍となり、現在のlogical cursor pageがcontinuationごとにselected immutable run blocksを先頭から再取得するread amplificationが支配的である。これはproduction-ready latencyではない。次の優先実装をphysical data subblock、run sparse index、logical cursorに加えたrun/block position continuationとする。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-large-prefix-join.edn`、host PR #56 merge commitは`49f8a231872e3a5c16a6fbaab984b2935be3644f`である。R2 GET count/bytesとWorker peak memoryは今回のremote previewから取得できておらず、10^5/10^7 release gateとともに未完了のままとする。
 
 # Consequences
 
