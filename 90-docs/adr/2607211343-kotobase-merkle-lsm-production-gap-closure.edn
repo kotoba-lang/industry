@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54], :latest-peer-main \"8f8d14e4704c4c984330db06751be5ae427fd1ab\", :latest-host-main \"c3101eac0edf2256ef939faf15cca326f9e5723b\", :latest-worker-version \"ae31476a-7efd-4c62-b5ce-e0dace763471\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54], :latest-peer-main \"8f8d14e4704c4c984330db06751be5ae427fd1ab\", :latest-host-main \"5cf4fc21d977788ef42e9430eaaba0df5a4108e9\", :latest-worker-version \"ae31476a-7efd-4c62-b5ce-e0dace763471\"}"
   :adr/body
   "# Context
 
@@ -236,12 +236,14 @@ local contractでは同期budgetを1 byteへ下げて強制発火し、immutable
 
 pointer lifecycle follow-upでは、resumable pointerを無条件の永久GC rootとする保守的初版を置換した。pointerの`db-id`に対応するcurrent headが`expected-head`と一致し、statusがrunning/completedである間だけcheckpoint graphをmarkする。headが進んだtaskまたはreleased pointerは再publish不能なので、grace period後にcheckpoint/spill/temporary segment blocksとpointer keyをcandidateとする。blockとpointerは同じ二回のhead/retention/pointer snapshot一致後だけdeleteする。R2 listingの`uploaded` Dateはmillisecond整数へ正規化し、同時刻の別JS object identityが常時fenceを起こさないこともtestした。CLJSは206 tests/644 assertions、JVMは210 tests/593 assertions、lint errors 0。peer PR #54 merge commitは`8f8d14e4704c4c984330db06751be5ae427fd1ab`である。これによりcompleted/stale task graphの自動retention/cleanup gapは完了した。
 
+task status follow-upでは、service bearer認証済み`GET /v1/kotobase/resumable-status?headKey=...&taskId=...`をhostへ追加した。status、attempt、next ordinal、processed items/bytes、lease expiry、expected/current head、stale fence、terminal result CIDだけを返し、attempt tokenとpointer ETagは公開しない。missing parameter 400、unauthorized 401、missing task 404を固定した。local smokeはpublish後のcompleted taskがordinal 7、result CIDあり、head移動によりstale=trueとなることを確認した。host JVM 75 tests/403 assertions、Worker release build、lint errors 0。host PR #51 merge commitは`5cf4fc21d977788ef42e9430eaaba0df5a4108e9`である。これでtask status read API gapは完了した。
+
 このpass後も残るgapは次である。
 
 1. 一つのlogical key partition自体が4 MiBを越える場合はfail closedする。block内sub-partition、hot-key spill、output streamingが必要である。
 2. positive join frontierは10,000 binding states/100,000 rowsでboundedだがresumableではない。frontier spillとhistorical snapshot joinは未完了である。
 3. orphan block/pointer countはGC auditへ出るが、bytes、age histogram、alert threshold、restore drillは未完了である。
-4. HTTP 202を自動driveする常駐job runner、backoff、deadline/cancellation、task status read APIは未完了であり、現時点ではclient retryが進行を担う。
+4. HTTP 202を自動driveする常駐job runner、backoff、deadline/cancellationは未完了であり、status APIはあるが現時点ではclient retryが進行を担う。
 5. 10^7 datom、multi-megabyte segment、32 concurrent writers+compactor、multi-region、backup/restore、encrypted rangeのrelease gateは未実行である。
 6. columnar block、CDN/browser end-to-end percentile、prefetch/cache、generic on-disk q/pullと複合form optimizerは引き続きP1/P2に残る。
 
