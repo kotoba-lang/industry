@@ -26,9 +26,8 @@
 - topdir は「manifest ディレクトリの親」として導出されるため、チェックアウトの
   ディレクトリ名に依存しない。
 - project の `path:` は旧 submodule と同一なので、ツール・CI のパス前提を変えずに済む。
-- 既定は full clone。`clone-depth: 1` が付くのは `repos.edn` `:manifest.repos/heavy`
-  （大容量バイナリ同梱リポ）に属する project だけ（CLAUDE.md「Git operations」、
-  ADR-2607211500 / ADR-2606302100）。
+- 全 project が full history（shallow は使わない。2026-07-21、ADR-2607211600 で
+  旧 `clone-depth: 1` 既定を撤回）。
 - ネスト submodule を持つ repo（`ghosthacker` / `kami-engine` / `root` /
   `ai-gftd-apps-gftdcojp`）は `submodules: true` で git の再帰取得に委ねる。
 

@@ -4,10 +4,9 @@
 ;;
 ;; 理由 (CLAUDE.md 「Git operations」): このリポジトリの正しい同期手順は
 ;;   git fetch origin && git merge --ff-only origin/main && west update --fetch smart
-;; の3ステップで、子リポの pin を west update で追従させる(shallow はもう既定ではない
-;; — ADR-2607211500。west heavy リポだけ manifest 側 clone-depth:1 で例外的に shallow)。
-;; `git pull`(単体)はこれを満たさない(west update が走らず子リポの pin が追従しない)
-;; ため、実行を許さず代替コマンドを提示する。
+;; の3ステップで、子リポの pin を west update で追従させる。
+;; `git pull`(単体)はこれを満たさない(west update が走らず子リポの pin が
+;; manifest と食い違ったままになる)ため、実行を許さず代替コマンドを提示する。
 ;;
 ;; west 管理下でない repo（.west/ も manifest/west.yml も無い）は対象外で素通りさせる
 ;; （この規約は superproject 固有であり、無関係な repo の plain pull を妨げない）。

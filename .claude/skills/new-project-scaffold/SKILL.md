@@ -53,7 +53,7 @@ description: Standing-authorized flow for creating and registering a new project
 
 - **ただしガードレールは常に守る**（恒久承認は手順の省略であって安全策の省略ではない）:
   - **west.yml / manifest の main 反映は `repos.edn :manifest-workflow` の正経路
-    （API single-entry。楽観ロック）で行う。** local の shallow 3-way merge を戦わない・
+    （API single-entry。楽観ロック）で行う。** local での 3-way merge を戦わない・
     conflict marker を手編集しない・`--force` push しない。
   - **オーナーの未コミット WIP は破棄しない。** ブロック時は `git stash`（drop せず温存）。
     衝突は marker 手編集でなく **west.yml 再生成**で解く。

@@ -14,8 +14,9 @@
 ;;   nbb scripts/cleanup.cljs --merge    ; MERGEABLE な PR を gh pr merge --merge（main 同期を先に）
 ;;   nbb scripts/cleanup.cljs --subrepos ; 子リポ survey を省略（superproject のみ）
 ;;
-;; shallow な local は ancestry 誤判定する（CLAUDE.md「shallow-depth1-git-default」）。
-;; PR の ahead/behind・mergeable は GitHub API（server-side full history）で確定すること。
+;; full history が既定（2026-07-21、ADR-2607211600 で shallow 既定は撤回済み）だが、
+;; PR の ahead/behind・mergeable は引き続き GitHub API（server-side full history）で
+;; 確定すること（ローカル判定だけに頼らない）。
 (require '[scripts.nbb-compat :refer [slurp spit file-seq format]]
          '[clojure.string :as str]
          '[clojure.java.shell :refer [sh]]

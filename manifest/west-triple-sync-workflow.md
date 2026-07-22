@@ -50,7 +50,7 @@ nbb scripts/west-triple-sync.cljs verify --scope blocking
 
 1. **discover** — `west-orphan-audit --edn` + local∩west inventory  
 2. **ensure-github** — remote must exist (`gh`); do not `gh repo create` here  
-3. **ensure-local** — `git clone --depth 1` if missing (skip if dirty would be overwritten — N/A for missing dir)  
+3. **ensure-local** — `git clone` (full history — shallow retired 2026-07-21, ADR-2607211600) if missing (skip if dirty would be overwritten — N/A for missing dir)  
 4. **ensure-west** — surgical `:extra-projects` insert + `gen-west-manifest.cljs --entry`  
 5. **align-latest** — `fetch` + `merge --ff-only` when clean; pin advance only if HEAD is on origin  
 6. **verify** — orphan blocking + pin verify  

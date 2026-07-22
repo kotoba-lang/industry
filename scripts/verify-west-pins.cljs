@@ -11,8 +11,8 @@
 ;;      (behind = 静かな pin 退行 / diverged = 系統違い。どちらも fail)。
 ;;      旧 pin 自体が上流に無い場合(壊れた pin の修復時)は WARN で通す。
 ;;
-;; 判定はすべて GitHub API(サーバ側 full 履歴)。ローカル shallow の ancestry は
-;; 一切信用しない(CLAUDE.md「マージ / ancestry 判定」節と同じ理由)。
+;; 判定はすべて GitHub API(サーバ側 full 履歴)。ローカルの ancestry 判定だけに
+;; 頼らない(CLAUDE.md「マージ / ancestry 判定」節と同じ理由)。
 ;;
 ;; 使い方:
 ;;   nbb scripts/verify-west-pins.cljs                        ; baseline=origin/main(無ければ HEAD), candidate=working tree
