@@ -286,4 +286,18 @@
  {:product/id :product/pipedrive :product/name "Pipedrive"}
  {:product/id :product/zoho-crm :product/name "Zoho CRM"}
  {:product/id :product/dynamics-365-sales :product/name "Microsoft Dynamics 365 Sales"}
+
+ ;; flagship-parity addition (2026-07-22, owner directive): cloud-itonami-isic-851 (primary/pre-primary
+ ;; education administrative coordination) was outside the original 28-vertical pilot batch and had no
+ ;; pricing docs at all; benchmarked here as part of bringing it to the same real-market-anchored pricing
+ ;; discipline as the 6399/6310/7810/5820 flagship cohort.
+ {:vertical/id :vertical/isic-851 :vertical/code "851" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Pre-primary and primary education — administrative coordination (attendance, scheduling, supply, staffing, safety-flagging)"
+  :vertical/cluster [:cluster/id :cluster/utilities-etc]
+  :vertical/repo "cloud-itonami-isic-851" :vertical/pricing-shape "flat monthly managed-tenant fee, per school"}
+ {:product/id :product/schoolcues :product/name "SchoolCues"}
+ {:product/id :product/bloomz :product/name "Bloomz"}
+ {:product/id :product/parentsquare :product/name "ParentSquare"}
+ {:product/id :product/brightwheel :product/name "Brightwheel"}
+ {:product/id :product/procare :product/name "Procare"}
 ]
