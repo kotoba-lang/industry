@@ -426,9 +426,10 @@
 (defn ensure-extra-project! [path]
   (let [f (node-path.join root "manifest/repos.edn")
         text (slurp f)
-        ;; repos.edn stores :extra-projects as an EDN blob string, so entries
-        ;; must retain the escaped quotes of the vector encoded in that blob.
-        token (str "\\\"" path "\\\"")]
+        ;; :manifest.repos/extra-projects is a plain top-level EDN vector of
+        ;; strings in repos.edn (unlike blob-string-encoded fields such as
+        ;; :manifest.repos/datalad) -- entries use bare quotes, no escaping.
+        token (str "\"" path "\"")]
     (if (str/includes? text token)
       :already
       (let [key-idx (.indexOf text ":manifest.repos/extra-projects")
