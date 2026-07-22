@@ -252,7 +252,10 @@
    :evidence "same empty-shell class as kami-engine-core (ADR-2607102200 addendum 8-9); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
   {:repo "kotoba-lang/kami-engine-web" :pr 1
    :sha "6c019a9b256b510979a8a3340b9069192c622f6b"
-   :evidence "same empty-shell class as kami-engine-core; canonical implementation lives in webgpu/kami-web (ADR-2607102200); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}]
+   :evidence "same empty-shell class as kami-engine-core; canonical implementation lives in webgpu/kami-web (ADR-2607102200); docs-only authority CI green, retired from the canonical matrix at exact live head with zero tracked CLJC"}
+  {:repo "com-junkawasaki/ghosthacker-vamos" :pr 1
+   :sha "541d7ab9688533d330f4478d73cbde6633c26830"
+   :evidence "bounded-profile-split, additive (core.cljc/roster.cljc retained as general oracle, not replaced): src/ghosthacker_vamos/bounded.kotoba computes each of the fixed four-player roster's tally from a flat 24-element vector-i64 (reaction-tap target=42/close-window=5, quick-pick correct-index=0, sequence-recall canonical-order=[0 1 2 3]), fails closed on any other input length; both expected tallies (all-270, and boundary-mixed [270 70 120 0] pinning the close-window boundary exactly at diff=5) were hand-derived from the legacy judgment tables before compiling and confirmed against both the reference Web build and instantiated typed WebAssembly, not just internal self-consistency; unchanged legacy suite 22 tests / 63 assertions and clj-kondo lint both clean; hosted CI blocked by the same account-level GitHub Actions billing hold already recorded for ghosthacker-family/memorize/timemachine/sha256d (reverification-required true), merged on local reference+Web+Wasm conformance evidence per that established precedent"}]
 
  :canonical-snapshot
  {:artifact "90-docs/migration/kotoba-cljc-canonical-admission-matrix.json"
