@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 10288, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 10298, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 481188,
-  :pageviews-7d 6513,
-  :uniques-7d-sum 5070,
+ {:requests-7d 486491,
+  :pageviews-7d 6520,
+  :uniques-7d-sum 5115,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/ccc.php", :requests 32}
+  [{:path "/", :requests 1065}
+   {:path "/favicon.ico", :requests 145}
+   {:path "/inputs.php", :requests 35}
    {:path "/ms-edit.php", :requests 32}
-   {:path "/ops.php", :requests 26}
-   {:path "/a2.php", :requests 26}
-   {:path "/puc.php", :requests 23}
-   {:path "//cgi-bin/index.php", :requests 23}
-   {:path "/gettest.php", :requests 21}
-   {:path "/wp-content/themes/index.php", :requests 19}],
-  :status-mix {:client-error 1144, :ok 818, :server-error 15416},
+   {:path "/8.php", :requests 29}
+   {:path "/dr.php", :requests 24}
+   {:path "//cgi-bin/index.php", :requests 24}
+   {:path "/ssh3ll.php", :requests 23}],
+  :status-mix {:server-error 15426, :client-error 1509, :ok 2101},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-22",
- :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 89},
+ :traffic-quality {:window "24h", :probe-4xx-pct 8, :error-5xx-pct 81},
  :top-paths
- "上位 page (24h, 2xx/3xx): /ccc.php 32 · /ms-edit.php 32 · /ops.php 26 · /a2.php 26 · /puc.php 23 | 4xx(probe) 7% · 5xx 89%",
+ "上位 page (24h, 2xx/3xx): / 1065 · /favicon.ico 145 · /inputs.php 35 · /ms-edit.php 32 · /8.php 29 | 4xx(probe) 8% · 5xx 81%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 481188 req/7d・5070 uniques(日次和)・うち4xx probe 7%(24h)、workers 10289 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 486491 req/7d・5115 uniques(日次和)・うち4xx probe 8%(24h)、workers 10299 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
