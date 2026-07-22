@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 6506, "kotobase-cf-wasm-staging" 716},
+ {"net-kotobase" 6510, "kotobase-cf-wasm-staging" 716},
  :zone
- {:requests-7d 13939,
-  :pageviews-7d 593,
-  :uniques-7d-sum 929,
+ {:requests-7d 13943,
+  :pageviews-7d 595,
+  :uniques-7d-sum 930,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 50}
+  [{:path "/", :requests 51}
    {:path "/api/funnel", :requests 25}
    {:path "/health", :requests 25}
-   {:path "/robots.txt", :requests 11}
+   {:path "/robots.txt", :requests 10}
    {:path "/favicon.ico", :requests 2}
    {:path "/.well-known/did.json", :requests 2}
    {:path "/llms.txt", :requests 1}
    {:path "/llms-full.txt", :requests 1}],
-  :status-mix {:client-error 325, :ok 121},
+  :status-mix {:client-error 323, :ok 121},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,7 +32,7 @@
  :as-of "2026-07-22",
  :traffic-quality {:window "24h", :probe-4xx-pct 73, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 50 · /api/funnel 25 · /health 25 · /robots.txt 11 · /favicon.ico 2 | 4xx(probe) 73%",
- :funnel {:visitors 1116, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 51 · /api/funnel 25 · /health 25 · /robots.txt 10 · /favicon.ico 2 | 4xx(probe) 73%",
+ :funnel {:visitors 1117, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 13939 req/7d・929 uniques(日次和)・うち4xx probe 73%(24h)、workers 7222 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 13943 req/7d・930 uniques(日次和)・うち4xx probe 73%(24h)、workers 7226 inv/7d、Stripe active subs 0"}
