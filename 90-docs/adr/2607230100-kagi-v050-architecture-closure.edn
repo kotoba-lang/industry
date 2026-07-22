@@ -1,0 +1,22 @@
+[{:db/id -1
+  :adr/id "adr-2607230100-kagi-v050-architecture-closure"
+  :adr/title "ADR-2607230100: kagi v0.5.0 architecture implementation closure"
+  :adr/topic "security-vault"
+  :adr/status "accepted"
+  :adr/date "2026-07-23"
+  :adr/last-verified "2026-07-23"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/supersedes ["adr-2606272330-kagi-clj-pqc-vault"]
+  :adr/superseded-by []
+  :adr/related ["orgs/kotoba-lang/kagi"
+                "orgs/kotoba-lang/kagitaba"
+                "https://github.com/kotoba-lang/kagi/releases/tag/v0.5.0"]
+  :adr/authoritative-for
+  ["kagi v0.5.0時点のarchitecture実装完了判定"
+   "未完architectureとproduction assurance follow-upの境界"
+   "Passkey PRF・Shamir recovery・cloud syncの実装状態"]
+  :adr/body
+  "# ADR-2607230100: kagi v0.5.0 architecture implementation closure\n\n## Decision\n\nADR-2606272330の中核architecture decisionを、v0.5.0で実装済みとしてcloseする。closeは開発停止やproduction認証を意味せず、decisionがコード、回帰テスト、CI、tagged releaseで実証されたことを意味する。\n\n## Implemented evidence\n\n- hybrid PQC、Governor、CACAO、hybrid署名hash-chain ledger、暗号化vault CLI。\n- 注入式KotobaStore / SealedBlockStore境界とciphertext E2E contract。\n- cloud snapshot同期、remote sequence競合のfail-closed検知。\n- Shamir k-of-n recovery、owner-only share ceremony、端末紛失drill。\n- Apple Keychain custody、WebAuthn PRF、browser UX、one-shot loopback bridge。\n- kagitaba 1PUX import、bounded ZIP、匿名化互換fixture。\n- kagi v0.5.0: 60 tests / 369 assertions、browser 3 tests、lint 0 errors / 0 warnings、GitHub Actions pass。\n- kagitaba v0.1.0: 22 tests / 157 assertions、lint 0 errors / 0 warnings、GitHub Actions pass。\n\n## Follow-ups, not closure blockers\n\n- 独立第三者による暗号・application security監査。\n- 実browser / platform / roaming authenticator互換性マトリクス。\n- B2/IPFS production SealedBlockStore adapter、item-level conflict merge。\n- Android Keystore、Windows Credential Manager、Linux Secret Service。\n- memory zeroization、autofill/phishing defense、GUI device grant/revoke。\n\nこれらはproduction assuranceまたはplatform expansionとして、独立したADR・issue・監査証跡で追跡する。"}]
