@@ -17,8 +17,8 @@
 ;;   H が S の ahead      → DRIFT(pin が behind_by N。下層 fix が届いていない可能性)
 ;;   diverged / behind    → BROKEN(pin が HEAD 系統外 / HEAD より先。要調査)
 ;;
-;; 判定はすべて GitHub API(サーバ側 full 履歴)。ローカル shallow の ancestry は
-;; 信用しない(CLAUDE.md「マージ / ancestry 判定」節、verify-west-pins.cljs と同方針)。
+;; 判定はすべて GitHub API(サーバ側 full 履歴)。ローカルの ancestry 判定だけに
+;; 頼らない(CLAUDE.md「マージ / ancestry 判定」節、verify-west-pins.cljs と同方針)。
 ;;
 ;; 使い方:
 ;;   nbb scripts/check-foundation-deps.cljs              ; 既定の foundation 集合を検査

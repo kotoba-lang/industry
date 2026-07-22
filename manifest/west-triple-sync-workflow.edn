@@ -44,8 +44,8 @@
     :register ["surgical insert into manifest/repos.edn :extra-projects"
                "preserve escaped quotes when inserting into the EDN blob string"
                "nbb scripts/gen-west-manifest.cljs --entry <name>"]
-    :clone ["git clone --depth 1 <url> orgs/<org>/<name>"]
-    :align ["git fetch --depth 1 origin"
+    :clone ["git clone <url> orgs/<org>/<name>  ;; full history — shallow retired 2026-07-21, ADR-2607211600"]
+    :align ["git fetch origin"
             "git merge --ff-only origin/<default> when clean"
             "gen-west-manifest --entry when HEAD is on origin"]}
    {:step :verify

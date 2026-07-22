@@ -12,7 +12,7 @@ merge conflicts in this superproject and its `orgs/` child repos.
 - Do not discard owner WIP.
 - Do not force-push shared branches.
 - Do not rebase. If a stale branch cannot fast-forward, create a clean branch/worktree from current `origin/main` and replay only the needed commits or patch.
-- Prefer a new branch from current `origin/main` when an old branch is stale or shallow ancestry is unreliable.
+- Prefer a new branch from current `origin/main` when an old branch is stale.
 - Treat `manifest/west.yml` as generated output. Resolve source files and regenerate it; do not hand-edit conflict markers.
 - Keep failed `stash pop` entries. Git keeps the stash on failed pop; inspect it before applying manually.
 - **GitHub push alone is not registration.** Repos under `orgs/` that consumers resolve via `:local/root` (or that are intentional fleet members) must also appear in west (`repos.edn` `:extra-projects` + `gen-west-manifest.cljs --entry`). See skill `new-project-scaffold`.
@@ -68,12 +68,12 @@ crm missing from west and often from the local tree → fresh checkout breaks.
 3. For stale branches, prefer a clean branch:
 
    ```bash
-   git fetch --depth 1 origin main
+   git fetch origin main
    git switch -c cleanup-<date> origin/main
    git cherry-pick <needed-commit>
    ```
 
-   If shallow history turns a small cherry-pick into add/add conflicts, abort and apply the small diff manually.
+   If a cherry-pick turns into add/add conflicts, abort and apply the small diff manually.
    Do not switch to rebase to solve the conflict.
 
 4. Commit cleanup work with:
@@ -130,9 +130,8 @@ accumulation); this section is the recovery path. Verified in practice 2026-07-0
    ```
 
 5. **Retire branches with the same discipline.** Per branch: check
-   `git merge-base --is-ancestor <branch> main` (deepen with
-   `git fetch --shallow-since=<date> origin main` first if grafts block it — do not trust
-   shallow ancestry). Non-ancestors get the added-line containment check (step 2), and
+   `git merge-base --is-ancestor <branch> main` (full history is the default — ADR-2607211600 —
+   so this resolves directly; no shallow deepening needed). Non-ancestors get the added-line containment check (step 2), and
    unrelated-history branches (no merge base) get a remote-preservation check
    (`gh api repos/<org>/<repo>/commits/<tip>` — if the tip exists in the successor repo,
    the branch is preserved remotely). Archive `git diff main...<branch>` + a commit log to
