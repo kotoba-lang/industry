@@ -14,7 +14,8 @@
          '[clojure.edn]
          '[clojure.java.shell :refer [sh]]
          '[clojure.pprint :as pprint]
-         '[clojure.string :as str])
+         '[clojure.string :as str]
+         '[gftd.traffic :as traffic])
 
 (def root (or (scripts.nbb-compat/getenv "GFTD_ROOT") "."))
 (def out-dir (str root "/90-docs/business/metrics"))
@@ -139,13 +140,23 @@
 
 (defn zone-top-paths
   "実際に user がどのpageにアクセスしているか (直近24h)。edgeResponseStatus で
-   「実際に配信された page (2xx/3xx)」とスキャナ probe (4xx) を分離する —
+   「実際に配信された page (2xx/3xx)」とスキャナ probe (4xx/5xx) を分離する —
    kotobase.net の初回実測で上位 path の大半が /.env.backup 等の bot probe
    だったため、status 混在のままだと channels 観測が導線として読めない。
+   ただし status-code だけでは不十分な product がある: network-isekai は
+   Cloudflare Pages が unmatched path にも 2xx/3xx を返す (custom 404 未設定)
+   ため、status filter を通過した \"ok\" bucket 自体がスキャナ probe path で
+   汚染される (evidence: canvas-ledger.edn 参照、gftd.traffic/classify-path
+   docstring)。product が gftd.traffic/channel-allowlist に登録されていれば、
+   status filter 通過後の path 集合をさらに classify-path で
+   :channel/:probe/:unclassified に分け、:channel のみを top-paths として返し、
+   他2バケットの比率を :channel-mix に載せる (未登録 product は従来どおり
+   status のみで top8)。
    httpRequestsAdaptiveGroups は free plan だと概ね1日分しか引けないので
-   window は 24h 固定。→ {:ok [{:path :requests}…8] :status-mix {:ok n :client-error n :server-error n}}
+   window は 24h 固定。→ {:ok [{:path :requests}…8] :status-mix {:ok n :client-error n :server-error n}
+   :channel-mix (opt) {:channel n :probe n :unclassified n :ok-total n}}
    取れなければ nil (捏造ゼロ: 出力に入れない)。"
-  [token zone-tag]
+  [token zone-tag product]
   (try
     (let [now (iso-now)
           q (str "{ viewer { zones(filter: {zoneTag: \"" zone-tag "\"})"
@@ -161,26 +172,50 @@
                                         :else :server-error)))
               mix (reduce (fn [m g] (update m (status-of g) (fnil + 0) (:count g 0)))
                           {} groups)
-              ok-paths (->> groups
-                            (filter #(= :ok (status-of %)))
-                            (reduce (fn [m g] (update m (get-in g [:dimensions :clientRequestPath])
-                                                      (fnil + 0) (:count g 0)))
-                                    {})
-                            (sort-by val >)
-                            (take 8)
-                            (mapv (fn [[path n]] {:path path :requests n})))]
-          {:ok ok-paths :status-mix mix})))
+              path-counts (->> groups
+                               (filter #(= :ok (status-of %)))
+                               (reduce (fn [m g] (update m (get-in g [:dimensions :clientRequestPath])
+                                                         (fnil + 0) (:count g 0)))
+                                       {}))]
+          (if (contains? traffic/channel-allowlist product)
+            (let [by-class (group-by (fn [entry] (traffic/classify-path product (key entry))) path-counts)
+                  sum-class (fn [k] (reduce + (map val (get by-class k))))
+                  channel-paths (->> (get by-class :channel)
+                                     (sort-by val >)
+                                     (take 8)
+                                     (mapv (fn [entry] {:path (key entry) :requests (val entry)})))]
+              {:ok channel-paths
+               :status-mix mix
+               :channel-mix {:channel (sum-class :channel)
+                             :probe (sum-class :probe)
+                             :unclassified (sum-class :unclassified)
+                             :ok-total (reduce + (vals path-counts))}})
+            (let [ok-paths (->> path-counts
+                                (sort-by val >)
+                                (take 8)
+                                (mapv (fn [[path n]] {:path path :requests n})))]
+              {:ok ok-paths :status-mix mix})))))
     (catch :default _ nil)))
 
 (defn top-paths-summary
-  "2xx/3xx (実配信 page) の上位のみを導線観測として要約し、probe (4xx) 率を
-   併記する。governor の 300 chars 上限に収まるよう上位5件・path は40字で切る。"
-  [{:keys [ok status-mix]}]
+  "2xx/3xx (実配信 page) の上位のみを導線観測として要約し、probe (4xx/5xx) 率を
+   併記する。channel-allowlist 対象 product (:channel-mix あり) は、その
+   2xx/3xx bucket 自体に混入した bot/vuln-scanner probe path
+   (CF Pages の unmatched-path 200-fallback 由来。gftd.traffic/classify-path
+   参照) の probe-path-pct と、allowlist 未登録の real route かもしれない
+   unclassified-pct を追記する (捏造ゼロ: 未分類は落とさず可視化)。
+   governor の 300 chars 上限に収まるよう上位5件・path は40字で切る。"
+  [{:keys [ok status-mix channel-mix]}]
   (when (seq ok)
     (let [total (reduce + (vals status-mix))
           probe (get status-mix :client-error 0)
-          err (get status-mix :server-error 0)]
-      (str "上位 page (24h, 2xx/3xx): "
+          err (get status-mix :server-error 0)
+          ok-total (:ok-total channel-mix 0)
+          probe-path-pct (when (and channel-mix (pos? ok-total))
+                           (Math/round (* 100.0 (/ (:probe channel-mix 0) ok-total))))
+          unclassified-pct (when (and channel-mix (pos? ok-total))
+                             (Math/round (* 100.0 (/ (:unclassified channel-mix 0) ok-total))))]
+      (str "上位 page (24h, 2xx/3xx" (when channel-mix "・channel-allowlist済") "): "
            (str/join " · "
                      (map (fn [{:keys [path requests]}]
                             (str (if (> (count path) 40) (str (subs path 0 40) "…") path)
@@ -189,7 +224,11 @@
            (when (pos? total)
              (str " | 4xx(probe) " (Math/round (* 100.0 (/ probe total))) "%"
                   (when (pos? err)
-                    (str " · 5xx " (Math/round (* 100.0 (/ err total))) "%"))))))))
+                    (str " · 5xx " (Math/round (* 100.0 (/ err total))) "%"))))
+           (when (and probe-path-pct (pos? probe-path-pct))
+             (str " · probe(200-fallback) " probe-path-pct "%"))
+           (when (and unclassified-pct (pos? unclassified-pct))
+             (str " · unclassified " unclassified-pct "%"))))))
 
 ;; kotobase 課金 product の price_id (ADR-2607022200)。gate kotobase-graph-arpu は
 ;; 「kotobase の初 paid tenant」を測るので、アカウント全体の active-subscriptions を
@@ -372,7 +411,7 @@
                        :sources (vec (remove nil? [:cloudflare (when (and (:stripe cfg) stripe) :stripe)
                                                    (when health :health)]))}
                 zone (assoc :zone (assoc (get zt zone) :zone zone-name) :zone-name zone-name)
-                zone (as-> m' (let [tp (zone-top-paths tok zone)]
+                zone (as-> m' (let [tp (zone-top-paths tok zone p)]
                                 (cond-> m'
                                   tp (assoc :paths (assoc tp :window "24h")
                                             :top-paths (top-paths-summary tp))

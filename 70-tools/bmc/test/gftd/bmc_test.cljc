@@ -9,7 +9,8 @@
             [gftd.funnel :as funnel]
             [gftd.score :as score]
             [gftd.murakumo :as murakumo]
-            [gftd.kotobase :as kbase]))
+            [gftd.kotobase :as kbase]
+            [gftd.traffic :as traffic]))
 
 (def base
   [{:canvas/kind :lean :canvas/product :cloud-itonami :canvas/layer :business-operator
@@ -366,3 +367,37 @@
               (:canvas/id (cli/normalize-llm-proposal {:canvas/id (symbol "cloud-itonami.problem")})))))
      (testing "keyword はそのまま素通し"
        (is (= {:canvas/id :a.b} (cli/normalize-llm-proposal {:canvas/id :a.b}))))))
+
+;; ---- traffic classification (ADR-2607231800) ------------------------------------
+;; classify-path が実測 canvas-ledger.edn の bot-probe path を正しく分類すること
+;; (:network-isekai.channels 2026-07-09..22 の実観測、90-docs/business/
+;; canvas-ledger.edn より — WordPress/PHP スキャナ signature 群と、
+;; //abcd.php のような二重スラッシュ + probe-path-re 非対象の real route)。
+
+(deftest classify-path-known-bot-probes-observed-in-canvas-ledger
+  (testing "実測スキャナ signature (canvas-ledger.edn 2026-07-18..22) は :probe に分類される"
+    (doseq [path ["/mailer.php" "/wp.php" "/a1.php" "/1996.php" "/biufile.php"
+                  "/w3lls.php" "/inputs.php" "/wp-lvminl.php" "/1c.php" "/ops.php"
+                  "/min.php" "/m.php" "/cxc.php" "/sbhu.php" "/ws.php"
+                  "/wp-admin/css/colors/index.php" "/.git" "/.env"
+                  "/config/config.php" "/config/nexmo.php" "/Dockerfile"
+                  "/package-updates/yum.cgi" "//abcd.php" "//avcqlevnbk.php"]]
+      (is (= :probe (traffic/classify-path :network-isekai path))
+          (str path " should classify as :probe"))))
+  (testing "既知の実 route は :channel に分類される"
+    (doseq [path ["/" "/robots.txt" "/favicon.ico" "/sitemap.xml"
+                  "/feed/fork-stats.edn" "/play" "/studio" "/api/events"]]
+      (is (= :channel (traffic/classify-path :network-isekai path))
+          (str path " should classify as :channel"))))
+  (testing "allowlist にも probe-path-re にも一致しない path は :unclassified
+            (捏造ゼロ — 落とさず可視化する。allowlist 未登録の real route かもしれない)"
+    (doseq [path ["/some-new-page" "/team/roster"]]
+      (is (contains? #{:channel :unclassified} (traffic/classify-path :network-isekai path))))
+    (is (= :unclassified (traffic/classify-path :network-isekai "/totally-unknown-route"))))
+  (testing "channel-allowlist 未登録 product は :probe-path-re のみ効く (allowlist が nil なので :channel には絶対ならない) —
+            zone-top-paths 側は classify-path 自体を呼ばない (opt-in)、既存 status-only 挙動を壊さない のはそちらで保証"
+    (is (= :probe (traffic/classify-path :net-kotobase "/mailer.php")))
+    (is (= :unclassified (traffic/classify-path :net-kotobase "/"))))
+  (testing "cloud-itonami も同じ allowlist/probe denylist を共有する"
+    (is (= :channel (traffic/classify-path :cloud-itonami "/isco-4712")))
+    (is (= :probe (traffic/classify-path :cloud-itonami "/wp-login.php")))))
