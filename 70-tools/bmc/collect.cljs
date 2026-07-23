@@ -14,7 +14,8 @@
          '[clojure.edn]
          '[clojure.java.shell :refer [sh]]
          '[clojure.pprint :as pprint]
-         '[clojure.string :as str])
+         '[clojure.string :as str]
+         '[gftd.traffic :as traffic])
 
 (def root (or (scripts.nbb-compat/getenv "GFTD_ROOT") "."))
 (def out-dir (str root "/90-docs/business/metrics"))
@@ -137,53 +138,6 @@
                               (get-in g [:sum :requests] 0)))
             {} (get-in r [:data :viewer :accounts 0 :workersInvocationsAdaptive]))))
 
-(def probe-path-re
-  ;; Universal vulnerability-scanner signatures — product-agnostic because these
-  ;; hit every internet-facing host regardless of what it actually serves
-  ;; (evidence: 90-docs/business/canvas-ledger.edn :network-isekai.channels ticks
-  ;; 2026-07-09..22 show /mailer.php /wp.php /a1.php /1996.php /biufile.php
-  ;; /w3lls.php /inputs.php /wp-lvminl.php /wp-admin/css/colors/index.php /.git
-  ;; /config/config.php /config/nexmo.php /Dockerfile /package-updates/yum.cgi
-  ;; //abcd.php //avcqlevnbk.php answered 2xx/3xx by CF Pages' unmatched-path
-  ;; fallback and therefore surviving the status-code filter below).
-  #"(?i)(\.php$|\.(cgi|asp|aspx|jsp)$|wp-admin|wp-content|wp-includes|wp-login|wp-json|xmlrpc\.php|\.(env|git|htpasswd|htaccess)(/|$)|docker-compose\.ya?ml$|^/*Dockerfile$|/(phpmyadmin|cpanel|package-updates)/|^//)")
-
-(def channel-allowlist
-  ;; product → {:exact #{...} :prefixes [...]}. Real content routes only,
-  ;; hand-maintained (not generated) — update whenever a product ships a new
-  ;; page/route. Products with no entry here fall back to the pre-existing
-  ;; status-only behavior in zone-top-paths (opt-in, zero risk to the other
-  ;; products this file also collects for).
-  {:network-isekai
-   {:exact #{"/" "/robots.txt" "/favicon.ico" "/sitemap.xml"
-             "/assets" "/assets.html" "/benchmarks" "/benchmarks.html"
-             "/dance" "/dance.html" "/generate" "/generate.html"
-             "/play" "/play.html" "/preview" "/preview.html"
-             "/project" "/project.html" "/studio" "/studio.html"}
-    :prefixes ["/feed/" "/assets/" "/benchmarks/" "/team/" "/js/" "/kototama/"
-               "/wasm/" "/api/" "/gftd/" "/itonami/" "/studio/gftd/" "/studio/itonami/"]}
-   ;; itonami.cloud isn't hit by zone-top-paths today (products has no :zone
-   ;; key for :cloud-itonami, only :health) — its own 4xx filter works via a
-   ;; different code path. This entry is pre-emptive so cloud-itonami gets the
-   ;; same allowlist-based measurement if/when it gains a :zone here too.
-   :cloud-itonami
-   {:exact #{"/" "/robots.txt" "/favicon.ico" "/sitemap.xml"}
-    :prefixes ["/isco-" "/api/" "/itonami/"]}}) ; refine against itonami.cloud's actual route map before relying on this
-
-(defn classify-path
-  "channel-allowlist に登録済みの product だけ、real-route allowlist →
-   product-agnostic scanner denylist の順で3値分類する:
-     :channel — allowlist の既知route (top-paths に出す)
-     :probe   — probe-path-re に一致する既知スキャナ signature (top-paths から除外、% だけ集計)
-     :unclassified — どちらにも一致しない (捏造ゼロ: 黙って捨てず % を surface — 新route が
-                     allowlist 未登録なだけかもしれないので人間へのシグナルとして残す)"
-  [product path]
-  (let [{:keys [exact prefixes]} (get channel-allowlist product)]
-    (cond
-      (or (contains? exact path) (some #(str/starts-with? path %) prefixes)) :channel
-      (re-find probe-path-re path) :probe
-      :else :unclassified)))
-
 (defn zone-top-paths
   "実際に user がどのpageにアクセスしているか (直近24h)。edgeResponseStatus で
    「実際に配信された page (2xx/3xx)」とスキャナ probe (4xx/5xx) を分離する —
@@ -192,11 +146,12 @@
    ただし status-code だけでは不十分な product がある: network-isekai は
    Cloudflare Pages が unmatched path にも 2xx/3xx を返す (custom 404 未設定)
    ため、status filter を通過した \"ok\" bucket 自体がスキャナ probe path で
-   汚染される (evidence: canvas-ledger.edn 参照、classify-path docstring)。
-   product が channel-allowlist に登録されていれば、status filter 通過後の
-   path 集合をさらに classify-path で :channel/:probe/:unclassified に分け、
-   :channel のみを top-paths として返し、他2バケットの比率を :channel-mix に
-   載せる (未登録 product は従来どおり status のみで top8)。
+   汚染される (evidence: canvas-ledger.edn 参照、gftd.traffic/classify-path
+   docstring)。product が gftd.traffic/channel-allowlist に登録されていれば、
+   status filter 通過後の path 集合をさらに classify-path で
+   :channel/:probe/:unclassified に分け、:channel のみを top-paths として返し、
+   他2バケットの比率を :channel-mix に載せる (未登録 product は従来どおり
+   status のみで top8)。
    httpRequestsAdaptiveGroups は free plan だと概ね1日分しか引けないので
    window は 24h 固定。→ {:ok [{:path :requests}…8] :status-mix {:ok n :client-error n :server-error n}
    :channel-mix (opt) {:channel n :probe n :unclassified n :ok-total n}}
@@ -222,8 +177,8 @@
                                (reduce (fn [m g] (update m (get-in g [:dimensions :clientRequestPath])
                                                          (fnil + 0) (:count g 0)))
                                        {}))]
-          (if (contains? channel-allowlist product)
-            (let [by-class (group-by (fn [entry] (classify-path product (key entry))) path-counts)
+          (if (contains? traffic/channel-allowlist product)
+            (let [by-class (group-by (fn [entry] (traffic/classify-path product (key entry))) path-counts)
                   sum-class (fn [k] (reduce + (map val (get by-class k))))
                   channel-paths (->> (get by-class :channel)
                                      (sort-by val >)
@@ -246,8 +201,8 @@
   "2xx/3xx (実配信 page) の上位のみを導線観測として要約し、probe (4xx/5xx) 率を
    併記する。channel-allowlist 対象 product (:channel-mix あり) は、その
    2xx/3xx bucket 自体に混入した bot/vuln-scanner probe path
-   (CF Pages の unmatched-path 200-fallback 由来。classify-path 参照) の
-   probe-path-pct と、allowlist 未登録の real route かもしれない
+   (CF Pages の unmatched-path 200-fallback 由来。gftd.traffic/classify-path
+   参照) の probe-path-pct と、allowlist 未登録の real route かもしれない
    unclassified-pct を追記する (捏造ゼロ: 未分類は落とさず可視化)。
    governor の 300 chars 上限に収まるよう上位5件・path は40字で切る。"
   [{:keys [ok status-mix channel-mix]}]
