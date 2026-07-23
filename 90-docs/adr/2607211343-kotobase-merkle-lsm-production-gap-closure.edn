@@ -489,6 +489,14 @@ host PR #72〜#74（merge commits `c8d98772c7728d6eac8159c465f1ab6fb275000d`、`
 
 実R2 10M gateは同じisolated headを253,952 rowsからresumeしている。完了までは10M達成とせず、状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
 
+## 2026-07-23 Durable resumable cancellation
+
+peer PR #87（merge commit `571f5fee17b8ef0fd27df263931835d6b9f697ca`）はresumable checkpointへterminal `cancelled` stateを追加した。operator cancellationは現在pointerが指すimmutable checkpointとtask CIDを検証し、cancel reasonを含む新しいterminal checkpointをputしてからmutable pointerをR2 ETag-CASで進める。既にleaseを持つworkerは次のadvance/finishで古いETagを使うためpublishを失う。repeat cancellationはidempotent、completed/failedは409相当で上書きせず、cancelledを含むterminal pointerは再claimしない。peer canonical local CIはJVM 239 tests/743 assertions、CLJS 240 tests/886 assertions、R2 gateway 21 tests/67 assertions、lint errors 0を含む7 stepsがgreenだった。
+
+host PR #78（merge commit `0fcc0edff0b72d5802c7ecc057f32b725dae12ae`）はservice bearer必須の`POST /v1/kotobase/resumable-cancel`を追加した。`headKey`、`taskId`、`reason`を受け、task pointerを先にfenceした後、対応するscheduled ingress jobもETag-CASで`cancelled`へ進めてowner/token/leaseを除去する。public responseはattempt tokenとpointer ETagを返さない。MemoryR2 HTTP smokeはactive cancellation 200、repeat idempotent 200、status readback `cancelled`、scheduler job `cancelled`、missing 404、unauthorized 401、completed overwrite 409を確認した。host canonical local CIはroute contract 18 assertions、JVM 76 tests/427 assertions、lint errors 0、Worker release build、datom ingress smokeを含む5 stepsがgreenだった。
+
+これで前掲operation gapのexplicit cancellationは完了した。残るscheduler operation gapはdead-letter inspection、backlog/age/lease-loss alert、cron dispatch latency SLOである。実R2 10M gateは同一isolated durable headで継続し、本addendum確認時点で2,514,944/10,000,000 datomまで進んだ。途中値をscale達成とは扱わず、final directoryの各index exact 10,000,000 rows、lost/duplicate 0、page I/O/bytes、p95/p99 receiptを得るまでgateは未完了とする。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
