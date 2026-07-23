@@ -395,9 +395,11 @@
       (is (contains? #{:channel :unclassified} (traffic/classify-path :network-isekai path))))
     (is (= :unclassified (traffic/classify-path :network-isekai "/totally-unknown-route"))))
   (testing "channel-allowlist 未登録 product は :probe-path-re のみ効く (allowlist が nil なので :channel には絶対ならない) —
-            zone-top-paths 側は classify-path 自体を呼ばない (opt-in)、既存 status-only 挙動を壊さない のはそちらで保証"
+            zone-top-paths 側は classify-path 自体を呼ばない (opt-in)、既存 status-only 挙動を壊さない のはそちらで保証。
+            cloud-itonami も意図的に未登録 (status-only split で既に十分なため — traffic.cljc の channel-allowlist
+            docstring 参照): probe-path-re 自体は product-agnostic なので :probe 判定は効くが、:channel には
+            絶対にならない。"
     (is (= :probe (traffic/classify-path :net-kotobase "/mailer.php")))
-    (is (= :unclassified (traffic/classify-path :net-kotobase "/"))))
-  (testing "cloud-itonami も同じ allowlist/probe denylist を共有する"
-    (is (= :channel (traffic/classify-path :cloud-itonami "/isco-4712")))
-    (is (= :probe (traffic/classify-path :cloud-itonami "/wp-login.php")))))
+    (is (= :unclassified (traffic/classify-path :net-kotobase "/")))
+    (is (= :probe (traffic/classify-path :cloud-itonami "/wp-login.php")))
+    (is (= :unclassified (traffic/classify-path :cloud-itonami "/isco-4712")))))

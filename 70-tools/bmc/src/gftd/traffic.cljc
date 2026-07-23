@@ -40,6 +40,17 @@
   ;; page/route. Products with no entry here fall back to the pre-existing
   ;; status-only behavior in zone-top-paths (opt-in, zero risk to the other
   ;; products this file also collects for).
+  ;;
+  ;; cloud-itonami is deliberately NOT in this map: it doesn't have
+  ;; network-isekai's Cloudflare-Pages-answers-unmatched-paths-as-2xx problem
+  ;; (its own canvas already shows a clean status-only '4xx(probe) N%' split,
+  ;; per this ns's top docstring) — adding it here would only narrow its
+  ;; top-paths to a hand-maintained allowlist with no offsetting benefit,
+  ;; since the route list itself was never actually verified against
+  ;; itonami.cloud's real routes (it shipped with its own "refine before
+  ;; relying on this" caveat). If itonami.cloud ever needs this layer too,
+  ;; verify its route map first, then add an entry here rather than
+  ;; reinstating an unrefined placeholder.
   {:network-isekai
    {:exact #{"/" "/robots.txt" "/favicon.ico" "/sitemap.xml"
              "/assets" "/assets.html" "/benchmarks" "/benchmarks.html"
@@ -47,10 +58,7 @@
              "/play" "/play.html" "/preview" "/preview.html"
              "/project" "/project.html" "/studio" "/studio.html"}
     :prefixes ["/feed/" "/assets/" "/benchmarks/" "/team/" "/js/" "/kototama/"
-               "/wasm/" "/api/" "/gftd/" "/itonami/" "/studio/gftd/" "/studio/itonami/"]}
-   :cloud-itonami
-   {:exact #{"/" "/robots.txt" "/favicon.ico" "/sitemap.xml"}
-    :prefixes ["/isco-" "/api/" "/itonami/"]}}) ; refine against itonami.cloud's actual route map before relying on this
+               "/wasm/" "/api/" "/gftd/" "/itonami/" "/studio/gftd/" "/studio/itonami/"]}})
 
 (defn classify-path
   "channel-allowlist に登録済みの product だけ、real-route allowlist →
