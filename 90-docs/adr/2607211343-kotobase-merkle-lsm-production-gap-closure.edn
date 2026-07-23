@@ -505,6 +505,14 @@ MemoryR2 HTTP smokeは既存の32-attempt failed fixtureをdead letterとしてr
 
 実R2 10M gateは同一durable headで継続し、本addendum確認時点で3,334,144/10,000,000 datomまで進んだ。途中値はscale完了の証拠ではなく、状態は`:production-partial`を維持する。IStoreとCloudflare KVは使用しない。
 
+## 2026-07-23 Bounded backlog and lease-loss alerts
+
+host PR #80（merge commit `94c4e63bc59ef13aaafe3c1212287d0095e382f4`）はservice bearer必須の`GET /v1/kotobase/resumable-health`とscheduled health evaluationを追加した。一回の観測はR2 listing一page/最大100 jobs、job object GET最大4並列に制限し、truncated pageを正常な部分観測とはせず`:inventory-saturated` alertにする。receiptはbacklog、queued/running/failed/cancelled、oldest age、expired leases、overdue deadlinesを含む。backlog既定100件とage既定15分はenvironmentで変更でき、閾値超過、expired lease、overdue deadline、dead letter、inventory saturationのいずれかでHTTP 503/`:alert? true`となる。
+
+非GC scheduled turnは同じreceiptを評価し、異常時に構造化`KOTOBASE_RESUMABLE_ALERT` errorを発火する。MemoryR2 smokeはservice auth 401、failed/expired-running/old-backlogに対する503と三reason、expired lease count、隔離scheduled handlerからの構造化alertを確認した。canonical local CIはroute contract 18 assertions、JVM 76 tests/427 assertions、lint errors 0、Worker release build、scheduled alertを含むdatom ingress smokeの5 stepsがgreenだった。これでbacklog age/lease-lossのbounded detectionとscheduled signal発火gapは完了した。ただしCloudflare log alertから実pager/notification sinkへのdelivery drillとcron dispatch latency SLOは未完了である。
+
+実R2 10M gateは同一durable headで継続し、本addendum確認時点で3,956,736/10,000,000 datomまで進んだ。途中値をscale完了とは扱わず、状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
