@@ -341,7 +341,7 @@
            ;; schedule で反復するので dedup 拒否は正常 — react と同じく exit しない。
            (doseq [p products
                    :let [metrics (read-metrics ps p flags)
-                         props (funnel/proposals p metrics)]
+                         props (funnel/proposals idx p metrics)]
                    :when (seq props)]
              (let [{:keys [approved rejected]} (react/governor idx props)
                    actor (str "advisor:funnel")
@@ -713,7 +713,7 @@
            ;; schedule で反復するので dedup 拒否は正常 — react と同じく exit しない。
            (doseq [p products
                    :let [metrics (read-metrics ps p flags)
-                         props (funnel/proposals p metrics)]
+                         props (funnel/proposals idx p metrics)]
                    :when (seq props)]
              (let [{:keys [approved rejected]} (react/governor idx props)
                    actor (str "advisor:funnel")
