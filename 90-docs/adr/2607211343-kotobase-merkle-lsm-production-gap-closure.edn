@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68], :merged-host-prs [57 58 59 60], :latest-peer-main \"0e5a54ff223d5b27d190b994cfb698c7a649f4da\", :latest-host-main \"8fd5bd29d042b77162179c99b918f414aa9f887a\", :latest-worker-version \"r2-verified-2026-07-23-gc-backup-restore\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69], :merged-host-prs [57 58 59 60 61 62], :latest-peer-main \"e288e5dfe27f37d22855f5619866257f2b9031e5\", :latest-host-main \"f158f178f4b19bcdea2ab7bfe88f5cef08d89359\", :latest-worker-version \"r2-verified-2026-07-23-prefix-block-remainder\"}"
   :adr/body
   "# Context
 
@@ -368,6 +368,18 @@ MemoryR2 contractは誤削除からのrestore、同じinventoryの再実行、�
 実Cloudflare R2 bucket `kotobase-merkle-lsm`の隔離UUID prefixでは、heads 2、retention root 1、reachable blocks 4をmarkし、candidate 1件を二回一致させた。content-addressed backupとinventory CID `cc19055eca4749716f19ad7f102c21082c23f2007217885feb5056093d1f27df`を保存後、orphan 1件を削除し、inventoryから1件をrestoreしてCID一致を確認した。wall timeは1,446 msで、隔離prefixと一時Workerは終了時に削除した。authority receiptは`kotobase-peer/bench/results/2026-07-23-r2-gc-backup-restore.edn`であり、これはcorrectness drillであってproduction latency percentileではない。
 
 これによりP0.3の二回inventory delete gate、delete前backup、CID検証付きrestore、実R2誤削除復元drillは完了した。P0 correctnessの主要三項P0.1〜P0.3は閉じたが、全体は引き続き`:production-partial`である。次の優先はP1のunconsumed current-block remainder、plan-proven independent GET concurrency、byte/RTT/cache-aware adaptive block sizing、および10^5/10^7 scale/RSS/CPU gateとする。
+
+# Verification addendum — byte-bounded current-block remainder (2026-07-23)
+
+peer PR #69はbounded prefix pageへoptionalなdecoded physical-block remainderを追加した。hostが明示byte budgetを渡した場合だけ、返却cursorより後のrowを持つloaded blockをbudget内でinline返却する。次pageはcurrent manifest descriptorが同じCIDを参照する場合に限りremainderを利用し、DAG-CBOR再encode CID、ordinal/count、physical/logical min/max、index、tenantを再検証する。budget超過blockはremainderへ入れず通常R2 GETへfallbackする。300-row、64-row/pageのMemoryR2 contractでは同じ300 rowsを返しながらdata block GETを7から3へ削減した。peer canonical local CIはJVM 223 tests/674 assertions、CLJS 222 tests/783 assertions、lint errors 0、gateway 21 tests/67 assertionsで、merge commitは`e288e5dfe27f37d22855f5619866257f2b9031e5`である。
+
+host PR #61はremainderをresumable join frontier workへinline保存し、既定1 MiBかつwork node上限の半分以下に制約した。large bindingとの合成でnode上限を越える場合はremainderだけを除外して通常GET continuationへ戻る。`scanned-blocks`とは別に実object readを`fetched-blocks`としてcheckpoint、spill、terminal statusへ累積する。host canonical local CIは75 tests/403 assertions、lint errors 0、Worker release、durable ingress smokeがgreenで、merge commitは`2234e2f232e4f3d33b99f1afe1ee70e666aa270b`である。
+
+実R2 qualification中、HTTP JSONの`op` valueがstringのままpeerへ届く既存wiring bugを検出した。host PR #62はadmission boundaryで`\"retract\"`を`:retract`へ正規化し、既keywordは維持するregression testを追加した。最終host CIは75 tests/405 assertions、4 steps green、merge commitは`f158f178f4b19bcdea2ab7bfe88f5cef08d89359`である。
+
+Cloudflare R2の隔離prefix、511 teams、1,022 membership datoms、64 rows/pageでは、従来と同じ512 rows、9 steps、9 run scans、25 logical block scansを完了し、actual block fetchは25から18へ28%減少した。driver wallは直近demand-only＋spill probeの123,816.7 msから101,594.6 msへ17.95%改善し、durable replayは245.5 msだった。一方、最良の旧subblock probe 84,926.8 msより19.63%遅い。したがってunconsumed current-block再GET gapは閉じたが、latency optimization完了とはしない。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-prefix-block-remainder.edn`である。
+
+次のP1優先は、plan/cutoffが同時に必要と証明した独立run/blockだけのbounded concurrency、bytes/RTT/cache hitに基づくadaptive block sizing、10^5/10^7 scaleとWorker RSS/CPU/R2 bytes gateである。
 
 # Consequences
 
