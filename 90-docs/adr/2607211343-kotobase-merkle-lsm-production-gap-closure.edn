@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86], :latest-peer-main \"b4b96171c476c36378d6ec4d5408406c3b7070a4\", :latest-host-main \"629765e9d76e4860eb4e32a52f676a294d5aef24\", :latest-worker-version \"r2-database-disaster-restore\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87], :latest-peer-main \"b4b96171c476c36378d6ec4d5408406c3b7070a4\", :latest-host-main \"8daace4648ae25a5662f34971d190625d6e8de4c\", :latest-worker-version \"20260723-page-reuse-10m\"}"
   :adr/body
   "# Context
 
@@ -552,6 +552,22 @@ host PR #86（merge commit `629765e9d76e4860eb4e32a52f676a294d5aef24`）はservi
 実Cloudflare R2のisolated prefix `bench/database-restore/20260723`ではmaterialized viewを含む13 entries、12,886 bytesをbackupした後、mutable head、11 blocks、2 opaque objectsを実際に削除した。restoreは1,773.230msで13/13、head create-only CAS、reachable set 13一致。二回目は1,199.583msで0 restored/13 already-present、復元後の同一transactionは289.992msでdurable replayした。一時Worker、mutable head、retention roots、primary source objectsは削除し、immutable backup/inventoryだけを監査用に保持した。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-database-restore-drill.edn`である。
 
 これでsingle-account R2におけるmutable headを含むsmall database disaster restore vertical sliceは完了した。未完了はbackup bucketを別account/regionへ分離したcopy、large inventoryのpaged/resumable streaming、production RTO/RPO、汎用on-disk query完成後のquery corpus equivalenceである。実R2 10M gateは同一durable headで継続し、本addendum確認時点で7,856,128/10,000,000 datomまで進んだ。途中値をscale完了とは扱わず、状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
+## 2026-07-23 CID-paged database backup inventory v2
+
+peer branch `agent/database-backup-paged-inventory`（head `d7fab61`、merge前）は、全entryを一つのDAG-CBOR inventoryへinline化していたv1を、CID-addressed immutable pageを参照するv2 rootへ変更した。各pageは最大256 entriesかつexact encoded 65,536 bytes以下で、publish/loadはaggregate最大4 page waveに制限する。root descriptorはpage CID、ordinal、count、encoded bytes、first/last entryを持ち、restoreはroot/page CID、ordinal、count、byte limit、境界entry、全体sort/duplicate、head/base inclusionをfail closedに検証する。既存v1 inventoryは引き続きrestore可能である。
+
+10,000個の有効CID entryを使うdeterministic fixtureは40 pagesへ分割され、再生成時のpage CID、全entryの順序、件数が一致した。実Cloudflare R2のisolated prefix `bench/database-paged-restore/20260723`ではv2 root 653 bytes、page 1,073 bytes、12 entries（11 blocks、1 opaque object）、content 10,134 bytesをbackupした。mutable headと全primary 12 entriesを明示削除後、restoreは12/12、head CAS create、namespace-aware reachable set 12一致。再実行は0 restored/12 already-presentであった。一時Worker、primary、immutable backup objects、inventory root/pageは終了時に明示削除した。authority receiptは`kotobase-peer/bench/results/2026-07-23-r2-database-paged-inventory-restore.edn`である。
+
+これで単一inventory objectと個別page transferのsize boundは閉じた。ただしv2 root descriptor数はpage数に比例し、backup traversalの`seen` set、restore前の全entry materialization、restore後reachability verificationは依然としてO(total entries) memoryである。従って本変更をtrue streaming/resumable database restoreとは呼ばない。次のgapはhierarchical inventory root、durable page cursor、外部化visited set、page単位のrestore/verification checkpointにより、process再開を含む総working setをpage/fan-in上限へ制約することである。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
+## 2026-07-23 Completed 10M R2 RangeDirectory gate
+
+同一isolated durable head `bench/streaming/20260723-page-reuse-10m/10000000`を253,952 datomから再開し、残り9,746,048 datomを4,759 windows、100 compaction passesで投入した。processはexit 0、outcome `succeeded`で完了し、final RangeDirectory v2はEAVT/AEVT/AVETの各row-countがexact 10,000,000、各ref-count 4,883、612 pages、root最大242,634 bytes、leaf hard limit 262,144 bytesだった。
+
+resume phaseのwallは14,587,899.02ms、throughput 668.09 datom/s。seed latencyはp50 2,554.34ms、p95 3,415.82ms、p99 8,051.38ms、compaction latencyはp50 13,651.92ms、p95 16,012.52ms、p99 19,346.76msだった。non-overlap singleton promotionによりdata block GET/PUTは0、promoted runs 14,277、directory publicationはpage PUT 597/147,083,669 bytes、immutable page reuse 31,200だった。host PR #87（merge commit `8daace4648ae25a5662f34971d190625d6e8de4c`）のauthority receipt `local-murakumo/bench/results/2026-07-23-r2-streaming-compaction-10m.edn`を正本とする。
+
+これで「paged RangeDirectoryを使い、bounded individual object sizeのまま実R2で10M rowsへ到達する」scale gateは完了した。ただし性能値はresume phaseだけであり、最初の253,952 datomを含む単一process throughputではない。row summaryとdeterministic successful seedは全index件数を証明するが、10M全valueの独立corpus scan/equivalenceは行っていない。またaccount-authoritative Worker CPU、billed R2 operations、複数region/time-order cohortも未取得である。従って10M object-backed scale完了をもって汎用DB GAまたは`:production-ready`とはしない。残る主要gateはhistorical MVCC/on-disk q/pull、true bounded-memory/resumable backup restore、cross-account/region DR、KMS wrapping、multi-region qualificationである。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
 
 # Consequences
 
