@@ -923,7 +923,16 @@
     :equality-method :f64-to-bits-then-i64-equality
     :required-capabilities []
     :hosted-ci {:jdk [17 21] :status :passed}}
-   :next-action :retain-cljc-oracle-and-migrate-only-consumers-that-accept-the-pinned-min-difficulty-floor}]
+   :next-action :retain-cljc-oracle-and-migrate-only-consumers-that-accept-the-pinned-min-difficulty-floor}
+  {:root "orgs/kotoba-lang/search/src/search/model.cljc"
+   :repository "orgs/kotoba-lang/search"
+   :kind :retain-cljc-pending-regex-primitive
+   :review-status :reviewed-2026-07-23
+   :migration-authorized false
+   :reason "search.model/tokenize lower-cases then regex-splits on [a-z0-9\\u3040-\\u30ff\\u3400-\\u9fff]+ (Latin/digit plus Hiragana/Katakana/CJK Unicode ranges); kotoba-lang/compiler's string-operations set is exactly {string-byte-length string=? string-concat string-replace-all keyword-from-string keyword-name} -- no regex, no substring search, no character-class matching, no case-fold. This is the same missing-primitive class already found for kotoba-lang/clj-host's bit-shift gap and the wave-2 actor governors' phrase-matching gap: search is unimplementable without it, not merely unbounded. Independently, the whole model (index/document/add-document/remove-document/score-doc/search) and search.validate's problems/valid? operate over an open-ended :search/docs map keyed by arbitrary document id, which has no bounded-profile precedent yet either (every successful bounded-profile split so far -- association_facts, ghosthacker-family/vamos, mining-pool -- closed over a fixed small N, not an arbitrary map)."
+   :required-language-gates [:regex-or-character-class-substring-primitive
+                             :bounded-arbitrary-keyed-map-profile-precedent]
+   :next-action :retain-cljc-and-revisit-after-a-string-search-primitive-lands}]
  :language-maturity
  {:safe-f64-phase-3a
   {:status :merged-qualified
@@ -1352,9 +1361,9 @@
   :assoc-wave-note "All 37 cloud-itonami-assoc-* repositories (gh repo list, 2026-07-22) carry a sole production association_facts.kotoba with zero tracked CLJC. finra closed the reviewed retirement queue; the 18 repositories in :backfilled-unlogged-migrations were found already migrated by prior unlogged sessions (2026-07-20/21), verified against their merge commits and green CI, and logged into the ADR's :qualified-evidence -- their local checkouts were never canonical-matrix entries so they do not appear in :reviewed-association-wave above. No further next-reviewed-wave-candidate exists inside cloud-itonami-assoc-*; see :next-wave-census for the surveyed successor scope and the new :dispositions entry for why it is not yet actionable."
   :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA and FINRA retirement each removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; the assoc-* wave is closed, so resume with per-repo review inside the isic/isco/iso3166/unspsc/cofog/gtin census once the application-profile and string-search gates are tracked as landed."}
  :completion
- {:reviewed-project-roots 47
+ {:reviewed-project-roots 48
   :authorized-migrations 21
-  :retained-oracles 7
+  :retained-oracles 8
   :typed-refactors-pending 0
   :typed-refactors-in-review 0
   :typed-refactors-merged-awaiting-cutover 3}}}
