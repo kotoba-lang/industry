@@ -141,5 +141,6 @@
       (println "OK: docs/business-model.md up to date for" isic)
       (do (println "STALE: docs/business-model.md would change for" isic)
           (js/process.exit 1))))
-  (do (fs/writeFileSync out-path content)
+  (do (fs/mkdirSync (path/dirname out-path) #js {:recursive true})
+      (fs/writeFileSync out-path content)
       (println "wrote" out-path "for ISIC" isic)))
