@@ -381,6 +381,18 @@ Cloudflare R2の隔離prefix、511 teams、1,022 membership datoms、64 rows/pag
 
 次のP1優先は、plan/cutoffが同時に必要と証明した独立run/blockだけのbounded concurrency、bytes/RTT/cache hitに基づくadaptive block sizing、10^5/10^7 scaleとWorker RSS/CPU/R2 bytes gateである。
 
+# Verification addendum — plan-proven independent-run GET waves (2026-07-23)
+
+peer PR #70は、各physical runの現在head descriptorをpage cursorと現在のLIMIT+1 cutoffでpruneし、残ったheadをlogical minimum順に選ぶbounded GET waveを追加した。既定concurrencyは4でcallerが正整数へ変更でき、一runは一waveへ最大一blockだけを出す。wave完了後にcandidate cutoffを再計算してから次waveを計画するため、reject済みの同一run successor speculationを再導入しない。legacy inline runは先に逐次foldし、その候補もphysical waveのcutoffへ反映する。remainder経路は従来どおりCIDとdescriptorを検証する。
+
+MemoryR2の二つのinterleaved physical runではconcurrency 2の実observed GET overlapが2、cap 1では1となり、どちらも64 rows、required data GET 2で一致した。並列化はsuccessor GETを追加しない。peer canonical local CIはJVM 223 tests/674 assertions、CLJS 223 tests/794 assertions、R2 gateway 21 tests/67 assertions、lint errors 0で、merge commitは`f378557e0edd65142a093fb1b2868307a22096f5`である。
+
+host PR #63は`MERKLE_FRONTIER_BLOCK_GET_CONCURRENCY`を既定4・最大16としてprefix pageへ渡し、各stepとterminal resultへ`max-concurrent-block-gets`をmax集約してservice認証済みstatusへ公開した。benchmark driverはseedをmodulo分割したinterleaved transactionへ拡張し、各seedが202になった場合もserver-owned durable driverで完了してから次runをpublishする。host canonical local CIは75 tests/405 assertions、lint errors 0、Worker release、datom ingress smokeがgreenで、merge commitは`e76cbfb3eb75f7bec9c86a128d7c5d9a57b6d1e4`である。
+
+実Cloudflare R2の520 teams、1,040 membership datoms、4 interleaved runs、64 rows/page A/Bでは、concurrency 1と4の双方が521 rows、10 steps、37 run scans、47 block scans、15 actual block fetchで完了し、観測最大並列だけが1から4へ上がった。driver wallは1で119,149.0 ms、4で190,478.6 msとなり4-wayは59.87%遅かった。同じrunのseed wallも9,591.2 msから14,907.5 msへ55.43%悪化しており、単発逐次A/Bの時間帯ノイズを分離できない。したがってcorrectness、bounded parallelism、GET数不増は通過したが、latency winは主張しない。一時Workerは削除し、isolated prefixesはaudit用に保持した。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-independent-run-waves.edn`である。
+
+plan-proven independent GET concurrency gapは実装・観測まで閉じた。残るP1 performance gateはbytes/RTT/cache hitに基づくadaptive block sizing、複数時間帯・順序反転・複数regionでのA/B、10^5〜10^7 datomのp95/p99、Worker CPU/RSS、R2 request/bytes costである。historical MVCC join、KMS wrapping/rotation drill、multi-region replica lag、cron backlog/dead-letter/cancellationもproduction readiness上は未完了であり、状態は`:production-partial`のままとする。IStoreとCloudflare KVは使用しない。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
