@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6936, "ai-gftd-chat-shell" 2},
+ {"magatama-sh1n5h1x" 6939, "ai-gftd-chat-shell" 2},
  :zone
- {:requests-7d 469450,
-  :pageviews-7d 7003,
-  :uniques-7d-sum 5125,
+ {:requests-7d 477730,
+  :pageviews-7d 7951,
+  :uniques-7d-sum 5139,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/assets/main.js.map", :requests 49}
-   {:path "/.env.production.bak", :requests 49}
-   {:path "/sa.json", :requests 45}
-   {:path "/debug/pprof/", :requests 45}
+  [{:path "/assets/main.js.map", :requests 63}
+   {:path "/wp-trackback.php", :requests 60}
+   {:path "/debug/pprof/", :requests 52}
+   {:path "/api/v1/settings", :requests 44}
    {:path "//cgi-bin/index.php", :requests 43}
    {:path "/api/config", :requests 42}
-   {:path "/.htpasswd", :requests 37}
-   {:path "/.profile", :requests 33}],
-  :status-mix {:client-error 932, :ok 1089, :server-error 15558},
+   {:path "/health", :requests 38}
+   {:path "/.htpasswd", :requests 37}],
+  :status-mix {:client-error 1219, :ok 1336, :server-error 15651},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-23",
- :traffic-quality {:window "24h", :probe-4xx-pct 5, :error-5xx-pct 89},
+ :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 86},
  :top-paths
- "上位 page (24h, 2xx/3xx): /assets/main.js.map 49 · /.env.production.bak 49 · /sa.json 45 · /debug/pprof/ 45 · //cgi-bin/index.php 43 | 4xx(probe) 5% · 5xx 89%",
+ "上位 page (24h, 2xx/3xx): /assets/main.js.map 63 · /wp-trackback.php 60 · /debug/pprof/ 52 · /api/v1/settings 44 · //cgi-bin/index.php 43 | 4xx(probe) 7% · 5xx 86%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 469450 req/7d・5125 uniques(日次和)・うち4xx probe 5%(24h)、workers 6938 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 477730 req/7d・5139 uniques(日次和)・うち4xx probe 7%(24h)、workers 6941 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
