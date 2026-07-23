@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66], :merged-host-prs [57 58 59 60], :latest-peer-main \"8adb58777872b3d51303234240de93b2e0e7c241\", :latest-host-main \"8fd5bd29d042b77162179c99b918f414aa9f887a\", :latest-worker-version \"local-verified-2026-07-23-safe-epoch-oracle\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67], :merged-host-prs [57 58 59 60], :latest-peer-main \"7d2ca75b153ef4b0589308a1634e68f4f0b4154c\", :latest-host-main \"8fd5bd29d042b77162179c99b918f414aa9f887a\", :latest-worker-version \"local-verified-2026-07-23-two-pass-gc\"}"
   :adr/body
   "# Context
 
@@ -346,6 +346,16 @@ R2 adapterのcompactorは裸のminimum helperを再計算せずoracleのsafe epo
 portable testはclock skew 0/100ms、reader/replication/backupのminimum、invalid skew、release semanticsを固定した。host testは別database rootを除外しながら同じoracle decisionをcompactor helperへ返すことを検証した。JVM 223 tests/681 assertions、CLJS 222 tests/772 assertions、lint errors 0、R2 gateway 21 tests/67 assertions。merge commitは`8adb58777872b3d51303234240de93b2e0e7c241`である。
 
 これによりP0.1のreader/replica/legal-hold/release/backup root aggregation、host compactor/GC共通境界、lease expiryとclock skew、concurrent root registration fenceは完了した。P0 correctnessの次の未完了gateはP0.3であり、同じcandidate inventoryの二回連続一致をdelete条件にすること、inventory backup、実delete後restore、誤削除simulationを閉じる。
+
+# Verification addendum — two-pass GC candidate inventory gate (2026-07-23)
+
+peer PR #67はdelete modeのGCを、一回のcandidate計算と二回root snapshotだけで削除する経路から、reachabilityとsorted candidate key vectorを独立に二回完全計算するgateへ変更した。block candidate、stale resumable pointer、stale ingress pointerをdeduplicate/sortしたvectorが完全一致する場合だけdeleteする。二回の間に古いcandidateが現れる、消える、分類が変わる場合は`:inventory-changed`でdelete 0となる。dry-runは一回inventoryのままである。
+
+さらに二回のauditを最初・中間・最後の完全head/retention/resumable/ingress key+ETag snapshotで挟む。中間snapshot後のaudit中にreader/backup rootやpublication pointerが変化しても、最終snapshotが`:roots-changed`としてdeleteをfenceする。fresh immutable blockは従来どおりgrace cutoffによりcandidateにならず、publisherのblock-before-HeadCAS順序を保護する。
+
+MemoryR2 fault contractは通常deleteがinventory passes 2でorphan 1件だけを削除すること、二回目block listing直前に別のold orphanを注入すると両方を保持して`:inventory-changed`となること、concurrent head/backup root変更が`:roots-changed`となること、stale pointer cleanupも二回一致後だけ行うことを確認した。CLJS 222 tests/780 assertions、lint errors 0、R2 gateway 21 tests/67 assertions。merge commitは`7d2ca75b153ef4b0589308a1634e68f4f0b4154c`である。
+
+これによりP0.3の「dry-run inventoryと二回連続一致をdelete条件」は完了した。残るP0.3はdelete前inventory/bytes backup、CID検証付きrestore、実R2での誤削除simulationと復元drillであり、それらが通るまでproduction delete/restore gate全体を完了とはしない。
 
 # Consequences
 
