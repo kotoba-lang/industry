@@ -1000,7 +1000,28 @@
    :reason "ibis.parser's line-based .ibs-format reader (section headers, key=value lines, tabular V-I rows, numeric-token detection) is entirely re-matches-driven; same missing string-search-primitive class as kotoba-lang/search and kotoba-lang/cron's cron.model. ibis.component and ibis.model themselves are pure data-structure code with no regex -- in particular ibis.model/interpolate-current (linear interpolation over an ordered vector of [voltage current] points, clamping at the table endpoints) is a clean, bounded-numeric-algorithm candidate similar in shape to mining-pool's vardiff, but was not implemented this pass: it needs a fixed-size V-I table profile design (the legacy function takes an arbitrary-length vector) and real IBIS V-I curve reference data to hand-verify against, neither of which this review had time to produce. Flagged as a concrete next-wave candidate rather than left unremarked."
    :required-language-gates [:regex-or-substring-primitive-for-parser
                              :bounded-vi-table-profile-design-for-interpolate-current]
-   :next-action :retain-cljc-parser-and-consider-a-future-bounded-interpolate-current-profile-with-real-vi-curve-reference-data}]
+   :next-action :retain-cljc-parser-and-consider-a-future-bounded-interpolate-current-profile-with-real-vi-curve-reference-data}
+  {:root "orgs/kotoba-lang/atprotocol/src/atprotocol/boundary.cljc"
+   :repository "orgs/kotoba-lang/atprotocol"
+   :kind :bounded-profile-split
+   :review-status :bounded-boundary-profile-merged
+   :migration-authorized true
+   :migration-scope :atprotocol/bounded-boundary-v1
+   :legacy-domain :atprotocol.projection-app-record-profile-open-json-maps-and-function-valued-codec-contract
+   :safety-note "Covers the entire fixed 12-concern boundary table verbatim, including the fail-closed unknown-concern case. Not a narrowing -- projection/app-record/profile were never in scope, they are a categorically different (open-map, function-valued) domain."
+   :compiler-findings
+   {:equality-returns-i64-not-bool
+    {:description "= (and other comparisons) type as :i64, not :bool; a :bool-declared function body that returns a bare (= a b) fails the subset gate. Working as designed once understood -- wrap in (if (= a b) true false). Not filed as an issue."}}
+   :implementation
+   {:pr "https://github.com/kotoba-lang/atprotocol/pull/1"
+    :commit "41ef11e30836ccfc1f69b326bfe91971e8dfdd2e"
+    :kernel-and-conformance "src/atprotocol/bounded_boundary.kotoba"
+    :migration-record "migration/bounded-boundary-v1.edn"
+    :ground-truth "atprotocol.atprotocol-test/boundary-splits-cleanly (read directly, not independently re-derived, since the legacy test is the ground truth for a fixed lookup table)"
+    :local-test-suite-status :could-not-run-in-isolated-checkout-local-root-sibling-dep
+    :hosted-ci-status :passed-full-legacy-suite-including-sibling-clone
+    :required-capabilities []}
+   :next-action :retain-cljc-oracle-for-projection-app-record-profile}]
  :language-maturity
  {:safe-f64-phase-3a
   {:status :merged-qualified
@@ -1429,8 +1450,8 @@
   :assoc-wave-note "All 37 cloud-itonami-assoc-* repositories (gh repo list, 2026-07-22) carry a sole production association_facts.kotoba with zero tracked CLJC. finra closed the reviewed retirement queue; the 18 repositories in :backfilled-unlogged-migrations were found already migrated by prior unlogged sessions (2026-07-20/21), verified against their merge commits and green CI, and logged into the ADR's :qualified-evidence -- their local checkouts were never canonical-matrix entries so they do not appear in :reviewed-association-wave above. No further next-reviewed-wave-candidate exists inside cloud-itonami-assoc-*; see :next-wave-census for the surveyed successor scope and the new :dispositions entry for why it is not yet actionable."
   :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA and FINRA retirement each removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; the assoc-* wave is closed, so resume with per-repo review inside the isic/isco/iso3166/unspsc/cofog/gtin census once the application-profile and string-search gates are tracked as landed."}
  :completion
- {:reviewed-project-roots 52
-  :authorized-migrations 23
+ {:reviewed-project-roots 53
+  :authorized-migrations 24
   :retained-oracles 10
   :typed-refactors-pending 0
   :typed-refactors-in-review 0
