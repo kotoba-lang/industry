@@ -521,6 +521,16 @@ host PR #81（merge commit `0afd6150700e4d16e94cb5a2b0992c9350b3f0c3`）はCloud
 
 実R2 10M gateは同一durable headで継続し、本addendum確認時点で4,317,184/10,000,000 datomまで進んだ。途中値をscale完了とは扱わず、状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
 
+## 2026-07-23 Live Cloudflare cron alert qualification
+
+実Cloudflareで一時host Worker、alert sink Worker、隔離R2 prefixを用い、1分cronとintentional failed job、qualification用1ms dispatch thresholdを設定した。最初のlive eventはdispatch latency 1,300msでhealth/structured alertまで成功したが、Cloudflare edgeがFetch `redirect: "error"`を未実装としてdelivery前に拒否した。この実環境発見を受け、host PR #82（merge commit `1ead00aef8d52a7b7a254a69ec17ae9912903ae2`）で`redirect: "manual"`へ変更し、既存2xx gateで3xxを拒否する方式にした。
+
+同一accountのpublic workers.dev loopbackはsink Workerへ到達する前にplatform 404となったため、host PR #83（merge commit `2b09c26d5bcc7cabc825401d2e0f47b9db8a5084`）でoptional `MERKLE_ALERT_SINK` service binding adapterを追加した。transportだけを差し替え、HTTPS URL、Bearer header、JSON payload、manual redirect、2xx gateは同一contractを使う。再deploy後の実ScheduledEventはdispatch latency 1,294ms、Worker wall 1,147ms/CPU 7ms、reasons `[:dead-letter :cron-dispatch-latency]`、service-binding delivery 202、outcome okだった。次minuteも1,275ms/202で成功し、最終R2 payload readbackとsecret非混入を確認した。
+
+host PR #84（merge commit `1f16b8aa77264e825b1b6bf798aa70f8c8fb36f6`）はauthority receipt `local-murakumo/bench/results/2026-07-23-r2-cron-alert-delivery.edn`を保存した。一時host/sink Workersとmutable failed jobは削除し、isolated R2 receiptだけを監査用に保持した。これで実Cloudflare cronから認証済みsink/R2までのsingle-account delivery drillは完了した。ただし1msはqualification専用でproduction推奨値ではなく、複数region/notification providerのdelivery percentileは未測定である。
+
+実R2 10M gateは同一durable headで継続し、本addendum確認時点で5,398,528/10,000,000 datomまで進んだ。途中値をscale完了とは扱わず、状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
