@@ -407,6 +407,16 @@ host PR #64は`MERKLE_RUN_BLOCK_ROWS`既定128、`MERKLE_RUN_MAX_BLOCK_BYTES`既
 
 これによりrow固定だけだったblock/waveをexact bytesでも制御し、実GET bytesを次のpolicy入力として観測するvertical sliceは完了した。ただし一つのglobal byte値を選ぶ根拠は得ておらず、adaptive block sizing全体は未完了である。次はblock-size cohortをmanifest epochに固定し、16/32/64/128 KiBを順序反転・複数時間帯で反復して、GET、bytes、R2/Worker wall、CPU、cache hitから次epochのsize classを選ぶbounded controllerを実装する。10^5〜10^7 scale、multi-region、historical MVCC、KMS/rotation、operations gateも引き続き未完了で、状態は`:production-partial`とする。IStoreとCloudflare KVは使用しない。
 
+# Verification addendum — bounded adaptive block-size controller (2026-07-23)
+
+peer PR #74は16/32/64/128 KiBの離散size classから次epochを選ぶpure controllerを追加した。入力はclass別sample count、wall p95、CPU、fetched block数・bytes、cache hit率と、GET・MiB・CPU・cache missの明示cost weightである。current cohortがminimum samplesを満たさない場合はholdし、比較対象をcurrentと隣接classだけに限定し、既定10%のhysteresisを越えた場合だけ一段移動する。unknown class、重複cohort、NaN/negative metric、範囲外cache hitはfail closedとなる。portable testは一epoch一段、二epochでの段階移動、sample不足、hysteresis、resource costによる選択反転、malformed evidence拒否を固定した。
+
+peer canonical local CIはJVM 230 tests/700 assertions、CLJS 230 tests/828 assertions、lint errors 0、R2 gateway 21 tests/67 assertions、Merkle/view benchmark全てgreenだった。peer merge commitは`d28e8732d6af0f1beef72dad7f4df6e8e79c6237`である。
+
+host PR #65は`MERKLE_RUN_BLOCK_SIZING_EDN`をcontrollerへ渡し、直前のimmutable base manifestに記録された`run-max-block-bytes`を次epochのcurrent classとして優先する。bootstrapだけは設定のcurrentまたは静的既定を使う。選択classと完全なdecision EDNを次manifest statisticsへ同時保存し、新規transaction receiptにもdecisionを返す。これによりprocess-local mutable tunerを持たず、再現可能なmanifest epochごとに最大一classだけ進む。invalid evidenceはrefreshを失敗させ、sample不足は前classを維持する。host canonical local CIは75 tests/405 assertions、lint errors 0、Worker build、durable ingress smokeがgreenで、smokeは16→32 KiBのdecisionがreceiptへ露出することも確認した。host merge commitは`f7d988d27f44459e53f0e863a67a23bc12214942`である。
+
+これでadaptive sizingの制御vertical sliceは閉じたが、productionで自動選択を有効化するevidence gateは未完了である。既存の実R2 16/32 KiB比較は各一回・単一regionで、32 KiBのwallが速い一方16 KiBのGET数が少ないというtrade-offしか示さない。次は順序反転・複数時間帯・複数regionで各classをminimum samples以上反復し、Worker CPU、cache hit、R2 request/bytes単価を同一schemaで収集する。その後に10^5〜10^7 datom scaleのp95/p99、RSS/CPU、compaction/write amplification gateへ進む。historical MVCC、KMS rotation、multi-region lag、cron backlog/dead-letter/cancellationも残るため状態は`:production-partial`を維持する。IStoreとCloudflare KVは使用しない。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
