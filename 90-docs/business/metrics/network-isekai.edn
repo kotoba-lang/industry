@@ -1,28 +1,29 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 12392,
-  :pageviews-7d 6705,
-  :uniques-7d-sum 411,
+ {:requests-7d 12414,
+  :pageviews-7d 6723,
+  :uniques-7d-sum 414,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 70}
+  [{:path "/", :requests 73}
+   {:path "/feed/fork-stats.edn", :requests 25}
    {:path "/robots.txt", :requests 24}
-   {:path "/games/itonami/home-nursing-rounds/thumbnail.svg",
-    :requests 24}
-   {:path "/feed/fork-stats.edn", :requests 24}
-   {:path "//wp-includes/l10n/", :requests 22}
-   {:path "/666.php", :requests 20}
-   {:path "/file25.php", :requests 18}
-   {:path "/inputs.php", :requests 18}],
-  :status-mix {:ok 1711, :client-error 8, :server-error 5},
+   {:path "/sitemap.xml", :requests 12}
+   {:path "/api/events", :requests 4}
+   {:path "/favicon.ico", :requests 3}
+   {:path "/gftd/orbs", :requests 2}
+   {:path "/gftd/royale", :requests 2}],
+  :status-mix {:ok 1727, :client-error 8, :server-error 5},
+  :channel-mix
+  {:channel 162, :probe 1371, :unclassified 194, :ok-total 1727},
   :window "24h"},
  :as-of "2026-07-23",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 70 · /robots.txt 24 · /games/itonami/home-nursing-rounds/thumb… 24 · /feed/fork-stats.edn 24 · //wp-includes/l10n/ 22 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): / 73 · /feed/fork-stats.edn 25 · /robots.txt 24 · /sitemap.xml 12 · /api/events 4 | 4xx(probe) 0% · 5xx 0% · probe(200-fallback) 79% · unclassified 11%",
  :signal
- "isekai.network 実測 12392 req/7d・411 uniques(日次和)・うち4xx probe 0%(24h)",
+ "isekai.network 実測 12414 req/7d・414 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
