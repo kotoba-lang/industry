@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67], :merged-host-prs [57 58 59 60], :latest-peer-main \"7d2ca75b153ef4b0589308a1634e68f4f0b4154c\", :latest-host-main \"8fd5bd29d042b77162179c99b918f414aa9f887a\", :latest-worker-version \"local-verified-2026-07-23-two-pass-gc\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68], :merged-host-prs [57 58 59 60], :latest-peer-main \"0e5a54ff223d5b27d190b994cfb698c7a649f4da\", :latest-host-main \"8fd5bd29d042b77162179c99b918f414aa9f887a\", :latest-worker-version \"r2-verified-2026-07-23-gc-backup-restore\"}"
   :adr/body
   "# Context
 
@@ -356,6 +356,18 @@ peer PR #67はdelete modeのGCを、一回のcandidate計算と二回root snapsh
 MemoryR2 fault contractは通常deleteがinventory passes 2でorphan 1件だけを削除すること、二回目block listing直前に別のold orphanを注入すると両方を保持して`:inventory-changed`となること、concurrent head/backup root変更が`:roots-changed`となること、stale pointer cleanupも二回一致後だけ行うことを確認した。CLJS 222 tests/780 assertions、lint errors 0、R2 gateway 21 tests/67 assertions。merge commitは`7d2ca75b153ef4b0589308a1634e68f4f0b4154c`である。
 
 これによりP0.3の「dry-run inventoryと二回連続一致をdelete条件」は完了した。残るP0.3はdelete前inventory/bytes backup、CID検証付きrestore、実R2での誤削除simulationと復元drillであり、それらが通るまでproduction delete/restore gate全体を完了とはしない。
+
+# Verification addendum — immutable GC backup and CID-verified restore (2026-07-23)
+
+peer PR #68は、二回一致したcandidateを直ちに削除する経路を、全candidate bytesのimmutable backup、DAG-CBOR inventoryのCID-addressed保存、その後のprimary deleteへ変更した。backup objectはcontent CID、inventoryはinventory CIDをkeyとし、R2 put-if-absentが既存objectに敗れた場合も既存bytesのCID一致を要求する。candidateは逐次copyするため、GC hostが全object bytesを同時に保持しない。
+
+restoreはinventory CIDと各content CIDをdecode前に検証し、書戻し先を同じprefixの`blocks/`、`scheduler/resumable/`、`scheduler/ingress/`へ限定する。primaryへの書戻しはput-if-absentであり、既存destinationは同一CIDの場合だけidempotent successとするため、新しいmutable pointerや異なるbytesを上書きしない。既定は同じR2 bucketのGC対象外namespaceを使い、`MERKLE_GC_BACKUP_BUCKET`で別bucketへ隔離できる。backup inventory/objectは自動GCせず、明示retention policyの対象とする。
+
+MemoryR2 contractは誤削除からのrestore、同じinventoryの再実行、破損backupのCID mismatch拒否を固定した。canonical local CIは7 stepsすべてgreenで、JVM 223 tests/681 assertions、CLJS 222 tests/787 assertions、lint errors 0、R2 gateway 21 tests/67 assertionsだった。peer merge commitは`0e5a54ff223d5b27d190b994cfb698c7a649f4da`である。
+
+実Cloudflare R2 bucket `kotobase-merkle-lsm`の隔離UUID prefixでは、heads 2、retention root 1、reachable blocks 4をmarkし、candidate 1件を二回一致させた。content-addressed backupとinventory CID `cc19055eca4749716f19ad7f102c21082c23f2007217885feb5056093d1f27df`を保存後、orphan 1件を削除し、inventoryから1件をrestoreしてCID一致を確認した。wall timeは1,446 msで、隔離prefixと一時Workerは終了時に削除した。authority receiptは`kotobase-peer/bench/results/2026-07-23-r2-gc-backup-restore.edn`であり、これはcorrectness drillであってproduction latency percentileではない。
+
+これによりP0.3の二回inventory delete gate、delete前backup、CID検証付きrestore、実R2誤削除復元drillは完了した。P0 correctnessの主要三項P0.1〜P0.3は閉じたが、全体は引き続き`:production-partial`である。次の優先はP1のunconsumed current-block remainder、plan-proven independent GET concurrency、byte/RTT/cache-aware adaptive block sizing、および10^5/10^7 scale/RSS/CPU gateとする。
 
 # Consequences
 
