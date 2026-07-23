@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64], :merged-host-prs [57 58 59 60], :latest-peer-main \"2d8447df6a5c3ef91a28c09d51cda86491b2555e\", :latest-host-main \"8fd5bd29d042b77162179c99b918f414aa9f887a\", :latest-worker-version \"local-verified-2026-07-23-reader-snapshot-leases\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65], :merged-host-prs [57 58 59 60], :latest-peer-main \"f2bea0f36273ede5a87aac3e217919dbf28ac915\", :latest-host-main \"8fd5bd29d042b77162179c99b918f414aa9f887a\", :latest-worker-version \"local-verified-2026-07-23-checkpoint-inheritance\"}"
   :adr/body
   "# Context
 
@@ -324,6 +324,18 @@ host PR #60はdocument get/list/searchとevent readのmanifest/child traversal�
 resumable join frontierはtask CID由来のdeterministic reader rootを持つ。各page前にexact expected headを解決してleaseをCAS renew/reclaimし、prefix pageへ同じhead CIDを渡す。pending/crashではreleaseせず次invocationまたはexpiryまで保持し、terminal completionとcompleted replayではCAS releaseする。これによりquery途中のmutable-head切替と、active frontierが参照するsnapshotのGCを防ぐ。host local CIは75 tests/403 assertions、lint errors 0、peer #64 sourceを用いたWorker/UI release build、reader rootのactive/released lifecycleを含むingress smokeがgreen。merge commitは`8fd5bd29d042b77162179c99b918f414aa9f887a`である。
 
 これはP0.1のreader snapshot pinをhostへ配線したvertical sliceである。ただしreplica lag、legal hold、backup/release rootを一つのsafe-epoch oracleへ集約してcompactorへ明示入力する部分、clock skew/lease expiryとconcurrent GCのproperty/fault test、historical snapshot public queryは未完了である。したがってP0.1全体を完了とはせず、次はP0.2 checkpoint inheritance equivalenceと並行してsafe-epoch oracle integrationを閉じる。
+
+# Verification addendum — replacement-safe checkpoint inheritance (2026-07-23)
+
+peer PR #65は、既存RangeDirectoryを通常manifestとしてwindowへ取り込み、そのmanifest自身のindexesだけを再compactionするとdirectoryが継承していたrefsを欠落し得るcorrectness bugを修正した。manifest windowはRangeDirectoryを持つmanifestの直前で停止し、それをatomic checkpoint boundaryとして扱う。更新対象indexはcurrent window refsとinherited directory refsを同じcompaction inputへ入れ、出力refsでそのindexを完全置換する。更新されないindexとdirectoryのpartial legacy previous tailはそのまま継承する。
+
+directory refsはCIDでdeduplicateしてmin/max/CID順へcanonicalizeするため、同じinput rootとenumeration order違いのretryは同一directory CIDへ収束する。新しいcheckpointごとにoverlapping refsをappendし続けない。MerkleRunもexact same-epoch retry rowをdeduplicateし、同一physical keyでassert/retract内容が衝突する場合は順序依存にせずpublish前にfail closedする。
+
+RangeDirectory v1 validatorはformat/version、database ownership、directory epochがowning manifest epoch以下であること、既知index、vector refs、各CID IPLD Linkを検証する。direct legacy VersionManifest chainはdirectoryを持たないため引き続き読み、最初のcompactionでv1へ移行する。unknown future versionは明示migratorが導入されるまで拒否する。
+
+portable CLJ/CLJS corpusは二段checkpoint、同epoch retry、assert/retract tombstoneについて全snapshot `>= safe-epoch` がuncompacted oracleと一致し、input順序を反転してもoutput CID列が一致することを固定した。Worker end-to-end contractはpartial legacy tailを残す最初のcheckpoint、二回目のreplacement、古いpinned checkpoint read、HeadCAS loserの非公開、同じwinner headからのretry成功を検証する。canonical local CI 7 steps、R2 gateway 21 tests/67 assertions、final JVM 222 tests/675 assertions、CLJS 220 tests/759 assertions、lint errors 0。merge commitは`f2bea0f36273ede5a87aac3e217919dbf28ac915`である。
+
+これによりP0.2のcheckpoint inheritance semantics、canonical replacement、format compatibility、主要fault/equivalence contractは完了した。残るP0 correctness priorityはP0.1のreplica/legal-hold/backup rootを統合するsafe-epoch oracleとclock-skew/concurrent-GC fault test、およびP0.3の二回inventory delete/restore drillである。
 
 # Consequences
 
