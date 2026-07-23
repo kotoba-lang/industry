@@ -1,15 +1,15 @@
 {:health-status 200,
  :zone-name "manimani.cloud",
  :zone
- {:requests-7d 1535,
-  :pageviews-7d 365,
-  :uniques-7d-sum 285,
+ {:requests-7d 1596,
+  :pageviews-7d 379,
+  :uniques-7d-sum 289,
   :zone "manimani.cloud"},
  :sources [:cloudflare :health :emitter],
  :cloud {:signups 1},
  :paths
  {:ok
-  [{:path "/", :requests 54}
+  [{:path "/", :requests 67}
    {:path "/metrics", :requests 29}
    {:path "/robots.txt", :requests 5}
    {:path "/health", :requests 5}
@@ -17,13 +17,13 @@
    {:path "/cdn-cgi/rum", :requests 1}
    {:path "/cdn-cgi/trace", :requests 1}
    {:path "/llms.txt", :requests 1}],
-  :status-mix {:ok 98, :client-error 49, :server-error 2},
+  :status-mix {:ok 111, :client-error 94, :server-error 1},
   :window "24h"},
  :as-of "2026-07-23",
- :traffic-quality {:window "24h", :probe-4xx-pct 33, :error-5xx-pct 1},
+ :traffic-quality {:window "24h", :probe-4xx-pct 46, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 54 · /metrics 29 · /robots.txt 5 · /health 5 · /decisions 2 | 4xx(probe) 33% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): / 67 · /metrics 29 · /robots.txt 5 · /health 5 · /decisions 2 | 4xx(probe) 46% · 5xx 0%",
  :conversion {:oss-active 0, :cloud-paid 0, :pct 0},
  :oss {:installs 0},
  :signal
- "manimani.cloud 実測 1535 req/7d・285 uniques(日次和)・うち4xx probe 33%(24h)"}
+ "manimani.cloud 実測 1596 req/7d・289 uniques(日次和)・うち4xx probe 46%(24h)"}
