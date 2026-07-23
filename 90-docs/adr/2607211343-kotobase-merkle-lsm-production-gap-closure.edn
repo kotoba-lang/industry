@@ -417,6 +417,16 @@ host PR #65は`MERKLE_RUN_BLOCK_SIZING_EDN`をcontrollerへ渡し、直前のimm
 
 これでadaptive sizingの制御vertical sliceは閉じたが、productionで自動選択を有効化するevidence gateは未完了である。既存の実R2 16/32 KiB比較は各一回・単一regionで、32 KiBのwallが速い一方16 KiBのGET数が少ないというtrade-offしか示さない。次は順序反転・複数時間帯・複数regionで各classをminimum samples以上反復し、Worker CPU、cache hit、R2 request/bytes単価を同一schemaで収集する。その後に10^5〜10^7 datom scaleのp95/p99、RSS/CPU、compaction/write amplification gateへ進む。historical MVCC、KMS rotation、multi-region lag、cron backlog/dead-letter/cancellationも残るため状態は`:production-partial`を維持する。IStoreとCloudflare KVは使用しない。
 
+# Verification addendum — production cohort qualification gate (2026-07-23)
+
+peer PR #75はraw block-size trialをcontroller observationへ集約する前のproduction qualificationを共通libへ追加した。既定gateは16/32/64/128 KiB全class、最低2 region、各regionでcompleteなascending/descending round、classあたり最低3 samples、trialごとのunique Head、region/classごとのisolated prefix、non-syntheticなCPU/cache metric provenanceを要求する。malformed metric、重複trial/Head、異なるclass間のprefix共有はthrowし、構造は正しいが不足するevidenceは`:eligible? false`と明示reasonを返す。qualified cohortだけをwall p95とresource meanへ決定的に集約する。canonical local CIはJVM 233 tests/707 assertions、CLJS 233 tests/835 assertions、R2 gateway 21 tests/67 assertions、Merkle/view benchmark全てgreenで、merge commitは`8f6ce22e3e970ba7d96ef756066e11a234977068`である。
+
+host PR #66は手集計済み`:observations`の直入力を廃止し、`MERKLE_RUN_BLOCK_SIZING_EDN`のraw `:samples`を上記gateへ通す。未qualified evidenceはmanifest publish前に`:block-sizing-evidence-rejected`としてfail closedとなり、qualified summaryだけがcontroller decision、transaction receipt、immutable manifest statisticsへ入る。region/class cross-product runnerはroundごとにclass順を反転し、fresh Headでdurable R2 joinを実行し、terminal GET/byte metricsを認証済みmetrics endpointのCPU/cache値と結合して、そのままenvへ渡せるEDNを出力する。tokenはreceiptへ出さない。
+
+host canonical local CIはcohort runner 8 assertions、JVM 75 tests/405 assertions、lint errors 0、Worker build、durable ingress smokeがgreenだった。smokeはqualified 16→32 KiB decisionと、single-region/synthetic evidenceのHTTP 500拒否を両方確認した。merge commitは`90231cc45e3be263c6a8c6f94310d40c67b73236`、authority receiptは`local-murakumo/bench/results/2026-07-23-block-size-cohort-qualification-gate.edn`である。
+
+既存実R2 receiptは16/32 KiB、単一region、順序反転なし、CPU/cache provenanceなしのため、新gateでは明示的にproduction-unqualifiedとなる。したがってunsafeな自動採用gapは閉じたが、実測qualification自体はまだ通過していない。次は最低2実行region×4 class×ascending/descendingを認証済みCPU/cache metrics付きで採取し、その後10^5〜10^7 datomのp95/p99、RSS/CPU、R2 cost gateへ進む。状態は`:production-partial`、IStoreとCloudflare KVは引き続き使用しない。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
