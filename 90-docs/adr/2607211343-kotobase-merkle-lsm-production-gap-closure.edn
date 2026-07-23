@@ -427,6 +427,16 @@ host canonical local CIはcohort runner 8 assertions、JVM 75 tests/405 assertio
 
 既存実R2 receiptは16/32 KiB、単一region、順序反転なし、CPU/cache provenanceなしのため、新gateでは明示的にproduction-unqualifiedとなる。したがってunsafeな自動採用gapは閉じたが、実測qualification自体はまだ通過していない。次は最低2実行region×4 class×ascending/descendingを認証済みCPU/cache metrics付きで採取し、その後10^5〜10^7 datomのp95/p99、RSS/CPU、R2 cost gateへ進む。状態は`:production-partial`、IStoreとCloudflare KVは引き続き使用しない。
 
+# Verification addendum — authenticated cohort CPU and region provenance (2026-07-23)
+
+host PR #67はcohort runnerの外部`metricsUrl`信頼を除き、Cloudflare公式`workersInvocationsAdaptive` GraphQL datasetからdedicated scriptの`cpuTimeP99`を直接取得する。API token、account、script、trial開始/終了時刻を使い、benchmarkが発生させたinvocation数との完全一致、errors 0、nonzero CPUを要求する。adaptive sampling、同時traffic、欠落ingestionで件数が異なる場合は採用せず、5秒間隔・最大12回のbounded retry後にfail closedとなる。GraphQL値はmicrosecondsからmillisecondsへ変換してcontroller sampleへ入れ、tokenはreceiptにもenv EDNにも出さない。
+
+durable join runnerは全HTTP responseの`CF-Ray` suffixからobserved edge coloを集める。region/class targetが宣言する`expectedColos`外を一つでも観測したtrialはrejectするため、単にregion labelを書くだけではqualificationを通せない。Merkle pathはWorker Cache APIを使っておらず、CI source scanでこれを固定してcache hit ratio 0、source `merkle-cache-disabled-contract`とする。Cloudflare KV、Analytics Engine、IStoreは追加していない。
+
+canonical local CIはcohort/GraphQL/colo contract 18 assertions、JVM 75 tests/405 assertions、lint errors 0、Worker build、durable ingress smokeがgreenだった。host merge commitは`700d2907e4b9074833790892652f77941831b7bf`、authority receiptは`local-murakumo/bench/results/2026-07-23-cloudflare-cohort-cpu-metrics.edn`である。Cloudflare公式仕様上、Workers metricsはGraphQLを正本としCPU timeを提供する一方、Tail Worker event schemaはrequest/log/exception/coloを提供してもCPU timeを提供しないため、この設計はTail→KV/R2の疑似CPU値を採らない。
+
+metric provenance wiring gapは閉じた。live production qualificationにはanalytics-read API token、region/classごとのdedicated target、地理的に異なるrunnerが必要で、現時点のlocal OAuth permissionと単一実行地点だけでは未通過である。次のgateはこの実matrixのreceipt、その後の10^5〜10^7 datom p95/p99、memory/CPU、R2 request/bytes costである。状態は`:production-partial`を維持する。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
