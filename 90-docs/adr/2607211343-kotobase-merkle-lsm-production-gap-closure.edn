@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65], :merged-host-prs [57 58 59 60], :latest-peer-main \"f2bea0f36273ede5a87aac3e217919dbf28ac915\", :latest-host-main \"8fd5bd29d042b77162179c99b918f414aa9f887a\", :latest-worker-version \"local-verified-2026-07-23-checkpoint-inheritance\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66], :merged-host-prs [57 58 59 60], :latest-peer-main \"8adb58777872b3d51303234240de93b2e0e7c241\", :latest-host-main \"8fd5bd29d042b77162179c99b918f414aa9f887a\", :latest-worker-version \"local-verified-2026-07-23-safe-epoch-oracle\"}"
   :adr/body
   "# Context
 
@@ -336,6 +336,16 @@ RangeDirectory v1 validatorはformat/version、database ownership、directory ep
 portable CLJ/CLJS corpusは二段checkpoint、同epoch retry、assert/retract tombstoneについて全snapshot `>= safe-epoch` がuncompacted oracleと一致し、input順序を反転してもoutput CID列が一致することを固定した。Worker end-to-end contractはpartial legacy tailを残す最初のcheckpoint、二回目のreplacement、古いpinned checkpoint read、HeadCAS loserの非公開、同じwinner headからのretry成功を検証する。canonical local CI 7 steps、R2 gateway 21 tests/67 assertions、final JVM 222 tests/675 assertions、CLJS 220 tests/759 assertions、lint errors 0。merge commitは`f2bea0f36273ede5a87aac3e217919dbf28ac915`である。
 
 これによりP0.2のcheckpoint inheritance semantics、canonical replacement、format compatibility、主要fault/equivalence contractは完了した。残るP0 correctness priorityはP0.1のreplica/legal-hold/backup rootを統合するsafe-epoch oracleとclock-skew/concurrent-GC fault test、およびP0.3の二回inventory delete/restore drillである。
+
+# Verification addendum — unified safe-epoch oracle (2026-07-23)
+
+peer PR #66はreader/replication leaseとlegal-hold/release durable rootにbackup durable rootを加え、一つのpure `safe-epoch-oracle`へ統合した。oracleはactive rootのminimum epoch、kind別active count、evaluation時刻、effective時刻、clock skew allowanceを返す。leased rootだけは`MERKLE_RETENTION_CLOCK_SKEW_MS`（既定30秒）のconservative marginを受け、host clockが先行してもexpiry直後のlive reader/replicaをpruneしない。released tombstoneとdurable rootのactivityはskewに左右されない。
+
+R2 adapterのcompactorは裸のminimum helperを再計算せずoracleのsafe epochを明示入力として使う。GC markも同じoracleでactive rootsを選び、safe epoch、kind別count、skewをaudit metricsへ含める。root registryを含む二回目の完全snapshot fenceは、mark後にbackup rootが登録されたfault injectionでdelete 0・`:roots-changed` abortとなり、対象orphan blockを保持した。
+
+portable testはclock skew 0/100ms、reader/replication/backupのminimum、invalid skew、release semanticsを固定した。host testは別database rootを除外しながら同じoracle decisionをcompactor helperへ返すことを検証した。JVM 223 tests/681 assertions、CLJS 222 tests/772 assertions、lint errors 0、R2 gateway 21 tests/67 assertions。merge commitは`8adb58777872b3d51303234240de93b2e0e7c241`である。
+
+これによりP0.1のreader/replica/legal-hold/release/backup root aggregation、host compactor/GC共通境界、lease expiryとclock skew、concurrent root registration fenceは完了した。P0 correctnessの次の未完了gateはP0.3であり、同じcandidate inventoryの二回連続一致をdelete条件にすること、inventory backup、実delete後restore、誤削除simulationを閉じる。
 
 # Consequences
 
