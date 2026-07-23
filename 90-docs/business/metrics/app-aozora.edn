@@ -8,29 +8,29 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 9463, "app-aozora-appview" 12156},
+ {"app-aozora-pds" 9569, "app-aozora-appview" 12222},
  :zone
- {:requests-7d 45656,
-  :pageviews-7d 7618,
-  :uniques-7d-sum 780,
+ {:requests-7d 45930,
+  :pageviews-7d 7624,
+  :uniques-7d-sum 783,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 275334}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2899}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1702}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 270}
-   {:path "/", :requests 95}
-   {:path "/xrpc/com.atproto.repo.listRecords", :requests 52}
-   {:path "/robots.txt", :requests 39}
-   {:path "/federation-pilot/did.json", :requests 36}],
-  :status-mix {:client-error 1112, :ok 281580, :server-error 18},
+    :requests 277008}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2900}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1715}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 271}
+   {:path "/", :requests 92}
+   {:path "/xrpc/com.atproto.repo.listRecords", :requests 61}
+   {:path "/robots.txt", :requests 40}
+   {:path "/federation-pilot/did.json", :requests 39}],
+  :status-mix {:client-error 1113, :ok 283269, :server-error 16},
   :window "24h"},
  :as-of "2026-07-23",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 275334 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2899 · /xrpc/com.atproto.sync.subscribeRepos 1702 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 270 · / 95 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 277008 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2900 · /xrpc/com.atproto.sync.subscribeRepos 1715 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 271 · / 92 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 45656 req/7d・780 uniques(日次和)・うち4xx probe 0%(24h)、workers 21619 inv/7d"}
+ "aozora.app 実測 45930 req/7d・783 uniques(日次和)・うち4xx probe 0%(24h)、workers 21791 inv/7d"}
