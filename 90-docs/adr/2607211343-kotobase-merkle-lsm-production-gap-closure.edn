@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71], :latest-peer-main \"fb9b9040930a9000458edeccbdf43e4d86540737\", :latest-host-main \"4da5bde9162dc9e77b6563d11c99746c326f7a7d\", :latest-worker-version \"r2-range-directory-page-reuse\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74], :latest-peer-main \"1d0bdee9b1404123e3aad795d8a3f41ef6e29c84\", :latest-host-main \"ad333cf484b166bbf12dad3e2ad20b4596af2eef\", :latest-worker-version \"r2-range-directory-exact-page-bytes\"}"
   :adr/body
   "# Context
 
@@ -476,6 +476,18 @@ peer PR #83（merge commit `fb9b9040930a9000458edeccbdf43e4d86540737`）は、v2
 host PR #71（merge commit `4da5bde9162dc9e77b6563d11c99746c326f7a7d`）はdisabled-by-default/authenticated R2 scale seed上限を1,024から2,048 datomへ上げた。実R2 probeは2,048 datomをtotal 3,732.40ms、548.71 datom/s、seed 2,970.53ms、checkpoint 761.48ms、exact v2 row countで完了した。3,072 probeも成功したが402.07 datom/sへ低下したため、2,048を測定済みsafe/efficient boundとして採用した。host local CIはcohort 18 assertions、JVM 75 tests/405 assertions、lint errors 0、Worker build、datom ingress smokeがgreenである。
 
 これでinline root、unbounded leaf hydration、全leaf rewriteの三つのmetadata blockerは閉じた。isolated prefixの実R2 10M gateは2,048 datom/window、48 windows/checkpointで実行中であり、完了値を得るまで10M達成とはしない。状態は`:production-partial`、IStoreとCloudflare KVは引き続き使用しない。
+
+## 2026-07-23 Exact byte-bounded directory leaves and root-only receipts
+
+実R2 10M gateの途中、251,904 datom、各index 123 refsで、v2が3 leavesしか持たずleaf bytes合計3,799,893 bytesになることを観測した。原因はrun-refがblock descriptorsを含むのに、先行synthetic fixtureが小さいfake refだけを使い、leafを128 refsでしか制限していなかったことである。従って前addendumの「最大leaf 26,589 bytes」はそのminimal fixtureにだけ有効で、production-shaped上限としては撤回し、本addendumでsupersedeする。
+
+peer PR #84〜#86（merge commits `280ad3b5b845d560da43ee2abe4586cff1d1270d`、`22c7a07309ffef71f997ccc31f845aac3c4ec46e`、`1d0bdee9b1404123e3aad795d8a3f41ef6e29c84`）は、leafを128 refsに加えてexact DAG-CBOR 262,144 bytesでfail closedに制限した。各refを一度encodeしてconservative chunkを作り、完成pageのexact encodingが超過した時だけ二分するため通常O(n)、singleton超過はpublish前に拒否する。pre-byte-limit v2 descriptorは一度選択してmigrationし、新descriptorはencoded-bytesとaggregate row-countを持つ。query/compactionは取得leafをexact bytesで再検証する。
+
+2,048 rows/16 blocksのrepresentative run-refは7,204 bytesで、123 refsを[39 39 39 6]の4 leavesへ分け、最大258,117 bytes、1 index page build 3,245.07msだった。authority receiptは`kotobase-peer/bench/results/2026-07-23-range-directory-page-byte-bound.edn`である。旧3.8MiB leavesを持つ実253,952-row headのmigrationは、最初のquadratic版および全leaf receipt hydrate版ではedge 503だったが、linear partitionとroot descriptor summary後は11,418.20msで成功した。結果は15 leaves、page GET 3、PUT 15、PUT bytes 3,832,475、exact rows 253,952、lost 0である。
+
+host PR #72〜#74（merge commits `c8d98772c7728d6eac8159c465f1ab6fb275000d`、`3e5b6538a268afac81b1e8e3481f585d0a179881`、`ad333cf484b166bbf12dad3e2ad20b4596af2eef`）はreceipt leaf decodeでもpage-bytesを検証し、row-countをroot descriptorsから集計してpost-commit O(all leaves) GETを除去した。また10M receiptへdirectory page GET/PUT/bytes/reuse、maximum pages/root bytes、byte limitを追加した。
+
+実R2 10M gateは同じisolated headを253,952 rowsからresumeしている。完了までは10M達成とせず、状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
 
 # Consequences
 
