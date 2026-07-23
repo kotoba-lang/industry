@@ -93,16 +93,26 @@
 (defn- pct [r] (when r (str (Math/round (* 100.0 (double r))) "%")))
 (defn- block-id [product suffix] (keyword (str (name product) "." suffix)))
 
+(defn- block-items-set
+  "Current canvas items for a block as a set (advisor-side dedup).
+   gate.cljc と同一 shape — fresh idx / 未定義 block は #{}。"
+  [idx block-id]
+  (let [block (get-in idx [:blocks block-id])]
+    (if block (set (:canvas/items block)) #{})))
+
 (defn proposals
   "Governor-ready proposals that advance the sales/marketing motion:
    - bottleneck step below benchmark → GTM action into the channels block (dedup'd)
    - funnel snapshot → observation into the metrics block (dedup'd)
    - unmeasured stage → 計器 to-do into the solution block (dedup'd)"
-  [product metrics]
+  [idx product metrics]
   (let [spec (get funnel-specs product)]
     (if-not spec
       []
       (let [{:keys [stages steps bottleneck missing]} (evaluate-funnel metrics spec)
+            metrics-items (block-items-set idx (block-id product "metrics"))
+            channels-items (block-items-set idx (block-id product "channels"))
+            solution-items (block-items-set idx (block-id product "solution"))
             snapshot (str "funnel (" (name product) "): "
                           (str/join " → " (map (fn [s] (str (:label s) "=" (or (:count s) "?"))) stages))
                           (when (seq steps)
@@ -111,27 +121,31 @@
                                                                   (str (:from-label st) "→" (:to-label st) " " (pct (:rate st)))))
                                                        steps)))))]
         (concat
-         ;; funnel snapshot (always, when measurable)
-         (when (some :count stages)
+         ;; funnel snapshot (when measurable) — dedup'd against metrics block
+         (when (and (some :count stages) (not (contains? metrics-items snapshot)))
            [{:proposal/action :canvas/add-item
              :canvas/id (block-id product "metrics")
              :event/value snapshot
              :proposal/reason "sales/marketing funnel スナップショット — 運用指標に反映"}])
-         ;; bottleneck → GTM action
-         (when bottleneck
-           [{:proposal/action :canvas/add-item
-             :canvas/id (block-id product "channels")
-             :event/value (str "GTM (" (name (:from bottleneck)) "→" (name (:to bottleneck)) "): "
-                               (:from-label bottleneck) "→" (:to-label bottleneck) " 転換 "
-                               (pct (:rate bottleneck)) " < 目標 " (pct (:benchmark bottleneck))
-                               " — " (get gtm-playbook (:to bottleneck) "獲得施策を検討"))
-             :proposal/reason "funnel bottleneck（benchmark 未達の転換段）に GTM アクションを提案"}])
-         ;; unmeasured stages → instrument to-do
+         ;; bottleneck → GTM action — dedup'd against channels block
+         (let [gtm-txt (when bottleneck
+                         (str "GTM (" (name (:from bottleneck)) "→" (name (:to bottleneck)) "): "
+                              (:from-label bottleneck) "→" (:to-label bottleneck) " 転換 "
+                              (pct (:rate bottleneck)) " < 目標 " (pct (:benchmark bottleneck))
+                              " — " (get gtm-playbook (:to bottleneck) "獲得施策を検討")))]
+           (when (and bottleneck (not (contains? channels-items gtm-txt)))
+             [{:proposal/action :canvas/add-item
+               :canvas/id (block-id product "channels")
+               :event/value gtm-txt
+               :proposal/reason "funnel bottleneck（benchmark 未達の転換段）に GTM アクションを提案"}]))
+         ;; unmeasured stages → instrument to-do — dedup'd against solution block
          (for [k missing
-               :let [st (first (filter #(= (:key %) k) stages))]]
+               :let [st (first (filter #(= (:key %) k) stages))
+                     kiage-txt (str "計器 (funnel): " (:label st) " の計測（funnel emitter で " (str/join "/" (map name (:metric st))) " を出力）")]
+               :when (not (contains? solution-items kiage-txt))]
            {:proposal/action :canvas/add-item
             :canvas/id (block-id product "solution")
-            :event/value (str "計器 (funnel): " (:label st) " の計測（funnel emitter で " (str/join "/" (map name (:metric st))) " を出力）")
+            :event/value kiage-txt
             :proposal/reason "funnel 段の計測が未整備 — 計器を準備項目として提案"}))))))
 
 (defn render-text
