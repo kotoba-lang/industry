@@ -27,8 +27,28 @@
 ;;                                                 facts.cljc を持つ設計ではない
 ;;                                                 ADR-2607012000 の別種の repo なので
 ;;                                                 :none-measured に落とさない) /
+;;                                                 :internal-reference-facts
+;;                                                 (isic family 限定。facts.cljc は
+;;                                                 あるが :cost-threshold 形の内部
+;;                                                 参照テーブル — Governor/Advisor が
+;;                                                 コスト閾値を発明しないための内部
+;;                                                 参照専用で、そもそも外部citationを
+;;                                                 持つ設計ではない。2026-07-23 実測:
+;;                                                 71 件の isic zero-citation repo の
+;;                                                 うち 24 件がこの shape。isco の
+;;                                                 :actor-blueprint-structure と同型の
+;;                                                 「別種repoなのでgapに落とさない」
+;;                                                 救済) /
 ;;                                                 :none-measured(どの経路も
-;;                                                 存在しない)。
+;;                                                 存在しない)。なお isic family の
+;;                                                 facts.cljc で URL citation が0件の
+;;                                                 場合、:spec-basis "..." 形の実在する
+;;                                                 法令/規制citation(URLでなく条文名で
+;;                                                 引用)があれば :facts-citations の
+;;                                                 count に合算する(2026-07-23 実測:
+;;                                                 71件中7件がこの shape。detector が
+;;                                                 https:// のみ数えていたための過小
+;;                                                 count で、カテゴリ誤判定ではない)。
 ;;   :itonami.fleet-audit/real-world-ingest-gap?  対応する count が 0、または
 ;;                                                 経路が :none-measured なら true
 ;;                                                 (未測定は「対象外」ではなく
@@ -192,6 +212,54 @@
   (when-let [f (find-facts-file dir)]
     (count (re-seq url-re (slurp f)))))
 
+(def cost-threshold-re #":cost-threshold\b")
+
+(defn internal-reference-facts-count
+  "Count of `:cost-threshold` entries inside facts.cljc -- the isic-family
+   internal governor/advisor procurement-reference-table shape (2026-07-23
+   sampling: 24/71 isic zero-citation repos, e.g. cloud-itonami-isic-0111's
+   `cerealops.facts`/cloud-itonami-isic-0112's `riceops.facts`: 'supply
+   category cost policy ... the Governor and Advisor consult these instead
+   of inventing thresholds', ADR-2607152500-confirmed intent). These
+   repos were never designed to hold external citations at all -- a zero
+   `facts-citation-count` there is not an unpopulated citation catalog, it
+   is the CORRECT, complete state of a namespace whose only job is
+   internal cost-threshold/classification lookup. Deliberately scoped to
+   the literal `:cost-threshold` key (not a docstring-phrase match, which
+   would be far less reliable across this fleet's varied wording) --
+   nonzero exactly when this shape is present, so callers can use
+   `(pos? ...)` as both detector and a meaningful strength count."
+  [dir]
+  (when-let [f (find-facts-file dir)]
+    (count (re-seq cost-threshold-re (slurp f)))))
+
+(def spec-basis-citation-re #":spec-basis\s+\"")
+
+(defn isic-spec-basis-citation-count
+  "Count of populated `:spec-basis \"...\"` entries inside facts.cljc -- real,
+   named, citable regulatory/statute references (e.g.
+   cloud-itonami-isic-1410's `apparel.facts`: 'Vietnam Labor Code 2019
+   Article 93-94, ILO Conventions 98, 100, 111', cloud-itonami-isic-1512's
+   `luggage.facts`: 'FTC Guides for Select Leather and Imitation Leather
+   Products, 16 CFR Part 24', ADR-2612500000-confirmed real citations)
+   that `facts-citation-count` misses because they cite a statute/CFR
+   section/regulation name rather than an `https://` URL. 2026-07-23
+   sampling: 7/71 isic zero-citation repos share this exact per-
+   jurisdiction `catalog` + `:spec-basis` + honest-`coverage` template
+   (cloud-itonami-isic-1410/1420/1430/1512/1910/3520/3530) -- this is a
+   detector under-count, not a category mismatch: these repos already
+   ARE genuinely-cited real-world-ingest, just formatted as prose law
+   citations instead of a URL. Requires the key to be immediately
+   followed by a quoted string (`:spec-basis \"...\"`), not merely the
+   bare word `:spec-basis` appearing in a docstring's prose (e.g.
+   cloud-itonami-isic-4912's `railfreight.facts` docstring mentions
+   `:spec-basis` twice while explaining why it deliberately holds NO
+   citation data at all -- this regex correctly reads 0 there since
+   neither mention is followed by a quoted value)."
+  [dir]
+  (when-let [f (find-facts-file dir)]
+    (count (re-seq spec-basis-citation-re (slurp f)))))
+
 (def component-patterns
   {:governor #"governor\.cljc$"
    :store #"store\.cljc$"
@@ -300,9 +368,13 @@
 
 (defn real-world-ingest
   "Precedence: real facts.cljc citations first (strongest evidence, wins
-   even for isco family repos that happen to have one), then archive
-   content, then (isco family only) the governed-actor blueprint
-   component-structure signal, else none-measured.
+   even for isco family repos that happen to have one); then, ONLY for
+   isic-family facts.cljc files with zero URL citations, two narrower
+   isic-specific reclassifications (spec-basis prose citations counted as
+   real citations, then the internal-reference-table shape recognized as
+   by-design non-citation-bearing); then archive content; then (isco
+   family only) the governed-actor blueprint component-structure signal;
+   else none-measured.
 
    The :actor-blueprint-structure branch is deliberately gated on
    `(= family :isco)` and NOT applied family-agnostically: 2026-07-21
@@ -312,9 +384,56 @@
    blueprint pattern per ADR-2607012000 -- it would be a scope-widening
    false fix, not the same correction, to let those flip signal here).
    Ungating this check would silently change the isic family's
-   real-world-ingest-signal distribution, which this fix must not do."
-  [{:keys [has-facts-file? citation-count archive-count family blueprint-components]}]
+   real-world-ingest-signal distribution, which this fix must not do.
+
+   The two isic-only branches below are similarly narrowly gated (both on
+   `(= family :isic)` AND on the existing url `citation-count` already
+   being zero, so they can never override or double-count a repo that
+   already has real `https://` citations):
+
+   - `isic-spec-basis-count` (see `isic-spec-basis-citation-count`)
+     recognizes real, populated `:spec-basis \"...\"` law/regulation
+     citations that `facts-citation-count`'s URL-only regex misses --
+     genuinely NOT a gap, just under-counted. Folded into the SAME
+     `:facts-citations` signal (not a new signal name) because
+     semantically it is exactly that: a real-world citation found inside
+     facts.cljc, just not URL-shaped.
+   - `isic-internal-reference?` (see `internal-reference-facts-count`)
+     recognizes the isic-family internal governor/advisor cost-threshold
+     reference-table shape, which was never designed to hold external
+     citations at all (the isic-family analogue of isco's
+     :actor-blueprint-structure carve-out, ADR-2607152500-confirmed for
+     at least one sampled repo) -- surfaced as its own
+     `:internal-reference-facts` signal so it stays visibly distinct from
+     genuine citation coverage in `:by-ingest-signal` summaries.
+
+   2026-07-23 sampling (dozens of isic zero-citation repos read directly,
+   across 01xx/07xx/10xx-14xx/18xx/19xx/33xx/35xx/49xx/58xx/62xx/79x/80xx/
+   82xx code ranges): of the 71 isic repos with a facts.cljc but zero URL
+   citations, 24 match the internal-reference shape and 7 match the
+   spec-basis shape -- the remaining 40 (plus all 181 isic repos with no
+   facts.cljc at all) are a genuinely heterogeneous mix (jurisdiction-
+   keyed operational thresholds with no citable source at all, e.g.
+   cloud-itonami-isic-1010's `meatprocessing.facts`/cloud-itonami-
+   isic-1101's `distilling.facts`; bare record-verification predicates,
+   e.g. cloud-itonami-isic-791's `travelagencyops.facts`; internal
+   governance-tier catalogs that reuse citation-catalog docstring
+   phrasing without citing an external source, e.g. cloud-itonami-
+   isic-5820's `crm.facts`) with no single clean, defensible, content-
+   based signal found to separate a real backlog from a category error --
+   deliberately left flagged as a gap rather than forcing a broader
+   reclassification the sampled content doesn't support."
+  [{:keys [has-facts-file? citation-count archive-count family blueprint-components
+           isic-spec-basis-count isic-internal-reference-count]}]
   (cond
+    (and has-facts-file? (pos? citation-count)) {:signal :facts-citations :count citation-count}
+
+    (and has-facts-file? (= family :isic) (zero? citation-count) (pos? isic-spec-basis-count))
+    {:signal :facts-citations :count isic-spec-basis-count}
+
+    (and has-facts-file? (= family :isic) (zero? citation-count) (pos? isic-internal-reference-count))
+    {:signal :internal-reference-facts :count isic-internal-reference-count}
+
     has-facts-file? {:signal :facts-citations :count citation-count}
     (pos? archive-count) {:signal :archive-content :count archive-count}
     (and (= family :isco) (actor-blueprint-structure? blueprint-components))
@@ -334,6 +453,8 @@
         has-facts? (boolean (find-facts-file dir))
         juri-count (or (jurisdiction-coverage dir) 0)
         citation-count (or (facts-citation-count dir) 0)
+        isic-spec-basis-count (if (= family :isic) (or (isic-spec-basis-citation-count dir) 0) 0)
+        isic-internal-reference-count (if (= family :isic) (or (internal-reference-facts-count dir) 0) 0)
         own-maturity (:itonami.blueprint/maturity bp)
         registry-maturity (when-not own-maturity (canonical-maturity name))
         maturity (cond
@@ -353,7 +474,9 @@
                                    :citation-count citation-count
                                    :archive-count archive-count
                                    :family family
-                                   :blueprint-components blueprint-comps})
+                                   :blueprint-components blueprint-comps
+                                   :isic-spec-basis-count isic-spec-basis-count
+                                   :isic-internal-reference-count isic-internal-reference-count})
         ingest-signal (:signal ingest)
         ingest-count (:count ingest)]
     {:itonami.fleet-audit/repo name
@@ -483,7 +606,11 @@
        ";;                                             measured: :facts-citations (real https:// URL\n"
        ";;                                             citations inside facts.cljc — generalizes past\n"
        ";;                                             the isic/isco per-country catalog shape to\n"
-       ";;                                             municipality's per-ordinance shape etc.) /\n"
+       ";;                                             municipality's per-ordinance shape etc.; for\n"
+       ";;                                             isic family specifically also folds in real\n"
+       ";;                                             populated `:spec-basis \"...\"` law/regulation\n"
+       ";;                                             citations that cite a statute/CFR section rather\n"
+       ";;                                             than a URL, see `isic-spec-basis-citation-count`) /\n"
        ";;                                             :archive-content (80-data/ real files) /\n"
        ";;                                             :actor-blueprint-structure (isco family only:\n"
        ";;                                             governor.cljc + store.cljc governed-actor\n"
@@ -492,6 +619,11 @@
        ";;                                             non-facts.cljc repo kind, not an unmeasured gap;\n"
        ";;                                             see `real-world-ingest` for why this is gated to\n"
        ";;                                             isco and not applied to other families) /\n"
+       ";;                                             :internal-reference-facts (isic family only:\n"
+       ";;                                             facts.cljc exists but is a `:cost-threshold`\n"
+       ";;                                             internal governor/advisor reference table, never\n"
+       ";;                                             designed to hold external citations — see\n"
+       ";;                                             `internal-reference-facts-count`) /\n"
        ";;                                             :none-measured (no channel present at all).\n"
        ";;   :itonami.fleet-audit/real-world-ingest-gap?  true when the measured count is 0 OR the\n"
        ";;                                             signal is :none-measured — an entity with no\n"
