@@ -300,4 +300,33 @@
  {:product/id :product/parentsquare :product/name "ParentSquare"}
  {:product/id :product/brightwheel :product/name "Brightwheel"}
  {:product/id :product/procare :product/name "Procare"}
+
+ ;; flagship-parity addition, sibling repos (2026-07-23): cloud-itonami-isic-852 (secondary education)
+ ;; reuses isic-851's K-12 back-office coordination market research (same market, different grade band)
+ ;; rather than a fresh competitor survey -- no new :product/* entries needed, see :rec/vertical
+ ;; :vertical/isic-852 in the ledger for the cross-reference.
+ {:vertical/id :vertical/isic-852 :vertical/code "852" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Secondary education — administrative coordination (attendance, scheduling, supply, staffing, safety-flagging)"
+  :vertical/cluster [:cluster/id :cluster/utilities-etc]
+  :vertical/repo "cloud-itonami-isic-852" :vertical/pricing-shape "flat monthly managed-tenant fee, per school"}
+
+ ;; cloud-itonami-isic-853 (higher education) -- genuinely different market from K-12, benchmarked fresh.
+ {:vertical/id :vertical/isic-853 :vertical/code "853" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Higher education — administrative coordination (advising, facility booking, supply, staffing, safety-flagging)"
+  :vertical/cluster [:cluster/id :cluster/utilities-etc]
+  :vertical/repo "cloud-itonami-isic-853" :vertical/pricing-shape "flat monthly managed-tenant fee, per department/institution"}
+ {:product/id :product/waitwell :product/name "WaitWell"}
+ {:product/id :product/supersaas :product/name "SuperSaaS"}
+ {:product/id :product/slate :product/name "Slate (Technolutions)"}
+
+ ;; cloud-itonami-isic-854 (adult vocational/continuing education) -- genuinely different market again,
+ ;; benchmarked against the nearest real comparables (LMS/course-content platforms), which solve a
+ ;; different problem than this actor's back-office coordination scope -- see :rec/rationale.
+ {:vertical/id :vertical/isic-854 :vertical/code "854" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Other education (adult vocational/continuing education) — administrative coordination (enrollment, facility booking, supply, instructor shifts, safety-flagging)"
+  :vertical/cluster [:cluster/id :cluster/utilities-etc]
+  :vertical/repo "cloud-itonami-isic-854" :vertical/pricing-shape "flat monthly managed-tenant fee, per provider"}
+ {:product/id :product/talentlms :product/name "TalentLMS"}
+ {:product/id :product/trainual :product/name "Trainual"}
+ {:product/id :product/coursebox :product/name "Coursebox"}
 ]
