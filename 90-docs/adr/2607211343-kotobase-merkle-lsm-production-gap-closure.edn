@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68], :latest-peer-main \"175dfa20bfbc2623448d172499100d5ad6019785\", :latest-host-main \"6798093b3b5e1a9b3e77cb5659bd19affda77aba\", :latest-worker-version \"r2-verified-2026-07-23-streaming-compaction-1m\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70], :latest-peer-main \"1440002d6bc2f8a3f3c26cb7225912eabeb775e1\", :latest-host-main \"2a1c3afe0933fc688dacfb6641acc7fea1d40374\", :latest-worker-version \"r2-paged-range-directory-v2\"}"
   :adr/body
   "# Context
 
@@ -456,6 +456,16 @@ host PR #68（merge commit `6798093b3b5e1a9b3e77cb5659bd19affda77aba`）は、�
 1M correctness gateは、540,672 rowsまでのdurable phaseのlost HTTP acknowledgement後に同一head checkpointを認識してresumeし、残り459,328 datomを1,105,133.40ms、415.63 datom/sで完了した。resume phaseはseed p50 1,420.63ms/p95 1,695.27ms/p99 1,820.29ms、compaction p50 17,177.77ms/p95/p99 39,179.73ms、promoted runs 1,347、data block GET/PUT 0、recovered lost acknowledgements 5である。final RangeDirectoryは各index 977 refs/1,000,000 rows、lost/duplicate 0だった。client再開を挟んだため1M全体を単一process wall throughputとは表現せず、correctnessは全1M、性能値はresume phaseだけのauthorityとする。receiptは`local-murakumo/bench/results/2026-07-23-r2-streaming-compaction-1m.edn`である。
 
 このgateで次のhard blockerはinline RangeDirectory metadataと確定した。977 refsでcheckpoint p99が39.18秒へ増大しており、現行形式のまま10Mを実行してもbounded-scale evidenceにならない。次はRangeDirectoryをCID-addressed page/treeへ分割し、range lookup、checkpoint更新、GC traversalをbounded I/Oにした後、10M R2 gateを実行する。account-authoritative Worker CPU/billed R2 operationsにはanalytics-read token、production qualificationには複数region runnerも必要である。historical MVCC/query、KMS wrapping/rotation、replica lag、cron backlog/dead-letter/cancellationも未完了なので状態は`:production-partial`を維持する。IStoreとCloudflare KVは引き続き使用しない。
+
+## 2026-07-23 Paged RangeDirectory v2
+
+peer PR #82（merge commit `1440002d6bc2f8a3f3c26cb7225912eabeb775e1`）で、RangeDirectoryをinline refs配列のv1から、小さいCID-addressed rootと最大128 refsのimmutable leafからなるv2へ移行した。v2 rootはindexごとにleaf CID、count、logical range、first-component rangeだけを持つ。exact/prefix queryはroot descriptorでleafをpruneしてから取得し、queryとcheckpoint hydrationはいずれもaggregate最大4 GETのbounded waveで実行する。leafはformat/version、DB ownership、index、epoch、宣言count、page上限をfail closedに検証する。rootからleaf、leafからrunへのIPLD Linkを使うため、既存generic reachability walker/GCは特別なside indexなしで全objectをmarkできる。v1は読み続け、次checkpointでv2へ移行する。
+
+1M実測と同じ各index 977 refs、3 indexes、20 JVM samplesのmetadata benchでは、v1 inline root 606,812 bytes、build p50 3,413.42ms/p95 4,686.51msに対し、v2 rootは3,845 bytes、24 leaves、最大leaf 26,589 bytes、leaf total 608,949 bytes、build p50 3,527.64ms/p95 3,826.28msだった。root inline bytesは99.37%減り157.82倍小さくなったが、初回buildでは全refをleafへ書くためmetadata総bytesは同程度である。このreceiptは`kotobase-peer/bench/results/2026-07-23-range-directory-v2-1m.edn`をauthorityとし、immutable leaf reuseや10M達成を主張しない。peer local CIはJVM 238 tests/731 assertions、CLJS 239 tests/869 assertions、gateway 21 tests/67 assertions、lint errors 0、全bench step greenだった。
+
+host PR #70（merge commit `2a1c3afe0933fc688dacfb6641acc7fea1d40374`）はauthenticated compaction receipt/readbackをv1/v2両対応にし、leafを同じaggregate最大4 GETで解決・検証してdirectory version/page countと正確なindex ref/row countを返す。host local CIはcohort 18 assertions、JVM 75 tests/405 assertions、lint errors 0、Worker release、datom ingress smokeがgreenだった。
+
+これで巨大な単一inline metadata objectという10M blockerは除去した。ただし現checkpoint実装は既存v2 leafを全てhydrateし、新しいleafへ再partitionするため、metadata rewrite量はまだ全directory refsに比例する。次のhard gateは、new run rangesと交差しないleaf descriptor/CIDをそのまま継承し、境界・overlap leafだけをGET/rewriteするcopy-on-write page reuseである。それを実R2で確認してから10M benchmarkを実行する。状態は`:production-partial`、IStoreとCloudflare KVは引き続き使用しない。
 
 # Consequences
 
