@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63], :merged-host-prs [57 58 59], :latest-peer-main \"975f78d3949687236772745ef8c1651ad77fee2e\", :latest-host-main \"fec2b6b3b2b6d1d18d27c07e6fb7a169aed3e8d0\", :latest-worker-version \"remote-preview-2026-07-23-terminal-spill-v4\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64], :merged-host-prs [57 58 59 60], :latest-peer-main \"2d8447df6a5c3ef91a28c09d51cda86491b2555e\", :latest-host-main \"8fd5bd29d042b77162179c99b918f414aa9f887a\", :latest-worker-version \"local-verified-2026-07-23-reader-snapshot-leases\"}"
   :adr/body
   "# Context
 
@@ -314,6 +314,16 @@ peer PR #63は同一run successor speculationを撤去し、descriptorと現在p
 host PR #59はterminal completionで全spill row chunkを`Promise.all`し一つのin-memory setへ戻す経路を削除した。各checkpoint cursorがsteps/index batches/rows read/scanned runs/blocks/max statesを累積し、terminal resultはrow再読なしにmetricsを固定する。completed taskはimmutable spill-headを返し、phase A/B evaluatorはspillを一件、row chunkを一件ずつ読みhot Arrangementへ直接適用する。旧terminal resultにmetricsがない場合はrow chunkを読まずspill metadataだけをwalkし、row自体は同じstreaming evaluatorで処理する。これによりterminal input memoryは全result cardinalityでなく一spill descriptor＋一byte-bounded chunkへ制限された。alternative proof保持時delta 0、最後のproof削除時171-byte tombstone、crash/CAS/replay smokeを含むhost 75 tests/403 assertions、Worker release、lint errors 0を通過した。merge commitは`fec2b6b3b2b6d1d18d27c07e6fb7a169aed3e8d0`である。
 
 最新demand-only＋spill-streamingを実R2隔離prefix `codex/2026-07-23/large-prefix-terminal-spill-511-v4`で測定した。seed 12,577.1 ms、accept 2,607.7 ms、driver 10 calls/合計123,816.7 ms、replay 298.8 ms。taskは512 rows、9 steps、9 runs、25 blocks、max 64 statesで完了し、speculative版の28 block GETを25へ戻した。remote latencyは過去二probeより大きく、latency改善とは宣言しない。このpassが閉じたのはterminal全件再構築と不要successor GETであり、次のP1 gapはunconsumed current-block remainder、plan-proven independent GET concurrency、byte/RTT/cache-aware block sizing、10^5/10^7 scale/RSS/CPU gateである。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-subblock-prefix-join.edn`である。
+
+# Verification addendum — immutable snapshot reader leases (2026-07-23)
+
+peer PR #64は、mutable headを再読まず指定CIDからlegacy VersionManifestまたはEpochPublicationを解決する`resolve-database-snapshot!`を追加した。`find-index-prefix-page!`はoptional `head-cid`を受け、そのimmutable snapshotだけをscanする。pinned page testは64 rowsを返し、head objectを一度もGETしないことを固定した。peer local CIはJVM 219 tests/655 assertions、CLJS 216 tests/726 assertions、lint errors 0。merge commitは`2d8447df6a5c3ef91a28c09d51cda86491b2555e`である。
+
+host PR #60はdocument get/list/searchとevent readのmanifest/child traversalをrequest-scoped R2 reader retention rootで囲んだ。rootはmanifest CID、epoch、expiryを持ち、正常終了時にETag-CAS tombstoneへreleaseする。process deathまたはcleanup failureではactive rootが期限までGC safe epochを制約する。既定leaseは5分でenvironmentから短縮・延長できる。
+
+resumable join frontierはtask CID由来のdeterministic reader rootを持つ。各page前にexact expected headを解決してleaseをCAS renew/reclaimし、prefix pageへ同じhead CIDを渡す。pending/crashではreleaseせず次invocationまたはexpiryまで保持し、terminal completionとcompleted replayではCAS releaseする。これによりquery途中のmutable-head切替と、active frontierが参照するsnapshotのGCを防ぐ。host local CIは75 tests/403 assertions、lint errors 0、peer #64 sourceを用いたWorker/UI release build、reader rootのactive/released lifecycleを含むingress smokeがgreen。merge commitは`8fd5bd29d042b77162179c99b918f414aa9f887a`である。
+
+これはP0.1のreader snapshot pinをhostへ配線したvertical sliceである。ただしreplica lag、legal hold、backup/release rootを一つのsafe-epoch oracleへ集約してcompactorへ明示入力する部分、clock skew/lease expiryとconcurrent GCのproperty/fault test、historical snapshot public queryは未完了である。したがってP0.1全体を完了とはせず、次はP0.2 checkpoint inheritance equivalenceと並行してsafe-epoch oracle integrationを閉じる。
 
 # Consequences
 
