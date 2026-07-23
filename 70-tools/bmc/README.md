@@ -95,7 +95,37 @@ nbb 70-tools/bmc/collect.cljs      # Cloudflare/Stripe/health → 90-docs/busine
 # creds: env CF_API_TOKEN / STRIPE_SECRET_KEY → Keychain gftd.cf / 1Password
 ```
 
+`collect.cljs` requires `gftd.traffic` (see below), so it needs `70-tools/bmc/src`
+on the nbb classpath. The superproject root `nbb.edn` already lists it
+(`{:paths ["." "scripts/nbb_compat" "70-tools/bmc/src" "70-tools/bmc/test"]}`),
+so invoking `nbb 70-tools/bmc/collect.cljs` from the **superproject root** works
+with no extra flags. If you invoke it from anywhere else (a different cwd, a
+cron wrapper, a LaunchAgent `WorkingDirectory` that isn't the repo root), pass
+the classpath explicitly:
+
+```bash
+nbb --classpath "70-tools/bmc/src:70-tools/bmc/test:." 70-tools/bmc/collect.cljs
+```
+
 business を回す 1 運転 = `collect.cljs` → 各 product `react loop` → `canvas md --all` → `score md` → commit。
+
+### 導線計測の bot-probe 分離（gftd.traffic, ADR-2607231800）
+
+`zone-top-paths` は Cloudflare の `edgeResponseStatus` で「実配信 page (2xx/3xx)」
+とスキャナ probe (4xx/5xx) をまず分離する。それだけでは不十分な product
+（network-isekai — Cloudflare Pages が unmatched path にも 2xx/3xx を返すため、
+2xx/3xx bucket 自体が `/mailer.php` 等の bot probe で汚染される）向けに、
+`70-tools/bmc/src/gftd/traffic.cljc` の `classify-path` が第二段の分類を行う:
+
+- **`:channel`** — `channel-allowlist`（product ごとの既知 real route）に一致 → top-paths に採用。
+- **`:probe`** — `probe-path-re`（product-agnostic スキャナ signature、`.php`/`wp-admin`/`.git`/`Dockerfile` 等）に一致 → top-paths から除外、率だけ計上。
+- **`:unclassified`** — どちらにも一致しない → top-paths からは除外するが、率を surface する（捏造ゼロ — allowlist 未登録の新規 real route かもしれないので黙って捨てない）。
+
+`channel-allowlist` に product が登録されていれば `top-paths-summary` の出力に
+`probe(200-fallback) N%` / `unclassified N%` が追記される。未登録 product は
+従来どおり status-only（`:ok`/`:status-mix` のみ）。新しい product / 新しい route
+を追加するときは `gftd.traffic/channel-allowlist` を更新する（生成物ではなく
+手で保守する real-route 一覧）。
 
 ## gate 評価器 + LLM advisor (ADR-2607022100)
 
