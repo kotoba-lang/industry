@@ -991,7 +991,16 @@
    :migration-authorized false
    :reason "sheets.model's whole domain (workbook/tab/cell/named-range/chart) is built on open-ended maps keyed by arbitrary row/col pairs or ids (:sheets/cells, :sheets/tabs, :sheets/named-ranges), the same gap already found for kotoba-lang/search: no successful bounded-profile split so far (association_facts, ghosthacker-family/vamos, mining-pool, face-match, cron) has covered an arbitrary-keyed map, only fixed-arity records/vectors and small closed enums. sheets.wire additionally requires transit.core, a host-only serialization dependency, not evaluated further since model.cljc already blocks."
    :required-language-gates [:bounded-arbitrary-keyed-map-profile-precedent]
-   :next-action :retain-cljc-and-revisit-once-a-bounded-map-profile-precedent-exists-elsewhere-in-the-fleet}]
+   :next-action :retain-cljc-and-revisit-once-a-bounded-map-profile-precedent-exists-elsewhere-in-the-fleet}
+  {:root "orgs/kotoba-lang/org-ibis/src/ibis/parser.cljc"
+   :repository "orgs/kotoba-lang/org-ibis"
+   :kind :retain-cljc-pending-regex-primitive
+   :review-status :reviewed-2026-07-23
+   :migration-authorized false
+   :reason "ibis.parser's line-based .ibs-format reader (section headers, key=value lines, tabular V-I rows, numeric-token detection) is entirely re-matches-driven; same missing string-search-primitive class as kotoba-lang/search and kotoba-lang/cron's cron.model. ibis.component and ibis.model themselves are pure data-structure code with no regex -- in particular ibis.model/interpolate-current (linear interpolation over an ordered vector of [voltage current] points, clamping at the table endpoints) is a clean, bounded-numeric-algorithm candidate similar in shape to mining-pool's vardiff, but was not implemented this pass: it needs a fixed-size V-I table profile design (the legacy function takes an arbitrary-length vector) and real IBIS V-I curve reference data to hand-verify against, neither of which this review had time to produce. Flagged as a concrete next-wave candidate rather than left unremarked."
+   :required-language-gates [:regex-or-substring-primitive-for-parser
+                             :bounded-vi-table-profile-design-for-interpolate-current]
+   :next-action :retain-cljc-parser-and-consider-a-future-bounded-interpolate-current-profile-with-real-vi-curve-reference-data}]
  :language-maturity
  {:safe-f64-phase-3a
   {:status :merged-qualified
@@ -1420,9 +1429,9 @@
   :assoc-wave-note "All 37 cloud-itonami-assoc-* repositories (gh repo list, 2026-07-22) carry a sole production association_facts.kotoba with zero tracked CLJC. finra closed the reviewed retirement queue; the 18 repositories in :backfilled-unlogged-migrations were found already migrated by prior unlogged sessions (2026-07-20/21), verified against their merge commits and green CI, and logged into the ADR's :qualified-evidence -- their local checkouts were never canonical-matrix entries so they do not appear in :reviewed-association-wave above. No further next-reviewed-wave-candidate exists inside cloud-itonami-assoc-*; see :next-wave-census for the surveyed successor scope and the new :dispositions entry for why it is not yet actionable."
   :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA and FINRA retirement each removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; the assoc-* wave is closed, so resume with per-repo review inside the isic/isco/iso3166/unspsc/cofog/gtin census once the application-profile and string-search gates are tracked as landed."}
  :completion
- {:reviewed-project-roots 51
+ {:reviewed-project-roots 52
   :authorized-migrations 23
-  :retained-oracles 9
+  :retained-oracles 10
   :typed-refactors-pending 0
   :typed-refactors-in-review 0
   :typed-refactors-merged-awaiting-cutover 3}}}
