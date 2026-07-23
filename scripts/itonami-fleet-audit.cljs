@@ -21,12 +21,31 @@
 ;;                                                 拾える汎化版) / :archive-content
 ;;                                                 (80-data/ 配下の実ファイル) /
 ;;                                                 :actor-blueprint-structure
-;;                                                 (isco family 限定。governor.cljc+
-;;                                                 store.cljc の governed-actor
-;;                                                 blueprint 構成要素があるが、これは
-;;                                                 facts.cljc を持つ設計ではない
-;;                                                 ADR-2607012000 の別種の repo なので
-;;                                                 :none-measured に落とさない) /
+;;                                                 (isco/gtin family 限定。
+;;                                                 governor.cljc+store.cljc の
+;;                                                 governed-actor blueprint 構成要素が
+;;                                                 あるが、これは facts.cljc を持つ
+;;                                                 設計ではない ADR-2607012000 の別種の
+;;                                                 repo なので :none-measured に落とさ
+;;                                                 ない。2026-07-23: cloud-itonami-gtin-
+;;                                                 issuance/-verification が isco と
+;;                                                 basename-for-basename 一致する構造の
+;;                                                 clone だと確認して追加、同時に
+;;                                                 cofog/unspsc/partners/hygiene-access
+;;                                                 は governor+store は共通でも
+;;                                                 registry/phase/sim/operation を伴う
+;;                                                 別形状〈isic 型〉で、unspsc-27 が同じ
+;;                                                 形状のまま実 facts.cljc(OSHA 引用6件)
+;;                                                 を持つことが「いずれ facts.cljc を
+;;                                                 持ちうる」ことの証拠なので対象外に
+;;                                                 据え置いた) /
+;;                                                 :plain-library-structure
+;;                                                 (regulatory family 限定。
+;;                                                 cloud-itonami-regulatory-tracker が
+;;                                                 advisor/governor/store を一切持たない
+;;                                                 plain な .cljc 共有ライブラリだと自ら
+;;                                                 明記〈'not a governed actor'〉している
+;;                                                 ため、2026-07-23 追加) /
 ;;                                                 :none-measured(どの経路も
 ;;                                                 存在しない)。
 ;;   :itonami.fleet-audit/real-world-ingest-gap?  対応する count が 0、または
@@ -62,6 +81,7 @@
          '[clojure.edn :as edn]
          '[clojure.java.io :as io]
          '[clojure.java.shell :refer [sh]]
+         '[clojure.set :as set]
          '[clojure.string :as str])
 
 (def os (js/require "node:os"))
@@ -251,7 +271,32 @@
    below handles this via file-seq regardless of depth). advisor.cljc /
    actor.cljc are real too but only 191/216 -- present together or absent
    together in every repo checked, so they count toward this signal's
-   strength but are not required for the floor."
+   strength but are not required for the floor.
+
+   2026-07-23 finding: cloud-itonami-gtin-issuance and
+   cloud-itonami-gtin-verification (2 of the 3 cloud-itonami-gtin-* repos;
+   the third, cloud-itonami-gtin-catalog, is an unbuilt stub with none of
+   these files, so it is unaffected either way) match this exact 4-file
+   vocabulary basename-for-basename (governor.cljc + store.cljc +
+   advisor.cljc + actor.cljc, no registry.cljc, no facts.cljc) -- and their
+   own `actor.cljc`/`governor.cljc` ns docstrings say so explicitly
+   ('Modeled on cloud-itonami-isco-1324's supplydist.actor' /
+   '...supplydist.governor'). This is not a coincidental naming overlap;
+   the repos were built as instances of the same isco governed-actor
+   blueprint pattern, and the one externally-verifiable rule their
+   governor enforces (the GS1 GTIN Modulo-10 check-digit algorithm) is
+   embedded as code in `governor.cljc` itself, not as a per-source URL
+   citation catalog -- structurally the same 'not a facts.cljc-shaped
+   repo' kind as isco, not an unmeasured gap. See `real-world-ingest` for
+   why this stays gated to isco+gtin specifically and is not applied
+   family-agnostically (cofog/unspsc/partners/hygiene-access all also
+   have governor.cljc+store.cljc but are a DIFFERENT, mixed
+   catalog+actor shape -- registry.cljc + phase.cljc + sim.cljc +
+   operation.cljc alongside governor/store/advisor -- and are real,
+   not-yet-matured gaps: cloud-itonami-unspsc-27/formation ships a real
+   facts.cljc with 6 genuine https://www.osha.gov citations on that exact
+   file shape, proving the mixed-pattern genre does eventually grow real
+   citations, unlike isco/gtin's 4-file shape which never has)."
   #{"governor.cljc" "store.cljc" "advisor.cljc" "actor.cljc"})
 
 (defn actor-blueprint-components
@@ -269,10 +314,39 @@
   "true when both governor.cljc and store.cljc are present -- the minimal
    floor empirically true for 216/216 cloud-itonami-isco-* repos (see
    `actor-blueprint-file-names` docstring; advisor.cljc/actor.cljc are
-   real but only 191/216 so aren't required for the floor)."
+   real but only 191/216 so aren't required for the floor). Also the
+   floor for cloud-itonami-gtin-issuance/-verification (2026-07-23, see
+   `actor-blueprint-file-names`)."
   [blueprint-components]
   (and (contains? blueprint-components "governor.cljc")
        (contains? blueprint-components "store.cljc")))
+
+(defn plain-library-structure?
+  "true when the repo has real (non-stub) src/ content but NONE of the
+   governed-actor pattern's own component files (`component-patterns`'s
+   :governor / :advisor / :store) appear anywhere under src/ -- i.e.
+   structurally a plain, domain-agnostic .cljc library, not a governed
+   actor at all (no advisor, no governor, no StateGraph, no audit
+   ledger). 2026-07-23 finding: cloud-itonami-regulatory-tracker (the
+   sole cloud-itonami-regulatory-* repo) is exactly this shape --
+   src/cloud_itonami/regulatory_tracker/core.cljc is a single pure
+   ordered-stage/exit-stage transition-validation namespace built on
+   `kotoba.crm.pipeline`, whose own ns docstring and README say in so
+   many words: 'This is a PLAIN FUNCTION LIBRARY with NO independent
+   decision authority of its own -- not a governor, not an advisor, not
+   a StateGraph, no ledger' / 'This is a plain library, not a governed
+   actor'. It deliberately keeps its two domain fields
+   (:subject-id/:regulatory-track) opaque and caller-defined -- it never
+   inspects, validates, or cites real per-jurisdiction regulatory content
+   itself (that citation-bearing content lives in each CALLING actor's
+   own domain, e.g. cloud-itonami-hygiene-access's docs/regulatory/*.md
+   dossiers). A shared, domain-agnostic technical-commons library by
+   design has no real-world citation content of its own to ingest -- a
+   category-mismatch akin to isco/gtin's, not an unmeasured gap. See
+   `real-world-ingest` for the family gate."
+  [comps src-count]
+  (and (pos? src-count)
+       (empty? (set/intersection comps #{:governor :advisor :store}))))
 
 (defn actor-status [{:keys [src-file-count archive-file-count last-commit-at days-since-commit]}]
   (cond
@@ -298,27 +372,73 @@
 (defn prod-ready? [status]
   (contains? #{:active :archive} status))
 
+(def actor-blueprint-families
+  "Families whose governed-actor blueprint component-structure
+   (governor.cljc + store.cljc, see `actor-blueprint-structure?`) counts
+   as the :actor-blueprint-structure real-world-ingest signal rather than
+   an unmeasured gap. isco (ADR-2607012000) is the original, verified
+   member; gtin was added 2026-07-23 after confirming
+   cloud-itonami-gtin-issuance/-verification are literal structural
+   clones of the isco pattern (4-file vocabulary, own code docstrings say
+   'Modeled on cloud-itonami-isco-1324'). See `actor-blueprint-file-names`
+   and `real-world-ingest` for the full evidence and for why this set is
+   NOT widened to cofog/unspsc/partners/hygiene-access, which share
+   governor.cljc+store.cljc but are a different, mixed catalog+actor
+   shape with real (if not-yet-matured) facts.cljc potential."
+  #{:isco :gtin})
+
 (defn real-world-ingest
   "Precedence: real facts.cljc citations first (strongest evidence, wins
-   even for isco family repos that happen to have one), then archive
-   content, then (isco family only) the governed-actor blueprint
-   component-structure signal, else none-measured.
+   even for isco/gtin family repos that happen to have one), then archive
+   content, then (isco/gtin families only) the governed-actor blueprint
+   component-structure signal, then (regulatory family only) the plain
+   domain-agnostic library-structure signal, else none-measured.
 
    The :actor-blueprint-structure branch is deliberately gated on
-   `(= family :isco)` and NOT applied family-agnostically: 2026-07-21
-   measurement shows 164/429 cloud-itonami-isic-* repos also have both
-   governor.cljc + store.cljc under src/ without a facts.cljc (isic's
-   governor/store naming is not evidence of the same isco governed-actor
-   blueprint pattern per ADR-2607012000 -- it would be a scope-widening
-   false fix, not the same correction, to let those flip signal here).
-   Ungating this check would silently change the isic family's
-   real-world-ingest-signal distribution, which this fix must not do."
-  [{:keys [has-facts-file? citation-count archive-count family blueprint-components]}]
+   `actor-blueprint-families` (isco + gtin) and NOT applied
+   family-agnostically: 2026-07-21 measurement shows 164/429
+   cloud-itonami-isic-* repos also have both governor.cljc + store.cljc
+   under src/ without a facts.cljc (isic's governor/store naming is not
+   evidence of the same isco governed-actor blueprint pattern per
+   ADR-2607012000 -- it would be a scope-widening false fix, not the same
+   correction, to let those flip signal here). 2026-07-23: cofog/unspsc/
+   partners/hygiene-access were independently investigated and also NOT
+   added here -- they have the SAME governor.cljc+store.cljc floor, but
+   additionally carry registry.cljc/phase.cljc/sim.cljc/operation.cljc (a
+   different, mixed catalog+actor shape, structurally parallel to isic,
+   not to isco/gtin's narrower 4-file shape) and cloud-itonami-unspsc-27
+   (identical mixed shape, sibling segment in the same unspsc family)
+   ships a real facts.cljc with 6 genuine https://www.osha.gov citations
+   -- proof the mixed-pattern genre does reach real citations once
+   matured, so the other mixed-shape repos lacking one yet are a real,
+   not-yet-measured gap, not a category mismatch. Ungating
+   :actor-blueprint-structure beyond isco+gtin, or applying it to any of
+   these four families, would silently change their real-world-ingest-
+   signal distribution, which this fix must not do -- least of all
+   isic's, which a separate, parallel investigation owns.
+
+   The :plain-library-structure branch is gated on `(= family
+   :regulatory)`: cloud-itonami-regulatory-tracker (the sole
+   cloud-itonami-regulatory-* repo) is a plain, non-actor .cljc shared
+   library by its own explicit self-description (see
+   `plain-library-structure` docstring) -- a category mismatch, not an
+   unmeasured gap."
+  [{:keys [has-facts-file? citation-count archive-count family blueprint-components
+           comps src-count]}]
   (cond
     has-facts-file? {:signal :facts-citations :count citation-count}
     (pos? archive-count) {:signal :archive-content :count archive-count}
-    (and (= family :isco) (actor-blueprint-structure? blueprint-components))
+    (and (contains? actor-blueprint-families family) (actor-blueprint-structure? blueprint-components))
     {:signal :actor-blueprint-structure :count (count blueprint-components)}
+    (and (= family :regulatory) (plain-library-structure? comps src-count))
+    ;; count is deliberately `src-count`, NOT `(count comps)` -- `comps`
+    ;; is EMPTY by construction for this signal (`plain-library-structure?`
+    ;; requires no governor/advisor/store present), so counting it would
+    ;; make `:itonami.fleet-audit/real-world-ingest-gap?`'s `(zero?
+    ;; ingest-count)` clause re-flag this as a gap despite the signal no
+    ;; longer being :none-measured. `src-count` is the real, non-zero
+    ;; measure of on-disk content this signal is actually attesting to.
+    {:signal :plain-library-structure :count src-count}
     :else {:signal :none-measured :count 0}))
 
 (defn actor-facts [dir]
@@ -353,7 +473,9 @@
                                    :citation-count citation-count
                                    :archive-count archive-count
                                    :family family
-                                   :blueprint-components blueprint-comps})
+                                   :blueprint-components blueprint-comps
+                                   :comps comps
+                                   :src-count src-count})
         ingest-signal (:signal ingest)
         ingest-count (:count ingest)]
     {:itonami.fleet-audit/repo name
@@ -485,13 +607,21 @@
        ";;                                             the isic/isco per-country catalog shape to\n"
        ";;                                             municipality's per-ordinance shape etc.) /\n"
        ";;                                             :archive-content (80-data/ real files) /\n"
-       ";;                                             :actor-blueprint-structure (isco family only:\n"
-       ";;                                             governor.cljc + store.cljc governed-actor\n"
+       ";;                                             :actor-blueprint-structure (isco/gtin families\n"
+       ";;                                             only: governor.cljc + store.cljc governed-actor\n"
        ";;                                             blueprint components per ADR-2607012000 — these\n"
        ";;                                             repos are a structurally different, by-design\n"
        ";;                                             non-facts.cljc repo kind, not an unmeasured gap;\n"
        ";;                                             see `real-world-ingest` for why this is gated to\n"
-       ";;                                             isco and not applied to other families) /\n"
+       ";;                                             isco+gtin and not applied to cofog/unspsc/\n"
+       ";;                                             partners/hygiene-access, a different mixed\n"
+       ";;                                             catalog+actor shape with real, not-yet-matured\n"
+       ";;                                             facts.cljc potential — see cloud-itonami-unspsc-27) /\n"
+       ";;                                             :plain-library-structure (regulatory family only:\n"
+       ";;                                             cloud-itonami-regulatory-tracker, a plain\n"
+       ";;                                             domain-agnostic .cljc library with no advisor/\n"
+       ";;                                             governor/store of its own — a category mismatch,\n"
+       ";;                                             not an unmeasured gap) /\n"
        ";;                                             :none-measured (no channel present at all).\n"
        ";;   :itonami.fleet-audit/real-world-ingest-gap?  true when the measured count is 0 OR the\n"
        ";;                                             signal is :none-measured — an entity with no\n"
