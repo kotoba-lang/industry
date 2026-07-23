@@ -12,6 +12,10 @@
 ;;   :path-override-leftover  — repos.edn :path-overrides の旧 path（新 path が west にある）
 ;;   :personal                — orgs/personal/*（west 対象外）
 ;;   :worktree-scratch        — _* / *-current / *-boundary / _wt-* 等
+;;   :worktree-of-registered  — .git がファイル（git worktree）で、gitdir: の指す base
+;;                              repo が west 登録済み。誤検出防止（実測 2026-07-22:
+;;                              272 true-orphan-git 中 249 件がこれだった — network-isekai-*
+;;                              / render-* 等の feature worktree を orgs/ 直下に作る運用）。
 ;;   :true-orphan-git         — local git があり west path に無い（登録 or 退役候補）
 ;;   :true-orphan-nongit      — local dir のみ（scaffold 残骸等）
 ;;   :local-root-broken       — deps.edn の :local/root が指す project が
@@ -99,6 +103,24 @@
   (let [g (node-path.join root rel ".git")]
     (or (exists? g) (is-file? g))))
 
+(defn worktree-base-rel
+  "rel が git worktree（.git がファイルで `gitdir: .../<base>/.git/worktrees/<name>`
+   を指す）なら、その base repo の orgs/ 相対 path を返す。worktree でなければ nil。
+   249/272 件の true-orphan-git 誤検出（gpu-character-detail 等）の原因だった —
+   base repo が west 登録済みなら本当の orphan ではない。"
+  [rel]
+  (let [g (node-path.join root rel ".git")]
+    (when (is-file? g)
+      (when-let [content (read-text g)]
+        (when-let [m (re-find #"gitdir:\s*(.*)" (str/trim content))]
+          (when-let [b (re-find #"(.*)/\.git/worktrees/" (second m))]
+            (try
+              (let [abs-base (second b)
+                    rel-base (node-path.relative root abs-base)]
+                (when-not (str/starts-with? rel-base "..")
+                  rel-base))
+              (catch :default _ nil))))))))
+
 (defn git-remote [rel]
   (let [{:keys [exit out]} (sh "git" "-C" (node-path.join root rel)
                                "remote" "get-url" "origin")]
@@ -135,6 +157,10 @@
                  {:path rel :git? (git? rel)
                   :origin (when (git? rel) (git-remote rel))})
 
+         (when-let [base (worktree-base-rel rel)] (contains? west base))
+         (update acc :worktree-of-registered conj
+                 {:path rel :base (worktree-base-rel rel)})
+
          (git? rel)
          (update acc :true-orphan-git conj
                  {:path rel :origin (or (git-remote rel) "")})
@@ -144,6 +170,7 @@
      {:path-override-leftover []
       :personal []
       :worktree-scratch []
+      :worktree-of-registered []
       :true-orphan-git []
       :true-orphan-nongit []}
      unreg)))
@@ -219,6 +246,7 @@
     (println (str "  path-override leftovers: " (count (:path-override-leftover unregistered))))
     (println (str "  personal/*: " (count (:personal unregistered))))
     (println (str "  worktree/scratch: " (count (:worktree-scratch unregistered))))
+    (println (str "  worktree-of-registered: " (count (:worktree-of-registered unregistered))))
     (println (str "  true-orphan-git: " (count (:true-orphan-git unregistered))))
     (println (str "  true-orphan-nongit: " (count (:true-orphan-nongit unregistered))))
     (println (str "  local-root-broken (blocking): " (count local-root-broken)))
@@ -257,6 +285,10 @@
       (doseq [row (:worktree-scratch unregistered)]
         (println (str "  " (:path row) " git=" (:git? row))))
       (println)
+      (println "## worktree-of-registered (git worktree of an already-registered repo; not a real orphan)")
+      (doseq [row (:worktree-of-registered unregistered)]
+        (println (str "  " (:path row) " -> " (:base row))))
+      (println)
       (println "## true-orphan-nongit")
       (doseq [row (:true-orphan-nongit unregistered)]
         (println (str "  " (:path row)))))))
@@ -273,6 +305,7 @@
                          :unregistered (+ (count (:path-override-leftover unreg))
                                           (count (:personal unreg))
                                           (count (:worktree-scratch unreg))
+                                          (count (:worktree-of-registered unreg))
                                           (count (:true-orphan-git unreg))
                                           (count (:true-orphan-nongit unreg)))}
                 :unregistered unreg
