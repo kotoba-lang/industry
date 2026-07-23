@@ -1,19 +1,19 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 8667, "kotobase-cf-wasm-staging" 720},
+ {"net-kotobase" 8692, "kotobase-cf-wasm-staging" 720},
  :zone
- {:requests-7d 16172,
-  :pageviews-7d 661,
-  :uniques-7d-sum 983,
+ {:requests-7d 16198,
+  :pageviews-7d 665,
+  :uniques-7d-sum 987,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 57}
-   {:path "/health", :requests 30}
-   {:path "/api/funnel", :requests 27}
-   {:path "/robots.txt", :requests 24}
+  [{:path "/", :requests 56}
+   {:path "/health", :requests 31}
+   {:path "/api/funnel", :requests 28}
+   {:path "/robots.txt", :requests 23}
    {:path
     "/kotobase-cf-wasm-production/ipns/bafyreibj5757q6y24sbt35fs6bc67ravc7m6pve5iyzbnvsi5cqutahyx4.json",
     :requests 5}
@@ -26,7 +26,7 @@
    {:path
     "/kotobase-cf-wasm-production/owners/bafyreibj5757q6y24sbt35fs6bc67ravc7m6pve5iyzbnvsi5cqutahyx4.json",
     :requests 3}],
-  :status-mix {:client-error 1539, :ok 166, :server-error 2},
+  :status-mix {:client-error 283, :ok 168, :server-error 2},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -38,9 +38,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-23",
- :traffic-quality {:window "24h", :probe-4xx-pct 90, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 62, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 57 · /health 30 · /api/funnel 27 · /robots.txt 24 · /kotobase-cf-wasm-production/ipns/bafyre… 5 | 4xx(probe) 90% · 5xx 0%",
- :funnel {:visitors 1195, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 56 · /health 31 · /api/funnel 28 · /robots.txt 23 · /kotobase-cf-wasm-production/ipns/bafyre… 5 | 4xx(probe) 62% · 5xx 0%",
+ :funnel {:visitors 1197, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 16172 req/7d・983 uniques(日次和)・うち4xx probe 90%(24h)、workers 9387 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 16198 req/7d・987 uniques(日次和)・うち4xx probe 62%(24h)、workers 9412 inv/7d、Stripe active subs 0"}
