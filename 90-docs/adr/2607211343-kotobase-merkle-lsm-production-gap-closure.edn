@@ -437,6 +437,14 @@ canonical local CIはcohort/GraphQL/colo contract 18 assertions、JVM 75 tests/4
 
 metric provenance wiring gapは閉じた。live production qualificationにはanalytics-read API token、region/classごとのdedicated target、地理的に異なるrunnerが必要で、現時点のlocal OAuth permissionと単一実行地点だけでは未通過である。次のgateはこの実matrixのreceipt、その後の10^5〜10^7 datom p95/p99、memory/CPU、R2 request/bytes costである。状態は`:production-partial`を維持する。
 
+# Verification addendum — fail-closed Merkle scale resource gate (2026-07-23)
+
+peer PR #76は、各scaleを独立JVMで実行し、小さい成功が大きい失敗を隠さないfail-closed sweepとresource gateを追加した。gateはdatom数、throughput、flush p99、compaction wall、peak heap、CPU/datom、read/write amplification、object bytesを同じreceiptで判定する。percentileのoff-by-oneも修正し、5ms間隔のheap sampleとprocess CPUを計測する。`MERKLE_BENCH_ENFORCE_GATE=1`ではpolicy違反をprocess failureにする。peer canonical local CIはJVM 236 tests/716 assertions、CLJS 236 tests/844 assertions、gateway 21 tests/67 assertions、全benchmarkがgreenで、merge commitは`de464851238b3c7e19f0c424591b68bb046fae28`である。
+
+100,000 datom、1 writer、2 GiB heapの実測はtotal 237,181.28ms、throughput 421.62 datom/s、flush p50 1,602.81ms/p95 3,013.09ms/p99 3,348.37ms、compaction 73,871.24ms、peak heap 852,369,128 bytes、CPU 1.0364ms/datom、read amplification 4.0、write amplification 1.9977、object bytes 355.71/datom、compacted count 100,000、lost 0で、宣言した100k JVM gateを通過した。authority receiptは`kotobase-peer/bench/results/2026-07-23-merkle-resource-scale-100k.edn`である。
+
+この測定は同時に、pure in-memory oracleが100kだけで約852MBへ達することも可視化した。従って1M/10Mを単にJVM heap増加で実行してproduction evidenceとはしない。次のscale gateはhostのR2 object-backed streaming compactor/query iteratorを使い、bounded working setのまま1M、10Mを順に実測し、R2 request/bytes costを同じreceiptへ含めなければならない。100k local resource gateは完了したが、10M Worker/R2 scale、live multi-region cohort、historical MVCC、KMS rotation、replica lag、cron backlog/dead-letter/cancellationは未完了であり、状態は`:production-partial`を維持する。IStoreとCloudflare KVは使用しない。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
