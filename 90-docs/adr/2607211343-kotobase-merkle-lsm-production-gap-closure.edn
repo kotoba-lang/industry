@@ -513,6 +513,14 @@ host PR #80（merge commit `94c4e63bc59ef13aaafe3c1212287d0095e382f4`）はservi
 
 実R2 10M gateは同一durable headで継続し、本addendum確認時点で3,956,736/10,000,000 datomまで進んだ。途中値をscale完了とは扱わず、状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
 
+## 2026-07-23 Cron dispatch SLO and authenticated alert delivery
+
+host PR #81（merge commit `0afd6150700e4d16e94cb5a2b0992c9350b3f0c3`）はCloudflare ScheduledEventの`scheduledTime`と実observed timeからdispatch latencyを測り、既定120,000msまたは`MERKLE_CRON_ALERT_MAX_DISPATCH_MS`を越えた場合に`:cron-dispatch-latency`を既存health receiptへ追加する。alert時は従来の構造化errorを必ず残し、任意設定のvendor-neutral HTTPS webhookへ同じreceiptをBearer認証付きJSONで送る。deliveryはscheduled `waitUntil` chainに含め、2xxだけを成功としredirectを拒否する。webhook tokenはpayload、health response、ADR receiptへ含めない。
+
+隔離MemoryR2 scheduled smokeは5秒のdispatch遅延を1秒SLOに対して検出し、dead-letterとcron latencyを同一receiptへ記録した。mock HTTPS sinkはAuthorization headerを検証して202を返し、delivery promise完了とJSON payloadへのsecret非混入を確認した。canonical local CIはroute contract 18 assertions、JVM 76 tests/427 assertions、lint errors 0、Worker release build、authenticated webhook deliveryを含むdatom ingress smokeの5 stepsがgreenだった。これでcron dispatch measurement/SLO判定と認証delivery contractのlocal vertical sliceは完了した。ただし実Cloudflare cronから実notification sinkへのproduction delivery/latency receiptは未取得であり、production notification qualificationとは表現しない。
+
+実R2 10M gateは同一durable headで継続し、本addendum確認時点で4,317,184/10,000,000 datomまで進んだ。途中値をscale完了とは扱わず、状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
