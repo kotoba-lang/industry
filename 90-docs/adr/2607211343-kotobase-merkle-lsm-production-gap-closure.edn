@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85], :latest-peer-main \"1d0bdee9b1404123e3aad795d8a3f41ef6e29c84\", :latest-host-main \"d964ff807ebe98cb9f9553c206f36d70515bdaa0\", :latest-worker-version \"r2-gc-restore-drill\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86], :latest-peer-main \"b4b96171c476c36378d6ec4d5408406c3b7070a4\", :latest-host-main \"629765e9d76e4860eb4e32a52f676a294d5aef24\", :latest-worker-version \"r2-database-disaster-restore\"}"
   :adr/body
   "# Context
 
@@ -540,6 +540,18 @@ host PR #85（merge commit `d964ff807ebe98cb9f9553c206f36d70515bdaa0`）はservi
 実Cloudflare R2のisolated prefix `bench/gc-restore/20260723`では、意図的にheadを除去したgraphの6 objectsをauditし、6 backup、6 delete、inventory CIDから6 restore、二回目は6 already-presentとなった。復元対象は再度backup/deleteし、一時Workerを削除した。immutable inventoryは監査用に保持した。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-gc-restore-drill.edn`である。
 
 これで誤ったGC deleteをCID inventoryからrollbackするsingle-account live gapは完了した。ただしこれはmutable headを含む完全database disaster restoreではなく、head republish、cross-region copy、RTO/RPO、復元後query equivalenceは別の未完了gateである。実R2 10M gateは同一durable headで継続し、本addendum確認時点で6,119,424/10,000,000 datomまで進んだ。途中値をscale完了とは扱わず、状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
+## 2026-07-23 Namespace-aware database disaster restore
+
+peer PR #88（merge commit `8b0815479bc89343b287b6fc52ef44e889142a01`）はdatabase headを解決後、backup IDに対するdurable `:backup` retention rootをCAS登録し、snapshotから到達するstorage graphを4-object bounded waveでCID backupへ複製するkernelを追加した。inventoryは作成時刻をidentityへ含めず、同じbackup ID/headのretryが同じinventory CIDになる。restoreは全immutable entryをcreate-onlyで戻してからtarget headをCAS作成し、既存の同一headはidempotent、異なるheadは409相当でfenceする。
+
+hostの実datom graphで、全IPLD Linkを`blocks/`のDAG-CBOR nodeと仮定するとmaterialized pack CIDで失敗することが判明した。このruntime findingをpeer PR #89（merge commit `b4b96171c476c36378d6ec4d5408406c3b7070a4`）で修正した。inventoryは`[namespace CID]`を決定的に記録し、`blocks/`だけをdecode/traverse、`objects/`はCID検証したopaque bytesとして保存する。restore後もnamespace-aware reachable storage setがinventoryと完全一致しなければhead作成済みであっても成功receiptを返さない。
+
+host PR #86（merge commit `629765e9d76e4860eb4e32a52f676a294d5aef24`）はservice bearer必須の`POST /v1/kotobase/database-backup`と`POST /v1/kotobase/database-restore`を公開した。MemoryR2 E2Eは13 entries（11 blocks、2 opaque objects）の全primary bytesとheadを削除し、13/13 restore、exact reachability、同一transactionのdurable replay、backup/restore idempotency、backup ID conflict、target head conflictを確認した。peer canonical CIはJVM 239 tests/743 assertions、CLJS 241 tests/901 assertions、gateway 21 tests/67 assertions、lint errors 0、全7 steps green。host canonical CIはroute/cohort 18 assertions、JVM 76 tests/427 assertions、lint errors 0、Worker buildとfull ingress smokeを含む5 stepsがgreenだった。
+
+実Cloudflare R2のisolated prefix `bench/database-restore/20260723`ではmaterialized viewを含む13 entries、12,886 bytesをbackupした後、mutable head、11 blocks、2 opaque objectsを実際に削除した。restoreは1,773.230msで13/13、head create-only CAS、reachable set 13一致。二回目は1,199.583msで0 restored/13 already-present、復元後の同一transactionは289.992msでdurable replayした。一時Worker、mutable head、retention roots、primary source objectsは削除し、immutable backup/inventoryだけを監査用に保持した。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-database-restore-drill.edn`である。
+
+これでsingle-account R2におけるmutable headを含むsmall database disaster restore vertical sliceは完了した。未完了はbackup bucketを別account/regionへ分離したcopy、large inventoryのpaged/resumable streaming、production RTO/RPO、汎用on-disk query完成後のquery corpus equivalenceである。実R2 10M gateは同一durable headで継続し、本addendum確認時点で7,856,128/10,000,000 datomまで進んだ。途中値をscale完了とは扱わず、状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
 
 # Consequences
 
