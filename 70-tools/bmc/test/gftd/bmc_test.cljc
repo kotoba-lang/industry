@@ -214,7 +214,7 @@
                               {:cloud-itonami [{:key :awareness :label "訪問" :metric [:v]}
                                                {:key :acquisition :label "signup" :metric [:s] :benchmark 0.10}
                                                {:key :revenue :label "paid" :metric [:p] :benchmark 0.30}]}]
-                  (funnel/proposals :cloud-itonami {:v 1000 :s 20}))]  ; s/v=2% < 10%, p missing
+                  (funnel/proposals (canvas/index base) :cloud-itonami {:v 1000 :s 20}))]  ; s/v=2% < 10%, p missing
       (is (some #(and (= :cloud-itonami.channels (:canvas/id %))
                       (re-find #"GTM" (:event/value %))) props))
       (is (some #(and (= :cloud-itonami.metrics (:canvas/id %))
@@ -222,7 +222,30 @@
       (is (some #(and (= :cloud-itonami.solution (:canvas/id %))
                       (re-find #"計器" (:event/value %))) props))))
   (testing "no spec → no proposals"
-    (is (empty? (funnel/proposals :no-such-product {})))))
+    (is (empty? (funnel/proposals (canvas/index base) :no-such-product {})))))
+
+(deftest funnel-proposals-dedup
+  (testing "bottleneck が不変なら GTM/snapshot/計器 は advisor 側で dedup され、2度目は空になる（theater 停止）"
+    (let [spec {:cloud-itonami [{:key :awareness :label "訪問" :metric [:v]}
+                                {:key :acquisition :label "signup" :metric [:s] :benchmark 0.10}
+                                {:key :revenue :label "paid" :metric [:p] :benchmark 0.30}]}
+          metrics {:v 1000 :s 20}  ; s/v=2% < 10%, p missing → GTM + snapshot + 計器
+          idx0 (canvas/index (conj base
+                                   {:canvas/kind :lean :canvas/product :cloud-itonami
+                                    :canvas/id :cloud-itonami.channels :canvas/block :lean/channels
+                                    :canvas/label "Channels" :canvas/items []}
+                                   {:canvas/kind :lean :canvas/product :cloud-itonami
+                                    :canvas/id :cloud-itonami.solution :canvas/block :lean/solution
+                                    :canvas/label "Solution" :canvas/items ["s1"]}))
+          first-props (with-redefs [funnel/funnel-specs spec]
+                        (funnel/proposals idx0 :cloud-itonami metrics))
+          {:keys [approved]} (react/governor idx0 first-props)
+          folded (canvas/fold idx0 (mapv #(react/proposal->event 0 "advisor:funnel" %) approved))
+          second-props (with-redefs [funnel/funnel-specs spec]
+                         (funnel/proposals folded :cloud-itonami metrics))]
+      (is (= 3 (count first-props)))   ; GTM + snapshot + 計器
+      (is (= 3 (count approved)))      ; block あり・非重複で全可決
+      (is (empty? second-props)))))    ; advisor-side dedup で2度目は空 = theater 停止
 
 (deftest render-md-smoke
   (let [idx (canvas/index base)
@@ -347,6 +370,19 @@
       (is (= [] (vec (garbage obs)))))
     (testing "complete の例外も空 (fail-safe)"
       (is (= [] (vec (thrower obs)))))))
+
+(deftest llm-advisor-prompt-includes-dedup-constraint
+  (testing "llm-advisor の prompt に既存 item の重複禁止指示が含まれる (LLM theater 停止)"
+    (let [captured (atom nil)
+          advisor (react/llm-advisor (fn [prompt] (reset! captured prompt) "[]")) ; fail-safe・提案ゼロ
+          obs {:product :cloud-itonami :layer :business-operator
+               :blocks {:cloud-itonami.channels ["GTM existing bottleneck action"]}
+               :hyps [] :metrics {}}]
+      (advisor obs)
+      (testing "prompt に dedup 指示（governor duplicate 拒否）が含まれる"
+        (is (str/includes? @captured "duplicate")))
+      (testing "prompt に既存 item が渡っている（LLM が重複を認識できる）"
+        (is (str/includes? @captured "GTM existing bottleneck action"))))))
 
 ;; strip-fences moved to gftd.murakumo (transport-layer concern for the
 ;; murakumo-based advisor); see `murakumo-complete-from-http` above.

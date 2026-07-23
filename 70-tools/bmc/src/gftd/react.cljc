@@ -102,7 +102,12 @@
                       " {:proposal/action :canvas/add-item :canvas/id <product>.<block>"
                       " :event/value \"...\" :proposal/reason \"...\"}。block は"
                       " problem/uvp/solution/channels/metrics/unfair 等。観測:\n"
-                      (pr-str (select-keys obs [:product :layer :blocks :hyps :metrics])))
+                      (pr-str (select-keys obs [:product :layer :blocks :hyps :metrics]))
+                      "\n制約: 上記 blocks に既にある item と同じ・実質的に同じ :event/value"
+                      " を出すと governor が \"duplicate item\" で拒否し loop が進まない。"
+                      "安定 item（GTM/UVP/計器/準備 等の数値を含まないもの）は再提案禁止。"
+                      "観測系（\"観測 (signal):\"/\"観測 (paths):\" 等の数値が進むもの）は"
+                      "新しい数値なら可。")
           out (try (complete prompt) (catch #?(:clj Exception :cljs :default) _ nil))]
       (try
         (let [v (#?(:clj clojure.edn/read-string :cljs cljs.reader/read-string) (str out))]
