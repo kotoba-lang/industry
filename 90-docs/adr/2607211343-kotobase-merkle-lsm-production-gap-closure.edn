@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69], :merged-host-prs [57 58 59 60 61 62], :latest-peer-main \"e288e5dfe27f37d22855f5619866257f2b9031e5\", :latest-host-main \"f158f178f4b19bcdea2ab7bfe88f5cef08d89359\", :latest-worker-version \"r2-verified-2026-07-23-prefix-block-remainder\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68], :latest-peer-main \"175dfa20bfbc2623448d172499100d5ad6019785\", :latest-host-main \"6798093b3b5e1a9b3e77cb5659bd19affda77aba\", :latest-worker-version \"r2-verified-2026-07-23-streaming-compaction-1m\"}"
   :adr/body
   "# Context
 
@@ -444,6 +444,18 @@ peer PR #76は、各scaleを独立JVMで実行し、小さい成功が大きい�
 100,000 datom、1 writer、2 GiB heapの実測はtotal 237,181.28ms、throughput 421.62 datom/s、flush p50 1,602.81ms/p95 3,013.09ms/p99 3,348.37ms、compaction 73,871.24ms、peak heap 852,369,128 bytes、CPU 1.0364ms/datom、read amplification 4.0、write amplification 1.9977、object bytes 355.71/datom、compacted count 100,000、lost 0で、宣言した100k JVM gateを通過した。authority receiptは`kotobase-peer/bench/results/2026-07-23-merkle-resource-scale-100k.edn`である。
 
 この測定は同時に、pure in-memory oracleが100kだけで約852MBへ達することも可視化した。従って1M/10Mを単にJVM heap増加で実行してproduction evidenceとはしない。次のscale gateはhostのR2 object-backed streaming compactor/query iteratorを使い、bounded working setのまま1M、10Mを順に実測し、R2 request/bytes costを同じreceiptへ含めなければならない。100k local resource gateは完了したが、10M Worker/R2 scale、live multi-region cohort、historical MVCC、KMS rotation、replica lag、cron backlog/dead-letter/cancellationは未完了であり、状態は`:production-partial`を維持する。IStoreとCloudflare KVは使用しない。
+
+## 2026-07-23 Object-backed streaming compaction and 1M R2 gate
+
+peer PR #77〜#80（merge commits `9459339d7b7601d2582f797ee3d873dd49a4f38c`、`1b534365c49d9d0c06d87fba39a42f38726b6729`、`98680eb765d04f26a0feaa2ebea3ae013e9aca3e`、`175dfa20bfbc2623448d172499100d5ad6019785`）で、compactionをobject-backed block-at-a-time k-way mergeへ移行した。一度に保持する物理block、open run数、aggregate input bytes、inline rows、hot logical keyをfail closedに制限し、range componentを4並列・64MiB/waveのdeterministic waveとして実行する。run refへlogical min/maxを持たせ、新規rangeと重ならないrunはdata GET/再encode/PUTなしで継承する。さらにsingleton non-overlap runは同じCIDのままRangeDirectoryへpromoteする。JVM 237 tests/720 assertions、CLJS 238 tests/855 assertionsはgreenである。
+
+host PR #68（merge commit `6798093b3b5e1a9b3e77cb5659bd19affda77aba`）は、認証済み`POST /v1/kotobase/compact`、disabled-by-defaultのdirect Merkle scale seed、lost acknowledgementを同一head/receiptで回復するresumable R2 harnessを追加した。local/murakumo CIはcohort 18 assertions、JVM 75 tests/405 assertions、lint 0 errors、Worker release、datom ingress smoke、receipt runnerがgreenである。Cloudflare KVとIStoreは使わず、immutable CASはR2/S3互換object storageだけを利用する。
+
+実Cloudflare R2のisolated prefixで行った最終100k runはtotal 233,247.18ms、throughput 428.73 datom/s、seed p50 872.17ms/p95 1,119.08ms/p99 1,282.00ms、compaction p50 3,794.77ms/p95/p99 16,941.13msだった。input block GET 192/5,213,616 bytes、output PUT 240/5,357,408 bytes、peak buffered 512 rows/108,716 bytes、rewritten rows 24,576、final directoryは各index 196 refs/100,000 rows、lost/duplicate 0である。直前のpromotionなしrunに対してwall -55.44%、throughput +124.43%、GET/PUTとbytesを約91.8〜92.0%削減した。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-streaming-compaction-100k.edn`とする。
+
+1M correctness gateは、540,672 rowsまでのdurable phaseのlost HTTP acknowledgement後に同一head checkpointを認識してresumeし、残り459,328 datomを1,105,133.40ms、415.63 datom/sで完了した。resume phaseはseed p50 1,420.63ms/p95 1,695.27ms/p99 1,820.29ms、compaction p50 17,177.77ms/p95/p99 39,179.73ms、promoted runs 1,347、data block GET/PUT 0、recovered lost acknowledgements 5である。final RangeDirectoryは各index 977 refs/1,000,000 rows、lost/duplicate 0だった。client再開を挟んだため1M全体を単一process wall throughputとは表現せず、correctnessは全1M、性能値はresume phaseだけのauthorityとする。receiptは`local-murakumo/bench/results/2026-07-23-r2-streaming-compaction-1m.edn`である。
+
+このgateで次のhard blockerはinline RangeDirectory metadataと確定した。977 refsでcheckpoint p99が39.18秒へ増大しており、現行形式のまま10Mを実行してもbounded-scale evidenceにならない。次はRangeDirectoryをCID-addressed page/treeへ分割し、range lookup、checkpoint更新、GC traversalをbounded I/Oにした後、10M R2 gateを実行する。account-authoritative Worker CPU/billed R2 operationsにはanalytics-read token、production qualificationには複数region runnerも必要である。historical MVCC/query、KMS wrapping/rotation、replica lag、cron backlog/dead-letter/cancellationも未完了なので状態は`:production-partial`を維持する。IStoreとCloudflare KVは引き続き使用しない。
 
 # Consequences
 
