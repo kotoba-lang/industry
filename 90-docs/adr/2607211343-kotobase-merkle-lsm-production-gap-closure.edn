@@ -393,6 +393,20 @@ host PR #63は`MERKLE_FRONTIER_BLOCK_GET_CONCURRENCY`を既定4・最大16とし
 
 plan-proven independent GET concurrency gapは実装・観測まで閉じた。残るP1 performance gateはbytes/RTT/cache hitに基づくadaptive block sizing、複数時間帯・順序反転・複数regionでのA/B、10^5〜10^7 datomのp95/p99、Worker CPU/RSS、R2 request/bytes costである。historical MVCC join、KMS wrapping/rotation drill、multi-region replica lag、cron backlog/dead-letter/cancellationもproduction readiness上は未完了であり、状態は`:production-partial`のままとする。IStoreとCloudflare KVは使用しない。
 
+# Verification addendum — exact-byte run blocks and byte-bounded GET waves (2026-07-23)
+
+peer PR #71はphysical Merkle run blockを既定128 rowsだけでなくcanonical DAG-CBOR encoded bytes既定1 MiBでも分割する。最初にlogical-key-aligned row batchを作り、byte超過batchだけをlogical group境界で二分するため、exact boundを維持しながらcandidateを反復encodeするquadratic実装を避ける。一つのlogical key自体がrow/byte boundを越える場合は分割せず`oversized-logical-key`をdescriptorへ明示する。各physical descriptorはCID、range、countに加えて`encoded-bytes`を持ち、readerはdecoded blockの再encode lengthとも照合する。
+
+prefix readerは`block-get-max-wave-bytes`既定4 MiBをconcurrency capと同時に適用する。descriptor byte合計を越える次blockは次waveへ送り、byte metadataのない旧refは一wave全体を占有する保守値として扱う。実GETについて`fetched-block-bytes`、`unknown-fetched-block-bytes`、`max-wave-block-bytes`を返す。最初のexact-byte greedy prototypeは1,000-datom flushを約20秒へ退行させたためrejectし、row batch＋byte超過時だけの二分へ置換した。置換後の単独Merkle benchはflush 1,086.95 ms、total 1,879.78 msで、canonical CIも完走した。peer PR #71 merge commitは`7c8da376283753e4c8a50853a77199f342c2bc8d`である。
+
+peer PR #72はatomic Datalog refreshからbase flushへ`block-rows`と`max-block-bytes`を渡し、選択値をimmutable manifest statisticsへ記録した。PR #73はphysical blockを持たない新規inline run-refにもcanonical root bytesを追加し、真に旧formatのrefだけをunknown byte countへ残した。final peer verificationはJVM 225 tests/685 assertions、CLJS 225 tests/813 assertions、lint errors 0。merge commitsは順に`0990018afea014f32e23f35416e963d299b9c46c`、`0b2ae60c40bdd814f64efa171f0fdd0c51512111`である。
+
+host PR #64は`MERKLE_RUN_BLOCK_ROWS`既定128、`MERKLE_RUN_MAX_BLOCK_BYTES`既定1 MiB・最大4 MiB、`MERKLE_FRONTIER_BLOCK_GET_MAX_WAVE_BYTES`既定4 MiB・最大16 MiBを配線した。known/unknown fetched bytesとmax wave bytesはstep、checkpoint、spill、terminal result、service認証statusを通じてsum/max集約される。host canonical local CIは75 tests/405 assertions、lint errors 0、Worker release、byte-capを強制したdatom ingress smokeがgreenで、merge commitは`e9b582a79124abeadf538231bc9a712ce65e5c25`である。
+
+実Cloudflare R2では260 teams、520 membership datoms、4 interleaved seed runs、64 rows/page、row cap 4,096、wave cap64 KiB、concurrency 4を固定し、run byte capだけを16 KiBと32 KiBで比較した。16 KiBはphysical descriptorとなり、261 rows、6 steps、26 block scans、10 GET、117,941 known fetched bytes、max wave 48,712 bytes、driver 74,471.3 msだった。32 KiBではこの小runがinlineに収まり、21 whole-run GET、driver 53,192.5 msだった。16 KiBはGET数を52.38%減らしたがwallは40.00%遅く、small-object RTTがbytes削減を上回った。32 KiB probeでinline bytesがunknownだった欠落は上記peer #73で閉じた。一時Workerは削除し、isolated prefixesはaudit用に保持した。authority receiptは`local-murakumo/bench/results/2026-07-23-r2-byte-aware-run-blocks.edn`である。
+
+これによりrow固定だけだったblock/waveをexact bytesでも制御し、実GET bytesを次のpolicy入力として観測するvertical sliceは完了した。ただし一つのglobal byte値を選ぶ根拠は得ておらず、adaptive block sizing全体は未完了である。次はblock-size cohortをmanifest epochに固定し、16/32/64/128 KiBを順序反転・複数時間帯で反復して、GET、bytes、R2/Worker wall、CPU、cache hitから次epochのsize classを選ぶbounded controllerを実装する。10^5〜10^7 scale、multi-region、historical MVCC、KMS/rotation、operations gateも引き続き未完了で、状態は`:production-partial`とする。IStoreとCloudflare KVは使用しない。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
