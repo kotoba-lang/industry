@@ -899,7 +899,31 @@
    :reason "src/mesher.cljc (18313 bytes) plus src/mesher/mc_tables.cljc (13860 bytes, marching-cubes lookup tables) place this in the same f64-heavy 3D-geometry class as orgs/kotoba-lang/geo and orgs/kotoba-lang/cartpole-math, both of which required a dedicated qualified-golden-slice review rather than a direct port. Not read in full this pass; flagged so a future review starts from the geo/cartpole-math :required-language-gates precedent instead of a blank slate."
    :required-language-gates [:typed-f64 :transcendental-conformance :ieee-special-values
                              :marching-cubes-goldens]
-   :next-action :retain-cljc-and-review-in-full-against-the-geo-cartpole-math-precedent}]
+   :next-action :retain-cljc-and-review-in-full-against-the-geo-cartpole-math-precedent}
+  {:root "orgs/kotoba-lang/mining-pool/src/mining_pool/vardiff.cljc"
+   :repository "orgs/kotoba-lang/mining-pool"
+   :kind :bounded-profile-split
+   :review-status :bounded-vardiff-profile-merged
+   :migration-authorized true
+   :migration-scope :mining-pool/bounded-vardiff-v1
+   :legacy-domain :general-adjust-difficulty-with-min-difficulty-parameter
+   :safety-note "min-difficulty is pinned to the Stratum-standard 1.0 floor rather than taken as a fifth parameter; every legacy test.cljc case already used the default of 1, so this changes no observed behavior for the cases checked."
+   :compiler-findings
+   {:five-plus-f64-params-miscompile-to-wasm
+    {:description "functions with five or more :f64-typed parameters fail Wasm instantiation with an invalid-local-index error despite being within the compiler's declared max-parameters admission limit; reproduced with minimal standalone functions down to the exact 4-vs-5 boundary"
+     :compiler-sha "def5161be96d489539175813326a316da46268be"}
+    :f64-returning-cross-file-require-fails-project-link
+    {:description "kotoba.compiler.project/stub-value has no case for :f64/:f32, so requiring a function that returns raw :f64 from another module fails project-linking; worked around by keeping kernel and conformance in one file (pbrt/kami-usd-native/rtx-native precedent)"}}
+   :implementation
+   {:pr "https://github.com/kotoba-lang/mining-pool/pull/1"
+    :commit "73720fa6b8f08f9fd2cd0f6965ea215d5f1f4c08"
+    :kernel-and-conformance "src/mining_pool/bounded_vardiff.kotoba"
+    :migration-record "migration/bounded-vardiff-v1.edn"
+    :legacy-tests {:tests 15 :assertions 29 :failures 0 :errors 0}
+    :equality-method :f64-to-bits-then-i64-equality
+    :required-capabilities []
+    :hosted-ci {:jdk [17 21] :status :passed}}
+   :next-action :retain-cljc-oracle-and-migrate-only-consumers-that-accept-the-pinned-min-difficulty-floor}]
  :language-maturity
  {:safe-f64-phase-3a
   {:status :merged-qualified
@@ -1328,8 +1352,8 @@
   :assoc-wave-note "All 37 cloud-itonami-assoc-* repositories (gh repo list, 2026-07-22) carry a sole production association_facts.kotoba with zero tracked CLJC. finra closed the reviewed retirement queue; the 18 repositories in :backfilled-unlogged-migrations were found already migrated by prior unlogged sessions (2026-07-20/21), verified against their merge commits and green CI, and logged into the ADR's :qualified-evidence -- their local checkouts were never canonical-matrix entries so they do not appear in :reviewed-association-wave above. No further next-reviewed-wave-candidate exists inside cloud-itonami-assoc-*; see :next-wave-census for the surveyed successor scope and the new :dispositions entry for why it is not yet actionable."
   :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA and FINRA retirement each removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; the assoc-* wave is closed, so resume with per-repo review inside the isic/isco/iso3166/unspsc/cofog/gtin census once the application-profile and string-search gates are tracked as landed."}
  :completion
- {:reviewed-project-roots 46
-  :authorized-migrations 20
+ {:reviewed-project-roots 47
+  :authorized-migrations 21
   :retained-oracles 7
   :typed-refactors-pending 0
   :typed-refactors-in-review 0
