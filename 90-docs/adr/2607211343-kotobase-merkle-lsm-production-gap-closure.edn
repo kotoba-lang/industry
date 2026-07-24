@@ -579,6 +579,16 @@ peer PR #91（merge commit `98afcb85cd98ae5bf9e1ba5d00f7017ebda96298`）は、v2
 
 これでpage executionとcrash recoveryはboundedになったが、最終verificationは全inventory entriesとreachable visited setをprocess memoryへmaterializeするため、総working setはまだO(total entries)である。またv2 root descriptorもO(page count)である。次のP1 gapはR2上の外部visited set、verification cursor/checkpoint、hierarchical inventory rootであり、その後にcross-account/region copy、RTO/RPO、KMS、historical MVCC/on-disk q/pullを進める。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
 
+## 2026-07-24 External bounded-memory restore verification
+
+peer PR #92（merge commit `c1b6b7bfb239661c773573a4594a6906415552b2`）は、resumable restoreの最終reachability verificationをprocess-local visited setからR2上のETag-CAS markerへ外部化した。marker keyはtarget/task/CIDで一意となり、状態は`pending`/`done`である。1 invocationは最大64 markerをlistし、最大1 content objectをCID検証する。`blocks/`だけをdecodeしてchild markerをparentの`done`化より先にdurable作成し、`objects/`はopaque leafとして扱う。pendingを1件処理するたびscan cursor/countを先頭へ戻し、pendingのない完全scanのunique marker countがimmutable inventory entry countと完全一致した場合だけ`ready-to-publish`へ進める。immutable checkpointはmarker集合を持たずcursor/count/passだけを保持する。
+
+active `verifying` checkpointとmarker prefixはGC rootとなる。inactive markerはdatabase-restore grace、二回のcomplete inventory fence、backup-before-delete、CID-verified restoreの対象に追加した。これによりresumable verificationのprocess memoryは総entry数ではなく、marker list 64件、inventory sparse lookupの候補page、単一content objectとそのlink vectorへ制約された。10,000-entry deterministic synthetic gateは40 inventory pages、157 listing steps、158 checkpoint samplesで、checkpoint encodingは421〜448 bytesだった。authority receiptは`kotobase-peer/bench/results/2026-07-23-external-restore-verification-10k.edn`である。peer canonical local CIはJVM 242 tests/767 assertions、CLJS 247 tests/974 assertions、lint errors 0、R2 gateway 21 tests/67 assertions、全benchmark step greenだった。
+
+host PR #89（merge commit `dffed173294e88f990e1d61b7cdbcbc07861ce31`）はauthenticated restore-step responseへverification scan count/passを公開し、full disaster-restore smokeを`verification-started`、複数`verification-progress`、`ready-to-publish`、`completed`のlease-release付きloopへ変更した。peerのmerged mainを依存に使ったcanonical local CIはcohort contract 18 assertions、JVM 76 tests/427 assertions、lint errors 0、Worker release build、全ingress smokeがgreenだった。
+
+これでresumable restore verificationのO(total entries) process-local visited set gapは閉じた。ただし本receiptはsyntheticであり、live R2のlarge restore RTO/RPO、marker object/operation cost、worker restartを跨ぐ1M/10M verificationは未測定である。またCIDごとに1 marker objectを作るため、process memoryと引き換えにO(entries) R2 PUT/GET/LIST/DELETEを使う。単一blockのlink vectorはblock単位でdecodeし、legacy synchronous restoreとbackup-side graph discoveryの`seen` setは依然O(total entries)、inventory v2 root descriptorもO(page count)である。次はhierarchical inventory root、marker page/bitmapまたはpartitioned frontier、bounded backup traversal、cross-account/region copy、production RTO/RPO、KMS、historical MVCC/on-disk q/pullである。状態は`:production-partial`を維持し、IStoreとCloudflare KVは使用しない。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
