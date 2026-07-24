@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92], :latest-peer-main \"4bd918323da44eec909d04eb92f618169ec4ad2b\", :latest-host-main \"6ec5e40c19424a4507f3e6b51d079ba468f27925\", :latest-worker-version \"20260723-page-reuse-10m\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93], :latest-peer-main \"a1d911c1b11039fdb6f052056d1fae63d9c6ac37\", :latest-host-main \"287c5b1cf032655d0e1ed585ac3dba0cb2e07137\", :latest-worker-version \"20260723-page-reuse-10m\"}"
   :adr/body
   "# Context
 
@@ -650,6 +650,14 @@ delete modeはcandidate集合を64件ずつ読み、initial root snapshotのCID 
 host PR #92（merge commit `6ec5e40c19424a4507f3e6b51d079ba468f27925`）はservice bearer必須の`POST /v1/kotobase/global-gc-step`を公開した。task ID、0〜30日のgrace、boolean deleteを検証し、進行中202、completed 200、fenced/aborted 409へ写像する。full ingress smokeはunauthorized 401、invalid 400、dry-runのmarking/scanning/cleanup/completedを通過し、その後も13-object disaster restoreとtransaction replayを完了した。host canonical local CIはcohort 18 assertions、JVM 76 tests/427 assertions、lint errors 0、Worker release build、full smokeの全5 stepsがgreenだった。
 
 これで`blocks/`・`objects/`のreachable setとcandidate listingが総data object数に比例するprocess memory gapは閉じた。ただしroot catalog snapshot（heads、retention、resumable/restore/backup/ingress pointer）はまだ全件listingであり、global GC step自体のlease fencing、live R2 large-prefix restart/cost receipt、task work-prefix retention、abandoned non-terminal backup cancel tombstone、cron scheduleは未完了である。次はglobal GC leaseとroot-catalog cursor、次いでlive R2 restart drillを実装する。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
+## 2026-07-24 Global GC step lease fencing
+
+peer PR #99（merge commit `a1d911c1b11039fdb6f052056d1fae63d9c6ac37`）はglobal GCの全non-terminal stepを期限付きR2 ETag-CAS leaseでclaimする。active leaseを持つ別tokenはeffectを実行せず`:leased`を返し、expiry後は新owner/tokenが同じphase/checkpointをreclaimする。markingとcleanupを含む全bounded effectの完了後、pointer CAS成功と同時にlease fieldsを除去するため、通常のstep間にexpiry待ちは発生しない。taskのgrace/delete mode mismatchもfail closedである。
+
+70-child/74-object fixtureはactive contenderの`:leased`、expiry後reclaim、全phase完了、2 orphan backup/deleteを通過した。CLJSは251 tests/1042 assertions、lint errors 0。host PR #93（merge commit `287c5b1cf032655d0e1ed585ac3dba0cb2e07137`）は`:leased` phase/statusをHTTP 409へ写像し、通常progress 202とcompleted 200を維持する。
+
+これで同一global GC taskの並行effect fencing gapは閉じた。未完了の最優先はroot catalog snapshot（heads、retention、resumable/restore/backup/ingress）のpage cursor＋external root set化である。その後にlive R2 large-prefix restart/cost receipt、global GC work-prefix retention、cron schedule、abandoned non-terminal backup cancel tombstoneが残る。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
 
 # Consequences
 
