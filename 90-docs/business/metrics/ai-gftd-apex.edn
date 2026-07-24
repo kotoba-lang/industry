@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6732, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 6752, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 479457,
-  :pageviews-7d 17300,
-  :uniques-7d-sum 5125,
+ {:requests-7d 483750,
+  :pageviews-7d 17539,
+  :uniques-7d-sum 5129,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
@@ -18,7 +18,7 @@
    {:path "/assets/main.js.map", :requests 81}
    {:path "/trace.axd", :requests 79}
    {:path "/.aws/credentials", :requests 71}],
-  :status-mix {:server-error 16079, :client-error 1861, :ok 2156},
+  :status-mix {:server-error 16106, :client-error 1926, :ok 2138},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,11 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-24",
- :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 80},
+ :traffic-quality
+ {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 80},
  :top-paths
- "上位 page (24h, 2xx/3xx): /debug/pprof/ 128 · /.bash_profile 107 · /.ssh/id_ecdsa 99 · /api/.env 94 · /api/v1/settings 93 | 4xx(probe) 9% · 5xx 80%",
+ "上位 page (24h, 2xx/3xx): /debug/pprof/ 128 · /.bash_profile 107 · /.ssh/id_ecdsa 99 · /api/.env 94 · /api/v1/settings 93 | 4xx(probe) 10% · 5xx 80%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 479457 req/7d・5125 uniques(日次和)・うち4xx probe 9%(24h)、workers 6733 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 483750 req/7d・5129 uniques(日次和)・うち4xx probe 10%(24h)、workers 6753 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
