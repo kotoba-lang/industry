@@ -86,6 +86,35 @@ selection_score = 0.40 * cash_subscore + 0.60 * profit_subscore
 100点scoreは比較と監査用、上式は同点時の選択用。初回入金後も、
 一回限りの少額決済だけで全配分をB2Cへ移さない。
 
+## Capital-allocation governor
+
+正本は
+`../../adr/2607246100-revenue-agent-loop-capital-allocation-governor.edn`。
+予算は使い切る対象ではなく、外部証拠によって解放される上限とする。
+
+| Tranche | 上限 | 解放条件 |
+|---|---:|---|
+| T1 | ¥300,000 | ADR accepted。1 segment / 100 named accounts / paid closeを検証 |
+| T2 | ¥700,000 | 最初の非owner実入金とfulfillment成功 |
+| T3 | ¥1,000,000 | 2顧客以上、同じbuyer/problem/offerで再現可能 |
+| T4 | ¥1,000,000 | 実測CAC payback ≤ 3か月、限界利益が正 |
+
+次trancheを、前trancheの失敗を救うために使わない。広告は手動営業による
+実入金とfulfillmentが一件以上確認されるまでholdする。投資家からの資金は
+financing cashであり、売上、粗利益、需要検証に加算しない。
+
+各runは少なくとも次を記録する。
+
+```text
+contribution = collected revenue - refunds - payment fees - variable delivery cost
+CAC = attributable sales + marketing cash spend / new paying customers
+payback_months = CAC / monthly contribution after initial contribution
+capital_efficiency = expected contribution * evidence confidence / cash at risk
+```
+
+不明値は0でなく`unknown`。founder人時は実時間と明示的なshadow hourly rateの
+両方で記録する。
+
 ## One run
 
 1 runは最大14日、または20人時の早い方で終了する。開始時に次を固定する。
@@ -98,6 +127,7 @@ selection_score = 0.40 * cash_subscore + 0.60 * profit_subscore
 6. timebox
 7. hard gate
 8. 成功、継続、停止条件
+9. 現在tranche、run予算上限、既commit/spend、unit economics仮説
 
 終了時には次を必ず記録する。
 
@@ -108,6 +138,7 @@ selection_score = 0.40 * cash_subscore + 0.60 * profit_subscore
 - scoreのbefore/after
 - priorからposteriorへ変えた理由
 - `scale` / `continue` / `change` / `stop`
+- trancheを`hold` / `release`する根拠。次trancheの自動解放は禁止
 
 ## Decision rules
 
