@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90], :latest-peer-main \"7f6fd8c8dc824e5b3ba07e5f812089d10ce66352\", :latest-host-main \"40eda058e0d96609f6e64cb0a95b20746cf84255\", :latest-worker-version \"20260723-page-reuse-10m\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91], :latest-peer-main \"e82eac47282f7d96507130c9c8c61f6c918286a4\", :latest-host-main \"5bce3431e937b8696d84f62a078b42a0890c0003\", :latest-worker-version \"20260723-page-reuse-10m\"}"
   :adr/body
   "# Context
 
@@ -630,6 +630,14 @@ peer PR #96（merge commit `7f6fd8c8dc824e5b3ba07e5f812089d10ce66352`）は、co
 70 stale entry、completed terminal pointer、active pointer/frontierのdeterministic fixtureでは、64-object上限の中で61＋9 entriesを2 delete pagesへ分割し、全70 entryを削除した。terminal pointerとactive workは残存した。peer canonical local CIはJVM 242 tests/767 assertions、CLJS 250 tests/1023 assertions、lint errors 0、R2 gateway 21 tests/67 assertionsを含む全7 stepsがgreenだった。
 
 これでbackup external coordination cleanupの一回あたりlisting/candidate/backup inventory working setは64 objectsへboundedになった。ただしこのexecutorはcompleted backup work専用であり、blocks/objectsのglobal reachability mark、restore marker、ingress/resumable pointerを含む既存global GC auditは依然全candidateをmaterializeする。また同taskの同時executorに対するeffect lease、abandoned non-terminal backupの明示cancel tombstone、host/cron route、live R2 large-prefix receiptは未完了である。次はlease付きhost driver、次いでglobal mark/sweep namespace cursorとexternal mark setを実装する。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
+## 2026-07-24 Leased backup-work GC host driver
+
+peer PR #97（merge commit `e82eac47282f7d96507130c9c8c61f6c918286a4`）はcompleted-work sweeperの各stepを期限付きR2 ETag-CAS leaseでclaimする。active lease中のcontenderはeffectを実行せず`:leased`を返し、expiry後は新owner/tokenが同じcheckpointをreclaimする。pageまたはscan checkpointのCAS成功時にlease fieldを除去するため、通常完了後は次stepが直ちに進める。lease中にcrashした場合だけexpiryを待つ。owner/tokenはresponseへ公開しない。
+
+host PR #91（merge commit `5bce3431e937b8696d84f62a078b42a0890c0003`）はservice bearer必須の`POST /v1/kotobase/database-backup-work-gc-step`を公開した。task IDと0〜30日のgraceを検証し、進行中202、terminal 200、active lease 409へ写像する。full ingress smokeはunauthorized 401、invalid 400、external database backup完了後の`started → deleted-page → completed`を確認し、そのcleanup後もv3 inventoryから13/13 restore、head publication、transaction replayを完了した。
+
+peer canonical local CIはJVM 242 tests/767 assertions、CLJS 250 tests/1025 assertions、lint errors 0、R2 gateway 21 tests/67 assertionsを含む全7 stepsがgreenだった。hostはJVM 76 tests/427 assertions、lint errors 0、Worker release build、full disaster-restore smokeがgreenである。これでsingle-task並行effect fencingと認証済みhost driver gapは閉じた。未完了はcron schedule、live R2 large-prefix/restart receipt、abandoned non-terminal cancel tombstone、global blocks/objects reachability GCのexternal mark set＋namespace cursorである。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
 
 # Consequences
 
