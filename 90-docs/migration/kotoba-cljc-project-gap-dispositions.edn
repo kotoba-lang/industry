@@ -1043,7 +1043,32 @@
     :hand-verified-cases "case A matches actor_ipc_test.cljc's game-clock-advance test verbatim; cases B/C and wrap32 boundary checks independently computed via Python re-implementation"
     :required-capabilities []
     :hosted-ci {:status :passed}}
-   :next-action :retain-cljc-oracle-and-review-actor-and-ipc-namespaces-in-a-future-pass}]
+   :next-action :retain-cljc-oracle-and-review-actor-and-ipc-namespaces-in-a-future-pass}
+  {:root "orgs/kotoba-lang/ic-packaging/src/ic_packaging/thermal.cljc"
+   :repository "orgs/kotoba-lang/ic-packaging"
+   :kind :bounded-profile-split
+   :review-status :bounded-thermal-profile-merged
+   :migration-authorized true
+   :migration-scope :ic-packaging/bounded-thermal-v1
+   :legacy-domain :ic-packaging.package-bonding-not-reviewed-this-pass
+   :safety-note "Covers the entire calculate-thermal formula (natural and forced-airflow paths) verbatim, split into two functions purely to route around a compiler arity bug, not to narrow scope."
+   :compiler-findings
+   {:five-plus-f64-params-miscompile-to-wasm
+    {:description "same bug as kotoba-lang/mining-pool: the legacy calculate-thermal's 5 f64 inputs (power/ambient/theta_jc/theta_ca/airflow) would hit the known 5+-:f64-param Wasm-lowering bug if ported as one function; avoided by computing theta_ca_effective as a separate 2-param function before the 4-param main formula"
+     :filed "https://github.com/kotoba-lang/compiler/issues/206"}}
+   :operational-findings
+   {:pushing-token-lacks-workflow-oauth-scope
+    {:description "git push of a commit touching .github/workflows/ci.yml was rejected (\"refusing to allow an OAuth App to create or update workflow ... without workflow scope\") even though six earlier migrations this session (ghosthacker-vamos/mining-pool/face-match/cron/atprotocol/actor-ipc) successfully pushed CI workflow changes with the same token -- cause not conclusively identified (possible token/scope change mid-session). Worked around by reverting the workflow-file half of the change and shipping the kotoba source/tests/migration-record only; the existing unmodified CI still ran the full legacy suite and passed. Future migrations should check for this failure mode and split the commit the same way if it recurs."}}
+   :implementation
+   {:pr "https://github.com/kotoba-lang/ic-packaging/pull/1"
+    :commit "f9c5df6c545996dba21d99eff96d9ccdf14f00cf"
+    :kernel-and-conformance "src/ic_packaging/bounded_thermal.kotoba"
+    :migration-record "migration/bounded-thermal-v1.edn"
+    :legacy-tests {:tests 6 :assertions 10 :failures 0 :errors 0}
+    :hand-verified-cases "case A mirrors thermal-junction-temp-above-ambient exactly; case B mirrors airflow-reduces-theta-ja with exact float values, not just the legacy inequality; case C independently computed; all bit-exact against a Python re-implementation via f64-to-bits"
+    :required-capabilities []
+    :hosted-ci {:status :passed :workflow-updated false :reason :missing-oauth-workflow-scope}}
+   :next-action :retain-cljc-oracle-and-review-package-bonding-namespaces-in-a-future-pass}]
  :language-maturity
  {:safe-f64-phase-3a
   {:status :merged-qualified
@@ -1472,8 +1497,8 @@
   :assoc-wave-note "All 37 cloud-itonami-assoc-* repositories (gh repo list, 2026-07-22) carry a sole production association_facts.kotoba with zero tracked CLJC. finra closed the reviewed retirement queue; the 18 repositories in :backfilled-unlogged-migrations were found already migrated by prior unlogged sessions (2026-07-20/21), verified against their merge commits and green CI, and logged into the ADR's :qualified-evidence -- their local checkouts were never canonical-matrix entries so they do not appear in :reviewed-association-wave above. No further next-reviewed-wave-candidate exists inside cloud-itonami-assoc-*; see :next-wave-census for the surveyed successor scope and the new :dispositions entry for why it is not yet actionable."
   :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA and FINRA retirement each removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; the assoc-* wave is closed, so resume with per-repo review inside the isic/isco/iso3166/unspsc/cofog/gtin census once the application-profile and string-search gates are tracked as landed."}
  :completion
- {:reviewed-project-roots 54
-  :authorized-migrations 25
+ {:reviewed-project-roots 55
+  :authorized-migrations 26
   :retained-oracles 10
   :typed-refactors-pending 0
   :typed-refactors-in-review 0
