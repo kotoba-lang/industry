@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6896, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 6906, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 509760,
-  :pageviews-7d 17831,
-  :uniques-7d-sum 5289,
+ {:requests-7d 515656,
+  :pageviews-7d 17842,
+  :uniques-7d-sum 5311,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/health", :requests 98}
+  [{:path "/config/prod.exs", :requests 112}
+   {:path "/health", :requests 86}
    {:path "/debug/pprof/", :requests 76}
-   {:path "/.bash_profile", :requests 75}
    {:path "/trace.axd", :requests 72}
+   {:path "/.env.production.bak", :requests 69}
    {:path "/server-info", :requests 66}
-   {:path "/_next/static/buildManifest.js", :requests 58}
-   {:path "/.ssh/id_ecdsa", :requests 57}
-   {:path "/.vite/manifest.json", :requests 51}],
-  :status-mix {:client-error 1896, :server-error 16499, :ok 1705},
+   {:path "/nginx_status", :requests 64}
+   {:path "/.well-known/jwks.json", :requests 64}],
+  :status-mix {:server-error 16871, :client-error 2236, :ok 2327},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,11 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-24",
- :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 82},
+ :traffic-quality
+ {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 79},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 98 · /debug/pprof/ 76 · /.bash_profile 75 · /trace.axd 72 · /server-info 66 | 4xx(probe) 9% · 5xx 82%",
+ "上位 page (24h, 2xx/3xx): /config/prod.exs 112 · /health 86 · /debug/pprof/ 76 · /trace.axd 72 · /.env.production.bak 69 | 4xx(probe) 10% · 5xx 79%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 509760 req/7d・5289 uniques(日次和)・うち4xx probe 9%(24h)、workers 6897 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 515656 req/7d・5311 uniques(日次和)・うち4xx probe 10%(24h)、workers 6907 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
