@@ -1,0 +1,78 @@
+[{:db/id -1
+  :adr/id "adr-2607247000-cloud-itonami-emi-electronic-money-institution-actor"
+  :adr/title "ADR-2607247000: cloud-itonami-emi — EMD2 Electronic Money Institution (EMI) actor の新設"
+  :adr/status "accepted"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/authoritative-for "cloud-itonami フリートにおける EMI (Electronic Money Institution, EMD2/PSD2 の意味での電子マネー発行体) actor のスコープ・governor 設計・R0成熟度境界・sibling actor (isic-6419/isic-6492/isic-6619/cloud-itonami-pi/cloud-itonami-card-issuing) との責務境界の正本"
+  :adr/topic "cloud-itonami-emi-electronic-money-institution-actor"
+  :adr/related "adr-2607246000-adult-content-payment-processor-banking-jurisdiction-research, adr-2607031500-cloud-itonami-m6910-global-incorporation-actor"
+  :adr/last-verified "2026-07-25"
+  :adr/body "## Context
+
+`90-docs/adr/2607246000-adult-content-payment-processor-banking-jurisdiction-research.edn`（決済業界の一次調査。並行して `90-docs/adr-ledger/adr-ledger.edn` にamendment有り）が発端。この調査の過程で、cloud-itonami フリートには banking（`cloud-itonami-isic-6419`、預金取扱）・credit（`cloud-itonami-isic-6492`）・card-processing/acquiring（`cloud-itonami-isic-6619`）の actor は既に存在するが、**EMD2 (Directive 2009/110/EC) の意味での EMI（Electronic Money Institution、電子マネー発行体）ライセンス区分をカバーする actor が一つも存在しない**ことが判明した。EMI は EU 銀行免許とも PSD2 の Payment Institution（PI）免許とも制度上別区分であり、既存のどの actor も代替しない。本 ADR はこのギャップを埋める新規 actor `cloud-itonami-emi` の起票決定を記録する。
+
+本 actor は**業界横断の汎用目的**（any legitimate payment use case）として設計する。2607246000 のアダルト業界向け決済調査はこの actor を起票する契機であって、actor 自体のスコープをアダルト業界に限定するものではない。
+
+並行して2つの sibling actor が起票中で、本 actor とスコープが重ならないよう明示的に責務分離する: `cloud-itonami-card-issuing`（issuer-side の物理/バーチャルカードプログラム発行）と `cloud-itonami-pi`（PSD2 Annex I の意味での Payment Institution、送金/決済実行サービス）。
+
+## Decision
+
+### 1. スコープ: EMD2 の e-money 発行・ウォレット保管・保全・償還を governed actor としてカバーする
+
+`cloud-itonami-emi`（repo: `cloud-itonami/cloud-itonami-emi`）は本フリート共通の「封じ込め + 独立 governor + 不変台帳」actor パターン（langgraph-clj StateGraph、advisor は proposal のみ返す、独立 governor が censor、実アクチュエーションは governor + phase の2層で常に人間専用）で実装する。**EMI-LLM ⊣ EMIGovernor**。
+
+対象 op: `:wallet/intake`（ウォレット/顧客intake、phase 3で唯一auto-commit）・`:jurisdiction/assess`（法域のe-money発行要件evidence checklist評価、spec-basis必須）・`:kyc/screen`（顧客KYC/CDDスクリーニング）・`:emoney/issue`（額面通りのe-money発行、実アクチュエーション）・`:safeguarding/segregate`（保全口座への資金移動確認、EMD2 Art.7、実アクチュエーション）・`:redemption/redeem`（額面通りのオンデマンド償還、EMD2 Art.11、実アクチュエーション、全部/一部償還どちらも可）。
+
+### 2. Non-goals: 与信・銀行預金・カード発行・PI送金execution との重複回避
+
+- **電子マネー残高への与信供与・金利付与をしない。** EMD2 は e-money 残高への interest/credit を禁止しており、これを行えばEMIではなく無免許銀行と同義になる。`emi.governor` の `:interest-or-credit-forbidden` チェックが**あらゆるopの提案に対して無条件**に、かつ HARD（人間承認でも override不可）で強制する。
+- **銀行免許の意味での預金は取らない。** `cloud-itonami-isic-6419`（Community Monetary Intermediation）の責務。
+- **物理/バーチャルカードプログラムへの実カード発行は行わない。** 並行して起票される `cloud-itonami-card-issuing` actor の責務——本actorとは重複させない。
+- **サードパーティ加盟店向けの決済実行/送金サービスは行わない。** 並行して起票される `cloud-itonami-pi`（Payment Institution）actor の責務——本actorとは重複させない。
+- **消費者信用の与信審査は行わない。** `cloud-itonami-isic-6492` の責務。
+
+### 3. Governor 設計: 12チェック（10 HARD + 2 SOFT）
+
+`emi.governor`: ①effect-matches-op（advisor自己申告`:effect`とrequestの`:op`の一致——`cloud-itonami-isic-6910`のADR-0001 Addendum 12が実機再現で発見した「無害なopに見える提案がより高stakeなeffectを密輸できる」バグクラスを、本actorはR0の時点で最初から塞ぐ）②spec-basis（`emi.facts`への公式ソース引用必須）③sanctions-hit（KYCスクリーニング対象、または発行/償還対象ウォレットの顧客の制裁/PEPヒット、無条件評価）④kyc-incomplete（発行/償還は顧客が`:clear`まで screening 済みであることを要求。未スクリーニングはヒットではないので④が③と分離して必要）⑤evidence-incomplete（発行は法域の必要書類checklist充足を要求）⑥**interest-or-credit-forbidden**（本actor固有の中核ルール、EMD2、無条件評価）⑦**insufficient-balance**（償還額を、提案を信用せずウォレットの実残高から独立に再計算）⑧**IBAN checksum invalid**（保全口座IBANのISO 7064 MOD 97-10を独立再検証——`banking.registry`/`cloud-itonami-isic-6419`が確立した同一アルゴリズムを`emi.registry`にverbatim移植）⑨post-closure-intake-blocked（解約済み(`:closed`)ウォレットへのintake経由変更を禁止）⑩intake-fabrication（`:wallet/intake`が`:balance`/`:emoney-record-id`/`:safeguarded-amount`/`:safeguarding-iban`や終端`:status`を偽造できないよう構造的に禁止、patchの`:id`とrequestの`:subject`の不一致も禁止）。SOFT: confidence-floor + actuation-gate（`:emoney/issue`/`:safeguarding/segregate`/`:redemption/redeem`は常にescalate）。加えて already-closed（二重発行/二重償還防止、専用`:status :closed`factで判定、statusの他の値からの推測はしない）。
+
+### 4. 実アクチュエーションは governor + phase の2層で構造的に常に人間専用
+
+`emi.governor`の actuation gate と `emi.phase`のフェーズ表（`:emoney/issue`／`:safeguarding/segregate`／`:redemption/redeem`はどのフェーズの`:auto`集合にも含まれない）の両方が独立に強制する。`test/emi/phase_test.clj`の`actuation-never-auto-at-any-phase`でリグレッションを機械的に検出する。
+
+### 5. R0 成熟度境界: MemStore-only、8法域spec-basis、DatomicStore/実統合は次のシーム
+
+本actorは`cloud-itonami-isic-6910`の初期R0と同じ成熟度で公開する: 実際に動くactor loop（advisor/governor/phase/registry/store/operation）、**MemStore-only**永続化（`DatomicStore`/`langchain.db`未実装、`cloud-itonami-isic-6419`/`-6910`が既に実証した`:db-api`駆動パターンを適用できる見込みだが本ADRの対象外）、全ての破壊的/規制対象アクションを人間承認でゲート。法域spec-basisは8法域（GBR/DEU/FRA/LTU/IRL/JPN/SGP + USAの構造差異ノート——米国には連邦レベルのEMIライセンス区分自体が存在せず、州ごとのmoney transmitter免許+FinCEN MSB登録という別構造であることを`emi.facts`の当該entryに正直に明記し、存在しない「米国EMIライセンス」を捏造しない）のみ——`emi.facts/coverage`で常に正直に報告し、水増ししない。60 tests / 188 assertions green、clj-kondo clean、`clojure -M:dev:run`で intake→法域assessment→KYC→発行(承認)→保全確認(承認)→償還(承認、ウォレット解約)の一連の流れと、二重解約タッチ・未解決制裁フラグ・法域spec-basis欠如・IBAN checksum不正・金利/与信密輸試行という複数HARD holdケースを実機確認済み。
+
+### 6. 配置: `cloud-itonami` org 直下に新規 repo `cloud-itonami-emi`、manifest 登録なし
+
+既存の `cloud-itonami-{ISIC}` 系列と同じ open business blueprint 慣例（ADR-2607011000/2607012000/2607012100）に従い、public/AGPL-3.0-or-laterでcloud-itonami org直下に直接発行する。EMIはISICコードではなくライセンス種別（EMD2の意味でのElectronic Money Institution）で分類されるため、repo名は`cloud-itonami-isic-XXXX`ではなく`cloud-itonami-emi`とする。既存の`cloud-itonami-{ISIC}`系列/`cloud-itonami-pi`と同様、`manifest/repos.edn`/`manifest/west.yml`への登録は本ADRの対象外（standalone。west登録は並行スキャフォールドされる複数actorが揃った後、別ステップでオーケストレータが一括登録する）。
+
+Repo URL: https://github.com/cloud-itonami/cloud-itonami-emi
+
+## Consequences
+
+- (+) cloud-itonami フリートに欠けていたEMD2の意味でのEMI actorのギャップを埋め、`-isic-6419`（銀行）・`-isic-6492`（信用）・`-isic-6619`（カード処理）・`cloud-itonami-card-issuing`（issuer-side、並行起票）・`cloud-itonami-pi`（PI送金execution、並行起票）との責務境界を明文化した。
+- (+) `cloud-itonami-isic-6910`のADR-0001が15のAddendumを経て実機再現の末に発見したgovernance-bypassバグクラス（特にeffect-mismatch）を、本actorはR0の時点で設計に織り込み済み。
+- (+) EMI固有の中核不変条件（e-money残高への与信/金利付与の禁止）を、単一opでなくあらゆる提案に対する無条件HARDチェックとしてgovernorに構造的に埋め込んだ。
+- (-) 法域カバレッジ8/194（`emi.facts/coverage`）。追加は1エントリ=1本物の公式ソース引用が原則。
+- (-) `DatomicStore` backend未実装（MemStoreのみ）、実safeguarding-bank統合・実KYC/制裁スクリーニングプロバイダ・実償還payoutレールは対象外（operatorの責務、設計通り）。
+- superprojectへの反映: 本ADRのみ（既存の`cloud-itonami-{ISIC}`blueprint群/`cloud-itonami-pi`と同じ慣例により`manifest/repos.edn`/`manifest/west.yml`には本ADR起票時点では登録しない=standalone。west登録は別ステップ）。
+
+## References
+
+- https://github.com/cloud-itonami/cloud-itonami-emi （実装リポジトリ、README.md + docs/adr/0001-architecture.md が対）
+- `90-docs/adr/2607246000-adult-content-payment-processor-banking-jurisdiction-research.edn`（起票の契機となった一次調査）
+- `90-docs/adr/2607031500-cloud-itonami-m6910-global-incorporation-actor.edn`（同型actorパターンの直近の先例、R0成熟度の手本）
+- `90-docs/adr/2607248000-cloud-itonami-pi-payment-institution-actor.edn`（並行起票された sibling actor、責務境界を相互参照）
+- `cloud-itonami-isic-6419`（banking.governor、IBAN/ISO 7064 MOD 97-10の先行実装、本actorの`emi.registry`が同一アルゴリズムを移植）
+- `cloud-itonami-isic-6492`（消費者信用、本actorの与信禁止non-goalの隣接sibling）
+- `cloud-itonami-isic-6619`（カード処理/acquiring、本actorとスコープが隣接するがオーバーラップしないsibling）"
+  :adr/decision-summary "{:new-actor \"cloud-itonami-emi\", :repo \"https://github.com/cloud-itonami/cloud-itonami-emi\", :pattern \"sealed EMI-LLM advisor + independent EMIGovernor + append-only audit ledger (same shape as cloud-itonami-isic-6419/-6910/cloud-itonami-pi)\", :scope \"EMD2/PSD2-style e-money issuance at par, wallet/balance custody, safeguarding-account confirmation (EMD2 Art.7), redemption on demand (EMD2 Art.11) -- general-purpose, not adult-industry-specific\", :non-goals [\"extending credit or interest against e-money balances (EMD2 prohibition, enforced unconditionally by emi.governor's :interest-or-credit-forbidden check)\" \"banking-license deposits (see cloud-itonami-isic-6419)\" \"real card issuance to a physical/virtual card program (see cloud-itonami-card-issuing)\" \"payment execution/remittance as a service to third-party merchants (see cloud-itonami-pi)\" \"consumer credit underwriting (see cloud-itonami-isic-6492)\"], :actuation-invariant \"`:emoney/issue`/`:safeguarding/segregate`/`:redemption/redeem` are never members of any `emi.phase` phase's `:auto` set, and `emi.governor`'s actuation high-stakes check always escalates them -- two independent layers enforce the same structural fact\", :license \"AGPL-3.0-or-later\", :org \"cloud-itonami\", :manifest-registration \"none yet -- standalone at ADR time, per the existing cloud-itonami-{ISIC}/cloud-itonami-pi convention; west registration deferred to a separate batch step\", :r0-scope {:jurisdictions-with-spec-basis [\"GBR\" \"DEU\" \"FRA\" \"LTU\" \"IRL\" \"JPN\" \"SGP\" \"USA (structural-difference note, no federal EMI category)\"], :store-backend \"MemStore only (Datomic/kotoba-server backend is a planned seam, not implemented)\", :tests \"60 tests / 188 assertions, lint clean\"}}"
+  :adr/deciders ["Jun Kawasaki" "Claude"]
+  :adr/date "2026-07-25"
+  :adr/amends []
+  :adr/supersedes []
+  :adr/superseded_by []}]
