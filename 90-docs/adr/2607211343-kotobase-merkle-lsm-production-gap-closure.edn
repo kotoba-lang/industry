@@ -16,7 +16,7 @@
   :adr/id "adr-2607211343-kotobase-merkle-lsm-production-gap-closure"
   :adr/doc_type "adr"
   :adr/date "2026-07-21"
-  :adr/last_verified "2026-07-23"
+  :adr/last_verified "2026-07-24"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/source-format "edn"
@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88], :latest-peer-main \"98afcb85cd98ae5bf9e1ba5d00f7017ebda96298\", :latest-host-main \"5eb0295e09f438c5e57be92637d25c861494b8dd\", :latest-worker-version \"20260723-page-reuse-10m\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91 92 93 94], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90], :latest-peer-main \"e0fb70b00be2f9a71898d0026052bd58f0224626\", :latest-host-main \"40eda058e0d96609f6e64cb0a95b20746cf84255\", :latest-worker-version \"20260723-page-reuse-10m\"}"
   :adr/body
   "# Context
 
@@ -598,6 +598,18 @@ resumable restoreのpage ordinal lookupは各levelで該当childを1件だけ選
 4,097 data pages、1,048,832 represented entriesのdeterministic synthetic shapeはdirectory 68 nodes、height 3、top children 2、top node 728 bytes、最大directory node 20,812 bytesだった。authority receiptは`kotobase-peer/bench/results/2026-07-24-database-inventory-v3-tree.edn`である。peer canonical local CIはJVM 242 tests/767 assertions、CLJS 248 tests/989 assertions、lint errors 0、R2 gateway 21 tests/67 assertions、全benchmark step green。さらにmerged peer mainをmerged host mainへ接続したcanonical local CIはcohort 18 assertions、JVM 76 tests/427 assertions、lint errors 0、Worker release build、13-entry authenticated disaster-restore smokeを含む全5 stepsがgreenだった。
 
 これでinventory root descriptorのO(page count) gapは閉じた。ただし数値receiptはsyntheticで、large live R2 treeのlatency/cost証跡ではない。backup graph discoveryのprocess-local `seen` set、legacy synchronous restoreの全entry materialization、CIDごと1 objectのverification marker、cross-account/region copy、production RTO/RPO、KMS、historical MVCC/on-disk q/pullは残る。次のbounded-memory優先順位はbackup traversal frontier/visited setの外部化とverification markerのpaged bitmap/partitioned frontier化である。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
+## 2026-07-24 Externally resumable bounded database backup
+
+peer PR #94（merge commit `e0fb70b00be2f9a71898d0026052bd58f0224626`）は、legacy synchronous backupのprocess-local `seen` setと全entry収集に依存しない外部backup executorを追加した。R2上のbackup ID固定pointerがhead/base/epochとphaseをETag-CASで保持し、CID単位のfrontier markerを`pending`/`done`で外部化する。各invocationは最大64 markerのbounded list/scanから最大1 content objectだけをCID検証・immutable backupし、`blocks/`のchild markerをparent完了より先に作成する。`objects/`はopaque leafである。namespace-CID entry indexもR2へcreate-onlyで外部化し、traversalの完全scan後だけinventory構築へ進む。
+
+inventory構築は最大256 entriesのdata pageを一度に1 pageだけ発行し、v3 directoryを64進carryとしてincremental構築する。pointerが保持する未確定descriptorは各level最大63件で、総page数ではなくtree heightに比例する。directory/data/rootはimmutable CID objectとしてpointer CASより先に発行するため、crash/retry時の重複effectはcontent-addressed idempotentである。completed pointer replayは同じinventory CIDを返し、同じbackup IDを別headへ移動しない。旧synchronous backupとinventory v1/v2/v3 read compatibilityは維持する。
+
+peer canonical local CIはJVM 242 tests/767 assertions、CLJS 248 tests/1000 assertions、lint errors 0、R2 gateway 21 tests/67 assertionsを含む全7 stepsがgreenだった。host PR #90（merge commit `40eda058e0d96609f6e64cb0a95b20746cf84255`）はservice bearer必須の`POST /v1/kotobase/database-backup-step`を公開し、進行中202、完了200、pointer fencing 409を返す。host E2Eはunauthorized/invalid request、started、traversal progress/completion、inventory page completion、terminal replayを通り、外部backup inventoryの13 entriesから13/13 restore、head publication、transaction replayまで成功した。host unit 76 tests/427 assertions、lint、Worker release buildもgreenである。
+
+これで新しいstep API経路のbackup traversalとinventory publicationはprocess-local O(total entries)から外れ、1 invocationのgraph work、listing、page emissionがboundedになった。Cloudflare KV、IStore、第二の論理DB modelは導入せず、mutable coordinationはR2 ETag-CAS、正本dataはimmutable datom/IPLD/CID graphのままである。
+
+正直な残存gapは、(1) 今回のbackup E2EがMemoryR2 small graphであり、live R2の1M/10M restart・RTO/RPO・operation cost receiptがない、(2) CIDごと1 frontier markerと1 entry-index objectによるO(entries) R2 object/operation cost、(3) completed/stale backup work prefixのbounded GC/retention policy、(4) cross-account/region copyとindependent failure-domain drill、(5) production KMS wrapping/rotation、(6) legacy synchronous backup/restore APIの撤去または管理者限定化、(7) historical MVCC/on-disk q/pullである。次のbounded-scale優先順位はmarker/indexのpaged bitmapまたはpartitioned frontier、backup work GC、live 1M restart drillとする。状態は`:production-partial`を維持する。
 
 # Consequences
 
