@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91], :latest-peer-main \"e82eac47282f7d96507130c9c8c61f6c918286a4\", :latest-host-main \"5bce3431e937b8696d84f62a078b42a0890c0003\", :latest-worker-version \"20260723-page-reuse-10m\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92], :latest-peer-main \"4bd918323da44eec909d04eb92f618169ec4ad2b\", :latest-host-main \"6ec5e40c19424a4507f3e6b51d079ba468f27925\", :latest-worker-version \"20260723-page-reuse-10m\"}"
   :adr/body
   "# Context
 
@@ -638,6 +638,18 @@ peer PR #97（merge commit `e82eac47282f7d96507130c9c8c61f6c918286a4`）はcompl
 host PR #91（merge commit `5bce3431e937b8696d84f62a078b42a0890c0003`）はservice bearer必須の`POST /v1/kotobase/database-backup-work-gc-step`を公開した。task IDと0〜30日のgraceを検証し、進行中202、terminal 200、active lease 409へ写像する。full ingress smokeはunauthorized 401、invalid 400、external database backup完了後の`started → deleted-page → completed`を確認し、そのcleanup後もv3 inventoryから13/13 restore、head publication、transaction replayを完了した。
 
 peer canonical local CIはJVM 242 tests/767 assertions、CLJS 250 tests/1025 assertions、lint errors 0、R2 gateway 21 tests/67 assertionsを含む全7 stepsがgreenだった。hostはJVM 76 tests/427 assertions、lint errors 0、Worker release build、full disaster-restore smokeがgreenである。これでsingle-task並行effect fencingと認証済みhost driver gapは閉じた。未完了はcron schedule、live R2 large-prefix/restart receipt、abandoned non-terminal cancel tombstone、global blocks/objects reachability GCのexternal mark set＋namespace cursorである。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
+## 2026-07-24 External mark set and namespace-cursor global GC
+
+peer PR #98（merge commit `4bd918323da44eec909d04eb92f618169ec4ad2b`）は、legacy `gc-unreachable!` が全reachable CIDと`blocks/`・`objects/` listingを一つのWorker processへmaterializeしていた経路に、移行用の`step-resumable-global-gc!`を追加した。task-scoped R2 prefixへpointer、CID mark、traversal frontier、candidateを外部化し、`marking → scanning blocks → scanning objects → sweeping → cleanup → completed`を再開可能に進める。data namespaceのLISTは1 invocation最大64 objectsでopaque cursorをpointerへ保存する。candidateはdata scan中に削除せず外部集合へ記録するため、cursor走査中の集合縮小によるkey skipを避ける。
+
+delete modeはcandidate集合を64件ずつ読み、initial root snapshotのCID tokenと直前snapshotが一致した場合だけ、既存のCID-verified immutable backup inventoryを発行してprimaryを削除する。root変更時は`:roots-changed`でabortし、mark cleanupも64件ずつ行う。dry-runは同じmark/scanを通るがprimaryを変更せずcleanupへ進む。旧synchronous APIはhost移行中の互換性のため残した。
+
+70-child DAG、opaque reachable object、block/object orphan各1件を持つdeterministic MemoryR2 fixtureは74 data objectsを走査し、全reachable objectを保持、2 orphanをbackup/delete、external markを全cleanupした。観測LIST pageは最大64だった。peer canonical local CIはJVM 242 tests/767 assertions、CLJS 251 tests/1039 assertions、lint errors 0、R2 gateway 21 tests/67 assertionsを含む全7 stepsがgreenである。
+
+host PR #92（merge commit `6ec5e40c19424a4507f3e6b51d079ba468f27925`）はservice bearer必須の`POST /v1/kotobase/global-gc-step`を公開した。task ID、0〜30日のgrace、boolean deleteを検証し、進行中202、completed 200、fenced/aborted 409へ写像する。full ingress smokeはunauthorized 401、invalid 400、dry-runのmarking/scanning/cleanup/completedを通過し、その後も13-object disaster restoreとtransaction replayを完了した。host canonical local CIはcohort 18 assertions、JVM 76 tests/427 assertions、lint errors 0、Worker release build、full smokeの全5 stepsがgreenだった。
+
+これで`blocks/`・`objects/`のreachable setとcandidate listingが総data object数に比例するprocess memory gapは閉じた。ただしroot catalog snapshot（heads、retention、resumable/restore/backup/ingress pointer）はまだ全件listingであり、global GC step自体のlease fencing、live R2 large-prefix restart/cost receipt、task work-prefix retention、abandoned non-terminal backup cancel tombstone、cron scheduleは未完了である。次はglobal GC leaseとroot-catalog cursor、次いでlive R2 restart drillを実装する。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
 
 # Consequences
 
