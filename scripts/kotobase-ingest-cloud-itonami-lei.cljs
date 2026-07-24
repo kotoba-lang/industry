@@ -45,10 +45,26 @@
             ["node:child_process" :refer [execSync]]
             [cljs.reader :as edn]
             [clojure.string :as str]
+            [nbb.core :refer [*file*]]
             [kotobase.client :as client]))
 
+;; BUG FIX (2026-07-25): this used to be `(path/dirname (aget js/process.argv 2))`,
+;; which assumed argv[2] is this script's own path — true for plain
+;; `node script.js`, but NOT true for how this script is actually invoked
+;; (`nbb --classpath <cp> <script.cljs> ...`). Under nbb, process.argv is
+;; [node, nbb-bin, "--classpath", <cp>, <script.cljs>, ...script-args], so
+;; argv[2] is literally the string "--classpath" — `path/dirname` on that
+;; returns "." (no path separator), silently resolving script-dir to
+;; whatever the *current working directory* happened to be at invocation
+;; time instead of scripts/. That misplaced the identity file and made a
+;; real run look like a "first run", minting a throwaway identity instead
+;; of reusing the persisted one. `nbb.core/*file*` is nbb's own supported
+;; way to get the absolute path of the file currently being executed
+;; (see node_modules/nbb/README.md "Current file") — it is invocation-shape
+;; agnostic (no dependence on argv position, flag count, or cwd), so this
+;; can't recur regardless of what flags precede the script path.
 (def script-dir
-  (path/dirname (aget js/process.argv 2)))
+  (path/dirname *file*))
 
 (def identity-path
   (path/join script-dir ".kotobase-ingest-cloud-itonami-lei-identity.hex"))
@@ -123,11 +139,30 @@
                   (println "FAIL" repo (.-message e))
                   {:repo repo :ok false :error (.-message e)})))))
 
+(def pace-ms
+  "Conservative delay between successive company ingests (on top of
+  kotobase-client's own per-request retry/backoff). Added after a 2026-07-25
+  incident where running all 159 repos back-to-back with no inter-request
+  pause drove a rising rate of real Cloudflare Worker 503 'exceeded resource
+  limits' failures against backend.kotobase.net (observed climbing from
+  ~6/16 to 27/40 as the unpaced run progressed) — a backend capacity/pacing
+  issue, not a client-side bug, so the fix here is to slow down, not retry
+  harder. Override via INGEST_PACE_MS env var if a future run needs to tune
+  it (e.g. faster once backend headroom is confirmed)."
+  (let [v (aget js/process.env "INGEST_PACE_MS")]
+    (if (and v (not (js/isNaN (js/parseInt v 10))))
+      (js/parseInt v 10)
+      2000)))
+
+(defn sleep [ms]
+  (js/Promise. (fn [resolve] (js/setTimeout resolve ms))))
+
 (defn run-sequential [repos]
   (reduce (fn [chain-p repo]
             (.then chain-p (fn [acc]
                              (-> (ingest-one! repo)
-                                 (.then (fn [r] (.concat acc #js [r])))))))
+                                 (.then (fn [r] (.concat acc #js [r])))
+                                 (.then (fn [acc2] (.then (sleep pace-ms) (fn [_] acc2))))))))
           (js/Promise.resolve #js [])
           repos))
 
