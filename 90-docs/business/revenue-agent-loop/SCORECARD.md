@@ -4,6 +4,8 @@
 **Revenue state:** verified external revenue = 0
 **Mode:** Cash-first 60% / Profit-first 40%
 **Important:** 数値は初期prior。外部conversion実績ではない。
+**Capital state:** T1 released ceiling ¥300,000; committed ¥0; spent ¥0.
+T2–T4 are held by ADR-2607246100.
 
 ## Ranked actions
 
@@ -32,12 +34,19 @@ cloud-itonami共通Terms/PrivacyはDRAFTで、operator、税務、DPAに未確�
 
 ## Current selection
 
-- **Selected:** cloud-itonami shared commercial closure
-- **Run:** `runs/0019-cloud-itonami-legal-site.md`
+- **Selected:** cloud-itonamiを基盤にした高単価AI Revenue/Sales Pipeline offerの
+  T1 founder-led validation。ただし外部勧誘はcommercial gate green後
+- **Run:** `runs/0020-capital-allocation-governor.md`
 - **Timebox:** 14日または20人時
-- **Score:** 5820 action 61/100、commercial hard gateは現在red
+- **Cash at risk:** 最大¥300,000。広告費は¥0
+- **Offer hypothesis:** ¥20k診断（導入へ全額充当）→ ¥300k–¥500k導入
+  → ¥80k/月運用
+- **T1 evidence gate:** 100 named accounts、最大200個別contact、qualified discovery
+  5件、proposal 3件、非owner実入金1件
+- **Score:** 新offerは外部conversion未観測のため未採点。5820 priorは61/100
 - **Operator:** AWAI Network, L.L.C.（owner confirmed）
-- **Next:** provision authorized Stripe test secret → exact one-time ¥20k test checkout → E2E → counsel/tax release
+- **Next:** commercial gateの残り（Stripe test E2E、登記・税務）を閉じ、
+  T1 runを開始できるbuyer segmentと100 named-account母集団を一つ選ぶ
 
 ## Known evidence
 
