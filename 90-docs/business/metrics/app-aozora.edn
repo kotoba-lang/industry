@@ -8,31 +8,31 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 10200, "app-aozora-appview" 11605},
+ {"app-aozora-pds" 10367, "app-aozora-appview" 11730},
  :zone
- {:requests-7d 43891,
-  :pageviews-7d 6443,
-  :uniques-7d-sum 779,
+ {:requests-7d 44557,
+  :pageviews-7d 6623,
+  :uniques-7d-sum 787,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 282548}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2897}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1718}
+    :requests 282377}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2898}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1719}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 282}
-   {:path "/xrpc/com.atproto.repo.listRecords", :requests 79}
-   {:path "/", :requests 77}
+   {:path "/", :requests 78}
+   {:path "/xrpc/com.atproto.repo.listRecords", :requests 78}
    {:path
     "/kotobase-cf-wasm-testnet/ipns/bafyreiduo47gjg2uocvlehvhvuwrskyms52dbqpeahqv5363fgijitfrde.json",
     :requests 46}
-   {:path "/federation-pilot/did.json", :requests 44}],
-  :status-mix {:ok 288440, :client-error 321, :server-error 8},
+   {:path "/federation-pilot/did.json", :requests 45}],
+  :status-mix {:ok 288457, :client-error 328, :server-error 8},
   :window "24h"},
  :as-of "2026-07-24",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 282548 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2897 · /xrpc/com.atproto.sync.subscribeRepos 1718 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 282 · /xrpc/com.atproto.repo.listRecords 79 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 282377 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2898 · /xrpc/com.atproto.sync.subscribeRepos 1719 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 282 · / 78 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 43891 req/7d・779 uniques(日次和)・うち4xx probe 0%(24h)、workers 21805 inv/7d"}
+ "aozora.app 実測 44557 req/7d・787 uniques(日次和)・うち4xx probe 0%(24h)、workers 22097 inv/7d"}
