@@ -1,0 +1,256 @@
+;; Month 3 Strangler-Fig Fleet Migration Execution Plan (2026-08-18 to 2026-09-18)
+;; ADR-2607072100 implementation timeline, gates, and rollback procedures
+;; Generated: 2026-07-21
+
+[{:db/id -1
+  :execution-plan/id "fleet-migration-month-3-execution"
+  :execution-plan/phase "month-3-final-fleet-migration"
+  :execution-plan/start-date "2026-08-18"
+  :execution-plan/end-date "2026-09-18"
+  :execution-plan/status "planned"
+  :execution-plan/owner "Jun Kawasaki"
+
+  :execution-plan/week-1-timeline
+  {:week "1 (2026-08-18 to 2026-08-24)"
+   :phase "final-validation-sentinel"
+   :objective "Confirm Month 2 traffic at 50% meets all SLO targets for 1 full week before go/no-go gate"
+   :actions
+   [{:day "Monday 2026-08-18"
+     :time "06:00 JST"
+     :task "Validation checkpoint review: collect all metrics from Month 2 weeks 3-4 (50% traffic period)"
+     :owner "ops-lead + murakumo-monitoring"
+     :acceptance-criteria
+     ["All metrics collected in metrics-ingest database"
+      "Parity checker logs exported (B2 audit trail)"
+      "GC tuning results from Month 2 evaluation available"
+      "Performance budget compliance verified"]
+     :rollback-trigger "Critical gaps in Month 2 baseline → abort, return to staging fix cycle"}
+
+    {:day "Monday-Tuesday 2026-08-18 to 2026-08-19"
+     :time "08:00-17:00 JST"
+     :task "Owner go/no-go decision gate: formal review of Month 2 parity validation results"
+     :owner "Jun Kawasaki (owner), ops-lead (co-chair)"
+     :acceptance-criteria
+     ["Parity failure rate < 0.01% (Month 2 50% traffic window)"
+      "p99 latency ≤ 100ms sustained (no spikes > 120ms for >5min)"
+      "Throughput loss < 1% vs Rust baseline"
+      "Memory per-instance ≤ 384MB peak post-GC"
+      "HTTP 5xx rate ≤ 0.1% (acceptable for 50% canary)"
+      "No unrecovered panics/crashes"
+      "Alert noise < 5 false positives per day"
+      "GC tuning (ZGC or Shenandoah) selected and baselined"]
+     :decision-options
+     [{:option "GO" :meaning "proceed to Week 1-2 traffic migration phase" :approval-required "owner"}
+      {:option "NO-GO" :meaning "return to staging pool, fix identified issues, defer Month 3 by 2 weeks" :approval-required "owner"}
+      {:option "GO-WITH-SLO-ESCALATION" :meaning "proceed with escalated performance budget (p99 105ms acceptable)" :approval-required "owner"}]
+     :expected-decision "GO or GO-WITH-SLO-ESCALATION by EOD 2026-08-19"}
+
+    {:day "Wednesday 2026-08-20"
+     :time "09:00 JST"
+     :task "Staging to Production traffic split configuration: prepare 50% → 60% jump"
+     :owner "murakumo-ops"
+     :acceptance-criteria
+     ["Traffic split configuration deployed to murakumo control-plane"
+      "Dry-run executed (no actual traffic shifted yet)"
+      "Rollback script tested (revert from 60% back to 50%)"
+      "Monitoring dashboards live and green (p99, throughput, parity, memory)"]
+     :rollback-trigger "Dry-run failure → abort, troubleshoot murakumo routing layer"}
+
+    {:day "Thursday 2026-08-21"
+     :time "10:00 JST"
+     :task "TRAFFIC MIGRATION GATE 1: Shift from 50% → 60% cljc traffic"
+     :owner "ops-lead (execute), murakumo-monitoring (observe), Jun Kawasaki (approval)"
+     :procedure
+     ["Announce 'Traffic Migration Step 1' in all monitoring channels"
+      "Set murakumo traffic-split cljc-percent = 60 (was 50)"
+      "Monitor: p99 latency, parity, throughput, 5xx rate for 60 seconds (immediate spike detection)"
+      "Stabilization window: 3 days (Thu-Sat), check metrics every 1 hour"]
+     :success-criteria
+     ["p99 latency ≤ 105ms (baseline 100 + 5ms grace)"
+      "parity divergence < 0.02% (pass rate > 99.98%)"
+      "throughput loss < 1%"
+      "memory per-instance ≤ 400MB"
+      "HTTP 5xx rate ≤ 0.1%"
+      "No new exceptions / panics observed"]
+     :failure-actions
+     [{:trigger "p99 latency > 110ms sustained 5min" :action "revert to 50%, investigate GC pause"}
+      {:trigger "parity divergence > 0.1% sustained 1min" :action "full revert to Rust (0%), debug app logic"}
+      {:trigger "5xx rate > 1% sustained 2min" :action "full revert to Rust (0%), investigate panic logs"}]}
+     :gate-decision "Pass → continue to 75% on Day 3. Fail → revert and troubleshoot"
+     :audit-log "Timestamp, traffic %, metrics snapshot, decision"}
+
+    {:day "Friday 2026-08-22"
+     :time "10:00 JST"
+     :task "TRAFFIC MIGRATION GATE 2: Shift from 60% → 75% cljc traffic"
+     :owner "ops-lead, murakumo-monitoring, owner approval"
+     :procedure
+     ["Check 24-hour stabilization: all metrics nominal at 60%"
+      "Set murakumo traffic-split cljc-percent = 75"
+      "Monitor 60 seconds (immediate spike detection)"
+      "Stabilization window: 3 days (Fri-Sun), check every 1 hour"]
+     :success-criteria
+     ["p99 latency ≤ 105ms"
+      "parity divergence < 0.02%"
+      "throughput no loss"
+      "memory ≤ 400MB"
+      "5xx ≤ 0.1%"]
+     :failure-actions
+     [{:trigger "p99 > 110ms sustained 5min" :action "revert to 60%"}
+      {:trigger "parity > 0.1% sustained 1min" :action "full revert to Rust (0%)"}
+      {:trigger "5xx > 1% sustained 2min" :action "full revert to Rust (0%)"}]
+     :gate-decision "Pass → continue to 90% on Day 4. Fail → revert"}
+
+    {:day "Saturday 2026-08-23"
+     :time "10:00 JST"
+     :task "TRAFFIC MIGRATION GATE 3: Shift from 75% → 90% cljc traffic"
+     :owner "ops-lead, monitoring, owner approval"
+     :procedure
+     ["Confirm 24-hour at 75%, metrics stable"
+      "Set cljc-percent = 90"
+      "Monitor 60 seconds, then 3-day window"]
+     :success-criteria
+     ["p99 ≤ 105ms, parity < 0.02%, throughput OK, memory ≤ 400MB, 5xx ≤ 0.1%"]
+     :failure-actions
+     [{:trigger "p99 > 110ms sustained 5min" :action "revert to 75%"}
+      {:trigger "parity > 0.1% sustained 1min" :action "full revert to Rust (0%)"}
+      {:trigger "5xx > 1% sustained 2min" :action "full revert to Rust (0%)"}]
+     :gate-decision "Pass → continue to 99% on Day 5. Fail → revert"}
+
+    {:day "Sunday 2026-08-24"
+     :time "10:00 JST"
+     :task "TRAFFIC MIGRATION GATE 4: Shift from 90% → 99% cljc traffic"
+     :owner "ops-lead, monitoring, owner approval"
+     :procedure
+     ["Confirm 24-hour at 90%, metrics stable"
+      "Set cljc-percent = 99 (only 1% Rust fallback)"
+      "Monitor 60 seconds, then 3-day window"
+      "Prepare Rust graceful drain procedure (scheduled for Week 2)"]
+     :success-criteria
+     ["p99 ≤ 105ms, parity < 0.02%, throughput OK, memory ≤ 400MB, 5xx ≤ 0.1%"]
+     :failure-actions
+     [{:trigger "p99 > 110ms sustained 5min" :action "revert to 90%"}
+      {:trigger "parity > 0.1% sustained 1min" :action "full revert to Rust (0%)"}
+      {:trigger "5xx > 1% sustained 2min" :action "full revert to Rust (0%)"}]
+     :gate-decision "Pass → execute final 100% cutover on Day 7 (Week 2). Fail → revert"}}
+
+   :sentinel-checklist
+   ["Monday-Tuesday: owner decision gate (all Month 2 metrics reviewed)"
+    "Wednesday: murakumo routing dry-run, dashboards live"
+    "Thursday: 50%→60%, pass 24h, then proceed"
+    "Friday: 60%→75%, pass 24h, then proceed"
+    "Saturday: 75%→90%, pass 24h, then proceed"
+    "Sunday: 90%→99%, pass 24h, monitor through Week 2"]
+   :week-1-success-criteria
+   ["Traffic at 99% by end of Week 1 (99% cljc, 1% Rust fallback)"
+    "All SLO metrics within budget at 99% load"
+    "No unrecovered exceptions"
+    "Rollback procedures tested and confirmed working"
+    "Rust graceful drain procedure staged for Week 2"]}
+
+  :execution-plan/week-2-timeline
+  {:week "2 (2026-08-25 to 2026-08-31)"
+   :phase "final-cutover-and-graceful-drain"
+   :objective "Complete 100% cljc traffic, gracefully shutdown Rust fleet, validate production-ready state"
+   :actions
+   [{:day "Monday 2026-08-25"
+     :time "10:00 JST"
+     :task "FINAL CUTOVER: Shift from 99% → 100% cljc traffic (implicit, last 1%)"
+     :owner "ops-lead, monitoring, owner approval"
+     :procedure
+     ["Confirm 72-hour stability at 99% (Friday-Sunday, all metrics green)"
+      "Announce 'Final Cutover Event' on monitoring channels"
+      "Set murakumo traffic-split cljc-percent = 100 (Rust pool = 0)"
+      "Monitor 60 seconds (all traffic now on cljc)"
+      "Verify no client-side errors / 5xx spikes"
+      "Activate Rust graceful shutdown procedure (see Rust drain below)"]
+     :success-criteria
+     ["100% traffic redirected to cljc pool"
+      "No HTTP 5xx errors on cutover"
+      "p99 latency ≤ 105ms"
+      "Parity checker confirms no divergence (no Rust responses to compare)"
+      "All in-flight Rust requests complete (30-second drain timeout)"]
+     :failure-action "If critical error within 5 min of cutover → emergency revert to 50% Rust"
+     :rollback-trigger "Any unhandled exception or SLO breach in first 60 seconds"
+     :gate-decision "Success → proceed to Rust pool shutdown. Failure → emergency revert"}
+
+    {:day "Monday-Tuesday 2026-08-25 to 2026-08-26"
+     :time "10:00-18:00 JST"
+     :task "Rust fleet graceful drain and decommissioning"
+     :owner "ops-lead + infra-team"
+     :detailed-procedure
+     [{:step "1. Health check disable" :action "Disable health checks on Rust node pool (all 7 nodes marked unhealthy)" :timeout "2 min" :automation "murakumo/set-node-unhealthy [rust-node-1 … rust-node-7]"}
+      {:step "2. Connection drain" :action "Graceful timeout (30 seconds) for in-flight HTTP requests to complete" :timeout "30 sec" :automation "murakumo/graceful-shutdown :timeout 30000"}
+      {:step "3. Process shutdown" :action "SIGTERM to kotoba-server processes on each Rust node (murakumo-family/murakumo/bin/stop-server.sh)" :timeout "10 sec per node" :automation "ssh <node> 'systemctl stop murakumo-kotoba-server'"}
+      {:step "4. Port release" :action "Verify port :8077 (kotoba-server HTTP) no longer in use (netstat -an | grep 8077)" :timeout "5 sec per node" :automation "ssh <node> 'netstat -an | grep 8077' (should be empty)"}
+      {:step "5. Workdir cleanup (optional)" :action "Archive logs/state to B2 DataLad, optionally delete ~/murakumo-kotoba-server-run/ (keep git history)" :timeout "5 min" :automation "ssh <node> 'tar -czf murakumo-kotoba-server-final-$(date +%s).tar.gz ~/murakumo-kotoba-server-run && aws s3 cp … s3://kotobase.b2/'"}]
+     :success-criteria
+     ["All 7 Rust nodes no longer respond on :8077"
+      "murakumo control-plane confirms 0 nodes in Rust pool"
+      "No client-side connection refused errors"
+      "Logs archived to B2"]
+     :rollback-instruction
+     ["If Rust drain fails mid-way → restart kotoba-server on affected node (systemctl start murakumo-kotoba-server), return traffic split to 50%, investigate issue"]
+     :audit-trail
+     ["Timestamp, node name, step completed, result (success/failure), duration"
+      "Log all to murakumo metrics with :event/type :rust-drain"]}]
+
+   :week-2-success-criteria
+   ["Traffic at 100% cljc by end of Week 2"
+    "Rust fleet fully decommissioned"
+    "All SLO metrics stable and within budget"
+    "Performance baseline captured"]}
+
+  :monitoring-dashboards
+  {:live-dashboard "Fleet Migration - Month 3 Live (murakumo-metrics)"
+   :panels
+   [{:panel "Traffic Split (%)"
+     :metric "murakumo_traffic_cljc_percent"
+     :target "100"}
+    {:panel "Latency p99"
+     :metric "http_latency_p99"
+     :threshold "≤100ms (hard budget)"}
+    {:panel "Parity Failure Rate"
+     :metric "parity_checker_divergence_rate"
+     :threshold "≤0.01% (Week 1 only)"}
+    {:panel "HTTP 5xx Rate"
+     :metric "http_5xx_rate"
+     :threshold "≤0.1% (phase-specific)"}
+    {:panel "JVM Heap Peak"
+     :metric "jvm_heap_peak_mb"
+     :threshold "≤384MB (phase-2) / ≤256MB (phase-3)"}]}
+
+  :rollback-procedures
+  {:automatic
+   [{:trigger "p99 > baseline+100ms for 5min"
+     :action "revert traffic split by 15%"}
+    {:trigger "parity > 1% for 1min"
+     :action "full revert to Rust (0%)"}
+    {:trigger "5xx > 1% for 2min"
+     :action "full revert to Rust (0%)"}]}
+
+  :rust-fleet-decommissioning
+  {:procedure
+   [{:step "1. Disable health checks (mark unhealthy)"
+     :nodes "all 7 Rust nodes"}
+    {:step "2. Graceful connection drain (30 sec)"
+     :nodes "all 7"}
+    {:step "3. SIGTERM to kotoba-server processes"
+     :nodes "all 7"}
+    {:step "4. Port verification (8077 free)"
+     :nodes "all 7"}
+    {:step "5. Archive logs to B2 + DataLad"
+     :nodes "all 7"}]}
+
+  :validation-gates
+  [{:gate "Week 1, Day 1" :criterion "Month 2 50% traffic baseline stable" :decision "Go/No-Go"}
+   {:gate "Week 1, Day 3" :criterion "50%→60% traffic shift stable 24h" :decision "Proceed to 75%"}
+   {:gate "Week 1, Day 4" :criterion "60%→75% traffic shift stable 24h" :decision "Proceed to 90%"}
+   {:gate "Week 1, Day 5" :criterion "75%→90% traffic shift stable 24h" :decision "Proceed to 99%"}
+   {:gate "Week 1, Day 6" :criterion "90%→99% traffic shift stable 24h" :decision "Proceed to 100%"}
+   {:gate "Week 2, Day 1" :criterion "99% traffic stable 72h (Fri-Sun)" :decision "Execute 100% cutover"}
+   {:gate "Week 2, Day 3" :criterion "Rust fleet graceful shutdown complete" :decision "Performance baseline capture"}
+   {:gate "Week 2, End" :criterion "100% cljc traffic stable 1 week" :decision "Month 3 complete"}]
+
+  :follow-up
+  {:phase-4 "Other mesh app migration (kenchi, kotodama-bot) — Month 4+ after Month 3 stabilization"
+   :sustainability "Monthly performance review, quarterly capacity planning, annual security audit"}}]
