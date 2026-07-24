@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91 92 93 94 95], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90], :latest-peer-main \"5584164d77f827f6ceb44399f5a06b5d32502a8c\", :latest-host-main \"40eda058e0d96609f6e64cb0a95b20746cf84255\", :latest-worker-version \"20260723-page-reuse-10m\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90], :latest-peer-main \"7f6fd8c8dc824e5b3ba07e5f812089d10ce66352\", :latest-host-main \"40eda058e0d96609f6e64cb0a95b20746cf84255\", :latest-worker-version \"20260723-page-reuse-10m\"}"
   :adr/body
   "# Context
 
@@ -620,6 +620,16 @@ peer PR #95（merge commit `5584164d77f827f6ceb44399f5a06b5d32502a8c`）は、R2
 deterministic MemoryR2 testではbackup roots 2件のうち、最近更新されたactive `traversing` pointer/frontier 2 objectsを保持し、古い`completed` pointer/frontier/entry 3 objectsだけをbackup/deleteした。peer canonical local CIはJVM 242 tests/767 assertions、CLJS 249 tests/1011 assertions、lint errors 0、R2 gateway 21 tests/67 assertionsを含む全7 stepsがgreenだった。
 
 これでcompleted/abandoned external backup workが無期限に蓄積するlifecycle gapは閉じた。ただし現在のglobal GC audit自体は全candidate listingを一回のprocessへmaterializeする既存設計であり、大規模work prefixに対するGC execution memoryはまだbounded/resumableではない。また1 CIDあたりfrontier marker＋entry indexというO(entries) object/operation costは不変である。次はGC candidate inventory/page cursorのresumable化、marker/indexのpaged bitmapまたはpartitioned frontier、live R2 1M restart/cost drillを優先する。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
+## 2026-07-24 Durable page-bounded completed backup-work sweep
+
+peer PR #96（merge commit `7f6fd8c8dc824e5b3ba07e5f812089d10ce66352`）は、completed database-backup work専用のtask-scoped resumable sweeperを追加した。R2 ETag-CAS pointerがtask ID、grace、opaque listing cursor、scanned/deleted count、直近のrestore inventoryを保持する。1 invocationは最大64 objectsだけをlistし、graceを超えた`completed` prefixのfrontier/entry objectsだけを対象にする。`traversing`、`indexing`、`finalizing`を含む全non-terminal prefixとcompleted terminal pointerは削除しない。
+
+候補pageは既存CID-verified backup inventoryを発行してからdeleteする。deleteでlisting集合が縮んだstepはcursorを必ず先頭へ戻し、削除なしのpageだけopaque cursorを進めるため、offset型実装でもkey skipを起こさない。pointer CAS敗北はfenced resultとなり、task ID/grace mismatchはfail closedである。同task terminal replayは累積countを返す。
+
+70 stale entry、completed terminal pointer、active pointer/frontierのdeterministic fixtureでは、64-object上限の中で61＋9 entriesを2 delete pagesへ分割し、全70 entryを削除した。terminal pointerとactive workは残存した。peer canonical local CIはJVM 242 tests/767 assertions、CLJS 250 tests/1023 assertions、lint errors 0、R2 gateway 21 tests/67 assertionsを含む全7 stepsがgreenだった。
+
+これでbackup external coordination cleanupの一回あたりlisting/candidate/backup inventory working setは64 objectsへboundedになった。ただしこのexecutorはcompleted backup work専用であり、blocks/objectsのglobal reachability mark、restore marker、ingress/resumable pointerを含む既存global GC auditは依然全candidateをmaterializeする。また同taskの同時executorに対するeffect lease、abandoned non-terminal backupの明示cancel tombstone、host/cron route、live R2 large-prefix receiptは未完了である。次はlease付きhost driver、次いでglobal mark/sweep namespace cursorとexternal mark setを実装する。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
 
 # Consequences
 
