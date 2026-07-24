@@ -1,0 +1,79 @@
+# Scheduled fulfillment of kotoba-lang/loop-system-dynamics's own
+# `:wire-live-observe` leverage item (cloud_itonami_leverage.cljs) and a
+# real cron home for its sibling `:automate-age-lag-monitor` check (already
+# `:landed` there, but never actually wired to a schedule until now).
+#
+# Both loop-system-dynamics.cloud-itonami-live-diff and
+# loop-system-dynamics.cloud-itonami-age-lag-monitor are self-contained
+# (`fs`/`child_process` + clojure.string/set only, no kotoba-lang/dynamics
+# or other cross-repo classpath deps) and take a single `<superproject-root>`
+# arg to read `manifest/west.yml` from. Neither tool needs a full clone of
+# cloud-itonami's ~1155 repos -- both call `gh api orgs/cloud-itonami/repos`
+# internally (the org and its repos are public, so the runner's default
+# GITHUB_TOKEN is sufficient; no cross-org secret needed).
+#
+# This workflow deliberately lives HERE (com-junkawasaki/root), not in
+# kotoba-lang/loop-system-dynamics itself, because `manifest/west.yml` is
+# private to this repo -- a workflow in loop-system-dynamics (public) would
+# need a cross-repo PAT/secret to read it, which does not currently exist
+# (checked via `gh secret list --repo kotoba-lang/loop-system-dynamics`:
+# none). Running here instead gets manifest/west.yml for free from this
+# repo's own checkout, and only needs to shallow-clone the PUBLIC
+# kotoba-lang/loop-system-dynamics repo for the tool source -- the same
+# public-repo-shallow-clone pattern repo-reality-verify.yml already uses.
+#
+# age-lag-monitor already has real CI-ready semantics (exits 1 on a
+# genuine stall, per its own bin/run_cloud_itonami_age_lag_monitor.cljs
+# docstring) -- that exit code is this job's actual pass/fail gate.
+# live-diff is intentionally report-only: new codes appearing is normal
+# fleet growth, not a regression, so it does not gate the job -- its
+# output (new/removed/flip counts) is left in the run log for a human to
+# read, matching this session's own "a DIFF/REPORT tool, not a silent
+# seed-rewriter" framing in cloud_itonami_live_diff.cljs's docstring.
+name: cloud-itonami-live-observe
+
+on:
+  schedule:
+    - cron: "30 4 * * *"   # 毎日 04:30 UTC。既存5本の cron (01:17/06:17/06:00月/07:43) を避ける。
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: [.github/workflows/cloud-itonami-live-observe.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  live-observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nbb
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Shallow-clone kotoba-lang/loop-system-dynamics (public, tool source only)
+        run: git clone --depth 1 https://github.com/kotoba-lang/loop-system-dynamics.git /tmp/loop-system-dynamics
+
+      # Both tools' default resource/seed paths (e.g. resources/cloud-itonami-isic-isco-sysml-seed.edn)
+      # are relative to the TOOL's own repo root, not this repo -- each step's working-directory is
+      # therefore the clone, and the superproject-root arg (an explicit path, unrelated to cwd) points
+      # back at $GITHUB_WORKSPACE (this checkout) so manifest/west.yml is found there. nbb is invoked
+      # by its installed-here binary path since `npx` would not resolve it from a different cwd.
+      - name: Run cloud-itonami-live-diff (report-only -- new codes are normal growth, not a regression)
+        working-directory: /tmp/loop-system-dynamics
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: $GITHUB_WORKSPACE/node_modules/.bin/nbb --classpath src bin/run_cloud_itonami_live_diff.cljs "$GITHUB_WORKSPACE"
+
+      - name: Run cloud-itonami-age-lag-monitor (gates the job -- exits 1 on a real stall)
+        working-directory: /tmp/loop-system-dynamics
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: $GITHUB_WORKSPACE/node_modules/.bin/nbb --classpath src bin/run_cloud_itonami_age_lag_monitor.cljs "$GITHUB_WORKSPACE"
