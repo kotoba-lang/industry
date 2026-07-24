@@ -1,0 +1,80 @@
+[{:db/id -1
+  :adr/id "adr-2607250100-kotobase-maturity-bar-vs-production-databases"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-maturity-bar-vs-production-databases"
+  :adr/title "ADR-2607250100: kotobase 成熟度バー — RisingWave / Neo4j / Datomic 基準の定義と現在地"
+  :adr/status "accepted"
+  :adr/date "2026-07-25"
+  :adr/last_verified "2026-07-25"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["kotobase が「production database と同じ基準」を満たすと主張するための軸と gate の正本"
+   "各軸の現在地（measured / partial / gap）の追跡台帳（更新は adr-ledger 経由）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related
+  ["adr-2607244000-kotobase-merkle-lsm-streaming-spill-compaction"
+   "adr-2607211343-kotobase-merkle-lsm-production-gap-closure"
+   "adr-2607201600-kotobase-merkle-lsm-istore-retirement"]
+  :adr/decision-summary
+  "{:bar-definition [:documented-guarantee :measured-evidence :operational-gate], :axes [:performance-envelope :bounded-resource-scale :durability-recovery :query-surface :consistency-model :operations-slo :client-sdk :incremental-views], :as-of \"2026-07-25\", :peers {:datomic :single-writer-acid, :neo4j \"Aura Pro $65/GB-mo, BC 99.95% SLA\", :risingwave :incremental-mv-streaming-sql}}"
+  :adr/artifacts
+  "{:receipts \"orgs/kotoba-lang/kotobase-peer/bench/results/*.edn\", :serving-testplan \"orgs/gftdcojp/net-kotobase/kotobase-cf-wasm/TESTPLAN.md\", :qualification \"orgs/kotoba-lang/kotobase/qualification/*.edn\", :topology-analysis \"scratchpad kotobase-topology-analysis.cljs (dynamics 計算, 2026-07-25 session)\"}"
+  :adr/body
+  "# Context
+
+オーナー目標（2026-07-25）: 「kotobase の成熟度を RisingWave / Neo4j / Datomic と同じ基準まで引き上げる」。この目標を反証可能にするには『同じ基準』の操作的定義が要る。本 ADR はその定義（バー）と、軸ごとの実測ベース現在地を正本化する。以後の現在地更新は本文書き換えでなく adr-ledger append で行う。
+
+**バーの定義**: ある軸で peer 級と主張してよいのは、①保証が文書化され（consistency / durability / limits を含む）、②実測 evidence（receipt / 実測 ADR）で裏付けられ、③CI か運用 gate が回帰を検出する — の 3 点が揃ったときのみ。
+
+# 現在地（2026-07-25、全て日付・出典付き実測）
+
+## 軸 1: 性能包絡（measured — peer 比の位置も定量化済み）
+- engine read: materialized point p50 13ms / R2 越し ~34ms / browser warm 27-30ms（bench/results 2026-07-21〜22 receipt）。
+- serving read（kotobase.net backend、2026-07-24 の 4 パス改善後）: repeat ~0.5s / distinct warm 0.24-0.49s / cpuTime 24-440ms（改善前 1,550ms）。フロア ~400ms は NRT→B2 head GET。
+- write: server p50 1.7s（B2 4 直列 RTT + read-back 検証）、engine local 13.3ms。
+- ingest: merkle-lsm 1,102 rows/s @1M（2026-07-24 receipt）。
+- peer 比（公表値, 2026-07 取得）: Postgres/Neo4j の point read 0.1-10ms・write 0.5-10ms に対し serving は 1-2 桁劣後（ただし比較は同一ワークロード直接対決ではない）。Neo4j Aura Pro は $65/GB-mo — 価格は 4 桁優位。
+- 残 gap: 同一ハード同一ワークロードの直接対決 receipt が無い。
+
+## 軸 2: 有界リソースでのスケール gate（Stage A 実装済み・gate 実行）
+- ADR-2607244000 の要件（peak RSS O(partition)）に対し、`compact-run-readers-streaming`（emit! streaming + per-level 冪等 retention）+ 階層 fan-in spill ハーネス（stream-bench）を実装。
+- 実測: 100k datoms を **-Xmx1g / peak RSS 938MB** で row 保存完走（in-memory ハーネスは同スケールで 4.88GB）。
+- gate-1M（-Xmx4g）: 本 ADR 起票時点で実行中 — 結果は adr-ledger に append する。gate-10M（-Xmx8g）はその次。
+- peer 参照: Datomic/Neo4j/RisingWave はいずれも TB 級運用実績。kotobase の主張可能域は gate が通った規模のみ。
+
+## 軸 3: 耐久性・復旧（policy 定義済み・evidence 未検証 = gap）
+- qualification/ に recovery-policy（RTO 600s / RPO 300s / 2 region / restore drill 必須 / lost-key fail-closed）、operations-policy（evidence 30 日以内）、retention-policy（破壊操作 2-principal）実在。
+- ただし本セッションでは drill evidence の鮮度を検証していない — 「定義済み・実測未確認」が誠実な現在地。peer（Aura BC: PITR + 99.95% SLA、RisingWave: S3 checkpoint 復旧）に対し、gate ③（自動検証）が未接続。
+
+## 軸 4: クエリ表面（部分 — 誠実な近似が文書化済み）
+- 実装: Datalog（map-form + triple、cost-based 並べ替え、batched join）、pull/pullMany、19 read method（asOf/since/history 等は honest approximation と明記）、web/geo 検索の Datalog コンパイル。
+- 未実装: SPARQL / Cypher / GraphQL / Gremlin（ADR-2607172500 accepted、設計のみ）。negation/aggregation/recursive rules は staged roadmap。
+- peer 比: Neo4j Cypher / Datomic datalog のフル表面には未達。差分は列挙済みで silent ではない。
+
+## 軸 5: 一貫性・並行性モデル（documented — 弱点込みで実測済み）
+- single-head CAS + 署名付き IPNS head。B2 に条件付き書込が無いため write-then-read-back の race window を意図的 trade-off として文書化。同一グラフ並行 write は N=50 で 28/50 conflict（実測）。
+- Datomic の single-writer ACID に構造は同型だが、transactor 相当の直列化点が弱い（read-back 検出）。「文書化された保証」は満たす。強い transaction は docs/ 設計継続中。
+
+## 軸 6: 運用 SLO（gap）
+- SERVICE-LEVELS.md は alpha 目標のみで latency p50/p95 目標値なし。Aura BC 99.95% 級の SLA 主張には SLO 定義 + 計測 + 違反 alert が必要。cron の zone-analytics 取り込みは存在するが SLO 判定に接続されていない。
+
+## 軸 7: client SDK（early）
+- @gftd/kotobase-datomic（CACAO mint + datomic plane、wire 互換テスト有）+ CLI。peer の成熟 SDK 群（多言語・ORM 統合）には遠い。
+
+## 軸 8: incremental / materialized views（RisingWave 軸 — engine は measured、serving 統合は partial）
+- IVM: delta 適用 744 rows/s @10k+1k、materialized statistics で planner 3 桁高速化、R2 range GET serving p50 21ms — 全て receipt。
+- serving 統合: hydrated-rows の colo 共有 cache まで landed（2026-07-24）。MV を第一級 serving 面として顧客に露出する API は未提供。
+
+# Decision
+
+1. 上記 8 軸・バー 3 条件を kotobase 成熟度の正本とする。『RisingWave/Neo4j/Datomic と同じ基準』という主張は、軸ごとにこのバーを通した範囲でのみ行う。
+2. 優先順（レバレッジ順・2026-07-25 の dynamics 分析と整合）: 軸 2 の gate 系列（進行中）→ 軸 6 SLO 定義+計測接続 → 軸 3 drill evidence の自動検証接続 → 軸 4 の宣言済み surface（SPARQL/Cypher）→ 軸 1 の同一ワークロード直接対決 receipt。
+3. 現在地更新は adr-ledger append（type: note/amend）で行い、本文は書き換えない。
+
+# Consequences
+- 『成熟度を引き上げた』という報告は常に軸×バーの表で行える（劇場化した総論を排除）。
+- 未達軸が明示されるため、marketing 上の過大主張を構造的に防ぐ。"}]
