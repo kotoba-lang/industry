@@ -896,22 +896,30 @@ JS エンジン（Node/browser）ホスト・新規 Rust 実行エンジンの�
   kotoba-lang 全体に「Rust が必要な実装は全て cljc」を明文化済み
   （kotoba-lang/kotoba 自身の旧 ~38万行 Rust crate 群を撤去した実績が根拠）。
   wasmtime 埋め込みホスト等を新規 Rust で書くのはこの accepted ADR に反する。
-- **唯一許容される非 cljc コードは、OS 実行ファイル形式が要求する最小限の
-  エントリポイント（crt0 相当）シムだけ**（`kotoba-lang/aiueos` の `os/aiueos`
-  ベアメタル profile が先例——Rust runtime crate は持たないが C+asm は境界で
-  許容）。汎用ランタイムやRust代替としてのC導入はこの例外に含まれない。
+- **許容される非 cljc コードは「判断を含まない機構 (mechanism) 層」だけ**
+  （ADR-2607241100 D6 / aiueos ADR-0015 で従来の「crt0 相当シムのみ」表現を
+  実態に合わせて再定義、2026-07-24）。実測: `kotoba-lang/aiueos` の
+  `os/aiueos/kernel` は C/asm 約5,000行超（pci.c 1178 / main.c 690 /
+  scheduler.c 570 等）を持つが、**C はレジスタ/MMIO/GDT/IDT/ページング等の
+  機構のみを所有し、判断（SHA-256/RSA-2048 検証・ELF/catalog/journal
+  admission・capability 発行/委譲/世代付き失効・dispatch 計画）はすべて
+  compiler-emit の `.kotoba` オブジェクト**。レビュー可能な性質は
+  「decision-free C mechanism」であり、新しい admission/validation 経路は
+  必ず Kotoba object として書く（C に判断ロジックを足さない）。汎用ランタイム
+  や Rust 代替としての C 導入は引き続きこの例外に含まれない。
 - **`kotoba-lang/compiler` に、まさにこれを実現するネイティブ AOT バックエンドが
-  既に実在する**: `src/kotoba/compiler/backend/x86_64.clj`（289行）/
-  `backend/aarch64.clj`（186行）——生の機械語オペコードを直接 cljc で手書き
+  既に実在する**: `src/kotoba/compiler/backend/x86_64.cljc`（797行）/
+  `backend/aarch64.cljc`（735行）——生の機械語オペコードを直接 cljc で手書き
   emit（SysV/AAPCS64 ABI、fuel計測、末尾自己再帰最適化、`pair`ヒープアリーナ）。
   `test/kotoba/compiler/native_executor_test.clj` で実ネイティブプロセス実行
-  （`result 42`・trap/signal検知・ヒープアリーナ動作）を証明済み。非cljcコードは
-  `tools/kexe_loader.c`（+ `_windows.c`、SHA256ピン留め・レビュー済み）という
-  crt0相当シムのみ。**新しいネイティブ実行経路を探す前に、まずこのバックエンドを
+  （`result 42`・trap/signal検知・ヒープアリーナ動作）を証明済み。ホスト側の
+  非cljcコードは `tools/kexe_loader.c`（+ `_windows.c`、SHA256ピン留め・
+  レビュー済み）。**新しいネイティブ実行経路を探す前に、まずこのバックエンドを
   確認する（ゼロから設計しない）。**
-- 現状のギャップ: この native backend は `kgraph-assert!`/`kgraph-query`
-  （EAVT datom-store capability）をまだサポートしない——`pair`/ヒープアリーナと
-  純計算のみ（同 repo の `backend/wasm.cljc` と同じ限定的 op-surface）。
-  この capability を必要とする guest を真にネイティブ実行で証明するには、
-  同じ `pair`-arena のパターンを踏襲して native backend に移植する必要がある。
-  詳細・調査経緯は ADR-2607198300 / ADR-2607198200 を参照。
+- ~~現状のギャップ: この native backend は `kgraph-assert!`/`kgraph-query` を
+  まだサポートしない~~ **→ 解消済み（2026-07-24 実測、adr-ledger seq 41 で
+  ADR-2607198300 に amend 済み）**: x86_64/aarch64 backend は
+  `kgraph-assert!`/`kgraph-get`/`kgraph-count`/`kgraph-entity-at` を実装済みで、
+  `native_executor_test.clj` の kgraph-native-customer-pilot が実 kexe loader
+  実行で証明している。この capability gap を理由に native 経路を避けない。
+  詳細・調査経緯は ADR-2607198300 / ADR-2607198200 / ADR-2607241100 を参照。
