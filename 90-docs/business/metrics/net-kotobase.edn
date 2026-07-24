@@ -1,24 +1,30 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 6182, "kotobase-cf-wasm-staging" 586},
+ {"net-kotobase" 6384, "kotobase-cf-wasm-staging" 767},
  :zone
- {:requests-7d 10799,
-  :pageviews-7d 481,
-  :uniques-7d-sum 779,
+ {:requests-7d 10844,
+  :pageviews-7d 485,
+  :uniques-7d-sum 781,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 68}
-   {:path "/health", :requests 33}
-   {:path "/api/funnel", :requests 27}
-   {:path "/robots.txt", :requests 26}
-   {:path "/install-v2.sh", :requests 3}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 2}
-   {:path "/mcp", :requests 2}
-   {:path "/cdn-cgi/trace", :requests 2}],
-  :status-mix {:client-error 406, :ok 167, :server-error 2},
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 263}
+   {:path
+    "/kotobase-cf-wasm-production/ipns/bafyreicd2vxdg2gccquyfjb34w7di6plng6yohqovga5fu2z6dm7kthq6a.json",
+    :requests 220}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.pull", :requests 88}
+   {:path "/", :requests 67}
+   {:path
+    "/bafyreig2ayrxnilkyxynxmvgsx5wltkfofhppwcece4rhmuekagvqdftfm",
+    :requests 44}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact", :requests 36}
+   {:path
+    "/bafyreicvamrilmhdny5w76bthbfp76jn3kl2t7c34jzdbjkcdkac2mvx4a",
+    :requests 34}
+   {:path "/health", :requests 33}],
+  :status-mix {:client-error 462, :ok 1276, :server-error 82},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,9 +36,9 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-24",
- :traffic-quality {:window "24h", :probe-4xx-pct 71, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 25, :error-5xx-pct 5},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 68 · /health 33 · /api/funnel 27 · /robots.txt 26 · /install-v2.sh 3 | 4xx(probe) 71% · 5xx 0%",
- :funnel {:visitors 1211, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.q 263 · /kotobase-cf-wasm-production/ipns/bafyre… 220 · /xrpc/ai.gftd.apps.kotobase.datomic.pull 88 · / 67 · /bafyreig2ayrxnilkyxynxmvgsx5wltkfofhppw… 44 | 4xx(probe) 25% · 5xx 5%",
+ :funnel {:visitors 1215, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 10799 req/7d・779 uniques(日次和)・うち4xx probe 71%(24h)、workers 6768 inv/7d、Stripe active subs 0"}
+ "kotobase.net 実測 10844 req/7d・781 uniques(日次和)・うち4xx probe 25%(24h)、workers 7151 inv/7d、Stripe active subs 0"}
