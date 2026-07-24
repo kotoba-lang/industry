@@ -24,7 +24,7 @@
   :adr/decision-summary
   "{:state :production-partial, :canonical-model :datom, :physical-store :ipld-merkle-lsm-on-r2, :mutable-point :single-head-cas, :istore :prohibited-and-pruned, :priority-order [:p0-correctness-retention :p1-bounded-scale :p2-query-and-derived-indexes :p3-durability-and-operations], :release-scale [1000 100000 10000000], :production-provider :cloudflare-r2}"
   :adr/artifacts
-  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93], :latest-peer-main \"a1d911c1b11039fdb6f052056d1fae63d9c6ac37\", :latest-host-main \"287c5b1cf032655d0e1ed585ac3dba0cb2e07137\", :latest-worker-version \"20260723-page-reuse-10m\"}"
+  "{:peer \"orgs/kotoba-lang/kotobase-peer\", :host \"orgs/gftdcojp/local-murakumo\", :bucket \"kotobase-merkle-lsm\", :baseline-adr \"90-docs/adr/2607201600-kotobase-merkle-lsm-istore-retirement.edn\", :merged-peer-prs [22 23 24 25 26 27 29 30 31 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100], :merged-host-prs [57 58 59 60 61 62 63 64 65 66 67 68 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93], :latest-peer-main \"51ecfa9bd5fddbf77c5b16aeae0a7240a3a5717f\", :latest-host-main \"287c5b1cf032655d0e1ed585ac3dba0cb2e07137\", :latest-worker-version \"20260723-page-reuse-10m\"}"
   :adr/body
   "# Context
 
@@ -658,6 +658,12 @@ peer PR #99（merge commit `a1d911c1b11039fdb6f052056d1fae63d9c6ac37`）はgloba
 70-child/74-object fixtureはactive contenderの`:leased`、expiry後reclaim、全phase完了、2 orphan backup/deleteを通過した。CLJSは251 tests/1042 assertions、lint errors 0。host PR #93（merge commit `287c5b1cf032655d0e1ed585ac3dba0cb2e07137`）は`:leased` phase/statusをHTTP 409へ写像し、通常progress 202とcompleted 200を維持する。
 
 これで同一global GC taskの並行effect fencing gapは閉じた。未完了の最優先はroot catalog snapshot（heads、retention、resumable/restore/backup/ingress）のpage cursor＋external root set化である。その後にlive R2 large-prefix restart/cost receipt、global GC work-prefix retention、cron schedule、abandoned non-terminal backup cancel tombstoneが残る。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
+## 2026-07-24 Page-bounded external root catalog
+
+peer PR #100（merge commit `51ecfa9bd5fddbf77c5b16aeae0a7240a3a5717f`）はglobal GC root metadata収集を独立したtask-scoped executorへ分離した。`heads/`、`roots/`、resumable、database restore、database backup、ingressの6 namespaceを固定順で走査し、1 invocation最大64 objects、opaque LIST cursor、catalog index、累積scanned countをR2 ETag-CAS pointerへcheckpointする。各source key、ETag、valueはtask-scoped external catalog recordへcreate-onlyで保存し、全namespace走査後だけcatalogをcompletedにする。crash後は現在namespace/cursorから再開し、pointer CAS敗北は`:fenced`となる。
+
+このPRはroot catalogの収集working setをpage boundedにする基盤であり、global GC完了を意味しない。現在のmark seed生成とsweep前root comparisonはまだlegacy `gc-root-snapshot!`を読む。次の必須passはcompleted external catalogの型検証、active-root判定、mark frontier seed、二回目catalogとのroot-token比較、catalog/work-prefix cleanup、64件超・root mutation・restart fixture、host phase接続である。これらを閉じるまで状態は`:production-partial`とし、IStoreとCloudflare KVは使用しない。
 
 # Consequences
 
