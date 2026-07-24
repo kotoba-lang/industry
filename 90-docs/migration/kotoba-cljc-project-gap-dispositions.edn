@@ -1093,7 +1093,32 @@
     :ground-truth "sdc.clock-test/duty-cycle-computation and duty-cycle-invalid-period, read directly"
     :required-capabilities []
     :hosted-ci {:status :passed :workflow-updated false :reason :missing-oauth-workflow-scope}}
-   :next-action :retain-cljc-oracle-and-review-create-clock-io-delay-path-exception-parser-in-a-future-pass}]
+   :next-action :retain-cljc-oracle-and-review-create-clock-io-delay-path-exception-parser-in-a-future-pass}
+  {:root "orgs/kotoba-lang/states/src/states/model.cljc"
+   :repository "orgs/kotoba-lang/states"
+   :kind :retain-cljc-pending-bounded-arbitrary-keyed-map-profile-precedent
+   :review-status :reviewed-2026-07-24
+   :migration-authorized false
+   :reason "ASL (AWS Step Functions Amazon States Language) as EDN: the whole domain is a state machine keyed by arbitrary state-name strings (:states/states, an open-ended map). terminal? is the only closed-set function (checks :states/type against a 2-element set, or an :end flag) and is too trivial on its own to justify a standalone profile. Same bounded-arbitrary-keyed-map gap already found for kotoba-lang/search, kotoba-lang/sheets, kotoba-lang/atprotocol, kotoba-lang/sigma. execute.cljc/json.cljc likely compound this with regex/parsing, not read in full."
+   :required-language-gates [:bounded-arbitrary-keyed-map-profile-precedent]
+   :next-action :retain-cljc-and-revisit-once-a-bounded-map-profile-precedent-exists-elsewhere-in-the-fleet}
+  {:root "orgs/kotoba-lang/sigma/src/sigma/model.cljc"
+   :repository "orgs/kotoba-lang/sigma"
+   :kind :retain-cljc-pending-bounded-arbitrary-keyed-map-profile-precedent
+   :review-status :reviewed-2026-07-24
+   :migration-authorized false
+   :reason "Sigma detection rules as EDN: string-keyed selections map (arbitrary field names with |modifier suffixes) plus a free-text condition expression referencing them by name. Same bounded-arbitrary-keyed-map gap as kotoba-lang/states/search/sheets/atprotocol. sigma.execute (232 lines, presumably the condition-string evaluator) and sigma.yaml were not read in full, likely compound this with regex/parsing."
+   :required-language-gates [:bounded-arbitrary-keyed-map-profile-precedent]
+   :next-action :retain-cljc-and-revisit-once-a-bounded-map-profile-precedent-exists-elsewhere-in-the-fleet}
+  {:root "orgs/kotoba-lang/edu-berkeley-spice/src/spice/model.cljc"
+   :repository "orgs/kotoba-lang/edu-berkeley-spice"
+   :kind :retain-cljc-pending-bounded-arbitrary-keyed-map-profile-precedent
+   :review-status :reviewed-2026-07-24
+   :migration-authorized false
+   :reason "SPICE device compact-model library: models keyed by arbitrary device name in an open map, same gap as states/sigma/search/sheets/atprotocol. spice.analysis (432 lines, solve-dc-op/solve-dc-op-nonlinear) is almost certainly a Newton-Raphson conductance-matrix solver over a variable node count -- a second, independent blocker (arbitrary-sized matrix/vector state, likely also f64-heavy) -- flagged but not read in full given the model.cljc blocker alone already rules out a same-file bounded profile."
+   :required-language-gates [:bounded-arbitrary-keyed-map-profile-precedent
+                             :bounded-variable-node-count-matrix-profile-if-analysis-cljc-is-ever-attempted]
+   :next-action :retain-cljc-and-revisit-once-a-bounded-map-profile-precedent-exists-elsewhere-in-the-fleet}]
  :language-maturity
  {:safe-f64-phase-3a
   {:status :merged-qualified
@@ -1522,9 +1547,9 @@
   :assoc-wave-note "All 37 cloud-itonami-assoc-* repositories (gh repo list, 2026-07-22) carry a sole production association_facts.kotoba with zero tracked CLJC. finra closed the reviewed retirement queue; the 18 repositories in :backfilled-unlogged-migrations were found already migrated by prior unlogged sessions (2026-07-20/21), verified against their merge commits and green CI, and logged into the ADR's :qualified-evidence -- their local checkouts were never canonical-matrix entries so they do not appear in :reviewed-association-wave above. No further next-reviewed-wave-candidate exists inside cloud-itonami-assoc-*; see :next-wave-census for the surveyed successor scope and the new :dispositions entry for why it is not yet actionable."
   :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA and FINRA retirement each removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; the assoc-* wave is closed, so resume with per-repo review inside the isic/isco/iso3166/unspsc/cofog/gtin census once the application-profile and string-search gates are tracked as landed."}
  :completion
- {:reviewed-project-roots 56
+ {:reviewed-project-roots 59
   :authorized-migrations 27
-  :retained-oracles 10
+  :retained-oracles 13
   :typed-refactors-pending 0
   :typed-refactors-in-review 0
   :typed-refactors-merged-awaiting-cutover 3}}}
