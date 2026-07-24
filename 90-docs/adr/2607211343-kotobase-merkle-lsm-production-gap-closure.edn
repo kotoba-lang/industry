@@ -589,6 +589,16 @@ host PR #89（merge commit `dffed173294e88f990e1d61b7cdbcbc07861ce31`）はauthe
 
 これでresumable restore verificationのO(total entries) process-local visited set gapは閉じた。ただし本receiptはsyntheticであり、live R2のlarge restore RTO/RPO、marker object/operation cost、worker restartを跨ぐ1M/10M verificationは未測定である。またCIDごとに1 marker objectを作るため、process memoryと引き換えにO(entries) R2 PUT/GET/LIST/DELETEを使う。単一blockのlink vectorはblock単位でdecodeし、legacy synchronous restoreとbackup-side graph discoveryの`seen` setは依然O(total entries)、inventory v2 root descriptorもO(page count)である。次はhierarchical inventory root、marker page/bitmapまたはpartitioned frontier、bounded backup traversal、cross-account/region copy、production RTO/RPO、KMS、historical MVCC/on-disk q/pullである。状態は`:production-partial`を維持し、IStoreとCloudflare KVは使用しない。
 
+## 2026-07-24 Hierarchical database backup inventory v3
+
+peer PR #93（merge commit `2dda0723e6f231e419461b159bce4910d6979938`）は、inventory v2 rootが全data-page descriptorをinline保持していたO(page count) gapを、CID-addressed 64-way directory treeへ置換した。新backupはv3 rootにtop directory descriptorを1件だけ持ち、directory nodeは最大64 children、exact DAG-CBOR 65,536 bytes以下である。descriptorはCID、encoded bytes、level、first page ordinal、page/entry aggregate count、first/last namespace-CID rangeを持つ。load時はcontent CID、byte limit、level、child kind、連続ordinal span、非overlap range、全aggregateをfail closedに再検証する。
+
+resumable restoreのpage ordinal lookupは各levelで該当childを1件だけ選び、verificationのsparse inventory lookupは`blocks`/`objects`それぞれのnamespace-CID targetについて各level最大1 nodeを読む。従ってroot working setは総page数から独立し、lookup I/Oはtree heightに比例する。v1/v2は読み続け、legacy synchronous restoreだけは互換性のため全leafをmaterializeできる。
+
+4,097 data pages、1,048,832 represented entriesのdeterministic synthetic shapeはdirectory 68 nodes、height 3、top children 2、top node 728 bytes、最大directory node 20,812 bytesだった。authority receiptは`kotobase-peer/bench/results/2026-07-24-database-inventory-v3-tree.edn`である。peer canonical local CIはJVM 242 tests/767 assertions、CLJS 248 tests/989 assertions、lint errors 0、R2 gateway 21 tests/67 assertions、全benchmark step green。さらにmerged peer mainをmerged host mainへ接続したcanonical local CIはcohort 18 assertions、JVM 76 tests/427 assertions、lint errors 0、Worker release build、13-entry authenticated disaster-restore smokeを含む全5 stepsがgreenだった。
+
+これでinventory root descriptorのO(page count) gapは閉じた。ただし数値receiptはsyntheticで、large live R2 treeのlatency/cost証跡ではない。backup graph discoveryのprocess-local `seen` set、legacy synchronous restoreの全entry materialization、CIDごと1 objectのverification marker、cross-account/region copy、production RTO/RPO、KMS、historical MVCC/on-disk q/pullは残る。次のbounded-memory優先順位はbackup traversal frontier/visited setの外部化とverification markerのpaged bitmap/partitioned frontier化である。状態は`:production-partial`、IStoreとCloudflare KVは使用しない。
+
 # Consequences
 
 短期的には、現在のR2-backed document workloadをproduction partialとして継続できるが、汎用DB GAとは呼ばない。実装優先順位は機能追加よりsnapshot/GC correctnessとbounded memoryを先にする。
