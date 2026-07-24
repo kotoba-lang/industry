@@ -8,29 +8,29 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 10201, "app-aozora-appview" 12636},
+ {"app-aozora-pds" 9585, "app-aozora-appview" 11161},
  :zone
- {:requests-7d 47684,
-  :pageviews-7d 7672,
-  :uniques-7d-sum 813,
+ {:requests-7d 42154,
+  :pageviews-7d 6412,
+  :uniques-7d-sum 744,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 284518}
+    :requests 284396}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2900}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1730}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1736}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 276}
-   {:path "/", :requests 76}
+   {:path "/", :requests 75}
    {:path "/xrpc/com.atproto.repo.listRecords", :requests 70}
-   {:path "/federation-pilot/did.json", :requests 43}
-   {:path "/robots.txt", :requests 38}],
-  :status-mix {:ok 290054, :client-error 411, :server-error 11},
+   {:path "/federation-pilot/did.json", :requests 41}
+   {:path "/robots.txt", :requests 40}],
+  :status-mix {:ok 290050, :client-error 416, :server-error 10},
   :window "24h"},
- :as-of "2026-07-23",
+ :as-of "2026-07-24",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 284518 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2900 · /xrpc/com.atproto.sync.subscribeRepos 1730 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 276 · / 76 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 284396 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2900 · /xrpc/com.atproto.sync.subscribeRepos 1736 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 276 · / 75 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 47684 req/7d・813 uniques(日次和)・うち4xx probe 0%(24h)、workers 22837 inv/7d"}
+ "aozora.app 実測 42154 req/7d・744 uniques(日次和)・うち4xx probe 0%(24h)、workers 20746 inv/7d"}
