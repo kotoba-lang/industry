@@ -1,0 +1,20 @@
+[{:adr/id "adr-2607242600-cloud-itonami-awai-gftd-payment-collection"
+  :adr/topic "cloud-itonami-awai-gftd-payment-collection"
+  :adr/title "ADR-2607242600: AWAI Network contracts; Gftd Japan collects cloud-itonami payments as limited agent"
+  :adr/doc_type "adr"
+  :adr/status "accepted"
+  :adr/date "2026-07-24"
+  :adr/last_verified "2026-07-24"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["cloud-itonami contracting operator"
+   "Gftd Japan Stripe collection role"
+   "AWAI–Gftd Japan cloud-itonami settlement terms"]
+  :adr/related
+  ["adr-2607242100"
+   "adr-2607172600-cloud-itonami-isic-5820-salesforce-replace-flagship"
+   "orgs/gftdcojp/cloud-itonami/legal/payment-collection-agency-agreement.md"]
+  :adr/source-format "edn"
+  :adr/body
+  "# ADR-2607242600: AWAI Network contracts; Gftd Japan collects cloud-itonami payments as limited agent\n\n**Status:** accepted\n**Date:** 2026-07-24\n**Decider:** Jun Kawasaki\n\n## Context\n\nADR-2607242100 selected AWAI Network, L.L.C. as cloud-itonami's Service operator, while the existing Stripe account and four flagship Payment Links remain under Gftd Japan K.K. Leaving that relationship implicit would make the contracting supplier and payment collector appear inconsistent. The owner subsequently confirmed AWAI Network as operator and directed that the inter-company collection arrangement be concluded internally and recorded as an ADR.\n\n## Decision\n\n1. AWAI Network, L.L.C. is the contracting Service operator, Principal and supplier for cloud-itonami.\n2. Gftd Japan K.K. is a disclosed, limited Collection Agent. Use of its Stripe account does not make it the seller or Service operator.\n3. Collection authority is restricted to receiving payments, issuing approved refunds, handling Stripe disputes and remitting proceeds. It does not include changing product, price, customer contract, tax position or entitlement.\n4. Settlement is monthly, due within ten business days after month end. Gftd Japan may deduct actual Stripe fees, refunds, chargebacks and provider-required withholding only; it receives no additional collection commission unless a later signed amendment says otherwise.\n5. Customers must be verified businesses purchasing for business use. Checkout must disclose both AWAI's supplier role and Gftd Japan's collection role.\n6. The execution terms are the versioned `legal/payment-collection-agency-agreement.md`. Formal signature counterparts and legal notice addresses are confidential corporate records and are retained outside git. This ADR records the approved internal decision, not personal signatures.\n7. Japan tax characterization, foreign-company registration and counsel review remain separate gates; this collection decision does not decide them.\n\n## Consequences\n\n- The operator/collector mismatch is resolved at the internal governance level.\n- Terms and checkout disclosures must describe Gftd Japan as collection agent, never as supplier.\n- Stripe objects may be prepared in test mode against an approved order form. A live buyer may not be charged until the remaining legal/tax release gate and end-to-end provisioning verification pass.\n- The existing ¥80,000/month Payment Link does not represent the proposed ¥20,000 fixed 30-day validation sprint and must not be reused for that sprint.\n\n## Alternatives\n\n- Re-paper Stripe immediately to AWAI: deferred because it requires Stripe KYC and banking actions.\n- Keep Gftd Japan as operator: rejected by the owner's AWAI decision.\n- Leave collection undocumented: rejected because it obscures the supplier/collector boundary.\n"}]

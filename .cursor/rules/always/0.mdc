@@ -15,3 +15,41 @@ yarn
 # directory
 
 procs/{pid}-{processName} にプロジェクト
+
+# ポートフォリオ優先順位
+
+目的は技術完成度ではなく、外部顧客による実入金、粗利益、継続利用を増やすこと。
+プロジェクト単位で固定順位を付けず、次の外部証拠を得るアクション単位で毎週再計算する。
+
+- 目的関数を分ける:
+  - Cash-first = 最初の外部実入金までの期待時間を最小化
+  - Profit-first = 12か月期待粗利益を最大化
+- 外部売上ゼロの間は Cash-first 60% + Profit-first 40%。売上発生後は 40% + 60%。
+- `cash_score = P(30日以内の外部実入金) × 初回限界粗利益 × 信頼度 ÷ 証拠までの人時`。
+- `profit_score = P(90日以内の有料化) × 12か月期待粗利益 × 継続確率 × 信頼度 ÷ 証拠までの人時`。
+- B2C は既存有効 traffic、低単価、即時決済を加点し、wallet、暗号資産取得、
+  年齢確認、地域制限、決済失敗を減点する。
+- B2B は高単価と継続性を加点し、稟議、調達、導入、個別営業の時間を減点する。
+- 2週間で訪問→利用→決済開始→実入金→再購入の外部証拠が増えない作業は止めるか縮小する。
+- 機能数でなく、入金に最も近い未解決障害を解く。コード、営業、コピー、価格、
+  流通を別アクションとして採点する。
+- 既存 traffic がある商品では、追加開発より先に少額の実決済実験を行う。
+- 基盤開発は上位商品の販売、導入、安全、本番運用を現実に阻害するときだけ割り込ませる。
+- 初回入金は需要の証拠であって事業成功ではない。再購入、30日継続、粗利益を次の gate にする。
+- 自己購入、内部 dogfood、test payment、bot traffic は外部需要に数えない。
+- 現在の既定は、一つの B2C 決済実験と一つの B2B 商談実験の二本立て。
+
+cloud-itonami の vertical は均等に進めない。live product face、明示価格、決済経路、
+特定 buyer、外部到達経路の5条件中4つ以上を持つものだけを販売候補とし、vertical ごとに
+qualified lead、checkout start、paid、MRR、導入人時、解約を計測する。
+
+## 毎回の agent loop
+
+事業・product・distribution に関わる agent loop は、必ず
+`90-docs/business/revenue-agent-loop/README.md` に従う。
+
+- run 開始時に候補アクションを score し、WIP=1で最高点の一つだけを選ぶ。
+- safety / legal / payment honesty gate は減点項目ではなく非相殺の hard gate。
+- 実行前 score、使った人時、外部証拠、実行後 score、継続/変更/停止を run log に残す。
+- 「コードを追加した」は成果ではない。外部 funnel の状態変化が無ければ score を上げない。
+- run log が無い反復、自己購入、内部 traffic、test payment を進捗として扱わない。
