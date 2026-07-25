@@ -91,8 +91,18 @@
   (str/trim (:out (sh "git" "config" "annex.uuid" {:cwd dir}))))
 
 (defn whereis
-  "Parses `git annex whereis --json` (one JSON object per line). Returns a seq
-   of {:file :copies} where :copies counts locations that are NOT this repo."
+  "Parses `git annex whereis --json` (one JSON object per line).
+
+   git-annex reports two separate location sets and conflating them lies in both
+   directions. `whereis` holds locations annex will rely on; `untrusted` holds
+   locations that may hold the content but whose state annex cannot vouch for —
+   notably importtree remotes, whose objects can be replaced out-of-band, so a
+   recorded copy is not proof the same bytes are still there.
+
+   An earlier version read only `whereis` and therefore told us 272 imported
+   files 'exist ONLY on this machine' when each in fact had an untrusted remote
+   copy. That is a different (milder) problem than having no copy at all, and
+   printing the harsher one erodes trust in the check."
   [dir]
   (let [{:keys [out]} (sh "git" "annex" "whereis" "--json" {:cwd dir})]
     (->> (str/split-lines (or out ""))
@@ -100,13 +110,15 @@
          (keep (fn [line]
                  (try
                    (let [m (js->clj (.parse js/JSON line))
-                         locs (get m "whereis" [])]
+                         off #(remove (fn [x] (true? (get x "here"))) %)
+                         trusted (off (get m "whereis" []))
+                         untrusted (off (get m "untrusted" []))]
                      (when-let [f (get m "file")]
                        {:file f
-                        ;; `here` marks this repo's own copy; everything else is
-                        ;; off-machine custody.
-                        :copies (count (remove #(true? (get % "here")) locs))
-                        :where (mapv #(get % "description") (remove #(true? (get % "here")) locs))}))
+                        :copies (count trusted)
+                        :untrusted (count untrusted)
+                        :on (set (map #(get % "description") trusted))
+                        :where (mapv #(get % "description") (concat trusted untrusted))}))
                    (catch :default _ nil)))))))
 
 (defn- sample-indices
@@ -152,17 +164,24 @@
           {:name name :status :skipped :reason "not a git-annex repo (no annex.uuid)"}
           (let [entries (whereis dir)
                 total (count entries)
-                at-risk (filter #(zero? (:copies %)) entries)
-                candidates (mapv :file (remove #(zero? (:copies %)) entries))
+                at-risk (filter #(and (zero? (:copies %)) (zero? (:untrusted %))) entries)
+                only-untrusted (filter #(and (zero? (:copies %)) (pos? (:untrusted %))) entries)
+                ;; Only fsck files the *configured* remote actually claims —
+                ;; sampling a file that lives on some other remote makes the
+                ;; check fail for a bookkeeping reason rather than a custody one.
+                candidates (->> entries
+                                (filter #(contains? (:on %) (str "[" remote "]")))
+                                (mapv :file))
                 idxs (sample-indices (count candidates) sample-n)
                 sampled (mapv #(nth candidates %) idxs)
                 fsck (if (seq sampled)
                        (fsck-sample! dir remote sampled env)
                        {:ok [] :failed []})]
             {:name name :path path :remote remote
-             :status (if (or (seq at-risk) (seq (:failed fsck))) :fail :ok)
+             :status (if (or (seq at-risk) (seq only-untrusted) (seq (:failed fsck))) :fail :ok)
              :annexed total
              :at-risk (mapv :file at-risk)
+             :only-untrusted (mapv :file only-untrusted)
              :sampled sampled
              :fsck-failed (:failed fsck)}))))))
 
@@ -208,10 +227,17 @@
                 (println (str "  - " (:name r) ": FAIL — " (:annexed r) " annexed"))
                 (when (seq (:at-risk r))
                   (println (str "      " (count (:at-risk r))
-                                " file(s) exist ONLY on this machine (no off-machine copy):"))
+                                " file(s) exist ONLY on this machine (no off-machine copy at all):"))
                   (doseq [f (take 10 (:at-risk r))] (println (str "        " f)))
                   (when (> (count (:at-risk r)) 10)
                     (println (str "        ... +" (- (count (:at-risk r)) 10) " more"))))
+                (when (seq (:only-untrusted r))
+                  (println (str "      " (count (:only-untrusted r))
+                                " file(s) have ONLY an untrusted copy (importtree remote — its"
+                                " objects can be replaced out-of-band, so presence is not proof):"))
+                  (doseq [f (take 5 (:only-untrusted r))] (println (str "        " f)))
+                  (when (> (count (:only-untrusted r)) 5)
+                    (println (str "        ... +" (- (count (:only-untrusted r)) 5) " more"))))
                 (doseq [{:keys [file error kind]} (:fsck-failed r)]
                   (println (str "      "
                                 (if (= kind :key-unavailable)
