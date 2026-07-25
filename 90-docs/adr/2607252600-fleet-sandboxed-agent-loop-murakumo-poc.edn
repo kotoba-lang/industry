@@ -136,4 +136,45 @@ lease (kotoba.fleet.lease)
 Gap A1 closed: agent-authored code now runs under an OS-level exec backing (macOS Seatbelt), admitted by the governor, with a runnable negative control
 
 The PoC confined the file tools but not execution. Since the agent writes the code that :test-cmd runs, every session was arbitrary code execution as the node user — measured on naphtali with the backing disabled, all six escapes succeed (read ~/.ssh, list the node home, curl egress, node egress, write to home, write outside the sandbox). Closed in kotoba-fleet 1de9950: exec! is the single path by which agent-authored code runs and applies a Seatbelt profile that denies all network, denies reads under the node's real home, and permits writes only inside the ephemeral sandbox (HOME/TMPDIR redirected into it). Each session probes its own containment before the first model call and fails closed; --exec-probe --backing none is the negative control, because a probe that cannot fail proves nothing. Admission rules moved to a pure fleet.gate ns and the governor now REJECTS a payload that ran unsandboxed or whose probe leaked, even with green tests — opting out is a property of the work-unit (:allow-unsandboxed-exec), not of the runtime. Our own git calls use core.hooksPath=/dev/null so agent-written .git/hooks are not an execution path. Verified: selftest 25 checks; naphtali blocks 6/6 with the backing and leaks 6/6 without it; the same kotoba-delta work-unit still lands green end to end (5 turns / 28s / 1545B patch; 6 tests / 38 assertions verified independently on the materialized tree). Remaining: this is still a shared macOS node, not a container or microVM — a contained process shares the kernel and can see other processes; the backing is a value so a container backing can be added without touching the loop, tools or gate. Related gaps A3/B1/B2/C1 from the same review are untouched.
-"}]
+
+
+### 2026-07-25 — amend (B2 / A3)
+
+Gap B2 (共有ログ) と A3 (弱権限クレデンシャル) を解消した。kotoba-fleet f2af8a5。
+
+**B2 — fleet log を kotobase.net へ**。`fleet.kotobase-store` が同じ append-only
+`:db-api` を kotobase.net の tenant Datom 面に載せ、ログが1台のファイルでなく
+**マシン間で共有**される。認証は自己 mint CACAO — 鍵そのものが自分の DID から導かれる
+graph の authority なので、operator から grant を受け取らないし、その graph 以外には
+届かない。走らせて初めて分かった edge の性質3点を ns に明記した: (1) CACAO は
+**single-use**（nonce replay を記録する）なので毎リクエスト mint する、(2) 素の
+`:find`/`:where` は通るが `:in` バインディング付きは InternalError を返すので
+`:by`/`:entity` はログ全体から導出する、(3) **edge のクエリエンジンが 4 属性
+reification の join を適用しない** — lease 2件のログが属性を entity 横断で組み替えた
+240 行の直積になって返った — ため、fleet datom は「1 entity = 1 個の pr-str 済み
+タプル」で保存する（join が無ければ join を間違えようがない）。リモート backend には
+compare-and-swap が無く ordinal は衝突しうるが、決定的な `[t id]` tiebreak で holder は
+1つに収束し、`confirmed-holder?` が settle 後に読み直すので、敗者は materialize 時では
+なく **sandbox 実行を始める前に**降りる。
+
+クロスマシン実測: Mac が kotobase.net 経由で unit を claim し、**fleet 鍵を持たない**
+naphtali が使い捨て identity と graph CID だけで同じ 34 datom のログを読み、同じ holder
+を算出した。読むには graph CID があれば足り、書き込みは偽装できない（edge は書き込み先
+graph を書き手自身の DID から導出する）。
+
+**A3 — dispatcher を弱権限鍵に**。`gh api` への shell out（= operator の login が持つ
+スコープを毎回背負う）をやめ、source は codeload から HTTPS で取得する: public repo は
+**クレデンシャル無し**、private repo だけ明示的な `FLEET_SOURCE_TOKEN`、使った
+クレデンシャル種別は payload に記録する。dispatcher 自身は kagi から**名前指定で1件だけ**
+読む Ed25519 鍵で動く（`fleet-agent-sandbox-dispatch`、`manifest/fleet-agents.edn` に
+grant `fleet-sandbox/*` で enroll 済み、`fleet-keys.edn` の roots/canonical には不在 =
+pin 前進も governance quorum も持たない。fleet-agent-murakumo-ci と同じ封じ込め）。
+governor の決定はこの鍵で署名してログと `receipts/<work>.edn` の両方に落ちるので、
+receipt は「置いてある場所」ではなく enroll 済み DID で検証できる。
+
+検証: selftest 31 checks、kotobase-backed ログ経由の full dispatch が署名付き receipt
+つきで green、上記クロスマシン観測。
+
+**この時点で残っている gap**: B1 の一部（receipt は署名されるが公開台帳は無い）、
+C1/C2（push と人間 sign-off が未配線）、D1（常設 tick 無し）、D2（ノード toolchain の偏り）、
+E1/E2（kotoba-code との二重実装、モデル評価の欠如）。"}]
