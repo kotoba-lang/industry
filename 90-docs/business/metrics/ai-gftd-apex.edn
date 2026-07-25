@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 4902, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 4906, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 467441,
-  :pageviews-7d 16892,
-  :uniques-7d-sum 4911,
+ {:requests-7d 470680,
+  :pageviews-7d 16950,
+  :uniques-7d-sum 4924,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/config/prod.exs", :requests 69}
-   {:path "/nginx_status", :requests 64}
+  [{:path "/nginx_status", :requests 64}
    {:path "/.github/workflows/deploy.yml", :requests 61}
-   {:path "/trace.axd", :requests 59}
-   {:path "/.docker/config.json", :requests 54}
    {:path "/debug/pprof/", :requests 53}
-   {:path "/.ssh/id_ecdsa", :requests 48}
-   {:path "/api/.env", :requests 47}],
-  :status-mix {:client-error 2824, :ok 2300, :server-error 16490},
+   {:path "/api/.env", :requests 48}
+   {:path "/config/prod.exs", :requests 48}
+   {:path "/server-info", :requests 45}
+   {:path "/.env.production.bak", :requests 45}
+   {:path "/trace.axd", :requests 45}],
+  :status-mix {:client-error 2766, :ok 2204, :server-error 16474},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -31,10 +31,10 @@
   :last-charge-epoch 1604224274},
  :as-of "2026-07-25",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 76},
+ {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 77},
  :top-paths
- "上位 page (24h, 2xx/3xx): /config/prod.exs 69 · /nginx_status 64 · /.github/workflows/deploy.yml 61 · /trace.axd 59 · /.docker/config.json 54 | 4xx(probe) 13% · 5xx 76%",
+ "上位 page (24h, 2xx/3xx): /nginx_status 64 · /.github/workflows/deploy.yml 61 · /debug/pprof/ 53 · /api/.env 48 · /config/prod.exs 48 | 4xx(probe) 13% · 5xx 77%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 467441 req/7d・4911 uniques(日次和)・うち4xx probe 13%(24h)、workers 4903 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 470680 req/7d・4924 uniques(日次和)・うち4xx probe 13%(24h)、workers 4907 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
