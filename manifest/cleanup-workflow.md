@@ -78,9 +78,22 @@ follow (reads work, writes fail — resolve slugs through `gh api repos/<slug> -
 .full_name`; measured: `kotoba-git` → `bonsai`), and **`--jq` bare scalars are not JSON**
 (parsing `6dc20b…` as JSON yields nil and every commit fails quietly).
 
+`:branches` is opt-in (`--branches`, because it pushes) and capped at 20 live branches per
+repo, reported not hidden (webgpu has 67 local branches, slides over 90).
+
 Skipped and always reported: credential-looking paths, build junk, files over 2 MB,
 git-annex/DataLad datasets. Executable bits preserved. Nothing is ever deleted — archive
 to `.git/stash-archive-<date>/` first, then add.
+
+**Deletions are never applied** — a ` D ` entry comes from a working tree that may be far
+behind, and replaying it can delete work someone else added. **Re-runs must be idempotent**
+since landing does not remove the local copy: compare local blob shas against the base tree
+and drop what already matches.
+
+Three kinds of "no remote", needing different handling: has commits (create + push);
+**no commits at all** (create empty repo, land via a parentless root commit through the API,
+never touching the local checkout); **exists upstream but local lost `origin`** (reattach,
+do not create — measured: `kotoba-lang/org-threejs` had 10 of 12 files already landed).
 
 ## West orphan inventory
 

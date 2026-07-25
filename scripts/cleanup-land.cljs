@@ -8,6 +8,7 @@
 ;;   nbb scripts/cleanup-land.cljs --apply             ; 実行
 ;;   nbb scripts/cleanup-land.cljs --apply --names a,b ; 対象を限定
 ;;   nbb scripts/cleanup-land.cljs --apply --max 20    ; 上限（残りは報告して打切り）
+;;   nbb scripts/cleanup-land.cljs --apply --branches  ; :branches も処理（push / PR。merge しない）
 ;;
 ;; ── なぜ一律 merge しないか（重要） ────────────────────────────────────
 ;; UNLANDED を1種類として扱うと安全性が壊れる。危険度ではなく「main を壊しうるか」で
@@ -56,6 +57,7 @@
 (defn- opt [flag] (second (drop-while #(not= % flag) args)))
 (def only-names (some-> (opt "--names") (str/split #",") set))
 (def max-repos (some-> (opt "--max") parse-long))
+(def branches? (argset "--branches"))
 (def stamp "20260725")
 
 (defn- gitc [dir & xs]
@@ -120,8 +122,14 @@
   だけ落ちるので、canonical 化しないと「なぜか commit だけ失敗する」形で現れる。"
   [dir]
   (some-> (gitc dir "remote" "get-url" "origin") str/trim
-          (as-> u (second (re-find #"github\.com[:/](.+?)(?:\.git)?$" u)))
-          (as-> raw (or (gh-str "api" (str "repos/" raw) "--jq" ".full_name") raw))))
+          (as-> u (second (re-find #"github\.com[:/](.+?)(?:\.git)?$" u)))))
+
+(defn- canonical-slug
+  "raw slug -> GitHub 上の現在名。**着地対象がある repo にだけ呼ぶこと**。
+  planning 段階で全 repo に対して呼ぶと ~700 回の API 往復になり、実測で
+  25 分経っても plan が終わらなかった（かつ rate limit を無駄に消費する）。"
+  [raw]
+  (when raw (or (gh-str "api" (str "repos/" raw) "--jq" ".full_name") raw)))
 
 (defn- default-branch [dir]
   (or (some-> (gitc dir "symbolic-ref" "--quiet" "refs/remotes/origin/HEAD")
@@ -144,12 +152,18 @@
 
 ;; ---------- GitHub 側に commit を作る ----------
 
-(defn- b64-file [dir path]
-  (.toString (.readFileSync node-fs (str dir "/" path)) "base64"))
+(defn- b64-file
+  "読めなければ nil。1 ファイルの不整合で fleet 全体の実行を落とさない
+  （broken symlink・実行中に消えたファイル・権限など）。"
+  [dir path]
+  (try (.toString (.readFileSync node-fs (str dir "/" path)) "base64")
+       (catch :default e
+         (println (format "  skip unreadable     %s (%s)" path (ex-message e)))
+         nil)))
 
 (defn- create-blob! [slug dir path]
-  (gh-input! (str "repos/" slug "/git/blobs")
-             {:content (b64-file dir path) :encoding "base64"} ".sha"))
+  (when-let [c (b64-file dir path)]
+    (gh-input! (str "repos/" slug "/git/blobs") {:content c :encoding "base64"} ".sha")))
 
 (defn- file-mode
   "実行ビットを落とさない（bin/* を 100644 で載せると実行できなくなる）。"
@@ -158,23 +172,61 @@
          "100755" "100644")
        (catch :default _ "100644")))
 
+(defn- base-blobs
+  "base branch の tree を1回だけ取って path -> blob-sha の map にする。
+
+  これが無いと再実行が冪等にならない。着地しても**ローカルの untracked ファイルは
+  消さない**（安全床）ので、2 回目の実行では同じファイルがまた untracked として
+  現れる。実測 2026-07-25: kotoba-lang/bonsai は PR #3 で 15 件 merge 済みなのに、
+  次の dry-run がその 15 件をもう一度 :additive として計画した。ローカルの blob sha
+  （git hash-object）が base 側と一致するものは既に着地済みなので落とす。"
+  [slug base]
+  (when-let [tree-sha (some-> (gh-str "api" (str "repos/" slug "/git/ref/heads/" base) "--jq" ".object.sha")
+                              (as-> c (gh-str "api" (str "repos/" slug "/git/commits/" c) "--jq" ".tree.sha")))]
+    (some->> (gh-json "api" (str "repos/" slug "/git/trees/" tree-sha "?recursive=1"))
+             :tree
+             (filter #(= "blob" (:type %)))
+             (map (juxt :path :sha))
+             (into {}))))
+
+(defn- local-blob-sha [dir path]
+  (some-> (gitc dir "hash-object" "--" path) str/trim not-empty))
+
+(defn- drop-already-landed
+  "base 側と同一内容のパスを落とす。-> [残り 落としたもの]"
+  [dir base-map paths]
+  (if (empty? base-map)
+    [paths []]
+    (let [landed? (fn [p] (and (contains? base-map p)
+                               (= (get base-map p) (local-blob-sha dir p))))]
+      [(vec (remove landed? paths)) (vec (filter landed? paths))])))
+
 (defn- server-commit!
   "base branch の tip の上に paths を載せた commit を作り、branch ref を作る。
   branch が既にあれば ref は作らず、その ref を commit へ更新する。
   -> {:branch b :commit sha :files n} / nil"
   [slug dir base paths branch message]
-  (when-let [base-sha (gh-str "api" (str "repos/" slug "/git/ref/heads/" base) "--jq" ".object.sha")]
-    (when-let [base-tree (gh-str "api" (str "repos/" slug "/git/commits/" base-sha) "--jq" ".tree.sha")]
+  ;; base が未作成（= commit が1つも無い新規 repo）なら parents 無し・base_tree 無しの
+  ;; ルートコミットを作る。placeholder repo（例 kotoba-lang/org-threejs: branch
+  ;; init_placeholder に commit ゼロ、ファイルは全部 untracked）はこの経路でしか
+  ;; 着地できない。
+  (let [base-sha (gh-str "api" (str "repos/" slug "/git/ref/heads/" base) "--jq" ".object.sha")
+        base-tree (when base-sha
+                    (gh-str "api" (str "repos/" slug "/git/commits/" base-sha) "--jq" ".tree.sha"))]
+    (let [_ nil]
       (let [entries (keep (fn [p]
                             (when-let [sha (create-blob! slug dir p)]
                               {:path p :mode (file-mode dir p) :type "blob" :sha sha}))
                           paths)]
         (when (seq entries)
           (let [tree-sha (gh-input! (str "repos/" slug "/git/trees")
-                                    {:base_tree base-tree :tree entries} ".sha")
+                                    (cond-> {:tree entries} base-tree (assoc :base_tree base-tree))
+                                    ".sha")
                 commit-sha (when tree-sha
                              (gh-input! (str "repos/" slug "/git/commits")
-                                        {:message message :tree tree-sha :parents [base-sha]} ".sha"))]
+                                        (cond-> {:message message :tree tree-sha}
+                                          base-sha (assoc :parents [base-sha]))
+                                        ".sha"))]
             (when commit-sha
               ;; branch が未作成なら 404 が正常系。gh-str は失敗を stderr に出すので
               ;; ここだけ静かに判定する（毎 repo で "Not Found" が出ると本物の
@@ -206,12 +258,67 @@
 ;; gh-input! を使うので、ref 更新は PATCH ではなく POST/PATCH を gh が endpoint から
 ;; 判別する。既存 ref への POST は 422 になるため existing? で分岐している。
 
+(def ^:private org-visibility
+  "新規 repo の visibility。**既存 repo の visibility 変更ではない** — 新規作成を
+  org 既定に合わせるのは skill new-project-scaffold の恒久承認の範囲で、CLAUDE.md が
+  事前確認を要求する「公開リポ化」は既存 private を public に反転する操作を指す。
+  実測 2026-07-25（`gh repo list <org> --limit 60`）: kotoba-lang 60/60 public、
+  etzhayyim 60/60 public、cloud-itonami 60/60 public、gftdcojp 58 private / 2 public。
+  repos.edn の :orgs が SSoT（ADR-2607021330）。"
+  {"kotoba-lang" "--public" "etzhayyim" "--public" "cloud-itonami" "--public"
+   "gftdcojp" "--private" "com-junkawasaki" "--private" "jk-luxury" "--private"})
+
+(defn- create-remote!
+  "remote が無いローカル repo に GitHub repo を作って push する。
+  -> canonical slug / nil。commit が1つも無い repo は push できないので作らない。"
+  [dir]
+  (let [parts (str/split dir #"/")
+        org (nth parts 1) name (nth parts 2)
+        slug (str org "/" name)
+        vis (get org-visibility org "--private")]
+    (cond
+      ;; commit ゼロの placeholder。`gh repo create --source --push` は push する
+      ;; ものが無いので使えない。空 repo だけ作り、着地は server-commit! の
+      ;; ルートコミット経路に任せる（ローカル checkout には一切触らない）。
+      (not (gitc dir "rev-parse" "--verify" "--quiet" "HEAD"))
+      (if (gh-str "api" (str "repos/" slug) "--jq" ".full_name")
+        (do (println (format "  → %s は既存（commit ゼロのローカル）" slug)) slug)
+        (let [{:keys [exit err]} (sh "gh" "repo" "create" slug vis)]
+          (if (zero? exit)
+            (do (println (format "  → created empty %s (%s) — root commit で着地させる"
+                                 slug (subs vis 2)))
+                slug)
+            (do (println (format "  → repo 作成に失敗: %s" (str/trim (str err)))) nil))))
+
+      :else
+      (if (gh-str "api" (str "repos/" slug) "--jq" ".full_name")
+        (do (println (format "  → GitHub に %s は既存。remote を追加するだけ。" slug))
+            (gitc dir "remote" "add" "origin" (str "https://github.com/" slug ".git"))
+            slug)
+        (let [{:keys [exit err]} (sh "gh" "repo" "create" slug vis "--source" dir "--remote" "origin" "--push")]
+          (if (zero? exit)
+            (do (println (format "  → created %s (%s) + pushed" slug (subs vis 2))) slug)
+            (do (println (format "  → repo 作成に失敗: %s" (str/trim (str err)))) nil)))))))
+
 ;; ---------- 1 リポの処理 ----------
 
 (defn- plan-repo [dir]
   (let [status (remove str/blank? (str/split-lines (or (gitc dir "status" "--porcelain") "")))
         untracked-raw (->> status (filter #(str/starts-with? % "??")) (map #(subs % 3)))
-        tracked (->> status (remove #(str/starts-with? % "??")) (map #(str/trim (subs % 2))))
+        ;; porcelain のステータス2文字を見る。削除（D）は載せない — 古い working
+        ;; tree の削除をそのまま main に適用すると、その repo で他人が追加した
+        ;; ファイルを消しうる。rename（R）は "old -> new" 形式なので new 側を採る。
+        ;; 実測 2026-07-25: 削除エントリを読みに行って
+        ;; ENOENT: orgs/kotoba-lang/com-8th-wall/schema/8th_wall.kotoba で
+        ;; fleet 実行が 28/220 repo で落ちた。
+        tracked-rows (->> status (remove #(str/starts-with? % "??")))
+        deleted (->> tracked-rows (filter #(re-find #"^.?D" %)) (map #(str/trim (subs % 2))) vec)
+        tracked (->> tracked-rows
+                     (remove #(re-find #"^.?D" %))
+                     (map #(let [p (str/trim (subs % 2))]
+                             (if (str/includes? p " -> ") (second (str/split p #" -> ")) p)))
+                     (filter #(.exists (io/file dir %)))
+                     vec)
         ;; ディレクトリ表記（`?? foo/`）は展開する
         untracked (mapcat (fn [p]
                             (if (str/ends-with? p "/")
@@ -221,28 +328,51 @@
                           untracked-raw)
         grouped (group-by #(classify-file dir %) untracked)]
     {:dir dir :slug (repo-slug dir) :base (default-branch dir)
-     :take (vec (:take grouped))
+     :additive (vec (:take grouped))
+     :deleted deleted
      :skipped (into {} (for [[k v] grouped :when (not= k :take)] [k (vec v)]))
      :tracked (vec tracked)}))
 
-(defn- land-repo! [{:keys [dir slug base take skipped tracked]}]
+(declare land-branches!)
+
+(defn- land-repo! [{:keys [dir slug base additive skipped tracked deleted]}]
+  ;; canonical 化はここ（着地対象がある repo だけ）。plan 段階ではやらない。
+  (let [slug (when (or (seq additive) (seq tracked))
+               (if slug
+                 (canonical-slug slug)
+                 ;; remote が無いなら作る（オーナー指示 2026-07-25「remote がなければ
+                 ;; repo を作って ok」）。dry-run では作らない。
+                 (when apply?
+                   (println (format "\n%s  (remote 無し → 作成する)" dir))
+                   (create-remote! dir))))]
   (println (format "\n%s  (%s)" dir (or slug "no-remote")))
+  (when (seq deleted)
+    (println (format "  skip deleted        %d 件（削除は main に適用しない）: %s"
+                     (count deleted) (str/join ", " (take 4 deleted)))))
   (doseq [[k v] skipped]
     (println (format "  skip %-18s %d 件: %s" (name k) (count v)
                      (str/join ", " (take 4 v)))))
   (cond
     (nil? slug) (println "  → remote が無いので着地先が無い。報告のみ。")
-    (and (empty? take) (empty? tracked)) (println "  → 着地対象なし")
+    (and (empty? additive) (empty? tracked)) (println "  → 着地対象なし")
     :else
     (if-not apply?
-      (do (when (seq take) (println (format "  plan :additive  %d files → PR → merge" (count take))))
+      (do (when (seq additive) (println (format "  plan :additive  %d files → PR → merge" (count additive))))
           (when (seq tracked) (println (format "  plan :review    %d files → PR のみ（merge しない）" (count tracked)))))
-      (let [adir (archive! dir (concat take (mapcat vals (vals skipped))))]
+      (let [adir (archive! dir (concat additive (mapcat vals (vals skipped))))
+            base-map (base-blobs slug base)
+            [additive landed-additive] (drop-already-landed dir base-map additive)
+            [tracked landed-tracked] (drop-already-landed dir base-map tracked)]
         (println (format "  archived → %s" adir))
+        (when (seq (concat landed-additive landed-tracked))
+          (println (format "  already landed on %s（内容一致でスキップ）: %d 件"
+                           base (count (concat landed-additive landed-tracked)))))
+        (when (and (empty? additive) (empty? tracked))
+          (println "  → 全て着地済み。新規 PR なし。"))
         ;; :additive — untracked のみ。main のどの行も書き換えないので merge する。
-        (when (seq take)
+        (when (seq additive)
           (let [br (str "agent/cleanup-land-" stamp)
-                msg (str "cleanup: land untracked WIP (" (count take) " files)\n\n"
+                msg (str "cleanup: land untracked WIP (" (count additive) " files)\n\n"
                          "These files existed only in the shared west checkout — on no branch,\n"
                          "on no remote. A single `git checkout` there would have destroyed them.\n"
                          "Purely additive: none of these paths exist on " base ", so no existing\n"
@@ -250,7 +380,7 @@
                          "git-cleanup-conflict); originals archived under\n"
                          ".git/stash-archive-" stamp "/ in the operator's checkout.\n\n"
                          "Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>")]
-            (if-let [{:keys [files]} (server-commit! slug dir base take br msg)]
+            (if-let [{:keys [files]} (server-commit! slug dir base additive br msg)]
               (let [url (or (existing-pr slug br)
                             (open-pr! slug base br
                                       (str "cleanup: land untracked WIP (" files " files)")
@@ -279,7 +409,57 @@
                                            "`legal/terms.md` would have reverted owner-approved public legal pages to a DRAFT.\n\n"
                                            "🤖 Generated with [Claude Code](https://claude.com/claude-code)")))]
                 (println (format "  :review   %d files → %s （merge しない）" files url)))
-              (println "  :review   commit に失敗（報告のみ、ローカルは無傷）"))))))))
+              (println "  :review   commit に失敗（報告のみ、ローカルは無傷）"))))
+        (when branches? (land-branches! dir slug base)))))))
+
+(defn- live-branches
+  "default branch から到達できないローカル branch。"
+  [dir base]
+  (->> (str/split-lines (or (gitc dir "for-each-ref" "--format=%(refname:short)" "refs/heads/") ""))
+       (remove #{"" "main" "master" "synced/main" "git-annex" "manifest-rev"})
+       (remove #(gitc dir "merge-base" "--is-ancestor" % (str "origin/" base)))
+       vec))
+
+(defn- land-branches!
+  "`:branches` クラス。**merge は決してしない** — 放棄された実験・意図的な分岐・
+  force-push 済み履歴が見分けられない。やるのは保全（push）とレビュー導線（PR）だけ。
+
+  PR 照会は 1 branch = 1 API 往復なので、branch farm（実測: kotoba-lang/webgpu は
+  ローカル branch 67本、slides は 90本超）では打ち切って必ず報告する。"
+  [dir slug base]
+  (let [live (live-branches dir base)
+        cap 20]
+    (when (seq live)
+      (println (format "  branches: 未着地 %d 本" (count live)))
+      (if (> (count live) cap)
+        (println (format "  → %d 本は上限 %d 超のため未処理（branch farm。個別に扱うこと）"
+                         (count live) cap))
+        (doseq [b live]
+          (let [has-remote? (gitc dir "rev-parse" "--verify" "--quiet" (str "refs/remotes/origin/" b))
+                ahead (when has-remote?
+                        (some-> (gitc dir "rev-list" "--count" (str "origin/" b ".." b)) str/trim parse-long))]
+            (cond
+              (not has-remote?)
+              (let [{:keys [exit]} (sh "git" "-C" dir "push" "-u" "origin" b)]
+                (println (format "    %-46s %s" b (if (zero? exit) "pushed (新規)" "push 失敗"))))
+
+              (and ahead (pos? ahead))
+              (let [{:keys [exit]} (sh "git" "-C" dir "push" "origin" b)]
+                (println (format "    %-46s %s" b (if (zero? exit) (str "pushed (+" ahead ")") "push 失敗"))))
+
+              :else
+              (if-let [url (existing-pr slug b)]
+                (println (format "    %-46s PR 既存 %s" b url))
+                (if-let [url (open-pr! slug base b
+                                       (str "cleanup: review un-landed branch " b)
+                                       (str "⚠️ **Not auto-merged.** Opened so this branch is on a review path.\n\n"
+                                            "`" b "` is pushed but not reachable from `" base "` and had no open PR.\n"
+                                            "Abandoned experiments, deliberate forks and force-pushed histories all look\n"
+                                            "alike from outside, so landing it is a human call.\n\n"
+                                            "Opened by `scripts/cleanup-land.cljs` (skill `git-cleanup-conflict`).\n\n"
+                                            "🤖 Generated with [Claude Code](https://claude.com/claude-code)"))]
+                  (println (format "    %-46s PR 作成 %s" b url))
+                  (println (format "    %-46s PR 作成に失敗（差分なし等）" b)))))))))))
 
 ;; ---------- main ----------
 
@@ -293,7 +473,7 @@
        (remove annex?)
        (filter (fn [d] (if only-names (some #(str/ends-with? d (str "/" %)) only-names) true)))))
 
-(def plans (->> repos (map plan-repo) (filter #(or (seq (:take %)) (seq (:tracked %)) (seq (:skipped %))))))
+(def plans (->> repos (map plan-repo) (filter #(or (seq (:additive %)) (seq (:tracked %)) (seq (:skipped %))))))
 (def selected (if max-repos (take max-repos plans) plans))
 (def dropped (- (count plans) (count selected)))
 
@@ -302,7 +482,7 @@
 
 (println (format "\n完了: %d repo 処理 / additive=%d repo / review=%d repo"
                  (count selected)
-                 (count (filter #(seq (:take %)) selected))
+                 (count (filter #(seq (:additive %)) selected))
                  (count (filter #(seq (:tracked %)) selected))))
 (when (pos? dropped)
   (println (format "⚠ --max で %d repo を処理していない。再実行して残りを処理すること。" dropped)))

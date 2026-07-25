@@ -120,12 +120,39 @@ shared checkout is often parked on a stale branch. Same server-side single-commi
   the first implementation failed every commit while reporting success paths normally.
   Use a string-returning helper for `--jq` scalars.
 
+`:branches` runs only with `--branches` (it pushes, so it is opt-in). Branch farms are
+capped at 20 live branches per repo and reported, not silently skipped — measured:
+kotoba-lang/webgpu has 67 local branches, slides over 90.
+
 Skipped and always reported, never silently dropped: credential-looking paths
 (`.env`, `*.pem`, `*.key`, `identity.edn`, `*secret*`, `.kagi/`, …), build junk, files
 over 2 MB, and git-annex/DataLad datasets. Executable bits are preserved (`100755`), or
 `bin/*` lands unusable.
 
+**Deletions are never applied.** A `git status` ` D ` entry means the file is gone from a
+working tree that may be far behind; replaying that onto the default branch can delete
+work someone else added. They are counted and named in the report, and that is all.
+
+**Re-runs must be idempotent, because landing does not delete the local copy.** The same
+untracked files reappear on the next run. Compare each local blob sha against the base
+tree and drop what already matches — measured: after `kotoba-lang/bonsai` PR #3 merged 15
+files, the next dry-run planned all 15 again.
+
 Nothing is ever deleted: archive to `.git/stash-archive-<date>/` first, then add.
+
+### Three kinds of "no remote"
+
+`--apply` creates the missing repo (org-default visibility per `repos.edn :orgs` — this is
+new-repo creation under `new-project-scaffold`'s standing authorization, *not* the
+"公開リポ化" that needs prior confirmation). But the three cases need different handling:
+
+| Case | Handling |
+|---|---|
+| has commits, no GitHub repo | `gh repo create --source --push`, then land normally |
+| **no commits at all** (placeholder branch) | `--push` has nothing to push. Create the empty repo, then land via a **parentless root commit** through the git API — the local checkout is never touched. |
+| **repo exists upstream, local lost its `origin`** | Don't create anything — reattach. Measured: `kotoba-lang/org-threejs` looked local-only but existed on GitHub with 10 of its 12 files already landed. |
+
+Check for the existing repo *before* creating one, or you mint duplicates.
 
 ## Core rules
 
