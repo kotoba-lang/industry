@@ -331,6 +331,26 @@ skill `new-project-scaffold` を参照。
 - ユーザーが「git pull」とだけ指示した場合も、上記の main 同期 + `west update`
   まで含めて実行する（プルだけで終わらせない）。
 
+- **本番デプロイは `origin/main` を包含した checkout からのみ行う。** デプロイは
+  push と違って fast-forward 検査を持たない——**最後に実行した人が勝つ**ので、
+  main より古い checkout から出荷すると、その間に他セッションが入れた変更を
+  黙って巻き戻す。実インシデント（2026-07-25）: kotobase.net の signup funnel が
+  404 だったのを直して 07:01 に deploy した11分後、別セッションが**その変更を
+  含まない古い checkout** から同じ Worker を deploy し、funnel が 404 に戻った
+  （誰も気付かなかった）。デプロイ前に:
+
+  ```bash
+  git fetch origin && git merge --ff-only origin/main   # FF 不可なら乖離。rebase しない
+  ```
+
+  これは PreToolUse フック `.claude/hooks/wrangler-deploy-main-sync-guard.cljs`
+  （nbb、`.claude/settings.json` に登録済み）で強制される。`wrangler deploy` /
+  `wrangler versions deploy` / `npm|pnpm|yarn run deploy` を対象に、checkout が
+  `origin/main` より遅れていれば deny する。**隔離環境（`--env <name>`：
+  staging / testnet / b2 等）と `--dry-run` はブロックしない**——feature branch を
+  隔離環境で検証するのは正常な作業であり、そこを塞ぐと検証自体ができなくなる。
+  フックは破壊的な自動同期をしない（判定と指示のみ、fail-open）。
+
 - **`git push` / PR 作成・更新の前に、superproject と west の両方を最新化してから
   行う。** push や PR（`gh pr create`/`gh pr ready`/PR への追加 commit 等）の直前に、
   逐次・省略せず、以下を必ず実行してから push/PR する:
