@@ -497,6 +497,27 @@ CertGovernor）。
   `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs count`
   `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
   属性は datascript.js 向けに **裸文字列**（`"adr/id"`、コロン無し）。
+- **この面は 90-docs だけではない（2026-07-25 拡張、ADR-2607252000）。** 企業データと
+  fleet 状態も同じ面に載っており、`:company/lei` を結合キーに **repo を跨いで join
+  できる**。出自は `"source/dataset"` で区別する（属性名に出自を埋め込むと結合キーが
+  壊れるのでそうしない）。現在載っている dataset:
+  `market-intel`（SEC EDGAR 財務。`orgs/gftdcojp/cloud-murakumo-market-intel`）/
+  `cloud-itonami-lei`（法人実体 blueprint）/ `cloud-itonami-lei-tos`（ToS アーカイブ）/
+  `fleet-db`・`fleet-db-remote`・`fleet-ci`（fleet 状態）/ `yabai-passive-dns` /
+  `tadori-threat-intel` / `toshokan-patents`。
+  ```bash
+  # 財務 × 法人実体 × ToS を 1 クエリで
+  nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
+    '[:find ?legal ?juris ?rev ?url :where
+      [?a "company/lei" ?lei] [?a "source/dataset" "market-intel"] [?a "company/revenue-usd" ?rev]
+      [?b "company/lei" ?lei] [?b "company/legal-name" ?legal] [?b "company/jurisdiction" ?juris]
+      [?c "company/lei" ?lei] [?c "tos/source-url" ?url]]'
+  ```
+  **ローダは shape 不一致を nil で握り潰す**（1 ファイルの破損で面全体を落とさないため）
+  が、握り潰した分は必ず **stderr に WARNING で報告する**（`warn-skipped!`）。
+  count が「全部載っている」ように読めてしまうのを防ぐため。新しい corpus を足す時も
+  この報告を必ず付ける。実例: tos.journal.edn の一部が source 側の破損
+  （ToS 本文の未エスケープ引用符でファイルが 1 個の巨大タプルに潰れる）で 0 entity。
 - **schema**: `manifest/schema.edn`（自動生成、手編集禁止）。
 - **検証**: `nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljs verify`。
 - **移行ツール**: `manifest/docs-edn-only.cljs`（`migrate` / `status` / `verify`）。
