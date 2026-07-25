@@ -290,5 +290,66 @@ language nest）/ 狩猟・釣り協会（ACCA・猟友会 — 農村部で消�
 ## 5-4. iteration 5 終了時点
 
 - `community-coverage`: **148 org**（source-pinned 21 / 未 pin 127）
-- 統合クエリ面の org 総数: **216**"
+- 統合クエリ面の org 総数: **216**
+
+---
+
+# Iteration 6（2026-07-25）— corpus に自己計測を持たせる
+
+## 6-1. `queries/coverage.cljs`（新規）
+
+corpus の規模だけを報告するツールは間違ったものを測っている。**未検証率・登記不可視率・地域偏り・
+「数を主張していない件数」を出す**レポータを追加した（nbb、clojure.edn 直読み、統合クエリ面不要）。
+
+```bash
+nbb 90-docs/community-coverage/queries/coverage.cljs           # 全体レポート
+nbb 90-docs/community-coverage/queries/coverage.cljs unpinned  # 未 pin 一覧
+nbb 90-docs/community-coverage/queries/coverage.cljs regions    # 地域別内訳
+```
+
+iteration 6 時点の出力（148 org / 15 カテゴリ）:
+
+- **検証**: source-pinned 24（16%、primary 14 / secondary 10）、未 pin 124（84%）
+- **登記**: mixed 48 / registered 40 / unregistered 35 / mostly-unregistered 25 →
+  **60/148（41%）が企業・LEI レジストリから不可視**
+- **entity kind**: org-form 123（83%）/ named-org 25（17%）— 未登記共同体は
+  population-level の「形態」としてしか表現できないという設計判断が数字に出ている
+- **地域偏り（是正すべき最大の穴）**: europe 37 / north-america 31 / asia-east 23 /
+  africa 16 / asia-south 13 / south-america 10 / middle-east 7 / southeast-asia 6 /
+  **oceania 5（3%）**
+- **数の誠実さ**: 64/148 のみ `:org/member-count` を主張、**148/148 が
+  `:org/member-count-basis` を持つ**、58/148 は明示的に unknown
+
+レポータは「次に pin すべき未 pin org を主張サイズ降順で 10 件」も出すので、以降の iteration は
+このキューを消化すればよい。
+
+## 6-2. 追加 pin 3 件（累計 24）
+
+| entity | pin 後 | tier |
+|---|---|---|
+| Toastmasters International | 270,000 人 / 14,200 クラブ / 148 か国（2025） | primary |
+| Freemasonry | **UGLE 単独の 17万人 / 7,000+ lodge のみ**を pin。世界総数は主張しない | primary（UGLE のみ） |
+| gram panchayat / gram sabha | **264,211 パンチャーヤト（2026-03）のみ**を pin。member 数は主張しない | secondary |
+
+後ろ2件が iteration 6 の要点である: **pin とは数を確定させることではなく、確定できる範囲を
+確定し、できない範囲を明示的に空にすること**。
+
+- **Freemasonry**: 相互承認しない obedience 群の自己申告を足すしかないため、よく引かれる
+  「世界600万人」に典拠は無い。UGLE の自己公表値だけを pin し `:org/member-count` を削除した。
+- **gram sabha**: 法律上「村の全成年有権者」なので、会員数は農村有権者人口（数億）になる。
+  iteration 1 の 8億はまさにこの取り違えだった。**機関数だけを pin**した。
+
+## 6-3. schema.edn に `:org/*` が無い件（既存の穴）
+
+`manifest/schema.edn` に `org/` 属性は **0 件**。理由は `manifest/edn-datomize.cljs` が
+「自分が変換したファイル」の属性しか登録しない設計で、90-docs 配下のデータファイルを走査しない
+ため。**これは本 corpus 固有の問題ではなく、religious-community の `:org/*` も同様に未登録**。
+共有ジェネレータ側の変更が要るので本 iteration では手を出さず、gap として記録する
+（`edn-query.cljs` は DataScript のスキーマレス動作で読めるので実害は今のところ無い）。
+
+## 6-4. iteration 6 終了時点
+
+- `community-coverage`: **148 org**（source-pinned 24 / 未 pin 124）
+- 次の作業キュー（レポータ出力）: diaspora networks 2.8億 / FIFA 2.5億 / 政党支部 2億 /
+  La Via Campesina 2億 / 遊牧民 2億 / 广场舞 1億 / 障害・Deaf 7,000万"
   :source/file "90-docs/adr/2607257200-worldwide-community-coverage-corpus.edn"}]
