@@ -497,49 +497,31 @@ CertGovernor）。
   `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs count`
   `nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q '[:find ?id :where [?e "adr/id" ?id] [?e "adr/status" "accepted"]]'`
   属性は datascript.js 向けに **裸文字列**（`"adr/id"`、コロン無し）。
-- **この面は 90-docs だけではない（2026-07-25 拡張、ADR-2607252000）。** 企業データと
-  fleet 状態も同じ面に載っており、`:company/lei` を結合キーに **repo を跨いで join
-  できる**。出自は `"source/dataset"` で区別する（属性名に出自を埋め込むと結合キーが
-  壊れるのでそうしない）:
-  - `market-intel`（5,200 社、SEC EDGAR 財務。`orgs/gftdcojp/cloud-murakumo-market-intel`）
-  - `cloud-itonami-lei`（155 社の法人実体 blueprint）/ `cloud-itonami-lei-tos`（ToS アーカイブ）
-  - `itonami-fleet-audit` / `repo-maturity`（fleet 状態）
-  ```bash
-  # 財務 × 法人実体 × ToS を 1 クエリで（実測 69 社が結合可能）
-  nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
-    '[:find ?legal ?juris ?rev ?url :where
-      [?a "company/lei" ?lei] [?a "source/dataset" "market-intel"] [?a "company/revenue-usd" ?rev]
-      [?b "company/lei" ?lei] [?b "company/legal-name" ?legal] [?b "company/jurisdiction" ?juris]
-      [?c "company/lei" ?lei] [?c "tos/source-url" ?url]]'
-  ```
-  **ローダは shape 不一致を nil で握り潰す**（1 ファイルの破損で面全体を落とさないため）
-  が、握り潰した分は必ず **stderr に WARNING で報告する**（`warn-skipped!`）。
-  count が「全部載っている」ように読めてしまうのを防ぐため。新しい corpus を足す時も
-  この報告を必ず付ける。実例: tos.journal.edn 155 件中 9 件が source 側の破損
-  （ToS 本文の未エスケープ引用符でファイルが 1 個の巨大タプルに潰れる）で 0 entity。
-- **まだこの面に載っていないもの**: `manifest/fleet-db.edn` / `fleet-ci.edn`、
-  各 `cloud-itonami-*` repo 自身の `80-data`（lei 系以外）。
 - **schema**: `manifest/schema.edn`（自動生成、手編集禁止）。
 - **検証**: `nbb --classpath ".:scripts/nbb_compat" manifest/docs-edn-only.cljs verify`。
 - **移行ツール**: `manifest/docs-edn-only.cljs`（`migrate` / `status` / `verify`）。
 - multi-entity catalog（`*.datoms.edn`）は複数 entity のまま、query ローダが全 entity を読む。
 - 新規 ADR は最初から `.edn` tx-data で書く（`.md` を起こしてから変換しない）。
-- **status `accepted` の既存 ADR を修正するときは、`:adr/body`（や他の attribute）を直接
-  上書きしない。** `nbb --classpath ".:scripts/nbb_compat" scripts/adr-ledger-append.cljs
-  --adr <id> --type <amend|status-change|supersede|note> --summary "..." [--body "..."]
-  [--related id1,id2]` で `90-docs/adr-ledger/adr-ledger.edn`（append-only、1行1EDN map、
-  `manifest/edn-query.cljs` が `adr/id` で base ADR と join してロードする）に追記する
-  （ADR-2607181900、詳細は ADR-2607173000 decision item 6「Historical ADR prose is not
-  mass-rewritten」の理由節）。理由: DataScript（`manifest/edn-query.cljs` が使う実装）には
-  Datomic の `d/as-of`/`d/history` に相当する transaction-history API が無く、各 query 実行は
-  その時点のファイル内容を毎回新しく transact するだけなので、本文を上書きすると
-  git 履歴にバイトは残っても query 可能な形では失われる（ledger append.script 自身の
-  header comment に詳細）。**例外**: まだ `accepted` になっていない draft の推敲、
-  typo/parse エラーなど非実質的な訂正、および ADR 内の既存「Progress addendum」節への
-  地の文追記（2607173000 のように元々その様式で運用されているファイルへの追加のみ、
-  新規にこの様式を始めない）はこの限りでない。`90-docs/adr-ledger/adr-ledger.edn` 自体も
-  手編集禁止 — 追記は必ず `scripts/adr-ledger-append.cljs` 経由（`:event/seq` の単調性を
-  保証するのはこのスクリプトだけ）。
+- **文書は「最新状態のみ」を表す。履歴は git に任せる**（オーナー判断 2026-07-25、
+  ADR-2607257000）。`status accepted` の ADR であっても、決定が変わったり現在地が
+  進んだりしたら **`:adr/body` や `:adr/status` をその場で書き換える**。同じ規則が
+  `90-docs/` の md・`90-docs/task-graphs/*.datoms.edn`（`:task/status` を直接更新）・
+  子リポの `docs/*.md` にも適用される。**append-only の「追記して既存行は触らない」
+  運用はしない。** 何がいつ変わったかは `git log -p <file>` / `git blame` が持つ。
+  - **旧方式は撤去済み**: `90-docs/adr-ledger/adr-ledger.edn` と
+    `scripts/adr-ledger-append.cljs`、`90-docs/task-graphs/task-graph-ledger.edn` と
+    `scripts/task-graph-ledger-append.cljs` は削除した。既存 76 件の ADR amendment は
+    `scripts/fold-adr-ledger.cljs` で各 ADR の `:adr/body` 末尾「## 改訂履歴」節へ
+    統合済み。**これらのスクリプトを再導入しない**。ADR-2607181900 の ledger 部分と
+    ADR-2607173000 decision item 6、ADR-2607202800 の ledger 半分を supersede する。
+  - **書き換えの作法**: 決定を反転させるときは古い記述を黙って消さず、`:adr/status` を
+    `superseded` にして後継 ADR を `:adr/superseded-by` で指すか、本文に「いつ・なぜ
+    変えたか」を1〜2文残す。読み手が現在地を1回で読めることが目的であって、
+    経緯の抹消が目的ではない。
+  - **例外（従来どおり append-only を維持する）**: `90-docs/business/canvas-ledger.edn`・
+    `90-docs/design-quality/design-quality-ledger.edn`・`manifest/fleet-db.ledger.edn`。
+    これらは「文書」ではなく**測定・イベント列**（時系列そのものが値）または**署名付き
+    VCS プレーン**で、上書きすると時系列分析や quorum モデルが壊れる。
 
 ## LLM モデル選択 — murakumo-main alias（repo-wide mandatory、2026-07-17、ADR-2607173100）
 
@@ -629,8 +611,12 @@ ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics に�
   への新規登録は人間レビューを要する大きな決定で routine が自動でやることではない
   （`90-docs/adr/2607021600` 「書き換え禁止」）。これらは代わりに **standalone パターン**
   （`local-murakumo`: ADR-2607121600、`net-babiniku`: ADR-2607122300 が先例）を使う:
-  - 対象 repo 自身に `docs/bmc-lean-loop-log.md` を作り、そこに append-only で
-    `## Iteration N — <date>` を積む（既存 iteration は編集・削除しない）。
+  - 対象 repo 自身に `docs/bmc-lean-loop-log.md` を作り、`## Iteration N — <date>` を
+    積む。**過去 iteration の記述が誤っていた／陳腐化したと分かったらその場で直す**
+    （2026-07-25 のオーナー判断で append-only を撤回。ADR-2607257000。変更の経緯は
+    `git log -p docs/bmc-lean-loop-log.md` が持つ）。ただし後知恵で「当時こう見えていた」
+    という観測記録を書き換えて成功譚に整形しない — 誤りは誤りとして直し、
+    捏造はしない。
   - superproject（`com-junkawasaki/root`）側に、その反復トラッキングを開始する決定を
     記録する ADR（md+edn ペア）を作る。
   - 対象 repo が独自の `90-docs/adr/` 番号体系を持つ場合（`jk-luxury` 系リポジトリの

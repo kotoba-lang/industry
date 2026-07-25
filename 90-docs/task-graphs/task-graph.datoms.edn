@@ -1,19 +1,22 @@
-;; 90-docs/task-graphs/task-graph.datoms.edn — base catalog of task-dependency
+;; 90-docs/task-graphs/task-graph.datoms.edn — catalog of task-dependency
 ;; graphs ("workflows"), DataScript/Datomic-transactable tx-data (same shape
-;; as 90-docs/adr/*.edn). This file declares TOPOLOGY ONLY (workflow ids,
-;; task ids, :task/requires edges) — it is never hand-rewritten to reflect
-;; progress. Progress (started/completed/blocked) is recorded as append-only
-;; events in 90-docs/task-graphs/task-graph-ledger.edn (via
-;; scripts/task-graph-ledger-append.cljs) and PROJECTED against this base by
-;; scripts/task-graph-query.cljs's `ready-tasks` — the same
-;; base-file+append-only-ledger split used by 90-docs/adr-ledger/adr-ledger.edn
-;; and 90-docs/business/canvas-ledger.edn, for the same reason (DataScript has
-;; no as-of/history API; re-parsing a hand-edited base loses the trail).
-;; See ADR-2607202800.
+;; as 90-docs/adr/*.edn). It declares both the TOPOLOGY (workflow ids, task
+;; ids, :task/requires edges) and the CURRENT STATE of each task
+;; (:task/status, :task/status-at, :task/status-note).
+;;
+;; Edit entries IN PLACE to reflect the latest state — `git log -p` on this
+;; file is the history. Owner decision 2026-07-25 (ADR-2607257000) retired the
+;; former append-only 90-docs/task-graphs/task-graph-ledger.edn +
+;; scripts/task-graph-ledger-append.cljs split (which existed because
+;; DataScript has no as-of/history API); its two events were folded into the
+;; :task/status fields below. Supersedes the ledger half of ADR-2607202800.
+;;
+;; :task/status — :pending (default when the key is absent) | :dispatched |
+;; :started | :completed | :blocked | :skipped. scripts/task-graph-query.cljs
+;; reads it directly to compute the ready set.
 ;;
 ;; Adding a new workflow: append a new :workflow/id block + its :task/id
-;; entries to this vector (this file itself IS append-friendly at the
-;; workflow granularity — only *existing* entries must not be rewritten).
+;; entries to this vector.
 ;; :task/requires lists sibling :task/id strings within the same workflow.
 
 [{:db/id -1
@@ -29,7 +32,10 @@
   :task/kind "config-change"
   :task/repo "kotoba-lang/kotoba"
   :task/requires []
-  :task/external-gate false}
+  :task/external-gate false
+  :task/status :completed
+  :task/status-at "2026-07-20T11:59:52.832Z"
+  :task/status-note "kotoba-lang/kotoba#merge 3f0ff97fb2 — .gitattributes に *.kotoba linguist-language=Clojure を追加、main へマージ済み"}
 
  {:db/id -3
   :task/id "G-grammar-repo"
@@ -38,7 +44,10 @@
   :task/kind "new-repo-scaffold"
   :task/repo "kotoba-lang/kotoba-syntax"
   :task/requires []
-  :task/external-gate false}
+  :task/external-gate false
+  :task/status :dispatched
+  :task/status-at "2026-07-21T04:42:13.062Z"
+  :task/status-note "posted WorkItem taskgraph:kotoba-github-linguist-recognition:G-grammar-repo (kind=business)"}
 
  {:db/id -4
   :task/id "E-editor-extension"

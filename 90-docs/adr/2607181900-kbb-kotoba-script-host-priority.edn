@@ -141,4 +141,4 @@ ADR-2607171700（`.kotoba`/`.cljk`/`.cljc` source contract）
 - `orgs/kotoba-lang/kotoba/bin/kotoba-clj` + `src/kotoba/launcher.clj`
   （現行 `kotoba run` は JVM 経由）
 - ADR-2607100100（app/library 第一 runtime 順序）
-- ADR-2607173000（fleet-wide bb→nbb retirement、進行中）"}]
+- ADR-2607173000（fleet-wide bb→nbb retirement、進行中）\n\n## 2026-07-25 — ledger 運用部分は撤回（ADR-2607257000）\n\n本 ADR が導入した `90-docs/adr-ledger/adr-ledger.edn` + `scripts/adr-ledger-append.cljs` の append-only 運用は、オーナー判断（2026-07-25）で撤回された。ADR は最新状態のみを記述し、その場で書き換える。履歴は git が持つ。ledger と追記スクリプトは削除済み、既存 77 events は各 ADR 本文の「## 改訂履歴」節へ統合済み。**kbb > nbb >（退役 bb）の script-host 優先順位という本 ADR の主決定は生きている** — 撤回されたのは ledger 運用部分のみ。詳細は ADR-2607257000。"}]

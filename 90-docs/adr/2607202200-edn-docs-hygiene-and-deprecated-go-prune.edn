@@ -25,4 +25,11 @@
   :adr/consequences ["The historical archive no longer contains Go module metadata."
                      "90-docs has one canonical serialization and no Markdown ADR source files."
                      "The verifier rejects partially identified single-ADR transaction vectors instead of checking only their first entity."]
-  :adr/body "# ADR-2607202200\n\nThe final deprecated Go archive metadata was pruned with Git history retained as provenance. The superproject documentation backlog was reduced from md=3 / parse-errors=1 / not-tx=4 / path-md-refs=7 to zero in every category, and the EDN verifier now validates :db/id across all entities in a single-ADR transaction vector."}]
+  :adr/body "# ADR-2607202200\n\nThe final deprecated Go archive metadata was pruned with Git history retained as provenance. The superproject documentation backlog was reduced from md=3 / parse-errors=1 / not-tx=4 / path-md-refs=7 to zero in every category, and the EDN verifier now validates :db/id across all entities in a single-ADR transaction vector.\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-23 — note
+
+kotoba-lang/compiler ADR 0050-0061 (全merge済み) が state capability kit のCanonical ABI境界越えと初の実providerロジックを実Wasmtime実行で証明。gap-disposition (a) の文字列primitiveギャップは解消。(b) の :wasm-aot :pending は意図的に維持 (native-AOT/JIT完全未着手・他6kit未実装のため)。詳細は90-docs/adr/2607231830参照
+
+cloud-itonami isic/isco/iso3166/unspsc/cofog/gtin wave (294 repos) の not-yet-actionable 判定は変わらず。native-AOT対応はrecord/variant値表現が皆無なため独立した大型後続イニシアチブと判明、次はその基礎作業に着手する方針
+"}]

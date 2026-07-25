@@ -129,4 +129,11 @@ lease (kotoba.fleet.lease)
    commit・pin 検証（ADR-2607022900）を governor 側の不変条件として実装する。
 4. 常設 tick 化（murakumo 上 or LaunchAgent）と、receipt の署名（fleet-ci と同じ
    narrow-scope key 方式）。
+\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-25 — amend
+
+Gap A1 closed: agent-authored code now runs under an OS-level exec backing (macOS Seatbelt), admitted by the governor, with a runnable negative control
+
+The PoC confined the file tools but not execution. Since the agent writes the code that :test-cmd runs, every session was arbitrary code execution as the node user — measured on naphtali with the backing disabled, all six escapes succeed (read ~/.ssh, list the node home, curl egress, node egress, write to home, write outside the sandbox). Closed in kotoba-fleet 1de9950: exec! is the single path by which agent-authored code runs and applies a Seatbelt profile that denies all network, denies reads under the node's real home, and permits writes only inside the ephemeral sandbox (HOME/TMPDIR redirected into it). Each session probes its own containment before the first model call and fails closed; --exec-probe --backing none is the negative control, because a probe that cannot fail proves nothing. Admission rules moved to a pure fleet.gate ns and the governor now REJECTS a payload that ran unsandboxed or whose probe leaked, even with green tests — opting out is a property of the work-unit (:allow-unsandboxed-exec), not of the runtime. Our own git calls use core.hooksPath=/dev/null so agent-written .git/hooks are not an execution path. Verified: selftest 25 checks; naphtali blocks 6/6 with the backing and leaks 6/6 without it; the same kotoba-delta work-unit still lands green end to end (5 turns / 28s / 1545B patch; 6 tests / 38 assertions verified independently on the materialized tree). Remaining: this is still a shared macOS node, not a container or microVM — a contained process shares the kernel and can see other processes; the backing is a value so a container backing can be added without touching the loop, tools or gate. Related gaps A3/B1/B2/C1 from the same review are untouched.
 "}]

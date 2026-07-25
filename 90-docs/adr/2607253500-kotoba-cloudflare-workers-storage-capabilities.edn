@@ -127,4 +127,55 @@ guest には新しい import も handle も `env` も渡らない。**漏らせ�
 
 # 実装時に踏んだ罠（記録）
 
-`cloudflare.workers.policy/placeholder-count`（SQL の `?` を数えて宣言 arity と突き合わせる）を最初 `(int (nth sql j))` で書いたところ、**ClojureScript の `int` は `(bit-or x 0)` なので非数値文字列を 0 に強制する** — `(int \",\")` が `0` になり、数字 `0` と区別が付かず「全ての文字が数字に見える」バグになった。JVM では `nth` が Character を返すため通り、nbb でのみ失敗する典型的な `.cljc` 非対称性。reader conditional による `char-code` ヘルパに書き換えて解消（`command.cljc` の UTF-8 byte 計算は最初からこの形だったので無傷）。**同一 `.cljc` を 2 runtime で走らせる parity が、まさにこれを捕まえた。**"}]
+`cloudflare.workers.policy/placeholder-count`（SQL の `?` を数えて宣言 arity と突き合わせる）を最初 `(int (nth sql j))` で書いたところ、**ClojureScript の `int` は `(bit-or x 0)` なので非数値文字列を 0 に強制する** — `(int \",\")` が `0` になり、数字 `0` と区別が付かず「全ての文字が数字に見える」バグになった。JVM では `nth` が Character を返すため通り、nbb でのみ失敗する典型的な `.cljc` 非対称性。reader conditional による `char-code` ヘルパに書き換えて解消（`command.cljc` の UTF-8 byte 計算は最初からこの形だったので無傷）。**同一 `.cljc` を 2 runtime で走らせる parity が、まさにこれを捕まえた。**\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-25 — note
+
+着地確認 + 実装中に踏んだ運用インシデント5件（gen-west-manifest の無関係pin混入 / ADR id 衝突 / 共有checkout干渉2件 / ledger seq 衝突）と deps.edn 後追い修正
+
+## 着地状態（2026-07-25 検証）
+
+- repo: kotoba-lang/com-cloudflare-workers (public), pin 1b2a7a461b2e
+- west 登録済み（manifest/west.yml + repos.edn :extra-projects、single-entry diff 5行）
+- 検証: nbb 42 tests / 221 assertions、JVM Clojure 34 / 191（同一 .cljc）、clj-kondo 0 errors 0 warnings
+
+## deps.edn 後追い修正（pin 1b2a7a461b2e）
+
+:test alias が `-n` で3つの namespace を列挙していたため、後から .cljc テストを追加しても JVM 実行から黙って漏れる状態だった — **parity 証拠が「失敗するテスト」を一つも出さずに劣化する**形。`-d test` による discovery に変更した。cognitect test-runner は .clj/.cljc のみ走査するので、workerd 専用の provider_test.cljs は列挙ではなく構造的に除外される。
+
+## 運用インシデント（記録）
+
+### 1. gen-west-manifest.cljs --entry が無関係な pin を書き込んだ
+
+`--entry com-cloudflare-workers` を指定したにもかかわらず、west.yml に **24 件の無関係な pin 変更**（cloud-itonami-assoc-* / isic-1101 / dynamics / kagami / loop-system-dynamics）と 6 件の rad-rid userdata 追加が書き込まれた。スクリプト自身が「対象外の変更 pin 24 件は検証しません(呼び出し側が書き込む entry のみ検証)」と表示しており、**検証していない pin を書き込むこと自体は止めない**。
+
+これらはローカル子リポ checkout の HEAD 由来で前進とは限らない（実際、後の push guard 検証で isic-1020/1101/1200/3520/3530/4912・com-cloudflare・dynamics 等が status=behind = pin 退行と判定された）。CLAUDE.md「再生成はローカル working HEAD で pin するので、子が遅れていると黙ってロールバックする＝pin 退行の罠」の再現。
+
+対応: west.yml を HEAD から復元し自分の 5 行 entry のみをテキスト挿入（API single-entry route と同等の最小 diff）。**follow-up 候補: --entry 指定時は対象 entry 以外の pin 変更を書き込まない、または明示 opt-in を要求するようスクリプトを直す。**
+
+### 2. ADR id 衝突（2607252300）
+
+採番時にローカル 90-docs/adr/ を確認して空きと判断したが、作業中に並行セッションが upstream で 2607252300 を確保していた（2607252300-murakumo-gpu-market-page-affiliate-monetization + ledger seq 69）。origin/main から worktree を切った時点で初めて気付き、2607253500 に採番し直した（ADR / README / capability_descriptors.edn の参照も更新）。
+
+教訓: **採番前に必ず origin/main を fetch する。** ローカルのみの確認では並行セッションの取得分が見えない。
+
+### 3. 共有 checkout での並行セッション干渉（2件）
+
+(a) 自分の commit 作成後、共有 working tree の west.yml に並行セッションが 4 件の pin 変更（cloud-itonami-isco-1213/1222 ほか）を書き込み、それが自分の commit に混入した。→ working tree のコピーを退避 → west.yml を HEAD~1 から再構築 → 自分の entry のみ commit → 退避コピーを書き戻して相手の WIP を温存。
+
+(b) ローカル main の後片付けで `git reset --soft HEAD~1` を実行したところ、その間に並行セッションが自分の commit の上に commit（074f05dbbc0）しており、**相手の commit をブランチから外した**。reflog から `git reset --soft 074f05dbbc0` で即座に復元し、index が HEAD 一致であることを確認。
+
+教訓: CLAUDE.md「superproject 本体 checkout は統合・閲覧専用」は正しい。**共有 checkout の main に対する reset/commit は、自分の commit を戻すだけの目的でも行わない** — HEAD が今も自分のものである保証がないため。作業は sibling worktree に閉じる。
+
+### 4. ledger seq 衝突（このイベント自身）
+
+本 note を最初に共有 checkout で append したところ seq 68 が割り当てられたが、**upstream には既に別 ADR の seq 68（:amend, adr-2607252100）と seq 69 が存在**していた。共有 checkout が origin/main から 58 commits 遅れているため、スクリプトが stale なファイルから次 seq を計算したことによる。
+
+対応: 自分が追加した行だけを取り除いて共有 checkout を元の状態に戻し（並行セッションの 65-67 行は温存）、origin/main から切った worktree で append し直して正しい seq を得た。
+
+教訓: **adr-ledger への append は origin/main と同期した checkout（または origin/main から切った worktree）で行う。** append スクリプトは同一ファイルへの同時書き込みは lock で守るが、**stale なファイルから採番することは防げない**。follow-up 候補: append 時に origin/main の ledger 末尾 seq と突き合わせて遅れを検出する。
+
+### 5. ローカル main の重複 commit（未解消・引き継ぎ）
+
+登録 commit 2068fb15577 がローカル main にあり、upstream には cherry-pick 版 dd0e5a708af として着地済み。ローカル main は origin/main から大きく behind。同期時に repos.edn（単一巨大行）で衝突しうる。上記 3(b) を踏まえ自分では触らず、乖離解消と併せて git-cleanup-conflict skill で扱うべき事項として残した。
+"}]

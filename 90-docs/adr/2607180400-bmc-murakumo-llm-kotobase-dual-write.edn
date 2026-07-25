@@ -62,4 +62,11 @@ kotobase storage`. Answer was no; this ADR lands the missing two edges.
 - Routines (`itonami-react-growth-hourly` / `bmc-business-operate-daily`)
   inherit `auto` + dual-write on next deploy of this superproject path;
   set `BMC_ADVISOR=gate` if a host cannot reach murakumo.
+\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-22 — amend
+
+Reconciled onto current main as PR #1039 (not the original rescue PR #898); fixed a real regression found during reconciliation and relocated a transport-layer helper
+
+The rescued WIP (rescue/bmc-murakumo-kotobase-20260718, PR #898) deleted gftd.cli/normalize-llm-proposal (keyword-izes qwen3.6's string-typed :canvas/id / :proposal/action output, documented as a real observed model quirk) while replacing the old GFTD_LLM_URL/curl/SSE transport with gftd.murakumo, but nothing in the new resolve-advisor/compose-advisors pipeline replaced it -- LLM-mode proposals from the actual fleet-main model would have been silently dropped by the governor's keyword-only matching. Restored normalize-llm-proposal in gftd.cli and wired it into both :clj/:cljs branches of resolve-advisor via a new normalizing-advisor wrapper. Also relocated gftd.cli/strip-fences (markdown code-fence stripping) into gftd.murakumo/extract-content, matching its own docstring's stated transport-layer rationale, since it was deleted along with the old transport with nothing at the new transport layer replacing it. gftd.cli/sse-collect had no replacement and needed none -- it only reassembled the old streaming transport (ADR-2607172800), which make-complete's plain HTTP request/response supersedes outright. Verified via the bmc test runner: 31 tests / 161 assertions, 0 failures, 0 errors. Landed as PR #1039 (merged 2026-07-22), which closed and superseded #898.
 "}]
