@@ -86,5 +86,6 @@ launchctl kickstart -p gui/$(id -u)/com.gftd.fleet-ci-tip-tick   # 1 回だけ�
   → status は付くが「merge 前に PR を止める」用途にはまだならない。
 - GitHub Actions の `ci.yml` は **並存**（置き換えていない）。branch protection の
   required status check に `fleet-ci/murakumo/*` を指定する運用切り替えは別決定。
+- **LaunchAgent の gh token 未決**（上記）。現状の自走経路は対話セッション。
 - ADR-2607178000 の 6 時間 pin 回帰 runner は**別マシンで動き続けている**（このマシンには
   script も plist も鍵も無い。所在は未特定 — 重複 receipt は害が無いので放置している）。

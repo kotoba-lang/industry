@@ -94,18 +94,45 @@
         :out (str (or (some-> (.-stdout e) str) "") (or (some-> (.-stderr e) str) "")
                   (when-not (.-status e) (str e)))}))))
 
+;; launchd から動かす場合、gh は keyring を読めず匿名にフォールバックする（public repo の
+;; GET だけ通り、書き込みが 401）。plist に token を書くのは論外（tracked file）なので、
+;; **mode 600 のファイルから読んで子プロセスの env にだけ載せる**経路を用意する。
+;; ファイルを作るかどうかは運用判断（作らなければ preflight が理由付きで skip する）。
+(let [f (or (:gh-token-file opts) (.-FLEET_CI_GH_TOKEN_FILE js/process.env))]
+  (when (and f (fs/existsSync f))
+    (set! (.-GH_TOKEN js/process.env) (str/trim (str (fs/readFileSync f "utf8"))))))
+
 (defn gh [& args] (sh "gh" (vec args)))
 
 (defn gh! [& args]
   (let [{:keys [exit out]} (apply gh args)]
-    (when-not (zero? exit) (die (str "gh " (first args) " failed: " (str/trim out))))
+    (when-not (zero? exit)
+      ;; どの endpoint で落ちたかを必ず残す（"gh api failed: 404" だけでは追えない）
+      (die (str "gh " (str/join " " (remove #(str/starts-with? (str %) "-") args))
+                " failed: " (str/trim out))))
     (str/trim out)))
 
+(declare gh-blob-sha)
+
 (defn gh-raw
-  "repo の path を main から生バイトで取る（base64 を経由しない）。"
+  "repo の path を branch から取る。
+  第一経路は contents API の raw media type（base64 を経由しないので速い）。ただし
+  **実測（2026-07-25）で、725KB の manifest/west.yml に対してこの経路が exit 0 かつ
+  空文字列を返すことがあった**（同時刻に 172KB の fleet-ci.edn は正常）。空を掴んだまま
+  進むと『west.yml に project が 1 件も無い』＝全 repo skip という静かな無動作になるので、
+  空なら git blobs API（base64、100MB まで）へフォールバックし、それでも空なら die する。"
   [repo branch p]
-  (gh! "api" "-H" "Accept: application/vnd.github.raw"
-       (str "repos/" repo "/contents/" p "?ref=" branch)))
+  (let [raw (gh! "api" "-H" "Accept: application/vnd.github.raw"
+                 (str "repos/" repo "/contents/" p "?ref=" branch))]
+    (if (seq raw)
+      raw
+      (let [_ (log "WARN contents-raw returned empty for" p "— falling back to git blobs API")
+            b64 (gh! "api" (str "repos/" repo "/git/blobs/" (gh-blob-sha repo branch p))
+                     "--jq" ".content")
+            decoded (str (.toString (js/Buffer.from (str/replace b64 #"\s" "") "base64") "utf8"))]
+        (when (empty? decoded)
+          (die (str "could not fetch " p " from " repo "@" branch " (both contents-raw and git blobs came back empty)")))
+        decoded))))
 
 (defn gh-blob-sha
   "contents API の楽観ロック用 blob sha（ディレクトリ listing から取ると
@@ -212,6 +239,55 @@
   (fs/writeFileSync lock-file (pr-str {:pid js/process.pid :at (now)})))
 
 (defn release-lock! [] (try (fs/unlinkSync lock-file) (catch :default _)))
+
+;; ---------------------------------------------------------------------------
+;; preflight — credential が使えない context で走り始めない
+;;
+;; 実測（2026-07-25）: LaunchAgent（gui/<uid>）から起動すると macOS Keychain に
+;; 触れる 2 経路が両方だめになる:
+;;   * `gh` は keyring の token を読めず **匿名にフォールバック**する。public repo の
+;;     GET は通るので途中まで進むが、status POST / contents PUT が HTTP 401 で落ちる。
+;;   * `kagi get`（署名鍵）は Keychain の unlock prompt を出せず **120s timeout** する。
+;; 対話セッションから同じ tick を走らせると両方通る（本番 tick を実証済み）。
+;; → credential が無い context では **11 分かけて何も作らない** のをやめ、最初に
+;;   fail fast して理由をログに残す。launchd 側で使う場合は
+;;   `--signer-pem <file>`（または FLEET_CI_SIGNER_PEM）と GH_TOKEN を与える。
+
+(defn signer-pem []
+  (or (:signer-pem opts) (.-FLEET_CI_SIGNER_PEM js/process.env)))
+
+(def under-launchd?
+  ;; launchd 起動のプロセスには job label が XPC_SERVICE_NAME に入る（shell 起動だと
+  ;; 未設定か "0"）。Keychain が使えない context の判定に使う — kagi を毎 tick 叩いて
+  ;; 確かめる（= Keychain hit を増やす / 20s では終わらないこともある）のを避ける。
+  (let [x (.-XPC_SERVICE_NAME js/process.env)]
+    (boolean (and x (not= x "0")))))
+
+(defn preflight!
+  "-> nil（続行可）| 理由文字列（この tick は skip すべき）"
+  [cfg]
+  (let [{:keys [exit out]} (gh "api" "user" "--jq" ".login")]
+    (cond
+      (not (zero? exit))
+      (str "gh is not authenticated in this context (writes would 401 — public-repo "
+           "GETs still succeed anonymously, so this must be checked explicitly). "
+           "Under launchd the keyring is unreadable: pass GH_TOKEN in the LaunchAgent "
+           "env, or run the tick from an interactive session. detail: "
+           (first (str/split-lines (str/trim out))))
+
+      (and (signer-pem) (not (fs/existsSync (signer-pem))))
+      (str "--signer-pem points at a missing file: " (signer-pem))
+
+      (and under-launchd? (not (signer-pem)))
+      (str "running under launchd (" (.-XPC_SERVICE_NAME js/process.env) ") without "
+           "--signer-pem: kagi cannot show the Keychain unlock prompt there and blocks "
+           "until timeout, so no receipt could be signed. Provide FLEET_CI_SIGNER_PEM "
+           "(mode 600, the ADR-2607178000 pattern) or run the tick from an interactive session.")
+
+      :else
+      (do (log "preflight: gh authenticated as" (str/trim out)
+               (if (signer-pem) "· signer=pem" "· signer=kagi"))
+          nil))))
 
 ;; ---------------------------------------------------------------------------
 ;; kagami（fleet CLI）— **tip の kagami を使う**。ローカル checkout は west pin に
@@ -527,6 +603,11 @@
         nodes (:nodes (read-edn-file (path/join here "nodes.edn") {:nodes []}))
         _ (when-not cfg (die "gates.edn missing"))
         landing (:landing cfg)
+        skip (preflight! cfg)
+        _ (when skip
+            (log "preflight SKIP —" skip)
+            (release-lock!)
+            (js/process.exit 0))
         dry? (boolean (:dry-run opts))
         plan? (boolean (:plan opts))
         only (when (:only opts) (set (map str/trim (str/split (str (:only opts)) #","))))
@@ -608,7 +689,8 @@
                                   "ci-verify"
                                   "--db" db-file
                                   "--repos" (str/join "," (map :name prepared))
-                                  "--kagi" (or (:signer-kagi cfg) "fleet-agent-murakumo-ci")
+                                  (if (signer-pem) "--key" "--kagi")
+                                  (or (signer-pem) (:signer-kagi cfg) "fleet-agent-murakumo-ci")
                                   "--out" out-file
                                   "--policy" (:policy cfg)
                                   "--gate-timeout" (str (:gate-timeout-ms cfg))
