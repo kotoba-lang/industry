@@ -16,8 +16,17 @@
 ;;                              repo が west 登録済み。誤検出防止（実測 2026-07-22:
 ;;                              272 true-orphan-git 中 249 件がこれだった — network-isekai-*
 ;;                              / render-* 等の feature worktree を orgs/ 直下に作る運用）。
+;;   :tracked-superproject    — superproject 自身が tracked content として持っている
+;;                              （west project ではない）。**sparse-checkout でディスク上に
+;;                              materialize されていないと、中身が空/ゴミだけに見える** ので
+;;                              orphan と誤認されやすい。実測 2026-07-25: cleanup 中に
+;;                              orgs/com-junkawasaki/2604-linde が :true-orphan-nongit と
+;;                              分類され、ディスク上は .DS_Store 1個しか無いため「削除可能な
+;;                              残骸」と判断されかけたが、実際は Lean 証明 11 ファイルを
+;;                              tracked で持っていた。破壊的判断の前段でこれを分離する。
 ;;   :true-orphan-git         — local git があり west path に無い（登録 or 退役候補）
-;;   :true-orphan-nongit      — local dir のみ（scaffold 残骸等）
+;;   :true-orphan-nongit      — local dir のみ（scaffold 残骸等）。superproject にも
+;;                              tracked されていないので、消せばどこにも残らない。
 ;;   :local-root-broken       — deps.edn の :local/root が指す project が
 ;;                              未存在 or west 未登録（fresh checkout 破壊）
 ;;
@@ -126,6 +135,22 @@
                                "remote" "get-url" "origin")]
     (when (zero? exit) (not-empty (str/trim out)))))
 
+(defn tracked-in-superproject?
+  "superproject の index に <rel> 配下の tracked file があるか。
+
+  sparse-checkout 下ではディスク上の見た目と index が乖離するため、ファイル走査では
+  判定できない（materialize されていない tracked file は find に映らない）。
+  `git ls-files` は index を見るので sparse 状態に影響されない。"
+  [rel]
+  (let [{:keys [exit out]} (sh "git" "-C" root "ls-files" "--" rel)]
+    (and (zero? exit) (not (str/blank? out)))))
+
+(defn tracked-file-count [rel]
+  (let [{:keys [exit out]} (sh "git" "-C" root "ls-files" "--" rel)]
+    (if (zero? exit)
+      (count (remove str/blank? (str/split-lines out)))
+      0)))
+
 (defn worktree-scratch?
   [rel]
   (let [name (node-path.basename rel)]
@@ -161,6 +186,13 @@
          (update acc :worktree-of-registered conj
                  {:path rel :base (worktree-base-rel rel)})
 
+         ;; west project ではなく superproject 自身の tracked content。
+         ;; git? / nongit の判定より先に分離する — sparse-checkout でディスク上が
+         ;; 空に見えても index には中身があり、orphan として消してはならない。
+         (tracked-in-superproject? rel)
+         (update acc :tracked-superproject conj
+                 {:path rel :tracked (tracked-file-count rel)})
+
          (git? rel)
          (update acc :true-orphan-git conj
                  {:path rel :origin (or (git-remote rel) "")})
@@ -171,6 +203,7 @@
       :personal []
       :worktree-scratch []
       :worktree-of-registered []
+      :tracked-superproject []
       :true-orphan-git []
       :true-orphan-nongit []}
      unreg)))
@@ -247,6 +280,8 @@
     (println (str "  personal/*: " (count (:personal unregistered))))
     (println (str "  worktree/scratch: " (count (:worktree-scratch unregistered))))
     (println (str "  worktree-of-registered: " (count (:worktree-of-registered unregistered))))
+    (println (str "  tracked-superproject: " (count (:tracked-superproject unregistered))
+                  "  (NOT orphans — 消さないこと)"))
     (println (str "  true-orphan-git: " (count (:true-orphan-git unregistered))))
     (println (str "  true-orphan-nongit: " (count (:true-orphan-nongit unregistered))))
     (println (str "  local-root-broken (blocking): " (count local-root-broken)))
@@ -280,6 +315,11 @@
       (doseq [row (:path-override-leftover unregistered)]
         (println (str "  " (:path row) " → " (:maps-to row)
                       " (new-in-west=" (:target-in-west? row) ")")))
+      (println)
+      (println "## tracked-superproject (west project ではなく superproject の tracked content)")
+      (println "## sparse-checkout でディスク上が空に見えても index には中身がある。削除禁止。")
+      (doseq [row (:tracked-superproject unregistered)]
+        (println (str "  " (:path row) "  tracked-files=" (:tracked row))))
       (println)
       (println "## worktree/scratch")
       (doseq [row (:worktree-scratch unregistered)]
