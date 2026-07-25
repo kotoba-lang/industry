@@ -772,6 +772,33 @@
     (warn-skipped! "cloud-itonami-lei tos.journal.edn" @skipped)
     out))
 
+;; ---------- patent bibliographic（category J — toshokan-patents、ADR-2607251552） ----------
+;; toshokan-patents repo の 80-data/public/*.journal.edn（quads [entity attr value tx op]
+;; — toshokan と同じ ADR-2607072300 形）。lei-tos と同型でロードする。
+;; :patent/applicant-lei が埋まっていれば :company/lei と join（財務×法人×特許）。
+
+(defn toshokan-patents-entities [next-tempid!]
+  (let [dir (io/file root "orgs" "kotoba-lang" "toshokan-patents" "80-data" "public")]
+    (if-not (.exists dir)
+      []
+      (let [files (->> (.listFiles dir) (filter #(.endsWith (.getName %) ".journal.edn")) (sort-by #(.getName %)))
+            skipped (atom [])
+            out (mapcat
+                 (fn [f]
+                   (let [ents (or (not-empty (or (vector-tuple-journal-entities f) {}))
+                                  (flat-attrlist-journal-entities f)
+                                  {})]
+                     (when (empty? ents) (swap! skipped conj (.getName f)))
+                     (for [[eid attrs] ents]
+                       (assoc attrs
+                              :db/id (next-tempid!)
+                              :patent/entity-id (str eid)
+                              :source/dataset "toshokan-patents"
+                              :source/file (str f)))))
+                 files)]
+        (warn-skipped! "toshokan-patents journal" @skipped)
+        out))))
+
 ;; ---------- fleet 状態データ（category K） ----------
 ;; どちらも「A vector of DataScript/Datomic-transactable entity-maps」と自ら
 ;; 宣言しているのに、この面の manifest corpus（repos.edn /
@@ -922,6 +949,7 @@
                           (fleet-ci-entities next-tempid!))
         yabai-tx (yabai-passive-dns-entities next-tempid!)
         tadori-tx (tadori-threat-intel-entities next-tempid!)
+        patent-tx (toshokan-patents-entities next-tempid!)
         all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
                                                      biz-tx canvas-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
@@ -929,7 +957,7 @@
                                                      proc-registry-tx merged-kotoba-tx
                                                      working-doc-tx narrative-tx
                                                      company-tx fleet-tx
-                                                     yabai-tx tadori-tx)))]
+                                                     yabai-tx tadori-tx patent-tx)))]
     (.transact ds conn all-tx)
     {:conn conn
      :adr-count (count adr-tx)
@@ -948,28 +976,29 @@
      :company-count (count company-tx)
      :fleet-count (count fleet-tx)
      :yabai-count (count yabai-tx)
-     :tadori-count (count tadori-tx)}))
+     :tadori-count (count tadori-tx)
+     :patent-count (count patent-tx)}))
 
 (defn -main [& args]
   (let [[mode query-str] args
         {:keys [conn adr-count docs-count manifest-count foreign-adr-count biz-count
                 kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                narrative-count company-count fleet-count yabai-count tadori-count]}
+                narrative-count company-count fleet-count yabai-count tadori-count patent-count]}
         (build-conn)
         total (+ adr-count docs-count manifest-count foreign-adr-count biz-count
                  kj-count rad-count
                  etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                 narrative-count company-count fleet-count yabai-count tadori-count)]
+                 narrative-count company-count fleet-count yabai-count tadori-count patent-count)]
     (case mode
       "count"
       (println (format (str "adr=%s docs=%s manifest=%s foreign-adr=%s biz=%s kj=%s rad=%s "
                              "etzhayyim-80-data=%s proc-registry=%s merged-kotoba=%s working-doc=%s "
-                             "narrative=%s company=%s fleet=%s yabai=%s tadori=%s total=%s")
+                             "narrative=%s company=%s fleet=%s yabai=%s tadori=%s patent=%s total=%s")
                         adr-count docs-count manifest-count foreign-adr-count biz-count
                         kj-count rad-count
                         etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                        narrative-count company-count fleet-count yabai-count tadori-count total))
+                        narrative-count company-count fleet-count yabai-count tadori-count patent-count total))
 
       "q"
       (println (pr-str (js->clj (.q ds query-str (.db ds conn)))))
