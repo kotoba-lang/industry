@@ -1,0 +1,117 @@
+[
+;;; ============================================================
+;;; COMMUNITY COVERAGE TAXONOMY
+;;; ============================================================
+;;; ADR-2607257200. Companion vocabulary for 90-docs/community-coverage/*.edn.
+;;;
+;;; Why this exists: 90-docs/religious-community/ models organizations with a
+;;; comparative mental-model schema but only instantiates 12 orgs (7 religious,
+;;; 5 secular). Worldwide community coverage — and in particular the vast
+;;; population of UNREGISTERED / informal organizations (町内会, 講/ROSCA,
+;;; ultras, clan councils, Discord servers) — was not represented at all.
+;;; This corpus reuses the same :org/* attribute names so both datasets join
+;;; on the unified query plane (manifest/edn-query.cljs), and is distinguished
+;;; by :source/dataset "community-coverage" (ADR-2607252000 convention).
+;;;
+;;; Loader note: manifest/edn-query.cljs assigns :db/id per file and flattens
+;;; keyword values to bare strings. Join keys are therefore written as flat
+;;; scalar keywords (:org/category :cat-local-place), NOT lookup-ref vectors
+;;; (which would be pr-str'd into opaque blobs).
+
+;;; ---------- category taxonomy (the 8 axes the owner named) ----------
+
+{:community-category/id :cat-local-place
+ :community-category/name "地方・地縁 (local / place-based)"
+ :community-category/name-en "Local and place-based community"
+ :community-category/description "Membership follows from residence in a place: neighborhood associations, village assemblies, residents' committees, commons/land-holding collectives, homeowner associations."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-sports
+ :community-category/name "スポーツ (sport)"
+ :community-category/name-en "Sport clubs, leagues and supporter communities"
+ :community-category/description "Amateur/community sport clubs, member-owned professional clubs, supporter and ultras groups, informal pickup play, running/parkrun style open events, esports clans."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-fraternal
+ :community-category/name "結社 (fraternal / sworn societies)"
+ :community-category/name-en "Fraternal orders, service clubs and secret societies"
+ :community-category/description "Initiatory or oath-based membership bodies and service clubs: masonic and para-masonic orders, service clubs, collegiate fraternities, native-place and lineage-adjacent sworn societies."
+ :community-category/typical-registration :mixed
+ :community-category/scope-exclusion "Criminal organizations (mafia-type sworn groups) are deliberately out of scope for this corpus."
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-labor-coop
+ :community-category/name "組合 (unions, cooperatives, guilds)"
+ :community-category/name-en "Labor unions, cooperatives and guilds"
+ :community-category/description "Worker organization and member-owned economic bodies: trade union confederations, cooperatives (consumer, agricultural, worker, credit), craft/merchant guilds, informal-sector worker associations."
+ :community-category/typical-registration :mostly-registered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-mutual-aid
+ :community-category/name "相互扶助コミュニティ (mutual aid)"
+ :community-category/name-en "Mutual aid and rotating-savings communities"
+ :community-category/description "Reciprocal-obligation communities that mostly never register: rotating savings and credit associations (講/tanda/susu/stokvel/chit), burial societies, disaster volunteer networks, gift/Buy-Nothing groups, hometown associations, time banks."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-international
+ :community-category/name "国際 (transnational movements and INGOs)"
+ :community-category/name-en "International movements, INGOs and fellowships"
+ :community-category/description "Communities whose membership crosses borders by design: scouting, hospitality networks, anonymous fellowships, transnational social movements, diaspora networks, global federations of local clubs."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-traditional
+ :community-category/name "伝統・慣習共同体 (traditional / customary)"
+ :community-category/name-en "Traditional, customary and indigenous communities"
+ :community-category/description "Authority derived from custom, descent or ritual rather than statute: indigenous confederacies and councils, clan/lineage associations, age-set systems, festival (matsuri) bodies, customary village assemblies, chiefly systems."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-online
+ :community-category/name "ネットコミュニティ (online-native)"
+ :community-category/name-en "Online-native communities"
+ :community-category/description "Communities constituted primarily through a network platform or protocol: FOSS project communities, wiki communities, forum/subreddit/Discord/Fediverse communities, fandoms, DAOs, guilds in games."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+;;; ---------- controlled vocabularies (documented, not enforced) ----------
+
+{:vocab/id :vocab-legal-registration
+ :vocab/attribute "org/legal-registration"
+ :vocab/values ["registered" "mostly-registered" "mixed" "mostly-unregistered" "unregistered" "unknown"]
+ :vocab/note "Answers 'does this body appear in a state registry (corporate, association, charity, union) as a legal person?'. The whole point of this corpus is that :mostly-unregistered and :unregistered bodies are the majority of human community life and are absent from LEI/company registries."
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-entity-kind
+ :vocab/attribute "org/entity-kind"
+ :vocab/values ["named-org" "org-form"]
+ :vocab/note "named-org = one identifiable body (Rotary International). org-form = a population-level organizational FORM with many instances and usually no apex body (町内会, stokvels, subreddits). Worldwide coverage of unregistered community is only expressible with org-form entities; :org/instance-count-estimate carries the population size."
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-scope
+ :vocab/attribute "org/scope"
+ :vocab/values ["global" "transnational" "national" "subnational" "local-class"]
+ :vocab/note "local-class = the entity describes a class of local bodies, not a single one."
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-data-provenance
+ :vocab/attribute "org/data-provenance"
+ :vocab/values ["llm-recall-unverified" "source-pinned" "primary-document"]
+ :vocab/note "Iteration 1 of this corpus is llm-recall-unverified across the board: figures are approximate public estimates recalled without fetching the source, and MUST NOT be read as measurements. Later iterations pin each count to a dated source and flip the entity to source-pinned. Per the repo's system-dynamics rule (ADR-2607203000), an unmeasured entity is 'coverage not yet achieved', never 'out of scope' — and a recalled number is never presented as a computed one."
+ :source/dataset "community-coverage"}
+
+;;; ---------- corpus self-description ----------
+
+{:corpus/id :corpus-community-coverage
+ :corpus/name "Worldwide community coverage corpus"
+ :corpus/adr "ADR-2607257200"
+ :corpus/started "2026-07-25"
+ :corpus/iteration 1
+ :corpus/categories ["cat-local-place" "cat-sports" "cat-fraternal" "cat-labor-coop" "cat-mutual-aid" "cat-international" "cat-traditional" "cat-online"]
+ :corpus/coverage-claim "This corpus does NOT claim to enumerate every community on earth. It claims that no community type is categorically excluded from the schema, and it tracks per-category coverage honestly."
+ :corpus/known-gaps "Iteration 1: all counts llm-recall-unverified; no per-org 14-axis scores (deliberately omitted rather than fabricated); thin coverage of Central Asia, Central Africa, Pacific, Caribbean, Middle East non-Gulf; religious lay confraternities are held in 90-docs/religious-community/; criminal sworn societies excluded by policy."
+ :source/dataset "community-coverage"}
+]

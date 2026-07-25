@@ -1,0 +1,226 @@
+[
+;;; 組合 (unions, cooperatives, guilds). ADR-2607257200, iteration 1 (2026-07-25).
+;;; Complements cloud-itonami ISIC 941/942/949 actors, which coordinate the
+;;; ADMINISTRATION of such bodies; this corpus describes the bodies themselves.
+;;; All counts :org/data-provenance "llm-recall-unverified" — not measurements.
+
+{:org/id :org-global-ituc
+ :org/name "International Trade Union Confederation (ITUC)"
+ :org/entity-kind :named-org
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/founding-date 2006
+ :org/instance-count-estimate 340
+ :org/member-count 190000000
+ :org/member-count-basis "llm-recall-unverified: ~191M members via ~340 affiliated national centres commonly cited."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Global confederation of national trade union centres; counterpart at the world level to employer bodies covered by cloud-itonami-isic-9411."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-jpn-rengo
+ :org/name "日本労働組合総連合会 (RENGO)"
+ :org/entity-kind :named-org
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-asia-east
+ :org/countries ["JP"]
+ :org/founding-date 1989
+ :org/member-count 7000000
+ :org/member-count-basis "llm-recall-unverified: ~7M members commonly cited; Japanese union density has fallen below 17%."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Japan's largest union confederation; spring wage offensive (春闘) coordination."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-usa-aflcio
+ :org/name "AFL-CIO"
+ :org/entity-kind :named-org
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-north-america
+ :org/countries ["US"]
+ :org/founding-date 1955
+ :org/member-count 12500000
+ :org/member-count-basis "llm-recall-unverified: ~12.5M members across ~60 affiliated unions commonly cited."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "US federation of national unions; AFSCME (already modeled in 90-docs/religious-community/sample-orgs.edn) is an affiliate."
+ :org/related-org "org-afscme"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-ica-cooperatives
+ :org/name "International Cooperative Alliance member cooperatives"
+ :org/entity-kind :org-form
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/founding-date 1895
+ :org/instance-count-estimate 3000000
+ :org/member-count 1000000000
+ :org/member-count-basis "llm-recall-unverified: ~3M cooperatives and roughly 1 billion memberships worldwide are the figures ICA commonly cites."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "One-member-one-vote enterprises across consumer, worker, producer, housing and credit sectors; the largest democratically-governed economic sector on earth."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-credit-unions
+ :org/name "Credit unions / financial cooperatives (WOCCU network)"
+ :org/entity-kind :org-form
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 1850
+ :org/instance-count-estimate 82000
+ :org/member-count 400000000
+ :org/member-count-basis "llm-recall-unverified: ~82k credit unions and ~400M members commonly cited by WOCCU."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Member-owned deposit and credit institutions serving a common bond (workplace, parish, locality)."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-jpn-ja-group
+ :org/name "JA グループ (Japan Agricultural Cooperatives)"
+ :org/entity-kind :named-org
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-asia-east
+ :org/countries ["JP"]
+ :org/founding-date 1947
+ :org/member-count 10000000
+ :org/member-count-basis "llm-recall-unverified: regular plus associate members commonly cited near 10M, with associate members now the majority."
+ :org/legal-registration :registered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Federated agricultural cooperative system spanning marketing, supply, banking (JA Bank) and insurance (JA Kyosai)."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-jpn-jccu
+ :org/name "日本生活協同組合連合会 (JCCU consumer co-ops)"
+ :org/entity-kind :named-org
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-asia-east
+ :org/countries ["JP"]
+ :org/founding-date 1951
+ :org/member-count 30000000
+ :org/member-count-basis "llm-recall-unverified: ~30M members commonly cited — roughly a quarter of Japanese households."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Consumer cooperative federation with han-group joint purchasing, a historically important women-led community structure."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-ind-amul
+ :org/name "Amul / GCMMF dairy cooperative federation"
+ :org/entity-kind :named-org
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-asia-south
+ :org/countries ["IN"]
+ :org/founding-date 1946
+ :org/member-count 3600000
+ :org/member-count-basis "llm-recall-unverified: ~3.6M milk producer members across village societies commonly cited."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Three-tier village-district-state dairy cooperative structure (the Anand pattern) linking smallholders to national markets."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-ind-sewa
+ :org/name "Self-Employed Women's Association (SEWA)"
+ :org/entity-kind :named-org
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-asia-south
+ :org/countries ["IN"]
+ :org/founding-date 1972
+ :org/member-count 2500000
+ :org/member-count-basis "llm-recall-unverified: ~2-2.5M members commonly cited."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Trade union of informal-sector women workers — the canonical case of organizing workers who have no registered employer at all."
+ :org/coverage-note "Bridges the registered and unregistered halves of this corpus: a registered union whose members' work is entirely informal."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-streetnet-homenet
+ :org/name "StreetNet International, HomeNet and waste-picker federations"
+ :org/entity-kind :named-org
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-africa
+ :org/founding-date 2002
+ :org/member-count 1000000
+ :org/member-count-basis "llm-recall-unverified: affiliate-reported membership in the high hundreds of thousands to low millions; base organizations are themselves often unregistered."
+ :org/legal-registration :mixed
+ :org/governance-model :democratic
+ :org/mission-statement "Transnational federations of street vendors, home-based workers and waste pickers — organizing the explicitly unregistered economy."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-gig-collectives
+ :org/name "Gig and platform worker collectives"
+ :org/entity-kind :org-form
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/founding-date 2016
+ :org/member-count-basis "unknown — most collectives organize on WhatsApp/Telegram with no roll; only a minority register as unions."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Rider and driver self-organization (e.g. 配達員ユニオン-type bodies, IWGB couriers, Latin American app-worker assemblies) coordinating log-offs and safety demands."
+ :org/related-category :cat-online
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-jpn-shotengai
+ :org/name "商店街振興組合 (Japanese shopping-street associations) and craft guilds"
+ :org/entity-kind :org-form
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-asia-east
+ :org/countries ["JP"]
+ :org/instance-count-estimate 13000
+ :org/member-count-basis "llm-recall-unverified: ~12-13k shopping streets surveyed nationally, many now with high vacancy."
+ :org/legal-registration :mixed
+ :org/governance-model :democratic
+ :org/mission-statement "Merchant associations governing a shared street: festival, arcade maintenance, joint marketing — a guild descendant with local territorial monopoly features."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-fairtrade-producers
+ :org/name "Fairtrade producer organizations"
+ :org/entity-kind :org-form
+ :org/category :cat-labor-coop
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-africa
+ :org/founding-date 1997
+ :org/instance-count-estimate 1900
+ :org/member-count 1900000
+ :org/member-count-basis "llm-recall-unverified: ~1,900 certified producer organizations and ~1.9M farmers and workers commonly cited."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Certified smallholder cooperatives whose premium is allocated by member assembly to community projects."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

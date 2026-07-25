@@ -1,0 +1,99 @@
+[{:db/id -1
+  :adr/id "ADR-2607257200"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607257200: 全世界コミュニティ coverage corpus — 登記されない組織を第一級に置く queryable な面を 90-docs/community-coverage に起こす"
+  :adr/status "accepted"
+  :adr/date "2026-07-25"
+  :adr/deciders "Jun Kawasaki"
+  :adr/context "オーナー指示（2026-07-25）: 「全世界のコミュニティも repo, coverage を収集、例えば地方、スポーツ、結社、組合、コミュニティ、国際、伝統、ネットコミュニティ、、などの登記されていないであろう組織も全てカバレッジを向上」。
+
+棚卸しの結果、この workspace が持っていた組織カバレッジは3層に分かれており、いずれも「登記されない共同体」を扱えていなかった:
+
+1. cloud-itonami の ISIC/ISCO actor 群（west 3,694 project 中 isic だけで 460 repo。9491 宗教団体 / 9492 政治団体 / 9499 その他会員団体 / 941・942 業界団体・労組 を含む）は、そうした団体の *事務調整* を行う actor であって、団体そのものを記述する data ではない。しかも governor が教義・政治的立場の判断を hard block しており（ADR-2607154303）、意図的に「中身」を持たない。
+2. 90-docs/religious-community/（ADR-2608180100、status draft）は 13 tradition × 14 軸の比較スキーマを持つが、実インスタンスは 11 org（宗教 7 / 世俗 4）に留まる。phase2（宗派 39 件）/ phase3（先住民・NRM 8 + 世俗 15 件）の生成スクリプトは scripts/ に存在するが出力先が /tmp のため未着地で、sample-orgs.edn は一度 revert されている（dc0142c7e4a）。
+3. 「全世界」網羅が実在するのは企業・自治体面のみ（market-intel 5,200 社 / cloud-itonami-lei 155 社 / assoc 78 / municipality 各国首都）。これらはすべて *登記された法人* を前提とし、:company/lei を結合キーにしている。
+
+つまり、町内会・講/ROSCA・ultras・氏子/宮座・clan council・Discord server といった人類の共同体生活の大半は、この workspace のどの面からも見えていなかった。LEI 面が構造的に見られない側である。ADR-2607203000（system dynamics の repo-wide rule）は「いかなる entity も categorical に除外しない」「今日数値を持たない entity はカバレッジ未達であって対象外ではない」「捏造したグローバル総計を測定値として提示しない」を要求しており、この空白はその意味で ADR-2607203000 違反の状態だった。"
+  :adr/decision "90-docs/community-coverage/ に、登記の有無を第一級の属性として持つ queryable な community corpus を新設する。
+
+## 1. 既存スキーマの語彙を再利用する（新スキーマを作らない）
+
+:org/name / :org/type / :org/governance-model / :org/founding-date / :org/member-count / :region-* は 90-docs/religious-community/ と同じ属性名を使い、同じ統合クエリ面（manifest/edn-query.cljs）で join できるようにする。出自は :source/dataset \"community-coverage\" で区別する（ADR-2607252000 の規約。属性名に出自を埋め込むと結合キーが壊れるのでそうしない）。
+
+## 2. 登記されない組織のための3つの新属性
+
+- :org/legal-registration — registered / mostly-registered / mixed / mostly-unregistered / unregistered / unknown。「州の registry に法人として現れるか」を明示する。この corpus の存在理由そのもの。
+- :org/entity-kind — named-org（Rotary International のような1つの識別可能な body）/ org-form（町内会・stokvel・subreddit のような、apex body を持たない population-level の組織 *形態*）。全世界の未登記共同体は org-form でしか表現できないため、:org/instance-count-estimate に母集団規模を持たせる。
+- :org/data-provenance — llm-recall-unverified / source-pinned / primary-document。
+
+## 3. 数値の誠実さを構造で強制する
+
+iteration 1 は全件 :org/data-provenance \"llm-recall-unverified\"。出典を fetch せずに想起した概算であり、測定値として読んではならない旨を各ファイル冒頭と taxonomy の :vocab-data-provenance に明記する。数が無いものは :org/member-count を省き :org/member-count-basis に \"unknown — ...\" と理由を書く（例: informal pickup sport、WhatsApp group communities、ROSCA の世界総数）。14軸スコアは新規 org には *付けない* — 捏造した軸値を並べるくらいなら軸が空である方が正しい（ADR-2607203000）。
+
+## 4. カテゴリ（オーナーが挙げた8軸をそのまま taxonomy 化）
+
+cat-local-place（地方・地縁）/ cat-sports（スポーツ）/ cat-fraternal（結社）/ cat-labor-coop（組合）/ cat-mutual-aid（相互扶助コミュニティ）/ cat-international（国際）/ cat-traditional（伝統・慣習）/ cat-online（ネットコミュニティ）。
+
+## 5. スコープ除外（明示）
+
+犯罪的宣誓組織（マフィア型）はモデル化しない。khap panchayat / Poro-Sande のように強制的・違法な慣行を含む団体は、記述的カバレッジとして収録し :org/coverage-note に「記述であって是認ではない」旨を書く。
+
+## 6. iteration 1 の成果（本 ADR と同時に land）
+
+9 ファイル・95 org entity。登記区分の内訳は registered 33 / mixed 25 / unregistered 22 / mostly-unregistered 15 — すなわち **39% が既存の企業レジストリ面から構造的に不可視**。"
+  :adr/consequences "- (+) 「登記されていない組織」が初めて query 可能になった。`[:find ?n :where [?e \"source/dataset\" \"community-coverage\"] [?e \"org/legal-registration\" \"unregistered\"]]` が 22 件返す。
+- (+) 既存の religious-community 面と同じ属性名なので、宗教 12 org と community 95 org を1クエリで横断できる。
+- (+) cloud-itonami の ISIC 941/942/949/9491/9492/9499 actor と概念的に接続する（actor = 事務調整、corpus = 対象そのもの）。将来 :org/isic-hint を足せば機械的に join できる。
+- (+) 数値の誠実さが構造化された（:org/data-provenance / :org/member-count-basis の \"unknown — 理由\"）。後続 iteration は「llm-recall-unverified を source-pinned に変える」という明確な作業単位を持つ。
+- (−) iteration 1 の全数値は未検証。この corpus を根拠に外部向けの主張をしてはならない。
+- (−) 地域カバレッジが偏っている（中央アジア・中央アフリカ・カリブ・太平洋・湾岸以外の中東が薄い）。
+- (−) 14軸スコアが無いため、religious-community 側の軸比較クエリ（queries/comparison.cljs）は community-coverage の org には効かない。
+- (−) manifest/schema.edn（自動生成）には新属性が未反映。CLAUDE.md の統合クエリ面の節にもこの corpus をまだ載せていない（CLAUDE.md は他セッションが未コミット編集中のため衝突回避で見送り）。
+
+## 既知のギャップ / 次の iteration
+
+1. 出典の pin（llm-recall-unverified → source-pinned）。特に町内会・stokvel・SHG・Discord のような桁が大きい entry から。
+2. phase2（宗派 39 件）/ phase3（先住民・NRM 8 + 世俗 15 件）の生成スクリプトを /tmp 出力から実ファイル着地に切り替え、religious-community 側のカバレッジを 11 → 約 73 org にする。
+3. 地域の穴埋め（中央アジア・中央アフリカ・カリブ・太平洋・中東）。
+4. ADR-2608180100（religious-community framework）は依然 draft — accepted に上げるか、本 corpus に統合するかの判断。
+5. DAO の on-chain governance と、この fleet 自身の signed-quorum governance（manifest/fleet-keys.edn、ADR-2607160005）の構造比較。"
+  :adr/related "ADR-2608180100 ADR-2607203000 ADR-2607252000 ADR-2607154303 ADR-2607081200 ADR-2607086000 ADR-2607086100"
+  :adr/body "# ADR-2607257200: 全世界コミュニティ coverage corpus
+
+**Status**: Accepted / **Date**: 2026-07-25 / **Deciders**: Jun Kawasaki
+
+## 一行で
+
+登記されない共同体（町内会・講/ROSCA・ultras・氏子・clan council・Discord server）を第一級に置いた queryable な corpus を `90-docs/community-coverage/` に起こし、iteration 1 として 95 org を land した。うち 39% は既存の企業レジストリ面から構造的に不可視な組織である。
+
+## ファイル
+
+- `90-docs/community-coverage/community-coverage-taxonomy.edn` — 8 カテゴリ + 統制語彙（legal-registration / entity-kind / scope / data-provenance）+ corpus 自己記述（:corpus/known-gaps を含む）
+- `community-orgs-local-place.edn`（13）/ `-sports.edn`（11）/ `-fraternal.edn`（10）/ `-labor-coop.edn`（13）/ `-mutual-aid.edn`（10）/ `-international.edn`（12）/ `-traditional.edn`（14）/ `-online.edn`（12）
+
+## 使い方
+
+```bash
+# 登記されていない組織だけを見る
+nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+  '[:find ?n ?cat :where [?e \"source/dataset\" \"community-coverage\"]
+    [?e \"org/legal-registration\" \"unregistered\"] [?e \"org/name\" ?n] [?e \"org/category\" ?cat]]'
+
+# 登記区分の分布
+nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+  '[:find ?reg (count ?e) :where [?e \"source/dataset\" \"community-coverage\"]
+    [?e \"org/legal-registration\" ?reg]]'
+```
+
+## 設計上の判断3点
+
+1. **新スキーマを作らず religious-community の属性名を再利用した。** 別語彙にすると同じ統合クエリ面に載っていても join できない。出自は `:source/dataset` で切る（ADR-2607252000）。
+2. **lookup-ref ベクタ（`[:region/id :region-europe]`）を使わず flat scalar keyword を使った。** `manifest/edn-query.cljs` は入れ子 vector を `pr-str` blob 化するため、lookup-ref で書くと join キーとして機能しない（religious-community 側の `:org/primary-regions` は現に blob になっている）。
+3. **新規 org に 14 軸スコアを付けなかった。** 想起ベースの軸値を並べれば「計測済みに見える捏造」になる。ADR-2607203000 が禁じているのはまさにそれ。軸は出典が付いてから足す。
+
+## 検証
+
+- `manifest/edn-query.cljs` で 95 entity がロードされ、warn-skipped の WARNING は出ない。
+- `manifest/docs-edn-only.cljs verify` は FAIL するが、原因は既存 ADR 2 件の parse error・not-tx 7 件・md path ref 2 件で、本 corpus は 1 件も flagged されていない（origin/main 時点で既に FAIL していた既存不良）。
+- `.md` は追加していない（90-docs は EDN only）。ドキュメントは本 ADR と各 EDN 冒頭のコメントが正本。"
+  :source/file "90-docs/adr/2607257200-worldwide-community-coverage-corpus.edn"}]

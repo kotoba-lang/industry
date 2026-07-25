@@ -1,0 +1,232 @@
+[
+;;; 地方・地縁 (local / place-based). ADR-2607257200, iteration 1 (2026-07-25).
+;;; All counts are :org/data-provenance "llm-recall-unverified" — approximate
+;;; public estimates recalled without fetching sources. Not measurements.
+
+{:org/id :org-jpn-chonaikai
+ :org/name "町内会・自治会 (Japanese neighborhood associations)"
+ :org/name-en "Chonaikai / jichikai neighborhood associations"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-asia-east
+ :org/countries ["JP"]
+ :org/founding-date 1940
+ :org/founding-note "Consolidated nationally under wartime tonarigumi policy; abolished by GHQ 1947; re-formed voluntarily thereafter."
+ :org/instance-count-estimate 290000
+ :org/member-count 30000000
+ :org/member-count-basis "llm-recall-unverified: roughly 290k associations; household membership commonly cited near 30M households at declining participation."
+ :org/legal-registration :mostly-unregistered
+ :org/registration-note "Most are voluntary bodies with no legal personality; a minority obtain 認可地縁団体 status under the Local Autonomy Act to hold property."
+ :org/governance-model :consensus
+ :org/mission-statement "Neighborhood self-management: festival and shrine support, waste-station upkeep, disaster preparedness, circulating notice board (回覧板), liaison with municipal government."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-usa-community-associations
+ :org/name "Community / homeowner associations (USA)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-north-america
+ :org/countries ["US"]
+ :org/founding-date 1960
+ :org/instance-count-estimate 370000
+ :org/member-count 75000000
+ :org/member-count-basis "llm-recall-unverified: ~370k associations, ~75M residents commonly cited by the Foundation for Community Association Research."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Covenant-based governance of shared residential property: assessments, common-area maintenance, architectural rules, dispute enforcement."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-chn-residents-committees
+ :org/name "居民委員会 / 村民委員会 (Chinese residents' and villagers' committees)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-asia-east
+ :org/countries ["CN"]
+ :org/founding-date 1954
+ :org/instance-count-estimate 600000
+ :org/member-count-basis "llm-recall-unverified: on the order of 110k urban residents' committees and 490k villagers' committees."
+ :org/legal-registration :registered
+ :org/registration-note "Constitutionally 'mass self-governing organizations' rather than state organs, but registered and closely supervised."
+ :org/governance-model :hierarchical
+ :org/mission-statement "Grassroots administration: mediation, public security, sanitation, welfare distribution, and transmission of policy to households."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-idn-rt-rw
+ :org/name "RT / RW (Rukun Tetangga / Rukun Warga, Indonesia)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-southeast-asia
+ :org/countries ["ID"]
+ :org/instance-count-estimate 1500000
+ :org/member-count-basis "unknown — instance count is an order-of-magnitude guess; RT units are counted per neighborhood of roughly 30-50 households."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Neighborhood mutual assistance (gotong royong), night watch (siskamling), vital-event reporting, distribution of aid."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-ind-gram-sabha
+ :org/name "Gram Sabha / gram panchayat village assemblies (India)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-asia-south
+ :org/countries ["IN"]
+ :org/founding-date 1992
+ :org/founding-note "73rd Constitutional Amendment gave panchayati raj statutory footing; village assemblies long predate it."
+ :org/instance-count-estimate 255000
+ :org/member-count 800000000
+ :org/member-count-basis "llm-recall-unverified: ~250k gram panchayats; the gram sabha is every adult resident of the village, hence the very large membership figure."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Direct village assembly: approval of local development plans, beneficiary selection, social audit of works, common-resource decisions."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-phl-barangay
+ :org/name "Barangay assemblies (Philippines)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-southeast-asia
+ :org/countries ["PH"]
+ :org/instance-count-estimate 42000
+ :org/member-count-basis "llm-recall-unverified: ~42,000 barangays covering the whole population."
+ :org/legal-registration :registered
+ :org/registration-note "Smallest statutory administrative unit, but functions in daily life as a neighborhood community body (katarungang pambarangay mediation)."
+ :org/governance-model :democratic
+ :org/mission-statement "Neighborhood governance and compulsory pre-litigation mediation of local disputes."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-uzb-mahalla
+ :org/name "Mahalla committees (Uzbekistan and Central Asia)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-asia-south
+ :org/countries ["UZ" "TJ" "KG"]
+ :org/instance-count-estimate 10000
+ :org/member-count-basis "llm-recall-unverified: roughly 10,000 mahallas in Uzbekistan."
+ :org/legal-registration :mixed
+ :org/governance-model :consensus
+ :org/mission-statement "Quarter-level mutual support: life-cycle ceremonies, elder mediation, welfare targeting; increasingly used as an administrative arm."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-mex-ejido
+ :org/name "Ejidos y comunidades agrarias (Mexico)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-north-america
+ :org/countries ["MX"]
+ :org/founding-date 1917
+ :org/instance-count-estimate 32000
+ :org/member-count 5000000
+ :org/member-count-basis "llm-recall-unverified: ~29-32k ejidos and agrarian communities holding roughly half of Mexico's land, with a few million ejidatarios."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Communal landholding and its assembly government: land allocation, forestry/water commons, collective enterprise."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-per-comunidades-campesinas
+ :org/name "Comunidades campesinas y nativas (Peru / Andes)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-south-america
+ :org/countries ["PE" "BO" "EC"]
+ :org/instance-count-estimate 7000
+ :org/member-count-basis "llm-recall-unverified: roughly 6,000-7,000 recognized peasant communities in Peru plus native communities in Amazonia."
+ :org/legal-registration :mixed
+ :org/governance-model :consensus
+ :org/mission-statement "Recognized communal landholding with rotating unpaid office (cargo) and collective work parties (faena/minga)."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-jpn-iriai
+ :org/name "入会地・財産区 (Japanese commons collectives)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :local-class
+ :org/region-primary :region-asia-east
+ :org/countries ["JP"]
+ :org/instance-count-estimate 3000
+ :org/member-count-basis "unknown — iriai rights holders are counted per commons, and many commons survive only as customary rights without registry."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Customary collective rights over forest, grassland and coastal resources; a canonical Ostrom-style commons institution."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-deu-vereine
+ :org/name "Eingetragene Vereine (German registered association sector)"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-europe
+ :org/countries ["DE"]
+ :org/instance-count-estimate 615000
+ :org/member-count 50000000
+ :org/member-count-basis "llm-recall-unverified: ~600k+ registered Vereine; memberships (not distinct persons) commonly cited near 50M."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "The default legal shell of German associational life — sport, music, fire brigade, allotment, carnival, hobby — with statutory member assembly."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-gbr-neighbourhood-watch
+ :org/name "Neighbourhood Watch schemes"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :transnational
+ :org/region-primary :region-europe
+ :org/countries ["GB" "US" "AU" "ZA" "NL"]
+ :org/founding-date 1982
+ :org/instance-count-estimate 100000
+ :org/member-count-basis "llm-recall-unverified: England and Wales alone commonly cited near 2.3M member households."
+ :org/legal-registration :unregistered
+ :org/registration-note "Individual schemes are informal; only the national umbrella bodies are registered charities."
+ :org/governance-model :consensus
+ :org/mission-statement "Resident-run crime prevention and street-level information sharing in cooperation with police."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-community-land-trusts
+ :org/name "Community land trusts"
+ :org/entity-kind :org-form
+ :org/category :cat-local-place
+ :org/type :secular-community
+ :org/scope :transnational
+ :org/region-primary :region-north-america
+ :org/countries ["US" "GB" "BE" "KE" "PR"]
+ :org/founding-date 1969
+ :org/instance-count-estimate 500
+ :org/member-count-basis "unknown — CLT counts differ widely by definition (housing-only vs. land-commons)."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Community ownership of land held in perpetuity, with tripartite boards (residents, neighbors, public interest) governing resale-restricted housing."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]
