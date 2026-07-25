@@ -1,0 +1,180 @@
+[{:db/id -1
+  :adr/id "2607252200"
+  :adr/doc_type "adr"
+  :adr/title "cloud-itonami portfolio readiness is measured by running tests, not by grepping README; isco-* gets a real ILOSTAT market size"
+  :adr/status "accepted"
+  :adr/date "2026-07-25"
+  :adr/deciders "owner (jun784), via chat directive 'do it' on the three named follow-ups"
+  :adr/topic "cloud-itonami portfolio ranking, readiness measurement, market-size sourcing"
+  :adr/related ["2607141700" "2607021500" "2607021600" "2607203000" "2607161620"]
+  :adr/source "verify_results.csv / reverify_results.csv / staleness.csv / isco_tam.json (session scratchpad); ILOSTAT rplumber API; World Bank Open Data; GLEIF"
+  :adr/last_verified "2026-07-25"
+
+  :adr/authoritative_for
+  ["Readiness of a cloud-itonami sub-repo is established by EXECUTING its test suite (clojure -M:dev:test, or -M:test where no :dev alias exists), never by looking for an ':implemented' keyword in its README. The keyword heuristic was measured wrong in both directions and must not be reintroduced as a readiness signal."
+   "Any sweep that measures repo state must record WHICH tree it measured. Local west checkouts drift from upstream; a verdict from a stale tree is not a verdict about the repo. Where local and upstream disagree, upstream HEAD wins, because upstream is what a forker receives."
+   "isco-* blueprints are scored from ILOSTAT occupation data at ISCO-08 MAJOR GROUP (1 digit) resolution only. There is no global 2- or 4-digit employment series, so repos sharing a first digit necessarily receive an identical figure and this must be labelled as a tie, not presented as per-occupation precision."
+   "ISCO-08 major groups 0, 6 and 9 stay unscored. The ILO 'World' aggregate has no employment value for them in any year of the series, so no global figure exists to cite."]
+
+  :adr/decision
+  "1. Replace the README-keyword readiness heuristic with executed test suites across all 913 product repos. 2. Treat checkout staleness as a first-class source of error: quantify it, re-run stale repos at upstream HEAD, and let upstream supersede local. 3. Score isco-* from ILOSTAT (World employment x median USD earnings x 12) at major-group resolution with the tie and upward-bias limits recorded on every row; leave groups 0/6/9 unscored. 4. Publish a price list for cloud-itonami-isic-7310, the top zero-capital-feasible blueprint, without creating any Stripe object -- that is an owner action. 5. Fix the three genuine defects the sweep surfaced, each as its own PR, and leave them unmerged for review."
+
+  :adr/artifacts
+  "{:prs [\"cloud-itonami/cloud-itonami-isic-7310#1 -- publish a price list (Managed Starter JPY 80,000/mo, matching the tier live on isic-6399), market-anchored, no Stripe object created\"
+          \"cloud-itonami/cloud-itonami-isic-2660#1 -- :phase/N keywords are unreadable on the JVM, so the medical-device governor suite had never run; 0 tests read as 0 failures\"
+          \"cloud-itonami/cloud-itonami-isic-3812#1 -- client-manifest filtered an atom, and on the wrong key depth\"
+          \"cloud-itonami/cloud-itonami-isic-6492#1 -- an absent loan application read back as a record of nils instead of nil\"]
+    :artifact \"https://claude.ai/code/artifact/d3404238-2313-4c6c-8923-7238788a4984 -- sortable ledger of all 1,226 repos with measured readiness, cited market size, and confidence tier per row\"
+    :repaired \"orgs/kotoba-lang/identity had all 17 tracked files deleted from its working tree (no modifications, no untracked files), which build-blocked isic-6493 and iso3166-jpn. Restored with git checkout -- . ; both then passed (82 and 42 tests).\"}"
+
+  :adr/body
+  "# Context
+
+An earlier pass ranked all 1,226 cloud-itonami sub-repos by
+`log10(addressable_market_usd) x readiness`. Two inputs were weak, and both were
+called out at the time rather than hidden: `readiness` came from grepping each
+README for an `:implemented` keyword, and the 251 `isco-*` rows had no market
+number at all and were flagged `unscored`.
+
+A 20-repo workflow audit then found that 16 of 20 repos it doubted were fully
+built and green -- an ~80% false-negative rate. That made the heuristic
+indefensible as anything but a placeholder, so this ADR records replacing it.
+
+# What was measured
+
+All 913 product repos (`isic-*` 439, `isco-*` 251, `iso3166-*` 223) had their
+real suite executed. Reference catalogs (`lei-*`, `assoc-*`, `municipality-*`,
+313 rows) were left out: they are read-only compliance-fact sources feeding the
+products (ADR-2607141700) and are not independently monetizable.
+
+Readiness is now taken from the observed result:
+
+    pass     -> 1.00   suite runs green
+    fail     -> 0.70   implemented, suite runs, some assertions fail
+    error    -> 0.50   code present, suite fails to load
+    no-tests -> 0.30   deps + src, no test suite
+    no-deps  -> 0.05   scaffold shell
+
+# The staleness correction, which changed verdicts
+
+The first sweep ran against LOCAL west checkouts. A batched GraphQL query against
+upstream default-branch OIDs found 92 of the 913 trees behind upstream. That is
+not a cosmetic caveat: `isco-2111` was recorded `fail` locally while its
+`origin/main` is green, because the local tree sat two commits before a commit
+titled 'fix(advisor): propagate finalized?/novel? claim flags into the proposal'.
+
+All 92 were re-run in a detached worktree at upstream HEAD. Seven verdicts
+flipped -- `isco-2111` fail->pass, and six repos recorded `no-deps` locally
+(`isic-4321`, `-5011`, `-5110`, `-8020`, `-8130`, `iso3166-hrv`) are fully built
+upstream.
+
+Two further classes of false negative came from the harness rather than the
+repos, and were eliminated rather than reported as defects:
+
+- six repos (`isic-6411/6420/6511/6512/6810/6920`) resolve a sibling
+  `:local/root \"../cloud-itonami-isic-8291\"`, which was absent beside the
+  scratchpad worktrees. With the sibling linked, all six pass.
+- `isic-6493` and `iso3166-jpn` failed on a missing manifest for
+  `kotoba-lang/identity`. That library's working tree had all 17 tracked files
+  deleted locally while upstream has them. After restoring, both pass.
+
+Final measured state of the 913: 880 pass, 25 scaffold shells, 5 with no tests,
+2 failing, 1 erroring. Zero remain unverified.
+
+# The three genuine defects
+
+Only three survived as real defects at upstream HEAD. Each is now fixed in its
+own PR, left unmerged for review.
+
+`isic-2660` is the most consequential, and it was invisible by construction.
+`medicaldevice.phase` used `:phase/0` .. `:phase/3`; Clojure's reader requires a
+keyword name to start with a non-digit, so the file was unreadable and
+`clojure -M:dev:test` reported ZERO tests. A medical-device blueprint's governor
+suite had never executed on the JVM, and zero tests is indistinguishable from
+zero failures in any summary that counts failures. Switching to the house
+convention (integer phase keys, as in `advertising.phase`) made the file readable
+and immediately exposed a second bug the syntax error had been hiding: an
+assertion checking its own input instead of the produced fact.
+
+`isic-3812` had `client-manifest` filtering an atom rather than its contents, and
+then -- once deref'd -- matching `:client-id` at the wrong depth, so it matched
+nothing.
+
+`isic-6492` returned a fully-populated application record of nils for an id that
+does not exist, because its `(:application/id m)` guard passed on a pull that
+echoes the looked-up id back. In a loan store, absent data presenting as present
+is a decision-input bug, and it reached both the `Store` and `KVStore` surfaces.
+
+# isco-* market sizing
+
+ILOSTAT (`rplumber.ilo.org`, free, no auth) yields a defensible occupation-side
+figure, parallel to what the other families use -- World Bank sector value-added
+for `isic-*`, country GDP for `iso3166-*`:
+
+    annual labour income = World employment in the ISCO-08 major group
+                           x median monthly USD earnings for that group
+                           x 12
+
+Employment comes from the ILO `World` aggregate (`EMP_TEMP_SEX_OCU_NB_A`, 2025),
+so it is not a sum over countries and cannot double-count regional aggregates --
+an earlier attempt that summed `ref_area` rows produced 24.5 billion 'workers'
+against a real global figure near 3.5 billion, which is what caught the error.
+Earnings come from `EAR_EMTA_SEX_OCU_CUR_NB_A` filtered to
+`Currency: U.S. dollars`, a countries-only series (161 areas, no aggregates).
+
+Two limits are recorded on every isco row rather than smoothed over: the series
+resolves only to 1-digit major group, so all repos sharing a first digit tie; and
+the earnings median is unweighted across reporting countries which skew rich, so
+the figures are biased UPWARD. Groups 0, 6 and 9 are absent from the World series
+in every year, so 32 rows stay `unscored`.
+
+This moves 219 of 251 isco rows from 'no number' to a real cited one, and raises
+scored rows from 623 to 877 of 1,226.
+
+# Pricing the recommendation
+
+The ranking's raw top rows are giant-economy market-entry blueprints
+(`iso3166-usa`, `-chn`, `-deu`) and telecom -- the largest markets and the worst
+zero-capital picks, since they need credentials, indemnity or licences. Filtered
+to what one operator with no capital can sell, `isic-7310` (advertising) is the
+pick: #24 of the 210 individually-researched rows, against a real ~$1.0-1.26T
+global ad spend, needing no licence, inventory or float, and selling to agencies
+that already bill monthly.
+
+A survey of all 439 `isic-*` blueprints found only 10 carrying a concrete price,
+and 7310 was not among them -- five revenue lines named, no numbers. The gap to
+revenue was never code. A price ladder is now proposed (Managed Starter
+JPY 80,000/mo, matching the tier already live on `isic-6399`, so the portfolio
+shows one ladder rather than one per blueprint), anchored to public 2026
+comparables: campaign-automation SaaS at $49-890/mo and managed-ads retainers at
+$500-15,000+/mo.
+
+It is deliberately NOT priced as the industry-standard 2-5% of ad spend. That
+model pays the operator more precisely when the client spends more, which
+contradicts the one rule the Campaign Governor enforces: a media spend over its
+authorized budget forces a hold, not an override.
+
+No Stripe object was created. That is a payment-rail action reserved for the
+owner, so the blueprint has a published price and no checkout. Portfolio-wide
+`externalPaid` remains 0 -- the rail is proven live (Stripe live mode, webhook
+ready, a 6399 Payment Link walked end-to-end to the email step) and the final
+Subscribe click has simply never been made. Per the BMC projection
+(`90-docs/business/maturity-scores.edn`, as-of 2026-07-20) that leaves
+`revenue = 1` and `distribution = 2` as the two binding constraints, and neither
+is an engineering task.
+
+# Consequences
+
+- Any future portfolio sweep must execute suites and record which tree it ran
+  against. A sweep of local checkouts alone is not evidence about the repos.
+- `readiness` values in the ranking are now falsifiable: re-run the suite.
+- isco scores differentiate 7 major groups, not 251 occupations. Anyone reading
+  a per-occupation ranking off those rows is reading a tie as a signal.
+- 25 scaffold shells (mostly `iso3166-*` agency subdivisions such as `jpn-*` and
+  `usa-*`) are confirmed unbuilt at upstream, not merely unmarked. Their high
+  raw scores come from reusing whole-country GDP for an agency, which is already
+  labelled `coarse-proxy(country-level reused for agency)`.
+- `orgs/kotoba-lang/identity` was found with its entire tracked working tree
+  deleted locally. Restored here, but the cause is unknown and other libraries
+  may be in the same state; a checkout-integrity pass over `orgs/` is worth
+  running separately."}]
