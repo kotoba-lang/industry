@@ -117,6 +117,18 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   個別 item を持ち込みたい時は `bin/kagi import onepassword <file.1pux>`。
   既存 item 例: `net-kotobase` compartment に `KOTOBA_SEED_PRODUCTION`/
   `KOTOBA_SEED_TESTNET`/`KOTOBASE_B2_*` 等。
+- **`KOTOBA_INTERNAL_SECRET`（kagi vault、compartment `net-kotobase`、2026-07-25
+  mint、ADR-2607251500）** — kotobase.net edge（Worker `net-kotobase`）と pod-less
+  backend（Worker `kotobase-cf-wasm-staging` = `backend.kotobase.net`）が共有する
+  edge-only admission の shared secret。**両 Worker に同じ値を入れる**（edge は
+  `x-internal-trust` として送出、backend は一致しない `/xrpc/*` を 401 で弾く）。
+  backend 側が未設定の間は gate が armed にならない（`/_health` の
+  `edge_admission` で確認可能）ので、**edge → backend の順に投入**すれば無停止で
+  切り替わる。投入:
+  `bin/kagi get KOTOBA_INTERNAL_SECRET | npx wrangler secret put KOTOBA_INTERNAL_SECRET --env=""`
+  を各 Worker ディレクトリで実行。rotation も同じ順序（edge 先・backend 後）。
+  ⚠ 旧値は Cloudflare の write-only secret としてのみ存在し保管が無かったため、
+  2026-07-25 に新規生成して両者を揃えた（ローテーション扱い）。
 - **`gftd.kotobase/CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`（1Password
   `gftdcojp` vault）+ kagi `CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`
   （compartment `net-kotobase`）— 両方に保管済み** — ADR-2607113500
