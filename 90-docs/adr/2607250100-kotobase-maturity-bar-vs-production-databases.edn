@@ -26,44 +26,55 @@
   :adr/body
   "# Context
 
-オーナー目標（2026-07-25）: 「kotobase の成熟度を RisingWave / Neo4j / Datomic と同じ基準まで引き上げる」。この目標を反証可能にするには『同じ基準』の操作的定義が要る。本 ADR はその定義（バー）と、軸ごとの実測ベース現在地を正本化する。以後の現在地更新は本文書き換えでなく adr-ledger append で行う。
+オーナー目標（2026-07-25）: 「kotobase の成熟度を RisingWave / Neo4j / Datomic と同じ基準まで引き上げる」。この目標を反証可能にするには『同じ基準』の操作的定義が要る。本 ADR はその定義（バー）と、軸ごとの実測ベース現在地を正本化する。現在地は本文が最新状態を表す（ADR-2607257000: adr-ledger は撤去済み、履歴は git が持つ）。軸の状態が変わったら本文をその場で書き換える。
 
 **バーの定義**: ある軸で peer 級と主張してよいのは、①保証が文書化され（consistency / durability / limits を含む）、②実測 evidence（receipt / 実測 ADR）で裏付けられ、③CI か運用 gate が回帰を検出する — の 3 点が揃ったときのみ。
 
 # 現在地（2026-07-25、全て日付・出典付き実測）
 
-## 軸 1: 性能包絡（measured — peer 比の位置も定量化済み）
+## 軸 1: 性能包絡（measured — 3 peer 直接対決まで完了）
 - engine read: materialized point p50 13ms / R2 越し ~34ms / browser warm 27-30ms（bench/results 2026-07-21〜22 receipt）。
 - serving read（kotobase.net backend、2026-07-24 の 4 パス改善後）: repeat ~0.5s / distinct warm 0.24-0.49s / cpuTime 24-440ms（改善前 1,550ms）。フロア ~400ms は NRT→B2 head GET。
 - write: server p50 1.7s（B2 4 直列 RTT + read-back 検証）、engine local 13.3ms。
 - ingest: merkle-lsm 1,102 rows/s @1M（2026-07-24 receipt）。
-- peer 比（公表値, 2026-07 取得）: Postgres/Neo4j の point read 0.1-10ms・write 0.5-10ms に対し serving は 1-2 桁劣後（ただし比較は同一ワークロード直接対決ではない）。Neo4j Aura Pro は $65/GB-mo — 価格は 4 桁優位。
-- 残 gap: 同一ハード同一ワークロードの直接対決 receipt が無い。
+- **同一 workload 直接対決（2026-07-25、3 peer 全て実測済み）**: point-by-value p50 kotobase 0.004-0.010ms / Neo4j awaited-index 0.104ms / Datomic in-mem 0.53ms / RisingWave-psql 4.77ms — kotobase が 10x-500x 速い。full scan は全系 3-8ms で同等。3k write は kotobase が最遅（438ms vs Datomic 51ms）で、これは AES-GCM + HMAC + content-addressing の zero-trust コストとして receipt に明記。
+- receipt: `kotobase-peer/bench/results/2026-07-25-head-to-head-datomic.edn`（merged eb711c7）/ `2026-07-25-head-to-head-neo4j-risingwave.edn`（merged 0428c35、pin d342309）。RisingWave の psql round-trip floor・Neo4j embedded の on-disk 制約・run 間の機械負荷分散は caveat として receipt に記録。
+- serving 面の絶対値（repeat ~0.5s / フロア ~400ms = NRT→B2 head GET）は engine 実測とは別物で、peer の公表 point read 0.1-10ms に対しては依然 1-2 桁劣後。Neo4j Aura Pro $65/GB-mo に対する価格 4 桁優位は変わらず。
+- 残 gap: 直接対決は first-receipt 深度。**join / 並行 / スケールの深い workload は未実測**。
 
-## 軸 2: 有界リソースでのスケール gate（Stage A 実装済み・gate 実行）
+## 軸 2: 有界リソースでのスケール gate（gate-1M / gate-10M とも PASS）
 - ADR-2607244000 の要件（peak RSS O(partition)）に対し、`compact-run-readers-streaming`（emit! streaming + per-level 冪等 retention）+ 階層 fan-in spill ハーネス（stream-bench）を実装。
 - 実測: 100k datoms を **-Xmx1g / peak RSS 938MB** で row 保存完走（in-memory ハーネスは同スケールで 4.88GB）。
-- gate-1M（-Xmx4g）: 本 ADR 起票時点で実行中 — 結果は adr-ledger に append する。gate-10M（-Xmx8g）はその次。
+- **gate-1M（-Xmx4g）PASS / gate-10M（-Xmx8g）PASS**（2026-07-25、ADR-2607244000 の両 gate 完了）。receipt: `kotobase-peer/bench/results/2026-07-25-stream-compaction-gate-1m.edn`。主張可能域は 10M datoms @8GB heap まで前進。
 - peer 参照: Datomic/Neo4j/RisingWave はいずれも TB 級運用実績。kotobase の主張可能域は gate が通った規模のみ。
+- 残 gap: スケールでなく **production-workload realism**（object-storage spill、shadowed-version workload）。
 
-## 軸 3: 耐久性・復旧（policy 定義済み・evidence 未検証 = gap）
+## 軸 3: 耐久性・復旧（drill 稼働・初回 receipt PASS）
 - qualification/ に recovery-policy（RTO 600s / RPO 300s / 2 region / restore drill 必須 / lost-key fail-closed）、operations-policy（evidence 30 日以内）、retention-policy（破壊操作 2-principal）実在。
-- ただし本セッションでは drill evidence の鮮度を検証していない — 「定義済み・実測未確認」が誠実な現在地。peer（Aura BC: PITR + 99.95% SLA、RisingWave: S3 checkpoint 復旧）に対し、gate ③（自動検証）が未接続。
+- **gate ③ 接続済み（2026-07-25）**: `slo/recovery_drill.cljs` が testnet で logical export→restore→verify を実行。初回 receipt PASS（60/60 datoms、loss 0、RTO 4.8s vs limit 600s）。merge: net-kotobase 5a80e13。
+- 残 gap: **storage-level B2 loss drill は明示的に scope 外**として receipt に記録済み（logical restore は測れているが、物理ストレージ喪失からの復旧は未実測）。peer（Aura BC: PITR + 99.95% SLA、RisingWave: S3 checkpoint 復旧）との差はここ。
 
-## 軸 4: クエリ表面（部分 — 誠実な近似が文書化済み）
+## 軸 4: クエリ表面（SPARQL / Cypher とも本番 live、honest subset）
 - 実装: Datalog（map-form + triple、cost-based 並べ替え、batched join）、pull/pullMany、19 read method（asOf/since/history 等は honest approximation と明記）、web/geo 検索の Datalog コンパイル。
-- 未実装: SPARQL / Cypher / GraphQL / Gremlin（ADR-2607172500 accepted、設計のみ）。negation/aggregation/recursive rules は staged roadmap。
+- **SPARQL / Cypher が testnet + 本番 live（2026-07-25）**: `graph.sparql`（SELECT/WHERE BGP）と `graph.query`（Cypher basic subset）。以降 OPTIONAL / FILTER（全比較）/ COUNT・SUM・MIN・MAX・AVG / GROUP BY / UNION / ORDER BY まで拡張。subset 外は文法付きで loud reject（silent な誤答をしない）。merges: kotobase-server 234c3175 / 3554e1c6 / 992d49c8 / df22812e。
+- **engine push-down（2026-07-25）**: COUNT / COUNT-DISTINCT と `=` / `!=` FILTER は arrangement.datalog に押し込み済み（executor-native）。数値 FILTER（`<` `<=` `>` `>=`）と SUM/AVG/MIN/MAX、UNION/ORDER BY は理由付きで handler 層 post-pass 継続。merge: kotobase-server 774e5ef8。
+- 未実装: GraphQL / Gremlin（ADR-2607172500 accepted、設計のみ）。negation/recursive rules は staged roadmap。
 - peer 比: Neo4j Cypher / Datomic datalog のフル表面には未達。差分は列挙済みで silent ではない。
+- 残 gap: **property paths / nested OPTIONAL**、および **数値集約の engine push-down**（engine 側の型 coercion か typed value 格納が必要 — P2 typed-values と同根）。
 
 ## 軸 5: 一貫性・並行性モデル（documented — 弱点込みで実測済み）
 - single-head CAS + 署名付き IPNS head。B2 に条件付き書込が無いため write-then-read-back の race window を意図的 trade-off として文書化。同一グラフ並行 write は N=50 で 28/50 conflict（実測）。
 - Datomic の single-writer ACID に構造は同型だが、transactor 相当の直列化点が弱い（read-back 検出）。「文書化された保証」は満たす。強い transaction は docs/ 設計継続中。
 
-## 軸 6: 運用 SLO（gap）
-- SERVICE-LEVELS.md は alpha 目標のみで latency p50/p95 目標値なし。Aura BC 99.95% 級の SLA 主張には SLO 定義 + 計測 + 違反 alert が必要。cron の zone-analytics 取り込みは存在するが SLO 判定に接続されていない。
+## 軸 6: 運用 SLO（日次 gate 稼働・残りはカレンダー時間）
+- **SLO gate 稼働（2026-07-25）**: `slo/slo.edn`（実測由来目標・出典付き）+ `slo/probe.cljs`（15-sample p50/p95、可用性、auth 境界）+ daily `slo-gate` workflow。初回 receipt PASS（apex health p95 201ms / read floor p95 460ms / testnet reference p95 1674ms / unauth write 401 p95 23ms）。
+- **resilience gate 追加（2026-07-25）**: `slo/resilience_probe.cljs` — 持続負荷 240 req エラー 0・p95 861ms、敵対入力 8 種すべて clean 400・誤受理ゼロ、25-way 同一グラフ書込競合 22 ok/3×409・corruption ゼロ。merge: net-kotobase 02ab6dc。
+- 残 gap: Aura BC 99.95% 級の SLA 主張に必要なのは **長期稼働実績＝カレンダー時間**のみ（slo-gate が日次で積算中）。
 
-## 軸 7: client SDK（early）
-- @gftd/kotobase-datomic（CACAO mint + datomic plane、wire 互換テスト有）+ CLI。peer の成熟 SDK 群（多言語・ORM 統合）には遠い。
+## 軸 7: client SDK（二言語 full read+write 成立）
+- TypeScript: `@gftd/kotobase-datomic`（CACAO mint + datomic plane、wire 互換テスト有）+ CLI。
+- Python: `sdk/kotobase-py`（2026-07-25）— read plane は stdlib のみ（urllib）、write plane は `kotobase_auth.py` で dag-cbor EdDSA/did:key CACAO を実装（TS 参照 minter の byte-for-byte port、Ed25519 は audited cryptography）。testnet で write→read-back→所有権バインド→nonce 再利用拒否が ALL PASS。merges: net-kotobase cc29512 / b12a7b6。
+- 残 gap: peer の成熟 SDK 群（多言語・ORM 統合）には遠い。運用実績はカレンダー時間依存。
 
 ## 軸 8: incremental / materialized views（RisingWave 軸 — engine は measured、serving 統合は partial）
 - IVM: delta 適用 744 rows/s @10k+1k、materialized statistics で planner 3 桁高速化、R2 range GET serving p50 21ms — 全て receipt。
@@ -73,7 +84,7 @@
 
 1. 上記 8 軸・バー 3 条件を kotobase 成熟度の正本とする。『RisingWave/Neo4j/Datomic と同じ基準』という主張は、軸ごとにこのバーを通した範囲でのみ行う。
 2. 優先順（レバレッジ順・2026-07-25 の dynamics 分析と整合）: 軸 2 の gate 系列（進行中）→ 軸 6 SLO 定義+計測接続 → 軸 3 drill evidence の自動検証接続 → 軸 4 の宣言済み surface（SPARQL/Cypher）→ 軸 1 の同一ワークロード直接対決 receipt。
-3. 現在地更新は adr-ledger append（type: note/amend）で行い、本文は書き換えない。
+3. 現在地更新は本文をその場で書き換える（ADR-2607257000）。receipt の commit SHA / パスは改訂履歴節に残し、根拠を辿れる状態を保つ。
 
 # Consequences
 - 『成熟度を引き上げた』という報告は常に軸×バーの表で行える（劇場化した総論を排除）。
