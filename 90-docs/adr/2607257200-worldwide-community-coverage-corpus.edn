@@ -73,14 +73,14 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ## 現在の状態（2026-07-26）
 
-- **232 organization / 15 カテゴリ / 21 データファイル**
-- 検証: source-pinned **41**（primary 30 / secondary 11）、未 pin 191（82%）
+- **238 organization / 15 カテゴリ / 22 データファイル**
+- 検証: source-pinned **44**（primary 33 / secondary 11）、未 pin 194（82%）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
   **statutory-no-personality 8** → **企業・LEI レジストリから不可視が約 41%**
 - entity kind: org-form **197（87%）** / named-org 29（13%）
 - 地域: europe 52 / north-america 44 / asia-east 32 / africa 24 / asia-south 21 /
   south-america 18 / southeast-asia 12 / oceania 12 / middle-east 11
-- 数の誠実さ: **232/232 が `:org/member-count-basis` を持ち、120（52%）が明示的に unknown**。
+- 数の誠実さ: **238/238 が `:org/member-count-basis` を持ち、約 125（53%）が明示的に unknown**。
   `:org/member-count` を主張しているのは 73 件のみ
 
 ## ファイル構成
@@ -148,7 +148,7 @@ nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
 
 ### 3. ISIC は共同体形態の 38% に「その他」しか持たない
 
-232 org 中 約 88 件が ISIC 9499（その他の会員制団体 n.e.c.）**。とくに:
+238 org 中 約 90 件が ISIC 9499（その他の会員制団体 n.e.c.）**。とくに:
 - **ネットコミュニティに ISIC クラスが存在しない**（ISIC は事業所と雇用を前提に設計されており、
   拠点も給与も持たない共同体は原理的に見えない）
 - **協同組合は「協同組合」として分類されない**（酪農協同組合は酪農業。member-ownership が消える）
@@ -169,8 +169,8 @@ gram sabha の「8億人」は出典なしの人口取り違え、SEWA は逆に
 
 同時に、**発行元自身が複数の数字を出している**ケースも見つかった: SEWA（378万 / 321.6万）、
 AFL-CIO（加盟 61 / 65、かつ会員数に退職者を含む）、老人クラブ（438万 / 587.9万）。
-corpus はこれらを**照合せず両方記録**する — 勝手に一方へ丸めるのは、出典を持たない数字を
-作るのと同じことである。
+Repair Café（3,652 / 約3,200）も同型。corpus はこれらを**照合せず両方記録**する —
+勝手に一方へ丸めるのは、出典を持たない数字を作るのと同じことである。
 
 ### 6. 陳腐化と自己申告の可視化
 
