@@ -294,6 +294,74 @@
       (re-find #"terms|conditions" p) :terms-of-service
       :else :legal-notice)))
 
+
+;; ── robots.txt + headless render ────────────────────────────────────────────
+
+(def ^:private robots-cache (atom {}))
+
+(defn- fetch-robots [origin]
+  (if (contains? @robots-cache origin)
+    (js/Promise.resolve (get @robots-cache origin))
+    (-> (fetch-page (str origin "/robots.txt"))
+        (.then (fn [r]
+                 (let [body (:body r)
+                       ;; Only the rules that apply to everyone. A site that
+                       ;; singles out a named crawler is not addressing this
+                       ;; one, and inventing a match either way would be
+                       ;; guessing at intent.
+                       star (when body
+                              (->> (str/split body #"(?i)user-agent:")
+                                   (filter #(str/starts-with? (str/trim %) "*"))
+                                   (str/join "\n")))
+                       dis (when star
+                             (->> (re-seq #"(?im)^\s*disallow:\s*(\S*)\s*$" star)
+                                  (map second) (remove str/blank?) vec))]
+                   (swap! robots-cache assoc origin (or dis []))
+                   (or dis [])))))))
+
+(defn robots-allows?
+  "Prefix match against `Disallow:` for `User-agent: *`.
+
+  This crawler identifies itself honestly, so it should also read the file
+  that exists to tell it where not to go -- especially now that it escalates
+  to a real browser, where the cost of ignoring the request lands on the site
+  rather than on us. Unreadable or absent robots.txt is treated as allowed,
+  which is what the standard says, not as a reason to stop."
+  [disallowed url]
+  (let [p (try (.-pathname (js/URL. url)) (catch :default _ "/"))]
+    (not (some #(and (seq %) (str/starts-with? p %)) disallowed))))
+
+(def ^:private chrome-bin
+  (or (aget js/process.env "CHROME_BIN")
+      "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"))
+
+(defn render-dom
+  "Rendered DOM via headless Chrome, or nil.
+
+  WHY, and where the line is. Roughly a fifth of candidates publish their
+  legal text through client-side rendering, so a plain fetch sees an empty
+  shell and the pipeline reports `no published legal document` for a company
+  that plainly publishes one. Rendering the page the way any visitor's browser
+  would is retrieval, not circumvention.
+
+  It is used ONLY for that case. A site that answered 403/429 or served a
+  challenge is left recorded as blocked and is never retried here: getting
+  past a bot check is out of bounds no matter how much easier it would make
+  the dataset, and a browser aimed at a challenge page is exactly that. No
+  stealth flags, no fingerprint spoofing, no proxy rotation, and no CAPTCHA
+  solver -- `browser-use` in this workspace ships a capsolver adapter and it
+  is deliberately not wired in. The same honest user-agent is sent as on the
+  plain path, so the site can still identify and refuse this crawler."
+  [url]
+  (try
+    (let [out (execSync (str (pr-str chrome-bin)
+                             " --headless --disable-gpu --no-sandbox --virtual-time-budget=8000"
+                             " --user-agent=" (pr-str ua)
+                             " --dump-dom " (pr-str url) " 2>/dev/null")
+                        #js {:encoding "utf8" :maxBuffer (* 40 1024 1024) :timeout 60000})]
+      (when (and out (> (count out) 200)) out))
+    (catch :default _ nil)))
+
 ;; ── repo scaffold ───────────────────────────────────────────────────────────
 
 (defn- repo-name [lei] (str "cloud-itonami-lei-" (str/lower-case lei)))
@@ -303,7 +371,11 @@
        " [\"" slug "\" :tos/source-url " (pr-str (:url doc)) " 1 :add]\n"
        " [\"" slug "\" :tos/retrieved-at " (pr-str (:at doc)) " 1 :add]\n"
        " [\"" slug "\" :tos/sha256 " (pr-str (:sha doc)) " 1 :add]\n"
-       " [\"" slug "\" :tos/doc-type " (:doc-type doc) " 1 :add]]\n"))
+       " [\"" slug "\" :tos/doc-type " (:doc-type doc) " 1 :add]\n"
+       ;; How the bytes were obtained is provenance too: a reader comparing
+       ;; this archive against the live page needs to know whether it was the
+       ;; raw response or the rendered DOM, because they legitimately differ.
+       " [\"" slug "\" :tos/retrieval-method " (pr-str (or (:via doc) "http-get")) " 1 :add]]\n"))
 
 (defn- blueprint-edn [g site]
   (str "{:company/legal-name " (pr-str (:legal-name g)) "\n"
@@ -414,35 +486,61 @@
                     ;; the verification there instead. One of the two must
                     ;; pass; neither passing is still a rejection.
                     (let [home-ok? (site-verifies? (:legal-name g) (:body home))
-                          pages (legal-page-urls (:url home) (:body home))]
-                      (-> (reduce (fn [p url]
+                          all-pages (legal-page-urls (:url home) (:body home))
+                          origin (try (.-origin (js/URL. (:url home))) (catch :default _ nil))]
+                      (-> (fetch-robots origin)
+                          (.then
+                           (fn [disallowed]
+                             (let [pages (vec (filter #(robots-allows? disallowed %) all-pages))]
+                               (reduce (fn [p url]
                                     (.then p (fn [acc]
                                                (if acc
                                                  acc
                                                  (-> (fetch-page url)
                                                      (.then (fn [pg]
-                                                              (let [txt (some-> (:body pg) html->text)]
+                                                              (let [plain (some-> (:body pg) html->text)
+                                                                    ;; Escalate to a browser ONLY when the plain
+                                                                    ;; fetch succeeded but rendered to nothing --
+                                                                    ;; the client-side-rendering case. A blocked
+                                                                    ;; page is never re-attempted here.
+                                                                    rendered (when (and (not (blocked? pg))
+                                                                                        (or (nil? plain) (< (count plain) 500)))
+                                                                               (some-> (render-dom url) html->text))
+                                                                    txt (if (and rendered (> (count rendered) (count (or plain ""))))
+                                                                          rendered plain)
+                                                                    via (if (identical? txt rendered) "headless-render" "http-get")]
                                                                 (when (and txt (>= (count txt) 500)
                                                                            (not (blocked? pg))
+                                                                           ;; A rendered challenge page is still a
+                                                                           ;; challenge page, not a document.
+                                                                           (not (re-find #"(?i)captcha|are you a robot|challenge-platform" txt))
                                                                            (not (soft-404? (:url pg) txt))
                                                                            (policy-like? (doc-type-of url) txt))
                                                                   {:url (:url pg) :text txt :sha (sha256 txt)
-                                                                   :at (now-iso) :doc-type (doc-type-of url)
+                                                                   :at (now-iso) :doc-type (doc-type-of url) :via via
                                                                    :names-entity? (boolean
-                                                                                   (site-verifies? (:legal-name g) (:body pg)))})))))))))
+                                                                                   (or (site-verifies? (:legal-name g) (:body pg))
+                                                                                       (site-verifies? (:legal-name g) txt)))})))))))))
                                   (js/Promise.resolve nil)
-                                  pages)
+                                  pages))))
                           (.then (fn [doc]
-                                   (cond
-                                     (nil? doc)
-                                     {:cand name :lei (:lei g) :status :no-legal-doc
-                                      :reason (str (count pages) " candidate legal page(s), none yielded >=500 chars of text")}
-                                     (not (or home-ok? (:names-entity? doc)))
-                                     {:cand name :lei (:lei g) :status :site-unverified
-                                      :reason (str "neither " (:url home) " nor its legal page " (:url doc)
-                                                   " mentions the GLEIF legal name")}
-                                     :else
-                                     {:cand name :status :ready :gleif g :site (:url home) :doc doc}))))))))))))
+                                   (let [blocked-by-robots (- (count all-pages)
+                                                              (count (filter #(robots-allows?
+                                                                               (get @robots-cache origin []) %)
+                                                                             all-pages)))]
+                                     (cond
+                                       (nil? doc)
+                                       {:cand name :lei (:lei g) :status :no-legal-doc
+                                        :reason (str (count all-pages) " candidate legal page(s)"
+                                                     (when (pos? blocked-by-robots)
+                                                       (str ", " blocked-by-robots " disallowed by robots.txt"))
+                                                     ", none yielded >=500 chars of text")}
+                                       (not (or home-ok? (:names-entity? doc)))
+                                       {:cand name :lei (:lei g) :status :site-unverified
+                                        :reason (str "neither " (:url home) " nor its legal page " (:url doc)
+                                                     " mentions the GLEIF legal name")}
+                                       :else
+                                       {:cand name :status :ready :gleif g :site (:url home) :doc doc})))))))))))))
       (.catch (fn [e] {:cand name :status :error :reason (.-message e)}))))
 
 (defn run-bounded [items f n]
