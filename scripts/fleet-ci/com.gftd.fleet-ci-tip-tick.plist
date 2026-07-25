@@ -45,6 +45,11 @@
          fleet-ci/* のみで pin 前進も governance quorum も持たない。 -->
     <key>FLEET_CI_SIGNER_PEM</key>
     <string>/Users/junkawasaki/.gftd/fleet-ci-signer-tip.pem</string>
+    <!-- gh の token も keyring から読めないので owner ごとの fine-grained PAT を
+         mode 600 ファイルから読む（dir は 700）。ファイルが無い owner は preflight /
+         WARN で明示される。必要な権限は scripts/fleet-ci/README.md 参照。 -->
+    <key>FLEET_CI_GH_TOKEN_DIR</key>
+    <string>/Users/junkawasaki/.gftd/fleet-ci-gh-tokens</string>
   </dict>
   <key>StartInterval</key>
   <integer>300</integer>
