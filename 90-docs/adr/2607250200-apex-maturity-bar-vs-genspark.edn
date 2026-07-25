@@ -1,0 +1,107 @@
+[{:db/id -1
+  :adr/id "adr-2607250200-apex-maturity-bar-vs-genspark"
+  :adr/doc_type "adr"
+  :adr/topic "apex-maturity-bar-vs-genspark"
+  :adr/title "ADR-2607250200: ai-gftd-apex 成熟度バー — Genspark 基準の定義と現在地"
+  :adr/status "accepted"
+  :adr/date "2026-07-25"
+  :adr/last_verified "2026-07-25"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["ai-gftd-apex が「Genspark 級の consumer AI agent product」と主張するための軸と gate の正本"
+   "各軸の現在地（measured / partial / gap）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related
+  ["adr-2607250100-kotobase-maturity-bar-vs-production-databases"
+   "adr-2606250956-browser-agent-clj-genspark-style-super-agent"
+   "adr-2607151900-cloud-murakumo-business-react-loop-instruments"
+   "adr-2607122200-kotoba-lang-ui-hig-semantic-layer-topology"]
+  :adr/decision-summary
+  "{:method \"ADR-2607250100 と同じ 3 点バー（documented guarantee / measured evidence / operational gate）\", :axes [:agent-autonomy :tool-modality-surface :model-access :live-serviceability :demand :monetization :trust-compliance :verification-gate :differentiator-privacy], :as-of \"2026-07-25\", :verdict {:peer-level 0, :partial 2, :gap 6, :own-axis 1}, :peer {:genspark {:arr-usd 250000000, :mau 2000000, :paying-seats 100000, :valuation-usd 2600000000, :headcount 41, :certs [\"SOC 2 Type II\" \"ISO 27001\"]}}}"
+  :adr/artifacts
+  "{:apex-repo \"orgs/gftdcojp/ai-gftd-apex (origin/main 9908bea, 2026-07-24)\", :metrics \"90-docs/business/metrics/ai-gftd-apex.edn (as-of 2026-07-25)\", :live \"https://gftd.ai (Cloudflare Pages, deploy 2026-07-24)\", :probes \"本 ADR 起票セッションの curl 実測（chat/generation とも 401）\"}"
+  :adr/body
+  "# Context
+
+オーナー指示（2026-07-25）: 「今の ai-gftd-apex を genspark と同様に成熟度を比較して」。ADR-2607250100（kotobase vs RisingWave/Neo4j/Datomic）と**同じバー定義**を consumer AI agent product に当てはめ、反証可能な形で現在地を出す。
+
+**バーの定義**（2607250100 と同一）: ある軸で peer 級と主張してよいのは、①保証・仕様が文書化され、②実測 evidence（receipt / probe / metrics）で裏付けられ、③CI か運用 gate が回帰を検出する — の 3 点が揃ったときのみ。
+
+**peer（Genspark、2026-07 時点の公表値）**: ARR ~$250M（2026-03、2025 末 $85M から）、MAU ~2M、有料 seat ~10万、valuation $2.6B（Series B ext. $100M、総調達 $645M）、従業員 ~41 名、SOC 2 Type II + ISO 27001、Mixture-of-Agents で 80+ モデル・80+ ツールを orchestrate（Super Agent / Claw / Workspace 4.0、スライド・シート・ブラウザ操作・実際の発信電話まで）。価格は Free 100 credits/日、Plus $24.99/月、Pro $249.99/月、Team $30/user/月。
+
+# 現在地（2026-07-25、全て日付・出典付き実測）
+
+## 軸 1: エージェント自律性（gap）
+- apex の実装は **single-turn chat のみ**（`gftd.chat.model` / `events` / `inference`）。task decomposition・tool calling・multi-step 実行・ブラウザ操作・成果物生成の loop は**コード上に存在しない**（src 全体 3,979 行、agent loop 該当なし）。
+- Genspark は goal → 分解 → ツール選択 → 実行 → 完成物返却を製品の中核に置く。
+- 判定: 軸として未着手。「Genspark 同等」を主張できる材料はゼロ。
+
+## 軸 2: ツール・モダリティ表面（partial — 契約のみ）
+- 実装済み: chat（SSE stream / Stop / markdown / attachment chip）、photo→3D（`model3d` / `scene3d`、`gftd.apex.generation*` + `viewer.cljs`）。
+- 契約のみ存在（routing/validation は書かれているが可用性は runner 依存）: `character`(VRM) / `motion` / `sound`、image / video / music / sfx の entitlement 表（`gftd.apex.routing`）。
+- 未実装: スライド・シート・ドキュメント生成、ブラウザ操作、電話、ファイル横断ワークスペース。
+- 判定: 表面は Genspark の 1 桁小さい。ただし「宣言だけで実装済みと言わない」規律は守られている（README に runner 依存と明記）。
+
+## 軸 3: モデルアクセス（gap）
+- `gftd.apex.inference/tier->model`: **Fast / Balanced / Deep の 3 tier がすべて同一モデル**（murakumo fleet default = qwen3.6-35b-a3b）にマップ。UI のモデルピッカーは現状**見た目のみ**で routing 差が無い（コメントにも「distinct models can be swapped here」とある = 未実施）。
+- Genspark: 80+ モデルの MoA（GPT-5.1 / Claude Opus 4.6 / Gemini 3 Pro / Grok4 等）。
+- 判定: gap。加えて `murakumo-main` alias（ADR-2607173100）を使っておらず concrete model id が焼かれている（repo 規則違反、要修正）。
+
+## 軸 4: 稼働（gap — 本セッションで実測した最重要の欠陥）
+- 静的配信は健全: `https://gftd.ai/` **HTTP 200 / 0.20s**、`/assets/main.js` 443,239 bytes、Cloudflare Pages 本番 deploy は 2026-07-24（20 時間前、`9908bea`）。
+- **しかし chat も generation も匿名ブラウザから 401**（本セッション実測、`Origin: https://gftd.ai` 付きでも同じ）:
+  - `POST https://murakumo.cloud/api/v1/chat/completions` → `{\"type\":\"unauthorized\",\"message\":\"murakumo access token required\"}`
+  - `POST https://generation.murakumo.cloud/api/v1/generation` → `{\"type\":\"unauthorized\"}`
+  - 配信バンドルにトークンは焼かれておらず（`__APEX_CONFIG__` は endpoint/mode/maxTokens のみ）、アプリに**ログイン/サインイン UI も存在しない**（`views.cljc` に auth 導線なし）。
+  → **訪問者は現状 1 度もチャットできない。** 製品の主機能が本番で不通。
+- さらに直近 origin/main の commit は `fix(chat): resolve ReferenceError crashing entire app render on gftd.ai`（2026-07-24）— 昨日まで**画面全体がクラッシュ**していた。
+- 判定: 「live serviceability」は peer 比較以前の状態。最優先の修復対象。
+
+## 軸 5: 需要（gap — トラフィックはほぼ bot）
+- `90-docs/business/metrics/ai-gftd-apex.edn`（as-of 2026-07-25）: zone gftd.ai **476,872 req/7d・16,966 pageviews/7d・uniques 日次和 4,961**。
+- ただし内訳が実態を否定する: 24h の status mix は **5xx 77% / 4xx 13% / 2xx 2,152 件のみ**、上位 path は `/.github/workflows/deploy.yml` 61・`/debug/pprof/` 53・`/api/.env` 48 … と**脆弱性スキャナ**。人間の利用トラフィックとして読める量は事実上ゼロ。
+- Genspark: MAU ~2M。
+- 判定: gap。数字の大きさを需要の証拠として引用してはならない（この metrics ファイルの `:signal` 文言も probe 比率込みで読む）。
+
+## 軸 6: 収益化（gap — 配管は通っているが transaction ゼロ）
+- 実装済み: Stripe Payment Link（`plink_1TtSw7…`、$20/mo `:pro`）＋ **opaque actor id を `client_reference_id` に束ねる** Upgrade CTA（ADR-2607151900 addendum 6）。email を主キーにしない privacy 契約を境界で強制（`subject-id` が email 形状を拒否）。
+- 実測: **apex active subscriptions 0 / conversion 0%**（同 metrics、2026-07-25）。BMC gate `:hyp/apex-privacy-premium` の閾値は 4%。
+- Genspark: 有料 seat ~10万、ARR ~$250M。
+- 判定: gap（分子ゼロ）。ただし「conversion を測る計器が実在する」点は Genspark 比較以前の自社基準としては満たしている。
+
+## 軸 7: 信頼・コンプライアンス（gap）
+- Genspark: SOC 2 Type II + ISO 27001（企業導入の前提）。
+- apex: `legal/` に ToS/Privacy draft（2026-07-25 landed）。認証取得・監査ログ・SSO・データ保持ポリシーの運用 evidence は無い。
+- 判定: gap。
+
+## 軸 8: 検証 gate（gap）
+- `npm test` は**ローカルで起動すらしない**: classpath 解決エラー（`io.github.kotoba-lang/ed25519` の git coord と `orgs/kotoba-lang/org-ietf-ed25519` の `:local/root` が衝突。repo rename の残骸）。
+- GitHub Actions: 最新 run は **2026-07-09 の failure**（`CI`, clj-kondo gate）。以降 green の記録なし。
+- 一方で良い資産もある: `scripts/verify-e2e.cljs`（実 Chromium、light/dark トークン描画・simulate 送信 flow・live 503 のエラーバブル・320px/1440px・コントラスト 4.5:1・viewer）と design-quality 100.0（mobile refresh、`44e8139`）。
+- 判定: gate ③が切れている。**軸 4 の「本番で 401 / 全画面クラッシュ」を検出できなかった直接の原因がこれ**（E2E は simulate と mock 503 は見るが、本番実 endpoint の疎通を見ない）。
+
+## 軸 9: 差別化（apex 固有 — documented のみ、evidence/gate 無し）
+- privacy contract（README + ADR-2606301210/1220）: email/電話/実名/ソーシャル ID を主キーにしない、既定 ephemeral、履歴/ファイル/メモリは opt-in、provider 鍵はブラウザに置かない、policy proxy 経由。コード境界（`subject-id`、token 非同梱）で一部強制済み。
+- Genspark はここを製品訴求にしていない。**唯一 apex が構造的に前に出られる軸**。
+- ただしバー ②③（実測 evidence・自動 gate）は未接続 — 「PII が実際に保存されていない」ことを検証する test / 監査は無い。
+
+# Decision
+
+1. **「apex は Genspark と同水準」と主張しない。** 9 軸中 peer 級 0、partial 2（軸 2・軸 9 の一部）、gap 6。規模差は ARR で ∞（$250M vs $0）、MAU で 2M vs 実質 0。
+2. **比較以前の修復を最優先にする（順序固定）**:
+   - P0: 軸 4 — gftd.ai の chat / generation を匿名訪問者が使える状態にする（murakumo 側の anonymous/rate-limited public tier か、apex 側の opaque capability 発行のどちらか。**privacy contract を壊さない**選択肢のみ）。
+   - P0: 軸 8 — E2E に「本番 endpoint に実 request を打って 2xx かつ最初の token が返る」smoke を足し、CI を green に戻す（classpath 衝突の解消含む）。この 2 つが揃わない限り他軸の投資は無意味。
+   - P1: 軸 3 — `murakumo-main` alias 解決に切り替え（ADR-2607173100 準拠）、tier ごとに実際に異なる routing を与えるか、ピッカーを外す（見た目だけの選択肢を残さない）。
+   - P2: 軸 1 — agent loop を持つかどうかは**製品判断**。持たないなら「privacy-first chat」であって super agent ではないと自称を揃える。
+3. **軸 5 の数字を実績として引用しない。** 476k req/7d は bot probe 主体。人間トラフィックの分離指標（2xx かつ probe path 除外の unique）を metrics に足すまで、需要は「未測定」とする。
+4. 更新は本文書き換えで行う（ADR-2607257000: 文書は最新状態のみ）。
+
+# Consequences
+
+- 「Genspark 級」を目標に据えるなら、まず**動く**こと（軸 4）と**動き続けることを検出する**こと（軸 8）が gate。ここが 0 の間、モデル数・ツール数の追加は成熟度を上げない。
+- privacy 差別化（軸 9）は主張の core になりうるが、evidence と gate が付くまでは marketing claim であって measured maturity ではない。
+- 出典（peer 側、2026-07 取得）: sacra.com/c/genspark, getlatka.com/companies/genspark.ai, genspark.ai/blog/genspark-ai-workspace-and-series-b-funding, openai.com/index/genspark, tracxn Genspark profile, usagepricing.com/blueprint/genspark。自社側は全て本 repo 実測（metrics edn / curl probe / gh run list / wrangler deployment list）。"}]
