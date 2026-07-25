@@ -33,12 +33,17 @@
  :org/countries ["ZA"]
  :org/instance-count-estimate 800000
  :org/member-count 11000000
- :org/member-count-basis "llm-recall-unverified: ~800k stokvels and ~11M members, commonly cited from NASASA/industry surveys."
+ :org/member-count-basis "source-pinned: 'more than 11 million' members (NASASA founder/chair Andrew Lukhele, 2025-08); 'over 800,000 groups' and a R50bn sector from a 2024 Ipsos market study; over 810,000 stokvels registered on the NASASA database, which NASASA itself says is a portion of the total because most operate informally."
  :org/legal-registration :unregistered
  :org/registration-note "Exempt from banking law by a specific carve-out when affiliated to a recognized self-regulatory body; individual stokvels are not registered entities."
  :org/governance-model :consensus
  :org/mission-statement "Grocery, burial, investment and social stokvels — the most-documented national ROSCA ecosystem, and a rare case where an unregistered form has an explicit legal exemption."
- :org/data-provenance "llm-recall-unverified"
+ :org/source-name "NASASA (National Stokvel Association of South Africa) / Ipsos 2024 stokvel market study, reported by Eyewitness News"
+ :org/source-url "https://www.ewn.co.za/2025/08/14/more-than-11-million-south-africans-are-members-of-stokvels-nasasa"
+ :org/source-date "2025-08-14"
+ :org/source-tier :secondary
+ :org/pinned-on "2026-07-25"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-global-burial-societies
@@ -166,13 +171,18 @@
  :org/region-primary :region-asia-south
  :org/countries ["IN" "BD" "KE" "UG" "NE"]
  :org/founding-date 1992
- :org/instance-count-estimate 12000000
- :org/member-count 140000000
- :org/member-count-basis "llm-recall-unverified: India's SHG-bank-linkage program alone is commonly cited near 12M groups and well over 100M women members; VSLA programs add tens of millions elsewhere."
+ :org/instance-count-estimate 14421000
+ :org/member-count 177500000
+ :org/member-count-basis "source-pinned: 144.21 lakh (14.42M) SHGs savings-linked and 17.75 crore (177.5M) households reached as of 2024-03-31; 77.41 lakh (7.74M) of those groups credit-linked with ₹2,59,663.73 crore outstanding (NABARD, Status of Microfinance in India 2023-24). Households reached is not the same as active individual members. African/Asian VSLA programs add tens of millions more and are NOT included in this figure."
  :org/legal-registration :mostly-unregistered
+ :org/source-name "NABARD, Status of Microfinance in India 2023-24"
+ :org/source-url "https://www.nabard.org/auth/writereaddata/tender/0808244223NABARD-SOMFI%20%20%20%20%20%20%20%2020232024%20%20%20%20%20%2030072024.pdf"
+ :org/source-date "2024-03-31"
+ :org/source-tier :primary
+ :org/pinned-on "2026-07-25"
  :org/registration-note "Groups are typically unregistered but bank-linked — a hybrid where an unregistered community holds a formal financial relationship."
  :org/governance-model :consensus
  :org/mission-statement "Women's savings groups combining internal lending with federation into cluster and village-level bodies."
- :org/data-provenance "llm-recall-unverified"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 ]
