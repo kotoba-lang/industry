@@ -82,6 +82,13 @@
     (println "\nREGION (primary)")
     (doseq [[k v] (tally :org/region-primary orgs)] (line (name k) v n))
 
+    (println "\nFORM FAMILY  (cross-national analogues: what is this the local version OF?)")
+    (let [fam (tally :org/form-family orgs)
+          in-family (reduce + 0 (map second fam))]
+      (doseq [[k v] fam] (line (name k) v n))
+      (println (str "    -> " in-family "/" n " have a cross-national analogue recorded; "
+                    (- n in-family) " stand alone so far")))
+
     (println "\nISIC CLASS via category hint  (join key into cloud-itonami actors)")
     (let [by-cat (into {} (map (juxt :community-category/id identity)) categories)
           isic-of (fn [o] (get-in by-cat [(:org/category o) :community-category/isic-hint]))
