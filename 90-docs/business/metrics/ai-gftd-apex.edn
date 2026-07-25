@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 4928, "ai-gftd-chat-shell" 2},
+ {"magatama-sh1n5h1x" 4945, "ai-gftd-chat-shell" 2},
  :zone
- {:requests-7d 476872,
-  :pageviews-7d 16966,
-  :uniques-7d-sum 4961,
+ {:requests-7d 482963,
+  :pageviews-7d 16982,
+  :uniques-7d-sum 5005,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/.github/workflows/deploy.yml", :requests 61}
-   {:path "/debug/pprof/", :requests 53}
-   {:path "/api/.env", :requests 48}
-   {:path "/config/prod.exs", :requests 48}
-   {:path "/nginx_status", :requests 48}
-   {:path "/server-info", :requests 45}
-   {:path "/.env.production.bak", :requests 45}
-   {:path "/trace.axd", :requests 45}],
-  :status-mix {:client-error 2841, :ok 2152, :server-error 16337},
+  [{:path "/", :requests 1633}
+   {:path "/favicon.ico", :requests 134}
+   {:path "/hnphq.php", :requests 40}
+   {:path "/222.php", :requests 36}
+   {:path "/ccou.php", :requests 31}
+   {:path "/config/secrets.yml", :requests 30}
+   {:path "//cgi-bin/index.php", :requests 30}
+   {:path "/class.php", :requests 29}],
+  :status-mix {:ok 3613, :server-error 16726, :client-error 3108},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -31,10 +31,10 @@
   :last-charge-epoch 1604224274},
  :as-of "2026-07-25",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 77},
+ {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 71},
  :top-paths
- "上位 page (24h, 2xx/3xx): /.github/workflows/deploy.yml 61 · /debug/pprof/ 53 · /api/.env 48 · /config/prod.exs 48 · /nginx_status 48 | 4xx(probe) 13% · 5xx 77%",
+ "上位 page (24h, 2xx/3xx): / 1633 · /favicon.ico 134 · /hnphq.php 40 · /222.php 36 · /ccou.php 31 | 4xx(probe) 13% · 5xx 71%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 476872 req/7d・4961 uniques(日次和)・うち4xx probe 13%(24h)、workers 4930 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 482963 req/7d・5005 uniques(日次和)・うち4xx probe 13%(24h)、workers 4947 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
