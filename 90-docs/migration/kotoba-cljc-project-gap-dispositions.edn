@@ -1037,7 +1037,26 @@
     :local-test-suite-status :could-not-run-in-isolated-checkout-local-root-sibling-dep
     :hosted-ci-status :passed-full-legacy-suite-including-sibling-clone
     :required-capabilities []}
-   :next-action :retain-cljc-oracle-for-projection-app-record-profile}
+   :next-action :app-record-projection-vocabulary-now-also-bounded-see-next-entry-projection-and-profile-still-oracle}
+  {:root "orgs/kotoba-lang/atprotocol/src/atprotocol/app_record.cljc"
+   :repository "orgs/kotoba-lang/atprotocol"
+   :kind :bounded-profile-split
+   :review-status :bounded-app-record-vocab-profile-merged
+   :migration-authorized true
+   :migration-scope :atprotocol/bounded-app-record-vocab-v1
+   :legacy-domain :atprotocol.app-record-reduce-kv-record-manifest-codec-over-open-input-maps-plus-reverse-attr-field-and-validate-manifest-delegation-not-in-scope
+   :safety-note "First keyword-VALUE typed-map split: the fixed 13-field camelCase-record-key -> :kotoba.app/* attribute projection vocabulary is [:map :string :keyword]. The reduce-kv record<->manifest codec (walks arbitrary open input maps, preserving unknown fields under :atprotocol/unprojected), the reverse attr->field direction, valid-record? (delegates to kotoba.protocol.app/validate-manifest), and the profile/projection layers stay the CLJC oracle -- only the fixed forward projection vocabulary is bounded. Resolves the app-record half of this repo's ADR-2607202200 app-record/profile flag; profile.cljc still oracle."
+   :implementation
+   {:pr "https://github.com/kotoba-lang/atprotocol/pull/2"
+    :commit "3ec2a879c24cfc5ea146ee90a302e46a24a0ac60"
+    :kernel-and-conformance "src/atprotocol/bounded_app_record.kotoba"
+    :migration-record "migration/bounded-app-record-vocab-v1.edn"
+    :legacy-tests {:tests 8 :assertions 52 :failures 0 :errors 0}
+    :lint {:errors 0 :warnings 0}
+    :hand-verified-cases "main asserts field-count 13, bundleCid/sig attribute projection, and non-membership of the $type control key and an arbitrary unknown field (falls back to :atprotocol/unknown)"
+    :required-capabilities []
+    :note "also bumped the repo's :kotoba alias compiler pin from def5161be to f6ee539e; both bounded_boundary and bounded_app_record verified clean under it"}
+   :next-action :revisit-atprotocol-profile-cljc-and-sigma-with-the-same-typed-map-tool}
   {:root "orgs/kotoba-lang/actor-ipc/src/actor_ipc/time.cljc"
    :repository "orgs/kotoba-lang/actor-ipc"
    :kind :bounded-profile-split
@@ -1590,8 +1609,8 @@
   :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA and FINRA retirement each removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; the assoc-* wave is closed, so resume with per-repo review inside the isic/isco/iso3166/unspsc/cofog/gtin census once the application-profile and string-search gates are tracked as landed."}
  :completion
  {:reviewed-project-roots 59
-  :authorized-migrations 30
-  :retained-oracles 10
+  :authorized-migrations 31
+  :retained-oracles 9
   :typed-refactors-pending 0
   :typed-refactors-in-review 0
-  :typed-refactors-merged-awaiting-cutover 5}}}
+  :typed-refactors-merged-awaiting-cutover 6}}}
