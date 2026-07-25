@@ -242,4 +242,41 @@ durable-loop 設計の JVM 側実装として残す旨を当該 repo の README 
 
 残る open item は E2（複数ファイル・設計判断を伴うタスクでの成功率が未測定。実証済みは
 約10行の追加＋テスト1本まで）と、nbb 側 agent の **session checkpoint 欠如**
-（死んだ sandbox は再開でなくやり直し。lease があるので安全だが安価ではない）。"}]
+（死んだ sandbox は再開でなくやり直し。lease があるので安全だが安価ではない）。
+
+### 2026-07-25 — amend (E2: 能力を測った)
+
+**gap E2 を解決: 実測した。** 「約10行の追加＋テスト1本が1回通った」以外に根拠が無い状態
+だったので、`bin/fleet-eval.cljs` で難易度4段の課題を**実経路**（lease → fleet ノードでの
+sandbox 実行 → fleet 自身の gate）に流し、各3回ずつ回した。採点は**LLM に判定させない**:
+`fleet.eval` が patch を課題の `:expect`（触ってよいファイル・追加行に現れるべき文字列）と
+機械的に突き合わせ、**追加行だけ**を見る（「頼まれた物を削除して通す」が成立しないように）。
+`accepted`（fleet の gate が通した）と `meets-spec`（課題を実際にやった）の**独立2軸**で、
+pass はその両方。pass 率は best-of-N ではなく**試行数あたり**（fleet は work-unit 1件に
+1回しか試さないため）。
+
+**結果（murakumo-main = qwen3.6-35b-a3b、12試行 / 15.4分、naphtali）**:
+L1（純関数+テスト、2ファイル）**3/3**、L2（新 ns + そのテスト ns を suite に配線、3ファイル、
+うち1つは prompt が名指ししない）**2/3**、L3（既存関数の拡張、既存呼び出しの挙動を保つ）
+**0/3**、L4（既存の多理由ロジックへの新ルール追加）**0/3**。
+
+**支配的な失敗要因は推論力ではなく serving の context window（8192 tokens、prompt と
+generation を合算）だった。** `:max-tokens 4000` の budget では思考に使える prompt は約4k
+しか残らず、**L3 は3回とも turn 0 で拒否**され、モデルは課題を見てすらいなかった。緩和として
+agent 側で prompt を見積もり、**古い tool 結果から順に elide**（省略したことを本文に明示 —
+まだ読めていると誤認させないため）、context 拒否は言い換えではなく履歴解放で retry、
+generation budget の既定も縮小した。
+
+**緩和後に再測定: L3 は依然 0/3。ただし失敗の質が変わった** — 「turn 0 で拒否」から
+「8〜18 turn 実際に手を動かして赤テストで終わる」へ。さらに prompt 余地を増やした3回目
+（`:max-tokens 1200`）も 0/3。**つまり天井は window ではなくモデル側**である: このモデルは
+helper とテストの追加は確実にこなし、新 ns の配線は時々成功し、**既存関数を拡張しつつ既存
+5テストを緑に保つことはできない**。serving 側の `n_ctx` 引き上げは（masking を外した実績が
+あるので）やる価値があるが、L3 は動かない。
+
+3つの結果セットは `examples/eval/results/` にコミット済み（散文中の数値でなく実データを読む
+こと）。kotoba-fleet 70bd477。
+
+**この時点で残る gap**: fleet 側 scheduler（tick の起動は Mac 依存のまま）、nbb agent の
+session checkpoint（死んだ sandbox は再開でなくやり直し）、そして今回の測定が示した
+**モデル能力そのもの**（L3 以上を任せるなら別モデルか、タスク分割の設計が要る）。"}]
