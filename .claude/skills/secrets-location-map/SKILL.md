@@ -83,6 +83,15 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     （loopback）。**配信先の YouTube/Twitch stream key はここにもどこにも無い** —
     operator のマシンの `~/.babiniku/mediamtx-bridge.yml`（0600、`npm run
     bridge:config` が生成）だけに存在し、Worker にもブラウザにも repo にも入らない。
+  - **`aozora-live-broadcaster`（kagi vault、compartment `gftdcojp`）** — aozora live
+    配信の announce を `pds.aozora.app` に post する専用 identity（Ed25519 seed、64 hex）。
+    **`aozora-actor-approval-operator` を流用していない**のは意図的で、あちらは actor の
+    デプロイ承認を authorize する鍵なので、公開投稿の不具合で actor 承認まで巻き込まないため
+    （one key, one job）。PDS は自己主権なので**アカウント登録もパスワードも無い** —
+    この seed から mint した CACAO の発行者 DID がそのまま repo になる
+    （did:key:z6MkmWxGZsqQXAxp3DK3WHDXgkytraavZjdDwHtZBcbYBKUm、公開値）。
+    consumer は `net-babiniku` の `scripts/aozora_publish.cljs`（env override は
+    `AOZORA_BROADCASTER_SEED`）。ADR-2607259500。
 - **kagi（`kotoba-lang/kagi`）**: net-kotobase / kotoba-lang 系の新規プロジェクト
   向け secrets は、1Password ではなく **こちらを正**にしていく方針（自己主権
   vault、ADR-2606272330）。**実在する vault の実体は
