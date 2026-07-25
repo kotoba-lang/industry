@@ -32,13 +32,19 @@
  :org/region-primary :region-europe
  :org/founding-date 1993
  :org/member-count 1000
- :org/member-count-basis "llm-recall-unverified: roughly 1,000 Debian Developers with voting rights, plus maintainers and contributors."
+ :org/member-count-basis "source-pinned (qualitative): Debian's own description is 'more than a thousand active developers spread around the world', with the authoritative roster in the developer LDAP (db.debian.org) and the new-member queue (nm.debian.org) rather than in any published headline number. The project deliberately publishes no single membership figure — an accurate reflection of a community whose boundary is a keyring, not a roll."
  :org/legal-registration :unregistered
+ :org/source-name "Debian Project, People: Who we are and what we do"
+ :org/source-url "https://www.debian.org/intro/people"
+ :org/source-date "2025"
+ :org/source-tier :primary
+ :org/source-caveat "Qualitative pin. An exact count is derivable from db.debian.org keyring data and would be a better figure."
+ :org/pinned-on "2026-07-25"
  :org/registration-note "Deliberately has no legal personality; holds assets through fiscal sponsors (SPI and trusted organizations)."
  :org/governance-model :democratic
  :org/mission-statement "Volunteer OS project governed by a written Constitution, a Social Contract and Condorcet-method General Resolutions — one of the most formally constitutional online communities in existence."
  :org/coverage-note "Best in-corpus example of a rigorous constitutional community that chose to remain unregistered."
- :org/data-provenance "llm-recall-unverified"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-global-foss-foundations
@@ -100,12 +106,16 @@
  :org/region-primary :region-europe
  :org/founding-date 2016
  :org/instance-count-estimate 9000
- :org/member-count 10000000
- :org/member-count-basis "llm-recall-unverified: thousands of active instances and roughly 10M registered accounts with about 1M monthly active, post-2022 spike and decay."
+ :org/member-count-basis "source-pinned (secondary): ~10M registered Mastodon accounts as of summer 2025, but fewer than 690,000 Mastodon monthly active users by 2025-10 (PLOS research), against an ActivityPub-fediverse-wide plateau of roughly 2-3M MAU excluding Threads. Instance distribution is heavily skewed — a few large servers hold most accounts, the long tail has dozens to hundreds each. No single dashboard publishes an authoritative figure because the network is federated; every number here is one project's measurement, so :org/member-count is not asserted."
  :org/legal-registration :mostly-unregistered
+ :org/source-name "Fediverse statistics compilations (Fediview 2026 roundup, PLOS research on Mastodon MAU)"
+ :org/source-url "https://fediview.com/articles/fediverse-in-numbers-mastodon-stats-2026/"
+ :org/source-date "2025-10"
+ :org/source-tier :secondary
+ :org/pinned-on "2026-07-25"
  :org/governance-model :consensus
  :org/mission-statement "Federated servers each with its own admin, rules and defederation policy — community governance as a per-instance sovereign act."
- :org/data-provenance "llm-recall-unverified"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-global-daos
