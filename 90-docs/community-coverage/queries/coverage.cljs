@@ -10,6 +10,7 @@
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs            ; full report
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs unpinned   ; list unpinned orgs
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs regions    ; region histogram
+;;   nbb 90-docs/community-coverage/queries/coverage.cljs integrity  ; referential checks only
 ;;
 ;; The report deliberately prints the UNKNOWNS, not just the totals: a coverage
 ;; corpus that only reports its size is measuring the wrong thing.
@@ -51,6 +52,37 @@
   (println (str "  " (subs (str label "                              ") 0 26)
                 (subs (str "   " n) (- (count (str n)) 1))
                 "  " (bar n total) " " (pct n total) "%")))
+
+;; Referential integrity. Cross-dataset refs are legitimate — several entries
+;; point at orgs held in 90-docs/religious-community/ — so resolve against both.
+(def sibling-ids
+  (let [d (.join path (.dirname path dir) "religious-community")]
+    (if (.existsSync fs d)
+      (->> (.readdirSync fs d)
+           (filter #(str/ends-with? % ".edn"))
+           (mapcat #(read-edn (.join path d %)))
+           (filter map?)
+           (keep :org/id)
+           (map name)
+           set)
+      #{})))
+
+(defn integrity []
+  (let [ids (into sibling-ids (map (comp name :org/id) orgs))
+        cat-ids (set (map (comp name :community-category/id) categories))
+        dangling (for [o orgs :let [r (:org/related-org o)]
+                       :when (and r (not (ids (name r))))]
+                   [(name (:org/id o)) (name r)])
+        bad-cat (for [o orgs :when (not (cat-ids (name (:org/category o))))]
+                  [(name (:org/id o)) (str (:org/category o))])
+        dupes (for [[k v] (frequencies (map (comp name :org/id) orgs)) :when (> v 1)] [k v])
+        no-basis (for [o orgs :when (not (:org/member-count-basis o))] [(name (:org/id o)) "no member-count-basis"])
+        problems (concat dangling bad-cat dupes no-basis)]
+    (println "\nINTEGRITY")
+    (if (empty? problems)
+      (println (str "  clean — " (count orgs) " orgs, no dangling refs, no unknown categories,"
+                    " no duplicate ids, every org states a count basis"))
+      (doseq [[a b] problems] (println (str "  !! " a " -> " b))))))
 
 (defn report []
   (let [n (count orgs)
@@ -127,4 +159,5 @@
 (case (first *command-line-args*)
   "unpinned" (unpinned)
   "regions" (regions)
-  (report))
+  "integrity" (integrity)
+  (do (report) (integrity)))
