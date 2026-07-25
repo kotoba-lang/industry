@@ -307,6 +307,25 @@
                     (mapcat #(str/split % #","))
                     (map str/trim) (remove str/blank?) vec)
       rendered (render)
+      ;; --entry splices into the EXISTING file, so a missing/empty/truncated
+      ;; base silently yields a near-empty manifest. That is exactly how
+      ;; west.yml was emptied a SECOND time on 2026-07-25: after ad193ef4a2c
+      ;; left 0 bytes, `--entry abi` spliced into nothing and wrote a manifest
+      ;; with a single project (7803359c63f). Reproduced deliberately while
+      ;; adding this guard: an empty base plus `--entry` writes 207 bytes.
+      ;; Refuse instead -- the caller wants `--entry` to be a minimal diff, and
+      ;; there is no minimal diff against a base that is already broken.
+      _ (when (seq entries)
+          (let [existing (when (.exists out-file) (slurp out-file))
+                have (count (re-seq #"path: orgs/" (or existing "")))]
+            (when (< have 2)
+              (binding [*out* *err*]
+                (println (str "REFUSING --entry: manifest/west.yml has " have
+                              " projects, so splicing into it would produce a"
+                              " near-empty manifest instead of a minimal diff."
+                              " Restore the file (git show <good-rev>:manifest/west.yml)"
+                              " or regenerate in full without --entry.")))
+              (scripts.nbb-compat/exit 1))))
       content  (if (and (seq entries) (.exists out-file))
                  (splice (slurp out-file) rendered entries)
                  rendered)]
@@ -317,6 +336,29 @@
       (do (binding [*out* *err*] (println "west.yml is STALE. run: nbb scripts/gen-west-manifest.cljs"))
           (scripts.nbb-compat/exit 1)))
     (do (when verify? (verify-remote! content entries))
+        ;; Catastrophic-shrink guard. On 2026-07-25 west.yml was emptied on main
+        ;; TWICE within three minutes by `--entry abi` runs -- ad193ef4a2c
+        ;; ("add abi west entry", 18709 deletions / 0 insertions) and, right
+        ;; after a restore, 7803359c63f ("advance abi pin") -- leaving 0 bytes
+        ;; and 0 projects. An empty manifest pins nothing, so `west update`
+        ;; resolves no projects and a fresh clone or CI run gets an empty tree.
+        ;; Whatever the upstream cause (an --entry splice against a base that is
+        ;; already empty reproduces it), writing a manifest that lost most of
+        ;; its projects is never the intended outcome, so refuse instead.
+        (let [existing (when (.exists out-file) (slurp out-file))
+              count-projects #(count (re-seq #"path: orgs/" (or % "")))
+              before (count-projects existing)
+              after  (count-projects content)]
+          (when (and (pos? before) (< after (quot before 2)))
+            (binding [*out* *err*]
+              (println (str "REFUSING to write west.yml: project count would drop "
+                            before " -> " after
+                            ". This is the shape of the 2026-07-25 manifest-emptying"
+                            " incident. Re-run without --entry to regenerate in full,"
+                            " or restore the file first; override deliberately with"
+                            " WEST_ALLOW_SHRINK=1 if the drop is genuinely intended.")))
+            (when-not (= "1" (scripts.nbb-compat/getenv "WEST_ALLOW_SHRINK"))
+              (scripts.nbb-compat/exit 1))))
         (.mkdirs manifest-dir)
         (spit out-file content)
         (println (str "wrote " (.getPath out-file)
