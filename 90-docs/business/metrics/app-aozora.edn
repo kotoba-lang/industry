@@ -8,18 +8,18 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 11414, "app-aozora-appview" 11234},
+ {"app-aozora-pds" 11484, "app-aozora-appview" 11294},
  :zone
- {:requests-7d 46668,
-  :pageviews-7d 7842,
-  :uniques-7d-sum 762,
+ {:requests-7d 47061,
+  :pageviews-7d 7844,
+  :uniques-7d-sum 763,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 283147}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2906}
+    :requests 283156}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2907}
    {:path
     "/kotobase-cf-wasm-testnet/ipns/bafyreidwhkvt3omcwb6ytmiy6npf42crhvbekxi7aovgxjhl6hgrmsnvcm.json",
     :requests 784}
@@ -34,12 +34,12 @@
     "/kotobase-cf-wasm-testnet/ipns/bafyreigi6go4mxmmqjcxkt2227ahwdrtjxjgnq2at2wf5xpa3vbltwwafe.json",
     :requests 181}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
-    :requests 146}],
-  :status-mix {:ok 291987, :client-error 291, :server-error 309},
+    :requests 143}],
+  :status-mix {:ok 291470, :client-error 393, :server-error 285},
   :window "24h"},
  :as-of "2026-07-25",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 283147 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2906 · /kotobase-cf-wasm-testnet/ipns/bafyreidw… 784 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 287 · /kotobase-cf-wasm-testnet/ipns/bafyreies… 279 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 283156 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2907 · /kotobase-cf-wasm-testnet/ipns/bafyreidw… 784 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 287 · /kotobase-cf-wasm-testnet/ipns/bafyreies… 279 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 46668 req/7d・762 uniques(日次和)・うち4xx probe 0%(24h)、workers 22648 inv/7d"}
+ "aozora.app 実測 47061 req/7d・763 uniques(日次和)・うち4xx probe 0%(24h)、workers 22778 inv/7d"}
