@@ -1,0 +1,129 @@
+[{:db/id -1
+  :adr/id "adr-2607252500-kotoba-wasm-component-first-execution-boundary"
+  :adr/title "ADR-2607252500: Kotoba は Wasm Component-first、aiueos は guest control plane + native micro-TCB とする"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-25"
+  :adr/last-verified "2026-07-25"
+  :adr/last_verified "2026-07-25"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-wasm-component-first-execution-boundary"
+  :adr/authoritative-for
+  ["Kotoba の通常実行形式と native AOT の限定用途"
+   "kotoba / compiler / kototama / aiueos の capability 境界"
+   "aiueos control plane を Wasm Component 化する際の native TCB 境界"]
+  :adr/supersedes
+  ["adr-2607198300-kotoba-native-aot-execution-tier-discovery-and-no-bypass-policy"]
+  :adr/related
+  ["adr-2607241100-kotoba-stack-topology-and-design-cleanup"
+   "adr-2607022200-aiueos-cljc-wasm-component-kernel-architecture"
+   "adr-2607022400-kototama-unikernel-tender-runtime-vocabulary"]
+  :adr/body
+  "# ADR-2607252500: Kotoba は Wasm Component-first、aiueos は guest control plane + native micro-TCB とする
+
+**Status**: accepted
+**Date**: 2026-07-25
+
+## Context
+
+Kotoba compiler は共通 frontend、effect/capability admission、KIR、Wasm と
+native の backend を持つ。直接 native AOT は実装済みだが、通常の application
+execution に選ぶと OS ABI、loader、sandbox、capability bridge を target ごとに
+重複実装・監査することになる。これは portable capability confinement を目的とする
+Kotoba の安全境界を弱める。
+
+Wasm Component Model は import/export を WIT 型で宣言し、component 間の memory
+を共有しない。WASI はその host interface の標準語彙であり、ambient authority を
+guest に与える仕組みではない。最終的に import を満たし、物理 hardware を制御する
+engine、boot、MMU/IOMMU、driver、root key 利用は native code が担う必要がある。
+engine 自体を guest にしても、外側の native engine が無ければ guest を起動できない。
+
+## Decision
+
+### 1. Wasm Component を通常の実行成果物にする
+
+Kotoba の application、domain policy、orchestration、provider の高位ロジックは
+共通 compiler pipeline から Wasm Component として出力する。`kototama` は唯一の
+component linker/runtime として、署名・target identity・WIT world・resource limit を
+検証してから component を composition する。compiler と runtime は相互に再実装しない。
+
+### 2. aiueos を二層に分ける
+
+`aiueos` の grant policy、audit plan、placement、scheduler の高位 decision は
+Wasm Component として実装できる。これを **guest control plane** と呼ぶ。
+
+その外側に次だけを持つ **native micro-TCB** を置く。
+
+- verified Wasm engine と Component instantiation
+- secure boot、process/VM boundary、MMU/IOMMU、強制停止と資源上限
+- root secret の非抽出利用、署名済み grant の最終検証と revoke
+- device、network、clock、storage への最狭 host adapter
+
+native micro-TCB は policy を決定しない。guest control plane が出した grant を
+署名、subject、audience、expiry、revocation、quota、target interface の全てについて
+再検証し、失敗時は deny する。これにより control-plane component の侵害だけでは
+ambient authority を得られない。
+
+### 3. WASI は ambient authority として渡さない
+
+WASI/WIT は ABI と component composition に用いる。guest に
+`wasi:filesystem`、`wasi:http`、clock、random、environment、process の包括的権限を
+渡してはならない。各 effect は aiueos-owned の狭い WIT interface にし、最低でも
+対象、method/operation、byte/item quota、deadline、audit identity を型と grant の
+双方で束縛する。native adapter は同じ制約を独立に検証する。
+
+### 4. native AOT の用途を限定する
+
+native AOT は廃止しない。ただし boot/firmware、aiueos kernel、Wasm engine、driver、
+root-key adapter、または明示的に trusted とした低遅延 primitive に限る。通常の
+Kotoba application を native ABI/OS syscall に直接接続する新規経路は作らない。
+
+### 5. nested engine は主経路にしない
+
+guest 内 interpreter/engine は untrusted plugin の追加 sandbox、testing、研究用途には
+許容する。しかし outer engine/TCB を除去できず、二重 engine の実装・検証・性能負債を
+増やすため、Kotoba/aiueos の主 execution path には採用しない。
+
+## Architecture
+
+```text
+hardware / firmware
+  -> native micro-TCB (boot, isolation, verified Wasm engine, key use, adapter enforcement)
+  -> aiueos guest control-plane component (grant policy, audit, placement)
+  -> provider components (HTTP, DB, queue, secret-use protocol)
+  -> Kotoba application components
+```
+
+Capability flows only downward as a verified, scoped grant. Data and responses may flow
+upward, but no component acquires a host capability merely by being co-resident with its
+provider.
+
+## Consequences
+
+- The compiler has one primary portable backend and one shared KIR/admission pipeline.
+- `kototama` owns component linking/execution; it does not grow a compiler.
+- `aiueos` policy can be portable and replaceable without placing boot, device, or root-key
+  authority in a guest.
+- Platform-specific native code remains small, explicitly reviewed, and independently
+  testable.
+- Component/WASI support is an admission gate: unsupported imports reject before execution,
+  rather than causing a fallback to ambient host APIs.
+
+## Alternatives rejected
+
+| Alternative | Decision | Reason |
+|---|---|---|
+| Direct native AOT for ordinary applications | rejected | multiplies OS/ABI/capability enforcement implementations and expands the TCB |
+| Broad standard WASI grants | rejected | recreates ambient filesystem, network, clock, random, environment, or process authority |
+| Entire OS and engine as a Wasm guest | rejected as a primary architecture | an outer native engine and hardware-isolation layer remain necessary, so this adds a second engine without removing the root TCB |
+| Full microVM per invocation | conditional | use only for high-risk tenants where the extra isolation justifies cost and latency |
+
+## References
+
+- WebAssembly Component Model, `worlds` and typed imports/exports: https://component-model.bytecodealliance.org/design/worlds.html
+- wasmCloud host design (host uses Wasmtime and layers policy/provider controls): https://wasmcloud.com/docs/v1/concepts/hosts/
+- WAMR as an example of a small native Wasm engine: https://github.com/bytecodealliance/wasm-micro-runtime
+"}]
