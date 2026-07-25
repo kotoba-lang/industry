@@ -102,7 +102,17 @@
 (defn nested? [p] (.exists (io/file root p ".gitmodules")))
 (defn remote-of [p] (get (:remote-overrides cfg) p (org-of p)))
 (defn canonical-path [p] (get (:path-overrides cfg) p p))
-(defn heavy? [p] (contains? (:heavy cfg) p))
+;; NOTE: `heavy?` + `clone-depth` emission removed 2026-07-25. ADR-2607211600
+;; retired shallow as a default in 2026-07-21, but this generator still carried
+;; the machinery (`heavy?` gating `:defaults :clone-depth`), dormant only because
+;; `:heavy` happened to be empty — one path added back to `:heavy` would have
+;; silently reintroduced `clone-depth: 1` into west.yml. west re-applies
+;; clone-depth on every fetch, minting a fresh shallow graft each time, and a
+;; graft makes a pure fast-forward read as `unrelated histories` / a bogus
+;; ahead-count. Measured the same day in this superproject: `git status` reported
+;; `13989 ahead / 26 behind` with an EMPTY merge-base, while GitHub's compare API
+;; reported the truth, `2 ahead / 46 behind` with merge-base df98406fb61.
+;; `git fetch --unshallow` restored the correct reading. Keep this removed.
 (defn dup-basenames [paths]
   (->> paths (map name-of) frequencies (keep (fn [[n c]] (when (> c 1) n))) set))
 (defn west-name [path dup-names]
@@ -131,7 +141,6 @@
         dl      (get-in cfg [:datalad path])
         arch    (get-in cfg [:archived path])
         rid     (get-in cfg [:rad-rids path])
-        depth   (when (heavy? path) (get-in cfg [:defaults :clone-depth]))
         groups  (cond
                   dl   [(:group dl)]
                   arch [(:group arch "archived")]
@@ -152,7 +161,6 @@
            (when (not= wname base) (str "      repo-path: " base "\n"))
            "      revision: " sha "\n"
            "      path: " path "\n"
-           (when depth (str "      clone-depth: " depth "\n"))
            "      groups: [" (str/join ", " groups) "]\n"
            (cond
              subs    (str "      submodules:\n"
