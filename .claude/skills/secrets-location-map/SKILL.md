@@ -20,6 +20,26 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   - `gftd.b2/*`（1Password `gftdcojp` vault、フィールド分割: `BUCKET_NAME` /
     `ENDPOINT` / `ENDPOINT_URL` / `REGION` / `APPLICATION_KEY_ID` /
     `ACCESS_KEY_ID` / `SECRET_ACCESS_KEY`）— bucket `ai-gftd-cdn` 専用。
+    ⚠ **この item にかつて存在した `DATASETS_KEY_ID`/`DATASETS_APPLICATION_KEY`
+    （bucket `ai-gftd-datasets` 用）は現存しない。** Keychain service `gftd.b2`
+    の同名 account も無い。後述の `ai-gftd-datasets.b2_annex` を使うこと。
+  - **`ai-gftd-datasets.b2_annex`（Keychain service `b2:ai-gftd-datasets`、
+    account=key id / password=app key。`scripts/b2-creds.cljs` と同じ combined
+    形式）— bucket `ai-gftd-datasets` 専用**（capabilities:
+    listBuckets/listFiles/readFiles/writeFiles/deleteFiles）。2026-07-25 に
+    Master Key で発行。**SHIRO & PICO の制作資産 9.67GB / 297 objects
+    （prefix `ghosthacker-shiropico/`: ep01-07 フルエピソード×11言語、
+    ep08-12 ja、ep-scenes 178枚、bgm、panels、ep01 motion comic）がここにある。**
+    在庫と drift 検証は
+    `orgs/gftdcojp/ai-gftd-ghosthacker-shiropico/tools/b2_catalog.py`。
+    ⚠ **1Password への登録は未完（`op item create` が authorization timeout で
+    失敗するため）。オーナーが item `ai-gftd-datasets.b2_annex` を手動作成し、
+    ここの記述を「1Password が正・Keychain はミラー」に更新するのが望ましい。**
+    - **なぜこの項目が重要か**: この索引に `ai-gftd-datasets` の鍵が載って
+      いなかったため、2026-07-25 の調査が「どの現存鍵からも到達できない」と
+      誤判定し、**実際には無事だった ep01 の資産を一度 lost と結論した**
+      （ADR-2607252000 → 同 ledger seq 86 で訂正）。資格情報が見つからない時に
+      「データが無い」と結論する前に、必ずこの索引と下記 Master Key を確認する。
   - **`BACKBLAZE 260225 application keys`（1Password `gftdcojp` vault）— 1
     item に複数バケット分のスコープ付きキー + アカウント全体の
     Master Application Key が同居**:
@@ -83,15 +103,6 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     （loopback）。**配信先の YouTube/Twitch stream key はここにもどこにも無い** —
     operator のマシンの `~/.babiniku/mediamtx-bridge.yml`（0600、`npm run
     bridge:config` が生成）だけに存在し、Worker にもブラウザにも repo にも入らない。
-  - **`aozora-live-broadcaster`（kagi vault、compartment `gftdcojp`）** — aozora live
-    配信の announce を `pds.aozora.app` に post する専用 identity（Ed25519 seed、64 hex）。
-    **`aozora-actor-approval-operator` を流用していない**のは意図的で、あちらは actor の
-    デプロイ承認を authorize する鍵なので、公開投稿の不具合で actor 承認まで巻き込まないため
-    （one key, one job）。PDS は自己主権なので**アカウント登録もパスワードも無い** —
-    この seed から mint した CACAO の発行者 DID がそのまま repo になる
-    （did:key:z6MkmWxGZsqQXAxp3DK3WHDXgkytraavZjdDwHtZBcbYBKUm、公開値）。
-    consumer は `net-babiniku` の `scripts/aozora_publish.cljs`（env override は
-    `AOZORA_BROADCASTER_SEED`）。ADR-2607259500。
 - **kagi（`kotoba-lang/kagi`）**: net-kotobase / kotoba-lang 系の新規プロジェクト
   向け secrets は、1Password ではなく **こちらを正**にしていく方針（自己主権
   vault、ADR-2606272330）。**実在する vault の実体は
