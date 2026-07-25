@@ -315,4 +315,42 @@ Gated-DeltaNet/SSM 構成（40層中10層のみ full-attention）で full contex
 生き延びており、まさに「余裕があるのに履歴を捨て続ける client」になっていた
 （kotoba-fleet c41ad45）。
 
-結果は `examples/eval/results/2026-07-25-ctx-65536.edn`。"}]
+結果は `examples/eval/results/2026-07-25-ctx-65536.edn`。
+
+### 2026-07-25 — amend (setup: 常設運用に載せた)
+
+オーナー指示「上記で setup」により、ここまでの構成を**実運用として設置**した。
+
+**context の適正値（実測3設定）**: `n_ctx_train` は **262144**（モデル自身の上限。llama.cpp は
+sequence をここで打ち止め、YaRN 1M 主張はフラグでなくソースパッチが要る）。KV は hybrid
+Gated-DeltaNet/SSM（40層中10層のみ full-attention）で **total context 1 token あたり約 19 KiB**:
+
+| `--ctx-size` | per-slot(÷4) | VRAM | full window の prefill |
+|---|---|---|---|
+| 262144 | 65536 | 26 / 48 GiB | 約 1.3 分 |
+| **524288** | **131072** | **31 / 48 GiB** | **約 2.5 分** ← 採用 |
+| 1048576 | 262144 | 41 / 48 GiB | 約 5.1 分（モデル上限） |
+
+実測スループット 856 tok/s prefill、59 tok/s generation（33k probe）。**per-slot 131072 を標準**と
+した: 実測できる消費者（Claude Code bridge 約48k、fleet agent 10–15k）を2倍以上の余裕で
+覆い、VRAM 65%、window を使い切っても3分以内に最初のトークンが返る。262144/slot も
+41/48 GiB で**実際に起動して収まることを確認済み**だが、今どの consumer も要求しない window
+のために VRAM 10 GiB と prefill 5分を払うことになる。設定表は murakumo
+`deploy/llama-server.service`、`infer.edn :infer/ctx` も実配信値に修正済み（faa83d6）。
+
+**常設 tick を設置**（kotoba-fleet a2ed736）: launchd `com.gftd.fleet-tick` が毎時
+`~/.gftd/fleet-queue/*.edn` を1件処理する。**キューが空なら no-op** なので、置くだけでは
+何も起きない。launcher と plist template は `deploy/` にコミットした — 推論ヘッドの
+systemd unit が「マシン上にしか無い設定」で数週間の乖離を生んだ教訓をそのまま適用した。
+
+**無人実行の既定は対話実行より意図的に狭い**: materialize は `dry-run`（スケジュール
+ジョブが黙ってリポジトリの書き込み権限を獲得すべきでない。push には env var と
+work-unit の `:allow-push` と明示 token の3つが要る）、store は `file`（共有 kotobase ログは
+kagi vault = keychain unlock を要し、scheduler にそれがある保証がない）、1 tick 1 unit。
+
+**スケジュール経由で検証済み**（手動実行だけでなく）: `launchctl start` で queue の unit が
+fleet ノードに届き、**59秒で accepted + 署名付き receipt**、**launchd 配下でも kagi 鍵の読み取りが
+成功**した — 対話シェルから離す際の唯一の未知だった点。
+
+**残件**: scheduler は依然 Mac 側（fleet 自身は自分をスケジュールしない）、nbb agent の
+session checkpoint 欠如、L4 相当タスクのモデル能力。"}]
