@@ -39,6 +39,12 @@
     <string>/Users/junkawasaki/github/com-junkawasaki</string>
     <key>HOME</key>
     <string>/Users/junkawasaki</string>
+    <!-- launchd では kagi が Keychain の unlock prompt を出せずに timeout する
+         （gh の keyring は読める）。receipt の署名鍵だけ mode 600 の PEM から読む
+         — ADR-2607178000 §3 が同じ場所・同じ理由で認めている経路。鍵は grant
+         fleet-ci/* のみで pin 前進も governance quorum も持たない。 -->
+    <key>FLEET_CI_SIGNER_PEM</key>
+    <string>/Users/junkawasaki/.gftd/fleet-ci-signer-tip.pem</string>
   </dict>
   <key>StartInterval</key>
   <integer>300</integer>
@@ -48,9 +54,11 @@
   <string>/Users/junkawasaki/.gftd/fleet-ci-tip-tick.stdout.log</string>
   <key>StandardErrorPath</key>
   <string>/Users/junkawasaki/.gftd/fleet-ci-tip-tick.stdout.log</string>
+  <!-- ProcessType は Standard。**Background にしてはいけない**: 実測(2026-07-25)、
+       ProcessType=Background + Nice=5 で bootstrap した job は、他セッションの JVM が
+       CPU を占めている状況で 15 分間 CPU 0.09 秒しか進まず（macOS の background
+       throttling）、最初のログ 1 行すら出さなかった。CI の tick は数分で終わる前景仕事。 -->
   <key>ProcessType</key>
-  <string>Background</string>
-  <key>Nice</key>
-  <integer>5</integer>
+  <string>Standard</string>
 </dict>
 </plist>
