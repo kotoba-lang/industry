@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 4870, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 4902, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 463323,
-  :pageviews-7d 16884,
-  :uniques-7d-sum 4884,
+ {:requests-7d 467441,
+  :pageviews-7d 16892,
+  :uniques-7d-sum 4911,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/debug/pprof/", :requests 76}
-   {:path "/config/prod.exs", :requests 71}
+  [{:path "/config/prod.exs", :requests 69}
    {:path "/nginx_status", :requests 64}
-   {:path "/.env.production.bak", :requests 63}
-   {:path "/.github/workflows/deploy.yml", :requests 62}
+   {:path "/.github/workflows/deploy.yml", :requests 61}
    {:path "/trace.axd", :requests 59}
-   {:path "/.docker/config.json", :requests 56}
-   {:path "/api/.env", :requests 54}],
-  :status-mix {:client-error 2851, :ok 2288, :server-error 16529},
+   {:path "/.docker/config.json", :requests 54}
+   {:path "/debug/pprof/", :requests 53}
+   {:path "/.ssh/id_ecdsa", :requests 48}
+   {:path "/api/.env", :requests 47}],
+  :status-mix {:client-error 2824, :ok 2300, :server-error 16490},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,8 +33,8 @@
  :traffic-quality
  {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 76},
  :top-paths
- "上位 page (24h, 2xx/3xx): /debug/pprof/ 76 · /config/prod.exs 71 · /nginx_status 64 · /.env.production.bak 63 · /.github/workflows/deploy.yml 62 | 4xx(probe) 13% · 5xx 76%",
+ "上位 page (24h, 2xx/3xx): /config/prod.exs 69 · /nginx_status 64 · /.github/workflows/deploy.yml 61 · /trace.axd 59 · /.docker/config.json 54 | 4xx(probe) 13% · 5xx 76%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 463323 req/7d・4884 uniques(日次和)・うち4xx probe 13%(24h)、workers 4871 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 467441 req/7d・4911 uniques(日次和)・うち4xx probe 13%(24h)、workers 4903 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
