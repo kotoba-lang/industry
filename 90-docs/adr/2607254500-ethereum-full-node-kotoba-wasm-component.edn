@@ -29,11 +29,12 @@
   :adr/decision-summary
   {:question "kotoba 言語で設計実装し kototama runtime 上で動く geth 完全互換 Ethereum client は存在するか、無ければ作れるか"
    :existing-answer "存在しない。org-ethereum-jsonrpc / eth-crypto / base-l2 / chain は合計約 2000 行の .cljc/.clj/.cljs で、EVM・state trie・RLP・devp2p・Engine API のいずれも持たない read-only observer"
-   :feasibility :blocked-on-compiler-component-target
+   :feasibility :blocked-on-component-shape-generality-and-target-exposure
    :target-tier :wasm-component-kotoba-v1
    :rejected-tier :native-aot-for-ordinary-application
-   :blocking-dependency "compiler が Wasm Component (WIT world) を出力できない"
-   :fuel-wall-status "target architecture には存在しない。legacy core-wasm backend 固有"}
+   :blocking-dependency "compiler の Component 出力は実在するが、対応 KIR 形状が allowlist で、CLI target として露出しておらず、fuel budget を宣言しない"
+   :fuel-wall-status "target architecture には存在しない。legacy core-wasm backend 固有"
+   :correction "初版は compiler に Component 出力が無いと記載していたが誤り。143 commits 古い共有 checkout を計測していた。2026-07-25 訂正"}
   :adr/body
   "# ADR-2607254500: Ethereum full node (geth 互換) を Kotoba + Wasm Component tier で実装する
 
@@ -99,19 +100,63 @@ Keccak-256 を 1 回（24 ラウンド）回すだけでこの予算を超える
 すなわち fuel は codegen に焼かれた定数ではなく、component 単位の宣言的資源境界になる。
 これは Ethereum full node にとって決定的で、Component tier を選ぶ最大の技術的理由である。
 
-### 2. 真のブロッカーは compiler が Component を出せないこと
+### 2. Component 出力は実在する（初版の記述は誤りだった。2026-07-25 訂正）
 
-`compiler/src/` 全体を `wasm-component` で grep して **0 件**。
-`compiler/src/kotoba/compiler/target.cljc` の profile 一覧にも
-`:wasm-component-kotoba-v1` は無い（`:kotoba-wasi-host-v1` 等の core-wasm host profile のみ）。
-`component-platform.edn` の `:roles` は
-`{:language :effect-and-type-semantics, :compiler :wit-and-component-artifact,
-:kototama :admission-linking-composition-and-runtime}` と定めるが、
-compiler 側の `:wit-and-component-artifact` は未実装である。
+**訂正**: 本 ADR の初版は『compiler は Component を出力できない、`wasm-component` で
+grep して 0 件』と記載した。これは誤りである。計測対象が
+`orgs/kotoba-lang/compiler` の**共有 west checkout であり、`origin/main` から
+143 commits 遅れていた**（かつオーナーの未 push commit 3 件が乗った状態だった）。
+現在の `origin/main`（`f6ee539`）を計測し直した結果は次のとおり。
 
-**これが本プロジェクト全体の唯一かつ最大の blocking dependency。**
-kototama 側の契約（admission・budget・identity・provider binding）は既に書かれており、
-欠けているのは compiler の component 出力である。
+| ファイル | 行数 | 内容 |
+|---|---|---|
+| `src/kotoba/compiler/component_core.clj` | 2467 | Canonical ABI lowering |
+| `src/kotoba/compiler/component_composition.clj` | 567 | provider 合成・closed world |
+| `src/kotoba/compiler/component_wit.clj` | 172 | WIT world 生成 |
+| `src/kotoba/compiler/component_artifact.clj` | 66 | `wasm-tools component embed` / `new` による実バイナリ生成と preamble 検証 |
+
+`component_artifact.clj:10` は `(def target :wasm-component-kotoba-v1)` を宣言し、
+`core.clj:81` の `compile-component` が
+compile → WIT emit → component-core emit → wasm-tools package を実行する。
+生成物は `{:format :wasm-component/v1 :wasi-version 0.3.0 ...}`（WASI version は文字列）で、
+kototama の `component-platform.edn` と target 名・WASI version が一致している。
+component 系のテストも 3 本存在する（`component_artifact_test.clj` /
+`component_composition_test.clj` / `component_wit_test.clj`）。
+
+**したがって『Component を出せない』というブロッカーは存在しない。**
+
+### 2b. 実際に残っているギャップ（再計測に基づく）
+
+1. **対応 KIR 形状が allowlist である。** `component_core.clj:480` の
+   `assert-supported!` は形状を列挙して許可する fail-closed 方式で、
+   `:scalar-capability-call` / `:record-capability-call` / `:variant-capability-call` /
+   `:string-expression` / `:scalar-record-identity` / `:nested-record-identity` /
+   `:variant-identity` / `:string-field-record-identity` / `:scalar-record-projection`
+   などは**いずれも『関数 1 個・export 1 個』条件付き**である。
+   一般形として通るのは `(every? scalar-function? exports)` の `:scalar` のみで、
+   `scalar-function?` は param/result が `#{:i64 :f32 :f64}` に限られる
+   （`component_core.clj:17`）。`core.clj:81` の docstring 自身が
+   『the currently qualified scalar slice』『Structured/provider Canonical ABI
+   lowering remains fail-closed』と明示している。
+   Ethereum の各 module は多関数かつ capability effect を持つため、現状では通らない。
+2. **CLI target として露出していない。** `target.cljc` に
+   `:wasm-component-kotoba-v1` の profile は無く、`cli.clj` にも component の
+   分岐が無い（両ファイルを grep して 0 件）。`compile-component` は API 関数として
+   のみ存在する。
+3. **fuel budget を宣言しない。** core module の fuel global は依然
+   `backend/wasm.cljc:1401` の `global-sec [1 0x7e 1 0x42 0x80 0x04 0x0b]` で 512 固定であり、
+   artifact も `:budgets` を持たない。`component-platform.edn` が要求する
+   `:required-budgets [:fuel :memory-pages]` を満たす admission envelope は
+   まだ生成されない。
+4. **admission envelope 未生成。** `component_platform.clj/validate-world!` が要求する
+   `:admission-keys`（`:target :wasi-version :profile :imports :exports :grants
+   :provider-bindings :ambient-wasi :budgets :identity`）の完全な envelope を
+   compiler は出力しない。`:grants` は policy 側の責務なので compiler が出すべきではないが、
+   残りは compiler が出せる。
+5. **typed collection（externref）の Component 表現が未設計。** core module の typed 命令は
+   `0x6f`（externref）を使う（例 `[0x60 3 0x7f 0x6f 0x6f 1 0x6f]`）。Canonical ABI で
+   これを渡すには resource type 設計が要る。u256 の limb 配列や EVM stack/memory は
+   typed vector 前提なので、Ethereum にとってはこれが実質的な最大の設計課題である。
 
 ### 3. 言語表面のギャップ（いずれも設計で吸収可能、ただしコスト）
 
@@ -213,9 +258,13 @@ native micro-TCB (verified Wasm engine, isolation, key use, adapter enforcement)
 
 ## Blocking dependencies（本 ADR 単独では解けないもの）
 
-1. **compiler の Wasm Component 出力**（`:wasm-component-kotoba-v1` target と WIT 生成）。
-   これが無い限り Phase 1 以降は着手できない。**最優先の前提作業**であり、
-   Ethereum 側の作業ではなく compiler 側の作業である。
+1. **Component の対応形状を『一般の Kotoba application』まで広げること。**
+   Component 出力そのものは実在する（節 2 参照）ので、必要なのは新規実装ではなく
+   `component_core.clj/assert-supported!` の allowlist 拡張である。具体的には
+   (a) 多関数かつ capability effect を持つ module、(b) typed collection（externref）の
+   resource type 表現、(c) `:wasm-component-kotoba-v1` の CLI target 露出、
+   (d) fuel/memory-pages budget の宣言と admission envelope 生成。
+   このうち (b) が最も設計負荷が高く、Ethereum にとって実質的な前提である。
 2. **i64 シフト/ローテート命令の追加**（`i64.shl` 0x86 / `i64.shr_s` 0x87 / `i64.shr_u` 0x88 /
    `i64.rotl` 0x89）。32bit limb で回避可能だが、Keccak と u256 の fuel 消費を大幅に削減する。
    codegen への純粋な追加であり TCB を広げない。
@@ -253,8 +302,25 @@ native micro-TCB (verified Wasm engine, isolation, key use, adapter enforcement)
 ## 正直な状態表明
 
 本 ADR は**設計であって実装ではない**。起票時点でコードは 1 行も書かれていない。
-Phase 0 すら未着手である。理由は上記 Blocking dependency 1（compiler の Component 出力）で、
-これはオーナー判断を要する compiler 側の前提作業である。
+Phase 0 すら未着手である。
+
+**初版の誤りと、その原因（再発防止のため記録する）**:
+初版は『compiler は Wasm Component を出力できない』を中心的主張として起票され、
+その根拠は `orgs/kotoba-lang/compiler/src` に対する grep 0 件だった。しかし
+この共有 west checkout は `origin/main` から **143 commits 遅れており**、
+かつオーナーの未 push commit が 3 件乗った状態だった。実際の `origin/main` には
+Component 出力の実装が 3272 行存在した。
+
+教訓: **`orgs/<org>/<repo>` の共有 checkout に対して『機能が存在しない』を
+grep で結論づけてはならない。** west の pin は manifest が示す時点であって
+upstream の最新ではなく（CLAUDE.md『pin 鮮度』節が同じ罠を警告している）、
+不在の証明には `git fetch` 後の `origin/<default-branch>` を計測する必要がある。
+本 ADR の再計測はすべて `origin/main` の `f6ee539` に対して行った。
+
+なお compiler の共有 checkout には**オーナーの未 push commit が 2 件残っている**
+（`536d643` guest grammar authority、`f435960` Wasm Components を既定実行パスにする README）。
+143 commits 遅れた base の上にあるため素直には push できない。別途 landing が必要で、
+本 ADR はそれに手を付けていない。
 
 また『geth 完全互換フルノード』は geth 本体が約 70 万行の Go であることを踏まえると、
 本 ADR の Phase 0〜5 は単一セッションで到達できる規模ではない。
