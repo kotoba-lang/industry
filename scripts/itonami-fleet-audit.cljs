@@ -58,6 +58,16 @@
 ;;                                                 plain な .cljc 共有ライブラリだと自ら
 ;;                                                 明記〈'not a governed actor'〉している
 ;;                                                 ため、2026-07-23 追加) /
+;;                                                 :declared-internal-only(repo 自身が
+;;                                                 blueprint.edn で
+;;                                                 :itonami.blueprint/citation-policy
+;;                                                 :internal-vocabulary-only と宣言し、
+;;                                                 根拠文書を :citation-policy-basis で
+;;                                                 明示している場合。設計上 citation を
+;;                                                 持てない actor — 埋めること自体が
+;;                                                 ADR 違反になる gap を報告しないため、
+;;                                                 2026-07-25 追加。basis 無しの宣言は
+;;                                                 honour しない) /
 ;;                                                 :none-measured(どの経路も
 ;;                                                 存在しない)。なお isic family の
 ;;                                                 facts.cljc で URL citation が0件の
@@ -252,6 +262,32 @@
   [dir]
   (when-let [f (find-facts-file dir)]
     (count (re-seq cost-threshold-re (slurp f)))))
+
+(defn declared-internal-only?
+  "True when the repo's own blueprint.edn DECLARES that it holds no external
+   regulatory citations by design, and names the document justifying it.
+
+   Distinct from `internal-reference-facts-count`'s `:cost-threshold` shape:
+   that one is INFERRED from a recognizable table, whereas this is an explicit
+   self-declaration for actors whose design brief FORBIDS holding regulatory
+   content at all. First case: cloud-itonami-isic-4912, whose ADR-0002 removed
+   a fabricated jurisdiction catalog (real regulators' names, 49 C.F.R. /
+   鉄道事業法 / ROGS 2006 / AEG citations, government URLs) because it is an
+   internal operations-coordination actor -- `:spec-basis`/`:legal-basis` are
+   operator-supplied per request. Reporting such a repo as a real-world-ingest
+   gap points at a gap that must never be closed: closing it means
+   re-committing the exact fabrication the ADR removed.
+
+   Deliberately NOT a docstring-phrase match (see
+   `internal-reference-facts-count`'s note on why that is unreliable across
+   this fleet's wording) and deliberately NOT honoured without a basis: the
+   `:itonami.blueprint/citation-policy-basis` key must be a non-blank string
+   naming the decision record, so this cannot become a silent opt-out for a
+   repo that simply has not done its ingest work yet."
+  [bp]
+  (and (= :internal-vocabulary-only (:itonami.blueprint/citation-policy bp))
+       (let [basis (:itonami.blueprint/citation-policy-basis bp)]
+         (and (string? basis) (not (str/blank? basis))))))
 
 (def spec-basis-citation-re #":spec-basis\s+\"")
 
@@ -535,9 +571,21 @@
    deliberately left flagged as a gap rather than forcing a broader
    reclassification the sampled content doesn't support."
   [{:keys [has-facts-file? citation-count archive-count family blueprint-components
-           isic-spec-basis-count isic-internal-reference-count comps src-count]}]
+           isic-spec-basis-count isic-internal-reference-count comps src-count
+           declared-internal-only?]}]
   (cond
+    ;; A real citation count still wins: a repo that declares the policy but
+    ;; nevertheless carries citations is reported on its citations, so the
+    ;; declaration can never mask real content.
     (and has-facts-file? (pos? citation-count)) {:signal :facts-citations :count citation-count}
+
+    ;; Explicit, justified self-declaration that citations are forbidden here.
+    ;; `count` is `src-count` (real on-disk content), NOT 1 and NOT a component
+    ;; count -- same reasoning as `:plain-library-structure` below: a zero count
+    ;; would let `real-world-ingest-gap?`'s `(zero? ingest-count)` clause
+    ;; re-flag the repo despite the signal no longer being :none-measured.
+    declared-internal-only?
+    {:signal :declared-internal-only :count (max src-count 1)}
 
     (and has-facts-file? (= family :isic) (zero? citation-count) (pos? isic-spec-basis-count))
     {:signal :facts-citations :count isic-spec-basis-count}
@@ -598,7 +646,8 @@
                                    :isic-spec-basis-count isic-spec-basis-count
                                    :isic-internal-reference-count isic-internal-reference-count
                                    :comps comps
-                                   :src-count src-count})
+                                   :src-count src-count
+                                   :declared-internal-only? (declared-internal-only? bp)})
         ingest-signal (:signal ingest)
         ingest-count (:count ingest)]
     {:itonami.fleet-audit/repo name
@@ -656,6 +705,13 @@
    :total-jurisdiction-coverage (reduce + (map :itonami.fleet-audit/jurisdiction-coverage-count entities))
    :not-prod-ready (count (remove :itonami.fleet-audit/prod-ready? entities))
    :real-world-ingest-gap (count (filter :itonami.fleet-audit/real-world-ingest-gap? entities))
+   ;; Surfaced as its own headline number, not only inside :by-ingest-signal:
+   ;; repos excluded from the gap count by their OWN declaration must stay
+   ;; conspicuous, so a growing figure here is visible as something to audit
+   ;; rather than quietly shrinking :real-world-ingest-gap.
+   :declared-internal-only (count (filter #(= :declared-internal-only
+                                             (:itonami.fleet-audit/real-world-ingest-signal %))
+                                          entities))
    :by-ingest-signal (into (sorted-map) (frequencies (map :itonami.fleet-audit/real-world-ingest-signal entities)))})
 
 (defn needs-attention [entities]
@@ -754,6 +810,12 @@
        ";;                                             domain-agnostic .cljc library with no advisor/\n"
        ";;                                             governor/store of its own — a category mismatch,\n"
        ";;                                             not an unmeasured gap) /\n"
+       ";;                                             :declared-internal-only (the repo itself\n"
+       ";;                                             declares :itonami.blueprint/citation-policy\n"
+       ";;                                             :internal-vocabulary-only with a mandatory\n"
+       ";;                                             :citation-policy-basis — an actor whose design\n"
+       ";;                                             forbids holding citations, so the gap must\n"
+       ";;                                             never be closed) /\n"
        ";;                                             :none-measured (no channel present at all).\n"
        ";;   :itonami.fleet-audit/real-world-ingest-gap?  true when the measured count is 0 OR the\n"
        ";;                                             signal is :none-measured — an entity with no\n"
