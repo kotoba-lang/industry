@@ -1,13 +1,4 @@
 [{:adr/id "adr-2607022610-database-crates-merge-strategy-and-wave-schedule"
-  :adr/revision-history
-  "（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
-
-### 2026-07-21 — note
-
-Wave 1 completion checkpoint recorded (2026-07-21)
-
-Wave 1 (BlockStore abstract + Memory backend) ready for final verification before 2026-07-25 deadline. kotobase-peer pin d2678b35 verified. Wave 2 execution checkpoint (ADR-2607211400) created and Wave 2 kickoff formally recorded.
-"
   :adr/title "ADR-2607022610: kotoba database crates の重複統合と Wave 0–5 スケジュール —— quad-store/commit-dag、CACAO、Datalog fixpoint の決定論的終結"
   :adr/date "2026-07-20"
   :adr/status "accepted"
@@ -536,7 +527,6 @@ Wave 1 (BlockStore abstract + Memory backend) ready for final verification befor
    "CLAUDE.md: .cljc/.kotoba ランタイム優先順位"
    "CLAUDE.md: semantic authority の重複禁止"]
 
-  :adr/deciders ["Jun Kawasaki"]
   :adr/author-notes
   "本 ADR は ADR-2607022600 の3つの open design question に対する
    explicit resolution である。同時に ADR-2607072000 (Rust policy)と
