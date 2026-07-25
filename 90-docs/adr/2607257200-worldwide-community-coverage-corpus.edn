@@ -200,5 +200,49 @@ secondary）/ `:org/source-caveat` / `:org/pinned-on`、および
 ## 3-4. 残り
 
 `community-coverage` 132 org のうち **123 org が未 pin**、phase2/3 の 56 org は全件未 pin。
-pin は「真である」ことではなく「検証可能で日付が付いている」ことを意味する。"
+pin は「真である」ことではなく「検証可能で日付が付いている」ことを意味する。
+
+---
+
+# Iteration 4（2026-07-25）— pin 7 件追加 + 「立場を持たない人々」の共同体
+
+## 4-1. 追加 pin（累計 16 件 / community-coverage 142 org 中）
+
+| entity | pin 後 | 基準日 | tier |
+|---|---|---|---|
+| Rotary International | 1,124,681 人 / 36,498 クラブ | 2025-07-01 | secondary |
+| Lions Clubs International | 140万人 / 50,000 クラブ | 2025 | primary |
+| 日本生協連（JCCU） | 3,080万人（+0.6%）/ 事業高 3兆8,060億円 | 2024年度 | primary |
+| JA グループ | 1,014.8万人（-0.6%、7年連続減）正 385万 / 准 636万 | 2024年度 | secondary |
+| ITUC | 346 加盟組織 / 171 か国 | 2025-06 | primary |
+| 米国 community associations | 369,000 団体 / 2,880万住戸 / 7,710万人 | 2024 | secondary |
+| DAO | 13,000〜14,000 DAO / 650万 token holder / treasury $24.5B | 2025 | secondary |
+
+## 4-2. pin で分かった追加の誤り
+
+- **Rotary**: 想起値「46,000 クラブ」は実際の 36,498 を約 26% 過大（46k は Rotaract を含む
+  数字として流通している）。会員も 1.2M ではなく 1,124,681 で、RI 自身が 2030 年目標
+  1.25M を掲げている＝現状は目標下限を下回る。
+- **DAO**: 想起値 1,000万 holder は実際の約 650万 を 1.5 倍過大。さらに重要なのは分布で、
+  **treasury $1M 超は約 220 DAO、健全な governance は 80 未満**、投票参加率は概ね 20% 未満。
+- **ITUC**: よく引かれる「191M members」は**加盟組織の自己申告の合計**であって監査済みの
+  名簿ではない。affiliate 数（346）だけを pin し、**member 数は主張しない**ことにした。
+- **JA**: 准組合員が 636万 対 正組合員 385万 ＝ **非農家が組合員の約 62%**。「農業協同組合」の
+  多数派はもはや農家ではないという構造が数字で確認できた。
+
+## 4-3. 地域・形態の第二次補完（+10 org）
+
+chama/harambee（ケニア）/ gam'iya・CDA（エジプト）/ 部族和解評議会 majlis al-'asha'ir（レバント）/
+associações de moradores（ブラジル）/ asambleas barriales・trueque（アルゼンチン）/ konbit・sòl
+（ハイチ）/ **広场舞・老年协会（中国、推定5,000万〜1億人）** / biradari・mohalla（パキスタン）/
+**難民キャンプの block committee・majhi** / **Slum Dwellers International 連合**。
+
+最後の 2 つは意図的な追加である: **「登記されていない組織」の極限は、構成員自身が受入国で
+法的人格を持たない共同体**であり、登記簿ベースの面には原理的に載らない。自らを
+self-enumeration して統計を作る SDI は、その状況に対する共同体側の応答として対になる。
+
+## 4-4. iteration 4 終了時点
+
+- `community-coverage`: **142 org / 15 カテゴリ**（うち source-pinned 16 / 未 pin 126）
+- 統合クエリ面の org 総数: **210**"
   :source/file "90-docs/adr/2607257200-worldwide-community-coverage-corpus.edn"}]

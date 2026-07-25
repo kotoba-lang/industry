@@ -38,13 +38,19 @@
  :org/region-primary :region-north-america
  :org/countries ["US"]
  :org/founding-date 1960
- :org/instance-count-estimate 370000
- :org/member-count 75000000
- :org/member-count-basis "llm-recall-unverified: ~370k associations, ~75M residents commonly cited by the Foundation for Community Association Research."
+ :org/instance-count-estimate 369000
+ :org/member-count 77100000
+ :org/member-count-basis "source-pinned: an estimated 369,000 community associations covering 28.8 million housing units and 77.1 million residents in 2024 — roughly a third of the US housing stock — projected to reach ~373,000 at end-2025 and ~377,000 by end-2026 (Foundation for Community Association Research, US National and State Statistical Review). 'Residents' is a population under covenant, not a voluntary membership: you join by buying the house."
  :org/legal-registration :registered
  :org/governance-model :democratic
  :org/mission-statement "Covenant-based governance of shared residential property: assessments, common-area maintenance, architectural rules, dispute enforcement."
- :org/data-provenance "llm-recall-unverified"
+ :org/source-name "Foundation for Community Association Research, U.S. National and State Statistical Review for Community Association Data (2024) / 2026 HOA Outlook"
+ :org/source-url "https://foundation.caionline.org/publications/factbook/"
+ :org/source-date "2024"
+ :org/source-tier :secondary
+ :org/source-caveat "Figures read through the Foundation's press coverage; the Fact Book itself is the primary artifact."
+ :org/pinned-on "2026-07-25"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-chn-residents-committees
