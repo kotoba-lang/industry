@@ -20,9 +20,17 @@
 ;;
 ;; Usage:
 ;;   nbb bin/ingest-raw-eml.cljs --account jun784 [--thread-id T] \
-;;       [--message-id M]... <file.eml>...
-;;   --message-id may repeat; ids are applied to the .eml files positionally
-;;   (Gmail's internal message id is not present in the raw headers).
+;;       [--message-id M]... [--labels L,L,...]... <file.eml>...
+;;   --message-id and --labels may repeat; each is applied to the .eml files
+;;   positionally (file 1 gets the 1st, file 2 the 2nd, ...).
+;;
+;; Why --labels is not optional in practice: a raw .eml carries NO Gmail label
+;; information (the Gmail UI download emits no X-Gmail-Labels header; only the
+;; API's format=RAW response has a sibling labelIds field). Records written
+;; without it get "labels":[] while every API-ingested record carries e.g.
+;; ["IMPORTANT","STARRED","INBOX"] — so label-scoped queries over the warehouse
+;; silently skip them. Pass the labels from whatever surface you read the thread
+;; on (MCP get_thread returns labelIds) unless you truly have none.
 
 (ns ingest-raw-eml
   (:require ["fs" :as fs]
@@ -111,18 +119,25 @@
 ;; ----------------------------------------------------------------------- main
 
 (defn parse-args [argv]
-  (loop [[a & more] argv opts {:message-ids []} files []]
+  (loop [[a & more] argv opts {:message-ids [] :labels []} files []]
     (cond
       (nil? a) [opts files]
       (= a "--account")    (recur (rest more) (assoc opts :account (first more)) files)
       (= a "--thread-id")  (recur (rest more) (assoc opts :thread-id (first more)) files)
       (= a "--message-id") (recur (rest more) (update opts :message-ids conj (first more)) files)
+      (= a "--labels")     (recur (rest more)
+                                  (update opts :labels conj
+                                          (->> (str/split (or (first more) "") #",")
+                                               (map str/trim)
+                                               (remove str/blank?)
+                                               vec))
+                                  files)
       :else (recur more opts (conj files a)))))
 
 (defn -main [& argv]
   (let [[opts files] (parse-args argv)]
     (when (empty? files)
-      (println "usage: nbb bin/ingest-raw-eml.cljs --account SLUG [--thread-id T] [--message-id M]... <file.eml>...")
+      (println "usage: nbb bin/ingest-raw-eml.cljs --account SLUG [--thread-id T] [--message-id M]... [--labels L,L]... <file.eml>...")
       (js/process.exit 2))
     (fs/mkdirSync msgdir #js {:recursive true})
     (let [seen (atom (known-cids))
@@ -148,7 +163,7 @@
                                         :to (addr-list (g "to"))
                                         :cc (addr-list (g "cc"))
                                         :subject (g "subject")
-                                        :labels []
+                                        :labels (get (:labels opts) i [])
                                         :eml_path (str "mail/messages/" cid ".eml")
                                         :source "gmail-ui/download"}
                                  (:account opts)   (assoc :account (:account opts))
