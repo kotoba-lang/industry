@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 4690, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 4870, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 460074,
-  :pageviews-7d 16879,
-  :uniques-7d-sum 4855,
+ {:requests-7d 463323,
+  :pageviews-7d 16884,
+  :uniques-7d-sum 4884,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/config/prod.exs", :requests 79}
-   {:path "/debug/pprof/", :requests 76}
-   {:path "/.env.production.bak", :requests 69}
-   {:path "/trace.axd", :requests 66}
+  [{:path "/debug/pprof/", :requests 76}
+   {:path "/config/prod.exs", :requests 71}
    {:path "/nginx_status", :requests 64}
-   {:path "/.well-known/jwks.json", :requests 64}
-   {:path "/health", :requests 62}
-   {:path "/.github/workflows/deploy.yml", :requests 62}],
-  :status-mix {:client-error 2806, :ok 2523, :server-error 17052},
+   {:path "/.env.production.bak", :requests 63}
+   {:path "/.github/workflows/deploy.yml", :requests 62}
+   {:path "/trace.axd", :requests 59}
+   {:path "/.docker/config.json", :requests 56}
+   {:path "/api/.env", :requests 54}],
+  :status-mix {:client-error 2851, :ok 2288, :server-error 16529},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,8 +33,8 @@
  :traffic-quality
  {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 76},
  :top-paths
- "上位 page (24h, 2xx/3xx): /config/prod.exs 79 · /debug/pprof/ 76 · /.env.production.bak 69 · /trace.axd 66 · /nginx_status 64 | 4xx(probe) 13% · 5xx 76%",
+ "上位 page (24h, 2xx/3xx): /debug/pprof/ 76 · /config/prod.exs 71 · /nginx_status 64 · /.env.production.bak 63 · /.github/workflows/deploy.yml 62 | 4xx(probe) 13% · 5xx 76%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 460074 req/7d・4855 uniques(日次和)・うち4xx probe 13%(24h)、workers 4691 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 463323 req/7d・4884 uniques(日次和)・うち4xx probe 13%(24h)、workers 4871 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
