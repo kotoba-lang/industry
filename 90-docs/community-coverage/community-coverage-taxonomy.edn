@@ -77,6 +77,61 @@
  :community-category/typical-registration :mostly-unregistered
  :source/dataset "community-coverage"}
 
+;;; ---------- iteration 2 additions (2026-07-25) ----------
+;;; The owner's list ("地方、スポーツ、結社、組合、コミュニティ、国際、伝統、
+;;; ネットコミュニティ、、") was explicitly exemplary (例えば / 、、), so these
+;;; seven forms are added rather than folded into the original eight.
+
+{:community-category/id :cat-emergency-volunteer
+ :community-category/name "消防団・救難ボランティア (volunteer emergency response)"
+ :community-category/name-en "Volunteer fire, rescue and civil-protection corps"
+ :community-category/description "Standing volunteer bodies that respond to fire, flood, avalanche, sea rescue and civil emergency. Often the largest per-capita membership organization in a country and structurally invisible to corporate registries because members serve through a municipality or an unincorporated corps."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-education-parent
+ :community-category/name "PTA・同窓会・学校支援 (school-linked communities)"
+ :community-category/name-en "Parent, alumni and school-support communities"
+ :community-category/description "Communities constituted by a school: parent-teacher associations, alumni associations, school-support foundations, dormitory and class-year bodies."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-health-support
+ :community-category/name "患者会・自助グループ (health and peer support)"
+ :community-category/name-en "Patient, caregiver and peer-support communities"
+ :community-category/description "Disease-specific patient associations, caregiver circles, bereavement and hospice volunteer groups, peer-support groups outside the anonymous-fellowship model."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-identity-rights
+ :community-category/name "当事者・権利コミュニティ (identity and rights communities)"
+ :community-category/name-en "Identity-based and rights communities"
+ :community-category/description "Communities formed around a shared social position: disability communities, LGBTQ+ communities, ethnic and linguistic minority associations, veterans' bodies, refugee and migrant self-organization."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-hobby-interest
+ :community-category/name "趣味・同好 (hobby and interest)"
+ :community-category/name-en "Hobby and interest communities"
+ :community-category/description "Voluntary interest communities with regular meetings and internal norms: amateur radio, allotment/community gardens, chess and go clubs, birdwatching, model/rail, doujin circles, choirs and brass bands, dance and theater troupes."
+ :community-category/typical-registration :mostly-unregistered
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-resource-commons
+ :community-category/name "資源管理コモンズ (resource commons)"
+ :community-category/name-en "Resource-user and commons-management communities"
+ :community-category/description "Bodies that jointly manage a shared natural resource: water user and irrigation associations, forest user groups, fishery cooperatives with customary sea tenure, grazing commons, acequia and subak systems."
+ :community-category/typical-registration :mixed
+ :source/dataset "community-coverage"}
+
+{:community-category/id :cat-civic-political
+ :community-category/name "市民・政治 (civic and political grassroots)"
+ :community-category/name-en "Civic and political grassroots communities"
+ :community-category/description "Party branches and their volunteer bases, tenant unions, residents' referendum and anti-development committees, participatory budgeting assemblies, election-monitoring volunteer networks."
+ :community-category/typical-registration :mixed
+ :community-category/scope-note "Descriptive coverage of grassroots political community forms; this corpus takes no position on any party or platform (cf. cloud-itonami-isic-9492, whose governor blocks political-position decisions outright)."
+ :source/dataset "community-coverage"}
+
 ;;; ---------- controlled vocabularies (documented, not enforced) ----------
 
 {:vocab/id :vocab-legal-registration

@@ -6,6 +6,17 @@
 
 (def fs (js/require "fs"))
 
+(defn slug
+  "Name -> keyword-safe slug. Same fix as in
+  scripts/generate-phase2-religious-variants.cljs: unstripped parentheses and
+  apostrophes produced unreadable keywords and made the emitted EDN unparseable.
+  Fixed 2026-07-25, ADR-2607257200."
+  [s]
+  (-> (str s)
+      str/lower-case
+      (str/replace #"[^a-z0-9]+" "-")
+      (str/replace #"^-+|-+$" "")))
+
 ;;; ============================================================
 ;;; PHASE 3: INDIGENOUS, NRM, AND SECULAR COMMUNITIES
 ;;; ============================================================
@@ -110,11 +121,11 @@
 (defn generate-org-entity [org idx]
   "Generate :org/* entity for Phase 3 organization"
   {:db/id (+ 60000 idx)
-   :org/id (keyword (str "org-" (str/lower-case (str/replace (:name org) #" " "-"))))
+   :org/id (keyword (str "org-" (slug (:name org))))
    :org/name (:name org)
    :org/canonical-name (str/lower-case (name (:type org)))
    :org/type (:type org)
-   :org/tradition (keyword (str "tradition-" (str/lower-case (str/replace (name (:type org)) #" " "-"))))
+   :org/tradition (keyword (str "tradition-" (slug (name (:type org)))))
    :org/founding-date (:founding org)
    :org/founding-location "Global"
    :org/member-count (:members org)
@@ -164,7 +175,7 @@
         axis-entities (mapcat
                        (fn [org idx]
                          (generate-axis-entities
-                          [:org/id (keyword (str "org-" (str/lower-case (str/replace (:name org) #" " "-"))))]
+                          [:org/id (keyword (str "org-" (slug (:name org))))]
                           (+ 61000 (* idx 100))
                           (:axis org)))
                        phase3-organizations

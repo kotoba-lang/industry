@@ -52,11 +52,13 @@ cat-local-place（地方・地縁）/ cat-sports（スポーツ）/ cat-fraterna
 
 ## 既知のギャップ / 次の iteration
 
-1. 出典の pin（llm-recall-unverified → source-pinned）。特に町内会・stokvel・SHG・Discord のような桁が大きい entry から。
-2. phase2（宗派 39 件）/ phase3（先住民・NRM 8 + 世俗 15 件）の生成スクリプトを /tmp 出力から実ファイル着地に切り替え、religious-community 側のカバレッジを 11 → 約 73 org にする。
-3. 地域の穴埋め（中央アジア・中央アフリカ・カリブ・太平洋・中東）。
+1. 出典の pin（llm-recall-unverified → source-pinned）。特に町内会・stokvel・SHG・Discord のような桁が大きい entry から。**iteration 2 時点で未着手 — corpus 全 188 org が未検証**。
+2. ~~phase2 / phase3 の着地~~ → **iteration 2 で完了**（下記）。
+3. ~~地域の穴埋め（中央アジア・中央アフリカ・カリブ・太平洋・中東）~~ → **iteration 2 で一次補完**（下記）。残るのは中央アフリカの言語別・カリブ島嶼別のような粒度の細分化。
 4. ADR-2608180100（religious-community framework）は依然 draft — accepted に上げるか、本 corpus に統合するかの判断。
-5. DAO の on-chain governance と、この fleet 自身の signed-quorum governance（manifest/fleet-keys.edn、ADR-2607160005）の構造比較。"
+5. DAO の on-chain governance と、この fleet 自身の signed-quorum governance（manifest/fleet-keys.edn、ADR-2607160005）の構造比較。
+6. `manifest/schema.edn`（自動生成）と CLAUDE.md 統合クエリ面節への反映。
+7. phase2/phase3 由来の 784 軸行は `llm-prior-unverified` のまま。sample-orgs.edn 側の 11 org だけが `document-analysis`/`survey`/`fact` を名乗っており、**その 11 org の basis 自体も出典未確認**（同じ検証が要る）。"
   :adr/related "ADR-2608180100 ADR-2607203000 ADR-2607252000 ADR-2607154303 ADR-2607081200 ADR-2607086000 ADR-2607086100"
   :adr/body "# ADR-2607257200: 全世界コミュニティ coverage corpus
 
@@ -95,5 +97,61 @@ nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
 
 - `manifest/edn-query.cljs` で 95 entity がロードされ、warn-skipped の WARNING は出ない。
 - `manifest/docs-edn-only.cljs verify` は FAIL するが、原因は既存 ADR 2 件の parse error・not-tx 7 件・md path ref 2 件で、本 corpus は 1 件も flagged されていない（origin/main 時点で既に FAIL していた既存不良）。
-- `.md` は追加していない（90-docs は EDN only）。ドキュメントは本 ADR と各 EDN 冒頭のコメントが正本。"
+- `.md` は追加していない（90-docs は EDN only）。ドキュメントは本 ADR と各 EDN 冒頭のコメントが正本。
+
+---
+
+# Iteration 2（2026-07-25）
+
+ADR-2607257000 に従い、履歴は git に任せて本 ADR は最新状態を表す（adr-ledger への追記はしない）。
+
+## 2-1. phase2 / phase3 の着地 — 生成器のバグを直してから
+
+`scripts/generate-phase2-religious-variants.cljs` / `-phase3-indigenous-secular.cljs` は
+`/tmp` にしか書かないため未着地だったが、**そもそも出力が EDN として読めなかった**。原因は
+org 名から keyword を作る際に括弧・アポストロフィを落としていなかったこと:
+
+```clojure
+;; 修正前 — :org-latter-day-saints-(mormon) / :org-sunni-islam-(ash'ari-mainstream) を吐く
+(keyword (str \"org-\" (str/lower-case (str/replace (:variant variant) #\" \" \"-\"))))
+```
+
+`(` は EDN reader ではリスト開始なので、ファイル全体が parse 不能になる。**これが
+`dc0142c7e4a`「revert sample-orgs.edn to last known-good state」の真因**だった。両生成器に
+`slug`（`[^a-z0-9]+` → `-`）を入れて修正。
+
+## 2-2. 軸スコアを「計測済み」と偽らせない
+
+生成器が吐く `:org-axis/*` は `:org-axis/measurement-basis \"document-analysis\"`（phase3 は
+`\"survey\"`）を名乗るが、実際の値は生成器ソース内にハードコードされた LLM 事前分布である。
+そのまま載せると ADR-2607203000 が禁じる「計測済みに見える捏造」になるため、
+`scripts/land-religious-community-phases.cljs` を新設し、着地時に
+
+- `:org-axis/measurement-basis` → `\"llm-prior-unverified\"`、caveat に生成器名を明記
+- sample-orgs.edn / religious-community.datoms.edn と重複する org・tradition を除去（3 org を除去）
+- `999999999` のようなプレースホルダ member-count を削除して理由を残す
+- `:source/dataset` を付与（`religious-community-phase2` / `-phase3`）
+
+を行う。結果: **tradition 31 / org 56（34+22）/ 軸行 784** が query 可能になった。
+
+## 2-3. カテゴリと地域の拡張
+
+オーナーの列挙は「例えば…、、」と明示的に例示だったので、8 カテゴリに 7 つを追加した:
+`cat-emergency-volunteer`（消防団・RNLI・DLRG）/ `cat-education-parent`（PTA・同窓会・
+Nordic study circles）/ `cat-health-support`（患者会・介護者）/ `cat-identity-rights`
+（障害・Deaf・LGBTQ+・退役軍人）/ `cat-hobby-interest`（アマチュア無線・市民農園・同人・合唱）/
+`cat-resource-commons`（水利組合・subak・森林利用者グループ・漁協）/ `cat-civic-political`
+（政党支部・借家人組合・参加型予算）。
+
+地域の穴埋め: hashar（中央アジア）/ 同郷連合（コーカサス）/ KGW（ポーランド）/ dacha 協同組合
+（ロシア）/ 年齢階梯組織（イボ）/ chefferie（中央アフリカ）/ mas camp（カリブ）/ wantok
+（メラネシア）/ hemşehri（トルコ）/ hey'at（イラン）/ 葬儀扶助会（タイ）/ đình・họ（ベトナム）/
+samity・Sarvodaya（南アジア）/ juntas de acción comunal・comedores populares（ラテンアメリカ）/
+studiecirklar（北欧）/ 입주자대표회의（韓国）。
+
+## 2-4. iteration 2 終了時点の数値
+
+- `community-coverage`: **132 org / 15 カテゴリ**（iteration 1 は 95 org / 8 カテゴリ）
+- `religious-community-phase2`: 34 org、`religious-community-phase3`: 22 org
+- 統合クエリ面上の `org/name` を持つ entity: **200**（うち 12 が iteration 0 の religious-community 原本）"
   :source/file "90-docs/adr/2607257200-worldwide-community-coverage-corpus.edn"}]

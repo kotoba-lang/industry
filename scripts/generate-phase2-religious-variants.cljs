@@ -6,6 +6,19 @@
 
 (def fs (js/require "fs"))
 
+(defn slug
+  "Name -> keyword-safe slug. A bare (str/replace s #\" \" \"-\") left parentheses
+  and apostrophes in place, emitting unreadable keywords such as
+  :org-latter-day-saints-(mormon) — the EDN reader treats ( as a list open, so the
+  whole emitted file failed to parse. That is why an earlier attempt to merge this
+  generator's output into sample-orgs.edn had to be reverted (dc0142c7e4a).
+  Fixed 2026-07-25, ADR-2607257200."
+  [s]
+  (-> (str s)
+      str/lower-case
+      (str/replace #"[^a-z0-9]+" "-")
+      (str/replace #"^-+|-+$" "")))
+
 ;;; ============================================================
 ;;; PHASE 2 RELIGIOUS VARIANTS METADATA
 ;;; ============================================================
@@ -251,7 +264,7 @@
 (defn generate-org-entity [variant idx]
   "Generate :org/* entity for religious variant"
   {:db/id (+ 50000 idx)
-   :org/id (keyword (str "org-" (str/lower-case (str/replace (:variant variant) #" " "-"))))
+   :org/id (keyword (str "org-" (slug (:variant variant))))
    :org/name (:variant variant)
    :org/canonical-name (str (name (:tradition variant)))
    :org/type :religious-corp
@@ -305,7 +318,7 @@
         axis-entities (mapcat
                        (fn [variant idx]
                          (generate-axis-entities
-                          [:org/id (keyword (str "org-" (str/lower-case (str/replace (:variant variant) #" " "-"))))]
+                          [:org/id (keyword (str "org-" (slug (:variant variant))))]
                           (+ 51000 (* idx 100))
                           (:axis variant)))
                        religious-variants
@@ -314,7 +327,7 @@
         ;; Generate tradition entities (new)
         tradition-entities (mapv
                            (fn [trad]
-                             {:db/id (keyword (str "tradition-" (str/lower-case (str/replace (:name trad) #" " "-"))))
+                             {:db/id (keyword (str "tradition-" (slug (:name trad))))
                               :tradition/id (:id trad)
                               :tradition/name (:name trad)
                               :tradition/founding-approx-year (:founding trad)})
