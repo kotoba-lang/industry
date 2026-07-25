@@ -1141,13 +1141,26 @@
    :next-action :retain-cljc-and-revisit-now-that-kotoba-lang-states-bounded-model-v1-establishes-the-typed-map-precedent}
   {:root "orgs/kotoba-lang/edu-berkeley-spice/src/spice/model.cljc"
    :repository "orgs/kotoba-lang/edu-berkeley-spice"
-   :kind :retain-cljc-pending-bounded-arbitrary-keyed-map-profile-precedent
-   :review-status :reviewed-2026-07-24
-   :migration-authorized false
-   :reason "SPICE device compact-model library: models keyed by arbitrary device name in an open map, same gap as states/sigma/search/sheets/atprotocol. spice.analysis (432 lines, solve-dc-op/solve-dc-op-nonlinear) is almost certainly a Newton-Raphson conductance-matrix solver over a variable node count -- a second, independent blocker (arbitrary-sized matrix/vector state, likely also f64-heavy) -- flagged but not read in full given the model.cljc blocker alone already rules out a same-file bounded profile."
-   :required-language-gates [:bounded-arbitrary-keyed-map-profile-precedent
-                             :bounded-variable-node-count-matrix-profile-if-analysis-cljc-is-ever-attempted]
-   :next-action :retain-cljc-and-revisit-now-that-kotoba-lang-states-bounded-model-v1-establishes-the-typed-map-precedent}]
+   :kind :bounded-profile-split
+   :review-status :bounded-nmos-model-library-profile-merged
+   :migration-authorized true
+   :migration-scope :spice/bounded-nmos-model-library-v1
+   :legacy-domain :spice.model-bjt-diode-heterogeneous-tagging-plus-spice-circuit-netlist-and-the-variable-node-count-newton-raphson-solver-not-reviewed-this-pass
+   :safety-note "First f64-record-VALUE typed-map split, directly unblocked by kotoba-lang/compiler's f64 fixes (#262/#263/#264). The Level-1 NMOS compact-model library is [:map :string [:record :spice/nmos [[:vth0 :f64] [:kp :f64] [:lambda :f64] [:tox :f64] [:nsub :f64]]]] -- a name-keyed library whose value is a record of eight f64 compact-model parameters. Direct :f64 map keys/values are still rejected (structured-scalar-ABI rule); wrapping f64s in a record is the supported path. BJT/diode compact models, the heterogeneous [:mosfet|:bjt|:diode model] tagging, spice.circuit, spice.netlist, and the variable-node-count Newton-Raphson DC solver (spice.analysis) remain the CLJC oracle -- the analysis solver's arbitrary-sized matrix state is a separate, still-open bounded-profile design question."
+   :compiler-findings
+   {:f64-field-records-in-typed-map-values-now-work
+    {:description "A [:record ...:f64...] value inside a [:map :string ...] typed-map, and a body constructing it with f64-from-bits, now compile and run on wasm32-browser -- one of the classes fixed by compiler #262/#263/#264. Direct :f64 map keys/values remain rejected."}}
+   :implementation
+   {:pr "https://github.com/kotoba-lang/edu-berkeley-spice/pull/1"
+    :commit "2fc1b7eee6b3c3f5bd4ac3f084db81d7335e06a5"
+    :kernel-and-conformance "src/spice/bounded_nmos_library.kotoba"
+    :migration-record "migration/bounded-nmos-model-library-v1.edn"
+    :legacy-tests {:tests 11 :assertions 32 :failures 0 :errors 0}
+    :lint {:errors 0 :warnings 0}
+    :hand-verified-cases "main builds spice.model/default-nmos \"n1\" (vth0 0.7) plus \"n2\", asserts model-count 2, membership, vth0 IEEE-bit round-trip (4604480259023595110 == bits of 0.7), absence of \"absent\", and the missing-model fallback"
+    :required-capabilities []
+    :hosted-ci {:workflow-updated false :reason :ssh-push-used-legacy-workflow-unchanged}}
+   :next-action :revisit-atprotocol-app-record-profile-and-sigma-with-the-same-typed-map-tool}]
  :language-maturity
  {:safe-f64-phase-3a
   {:status :merged-qualified
@@ -1577,8 +1590,8 @@
   :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA and FINRA retirement each removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; the assoc-* wave is closed, so resume with per-repo review inside the isic/isco/iso3166/unspsc/cofog/gtin census once the application-profile and string-search gates are tracked as landed."}
  :completion
  {:reviewed-project-roots 59
-  :authorized-migrations 29
-  :retained-oracles 11
+  :authorized-migrations 30
+  :retained-oracles 10
   :typed-refactors-pending 0
   :typed-refactors-in-review 0
-  :typed-refactors-merged-awaiting-cutover 4}}}
+  :typed-refactors-merged-awaiting-cutover 5}}}
