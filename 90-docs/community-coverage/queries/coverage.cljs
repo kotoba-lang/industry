@@ -82,6 +82,15 @@
     (println "\nREGION (primary)")
     (doseq [[k v] (tally :org/region-primary orgs)] (line (name k) v n))
 
+    (println "\nISIC CLASS via category hint  (join key into cloud-itonami actors)")
+    (let [by-cat (into {} (map (juxt :community-category/id identity)) categories)
+          isic-of (fn [o] (get-in by-cat [(:org/category o) :community-category/isic-hint]))
+          residual (count (filter #(= "9499" (isic-of %)) orgs))]
+      (doseq [[k v] (tally isic-of orgs)] (line k v n))
+      (println (str "    -> " residual "/" n " (" (pct residual n)
+                    "%) fall into ISIC 9499 'other membership organizations n.e.c.',"))
+      (println "       i.e. the international standard has one residual bucket for them"))
+
     (println "\nHONESTY OF COUNTS")
     (println (str "    " with-count "/" n " assert :org/member-count"))
     (println (str "    " with-basis "/" n " state a :org/member-count-basis"))

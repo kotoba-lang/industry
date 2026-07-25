@@ -445,5 +445,60 @@ consejos comunales（ベネズエラ。**国家が上から共同体構造を製
 ## 8-5. iteration 8 終了時点
 
 - `community-coverage`: **178 org**（source-pinned 28 / 未 pin 150）
-- `:org/member-count-basis`: **178/178**"
+- `:org/member-count-basis`: **178/178**
+
+---
+
+# Iteration 9（2026-07-25）— corpus を cloud-itonami ISIC アクターに接続する
+
+## 9-1. 接続の設計 — org ではなく category に hint を置く
+
+ADR 冒頭で「将来 `:org/isic-hint` を足せば機械的に join できる」と書いたが、**org 178 件に
+個別 ISIC を割り当てるのは推測の量産**になる。代わりに **15 カテゴリの側**に
+`:community-category/isic-hint` / `:community-category/itonami-actor` /
+`:community-category/isic-note` を置いた。org は `:org/category` を持っているので join は
+2 ホップで成立し、推測は 178 件でなく 15 件に閉じる。
+
+```bash
+# community org → category → ISIC class（cloud-itonami actor repo への結合キー）
+nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \\
+  '[:find ?isic (count ?o) :where
+    [?o \"source/dataset\" \"community-coverage\"] [?o \"org/category\" ?cat]
+    [?c \"community-category/id\" ?cat] [?c \"community-category/isic-hint\" ?isic]]'
+```
+
+## 9-2. 実測結果 — **178 org 中 70 件（39%）が ISIC 9499 に落ちる**
+
+| ISIC | 意味 | org 数 |
+|---|---|---|
+| **9499** | その他の会員制団体 n.e.c.（残余クラス） | **70（39%）** |
+| 9491 | 宗教団体 | 30（17%） |
+| 6492 | その他与信（ROSCA・SHG・埋葬扶助） | 24（13%） |
+| 9420 | 労働組合 | 15（8%） |
+| 9312 | スポーツクラブ | 13（7%） |
+| 9492 | 政治団体 | 9（5%） |
+| 0161 | 作物生産支援（水利・コモンズ） | 8（4%） |
+| 8569 / 8890 / 8423 | 教育支援 / 社会福祉 / 公共の安全 | 各 3 |
+
+**国際標準産業分類は、人類の共同体形態の 39% に対して「その他」という単一のバケツしか
+持っていない。** これは corpus 側の欠陥ではなく **分類体系側の盲点**である。とくに:
+
+- **ネットコミュニティに ISIC クラスは存在しない**。subreddit も Discord サーバも DAO も
+  FOSS コミュニティも全部 9499。ISIC は「事業所と雇用」を前提に設計されているため、
+  拠点も給与も持たない共同体は原理的に見えない。
+- **協同組合は「協同組合」として分類されない** — 酪農協同組合は酪農業に分類される。
+  組織を定義している member-ownership が分類上は消える。
+- 氏族評議会・年齢階梯・慣習法廷にもクラスが無い（9499）。
+- 消防団は ISIC 8425（消防）だが fleet に該当 actor repo が無い（8423 で代用）。
+
+## 9-3. レポータに ISIC 分布を常設
+
+`queries/coverage.cljs` に ISIC セクションを追加したので、以後 corpus が増えるたびに
+「残余クラス率」が自動で追跡される。
+
+## 9-4. iteration 9 終了時点
+
+- `community-coverage`: 178 org / 15 カテゴリ（source-pinned 28）
+- カテゴリ ↔ cloud-itonami ISIC actor の join が成立（9499 / 9491 / 6492 / 9420 / 9312 /
+  9492 / 0161 / 8569 / 8890 / 8423 の 10 actor repo が対応先）"
   :source/file "90-docs/adr/2607257200-worldwide-community-coverage-corpus.edn"}]

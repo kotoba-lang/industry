@@ -21,6 +21,9 @@
 ;;; ---------- category taxonomy (the 8 axes the owner named) ----------
 
 {:community-category/id :cat-local-place
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "Statutory neighborhood bodies (barangay, gram panchayat, 居委会) arguably sit under 8411 general public administration instead; ISIC has no class for a voluntary body that governs a place."
  :community-category/name "地方・地縁 (local / place-based)"
  :community-category/name-en "Local and place-based community"
  :community-category/description "Membership follows from residence in a place: neighborhood associations, village assemblies, residents' committees, commons/land-holding collectives, homeowner associations."
@@ -28,6 +31,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-sports
+ :community-category/isic-hint "9312"
+ :community-category/itonami-actor "cloud-itonami-isic-9312"
+ :community-category/isic-note "9312 activities of sports clubs. Facility operators fall under 9311; informal pickup play falls under nothing."
  :community-category/name "スポーツ (sport)"
  :community-category/name-en "Sport clubs, leagues and supporter communities"
  :community-category/description "Amateur/community sport clubs, member-owned professional clubs, supporter and ultras groups, informal pickup play, running/parkrun style open events, esports clans."
@@ -35,6 +41,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-fraternal
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "Initiatory orders and service clubs both land in the residual class."
  :community-category/name "結社 (fraternal / sworn societies)"
  :community-category/name-en "Fraternal orders, service clubs and secret societies"
  :community-category/description "Initiatory or oath-based membership bodies and service clubs: masonic and para-masonic orders, service clubs, collegiate fraternities, native-place and lineage-adjacent sworn societies."
@@ -43,6 +52,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-labor-coop
+ :community-category/isic-hint "9420"
+ :community-category/itonami-actor "cloud-itonami-isic-9420"
+ :community-category/isic-note "9420 trade unions; employer/business associations are 9411 and professional bodies 9412. Cooperatives are classified by what they DO (dairy co-op = dairy), not as cooperatives — the member-ownership that defines them is invisible to ISIC. Credit unions are 6419/6492."
  :community-category/name "組合 (unions, cooperatives, guilds)"
  :community-category/name-en "Labor unions, cooperatives and guilds"
  :community-category/description "Worker organization and member-owned economic bodies: trade union confederations, cooperatives (consumer, agricultural, worker, credit), craft/merchant guilds, informal-sector worker associations."
@@ -50,6 +62,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-mutual-aid
+ :community-category/isic-hint "6492"
+ :community-category/itonami-actor "cloud-itonami-isic-6492"
+ :community-category/isic-note "ROSCAs and burial societies are financial mutual aid (6492 other credit granting) but almost never appear in financial statistics; the welfare side maps to 8890 other social work without accommodation."
  :community-category/name "相互扶助コミュニティ (mutual aid)"
  :community-category/name-en "Mutual aid and rotating-savings communities"
  :community-category/description "Reciprocal-obligation communities that mostly never register: rotating savings and credit associations (講/tanda/susu/stokvel/chit), burial societies, disaster volunteer networks, gift/Buy-Nothing groups, hometown associations, time banks."
@@ -57,6 +72,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-international
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "Transnational membership movements have no dedicated class; humanitarian delivery arms map to 8890."
  :community-category/name "国際 (transnational movements and INGOs)"
  :community-category/name-en "International movements, INGOs and fellowships"
  :community-category/description "Communities whose membership crosses borders by design: scouting, hospitality networks, anonymous fellowships, transnational social movements, diaspora networks, global federations of local clubs."
@@ -64,6 +82,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-traditional
+ :community-category/isic-hint "9491"
+ :community-category/itonami-actor "cloud-itonami-isic-9491"
+ :community-category/isic-note "9491 activities of religious organizations covers ritual bodies (氏子, hey'at, pagoda committees). Clan councils, age-sets and customary courts have no ISIC class at all and fall to 9499."
  :community-category/name "伝統・慣習共同体 (traditional / customary)"
  :community-category/name-en "Traditional, customary and indigenous communities"
  :community-category/description "Authority derived from custom, descent or ritual rather than statute: indigenous confederacies and councils, clan/lineage associations, age-set systems, festival (matsuri) bodies, customary village assemblies, chiefly systems."
@@ -71,6 +92,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-online
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "ISIC has NO class for platform-native community. Subreddits, Discord servers, DAOs and FOSS communities all fall into 9499 n.e.c. — a genuine blind spot in a classification designed around premises and payrolls."
  :community-category/name "ネットコミュニティ (online-native)"
  :community-category/name-en "Online-native communities"
  :community-category/description "Communities constituted primarily through a network platform or protocol: FOSS project communities, wiki communities, forum/subreddit/Discord/Fediverse communities, fandoms, DAOs, guilds in games."
@@ -83,6 +107,9 @@
 ;;; seven forms are added rather than folded into the original eight.
 
 {:community-category/id :cat-emergency-volunteer
+ :community-category/isic-hint "8423"
+ :community-category/itonami-actor "cloud-itonami-isic-8423"
+ :community-category/isic-note "8423 public order and safety; ISIC 8425 fire service activities has no actor repo in the fleet. Volunteer corps are counted under the municipality that hosts them, not as organizations."
  :community-category/name "消防団・救難ボランティア (volunteer emergency response)"
  :community-category/name-en "Volunteer fire, rescue and civil-protection corps"
  :community-category/description "Standing volunteer bodies that respond to fire, flood, avalanche, sea rescue and civil emergency. Often the largest per-capita membership organization in a country and structurally invisible to corporate registries because members serve through a municipality or an unincorporated corps."
@@ -90,6 +117,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-education-parent
+ :community-category/isic-hint "8569"
+ :community-category/itonami-actor "cloud-itonami-isic-8569"
+ :community-category/isic-note "8569 educational support activities. PTAs and alumni bodies are usually invisible because the school, not the parent body, is the classified unit."
  :community-category/name "PTA・同窓会・学校支援 (school-linked communities)"
  :community-category/name-en "Parent, alumni and school-support communities"
  :community-category/description "Communities constituted by a school: parent-teacher associations, alumni associations, school-support foundations, dormitory and class-year bodies."
@@ -97,6 +127,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-health-support
+ :community-category/isic-hint "8890"
+ :community-category/itonami-actor "cloud-itonami-isic-8890"
+ :community-category/isic-note "8890 other social work activities without accommodation. Peer-support groups with no staff and no premises rarely enter the statistic at all."
  :community-category/name "患者会・自助グループ (health and peer support)"
  :community-category/name-en "Patient, caregiver and peer-support communities"
  :community-category/description "Disease-specific patient associations, caregiver circles, bereavement and hospice volunteer groups, peer-support groups outside the anonymous-fellowship model."
@@ -104,6 +137,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-identity-rights
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "Disability, Deaf, LGBTQ+ and veterans communities all fall to the residual class."
  :community-category/name "当事者・権利コミュニティ (identity and rights communities)"
  :community-category/name-en "Identity-based and rights communities"
  :community-category/description "Communities formed around a shared social position: disability communities, LGBTQ+ communities, ethnic and linguistic minority associations, veterans' bodies, refugee and migrant self-organization."
@@ -111,6 +147,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-hobby-interest
+ :community-category/isic-hint "9499"
+ :community-category/itonami-actor "cloud-itonami-isic-9499"
+ :community-category/isic-note "9329 other amusement and recreation covers commercial provision, not member-run circles; allotment and hobby associations land in 9499."
  :community-category/name "趣味・同好 (hobby and interest)"
  :community-category/name-en "Hobby and interest communities"
  :community-category/description "Voluntary interest communities with regular meetings and internal norms: amateur radio, allotment/community gardens, chess and go clubs, birdwatching, model/rail, doujin circles, choirs and brass bands, dance and theater troupes."
@@ -118,6 +157,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-resource-commons
+ :community-category/isic-hint "0161"
+ :community-category/itonami-actor "cloud-itonami-isic-0161"
+ :community-category/isic-note "Irrigation and water-user associations map to 0161 support activities for crop production; forest user groups to 0240, fishery tenure to 0311/0322. The commons-governance function itself has no class."
  :community-category/name "資源管理コモンズ (resource commons)"
  :community-category/name-en "Resource-user and commons-management communities"
  :community-category/description "Bodies that jointly manage a shared natural resource: water user and irrigation associations, forest user groups, fishery cooperatives with customary sea tenure, grazing commons, acequia and subak systems."
@@ -125,6 +167,9 @@
  :source/dataset "community-coverage"}
 
 {:community-category/id :cat-civic-political
+ :community-category/isic-hint "9492"
+ :community-category/itonami-actor "cloud-itonami-isic-9492"
+ :community-category/isic-note "9492 activities of political organizations. Tenant unions and participatory-budgeting assemblies are not political organizations in the ISIC sense and fall to 9499."
  :community-category/name "市民・政治 (civic and political grassroots)"
  :community-category/name-en "Civic and political grassroots communities"
  :community-category/description "Party branches and their volunteer bases, tenant unions, residents' referendum and anti-development committees, participatory budgeting assemblies, election-monitoring volunteer networks."
