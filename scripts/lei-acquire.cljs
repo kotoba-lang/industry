@@ -139,28 +139,62 @@
        (sort-by :score >)
        first))
 
-(defn gleif-lookup [{:keys [name country]}]
+(defn gleif-lookup
+  "Resolve a candidate to ONE non-BRANCH GLEIF record, trying progressively
+  looser queries and stopping at the first confident match.
+
+  Four tiers, because GLEIF's own registered name and the name a candidate
+  list is written with disagree in two independent ways:
+
+    1. legalName, raw          -- the common case
+    2. legalName, NORMALISED   -- the registered name often carries no legal
+                                  form at all. ArcelorMittal S.A. is registered
+                                  simply as `ArcelorMittal`, and the raw query
+                                  buried it below 25 subsidiaries, returning
+                                  `Arcelormittal Greenfield S.A.` at 0.50 and
+                                  reporting the company as absent from GLEIF.
+                                  Querying the normalised form returns the
+                                  exact parent as the first result.
+    3. fulltext, raw           -- reaches transliterated names, so a natively
+                                  scripted registration (台灣積體電路製造股份有限公司)
+                                  is findable from its Latin name
+    4. fulltext, normalised    -- both looseness axes at once
+
+  Every tier stays jurisdiction-scoped. Dropping that filter was considered and
+  rejected: an unscoped `Hon Hai Precision Industry` search returns `Merck
+  Ltd.`, and a wrong company that scores well is far more damaging than a
+  missed one, because it enters the catalog indistinguishable from a correct
+  entry."
+  [{:keys [name country]}]
   (let [enc js/encodeURIComponent
-        by-name (str "https://api.gleif.org/api/v1/lei-records?"
-                     "filter%5Bentity.legalName%5D=" (enc name)
-                     "&filter%5Bentity.jurisdiction%5D=" (enc country)
-                     "&page%5Bsize%5D=25")
-        ;; Fulltext also searches the transliterated names, so it is the only
-        ;; way to reach a natively-scripted record from a Latin candidate.
-        ;; Still jurisdiction-scoped, or `Merck Ltd.` comes back for
-        ;; `Hon Hai Precision Industry` as it did on the first pass.
-        by-text (str "https://api.gleif.org/api/v1/lei-records?"
-                     "filter%5Bfulltext%5D=" (enc name)
-                     "&filter%5Bentity.jurisdiction%5D=" (enc country)
-                     "&page%5Bsize%5D=25")]
-    (-> (gleif-query by-name)
-        (.then (fn [rows]
-                 (let [b (pick name rows)]
-                   (if (and b (>= (:score b) 0.85))
-                     b
-                     (-> (gleif-query by-text)
-                         (.then (fn [rows2] (pick name (concat rows rows2)))))))))
-        (.then (fn [best]
+        simple (norm-name name)
+        url (fn [field q]
+              (str "https://api.gleif.org/api/v1/lei-records?"
+                   "filter%5B" field "%5D=" (enc q)
+                   "&filter%5Bentity.jurisdiction%5D=" (enc country)
+                   "&page%5Bsize%5D=25"))
+        tiers (cond-> [(url "entity.legalName" name)]
+                ;; Skip a normalised tier that would repeat the raw query.
+                (not= (str/lower-case simple) (str/lower-case name))
+                (conj (url "entity.legalName" simple))
+                true (conj (url "filter-fulltext-raw" name))
+                (not= (str/lower-case simple) (str/lower-case name))
+                (conj (url "filter-fulltext-simple" simple)))
+        tiers (mapv #(str/replace % "filter%5Bfilter-fulltext-raw%5D" "filter%5Bfulltext%5D") tiers)
+        tiers (mapv #(str/replace % "filter%5Bfilter-fulltext-simple%5D" "filter%5Bfulltext%5D") tiers)]
+    (-> (reduce (fn [p u]
+                  (.then p (fn [{:keys [best seen]}]
+                             (if (and best (>= (:score best) 0.85))
+                               {:best best :seen seen}
+                               (-> (gleif-query u)
+                                   (.then (fn [rows]
+                                            (let [all (concat seen rows)
+                                                  b (pick name all)]
+                                                {:best b :seen all})))
+                                   (.catch (fn [_] {:best best :seen seen})))))))
+                (js/Promise.resolve {:best nil :seen []})
+                tiers)
+        (.then (fn [{:keys [best]}]
                  ;; 0.85, not 0.6: a loose bar is how `AB Volvo` matched
                  ;; `Volvo Car AB`. A missed company costs one catalog gap and
                  ;; is visible in this run's own report; a wrong company enters
@@ -168,9 +202,9 @@
                  (if (and best (>= (:score best) 0.85))
                    (assoc best :ok true)
                    {:ok false :reason (if best
-                                        (str "no confident parent match (best: " (:legal-name best)
-                                             " score " (.toFixed (:score best) 2) ")")
-                                        "no non-BRANCH GLEIF record for this legal name + jurisdiction")})))
+                                        (str "no confident parent match across 4 query tiers (best: "
+                                             (:legal-name best) " score " (.toFixed (:score best) 2) ")")
+                                        "no non-BRANCH GLEIF record in this jurisdiction across 4 query tiers")})))
         (.catch (fn [e] {:ok false :reason (str "GLEIF lookup failed: " (.-message e))})))))
 
 ;; ── site + legal document ───────────────────────────────────────────────────
