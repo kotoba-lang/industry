@@ -500,5 +500,41 @@ nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \\
 
 - `community-coverage`: 178 org / 15 カテゴリ（source-pinned 28）
 - カテゴリ ↔ cloud-itonami ISIC actor の join が成立（9499 / 9491 / 6492 / 9420 / 9312 /
-  9492 / 0161 / 8569 / 8890 / 8423 の 10 actor repo が対応先）"
+  9492 / 0161 / 8569 / 8890 / 8423 の 10 actor repo が対応先）
+
+---
+
+# Iteration 10（2026-07-25）— 薄いカテゴリの深掘り（+14 org、192 org へ）
+
+カテゴリ最小値が **3 → 6** になった（health-support 3→7、education-parent 3→6、
+emergency-volunteer 3→6、identity-rights 5→6、resource-commons 6→9、hobby 6→7）。
+
+## 10-1. pin 1 件（累計 29）— バングラデシュ サイクロン準備プログラム
+
+**ボランティア 76,020 人（男 38,010 / 女 38,010 — 結果ではなく設計として男女同数）**、
+3,801 ユニット・42 upazila・13 県・7 ゾーン、**有給職員はわずか 203 人**。
+バングラデシュ赤新月社と防災管理省の共同運営。1970 年以降のサイクロン死者数を桁で減らした
+主因とされる。**有給職員 1 人あたりボランティア 375 人** — 本 corpus で最も高い比率。
+
+## 10-2. 追加された形態（抜粋）
+
+- **health-support**: コミュニティヘルスワーカー（ASHA 約100万人・promotoras・村落保健
+  ボランティア。**「volunteer 扱いで employee でない」ため当人たちが労組を作っている**）/
+  Hearing Voices Network（幻聴を消すのでなく受容する当事者運営の代替枠組み）/
+  薬物使用者ユニオン（**未登記の理由は非公式性でなく刑事罰化** — LGBTQ+ entry と同じ構造）/
+  La Leche League
+- **education-parent**: 補習授業校・継承語学校（**教育省の統計に載らない理由が「学校制度を
+  補完する位置にある」こと自体**）/ ホームスクール協同組合 / コミュニティ図書館・Little
+  Free Library（約15万拠点 — 「成立しうる最小の公共機関」）
+- **emergency-volunteer**: CERT（**専門部隊は間に合わないという前提**で設計された近隣班）/
+  ボランティア救急隊（Hatzalah 型。近接性そのものが医療資源）
+- **traditional / identity**: kris romani（ロマ慣習法評議会。**未登記は迫害の帰結**）/
+  アンベードカル派仏教ヴィハーラ（カーストからの exit として採用された宗教形態）
+- **commons / hobby**: コミュニティ種子銀行（貸出・利子付き返却で維持される遺伝資源コモンズ）/
+  市民科学（1900年開始の Christmas Bird Count 以来、査読に相当する内部規範を持つ）
+
+## 10-3. iteration 10 終了時点
+
+- `community-coverage`: **192 org / 15 カテゴリ**（source-pinned 29 / 未 pin 163）
+- カテゴリ最小 6・最大 31。地域最小 10（middle-east）・最大 37（europe、20%）"
   :source/file "90-docs/adr/2607257200-worldwide-community-coverage-corpus.edn"}]
