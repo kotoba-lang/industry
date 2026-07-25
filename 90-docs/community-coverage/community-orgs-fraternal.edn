@@ -1,0 +1,171 @@
+[
+;;; 結社 (fraternal / sworn societies). ADR-2607257200, iteration 1 (2026-07-25).
+;;; Scope exclusion: criminal sworn organizations are deliberately not modeled.
+;;; All counts :org/data-provenance "llm-recall-unverified" — not measurements.
+
+{:org/id :org-global-freemasonry
+ :org/name "Freemasonry (regular and continental obediences)"
+ :org/entity-kind :org-form
+ :org/category :cat-fraternal
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["GB" "US" "FR" "BR" "PH" "IN"]
+ :org/founding-date 1717
+ :org/instance-count-estimate 100000
+ :org/member-count 3000000
+ :org/member-count-basis "llm-recall-unverified: commonly cited 2-6M worldwide with steep decline in North America; obediences do not publish comparable rolls."
+ :org/legal-registration :mixed
+ :org/registration-note "Grand lodges are typically registered charities/corporations; individual lodges often are not, and membership rolls are private."
+ :org/governance-model :hierarchical
+ :org/mission-statement "Initiatory fraternal order structured by degrees, lodges and grand lodges, combining ritual, mutual aid and charity."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-rotary
+ :org/name "Rotary International"
+ :org/entity-kind :named-org
+ :org/category :cat-fraternal
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 1905
+ :org/instance-count-estimate 46000
+ :org/member-count 1200000
+ :org/member-count-basis "llm-recall-unverified: ~1.2M members in ~46k clubs commonly cited."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Vocational service clubs of local business and professional leaders; polio eradication is its flagship global program."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-lions
+ :org/name "Lions Clubs International"
+ :org/entity-kind :named-org
+ :org/category :cat-fraternal
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 1917
+ :org/instance-count-estimate 48000
+ :org/member-count 1400000
+ :org/member-count-basis "llm-recall-unverified: ~1.4M members in ~48k clubs commonly cited; largest service club network by membership."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Community service clubs with sight/vision programs as the historic focus."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-kiwanis-jci
+ :org/name "Kiwanis International and Junior Chamber International"
+ :org/entity-kind :named-org
+ :org/category :cat-fraternal
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 1915
+ :org/member-count 300000
+ :org/member-count-basis "llm-recall-unverified: Kiwanis commonly cited near 500k including youth programs; JCI near 100-200k active members."
+ :org/legal-registration :registered
+ :org/governance-model :democratic
+ :org/mission-statement "Service clubs oriented to children (Kiwanis) and to young active citizens/entrepreneurs (JCI, 青年会議所 in Japan)."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-usa-knights-of-columbus
+ :org/name "Knights of Columbus"
+ :org/entity-kind :named-org
+ :org/category :cat-fraternal
+ :org/type :faith-based-org
+ :org/scope :transnational
+ :org/region-primary :region-north-america
+ :org/founding-date 1882
+ :org/member-count 2000000
+ :org/member-count-basis "llm-recall-unverified: ~1.8-2M members commonly cited."
+ :org/legal-registration :registered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Catholic fraternal benefit society combining parish-level fraternity with a large member-owned life insurer."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-usa-legacy-fraternal-orders
+ :org/name "Legacy US fraternal orders (Odd Fellows, Elks, Moose, Eagles, Grange)"
+ :org/entity-kind :org-form
+ :org/category :cat-fraternal
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-north-america
+ :org/founding-date 1819
+ :org/member-count 1500000
+ :org/member-count-basis "llm-recall-unverified: aggregate of orders each commonly cited in the hundreds of thousands, all in long-run decline from mid-20th-century peaks."
+ :org/legal-registration :registered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Lodge-based mutual aid, sick/burial benefit and sociability — the pre-welfare-state insurance layer of American life."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-usa-greek-letter
+ :org/name "Collegiate fraternities and sororities (Greek-letter organizations)"
+ :org/entity-kind :org-form
+ :org/category :cat-fraternal
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-north-america
+ :org/founding-date 1825
+ :org/instance-count-estimate 12000
+ :org/member-count 750000
+ :org/member-count-basis "llm-recall-unverified: undergraduate membership commonly cited near 700-800k across NIC/NPC/NPHC chapters."
+ :org/legal-registration :mixed
+ :org/governance-model :hierarchical
+ :org/mission-statement "Residential initiatory student societies with lifelong alumni networks; includes the historically Black NPHC 'Divine Nine'."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-huiguan
+ :org/name "会館・同郷会 (Chinese native-place and clan associations)"
+ :org/entity-kind :org-form
+ :org/category :cat-fraternal
+ :org/type :secular-community
+ :org/scope :transnational
+ :org/region-primary :region-southeast-asia
+ :org/countries ["SG" "MY" "TH" "US" "ID" "PH"]
+ :org/founding-date 1600
+ :org/instance-count-estimate 20000
+ :org/member-count-basis "unknown — diaspora huiguan are numerous but not centrally counted; many are dormant property-holding shells."
+ :org/legal-registration :mixed
+ :org/governance-model :hierarchical
+ :org/mission-statement "Mutual aid, burial, schooling and credit for migrants sharing a native place or surname; historically the backbone of overseas Chinese settlement."
+ :org/related-category :cat-mutual-aid
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-esoteric-orders
+ :org/name "Esoteric and Rosicrucian orders (AMORC, OTO, Golden Dawn successors)"
+ :org/entity-kind :org-form
+ :org/category :cat-fraternal
+ :org/type :religious-corp
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 1888
+ :org/member-count-basis "unknown — orders publish no verifiable rolls; estimates range widely."
+ :org/legal-registration :mixed
+ :org/governance-model :hierarchical
+ :org/mission-statement "Initiatory esoteric instruction organized in grades and lodges; boundary case between fraternal order and new religious movement."
+ :org/related-category :cat-traditional
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-collegiate-secret-societies
+ :org/name "Collegiate and civic secret societies (Skull and Bones type)"
+ :org/entity-kind :org-form
+ :org/category :cat-fraternal
+ :org/type :secular-community
+ :org/scope :transnational
+ :org/region-primary :region-north-america
+ :org/member-count-basis "unknown — secrecy is constitutive; any published number should be treated as unreliable."
+ :org/legal-registration :unregistered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Small closed societies selecting members by tap/invitation, whose social function is elite network formation."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]

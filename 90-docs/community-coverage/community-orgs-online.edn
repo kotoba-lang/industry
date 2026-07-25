@@ -1,0 +1,210 @@
+[
+;;; ネットコミュニティ (online-native). ADR-2607257200, iteration 1 (2026-07-25).
+;;; Note the recurring pattern: a registered foundation (legal shell, tiny) sits
+;;; beside an unregistered contributor community (the actual community, large).
+;;; All counts :org/data-provenance "llm-recall-unverified" — not measurements.
+
+{:org/id :org-global-wikipedia-community
+ :org/name "Wikipedia / Wikimedia editor communities"
+ :org/entity-kind :named-org
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 2001
+ :org/instance-count-estimate 330
+ :org/member-count 120000
+ :org/member-count-basis "llm-recall-unverified: ~120k monthly active editors across ~330 language projects commonly cited; registered accounts are far larger and meaningless as membership."
+ :org/legal-registration :mixed
+ :org/registration-note "The Wikimedia Foundation and some chapters are registered; the editing communities, arbitration committees and policy bodies that actually govern content are not legal entities."
+ :org/governance-model :consensus
+ :org/mission-statement "Self-governing volunteer encyclopedias with elected/appointed arbitration, written policy corpora and rough-consensus decision making."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-debian-project
+ :org/name "Debian Project"
+ :org/entity-kind :named-org
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/founding-date 1993
+ :org/member-count 1000
+ :org/member-count-basis "llm-recall-unverified: roughly 1,000 Debian Developers with voting rights, plus maintainers and contributors."
+ :org/legal-registration :unregistered
+ :org/registration-note "Deliberately has no legal personality; holds assets through fiscal sponsors (SPI and trusted organizations)."
+ :org/governance-model :democratic
+ :org/mission-statement "Volunteer OS project governed by a written Constitution, a Social Contract and Condorcet-method General Resolutions — one of the most formally constitutional online communities in existence."
+ :org/coverage-note "Best in-corpus example of a rigorous constitutional community that chose to remain unregistered."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-foss-foundations
+ :org/name "FOSS project communities under foundations (Apache, GNOME, KDE, PSF, Rust)"
+ :org/entity-kind :org-form
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 1999
+ :org/instance-count-estimate 500
+ :org/member-count-basis "unknown — the Apache Software Foundation commonly cites hundreds of top-level projects and thousands of committers; contributor counts elsewhere are not comparable."
+ :org/legal-registration :mixed
+ :org/governance-model :meritocratic
+ :org/mission-statement "Merit-earned commit rights, PMC/board structures and codes of conduct; foundations hold trademarks and infrastructure so the community need not incorporate."
+ :org/related-org "org-linux-foundation"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-subreddits
+ :org/name "Subreddits and forum communities"
+ :org/entity-kind :org-form
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 2005
+ :org/instance-count-estimate 130000
+ :org/member-count-basis "llm-recall-unverified: on the order of 100k+ active subreddits governed by unpaid volunteer moderator teams; subscriber counts are not membership."
+ :org/legal-registration :unregistered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Topic communities with volunteer moderator governance, written rules and their own enforcement norms, existing entirely at a platform's discretion (the 2023 API blackout demonstrated the dependency)."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-discord-servers
+ :org/name "Discord servers and chat-platform communities"
+ :org/entity-kind :org-form
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 2015
+ :org/instance-count-estimate 20000000
+ :org/member-count-basis "llm-recall-unverified: Discord has commonly cited ~200M monthly active users and 'millions' of active servers; how many are communities rather than private group chats is unknown."
+ :org/legal-registration :unregistered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Role-and-channel structured communities with owner/moderator hierarchies — currently the default substrate for gaming, fandom, study, crypto and gig-worker organizing."
+ :org/coverage-note "Probably the single largest population of distinct governed communities created in human history, and entirely invisible to every civil registry."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-fediverse
+ :org/name "Fediverse instances (Mastodon, Lemmy, Misskey, PeerTube)"
+ :org/entity-kind :org-form
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/founding-date 2016
+ :org/instance-count-estimate 9000
+ :org/member-count 10000000
+ :org/member-count-basis "llm-recall-unverified: thousands of active instances and roughly 10M registered accounts with about 1M monthly active, post-2022 spike and decay."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Federated servers each with its own admin, rules and defederation policy — community governance as a per-instance sovereign act."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-daos
+ :org/name "DAOs (decentralized autonomous organizations)"
+ :org/entity-kind :org-form
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 2016
+ :org/instance-count-estimate 13000
+ :org/member-count 10000000
+ :org/member-count-basis "llm-recall-unverified: DeepDAO-style trackers have cited ~13k DAOs and ~10M governance-token holders, but holder counts wildly overstate active participation (voter turnout is often under 1%)."
+ :org/legal-registration :mostly-unregistered
+ :org/registration-note "A minority use Wyoming DAO LLC, Marshall Islands or Swiss association wrappers; most have no legal personality, which is a live liability question."
+ :org/governance-model :democratic
+ :org/mission-statement "Token- or share-weighted on-chain governance over a shared treasury; the only community form in this corpus whose votes and funds are natively machine-readable."
+ :org/coverage-note "Directly comparable to the fleet's own signed-quorum governance (manifest/fleet-keys.edn, ADR-2607160005) — worth a structured comparison in a later iteration."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-fandoms
+ :org/name "Fandom communities (K-pop fandoms, VTuber fandoms, AO3 / Organization for Transformative Works)"
+ :org/entity-kind :org-form
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-asia-east
+ :org/countries ["KR" "JP" "US" "PH" "BR"]
+ :org/founding-date 2007
+ :org/member-count-basis "unknown — fandom size is measured by streaming and hashtag volume, not membership; AO3 has millions of registered users but that is not a governed community roll."
+ :org/legal-registration :mixed
+ :org/registration-note "The Organization for Transformative Works is a registered nonprofit that owns AO3; the fandoms themselves are unregistered and often coordinate through Discord and X."
+ :org/governance-model :meritocratic
+ :org/mission-statement "Coordinated collective action (streaming drives, charity projects, subbing/translation teams, fan-work archives) with strong internal norms and reputation systems."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-jpn-net-communities
+ :org/name "Japanese net communities (5ch, ニコニコ, pixiv, Vket)"
+ :org/entity-kind :org-form
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :national
+ :org/region-primary :region-asia-east
+ :org/countries ["JP"]
+ :org/founding-date 1999
+ :org/member-count-basis "unknown — board and platform activity is measurable, but the communities (板/クラスタ) have no rolls."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Pseudonymous board and creator-platform cultures that produced their own norms, dialects and mass events (Comiket-adjacent, VRChat/Vket worlds)."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-mmo-guilds
+ :org/name "MMO guilds, clans and in-game corporations"
+ :org/entity-kind :org-form
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 1997
+ :org/member-count-basis "unknown — guild counts exist per game and are not aggregated; EVE Online alliances alone have run wars with thousands of coordinated players."
+ :org/legal-registration :unregistered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Persistent teams with ranks, shared treasuries, recruitment interviews, scheduled raids and diplomacy — one of the oldest continuously studied online governance forms."
+ :org/related-category :cat-sports
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-messaging-groups
+ :org/name "WhatsApp / Telegram / LINE group communities"
+ :org/entity-kind :org-form
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-asia-south
+ :org/countries ["IN" "BR" "NG" "ID" "JP"]
+ :org/founding-date 2010
+ :org/member-count-basis "unknown — structurally unmeasurable (end-to-end encrypted, no directory). In much of the world this is where neighborhood, school, temple and worker communities actually meet."
+ :org/legal-registration :unregistered
+ :org/governance-model :hierarchical
+ :org/mission-statement "Admin-moderated group chats functioning as the operational layer of otherwise offline communities."
+ :org/coverage-note "Deliberately included with :member-count-basis unknown: pretending to a number here would be exactly the fabrication ADR-2607203000 forbids."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-qa-communities
+ :org/name "Q&A and knowledge communities (Stack Exchange, OpenStreetMap, iNaturalist)"
+ :org/entity-kind :org-form
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/founding-date 2004
+ :org/member-count 10000000
+ :org/member-count-basis "llm-recall-unverified: OpenStreetMap commonly cites ~10M registered mappers with a far smaller active core; Stack Exchange similar shape."
+ :org/legal-registration :mixed
+ :org/governance-model :meritocratic
+ :org/mission-statement "Reputation-graded contributor communities producing a public knowledge commons, with elected moderators and written governance."
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]
