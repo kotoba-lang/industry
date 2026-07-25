@@ -81,13 +81,18 @@
 (defn sh
   "同期実行。-> {:exit n :out s}（throw しない）"
   ([cmd args] (sh cmd args nil))
-  ([cmd args {:keys [input timeout binary?] :as o}]
+  ([cmd args {:keys [input timeout binary? env-extra] :as o}]
    (try
      (let [out (cp/execFileSync cmd (clj->js (vec args))
                                 (clj->js (cond-> {:maxBuffer (* 256 1024 1024)
                                                   :timeout (or timeout 600000)}
                                            (not binary?) (assoc :encoding "utf8")
-                                           input (assoc :input input))))]
+                                           input (assoc :input input)
+                                           ;; token は env で子にだけ渡す（argv に出さない
+                                           ;; = ps で見えない）
+                                           env-extra (assoc :env (js/Object.assign
+                                                                  #js {} js/process.env
+                                                                  (clj->js env-extra))))))]
        {:exit 0 :out (if binary? out (str out))})
      (catch :default e
        {:exit (or (.-status e) 1)
@@ -95,14 +100,34 @@
                   (when-not (.-status e) (str e)))}))))
 
 ;; launchd から動かす場合、gh は keyring を読めず匿名にフォールバックする（public repo の
-;; GET だけ通り、書き込みが 401）。plist に token を書くのは論外（tracked file）なので、
-;; **mode 600 のファイルから読んで子プロセスの env にだけ載せる**経路を用意する。
-;; ファイルを作るかどうかは運用判断（作らなければ preflight が理由付きで skip する）。
-(let [f (or (:gh-token-file opts) (.-FLEET_CI_GH_TOKEN_FILE js/process.env))]
-  (when (and f (fs/existsSync f))
-    (set! (.-GH_TOKEN js/process.env) (str/trim (str (fs/readFileSync f "utf8"))))))
+;; GET だけ通り、private repo は 404 / 書き込みは 401）。plist に token を書くのは論外
+;; （tracked file）なので、**mode 600 のファイルから読んで子プロセスの env にだけ載せる**。
+;;
+;; **fine-grained PAT は resource owner 1 つにしか紐付かない**（オーナー選択: 最小権限）。
+;; 対象 repo は com-junkawasaki と kotoba-lang に跨るので、token は
+;; `FLEET_CI_GH_TOKEN_DIR/<owner>`（mode 600、owner 名のファイル）から **endpoint の
+;; owner に応じて選ぶ**。単一 token で済ませたい場合は FLEET_CI_GH_TOKEN_FILE を使う
+;; （全 owner に同じ token を使う。classic PAT / OAuth token 向け）。
+(def gh-token-dir (or (:gh-token-dir opts) (.-FLEET_CI_GH_TOKEN_DIR js/process.env)))
+(def gh-token-file (or (:gh-token-file opts) (.-FLEET_CI_GH_TOKEN_FILE js/process.env)))
 
-(defn gh [& args] (sh "gh" (vec args)))
+(defn- read-token [f]
+  (when (and f (fs/existsSync f))
+    (let [t (str/trim (str (fs/readFileSync f "utf8")))]
+      (when (seq t) t))))
+
+(defn endpoint-owner
+  "gh の argv から repos/<owner>/… の owner を拾う（token 選択用）。"
+  [args]
+  (some (fn [a] (second (re-find #"repos/([^/]+)/" (str a)))) args))
+
+(defn token-for [owner]
+  (or (when (and gh-token-dir owner) (read-token (path/join gh-token-dir owner)))
+      (read-token gh-token-file)))
+
+(defn gh [& args]
+  (let [tok (token-for (endpoint-owner args))]
+    (sh "gh" (vec args) (when tok {:env-extra {"GH_TOKEN" tok}}))))
 
 (defn gh! [& args]
   (let [{:keys [exit out]} (apply gh args)]
@@ -264,15 +289,21 @@
     (boolean (and x (not= x "0")))))
 
 (defn preflight!
-  "-> nil（続行可）| 理由文字列（この tick は skip すべき）"
+  "-> nil（続行可）| 理由文字列（この tick は skip すべき）
+
+  auth 判定は **landing 先の private repo を読めるか**で行う（`gh api user` では
+  弱い: public repo の GET は匿名でも通るので『途中まで動いて書き込みだけ落ちる』
+  状態を見逃す。private repo は匿名だと 404 になるので、これが実効的な proof）。"
   [cfg]
-  (let [{:keys [exit out]} (gh "api" "user" "--jq" ".login")]
+  (let [landing-repo (get-in cfg [:landing :repo])
+        {:keys [exit out]} (gh "api" (str "repos/" landing-repo) "--jq" ".full_name")]
     (cond
       (not (zero? exit))
-      (str "gh is not authenticated in this context (writes would 401 — public-repo "
-           "GETs still succeed anonymously, so this must be checked explicitly). "
-           "Under launchd the keyring is unreadable: pass GH_TOKEN in the LaunchAgent "
-           "env, or run the tick from an interactive session. detail: "
+      (str "cannot read " landing-repo " — this context has no usable GitHub auth "
+           "(anonymous requests 404 on a private repo and 401 on any write). "
+           "Under launchd the gh keyring is unreadable: put a token in "
+           "FLEET_CI_GH_TOKEN_DIR/<owner> (mode 600), or run the tick from an "
+           "interactive session. detail: "
            (first (str/split-lines (str/trim out))))
 
       (and (signer-pem) (not (fs/existsSync (signer-pem))))
@@ -285,7 +316,10 @@
            "(mode 600, the ADR-2607178000 pattern) or run the tick from an interactive session.")
 
       :else
-      (do (log "preflight: gh authenticated as" (str/trim out)
+      (do (log "preflight: gh can read" (str/trim out)
+               (cond gh-token-dir (str "· token=dir:" gh-token-dir)
+                     gh-token-file "· token=file"
+                     :else "· token=gh-keyring")
                (if (signer-pem) "· signer=pem" "· signer=kagi"))
           nil))))
 
@@ -631,6 +665,13 @@
                only (remove #(nil? (:tip %)) work)
                :else (filter :changed? work))]
     (doseq [m missing] (log "WARN no tip resolved (skipped):" (:name m) (:org-repo m)))
+    ;; fine-grained PAT は owner ごとなので、token dir 運用のときは
+    ;; 「この owner の token が無い = その repo の status 書き戻しが 401 になる」を先に言う。
+    (when gh-token-dir
+      (doseq [o (distinct (keep :org work))]
+        (when-not (token-for o)
+          (log "WARN no token file for owner" o "— commit statuses for its repos will fail"
+               (str "(expected " (path/join gh-token-dir o) ")")))))
     (log "tick:" (count repos) "covered," (count todo) "to verify;"
          "nodes" (pr-str (mapv (juxt :host :caps) (filter :reachable? nodes))))
     (when (empty? todo)
