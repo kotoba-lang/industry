@@ -3,12 +3,9 @@ name: IStore Freeze Check
 on:
   pull_request:
     paths:
-      - 'orgs/kotoba-lang/**/*.clj'
-      - 'orgs/kotoba-lang/**/*.cljs'
-      - 'orgs/kotoba-lang/**/*.cljc'
-      - 'orgs/gftdcojp/**/*.clj'
-      - 'orgs/gftdcojp/**/*.cljs'
-      - 'orgs/gftdcojp/**/*.cljc'
+      - 'orgs/**/*.clj'
+      - 'orgs/**/*.cljs'
+      - 'orgs/**/*.cljc'
 
 jobs:
   istore-freeze:
@@ -18,21 +15,35 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Get PR base and head commits
+      - name: Resolve PR merge base
         id: commits
         run: |
-          echo "base=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
-          echo "head=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+          BASE_SHA='${{ github.event.pull_request.base.sha }}'
+          # Diff against the merge base, not the base tip, so unrelated commits
+          # landed on main after the PR branched are not attributed to this PR.
+          MERGE_BASE=$(git merge-base "$BASE_SHA" HEAD 2>/dev/null || echo "$BASE_SHA")
+          echo "base=$MERGE_BASE" >> $GITHUB_OUTPUT
 
       - name: Check for NEW IStore usage (not in base)
         run: |
-          # Get list of added/modified files in this PR
-          git diff --name-only ${{ steps.commits.outputs.base }}..HEAD > changed_files.txt
+          BASE='${{ steps.commits.outputs.base }}'
 
-          # Pattern to match IStore-related namespaces and calls
-          # Match: kotobase.store.IStore, IStore, kotobase.store.*, etc.
-          # but allow existing usage (only flag NEW additions)
-          ISTORE_PATTERN='(kotobase\.store\.IStore|kotobase\.store\.ITransactionalStore|kotobase\.store\.LocalStore|kotobase\.store\.KotobaseStore|kotobase\.store\.[a-z-]+/[a-z-]+)'
+          git diff --name-only "$BASE"..HEAD > changed_files.txt
+
+          # Namespace-anchored patterns. IStore is always reached by requiring
+          # one of these namespaces, so gating the ns reference catches the
+          # alias idiom -- `(:require [kotobase.store :as st])` + `st/-put` --
+          # which a `kotobase.store.`-dotted pattern silently misses.
+          #
+          #   1. `[kotobase.store :as st]`  / `'[kotobase.local :as local]`
+          #      (require vectors, quoted or not, any of store|local|istore)
+          #   2. `kotobase.store/IStore`    / `kotobase.local/local-store`
+          #      (fully-qualified var reference)
+          #
+          # Deliberately NOT matched: a bare `IStore` symbol. Unrelated repos
+          # define their own protocol of that name (e.g. beverageops/store.cljc
+          # in cloud-itonami-isic-563) and would be false positives.
+          ISTORE_PATTERN='(\[[[:space:]]*kotobase\.(store|local|istore)[[:space:]]|\[[[:space:]]*kotobase\.(store|local|istore)\]|kotobase\.(store|local|istore)/)'
 
           ERROR_COUNT=0
 
@@ -42,35 +53,35 @@ jobs:
               continue
             fi
 
-            # Get only NEW lines (additions) in this PR
-            NEW_ISTORE_LINES=$(git diff ${{ steps.commits.outputs.base }}..HEAD -- "$file" | \
-              grep '^+' | grep -v '^+++' | \
-              grep -iE "$ISTORE_PATTERN" | \
-              wc -l)
+            # Added lines only, with comment-only lines stripped so that prose
+            # about the retirement itself ("the retired net.kotobase.store.*
+            # fallback is gone") does not fail the gate.
+            HITS=$(git diff "$BASE"..HEAD -- "$file" \
+              | grep '^+' | grep -v '^+++' \
+              | grep -vE '^\+[[:space:]]*;' \
+              | grep -E "$ISTORE_PATTERN" || true)
 
-            if [ "$NEW_ISTORE_LINES" -gt 0 ]; then
-              echo "❌ ERROR: Found $NEW_ISTORE_LINES NEW lines using IStore in $file"
-              git diff ${{ steps.commits.outputs.base }}..HEAD -- "$file" | \
-                grep '^+' | grep -v '^+++' | \
-                grep -iE "$ISTORE_PATTERN" | \
-                head -5
-              ERROR_COUNT=$((ERROR_COUNT + NEW_ISTORE_LINES))
+            if [ -n "$HITS" ]; then
+              N=$(printf '%s\n' "$HITS" | wc -l | tr -d ' ')
+              echo "❌ ERROR: Found $N NEW line(s) using IStore in $file"
+              printf '%s\n' "$HITS" | head -5
+              ERROR_COUNT=$((ERROR_COUNT + N))
             fi
           done < changed_files.txt
 
           if [ "$ERROR_COUNT" -gt 0 ]; then
             echo ""
             echo "❌ ADR-2607201600 M0 Freeze: NEW IStore usage is not permitted"
-            echo "   This ADR retires the IStore abstraction (kotobase.store.* APIs)"
-            echo "   Existing IStore code will be migrated incrementally (M1-M6)"
-            echo "   New code must use datom transaction/query/pull APIs instead"
+            echo "   This ADR retires the IStore abstraction (kotobase.store /"
+            echo "   kotobase.local / kotobase.istore)."
+            echo "   Existing IStore code is migrated incrementally (M1-M6)."
+            echo "   New code must use datom transact/q/pull instead."
             echo ""
             echo "   Rejected patterns:"
-            echo "     - kotobase.store.IStore"
-            echo "     - kotobase.store.ITransactionalStore"
-            echo "     - kotobase.store.LocalStore"
-            echo "     - kotobase.store.KotobaseStore"
-            echo "     - kotobase.store.*/put, kotobase.store.*/get, etc."
+            echo "     - (:require [kotobase.store :as st])   <- alias idiom"
+            echo "     - (:require [kotobase.local :as local])"
+            echo "     - (:require [kotobase.istore :as istore])"
+            echo "     - kotobase.store/IStore, kotobase.store/-put, ..."
             echo ""
             exit 1
           else
