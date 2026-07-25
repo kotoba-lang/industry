@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 5976, "kotobase-cf-wasm-staging" 1997},
+ {"net-kotobase" 6011, "kotobase-cf-wasm-staging" 2050},
  :zone
- {:requests-7d 9834,
-  :pageviews-7d 469,
-  :uniques-7d-sum 702,
+ {:requests-7d 9920,
+  :pageviews-7d 473,
+  :uniques-7d-sum 715,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -34,7 +34,7 @@
    {:path
     "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreifl3ppv23i3o7j4bf4rnnejhcbnzrtsvoyu6xgusmrnmdxtlk2cuu",
     :requests 25}],
-  :status-mix {:ok 2183, :client-error 406, :server-error 71},
+  :status-mix {:ok 2191, :client-error 306, :server-error 73},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -46,12 +46,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-25",
- :traffic-quality {:window "24h", :probe-4xx-pct 15, :error-5xx-pct 3},
+ :traffic-quality {:window "24h", :probe-4xx-pct 12, :error-5xx-pct 3},
  :top-paths
- "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/blocks/bafy… 80 · /kotobase-cf-wasm-production/blocks/bafy… 49 · /kotobase-cf-wasm-production/blocks/bafy… 44 · /kotobase-cf-wasm-production/blocks/bafy… 44 · /bafyreibif73tzuraqgszkdhdccp6xpzfihz5yt… 31 | 4xx(probe) 15% · 5xx 3%",
- :funnel {:visitors 1302, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/blocks/bafy… 80 · /kotobase-cf-wasm-production/blocks/bafy… 49 · /kotobase-cf-wasm-production/blocks/bafy… 44 · /kotobase-cf-wasm-production/blocks/bafy… 44 · /bafyreibif73tzuraqgszkdhdccp6xpzfihz5yt… 31 | 4xx(probe) 12% · 5xx 3%",
+ :funnel {:visitors 1306, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 9834 req/7d・702 uniques(日次和)・うち4xx probe 15%(24h)、workers 7973 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 9920 req/7d・715 uniques(日次和)・うち4xx probe 12%(24h)、workers 8061 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 4,
   :submissions 3,
