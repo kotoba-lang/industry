@@ -45,7 +45,19 @@ jobs:
           # in cloud-itonami-isic-563) and would be false positives.
           ISTORE_PATTERN='(\[[[:space:]]*kotobase\.(store|local|istore)[[:space:]]|\[[[:space:]]*kotobase\.(store|local|istore)\]|kotobase\.(store|local|istore)/)'
 
+          # `kotobase.protocols.store` is NOT a datom migration target: it is
+          # the same docs/streams/monotonic-:seq semantics re-expressed as a
+          # map of closures instead of a protocol, plus a `memory-store`
+          # LocalStore equivalent. Adopting it satisfies the pattern above
+          # while preserving exactly the second logical model that
+          # ADR-2607201600 Invariant 1 forbids -- i.e. it is an escape hatch.
+          # Inside kotoba-lang/kotobase-protocols it is legitimate (that repo
+          # decoupled from the protocol on purpose), so this warns rather than
+          # fails, and only outside that repo.
+          LOOKALIKE_PATTERN='(\[[[:space:]]*kotobase\.protocols\.store[[:space:]\]]|kotobase\.protocols\.store/)'
+
           ERROR_COUNT=0
+          WARN_COUNT=0
 
           while IFS= read -r file; do
             # Only check changed Clojure files
@@ -56,10 +68,11 @@ jobs:
             # Added lines only, with comment-only lines stripped so that prose
             # about the retirement itself ("the retired net.kotobase.store.*
             # fallback is gone") does not fail the gate.
-            HITS=$(git diff "$BASE"..HEAD -- "$file" \
+            ADDED=$(git diff "$BASE"..HEAD -- "$file" \
               | grep '^+' | grep -v '^+++' \
-              | grep -vE '^\+[[:space:]]*;' \
-              | grep -E "$ISTORE_PATTERN" || true)
+              | grep -vE '^\+[[:space:]]*;' || true)
+
+            HITS=$(printf '%s\n' "$ADDED" | grep -E "$ISTORE_PATTERN" || true)
 
             if [ -n "$HITS" ]; then
               N=$(printf '%s\n' "$HITS" | wc -l | tr -d ' ')
@@ -67,7 +80,30 @@ jobs:
               printf '%s\n' "$HITS" | head -5
               ERROR_COUNT=$((ERROR_COUNT + N))
             fi
+
+            case "$file" in
+              orgs/kotoba-lang/kotobase-protocols/*) ;;
+              *)
+                LOOKALIKE=$(printf '%s\n' "$ADDED" | grep -E "$LOOKALIKE_PATTERN" || true)
+                if [ -n "$LOOKALIKE" ]; then
+                  M=$(printf '%s\n' "$LOOKALIKE" | wc -l | tr -d ' ')
+                  echo "::warning file=$file::$M new kotobase.protocols.store reference(s) -- same docs/streams model as IStore (ADR-2607201600 Invariant 1), not a datom migration target"
+                  echo "⚠️  WARN: $M NEW line(s) adopting the IStore look-alike kotobase.protocols.store in $file"
+                  printf '%s\n' "$LOOKALIKE" | head -5
+                  WARN_COUNT=$((WARN_COUNT + M))
+                fi
+                ;;
+            esac
           done < changed_files.txt
+
+          if [ "$WARN_COUNT" -gt 0 ]; then
+            echo ""
+            echo "⚠️  $WARN_COUNT line(s) adopt kotobase.protocols.store outside kotoba-lang/kotobase-protocols."
+            echo "   That namespace keeps docs/streams + :seq -- the second logical model"
+            echo "   ADR-2607201600 retires. It is not a migration target. Prefer the datom"
+            echo "   plane (transact/q/pull). Not failing the build; see ADR-2607201600 M6."
+            echo ""
+          fi
 
           if [ "$ERROR_COUNT" -gt 0 ]; then
             echo ""
