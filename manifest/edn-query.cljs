@@ -677,6 +677,17 @@
           (str/join ", " (take 5 dirs))
           (when (> (count dirs) 5) (str " ... +" (- (count dirs) 5) " more"))))))
 
+(defn- normalize-name
+  "Normalize a company/applicant name for fuzzy string join: uppercase,
+  strip punctuation, collapse whitespace. Lets 'Broad Institute Inc'
+  join with 'Broad Institute, Inc.' on the unified query plane."
+  [s]
+  (when (and s (string? s) (not (str/blank? s)))
+    (-> s str/upper-case
+        (str/replace #"[,.\"'`(){}\[\];]" "")
+        (str/replace #"\s+" " ")
+        str/trim)))
+
 (defn lei-blueprint-entities [next-tempid!]
   (let [skipped (atom [])
         out (doall
@@ -690,6 +701,7 @@
                                   ;; 持たない場合だけディレクトリ名から補う
                                   ;; （捏造ではなく、その repo の識別子そのもの）。
                                   :company/lei (or (:company/lei e) (lei-from-dir d))
+                                  :company/legal-name-norm (normalize-name (:company/legal-name e))
                                   :source/dataset "cloud-itonami-lei"
                                   :source/file (str f))
                            (do (swap! skipped conj (lei-from-dir d)) nil)))))
@@ -790,11 +802,14 @@
                                   {})]
                      (when (empty? ents) (swap! skipped conj (.getName f)))
                      (for [[eid attrs] ents]
-                       (assoc attrs
-                              :db/id (next-tempid!)
-                              :patent/entity-id (str eid)
-                              :source/dataset "toshokan-patents"
-                              :source/file (str f)))))
+                       (let [a (:patent/applicant attrs)
+                             applicants (if (sequential? a) a (when a [a]))]
+                         (assoc attrs
+                                :db/id (next-tempid!)
+                                :patent/entity-id (str eid)
+                                :patent/applicant-norm (vec (keep normalize-name applicants))
+                                :source/dataset "toshokan-patents"
+                                :source/file (str f))))))
                  files)]
         (warn-skipped! "toshokan-patents journal" @skipped)
         out))))
@@ -1004,6 +1019,9 @@
       (when (= (:db/cardinality attr) :db.cardinality/many)
         (aset obj (kw->attr (:db/ident attr)) (js-obj ":db/cardinality" ":db.cardinality/many"))))
     (aset obj "rad/cid" (js-obj ":db/unique" ":db.unique/identity"))
+    ;; patent/applicant-norm is a vector of normalized names — join many-to-one
+    ;; against company/legal-name-norm (gap 2: applicant × LEI cross-corpus join).
+    (aset obj "patent/applicant-norm" (js-obj ":db/cardinality" ":db.cardinality/many"))
     obj))
 
 ;; ---------- build + query ----------
