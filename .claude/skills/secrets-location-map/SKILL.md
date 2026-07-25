@@ -23,18 +23,29 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     ⚠ **この item にかつて存在した `DATASETS_KEY_ID`/`DATASETS_APPLICATION_KEY`
     （bucket `ai-gftd-datasets` 用）は現存しない。** Keychain service `gftd.b2`
     の同名 account も無い。後述の `ai-gftd-datasets.b2_annex` を使うこと。
-  - **`ai-gftd-datasets.b2_annex`（Keychain service `b2:ai-gftd-datasets`、
-    account=key id / password=app key。`scripts/b2-creds.cljs` と同じ combined
-    形式）— bucket `ai-gftd-datasets` 専用**（capabilities:
-    listBuckets/listFiles/readFiles/writeFiles/deleteFiles）。2026-07-25 に
-    Master Key で発行。**SHIRO & PICO の制作資産 9.67GB / 297 objects
-    （prefix `ghosthacker-shiropico/`: ep01-07 フルエピソード×11言語、
-    ep08-12 ja、ep-scenes 178枚、bgm、panels、ep01 motion comic）がここにある。**
-    在庫と drift 検証は
-    `orgs/gftdcojp/ai-gftd-ghosthacker-shiropico/tools/b2_catalog.py`。
-    ⚠ **1Password への登録は未完（`op item create` が authorization timeout で
-    失敗するため）。オーナーが item `ai-gftd-datasets.b2_annex` を手動作成し、
-    ここの記述を「1Password が正・Keychain はミラー」に更新するのが望ましい。**
+  - **bucket `ai-gftd-datasets` 専用キー — 正本は kagi、item
+    `ai-gftd-datasets-b2-annex`（compartment `gftdcojp`）**。値は 1 つの JSON
+    （`{"key-id","app-key","bucket","endpoint"}`）で、取り違え防止のため
+    key-id と app-key を同一 item にまとめてある。取得は
+    `orgs/kotoba-lang/kagi/bin/kagi get ai-gftd-datasets-b2-annex`。
+    capabilities は listBuckets/listFiles/readFiles/writeFiles/deleteFiles で
+    **このバケットのみにスコープ済み**（2026-07-25 に Master Key で発行）。
+    - **Keychain ミラー**（非対話ローカル）: service `b2:ai-gftd-datasets`、
+      account=key id / password=app key（`scripts/b2-creds.cljs` と同じ
+      combined 形式）。
+    - **1Password には入れていない。** `op` がこの環境で
+      `account is not signed in` / `op item create` の authorization timeout に
+      なり、非対話で書けなかったため。CLAUDE.md も新規 secret は kagi を正と
+      する方針なので、kagi を正本として運用する（1Password に移したい場合は
+      オーナーが手動で作成し、ここを更新する）。
+    - **何がここにあるか**: SHIRO & PICO の制作資産 9.67GB / 297 objects
+      （prefix `ghosthacker-shiropico/`: ep01-07 フルエピソード×11言語、
+      ep08-12 ja、ep-scenes 178枚、bgm、panels、ep01 motion comic）。
+      在庫と drift 検証は
+      `orgs/gftdcojp/ai-gftd-ghosthacker-shiropico/tools/b2_catalog.py`
+      （`--verify` は kagi/Keychain/env のどれからでも鍵を解決できる）。
+      同じ実体は annex 化されて `gftdcojp-m365-annex` にも trusted copy がある
+      （ADR-2607252000 ledger seq 86）。
     - **なぜこの項目が重要か**: この索引に `ai-gftd-datasets` の鍵が載って
       いなかったため、2026-07-25 の調査が「どの現存鍵からも到達できない」と
       誤判定し、**実際には無事だった ep01 の資産を一度 lost と結論した**
@@ -117,18 +128,6 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   個別 item を持ち込みたい時は `bin/kagi import onepassword <file.1pux>`。
   既存 item 例: `net-kotobase` compartment に `KOTOBA_SEED_PRODUCTION`/
   `KOTOBA_SEED_TESTNET`/`KOTOBASE_B2_*` 等。
-- **`KOTOBA_INTERNAL_SECRET`（kagi vault、compartment `net-kotobase`、2026-07-25
-  mint、ADR-2607251500）** — kotobase.net edge（Worker `net-kotobase`）と pod-less
-  backend（Worker `kotobase-cf-wasm-staging` = `backend.kotobase.net`）が共有する
-  edge-only admission の shared secret。**両 Worker に同じ値を入れる**（edge は
-  `x-internal-trust` として送出、backend は一致しない `/xrpc/*` を 401 で弾く）。
-  backend 側が未設定の間は gate が armed にならない（`/_health` の
-  `edge_admission` で確認可能）ので、**edge → backend の順に投入**すれば無停止で
-  切り替わる。投入:
-  `bin/kagi get KOTOBA_INTERNAL_SECRET | npx wrangler secret put KOTOBA_INTERNAL_SECRET --env=""`
-  を各 Worker ディレクトリで実行。rotation も同じ順序（edge 先・backend 後）。
-  ⚠ 旧値は Cloudflare の write-only secret としてのみ存在し保管が無かったため、
-  2026-07-25 に新規生成して両者を揃えた（ローテーション扱い）。
 - **`gftd.kotobase/CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`（1Password
   `gftdcojp` vault）+ kagi `CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`
   （compartment `net-kotobase`）— 両方に保管済み** — ADR-2607113500
