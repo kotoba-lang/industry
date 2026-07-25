@@ -117,14 +117,20 @@
  :org/region-primary :region-north-america
  :org/founding-date 2016
  :org/instance-count-estimate 13000
- :org/member-count 10000000
- :org/member-count-basis "llm-recall-unverified: DeepDAO-style trackers have cited ~13k DAOs and ~10M governance-token holders, but holder counts wildly overstate active participation (voter turnout is often under 1%)."
+ :org/member-count 6500000
+ :org/member-count-basis "source-pinned (secondary): ~13,000-14,000 DAOs tracked across chains with ~6.5M governance-token holders in 2025, total treasuries ~$24.5B ($21.4B liquid). The distribution is the real finding: only ~220 DAOs hold treasuries above $1M and fewer than 80 run governance an institutional observer would call healthy, with active participation generally under 20% of holders. Iteration 1's recalled 10M holders overstated by ~1.5x."
  :org/legal-registration :mostly-unregistered
+ :org/source-name "DeepDAO ecosystem data as reported by DAO Times / DAO statistics reviews (2025-2026)"
+ :org/source-url "https://daotimes.com/deepdao-dao-tool-report-for-2025/"
+ :org/source-date "2025"
+ :org/source-tier :secondary
+ :org/source-caveat "DeepDAO's own dashboard is the primary source; these figures come through summaries and vary by chain-coverage definition."
+ :org/pinned-on "2026-07-25"
  :org/registration-note "A minority use Wyoming DAO LLC, Marshall Islands or Swiss association wrappers; most have no legal personality, which is a live liability question."
  :org/governance-model :democratic
  :org/mission-statement "Token- or share-weighted on-chain governance over a shared treasury; the only community form in this corpus whose votes and funds are natively machine-readable."
  :org/coverage-note "Directly comparable to the fleet's own signed-quorum governance (manifest/fleet-keys.edn, ADR-2607160005) — worth a structured comparison in a later iteration."
- :org/data-provenance "llm-recall-unverified"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-global-fandoms
