@@ -157,13 +157,18 @@
  :org/type :secular-community
  :org/scope :global
  :org/region-primary :region-asia-south
- :org/member-count 280000000
- :org/member-count-basis "llm-recall-unverified: the UN commonly cites ~280M international migrants; that is a population, NOT a count of organized diaspora community membership, which is unknown."
+ :org/member-count-basis "source-pinned as a POPULATION, not a membership: 304 million international migrants in 2024, up from 275M in 2020, 3.7% of world population, 146M of them women (UN DESA, International Migrant Stock 2024). This is the pool from which diaspora communities form — the number who actually belong to a hometown association, language school, temple or WhatsApp network is unknown and much smaller, so :org/member-count is not asserted."
  :org/legal-registration :mixed
+ :org/source-name "UN DESA Population Division, International Migrant Stock 2024: Key facts and figures"
+ :org/source-url "https://www.un.org/development/desa/pd/content/international-migrant-stock"
+ :org/source-date "2024"
+ :org/source-tier :primary
+ :org/source-caveat "Pinned to bound the pool, not to claim membership. Conflating the two is the exact error iteration 1 made."
+ :org/pinned-on "2026-07-25"
  :org/governance-model :consensus
  :org/mission-statement "Language schools, temples/mosques/churches, hometown associations, chambers and WhatsApp groups that reproduce origin-community life abroad."
  :org/related-org "org-global-hometown-associations"
- :org/data-provenance "llm-recall-unverified"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-global-slow-food
