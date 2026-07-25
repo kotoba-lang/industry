@@ -1,0 +1,79 @@
+;; lei-candidates.edn — acquisition work list for the cloud-itonami-lei catalog.
+;;
+;; Adding a company is adding ONE map to this vector. Nothing else in the
+;; pipeline needs to change: scripts/lei-acquire.cljs verifies every entry
+;; against GLEIF, so a wrong name or a wrong country here fails loudly as a
+;; lookup miss rather than entering the catalog unverified.
+;;
+;; :name    the entity's LEGAL name as registered, not its brand. GLEIF is
+;;          searched by legal name + jurisdiction, and a brand ("Google")
+;;          usually is not the registered name ("Alphabet Inc.").
+;; :country ISO 3166-1 alpha-2, matched against GLEIF's own jurisdiction.
+;; :site    candidate official website. VERIFIED before use -- the fetched page
+;;          must actually mention the company -- so a stale or wrong guess here
+;;          is recorded as unverified rather than published as fact.
+;;
+;; Selection for this pass: the countries the catalog had ZERO coverage of
+;; after the 2026-07-25 normalisation showed real coverage was 27 countries
+;; (US alone 55%), not the 53 that the un-normalised jurisdiction strings
+;; suggested. National champions / largest listed issuers per country, since
+;; those are the entities most likely to have both a real LEI and a published
+;; legal/privacy page.
+
+[{:name "BANCO SANTANDER, S.A." :country "ES" :site "https://www.santander.com"}
+ {:name "TELEFONICA, S.A." :country "ES" :site "https://www.telefonica.com"}
+ {:name "IBERDROLA, S.A." :country "ES" :site "https://www.iberdrola.com"}
+ {:name "INDUSTRIA DE DISENO TEXTIL, S.A." :country "ES" :site "https://www.inditex.com"}
+ {:name "Telefonaktiebolaget LM Ericsson" :country "SE" :site "https://www.ericsson.com"}
+ {:name "AB Volvo" :country "SE" :site "https://www.volvogroup.com"}
+ {:name "H & M Hennes & Mauritz AB" :country "SE" :site "https://hmgroup.com"}
+ {:name "Equinor ASA" :country "NO" :site "https://www.equinor.com"}
+ {:name "Telenor ASA" :country "NO" :site "https://www.telenor.com"}
+ {:name "DNB Bank ASA" :country "NO" :site "https://www.dnb.no"}
+ {:name "Novo Nordisk A/S" :country "DK" :site "https://www.novonordisk.com"}
+ {:name "A.P. Møller - Mærsk A/S" :country "DK" :site "https://www.maersk.com"}
+ {:name "Ørsted A/S" :country "DK" :site "https://orsted.com"}
+ {:name "Nokia Oyj" :country "FI" :site "https://www.nokia.com"}
+ {:name "Fortum Oyj" :country "FI" :site "https://www.fortum.com"}
+ {:name "ORLEN Spółka Akcyjna" :country "PL" :site "https://www.orlen.pl"}
+ {:name "Powszechna Kasa Oszczędności Bank Polski Spółka Akcyjna" :country "PL" :site "https://www.pkobp.pl"}
+ {:name "OMV Aktiengesellschaft" :country "AT" :site "https://www.omv.com"}
+ {:name "Erste Group Bank AG" :country "AT" :site "https://www.erstegroup.com"}
+ {:name "Anheuser-Busch InBev SA/NV" :country "BE" :site "https://www.ab-inbev.com"}
+ {:name "Solvay SA" :country "BE" :site "https://www.solvay.com"}
+ {:name "EDP - Energias de Portugal, S.A." :country "PT" :site "https://www.edp.com"}
+ {:name "Galp Energia, SGPS, S.A." :country "PT" :site "https://www.galp.com"}
+ {:name "HELLENIC TELECOMMUNICATIONS ORGANIZATION S.A." :country "GR" :site "https://www.cosmote.gr"}
+ {:name "ČEZ, a. s." :country "CZ" :site "https://www.cez.cz"}
+ {:name "TÜRKİYE İŞ BANKASI A.Ş." :country "TR" :site "https://www.isbank.com.tr"}
+ {:name "TURKCELL ILETISIM HIZMETLERI A.S." :country "TR" :site "https://www.turkcell.com.tr"}
+ {:name "Tata Consultancy Services Limited" :country "IN" :site "https://www.tcs.com"}
+ {:name "Infosys Limited" :country "IN" :site "https://www.infosys.com"}
+ {:name "Reliance Industries Limited" :country "IN" :site "https://www.ril.com"}
+ {:name "HDFC Bank Limited" :country "IN" :site "https://www.hdfcbank.com"}
+ {:name "PT Telkom Indonesia (Persero) Tbk" :country "ID" :site "https://www.telkom.co.id"}
+ {:name "PT Bank Mandiri (Persero) Tbk" :country "ID" :site "https://www.bankmandiri.co.id"}
+ {:name "América Móvil, S.A.B. de C.V." :country "MX" :site "https://www.americamovil.com"}
+ {:name "CEMEX, S.A.B. de C.V." :country "MX" :site "https://www.cemex.com"}
+ {:name "PTT Public Company Limited" :country "TH" :site "https://www.pttplc.com"}
+ {:name "The Siam Cement Public Company Limited" :country "TH" :site "https://www.scg.com"}
+ {:name "SM Investments Corporation" :country "PH" :site "https://www.sminvestments.com"}
+ {:name "PLDT Inc." :country "PH" :site "https://www.pldt.com"}
+ {:name "Taiwan Semiconductor Manufacturing Company Limited" :country "TW" :site "https://www.tsmc.com"}
+ {:name "Hon Hai Precision Industry Co., Ltd." :country "TW" :site "https://www.honhai.com"}
+ {:name "Teva Pharmaceutical Industries Limited" :country "IL" :site "https://www.tevapharm.com"}
+ {:name "Bank Leumi Le-Israel B.M." :country "IL" :site "https://www.leumi.co.il"}
+ {:name "Saudi Arabian Oil Company" :country "SA" :site "https://www.aramco.com"}
+ {:name "Saudi Telecom Company" :country "SA" :site "https://www.stc.com.sa"}
+ {:name "Emirates NBD Bank PJSC" :country "AE" :site "https://www.emiratesnbd.com"}
+ {:name "DP World Limited" :country "AE" :site "https://www.dpworld.com"}
+ {:name "YPF Sociedad Anónima" :country "AR" :site "https://www.ypf.com"}
+ {:name "Ecopetrol S.A." :country "CO" :site "https://www.ecopetrol.com.co"}
+ {:name "Bancolombia S.A." :country "CO" :site "https://www.bancolombia.com"}
+ {:name "Empresas COPEC S.A." :country "CL" :site "https://www.empresascopec.cl"}
+ {:name "Commercial International Bank (Egypt) S.A.E." :country "EG" :site "https://www.cibeg.com"}
+ {:name "Safaricom PLC" :country "KE" :site "https://www.safaricom.co.ke"}
+ {:name "Vingroup Joint Stock Company" :country "VN" :site "https://vingroup.net"}
+ {:name "Sasol Limited" :country "ZA" :site "https://www.sasol.com"}
+ {:name "Ping An Insurance (Group) Company of China, Ltd." :country "CN" :site "https://group.pingan.com"}
+ {:name "China Petroleum & Chemical Corporation" :country "CN" :site "https://www.sinopec.com"}]
