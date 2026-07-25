@@ -35,12 +35,17 @@
  :org/region-primary :region-asia-east
  :org/countries ["JP"]
  :org/founding-date 1989
- :org/member-count 7000000
- :org/member-count-basis "llm-recall-unverified: ~7M members commonly cited; Japanese union density has fallen below 17%."
+ :org/member-count 6924000
+ :org/member-count-basis "source-pinned: 6,924,000 members including directly affiliated local unions (6,822,000 through industrial federations), both up slightly year on year, as of 2025. National context from the same 厚生労働省 survey: 9,927,000 union members in Japan overall and an estimated organization rate of 16.0% — the lowest since the survey began in 1947 and a fifth consecutive annual fall. Women members 3,545,000 (+1.1%) at 12.3% density."
  :org/legal-registration :registered
+ :org/source-name "厚生労働省「令和7年（2025年）労働組合基礎調査」／連合 事務局長談話"
+ :org/source-url "https://www.jtuc-rengo.or.jp/news/article_detail.php?id=1387"
+ :org/source-date "2025-06-30"
+ :org/source-tier :primary
+ :org/pinned-on "2026-07-26"
  :org/governance-model :democratic
  :org/mission-statement "Japan's largest union confederation; spring wage offensive (春闘) coordination."
- :org/data-provenance "llm-recall-unverified"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-usa-aflcio
@@ -52,13 +57,19 @@
  :org/region-primary :region-north-america
  :org/countries ["US"]
  :org/founding-date 1955
- :org/member-count 12500000
- :org/member-count-basis "llm-recall-unverified: ~12.5M members across ~60 affiliated unions commonly cited."
+ :org/member-count 15000000
+ :org/member-count-basis "source-pinned: the AFL-CIO describes itself as a federation of 61-65 national and international unions representing nearly 15 million ACTIVE AND RETIRED workers. Retirees are included in that figure, so it is not a count of currently employed union members — a distinction the federation's own phrasing makes and secondary citations usually drop. Affiliate counts of 61 and 65 both appear in 2025 material."
  :org/legal-registration :registered
  :org/governance-model :democratic
  :org/mission-statement "US federation of national unions; AFSCME (already modeled in 90-docs/religious-community/sample-orgs.edn) is an affiliate."
  :org/related-org "org-afscme"
- :org/data-provenance "llm-recall-unverified"
+ :org/source-name "AFL-CIO, Get to Know AFL-CIO's Affiliates"
+ :org/source-url "https://aflcio.org/2025/8/4/get-know-afl-cios-affiliates"
+ :org/source-date "2025"
+ :org/source-tier :primary
+ :org/source-caveat "Affiliate count differs between AFL-CIO pages (61 vs 65); membership includes retirees."
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-global-ica-cooperatives
@@ -159,12 +170,17 @@
  :org/region-primary :region-asia-south
  :org/countries ["IN"]
  :org/founding-date 1946
- :org/member-count 3600000
- :org/member-count-basis "llm-recall-unverified: ~3.6M milk producer members across village societies commonly cited."
+ :org/member-count 3640000
+ :org/member-count-basis "source-pinned: 3.64 million milk producer members supplying 18,600 village milk cooperative societies through 18 member unions across 33 districts, procuring ~35 million litres a day, with GCMMF turnover of ₹65,911 crore in FY2024-25."
  :org/legal-registration :registered
+ :org/source-name "Amul / Gujarat Cooperative Milk Marketing Federation, Organisation page"
+ :org/source-url "https://amul.com/m/organisation"
+ :org/source-date "2025"
+ :org/source-tier :primary
+ :org/pinned-on "2026-07-26"
  :org/governance-model :democratic
  :org/mission-statement "Three-tier village-district-state dairy cooperative structure (the Anand pattern) linking smallholders to national markets."
- :org/data-provenance "llm-recall-unverified"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-ind-sewa
@@ -176,13 +192,19 @@
  :org/region-primary :region-asia-south
  :org/countries ["IN"]
  :org/founding-date 1972
- :org/member-count 2500000
- :org/member-count-basis "llm-recall-unverified: ~2-2.5M members commonly cited."
+ :org/member-count 3780000
+ :org/member-count-basis "source-pinned, with the discrepancy kept: SEWA's site states over 3.78 million members across 20 states, while its own membership page gives 3,216,054 across 18 states — different state counts and probably different reference years. 32-35% of members are now second- or third-generation. Founded 1972-04-12 by Ela Bhatt. Iteration 1's recalled 2.5M was low by a third."
  :org/legal-registration :registered
+ :org/source-name "Self Employed Women's Association, Membership and Affiliations"
+ :org/source-url "https://www.sewa.org/membership-and-affiliations/sewa-membership/"
+ :org/source-date "2024"
+ :org/source-tier :primary
+ :org/source-caveat "Two self-published figures (3.78M / 3.216M) are in circulation; both recorded rather than reconciled."
+ :org/pinned-on "2026-07-26"
  :org/governance-model :democratic
  :org/mission-statement "Trade union of informal-sector women workers — the canonical case of organizing workers who have no registered employer at all."
  :org/coverage-note "Bridges the registered and unregistered halves of this corpus: a registered union whose members' work is entirely informal."
- :org/data-provenance "llm-recall-unverified"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-global-streetnet-homenet
@@ -241,12 +263,17 @@
  :org/scope :global
  :org/region-primary :region-africa
  :org/founding-date 1997
- :org/instance-count-estimate 1900
+ :org/instance-count-estimate 1800
  :org/member-count 1900000
- :org/member-count-basis "llm-recall-unverified: ~1,900 certified producer organizations and ~1.9M farmers and workers commonly cited."
+ :org/member-count-basis "source-pinned: more than 1,800 certified producer organisations in 2024 earning €201.6 million in Fairtrade Premium; the 2023 edition counted 1,896 organisations representing more than 1.9 million farmers and workers with €211.5M premium. 23% of Fairtrade farmers and 40% of workers are women. Both organisation count and premium fell year on year."
  :org/legal-registration :registered
  :org/governance-model :democratic
  :org/mission-statement "Certified smallholder cooperatives whose premium is allocated by member assembly to community projects."
- :org/data-provenance "llm-recall-unverified"
+ :org/source-name "Fairtrade International, Monitoring the scope and benefits of Fairtrade (16th edition) / Annual Report 2024"
+ :org/source-url "https://www.fairtrade.net/en/get-involved/library/monitoring-report-overview-16th-ed.html"
+ :org/source-date "2024"
+ :org/source-tier :primary
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 ]
