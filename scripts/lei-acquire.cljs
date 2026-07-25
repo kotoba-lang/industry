@@ -455,6 +455,33 @@
     (-> (js/Promise.all (clj->js (repeatedly (min n (max 1 (count items))) worker)))
         (.then (fn [_] @out)))))
 
+;; A long multi-fetch run keeps many connections alive, and a peer closing one
+;; mid-flight surfaces as an 'error' event on the underlying HTTP/2 stream --
+;; OUTSIDE any promise chain, so neither `fetch`'s .catch nor a per-candidate
+;; handler sees it, and the default behaviour kills the process. Observed live
+;; 2026-07-25: `SocketError: other side closed` aborted an 88-candidate run
+;; after ~20 minutes with nothing created and no summary.
+;;
+;; Only transport-layer failures are absorbed, and each one is printed. A
+;; genuine programming error still crashes the run, because a scraper that
+;; swallows every exception reports a clean pass over work it never did.
+(defn- install-network-error-guard! []
+  (let [net? (fn [^js e]
+               (let [s (str (or (.-code e) "") " " (or (.-name e) "") " " (or (.-message e) ""))]
+                 (boolean (re-find #"(?i)SocketError|ECONNRESET|ECONNREFUSED|EPIPE|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|UND_ERR|ERR_HTTP2|other side closed|terminated" s))))]
+    (.on js/process "uncaughtException"
+         (fn [^js e]
+           (if (net? e)
+             (js/console.error "network error absorbed (run continues):" (or (.-message e) (str e)))
+             (do (js/console.error "FATAL (not a network error):" (or (.-stack e) (str e)))
+                 (.exit js/process 1)))))
+    (.on js/process "unhandledRejection"
+         (fn [^js e]
+           (if (net? e)
+             (js/console.error "network rejection absorbed (run continues):" (or (.-message e) (str e)))
+             (do (js/console.error "FATAL unhandled rejection:" (or (.-stack e) (str e)))
+                 (.exit js/process 1)))))))
+
 (defn -main []
   (let [all (edn/read-string (fs/readFileSync "scripts/d1/lei-candidates.edn" "utf8"))
         existing (set (->> (str/split-lines
@@ -499,7 +526,23 @@
                       " no-doc:" (count (filter #(= :no-legal-doc (:status %)) results)))
              (when (seq @created)
                (fs/writeFileSync "/tmp/lei-created.txt" (str/join "\n" @created))
-               (println "created repo names written to /tmp/lei-created.txt (for manifest registration)")))))
+               (println "created repo names written to /tmp/lei-created.txt (for manifest registration)"))
+             ;; Exit explicitly once the summary is out. A long run leaves
+             ;; sockets from aborted/slow fetches that can emit an error event
+             ;; after every candidate has been reported, which crashed the
+             ;; process with a non-zero status AFTER the work had succeeded --
+             ;; and any caller reading the exit code (the loop does) saw a
+             ;; clean run as a failure. Exiting here reports the outcome the
+             ;; summary actually describes rather than teardown noise; real
+             ;; per-candidate failures are already in that summary.
+             ;; Always 0 here: a candidate that was blocked, unreachable, or
+             ;; published no document is DATA, not a script failure -- it is
+             ;; reported in the summary above and is the expected outcome for a
+             ;; sizeable share of any candidate list. A real failure (an
+             ;; unreadable candidate file, a GLEIF outage) throws and is caught
+             ;; by the .catch below, which sets exit 1.
+             (js/setImmediate (fn [] (.exit js/process 0))))))
         (.catch (fn [e] (println "FATAL:" (.-message e)) (set! (.-exitCode js/process) 1))))))
 
+(install-network-error-guard!)
 (-main)
