@@ -13,10 +13,15 @@
 ;; * gad の鍵 passphrase は kagi item `radicle-seed-gad-passphrase` にある。
 ;;   **この Mac のローカル node の passphrase は所在不明**なので Mac 側では登録できない。
 ;;
-;; ## 存在判定の鉄則
-;; `rad inspect <rid>` は **ローカル storage しか見ない**。他ノードに登録された RID は
-;; 「存在しない」と出る。判定は必ず **登録した node の storage / inventory** で行う
-;; （この誤りで実在マッピングを一度消した — ADR-2607259000）。
+;; ## 存在判定の鉄則（2 度間違えた箇所 — ADR-2607259000 seq 91）
+;; * `rad inspect <rid>` は **ローカル storage しか見ない**。他ノードに登録された RID は
+;;   必ず「存在しない」と出る。
+;; * **seed の storage を見るだけでも不十分**。登録は別 PC の鍵で行われている場合があり、
+;;   その repo は announce されていてもこちらの storage には無い。
+;; * 唯一まともな存在判定は **ネットワーク fetch**（`rad clone <rid>` / `rad seed` + fetch）。
+;;   ただし登録元ノードが offline だと取れないので、**取得失敗を「存在しない」の証拠に
+;;   してはいけない**（inconclusive として扱う）。
+;; * したがって **storage の不在を根拠に manifest から RID を消してはならない。**
 ;;
 ;; ## 使い方
 ;;   nbb scripts/rad-register.cljs --names kagami,langgraph        ;; 指定 project
