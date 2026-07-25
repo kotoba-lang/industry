@@ -610,6 +610,229 @@
            (or (add-datoms-entities f :tx/datoms :ghosthacker/entity-id) []))
       [])))
 
+;; ---------- cross-repo 企業データ（category J。:company/lei が結合キー） ----------
+;; 2026-07-25 追加。以下の 3 corpus は同じ `:company/lei` を持ちながら別々の
+;; ファイル・別々のリポジトリに座っており、この統合面にもどこにも載っていなかった
+;; （実測: この 3 者を突合すると 69 社が :company/lei で結合可能なのに、結合する
+;; ローダが存在しなかった）:
+;;
+;;   - orgs/gftdcojp/cloud-murakumo-market-intel/data/company-facts.edn
+;;     SEC EDGAR 由来の財務ファンダメンタルズ 5,200 社（うち :company/lei 保有
+;;     2,640 社）。市場サイジング用の別ストア（market-intel.store の
+;;     langchain.db / DataScript バックエンド）でだけ query 可能だった。
+;;   - orgs/cloud-itonami/cloud-itonami-lei-<lei>/blueprint.edn
+;;     法人実体 155 社（legal-name / jurisdiction / website / ticker）。
+;;   - 同 80-data/public/tos.journal.edn
+;;     各社の ToS アーカイブ（[e a v tx op] journal、1 ファイル 1 entity）。
+;;
+;; 同一面に載せることで「財務 × 法人実体 × ToS」を 1 クエリで結合できる。
+;; `:company/*` の属性名は 3 者で共有されるので、出自の区別は `:source/dataset`
+;; で行う（属性名を書き換えて出自を埋め込むと結合キーが壊れるため、そうしない）。
+
+(defn market-intel-company-facts-file []
+  (io/file root "orgs" "gftdcojp" "cloud-murakumo-market-intel" "data" "company-facts.edn"))
+
+(defn company-facts-entities [next-tempid!]
+  (let [f (market-intel-company-facts-file)]
+    (if (.exists f)
+      (for [e (or (vector-of-maps-entities f) [])]
+        (assoc e
+               :db/id (next-tempid!)
+               :source/dataset "market-intel"
+               :source/file (str f)))
+      [])))
+
+(defn lei-repo-dirs
+  "orgs/cloud-itonami/cloud-itonami-lei-<lei> ディレクトリの一覧。親を
+   `.listFiles` で 1 段だけ見る（cloud-itonami 配下は 1,200+ repo あるので
+   file-seq で全走査しない）。"
+  []
+  (let [parent (io/file root "orgs" "cloud-itonami")]
+    (if (.exists parent)
+      (->> (seq (.listFiles parent))
+           (filter #(str/includes? (str %) "cloud-itonami-lei-"))
+           (filter #(.isDirectory %))
+           (sort-by str))
+      [])))
+
+(defn lei-from-dir
+  "ディレクトリ名 `cloud-itonami-lei-<lei>` から LEI を復元する。ディレクトリ名は
+   小文字、GLEIF/blueprint の `:company/lei` は大文字なので大文字化して揃える
+   （揃えないと同じ企業が別キーになり結合できない）。"
+  [d]
+  (let [n (last (str/split (str d) #"/"))]
+    (when-let [m (second (re-matches #"cloud-itonami-lei-(.+)" n))]
+      (str/upper-case m))))
+
+(defn warn-skipped!
+  "存在するのに 0 entity しか生まなかったソースを stderr に報告する。
+   このローダ群は shape 不一致を nil で握り潰す設計（1 ファイルの破損で面
+   全体が落ちないため）だが、握り潰したまま黙っていると count が「全部載って
+   いる」ように読めてしまう。落としたものは必ず言う。"
+  [label dirs]
+  (when (seq dirs)
+    (js/console.error
+     (str "edn-query: WARNING " label ": " (count dirs)
+          " source(s) existed but yielded no entity — NOT queryable: "
+          (str/join ", " (take 5 dirs))
+          (when (> (count dirs) 5) (str " ... +" (- (count dirs) 5) " more"))))))
+
+(defn lei-blueprint-entities [next-tempid!]
+  (let [skipped (atom [])
+        out (doall
+             (keep (fn [d]
+                     (let [f (io/file d "blueprint.edn")]
+                       (when (.exists f)
+                         (if-let [e (single-map-entity f "company")]
+                           (assoc e
+                                  :db/id (next-tempid!)
+                                  ;; blueprint は通常自分で :company/lei を持つ。
+                                  ;; 持たない場合だけディレクトリ名から補う
+                                  ;; （捏造ではなく、その repo の識別子そのもの）。
+                                  :company/lei (or (:company/lei e) (lei-from-dir d))
+                                  :source/dataset "cloud-itonami-lei"
+                                  :source/file (str f))
+                           (do (swap! skipped conj (lei-from-dir d)) nil)))))
+                   (lei-repo-dirs)))]
+    (warn-skipped! "cloud-itonami-lei blueprint.edn" @skipped)
+    out))
+
+(defn flat-attrlist-journal-entities
+  "tos.journal.edn の **第2の形**を読む。実測 2026-07-25、155 件中 9 件がこちら:
+
+     [[\"berkshire-hathaway-legal-1\"
+       :tos/full-text \"...\" :tos/source-url \"...\" ... :tx 1 :op :add]]
+
+   1 datom = 1 タプル（`[e a v tx op]`、`replay-journal` が読む形）ではなく、
+   **1 entity = 1 タプル**で attr/value が平坦に並び、末尾に `:tx` / `:op` が
+   付く。壊れているのではなく別のシリアライズ規約なので、捨てずに読む。
+
+   末尾の tx/op には**さらに 2 通りの書き方**がある（実測、両方とも実在する）:
+
+     keyed      [... :tos/doc-type :legal-disclaimer :tx 1 :op :add]   (1 件)
+     positional [... :tos/doc-type :terms-of-service 1 :add]           (6 件)
+
+   `{e {a v ...}}` を返す（`replay-journal` と同じ戻り値の形）。tx/op はメタなので
+   entity 属性には含めない。`op` が `:add` 以外なら nil を返す（retract 相当を
+   この形で書いた例は実データに無いため、黙って add 扱いにしない）。"
+  [f]
+  (try
+    (let [content (slurp-edn f)]
+      (when (and (vector? content) (= 1 (count content)) (vector? (first content)))
+        (let [t (vec (first content))
+              n (count t)
+              [body op]
+              (cond
+                ;; keyed: 末尾 4 要素が :tx N :op OP
+                (and (>= n 5) (= :op (nth t (- n 2))))
+                [(subvec t 1 (- n 4)) (nth t (dec n))]
+                ;; positional: 末尾 2 要素が N OP
+                (and (>= n 3) (keyword? (nth t (dec n))) (number? (nth t (- n 2))))
+                [(subvec t 1 (- n 2)) (nth t (dec n))]
+                :else [nil nil])]
+          (when (and body (= :add op) (even? (count body)) (seq body))
+            {(first t) (into {} (map vec) (partition 2 body))}))))
+    (catch :default _ nil)))
+
+(defn lei-tos-entities [next-tempid!]
+  (let [skipped (atom [])
+        out (doall
+             (mapcat
+              (fn [d]
+                (let [f (io/file d "80-data" "public" "tos.journal.edn")]
+                  (if (.exists f)
+                    ;; 2 つのシリアライズ規約が混在している。datom-tuple 形を
+                    ;; 先に試し、0 件なら flat-attrlist 形として読み直す。
+                    (let [ents (or (not-empty (or (vector-tuple-journal-entities f) {}))
+                                   (flat-attrlist-journal-entities f)
+                                   {})]
+                      ;; 実測 2026-07-25 の内訳（当初「9 件すべて破損」と誤診し、
+                      ;; 個別に検証して訂正した）: 146 件が datom-tuple 形、
+                      ;; 8 件が flat-attrlist 形（壊れていない、別規約）、
+                      ;; 1 件（Berkshire Hathaway）だけが本物の破損で、本文中の
+                      ;; `provided "as is" without` の引用符が未エスケープのまま
+                      ;; 書かれ文字列が途中終端していた。記録されていた
+                      ;; :tos/sha256 と復元テキストのハッシュが一致したことで
+                      ;; 復元の正しさを証明した上で source を修復済み。
+                      ;; 以後ここで skip が出たら「また別の規約か本物の破損」なので
+                      ;; 黙って落とさず報告する。
+                      (when (empty? ents) (swap! skipped conj (lei-from-dir d)))
+                      ;; journal の entity-id は "wabtec-tos-1" のような repo
+                      ;; ローカル名であって LEI ではない。ディレクトリ由来の LEI を
+                      ;; 足して初めて blueprint / market-intel と結合できる。
+                      (for [[eid attrs] ents]
+                        (assoc attrs
+                               :db/id (next-tempid!)
+                               :tos/entity-id (str eid)
+                               :company/lei (lei-from-dir d)
+                               :source/dataset "cloud-itonami-lei-tos"
+                               :source/file (str f))))
+                    [])))
+              (lei-repo-dirs)))]
+    (warn-skipped! "cloud-itonami-lei tos.journal.edn" @skipped)
+    out))
+
+;; ---------- fleet 状態データ（category K） ----------
+;; どちらも「A vector of DataScript/Datomic-transactable entity-maps」と自ら
+;; 宣言しているのに、この面の manifest corpus（repos.edn /
+;; kotoba-boundaries.edn / cleanup-workflow.edn の 3 件のみ）に入っておらず
+;; query できなかった。
+
+(defn fleet-state-sources []
+  [["itonami-fleet-audit" (io/file root "manifest" "itonami-fleet-audit.edn")]
+   ["repo-maturity"       (io/file root "manifest" "repo-maturity.edn")]])
+
+(defn fleet-state-entities [next-tempid!]
+  (let [skipped (atom [])
+        out (doall
+             (mapcat
+              (fn [[dataset f]]
+                (if (.exists f)
+                  (let [es (or (vector-of-maps-entities f) [])]
+                    (when (empty? es) (swap! skipped conj dataset))
+                    (for [e es]
+                      (assoc e
+                             :db/id (next-tempid!)
+                             :source/dataset dataset
+                             :source/file (str f))))
+                  []))
+              (fleet-state-sources)))]
+    (warn-skipped! "fleet state" @skipped)
+    out))
+
+;; fleet-db.edn は west.yml の **上流の正本**（ADR-2607160005、west.yml はその
+;; projection）。トップレベルは単一 map で、query したい実体はその中の
+;; `:fleet/repos`（実測 2,996 件、`:repo/name` `:repo/remote` `:repo/revision`
+;; `:repo/path` `:repo/groups`）と `:fleet/remotes`（6 件）。`:fleet/header` /
+;; `:fleet/footer` は west.yml を書き出すためのテキストなので entity にしない。
+;;
+;; fleet-ci.edn は署名付き CI receipt が 1 件（`:receipt` `:cid` `:signature`
+;; `:signer`）。`:receipt` は入れ子 map なので `->ds-value` が blob 文字列にする。
+;;
+;; どちらも append-only / 署名付きの正本なので、このローダは **読むだけ**。
+
+(defn fleet-db-entities [next-tempid!]
+  (let [f (io/file root "manifest" "fleet-db.edn")]
+    (if (.exists f)
+      (let [repos   (or (seed-vector-entities f :fleet/repos) [])
+            remotes (or (seed-vector-entities f :fleet/remotes) [])]
+        (when (empty? repos)
+          (warn-skipped! "fleet-db.edn :fleet/repos" ["(no repo entries parsed)"]))
+        (concat
+         (for [e repos]
+           (assoc e :db/id (next-tempid!) :source/dataset "fleet-db" :source/file (str f)))
+         (for [e remotes]
+           (assoc e :db/id (next-tempid!) :source/dataset "fleet-db-remote" :source/file (str f)))))
+      [])))
+
+(defn fleet-ci-entities [next-tempid!]
+  (let [f (io/file root "manifest" "fleet-ci.edn")]
+    (if (.exists f)
+      (if-let [e (single-map-entity f "fleet-ci")]
+        [(assoc e :db/id (next-tempid!) :source/dataset "fleet-ci" :source/file (str f))]
+        (do (warn-skipped! "fleet-ci.edn" ["(shape not a map)"]) []))
+      [])))
+
 ;; ---------- schema (manifest/schema.edn -> datascript createConn schema) ----------
 
 (defn schema-path [] (io/file root "manifest" "schema.edn"))
@@ -657,12 +880,19 @@
         working-doc-tx (working-doc-entities next-tempid!)
         narrative-tx (concat (spirit-in-physics-entities next-tempid!)
                               (ghosthacker-manga-log-entities next-tempid!))
+        company-tx (concat (company-facts-entities next-tempid!)
+                            (lei-blueprint-entities next-tempid!)
+                            (lei-tos-entities next-tempid!))
+        fleet-tx (concat (fleet-state-entities next-tempid!)
+                          (fleet-db-entities next-tempid!)
+                          (fleet-ci-entities next-tempid!))
         all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
                                                      biz-tx canvas-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
                                                      hirameki-corpus-tx jinushi-tx
                                                      proc-registry-tx merged-kotoba-tx
-                                                     working-doc-tx narrative-tx)))]
+                                                     working-doc-tx narrative-tx
+                                                     company-tx fleet-tx)))]
     (.transact ds conn all-tx)
     {:conn conn
      :adr-count (count adr-tx)
@@ -677,28 +907,30 @@
      :proc-registry-count (count proc-registry-tx)
      :merged-kotoba-count (count merged-kotoba-tx)
      :working-doc-count (count working-doc-tx)
-     :narrative-count (count narrative-tx)}))
+     :narrative-count (count narrative-tx)
+     :company-count (count company-tx)
+     :fleet-count (count fleet-tx)}))
 
 (defn -main [& args]
   (let [[mode query-str] args
         {:keys [conn adr-count docs-count manifest-count foreign-adr-count biz-count
                 kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                narrative-count]}
+                narrative-count company-count fleet-count]}
         (build-conn)
         total (+ adr-count docs-count manifest-count foreign-adr-count biz-count
                  kj-count rad-count
                  etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                 narrative-count)]
+                 narrative-count company-count fleet-count)]
     (case mode
       "count"
       (println (format (str "adr=%s docs=%s manifest=%s foreign-adr=%s biz=%s kj=%s rad=%s "
                              "etzhayyim-80-data=%s proc-registry=%s merged-kotoba=%s working-doc=%s "
-                             "narrative=%s total=%s")
+                             "narrative=%s company=%s fleet=%s total=%s")
                         adr-count docs-count manifest-count foreign-adr-count biz-count
                         kj-count rad-count
                         etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                        narrative-count total))
+                        narrative-count company-count fleet-count total))
 
       "q"
       (println (pr-str (js->clj (.q ds query-str (.db ds conn)))))
