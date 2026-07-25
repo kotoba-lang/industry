@@ -1,6 +1,6 @@
 ---
 name: git-cleanup-conflict
-description: Clean up unmerged Git branches, PRs, worktrees, and stashes, and resolve merge conflicts, in the com-junkawasaki/root west-managed superproject and its orgs/ child repos. Use whenever the user says "cleanup", asks to drain/retire stashes or branches, asks to merge PRs to main, asks to stash pop safely, or asks to resolve manifest/west.yml or other generated-file conflicts without losing WIP. Also use proactively any time you are about to `git stash drop` or `git branch -D` something yourself — do not free-hand it. Also trigger on "orphan repo", "west 未登録", "local only", ":local/root が壊れている", or when a fresh checkout cannot resolve a sibling dep.
+description: Clean up unmerged Git branches, PRs, worktrees, and stashes, and resolve merge conflicts, in the com-junkawasaki/root west-managed superproject and its orgs/ child repos. Use whenever the user says "cleanup", asks to drain/retire stashes or branches, asks to merge PRs to main, asks to stash pop safely, or asks to resolve manifest/west.yml or other generated-file conflicts without losing WIP. Also use proactively any time you are about to `git stash drop` or `git branch -D` something yourself — do not free-hand it. Also trigger on "orphan repo", "west 未登録", "local only", ":local/root が壊れている", or when a fresh checkout cannot resolve a sibling dep. Also trigger on any request to FIND un-landed work across the fleet — "どの repo に WIP が残っている", "merge されていない/PR が無い repo を特定", "未 push の作業を洗い出す", "landed していない変更", "deploy されていない変更".
 ---
 
 # Git Cleanup Conflict
@@ -33,6 +33,52 @@ stashes, diff + commit log for branches, per `:retirement :archive` in the edn) 
 `index.txt` entry. This is true even when you are highly confident the content is
 landed. The archive step is what makes the decision reversible; skipping it because
 you're confident is exactly the failure mode this note exists to catch.
+
+## Finding un-landed work across the fleet (UNLANDED inventory)
+
+When the question is "which child repos still have work that hasn't landed?", run:
+
+```bash
+nbb scripts/cleanup.cljs --unlanded      # only repos with un-landed work
+nbb scripts/cleanup.cljs                 # full survey (also lists quiet repos)
+nbb scripts/cleanup.cljs --subrepos      # superproject only (fast)
+```
+
+It reports, per child repo, a **landing ladder** — left is more dangerous because git
+protects it less:
+
+| Marker | Meaning | Why it matters |
+|---|---|---|
+| `untracked=N` | **not committed at all** | On no branch, on no remote. One `git checkout` in the shared west checkout destroys it. |
+| `dirty=N` | tracked, uncommitted | Survives branch switches only by accident. |
+| `unpushed=B:N` | branch `B` is N commits ahead of `origin/B` (or `no-remote`) | Exists only on this machine. |
+| `nopr=B` | pushed, not merged into the default branch, **no open PR** | Not on anyone's review path; will rot. |
+| `nopr=?(N branches…)` | PR lookup capped | Branch farms (webgpu ≈80, slides ≈90 local branches) would need one API round-trip each. Reported, never silently dropped. |
+
+`untracked` is the marker that matters most, and it is the one the pre-2026-07-25
+script could not surface.
+
+**Real incident (2026-07-25).** `orgs/gftdcojp/cloud-itonami` held the entire
+Workspace suite — Directory / Mail / Drive / backup / domain-proof / projection-outbox,
+~4,000 lines with tests and its own ADR — as **untracked files in the shared west
+checkout**, on a `rescue/wip-20260718` branch that was 1381 commits behind
+`origin/main`. It was on no branch, on no remote, and not deployed (live
+`itonami.cloud` still answered `502 api-route-html-leak`). The old survey printed
+`dirty=57` and nothing else, which is indistinguishable from a one-line edit in some
+other repo. Landed as PR #488 after replaying onto current `origin/main` in a clean
+worktree.
+
+Two lessons baked into the tooling:
+
+1. **`git status` alone under-reports danger.** Split untracked from dirty and rank by
+   how little git protects it.
+2. **PRs must be checked per child repo, not on the superproject.** The old script only
+   ran `gh pr list` against `com-junkawasaki/root`, so a child repo with pushed-but-
+   un-PR'd branches looked clean. `--unlanded` now queries each child repo's own slug.
+
+Un-landed ≠ deployed. Even after a merge, check whether the change actually reached
+production — cloud-itonami's live Pages Function had been serving a build that predated
+the merged source. `git log` says nothing about that; probe the live surface.
 
 ## Core rules
 
@@ -106,6 +152,8 @@ nbb scripts/west-triple-sync.cljs verify --scope blocking
 1. Inventory: `git worktree list --porcelain`, `git branch --show-current`,
    `git stash list`, `git status --short --branch`,
    `gh pr list --state open --json number,title,headRefName,baseRefName,url,mergeable,statusCheckRollup`,
+   **`nbb scripts/cleanup.cljs --unlanded`** (child-repo landing ladder — untracked /
+   unpushed / no-PR; see the UNLANDED section above),
    **`nbb scripts/west-orphan-audit.cljs`** (and `--blocking` if any dep failure is
    in scope).
 2. Classify each stash/branch per `:retirement :classify` in the edn (landed /
