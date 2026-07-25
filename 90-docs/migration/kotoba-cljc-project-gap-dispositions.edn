@@ -926,13 +926,28 @@
    :next-action :retain-cljc-oracle-and-migrate-only-consumers-that-accept-the-pinned-min-difficulty-floor}
   {:root "orgs/kotoba-lang/search/src/search/model.cljc"
    :repository "orgs/kotoba-lang/search"
-   :kind :retain-cljc-pending-regex-primitive
-   :review-status :reviewed-2026-07-23
-   :migration-authorized false
-   :reason "search.model/tokenize lower-cases then regex-splits on [a-z0-9\\u3040-\\u30ff\\u3400-\\u9fff]+ (Latin/digit plus Hiragana/Katakana/CJK Unicode ranges); kotoba-lang/compiler's string-operations set is exactly {string-byte-length string=? string-concat string-replace-all keyword-from-string keyword-name} -- no regex, no substring search, no character-class matching, no case-fold. This is the same missing-primitive class already found for kotoba-lang/clj-host's bit-shift gap and the wave-2 actor governors' phrase-matching gap: search is unimplementable without it, not merely unbounded. Independently, the whole model (index/document/add-document/remove-document/score-doc/search) and search.validate's problems/valid? operate over an open-ended :search/docs map keyed by arbitrary document id, which has no bounded-profile precedent yet either (every successful bounded-profile split so far -- association_facts, ghosthacker-family/vamos, mining-pool -- closed over a fixed small N, not an arbitrary map)."
-   :required-language-gates [:regex-or-character-class-substring-primitive
-                             :bounded-arbitrary-keyed-map-profile-precedent]
-   :next-action :retain-cljc-and-revisit-after-a-string-search-primitive-lands}
+   :kind :bounded-profile-split
+   :review-status :bounded-index-and-weights-profile-merged
+   :migration-authorized true
+   :migration-scope :search/bounded-index-and-weights-v1
+   :legacy-domain :search.model-tokenize-score-doc-search-term-count-plus-validate-need-a-codepoint-regex-string-primitive-not-in-scope
+   :safety-note "Splits the two blockers this entry originally conflated. (1) The bounded-arbitrary-keyed-map blocker is RESOLVED: the name-keyed document registry (doc-id -> {:title :body} record) is now [:map :string [:record :search/doc ...]], the same typed-map precedent kotoba-lang/states established and sheets/spice/atprotocol/sigma reused; the closed field-weight table (:title 4 / :tags 3 / :body 1) is closed keyword membership. (2) The regex/codepoint blocker REMAINS and now precisely scoped: tokenize is a re-seq character-class tokenizer over a-z0-9 + Hiragana/Katakana/CJK Unicode ranges; kotoba-lang/compiler's string ABI is UTF-8 byte-offset based (string-substring / string-contains? / string-byte-length only) with NO per-code-point classification op, so tokenize/score-doc/search/term-count and search.validate stay the CLJC oracle. The index structure -- the part that does NOT need the primitive -- is migrated."
+   :compiler-findings
+   {:document-star-fn-names-are-reserved
+    {:description "document-count/has-document?/document-title-or collide with the built-in document-* typed-value operations (document-count is one of them), so the kernel uses doc-count/has-doc?/doc-title-or. Working as designed."}
+    :string-abi-has-no-codepoint-op
+    {:description "The remaining tokenize blocker: kotoba's string ops are UTF-8 byte-offset based (string-substring/string-contains?/string-byte-length), with no string-code-point-at / regex / character-class op. Adding one is a multi-site feature (frontend admission + cljs + reference/value.cljc utf8 decode + a typed-string-* wasm host intrinsic implemented in every host) -- scoped as a follow-up, not filed as a bug (it is a missing feature, not incorrect behavior)."}}
+   :implementation
+   {:pr "https://github.com/kotoba-lang/search/pull/1"
+    :commit "11ab1f8f4b35875e3132c5bb82520bc29e5cf1df"
+    :kernel-and-conformance "src/search/bounded_index.kotoba"
+    :migration-record "migration/bounded-index-and-weights-v1.edn"
+    :legacy-tests {:tests 1 :assertions 3 :failures 0 :errors 0}
+    :hand-verified-cases "main replays search.model-test's seed-index shape (add slides/sheets, count 2, membership, title read-back, missing-doc fallback, closed field weights :title 4/:body 1/:unknown->fallback)"
+    :required-capabilities []
+    :hosted-ci {:status :passed}}
+   :required-language-gates [:regex-or-code-point-string-primitive-for-tokenize-only]
+   :next-action :the-index-structure-is-migrated-tokenize-awaits-a-code-point-string-primitive-the-highest-leverage-remaining-compiler-gap-unblocking-search-tokenize-plus-the-ibis-cron-parser-class}
   {:root "orgs/kotoba-lang/face-match/src/face_match/core.cljc"
    :repository "orgs/kotoba-lang/face-match"
    :kind :bounded-profile-split
@@ -1622,8 +1637,8 @@
   :safety-note "The full rescan replaced an inconsistent concurrent snapshot. Retirement required explicit clean default-branch checkouts at exact live heads with zero tracked CLJC. UBF and ABA were re-retired after their stale pre-migration checkouts resurfaced. Live GitHub refreshes may reclassify unrelated local snapshots between current and stale; JSDA and FINRA retirement each removed exactly one repository and one production CLJC file. Compiler output byte identity is not a language-conformance requirement. Exact bytes are tested only for signatures, cryptographic vectors, canonical wire encodings, and package integrity; hashes remain provenance/integrity/cache evidence. Session closeout is safe; the assoc-* wave is closed, so resume with per-repo review inside the isic/isco/iso3166/unspsc/cofog/gtin census once the application-profile and string-search gates are tracked as landed."}
  :completion
  {:reviewed-project-roots 59
-  :authorized-migrations 32
-  :retained-oracles 8
+  :authorized-migrations 33
+  :retained-oracles 7
   :typed-refactors-pending 0
   :typed-refactors-in-review 0
-  :typed-refactors-merged-awaiting-cutover 7}}}
+  :typed-refactors-merged-awaiting-cutover 8}}}
