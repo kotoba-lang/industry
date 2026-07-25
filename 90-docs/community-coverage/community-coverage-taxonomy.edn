@@ -155,7 +155,18 @@
 {:vocab/id :vocab-data-provenance
  :vocab/attribute "org/data-provenance"
  :vocab/values ["llm-recall-unverified" "source-pinned" "primary-document"]
- :vocab/note "Iteration 1 of this corpus is llm-recall-unverified across the board: figures are approximate public estimates recalled without fetching the source, and MUST NOT be read as measurements. Later iterations pin each count to a dated source and flip the entity to source-pinned. Per the repo's system-dynamics rule (ADR-2607203000), an unmeasured entity is 'coverage not yet achieved', never 'out of scope' — and a recalled number is never presented as a computed one."
+ :vocab/note "Iterations 1-2 of this corpus were llm-recall-unverified across the board: figures were approximate public estimates recalled without fetching the source, and MUST NOT be read as measurements. Iteration 3 (2026-07-25) began flipping entries to source-pinned. Per the repo's system-dynamics rule (ADR-2607203000), an unmeasured entity is 'coverage not yet achieved', never 'out of scope' — and a recalled number is never presented as a computed one. Query `[?e \"org/data-provenance\" \"llm-recall-unverified\"]` to see what is still unpinned."
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-source-tier
+ :vocab/attribute "org/source-tier"
+ :vocab/values ["primary" "secondary"]
+ :vocab/note "primary = the figure was taken from the publishing body's own report or dataset (NABARD SOMFI, WOCCU Statistical Report, DOSB Bestandserhebung, 消防庁 press release, ICA facts page). secondary = the figure traces to that body but was read through a news article, encyclopedia or summary; :org/source-caveat then says what would be needed to promote it. Pinning a figure does NOT make it true — it makes it checkable and dated."
+ :source/dataset "community-coverage"}
+
+{:vocab/id :vocab-pinning-conventions
+ :vocab/attribute "org/member-count-basis"
+ :vocab/note "Three recurring traps this corpus makes explicit rather than silently absorbing: (1) MEMBERSHIPS vs PEOPLE — DOSB's 29.3M and ICA's 1B count memberships, so one person joining three bodies counts three times; (2) HOUSEHOLDS vs INDIVIDUALS — NABARD's 177.5M is households reached, not active members; (3) FEDERATION SCOPE — WOSM's 51.4M excludes WAGGGS, and Colombia's 62,553 JAC figure does not cover the other countries listed in :org/countries. Any entry that mixes these MUST say so in this field."
  :source/dataset "community-coverage"}
 
 ;;; ---------- corpus self-description ----------

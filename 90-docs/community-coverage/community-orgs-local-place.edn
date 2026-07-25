@@ -14,14 +14,19 @@
  :org/countries ["JP"]
  :org/founding-date 1940
  :org/founding-note "Consolidated nationally under wartime tonarigumi policy; abolished by GHQ 1947; re-formed voluntarily thereafter."
- :org/instance-count-estimate 290000
- :org/member-count 30000000
- :org/member-count-basis "llm-recall-unverified: roughly 290k associations; household membership commonly cited near 30M households at declining participation."
+ :org/instance-count-estimate 290054
+ :org/member-count-basis "source-pinned: 290,054 associations nationwide as of 2021-04-01 (総務省自治行政局市町村課 aggregation of all 1,741 municipalities). Household participation rate 71.8% in 2021, down from 78.0% in 2010 — 57.9% in cities over 500k population, 88.3% in municipalities under 10k. No absolute member-household total is published, so :org/member-count is deliberately not asserted (iteration 1 carried a recalled 30M figure that had no source)."
  :org/legal-registration :mostly-unregistered
  :org/registration-note "Most are voluntary bodies with no legal personality; a minority obtain 認可地縁団体 status under the Local Autonomy Act to hold property."
  :org/governance-model :consensus
  :org/mission-statement "Neighborhood self-management: festival and shrine support, waste-station upkeep, disaster preparedness, circulating notice board (回覧板), liaison with municipal government."
- :org/data-provenance "llm-recall-unverified"
+ :org/source-name "総務省自治行政局市町村課「自治会等に関する市区町村の取組についてのアンケート とりまとめ結果」"
+ :org/source-url "https://www.soumu.go.jp/main_content/000808317.pdf"
+ :org/source-date "2021-04-01"
+ :org/source-tier :secondary
+ :org/source-caveat "The 総務省 PDF is image-based and could not be machine-parsed; the 290,054 / 71.8% figures were taken from summaries of that aggregation. Re-pin as :primary if the PDF is OCR'd."
+ :org/pinned-on "2026-07-25"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-usa-community-associations

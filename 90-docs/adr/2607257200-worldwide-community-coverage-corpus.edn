@@ -52,7 +52,7 @@ cat-local-place（地方・地縁）/ cat-sports（スポーツ）/ cat-fraterna
 
 ## 既知のギャップ / 次の iteration
 
-1. 出典の pin（llm-recall-unverified → source-pinned）。特に町内会・stokvel・SHG・Discord のような桁が大きい entry から。**iteration 2 時点で未着手 — corpus 全 188 org が未検証**。
+1. 出典の pin（llm-recall-unverified → source-pinned）。**iteration 3 で 9 件着手（primary 5 / secondary 4）。community-coverage 132 org のうち 123 件が依然未 pin、phase2/3 の 56 org は全件未 pin。**
 2. ~~phase2 / phase3 の着地~~ → **iteration 2 で完了**（下記）。
 3. ~~地域の穴埋め（中央アジア・中央アフリカ・カリブ・太平洋・中東）~~ → **iteration 2 で一次補完**（下記）。残るのは中央アフリカの言語別・カリブ島嶼別のような粒度の細分化。
 4. ADR-2608180100（religious-community framework）は依然 draft — accepted に上げるか、本 corpus に統合するかの判断。
@@ -153,5 +153,52 @@ studiecirklar（北欧）/ 입주자대표회의（韓国）。
 
 - `community-coverage`: **132 org / 15 カテゴリ**（iteration 1 は 95 org / 8 カテゴリ）
 - `religious-community-phase2`: 34 org、`religious-community-phase3`: 22 org
-- 統合クエリ面上の `org/name` を持つ entity: **200**（うち 12 が iteration 0 の religious-community 原本）"
+- 統合クエリ面上の `org/name` を持つ entity: **200**（うち 12 が iteration 0 の religious-community 原本）
+
+---
+
+# Iteration 3（2026-07-25）— 出典 pin の開始
+
+**カバレッジを広げるだけでは corpus は「大きな未検証の主張の山」にしかならない**ので、桁の
+大きい entry から実出典に当てた。新属性: `:org/source-name` / `:org/source-url` /
+`:org/source-date`（データの基準日。取得日ではない）/ `:org/source-tier`（primary |
+secondary）/ `:org/source-caveat` / `:org/pinned-on`、および
+`:org/data-provenance \"source-pinned\"`。
+
+## 3-1. pin した 9 件（primary 5 / secondary 4）
+
+| entity | pin 後 | 基準日 | tier |
+|---|---|---|---|
+| SHG / VSLA（インド） | 14.42M グループ・1億7,750万世帯到達（うち 7.74M が credit-linked） | 2024-03-31 | primary（NABARD SOMFI 2023-24） |
+| 信用組合（WOCCU） | 412,681,905 人 / 67,137 組合 / 101 か国 | 2024-12-31 | primary |
+| DOSB クラブ | 29.3M membership / 約86,000 クラブ | 2025-01-01 | primary |
+| 消防団 | 732,223 人（前年比 -14,458、-1.9%） | 2025-04-01 | primary（消防庁） |
+| ICA 協同組合 | 300万協同組合 / 10億超 member / 2.8億人の雇用 | 2025 | primary |
+| 町内会・自治会 | 290,054 団体、加入率 71.8% | 2021-04-01 | secondary |
+| stokvel | 800,000+ グループ / 1,100万人超 / R50bn | 2025-08-14 | secondary |
+| WOSM | 51.4M 参加者 / 176 加盟団体 | 2025 | secondary |
+| juntas de acción comunal | 62,553 JAC / 630万人（コロンビアのみ） | 2024 | secondary |
+
+## 3-2. pin して初めて分かった iteration 1-2 の誤り
+
+- **WOCCU**: 想起値「82k 組合」は実際の 67,137 を約 22% 過大に見積もっていた（統合が進み
+  2016 年以来初めて 7 万を割った）。
+- **WOSM**: 想起値 65M は WOSM と WAGGGS を合算していた。WOSM 単独は 51.4M。
+- **町内会**: 想起値「30M 世帯」に出典が無い。総務省は加入率（71.8%）しか公表していないため、
+  **`:org/member-count` を削除**して加入率だけを残した（数を作らない）。
+- **Wikipedia**: 「~120k monthly active editors」はどの公表値にも一致しない（39k は英語版の
+  active editor、291k は英語版の 30 日 active registered user、Wikimedia 全体はまた別）。
+  数を出さず `unknown` に戻し、stats.wikimedia.org で解決すべきと明記した。
+
+## 3-3. 数え方の罠を語彙に固定した
+
+`:vocab-pinning-conventions` として3つを明文化: ①**membership ≠ 人**（DOSB 29.3M・ICA 10億は
+延べ会員数）②**世帯 ≠ 個人**（NABARD の 1億7,750万は到達世帯）③**連合体のスコープ**
+（WOSM に WAGGGS は含まれない、コロンビアの 62,553 は他国を含まない）。これらを混ぜる entry は
+`:org/member-count-basis` に必ず書く。
+
+## 3-4. 残り
+
+`community-coverage` 132 org のうち **123 org が未 pin**、phase2/3 の 56 org は全件未 pin。
+pin は「真である」ことではなく「検証可能で日付が付いている」ことを意味する。"
   :source/file "90-docs/adr/2607257200-worldwide-community-coverage-corpus.edn"}]
