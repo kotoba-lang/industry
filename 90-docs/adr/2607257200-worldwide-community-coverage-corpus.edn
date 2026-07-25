@@ -73,7 +73,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ## 現在の状態（2026-07-26）
 
-- **250 organization / 15 カテゴリ / 24 データファイル**
+- **250 organization / 15 カテゴリ / 12 form-family / 24 データファイル**
 - 検証: source-pinned **48**（primary 34 / secondary 14）、未 pin 202（81%）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
   **statutory-no-personality 8** → **企業・LEI レジストリから不可視が約 41%**
@@ -122,8 +122,11 @@ nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
    fediverse・地下学校）、空欄＋理由が最も正確な記録である。
 4. **14 軸スコアを新規 org に付けない。** 想起ベースの軸値は「計測済みに見える捏造」になる
    （ADR-2607203000）。出典が付いてから足す。
-5. **ISIC hint は org でなく category に置く。** 226 org に個別付与すれば 226 件の推測になるが、
+5. **ISIC hint は org でなく category に置く。** 250 org に個別付与すれば 250 件の推測になるが、
    category に置けば推測は 15 件に閉じ、join は `:org/category` 経由の 2 ホップで成立する。
+6. **category（何であるか）と form-family（何のローカル版であるか）を分ける。**
+   `:org/form-family` は国を跨ぐ類縁形態の索引で、比較こそがこの corpus の価値だから独立させた
+   （下記 知見7）。
 
 ## 構造的知見（この corpus が実際に示したこと）
 
@@ -172,6 +175,29 @@ AFL-CIO（加盟 61 / 65、かつ会員数に退職者を含む）、老人ク�
 Repair Café（3,652 / 約3,200）、Slow Food（reach 100万 / member 約10万）も同型。
 とくに Slow Food は **「到達人数」と「会員数」が一桁違う**まま両方が流通している。corpus はこれらを**照合せず両方記録**する —
 勝手に一方へ丸めるのは、出典を持たない数字を作るのと同じことである。
+
+### 7. 同じ制度が12の名前で存在する — `:org/form-family`
+
+講 / stokvel / tanda / susu / chit / hui / tontine / gam'iya / chama / sòl / equb / gye は
+**一つの制度が十二の名前を着ているだけ**である。結 / 두레 / hashar / bayanihan / minga も同様。
+カテゴリ（何であるか）だけでは、これらは無関係な項目と同じ箱に入ってしまい、比較のたびに
+手作業で再構成することになる。そこで `:org/form-family` を独立の索引として追加した:
+
+| family | 件数 | 例 |
+|---|---|---|
+| neighborhood-assembly | 19 | 町内会・居委会・RT/RW・barangay・banjar・JAC・fono |
+| commons-management | 13 | 入会地・subak・CFUG・Allmend・漁業権・ejido |
+| platform-native | 12 | subreddit・Discord・DAO・fediverse・fansub |
+| fraternal-order | 12 | Freemasonry・Rotary・cofradía・ahi・Compagnons |
+| customary-council | 11 | xeer・jemaa・kris・matai・majlis・age-grade |
+| volunteer-emergency | 8 | 消防団・Feuerwehr・CERT・CPP・ERR |
+| religious-lay-committee | 8 | 氏子・モスク委員会・寺院委員会・hey'at・guthi |
+| diaspora-hometown | 7 | 会館・hemşehri・HTA・dahira・日曜共同体 |
+| rosca | 7 | 講・stokvel・gam'iya・chama・sòl・SHG |
+| labor-exchange / displaced-community / burial-society | 5 / 5 / 4 | 結・두레・hashar / 難民委員会・RLO / iddir・chevra kadisha |
+
+**111/250 に類縁形態が記録され、139 は現時点で単独。** 単独であること自体が
+「まだ他地域の対応物を見つけていない」というカバレッジ信号になる。
 
 ### 6. 陳腐化と自己申告の可視化
 

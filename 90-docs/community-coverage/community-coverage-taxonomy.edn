@@ -210,6 +210,13 @@
  :vocab/note "primary = the figure was taken from the publishing body's own report or dataset (NABARD SOMFI, WOCCU Statistical Report, DOSB Bestandserhebung, 消防庁 press release, ICA facts page). secondary = the figure traces to that body but was read through a news article, encyclopedia or summary; :org/source-caveat then says what would be needed to promote it. Pinning a figure does NOT make it true — it makes it checkable and dated."
  :source/dataset "community-coverage"}
 
+{:vocab/id :vocab-form-family
+ :vocab/attribute "org/form-family"
+ :vocab/values ["family-rosca" "family-burial-society" "family-neighborhood-assembly" "family-labor-exchange" "family-customary-council" "family-commons-management" "family-fraternal-order" "family-diaspora-hometown" "family-volunteer-emergency" "family-religious-lay-committee" "family-platform-native" "family-displaced-community"]
+ :vocab/note "Added 2026-07-26 (iteration 20). Categories answer 'what kind of thing is this?'; families answer 'what is this the local version OF?'. The corpus's comparative value is in the second question: 講 / stokvel / tanda / chama / gam'iya / sòl are one institution wearing twelve names, and 結 / 두레 / hashar / bayanihan / minga are another. Without the family key those analogues sit in the same category as unrelated entries and the cross-national comparison has to be reconstructed by hand every time. 111 of 250 orgs carry a family; the rest have no cross-national analogue in the corpus yet, which is itself a coverage signal."
+ :vocab/query-example "[:find ?fam ?n :where [?e \"org/form-family\" ?fam] [?e \"org/name\" ?n]]"
+ :source/dataset "community-coverage"}
+
 {:vocab/id :vocab-pinning-conventions
  :vocab/attribute "org/member-count-basis"
  :vocab/note "Three recurring traps this corpus makes explicit rather than silently absorbing: (1) MEMBERSHIPS vs PEOPLE — DOSB's 29.3M and ICA's 1B count memberships, so one person joining three bodies counts three times; (2) HOUSEHOLDS vs INDIVIDUALS — NABARD's 177.5M is households reached, not active members; (3) FEDERATION SCOPE — WOSM's 51.4M excludes WAGGGS, and Colombia's 62,553 JAC figure does not cover the other countries listed in :org/countries. Any entry that mixes these MUST say so in this field."
