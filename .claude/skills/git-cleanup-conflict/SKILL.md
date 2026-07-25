@@ -1,6 +1,6 @@
 ---
 name: git-cleanup-conflict
-description: Clean up unmerged Git branches, PRs, worktrees, and stashes, and resolve merge conflicts, in the com-junkawasaki/root west-managed superproject and its orgs/ child repos. Use whenever the user says "cleanup", asks to drain/retire stashes or branches, asks to merge PRs to main, asks to stash pop safely, or asks to resolve manifest/west.yml or other generated-file conflicts without losing WIP. Also use proactively any time you are about to `git stash drop` or `git branch -D` something yourself — do not free-hand it. Also trigger on "orphan repo", "west 未登録", "local only", ":local/root が壊れている", or when a fresh checkout cannot resolve a sibling dep. Also trigger on any request to FIND un-landed work across the fleet — "どの repo に WIP が残っている", "merge されていない/PR が無い repo を特定", "未 push の作業を洗い出す", "landed していない変更", "deploy されていない変更".
+description: Clean up unmerged Git branches, PRs, worktrees, and stashes, and resolve merge conflicts, in the com-junkawasaki/root west-managed superproject and its orgs/ child repos. Use whenever the user says "cleanup", asks to drain/retire stashes or branches, asks to merge PRs to main, asks to stash pop safely, or asks to resolve manifest/west.yml or other generated-file conflicts without losing WIP. Also use proactively any time you are about to `git stash drop` or `git branch -D` something yourself — do not free-hand it. Also trigger on "orphan repo", "west 未登録", "local only", ":local/root が壊れている", or when a fresh checkout cannot resolve a sibling dep. Also trigger on any request to LAND un-landed work in bulk — "すべて pr create, merge, cleanup", "全部着地させて", "WIP を全部 PR にして". Also trigger on any request to FIND un-landed work across the fleet — "どの repo に WIP が残っている", "merge されていない/PR が無い repo を特定", "未 push の作業を洗い出す", "landed していない変更", "deploy されていない変更".
 ---
 
 # Git Cleanup Conflict
@@ -79,6 +79,53 @@ Two lessons baked into the tooling:
 Un-landed ≠ deployed. Even after a merge, check whether the change actually reached
 production — cloud-itonami's live Pages Function had been serving a build that predated
 the merged source. `git log` says nothing about that; probe the live surface.
+
+## Landing it — `scripts/cleanup-land.cljs`
+
+Survey is read-only; this is the write side.
+
+```bash
+nbb scripts/cleanup-land.cljs                      # dry-run plan (default)
+nbb scripts/cleanup-land.cljs --apply              # execute
+nbb scripts/cleanup-land.cljs --apply --names a,b  # limit to named repos
+nbb scripts/cleanup-land.cljs --apply --max 20     # cap; the rest is reported, not hidden
+```
+
+**Never merge all UNLANDED work as one class.** Split by *whether it can break `main`*,
+not by how dangerous it is to lose:
+
+| Class | What | Action |
+|---|---|---|
+| `:additive` | untracked files only | commit → PR → **merge**. No such path exists on the default branch, so no existing line is rewritten. Not landing it is the greater risk — it lives on no branch and no remote. |
+| `:review` | changes to tracked files | commit → PR, **never auto-merge**. A stale base silently rolls `main` back. |
+| `:branches` | existing local branches | push if unpushed (preserve); open a PR if pushed with none. **Never auto-merge** — abandoned experiments, deliberate forks and force-pushed histories all look alike. |
+
+The `:review` rule is not hypothetical. cloud-itonami's working tree was 1381 commits
+behind `main`; applying its `legal/terms.md` would have reverted owner-approved public
+legal pages to a 2026-07-18 DRAFT.
+
+**Write path is the GitHub git API** (blob → tree with `base_tree` → commit → ref), not a
+local worktree — at ~100-repo scale, per-repo full checkouts are impractical, and the
+shared checkout is often parked on a stale branch. Same server-side single-commit shape
+`CLAUDE.md` already mandates for `manifest/west.yml`.
+
+**Two traps this hit, both silent:**
+
+- **Renamed repos.** GitHub redirects GETs and `-f`-style POSTs, but returns **HTTP 307
+  to `--input` POSTs, and `gh` does not follow it**. Reads succeed while writes fail, so
+  it presents as "commits mysteriously fail." The script resolves every slug through
+  `gh api repos/<slug> --jq .full_name` first. Measured: `kotoba-lang/kotoba-git` is now
+  `kotoba-lang/bonsai`; the local remote URL still said the old name.
+- **`--jq` returning a bare scalar is not JSON.** `6dc20b…` parsed as JSON yields nil, so
+  the first implementation failed every commit while reporting success paths normally.
+  Use a string-returning helper for `--jq` scalars.
+
+Skipped and always reported, never silently dropped: credential-looking paths
+(`.env`, `*.pem`, `*.key`, `identity.edn`, `*secret*`, `.kagi/`, …), build junk, files
+over 2 MB, and git-annex/DataLad datasets. Executable bits are preserved (`100755`), or
+`bin/*` lands unusable.
+
+Nothing is ever deleted: archive to `.git/stash-archive-<date>/` first, then add.
 
 ## Core rules
 
@@ -163,7 +210,9 @@ nbb scripts/west-triple-sync.cljs verify --scope blocking
    before touching anything — see the non-negotiable rule above.
 4. Landed/superseded → drop/delete. Unlanded → rescue to a pushed branch (never back
    into a stash) in a sparse worktree outside the superproject, per `:retirement
-   :rescue`.
+   :rescue`. At fleet scale use **`nbb scripts/cleanup-land.cljs --apply`** instead of
+   doing this by hand — it archives, then lands `:additive` and opens PRs for
+   `:review`/`:branches` without merging them (see the section above).
 5. Resolve any real merge conflicts by file class (`:resolve-conflicts` in the edn),
    regenerating `manifest/west.yml` rather than editing markers.
 6. For blocking orphans: finish registration (`new-project-scaffold` / `--entry`) or

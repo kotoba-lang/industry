@@ -53,6 +53,35 @@ Two gaps this closed:
 predated the merged source; `git log` cannot see that. Probe the live surface after
 landing.
 
+### Landing it — `scripts/cleanup-land.cljs`
+
+```bash
+nbb scripts/cleanup-land.cljs                      # dry-run plan (default)
+nbb scripts/cleanup-land.cljs --apply              # execute
+nbb scripts/cleanup-land.cljs --apply --names a,b  # limit to named repos
+nbb scripts/cleanup-land.cljs --apply --max 20     # cap; the rest is reported, not hidden
+```
+
+Never merge all UNLANDED work as one class. Split by *whether it can break `main`*:
+
+| Class | What | Action |
+|---|---|---|
+| `:additive` | untracked files only | commit → PR → **merge** (no such path exists on the default branch, so nothing is rewritten) |
+| `:review` | changes to tracked files | commit → PR, **never auto-merge** (a stale base silently rolls `main` back) |
+| `:branches` | existing local branches | push if unpushed; PR if pushed with none; **never auto-merge** |
+
+Write path is the GitHub git API (blob → tree with `base_tree` → commit → ref), not local
+worktrees — same server-side single-commit shape `CLAUDE.md` mandates for `west.yml`.
+
+Two silent traps: **renamed repos** return HTTP 307 to `--input` POSTs and `gh` does not
+follow (reads work, writes fail — resolve slugs through `gh api repos/<slug> --jq
+.full_name`; measured: `kotoba-git` → `bonsai`), and **`--jq` bare scalars are not JSON**
+(parsing `6dc20b…` as JSON yields nil and every commit fails quietly).
+
+Skipped and always reported: credential-looking paths, build junk, files over 2 MB,
+git-annex/DataLad datasets. Executable bits preserved. Nothing is ever deleted — archive
+to `.git/stash-archive-<date>/` first, then add.
+
 ## West orphan inventory
 
 `orgs/<org>/<repo>` can exist locally without being in west, or exist on GitHub without local/west. Mixing path-override leftovers with true orphans causes false registrations.
