@@ -228,4 +228,18 @@ toolchain がいくら揃っていても agent コードを封じ込められな
 naphtali/asher = contained、zebulun/judah = nbb 欠如で不適格。
 
 検証: selftest **44 checks**。**この時点で残る gap**: E1（kotoba-code との二重実装）、
-E2（モデル能力の未評価）、および D1 の残件（fleet 側 scheduler）。"}]
+E2（モデル能力の未評価）、および D1 の残件（fleet 側 scheduler）。
+
+### 2026-07-25 — amend (E1: 正本は nbb)
+
+**gap E1 を解決: fleet の agent runtime の正本は nbb**（オーナー判断「nbb が正本」）。
+`kotoba.fleet.agent` の `run` seam・`fleet.core` の docstring・kotoba-fleet README が
+名指ししていた「production では kotoba-code セッション」を、実態（
+`hosts/nbb/fleet/sandbox_agent.cljs` を fleet ノードで封じ込め実行）に合わせた
+（kotoba-fleet e712b80）。**kotoba-code は撤去も書き換えもせず**、ADR-2606280001 の
+durable-loop 設計の JVM 側実装として残す旨を当該 repo の README にも明記した
+（kotoba-code 9b07f36）。二重実装が「どちらが本物か分からない」状態ではなくなった。
+
+残る open item は E2（複数ファイル・設計判断を伴うタスクでの成功率が未測定。実証済みは
+約10行の追加＋テスト1本まで）と、nbb 側 agent の **session checkpoint 欠如**
+（死んだ sandbox は再開でなくやり直し。lease があるので安全だが安価ではない）。"}]
