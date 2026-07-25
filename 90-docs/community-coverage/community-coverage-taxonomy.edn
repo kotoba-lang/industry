@@ -181,7 +181,8 @@
 
 {:vocab/id :vocab-legal-registration
  :vocab/attribute "org/legal-registration"
- :vocab/values ["registered" "mostly-registered" "mixed" "mostly-unregistered" "unregistered" "unknown"]
+ :vocab/values ["registered" "mostly-registered" "mixed" "mostly-unregistered" "unregistered" "statutory-no-personality" "unknown"]
+ :vocab/added-in-iteration-13 "statutory-no-personality (2026-07-26) — :mixed was flattening a distinct third state the data kept producing: bodies holding statutory powers and duties while having NO corporate personality of their own. 民生委員 and 保護司 are unpaid public servants commissioned by a minister; 消防団 members are non-permanent municipal officers; Samoa's village fono has enforcement powers under the Village Fono Act; Peru's rondas campesinas exercise constitutional jurisdiction (Art. 149); Bangladesh's CPP units carry state warning duties; Yemen's aqil al-hara is recognized by whichever authority holds the area. None is an incorporated organization and none is merely informal, so calling them 'mixed' hid the pattern."
  :vocab/note "Answers 'does this body appear in a state registry (corporate, association, charity, union) as a legal person?'. The whole point of this corpus is that :mostly-unregistered and :unregistered bodies are the majority of human community life and are absent from LEI/company registries."
  :source/dataset "community-coverage"}
 
