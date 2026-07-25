@@ -177,4 +177,55 @@ receipt は「置いてある場所」ではなく enroll 済み DID で検証�
 
 **この時点で残っている gap**: B1 の一部（receipt は署名されるが公開台帳は無い）、
 C1/C2（push と人間 sign-off が未配線）、D1（常設 tick 無し）、D2（ノード toolchain の偏り）、
-E1/E2（kotoba-code との二重実装、モデル評価の欠如）。"}]
+E1/E2（kotoba-code との二重実装、モデル評価の欠如）。
+
+### 2026-07-25 — amend (B1 / C1 / C2 / D1 / D2 + 共通化)
+
+残っていた5つの gap を解消し、**重なる部分は5回書かずに共通モジュールへ切り出した**。
+kotoba-fleet 6f46348。
+
+**共通化（これが本丸）**: `fleet.dispatch`（work-unit 1件の end-to-end フロー）を
+dispatcher スクリプトから関数として切り出した。これが無いと常設 tick が同じフローを
+再実装することになり、**tick と対話実行が乖離した瞬間に誰も挙動を推論できなくなる**。
+あわせて `fleet.cli`（argv・プロセス・HTTP。4スクリプトが4種類に分岐しており、片方の
+`sh` は stderr を飲み、もう片方は継承していた／HTTP ヘルパは curl 死亡を 599 と例外に
+分けていた）、`fleet.github`（**GitHub と話す唯一の場所**。source 取得・台帳追記・push の
+3経路が同じクレデンシャル規則 = ambient login を読まない、を共有するから1つにした）、
+`fleet.receipt`（署名済み決定・sign-off 規則・公開台帳は1つのオブジェクトの3側面。
+分けると「署名した物」と「公開した物」が乖離する）、`fleet.node`（能力の実測と選択）。
+
+**B1 公開台帳**: 署名済み receipt を `manifest/fleet-sandbox.edn` へ追記する。blob sha の
+楽観ロックなので、2つの fleet が同じ台帳へ publish しても lock 無しで行が消えない。
+ここを append-only に保つのは意図的で、2026-07-25 の latest-state 方針（ADR-2607257000）
+自身が**署名付きイベント列**を append-only の例外として残している。実測: 公開された台帳を
+**enroll 済み公開 DID だけで検証**でき、1フィールド改竄で検証が落ちる。
+
+**C1 push**: `--materialize push` は **branch + PR** を作る。main への push でも pin 前進でも
+ない — pin 前進は別個の検証済み行為だという本リポの規則を保つには、agent の patch は
+レビュー可能な branch として届くのが正しい。アップロードする blob は gate が検証した
+patch を pinned tree に当てて生成するので、**判定された物と着地する物が同一**。明示的な
+`FLEET_PUSH_TOKEN` と work-unit 側の `:allow-push` の両方を要求する（push は scratch
+ディレクトリを消しても取り消せない唯一の段）。実測: `kotoba-lang/kotoba-delta#1`。
+
+**C2 sign-off**: `:protected-paths`（絶対に触らせない＝reject）と `:signoff-paths`
+（人間が決める＝**hold**）を分離した。hold された proposal は署名付き承認が現れるまで
+pending のまま残り、承認は**承認者が proposal id に署名した事実**としてログに載る（別の
+proposal に付け替えられない・未登録鍵では作れない）。`--drain` は**agent を再実行せずに**
+決定する — 再実行は人間が承認済みの patch を作り直すために sandbox セッションを1回
+消費する上、同じ patch が再現する保証も無い。実測: hold → 承認 → drain で materialize。
+なお最初の承認は**拒否された**（ローカルの `manifest/fleet-agents.edn` が古く承認者 DID が
+未登録だった）— 未登録署名者を弾く経路が実地で効くことの確認になった。
+
+**D1 常設 tick**: `bin/fleet-tick.cljs` が最大 `--max` 件を取り、ノードを1回だけ probe して、
+同じ `fleet.dispatch` を回す。daemon ではなく**有界な1パス**にしてある: lease と署名付き
+receipt があるので、途中で死んだ tick の unit は lease 失効後に次の tick が拾う。cadence は
+tick を起動する側（launchd / cron trigger）の責任。実測: 1 unit を 68s で decided。
+**残件**: その起動側はまだ Mac 依存で、fleet 自身は自分をスケジュールしない。
+
+**D2 ノード選択**: work-unit が `:requires` を宣言し、fleet がそれを持つ機械を選ぶ。
+`contains-exec` は**ノード上で sandbox agent 自身の封じ込め probe を走らせて実測**するので、
+toolchain がいくら揃っていても agent コードを封じ込められない機械は不適格になる。実測:
+naphtali/asher = contained、zebulun/judah = nbb 欠如で不適格。
+
+検証: selftest **44 checks**。**この時点で残る gap**: E1（kotoba-code との二重実装）、
+E2（モデル能力の未評価）、および D1 の残件（fleet 側 scheduler）。"}]
