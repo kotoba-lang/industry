@@ -130,6 +130,7 @@
         sha     (or (working-head path) (:revision existing))
         dl      (get-in cfg [:datalad path])
         arch    (get-in cfg [:archived path])
+        rid     (get-in cfg [:rad-rids path])
         depth   (when (heavy? path) (get-in cfg [:defaults :clone-depth]))
         groups  (cond
                   dl   [(:group dl)]
@@ -157,12 +158,17 @@
              subs    (str "      submodules:\n"
                           (apply str (for [p subs] (str "        - path: " p "\n"))))
              recurse "      submodules: true\n")
-           (when dl (str "      userdata:\n"
-                         "        datalad: true\n"
-                         "        annex-remote: " (:annex-remote dl) "\n"))
-           (when (and arch (not dl))
-             (str "      userdata:\n"
-                  "        archived: true\n"))))))
+           ;; userdata は datalad / archived / rad-rid が共存しうるので、
+           ;; それぞれ独立に `userdata:` を出さず1ブロックにまとめて出す
+           ;; (rad-rid = Radicle 実登録の RID。repos.edn :rad-rids が正本で、
+           ;;  west.yml はその projection。fleet reconcile がここから吸収する)。
+           (let [ud (cond-> []
+                      dl                  (into ["        datalad: true"
+                                                 (str "        annex-remote: " (:annex-remote dl))])
+                      (and arch (not dl)) (conj "        archived: true")
+                      rid                 (conj (str "        rad-rid: " rid)))]
+             (when (seq ud)
+               (str "      userdata:\n" (str/join "\n" ud) "\n")))))))
 
 (defn render []
   (let [workspace-projects (->> (:manifest.kotoba-workspace/components kotoba-workspace)
