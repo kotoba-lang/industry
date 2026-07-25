@@ -17,6 +17,42 @@ merge conflicts in this superproject and its `orgs/` child repos.
 - Keep failed `stash pop` entries. Git keeps the stash on failed pop; inspect it before applying manually.
 - **GitHub push alone is not registration.** Repos under `orgs/` that consumers resolve via `:local/root` (or that are intentional fleet members) must also appear in west (`repos.edn` `:extra-projects` + `gen-west-manifest.cljs --entry`). See skill `new-project-scaffold`.
 
+## UNLANDED inventory — which child repos still hold work that hasn't landed
+
+```bash
+nbb scripts/cleanup.cljs --unlanded   # only repos with un-landed work
+nbb scripts/cleanup.cljs              # full survey (also lists quiet repos)
+nbb scripts/cleanup.cljs --subrepos   # superproject only (fast)
+```
+
+Per child repo, a **landing ladder** — left is more dangerous because git protects it less:
+
+| Marker | Meaning | Hazard |
+|---|---|---|
+| `untracked=N` | not committed at all | On no branch, on no remote. One `git checkout` in the shared west checkout destroys it. |
+| `dirty=N` | tracked, uncommitted | Survives branch switches only by accident. |
+| `unpushed=B:N` | branch `B` is N ahead of `origin/B` (or `no-remote`) | Exists only on this machine. |
+| `nopr=B` | pushed, unreachable from default branch, no open PR | Not on any review path; rots silently. |
+| `nopr=?(N branches…)` | PR lookup capped at 20 branches | Branch farms (webgpu ≈80, slides ≈90) need one API round-trip each. Reported, never silently dropped. |
+
+Incident reference (2026-07-25): `orgs/gftdcojp/cloud-itonami` held the entire Workspace
+suite (Directory/Mail/Drive/backup/domain-proof/projection-outbox, ~4,000 lines with tests
+and its own ADR) as **untracked files** in the shared west checkout, on a
+`rescue/wip-20260718` branch 1381 commits behind `origin/main` — on no branch, on no
+remote, not deployed. The pre-fix survey printed only `dirty=57`, indistinguishable from a
+one-line edit elsewhere. Landed as `gftdcojp/cloud-itonami` PR #488.
+
+Two gaps this closed:
+
+1. `git status` alone under-reports danger — split untracked from dirty and rank them.
+2. PRs must be queried **per child repo slug**. The old script ran `gh pr list` only
+   against `com-junkawasaki/root`, so a child repo with pushed-but-un-PR'd branches
+   looked clean.
+
+**Landed ≠ deployed.** cloud-itonami's live Pages Function was serving a build that
+predated the merged source; `git log` cannot see that. Probe the live surface after
+landing.
+
 ## West orphan inventory
 
 `orgs/<org>/<repo>` can exist locally without being in west, or exist on GitHub without local/west. Mixing path-override leftovers with true orphans causes false registrations.

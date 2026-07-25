@@ -13,10 +13,30 @@
 ;;   nbb scripts/cleanup.cljs --apply    ; 孤児 PR を close する安全処置のみ実行
 ;;   nbb scripts/cleanup.cljs --merge    ; MERGEABLE な PR を gh pr merge --merge（main 同期を先に）
 ;;   nbb scripts/cleanup.cljs --subrepos ; 子リポ survey を省略（superproject のみ）
+;;   nbb scripts/cleanup.cljs --unlanded ; 子リポ survey を UNLANDED（要着地）だけに絞る
 ;;
 ;; full history が既定（2026-07-21、ADR-2607211600 で shallow 既定は撤回済み）だが、
 ;; PR の ahead/behind・mergeable は引き続き GitHub API（server-side full history）で
 ;; 確定すること（ローカル判定だけに頼らない）。
+;;
+;; 2026-07-25 追加 — UNLANDED 判定（cloud-itonami Workspace 事故の再発防止）:
+;;
+;;   実測事故: orgs/gftdcojp/cloud-itonami に Directory/Mail/Drive/backup 一式
+;;   ~4,000 行が **untracked のまま**（どのブランチにも無い・GitHub にも無い・
+;;   デプロイもされていない）で共有 west checkout に置かれていた。当時のこの
+;;   script はそれを `dirty=57` と出すだけで、内訳が「commit すらされていない
+;;   feature 一式」だとは分からなかった。共有 checkout で誰かが `git checkout`
+;;   した瞬間に消える状態だったのに、survey 上は他の repo の `dirty=1` と
+;;   見分けがつかない。
+;;
+;;   そこで子リポごとに次の 4 段の着地状況（landing status）を出す:
+;;     untracked=N   commit されていないファイル数（★最も危険。git が守らない）
+;;     dirty=N       tracked だが未 commit の変更数
+;;     unpushed=B:N  ローカル branch B が origin/B より N commit 先行（push 未了）
+;;     nopr=B        push 済みだが open PR も default branch への merge も無い
+;;   これらのいずれかがあれば UNLANDED としてマークする。
+;;   PR の有無は各子リポの slug に対して `gh pr list --head <branch>` で引く
+;;   （従来は superproject の PR しか見ていなかった＝子リポの未 PR は素通り）。
 (require '[scripts.nbb-compat :refer [slurp spit file-seq format]]
          '[clojure.string :as str]
          '[clojure.java.shell :refer [sh]]
@@ -28,6 +48,7 @@
 (def apply? (args "--apply"))
 (def merge? (args "--merge"))
 (def skip-sub? (args "--subrepos"))
+(def unlanded-only? (args "--unlanded"))
 
 (defn git [& xs] (let [{:keys [out exit]} (apply sh "git" xs)] (when (zero? exit) out)))
 (defn gitc [dir & xs] (let [{:keys [out exit]} (apply sh "git" "-C" dir xs)] (when (zero? exit) out)))
@@ -89,29 +110,136 @@
                  (count orphan-prs) (count merge-prs) (count conflict-prs)))
 
 ;; ---------- 3. 子リポ survey（読取専用） ----------
+;;
+;; 「UNLANDED」= その子リポの成果が default branch に到達していない状態。
+;; untracked > unpushed > nopr > dirty の順に危険（左ほど git が守ってくれない）。
+(defn- repo-slug
+  "子リポの GitHub slug。remote URL から採る（gh repo view はネットワーク往復が
+  重いので使わない）。取れなければ nil。"
+  [dir]
+  (some-> (gitc dir "remote" "get-url" "origin")
+          str/trim
+          (as-> u (or (second (re-find #"github\.com[:/](.+?)(?:\.git)?$" u)) nil))))
+
+(defn- default-branch
+  "origin/HEAD が指す既定ブランチ。未設定なら main を仮定する。"
+  [dir]
+  (or (some-> (gitc dir "symbolic-ref" "--quiet" "refs/remotes/origin/HEAD")
+              str/trim (str/replace #"^refs/remotes/origin/" "") not-empty)
+      "main"))
+
+(defn- ahead-of-remote
+  "ローカル branch が origin/<branch> より何 commit 先行しているか。
+  upstream が無ければ :no-remote。"
+  [dir branch]
+  (if-not (gitc dir "rev-parse" "--verify" "--quiet" (str "refs/remotes/origin/" branch))
+    :no-remote
+    (some-> (gitc dir "rev-list" "--count" (str "origin/" branch ".." branch))
+            str/trim parse-long)))
+
+(defn- open-pr-for
+  "その branch を head に持つ open PR の番号。無ければ nil。
+  slug が取れない/gh が失敗した場合も nil（fail-open — survey を落とさない）。"
+  [slug branch]
+  (when slug
+    (let [{:keys [out exit]} (sh "gh" "pr" "list" "--repo" slug "--state" "open"
+                                 "--head" branch "--json" "number" "--limit" "1")]
+      (when (zero? exit)
+        (some-> (json/parse-string out true) first :number)))))
+
+(defn- merged-into-default?
+  "branch の tip が既に default branch から到達可能か（= 着地済み）。"
+  [dir branch default]
+  (boolean (gitc dir "merge-base" "--is-ancestor" branch (str "origin/" default))))
+
+(defn- annex?
+  "git-annex / DataLad dataset か。実測: orgs/gftdcojp/m365-archive は untracked=15945
+  / dirty=122792 を常時抱えており（annex はコンテンツを working tree に materialize
+  するので当然）、これを UNLANDED として最上位に並べると本物の未着地 WIP が
+  埋もれる。annex は別扱いにして UNLANDED から外す（branch/stash は従来どおり報告）。"
+  [dir]
+  (or (.exists (io/file dir ".git" "annex"))
+      (.exists (io/file dir ".datalad"))))
+
+(defn- survey-repo [dir]
+  (let [br      (str/trim (or (gitc dir "rev-parse" "--abbrev-ref" "HEAD") ""))
+        stash   (count (remove str/blank? (str/split-lines (or (gitc dir "stash" "list") ""))))
+        status  (remove str/blank? (str/split-lines (or (gitc dir "status" "--porcelain") "")))
+        untracked (count (filter #(str/starts-with? % "??") status))
+        dirty     (- (count status) untracked)
+        locals  (remove #{"" "main" "master" "synced/main" "git-annex" "manifest-rev"}
+                        (str/split-lines (or (gitc dir "for-each-ref"
+                                                   "--format=%(refname:short)" "refs/heads/") "")))
+        default (default-branch dir)
+        slug    (repo-slug dir)
+        ;; 実際に「まだ着地していない」ローカル branch だけを見る。既に default
+        ;; から到達可能な branch は着地済みなので PR の有無を問わない。
+        live    (remove #(merged-into-default? dir % default) locals)
+        unpushed (for [b live
+                       :let [n (ahead-of-remote dir b)]
+                       :when (or (= n :no-remote) (and (number? n) (pos? n)))]
+                   (str b ":" (if (= n :no-remote) "no-remote" n)))
+        ;; push 済みで未着地の branch。PR 照会は 1 branch = 1 API 往復なので、
+        ;; 長期 branch farm（実測: kotoba-lang/webgpu は 80 本超、slides は 90 本超）
+        ;; では survey が実質終わらない。上限を超えたら PR 照会を諦めるが、
+        ;; 黙って切り捨てず :nopr-skipped として必ず報告する。
+        pushed-live (for [b live :let [n (ahead-of-remote dir b)]
+                          :when (and (number? n) (zero? n))] b)
+        pr-cap  20
+        skip-pr? (> (count pushed-live) pr-cap)
+        nopr    (if skip-pr? [] (vec (remove #(open-pr-for slug %) pushed-live)))]
+    {:dir dir :branch br :stash stash :dirty dirty :untracked untracked
+     :locals locals :unpushed (vec unpushed) :nopr nopr :annex? (annex? dir)
+     :nopr-skipped (when skip-pr? (count pushed-live))
+     ;; annex/DataLad の untracked/dirty は正常状態なので UNLANDED に数えない。
+     ;; branch 側の未着地（unpushed / nopr）は annex でも本物なので残す。
+     :unlanded? (boolean (if (annex? dir)
+                           (or (seq unpushed) (seq nopr) skip-pr?)
+                           (or (pos? untracked) (pos? dirty)
+                               (seq unpushed) (seq nopr) skip-pr?)))}))
+
 (when-not skip-sub?
-  (hr "子リポ survey: 要オーナー確認（detached-HEAD+manifest-rev のみは通常状態）")
+  (hr "子リポ survey: UNLANDED 判定（detached-HEAD + manifest-rev のみは通常状態）")
+  (println "凡例: untracked=commit すらされていない / unpushed=push 未了 / nopr=push 済みだが PR 無し")
+  (println)
   (let [repos (->> (sh "find" "orgs" "-maxdepth" "3" "-name" ".git" "-type" "d")
-                   :out str/trim str/split-lines sort)]
-    (doseq [r repos]
-      (let [dir (.substring r 0 (- (count r) 5))
-            br (str/trim (or (gitc dir "rev-parse" "--abbrev-ref" "HEAD") ""))
-            stash (count (str/split-lines (or (gitc dir "stash" "list") "")))
-            dirty (count (remove str/blank?
-                                 (str/split-lines (or (gitc dir "status" "--porcelain") ""))))
-            locals (remove #{"" "main" "master" "synced/main" "git-annex"}
-                           (str/split-lines (or (gitc dir "for-each-ref"
-                                                      "--format=%(refname:short)" "refs/heads/") "")))
-            interesting? (or (and (not= br "HEAD") (not= br "") (seq locals))
-                             (and (seq locals) (not= (set locals) #{"manifest-rev"}))
-                             (pos? stash) (pos? dirty))]
-        (when interesting?
-          (let [parts (cond-> []
-                        (and (not= br "HEAD") (not= br "")) (conj (str "branch=" br))
-                        (pos? stash) (conj (str "stash=" stash))
-                        (pos? dirty) (conj (str "dirty=" dirty))
-                        (seq locals) (conj (str "locals=" (str/join "," locals))))]
-            (println (format "%-58s %s" dir (str/join "; " parts)))))))))
+                   :out str/trim str/split-lines sort)
+        rows  (->> repos
+                   (map #(survey-repo (.substring % 0 (- (count %) 5))))
+                   (filter (fn [{:keys [unlanded? branch stash locals]}]
+                             (if unlanded-only?
+                               unlanded?
+                               (or unlanded? (pos? stash) (seq locals)
+                                   (and (not= branch "HEAD") (not= branch ""))))))
+                   ;; 危険な順（untracked が最優先）。annex は untracked を 0 扱いに
+                   ;; して並べる（m365-archive の 15945 件が先頭を占拠しないように）。
+                   (sort-by (juxt #(if (:annex? %) 0 (- (:untracked %)))
+                                  #(if (:annex? %) 0 (- (:dirty %)))
+                                  :dir)))]
+    (doseq [{:keys [dir branch stash dirty untracked locals unpushed nopr
+                    nopr-skipped annex? unlanded?]} rows]
+      (let [parts (cond-> []
+                    unlanded?                           (conj "UNLANDED")
+                    annex?                              (conj "annex(untracked/dirty は既定状態)")
+                    (and (pos? untracked) (not annex?)) (conj (str "untracked=" untracked))
+                    (and (pos? dirty) (not annex?))     (conj (str "dirty=" dirty))
+                    (seq unpushed)                      (conj (str "unpushed=" (str/join "," unpushed)))
+                    (seq nopr)                          (conj (str "nopr=" (str/join "," nopr)))
+                    nopr-skipped                        (conj (str "nopr=?(" nopr-skipped " branches, PR照会を打切り)"))
+                    (pos? stash)                        (conj (str "stash=" stash))
+                    (and (not= branch "HEAD") (not= branch "")) (conj (str "branch=" branch))
+                    (seq locals)                        (conj (str "locals=" (count locals))))]
+        (println (format "%-58s %s" dir (str/join "; " parts)))))
+    (println)
+    (println (format "UNLANDED な子リポ=%d / 掲載=%d（untracked を持つ repo=%d、annex 除外=%d）"
+                     (count (filter :unlanded? rows)) (count rows)
+                     (count (filter #(and (pos? (:untracked %)) (not (:annex? %))) rows))
+                     (count (filter :annex? rows))))
+    (when (some #(and (pos? (:untracked %)) (not (:annex? %))) rows)
+      (println)
+      (println "⚠ untracked を持つ repo は最優先で着地させること — どのブランチにも")
+      (println "  存在しないので、共有 checkout で `git checkout` が走った瞬間に消える。")
+      (println "  手順は skill git-cleanup-conflict / manifest/cleanup-workflow.edn :retirement。"))))
 
 ;; ---------- 4. 処置 ----------
 (hr "処置")
