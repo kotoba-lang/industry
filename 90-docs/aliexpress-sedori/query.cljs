@@ -102,11 +102,30 @@
    価格は複数出品者を集約した面の最安バリアントや期間限定promoを表示していることが
    あり、実際にその出品者から買える金額とは限らない(実測 2026-07-25: 11商品中6件で
    一覧価格 < 詳細価格、最大2.5倍差)。安い方を採ると利ざやを過大評価するので、
-   保守的に詳細ページ価格を使う。"
+   保守的に詳細ページ価格を使う。
+
+   **すべての商品単位コマンド(candidates/margin)はこの1つの規則だけを使う。**
+   かつて cmd-candidates が latest-by-product(seq最新)を使い cmd-margin が
+   こちらを使っていたため、同じ ledger から両者の対象集合が食い違っていた
+   (実測: 魚の鱗取り 1005007038640140 が margin に出て candidates に出ない)。"
   [evs pid]
   (let [obs (filter #(and (= :product-observed (:event/type %)) (= pid (:product/id %))) evs)]
     (or (->> obs (filter #(= :detail-browse (:event/source %))) (sort-by :event/seq) last)
         (->> obs (sort-by :event/seq) last))))
+
+(defn- discount-pct-of
+  "割引率。AliExpress が `-83%` と % 表示している時はその観測値を使い、
+   `374円 お得` のように**円引き**で出している時は % 属性ごと欠落するので
+   原価と現価から導出する(切り捨て — AliExpress 自身の丸めに合わせた。
+   実測: 165/985 = 83.25% を AliExpress は -83% と表示)。
+
+   導出しないと「% が無い」というだけで候補から静かに落ちる: ピーラー
+   1005005643444241 は 970円→150円(実質84%off)・5万点販売・評価4.4 なのに
+   両観測とも % 属性を持たず、修正前は candidates に一度も現れなかった。"
+  [{:keys [price/discount-pct price/amount price/orig-amount]}]
+  (or discount-pct
+      (when (and amount orig-amount (pos? orig-amount) (< amount orig-amount))
+        (Math/floor (* 100 (- 1 (/ amount orig-amount)))))))
 
 (defn cmd-latest []
   (let [evs (events)
@@ -129,22 +148,27 @@
    'uncomputable-until-measured' 方針 — 出典の無い数値を作らない)。"
   []
   (let [evs (events)
-        latest (latest-by-product evs)
-        worthy (->> latest
-                    (filter (fn [{:keys [sold/count-min rating/value price/discount-pct]}]
-                              (and count-min (>= count-min 1000)
-                                   value (>= value 4.5)
-                                   discount-pct (>= discount-pct 50))))
+        pids (distinct (map :product/id (filter #(= :product-observed (:event/type %)) evs)))
+        ;; margin と同じ purchasable 規則。ここだけ latest-by-product を使うと
+        ;; 同じ ledger なのに2コマンドの対象集合がズレる(修正前の実バグ)。
+        current (map #(purchasable evs %) pids)
+        worthy (->> current
+                    (filter (fn [{:keys [sold/count-min rating/value] :as p}]
+                              (let [d (discount-pct-of p)]
+                                (and count-min (>= count-min 1000)
+                                     value (>= value 4.5)
+                                     d (>= d 50)))))
                     (sort-by :sold/count-min >))]
     (doseq [{:keys [product/id product/title price/amount price/currency
-                     sold/count-min rating/value price/discount-pct event/category]} worthy]
+                     sold/count-min rating/value event/category] :as p} worthy]
       (println (str "[" id "] " title
-                     " | " amount currency " (-" discount-pct "%)"
+                     " | " amount currency " (-" (discount-pct-of p) "%)"
+                     (when-not (:price/discount-pct p) "[導出]")
                      " | rating=" value
                      " | sold>=" count-min
                      " | cat=" category
                      " | seller=" (or (seller-for evs id) "unknown (not yet detail-enriched)"))))
-    (println (str "-- " (count worthy) " candidate(s) of " (count latest) " known product(s)"))))
+    (println (str "-- " (count worthy) " candidate(s) of " (count current) " known product(s)"))))
 
 (defn cmd-margin
   "仕入れ値(AliExpress 詳細ページ価格 + 送料)と、国内相場の中央値を並べる。
