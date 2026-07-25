@@ -1,0 +1,132 @@
+[{:db/id -1
+  :adr/id "2607252600"
+  :adr/title "Sandboxed agent loop on murakumo fleet nodes — PoC closing ADR-2606302000's F3/F4 seam"
+  :adr/status "accepted"
+  :adr/date "2026-07-25"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/type "decision-record"
+  :adr/topic "kotoba-fleet-coordination"
+  :adr/related ["2606302000" "2606280001" "2607010900" "2607178000" "2607173100"
+                "2606290740" "2607071400" "2607011345"]
+  :adr/authoritative_for
+  ["how a coding-agent session is executed on murakumo compute instead of an operator terminal"
+   "what the fleet sandbox actually isolates today (and what it does not)"
+   "why the governor re-verifies the agent's report rather than trusting it"]
+  :adr/body "
+# ADR-2607252600: サンドボックス化した agent loop を murakumo fleet ノードで回す（PoC）
+
+**Status**: accepted (proof-of-concept; 実測付き)
+**Date**: 2026-07-25
+**Deciders**: Jun Kawasaki（「今の repo 開発は terminal で agent 並列。これを
+sandbox / agent loop として murakumo.cloud fleet でやる設計はあるか」→「poc」）
+
+## Context
+
+問いは「terminal で並列に走らせている coding agent を、Codex Cloud / Claude Code の
+ような sandbox 化された agent loop として murakumo fleet 上で回す設計はあるか」。
+調査の結果、**部品と設計の骨格は3層とも既にあり、欠けていたのは接着だけ**だった:
+
+- **ADR-2606280001**（accepted）: kotoba-code = durable outer loop（lease /
+  checkpoint / budget / governor tick）を持つ terminal coding agent。実装あり。
+- **ADR-2606302000**（proposed）: kotoba-fleet = 20-agent 並列を git conflict なしで
+  回す調整基板。`lease` / `agent` / `governor`（single-writer drain）/ `view` を
+  append-only datom 上に実装済み、contract test 付き。maturity ladder の
+  **F3「worktree / WASM pod isolation を kotoba-code runtime に統合」と
+  F4「murakumo fleet-view 拡張 + 2 PC × ~20 agent rollout」だけが `:future`** のまま。
+- **ADR-2607071400**（accepted）: murakumo ファミリー = 分散 hosting / control plane
+  （wash + wadm 相当、leaderless lattice）。`fleet.edn` に Tailscale 12 node。
+- **ADR-2607178000**（accepted）: fleet-native CI standing runner。pinned commit の
+  tarball を GitHub API から取得 → tailnet ssh で node の ephemeral `/tmp` に展開 →
+  実テスト実行 → 署名付き receipt。**fleet 上でコードを実行している唯一の常設経路**
+  だが gate 実行専用で LLM を呼ばない。
+
+`kotoba-fleet` の `agent.cljc` は `run` を注入 seam として明示していた（docstring:
+「a kotoba-code session in prod」）が、その `run` を **fleet ノード上の隔離実行**に
+繋ぐホストが存在しなかった。本 ADR はその 1 本を PoC として埋める。
+
+## Decision
+
+`kotoba-lang/kotoba-fleet` に **`hosts/nbb` ホスト層**を追加する（ライブラリの
+portable `.cljc` は不変。ADR-2607173000 の nbb-only script host 規則に従い `.sh` /
+`.mjs` を新規に書かない）。
+
+```
+lease (kotoba.fleet.lease)
+  └─ run = pinned tarball（GitHub API）→ scp → ssh node
+           → hosts/nbb/fleet/sandbox_agent.cljs（ReAct loop vs murakumo-main）
+       └─ proposal (kotoba.fleet.governor/submit-proposal!)
+            └─ gate → materialize（single writer）→ receipt
+```
+
+| 部品 | 役割 |
+|---|---|
+| `hosts/nbb/fleet/filestore.cljs` | MemStore と同じ `:db-api` を **ファイル**で実装。ordinal を排他ロック下で採番し、`swap!` が MemStore に与えていた原子性を再現する（これが無いと2プロセスが同じ t を計算し、`lease/holder` が同一の排他 lease を両者に渡す） |
+| `hosts/nbb/fleet/sandbox_agent.cljs` | **ノード上**で動く: pinned commit の tarball から ephemeral workdir、path 拘束ツール、anchored `edit_file`、allowlist された test コマンド1本、turn/tool/token/wall-clock budget。出力は **patch のみ** |
+| `bin/fleet-sandbox-dispatch.cljs` | lease → remote run → proposal → gate → materialize → receipt |
+| `hosts/nbb/selftest.cljs` | 実プロセス8並列の lease 競合、governor 不変条件、path confinement matrix |
+
+### 形から出る性質（モデルの行儀に依存しない）
+
+1. ノードが見るのは **GitHub API から都度取得した pinned commit の tarball** だけ。
+   operator の checkout（drift する。ADR-2607170500 の前例）には触れない。
+2. agent が返すのは **patch**。remote も credential も持たないので commit / push /
+   pin 前進の経路が構造的に存在しない。
+3. **governor が唯一の writer**。gate は lease 保持者か・protected path に触れて
+   いないか・patch が pinned tree に当たるか・**テストが本当に green か**を自分で
+   検証し、agent の自己申告を信用しない。
+4. lease 競合に負けたら backoff。ロックサーバ無しで複数 dispatcher が同一 log を
+   共有できる。
+5. モデル id をハードコードせず `murakumo-main` alias を解決する（ADR-2607173100）。
+   解決失敗時は **endpoint のみ** fallback（モデル切替に追従する）。
+
+## 実測（2026-07-25）
+
+- **selftest**: 15 checks 全通過。実 OS プロセス8並列が同一 unit を claim →
+  **winner はちょうど1つ、ordinal は 8/8 distinct**（file store でも TOCTOU が
+  起きない）。path confinement は `../`・絶対パス・symlink 脱出を 6/6 拒否。
+- **実 dispatch**: 対象 `kotoba-lang/kotoba-delta @ c8c405ab`、ノード `naphtali`、
+  モデル `murakumo-main` → `qwen3.6-35b-a3b`。7 turns / 7 tool calls / 37s で
+  1494B の patch。gate accept（狙い通り 2 ファイルのみ）。materialize 後の tree を
+  **こちらで独立に実行して 6 tests / 36 assertions green**（元は 5 / 34）。
+- **走らせて初めて分かった失敗が2つ**（設計レビューでは出なかった）:
+  1. whole-file `write_file` の引数（4KB 超）が **llama.cpp 側の tool-call
+     引数パーサを 500 で壊し**、セッションごと落ちた。
+  2. 同じ whole-file 書き戻しが、無関係な再インデント 4 hunk を patch に混入させた。
+  → **anchored `edit_file`**（not-found / ambiguous を明示エラーにする＝
+  kotoba-delta 自身の Edit 意味論と同型）+ 引数 4000B 上限 + サーバエラーを
+  guidance として戻す bounded recovery で両方解消。**この最初の失敗回でも gate は
+  正しく reject しており**（`:stop :error`）、壊れた patch は materialize されなかった。
+- 副次的に判明: fleet node の可用性は不安定（`asher` は途中で ssh 到達不能に
+  なった）。dispatcher 側は run の例外で **lease を release** して no-op 扱いにする
+  （ssh timeout は「実作業を抱えて落ちた agent」ではないので TTL まで unit を
+  抑えない）。
+
+## Consequences
+
+- ADR-2606302000 の **F3 / F4 に実測の底が付いた**: 「fleet ノード上で隔離実行し、
+  lease → proposal → gate → receipt が閉じる」ことが 1 本通しで確認できた。
+  ladder 自体の status は据え置き（PoC であって rollout ではない）。
+- 現状の隔離は **fleet ノード + ephemeral dir + path 拘束**であって、コンテナでも
+  microVM でもない。強い隔離が要るなら既存資産（ADR-2606290740 の aiueos
+  `computer-virtual` 隔離 Linux コンテナ backing、kototama tender の WASM pod）に
+  寄せるのが次段で、新規に隔離ランタイムを書き起こさない。
+- `--materialize dry-run` は patch をローカル scratch repo に 2 commit として
+  落とすだけで **push しない**。実 push / PR / pin 前進を governor に持たせるかは
+  別判断（west single-entry commit と pin 検証の経路に載せる必要がある）。
+- 常設化（LaunchAgent / Cron Trigger / claude.ai routine）はまだ無い。今は手動
+  dispatch。ADR-2607231855 のとおり cloud-murakumo 側の Cron Trigger は feature
+  branch 止まりで、RemoteTrigger は org によっては 403。
+- fleet node の toolchain は依然として偏っている（ADR-2607178000 の実測どおり
+  JVM+clojure は zebulun のみ）。今回の sandbox は nbb だけで完結する対象を選んだ。
+  JVM 系 repo を回すなら provisioning が先。
+
+## Follow-ups（順序付き）
+
+1. 対象 repo と node をリストで受け、複数 unit を並列 dispatch する driver
+   （fleet-view で進捗を1画面に集約する = F4 の残り）。
+2. コンテナ / WASM pod backing への隔離昇格（既存 aiueos / kototama 資産の再利用）。
+3. materialize を push まで通す場合の設計: protected path・west single-entry
+   commit・pin 検証（ADR-2607022900）を governor 側の不変条件として実装する。
+4. 常設 tick 化（murakumo 上 or LaunchAgent）と、receipt の署名（fleet-ci と同じ
+   narrow-scope key 方式）。
+"}]
