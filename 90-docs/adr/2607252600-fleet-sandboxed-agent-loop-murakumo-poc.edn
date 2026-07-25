@@ -279,4 +279,40 @@ helper とテストの追加は確実にこなし、新 ns の配線は時々成
 
 **この時点で残る gap**: fleet 側 scheduler（tick の起動は Mac 依存のまま）、nbb agent の
 session checkpoint（死んだ sandbox は再開でなくやり直し）、そして今回の測定が示した
-**モデル能力そのもの**（L3 以上を任せるなら別モデルか、タスク分割の設計が要る）。"}]
+**モデル能力そのもの**（L3 以上を任せるなら別モデルか、タスク分割の設計が要る）。
+
+### 2026-07-25 — amend (context を上げた: 前の結論の訂正)
+
+**直前の amend の結論「天井は window ではなくモデル側」は誤りだった。訂正する。**
+あの再測定は client 側で履歴を elide して session を延命しただけで、**serving の window は
+8192 のままだった** — つまり「window が原因ではない」ことを示す実験になっていなかった。
+
+**実際の状態**: 推論ヘッド（`root@100.82.98.110`、systemd `llama-server.service`）は
+`--ctx-size 8192` で動いていた。一方 murakumo の `infer.edn` は `:infer/ctx 262144` と
+**数週間ドキュメントしていた**。設定がマシン上にしか存在せず、どちらのリポジトリからも
+この乖離が見えなかった。
+
+**変更**: ヘッドのユニットを `--ctx-size 262144 --parallel 4` に変更（= **per-slot
+65536 tokens**。request が実際に測られるのはこの per-slot 値）。KV は hybrid
+Gated-DeltaNet/SSM 構成（40層中10層のみ full-attention）で full context でも ~5GB f16、
+再起動後の実測で 46GB 中 42GB 空き。**以前 400 で拒否された 33k tokens の prompt が通る**。
+ユニットは machine 上にしか無かったので murakumo `deploy/llama-server.service` として
+リポジトリに取り込んだ（cb62518）。
+
+**同一課題での再測定（3回ずつ）**:
+
+| level | 8k window | 64k window |
+|---|---|---|
+| L3 既存関数の拡張（既存5テストを緑に保つ） | **0/3** | **2/3**（成功時 6 turn） |
+| L4 多理由ロジックへの新ルール追加 | 0/3 | 0/3 |
+
+**L3 は能力の限界ではなかった** — window に阻まれて着手すらできていなかった。L4 は依然
+0/3 だが、失敗は window ではなく**作業そのもの**（赤テスト、テストファイルを書き忘れる）に
+移ったので、こちらは本物のモデル能力の限界。
+
+**agent は window を仮定しなくなった**: 起動時に endpoint に問い合わせ（`--ctx-probe`）、
+サーバが報告する値に対して trim する。ハードコードした 8192 は今回の引き上げをそのまま
+生き延びており、まさに「余裕があるのに履歴を捨て続ける client」になっていた
+（kotoba-fleet c41ad45）。
+
+結果は `examples/eval/results/2026-07-25-ctx-65536.edn`。"}]
