@@ -75,6 +75,14 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     （s3.kotobase.net の AWS SigV4 write 認可、ADR-2607176000）: Worker secret
     投入済み。operator copy は同 Keychain service `cf:kotobase-protocols-worker`
     の account `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`（2026-07-17 生成）。
+  - **net-babiniku 外部配信の operator gate**（ADR-2607253000）: Pages secret
+    `LIVESTREAM_OPERATOR_SECRET`（project `net-babiniku`）の operator copy は
+    macOS Keychain `service=net-babiniku:livestream-operator-secret` /
+    `account=junkawasaki`（2026-07-25 生成）。同 project の
+    `LIVESTREAM_WHIP_URL` は `http://127.0.0.1:8889/babiniku/whip` で**秘密ではない**
+    （loopback）。**配信先の YouTube/Twitch stream key はここにもどこにも無い** —
+    operator のマシンの `~/.babiniku/mediamtx-bridge.yml`（0600、`npm run
+    bridge:config` が生成）だけに存在し、Worker にもブラウザにも repo にも入らない。
 - **kagi（`kotoba-lang/kagi`）**: net-kotobase / kotoba-lang 系の新規プロジェクト
   向け secrets は、1Password ではなく **こちらを正**にしていく方針（自己主権
   vault、ADR-2606272330）。**実在する vault の実体は
