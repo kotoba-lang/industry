@@ -74,7 +74,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 ## 現在の状態（2026-07-26）
 
 - **232 organization / 15 カテゴリ / 21 データファイル**
-- 検証: source-pinned **35**、未 pin 197（85%）
+- 検証: source-pinned **41**（primary 30 / secondary 11）、未 pin 191（82%）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
   **statutory-no-personality 8** → **企業・LEI レジストリから不可視が約 41%**
 - entity kind: org-form **197（87%）** / named-org 29（13%）
@@ -164,7 +164,13 @@ nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
 出典に当てた結果、想起値の誤りが体系的に出た: WOCCU の組合数は 22% 過大（82k→67,137）、
 Rotary のクラブ数は 26% 過大（46k→36,498）、DAO の holder は 1.5 倍過大（1,000万→650万）、
 WOSM 65M は WAGGGS との合算、AA の 18万グループは NA/Al-Anon 混入、町内会の「30M 世帯」と
-gram sabha の「8億人」は出典なしの人口取り違え。**いずれも pin する前は自然に見えた。**
+gram sabha の「8億人」は出典なしの人口取り違え、SEWA は逆に 3 分の 1 過小（250万→378万）。
+**いずれも pin する前は自然に見えた。**
+
+同時に、**発行元自身が複数の数字を出している**ケースも見つかった: SEWA（378万 / 321.6万）、
+AFL-CIO（加盟 61 / 65、かつ会員数に退職者を含む）、老人クラブ（438万 / 587.9万）。
+corpus はこれらを**照合せず両方記録**する — 勝手に一方へ丸めるのは、出典を持たない数字を
+作るのと同じことである。
 
 ### 6. 陳腐化と自己申告の可視化
 
