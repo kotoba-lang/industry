@@ -20,3 +20,8 @@ analysis/**          annex.largefiles=anything
 # litigation/ holds case work product (答弁書 drafts, evidence figures, strategy).
 # Always annex+encrypt; never plaintext to GitHub. Overrides **/*.md=nothing.
 litigation/**        annex.largefiles=anything
+
+# contracts/ holds executed and pending agreements (counterparty names, addresses,
+# dates of birth, bank/fee terms, signatures). Always annex+encrypt, even .md/.txt.
+# Overrides **/*.md=nothing.
+contracts/**         annex.largefiles=anything
