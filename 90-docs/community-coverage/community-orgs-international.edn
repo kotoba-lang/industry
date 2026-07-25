@@ -34,13 +34,18 @@
  :org/scope :global
  :org/region-primary :region-europe
  :org/founding-date 1863
- :org/instance-count-estimate 192
- :org/member-count 16000000
- :org/member-count-basis "llm-recall-unverified: ~192 national societies and ~16M volunteers commonly cited by IFRC."
+ :org/instance-count-estimate 191
+ :org/member-count 18000000
+ :org/member-count-basis "source-pinned: 191 National Red Cross and Red Crescent Societies and more than 18 million volunteers, reaching 160 million people a year through services, development programmes and disaster response (IFRC). Per-society detail is published in the Federation-wide Databank and Reporting System (FDRS)."
  :org/legal-registration :registered
  :org/governance-model :hierarchical
  :org/mission-statement "Auxiliary-to-the-state humanitarian network whose local branches are volunteer communities with statutory recognition."
- :org/data-provenance "llm-recall-unverified"
+ :org/source-name "IFRC, About the IFRC / About National Societies"
+ :org/source-url "https://www.ifrc.org/who-we-are/about-ifrc"
+ :org/source-date "2025"
+ :org/source-tier :primary
+ :org/pinned-on "2026-07-25"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-global-anonymous-fellowships
@@ -51,15 +56,21 @@
  :org/scope :global
  :org/region-primary :region-north-america
  :org/founding-date 1935
- :org/instance-count-estimate 180000
- :org/member-count 3000000
- :org/member-count-basis "llm-recall-unverified: AA commonly cites ~2M members in ~120k groups; NA and other fellowships add roughly a million more. Counts are self-reported by groups that keep no membership rolls."
+ :org/instance-count-estimate 120455
+ :org/member-count 1900000
+ :org/member-count-basis "source-pinned (AA only): 120,455 groups worldwide at end-2023 with an assessed membership near 1.6-2.0M across roughly 180 countries (A.A. World Services, 'Estimated Worldwide A.A. Individual and Group Membership'). AA itself labels these ESTIMATES, not counts: the totals come from periodic surveys of general service offices, and not every group reports in a given year. NA, Al-Anon and OA are NOT included — iteration 1's 180k groups / 3M members conflated the whole fellowship family."
  :org/legal-registration :unregistered
+ :org/source-name "Alcoholics Anonymous World Services, Estimated Worldwide A.A. Individual and Group Membership"
+ :org/source-url "https://www.aa.org/estimated-worldwide-aa-individual-and-group-membership"
+ :org/source-date "2023-12-31"
+ :org/source-tier :primary
+ :org/source-caveat "The publisher's own methodology note is the important part: an organization with no membership rolls by doctrine can only ever publish an estimate."
+ :org/pinned-on "2026-07-25"
  :org/registration-note "Deliberately unincorporated at group level ('ought never be organized', Tradition 9); only service offices register."
  :org/governance-model :consensus
  :org/mission-statement "Peer recovery fellowships governed by Twelve Traditions — self-supporting, non-professional, anonymous, with inverted-pyramid service structure."
  :org/coverage-note "The strongest single example of a large, globally distributed community that is unregistered BY DOCTRINE rather than by neglect."
- :org/data-provenance "llm-recall-unverified"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-global-toastmasters

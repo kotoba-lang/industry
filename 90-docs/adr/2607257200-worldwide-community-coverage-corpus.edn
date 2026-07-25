@@ -244,5 +244,51 @@ self-enumeration して統計を作る SDI は、その状況に対する共同�
 ## 4-4. iteration 4 終了時点
 
 - `community-coverage`: **142 org / 15 カテゴリ**（うち source-pinned 16 / 未 pin 126）
-- 統合クエリ面の org 総数: **210**"
+- 統合クエリ面の org 総数: **210**
+
+---
+
+# Iteration 5（2026-07-25）— 「数えない」ことを選んだ組織の pin
+
+## 5-1. 追加 pin 5 件（累計 21）
+
+| entity | pin 後 | 基準日 | tier |
+|---|---|---|---|
+| AA（無名フェローシップ） | 120,455 グループ / 推定 160〜200万人 / 約180か国 | 2023-12-31 | primary |
+| parkrun | 2,200+ イベント / 20か国 / 毎土曜 36〜39万 finisher | 2025-10 | primary |
+| IFRC 赤十字・赤新月 | 191 の national society / ボランティア 1,800万人超 / 年間1.6億人に到達 | 2025 | primary |
+| Debian Project | 「1,000人超の active developer」（定量値は非公表） | 2025 | primary（定性） |
+| Fediverse / Mastodon | 登録1,000万アカウント・Mastodon MAU 69万未満・fediverse 全体 MAU 200〜300万 | 2025-10 | secondary |
+
+## 5-2. この iteration の発見 — **数えないことが設計である組織**
+
+pin していて繰り返し当たったのは「正確な数を出せない」ではなく **「出さないことを選んでいる」**
+組織群だった:
+
+- **AA** は Tradition により名簿を持たない。公表値は general service office への periodic survey の
+  集計であり、AA 自身が estimate と明記している。iteration 1 の「18万グループ・300万人」は
+  NA/Al-Anon を混ぜていた（AA 単独は 120,455 グループ）。
+- **Debian** は単一の会員数を公表しない。境界は roll ではなく **keyring**（db.debian.org）であり、
+  「1,000人超」という定性表現が公式の言い方。
+- **Fediverse** は連合構造ゆえに単一 dashboard が存在しない。登録 1,000万に対し Mastodon の
+  MAU は 69万未満 — **登録数と実参加が 15 倍乖離する**典型例。
+- **parkrun** の「累計登録者数百万」は membership ではない。誠実な指標は毎週の finisher 数
+  （36〜39万）なので、`:org/member-count` を主張せず finisher で記述した。
+
+これは corpus 設計への含意がある: **`:org/member-count` を必須にしてはならない**。数を持たない
+ことが組織の性質である場合、空欄＋理由が最も正確な記述になる。
+
+## 5-3. 未カバーだった形態 +6
+
+モスク委員会・waqf 管理組織（イスラーム圏の既定の地域組織単位）/ 教会・寺院の女性会
+（Mothers' Union・manyano・婦人会・Women's Institute — 地球上最大級の女性組織形態でありながら
+データセットにほぼ存在しない）/ 言語復興コミュニティ（kōhanga reo・Welsh・Hawaiian・Sámi の
+language nest）/ 狩猟・釣り協会（ACCA・猟友会 — 農村部で消防団と並ぶ男性社交制度）/
+インフォーマル交通労働者組合（matatu SACCO・okada・jeepney — ケニアが SACCO 登録を強制した
+ことで「見えない形態を可視化した自然実験」になっている）/ 高齢者サロン・ゲートボール（日本）。
+
+## 5-4. iteration 5 終了時点
+
+- `community-coverage`: **148 org**（source-pinned 21 / 未 pin 127）
+- 統合クエリ面の org 総数: **216**"
   :source/file "90-docs/adr/2607257200-worldwide-community-coverage-corpus.edn"}]
