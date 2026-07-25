@@ -833,6 +833,40 @@
         (do (warn-skipped! "fleet-ci.edn" ["(shape not a map)"]) []))
       [])))
 
+;; ---------- cross-actor CTI graph（category M。yabai/tadori の DNS/IP/CTI） ----------
+;; yabai (com-etzhayyim-yabai) は passive-DNS / TLS-CT / IOC / IP-hosting-history の
+;; リスク評価グラフ、tadori (com-etzhayyim-tadori) は case-anchored evidence。
+;; どちらも SecurityTrails 的な DNS/IP/CTI テレメトリを kotoba EAVT の EDN として持つ
+;; （schema: 00-contracts/schemas/passive-dns-cti-ontology.kotoba.edn / tadori kotoba/schema.edn）。
+;; :db.type/ref は datascript.js 上で解決されず文字列値として join する
+;; （:pdns/domain "domain.x" が :domain/id "domain.x" と文字列一致 — lei-tos と同型）。
+;; yabai の merged file は生成物（cf_sweep/rebuild-merged!）。query 面は point-in-time snapshot。
+;; :access/* は envelope CID のみ（PII は暗号化済み・ADR-2605181100）。tadori は現状 sample のみ。
+
+(defn yabai-passive-dns-entities [next-tempid!]
+  (let [f (io/file root "orgs" "etzhayyim" "com-etzhayyim-yabai"
+                   "data" "passive-dns.merged.kotoba.edn")]
+    (if (.exists f)
+      (let [es (or (vector-of-maps-entities f) [])]
+        (when (empty? es) (warn-skipped! "yabai passive-dns.merged.kotoba.edn" [f]))
+        (for [e es]
+          (assoc e :db/id (next-tempid!)
+                 :source/dataset "yabai-passive-dns"
+                 :source/file (str f))))
+      [])))
+
+(defn tadori-threat-intel-entities [next-tempid!]
+  (let [f (io/file root "orgs" "etzhayyim" "com-etzhayyim-tadori"
+                   "data" "persisted" "tadori-threat-intel.tx.kotoba.edn")]
+    (if (.exists f)
+      (let [es (or (add-datoms-entities f nil :tadori/entity-id) [])]
+        (when (empty? es) (warn-skipped! "tadori threat-intel.tx.kotoba.edn" [f]))
+        (for [e es]
+          (assoc e :db/id (next-tempid!)
+                 :source/dataset "tadori-threat-intel"
+                 :source/file (str f))))
+      [])))
+
 ;; ---------- schema (manifest/schema.edn -> datascript createConn schema) ----------
 
 (defn schema-path [] (io/file root "manifest" "schema.edn"))
@@ -886,13 +920,16 @@
         fleet-tx (concat (fleet-state-entities next-tempid!)
                           (fleet-db-entities next-tempid!)
                           (fleet-ci-entities next-tempid!))
+        yabai-tx (yabai-passive-dns-entities next-tempid!)
+        tadori-tx (tadori-threat-intel-entities next-tempid!)
         all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
                                                      biz-tx canvas-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
                                                      hirameki-corpus-tx jinushi-tx
                                                      proc-registry-tx merged-kotoba-tx
                                                      working-doc-tx narrative-tx
-                                                     company-tx fleet-tx)))]
+                                                     company-tx fleet-tx
+                                                     yabai-tx tadori-tx)))]
     (.transact ds conn all-tx)
     {:conn conn
      :adr-count (count adr-tx)
@@ -909,28 +946,30 @@
      :working-doc-count (count working-doc-tx)
      :narrative-count (count narrative-tx)
      :company-count (count company-tx)
-     :fleet-count (count fleet-tx)}))
+     :fleet-count (count fleet-tx)
+     :yabai-count (count yabai-tx)
+     :tadori-count (count tadori-tx)}))
 
 (defn -main [& args]
   (let [[mode query-str] args
         {:keys [conn adr-count docs-count manifest-count foreign-adr-count biz-count
                 kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                narrative-count company-count fleet-count]}
+                narrative-count company-count fleet-count yabai-count tadori-count]}
         (build-conn)
         total (+ adr-count docs-count manifest-count foreign-adr-count biz-count
                  kj-count rad-count
                  etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                 narrative-count company-count fleet-count)]
+                 narrative-count company-count fleet-count yabai-count tadori-count)]
     (case mode
       "count"
       (println (format (str "adr=%s docs=%s manifest=%s foreign-adr=%s biz=%s kj=%s rad=%s "
                              "etzhayyim-80-data=%s proc-registry=%s merged-kotoba=%s working-doc=%s "
-                             "narrative=%s company=%s fleet=%s total=%s")
+                             "narrative=%s company=%s fleet=%s yabai=%s tadori=%s total=%s")
                         adr-count docs-count manifest-count foreign-adr-count biz-count
                         kj-count rad-count
                         etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                        narrative-count company-count fleet-count total))
+                        narrative-count company-count fleet-count yabai-count tadori-count total))
 
       "q"
       (println (pr-str (js->clj (.q ds query-str (.db ds conn)))))
