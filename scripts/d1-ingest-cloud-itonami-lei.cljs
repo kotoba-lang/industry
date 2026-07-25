@@ -119,9 +119,49 @@
 
 (defn sql-num [v] (if (number? v) (str v) "NULL"))
 
+(def ^:private country-aliases
+  "Free-text jurisdiction spellings seen in the wild, mapped to ISO 3166-1
+  alpha-2. `blueprint.edn` is hand-written by whoever scaffolded the repo, so
+  the same country arrives as `US`, `US-DE`, `United States` and
+  `United States (Delaware)`. Left unnormalised, a plain
+  `GROUP BY jurisdiction` reports 53 'jurisdictions' for what is really ~27
+  countries and makes the catalog's geography look far broader than it is.
+
+  Normalised in the PROJECTION, not by rewriting 161 blueprints: git is the
+  source of truth and the raw `jurisdiction` string is kept verbatim beside
+  this, so a subdivision (US-DE vs US-TX) is still recoverable and a bad guess
+  here is fixable by re-running the ingest rather than by another mass edit."
+  {"united states" "US" "united states of america" "US" "usa" "US"
+   "france" "FR" "germany" "DE" "japan" "JP" "new zealand" "NZ"
+   "united kingdom" "GB" "great britain" "GB" "england" "GB"
+   "cayman islands" "KY" "bermuda" "BM" "singapore" "SG" "canada" "CA"
+   "australia" "AU" "switzerland" "CH" "netherlands" "NL" "italy" "IT"
+   "ireland" "IE" "hong kong" "HK" "south korea" "KR" "korea" "KR"
+   "brazil" "BR" "south africa" "ZA" "nigeria" "NG" "algeria" "DZ"
+   "ethiopia" "ET" "zambia" "ZM" "liberia" "LR" "malaysia" "MY"
+   "marshall islands" "MH" "guernsey" "GG"})
+
+(defn ->country
+  "ISO 3166-1 alpha-2 for a raw jurisdiction string, or nil if it cannot be
+  determined. Handles `XX-SUB` subdivision codes, bare alpha-2, and the
+  free-text spellings above (including a trailing parenthetical such as
+  `KY (Cayman Islands)` / `United States (Delaware)`). Returns nil rather than
+  guessing: an unknown value left blank is visibly incomplete, whereas a
+  wrong country silently corrupts every geographic rollup built on it."
+  [j]
+  (when (string? j)
+    (let [s (str/trim j)
+          bare (str/trim (str/replace s #"\(.*?\)" ""))
+          lower (str/lower-case bare)]
+      (cond
+        (re-matches #"[A-Z]{2}" bare) bare
+        (re-matches #"[A-Z]{2}-[A-Z0-9]{1,3}" bare) (subs bare 0 2)
+        (contains? country-aliases lower) (get country-aliases lower)
+        :else nil))))
+
 (defn company-upsert [bp repo at]
   (str "INSERT INTO company (lei, legal_name, jurisdiction, website, ticker, isic_rev5, "
-       "sector, reg_status, contact_email, contact_email_note, inquiry_form_url, repo, ingested_at) VALUES ("
+       "sector, reg_status, contact_email, contact_email_note, inquiry_form_url, repo, country, ingested_at) VALUES ("
        (str/join ", " [(sql-str (:company/lei bp))
                        (sql-str (:company/legal-name bp))
                        (sql-str (:company/jurisdiction bp))
@@ -134,6 +174,7 @@
                        (sql-str (:company/contact-email-note bp))
                        (sql-str (:company/inquiry-form-url bp))
                        (sql-str (str "https://github.com/cloud-itonami/" repo))
+                       (sql-str (->country (:company/jurisdiction bp)))
                        (sql-str at)])
        ") ON CONFLICT(lei) DO UPDATE SET "
        ;; Only overwrite with a non-NULL incoming value: a later scaffold that
@@ -142,7 +183,7 @@
        (str/join ", " (map #(str % " = COALESCE(excluded." % ", company." % ")")
                            ["legal_name" "jurisdiction" "website" "ticker" "isic_rev5"
                             "sector" "reg_status" "contact_email" "contact_email_note"
-                            "inquiry_form_url" "repo"]))
+                            "inquiry_form_url" "repo" "country"]))
        ", ingested_at = excluded.ingested_at;"))
 
 (defn doc-upsert [lei d at]
