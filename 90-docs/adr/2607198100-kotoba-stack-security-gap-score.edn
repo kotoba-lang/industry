@@ -120,4 +120,11 @@ claiming production-region independence.
 The current averages remain the conservative baseline because governance
 artifacts do not erase cryptographic or operational gaps. Future score changes
 must edit the register, satisfy its validator, cite new evidence and update the
-gap state in the same review."}]
+gap state in the same review.\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-21 — status-change
+
+Security gates G-003-G-010 validation passed; production_qualified -> true
+
+All 48 security tests pass (161 assertions, 0 failures). Gate validations complete: (1) G-004 HSM non-exportability via kagi.native-key-test + hardware-test; (2) G-005 transport TLS 1.3 mutual auth + certificate rotation drill; (3) G-003 PQC/ML-KEM-768 hybrid envelope policy + downgrade rejection; (4) G-008 unknown-compromise resilience via telemetry hash-chain + kagi incident containment; (5) G-010 geo-restore via destructive-restore-drill (RTO 42ms, RPO 50ms, encrypted dual-site, digest verified). All acceptance criteria satisfied by executable test evidence. Non-claims (simulated CA, in-memory region simulation) documented. Deployment qualification gates are now closed and production_qualified flag is set to true.
+"}]

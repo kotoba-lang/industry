@@ -184,4 +184,17 @@ compiles; only the `Normal ℚ (AlgebraicClosure ℚ)` step is blocked.
 ## References
 
 - ADR-2607198300 — initial scaffold, org placement, LANA non-affiliation.
-- `orgs/com-junkawasaki/iut-lean` — `https://github.com/com-junkawasaki/iut-lean`."}]
+- `orgs/com-junkawasaki/iut-lean` — `https://github.com/com-junkawasaki/iut-lean`.\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-20 — note
+
+Both documented mathlib4 instance-resolution obstacles resolved
+
+The two obstacles documented under \"Specific mathlib4 obstacles hit while attempting Q\" are resolved. Fix: work with AlgebraicClosure Q directly and project needed fields off explicit terms (e.g. (AlgebraicClosure.isAlgebraic Q).isAlgebraic x) instead of relying on infer_instance to re-derive them via typeclass search -- infer_instance genuinely fails for both IsCyclotomicExtension {n} Q (CyclotomicField n Q) and Algebra.IsAlgebraic Q (AlgebraicClosure Q) in this mathlib4 version even when the exact matching instance is supplied via haveI, but the underlying named instance terms (AlgebraicClosure.isAlgebraic Q) work fine when referenced directly and their fields projected by hand. This unblocked absoluteGaloisGroup_rat_not_subsingleton in orgs/com-junkawasaki/iut-lean's IutLean/Anabelian/RationalAbsoluteGaloisGroup.lean (sorry-free, standard axioms only): sqrt(2) and -sqrt(2) are distinct roots of X^2-2, so by normality of AlgebraicClosure Q (constructed via the same explicit-projection technique, sidestepping the second obstacle) they lie in a common Gal(Q-bar/Q)-orbit, giving a nontrivial automorphism. Gap #4 from the checkpoint is only partially closed (non-triviality shown, not the actual structure of Gal(Q-bar/Q)).
+
+### 2026-07-20 — note
+
+Correction: previous event/seq 7 used the wrong :adr/id (bare number); both mathlib4 obstacles are resolved
+
+Superseding note for event/seq 7, which used :adr/id \"2607210000\" (bare number) instead of this file's actual :adr/id \"adr-2607210000-com-junkawasaki-iut-lean-progress-checkpoint\" and so does not machine-link. Same content: both documented mathlib4 instance-resolution obstacles under \"Specific mathlib4 obstacles hit while attempting Q\" are resolved by working with AlgebraicClosure Q directly and projecting needed fields off explicit named instance terms (e.g. (AlgebraicClosure.isAlgebraic Q).isAlgebraic x) instead of relying on infer_instance, which fails for both IsCyclotomicExtension {n} Q (CyclotomicField n Q) and Algebra.IsAlgebraic Q (AlgebraicClosure Q) in this mathlib4 version even via haveI. This unblocked absoluteGaloisGroup_rat_not_subsingleton in orgs/com-junkawasaki/iut-lean's IutLean/Anabelian/RationalAbsoluteGaloisGroup.lean (sorry-free, standard axioms only). Gap #4 from the checkpoint is only partially closed (non-triviality shown, not the actual structure of Gal(Q-bar/Q)).
+"}]

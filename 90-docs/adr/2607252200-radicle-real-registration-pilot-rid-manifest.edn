@@ -128,4 +128,11 @@ rad-rid を足すと同一 project に `userdata:` が二重に出る壊れた Y
    載せないままにするか。露出リスクの評価が必要。
 3. **二重 push の自動化。** kagami/fleet に `git push rad` を組み込むか、
    post-push hook にするか。
+\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-25 — note
+
+Radicle 拡大: 自前 seed(gad)構築、etzhayyim private 353本を監査して352本を public 化、app-deai は gftdcojp/ai-gftd-deai へ private 移設
+
+自前 seed: gad(tailnet 100.82.98.110:8776)に radicle-node を systemd 常駐(linger 有効)、node.seedingPolicy={default:allow,scope:all}、preferredSeeds=[] で公開 seed 非依存。node ID did:key:z6MkmUNjE8mrWx7d1NVnYCWZFokoTMaPNxmubf8RpBfAu8Me、passphrase は kagi radicle-seed-gad-passphrase。実測: rad init は node 起動時 5.3s(到達不能な preferred seed があると 8.5s〜38.7s)に対し node 停止時 234ms。並列化は node の単一ロックで逆効果(jobs=16 で 0.09 repo/s < 直列 0.19)。announce は双方が listen していないと成立しない(片方向だと All seeds timed out)。seedingPolicy は node の下でトップレベルに置くと無視され既定 block のまま。 監査: etzhayyim private 353本を trufflehog(git履歴込み --no-verification)+PII regex で走査。REVIEW 70本のうち高深刻度は全て誤検知 — secret:Github/CloudflareApiToken は migration.edn の :revision/:tree(etzhayyim/root の実在 commit と API 照合)、Postgres は train.jsonl の合成接続文字列、jp-mynumber は UI 文言と公的窓口名(12桁実番号 0件)、credit-card は Luhn 検証なし regex が数値IDに反応、Hunter は Monster Hunter Stories 3、bank-acct はスキーマ定義文。false negative 二次チェック(*.pem/id_rsa*/credentials*.json 等)は 0件。実質的だったのは email のみで、絞り込むと第三者アドレスが残るのは 16本、うち本物の実在個人アカウントは lexicons-bundle の M365 1件のみ。 結果: 352本を GitHub public 化(etzhayyim public 270→622, private 353→0)。app-deai のみ owner 判断で gftdcojp/ai-gftd-deai として private 移設(transfer+rename, SHA 7810f8bb 不変)、manifest も追随(repos.edn path 差し替え + west.yml 旧entry削除+--entry で正順挿入)。
 "}]

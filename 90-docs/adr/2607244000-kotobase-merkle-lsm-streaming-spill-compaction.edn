@@ -64,4 +64,17 @@ ADR-2607211343 は P1 として「10^7 datom の compaction gate — peak RSS �
 
 - **大メモリマシンで 10M を力押し**: gate は通せても production の compaction 実行環境（Worker / 小型 host）と乖離し、実用判定にならない。却下。
 - **shallow な傾き確認（2M）**: 設計判断を変えない 3 点目に ~30 分を払う価値がない（オーナー判断）。却下。
-- **columnar を先行**: per-datom 定数は下がるが O(dataset) 保持という構造は変わらず、gate-10M には streaming/spill が先に必要。Stage C として後置。"}]
+- **columnar を先行**: per-datom 定数は下がるが O(dataset) 保持という構造は変わらず、gate-10M には streaming/spill が先に必要。Stage C として後置。\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-24 — note
+
+gate-1M PASSED (2026-07-25): 1M datoms, zero row loss, peak RSS 3.40GB under -Xmx4g via compact-run-readers-streaming + fan-in spill harness; throughput 1,235 rows/s (above in-memory 1,102)
+
+Stage A implemented and merged (kotoba-lang/kotobase-peer 6e3c9a3): compact-run-readers-streaming (emit!-streaming outputs, reader-supplied inputs, per-level idempotent retention with unit-tested 2-level==global CID parity) + stream-bench (content-addressed disk spill, fan-in 64, level-N group -> one lazy level-N+1 reader). Receipts: bench/results/2026-07-25-stream-compaction-gate-1m.edn (1M @4g: RSS 3.40GB vs in-memory 6.93GB; supporting 100k @1g: RSS 938MB vs 4.88GB). Co-resident rows bounded at O(fan-in x target-rows) per level, dataset-independent -- the ADR's Stage A requirement is measured, not asserted. gate-10M (-Xmx8g) is next on the same harness.
+
+### 2026-07-24 — note
+
+gate-10M PASSED (2026-07-25): 10M datoms, zero row loss, under the -Xmx8g cap, 2.85h / 974 rows/s -- both gates of this ADR now closed by measurement
+
+Receipt: kotoba-lang/kotobase-peer bench/results/2026-07-25-stream-compaction-gate-10m.edn (merged a7be3e3, pin advanced 6bdb0c0). 3 merge levels, 2,442 final runs, rows conserved exactly. RSS tracks the GC expanding to the heap cap (8.47GB incl. non-heap), not the requirement -- the true 10M floor is untested and the receipt says so. ADR-2607211343 P1's 10^7 scale, measurably infeasible for the in-memory path (~27GB extrapolated; two 20GB attempts stopped 2026-07-24), passes under 8GB via streaming/spill.
+"}]

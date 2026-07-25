@@ -35,4 +35,11 @@
 - オーナーが Amazon タグ / EPN campid / AliExpress tracking_id を発行後、`market.cljc` のリンク生成をアフィリンク化し、PR 表記を追加して再生成・デプロイする（AliExpress の app_key/secret は kagi 保管を推奨）。
 - ページの価格は 2026-07-25 のスナップショット。市況急変動のため、更新する場合は同じ確度ラベル付き収集手順で再調査してから差し替える（数値の手先更新・捏造をしない）。
 - superproject の west pin（cloud-murakumo entry）は本作業時点で未前進（共有 checkout に別セッションの rescue WIP が載っていたため意図的にスキップ）。pin 前進は fleet 署名経路または GitHub API single-entry で別途行う。
-- Amazon アソシエイトは 180 日 3 販売の維持条件があるため、リンク実装後にトラッキング（BMC funnel 側での成果計測）を検討する。"}]
+- Amazon アソシエイトは 180 日 3 販売の維持条件があるため、リンク実装後にトラッキング（BMC funnel 側での成果計測）を検討する。\n\n## 改訂履歴\n\n（2026-07-25 に `90-docs/adr-ledger/adr-ledger.edn` から統合。以後この文書は最新状態のみを表し、履歴は git が持つ。）
+
+### 2026-07-25 — note
+
+セッションクローズ時点の引き継ぎ状態: /gpu-market 公開済み・アフィリエイト登録はオーナー確定待ち
+
+2026-07-25 セッション終了時点の残タスクと引き継ぎ詳細（session scratchpad の dossier は消滅するためここに永続化）。(1) オーナー操作待ち: Chrome 新規ウィンドウに 4 タブ準備済み — Amazon アソシエイト (affiliate.amazon.co.jp, 要サインイン+電話PIN認証, 銀行振込最低¥5,000, 180日3販売条件) / eBay Partner Network (要 eBay アカウント+CAPTCHA, W-8BEN 必須, PayPal 最低) / AliExpress Portals (要アカウント作成, 引出手数料/回) / Temu は見送り推奨。登録フォーム推奨値: サイトURL https://murakumo.cloud/ (+ /gpu-market), カテゴリ Computers/Electronics, 説明「分散GPUクラウドの技術サイト。GPU実勢価格の比較・調達ガイドページを運営」。(2) ID 受領後の agent 作業: market.cljc のリンク差し替え — Amazon は検索URL+?tag=xxxx-22 / eBay は mkevt=1&mkcid=1&mkrid=711-53200-19255-0&campid=<10桁>&toolid=10001 を検索URLに付与 / AliExpress は Open Platform API aliexpress.affiliate.link.generate で商品単位リンク生成 (app_key/secret は kagi 保管推奨) / メルカリはアンバサダーUI生成の検索結果リンク貼付可。同時に景表法ステマ規制の「広告/PR」表記と Amazon 必須文言「Amazonのアソシエイトとして、［運営者名］は適格販売により収入を得ています。」を追加し、clojure -M:site 再生成→wrangler deploy。(3) 未解消: cloud-murakumo west pin 前進 (共有 checkout の rescue WIP 回避のため未実施) / docs-edn-only verify の既存 11 件 FAIL は本件と無関係の既知問題。
+"}]
