@@ -74,7 +74,8 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 ## 現在の状態（2026-07-26）
 
 - **270 organization / 15 カテゴリ / 36 form-family / 27 データファイル**
-- 検証: source-pinned **51**（primary 36 / secondary 15）、未 pin 219（81%）
+- 検証: source-pinned **52**（primary 37 / secondary 15）、未 pin 218（81%）
+- 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
   **statutory-no-personality 8** → **企業・LEI レジストリから不可視が約 41%**
 - entity kind: org-form **197（87%）** / named-org 29（13%）
@@ -99,6 +100,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 nbb 90-docs/community-coverage/queries/coverage.cljs
 nbb 90-docs/community-coverage/queries/coverage.cljs unpinned
 nbb 90-docs/community-coverage/queries/coverage.cljs regions
+nbb 90-docs/community-coverage/queries/coverage.cljs integrity   # 参照整合性のみ
 
 # 統合クエリ面（religious-community と同じ :org/* 語彙で join 可能）
 nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
