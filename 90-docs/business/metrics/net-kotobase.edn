@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 5912, "kotobase-cf-wasm-staging" 1966},
+ {"net-kotobase" 5918, "kotobase-cf-wasm-staging" 1966},
  :zone
- {:requests-7d 9714,
-  :pageviews-7d 458,
-  :uniques-7d-sum 682,
+ {:requests-7d 9747,
+  :pageviews-7d 461,
+  :uniques-7d-sum 688,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -14,17 +14,14 @@
     "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreigv3roefdv6myhrs7plbxcjtstvs2f6gi4zlk7auhykjarnj2donu",
     :requests 80}
    {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreidficcqtzdereatdcba7fju54euj2cjejnd65guhbu5dydscz4maq",
-    :requests 54}
-   {:path
     "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreidqasmswmyjmxvfbk2576r4a4xwkbq2nafdyl3evjvcye7eity5oa",
     :requests 49}
    {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreifur7i4knodjdx4i5xhh2tmgdx4yfejmkcbl3seucq3mpbcicl3q4",
+    "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreidficcqtzdereatdcba7fju54euj2cjejnd65guhbu5dydscz4maq",
     :requests 44}
    {:path
-    "/bafyreidjlabxcjcdz6uxf6zhx6wnkvho4plyufpqhapy57ykncfacof7f4",
-    :requests 41}
+    "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreifur7i4knodjdx4i5xhh2tmgdx4yfejmkcbl3seucq3mpbcicl3q4",
+    :requests 44}
    {:path
     "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreieyf37tobj2m5iamrozz74ql4ylvsqekcldzlsxm7okwu5yvfnkuy",
     :requests 28}
@@ -33,8 +30,11 @@
     :requests 26}
    {:path
     "/bafyreibif73tzuraqgszkdhdccp6xpzfihz5ytvsgb36ku2i336avnmtqi",
-    :requests 26}],
-  :status-mix {:ok 2335, :client-error 288, :server-error 77},
+    :requests 26}
+   {:path
+    "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreibri6ocdvcduipisnxjwydvprjgwoakpnvi7coaqwcxfifh7ixvha",
+    :requests 25}],
+  :status-mix {:ok 2285, :client-error 391, :server-error 62},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -46,12 +46,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-25",
- :traffic-quality {:window "24h", :probe-4xx-pct 11, :error-5xx-pct 3},
+ :traffic-quality {:window "24h", :probe-4xx-pct 14, :error-5xx-pct 2},
  :top-paths
- "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/blocks/bafy… 80 · /kotobase-cf-wasm-production/blocks/bafy… 54 · /kotobase-cf-wasm-production/blocks/bafy… 49 · /kotobase-cf-wasm-production/blocks/bafy… 44 · /bafyreidjlabxcjcdz6uxf6zhx6wnkvho4plyuf… 41 | 4xx(probe) 11% · 5xx 3%",
- :funnel {:visitors 1298, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/blocks/bafy… 80 · /kotobase-cf-wasm-production/blocks/bafy… 49 · /kotobase-cf-wasm-production/blocks/bafy… 44 · /kotobase-cf-wasm-production/blocks/bafy… 44 · /kotobase-cf-wasm-production/blocks/bafy… 28 | 4xx(probe) 14% · 5xx 2%",
+ :funnel {:visitors 1299, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 9714 req/7d・682 uniques(日次和)・うち4xx probe 11%(24h)、workers 7878 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 9747 req/7d・688 uniques(日次和)・うち4xx probe 14%(24h)、workers 7884 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 4,
   :submissions 3,
