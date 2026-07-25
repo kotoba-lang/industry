@@ -894,6 +894,105 @@
                  :source/file (str f))))
       [])))
 
+;; ---------- 因縁 dependency record（category N。ADR-2607258500） ----------
+;; kotoba-lang/loop-innen の corpus/*.edn（+ resources/*-corpus.edn）。
+;; entity 間の**依存エッジ**を持つ唯一の corpus — この面には従来「entity の台帳」
+;; （company/lei 系・municipality）と「entity 内部の stock/flow」（loop-system-dynamics）
+;; はあったが、entity → entity の依存関係（supply / ownership / funding /
+;; legal-authority / causation / participation / infrastructure …）が無かった。
+;;
+;; 形は `{:innen/nodes [...] :innen/edges [...]}` の単一 map。node/edge は
+;; どちらも DataScript-transactable な entity map だが、`:innen.node/existed` /
+;; `:innen.edge/valid` だけは入れ子 map なので、ここで **scalar に平坦化**する
+;; （`->ds-value` が blob 文字列にしてしまうと `?k < 18000000` のような期間
+;; 比較ができなくなる）。平坦化は innen.tx/->flat-tx と同じ規則:
+;;   :innen.edge/valid {:from "1602-03-20" :to "1799-12-31"}
+;;     -> :innen.edge/valid-from / -to（文字列）
+;;      + :innen.edge/valid-from-key / -to-key（整数。BCE を含めて単調）
+;; edge の endpoint は `:innen.edge/from-id` / `-to-id`（keyword id）で、
+;; datascript.js に lookup ref は無いので `:innen.node/id` と**値で** join する
+;; （lei-tos / yabai と同型）。
+;;
+;; :company/lei は innen 側でも同じ属性名なので、この面に載せるだけで
+;; 「依存グラフ × SEC 財務 × 法人実体 × ToS」が 1 クエリで結合可能になる。
+
+(defn innen-corpus-files []
+  (let [repo (io/file root "orgs" "kotoba-lang" "loop-innen")]
+    (when (.exists repo)
+      (concat (let [d (io/file repo "resources")]
+                (when (.exists d)
+                  (->> (.listFiles d)
+                       (filter #(.endsWith (.getName %) "-corpus.edn"))
+                       (sort-by #(.getName %)))))
+              (let [d (io/file repo "corpus")]
+                (when (.exists d)
+                  (->> (.listFiles d)
+                       (filter #(.endsWith (.getName %) ".edn"))
+                       (sort-by #(.getName %)))))))))
+
+(defn- innen-date-key
+  "innen.time の key encoding（year*10000 + month*100 + day）。BCE も含めて単調に
+   なるので Datalog の範囲比較に使える。ISO 文字列の辞書順ではこれができない
+   （\"-0221\" は全ての CE 日付より前に並ぶ）。coarse な日付は from 側を下限、
+   to 側を上限に寄せる（innen.time/lower-key・upper-key と同じ規則）。"
+  [s upper?]
+  (when (and (string? s) (seq s))
+    (let [bce? (str/starts-with? s "-")
+          body (if bce? (subs s 1) s)
+          [y m d] (map #(js/parseInt % 10) (str/split body #"-"))]
+      (when (and y (not (js/isNaN y)))
+        (let [y (if bce? (- y) y)
+              m (if (and m (not (js/isNaN m))) m (if upper? 12 1))
+              d (if (and d (not (js/isNaN d))) d (if upper? 31 1))]
+          (+ (* y 10000) (* m 100) d))))))
+
+(defn- innen-flatten-interval
+  "入れ子 interval map を scalar 属性に展開する。attr-prefix 例: \"innen.edge/valid\"。"
+  [e k attr-prefix]
+  (if-let [iv (get e k)]
+    (let [{:keys [from to]} iv]
+      (cond-> (dissoc e k)
+        from (assoc (keyword (namespace (keyword attr-prefix)) (str (name (keyword attr-prefix)) "-from")) from)
+        to (assoc (keyword (namespace (keyword attr-prefix)) (str (name (keyword attr-prefix)) "-to")) to)
+        (innen-date-key from false) (assoc (keyword (namespace (keyword attr-prefix)) (str (name (keyword attr-prefix)) "-from-key")) (innen-date-key from false))
+        (innen-date-key to true) (assoc (keyword (namespace (keyword attr-prefix)) (str (name (keyword attr-prefix)) "-to-key")) (innen-date-key to true))
+        ;; 元の map も pr-str で残す（この面の入れ子値の慣習。無損失にする）
+        true (assoc (keyword (namespace (keyword attr-prefix)) (str (name (keyword attr-prefix)) "-edn")) (pr-str iv))))
+    e))
+
+(defn innen-entities [next-tempid!]
+  (let [files (innen-corpus-files)
+        skipped (atom [])
+        out (doall
+             (mapcat
+              (fn [f]
+                (let [c (try (slurp-edn f) (catch :default _ nil))
+                      dataset (or (:innen/dataset c) "innen")
+                      nodes (when (map? c) (:innen/nodes c))
+                      edges (when (map? c) (:innen/edges c))]
+                  (if-not (seq nodes)
+                    (do (swap! skipped conj (.getName f)) [])
+                    (concat
+                     (for [n nodes]
+                       (-> n
+                           (innen-flatten-interval :innen.node/existed "innen.node/existed")
+                           (assoc :db/id (next-tempid!)
+                                  :source/dataset dataset
+                                  :source/file (str f))))
+                     (for [e (or edges [])]
+                       (-> e
+                           (innen-flatten-interval :innen.edge/valid "innen.edge/valid")
+                           (assoc :db/id (next-tempid!)
+                                  ;; from-id/to-id を明示的に持たせる（corpus が
+                                  ;; from/to だけを持つ形でも値 join できるように）
+                                  :innen.edge/from-id (:innen.edge/from e)
+                                  :innen.edge/to-id (:innen.edge/to e)
+                                  :source/dataset dataset
+                                  :source/file (str f))))))))
+              files))]
+    (warn-skipped! "innen corpus" @skipped)
+    out))
+
 ;; ---------- schema (manifest/schema.edn -> datascript createConn schema) ----------
 
 (defn schema-path [] (io/file root "manifest" "schema.edn"))
@@ -950,6 +1049,7 @@
         yabai-tx (yabai-passive-dns-entities next-tempid!)
         tadori-tx (tadori-threat-intel-entities next-tempid!)
         patent-tx (toshokan-patents-entities next-tempid!)
+        innen-tx (innen-entities next-tempid!)
         all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
                                                      biz-tx canvas-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
@@ -957,7 +1057,7 @@
                                                      proc-registry-tx merged-kotoba-tx
                                                      working-doc-tx narrative-tx
                                                      company-tx fleet-tx
-                                                     yabai-tx tadori-tx patent-tx)))]
+                                                     yabai-tx tadori-tx patent-tx innen-tx)))]
     (.transact ds conn all-tx)
     {:conn conn
      :adr-count (count adr-tx)
@@ -977,28 +1077,32 @@
      :fleet-count (count fleet-tx)
      :yabai-count (count yabai-tx)
      :tadori-count (count tadori-tx)
-     :patent-count (count patent-tx)}))
+     :patent-count (count patent-tx)
+     :innen-count (count innen-tx)}))
 
 (defn -main [& args]
   (let [[mode query-str] args
         {:keys [conn adr-count docs-count manifest-count foreign-adr-count biz-count
                 kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                narrative-count company-count fleet-count yabai-count tadori-count patent-count]}
+                narrative-count company-count fleet-count yabai-count tadori-count patent-count
+                innen-count]}
         (build-conn)
         total (+ adr-count docs-count manifest-count foreign-adr-count biz-count
                  kj-count rad-count
                  etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                 narrative-count company-count fleet-count yabai-count tadori-count patent-count)]
+                 narrative-count company-count fleet-count yabai-count tadori-count patent-count
+                 innen-count)]
     (case mode
       "count"
       (println (format (str "adr=%s docs=%s manifest=%s foreign-adr=%s biz=%s kj=%s rad=%s "
                              "etzhayyim-80-data=%s proc-registry=%s merged-kotoba=%s working-doc=%s "
-                             "narrative=%s company=%s fleet=%s yabai=%s tadori=%s patent=%s total=%s")
+                             "narrative=%s company=%s fleet=%s yabai=%s tadori=%s patent=%s innen=%s total=%s")
                         adr-count docs-count manifest-count foreign-adr-count biz-count
                         kj-count rad-count
                         etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
-                        narrative-count company-count fleet-count yabai-count tadori-count patent-count total))
+                        narrative-count company-count fleet-count yabai-count tadori-count patent-count
+                        innen-count total))
 
       "q"
       (println (pr-str (js->clj (.q ds query-str (.db ds conn)))))
