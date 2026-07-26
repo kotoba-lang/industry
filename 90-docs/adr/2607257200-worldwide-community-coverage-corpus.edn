@@ -73,8 +73,8 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ## 現在の状態（2026-07-26）
 
-- **312 organization / 15 カテゴリ / 36 form-family / 36 データファイル**
-- 検証: source-pinned **65**（primary 45 / secondary 20）、未 pin 247（79%）
+- **318 organization / 15 カテゴリ / 38 form-family / 37 データファイル**
+- 検証: source-pinned **68**（primary 46 / secondary 22）、未 pin 250（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
@@ -82,7 +82,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 - entity kind: org-form **197（87%）** / named-org 29（13%）
 - 地域: europe 52 / north-america 44 / asia-east 32 / africa 24 / asia-south 21 /
   south-america 18 / southeast-asia 12 / oceania 12 / middle-east 11
-- 数の誠実さ: **312/312 が `:org/member-count-basis` を持ち、約 195（62%）が明示的に unknown**。
+- 数の誠実さ: **318/318 が `:org/member-count-basis` を持ち、約 199（63%）が明示的に unknown**。
 - 国別: **国連加盟 193/193 か国**が少なくとも1エントリに現れる（`coverage.cljs countries`）
 - 記述の厚み: 7 形態以上 24 か国 / 4-6 形態 34 / 2-3 形態 135 / **1 形態のみ 0**（`coverage.cljs depth`）
   `:org/member-count` を主張しているのは 73 件のみ
@@ -365,6 +365,28 @@ La Via Campesina の「2億人」は加盟団体の自己申告合計であっ�
 5. 地域: middle-east 11・oceania 12・southeast-asia 12 が相対的に薄い。
 6. DAO の on-chain governance と fleet 自身の signed-quorum governance
    （`manifest/fleet-keys.edn`、ADR-2607160005）の構造比較は未着手。
+
+### 15. 痕跡から推定される共同体 — `:org/proxy-metric`（オーナー指示、2026-07-26）
+
+ブロックチェーン・コミュニティとファンクラブを収録した際、**両者が同一の計数構造**を持つことが
+判明した: **誰も公表せず、共同体が残した痕跡から人数が推定される**。
+
+- **チェーン・コミュニティ**: 痕跡は **on-chain アドレス**。a16z の推計では実ユーザーは月間
+  3,000〜6,000万人だが、**月間アクティブ「アドレス」は約2億2,000万** — bot と sybil を除くと
+  **アドレスの14〜27%しか人に対応せず、4〜7倍の過大**。LayerZero の CEO は airdrop 前の
+  600万アカウントのうち**実在は40〜60万**と公言した（約10倍）。逆にカストディ取引所は
+  数百万人を数個のアドレスの背後に隠すので、**誤差は単純な係数ではなく反転もできない**。
+- **日本のファンクラブ**: 痕跡は **入会時に発行される連番会員番号**。事務所は会員数を公表せず、
+  ファンが番号から復元している（STARTO 系 1,458万7,100 人、2025-01-25 時点）。ただしこれは
+  **累計**であり退会者を引かない。**2020年に活動休止した嵐が今も1位**という事実が、
+  この指標の性質をそのまま示している。
+- サッカーの公式サポーターズクラブ支部（Bayern 4,753支部・33万9,245人、Barça penya 1,264）は
+  **クラブが公認した支部だけ**を数え、ultras や無所属ファンを構造的に除外する。
+
+そこで `:org/proxy-metric`（何を痕跡として数えたか）と `:org/proxy-bias`（どちらにどれだけ
+歪むか）を導入した。**痕跡を `:org/member-count` に洗浄して流し込まない**ための装置である。
+なお節点数（validator / node）は逆向きで、**ステーキング事業者が多数を集約するため人を過小に
+見せる**。同じ「機械を数えている」問題が上下逆に出る。
 
 ### 14. 当局と共同体の数え方が食い違うとき、大きいのは共同体側だった
 

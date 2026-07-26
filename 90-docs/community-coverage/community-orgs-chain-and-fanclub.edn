@@ -1,0 +1,153 @@
+[
+;;; Blockchain chain communities and fan clubs (2026-07-26, owner request).
+;;; ADR-2607257200.
+;;;
+;;; These two clusters share a counting structure that no other part of the
+;;; corpus has in such a pure form: the size is INFERRED FROM AN ARTIFACT the
+;;; community leaves behind — on-chain addresses, issued membership numbers —
+;;; rather than published by anyone. Both artifacts systematically overstate.
+;;; The proxy and its bias are recorded in :org/proxy-metric and :org/proxy-bias
+;;; so no reader mistakes an artifact count for a headcount.
+
+{:org/id :org-global-chain-communities
+ :org/name "Blockchain chain communities (Ethereum, Bitcoin, Solana, Cosmos zones, L2 ecosystems)"
+ :org/entity-kind :org-form
+ :org/form-family :family-chain-community
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "DE" "SG" "KR" "NG" "BR" "IN" "JP" "CH" "AE"]
+ :org/founding-date 2009
+ :org/member-count 45000000
+ :org/member-count-basis "source-pinned as an ESTIMATE DERIVED FROM A PROXY, not a roll: a16z's methodology puts real monthly active crypto users at roughly 30-60 million, against about 220 million monthly ACTIVE ADDRESSES — i.e. only ~14-27% of active addresses correspond to a distinct person once bots and sybils are filtered, an overstatement factor of roughly 4-7x. The corpus records the midpoint (~45M) with that derivation stated, and asserts no cumulative 'total users' figure at all, since cumulative unique addresses are larger again and even less meaningful."
+ :org/proxy-metric "unique / active on-chain addresses"
+ :org/proxy-bias "Overstates people by ~4-7x: one person holds many addresses; airdrop farming manufactures addresses deliberately; contracts and bots transact. It also UNDERSTATES in the opposite direction where an exchange custodies millions of users behind a handful of addresses. The error is therefore not a simple scale factor and cannot be inverted reliably. LayerZero's CEO publicly estimated that only 400,000-600,000 of 6 million pre-airdrop accounts were real — a 10x inflation in that instance."
+ :org/legal-registration :unregistered
+ :org/registration-note "The chain community as such has no legal person anywhere. Foundations (Ethereum Foundation, Solana Foundation) are registered and fund development but do not constitute or represent the community; validators, holders and local meetup chapters are unaffiliated with them."
+ :org/governance-model :meritocratic
+ :org/mission-statement "The people who run nodes, validate, hold governance tokens, write clients, translate documentation and organise local meetups around a single ledger — a community whose boundary is participation in one shared state machine, and whose apparent size is an artefact of how addresses are counted."
+ :org/coverage-note "Distinct from the DAO entry, which covers treasuries and on-chain voting inside a chain. This entry is the chain's own community layer."
+ :org/related-org "org-global-daos"
+ :org/source-name "a16z crypto, Estimating the number of real crypto users"
+ :org/source-url "https://a16zcrypto.com/posts/article/estimating-crypto-users/"
+ :org/source-date "2025"
+ :org/source-tier :secondary
+ :org/source-caveat "a16z is an investor in this sector; its estimate is the most methodologically explicit one located, not a disinterested one."
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-validator-node-communities
+ :org/name "Validator, miner and node-operator communities"
+ :org/entity-kind :org-form
+ :org/form-family :family-chain-community
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["US" "DE" "FI" "SG" "KZ" "PY" "IS" "CA"]
+ :org/founding-date 2009
+ :org/member-count-basis "unknown as people — validator and node counts are directly observable on-chain (Ethereum's validator count is published continuously, Bitcoin's reachable nodes are crawled), but one operator runs many validators and staking services run tens of thousands, so the machine count is not an operator count. This is the inverse of the address problem: here the artefact UNDERSTATES the community when read as people, because concentration hides operators."
+ :org/proxy-metric "validator / node counts observed on-chain or by crawlers"
+ :org/proxy-bias "Machines, not people. Staking pools and hosting providers concentrate many validators under one operator, so validator counts overstate independence while understating nothing about scale; reachable-node crawls miss nodes behind firewalls."
+ :org/legal-registration :mixed
+ :org/registration-note "Large staking operators are registered companies; solo stakers and hobby node runners are individuals with no organizational form, and the community that connects them is a chat channel and a client-team mailing list."
+ :org/governance-model :meritocratic
+ :org/mission-statement "Operators who keep a chain running — solo stakers, mining pools, RPC providers, client teams — organised through client-team calls, testnets and incident channels, and the group that actually executes a hard fork when governance decides on one."
+ :org/related-org "org-global-chain-communities"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-crypto-local-meetups
+ :org/name "Local crypto meetups, hackerhouses and regional chain chapters"
+ :org/entity-kind :org-form
+ :org/form-family :family-chain-community
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-africa
+ :org/countries ["NG" "KE" "AR" "VN" "PH" "TR" "IN" "BR"]
+ :org/founding-date 2013
+ :org/member-count-basis "unknown — meetup groups and hackerhouses are counted on event platforms whose numbers inflate with registrations rather than attendance; the largest adoption populations (Nigeria, Argentina, Vietnam, Turkey) are counted through survey-based ownership rates instead, which measure holders, not community participation."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "In-person chapters — meetups, hackerhouses, campus clubs, remittance user groups — that turn a globally distributed protocol community into a local one, concentrated in economies where the use case is currency substitution rather than speculation."
+ :org/related-org "org-global-user-groups-meetups"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-football-supporters-branches
+ :org/name "Official football supporters' club branches (penyes, Fanclubs, 後援会, peñas)"
+ :org/entity-kind :org-form
+ :org/form-family :family-fan-club
+ :org/category :cat-sports
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-europe
+ :org/countries ["ES" "DE" "GB" "IT" "JP" "AR" "BR" "MX" "US" "ID"]
+ :org/founding-date 1920
+ :org/instance-count-estimate 4753
+ :org/member-count 339245
+ :org/member-count-basis "source-pinned for two clubs: Bayern Munich recognises 4,753 fan clubs with 339,245 fan club members, of which 572 clubs in 108 countries are international with about 46,880 members; FC Barcelona's official penya census stood at 1,264 recognised supporters' clubs (2023). These are BRANCH counts recognised by the club, not the club's own membership — Bayern separately has 400,000+ club members, which is a different thing again."
+ :org/proxy-metric "club-recognised branch registers"
+ :org/proxy-bias "Counts only branches the club has formally recognised. Unrecognised supporter groups, ultras groups (recorded separately in this corpus) and the far larger population of unaffiliated fans are excluded by construction, so this undercounts organised support and says nothing about total fandom."
+ :org/legal-registration :mixed
+ :org/registration-note "Branches are typically registered associations in their own right (a German Fanclub is usually an e.V.) while being recognised by, not owned by, the club."
+ :org/governance-model :democratic
+ :org/mission-statement "Local branches that organise travel to matches, run their own bar or clubhouse, hold an AGM and elect officers — a franchise of belonging, where a club's identity is reproduced by thousands of small associations it does not control."
+ :org/related-org "org-esp-socios-clubs"
+ :org/source-name "FC Bayern München fan club pages / FC Barcelona penyes census"
+ :org/source-url "https://fcbayern.com/en/fans/fan-clubs/fanclubs"
+ :org/source-date "2025"
+ :org/source-tier :primary
+ :org/source-caveat "Two clubs pinned; there is no global count of supporters' branches across football."
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-jpn-artist-fan-clubs
+ :org/name "Subscription artist fan clubs (ファンクラブ, official fandom memberships)"
+ :org/entity-kind :org-form
+ :org/form-family :family-fan-club
+ :org/category :cat-hobby-interest
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-asia-east
+ :org/countries ["JP" "KR" "CN" "TW" "US" "GB"]
+ :org/founding-date 1960
+ :org/member-count-basis "source-pinned as an INFERRED figure, with the inference stated: Japanese agencies generally do NOT publish fan club membership. Fans reconstruct it from the sequential membership number issued at signup, and community-maintained rankings put STARTO ENTERTAINMENT (the former Johnny's) fan clubs at 14,587,100 as of 2025-01-25 including the Junior joho-kyoku. That figure is CUMULATIVE — it counts numbers ever issued, not current paying members — so it overstates the live community, by an unknown margin. Arashi still ranks first despite having stopped activity in 2020, which shows the same thing from another angle; Snow Man passed one million in 2023."
+ :org/proxy-metric "sequential membership numbers issued at signup"
+ :org/proxy-bias "Cumulative and unreconciled: lapsed members are never subtracted, one person may hold memberships in several groups, and a disbanded act keeps its number. The artefact grows monotonically while the actual community can shrink — structurally the same failure as counting cumulative blockchain addresses."
+ :org/legal-registration :registered
+ :org/registration-note "The fan club is operated by the agency as a paid service; the community is the members, who have no governance rights over it at all — the corpus's clearest case of a community owned by a counterparty."
+ :org/governance-model :hierarchical
+ :org/mission-statement "Paid memberships that allocate concert ticket lotteries, exclusive media and fan events — where a subscription is the entry to a community whose ranking, etiquette and seniority (by membership number) are entirely member-generated."
+ :org/related-org "org-global-fandoms"
+ :org/source-name "Community-maintained STARTO/Johnny's fan club membership rankings (agency does not publish)"
+ :org/source-url "https://kuracon.jp/johnnys-fc-ranking/"
+ :org/source-date "2025-01-25"
+ :org/source-tier :secondary
+ :org/source-caveat "No primary source exists by design: the agency withholds the figure, so every published number is a fan reconstruction from issued membership numbers."
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-touring-follower-communities
+ :org/name "Touring follower communities (Deadheads, Parrotheads, Grateful-Dead-style tour families, K-pop tour circuits)"
+ :org/entity-kind :org-form
+ :org/form-family :family-fan-club
+ :org/category :cat-hobby-interest
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "GB" "DE" "JP" "KR" "BR"]
+ :org/founding-date 1965
+ :org/member-count-basis "unknown — following a tour is a practice, not a membership. Proxies exist (tape-trading networks, ticket lotteries, fan club rolls, hotel blocks) and each measures a different slice; nobody counts the people who structure years of their life around a touring act."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "People who travel with an act across a tour, sharing lifts, floors, tickets and taping etiquette, with their own economy of merchandise and food — a mobile community whose territory is a schedule, closely analogous to the pilgrim-route communities recorded elsewhere in this corpus."
+ :org/related-org "org-global-pilgrim-trail-communities"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]
