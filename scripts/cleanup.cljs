@@ -161,51 +161,127 @@
   (or (.exists (io/file dir ".git" "annex"))
       (.exists (io/file dir ".datalad"))))
 
-(defn- survey-repo [dir]
-  (let [br      (str/trim (or (gitc dir "rev-parse" "--abbrev-ref" "HEAD") ""))
+;; ---------- survey の実行形（2026-07-26 全面改訂） ----------
+;;
+;; 実測事故（2026-07-26）: この section は **一度も完走していなかった**。orgs 配下は
+;; 3,690 repo あり、旧実装は repo ごとに `status --porcelain` を回した上で、さらに
+;; **branch ごとに `gh pr list` のネットワーク往復**を挟んでいた。30 分の timeout で
+;; kill され、`println` 済みの見出しだけが残り、肝心の行と集計は 1 件も出ないまま
+;; 終了した。結果として出力は「UNLANDED な子リポは無い」と読める空セクションになり、
+;; 実際には net-kotobase に未 push commit + untracked WIP があったのに素通りした。
+;; これは runbook 自身が禁じている silent truncation（"a truncated survey that looks
+;; complete is worse than a slow one"）の実例である。
+;;
+;; 対策は 4 つ:
+;;   1. **2 フェーズ化**。phase 1 はローカル git のみ（ネットワーク往復ゼロ）で全 repo を
+;;      走査する。`gh` 照会は phase 2 に隔離し、phase 1 を絶対にネットワークで詰まらせない。
+;;   2. **ストリーミング出力**。危険な repo（untracked あり）は見つけた瞬間に 1 行出す。
+;;      途中で kill されても、そこまでの真実は画面に残る（旧実装は全部失った）。
+;;   3. **予算と打切りの明示**。phase 2 の API 往復に全体上限を置き、打ち切ったら
+;;      件数を必ず報告する。黙って切らない。
+;;   4. **annex repo は status を撮らない**。m365-archive は untracked 15,945 /
+;;      dirty 122,792 を常時抱えており、`status --porcelain` 自体が極端に重い。
+;;      annex は untracked/dirty が既定状態なので、そもそも数える必要がない。
+
+(def ^:private pr-budget
+  "phase 2 で許す `gh pr list` の総往復数。超えたら打ち切って件数を報告する。"
+  200)
+
+(def ^:private pr-spent (atom 0))
+(def ^:private pr-truncated (atom 0))
+
+(defn- eprogress [s] (.error js/console s))
+
+(defn- survey-local
+  "phase 1: ローカル git のみ。ネットワークに一切触らない。"
+  [dir]
+  (let [annex   (annex? dir)
+        br      (str/trim (or (gitc dir "rev-parse" "--abbrev-ref" "HEAD") ""))
         stash   (count (remove str/blank? (str/split-lines (or (gitc dir "stash" "list") ""))))
-        status  (remove str/blank? (str/split-lines (or (gitc dir "status" "--porcelain") "")))
+        ;; annex/DataLad の untracked/dirty は既定状態。数えないだけでなく、
+        ;; status 自体を撮らない（12 万件の working tree walk を避ける）。
+        status  (when-not annex
+                  (remove str/blank? (str/split-lines (or (gitc dir "status" "--porcelain") ""))))
         untracked (count (filter #(str/starts-with? % "??") status))
         dirty     (- (count status) untracked)
         locals  (remove #{"" "main" "master" "synced/main" "git-annex" "manifest-rev"}
                         (str/split-lines (or (gitc dir "for-each-ref"
                                                    "--format=%(refname:short)" "refs/heads/") "")))
         default (default-branch dir)
-        slug    (repo-slug dir)
-        ;; 実際に「まだ着地していない」ローカル branch だけを見る。既に default
-        ;; から到達可能な branch は着地済みなので PR の有無を問わない。
+        ;; 既に default から到達可能な branch は着地済み。PR の有無を問わない。
         live    (remove #(merged-into-default? dir % default) locals)
-        unpushed (for [b live
-                       :let [n (ahead-of-remote dir b)]
-                       :when (or (= n :no-remote) (and (number? n) (pos? n)))]
-                   (str b ":" (if (= n :no-remote) "no-remote" n)))
-        ;; push 済みで未着地の branch。PR 照会は 1 branch = 1 API 往復なので、
-        ;; 長期 branch farm（実測: kotoba-lang/webgpu は 80 本超、slides は 90 本超）
-        ;; では survey が実質終わらない。上限を超えたら PR 照会を諦めるが、
-        ;; 黙って切り捨てず :nopr-skipped として必ず報告する。
-        pushed-live (for [b live :let [n (ahead-of-remote dir b)]
-                          :when (and (number? n) (zero? n))] b)
-        pr-cap  20
-        skip-pr? (> (count pushed-live) pr-cap)
-        nopr    (if skip-pr? [] (vec (remove #(open-pr-for slug %) pushed-live)))]
+        ;; ahead-of-remote は branch ごとに 2 回呼ばれていた（unpushed 判定と
+        ;; pushed-live 判定）。1 回に畳んで分岐する。
+        aheads  (into {} (map (fn [b] [b (ahead-of-remote dir b)]) live))
+        unpushed (vec (for [[b n] aheads
+                            :when (or (= n :no-remote) (and (number? n) (pos? n)))]
+                        (str b ":" (if (= n :no-remote) "no-remote" n))))
+        pushed-live (vec (for [[b n] aheads :when (and (number? n) (zero? n))] b))]
     {:dir dir :branch br :stash stash :dirty dirty :untracked untracked
-     :locals locals :unpushed (vec unpushed) :nopr nopr :annex? (annex? dir)
-     :nopr-skipped (when skip-pr? (count pushed-live))
-     ;; annex/DataLad の untracked/dirty は正常状態なので UNLANDED に数えない。
-     ;; branch 側の未着地（unpushed / nopr）は annex でも本物なので残す。
-     :unlanded? (boolean (if (annex? dir)
-                           (or (seq unpushed) (seq nopr) skip-pr?)
-                           (or (pos? untracked) (pos? dirty)
-                               (seq unpushed) (seq nopr) skip-pr?)))}))
+     :locals locals :unpushed unpushed :pushed-live pushed-live
+     :annex? annex :slug (repo-slug dir)
+     ;; phase 1 の時点で確定する未着地。nopr は phase 2 で足す。
+     :local-unlanded? (boolean (if annex
+                                 (seq unpushed)
+                                 (or (pos? untracked) (pos? dirty) (seq unpushed))))}))
+
+(defn- survey-prs
+  "phase 2: push 済み未着地 branch にだけ `gh pr list` を当てる。予算超過は打切り、
+  件数は :nopr-skipped として必ず報告する（黙って切らない）。"
+  [{:keys [pushed-live slug] :as row}]
+  (let [pr-cap 20
+        over-cap? (> (count pushed-live) pr-cap)
+        budget-left (- pr-budget @pr-spent)
+        skip? (or over-cap? (nil? slug) (< budget-left (count pushed-live)))]
+    (if skip?
+      (do (when (seq pushed-live) (swap! pr-truncated + (count pushed-live)))
+          (assoc row :nopr [] :nopr-skipped (when (seq pushed-live) (count pushed-live))))
+      (let [nopr (vec (remove #(do (swap! pr-spent inc) (open-pr-for slug %)) pushed-live))]
+        (assoc row :nopr nopr :nopr-skipped nil)))))
+
+(defn- finalize [row]
+  (assoc row :unlanded? (boolean (or (:local-unlanded? row)
+                                     (seq (:nopr row))
+                                     (:nopr-skipped row)))))
 
 (when-not skip-sub?
   (hr "子リポ survey: UNLANDED 判定（detached-HEAD + manifest-rev のみは通常状態）")
   (println "凡例: untracked=commit すらされていない / unpushed=push 未了 / nopr=push 済みだが PR 無し")
   (println)
   (let [repos (->> (sh "find" "orgs" "-maxdepth" "3" "-name" ".git" "-type" "d")
-                   :out str/trim str/split-lines sort)
-        rows  (->> repos
-                   (map #(survey-repo (.substring % 0 (- (count %) 5))))
+                   :out str/trim str/split-lines (remove str/blank?) sort)
+        total (count repos)
+        ;; 0 件は「fleet が綺麗」ではなく「orgs/ が展開されていない checkout で
+        ;; 走らせた」の意味である（west project は submodule ではないので、
+        ;; superproject の worktree には orgs/ が存在しない）。旧実装はこの場合も
+        ;; 空セクションを出すだけで、健全な fleet と見分けがつかなかった。
+        _ (when (zero? total)
+            (println "⚠ orgs/ 配下に子リポが 1 件も見つからない。")
+            (println "  これは「未着地の作業が無い」という意味ではない — orgs/ が展開されて")
+            (println "  いない checkout（superproject の worktree 等）で走らせた可能性が高い。")
+            (println "  west project は submodule ではないので worktree には展開されない。")
+            (println "  superproject 本体の checkout（west update 済み）で再実行すること。"))
+        _ (eprogress (str "phase 1 (local only): " total " repos ..."))
+        ;; phase 1: ローカルのみ。危険な repo は見つけた瞬間に出す（途中で kill されても残る）。
+        local-rows
+        (doall
+         (map-indexed
+          (fn [i g]
+            (when (zero? (mod i 250))
+              (eprogress (str "  phase 1 " i "/" total)))
+            (let [row (survey-local (.substring g 0 (- (count g) 5)))]
+              (when (and (pos? (:untracked row)) (not (:annex? row)))
+                (println (format "! %-56s untracked=%d dirty=%d  ← commit すらされていない"
+                                 (:dir row) (:untracked row) (:dirty row))))
+              row))
+          repos))
+        candidates (filter #(seq (:pushed-live %)) local-rows)
+        _ (eprogress (str "phase 2 (gh pr lookup): " (count candidates)
+                          " repos have pushed-but-unlanded branches"))
+        pr-map (into {} (map (juxt :dir identity)
+                             (map survey-prs candidates)))
+        rows  (->> local-rows
+                   (map #(finalize (get pr-map (:dir %) (assoc % :nopr []))))
                    (filter (fn [{:keys [unlanded? branch stash locals]}]
                              (if unlanded-only?
                                unlanded?
@@ -231,10 +307,18 @@
                     (seq locals)                        (conj (str "locals=" (count locals))))]
         (println (format "%-58s %s" dir (str/join "; " parts)))))
     (println)
-    (println (format "UNLANDED な子リポ=%d / 掲載=%d（untracked を持つ repo=%d、annex 除外=%d）"
-                     (count (filter :unlanded? rows)) (count rows)
+    (println (format "UNLANDED な子リポ=%d / 掲載=%d / 走査=%d（untracked を持つ repo=%d、annex 除外=%d）"
+                     (count (filter :unlanded? rows)) (count rows) total
                      (count (filter #(and (pos? (:untracked %)) (not (:annex? %))) rows))
                      (count (filter :annex? rows))))
+    ;; 打切りは必ず報告する。「完走したように見える不完全な survey」は
+    ;; 遅い survey より悪い（runbook :unlanded :caps）。
+    (println (format "PR 照会: %d/%d 往復を使用%s"
+                     @pr-spent pr-budget
+                     (if (pos? @pr-truncated)
+                       (format " / ⚠ %d branch は照会を打切り（nopr=? として上に表示）" @pr-truncated)
+                       "（打切りなし）")))
+    (println "※ このセクションは完走した（この行が出ていれば途中 kill されていない）。")
     (when (some #(and (pos? (:untracked %)) (not (:annex? %))) rows)
       (println)
       (println "⚠ untracked を持つ repo は最優先で着地させること — どのブランチにも")
