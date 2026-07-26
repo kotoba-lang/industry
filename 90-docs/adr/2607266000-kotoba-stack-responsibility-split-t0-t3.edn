@@ -75,13 +75,13 @@ T6 は既存 `murakumo` が受け皿で、`kototama` の fleet 1,498 行を移�
 | repo | tier | 行数 | 抽出元 |
 |---|---|---|---|
 | `kotoba-kir` | T0 | 3,562 | compiler: ir/value/target/decimal/xml/compatibility/admission/cljs-i64 |
-| `artifact` | T0 | 338 | compiler: artifact/runtime-identity/signing |
+| `artifact` | T0 | 338 | compiler: artifact/runtime-identity |
 | `kgraph` | T1 | 83 | kotoba: kgraph |
 | `grammar` | T1 | 163 | kotoba+compiler: guest-grammar |
 | `kotoba-wasm` | T2 | 2,661 | compiler: backend/wasm, wasm-typed, canonical-abi, wasm-tools |
 | `kotoba-native` | T2 | 1,961 | compiler: backend/x86_64, aarch64, packaging/elf64 |
 | `kotoba-component` | T2 | 3,664 | compiler: component-core/composition/admission/artifact/wit |
-| `kotoba-verifier` | T2 | 669 | compiler: verifier |
+| `kotoba-verifier` | T2 | 669 | compiler: verifier + signing |
 | `tender-native` | T3 | 635 | compiler: native-executor |
 | `provider` | T3 | 2,248 | compiler: provider/ 12 ファイル |
 | `provider-postgres` | T3 | 433 | kototama: postgresql-pool-provider |
@@ -137,7 +137,7 @@ kotoba.compiler.admission             -> kotoba.kir.admission
 kotoba.compiler.cljs-i64              -> kotoba.kir.cljs-i64
 kotoba.compiler.artifact              -> kotoba.artifact.core
 kotoba.compiler.runtime-identity      -> kotoba.artifact.runtime-identity
-kotoba.compiler.signing               -> kotoba.artifact.signing
+kotoba.compiler.signing               -> kotoba.verifier.signing
 kotoba.compiler.backend.wasm          -> kotoba.wasm.core
 kotoba.compiler.backend.wasm-typed    -> kotoba.wasm.typed
 kotoba.compiler.canonical-abi         -> kotoba.wasm.canonical-abi
@@ -178,22 +178,51 @@ abi   kotoba-kir   artifact          (T0: 契約。kotoba-kir のみ security �
 - (+) 各 repo に `resources/repository-rules.edn` を同梱したため、
   taxonomy 宣言率が 1,828 repo 中 2 -> 13 に増えた。
 - (-) west manifest は 3,730 -> 3,741 projects に増えた。
-- (-) Phase A では元 repo からコードを削除していないため、**同じコードが 2 箇所に
-  存在する**。Phase B までこの重複は解消しない。
 - (-) 逆依存が 1 件残っている: `provider-postgres` が `kototama.tender` を require
   している (provider が runtime に依存する逆流)。abi 契約経由に直すのが本筋。
+
+## Phase B — compiler は完了 (2026-07-26)
+
+`kotoba-lang/compiler` は 37 ソースを削除し、8 repo を pinned dependency として
+消費する形に切り替えた (`src/kotoba/compiler/` は 49 -> 29 ファイル、
+`provider/` ディレクトリは消滅)。**全スイート green: 613 tests / 5295 assertions /
+0 failures / 0 errors。**
+
+Phase B の途中で 2 つの実問題が出た。どちらも「読んで判断」では見つからず、
+実際にテストを走らせて初めて出た。
+
+1. **最初の抽出元が間違っていた。** 共有 west checkout
+   (`orgs/kotoba-lang/compiler`) は evidence branch `agent/nested-record-ref-v1`
+   に居座っており、main より `component_core` で -427 行、`composition` で -53 行、
+   `backend/wasm` で -59 行、`canonical-abi` で -2 行 古かった。これは
+   ADR-2607252500 が「merge すると起きる」と警告した退行そのもの。各 repo の
+   `origin/main` から pristine worktree を切って全 11 repo を再抽出し直した。
+2. **上流が動き続ける。** 再抽出後、compiler main に #283
+   (heterogeneous scalar union decoding) が着地し、削除対象 3 ファイルを変更した。
+   削除を維持したまま `kotoba-wasm` / `kotoba-component` へ forward-port して解決。
+   分割は一度やれば終わりではなく、**着地までの時間が短いほど port コストが低い**。
+
+### Phase B の残り
+
+| repo | 内容 | 状態 |
+|---|---|---|
+| `compiler` | 37 ソース削除・8 repo 消費 | **完了** (613 tests green) |
+| `kototama` | `postgresql_pool_provider` (433) 削除 + `provider-postgres` 消費 | 未 |
+| `kototama` | fleet 1,498 行を `murakumo` へ移設 (T6) | 未 |
+| `kotoba` | `kgraph` / `guest_grammar` 削除 + 新 repo 消費 | 未 |
+| west pin | `compiler` の pin 前進 | 未 (共有 checkout が別セッションの未 push branch に居るため) |
 
 ## Gap ledger (2026-07-26)
 
 | id | gap | 状態 |
 |---|---|---|
 | G-A | ADR-2607252500 決定 4 に二面出力の but 節を追記 | 未実施 |
-| G-B | Phase B: consumer flip と元コード削除 (compiler/kototama/kotoba) | 未実施 |
+| G-B | Phase B: consumer flip と元コード削除 | compiler **完了**、kototama/kotoba 未 |
 | G-C | `provider-postgres` -> `kototama.tender` の逆依存を abi 契約経由に | 未実施 |
 | G-D | `kototama` の fleet 1,498 行を `murakumo` へ移設 (T6) | 未実施 |
 | G-E | `kotoba` から supply-chain 8 / codebase-actor 8 を追い出す (T1) | 未実施 |
 | G-F | `kotoba.kir.xml` (224) と既存 `kotoba-lang/xml` repo の重複判定 | 未実施 |
-| G-G | 各 repo の `clojure -M:test` 実行 (Phase A では未実行) | 未実施 |
+| G-G | 各 repo の `clojure -M:test` 実行 | **完了** 11/11 green |
 | G-H | taxonomy を全 repo 必須化する CI gate | 未実施 |
 | G-I | T5 (aiueos-kernel / aiueos-boot / virtio) の分割 | 対象外 (別 ADR) |
 
