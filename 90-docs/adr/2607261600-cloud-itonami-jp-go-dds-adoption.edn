@@ -219,6 +219,115 @@ cloud-itonami org(約1225 repo)の UI 面を棚卸しした結果、2層に分�
   `(mapv row [])` が `[]` になる経路で踏んだ。子の並びは必ず `[:<> ...]` フラグメントで
   包む。ハーネスの no-hit ケースが検出した。
 
+## 追記: operator console 289面 と 亜種 LP 28面
+
+product face 387 面のあと、残っていた面を全数で洗い出した(cloud-itonami の
+.html は 713 件)。未移行は 321 件で、内訳は operator console 289 /
+亜種 LP 28 / public/index.html 2 / verify.html 1 / swift-console 1。
+
+### 共通の機構: jp-go-dds.skin(互換スキン)
+
+これらは 1 repo ずつ形が違い(console の CSS は少なくとも 5 系統、LP は 26 種類)、
+構造を組み直すとセクションを落とす。そこで **markup を一切変えず style 要素の
+中身だけ**を dds.css + skin-css に差し替える互換スキンを jp-go-dds に足した。
+意味的な HTML と小さな class 語彙(.ok 1586 / .muted 863 / .card 825 /
+.critical 667 / .warn 487 / .err 306 / .badge 281 / .bar 277 …実測)を DADS token
+で描く。判定色は DADS の semantic token(.ok→success-2 / .warn→warning-yellow-2 /
+.err,.critical→error-1)。
+
+### console(生成器ごと直した)
+
+**141/141 の repo が CI で console を再生成する**ため、生成物だけ直しても次の CI で
+戻る。よって各 repo の render_html.clj 自体を移行した。要は「style の開始/終了タグは
+必ず文字列リテラルの内側にある」性質を使い、**リテラルを閉じて式を挟み開き直す**
+こと —— 141 通りの書き方すべてに効き、markup には触れない。
+jp-go-dds.skin/dds+skin(JVM)を style に流し込む。
+
+結果: **127/141 を移行**(main へマージ済み、失敗 0)。各 repo で
+clojure -M:render-html を実走し、**style 以外の markup がバイト一致**する
+ことを検証してから commit している(落ちた repo は land していない)。
+
+**未移行 13 件**(isic-2211 / 2620 / 2910 / 4711 / 5320 / 6420 / 6512 / 6612 /
+6622 / 6810 / 6910 / 6920 / 8299): これらは deps.edn が kotoba-lang/html を
+:local/root で持つ一方、jp-go-dds が同じ lib を :git/sha で引くため
+**依存座標が比較できず** classpath 構築に失敗する。解消には各 repo の依存解決
+方式そのものを変える必要があり、UI スキンの移行としては過剰なので別件にした。
+
+### 亜種 LP
+
+**18/28 を移行**(失敗 0)。残り 10 は render_html.clj を持つ repo で、生成物
+だけ直しても戻るため対象外にした。
+
+### 前提として直したこと
+
+- jp-go-dds の deps を :local/root → :git/sha に変更(git 依存として消費
+  できるようにするため。:local/root は消費側の git キャッシュで解決できない)。
+- jp-go-dds.skin/dds+skin を追加(JVM 消費者向け、71KB)。
+
+### 途中で出した自分のバグ(いずれも検証が捕捉)
+
+1. worktree を平置きしたため、:local/root の兄弟パス参照を使う
+   **99/141 でクラスパス構築が失敗**。monorepo と同じ階層を再現して解消。
+2. 一部の生成器は HTML 全体を format で組み立てており、注入した CSS の %
+   (width: 100% 等)が変換指定子と解釈されて UnknownFormatConversionException。
+   % を %% にエスケープする variant を作り、**出力側に %% が漏れず 100% が
+   そのまま出ること**を検証する経路を足した。
+
+## 上流 DADS との準拠状況(全数調査)
+
+上流 digital-go-jp/design-system-example-components-html の vendor 済み commit
+3b34f4c3 を git tree API で全数取得して突き合わせた。
+
+- 上流の公式エントリ **41**。うち **40 が正式コンポーネント**(各 c/c.css を持つ)、
+  **1 が パターン**(card —— card.css を持たず example CSS 6 本のみ)。
+- こちらが vendor 済みは **11**。よって **未 vendor の正式コンポーネントが 29**。
+
+未 vendor 29: blockquote / breadcrumb / calendar / carousel / date-picker /
+description-list / disclosure / drawer / emergency-banner / file-upload /
+hamburger-menu-button / horizontal-menu / image / language-selector / link /
+list / menu-list / menu-list-box / modal-dialog / page-navigation /
+progress-indicator / radio / resource-list / search-box / select /
+step-navigation / tab / toc / utility-link
+
+### 公式にあるのに自前実装してしまったもの(要修正)
+
+| 自前 | 公式 | 箇所 |
+|---|---|---|
+| .pt-select / .tb-select / .mjs-select | **select** | 3面(partners / isic-6310 / isic-6399) |
+| input-text[type=search] | **search-box** | 3面(catalog / 6310 / 6399) |
+| skin の a 要素スタイル | **link** | console 127 + LP 18 |
+| skin の ul/ol/li | **list** | console 127 + LP 18 |
+
+**select が最も明確な非準拠。** 移行時に「上流の vendored subset に .dads-select が
+無い」と判断して 3 面で自前 CSS を書き、コメントにも「上流 DADS の vendored subset
+に無い」と書いたが、**正しくは「vendor していないだけで上流には select.css を持つ
+正式コンポーネントが存在する」**。当該コメントは事実誤認なので直す。
+
+dds.css には .dads-radio / .dads-select / .dads-link / .dads-list のルール定義が
+**0 件**(table CSS 内で :has(.dads-radio) として参照されるだけ)であることも確認した。
+
+### 自前で問題ないもの
+
+- **dds-ext-card** —— 上流の card はパターン(card.css 無し)なので独自実装で正しい。
+- dds-ext-container / grid / stack / row / section / hero / center / lead ——
+  上流に対応物なし。dds-ext-* prefix で上流 class と分離済み。
+
+### component 化できていない最大面積: jp-go-dds.skin
+
+console 127 面 + LP 18 面に当てている互換スキンは **DADS コンポーネントではなく、
+素の markup を DADS token で塗る互換レイヤー**。.ok / .warn / .critical / .banner /
+.bar などは DADS の語彙ではない。markup を触らずセクション欠落を避けるための
+意図的な設計だが、準拠という観点では最大の未達。将来 link / list / notification-banner
+(既 vendor)へ寄せられる部分がある。
+
+### 優先順位
+
+1. select を vendor して 3 面を差し替え(明確な非準拠、範囲が小さい)
+2. search-box を vendor(検索欄 3 面)
+3. link / list を vendor(skin の素要素スタイルを公式へ寄せる)
+4. radio / date-picker / file-upload(フォーム系)
+5. breadcrumb / page-navigation / toc(ナビゲーション系、現状どの面も未所持)
+
 ## Follow-ups
 
 1. 共有テンプレート由来の product face — **完了**。対象は 387 repo(marker
