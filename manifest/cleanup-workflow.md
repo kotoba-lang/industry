@@ -281,3 +281,18 @@ nbb scripts/west-orphan-audit.cljs --blocking
 Report merged PRs, closed/superseded PRs, deleted remote branches, preserved stashes,
 untracked placeholder repos, and **west-orphan summary** (blocking count +
 true-orphan-git count, with any intentional deferrals named).
+
+## Session closing
+
+`closing` is a trigger for Standard Cleanup plus an authoritative handoff:
+
+1. Update the relevant ADR/gap ledger with landed-vs-evidence status and a concrete resume point.
+2. Compare every evidence branch with the current remote default branch before opening or merging
+   a PR. A branch that deletes newer default-branch work is superseded evidence, not merge input.
+3. Create and merge a fresh-default-branch PR for the closing record and any safely ported delta.
+   Comment and close conflicting predecessor PRs with a link to the record or successor.
+4. After merge confirmation, remove only the closing session's worktrees and branches.
+5. Finish with merged PR/default SHA, remaining gaps in priority order, exact validation results,
+   preserved owner WIP, open PRs, worktrees, stashes, and west-orphan counts.
+
+The closing report must be sufficient for a new agent with no conversation history to resume.

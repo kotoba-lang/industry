@@ -6,8 +6,8 @@
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-07-25"
-  :adr/last-verified "2026-07-25"
-  :adr/last_verified "2026-07-25"
+  :adr/last-verified "2026-07-26"
+  :adr/last_verified "2026-07-26"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "kotoba-wasm-component-first-execution-boundary"
@@ -111,6 +111,78 @@ provider.
   testable.
 - Component/WASI support is an admission gate: unsupported imports reject before execution,
   rather than causing a fallback to ambient host APIs.
+
+## Implementation ledger and remaining gaps (2026-07-26)
+
+The implementation session proved the intended v0.3 boundary on evidence branches, but those
+long-running branches are **not the current default branches**. They diverged before substantial
+compiler Component-memory work and Kototama authority-daemon work landed. A direct merge would
+delete or roll back current-main functionality, so the evidence branches are retained only as
+porting references and their conflicting PRs are closed as superseded.
+
+### Proven on the evidence revision set
+
+- ABI revision `0617a60ac8d1179d2de40aef52783954fcb0d1cb` defines
+  `aiueos:capability@0.3.0`, a host-owned `grant`, exact `grant-request` operation selector,
+  typed request/response records, denial results, and the effectful `application` world.
+- Compiler evidence revision `5f8269a8091423426bd1107fcf7cad427633f89f` lowers all seven
+  operations (identity sign/verify, SHA-256, HTTP post, log read/append, clock now) through
+  Canonical ABI and host-issued grants. Its full suite passed 332 tests / 4046 assertions.
+- Kototama evidence revision `5d3bacd558b12a99d503f92fa8ae75d59d00afea` binds all seven
+  typed interfaces in the native Wasmtime micro-TCB, checks exact operation authority and quotas,
+  requires a live lease proof and persisted audit receipt, rejects ambient WASI and ABI v0.2,
+  and requires explicit Aiueos policy grants for sensitive operations. Seven-operation native
+  E2E passed 14 assertions; its TCB inventory was valid.
+
+These results are evidence that the boundary design works. They are not evidence that current
+`main` contains the implementation.
+
+### P0 — port without regressing current main
+
+1. Port ABI v0.3 to `kotoba-lang/abi` current `main` and publish one immutable revision.
+2. Port the typed-operation lowering into the compiler's current
+   `component-core` / `component-composition` / ADR-0076/0077 linear-memory architecture.
+   Do not replace that architecture with the evidence branch's older backend-local Component
+   encoder. Canonical list allocation must preserve current alignment, arena sizing, and
+   post-return rules.
+3. Port the native typed grant/resource/lease/audit enforcement into Kototama current `main`
+   while preserving the authenticated authority epoch consumer and authority-daemon work landed
+   through PRs 60–69. No authority file, daemon, packaging unit, or conformance fixture may be
+   deleted as a side effect of the port.
+4. Pin compiler and Kototama to the same landed ABI revision, regenerate WIT bindings, and make
+   cross-repo CI exercise all seven operations from compiler source through the native host.
+5. Reissue release evidence from default-branch commits only. Evidence-branch SHAs must not be
+   reported as a production revision set.
+
+### P1 — complete the architectural decision
+
+- Compile the Aiueos policy/control plane itself as a Component and prove that the native host
+  only verifies and enforces decisions; today the native micro-TCB boundary is proven, while the
+  full guest-control-plane replacement remains incomplete.
+- Replace the temporary scalar migration convention (`s64` encoded as eight little-endian bytes,
+  fixed empty HTTP path/headers) with source-level typed request/response values. Keep the scalar
+  convention only as an explicitly versioned compatibility adapter.
+- Add denial-path E2E for every operation: wrong-operation grant, revoked/expired epoch, quota,
+  deadline, unavailable audit sink, malformed provider result, short byte result, allocator
+  exhaustion, and old/ambient imports.
+- Qualify the same closed WIT world on each supported production host and record engine/version,
+  fuel, memory, deadline, and cancellation conformance.
+
+### P2 — content-addressed / Unison-style safety
+
+Execution identity already includes Component and definition CIDs, but Unison-style
+content-addressed code identity, dependency closure, update propagation, and rollback semantics
+are not yet one integrated language/runtime design. Content addressing improves safety only when
+the admitted definition closure, capability descriptor, lease subject/audience, audit record,
+and release provenance all bind the same hashes. Adding Unison-like naming or storage alone does
+not create that property. Specify and prove this binding before claiming Unison-derived safety.
+
+### Resume point
+
+Start from current default branches, not the evidence branches. Use the evidence commits above as
+behavioral references and copy only the typed boundary delta. First inspect current compiler
+ADRs 0076/0077 and Kototama authority lifecycle PRs 60–69, then write failing current-main E2E
+tests for the seven-operation world before porting implementation code.
 
 ## Alternatives rejected
 
