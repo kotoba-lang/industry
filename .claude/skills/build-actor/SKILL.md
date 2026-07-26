@@ -74,9 +74,30 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   ない*）。actor は鍵を持つことで自分の graph の owner → depth-1 の自己 mint が
   構造的に authorized。**owner hand-off も共有 token も要らない**（「token をもらう／
   owner が grant する」前提は誤り）。
-- 手本は `cloud-itonami/src/cloud_itonami/edge/cacao.cljc`（旧 `ai-gftd-itonami/src/itonami/cacao.clj` 参照は廃止。2026-07-04）: did:key(0xED01+base58btc →
-  `z6Mk…`)、鍵由来 IPNS(`ipns-name` → `k51qzi5uqu5d…`)、SIWE/wire は `kotoba.cacao` の
-  byte-exact 純関数を移植、署名は JDK Ed25519、最小 CBOR。`load-or-create-identity!`
-  で actor 鍵を 初回生成→永続→再読込。**秘密鍵は `.<actor>/identity.edn` に置き
-  gitignore（git に絶対コミットしない）**。`kotoba-store {:identity me}` で graph 既定
-  ＝鍵由来 IPNS ＋ 自己 mint。設定参照は `manifest/repos.edn` の `:kotoba`。
+- **CACAO の実装は書かない。`kotoba-lang/org-chainagnostic-cacao` に依存する**
+  （ADR-2607268000。GitHub 上の旧名 `kotoba-lang/cacao` は同一 repo への redirect）。
+  JVM actor は `cacao.core`（mint / verify）、edge/Worker は `cacao.edge.mint` /
+  `cacao.edge.verify`。did:key(0xED01+base58btc → `z6Mk…`)・SIWE/EIP-4361 平文の
+  再構成・CBOR envelope・Ed25519・temporal window はすべてそこにあり、**他のどこにも
+  あってはならない**。
+
+  ```clojure
+  ;; deps.edn
+  io.github.kotoba-lang/org-chainagnostic-cacao
+  {:git/url "https://github.com/kotoba-lang/org-chainagnostic-cacao.git"
+   :git/sha "b395935018d97ee281c9b4564f855c8242b438e7"}
+  ```
+
+  **旧 手本（`cloud-itonami/src/cloud_itonami/edge/cacao.cljc` を写す）は廃止。**
+  この skill がそれを指していた結果、`<actor>/cacao.clj` が約 25 repo に複製され、
+  しかも「keep in sync」コメント付きのまま**実際に乖離した**（実測 2026-07-26:
+  `denrei` は共有 `ed25519.core`/`ipns.core` を使い multi-cap `grant->resources` を
+  持つが、`gijiroku` は JDK Ed25519 と最小 CBOR を自前で持ち multi-cap が無い）。
+  手で同期する取り決めは機能しない。**新しい actor でこれらを写さない。**
+  既存コピーを持つ repo を触る機会があれば、その時に上記依存へ寄せる。
+
+- 鍵の扱いは actor 側の責任として残る: `load-or-create-identity!` 相当で初回生成→
+  永続→再読込し、**秘密鍵は `.<actor>/identity.edn` に置き gitignore（git に絶対
+  コミットしない）**。鍵由来 IPNS 名は `ipns.core`（`k51qzi5uqu5d…`）。
+  `kotoba-store {:identity me}` で graph 既定＝鍵由来 IPNS ＋ 自己 mint。
+  設定参照は `manifest/repos.edn` の `:kotoba`。
