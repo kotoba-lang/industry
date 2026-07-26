@@ -260,7 +260,7 @@ Worth stating as a method, because each rung found defects the one below could n
   SAME external vectors on both platforms — 29 tests / 48 assertions under nbb
   against 20/28 on the JVM — plus a multi-block Keccak vector the shared suite never
   exercised. Also added `legacy-digest` and `signature->bytes` (both platforms), and
-  the ns docstring's stale ":clj-only" inventory was rewritten. Both halves are
+  the ns docstring's stale \":clj-only\" inventory was rewritten. Both halves are
   documented as NOT constant-time.
 - **LI.FI: LIVE-VERIFIED 2026-07-26** (keyless, `li.quest`). The first live call
   FAILED and found **four** real defects that fixtures could not, because a fixture
@@ -313,6 +313,17 @@ Worth stating as a method, because each rung found defects the one below could n
 - **Regulatory.** Charging a fee to intermediate swaps can bring MSB/VASP obligations
   in many jurisdictions even for a non-custodial interface. Not a determination this
   ADR can make; flagged as a prerequisite to monetizing, not to building.
+- **A THORName is needed only for BTC-sourced fee-taking** (80-byte `OP_RETURN`), not
+  for EVM-sourced. Registering one is a native THORChain tx — fastest via Keplr; a
+  self-hosted path would need Cosmos tx encoding (secp256k1 and bech32 already exist
+  here).
+- **EVM-address affiliate delivery is unverified.** Priced by the quote, but payout to
+  a non-THOR address is not established. Use a `thor1…` affiliate until a real swap
+  shows otherwise.
+- **The treasury Safe is 1-of-1 and Ethereum-only.** No quorum protection today, and it
+  must be deployed on any other chain before that chain is used to receive.
+- **0x remains deferred** (owner decision). One live call away from `:verified? true`
+  whenever a key exists; LI.FI alone is sufficient to operate.
 
 ### Relationship to the earlier read-only boundary
 
@@ -325,6 +336,85 @@ the \"needs its own ADR\" gate those two ADRs described was in effect satisfied 
 different route. This ADR states the current position plainly: signing exists in the
 crypto/wallet libraries, the swap plane orchestrates but never holds a key, and both
 chain-observer repos stay read-only.
+
+## Receiving the fee: no wallet dependency, and one hazard that could burn it
+
+Asked whether Keplr or Vultisig is required to connect. **Neither is, and there is no
+connect step at all** — worth recording because it is a property of the architecture,
+not a coincidence.
+
+A THORChain swap is an ordinary BTC/ETH transfer to a vault address with a memo.
+Nothing signs a Cosmos transaction, so Keplr (a Cosmos signer) never enters the swap
+path. And this plane is not a dapp connecting to a wallet: it **is** the wallet, with
+keys held by `btc-crypto`/`eth-crypto`/`wallet` and signing already demonstrated
+on-chain.
+
+Where a Cosmos signer would actually matter, measured 2026-07-26:
+
+| action | needs |
+|---|---|
+| **earn** an affiliate fee | a `thor1…` address. No wallet, no THORName registration |
+| **move** the earned RUNE out | a native THORChain tx -> Keplr/Vultisig, or our own Cosmos tx encoding |
+| register a THORName | same (native tx) |
+
+A `thor1…` address is derivable **today** with `btc-crypto`'s existing bech32 +
+HASH160 — a THORChain address is bech32 over HASH160(compressed secp256k1 pubkey) with
+hrp `thor`, structurally the same shape as P2WPKH. A derived one was accepted by the
+live network as an affiliate and priced; a one-character mutation was rejected, so the
+acceptance is checksum-enforced and meaningful. Vultisig is an MPC/threshold wallet —
+relevant only if treasury custody becomes multi-party, not for connectivity.
+
+### The affiliate constraint that survives
+
+A **plain 43-character `thor1…` affiliate does not fit a Bitcoin-sourced swap.** The
+live network answers `generated memo too long for source chain` — the 80-byte
+`OP_RETURN` limit, i.e. **the network produced the same error our own
+`thorchain.memo/max-memo-bytes` guard produces.** EVM-sourced swaps carry the memo in
+router calldata and accept 101 bytes fine.
+
+So the earlier register-a-THORName prerequisite is now precise: **not needed for
+EVM-sourced swaps; effectively required to take a fee on BTC-sourced ones** — and BTC
+is the deepest pool by a factor of three, so that is the commercially relevant half.
+
+An EVM address as affiliate is *accepted and priced identically* by the quote endpoint,
+but **delivery is unverified**: THORNames carry `preferred_asset` /
+`affiliate_collector_rune` machinery that exists precisely to accumulate RUNE and
+convert it outward, and whether a raw non-THOR address gets the same treatment can
+only be established by a real swap. A priced quote is not proof of payout, and this
+ADR does not treat it as one.
+
+### A Safe exists only where it was deployed
+
+`treasury` advised switching the payment rail to a cheaper L2 without changing the
+recipient, on the grounds that a Safe address is the same across chains (CREATE2). The
+premise is often true and **the conclusion could burn funds**: a Safe is a CONTRACT,
+deployed per chain, and value sent to an address with no code there cannot be moved by
+anyone.
+
+Measured on the owner's actual Safe (`0x640404B5…A881`): deployed on Ethereum mainnet
+as **v1.4.1**, `eth_getCode` **empty on BSC, Avalanche, Base, Polygon, Arbitrum and
+Optimism**. Following the old advice would have sent USDC to a dead address on six
+chains. It is also **threshold 1 of 1 owner** — a smart account, not a quorum, so it
+carries no multisig protection today.
+
+Fixed in both libraries, and enforced rather than documented:
+
+- `treasury/verify-recipient-deployed` — refuses a contract recipient on a chain where
+  it has no code, and the inverse (caller said EOA, address has code) so the check
+  cannot pass for both cases.
+- `swap.core/check` gained a `facts` arity taking `:fee-recipient-code`, with
+  `:fee-recipient-has-no-code` (fatal) and `:fee-recipient-unverified`.
+  `:fee-recipient-contract?` is **declared on the intent, never inferred** — an EOA
+  legitimately has no code, so a missing-code result is otherwise ambiguous between
+  fine and funds-lost. Declared-but-unchecked is its own problem, so a caller cannot
+  forget to look, and not declaring anything preserves prior behaviour.
+
+Verified live against that Safe on a chain where it exists and one where it does not.
+Both directions are asserted deliberately: the first version of that check read the RPC
+result from the wrong key, got `nil` on both chains, and **the negative assertion
+passed by accident** — only the positive case exposed it. That is the general lesson of
+this whole effort, and it is why every refusal in this plane is paired with a case that
+must succeed.
 
 ## Chain coverage review (2026-07-26, CoinMarketCap top 40)
 
