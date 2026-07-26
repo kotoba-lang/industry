@@ -341,11 +341,12 @@
      :skipped (into {} (for [[k v] grouped :when (not= k :take)] [k (vec v)]))
      :tracked (vec tracked)}))
 
-(declare land-branches!)
+(declare land-branches! live-branches)
 
 (defn- land-repo! [{:keys [dir slug base additive skipped tracked deleted]}]
   ;; canonical 化はここ（着地対象がある repo だけ）。plan 段階ではやらない。
-  (let [slug (when (or (seq additive) (seq tracked))
+  (let [branch-work? (and branches? (seq (live-branches dir base)))
+        slug (when (or (seq additive) (seq tracked) branch-work?)
                (if slug
                  (canonical-slug slug)
                  ;; remote が無いなら作る（オーナー指示 2026-07-25「remote がなければ
@@ -362,7 +363,12 @@
                      (str/join ", " (take 4 v)))))
   (cond
     (nil? slug) (println "  → remote が無いので着地先が無い。報告のみ。")
-    (and (empty? additive) (empty? tracked)) (println "  → 着地対象なし")
+    (and (empty? additive) (empty? tracked))
+    (cond
+      (not branches?) (println "  → 着地対象なし")
+      apply?          (land-branches! dir slug base)
+      :else           (println (format "  plan :branches  %d 本 → push / PR（merge しない）"
+                                       (count (live-branches dir base)))))
     :else
     (if-not apply?
       (do (when (seq additive) (println (format "  plan :additive  %d files → PR → merge" (count additive))))
@@ -481,7 +487,15 @@
        (remove annex?)
        (filter (fn [d] (if only-names (some #(str/ends-with? d (str "/" %)) only-names) true)))))
 
-(def plans (->> repos (map plan-repo) (filter #(or (seq (:additive %)) (seq (:tracked %)) (seq (:skipped %))))))
+(def plans
+  (->> repos (map plan-repo)
+       (filter #(or (seq (:additive %)) (seq (:tracked %)) (seq (:skipped %))
+                    ;; --branches のときは作業ツリーが綺麗でもローカル専用 branch を
+                    ;; 持つ repo を候補に入れる。これが無いと、この機械にしか存在しない
+                    ;; branch しか持たない repo は候補にすら入らず、--branches を付けても
+                    ;; 一本も push されない（実測 2026-07-27: 70 repo だけ処理され、
+                    ;; 227 repo が machine-only のまま残った）。
+                    (and branches? (seq (live-branches (:dir %) (:base %))))))))
 (def selected (if max-repos (take max-repos plans) plans))
 (def dropped (- (count plans) (count selected)))
 
