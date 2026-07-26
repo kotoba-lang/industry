@@ -192,6 +192,23 @@
 
 (defn- eprogress [s] (.error js/console s))
 
+(def ^:private junk-re
+  ;; ビルド副産物。untracked として数えると本物の未着地 WIP が埋もれる。
+  ;; 実測 2026-07-26: untracked を持つ 167 repo のうち大半が `.cpcache/` か
+  ;; `target/` の 1 エントリだけで、直前の cleanup-land 実行はこれを 16 本の
+  ;; PR にして出してしまっていた（全 close 済み）。数えるが別枠で報告する。
+  #"(^|/)(\.cpcache|target|node_modules|\.nbb|dist|\.shadow-cljs|\.wrangler|\.clj-kondo|\.lsp|\.cljs_node_repl)/?$|\.log$|(^|/)\.DS_Store$")
+
+(defn- junk-path? [line]
+  (boolean (re-find junk-re (str/trim (subs line (min 3 (count line)))))))
+
+(def ^:private branch-cap
+  "1 repo あたり per-branch 解析（merge-base + ahead-of-remote = 3 git 呼び出し）を
+  許す branch 数。実測: kotoba-lang/webgpu は 67 本、slides は 90 本超あり、
+  これだけで数百回の git 起動になって survey が完走できなかった。上限を超えたら
+  解析を打ち切るが、PR 照会と同じ規律で件数を必ず報告する。"
+  20)
+
 (defn- survey-local
   "phase 1: ローカル git のみ。ネットワークに一切触らない。"
   [dir]
@@ -202,14 +219,20 @@
         ;; status 自体を撮らない（12 万件の working tree walk を避ける）。
         status  (when-not annex
                   (remove str/blank? (str/split-lines (or (gitc dir "status" "--porcelain") ""))))
-        untracked (count (filter #(str/starts-with? % "??") status))
-        dirty     (- (count status) untracked)
+        untracked-lines (filter #(str/starts-with? % "??") status)
+        junk-untracked (count (filter junk-path? untracked-lines))
+        untracked (- (count untracked-lines) junk-untracked)
+        dirty     (- (count status) (count untracked-lines))
         locals  (remove #{"" "main" "master" "synced/main" "git-annex" "manifest-rev"}
                         (str/split-lines (or (gitc dir "for-each-ref"
                                                    "--format=%(refname:short)" "refs/heads/") "")))
         default (default-branch dir)
+        ;; branch 数が上限を超える repo は per-branch 解析を打ち切る（下で報告）。
+        branch-analysis-skipped (when (> (count locals) branch-cap) (count locals))
         ;; 既に default から到達可能な branch は着地済み。PR の有無を問わない。
-        live    (remove #(merged-into-default? dir % default) locals)
+        live    (if branch-analysis-skipped
+                  []
+                  (remove #(merged-into-default? dir % default) locals))
         ;; ahead-of-remote は branch ごとに 2 回呼ばれていた（unpushed 判定と
         ;; pushed-live 判定）。1 回に畳んで分岐する。
         aheads  (into {} (map (fn [b] [b (ahead-of-remote dir b)]) live))
@@ -218,12 +241,15 @@
                         (str b ":" (if (= n :no-remote) "no-remote" n))))
         pushed-live (vec (for [[b n] aheads :when (and (number? n) (zero? n))] b))]
     {:dir dir :branch br :stash stash :dirty dirty :untracked untracked
+     :junk-untracked junk-untracked
+     :branch-analysis-skipped branch-analysis-skipped
      :locals locals :unpushed unpushed :pushed-live pushed-live
      :annex? annex :slug (repo-slug dir)
      ;; phase 1 の時点で確定する未着地。nopr は phase 2 で足す。
      :local-unlanded? (boolean (if annex
                                  (seq unpushed)
-                                 (or (pos? untracked) (pos? dirty) (seq unpushed))))}))
+                                 (or (pos? untracked) (pos? dirty) (seq unpushed)
+                                     branch-analysis-skipped)))}))
 
 (defn- survey-prs
   "phase 2: push 済み未着地 branch にだけ `gh pr list` を当てる。予算超過は打切り、
@@ -293,7 +319,7 @@
                                   #(if (:annex? %) 0 (- (:dirty %)))
                                   :dir)))]
     (doseq [{:keys [dir branch stash dirty untracked locals unpushed nopr
-                    nopr-skipped annex? unlanded?]} rows]
+                    nopr-skipped annex? unlanded?] :as row} rows]
       (let [parts (cond-> []
                     unlanded?                           (conj "UNLANDED")
                     annex?                              (conj "annex(untracked/dirty は既定状態)")
@@ -302,6 +328,8 @@
                     (seq unpushed)                      (conj (str "unpushed=" (str/join "," unpushed)))
                     (seq nopr)                          (conj (str "nopr=" (str/join "," nopr)))
                     nopr-skipped                        (conj (str "nopr=?(" nopr-skipped " branches, PR照会を打切り)"))
+                    (:branch-analysis-skipped row)       (conj (str "branches=?(" (:branch-analysis-skipped row) " 本, branch解析を打切り)"))
+                    (pos? (:junk-untracked row 0))       (conj (str "junk-untracked=" (:junk-untracked row) "(ビルド副産物・着地対象外)"))
                     (pos? stash)                        (conj (str "stash=" stash))
                     (and (not= branch "HEAD") (not= branch "")) (conj (str "branch=" branch))
                     (seq locals)                        (conj (str "locals=" (count locals))))]
