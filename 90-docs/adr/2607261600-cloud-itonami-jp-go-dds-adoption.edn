@@ -320,13 +320,28 @@ console 127 面 + LP 18 面に当てている互換スキンは **DADS コンポ
 意図的な設計だが、準拠という観点では最大の未達。将来 link / list / notification-banner
 (既 vendor)へ寄せられる部分がある。
 
-### 優先順位
+### 対応(実施済み)
 
-1. select を vendor して 3 面を差し替え(明確な非準拠、範囲が小さい)
-2. search-box を vendor(検索欄 3 面)
-3. link / list を vendor(skin の素要素スタイルを公式へ寄せる)
-4. radio / date-picker / file-upload(フォーム系)
-5. breadcrumb / page-navigation / toc(ナビゲーション系、現状どの面も未所持)
+- **select / link / list を vendor した**。vendor 済みと同じ upstream commit
+  3b34f4c3 に固定して再実行したので dds.css は **+215 行の追加のみ・既存 CSS の
+  変更 0 行**。vendor 済みは 11 → 14、未 vendor は 29 → 26。
+- **自前 .pt-select / .tb-select / .mjs-select を撤去し dds/select に差し替えた**
+  (partners / isic-6310 / isic-6399)。markup は上流
+  select/with-form-control-label.html に忠実。実ブラウザで select の高さが
+  input と一致(48px)することを確認。
+- **必須マーカーの意味的誤りを修正**。調査中に vendored CSS を読んで判明:
+  __status はグレーの塗りバッジ(状態表示用)、__requirement が必須マーカー本体
+  (data-required=true で赤字)。form-field に :requirement / :required? を足し、
+  __status は状態表示用として残した(後方互換)。
+
+### 残りの優先順位
+
+1. search-box(検索欄 3 面)。ただし公式 search-box は scope select + 送信ボタンを
+   持つ複合部品で、こちらの検索欄は即時フィルタなので、そのまま当てると
+   「送信する」という誤った UX を示唆する。当てるなら UX ごと設計し直す。
+2. radio / date-picker / file-upload(フォーム系)
+3. breadcrumb / page-navigation / toc(ナビゲーション系、現状どの面も未所持)
+4. skin(console 127 + LP 18)の素要素スタイルを link / list へ寄せる
 
 ## Follow-ups
 
