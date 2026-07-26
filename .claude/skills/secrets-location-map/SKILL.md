@@ -138,6 +138,23 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     （loopback）。**配信先の YouTube/Twitch stream key はここにもどこにも無い** —
     operator のマシンの `~/.babiniku/mediamtx-bridge.yml`（0600、`npm run
     bridge:config` が生成）だけに存在し、Worker にもブラウザにも repo にも入らない。
+- **Radicle node passphrase（COB 署名鍵の unlock）**: kagi compartment `personal`
+  - `radicle-node-passphrase` — **この Mac（main-2、alias `com-junkawasaki`、
+    `did:key:z6Mkud1DguEntg5EBhsfiHNJJBs8Qiw39x5iRgSCfH3cAuin`）**の node 鍵。
+    元は macOS Keychain の service `radicle` にあり、2026-07-26 に kagi へ写した。
+  - `radicle-seed-gad-passphrase` — 常時稼働 seed **gad**（alias `seed-gad`、
+    `did:key:z6MkmUNjE8mrWx7d1NVnYCWZFokoTMaPNxmubf8RpBfAu8Me`）の node 鍵。
+    実体は gad の `~/.config/radicle-node.env`（0600、systemd の
+    `EnvironmentFile=`）にあり、同日 kagi へ写した。
+  - **なぜ要るか**: Radicle の COB（issue / patch）は**署名する**ので、node が
+    動いているだけでは書けない。gad に ssh-agent は無いため passphrase 経路が
+    唯一の unlock 手段で、fleet-ci の Radicle 反映（`scripts/fleet-ci/tick.cljs`
+    の `:rad`）はこの item を読む。
+  - ADR-2607252200 はこの置き場所を決めていたが**実際には置かれておらず**、
+    両方とも `no such item` だった（ADR-2607259600 の Not done にも
+    「secrets-location-map に未記載」として残っていた）。両方とも解消済み。
+  - **端末 A（25mbair、alias `junkawasaki`）の passphrase は未記載のまま** —
+    その端末に到達できないため（hostname が解決しない）。
 - **kagi（`kotoba-lang/kagi`）**: net-kotobase / kotoba-lang 系の新規プロジェクト
   向け secrets は、1Password ではなく **こちらを正**にしていく方針（自己主権
   vault、ADR-2606272330）。**実在する vault の実体は
