@@ -76,7 +76,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 - **276 organization / 15 カテゴリ / 36 form-family / 28 データファイル**
 - 検証: source-pinned **58**（primary 42 / secondary 16）、未 pin 218（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
-- pin の鮮度: current 34 / recent 16 / ageing 4 / **stale（7年以上）4**（`coverage.cljs freshness`）
+- pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
   **statutory-no-personality 8** → **企業・LEI レジストリから不可視が約 41%**
 - entity kind: org-form **197（87%）** / named-org 29（13%）
@@ -234,6 +234,18 @@ popular-education・foss-project 各 3。
 これは「pin が悪い」のではなく、**その分野に新しい計測が存在しない**ことの表示である。
 世界最大のスポーツの参加者数が20年更新されていないという事実は、corpus が可視化するまで
 誰も数えていなかった。
+
+**鮮度計測は即座に仕事を生んだ**（iteration 30）。最古の pin を当たり直した結果:
+
+- **タイ村落基金は更新できた**（14年 → 2年）。2012年の世界銀行評価に代えて、仏暦2567（2024）の
+  基金事務局データを pin: 村落基金 75,000・都市コミュニティ基金 3,872・軍コミュニティ基金 738、
+  委員と会員の合計 **10,743,207 人**、さらに**法人登記済み 77,927／未登記 1,683** という
+  登記状況まで公表されている（本 corpus の中心変数がそのまま出ている稀な例）。
+- **WIR は更新できなかった。そしてその理由が重要だった。** Bank WIR は投資家向けページで
+  貸借対照表・利益・自己資本（2024年は過去最高益 1,750万フラン、総資産 66億フラン）を公表するが、
+  **参加中小企業数も WIR 建て取引高も公表していない**。銀行が報告するのは銀行の指標であって、
+  共同体の指標ではない。この否定的結果を `:org/refresh-checked` / `:org/refresh-result` として
+  記録した — **次の iteration が同じ空振りを繰り返さないため**。
 
 ### 8. pin は「衰退している」という通説も訂正する
 
