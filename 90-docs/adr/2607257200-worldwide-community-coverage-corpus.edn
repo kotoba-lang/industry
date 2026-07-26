@@ -74,7 +74,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 ## 現在の状態（2026-07-26）
 
 - **299 organization / 15 カテゴリ / 36 form-family / 33 データファイル**
-- 検証: source-pinned **58**（primary 42 / secondary 16）、未 pin 218（79%）
+- 検証: source-pinned **60**（primary 43 / secondary 17）、未 pin 239（80%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
@@ -281,6 +281,13 @@ iteration 35 でこの 38 か国も消化し、**1 形態のみの国は 0** に
 **ただし「1 形態のみ 0」も達成ではない。** 2-3 形態が 135 か国＝70% であり、深さの中央値は
 依然として低い。日本 28・米国 28・英国 25 に対し大半は 2-3 である。指標は
 **100% を主張しないための計器**として常設してある。
+
+**そして深さ指標そのものにバイアスがある**（iteration 36 で出力に明記）: `:org/countries` は
+**例示であって網羅ではない**。6 か国を挙げたエントリは「7 か国目には無い」と主張していない。
+したがって深さは**下限値**であり、国同士の比較には使えない。さらに重要なのは、
+**国リストを伸ばせばこの指標は簡単に上がる**ということで、それは数字を作る行為である。
+レポータ出力に \"Do not raise this metric by lengthening country lists; that manufactures depth.\"
+と印字して、後続の iteration（人間・エージェントを問わず）が指標を追いかけないようにした。
 
 なお導入時のリストは**タンザニアを国連加盟国から落としており**、レポータが TZ を
 「非加盟コード」として表示していた。193 に修正した上で、手入力リストであることを
