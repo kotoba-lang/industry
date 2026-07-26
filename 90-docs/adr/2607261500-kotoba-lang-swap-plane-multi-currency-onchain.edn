@@ -1,0 +1,246 @@
+[{:db/id -1
+  :adr/id "adr-2607261500-kotoba-lang-swap-plane-multi-currency-onchain"
+  :adr/doc_type "adr"
+  :adr/title "ADR-2607261500: kotoba-lang swap plane -- on-chain multi-currency swap (BTC/ETH/ERC-20) with a fee, two rails, no custody contract"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/last_verified "2026-07-26"
+  :adr/related ["90-docs/adr/2607172600-kotobase-bitcoin-ethereum-clients.edn"
+                "90-docs/adr/2607172700-bitcoin-ethereum-boundary-correction.edn"
+                "90-docs/adr/2607051621-cloud-murakumo-agpl-isic-network-registry-kotoba-treasury.edn"
+                "90-docs/adr/2607093100-x402-monetization-gateway-integration.edn"
+                "90-docs/adr/2607201300-kotoba-safe-application-language-profile.edn"]
+  :adr/body
+  "# ADR-2607261500: kotoba-lang swap plane — on-chain multi-currency swap with a fee
+
+**Status**: accepted
+**Date**: 2026-07-26
+**Deciders**: Jun Kawasaki
+**Scope**: `kotoba-lang` org — 1 extended repo (`eth-crypto`), 3 new repos (`erc20`,
+`org-thorchain`, `swap`)
+
+## Context
+
+The owner asked for a MetaMask-shaped capability: swap between multiple currencies
+(Ethereum, Bitcoin, tokens) with the swap completing **on-chain**, while **taking a
+fee** — noting correctly that MetaMask itself takes one.
+
+An inventory of what already existed found the wallet half largely built and the swap
+half entirely absent.
+
+**Already working (verified by reading the code, not the READMEs):**
+
+| layer | repo | state |
+|---|---|---|
+| ETH crypto | `eth-crypto` (622 lines) | Keccak-256 (own Keccak-f[1600]), EIP-55, EIP-712, ecrecover, secp256k1-sign (RFC 6979, low-s), RLP, `sign-tx-legacy` (EIP-155) |
+| BTC crypto | `btc-crypto` (886 lines) | BIP-32/39, base58check, bech32/bech32m, RIPEMD-160, **tx signing** (legacy P2PKH sighash + BIP-143 P2WPKH segwit, DER) |
+| wallet | `wallet` (331 lines) | one BIP-32 seed driving both `:eth` and `:btc` through a `ChainDriver` protocol, keystore encryption, SIWE |
+| EVM calls | `base-l2` (767 lines) | ABI encode/decode, function selectors, `eth_call`/`eth_sendRawTransaction`/receipts/gas, ERC-4337 paymaster |
+| fee ledger | `treasury` (305 lines) | `fee-split`, `crypto-quote`, on-chain receipt verification, no-custody design |
+| read-only chain | `org-ethereum-jsonrpc`, `org-bitcoin-p2p` | observers, kotobase-backed |
+| Solidity precedent | `engi-witness-escrow` | Foundry + `.sol`, explicitly local-test-only |
+
+**Missing (the swap itself):**
+
+1. **No DEX routing.** `com-uniswap-v3` is a 188-line generated stub — the same
+   byte-count template as `com-coinbase`/`com-chainlink`, a datom CRUD scaffold with
+   no pool math and no router calldata.
+2. **No EIP-1559.** Only `sign-tx-legacy`. `base-l2/src/kotoba/lang/base_l2/l2.clj:60`
+   already said so: \"EIP-1559 support can be added later (add a `sign-tx-eip1559`)\".
+   Legacy-only signing is not viable on today's gas market.
+3. **No ERC-20 helpers.** An ABI encoder existed; approve/allowance/permit did not.
+4. **No cross-chain anything.** `kotoba-lang/bridge` is README + one ADR with `src/`
+   empty (a historical reservation for a retired Rust crate).
+5. **No cljs crypto at all.** `eth-crypto`'s `:cljs` branch is throw-stubs, for a
+   correct reason recorded in its own docstring: JS bitwise operators are 32-bit, so
+   Keccak-f[1600]'s 64-bit lanes would *silently compute a wrong hash* rather than
+   fail to compile.
+
+### The structural fact that determines the design
+
+**Bitcoin has no smart contracts, so \"BTC <-> ETH completing on-chain\" has exactly
+three possible shapes**, and picking one is the whole architecture:
+
+- **HTLC atomic swap.** Genuinely trustless. Requires supplying counterparty
+  liquidity, both parties online, timelock waits, and refund handling on failure. The
+  UX does not survive contact with users; MetaMask does not do this either.
+- **Wrapped/pegged BTC** (WBTC custodian, tBTC threshold). Collapses to an ERC-20 swap
+  plus a custodian. This is what \"BTC swap\" means in most wallets.
+- **Native cross-chain liquidity network** (THORChain, Maya, Chainflip, Garden).
+  Native BTC in, native ETH out.
+
+The third also answers the fee question in the cleanest possible way: **THORChain
+takes an affiliate address and basis points in the swap memo and skims the fee
+on-chain itself, paying the affiliate as part of the swap.** No fee contract, no
+custody, no audit surface.
+
+### How MetaMask actually charges (verified 2026-07-26)
+
+**0.875% service fee on swaps**, embedded in the quote presented to the user — not a
+second transfer. Bridge is charged separately; Card and staking have their own
+schedules. The network (gas) fee goes to validators and is *not* MetaMask revenue.
+Mechanically it is an aggregator integration using the aggregator's own fee-recipient
+parameter. So the answer to \"does MetaMask take a fee\" is yes, and the more useful
+finding is *how*: *not* by deploying a fee-collecting contract.
+
+## Decision
+
+### Two rails, one shape
+
+| rail | when | fee mechanism |
+|---|---|---|
+| **aggregator** (`swap.aggregator`) | same-chain EVM (ERC-20 <-> ERC-20/ETH) | the aggregator's own on-chain fee parameter (0x `swapFeeRecipient`/`swapFeeBps`, LI.FI integrator fee) |
+| **thorchain** (`swap.thorchain`) | native cross-chain, BTC <-> ETH | affiliate name + bps in the memo, skimmed on-chain by the network |
+
+Both normalize to one quote shape and one plan shape, so a caller selects a rail by
+asset pair rather than branching on vendor shapes.
+
+### Fee mechanisms are ranked, and the ranking is part of the decision
+
+1. **`:protocol-affiliate` — the default and the recommendation.** One transaction, no
+   custody, nothing to audit, and it is what MetaMask does.
+2. **`:separate-transfer`** — supported because some providers offer nothing better.
+   Doubles gas, and the two transactions are not atomic: the swap can land while the
+   fee transfer fails, leaving books and chain disagreeing.
+3. **A custom fee-router contract — deliberately NOT built.** It would be atomic and
+   fully controlled, and it would also be a new contract custodying third-party funds:
+   an audit, a deployment key, an upgrade story, a permanent liability. The workspace's
+   only Solidity precedent (`engi-witness-escrow`) is explicitly local-test-only for
+   the same reason.
+
+### Repo layout
+
+| repo | shape | deps |
+|---|---|---|
+| `eth-crypto` (extended) | + `sign-tx-eip1559`, `eip1559-digest`, `eip1559-raw`, `raw-tx-hash` | none |
+| `erc20` (new) | ERC-20 calldata + EIP-2612 permit typed data, **portable `.cljc`** | none (eth-crypto is test-only) |
+| `org-thorchain` (new) | memo grammar + quote/inbound requests as data + **quote verification** | none |
+| `swap` (new) | intent -> quote -> plan -> state machine, safety checks, fee accounting | erc20, org-thorchain, treasury |
+
+### Design rules adopted across all four
+
+- **Nothing signs or sends in the swap plane.** `plan` returns ordered steps as data
+  (`:erc20-approve` / `:evm-call` / `:native-transfer`); an executor holding the keys
+  carries them out and returns events. This is ADR-2607201300's
+  `state + event -> next-state + effects` shape, and it makes routing, fee encoding,
+  slippage guards and sequencing testable with no network, no key and no chain.
+- **`:step/why` is mandatory on every step.** A wallet that cannot explain a
+  confirmation prompt in the user's own units should not be asking for one.
+- **Amounts are decimal strings, never numbers.** A `uint256` does not fit in a double
+  and ClojureScript loses precision above 2^53 *before* a library sees the value.
+  `erc20/->units` / `->display` are pure string arithmetic: `0.1` at 18 decimals is
+  exactly `100000000000000000`. `->units` throws when the amount carries more
+  fractional digits than the token has decimals — quietly losing a user's dust is
+  worse than failing loudly.
+- **Digest and assembly are split from signing.** `eip1559-digest` +
+  `eip1559-raw` let a hardware wallet, WebAuthn passkey or remote KMS sign without
+  the key ever entering this process.
+- **Never submit a memo or calldata that has not been checked.** A THORChain quote
+  returns both the vault address and the memo, and the memo says where the output
+  goes; unverified, that is a remote server with authority over the user's funds.
+  `thorchain.quote/verify-memo` re-checks destination, asset, affiliate and total bps,
+  and `swap.thorchain/parse-quote` refuses to build a transfer on a mismatch.
+- **Never report a guard that is not enforced.** When a THORChain memo carries no
+  `LIM` field there is no on-chain minimum-output, so `:min-out` is `nil` and
+  `swap.core/check` raises `:missing-min-out` — rather than defaulting to expected-out
+  and claiming protection that does not exist.
+- **Verify against independent implementations, not against ourselves.** Every vector
+  in the new code comes from a third party: viem 2.x for EIP-1559 txs, ERC-20 calldata
+  and the EIP-2612 digest; THORChain's own published memo examples for the memo
+  grammar; keccak256 for all 12 pinned ERC-20 selectors.
+- **State unverified vendor mappings as unverified.** The shipped 0x-v2 and LI.FI
+  adapters carry `:verified? false` and the normalized quote surfaces
+  `:verified-adapter?`, because their field names come from published docs and have not
+  been exercised against a live API key. `parse-quote` fails loudly naming the missing
+  path rather than yielding a partial quote.
+
+### The portability trick worth recording
+
+`erc20` is fully dual-platform even though `eth-crypto/keccak256` is `:clj`-only. A
+4-byte selector is `keccak256(signature)[0..4]`, and the ERC-20 selectors are
+**constants** — so they are pinned in `erc20.core/selectors` and *verified* against
+keccak256 in the test suite instead of hashed at runtime. Static-type ABI encoding is
+just 32-byte word padding. The browser therefore gets a working ERC-20 encoder
+**today**, before the cljs keccak port lands, and nobody has to trust a hand-typed hex
+string: a wrong selector does not crash, it quietly calls a different function on a
+real token.
+
+## Consequences
+
+### Shipped and verified
+
+| repo | tests |
+|---|---|
+| `eth-crypto` | 20 tests / 28 assertions JVM; EIP-1559 digest, raw tx and pre-broadcast hash asserted byte-for-byte against viem for both yParity 0 and a two-slot access list |
+| `erc20` | 31/77 JVM + 27/60 cljs; all 12 selectors recomputed with keccak256; permit digest == viem `hashTypedData`; sign -> ecrecover roundtrip |
+| `org-thorchain` | 43/116 on both JVM and cljs; THORChain's own published memo examples reproduced verbatim; `verify-memo` tested against substituted destination, substituted asset, dropped fee, inflated fee |
+| `swap` | 47/128 on both JVM and cljs; both rails driven with fixtures; adversarial cases (vendor field rename, off-by-one allowance, min-out ignoring slippage, expired quote, late confirmation after failure) |
+
+All four lint clean (`clj-kondo`, 0 errors 0 warnings). cljs suites are CI gates, not
+decoration — for `erc20` the cljs run *is* the browser claim.
+
+### Still open
+
+- **`eth-crypto`'s cljs port is the remaining blocker for a real MetaMask-shaped
+  wallet** (keys on the user's device, signing in the browser): keccak256 via
+  `js/BigInt` 64-bit lanes, and secp256k1 + RFC 6979 via hand-rolled `modPow`/
+  `modInverse`. Tracked as follow-up work, not started here. Until then the signing
+  half runs on the JVM/nbb side.
+- **The 0x / LI.FI adapter field mappings need one live smoke test each** against a
+  real API key before either is used with real funds. `:verified? false` until then.
+- **Permit2 is not implemented.** Reproducing `PermitSingle` / `PermitDetails` /
+  `TokenPermissions` from memory risks signatures that are silently invalid, or valid
+  for something other than what the UI showed. It needs the real spec plus a
+  cross-implementation digest check — the bar the EIP-2612 path met.
+- **THORChain's affiliate-bps ceiling is documented inconsistently.** The published
+  memo docs say 0–1000 bps; THORNode's own validation rejects only a *total* above
+  10000 bps. `thorchain.memo` defaults to the documented 1000 and requires explicit
+  `:allow-node-max? true` to exceed it, because the loose reading's failure mode is a
+  wallet quietly charging 50%.
+- **Monero.** This workspace mines XMR, but the native-swap option set for XMR is much
+  narrower than for BTC/ETH and was not verified here. Out of scope until it is.
+- **Regulatory.** Charging a fee to intermediate swaps can bring MSB/VASP obligations
+  in many jurisdictions even for a non-custodial interface. Not a determination this
+  ADR can make; flagged as a prerequisite to monetizing, not to building.
+
+### Relationship to the earlier read-only boundary
+
+ADR-2607172600 scoped `org-bitcoin-p2p` and `org-ethereum-jsonrpc` as read-only and
+originally called that boundary permanent; ADR-2607172700 corrected it to
+current-phase. Neither repo changes here — both remain read-only observers. Note for
+the record that transaction *signing* had already landed elsewhere (`btc-crypto`'s
+BIP-143 signer, `eth-crypto`'s `sign-tx-legacy`, `wallet`'s `ChainDriver/sign-tx`), so
+the \"needs its own ADR\" gate those two ADRs described was in effect satisfied by a
+different route. This ADR states the current position plainly: signing exists in the
+crypto/wallet libraries, the swap plane orchestrates but never holds a key, and both
+chain-observer repos stay read-only.
+
+## Alternatives rejected
+
+- **Write our own AMM / router contracts.** Custody, audit and liability for no
+  routing advantage over an aggregator that already splits across every venue.
+- **HTLC atomic swaps as the primary BTC rail.** Trustless but requires our own
+  counterparty liquidity and an unusable UX. Reconsider only if a specific
+  counterparty-matching product justifies it.
+- **Wrapped BTC as the primary rail.** Reintroduces a custodian, which defeats the
+  point of the question as asked.
+- **A fee-collecting router contract for v1.** See the fee ranking above.
+- **Finishing `com-uniswap-v3` first.** Direct router calls are a narrower capability
+  than aggregator routing and are not needed while the aggregator rail carries the fee
+  parameter. The stub stays a stub, now documented as one.
+- **Waiting for the cljs crypto port before building the swap plane.** The plane is
+  useful on the JVM/nbb side immediately, and `erc20` showed the browser can be served
+  earlier by pinning-and-verifying constants rather than by porting a hash function.
+
+## References
+
+- ADR-2607172600 / ADR-2607172700 (Bitcoin/Ethereum client repos; the read-only
+  boundary and its correction to current-phase)
+- ADR-2607051621 (`treasury` — the no-custody fee ledger this plane books into)
+- ADR-2607201300 (Kotoba as a safe application language — the
+  `state + event -> next-state + effects` shape `swap.core` follows)
+- MetaMask Swaps fee (0.875%), verified 2026-07-26 at support.metamask.io
+- THORChain memo grammar, verified 2026-07-26 against THORNode's own parser
+  (`x/thorchain/memo/memo_swap.go`) and the published memo docs
+"}]
