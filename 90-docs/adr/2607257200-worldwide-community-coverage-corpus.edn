@@ -73,8 +73,8 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ## 現在の状態（2026-07-26）
 
-- **318 organization / 15 カテゴリ / 38 form-family / 37 データファイル**
-- 検証: source-pinned **68**（primary 46 / secondary 22）、未 pin 250（79%）
+- **323 organization / 15 カテゴリ / 38 form-family / 38 データファイル**
+- 検証: source-pinned **69**（primary 46 / secondary 23）、未 pin 254（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
@@ -82,7 +82,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 - entity kind: org-form **197（87%）** / named-org 29（13%）
 - 地域: europe 52 / north-america 44 / asia-east 32 / africa 24 / asia-south 21 /
   south-america 18 / southeast-asia 12 / oceania 12 / middle-east 11
-- 数の誠実さ: **318/318 が `:org/member-count-basis` を持ち、約 199（63%）が明示的に unknown**。
+- 数の誠実さ: **323/323 が `:org/member-count-basis` を持ち、約 204（63%）が明示的に unknown**。
 - 国別: **国連加盟 193/193 か国**が少なくとも1エントリに現れる（`coverage.cljs countries`）
 - 記述の厚み: 7 形態以上 24 か国 / 4-6 形態 34 / 2-3 形態 135 / **1 形態のみ 0**（`coverage.cljs depth`）
   `:org/member-count` を主張しているのは 73 件のみ
@@ -384,7 +384,20 @@ La Via Campesina の「2億人」は加盟団体の自己申告合計であっ�
   **クラブが公認した支部だけ**を数え、ultras や無所属ファンを構造的に除外する。
 
 そこで `:org/proxy-metric`（何を痕跡として数えたか）と `:org/proxy-bias`（どちらにどれだけ
-歪むか）を導入した。**痕跡を `:org/member-count` に洗浄して流し込まない**ための装置である。
+歪むか）を導入した。iteration 42 で両 family を各 6 件に深掘りし、この構造がさらに 3 つ見つかった:
+**scholar guild**（YGG。2021年2月 241人 → 2022年2月 20,700人 → 累計3万超の「奨学生」だが、
+これは**発行済み奨学枠の累計**であり、P2E 経済崩壊後の現在値は不明。**収入機会によって形成され
+それとともに解散した共同体**の最明確例）/ **Bitcoin 循環経済**（**加盟店オンボード数と
+ウォレット導入数**で数えるが、どちらも一度きりの事象で減算されない）/ **NFT/PFP ホルダー**
+（保有アドレス数はさらに**価格連動**で、床値が下がると計測上の共同体が縮む — 帰属ではなく
+資産を測っている）。
+
+対照として **SF ファンダム（Worldcon）**を入れた: 毎年別の実行委員会が法人を作って解散し、
+World Science Fiction Society は**憲章としてしか存在しない**にもかかわらず、**会員投票で賞
+（Hugo）と次回開催地を決める**。**事務所に所有されたファンクラブの正反対で、ファンが制度を
+所有し創作者は所有しない**。日本の **後援会**も収録した（政治団体としての届出義務がある政治
+後援会と、届出不要の相撲・芸能の後援会は**同じ社会形態が支援対象によって2つの登記レジームに
+割れている**）。**痕跡を `:org/member-count` に洗浄して流し込まない**ための装置である。
 なお節点数（validator / node）は逆向きで、**ステーキング事業者が多数を集約するため人を過小に
 見せる**。同じ「機械を数えている」問題が上下逆に出る。
 
