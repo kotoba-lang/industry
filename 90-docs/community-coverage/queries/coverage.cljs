@@ -13,6 +13,7 @@
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs integrity  ; referential checks only
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs freshness  ; age of pinned sources
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs countries  ; country coverage + absences
+;;   nbb 90-docs/community-coverage/queries/coverage.cljs depth      ; form families per country
 ;;
 ;; The report deliberately prints the UNKNOWNS, not just the totals: a coverage
 ;; corpus that only reports its size is measuring the wrong thing.
@@ -124,6 +125,33 @@
     (doseq [chunk (partition-all 24 missing)]
       (println (str "    " (str/join " " chunk))))))
 
+;; Depth, not presence. Every UN member state is referenced by at least one entry,
+;; which says nothing about how much of that country's community life is
+;; described. This counts DISTINCT form families per country.
+(defn depth []
+  (let [per-country (reduce (fn [acc o]
+                              (reduce (fn [a c]
+                                        (update a c (fnil conj #{}) (:org/form-family o)))
+                                      acc (:org/countries o)))
+                            {} orgs)
+        fams (into {} (map (fn [[c s]] [c (count (disj s nil))])) per-country)
+        un (filter (comp un-members key) fams)
+        bucket (fn [k] (cond (<= k 1) "1 family" (<= k 3) "2-3 families"
+                             (<= k 6) "4-6 families" :else "7+ families"))
+        dist (frequencies (map (comp bucket val) un))
+        n (count un)]
+    (println "\nDEPTH PER COUNTRY  (distinct form families described, not just referenced)")
+    (doseq [b ["7+ families" "4-6 families" "2-3 families" "1 family"]
+            :let [v (get dist b 0)] :when (pos? v)]
+      (line b v n))
+    (println "  deepest:")
+    (println (str "    " (str/join "  " (map (fn [[k v]] (str k ":" v))
+                                             (take 10 (sort-by (comp - val) un))))))
+    (let [thin (sort (map key (filter #(<= (val %) 1) un)))]
+      (println (str "  described by a single form family (" (count thin) "):"))
+      (doseq [chunk (partition-all 24 thin)]
+        (println (str "    " (str/join " " chunk)))))))
+
 (defn integrity []
   (let [ids (into sibling-ids (map (comp name :org/id) orgs))
         cat-ids (set (map (comp name :community-category/id) categories))
@@ -191,6 +219,8 @@
 
     (countries)
 
+    (depth)
+
     (println "\nHONESTY OF COUNTS")
     (println (str "    " with-count "/" n " assert :org/member-count"))
     (println (str "    " with-basis "/" n " state a :org/member-count-basis"))
@@ -223,4 +253,5 @@
   "integrity" (integrity)
   "freshness" (staleness)
   "countries" (countries)
+  "depth" (depth)
   (do (report) (integrity)))
