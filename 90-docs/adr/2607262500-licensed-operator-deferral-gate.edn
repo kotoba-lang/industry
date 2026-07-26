@@ -135,6 +135,44 @@ warehousing の収録で設計上の穴が出た。**JSIC 4721 冷蔵倉庫業�
 **確信を持って違法になる**。entry に `:additional-gates` を持たせ、
 `gate/all-gates` と `plan` の両方が必ず返すようにした。
 
+### D9. 条文原文は e-Gov 法令 API から取る（2026-07-26 追加）
+
+初版〜第2版は日本の条文を1本も原文で持てず、すべて公式ページ・通知・解説に
+依拠していた。**e-Gov 法令検索の Web ページは JavaScript レンダリングで本ツールから
+読めないが、法令 API（`/api/1/articles;lawNum=<漢数字法令番号>;article=<条>`）は
+XML を直接返す。** これで12条文を取得し、カタログは
+**一次読了17 / 公式取得4 / 二次のみ0** になった。許可方向の結論が伝聞に
+依拠しているものは一つも残っていない。
+
+定義条文が読めたことで3件の verdict が動いた。いずれも「どこからが規制業か」を
+定義条文が決めていたケース:
+
+- **second-hand-dealing の defer**: `:unsettled` → `:conditional`。
+  古物営業法3条は2条2項の**1号・2号だけ**を許可対象とし、3号
+  （古物競りあつせん業）を含まない。売買・交換の当事者にならなければ
+  3条は及ばないと条文上読める。
+- **warehousing の defer**: `:unsettled` → `:conditional`。倉庫業法2条2項が
+  「**寄託を受けた**物品の倉庫における保管を行う営業」と定義しているため、
+  寄託の当事者にならなければ登録義務の外。
+- **industrial-waste-collection**: 14条1項に**但書**があり
+  「事業者（自らその産業廃棄物を運搬する場合に限る。）」は許可不要。
+  **ITAD にとってこれは決定的かつ不利**で、顧客の PC を引き取るなら排出事業者は
+  顧客であって自社ではないため但書に乗れない。kyoninka が抱えていた
+  「廃棄物該当性」の legal-question は、この但書のどちら側に立つかを決める問い
+  そのものだった。`:licence/exemptions` として data 化した。
+
+**travel-agency の defer は意図的に `:unsettled` のまま**。旅行業法3条が
+「旅行業**又は旅行業者代理業**を営もうとする者」を登録対象にしており、他社商品の
+代理販売まで捕捉するので、他業種で効く「規制上の役回りに入らない」手が効くか
+分からない。2条の定義を取るまで開けない。
+
+### D10. 自社が名義人になれる業種も厚くする（2026-07-26 追加）
+
+カタログが「自社が締め出されている業種」ばかりだと片手落ちなので、法人が
+名義人になれる3業種を足した: **employment-placement**（職安法30条、isic-7810）/
+**real-estate-brokerage**（宅建業法3条、isic-6820）/ **travel-agency**
+（旅行業法3条、isic-7911）。いずれも実装済み actor がある。
+
 ## Consequences
 
 ### 現在の判定結果（`gate/summary` の実出力）
@@ -143,10 +181,13 @@ warehousing の収録で設計上の穴が出た。**JSIC 4721 冷蔵倉庫業�
 |---|---|---|---|---|---|
 | legal-services | 弁護士資格 | 不可 | 1 | `:prohibited` | **`:admissible`** |
 | medical-practice | 医療機関の開設許可 | 不可 | 1 | `:prohibited` | `:conditional` |
-| second-hand-dealing | 古物商許可 | 可 | 1 | `:conditional` | `:unsettled` |
+| second-hand-dealing | 古物商許可 | 可 | 1 | `:conditional` | `:conditional` |
 | industrial-waste-collection | 産廃収集運搬業許可 | 可 | 1 | `:conditional` | `:conditional` |
 | food-manufacture | 食品衛生法 営業許可（32業種） | 可 | 1 | `:conditional` | `:conditional` |
-| warehousing | 倉庫業の登録 | 可 | **2** | `:conditional` | `:unsettled` |
+| warehousing | 倉庫業の登録 | 可 | **2** | `:conditional` | `:conditional` |
+| employment-placement | 有料職業紹介事業の許可 | 可 | 1 | `:conditional` | `:conditional` |
+| real-estate-brokerage | 宅地建物取引業の免許 | 可 | 1 | `:conditional` | `:conditional` |
+| travel-agency | 旅行業の登録 | 可 | 1 | `:conditional` | `:unsettled` |
 
 ITAD の現在地は機械が判定できる状態になった:
 `gate/plan {:sector :sector/second-hand-dealing :licence-held? false}` →
@@ -155,20 +196,16 @@ ITAD の現在地は機械が判定できる状態になった:
 
 ### 収録範囲と、その限界
 
-6件（法域×業種）・11ルール —— 一次読了5（弁護士法72条 / 法務省ガイドライン /
-東京都の食品衛生法 要許可32業種一覧 ×2 / 厚生省医務局長回答 医収第190号）、
-公式ページ取得4（警視庁 古物商許可手続き / 東京都環境局 産廃許可申請 /
-国交省 倉庫業法 / 東京都 食品衛生の窓。前2者は**台帳の記録を信用せず一次確認し
-直した**）、二次情報のみ2（**古物営業法3条と廃掃法14条の条文原文が未取得**）。
+9件（法域×業種）・21ルール —— **一次読了17 / 公式ページ取得4 / 二次情報のみ0**。
+e-Gov 法令 API から12条文を取得したことで、許可方向の結論が伝聞に依拠している
+ものは一つも残っていない（D9）。
 
 初版は3件で、うち2件が ITAD だった —— 1プロジェクトにしか使えない commons
 だったので、**実装済み actor が実際に載っている業種**を3件足した（D7）。
 
-日本の許認可業種は数百あり、これは一次/公式まで確認できた6件にすぎない。
-倉庫業法・食品衛生法・医師法17条・医療法7条の**条文原文はいずれも未取得**で、
-現在は公式ページと通知に依拠している —— だからこれらの entry はどれも
-`:admissible` になっていない。各エントリが `:known-gaps` で何を確認して
-いないかを名指ししている。
+日本の許認可業種は数百あり、これは9件にすぎない。残る穴の多くは**定義条文の
+周辺**で、例えば宅建業法2条の「宅地建物取引業」の定義は未取得であり、
+媒介・代理の境界はそこで決まる。各エントリが `:known-gaps` で名指ししている。
 
 ### 残っている ITAD のブロッカー（すべて owner の物理行動）
 
@@ -195,7 +232,7 @@ ITAD の現在地は機械が判定できる状態になった:
 
 ## Verification
 
-`clojure -M:test` 45 tests / 276 assertions green、`clojure -M:lint` warnings 0 /
+`clojure -M:test` 48 tests / 406 assertions green、`clojure -M:lint` warnings 0 /
 errors 0（いずれも実走、2026-07-26）。変異テスト3件で suite が噛むことを確認:
 
 1. 未検証出典からの許可の降格を外す → 3 failures
@@ -204,6 +241,12 @@ errors 0（いずれも実走、2026-07-26）。変異テスト3件で suite が
 4. `:additional-gates` を plan から落とす → 1 failure / 1 error
 5. 医業の principal を `:conditional` に緩める → 4 failures
 6. 冷蔵倉庫の食品衛生法ゲートを消す → 4 failures / 2 errors
+7. 廃掃法14条1項但書（適用除外）を消す → 2 failures / 1 error
+8. 旅行業の defer を `:conditional` に緩める → 3 failures
+
+D9 で7件のテストが古い `:unsettled` を固定したまま落ちた —— 意図どおりの検知
+なので、緩めずに新しい事実へ貼り替えた。二次情報ルールが実在しなくなったため、
+降格機構は合成の伝聞ルールを注入して証明している。
 
 いずれも復元後 0 failures。
 
