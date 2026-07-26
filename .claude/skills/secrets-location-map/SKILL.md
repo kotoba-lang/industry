@@ -71,6 +71,30 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
       （毎回 1Password 内を探索し直さない）。
   - `Backblaze`（1Password `Private` vault、2 件）— 個人用途、org のプロジェクト
     には使わない。
+- **GoDaddy Domains API（DNS レコード書き込み）**:
+  - **正本 = 1Password `gftdcojp` vault / item `gftd.godaddy`**
+    - `op://gftdcojp/gftd.godaddy/GODADDY_API_KEY`
+    - `op://gftdcojp/gftd.godaddy/GODADDY_API_SECRET`
+    - `hostname=https://api.godaddy.com`
+  - 用途: `gftd.co.jp` の DNS。**NS が `ns67/ns68.domaincontrol.com`
+    ＝ GoDaddy がゾーンをホストしているので、keychain の Cloudflare zone
+    token（`gftd.cf`）ではこのゾーンに書けない。**
+  - 消費側: `cloud-itonami.dns-provider`（`GODADDY_API_KEY` /
+    `GODADDY_API_SECRET` を env で受ける。secret に触れる唯一の場所）。
+    検証ハーネス: `clojure -M:dns-verify gftd.co.jp [--execute]`。
+  - **`op run` は使わない — interactive auth timeout に当たる**（本 repo 既知）。
+    `op read` で環境変数に注入する。
+  - **`op` の "account is not signed in" は行き止まりではない**（2026-07-26 実測）:
+    `op signin --account my.1password.com --raw` が 1Password デスクトップ
+    アプリ統合（Touch ID）で非対話に通り、その後 `op read` / `op item create
+    --template <file>` が動く。**セッションは数分で切れる**ので、長い作業では
+    `op whoami` で確認して signin し直す — 切れたまま走ると値が空になり、
+    呼び出し側が黙って mock にフォールバックすることがある（実際に起きた）。
+    item 作成時は値を argv に載せない（`ps` 露出）。テンプレート JSON を
+    scratchpad に書いて `--template` で渡し、直後に削除する。
+  - OTE（テスト）キーは `api.ote-godaddy.com` 専用で本番ゾーンには書けない。
+    また GoDaddy は DNS 書き込み API を保有ドメイン数の少ないアカウントに
+    対して 403 で拒否することがある。
 - **Resend（transactional email / smtp.kotobase.net）**:
   - **正本 = 1Password `gftdcojp` vault / item `gftd.resend`**
     - `op://gftdcojp/gftd.resend/credential`（API Credential の credential 欄）
