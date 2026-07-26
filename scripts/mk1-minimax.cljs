@@ -2,27 +2,36 @@
   "叢雲 MK-1 — 原資 JPY 3,000,000 の配分を minimax 系の判断基準で決める。
    nbb only (ADR-2607173000)。
 
-   理論の適用範囲を正確にしておく:
+   理論の位置づけ(2026-07-26 訂正 — 初版は境界を引きすぎていた):
 
-   ・von Neumann の minimax 定理(1928)は **2人ゼロ和有限ゲーム** の定理で、
-     max_x min_y x'Ay = min_y max_x x'Ay、最適戦略は混合戦略になり得る、
-     そしてゲームには一意の『値』がある、という主張。
-   ・**自然(市場・技術的不確実性)は我々の損失から利得を得ないので、厳密には
-     ゼロ和ではない。**したがって『自然を相手にした minimax』は von Neumann の
-     定理そのものではなく、Wald の maximin(1945)と Savage の minimax regret
-     (1951)である。本モデルは両方を計算する。
-   ・**von Neumann が文字通り当てはまる相手は1つある: DRAM/GDDR6 の希少供給を
-     めぐる AI データセンターとの争奪。**これは近似的にゼロ和で、我々は極小の
-     プレイヤーなので、このゲームの値は我々にとって負である。値が負のゲームに
-     対する処方は『参加しない』こと。部材 pass-through はまさにそれ(§1)。
-   ・混合戦略は本件では『無作為化』ではなく『分散投資』の意味。無作為化が価値を
-     持つのは相手が我々の純戦略を読んで突いてくる場合で、自然は突いてこない。
-     一回限りの資本配分をコイン投げで決めるのは誤用。**混合するのは分散を
-     縮めるためであって、読まれないためではない。**")
+   ・**von Neumann の minimax は『単にゼロ和』の話ではなく『最悪を想定して手を
+     打つ』話である。**Borel と von Neumann はどちらも security level /
+     safety level(最悪の中の最良)に到達し、それをゲームの値とした。1928年の
+     定理の意義は、**最悪を想定することが単に慎重なのではなく数学的に最適だと
+     示した点** にある。
+   ・**ゼロ和は別の話題ではなく、『最悪を想定する』と『合理的な相手を想定する』が
+     一致する条件である。**ゼロ和では相手の個人合理性が『こちらを潰しに来る』と
+     一致する。ゼロ和を外れるとこの2つは分岐するが、最悪ケースという**決定規則**
+     はそのまま使える。
+   ・**Wald は von Neumann の代替物を作ったのではなく、von Neumann を自然に
+     適用した。**Wald の統計的決定理論は決定問題を『悪意ある Nature との2人ゼロ和
+     ゲーム』として解釈する(von Neumann-Morgenstern に明示的に依拠)。
+     初版が『定理は適用しない、正しい対応物は Wald』と書いたのは誤り。
+   ・**架空の敵は厳密な裏付けを持つ: Bayes-minimax 双対性。**minimax 規則は
+     least favorable prior に対する Bayes 規則であり、自然の最適混合戦略が
+     まさにその prior である。したがって『自然を敵と見なす』のは便宜ではなく
+     均衡的に特徴づけられた操作。§3 でこれを実務的な診断に使う。
+   ・**定理自体はゲームの話ですらない。**Sion(1958)は準凸/準凹関数と凸集合の
+     条件下に一般化した — min と max を交換できる条件についての命題であり、
+     現代の robust optimization / DRO / 敵対的学習はここから来ている。
+   ・残る限界は2つだけ: ①minimax 系は確率を使わないので保守的(§3-3 で
+     『どの信念なら正当化されるか』に変換する) ②maximin と minimax regret の
+     どちらを採るかは『最悪』の定義の選択であり、定理が決めることではない。")
 
 (def fx 163.8)
 (def budget 3000000)
 
+(defn joins [sep xs] (apply str (interpose sep xs)))
 (defn r0 [x] (str (Math/round (double x))))
 (defn m [x] (str (/ (Math/round (/ (double x) 100000.0)) 10.0) "M"))   ; JPY -> "xx.xM"
 (defn rp [s w] (let [s (str s)] (str s (apply str (repeat (max 0 (- w (count s))) " ")))))
@@ -188,3 +197,97 @@
               (r0 (* 12500 fx)) "、EU は +$28,292 = JPY " (r0 (* 28292 fx)) "。"))
 (println "  **JPY 3,000,000 は『日本だけの launch』を丁度賄う額であって、")
 (println "  4地域展開の原資ではない。US/EU は campaign 収入から出す。**")
+
+;; ════════════════════════════════════════════════════════════════════════════
+;; §3  支配関係 と Bayes-minimax 双対性
+;;
+;;     オーナー指摘(2026-07-26)を受けた修正: von Neumann の minimax は
+;;     『単にゼロ和』の話ではなく『最悪を想定して手を打つ』話である、が正しい。
+;;     Borel と von Neumann はどちらも security level / safety level(最悪の中の
+;;     最良)に到達し、それをゲームの値とした。定理の意義は **最悪を想定すること
+;;     が単に慎重なのではなく数学的に最適だと示した点** にある。
+;;     ゼロ和は別の話題ではなく、『最悪を想定する』と『合理的な相手を想定する』
+;;     が一致する条件である。
+;;
+;;     そして Wald は von Neumann の代替物を作ったのではなく、**von Neumann を
+;;     自然に適用した**(決定問題を悪意ある Nature との2人ゼロ和ゲームとして
+;;     解釈した)。さらに Bayes-minimax 双対性により、minimax 規則は
+;;     **least favorable prior に対する Bayes 規則** であり、自然の最適混合戦略が
+;;     まさにその prior である。つまり『架空の敵』は厳密な均衡的裏付けを持つ。
+;;
+;;     この双対性は実務的な道具になる: 『minimax は確率を使わない』という批判を
+;;     裏返して、**F を最適にする暗黙の prior を逆算し、それを本当に信じるかを
+;;     オーナーに問う** ことができる。以下はその計算。
+;; ════════════════════════════════════════════════════════════════════════════
+(println "\n\n════ §3 支配関係 と Bayes-minimax 双対性 ════")
+
+;; ── 3-1 支配関係(確率を一切使わずに言えること) ─────────────────────────────
+(println "\n■ 3-1 支配関係 — 確率の見立てを一切使わずに言えること")
+(def sk (mapv :k strategies))
+(defn row-of [k] (:row (payoffs k)))
+(defn dominates? [a b]
+  (let [ra (row-of a) rb (row-of b)]
+    (and (every? true? (map >= ra rb)) (some true? (map > ra rb)))))
+(def dominated
+  (for [b sk :let [ds (filter #(dominates? % b) (remove #{b} sk))] :when (seq ds)]
+    [b ds]))
+(if (seq dominated)
+  (doseq [[b ds] dominated]
+    (println (str "  " (name b) " は " (joins ", " (map name ds))
+                  " に **支配される** → 確率をどう置いても選ぶ理由が無い(inadmissible)")))
+  (println "  支配される戦略は無い"))
+(println (str "  可容(admissible)な戦略: "
+              (joins ", " (map name (remove (set (map first dominated)) sk)))))
+
+;; ── 3-2 期待値を確率の関数として見る ───────────────────────────────────────
+;;   p = P(gate PASS) / q = P(200台 | PASS) / r = P(自社需要 実在 | FAIL)
+(defn ev [k p q r]
+  (let [[v1 v2 v3 v4] (row-of k)]
+    (+ (* p q v1) (* p (- 1 q) v2) (* (- 1 p) r v3) (* (- 1 p) (- 1 r) v4))))
+
+(def q-ref 0.30)   ; PASS したとき 200台に届く確率(assumption)
+(def r-ref 0.70)   ; FAIL でも自社推論需要は実在する確率(assumption)
+
+(println (str "\n■ 3-2 期待値 (q=P(200台|PASS)=" q-ref ", r=P(自社需要実在|FAIL)=" r-ref ")"))
+(println (str (rp "戦略" 40) (apply str (map #(lp (str "p=" %) 10) [0.0 0.1 0.3 0.5 0.8]))))
+(doseq [{:keys [k n]} strategies]
+  (println (str (rp (str (name k) " " n) 40)
+                (apply str (map #(lp (m (ev k % q-ref r-ref)) 10) [0.0 0.1 0.3 0.5 0.8])))))
+
+;; ── 3-3 F が他を上回るのに必要な P(gate PASS) ──────────────────────────────
+(defn breakeven-p
+  "F の期待値が k の期待値と等しくなる p を二分法で求める。
+   全域で F が上なら :F-always、全域で下なら :F-never。"
+  [k]
+  (let [f (fn [p] (- (ev :F p q-ref r-ref) (ev k p q-ref r-ref)))]
+    (cond (and (pos? (f 0.0)) (pos? (f 1.0))) :F-always
+          (and (neg? (f 0.0)) (neg? (f 1.0))) :F-never
+          :else (loop [lo 0.0 hi 1.0 i 0]
+                  (if (> i 60) (/ (+ lo hi) 2.0)
+                      (let [mid (/ (+ lo hi) 2.0)]
+                        (if (= (pos? (f mid)) (pos? (f hi)))
+                          (recur lo mid (inc i)) (recur mid hi (inc i)))))))))
+(println "\n■ 3-3 F を採るのに必要な P(gate PASS) — これが暗黙の prior の正体")
+(doseq [{:keys [k n]} strategies :when (not= k :F)]
+  (let [b (breakeven-p k)]
+    (println (str "  F vs " (rp (str (name k) " " n) 38)
+                  (cond (= b :F-always) "→ p を問わず F が上"
+                        (= b :F-never)  "→ p を問わず F が下"
+                        :else (str "→ p > " (/ (Math/round (* 1000.0 b)) 10.0) "% なら F が上"))))))
+(println "\n  これが Bayes-minimax 双対性の実務版: minimax が確率を使わないという批判を")
+(println "  裏返して『F を正当化する最小の信念』を明示できる。**この閾値を本当に")
+(println "  超えていると信じられるかがオーナーの判断事項** で、行列が決めることではない。")
+
+;; ── 3-4 portfolio と lottery は別物 ────────────────────────────────────────
+(println "\n■ 3-4 なぜ F は『混合』でも無作為化ではないのか(前版の理由づけを訂正)")
+(println "  前版は『自然は突いてこないから無作為化は不要』と書いたが、これは理由として")
+(println "  不正確だった — 統計的決定理論では損失が凸でない場合、自然相手でも")
+(println "  無作為化規則が minimax risk を真に下げることがある。")
+(println "  正しい理由は **portfolio と lottery が別の対象** だから:")
+(let [f-row (row-of :F)]
+  (println (str "    portfolio F(B70 1台 + Strix 2台を実際に買う) = 1つの確定的行動。"))
+  (println (str "    利得ベクトルは " (joins " / " (map m f-row)) " で確定する。"))
+  (println "    一方 lottery(『B70 3台』と『Strix 3台』をコイン投げで選ぶ)は")
+  (println "    期待値が同じでも一回限りでは分散が残る。**破滅に敏感な一回限りの")
+  (println "    決定では portfolio が lottery を厳密に支配する。**")
+  (println "    F は6行の凸結合ではなく、予算制約下で実行可能な新しい第7の行動である。"))
