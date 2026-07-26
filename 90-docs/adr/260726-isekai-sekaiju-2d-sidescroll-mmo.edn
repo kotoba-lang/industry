@@ -1,0 +1,90 @@
+[{:db/id -1
+  :adr/id "260726-isekai-sekaiju-2d-sidescroll-mmo"
+  :adr/title "network-isekai hosts a MapleStory-shaped 2D side-scrolling MMORPG on PostgreSQL-backed Kotobase"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "game-platform-persistence"
+  :adr/last_verified "2026-07-26"
+  :adr/authoritative_for
+  ["fleet-level record that network-isekai adopts a side-scroll MMO genre"
+   "the durable/live/client plane split for realtime games on Kotobase"]
+  :adr/child_adr "gftdcojp/network-isekai 90-docs/adr/0071-sekaiju-2d-sidescroll-mmo-kotobase-postgres.edn"
+  :adr/child_contract "gftdcojp/network-isekai resources/sekaiju-mmo.edn"
+  :adr/relates_to ["260726-gftd-jk-luxury-kotobase-postgres-policy"]
+  :adr/body
+  "# Decision
+
+`gftdcojp/network-isekai` gains a MapleStory-shaped 2D side-scrolling MMORPG,
+codename 世界樹 / `sekaiju`. Its durable persistence is the Cloudflare-accessed
+PostgreSQL-backed Kotobase service, per ADR 260726-gftd-jk-luxury-kotobase-postgres-policy.
+The full design lives in the child repository; this entry records the fleet-level
+decision and the one reusable pattern that came out of it.
+
+# The reusable pattern: three planes
+
+A realtime multiplayer game on Kotobase splits every fact into exactly one plane.
+
+- **durable** — Kotobase over PostgreSQL. Character, inventory, equipment, skills,
+  quests, currency, guild, market, world definition, audit ledger. Append-only,
+  content-addressed, CAS-serialized per ref.
+- **live** — one Cloudflare Durable Object per world/channel/field leaf. 20 Hz
+  authoritative simulation, in memory. Position, velocity, FSM, HP, buffs, mob
+  state, chat. No durability; recovery is the last durable checkpoint.
+- **client** — prediction and interpolation only. No authority.
+
+A fact enters the durable plane only at a checkpoint boundary, and only through
+the Durable Object that currently holds that character's write lease. Movement
+ticks, damage packets, mob AI and chat never reach PostgreSQL.
+
+This split is derived from what Kotobase actually is — an append-only commit chain
+whose writes are one block insert plus one ref CAS, and whose reads are an indexed
+prolly-tree snapshot plus a novelty front — not from taste. Any other realtime
+game in this fleet that wants Kotobase durability should start from the same split.
+
+# Two consequences worth carrying to other projects
+
+**One ref, one writer.** Refs are sharded (one per character, per guild, per market
+shard, per ledger day) so that exactly one Durable Object writes each ref. A DO is a
+single-threaded serializer, so CAS never contends and `commit-serialized!`'s retry
+budget is never consumed. The goal is not to handle contention well; it is to make
+contention impossible.
+
+**Fencing epochs make duplication structurally impossible.** The write lease lives
+inside the character's own ref as `:lease/holder` + `:lease/epoch`. A transaction is
+admitted only when it carries the current epoch and holder, so a crashed or
+partitioned DO's late writes are fenced. Two Durable Objects cannot hold epoch n at
+once, which removes the classic duplicate-login item-duplication class outright.
+
+**Content-addressing turns odds into a proof.** Gacha, equipment scrolls and boss
+drops use commit-reveal: the commit hash and the drop-table CID are written to the
+append-only ledger before the player acts, the seed and outcome after. Anyone can
+re-derive the outcome and confirm the operator did not change the odds afterwards.
+This is not available on a mutable SQL table and is treated as a product feature,
+not an implementation detail.
+
+# Fold is an operating invariant
+
+Kotobase reads cost indexed-snapshot plus novelty, so an un-folded ref gets slow.
+Character refs fold at session close or 64 novelty blocks, ledger refs rotate daily
+and fold nightly, market shards fold every five minutes, and an alarm fires at 256
+novelty blocks or 24 hours un-folded. Any Kotobase-backed workload in this fleet
+needs an equivalent explicit fold owner.
+
+# Blocking prerequisites, unresolved as of this entry
+
+1. **Worker-to-PostgreSQL transport is unverified.** `kotobase-storage-postgres`
+   takes a `javax.sql.DataSource` and is JVM-only; a Durable Object cannot use it
+   directly. Either the DO goes through `kotobase-server`'s XRPC surface hosted by
+   `gftdcojp/net-kotobase`, or a Worker-side `kotobase-storage` provider is built on
+   Hyperdrive plus `kotoba-lang/org-postgresql-wire`. This is not decided and blocks
+   implementation.
+2. **`isekai.social` still persists to D1 (ADR-0037 phase 1).** The org policy forbids
+   silent D1 fallback for new persistence, so wallet, inventory and save need a
+   Kotobase adapter before the game's economy can ship. Until then the game fails
+   closed rather than writing to D1.
+3. **`kotobase-storage-postgres` is not registered in `manifest/west.yml`** — it is
+   checked out under `orgs/kotoba-lang/` without a manifest entry.
+
+# Status
+
+Design only. No implementation has started. Phase 0 exists to close prerequisite 1."}]
