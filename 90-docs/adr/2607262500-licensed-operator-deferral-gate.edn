@@ -1,0 +1,167 @@
+[{:db/id -1
+  :adr/id "2607262500"
+  :adr/title "cloud-itonami-licensed-operator — 許認可業種で有資格者の ops 層として動けるかの判定 commons、および ITAD 許認可の前進"
+  :adr/status "accepted"
+  :adr/date "2026-07-26"
+  :adr/org "cloud-itonami"
+  :adr/repo "cloud-itonami/cloud-itonami-licensed-operator"
+  :adr/tags "cloud-itonami commons regulatory licence deferral japan itad kyoninka legalsupport"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "## Context
+
+オーナーからの問い「今日本国内でできる itonami の project はどういったものに
+なるか」に対して、コーパスを実測した結果:
+
+- `:implemented` は 177 本（ISCO 職業 124 / ISIC 産業 44 / cofog 5 / gtin 2 /
+  unspsc 1 / **jsic 1**）。ISIC 44 本は農業(0111-0150 で約20)・鉱業・食品製造に
+  集中しており、**日本では個人・単独法人が事業主体になれない領域**（農地法・
+  鉱業法・酒税法・医療法・電気事業法・士業独占）。
+- 一方、無許可でできる情報サービス・コンサル系（6201/6202/6209/6311/6312/
+  7020/7310/7320/7410/7490/5819/8549）は README に Maturity マーカーが無いだけで
+  実体があり、実走で確認した: isic-6201 82 tests / 6312 35 / 7020 30 / 4774 37 /
+  7810 46 / 6820 39、いずれも 0 failures。**当初『実装済みと日本で可能な集合は
+  ほぼ重ならない』と見立てたが、これは誤りだったので訂正した。**
+- 日本軸で分類された repo は `jsic-4721`（冷蔵倉庫3PL）ただ1本。
+- 日本固有の規制事実は既に 29 本ある（assoc-jpn 9 + iso3166-jpn 中央省庁 20）。
+- 実際に動いている日本案件は ITAD 一件のみで、**台帳が 2026-07-15 で停止**して
+  いた（`gftdcojp/cloud-itonami` の `itad-license-ledger.edn`）。
+
+ここから出た構造的な問題: **実装済み資産の大半が載っている許認可業種を
+『日本ではできない』で終わらせると、国内でほぼ全部が死ぬ。**
+
+## Decision
+
+### D1. 死なせない形は既に実証済みなので、それを一般化する
+
+`cloud-itonami-isic-6910-legalsupport`（ADR-2607261500）は、法人が弁護士資格を
+取れないという事実を**回避せず受け入れた上で**、法務省ガイドライン第4項
+（弁護士が自ら精査し必要に応じ自ら修正するなら、他の全要件に該当しても
+弁護士法72条に違反しない）に載る形で成立させた。**自社が名義人にならず、
+有資格者の ops 層に徹する。**
+
+`cloud-itonami/cloud-itonami-licensed-operator` を新設し、弁護士に固有だった
+検査 —— 資格が検証済みか / 案件と同一法域か / 本人が自ら判断したか ——
+を業種非依存の語彙へ開いた。(法域, 業種) ごとに2経路を持つ:
+
+- `:route/principal` 自社が許認可の名義人になる
+- `:route/defer` 許認可を持つ第三者を主体に立て、自社はその判断を代替しない
+  ops 層に徹する
+
+### D2. `regulatory-tracker` とは別の問いなので別 repo にする
+
+既存 `cloud-itonami-regulatory-tracker` は**許認可を取る**進行の管理
+（`:draft → :submitted → :approved`）。こちらは**許認可を持たないまま動けるか**
+の判定。同じ『規制』でも問いが違い、既存 commons は後者を持っていなかった。
+`regulatory-tracker` と同型で **plain library**（advisor / StateGraph / 台帳を
+持たない、何も申請しない、許認可も持たない）にした。
+
+### D3. カタログが開いても、相手の実レコードが要件を満たさなければ開かない
+
+これが設計の要点。`:route/defer` が `:admissible` でも `gate/plan` は立てた
+有資格者の実レコードを毎回検査し、**記録が無い項目は fail closed で落とす** ——
+他人の許認可について記録が無いことを『満たされている』と推定しないのが、
+この commons の存在理由そのものだから。検査できる6要件:
+
+`:req/licence-verified`（自己申告は検証ではない）/ `:req/same-jurisdiction`
+（**越境は ops 層が無資格営業に化ける典型経路**）/ `:req/scope-covers`
+（許可はあるが区分が違うのは許可が無いのと同じ）/ `:req/not-expired` /
+`:req/personally-decided`（**名義を立てただけ・押印しただけは委譲ではない**）/
+`:req/written-contract`。
+
+要求された要件を実装していない場合、それ自体が違反として返る ——
+**未実装の検査を『満たした』ことにはしない。**
+
+### D4. 経路選択は principal → defer → blocked に固定する
+
+委譲は『許認可を取らずに済ませる裏口』ではないので、自社が名義人になれる
+ならその経路を先に採る。閉じているとき `:next` が次の一手を返し、取得可能な
+許認可なら `kotoba-lang/kyoninka` の手続き id を指す。
+
+### D5. カタログの規約は legalsupport と同一にする
+
+①捏造しない（未収載は spec-basis 無し、gate が既定で拒否）②`:secondary-source-only`
+のルールは制限的 verdict しか支えられず `:admissible` の唯一の根拠にできない
+（`verdict-for` が `:unsettled` へ降格）③カバレッジは報告する。
+
+### D6. ITAD の2件を JPN seed にし、台帳を前進させる
+
+台帳が停止していた原因のうち **agent 側で潰せる分を潰した**:
+
+- **applicant.edn の穴を公式2ソースで埋めた**（`gftdcojp/ai-gftd-itad`、b5d1e04）:
+  法人番号 1011101086505 / フリガナ「ギフテッドジャパン」/ 登記上の商号
+  「Ｇｆｔｄ　Ｊａｐａｎ株式会社」/ 本店所在地の全角表記を、国税庁法人番号
+  公表サイトと gBizINFO の2ソースで一致確認。この4項目が `:unknown` のままだと
+  生成器が申請書上「【要記入】」に落とすので、両ケースとも書類が完成しなかった。
+- **埋めなかったものも記録した**: 資本金は公式2ソースとも記載が無く、第三者
+  サイトに 2,100万円 とするものがあって現在値 2,000万円 と食い違うため
+  `:capital-verify :unverified` を付け、履歴事項全部証明書を正とすると書いた。
+  電話番号は第三者サイトにあるが公式未確認なので `:unknown` を維持 ——
+  **許可申請書の連絡先を未検証値で埋めるのは【要記入】より悪い。**
+- **台帳に追記した**（`gftdcojp/cloud-itonami`、0c87687）: `:errand/evidence-received`
+  1件と残ブロッカーを名指しする `:case/note` 3件。`:human-approved` は立てて
+  いない（step-done の判断は owner のもの）。`:by` も actor 鍵による署名ではなく
+  agent セッションであることを明記した —— 台帳の他の行が持つ did:key を騙らない。
+
+## Consequences
+
+### 現在の判定結果（`gate/summary` の実出力）
+
+| (法域, 業種) | 許認可 | 法人で取得可 | principal | defer |
+|---|---|---|---|---|
+| JPN/legal-services | 弁護士資格 | 不可 | `:prohibited` | **`:admissible`** |
+| JPN/second-hand-dealing | 古物商許可 | 可 | `:conditional` | `:unsettled` |
+| JPN/industrial-waste-collection | 産廃収集運搬業許可 | 可 | `:conditional` | `:conditional` |
+
+ITAD の現在地は機械が判定できる状態になった:
+`gate/plan {:sector :sector/second-hand-dealing :licence-held? false}` →
+`{:route :blocked :blockers [{:rule :licence-not-held}]
+  :next {:action :obtain-licence :kyoninka-procedure :kobutsu-marunouchi}}`。
+
+### 収録範囲と、その限界
+
+3件（法域×業種）・6ルール —— 一次読了2（弁護士法72条 / 法務省ガイドライン）、
+公式ページ取得2（警視庁 古物商許可手続き / 東京都環境局 産廃許可申請、いずれも
+**台帳の記録を信用せず本日一次確認し直した**）、二次情報のみ2（**古物営業法3条と
+廃掃法14条の条文原文が未取得**）。
+
+日本の許認可業種は数百あり、これは一次/公式まで確認できた3件にすぎない。
+各エントリが `:known-gaps` で何を確認していないかを名指ししている。
+
+### 残っている ITAD のブロッカー（すべて owner の物理行動）
+
+- 古物商: 役員全員＋管理者の本籍地書類（住民票・身分証明書）/ 登記事項証明書 /
+  営業所管理者の選任 / 丸の内署への営業所適格性（サービスオフィスの可否）事前確認
+- 産廃: 廃棄物該当性の行政書士確認。**これが決まるまで収集運搬許可の要否自体が
+  未確定**で、車両・容器・駐車場書類の要否もこれに従属する
+
+## Alternatives considered
+
+- **`regulatory-tracker` を拡張する** — 却下。あちらは許認可取得の進行管理で、
+  ステージ機械（draft→submitted→approved）が中心。『許認可を持たないまま
+  動けるか』は状態ではなく判定であり、混ぜると両方が濁る。
+- **legalsupport のコードを直接他 actor から使う** — 却下。あちらの語彙は
+  `:mode/lawyer-reviewed` 等の法律サービス固有で、産廃業者や冷蔵倉庫業者に
+  そのまま当たらない。ただし legalsupport 自体は当面自前の検査を持ち続け、
+  触るついでにこちらへ寄せる（一括書き換えはしない）。
+- **日本の許認可業種を網羅的にカタログ化する** — 却下。数百件を二次情報で
+  埋めれば、D5 の②に真っ向から反する。一次/公式で確認できた3件から始める。
+- **ITAD 台帳に `:human-approved true` を立てて先に進める** — 却下。証拠の
+  受領は agent がやってよいが、step-done は owner の判断。
+- **電話番号を第三者サイトから埋める** — 却下。許可申請書の連絡先を未検証値で
+  埋めるのは【要記入】より悪い。
+
+## Verification
+
+`clojure -M:test` 35 tests / 159 assertions green、`clojure -M:lint` warnings 0 /
+errors 0（いずれも実走、2026-07-26）。変異テスト3件で suite が噛むことを確認:
+
+1. 未検証出典からの許可の降格を外す → 3 failures
+2. 宣誓が `:prohibited` も解錠するようにする → 3 failures
+3. 資格法域の一致チェックを無効化 → 4 failures / 1 error
+
+いずれも復元後 0 failures。
+
+台帳は追記後 18 イベントで replay がクリーン（`license/replay-case` を実走）、
+重複行 0。applicant.edn は nbb でパース検証済み。"}]
