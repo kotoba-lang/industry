@@ -55,6 +55,13 @@
     "echo freegb=$(df -k / | awk 'NR==2{printf \"%d\", $4/1048576}')"
     ;; homebrew の openjdk を優先（/usr/bin/java は macOS の未設定スタブ）
     "for j in /opt/homebrew/opt/openjdk /opt/homebrew/opt/openjdk@26 /opt/homebrew/opt/openjdk@21 /usr/lib/jvm/default-java; do [ -x \"$j/bin/java\" ] && echo javahome=$j && break; done"
+    ;; **loopback TCP が通るか**。ping(ICMP) は通るのに TCP connect が
+    ;; EADDRNOTAVAIL になるノードが実在する（実測 2026-07-26 zebulun: python の
+    ;; 127.0.0.1 listener が LISTEN しているのに同ホストの curl / nc が繋がらない。
+    ;; app firewall も pf も無効、lo0 に 127.0.0.1 はある）。ローカルに server を
+    ;; 立てるテストは軒並み落ちるので、これを cap として持たないと「ノードが壊れて
+    ;; いる」を「テストが失敗した」と読み違える — bonsai の gate が実際そうなった。
+    "python3 -c 'import socket,sys\ns=socket.socket();s.bind((\"127.0.0.1\",0));s.listen(1)\nc=socket.socket()\ntry:\n c.settimeout(3);c.connect(s.getsockname());print(\"loopback=yes\")\nexcept Exception:\n print(\"loopback=no\")' 2>/dev/null || echo loopback=no"
     "echo clojure=$(command -v clojure)"
     "echo node=$(command -v node)"
     "echo nodev=$(node -v 2>/dev/null)"
@@ -103,7 +110,11 @@
     (assoc n :caps #{} :max-parallel 0)
     (let [free (num (:freegb n))
           cores (num (:cores n))
-          base? (and (seq curl) (seq tar))
+          ;; loopback が無いノードは gate を回せない。JVM/node のどちらの
+          ;; テストでもローカルに server を立てるものは普通にあるので、cap
+          ;; ごとではなく base 条件に入れる。
+          loopback? (= "yes" (:loopback n))
+          base? (and (seq curl) (seq tar) loopback?)
           jvm? (and base? (seq javahome) (seq clojure) (>= free 8))
           node? (and base? (seq npx) (>= free 5))]
       (assoc n
@@ -115,7 +126,7 @@
              :max-parallel (max 1 (min 2 (quot cores 4)))))))
 
 (defn edn-node [n]
-  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx caps max-parallel detail]} n]
+  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx caps max-parallel detail loopback]} n]
     (str "  {:host " (pr-str host)
          " :reachable? " (pr-str (boolean reachable?))
          (when os (str " :os " (pr-str os)))
@@ -126,6 +137,8 @@
          (when (seq node) (str "\n   :node " (pr-str node)))
          (when (seq nodev) (str " :node-version " (pr-str nodev)))
          (when (seq npx) (str " :npx " (pr-str npx)))
+         (when (and reachable? (= "no" loopback))
+           (str "\n   :loopback? false"))
          (when reachable? (str "\n   :caps " (pr-str (or caps #{})) " :max-parallel " (or max-parallel 0)))
          (when detail (str "\n   :detail " (pr-str detail)))
          "}")))
