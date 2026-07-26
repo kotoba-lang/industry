@@ -196,6 +196,28 @@ ops 層が生き残るのは、顧客ではなく**免許業者の内部業務**
 医療法人を主体に立てても、そこから利益を取り出す設計に制約がかかる ——
 業務委託料が実質的な配当と評価されない水準・算定根拠であることが要る。
 
+### D12. legalsupport を最初の consumer にする（2026-07-26 追加）
+
+**consumer の無い commons は検証されていない主張にすぎない** —— これはこの repo の
+README が `regulatory-tracker`（consumer 1件）に向けた批判そのものなので、
+自分がそれに当たる状態を放置しない。D1 で「legalsupport は当面自前の検査を持ち続け、
+触るついでにこちらへ寄せる」と宣言した債務を返した。
+
+`legalsupport.governor` の reviewer 検査3件（資格検証済み / 案件と同一法域 /
+本人が自ら精査）は、そもそもこの commons の抽出元だった。両方に実装を残せば
+同じ規則が2つ存在して drift する。`licensee/verify` への委譲に切り替え、
+違反は commons の `:req/*` 語彙で返るようにした。
+
+**分割線**: 「レビュアーが要るかどうか」は legalsupport 側に残した ——
+service mode と事件性で決まる、その actor 固有の判断だから。
+「立てたレビュアーについて何が真であるべきか」が fleet 共通の問いで、commons に行く。
+なお reviewer が nil のときは commons に空レコードを渡さず
+`:no-licensed-reviewer` を1件返す（空レコードを渡すと要件違反3件になるが、
+「なぜレビュアーが要るのか」を1文で伝えるほうが読み手に親切）。
+
+依存が本物であることは、`lic/checks` を `with-redefs` で壊すと legalsupport 側が
+`:unknown-requirement` を検出して落ちるテストで証明している。
+
 ## Consequences
 
 ### 現在の判定結果（`gate/summary` の実出力）
