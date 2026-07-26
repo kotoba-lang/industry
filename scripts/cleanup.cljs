@@ -202,6 +202,22 @@
 (defn- junk-path? [line]
   (boolean (re-find junk-re (str/trim (subs line (min 3 (count line)))))))
 
+(defn- already-upstream?
+  "その untracked path の内容が、既に origin/<default> の同じ path に同一内容で
+  存在するか。存在すれば「未着地の WIP」ではなく「ローカル checkout が古いだけ」。
+
+  実測 2026-07-27: untracked 上位 8 repo（inc 95件 / kotobase 24 / toshokan 23 /
+  kotoba-git 17 / org-threejs 12 / mangaka 11 / shell 9 / net-kotobase 8）を
+  cleanup-land にかけたところ **全件が内容一致で既に main にあった**。つまり
+  untracked= は runbook が最も危険と位置づけるマーカーなのに、実際には安全な
+  ケースを大量に上位に押し上げていた。ビルド副産物(junk-path?)とは別クラスの
+  誤検知なので、別に潰す。判定はローカルのみ（origin/<default> は fetch 済み前提）。"
+  [dir default path]
+  ;; gitc は `git -C dir` なので path は dir 相対でよい。
+  (let [local-sha (some-> (gitc dir "hash-object" path) str/trim)
+        upstream-sha (some-> (gitc dir "rev-parse" (str "origin/" default ":" path)) str/trim)]
+    (and local-sha upstream-sha (= local-sha upstream-sha))))
+
 (def ^:private branch-cap
   "1 repo あたり per-branch 解析（merge-base + ahead-of-remote = 3 git 呼び出し）を
   許す branch 数。実測: kotoba-lang/webgpu は 67 本、slides は 90 本超あり、
@@ -301,6 +317,35 @@
                                  (:dir row) (:untracked row) (:dirty row))))
               row))
           repos))
+        ;; phase 1.5: untracked を持つ repo だけを精査する。phase 1 は `?? dir/` の
+        ;; ように git がディレクトリで畳んだ行を数えるだけなので、ここで -uall に
+        ;; 展開し、1 ファイルずつ「既に upstream に同一内容で存在するか」を見る。
+        ;; 対象を untracked>0 の repo に絞るので全走査のコストは増えない。
+        untracked-repos (filter #(pos? (:untracked %)) local-rows)
+        _ (eprogress (str "phase 1.5 (untracked containment): " (count untracked-repos) " repos"))
+        refined (into {}
+                      (map (fn [row]
+                             (let [dir (:dir row)
+                                   default (default-branch dir)
+                                   files (->> (or (gitc dir "status" "--porcelain" "-uall") "")
+                                              str/split-lines
+                                              (filter #(str/starts-with? % "??"))
+                                              (map #(str/trim (subs % 2)))
+                                              (remove str/blank?)
+                                              (remove junk-path?))
+                                   upstream (count (filter #(already-upstream? dir default %) files))
+                                   real (- (count files) upstream)]
+                               [dir (assoc row
+                                           :untracked real
+                                           :untracked-upstream upstream
+                                           :local-unlanded?
+                                           (boolean (if (:annex? row)
+                                                      (seq (:unpushed row))
+                                                      (or (pos? real) (pos? (:dirty row))
+                                                          (seq (:unpushed row))
+                                                          (:branch-analysis-skipped row)))))])))
+                      untracked-repos)
+        local-rows (mapv #(get refined (:dir %) %) local-rows)
         candidates (filter #(seq (:pushed-live %)) local-rows)
         _ (eprogress (str "phase 2 (gh pr lookup): " (count candidates)
                           " repos have pushed-but-unlanded branches"))
@@ -330,6 +375,7 @@
                     nopr-skipped                        (conj (str "nopr=?(" nopr-skipped " branches, PR照会を打切り)"))
                     (:branch-analysis-skipped row)       (conj (str "branches=?(" (:branch-analysis-skipped row) " 本, branch解析を打切り)"))
                     (pos? (:junk-untracked row 0))       (conj (str "junk-untracked=" (:junk-untracked row) "(ビルド副産物・着地対象外)"))
+                    (pos? (:untracked-upstream row 0))   (conj (str "untracked-but-upstream=" (:untracked-upstream row) "(内容は既に main にある・着地不要)"))
                     (pos? stash)                        (conj (str "stash=" stash))
                     (and (not= branch "HEAD") (not= branch "")) (conj (str "branch=" branch))
                     (seq locals)                        (conj (str "locals=" (count locals))))]
