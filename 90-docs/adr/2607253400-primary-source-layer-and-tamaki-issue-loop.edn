@@ -1,0 +1,118 @@
+[{:db/id -1
+  :adr/id "adr-2607253400-primary-source-layer-and-tamaki-issue-loop"
+  :adr/title "ADR-2607253400: the primary-source layer — honest sourcing for office holders, government press 7→53 countries, and the follow-up backlog moved into tamaki"
+  :adr/status "accepted"
+  :adr/date "2026-07-26"
+  :adr/last-verified "2026-07-26"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "public-figures-registry"
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["「1次ソースとしての coverage は?」への回答と、それを埋めた作業の正本。層ごとに何が1次で何が2次/3次かの切り分け（政府組織=1次、公人=Wikidata由来の3次、政府発表=1次だが7主体、報道=定義上2次）はここが起点。"
+   "ooyake の `:gov.person/sourcing` に `third-party` を導入し、`:authoritative` を「当局自身のページで確認できた行だけ」に限定する決定。および `:gov.person/source-url` がその引用であるという規約。"
+   "この一連の作業で残った follow-up を chat ではなく tamaki の Radicle issue として持つ決定、および kawaraban/ooyake/kouhou を rad 化して continuous ループを回す構成。"]
+  :adr/related
+  ["orgs/etzhayyim/com-etzhayyim-ooyake"
+   "orgs/etzhayyim/com-etzhayyim-kouhou"
+   "orgs/etzhayyim/com-etzhayyim-kawaraban"
+   "orgs/kotoba-lang/tamaki"
+   "90-docs/adr/2607253200-coverage-expansion-and-scheduled-refresh.edn"
+   "90-docs/adr/2607253000-ooyake-public-officeholders-g6-amendment-kawaraban-byline.edn"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/body
+  "
+# ADR-2607253400: the primary-source layer
+
+**Status**: accepted
+**Date**: 2026-07-26
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナーの問い（2026-07-26）: 「今の1次ソースの収集としての coverage は?」。
+
+それまで報告してきた数字（媒体 55カ国、公人 1,046名）は**2次・3次情報のカバレッジ**だった。層を切り分けて実測すると:
+
+| 問い | 1次ソース | 実態 | 種別 |
+|---|---|---|---|
+| どんな政府組織があるか | その組織の公式サイト | ooyake 7,089 units、全件 provenance が official URL | **1次** |
+| 国際団体 | 同上 | ooyake intergovernmental 96 団体（94 に official-url） | **1次** |
+| 非営利・業界団体 | その団体の公表 | `cloud-itonami-assoc-*` 78 repo、**78/78 が `:sourced-from`**（取得日・手段・逐語引用・見つからなかったものを推測せず省いた記録） | **1次・最も厳格** |
+| 誰がその職に就いているか | 政府の公表・官報 | ooyake 1,046名、provenance が **100% wikidata** | **3次** |
+| 政府が何を発表したか | 政府広報・官報 | kouhou **8 source / 7 jurisdiction** | **1次だが極小** |
+| 何が報じられたか | （報道は2次） | kawaraban 154 outlets | **2次** |
+
+つまり **1次ソース層だけが薄かった**。しかも公人は3次由来なのに `:sourcing :authoritative` を名乗っていた。
+
+## Decision
+
+### 1. 公人の sourcing を実測に合わせる（語彙を緩めない）
+
+ooyake の語彙で `authoritative` は「当局から得た」を意味する（gov-units 7,085 行が official-url を provenance に持つ）。公人 1,046 行はそれを名乗りながら provenance が `wikidata` で、**行われていない1次確認を主張していた**。
+
+直し方は2つあった——語彙を緩めるか、主張を実測に合わせるか。後者を採った。
+
+- lexicon と schema に **`third-party`** を追加（実在するが aggregator 由来・当局未確認）。fetch はこれを出す。
+- **`:gov.person/source-url`** を追加。当局自身のページで在任が確認できた行にのみ付き、`authoritative` たらしめるのはこの1本。無い行が `authoritative` を名乗るのは**矛盾**になった。
+- `scripts/verify_primary_sources.cljs` が各 unit の official-url を取得し、人物名（英語表記・現地表記の両方）を探す。
+
+結果: **`:authoritative` 185（全件 source-url あり、113 jurisdiction）/ `:third-party` 861**。従来は 1,046 行が authoritative を名乗り、根拠を示せる行は 0 だった。
+
+**17% という確認率は、低い数字ではなく正直な数字**である。461 件はページに届いたが名前が無く、144 件が 403、217 件が到達不能だった。「名前がトップページに載っている」は在任の証明ではない弱い証拠だが、*載っていない* ことは確実に「未確認」であり、昇格した行はすべて人が検証できる URL を持つ。
+
+**降格も同じスクリプトが行う。** 最初の実装は昇格しかせず、確認できなかった行を `:authoritative` のまま残した——直そうとした嘘がそのまま残る状態を作ってしまった（実測: 実行後 `:authoritative` 1,046 / `:source-url` 181）。現在は3分岐:
+
+- 確認できた → `:authoritative` ＋ `:source-url` ＋ `:source-checked`
+- **ページに届いたが名前が無い** → `:third-party` に降格、`:source-url` も外す（届いて載っていないのは積極的な反証で、多くは交代済み）
+- **届かなかった**（403 / timeout / DNS）→ **据え置き**。情報がゼロなのだから降格の根拠にしてはいけない。政府サイトが今日こちらの bot を断ったことは、その人が退任した証拠ではない。
+
+### 2. kouhou を 7 → 53 jurisdiction へ
+
+候補は国名からの推測ではなく、**ooyake が maintainer-verified 済みで持つ内閣・政府ポータルの `:gov.unit/official-url`**（193 jurisdiction）から生成した。ISO alpha-2 は Wikidata P297 から解決し（既存 registry の ISO2 と揃えるため、かつ私の記憶より出典が明確）、導出は `registry/candidates.world-exec.json` に残して再現可能にした。
+
+`scripts/discover-sources.cljs` は kawaraban と同じ作法——判定規則も User-Agent も `src/kouhou/live_fetch.cljc` と揃えてあるので、ここで0件なら本番 ingest でも0件。**53/201 が実測で通った**。落ちた 148 件は日付つきの理由を付けて残す。
+
+### 3. reachable-but-wrong という失敗モードを記録する
+
+discovery が `gov-mdv-exec` に**観光局のマーケティング feed**を登録した。原因は discovery ではなく **ooyake のデータ**で、`gov.mdv` の official-url が `https://visitmaldives.com/` になっており、provenance も同じページを引いて `:authoritative` `:maintainer-verified` だった。`https://presidency.gov.mv/` に訂正（同 registry が `gov.mdv.education` で既に引いていた）。
+
+**404 は自己申告するが、到達する誤 URL は静かに伝播する。** これは official-url が atlas の1次ソース性そのものである以上、reachability より重い欠陥。
+
+ただし**規模は測れていない**。193 の国レベル URL を「政府らしいホスト」パターンで判定すると 69 件が該当するが、`kryeministria.al` `u.ae` `canada.ca` `beit-salam.km` `government.bg` `e-gov.am` など**大半は正当**で、ホスト名の形では真の誤りと「珍しいが正しい」を分離できない。**測れていないものを測れたことにしない**——issue として ooyake に立て、検出手法の false-positive 率を実測することを受け入れ条件にした。
+
+### 4. follow-up を chat から tamaki の issue へ移す
+
+この一連の作業で見つかった gap を会話で持ち回るのをやめ、コードと同じ場所に durable に置く。`tamaki issue` / `loop` は Radicle 前提なので、3子リポを `rad init` した（GitHub 上で既に public なので visibility 変更ではない。この workspace の rad repo は 3,181 中 2 だったので、構造的な追加としてオーナー確認を取った）。
+
+**11 issue** を登録: kawaraban 6（進捗バッファ / verify-feeds のテスト欠如 / mention edge が live で作られない / outlet に provenance が無い / seed と allowlist の id 空間分裂）、ooyake 3（Wikidata 形のカバレッジ偏り / official-url 到達率 55% / reachable-but-wrong の検出）、kouhou 2（148 件の失敗を種別に分けて埋める / live ingest が gate されたまま未実証）。
+
+3リポで `--continuous --auto-approve` のループを起動し、`dev.kotoba.tamaki.loop.*` の LaunchAgent が駆動する。作業木は `~/.tamaki/<repo>` の専用 clone——west 管理下の共有 checkout でも、週次 refresh 用 clone でもない。**統合先は `rad` remote のみ**（`git push -o no-sync rad <branch>`）なので GitHub の canonical は触られない。
+
+## Consequences
+
+- 1次ソース層: 政府組織 7,089 / 国際団体 96 / 非営利 78 は元から良好、政府発表 7→53 jurisdiction、公人の1次確認 0→185（113 jurisdiction）。
+- **報道（kawaraban 154 outlets）は依然として組織としての provenance を持たない**——feed の生死は週次で測っているが、「BBC が GB の public-broadcaster である」は allowlist に手で書かれた主張のまま。`:news.outlet/kind` は憲章の選定基準そのものなので、これは issue として最優先級（kawaraban `6bcb348`）。
+- `cloud-itonami-assoc-*` の `:sourced-from`（取得日・手段・逐語引用・**推測せず省いた記録**）が、このワークスペースにおける1次ソース記録の到達点であり、他層はこれに倣うべき。
+
+## この作業中に自分で作った欠陥（すべて修正済み・記録として残す）
+
+1. **`verify-feeds.cljs` を parse error のまま main に出した**（`if`→`cond` で `)` を1つ落とし、実行せず commit）。テストも audit もこのスクリプトを呼ばないため緑のまま通過した。
+2. **runner のテスト実行が自分自身を消した**（`git clean -fd` が untracked の自分を削除、message だけが存在を主張する commit が main に乗った）。
+3. **ooyake plist のログが kawaraban のディレクトリに出ていた**（sed が `refresh-clone` を含むパスしか置換しなかった）。
+4. **昇格だけ実装して降格を忘れた**（上述）。
+5. **`| head -6` が SIGPIPE で 25 分の測定ジョブを殺した**（600/1046 で停止）。
+6. **zsh の非単語分割を忘れ、plist のファイル名にスペースが入った**（CLAUDE.md に注意書きのある挙動）。
+
+いずれも「書いたが実行していない」か「実行結果を見ずに次へ進んだ」ことが原因。1〜4 は main に到達してから発覚しており、**動かすまで分からなかった**という点が共通している。
+
+## Alternatives considered
+
+- **語彙を緩めて `authoritative` の意味を弱める** — 1行も直さずに矛盾が消える。却下。gov-units 7,085 行が既にこの語を厳密な意味で使っており、そちらの主張が薄まる。
+- **公人の確認に検索エンジンや第三者サイトを使う** — 確認率は上がる。却下。3次のまま名前を変えるだけで、1次確認にならない。
+- **403 を UA 偽装で抜ける** — kouhou の 53 も ooyake の 55% も数字が上がる。却下。測定ではなく偽装になる。
+- **`gov.mdv` 型の誤りをパターンで一括修正** — 69 件を機械的に直せる。却下。大半が正当なので、正しい entry を「修正」して壊す。
+- **issue を tamaki 自身の repo に立てる**（rad init 不要）— loop は `--project` のツリーに patch を作るので、他リポの改修ができない。却下。
+"}]
