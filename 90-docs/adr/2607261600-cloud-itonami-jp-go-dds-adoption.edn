@@ -361,6 +361,59 @@ console 127 面 + LP 18 面に当てている互換スキンは **DADS コンポ
 3. breadcrumb / page-navigation / toc(ナビゲーション系、現状どの面も未所持)
 4. skin(console 127 + LP 18)の素要素スタイルを link / list へ寄せる
 
+## 残り 3 件の設計判断と実装
+
+### 1. skin の component 化 —— 調べた結果、ほぼ「component ではなかった」
+
+skin が塗っている legacy class を実際の中身で確認したところ、**大半は
+component ではなく semantic text だった**。以前これを「component 化できて
+いない最大面積」と書いたが、その見立ては誤りだったので訂正する。
+
+| class | 出現 | 実際の中身 | 判定 |
+|---|---|---|---|
+| .muted | 674 | 副次テキスト | token が正しい |
+| .ok | 547 | no table-verification gate (facility op) のような**文** | token が正しい |
+| .card | 491 | 箱 | 上流 card はパターン。dds-ext-card で正しい |
+| .warn | 375 | 状態語/文 | token が正しい |
+| .critical | 243 | 状態語/文 | token が正しい |
+| .bar | 127 | ヘッダ帯(レイアウト) | 上流に対応物なし |
+| .badge | 127 | read-only sample / governor-gated / … という**開示文** | chip ではない |
+| .banner | 2 | 画面の説明ブロック | **notification-banner そのもの** |
+
+design system は component と token の両方を持つ。文や状態語に token を当てるのは
+準拠であって違反ではない。547 個の文を chip-label にすると視覚的にむしろ悪くなる。
+
+**実装した分**: .banner を使う 2 repo(isco-0110 / isco-1345)を公式
+notification-banner(data-type=info-2)に置き換えた。本文差分は component が要求する
+見出し「この画面について」の追加 1 点のみで、既存の文言は 1 文字も変えていない。
+
+### 2. search-box —— 当てないことが正しい
+
+上流 search-box.css のセレクタは
+.dads-search-box / __fields / __select / __input / __detail / __detail-actions で、
+example もすべて button type=submit を含む。**検索の「送信」のための複合部品**。
+こちらの検索欄は即時フィルタ(送信もサーバ往復も無い)なので、当てると動かない
+送信ボタンを置くことになる —— notification-banner の閉じるボタンを既定で出さない
+のと同じ理由で採らない。**input-text[type=search] を form-control-label で包む
+現状が正しい**。将来 実際に送信を伴う検索を作るときに採用する。
+
+### 3. 未 vendor 26 件 —— 全件 vendor した(ただし配り方を変えた)
+
+**全 40 component を vendor した。** ただし単純に dds.css へ足すと、40 件束ねた
+CSS は global 込み約 172KB で現行 72KB から **+100KB**。この CSS は各ページの
+style に inline されるので、713 ページすべてが太る(実測)。
+
+そこで配り方を 2 段構えにした:
+
+- 全 component を **1 ファイルずつ** vendor(resources/jp_go_dds/components/)
+- **dds.css は core 14 の束のまま変えない** —— 既存 713 ページのバイト数は
+  1 バイトも変わらない(再 vendor 後に md5 一致を確認)
+- jp-go-dds.css/css-for で必要な分だけ合成する。core に入っている component は
+  黙って落とす(custom property の二重定義を避けるため)
+
+実測: css-for [:date-picker :radio] = 13,707 bytes、all-css = 185,030 bytes。
+併せて radio の hiccup helper を追加(checkbox の対で、フォーム系で最初に要る)。
+
 ## Follow-ups
 
 1. 共有テンプレート由来の product face — **完了**。対象は 387 repo(marker
