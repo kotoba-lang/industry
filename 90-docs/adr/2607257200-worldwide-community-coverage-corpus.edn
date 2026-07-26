@@ -73,8 +73,8 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ## 現在の状態（2026-07-26）
 
-- **346 organization / 15 カテゴリ / 38 form-family / 43 データファイル**
-- 検証: source-pinned **74**（primary 50 / secondary 24）、未 pin 272（79%）
+- **351 organization / 15 カテゴリ / 38 form-family / 44 データファイル**
+- 検証: source-pinned **74**（primary 50 / secondary 24）、未 pin 277（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
@@ -82,7 +82,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 - entity kind: org-form **197（87%）** / named-org 29（13%）
 - 地域: europe 52 / north-america 44 / asia-east 32 / africa 24 / asia-south 21 /
   south-america 18 / southeast-asia 12 / oceania 12 / middle-east 11
-- 数の誠実さ: **346/346 が `:org/member-count-basis` を持ち、約 226（65%）が明示的に unknown**。
+- 数の誠実さ: **351/351 が `:org/member-count-basis` を持ち、約 231（66%）が明示的に unknown**。
 - 国別: **国連加盟 193/193 か国**が少なくとも1エントリに現れる（`coverage.cljs countries`）
 - 記述の厚み: 7 形態以上 24 か国 / 4-6 形態 34 / 2-3 形態 135 / **1 形態のみ 0**（`coverage.cljs depth`）
   `:org/member-count` を主張しているのは 73 件のみ
@@ -358,7 +358,7 @@ La Via Campesina の「2億人」は加盟団体の自己申告合計であっ�
 
 ## 既知のギャップ
 
-1. **未 pin 191 件（85%）**。レポータの「TOP UNPINNED BY ASSERTED SIZE」が作業キュー。
+1. **未 pin 277 件（79%）**。レポータの「TOP UNPINNED BY ASSERTED SIZE」が作業キュー。
 2. `manifest/schema.edn` に `:org/*` 属性が 0 件（`edn-datomize.cljs` が 90-docs のデータ
    ファイルを走査しない設計のため。religious-community も同様で、共有ジェネレータ側の変更が要る）。
 3. CLAUDE.md 統合クエリ面節への本 corpus の記載（他セッションが CLAUDE.md を未コミットで
@@ -366,7 +366,12 @@ La Via Campesina の「2億人」は加盟団体の自己申告合計であっ�
 4. `90-docs/religious-community/` の phase2/phase3 由来 56 org・784 軸行は
    `llm-prior-unverified` のまま。sample-orgs.edn 側 11 org の `document-analysis`/`survey`
    ラベルも出典未確認。
-5. 地域: middle-east 11・oceania 12・southeast-asia 12 が相対的に薄い。
+5. 地域偏り（2026-07-26 iteration 48 で計測・補正着手）: europe 95・north-america 74 に対し
+   oceania 14・middle-east 17・southeast-asia 17・south-america 27・africa 32。
+   **corpus は「全世界」を名乗りながら記述の密度は欧米に偏っている。**
+   iteration 48 は新規5件すべてを south-america / middle-east / southeast-asia /
+   asia-south に限定した（+2/+1/+1/+1）。国カバレッジ 193/193 は達成済みなので、
+   残る不均衡は「どの国が載っているか」ではなく「どれだけ厚く書かれているか」の問題。
 6. DAO の on-chain governance と fleet 自身の signed-quorum governance
    （`manifest/fleet-keys.edn`、ADR-2607160005）の構造比較は未着手。
 
@@ -465,6 +470,18 @@ corpus はこれまで「衰退の物語に反する成長」（Moose、知見7�
 **同一組織で会員増と支部減が同時に起きる**のはこれが初出。会員数だけを見ると
 地域単位の消滅が完全に隠れる。`:org/instance-count-estimate` を会員数と併記する
 運用は、この差分を見えるようにするためにある。
+
+### 18. 二つの公式情報源が食い違ったら、平均せず精密な方を残して不一致を記録する
+
+コロンビアの Juntas de Acción Comunal を再確認したところ、
+**Unidad para las Víctimas（国家機関）は「約 70,000 JAC・約 1,000万人・約 1,300 asociaciones」
+（日付なし・すべて概数）**、既存 pin の **内務省系数値は 62,553 / 6,300,000 / 1,500（精密）**。
+団体数で約12%、人数で約60%乖離し、どちらも計測日を示していない。corpus は
+**平均も上書きもせず、精密で帰属可能な方を残し `:org/refresh-result` に不一致を記録**した。
+
+副次的な観察: **法律で設置が義務づけられ、選挙で選ばれ、登記される形態ですら、
+国家機関が概数でしか公表しないことがある。** 日本の消防団（人単位まで精密）と対照的で、
+「統治されている＝正確に数えられている」は成り立たない。
 
 ## スコープ除外（明示）
 
