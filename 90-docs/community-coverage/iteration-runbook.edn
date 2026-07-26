@@ -98,6 +98,43 @@ west は使わない（`west init` 不要 / `manifest/west.yml` に触らない 
   形態だけを記録し、そう書く。
 - **文書は最新状態のみ**（ADR-2607257000）。古い記述は書き換える。改訂履歴は git が持つ。
 
+## tamaki から回す場合（2026-07-26 実測）
+
+登録済み: `kotoba-lang/tamaki` の `loops/community-coverage.edn`（LoopSpec）と
+`actors/community-coverage.edn`（ActorSpec）。専用ワークスペースは
+`~/github/tamaki-workspaces/community-coverage`（superproject の **外**に切った
+sparse worktree。`90-docs manifest scripts .gitignore` のみ。`node_modules/` は
+superproject の実体への symlink を実ディレクトリの中に置く —
+symlink 単体だと `.gitignore` の `node_modules/` に一致せず tree が dirty になる）。
+
+```sh
+cd orgs/kotoba-lang/tamaki
+export COM_JUNKAWASAKI_ROOT=/Users/junkawasaki/github/com-junkawasaki
+bin/tamaki actor validate  actors/community-coverage.edn
+bin/tamaki actor status    actors/community-coverage.edn
+bin/tamaki actor reconcile actors/community-coverage.edn --execute   # 1 replica を起動
+bin/tamaki loop list ; bin/tamaki loop status
+```
+
+**実測で分かった制約（推測ではなく実行結果）:**
+
+1. **LoopSpec の `loop tick` はこの corpus を回せない。** cycle は最初に
+   `rad issue open` を実行するが、`:com-junkawasaki` は private organism で
+   issue authority が `:github-private`（Radicle 公開は policy で拒否 — superproject は
+   private なのでこれが正しい）。**ActorSpec（`mode :local` = kotoba-code 直接実行、
+   Radicle 不要）が実行面**で、LoopSpec は宣言的登録として残す。
+2. **project に superproject checkout そのものは使えない。** 他セッションの WIP と
+   tamaki 自身が作る actor worktree で恒常的に dirty なため、cycle は
+   `Cycle requires a clean working tree` で必ず中断する。専用 worktree が必須。
+3. **未解決のブロッカー: kotoba-code の shell allowlist に `nbb` が無い**
+   （`src/kotoba_code/host.clj` の `allowed-shell?` は `clojure -M:test` /
+   `bb test` / `git status|diff|show` / `rg` / `ls` / `pwd` / `find .` のみ）。
+   実行すると actor は自前の worktree を作り runbook を読むところまで進むが、
+   **coverage reporter も integrity check も DENIED になり、検証してから commit する
+   という本 runbook の前提が満たせない。** さらに kotoba-code には git-commit tool が
+   無く、着地は `tamaki deliver` 側の責務。allowlist の拡張は sandbox 境界の変更なので
+   オーナー判断待ち（agent が勝手に広げない）。
+
 ## やらないこと
 
 - `manifest/west.yml` を触る（この作業で pin が動くことは無い。diff 0 が正常）。
