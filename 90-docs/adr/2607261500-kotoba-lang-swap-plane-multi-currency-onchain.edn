@@ -199,7 +199,52 @@ because a third party is down. It exists because fixtures cannot check these:
   the secp256k1 signature and derive the sender. A malformed envelope or a bad
   signature fails earlier and differently.
 
-**No transaction has been broadcast with real funds, and no funds have moved.**
+### On-chain execution (2026-07-26, Sepolia, 12/12)
+
+`erc20/bin/verify_onchain.cljs` — the end of the ladder. Signer
+`0xAd785580D9af6AC6e43D19eC5F5F666b6b016EA9`, funded via a PoW faucet whose CAPTCHA
+the owner solved (bot-detection circumvention is off the table, so the human did
+that one step and the agent drove the rest):
+
+| tx | what it proves |
+|---|---|
+| `0xa3e0d7115a5b91c9b124f93066b3467e00bf1ffdd508a8c11f237a2f14aeb6e4` (block 11354631, `status 0x1`) | an EIP-1559 envelope carrying BOTH calldata and value — `deposit()` on Sepolia WETH |
+| `0x9a48363f1a5123fdbfb27faae2d61b3db4344c11f2a12e2d9e760f7b3b6c87f0` (block 11354632, `status 0x1`) | `erc20`'s own `transfer` calldata executing on a real deployed token |
+
+Read back through `erc20`'s own decoder: `balanceOf(us)` was exactly `0.01` WETH
+after the wrap and exactly `0.006` after transferring `0.004`, and the recipient
+rose by exactly `0.004`. That confirms two independent things at once — the calldata
+was right, and `->units`/`->display`/`decode-uint` agree with what the chain did
+rather than merely with each other. The WETH contract and the `deposit()` selector
+were themselves verified rather than trusted (`symbol()`/`decimals()` read with
+`erc20`'s calldata; the selector computed with `eth-crypto`'s keccak).
+
+Two checks in that script generalize to anywhere signing happens:
+
+- **Before broadcasting**, `ecrecover` on the digest must return our own address.
+  A signature that does not recover locally must never reach a node.
+- **After broadcasting**, the node's transaction hash is compared to
+  `eth-crypto/raw-tx-hash` computed locally. Both matched byte-for-byte — the only
+  way to verify that function against an independent authority.
+
+**Mainnet has still never been touched, and no real-value funds have moved.** Every
+mainnet interaction in this ADR is read-only (`eth_call`, quote requests).
+
+### The verification ladder, and what each rung caught
+
+Worth stating as a method, because each rung found defects the one below could not:
+
+1. **Unit vectors** (spec examples, viem cross-checks) — caught nothing the author
+   already knew, but locks the crypto down against regression.
+2. **cljs parity on the same vectors** — proved the browser port rather than
+   asserting it.
+3. **Live read-only calls** — caught 6 defects: 4 in the LI.FI mapping, a dead
+   default endpoint, and `verify-memo` rejecting every legitimate live memo.
+   *Fixtures cannot find these, because a fixture encodes what the author believed
+   the vendor wanted.*
+4. **On-chain execution** — confirmed the parts that only a chain can confirm:
+   that the calldata does what it says, and that `raw-tx-hash` matches an
+   independent authority.
 
 ### Still open
 

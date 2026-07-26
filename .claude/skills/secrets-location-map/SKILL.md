@@ -175,6 +175,20 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     kagi:itonami-org-root ...` で再 mint**)。merge 時は
     `bin/kagi get itonami-<dept>-head-chain > /tmp/chain.edn` で取り出す。
 
+## swap plane testnet key (ADR-2607261500、2026-07-26)
+
+- **`SWAP_SEPOLIA_TESTNET_KEY`（kagi vault、compartment `personal`）** — Ethereum
+  **Sepolia testnet 専用**の secp256k1 秘密鍵（32-byte hex）。address は
+  `0xAd785580D9af6AC6e43D19eC5F5F666b6b016EA9`（公開値）。swap plane の on-chain
+  検証（`erc20/bin/verify_onchain.cljs`）が `SEPOLIA_KEY` として読む。
+  PoW faucet 由来の testnet 資金のみ保持（実価値なし）。**mainnet では絶対に使わない** —
+  faucet 経由で公開された address であり、実資金用の鍵はこれとは別に発行する。
+  取得: `bin/kagi get SWAP_SEPOLIA_TESTNET_KEY`。
+- **0x Swap API キーは存在しない**（2026-07-26 時点で確認済み）。`swap.aggregator` の
+  `:zero-ex-v2` adapter が `:verified? false` のままなのはこれが理由 — キーを取得したら
+  `swap/bin/verify_live.cljs` を実行して live 検証し、フラグを立てる。LI.FI 側は
+  キー不要で live 検証済み。
+
 ## 確認屋 / manimani per-user (ADR-2607141753、2026-07-14)
 
 - **manimani admin token**(org 側 push/pull 用、wrangler secret `MANIMANI_ADMIN_TOKEN` と同値):
