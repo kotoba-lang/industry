@@ -27,6 +27,21 @@
            :receipts "manifest/fleet-ci.edn"
            :west "manifest/west.yml"
            :db "manifest/fleet-db.edn"}
+ ;; Radicle 反映。**落ちたときだけ issue を開く**（rad 1.9.1 に commit status に
+ ;; 当たる COB は無い — job も ci も status も無く、書ける面は issue か patch の
+ ;; コメント/レビューだけ。patch は tip 駆動のこの CI には存在しない）。
+ ;;
+ ;; 実行先が seed node なのは、この laptop の rad key の passphrase item が
+ ;; kagi に無いため（ADR-2607252200 は `radicle-node-passphrase` に置く前提で
+ ;; 書かれているが、実測 `no such item`）。gad は systemd で node 常駐・16 repo
+ ;; seed 済みで、announce できる identity はそちらにある。
+ ;;
+ ;; RID は manifest/repos.edn の rad-rids から orgs/<org>/<repo> で引く。RID の
+ ;; 無い repo は skip して名前を出す（黙って落とさない）。
+ :rad {:enabled true
+       :host "gad"
+       :bin "/home/gad/.radicle/bin/rad"
+       :run-as "gad"}
  ;; CD: gate が green かつ west pin が tip より遅れているとき pin を前進させる。
  ;; 対象は :cd true の repo のみ（opt-in — 静かな pin 前進を全 repo に広げない）。
  :cd {:pin-advance-on-green true}
