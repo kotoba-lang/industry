@@ -633,6 +633,90 @@
     (zero? exit)))
 
 ;; ---------------------------------------------------------------------------
+;; Radicle 反映（失敗時だけ issue）
+;;
+;; Radicle には GitHub の commit status に当たる COB が無い（rad 1.9.1 の
+;; サブコマンドは issue / patch / inbox …で、job も ci も status も無い）。
+;; 書ける面は issue か patch のコメント/レビューだが、patch は tip 駆動の
+;; この CI には存在しない — 検証しているのは既に default branch に載った
+;; commit なので。したがって **失敗したときだけ issue を開く**。
+;;
+;; green を毎回書かないのは意図的で、Radicle 側に「常に最新の緑」を置く面が
+;; 無い以上、pass ごとに issue を作れば台帳がノイズで埋まるだけになる。緑の
+;; 正本は署名付き receipt（manifest/fleet-ci.edn）のままで、issue は
+;; 「人間が気付く必要がある事象」だけを載せる。
+;;
+;; 実行は seed node（既定 gad）へ ssh して行う。この laptop の node は鍵の
+;; passphrase が要り、その item は kagi に存在しなかった（ADR-2607252200 は
+;; 置く前提で書かれているが実測 `no such item`）。一方 gad の node は既に
+;; systemd で常駐していて 16 repo を seed 済みなので、announce できる identity
+;; はそちらにある。
+
+(defn rad-rid-map
+  "manifest/repos.edn の :manifest.repos/rad-rids（pr-str された map の string
+  blob）→ {\"orgs/<org>/<repo>\" \"rad:z…\"}。"
+  [landing]
+  (try
+    (let [edn (reader/read-string (gh-raw (:repo landing) (:branch landing) "manifest/repos.edn"))
+          blob (:manifest.repos/rad-rids (first edn))]
+      (if (string? blob) (reader/read-string blob) (or blob {})))
+    (catch :default e
+      (log "WARN rad: could not read rad-rids —" (ex-message e))
+      {})))
+
+(defn- rad-sh
+  "seed node 上で rad を1回実行する。引数は heredoc 経由で渡すので、
+  タイトルや本文に引用符が入っても壊れない。"
+  [{:keys [host bin run-as]} script]
+  (let [wrapped (str "sudo -u " (or run-as "gad") " " (or bin "rad") " \"$@\"")]
+    (sh "bash" ["-c" (str "ssh -o BatchMode=yes -o ConnectTimeout=20 " host
+                          " bash -s <<'FLEET_CI_RAD_EOF'\n"
+                          "rad() { " wrapped "; }\n"
+                          script
+                          "\nFLEET_CI_RAD_EOF")]
+        {:timeout 120000})))
+
+(defn rad-issue-for-failure!
+  "失敗 1 件につき issue 1 件。同じ sha について既に開いていれば作らない
+  （tick は 5 分ごとに回るので、これが無いと同じ失敗で issue が増え続ける）。"
+  [rad-cfg rid {:keys [name tip gate-name node detail cid]}]
+  (let [sha (sha7 tip)
+        marker (str "fleet-ci:" name "@" sha)
+        title (str "fleet-ci: " name " gate failed at " sha)
+        body (str "murakumo fleet-ci gate failed.\n\n"
+                  "- repo: " name "\n- commit: " tip "\n- gate: " gate-name
+                  "\n- node: " (get node :host "?") "\n- receipt: " (sha12 cid)
+                  "\n- marker: " marker
+                  "\n\n```\n" (str/trim (str detail)) "\n```\n")
+        existing (rad-sh rad-cfg (str "rad issue list --repo " rid " 2>/dev/null | grep -c '" sha "' || true"))]
+    (if (pos? (js/parseInt (str/trim (or (:out existing) "0")) 10))
+      (do (log "rad: issue already open for" name sha "— skipped") :skipped)
+      (let [{:keys [exit out]}
+            (rad-sh rad-cfg
+                    (str "rad issue open --repo " rid
+                         " --title " (pr-str title)
+                         " --description " (pr-str body)
+                         " --labels fleet-ci --labels gate-failure --quiet 2>&1"))]
+        (cond
+          (zero? exit)
+          (do (log "rad: issue opened for" name sha "in" rid) :opened)
+
+          ;; COB は署名するので、node が動いているだけでは足りない。鍵が
+          ;; unlock できないと必ずここに来る — 実測 2026-07-26、gad には
+          ;; ssh-agent が無く、ADR-2607252200 が置くと書いている kagi item
+          ;; (radicle-node-passphrase / radicle-seed-gad-passphrase) はどちらも
+          ;; 存在しない。原因を毎回 1 行で名指しする。
+          (re-find #"(?i)ssh-agent|SSH_AUTH_SOCK|passphrase" (str out))
+          (do (log "WARN rad: cannot sign COBs on" (:host rad-cfg)
+                   "— the signing key is locked (no ssh-agent / no RAD_PASSPHRASE)."
+                   "Put the node passphrase in kagi and export RAD_PASSPHRASE for the rad call;"
+                   "until then Radicle reflection is a no-op. Detail:" (str/trim (str out)))
+              :locked)
+
+          :else
+          (do (log "WARN rad: issue open failed for" name sha "—" (str/trim (str out))) :failed))))))
+
+;; ---------------------------------------------------------------------------
 ;; CD: green なら pin 前進（サーバ側検証を必ず通す）
 
 (defn advance-pin!
@@ -805,8 +889,13 @@
                                (if (:ok r) "landed" (str "LANDING FAILED " (:detail r))))))
                       (doseq [w prepared]
                         (let [oc (outcome-of w)
-                              ok? (= :pass oc)]
-                          (swap! results conj (assoc w :outcome oc :cid (:cid receipt)))
+                              ok? (= :pass oc)
+                              ;; check の :detail は Radicle issue 本文に入れる。
+                              ;; 「落ちた」だけの issue は読んでも何も分からない。
+                              det (let [k (keyword (str "gate/" (:gate-name w)))]
+                                    (:detail (first (filter #(= k (:name %)) checks))))]
+                          (swap! results conj (assoc w :outcome oc :cid (:cid receipt)
+                                                     :detail det))
                           (when-not (or dry? (:no-status opts))
                             (post-status! (:org-repo w) (:tip w)
                                           {:state (if ok? "success" "failure")
@@ -820,6 +909,22 @@
                             (swap! state assoc-in [:repos (:name w)]
                                    {:sha (:tip w) :outcome oc :cid (:cid receipt) :at (now)})
                             (save-state!)))))))))))
+        ;; ---- Radicle: 落ちたものだけ issue を開く
+        (let [rc (:rad cfg)
+              failed (filter #(not= :pass (:outcome %)) @results)]
+          (cond
+            (not (:enabled rc)) nil
+            (or dry? (:no-rad opts))
+            (when (seq failed) (log "rad skipped (--no-rad/--dry-run):"
+                                    (pr-str (mapv :name failed))))
+            (empty? failed) nil
+            :else
+            (let [rids (rad-rid-map landing)]
+              (doseq [w failed]
+                (if-let [rid (get rids (str "orgs/" (:org w) "/" (:name w)))]
+                  (rad-issue-for-failure! rc rid w)
+                  (log "rad: no RID registered for" (str (:org w) "/" (:name w))
+                       "— skipped (register it in repos.edn rad-rids first)"))))))
         ;; ---- CD: green かつ pin が遅れているものを前進
         (let [cd? (and (get-in cfg [:cd :pin-advance-on-green])
                        (not (:no-cd opts)) (not dry?))
