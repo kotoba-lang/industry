@@ -1,0 +1,198 @@
+[{:db/id -1
+  :adr/id "adr-2607271000-kotoba-app-profile-first-capability-component"
+  :adr/title "ADR-2607271000: .kotoba 源から capability を持つ多関数 Component が初めて出た — cloud-itonami CertGovernor と、その途中で見つかった 2 つの実バグ"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-27"
+  :adr/last-verified "2026-07-27"
+  :adr/last_verified "2026-07-27"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-app-profile-first-capability-component"
+  :adr/authoritative-for
+  ["2026-07-27 時点で .kotoba 源から Component にできるもの / できないものの実測境界"
+   "Application Profile capability (state/ui/llm/storage) の到達可能性の現在地"
+   "typed collection を境界で渡せない理由と、それが何にブロックされているか"]
+  :adr/related
+  ["adr-2607252500-kotoba-wasm-component-first-execution-boundary"
+   "adr-2607266000-kotoba-stack-responsibility-split-t0-t3"
+   "adr-2607201300-kotoba-safe-application-language"
+   "adr-2607254600-kotoba-language-capability-gaps-computational-workloads"
+   "kotoba-lang/compiler docs/adr/0076-general-canonical-abi-lowering"
+   "kotoba-lang/compiler docs/adr/0077-typed-collections-in-component-linear-memory"
+   "kotoba-lang/compiler docs/adr/0049-component-application-language-gap-ledger"
+   "gftdcojp/cloud-itonami docs/adr/0032-cert-governor-application-profile-component"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/decision-summary
+  {:proved "capability を使う多関数アプリは .kotoba 源から Component にできる（実測・実行済み）"
+   :still-blocked "typed collection の境界通過（compiler ADR 0077 待ち）と本番 provider（compiler ADR 0049）"
+   :defects-fixed [:kotoba-wasm-5 :abi-6]
+   :landed ["kotoba-lang/kotoba-wasm#5" "kotoba-lang/abi#6" "kotoba-lang/compiler#295"
+            "gftdcojp/cloud-itonami#495"]}
+  :adr/body
+  "# ADR-2607271000: capability を持つ多関数 Component が .kotoba 源から初めて出た
+
+**Status**: accepted / **Date**: 2026-07-27
+
+## Context
+
+ADR-2607252500 が Wasm Component を通常の実行成果物と定め、compiler ADR 0076
+increment 1 が `:scalar-with-capabilities` lowering（多関数 + capability 呼び出し、
+呼び出しの周りに計算があってよい）を landed させていた。ADR-2607266000 が T0-T3 の
+責任分割を終えた翌日、この面が**実際に .kotoba 源から使えるのか**を、書いて動かして
+確かめた。
+
+結論を先に: **使えなかった。** lowering は存在したが、この repo 群の capability
+テストは全て KIR を手で組んでおり、**源から通した者がいなかった**。手組み
+単一関数 KIR からは到達しない場所に、別々の repo に 1 つずつ、計 2 つの実バグが
+座っていた。
+
+## 見つかった 2 つのバグ（どちらも「読んで判断」では出ない）
+
+### 1. `typed-cap-call` の型引数が値として数えられていた（kotoba-wasm#5）
+
+`literal-walk` は関数本体中の裸のキーワードを全て guest のキーワードリテラルとして
+数えていた。`(typed-cap-call <id> :i64 :i64 x)` の**2 つの型位置も含めて**である。
+そこは `capability-contracts` が読む封印された contract であって、guest が値として
+計算するものではない。
+
+結果、値が全てスカラーのプログラムで `requires-host-runtime?` が真になり、
+`emit-component-core` が `kotoba:typed` intrinsic を import する core module を
+出した。ADR 0076 §4a が『component は `kotoba:typed`/`kotoba:heap` を import できない』
+と既に書いているとおり、これはどの WIT world も束縛できない。`wasm-tools component
+new` が `failed to resolve import kotoba:typed::literal` で落ち、**源から書いた
+`typed-cap-call` は全て Component にできなかった**。
+
+手書き WAT を出す 4 つの capability shape がこれを踏まないのは、`emit-component-core`
+を通らないから。つまり『qualified に見える path に、誰も源から入っていなかった』。
+
+### 2. Application Profile の capability に可搬な import 名が無かった（abi#6）
+
+`abi` の `capability-import-names` は id 7 で止まっていた（`aiueos:capability@0.3.0`
+が `grant-request` として定義する 7 operation）。`component-model-v1.edn` が同じ id で
+宣言している Application Profile の capability — `:state/transact` 8 / `:ui/commit` 9 /
+`:ui/next-event` 10 / `:llm/generate` 11 / `:storage/transact` 12 — には名前が無く、
+`capability-import-name` が投げた。
+
+**effect が state/ui/llm/storage だけのアプリケーションは、そもそも compile
+できなかった。** 言語は呼び出しを admit し、WIT emitter は interface を描画し、
+artifact 段階で拒否する、という形で profile が到達不能になっていた。
+
+名前を付けることは runtime の主張ではない。この 5 つは v0.3 WIT の `grant-request`
+に**意図的に入れていない** — host 実装がまだ無く、component はその
+`kotoba:application/<interface>@1` を供給する provider にしかリンクしない。enum に
+case を足すのは ADR-2607252500 が P1 として追う別作業である。id 13-16
+（`http/get-stream` / `object/*`）は stream と linear resource なので**名前を付けない
+まま**にした（名前は Canonical ABI path に無い lowering を約束してしまう）。
+
+## 今できること（実測・実行済み）
+
+`gftdcojp/cloud-itonami` の CertGovernor を Application Profile component として
+書いた（cloud-itonami ADR-0032）。
+
+```text
+state/transact -> gate-verdict (純粋) -> llm/generate -> contain-proposal
+               -> ui/commit -> log/append
+```
+
+actor の封じ込め不変条件 — **ops-LLM は提案し、gate が決める** — が .cljc facade
+ではなく Kotoba 自身の中にある。`contain-proposal` は提案が well-formed かつ
+gate 自身の verdict より緩くない時にだけ受理する。advisor は gate より保守的で
+あってよいが、緩くはできない。これを 3 つの独立した絞りが支える: ns の
+`:capabilities` 宣言（実使用と一致することを compiler が要求）、policy の
+deny-by-default な最小権限付与、`:export` リスト（WIT world は 2 export であって
+22 ではない）。
+
+**実行証拠**: import した interface ごとに scalar provider component を建て、
+`wac plug` で合成し、`decide` を wasmtime で vector ごとに呼ぶ
+（`nbb scripts/verify_cert_governor_component.cljs`）。**8/8 通過**。
+`wasm-tools validate --features all` clean、`wasm-tools component wit` は 4 本の
+`kotoba:application/*` import のみで `kotoba:typed` / `kotoba:heap` / `wasi:` は無い。
+
+| vector | state | advisor | decided |
+|---|---|---|---|
+| A | hard findings | commit | **hold**（封じ込め） |
+| B | clean/confident/testing | commit | commit |
+| C | clean/confident/testing | hold | hold（advisor の方が保守的なので採用） |
+| D | clean/confident/testing | `7`（範囲外） | commit（gate の上限） |
+| E | confidence が floor 未満 | commit | **escalate**（封じ込め） |
+| F | testing phase の外 | commit | **escalate**（封じ込め） |
+| G | clean/confident/testing | `-1` | commit（gate の上限） |
+| H | hard findings | escalate | **hold**（封じ込め） |
+
+## まだできないこと（実測した境界）
+
+### typed collection は境界を越えられない
+
+- `list<s64>` が渡せる shape は `:vector-i64-identity`（`(defn f [v] v)` という
+  単一関数の恒等写像）と `:vector-i64-literal` の 2 つだけ。多関数や capability と
+  併用できない（`:scalar` / `:scalar-with-capabilities` は**全 export が
+  スカラー**であることを要求する）。
+- さらに **源からは list 引数を宣言する手段が無い**。param の型は推論であり、
+  `(defn total [xs] (vector-count xs))` は `expression type mismatch: expected
+  vector-i64, got i64` で落ちる。上の 2 shape は手組み KIR からしか到達しない。
+- ブロッカーは compiler ADR 0077（accepted、未実装）。永続コレクションを
+  回収しない bump allocator に載せると、16384 item の上限で `conj` の
+  copy-on-write が 1.0 GiB を触るという実測がそこに書いてある。**表現の設計問題
+  であって配線の問題ではない**ので、片手間に埋めない。
+
+### 本番 provider が無い
+
+compiler ADR 0049 は 9 つの application capability を今も『identity wiring
+fixtures, not implementations』と記録している。今回の 4 本の import は、
+verification script が建てる stub provider にリンクしている。変わったのは
+**provider に満たすべき具体的な consumer ができた**ことであって、provider が
+できたことではない。
+
+### scalar 一本の wire
+
+request も result も `s64` 一本（ADR-2607252500 P1 が『temporary scalar migration
+convention』と呼んでいるもの）。実信号は 1 個の整数に詰めている
+（`confidence + 10000 * hard-findings + 1000000 * phase`）。本物の prompt や
+view tree はまだ越えられない。
+
+### 実行環境
+
+wasmtime 42.0.1 で実行した。`component-model-v1.edn` は qualification には
+`:minimum-wasmtime-major 43` を要求するので、これは**挙動の証拠であって release
+の証拠ではない**（ADR 0049 の立場をそのまま維持する）。
+
+## Consequences
+
+- `.kotoba` の Application Profile は『宣言はあるが到達不能』から『**スカラー幅で
+  到達可能、実行済み**』に変わった。UI/LLM/state/storage を持つアプリを源から
+  書けるのは今日からである。
+- 到達可能になった結果、次のブロッカーが**具体的な 1 つ**に絞れた: compiler
+  ADR 0077（typed collection の linear memory 表現）。これが入るまで、
+  Application Profile は『スカラーに詰められる範囲のアプリ』に留まる。
+- **教訓として残す**: lowering が存在することと、源からそれに入れることは別。
+  この repo 群の capability テストは全て KIR を手で組んでおり、それが 2 つの
+  バグを同時に隠していた。新しい lowering には**源からの test を必ず 1 本**
+  付ける（compiler#295 で追加済み）。
+
+## Landed
+
+| repo | PR | 内容 | 検証 |
+|---|---|---|---|
+| `kotoba-lang/kotoba-wasm` | #5 | `typed-cap-call` の型引数を literal から除外 | 62 tests / 254 assertions / 0 failures |
+| `kotoba-lang/abi` | #6 | Application Profile capability id 8-12 に可搬な import 名 | 11 tests / 62 assertions / 0 failures |
+| `kotoba-lang/compiler` | #295 | 上記 2 つを repin + **源からの** 多 capability test | 620 tests / 5365 assertions / 0 failures |
+| `gftdcojp/cloud-itonami` | #495 | CertGovernor component + nbb 検証 + ADR-0032 | 8/8 vectors（wasmtime 実行） |
+
+## Resume point — 次に触る人へ
+
+1. **compiler ADR 0077 を実装する**（typed collection の linear memory 表現）。
+   これが typed collection 境界通過・crypto/storage provider（ADR-2607254600
+   D5/D6）・Ethereum client（ADR-2607254500 Phase 1 以降）を同時にブロックしている。
+   ADR 0077 は選択肢 (A)(B) を既に測って書いてあるので、そこから読む。
+2. **`.kotoba` 源から list 引数を宣言できるようにする。** 0077 が入っても、
+   param 型が推論のみだと源から書けない。ns の `:schemas` clause と同型の
+   宣言経路が要る。
+3. **9 capability のどれか 1 つを本番 provider にする**（ADR 0049 の項目 2）。
+   `:llm/generate` は compiler ADR 0064 で `:clj` transport が既にあるので最短。
+4. 作業前に ADR-2607266000 G-M を読む — 抽出・pin 前進は共有 west checkout では
+   なく `origin/main` の pristine worktree から行う。今回もそうした。
+"}]
