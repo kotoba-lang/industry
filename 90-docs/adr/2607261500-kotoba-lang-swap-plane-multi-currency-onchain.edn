@@ -113,7 +113,7 @@ asset pair rather than branching on vendor shapes.
 
 | repo | shape | deps |
 |---|---|---|
-| `eth-crypto` (extended) | + `sign-tx-eip1559`, `eip1559-digest`, `eip1559-raw`, `raw-tx-hash` | none |
+| `eth-crypto` (extended) | + `sign-tx-eip1559`, `eip1559-digest`, `eip1559-raw`, `legacy-digest`, `signature->bytes`, `raw-tx-hash`, **and a full ClojureScript implementation of the crypto half** | none |
 | `erc20` (new) | ERC-20 calldata + EIP-2612 permit typed data, **portable `.cljc`** | none (eth-crypto is test-only) |
 | `org-thorchain` (new) | memo grammar + quote/inbound requests as data + **quote verification** | none |
 | `swap` (new) | intent -> quote -> plan -> state machine, safety checks, fee accounting | erc20, org-thorchain, treasury |
@@ -172,7 +172,7 @@ real token.
 
 | repo | tests |
 |---|---|
-| `eth-crypto` | 20 tests / 28 assertions JVM; EIP-1559 digest, raw tx and pre-broadcast hash asserted byte-for-byte against viem for both yParity 0 and a two-slot access list |
+| `eth-crypto` | 20/28 JVM + 29/48 cljs; EIP-1559 digest, raw tx and pre-broadcast hash asserted byte-for-byte against viem for both yParity 0 and a two-slot access list — and the whole suite re-run under ClojureScript |
 | `erc20` | 31/77 JVM + 27/60 cljs; all 12 selectors recomputed with keccak256; permit digest == viem `hashTypedData`; sign -> ecrecover roundtrip |
 | `org-thorchain` | 43/116 on both JVM and cljs; THORChain's own published memo examples reproduced verbatim; `verify-memo` tested against substituted destination, substituted asset, dropped fee, inflated fee |
 | `swap` | 47/128 on both JVM and cljs; both rails driven with fixtures; adversarial cases (vendor field rename, off-by-one allowance, min-out ignoring slippage, expired quote, late confirmation after failure) |
@@ -182,11 +182,20 @@ decoration — for `erc20` the cljs run *is* the browser claim.
 
 ### Still open
 
-- **`eth-crypto`'s cljs port is the remaining blocker for a real MetaMask-shaped
-  wallet** (keys on the user's device, signing in the browser): keccak256 via
-  `js/BigInt` 64-bit lanes, and secp256k1 + RFC 6979 via hand-rolled `modPow`/
-  `modInverse`. Tracked as follow-up work, not started here. Until then the signing
-  half runs on the JVM/nbb side.
+- ~~`eth-crypto`'s cljs port~~ **DONE** (2026-07-26, same day). Browser-side
+  signing works: `eth-crypto`'s entire public API is now dual-platform, so keys can
+  live on the user's own device. Three namespaces closed three specific gaps —
+  `eth-crypto.keccak` (Keccak-f[1600]'s 64-bit lanes as `js/BigInt`, because cljs
+  bitwise ops are 32-bit and a naive port would have silently returned a WRONG hash
+  rather than failing to compile), `eth-crypto.sha256` (pure-cljs HMAC-SHA256 for
+  RFC 6979: `javax.crypto` has no cljs equivalent and `SubtleCrypto` is async, which
+  would have made signing return a Promise), and `eth-crypto.secp256k1` (`js/BigInt`
+  has arbitrary precision but no `modInverse`/`modPow`). Verified by running the
+  SAME external vectors on both platforms — 29 tests / 48 assertions under nbb
+  against 20/28 on the JVM — plus a multi-block Keccak vector the shared suite never
+  exercised. Also added `legacy-digest` and `signature->bytes` (both platforms), and
+  the ns docstring's stale ":clj-only" inventory was rewritten. Both halves are
+  documented as NOT constant-time.
 - **The 0x / LI.FI adapter field mappings need one live smoke test each** against a
   real API key before either is used with real funds. `:verified? false` until then.
 - **Permit2 is not implemented.** Reproducing `PermitSingle` / `PermitDetails` /
@@ -229,9 +238,11 @@ chain-observer repos stay read-only.
 - **Finishing `com-uniswap-v3` first.** Direct router calls are a narrower capability
   than aggregator routing and are not needed while the aggregator rail carries the fee
   parameter. The stub stays a stub, now documented as one.
-- **Waiting for the cljs crypto port before building the swap plane.** The plane is
-  useful on the JVM/nbb side immediately, and `erc20` showed the browser can be served
-  earlier by pinning-and-verifying constants rather than by porting a hash function.
+- **Waiting for the cljs crypto port before building the swap plane.** Correct call,
+  and the order paid off twice: the plane was useful on the JVM/nbb side immediately,
+  and `erc20` showed the browser could be served earlier by pinning-and-verifying
+  constants than by porting a hash function. The port then landed the same day
+  anyway, so nothing was traded away permanently.
 
 ## References
 
