@@ -12,6 +12,7 @@
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs regions    ; region histogram
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs integrity  ; referential checks only
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs freshness  ; age of pinned sources
+;;   nbb 90-docs/community-coverage/queries/coverage.cljs countries  ; country coverage + absences
 ;;
 ;; The report deliberately prints the UNKNOWNS, not just the totals: a coverage
 ;; corpus that only reports its size is measuring the wrong thing.
@@ -97,6 +98,28 @@
     (doseq [[o a] (take 5 (sort-by (comp - second) aged))]
       (println (str "      " (:org/source-date o) "  (" a "y)  " (:org/name o))))))
 
+;; Country coverage. A corpus that calls itself worldwide should be able to say
+;; which countries it has actually touched and which it has not.
+(def un-members
+  (set (str/split "AF AL DZ AD AO AG AR AM AU AT AZ BS BH BD BB BY BE BZ BJ BT BO BA BW BR BN BG BF BI CV KH CM CA CF TD CL CN CO KM CG CD CR CI HR CU CY CZ DK DJ DM DO EC EG SV GQ ER EE SZ ET FJ FI FR GA GM GE DE GH GR GD GT GN GW GY HT HN HU IS IN ID IR IQ IE IL IT JM JP JO KZ KE KI KP KR KW KG LA LV LB LS LR LY LI LT LU MG MW MY MV ML MT MH MR MU MX FM MD MC MN ME MA MZ MM NA NR NP NL NZ NI NE NG MK NO OM PK PW PA PG PY PE PH PL PT QA RO RU RW KN LC VC WS SM ST SA SN RS SC SL SG SK SI SB SO ZA SS ES LK SD SR SE CH SY TJ TH TL TG TO TT TN TR TM TV UG UA AE GB US UY UZ VU VE VN YE ZM ZW" #"\s+")))
+
+(defn countries []
+  (let [freq (frequencies (mapcat :org/countries orgs))
+        seen (set (keys freq))
+        seen-un (filter un-members seen)
+        missing (sort (remove seen un-members))]
+    (println "\nCOUNTRY COVERAGE  (a worldwide corpus should say which countries it has touched)")
+    (println (str "  " (count seen-un) "/" (count un-members) " UN member states appear in at least one entry ("
+                  (pct (count seen-un) (count un-members)) "%)"))
+    (when-let [extra (seq (remove un-members seen))]
+      (println (str "  plus non-UN-member codes: " (str/join " " (sort extra)))))
+    (println "  most-referenced:")
+    (println (str "    " (str/join "  " (map (fn [[k v]] (str k ":" v))
+                                             (take 12 (sort-by (comp - val) freq))))))
+    (println (str "  absent (" (count missing) "):"))
+    (doseq [chunk (partition-all 24 missing)]
+      (println (str "    " (str/join " " chunk))))))
+
 (defn integrity []
   (let [ids (into sibling-ids (map (comp name :org/id) orgs))
         cat-ids (set (map (comp name :community-category/id) categories))
@@ -162,6 +185,8 @@
 
     (staleness)
 
+    (countries)
+
     (println "\nHONESTY OF COUNTS")
     (println (str "    " with-count "/" n " assert :org/member-count"))
     (println (str "    " with-basis "/" n " state a :org/member-count-basis"))
@@ -193,4 +218,5 @@
   "regions" (regions)
   "integrity" (integrity)
   "freshness" (staleness)
+  "countries" (countries)
   (do (report) (integrity)))
