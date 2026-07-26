@@ -82,9 +82,9 @@
   ;; :org を明示するのは superproject が west project ではないから（他の entry は
   ;; west.yml の remote から org を引く）。:cd false — 自分の pin は無い。
   ;;
-  ;; :include-from :tarball — tracked な .edn は実測 1,882 件で、blob ごとに 1 API
-  ;; 呼び出しする既定の経路では tip が動くたび 1,882 回叩くことになる（5,000/h の
-  ;; 予算を 1 tick で 4 割）。tarball なら sha ごと 1 回（実測 53MB / 7 秒）。
+  ;; :include-ext — ノードへ送る tree を .edn だけに絞る。転送は git mirror から
+  ;; の archive なので、対象が 1,882 件でも取得は sha ごと 1 回で済む（API 経由
+  ;; だった頃は blob ごとに 1 call で、5,000/h の予算を 1 tick で 4 割使った）。
   ;;
   ;; :sub 90-docs/adr — 検査範囲を ADR plane に絞る。ADR-2607171600 の EDN-only
   ;; 規約が実際に効いているのはここで、実測でも 1,552 件すべて parse 可能。
@@ -94,4 +94,4 @@
   ;; 「最初から赤で誰も直さない」になる。範囲を明示して、直ったら広げる。
   {:name "root" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs/adr" "--min" "1400"]
-   :include-ext [".edn"] :include-from :tarball :min-files 1500 :cd false}]}
+   :include-ext [".edn"] :min-files 1500 :cd false}]}
