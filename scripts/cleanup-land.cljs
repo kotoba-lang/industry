@@ -58,7 +58,15 @@
 (def only-names (some-> (opt "--names") (str/split #",") set))
 (def max-repos (some-> (opt "--max") parse-long))
 (def branches? (argset "--branches"))
-(def stamp "20260725")
+(def stamp
+  "Archive directory suffix. Derived from today, not hardcoded: a fixed
+  stamp makes every run write into the SAME .git/stash-archive-<stamp>/
+  and overwrite the previous run's untracked-files.txt / index.txt /
+  tracked-modifications.patch. The local WIP is never deleted here, so
+  that was not data loss in practice, but it silently destroyed the
+  audit trail the archive exists to provide and mislabelled archives
+  with a date they were not taken on."
+  (-> (js/Date.) .toISOString (subs 0 10) (str/replace "-" "")))
 
 (defn- gitc [dir & xs]
   (let [{:keys [out exit]} (apply sh "git" "-C" dir xs)] (when (zero? exit) out)))
