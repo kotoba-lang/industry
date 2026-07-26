@@ -11,6 +11,7 @@
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs unpinned   ; list unpinned orgs
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs regions    ; region histogram
 ;;   nbb 90-docs/community-coverage/queries/coverage.cljs integrity  ; referential checks only
+;;   nbb 90-docs/community-coverage/queries/coverage.cljs freshness  ; age of pinned sources
 ;;
 ;; The report deliberately prints the UNKNOWNS, not just the totals: a coverage
 ;; corpus that only reports its size is measuring the wrong thing.
@@ -66,6 +67,35 @@
            (map name)
            set)
       #{})))
+
+;; A pin is not binary. FIFA's participation figure is pinned to a 2006 survey and
+;; WIR's to a 2013 report; Buy Nothing's membership tripled between two recalls.
+;; Age of the underlying source is therefore reported alongside the pin count.
+(defn source-year [o]
+  (when-let [d (:org/source-date o)]
+    (let [m (re-find #"^(\d{4})" (str d))]
+      (when m (js/parseInt (second m) 10)))))
+
+(defn staleness []
+  (let [now (.getFullYear (js/Date.))
+        pinned (filter #(= "source-pinned" (:org/data-provenance %)) orgs)
+        aged (keep (fn [o] (when-let [y (source-year o)] [o (- now y)])) pinned)
+        bucket (fn [a] (cond (<= a 1) "current (0-1y)"
+                             (<= a 3) "recent (2-3y)"
+                             (<= a 6) "ageing (4-6y)"
+                             :else "stale (7y+)"))
+        by-bucket (frequencies (map (comp bucket second) aged))
+        n (count pinned)]
+    (println "\nPIN FRESHNESS  (a pin fixes WHEN something was counted, so age matters)")
+    (doseq [b ["current (0-1y)" "recent (2-3y)" "ageing (4-6y)" "stale (7y+)"]
+            :let [v (get by-bucket b 0)]
+            :when (pos? v)]
+      (line b v n))
+    (when-let [no-date (seq (remove source-year pinned))]
+      (println (str "    " (count no-date) " pinned org(s) carry no parseable :org/source-date")))
+    (println "    stalest pins:")
+    (doseq [[o a] (take 5 (sort-by (comp - second) aged))]
+      (println (str "      " (:org/source-date o) "  (" a "y)  " (:org/name o))))))
 
 (defn integrity []
   (let [ids (into sibling-ids (map (comp name :org/id) orgs))
@@ -130,6 +160,8 @@
                     "%) fall into ISIC 9499 'other membership organizations n.e.c.',"))
       (println "       i.e. the international standard has one residual bucket for them"))
 
+    (staleness)
+
     (println "\nHONESTY OF COUNTS")
     (println (str "    " with-count "/" n " assert :org/member-count"))
     (println (str "    " with-basis "/" n " state a :org/member-count-basis"))
@@ -160,4 +192,5 @@
   "unpinned" (unpinned)
   "regions" (regions)
   "integrity" (integrity)
+  "freshness" (staleness)
   (do (report) (integrity)))

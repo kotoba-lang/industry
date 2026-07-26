@@ -76,6 +76,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 - **276 organization / 15 カテゴリ / 36 form-family / 28 データファイル**
 - 検証: source-pinned **58**（primary 42 / secondary 16）、未 pin 218（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
+- pin の鮮度: current 34 / recent 16 / ageing 4 / **stale（7年以上）4**（`coverage.cljs freshness`）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
   **statutory-no-personality 8** → **企業・LEI レジストリから不可視が約 41%**
 - entity kind: org-form **197（87%）** / named-org 29（13%）
@@ -101,6 +102,7 @@ nbb 90-docs/community-coverage/queries/coverage.cljs
 nbb 90-docs/community-coverage/queries/coverage.cljs unpinned
 nbb 90-docs/community-coverage/queries/coverage.cljs regions
 nbb 90-docs/community-coverage/queries/coverage.cljs integrity   # 参照整合性のみ
+nbb 90-docs/community-coverage/queries/coverage.cljs freshness   # pin 元出典の古さ
 
 # 統合クエリ面（religious-community と同じ :org/* 語彙で join 可能）
 nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
@@ -219,6 +221,19 @@ international-club-network 10 / cooperative-enterprise 9 / civic-movement 8 /
 peer-support 8 / status-based-community 7 / gift-and-sharing 6 /
 school-linked・elder-sociability・festival-society・intentional-community 各 4 /
 popular-education・foss-project 各 3。
+
+### 9. pin は二値ではない — 出典の古さを計測する
+
+「pin 済み」を成功として数えると、**2006年の調査に固定された数字と 2025年の年次報告に固定された
+数字が同じ扱い**になる。レポータは pin 済み 58 件の出典年を集計する:
+
+- current（0-1年）34（59%）/ recent（2-3年）16（28%）/ ageing（4-6年）4 / **stale（7年以上）4**
+- 最古: **FIFA 2006（20年前）** / タイ村落基金 2012（14年） / WIR 2013（13年） /
+  UEA 2015（11年） / La Via Campesina 2021（5年）
+
+これは「pin が悪い」のではなく、**その分野に新しい計測が存在しない**ことの表示である。
+世界最大のスポーツの参加者数が20年更新されていないという事実は、corpus が可視化するまで
+誰も数えていなかった。
 
 ### 8. pin は「衰退している」という通説も訂正する
 
