@@ -1,0 +1,108 @@
+[
+;;; Iteration 43 (2026-07-26). ADR-2607257200.
+;;; Counts llm-recall-unverified unless pinned.
+
+{:org/id :org-global-creator-membership-communities
+ :org/name "Creator membership communities (Patreon, Fanbox, Twitch subs, fan funding)"
+ :org/entity-kind :org-form
+ :org/form-family :family-fan-club
+ :org/category :cat-online
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "JP" "GB" "DE" "BR" "KR" "PL"]
+ :org/founding-date 2013
+ :org/instance-count-estimate 286287
+ :org/member-count 10000000
+ :org/member-count-basis "source-pinned for one platform: Patreon reports 286,287 creators with at least one paying member as of February 2026 — DOWN about 5% since June 2025 — against 25 million+ paid memberships and 10 million+ people paying monthly, plus 60 million+ free memberships. Memberships exceed paying people because one person subscribes to several creators, so the corpus records the ~10M payer figure and not the 25M membership figure. Fanbox, Twitch subscriptions and other platforms are separate and not included."
+ :org/proxy-metric "platform-reported paid memberships and creator accounts"
+ :org/proxy-bias "Memberships overstate people (one payer, several creators). Free memberships overstate again by an order of magnitude. The creator count includes anyone with a single paying member, so it counts the long tail as communities of one."
+ :org/legal-registration :unregistered
+ :org/registration-note "The community lives entirely inside a company's account system: if the platform closes the account, the community has no roll, no treasury and no way to reassemble — the same dependency the subscription fan club has on an agency."
+ :org/governance-model :hierarchical
+ :org/mission-statement "Paying audiences with tiered access to a creator's work, chat and events — the direct successor to the subscription fan club, disintermediated from the agency but re-intermediated by the platform."
+ :org/related-org "org-jpn-artist-fan-clubs"
+ :org/source-name "Patreon platform statistics compilations (2025-2026)"
+ :org/source-url "https://backlinko.com/patreon-users"
+ :org/source-date "2026-02"
+ :org/source-tier :secondary
+ :org/source-caveat "Third-party compilations of Patreon data; Patreon does not publish a standard statistical report."
+ :org/pinned-on "2026-07-26"
+ :org/data-provenance "source-pinned"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-theme-camps-burns
+ :org/name "Theme camps and regional burn communities (Burning Man, AfrikaBurn, Midburn, Nowhere)"
+ :org/entity-kind :org-form
+ :org/form-family :family-festival-society
+ :org/category :cat-hobby-interest
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "ZA" "IL" "ES" "AU" "CA" "JP"]
+ :org/founding-date 1986
+ :org/instance-count-estimate 1500
+ :org/member-count-basis "unknown — theme camps register with each event and number in the high hundreds to low thousands per burn, but camps persist year-round as year-long organizing groups that no event roster captures."
+ :org/legal-registration :mostly-unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Year-round crews that build, transport and run a camp — kitchen, sound, shade, art — for one week a year under a gifting rule that forbids commerce, then spend the other 51 weeks fundraising and fabricating for it."
+ :org/related-org "org-global-carnival-krewes-guilds"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-cosplay-communities
+ :org/name "Cosplay communities and costume circles"
+ :org/entity-kind :org-form
+ :org/form-family :family-hobby-society
+ :org/category :cat-hobby-interest
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-asia-east
+ :org/countries ["JP" "KR" "CN" "US" "BR" "PH" "ID" "MX"]
+ :org/founding-date 1984
+ :org/member-count-basis "unknown — convention attendance and platform follower counts are the only proxies, and both measure audience rather than the makers' community, which organizes in small workshop groups and studio shares."
+ :org/legal-registration :unregistered
+ :org/governance-model :meritocratic
+ :org/mission-statement "Makers who build costumes and characters together, sharing patterns, workshop space, photography and convention logistics — a craft community whose output is worn, photographed and then rebuilt for the next event."
+ :org/related-org "org-jpn-doujin-circles"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-ttrpg-tables
+ :org/name "Tabletop RPG tables, board game clubs and play groups"
+ :org/entity-kind :org-form
+ :org/form-family :family-hobby-society
+ :org/category :cat-hobby-interest
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "GB" "DE" "JP" "BR" "PL" "FR"]
+ :org/founding-date 1974
+ :org/member-count-basis "unknown and structurally unmeasurable in the same way as book clubs: a table is 3-6 people meeting fortnightly in a home or a game shop, with no name and no account. Publisher sales and convention attendance measure the market, not the groups."
+ :org/legal-registration :unregistered
+ :org/governance-model :consensus
+ :org/mission-statement "Small groups meeting on a fixed schedule for years around a shared imagined world, with one member carrying disproportionate preparation load — a durable form of adult friendship maintenance that leaves almost no institutional trace."
+ :org/related-org "org-global-book-clubs"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+
+{:org/id :org-global-fantasy-sports-leagues
+ :org/name "Fantasy sports leagues and prediction pools (office pools, kabaddi/cricket fantasy, sweepstakes)"
+ :org/entity-kind :org-form
+ :org/form-family :family-hobby-society
+ :org/category :cat-sports
+ :org/type :secular-community
+ :org/scope :global
+ :org/region-primary :region-north-america
+ :org/countries ["US" "IN" "GB" "AU" "CA" "BR"]
+ :org/founding-date 1980
+ :org/member-count-basis "unknown as communities — platform user counts (Indian fantasy cricket apps report user bases in the hundreds of millions of registrations) measure accounts, not leagues, and the durable social unit is a 10-12 person private league that has run for years among the same friends or colleagues."
+ :org/proxy-metric "fantasy platform registered users"
+ :org/proxy-bias "Registrations, not leagues or people: heavy promotional acquisition in the Indian market inflates account counts, and a private league of colleagues is invisible in them."
+ :org/legal-registration :unregistered
+ :org/governance-model :democratic
+ :org/mission-statement "Private leagues with their own constitutions, punishments and decades-long rivalries, run by a volunteer commissioner — a community whose pretext is a sport it does not play."
+ :org/related-org "org-global-mmo-guilds"
+ :org/data-provenance "llm-recall-unverified"
+ :source/dataset "community-coverage"}
+]
