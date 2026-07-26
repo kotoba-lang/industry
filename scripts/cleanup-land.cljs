@@ -359,7 +359,7 @@
     (if-not apply?
       (do (when (seq additive) (println (format "  plan :additive  %d files → PR → merge" (count additive))))
           (when (seq tracked) (println (format "  plan :review    %d files → PR のみ（merge しない）" (count tracked)))))
-      (let [adir (archive! dir (concat additive (mapcat vals (vals skipped))))
+      (let [adir (archive! dir (concat additive (mapcat val skipped)))
             base-map (base-blobs slug base)
             [additive landed-additive] (drop-already-landed dir base-map additive)
             [tracked landed-tracked] (drop-already-landed dir base-map tracked)]
