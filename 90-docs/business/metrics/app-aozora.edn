@@ -8,19 +8,19 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 12873, "app-aozora-appview" 11367},
+ {"app-aozora-pds" 12975, "app-aozora-appview" 11428},
  :zone
- {:requests-7d 50953,
-  :pageviews-7d 8456,
-  :uniques-7d-sum 808,
+ {:requests-7d 51248,
+  :pageviews-7d 8460,
+  :uniques-7d-sum 814,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 274310}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2909}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1860}
+    :requests 274319}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2906}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1863}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 293}
    {:path
     "/kotobase-cf-wasm-testnet/ipns/bafyreidwhkvt3omcwb6ytmiy6npf42crhvbekxi7aovgxjhl6hgrmsnvcm.json",
@@ -29,12 +29,12 @@
     "/kotobase-cf-wasm-testnet/ipns/bafyreiahgbnxyk4jd7uwzssim5plym6enaw47klnydqbowdjyhlfztpp5i.json",
     :requests 157}
    {:path "/xrpc/com.atproto.sync.getBlob", :requests 107}
-   {:path "/", :requests 96}],
-  :status-mix {:ok 281931, :client-error 616, :server-error 81},
+   {:path "/", :requests 89}],
+  :status-mix {:ok 281830, :client-error 660, :server-error 80},
   :window "24h"},
  :as-of "2026-07-26",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 274310 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2909 · /xrpc/com.atproto.sync.subscribeRepos 1860 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 293 · /kotobase-cf-wasm-testnet/ipns/bafyreidw… 254 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 274319 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2906 · /xrpc/com.atproto.sync.subscribeRepos 1863 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 293 · /kotobase-cf-wasm-testnet/ipns/bafyreidw… 254 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 50953 req/7d・808 uniques(日次和)・うち4xx probe 0%(24h)、workers 24240 inv/7d"}
+ "aozora.app 実測 51248 req/7d・814 uniques(日次和)・うち4xx probe 0%(24h)、workers 24403 inv/7d"}
