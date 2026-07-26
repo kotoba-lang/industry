@@ -315,6 +315,60 @@ legislation.gov.uk の XML から一次読了で収録した。
 見当たらないことは免許が存在しないことの証明ではないので、不在の推認で
 `:admissible` を出さない（D5 ②の帰結）。その旨を `:known-gaps` に明記している。
 
+### D17. ドイツ —— 入口の作りは1つではなく4つある（2026-07-26 追加）
+
+ドイツを入れて、`:licence/regime` に**4つ目の型**が出そろった。同じ「法律サービス」でも:
+
+| 法域 | 型 | 中身 |
+|---|---|---|
+| JPN | `:prior-authorisation` | 弁護士法72条。**法人が名義人になれない唯一の法域** |
+| GBR | `:reserved-activities-only` | LSA 2007。6類型だけ閉じ、それ以外は入口規制なし |
+| DEU | `:prohibition-with-registration-exceptions` | RDG §3 で原則禁止、§10 の能力分野別登録で門を開ける。**法人も登録できる** |
+
+不動産仲介では GBR が `:negative-licensing` になるので4型そろう。
+**「参入前に許可を取る」「列挙されたものだけ閉じる」「原則禁止＋登録で開ける」
+「自由に始めて後から排除する」は別の世界**で、事業設計への含意が違う。
+
+**RDG §2(1) の境界語が日本と一致していた**のが最大の発見:
+「jede Tätigkeit in konkreten fremden Angelegenheiten, sobald sie eine
+**rechtliche Prüfung des Einzelfalls** erfordert」—— 法務省ガイドラインが判断要素
+として挙げる『個別の事案における…法的に処理して』と実質同じ線を、ドイツは
+**規制対象の定義そのもの**として条文に置いている。機械が個別事案を法的に処理した
+瞬間に規制へ入る、という構造は日独で共通。
+
+**GewO §34c** は不動産仲介で3つ目の答え。しかも Vermittlung（媒介）だけでなく
+**Nachweis der Gelegenheit（機会の提示）**まで捕捉し、日英いずれより広い。
+
+**KrWG §53/§54** は廃棄物を**危険かどうか**で届出と許可に分ける（日本は収集運搬と
+処分、英国は controlled waste 一律）。名宛人に **Händler と Makler** が入るため、
+**取次ぎに徹する ops 層がそのまま規制対象に入る** —— 3法域中もっとも委譲が効かない。
+
+### D18. EU 規範は verdict に混ぜない（2026-07-26 追加）
+
+役務指令9条は「**Member States shall not make** … subject to an authorisation
+scheme unless…」と書かれている。**加盟国の権限を縛るのであって、事業者に許可を
+免除するものではない。** ドイツ法が Erlaubnis を要求する以上、事業者は取る必要が
+あり、指令が与えるのは「その許可制を争う経路がある」ことだけ。制度を無効にできるのは
+裁判所か委員会だけである。
+
+これを verdict にマージすれば、**まさに D5 ②が防ごうとしている許可方向の誤り**に
+なる（「EU が許可不要と言っている」という誤読）。よって:
+
+- EU 規範は `supranational-rules` に1か所だけ持ち、entry からは
+  `:supranational-constraints` で参照する
+- 各制約は `:constraint/on :member-state` を持ち、rule 自体も `:rule/binds :member-state`
+- `gate/plan` は verdict の**外**に、ラベル付きで返す
+- **テストが「EU 制約を全部消しても verdict が1つも変わらない」ことを検査する**
+
+地方の層（D13）が「締める方向にしか動けない」のと対称に、超国家の層は
+「緩める方向の主張を持つが、それを事業者の verdict には反映しない」。
+向きが逆なので同じ継承機構には載せなかった。
+
+なお、比較出力を見て**自分の不正確さが1件露見した**: GBR の legal-services が
+`:licence/regime` を書き忘れて既定の `:prior-authorisation` に落ちていた。
+LSA 2007 の要点は入口規制が無いことなので誤り。`:reserved-activities-only` を
+追加し、**既定値に落ちている entry が無いことを検査するテスト**を足した。
+
 ## Consequences
 
 ### 現在の判定結果（`gate/summary` の実出力）
@@ -338,10 +392,10 @@ ITAD の現在地は機械が判定できる状態になった:
 
 ### 収録範囲と、その限界
 
-21件（法域×業種）・**異なる条文41本** —— JPN 13業種 + JPN-13（東京都）3件 +
-GBR 5業種。**一次読了36 / 公式ページ取得5 / 二次情報のみ0**
-（D9・D11・D13〜D16）。日本は e-Gov 法令 API、英国は legislation.gov.uk の
-`data.xml` から取得。
+24件（法域×業種）・**異なる条文47本** —— JPN 13業種 + JPN-13（東京都）3件 +
+GBR 5業種 + DEU 3業種。**一次読了42 / 公式ページ取得5 / 二次情報のみ0**
+（D9・D11・D13〜D18）。日本は e-Gov 法令 API、英国は legislation.gov.uk の
+`data.xml`、ドイツは gesetze-im-internet.de の `xml.zip`、EU は EUR-Lex。
 
 初版は3件で、うち2件が ITAD だった —— 1プロジェクトにしか使えない commons
 だったので、**実装済み actor が実際に載っている業種**を3件足した（D7）。
@@ -376,7 +430,7 @@ GBR 5業種。**一次読了36 / 公式ページ取得5 / 二次情報のみ0**
 
 ## Verification
 
-`clojure -M:test` 66 tests / 925 assertions green、`clojure -M:lint` warnings 0 /
+`clojure -M:test` 70 tests / 1,064 assertions green、`clojure -M:lint` warnings 0 /
 errors 0（いずれも実走、2026-07-26）。変異テスト3件で suite が噛むことを確認:
 
 1. 未検証出典からの許可の降格を外す → 3 failures
@@ -396,6 +450,8 @@ errors 0（いずれも実走、2026-07-26）。変異テスト3件で suite が
 15. telecom の閾値説明から設備非設置の帰結を削る → 1 failure
 16. GBR 宅建の negative-licensing 表示を消す → 1 failure
 17. GBR 廃棄物の同一構内除外を消す → 1 failure / 1 error
+18. EU 制約を verdict にマージする（許可方向の誤り） → 1 failure
+19. KrWG §53 の名宛人から Händler/Makler を落とす → 1 failure
 
 D13/D14 では**テストが実際の欠陥を2件見つけた**: 国の層に東京都の 81,000 円が
 残っていたこと、および telecom の2つ目のゲートを検証するテストが存在せず
