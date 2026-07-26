@@ -441,6 +441,14 @@
   PR 照会は 1 branch = 1 API 往復なので、branch farm（実測: kotoba-lang/webgpu は
   ローカル branch 67本、slides は 90本超）では打ち切って必ず報告する。"
   [dir slug base]
+  ;; stale な remote-tracking ref を先に落とす。has-remote? は
+  ;; refs/remotes/origin/<b> の存在で判定するので、upstream から消えた
+  ;; (あるいは一度も存在しなかった) branch のローカルキャッシュが残っていると
+  ;; 「push 済み」と誤判定し、push をスキップして PR 作成に回り、それが失敗して
+  ;; 「PR 作成に失敗（差分なし等）」という無害そうな行になる。実測 2026-07-27:
+  ;; 残存 102 本のうち 100 本がこれで、この機械にしか無い commit を保全するという
+  ;; このクラスの唯一の目的が静かに達成されていなかった。
+  (gitc dir "fetch" "--prune" "--quiet" "origin")
   (let [live (live-branches dir base)
         cap 20]
     (when (seq live)
