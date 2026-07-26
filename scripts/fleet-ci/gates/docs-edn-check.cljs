@@ -18,10 +18,22 @@
             [clojure.string :as str]))
 
 (def args (vec *command-line-args*))
-(def root (or (first (remove #(str/starts-with? % "--") args)) "."))
-(def min-files
-  (let [i (.indexOf args "--min")]
-    (if (neg? i) 50 (js/parseInt (nth args (inc i)) 10))))
+
+(defn- flag [name default]
+  (let [i (.indexOf args name)]
+    (if (neg? i) default (nth args (inc i)))))
+
+;; tick.cljs は常に「展開ディレクトリ」を第1引数で渡すので、検査範囲を狭めたい
+;; ときはここで受ける。superproject のように .edn が repo 全体に散っていて、
+;; 不変条件（EDN-only / parse 可能）が課されているのは一部の plane だけ、という
+;; 対象のための口。範囲外に古い壊れた EDN があっても、規約が効いている plane の
+;; 回帰を検出できる。
+(def sub (flag "--sub" nil))
+(def root (let [d (or (first (remove #(str/starts-with? % "--")
+                                     (remove (set [(flag "--min" nil) (or sub "")]) args)))
+                      ".")]
+            (if sub (path/join d sub) d)))
+(def min-files (js/parseInt (str (flag "--min" 50)) 10))
 
 (def skip-dirs #{"node_modules" ".git" "archive" "dist" "target" ".shadow-cljs"})
 
@@ -35,6 +47,11 @@
              (str/ends-with? n ".edn") (swap! out conj p)))))
      dir)
     @out))
+
+(when-not (fs/existsSync root)
+  (println "FLEET-CI: root does not exist:" root
+           "— extraction or --sub is wrong, refusing to report pass")
+  (js/process.exit 90))
 
 (let [files (edn-files root)
       bad (atom [])]

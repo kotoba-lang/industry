@@ -392,12 +392,49 @@
           (when-not (zero? exit) (die (str "tar create failed: " out))))
         f))))
 
+(defn filtered-tarball!
+  "全体 tarball を **1 回だけ** 取り、拡張子で絞って詰め直す。
+
+  `blob-tarball!` と目的は同じで、コストの形が逆。あちらは blob ごとに
+  1 API 呼び出しなので、対象が少ない repo では最小の転送で済むが、対象が
+  数百を超えると破綻する — superproject の tracked `.edn` は実測 1,882 件
+  で、tip が動くたびに 1,882 回叩けば 5,000/h のレート予算を 1 tick で 4 割
+  食う。tarball は sha ごとに 1 回（実測 53MB / 7 秒）で、絞り込みは手元で
+  やる。**対象ファイル数が多い repo はこちらを使う**（`:include-from
+  :tarball`）。
+
+  `ensure-tree!` の展開キャッシュをそのまま使うので、同じ sha を別 gate が
+  既に取っていれば追加の取得は起きない。"
+  [org-repo sha {:keys [include-ext min-files]}]
+  (let [f (path/join cache-dir (str (str/replace org-repo "/" "-") "-" (sha12 sha) "-filtered.tar.gz"))]
+    (if (fs/existsSync f)
+      f
+      (let [dir (ensure-tree! org-repo sha)
+            ;; find の -name は OR で並べる（-o）。括弧は bash から隠す。
+            name-expr (str/join " -o " (map #(str "-name '*" % "'") include-ext))
+            count-cmd (str "cd " dir " && find . -type f \\( " name-expr " \\) | wc -l")
+            n (js/parseInt (str/trim (:out (sh "bash" ["-c" count-cmd]))) 10)]
+        (log "tarball-filter" org-repo (sha12 sha) ":" n "files" (pr-str include-ext))
+        (when (and min-files (< n min-files))
+          (die (str "tarball filter found only " n " files for " org-repo
+                    " (expected >= " min-files ") — refusing to build a gate input that "
+                    "would trivially pass")))
+        (let [{:keys [exit out]}
+              (sh "bash" ["-c" (str "cd " dir " && find . -type f \\( " name-expr
+                                    " \\) -print0 | tar czf " f " --null -T -")]
+                  {:timeout 300000})]
+          (when-not (zero? exit) (die (str "filtered tar create failed: " out))))
+        f))))
+
 (defn gate-input!
-  "gate に渡す tarball を用意する。:include-ext があれば path 限定 tarball、
+  "gate に渡す tarball を用意する。:include-ext があれば path 限定 tarball
+  （`:include-from :tarball` なら全体 tarball から絞り、既定は blob ごと取得）、
   無ければ repo 全体の tarball。ノードへ送るサイズに上限を掛ける。"
-  [{:keys [org-repo tip include-ext min-files name]}]
+  [{:keys [org-repo tip include-ext include-from min-files name]}]
   (let [f (if (seq include-ext)
-            (blob-tarball! org-repo tip {:include-ext include-ext :min-files min-files})
+            (if (= :tarball include-from)
+              (filtered-tarball! org-repo tip {:include-ext include-ext :min-files min-files})
+              (blob-tarball! org-repo tip {:include-ext include-ext :min-files min-files}))
             (let [f (path/join cache-dir (str (str/replace org-repo "/" "-") "-" (sha12 tip) ".tar.gz"))]
               (when-not (fs/existsSync f)
                 (fs/mkdirSync cache-dir #js {:recursive true})
@@ -651,7 +688,10 @@
         ;; 各 repo の tip（fresh）と west pin
         work (vec (for [r repos
                         :let [nm (:name r)
-                              org (org-of west nm)
+                              ;; org は west.yml の remote から引くのが既定（drift 防止）。
+                              ;; superproject 自身は west project ではないので引けない —
+                              ;; そういう対象だけ gates.edn に :org を明示する。
+                              org (or (:org r) (org-of west nm))
                               org-repo (str org "/" nm)
                               tip (when org (gh-tip org-repo))
                               pin (get-in west [:projects nm :revision])

@@ -44,11 +44,11 @@ schema はそれぞれ `00-contracts/schemas/passive-dns-cti-ontology.kotoba.edn
 
 1. **`yabai-passive-dns-entities`** — `vector-of-maps-entities`（kanjo/kabuto の
    `*.merged.kotoba.edn` と同型）で `orgs/etzhayyim/com-etzhayyim-yabai/data/
-   passive-dns.merged.kotoba.edn` を読む。`:source/dataset "yabai-passive-dns"`。
+   passive-dns.merged.kotoba.edn` を読む。`:source/dataset \"yabai-passive-dns\"`。
 2. **`tadori-threat-intel-entities`** — `add-datoms-entities f nil :tadori/entity-id`
    （hirameki-patents の `[:db/add e a v]` 4-tuple と同型）で
    `orgs/etzhayyim/com-etzhayyim-tadori/data/persisted/tadori-threat-intel.tx.kotoba.edn`
-   を読む。`:source/dataset "tadori-threat-intel"`。
+   を読む。`:source/dataset \"tadori-threat-intel\"`。
 
 `:source/dataset` で出自を区別し（属性名に出自を埋め込まない — ADR-2607252000 と同じ）、
 `build-conn` の let / all-tx / count map と `-main` の count 表示に組込む。
@@ -56,8 +56,8 @@ schema はそれぞれ `00-contracts/schemas/passive-dns-cti-ontology.kotoba.edn
 ## 既知のセマンティクス（実装時に障害にならないよう明記）
 
 - **`:db.type/ref` は datascript.js 上で解決されず文字列値として join する**。
-  `:pdns/domain "domain.cloudflare-com"` が `:domain/id "domain.cloudflare-com"` と
-  文字列一致で結合する（lei-tos の `:company/lei` と同じ）。ref 値（`[:ns/id "x"]` のような
+  `:pdns/domain \"domain.cloudflare-com\"` が `:domain/id \"domain.cloudflare-com\"` と
+  文字列一致で結合する（lei-tos の `:company/lei` と同じ）。ref 値（`[:ns/id \"x\"]` のような
   vector）は JS array として保持され、query での中継は ipaddress graph id 形式を経由する。
   実測: `pdns/ip`（`ip.v4.104-16-1-1` 形式）と `indicator/value`（生 IP `1.1.1.1`）は形式が
   違うため直接 join できない — これは仕様（ipaddress graph を中継する設計）であって
@@ -87,7 +87,7 @@ adr=1804 docs=2253 ... yabai=545 tadori=5 total=15660
 
 corpus 内 join: `domain/fqdn → domain/id → pdns/domain → pdns/ip` で
 `[cloudflare.com ip.v4.104-16-1-1] [dns.google ip.v4.8-8-8-8] [one.one.one.one ip.v4.1-1-1-1]`
-が取得可能。IP indicator リスト（`indicator/type "ip"` × `indicator/category`）で
+が取得可能。IP indicator リスト（`indicator/type \"ip\"` × `indicator/category`）で
 scanner IP（confidence 700-900）や `1.1.1.1 benign 950` / `192.0.2.66 tor-exit 700` が引ける。
 これらは `kotoba-cf-zones` 由来の実データ（2026-07-13→16 の CF GraphQL sweep）。
 

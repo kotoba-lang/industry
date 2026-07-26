@@ -50,4 +50,26 @@
   ;; 防ぐ床（gate 側の --min と二重に掛ける）。
   {:name "org-spirit-in-physics-comics" :gate :nbb-script
    :script "gates/docs-edn-check.cljs" :script-args ["--min" "50"]
-   :include-ext [".edn"] :min-files 50 :cd true}]}
+   :include-ext [".edn"] :min-files 50 :cd true}
+
+  ;; superproject 自身。GitHub Actions の docs-edn-verify と同じ不変条件を、
+  ;; Actions に依存しない経路で持つ（2026-07-26: com-junkawasaki と gftdcojp の
+  ;; Actions は課金停止で job が起動せず、この repo の検証が全部止まった。
+  ;; kotoba-lang は動いていたので、止まったのは「アカウント単位」）。
+  ;;
+  ;; :org を明示するのは superproject が west project ではないから（他の entry は
+  ;; west.yml の remote から org を引く）。:cd false — 自分の pin は無い。
+  ;;
+  ;; :include-from :tarball — tracked な .edn は実測 1,882 件で、blob ごとに 1 API
+  ;; 呼び出しする既定の経路では tip が動くたび 1,882 回叩くことになる（5,000/h の
+  ;; 予算を 1 tick で 4 割）。tarball なら sha ごと 1 回（実測 53MB / 7 秒）。
+  ;;
+  ;; :sub 90-docs/adr — 検査範囲を ADR plane に絞る。ADR-2607171600 の EDN-only
+  ;; 規約が実際に効いているのはここで、実測でも 1,552 件すべて parse 可能。
+  ;; 範囲外には古い壊れた EDN が 25 件ある（90-docs/deployment/ 13、90-docs/gates/ 8、
+  ;; 90-docs/ 直下ほか 4 — Unmatched delimiter / 奇数個の map form など、2026-08
+  ;; 付けの計画文書群）。これらは規約成立前の遺物で、gate をそこまで広げると
+  ;; 「最初から赤で誰も直さない」になる。範囲を明示して、直ったら広げる。
+  {:name "root" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs/adr" "--min" "1400"]
+   :include-ext [".edn"] :include-from :tarball :min-files 1500 :cd false}]}
