@@ -664,13 +664,37 @@
       (log "WARN rad: could not read rad-rids —" (ex-message e))
       {})))
 
+(def ^:private rad-passphrase
+  "COB は署名するので、node が動いていても鍵が unlock できないと書けない。
+  passphrase は kagi（compartment personal、item は :rad :passphrase-item）
+  から取る — ADR-2607252200 がそう決めている置き場所で、2026-07-26 に実際に
+  置いた（それまで `no such item` で、ADR は実行されなかった意図を書いていた）。
+
+  memo 化するのは 1 tick に複数回 rad を叩くため（issue list → issue open）。"
+  (memoize
+   (fn [item]
+     (let [{:keys [exit out]}
+           (sh (path/join root "orgs" "kotoba-lang" "kagi" "bin" "kagi")
+               ["get" item "--compartment" "personal"]
+               {:env (js/Object.assign #js {} js/process.env #js {:FLEET_ROOT root})})]
+       (when (zero? exit)
+         (let [v (str/trim (str out))]
+           (when-not (str/starts-with? v "no such item") v)))))))
+
 (defn- rad-sh
-  "seed node 上で rad を1回実行する。引数は heredoc 経由で渡すので、
-  タイトルや本文に引用符が入っても壊れない。"
-  [{:keys [host bin run-as]} script]
-  (let [wrapped (str "sudo -u " (or run-as "gad") " " (or bin "rad") " \"$@\"")]
+  "seed node 上で rad を1回実行する。script は heredoc（= stdin）で渡すので、
+  タイトルや本文に引用符が入っても壊れない。
+
+  passphrase も **同じ stdin 経由**で渡し、ssh の argv には置かない — argv は
+  リモートの `ps` に出る。ローカルの argv にも置かない（同じ理由）。"
+  [{:keys [host bin run-as passphrase-item]} script]
+  (let [pass (rad-passphrase (or passphrase-item "radicle-seed-gad-passphrase"))
+        wrapped (str "sudo -u " (or run-as "gad")
+                     " env RAD_PASSPHRASE=\"$RAD_PASSPHRASE\" RAD_HOME=/home/" (or run-as "gad")
+                     "/.radicle " (or bin "rad") " \"$@\"")]
     (sh "bash" ["-c" (str "ssh -o BatchMode=yes -o ConnectTimeout=20 " host
                           " bash -s <<'FLEET_CI_RAD_EOF'\n"
+                          (if pass (str "RAD_PASSPHRASE=" (pr-str pass) "\n") "")
                           "rad() { " wrapped "; }\n"
                           script
                           "\nFLEET_CI_RAD_EOF")]
@@ -687,30 +711,44 @@
                   "- repo: " name "\n- commit: " tip "\n- gate: " gate-name
                   "\n- node: " (get node :host "?") "\n- receipt: " (sha12 cid)
                   "\n- marker: " marker
-                  "\n\n```\n" (str/trim (str detail)) "\n```\n")
+                  "\n\n" (str/trim (str detail)) "\n")
         existing (rad-sh rad-cfg (str "rad issue list --repo " rid " 2>/dev/null | grep -c '" sha "' || true"))]
     (if (pos? (js/parseInt (str/trim (or (:out existing) "0")) 10))
       (do (log "rad: issue already open for" name sha "— skipped") :skipped)
       (let [{:keys [exit out]}
+            ;; title/description は argv に直接置かず、リモートで quoted heredoc
+            ;; に書き出してから $(cat) で読む。gate の detail は任意のテキストで、
+            ;; 最初の版は本文の ``` が bash のバッククォート（コマンド置換）に
+            ;; 食われて `nexit: command not found` を撒いた。--labels も外した:
+            ;; label の適用は repo の delegate 権限を要求し、seed node の DID は
+            ;; 持っていない（実測 `not authorized to apply Label`）。issue 本体は
+            ;; 開けるので、分類は本文の marker 行で足りる。
             (rad-sh rad-cfg
-                    (str "rad issue open --repo " rid
-                         " --title " (pr-str title)
-                         " --description " (pr-str body)
-                         " --labels fleet-ci --labels gate-failure --quiet 2>&1"))]
+                    (str "cat > /tmp/fleet-ci-issue-title <<'FLEET_CI_TITLE_EOF'\n"
+                         title
+                         "\nFLEET_CI_TITLE_EOF\n"
+                         "cat > /tmp/fleet-ci-issue-body <<'FLEET_CI_BODY_EOF'\n"
+                         body
+                         "\nFLEET_CI_BODY_EOF\n"
+                         "rad issue open --repo " rid
+                         " --title \"$(cat /tmp/fleet-ci-issue-title)\""
+                         " --description \"$(cat /tmp/fleet-ci-issue-body)\""
+                         " --quiet 2>&1; rc=$?;"
+                         " rm -f /tmp/fleet-ci-issue-title /tmp/fleet-ci-issue-body; exit $rc"))]
         (cond
           (zero? exit)
           (do (log "rad: issue opened for" name sha "in" rid) :opened)
 
           ;; COB は署名するので、node が動いているだけでは足りない。鍵が
-          ;; unlock できないと必ずここに来る — 実測 2026-07-26、gad には
-          ;; ssh-agent が無く、ADR-2607252200 が置くと書いている kagi item
-          ;; (radicle-node-passphrase / radicle-seed-gad-passphrase) はどちらも
-          ;; 存在しない。原因を毎回 1 行で名指しする。
+          ;; unlock できないと必ずここに来る。gad には ssh-agent が無いので
+          ;; passphrase 経路が唯一の unlock 手段 — kagi に item が無い/読めない
+          ;; ときにここへ落ちる。原因を毎回 1 行で名指しする。
           (re-find #"(?i)ssh-agent|SSH_AUTH_SOCK|passphrase" (str out))
           (do (log "WARN rad: cannot sign COBs on" (:host rad-cfg)
-                   "— the signing key is locked (no ssh-agent / no RAD_PASSPHRASE)."
-                   "Put the node passphrase in kagi and export RAD_PASSPHRASE for the rad call;"
-                   "until then Radicle reflection is a no-op. Detail:" (str/trim (str out)))
+                   "— the signing key is locked. kagi item"
+                   (pr-str (or (:passphrase-item rad-cfg) "radicle-seed-gad-passphrase"))
+                   "(compartment personal) must hold the node passphrase; see ADR-2607252200."
+                   "Detail:" (str/trim (str out)))
               :locked)
 
           :else

@@ -31,17 +31,24 @@
  ;; 当たる COB は無い — job も ci も status も無く、書ける面は issue か patch の
  ;; コメント/レビューだけ。patch は tip 駆動のこの CI には存在しない）。
  ;;
- ;; 実行先が seed node なのは、この laptop の rad key の passphrase item が
- ;; kagi に無いため（ADR-2607252200 は `radicle-node-passphrase` に置く前提で
- ;; 書かれているが、実測 `no such item`）。gad は systemd で node 常駐・16 repo
- ;; seed 済みで、announce できる identity はそちらにある。
+ ;; 実行先が seed node なのは、gad が systemd で node 常駐・gate 対象を seed
+ ;; 済みで、announce できる identity がそちらにあるため。この laptop の node は
+ ;; 停止したままで、その鍵の passphrase item（radicle-node-passphrase）は今も
+ ;; kagi に無い。
+ ;;
+ ;; :passphrase-item — COB の署名鍵を unlock する passphrase の kagi item
+ ;; （compartment personal）。gad に ssh-agent は無いので、これが唯一の unlock
+ ;; 手段。2026-07-26 に実際に置いた（ADR-2607252200 はこの置き場所を決めて
+ ;; いたが、実測では `no such item` のままだった＝実行されていなかった）。
+ ;; 値は stdin 経由でのみ渡す（argv はリモートの ps に出る）。
  ;;
  ;; RID は manifest/repos.edn の rad-rids から orgs/<org>/<repo> で引く。RID の
  ;; 無い repo は skip して名前を出す（黙って落とさない）。
  :rad {:enabled true
        :host "gad"
        :bin "/home/gad/.radicle/bin/rad"
-       :run-as "gad"}
+       :run-as "gad"
+       :passphrase-item "radicle-seed-gad-passphrase"}
  ;; CD: gate が green かつ west pin が tip より遅れているとき pin を前進させる。
  ;; 対象は :cd true の repo のみ（opt-in — 静かな pin 前進を全 repo に広げない）。
  :cd {:pin-advance-on-green true}
