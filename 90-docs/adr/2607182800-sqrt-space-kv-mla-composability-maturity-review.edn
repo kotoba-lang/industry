@@ -424,7 +424,7 @@ M5-mac/M6-macはこのフレーミングを前提に設計・実施した。
 による実process RSS計測——`resource.getrusage`の単調増加のhigh-water-mark
 ではない）:
 
-- 非常駐分をmx.arrayからnumpyへ退避（"cpu-move"）: RSSは3スケール
+- 非常駐分をmx.arrayからnumpyへ退避（\"cpu-move\"）: RSSは3スケール
   （97/395/794MB）すべてで**増加**（+94.6/+377.2/+869.6MB）——unified
   memoryでは当然の結果で、CPU側への退避は実際のメモリ節約にならない。
 - 素朴な `write()` + `del()` によるdisk退避: ほぼ効果なし（3中1のみ
