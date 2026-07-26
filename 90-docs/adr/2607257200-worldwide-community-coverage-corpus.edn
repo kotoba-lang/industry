@@ -73,7 +73,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ## 現在の状態（2026-07-26）
 
-- **286 organization / 15 カテゴリ / 36 form-family / 30 データファイル**
+- **290 organization / 15 カテゴリ / 36 form-family / 31 データファイル**
 - 検証: source-pinned **58**（primary 42 / secondary 16）、未 pin 218（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
@@ -82,7 +82,8 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 - entity kind: org-form **197（87%）** / named-org 29（13%）
 - 地域: europe 52 / north-america 44 / asia-east 32 / africa 24 / asia-south 21 /
   south-america 18 / southeast-asia 12 / oceania 12 / middle-east 11
-- 数の誠実さ: **286/286 が `:org/member-count-basis` を持ち、約 170（59%）が明示的に unknown**。
+- 数の誠実さ: **290/290 が `:org/member-count-basis` を持ち、約 174（60%）が明示的に unknown**。
+- 国別: **国連加盟 193/193 か国**が少なくとも1エントリに現れる（`coverage.cljs countries`）
   `:org/member-count` を主張しているのは 73 件のみ
 
 ## ファイル構成
@@ -240,8 +241,22 @@ corpus のどこかに現れるか**を出す。導入時点（iteration 32）�
 - talka・talkoot（ラトビア・モルドバほか）— dugnad と同型で、1990年代以降 **市民ナショナリズム的な
   全国清掃デーとして第二の生**を得た
 
-残る不在 20 か国（AD AL BI BT CV CY GA GQ GW LI LU MC MT NR OM PY SM ST TD TM）は、
-**小国・都市国家・記述の少ない中部アフリカ**に偏っている。埋没した空白ではなく、名前の付いた作業キューである。
+iteration 33 で残り 20 か国も消化し、**193/193（100%）**になった: マルタのバンドクラブ
+（**町ごとに同じ守護聖人を巡って2つの対立クラブがある — 共同体の構造がそのまま分裂**）で
+MT CY AL SM AD LI MC、**オマーンのファラジ灌漑共同体**（水利権が売買・相続される持分制で、
+近代国家に先行する権利登記を持つコモンズ）で OM、ubushingantahe と中部アフリカの
+mutuelle de développement（**慣習制度が吸収でなく置換された記録された事例**）で
+BI GA GQ GW TD ST CV、ブータンの共同体林業グループで BT、および hashar に TM、
+ミクロネシア長老評議会に NR、ボリビア juntas に PY、loi 1901 に LU を追加。
+
+**ただし 100% の意味は限定的である。** これは「各国に少なくとも1エントリが言及している」
+だけであり、その国の共同体生活を記述したという意味ではない。参照回数は JP:84 / US:74 /
+GB:54 に対し、多くの国は 1 である。**次の指標は「1 か国あたり何形態を記述したか」であって、
+「触れたか否か」ではない。**
+
+なお導入時のリストは**タンザニアを国連加盟国から落としており**、レポータが TZ を
+「非加盟コード」として表示していた。193 に修正した上で、手入力リストであることを
+コード内に明記した。
 
 ### 9. pin は二値ではない — 出典の古さを計測する
 
