@@ -73,7 +73,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ## 現在の状態（2026-07-26）
 
-- **290 organization / 15 カテゴリ / 36 form-family / 31 データファイル**
+- **295 organization / 15 カテゴリ / 36 form-family / 32 データファイル**
 - 検証: source-pinned **58**（primary 42 / secondary 16）、未 pin 218（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
@@ -82,8 +82,9 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 - entity kind: org-form **197（87%）** / named-org 29（13%）
 - 地域: europe 52 / north-america 44 / asia-east 32 / africa 24 / asia-south 21 /
   south-america 18 / southeast-asia 12 / oceania 12 / middle-east 11
-- 数の誠実さ: **290/290 が `:org/member-count-basis` を持ち、約 174（60%）が明示的に unknown**。
+- 数の誠実さ: **295/295 が `:org/member-count-basis` を持ち、約 178（60%）が明示的に unknown**。
 - 国別: **国連加盟 193/193 か国**が少なくとも1エントリに現れる（`coverage.cljs countries`）
+- 記述の厚み: 7 形態以上 24 か国 / 4-6 形態 32 / 2-3 形態 99 / **1 形態のみ 38**（`coverage.cljs depth`）
   `:org/member-count` を主張しているのは 73 件のみ
 
 ## ファイル構成
@@ -105,6 +106,7 @@ nbb 90-docs/community-coverage/queries/coverage.cljs regions
 nbb 90-docs/community-coverage/queries/coverage.cljs integrity   # 参照整合性のみ
 nbb 90-docs/community-coverage/queries/coverage.cljs freshness   # pin 元出典の古さ
 nbb 90-docs/community-coverage/queries/coverage.cljs countries   # 国別カバレッジと不在国
+nbb 90-docs/community-coverage/queries/coverage.cljs depth       # 1 か国あたりの形態数
 
 # 統合クエリ面（religious-community と同じ :org/* 語彙で join 可能）
 nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
@@ -253,6 +255,22 @@ BI GA GQ GW TD ST CV、ブータンの共同体林業グループで BT、およ
 だけであり、その国の共同体生活を記述したという意味ではない。参照回数は JP:84 / US:74 /
 GB:54 に対し、多くの国は 1 である。**次の指標は「1 か国あたり何形態を記述したか」であって、
 「触れたか否か」ではない。**
+
+### 11. 深さ指標 — 半数の国が「1 形態だけ」だった
+
+iteration 34 で `coverage.cljs depth` を追加し、**国ごとに記述済みの form-family 数**を出した。
+導入時点: 7 形態以上 24 か国 / 4-6 形態 28 / 2-3 形態 47 / **1 形態のみ 94 か国（49%）**。
+つまり **193/193 という国別 100% の裏で、世界の半分は「1 種類の共同体」しか記述されていなかった**。
+
+同 iteration で 5 エントリを足し **1 形態のみ 94 → 38 か国**に:
+KUD 民俗芸能協会（バルカン・中欧 12 か国。**Sokol と同じ19世紀の国民形成の波**）/
+カリブのクリケット・村スポーツクラブ（**小島嶼では教会以外に村が所有する唯一の公共建物**）/
+チャイハナと gap（中央アジア・コーカサス・イラン。**マハッラの実務が実際に決まる場所**）/
+アフリカの街区サッカークラブと路上大会（**連盟が数えるのは licensed 層だけで、その基盤は誰も数えない** 37 か国）/
+太平洋島嶼の教会フェローシップ（**小島では教会の婦人会・青年会が暦・金庫・共済を兼ねる**）。
+
+残る 38 か国は小国・都市国家・カリブ・中欧に偏る。深さは「触れたか」より遥かに増やしにくい
+指標であり、**100% の達成を主張しないための計器**として常設した。
 
 なお導入時のリストは**タンザニアを国連加盟国から落としており**、レポータが TZ を
 「非加盟コード」として表示していた。193 に修正した上で、手入力リストであることを
