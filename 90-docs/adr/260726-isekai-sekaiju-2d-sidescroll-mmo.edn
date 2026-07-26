@@ -115,39 +115,56 @@ as PostgreSQL did.
 
 # Blocking prerequisites
 
-1. **`kotobase.engine`'s cljs read path cannot read back what its write path
-   wrote.** `transact!` and `head` succeed; `q`, `pull`, `datoms` and `query`
-   die on `block-miss` for blocks that are demonstrably present. Backend-
-   independent — D1 does not fix it. **Now narrowed:** `kotobase.engine` hydrates
-   a full hot db via `peer/hydrate-chain` then calls `peer/q`, while
-   `kotobase.server.handler` — the path live in production on kotobase.net, and
-   the one `kotobase-storage-d1`'s own Worker uses — reads through
-   `peer/hot-datoms`, the range-pruned path kotobase-peer documents as the
-   scale-safe reader. Two implementations of one operation; only the engine's is
-   broken, which is why kotobase.net serves reads today. Probable fix is to move
-   the engine onto `hot-datoms` rather than repair `hydrate-chain`. Not attempted.
+1. ~~The cljs read path~~ — **fixed 2026-07-26.** Root cause was narrow and worth
+   carrying: `kotobase-peer`'s `hydrate-chain-cached` threaded its optional
+   `async-get-fn` to the **snapshot half only**. The novelty half still read
+   through the synchronous `get-fn` inside `pmap-async`, which calls its mapping
+   function in a promise continuation — and a miss thrown there never returns
+   through a `with-blocks` trampoline's `.catch`, so the retry does not fire and
+   the read dies on the first un-folded novelty block. `hot-datoms` already
+   routed both halves, which is exactly why `kotobase.server.handler` — and so
+   kotobase.net — kept serving reads while anything hydrating a full db value
+   could not. `read-tx-block-async` already existed for this reason and was
+   simply never wired into that arity.
+
+   Fixed in `kotoba-lang/kotobase-peer` `5319c926` (west pin advanced), guarded
+   so `async-get-fn` nil keeps the previous path byte-identical. JVM suite 247
+   tests / 781 assertions / 0 failures.
+
+   **The general lesson**: every test in that repo ran on the JVM, where block
+   reads are synchronous and always succeed, so no test could observe a defect
+   that only exists over an async store — which is every Worker deployment.
+   The fix ships `test/kotobase_peer/hydrate_async_test.cljc`, cljs-only, over a
+   store that returns bytes only through a Promise. Any `.cljc` library in this
+   fleet whose cljs path talks to async storage has the same blind spot until it
+   has an equivalent test.
+
+   Remaining: `kotobase.engine` must **supply** an `async-get-fn`. Written and
+   verified, cannot land — see (2).
 2. **The entire `kotobase.storage` layer is unpublished.** `kotobase-storage`,
    `-s3`, `-ipfs`, `-postgres`, `-d1`, `-sqlite` and `kotobase-engine` each have
    zero commits, no GitHub repository and no west entry; `kotobase`'s own
    `core.clj`/`core.cljs` are untracked, and `kotoba-lang/kotobase` main still
    describes the legacy IStore surface. The Datomic-shaped API the org policy
    targets is not fetchable anywhere. Registering one repo is impossible — the
-   chain lands together or not at all.
+   chain lands together or not at all. **This is now the only thing between the
+   design and Phase 1.**
 3. **`isekai.social` still persists to raw D1 tables (ADR-0037 phase 1).** The D1
    switch moves this *closer*: same backend now, so what is missing is not an
-   escape from D1 but an adapter that puts those tables onto the Kotobase datom
-   plane. Until it exists sekaiju's wallet, inventory and save fail closed rather
-   than writing raw tables.
+   escape from D1 but an adapter putting those tables on the Kotobase datom
+   plane. Until then sekaiju's wallet, inventory and save fail closed.
 
-**Policy conflict, unresolved.** ADR `260726-gftd-jk-luxury-kotobase-postgres-policy`
-names PostgreSQL-backed Kotobase for new gftdcojp persistence and prohibits
-silent local/D1 fallback. This is neither silent nor a fallback — it is explicit
-owner direction — but that policy needs amending or an explicit carve-out so the
-two documents stop disagreeing.
+**On the policy conflict.** ADR `260726-gftd-jk-luxury-kotobase-postgres-policy`
+names PostgreSQL and prohibits D1 fallback — but that ADR and
+`manifest/org-database-policy.edn` are both untracked working-tree drafts absent
+from origin. There is no landed document for the D1 choice to contradict, and
+nothing to amend. Whoever lands that policy should carve this game out; editing
+an in-flight draft owned by another session would have been the wrong fix.
 
 # Status
 
-Design complete. Transport resolved and the write path proven against a real SQL
-server. Implementation waits on prerequisites 1–3, of which 1 and 2 are
-fleet-wide concerns that outrank this game. sekaiju's own D1 databases have not
-been created yet."}]
+Design complete. Transport resolved, and the full Datomic-shaped round trip —
+`transact!`, `head`, `q`, `pull`, a second `transact!` appending novelty, ref
+revision advancing — is proven against a real SQL server. Implementation now
+waits on prerequisite 2 alone, which is a fleet-wide concern that outranks this
+game. sekaiju's own D1 databases have not been created yet."}]
