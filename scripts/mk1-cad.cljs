@@ -53,8 +53,12 @@
 (defn ez [id] (nth (env id) 2))
 
 ;; ── クリアランス規則(EDN の rule-clearance と同じ値を明示的に持つ) ────────
+;; gpu-cable-end は 25 -> 40mm。ケーブル経路判定(6c)が、12V-2x6 の最終アプローチに
+;; 十分な直線区間が取れず曲げ半径を満たせないことを検出したため。12V-2x6 の仕様は
+;; コネクタから 35mm 以内で曲げないことを求めており、25mm の逃げでは足りない。
+;; **これは部材 AABB だけを見ていた限りは出てこない寸法**で、容積は 7.84 -> 8.2L に増える。
 (def C {:wall 1.2 :part-wall 3.0 :part-part 2.0 :riser-gap 10.0
-        :rear-io 8.0 :gpu-cable-end 25.0 :plenum 12.0})
+        :rear-io 8.0 :gpu-cable-end 40.0 :plenum 12.0})
 
 (println "叢雲 MK-1 — 筐体 CAD / 組み立て工程 / 組み立て sim")
 (println (str "部材カタログ: " parts-path "  (" (count parts) " 部材種)"))
@@ -237,10 +241,14 @@
      {:id "gpu-b70"    :pos [gx floor rear]}
      {:id "riser"      :pos [(- gx (:riser-gap C)) (+ floor 4) rear]}
      ;; GPU の上(Y) かつ mobo の後ろ(Z) の L 字隅
-     {:id "psu-sfx750" :pos [floor (+ floor (ey "gpu-b70") (:part-part C))
+     ;; GPU 上面とのすき間は part-part(2mm)では公差最悪ケースで 0.5mm しか残らない
+     ;; と sim が示したので、この1ペアだけ 4mm に広げる(Y には余裕がある)。
+     {:id "psu-sfx750" :pos [floor (+ floor (ey "gpu-b70") 4.0)
                              (+ rear (ez "mobo-b650i") (:part-part C))]}
      ;; 前面パネル実装。厚み 25mm が Z。board 室側の X 帯のみ
-     {:id "fan-92"     :pos [floor floor (- outer-z w (ez "fan-92"))]}]))
+     ;; 前面 passive メッシュ化により筐体ファンは無い(qty 0)。placement からも外す。
+     ]))
+(def placement (vec (remove #(zero? (:part/qty (by-id (:id %)))) placement)))
 
 (def A
   (reduce (fn [a {:keys [id pos]}]
@@ -337,7 +345,10 @@
   (let [bs (map #(aabb (by-pid %)) ids)]
     [(reduce k/v-min (map first bs)) (reduce k/v-max (map second bs))]))
 (reset! bench-set (set bench-ids))
-(def chassis-order ["mobo-subassy" "psu-sfx750" "fan-92" "gpu-b70"])
+;; 筐体組み立て順。placement に無い部材(qty 0 で外したもの)は自動で落ちる。
+(def chassis-order
+  (vec (filter #(or (= % "mobo-subassy") (some (fn [p] (= (:id p) %)) placement))
+               ["mobo-subassy" "psu-sfx750" "fan-92" "gpu-b70"])))
 (defn box-of [id] (if (= id "mobo-subassy") (union-aabb bench-ids) (aabb (by-pid id))))
 ;; **union AABB は保守的すぎて偽陽性を出す**: mobo サブアセンブリの合併箱は
 ;; 実部材が無い L 字の空隙まで埋めてしまい、そこに正しく収まっている PSU と
@@ -397,19 +408,31 @@
   (println (str "    footprint 内の相対位置 X=" (r2 fx) " Z=" (r2 fz)
                 (if ok "  ○ 転倒安定域" "  △ 偏心 — 脚配置で対処"))))
 
-;; 5-5 熱・気流の一次チェック
-(println "  5-5 熱/気流の一次チェック")
+;; 5-5 熱・気流
+;; **経験式ではなく検証済み CFD で出す。**kami-engine-cfd の D3Q19 LBM
+;; (kami-cfd.duct、内部流 BC)を使う。同 namespace は力駆動平面 Poiseuille 流を
+;; 閉形解と突き合わせて検証済み(相対 L2 = 1.4%、ピーク 1.1%)。
+;; ただし LBM は SCI インタプリタ上では遅すぎるので、**実際の solve は JVM 側で
+;; 走らせて結果を EDN に落とし、本 script はそれを読む**(nbb は編成、数値は
+;; 計算ホスト、という repo の runner パターンに合わせる)。
+(println "  5-5 熱・気流(検証済み CFD の結果を読む)")
+(def cfd-path "90-docs/hardware/mk1-cfd.edn")
+(def cfd (when (fs/existsSync cfd-path) (edn/read-string (fs/readFileSync cfd-path "utf8"))))
 (def heat-w (reduce + (map #(* (:part/power-w (by-id (:id %))) (:part/qty (by-id (:id %)))) placement)))
-(def dT 15.0)      ; 許容温度上昇 K
-(def cfm-req (/ (* heat-w 1.76) dT))   ; 経験式 CFM ≈ 1.76*W/ΔT(°C)
-(def n-fan (:part/qty (by-id "fan-92")))
-(def intake-area-mm2 (* n-fan (* Math/PI 46 46) 0.6))  ; メッシュ開口率 60%
 (println (str "    総発熱 = " (r0 heat-w) " W  (B70 230W が支配)"))
-(println (str "    必要風量 ≈ " (r1 cfm-req) " CFM (ΔT=" (r0 dT) "K)"))
-(println (str "    吸気開口 = " (r0 intake-area-mm2) " mm2 (92mm x" n-fan "、開口率60%)"))
-(println "    ※ B70 は blower で背面 I/O から直接排気するので、GPU 熱は筐体内に")
-(println "      滞留しない。上式は CPU/VRM/PSU 側の残余熱に対する一次近似で、")
-(println "      **CFD ではない。実機で吸排気温度を測るまで確定値として扱わない。**")
+(if cfd
+  (do
+    (println (str "    CFD: " (:solver cfd) " / 格子 " (:lattice cfd)
+                  " / セル " (:cell-mm cfd) "mm / " (:steps cfd) " steps"))
+    (println (str "    検証: Poiseuille 相対L2 = " (:validation-l2 cfd)
+                  " (tol " (:validation-tol cfd) ") → "
+                  (if (:validation-pass cfd) "PASS" "FAIL")))
+    (println (str "    通過流量 = " (r1 (:cfm cfd)) " CFM (" (:q-m3s cfd) " m3/s)"))
+    (println (str "    停滞領域 = " (r1 (* 100.0 (:stagnant-fraction cfd))) "% の流体セルが u0 の 10% 未満"))
+    (println (str "    バルク空気温度上昇 ΔT = " (r1 (:bulk-delta-t-k cfd)) " K"))
+    (println "    ※ ΔT は CFD ではなくエネルギー保存(W/(rho*cp*Q))。**排気空気**の")
+    (println "      上昇であって素子ジャンクション温度ではない(共役熱伝達は未実装)。"))
+  (println (str "    × " cfd-path " が無い。`clojure -M:run-cfd` 相当で生成してから再実行する。")))
 
 ;; ════════════════════════════════════════════════════════════════════════════
 ;; 6. 組み立て工程 — EDN に書き出す
@@ -441,11 +464,10 @@
          "サブアセンブリを一体で投入。standoff 4 点。I/O シールドを先に嵌める")
      (mk 7 :chassis "psu-sfx750" :mount "PH2 電動ドライバ" 60 150
          "**着脱式ブラケットに載せてから投入** — L 字隅の PSU はどの単一軸からも直接挿入できない(sim 5-3)")
-     (mk 8 :chassis "fan-92" :mount "PH2 電動ドライバ" 40 150
-         "前面吸気 1 基。前面 Z 帯 25mm は GPU の 8-pin 逃げと競合するため board 室側のみ")
-     (mk 9 :chassis "gpu-b70" :mount "PH2 手ドライバ" 45 180
+     ;; 筐体ファンの工程は無い — 前面は passive メッシュ(sim が 92mm 角の非搭載を確定)
+     (mk 8 :chassis "gpu-b70" :mount "PH2 手ドライバ" 45 180
          "GPU 室側パネルから挿入(-X)。8-pin はカード**端** — 25mm の逃げを使って結線")
-     (mk 10 :chassis "cordset" :connect "手" nil 20 "◇PSE コードセット。IEC C14")]))
+     (mk 9 :chassis "cordset" :connect "手" nil 20 "◇PSE コードセット。IEC C14")]))
 
 (def burn-in
   [{:qc/n 1 :qc/name "通電・POST" :qc/minutes 5 :qc/pass "POST 到達 + BIOS で全 DIMM/M.2 認識"}
@@ -478,6 +500,139 @@
 
 
 ;; ════════════════════════════════════════════════════════════════════════════
+;; 6b. 寸法公差の伝播 — 「実測していない」を「上限で押さえた」に変える
+;;
+;; 部材寸法の多くは規格値か公称値で、実測ではない。**それを理由に検証を諦める
+;; のではなく、片側公差を最悪ケースで積み上げる**(worst-case stack-up、機械設計
+;; の標準手法)。部材は最大、筐体内寸は最小に振った状態でも成立するなら、採寸前
+;; でも設計はロバストだと言える。
+;; ════════════════════════════════════════════════════════════════════════════
+(hr "═")
+(println "6b. 寸法公差の worst-case stack-up")
+(hr "═")
+(defn tol [id] (let [t (:part/tolerance-mm (by-id id))]
+                 (if t (edn/read-string t) [0.0 0.0 0.0])))
+(defn grade [id] (or (:part/dim-grade (by-id id)) :estimate))
+(println (str "  " (rp "部材" 14) (rp "grade" 12) "公差(片側 mm)"))
+(doseq [p placement]
+  (println (str "  " (rp (:id p) 14) (rp (str (grade (:id p))) 12) (str (tol (:id p))))))
+(println (str "  grade 内訳: " (frequencies (map #(grade (:id %)) placement))))
+
+;; 最悪ケース: 各部材を +公差 で膨らませ、筐体内寸を -壁公差 で縮める
+(def wall-tol 0.3)   ; 板金の曲げ/切断公差(assumption)
+(defn aabb-worst [{:keys [id pos]}]
+  (let [[ex' ey' ez'] (env id) [tx ty tz] (tol id)]
+    [(mapv - pos [tx ty tz])
+     (mapv + pos [(+ ex' tx tx) (+ ey' ty ty) (+ ez' tz tz)])]))
+(def worst-collisions
+  (for [[a b] (for [x placement y placement
+                    :when (neg? (compare (:id x) (:id y)))] [x y])
+        :when (and (not (related? (:id a) (:id b)))
+                   (intersect? (aabb-worst a) (aabb-worst b) 0.0))]
+    [(:id a) (:id b)]))
+(def worst-out
+  (for [p placement
+        :let [[mn mx] (aabb-worst p)]
+        :when (not (and (>= (nth mn 0) (- w wall-tol))
+                        (<= (nth mx 0) (+ (- outer-x w) wall-tol 0.001))
+                        (<= (nth mx 1) (+ (- outer-y w) wall-tol 0.001))
+                        (<= (nth mx 2) (+ (- outer-z w) wall-tol 0.001))))]
+    (:id p)))
+(println (str "\n  最悪ケース判定(部材 +公差 / 壁 ±" wall-tol "mm)"))
+(println (str "    はみ出し: " (if (empty? worst-out) "0 ○" (vec worst-out))))
+(println (str "    干渉:     " (if (empty? worst-collisions) "0 ○" (vec worst-collisions))))
+
+;; 最小クリアランス余裕 — どのペアが一番際どいか
+(defn gap-1d [[a0 a1] [b0 b1]] (max (- b0 a1) (- a0 b1)))
+(def tight
+  (->> (for [[a b] (for [x placement y placement
+                         :when (neg? (compare (:id x) (:id y)))] [x y])
+             :when (not (related? (:id a) (:id b)))]
+         (let [[amn amx] (aabb-worst a) [bmn bmx] (aabb-worst b)
+               g (apply max (map (fn [i] (gap-1d [(nth amn i) (nth amx i)]
+                                                 [(nth bmn i) (nth bmx i)])) (range 3)))]
+           [(:id a) (:id b) g]))
+       (sort-by #(nth % 2)) (take 4)))
+(println "  最小クリアランス上位(最悪ケース、mm)")
+(doseq [[a b g] tight]
+  (println (str "    " (rp (str a " / " b) 30) (lp (r1 g) 7)
+                (cond (neg? g) "  × 干渉" (< g 1.0) "  △ 際どい" :else "  ○"))))
+(def min-gap (if (seq tight) (nth (first tight) 2) 999.0))
+
+;; ════════════════════════════════════════════════════════════════════════════
+;; 6c. ケーブル経路 — SFF で「入らない」の最頻要因
+;;
+;; 部材 AABB だけでは絶対に守れない層。各ケーブルを waypoint 折れ線に沿った
+;; 掃引ボックス(束外径を断面とする)としてモデル化し、①部材との干渉 ②最小曲げ
+;; 半径 ③自由体積に対する占積率 を判定する。
+;; ════════════════════════════════════════════════════════════════════════════
+(hr "═")
+(println "6c. ケーブル経路の成立性")
+(hr "═")
+(def cables (filter :cable/id catalog))
+(defn wp [c] (edn/read-string (:cable/waypoints c)))
+(defn seg-aabb [[p0 p1] dia]
+  (let [r (/ dia 2.0)]
+    [(mapv (fn [a b] (- (min a b) r)) p0 p1)
+     (mapv (fn [a b] (+ (max a b) r)) p0 p1)]))
+(defn seg-len [[p0 p1]] (Math/sqrt (reduce + (map (fn [a b] (let [d (- a b)] (* d d))) p0 p1))))
+(defn angle-at
+  "waypoint での **折れ角** φ(度)。0 = 直線、90 = 直角に曲がる。
+  acos(v1·v2) なので直線が 0 になる — 初版の docstring は『180 = 直線』と
+  書いていて逆だった。"
+  [a b c]
+  (let [v1 (mapv - b a) v2 (mapv - c b)
+        n1 (Math/sqrt (reduce + (map * v1 v1))) n2 (Math/sqrt (reduce + (map * v2 v2)))
+        dot (reduce + (map * v1 v2))]
+    (if (or (zero? n1) (zero? n2)) 180.0
+        (* (/ 180.0 Math/PI) (Math/acos (max -1.0 (min 1.0 (/ dot (* n1 n2)))))))))
+(def cable-report
+  (for [c cables]
+    (let [pts (wp c) dia (:cable/bundle-dia-mm c) bf (:cable/min-bend-factor c)
+          segs (partition 2 1 pts)
+          endpoints #{(:cable/from c) (:cable/to c)}
+          hits (distinct
+                (for [sg segs
+                      p placement
+                      :when (and (not (endpoints (:id p)))
+                                 (intersect? (seg-aabb sg dia) (aabb p) 0.0))]
+                  (:id p)))
+          ;; 折れ角から必要曲げ半径を近似: 鋭角ほど大きな半径が要る
+          bends (for [[a b cc] (partition 3 1 pts)]
+                  (let [ang (angle-at a b cc)
+                        ;; 内角 α = 180 - φ。半径 r のフィレットは各脚に
+                        ;; 接線長 t = r / tan(α/2) を食うので、脚長 t_max から
+                        ;; 作れる最大半径は r = t_max * tan(α/2)。
+                        ;; 初版は係数 0.5 を根拠なく掛けており、通る経路まで
+                        ;; 曲げ不足と誤判定していた。
+                        avail (* (min (seg-len [a b]) (seg-len [b cc]))
+                                 (Math/tan (/ (* Math/PI (- 180.0 ang)) 360.0)))
+                        need (* bf dia)]
+                    {:angle ang :avail avail :need need :ok (>= avail need)}))
+          len (reduce + (map seg-len segs))
+          vol (* Math/PI (Math/pow (/ dia 2.0) 2) len)]
+      {:id (:cable/id c) :dia dia :len len :vol vol :hits (vec hits)
+       :bends (vec bends)
+       :bend-fail (count (remove :ok bends))})))
+(println (str "  " (rp "cable" 12) (lp "径" 4) (lp "長さmm" 8) (lp "体積cm3" 9) "  干渉 / 曲げ"))
+(doseq [{:keys [id dia len vol hits bend-fail]} cable-report]
+  (println (str "  " (rp id 12) (lp dia 4) (lp (r0 len) 8) (lp (r1 (/ vol 1000.0)) 9)
+                "  " (if (empty? hits) "干渉なし" (str "× " (clojure.string/join "," hits)))
+                " / " (if (zero? bend-fail) "曲げOK" (str "× 曲げ不足 " bend-fail "箇所")))))
+(def cable-vol (reduce + (map :vol cable-report)))
+(def part-vol (reduce + (map (fn [p] (let [[a b c] (env (:id p))] (* a b c))) placement)))
+(def free-vol (- (* inner-x inner-y inner-z) part-vol))
+(println (str "\n  部材占有 " (r1 (/ part-vol 1000.0)) " cm3 / 自由 " (r1 (/ free-vol 1000.0))
+              " cm3 / ケーブル " (r1 (/ cable-vol 1000.0)) " cm3"))
+(println (str "  ケーブル占積率 = " (r1 (* 100.0 (/ cable-vol free-vol))) "% of 自由体積"))
+(def cable-hits (reduce + (map #(count (:hits %)) cable-report)))
+(def cable-bends (reduce + (map :bend-fail cable-report)))
+(println (str "  ※ 掃引 AABB 近似。実際の束は柔軟で押し込めるので、干渉は"))
+(println (str "    『そのまま通らない』の意味であって物理的不可能とは違う。"))
+(println (str "    占積率が 30% を超えると実務上ルーティングが苦しくなる目安 → "
+              (if (> (* 100.0 (/ cable-vol free-vol)) 30.0) "超過 △" "余裕 ○")))
+
+;; ════════════════════════════════════════════════════════════════════════════
 ;; 7. BOM 突き合わせ — 部材 EDN と ADR-2607267000 の原価モデルの差分
 ;; ════════════════════════════════════════════════════════════════════════════
 (hr "═")
@@ -494,7 +649,7 @@
 (println (str "  差分                                = $" (r0 delta)))
 (when (pos? delta)
   (println "  ■ **sandwich レイアウトが原価モデルに無い部材を要求している:**")
-  (doseq [id ["riser" "fan-92"]]
+  (doseq [id ["riser"]]
     (let [pt (by-id id)]
       (println (str "    + " (rp (:part/name pt) 40) "$" (lp (* (:part/price-usd pt) (:part/qty pt)) 5)))))
   (println (str "    → 部材 $2,265 → $" (r0 (+ 2265 delta))
@@ -522,8 +677,19 @@
              :total-mass-g (js/parseInt (r0 total-mass))
              :cog-mm (mapv #(js/parseFloat (r1 %)) cog)
              :heat-w heat-w
-             :cfm-required (js/parseFloat (r1 cfm-req))
+             :cfd (when cfd (select-keys cfd [:solver :lattice :cell-mm :steps :cfm :q-m3s
+                                             :stagnant-fraction :bulk-delta-t-k
+                                             :validation-l2 :validation-pass]))
              :method "AABB 干渉 + 挿入軸掃引。メッシュ精度の衝突判定ではない"
+             :worst-case {:wall-tol-mm wall-tol
+                          :containment-failures (vec worst-out)
+                          :collisions (mapv vec worst-collisions)
+                          :min-gap-mm (js/parseFloat (r1 min-gap))
+                          :dim-grades (into {} (map (fn [p] [(:id p) (grade (:id p))]) placement))}
+             :cables {:runs (mapv (fn [c] (dissoc c :bends)) cable-report)
+                      :interference-count cable-hits
+                      :bend-failures cable-bends
+                      :fill-pct (js/parseFloat (r1 (* 100.0 (/ cable-vol free-vol))))}
              :bracket-required (vec (for [p placement
                                           :when (= :bracket (:part/insert-axis (by-id (:id p))))]
                                       (:id p)))}
@@ -534,7 +700,7 @@
    :mk1/bom-reconciliation {:edn-components-usd edn-components
                             :cost-model-components-usd model-components
                             :delta-usd delta
-                            :missing-in-cost-model ["riser" "fan-92"]}
+                            :missing-in-cost-model ["riser"]}
    :mk1/provenance {:parts-catalog parts-path
                     :kernels ["org-iso-10303/brep.kernel" "brep.feature" "brep.assembly"
                               "brep.tessellate" "brep.step"]
@@ -547,8 +713,12 @@
 (println (str "  EDN 書き出し: " out-path))
 
 (hr "═")
-(println (str "判定: 内包NG=" n-out " / 干渉=" (count collisions) " / 挿入不可=" n-block))
-(println (if (and (zero? n-out) (zero? (count collisions)) (zero? n-block))
+(println (str "判定: 内包NG=" n-out " / 干渉=" (count collisions) " / 挿入不可=" n-block
+              " / 最悪ケース干渉=" (count worst-collisions) " / 最悪ケースはみ出し=" (count worst-out)
+              " / ケーブル干渉=" cable-hits " / 曲げ不足=" cable-bends))
+(println (if (and (zero? n-out) (zero? (count collisions)) (zero? n-block)
+                  (zero? (count worst-collisions)) (zero? (count worst-out))
+                  (zero? cable-hits) (zero? cable-bends))
            "  ○ AABB レベルでは成立。次は実機で gate(39.2 tok/s)を測る。"
            "  × 未解決の幾何的問題がある。上記を解消するまで発注しない。"))
 (hr "═")
