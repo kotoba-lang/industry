@@ -1,0 +1,100 @@
+[{:db/id -1
+  :adr/id "adr-2607270000-murakumo-mk1-enclosure-cad-assembly-sim"
+  :adr/doc_type "adr"
+  :adr/topic "murakumo-mk1-enclosure-cad-assembly-sim"
+  :adr/title "ADR-2607270000: 叢雲 MK-1 の筐体を kotoba-lang の brep kernel で parametric にモデリングし、組み立て工程と組み立て sim を通した — 7.84L sandwich、幅を決めるのは GPU でなく PSU、sim が5件の設計欠陥を検出して修正"
+  :adr/status "proposed"
+  :adr/date "2026-07-26"
+  :adr/last_verified "2026-07-26"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["叢雲 MK-1 の筐体寸法・レイアウト・板金要件の正本"
+   "MK-1 の部材カタログ(寸法/質量/電力/嵌合関係/挿入軸)の正本 — 90-docs/hardware/mk1-parts.datoms.edn"
+   "MK-1 の組み立て工程(bench 先組み / chassis 組み込みの2段構成)と burn-in/QC の正本"
+   "MK-1 の組み立てシミュレーションの手法とその能力範囲(AABB レベル)の正本"
+   "sandwich レイアウトが要求する追加部材(Gen5 ライザー / ファン)と、それによる BOM 差分の正本"]
+  :adr/source-format "edn"
+  :adr/related
+  ["adr-2607267000-murakumo-mk1-arc-pro-b70-ai-workstation"
+   "adr-2607268000-murakumo-mk1-crowdfunding-4region-tax-asset"
+   "adr-2607269000-murakumo-mk1-minimax-capital-allocation"
+   "adr-2607255000-murakumo-cad-rig-enterprise-design-integration"
+   "adr-2607102200-kami-render-stack-deps-authority-rename"
+   "adr-2607072000-kotoba-lang-no-rust"
+   "adr-2607173000-nbb-only-script-host"]
+
+  :adr/context
+  "オーナー指示(2026-07-26): 一度計画は進めたいので、B70 を軸に mini PC を設計し、PC box 自体も kotoba-lang の cad / 3d repo を使ってモデリングし、組み立て工程・組み立ても sim して、部材などの情報を EDN に記録する。
+
+   使える kernel を先に実測で確認した(ADR-2607255000 の LOC と一致): org-iso-10303 = 1,599 行(brep.kernel / brep.feature / brep.assembly / brep.tessellate / brep.step / brep.spline / brep.mesh-csg / iso-10303.part21)、kami-engine-cad = 686 行、org-iso-6983 = 646 行、scad = 762 行、mesher = 675 行、sdf = 524 行、dxf = 77 行、bim = 10,657 行。
+
+   nbb 実行可能性を先に検証した: `brep.config` は docstring が『portable(cljs/SCI-safe, no classpath-resource I/O)』と明記しており、JVM 専用の `brep.config-loader`(.clj)はテストからのみ使われる。よって kernel 一式は nbb で動く(ADR-2607173000 準拠、Rust も JVM も経由しない)。
+
+   能力の実測: `make-box` は `[solid edges vertices]` を返し、`write-step` はまさにその形を取る(:plane 面 + :line 稜線のみ)。`brep.assembly/solve` は **制約の参照検証のみで transform を解かない**(docstring が明記)。したがって配置と干渉判定は本設計側で持つ必要がある。"
+
+  :adr/decision
+  "1. **筐体寸法を手で与えず、部材 envelope + クリアランス規則から導出する。**部材の正本は `90-docs/hardware/mk1-parts.datoms.edn`(datoms 形式、12 部材 + 18 schema、`:source/dataset \"mk1-parts\"` で既存 EDN query plane に載る)。導出器は `scripts/mk1-cad.cljs`(nbb)。寸法をコードに焼かない。
+
+   2. **レイアウトは sandwich(board 室と GPU 室を X 方向に並べ Gen5 ライザーで繋ぐ)。外寸 133.4 x 192.4 x 305.4 mm = 7.84 L。**ADR-2607267000 の Phase 1 が使う NR200 級 18.25L に対し **57% 減**。B70 が blower で背面 I/O から直接排気するため、側面の再循環余裕が不要でストレートスルーが成立する。
+
+   3. **設計上の発見: 筐体の幅を決めているのは GPU ではなく PSU の 125mm。**sandwich 積み上げ(part-wall 3 + board室 44.6 + riser-gap 10 + GPU 39 + part-wall 3)は 99.6mm で足りるのに、SFX 規格の幅 125mm が内寸を 131mm まで押し広げている。結果 board 室に 31.4mm の余剰 X が生まれ、配線とライザーの曲げ半径に使える。**GPU が律速だと思い込んで設計を始めると、この余剰を見落として無駄に薄い箱を狙うことになる。**
+
+   4. **PSU を SFX-L(奥行 130mm)から SFX(100mm)に変更する。これは長さ予算が強制した設計判断である。**内寸 Z 303mm から背面 I/O 8mm と mobo 170mm を引いた board 室の Z 余白は 125mm。SFX 100mm は収まるが SFX-L 130mm は収まらない。**ADR-2607267000 の BOM は SFX-L 750W を挙げていたので、これは実質的な訂正。**
+
+   5. **parametric feature tree(`brep.feature`)を設計意図の正本として持つ。**sketch(plane/line/circle/dimension)→ extrude(:new / :cut)で 10 feature: 外殻、内空、背面 I/O 開口(159mm)、GPU dual-slot 排気スロット(40mm)、前面吸気開口(ファン数量は `:part/qty` から導出)。**ただし現 kernel は feature tree を評価して brep を作る経路を持たない**ので、実体化は `make-box` + AABB 差分で行い、feature tree は STEP には反映されない設計意図の記録として扱う。ここを『CAD が通った』と誤読しない。
+
+   6. **STEP は実際に出る。往復も通る。**`brep.step/write-step` が ISO 10303-21 を 144 entity 出力(`90-docs/hardware/mk1-enclosure.step`、HEADER / FILE_SCHEMA(CONFIG_CONTROL_DESIGN) / MANIFOLD_SOLID_BREP / END-ISO-10303-21)。`read-step` で読み戻して **6 面 / 12 稜線 / 8 頂点、bbox [[0 0 0] [133.4 192.4 305.4]]、体積 7.838L が一致**することを確認した(往復検証)。板金体積から SPCC 1.2mm 換算 2,173g(全面ソリッド前提の上限)。
+
+   7. **組み立ては2段構成: bench(作業台で mobo に先組み)→ chassis(筐体に組み込み)。**bench = CPU → 裏面 M.2 → RAM → クーラー → ライザー。chassis = mobo サブアセンブリ一体投入 → PSU(着脱ブラケット)→ 前面ファン → GPU(GPU 室側パネルから -X)→ 電源コード。全 10 ステップ・実作業 17.3 分。**burn-in/QC 6 項目 313 分**(通電/POST → memtest 60分 → ReBAR 確認 → **LLM soak 120分で gate 39.2 tok/s を判定** → 熱ログ → assembler DID 署名で tsukuru の `quality_inspection` に着地)。
+
+   8. **組み立て sim は AABB レベルであることを明示する。**内包判定 / 相互干渉(mounts-on 親子は除外)/ 挿入経路(挿入軸に沿った掃引が既設部材と当たらないか)/ 質量重心 / 熱気流の一次近似。**『干渉なし』は『AABB が重ならない』の意味であって、メッシュ精度の衝突判定ではない。**熱の式は経験式で **CFD ではない**。
+
+   9. **sim が実際に5件の問題を検出し、そのうち3件は本物の設計欠陥だった。**これが sim を回した価値である:
+      (a) **本物** — 120x120x47 の低背クーラーが mini-ITX の DIMM と M.2 に覆い被さる(SFF の古典的問題)。→ 95x95x37(NH-L9a-AM5 級、AM5 65W 定格)に変更。board 室 X が 54.6 → 44.6mm に縮小。
+      (b) **本物** — M.2 を PCB 表面に置くとクーラーと干渉する。→ **裏面 M.2 に実装**(mini-ITX が M.2 を裏面に持つのはまさにこの理由。ASRock B650I Lightning WiFi は 2x M.2 のうち1基が裏面)。
+      (c) **本物** — L 字隅(GPU の上・mobo の後ろ)に置いた PSU は**どの単一軸からも直接挿入できない**。→ 筐体はモノコックではなく **着脱式 PSU ブラケット**を持つ必要がある(SFF ケースでは一般的な構造)。これは板金設計の要件として確定。
+      (d) 偽陽性 — CPU/クーラー/RAM/ライザーが親部材と『衝突』。→ `:part/mounts-on` を導入して嵌合親子を除外(嵌合部は envelope が重なるのが正常)。
+      (e) 偽陽性 — mobo サブアセンブリの **union AABB が保守的すぎ**、実部材の無い L 字の空隙まで埋めて PSU と干渉判定された。→ 挿入判定を合併箱ではなく**構成部材ごとの箱**で行う。
+      最終状態: 内包NG 0 / 干渉 0 / 挿入不可 0。
+
+   10. **PSU の位置は sim の指摘で2回動かした**(設計の履歴として残す): ①mobo の上(Y)→ mobo が 170mm で Y をほぼ使い切るため内包 NG ②mobo の後ろ(Z、床置き)→ GPU が 267mm で Z をほぼ占めるため GPU と干渉 ③GPU の上かつ mobo の後ろの L 字隅 → 成立。
+
+   11. **sandwich レイアウトは原価モデルに無い部材を要求する。BOM を訂正する。**Gen5 x16 フレキシブルライザー $45(**Gen4 品は B70 で不可**)+ 92mm 吸気ファン $11 = **+$56**。ADR-2607267000 の BOM はストレート ITX ケース前提でライザーを含んでいなかった。**部材 $2,265 → $2,321 / COGS $2,479.5 → $2,535.5。**$4,990 pledge のままなら差益 $1,899 → $1,843、差益を維持するなら pledge を **$5,051** に上げる(platform 手数料 8.2% 込み)。
+
+   12. **前面 Z 帯 25mm の競合を未解決として記録する。**`gpu-cable-end` として確保した 25mm は B70 の 8-pin がカード**端**にあるため必要だが、前面吸気ファンの実装帯と同じ Z にある。→ ファン数量を 2 から **1** に減らし board 室側のみに置いた。**Phase 2 の板金でファンを Y 方向にオフセットするか、前面をメッシュのみにするかは未決。**
+
+   13. **組み立て工程からの touch time 導出が ADR-2607267000 の前提を裏付けた。**工程 17.3 分 + QC 立会 0.5h + イメージ 0.3h = **1.09h** に対し、原価モデルの前提は 2.5h。**前提が保守的なので COGS の労務は据え置きでよい。**
+
+   14. **Rust は書かない。3D は kami-engine stack の権限内に留める。**新規 crate も新規 renderer も作らず、既存 `.cljc` kernel を読み取り専用の消費者として使った(ADR-2607072000 / ADR-2607102200)。スクリプトは nbb のみ、`.sh` も `.mjs` も新規に書いていない(ADR-2607173000)。"
+
+  :adr/consequences
+  "得るもの: 筐体が 18.25L(市販)から 7.84L(自社板金)へ 57% 縮小し、寸法が部材カタログから機械的に導出されるので部材変更が寸法に自動で伝播する。STEP が実際に出て往復も通るので、tsukuru の RFQ に投げられる図面の一次データが揃った。組み立て工程が2段構成で確定し、QC に gate 判定が組み込まれた。**そして sim が本物の設計欠陥を3件、発注前に捕まえた** — クーラー干渉・裏面 M.2・PSU ブラケット要件はいずれも板金を切ってから気づくと作り直しになる。
+
+   失うもの / リスク:
+   - **sim は AABB レベルなので、実形状の干渉(ヒートシンクのフィン、コネクタの張り出し、ケーブルの取り回し)は検出できない。**とくにケーブル体積は一切モデル化していない。SFF でケーブルが入らないのは最頻の失敗要因であり、**ここは AABB では守れない。**
+   - feature tree は STEP に反映されない(kernel に評価器が無い)。**STEP に出ているのは外殻の直方体だけで、開口・折り曲げ・ブラケットは入っていない。**Phase 2 の実図面はこれをベースに板金 CAD で作り直す必要がある。
+   - `brep.assembly/solve` は参照検証のみなので、**mate/align/insert 制約は設計意図の記録であって幾何を拘束していない。**制約を足しても配置は変わらない。
+   - 熱の 39.2 CFM は経験式(1.76W/ΔT)の一次近似で **CFD ではない**。7.84L に 334W を入れるのは体積あたり 42.6 W/L で、SFF としては攻めた密度。**実機で吸排気 ΔT を測るまで確定値として扱わない。**
+   - 板金質量 2,173g は全面ソリッド前提の上限で、開口を引いた実質は 1,900g 程度と推定した(未検証)。総質量 5.4kg。
+   - 部材寸法の大半は `:part/measured false`(公称値または推定)。**実部材を採寸するまで clearance の妥当性は仮。**とくに B70 の質量 1,050g、クーラー、ライザーは推定。
+   - BOM が +$56 増えたので、ADR-2607268000 の pledge $4,990 は $5,051 に上げるか差益 $1,843 を受け入れるかの選択が発生した。**どちらを採るかは未決。**
+
+   未実施: 実部材の採寸、Phase 2 板金図面(開口/折り曲げ/ブラケット)、ケーブル体積のモデル化、CFD、tsukuru RFQ への投函、gate 実測。**ADR-2607269000 の配分どおり、即金 1.26M(B70 probe + Strix 2台)を出して gate を測るまで板金は発注しない。**"
+
+  :adr/alternatives
+  "却下: (a) **ストレート ITX レイアウト(GPU を board と同一面に inline)** — ライザー $45 が不要になるが、GPU 267mm と board 170mm が Z 方向に直列するため容積が 12L 級に膨らむ。57% の容積削減と $45 を交換する判断で sandwich を採った。(b) **NR200 級市販筐体のまま Phase 2 も通す** — ADR-2607267000 の Phase 1 はこれ。18.25L で $60-75。自社板金は金型 NRE $12,000 を 200台で償却して単価 $60 級なので、**200台の見込みが立つまでは市販が正しい。**本 ADR は Phase 2 の準備であって Phase 1 の置き換えではない。(c) **SFX-L 750W を維持して筐体を長くする** — Z が 333mm 級になり容積 8.6L。SFX で足りるので不要。(d) **クーラーを 120mm 級のまま DIMM を低背品にする** — 低背 DDR5 の入手性がメモリ危機下で不確実。95x95x37 の実在品(NH-L9a-AM5 級)を選ぶ方が確実。(e) **kami-engine / WebGPU で3D ビューアを作る** — ADR-2607102200 の権限内ではあるが、今回の目的(寸法導出・干渉検出・STEP 出力)には不要。**screenshot を根拠に実装済みとしない**という同 ADR の完了条件に照らしても、ビューアは今の価値を増やさない。(f) **scad / mesher / sdf で CSG から作る** — 直方体主体の板金には over-kill で、STEP 出力経路(:plane + :line のみ)にも乗らない。(g) **org-iso-6983 で板金の CAM/G-code を出す** — 板金はレーザー切断+曲げでフライス加工ではないので、この kernel の toolpath 語彙は合わない。tsukuru の工場に DXF/STEP を渡すのが正しい。"
+
+  :adr/verification
+  "再現: `nbb --classpath orgs/kotoba-lang/org-iso-10303/src scripts/mk1-cad.cljs`。7 節(寸法導出 / feature tree / 実体化+STEP / assembly / 組み立て sim / 工程生成 / BOM 突き合わせ)を出力し、`90-docs/hardware/mk1-enclosure.step` と `90-docs/hardware/mk1-assembly.edn` を生成する。部材の正本は `90-docs/hardware/mk1-parts.datoms.edn`(手編集可、寸法はここだけを直す)。生成物 `mk1-assembly.edn` は手編集しない。
+
+   実施した検証:
+   ・kernel の nbb 実行可能性 — brep.kernel / feature / assembly / tessellate / step を nbb でロードし、make-box の面数6・稜線数12・頂点数8、体積 125,000mm3(100x50x25 の厳密値)を確認。
+   ・**STEP 往復** — write-step 出力(144 entity)を read-step で読み戻し、6面/12稜線/8頂点・bbox [[0 0 0] [133.4 192.4 305.4]]・体積 7.838L の一致を確認。
+   ・sim 判定 — 内包NG 0 / 相互干渉 0 / 挿入不可 0。検出した5件(うち本物3件)は決定9のとおり修正済み。
+   ・BOM 突き合わせ — 部材 EDN 合計(筐体除く)$2,236 対 原価モデル相当分 $2,180、差分 $56 の内訳がライザー $45 + ファン $11 で説明されることを確認。
+   ・EDN 妥当性 — mk1-parts.datoms.edn は 30 entity(18 schema + 12 部材)の vector として読め、mk1-assembly.edn は 8 キーの map として読める。
+
+   **未検証(明示):** ①実部材の採寸(ほぼ全部材が `:part/measured false`)②ケーブル体積 ③CFD ④板金の折り曲げ展開と最小曲げ半径 ⑤ブラケットの具体形状 ⑥Gen5 ライザーの実機動作(B70 で Gen5 x16 が riser 経由で安定するか) ⑦gate 39.2 tok/s。
+
+   **手法上の限界(明示):** AABB 干渉はメッシュ精度の衝突判定ではない。feature tree は STEP に反映されない。assembly の制約は幾何を拘束しない。熱式は CFD ではない。"}]
