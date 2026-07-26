@@ -73,8 +73,8 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ## 現在の状態（2026-07-26）
 
-- **308 organization / 15 カテゴリ / 36 form-family / 35 データファイル**
-- 検証: source-pinned **64**（primary 44 / secondary 20）、未 pin 244（79%）
+- **312 organization / 15 カテゴリ / 36 form-family / 36 データファイル**
+- 検証: source-pinned **65**（primary 45 / secondary 20）、未 pin 247（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
@@ -82,7 +82,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 - entity kind: org-form **197（87%）** / named-org 29（13%）
 - 地域: europe 52 / north-america 44 / asia-east 32 / africa 24 / asia-south 21 /
   south-america 18 / southeast-asia 12 / oceania 12 / middle-east 11
-- 数の誠実さ: **308/308 が `:org/member-count-basis` を持ち、約 191（62%）が明示的に unknown**。
+- 数の誠実さ: **312/312 が `:org/member-count-basis` を持ち、約 195（62%）が明示的に unknown**。
 - 国別: **国連加盟 193/193 か国**が少なくとも1エントリに現れる（`coverage.cljs countries`）
 - 記述の厚み: 7 形態以上 24 か国 / 4-6 形態 34 / 2-3 形態 135 / **1 形態のみ 0**（`coverage.cljs depth`）
   `:org/member-count` を主張しているのは 73 件のみ
@@ -365,6 +365,14 @@ La Via Campesina の「2億人」は加盟団体の自己申告合計であっ�
 5. 地域: middle-east 11・oceania 12・southeast-asia 12 が相対的に薄い。
 6. DAO の on-chain governance と fleet 自身の signed-quorum governance
    （`manifest/fleet-keys.edn`、ADR-2607160005）の構造比較は未着手。
+
+### 14. 当局と共同体の数え方が食い違うとき、大きいのは共同体側だった
+
+ネパールの共同体林業を pin した際、**2つの権威が違う数を出していた**:
+森林土壌保全局が **19,361 CFUG / 181万ha / 246万世帯**、当の利用者連合 FECOFUN が
+**23,026 CFUG / 319万世帯 / 242万ha**。**共同体自身の名簿の方が国家の登記より多い**。
+通常の想定（国家が把握し切れず共同体側が小さく見える）と逆であり、
+どちらか一方に丸めず両方を記録した。
 
 ### 13. 「探して見つからなかった」も成果として記録する
 
