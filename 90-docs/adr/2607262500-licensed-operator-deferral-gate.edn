@@ -430,6 +430,36 @@ legalsupport のカタログは e-Gov しか経路が無かった時期に書か
 落ちた。**機構でなく出典の都合で落ちるテスト**なので、合成の伝聞ルールを注入する
 形に変えた（licensed-operator 側でも同じ修正を先にしている）。
 
+### D22. モデル規則は権威ではない —— 拘束力を検証水準から分離した（2026-07-26 追加）
+
+米国の出典探しはほぼ失敗した（ABA 公式403 / Cornell LII は現在ホストせず /
+azcourts.gov は curl・WebFetch とも403 / utcourts.gov 到達不能）。だがその失敗が、
+**探索よりも重要な枠組みの誤り**を露わにした。
+
+legalsupport が収録していた米国ルール3本は **ABA Model Rules** である。
+**これはどこの法でもない。** 州が採用して初めて拘束力を持ち、採用州は内容を大きく
+改変する —— D.C. は自身の 5.4(b) で非弁護士の資本参加を認め、アリゾナは 5.4 自体を
+撤廃した。「Model Rule 5.4 によれば」を米国の事業者の可否の根拠にするのは
+**カテゴリーの誤り**であり、**出典をいくら丁寧に検証しても直らない** ——
+テンプレートを注意深く読んでもそれが法になるわけではないからだ。
+
+よって `:rule/binding-force` を `:rule/verification` から**独立した軸**として導入し、
+`verified-rule?` は両方を要求する（**十分に検証されており、かつ実際に拘束力がある**）。
+モデル規則は「州が何を改変しているか」を名指すために残すが、許可方向の verdict は
+支えられない。**`:primary-source-read` かつ `:model-only` のルールが拒否されること**を
+テストで固定した。
+
+D.C. Rule 5.4 は `:primary-source-read` に上がった。(a)(b)(c) 全文を D.C. Bar から
+curl で取得し、501(c)(3) 団体との報酬分配の例外と、非弁護士が財産的利益を持てる
+4条件まで引用に含めた。**米国でこのカタログが一次で持てている唯一の州法**である。
+
+取れなかったものは糊塗せず `:known-gaps` に経路ごと記録した。
+
+**なお、この作業で自分がテスト失敗を抱えたままコミットした。** projection を再生成した
+あとに `:known-gaps` を編集し、suite を再実行せずに commit・push した —— 同期ガードは
+正しく落ちていたのに、それを越えて出荷した。次の commit で修正し、その旨を
+commit message に書いた。
+
 ## Consequences
 
 ### 現在の判定結果（`gate/summary` の実出力）
@@ -458,7 +488,8 @@ FRA 1 + CAN-ON 2。**一次読了46 / 公式ページ取得5 / 二次情報の�
 （D9・D11・D13〜D21）。日本 e-Gov、英国 legislation.gov.uk、
 ドイツ gesetze-im-internet.de、EU EUR-Lex、カナダ・オンタリオ e-Laws（生 HTML）、
 フランス Légifrance（WebFetch 経由）。
-**legalsupport 側も secondary-only 18→13 / primary 8→13 に改善した（D21）。**
+**legalsupport 側も secondary-only 18→13 / primary 8→14 に改善し、さらに
+モデル規則3本を `:model-only` として権威から外した（D21・D22）。**
 
 初版は3件で、うち2件が ITAD だった —— 1プロジェクトにしか使えない commons
 だったので、**実装済み actor が実際に載っている業種**を3件足した（D7）。
@@ -493,7 +524,7 @@ FRA 1 + CAN-ON 2。**一次読了46 / 公式ページ取得5 / 二次情報の�
 
 ## Verification
 
-`clojure -M:test` 76 tests / 1,151 assertions green（legalsupport は 52 tests / 4,395 assertions）、`clojure -M:lint` warnings 0 /
+`clojure -M:test` 76 tests / 1,151 assertions green（legalsupport は 54 tests / 4,433 assertions）、`clojure -M:lint` warnings 0 /
 errors 0（いずれも実走、2026-07-26）。変異テスト3件で suite が噛むことを確認:
 
 1. 未検証出典からの許可の降格を外す → 3 failures
