@@ -22,7 +22,9 @@
    "scittle(ブラウザ内 ClojureScript)が実行時に注入するカードも dds-ext-card / dads-chip-label を出す — 静的部分と注入部分で見た目を割らない"
    "上流 DADS の vendored subset に select が無いため、select は app 固有 class(.pt-select/.tb-select/.mjs-select)で dads-input-text__input と寸法・境界・focus を揃える。上流 class 名は騙らない"
    "jp-go-dds に notification-banner の hiccup helper を追加した(CSS は既に vendor 済みだったが helper が無く使えなかった)"
-   "この移行のスコープは bespoke 5面のみ。共有テンプレート由来の docs/index.html(366+ repo)は対象外で現状維持"]
+   "この移行のスコープは bespoke 5面のみ。共有テンプレート由来の docs/index.html(366+ repo)は対象外で現状維持"
+   "自分たちが書く CSS は EDN(kotoba-lang/css の [selector decls] ベクタ列)、markup は hiccup。生 CSS / 生 HTML / 生 JS の文字列をソースに書かない。vendored dds.css(上流デジタル庁 MIT、手編集禁止)だけが例外"
+   "ブラウザ側 .cljs も hiccup + html.core で組む。html.core は ns の :require ではなく完全修飾で呼ぶ(headless ハーネスが load-string で評価するため)。子の並びは [:<> ...] で包む(空ベクタを html.core がタグと誤解するため)"]
   :adr/decision-summary
   "{:scope {:migrated [\"cloud-itonami.github.io\" \"cloud-itonami-partners\" \"cloud-itonami-isic-6310\" \"cloud-itonami-isic-6399\" \"cloud-itonami-isic-7810\"], :out-of-scope {:what \"共有テンプレート由来の per-repo docs/index.html\", :count 366, :reason \"オーナー判断でまず bespoke 5面に絞った\"}}, :design-system {:from :hand-rolled-css-core-stylesheets, :to \"kotoba-lang/jp-go-digital-design-system\", :opt-out-from :kotoba-ui, :reason [:public-administration-domain :government-visual-language-trust]}, :dark-mode {:before :prefers-color-scheme, :after :light-fixed, :why \"上流 DADS に dark palette が無い\"}, :library-change {:repo \"kotoba-lang/jp-go-digital-design-system\", :added :notification-banner, :upstream-fidelity :icon-paths-copied-verbatim, :deviation \"閉じるボタンは既定で出さない(JS 依存のため静的 SSR ページでは動かない)\"}, :css-path-override :JP_GO_DDS_CSS, :verification {:github-io \"verify_catalog.cljs 全通過\", :isic-6310 \"disposition 列が移行前と完全一致 + verify_search.cljs 全通過\", :isic-7810 \"8 candidacies/6 holds/24 facts 一致 + verify_search.cljs 全通過\", :isic-6399 \"demo build で verify_search.cljs 全通過、operator build で 728/0/19/3252/4746 一致\", :partners \"intake API の 8 フィールド name 属性を維持\"}}"
   :adr/body
@@ -179,12 +181,50 @@ cloud-itonami org(約1225 repo)の UI 面を棚卸しした結果、2層に分�
 - (−) DADS と kotoba-ui の二本立てが cloud-itonami にも広がった。
   ADR-2607141915 の「opt-out 理由を ADR に書く」運用でこれ以上の乱立を抑える。
 
+## 追記(同日): CSS/HTML の記法を EDN・hiccup に統一
+
+**この移行の初版は、記法の面で退行していた。** 移行前の各 `generate.cljs` は
+`css.core` の EDN で stylesheet を書いていた(`{:rules {\".card\" {:background ...}}}`)
+のに、DADS 化の際にそれを**生 CSS 文字列**(`\".fleet-card{margin:0}\"`)へ置き換えて
+しまっていた。オーナー指摘(「html, css のオリジナル記法が残らなければ ok」)を受けて
+全面的に EDN / hiccup へ戻した。
+
+移行後の状態:
+
+- **CSS**: 5面の `app-css` と jp-go-dds の `ext-css` / `tokens` を
+  `[selector decls]` の**ベクタ列**で書き、`css.core/css` が文字列化する。
+  map でなくベクタ列にしているのは順序のため —— Clojure の map は要素数が
+  閾値を超えるとハッシュ順になり CSS のカスケード(後勝ち)が壊れる。
+  この移行中に `(into {} (sort-by key ...))` で実際に順序を壊し、既存テストが検出した。
+- **markup**: 生成側は元から hiccup。ブラウザ側(`search.cljs` / `catalog.cljs`)も
+  文字列連結をやめて hiccup + `html.core/->html` にした。`html.core` が
+  エスケープするので各ファイルの自前 `esc` は削除。sitemap.xml も hiccup 化
+  (XML 宣言だけは要素でないので文字列)。
+- **JS**: `cloud-itonami-partners` の手書き JS 60行を撤去し scittle 化した。
+  成否バナーは**生成側と同一の `dds/notification-banner`** をブラウザでも呼ぶので、
+  上流の SVG アイコンや DADS の class 名をブラウザ側に書き写す必要がない。
+  scittle は `web/vendor/` に **self-host**(このフォームの「外部リクエストゼロ」を
+  維持するため。他4面は従来どおり jsDelivr の CDN)。
+- **例外は vendored `dds.css` の 2427 行だけ** —— 上流デジタル庁(MIT)の成果物を
+  そのまま取り込むファイルで `scripts/vendor.cljs` が再生成する。EDN 化すると
+  上流追従が壊れるので、ここは生 CSS のまま維持する。
+
+この過程で捕まえた実測知見:
+
+- **nbb の `load-string` は ns の `:require` を解決できない**(Doesn`t support name)。
+  headless ハーネスがブラウザ側 `.cljs` を `load-string` で評価するため、
+  ブラウザ側コードは `html.core/->html` を**完全修飾**で呼び、ハーネス側で事前に
+  `require` しておく(ブラウザ側は script の読み込み順で満たす)。
+- **`html.core` に空ベクタ `[]` を渡すと落ちる**(`(name nil)`)。検索ヒット0件で
+  `(mapv row [])` が `[]` になる経路で踏んだ。子の並びは必ず `[:<> ...]` フラグメントで
+  包む。ハーネスの no-hit ケースが検出した。
+
 ## Follow-ups
 
 1. **共有テンプレート由来の product face(366+ repo)の扱いを決める** — 本 ADR の
    スコープ外。DADS ベースの単一ジェネレータで一括再生成する案があるが、
    366 リポジトリへの commit/push/west pin 前進を伴う。
-2. 実ブラウザでの視覚確認(本 ADR 時点では生成 HTML の markup 検証まで)。
+2. 実ブラウザでの視覚確認 —— **実施済み**。5面 × 390/768/1280px で document.scrollWidth == clientWidth(横スクロール無し)、scittle 注入カードの DADS 描画、partners フォームの送信〜成功バナーまでを実ブラウザで確認した。
 3. inline CSS のサイズ計測(gzip 後)。必要なら dds.css の per-page subset 化を検討。
 4. select / radio / date-picker 等、上流 DADS の未 vendor コンポーネントの追加
    (ADR-2607141915 follow-up 2 と同じ項目。select は今回 app 側で寸法合わせして凌いだ)。"}]
