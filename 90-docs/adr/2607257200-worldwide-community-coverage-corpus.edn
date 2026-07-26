@@ -74,7 +74,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 ## 現在の状態（2026-07-26）
 
 - **276 organization / 15 カテゴリ / 36 form-family / 28 データファイル**
-- 検証: source-pinned **56**（primary 40 / secondary 16）、未 pin 220（80%）
+- 検証: source-pinned **58**（primary 42 / secondary 16）、未 pin 218（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
   **statutory-no-personality 8** → **企業・LEI レジストリから不可視が約 41%**
@@ -229,6 +229,14 @@ popular-education・foss-project 各 3。
 
 逆方向もある: エスペラント運動の UEA は個人会員 **5,501 人**（121か国、2015年時点）で、
 運動の知名度に対して桁が違う。しかもその内訳は 11 年前のものである。
+
+**縮小が実測される例も出た**: スウェーデンの studieförbund は 2024 年の予算削減で 2 団体が
+閉鎖され、**10 団体から 8 団体に減った**。「北欧の結社密度」は静的な文化特性ではなく、
+毎年の予算判断に依存している。
+
+**逆に急成長も**: Buy Nothing Project は **1,400万人・50か国超**（年間16.2万トン・3.6億ドル
+相当を融通）。iteration 1 の想起値 500万は 3 分の 1 弱で、これは recall 誤差だけでなく
+**実際の急成長による陳腐化**でもある — corpus の数値は「取得時点」を持たないと意味を失う。
 
 ### 6. 陳腐化と自己申告の可視化
 
