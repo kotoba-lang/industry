@@ -73,7 +73,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ## 現在の状態（2026-07-26）
 
-- **276 organization / 15 カテゴリ / 36 form-family / 28 データファイル**
+- **281 organization / 15 カテゴリ / 36 form-family / 29 データファイル**
 - 検証: source-pinned **58**（primary 42 / secondary 16）、未 pin 218（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
@@ -82,7 +82,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 - entity kind: org-form **197（87%）** / named-org 29（13%）
 - 地域: europe 52 / north-america 44 / asia-east 32 / africa 24 / asia-south 21 /
   south-america 18 / southeast-asia 12 / oceania 12 / middle-east 11
-- 数の誠実さ: **276/276 が `:org/member-count-basis` を持ち、約 160（58%）が明示的に unknown**。
+- 数の誠実さ: **281/281 が `:org/member-count-basis` を持ち、約 165（59%）が明示的に unknown**。
   `:org/member-count` を主張しているのは 73 件のみ
 
 ## ファイル構成
@@ -246,6 +246,16 @@ popular-education・foss-project 各 3。
   **参加中小企業数も WIR 建て取引高も公表していない**。銀行が報告するのは銀行の指標であって、
   共同体の指標ではない。この否定的結果を `:org/refresh-checked` / `:org/refresh-result` として
   記録した — **次の iteration が同じ空振りを繰り返さないため**。
+
+iteration 31 で残り2件も当たった:
+
+- **FIFA は更新されていないが、計測の位置が動いていた。** Big Count 2006 の後継は存在しない一方、
+  FIFA は現在 **Professional Football Report** を出しており、2023年時点で **プロ選手 123,694 人**。
+  つまり「更新されなかった」のではなく、**計測がゲームの最も小さく最も可視な層に移り、
+  アマチュアと未登録の基盤は 2006 年以降誰も数えていない**。
+- **UEA は検索水準では新しい数字が見つからなかった。** 2015年の内訳を全ての二次情報が
+  繰り返している。uea.org 自体は取得していないので「検索で見つからない」であって
+  「存在しない」ではない、と `:org/refresh-result` に明記した。
 
 ### 8. pin は「衰退している」という通説も訂正する
 
