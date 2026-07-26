@@ -8,19 +8,19 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 12768, "app-aozora-appview" 11305},
+ {"app-aozora-pds" 12873, "app-aozora-appview" 11367},
  :zone
- {:requests-7d 50670,
-  :pageviews-7d 8419,
-  :uniques-7d-sum 806,
+ {:requests-7d 50953,
+  :pageviews-7d 8456,
+  :uniques-7d-sum 808,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 274361}
+    :requests 274310}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2909}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1861}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1860}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 293}
    {:path
     "/kotobase-cf-wasm-testnet/ipns/bafyreidwhkvt3omcwb6ytmiy6npf42crhvbekxi7aovgxjhl6hgrmsnvcm.json",
@@ -30,11 +30,11 @@
     :requests 157}
    {:path "/xrpc/com.atproto.sync.getBlob", :requests 107}
    {:path "/", :requests 96}],
-  :status-mix {:ok 281945, :client-error 688, :server-error 81},
+  :status-mix {:ok 281931, :client-error 616, :server-error 81},
   :window "24h"},
  :as-of "2026-07-26",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 274361 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2909 · /xrpc/com.atproto.sync.subscribeRepos 1861 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 293 · /kotobase-cf-wasm-testnet/ipns/bafyreidw… 254 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 274310 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2909 · /xrpc/com.atproto.sync.subscribeRepos 1860 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 293 · /kotobase-cf-wasm-testnet/ipns/bafyreidw… 254 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 50670 req/7d・806 uniques(日次和)・うち4xx probe 0%(24h)、workers 24073 inv/7d"}
+ "aozora.app 実測 50953 req/7d・808 uniques(日次和)・うち4xx probe 0%(24h)、workers 24240 inv/7d"}
