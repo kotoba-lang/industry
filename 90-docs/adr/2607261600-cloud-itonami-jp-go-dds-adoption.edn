@@ -243,20 +243,38 @@ product face 387 面のあと、残っていた面を全数で洗い出した(cl
 こと —— 141 通りの書き方すべてに効き、markup には触れない。
 jp-go-dds.skin/dds+skin(JVM)を style に流し込む。
 
-結果: **127/141 を移行**(main へマージ済み、失敗 0)。各 repo で
+結果: **141/141 を移行**(main へマージ済み、失敗 0)。各 repo で
 clojure -M:render-html を実走し、**style 以外の markup がバイト一致**する
 ことを検証してから commit している(落ちた repo は land していない)。
 
-**未移行 13 件**(isic-2211 / 2620 / 2910 / 4711 / 5320 / 6420 / 6512 / 6612 /
-6622 / 6810 / 6910 / 6920 / 8299): これらは deps.edn が kotoba-lang/html を
-:local/root で持つ一方、jp-go-dds が同じ lib を :git/sha で引くため
-**依存座標が比較できず** classpath 構築に失敗する。解消には各 repo の依存解決
-方式そのものを変える必要があり、UI スキンの移行としては過剰なので別件にした。
+当初 13 件が classpath 構築に失敗した。原因は 2 つで、いずれも解消した:
+
+1. **依存座標の衝突** —— 推移依存が kotoba-lang/html を :local/root で引く一方
+   jp-go-dds は :git/sha で引くため、tools.deps が版を比較できない。
+   repo 側で html/css を **top-level の git 座標に固定**すると解決する。
+2. **兄弟 repo の :local/root 参照** —— 例えば isic-6420 は
+   cloud-itonami-isic-8291 を :local/root で引いており、monorepo では隣に居るが
+   worktree 配置では居ないため解決できない。共有 checkout を symlink して解消。
+
+また **% エスケープの要否は repo ごとに違う**(生成器が format を使うかどうか)。
+plain と format-safe を順に試し、**CSS に %% が漏れておらず かつ markup が
+バイト不変**な方だけを land する自動リトライにした —— isic-2211 は plain が正解で、
+format-safe だと %% が出力に漏れる。
 
 ### 亜種 LP
 
-**18/28 を移行**(失敗 0)。残り 10 は render_html.clj を持つ repo で、生成物
-だけ直しても戻るため対象外にした。
+**28/28 を移行**(失敗 0)。当初 10 件を「render_html.clj を持つから再生成で戻る」
+として除外したが、**これは過剰だった** —— 実測するとその 10 件すべて
+render_html は operator console 専用で、docs/index.html は静的(CI も触らない)。
+除外条件を「実際に docs/index.html を生成しているか」に直して全件移行した。
+
+### 残っていた 4 面
+
+public/index.html 2(commitment-ledger / isic-6492)、docs/verify.html 1
+(isic-6611-cryptoexchange)、docs/samples/swift-console.html 1(isic-6419)も
+移行し、**cloud-itonami の .html 713 件がすべて DADS になった**。
+うち 2 件は元から style 要素を持たないので </head> の直前に挿入している
+(既存要素の増減なし)。
 
 ### 前提として直したこと
 
