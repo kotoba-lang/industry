@@ -18,10 +18,15 @@
   **モデル化の中身と、その限界。**
   ・領域 = 筐体内寸を `cell-mm` で離散化。部材は mk1-assembly.edn の AABB を
     そのまま solid セルに焼く(部材形状は箱近似 — フィンやコネクタの凹凸は無い)。
-  ・入口 = 前面 passive メッシュ。B70 blower が背面から吸い出すことで生じる負圧で
-    makeup air が入る構造なので、**入口に blower 相当の速度を与え、背面 GPU
-    スロットを出口にする**という等価な向きで解く。
-  ・出口 = 背面 GPU dual-slot 開口(zero-gradient)。
+  ・**送風源は B70 blower なので、速度を与えるのは背面 GPU スロット(吸い出し)**。
+    前面 passive メッシュは zero-gradient の :outlet(大気開放)にする。
+    初版は逆にしていた — 前面メッシュに速度を与え背面を passive outlet にした。
+    これは等価ではなく質量を過拘束する: 大きな速度入口が小さな zero-gradient
+    出口に流し込めないので領域が加圧され、出口流束がゼロに潰れ、ほぼ全セルが
+    停滞と出る。実測でまさにそうなった(入口 51.7 / 出口 0.045、停滞 96.4%)。
+  ・収束は固定 step 数でなく `run-until-steady` で判定する。初版は 1500 step
+    固定で、6x6x14 の小さなダクトでも収束に 2550 step 掛かることが判明した
+    ため、**32x47x79 の本ケースは全く定常でなかった**。
   ・**解いているのは流れだけ。**エネルギー方程式は無いので素子温度は出ない。
     出るのは通過流量・停滞領域・そこから エネルギー保存で出るバルク ΔT。"
   (:require [kami-cfd.duct :as duct]
@@ -39,8 +44,15 @@
 ;; 知りたいのが「どこが淀むか」「どれだけ通るか」なので妥当。細かくすれば
 ;; 精度は上がるが、この解像度で結論が変わらないことを別途確認すべき
 ;; (格子収束確認は未実施 — 下の :caveats に明記する)。
-(def ^:private cell-mm 4.0)
-(def ^:private steps 1500)
+;; 6mm セル。4mm では 118,816 セル x 1500 step で 17 分掛かり、しかも未収束
+;; だった。設計反復に使える道具にするため粗くする(格子収束確認は別途)。
+(def ^:private cell-mm 6.0)
+;; 収束判定は u0 に対する相対値で与える。初版は :tol 1.0e-7(絶対)で、
+;; u0=0.05 に対して 2e-6 相当という無茶な基準だった — 34,503 セルで 60 分回して
+;; 収束しなかった。1e-4 は実務的な基準。
+(def ^:private max-steps 30000)
+(def ^:private check-every 100)
+(def ^:private rel-tol 1.0e-4)
 (def ^:private u-lat 0.05)      ; 格子入口速度
 (def ^:private nu-lat 0.02)     ; 格子動粘性
 
@@ -83,14 +95,21 @@
         gy0 (nth (:lo gpu) 1) gy1 (min (nth (:hi gpu) 1) (dec iy))
         lbm0 (duct/duct-new
               dom {:nu nu-lat :u0 u-lat
-                   :patches [(duct/patch :z-max :inlet
-                                         (fn [x _] (< x gx0)) u-lat)
-                             (duct/patch :z-min :outlet
+                   ;; 背面 GPU スロット = blower。inward normal は +z なので
+                   ;; 外向き(吸い出し)は負の u。
+                   :patches [(duct/patch :z-min :inlet
                                          (fn [x y] (and (>= x gx0) (<= x gx1)
-                                                        (>= y gy0) (<= y gy1))) nil)]})
-        _ (println (format "running %d steps..." steps))
+                                                        (>= y gy0) (<= y gy1)))
+                                         (- u-lat))
+                             ;; 前面 passive メッシュ = 大気開放
+                             (duct/patch :z-max :outlet
+                                         (fn [x _] (< x gx0)) nil)]})
+        _ (println (format "running until steady (max %d, check every %d)..."
+                           max-steps check-every))
         t0 (System/currentTimeMillis)
-        lbm (duct/run lbm0 steps)
+        conv (duct/run-until-steady lbm0 {:rel-tol rel-tol :max-steps max-steps
+                                          :check-every check-every})
+        lbm (:lbm conv)
         secs (/ (- (System/currentTimeMillis) t0) 1000.0)
         fin (duct/patch-flux lbm :inlet)
         fout (duct/patch-flux lbm :outlet)
@@ -103,7 +122,11 @@
          :lattice "D3Q19 BGK + Smagorinsky LES"
          :domain-cells [ix iy iz]
          :cell-mm cell-mm
-         :steps steps
+         :steps (:steps conv)
+         :convergence (:status conv)
+         :residual (:residual conv)
+         :residual-tol (:tol conv)
+         :rel-tol rel-tol
          :solid-fraction (/ (Math/round (* 1000.0 (/ (double (:solid-count dom)) (* ix iy iz)))) 1000.0)
          :inlet-flux-lattice fin
          :outlet-flux-lattice fout
@@ -118,9 +141,11 @@
          :validation-tol (:tol val)
          :validation-pass (:pass? val)
          :wall-clock-s secs
+         :mass-balance-residual (if (zero? fin) nil (Math/abs (/ (+ fin fout) fin)))
          :caveats
          ["部材は AABB の箱近似。ヒートシンクのフィン形状・コネクタの凹凸は無い。"
           "格子収束確認(cell-mm を半分にして結論が変わらないこと)は未実施。"
+          "convergence が :max-steps なら流れ場はまだ変化中で、流束は暫定値。"
           "入口風速 3.0 m/s は B70 blower の assumption。実機で風速計を当てて置き換える。"
           "エネルギー方程式なし → 素子ジャンクション温度は出ない。bulk-delta-t-k は排気空気の上昇。"
           "ケーブルは solid として入れていない(mk1-cad.cljs の 6c で別に経路判定)。"]
@@ -129,6 +154,11 @@
     (println (format "-> %.4f m3/s = %.1f CFM" q-m3s cfm))
     (println (format "stagnant fraction %.3f" stag))
     (println (format "bulk dT %.2f K for %d W" dt (long heat-w)))
+    (println (format "convergence %s after %d steps (residual %.3e, tol %.3e = %.0e x u0)"
+                     (name (:status conv)) (:steps conv) (:residual conv)
+                     (:tol conv) rel-tol))
+    (println (format "mass balance: |inlet+outlet| / |inlet| = %.4f (0 = perfect)"
+                     (if (zero? fin) ##Inf (Math/abs (/ (+ fin fout) fin)))))
     (println (format "poiseuille validation L2=%.5f pass=%s" (:l2-rel val) (:pass? val)))
     (println (format "wall clock %.1f s" secs))
     (io/make-parents (out-path))
