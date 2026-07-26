@@ -66,7 +66,9 @@
  :org/countries ["CN"]
  :org/founding-date 1954
  :org/instance-count-estimate 600000
- :org/member-count-basis "llm-recall-unverified: on the order of 110k urban residents' committees and 490k villagers' committees."
+ :org/member-count-basis "unknown at a verified level, and the search itself is the finding: China's 2024 national statistical communiqué does NOT publish 村民委员会 / 居民委员会 counts, and the Ministry of Civil Affairs bulletins that do carry them were not retrieved here. The order-of-magnitude figures in circulation (roughly 490k villagers' committees and 110k urban residents' committees) remain unverified."
+ :org/refresh-checked "2026-07-26"
+ :org/refresh-result "Checked the 2024 国民经济和社会发展统计公报 directly: it covers macroeconomic and employment indicators and contains no grassroots self-governance organization counts. mca.gov.cn statistical bulletins are the right source and were not fetched."
  :org/legal-registration :registered
  :org/registration-note "Constitutionally 'mass self-governing organizations' rather than state organs, but registered and closely supervised."
  :org/governance-model :hierarchical
@@ -125,13 +127,19 @@
  :org/scope :local-class
  :org/region-primary :region-southeast-asia
  :org/countries ["PH"]
- :org/instance-count-estimate 42000
- :org/member-count-basis "llm-recall-unverified: ~42,000 barangays covering the whole population."
+ :org/instance-count-estimate 42010
+ :org/member-count-basis "source-pinned: 42,010 barangays as of 2026, up from 42,001 at the 2023 barangay elections — the count is maintained by the Philippine Statistics Authority in the Philippine Standard Geographic Code and moves by a handful as barangays are created or merged. Every resident belongs by address, so no membership figure applies."
+ :org/source-name "Philippine Statistics Authority, Philippine Standard Geographic Code (PSGC)"
+ :org/source-url "https://psa.gov.ph/classification/psgc/barangays"
+ :org/source-date "2026"
+ :org/source-tier :secondary
+ :org/source-caveat "Count reported through PSGC listings and election coverage rather than a single dated PSA release."
+ :org/pinned-on "2026-07-26"
  :org/legal-registration :registered
  :org/registration-note "Smallest statutory administrative unit, but functions in daily life as a neighborhood community body (katarungang pambarangay mediation)."
  :org/governance-model :democratic
  :org/mission-statement "Neighborhood governance and compulsory pre-litigation mediation of local disputes."
- :org/data-provenance "llm-recall-unverified"
+ :org/data-provenance "source-pinned"
  :source/dataset "community-coverage"}
 
 {:org/id :org-uzb-mahalla
@@ -163,7 +171,11 @@
  :org/founding-date 1917
  :org/instance-count-estimate 32000
  :org/member-count 5000000
- :org/member-count-basis "llm-recall-unverified: ~29-32k ejidos and agrarian communities holding roughly half of Mexico's land, with a few million ejidatarios."
+ :org/member-count-basis "unknown at a verified level, with the authoritative source now identified: Mexico's Registro Agrario Nacional publishes the Atlas de la Propiedad Social de la Tierra 2024, the definitive cartographic record of certified ejidos and communities. It was located but not queried for totals, so the circulating ~29-32k ejidos / roughly half of national land figures stay unverified. One dated fragment found: 12,717 ejidos and communities covering 38.7 million hectares across 48% of hydrological regions."
+ :org/source-name "Registro Agrario Nacional, Atlas de la Propiedad Social de la Tierra en México 2024"
+ :org/source-url "https://www.gob.mx/ran/articulos/el-atlas-de-la-propiedad-social-de-la-tierra-en-mexico-2024-guia-cartografica-completa-sobre-ejidos-y-comunidades-en-el-pais"
+ :org/refresh-checked "2026-07-26"
+ :org/refresh-result "Authoritative source identified (RAN Atlas 2024) but not queried; recorded as a pointer rather than upgraded to a pin."
  :org/legal-registration :registered
  :org/governance-model :democratic
  :org/mission-statement "Communal landholding and its assembly government: land allocation, forestry/water commons, collective enterprise."
