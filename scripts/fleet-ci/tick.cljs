@@ -356,28 +356,45 @@
 (defn filtered-tarball!
   "検査対象だけを詰めた tarball。
 
-  以前は 2 経路あった（trees+blobs API で blob ごとに落とす経路と、全体 tarball
-  を取って絞る経路）。git 化でどちらも同じ形になった — mirror は sha ごとに 1 回
-  fetch すれば済み、絞り込みは常に手元。したがって :include-from は不要になり、
-  :include-ext があればこれ、無ければ全体、の 2 択に戻る。"
+  **`git archive` に pathspec を渡す**（tree を展開してから find で絞らない）。
+  最初の git 版は ensure-tree! で全展開してから `find | tar` していて、
+  superproject では tracked 230,000 ファイルを 2 回歩くことになり、実測で
+  5 分の timeout を超えて `spawnSync bash ETIMEDOUT` で落ちた（2026-07-26
+  12:11Z の launchd tick）。pathspec なら該当ファイルだけが 1 パスで出る。
+
+  以前は 2 経路あった（trees+blobs API で blob ごとに落とす経路と、全体
+  tarball を取って絞る経路）。git 化でどちらも同じ形になったので :include-from
+  は無くなり、:include-ext があればこれ、無ければ全体、の 2 択。"
   [org-repo sha {:keys [include-ext min-files]}]
   (let [f (path/join cache-dir (str (str/replace org-repo "/" "-") "-" (sha12 sha) "-filtered.tar.gz"))]
     (if (fs/existsSync f)
       f
-      (let [dir (ensure-tree! org-repo sha)
-            name-expr (str/join " -o " (map #(str "-name '*" % "'") include-ext))
-            n (js/parseInt (str/trim (str (:out (sh "bash" ["-c" (str "cd " dir " && find . -type f \\( "
-                                                                     name-expr " \\) | wc -l")])))) 10)]
-        (log "tree-filter" org-repo (sha12 sha) ":" n "files" (pr-str include-ext))
+      (let [m (ensure-sha! (mirror! org-repo) org-repo sha)
+            ;; ワイルドカード pathspec は使わない。実測: `-- '*.edn'` は 0 件、
+            ;; `:(glob)**/*.edn` は 1 件しか拾わなかった（git の pathspec は
+            ;; fnmatch のアンカー規則が直感と違う）。名前一覧を出して手元で
+            ;; 絞り、**リテラルな path を archive に渡す**方が曖昧さがない。
+            all (str/split-lines
+                 (str (:out (git m ["ls-tree" "-r" "--name-only" sha]
+                                 {:timeout 600000 :maxBuffer 536870912}))))
+            files (filterv (fn [p] (and (seq p) (some #(str/ends-with? p %) include-ext))) all)
+            n (count files)]
+        (log "pathspec-filter" org-repo (sha12 sha) ":" n "files" (pr-str include-ext))
         (when (and min-files (< n min-files))
           (die (str "filter found only " n " files for " org-repo
                     " (expected >= " min-files ") — refusing to build a gate input that "
                     "would trivially pass")))
+        ;; argv 長の上限が現実的な天井（実測 1,889 path で ~95KB、ARG_MAX の 1/10）。
+        ;; 桁が変わる repo が出たら分割ではなく設計を見直す方が良いので、黙って
+        ;; 壊れるのでなく先に落とす。
+        (when (> n 20000)
+          (die (str n " matching files for " org-repo " — too many to pass as argv; "
+                    "narrow :include-ext or give the gate a subdirectory")))
+        (fs/mkdirSync cache-dir #js {:recursive true})
         (let [{:keys [exit out]}
-              (sh "bash" ["-c" (str "cd " dir " && find . -type f \\( " name-expr
-                                    " \\) -print0 | tar czf " f " --null -T -")]
-                  {:timeout 300000})]
-          (when-not (zero? exit) (die (str "filtered tar create failed: " out))))
+              (git m (into ["archive" "--format=tar.gz" "-o" f "--prefix=repo/" sha "--"] files)
+                   {:timeout 1800000})]
+          (when-not (zero? exit) (die (str "git archive (filtered) failed: " (str/trim out)))))
         f))))
 
 (defn full-tarball!
