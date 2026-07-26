@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 6334, "kotobase-cf-wasm-staging" 1944},
+ {"net-kotobase" 6339, "kotobase-cf-wasm-staging" 1944},
  :zone
- {:requests-7d 10648,
-  :pageviews-7d 464,
-  :uniques-7d-sum 637,
+ {:requests-7d 10655,
+  :pageviews-7d 466,
+  :uniques-7d-sum 639,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -13,7 +13,7 @@
   [{:path
     "/kotobase-cf-wasm-production/ipns/bafyreigrbxg2dutsb7chtps7ppyqus3zjsvtgr6vuruuzjxemuzevt32t4.json",
     :requests 132}
-   {:path "/health", :requests 61}
+   {:path "/health", :requests 59}
    {:path
     "/bafyreie2xf2yflnmbsl75q4fvvzm5rmlfr75qrtvfqogl65kh3njpcveba",
     :requests 49}
@@ -32,7 +32,7 @@
    {:path
     "/kotobase-cf-wasm-production/ipns/bafyreiccc4mj54mv73xc7p7qjwu4rowyszyxm5v5ij3wlekyv7vypn5rxu.json",
     :requests 36}],
-  :status-mix {:client-error 1811, :ok 1993, :server-error 260},
+  :status-mix {:client-error 1810, :ok 1990, :server-error 260},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -46,10 +46,10 @@
  :as-of "2026-07-26",
  :traffic-quality {:window "24h", :probe-4xx-pct 45, :error-5xx-pct 6},
  :top-paths
- "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/ipns/bafyre… 132 · /health 61 · /bafyreie2xf2yflnmbsl75q4fvvzm5rmlfr75qr… 49 · /bafyreih3kjj6r7oeedcdzztplxcydz7tk7yirk… 43 · /bafyreifb3zlzmngj645lbx6mk27qpwnvlfkom4… 39 | 4xx(probe) 45% · 5xx 6%",
- :funnel {:visitors 1345, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/ipns/bafyre… 132 · /health 59 · /bafyreie2xf2yflnmbsl75q4fvvzm5rmlfr75qr… 49 · /bafyreih3kjj6r7oeedcdzztplxcydz7tk7yirk… 43 · /bafyreifb3zlzmngj645lbx6mk27qpwnvlfkom4… 39 | 4xx(probe) 45% · 5xx 6%",
+ :funnel {:visitors 1347, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 10648 req/7d・637 uniques(日次和)・うち4xx probe 45%(24h)、workers 8278 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 10655 req/7d・639 uniques(日次和)・うち4xx probe 45%(24h)、workers 8283 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 4,
   :submissions 3,
