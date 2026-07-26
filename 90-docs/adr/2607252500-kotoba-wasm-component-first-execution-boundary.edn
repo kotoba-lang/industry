@@ -81,6 +81,16 @@ native AOT は廃止しない。ただし boot/firmware、aiueos kernel、Wasm e
 root-key adapter、または明示的に trusted とした低遅延 primitive に限る。通常の
 Kotoba application を native ABI/OS syscall に直接接続する新規経路は作らない。
 
+**ただし KIR 二面出力はこの禁止に当たらない**(2026-07-26 追記、ADR-2607266000)。
+同一の checked KIR から Component (配布・契約・admission の面) と native
+(実行の面) を出し、両者が同じ effect set・同じ export 表・同じ admission 判定を
+通ることを compiler が保証する経路は、禁じた『application を native ABI/OS
+syscall に直結する』ものではない。native 側は micro-TCB が管理する同じ
+capability 境界の内側の実行形式であり、境界を迂回しない。この区別が要るのは、
+core を Rust 必須にしない方針 (host adapter としての Rust は可) の下では
+Wasmtime を micro-TCB に埋める選択肢が取れず、engine を持たない二面出力が
+主経路になるため。両面の同値性を示す conformance vector は未整備。
+
 ### 5. nested engine は主経路にしない
 
 guest 内 interpreter/engine は untrusted plugin の追加 sandbox、testing、研究用途には

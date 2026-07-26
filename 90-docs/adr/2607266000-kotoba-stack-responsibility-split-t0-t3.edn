@@ -202,24 +202,47 @@ Phase B の途中で 2 つの実問題が出た。どちらも「読んで判断
    削除を維持したまま `kotoba-wasm` / `kotoba-component` へ forward-port して解決。
    分割は一度やれば終わりではなく、**着地までの時間が短いほど port コストが低い**。
 
+### T6 (fleet) の移設先は ADR 起票時の想定が誤っていた
+
+本 ADR は当初「`kototama` の fleet 1,498 行を `murakumo` が引き取る」と書いたが、
+実測するとこれは成立しない。
+
+- **`murakumo` に Clojure の src ツリーが無い。** 中身は `bin/`(llama.cpp 実体)、
+  `*.edn` 配置設定、`deploy/`、`docs/` で、ライブラリの置き場ではない。
+- **単純移設ではない。** `fleet_exec` は `kototama.tender` / `contract` /
+  `aiueos-adapter` を require する(placement が execution を駆動する正しい向き)
+  一方、`kototama.cli` が fleet 4 ns を require している。外に出すと
+  kototama -> fleet -> kototama の循環になるため、**CLI の fleet サブコマンド
+  10 個**(`fleet-run`/`fleet-daemon`/`fleet-status`/`fleet-audit`/`fleet-gate`/
+  `fleet-list`/`fleet-recover`/`fleet-resume`/`fleet-demo`/`fleet-fence-demo`)を
+  別エントリポイントへ移す必要がある。cli.clj 364 行中 92 行が fleet 参照。
+- **kototama の宣言する成熟度に触れる。** `docs/maturity.md` は R3 を
+  'Fleet multi-tenant tender — stable' として掲げており、fleet を外すと
+  この repo が何を主張するかが変わる。
+
+したがって T6 は「移設のみ・新規実装ゼロ」ではなく、**利用者に見える CLI 面と
+成熟度宣言の変更を伴う**。候補は (a) 新規 `fleet` repo(名前は空き、taxonomy の
+prefix 無し = reusable library に合致) (b) `murakumo` に src ツリーを新設
+(c) kototama に残す、の 3 つ。オーナー判断待ち。
+
 ### Phase B の残り
 
 | repo | 内容 | 状態 |
 |---|---|---|
 | `compiler` | 37 ソース削除・8 repo 消費 | **完了** (613 tests green) |
-| `kototama` | `postgresql_pool_provider` (433) 削除 + `provider-postgres` 消費 | 未 |
-| `kototama` | fleet 1,498 行を `murakumo` へ移設 (T6) | 未 |
-| `kotoba` | `kgraph` / `guest_grammar` 削除 + 新 repo 消費 | 未 |
+| `kototama` | `postgresql_pool_provider` (433) 削除 | **完了** (199 tests green、TCB 32->31) |
+| `kototama` | fleet 1,498 行の分離 (T6) | 未 — 下記のとおり移設先の再検討が要る |
+| `kotoba` | `kgraph` / `guest_grammar` 削除 + 新 repo 消費 | **完了** (regression ゼロ) |
 | west pin | `compiler` の pin 前進 | 未 (共有 checkout が別セッションの未 push branch に居るため) |
 
 ## Gap ledger (2026-07-26)
 
 | id | gap | 状態 |
 |---|---|---|
-| G-A | ADR-2607252500 決定 4 に二面出力の but 節を追記 | 未実施 |
+| G-A | ADR-2607252500 決定 4 に二面出力の but 節を追記 | **完了** |
 | G-B | Phase B: consumer flip と元コード削除 | compiler **完了**、kototama/kotoba 未 |
-| G-C | `provider-postgres` -> `kototama.tender` の逆依存を abi 契約経由に | 未実施 |
-| G-D | `kototama` の fleet 1,498 行を `murakumo` へ移設 (T6) | 未実施 |
+| G-C | `provider-postgres` -> `kototama.tender` | **解消** — 逆流ではなく tender プラグインと再定義し、tender 側が同梱をやめた |
+| G-D | `kototama` の fleet 1,498 行の分離 (T6) | 未実施 (移設先要再検討) |
 | G-E | `kotoba` から supply-chain 8 / codebase-actor 8 を追い出す (T1) | 未実施 |
 | G-F | `kotoba.kir.xml` (224) と既存 `kotoba-lang/xml` repo の重複判定 | 未実施 |
 | G-G | 各 repo の `clojure -M:test` 実行 | **完了** 11/11 green |
