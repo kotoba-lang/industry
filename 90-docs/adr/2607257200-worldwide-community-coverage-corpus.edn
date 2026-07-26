@@ -74,7 +74,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 ## 現在の状態（2026-07-26）
 
 - **308 organization / 15 カテゴリ / 36 form-family / 35 データファイル**
-- 検証: source-pinned **62**（primary 44 / secondary 18）、未 pin 246（80%）
+- 検証: source-pinned **63**（primary 44 / secondary 19）、未 pin 245（80%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
@@ -365,6 +365,20 @@ La Via Campesina の「2億人」は加盟団体の自己申告合計であっ�
 5. 地域: middle-east 11・oceania 12・southeast-asia 12 が相対的に薄い。
 6. DAO の on-chain governance と fleet 自身の signed-quorum governance
    （`manifest/fleet-keys.edn`、ADR-2607160005）の構造比較は未着手。
+
+### 13. 「探して見つからなかった」も成果として記録する
+
+pin できなかった調査を捨てると、次の iteration が同じ空振りを繰り返す。そこで
+`:org/refresh-checked` / `:org/refresh-result` に**何を見て何が無かったか**を残している。
+iteration 39 の例:
+
+- **中国の村民委員会・居民委員会**: 2024年の国民経済和社会発展統計公報を直接取得して確認したが、
+  **基層自治組織の数は載っていない**（マクロ経済・雇用指標のみ）。流通している「村 49万・
+  居 11万」は未検証のままとし、正しい所在（民政部の統計公報）を記録した。
+- **メキシコの ejido**: 権威ある出典（**RAN『Atlas de la Propiedad Social de la Tierra 2024』**）を
+  特定したが照会はしていない。**ポインタとして記録し pin に格上げしない**。
+
+一方で pin できたもの: **フィリピンのバランガイ 42,010**（2026年、PSGC。2023年選挙時 42,001 から微増）。
 
 ### 12. 同じ制度が誰かを支え、誰かを剥ぎ取る
 
