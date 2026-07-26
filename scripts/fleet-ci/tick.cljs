@@ -99,81 +99,81 @@
         :out (str (or (some-> (.-stdout e) str) "") (or (some-> (.-stderr e) str) "")
                   (when-not (.-status e) (str e)))}))))
 
-;; launchd から動かす場合、gh は keyring を読めず匿名にフォールバックする（public repo の
-;; GET だけ通り、private repo は 404 / 書き込みは 401）。plist に token を書くのは論外
-;; （tracked file）なので、**mode 600 のファイルから読んで子プロセスの env にだけ載せる**。
+
+;; ---------------------------------------------------------------------------
+;; git transport — GitHub の **API を使わない**経路（2026-07-26、オーナー方針
+;; 「github token は使わない」）。
 ;;
-;; **fine-grained PAT は resource owner 1 つにしか紐付かない**（オーナー選択: 最小権限）。
-;; 対象 repo は com-junkawasaki と kotoba-lang に跨るので、token は
-;; `FLEET_CI_GH_TOKEN_DIR/<owner>`（mode 600、owner 名のファイル）から **endpoint の
-;; owner に応じて選ぶ**。単一 token で済ませたい場合は FLEET_CI_GH_TOKEN_FILE を使う
-;; （全 owner に同じ token を使う。classic PAT / OAuth token 向け）。
-(def gh-token-dir (or (:gh-token-dir opts) (.-FLEET_CI_GH_TOKEN_DIR js/process.env)))
-(def gh-token-file (or (:gh-token-file opts) (.-FLEET_CI_GH_TOKEN_FILE js/process.env)))
+;; 経緯: launchd から起動すると gh は Keychain の token を読めず匿名に落ちる。
+;; private repo は匿名だと 404 なので preflight が毎 tick skip し、**scheduled
+;; CI が一度も動かない**状態になっていた（実測 2026-07-26 11:00Z）。token を
+;; 置けば直るが、置かない方針なので入力経路ごと git+SSH に移す。
+;;
+;; SSH なら token は要らない。実測: ssh-agent に identity が 1 つも無い状態でも
+;; `git ls-remote git@github.com:com-junkawasaki/root.git HEAD` が private repo
+;; の sha を返す（~/.ssh の鍵を直接使うので、launchd でも agent 不要）。
+;;
+;; API でしかできないこと＝**commit status の書き戻し**は落とした。反映面は
+;; Radicle issue（:rad）に一本化する。
 
-(defn- read-token [f]
-  (when (and f (fs/existsSync f))
-    (let [t (str/trim (str (fs/readFileSync f "utf8")))]
-      (when (seq t) t))))
+(def landing-repo
+  "landing 先（= superproject）。mirror! が「自分自身は clone しない」判定に使う。
+  gates.edn を直に読むのは、この定数が read-edn-file / cfg より前に必要だから。"
+  (try (get-in (reader/read-string (str (fs/readFileSync (path/join here "gates.edn") "utf8")))
+               [:landing :repo])
+       (catch :default _ "com-junkawasaki/root")))
 
-(defn endpoint-owner
-  "gh の argv から repos/<owner>/… の owner を拾う（token 選択用）。"
-  [args]
-  (some (fn [a] (second (re-find #"repos/([^/]+)/" (str a)))) args))
+(defn ssh-url [org-repo] (str "git@github.com:" org-repo ".git"))
 
-(defn token-for [owner]
-  (or (when (and gh-token-dir owner) (read-token (path/join gh-token-dir owner)))
-      (read-token gh-token-file)))
+(defn git
+  "git を1回叩く。dir が nil なら cwd。"
+  [dir args & [opts]]
+  (sh "git" (into (if dir ["-C" dir] []) args) (merge {:timeout 600000} opts)))
 
-(defn gh [& args]
-  (let [tok (token-for (endpoint-owner args))]
-    (sh "gh" (vec args) (when tok {:env-extra {"GH_TOKEN" tok}}))))
+(defn git-tip
+  "上流 default branch の tip sha。`ls-remote HEAD` は default branch を指すので
+  branch 名を知らなくてよい（gh の commits API と同じ意味）。"
+  [org-repo]
+  (let [{:keys [exit out]} (git nil ["ls-remote" (ssh-url org-repo) "HEAD"] {:timeout 120000})]
+    (when (zero? exit)
+      (let [line (first (remove str/blank? (str/split-lines (str/trim out))))]
+        (when line (first (str/split line #"\s+")))))))
 
-(defn gh! [& args]
-  (let [{:keys [exit out]} (apply gh args)]
-    (when-not (zero? exit)
-      ;; どの endpoint で落ちたかを必ず残す（"gh api failed: 404" だけでは追えない）
-      (die (str "gh " (str/join " " (remove #(str/starts-with? (str %) "-") args))
-                " failed: " (str/trim out))))
-    (str/trim out)))
+(def mirror-dir (path/join cache-dir "mirrors"))
 
-(declare gh-blob-sha)
+(defn mirror!
+  "org/repo の bare mirror を cache に用意して path を返す（2回目以降は fetch のみ）。
+  superproject 自身は自分の clone をそのまま使う — 既にここに居るので二重に持たない。"
+  [org-repo]
+  (if (= org-repo landing-repo)
+    root
+    (let [d (path/join mirror-dir (str (str/replace org-repo "/" "-") ".git"))]
+      (if (fs/existsSync d)
+        (do (git d ["fetch" "--prune" "--quiet" "origin" "+refs/heads/*:refs/heads/*"]) d)
+        (do (fs/mkdirSync mirror-dir #js {:recursive true})
+            (let [{:keys [exit out]} (git nil ["clone" "--mirror" "--quiet" (ssh-url org-repo) d]
+                                          {:timeout 1800000})]
+              (when-not (zero? exit) (die (str "git clone --mirror failed for " org-repo ": " (str/trim out))))
+              d))))))
+
+(defn git-show
+  "ref:path の blob を文字列で。空なら nil（呼び側が die する）。"
+  [dir ref p]
+  (let [{:keys [exit out]} (git dir ["show" (str ref ":" p)] {:maxBuffer 268435456})]
+    (when (and (zero? exit) (seq out)) out)))
+
 
 (defn gh-raw
-  "repo の path を branch から取る。
-  第一経路は contents API の raw media type（base64 を経由しないので速い）。ただし
-  **実測（2026-07-25）で、725KB の manifest/west.yml に対してこの経路が exit 0 かつ
-  空文字列を返すことがあった**（同時刻に 172KB の fleet-ci.edn は正常）。空を掴んだまま
-  進むと『west.yml に project が 1 件も無い』＝全 repo skip という静かな無動作になるので、
-  空なら git blobs API（base64、100MB まで）へフォールバックし、それでも空なら die する。"
+  "landing repo の path を branch の tip から読む。名前は呼び出し側との互換で
+  残しているが、経路は git（fetch → show）で API は通らない。"
   [repo branch p]
-  (let [raw (gh! "api" "-H" "Accept: application/vnd.github.raw"
-                 (str "repos/" repo "/contents/" p "?ref=" branch))]
-    (if (seq raw)
-      raw
-      (let [_ (log "WARN contents-raw returned empty for" p "— falling back to git blobs API")
-            b64 (gh! "api" (str "repos/" repo "/git/blobs/" (gh-blob-sha repo branch p))
-                     "--jq" ".content")
-            decoded (str (.toString (js/Buffer.from (str/replace b64 #"\s" "") "base64") "utf8"))]
-        (when (empty? decoded)
-          (die (str "could not fetch " p " from " repo "@" branch " (both contents-raw and git blobs came back empty)")))
-        decoded))))
+  (let [d (mirror! repo)]
+    (git d ["fetch" "--quiet" "origin" (str "+refs/heads/" branch ":refs/remotes/origin/" branch)]
+         {:timeout 600000})
+    (or (git-show d (str "origin/" branch) p)
+        (die (str "could not read " p " from " repo "@" branch " over git")))))
 
-(defn gh-blob-sha
-  "contents API の楽観ロック用 blob sha（ディレクトリ listing から取ると
-  巨大な base64 を落とさずに済む）。"
-  [repo branch p]
-  (let [dir (or (path/dirname p) "")
-        base (path/basename p)]
-    (gh! "api" (str "repos/" repo "/contents/" dir "?ref=" branch)
-         "--jq" (str ".[] | select(.name==\"" base "\") | .sha"))))
-
-(defn gh-tip
-  "上流 default branch の tip sha（1 call）。"
-  [org-repo]
-  (let [{:keys [exit out]} (gh "api" (str "repos/" org-repo "/commits?per_page=1")
-                               "--jq" ".[0].sha")]
-    (when (zero? exit) (str/trim out))))
+(def gh-tip git-tip)
 
 ;; ---------------------------------------------------------------------------
 ;; west.yml（生成物 — ここでは読み取りと **1 entry の revision 行だけ**の書き換え）
@@ -291,19 +291,18 @@
 (defn preflight!
   "-> nil（続行可）| 理由文字列（この tick は skip すべき）
 
-  auth 判定は **landing 先の private repo を読めるか**で行う（`gh api user` では
-  弱い: public repo の GET は匿名でも通るので『途中まで動いて書き込みだけ落ちる』
-  状態を見逃す。private repo は匿名だと 404 になるので、これが実効的な proof）。"
+  auth 判定は **landing 先の private repo を git で読めるか**で行う。以前は
+  `gh api repos/<landing>` だったが、gh は launchd 配下で Keychain の token を
+  読めず匿名に落ち、private repo は 404 になる — つまり毎 tick skip していた
+  （実測 2026-07-26 11:00Z）。git+SSH は ~/.ssh の鍵を直接使うので agent も
+  Keychain も要らず、この context でも通る。"
   [cfg]
   (let [landing-repo (get-in cfg [:landing :repo])
-        {:keys [exit out]} (gh "api" (str "repos/" landing-repo) "--jq" ".full_name")]
+        {:keys [exit out]} (git nil ["ls-remote" (ssh-url landing-repo) "HEAD"] {:timeout 120000})]
     (cond
       (not (zero? exit))
-      (str "cannot read " landing-repo " — this context has no usable GitHub auth "
-           "(anonymous requests 404 on a private repo and 401 on any write). "
-           "Under launchd the gh keyring is unreadable: put a token in "
-           "FLEET_CI_GH_TOKEN_DIR/<owner> (mode 600), or run the tick from an "
-           "interactive session. detail: "
+      (str "cannot reach " landing-repo " over git+SSH — check that ~/.ssh has a key "
+           "authorised for GitHub (no token is used by design). detail: "
            (first (str/split-lines (str/trim out))))
 
       (and (signer-pem) (not (fs/existsSync (signer-pem))))
@@ -316,10 +315,7 @@
            "(mode 600, the ADR-2607178000 pattern) or run the tick from an interactive session.")
 
       :else
-      (do (log "preflight: gh can read" (str/trim out)
-               (cond gh-token-dir (str "· token=dir:" gh-token-dir)
-                     gh-token-file "· token=file"
-                     :else "· token=gh-keyring")
+      (do (log "preflight: git+SSH can reach" landing-repo
                (if (signer-pem) "· signer=pem" "· signer=kagi"))
           nil))))
 
@@ -330,93 +326,51 @@
 
 (def max-ship-mb 200)
 
-(defn fetch-tarball!
-  "GitHub tarball API を **ファイルへ直接** 流す（メモリに載せない — 展開後 1.6GB の
-  repo が実在するので execFileSync の maxBuffer に載せる設計は破綻する）。"
-  [org-repo sha out-file]
-  (fs/mkdirSync (path/dirname out-file) #js {:recursive true})
-  (let [{:keys [exit out]} (sh "bash" ["-c" (str "gh api repos/" org-repo "/tarball/" sha
-                                                 " > " (js/JSON.stringify out-file))]
-                               {:timeout 900000})]
-    (if (zero? exit)
-      true
-      (do (log "ERROR tarball fetch" org-repo (sha12 sha) (str/trim out)) false))))
+(defn- ensure-sha! [dir org-repo sha]
+  "mirror に sha が居ることを保証する（default branch の tip 以外を要求されても
+  取れるように、名前付き ref も一緒に取る）。"
+  (when-not (zero? (:exit (git dir ["cat-file" "-e" (str sha "^{commit}")])))
+    (git dir ["fetch" "--quiet" "origin" "+refs/heads/*:refs/heads/*"] {:timeout 1800000}))
+  (when-not (zero? (:exit (git dir ["cat-file" "-e" (str sha "^{commit}")])))
+    (die (str sha " is not reachable in " org-repo " after fetch")))
+  dir)
 
 (defn ensure-tree!
-  "org/repo の sha の tree を dir に展開して dir を返す（キャッシュ済みなら再取得しない）。
-  展開の健全性（期待ファイルの存在）は呼び出し側が assert する。"
+  "org/repo の sha の tree を展開して dir を返す（キャッシュ済みなら再展開しない）。
+  API tarball ではなく mirror からの `git archive`。"
   [org-repo sha]
   (let [dir (path/join cache-dir (str (str/replace org-repo "/" "-") "-" (sha12 sha)))]
     (if (fs/existsSync dir)
       dir
-      (let [tgz (str dir ".tar.gz")]
-        (when-not (fetch-tarball! org-repo sha tgz)
-          (die (str "tarball fetch failed for " org-repo "@" sha)))
+      (let [m (ensure-sha! (mirror! org-repo) org-repo sha)
+            tgz (str dir ".tar.gz")]
         (fs/mkdirSync dir #js {:recursive true})
-        (let [{:keys [exit out]} (sh "tar" ["xzf" tgz "-C" dir "--strip-components=1"])]
+        (let [{:keys [exit out]} (git m ["archive" "--format=tar.gz" "-o" tgz sha]
+                                      {:timeout 1800000})]
+          (when-not (zero? exit) (die (str "git archive failed for " org-repo "@" sha ": " (str/trim out)))))
+        (let [{:keys [exit out]} (sh "tar" ["xzf" tgz "-C" dir])]
           (fs/unlinkSync tgz)
           (when-not (zero? exit) (die (str "tar extract failed: " out))))
         dir))))
 
-(defn blob-tarball!
-  "**必要な path だけ**を集めた tarball を作る（asset 重量 repo 用）。
-  git trees API で 1 回だけ tree を取り、拡張子で絞った blob のみ落とす。
-  実測: org-spirit-in-physics-comics の全 tarball は 1.6GB（assets）で、
-  EDN を parse するだけの gate に毎回それを転送するのは論外だった。
-  この経路なら数百 KB で済み、ノードには『検査対象そのもの』だけが渡る。"
-  [org-repo sha {:keys [include-ext min-files] :as spec}]
-  (let [f (path/join cache-dir (str (str/replace org-repo "/" "-") "-" (sha12 sha) "-paths.tar.gz"))]
-    (if (fs/existsSync f)
-      f
-      (let [json (gh! "api" (str "repos/" org-repo "/git/trees/" sha "?recursive=1"))
-            tree (js->clj (js/JSON.parse json) :keywordize-keys true)
-            _ (when (:truncated tree)
-                (log "WARN trees API truncated for" org-repo "— path fetch may be incomplete"))
-            files (->> (:tree tree)
-                       (filter #(= "blob" (:type %)))
-                       (filter (fn [e] (some #(str/ends-with? (:path e) %) include-ext))))
-            stage (fs/mkdtempSync (path/join (os/tmpdir) "fleet-ci-paths-"))]
-        (log "path-fetch" org-repo (sha12 sha) ":" (count files) "files"
-             (pr-str include-ext))
-        (when (and min-files (< (count files) min-files))
-          (die (str "path fetch found only " (count files) " files for " org-repo
-                    " (expected >= " min-files ") — refusing to build a gate input that "
-                    "would trivially pass")))
-        (doseq [e files]
-          (let [dest (path/join stage (:path e))
-                content (gh! "api" (str "repos/" org-repo "/git/blobs/" (:sha e)) "--jq" ".content")]
-            (fs/mkdirSync (path/dirname dest) #js {:recursive true})
-            (fs/writeFileSync dest (js/Buffer.from (str/replace content #"\s" "") "base64"))))
-        (let [{:keys [exit out]} (sh "tar" ["czf" f "-C" stage "."] {:timeout 300000})]
-          (sh "rm" ["-rf" stage])
-          (when-not (zero? exit) (die (str "tar create failed: " out))))
-        f))))
-
 (defn filtered-tarball!
-  "全体 tarball を **1 回だけ** 取り、拡張子で絞って詰め直す。
+  "検査対象だけを詰めた tarball。
 
-  `blob-tarball!` と目的は同じで、コストの形が逆。あちらは blob ごとに
-  1 API 呼び出しなので、対象が少ない repo では最小の転送で済むが、対象が
-  数百を超えると破綻する — superproject の tracked `.edn` は実測 1,882 件
-  で、tip が動くたびに 1,882 回叩けば 5,000/h のレート予算を 1 tick で 4 割
-  食う。tarball は sha ごとに 1 回（実測 53MB / 7 秒）で、絞り込みは手元で
-  やる。**対象ファイル数が多い repo はこちらを使う**（`:include-from
-  :tarball`）。
-
-  `ensure-tree!` の展開キャッシュをそのまま使うので、同じ sha を別 gate が
-  既に取っていれば追加の取得は起きない。"
+  以前は 2 経路あった（trees+blobs API で blob ごとに落とす経路と、全体 tarball
+  を取って絞る経路）。git 化でどちらも同じ形になった — mirror は sha ごとに 1 回
+  fetch すれば済み、絞り込みは常に手元。したがって :include-from は不要になり、
+  :include-ext があればこれ、無ければ全体、の 2 択に戻る。"
   [org-repo sha {:keys [include-ext min-files]}]
   (let [f (path/join cache-dir (str (str/replace org-repo "/" "-") "-" (sha12 sha) "-filtered.tar.gz"))]
     (if (fs/existsSync f)
       f
       (let [dir (ensure-tree! org-repo sha)
-            ;; find の -name は OR で並べる（-o）。括弧は bash から隠す。
             name-expr (str/join " -o " (map #(str "-name '*" % "'") include-ext))
-            count-cmd (str "cd " dir " && find . -type f \\( " name-expr " \\) | wc -l")
-            n (js/parseInt (str/trim (:out (sh "bash" ["-c" count-cmd]))) 10)]
-        (log "tarball-filter" org-repo (sha12 sha) ":" n "files" (pr-str include-ext))
+            n (js/parseInt (str/trim (str (:out (sh "bash" ["-c" (str "cd " dir " && find . -type f \\( "
+                                                                     name-expr " \\) | wc -l")])))) 10)]
+        (log "tree-filter" org-repo (sha12 sha) ":" n "files" (pr-str include-ext))
         (when (and min-files (< n min-files))
-          (die (str "tarball filter found only " n " files for " org-repo
+          (die (str "filter found only " n " files for " org-repo
                     " (expected >= " min-files ") — refusing to build a gate input that "
                     "would trivially pass")))
         (let [{:keys [exit out]}
@@ -426,20 +380,25 @@
           (when-not (zero? exit) (die (str "filtered tar create failed: " out))))
         f))))
 
+(defn full-tarball!
+  "repo 全体の tarball（mirror からの git archive）。"
+  [org-repo sha]
+  (let [f (path/join cache-dir (str (str/replace org-repo "/" "-") "-" (sha12 sha) ".tar.gz"))]
+    (when-not (fs/existsSync f)
+      (fs/mkdirSync cache-dir #js {:recursive true})
+      (let [m (ensure-sha! (mirror! org-repo) org-repo sha)
+            {:keys [exit out]} (git m ["archive" "--format=tar.gz" "-o" f "--prefix=repo/" sha]
+                                    {:timeout 1800000})]
+        (when-not (zero? exit) (die (str "git archive failed for " org-repo "@" sha ": " (str/trim out))))))
+    f))
+
 (defn gate-input!
-  "gate に渡す tarball を用意する。:include-ext があれば path 限定 tarball
-  （`:include-from :tarball` なら全体 tarball から絞り、既定は blob ごと取得）、
-  無ければ repo 全体の tarball。ノードへ送るサイズに上限を掛ける。"
-  [{:keys [org-repo tip include-ext include-from min-files name]}]
+  "gate に渡す tarball。:include-ext があれば絞り込み版、無ければ全体。
+  ノードへ送るサイズに上限を掛ける。"
+  [{:keys [org-repo tip include-ext min-files name]}]
   (let [f (if (seq include-ext)
-            (if (= :tarball include-from)
-              (filtered-tarball! org-repo tip {:include-ext include-ext :min-files min-files})
-              (blob-tarball! org-repo tip {:include-ext include-ext :min-files min-files}))
-            (let [f (path/join cache-dir (str (str/replace org-repo "/" "-") "-" (sha12 tip) ".tar.gz"))]
-              (when-not (fs/existsSync f)
-                (fs/mkdirSync cache-dir #js {:recursive true})
-                (when-not (fetch-tarball! org-repo tip f) (die (str "gate input fetch failed: " name))))
-              f))
+            (filtered-tarball! org-repo tip {:include-ext include-ext :min-files min-files})
+            (full-tarball! org-repo tip))
         mb (/ (.-size (fs/statSync f)) 1048576)]
     (when (> mb max-ship-mb)
       (die (str name " gate input is " (js/Math.round mb) "MB (> " max-ship-mb
@@ -575,31 +534,42 @@
 ;; landing（append-only receipt log / west.yml pin）— branch + PUT + server merge
 
 (defn put-file!
-  "repo の path を content に置き換える（branch 経由 → server-side merge → branch 削除）。
-  blob sha による楽観ロックなので、他の書き手と race したら 409 で弾かれる（再試行は呼び側）。"
-  [{:keys [repo branch path content message blob-sha work-branch]}]
-  (let [body (js/JSON.stringify
-              (clj->js {:message message
-                        :content (.toString (js/Buffer.from content "utf8") "base64")
-                        :branch work-branch
-                        :sha blob-sha}))
-        ;; branch を作る（既存なら無視）
-        base-sha (gh! "api" (str "repos/" repo "/git/refs/heads/" branch) "--jq" ".object.sha")
-        _ (gh "api" "--method" "POST" (str "repos/" repo "/git/refs")
-              "-f" (str "ref=refs/heads/" work-branch) "-f" (str "sha=" base-sha))
-        {:keys [exit out]} (sh "gh" ["api" "--method" "PUT"
-                                     (str "repos/" repo "/contents/" path) "--input" "-"]
-                               {:input body :timeout 180000})]
-    (if-not (zero? exit)
-      (do (gh "api" "--method" "DELETE" (str "repos/" repo "/git/refs/heads/" work-branch))
-          {:ok false :detail (str/trim out)})
-      (let [{:keys [exit out]} (sh "gh" ["api" (str "repos/" repo "/merges")
-                                         "-f" (str "base=" branch) "-f" (str "head=" work-branch)
-                                         "-f" (str "commit_message=" message)])]
-        (gh "api" "--method" "DELETE" (str "repos/" repo "/git/refs/heads/" work-branch))
-        (if (zero? exit)
-          {:ok true :detail (str/trim out)}
-          {:ok false :detail (str "merge failed: " (str/trim out))})))))
+  "landing repo の path を content に置き換えて push する。
+
+  以前は contents API の PUT（blob sha による楽観ロック）+ server-side merge
+  だったが、それは token を要求する。git では ref 更新そのものが楽観ロックで、
+  non-fast-forward push が拒否されるのが 409 に相当する — 呼び側は「読み直して
+  作り直して再試行」すればよく、意味論は変わらない。
+
+  作業は使い捨ての worktree で行う（superproject の working tree には触らない）。"
+  [{:keys [repo branch path content message]}]
+  (let [d (mirror! repo)
+        wt (fs/mkdtempSync (path/join (os/tmpdir) "fleet-ci-put-"))]
+    (try
+      (let [fetch (git d ["fetch" "--quiet" "origin"
+                          (str "+refs/heads/" branch ":refs/remotes/origin/" branch)])]
+        (if-not (zero? (:exit fetch))
+          {:ok false :detail (str "fetch failed: " (str/trim (:out fetch)))}
+          (let [add (git d ["worktree" "add" "--detach" "--quiet" wt (str "origin/" branch)])]
+            (if-not (zero? (:exit add))
+              {:ok false :detail (str "worktree add failed: " (str/trim (:out add)))}
+              (do
+                (fs/mkdirSync (path/join wt (path/dirname path)) #js {:recursive true})
+                (fs/writeFileSync (path/join wt path) content)
+                (git wt ["add" "--" path])
+                (let [c (git wt ["-c" "user.name=fleet-ci" "-c" "user.email=fleet-ci@murakumo"
+                                 "commit" "-q" "-m" message])]
+                  (if-not (zero? (:exit c))
+                    {:ok false :detail (str "commit failed: " (str/trim (:out c)))}
+                    (let [pu (git wt ["push" "--quiet" "origin" (str "HEAD:" branch)])]
+                      (if (zero? (:exit pu))
+                        {:ok true :detail (str "pushed to " branch)}
+                        {:ok false :detail (str "push rejected (someone else moved "
+                                                branch " — retry): "
+                                                (str/trim (:out pu)))})))))))))
+      (finally
+        (git d ["worktree" "remove" "--force" wt])
+        (sh "rm" ["-rf" wt])))))
 
 (defn append-receipt!
   "receipt 1 行を manifest/fleet-ci.edn に追記（append-only）。409 は再取得して再試行。
@@ -608,13 +578,9 @@
   (loop [attempt 1]
     (let [path receipts
           cur (gh-raw repo branch path)
-          blob (gh-blob-sha repo branch path)
           content (str (if (str/ends-with? cur "\n") cur (str cur "\n")) line "\n")
           r (put-file! {:repo repo :branch branch :path path :content content
-                        :message "fleet-ci: tip-driven murakumo tick receipt"
-                        :blob-sha blob
-                        :work-branch (str "agent/fleet-ci-receipt-"
-                                          (subs (str (.getTime (js/Date.))) 4) "-" attempt)})]
+                        :message "fleet-ci: tip-driven murakumo tick receipt"})]
       (cond
         (:ok r) {:ok true}
         (< attempt 3) (do (log "WARN receipt landing retry" attempt (:detail r)) (recur (inc attempt)))
@@ -623,14 +589,6 @@
 ;; ---------------------------------------------------------------------------
 ;; commit status 書き戻し（Checks API は GitHub App 必須。statuses は repo scope で足りる）
 
-(defn post-status! [org-repo sha {:keys [state context description url]}]
-  (let [{:keys [exit out]}
-        (gh "api" "--method" "POST" (str "repos/" org-repo "/statuses/" sha)
-            "-f" (str "state=" state) "-f" (str "context=" context)
-            "-f" (str "description=" (subs (str description) 0 (min 140 (count (str description)))))
-            "-f" (str "target_url=" (or url "")))]
-    (when-not (zero? exit) (log "WARN status post failed" org-repo (subs sha 0 7) (str/trim out)))
-    (zero? exit)))
 
 ;; ---------------------------------------------------------------------------
 ;; Radicle 反映（失敗時だけ issue）
@@ -779,12 +737,9 @@
                                        {:timeout 300000})]
             (if-not (zero? exit)
               {:ok false :detail (str "pin verification refused: " (str/trim out))}
-              (let [blob (gh-blob-sha repo branch west)
-                    r (put-file! {:repo repo :branch branch :path west :content cand
+              (let [r (put-file! {:repo repo :branch branch :path west :content cand
                                   :message (str "west: advance " nm " pin to " (sha12 new-sha)
-                                                " (fleet-ci green on murakumo)")
-                                  :blob-sha blob
-                                  :work-branch (str "agent/fleet-ci-pin-" nm "-" (sha7 new-sha))})]
+                                                " (fleet-ci green on murakumo)")})]
                 (if (:ok r) {:ok true :detail (str old " -> " new-sha)} r)))))
         {:ok false :detail "could not locate revision line (minimal-diff refused)"}))))
 
@@ -827,13 +782,6 @@
                only (remove #(nil? (:tip %)) work)
                :else (filter :changed? work))]
     (doseq [m missing] (log "WARN no tip resolved (skipped):" (:name m) (:org-repo m)))
-    ;; fine-grained PAT は owner ごとなので、token dir 運用のときは
-    ;; 「この owner の token が無い = その repo の status 書き戻しが 401 になる」を先に言う。
-    (when gh-token-dir
-      (doseq [o (distinct (keep :org work))]
-        (when-not (token-for o)
-          (log "WARN no token file for owner" o "— commit statuses for its repos will fail"
-               (str "(expected " (path/join gh-token-dir o) ")")))))
     (log "tick:" (count repos) "covered," (count todo) "to verify;"
          "nodes" (pr-str (mapv (juxt :host :caps) (filter :reachable? nodes))))
     (when (empty? todo)
@@ -862,13 +810,6 @@
             (doseq [u unassigned]
               (log "WARN no capable node for" (:name u) "(gate" (:gate u) ") — skipped"))
             (when (seq batch)
-              ;; pending status
-              (when-not (or dry? (:no-status opts))
-                (doseq [w batch]
-                  (post-status! (:org-repo w) (:tip w)
-                                {:state "pending"
-                                 :context (str (:status-context-prefix cfg) "/" (name (:gate w)))
-                                 :description (str "queued on " (get-in w [:node :host]))})))
               ;; gate ごとに tarball + script を用意
               (let [prepared
                     (vec (for [w batch]
@@ -934,15 +875,6 @@
                                     (:detail (first (filter #(= k (:name %)) checks))))]
                           (swap! results conj (assoc w :outcome oc :cid (:cid receipt)
                                                      :detail det))
-                          (when-not (or dry? (:no-status opts))
-                            (post-status! (:org-repo w) (:tip w)
-                                          {:state (if ok? "success" "failure")
-                                           :context (str (:status-context-prefix cfg) "/" (name (:gate w)))
-                                           :description (str (if ok? "passed" "FAILED") " on murakumo/"
-                                                             (get-in w [:node :host])
-                                                             " — receipt " (sha12 (:cid receipt)))
-                                           :url (str "https://github.com/" (:repo landing)
-                                                     "/blob/" (:branch landing) "/" (:receipts landing))}))
                           (when-not dry?
                             (swap! state assoc-in [:repos (:name w)]
                                    {:sha (:tip w) :outcome oc :cid (:cid receipt) :at (now)})
