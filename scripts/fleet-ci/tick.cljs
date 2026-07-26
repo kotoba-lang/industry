@@ -497,6 +497,75 @@
          "echo \"FLEET-CI-EXIT: $code\""]
         ["fail 'unknown gate kind' 92"])))))
 
+(def ^:private git-dep-re
+  #"io\.github\.([a-zA-Z0-9_.-]+)/([a-zA-Z0-9_.-]+)\s*\{[^}]*?:git/sha\s+\"([0-9a-f]{40})\"")
+
+(defn git-deps-of
+  "deps.edn の本文 → [{:lib \"io.github.org/name\" :org :repo :sha} …]。
+  :override-deps（:local 用）は :git/sha を持たないので自然に外れる。"
+  [deps-text]
+  (mapv (fn [[_ org repo sha]]
+          {:lib (str "io.github." org "/" repo) :org org :repo repo :sha sha})
+        (re-seq git-dep-re (str deps-text))))
+
+(defn ship-git-deps!
+  "gate repo の git 依存を **ノードの ~/.gitlibs に直接置く**。
+
+  murakumo のノードは tailnet だけに繋がっていて、外向きの HTTPS が無い
+  （実測 2026-07-26、zebulun: github.com:443 も 1.1.1.1:443 も届かない。DNS は
+  引ける）。したがって `clojure -M:test` は deps.edn の :git/sha を自力で
+  取得できず、**たまたま ~/.gitlibs にキャッシュされている sha でしか動かない**。
+  bonsai の pin を正しく前進させた途端 gate が落ちたのはこれで、ノードには古い
+  1c2a677 しか無かった（`Error building classpath. Unable to fetch …
+  Failed to connect to github.com port 443`）。依存を更新すると CI が壊れる、
+  という形の壊れ方なので、キャッシュ待ちにはできない。
+
+  operator（ここ）は GitHub に届くので、mirror から `git archive` して
+  `~/.gitlibs/libs/<lib>/<sha>/` に展開する。ノードは何も取りに行かない —
+  ソース tarball を ssh stdin で渡すのと同じ経路で、token も置かない。
+
+  推移的な依存も辿る（依存先の deps.edn を mirror から読んで再帰）。"
+  [host deps-text]
+  (loop [queue (git-deps-of deps-text) seen #{} shipped 0]
+    (if (empty? queue)
+      shipped
+      (let [{:keys [lib org repo sha] :as d} (first queue)
+            k [lib sha]]
+        (if (contains? seen k)
+          (recur (rest queue) seen shipped)
+          (let [dest (str "$HOME/.gitlibs/libs/" lib "/" sha)
+                ;; **exit code は見ない**。Tailscale SSH + /usr/bin/login では
+                ;; リモートの終了ステータスが伝播せず必ず 0 になる（gate-command
+                ;; が sentinel を grep しているのと同じ理由）。最初の版はこれを
+                ;; 忘れて `test -d` を exit で判定したので「常に present」と読み、
+                ;; 依存を 1 つも送らないまま成功したように見えていた。
+                present? (str/includes?
+                          (str (:out (sh "ssh" ["-o" "BatchMode=yes" "-o" "ConnectTimeout=20" host
+                                                (str "test -d " dest " && echo FLEET-CI-DEP-PRESENT")])))
+                          "FLEET-CI-DEP-PRESENT")
+                m (try (ensure-sha! (mirror! (str org "/" repo)) (str org "/" repo) sha)
+                       (catch :default e
+                         (log "WARN dep mirror failed for" lib (sha7 sha) "—" (ex-message e))
+                         nil))
+                next-deps (when m (git-deps-of (or (git-show m sha "deps.edn") "")))]
+            (when (and m (not present?))
+              (let [tgz (path/join cache-dir (str (str/replace lib "/" "-") "-" (sha12 sha) "-dep.tar.gz"))]
+                (when-not (fs/existsSync tgz)
+                  (let [{:keys [exit out]} (git m ["archive" "--format=tar.gz" "-o" tgz sha]
+                                                {:timeout 900000})]
+                    (when-not (zero? exit) (die (str "git archive failed for dep " lib ": " (str/trim out))))))
+                (let [{:keys [out]}
+                      (sh "bash" ["-c" (str "cat " tgz " | ssh -o BatchMode=yes -o ConnectTimeout=20 "
+                                            host " \"mkdir -p " dest " && tar xz -C " dest
+                                            " && test -f " dest "/deps.edn && echo FLEET-CI-DEP-OK\"")]
+                          {:timeout 600000})]
+                  ;; 同上 — 成功判定も出力の sentinel で行う
+                  (if (str/includes? (str out) "FLEET-CI-DEP-OK")
+                    (log "dep shipped" lib (sha7 sha) "->" host)
+                    (log "WARN dep ship failed" lib (sha7 sha) "—" (str/trim (str out)))))))
+            (recur (concat (rest queue) next-deps) (conj seen k)
+                   (if (and m (not present?)) (inc shipped) shipped))))))))
+
 (defn gate-command
   "ci-verify の --gate に渡す 1 行コマンド。
   ① tarball を ssh stdin でノードへ流して展開（token をノードに置かない）
@@ -831,6 +900,14 @@
               (let [prepared
                     (vec (for [w batch]
                            (let [tgz (gate-input! w)
+                                 ;; JVM gate はノード上で deps.edn を解決する。
+                                 ;; ノードに外向き HTTPS が無いので、git 依存は
+                                 ;; operator から ~/.gitlibs へ先に置いておく。
+                                 _ (when (= :jvm-test (:gate w))
+                                     (let [m (mirror! (:org-repo w))
+                                           dtxt (git-show m (:tip w) "deps.edn")]
+                                       (when dtxt
+                                         (ship-git-deps! (get-in w [:node :host]) dtxt))))
                                  body (when (:script w)
                                         (str (fs/readFileSync (path/join here (:script w)) "utf8")))
                                  sfile (path/join tmp (str "gate-" (:name w) ".bash-stdin"))
