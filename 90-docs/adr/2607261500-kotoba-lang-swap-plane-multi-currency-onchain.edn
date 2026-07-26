@@ -180,6 +180,27 @@ real token.
 All four lint clean (`clj-kondo`, 0 errors 0 warnings). cljs suites are CI gates, not
 decoration — for `erc20` the cljs run *is* the browser claim.
 
+### Live verification (2026-07-26, keyless, 15/15)
+
+`swap/bin/verify_live.cljs` — deliberately NOT in CI, because CI must not go red
+because a third party is down. It exists because fixtures cannot check these:
+
+- **A live LI.FI quote**, end to end: adapter mapping, expected-out, min-out, a
+  built transaction step, and `swap.core/check` passing. Found four defects (above).
+- **`erc20` against DEPLOYED USDC on Ethereum mainnet**: `decimals`/`symbol`/`name`/
+  `balanceOf`/`nonces` calldata and decoders all correct against the real contract —
+  and the strongest check available without spending anything, a **locally built
+  EIP-712 domain separator byte-identical to USDC's on-chain `DOMAIN_SEPARATOR()`**
+  (`0x06c37168a7db…`), with the wrong `version` correctly NOT matching. A mismatch
+  there would mean every permit signature we produce is silently rejected on-chain.
+- **An EIP-1559 transaction validated by a real Sepolia node**: signed from an empty
+  throwaway key, so the node's `insufficient funds` reply is the precise
+  discriminator — to produce it, it had to RLP-decode the typed envelope, recover
+  the secp256k1 signature and derive the sender. A malformed envelope or a bad
+  signature fails earlier and differently.
+
+**No transaction has been broadcast with real funds, and no funds have moved.**
+
 ### Still open
 
 - ~~`eth-crypto`'s cljs port~~ **DONE** (2026-07-26, same day). Browser-side
@@ -196,8 +217,33 @@ decoration — for `erc20` the cljs run *is* the browser claim.
   exercised. Also added `legacy-digest` and `signature->bytes` (both platforms), and
   the ns docstring's stale ":clj-only" inventory was rewritten. Both halves are
   documented as NOT constant-time.
-- **The 0x / LI.FI adapter field mappings need one live smoke test each** against a
-  real API key before either is used with real funds. `:verified? false` until then.
+- **LI.FI: LIVE-VERIFIED 2026-07-26** (keyless, `li.quest`). The first live call
+  FAILED and found **four** real defects that fixtures could not, because a fixture
+  encodes what the author believed the vendor wanted: `toChain` is required and was
+  never sent; `fee` is a decimal FRACTION (0.02 = 2%), not basis points; `slippage`
+  is a fraction too; and `at` with a nil field path returned the WHOLE response
+  body, so an adapter declaring no allowance paths got the entire response as its
+  `spender` and threw encoding a map as an address. All fixed, with regressions, and
+  `:verified? true`. This is the empirical case for `:verified?` being a field
+  rather than a comment.
+- **0x: still docs-verified only.** Its parameter names, `swapFeeBps`'s bps unit
+  (0–1000), the `issues.allowance` semantics and the `0x-version: v2` header are
+  confirmed against 0x's current published documentation, but 0x requires an API key
+  and **no 0x key exists anywhere in this workspace** (checked against the
+  secrets-location map), so no live call has exercised its RESPONSE field paths.
+  Stays `:verified? false`. Getting a key is the single cheapest remaining step —
+  LI.FI's four defects are the argument for doing it before real funds.
+- **The THORChain rail could NOT be live-verified, and one of its defaults was
+  dead.** `thornode.ninerealms.com` does not resolve at all (confirmed via 1.1.1.1),
+  `midgard.ninerealms.com` likewise, `thornode.thorswap.net` answers a Cloudflare
+  bot interstitial, and `thornode.thorchain.liquify.com` resolves but does not
+  connect. Working around bot protection is not on the table. So
+  `mainnet-base-url`/`stagenet-base-url` were removed in favour of
+  `known-endpoints` (measured state + dates, as data) and **`base-url` is now a
+  required argument** in both `org-thorchain` and `swap.thorchain` — a default
+  pointing at a dead host fails at the moment someone is moving funds and looks like
+  a bug in our code. The rail's grammar and verification logic remain fixture- and
+  spec-verified; what is unproven is only the live wire, and it needs an own node.
 - **Permit2 is not implemented.** Reproducing `PermitSingle` / `PermitDetails` /
   `TokenPermissions` from memory risks signatures that are silently invalid, or valid
   for something other than what the UI showed. It needs the real spec plus a
