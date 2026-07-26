@@ -221,10 +221,31 @@ cloud-itonami org(約1225 repo)の UI 面を棚卸しした結果、2層に分�
 
 ## Follow-ups
 
-1. **共有テンプレート由来の product face(366+ repo)の扱いを決める** — 本 ADR の
-   スコープ外。DADS ベースの単一ジェネレータで一括再生成する案があるが、
-   366 リポジトリへの commit/push/west pin 前進を伴う。
+1. 共有テンプレート由来の product face — **完了**。対象は 387 repo(marker
+   「Open occupation blueprint — no invented usage or revenue metrics」で確定。
+   当初 366+ と見積もっていたのは style ブロック完全一致だけを数えていたため)。
+   生成器は superproject の scripts/gen-product-face.cljs、反映は
+   scripts/land-product-faces.cljs(GitHub Contents API のサーバ側 single-file
+   commit。387 repo を clone/branch/merge せず、blob SHA の楽観ロックで競合が
+   構造的に起きない)。
+
+   **本文は既存ページから抽出して持ち越し、blueprint.edn から再導出していない。**
+   repo 種別で badge の書式が違い(ISIC Rev.4/Rev.5 / UNSPSC segment / domain のみ)、
+   blueprint.edn を持たない repo も 4 件あるため、再導出は欠落・取り違えの温床になる。
+   この移行は presentation 層だけを差し替えた。
+
+   検証(387 全件): 本文完全一致 358 / blockquote マーカー除去のみ 29 /
+   それ以外の差分 0。矢印や ⊣ や実体参照の欠落は 0 件。途中で 2 件の実バグを
+   出して検証が捕まえた: (a) 引用マーカー除去の正規表現がゼロ幅にマッチし
+   advise -> govern の矢印まで食っていた、(b) 数値文字参照(&#8867; = ⊣)を
+   復号しておらず二重エスケープして画面に実体参照が露出していた。
 2. 実ブラウザでの視覚確認 —— **実施済み**。5面 × 390/768/1280px で document.scrollWidth == clientWidth(横スクロール無し)、scittle 注入カードの DADS 描画、partners フォームの送信〜成功バナーまでを実ブラウザで確認した。
-3. inline CSS のサイズ計測(gzip 後)。必要なら dds.css の per-page subset 化を検討。
+3. inline CSS のサイズ計測 — **実施済み**。product face 1 ページで
+   4,554 B → 72,274 B(15.9 倍)、**gzip 後は 1,902 B → 10,245 B(5.4 倍)**。
+   387 ページ合計では gzip 後 0.74 MB → 3.96 MB。配信は gzip/brotli が効くので
+   実転送は 1 ページ約 10 KB で、外部リクエストゼロと引き換えとして許容範囲と
+   判断した。per-page subset 化は行っていない(dds.css は上流 vendor 物なので
+   subset 化すると上流追従が壊れる)。将来ページ数がさらに増えるなら、
+   共有 CSS を 1 ファイルとして配信する案を別途検討する。
 4. select / radio / date-picker 等、上流 DADS の未 vendor コンポーネントの追加
    (ADR-2607141915 follow-up 2 と同じ項目。select は今回 app 側で寸法合わせして凌いだ)。"}]
