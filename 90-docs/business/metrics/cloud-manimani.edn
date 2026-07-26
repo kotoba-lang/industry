@@ -1,27 +1,28 @@
 {:health-status 200,
  :zone-name "manimani.cloud",
  :zone
- {:requests-7d 3259,
-  :pageviews-7d 405,
-  :uniques-7d-sum 308,
+ {:requests-7d 3264,
+  :pageviews-7d 406,
+  :uniques-7d-sum 309,
   :zone "manimani.cloud"},
  :sources [:cloudflare :health :emitter],
  :cloud {:signups 1},
  :paths
  {:ok
-  [{:path "/", :requests 53}
+  [{:path "/", :requests 51}
    {:path "/metrics", :requests 27}
-   {:path "/u/junkawasaki/decisions", :requests 4}
+   {:path "/u/junkawasaki/decisions", :requests 6}
    {:path "/robots.txt", :requests 3}
    {:path "/health", :requests 1}
+   {:path "/cdn-cgi/trace", :requests 1}
    {:path "/llms.txt", :requests 1}],
-  :status-mix {:client-error 89, :ok 89, :server-error 1},
+  :status-mix {:client-error 90, :ok 90, :server-error 1},
   :window "24h"},
  :as-of "2026-07-26",
  :traffic-quality {:window "24h", :probe-4xx-pct 50, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 53 · /metrics 27 · /u/junkawasaki/decisions 4 · /robots.txt 3 · /health 1 | 4xx(probe) 50% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): / 51 · /metrics 27 · /u/junkawasaki/decisions 6 · /robots.txt 3 · /health 1 | 4xx(probe) 50% · 5xx 1%",
  :conversion {:oss-active 0, :cloud-paid 0, :pct 0},
  :oss {:installs 0},
  :signal
- "manimani.cloud 実測 3259 req/7d・308 uniques(日次和)・うち4xx probe 50%(24h)"}
+ "manimani.cloud 実測 3264 req/7d・309 uniques(日次和)・うち4xx probe 50%(24h)"}
