@@ -1,0 +1,114 @@
+[{:db/id -1
+  :adr/id "adr-2607265000-kotobase-d1-datomic-edn-api"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-d1-datomic-edn-api"
+  :adr/title "ADR-2607265000: D1-backed Kotobase は Datomic の EDN 文法をそのまま公開する"
+  :adr/status "accepted"
+  :adr/date "2026-07-26"
+  :adr/last_verified "2026-07-26"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotobase.datomic のDatomic互換引数順とEDN transaction/query grammar"
+   "Cloudflare D1 bindingをIBlockStore/IRefStoreとして実装するprovider boundary"
+   "D1 Workerのapplication/edn API、CACAO authentication、capability/tenant authorizationの分離"
+   "Datomic文法互換とDatomic製品互換を区別する明示的coverage boundary"
+   "2026-07-26のlocal/remote D1 end-to-end verification evidence"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2607032430-kotoba-datom-log-structured-engine-redesign"
+   "adr-2607032500-kotoba-kotobase-clojure-datomic-relationship"
+   "adr-2607177000-kotobase-protocols-per-did-cacao-auth"
+   "adr-2607261300-kotobase-split-dependency-audit-coordination"
+   "260726-gftd-jk-luxury-kotobase-postgres-policy"]
+  :adr/repos
+  ["kotoba-lang/kotobase"
+   "kotoba-lang/kotobase-engine"
+   "kotoba-lang/kotobase-storage"
+   "kotoba-lang/kotobase-storage-d1"
+   "kotoba-lang/kotobase-peer"]
+  :adr/decision
+  {:api-namespace "kotobase.datomic"
+   :argument-order
+   ["(d/db conn)"
+    "(d/transact conn {:tx-data [...]})"
+    "(d/q query db & inputs)"
+    "(d/pull db selector eid)"
+    "(d/datoms db {:index ... :components ... :limit ...})"]
+   :transaction-syntax
+   ["Datomic Client {:tx-data [...]}"
+    "entity maps with :db/id"
+    "[:db/add e a v]"
+    "[:db/retract e a v]"
+    "[:db/retractEntity e]"]
+   :query-syntax
+   ["vector and map query representation"
+    ":find :in :where :with :keys :strs :syms"
+    "relation, scalar '.', collection '...', tuple"
+    "joins, negation, or/or-join, whitelisted functions, aggregates, rules"]
+   :wire
+   {:content-type "application/edn"
+    :routes ["/v1/transact" "/v1/q" "/v1/pull" "/v1/datoms" "/v1/head"]
+    :database-ref-header "x-kotobase-ref"
+    :query-evaluation "EDN reader only; never eval; fixed function whitelist"}
+   :storage
+   {:provider "kotobase-storage-d1"
+    :contracts ["IBlockStore" "IRefStore" "IBackendCapabilities"]
+    :publication-order ["persist immutable IPLD blocks" "conditional ref CAS"]
+    :not-postgresql true
+    :not-embedded-sqlite true}
+   :security
+   {:authentication "signed Ed25519 did:key CACAO with iat/exp/nonce validation"
+    :authorization "deny-by-default capability plus tenant-ref prefix"
+    :replay-protection "D1-backed nonce claim"
+    :evidence "sanitized decisions only; raw credential is not persisted"}}
+  :adr/non-goals
+  ["numeric basis-t and Datomic transaction entity ids"
+   "immutable cached Datomic Db lifecycle equivalence"
+   "tempid allocation/resolution and lookup refs"
+   "transaction functions, listeners, sync, and log API"
+   "index-range, seek-datoms, entity/touch, and pull-many"
+   "complete Datomic scalar/schema semantics"
+   "a permanent production route, SLO, or load qualification"
+   "changing the PostgreSQL production-default policy or allowing silent D1 fallback"]
+  :adr/verification
+  {:engine
+   {:tests 3 :assertions 11 :failures 0 :errors 0}
+   :local-d1
+   ["CACAO authn, wrong-capability/cross-tenant/replay rejection"
+    "multi-block transaction and head CAS"
+    "relation, :in, scalar, collection, and aggregate q"
+    "pull, EAVT, AVET, retract visibility, persisted head"
+    "stale CAS and CID collision rejection"]
+   :remote-d1
+   {:database-name "kotobase-d1-verification"
+    :database-id "6f42fbb0-20ee-4187-9435-bd71b4e264bb"
+    :final-version-id "5e7e9280-588e-4681-9889-ba344e8649f5"
+    :earlier-stable-version-id "3c345154-d05a-4dc3-90f8-f902c2475d74"
+    :result "same end-to-end suite passed"
+    :worker-after-verification "deleted to avoid public abuse"
+    :database-after-verification "retained"}
+   :build {:shadow-cljs "passed"
+           :npm-audit-vulnerabilities 0}}
+  :adr/artifacts
+  ["orgs/kotoba-lang/kotobase-engine/src/kotobase/datomic.cljc"
+   "orgs/kotoba-lang/kotobase-storage-d1/src-cljs/kotobase/storage/d1_worker.cljs"
+   "orgs/kotoba-lang/kotobase-storage-d1/src/worker.mjs"
+   "orgs/kotoba-lang/kotobase-storage-d1/scripts/verify.mjs"
+   "orgs/kotoba-lang/kotobase-storage-d1/docs/datomic-coverage.md"
+   "orgs/kotoba-lang/kotobase-storage-d1/migrations/0001_storage_auth.sql"
+   "orgs/kotoba-lang/kotobase-storage-d1/migrations/0002_block_metadata.sql"]
+  :adr/consequences
+  ["Applications and LLMs use one Datomic EDN query grammar across storage providers."
+   "D1 remains a distinct backend rather than being mislabeled PostgreSQL or merged with embedded SQLite."
+   "Authentication and authorization stay at the Worker boundary and do not become storage or query semantics."
+   "CID heads replace numeric Datomic basis/tx identity; unsupported product features remain explicit."
+   "Production qualification still requires cold/index-pruned reads, folding policy, load tests, and a permanent protected route."
+   "The split Kotobase repositories are currently local independent repos and require a separate commit/publish/west graduation."]
+  :adr/canonical-markdown
+  "90-docs/adr/2607265000-kotobase-d1-datomic-edn-api.md"
+  :adr/body
+  "D1-backed Kotobase now composes the provider-neutral immutable-block/conditional-ref contract with the same ClojureScript engine used by other providers. `kotobase.datomic` accepts Datomic's EDN transaction/query grammar and argument order; the Worker transports EDN rather than inventing a JSON query DSL. Every request is separately authenticated with signed CACAO and authorized by capability plus tenant-ref scope. The compatibility claim covers grammar and the documented query subset, not Datomic product features such as numeric basis-t, tempids, transactor/log/listener APIs, or complete scalar/schema semantics. Local workerd+D1 and remote Cloudflare D1 passed the authenticated transact/query/pull/datoms/retract/head suite. The public verification Worker was deleted afterward; D1 data, migrations, source, and redeploy scripts remain."
+  :adr/source-format "edn"}]
+
