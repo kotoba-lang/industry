@@ -141,6 +141,10 @@
         dist (frequencies (map (comp bucket val) un))
         n (count un)]
     (println "\nDEPTH PER COUNTRY  (distinct form families described, not just referenced)")
+    (println "  CAVEAT: :org/countries lists are illustrative, not exhaustive — an entry naming")
+    (println "  six countries does not claim the form is absent from the seventh. Depth is a")
+    (println "  LOWER BOUND on what is described, and country-to-country comparison is unsafe.")
+    (println "  Do not raise this metric by lengthening country lists; that manufactures depth.")
     (doseq [b ["7+ families" "4-6 families" "2-3 families" "1 family"]
             :let [v (get dist b 0)] :when (pos? v)]
       (line b v n))
