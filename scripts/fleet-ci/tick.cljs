@@ -533,7 +533,10 @@
             k [lib sha]]
         (if (contains? seen k)
           (recur (rest queue) seen shipped)
-          (let [dest (str "$HOME/.gitlibs/libs/" lib "/" sha)
+          ;; $HOME は **リモートで**展開させる。ローカルの bash -c の二重引用符の
+          ;; 中に素で置くと手元で展開され、リモートに他人の HOME パスが渡る
+          ;; （実測: asher に `mkdir: /Users/junkawasaki: Permission denied`）。
+          (let [dest (str "\\$HOME/.gitlibs/libs/" lib "/" sha)
                 ;; **exit code は見ない**。Tailscale SSH + /usr/bin/login では
                 ;; リモートの終了ステータスが伝播せず必ず 0 になる（gate-command
                 ;; が sentinel を grep しているのと同じ理由）。最初の版はこれを
