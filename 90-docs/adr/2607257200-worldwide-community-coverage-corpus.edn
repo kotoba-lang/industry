@@ -73,8 +73,8 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ## 現在の状態（2026-07-26）
 
-- **351 organization / 15 カテゴリ / 38 form-family / 44 データファイル**
-- 検証: source-pinned **74**（primary 50 / secondary 24）、未 pin 277（79%）
+- **357 organization / 15 カテゴリ / 38 form-family / 45 データファイル**
+- 検証: source-pinned **75**（primary 51 / secondary 24）、未 pin 282（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
@@ -82,7 +82,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 - entity kind: org-form **197（87%）** / named-org 29（13%）
 - 地域: europe 52 / north-america 44 / asia-east 32 / africa 24 / asia-south 21 /
   south-america 18 / southeast-asia 12 / oceania 12 / middle-east 11
-- 数の誠実さ: **351/351 が `:org/member-count-basis` を持ち、約 231（66%）が明示的に unknown**。
+- 数の誠実さ: **357/357 が `:org/member-count-basis` を持ち、約 237（66%）が明示的に unknown**。
 - 国別: **国連加盟 193/193 か国**が少なくとも1エントリに現れる（`coverage.cljs countries`）
 - 記述の厚み: 7 形態以上 24 か国 / 4-6 形態 34 / 2-3 形態 135 / **1 形態のみ 0**（`coverage.cljs depth`）
   `:org/member-count` を主張しているのは 73 件のみ
@@ -358,7 +358,7 @@ La Via Campesina の「2億人」は加盟団体の自己申告合計であっ�
 
 ## 既知のギャップ
 
-1. **未 pin 277 件（79%）**。レポータの「TOP UNPINNED BY ASSERTED SIZE」が作業キュー。
+1. **未 pin 282 件（79%）**。レポータの「TOP UNPINNED BY ASSERTED SIZE」が作業キュー。
 2. `manifest/schema.edn` に `:org/*` 属性が 0 件（`edn-datomize.cljs` が 90-docs のデータ
    ファイルを走査しない設計のため。religious-community も同様で、共有ジェネレータ側の変更が要る）。
 3. CLAUDE.md 統合クエリ面節への本 corpus の記載（他セッションが CLAUDE.md を未コミットで
@@ -367,7 +367,8 @@ La Via Campesina の「2億人」は加盟団体の自己申告合計であっ�
    `llm-prior-unverified` のまま。sample-orgs.edn 側 11 org の `document-analysis`/`survey`
    ラベルも出典未確認。
 5. 地域偏り（2026-07-26 iteration 48 で計測・補正着手）: europe 95・north-america 74 に対し
-   oceania 14・middle-east 17・southeast-asia 17・south-america 27・africa 32。
+   oceania 16・middle-east 18・southeast-asia 18・south-america 29・africa 32
+   （iteration 48→49 の 2 パスで oceania +2 / south-america +4 / se-asia +1 / middle-east +1）。
    **corpus は「全世界」を名乗りながら記述の密度は欧米に偏っている。**
    iteration 48 は新規5件すべてを south-america / middle-east / southeast-asia /
    asia-south に限定した（+2/+1/+1/+1）。国カバレッジ 193/193 は達成済みなので、
@@ -482,6 +483,31 @@ corpus はこれまで「衰退の物語に反する成長」（Moose、知見7�
 副次的な観察: **法律で設置が義務づけられ、選挙で選ばれ、登記される形態ですら、
 国家機関が概数でしか公表しないことがある。** 日本の消防団（人単位まで精密）と対照的で、
 「統治されている＝正確に数えられている」は成り立たない。
+
+### 19. 単位が「組織」ですらない共同体がある — kula と bodong
+
+- **kula ring**（Massim）は corpus の分析単位の極限。**組織が存在しない。**
+  個人間の相続された partnership の網だけで、腕輪と首飾りを逆回りに回し続ける
+  （**保持せず渡し続けることで得た評判が実体**）。それでいて数百km の航海・同盟・交易を
+  調整している。**名簿を持つ主体が無いので、数えられる対象そのものが無い。**
+- **bodong / pechen**（コルディリェラ）は逆に、**共同体と共同体の「あいだ」だけに存在する**。
+  ili（村域）どうしの二者間協定で、双方の pact-holder が担い、pagta という成文法典を持つ。
+  corpus は内向きの団体で構成されているが、この形態は境界を越える義務としてのみ存在する。
+
+どちらも `:org/member-count-basis` に「数える単位が無い / 単位は pact であって人ではない」と
+書ける。**「数えられない」を「存在しない」に丸めない**ための境界事例。
+
+### 20. 登記の段階は一致しないし、名前は実態を保証しない
+
+- **quilombola（ブラジル）**: ①自己申告（2022年 IBGE センサス = **初めて数えた**。
+  1,327,802人 / 8,441 集落 / 7,666 共同体）②Palmares 認証 ③INCRA 土地権原 —
+  **3つの status は入れ子で一致せず**、「センサスに載り、未認証、未権原」が通常状態。
+  知見14（当局より共同体の方が数が多い）の2例目でもある。
+- **キブツ（イスラエル）**: 登記された協同組合であり続けたまま、**大半が「私有化」して
+  差額賃金と個人所有住宅に移行した**。「キブツの数」は共同生活の量を過大評価し、
+  **どれが共同体のままかを示す登記簿は存在しない**。
+
+**登記簿にあること・名前を保つことは、実態がその名の通りである保証にならない。**
 
 ## スコープ除外（明示）
 
