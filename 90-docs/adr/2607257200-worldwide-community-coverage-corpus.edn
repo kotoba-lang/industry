@@ -73,8 +73,8 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 
 ## 現在の状態（2026-07-26）
 
-- **341 organization / 15 カテゴリ / 38 form-family / 42 データファイル**
-- 検証: source-pinned **73**（primary 49 / secondary 24）、未 pin 268（79%）
+- **346 organization / 15 カテゴリ / 38 form-family / 43 データファイル**
+- 検証: source-pinned **74**（primary 50 / secondary 24）、未 pin 272（79%）
 - 整合性: `coverage.cljs integrity` が clean（dangling ref 0 / 未知カテゴリ 0 / ID 重複 0 / basis 欠落 0）
 - pin の鮮度: current 34 / recent 17 / ageing 4 / **stale（7年以上）3**（`coverage.cljs freshness`）
 - 登記区分: mixed 67 / registered 53+ / unregistered 48+ / mostly-unregistered 42+ /
@@ -82,7 +82,7 @@ ADR-2607257000（文書は最新状態のみを表す）に従い、本 ADR は 
 - entity kind: org-form **197（87%）** / named-org 29（13%）
 - 地域: europe 52 / north-america 44 / asia-east 32 / africa 24 / asia-south 21 /
   south-america 18 / southeast-asia 12 / oceania 12 / middle-east 11
-- 数の誠実さ: **341/341 が `:org/member-count-basis` を持ち、約 222（65%）が明示的に unknown**。
+- 数の誠実さ: **346/346 が `:org/member-count-basis` を持ち、約 226（65%）が明示的に unknown**。
 - 国別: **国連加盟 193/193 か国**が少なくとも1エントリに現れる（`coverage.cljs countries`）
 - 記述の厚み: 7 形態以上 24 か国 / 4-6 形態 34 / 2-3 形態 135 / **1 形態のみ 0**（`coverage.cljs depth`）
   `:org/member-count` を主張しているのは 73 件のみ
@@ -138,7 +138,7 @@ nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
 
 ## 構造的知見（この corpus が実際に示したこと）
 
-### 1. 未登記には 5 つの異なる原因がある
+### 1. 未登記には 6 つの異なる原因がある
 
 「非公式だから登記していない」は一部でしかない:
 
@@ -147,6 +147,10 @@ nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\\\
 3. **迫害** — kris romani、スーダン ERR（**登記簿が標的リストになる**）
 4. **法的資格の欠如** — 難民主導組織・難民キャンプ委員会（非市民は登記できない）
 5. **著作権露出** — fansub / scanlation
+6. **裁量的許可** — 刑務所内の集団（2026-07-26 追加）。非公式でも違法でも迫害でもなく、
+   **結社が第三者の裁量で成立している**。北欧の受刑者評議会だけが法定
+   （`statutory-no-personality` と同型で法人格は無い）で、それ以外の礼拝・回復ミーティング・
+   学習会は矯正当局の許可で存在し、理由を示さずに撤回されうる。
 
 極限は**アフガニスタン等の地下学校**で、「数えられること自体が危険」。corpus は
 `:org/member-count-basis` に「推定しないと決めた」と書ける構造を持つ。
@@ -452,6 +456,15 @@ DIY スケートパークとサーフのローカリズムを収録した際、*
 アクセスが統制される**」。前者だけを書けば共同体を誤って記述することになる。
 慣習評議会（khap・Poro/Sande・kris）で採った姿勢と同じで、**同一の制度が包摂と排除の両方を
 担う**という corpus 全体の観察（知見12）の、非公式スポーツ空間における現れである。
+
+### 17. 会員が増えながら支部が減ることがある
+
+ドイツ射撃連盟（DSB）は 2025-12-31 時点で **1,357,240 人 / 13,502 団体**、
+**会員は 4 年連続増（+7,482、うち 21 歳未満 +4,104）なのに団体数は 99 減**。
+corpus はこれまで「衰退の物語に反する成長」（Moose、知見7）を記録してきたが、
+**同一組織で会員増と支部減が同時に起きる**のはこれが初出。会員数だけを見ると
+地域単位の消滅が完全に隠れる。`:org/instance-count-estimate` を会員数と併記する
+運用は、この差分を見えるようにするためにある。
 
 ## スコープ除外（明示）
 
