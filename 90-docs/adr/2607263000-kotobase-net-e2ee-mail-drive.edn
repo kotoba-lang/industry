@@ -35,7 +35,9 @@
    "Phase 1 実測（deploy 後、2026-07-26）: s3 の bucket listing / object GET / HEAD がいずれも 401、pinning /pins も 401、s3・atproto の GET /health は 200（router の EDN）。git.kotobase.net はデータを持つ kotobase-git worker に復帰"
    "kotoba-lang/envelope a2119e38（新規 repo、20 tests / 61 assertions、実 Web Crypto + 実 X25519）。west entry 登録済み"
    "kotoba-lang/org-ietf-mime 800548cd（新規 repo、20 tests / 71 assertions、JVM と ClojureScript の両方で green）。west entry 登録済み"
-   "Phase 3 transport: Cloudflare Email Routing を kotobase.net で有効化（zone 5ad3da692f2367905c257cfcb0c1057c、status ready）。実測 dig MX kotobase.net -> route1/2/3.mx.cloudflare.net、TXT -> v=spf1 include:_spf.mx.cloudflare.net ~all"]
+   "Phase 3 transport: Cloudflare Email Routing を kotobase.net で有効化（zone 5ad3da692f2367905c257cfcb0c1057c、status ready）。実測 dig MX kotobase.net -> route1/2/3.mx.cloudflare.net、TXT -> v=spf1 include:_spf.mx.cloudflare.net ~all"
+   "Phase 3 実装: gftdcojp/net-kotobase mail-worker（817c3d16 で main へ）。Worker kotobase-mail version b5f7a11d-9112-4d1b-93d6-36ff216c788c、R2 bucket kotobase-mail、KV MAIL_DIR 4ca747c7df2f4f4a805b1a0b0928ee74、catch-all rule -> kotobase-mail"
+   "Phase 3 end-to-end 実測（2026-07-26、fixture ではなく外部からの実メール）: seal-check@kotobase.net 宛 -> Cloudflare MX -> Worker -> R2 に 4 objects（index 366B / envelope.json 1259B / parsed/0 4975B / raw/0 5099B）。保存された ciphertext と index のいずれにも本文・subject は含まれない。受信者の X25519 秘密鍵で parsed（subject 「テスト件 inbound seal」= RFC 2047 復号、body = quoted-printable 復号、spf/dkim/dmarc すべて :pass）と byte-exact な raw 原本の両方を復元"]
   :adr/decision-summary
   "Drive を先に出す（ドメインモデル・storage・課金・認証が既に揃っており、不足は暗号エンベロープ層とチャンク化と s3 面の認証の3つだけ）。Mail は MX が無く MIME parser も OpenPGP も存在しないため後段に置き、まず Tier A の zero-access encryption だけを実装する。暗号は org-signal の X25519 を消費し新規実装しない。CID は ciphertext に対して取り、cross-user dedup は放棄する。"
   :adr/source-format "edn"
@@ -210,11 +212,26 @@ Phase 5  Webmail / Drive UI（kotoba-uiux、app-aozora が前例）
   MX（route1/2/3.mx.cloudflare.net）と SPF TXT が live。**メールの入口が存在しない**
   という最大のブロッカーは解消した。
 
+- **Phase 3 完了・deploy 済み・実メールで end-to-end 検証済み。** `mail-worker`
+  （Cloudflare Email Worker）が受信 → `org-ietf-mime` で parse → `envelope` で
+  受信者の**公開**鍵に封入 → R2 に保存。private key を持たないので、封入した
+  ものを自分で読めない。1 メッセージにつき sealed object を 2 つ持つ:
+  `raw`（原本バイト列。後から DKIM を再検証でき、より良い parser で読み直せる）と
+  `parsed`（構造化済み。mailbox client に MIME parser を積まずに済む）。
+  `route/clear-fields` が誠実さの境界で、平文で残す各 field に「なぜ封入できないか」
+  を書いてある — subject / body / attachments はそこに**無い**（test が assert）。
+  `:mail/custody` を 1 通ごとに記録する: `:self` なら本当に zero-access、
+  `:server` なら封入はされているがサービスは開けてしまう。どちらだったかを
+  毎回言うことが、security property と宣伝文句の違い。
+  未知の mailbox は**保存せず reject** する（封入する鍵が無い＝平文保存しかできない）。
+  処理失敗も reject（= 送信者にバウンスして伝わる。silent drop は誰も気付かず
+  メールを失う）。
+
 **残り:**
 
-- Email Worker 本体の配線（受信 → `org-ietf-mime` で parse → `envelope` で受信者
-  公開鍵に封入 → 保存）。account→X25519 公開鍵のディレクトリが要るので
-  ADR-2607252000 の authn/accountDid に接続する
+- mailbox directory を実アカウントに接続する。今は KV `MAIL_DIR` を手で埋めている。
+  ADR-2607252000 の authn/accountDid と、account ごとの X25519 公開鍵の発行・
+  公開経路を繋ぐ必要がある
 - DKIM / DMARC レコード（送信を始める時点で必要。Phase 4）
 - Drive のチャンク化アップロード client（envelope 側の nonce/AAD/chunk-count は
   実装済みなので、残りは分割・並列 upload・range GET・再開）
