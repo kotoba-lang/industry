@@ -104,15 +104,49 @@
   いない（step-done の判断は owner のもの）。`:by` も actor 鍵による署名ではなく
   agent セッションであることを明記した —— 台帳の他の行が持つ did:key を騙らない。
 
+### D7. 実装済み actor が載っている業種でカバレッジを広げる（2026-07-26 追加）
+
+初版の3件は2件が ITAD で、他の作業には使えなかった。cloud-itonami に実装済み
+actor がある業種を3件足した:
+
+- **warehousing**（JSIC 4721 冷蔵倉庫業）
+- **food-manufacture**（isic-1030/1071/1072/1073/1074/1075/1020/562）
+- **medical-practice**（isic-862/869）
+
+`medical-practice` は legal-services に続く2例目の明快な
+`:prohibited` / `:defer` ペアで、根拠の型も同じ。**厚生省医務局長回答
+（昭和27年6月24日 医収第190号）が「医業はその収益の使途の如何を問わず営利を
+目的として営むことは許されない」と述べている**ため、株式会社は開設者になれず、
+医療法人・医師を主体に立てる経路しかない。
+
+**`jsic-4721` に依存を足すことはしなかった。** 当該 repo は `:deps {}` を
+ADR-2607176501 の fleet standalone 規約に基づいて明示的に選んでいるので、
+こちらから `:local/root` を差し込むのは筋が悪い。カタログ側に業種を持たせ、
+先方が触るついでに寄せられる状態にした（「一括書き換えはしない」）。
+
+### D8. 許認可は1つとは限らない（`:additional-gates`）
+
+warehousing の収録で設計上の穴が出た。**JSIC 4721 冷蔵倉庫業は倉庫業法第3条の
+登録だけでは営業できない。** 東京都の公式資料は届出不要業種として『食品又は
+添加物の貯蔵又は運搬のみをする営業』を挙げつつ、**冷凍又は冷蔵倉庫業を明示的に
+除外**しており、保健所への食品衛生法の営業届出が別途要る。
+
+`:licence` を単数のままにしておくと、呼び出し側が目立つ方のゲートだけ通して
+**確信を持って違法になる**。entry に `:additional-gates` を持たせ、
+`gate/all-gates` と `plan` の両方が必ず返すようにした。
+
 ## Consequences
 
 ### 現在の判定結果（`gate/summary` の実出力）
 
-| (法域, 業種) | 許認可 | 法人で取得可 | principal | defer |
-|---|---|---|---|---|
-| JPN/legal-services | 弁護士資格 | 不可 | `:prohibited` | **`:admissible`** |
-| JPN/second-hand-dealing | 古物商許可 | 可 | `:conditional` | `:unsettled` |
-| JPN/industrial-waste-collection | 産廃収集運搬業許可 | 可 | `:conditional` | `:conditional` |
+| 業種（すべて JPN） | 許認可 | 法人で取得可 | ゲート数 | principal | defer |
+|---|---|---|---|---|---|
+| legal-services | 弁護士資格 | 不可 | 1 | `:prohibited` | **`:admissible`** |
+| medical-practice | 医療機関の開設許可 | 不可 | 1 | `:prohibited` | `:conditional` |
+| second-hand-dealing | 古物商許可 | 可 | 1 | `:conditional` | `:unsettled` |
+| industrial-waste-collection | 産廃収集運搬業許可 | 可 | 1 | `:conditional` | `:conditional` |
+| food-manufacture | 食品衛生法 営業許可（32業種） | 可 | 1 | `:conditional` | `:conditional` |
+| warehousing | 倉庫業の登録 | 可 | **2** | `:conditional` | `:unsettled` |
 
 ITAD の現在地は機械が判定できる状態になった:
 `gate/plan {:sector :sector/second-hand-dealing :licence-held? false}` →
@@ -121,13 +155,20 @@ ITAD の現在地は機械が判定できる状態になった:
 
 ### 収録範囲と、その限界
 
-3件（法域×業種）・6ルール —— 一次読了2（弁護士法72条 / 法務省ガイドライン）、
-公式ページ取得2（警視庁 古物商許可手続き / 東京都環境局 産廃許可申請、いずれも
-**台帳の記録を信用せず本日一次確認し直した**）、二次情報のみ2（**古物営業法3条と
-廃掃法14条の条文原文が未取得**）。
+6件（法域×業種）・11ルール —— 一次読了5（弁護士法72条 / 法務省ガイドライン /
+東京都の食品衛生法 要許可32業種一覧 ×2 / 厚生省医務局長回答 医収第190号）、
+公式ページ取得4（警視庁 古物商許可手続き / 東京都環境局 産廃許可申請 /
+国交省 倉庫業法 / 東京都 食品衛生の窓。前2者は**台帳の記録を信用せず一次確認し
+直した**）、二次情報のみ2（**古物営業法3条と廃掃法14条の条文原文が未取得**）。
 
-日本の許認可業種は数百あり、これは一次/公式まで確認できた3件にすぎない。
-各エントリが `:known-gaps` で何を確認していないかを名指ししている。
+初版は3件で、うち2件が ITAD だった —— 1プロジェクトにしか使えない commons
+だったので、**実装済み actor が実際に載っている業種**を3件足した（D7）。
+
+日本の許認可業種は数百あり、これは一次/公式まで確認できた6件にすぎない。
+倉庫業法・食品衛生法・医師法17条・医療法7条の**条文原文はいずれも未取得**で、
+現在は公式ページと通知に依拠している —— だからこれらの entry はどれも
+`:admissible` になっていない。各エントリが `:known-gaps` で何を確認して
+いないかを名指ししている。
 
 ### 残っている ITAD のブロッカー（すべて owner の物理行動）
 
@@ -154,12 +195,15 @@ ITAD の現在地は機械が判定できる状態になった:
 
 ## Verification
 
-`clojure -M:test` 35 tests / 159 assertions green、`clojure -M:lint` warnings 0 /
+`clojure -M:test` 45 tests / 276 assertions green、`clojure -M:lint` warnings 0 /
 errors 0（いずれも実走、2026-07-26）。変異テスト3件で suite が噛むことを確認:
 
 1. 未検証出典からの許可の降格を外す → 3 failures
 2. 宣誓が `:prohibited` も解錠するようにする → 3 failures
 3. 資格法域の一致チェックを無効化 → 4 failures / 1 error
+4. `:additional-gates` を plan から落とす → 1 failure / 1 error
+5. 医業の principal を `:conditional` に緩める → 4 failures
+6. 冷蔵倉庫の食品衛生法ゲートを消す → 4 failures / 2 errors
 
 いずれも復元後 0 failures。
 
