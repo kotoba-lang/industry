@@ -271,13 +271,23 @@ Worth stating as a method, because each rung found defects the one below could n
   `spender` and threw encoding a map as an address. All fixed, with regressions, and
   `:verified? true`. This is the empirical case for `:verified?` being a field
   rather than a comment.
-- **0x: still docs-verified only.** Its parameter names, `swapFeeBps`'s bps unit
-  (0–1000), the `issues.allowance` semantics and the `0x-version: v2` header are
-  confirmed against 0x's current published documentation, but 0x requires an API key
-  and **no 0x key exists anywhere in this workspace** (checked against the
-  secrets-location map), so no live call has exercised its RESPONSE field paths.
-  Stays `:verified? false`. Getting a key is the single cheapest remaining step —
-  LI.FI's four defects are the argument for doing it before real funds.
+- **0x: DEFERRED by owner decision (2026-07-26). LI.FI only for now.** Its parameter
+  names, `swapFeeBps`'s bps unit (0–1000), the `issues.allowance` semantics and the
+  `0x-version: v2` header are confirmed against 0x's current published
+  documentation, but 0x requires an API key and **no 0x key exists anywhere in this
+  workspace** (checked against the secrets-location map), so no live call has ever
+  exercised its RESPONSE field paths.
+
+  The decision is **enforced rather than remembered**: `swap.aggregator/adapter`
+  defaults to `:lifi` and refuses an unverified adapter unless the caller passes
+  `:allow-unverified? true`. That gate exists because LI.FI's four defects were
+  found in a mapping written just as carefully from that vendor's own docs — so an
+  unverified mapping is not a smaller risk than an untested one, it is the same risk
+  wearing documentation. Nothing is deleted: 0x's mapping stays, one live call away
+  from `:verified? true` whenever a key appears.
+
+  One aggregator is sufficient to operate. A second is price-comparison
+  redundancy, not a prerequisite.
 - **The THORChain rail could NOT be live-verified, and one of its defaults was
   dead.** `thornode.ninerealms.com` does not resolve at all (confirmed via 1.1.1.1),
   `midgard.ninerealms.com` likewise, `thornode.thorswap.net` answers a Cloudflare
