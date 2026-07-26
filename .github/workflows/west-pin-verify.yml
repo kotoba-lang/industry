@@ -21,6 +21,17 @@ permissions:
   issues: write
 
 jobs:
+  guard-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx nbb --classpath ".:scripts/nbb_compat" scripts/west-pin-guard-policy-test.cljs
+
   verify:
     runs-on: ubuntu-latest
     steps:

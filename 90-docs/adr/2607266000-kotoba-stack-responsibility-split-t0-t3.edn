@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "adr-2607266000-kotoba-stack-responsibility-split-t0-t3"
-  :adr/title "ADR-2607266000: kotoba/compiler/kototama/aiueos の過積載を T0-T3 の責任 tier に分解し、11 repo を切り出す"
+  :adr/title "ADR-2607266000: kotoba/compiler/kototama/aiueos の過積載を T0-T6 の責任 tier に分解する"
   :adr/status "accepted"
   :adr/doc_type "adr"
   :adr/doc-type "adr"
@@ -13,7 +13,7 @@
   :adr/topic "kotoba-stack-responsibility-split-t0-t3"
   :adr/authoritative-for
   ["kotoba stack の責任 tier (T0 契約 / T1 言語 / T2 生成 / T3 実行 / T4 権限 / T5 機構 / T6 配置) の定義"
-   "T0-T3 で切り出した 11 repo の所有範囲と依存方向"
+   "T0-T6 の責任 repo 群の所有範囲と依存方向"
    "Rust の位置づけ (host adapter として可、core 依存経路には含めない)"
    "Phase A (抽出・公開・登録) と Phase B (consumer flip・元 repo からの削除) の境界"
    "この規模の横断分割を並行セッション環境で安全に行うための運用条件 (G-M..G-P)"]
@@ -106,15 +106,14 @@ T6 は新規 `kotoba-lang/fleet` が reusable placement library / CLI / packagin
 
 Rust は **host adapter の一つとしては許容**する。ただし **kotoba の core を
 Rust 必須にしない / core の依存経路に含めない**。この制約により、`kototama` の
-evidence branch にある `native/wasmtime-component-host/src/main.rs` (336 行) は
+Component host として `tender-component/native/component-host` が所有し、
 core 経路に取り込まない。Wasm engine を core に埋める設計 (D1 Wasmtime JIT /
 D2 Wasmtime AOT) はこの制約下では主経路にできず、**同一 KIR から Component (契約面)
 と native (実行面) を出す二面出力**が主経路になる。ADR-2607252500 決定 4 の
 'native AOT は boot/firmware/kernel/engine/driver に限る' との整合は、二面出力の
 native 側が『application を native ABI/OS syscall に直結する経路』ではなく
 『micro-TCB が管理する同じ capability 境界の内側の実行形式』である、という解釈に
-拠る。この解釈は ADR-2607252500 の文言からは自明でないため、同 ADR に but 節を
-追記する必要がある (未実施 / G-A)。
+拠る。この解釈は ADR-2607252500 の but 節へ反映済み (G-A)。
 
 ### 5. Phase A と Phase B を分ける
 
@@ -159,18 +158,37 @@ kotoba.guest-grammar                  -> kotoba.grammar
 ## Dependency graph
 
 ```text
-abi   kotoba-kir   artifact          (T0: 契約。kotoba-kir のみ security に依存)
-        |            |
-   kgraph  grammar                   (T1: 言語。依存なし)
-        |
-    kotoba-wasm   kotoba-native      (T2: backend。ともに kotoba-kir を pin)
-        |            |
-  kotoba-component  kotoba-verifier  (T2: verifier は両 backend + artifact を pin)
-        |
-  tender-native   provider   provider-postgres   (T3)
+T0 contract:
+  kotoba-core-contracts <- grammar
+  security <- kotoba-kir <- artifact
+
+T1 language/library:
+  datom <- kgraph
+  dag-cbor / artifact / rad / sqlite <- codebase
+  kotoba-lang <- compiler
+
+T2 production:
+  kotoba-kir <- kotoba-wasm <- kotoba-component
+  kotoba-kir / artifact <- kotoba-native
+  kotoba-kir / artifact / both backend surfaces <- kotoba-verifier
+  contracts / language libraries / backends / verifier <- compiler
+
+T3 execution:
+  compiler / language libraries / assurance <- kotoba
+  kotoba + selfhost <- mesh
+  kotoba-kir <- provider
+  kototama / assurance <- provider-transport
+  kototama / kotoba-kir <- provider-postgres
+  kotoba-kir / artifact <- tender-native
+  kototama <- tender-component
+
+T6 placement:
+  kototama / security <- fleet
 ```
 
-依存は下向きのみ。`kotoba-verifier` だけが両 backend を消費するが、生成には関与しない。
+矢印は dependency -> consumer。生成者と検証者は分離し、provider は tender の ABI を
+消費できるが tender は provider を同梱しない。全 production git edge の宣言一致、
+role 方向、非循環性を 21-repo gate が検証する。
 
 ## Consequences
 
@@ -178,28 +196,23 @@ abi   kotoba-kir   artifact          (T0: 契約。kotoba-kir のみ security �
   比較できる (`kotoba-verifier`)。二面出力の同値性検証が構造的に可能になった。
 - (+) compiler から 2,248 行の provider と 635 行の実行系が出たため、
   'compiler が何であるか' が行数の上でも説明可能になった。
-- (+) 各 repo に `resources/repository-rules.edn` を同梱したため、
-  taxonomy 宣言率が 1,828 repo 中 2 -> 13 に増えた
-  (本 ADR の T0-T3 11 + T6 `fleet` + `loop-system-dynamics`)。
-- (-) 本 ADR による west 登録は 11 -> 12 repo になった。
-- (-) 逆依存が 1 件残っている: `provider-postgres` が `kototama.tender` を require
-  している (provider が runtime に依存する逆流)。abi 契約経由に直すのが本筋。
+- (+) 21 repo が `resources/repository-rules.edn` で実際の production git 依存を
+  完全宣言し、role 方向と非循環性を superproject CI で強制する。
+- (+) west 登録は元の 11 repo に `fleet` / `codebase` / `mesh` /
+  `provider-transport` / `tender-component` を加えた 16 repo になった。
+- (+) provider が特定 tender の ABI を消費する依存は許可する一方、tender から
+  provider を同梱する逆方向は全て除去した。
 
 ## Phase B (2026-07-26)
 
 | repo | 内容 | 結果 |
 |---|---|---|
-| `compiler` | 37 ソース削除、8 repo を pinned dep として消費。`src/kotoba/compiler/` 49 -> 29 ファイル、`provider/` 消滅 | **完了** — 613 tests / 5295 assertions / 0 failures |
-| `kotoba` | `kgraph` / `guest_grammar` 削除、2 repo を消費。`kotoba.guest-grammar` -> `kotoba.grammar` | **完了** — 499 tests / 8540 assertions、無改変 baseline と完全一致 (regression ゼロ) |
-| `kototama` | `postgresql_pool_provider` (433) 同梱廃止、fleet 4 ns・10 CLI command・daemon packaging を分離。TCB inventory 32 -> 27 | **完了** — 分離後 161 tests / 552 assertions / 0 failures |
+| `compiler` | owner repo を pinned dep として消費。owner の単体テスト 6 群も移設し、provider と native tender は test / optional execution plugin 化 | **完了** — 543 tests / 5037 assertions / 0 failures |
+| `kotoba` | grammar に加え assurance / semantic codebase / mesh を `security` / `codebase` / `mesh` へ移設。`cap_table` と host adapter は実行責任として残置 | **完了** — 397 tests / 8116 assertions / 0 failures |
+| `kototama` | PostgreSQL / transport provider、fleet、Wasmtime + jco Component tender を分離。Rust / npm を core 依存経路から除去 | **完了** — 154 tests / 530 assertions / 0 failures、TCB 32 -> 23、external surface 10 -> 8 |
 | `fleet` | T6 の 4 ns + 3 test namespace + CLI + systemd packaging を新 repo へ移設。persisted key `:kototama.fleet/*` は checkpoint 互換のため維持 | **完了** — 35 tests / 136 assertions / 0 failures、R3 gate 11/11、staging smoke green |
-| west pin | `compiler` / `kotoba` / `kototama` + `kotoba-lang-fleet` 登録 | **完了** — kototama `15333cc -> 6459eb0` fast-forward、fleet `fdaaaa4` は main 到達性検証 OK |
-
-`kotoba` の 2 failures / 1 error は**この変更由来ではない**。同一 worktree を無改変の
-`origin/main` で走らせて 499/8540/2/1 が完全一致することを確認済み (内訳:
-`../kototama/*` の sibling パスを参照する evidence assertion 2 件と、
-`collections/set.kotoba` conformance resource 欠落 1 件。どちらも west layout の
-外で走らせたときの環境要因)。
+| 新 owner | `security` / `codebase` / `mesh` / `provider-transport` / `tender-component` が実装・テスト・qualification を所有 | **完了** — security 210/1063、codebase 21/152、mesh 8/23、transport 5/19、Component Clojure + Rust + Chromium 全 green |
+| west pin | 全変更 child と新規 4 repo を immutable main SHA で登録 | **完了** — root の pin gate と role gate を通過 |
 
 Phase B の途中で 2 つの実問題が出た。どちらも「読んで判断」では見つからず、
 実際にテストを走らせて初めて出た。
@@ -240,20 +253,20 @@ fleet CLI command と systemd packaging も `fleet` 側へ移した。kototama �
 | G-A | ADR-2607252500 決定 4 の but 節 | 追記済み。KIR 二面出力は「application を native ABI に直結」に当たらない (native 面も micro-TCB の capability 境界の内側) |
 | G-B | Phase B: consumer flip と元コード削除 | `compiler` / `kotoba` / `kototama` / T6 `fleet` まで完了 |
 | G-C | `provider-postgres` -> `kototama.tender` | **逆流ではなかった。** 実物は `tender/host-fn` に加え `ValType/I32` も直接使う Chicory tender 専用プラグイン。特定 tender の ABI に対して書かれた host adapter がその tender に依存するのは構造上正しい。**間違っていたのは逆方向 — tender がプラグインを同梱していたこと**で、それを外して解消 |
-| G-D | fleet 分離 (T6) | 新規 `kotoba-lang/fleet` に決着。`fleet -> kototama` の一方向依存、4 ns + 3 test ns + 10 CLI command + packaging を移設。checkpoint key は互換維持。kototama TCB 31 -> 27 |
+| G-D | fleet 分離 (T6) | 新規 `kotoba-lang/fleet` に決着。`fleet -> kototama` の一方向依存、4 ns + 3 test ns + 10 CLI command + packaging を移設。checkpoint key は互換維持。transport / Component tender の分離も含め kototama TCB 32 -> 23 |
 | G-F | `kotoba.kir.xml` (224) と `kotoba-lang/xml` repo の重複判定 | **非重複。** `kotoba.kir.xml` は `kotoba.kir.value` を require する KIR 値の emitter、`xml/src/xml/core.cljc` (40 行) は Hiccup -> XML emitter で別物。ただし名前が紛らわしいので将来 rename 候補 |
 | G-G | 各 repo の `clojure -M:test` | 11/11 green。**これを実際に走らせたことが 4 件の実バグを検出した** — `artifact` <-> `kotoba-verifier` の循環、`kgraph` の未宣言 `datom` 依存、component/provider の resource 3 セット欠落、ハイフン入り repo 名でのテスト ns/パス不整合。いずれもコードを読むだけでは出なかった |
 
-### 未解決
+### 追加 gap の決着
 
-| id | gap | 内容 |
+| id | gap | 決着 |
 |---|---|---|
-| **G-E** | `kotoba` の非言語コード | supply-chain 統治 8 ファイル、codebase-actor 8 ファイル、storage/mesh 5、`cap_table` 等。`security` repo が既に `supply_chain.cljc` を持つため、そこへ寄せるのが第一候補 |
-| **G-H** | taxonomy の CI gate | `kotoba.repository-role-rules.v0` の宣言は 1,828 repo 中 **13**（本 ADR の 12 + `loop-system-dynamics`）。分割を増やすなら「宣言 role と実際の依存方向が一致するか」を CI で強制しないと、責任は再び混ざる |
-| **G-J** | 二面出力の同値性 conformance vector | G-A で「同一 KIR から出た Component と native が同じ effect set / export 表 / admission 判定を通る」ことを compiler が保証すると書いたが、**それを証明する vector が無い**。`kotoba-verifier` が置き場 |
-| **G-K** | `kototama` の残プラグイン候補 | `transport_provider.clj` (440) と `wasmtime_component.clj` (238)。前者は postgres と同型でプラグイン化候補、後者は Rust wasmtime host に紐づくため「core を Rust 必須にしない」方針との整合を要判断 |
-| **G-L** | 抽出した実装のテストが元 repo に残っている | 各新 repo が持つのは load gate のみで、実テストは `compiler` 側に残置。テストはコードと一緒に動くべきで、現状は「消費者が被消費者をテストしている」状態 |
-| G-I | T5 (aiueos-kernel / aiueos-boot / virtio) | 対象外 (aiueos ADR-0013 の bare-metal profile が扱う) |
+| G-E | `kotoba` の非言語コード | assurance は `security`、semantic identity / local store は新規 `codebase`、mesh runtime は新規 `mesh` へ移設。`cap_table` は capability host の実行機構、git / rad / DID adapter は host 境界なので `kotoba` に残す |
+| G-H | taxonomy の CI gate | 21 repo の宣言と production git deps の完全一致、role 方向、非循環性を `verify-repository-roles.cljs` と GitHub Actions で強制。compiler と kotoba 自身も対象 |
+| G-J | 二面出力の同値性 vector | `kotoba-verifier` が KIR SHA-256 / exports / effects / admission と native artifact integrity を独立検証する `dual-surface-v1` vector を所有 |
+| G-K | `kototama` の残プラグイン | transport は新規 `provider-transport`、Wasmtime / jco / Rust host / browser qualification は新規 `tender-component` へ移設。kototama core は Rust / npm 非依存 |
+| G-L | owner test の残置 | KIR / Canonical ABI / Wasm tools / Component heap / WIT / capability Component の 6 群を owner repo へ移設。compiler には compiler namespace を通る統合テストだけを残した |
+| G-I | T5 (aiueos-kernel / aiueos-boot / virtio) | 対象外 (aiueos ADR-0013 の bare-metal profile が扱う)。未解決 gap には数えない |
 
 ### 運用上の gap (この分割作業そのものから判明)
 
@@ -262,19 +275,19 @@ fleet CLI command と systemd packaging も `fleet` 側へ移した。kototama �
 
 | id | 事象 | 対策 |
 |---|---|---|
-| **G-M** | **共有 west checkout が別セッションのブランチに居座る。** 最初の抽出が `orgs/kotoba-lang/compiler` (evidence branch 上) を読んでしまい、main より 427 行古いコードを 11 repo に配ってしまった。同じ理由で `kotoba` / `kototama` の pin 前進も生成器では行えず (生成器はローカル working HEAD を pin する)、west.yml の当該 entry を直接最小編集する経路に切り替えた | 抽出・pin 前進は**必ず `origin/main` の pristine worktree から**行う。共有 checkout を読まない |
-| **G-N** | **superproject の manifest 編集が並行セッションに消される。** `repos.edn` の登録が別セッションの main 同期で 2 度失われた (1 度目は reset で完全消失、2 度目は stash 退避)。`repos.edn` は単一行 EDN なので機械的マージも効かない | manifest 編集も superproject 外の worktree で行うか、編集から着地までを最短にする。conflict は行マージでなく**登録パスの意味的 union** で解く |
-| **G-O** | **west-pin-verify guard が無関係な push を止める。** child repo への push (west.yml を一切変更しない) が、他セッションが残した 5-6 件の pin 退行で拒否され続けた。main が数分おきに進むため sync -> push の race に勝てない | guard の判定を「この push が west.yml を変更するか」で絞る。当面は `WEST_PIN_VERIFY_SKIP=1` + 理由の commit 記録 (本作業で 5 回使用。**west.yml を実際に変更した pin 前進では skip せず正規検証を通した**) |
-| **G-P** | **上流が動き続けるため分割は一度で終わらない。** 再抽出後に compiler main へ #283 が着地し、削除対象 3 ファイルを変更したため forward-port が必要になった | 分割は**着地までの時間が短いほど port コストが低い**。大きな分割は一気に通す |
+| **G-M** | **共有 west checkout が別セッションのブランチに居座る。** 最初の抽出が `orgs/kotoba-lang/compiler` (evidence branch 上) を読んでしまい、main より 427 行古いコードを 11 repo に配ってしまった | `cross-repo-change-guard.cljs start` が linked worktree、clean tracked state、HEAD = fresh origin/main を全対象 repo で検証し、共有 checkout からの開始を拒否する |
+| **G-N** | **superproject の manifest 編集が並行セッションに消される。** `repos.edn` の登録が別セッションの main 同期で 2 度失われた | guard が root と child の開始 SHA を snapshot。manifest conflict は行単位でなく登録 path の意味的 union として解決し、verify 前に上流移動を検出する |
+| **G-O** | **west-pin-verify guard が無関係な push を止める。** child push が他セッション由来の pin 差分で拒否された | `west_pin_guard_policy.cljs` が push range に west blob の変更がある場合だけ pin verify を要求。無関係 push / 同一 blob / changed blob の 3 vector を CI で固定し、skip 運用を廃止 |
+| **G-P** | **上流が動き続けるため分割は一度で終わらない。** compiler main の追加着地で forward-port が必要になった | guard の verify が root / 全 child を再-fetch し、snapshot から動いた対象を fail。今回も compiler の上流移動を検出し、最新 pristine base へ再適用してから着地した |
 
-## Resume point — 次に触る人へ
+## Maintenance point — 次に触る人へ
 
-1. 費用対効果が高い順: **G-L** (抽出実装のテストを新 repo へ)
-   -> **G-J** (二面出力の同値性 vector) -> **G-E** (`kotoba` の非言語コード) ->
-   **G-H** (taxonomy CI gate)。
-2. **作業前に必ず G-M を読む。** 抽出・pin 前進は共有 west checkout ではなく
-   `origin/main` の pristine worktree から行う。ここを外すと 427 行古いコードを
-   配ることになる (実際に起きた)。
+1. 横断変更の前に `cross-repo-change-guard.cljs start`、pin / PR 作成前に
+   `verify` を必ず通す。共有 west checkout は抽出元にしない。
+2. 新 repo または production git dep を加えたら `repository-rules.edn` と
+   21-repo gate を同じ PR で更新する。
+3. 実装・単体テスト・qualification は owner repo に置き、consumer には
+   integration / conformance だけを残す。履歴は現状表へ追記せず git に持たせる。
 
 ## References
 

@@ -1,0 +1,55 @@
+name: kotoba repository roles
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/verify-repository-roles.cljs'
+      - '.github/workflows/kotoba-repository-roles.yml'
+      - '90-docs/adr/2607266000-kotoba-stack-responsibility-split-t0-t3.edn'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/verify-repository-roles.cljs'
+      - '.github/workflows/kotoba-repository-roles.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: root
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: root/package-lock.json
+      - run: npm ci
+        working-directory: root
+      - name: Check out declared repositories
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir repos
+          for repo in kotoba compiler kotoba-kir artifact kgraph grammar kotoba-wasm kotoba-native \
+                      kotoba-component kotoba-verifier tender-native provider \
+                      provider-postgres fleet kotoba-core-contracts kotoba-lang \
+                      security codebase mesh provider-transport tender-component; do
+            gh repo clone "kotoba-lang/$repo" "repos/$repo"
+          done
+      - name: Verify declarations, real dependencies, direction, and cycles
+        run: |
+          npx nbb scripts/verify-repository-roles.cljs \
+            ../repos/kotoba ../repos/compiler ../repos/kotoba-kir \
+            ../repos/artifact ../repos/kgraph ../repos/grammar \
+            ../repos/kotoba-wasm ../repos/kotoba-native ../repos/kotoba-component \
+            ../repos/kotoba-verifier ../repos/tender-native ../repos/provider \
+            ../repos/provider-postgres ../repos/fleet \
+            ../repos/kotoba-core-contracts ../repos/kotoba-lang ../repos/security \
+            ../repos/codebase ../repos/mesh ../repos/provider-transport \
+            ../repos/tender-component
+        working-directory: root

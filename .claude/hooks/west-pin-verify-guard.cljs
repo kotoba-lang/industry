@@ -16,7 +16,8 @@
          '[babashka.process :as p]
          '[clojure.string :as str]
          '[clojure.java.io :as io]
-         '[scripts.nbb-compat :as compat])
+         '[scripts.nbb-compat :as compat]
+         '[scripts.west-pin-guard-policy :as policy])
 
 (def node-fs (js/require "node:fs"))
 (def node-os (js/require "node:os"))
@@ -121,7 +122,7 @@
         (let [head-blob (:out (git top "rev-parse" "-q" "--verify" "HEAD:manifest/west.yml"))
               main-blob (:out (git top "rev-parse" "-q" "--verify" "origin/main:manifest/west.yml"))]
           ;; west.yml を持たない repo / 差分なし → 対象外
-          (when (or (str/blank? head-blob) (str/blank? main-blob) (= head-blob main-blob))
+          (when-not (policy/requires-verification? head-blob main-blob)
             (allow!))
           (verify! top "--baseline" "origin/main" "--candidate" "HEAD"))))
 
