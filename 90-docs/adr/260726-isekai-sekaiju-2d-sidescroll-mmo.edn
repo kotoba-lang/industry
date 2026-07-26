@@ -70,21 +70,64 @@ and fold nightly, market shards fold every five minutes, and an alarm fires at 2
 novelty blocks or 24 hours un-folded. Any Kotobase-backed workload in this fleet
 needs an equivalent explicit fold owner.
 
-# Blocking prerequisites, unresolved as of this entry
+# Phase 0, run 2026-07-26: transport settled, three larger blockers found
 
-1. **Worker-to-PostgreSQL transport is unverified.** `kotobase-storage-postgres`
-   takes a `javax.sql.DataSource` and is JVM-only; a Durable Object cannot use it
-   directly. Either the DO goes through `kotobase-server`'s XRPC surface hosted by
-   `gftdcojp/net-kotobase`, or a Worker-side `kotobase-storage` provider is built on
-   Hyperdrive plus `kotoba-lang/org-postgresql-wire`. This is not decided and blocks
-   implementation.
-2. **`isekai.social` still persists to D1 (ADR-0037 phase 1).** The org policy forbids
-   silent D1 fallback for new persistence, so wallet, inventory and save need a
-   Kotobase adapter before the game's economy can ship. Until then the game fails
-   closed rather than writing to D1.
-3. **`kotobase-storage-postgres` is not registered in `manifest/west.yml`** — it is
-   checked out under `orgs/kotoba-lang/` without a manifest entry.
+**Transport.** Durable Objects reach PostgreSQL through a Worker-side async
+`kotobase-storage` provider over Hyperdrive — `kotobase.storage.postgres-worker`
+(`.cljs`), living beside the JVM adapter in `kotobase-storage-postgres` so both
+share one schema. It passes `kotobase.storage.async-contract/verify` 8/8 against
+real PostgreSQL 17.9; the JVM adapter passes its own contract 8/8 on the same
+server. The write half of the round trip is proven: 28 field quads committed to
+the sekaiju `/world` ref, head matching, blocks and ref row landing in PostgreSQL.
+
+Two candidates were rejected. Routing through `kotobase-server`'s XRPC surface at
+kotobase.net would make the durable plane B2-backed, because B2/S3 is what
+net-kotobase actually stores into. And the first draft of this entry was **wrong**
+about `kotoba-lang/org-postgresql-wire`: that repository points the other way — it
+*serves* the PostgreSQL wire protocol on top of kotobase so `psql` can query
+kotobase — and cannot reach a PostgreSQL server. Anything citing it as a client
+path should be corrected.
+
+Two operational notes worth carrying: the injected query function must tolerate
+concurrent statements (kotobase fetches blocks while another statement is in
+flight, so a single node-postgres `Client` interleaves results — use a pool, which
+is what Hyperdrive hands a Worker anyway), and both Hyperdrive configs on the
+Cloudflare account point at RisingWave, a streaming engine, not a transactional
+PostgreSQL.
+
+# Blocking prerequisites
+
+1. **The cljs read path cannot read back what the cljs write path wrote.**
+   `transact!` and `head` succeed against real PostgreSQL; `q`, `pull`, `datoms`
+   and `query` then die on `block-miss` for a block that is demonstrably present
+   — confirmed by querying `kotobase_blocks` directly and by calling `-get-blocks`
+   on that exact CID, which returns the bytes. The trampoline retries the first
+   two misses and the third never reaches the retry handler. Substituting the
+   canonical `kotobase.server.trampoline` for `kotobase-engine`'s private
+   duplicate fails identically, which rules out the miss-signal encoding and
+   points at `kotobase-peer`'s cljs `hydrate-chain`/`hydrate-db` not surfacing
+   misses through the promise it returns. This blocks **every Worker-side reader
+   in the fleet**, not just this game. Owner: `kotobase-peer`.
+2. **The entire `kotobase.storage` layer is unpublished.** `kotobase-storage`,
+   `kotobase-storage-s3`, `kotobase-storage-ipfs`, `kotobase-storage-postgres`
+   and `kotobase-engine` each have zero commits, no GitHub repository and no
+   `manifest/west.yml` entry. `kotobase`'s own `src/kotobase/core.clj` and
+   `core.cljs` are untracked, and the `deps.edn` on `kotoba-lang/kotobase` main
+   still describes the legacy IStore surface — the one the org policy tells
+   products not to depend on. So the Datomic-shaped API that policy names as the
+   target does not exist in any fetchable form; a fresh clone or CI run cannot
+   build it. Registering `kotobase-storage-postgres` alone is impossible — the
+   whole chain has to land first.
+3. **`isekai.social` still persists to D1 (ADR-0037 phase 1).** The org policy
+   forbids silent D1 fallback for new persistence, so wallet, inventory and save
+   need a Kotobase adapter before the game's economy can ship. Until then the game
+   fails closed rather than writing to D1.
+4. **No transactional PostgreSQL instance is provisioned.** Phase 0 verified
+   against a local PostgreSQL 17.9. Choosing and paying for a managed instance is
+   an owner decision.
 
 # Status
 
-Design only. No implementation has started. Phase 0 exists to close prerequisite 1."}]
+Design complete. Phase 0 partially done: transport decided and the write path
+proven. Implementation waits on prerequisites 1–4, of which 1 and 2 are fleet-wide
+concerns that outrank this game."}]
