@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 13271,
-  :pageviews-7d 6944,
-  :uniques-7d-sum 423,
+ {:requests-7d 11488,
+  :pageviews-7d 5954,
+  :uniques-7d-sum 389,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 75}
+  [{:path "/", :requests 78}
    {:path "/robots.txt", :requests 26}
-   {:path "/feed/fork-stats.edn", :requests 24}
+   {:path "/feed/fork-stats.edn", :requests 25}
    {:path "/api/events", :requests 17}
    {:path "/sitemap.xml", :requests 13}
    {:path "/js/app.js", :requests 6}
    {:path "/api/fork/feed", :requests 5}
    {:path "/feed/index.edn", :requests 4}],
-  :status-mix {:ok 1193, :server-error 31, :client-error 5},
+  :status-mix {:ok 1359, :server-error 36, :client-error 5},
   :channel-mix
-  {:channel 192, :probe 670, :unclassified 331, :ok-total 1193},
+  {:channel 196, :probe 788, :unclassified 375, :ok-total 1359},
   :window "24h"},
- :as-of "2026-07-25",
+ :as-of "2026-07-26",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 3},
  :top-paths
- "上位 page (24h, 2xx/3xx・channel-allowlist済): / 75 · /robots.txt 26 · /feed/fork-stats.edn 24 · /api/events 17 · /sitemap.xml 13 | 4xx(probe) 0% · 5xx 3% · probe(200-fallback) 56% · unclassified 28%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): / 78 · /robots.txt 26 · /feed/fork-stats.edn 25 · /api/events 17 · /sitemap.xml 13 | 4xx(probe) 0% · 5xx 3% · probe(200-fallback) 58% · unclassified 28%",
  :signal
- "isekai.network 実測 13271 req/7d・423 uniques(日次和)・うち4xx probe 0%(24h)",
+ "isekai.network 実測 11488 req/7d・389 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
