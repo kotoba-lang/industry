@@ -8,31 +8,31 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 14511,
-  "app-aozora-appview" 12051,
-  "app-aozora-spa" 1574},
+ {"app-aozora-pds" 14612,
+  "app-aozora-appview" 12163,
+  "app-aozora-spa" 1582},
  :zone
- {:requests-7d 191028,
-  :pageviews-7d 10770,
-  :uniques-7d-sum 1003,
+ {:requests-7d 196677,
+  :pageviews-7d 10779,
+  :uniques-7d-sum 1010,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 211794}
+  [{:path "/v1/datoms", :requests 211764}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 183778}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2006}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 142}
+    :requests 188854}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2035}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 131}
    {:path "/v1/transact", :requests 75}
    {:path "/api/q", :requests 60}
    {:path "/.terraform/credentials.tfrc.json", :requests 48}
-   {:path "/federation-pilot/did.json", :requests 48}],
-  :status-mix {:ok 399524, :client-error 936, :server-error 186},
+   {:path "/federation-pilot/did.json", :requests 45}],
+  :status-mix {:ok 404536, :client-error 949, :server-error 186},
   :window "24h"},
  :as-of "2026-07-27",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 211794 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 183778 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2006 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 142 · /v1/transact 75 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 211764 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 188854 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2035 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 131 · /v1/transact 75 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 191028 req/7d・1003 uniques(日次和)・うち4xx probe 0%(24h)、workers 28136 inv/7d"}
+ "aozora.app 実測 196677 req/7d・1010 uniques(日次和)・うち4xx probe 0%(24h)、workers 28357 inv/7d"}
