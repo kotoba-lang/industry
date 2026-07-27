@@ -192,6 +192,36 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     kagi:itonami-org-root ...` で再 mint**)。merge 時は
     `bin/kagi get itonami-<dept>-head-chain > /tmp/chain.edn` で取り出す。
 
+## marketplace 共有 identity seed (ADR-2607275000、2026-07-27)
+
+- **`itonami-marketplace-kotobase-seed`（kagi vault、compartment `personal`）** —
+  cloud-itonami の marketplace 7 actor（order / onboarding / listing / settlement /
+  fulfillment / crossborder / returns）が**共有する** Ed25519 seed（base64 32 byte）。
+  did は `did:key:z6Mkid37JoU81KWZCA5KbrX3t8Ji9dkH6azjrAKyg63XyvTm`（公開値）、
+  graph/ref は `marketplace`。取得: `bin/kagi get itonami-marketplace-kotobase-seed`。
+  - **なぜ 1 本を共有するか**: `:apex` は graph scope == issuer DID を要求するので、
+    1 つの ref を共有する actor 群は 1 つの鍵を共有するしかない。actor ごとの帰属は
+    鍵ではなく `marketplace.persist/stream-ctx` の per-actor 台帳が担保する。
+  - **Cloudflare 側**: 7 worker の secret `KOTOBASE_SECRET_KEY` に投入済み
+    （wrangler secret は読み出せないので、kagi が唯一の可読な複製）。
+  - **1Password には入れていない。** kagi 側が push で同期し、PQC + 台帳 + 非対話
+    読み出しを持つため。**代わりに 1Password に置くべきは kagi の recovery
+    passphrase**（単一障害点を分ける）—— これはオーナー手動。
+
+## kagi の cloud 同期と端末登録（2026-07-27）
+
+- **`kagi push` / `pull` / `sync` は 2026-07-27 まで一度も動いていなかった**
+  （apex に対して常に 401）。原因は自前 `cacao.clj` の 3 つの乖離で、最大のものは
+  `iat` にナノ秒が付くと apex の `parse-utc-seconds`
+  （`^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$` のみ）に落ちること。
+  修正済み（kagi `6c514cb` 系）。暗号化 vault は
+  `kotobase/db/<did>/kagi-vault` に seq 付きで載る。
+- **2 台目の登録は `kagi device request|grant|accept`** — master passphrase を
+  新端末に渡さずに VMK を hybrid KEM（X25519 + ML-KEM-768）で受け渡す。
+  `grant` は `--fingerprint` 必須（中間者防止。人間が読み上げる手順を省けない設計）。
+  **`kagi device revoke` は access-list の変更であって、その端末が既に得た VMK の
+  取り消しではない** —— 紛失端末は vault 侵害として扱い secret 自体を rotate する。
+
 ## swap plane testnet key (ADR-2607261500、2026-07-26)
 
 - **`SWAP_SEPOLIA_TESTNET_KEY`（kagi vault、compartment `personal`）** — Ethereum
