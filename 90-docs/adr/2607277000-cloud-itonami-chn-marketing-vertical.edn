@@ -122,12 +122,33 @@ Governor `:survey-integrity-governor`。flagship HARD は2つ、いずれも
   `gen-west-manifest.cljs --entry` で当該 entry のみの最小 diff を生成
   （west.yml は +10 行、pin 検証 OK）。
 
-## Follow-ups（本 ADR のスコープ外、別途）
+## Follow-ups の現在地（2026-07-27 更新）
 
-- **`cloud-itonami-isic-7310` / `7320` の catalog に \"CHN\" 行を追加する。**
-  gate は sibling repo が持つが、generic actor が中国を「未カバー」と
-  報告し続けるのは不正確。additive な変更なので独立に着地させる。
-- `cloud-itonami-assoc-*` の中国業界団体（chn 0件）と
-  `cloud-itonami-municipality-*` の中国都市（0件）のカバレッジ。
-- `cloud-itonami-gtm-data` の iso3166 カバレッジ（223件中81件）。
+- ~~**`cloud-itonami-isic-7310` / `7320` の catalog に \"CHN\" 行を追加**~~
+  → **完了**（7310 `22e3f57` / 7320 `0365754`）。両行は `:out-of-scope-here`
+  を **data として**持ち、generic actor が判定「しない」ゲート
+  （7310: 广告批准文号 / 7320: 涉外调查许可证・项目审批）と、それを実装する
+  sibling repo を名指しする。テストが「境界が宣言されていること」を検証する。
+  catalog 行を足すだけだと「中国はカバー済み」と誤読されるため。
+- **`cloud-itonami-assoc-*` の中国業界団体** → **部分的に着手**。
+  `cloud-itonami-assoc-2910-chn-caam`（中国汽车工业协会 CAAM、ISIC 2910、
+  deu-vda / gbr-smmt の CHN peer）を作成。**assoc family 初の chn** で、
+  それまでは 106 repo 中 usa 38 / jpn 18 / deu 6 / gbr 4 / fra 4 / **chn 0**
+  だった。CAAM 自身の 协会简介 ページ（発布 2023-06-12）を 2026-07-27 に
+  読んで 2 entry を seed。
+  - **中国银行业协会（CBA、ISIC 6419）は着手して断念した。** `china-cba.net`
+    が HTTP/HTTPS ともこのネットワークから到達不能で、この family は
+    `official-association-site` provenance に二次情報を認めない。CBA は
+    どのファイルにも登場しない — **穴は穴のまま残す**。6419 は多国カバー
+    （are/aus/che/deu/esp/fra/jpn…）があるので、到達可能な環境から
+    再試行する価値がある。
+  - CAAM の 2 entry は**同一 URL を引く**。到達できた CAAM ソースがその 1
+    ページだけだったため、VDA sibling と違い**独立した自律規範文書は主張
+    しない**（`:self-regulatory-mandate` であって `:self-regulatory-code`
+    ではない）。`coverage-note` がその理由を述べ、テストがそれを検証する。
+- `cloud-itonami-municipality-*` の中国都市（0件）— 未着手。
+- `cloud-itonami-gtm-data` の iso3166 カバレッジ（223件中 **82**件。
+  2026-07-27 addendum で CHN の1件が埋まった）。**残り141件を一括生成する
+  なら捏造なしでは不可能** — 各 repo につき実在の見込み先を fetch して
+  確認する必要があり、それが 07-25 run が 81 件で止まっている理由でもある。
 "}]
