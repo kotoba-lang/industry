@@ -1035,16 +1035,17 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
 
 ### 今日の既知ブロッカー（回避策を知らずに時間を溶かさないこと）
 
-1. **project linker が `:capabilities` を拒否** — 多ファイル経路の ns は `:export` と
-   alias-only `:require` のみ許す。**「多ファイル」と「capability」は現状排他**。
-2. **`kotoba` CLI の `compile` verb は policy を `{}` 固定で渡す** — capability を使うと必ず
-   `capability policy denies required effects`。回避は `kotoba.compiler.core/compile-source`
-   を直接呼ぶこと。
-3. **全 8 capability kit（clock/http/llm/log/state/storage/stream-object/ui）は
+1. ~~project linker が `:capabilities` を拒否~~ / ~~CLI が policy を `{}` 固定で渡す~~ —
+   **どちらも 2026-07-27 に解消**（compiler#332 / kotoba#432 + pin 前進 #433）。
+   多ファイル project で `:capabilities` を宣言でき、`--policy` に compiler の
+   `{:allow #{[:cap/call <id>]}}` を渡せば CLI からそのままコンパイルできる。
+   `--policy` 無しは空 policy（deny-by-default は不変）。`:schemas` は project mode では
+   引き続き拒否（同名 schema の衝突規則が未決定）。
+2. **全 8 capability kit（clock/http/llm/log/state/storage/stream-object/ui）は
    `:reference :implemented` だが `:wasm-aot`/`:native-aot`/`:jit` は `pending`**。
-4. **ingress（Request→Response）capability はどちらの面にも無い** — Cloudflare Worker の
+3. **ingress（Request→Response）capability はどちらの面にも無い** — Cloudflare Worker の
    エントリは cljs のままにする（ADR-2606290000 と整合）。
-5. **fs/process/exec capability も Kotoba script host（`kbb`）も無い** — build スクリプトは
+4. **fs/process/exec capability も Kotoba script host（`kbb`）も無い** — build スクリプトは
    nbb 据え置き。`kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner
    ではない（名前で誤解しないこと）。
 

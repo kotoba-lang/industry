@@ -114,14 +114,24 @@ limits: nodes 32 / queued-events 64）を定義する。
 
 ### 8. 「残りも .kotoba へ」を塞いでいる具体的ブロッカー（2026-07-27 実測）
 
-1. **project linker が `:capabilities` を受け付けない** — `--source-path` / `--project` の
-   多ファイル経路は ns に `:export` と alias-only `:require` の 2 節しか許さず、
-   `:capabilities` を書くと `only one :export and alias-only :require clauses are admitted`。
-   よって現状は**「多ファイル」か「capability」のどちらか一方**しか選べない。実アプリを
-   `.kotoba` で書く上での最大の障害はこれ。
-2. **`kotoba` CLI の `compile` verb が policy を `{}` 固定で渡す** — capability を使う
-   プログラムは CLI 経由では必ず `capability policy denies required effects` になる。
-   compiler API を直接呼べば通るので、launcher 側の受け渡し修正で解ける。
+1. ~~project linker が `:capabilities` を受け付けない~~ **解消済み（2026-07-27、
+   kotoba-lang/compiler#332 merged `892d3ddb`）**。`module-info` が `:capabilities` 節を
+   frontend と同一の bounds で受理する。リンク後の合成 ns には **`:capabilities` を載せない** —
+   その時点で named cap-call は整数 id に降りており used-keyword 集合が空になるため、
+   union を再宣言すると frontend 自身の declare-then-check に落ちる。宣言チェックは
+   per-module で既に済んでおり、admission と `requiredCapabilities` は整数形から算出される
+   ので安全性は落ちない。`:schemas` は同名 schema の衝突規則が別決定なので**引き続き拒否**。
+2. ~~`kotoba` CLI の `compile` verb が policy を `{}` 固定で渡す~~ **解消済み（2026-07-27、
+   kotoba-lang/kotoba#432 merged `46ad06ed`、pin 前進 #433 `ae867b9d`）**。
+   `compile-policy-result` が `--policy` を読んで `compile-project` / `compile-source` の
+   両方に渡す。legacy の `policy-result`（`{:kotoba.policy/capabilities #{...}}` へ正規化）
+   とは**別関数**にしてある — 面が違う shape を食わせると全 effect が黙って deny される。
+   `--policy` 無しは空 policy のままで deny-by-default は不変。
+
+   **実測（pinned deps のみ、override なし）**: `:ui/commit` / `:ui/next-event` を宣言・使用する
+   3 モジュール project が CLI から web / wasm 両ターゲットに出力でき、artifact は
+   `requiredCapabilities [9 10]` を報告する。grant を欠くと instantiate 時に
+   `capability-grant-mismatch`。
 3. **legacy `wasm emit` は多ファイル非対応** — `mod-a/double-it` が `unknown-form`。
    多ファイルが要るなら `compile` 経路に移る必要がある。
 4. **ingress capability がどちらの面にも無い** — Worker のエントリは cljs のまま。
