@@ -188,6 +188,52 @@ gap として書き残すのではなく閉じた。
    配送業者から入ってくる想定だが、その取り込み経路（`logistics` との結線）は未実装。
    現状は request 経由で渡す。
 
+## 着地状況（2026-07-27 時点。すべて default branch 上）
+
+| repo | pin (= HEAD) | test | lint |
+|---|---|---|---|
+| `kotoba-lang/crowdfunding` | `ae91376` | 134 / 426 | 0 / 0 |
+| `cloud-itonami-crowdfunding-campaign` | `2fea408` | 22 / 67 | 0 / 0 |
+| `cloud-itonami-crowdfunding-pledge` | `265b7e9` | 33 / 80 | 0 / 0 |
+| `cloud-itonami-crowdfunding-collection` | `fe64b64` | 25 / 81 | 0 / 0 |
+| `cloud-itonami-crowdfunding-payout` | `be4336f` | 28 / 100 | 0 / 0 |
+| `cloud-itonami-crowdfunding-fulfillment` | `8f5e238` | 24 / 81 | 0 / 0 |
+
+superproject: `c76daa6`（初回登録）→ `9f55c9d`（fulfillment + cap check）。
+etzhayyim 側の supersede 記録: `585de82` → `75d3983`。
+**未 merge の branch / PR / worktree は残っていない。**
+
+## 次に着手する場合の起点（resume point）
+
+再開時の最初の 3 コマンド:
+
+```bash
+cd orgs/kotoba-lang/crowdfunding && clojure -M:dev:test   # 134 tests が通ることを確認
+cd orgs/cloud-itonami/cloud-itonami-crowdfunding-fulfillment && clojure -M:dev:run
+nbb scripts/verify-west-pins.cljs --baseline origin/main --candidate manifest/west.yml \
+  --only crowdfunding,cloud-itonami-crowdfunding-fulfillment    # pin の健全性
+```
+
+優先順位つきの次作業:
+
+1. **discovery アクター**（gap 1）。`crowdfunding.discovery/rank` と `search-doc` は
+   純関数として完成しているので、`search` への index 投入と、除外理由を返す
+   read surface を持つアクターを作るだけ。money を触らないので governor は軽い。
+2. **fulfillment の上流結線**（gap 4）。追跡番号・配送不能理由を `logistics` から
+   取り込む経路。現状は request 経由。
+3. **実 LLM advisor**（gap 3）。`murakumo-main` alias 解決 → endpoint-only fallback の
+   既存パターン（`70-tools/bmc` の `GFTD_LLM_*`）に合わせる。
+4. **CI**（gap 2）。`:local/root` のままでは単独 checkout で解決しないので、
+   monorepo 側の集約 CI か push 済み SHA での git 座標化のどちらかを選ぶ判断が要る。
+
+**運用上の注意（実測）**: `nbb scripts/gen-west-manifest.cljs --entry <name>` は
+この機で **1 回あたり 20 分以上**かかり、ローカル `repos.edn` に当該 entry が無いと
+「生成結果に entry がありません」で失敗したあと **sleep ループで固まる**（実測 30 分、
+CPU 0%）。west.yml の 1〜数 entry の更新は、`origin/main` から worktree を切って
+該当ブロックだけ手で splice し、`scripts/verify-west-pins.cljs --only <names>` で
+サーバ側検証する方が速く確実（数秒）。CLAUDE.md が正経路とする API single-entry commit
+と同じ保証が得られる。
+
 ## 改訂履歴
 
 - **2026-07-27（同日、後続作業）**: 初版で gap として挙げた 2 件を閉じた。
