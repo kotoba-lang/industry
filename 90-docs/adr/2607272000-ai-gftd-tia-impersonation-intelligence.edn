@@ -260,6 +260,56 @@ JPEG 正規化は**明示的な依存**にした（Cloudflare Images binding 等
 3倍リサイズ ≤6 bit（avatar-reuse しきい値 0.90 を通る）/ 明度シフト ≤4 bit /
 無関係な画像 ≥16 bit。9 tests / 18 assertions。
 
+## Worker host（2026-07-27 追記、gap D を解消）
+
+### 保存先は D1。Durable Object のストレージではない
+
+各 DO の SQLite は private なので、そこに durable plane を置くと datom 面が
+object の数だけ孤島に割れる（CLAUDE.md がこの失敗を名指ししている）。D1 は共有なので
+単一 ref が単一のまま保たれる。
+
+**write lease も fencing epoch も無い。** ref ポインタは条件付き `UPDATE ... WHERE cid = ?`
+で動き、SQLite が触った行数を返す。1行ならこの writer が CAS に勝ち、0行なら他が勝った
+ので相手の値に対してリトライする。データベース自身のトランザクションによる
+linearizable CAS なので、その上に lease を置くと「誰が書いてよいか」の2つ目の、
+より弱い真実の源ができるだけ。
+
+ブロックは BLOB ではなく base64 TEXT。D1 は BLOB カラムをバージョンによって異なる形で
+返してきた実績があり、バイト配列が黙って別の形で届くと content-addressed store が
+読み出し時にだけ壊れる。
+
+### `:advanced` がバインディングのメソッド名を消していた
+
+最初のビルドは `.run` と `.meta.changes` がリネームされた bundle を出していた。本番なら
+`stmt.run()` が throw し `changes` が `undefined` を読み、**すべての compare-and-set が
+「負けた」と報告し、ref は一度も進まず、TIA は 200 を返しながら何も永続しない**。
+nbb のテストは最適化なしで走るので検出できない — bundle だけが検出できる。`^js` ヒントで
+解消し、`verify-bundle.cljs` を build に組み込んで恒久的なゲートにした。
+
+同種の発見をもう1つ: `tia.store/open!` の型プローブが `decrypt-fn` を1バイトで呼び、
+実装された `decrypt-fn` は IV より短い入力を reject するため、unhandled rejection が
+起動時にプロセスを落としていた。**設定ミスを明確なエラーにするための検査そのものが
+クラッシュになっていた。**
+
+### security control は実装した
+
+`kotobase.core/open` は `:encrypt-fn identity` を受け入れる（`ifn?` しか見ない）。それは
+TIA の tx ブロック — スクリーンショットの digest、実名プロフィール、他人への申し立て —
+を平文で保存することを意味する。AES-GCM をブロックごとランダム IV で、**意図的に
+非決定的に**（決定的な暗号を content-addressed store に載せると、平文の候補を持つ者が
+CID を再計算するだけで存在を確認できる）。blind index は**別鍵**の HMAC-SHA-256
+（同じ鍵だと検索トークンが復号オラクルの入力を兼ねる）。鍵は 64桁 hex（base64 は
+切り詰めても valid なままで、黙って短い鍵になる）。
+
+### 権限はルーティングテーブルに1箇所だけ置く
+
+ハンドラごとのチェックにしない（忘れたハンドラが漏らす）。**subject は `submitJob` を
+呼べない** — 自分の巡回に candidate を提出できる subject は、`g8` が要求する2件目の
+独立確認を自作できてしまう。**seeker は review / approve / file のいずれも呼べない。**
+
+22 tests / 67 assertions。D1 backend は kotobase 自身の storage conformance suite を
+通している。**未デプロイ**（D1 の id も secrets も未設定）で、UI の `:act` は inert のまま。
+
 ## Consequences
 
 - gftdcojp に impersonation 検知の正本ができた。`ai-gftd-content-protection`
