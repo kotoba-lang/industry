@@ -91,8 +91,30 @@ ADR-2607268000 が「~25 repo が keep-in-sync コメント付きで複製し、
   （`rotate` は item DEK の回転）。紛失端末は vault 侵害として扱い secret を rotate する。
 - **同期の衝突は `:kagi.vault/seq` の last-writer-wins。** 2 台で同時に別 item を
   足すと片方が失われる。item 単位マージが要る。
-- **`cacao.clj` は依然ローカルコピー。** 共有ライブラリへの移行が本来の修正。
+- ~~`cacao.clj` は依然ローカルコピー~~ **解消（同日）。下記「共有ライブラリへの移行」。**
 - **`recovery create` による Shamir share 発行と、実 2 台目での
   `unlock-enable-keychain` はオーナーの手元操作**（passphrase 入力と share の
-  物理保管）—— agent が代行すべきものではない。"
+  物理保管）—— agent が代行すべきものではない。
+
+## 共有ライブラリへの移行（同日、追記）
+
+apex の受理規則を **`org-chainagnostic-cacao` の `cacao.core/mint-kotobase-apex`**
+に集約し、kagi はそれを呼ぶだけにした。コピーにパッチを当てるのではなくコピーを
+消したのが本来の修正であり、ADR-2607268000 の直接の適用である。
+
+**設計上の要点: 違反は mint 時点で throw する。** apex の拒否は理由を持たない
+（署名不正・未知 DID・nonce 再利用・時刻形式のすべてが同じ 401）ので、**理由は
+mint 側で作るしかない**。`mint-kotobase-apex` は graph scope・caip122・
+ISO 秒精度・nonce のいずれかが欠ければ、フィールド名を名指しした例外を投げる。
+
+`mint` には `:header-type`（既定 `eip4361`）を足しただけで、既存 consumer は
+バイト単位で不変（テストで固定）。
+
+**意図的に移行していないもの**: kagi の自己発行 `mint`/`verify` と、その下の
+SIWE/CBOR ヘルパ。これらは kagi が mint も verify も行うので、乖離しても
+自己整合的であり、「理由を言わない他人のサービスからの黙った 401」にはならない。
+リスクの質が違うため別 follow-up とする。
+
+実測: 共有ライブラリ経由で `kagi push` が seq 2、`sync` が往復。
+kagi 78 tests / 408 assertions、cacao 43 tests / 171 assertions、いずれも 0 failures。"
   }]
