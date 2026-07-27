@@ -88,6 +88,19 @@
   system resolver から向ける。常駐は **LaunchDaemon**（LaunchAgent はログアウトで死に、
   SSH 越しの `launchctl list` に現れない — murakumo が実測で記録済みの罠）。
 
+## 着地（2026-07-26/27）
+
+| | |
+|---|---|
+| `kotoba-lang/noise` | `8eccaff35e1c6e5dec64fb81a9d62c7618e4b018`（public、**CI green**）|
+| `kotoba-lang/kekkai-node` | `a2d71684657644f6f484ee6d5aa99b8e66bd06b0`（public、**CI green**: nbb job = pure core + real-socket E2E、jvm job = pure core + lint）|
+| 本 ADR | `com-junkawasaki/root` main `a1bd3698` |
+| west 登録 | main `88021426`（west.yml、当該 2 entry のみ）+ `dfb51709`（repos.edn extra-projects）。両 pin は commit 前に GitHub API でサーバ側検証（`status=identical` = default branch tip）|
+| kekkai README | `kotoba-lang/kekkai` main `4d9a5da7`（データ面 agent の所在を明記、残タスクを「netmap を署名付きにする」へ更新）|
+
+PR は無し（新規 repo の初期 commit + 最小 diff の manifest 登録なので、API server-side
+clean commit で直接着地。open PR / 未 merge branch / stash / worktree はゼロ）。
+
 ## 検証（2026-07-26 実測）
 
 - `noise`: **25 tests / 152 assertions、両 runtime（nbb + @noble / Temurin 21 + JCA）で 0 failures**、
@@ -113,6 +126,16 @@
    → 直近数回の attempt を世代 id 付きで保持して解決。
 2. **順序が乱れた応答が確立済み session を巻き戻せた**。両端が別 session を持ち、以後
    全フレームが認証失敗。→ 世代 id が現在以上のときだけ採用。
+
+### CI が見つけた実バグ 1 件
+
+**`nbb.edn` の `:deps` が nbb に `bb`（babashka）を起動させていた。** 初回 CI が
+`/bin/sh: 1: bb: not found` で落ちた — ローカルは全部 green だったが、それは**この
+workstation に bb が入っていたから**。bb は ADR-2607173000 で script host として退役
+済みなので、依存していたこと自体が誤り。両 repo の `nbb.edn` から `:deps` を外し
+（sibling は `--classpath` で渡す、元々全ての documented invocation がそうしていた）、
+**PATH から bb を除いた状態で再検証**して green を確認した。教訓: 「ローカルで通った」は
+「CI で通る」の証拠にならない — ツールの有無が環境差として効く。
 
 ### 性能（実測、都合の良い数字ではない）
 
@@ -143,6 +166,46 @@ platform buffer の marshalling と interpreted glue。handshake / 制御 / ssh�
   前の能動的 re-handshake をまだしない（180 s 境界で次の dial までギャップ）。
 - relay は netmap の先頭 1 本を使う。`relay/home` は latency 選択を実装済みだが
   agent が relay mesh を probe していない。
+
+### この ADR の検証が **カバーしていない** 同 repo 内の並行作業（2026-07-27 時点）
+
+`kekkai-node` の working tree には別セッションが進行中の実装がある: `src/kekkai/node/packet.cljc`
+/ `packet_bridge.cljs` / `test/kekkai/node/packet_test.cljc`（L3 packet plane）、
+`platform/{android,apple}`、`docs/`、`kotoba/kekkai/packet_plane.kotoba`、
+`kekkai-tun-agent.example.edn`、`scripts/{build-android-packet-plane.sh,verify-packet-plane.mjs}`。
+**これらは本 ADR の測定・commit のどちらにも含まれない**（未検証のものを検証済みの主張の
+下に push しないため未 commit のまま残した）。着地させる担当者への申し送り:
+
+1. packet plane を commit するとき、README の「No L3/TUN plane」gap を必ず書き換える
+   （今の README は commit 済み状態としては正しいが、packet plane が入った瞬間に自己矛盾する）。
+2. `scripts/build-android-packet-plane.sh` と `scripts/verify-packet-plane.mjs` は
+   本 workspace の「`.sh` / `.mjs` を新規に書かない、nbb で書く」規則（CLAUDE.md）に反する。
+3. `src/kekkai/node/signed_netmap.cljs`（Ed25519 envelope 検証）は実装済みだが
+   `agent/load-netmap` が呼んでいない。下記 resume point の 1 番目がこれ。
+
+### Resume point（次に手を付ける具体的な順序）
+
+```bash
+CP="src:test:../bytes/src:../noise/src:../org-ietf-dns/src:../org-ietf-turn/src"
+cd orgs/kotoba-lang/kekkai-node
+nbb --classpath "$CP" run-tests.cljs && nbb --classpath "$CP" test/e2e.cljs   # 現状 green を確認
+```
+
+1. **netmap 署名検証を agent に配線する（最優先）**: `agent/load-netmap` が
+   `kekkai.node.signed-netmap/verify-envelope` を通るようにし、authority SPKI を config に
+   置く。合わせて kekkai 側（control plane）が署名 envelope を**発行**するようにする。
+   これが閉じるまで「node は netmap file を書ける者を信頼する」状態が残る。
+2. **`netmap/permitted?` / `sessionable` を agent が enforce する**（今は
+   `dialable`/`:overlay` のみ）。port 単位 ACL と inbound-only edge は実装・test 済み。
+3. **expiry 前の能動的 re-handshake**（今は `:rekey-due` を報告するだけなので 180s 境界で
+   次の dial までギャップが出る）。
+4. **実 NAT 測定**: 2 台以上の実 fleet node に agent を置き、`disco/path-report` の
+   `:via` と `stun/candidates` の `:symmetric?` を記録する。これが取れるまで hole punching の
+   成功率は不明のまま。
+5. **throughput**: hot path を platform buffer のまま通す（port 境界の内側で完結）か
+   shadow-cljs で compile。現状 ~100–600 pkt/s。
+6. murakumo overlay（共有 `--auth-key` + AES-GCM）からの移行と、Tailscale SSH 依存の解消は
+   1 と 4 が終わってから。
 
 ## Consequences
 
