@@ -1,0 +1,122 @@
+[{:db/id -1
+  :adr/id "adr-2607270100-kotoba-cloudflare-worker-and-ui-feasibility-spike"
+  :adr/title "ADR-2607270100: .kotoba は cljs shell の背後で Cloudflare Workers 上に deploy できる / UI は駆動できない（実測 spike）"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-27"
+  :adr/last-verified "2026-07-27"
+  :adr/last_verified "2026-07-27"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-cloudflare-worker-and-ui-feasibility-spike"
+  :adr/repo "kotoba-lang/kotoba-worker-demo"
+  :adr/authoritative-for
+  [".kotoba guest を Cloudflare Workers に載せる唯一動作する配線"
+   ".kotoba が frontend/UI をどこまで担えるか（担えないか）"
+   "kotoba cljs backend と wasm backend の能力差・実測寿命"]
+  :adr/related
+  ["90-docs/adr/2606290000-all-workers-cljc-only-policy.edn"
+   "90-docs/adr/2607252500-kotoba-wasm-component-first-execution-boundary.edn"
+   "90-docs/adr/2607201300"
+   "90-docs/adr/2607122200"]
+  :adr/evidence
+  {:live-url "https://kotoba-worker-demo.04-feasts-minded.workers.dev"
+   :repo "https://github.com/kotoba-lang/kotoba-worker-demo"
+   :commit "ea5207f"
+   :guest-bytes 730
+   :parity-inputs 1206
+   :browser-checks "12/12 pass (headless Chromium, light+dark)"
+   :design-quality-score 100.0}
+  :adr/body
+  "# ADR-2607270100: .kotoba は cljs shell の背後で Cloudflare Workers 上に deploy できる / UI は駆動できない
+
+**Status**: accepted / **Date**: 2026-07-27
+**Scope**: `kotoba-lang/kotoba-worker-demo`（検証 spike、live deploy 済み）
+
+## Context
+
+オーナー質問（2026-07-27）: 「今の kotoba-lang/kotoba 言語で .kotoba で書いたものは
+Cloudflare Worker に deploy・動作可能か。また frontend 側も kotoba で書いて cljs のように
+動かせるか。」ドキュメント読解ではなく**実際に動く deployment** で答えるため spike を実装した。
+
+## Decision / 実測結果
+
+### 1. Worker: 可能。ただし cljs fetch handler の**背後の被呼び出し**としてのみ
+
+capability contract（`kotoba-core-contracts/resources/kotoba/runtime/capability_contract.edn`）の
+HTTP は**すべて egress**: `http/fetch` 205 / `http/post` 223 / `component/http` 241
+（`http_open`/`write`/`read`/`close`/`get`）。**ingress（Request→Response）family は存在しない**ため
+`.kotoba` は fetch handler を所有できない。ADR-2606290000（Workers は CLJC のみ）と整合し、
+guest は entry point ではなく callee になる。実装では cljs shell が request を読み、guest が
+宣言した `log-read` import 経由で 4 byte を渡し、`main` の返す i32 を response にする。
+
+### 2. wasm module の載せ方は 3 案中 1 案しか通らない
+
+| 方式 | 結果 |
+|---|---|
+| cljs で `(:require [\"./pricing.wasm\" ...])` | shadow-cljs `cannot identify as cljs resource` |
+| wrangler `wasm_modules` binding | workerd 拒否: *\"Wasm bindings are not allowed in modules-based scripts\"* |
+| build 後の bundle に ESM `import` を前置 | **動作**（`inject_guest_import.cljs`） |
+
+module Workers は `.wasm` の**実 ESM import のみ**を受け付け、shadow-cljs はそれを emit しない。
+この 4 行の injection step が唯一の継ぎ目であり、`.kotoba` を cljs Worker に載せる者は全員ここに当たる。
+
+### 3. capability は本当に fail closed
+
+policy を空にすると compiler は binary を一切出さない（`capability-not-granted log/read` /
+`log/write`）。warning ではなく emit 拒否。
+
+### 4. guest は request ごとに instantiate が必須（実測値あり）
+
+単一 instance は **5,290 回**の `main()` で `memory access out of bounds` により trap する。
+**fuel 枯渇ではない** — `alloc` は free を持たない bump allocator で、1 回 12 byte を単一 64 KB
+page から消費する（`(65536-2048)/12 ≈ 5291`）。よって Worker は request ごとに新 instance を作る
+（副次的に request 間の linear memory 分離も得られる）。
+
+### 5. cljs backend は pure module に fuel counter を出さない
+
+nbb で 200,000 回、browser で 20,000 回を単一 instance で trap なく完走。wasm backend に文書化
+された 512 charge の fuel global は、capability を持たない module の cljs 出力には現れない。
+**「長寿命 frontend では fuel が致命的」という事前想定は誤りだった。**
+
+### 6. cljs backend は wasm backend より大幅に狭い
+
+memory ops / capability call / i64・f32・bitwise・string ops を拒否（`emit-unsupported`）。
+そのため decision logic（`pricing_core.kotoba`）と wasm ABI（`pricing_wasm_abi.kotoba`）を
+分離し、前者のみ両 backend が共有する。`(ns kotoba.compiled.generated)` を hardcode するため
+build 側で ns を rename している。
+
+### 7. UI: 不可。`.kotoba` は UI を駆動できない
+
+contract に `ui/*` / `dom/*` capability は**存在しない**（あるのは `render/galactic-frame` 232 /
+`gpu/clear` 226 / `gpu/set-position` 229 / `gpu/draw-frame` 230 / `kami/engine` 233 のみ）。
+`docs/lang/application-profile.md` の 6 項目完了ゲートを通過した UI family はゼロで、doc 自身が
+ゲート通過まで runtime support を主張することを禁じている。page は全面 `kotoba-ui`/`.cljc` で、
+`.kotoba` の寄与は `quote-price` のみ。
+
+## 推奨する線引き（現時点）
+
+- Worker の fetch/routing/D1/KV interop → **cljs**（ADR-2606290000 Pattern B）
+- frontend → **cljc/cljs + kotoba-ui スタック**（skill `kotoba-uiux`）
+- 価格計算・ポリシー判定・検証などの決定関数 → **`.kotoba`**（wasm / cljs 両 backend に出せる）
+
+`.kotoba` を Worker の一級市民にするには (a) ingress capability family の contract 追加、
+(b) `kototama/workerd_core.clj` の plan を消費する JS host、(c) application profile 完了ゲート通過
+が必要。いずれも本 ADR の範囲外。
+
+## Evidence
+
+| check | result |
+|---|---|
+| `verify_pricing.cljs`（guest 演算 + log-write bytes） | pass（checksum 27496 が手計算と一致） |
+| `verify_parity.cljs`（1,206 input、wasm vs cljs） | 全一致 |
+| live Worker `/health` | `ok: true`、4/4 一致 |
+| `verify_browser.cljs`（headless Chromium、live URL） | 12/12 pass、light+dark |
+| `design-quality.cli score` | 100.00 |
+
+## 付随所見（upstream 報告事項）
+
+`liquid-glass-ui` の slider は light 背景で track が事実上不可視（thumb のみ描画、dark では正常）。
+決定論的 HIG/WCAG audit は 100.00 を付けており、この欠落を検出できていない。"}]
