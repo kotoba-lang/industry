@@ -129,10 +129,62 @@ limits: nodes 32 / queued-events 64）を定義する。
    （`kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner ではない）。
    build スクリプトの `.kotoba` 化が最も遠い。
 
+### 9. 型・文字列・再帰の実測（2026-07-27、設計システム移植の可否判定）
+
+`compile` 経路の型システムは実用十分に豊かで、**legacy emitter の貧弱さは compiler の限界ではない**。
+
+- **型付きコレクションが全て実在**（`resources/kotoba/compiler/typed-value-conformance.edn`）:
+  `[:map K V]`（`typed-map-new`/`typed-map-get`/`typed-map-entry-at`）、`[:set T]`、
+  `[:record name [[field type]...]]`（`record`/`record-get`）、
+  `[:variant name [[tag type]...]]`（`match-variant`）、`[:option T]`、`[:result T E]`、
+  異種 `[:vector [T1 T2 ...]]`。さらに `:document` / `:string-index` 型もある。
+- **型注釈はインライン構文**: `(defn f [p :string n :i64] :string body)`。
+  legacy の `^:i64` メタデータ形式ではない。
+- **文字列は 127 バイト上限ではない**。その上限は legacy cljs backend の
+  `kotoba$string-checked` 固有。`compile` 経路では EDN 上限 1 MiB / Component の
+  string leaf 64 KiB で、**実測で 4,920 バイトの HTML 断片を `string-concat` の再帰で構築し
+  ESM として実行できた**。SSR で実用サイズの文書を生成することは可能。
+
+**ただし再帰的な値型は無い**（これが設計システム移植の本質的な制約）:
+
+- `docs/architecture.md`: 「bounded monomorphic foundation for later generic ADTs,
+  **not a recursive value**」
+- `docs/component-model-baseline.md`: 「**General recursive Kotoba schemas are rejected by
+  Component v1**」
+- `[:set T]` は最大 32 要素（ui-v1 kit の nodes 32 上限と同根）
+
+つまり **hiccup（任意深度の入れ子ベクタ）を Kotoba の値として表現できない**。これは
+ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフラットな node 集合）
+を選んでいる理由でもある。
+
+### 10. kotoba-ui / shitsuke / liquid-glass-ui を `.kotoba` 化する方針（オーナー判断 2026-07-27）
+
+オーナー指示により、この3リポジトリ（および `css` / `html`）は **`.cljc` 恒久ではなく
+`.kotoba` 移行の対象**とする。ADR 初版の「これらは provider 層に降りるので移行対象ではない」
+という推奨は撤回する。
+
+移植の形は**機械的な移植ではない**。これらは本質的に「データ → 文字列」の純関数群
+（token map → CSS 変数、hiccup → HTML、opts → component）であり、`->page` は文字列を返す。
+したがって **capability は一切不要で `kotoba/pure` プロファイルに収まる**。問題は型の方で、
+上記のとおり再帰的な値型が無いため、2 つの形のどちらかを取る:
+
+- **形 A（SSR、今日可能）**: 木を**値ではなく呼び出しグラフ**として持つ。各 component を
+  `:string` を返す純関数にし、`string-concat` で合成する。hiccup を data として保持・変換する
+  性質は失われるが、`->page` 相当の SSR は今日の言語で書ける（§9 の 4,920 バイト実測が根拠）。
+- **形 B（対話 UI、要 kit 拡張）**: ui-v1 kit のフラット node 集合に載せる。`:parent` ポインタで
+  木を表現するので再帰型が要らない。ただし nodes 32 / queued-events 64 の上限引き上げと、
+  そのフラット commit を実 DOM に反映する provider の実装・qualification が必要。
+
+いずれの形でも `css` / `html` は**先に移せる最下層**（EDN→CSS、hiccup→HTML の純変換）であり、
+そこから `shitsuke`（token 層）→ `liquid-glass-ui`（component 層）→ `kotoba-ui`（合成層）の
+依存順に上がるのが唯一の安全な順序。逆順・同時並行は依存が壊れる。
+
 ## 推奨する線引き（現時点）
 
 - Worker の fetch/routing/D1/KV interop → **cljs**（ADR-2606290000 Pattern B）
-- frontend → **cljc/cljs + kotoba-ui スタック**（skill `kotoba-uiux`）
+- frontend → **当面 cljc/cljs + kotoba-ui スタック**（skill `kotoba-uiux`）。ただし §10 のとおり
+  この面自体を `.kotoba` へ移す方針がオーナー判断で決まっており、`css` → `html` →
+  `shitsuke` → `liquid-glass-ui` → `kotoba-ui` の依存順に移行する
 - 価格計算・ポリシー判定・検証などの決定関数 → **`.kotoba`**（wasm / cljs 両 backend に出せる）
 
 `.kotoba` を Worker の一級市民にするには (a) ingress capability family の contract 追加、
