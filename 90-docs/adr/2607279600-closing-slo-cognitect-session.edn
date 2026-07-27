@@ -1,0 +1,78 @@
+[{:db/id -1
+  :adr/id "adr-2607279600-closing-slo-cognitect-session"
+  :adr/doc_type "adr"
+  :adr/topic "datomic-client-api"
+  :adr/title "ADR-2607279600: Closing — auth-path SLO re-qualify + Cognitect owner-block fixed"
+  :adr/status "accepted"
+  :adr/date "2026-07-27"
+  :adr/last_verified "2026-07-27"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["Auth-path SLO evidence edge+D1 2026-07-27"
+   "Cognitect wire remains owner-blocked (shape only)"
+   "Session resume points after remaining-4"]
+  :adr/repos ["gftdcojp/net-kotobase" "kotoba-lang/kotobase-storage-d1" "com-junkawasaki/root"]
+  :adr/related ["adr-2607279500-remaining-4-service-binding-xrpc-sdk"
+   "adr-2607279400-datomic-gaps-1-2-3-closure"
+   "adr-2607279000-kotobase-datomic-client-api-maturity"]
+  :adr/body "## Context
+
+Session closing after remaining-4 (Service Binding, XRPC policy, SDK /api/*,
+synthetic Cognitect harness). Owner asked to close residual items **2** (auth
+SLO) and **3** (Cognitect status), then wrap the session.
+
+## Decision / results
+
+### 2. Auth-path SLO re-qualify — DONE
+
+Measured 2026-07-27 with CACAO did:key, N=300 entities, v1 gates
+(point/count ≤1500ms, join ≤2000ms, tx ≤5000ms, reindex ≤8000ms):
+
+- **D1 direct** (`kotobase-storage-d1.aozora.app`): point 682 / count 650 /
+  join 604 / tx 3193 / reindex 1369 — all green.
+- **Edge** (`kotobase.net` → Service Binding → D1): point 659 / count 639 /
+  join 681 / tx 3039; reindex via D1 `/v1/reindex` 1990 — all green;
+  response header `x-kotobase-d1-transport: service-binding`.
+
+Evidence EDN:
+- `orgs/kotoba-lang/kotobase-storage-d1/docs/evidence/slo-auth-2026-07-27.edn`
+- `orgs/gftdcojp/net-kotobase/docs/evidence/slo-auth-edge-2026-07-27.edn`
+
+Not a multi-tenant contractual SLA.
+
+### 3. Cognitect wire — FIXED AS OWNER-BLOCKED (no false claim)
+
+- Synthetic fixtures + `cognitect-wire-check` harness remain codec regression only.
+- `test/fixtures/cognitect-wire/captured/` still empty.
+- Docs must say **shape-compatible, not wire-compatible**.
+- Unblock requires owner: Datomic Cloud MITM capture or redacted golden vectors.
+
+## Landed on main this session (prior)
+
+- net-kotobase `dabafc99` remaining-4 + production deploy
+- superproject pin net-kotobase → dabafc99
+- ADR-2607279500
+- WIP branches reviewed: content already on main or would regress if merged; retired
+
+## Remaining after this closing (explicit)
+
+1. **Ops:** flip `KOTOBASE_XRPC_DATOMIC=off` after client migration check.
+2. **Owner:** Cognitect Cloud capture → `captured/` fixtures.
+3. **Later:** Client API surface completeness (entity/as-of first-class, etc.),
+   SDK CACAO mint + TS publish polish, dependabot PRs, STORAGE_MODE full-D1
+   decision (orthogonal).
+
+## Resume point for next agent
+
+```bash
+# Live health
+curl -sS https://kotobase.net/health | jq '{api,xrpc_datomic,d1_transport,sunset}'
+# Re-run D1 auth SLO
+cd orgs/kotoba-lang/kotobase-storage-d1 && npm run slo:qualify
+# Cognitect: only when owner supplies capture
+ls orgs/gftdcojp/net-kotobase/test/fixtures/cognitect-wire/captured/
+```
+
+Default branch tips at closing: net-kotobase main includes remaining-4;
+storage-d1 main at ee682c5+ (evidence commit of this closing).
+"}]
