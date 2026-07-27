@@ -146,7 +146,24 @@ Governor `:survey-integrity-governor`。flagship HARD は2つ、いずれも
     ページだけだったため、VDA sibling と違い**独立した自律規範文書は主張
     しない**（`:self-regulatory-mandate` であって `:self-regulatory-code`
     ではない）。`coverage-note` がその理由を述べ、テストがそれを検証する。
-- `cloud-itonami-municipality-*` の中国都市（0件）— 未着手。
+- **`cloud-itonami-municipality-*` の中国都市** → **着手**。
+  `cloud-itonami-municipality-chn-beijing`（北京市）を作成。**municipality
+  family 初の chn** で、それまで 59 repo 中に中国の都市は 1件も無かった。
+  beijing.gov.cn から条例 2件（控制吸烟条例＝地方性法规、2021-09-24 修正込み /
+  生活垃圾管理条例の**修改决定**）と culture 8件を 2026-07-27 に読んで seed。
+  - **3つの「無いものは無い」をテストで固定した**: ①廃棄物側は
+    consolidated 条例ではなく**修改决定**（実際に読んだのがそのページなので
+    `:kind :amendment-decision`、`:ordinance/number` はその公告番号であって
+    条例番号ではない）②`:festival` と `:craft` は**空のまま**（庙会の一般記事は
+    北京を名指ししない、景泰蓝の出典は Jingtai 帝には触れるが北京には触れない
+    ——出典が支持しない自治体紐付けを主張しない）③八达岭は UNESCO 指定を
+    **記録しない**（出典が述べていない。故宫/天坛/颐和园は述べているので記録する）。
+  - **schema は sibling と完全に同一に保った**。当初 `:ordinance/effective-date`
+    を足しかけたが、schema の同一性こそが federated query の join を成立させて
+    いるので、施行日は日本 sibling と同じく `:ordinance/number` に畳んだ。
+    「catalog が使う属性はすべて schema に宣言されている」ことを検証する
+    テストを追加したので、以後この乖離は静かには入らない。
+  - 上海など他都市は未着手。
 - `cloud-itonami-gtm-data` の iso3166 カバレッジ（223件中 **82**件。
   2026-07-27 addendum で CHN の1件が埋まった）。**残り141件を一括生成する
   なら捏造なしでは不可能** — 各 repo につき実在の見込み先を fetch して
