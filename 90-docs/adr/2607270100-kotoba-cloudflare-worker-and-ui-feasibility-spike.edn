@@ -251,6 +251,9 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
 - **W4 first slice (2026-07-27, kotoba-lang/compiler#339)**: logical UI tree as
   `:document` → pure guest HTML render (KIR+ESM parity) + budget fail-closed.
   Design-system cutover still waits on digest/DOM reconcile/Style vocabulary.
+- **W4 second slice (2026-07-27, compiler#340)**: structural document fingerprint
+  (content-sensitive i64) + Style document→CSS stream. Remaining: document-sha256
+  host op, DOM reconcile, perf workloads.
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
