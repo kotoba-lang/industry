@@ -1,0 +1,184 @@
+[{:db/id -1
+  :adr/id "adr-2607272000-ai-gftd-tia-impersonation-intelligence"
+  :adr/doc_type "adr"
+  :adr/topic "ai-gftd-tia-impersonation-intelligence"
+  :adr/title "ADR-2607272000: ai-gftd-tia — social 認証だけで始まる、なりすましアカウントの巡回・判定・通報。seeker(gig worker) が人手で収集し、LLM が判定し、Governor が「証拠の上限」でモデルを封じ込める"
+  :adr/status "accepted"
+  :adr/date "2026-07-27"
+  :adr/last_verified "2026-07-27"
+  :adr/deciders ["Jun Kawasaki (+ Claude)"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["gftdcojp における なりすまし(impersonation)アカウントの検知・通報の正本は gftdcojp/ai-gftd-tia。TIA = Threat Intelligence Agent"
+   "なりすまし判定における LLM の権限境界: 決定論的な証拠が到達可能な最重判定(ceiling)を決め、モデルはそれ以下にしか動けない。モデルは通報を止められるが始めさせられない"
+   "seeker(gig worker)による収集が人手である理由は品質でもコストでもなく、bot 検出回避・CAPTCHA 回避・スクレイピングを一切行わないという制約から導かれる唯一の合法収集手段だから"
+   "通報の自動送信はしない。TIA は通報パッケージを作るところまでで、提出は人が行う"]
+  :adr/repos ["gftdcojp/ai-gftd-tia" "com-junkawasaki/root"]
+  :adr/related ["adr-2607171600-docs-edn-only-datascript-query"
+                "adr-260726-kotobase-query-plane-is-one-ref"
+                "adr-2607173100-murakumo-main-alias"
+                "adr-2607173000-nbb-only-script-host"]
+  :adr/body
+  "# ADR-2607272000: ai-gftd-tia — なりすましアカウントの脅威情報エージェント
+
+**Status**: accepted
+**Date**: 2026-07-27
+
+## Context
+
+オーナーからの要求: 「Facebook, LinkedIn, Instagram, LINE などで social 認証を
+するだけで、seeker という gig worker に巡回 job が割り当てられて、人間が半自動で
+収集、LLM がなりすまし判定、報告をするところまで実装して」。
+
+着手前の調査で、gftdcojp の 82 repo・west manifest・fleet-db・90-docs/adr のいずれ
+にも `ai-gftd-tia` は存在せず、なりすまし検知を主題にした ADR も無いことを確認した。
+最も近い既存物は `ai-gftd-content-protection`（TikTok/YouTube の無断転載を指紋照合
+→ 証拠保全 → 公式フォーム向け通報パッケージ → 再掲載監視）で、パイプラインの骨格は
+そのまま流用できるが、対象が*コンテンツ*であって*アカウント*ではない（README に
+account/アカウントの語が一度も出てこない）。したがって新規 repo を起こす。
+
+## Decision
+
+### 1. オンボーディングは OAuth 1 回。正本 identity は認証プロフィールそのもの
+
+本人はハンドルを入力しない・アバターをアップロードしない・自己紹介を書かない。
+`tia.identity/normalize-profile` が provider の payload をそのまま正本 identity に
+する。provider が返さないものは**欠損のまま**にし、その分だけシグナルが立たなく
+なる（推測で埋めない — 推測した正本は推測した証拠を生み、証拠こそが商品だから）。
+
+LINE と Facebook はハンドル名前空間を持たない（LINE ID は列挙不可、Graph API は
+username を返さない）ので、両者の patrol は名前・アバター・ディレクトリ検索のみ。
+**LINE でハンドル変種を生成しない**のは意図的で、生成すれば検索ではなく ID
+プロービングになる。
+
+### 2. seeker が人手で収集するのは、bot 回避をしないという制約の帰結
+
+patrol job は「プラットフォーム自身の検索 UI への deep link の並び」として決定論的
+に生成される。seeker が job の中でできることは、ログインした一般ユーザーができる
+ことを一歩も超えない。crawler も未公開エンドポイントも anti-bot 回避も、コードにも
+descriptor にも存在しない。
+
+job が決定論的（同じ subject は常に同じ worklist）なのは3つの理由による:
+品質（同一の指示で数百人の結果が比較可能になる）、公平性（着手前に工数を値付け
+できる）、監査（実行のたびに形が変わる job は監査も支払いもできない）。
+
+### 3. Governor は「上限(ceiling)」として書く — モデルは案件を格上げできない
+
+怖い失敗はなりすましの見逃しではなく、**ありふれた名前の実在の人物が、gig worker
+と言語モデルの合意だけでアカウントを失う**ことである。したがって:
+
+- 決定論的な証拠が、その案件が到達してよい最重判定(ceiling)を決める
+- モデルはその上限以下にしか動けない
+- **モデルは通報を止められるが、通報を始めさせられない**
+- 上限とモデルが重い側で食い違ったら、勝った方を採らず**人に回す**
+
+gate は g0-evidence（証拠が無ければ判定しない）/ g1-self（本人の連携済み
+アカウント）/ g2-parody（免責表示あり かつ 同一性の主張なし）/ g3-independence
+（独立 strong シグナル2つ以上）/ g4-misattribution（「似ている」だけでは不可、
+主張・素材流用・投稿転載のいずれかが必要）/ g5-clamp / g6-confidence /
+g7-verified-candidate / g8-seeker-trust / g9-rate-limit(brigading 防止) の10種。
+
+**g0〜g4 は人的レビューでも waive できない**（`tia.service/waivable-gates` は
+g6〜g9 のみ）。証拠側の上限まで人がクリックで外せるなら、封じ込めは演出になる。
+
+独立性を「重み付き合計スコア」ではなく**シグナルのクラス集合**で数えるのは、
+『名前が似ている』と『ハンドルが似ている』は同じ観測が2つの帽子を被っている
+だけであるのに対し、『アバターが画素レベルで同一』と『自己紹介が逐語コピー』は
+別々の行為だから。
+
+### 4. 通報は「作る」まで。「出す」のは人
+
+各プラットフォームのなりすまし窓口は本人確認書類と善意の宣誓を要求する。どちらも
+人がやることであってサービスがやることではない（安全床①: 認証情報や本人確認書類
+を agent がフォーム入力・アップロードしない）。TIA が肩代わりするのは証拠を揃える
+数時間であって、他人を名指しする判断ではない。
+
+`tia.report/guarded-submit` が返すのは HTTP 呼び出しではなく**認可**であり、認可は
+承認者の氏名と宣誓の記録なしには存在できない。transport adapter は認可なしに発火
+できない。
+
+### 5. 報酬設計は安全機構であって付随事項ではない
+
+candidate 提出ごとに払う賞金は「量」を買う。この領域で量とは、ありふれた名前の
+一般人が通報されることを意味する。よって:
+
+- 完了した巡回は**何も見つからなくても base を払う**（0件は正しい結果であり最頻値）
+- bonus は Governor と人的レビューを通過した candidate にのみ付く
+- trust は精度で決まり量では決まらない。trust は同時 claim 数を制限する
+- **inconclusive は seeker を減点しない**（曖昧さを罰すると、人が見るべき案件こそ
+  提出されなくなる）
+
+結果として、当てずっぽうの seeker は正直な seeker より遅く・貧しくなる。何も
+見つけずに正直に0件を出す場合を含めて。
+
+## 実装
+
+`.cljc` 純粋コア + adapter 分離。CLAUDE.md の runtime 優先順位に従い、コアは
+runtime 非依存の `.cljc`、host adapter は `.cljs`、test host は nbb（bb は
+ADR-2607173000 で退役済み。`.sh`/`.mjs` は新規作成しない）。
+
+- `tia.confusable` — 同形異字畳み込み(Cyrillic/Greek/全角/数字字形)、
+  Damerau-Levenshtein、決定論的 squat 変種生成
+- `tia.identity` — OAuth プロフィール → 正本 identity
+- `tia.signals` — 決定論シグナル層（知覚ハッシュのハミング距離、逐語一致 LCS、
+  リンク重複、口座年齢は純粋な暦計算 days-from-civil）
+- `tia.judge` — prompt 生成と応答パース（純粋、IO 無し）
+- `tia.governor` — 上限と10 gate
+- `tia.job` / `tia.seeker` / `tia.candidate` / `tia.report`
+- `tia.service` — operation dispatch を純粋 reducer として実装。モデル呼び出しは
+  `prepareAssessment`（prompt を作る）と `recordAssessment`（応答を畳み込む）に
+  分割されているので、判定経路は台帳から完全に replay できる
+- `tia.platforms` — 4 プラットフォームの patrol/report descriptor
+- `tia.llm` / `tia.oauth` / `tia.store` — host adapter
+
+**コアは時計を読まない。** すべての状態遷移は明示的な `:at` を要求する
+（`core/require-at`）。id も乱数ではなく内容から導出する。replay できない監査は
+監査ではない。
+
+**永続化は単一 ref**（`tia.store`）。ADR-260726 のとおり `kotobase.core/open` は
+`:ref-name` を1つしか取らず Datalog の到達範囲はちょうど ref 1本なので、
+「どの seeker がどの subject のためにどの candidate を見つけ、その通報がどうなったか」
+という TIA の商品価値そのものである join を割らないため。書き込み競合が現実になった
+場合の答えは第2の ref ではなく、単一 writer によるバッチング（DO を直列化器、
+D1 をストレージ）。
+
+## 実測 / 検証
+
+`nbb --classpath src:test run-tests.cljs` → **43 tests / 130 assertions / 0 failures**。
+
+`test/tia/governor_test.cljc` は仕様書として読める形にしてある: 同名の他人はモデルが
+告発しても通報不能のまま、モデルは案件を格上げできない、免責表示のあるパロディは
+保護される、本人の自アカウントは通報されない、証拠が無ければ判定しない、認証済み
+アカウントは自動通報しない、実績の浅い seeker の発見は独立確認が要る、1 subject
+あたりの日次通報数に上限がある。
+
+### 実装中に見つかった実バグ（テストが捕まえた）
+
+日本語の免責表現は、主張が使うのと同じ語を否定して作られる: `非公式` は `公式` を、
+`本人とは無関係です` は `本人` を部分文字列に含む。素朴な部分文字列検索では
+**すべてのパロディ bio が「同一性の主張」として読まれ**、`【非公式パロディ】本人とは
+無関係です` が通報対象になっていた。修正は (1) マーカーを単語ではなく句にする
+(2) **免責句をマスクしてから主張を探す**（`tia.signals/contains-claim?`）。
+
+## Consequences
+
+- gftdcojp に impersonation 検知の正本ができた。`ai-gftd-content-protection`
+  （コンテンツの無断転載）と対になる
+- Worker host（HTTP / OAuth callback / D1 binding）、seeker console / owner console
+  の UI、アバターの知覚ハッシュ計算（host capability）、証拠 blob の B2 保存、
+  本人投稿の転載検出は未実装。README の「未実装」節が正本
+- プラットフォームの通報フォーム URL は `:form/verified-at \"2026-07-27\"` を持つ。
+  プラットフォームは窓口を頻繁に動かすので、古い entry は雑音ではなく欠陥として扱う
+
+## Alternatives considered
+
+- **`ai-gftd-content-protection` を拡張してアカウント面を足す**: パイプラインの骨格
+  は同じだが、判定の中身（指紋照合 vs 同一性の簒奪）も通報窓口（著作権 vs
+  なりすまし）も、危険な失敗モード（過剰削除 vs 同名他人への誤爆）も別物。
+  Governor の ceiling 設計は content-protection には要らない
+- **LLM に最終判断させ、決定論層は前処理にする**: 却下。それは本 ADR が防いでいる
+  ものそのもの。実際、governor_test で LLM に impersonation と言わせても同名他人は
+  通報不能のままであることを assertion にしてある
+- **自動収集（スクレイピング）**: 却下。安全床④（bot 検出回避の禁止）に抵触し、
+  かつ収集を人手にしたことが seeker という product surface を生んでいる
+- **candidate 1件ごとの賞金**: 却下。偽陽性を買うことになる"}]
