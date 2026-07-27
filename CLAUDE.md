@@ -1057,6 +1057,15 @@ hiccup → HTML、opts → component）で `->page` は文字列を返すため�
 `kotoba/pure` に収まる**。制約は型の方（上記の再帰的値型なし）なので、移植は機械的ではなく
 上記の形 A / 形 B のどちらかへの**データモデル再設計**を伴う。
 
+**進捗**: `css` は形 A で**移植済み**（2026-07-27、kotoba-lang/css#2）。`kotoba/css_core.kotoba` +
+byte 一致 parity gate（KIR インタプリタを同一 JVM で回す / compiler は test-only 依存）。
+`css.core` 自体は無変更で、facade の裏に置く方針を踏襲。後続で効く実測知見:
+**数値→文字列の組み込みが無い**（桁を literal から `string-substring` で引く）・**正規表現が無い**
+（`string-contains?` で代替）・**`or` は bool でなく i64 を返す**（`if` の入れ子で畳む）・
+例外の代わりに `[:result T E]` を返す。なお原典 `css.core/declarations` は**宣言 8 件超で
+順序が未規定**（Clojure map が hash-map に切り替わるため。実測済み）で、移植版は
+`typed-map-entry-at` のキー昇順で決定的。
+
 **移行順序は依存順に厳守する**: `css` → `html` → `shitsuke` → `liquid-glass-ui` → `kotoba-ui`。
 逆順・同時並行は依存を壊す。移行が完了するまでは skill `kotoba-uiux` の既存ルール
 （app は `kotoba-ui.core` のみ require、raw hex 禁止、layout は shell から）がそのまま有効で、
