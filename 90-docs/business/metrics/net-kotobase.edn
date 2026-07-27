@@ -1,32 +1,30 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 6025, "kotobase-cf-wasm-staging" 1951},
+ {"net-kotobase" 6028, "kotobase-cf-wasm-staging" 1951},
  :zone
- {:requests-7d 9737,
-  :pageviews-7d 401,
-  :uniques-7d-sum 598,
+ {:requests-7d 9742,
+  :pageviews-7d 402,
+  :uniques-7d-sum 599,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 86}
-   {:path
-    "/kotobase-cf-wasm-production/ipns/bafyreigrbxg2dutsb7chtps7ppyqus3zjsvtgr6vuruuzjxemuzevt32t4.json",
-    :requests 81}
+  [{:path "/", :requests 85}
    {:path "/health", :requests 61}
    {:path
+    "/kotobase-cf-wasm-production/ipns/bafyreigrbxg2dutsb7chtps7ppyqus3zjsvtgr6vuruuzjxemuzevt32t4.json",
+    :requests 55}
+   {:path
     "/bafyreifb3zlzmngj645lbx6mk27qpwnvlfkom4m7wk7nnchgnexxl7fbwq",
-    :requests 39}
-   {:path
-    "/bafyreicepbggxkg3v3gyluotkqaanj23xtf5zij5ly64umsmxyngeef6ti",
-    :requests 27}
+    :requests 36}
+   {:path "/robots.txt", :requests 28}
    {:path "/api/funnel", :requests 27}
+   {:path "/_health", :requests 25}
    {:path
-    "/bafyreiadr2v44lmhk4a55n2wcb5zxaryj5qjpy46gceifae6akukgur3qq",
-    :requests 27}
-   {:path "/_health", :requests 25}],
-  :status-mix {:ok 1542, :client-error 2168, :server-error 179},
+    "/bafyreihqihj7cghzdeu3rbwxu22arkeqvmf364r3hc7uxrejbom43vqh3u",
+    :requests 24}],
+  :status-mix {:ok 1292, :client-error 2206, :server-error 132},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -38,12 +36,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-27",
- :traffic-quality {:window "24h", :probe-4xx-pct 56, :error-5xx-pct 5},
+ :traffic-quality {:window "24h", :probe-4xx-pct 61, :error-5xx-pct 4},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 86 · /kotobase-cf-wasm-production/ipns/bafyre… 81 · /health 61 · /bafyreifb3zlzmngj645lbx6mk27qpwnvlfkom4… 39 · /bafyreicepbggxkg3v3gyluotkqaanj23xtf5zi… 27 | 4xx(probe) 56% · 5xx 5%",
+ "上位 page (24h, 2xx/3xx): / 85 · /health 61 · /kotobase-cf-wasm-production/ipns/bafyre… 55 · /bafyreifb3zlzmngj645lbx6mk27qpwnvlfkom4… 36 · /robots.txt 28 | 4xx(probe) 61% · 5xx 4%",
  :funnel {:visitors 1367, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 9737 req/7d・598 uniques(日次和)・うち4xx probe 56%(24h)、workers 7976 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 9742 req/7d・599 uniques(日次和)・うち4xx probe 61%(24h)、workers 7979 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 4,
   :submissions 3,
