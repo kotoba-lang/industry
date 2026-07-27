@@ -1,0 +1,102 @@
+[{:db/id -1
+  :adr/id "ADR-2607273000"
+  :adr/title "marketplace order actor は kotobase-client 経由で kotobase.net に載せ、直 D1 を撤去する"
+  :adr/status "accepted"
+  :adr/date "2026-07-27"
+  :adr/tags ["marketplace" "cloud-itonami" "kotobase" "persistence" "actor"]
+  :adr/supersedes ""
+  :adr/body
+  "## 現在地（一行）
+
+`cloud-itonami-marketplace-order` は kotobase.net 上の graph
+`did:key:z6Mki6yuQNU7Ci8BMuaJF3srgtB4PSHznd1EmVBCVB75XraX` / db
+`marketplace-order` に対し、`kotoba-lang/kotobase-client` 経由でリクエスト毎に
+CACAO を発行して読み書きしている。Cloudflare D1 データベース
+`cloud-itonami-marketplace` は削除済み。
+
+## 何が問題だったか
+
+最初の実装はこの actor 自身に D1 binding を持たせ、`kotobase-storage-d1` を
+直接駆動していた。結果としてこの actor が transport・CACAO 発行・マイグレーション
+適用・2 パターンだけの手書き `:q` を所有していた。`manifest/org-database-policy.edn`
+はこれらをすべて **host 側** に置く。app が持ってよいのは datoms / query / schema
+だけである。
+
+実害も出た。migration が 0001/0002 しか当たっておらず
+`no such table: kotobase_projection` になっていたのに、広すぎる `.catch` が `[]` を
+返していたため、壊れた store が「空のデータベース」に見えていた。
+
+## 決定
+
+1. **`orderops.edge.worker` は `kotoba-lang/kotobase-client` を使う。**
+   endpoint は kotobase.net、auth profile は `:apex`（`kotoba://can/kotobase:pin`
+   capability、graph scope == issuer DID、`x-kotoba-did` ヘッダ、nonce はリクエスト毎に
+   新規）。CACAO の実装はこの actor に一行も無い（ADR-2607268000 と整合）。
+
+2. **host が同期 actor を async でブラケットする。** kotobase-client は Promise
+   ベースで actor は同期なので、host は
+
+       prefetch（リクエストが *名指しした* 文書だけ）
+         -> recording db-api を seed
+           -> advisor / governor / phase gate を 1 パス実行
+         -> 記録された書き込みを **1 回の transact** で flush
+
+   の順で回す。**retry は OFF** — ordinal を振り直した append の再適用は台帳を
+   二重化する（client 自身の `transact` docstring が警告している hazard そのもの）。
+
+   prefetch の *選択* は正確である: 買い手 1 件、明細が名指したオファー、その
+   オファーの背後の出品者、遷移なら当該オーダーのみ。
+
+3. **読みは当面 `:eavt` 全走査を `{kind {id doc}}` に畳む。** apex 上で
+   `datomic.q` は `rows: []` を返し `datomic.fold` は `MethodNotImplemented` を
+   返すため（2026-07-27 実測。net-kotobase が fold を routing し始めたのは `3a94150`）。
+   これは `load-graph` の docstring に事実として書いてあり、bounded read が
+   使えるようになったらこの関数だけが変わる。**推測を実装に埋めない。**
+
+4. **直 D1 は撤去。** 削除前に `wrangler d1 export` でスクラッチへ退避（26 INSERT /
+   37,958 bytes）。本リポの「drop 前に必ず退避」慣行に従った。
+
+5. **`marketplace.persist/doc->tx` は `[:db/add e a v]` を出す。** kotobase-peer は
+   Worker からの裸のトリプルを `unrecognized tx-data item` で拒否する。ドキュメントの
+   読みではなく kotobase.net に対する実測で確定した。
+
+6. **`mem-db-api` は TEST ONLY と明記。** その `:q` はこの namespace が発行する
+   2 つの shape しか解さない test double であり、**教えられていないクエリはエラーでは
+   なく誤答を返す**。実 datalog が要るコードはこれに手を伸ばしてはならない。
+   namespace docstring が以前これらを「the four kotobase.core operations」と
+   呼んでいたのは、この namespace には言えない主張だったので訂正した — 何が wire
+   されるかを決めるのは host であり、kotobase-client / kotobase.core / mem-db-api は
+   いずれも正直な答えである。
+
+7. **`op` を honour する。** 以前は POST が常に `:place-order` だったため遷移が
+   通らなかった。`:advance-sub-order` / `:cancel-sub-order` も同じ governor を通る。
+
+## 実測（kotobase.net に対する live 検証、2026-07-27）
+
+- 複数出品者オーダー 2×1200 + 1×1100 = 3500。**価格はカタログ由来**であって
+  リクエストの payload 由来ではない（買い手が自分で値段を名乗れない）。
+- 書いたものが新しい Worker isolate から読み戻せる（`ord-kb-live-1`、`ord-kb-final`）。
+- 拒否: `seller-not-sellable`（merchant.gamma は payout-bound でない）/
+  `buyer-unknown` / `no-shipping-address`（住所なしゲスト × 物理配送）/
+  `illegal-transition`（confirmed -> delivered の飛び越しを kotoba.okaimono の
+  遷移表が拒否）/ `seller-not-on-order`。
+- `cancel-sub-order` は commit せず **escalate**（金銭的帰結があるため機械の
+  無人判断にしない）。
+- overall status は導出であって格納ではない: alpha=confirmed / beta=placed →
+  `placed`。
+- テスト: `kotoba-lang/marketplace` 148 tests / 634 assertions、
+  `cloud-itonami-marketplace-order` 43 tests / 119 assertions、いずれも 0 failures。
+
+## 残っているギャップ（正直に）
+
+- **読みが unbounded。** graph が育つと 1 リクエストあたりの `:eavt` 全走査が効かなく
+  なる。apex 側で `datomic.q` が rows を返すか `datomic.fold` が実装されるまで解けない。
+  これは net-kotobase 側の作業であってこの actor 側の作業ではない。
+- **seed route が残っている。** 出品者クレデンシャル（`-marketplace-onboarding` が
+  発行）とカタログオファーは、本来それらの actor が自分でこの graph に書く。
+  `/admin/seed` はその配線が済むまでの足場である。
+- **probe 文書 3 件が graph に残る。** デバッグ中に書いた `mp.probe/*`。kotobase は
+  追記型なので消せない。無害だが存在する。
+- **`persist` の `durable?` は `:memory?` フラグ由来**であり、host が実際に到達可能な
+  store を持っているかは検査していない。"
+  }]
