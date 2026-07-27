@@ -14,13 +14,16 @@ worked examples.
 
 `css` / `html` / `shitsuke` / `liquid-glass-ui` / `kotoba-ui` are **not** a permanent `.cljc`
 layer — they are targets for `.kotoba` migration, in that dependency order. They need **no
-capabilities** (`->page` returns a string, so `kotoba/pure` covers them); the real work is a
-data-model redesign, because Kotoba has **no recursive value types** and therefore cannot hold
-hiccup as a value. Two admitted shapes: **A** — components are `:string`-returning pure
-functions composed with `string-concat`, tree lives only in the call graph (works today);
-**B** — the ui-v1 kit's `:declarative-flat-tree` with `:parent` pointers (needs the 32-node
-limit raised and a DOM provider). Write new `.kotoba` on the `compile` path, never the legacy
-`wasm emit`/`cljs emit` emitter — see CLAUDE.md's "`.kotoba` を書くときは `compile` 経路を使う".
+capabilities** (`->page` returns a string, so `kotoba/pure` covers them).
+
+**Do not start the real cutover yet, and do not treat string-only SSR as the target.**
+ADR-2607279200 Delivery #6 and the migration plan say verbatim: *"Do not make string-only SSR
+the final abstraction. Start cutover when the shared logical value and both required renderers
+for that tranche are qualified."* Kotoba has no recursive value types **today**, but plan W4
+schedules them with explicit node/depth/byte budgets and states that *"handles are not the
+application programming model"* — so do not generalise flat/parent-pointer node sets as the way
+to write Kotoba UI. Anything written before W4 is an oracle-backed experiment, not the API.
+Write new `.kotoba` on the `compile` path, never the legacy emitter — see CLAUDE.md.
 
 **Until a repo has actually migrated, every rule below still applies unchanged**, and app code
 must not require a mid-migration repo directly.

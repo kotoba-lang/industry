@@ -996,7 +996,18 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   目の前のタスクを止めてまで存在しない統合（例: `clojurewasm` の新規導入）を
   今から作ることはしない（別スコープの ADR とプロジェクトとして切り出す）。
 
-## `.kotoba` を書くときは `compile` 経路を使う — legacy emitter は使わない（repo-wide mandatory、2026-07-27、ADR-2607270100）
+## `.kotoba` を書くときは `compile` 経路を使う — legacy emitter は使わない（repo-wide mandatory、2026-07-27）
+
+> **方向の正本は ADR-2607279200（accepted）と
+> `orgs/kotoba-lang/kotoba-lang/docs/kotoba-centered-migration-plan.md`。**
+> 本節と ADR-2607270100 が記すのは *2026-07-27 時点で実測した現在地* であって到達目標ではない。
+> 現在地の制約（再帰値・explicit capability 等）を恒久的な設計前提として引用しないこと —
+> 計画側で解消予定のものが含まれる。両者が食い違ったら ADR-2607279200 が勝つ。
+>
+> **source-surface の唯一の authority は `orgs/kotoba-lang/kotoba-lang/lang/guest-grammar.edn`**
+> （ADR-2607279200 Delivery #1）。`compiler/frontend.cljc` が受理することと authority が
+> 認めることは**別物**で、両者の drift は機械検査で潰す対象。文法面を触るときは
+> frontend ではなく authority を先に見る。
 
 **kotoba には独立した2つのコンパイラ面があり、新規の `.kotoba` は必ず後者
 （`kotoba compile` → `kotoba-lang/compiler`）で書く。** legacy emitter
@@ -1015,23 +1026,36 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
 
 - **型注釈はインライン構文**: `(defn f [p :string n :i64] :string body)`。
   legacy の `^:i64` メタデータ形式ではない。
-- **capability は `(ns x (:capabilities #{:ui/commit}))` + `(cap-call :ui/commit v)`**、
-  policy は `{:allow #{[:cap/call 9]}}`。宣言したのに使わないとコンパイルエラー。
+- capability は今のところ `(ns x (:capabilities #{:ui/commit}))` + `(cap-call :ui/commit v)`、
+  policy は `{:allow #{[:cap/call 9]}}` と書ける（宣言したのに使わないとコンパイルエラー）。
+  **ただしこれを「effect の書き方」として広めない。** ADR-2607279200 §2 は
+  「通常の source は capability ID / WIT import / provider callback を記述しない」、
+  Consequences は「`cap-call`・wire ID は compiler/host 内部へ押し下げられる」と定める。
+  **effect は推論が既定**で、明示宣言が正当なのは公開 API・package 境界・security ceiling、
+  および scope/quota/deadline を attenuate して委譲する場合だけ。数値 ID は wire ABI であって
+  source 語彙ではない（正本は `lang/capability-semantics.edn` の
+  `:cap/kind`/`:cap/resource`/`:cap/holder` という名前付き scoped モデル）。
 - **`:js-kotoba-v1` の成果物は `kotoba-js-artifact/v1`**: `instantiateKotoba(grants)` を
   export し、grant が `requiredCapabilities` と厳密一致しなければ
   `capability-grant-mismatch` で instantiate 自体が落ちる（実行時も fail closed）。
 
-### 再帰的な値型は無い — 木を「値」でなく「呼び出しグラフ」か「フラット node 集合」で持つ
+### 再帰的な値型は「まだ」無い — flat/handle 設計を恒久前提にしない
 
-`docs/architecture.md`「not a recursive value」/ `docs/component-model-baseline.md`
+現在地: `docs/architecture.md`「not a recursive value」/ `docs/component-model-baseline.md`
 「General recursive Kotoba schemas are rejected by Component v1」。`[:set T]` は最大 32 要素。
-**したがって hiccup のような任意深度の入れ子データを Kotoba の値として表現できない。**
-これを回避する形は 2 つだけで、新しく UI/文書生成を書くときはどちらかを選ぶ:
+今日は hiccup のような任意深度の入れ子を Kotoba の値として表現できない。
 
-- **形 A（SSR、今日可能）**: component を `:string` を返す純関数にし `string-concat` で合成する。
-  木は呼び出しグラフとしてのみ存在する。capability 不要（`kotoba/pure`）。
-- **形 B（対話 UI）**: ui-v1 kit の `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text`）に
-  載せる。`:parent` ポインタで木を表すので再帰型が要らない。
+**しかしこれは到達目標ではない。** migration plan の W4 は
+「Define **recursive logical values** with explicit node/depth/byte budgets」を計画しており、
+さらに **「Implementations may use arenas and handles, but *handles are not the application
+programming model*」** と明記している。したがって:
+
+- **flat node 集合 / parent ポインタ / handle を「Kotoba ではこう書くもの」として文書化しない。**
+  それは実装戦略であって application の書き方ではない、と計画側が名指しで否定している。
+- 今日どうしても書く必要があるなら暫定として次の 2 形を使ってよいが、**暫定と明記する**:
+  **形 A** component を `:string` を返す純関数にし `string-concat` で合成（木は呼び出しグラフ
+  としてのみ存在、capability 不要）／**形 B** ui-v1 kit の `:declarative-flat-tree`。
+- 新しく永続的な API を設計するなら、W4 の recursive logical value を待つ方が正しい。
 
 ### 今日の既知ブロッカー（回避策を知らずに時間を溶かさないこと）
 
@@ -1054,10 +1078,16 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
 **この 5 リポジトリを「`.cljc` のまま維持する層」と扱わない。** `.kotoba` へ移行する方針が
 決まっている。これらは本質的に「データ → 文字列」の純関数群（token map → CSS 変数、
 hiccup → HTML、opts → component）で `->page` は文字列を返すため、**capability は一切不要で
-`kotoba/pure` に収まる**。制約は型の方（上記の再帰的値型なし）なので、移植は機械的ではなく
-上記の形 A / 形 B のどちらかへの**データモデル再設計**を伴う。
+`kotoba/pure` に収まる**。
 
-**進捗**: `css` は形 A で**移植済み**（2026-07-27、kotoba-lang/css#2）。`kotoba/css_core.kotoba` +
+**ただし string-only SSR を最終 API にしない（ADR-2607279200 Delivery #6 /
+migration plan L201）**: *"Do not make string-only SSR the final abstraction. Start cutover
+when the shared logical value and both required renderers for that tranche are qualified."*
+つまり本格的な切り替えは **W4（recursive logical values）と両 renderer の qualification 後**に
+始める。それ以前に書くものは oracle 付きの先行実験として扱い、最終 API として固定しない。
+
+**進捗**: `css` は形 A で移植済み（2026-07-27、kotoba-lang/css#2）——ただし上記のとおり
+**W4 に先行した oracle 付き実験**であって「5 段階の 1 段目完了」ではない。`kotoba/css_core.kotoba` +
 byte 一致 parity gate（KIR インタプリタを同一 JVM で回す / compiler は test-only 依存）。
 `css.core` 自体は無変更で、facade の裏に置く方針を踏襲。後続で効く実測知見:
 **数値→文字列の組み込みが無い**（桁を literal から `string-substring` で引く）・**正規表現が無い**
