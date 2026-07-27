@@ -31,9 +31,9 @@
 ;;
 ;; ## 捏造しないための線引き
 ;;
-;; - **website は GLEIF から出ない。** GLEIF は住所と法人名しか持たないので、
-;;   `:site` は **付けない**。`lei-acquire` が公式サイトを自分で検証して埋める。
-;;   ここで推測した URL を書くと、検証済みの値と区別がつかなくなる。
+;; - **`:site` は Wikidata の P856 をそのまま通すだけ**（推測しない）。
+;;   `lei-acquire` が実際に GET して「本当にその会社のサイトか」を検証する。
+;;   P856 が無ければ付けない —— そのときは site-issue として正直に止まる。
 ;; - **BRANCH を除外する。** GLEIF は支店レコードが親とほぼ同名で返るので、
 ;;   支店を会社として登録しない（`lei-acquire` と同じ判断をここでも行う）。
 ;; - 既に候補にある名前・既に取得済みの名前は出さない（重複を積まない）。
@@ -131,9 +131,15 @@
   "Wikidata SPARQL。売上のあるものを上に、無いものも拾う（売上が未記入でも
   著名な企業はあるため）。"
   [qid limit]
-  (str "SELECT ?lei ?name ?rev WHERE { "
+  (str "SELECT ?lei ?name ?rev ?site WHERE { "
        "?c wdt:P1278 ?lei ; wdt:P17 wd:" qid " . "
        "OPTIONAL { ?c wdt:P2139 ?rev } "
+       ;; P856 = 公式サイト。**これが無いとパイプラインが完結しない** ——
+       ;; lei-acquire は公式サイトを実際に GET して検証してから repo を作る
+       ;; ので、:site 無しの候補は site-issue で止まり 1 件も repo にならない。
+       ;; 推測 URL ではなく Wikidata の申告値をそのまま通し、検証は
+       ;; lei-acquire に任せる（線引きは守ったまま穴だけ塞ぐ）。
+       "OPTIONAL { ?c wdt:P856 ?site } "
        "?c rdfs:label ?name . FILTER(LANG(?name)=\"en\") "
        "} ORDER BY DESC(?rev) LIMIT " limit))
 
@@ -158,6 +164,7 @@
                              {:lei (some-> (aget b "lei") (aget "value"))
                               :name (some-> (aget b "name") (aget "value"))
                               :revenue (some-> (aget b "rev") (aget "value"))
+                              :site (some-> (aget b "site") (aget "value"))
                               :country country}))
                       (filter :lei)
                       vec)))
@@ -251,7 +258,10 @@
                             (map (fn [f]
                                    {:name (get-in f [:verify :legal-name])
                                     :country (get-in f [:verify :country])
-                                    :lei (:lei f)}))
+                                    :lei (:lei f)
+                                    ;; Wikidata の申告値。検証は lei-acquire。
+                                    ;; 無ければ付けない（推測しない）。
+                                    :site (:site f)}))
                             (filter :name)
                             (distinct)
                             vec)]
@@ -279,7 +289,10 @@
                                    (map (fn [f]
                                           (str " {:name " (pr-str (:name f))
                                                " :country " (pr-str (:country f))
-                                               " :lei " (pr-str (:lei f)) "}"))
+                                               " :lei " (pr-str (:lei f))
+                                               (when (:site f)
+                                                 (str " :site " (pr-str (:site f))))
+                                               "}"))
                                         found))]
                (if (neg? idx)
                  (println "STOP:" candidates-path "の閉じ括弧が見つかりません。")
