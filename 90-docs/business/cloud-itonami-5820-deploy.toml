@@ -14,6 +14,14 @@ store_file    = "~/.gftd/itonami-5820-store.edn   # durable FileStore (survives 
 [deploy]
 strategy             = "local-launchagent + cloudflared-named-tunnel"
 host                 = "macOS (junkawasaki) — in-house, no external compute account"
+# WHICH Mac. 2026-07-27 追記(ADR-2607271200): 元の host 行は「macOS
+# (junkawasaki)」としか書いておらず、fleet に macOS ノードが12台あるため
+# 再デプロイ時にどこを触ればよいか分からなかった。特定に要した手順を残す:
+#   ① cloudflared tunnel info <uuid> → connector の arch/version/origin-IP
+#   ② tailnet の全ノードに curl http://<ip>:8582/health を撒く ← これが効いた
+tailnet_host         = "25mbair (100.86.235.122) — tailnet 名。ssh 100.86.235.122 で入れる"
+checkout             = "~/github/com-junkawasaki/orgs/cloud-itonami/cloud-itonami-isic-5820 (25mbair 側の superproject checkout)"
+redeploy             = "そこで git merge --ff-only origin/main → launchctl kickstart -k gui/$(id -u)/com.gftdcojp.itonami-5820-serve"
 launchagent_service  = "com.gftdcojp.itonami-5820-serve"
 launchagent_tunnel   = "com.gftdcojp.itonami-5820-tunnel"
 plist_source         = "~/.gftd/"
