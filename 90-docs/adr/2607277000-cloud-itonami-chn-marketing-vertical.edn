@@ -136,12 +136,18 @@ Governor `:survey-integrity-governor`。flagship HARD は2つ、いずれも
   それまでは 106 repo 中 usa 38 / jpn 18 / deu 6 / gbr 4 / fra 4 / **chn 0**
   だった。CAAM 自身の 协会简介 ページ（発布 2023-06-12）を 2026-07-27 に
   読んで 2 entry を seed。
+  - **2件目: `cloud-itonami-assoc-4719-chn-ccfa`**（中国连锁经营协会 CCFA、
+    `assoc-4719-usa-nrf` の CHN peer）。CCFA 自身の 简介 ページ（発布
+    2025/01/01）から 2 entry。**ISIC 4719 は CCFA 自身の範囲より狭い**
+    （CCFA は 零售/餐饮/服务/供应商 を含む）ので、「usa-nrf peer と join
+    させるための割当であって CCFA が 4719 に限定される主張ではない」と
+    coverage-note に明記し、テストがその注記の存在を検証する。
   - **中国银行业协会（CBA、ISIC 6419）は着手して断念した。** `china-cba.net`
-    が HTTP/HTTPS ともこのネットワークから到達不能で、この family は
-    `official-association-site` provenance に二次情報を認めない。CBA は
-    どのファイルにも登場しない — **穴は穴のまま残す**。6419 は多国カバー
-    （are/aus/che/deu/esp/fra/jpn…）があるので、到達可能な環境から
-    再試行する価値がある。
+    が HTTP/HTTPS ともこのネットワークから到達不能で（2026-07-27 に再試行
+    しても同じ）、この family は `official-association-site` provenance に
+    二次情報を認めない。CBA はどのファイルにも登場しない — **穴は穴のまま
+    残す**。6419 は多国カバー（are/aus/che/deu/esp/fra/jpn…）があるので、
+    到達可能な環境から再試行する価値がある。
   - CAAM の 2 entry は**同一 URL を引く**。到達できた CAAM ソースがその 1
     ページだけだったため、VDA sibling と違い**独立した自律規範文書は主張
     しない**（`:self-regulatory-mandate` であって `:self-regulatory-code`
@@ -163,7 +169,19 @@ Governor `:survey-integrity-governor`。flagship HARD は2つ、いずれも
     いるので、施行日は日本 sibling と同じく `:ordinance/number` に畳んだ。
     「catalog が使う属性はすべて schema に宣言されている」ことを検証する
     テストを追加したので、以後この乖離は静かには入らない。
-  - 上海など他都市は未着手。
+  - **2都市目: `cloud-itonami-municipality-chn-shanghai`**（上海市）。
+    cgzf.sh.gov.cn（上海市城市管理行政执法局）から条例 2件と culture 6件。
+    北京と違い**両方とも consolidated な条例本文**——生活垃圾管理条例は
+    公式 PDF を落として first/last ページを読み、header の
+    「2019年1月31日上海市第十五届人民代表大会第二次会议通过」（常務委員会
+    ではなく**本会議**）と 第六十五条「本条例自2019年7月1日起施行」を
+    verbatim で取得。控制吸烟条例は 第一条 が 电子烟 を名指しするので
+    `:e-cigarettes` を topic に入れた（推論ではなく条文）。
+  - 上海側の正直な欠落も 2件テストで固定: ①`:performing-art` は空
+    （沪剧の出典が HTTP 404、読んでいないページからは書かない）
+    ②小笼包・生煎馒头 の summary は出典が挙げる 常州 / 苏州 も名指しし、
+    「純粋に上海のもの」として提示しない。
+  - 深圳など他都市は未着手（sz.gov.cn は到達可能を確認済み）。
 - `cloud-itonami-gtm-data` の iso3166 カバレッジ（223件中 **82**件。
   2026-07-27 addendum で CHN の1件が埋まった）。**残り141件を一括生成する
   なら捏造なしでは不可能** — 各 repo につき実在の見込み先を fetch して
