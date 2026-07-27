@@ -208,26 +208,31 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
 | # | repo | 状態 |
 |---|---|---|
 | 1 | **css** | 形 A で移植済み（2026-07-27、kotoba-lang/css#2 merged `fd5b15dc`）。**ただし W4 に先行した oracle 付き実験**であり、最終 API ではない |
-| 2 | html | 未着手 |
+| 2 | **html** | 形 A で移植済み（2026-07-27、kotoba-lang/html#2 merged `ad835e22`）。**W4 先行の oracle 付き実験** — 最終 API ではない |
 | 3 | shitsuke | 未着手（dual-render seam はホスト側に残す） |
 | 4 | liquid-glass-ui | 未着手 |
 | 5 | kotoba-ui | 未着手 |
 
-**css の実測知見（後続 4 repo にそのまま効く）**:
+**css / html の実測知見（後続 3 repo にそのまま効く）**:
 
-- 移植先は `kotoba/css_core.kotoba`。`css.core` は**一切変更していない** — 消費者が使う API は
-  そのままで、facade の裏に置く移行方針どおり。
-- **capability はゼロ**。CSS 生成は data→text なので `kotoba/pure` に収まる。
+- 移植先は `kotoba/css_core.kotoba` / `kotoba/html_core.kotoba`。`css.core` / `html.core` は
+  **一切変更していない** — 消費者が使う API はそのままで、facade の裏に置く移行方針どおり。
+- **capability はゼロ**。CSS/HTML 生成は data→text なので `kotoba/pure` に収まる。
 - 言語側で自前実装が要ったもの: ①**数値→文字列の組み込みが無い**ので `nat-str` を再帰 +
   `string-substring` で桁を literal から引く（ASCII なのでバイト索引が厳密）②**正規表現が無い**ので
-  breakout guard は `string-contains?` 4 本 ③**`or` は bool でなく i64 を返す**ので
-  `(not (or ...))` は型エラー、`if` の入れ子で畳む。
+  CSS breakout guard は `string-contains?` 4 本、HTML RAWTEXT は `string-fold-case` +
+  `string-contains?` で case-insensitive `</tag` を検出 ③**`or` は bool でなく i64 を返す**ので
+  `(not (or ...))` は型エラー、`if` の入れ子で畳む ④escape は `string-replace-all` 4 段
+  （`&` → `<` → `>` → `"` の順で html.core/esc と一致）。
 - 例外の代わりに `[:result :string :string]` を返す（原典は throw）。
 - **parity gate は KIR インタプリタを同一 JVM で回す**。各ケースを 0 引数の `.kotoba` 関数として
   生成するので、typed value を Clojure 側からマーシャリングする必要が無い。
   `kotoba-lang/compiler` は **test-only 依存**。
-- **16 tests / 166 assertions / 0 failures**（うち gate が 125: operator-theme の実 rule 6 件、
+- **css**: 16 tests / 166 assertions / 0 failures（うち gate が 125: operator-theme の実 rule 6 件、
   unit 有無をまたぐ数値 110 通り、原典が throw する敵対的入力 4 件）。
+- **html**: 18 tests / 64 assertions / 0 failures（escape 7、attrs/style、void/closed 合成、
+  RAWTEXT ok/reject）。tag sugar / class 集合 / seq children / pretty-print は .cljc に残す
+  （form A の call-graph では木を値として持たないため。shitsuke.hiccup も compact walk を自前で持つ）。
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
