@@ -50,6 +50,7 @@
          '[cheshire.core :as json])
 
 (def node-fs (js/require "node:fs"))
+(def node-os (js/require "node:os"))
 
 (def args *command-line-args*)
 (def argset (set args))
@@ -190,6 +191,45 @@
   (when-let [c (b64-file dir path)]
     (gh-input! (str "repos/" slug "/git/blobs") {:content c :encoding "base64"} ".sha")))
 
+(defn- three-way-blob!
+  "tracked ファイルを載せるときの blob。**作業ツリーの中身をそのまま置かない。**
+
+  この関数が存在する理由（2026-07-26/27 の実害）: server-commit! は base_tree に
+  default branch の tree を使い、その上へ作業ツリーのファイルを丸ごと重ねていた。
+  west の子リポは pin された SHA の **detached HEAD が正常状態**なので、checkout は
+  default branch より古いのが普通である。したがって丸ごと上書きすると、pin 以降に
+  default branch が足した行が全部消える。これが `cleanup: preserve uncommitted
+  tracked changes` PR の削除の正体で、17 本が merge されて main から約 913 行が
+  失われた（langchain の schema-from-tx-data、kotobase-protocols の
+  ADR-2607171700/2607172210 文書、toshokan の README 205 行 等）。checkout が古い
+  ことは異常ではないので、直すべきは checkout ではなくここ。
+
+  正しい内容は「作業ツリーの編集を default branch の上に載せ替えたもの」= 3-way
+  merge（base = その checkout の HEAD 版、ours = 作業ツリー、theirs = default 版）。
+  衝突したら **その 1 ファイルを諦めて報告する**（conflict marker 入りのファイルを
+  main に載せる方が、載せないより遥かに悪い）。HEAD に無い（= 新規 tracked）や
+  default に無いファイルは 3-way の意味が無いので作業ツリーをそのまま使う。"
+  [slug dir base path]
+  (let [tmp (str (.tmpdir node-os) "/cl-" (str/replace path #"[^A-Za-z0-9._-]" "_"))
+        head-f (str tmp ".head") main-f (str tmp ".main")
+        head-out (sh "git" "-C" dir "show" (str "HEAD:" path))
+        main-out (sh "git" "-C" dir "show" (str "origin/" base ":" path))]
+    (if-not (and (zero? (:exit head-out)) (zero? (:exit main-out)))
+      ;; 片側に存在しない → 3-way の基準が無い。従来どおり作業ツリーを載せる。
+      (create-blob! slug dir path)
+      (let [wt-f (str tmp ".wt")]
+        (.writeFileSync node-fs head-f (:out head-out))
+        (.writeFileSync node-fs main-f (:out main-out))
+        (.copyFileSync node-fs (str dir "/" path) wt-f)
+        (let [{:keys [exit]} (sh "git" "merge-file" "-q" wt-f head-f main-f)]
+          (if (neg? exit)
+            (do (println (format "  skip 3-way 失敗     %s" path)) nil)
+            (if (pos? exit)
+              (do (println (format "  skip conflict       %s（%d hunk が衝突。手動で解決すること）" path exit)) nil)
+              (gh-input! (str "repos/" slug "/git/blobs")
+                         {:content (.toString (.readFileSync node-fs wt-f) "base64")
+                          :encoding "base64"} ".sha"))))))))
+
 (defn- file-mode
   "実行ビットを落とさない（bin/* を 100644 で載せると実行できなくなる）。"
   [dir path]
@@ -230,7 +270,7 @@
   "base branch の tip の上に paths を載せた commit を作り、branch ref を作る。
   branch が既にあれば ref は作らず、その ref を commit へ更新する。
   -> {:branch b :commit sha :files n} / nil"
-  [slug dir base paths branch message]
+  [slug dir base paths branch message & [three-way?]]
   ;; base が未作成（= commit が1つも無い新規 repo）なら parents 無し・base_tree 無しの
   ;; ルートコミットを作る。placeholder repo（例 kotoba-lang/org-threejs: branch
   ;; init_placeholder に commit ゼロ、ファイルは全部 untracked）はこの経路でしか
@@ -240,7 +280,9 @@
                     (gh-str "api" (str "repos/" slug "/git/commits/" base-sha) "--jq" ".tree.sha"))]
     (let [_ nil]
       (let [entries (keep (fn [p]
-                            (when-let [sha (create-blob! slug dir p)]
+                            (when-let [sha (if three-way?
+                                             (three-way-blob! slug dir base p)
+                                             (create-blob! slug dir p))]
                               {:path p :mode (file-mode dir p) :type "blob" :sha sha}))
                           paths)]
         (when (seq entries)
@@ -442,7 +484,8 @@
                          "NOT auto-merged. These rewrite files that already exist on " base ",\n"
                          "and the working tree they came from may be far behind it.\n\n"
                          "Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>")]
-            (if-let [{:keys [files]} (server-commit! slug dir base tracked br msg)]
+            ;; tracked は必ず 3-way で載せる（three-way-blob! の docstring 参照）。
+            (if-let [{:keys [files]} (server-commit! slug dir base tracked br msg true)]
               (let [url (or (existing-pr slug br)
                             (open-pr! slug base br
                                       (str "DO-NOT-MERGE cleanup: preserve uncommitted tracked changes ("
