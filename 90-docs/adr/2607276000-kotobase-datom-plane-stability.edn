@@ -1,0 +1,156 @@
+[{:db/id -1
+  :adr/id "ADR-2607276000"
+  :adr/title "kotobase datom 面の安定化 — 契約を実行可能にし、承認待ちを可視化する"
+  :adr/status "accepted"
+  :adr/date "2026-07-27"
+  :adr/tags ["kotobase" "cacao" "conformance" "marketplace" "incident" "closing"]
+  :adr/supersedes ""
+  :adr/body
+  "## 現在地（一行）
+
+kotobase の CACAO 契約が `cacao.conformance` として**実行可能**になり、任意のデプロイに
+向けて走らせられる。marketplace 7 actor は `/escalations` `/ledger` を持ち承認待ちが
+読める。**ただし marketplace の live worker は現在 401 で停止中** — 進行中の
+バックエンド移行（pod → kotobase-storage-d1）に起因し、修正は移行側の決定を要する。
+
+## 何が起きたか
+
+1 日で 4 つの障害が起き、**すべて同じ症状（裸の 401）** だった。
+
+| 原因 | 発見経緯 |
+|---|---|
+| kagi の `iat` にナノ秒（`(str (Instant/now))`） | `kagi push` が数ヶ月死んでいた |
+| エッジが CACAO の検証を開始（ADR-2607279500） | 旧形を出す全 client が同時に停止 |
+| capability 語彙が 2 系統（`datom:read` vs `graph:query`） | marketplace 全読みが 401 |
+| アドレッシングが CID → literal ref | 既存データが不可視（`UnknownGraphCid`） |
+
+**共通の構造**: client と server の契約が実行可能な形でどこにも書かれておらず、
+破れたことが本番でしか分からず、しかも全部同じに見える。
+
+決定的な観測: `proxy.cljc:193` の `(.catch (fn [_] nil))`。エッジは
+`invalid CACAO iat` / `CACAO graph scope does not include issuer DID` /
+`CACAO nonce replay` という**正確な理由を計算してから捨てている**。4 つの別々の原因が
+外からは 1 ビットにしか見えない。
+
+## 決定
+
+### 1. 契約を実行可能にする（`cacao.conformance`、実装済み）
+
+規則ごとに **1 箇所だけ** valid と違う CACAO を発行する。2 箇所違うと拒否が
+どの規則を破ったか名指さなくなるため。transport は注入で、live・ローカル worker・
+スタブに同じスイートを当てられる。
+
+**3 件は `:unknown` = 測定であって失敗ではない。** `xrpc-vocabulary-only` と
+`d1-vocabulary-only` は鏡像で、その答えが**どちらのバックエンドが応答しているか**を
+示す — 他のどの観測でも見えない。
+
+`capability-vocabularies` は、無かったせいで障害になった表そのもの
+（1 つの権限に 2 つの名前、対応表なし）。
+
+### 2. apex 規則を共有ライブラリ 1 箇所に（実装済み）
+
+`cacao.core/mint-kotobase-apex` が graph scope / caip122 / ISO 秒 / nonce を所有し、
+**違反は mint 時点で throw する**。apex の拒否は理由を持たないので、理由は mint 側で
+作るしかない。kagi のローカルコピーは削除（ADR-2607268000 の適用）。
+
+### 3. 承認待ちを可視化する（実装済み）
+
+marketplace の全 actor は高リスク操作を escalate するが、**それを読む経路が無かった**。
+actor は正しく判断を拒否し、人間はそれが起きたことを見られなかった。
+`marketplace.edge/ledger-routes` が `/escalations`（未解決のみ）と `/ledger` を
+1 実装で提供し、7 actor が 1 行ずつ委譲する。
+
+`fact-ref` が必要だったのは actor ごとに subject の名前が違うため（`edge/run` は
+`:ref`、order の独自ランナーは `:order-id`）。`:ref` だけで突き合わせると
+**何もマッチせず待ち行列が空に見える** — エラーより悪い「やることなし」に読める。
+
+## live 適合性実行の結果（kotobase.net、2026-07-27）
+
+```
+valid                        accept    ok
+missing-pin-capability       reject    ok
+graph-scope-is-a-cid         reject    ok
+iat-with-fractional-seconds  reject    ok
+iat-as-epoch-seconds         reject    ok
+expired                      reject    ok
+eip4361-header               reject    measured
+xrpc-vocabulary-only         reject    measured
+d1-vocabulary-only           accept    measured
+both-vocabularies            accept    ok
+tampered-signature           reject    ok
+
+8 checked, 8 agree, 0 disagree, 3 measured
+rejections carry NO reason — every cause looks identical from outside
+```
+
+1 回の実行で 4 つの未解決問題が片付いた: 検査 8 規則すべて記述どおり強制されている /
+**apex は既に D1 が応答している** / **`h` は効き `caip122` 必須**（乖離した 2 コピーが
+食い違っていた点） / 拒否は理由を返さない（言い伝えでなく測定結果として）。
+
+## 検証（全て 2026-07-27 実測）
+
+| repo | tests | assertions |
+|---|---|---|
+| org-chainagnostic-cacao | 53 | 200 |
+| marketplace | 152 | 642 |
+| kagi | 78 | 408 |
+| marketplace-order | 46 | 123 |
+| marketplace-onboarding | 37 | 129 |
+| marketplace-listing | 32 | 90 |
+| marketplace-settlement | 46 | 134 |
+| marketplace-fulfillment | 22 | 64 |
+| marketplace-crossborder | 35 | 132 |
+| marketplace-returns | 21 | 54 |
+| **計** | **522** | **1,976** |
+
+全て 0 failures / 0 errors。`kotobase-client` は test suite を持たない（未整備、下記 gap）。
+
+live 実測: kagi `push`/`pull`/`sync` が共有ライブラリ経由で往復（seq 3）。端末登録は
+実 vault のコピーに対して wrap-count 1→2、`KAGI_MASTER` 無しで実 secret を読み出し
+バイト一致、`revoke` で 1 に戻る。実 vault は無傷（wrap-count 1）。
+
+## 未解決 — marketplace live worker が 401（最優先）
+
+**プラットフォームは動いている。** JVM client から marketplace と同一の identity・
+DB・capability で読み書きとも 200 を実測（`db-before nil` = D1 側の `marketplace` は空）。
+**worker だけが 401。**
+
+差分は**アドレッシング**: kotobase-client の XRPC read は `graph` を content-addressed
+CID で送り `db_name` を送らない。エッジは現在 kotobase-storage-d1 へブリッジし、
+D1 は ref を literal `kotobase/db/<did>/<name>` でアドレスするため、テナント ref を
+導出できない。write は `db_name` を送っており JVM からは通る。
+
+**TTL を 900 秒に広げた変更は外れだった。** Workers の `Date.now()` 凍結は実在の性質
+なので強化として残すが、**今回の原因ではなく何も直していない**（commit message にも明記）。
+
+read のワイヤ形状変更は**まだ着地中の移行に先回りすること**になるため、意図的に止めた。
+
+## 旧データについて（喪失ではない）
+
+移行前の注文・credential・台帳は CID アドレスの旧バックエンドにある。D1 は同じ ref を
+別アドレスで扱うため現経路から見えないだけ。`kagi push` が `UnknownGraphCid` を返すのは
+同じ事実の別の言い方。**「資格情報が見つからないときにデータが無いと結論しない」**
+（秘密情報マップに記録された過去の実事故の教訓）に従い、喪失とは言わない。
+
+## 次に効くもの（未実装、優先順）
+
+1. **エッジが理由コードを返す。** 理由は既に計算済みで捨てているだけ。1 日が
+   1 リクエストになる。`conformance` の `reason-visible?` がそのまま回帰テストになる。
+2. **read のワイヤ形状を D1 のブリッジに合わせる**（`db_name` を送る）。移行担当と
+   順序を決めてから。
+3. **ref 同一性の変換を 1 箇所に + バックエンド切替の preflight** — 解決できない ref を
+   配る構成への切替を拒否する。
+4. **conformance を net-kotobase / kotobase-client / kagi の CI に入れる。**
+5. kagi: 同期衝突が `seq` の last-writer-wins（item 単位マージが要る）/ VMK rotation
+   未実装のため `revoke` は access-list 変更止まり / 自己発行 CACAO 経路は未統合。
+6. marketplace: buyer surface が live カタログと切れている / durable store の契約
+   テストが 7 分の 2 / `:all` クエリが件数で区切られていない / 冪等性が発注だけ。
+7. `kotobase-client` に test suite が無い。
+
+## オーナー判断が要るもの
+
+- 既存 datom をどうするか（pod へ戻す / 移行する / 直 D1 へ切替）。
+- kagi の Shamir share 発行と 2 台目での `unlock-enable-keychain`（passphrase 入力と
+  share の物理保管は agent が代行すべきでない）。
+- 裁定の受け皿となる人間プロセス（誰が・どの権限で・どの SLA で）。"
+  }]
