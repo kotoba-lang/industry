@@ -261,8 +261,11 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
 - **W4 fourth slice (2026-07-27, compiler#342)**: host `reconcileUiDocument`
   maps shallow UI `:document` (`:tag`/`:text`/`:children`) onto real DOM;
   in-place text update; dangerous tags fail closed. Not the full `:ui/commit`
-  kit. Design-system final cutover still waits on recursive logical values,
-  dual renderer qualification, and perf workloads.
+  kit.
+- **W4 fifth slice (2026-07-27, compiler#343 + kir#10 + script#71)**: recursive
+  logical trees via `[:ref R]` resolution to nominal variant/record values
+  (sealed `:app/node` leaf/branch under ADT budgets; KIR+ESM). Design-system
+  final cutover still waits on dual renderer qualification and perf workloads.
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
