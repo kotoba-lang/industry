@@ -310,6 +310,55 @@ CID を再計算するだけで存在を確認できる）。blind index は**�
 22 tests / 67 assertions。D1 backend は kotobase 自身の storage conformance suite を
 通している。**未デプロイ**（D1 の id も secrets も未設定）で、UI の `:act` は inert のまま。
 
+## 操作の配線（2026-07-27 追記、gap C を解消）
+
+### script を使わない — 素の HTML フォームで配線した
+
+CSP に `script-src` が無い。ボタンを動かす方法は2つあった: client bundle を足して
+CSP を緩める（reagent mount）か、素のフォームにするか。**後者を採った。** 結果として
+JavaScript を切ってあっても、借りたスマホでも、悪い回線でも確認画面は動く —
+このスコアの決定が bundle の読み込みに依存してよい理由が無い。
+
+POST → 303 → GET（リロードで通報判断や二重 claim が再送されない）。CSRF は principal に
+署名でひも付けた hidden field で、**session cookie は流用しない**（HTML の中に資格情報を
+置くことになり、スクショや保存ページから漏れる）。
+
+「本文をコピー」ボタンは**消した**。クリップボードには script が要る。法的な申告を
+している画面で、押しても黙って何も起きないボタンは、ボタンが無いより悪い。
+
+三値の質問は radio group にし、**「わからない」を既定選択**にした。チェックボックスには
+「わからない」を表す方法が無く、既定は「いいえ」になる — パロディ質問の既定が「いいえ」
+だと、表記のあるファンアカウントが保護を失う。
+
+### seeker はハッシュを入力しない。サーバが証拠から計算する
+
+記録画面はスクリーンショットを**アップロード**し、サーバが受け取ったバイト列から
+SHA-256 digest と知覚ハッシュを計算する。**これは script が無いことへの妥協ではなく、
+そちらが正しい設計だった**: クライアント計算のハッシュは主張でしかなく、スクショが
+別物を映していても一致する値を送れてしまう。サーバ計算なら証拠そのものの測定になり、
+`:evidence/digest` は TIA が実際に保持しているバイト列を指す — これが `g0-evidence` に
+意味を持たせている。実体は R2 に digest をキーとして保存し、binding が無ければ
+`:evidence/blob-stored? false` が証拠エントリに同行する（案件が証明可能に弱くなるが、
+黙って弱くなるのではない）。
+
+### ドメインに `:recordCandidate` を足した
+
+巡回を進めながら1件ずつ記録する。接続が切れても、20タスク目までの発見ではなく
+最後の1回答だけを失う。`:submitJob` は batch 無しで呼ばれたら記録済みを確定する
+（既存の batch 経路は互換のまま）。
+
+### 上流の欠陥を1つ回避している（恒久ではない）
+
+`kotoba-ui/checkbox` は `:name` を転送しないので、design system が描いたチェックボックスは
+フォームで送信できない。SSR-first を謳うコンポーネントライブラリの実際の欠陥であり、
+本来 liquid-glass-ui で直すべきもの。**そうしなかったのは、あのリポジトリが現在
+別セッションの未コミット作業を抱えていて detached HEAD だから** — 誰かが編集中の共有
+west checkout を触るのは CLAUDE.md の並行エージェント規則が防いでいる失敗そのもの。
+`tia.ui.common/checkbox-field` は emit された `<input>` に属性をマージするだけで、
+上流が受け取るようになった日に消える。**この回避は上流 issue として残っている。**
+
+12 tests / 76 assertions（UI 不変条件）、25 tests / 78 assertions（Worker）。
+
 ## Consequences
 
 - gftdcojp に impersonation 検知の正本ができた。`ai-gftd-content-protection`
