@@ -266,10 +266,23 @@
                                     {:ref (str "refs/heads/" branch) :sha commit-sha} ".object.sha"))]
                 (when ok {:branch branch :commit commit-sha :files (count entries)})))))))))
 
-(defn- open-pr! [slug base branch title body]
-  (let [{:keys [out exit]} (sh "gh" "pr" "create" "--repo" slug "--base" base "--head" branch
-                               "--title" title "--body" body)]
-    (when (zero? exit) (str/trim out))))
+(defn- open-pr!
+  "PR を作る。`draft?` の PR は GitHub 側が merge をブロックするので、
+  「auto-merge するな」を本文のお願いではなく機構として強制できる。
+
+  実測事故 2026-07-26/27: :review クラスの PR は本文に警告を書いていたが、
+  タイトルは中立（`cleanup: preserve uncommitted tracked changes`）で draft でも
+  なかったため、別セッションの一括 merge が mergeable なものとして 17 本を main に
+  入れ、約 913 行が main から消えた（langchain の `schema-from-tx-data`、
+  kotobase-protocols の ADR-2607171700/2607172210 文書、toshokan の README 205 行 等。
+  8 本は復旧済み）。本文の警告は読まれない前提で設計する。"
+  ([slug base branch title body] (open-pr! slug base branch title body false))
+  ([slug base branch title body draft?]
+   (let [args (cond-> ["gh" "pr" "create" "--repo" slug "--base" base "--head" branch
+                       "--title" title "--body" body]
+                draft? (conj "--draft"))
+         {:keys [out exit]} (apply sh args)]
+     (when (zero? exit) (str/trim out)))))
 
 (defn- merge-pr! [slug url]
   (let [{:keys [exit err]} (sh "gh" "pr" "merge" url "--repo" slug "--merge")]
@@ -432,14 +445,22 @@
             (if-let [{:keys [files]} (server-commit! slug dir base tracked br msg)]
               (let [url (or (existing-pr slug br)
                             (open-pr! slug base br
-                                      (str "cleanup: preserve uncommitted tracked changes (" files " files)")
-                                      (str "⚠️ **Review before merging — deliberately not auto-merged.**\n\n"
+                                      (str "DO-NOT-MERGE cleanup: preserve uncommitted tracked changes ("
+                                           files " files)")
+                                      (str "⚠️ **Draft on purpose — this must not be merged as-is.**\n\n"
+                                           "Opened as a draft so GitHub itself blocks the merge. On 2026-07-26/27, 17 PRs of\n"
+                                           "exactly this shape were merged by an automated pass because the body's warning was\n"
+                                           "advisory and the PR looked mergeable; ~913 lines were deleted from `" base "` before\n"
+                                           "the damage was found and 8 of them restored.\n\n"
+                                           "To use this: keep the additions, drop any deletions, or re-cut the branch from\n"
+                                           "current `" base "` so it only adds. Then mark it ready.\n\n"
                                            "These rewrite files that already exist on `" base "`, and the working tree they\n"
                                            "came from may be far behind it. Merging blind can silently roll `" base "` back.\n\n"
                                            "Precedent: cloud-itonami's working tree was 1381 commits behind `main`; applying its\n"
                                            "`legal/terms.md` would have reverted owner-approved public legal pages to a DRAFT.\n\n"
-                                           "🤖 Generated with [Claude Code](https://claude.com/claude-code)")))]
-                (println (format "  :review   %d files → %s （merge しない）" files url)))
+                                           "🤖 Generated with [Claude Code](https://claude.com/claude-code)")
+                                      true))]
+                (println (format "  :review   %d files → %s （draft・merge しない）" files url)))
               (println "  :review   commit に失敗（報告のみ、ローカルは無傷）"))))
         (when branches? (land-branches! dir slug base)))))))
 
@@ -490,13 +511,17 @@
               (if-let [url (existing-pr slug b)]
                 (println (format "    %-46s PR 既存 %s" b url))
                 (if-let [url (open-pr! slug base b
-                                       (str "cleanup: review un-landed branch " b)
-                                       (str "⚠️ **Not auto-merged.** Opened so this branch is on a review path.\n\n"
+                                       (str "DO-NOT-MERGE cleanup: review un-landed branch " b)
+                                       (str "⚠️ **Draft on purpose — opened only to put this branch on a review path.**\n\n"
                                             "`" b "` is pushed but not reachable from `" base "` and had no open PR.\n"
                                             "Abandoned experiments, deliberate forks and force-pushed histories all look\n"
                                             "alike from outside, so landing it is a human call.\n\n"
+                                            "Draft so GitHub blocks the merge rather than relying on this note being\n"
+                                            "read — on 2026-07-26/27 an automated pass merged 17 advisory-only PRs of the\n"
+                                            "sibling `:review` class and deleted ~913 lines from `" base "`.\n\n"
                                             "Opened by `scripts/cleanup-land.cljs` (skill `git-cleanup-conflict`).\n\n"
-                                            "🤖 Generated with [Claude Code](https://claude.com/claude-code)"))]
+                                            "🤖 Generated with [Claude Code](https://claude.com/claude-code)")
+                                       true)]
                   (println (format "    %-46s PR 作成 %s" b url))
                   (println (format "    %-46s PR 作成に失敗（差分なし等）" b)))))))))))
 
