@@ -996,6 +996,71 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   目の前のタスクを止めてまで存在しない統合（例: `clojurewasm` の新規導入）を
   今から作ることはしない（別スコープの ADR とプロジェクトとして切り出す）。
 
+## `.kotoba` を書くときは `compile` 経路を使う — legacy emitter は使わない（repo-wide mandatory、2026-07-27、ADR-2607270100）
+
+**kotoba には独立した2つのコンパイラ面があり、新規の `.kotoba` は必ず後者
+（`kotoba compile` → `kotoba-lang/compiler`）で書く。** legacy emitter
+（`kotoba wasm emit` / `kotoba cljs emit`）は単一ファイル・貧弱な型・127 バイト文字列上限を
+持つ旧経路であり、その制約を「Kotoba 言語の限界」と誤認しない（実際に 2026-07-27 の spike が
+この取り違えをやった）。
+
+| | legacy（`wasm emit` / `cljs emit`） | **`compile`（使うのはこちら）** |
+|---|---|---|
+| モジュール | 単一ファイルのみ | 複数ファイル閉グラフ `(:require [m :as a])` + `(:export [...])` |
+| ターゲット | wasm32 / cljs テキスト | wasm32 + `:js-kotoba-v1` restricted ESM |
+| 型 | i32/i64/f32 と生メモリ | `[:map K V]` `[:set T]` `[:record ...]` `[:variant ...]` `[:option T]` `[:result T E]` 異種 `[:vector ...]` `:document` `:string-index` |
+| 数値 | cljs 側は 2^53 で throw | BigInt i64 + `assertI64` |
+| 文字列 | **127 UTF-8 バイト上限** | EDN 1 MiB / string leaf 64 KiB（実測: 4,920 バイトの HTML 断片を構築可） |
+| capability | host-import 表（id 201+） | capability-registry（id 1–12）+ 型付き kit |
+
+- **型注釈はインライン構文**: `(defn f [p :string n :i64] :string body)`。
+  legacy の `^:i64` メタデータ形式ではない。
+- **capability は `(ns x (:capabilities #{:ui/commit}))` + `(cap-call :ui/commit v)`**、
+  policy は `{:allow #{[:cap/call 9]}}`。宣言したのに使わないとコンパイルエラー。
+- **`:js-kotoba-v1` の成果物は `kotoba-js-artifact/v1`**: `instantiateKotoba(grants)` を
+  export し、grant が `requiredCapabilities` と厳密一致しなければ
+  `capability-grant-mismatch` で instantiate 自体が落ちる（実行時も fail closed）。
+
+### 再帰的な値型は無い — 木を「値」でなく「呼び出しグラフ」か「フラット node 集合」で持つ
+
+`docs/architecture.md`「not a recursive value」/ `docs/component-model-baseline.md`
+「General recursive Kotoba schemas are rejected by Component v1」。`[:set T]` は最大 32 要素。
+**したがって hiccup のような任意深度の入れ子データを Kotoba の値として表現できない。**
+これを回避する形は 2 つだけで、新しく UI/文書生成を書くときはどちらかを選ぶ:
+
+- **形 A（SSR、今日可能）**: component を `:string` を返す純関数にし `string-concat` で合成する。
+  木は呼び出しグラフとしてのみ存在する。capability 不要（`kotoba/pure`）。
+- **形 B（対話 UI）**: ui-v1 kit の `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text`）に
+  載せる。`:parent` ポインタで木を表すので再帰型が要らない。
+
+### 今日の既知ブロッカー（回避策を知らずに時間を溶かさないこと）
+
+1. **project linker が `:capabilities` を拒否** — 多ファイル経路の ns は `:export` と
+   alias-only `:require` のみ許す。**「多ファイル」と「capability」は現状排他**。
+2. **`kotoba` CLI の `compile` verb は policy を `{}` 固定で渡す** — capability を使うと必ず
+   `capability policy denies required effects`。回避は `kotoba.compiler.core/compile-source`
+   を直接呼ぶこと。
+3. **全 8 capability kit（clock/http/llm/log/state/storage/stream-object/ui）は
+   `:reference :implemented` だが `:wasm-aot`/`:native-aot`/`:jit` は `pending`**。
+4. **ingress（Request→Response）capability はどちらの面にも無い** — Cloudflare Worker の
+   エントリは cljs のままにする（ADR-2606290000 と整合）。
+5. **fs/process/exec capability も Kotoba script host（`kbb`）も無い** — build スクリプトは
+   nbb 据え置き。`kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner
+   ではない（名前で誤解しないこと）。
+
+## design system（css / html / shitsuke / liquid-glass-ui / kotoba-ui）は `.kotoba` 移行対象（オーナー判断 2026-07-27、ADR-2607270100 §10）
+
+**この 5 リポジトリを「`.cljc` のまま維持する層」と扱わない。** `.kotoba` へ移行する方針が
+決まっている。これらは本質的に「データ → 文字列」の純関数群（token map → CSS 変数、
+hiccup → HTML、opts → component）で `->page` は文字列を返すため、**capability は一切不要で
+`kotoba/pure` に収まる**。制約は型の方（上記の再帰的値型なし）なので、移植は機械的ではなく
+上記の形 A / 形 B のどちらかへの**データモデル再設計**を伴う。
+
+**移行順序は依存順に厳守する**: `css` → `html` → `shitsuke` → `liquid-glass-ui` → `kotoba-ui`。
+逆順・同時並行は依存を壊す。移行が完了するまでは skill `kotoba-uiux` の既存ルール
+（app は `kotoba-ui.core` のみ require、raw hex 禁止、layout は shell から）がそのまま有効で、
+**移行途中のリポジトリを app から直接 require しない**。
+
 ## kotoba の実行は最終的に JVM/Node/Rust を経由しない（ADR-2607198300、2026-07-19）
 
 **kotoba-lang における「実行時に JVM/Node/Rust を迂回しない」とは、kotoba 自身の

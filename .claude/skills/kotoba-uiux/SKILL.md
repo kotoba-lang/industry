@@ -10,6 +10,21 @@ file next** (fetch the repo with `west update --fetch smart kotoba-ui` if it is 
 checked out). This SKILL.md is the contract summary; the agent-guide is the how-to with
 worked examples.
 
+## Status: this stack is migrating to `.kotoba` (owner decision 2026-07-27, ADR-2607270100 §10)
+
+`css` / `html` / `shitsuke` / `liquid-glass-ui` / `kotoba-ui` are **not** a permanent `.cljc`
+layer — they are targets for `.kotoba` migration, in that dependency order. They need **no
+capabilities** (`->page` returns a string, so `kotoba/pure` covers them); the real work is a
+data-model redesign, because Kotoba has **no recursive value types** and therefore cannot hold
+hiccup as a value. Two admitted shapes: **A** — components are `:string`-returning pure
+functions composed with `string-concat`, tree lives only in the call graph (works today);
+**B** — the ui-v1 kit's `:declarative-flat-tree` with `:parent` pointers (needs the 32-node
+limit raised and a DOM provider). Write new `.kotoba` on the `compile` path, never the legacy
+`wasm emit`/`cljs emit` emitter — see CLAUDE.md's "`.kotoba` を書くときは `compile` 経路を使う".
+
+**Until a repo has actually migrated, every rule below still applies unchanged**, and app code
+must not require a mid-migration repo directly.
+
 ## The stack (dependency direction is law)
 
 ```
