@@ -264,8 +264,15 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   kit.
 - **W4 fifth slice (2026-07-27, compiler#343 + kir#10 + script#71)**: recursive
   logical trees via `[:ref R]` resolution to nominal variant/record values
-  (sealed `:app/node` leaf/branch under ADT budgets; KIR+ESM). Design-system
-  final cutover still waits on dual renderer qualification and perf workloads.
+  (sealed `:app/node` leaf/branch under ADT budgets; KIR+ESM).
+- **W4 sixth slice (2026-07-27, compiler#344)**: dual-renderer qualification
+  (guest HTML stream ⇄ host DOM serialize agree on one logical UI document;
+  persistent `document-assoc` update keeps both in lockstep) + soft 200×
+  render workload + recursive tree persistent update (`hetero-vector-assoc`)
+  and guest `tree-eq`. Design-system final cutover (Delivery 6) can target
+  these dual renderers. Remaining Delivery-4 gaps: reader/printer round-trip
+  of recursive logical values; harder perf evidence before HAMT/arena
+  selection. Full `:ui/commit` kit remains W5.
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
