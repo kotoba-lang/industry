@@ -125,19 +125,37 @@ deny-by-default な最小権限付与、`:export` リスト（WIT world は 2 ex
 
 ## まだできないこと（実測した境界）
 
-### typed collection は境界を越えられない
+### typed collection は境界を渡せるが、渡した先で計算できない
 
-- `list<s64>` が渡せる shape は `:vector-i64-identity`（`(defn f [v] v)` という
-  単一関数の恒等写像）と `:vector-i64-literal` の 2 つだけ。多関数や capability と
-  併用できない（`:scalar` / `:scalar-with-capabilities` は**全 export が
-  スカラー**であることを要求する）。
-- さらに **源からは list 引数を宣言する手段が無い**。param の型は推論であり、
-  `(defn total [xs] (vector-count xs))` は `expression type mismatch: expected
-  vector-i64, got i64` で落ちる。上の 2 shape は手組み KIR からしか到達しない。
-- ブロッカーは compiler ADR 0077（accepted、未実装）。永続コレクションを
-  回収しない bump allocator に載せると、16384 item の上限で `conj` の
-  copy-on-write が 1.0 GiB を触るという実測がそこに書いてある。**表現の設計問題
-  であって配線の問題ではない**ので、片手間に埋めない。
+（2026-07-27 訂正。初版は『源からは list 引数を宣言する手段が無い』と書いたが
+**誤りだった** — 型注釈構文が存在する。境界の位置を測り直して差し替える。
+compiler `origin/main` = 2257a72 で実測。）
+
+源には型注釈がある: `(defn f [xs :vector-i64] :vector-i64 ...)`。param 型は
+注釈が無い時だけ推論される。したがって:
+
+| 源 | 結果 |
+|---|---|
+| `(defn passthrough [xs :vector-i64] :vector-i64 xs)` | **通る**。`:vector-i64-identity`、WIT は `func(xs: list<s64>) -> list<s64>` |
+| `(defn total [xs :vector-i64] :i64 (vector-count xs))` | `component function body has no qualified Canonical lowering`（`:phase :component-core`） |
+| `(defn tail [xs :vector-i64] :vector-i64 (vector-drop xs 1))` | 同上 |
+| list 引数 + capability 呼び出しの併用 | 同上 |
+
+つまり **`list<s64>` は今日でも境界を渡せる。渡した中身で計算できない。**
+壁は frontend でも KIR でもなく **component lowering の shape 表**にある
+（`:vector-i64-identity` と `:vector-i64-literal` の 2 つしか無く、`:scalar` /
+`:scalar-with-capabilities` は全 export がスカラーであることを要求する）。
+
+ブロッカーは compiler ADR 0077（accepted、未実装）。永続コレクションを
+回収しない bump allocator に載せると、16384 item の上限で `conj` の
+copy-on-write が 1.0 GiB を触るという実測がそこに書いてある。**表現の設計問題
+であって配線の問題ではない**ので、片手間に埋めない。
+
+なお本 ADR を書いた当日、compiler main に #314-#317（`Compile nested lists
+across capabilities` / `indirect lists` / `indirect list capability matches` /
+`bool list capability matches`）が着地している。上の実測はその後の main に対する
+ものなので、**それらは shape 表を広げたが、上の 3 例はまだ通らない**。次に触る人は
+この表を測り直すところから始めるとよい。
 
 ### 本番 provider が無い
 
@@ -188,9 +206,10 @@ wasmtime 42.0.1 で実行した。`component-model-v1.edn` は qualification に
    これが typed collection 境界通過・crypto/storage provider（ADR-2607254600
    D5/D6）・Ethereum client（ADR-2607254500 Phase 1 以降）を同時にブロックしている。
    ADR 0077 は選択肢 (A)(B) を既に測って書いてあるので、そこから読む。
-2. **`.kotoba` 源から list 引数を宣言できるようにする。** 0077 が入っても、
-   param 型が推論のみだと源から書けない。ns の `:schemas` clause と同型の
-   宣言経路が要る。
+2. **上の shape 表を測り直す。** compiler main は日に数本のペースで list ×
+   capability の lowering を足しているので、『何が通るか』は本 ADR の実測日
+   （2026-07-27、main = 2257a72）から動いている可能性が高い。`vecid` /
+   `vecann` / `vecret` / `veccap2` の 4 例を再実行するのが最短。
 3. **9 capability のどれか 1 つを本番 provider にする**（ADR 0049 の項目 2）。
    `:llm/generate` は compiler ADR 0064 で `:clj` transport が既にあるので最短。
 4. 作業前に ADR-2607266000 G-M を読む — 抽出・pin 前進は共有 west checkout では
