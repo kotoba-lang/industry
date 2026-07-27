@@ -207,7 +207,7 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
 
 | # | repo | 状態 |
 |---|---|---|
-| 1 | **css** | 形 A で移植済み（2026-07-27、kotoba-lang/css#2 merged `fd5b15dc`）。**ただし W4 に先行した oracle 付き実験**であり、最終 API ではない |
+| 1 | **css** | 形 A で移植済み（css#2）。**D6 first cutover**（2026-07-27、css#3）: logical style `:document` → CSS stream（`css_document.kotoba`）が form-A / key-sorted css.core と byte 一致。form-A は oracle 残置。最終 API は html 以降も揃ってから |
 | 2 | **html** | 形 A で移植済み（2026-07-27、kotoba-lang/html#2 merged `ad835e22`）。**W4 先行の oracle 付き実験** — 最終 API ではない |
 | 3 | **shitsuke** | 形 A で移植済み（2026-07-27、kotoba-lang/shitsuke#7 merged `1b553e22`）。dual-render seam はホスト側に残置。**W4 先行の oracle 付き実験** |
 | 4 | **liquid-glass-ui** | 形 A で移植済み（2026-07-27、kotoba-lang/liquid-glass-ui#8 merged `8d89b8e5`）。component hiccup / style.cljc は .cljc に残置。**W4 先行の oracle 付き実験** |
@@ -282,6 +282,7 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   read/eq on KIR+ESM + host plane; tighter budgets than soft sixth-slice
   probe). Delivery-4 recursive logical document evidence is complete enough
   to start Delivery-6 design-system cutover. Full `:ui/commit` kit remains W5.
+- **Delivery-6 first cutover (2026-07-27, css#3)**: logical style `:document` → CSS stream with form-A/css.core parity; next is html.
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
