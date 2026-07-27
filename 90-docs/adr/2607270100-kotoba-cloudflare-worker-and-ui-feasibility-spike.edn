@@ -88,13 +88,46 @@ memory ops / capability call / i64・f32・bitwise・string ops を拒否（`emi
 分離し、前者のみ両 backend が共有する。`(ns kotoba.compiled.generated)` を hardcode するため
 build 側で ns を rename している。
 
-### 7. UI: 不可。`.kotoba` は UI を駆動できない
+### 7. UI: この spike の構成では不可。ただし別経路には UI capability が実在する（2026-07-27 追記で訂正）
 
-contract に `ui/*` / `dom/*` capability は**存在しない**（あるのは `render/galactic-frame` 232 /
+本 spike が使った **legacy emitter**（`kotoba wasm emit` / `cljs emit`、`kotoba-core-contracts` の
+host-import 表 id 201+）には `ui/*` / `dom/*` は存在しない（あるのは `render/galactic-frame` 232 /
 `gpu/clear` 226 / `gpu/set-position` 229 / `gpu/draw-frame` 230 / `kami/engine` 233 のみ）。
-`docs/lang/application-profile.md` の 6 項目完了ゲートを通過した UI family はゼロで、doc 自身が
-ゲート通過まで runtime support を主張することを禁じている。page は全面 `kotoba-ui`/`.cljc` で、
-`.kotoba` の寄与は `quote-price` のみ。
+この spike の page が全面 `kotoba-ui`/`.cljc` で `.kotoba` の寄与が `quote-price` のみ、という
+事実は変わらない。
+
+**しかし `kotoba-lang/compiler` は独立した第2の capability 面を持ち、そこには UI が実在する**
+（当初の記述はこれを見落としていた）。`resources/kotoba/compiler/capability-registry.edn`
+（id 空間 1-255、201+ の host-import 表とは意図的に非共有）に `:ui/commit 9` /
+`:ui/next-event 10` が登録済みで、`resources/kotoba/lang/capability-kits/ui-v1.edn` が
+型付き contract（宣言的フラットツリー、`:ambient-dom false`、bounded-pull イベント、
+limits: nodes 32 / queued-events 64）を定義する。
+
+**実測（2026-07-27）**: `(ns ui-single (:capabilities #{:ui/commit :ui/next-event}))` +
+`cap-call` を `compiler.core/compile-source` に policy `{:allow #{[:cap/call 9] [:cap/call 10]}}`
+付きで通すと、41KB の restricted ESM（`kotoba-js-artifact/v1`、`requiredCapabilities [9 10]`）が
+出て、Node 上で grant を与えた host に対し実際に `ui/commit` を呼ぶ。よって
+「`.kotoba` は原理的に UI を駆動できない」は**誤り**。
+
+未達なのは runtime qualification の方: 全 8 kit（clock/http/llm/log/state/storage/stream-object/ui）
+が `:reference :implemented` である一方、`:wasm-aot` / `:native-aot` / `:jit` はすべて `pending`。
+
+### 8. 「残りも .kotoba へ」を塞いでいる具体的ブロッカー（2026-07-27 実測）
+
+1. **project linker が `:capabilities` を受け付けない** — `--source-path` / `--project` の
+   多ファイル経路は ns に `:export` と alias-only `:require` の 2 節しか許さず、
+   `:capabilities` を書くと `only one :export and alias-only :require clauses are admitted`。
+   よって現状は**「多ファイル」か「capability」のどちらか一方**しか選べない。実アプリを
+   `.kotoba` で書く上での最大の障害はこれ。
+2. **`kotoba` CLI の `compile` verb が policy を `{}` 固定で渡す** — capability を使う
+   プログラムは CLI 経由では必ず `capability policy denies required effects` になる。
+   compiler API を直接呼べば通るので、launcher 側の受け渡し修正で解ける。
+3. **legacy `wasm emit` は多ファイル非対応** — `mod-a/double-it` が `unknown-form`。
+   多ファイルが要るなら `compile` 経路に移る必要がある。
+4. **ingress capability がどちらの面にも無い** — Worker のエントリは cljs のまま。
+5. **fs / process / exec capability が無く、Kotoba script host (`kbb`) も未実装**
+   （`kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner ではない）。
+   build スクリプトの `.kotoba` 化が最も遠い。
 
 ## 推奨する線引き（現時点）
 
