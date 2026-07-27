@@ -43,7 +43,7 @@ DO はグローバル一意 + シングルスレッドなので lease や fencin
 robot は `:robot-id` で書かれるのに host は `:robot/id` で再エンコードしていた。
 結果、fulfillment actor は**たった今渡されたロボットについて `robot-unknown`**
 と答え、settlement は**たった今与えた設定について `missing-operator`** と答えた。
-`persist/doc->tx*` が id を明示的に取り、`edge/select` が entity id
+`persist/doc->tx*` が id を明示的に取り、`edge/prefetch` が entity id
 （`doc-eid` が既にそこに入れている）から id を運ぶ形にして、**テーブルごと削除**した。
 1 件を直すのではなく、この種の乖離を構造的に消した。
 
@@ -115,14 +115,59 @@ settlement 46/134、fulfillment 22/64、crossborder 35/132、returns 21/54。
 
 ## 残っているギャップ（正直に）
 
-- **読みが unbounded。** apex 上で `datomic.q` が `rows: []`、`datomic.fold` が
-  `MethodNotImplemented` を返すため、リクエストごとに `:eavt` 全走査を
-  `{kind {id doc}}` に畳んでいる。graph が育つと破綻する。net-kotobase 側の作業。
+- ~~読みが unbounded~~ **解消（2026-07-27、同日）。下記「読みの誤解」を参照。**
 - **書き込み直後の読みは伝播が遅れることがある。** 別 isolate で直前に書いた値が
   次のリクエストで旧値に見える事象を実測した（数秒後には収束）。読み取り整合性の
   保証は主張しない。
 - **台帳の全順序は無い**（上記 1 の残余。DO 直列化器が正解）。
-- **決済レール未接続 / 倉庫ロボット未接続 / 出品者 UI 無し / 冪等キー無し。**
+- **決済レール未接続 / 倉庫ロボット未接続 / 出品者 UI 無し。**（冪等キーは下記で解消）
 - **裁定の受け皿となる人間プロセスが未定義**（設計上 actor は裁定しないので、
-  エスカレート先の運用がまだ空である）。"
+  エスカレート先の運用がまだ空である）。これは実装の穴ではなく**運用者が決めること**
+  であり、agent が代わりに決めるべきではない。
+
+## 読みの誤解 — `datomic.q` は Datalog ではなく三つ組パターンを取る
+
+**上に「apex では bounded read ができない」と書いたのは誤りだった。** 同日中に判明し、
+撤回して修正した。
+
+`datomic.q` の `query_edn` は **`[s p o]` の三つ組パターン**（`nil` がワイルドカード）
+であり、pod は `arrangement.query/query` にそのまま渡す。`[:find … :where …]` を
+送ると **6 要素ベクタとして解釈され、何にもマッチせず `rows: []` を返す** —
+これは空のデータベースの応答と**区別がつかない**。エンドポイントは最初から動いており、
+呼び方が間違っていた。
+
+原因の一端は `kotobase-client` の `q` の docstring 先頭行
+「Datalog query (EDN string)」で、これは `:direct-v1`（実際に `read-string` して
+`{:query … :args []}` を送る）については真だが、`:apex` については偽だった。
+**両トランスポートは別の言語を取る。** client 側の docstring を訂正済み。
+
+現在の読み:
+
+    named id   ["mp.order/ord-1" ":mp.order/doc" nil]   subject 1 件
+    :all       [nil ":mp.offer/doc" nil]                 kind 1 件
+
+を並行発行する。1 注文の判断のために marketplace 中の task・RMA・見積・税率・
+台帳イベントを全部ワイヤに載せることは無くなった。
+
+**読みは署名される。** `:public? true` で CACAO を省くと apex は 401 を返す —
+鍵由来 graph も誰かの graph だから。実測で確認した（想定ではない）。
+
+## 冪等性 — 注文 ID が冪等キー
+
+再送（クライアントの timeout・プロキシの再試行・ボタン二度押し）が二重注文に
+なっていた。注文 ID をそのまま冪等キーにする（既にその注文を同定するものであり、
+第二の識別子を呼び出し側に発明させるのは間違えさせる設計）。
+
+    ID 未見          → 発注する
+    ID 既知・同一内容 → `:idempotent true`、書き込み 0。再送は罰ではなく応答する
+    ID 既知・内容相違 → `order-id-conflict`。これは再送ではなく 1 つの ID を
+                       2 つの注文が主張している状態で、どちらかを黙って採ると
+                       もう一方が失われる
+
+比較対象は record 全体ではなく `->basket-lines`。それが settlement が分割する
+対象そのものなので、再送が安全と言えるために一致していなければならないのは
+そこであり、record 全体を比べると再シリアライズされた注文を競合と呼んでしまう。
+
+実測: 初回 POST は 11 triples、同一 POST は 0 triples で `idempotent`、
+qty だけ変えた同 ID は拒否され保存内容は初回のまま。"
   }]
