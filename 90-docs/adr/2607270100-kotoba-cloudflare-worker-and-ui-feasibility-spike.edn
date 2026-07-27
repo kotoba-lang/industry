@@ -277,9 +277,11 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   leaves; sha256 stable; KIR+ESM).
 - **W4 eighth slice (2026-07-27, compiler#346 + kotoba-wasm#32)**: real wasm
   + browser-host parity for print/read (document-sha256 multi-repo pattern).
-  Remaining Delivery-4: harder perf evidence before HAMT/arena selection.
-  Full `:ui/commit` kit remains W5. Delivery 6 design-system cutover remains
-  unblocked on dual renderers + logical document identity/print.
+- **W4 ninth slice (2026-07-27, compiler#347)**: harder document perf
+  workloads before structure selection (multi-section tree construct/print/
+  read/eq on KIR+ESM + host plane; tighter budgets than soft sixth-slice
+  probe). Delivery-4 recursive logical document evidence is complete enough
+  to start Delivery-6 design-system cutover. Full `:ui/commit` kit remains W5.
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
