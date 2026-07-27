@@ -248,6 +248,9 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   合成（shitsuke+liquid-glass+shell の host 出力を join）は .cljc に残す。移植先は
   `kotoba/theme_core.kotoba`。**依存順 5/5 の form-A 先行実験はこれで一通り完了**（最終 API 化は
   W4 + 両 renderer qualification 後 — ADR-2607279200 Delivery #6）。
+- **W4 first slice (2026-07-27, kotoba-lang/compiler#339)**: logical UI tree as
+  `:document` → pure guest HTML render (KIR+ESM parity) + budget fail-closed.
+  Design-system cutover still waits on digest/DOM reconcile/Style vocabulary.
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
