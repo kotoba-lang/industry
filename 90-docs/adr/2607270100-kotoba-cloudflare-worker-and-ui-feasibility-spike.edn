@@ -250,10 +250,16 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   W4 + 両 renderer qualification 後 — ADR-2607279200 Delivery #6）。
 - **W4 first slice (2026-07-27, kotoba-lang/compiler#339)**: logical UI tree as
   `:document` → pure guest HTML render (KIR+ESM parity) + budget fail-closed.
-  Design-system cutover still waits on digest/DOM reconcile/Style vocabulary.
 - **W4 second slice (2026-07-27, compiler#340)**: structural document fingerprint
-  (content-sensitive i64) + Style document→CSS stream. Remaining: document-sha256
-  host op, DOM reconcile, perf workloads.
+  (content-sensitive i64) + Style document→CSS stream.
+- **W4 third slice (2026-07-27, compiler#341 + multi-repo)**: first-class
+  `document-sha256` host op. Shared deterministic UTF-8 canonical encoding
+  (n/b/i/f/s/k/v/m + K for map keys) + SHA-256 hex. Landed as:
+  kotoba-kir#9, kotoba-script#70, kotoba-wasm#31, compiler#341. Parity:
+  KIR interpreter / restricted ESM / real wasm+browser-host (null golden +
+  content-sensitive + signed-zero). Design-system final cutover still waits
+  on recursive logical values (W4 remaining), dual renderer qualification,
+  DOM reconcile, and perf workloads.
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
