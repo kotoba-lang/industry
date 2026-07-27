@@ -1,0 +1,133 @@
+[{:db/id -1
+  :adr/id "adr-2607277000-cloud-itonami-chn-marketing-vertical"
+  :adr/doc_type "adr"
+  :adr/topic "cloud-itonami-chn-marketing-vertical"
+  :adr/title "ADR-2607277000: cloud-itonami に中国市場向け marketing vertical を起こす（広告审查 7310 / 涉外调查 7320）+ iso3166-chn の GTM 生成"
+  :adr/status "accepted"
+  :adr/date "2026-07-27"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/source-format "edn"
+  :adr/authoritative_for ["cloud-itonami-iso3166-chn-advertising :implemented"
+                          "cloud-itonami-iso3166-chn-market-research :implemented"
+                          "cloud-itonami-gtm-data 2026-07-27 run (CHN family)"]
+  :adr/related ["adr-2607105500-cloud-itonami-iso3166-usa-chn-implemented"
+                "adr-2607105300-cloud-itonami-iso3166-jpn-implemented"
+                "adr-2607252100-webwide-product-corpus-common-crawl-datalad"]
+  :adr/decision-summary "{:new-repos [\"cloud-itonami-iso3166-chn-advertising\" \"cloud-itonami-iso3166-chn-market-research\"] :maturity :implemented :gtm-run \"2026-07-27\" :follow-ups [\"add CHN row to cloud-itonami-isic-7310 catalog\" \"add CHN row to cloud-itonami-isic-7320 catalog\"]}"
+  :adr/body
+"# ADR-2607277000: cloud-itonami に中国市場向け marketing vertical を起こす
+
+**Status**: accepted
+**Date**: 2026-07-27
+
+## Context
+
+オーナーの問い「今の cloud-itonami で 中国市場向けの business, marketing
+business はある?」に対する棚卸しの結果:
+
+- **中国市場向け business は1本だけ存在した** — `cloud-itonami-iso3166-chn`
+  （公共調達の market entry: CCGP / 统一社会信用代码 / domestic-entity posture、
+  ADR-2607105500 で `:implemented` 昇格済み）。
+- **中国向けの marketing business は存在しなかった。** `cloud-itonami-isic-7310`
+  (Advertising) / `7320` (Market research) は実装済みだが catalog は
+  JPN/USA/GBR/DEU の4法域のみで、中国固有の記述はゼロ（WeChat / Weibo /
+  Douyin / Tmall 等の言及も無し）。`adserver` / `ai-gftd-ads` /
+  `shinshi-growth-actor` はいずれも国内向け。
+- カバレッジの穴も判明: `cloud-itonami-assoc-*`（業界団体106件）に **chn は0件**、
+  `cloud-itonami-municipality-*`（59都市）に **中国の都市0件**、
+  `cloud-itonami-gtm-data` の 2026-07-25 run（624 repo）に
+  **`iso3166-chn` は含まれず**（iso3166 は223件中81件しか生成されていない）。
+  GTM summary 内の \"China\" 22件は Goertek / Danieli 等**他 vertical の
+  見込み客の所在地**としての言及にすぎない。
+
+つまり chn 事業は actor としては実装済みだが**売り方が無い**状態で、
+marketing vertical そのものが欠けていた。
+
+## Decision
+
+1. **中国向け marketing vertical を2リポジトリとして起こす**（1本に統合しない）。
+   主管当局・法令・governor がそれぞれ異なり、fleet の慣行は「1つの規制レジーム
+   につき1 actor」であるため。
+   - `cloud-itonami-iso3166-chn-advertising`（ISIC 7310 / SAMR）
+   - `cloud-itonami-iso3166-chn-market-research`（ISIC 7320 / 国家统计局）
+2. **generic な isic-7310/7320 に \"CHN\" 行を足すだけでは不十分**と判断した。
+   catalog 行は citation は運べるが **gate は運べない** — 品目カテゴリ依存で
+   有効期限を持ち、判定不能状態を持ち、独自の監査記録を残す HARD check は
+   データ行では表現できない。7310 の generic な形を1法域のために曲げることに
+   なるため、thematic sibling repo（`iso3166-ind-clean-air` の先例と同型）とした。
+3. **`iso3166-chn` の GTM を生成し `cloud-itonami-gtm-data` の 2026-07-27 run
+   として追加する**（2026-07-25 run は書き換えず、新しい日付ディレクトリに置く）。
+
+### cloud-itonami-iso3166-chn-advertising
+
+Governor `:ad-review-compliance-governor`。flagship HARD は
+`ad-review-approval-missing`: 品目カテゴリが CLOSED な审查対象集合
+（广告法第四十六条の 医疗/药品/医疗器械/农药/兽药/保健食品 ＋
+互联网广告管理办法第七条の 特殊医学用途配方食品）に入る campaign は、
+**广告批准文号が記録済みかつ発布日時点で未失効であることを独立検証**しない限り
+発布提案に進めない（暂行办法第九条/第十八条）。その他の HARD:
+`internet-ad-unlabelled`・`popup-no-one-click-close`（互联网广告管理办法
+第九条/第十条）、`endorser-did-not-use-product`・`endorser-under-minimum-age`
+（广告法第三十八条）、media spend 上限、二重 actuation ガード。
+45 tests / 189 assertions green、clj-kondo clean。
+
+### cloud-itonami-iso3166-chn-market-research
+
+Governor `:survey-integrity-governor`。flagship HARD は2つ、いずれも
+涉外调查管理办法（国家统计局令第7号）:
+- `foreign-survey-permit-missing`/`-elapsed`/`-validity-unknown`（第十条）—
+  実施机构が涉外调查许可证を保持し、実施開始日時点で未失効であること。
+  第十条は「涉外调查を行うこと」自体を许可证保持に条件づけるため、
+  **fieldwork だけでなく filing 時点でも検証する**。
+- `social-survey-project-unapproved`（第八条/第九条）— **涉外社会调查のみ**
+  项目审批を要し、涉外市场调查は许可证のみで足りる。市场调查を审批欠如で
+  hold すると正当な調査を阻害するため、`:per-project-approval-kinds` は
+  boolean ではなく **CLOSED set** とし、未知の种别は「より緩い市场调查」に
+  丸めずそのまま hold する（`survey-kind-unrecognized`）。
+第七条の禁止内容7項目（filing 時点でも検証）、PIPL の単独同意・
+第三十八条の越境4類型、承認標本数の上限。
+51 tests / 217 assertions green、clj-kondo clean。
+
+## 両 repo に共通する設計上の判断
+
+- **判定不能 (un-checkable) は「合格」ではなく独立した HARD hold**。
+  上限値や有効期限の片側が未記録なら `media-budget-uncheckable` /
+  `ad-review-validity-unknown` / `approved-sample-uncheckable` /
+  `foreign-survey-permit-validity-unknown` として hold する。
+  `(and (number? x) (number? y) (> x y))` 型のガードが未記録エンティティを
+  黙って「上限内」として通していた `cloud-itonami-isic-7310` の既往修正と
+  同じ規律。DatomicStore の round-trip も nil を nil のまま保持し、
+  0 や \"\" に潰さない（store contract test で保証）。
+- **日付は ISO-8601 `YYYY-MM-DD` 文字列の辞書順比較**。JVM/JS 両対応、
+  date library 不要、timezone を間違えようがない。その形でない値は
+  `iso-date?` が拒否し、黙って誤順序にならない。
+- **actuation は load 時アサーションで守る**。`:campaign/publish` /
+  `:survey/field` をどの phase の `:auto` にも入れないことを、prose や
+  test だけでなく **namespace の load 時に throw** して保証する
+  （一語の diff で invariant を弱められないように）。
+- **本 actor は許認可番号を発行しない**。广告批准文号・涉外调查许可证・
+  项目审批番号はいずれも当局のみが発行し、actor は「記録されているか」を
+  検証するだけ。
+- **引用は実際に fetch して読んだ公式 URL のみ**。`:retrieved-at` を
+  記録し、catalog に無い法域は spec-basis 無し（governor が hold）。
+
+## Consequences
+
+- iso3166 family の CHN メンバーが3本になった（market entry / advertising /
+  market research）。中国市場向けに「入る → 広告を出す → 調査する」が揃った。
+- 引用元（2026-07-27 fetch）: 中华人民共和国广告法・互联网广告管理办法
+  （令第72号）・药品等广告审查管理暂行办法（令第21号）は samr.gov.cn、
+  涉外调查管理办法（令第7号）は stats.gov.cn、个人信息保护法は cac.gov.cn。
+- `manifest/repos.edn :extra-projects` に2件追加し、
+  `gen-west-manifest.cljs --entry` で当該 entry のみの最小 diff を生成
+  （west.yml は +10 行、pin 検証 OK）。
+
+## Follow-ups（本 ADR のスコープ外、別途）
+
+- **`cloud-itonami-isic-7310` / `7320` の catalog に \"CHN\" 行を追加する。**
+  gate は sibling repo が持つが、generic actor が中国を「未カバー」と
+  報告し続けるのは不正確。additive な変更なので独立に着地させる。
+- `cloud-itonami-assoc-*` の中国業界団体（chn 0件）と
+  `cloud-itonami-municipality-*` の中国都市（0件）のカバレッジ。
+- `cloud-itonami-gtm-data` の iso3166 カバレッジ（223件中81件）。
+"}]
