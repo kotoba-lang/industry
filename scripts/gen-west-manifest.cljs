@@ -73,6 +73,8 @@
             (swap! current assoc :revision revision))
           (when-let [path (second (re-find #"^\s*path:\s*(\S+)" line))]
             (swap! current assoc :path path))
+          (when-let [rid (second (re-find #"^\s*rad-rid:\s*(\S+)" line))]
+            (swap! current assoc :rad-rid rid))
           (when (re-find #"^\s*submodules:\s*true\s*$" line)
             (swap! current assoc :submodules true))
           (when-let [path (:path @current)]
@@ -140,7 +142,10 @@
         sha     (or (working-head path) (:revision existing))
         dl      (get-in cfg [:datalad path])
         arch    (get-in cfg [:archived path])
-        rid     (get-in cfg [:rad-rids path])
+        ;; Preserve an existing projected RID when an older repos.edn snapshot
+        ;; does not contain it. Minimal --entry maintenance must never erase
+        ;; unrelated identity metadata while only renaming a west project.
+        rid     (or (get-in cfg [:rad-rids path]) (:rad-rid existing))
         groups  (cond
                   dl   [(:group dl)]
                   arch [(:group arch "archived")]
@@ -247,8 +252,44 @@
                       " (repos.edn :extra-projects への登録と clone 済み working tree を確認)")))
       (scripts.nbb-compat/exit 1))
     (let [names-set (set names)
-          ex-names  (set (map first (:entries ex)))
-          replaced  (mapv (fn [[n ls]] [n (if (names-set n) (rmap n) ls)]) (:entries ex))
+          ;; A basename collision changes the generated west name
+          ;; (`business-manager` -> `gftdcojp-business-manager`). Match the
+          ;; existing block by canonical path as well as by its old name so a
+          ;; minimal --entry regeneration replaces the block instead of adding
+          ;; a second project for the same checkout path.
+          requested-by-path
+          (into {}
+                (keep (fn [n]
+                        (when-let [blk (rmap n)]
+                          [(block-path blk) [n blk]])))
+                names)
+          replaced
+          (mapv (fn [[n ls]]
+                  (cond
+                    (names-set n) [n (rmap n)]
+                    (contains? requested-by-path (block-path ls))
+                    (get requested-by-path (block-path ls))
+                    :else [n ls]))
+                (:entries ex))
+          ;; Replacement can collapse two stale blocks which already pointed at
+          ;; the same checkout path. Keep exactly one canonical name/path pair.
+          replaced
+          (second
+           (reduce (fn [[seen out :as acc] [n ls :as entry]]
+                     (let [p (block-path ls)
+                           key [n p]]
+                       (if (or (contains? (:names seen) n)
+                               (contains? (:paths seen) p)
+                               (contains? (:pairs seen) key))
+                         acc
+                         [(-> seen
+                              (update :names conj n)
+                              (update :paths conj p)
+                              (update :pairs conj key))
+                          (conj out entry)])))
+                   [{:names #{} :paths #{} :pairs #{}} []]
+                   replaced))
+          replaced-names (set (map first replaced))
           with-new  (reduce (fn [entries n]
                               (let [blk (rmap n)
                                     p   (block-path blk)
@@ -258,7 +299,7 @@
                                                      entries))
                                             (count entries))]
                                 (vec (concat (subvec entries 0 idx) [[n blk]] (subvec entries idx)))))
-                            replaced (remove ex-names names))]
+                            replaced (remove replaced-names names))]
       (str (str/join "\n" (concat (:prefix ex) (mapcat second with-new) (:suffix ex))) "\n"))))
 
 ;; --- pin のサーバ側検証(scripts/verify-west-pins.cljs に委譲) ---
@@ -301,12 +342,31 @@
 
 (let [args     *command-line-args*
       check?   (some #{"--check"} args)
+      dedupe?  (some #{"--dedupe"} args)
       verify?  (not (some #{"--no-verify-remote"} args))
-      entries  (->> (map vector args (rest args))
-                    (keep (fn [[a b]] (when (= a "--entry") b)))
-                    (mapcat #(str/split % #","))
-                    (map str/trim) (remove str/blank?) vec)
       rendered (render)
+      requested-entries
+      (->> (map vector args (rest args))
+           (keep (fn [[a b]] (when (= a "--entry") b)))
+           (mapcat #(str/split % #","))
+           (map str/trim) (remove str/blank?) vec)
+      dedupe-entries
+      (when (and dedupe? (.exists out-file))
+        (let [existing (:entries (split-blocks (slurp out-file)))
+              rendered-by-path
+              (into {} (map (fn [[n ls]] [(block-path ls) n]))
+                    (:entries (split-blocks rendered)))
+              name-counts (frequencies (map first existing))
+              path-counts (frequencies (map (comp block-path second) existing))]
+          (->> existing
+               (keep (fn [[n ls]]
+                       (let [p (block-path ls)]
+                         (when (or (> (get name-counts n 0) 1)
+                                   (> (get path-counts p 0) 1))
+                           (get rendered-by-path p)))))
+               (remove nil?)
+               distinct)))
+      entries  (vec (distinct (concat requested-entries dedupe-entries)))
       ;; --entry splices into the EXISTING file, so a missing/empty/truncated
       ;; base silently yields a near-empty manifest. That is exactly how
       ;; west.yml was emptied a SECOND time on 2026-07-25: after ad193ef4a2c
