@@ -210,15 +210,16 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
 | 1 | **css** | 形 A で移植済み（2026-07-27、kotoba-lang/css#2 merged `fd5b15dc`）。**ただし W4 に先行した oracle 付き実験**であり、最終 API ではない |
 | 2 | **html** | 形 A で移植済み（2026-07-27、kotoba-lang/html#2 merged `ad835e22`）。**W4 先行の oracle 付き実験** — 最終 API ではない |
 | 3 | **shitsuke** | 形 A で移植済み（2026-07-27、kotoba-lang/shitsuke#7 merged `1b553e22`）。dual-render seam はホスト側に残置。**W4 先行の oracle 付き実験** |
-| 4 | liquid-glass-ui | 未着手 |
+| 4 | **liquid-glass-ui** | 形 A で移植済み（2026-07-27、kotoba-lang/liquid-glass-ui#8 merged `8d89b8e5`）。component hiccup / style.cljc は .cljc に残置。**W4 先行の oracle 付き実験** |
 | 5 | kotoba-ui | 未着手 |
 
-**css / html / shitsuke の実測知見（後続 2 repo にそのまま効く）**:
+**css / html / shitsuke / liquid-glass-ui の実測知見（後続 1 repo にそのまま効く）**:
 
 - 移植先は `kotoba/css_core.kotoba` / `kotoba/html_core.kotoba` /
-  `kotoba/tokens_core.kotoba` + `kotoba/hig_core.kotoba`。`css.core` / `html.core` /
-  `shitsuke.tokens` / `shitsuke.hig` は**一切変更していない** — 消費者 API はそのまま、
-  facade の裏に置く移行方針どおり。
+  `kotoba/tokens_core.kotoba` + `kotoba/hig_core.kotoba` /
+  liquid-glass `kotoba/tokens_core.kotoba`。`css.core` / `html.core` /
+  `shitsuke.tokens` / `shitsuke.hig` / `liquid-glass.tokens` は**一切変更していない** —
+  消費者 API はそのまま、facade の裏に置く移行方針どおり。
 - **capability はゼロ**。CSS/HTML/token 生成は data→text なので `kotoba/pure` に収まる。
 - 言語側で自前実装が要ったもの: ①**数値→文字列の組み込みが無い**ので `nat-str` を再帰 +
   `string-substring` で桁を literal から引く（ASCII なのでバイト索引が厳密）②**正規表現が無い**ので
@@ -239,6 +240,10 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   文字列パイプライン。`normalize-hex` / layer-order / text-style-props / 代表サンプル root）。
   dual-render（reagent/re-frame）・deep-merge・full default-hig-tokens は .cljc に残す。
   移植先は `kotoba/tokens_core.kotoba` + `kotoba/hig_core.kotoba`。
+- **liquid-glass-ui**: 63 tests / 665 assertions / 0 failures（parity は material token →
+  `--liquid-glass-*` 文字列。light `:root` + dark `@media` redeclare、surface/radius/ink
+  サンプル）。component hiccup・style.cljc EDN→css.core・spring-linear-easing(f64) は .cljc
+  に残す。移植先は `kotoba/tokens_core.kotoba`。
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
