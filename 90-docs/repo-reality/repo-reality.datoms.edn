@@ -192,6 +192,15 @@
   :claim/self-caveat true,
   :claim/axis [:axis/evidence-linkage :axis/functional-completeness]}
 
+ ;; ---- claim catalog: aiueos (extended 2026-07-27, weekly claim-discovery pass) ------------
+ {:claim/id :claim/aiueos-f002-signer-revocation-not-enforced,
+  :claim/project :project/aiueos,
+  :claim/source "orgs/kotoba-lang/aiueos/.issues/issues.edn:1 (issue F-002, security-key-lifecycle-signer-revocation); docs/issues/security-key-lifecycle-signer-revocation.md:35-44; src/aiueos/contract.cljc:248,849-850; src/aiueos/signing.cljc:244-274",
+  :claim/text "aiueos's newly-added .issues/issues.edn (2026-07-26, PR #134) self-reports finding F-002 ('Security: enforce key lifecycle and signer revocation for manifests', Severity Critical) as :implemented-local, with the issue doc's own 'Local resolution evidence' section claiming a CLJC policy-level :aiueos/signer-status lifecycle vocabulary (active/retired/revoked/expired/compromised/suspended) that adapters consult to reject a revoked/expired/compromised signer. Grepping the actual current source: the exact keyword :aiueos/signer-status the issue names does not exist anywhere in src/ or test/; the only related field is contract.cljc's :aiueos.policy/signer-statuses, which is validated ONLY as a keyword-set SHAPE (a policy schema check) and never read anywhere else. aiueos.signing/verify (the actual manifest-signature verification entrypoint) checks only that a signer is registered in :aiueos.policy/signers and that the signature bytes are valid -- it never consults any signer-status field, so a manifest signed by a key the operator intends as revoked/expired/compromised still verifies exactly like one signed by an active key.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/safety-enforcement :axis/doc-code-drift]}
+
  ;; ---- claim catalog: kotoba (extended 2026-07-15) -----------------------------------------
  {:claim/id :claim/kotoba-maturity-m6,
   :claim/project :project/kotoba,
@@ -249,6 +258,23 @@
   :claim/self-reported-level "",
   :claim/self-caveat false,
   :claim/axis [:axis/production-readiness :axis/evidence-linkage]}
+
+ ;; ---- claim catalog: kotoba (extended 2026-07-27, weekly claim-discovery pass) ------------
+ {:claim/id :claim/kotoba-cap-affine-changelog-contradicts-code,
+  :claim/project :project/kotoba,
+  :claim/source "orgs/kotoba-lang/kotoba/CHANGELOG.md:9-20 (Unreleased, cap-affine-problems bullet); src/kotoba/runtime.clj:2688-2701 (cap-expr-info docstring), 2713-2719 (affine-use docstring)",
+  :claim/text "CHANGELOG.md's Unreleased entry for the newly-added kotoba.runtime/cap-affine-problems check (narrow S2 capability-value affine tracking) self-discloses a 'conservative limitation: tracking is per local binding name, not per underlying value, so renaming through a let-alias and using both names once each is an uncaught reuse.' This is the opposite of what the function's own source docstrings say: affine-use's docstring states 'Tracking is by ORIGIN, not by local binding name, so a let-bound alias and whatever it aliases share the same origin and a reuse through either name is caught,' and cap-expr-info's docstring confirms a let-bound alias 'shares its origin with whatever it aliases ... lets the affine check in cap-affine-step catch (let [alias c] ...) followed by using alias and c once each as a double-spend of the SAME origin.' The implemented check is origin-based (alias reuse IS caught); the CHANGELOG's self-disclosed 'conservative limitation' describes a weaker, name-based mechanism that does not match the code -- an inverted-severity drift (the doc understates the safety property actually implemented, rather than overclaiming it).",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/doc-code-drift]}
+
+ {:claim/id :claim/kotoba-package-lock-mandatory-f001-closed,
+  :claim/project :project/kotoba,
+  :claim/source "orgs/kotoba-lang/kotoba/CHANGELOG.md:31-37 (Unreleased, --package-lock bullet); src/kotoba/launcher.clj:1224-1259 (admission-gated, wasm-emit-result, cljs-emit-result, wasm-run-result); test/kotoba/launcher_test.clj:1130-1151",
+  :claim/text "CHANGELOG.md's Unreleased entry states 'kotoba wasm emit and kotoba wasm run now require --package-lock <path> unconditionally ... Closes the F-001 gap where the flag was optional for wasm emit and entirely absent for wasm run ... There is no opt-out.' Confirmed in source: launcher.clj's shared admission-gated fn (used by wasm-emit-result/wasm-run-result/cljs-emit-result) runs the package admission gate unconditionally and short-circuits with :wasm/package-rejected before ever calling the unguarded build/run fn if the lock is missing or rejected; no bypass flag or env var exists anywhere in launcher.clj. Backed by real tests: wasm-emit-rejects-missing-package-lock and wasm-run-rejects-missing-package-lock (launcher_test.clj:1130-1141) assert :package/missing-lock-option is returned when --package-lock is omitted.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/safety-enforcement]}
 
  ;; ---- claim catalog: kotoba-lang (extended 2026-07-15) ------------------------------------
  {:claim/id :claim/kotoba-lang-maturity-m6,
@@ -308,6 +334,15 @@
   :claim/self-caveat true,
   :claim/axis [:axis/production-readiness :axis/functional-completeness]}
 
+ ;; ---- claim catalog: kotoba-lang (extended 2026-07-27, weekly claim-discovery pass) -------
+ {:claim/id :claim/kotoba-lang-f001-package-conformance-evidence-missing,
+  :claim/project :project/kotoba-lang,
+  :claim/source "orgs/kotoba-lang/kotoba-lang/.issues/issues.edn:5-16 (issue F-001, security-package-contract-conformance-gap); docs/issues/security-package-contract-conformance-gap.md:32-38",
+  :claim/text "kotoba-lang's newly-added .issues/issues.edn (2026-07-27, PR #62 'Separate contracts and assurance ownership') self-reports architecture-review finding F-001 ('Security: extend package contract conformance for safe execution blockers', Severity Critical) as :implemented-local, citing 5 negative package-conformance fixtures (lang/package-conformance/negative/missing_repo_rid_lock.edn, missing_manifest_cid_lock.edn, bad_signature_alg_manifest.edn, revoked_signer_lock.edn, expired_signer_lock.edn) plus scripts/check-package-contract.bb as evidence, and the issue doc's own 'Local resolution evidence' section repeats the same file list plus 'Verified with bb scripts/check-package-contract.bb'. None of these 6 cited paths exist anywhere in the current repo tree (confirmed by direct path check and a repo-wide search for the fixture/script basenames) -- lang/package-conformance/ itself does not exist (only the unrelated lang/conformance/ directory does), and no .bb script of that name exists anywhere under scripts/. This is a silent overclaim, not a disclosed gap: the issue doc presents the work as done with a specific, itemized evidence list, and none of that evidence is present.",
+  :claim/self-reported-level "implemented-local (self-reported; evidence unconfirmed)",
+  :claim/self-caveat false,
+  :claim/axis [:axis/doc-code-drift :axis/safety-enforcement]}
+
  ;; ---- claim catalog: kotobase (extended 2026-07-15) ---------------------------------------
  {:claim/id :claim/kotobase-istore-seam,
   :claim/project :project/kotobase,
@@ -342,6 +377,15 @@
   :claim/self-caveat true,
   :claim/axis [:axis/safety-enforcement]}
 
+ ;; ---- claim catalog: kotobase (extended 2026-07-27, weekly claim-discovery pass) ----------
+ {:claim/id :claim/kotobase-security-adoption-manifest-v3,
+  :claim/project :project/kotobase,
+  :claim/source "orgs/kotoba-lang/kotobase/security-adoption.edn:1-11; src/kotobase/kotobase.cljc:15,40,65; src/kotobase/code_graph.cljc:9,607,610",
+  :claim/text "A newly-added security-adoption.edn (:adoption/version 3, PR #25 merged 2026-07-26) declares a required-control-namespace manifest: kotobase.kotobase/authorize-xrpc must route through kotoba.security.abac, and kotobase.code-graph/revoke-pin! must route through kotoba.security.effect. Confirmed in source: kotobase.cljc requires kotoba.security.abac and authorize-xrpc's body calls abac/evaluate before permitting any wrapped XRPC operation; code_graph.cljc requires kotoba.security.effect and revoke-pin! wraps its whole state transition in effect/guard!. Both of the manifest's two named :sensitive-operations entries are genuinely wired, not just declared.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/safety-enforcement]}
+
  ;; ---- claim catalog: kototama (extended 2026-07-15) ---------------------------------------
  {:claim/id :claim/kototama-r3-stable,
   :claim/project :project/kototama,
@@ -374,4 +418,20 @@
   :claim/self-reported-level "",
   :claim/self-caveat true,
   :claim/axis [:axis/functional-completeness :axis/doc-code-drift]}
+
+ ;; ---- claim catalog: kototama (extended 2026-07-27, weekly claim-discovery pass) ----------
+ ;; Note: this same PR (#76, "Split transport and component tenders") is why the 4 claims
+ ;; above (kototama-r3-stable, kototama-r2-browser-parity, kototama-fencing-not-raft,
+ ;; kototama-fleet-broker-partial) now cite files -- src/kototama/fleet.cljc,
+ ;; src/kototama/fleet_fence.cljc -- that no longer exist in this repo at all; that R3 fleet
+ ;; subsystem moved out to the external kotoba-lang/fleet repo. Not re-litigated as a new
+ ;; claim here (the periodic verify script will surface it as evidence-linkage decay on the
+ ;; existing claims); what IS new and independently checkable is the doc-vs-doc mismatch below.
+ {:claim/id :claim/kototama-r2-r3-readme-maturity-mismatch,
+  :claim/project :project/kototama,
+  :claim/source "orgs/kotoba-lang/kototama/README.md:146-158; docs/maturity.md:6-16; src/kototama/browser.cljc:67-68",
+  :claim/text "PR #76 ('Split transport and component tenders', 2026-07-27) moved the former R3 shared-store fleet placement out to the external kotoba-lang/fleet repo; both README.md and docs/maturity.md (added in the SAME commit) agree on that split. But the two docs disagree with each other on the resulting R2 status: README.md's own Maturity section says 'Current tender level: R2 advanced-partial' with '9/9 linkable', while docs/maturity.md says 'Current tender level: R2 qualified' with '14/14 browser-linkable' -- neither doc cross-references the other's conflicting number, the same doc-vs-doc pattern previously found (and fixed) in claim/kotobase-m5-doc-inconsistency. Source confirms the higher, maturity.md number is current, not README's stale one: browser.cljc's :llm-infer entry now reads {:jvm :yes :browser :yes :node :inject ...}, closing the browser-parity gap previously disclosed by claim/kototama-r2-browser-parity (which cited an 8/9 parity with llm-infer as the one 'browser: no sync network' gap).",
+  :claim/self-reported-level "R2 advanced-partial (README.md) vs R2 qualified (docs/maturity.md)",
+  :claim/self-caveat false,
+  :claim/axis [:axis/doc-code-drift]}
 ]
