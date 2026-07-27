@@ -117,4 +117,99 @@
  {:name "Joint Stock Company Commercial Bank PrivatBank" :country "UA" :site "https://privatbank.ua"}
  {:name "National Joint Stock Company Naftogaz of Ukraine" :country "UA" :site "https://www.naftogaz.com"}
  {:name "Kernel Holding S.A." :country "LU" :site "https://www.kernel.ua"}
+
+ ;; ── discovery で追加（scripts/lei-discover-candidates.cljs）──
+ ;; Wikidata で売上順に選び、GLEIF で LEI と登記名を裏取り済み。
+ ;; :site は付けていない — lei-acquire が公式サイトを検証して埋める。
+ {:name "شركة ابوظبي لطاقة المستقبل - ش م خ - مصدر" :country "AE" :lei "213800BBECR1I9FTPZ70"}
+ {:name "Jumeirah Group L.L.C." :country "AE" :lei "254900DP7CY9LMWBVD58"}
+ {:name "شركة مجموعة الامارات للاتصالات ش.م.ع." :country "AE" :lei "529900XDPQPWEQ9BGB80"}
+ {:name "BANCO DE SANTIAGO DEL ESTERO SOCIEDAD ANONIMA" :country "AR" :lei "579100GDDGGEGJGIE042"}
+ {:name "Telecom Argentina Sociedad Anonima" :country "AR" :lei "549300MKPIRSJD8SB782"}
+ {:name "Isaura S.A." :country "AR" :lei "549300F1RPI7RYS3QH03"}
+ {:name "BANCO MACRO SOCIEDAD ANONIMA" :country "AR" :lei "579100KKDKKIFEBKK040"}
+ {:name "CABLEVISION HOLDING S. A." :country "AR" :lei "254900SFRPHMM26ZOQ87"}
+ {:name "YPF Sociedad Anonima" :country "AR" :lei "5493003N7447U18U5U53"}
+ {:name "Red Bull GmbH" :country "AT" :lei "5299000HTNHA5ACH9N32"}
+ {:name "OMV AKTIENGESELLSCHAFT" :country "AT" :lei "549300V62YJ9HTLRI486"}
+ {:name "STRABAG SE" :country "AT" :lei "529900TYYSRJH2VJSP60"}
+ {:name "VIENNA INSURANCE GROUP AG Wiener Versicherung Gruppe" :country "AT" :lei "549300JCRU23I1THU176"}
+ {:name "ERSTE GROUP BANK AG" :country "AT" :lei "PQOH26KWDF7CG10L6792"}
+ {:name "ANHEUSER-BUSCH INBEV" :country "BE" :lei "5493008H3828EMEXB082"}
+ {:name "UMICORE" :country "BE" :lei "529900F3AIQECS8ZSV61"}
+ {:name "PETROLEO BRASILEIRO S A PETROBRAS" :country "BR" :lei "5493000J801JZRCMFE49"}
+ {:name "ITAÚ UNIBANCO HOLDING S.A." :country "BR" :lei "5493002W2IVG62O3ZJ94"}
+ {:name "EMBRAER S.A." :country "BR" :lei "549300EM51WYXFHUY333"}
+ {:name "LATAM AIRLINES GROUP S.A." :country "CL" :lei "549300HX3UUDPEFTG707"}
+ {:name "CELULOSA ARAUCO Y CONSTITUCION S A" :country "CL" :lei "549300QEKV8G0AMNQD28"}
+ {:name "Compañía Cervecerías Unidas S.A." :country "CL" :lei "529900BJW9B0O6LI2R39"}
+ {:name "ENEL GENERACION CHILE S.A." :country "CL" :lei "549300PVHXUFEIE6LY50"}
+ {:name "SOC QUIMICA Y MINERA DE CHILE S A" :country "CL" :lei "TJ88LXZZW5PWIN93ZC81"}
+ {:name "Parque Arauco S A" :country "CL" :lei "2549001WW2PV1Y0UEU97"}
+ {:name "China Petroleum & Chemical Corporation" :country "CN" :lei "529900A2OB24EZ5B3J19"}
+ {:name "中国石油天然气集团有限公司" :country "CN" :lei "3003004HNTGCYVG6A618"}
+ {:name "国家电网有限公司" :country "CN" :lei "300300SRCLQKVTFFOM15"}
+ {:name "PetroChina Company Limited" :country "CN" :lei "529900RPY4YG47TRSV05"}
+ {:name "中国国家铁路集团有限公司" :country "CN" :lei "300300FQQ9DQSCWEC194"}
+ {:name "Ecopetrol S.A." :country "CO" :lei "254900IDGKCJICKBPA66"}
+ {:name "Grupo Aval Acciones Y Valores S.A." :country "CO" :lei "549300BBUKBHWLSUZM17"}
+ {:name "BANCOLOMBIA S.A." :country "CO" :lei "54930052NWJRPNMP1W58"}
+ {:name "Universidad de los Andes" :country "CO" :lei "5493003UWHNNZEJZO875"}
+ {:name "ČEZ, a. s." :country "CZ" :lei "529900S5R9YHJHYKKG94"}
+ {:name "AGROFERT, a.s." :country "CZ" :lei "31570010000000033560"}
+ {:name "Hyundai Motor Manufacturing Czech s.r.o." :country "CZ" :lei "315700BR7E0VCABTO045"}
+ {:name "ORLEN Unipetrol a.s." :country "CZ" :lei "3157000N7PWAD2WV7808"}
+ {:name "FOXCONN CZ s.r.o." :country "CZ" :lei "315700XPUFHU07TXE919"}
+ {:name "A.P. MØLLER HOLDING A/S" :country "DK" :lei "5493000HKHWS15XW2C38"}
+ {:name "Novo Nordisk Fonden" :country "DK" :lei "529900UTAHSVRYZL0380"}
+ {:name "NOVO NORDISK A/S" :country "DK" :lei "549300DAQ1CVT6CXN342"}
+ {:name "Maersk A/S" :country "DK" :lei "254900BLYIXBFFRLUJ90"}
+ {:name "ØRSTED A/S" :country "DK" :lei "W9NG6WMZIYEU8VEDOG48"}
+ {:name "A/S UNITED SHIPPING & TRADING COMPANY" :country "DK" :lei "549300CZ3SKKMU177474"}
+ {:name "CENTRAL BANK OF EGYPT" :country "EG" :lei "QPLH1J8M7Y52YWI9GF53"}
+ {:name "EDITA FOOD INDUSTRIES S.A.E." :country "EG" :lei "2138009F7ZFOJY44V768"}
+ {:name "REPSOL SA" :country "ES" :lei "BSYCX13Y0NOTV14V9N85"}
+ {:name "IBERDROLA SA" :country "ES" :lei "5QK37QC7NWOJ8D7WVQ45"}
+ {:name "BANCO SANTANDER S.A." :country "ES" :lei "5493006QMFDDMYWIAM13"}
+ {:name "TELEFONICA SA" :country "ES" :lei "549300EEJH4FEPDBBR25"}
+ {:name "Nokia Oyj" :country "FI" :lei "549300A0JPRWG1KI7U06"}
+ {:name "Nordea Bank Abp" :country "FI" :lei "529900ODI3047E2LIV03"}
+ {:name "Outokumpu Oyj" :country "FI" :lei "5493009YRUJJDCFF0R80"}
+ {:name "Sanoma Oyj" :country "FI" :lei "743700XJC24THUPK0S03"}
+ {:name "YIT Oyj" :country "FI" :lei "529900M13GM4VSTE6W80"}
+ {:name "Nokian Renkaat Oyj" :country "FI" :lei "743700YQIO8Y4L4WKR40"}
+ {:name "HELLENIQ ENERGY ΑΝΩΝΥΜΗ ΕΤΑΙΡΕΙΑ ΣΥΜΜΕΤΟΧΩΝ" :country "GR" :lei "213800YUBJMZYR1SNG35"}
+ {:name "ΔΗΜΟΣΙΑ ΕΠΙΧΕΙΡΗΣΗ ΗΛΕΚΤΡΙΣΜΟΥ Α.Ε." :country "GR" :lei "213800T9Y5XCOVRZ4Y57"}
+ {:name "ΟΡΓΑΝΙΣΜΟΣ ΤΗΛΕΠΙΚΟΙΝΩΝΙΩΝ ΤΗΣ ΕΛΛΑΔΟΣ ΑΝΩΝΥΜΗ ΕΤΑΙΡΕΙΑ" :country "GR" :lei "ELPUFM0XZRZO4LFXW404"}
+ {:name "MVM CEEnergy Zártkörűen Működő Részvénytársaság" :country "HU" :lei "529900DA44GKVNZBRY65"}
+ {:name "PT Bumi Resources TBK" :country "ID" :lei "529900UUMEQCPSDKFD75"}
+ {:name "PT FREEPORT INDONESIA" :country "ID" :lei "549300T4HTQHRKLNE619"}
+ {:name "P.T. BERAU COAL" :country "ID" :lei "549300U0VYICQTIJ3V34"}
+ {:name "Fajar Surya Wisesa Tbk, PT" :country "ID" :lei "254900A9W66Y580CQX43"}
+ {:name "PT Pabrik Kertas Tjiwi Kimia TBK" :country "ID" :lei "529900AYY9T852XBBO93"}
+ {:name "בזק החברה הישראלית לתקשורת בע\"מ" :country "IL" :lei "213800XCGZCFSWY9U863"}
+ {:name "Elbit Systems Ltd." :country "IL" :lei "529900Q9CB1REUMZSS32"}
+ {:name "רפאל מערכות לחימה מתקדמות בע\"מ" :country "IL" :lei "549300GTHDKIZL3XIO17"}
+ {:name "התעשיה האוירית לישראל בע\"מ" :country "IL" :lei "213800NHLDOM1LVCYX17"}
+ {:name "אודיוקודס בע\"מ" :country "IL" :lei "529900TA48138NEVR854"}
+ {:name "צ'ק פוינט טכנולוגיות תוכנה בע\"מ" :country "IL" :lei "2549003ZVBH73EPNS513"}
+ {:name "UNIPRO" :country "IN" :lei "98450016D1DA0D640356"}
+ {:name "HINDUSTAN AERONAUTICS LIMITED" :country "IN" :lei "335800AKDC7T933T3I86"}
+ {:name "ArcelorMittal" :country "LU" :lei "2EULGUTUI56JI9SAL165"}
+ {:name "ArcelorMittal Bissen & Bettembourg" :country "LU" :lei "549300SWTDSNLYQSQR64"}
+ {:name "SPOTIFY TECHNOLOGY S.A." :country "LU" :lei "549300B4X0JHWV0DTD60"}
+ {:name "RTL Group S.A." :country "LU" :lei "5493000C8J3C3SZYS040"}
+ {:name "APERAM" :country "LU" :lei "5493001136GE6L4R7M63"}
+ {:name "CPI PROPERTY GROUP" :country "LU" :lei "222100CO2ZOTEPGJO223"}
+ {:name "INSTITUTO TECNOLOGICO Y DE ESTUDIOS SUPERIORES DE MONTERREY" :country "MX" :lei "4469000001DNSZR75N05"}
+ {:name "GRUPO TELEVISA S A B" :country "MX" :lei "549300O4AF0C816ILN62"}
+ {:name "STANBIC IBTC HOLDINGS PLC" :country "NG" :lei "029200388A7S7Z5I0H57"}
+ {:name "INTERNATIONAL BREWERIES PLC" :country "NG" :lei "029200840G5MA6F60G17"}
+ {:name "FLOUR MILLS OF NIGERIA PLC" :country "NG" :lei "0292002087D4NH3E6743"}
+ {:name "Veidekke ASA" :country "NO" :lei "5967007LIEEXZXHF4O96"}
+ {:name "REITAN AS" :country "NO" :lei "5493000FY3LKWUKUP045"}
+ {:name "Helse Sør-Øst Rhf" :country "NO" :lei "549300TXFCROOJWOPJ63"}
+ {:name "TELENOR ASA" :country "NO" :lei "549300IM1QSBY4SLPM26"}
+ {:name "NORGESGRUPPEN ASA" :country "NO" :lei "5967007LIEEXZXGHY826"}
+ {:name "Spark New Zealand Limited" :country "NZ" :lei "529900HUN51H3Y7QBB66"}
 ]
