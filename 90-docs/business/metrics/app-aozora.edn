@@ -8,31 +8,31 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 15095,
-  "app-aozora-appview" 12491,
-  "app-aozora-spa" 1620},
+ {"app-aozora-pds" 15207,
+  "app-aozora-appview" 12552,
+  "app-aozora-spa" 1636},
  :zone
- {:requests-7d 229723,
-  :pageviews-7d 10819,
-  :uniques-7d-sum 1036,
+ {:requests-7d 236061,
+  :pageviews-7d 10836,
+  :uniques-7d-sum 1038,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 218177}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2363}
+    :requests 224267}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 2463}
    {:path "/v1/transact", :requests 75}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 70}
    {:path "/api/q", :requests 60}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.fold", :requests 57}
    {:path "/s3/bucket", :requests 37}
-   {:path "/robots.txt", :requests 37}
+   {:path "/robots.txt", :requests 35}
    {:path "/var/task/docker-compose.yaml", :requests 33}],
-  :status-mix {:server-error 157, :ok 221893, :client-error 1489},
+  :status-mix {:server-error 157, :ok 228065, :client-error 1487},
   :window "24h"},
  :as-of "2026-07-27",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 218177 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2363 · /v1/transact 75 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 70 · /api/q 60 | 4xx(probe) 1% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 224267 · /xrpc/ai.gftd.apps.kotobase.datomic.view 2463 · /v1/transact 75 · /api/q 60 · /xrpc/ai.gftd.apps.kotobase.datomic.fold 57 | 4xx(probe) 1% · 5xx 0%",
  :signal
- "aozora.app 実測 229723 req/7d・1036 uniques(日次和)・うち4xx probe 1%(24h)、workers 29206 inv/7d"}
+ "aozora.app 実測 236061 req/7d・1038 uniques(日次和)・うち4xx probe 1%(24h)、workers 29395 inv/7d"}
