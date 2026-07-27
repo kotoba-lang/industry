@@ -210,7 +210,7 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
 | 1 | **css** | 形 A で移植済み（css#2）。**D6 first cutover**（2026-07-27、css#3）: logical style `:document` → CSS stream（`css_document.kotoba`）が form-A / key-sorted css.core と byte 一致。form-A は oracle 残置。最終 API は html 以降も揃ってから |
 | 2 | **html** | 形 A で移植済み（html#2）。**D6 second cutover**（2026-07-27、html#3）: logical UI `:document` → HTML stream（`html_document.kotoba`）が form-A と byte 一致。form-A は oracle 残置 |
 | 3 | **shitsuke** | 形 A で移植済み（shitsuke#7）。**D6 third cutover**（2026-07-27、shitsuke#9）: logical token-group `:document` → CSS-var stream（tokens_document + hig_document）。form-A は oracle 残置。dual-render seam はホスト側 |
-| 4 | **liquid-glass-ui** | 形 A で移植済み（2026-07-27、kotoba-lang/liquid-glass-ui#8 merged `8d89b8e5`）。component hiccup / style.cljc は .cljc に残置。**W4 先行の oracle 付き実験** |
+| 4 | **liquid-glass-ui** | 形 A で移植済み（#8）。**D6 fourth cutover**（2026-07-27、#10）: logical token-group `:document` → CSS-var stream（tokens_document）。form-A は oracle 残置。component hiccup / style.cljc は .cljc |
 | 5 | **kotoba-ui** | 形 A で移植済み（2026-07-27、kotoba-lang/kotoba-ui#7 merged `06f2d2cc`）。theme-css 合成はホスト .cljc に残置。**W4 先行の oracle 付き実験 — 5/5 完了** |
 
 **css → html → shitsuke → liquid-glass-ui → kotoba-ui の実測知見（依存順 5/5 完了）**:
