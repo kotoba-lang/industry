@@ -113,6 +113,52 @@
   :adr/alternatives
   "却下: (a) **ストレート ITX レイアウト(GPU を board と同一面に inline)** — ライザー $45 が不要になるが、GPU 267mm と board 170mm が Z 方向に直列するため容積が 12L 級に膨らむ。57% の容積削減と $45 を交換する判断で sandwich を採った。(b) **NR200 級市販筐体のまま Phase 2 も通す** — ADR-2607267000 の Phase 1 はこれ。18.25L で $60-75。自社板金は金型 NRE $12,000 を 200台で償却して単価 $60 級なので、**200台の見込みが立つまでは市販が正しい。**本 ADR は Phase 2 の準備であって Phase 1 の置き換えではない。(c) **SFX-L 750W を維持して筐体を長くする** — Z が 333mm 級になり容積 8.6L。SFX で足りるので不要。(d) **クーラーを 120mm 級のまま DIMM を低背品にする** — 低背 DDR5 の入手性がメモリ危機下で不確実。95x95x37 の実在品(NH-L9a-AM5 級)を選ぶ方が確実。(e) **kami-engine / WebGPU で3D ビューアを作る** — ADR-2607102200 の権限内ではあるが、今回の目的(寸法導出・干渉検出・STEP 出力)には不要。**screenshot を根拠に実装済みとしない**という同 ADR の完了条件に照らしても、ビューアは今の価値を増やさない。(f) **scad / mesher / sdf で CSG から作る** — 直方体主体の板金には over-kill で、STEP 出力経路(:plane + :line のみ)にも乗らない。(g) **org-iso-6983 で板金の CAM/G-code を出す** — 板金はレーザー切断+曲げでフライス加工ではないので、この kernel の toolpath 語彙は合わない。tsukuru の工場に DXF/STEP を渡すのが正しい。"
 
+
+  :adr/resume
+  "**MK-1 プログラム全体の現在地と再開点(2026-07-27 セッション終了時点)。**会話履歴なしで再開できる粒度で書く。
+
+   -- 正本4件(すべて status proposed、default branch 着地済み) --
+   ADR-2607267000 製品(B70 1枚 / 多GPU却下 / COGS / gate 39.2 tok/s)
+   ADR-2607268000 市場投入・税制(部材 pass-through + 固定円建て差益 / JP→US→EU・中国除外 / 経営強化税制 B類型)
+   ADR-2607269000 原資配分(minimax。混合戦略 F / 情報の価格 JPY 120,000 / 決定は P(gate PASS) > 10.8% の一問に還元)
+   ADR-2607270000 筐体 CAD・組み立て・ケーブル・公差・CFD(本 ADR)
+
+   -- 着地した commit --
+   com-junkawasaki/root main: 2e264b81745(ADR 3件+計算器3本)/ 4c41f372e35(minimax 理論訂正)/
+     97164dd2582(筐体 CAD 初版)/ 85c29cfc8a7(pin 前進)/ 68a422eefed(5つの限界対応)/
+     ea0d467d51e(熱は未解決と訂正)/ 7a251ed1896(kami-engine-cfd pin 前進)
+   kotoba-lang/org-iso-10303 main = b92ce06(sketch 駆動 extrude / 実 boolean / translation 制約解法)
+   kotoba-lang/kami-engine-cfd main = a91b227(内部流 BC / bool-array 移植性修正 / 収束判定 / rel-tol / reachable-reynolds)
+   west pin は両方 head と一致(検証済み)。
+
+   -- 固定した検証(すべて 0 failure) --
+   org-iso-10303: 13 deftest / 35 assertion(nbb 実行)。幾何は全て閉形解と突き合わせ。
+   kami-engine-cfd: 9 deftest / 27 assertion(JVM clojure -M:test)。Poiseuille 相対 L2 = 1.44%。
+   STEP: write→read 往復で 6面/12稜線/8頂点・bbox・体積 7.838L 一致。
+   mk1-cad.cljs: 内包NG 0 / 干渉 0 / 挿入不可 0 / 最悪ケース干渉 0 / ケーブル干渉 0 / 曲げ不足 0。
+   CSG: 100^3 から 50x50x100 を抜いて 750,000 mm3 ちょうど。
+
+   -- 未解決 gap(優先順) --
+   1. **B70 単体 decode >= 39.2 tok/s(未実測)。**製品・節税の投資計画・pledge 価格のすべてがこの1数字に依存する。
+      これが落ちたら Strix Halo ベース SKU に切り替える(ADR-2607269000 の撤退先)。
+   2. **筐体熱が未解決。**CFD ソルバは検証済みだが筐体 Re に 237倍 届かない(決定20)。
+      OpenFOAM 経路(kotoba-lang/kami-engine-cae-solver)か実機実測で決着させるまで**板金を発注しない。**
+   3. ECCN 3A090 該当性(法律意見書)。中国市場の可否を決める二値。
+   4. Kickstarter 規約下で『後日実費精算』の reward 表示が許されるか。不可なら 45日以内の在庫先行 preorder に切替。
+   5. 実部材の採寸(現状ほぼ :part/measured false)、格子収束確認、Phase 2 板金図面。
+   6. BOM 差分 $45 を pledge $5,039 に反映するか差益 $1,854 を受け入れるか(未決)。
+
+   -- 次に打つ最初の手(具体) --
+   a. 即金 JPY 1,260,000 を出す: B70 probe 1台 + Strix Halo 2台(ADR-2607269000 戦略 F)。
+      残り JPY 1,740,000 は gate 通過後の日本 launch(JP cert 1.03M + campaign 0.5M)に留保。
+   b. gate 測定: llama.cpp SYCL/Vulkan、qwen3.6-35b-a3b Q4_K_M、単一ストリーム、>= 39.2 tok/s か。
+      比較対象は同一条件の Strix Halo(gad は 70.09 tok/s)。
+   c. 設計の再現: nbb --classpath orgs/kotoba-lang/org-iso-10303/src scripts/mk1-cad.cljs
+      (寸法を変えるときは 90-docs/hardware/mk1-parts.datoms.edn だけを直す。他は生成物)。
+   d. 自社推論需要の実在確認(ADR-2607269000 の状態 θ4 回避。Strix 2台を買うより先に確認した方が安い可能性)。
+
+   -- 何も買っていない・何も発注していない。**この時点で外部への不可逆な支出・約束は一切ない。**"
+
   :adr/verification
   "再現: `nbb --classpath orgs/kotoba-lang/org-iso-10303/src scripts/mk1-cad.cljs`。7 節(寸法導出 / feature tree / 実体化+STEP / assembly / 組み立て sim / 工程生成 / BOM 突き合わせ)を出力し、`90-docs/hardware/mk1-enclosure.step` と `90-docs/hardware/mk1-assembly.edn` を生成する。部材の正本は `90-docs/hardware/mk1-parts.datoms.edn`(手編集可、寸法はここだけを直す)。生成物 `mk1-assembly.edn` は手編集しない。
 
