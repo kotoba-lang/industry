@@ -209,4 +209,68 @@ Governor `:survey-integrity-governor`。flagship HARD は2つ、いずれも
   2026-07-27 addendum で CHN の1件が埋まった）。**残り141件を一括生成する
   なら捏造なしでは不可能** — 各 repo につき実在の見込み先を fetch して
   確認する必要があり、それが 07-25 run が 81 件で止まっている理由でもある。
+
+## Closing 状態（2026-07-27 セッション終了時点）
+
+**全成果は default branch に着地済み。open PR・自分の worktree/branch/stash は
+ゼロ。** 各子リポは remote main と 0/0、dirty なし。
+
+### 着地した10 pin（すべて `west.yml == child HEAD == remote main` を確認）
+
+| repo | 種別 | tests |
+|---|---|---|
+| `cloud-itonami-iso3166-chn-advertising` | 新規 actor (7310/SAMR) | 45 / 189 |
+| `cloud-itonami-iso3166-chn-market-research` | 新規 actor (7320/国家统计局) | 51 / 217 |
+| `cloud-itonami-isic-7310` | CHN catalog 行追加 | 71 / 441 |
+| `cloud-itonami-isic-7320` | CHN catalog 行追加 | 33 / 150 |
+| `cloud-itonami-assoc-2910-chn-caam` | 新規 (assoc 初 chn) | 3 / 17 |
+| `cloud-itonami-assoc-4719-chn-ccfa` | 新規 | 3 / 17 |
+| `cloud-itonami-municipality-chn-beijing` | 新規 (municipality 初 chn) | 16 / 47 |
+| `cloud-itonami-municipality-chn-shanghai` | 新規 | 17 / 47 |
+| `cloud-itonami-municipality-chn-shenzhen` | 新規 | 19 / 65 |
+| `cloud-itonami-gtm-data` | 2026-07-27 addendum | (データのみ) |
+
+**合計 258 tests / 1,190 assertions、全 suite 0 failures 0 errors**（closing 時に
+全リポで再実行して確認）。clj-kondo はどのリポも errors 0
+（`isic-7310` に render_html.clj の unused-var warning 1件が**既存**として残る）。
+
+superproject 側 merge commit: `bedfc5d8608`（ADR + 最初の2 entry）/
+`dfeeb8023b1`（gtm-data pin）/ `4393434`（7310・7320 pin）/
+`b3b9a2c660c`（CAAM）/ `38509a75b52`（Shanghai + CCFA）/
+`09f3beed381`（Shenzhen）。
+
+### 既知の未解決（優先順）
+
+1. **`cloud-itonami-gtm-data` の iso3166 141件** — 一括生成は捏造なしでは
+   不可能。**再開コマンド**: 対象 repo を1つ選び、見込み先を実際に fetch して
+   `2026-07-27/per-repo/<repo>.edn` に既存フォーマットで追記 →
+   `datalad save` → `git annex copy --to b2`（B2 creds は keychain
+   `b2:gftdcojp-m365-annex`、`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` に
+   セット）→ `git push origin main git-annex` → superproject の pin を
+   `gen-west-manifest.cljs --entry cloud-itonami-gtm-data` で前進。
+2. **`cloud-itonami-assoc-6419-chn`（中国银行业协会 CBA）** — `china-cba.net`
+   が HTTP/HTTPS とも到達不能（2026-07-27 に2回試行）。この family は
+   `official-association-site` provenance に二次情報を認めないので**穴のまま**。
+   **再開条件**: 到達可能なネットワークから `https://www.china-cba.net/Index/lists/catid/8.html`
+   を読めること。読めたら `cloud-itonami-assoc-2910-chn-caam` を雛形に複製する。
+3. **municipality 広州ほか** — 手順は確立済み。北京/上海/深圳と同じく
+   市の公式ポータルから条例2件＋culture を読む。深圳で判明した注意点:
+   区政府ドメイン（例 `szns.gov.cn`）は市ドメインのサブドメインではないので
+   `:url-provenance` を分けること。
+4. **assoc の他 ISIC で CHN** — 未探索。既存の多国カバー ISIC
+   （6419/6512/6612/6920/2100 等）から埋めると join 価値が高い。
+
+### この作業で確立した規律（後続はこれを守ること）
+
+- **判定不能 (un-checkable) を「合格」にしない**。上限・有効期限の片側が
+  未記録なら独立した HARD hold にし、DatomicStore の round-trip も nil を
+  0 や空文字列に潰さない。
+- **出典が言っていないことは書かない**。到達できなかったページ・自治体を
+  名指ししない出典は、埋めずに「無い」と記録し、**テストでその空を固定する**
+  （後から出典なしに埋めるとビルドが落ちる）。
+- **schema は sibling 間で同一に保つ**。federated query の join がそれで
+  成立している。「catalog が使う属性はすべて schema に宣言済み」を検証する
+  テストを各 municipality repo に入れてある。
+- **actuation を `:auto` に入れない invariant は load 時 throw で守る**
+  （prose や test だけに頼らない）。
 "}]
