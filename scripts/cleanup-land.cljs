@@ -100,7 +100,23 @@
 ;; ---------- 分類 ----------
 
 (def ^:private credential-re
-  #"(?i)(^|/)(\.env($|\.)|.*\.(pem|key|p12|pfx|jks|keystore)$|id_(rsa|ed25519)|identity\.edn$|.*secret.*|.*credential.*|\.kagi/|\.npmrc$|\.netrc$)")
+  #"(?i)(^|/)(\.env($|\.)|.*\.(pem|key|p12|pfx|jks|keystore|jwk)$|id_(rsa|ed25519)|identity\.(edn|json|yaml|yml)$|.*secret.*|.*credential.*|\.kagi/|\.npmrc$|\.netrc$)")
+
+;; パス名だけの判定は実際に破れた（2026-07-26）。actor の identity.json は
+;; `identity\.edn$` にも `.*secret.*` にも当たらず、private-b64 を含んだまま
+;; public repo cloud-itonami/cloud-itonami-isic-6310 に merge された
+;; （sibling の 7810/6399 は .gitignore に identity.json があり無事だった）。
+;; 名前が何であれ鍵素材そのものを撃ち落とす content 側の網を足す。
+(def ^:private secret-content-re
+  #"(?i)(private[-_](b64|key|pem|jwk)|BEGIN [A-Z ]*PRIVATE KEY|secret[-_]key|mnemonic)")
+
+(defn- secret-content?
+  "中身に鍵素材のマーカーがあるか。読めなければ false（fail-open にはしない —
+   読めないファイルは size/パス側の網で拾う）。"
+  [f]
+  (try
+    (boolean (re-find secret-content-re (.toString (.readFileSync node-fs (.getPath f)) "utf8")))
+    (catch :default _ false)))
 
 (def ^:private junk-re
   #"(^|/)(node_modules|\.cpcache|\.shadow-cljs|\.wrangler|target|dist|build|out|\.DS_Store|.*\.log)(/|$)")
@@ -114,6 +130,7 @@
       (re-find credential-re path) :skip-credential
       (re-find junk-re path)       :skip-junk
       (> size max-bytes)           :skip-large
+      (secret-content? f)          :skip-credential
       :else                        :take)))
 
 (defn- annex? [dir]
