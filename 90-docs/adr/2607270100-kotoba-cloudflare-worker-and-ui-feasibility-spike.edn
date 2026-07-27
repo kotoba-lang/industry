@@ -211,7 +211,7 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
 | 2 | **html** | 形 A で移植済み（html#2）。**D6 second cutover**（2026-07-27、html#3）: logical UI `:document` → HTML stream（`html_document.kotoba`）が form-A と byte 一致。form-A は oracle 残置 |
 | 3 | **shitsuke** | 形 A で移植済み（shitsuke#7）。**D6 third cutover**（2026-07-27、shitsuke#9）: logical token-group `:document` → CSS-var stream（tokens_document + hig_document）。form-A は oracle 残置。dual-render seam はホスト側 |
 | 4 | **liquid-glass-ui** | 形 A で移植済み（#8）。**D6 fourth cutover**（2026-07-27、#10）: logical token-group `:document` → CSS-var stream（tokens_document）。form-A は oracle 残置。component hiccup / style.cljc は .cljc |
-| 5 | **kotoba-ui** | 形 A で移植済み（2026-07-27、kotoba-lang/kotoba-ui#7 merged `06f2d2cc`）。theme-css 合成はホスト .cljc に残置。**W4 先行の oracle 付き実験 — 5/5 完了** |
+| 5 | **kotoba-ui** | 形 A で移植済み（#7）。**D6 fifth (final) cutover**（2026-07-27、#9）: logical theme `:document`（`:accent` / optional `:appearance`）→ cascade header stream（`theme_document.kotoba`）。form-A は oracle 残置。full `theme-css` join は .cljc。**D6 document cutover 依存順 5/5 完了** |
 
 **css → html → shitsuke → liquid-glass-ui → kotoba-ui の実測知見（依存順 5/5 完了）**:
 
@@ -243,11 +243,7 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   `--liquid-glass-*` 文字列。light `:root` + dark `@media` redeclare、surface/radius/ink
   サンプル）。component hiccup・style.cljc EDN→css.core・spring-linear-easing(f64) は .cljc
   に残す。移植先は `kotoba/tokens_core.kotoba`。
-- **kotoba-ui**: 26 tests / 179 assertions / 0 failures（parity は composition 層の純関数:
-  `hex->rgba` / accent decls / layer-order / shell class+layout constants）。full `theme-css`
-  合成（shitsuke+liquid-glass+shell の host 出力を join）は .cljc に残す。移植先は
-  `kotoba/theme_core.kotoba`。**依存順 5/5 の form-A 先行実験はこれで一通り完了**（最終 API 化は
-  W4 + 両 renderer qualification 後 — ADR-2607279200 Delivery #6）。
+- **kotoba-ui**: form-A 26 tests / 179 assertions; **D6 document parity** 3 tests / 31 assertions / 0 failures（`theme_document.kotoba`: theme `:document` → cascade header; form-A `theme_core` と byte 一致 + sha256/print/read identity）。full `theme-css` join は .cljc に残す。**D6 document cutover 依存順 5/5 完了**（css#3 → html#3 → shitsuke#9 → liquid-glass-ui#10 → kotoba-ui#9）。
 - **W4 first slice (2026-07-27, kotoba-lang/compiler#339)**: logical UI tree as
   `:document` → pure guest HTML render (KIR+ESM parity) + budget fail-closed.
 - **W4 second slice (2026-07-27, compiler#340)**: structural document fingerprint
@@ -282,7 +278,8 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   read/eq on KIR+ESM + host plane; tighter budgets than soft sixth-slice
   probe). Delivery-4 recursive logical document evidence is complete enough
   to start Delivery-6 design-system cutover. Full `:ui/commit` kit remains W5.
-- **Delivery-6 first cutover (2026-07-27, css#3)**: logical style `:document` → CSS stream with form-A/css.core parity; next is html.
+- **Delivery-6 first cutover (2026-07-27, css#3)**: logical style `:document` → CSS stream with form-A/css.core parity.
+- **Delivery-6 second–fifth cutovers (2026-07-27)**: html#3 UI document→HTML; shitsuke#9 token documents→CSS-vars; liquid-glass-ui#10 material tokens→CSS-vars; **kotoba-ui#9 theme document→cascade header**. **Design-system document cutover complete 5/5.**
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
