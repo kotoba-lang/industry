@@ -270,9 +270,13 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   persistent `document-assoc` update keeps both in lockstep) + soft 200×
   render workload + recursive tree persistent update (`hetero-vector-assoc`)
   and guest `tree-eq`. Design-system final cutover (Delivery 6) can target
-  these dual renderers. Remaining Delivery-4 gaps: reader/printer round-trip
-  of recursive logical values; harder perf evidence before HAMT/arena
-  selection. Full `:ui/commit` kit remains W5.
+  these dual renderers.
+- **W4 seventh slice (2026-07-27, compiler#345 + kir#11 + script#72)**:
+  `document-print` / `document-read` reader-printer round-trip (canonical
+  hex of `document-canonical-bytes`; budgets re-checked on read; UI tree +
+  leaves; sha256 stable; KIR+ESM). Wasm host import wiring is a follow-up.
+  Remaining Delivery-4: harder perf evidence before HAMT/arena selection.
+  Full `:ui/commit` kit remains W5.
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
