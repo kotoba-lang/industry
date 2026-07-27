@@ -257,9 +257,12 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   (n/b/i/f/s/k/v/m + K for map keys) + SHA-256 hex. Landed as:
   kotoba-kir#9, kotoba-script#70, kotoba-wasm#31, compiler#341. Parity:
   KIR interpreter / restricted ESM / real wasm+browser-host (null golden +
-  content-sensitive + signed-zero). Design-system final cutover still waits
-  on recursive logical values (W4 remaining), dual renderer qualification,
-  DOM reconcile, and perf workloads.
+  content-sensitive + signed-zero).
+- **W4 fourth slice (2026-07-27, compiler#342)**: host `reconcileUiDocument`
+  maps shallow UI `:document` (`:tag`/`:text`/`:children`) onto real DOM;
+  in-place text update; dangerous tags fail closed. Not the full `:ui/commit`
+  kit. Design-system final cutover still waits on recursive logical values,
+  dual renderer qualification, and perf workloads.
 
 **原典側の欠陥を1つ発見した（移植の制約ではない）**: `css.core/declarations` は Clojure map を
 walk するため、**宣言 8 件を超えると順序が未規定**になる。実測:
