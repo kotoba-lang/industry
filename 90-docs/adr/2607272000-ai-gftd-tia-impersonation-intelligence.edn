@@ -229,7 +229,7 @@ hiccup レンダラは body vector 中の `nil` をノードとして扱って�
    起動時に名前付きで弾くようにした。
 3. **値はすべて文字列化される**（`->quad-value`、typed value は上流 follow-up）。
    よって全値を `pr-str` で書き `edn/read-string` で読む。これをしないと
-   `(>= "3" 2)` がリロードを跨いで生き残るバグになる。
+   `(>= \"3\" 2)` がリロードを跨いで生き残るバグになる。
 4. **cardinality-one が無い。** status を上書き assert すると歴代値が全部残る。
    service は entity 全体を返す純粋 reducer なので `persist!` は retract-entity して
    から再 assert する。部分更新 API は提供しない。
@@ -361,14 +361,59 @@ west checkout を触るのは CLAUDE.md の並行エージェント規則が防�
 
 ## Consequences
 
-- gftdcojp に impersonation 検知の正本ができた。`ai-gftd-content-protection`
-  （コンテンツの無断転載）と対になる
-- Worker host（HTTP / OAuth callback / D1 binding）と UI の browser mount
-  （views は SSR 済み・dual-render 契約準拠、reagent seam への配線が未着手）、
-  アバターの知覚ハッシュ計算（host capability）、証拠 blob の B2 保存、
-  本人投稿の転載検出は未実装。README の「未実装」節が正本
-- プラットフォームの通報フォーム URL は `:form/verified-at \"2026-07-27\"` を持つ。
-  プラットフォームは窓口を頻繁に動かすので、古い entry は雑音ではなく欠陥として扱う
+gftdcojp に impersonation 検知の正本ができた。`ai-gftd-content-protection`
+（コンテンツの無断転載）と対になる。
+
+### 現在地（2026-07-27 closing 時点）
+
+**着地済み**: `gftdcojp/ai-gftd-tia` @ `259325f`（default branch）。west pin
+`259325f`、本 ADR ともに `com-junkawasaki/root` の main に反映済み。
+
+**実装済み**: 純粋ドメインコア（identity / confusable / signals / judge / governor /
+job / seeker / candidate / report / service）、知覚ハッシュ + PNG デコーダ、
+Kotobase 永続化（実エンジン検証済み・単一 ref）、Cloudflare Worker host
+（D1 storage / AES-GCM + blind index / 署名 cookie + OAuth CSRF / routing +
+権限テーブル）、SSR 2アプリ10画面、**素の HTML フォームによる全操作の配線**
+（client script ゼロ）、サーバ側での証拠 digest + 知覚ハッシュ計算。
+
+**検証**: 5 スイート合計 98 tests / 326 assertions、全緑。内訳 — domain 43/130、
+phash+PNG 9/18、Kotobase 実エンジン統合 9/24、UI 不変条件 12/76、Worker host 25/78。
+`design-quality` 全12軸で10画面すべて 100.00（ただし rubric は「良いパターンの存在」を
+見る heuristic であって品質の証明ではない — 本文の該当節を参照）。
+`shadow-cljs release` は警告ゼロで 505 KB、`verify-bundle.cljs` PASS。
+
+**未実装（優先順）**:
+1. **デプロイ** — D1 database id、R2 バケット、7つの secret、4プラットフォームの
+   OAuth アプリ登録がいずれも未設定。取り消しの効かない外部登録を含むため未実行
+2. **seeker のサインイン導線** — session の仕組みはあるが seeker principal を発行する
+   経路が無い。KYC・支払いレールも未着手（円で計算はするが口座も送金手段も無い）
+3. **Datalog（`q`）が未実証** — unfolded novelty に対して `#{}` を返し `fold!` は
+   block-miss。`load-slice` / `count-reportable-today` は datoms 走査で代替している。
+   ADR-260726 の join 前提は今日の TIA では実証されていない
+4. **`relist` / lease 期限切れ / `strike` が service に未接続**（関数は存在する）
+5. `:content-reuse-count` の収集導線、JPEG 正規化器の実配線
+
+**構造的な弱点（実装しても消えない）**: 共謀 seeker（2アカウントで `g8` の
+2件目の独立確認を自作できる）。通報フォーム URL は `:form/verified-at` を持つが
+プラットフォームは窓口を頻繁に動かす — 古い entry は雑音ではなく欠陥として扱う。
+
+**上流に返すべきもの**: `kotoba-ui/checkbox` が `:name` を転送しないため design system の
+チェックボックスがフォーム送信できない（`tia.ui.common/checkbox-field` で暫定回避中、
+liquid-glass-ui 側が受け取れば消える）。`kotobase-peer` の値型は文字列化のみ
+（typed value は上流 follow-up ADR-2607023200 §6-5）。
+
+### 次の一手
+
+```bash
+cd orgs/gftdcojp/ai-gftd-tia && npm install
+nbb --classpath src:test run-tests.cljs          # 43/130、依存ゼロで最初に回る
+npm run build                                     # bundle + verify-bundle
+```
+
+デプロイに進むなら `wrangler d1 create tia` → `npm run db:migrate` →
+`wrangler r2 bucket create tia-evidence` → 7 secret の `wrangler secret put` →
+各プラットフォームの OAuth アプリ登録（redirect URI は
+`https://tia.gftd.ai/auth/<platform>/callback`）。**いずれも外部に痕跡が残る操作。**
 
 ## Alternatives considered
 
