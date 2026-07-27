@@ -109,7 +109,37 @@
                 {:score 0.6 :note (str "README still discloses Wave-1-only authorization, but only " not-authorized-count "/4 expected ':status :not-authorized' waves remain in lang/q9-migration.edn -- some later wave may have been authorized; re-verify which one(s).")}
                 :else
                 {:score 1.0 :note (str "confirmed: README still discloses Q9 as authorized only for bounded Wave 1, and lang/q9-migration.edn still marks " not-authorized-count " waves ':status :not-authorized' -- disclosed scope limit matches the migration-tracking data, not just prose.")}))
-            {:score 0.0 :note "lang/q9-migration.edn no longer exists -- claim's cited source file is gone; re-verify."}))}])
+            {:score 0.0 :note "lang/q9-migration.edn no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   ;; ---- 2026-07-27 weekly claim-discovery addition: .issues/issues.edn F-001 self-report vs
+   ;; the actual repo tree (6 cited evidence paths, none of which exist). --------------------
+   {:claim :claim/kotoba-lang-f001-package-conformance-evidence-missing :axis :axis/doc-code-drift :layer :evidence-link
+    :fn (fn []
+          (let [issues (slurp* ".issues/issues.edn")
+                cited ["lang/package-conformance/negative/missing_repo_rid_lock.edn"
+                       "lang/package-conformance/negative/missing_manifest_cid_lock.edn"
+                       "lang/package-conformance/negative/bad_signature_alg_manifest.edn"
+                       "lang/package-conformance/negative/revoked_signer_lock.edn"
+                       "lang/package-conformance/negative/expired_signer_lock.edn"
+                       "scripts/check-package-contract.bb"]
+                present (filter exists? cited)]
+            (cond
+              (not (has? issues #"F-001"))
+              {:score 0.5 :note "F-001 entry no longer found in .issues/issues.edn -- issue may have been removed/renumbered; re-verify by hand."}
+              (not (has? issues #":issue/status :implemented-local"))
+              {:score 0.6 :note "F-001's :issue/status is no longer :implemented-local -- status may have been corrected (e.g. to :open or :in-progress); re-verify, would be a genuine fix of this claim's finding."}
+              (seq present)
+              {:score 0.6 :note (str (count present) "/" (count cited) " previously-missing cited evidence path(s) now exist (" (str/join ", " present) ") -- some of the claimed fixtures/script may have actually landed since this claim was written; re-verify how many of the 6 are now real before raising this score further.")}
+              :else
+              {:score 0.1 :note "confirmed: none of the 6 evidence paths F-001's issues.edn entry (and its own docs/issues/security-package-contract-conformance-gap.md 'Local resolution evidence' section) cites exist anywhere in the repo -- lang/package-conformance/ itself is absent (only the unrelated lang/conformance/ exists) and no scripts/check-package-contract.bb exists. The :implemented-local self-report for a Critical-severity finding is not backed by any of its own cited evidence."})))}
+
+   {:claim :claim/kotoba-lang-f001-package-conformance-evidence-missing :axis :axis/safety-enforcement :layer :lint
+    :fn (fn []
+          (let [any-conformance-dir? (exists? "lang/package-conformance")
+                any-check-script? (exists? "scripts/check-package-contract.bb")]
+            (if (or any-conformance-dir? any-check-script?)
+              {:score 0.6 :note "lang/package-conformance/ or scripts/check-package-contract.bb now exists where neither did before -- partial progress on F-001's actual safety mechanism (unsafe package references made non-conforming); re-verify how complete it is."}
+              {:score 0.1 :note "confirmed: no package-conformance negative-fixture directory and no package-contract check script exist anywhere in the repo -- the safety mechanism F-001 is meant to add (unsafe package references unambiguously rejected) is not present in the codebase regardless of what .issues/issues.edn claims."})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

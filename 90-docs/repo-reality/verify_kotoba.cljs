@@ -104,7 +104,34 @@
                      (has? readme #"authoritative JVM-free distribution paths")
                      (exists? ".github/workflows/native-release.yml"))
               {:score 1.0 :note "confirmed: README.md still states the native installer requires 'Neither a JVM nor Clojure CLI ... at runtime' and calls Homebrew/shell installs 'the authoritative JVM-free distribution paths', and .github/workflows/native-release.yml (GraalVM native-image build) still exists -- the JVM-free distribution claim is backed by a real release pipeline, not just README prose."}
-              {:score 0.4 :note "expected JVM-free distribution language in README.md or .github/workflows/native-release.yml no longer found -- either the native release pipeline was removed/renamed or wording changed; re-verify by hand."})))}])
+              {:score 0.4 :note "expected JVM-free distribution language in README.md or .github/workflows/native-release.yml no longer found -- either the native release pipeline was removed/renamed or wording changed; re-verify by hand."})))}
+
+   ;; ---- 2026-07-27 weekly claim-discovery additions: CHANGELOG.md Unreleased entries for the
+   ;; new cap-affine-problems check and the mandatory --package-lock gate. --------------------
+   {:claim :claim/kotoba-cap-affine-changelog-contradicts-code :axis :axis/doc-code-drift :layer :lint
+    :fn (fn []
+          (let [changelog (slurp* "CHANGELOG.md")
+                runtime (slurp* "src/kotoba/runtime.clj")]
+            (cond
+              (not (has? changelog #"tracking is per local binding name, not per\s+underlying value"))
+              {:score 0.5 :note "expected CHANGELOG.md wording ('tracking is per local binding name, not per underlying value') no longer found verbatim -- CHANGELOG may have been corrected to match the code, or reworded; re-verify by hand (a correction would be a genuine improvement)."}
+              (not (has? runtime #"Tracking is by ORIGIN, not by local binding name"))
+              {:score 0.4 :note "affine-use's docstring no longer states 'Tracking is by ORIGIN, not by local binding name' verbatim -- the implementation or its docstring changed; re-verify whether the contradiction with CHANGELOG.md still holds."}
+              :else
+              {:score 0.2 :note "confirmed contradiction still present: CHANGELOG.md's Unreleased entry still says cap-affine tracking is 'per local binding name, not per underlying value' (implying alias-renaming escapes the check), while runtime.clj's own affine-use/cap-expr-info docstrings still say tracking is by ORIGIN and a let-bound alias 'shares its origin ... a reuse through either name is caught' -- the doc's self-disclosed 'conservative limitation' does not match what the code actually does. Scored low on doc-code-drift because the CHANGELOG's own account of the mechanism is inaccurate, even though the direction of the error is safety-favorable (code is stricter than documented, not laxer)."})))}
+
+   {:claim :claim/kotoba-package-lock-mandatory-f001-closed :axis :axis/safety-enforcement :layer :evidence-link
+    :fn (fn []
+          (let [launcher (slurp* "src/kotoba/launcher.clj")
+                test (slurp* "test/kotoba/launcher_test.clj")]
+            (cond
+              (not (has? launcher #"is\s+mandatory, not opt-in \(F-001"))
+              {:score 0.4 :note "expected 'mandatory, not opt-in (F-001' language no longer found verbatim in launcher.clj's admission-gated docstring -- wording or mechanism changed; re-verify by hand."}
+              (not (and (has? test #"wasm-emit-rejects-missing-package-lock")
+                        (has? test #"wasm-run-rejects-missing-package-lock")))
+              {:score 0.5 :note "admission-gated's F-001 docstring is present, but the two named regression tests (wasm-emit-rejects-missing-package-lock / wasm-run-rejects-missing-package-lock) are no longer both found in launcher_test.clj -- re-verify test coverage."}
+              :else
+              {:score 1.0 :note "confirmed: launcher.clj's admission-gated fn (shared by wasm-emit-result/wasm-run-result/cljs-emit-result) still documents --package-lock as mandatory with no opt-out (F-001), and launcher_test.clj still has wasm-emit-rejects-missing-package-lock + wasm-run-rejects-missing-package-lock asserting :package/missing-lock-option on a missing flag -- the CHANGELOG's 'no opt-out' claim is backed by real, currently-passing-shaped test coverage, not just prose."})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

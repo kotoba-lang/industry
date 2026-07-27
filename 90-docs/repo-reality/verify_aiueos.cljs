@@ -202,7 +202,36 @@
           (let [adr (slurp* "90-docs/adr/0014-self-owned-vmm-hvt-tender.md")]
             (if (has? adr #"needs an x86_64 KVM host, which the dev\s+machine is not")
               {:score 1.0 :note "confirmed: ADR-0014's own Finding 1 still discloses that direct-loading the real ADR-0013 (x86_64) kernel through the self-owned VMM needs an x86_64 KVM host the aarch64 dev machine does not have -- the headline V0/V1 goal remains explicitly unverified, only the arch-independent ELF-loader mechanism itself is proven."}
-              {:score 0.4 :note "expected Finding 1 language ('needs an x86_64 KVM host, which the dev machine is not') no longer found verbatim in ADR-0014 -- either an x86_64 host became available and the real kernel was booted (re-verify, would be major progress) or wording changed; re-verify by hand."})))}])
+              {:score 0.4 :note "expected Finding 1 language ('needs an x86_64 KVM host, which the dev machine is not') no longer found verbatim in ADR-0014 -- either an x86_64 host became available and the real kernel was booted (re-verify, would be major progress) or wording changed; re-verify by hand."})))}
+
+   ;; ---- 2026-07-27 weekly claim-discovery addition: .issues/issues.edn F-002 self-report vs
+   ;; the actual signature-verification source. ------------------------------------------------
+   {:claim :claim/aiueos-f002-signer-revocation-not-enforced :axis :axis/safety-enforcement :layer :lint
+    :fn (fn []
+          (let [signing (slurp* "src/aiueos/signing.cljc")
+                issues (slurp* ".issues/issues.edn")
+                lifecycle-kw-anywhere? (or (has? signing #":aiueos/signer-status\b")
+                                           (and (exists? "src/aiueos/contract.cljc")
+                                                (has? (slurp* "src/aiueos/contract.cljc") #":aiueos/signer-status\b")))]
+            (cond
+              (not (has? issues #"F-002"))
+              {:score 0.5 :note "F-002 entry no longer found in .issues/issues.edn -- issue may have been removed/renumbered; re-verify by hand."}
+              lifecycle-kw-anywhere?
+              {:score 0.7 :note "the :aiueos/signer-status lifecycle keyword F-002's resolution evidence names is now present in source -- signer-status enforcement may have actually landed since this claim was written; re-verify whether aiueos.signing/verify now consults it before trusting a higher score."}
+              :else
+              {:score 0.1 :note "confirmed: :aiueos/signer-status is still absent from both signing.cljc and contract.cljc, and aiueos.signing/verify still only checks signer registration (:aiueos.policy/signers) + signature bytes, never a lifecycle status -- F-002's :implemented-local self-report for 'enforce key lifecycle and signer revocation' does not match runtime behavior; a manifest signed by a key the operator intends as revoked/expired/compromised still verifies exactly like one signed by an active key."})))}
+
+   {:claim :claim/aiueos-f002-signer-revocation-not-enforced :axis :axis/doc-code-drift :layer :evidence-link
+    :fn (fn []
+          (if (exists? "docs/issues/security-key-lifecycle-signer-revocation.md")
+            (let [doc (slurp* "docs/issues/security-key-lifecycle-signer-revocation.md")]
+              (if (has? doc #"Added CLJC policy-level `:aiueos/signer-status` lifecycle states")
+                (let [contract (slurp* "src/aiueos/contract.cljc")]
+                  (if (has? contract #":aiueos/signer-status\b")
+                    {:score 1.0 :note "the issue doc's specific evidence claim now matches source -- :aiueos/signer-status found in contract.cljc; re-verify the safety-enforcement axis event too."}
+                    {:score 0.1 :note "confirmed: the issue doc still claims 'Added CLJC policy-level :aiueos/signer-status lifecycle states' as resolution evidence, but that exact keyword is absent from contract.cljc (the file the issue itself points to) -- the doc's own cited evidence does not exist; a silent overclaim, not a disclosed gap."}))
+                {:score 0.5 :note "expected resolution-evidence wording no longer found verbatim in the issue doc -- content may have been reworded; re-verify by hand."}))
+            {:score 0.0 :note "docs/issues/security-key-lifecycle-signer-revocation.md no longer exists -- claim's cited source file is gone; re-verify."}))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

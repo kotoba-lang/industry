@@ -110,7 +110,27 @@
                        (has? fleet #"full aiueos fleet broker"))
                 {:score 1.0 :note "confirmed: the code's own r3-report distinguishes basic-grant-works from full-policy-not-done -- honestly disclosed at the source, not glossed over."}
                 {:score 0.3 :note "expected markers not found -- re-verify."}))
-            {:score 0.0 :note "src/kototama/fleet.cljc no longer exists -- re-verify."}))}])
+            {:score 0.0 :note "src/kototama/fleet.cljc no longer exists -- re-verify."}))}
+
+   ;; ---- 2026-07-27 weekly claim-discovery addition: PR #76 "Split transport and component
+   ;; tenders" -- README.md vs docs/maturity.md disagree on the resulting R2 status. ---------
+   {:claim :claim/kototama-r2-r3-readme-maturity-mismatch :axis :axis/doc-code-drift :layer :lint
+    :fn (fn []
+          (let [readme (slurp* "README.md")
+                maturity (slurp* "docs/maturity.md")
+                browser (if (exists? "src/kototama/browser.cljc") (slurp* "src/kototama/browser.cljc") "")
+                readme-level (re-find #"Current tender level: R2 [a-z-]+" readme)
+                maturity-level (re-find #"Current tender level: R2 [a-z]+" maturity)
+                llm-infer-browser-yes? (has? browser #":llm-infer\s+\{:jvm :yes :browser :yes")]
+            (cond
+              (or (nil? readme-level) (nil? maturity-level))
+              {:score 0.5 :note (str "expected 'Current tender level: R2 ...' wording no longer found verbatim in one or both docs (README=" (some? readme-level) ", maturity.md=" (some? maturity-level) ") -- re-verify by hand.")}
+              (= readme-level maturity-level)
+              {:score 0.9 :note (str "README.md and docs/maturity.md now agree on the R2 status label (both say '" readme-level "') -- the doc-vs-doc mismatch this claim tracked appears to have been reconciled; re-verify the parity counts (9/9 vs 14/14) match too before scoring this 1.0.")}
+              :else
+              {:score 0.2 :note (str "confirmed: the two docs still disagree -- README.md says '" readme-level "', docs/maturity.md says '" maturity-level "'. llm-infer's browser column in src/kototama/browser.cljc is "
+                                     (if llm-infer-browser-yes? "still :yes (matching maturity.md's higher 14/14, not README's stale 9/9)." "no longer :yes -- re-verify which doc's parity count is actually current.")
+                                     " Scored low on doc-code-drift because the two self-descriptions of the SAME repo's SAME metric, added in the same commit, contradict each other and neither discloses the other's number.")})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

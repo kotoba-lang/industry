@@ -71,7 +71,30 @@
                 {:score 0.5 :note "README still carries the 'CID possession is never authority' caveat, but the matching docstring language ('never grants authority by itself' / 'not authority') no longer found verbatim in code_graph.cljc -- re-verify whether the code-level disclosure moved or was dropped."}
                 :else
                 {:score 0.3 :note "expected 'CID possession is never authority' text no longer found verbatim in README.md -- re-verify whether the caveat was reworded or silently dropped while the underlying authorization-scope limitation still applies."}))
-            {:score 0.0 :note "src/kotobase/code_graph.cljc no longer exists -- claim's cited source file is gone; re-verify."}))}])
+            {:score 0.0 :note "src/kotobase/code_graph.cljc no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   ;; ---- 2026-07-27 weekly claim-discovery addition: security-adoption.edn (:adoption/version
+   ;; 3) required-control-namespace manifest vs the two named sensitive-operations. ----------
+   {:claim :claim/kotobase-security-adoption-manifest-v3 :axis :axis/safety-enforcement :layer :lint
+    :fn (fn []
+          (if (exists? "security-adoption.edn")
+            (let [manifest (slurp* "security-adoption.edn")
+                  kotobase-src (if (exists? "src/kotobase/kotobase.cljc") (slurp* "src/kotobase/kotobase.cljc") "")
+                  code-graph-src (if (exists? "src/kotobase/code_graph.cljc") (slurp* "src/kotobase/code_graph.cljc") "")
+                  authorize-wired? (and (has? kotobase-src #"kotoba\.security\.abac")
+                                        (has? kotobase-src #"abac/evaluate")
+                                        (has? kotobase-src #"defn authorize-xrpc"))
+                  revoke-wired? (and (has? code-graph-src #"kotoba\.security\.effect")
+                                     (has? code-graph-src #"effect/guard!")
+                                     (has? code-graph-src #"defn revoke-pin!"))]
+              (cond
+                (not (has? manifest #":adoption/version 3"))
+                {:score 0.5 :note "security-adoption.edn no longer declares :adoption/version 3 -- manifest may have been revised; re-verify the sensitive-operations list before trusting this score."}
+                (and authorize-wired? revoke-wired?)
+                {:score 1.0 :note "confirmed: both :sensitive-operations the manifest names are genuinely wired -- kotobase.kotobase/authorize-xrpc requires kotoba.security.abac and calls abac/evaluate before permitting an operation, and kotobase.code-graph/revoke-pin! requires kotoba.security.effect and wraps its state transition in effect/guard! -- the manifest describes real enforcement, not aspirational policy."}
+                :else
+                {:score 0.3 :note (str "security-adoption.edn still declares authorize-xrpc->abac and revoke-pin!->effect as required, but source no longer confirms both wirings (authorize-xrpc wired=" authorize-wired? ", revoke-pin! wired=" revoke-wired? ") -- re-verify by hand, this is exactly the kind of drift periodic re-runs are meant to catch.")}))
+            {:score 0.0 :note "security-adoption.edn no longer exists -- claim's cited source file is gone; re-verify."}))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]
