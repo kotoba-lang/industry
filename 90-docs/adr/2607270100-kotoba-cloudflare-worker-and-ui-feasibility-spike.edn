@@ -8,7 +8,7 @@
   :adr/date "2026-07-27"
   :adr/last-verified "2026-07-27"
   :adr/last_verified "2026-07-27"
-  :adr/authoritative true
+  :adr/authoritative false
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "kotoba-cloudflare-worker-and-ui-feasibility-spike"
   :adr/repo "kotoba-lang/kotoba-worker-demo"
@@ -16,8 +16,11 @@
   [".kotoba guest を Cloudflare Workers に載せる唯一動作する配線"
    ".kotoba が frontend/UI をどこまで担えるか（担えないか）"
    "kotoba cljs backend と wasm backend の能力差・実測寿命"]
+  :adr/subordinate-to
+  ["adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"]
   :adr/related
-  ["90-docs/adr/2606290000-all-workers-cljc-only-policy.edn"
+  ["90-docs/adr/2607279200-kotoba-clojure-shaped-safety-elaboration-migration.edn"
+   "90-docs/adr/2606290000-all-workers-cljc-only-policy.edn"
    "90-docs/adr/2607252500-kotoba-wasm-component-first-execution-boundary.edn"
    "90-docs/adr/2607201300"
    "90-docs/adr/2607122200"]
@@ -34,6 +37,21 @@
 
 **Status**: accepted / **Date**: 2026-07-27
 **Scope**: `kotoba-lang/kotoba-worker-demo`（検証 spike、live deploy 済み）
+
+> **本 ADR は「2026-07-27 に実測した現在地」の記録であり、方向の正本ではない。**
+> 方向の正本は **ADR-2607279200（accepted）** と
+> `orgs/kotoba-lang/kotoba-lang/docs/kotoba-centered-migration-plan.md`。食い違ったら
+> あちらが勝つ。特に次の 3 点は本 ADR 初版の書き方が計画と逆で、2026-07-27 に訂正した:
+>
+> 1. **再帰的な値型は「無い」ではなく「まだ無い」** — plan W4 が
+>    「recursive logical values with explicit node/depth/byte budgets」を計画し、
+>    「handles are not the application programming model」と明記している。flat node /
+>    parent ポインタを Kotoba の書き方として一般化しない。
+> 2. **string-only SSR（形 A）は最終 API ではない** — Delivery #6 /plan L201 が
+>    明示的に禁じている。切り替えは W4 と両 renderer の qualification 後。
+> 3. **`cap-call` と数値 capability ID は通常 source の語彙ではない** — §2 が
+>    「通常の source は capability ID を記述しない」、Consequences が
+>    「compiler/host 内部へ押し下げる」と定める。effect は推論が既定。
 
 ## Context
 
@@ -185,11 +203,11 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   木を表現するので再帰型が要らない。ただし nodes 32 / queued-events 64 の上限引き上げと、
   そのフラット commit を実 DOM に反映する provider の実装・qualification が必要。
 
-### 移行の進捗
+### 移行の進捗（Delivery #6 は W4 の後——下表は先行実験の記録）
 
 | # | repo | 状態 |
 |---|---|---|
-| 1 | **css** | **形 A で移植済み（2026-07-27、kotoba-lang/css#2 merged `fd5b15dc`）** |
+| 1 | **css** | 形 A で移植済み（2026-07-27、kotoba-lang/css#2 merged `fd5b15dc`）。**ただし W4 に先行した oracle 付き実験**であり、最終 API ではない |
 | 2 | html | 未着手 |
 | 3 | shitsuke | 未着手（dual-render seam はホスト側に残す） |
 | 4 | liquid-glass-ui | 未着手 |
@@ -248,6 +266,22 @@ walk するため、**宣言 8 件を超えると順序が未規定**になる�
 | live Worker `/health` | `ok: true`、4/4 一致 |
 | `verify_browser.cljs`（headless Chromium、live URL） | 12/12 pass、light+dark |
 | `design-quality.cli score` | 100.00 |
+
+## Delivery #1 / #2 への follow-up（2026-07-27 起票）
+
+本 spike と compiler#332 は、authority ではなく `compiler/frontend.cljc` を基準に文法面を
+触った。ADR-2607279200 Delivery #1/#2 に沿って 2 件を起票済み:
+
+- **kotoba-lang/compiler#334** — compiler の文法を
+  `kotoba-lang/kotoba-lang/lang/guest-grammar.edn` に対して機械検査する。`:capabilities` は
+  authority に **0 回**しか出てこない（`grep -c` = 0）のに frontend は受理しており、#332 が
+  それを project mode へ広げた。「compiler が受理するか」が「言語にあるか」の代わりを
+  し続けている状態を止める。
+- **kotoba-lang/compiler#335** — 数値 capability registry を
+  `lang/capability-semantics.edn`（`:cap/kind`/`:cap/resource`/`:cap/holder` の名前付き
+  scoped モデル）から生成する。現在は compiler(1–12) と kotoba-core-contracts(201+) の
+  2 表が独立採番で手書き維持されており、Delivery #2 が名指しで廃止対象としている
+  「手書きの重複 catalog」そのもの。
 
 ## 付随所見（upstream 報告事項）
 
