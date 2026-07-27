@@ -213,6 +213,53 @@ hiccup レンダラは body vector 中の `nil` をノードとして扱って�
 `tia.ui.common/panel` で nil を落とすようにした——これは利便性ではなく、views が
 欠測について正直でいられるための条件。
 
+## 永続化と知覚ハッシュ（2026-07-27 追記、gap 1-2 を解消）
+
+### Kotobase の契約はドキュメントではなく実測で決まった
+
+`tia.store` の初版はドキュメントから書いたもので、実行したことが一度も無く、
+**4点間違っていた**。実エンジンに対して走らせて判明した契約:
+
+1. tx-data は entity map ではなく **triple**（`{:s :p :o}` 等）。`:db/id` 付き
+   entity map は拒否される。TIA の id は内容由来の文字列なので tempid が要らない。
+2. **security control は cljs では Promise を返さなければならない。** `:encrypt-fn`
+   に `identity` を渡しても `open` は通る（`ifn?` しか見ない）が、commit 経路の奥で
+   promise chain が切れ、kotobase がスタックに1フレームも出ない
+   `Could not find instance method: then` として現れる。`tia.store/open!` は
+   起動時に名前付きで弾くようにした。
+3. **値はすべて文字列化される**（`->quad-value`、typed value は上流 follow-up）。
+   よって全値を `pr-str` で書き `edn/read-string` で読む。これをしないと
+   `(>= "3" 2)` がリロードを跨いで生き残るバグになる。
+4. **cardinality-one が無い。** status を上書き assert すると歴代値が全部残る。
+   service は entity 全体を返す純粋 reducer なので `persist!` は retract-entity して
+   から再 assert する。部分更新 API は提供しない。
+
+**未解決**: `q`（Datalog）は unfolded novelty に対して `#{}` を返し、`fold!` は
+async-memory harness で `kotobase engine block miss` で落ちる。**ADR-260726 が
+前提にしている Datalog join は今日の TIA では実証されていない。** `load-slice` と
+`count-reportable-today` は `datoms` 走査 + メモリ絞り込みで実装した（正しいが
+index 加速なし）。`store_test` の当該テストが緑になるまで「動く Datalog 面がある」と
+言わないこと。9 tests / 24 assertions。
+
+### 知覚ハッシュは自前で書いた
+
+Worker と nbb に共通の画像ライブラリが無く、wasm デコーダは git にバイナリを
+持ち込み（`large-binary-datalad` が防いでいるもの）、Rust は ADR-2607072000 が
+kotoba-lang 全体で禁じている。両方にあるのは `DecompressionStream` であり、
+PNG の難所はそこだけなので、**PNG デコーダを `.cljs` で書き、ハッシュ本体を純粋
+`.cljc` に置いた**。8bit・非インタレース・color type 0/2/4/6 に限定し、それ以外は
+名前付きで throw する — 黙って plausible なラスタを返すと、黙って間違ったハッシュに
+なり、間違った人への通報になる。
+
+JPEG 正規化は**明示的な依存**にした（Cloudflare Images binding 等）。正規化器が
+無ければ JPEG は名前付きエラーで失敗し、ハッシュは欠測のままになる。
+`tia.signals` は欠測を「距離0」ではなく「測っていない」として扱うので、
+欠測はシグナル1つ分の損失で済む。誤ったハッシュは他人のアカウントを奪う。
+
+実測（fixture は node:zlib で作った本物の PNG を実デコーダに通す）: 同一画像 0 bit /
+3倍リサイズ ≤6 bit（avatar-reuse しきい値 0.90 を通る）/ 明度シフト ≤4 bit /
+無関係な画像 ≥16 bit。9 tests / 18 assertions。
+
 ## Consequences
 
 - gftdcojp に impersonation 検知の正本ができた。`ai-gftd-content-protection`
