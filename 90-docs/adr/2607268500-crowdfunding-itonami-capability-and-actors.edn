@@ -82,7 +82,7 @@ pass-through、ただし支援者が合意した上限で必ず止まる。**
 自分たちのハードウェア campaign が選んだ構造を表現できないプラットフォームを作らない、
 というのがこの節の趣旨。
 
-## D2. `cloud-itonami/cloud-itonami-crowdfunding-{campaign,pledge,collection,payout}` — 4 アクター
+## D2. `cloud-itonami/cloud-itonami-crowdfunding-{campaign,pledge,collection,payout,fulfillment}` — 5 アクター
 
 いずれも既存 `cloud-itonami-marketplace-settlement` と同型（advisor 1 ノード封じ込め +
 独立ガバナー + phase 0-3 + append-only 台帳 + langgraph StateGraph + `interrupt-before`
@@ -94,6 +94,7 @@ pass-through、ただし支援者が合意した上限で必ず止まる。**
 | pledge | 支援の受付・変更・取消 | concern、および**プラットフォーム主導の**取消 |
 | collection | 締切での一括請求・再試行・確定 | plan-collection / finalize / concern |
 | payout | 支払計画・支払先登録・解放・留保・返金 | destination / release / hold / refund / concern |
+| fulfillment | アンケート・配送・説明責任 | disclose-failure / concern |
 
 **設計上いちばん効いている 3 点:**
 
@@ -107,6 +108,15 @@ pass-through、ただし支援者が合意した上限で必ず止まる。**
 3. **事実は自動、判断は人間。** `:record-attempt`（決済レールが返した結果）は自動。
    拒否を記録しないことで拒否が消えるわけではない。`:plan-collection`（今日数千人が
    引き落とされる）と `:finalize-collection`（創作者が生産計画を立てる数値）は必ず人間。
+4. **fulfillment が書く記録が payout の gate を解錠する。** payout は
+   `:on-first-shipment` / `:on-fulfillment-complete` に対してトランシェを解放するが、
+   その事実を書くのは fulfillment アクターである。だから `:shipped` は
+   **支援者が確認できる追跡番号が無ければ拒否する** — この検査があって初めて
+   `:ship-line` を phase 3 で自動コミットしてよくなる（創作者が自分について主張する
+   だけで自分に支払わせられる op になってはならない）。fulfillment には
+   `:refunded` へ至る経路が存在せず（返金は payout の人間承認）、住所・電話・氏名の
+   実体を持ち込む提案も拒否する（回答は参照のみ。value tree 全体を走査する — 想定して
+   いる失敗は悪意ではなく「便利なフィールドの追加」だから）。
 
 ## D3. 発見（discovery）に親指を置かない
 
@@ -136,11 +146,12 @@ crowdfunding プロトコルが 1 事業者の契約を焼き込んではなら�
 |---|---|---|
 | `kotoba-lang/crowdfunding` | 134 tests / 426 assertions / 0 failures | 0 errors 0 warnings |
 | `cloud-itonami-crowdfunding-campaign` | 22 tests / 67 assertions / 0 failures | 0 errors 0 warnings |
-| `cloud-itonami-crowdfunding-pledge` | 25 tests / 64 assertions / 0 failures | 0 errors 0 warnings |
+| `cloud-itonami-crowdfunding-pledge` | 33 tests / 80 assertions / 0 failures | 0 errors 0 warnings |
 | `cloud-itonami-crowdfunding-collection` | 25 tests / 81 assertions / 0 failures | 0 errors 0 warnings |
 | `cloud-itonami-crowdfunding-payout` | 28 tests / 100 assertions / 0 failures | 0 errors 0 warnings |
+| `cloud-itonami-crowdfunding-fulfillment` | 24 tests / 81 assertions / 0 failures | 0 errors 0 warnings |
 
-4 アクターすべて `clojure -M:dev:run` のオフライン sim が実行可能で、拒否・人間承認・
+5 アクターすべて `clojure -M:dev:run` のオフライン sim が実行可能で、拒否・人間承認・
 台帳記録まで通る。
 
 ## 実装中に見つけて直したもの
@@ -163,26 +174,30 @@ gap として書き残すのではなく閉じた。
 
 ## 残るギャップ（正直な列挙）
 
-1. **fulfillment アクターが無い。** `crowdfunding.fulfillment`（アンケート・配送・
-   説明責任）はライブラリにあるが、それを回すアクターはまだ作っていない。payout の
-   `:on-first-shipment` / `:on-fulfillment-complete` gate は現状 store に注入された
-   fulfillment 行から導出しており、その行を書くアクターが未実装。
-2. **discovery アクターが無い。** ランキングは純関数として存在するが、index を持つ
+1. **discovery アクターが無い。** ランキングは純関数として存在するが、index を持つ
    surface はまだ無い。`search` との結線は `discovery/search-doc` まで。
-3. **CI ワークフローを置いていない。** deps が `:local/root` なので単独 checkout の
+2. **CI ワークフローを置いていない。** deps が `:local/root` なので単独 checkout の
    GitHub Actions では classpath が解決しない。参照実装
    （`cloud-itonami-marketplace-settlement`）の ci.yml は「deps.edn は :git/sha で
    pin している」と書いているが実際は `:local/root` で、**その CI は今も嘘をついている**。
    落ちる CI を足すより無いほうがましと判断した。恒久対応は monorepo 側の集約 CI か、
    push 済み SHA での git 座標化。
-4. **advisor は決定論的 mock。** 3 アクターの先例と同じで、実 LLM 接続は
+3. **advisor は決定論的 mock。** 3 アクターの先例と同じで、実 LLM 接続は
    `murakumo-main` alias 経由の別作業。
-5. **`passthrough` の検査をガバナーがまだ呼んでいない。**
-   `passthrough/campaign-quote-errors` はライブラリ側に存在しテストもあるが、
-   pledge アクターのガバナーの HARD チェックにはまだ結線していない
-   （現状の 4 アクターはすべて `:fixed` を前提に動く）。
-   `:deposit-plus-settlement` の campaign を実際に走らせる前に必ず結線する。
-   次に触るときの最初の作業はここ。
+4. **fulfillment の記録を書く上流が人間/外部システム前提。** 追跡番号や配送不能理由は
+   配送業者から入ってくる想定だが、その取り込み経路（`logistics` との結線）は未実装。
+   現状は request 経由で渡す。
+
+## 改訂履歴
+
+- **2026-07-27（同日、後続作業）**: 初版で gap として挙げた 2 件を閉じた。
+  ① `passthrough/campaign-quote-errors` を pledge アクターのガバナーの 7 番目の
+  HARD チェックに結線（`:deposit-plus-settlement` の campaign に見積の無い pledge =
+  上限の無い青天井の約束、を拒否。逆に `:fixed` に見積が付く鏡像も拒否。価格モデルは
+  store から再導出し、見積は pledge と一緒に保存する — 後の支援者の上限は同じ campaign
+  でも別の合意だから。変更時は既存の見積を持ち越すので、tier 変更が副作用で上限を
+  外すことがない）。② **fulfillment アクターを新設**（上記 D2 の 4 点目）。
+  これに伴い D2 は 4 アクターから 5 アクターになった。
 
 # Related
 
