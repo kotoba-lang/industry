@@ -83,9 +83,27 @@
    - i18n.etzhayyim.com が未デプロイなので、**この actor が事実上その契約の
      実装体になる**。将来 etzhayyim 側が復活したら、どちらが正本かを決める必要がある
      （現時点では契約が正本、実装は複数あってよい）。
-   - **本 ADR で作ったのは pure core のみ。** edge worker（XRPC 面・D1 台帳・
-     x402 決済配線・engi countersign 連携）は未実装。actor の完了条件である
-     west 登録と RAD identity も未了。次の increment。
+   - **成熟度の追記（同日、オーナー指示『成熟度を高めて』）**: actor パターンの
+     残り半分を実装した。advisor（封じ込め: 値付け・自己検収・容量宣言の
+     いずれも構造的に不可能）、phase 0→3、langgraph StateGraph の operation、
+     append-only 台帳付き store、edge worker（XRPC/D1）。
+     **32 tests / 85 assertions、lint 0 warnings、Worker バンドル生成確認。**
+
+     設計上の判断が1つ、失敗テストから出た: **納品は検収に落ちても必ず記録する。**
+     governor の拒否は『支払わない』であって『記録しない』ではない。痕跡を残さないと
+     『ゴミを納品した供給者』と『使ったことがない供給者』が区別できず、
+     accept-rate の履歴（＝使える1文字列あたりの実質単価）が作れない。
+
+     phase の非対称性も明文化した: `:plan-procurement` は **phase 3 を含む
+     どの phase でも auto-commit しない**。守っているのは『間違った数字』ではなく
+     『もっともらしい数字』——16,000リクエストを $0.01 で流す計画は、その売り手が
+     自分のフリートだと気づくまで完全に妥当に読める。テストで将来の phase が
+     支出 op を auto に加えられないことを固定した。
+   - **それでも未達（主張しない）**: 本番稼働実績ゼロ、x402 の決済実行未配線
+     （402 challenge → USDC → settle → receipt 照合）、並列ディスパッチャ未実装、
+     未デプロイ（PHASE=0・D1 未バインドで出荷）、RAD identity 未登録。
+     `:maturity :implemented` は『部品が揃ってテストが通る』の意であり、
+     『使われた実績がある』ではない。
    - 4つの派生決定は別 ADR に切った: 需要側スケジューリング(2607289200)、
      供給側調達(2607289300)、容量(2607289400)、現行ジョブの扱い(2607289500)。"
   :adr/evidence
