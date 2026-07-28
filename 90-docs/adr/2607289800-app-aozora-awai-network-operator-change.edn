@@ -1,0 +1,50 @@
+[{:db/id -1
+  :adr/id "adr-2607289800-app-aozora-awai-network-operator-change"
+  :adr/title "ADR-2607289800: app-aozora / aozora.app の運営法人を AWAI Network, L.L.C.(Stripe Atlas 設立の Delaware LLC)に変更する"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-28"
+  :adr/last-verified "2026-07-28"
+  :adr/last_verified "2026-07-28"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "app-aozora-awai-network-operator-change"
+
+  :adr/authoritative_for
+  ["app-aozora / aozora.app および yoro messenger の Service operator・data controller が Gftd Japan 株式会社 から AWAI Network, L.L.C. に変わること"
+   "app-aozora の法人記録の置き場所 = 子リポの legal/company.md(cloud-murakumo / cloud-itonami と同型)"
+   "app-aozora に固有の未解決事項 — consumer 向けサービスであること・有償面が存在しないこと から来る差分"]
+
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2607289700-org-taxonomy-by-invocation-axis-network-awai"
+   "adr-2607242100-cloud-itonami-awai-network-operator-change"
+   "adr-2607242600-cloud-itonami-awai-gftd-payment-collection"
+   "adr-2607231835-atlas-mercury-reverse-domain-isic-ownership"
+   "adr-2607141600-cloud-itonami-real-entity-record-placement"]
+
+  :adr/repos ["orgs/network-awai/app-aozora"]
+
+  :adr/decision
+  ["D1: app-aozora / aozora.app と yoro messenger の Service operator・data controller は AWAI Network, L.L.C.(Delaware LLC、Stripe Atlas 経由で 2026-07-20 設立、file number 10704996)。cloud-murakumo / cloud-itonami と同一法人で、app-aozora のために別 LLC は作らない"
+   "D2: Gftd Japan 株式会社 はインフラ・ソフトウェア供給元として legal 文書に残すが、operator ではないことを明示する"
+   "D3: 法人記録は子リポの legal/company.md に置く(cloud-murakumo public/legal/company.md / cloud-itonami legal/company.md と同型)。superproject 側には ADR のみ"
+   "D4: 準拠法(日本法)と東京地裁専属管轄は変更しない。[CONFIRM] マーカーを付けて counsel 判断に残す — 準拠法の変更は agent が実行してよい範囲ではない"
+   "D5: DRAFT バナーは全文書で維持。counsel review 未了であることを取り下げない"]
+
+  :adr/verify "grep -rn 'AWAI Network' orgs/network-awai/app-aozora/legal orgs/network-awai/app-aozora/README.md orgs/network-awai/app-aozora/RESPONSIBILITY.md"
+
+  :adr/evidence
+  ["orgs/network-awai/app-aozora child commit 3d0b40b6 -> main merge d0668f2afdf7b3bdb9a9a8c21fccaeffe98c5333 (server-side merge, gh api /merges)"
+   "manifest/west.yml pin 5f98806d -> d0668f2a, single-entry GitHub API commit f235cbaf98ec7032b3db6a037c33e9eee507e807"
+   "変更ファイル 7 件 / +231 -19: legal/company.md(新規) legal/terms.md legal/privacy.md legal/yoro/terms.md legal/yoro/privacy.md README.md RESPONSIBILITY.md"]
+
+  :adr/body
+  "# ADR-2607289800: app-aozora の運営法人を AWAI Network, L.L.C. にする\n\n**Status**: accepted\n**Date**: 2026-07-28\n**Deciders**: Jun Kawasaki(オーナー指示、agent 実行)\n**Scope**: `orgs/network-awai/app-aozora`(子リポ commit `3d0b40b6` → `main` へ server-side merge `d0668f2a`)、`manifest/west.yml` pin 前進(`5f98806d`→`d0668f2a`、single-entry API commit `f235cbaf`)\n\n## Context\n\nオーナー指示(2026-07-28): 「app-aozora の運営法人を awai network にして。法人情報は\nこの repo wide にあるはず。stripe atlas で作成しました」。\n\n法人情報は既に workspace 内に存在していた:\n\n- **AWAI Network, L.L.C.** — Delaware LLC、設立 2026-07-20、Delaware file number\n  **10704996**、EIN は pending(未公開)。登録代理人は Legalinc Corporate Services\n  Inc.(131 Continental Dr, Suite 305, Newark, DE 19713、2027-07-20 まで有効)。\n  正本は `orgs/network-awai/cloud-murakumo/public/legal/company.md` と\n  `orgs/network-awai/cloud-itonami/legal/company.md`。\n- **Stripe Atlas 経由の設立**であることは ADR-2607231835 が既に記録している\n  (Stripe Atlas 契約の所有 repo は `kotoba-lang/com-stripe`、会社設立ワークフローは\n  `cloud-itonami/cloud-itonami-isic-6910`)。オーナーの今回の発言はこれと整合する。\n- **app-aozora が Awai network 法人で動くことは ADR-2607289700 が既に宣言済み**\n  (D2: aozora.app を含む 7 ドメインの repo を network-awai org へ)。実際 repo は\n  既に `network-awai/app-aozora` に移送済み。\n\nつまり **org 移送は済んでいたが、legal 文書が追随していなかった** — これが実際の gap\nだった。`legal/terms.md` / `legal/privacy.md` / `legal/yoro/terms.md` /\n`legal/yoro/privacy.md` の 4 文書が Gftd Japan 株式会社 を Service operator・\ndata controller として名指ししたままだった(実測 2026-07-28)。\n\n## Decision\n\n### 1. operator identity の更新(子リポ commit `3d0b40b6`)\n\n4 つの legal 文書の operator/controller 行と contact 節を AWAI Network, L.L.C.\n(Delaware file number 10704996)に差し替え、Gftd Japan 株式会社 を\n「インフラ・ソフトウェア供給元であって operator ではない」と明示した。\n`README.md` / `RESPONSIBILITY.md` の org path も `gftdcojp/app-aozora` →\n`network-awai/app-aozora` に修正した(ADR-2607289700 の移送に追随)。\n\n### 2. `legal/company.md` の新設\n\ncloud-murakumo / cloud-itonami と同じ構造(entity facts / Delaware registered\nagent / operating relationship / known gaps)で app-aozora 側の operator record を\n新設した。**superproject 側にはこの記録を置かない** — ADR-2607141600 が確立した\n「identity は対象リポに、superproject には決定だけ」を踏襲する。\n\n### 3. 準拠法は変更しない\n\n`legal/terms.md` §16 の日本法・東京地裁専属管轄は**そのまま残し**、`[CONFIRM]`\nマーカーだけを付けた。準拠法条項の変更は counsel の判断であって agent が実行して\nよい範囲ではない。同じ理由で全文書の DRAFT バナーも維持している。\n\n## app-aozora 固有の差分(先行 2 例との違い)\n\nこれは 3 件目の AWAI operator 変更だが、条件が両先例のどちらとも違う。\n\n| | cloud-murakumo | cloud-itonami | **app-aozora** |\n|---|---|---|---|\n| 変更時点の有償取引 | 無し | **有り**(Stripe Payment Links 稼働、外部テナント 4) | **無し**(Stripe 統合が存在しない、ToS に価格条項なし) |\n| 顧客 | — | B2B(ToS が consumer 向けでないと明記) | **consumer**(一般向け SNS) |\n| 日本語面 | 有り | 有り | 有り |\n\n帰結:\n\n- cloud-itonami の記録を支配していた **Stripe merchant-of-record / 消費税 /\n  収納代行の gap は app-aozora には現時点で当たらない**(有償面が無いため)。\n  課金を始めるときに再評価する。\n- 逆に **consumer 保護と会社法 818 条の外国会社登記が重く効く**。ToS が日本法・\n  東京地裁を選択した日本語 consumer サービスであるまま operator が Delaware LLC に\n  なったため、消費者契約法 / 法の適用に関する通則法 11 条との関係が未評価になった。\n  「**無償**の consumer サービスが会社法 818 条の『取引を継続してしようとする』に\n  当たるか」が cloud-itonami の有償 subscription 事例と分岐する論点で、これは\n  「当たらないと仮定してよい理由」ではなく**未解決の論点**として記録した。\n- **APPI は 171 条(域外適用)で AWAI Network に直接かかる** — cloud-itonami で\n  一度誤って 24 条(越境提供)を引いて訂正した経緯があるので、最初から 171 条で書いた。\n- **DMCA 指定代理人**の `[DECISION NEEDED]` は状態は変わらないが**答えが変わった**:\n  US 法人が operator になったことで 17 U.S.C. §512 の safe harbour が具体的に\n  効くようになり、§512(c)(2) の Copyright Office への代理人登録(有料の届出)が\n  「やれば得がある手続き」になった。単なる連絡先の問題ではなくなっている。\n- **GDPR Art. 27 代理人**は変更前後とも controller が EU/UK 域外なので**状態は\n  不変**。今回の変更で解決も悪化もしていない、と明記した(変更に見せかけない)。\n- **年齢確認**が account 作成のどこにも無いという既存の gap は不変だが、US 法人\n  operator になったことで COPPA の関連性が上がった。\n\n## Consequences\n\n- (+) `legal/company.md` が 3 サービスで同型になり、AWAI Network 配下の operator\n  record が横断で読める。\n- (+) org 移送(ADR-2607289700)と legal 文書の乖離が解消された。\n- (−) 外国会社登記・consumer 準拠法・DMCA 代理人・年齢確認はいずれも **counsel か\n  owner の実行**が必要で、agent 側でできることは無い。`legal/company.md` の\n  「Known gaps」がその一覧になっている。\n- (−) 連絡先が `hello@gftd.co.jp` のまま(AWAI 管理のアドレスが未取得)。3 サービス\n  共通の未解決事項として据え置き。\n\n## 実行しなかったこと(意図的)\n\n- 準拠法・管轄の変更(counsel 判断)\n- DRAFT バナーの削除(counsel review 未了)\n- 課金・Stripe 関連の記述追加(app-aozora に有償面が無いため書くことが無い)\n- コード・DID・federation・データ所在の変更(operator identity と無関係)\n"
+
+  :source/dataset "adr"}]
