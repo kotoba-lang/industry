@@ -162,7 +162,7 @@ bare name への rename は実運用 identity との一致でもある。
 | ai-gftd-misogi | `misogi` | reversible macOS hygiene console (deny-by-default) | B2B |
 | ai-gftd-smishing | `smishing` | smishing actor | B2B |
 
-`cloud-mamori` は `mamori` と同一ドメインなので統合可否を別途判断する (本 ADR では触らない)。
+`cloud-mamori` は同名だが**別プロダクト**である (実体確認 2026-07-28)。統合しない — 下記「mamori は統合しない」節を参照。
 
 ### D5. creative は既に cloud-itonami にある — prefix だけ外す
 
@@ -288,6 +288,54 @@ adult 消費者向け事業ではなく etzhayyim の研究アプリなので、
 分類していたら誤配置していた** — ADR-2607289600 D5-1「名前 glob で種別を決めない」の
 実例として記録する。
 
+### Phase 3a — 未決項目のオーナー裁定を反映 (2026-07-28)
+
+オーナー裁定: jk-corp はそのまま残す / ai-gftd-isekai は特別なものが無ければ prune し
+network-isekai に必要なものだけ移動 / deai・manimani は network-awai へ / mamori は統合。
+4 件のうち 3 件を実行し、1 件 (mamori) は前提が成り立たないため実行しなかった。
+
+| 対象 | 実行 |
+|---|---|
+| `jk-corp` | jk-luxury に残置 (裁定どおり)。jk-luxury org は解散せず jk-corp 1 件で存続 |
+| `ai-gftd-deai` | network-awai/`deai` へ transfer + rename |
+| `ai-gftd-manimani` | network-awai/`manimani` へ transfer + rename。**GitHub 側で archived だったため unarchive -> rename -> 再 archive** の順で状態を保存 |
+| `cloud-manimani` / `local-manimani` | network-awai へ transfer (名前は据え置き) |
+| `ai-gftd-isekai` | 著作物 2 点を network-isekai へ移送し、MOVED tombstone を置いて **GitHub archive**。west では `groups: [archived]` (group-filter の `-archived` で既定取得対象外)、pin は tombstone commit へ前進 |
+
+**`ai-gftd-isekai` を削除せず archive にした理由**: 34 file のうち著作物は
+`scenes/isekai-overworld.jsonld` (IslandScene 定義) と `world.cljc`
+(kami-clj survivors コアループ) の 2 点で、これは network-isekai の
+`resources/scenes/` へ移送した。残りは build 成果物 (wasm / svelte 静的 htm) と
+e2e スクリーンショットで再生成可能。ただし本 repo は
+`appview/ai-gftd-wasm-isekai-is3k41w0/wrangler.jsonc` の worker
+`magatama-is3k41w0` の deploy 元であり、**`isekai.gftd.ai` が live か
+この環境から判定できなかった** (DNS は Cloudflare に解決、HTTP は 301 を返すが HTTPS が
+無応答。ただし `mamori.gftd.ai` / `arms.gftd.ai` も同じ挙動だったので環境側の
+問題の可能性がある)。live な deploy 元を不可逆に消す危険があるため archive (可逆) に留めた。
+live でないと確認できた時点で削除してよい。
+
+なお `network-isekai` (1,639 file、physics/realtime backend) と
+`ai-gftd-isekai` (34 file、isekai.gftd.ai のデモ appview) は**重複ではなく別物**
+だった。前者に後者の資産 (`isekai-overworld.jsonld` / `contract.clj` /
+`world.cljc`) は 1 件も存在しなかった。
+
+### `mamori` は統合しない — 同名だが別プロダクトだった
+
+オーナー裁定は「統合」だったが、実体確認の結果 **2 つは重複ではなく別の事業**である
+ことが判明したため実行しなかった。統合すると 2 プロダクトを混同して片方の設計意図を
+失う。
+
+| repo | 実体 | 規模 |
+|---|---|---|
+| `gftdcojp/ai-gftd-mamori` | **mamori.gftd.ai** — privacy data-sharing analyzer + ToS 不公正スコアラ。cookie-consent / iOS・macOS app-privacy の許可をインポートし「誰が自分のデータを受け取るか」を可視化 | `clj/src/mamori/{core,schema,score,taxonomy}.cljc` 計 813 行 + Cloudflare worker |
+| `gftdcojp/cloud-mamori` | **サイバー犯罪・暗号資産盗難の被害者インテークと referral 起草**。etzhayyim の actor クラスタ (助 tasuke / 辿 tadori / malak / crypto-asset-freeze) への照会ドラフトを作るだけで、凍結・送金・提出は一切行わない | `src/cloud_mamori/case.cljc` 91 行 + `docs/adr/0001-architecture.md` |
+
+守 (mamori) という語が両方に合うために同名になっただけで、扱うドメインも参照先も
+別である。**推奨**: `ai-gftd-mamori` を bare name `mamori` に rename し
+(mamori.gftd.ai を所有しているのはこちら、D4 の DNS 一致原則どおり)、
+`cloud-mamori` は被害者インテークであることが分かる名前へ改名する。
+どちらも security 面なので org は gftdcojp のまま。**この改名はオーナー裁定待ち。**
+
 ### Phase 3-4 — 未着手
 
 ## Consequences
@@ -307,13 +355,12 @@ adult 消費者向け事業ではなく etzhayyim の研究アプリなので、
 
 ## 未決 (本 ADR では決めない)
 
-1. `ai-gftd-isekai` (engine) と `network-isekai` (network-awai 行き) の責任分界
+1. ~~`ai-gftd-isekai` と `network-isekai` の責任分界~~ **決定 (2026-07-28): 別物と確認。著作物を network-isekai へ移送し ai-gftd-isekai は archive**
 2. `ai-gftd-ghosthacker-shiropico` と `ghosthacker-shiropico-assets` の統合
-3. `cloud-mamori` と `ai-gftd-mamori`(→`mamori`) の統合
-4. `jk-corp` の行き先
-4b. `ai-gftd-deai` (= `com-etzhayyim-app-deai`) の行き先 — etzhayyim 研究アプリなので Phase 4 の organism 再判定と併せて判断する
-5. `cloud-manimani` / `local-manimani` / `ai-gftd-manimani` — manimani は D2 の 7 ドメインに
-   含まれないため、gftdcojp 残留か network-awai 行きかをオーナーに確認する
+3. ~~`cloud-mamori` と `ai-gftd-mamori` の統合~~ **統合しない (2026-07-28、別プロダクトと判明)**。代わりに両者の改名がオーナー裁定待ち — 上記「mamori は統合しない」節を参照
+4. ~~`jk-corp` の行き先~~ **決定 (2026-07-28): jk-luxury に残置**
+4b. ~~`ai-gftd-deai` の行き先~~ **決定 (2026-07-28): network-awai/`deai`**
+5. ~~manimani 3 件の行き先~~ **決定 (2026-07-28): 3 件とも network-awai**
 6. cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断"
 
   :adr/decision-summary
