@@ -217,10 +217,43 @@ D4 と同じ理由で bare name にする (`ibuki` / `kyoninka` / `sng`)。
 各 phase は west.yml の **single-entry commit** で pin を進める
 (CLAUDE.md「wholesale 再生成は禁止」。rename は `gen-west-manifest.cljs --entry <name>`)。
 
-1. **Phase 1 — network-awai を埋める** (0 repo なので衝突リスクなし): D2 の 7 ドメイン + 随伴
+1. **Phase 1 — network-awai を埋める** (0 repo なので衝突リスクなし): D2 の 7 ドメイン + 随伴 — **実施済み (2026-07-28)。下記「実施状況」参照**
 2. **Phase 2 — adult 4 件**: D3。livecam の CHARTER-VIOLATION マーカー削除を含む
 3. **Phase 3 — ai-gftd- prefix 廃止**: D4 security 9 + D5 cloud-itonami 側 21
 4. **Phase 4 — etzhayyim**: D7 の organism 再判定が終わってから着手
+
+## 実施状況
+
+### Phase 1 — 完了 (2026-07-28、main commit `bbf80dfb389`)
+
+19 repo を network-awai へ transfer し、west 登録を追随させた。全件 private のまま
+(visibility 無変更)。org 側実測 `total_private_repos=19`、`public_repos=0`。
+
+| 内訳 | 件数 | repo |
+|---|---:|---|
+| 7 ドメイン | 7 | cloud-itonami / cloud-murakumo / network-isekai / net-kotobase / app-aozora / net-babiniku / club-shinshi |
+| aozora サテライト | 5 | aozora-appview / aozora-design-system / aozora-engine / aozora-yoro-ui / app-aozora-svelte |
+| murakumo サテライト | 3 | local-murakumo / cloud-murakumo-market-analyst / cloud-murakumo-market-intel |
+| その他 | 4 | net-kotobase-ipfs / net-isekai-gen / club-shinshi-app / nexus-x402 |
+
+**west.yml は生成器を通していない。** 対象 19 repo のローカル checkout は
+agent/* や codex/* の WIP ブランチ上にあり、`gen-west-manifest.cljs` は
+`working-head` (= ローカル HEAD) で pin するため、再生成すると pin を静かに書き換える。
+**実測: 抜き取った 9 件中 8 件で local HEAD != 既存 pin。** CLAUDE.md が記録する
+「pin 退行の罠」そのものなので、正経路である「当該 entry の行だけ編集」に従い
+path / remote / groups のみを書き換え、revision は一切触っていない。
+
+検証 (すべて実測):
+- **name -> revision の対応が origin/main と完全一致** = pin 変更 0 件
+- project 数 3830 で不変、旧 path 残存 0、remote 定義 6 -> 7
+- `west list` が 19 件すべて orgs/network-awai/* として解決
+- 移送後の remote で実 `git fetch` が成功 (exit 0、`ls-remote` が HEAD を解決)
+
+ローカル checkout は `mv` で移動済み (ワーキングツリーごと保持したので未コミット
+WIP は無傷 — net-kotobase 74 件 / club-shinshi 58 件 / nexus-x402 13 件 /
+app-aozora 12 件 / cloud-murakumo 7 件 / net-babiniku 2 件)。remote URL も張り替え済み。
+
+### Phase 2-4 — 未着手
 
 ## Consequences
 
