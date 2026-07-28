@@ -340,7 +340,23 @@
               (binding [*out* *err*] (println "WARN: pin 検証を実行できず fail-open で続行"))))
           (finally (.rmSync node-fs tmp-dir #js {:recursive true :force true})))))))
 
-(let [args     *command-line-args*
+(defn script-args []
+  ;; nbb 1.4.210 no longer populates *command-line-args* for script files.
+  ;; Recover only the argv suffix after this script, while retaining the
+  ;; standard binding for older nbb releases.
+  (if (seq *command-line-args*)
+    *command-line-args*
+    (let [argv (vec (js->clj (.-argv js/process)))
+          index (first
+                 (keep-indexed
+                  (fn [i value]
+                    (when (str/ends-with? value
+                                          "scripts/gen-west-manifest.cljs")
+                      i))
+                  argv))]
+      (if (some? index) (subvec argv (inc index)) []))))
+
+(let [args     (script-args)
       check?   (some #{"--check"} args)
       dedupe?  (some #{"--dedupe"} args)
       verify?  (not (some #{"--no-verify-remote"} args))
