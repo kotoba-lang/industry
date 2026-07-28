@@ -127,6 +127,8 @@ p2p / crypto / adult なら network-awai**。
 `:axis-b-charter-rider-v2` の worked example として livecam を挙げていた記述も、
 本 ADR による supersede に伴い根拠を失う。
 
+**補足 (2026-07-28 実測)**: `pornhub` / `exoclick` のマーカーは当初から 「**NOT a Charter Rider §2 violation**、仏教的観点から adult は中立、規制対応 (年齢確認義務・プロバイダ責任制限法) のため vendor 残置」と書かれており、オーナー判断と既に一致していた。charter 違反を主張していたのは `livecam` の マーカーだけで、しかも 8 条項を列挙するのみで該当条項を特定していなかった。したがって撤去対象は livecam の 1 件、pornhub / exoclick は規制根拠を保持したまま operator 行のみ訂正する。
+
 adult repo は consumer network 事業として network-awai に置き、bare name に rename する:
 
 | 現 repo | 移送先 | rename |
@@ -134,7 +136,7 @@ adult repo は consumer network 事業として network-awai に置き、bare na
 | `gftdcojp/ai-gftd-livecam` | network-awai | `livecam` |
 | `gftdcojp/ai-gftd-pornhub` | network-awai | `pornhub` |
 | `gftdcojp/ai-gftd-exoclick` | network-awai | `exoclick` |
-| `gftdcojp/ai-gftd-deai` | network-awai | `deai` (ローカル 0 file、移送前に実体確認) |
+| ~~`gftdcojp/ai-gftd-deai`~~ | **移送しない** | 実体確認の結果 adult 事業ではなかった — 下記「実施状況」参照 |
 
 ### D4. `ai-gftd-` prefix を廃止し bare name にする
 
@@ -253,7 +255,40 @@ path / remote / groups のみを書き換え、revision は一切触っていな
 WIP は無傷 — net-kotobase 74 件 / club-shinshi 58 件 / nexus-x402 13 件 /
 app-aozora 12 件 / cloud-murakumo 7 件 / net-babiniku 2 件)。remote URL も張り替え済み。
 
-### Phase 2-4 — 未着手
+### Phase 2 — 完了 (2026-07-28、main commit は下記)
+
+adult 3 件を network-awai へ transfer し bare name へ rename、marker を処理した。
+全件 private のまま。
+
+| 旧 | 新 | pin | marker 処理 |
+|---|---|---|---|
+| gftdcojp/ai-gftd-livecam | network-awai/livecam | 0f9ecd9a25 -> d97e20f9df | CHARTER-VIOLATION を**削除** |
+| gftdcojp/ai-gftd-pornhub | network-awai/pornhub | ad1b0d46f6 -> 524d13dc47 | VENDOR-REGULATORY の operator 行のみ訂正 |
+| gftdcojp/ai-gftd-exoclick | network-awai/exoclick | 1e52aa6db4 -> d95aa8f6ed | VENDOR-REGULATORY の operator 行のみ訂正 |
+
+pin は marker commit の分だけ前進させた。**3 件とも `status=ahead / ahead_by=1 /
+behind_by=0` かつ default branch (main) の tip** であることを GitHub API で確認済み
+(存在・default branch 到達性・前進の 3 条件を満たす)。他 entry の path -> revision は
+完全一致、project 数 3831 で不変。
+
+### `ai-gftd-deai` は移送しない — 実体が adult 事業ではなかった
+
+D3 の当初リストに入れていたが、移送前の実体確認 (ローカル checkout が 0 file だったため
+GitHub 側を直接確認) で **`com-etzhayyim-app-deai` である**ことが判明した:
+
+- `README.edn`: `:name "com-etzhayyim-app-deai"` /
+  `:source "etzhayyim/root/60-apps/etzhayyim-project-deai"`
+- `CLAUDE.md`: `decom.etzhayyim.ai` — Spirit-in-Physics 研究データ収集フロントエンド。
+  **主目的は研究データ収集**で、出会い・マッチング機能は参加インセンティブ。
+  全データは spirit-in-physics.com (研究 SSoT) に送信される
+
+adult 消費者向け事業ではなく etzhayyim の研究アプリなので、network-awai の
+受け入れ境界 (consumer network + adult) に当たらない。D7 の etzhayyim 再判定
+(Phase 4) と併せて扱うべき対象として未決に送る。**名前 (`deai` = 出会い) だけで
+分類していたら誤配置していた** — ADR-2607289600 D5-1「名前 glob で種別を決めない」の
+実例として記録する。
+
+### Phase 3-4 — 未着手
 
 ## Consequences
 
@@ -276,6 +311,7 @@ app-aozora 12 件 / cloud-murakumo 7 件 / net-babiniku 2 件)。remote URL も�
 2. `ai-gftd-ghosthacker-shiropico` と `ghosthacker-shiropico-assets` の統合
 3. `cloud-mamori` と `ai-gftd-mamori`(→`mamori`) の統合
 4. `jk-corp` の行き先
+4b. `ai-gftd-deai` (= `com-etzhayyim-app-deai`) の行き先 — etzhayyim 研究アプリなので Phase 4 の organism 再判定と併せて判断する
 5. `cloud-manimani` / `local-manimani` / `ai-gftd-manimani` — manimani は D2 の 7 ドメインに
    含まれないため、gftdcojp 残留か network-awai 行きかをオーナーに確認する
 6. cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断"
