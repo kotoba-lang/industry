@@ -1,0 +1,206 @@
+[{:db/id -1,
+  :adr/id "adr-2607284000-corporate-vishing-fraud-system-dynamics-and-interventions",
+  :adr/title "ADR-2607284000: 法人向けニセ警察詐欺を case として登録し、3 org に介入を実装した — 敗因は検知の遅さではなく作動権限の所在",
+  :adr/status "accepted, implemented",
+  :adr/doc_type "adr",
+  :adr/date "2026-07-28",
+  :adr/deciders ["Jun Kawasaki (+ Claude)"],
+  :adr/topic "corporate-vishing-fraud-system-dynamics",
+  :adr/related ["adr-2607203000-system-dynamics-no-entity-out-of-scope"
+                "adr-2607062200-meibo-verified-legal-institution-directory"
+                "adr-0003-phish-infra-brand-impersonation-scorer"
+                "adr-2607283000-yabai-phish-infra-cljc-port"
+                "adr-2607141700-cloud-itonami-compliance-fact-federation"],
+  :adr/supersedes [],
+  :adr/superseded_by [],
+  :adr/repos ["com-junkawasaki/root"
+              "kotoba-lang/loop-system-dynamics"
+              "cloud-itonami/meibo"
+              "etzhayyim/com-etzhayyim-yabai"
+              "gftdcojp/ai-gftd-kabuto"],
+  :adr/authoritative true,
+  :adr/authoritative_for ["法人向けニセ警察詐欺の system-dynamics モデルと、その計算結果の正本"
+                          "この case に対して 3 org のどこに何を実装したか（実装先 repo と merge commit）の正本"
+                          "『検知を速くする』では解けない、という判定の根拠"],
+  :adr/body
+  "# 文脈
+
+2026-04-20、上場企業の経理部長が千葉県警を騙る詐欺グループに操作され、約27時間で
+**11億7,981万円**が社外へ流出した。2026-07-24 に特別調査委員会報告書が公表され、
+2026-07-25 の報道でオーナーから『こういった事案を防ぎ、詐欺グループを特定するために
+etzhayyim / cloud-itonami / gftdcojp でそれぞれ何ができるか、なぜ対策できないかを
+system dynamics でモデル化して計算せよ』という問いが出た。本 ADR はその計算結果と、
+続く『case として登録して、設計実装して、この dynamics に介入』の実行記録である。
+
+全国統計（警察庁 令和7年）: 特殊詐欺 認知 27,832件 / 被害額 1,423.1億円（前年比+98.0%）。
+うち **ニセ警察詐欺 11,014件 / 1,005億円**。初期接触が電話 99.0%。犯行利用国際電話番号
+86,180件（1-11月）。検挙件数 6,575件・検挙人員 2,338人（受け子 1,379人 / **主犯 69人**）。
+
+# 決定
+
+## 1. case として `kotoba-lang/loop-system-dynamics` に登録した
+
+このリポジトリで初めて、*組織* ではなく *事案クラス* をモデル化したサイクル
+`corporate-vishing-fraud`。採点は従来どおり `kotoba-lang/dynamics` に委譲し
+（ADR-2607203000、repository-rules.edn :must-not :own-domain-scoring-truth）、
+本サイクルが持つのは case の事実と、dynamics.core の出力の上に載る3つの合成だけ。
+
+| loop | cycle | cycles/yr | 構造強度 | 実効強度 |
+|---|---|---|---|---|
+| R1 詐欺再投資（強化） | 1.12日 | 325 | 341.09 | 341.09 |
+| B1 銀行スクリーニング（均衡） | 0.18日 | 2,029 | 219.12 | **0** |
+| B2 社内統制（均衡） | 0.04日 | 8,753 | 183.81 | **0** |
+| B3 制度学習（均衡） | 95日 | 3.8 | 0.03 | 0.03 |
+| B4 捜査・特定（均衡） | 365日※ | 1 | 0.03 | 0.03 |
+
+※B4 の cycle-time 365日は年次統計の観測周期を置いた代理値（個別事件の検挙ラグは非公表）。
+倍率ではなく桁として読むこと。
+
+## 2. 主要な計算結果
+
+**(a) 敗因は検知の遅さではない。** B1（銀行スクリーニング）は攻撃ループの **6.25倍速く**
+回り、初回送金 11:41 の **4.317時間後 = 送金ウィンドウの 18.5% 時点**で
+「9999万円の移動は詐欺の際によくある金額」と取締役に届いていた。それでも実効強度は 0。
+出力の終端先が *いま攻撃を受けている本人* で、本人が制限を解除できたから。
+本 ADR はこれを `effective-strength = loop-structural-strength × (1 - override-authority)`
+として定式化した。override = 1.00 なら、名目ゲインをいくら上げても積は 0 になる。
+**検知製品を足しても、規程を厚くしても、この積は動かない。**
+
+**(b) 攻撃ループは制度学習ループの 11,837倍の強度で回る。** 攻撃は27時間で完結し、
+被害金がそのまま次サイクルの調達原資になる（自己資金化 0.90）。対して事故→報告書だけで
+95日、業界普及はさらに長く、統制投資は収益を生まない（0.05）。
+
+**(c) 単発上限を下げても止まらない。** 送金は 9,999万/1億/8,000万 に分割済みで、
+銀行自身が 9,999万円を『詐欺の際によくある金額』と名指ししていた＝閾値直下への
+structuring が既に成立していた。効くのは **日次累積上限** のみ:
+総資産の20%/日 → 回避額 0円（binding しない）/ 10% → 4.72億円(40%) /
+5% → 8.26億円(70%) / 2% → 10.38億円(88%)。
+なお実際の上限は初期設定のままで、推定保有資産の **282倍**（9,999億9,999万9,999円）。
+
+**(d) 個社は自社のリスクを構造的に測定できない。** 報告書の『過去に大きな事故が
+なかったことによりリスク認識が弱かった』は、0件を発生率0と読む誤り。
+dynamics.core/upper-bound-rate-from-zero-events で正しく読むと、25社年で0件は年率
+**11.29%** と両立する（期待年間損失 ≤ 1.33億円）。逆問題として、年率≤1%を95%信頼で
+主張するには **299社年** の無事故が要る。**1社では絶対に貯まらない。**
+→ 測定はプール層（業界団体）にしか存在しえない。これが cloud-itonami の
+assoc-* コンプライアンス事実連合が構造上の解になる理由である。
+
+**(e) 詐欺グループが特定されない理由は検挙率ではなく到達深度。** 件ベース検挙率は
+23.62%あるが、検挙人員 2,338人の内訳は受け子 58.98% / **主犯 2.95%**。
+**主犯検挙人員 ÷ 認知件数 = 0.25%**（認知403件につき主犯1人）。突合が制度的に
+別々の保有者へ分割されていること（番号=通信事業者 / 口座=銀行 / 端末=企業 /
+資金=取引所）そのものが詐欺グループの防御になっている。
+加えて供給側: 国際電話番号は **258件/日** で使い捨てられ、週次更新のブロックリストは
+常時 **1,806件** 遅れる。列挙型の対策は原理的に閉じない。
+
+## 3. 3 org に実装した介入（すべて merge 済み）
+
+| org | 実装 | repo / merge |
+|---|---|---|
+| cloud-itonami | verification-window レジストリ（名乗り→機関自身の公表窓口） | `cloud-itonami/meibo` 160edec |
+| etzhayyim | line_infra（電話/回線インフラのなりすましスコアラ） | `etzhayyim/com-etzhayyim-yabai` 3507b72 |
+| gftdcojp | scn/vishing-transfer（攻撃経路の対策カバレッジ空白） | `gftdcojp/ai-gftd-kabuto` 17c6eff |
+| — | case 登録＋モデル | `kotoba-lang/loop-system-dynamics` eaa3364 |
+
+### meibo — 判定器ではなく引き当て表（新 gate G11）
+
+『Xを名乗る連絡があった』ときに、名乗りを一切評価せず **X自身が公表している窓口** を
+引き当てる第2レジストリ（日本8件、全URLライブ検証済み）。既存の legal-directory と
+同じ G1/G2/G10 に加え、**G11 no-inbound-attestation** を新設した:
+着信番号・発信者番号・相手が伝えた折り返し先を入力に取る API を一切持たない。
+発信者番号は偽装できるので『この着信は本物か』に答える endpoint は双方向に壊れる
+（一致すれば偽装番号を肯定し、不一致は詐欺の証拠と読まれる）。`lookup` は
+covered/uncovered/nonsense のいずれの入力でも定数 `:call-the-published-window` だけを
+返し、未収載であることが相手の正当性の根拠にならないと guidance に明記する。
+テストが不在を強制する。**(a) の帰結**: 判断そのものが攻撃対象である以上、判断の質を
+上げる対策は効かない。効くのは判断を引き当てに置き換えることであり、attestation
+endpoint を足すことはそこに判断を戻すことになる。
+
+副産物として実テストが本物のギャップを露見させた: meibo は9法域に court-locator を
+持ちながら日本だけ持っていなかった。テストを緩めず courts.go.jp をライブ検証して追加
+（22→23件）。
+
+### yabai — phish_infra の規律を電話面へ
+
+phish_infra はドメイン＋ホスティングを採点する。line_infra は提示された発信番号＋
+**調達ルート**を採点する。2独立シグナルと3つの hard rule（ルート集中だけでは決して
+`:confirmed` にしない / 弱い単独シグナルは `:indicator/*` を一切出さない / 機関の
+outbound 可能番号は採点しない）を ADR-0003 からそのまま継承。24番号 benign /
+6形状 impersonation の回帰セットで較正。
+
+意図的にできないことが2つあり、どちらも要点である。(1) 公表済み非短縮番号への
+完全一致は **nil** を返す — それはその番号からの正規の着信とまったく同じ見え方であり、
+区別できるふりは捏造になる。だからこそ折り返し検証（meibo）が実際に効く制御であって、
+このスコアラではない。(2) **いかなる入力でも genuineness verdict を出さない** —
+`nil` は『主張なし』であって『安全』ではない。
+
+### kabuto — 空白を出すためのシナリオ
+
+3本目の攻撃経路を、網羅を増やすためではなく **空白を出すために** 載せた。
+ATT&CK 6技法（T1598/T1656/T1204/T1219/T1621/T1657）+ ノード4 + エッジ6。
+`clojure -M:run` の結果、69カテゴリ・442製品のうち **後半3ステップを切れるものは
+1つも無い**。しかも空白は **連続していて末尾にある** ので、クラウンジュエル（法人資金）
+には空白の中だけを通って到達する。
+
+空白はデータを入れなかったから出たのではない。置けるものは正直に置いた（前半3ステップは
+実際にカバーされ EDR は2ステップに効くチョークポイントとして出る）。置かなかったものにも
+理由がある: **MFA/SSO を『本人が承認』エッジに置かない**（承認は正規利用者が正規端末から
+正規オリジンに対して行うので、フィッシング耐性 MFA でも構造的に破れない。置けば
+カバレッジ表が嘘になる）。**Email Sec/RBI/SWG/DNS Sec を音声エッジに置かない**
+（電話を観測できない）。**申請=承認 / ホールド解除 / 他行補充に置ける製品カテゴリは
+存在しない**（職務分離は銀行側アプリの認可モデルの性質、解除権限は銀行の運用の性質で
+あって、顧客側に置く製品の性質ではない）。
+
+## 4. 介入後シナリオ — 計算できるものだけ計算する
+
+`scenario` が適用するのは **効果が定義上の量である介入だけ**。
+`override-authority → 0`（統制の解除権限を統制対象の本人から外す）は本モデル自身の
+定義に対する算術なので計算してよい: B1 +219.12 / B2 +183.81（実効 0 → 構造強度そのもの）。
+
+一方、コールバックレジストリが実際に攻撃側 friction をどれだけ上げるか、電話面スコアラが
+突合 friction をどれだけ下げるかは **経験的な問い**であり、`:uncomputable-until-measured`
+として対象ループと方向だけを返す。パラメータを推測して埋めていない。
+テストが `R1` の強度が介入前後で同一であることを固定しており、**モデルが介入を
+『攻撃を遅くした』と黙って credit することを禁じている。**
+
+# 結果
+
+- 介入ランキング上位が band/B（ルール・情報流構造）に集中した。band/E（パラメータ）と
+  band/D（構造）は既に飽和していて、詰まっているのは情報の流れ方だからである
+  — 検知は届いていた、統計は存在する、突合できるデータもある。届く先と、届いた後に
+  誰が動けるかが間違っている。
+- 未実装のまま残る上位介入: 全銀協カタログへの『振込承認上限 既定値』ルール事実収載
+  （band/B、既定値は1社では band/E だが協会が決めれば全加盟行の全法人顧客に一度に効く）、
+  協会層の遭遇率レジストリ（(d) の直接の帰結）、cyber-drill の計測付き vishing ドリル
+  （B3 の instrumentation 0.00 を埋める唯一の介入）、regulatory-tracker の凍結パイプライン。
+- 本 ADR は『検知を速くする』提案を却下する根拠として引用してよい。B1 は既に攻撃ループの
+  6.25倍速く、送金ウィンドウの18.5%時点で発火していた。
+
+# 正直な限界
+
+- `self-funding` / `instrumentation` / `friction` は推定値（seed に `:estimate? true` と
+  `:evidence` を明記）。cycle-time はすべて実測・出典付き。
+- B4 の cycle-time は代理値。強度比 12,994倍は桁の主張であって精度の主張ではない。
+- 推定保有資産 35.4億円は『流出額が約1/3』からの逆算。送金内訳は二次報道による部分列挙。
+- pool-tap 型介入（番号レジストリ / ドリル / 法人実体照会）の期待収量は転換率が未計測の
+  ため `:uncomputable-until-measured` のまま。大きな pool に未計測の変換率を掛けた
+  期待値は作っていない。
+- yabai line_infra は **offline-default で live な電話フィードは無い**。回帰セットが
+  成果物であり、carrier/CDR フィードの配線は別の operator-gated wave。
+- 介入スコアは band × tractability の監査可能なヒューリスティックであって物理量ではない。
+
+# 検証
+
+- `kotoba-lang/loop-system-dynamics`: 116 tests / 369 assertions, 0 failures（CI 等価 classpath）
+- `cloud-itonami/meibo`: 26 tests / 428 assertions, 0 failures
+- `etzhayyim/com-etzhayyim-yabai`: 56 tests / 9,287 assertions, 0 failures（全 method suite）
+- `gftdcojp/ai-gftd-kabuto`: 7 tests / 32 assertions, 0 failures
+- west pin 4件を `--entry` 最小 diff + サーバ側 pin 検証で前進。
+
+# 出典
+
+- 株式会社はてな 特別調査委員会報告書（2026-07-24公表）の報道:
+  coki.jp/article/news/89967 / news.yahoo.co.jp/expert/articles/88b665c4276a6dc50af7306101a442fda6caa5a8（山口健太, 2026-07-25）
+- 警察庁 令和7年 特殊詐欺及びSNS型投資・ロマンス詐欺の認知・検挙状況（nippon.com/ja/japan-data/h02795 が引用）
+- 警察庁 SOS47 令和7年11月末 暫定値（npa.go.jp/bureau/safetylife/sos47/new-topics/251225/01.html）
+- 各機関の公表窓口（meibo `data/verification-window.edn` に URL と検証日を記録）"}]
