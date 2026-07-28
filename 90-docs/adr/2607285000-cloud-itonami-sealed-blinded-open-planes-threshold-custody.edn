@@ -174,11 +174,27 @@ Phase 5  exit の自由      storage provider 選択を tenant へ開放
   - `one-share-short-of-the-threshold-determines-nothing` は情報理論的安全性を主張ではなく**全単射の提示**で証明している（share を1つ固定し、もう1つを全 256 値動かすと秘密が 256 通りすべてを1回ずつ取る = 1 share は何も絞り込まない）。
   - 隠さないものを docstring と test で明示: **秘密の長さは漏れる**（share は秘密と同じ長さ）、**Shamir 単体は誤りを検知しない**。
 
+- **`kotoba-lang/envelope` に `wrap-bytes`/`unwrap-bytes` を追加**（`ccb3d16`）。`wrap-for` が envelope 自身の AAD を焼き込んでいたため custody が同じ ECIES を再利用できず、workspace に2本目の X25519 が生まれるところだった。AAD を引数にし、`wrap-for`/`unwrap-with` はそれを呼ぶだけにした。envelope の既存 20 tests は無改変で green（22 tests / 67 assertions）。
+
+- **`custody.seal`（`ee234a9`）— threshold を実行可能にした。** `split-and-wrap!` / `release!` / `open!`。pure 半分が意図的に選ばない CSPRNG と SHA-256 をここで1回だけ供給し、wrap は `envelope.seal/wrap-bytes` に委譲する。**`split-and-wrap!` は既定で `independence/sound?` を gate する** — 3 share が1つの operator に集まった 3-of-5 を返さず拒否する（`:require-sound? false` で強行可能だが、それは記録に残る）。実 Web Crypto / @noble/curves によるネガティブテストが本体: operator 単独は `:below-threshold`、自分の鍵で他人の wrap・自分の wrap を別座標に貼り替えたもの・別 epoch を主張する deal は**どれも復号しない**（`share-aad` が束縛しているので AES-GCM が拒否し、custody 側のコードには検査が1行も無い）。JVM 22/83、nbb 28/103。
+
+- **Phase 1 着地（`584cf40`、cloud-itonami）— Drive の sealed upload。** `upload-sealed-version` は ciphertext chunk と envelope descriptor（wrap のみ、content key 無し）を不透明に保存する。**Worker はこの経路で暗号処理を一切行わない**（`envelope.model` のみ require し `envelope.seal` は require しない）——これが「Worker は中身を読めない」と言える唯一の構造的根拠。全 version が `:drive.version/custody`（`:self` / `:server`）を1行ごとに記録し、`download!` / `resolve-share!` が応答で明示する。`:drive.policy/sealed-required?` を立てた tenant は平文経路を 409 で拒否される（黙って downgrade しない）。`sealed-upload-error` は鍵素材を載せた envelope を fail-closed で拒否する（content key を ciphertext と一緒に post する client バグは、そうしないと「サービスが開ける形で保存されたのに誰も気付かない」になる）。テストは実 Web Crypto + X25519 で封入してから**実際に書かれたものを読んで canary 文字列を探す** — R2 object にも KV workspace にも現れず、かつ holder は開ける。edge suite 368 tests / 993 assertions。
+
 **未着手:**
 
 - Phase 0（鍵分離）。本番 `KOTOBA_SEED` に触るため、epoch 方式の移行として設計してから実行する。盲目的な rotate は全 graph の再暗号化と operator identity 変更を同時に起こす。
 - Phase 1–3、Phase 5。
-- custody を envelope の wrap 経路に配線すること（`share-aad` は定義済みだが、実際に share を wrap する `.cljs` 側はまだ無い）。
+- Phase 1 の残り: Drive の client 側（分割・並列 upload・range GET・再開）と、mail / CRM / HR など sealed 面の他の store。既存の `:server` version は移行していない（サービスが読める状態のまま。移行は別作業）。
+- **sealed 面が隠さないもの**: item title・フォルダ構造・サイズ・timestamp は workspace map に平文で入る。封入されるのは version の content だけで、metadata 封入は ADR-2607263000 自身の open question のまま。
+
+## 作業中に判明した manifest の不整合（未修正、要判断）
+
+`cloud-itonami` は **`gftdcojp` から `network-awai` org へ移動済み**で（両 URL が同じ HEAD を返す = GitHub redirect）、west の登録も `orgs/network-awai/cloud-itonami` になっている。superproject の checkout に `orgs/gftdcojp/cloud-itonami` が存在しないのはこのためで、消えたわけではない。
+
+そのうえで2点:
+
+1. **west の pin が古い** — `6d6290d6`（本作業の merge `584cf40` を含まない）。
+2. **`gen-west-manifest.cljs --entry cloud-itonami` は既存 entry を更新せず、2つ目の `- name: cloud-itonami` を追加してしまう**（実測。project 数が 3831→3832 になる）。west.yml に同名 project が2つできるのは壊れた状態なので、**本作業では cloud-itonami の pin 前進を意図的に見送った**（envelope と custody のみ前進）。生成器側の同定ロジック（remote が異なる同名 project の扱い）を直してから pin を進める必要がある。
 
 ## Consequences
 
