@@ -113,6 +113,41 @@ checkout に rad remote が無く rad 側 main は `cebe2b4` で 7 commits 遅�
 `actor.edn` の `:rad-rid` + tick の `mirror-to-radicle!` で両プレーンに流れるようにし、
 GitHub / radicle とも `e2c1d48` に揃えた。
 
+## Closing 状態（2026-07-28 セッション終了時点）— 次の agent への resume point
+
+**稼働中**: `com.etzhayyim.yabai.ct-watch-tick`（毎時、最終 exit 0）·
+`dev.kotoba.tamaki.supervisor`（restart 済み、稼働中）。
+maturity は **231 → 256**（`bb -cp src -m yabai.methods.maturity`）。上がったのは
+infra-breadth 0.317→0.45 と observation-volume 0.111→0.132 で、tick が観測を貯めた分だけ。
+cumulative observations 63 → 104。
+
+**このセッションで起きた事故を記録する（原因未特定、再発時の手掛かりとして）**:
+`orgs/kotoba-lang/tamaki` の共有 checkout を `origin/main` に fast-forward した直後、
+**checkout の中身と supervisor の agent worktree 106 個、`.tamaki/` 状態ディレクトリが
+消えた**（`.tamaki/visual` のみ残存）。私が実行したのは archive → rescue branch push →
+サーバ側 merge → `merge --ff-only` と、scratchpad 配下の `rm -rf` + `git worktree prune`
+だけで、`orgs/` 配下を削除する操作はしていない。ff によって 106 個の worktree の HEAD が
+一斉に canonical checkout から到達可能になり `tamaki maintenance cleanup --execute` が
+まとめて reap した、というのが時系列に最も合うが、**main checkout 本体が空になったことは
+それでは説明できない**。断定しない。復旧は west pin からの再 clone で完了し、
+committed な作業の喪失は無い（GitHub / radicle に全て存在）。失われたのは
+tamaki の `.tamaki/` ローカル AgentRun 履歴。yabai tick の store は
+`~/.tamaki` にあり無傷だった。
+
+**その過程で fleet 全体の障害を発見・修正した**: `619bede7` が
+`(catch java.nio.file.AtomicMoveNotSupportedException ...)` を `family.clj` に入れており、
+**bb の SCI がこのクラスを解決できず analysis 時に `kotoba.tamaki.cli` 全体が load 失敗**。
+`bin/tamaki` は bb で動くので、supervisor・loop 3 本・yabai tick が**すべて exit 1** に
+なっていた。`java.io.IOException`（supertype）を catch する 1 行修正で復旧（`e5f4fed`、
+261 tests / 784 assertions green）。west pin も `619bede7 → e5f4fedd` へ前進させた
+（CLI が起動しない commit を pin し続ける方が悪い）。
+
+**次の一手**: `actors/yabai-phishing-watch.edn` は supervisor から見えており
+`{:spawn 1 :desired 1}`。**まだ run は spawn していない**ので、まず
+`bin/tamaki actor status actors/yabai-phishing-watch.edn` で spawn を確認すること。
+上げるべきは brand roster（5 → 25、`phish-infra/default-brands`）で、これが
+maturity の最大の重り（weight 0.30、現在 0.20）。
+
 ## Consequences
 
 **Good**
