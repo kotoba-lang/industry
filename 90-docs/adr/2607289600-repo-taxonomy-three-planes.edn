@@ -243,14 +243,39 @@ identity 面 `:entity/kind`: organisation 185 (LEI) / organism 9 / agent 4
    organism と名乗っていない repo は取りこぼす。organism の正本は
    `artificial-organism-actors.json` (9 identity) 側
 
+### D9. 層単位の操作は west groups への投影ではなく selector で行う
+
+**`groups: [cloud-itonami kind-actor]` への投影は採らない。** 代わりに
+`scripts/repo-taxonomy-select.cljs` が `manifest/repo-taxonomy.edn` を引いて
+west project 名のプレーンなリストを stdout に出し、`west update <names>` /
+`fleet sync --names` にパイプする。**west.yml を 1 バイトも変えない。**
+
+投影を捨てた根拠は 3 つとも実測 (2026-07-28):
+
+1. **`nbb scripts/gen-west-manifest.cljs --check` は main 上で既に STALE。**
+   groups を足すために全体再生成すると pin が **ローカル working HEAD** から
+   書き直される — CLAUDE.md が記録する『1 件の登録のつもりが壊れた pin を 44 件
+   main に流した』事故 (`90852b86`) と同じ経路になる。
+2. **`west list` に `--group-filter` が無い** (west v1.5.0: `unexpected arguments`)。
+   group による絞り込みは `west config manifest.group-filter` の**永続的な書き換え**を
+   要求し、『今この slice だけ触る』用途に使えない。
+3. **west の group 意味論は「どれか 1 つでも有効なら active」。** org group が既定で
+   有効なので、`kind-actor` を足しても org group を全部無効にしない限り絞れない。
+
+selector の契約は実測で確認済み: `--kind actor --present` の 1,107 名すべてが
+west 既知の project 名 (未知 0 件)。使用時の罠も 2 つ実測して usage に記載した —
+**zsh は変数を単語分割しない**ので `west update $NAMES` は 1 引数になって落ちる
+(必ず `xargs`)、**xargs の既定バッチは大きすぎて** 1,107 名一括で west が落ちる
+(`-n 400`〜`-n 1000` は通る)。
+
 ## 実施しないこと (次段、別 PR)
 
-- **west groups への投影** (`groups: [cloud-itonami layer-actor kind-actor]`) —
-  `gen-west-manifest.cljs` の変更を伴い、west.yml 全体の diff になる。
-  pin 検証・single-entry commit 規約と衝突しない形を別途設計する
 - **`repository-rules.edn` の workspace 規約への昇格** — 現在 kotoba-lang の 5 repo に
   コピーが散在。統合は別 ADR
-- **person entity の追加** — D6 のとおり穴として記録するに留める"
+- **person entity の追加** — D6 のとおり穴として記録するに留める
+- **`manifest/repo-maturity.edn` の再生成** — 実測: repo-taxonomy と path が重なるのは
+  1,617 件だが、person 役割 (ISCO) 340 件の maturity スコアは **0 件** (repo-maturity が
+  cloud-itonami の ISCO 系を未カバー)。3 面 join 自体は動くのでこの組み合わせだけが空になる"
 
   :adr/decision-summary
   ["D1: 7 語を identity 面 / runtime 面 / role リンク / scope に分解する。system は entity にしない"
@@ -260,9 +285,11 @@ identity 面 `:entity/kind`: organisation 185 (LEI) / organism 9 / agent 4
    "D5: scripts/repo-taxonomy.cljs が repo 内の証拠から manifest/repo-taxonomy.edn を生成する。名前 glob はフォールバックのみ・捏造ゼロ・握り潰さない"
    "D6: person 面のギャップは捏造して埋めず :taxonomy/gap entity として記録する"
    "D7: 責任連鎖の 4 境界 — agent は actor になれない / actor は organisation になれない / organism は person になれない / service は identity を持たない"
-   "D8: organism は layer ではないので manifest/layers.edn に :layer-organism を足さない"]
+   "D8: organism は layer ではないので manifest/layers.edn に :layer-organism を足さない"
+   "D9: 層単位の操作は west groups への kind-* 投影ではなく scripts/repo-taxonomy-select.cljs で行う。gen-west-manifest --check が既に STALE (全体再生成は pin をローカル HEAD から書き直す) / west list に --group-filter が無い / west の group は「どれか1つ有効なら active」— の 3 実測が根拠"]
 
   :adr/generator "scripts/repo-taxonomy.cljs"
+  :adr/selector "scripts/repo-taxonomy-select.cljs"
   :adr/artifact "manifest/repo-taxonomy.edn"
   :adr/verify "nbb --classpath \".:scripts/nbb_compat\" scripts/repo-taxonomy.cljs --check --workspace <root>"
   :source/dataset "adr"}]
