@@ -273,9 +273,36 @@ west 既知の project 名 (未知 0 件)。使用時の罠も 2 つ実測して
 - **`repository-rules.edn` の workspace 規約への昇格** — 現在 kotoba-lang の 5 repo に
   コピーが散在。統合は別 ADR
 - **person entity の追加** — D6 のとおり穴として記録するに留める
-- **`manifest/repo-maturity.edn` の再生成** — 実測: repo-taxonomy と path が重なるのは
-  1,617 件だが、person 役割 (ISCO) 340 件の maturity スコアは **0 件** (repo-maturity が
-  cloud-itonami の ISCO 系を未カバー)。3 面 join 自体は動くのでこの組み合わせだけが空になる"
+### D10. repo-maturity は incremental (west pin 不変なら API を叩かない) で回す
+
+`manifest/repo-maturity.edn` は 2026-07-12 時点で 1,642 repo (cloud-itonami **0 件**) しか
+カバーしておらず、person 役割 (ISCO) 340 件の maturity スコアが 0 件だった。2026-07-28 に
+全再生成し **3,809 repo / 3,505 スコア化・skip 0** に更新。3 面 join は
+ISCO(person) × actor × maturity = 340、taxonomy × maturity の path 重なり = 3,808 に回復した。
+
+再生成を現実的な時間に収めるため `scripts/repo-maturity.cljs` に 3 点を入れた:
+
+1. **incremental (既定)** — `:repo/pinned-revision` が west.yml の現在の pin と一致する
+   repo は **GraphQL を 1 回も叩かず**前回 entity を再利用する。pin が同じなら repo の内容は
+   バイト同一なので、内容由来の 4 軸は必ず同じ値になる。再利用分は
+   `:maturity/reused-at-pin true` を持ち `:maturity/computed-at` は前回のまま =
+   いつの値か監査できる。全軸を取り直すなら `--full`。
+   **実測: 全 pin 一致の再実行が GraphQL 0 回・1.55 秒**(フルランは約 13 分)。
+2. **REST 並列化 (`--jobs`、既定 8)** — 律速は GraphQL ではなく **coverage 軸が repo ごとに
+   無条件で叩いていた REST `git/trees` (~0.6s/repo)** だった (GraphQL 本体は 20 repo で
+   1.5-3.4s = ~0.1s/repo)。バッチ内の tree 取得を並列プール化し、同一スライスで
+   **8.4 秒 -> 1.0 秒 (8 倍)**。スコアは不変 (内容由来の全軸が一致することを同期版と
+   diff して確認。composite のみ 1e-6 ずれるが、これは `pushedAt` 経過日数で動く
+   activity 軸によるもの)。あわせて「REST を叩かなくても答が確定する 2 ケース」
+   (coverage 宣言あり / src・test ディレクトリ無し) を短絡した。
+3. **分割再試行と checkpoint** — この 2 つは **既存の実害**を潰すもの:
+   `--batch-size 40` では 5 バッチ中 4 バッチで GitHub が JSON でなく HTML を返し
+   (`invalid character '<'`)、**1 バッチ = 40 repo が WARN 1 行だけ残して黙って欠落**して
+   いた。空応答は半分に割って再試行する (最小 5)。また結果は最後にしか書き出されず、
+   フルランが batch 113/176 で kill されたとき全結果がメモリごと消えた。20 バッチごとに
+   checkpoint を書き、再開は incremental が pin 一致で自動的に行う。
+
+## 実施しないこと (次段、別 PR)"
 
   :adr/decision-summary
   ["D1: 7 語を identity 面 / runtime 面 / role リンク / scope に分解する。system は entity にしない"
@@ -286,6 +313,7 @@ west 既知の project 名 (未知 0 件)。使用時の罠も 2 つ実測して
    "D6: person 面のギャップは捏造して埋めず :taxonomy/gap entity として記録する"
    "D7: 責任連鎖の 4 境界 — agent は actor になれない / actor は organisation になれない / organism は person になれない / service は identity を持たない"
    "D8: organism は layer ではないので manifest/layers.edn に :layer-organism を足さない"
+   "D10: repo-maturity は incremental (west pin 不変なら GraphQL を叩かず再利用) を既定とし、REST 並列化・分割再試行・checkpoint を持つ。2026-07-28 に 3,809 repo へ全再生成し 3 面 join のギャップを解消"
    "D9: 層単位の操作は west groups への kind-* 投影ではなく scripts/repo-taxonomy-select.cljs で行う。gen-west-manifest --check が既に STALE (全体再生成は pin をローカル HEAD から書き直す) / west list に --group-filter が無い / west の group は「どれか1つ有効なら active」— の 3 実測が根拠"]
 
   :adr/generator "scripts/repo-taxonomy.cljs"
