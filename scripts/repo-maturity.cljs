@@ -42,7 +42,14 @@
 ;; 使い方:
 ;;   nbb scripts/repo-maturity.cljs                 ; 全 repo を評価して manifest/repo-maturity.edn を書く
 ;;   nbb scripts/repo-maturity.cljs --limit 20       ; 先頭 N repo だけ（動作確認用）
-;;   nbb scripts/repo-maturity.cljs --batch-size 10  ; GraphQL バッチサイズ変更（既定 20）
+;;   nbb scripts/repo-maturity.cljs --batch-size 40  ; GraphQL バッチサイズ変更（既定 20）
+;;   nbb scripts/repo-maturity.cljs --full           ; incremental を無効化し全 repo を再取得
+;;
+;; **既定は incremental**: 既存 manifest/repo-maturity.edn を読み、west pin が前回から
+;; 動いていない repo は GraphQL を 1 回も叩かずに前回 entity を再利用する（pin が同じなら
+;; repo の内容はバイト同一なので、内容由来の 4 軸は必ず同じ値になる）。再利用した entity は
+;; :maturity/reused-at-pin true を持ち、:maturity/computed-at は前回のまま = いつの値か
+;; 監査できる。pin と独立に動く activity 軸も据え置きになるので、全軸を取り直すなら --full。
 (require '[scripts.nbb-compat :as io :refer [slurp spit format]]
          '[clojure.string :as str]
          '[clojure.edn :as edn])
@@ -55,7 +62,7 @@
 ;; ---- CLI args --------------------------------------------------------------
 
 (defn- parse-args [args]
-  (loop [args args opts {:batch-size 20}]
+  (loop [args args opts {:batch-size 20 :jobs 8}]
     (if-let [[k & more] (seq args)]
       (case k
         "--limit"      (recur (rest more) (assoc opts :limit (js/parseInt (first more))))
@@ -64,6 +71,8 @@
         "--only"       (recur (rest more) (assoc opts :only (first more)))
         "--self-test"  (recur more (assoc opts :self-test true))
         "--merge-existing" (recur more (assoc opts :merge-existing true))
+        "--full"           (recur more (assoc opts :full true))
+        "--jobs"           (recur (rest more) (assoc opts :jobs (js/parseInt (first more))))
         (recur more opts))
       opts)))
 
@@ -169,6 +178,7 @@
        "  languages(first: 8, orderBy: {field: SIZE, direction: DESC}) { edges { size node { name } } }\n"
        "  readme: object(expression: \"HEAD:README.md\") { ... on Blob { text } }\n"
        "  claudemd: object(expression: \"HEAD:CLAUDE.md\") { ... on Blob { text } }\n"
+       "  srcDir: object(expression: \"HEAD:src\") { ... on Tree { oid } }\n"
        "  testsDir: object(expression: \"HEAD:tests\") { ... on Tree { oid } }\n"
        "  testDir: object(expression: \"HEAD:test\") { ... on Tree { oid } }\n"
        "}\n"))
@@ -297,6 +307,56 @@
         {:src-files  (count (filter #(str/starts-with? % "src/") paths))
          :test-files (count (filter #(re-find #"^tests?/" %) paths))}))))
 
+(def ^:private child-process (js/require "node:child_process"))
+
+(defn- sh-async
+  "spawn ベースの非同期 shell-out。resolve のみ（reject しない）ので
+   Promise.all が 1 件の失敗で全体を落とさない。"
+  [cmd args]
+  (js/Promise.
+   (fn [resolve _reject]
+     (let [proc (.spawn child-process cmd (clj->js args))
+           out  (atom "")]
+       (.on (.-stdout proc) "data" (fn [d] (swap! out str d)))
+       (.on proc "error" (fn [_] (resolve {:exit -1 :out ""})))
+       (.on proc "close" (fn [code] (resolve {:exit code :out @out})))))))
+
+(defn- p-map
+  "items を最大 concurrency 本で並列に f にかけ、入力順の vector を resolve する。
+   f は Promise を返すこと。個別の失敗は nil になる（全体は落とさない）。"
+  [f items concurrency]
+  (let [items (vec items) n (count items)]
+    (if (zero? n)
+      (js/Promise.resolve [])
+      (js/Promise.
+       (fn [resolve _reject]
+         (let [results (atom (vec (repeat n nil)))
+               next-idx (atom 0)
+               done (atom 0)]
+           (letfn [(start! []
+                     (let [i @next-idx]
+                       (when (< i n)
+                         (swap! next-idx inc)
+                         (-> (f (nth items i))
+                             (.then (fn [v] (swap! results assoc i v)))
+                             (.catch (fn [_] nil))
+                             (.then (fn [_]
+                                      (swap! done inc)
+                                      (if (= @done n) (resolve @results) (start!))))))))]
+             (dotimes [_ (min concurrency n)] (start!)))))))))
+
+(defn- fetch-tree-async
+  "fetch-tree の非同期版。実測でこの REST が全体の律速だったので並列化する。
+   数え方は同期版と同一（src/ と test(s)/ 配下のファイル数）。"
+  [org name]
+  (-> (sh-async "gh" ["api" (str "repos/" org "/" name "/git/trees/HEAD?recursive=1")
+                      "--jq" ".tree[].path"])
+      (.then (fn [{:keys [exit out]}]
+               (when (= 0 exit)
+                 (let [paths (str/split-lines (str/trim (or out "")))]
+                   {:src-files  (count (filter #(str/starts-with? % "src/") paths))
+                    :test-files (count (filter #(re-find #"^tests?/" %) paths))}))))))
+
 (defn- coverage-score-from-data [gql tree]
   ;; 純関数: gql + tree -> [score detail] or nil（--self-test 対象）。
   (let [text (str (get-in gql [:readme :text]) " " (get-in gql [:claudemd :text]))
@@ -308,9 +368,18 @@
         [(clamp01 (/ tf (+ sf tf))) {:method :file-ratio :src-files sf :test-files tf}])
       :else nil)))
 
-(defn- coverage-score [org name gql]
-  ;; 副作用ラッパ: REST で tree を取得して coverage-score-from-data に渡す。
-  (coverage-score-from-data gql (fetch-tree org name)))
+(defn- needs-tree?
+  "REST git/trees を叩く必要があるか。**叩かなくても答が確定する 2 ケース**は false:
+     (a) README/CLAUDE.md に coverage 宣言がある -> coverage-score-from-data は
+         tree を見ずに :declared を返す
+     (b) HEAD に src/ も test/ も tests/ も無い -> 数え上げは 0/0 になり
+         :file-ratio 分岐の (pos? (+ ...)) が偽 -> nil
+   どちらも短絡してもスコアの値は変わらない。実測でこの REST が repo あたり ~0.6s、
+   フルラン時間の大半だった (GraphQL 本体は 20 repo ~1.5-3.4s = ~0.1s/repo)。"
+  [gql]
+  (let [text (str (get-in gql [:readme :text]) " " (get-in gql [:claudemd :text]))]
+    (and (nil? (parse-declared-coverage text))
+         (or (some? (:srcDir gql)) (some? (:testsDir gql)) (some? (:testDir gql))))))
 
 (defn- composite [stage structural activity impl coverage]
   ;; 5 軸化（coverage 追加）。stage を 0.40->0.30 に減らし、structural/activity を
@@ -323,14 +392,14 @@
       (/ (reduce + (map (fn [[v w]] (* v w)) present))
          (reduce + (map second present))))))
 
-(defn- score-repo [{:keys [org name path revision] :as repo} gql]
+(defn- score-repo [{:keys [org name path revision] :as repo} gql tree]
   (when gql
     (let [text (str (get-in gql [:readme :text]) " " (get-in gql [:claudemd :text]))
           [stage stage-tag] (or (stage-score text) [nil nil])
           [structural structural-detail] (structural-score gql)
           activity (activity-score gql)
           [impl impl-detail] (or (impl-score gql) [nil nil])
-          [coverage coverage-detail] (or (coverage-score org name gql) [nil nil])
+          [coverage coverage-detail] (or (coverage-score-from-data gql tree) [nil nil])
           comp (composite stage structural activity impl coverage)]
       (cond-> {:repo/path path
                :repo/org org
@@ -385,48 +454,116 @@
 
 (when (:self-test opts) (run-self-test))
 
+;; ---- incremental: west pin が動いていない repo は API を叩かない ---------------
+;;
+;; `:repo/pinned-revision` は生成時の west pin。**pin が同一なら repo の内容は
+;; バイト単位で同一**なので、内容から出る 4 軸 (stage / structural / impl /
+;; coverage) は再計算しても必ず同じ値になる。よって GraphQL を 1 回も叩かずに
+;; 前回の entity をそのまま再利用してよい。判定材料は west.yml だけで、
+;; ネットワークアクセスは発生しない。
+;;
+;; 唯一 pin と独立に動くのは `:maturity/activity-score`（pushedAt の新しさ +
+;; commit 数）。既定ではこれも据え置き、`:maturity/reused-at-pin true` と
+;; 元の `:maturity/computed-at` を残して「いつの値か」を監査可能にする。
+;; 全軸を取り直したいときは `--full`。
+(def existing-by-path
+  (when-not (:self-test opts)
+    (try (into {} (map (juxt :repo/path identity)
+                       (edn/read-string (slurp (or (:out opts) "manifest/repo-maturity.edn")))))
+         (catch :default _ {}))))
+
+(defn- reusable? [{:keys [path revision]}]
+  (when-let [prev (get existing-by-path path)]
+    (and revision
+         (= revision (:repo/pinned-revision prev))
+         ;; スコアが 1 つも無い entity は再利用しない（前回失敗分は取り直す）
+         (some? (:maturity/composite prev)))))
+
+(def reused
+  (if (:full opts)
+    []
+    (->> target-repos
+         (filter reusable?)
+         (mapv (fn [{:keys [path]}]
+                 (assoc (get existing-by-path path) :maturity/reused-at-pin true))))))
+
+(def reused-paths (set (map :repo/path reused)))
+(def fetch-repos (vec (remove #(contains? reused-paths (:path %)) target-repos)))
+
+(println (str "repo-maturity: incremental — pin 不変で再利用 " (count reused)
+              " / GraphQL 対象 " (count fetch-repos)
+              (if (:full opts) "  (--full: 再利用を無効化)" "")))
+
 (def batch-size (:batch-size opts))
-(def batches (partition-all batch-size target-repos))
+(def batches (partition-all batch-size fetch-repos))
 (def n-batches (count batches))
 
-(def results
-  (loop [bs batches idx 0 acc []]
-    (if-let [[batch & more] (seq bs)]
-      (let [_ (println (str "  batch " (inc idx) "/" n-batches " (" (count batch) " repos)..."))
-            data (fetch-batch batch)
-            scored (keep-indexed (fn [i r]
-                                    (score-repo r (get data (keyword (gql-alias i)))))
-                                  batch)]
-        (recur more (inc idx) (into acc scored)))
-      acc)))
+(def jobs (:jobs opts))
 
-(println (str "repo-maturity: scored " (count results) "/" (count target-repos) " repos "
-              "(" (- (count target-repos) (count results)) " skipped — repo not found / no API access / batch failure)."))
+(defn- fetch-data-by-path
+  "fetch-batch を **repo path キー**で返す。alias (r0, r1...) はクエリ内の位置なので、
+   分割再試行すると番号が振り直される — path に正規化してから合成する。
 
-(def out-path (or (:out opts) "manifest/repo-maturity.edn"))
+   バッチ全体が空応答だったら **半分に割って再試行する**。実測 (2026-07-28):
+   --batch-size 40 では 5 バッチ中 4 バッチが GitHub から JSON でなく HTML を返し
+   ('invalid character '<'' / 'unexpected end of JSON input')、1 バッチ = 40 repo が
+   黙って欠落していた。分割再試行にすれば、大きすぎるクエリも一時障害も
+   小さい単位まで落として拾い直せる。"
+  [batch]
+  (let [data (fetch-batch batch)
+        got  (into {} (keep-indexed
+                       (fn [i r] (when-let [d (get data (keyword (gql-alias i)))]
+                                   [(:path r) d]))
+                       batch))]
+    (if (and (empty? got) (> (count batch) 4))
+      (let [half (quot (count batch) 2)]
+        (println (str "    retry: 空応答のため " (count batch) " -> " half " + " (- (count batch) half) " に分割"))
+        (merge (fetch-data-by-path (vec (take half batch)))
+               (fetch-data-by-path (vec (drop half batch)))))
+      got)))
 
-;; --merge-existing: 今回スコア化できなかった repo は既存 edn の古い値を保持。
-;; CI cron で GraphQL rate limit に阻まれた分を翌日以降に持ち越すため（ADR-2607171030 Z）。
-(def existing-entities
-  (when (and (:merge-existing opts) (not (:self-test opts)))
-    (try (edn/read-string (slurp out-path))
-         (catch :default _ nil))))
+(defn- process-batch
+  "1 バッチ: GraphQL は 1 リクエスト（同期）、その後 tree が要る repo だけを
+   最大 --jobs 本で並列 REST 取得してからスコア化する。Promise を返す。"
+  [idx batch]
+  (println (str "  batch " (inc idx) "/" n-batches " (" (count batch) " repos)..."))
+  (let [data    (fetch-data-by-path batch)
+        indexed (vec (map (fn [r] [r (get data (:path r))]) batch))
+        want    (vec (filter (fn [[_ gql]] (and gql (needs-tree? gql))) indexed))]
+    (-> (p-map (fn [[r _]] (fetch-tree-async (:org r) (:name r))) want jobs)
+        (.then (fn [trees]
+                 (let [tree-by-path (into {} (map (fn [[[r _] t]] [(:path r) t])
+                                                  (map vector want trees)))]
+                   (vec (keep (fn [[r gql]]
+                                (score-repo r gql (get tree-by-path (:path r))))
+                              indexed))))))))
 
-(def results-by-path (into {} (map (juxt :repo/path identity) results)))
+(defn- write-artifact!
+  "results を既存 artifact にマージして書き出す。checkpoint と最終書き出しの共通経路。
+   keep-existing? が true なら今回スコア化していない repo の前回値を残す
+   (checkpoint では必須 — 残さないと途中経過で全体が消える)。"
+  [results keep-existing?]
+  (let [out-path (or (:out opts) "manifest/repo-maturity.edn")
 
-(def merged
-  (if (and (:merge-existing opts) (seq existing-entities))
-    (let [kept (remove #(contains? results-by-path (:repo/path %)) existing-entities)]
-      (vec (concat results kept)))
-    results))
-
-(when (and (:merge-existing opts) (seq existing-entities))
-  (println (str "repo-maturity: merge-existing kept " (- (count merged) (count results))
-                " repos from prior run (merged total " (count merged) "/"
-                (count all-repos) ").")))
-
-(def header
-  (str ";; manifest/repo-maturity.edn — generated by scripts/repo-maturity.cljs. DO NOT EDIT BY HAND.\n"
+        ;; 既存 edn の値を保持する条件（ADR-2607171030 Z: CI cron が rate limit に
+        ;; 阻まれた分を翌日に持ち越す / checkpoint が途中経過で全体を消さない）。
+        existing-entities (when (and keep-existing? (not (:self-test opts)))
+                            (try (edn/read-string (slurp out-path))
+                                 (catch :default _ nil)))
+        ;; 今回の結果 + pin 不変で再利用した分。--merge-existing はさらに、今回
+        ;; スコア化できなかった repo の前回値を保持する（rate limit の持ち越し）。
+        scored-now   (vec (concat results reused))
+        scored-paths (set (map :repo/path scored-now))
+        merged (if (seq existing-entities)
+                 (vec (concat scored-now
+                              (remove #(contains? scored-paths (:repo/path %)) existing-entities)))
+                 scored-now)
+        _ (when (seq existing-entities)
+            (println (str "repo-maturity: merge-existing kept " (- (count merged) (count scored-now))
+                          " repos from prior run (merged total " (count merged) "/"
+                          (count all-repos) ").")))
+        header
+        (str ";; manifest/repo-maturity.edn — generated by scripts/repo-maturity.cljs. DO NOT EDIT BY HAND.\n"
        ";; Regenerate: nbb scripts/repo-maturity.cljs\n"
        ";;\n"
        ";; A vector of DataScript/Datomic-transactable entity-maps, one per west-registered\n"
@@ -452,11 +589,38 @@
        ";;                                activity .15/impl .2/coverage .2, renormalized when an axis is nil).\n"
        ";;\n"
        ";; Generated: " (.toISOString (js/Date.)) "\n"
-       ";; Coverage: " (count merged) "/" (if (:merge-existing opts) (count all-repos) (count target-repos)) " scored"
-       (if (:limit opts) (str " (--limit " (:limit opts) " run)") "") "\n\n"))
+       ";; Coverage: " (count merged) "/" (if (:limit opts) (count target-repos) (count all-repos)) " scored"
+       (str " (" (count reused) " reused at unchanged west pin)")
+       (if (:limit opts) (str " (--limit " (:limit opts) " run)") "") "\n\n")
 
-(def body
-  (str "[\n" (str/join "\n" (map #(str " " (pr-str %)) merged)) "\n]\n"))
+        body (str "[\n" (str/join "\n" (map #(str " " (pr-str %)) merged)) "\n]\n")]
+    (spit out-path (str header body))
+    (println (str "repo-maturity: wrote " out-path " (" (count merged) " entities)"))
+    :done))
 
-(spit out-path (str header body))
-(println (str "repo-maturity: wrote " out-path))
+(defn- finish! [results]
+  (println (str "repo-maturity: scored " (count results) "/" (count fetch-repos) " repos "
+                "(" (- (count fetch-repos) (count results)) " skipped — repo not found / no API access / batch failure)."))
+  (write-artifact! results (:merge-existing opts)))
+
+;; バッチは順番に、バッチ内の REST だけ並列。最後の top-level 式が Promise なので
+;; nbb がこれを await してからプロセスを終了する（実測確認済み）。
+;; **20 バッチごとに checkpoint を書く。** 途中で kill されても、次回起動時に
+;; incremental (west pin 一致) がその分をそのまま再利用するので、再開できる。
+;; 実測 (2026-07-28): checkpoint 無しでフルランが batch 113/176 で kill され、
+;; 全 batch 分の結果がメモリごと失われた。
+(def checkpoint-every 20)
+
+(.then (reduce (fn [pacc [idx batch]]
+                 (.then pacc (fn [acc]
+                               (.then (process-batch idx batch)
+                                      (fn [s]
+                                        (let [acc' (into acc s)]
+                                          (when (zero? (mod (inc idx) checkpoint-every))
+                                            (println (str "  checkpoint: " (count acc') " scored so far"))
+                                            (write-artifact! acc' true))
+                                          acc'))))))
+               (js/Promise.resolve [])
+               (map-indexed vector batches))
+       finish!)
+
