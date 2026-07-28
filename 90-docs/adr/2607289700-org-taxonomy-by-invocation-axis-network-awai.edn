@@ -1,0 +1,263 @@
+[{:db/id -1
+  :adr/id "adr-2607289700-org-taxonomy-by-invocation-axis-network-awai"
+  :adr/title "ADR-2607289700: org 分類軸を「目的(公益/事業)」から「起動主体(organism/actor/service)」へ移し、network-awai (AWAI Network, L.L.C.) を営業主体 org として追加する"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-28"
+  :adr/last-verified "2026-07-28"
+  :adr/last_verified "2026-07-28"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "org-taxonomy-invocation-axis"
+
+  :adr/authoritative_for
+  ["新規 repo がどの GitHub org に属するかの判定軸 — 目的軸(公益/事業)ではなく起動主体軸(organism/actor/service)"
+   "6 org それぞれの受け入れ境界: kotoba-lang / etzhayyim / cloud-itonami / gftdcojp / network-awai / com-junkawasaki"
+   "network-awai org = AWAI Network, L.L.C.(デラウェア LLC、etzhayyim 傘下の営業主体)のコード側対応物であること"
+   "Awai network 法人で動く 7 ドメイン(itonami.cloud / murakumo.cloud / isekai.network / babiniku.net / shinshi.club / aozora.app / kotobase.net)の repo 所属"
+   "adult 事業が Charter Rider v2.0 に違反しないこと、および adult repo の所属先が network-awai であること"
+   "ai-gftd-* prefix の意味の終了 — prefix は vendor 留保マーカーではなくなり、bare name へ rename する"
+   "jk-luxury org の解散方針"]
+
+  :adr/supersedes ["adr-2606302300-org-taxonomy-4-orgs"]
+  :adr/superseded-by []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2607289600-repo-taxonomy-three-planes"
+   "adr-2607012100-cloud-itonami-org-split"
+   "adr-2607261601-etzhayyim-org-reorg-audit"
+   "adr-2607242100-cloud-itonami-awai-network-operator-change"
+   "adr-2607242600-cloud-itonami-awai-gftd-payment-collection"
+   "adr-2607269500-two-entity-hiring-structure-us-first"
+   "adr-2607023000-ka-creative-craft-libs-isco-decomposition"
+   "manifest/repo-taxonomy.edn"
+   "manifest/kotoba-boundaries.edn"]
+
+  :adr/body
+  "# ADR-2607289700: org 分類軸を起動主体へ移し、network-awai を営業主体 org として追加する
+
+**Status**: accepted
+**Date**: 2026-07-28
+**Deciders**: Jun Kawasaki
+**Supersedes**: ADR-2606302300 (4-org taxonomy)
+
+## Context
+
+ADR-2606302300 は org を **目的軸**(公益=etzhayyim / 事業=gftdcojp / library=kotoba-lang /
+cloud+data=com-junkawasaki)で切っていた。この軸は実装形態を決めないため、実測で破綻している:
+
+| org | 総数 | 目的軸が想定する中身 | 実測 (`manifest/repo-taxonomy.edn`) |
+|---|---:|---|---|
+| etzhayyim | 347 | 公益 agent | organism **3** / actor 36 / **lib 87** / corpus 20 / unclassified 58 |
+| gftdcojp | 66 | 商用 product | service **4** / actor 3 / app 6 / lib 6 / tombstone 11 |
+| cloud-itonami | 1597 | (ADR-2607012100 で例外的に追加) | actor 1050 / organisation-record 323 / app 22 / lib 28 |
+
+etzhayyim は 612 repo 中 466 が library であり (ADR-2607261601 の実測)、「公益かどうか」は
+repo が何であるかを教えてくれない。同じ理由で `ai-gftd-` prefix も破綻した — この prefix は
+本来「規制・Charter 上 gftd 事業体に留保する」マーカーだったが (ADR-2606302300
+`:repo-creation-check`)、現在 59 件に付いており、そのうち規制留保が理由なのは 6 件にすぎない。
+残りは creative・lib・weights・tombstone が prefix を惰性で引きずっている。
+
+さらに 2026-07-24〜26 に法人構造が変わった:
+
+- **AWAI Network, L.L.C.**(デラウェア LLC)が cloud-itonami の operator になった
+  (ADR-2607242100)、収納代行を持つ (ADR-2607242600)、米国側 principal である
+  (ADR-2607269500)
+- **Gftd Japan K.K.** が日本の運営法人 (ADR-2607269500)
+- GitHub org `network-awai` を 2026-07-26 に作成済み (本 ADR 執筆時点で 0 repo)
+
+法人が増えたのに org 軸が旧構造のままだったため、Awai network 法人で動くプロダクトの
+repo が gftdcojp と jk-luxury に散在している。
+
+## Decision
+
+### D1. org の判定軸を「起動主体」にする
+
+ADR-2607289600 が確立した **runtime 面 `:repo/kind`** をそのまま org 軸に採用する。
+「誰が起動するか」は repo 内の証拠から機械判定でき、目的の解釈に依存しない。
+
+| org | 法人格 | 軸 | 主たる `:repo/kind` |
+|---|---|---|---|
+| **kotoba-lang** | — (OSS) | 言語・ライブラリ。呼ばれるだけ | `lib` |
+| **etzhayyim** | 宗教法人 (任意団体、did:web:etzhayyim.com) | **artificial organism の自律 actor のみ** — 自分で起きる (heartbeat)、自分の did で対外発話する | `organism` |
+| **cloud-itonami** | — (AGPL OSS fleet) | **人間または actor が使う基盤** — 呼ばれて動く (request-scoped) | `actor` / `lib` / `organisation-record` |
+| **gftdcojp** | Gftd Japan K.K. | **B2B/B2G security service** | `service` |
+| **network-awai** | **AWAI Network, L.L.C.** (DE) | **etzhayyim 傘下の営業主体**。p2p / crypto / blockchain 中心の consumer network + adult | `service` / `app` |
+| **com-junkawasaki** | 個人 | cloud + data + 個人研究 | `corpus` |
+
+**jk-luxury は解散する** (D6)。
+
+判定手順: `:repo/kind` を `manifest/repo-taxonomy.edn` から引き、上表で org を決める。
+kind が `service` の場合のみ第二軸が要る — **security なら gftdcojp、consumer network /
+p2p / crypto / adult なら network-awai**。
+
+### D2. network-awai — Awai network 法人で動く 7 ドメイン
+
+以下は AWAI Network, L.L.C. が運営主体であり、repo も network-awai org に置く:
+
+| ドメイン | repo | 現 org |
+|---|---|---|
+| itonami.cloud | `cloud-itonami` | gftdcojp |
+| murakumo.cloud | `cloud-murakumo` | gftdcojp |
+| isekai.network | `network-isekai` | gftdcojp |
+| kotobase.net | `net-kotobase` | gftdcojp |
+| aozora.app | `app-aozora` | gftdcojp |
+| babiniku.net | `net-babiniku` | jk-luxury |
+| shinshi.club | `club-shinshi` | jk-luxury |
+
+**org 名 `cloud-itonami` と product repo `cloud-itonami` の衝突は rename で解かない。**
+前者は OSS 基盤 fleet の org、後者は itonami.cloud の business-os であり、
+移送後のパス `orgs/network-awai/cloud-itonami` で一意に区別できる。ADR-2607289600 が
+記録した名前衝突 (org 名かつ product 名かつ blueprint catalog 名) はこれで 2/3 が解消する。
+
+随伴 repo (同一ドメインのサテライト) も同時に移す:
+`aozora-appview` / `aozora-design-system` / `aozora-engine` / `aozora-yoro-ui` /
+`app-aozora-svelte` / `net-kotobase-ipfs` / `net-isekai-gen` / `local-murakumo` /
+`cloud-murakumo-market-analyst` / `cloud-murakumo-market-intel` / `club-shinshi-app` /
+`nexus-x402` (x402 = crypto 決済プロトコル、p2p/crypto 軸に該当)。
+
+### D3. adult は Charter Rider v2.0 に違反しない — network-awai に置く
+
+**オーナー判断 (2026-07-28): adult 事業は Charter Rider v2.0 §2 のいずれの条項にも違反しない。**
+したがって `orgs/gftdcojp/ai-gftd-livecam/NOT-MIGRATED-CHARTER-VIOLATION.md.edn` の
+判定は**失効**であり、当該マーカーファイルを削除する。ADR-2606302300 が
+`:axis-b-charter-rider-v2` の worked example として livecam を挙げていた記述も、
+本 ADR による supersede に伴い根拠を失う。
+
+adult repo は consumer network 事業として network-awai に置き、bare name に rename する:
+
+| 現 repo | 移送先 | rename |
+|---|---|---|
+| `gftdcojp/ai-gftd-livecam` | network-awai | `livecam` |
+| `gftdcojp/ai-gftd-pornhub` | network-awai | `pornhub` |
+| `gftdcojp/ai-gftd-exoclick` | network-awai | `exoclick` |
+| `gftdcojp/ai-gftd-deai` | network-awai | `deai` (ローカル 0 file、移送前に実体確認) |
+
+### D4. `ai-gftd-` prefix を廃止し bare name にする
+
+prefix の本来の意味 (vendor 留保マーカー) は D1 の org 軸に吸収されたので、
+**prefix は情報を持たなくなった**。CLAUDE.md の「`-clj` suffix 禁止 — 言語は package identity
+ではない」と同じ論法で、**vendor 名も identity ではない**。59 件すべてから prefix を外す。
+
+裏付け: security プロダクトの**デプロイ先 DNS は既に bare name** である
+(`arms.gftd.ai` / `kakure.gftd.ai` / `mamori.gftd.ai` / `stripe.gftd.ai`)。
+bare name への rename は実運用 identity との一致でもある。
+
+**gftdcojp に残す = B2B/B2G security 9 件** (すべて `ai-gftd-` を外す):
+
+| 現名 | 新名 | 中身 | 面 |
+|---|---|---|---|
+| ai-gftd-arms | `arms` | 銃器 ID 認証 (軍・警察・許可所持者、chain of custody) | B2G |
+| ai-gftd-defence | `defence` | ITAR/ECCN 輸出管理・契約 FSM・audit-chain receipts | B2G |
+| ai-gftd-cyber-drill | `cyber-drill` | OT サイバーセキュリティ訓練 (WebVR) | B2B |
+| ai-gftd-kabuto | `kabuto` | attack-graph + 全世界対策ソリューション知識グラフ | B2B |
+| ai-gftd-tia | `tia` | Threat Intelligence Agent (なりすまし巡回・通報) | B2B/B2C |
+| ai-gftd-mamori | `mamori` | privacy guardian + ToS 不公正スコアラ | B2C/B2B |
+| ai-gftd-kakure | `kakure` | personal data exposure removal | B2C |
+| ai-gftd-misogi | `misogi` | reversible macOS hygiene console (deny-by-default) | B2B |
+| ai-gftd-smishing | `smishing` | smishing actor | B2B |
+
+`cloud-mamori` は `mamori` と同一ドメインなので統合可否を別途判断する (本 ADR では触らない)。
+
+### D5. creative は既に cloud-itonami にある — prefix だけ外す
+
+**実測 (2026-07-28、git remote で確認): creative 系 10 件は既に cloud-itonami org へ移送済み**
+(`animeka` `mangaka` `dougaka` `dougaka-kagaku` `dougaka-kodomo` `dougaka-vector`
+`yukkuri` `syosetsuka` `ongakuka` `gameka`)。ADR-2607023000 が定めた 3 レイヤ分解
+(技芸=kotoba-lang / 職能=cloud-itonami-isco / 商売=gftdcojp) のうち「商売レイヤは gftdcojp」
+という割当は、creative については**既に実態が cloud-itonami に移っている**。
+本 ADR はこの実態を追認し、当該セルを訂正する。
+
+gftdcojp に取り残されている 2 件も cloud-itonami へ移す: `ai-gftd-isekai`(→ isekai.network
+本体 `network-isekai` は network-awai。この repo は engine 側なので要判断) /
+`ai-gftd-ghosthacker-shiropico`(→ 作品 corpus、`ghosthacker-shiropico-assets` と統合判断)。
+
+cloud-itonami 内の `ai-gftd-*` 21 件のうち **actor は 2 件のみ** (`ai-gftd-itonami` /
+`ai-gftd-newscaster`、いずれも governor 実装あり。前者はテスト 20/69 assertions 通過)。
+残り 19 件の内訳は docs 6 / unclassified 8 / lib 3 / app 1 / tombstone 1 であり、
+**blueprint.edn を 0/21 が持たず、`kotoba-lang/industry` registry.edn の 459 entry にも
+0 件しか載っていない** = cloud-itonami の actor 契約に未登録。prefix を外すと同時に
+blueprint 起票 (actor として残すもの) と retire (docs/tombstone) を仕分ける。
+
+### D6. jk-luxury は解散する
+
+4 repo のうち `net-babiniku` / `club-shinshi` / `club-shinshi-app` は D2 により network-awai へ。
+残る `jk-corp` は法人記録なので com-junkawasaki へ移すか、network-awai の
+organisation-record として置くかを別途判断する。
+
+### D7. etzhayyim は organism のみ — ADR-2607261601 より厳しい
+
+ADR-2607261601 (accepted) は 612 entity の移行先を確定済み
+(cloud-itonami 220 / kotoba-lang 108 / gftdcojp 64 / stay 191 / stay-authority 11 / delete 1)。
+**本 ADR の D1 はその stay 191 をさらに絞る**: 宗教核であっても「呼ばれて動く actor」は
+cloud-itonami であり、etzhayyim に残るのは `organism` = 自分で起きるものだけである。
+
+現在 organism と判定されているのは 3 件 (`com-etzhayyim-ibuki` / `-kyoninka` / `-sng`)。
+ただし ADR-2607289600 の既知の限界 5 のとおり **organism 判定は README 宣言ベース**なので、
+heartbeat 実装を持ちながら宣言していない repo を取りこぼしている。移送前に
+`80-data/system/artificial-organism-actors.json` (9 identity) と突き合わせて再判定する。
+**この再判定が終わるまで etzhayyim からの大量移送は実行しない** (D9)。
+
+etzhayyim が organism のみになれば `com-etzhayyim-` prefix も情報を持たないので、
+D4 と同じ理由で bare name にする (`ibuki` / `kyoninka` / `sng`)。
+
+### D8. 移送しないもの (現状維持)
+
+`kotoba-lang` 1763 repo と `cloud-itonami` の taxonomy 系 1388 repo
+(`isic-` / `isco-` / `lei-` / `assoc-` / `jsic-` / `cofog-` / `unspsc-` / `iso3166-`) は
+既に軸に適合しているので触らない。taxonomy prefix は role リンクの正本
+(ADR-2607289600 D4) なので **prefix 廃止 (D4) の対象外**である — これは vendor 名ではなく
+分類標準コードであり、identity を持つ。
+
+### D9. 実行順序 — 影響範囲の小さい順に 4 phase
+
+各 phase は west.yml の **single-entry commit** で pin を進める
+(CLAUDE.md「wholesale 再生成は禁止」。rename は `gen-west-manifest.cljs --entry <name>`)。
+
+1. **Phase 1 — network-awai を埋める** (0 repo なので衝突リスクなし): D2 の 7 ドメイン + 随伴
+2. **Phase 2 — adult 4 件**: D3。livecam の CHARTER-VIOLATION マーカー削除を含む
+3. **Phase 3 — ai-gftd- prefix 廃止**: D4 security 9 + D5 cloud-itonami 側 21
+4. **Phase 4 — etzhayyim**: D7 の organism 再判定が終わってから着手
+
+## Consequences
+
+- **`:repo/kind` が org 判定の入力になるため、`manifest/repo-taxonomy.edn` が
+  「分類メタデータ」から「配置の正本」に昇格する。** 生成器 `scripts/repo-taxonomy.cljs` の
+  精度がそのまま配置の正しさになるので、`unclassified` 112 / `absent` 430 を
+  デフォルト値で埋めない規律 (ADR-2607289600 D5-2) が一層重要になる
+- org と kind の不一致を機械検出できる。`scripts/repo-taxonomy.cljs` に
+  `--check-org` を足して CI で乖離を可視化する (別 PR)
+- GitHub repo rename は redirect が残るので外部リンクは壊れないが、**west.yml の
+  `name:` は追随が必要**。`manifest/fleet-db.edn` 側も dual-write 期なので
+  `fleet reconcile` が吸収するのを確認する
+- ADR-2606302300 の `:repo-creation-check` (layer test → 3-axis+Charter check) は
+  **Charter 判定部分が D3 で無効化される**。新しい判定は D1 の「kind → org、
+  service のみ security/consumer で二分」に置き換わる
+
+## 未決 (本 ADR では決めない)
+
+1. `ai-gftd-isekai` (engine) と `network-isekai` (network-awai 行き) の責任分界
+2. `ai-gftd-ghosthacker-shiropico` と `ghosthacker-shiropico-assets` の統合
+3. `cloud-mamori` と `ai-gftd-mamori`(→`mamori`) の統合
+4. `jk-corp` の行き先
+5. `cloud-manimani` / `local-manimani` / `ai-gftd-manimani` — manimani は D2 の 7 ドメインに
+   含まれないため、gftdcojp 残留か network-awai 行きかをオーナーに確認する
+6. cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断"
+
+  :adr/decision-summary
+  ["D1: org 判定軸を目的(公益/事業)から起動主体(:repo/kind)へ移す。6 org: kotoba-lang=lib / etzhayyim=organism のみ / cloud-itonami=呼ばれて動く基盤 / gftdcojp=B2B/B2G security service / network-awai=AWAI Network L.L.C. の consumer network(p2p/crypto/blockchain)+adult / com-junkawasaki=cloud+data+個人"
+   "D2: Awai network 法人で動く 7 ドメイン(itonami.cloud/murakumo.cloud/isekai.network/kotobase.net/aozora.app/babiniku.net/shinshi.club)の repo を network-awai へ。org 名と product 名の衝突はパスで区別し rename しない"
+   "D3: adult は Charter Rider v2.0 に違反しない(オーナー判断)。ai-gftd-livecam の NOT-MIGRATED-CHARTER-VIOLATION マーカーは失効・削除。adult 4 件は network-awai へ"
+   "D4: ai-gftd- prefix を廃止し bare name へ。デプロイ先 DNS が既に bare name であることが裏付け。gftdcojp に残る security は 9 件"
+   "D5: creative 10 件は既に cloud-itonami へ移送済み(git remote 実測)。ADR-2607023000 の「商売レイヤ=gftdcojp」セルを実態に合わせ訂正。cloud-itonami 内 ai-gftd-* 21 件は 0/21 が blueprint.edn を持たず registry 459 entry にも 0 件 = actor 契約未登録"
+   "D6: jk-luxury は解散。net-babiniku / club-shinshi / club-shinshi-app は network-awai へ"
+   "D7: etzhayyim は organism のみ(ADR-2607261601 の stay 191 をさらに絞る)。organism 判定が README 宣言ベースで取りこぼすため、再判定が終わるまで大量移送しない"
+   "D8: kotoba-lang 1763 と cloud-itonami の taxonomy 系 1388 は軸に適合済みで触らない。taxonomy prefix(isic-/isco-/lei-…)は分類標準コードであり identity を持つので prefix 廃止の対象外"
+   "D9: 4 phase で実行。network-awai を埋める → adult → prefix 廃止 → etzhayyim。west.yml は single-entry commit"]
+
+  :adr/verify "nbb --classpath \".:scripts/nbb_compat\" scripts/repo-taxonomy.cljs --check --workspace <root>"
+  :adr/artifact "manifest/repo-taxonomy.edn"
+  :source/dataset "adr"}]
