@@ -553,7 +553,9 @@ CertGovernor）。
   `market-intel`（SEC EDGAR 財務。`orgs/gftdcojp/cloud-murakumo-market-intel`）/
   `cloud-itonami-lei`（法人実体 blueprint）/ `cloud-itonami-lei-tos`（ToS アーカイブ）/
   `fleet-db`・`fleet-db-remote`・`fleet-ci`（fleet 状態）/ `yabai-passive-dns` /
-  `tadori-threat-intel` / `toshokan-patents`。
+  `tadori-threat-intel` / `toshokan-patents` / `repo-maturity`・`itonami-fleet-audit` /
+  **`repo-taxonomy`**（repo の 3 面分類。ADR-2607289600。`:repo/path` で repo-maturity と、
+  `:company/lei` で market-intel / cloud-itonami-lei と join できる）。
   ```bash
   # 財務 × 法人実体 × ToS を 1 クエリで
   nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \

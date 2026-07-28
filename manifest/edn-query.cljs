@@ -820,9 +820,14 @@
 ;; kotoba-boundaries.edn / cleanup-workflow.edn の 3 件のみ）に入っておらず
 ;; query できなかった。
 
+;; repo-taxonomy は fleet「状態」ではなく repo の分類だが、形は同じ
+;; （manifest/ 配下の vector-of-maps 生成物）なのでこのローダを共有する。
+;; :repo/path で repo-maturity と、:company/lei で market-intel /
+;; cloud-itonami-lei と join できる（ADR-2607289600 D5: 3 面は同じ ref に置く）。
 (defn fleet-state-sources []
   [["itonami-fleet-audit" (io/file root "manifest" "itonami-fleet-audit.edn")]
-   ["repo-maturity"       (io/file root "manifest" "repo-maturity.edn")]])
+   ["repo-maturity"       (io/file root "manifest" "repo-maturity.edn")]
+   ["repo-taxonomy"       (io/file root "manifest" "repo-taxonomy.edn")]])
 
 (defn fleet-state-entities [next-tempid!]
   (let [skipped (atom [])
