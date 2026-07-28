@@ -1,0 +1,128 @@
+[{:db/id -1,
+  :adr/id "adr-2607283100-yabai-phishing-watch-residency",
+  :adr/title "ADR-2607283100: フィッシング判定を常駐化 — CT log 供給 + tamaki exec + LaunchAgent、murakumo は幅",
+  :adr/status "accepted, implemented, live",
+  :adr/doc_type "adr",
+  :adr/date "2026-07-28",
+  :adr/deciders ["Jun Kawasaki (+ Claude)"],
+  :adr/topic "yabai-phishing-watch-residency",
+  :adr/related ["adr-2607283000-yabai-phish-infra-cljc-port"
+                "adr-0004-ct-watch-worldwide-supply-and-residency"
+                "adr-0003-phish-infra-brand-impersonation-scorer"
+                "adr-2607255100-toshokan-self-growing-resident-ingest"
+                "adr-2607251552-toshokan-patents-worldwide-patent-resident-harvest"
+                "adr-2607256000-murakumo-task-plane-distributed-execution"],
+  :adr/supersedes [],
+  :adr/superseded_by [],
+  :adr/repos ["com-junkawasaki/root" "etzhayyim/com-etzhayyim-yabai" "kotoba-lang/tamaki"],
+  :adr/authoritative true,
+  :adr/authoritative_for ["ドメインのフィッシング判定が常駐している実体（LaunchAgent com.etzhayyim.yabai.ct-watch-tick + tamaki exec）"
+                          "決定論 tick を tamaki loop ではなく tamaki exec で表現する区別"
+                          "murakumo を heartbeat ではなく幅（fan-out）に使う判断"],
+  :adr/last_verified "2026-07-28",
+  :adr/body "# ADR-2607283100: フィッシング判定の常駐化
+
+**Status**: accepted, implemented, live
+**Date**: 2026-07-28
+
+## Context
+
+ADR-2607283000 でドメインのフィッシング判定器（yabai `phish_infra`）を作ったが、
+**母集団供給が無い**ことを残ギャップとして明記していた。オーナー指示:
+「これが tamaki cli, murakumo で 常駐化するように整えて」。
+
+供給が無いまま常駐させれば、同じ 150 件を永遠に再スコアするだけの見せかけになる。
+したがって常駐化は「供給を作ること」と不可分だった。設計・実測の正本は子リポの
+**ADR-0004**。ここは superproject 側の位置づけだけを記す。
+
+## Decision
+
+### 供給 = Certificate Transparency log の直接 tail
+
+crt.sh は 1 ドメイン指定には正しいが（ADR-0002）、母集団供給には**使えない**ことを実測した
+（`?q=mastercard.com` → 503、`?q=%25mastercard%25` → 502/404）。CT log 本体の
+`get-sth` / `get-entries` は鍵不要の機械向けインタフェースで、地球上で発行された公開信頼
+証明書すべてを記録している（argon2026h2 = 22 億件）。
+
+**順序が設計の要**: CT は firehose なので、純粋な lexical prefilter を全件へ先に通し、
+生き残った一握りだけが DNS/ASN でネットワークに触れる（実測 3035 名 → 11 件）。
+
+### 常駐 = LaunchAgent + `tamaki exec`（toshokan パターン）
+
+`com.etzhayyim.yabai.ct-watch-tick`（毎時）→ `~/.gftd/run-yabai-ct-watch-tick.cljs`（nbb）
+→ **`tamaki exec`** → `bb -m yabai.methods.ct-watch --live --score --commit`。
+
+**`tamaki loop` ではなく `tamaki exec` を使う。** loop（`loops/*.edn`）は runner
+（codex/claude/grok）を回す**モデル入り**の成熟度ループで、本 tick は決定論。混ぜると
+「モデルが判定している」と読める記録になる。`exec` は `:agent.run/mode :external` として
+実 argv と exit code のまま記録し、`tamaki status` に出る。
+
+murakumo WASM on-tick にはしない — ADR-2607255100 §4 が toshokan で下したのと同じ判断で、
+LaunchAgent が今日の正直な production 経路（`toshokan-tick` / `toshokan-patents-tick` /
+`fleet-ci-murakumo-tick` と同クラス）。
+
+### murakumo = heartbeat ではなく「幅」
+
+`ct_watch --plan N` が `murakumo task run --tasks` にそのまま渡せる batch を出す。実測:
+4 slice を `murakumo task plan --tasks` に通し、planner が fleet（11/12 node・132 cores）へ
+配置することを確認（**実行はしていない** — `plan` は純粋プレビュー）。
+毎時の心拍を fleet に散らすのではなく、広域 sweep をしたいときだけ fan-out する。
+
+### tamaki 側の登録（判断作業は loop、心拍は exec）
+
+`kotoba-lang/tamaki` に `actors/yabai-phishing-watch.edn` +
+`loops/yabai-phishing-watch.edn` を追加した。これは **watch 本体ではなく、その周りの
+判断作業**（brand roster を増やす・CT shard を増やす・fan-out を実行可能にする）。
+`bin/tamaki-supervisor` は `TAMAKI_LOOP_SPEC` を 1 つしか見ないので、**spec を置いても
+勝手には起動しない** — 起動は明示的に
+`bin/tamaki loop ensure --spec loops/yabai-phishing-watch.edn`。
+`:loop/auto-approve false`、`:external-effect :voice-required`（abuse report は第三者を
+名指しして estate の外に出る）。
+
+## Live 確認（2026-07-28）
+
+```
+launchctl                com.etzhayyim.yabai.ct-watch-tick loaded、RunAtLoad で初回 tick 実行
+tick 実測                2000 entries → 3411 SAN → 15 candidate → 13 解決 → cumulative 63
+tamaki status            run-1785239117549-7bfecc85 :mode :external :status :succeeded
+自己 commit/push         chore(ct-watch): argon2026h2 2204345286..2204347286 … を origin/main へ
+                         （checkout は clean を維持 = west update を塞がない）
+実検出                   whatsapp-income-assistance-center.com.ph /
+                         whatsapp-income-redeeming.com.ph（同一 Linode IP）を candidate 820
+偽陽性                   同 slice の CDN 上 containment ノイズ 9 件はすべて claim なし
+tests                    49 tests / 10083 assertions green
+```
+
+## Consequences
+
+**Good**
+
+- ADR-2607283000 が残した**母集団ギャップが閉じた**。判定器に世界規模の供給が毎時流れ込む。
+- 常駐が `tamaki status` から見える。決定論 tick をモデル実行と偽らない形で記録される。
+- tick が自分の成果物を commit/push するので、共有 west checkout が dirty のまま残らない
+  （= `west update` と他 agent の作業を塞がない）。git 履歴が成長ログになる。
+
+**Bad / 負債**
+
+- **sampling であって完全網羅ではない。** 毎時 2000 entries は世界の発行量のごく一部。
+  コーパスに無いことは「未サンプル」であって「フィッシングでない」ではない。
+- **fan-out の実行は未検証**（`task plan` は通ったが、`task run` には各 node に yabai
+  checkout が要る）。
+- **brand roster は 5 件のまま** — firehose を流しても roster 外のブランド偽装は素通りする。
+  ここが次に効く最大の投資で、tamaki loop の objective 第 1 項にした。
+- **tick が毎時 commit するので west pin は恒常的に古くなる**（toshokan と同じ性質）。
+  pin は「その時点で到達可能な commit」として扱う。
+- `orgs/kotoba-lang/tamaki` の共有 checkout は `origin/main` から乖離している
+  （自律サイクルの commit `58e0117` が main に無い）。本 ADR では触っていない —
+  pin は GitHub 側 main（`312e8ae`）を検証して入れた。解消は `git-cleanup-conflict` 案件。
+
+## 併せて行った pin 前進
+
+| project | from | to | 理由 |
+|---|---|---|---|
+| `com-etzhayyim-yabai` | `d7809d8a` | `5f436931` | ADR-0004 + 常駐 tick の初回 commit |
+| `murakumo` | `faa83d6a` | `8fcc93f5` | ローカルが 105 commits 遅れで task plane（ADR-2607256000）が不在だった |
+| `tamaki` | `1edd86f1` | `312e8ae7` | loop/actor spec 追加。ローカル checkout は乖離のため GitHub main を検証して採用 |
+
+いずれも `verify-west-pins` で fast-forward を確認済み。
+"}]
