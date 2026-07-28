@@ -1,0 +1,124 @@
+[{:db/id -1
+  :adr/id "adr-2607287100-kotoba-lang-drpc-wire-format"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-lang-drpc-wire-format"
+  :adr/title "ADR-2607287100: kotoba-lang/drpc — DRPC wire format（frame + packet 再組立）を独立 library として実装、および proto.wire の varint overflow 修正"
+  :adr/status "accepted"
+  :adr/date "2026-07-28"
+  :adr/last_verified "2026-07-28"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["DRPC wire format を io-storj-node でなく独立 repo kotoba-lang/drpc に置く決定と、その根拠"
+   "reader が拒否する条件（id 単調性 / 新 id は未完 packet を破棄 / kind 不変 / payload 上限 / control の粘着）とそれぞれの理由"
+   "incomplete と malformed を区別する契約（長さ超過は待つ、終端しない varint だけが不正）"
+   "proto.wire の varint shift が JVM long を overflow し 2 runtime で挙動が割れていた欠陥と修正"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related
+  ["adr-2607287000-kotoba-lang-io-storj-node-protocol-core"
+   "adr-2607254100-kotoba-lang-sigv4-shared-signer-and-kotoba-byte-slice"]
+  :adr/decision-summary
+  "{:repo \"kotoba-lang/drpc\", :namespaces [drpc.wire], :in-scope [:frame-codec :packet-reassembly :split :reader-state-machine], :out-of-scope [:tls :sockets :service-dispatch :code-generation], :deps [io.github.kotoba-lang/proto], :verification [:storj-drpc-own-output :per-kind-and-per-flag-vectors :two-runtime-parity :negative-controls], :defect-found-in-dependency :varint-shift-long-overflow}"
+  :adr/artifacts
+  "{:repo \"orgs/kotoba-lang/drpc\", :pin \"3c5a2117377a59cae7fd09dc286071b53d626467\", :vector-generator \"orgs/kotoba-lang/drpc/testdata/gen_vectors.go\", :vectors \"orgs/kotoba-lang/drpc/testdata/vectors.edn\", :proto-fix \"kotoba-lang/proto cd8b83ade7a2 (varint shift cap)\", :evidence {:drpc {:jvm \"20 tests / 141 assertions, 0 failures 0 errors\", :cljs \"nbb — same 20 / 141\", :lint \"clj-kondo clean\", :negative-controls \"kind shift → 14 failures; keeping abandoned bytes → 1 failure\"}, :proto {:jvm \"11 tests / 67 assertions\", :cljs \"9 tests / 57 assertions\"}}}"
+  :adr/body
+  "# Context
+
+ADR-2607287000 は io-storj-node の最大の欠落を **DRPC over TLS** と記録し、
+着手順を「DRPC framing → peer TLS → check-in → settlement」とした。
+オーナー指示（2026-07-28）「自前実装したいので、そこはがんばろう」を受け、
+その 1 段目を実装する。
+
+# Decision
+
+## 1. 独立 repo にする — DRPC は Storj 専用ではない
+
+`kotoba-lang/drpc`（namespace `drpc.*`）。DRPC は gRPC の代替として
+storj.io が公開している**汎用 RPC**であり、Storj に固有ではない。
+`io-storj-node` に埋めると、DRPC を使う別のものが現れたときに 2 つ目の実装が
+生える（ADR-2607254100 が SigV4 で数えた代償と同じ形）。
+命名は `repository-rules.edn` の taxonomy に従い prefix 無し = reusable library。
+
+## 2. スコープ — framing だけ
+
+対象: frame の encode/parse、packet への再組立（reader 状態機械）、
+packet の frame 分割（`split`）。
+非対象: socket、TLS、service dispatch、コード生成。
+host が接続を所有し、read が返したバイトをそのまま `feed` に渡す
+（frame 境界に揃える必要は無い）。
+
+## 3. reader は「拒否」が本体
+
+`feed` は状態機械で、規則はすべて実際に効く:
+
+- **frame id は後退できない**（単調）。後退は protocol error であって並べ替え
+  対象ではない。
+- **新しい id は進行中の packet を破棄する。** これは DRPC の意図的な設計で
+  非同期割り込みの表現なので、**破棄したバイトを次の packet の先頭に混ぜない**。
+- **1 packet の frame は kind が一致していなければならない。**
+- **payload には上限がある**（既定 4 MiB）。無いと、peer は `done` を立てない
+  だけでメモリを掴み続けられる。
+- **control は粘着する。** 1 つでも control frame があれば packet 全体が
+  control になり、後続 frame がそれを下ろすことはできない。
+
+## 4. incomplete と malformed を混同しない
+
+**宣言した長さより届いたバイトが少ない frame はエラーではない。**
+参照実装の reader も「まだ足りない」と「長さが手持ちを超える」を区別しない
+——どちらも「もっと読む」。不正なのは**終端しない varint だけ**。
+両者を混同すると、frame が TCP セグメント境界を跨ぐたびに健全な接続を
+落とすことになる。
+
+# Verification
+
+期待値は `storj.io/drpc` 自身の出力（`testdata/gen_vectors.go` が
+`drpcwire.AppendFrame` / `SplitN` を呼ぶ）。checked in した
+`testdata/vectors.edn` を CI が再生成して diff し、さらに各 hex が
+テストに現れることを検査する。
+
+**この小ささの format でこそ交差検証が要る**: control byte は kind・done・
+control を 8 bit に詰めており、**kind の shift 量を間違えても自分の codec の
+中では完全に round-trip する**——相互運用しないだけ。だから round-trip
+property でなく **kind ごと・flag ごとのベクタ**を置いた。実際に shift を
+1→2 に変える negative control は **14 assertion を落とす**（もう 1 件、
+破棄バイトを次 packet に残す変更も 1 件落ちる）。
+
+実測: JVM 20 tests / 141 assertions、nbb で同じ 20/141、clj-kondo clean。
+
+## 依存側で見つけた実欠陥 — proto.wire の varint shift overflow
+
+`drpc.wire` を書いている最中に `proto.wire/read-varint` の欠陥が出た。
+**全バイトが `0x80` の varint**（終端しない）は payload が全ゼロなので
+accumulator が伸びず、長さガードだけが止められる。ところが `shift` が
+無制限に 128 倍され、**10 byte 目で 2^63 に達して JVM の long を overflow**
+する。結果:
+
+- JVM: `long overflow`（算術例外）
+- ClojureScript: double は overflow しないので通過し、意図どおり
+  `longer than 10 bytes` を報告
+
+**同じバイト列で 2 runtime の挙動が割れていた。** しかもこのバイト列は
+peer が自由に送れる。既存テストが見逃したのは、over-long varint の
+ケースで payload が非ゼロだったため accumulator 側が先に発火して
+shift が大きくならなかったから。
+
+修正（`kotoba-lang/proto` `cd8b83a`）: shift は accumulator の上限
+（2^53-1）を超えたら伸ばすのをやめる。近似ではなく安全——その位置に
+非ゼロ payload byte が来れば shift の正確な値に関係なく accumulator が
+上限を超えて次のパスで落ちる。
+
+**これは「2 runtime で回す」ことが理屈でなく実利だった実例**として記録する。
+
+# Consequences
+
+- io-storj-node の最大の欠落の 1 段目が埋まった。残りは peer TLS →
+  check-in → settlement。
+- **まだ satellite と会話できない。** framing はバイト列の話で、接続には
+  TLS と Storj の peer certificate 規則が要る。
+- `proto.wire` の varint は hostile input に対して 2 runtime で同じ挙動に
+  なった。socket から直接 varint を読む利用者（まさに drpc）にとっては
+  robustness の問題であって美観ではない。
+"}]

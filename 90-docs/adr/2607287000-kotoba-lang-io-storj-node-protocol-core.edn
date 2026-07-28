@@ -173,6 +173,9 @@ JS で `Uint8Array` を要求し、base58 decode の戻り値も分岐する）�
   数百リポのローカル checkout が pin より遅れていることによる。wholesale 再生成を
   すると pin を大量に退行させるので、`--entry io-storj-node` の 5 行 diff のみを
   入れた（CLAUDE.md の wholesale 禁止・ADR-2607022900 と整合）。
-- 次に着手するなら DRPC framing → peer TLS → check-in の順。DRPC は
-  varint framing なので `proto.wire` の上に載る。
+- 着手順は DRPC framing → peer TLS → check-in → settlement。
+  **DRPC framing は 2026-07-28 に完了した**（`kotoba-lang/drpc`、
+  ADR-2607287100）。予想どおり `proto.wire` の varint の上に載り、その過程で
+  `proto.wire` の varint が JVM long を overflow する欠陥も出て修正済み。
+  次は peer TLS。
 "}]
