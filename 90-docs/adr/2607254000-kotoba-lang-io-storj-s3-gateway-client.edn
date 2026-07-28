@@ -5,7 +5,7 @@
   :adr/title "ADR-2607254000: kotoba-lang/io-storj — Storj Gateway-MT / Linksharing クライアント（portable .cljc + injected crypto/transport、native uplink は非対象）"
   :adr/status "accepted"
   :adr/date "2026-07-25"
-  :adr/last_verified "2026-07-25"
+  :adr/last_verified "2026-07-28"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/source-format "edn"
@@ -18,13 +18,14 @@
   :adr/superseded_by []
   :adr/amends []
   :adr/related
-  ["adr-2606302300-org-taxonomy-library-placement"
+  ["adr-2607254100-kotoba-lang-sigv4-shared-signer-and-kotoba-byte-slice"
+   "adr-2606302300-org-taxonomy-library-placement"
    "adr-2607173000"
    "adr-2607253500-kotoba-cloudflare-workers-storage-capabilities"]
   :adr/decision-summary
-  "{:repo \"kotoba-lang/io-storj\", :namespaces [storj.sigv4 storj.gateway storj.core storj.linkshare storj.crypto storj.protocols], :surface [:gateway-mt-s3 :linksharing], :out-of-scope [:native-uplink :multipart-upload :acl-policy-lifecycle-cors], :deps :none, :addressing :path-style, :sync-async-seam :then, :verification [:aws-published-vectors :independent-cross-check :two-runtime-parity]}"
+  "{:repo \"kotoba-lang/io-storj\", :namespaces [storj.gateway storj.core storj.linkshare storj.protocols], :surface [:gateway-mt-s3 :linksharing], :out-of-scope [:native-uplink :multipart-upload :acl-policy-lifecycle-cors], :deps [io.github.kotoba-lang/sigv4], :addressing :path-style, :sync-async-seam :then, :verification [:aws-published-vectors :independent-cross-check :two-runtime-parity], :live-gateway-request :never-performed}"
   :adr/artifacts
-  "{:repo \"orgs/kotoba-lang/io-storj\", :sigv4 \"orgs/kotoba-lang/io-storj/src/storj/sigv4.cljc\", :core \"orgs/kotoba-lang/io-storj/src/storj/core.cljc\", :cljs-parity \"orgs/kotoba-lang/io-storj/scripts/verify-cljs.cljs\", :evidence {:jvm \"36 tests / 105 assertions, 0 failures 0 errors\", :cljs \"nbb verify-cljs.cljs — 15 checks pass, negative-control confirmed (deliberate mismatch → exit 1)\", :aws-vectors [\"f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41\" \"aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404\"]}}"
+  "{:repo \"orgs/kotoba-lang/io-storj\", :sigv4 \"orgs/kotoba-lang/sigv4 (extracted by ADR-2607254100; storj.sigv4/storj.crypto no longer exist in this repo)\", :core \"orgs/kotoba-lang/io-storj/src/storj/core.cljc\", :cljs-parity \"orgs/kotoba-lang/io-storj/scripts/verify-cljs.cljs\", :evidence {:as-of \"2026-07-28 (local re-run at pin 2b0cbc28)\", :jvm \"23 tests / 74 assertions, 0 failures 0 errors\", :cljs \"nbb --classpath \\\"$(clojure -Spath)\\\" scripts/verify-cljs.cljs — 7 checks pass\", :note \"initial figures (36 tests/105 assertions, 15 cljs checks) covered the sigv4 code that has since moved to kotoba-lang/sigv4; that repo now reports 28 tests/82 assertions and 18 cljs checks\", :aws-vectors [\"f0e8bdb87c964420e857bd35b5d6ed310bd44f0170aba48dd91039c6036bdb41\" \"aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404\"]}}"
   :adr/body
   "# Context
 
@@ -89,22 +90,28 @@ S3 SDK を入れると JVM 専用 or Node 専用の library になり、kotoba-l
 優先順位（`kotoba wasm` > `clojurewasm` > ClojureScript > nbb）が狙う実行環境を
 そのまま失う。SigV4 の実体は **文字列操作 + SHA-256 + HMAC-SHA-256** であり、
 後者2つは対象 runtime のすべてに既にある（`javax.crypto` / `crypto.subtle`）。
-約500行の library と引き換えに portability を取る。deps.edn は `:deps {}`。
+約500行の library と引き換えに portability を取る。
+
+**2026-07-25 追記**: この SigV4 実装は翌 ADR-2607254100 で `kotoba-lang/sigv4` へ
+切り出され、`storj.sigv4` / `storj.crypto` はこの repo から**削除された**。
+「AWS SDK に依存しない」判断は変わっていない（変わったのは実装の置き場所だけ）。
+deps.edn は `:deps {}` ではなく `io.github.kotoba-lang/sigv4` の git dep 1 本になり、
+`storj.protocols` は `IHttp` だけを持つ。以下の設計記述はその library に引き継がれている。
 
 ## 3. 層の分離 — pure な文字列層と、host に注入させる crypto/transport
 
 `kotoba.lang.ipfs` の契約（ADR-2606302300 §Step-1: pure `.cljc`、zero network
 I/O、zero vendor SDK）を踏襲する:
 
-- `storj.sigv4` は **crypto を持たない**。encoding / canonicalization /
-  string-to-sign までの全域が data → data の total function。clock も読まない
-  （`:now` は呼び出し側が ISO-8601 で渡す）。**この層が pure であることが、
-  後述の AWS 公表ベクタで固定できる理由そのもの**。
+- 署名の文字列層（現 `sigv4.core`、当時 `storj.sigv4`）は **crypto を持たない**。
+  encoding / canonicalization / string-to-sign までの全域が data → data の
+  total function。clock も読まない（`:now` は呼び出し側が ISO-8601 で渡す）。
+  **この層が pure であることが、後述の AWS 公表ベクタで固定できる理由そのもの**。
 - 鍵導出は `signing-key-chain` が **HMAC の入力列だけを返す** seam にした。
   host が自前の HMAC を畳み込むので、この namespace は cipher に一切触れない。
-- `storj.protocols` の `ICrypto` / `IHttp` が host seam。`storj.crypto` は
-  任意の既定実装（javax.crypto / WebCrypto）で、独自 crypto を持つ host は
-  無視してよい。
+- host seam は `ICrypto`（現 `sigv4.protocols`）と `IHttp`（`storj.protocols`）。
+  既定 `ICrypto` 実装（javax.crypto / WebCrypto）は `sigv4.crypto` にあり、
+  独自 crypto を持つ host は無視してよい。
 
 **RFC 3986 encoding は `encodeURIComponent` + 例外パッチ（JS の定番レシピ、かつ
 signature mismatch の常習犯）ではなく UTF-8 バイトから直接実装した** — 実装が
@@ -178,11 +185,11 @@ SigV4 は静かに失敗する — 1バイト違っても request は妥当に�
 
 - kotoba-lang に content addressing（IPFS/IPLD/IPNS）とは別軸の、erasure-coded な
   durable storage 経路ができた。B2 一択だった実体バックエンドに選択肢が増える。
-- 副産物として **再利用可能な portable SigV4 実装**（`storj.sigv4` + `storj.crypto`）
-  ができた。現在 `kotobase-ipfs.sigv4` / `com-backblaze-secure` が各自コピーで
-  持っている B2 署名は、将来これに寄せられる（**今回は寄せない** — net-kotobase-ipfs
-  の「single-purpose / low-privilege に保つためコピー」は当時の正しい判断であり、
-  retroactive に書き換えない。移行するなら対象を決めて別途 ADR 化する）。
+- 副産物として **再利用可能な portable SigV4 実装**ができた。初版はこれを
+  「今回は寄せない」（既存コピーは当時の正しい判断なので retroactive に書き換えない）
+  としたが、**その判断はオーナー指示で翌日覆り、ADR-2607254100 で
+  `kotoba-lang/sigv4` として切り出された**。workspace 内の SigV4 実装 6 箇所は
+  すべてそこへ移行済み（2026-07-28 確認）。新規に SigV4 を書かない。
 - multipart upload と native uplink は意図的な穴として残る。大きいオブジェクトを
   Storj に置きたい呼び出し元が現れた時点で、そのサイズプロファイルに対して設計する。
 "}]

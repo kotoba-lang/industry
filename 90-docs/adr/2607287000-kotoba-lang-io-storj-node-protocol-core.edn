@@ -1,0 +1,178 @@
+[{:db/id -1
+  :adr/id "adr-2607287000-kotoba-lang-io-storj-node-protocol-core"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-lang-io-storj-node-protocol-core"
+  :adr/title "ADR-2607287000: kotoba-lang/io-storj-node — Storj storage node の protocol core（署名対象バイトを Storj 実装から交差検証、DRPC/TLS は非対象）と proto.wire の追加"
+  :adr/status "accepted"
+  :adr/date "2026-07-28"
+  :adr/last_verified "2026-07-28"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["kotoba-lang における Storj node 側実装の有無（2026-07-28 時点で不在）と、新規 repo kotoba-lang/io-storj-node を起こす決定"
+   "io-storj-node のスコープ境界（identity / 署名対象バイト / order limit admission / piece layout は対象、DRPC・TLS・identity 生成・settlement・streaming・uplink 側は非対象）"
+   "署名対象バイトを推測でなく Storj 実装（storj.io/common）の出力で固定する検証戦略と、それが実際に捕まえた 3 件の誤り"
+   "kotoba-lang/proto に protobuf wire codec（proto.wire）を追加し、unknown field を保存する lossless 設計にした決定"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related
+  ["adr-2607254000-kotoba-lang-io-storj-s3-gateway-client"
+   "adr-2607254100-kotoba-lang-sigv4-shared-signer-and-kotoba-byte-slice"
+   "adr-2606302300-org-taxonomy-library-placement"]
+  :adr/decision-summary
+  "{:repos [\"kotoba-lang/io-storj-node\" \"kotoba-lang/proto\"], :namespaces [storj.node.id storj.node.pb storj.node.orders storj.node.piece storj.node.protocols storj.node.bytes proto.wire], :in-scope [:node-id :signing-form-bytes :order-limit-admission :piece-layout :v1-piece-header], :out-of-scope [:drpc :tls-peer-identity :identity-generation :settlement :retain-gc :graceful-exit :streaming :uplink-side], :deps [io.github.kotoba-lang/proto io.github.kotoba-lang/io-multiformats], :verification [:storj-own-encoder-vectors :published-satellite-node-ids :two-runtime-parity :negative-controls], :live-satellite-request :never-performed}"
+  :adr/artifacts
+  "{:repo \"orgs/kotoba-lang/io-storj-node\", :pin \"63bd7c9eed992a54c783049ac8273c614871284c\", :vector-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_vectors.go\", :vectors \"orgs/kotoba-lang/io-storj-node/testdata/vectors.edn\", :wire-codec \"orgs/kotoba-lang/proto/src/proto/wire.cljc (merged 0eba39ede385)\", :evidence {:io-storj-node {:jvm \"34 tests / 140 assertions, 0 failures 0 errors\", :cljs \"nbb — same 34 tests / 140 assertions\", :lint \"clj-kondo 0 errors 0 warnings\", :negative-controls \"3/3 reintroduced defects fail the suite\"}, :proto {:jvm \"11 tests / 61 assertions\", :cljs \"9 tests / 51 assertions\", :negative-control \"ignoring :raw fails on a non-canonical length prefix\"}}}"
+  :adr/body
+  "# Context
+
+オーナー質問（2026-07-28）: 「今の kotoba-lang で storj の node, client はそれぞれ
+設計実装されている?」→ 実測回答は **client のみ**（`io-storj`、S3 Gateway-MT /
+Linksharing surface）。続いて「また node も設計実装」。
+
+実測（2026-07-28）: node 側の資産は**ゼロ**だった。erasure coding / Reed-Solomon /
+satellite / DRPC の実装は `orgs/` 全体の grep で 1 件も無く、ADR-2607254000 が
+native uplink protocol を明示的に out-of-scope としていた。
+
+# Decision
+
+## 1. node は client より小さい — erasure coding は node 側に無い
+
+**storage node は不透明な share を保持するだけで、何も復号せず erasure coding も
+しない。** uplink が暗号化と Reed-Solomon を済ませてから node に接触するので、
+node は 1 segment の 1 share を、他の share の中身を知らないまま持つ。
+
+これが「node 側は library として成立するが uplink 側は成立しない」理由であり、
+ADR-2607254000 が native uplink を退けた根拠（erasure coding + satellite protocol の
+再実装は「オブジェクトストレージが欲しい」の副作用としてやる規模ではない）は
+**node 側には当たらない**。だから node は作れる。
+
+## 2. スコープ — protocol core であって、動く node ではない
+
+`kotoba-lang/io-storj-node`（namespace `storj.node.*`）に実装したもの:
+
+| ns | 中身 |
+|---|---|
+| `storj.node.id` | node ID の base58check / version byte / difficulty |
+| `storj.node.pb` | Storj の各メッセージと、**その署名が覆う正確なバイト列** |
+| `storj.node.orders` | order limit を実行してよいかの判定と、駄目な理由の全列挙 |
+| `storj.node.piece` | blob path と V1 piece header（512 byte 予約領域） |
+| `storj.node.protocols` | host seam（`IVerifier` / `IClock` / `IBlobStore`） |
+| `storj.node.bytes` | runtime を知っている唯一のファイル |
+
+**非対象（README に明記）**: DRPC over TLS と Storj の peer certificate 規則
+（これが最大の欠落で、現状 satellite と会話できない理由）/ identity 生成（PoW と
+CA・leaf 証明書）/ order settlement・check-in・retain GC・graceful exit /
+streaming（`IBlobStore` は blob 全体を動かす）/ uplink 側一式。
+
+**live satellite への request は一度も行っていない。**
+
+## 3. 検証 — 自分の出力を自分に assert しない
+
+この protocol の要点は自己検証できない。`encode-order-limit-for-signing` が
+satellite の署名したバイトを再現するかは gogoproto の `nullable=false` 扱いと
+Go のゼロ時刻定義の問題であって、`.proto` を読んで推論する方法は
+**「もっともらしいが何も検証しない実装」を書く最短経路**である。
+
+そこで期待値を外から採った:
+
+- **Storj 自身のコード**: `testdata/gen_vectors.go` が `storj.io/common` を
+  リンクし、`signing.EncodeOrderLimit` / `EncodeOrder` / `EncodePieceHash` /
+  `NodeID.String()` / `PieceID.String()` の出力を吐く。それがテストのリテラル。
+  出力は `testdata/vectors.edn` として checked in し、CI が再生成して diff する。
+- **公開 identity**: Storj が公表している satellite node ID 4 件
+  （us1 / eu1 / ap1 / saltlake）を全項目デコード — 37 byte 長・version byte・
+  double-SHA256 checksum・difficulty（30 / 35 / 30 / 36）。
+- **2 runtime**: JVM と nbb で同じ suite。SHA-256 は `MessageDigest` と
+  `@noble/hashes` という別実装を通るので、node ID の checksum は両者で別コードが
+  計算する。varint は JS の bitwise 32bit 切り捨てと 2^53 境界を跨ぐ。
+
+### 実際に捕まえた 3 件の誤り（すべて「署名が通らない」以外の症状を出さない種類）
+
+1. **field 番号**: `limit` / `action` / `satellite_signature` を 8 / 9 / 6 と
+   記憶で書いた。正解は **6 / 7 / 10**。公開 `.proto` を取得して発覚。
+2. **ゼロ timestamp の表現**: 未設定の timestamp が wire 上 `seconds = 0` で来ると
+   仮定した。**Go のゼロ時刻は西暦 1 年**なので実際は `-62135596800`（10 byte の
+   2 の補数 varint）で来て、signing 形式はそれを見て field を落とす。
+   epoch と仮定すると **全 satellite 署名が落ちる**。
+3. **node ID の最終バイト**: ハッシュの一部と扱った。実際は **identity version**
+   で、`String()` はそこをゼロにして base58check の version field へ移し、
+   `NodeIDFromString` は書き戻し、`Difficulty()` は読み飛ばす（走査を 31 byte 目から
+   始め、飛ばした分を 8 bit として加算するので**最小値は 8**）。Storj 自身の
+   encoder と round-trip が一致しないことから発覚した。
+
+**3 件それぞれを再導入して suite が落ちることを確認済み**（落ちない検証は検証ではない）。
+
+## 4. 署名は「signature field を消す」ことではない
+
+Storj は送るメッセージに署名しない。`orders.proto` は `OrderLimitSigning` /
+`OrderSigning` / `PieceHashSigning` を別に定義し、`signing.EncodeOrderLimit` が
+wire メッセージをそこへ複写してから marshal する（gogoproto が `nullable=false`
+を round-trip できないため、と当該ファイルのコメントが述べている）。
+
+検証側にとっての帰結:
+
+- signature field は **空でなく不在**。
+- wire 上「存在するがゼロ」の timestamp は署名形式では**落ちる**。wire 側は
+  `nullable=false` なので未設定でも常に出力され、署名側は nullable なので
+  `IsZero()` で落ちる。
+- `deprecated_uplink_id` / `uplink_public_key` も同様。
+- **unknown field は残る。** `EncodeOrderLimit` は `XXX_unrecognized` を明示的に
+  複写する。新しい schema の satellite は、この node が知らない field を含めて
+  署名する。
+
+## 5. protobuf wire codec は `kotoba-lang/proto` に置く（新 repo を作らない）
+
+上記の最後の点が設計を決めた: **decoder が未知 field を落とす実装だと、
+新しい satellite の署名を 1 つも検証できない。** そこで
+`kotoba-lang/proto` に `proto.wire` を追加した（`proto.core` は `.proto`
+テキスト生成器で wire codec ではなかった。workspace 全体に wire codec は不在）。
+
+`decode` は **lossless**: 各 field が「tag を含む占有バイト列そのもの」を `:raw`
+として保持し、`encode` はそれを連結する。round-trip の byte 一致が注意ではなく
+構造で保証され、unknown field は生き残り、他実装が書いた非正準 varint もそのまま
+戻る。「signature field を落として残りを再現する」という検証操作は
+`remove-field` + `encode` になる。
+
+**新しい repo を作らず既存 `proto` に足したのは、ADR-2607254100 の教訓
+（SigV4 が 6 箇所に重複していた）を適用した結果。** 依存は
+`proto` と `io-multiformats`（base58 / base32 / SHA-256）の 2 本だけで、
+Storj SDK も TLS スタックも protobuf runtime も入れない — どれも runtime を
+1 つに固定してしまい、それこそが避けている当のもの。
+
+`io-multiformats` の byte 表現は runtime 依存（`sha256` は JVM で `byte-array`、
+JS で `Uint8Array` を要求し、base58 decode の戻り値も分岐する）なので、
+`storj.node.bytes` 1 ファイルに正規化を隔離した。**2 つ目の SHA-256 実装を書く
+方が代替案だったが、それはまさに ADR-2607254100 が代償を数えた形。**
+
+## 6. 判定は理由を全部返す
+
+`storj.node.orders/admit` は最初の失敗で止めず、受け入れられない理由を全部返す。
+また **署名検証を最後に回す**（内容が既に不整合なら asymmetric crypto を一切
+実行しない）。これは最適化ではなく、malformed な limit の洪水に対する性質。
+
+# Verification（2026-07-28 実測）
+
+- `io-storj-node`: JVM 34 tests / 140 assertions、nbb で同じ 34 / 140、
+  clj-kondo 0 errors 0 warnings。negative control 3/3 が失敗を検出。
+- `proto`: JVM 11 tests / 61 assertions、nbb 9 tests / 51 assertions。
+  `:raw` を無視すると非正準 length prefix のテストが落ちることを確認済み。
+- 依存の pin: `proto` は `0eba39ede385`（本 ADR で main 化）、
+  `io-multiformats` は `310724803db6`。
+
+# Consequences
+
+- kotoba-lang が Storj を「使う」側（`io-storj`）だけでなく「なる」側の中核を持った。
+  ただし **動く node ではない** — DRPC/TLS が入るまで satellite と会話できない。
+- **副産物として portable な protobuf wire codec ができた。** unknown field 保存が
+  必要な署名検証用途（Storj に限らない）はこれを使う。新規に書かない。
+- **登録時の注意（実測）**: `nbb scripts/gen-west-manifest.cljs --check` は
+  2026-07-28 時点で STALE を返すが、これは**本件と無関係の既存状態**で、
+  数百リポのローカル checkout が pin より遅れていることによる。wholesale 再生成を
+  すると pin を大量に退行させるので、`--entry io-storj-node` の 5 行 diff のみを
+  入れた（CLAUDE.md の wholesale 禁止・ADR-2607022900 と整合）。
+- 次に着手するなら DRPC framing → peer TLS → check-in の順。DRPC は
+  varint framing なので `proto.wire` の上に載る。
+"}]
