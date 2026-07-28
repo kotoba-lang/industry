@@ -112,11 +112,11 @@ deferral する規約を入れて防いだ（ADR-0003 §4）。
 
 **残ギャップ（「世界中のドメイン」の本体）**
 
-- **判定器はあるが、母集団の能動供給が無い。** CT log の全 stream 購読や CZDS zone file の
-  取り込みは未設計で、現状の入力は「このコーパス」と `ingest --live --domain <fqdn>` の 1 件 pull。
-  ADR-2607256100 は有料 feed（SecurityTrails/DNSDB/Recorded-Future）を
-  `:feature-flagged-input` 限定・非 system-of-record と決めているので、供給経路は
-  public/free 主系（crt.sh CT stream / CZDS）で設計する必要がある。
+- ~~判定器はあるが、母集団の能動供給が無い~~ → **2026-07-28 に解消**（ADR-2607283100 /
+  子リポ ADR-0004）。Certificate Transparency log を直接 tail する `ct_watch` が毎時 tick で
+  供給する。crt.sh は当初の候補だったが、ブランド横断クエリが 502/503 を返して母集団供給には
+  使えないことを実測した（`?q=mastercard.com` → 503）。実際に使うのは CT log 本体の
+  `get-sth` / `get-entries`。ただし **sampling であって完全網羅ではない**。
 - **ブランド roster は 5 件の手書き。** 世界中のブランドは網羅しない。
 - **co-hosting は IP 単位のみ**（ASN 単位は大手クラウドで弱すぎるため入れていない）。
 - `cloud-itonami/yabai` の旧シードは **TRANSFORM のまま残置**。今回は
