@@ -118,6 +118,24 @@ rejections carry NO reason — every cause looks identical from outside
 3. `report` が未定義の `pad` を参照。`format` は JVM 専用でこれは `.cljc` — Node
    ランナーでも同じレポートが出る必要がある（誰でもデプロイに向けて撃てることが要点）。
 
+## 復旧（2026-07-28）
+
+原因 3・4・5 をすべて修正して 7 actor を再デプロイし、**読み・書き・ガバナ拒否・
+`/escalations` のすべてが稼働**することを実測した（buyer 登録が 3 triples commit、
+未登録買い手は `buyer-unknown` で拒否、7/7 が `/escalations` に応答）。
+
+- **署名符号化**: apex 経路も `:sig-encoding :base64`（原因 5）。`v1-cacao` は既に
+  そうしていた（kotobase-client #12）のに apex 経路だけ取り残されていた。
+- **read が ref 名を送る**: `q`/`datoms`/`pull` に `db_name` を追加（原因 4）。
+- **404 を空に潰さない**: `UnknownGraphCid` 等は伝播させる。**読めないストアが空の
+  ストアに見えてはいけない** — 空のデータベースは日常的に見るものなので誰も違和感を
+  持たず、これがデータ喪失に見えた直接の原因だった。
+- **`load-one` の退避（残る後退）**: ブリッジは bound subject を拒否する（400
+  `InvalidDatomicRequest`）ので、kind 単位読み + client 側フィルタにした。
+  **読み取り精度の実質的な後退**であり、graph 全走査には戻っていない（kind 1 属性で
+  区切られたまま）が、買い手 1 件の要求で全買い手が流れる。ブリッジが bound subject を
+  受けるようになれば 1 クエリに戻り、`marketplace.edge` の他は何も変わらない。
+
 ## 検証（全て 2026-07-28 実測）
 
 | repo | tests | assertions |
