@@ -93,6 +93,26 @@ tamaki status            run-1785239117549-7bfecc85 :mode :external :status :suc
 tests                    49 tests / 10083 assertions green
 ```
 
+## 続き（2026-07-28、同日）— 自律ループの最適化対象
+
+「成熟度を自律的に ai agent が上げるには」への答えは **tamaki が上げる側・murakumo は基盤**だが、
+機構は両方すでに動いており、足りなかったのは**数値**だった。子リポ **ADR-0005** で決定論的な
+fitness function を入れた（`bb -cp src -m yabai.methods.maturity` → `docs/maturity.edn`、
+初回 231/1000）。floors（benign 36 件が claim ゼロ / 明白な偽装 7 件を取りこぼさない）が
+gradient（coverage 寄りの 5 次元）をゲートし、**閾値を緩める改悪は score 0** になる。
+tamaki の `loops/yabai-phishing-watch.edn` はこの score を `:loop/fitness` として名指す。
+
+**supervisor の挙動について前言を訂正する**: `bin/tamaki-supervisor` は `actors/*.edn` を
+**全部自動発見して 60 秒ごとに `actor reconcile --execute` する**。`loops/` が
+`TAMAKI_LOOP_SPEC` 1 本なのは正しいが、actors には当てはまらない。したがって
+`actors/yabai-phishing-watch.edn` は supervisor の checkout が main に同期した時点で
+自律的に run を spawn し始める（現在その checkout は main から乖離しており未稼働）。
+
+**radicle の成長も止まっていた**: identity は west manifest にあり node も稼働していたが、
+checkout に rad remote が無く rad 側 main は `cebe2b4` で 7 commits 遅れていた。
+`actor.edn` の `:rad-rid` + tick の `mirror-to-radicle!` で両プレーンに流れるようにし、
+GitHub / radicle とも `e2c1d48` に揃えた。
+
 ## Consequences
 
 **Good**
