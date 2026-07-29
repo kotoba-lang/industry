@@ -344,9 +344,16 @@
   取れるように、名前付き ref も一緒に取る）。"
   (when-not (zero? (:exit (git dir ["cat-file" "-e" (str sha "^{commit}")])))
     (git dir ["fetch" "--quiet" "origin" "+refs/heads/*:refs/heads/*"] {:timeout 1800000}))
-  ;; PR head は refs/heads の外（refs/pull/N/head）に居るので、branch の
-  ;; fetch では届かない。PR 検証のためにここで2段目を引く。
+  ;; PR head は refs/heads の外（refs/pull/N/head）に居るので、branch の fetch
+  ;; では届かない。まず **sha を直に要求する** — GitHub は ref から到達可能な
+  ;; sha の直指定 fetch を許可する（実測 2026-07-29、kotoba-lang/nekko の PR
+  ;; head で確認）。mirror は既に main の履歴を持っているので増分で済む。
   (when-not (zero? (:exit (git dir ["cat-file" "-e" (str sha "^{commit}")])))
+    (git dir ["fetch" "--quiet" "origin" sha] {:timeout 1800000}))
+  ;; それでも駄目なときだけ pull refs を総取りする。これは重い経路で、root は
+  ;; refs/pull/*/head を 1,411 本持つ（うち open は 1 本）。常用しない。
+  (when-not (zero? (:exit (git dir ["cat-file" "-e" (str sha "^{commit}")])))
+    (log "ensure-sha: falling back to a full refs/pull fetch for" org-repo (sha7 sha))
     (git dir ["fetch" "--quiet" "origin" "+refs/pull/*/head:refs/pull/*/head"]
          {:timeout 1800000}))
   (when-not (zero? (:exit (git dir ["cat-file" "-e" (str sha "^{commit}")])))
