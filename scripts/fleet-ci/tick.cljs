@@ -377,7 +377,18 @@
   tarball を取って絞る経路）。git 化でどちらも同じ形になったので :include-from
   は無くなり、:include-ext があればこれ、無ければ全体、の 2 択。"
   [org-repo sha {:keys [include-ext min-files]}]
-  (let [f (path/join cache-dir (str (str/replace org-repo "/" "-") "-" (sha12 sha) "-filtered.tar.gz"))]
+  ;; **キャッシュキーに include-ext を含める。** 含めないと「1 repo = 1 filter」を
+  ;; 暗黙に仮定することになり、同じ repo・同じ sha に別 filter の gate を足した
+  ;; 瞬間に、先に走った方の tarball を後の方が黙って再利用する。実際に起きた
+  ;; （2026-07-29）: root の docs-edn gate（[".edn"]）が先に tarball を作り、
+  ;; repository-roles gate（[".edn" ".cljs"]）がそれを掴んで verifier 本体を
+  ;; 見つけられず exit 90。gate 側の床が拾ったので false-pass にはならなかったが、
+  ;; 床が無ければ「.cljs が無い tree で検査して合格」になっていた。
+  (let [slug (if (seq include-ext)
+               (str "-" (str/join "" (map #(str/replace % #"[^a-zA-Z0-9]" "") include-ext)))
+               "")
+        f (path/join cache-dir (str (str/replace org-repo "/" "-") "-" (sha12 sha)
+                                    "-filtered" slug ".tar.gz"))]
     (if (fs/existsSync f)
       f
       (let [m (ensure-sha! (mirror! org-repo) org-repo sha)
