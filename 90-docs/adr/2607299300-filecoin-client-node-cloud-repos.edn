@@ -277,7 +277,34 @@ wrapper → f410f addressing → selector → ABI decode と通す。**5 repo �
 正しいことは offline テストでは示せない。**
 
 これで各 README の「no live request has ever been made from this code」は
-read 経路については解消した。**write (署名した message の送信) は未実施。**
+read 経路については解消した。
+
+### write 経路: 資金を使わずに「署名が受理されること」を実証した
+
+lotus の `MessagePool.Add` は `checkMessage` → `ValidForBlockInclusion` →
+**`VerifyMsgSig`** の順で検証し、**その後で**送信者の actor を引く。したがって
+**空の account から同じ message を2回 push** する——1回は正しく署名し、1回は
+署名の1 bit を反転させる——と、拒否される**場所が変わる**:
+
+    正しい署名    failed to look up actor state nonce: resolution lookup failed
+    1 bit 反転    signature verification failed: failed to validate signature
+
+**2つの異なるエラーが証拠**であり、これは Go を読んだ結論ではなく node が
+言ったこと。同じエラーが2回なら「署名検査に到達していない」ので、その場合
+probe は成功ではなく**失敗**する。
+
+資金は動かず chain にも何も載らない: balance を先に読み、**厳密に 0 でなければ
+push しない**ので両方とも構造的に拒否される。mainnet ではなく calibration。
+
+**主張の範囲は厳密に**: lotus の `VerifyMsgSig` がこのコードの署名
+(digest・65 byte 形式・address 導出・CBOR) を受理する、ということだけ。
+message が正しく**実行される**ことや、資金のある account での gas / nonce の
+扱いが正しいことは示していない。
+
+初版の probe は1回だけ push して「rejected at funds なら OK」としていたが、
+返ってきたのは `Actor not found` だった——account が一度も存在しないので
+balance 検査に到達しない——のに `ok` と報告していた。**何も立証しない結果を
+成功として報告していた**ので、differential に置き換えた。
 
 ### live 検証が初回実行で見つけたバグ
 
@@ -312,10 +339,10 @@ offline テストは1つも捕まえられず、最初の live `GasEstimateMessa
   `orgs/network-awai/cloud-mamori` consumers=1) で、どちらも dir 不在かつ
   west 未登録。本 ADR の 5 repo は audit に一切現れない。この 2 件の修復は
   skill `git-cleanup-conflict` の担当で、別タスク。
-- **(a) native 経路 (f1・secp256k1) は transport まで閉じた。** read は実ノードで
-  検証済み。**残るのは write の実行だけで、それには資金のある testnet 鍵が要る**
-  (安全床②により agent は資金操作をしない)。write 経路の失敗様態は現状
-  「議論した」だけで「実証した」ではない。
+- **(a) native 経路 (f1・secp256k1) は transport まで閉じ、署名が実ノードに
+  受理されることも実証した** (上記 differential probe)。**残るのは資金のある
+  account での実送信だけ**——gas / nonce の扱いはまだ「議論した」段階で、
+  それには資金のある testnet 鍵が要る (安全床②により agent は資金操作をしない)。
 - **(b) Ethereum 経路 (f410f・delegated) は依然未実装。** keccak が JVM 専用
   だという以前の記述は誤り (`eth-crypto` は dual-platform 化済み)。実際に
   足りないのは lotus が要求する Filecoin↔EthTransaction の byte 一致
