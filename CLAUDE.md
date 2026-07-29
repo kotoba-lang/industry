@@ -432,6 +432,47 @@ skill `new-project-scaffold` を参照。
 WIP を並行セッションが約40分間隔で退避し続け stash が20個堆積。棚卸しの結果、実質的な
 未着地は2件だけで残り18件は着地済み/陳腐化だった）。
 
+### 分岐を作る前に、必ず local を remote に同期する（前提条件・repo-wide mandatory、2026-07-29）
+
+**agent loop の起動・Agent への委譲（fork / fresh agent）・`git worktree add`・
+`git checkout -b` / `git switch -c`・新しい clone からの作業開始 — これらを行う「前」に、
+対象リポジトリを必ず remote と同期する。** 同期していない状態で分岐を作らない。
+
+```bash
+git fetch origin
+git merge --ff-only origin/main      # FF 不可なら停止。rebase しない
+# 子リポも触るなら、その repo でも同じことをする
+```
+
+**分岐元は必ず `origin/main` を明示する**（ローカル `main` ではなく）。これが最も確実で、
+ローカルが遅れていても正しい base から始まる:
+
+```bash
+git worktree add -b <branch> /tmp/root-<name> origin/main   # ✅ 分岐元が明示されている
+git worktree add -b <branch> /tmp/root-<name>               # ❌ 遅れたローカル HEAD から分岐する
+```
+
+**なぜ「分岐の瞬間」が特別なのか。** 遅れた base の上に積んだ commit は、後から同期しても
+遅れたままになる — その worktree で行った作業**全部**が古い base に載っており、着地時に
+乖離・conflict・pin 退行として現れる。push 直前に同期しても手遅れで、そこから救うには
+CLAUDE.md が禁じている rebase か、clean branch への移植が要る。**同期のコストは分岐前なら
+`git fetch` 1回、分岐後なら作業のやり直し**という非対称性が、この規則が独立して存在する
+理由。
+
+**SessionStart hook（`session-start-branch-sync-check.cljs`）はこれを代替しない。**
+あれはセッション開始時点の ahead/behind を1回警告するだけで、その後セッション中に上流が
+進んだ場合も、警告を見たまま同期せず分岐した場合も止めない。実測（2026-07-29、この規則が
+生まれたセッション）: hook が「main が origin/main から 0 ahead / 78 behind」と正しく警告
+したにもかかわらず、同期しないまま作業を開始し、superproject の同期は数十分後の
+push 直前まで行われなかった。**警告を読むことと同期することは別の動作**で、前者は後者を
+保証しない。
+
+**これは PreToolUse hook `.claude/hooks/branch-create-main-sync-guard.cljs` で強制する**
+（`.claude/settings.json` に登録済み）。対象は `git worktree add` / `git checkout -b` /
+`git switch -c` / `git branch <new>`。**分岐元を `origin/<default>` で明示していれば
+ブロックしない**（それが推奨形であり、ローカルの遅れと無関係に正しい base になるため）。
+判定不能時は fail-open（セッションを止めない）。
+
 - **superproject 本体 checkout（このフォルダ）は「統合・閲覧専用」。** ここでは編集・
   commit・ブランチ切替をしない。やってよいのは `git fetch` / `--ff-only` pull /
   `west update` / 読み取りだけ。本体に未コミット編集が転がっていると、並行セッションの
@@ -510,6 +551,13 @@ fork がそちらを実行許可として拾い、指示範囲を超えて実装
   を付けて隔離する。** それが使えない/不十分な場合は上記の sibling-path
   `git worktree add` を手動で切ってから作業させる。superproject 本体の `orgs/` に
   直接書き込ませない。
+- **委譲・agent loop の起動の前に、local を remote に同期しておく**（上記
+  「分岐を作る前に、必ず local を remote に同期する」）。`isolation: "worktree"` の
+  worktree はその時点のローカル HEAD から切られるので、**遅れた checkout から委譲すると
+  agent の作業全部が遅れた base に載る**。`git worktree add` を手で切る場合と違い、
+  委譲や loop の起動は git コマンドではないので **PreToolUse hook は止められない** —
+  ここだけは prose の規律で守るしかない。委譲前に `git fetch origin &&
+  git merge --ff-only origin/main` を済ませてから `Agent` を呼ぶ。
 
 ## 大容量バイナリの扱い（B2 + DataLad）
 
