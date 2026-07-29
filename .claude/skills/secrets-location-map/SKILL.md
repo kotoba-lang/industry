@@ -273,9 +273,47 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     seal され、priv で open する。recipient を rotate outするには reseal 時に
     その pub を外す。
 
-## Murakumo generation caller gate (ADR-2607161750、2026-07-16)
+## ⚠ kagi vault は 2 つある — `~/.kagi` が live（2026-07-29 実測）
 
-- **`MURAKUMO_GENERATION_TOKEN_SECRET`（kagi vault、compartment `gftdcojp`）** —
+**`bin/kagi` は自身の repo root へ `cd` するため、既定では
+`orgs/kotoba-lang/kagi/.kagi/vault.edn`（2026-07-17 付・56KB の**古い方**）を読む。
+実際に使われている vault は `~/.kagi/vault.edn`（2.1MB、日々更新）。**
+下の項目を「無い」と判断する前に必ず `KAGI_HOME=$HOME/.kagi` を付けて引き直すこと:
+
+```bash
+KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get <ITEM>
+```
+
+実害: 2026-07-29、この差で murakumo generation secret を「消失」と誤判定しかけた
+（結果的に live 側にも無く再発行したが、判定根拠としては不正確だった）。
+**安全床⑦により、見つからない時に `kagi ls` で総当たり列挙してはいけない** —
+既知の識別子で狙い撃ちし、それでも無ければオーナーに聞く。
+
+## Murakumo generation caller gate (ADR-2607161750、2026-07-16 / 2026-07-29 再発行)
+
+- ⚠ **2026-07-29 実測: 下記 2 item は `~/.kagi`（live vault）にも
+  `orgs/kotoba-lang/kagi/.kagi`（旧 vault）にも存在しなかった** —
+  `MURAKUMO_GENERATION_TOKEN_SECRET` / `MURAKUMO_CHAT_TOKEN_SECRET_2` とも
+  `no such item`。ADR-2607161750 / ADR-2607171800 addendum 2 の「kagi 保管を正とする」
+  という記述は**実態と乖離していた**（保管されなかったか、後に失われた）。
+  オーナー承認（2026-07-29「kagi は再発行して ok」）のもとで再発行した。詳細は
+  ADR-2607299960。
+- **再発行後の現在地（すべて `KAGI_HOME=$HOME/.kagi` で引く）**:
+  - `MURAKUMO_GENERATION_TOKEN_SECRET`（compartment `gftdcojp`）— 新規生成。
+    **Worker `murakumo-generation-proxy` の `MURAKUMO_TOKEN_SECRET_2`（optional な
+    第2検証スロット、未設定だった）へ投入**したので、**primary は無傷** =
+    `net-babiniku` / `network-isekai` の既存 caller は壊れていない（rotation ではない）。
+  - `MURAKUMO_DOUGAKA_GENERATION_TOKEN`（compartment `gftdcojp`）— 上記 secret で
+    mint した subject=`dougaka` / scope=`generation` / ttl 90 日の実 token。
+    dougaka pipeline が `MURAKUMO_GENERATION_TOKEN` として読む。
+  - **`murakumo-generation-proxy` は 2026-07-15 版が動いていて `_2` を読まなかった**
+    ため、main から rebuild して再 deploy 済み（version `9a183830`）。
+- **どのホストを叩くか**: 実 API は **`generation.murakumo.cloud/api/v1/generation`**。
+  同じ token は `murakumo.cloud` では 401（別 worker・別 secret）。job status と
+  artifact も同じホストで引く（API が返す URL は `murakumo.cloud` を指すので
+  ホストを差し替える必要がある）。
+- 旧記述（参考、上記のとおり item は実在しなかった）:
+  **`MURAKUMO_GENERATION_TOKEN_SECRET`（kagi vault、compartment `gftdcojp`）** —
   `generation.murakumo.cloud`（Worker `murakumo-generation-proxy`）の caller gate
   `MURAKUMO_TOKEN_SECRET` と、その caller（`net-babiniku` / `network-isekai` 両
   Pages の `MURAKUMO_CALLER_SECRET`）が共有する HMAC signing secret の正本。
@@ -288,6 +326,21 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   ⚠ `murakumo.cloud` site Worker（chat/inference gate）と `api.murakumo.cloud`
   （local-murakumo、`MURAKUMO_PROXY_TOKEN` 系）は**別の secret** — この item では
   ローテーションも検証もできない。
+
+## kotobase.net archive write token (2026-07-29)
+
+- **`KOTOBASE_ARCHIVE_TOKEN`（kagi vault、compartment `net-kotobase`）** —
+  `kotobase.net` の first-party content-addressed archive（`PUT /ipfs/:cid`、
+  `kotobase.archive-put`）の write gate。Worker `net-kotobase` の同名 secret と同値。
+  **この Worker secret は以前から設定されていたが値はどこにも保管されておらず
+  読み戻せなかった**ため、2026-07-29 にオーナー承認のもと再発行した
+  （workspace 全体を grep して consumer ゼロを確認した上で交換）。
+  取得: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get KOTOBASE_ARCHIVE_TOKEN`。
+- **使い方**: raw CIDv1（`bafkrei…` = 本体バイト列の sha2-256）を自分で計算し、
+  `PUT https://kotobase.net/ipfs/<cid>` に Bearer で置く。サーバが digest を再計算して
+  不一致は 422 で弾く。読みは無認証の `GET /ipfs/<cid>`。**未設定だと 403（feature off）**。
+  live 検証済み（2026-07-29、PUT 201 → GET 200、バイト一致）。
+- 消費側: `dougaka.archive`（production artifact の保管、ADR-2607299960）。
 
 ## Murakumo chat gate secondary secret (ADR-2607171800 addendum 2、2026-07-16)
 
