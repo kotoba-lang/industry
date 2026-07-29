@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 8350,
-  :pageviews-7d 4555,
-  :uniques-7d-sum 430,
+ {:requests-7d 8365,
+  :pageviews-7d 4559,
+  :uniques-7d-sum 433,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 56}
+  [{:path "/", :requests 59}
    {:path "/api/scores", :requests 32}
-   {:path "/robots.txt", :requests 24}
+   {:path "/robots.txt", :requests 29}
    {:path "/api/liveops", :requests 23}
    {:path "/play.html", :requests 21}
    {:path "/kototama/kototama_bg.wasm", :requests 21}
    {:path "/play", :requests 19}
    {:path "/api/analytics", :requests 19}],
-  :status-mix {:ok 1360, :client-error 15, :server-error 81},
+  :status-mix {:ok 1374, :client-error 15, :server-error 82},
   :channel-mix
-  {:channel 279, :probe 957, :unclassified 124, :ok-total 1360},
+  {:channel 290, :probe 957, :unclassified 127, :ok-total 1374},
   :window "24h"},
  :as-of "2026-07-29",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 6},
  :top-paths
- "上位 page (24h, 2xx/3xx・channel-allowlist済): / 56 · /api/scores 32 · /robots.txt 24 · /api/liveops 23 · /play.html 21 | 4xx(probe) 1% · 5xx 6% · probe(200-fallback) 70% · unclassified 9%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): / 59 · /api/scores 32 · /robots.txt 29 · /api/liveops 23 · /play.html 21 | 4xx(probe) 1% · 5xx 6% · probe(200-fallback) 70% · unclassified 9%",
  :signal
- "isekai.network 実測 8350 req/7d・430 uniques(日次和)・うち4xx probe 1%(24h)",
+ "isekai.network 実測 8365 req/7d・433 uniques(日次和)・うち4xx probe 1%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
