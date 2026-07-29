@@ -853,8 +853,29 @@ lexicon + deploy workflow、`com-etzhayyim-okaimono` = `cells/*.edn` ドメイ�
   SUITE-PY-WASM-MIGRATION の doc 付き) — 同一 ERP の 3 変種
 - **`kaname`**: 66 file / 282KB の実コードに 7 route が集中。分割は設計そのもの
 
-つまり Phase 5 の残作業は ADR-2607261601 が挙げた 5 クラスタではなく、
-**`kyber` の 3 変種統合と `kaname` の分割の 2 件**である。
+#### 結論 (2026-07-29): **Phase 5 は仕様どおりには実行しない**。5 クラスタすべてが誤分類だった
+
+残る 2 件 (`kyber` 統合 / `kaname` 分割) も中身を開けた結果、やはり重複ではなかった。
+5 クラスタを全件実測した結果は次のとおり:
+
+| クラスタ | ADR-2607261601 の想定 | 実体 (2026-07-29 実測) | 判断 |
+|---|---|---|---|
+| `oil-*` 7 | 7 分割されたコード | **コードなしの did:web シェル 7 件** (各 6-7 file)。DID は `did:web:etzhayyim.com:actor:oil-*` で **live** | 統合はコード整理でなく **live な DID identity 7 件の退役判断**。実行しない |
+| `kami-mangaka-*` 8 | KAMI 創作の重複 | **モジュール族**。scene / expression / scene-author / reader / page / text / qa / render が各々独立した `deps.edn` + `src` を持つ | 畳んではいけない |
+| `kyber` 3 | ERP 重複 | **層**。`kyber-qzzg06nh` = appview 3 面 (finance / ga / governance、Svelte) / `kotoba-lang/kyber` = langgraph agent graph (`lg/lg_kyber/graphs/*`) / `com-etzhayyim-app-open-kyber` = ERP worker + Playwright e2e + 移行 doc | 統合しない |
+| ERP 5 | ERP 重複 5 件 | **substring ノイズ**。`com-int**erp**ol` / `org-apache-tink**erp**op-gremlin` / `com-matt**erp**ort-api` が名前一致で拾われていた。実 ERP は `auto-sales-erp` (BPMN wire 4 file) と `kotoba-erp` (CRM 11.4MB) の 2 件で別物 | 対象が存在しない |
+| `kaname` 7 ドメイン集中 | 7 つに分割 | **cross-domain 統合器そのもの**。README いわく「per-domain observatory (tsumugi / keizu / kabuto / chie / shiori / abaki / shionome / busshi / hokorobi / kosatsu / inochi) を 1 つの multilayer graph に join し、最も多くのドメインで耐性を改善する構造位置 (要) を read 時に計算する META synthesis layer」。コードも `methods/{centrality,join,ingest,sos,coverage_report,route,gates}` というグラフアルゴリズム群で、7 ドメインの実装ではない | **分割すると存在意義が消える**。実行しない |
+
+**Phase 5 のクラスタは名前 (と substring) の類似から推定されたもので、中身の確認を経ていなかった。**
+実際にはいずれも「層の分解」「モジュール族」「DID シェル」「文字列の偶然一致」であり、
+統合すべき重複は 1 件も見つからなかった。したがって **ADR-2607261601 Phase 5 は
+「実行しない」で閉じる**。
+
+唯一、追加調査の価値があるのは **Web クロールの 2 件** —
+`kotoba-lang/kotobase-commoncrawl-actor` (197KB / 40 file、GOVERNANCE.md 付きの OSS repo) と
+`com-junkawasaki/net-kotobase-commoncrawler` (34KB / 23 file、`src/net_kotobase/commoncrawler/actor/{graph,nodes}.cljc`)。
+3 件目の `kotoba-lang/common-crawl` は appview なので層だが、この 2 件は
+どちらも「Common Crawl を読む actor」で重なる可能性がある。ただし今回は未確認。
 
 これらは「7 repo を 1 つに畳む」「1 repo を 7 つに割る」という**設計判断そのもの**で、
 配置の付け替えではない。どれが正本になり何が壊れるかを決めてからでないと動かせないので、
