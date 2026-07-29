@@ -92,12 +92,106 @@ mock を信じずに実 D1 に対して直接確認してから deploy した: `
 - D1 が増えたが**依存にはなっていない**（off 既定 + 全経路 fallback）。B2 は durable record のまま。
 - 環境ごとに独立した D1 を持つ（own bucket / own seed の隔離方針に合わせた）。
 
-# やっていないこと（正直な残件）
+# 追補（2026-07-29、同日の後続作業）
 
-1. **signer pin**: `ipns/verify-head` は **任意の valid な did:key 署名を受理する**。つまり head record は「この Worker の operator identity が署名した」ことに束縛されていない。B2 に書ける者は自分の鍵で署名した head を作れる。`head.cljs` の docstring が言う「integrity は署名から来る、B2 の access control を信頼していない」は**改竄には正しいが差し替えには成り立っていない**。live production record に対する確認を経てから別変更として enforce する。
-2. **write path の RTT**: authoritative でも B2 へ 2 直列 RTT（block flush と durable head mirror）が残る。mirror を critical path から外すと「ack した write は recovery 面に durable」という性質が壊れるので外していない。
-3. **contention の天井**: 12/25 は retry アルゴリズムでなく直列化（1 head 前進 × ~0.5s/write）の限界。答えは単一 owner でのバッチング（ADR-2607201600 が 8 heads × batch 4 で 62 writes/s を実測）で、本変更のスコープ外。
-4. **R2 の再評価**: OAuth トークンに `r2` scope が付いたら、head を R2 ETag CAS に置く選択肢を測り直す価値がある（D1 より近い可能性がある）。
+前節の残件 1〜3 に着手した。2 件は着地し、1 件は**作って計測して外した**。
+receipt: `kotobase-cf-wasm/slo/receipts/2026-07-29-head-followups.edn`。
+
+## 1. signer pin — 実装済み（testnet enforce / production warn）
+
+`ipns/verify-head` は **record 自身が持つ公開鍵**に対して署名を検証するので、storage に
+書ける者が自分の鍵で署名した head は完全に verify を通っていた。head.cljs の
+「integrity は署名から来る、B2 の access control を信頼していない」は**改竄には正しく
+差し替えには成り立っていなかった**。
+
+`KOTOBASE_HEAD_SIGNER` = `off | warn（既定）| enforce` を追加し、record の signer を
+**この deployment 自身の seed が生む did:key** と比較する。**enforce は operator 鍵を
+導出できないとき warn に降格する** — seed が無いことが「graph が空に見える」理由に
+なっては絶対にいけない。testnet は enforce（その環境の record は全てその環境の seed で
+署名されている、既存 graph の解決を live 確認済み）。production は warn のまま。
+
+## 2. write path の内訳 — 計測して確定（そして自分の推論を2回否定した）
+
+`KOTOBASE_TIMING=1` で phase ごとの wall time を出す。testnet 実測（1 write あたり）:
+
+| phase | ms |
+|---|---|
+| head-read（D1） | 15–16 |
+| engine | **0** |
+| flush（3 block → B2） | 709–1381 |
+| head-write（B2 mirror） | 307–867 |
+
+**write の ~95% は B2 への 2 往復**で、engine は 0。head-read が 15ms なのは本 ADR の
+D1 化の効果（以前は ~400ms の serving floor）。
+
+同じセッション中に私はこの結論を**逆に**述べた: 12 write の上昇列（1076→5928ms）を
+見て「往復ではなく成長が支配的」と書いた。実際はそれは **auto-fold の spike + 分散**で
+あって成長ではなく（`novelty_size` は auto-fold で **reset する**）、その裏にあると疑った
+O(chain) walk は **O(1) のカウンタ**だった（`kotobase-peer.core/novelty-size` は維持された
+`novelty-count` を読む）。**推論2回に対し、計測1リクエストで決着した。**
+
+したがって「mirror を waitUntil に逃がす」案は**採らない**: 節約は全体の ~25% で、
+引き換えに「ack した write は recovery 面に durable」を失う。効くのは往復の**回数**を
+減らすこと、つまりバッチングであり、それが次項。
+
+## 3. バッチング — 実装し、計測し、**外した**
+
+設計: graph ごとの queue、N 件を**1 回の hydration** に対して順に適用し、1 回の head CAS で
+publish。store.cljs の `head-get`/`head-put!` を chain buffer にすることで成立する
+（`do-transact` が head-put! を「呼び出し側が使うバッファ」と元々規定している）。
+
+**動いた**: commit は正しく連鎖し（各 `previous_commit` が直前の commit）、各 caller は
+自分の結果を受け取った。
+
+**外した理由**: Workers では **runner になったリクエストが、バッチ全員分の I/O を自分の
+subrequest / CPU / wall 予算で実行する**。25 並行 writer で予算を超え、**単独なら成功して
+いた 25 件中 15 件が 5xx** になった。lost-write invariant は保たれていた（corruption では
+なく availability の失敗）が、**1 リクエストの上限がバッチ全員の failure domain になる**。
+
+**正しい置き場所は Durable Object**（自前の実行コンテキストと予算を持つ）。
+ADR-2607142200 は「CF 固有機構を *required* にしない」限りこれを許す — D1 head plane と
+同じ optional 形にすればよい。別変更・別検証とする。**batch-max を小さくして誤魔化さない**
+（この並行度で症状が隠れるだけで構造は変わらない）。
+
+**残した2つ**（単独で正しいから）:
+- **store.cljs の chain buffer**: `head-get` が定数を返す実装は、将来のバッチャを
+  「未対応」ではなく**黙って誤動作**させる。trampoline 再実行でリセットされることまで
+  unit test 済み。
+- **`claim-fold!`/`release-fold!`**: graph あたり同時 1 fold。fold はこの Worker で最も
+  高価な操作で、並行 writer が閾値を跨ぐと各自が fold を投げていた。
+
+## 最終計測（testnet、本 ADR の全変更込み）
+
+- contention 25 writer: **ok 14 / 409 11 / other 0 / 5xx なし**、`final == ok + seed`（消失 0）
+- sustained load: p50 **97ms** / p95 **361ms**（セッション開始時 195 / 1695ms）
+- read: p50 **42ms** / p95 **100ms**（開始時 176 / 2986ms）
+- SLO probe **pass** / unit 133 tests・304 assertions・0 failures
+
+## この作業中に自分で起こした事故（記録）
+
+バッチング撤去のテキスト編集が、削除範囲に同居していた `transact-finish` も消し、
+unit suite がそこを覆っていなかったため、**壊れた bundle が testnet に出た**（全 transact が
+`400 invalid JSON body: Cannot read properties of undefined`）。resilience probe（ok 1 /
+other 19）で検知し、3 リクエストの burst で body を読んで特定、production 前に修正。
+
+**教訓**: `handle-transact` は chain 全体を1つの `.catch` で包み、あらゆる失敗を
+「invalid JSON body」と**誤ラベル**する。ここは狭めるべきで、かつ「deploy 検証済み」の
+条件に **transact が 1 件成功すること**を含めるべき。
+
+# 残件
+
+- **R2 の再評価**: OAuth トークンに `r2` scope が付いたら、head を R2 ETag CAS に置く
+  選択肢を測り直す価値がある（D1 より近い可能性がある）。今回 D1 を選んだのは能力の
+  優劣ではなく **この鍵で今できること**による。
+- **バッチングの Durable Object 版**: 上記のとおり、往復回数を減らす唯一の道。
+- **production の authoritative flip**: `kotobase_heads` が実 graph を並べたら。
+- **`handle-transact` の包括 catch**: あらゆる失敗を「invalid JSON body」と誤ラベルする。
+
+# production の現在地（2026-07-29 時点）
+
+`shadow` + signer `warn` で稼働（version 8c8a9c66、backend/apex とも health 200）。
+`authoritative` への flip は**依然として証拠待ち**: `kotobase_heads` は 0 行のままで、
+shadow deploy 以降 production の head read が発生していない。
 
 # Alternatives considered
 
