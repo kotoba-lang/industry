@@ -548,6 +548,86 @@ Phase 4 に着手する前に潰すべきものとして記録する。**移送�
    実在しない重複が名前を `<org>-<base>` に化けさせていた。Phase 3 で prefix を外したら
    drift が 308 行 -> 195 行に減ったのはこれが理由。**未実行**
 
+### 未決 9 / 10 / 11 — 決定 (2026-07-29、main commit は下記)
+
+#### 未決 11 — `extra-projects` の陳腐化が `--check` STALE の主因だった
+
+`gen-west-manifest.cljs` の `dup-basenames` は **west.yml の path と `extra-projects` の
+和集合**で計算される。`extra-projects` には移送済み repo の旧 org path が残っていたため、
+**実在しない重複**が west name を `<org>-<base>` に化けさせていた。
+
+`extra-projects` を **3,465 -> 234** に整理した:
+
+| 削除 | 件数 | 理由 |
+|---|---:|---|
+| west.yml に既登録 | 3,200 | 登録の受け口としての役目は終わっている (`distinct` で潰れるだけ) |
+| `orgs/` で始まらない | 15 | generator が filter で捨てる純ノイズ (`cloud-itonami-lei-*` 等) |
+| 移送済み repo の旧 org path | 16 | `orgs/gftdcojp/adserver` -> 実体は `orgs/cloud-itonami/adserver` 等。phantom dup の発生源 |
+
+残した 234 は **west 未登録の実 repo (= 登録バックログ)** で、うち 3 件
+(`com-etzhayyim-oteint` / `-swachh-actor` / `-yomi`) はローカル checkout を持つ。
+
+併せて **`:manifest.repos/datalad` の stale キー 9 件を再キー**した。org 移送に追随できて
+おらず、**再生成すると 9 つの dataset から `datalad: true` / `annex-remote: b2` が黙って
+落ちる**状態だった (`west_annex.cljs` の annex-get/drop 対象から外れる)。
+
+結果、`nbb scripts/gen-west-manifest.cljs --check` が **`west.yml is up to date`** になった。
+ADR-2607289600 D9 が STALE と記録して以来はじめて通った。残っていた 45 行の drift は
+`userdata:` 内の行順と末尾改行だけだったので、値を変えずに generator の出力順へ正規化した
+(9 block)。
+
+#### 未決 10 — 前回の診断が誤っていた。rename ではなく重複だった
+
+前回「etzhayyim の 26 repo が bare name へ rename 済み、21 件が衝突」と書いたが**誤り**。
+`gh api` の `.name` だけを見て `.full_name` を見ていなかったため取り違えた。実際は
+**他 org へ transfer + rename 済み**で、25 件が `cloud-itonami`、1 件が `kotoba-lang` に居る。
+
+repo id を突き合わせた結果、**west に同一 repo の entry が 2 つ**ある状態だった
+(旧 etzhayyim path 側は GitHub の redirect 経由で解決するので fetch は通り、気付けない)。
+したがって正しい処置は rename ではなく**重複の解消**である。衝突 21 件という話も、
+rename を前提にした場合にだけ生じる幻で、実際には存在しなかった。
+
+**ただし単純削除は pin を巻き戻す。** 26 組の pin を GitHub API で比較したところ:
+
+| 比較 | 件数 |
+|---|---:|
+| 同一 | 19 |
+| **旧 etzhayyim entry 側が ahead** | 7 (`aburi` は 8 commit、`fleet` は 2 commit 先行) |
+| diverged / behind | 0 |
+
+先行していた 7 件の pin を生存側へ載せてから、26 件の重複 entry を削除した。
+`path-overrides` に 26 件を追加し、旧 path 参照が生存 path へ解決するようにしてある。
+project 数は **3,846 -> 3,820** (減ったのは重複 26 件のみ)。
+
+#### 未決 9 — `jp-ashiba` に governor は「まだ」要らない。actuation が 1 つも無い
+
+結論: **今は governor を載せる対象ではない。`send_via_mailer_xrpc` を wire する時点で必須。**
+
+実測すると、この repo は Python 実装 (`20-actors/jp-ashiba/py/`) からの **pure cljc port** で、
+**外部作用を持つ関数が 1 つも実装されていない**。各 namespace の docstring が「NOT ported
+(host-injected IO)」と明示している:
+
+| namespace | 未 port の作用 |
+|---|---|
+| `outbound-emailer` | `send_via_mailer_xrpc` (Resend 経由の実送信) / `pull_site_state` / `generate_site_proposal` (Murakumo LLM) / `select_vendor_candidates` / `conn.transact` / `send_handler` |
+| `satellite-detector` | pyzeebe task entry |
+| `owner-resolver` | Datalog pull と transact |
+| `safety-predictor` | host-injected IO |
+
+port されているのは `route-by-risk` / `route-by-send-status` / `build-*-tx-edn` のような
+**純関数のビルダとルーティングだけ**で、governor が止めるべき対象が存在しない。この状態で
+governor を書いても govern するものが無い。
+
+**発火条件**: `send_via_mailer_xrpc` は第三者 (土地所有者) への **cold outreach メール送信**で、
+CLAUDE.md の actor パターンが governor を要求する actuation そのもの。これを wire する commit と
+同時に、独立 Governor + append-only 台帳を入れること。
+
+**併せて記録する既知の落とし穴**: `seal.cljc` の `seal!` / `unseal` は「port ではなく新規実装」
+(python 側は両方 `NotImplementedError`) で JVM の AES-256-GCM を使うが、**鍵導出は
+`SHA-256(actor-did [+ run-graph])` の bridging placeholder** であり実 SecureVault の鍵管理
+(HSM / actor ごとの永続鍵) ではない。docstring に明記されているが、tier-2/tier-3 の封緘が
+本物だと誤認しないこと。実鍵への配線は governor と同じタイミングで潰すのが自然。
+
 ### Phase 4 本体 — 未着手 (ADR-2607261601 Phase 1-3、392 repo)
 
 ## Consequences
@@ -576,9 +656,9 @@ Phase 4 に着手する前に潰すべきものとして記録する。**移送�
 6. ~~cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断~~ **決定 (2026-07-29): retire 2 件 (`ads` / `oshikatsu`) を archive。残りは app / library / data で actor 契約の対象外 — blueprint 起票という作業自体が存在しなかった (D5 の前提誤りを訂正)**。派生して残る唯一の未決は下記 9
 7. ~~`gftdcojp/ai-gftd-cyber-drill` と `cloud-itonami/cyber-drill`~~ **決定 (2026-07-29): `ai-gftd-cyber-drill` を archive、bare name は動く方 (cloud-itonami) が保持**
 8. ~~`cloud-itonami/ai-gftd-kaisya` (Clojure runtime) と `cloud-itonami/kaisya` (BPMN 5 点)~~ **決定 (2026-07-29): `ai-gftd-kaisya` を archive、bare name は BPMN 側が保持**
-9. `cloud-itonami/jp-ashiba` を cloud-itonami の governor 契約 (langgraph-clj StateGraph + 独立 Governor + append-only 台帳) に載せるか。現状は `actor/actor-manifest.jsonld` が Python/LangGraph pod を記述し、実体は cljc 8 モジュール + テストで governor を持たない
-10. etzhayyim 26 repo の上流 rename への west 追随 (21 件が bare name 衝突 — `<org>-<basename>` + `repo-path:` 変換が要る)
-11. `:manifest.repos/extra-projects` の陳腐化解消 (`gen-west-manifest.cljs --check` STALE の主因)"
+9. ~~`cloud-itonami/jp-ashiba` を governor 契約に載せるか~~ **決定 (2026-07-29): 今は不要 — actuation が 1 つも実装されていない (全 IO 境界が「NOT ported」)。`send_via_mailer_xrpc` (第三者への cold outreach 送信) を wire する commit と同時に独立 Governor + append-only 台帳を入れる。同時に `seal.cljc` の placeholder 鍵導出も実 SecureVault へ配線する**
+10. ~~etzhayyim 26 repo の上流 rename への west 追随~~ **決定 (2026-07-29): rename ではなく重複だった (他 org へ transfer 済み、repo id 一致)。先行していた 7 件の pin を生存側へ載せてから重複 26 entry を削除。衝突 21 件は rename 前提の幻で実在しなかった**
+11. ~~`:manifest.repos/extra-projects` の陳腐化解消~~ **決定 (2026-07-29): 3,465 -> 234 に整理、`:datalad` の stale キー 9 件も再キー。`--check` が `west.yml is up to date` になった**"
 
   :adr/decision-summary
   ["D1: org 判定軸を目的(公益/事業)から起動主体(:repo/kind)へ移す。6 org: kotoba-lang=lib / etzhayyim=organism のみ / cloud-itonami=呼ばれて動く基盤 / gftdcojp=B2B/B2G security service / network-awai=AWAI Network L.L.C. の consumer network(p2p/crypto/blockchain)+adult / com-junkawasaki=cloud+data+個人"
