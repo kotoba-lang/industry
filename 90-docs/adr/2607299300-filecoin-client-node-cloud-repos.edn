@@ -328,6 +328,68 @@ offline テストは1つも捕まえられず、最初の live `GasEstimateMessa
 
 現在の pin: io-filecoin `244db55`、io-filecoin-transport `99939bfb`。
 
+## Closing record (2026-07-29)
+
+### 着地したもの (すべて default branch 上、CI green)
+
+| repo | pin | 内容 |
+|---|---|---|
+| `org-ietf-blake2` | `5785beab` | RFC 7693。Filecoin の checksum / actor payload / CID はすべてこれ |
+| `org-ethereum-abi` | `f3e5662d` | head/tail ABI (array・tuple 含む)。keccak を持たない |
+| `io-filecoin` | `244db55c` | address・message・署名対象・FRC-0042・Lotus RPC |
+| `io-filecoin-node` | `fb7b64d2` | 16-field header・tipset 順序・mpool admission・base fee 2 方式 |
+| `io-filecoin-signer` | `0e679827` | secp256k1 (f1 経路) |
+| `io-filecoin-transport` | `588c123e` | IHttp と呼び出し順序。live 検証 |
+| `cloud-filecoin` | `0b039003` | PieceCID v2・PDP・Pay・Warm Storage・calldata→message |
+| `eth-crypto` | `702293e3` | `ecrecover-pubkey` 追加 (既存 repo への additive 変更) |
+
+### 検証 (固定値)
+
+7 repo の JVM / nbb assertion 数は**全て一致**:
+
+    org-ietf-blake2         6 tests /  33 assertions  (both)
+    org-ethereum-abi       12 /  130  (both)
+    io-filecoin            36 /  430  (both)
+    io-filecoin-node       33 /  163  (both)
+    io-filecoin-signer     11 /   44  (both)
+    io-filecoin-transport  11 /   20  (both)
+    cloud-filecoin         29 /  499  (both)
+    ------------------------------------------
+    合計                  138 / 1,319 (両 runtime で同一)
+
+`eth-crypto` は 21/32 (:clj) と 30/52 (:cljs) — cljs 専用 primitive テストがある
+ため数が違うのが正常。CI は 8 repo すべて success。
+
+**両 runtime の assertion 数一致を明示的に確認するのは、io-filecoin-transport で
+「両方 green なのに cljs 側だけ 10、JVM 側 19」という状態を実際に作ったから**
+(promise の `.then` 内の assertion は `run-tests` の報告後に走る)。
+「両方 green」は「両方同じだけ検査した」を意味しない。
+
+live 検証 (mainnet / calibration、read-only、鍵も資金も無し): 8 checks, 0 failed。
+うち 2 件は deployed PDPVerifier への実 contract call、1 件は署名受理の
+differential probe。**CI では走らせない** (公開 endpoint 依存・非 hermetic)。
+
+### 実装中に見つけて直したもの (すべて着地済み)
+
+1. `filecoin.bigint/fil->atto` が local `neg?` で `clojure.core/neg?` を隠していた
+2. `filecoin.message/encode` が `:to` の有無で正規化要否を誤判定
+3. `filecoin.rpc/message->json` が同じ罠 (2 を直した時に見落とし)。**live 呼び出しが発見**
+4. `filecoin.bigint/div` は Euclidean でなければならない (両 platform は 0 方向切り捨て)
+5. nbb は required namespace の top-level `(do ...)` 内の var を後続 form から解決できない
+6. cljs の `reify` は `IWithMeta` でないので `with-meta` が throw する
+7. cljs の async assertion が `run-tests` 報告後に走る (上記)
+8. Glif public endpoint が応答を改行区切りで2回返す
+9. cloud-filecoin の PDP selector 31 件中 **15 件が誤り** (ドキュメントから書いた初版)
+10. delegated 署名は message CID を覆わない (初版 ADR の記述を訂正)
+11. delegated 署名は 65 byte とは限らない (legacy EIP-155 は 0x02 prefix + 2 byte v で 67)
+
+### 次の agent が最初に打つコマンド
+
+    cd orgs/kotoba-lang/io-filecoin-transport && npm run live
+
+これが 8/8 なら stack は健全。write 経路を進めるなら
+`scripts/live.cljs` の `probe-write` が出発点。
+
 ## 未達 / 引き継ぎ
 
 - `nbb scripts/gen-west-manifest.cljs --check` は STALE を報告するが、これは
@@ -344,9 +406,33 @@ offline テストは1つも捕まえられず、最初の live `GasEstimateMessa
   account での実送信だけ**——gas / nonce の扱いはまだ「議論した」段階で、
   それには資金のある testnet 鍵が要る (安全床②により agent は資金操作をしない)。
 - **(b) Ethereum 経路 (f410f・delegated) は依然未実装。** keccak が JVM 専用
-  だという以前の記述は誤り (`eth-crypto` は dual-platform 化済み)。実際に
-  足りないのは lotus が要求する Filecoin↔EthTransaction の byte 一致
-  round-trip と、上記 2 種の署名 shape の組み立て。
+  だという以前の記述は誤り (`eth-crypto` は dual-platform 化済みで、RLP と
+  EIP-1559 署名も持つ)。実際に足りないのは lotus が要求する
+  Filecoin↔EthTransaction の byte 一致 round-trip と、上記 2 種の署名 shape の
+  組み立て。
+
+### 優先順位付き gap (closing 時点)
+
+1. **transport 以外に残る native 経路の穴は無い。** 実送信のみ未実施で、
+   それには資金のある testnet 鍵が要る (安全床②)。gas / nonce の扱いは
+   offline テストと live の `GasEstimateMessageGas` までは通っている。
+2. **delegated / FEVM sender 経路** — 実装可能になったが未着手。
+3. **BLS12-381** — workspace 全体に実装が無い。f3 account の署名、block
+   signature 検証、`bls-aggregate` 検証がすべて不可。単体で最大の欠落。
+4. **state / FVM / HAMT / AMT** — `parent-state-root` は header に入れて読み
+   出せる CID であって、その先は読めない。
+5. **証明生成** (PDP の Merkle path)、event log decode、provider HTTP API。
+6. **`base-l2/abi.clj` の置き換え** — `org-ethereum-abi` が portable で
+   array/tuple も扱えるので寄せられるが、JVM 専用の既存利用があり別スコープ。
+
+### この family の外に残した blocking (自分の作業ではない)
+
+`nbb scripts/west-orphan-audit.cljs --blocking` は exit 1 で、原因は
+`:local/root` の壊れた edge 3 件 (`gftdcojp/cloud-murakumo` consumers=10、
+`etzhayyim/com-etzhayyim-social-publication` consumers=2、
+`network-awai/cloud-mamori` consumers=1)。**いずれも本 ADR の 7 repo とは
+無関係**で、`west-triple-sync plan` も自動 action を 0 件と判定している
+(retarget は手動判断)。詳細は skill `git-cleanup-conflict` の cleanup 記録。
 - gas と nonce は chain state で、`GasEstimateMessageGas` / `MpoolGetNonce` の
   呼び出しが要る。request body は `filecoin.rpc` にある。
 - calibration に実際に送るには資金のある testnet 鍵が要る (安全床②により agent は
