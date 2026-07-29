@@ -39,13 +39,15 @@ manifest:
       groups: [archived]
       userdata:
         archived: true
-    - name: adserver
+    - name: cloud-itonami-adserver
       remote: cloud-itonami
+      repo-path: adserver
       revision: 3242aa57dc9e563883a38194e7f85c52b6179a40
       path: orgs/cloud-itonami/adserver
       groups: [cloud-itonami]
-    - name: ai-gftd-kaisya
+    - name: cloud-itonami-ai-gftd-kaisya
       remote: cloud-itonami
+      repo-path: ai-gftd-kaisya
       revision: ab9fe841195a19f33847c9cdd4c94f37ff82c102
       path: orgs/cloud-itonami/ai-gftd-kaisya
       groups: [archived]
@@ -88,8 +90,9 @@ manifest:
       revision: 2d14ac14628cd96b3aaa841840e73b2e193c877c
       path: orgs/cloud-itonami/animeka
       groups: [cloud-itonami]
-    - name: animeka-actor
+    - name: cloud-itonami-animeka-actor
       remote: cloud-itonami
+      repo-path: animeka-actor
       revision: 564275387d385f39f4c175bb99d5ea7903a2379d
       path: orgs/cloud-itonami/animeka-actor
       groups: [cloud-itonami]
@@ -835,8 +838,9 @@ manifest:
       groups: [cloud-itonami]
       userdata:
         rad-rid: rad:z4VwhR88R3AvB6gu5BfLw9V6G4pA6
-    - name: cloud-itonami-gtm-data
+    - name: cloud-itonami-cloud-itonami-gtm-data
       remote: cloud-itonami
+      repo-path: cloud-itonami-gtm-data
       revision: bd9820d6ca55174ca999f454ac8e1a19af733577
       path: orgs/cloud-itonami/cloud-itonami-gtm-data
       groups: [datalad]
@@ -9837,6 +9841,22 @@ manifest:
       groups: [cloud-itonami]
       userdata:
         rad-rid: rad:z4Z1DReLmaekLMWVDz3FGqHQoV78b
+    - name: com-etzhayyim-gov_municipality
+      remote: cloud-itonami
+      revision: 225114114375100a40af5ca257704f1e13de2e66
+      path: orgs/cloud-itonami/com-etzhayyim-gov_municipality
+      groups: [archived]
+      userdata:
+        archived: true
+        rad-rid: rad:z34dezHDZJ5niYSNddgt33ic9fmZ8
+    - name: com-etzhayyim-infra_utility_connect
+      remote: cloud-itonami
+      revision: 7c8db82293dc369ff8cda0da06b3a8318e56fafd
+      path: orgs/cloud-itonami/com-etzhayyim-infra_utility_connect
+      groups: [archived]
+      userdata:
+        archived: true
+        rad-rid: rad:z4L1iu6wgkXRDRbvU9DiENQQWyFRL
     - name: communicator
       remote: cloud-itonami
       revision: f591c8f7bfa6af2b0fe4394537998dd8233c9954
@@ -9903,8 +9923,9 @@ manifest:
       revision: 00ed0fa0473fe5061f5f16975da15854aad8d90e
       path: orgs/cloud-itonami/dougaka
       groups: [cloud-itonami]
-    - name: dougaka-actor
+    - name: cloud-itonami-dougaka-actor
       remote: cloud-itonami
+      repo-path: dougaka-actor
       revision: 4e0639495c509c8a0304e51d7021524b728c40da
       path: orgs/cloud-itonami/dougaka-actor
       groups: [cloud-itonami]
@@ -10019,56 +10040,63 @@ manifest:
       groups: [cloud-itonami]
       userdata:
         rad-rid: rad:z2xLXDsywo3CkzetLrpTQ1qXT9rF6
-    - name: gftd-audio-actor
+    - name: cloud-itonami-gftd-audio-actor
       remote: cloud-itonami
+      repo-path: gftd-audio-actor
       revision: 6dccc043e1fdc85ab431cee3adfbaed5cc11a546
       path: orgs/cloud-itonami/gftd-audio-actor
       groups: [datalad]
       userdata:
         datalad: true
         annex-remote: b2
-    - name: gftd-avatar-actor
+    - name: cloud-itonami-gftd-avatar-actor
       remote: cloud-itonami
+      repo-path: gftd-avatar-actor
       revision: cb0482cfc10de5abaf0f40edb3b542d5d1cc2883
       path: orgs/cloud-itonami/gftd-avatar-actor
       groups: [datalad]
       userdata:
         datalad: true
         annex-remote: b2
-    - name: gftd-illust-actor
+    - name: cloud-itonami-gftd-illust-actor
       remote: cloud-itonami
+      repo-path: gftd-illust-actor
       revision: b7cc66d4d5b8d00f6eaecec79028f4159e6a18e7
       path: orgs/cloud-itonami/gftd-illust-actor
       groups: [datalad]
       userdata:
         datalad: true
         annex-remote: b2
-    - name: gftd-motion-actor
+    - name: cloud-itonami-gftd-motion-actor
       remote: cloud-itonami
+      repo-path: gftd-motion-actor
       revision: d8668c61fdbc71247c06f484edd8814228ab67de
       path: orgs/cloud-itonami/gftd-motion-actor
       groups: [datalad]
       userdata:
         datalad: true
         annex-remote: b2
-    - name: gftd-rig-actor
+    - name: cloud-itonami-gftd-rig-actor
       remote: cloud-itonami
+      repo-path: gftd-rig-actor
       revision: 3c4e93f98eea62846a5b3444146b90ab9c5915e6
       path: orgs/cloud-itonami/gftd-rig-actor
       groups: [datalad]
       userdata:
         datalad: true
         annex-remote: b2
-    - name: gftd-sculpt-actor
+    - name: cloud-itonami-gftd-sculpt-actor
       remote: cloud-itonami
+      repo-path: gftd-sculpt-actor
       revision: b4a39c02457700cf2f88d5553afd196762b1a1c7
       path: orgs/cloud-itonami/gftd-sculpt-actor
       groups: [datalad]
       userdata:
         datalad: true
         annex-remote: b2
-    - name: gftd-voice-actor
+    - name: cloud-itonami-gftd-voice-actor
       remote: cloud-itonami
+      repo-path: gftd-voice-actor
       revision: 21b7007fd6961e10a75a0e80306336ddd6688745
       path: orgs/cloud-itonami/gftd-voice-actor
       groups: [datalad]
@@ -10425,8 +10453,9 @@ manifest:
       revision: 9236d10862874d21c1226f14c31cbcdf9b4881e0
       path: orgs/cloud-itonami/mangaka
       groups: [cloud-itonami]
-    - name: mangaka-data
+    - name: cloud-itonami-mangaka-data
       remote: cloud-itonami
+      repo-path: mangaka-data
       revision: 1d72dba428b5c9f864b24bff7526acb4d83d7d81
       path: orgs/cloud-itonami/mangaka-data
       groups: [datalad]
@@ -10871,8 +10900,9 @@ manifest:
       groups: [cloud-itonami]
       userdata:
         rad-rid: rad:z3RDEoEw2L6CxMZQuS2vsEAhTuGnk
-    - name: shinshi-growth-actor
+    - name: cloud-itonami-shinshi-growth-actor
       remote: cloud-itonami
+      repo-path: shinshi-growth-actor
       revision: d15d5d6ebcfe6dc42ed1e2c89e3afbbc141e2fa1
       path: orgs/cloud-itonami/shinshi-growth-actor
       groups: [cloud-itonami]
@@ -12338,13 +12368,6 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z2nhaQQKgjAjgK4Ne78wbLVrKYC3i
-    - name: com-etzhayyim-chie
-      remote: etzhayyim
-      revision: 72bc5c1a39a0043795f2e83de901847fea060cdc
-      path: orgs/etzhayyim/com-etzhayyim-chie
-      groups: [etzhayyim]
-      userdata:
-        rad-rid: rad:zPeAwui6iC9fTxApCuPCpNzsuYvr
     - name: com-etzhayyim-chigiri
       remote: etzhayyim
       revision: d559a5ea4aee94dd77f4201c3b97b6a6f8a665c6
@@ -12422,14 +12445,6 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z2XSe4rJPw2YzV4DxyHeTh6XAge6a
-    - name: com-etzhayyim-gov_municipality
-      remote: etzhayyim
-      revision: 225114114375100a40af5ca257704f1e13de2e66
-      path: orgs/etzhayyim/com-etzhayyim-gov_municipality
-      groups: [archived]
-      userdata:
-        archived: true
-        rad-rid: rad:z34dezHDZJ5niYSNddgt33ic9fmZ8
     - name: com-etzhayyim-graph-sos-intel
       remote: etzhayyim
       revision: ad1b4e45227161f5288e843755010440ec20eebb
@@ -12556,14 +12571,6 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z4PbUVob7Mjh9rfXCE2S9fUkgmSpf
-    - name: com-etzhayyim-infra_utility_connect
-      remote: etzhayyim
-      revision: 7c8db82293dc369ff8cda0da06b3a8318e56fafd
-      path: orgs/etzhayyim/com-etzhayyim-infra_utility_connect
-      groups: [archived]
-      userdata:
-        archived: true
-        rad-rid: rad:z4L1iu6wgkXRDRbvU9DiENQQWyFRL
     - name: com-etzhayyim-inochi
       remote: etzhayyim
       revision: 80c16d364c53a12f3713d1e29133e80e54621106
@@ -12758,20 +12765,6 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z3DPgHd5cFTE24kCeg5yXjxVCQuVA
-    - name: com-etzhayyim-kg-appview
-      remote: etzhayyim
-      revision: 9005572df748867a719fc4130a641d99208cd8d4
-      path: orgs/etzhayyim/com-etzhayyim-kg-appview
-      groups: [etzhayyim]
-      userdata:
-        rad-rid: rad:z2LD6guRrseEMqbaNdJKYHunAF6g4
-    - name: com-etzhayyim-kg-projector
-      remote: etzhayyim
-      revision: 179671102524d427178c6363d801ff13c19e53cd
-      path: orgs/etzhayyim/com-etzhayyim-kg-projector
-      groups: [etzhayyim]
-      userdata:
-        rad-rid: rad:z2X6iyU1pYd5YJvXUQMriGQiQAdpd
     - name: com-etzhayyim-kizashi
       remote: etzhayyim
       revision: 55c694abb33decc733d05179615c41e9e65f85df
@@ -13033,20 +13026,6 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z3kRxUbaw8j8wWs9y6Qo2zPdb3rKW
-    - name: com-etzhayyim-ooyake
-      remote: etzhayyim
-      revision: 0ad81ef908c7f54da067c27c4dc0ce148fe130e2
-      path: orgs/etzhayyim/com-etzhayyim-ooyake
-      groups: [etzhayyim]
-      userdata:
-        rad-rid: rad:z3A3KAN4UP3QfhsjjFmu6BrrLaybp
-    - name: com-etzhayyim-open-seiyaku
-      remote: etzhayyim
-      revision: a0a5124e39a8fa6524cf4e7adc2fb9f5e5b788b2
-      path: orgs/etzhayyim/com-etzhayyim-open-seiyaku
-      groups: [etzhayyim]
-      userdata:
-        rad-rid: rad:z3DYfwWN9PYxarP9ZJiZ56T2HCTYN
     - name: com-etzhayyim-open-wellbecoming
       remote: etzhayyim
       revision: b8b86f6f7b55e1aeda7c843d162da90577945082
@@ -13089,13 +13068,6 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z2xgkncFNFF2UPG8nKbcGwuVzsWDX
-    - name: com-etzhayyim-root-router
-      remote: etzhayyim
-      revision: b98a85aaae4f3c097fe1589c93de2d1aed65663c
-      path: orgs/etzhayyim/com-etzhayyim-root-router
-      groups: [etzhayyim]
-      userdata:
-        rad-rid: rad:z3tVchAWMuWwTFCaJ9w1MSDrvL4Co
     - name: com-etzhayyim-sanae
       remote: etzhayyim
       revision: 0a630401c37d6367e38a00273702f86763dea7f9
@@ -13166,13 +13138,6 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z2UL6QdehV22RJkoUSuroG4GC3uDx
-    - name: com-etzhayyim-social-publication
-      remote: etzhayyim
-      revision: e8127d0661284b1c12ce1b216c84b5ed2db619ab
-      path: orgs/etzhayyim/com-etzhayyim-social-publication
-      groups: [etzhayyim]
-      userdata:
-        rad-rid: rad:zb9kumwoA2dRCj9wWCZB3HBhoEZo
     - name: com-etzhayyim-society6
       remote: etzhayyim
       revision: 1386dce55efb9280a6b8deee34a1476487a3f3a5
@@ -13222,20 +13187,6 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z2zxEHPENhZmGjqSArw559ZJ67syZ
-    - name: com-etzhayyim-svelte-auth
-      remote: etzhayyim
-      revision: ad28c5497d4182fb8d0d79d118746529e93eda72
-      path: orgs/etzhayyim/com-etzhayyim-svelte-auth
-      groups: [etzhayyim]
-      userdata:
-        rad-rid: rad:z3sRhDSE9x355jqNdpR3bX4UmtKj
-    - name: com-etzhayyim-svelte-design-system
-      remote: etzhayyim
-      revision: 18834c0e410573be1550b8047930303be8eba503
-      path: orgs/etzhayyim/com-etzhayyim-svelte-design-system
-      groups: [etzhayyim]
-      userdata:
-        rad-rid: rad:zjFHhp73c2XE4d5eUKUXvk2KBkCC
     - name: com-etzhayyim-talent
       remote: etzhayyim
       revision: db68114486cb34195b50c6e1e57ae11667d533ee
@@ -13404,13 +13355,6 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z3fD93gf2F8N9pLGrVhTfaTCo8Fjy
-    - name: com-etzhayyim-vite-plugin-safe-builder
-      remote: etzhayyim
-      revision: 5c391d7f2fb1215cd6d204ef7d706656b23dd097
-      path: orgs/etzhayyim/com-etzhayyim-vite-plugin-safe-builder
-      groups: [etzhayyim]
-      userdata:
-        rad-rid: rad:z2kp8Cfrf22fg12Wfoe8i33MVxqNY
     - name: com-etzhayyim-wadachi
       remote: etzhayyim
       revision: 2961efbcad5a91a6569c73bdeb4666eebf25b554
@@ -13439,13 +13383,6 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z3Y7PMQsjBo9ThQM1nwRFB3cKXVpB
-    - name: com-etzhayyim-xrpc
-      remote: etzhayyim
-      revision: c2716098eed399a4be4a8fed9918ff6e952e3797
-      path: orgs/etzhayyim/com-etzhayyim-xrpc
-      groups: [etzhayyim]
-      userdata:
-        rad-rid: rad:z2RnJDFg7rVksiQRYiPt1SXHuW9r
     - name: com-etzhayyim-yabai
       remote: etzhayyim
       revision: 64cb11c128c5ecd87e9f3693844b50fb2976e3a2
@@ -14259,6 +14196,13 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z329d2Xaavmo4gg69HWLeRCrvKSLT
+    - name: chie
+      remote: kotoba-lang
+      revision: 72bc5c1a39a0043795f2e83de901847fea060cdc
+      path: orgs/kotoba-lang/chie
+      groups: [kotoba-lang]
+      userdata:
+        rad-rid: rad:zPeAwui6iC9fTxApCuPCpNzsuYvr
     - name: chobo
       remote: kotoba-lang
       revision: b106afc0a68b706c27852fded59a7194870d6689
@@ -23397,6 +23341,20 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z2UxyctEPtXvotTRYMPKnxE4zFoqE
+    - name: kg-appview
+      remote: kotoba-lang
+      revision: 9005572df748867a719fc4130a641d99208cd8d4
+      path: orgs/kotoba-lang/kg-appview
+      groups: [kotoba-lang]
+      userdata:
+        rad-rid: rad:z2LD6guRrseEMqbaNdJKYHunAF6g4
+    - name: kg-projector
+      remote: kotoba-lang
+      revision: 179671102524d427178c6363d801ff13c19e53cd
+      path: orgs/kotoba-lang/kg-projector
+      groups: [kotoba-lang]
+      userdata:
+        rad-rid: rad:z2X6iyU1pYd5YJvXUQMriGQiQAdpd
     - name: kgraph
       remote: kotoba-lang
       revision: c0cb9332c540e7205b78dff00b82b813097fbb9c
@@ -24423,6 +24381,20 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:zdXxjYngSCeAtvqpuPXepSTu8jpK
+    - name: ooyake
+      remote: kotoba-lang
+      revision: 0ad81ef908c7f54da067c27c4dc0ce148fe130e2
+      path: orgs/kotoba-lang/ooyake
+      groups: [kotoba-lang]
+      userdata:
+        rad-rid: rad:z3A3KAN4UP3QfhsjjFmu6BrrLaybp
+    - name: open-seiyaku
+      remote: kotoba-lang
+      revision: a0a5124e39a8fa6524cf4e7adc2fb9f5e5b788b2
+      path: orgs/kotoba-lang/open-seiyaku
+      groups: [kotoba-lang]
+      userdata:
+        rad-rid: rad:z3DYfwWN9PYxarP9ZJiZ56T2HCTYN
     - name: openapi
       remote: kotoba-lang
       revision: 42ea63a4d3a5ebc9ad518e32db5ae141a7cc0445
@@ -25364,6 +25336,13 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:zVGLkEzXLetjQjjHfh2rP55aoveP
+    - name: root-router
+      remote: kotoba-lang
+      revision: b98a85aaae4f3c097fe1589c93de2d1aed65663c
+      path: orgs/kotoba-lang/root-router
+      groups: [kotoba-lang]
+      userdata:
+        rad-rid: rad:z3tVchAWMuWwTFCaJ9w1MSDrvL4Co
     - name: rtc
       remote: kotoba-lang
       revision: 7045daab519931d3e1c32f0128ebe2a57e0ac1f9
@@ -25593,6 +25572,13 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:zmtzf8gzPaJq6LKEs9A61pEmuyCz
+    - name: social-publication
+      remote: kotoba-lang
+      revision: e8127d0661284b1c12ce1b216c84b5ed2db619ab
+      path: orgs/kotoba-lang/social-publication
+      groups: [kotoba-lang]
+      userdata:
+        rad-rid: rad:zb9kumwoA2dRCj9wWCZB3HBhoEZo
     - name: soko
       remote: kotoba-lang
       revision: f051df00880fbf2345fd88773ba342d7de652cab
@@ -25704,6 +25690,20 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z4Kf38mgv5dvjpbVJ6wxDkfcmKh6c
+    - name: svelte-auth
+      remote: kotoba-lang
+      revision: ad28c5497d4182fb8d0d79d118746529e93eda72
+      path: orgs/kotoba-lang/svelte-auth
+      groups: [kotoba-lang]
+      userdata:
+        rad-rid: rad:z3sRhDSE9x355jqNdpR3bX4UmtKj
+    - name: svelte-design-system
+      remote: kotoba-lang
+      revision: 18834c0e410573be1550b8047930303be8eba503
+      path: orgs/kotoba-lang/svelte-design-system
+      groups: [kotoba-lang]
+      userdata:
+        rad-rid: rad:zjFHhp73c2XE4d5eUKUXvk2KBkCC
     - name: kotoba-lang-svgraph
       remote: kotoba-lang
       repo-path: svgraph
@@ -25977,6 +25977,13 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z3hYyGWJa2WGriEnC9vqC7cLPz4wF
+    - name: vite-plugin-safe-builder
+      remote: kotoba-lang
+      revision: 5c391d7f2fb1215cd6d204ef7d706656b23dd097
+      path: orgs/kotoba-lang/vite-plugin-safe-builder
+      groups: [kotoba-lang]
+      userdata:
+        rad-rid: rad:z2kp8Cfrf22fg12Wfoe8i33MVxqNY
     - name: vllm
       remote: kotoba-lang
       revision: bcbed8d4af066980874024eec5fe55cec0e860b0
@@ -26124,6 +26131,13 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z3murtYpGVaxsk5QLnod3SYHifSF3
+    - name: xrpc
+      remote: kotoba-lang
+      revision: c2716098eed399a4be4a8fed9918ff6e952e3797
+      path: orgs/kotoba-lang/xrpc
+      groups: [kotoba-lang]
+      userdata:
+        rad-rid: rad:z2RnJDFg7rVksiQRYiPt1SXHuW9r
     - name: yakuwari
       remote: kotoba-lang
       revision: 1ae34252208abaeb59d102b10b97c62f838d0288
@@ -26260,8 +26274,9 @@ manifest:
       revision: a751462465957617fa6ea4b8512f17759e0b7e6f
       path: orgs/network-awai/manimani
       groups: [network-awai]
-    - name: net-babiniku
+    - name: network-awai-net-babiniku
       remote: network-awai
+      repo-path: net-babiniku
       revision: ffc313e1fdf40033f679dac29bed1be7ee86b4bb
       path: orgs/network-awai/net-babiniku
       groups: [network-awai]
