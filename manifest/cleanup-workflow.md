@@ -233,11 +233,43 @@ Resolve by file class:
 - Markdown policy files: preserve current `main` policy and add only the missing procedure/reference text.
 - Stash conflicts: do not drop the stash; inspect `git stash show --stat` and `git show 'stash@{0}' -- <paths>`.
 
+### `--check` reports STALE almost always — do not "fix" it by regenerating
+
+`nbb scripts/gen-west-manifest.cljs --check` compares `west.yml` against what a
+**wholesale** regeneration would produce, and the generator pins from each child
+repo's *local working HEAD*. In a shared checkout that is drifted by definition.
+
+Measured 2026-07-29 on a clean `main`: of **3,299** locally-present west
+projects, **287** had a local HEAD different from their pin. Sampling 25 of
+those for direction:
+
+| | |
+|---|---|
+| local **ahead** of pin — regeneration would advance | 3 |
+| local **behind** pin — regeneration would **regress** | 5 |
+| diverged | 3 |
+| **pin not present in the local clone at all** | 14 |
+
+Extrapolated, a wholesale regeneration would have rolled back on the order of
+57 pins and mangled ~160 more whose pin the local clone cannot even see. That
+is the `90852b86` incident (44 broken pins pushed to `main`) waiting to happen
+again.
+
+So: **STALE is the normal reading, not a defect.** The `:west-conflict`
+resolution below lists "ensure child repos are checked out at the intended
+pins" as a precondition, and nothing enforces it. Treat `--check` as
+informational unless you have just run `--entry` for your own change, and
+verify *that entry's* diff instead:
+
+```bash
+git diff manifest/west.yml     # must show only the entries you intended
+```
+
 After resolving:
 
 ```bash
 rg -n '<<<<<<<|=======|>>>>>>>' <changed-files> || true
-nbb scripts/gen-west-manifest.cljs --check
+nbb scripts/gen-west-manifest.cljs --check   # informational — see above
 ```
 
 Run any domain-specific verification touched by the change, for example:
