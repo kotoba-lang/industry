@@ -667,13 +667,17 @@ chunk が要る」と書いたが既存 provider は 1 ブロック 1 INSERT（4
   `:uncomputable-until-measured` として明示する — 大きな pool に未計測の
   変換率を掛けて期待値を捏造しない。
 - **実 entity データに対して継続的に回す orchestrator は
-  `kotoba-lang/loop-system-dynamics`（`loop-*` prefix、
-  `kotoba-lang/loop-ux-kaizen` の `resources/repository-rules.edn` taxonomy
-  準拠: observe → evaluate → decide → act → record-evidence、domain scoring
-  truth は `dynamics` に委譲し自前で持たない）を使う。** 新しい `loop-*` repo を
-  作る前に、必ず `resources/repository-rules.edn` 規約（`loop-*` は
-  continuous orchestrator、prefix 無しは reusable library、`skill-*`/`action-*`
-  は別役割）を確認してから命名する。
+  `kotoba-lang/loop-system-dynamics`（`loop-*` prefix、`manifest/repository-rules.edn`
+  の `:name-prefix` taxonomy 準拠: observe → evaluate → decide → act →
+  record-evidence、domain scoring truth は `dynamics` に委譲し自前で持たない）を
+  使う。** 新しい `loop-*` repo を作る前に、必ず**この superproject の
+  `manifest/repository-rules.edn`**（`loop-*` は continuous orchestrator、prefix 無しは
+  reusable library、`skill-*`/`action-*` は別役割）を確認してから命名する。
+  **taxonomy は 2026-07-29 に `kotoba-lang/loop-ux-kaizen` から superproject へ移した**
+  （ADR-2607299000。leaf repo に置かれた workspace 規約を他 3 repo が
+  docstring で参照しており、適合を検査するものが無かった）— リーフ側の
+  `resources/repository-rules.edn` は「その repo 自身がどの契約を主張するか」の
+  宣言だけを残す。
 - entity の追加は `kotoba-lang/loop-system-dynamics` の
   `resources/entities-seed.edn` に日付・出典付きの map を 1 つ足すだけでよい
   設計になっている——コードの再設計は不要。詳細・実例（etzhayyim/kotoba-lang/

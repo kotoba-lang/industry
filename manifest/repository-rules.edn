@@ -1,0 +1,129 @@
+;; Workspace-wide authority for repository role / naming rules.
+;;
+;; Until 2026-07-29 two *incompatible* vocabularies shared one schema string
+;; ("kotoba.repository-role-rules.v0") and neither had a workspace-level home:
+;;
+;;   - the stack-tier vocabulary's edge table lived only as a hardcoded map
+;;     inside scripts/verify-repository-roles.cljs
+;;   - the name-prefix vocabulary lived inside a leaf repo
+;;     (kotoba-lang/loop-ux-kaizen/resources/repository-rules.edn)
+;;
+;; Both are declared here instead, explicitly discriminated by :vocabulary/id.
+;; See ADR-2607299000.
+;;
+;; Per-repo declarations stay in each repo's resources/repository-rules.edn and
+;; keep schema "kotoba.repository-role-rules.v0" — a reader of one repo alone
+;; must still be able to see which contract that repo claims to satisfy.
+;; This file is the authority those declarations are checked *against*.
+
+{:schema "kotoba.repository-role-rules.workspace.v1"
+
+ :vocabularies
+ [{:vocabulary/id :stack-tier
+   :vocabulary/authority "90-docs/adr/2607266000-kotoba-stack-responsibility-split-t0-t3.edn"
+   :vocabulary/applies-to "kotoba language stack repositories (t0-t6)"
+   :vocabulary/declaration-shape {:required [:name :tier :role]
+                                  :optional [:must-not :depends-on]}
+   :vocabulary/discriminator :name
+   ;; Lifted verbatim from the `allowed-role-edges` map that was hardcoded in
+   ;; scripts/verify-repository-roles.cljs. A repo of role K may declare a
+   ;; production dependency only on repos whose role is in (get edges K).
+   :vocabulary/allowed-role-edges
+   {:contract  #{:contract :library :assurance}
+    :library   #{:contract :library}
+    :backend   #{:contract :library :backend}
+    :compiler  #{:contract :library :backend :verifier}
+    :verifier  #{:contract :backend}
+    :runtime   #{:contract :library :backend :compiler :verifier :runtime :assurance}
+    :provider  #{:contract :runtime :assurance}
+    :assurance #{:contract :library :assurance}
+    :placement #{:runtime :assurance}}}
+
+  {:vocabulary/id :name-prefix
+   :vocabulary/authority "90-docs/adr/2607299000-repository-rules-workspace-authority.edn"
+   :vocabulary/originated-in "kotoba-lang/loop-ux-kaizen docs/adr/0001-loop-repository-taxonomy.md"
+   :vocabulary/first-instantiation "90-docs/adr/2607220100-skill-action-loop-system-dynamics-scaffold.edn"
+   :vocabulary/applies-to "any repo in this workspace whose name carries a role prefix"
+   :vocabulary/declaration-shape {:required [:prefix :role]
+                                  :optional [:must :must-not :authority-library :composition]}
+   :vocabulary/discriminator :prefix
+   ;; Lifted verbatim from kotoba-lang/loop-ux-kaizen/resources/repository-rules.edn,
+   ;; which originated the convention and remains its first example.
+   :vocabulary/rules
+   [{:prefix "loop-"
+     :role :continuous-orchestrator
+     :must [:observe :evaluate :decide :act :record-evidence]
+     :must-not [:own-domain-scoring-truth :bind-to-one-ci-provider]
+     :examples ["loop-ux-kaizen" "loop-system-dynamics"]}
+    {:prefix "skill-"
+     :role :agent-instruction-package
+     :must [:define-agent-procedure :declare-inputs :declare-outputs]
+     :must-not [:require-resident-runner :own-ci-state]
+     :examples ["skill-ux-kaizen"]}
+    {:prefix "action-"
+     :role :github-action-adapter
+     :must [:expose-action-yml :pin-external-revisions :emit-check-result]
+     :must-not [:own-domain-contract :hide-provider-neutral-core]
+     :examples ["action-ux-kaizen"]}
+    {:prefix nil
+     :role :library
+     :must [:provide-reusable-contract]
+     :examples ["design-quality" "hinshitsu" "browser-agent"]}]
+   :vocabulary/composition
+   {:authority "loop-*"
+    :adapters ["action-*" "skill-*"]
+    :libraries ["design-quality" "hinshitsu" "browser-agent" "browser-use"]}
+   :vocabulary/github
+   {:required-permissions {:contents :read}
+    :pull-request-gate true
+    :schedule-supported true
+    :baseline-promotion :explicit-human-action
+    :missing-evidence :fail-closed}}]
+
+ ;; Naming constraints that hold for every repo in the workspace regardless of
+ ;; vocabulary. Lifted from CLAUDE.md "Repo naming" / ADR-2607102200 addendum 14.
+ :naming
+ {:forbidden-suffixes
+  [{:suffix "-clj"
+    :since "2026-07-10"
+    :authority "90-docs/adr/2607102200-kami-render-stack-deps-authority-rename.edn"
+    :reason "language is not the package identity"
+    :instead "short domain name, or a role suffix when the short name is taken"
+    :examples ["kami-engine-guest" "kami-mangaka-scene-author"]}]}
+
+ ;; Responsibility edges that exist in production but are not permitted by
+ ;; :vocabulary/allowed-role-edges. An entry here does NOT bless the edge — it
+ ;; makes it visible and dated. The verifier prints EXCEPTION for each and keeps
+ ;; going; without an entry the edge is a hard failure. Every entry must name
+ ;; what would resolve it. Delete the entry when the edge is gone.
+ :exceptions
+ [{:exception/id :kotoba-lang-library-depends-on-assurance
+   :exception/from "kotoba-lang/kotoba-lang"
+   :exception/from-role :library
+   :exception/to "kotoba-lang/security"
+   :exception/to-role :assurance
+   :exception/recorded "2026-07-29"
+   :exception/evidence "kotoba-lang/deps.edn declares io.github.kotoba-lang/security as a production dependency for kotoba.lang.release-admission"
+   :exception/why-not-allowed "ADR-2607266000 lists assurance as a dependency of T3 execution (kotoba, provider-transport), not of T1 language libraries. A T1 library reaching into T4 authority inverts the tier direction."
+   :exception/was-hidden-by "the declaration simply omitted the dependency, so nothing reported it until this check was made to run (2026-07-29)"
+   :exception/resolve "owner decision: move kotoba.lang.release-admission out of the T1 library, or reclassify the repo/tier. Not resolvable by editing the declaration."}]
+
+ ;; Measured 2026-07-29 by scripts/verify-repository-roles.cljs --prefix-audit.
+ ;; Recorded as a gap rather than fabricated: these repos carry a role prefix
+ ;; but ship no resources/repository-rules.edn, so nothing states which contract
+ ;; they claim. Not an error — the convention simply is not adopted there yet.
+ :gaps
+ [{:gap/id :name-prefix-declaration-missing
+   :gap/measured-at "2026-07-29"
+   :gap/measured-by "gh api graphql — HEAD:resources/repository-rules.edn across 27 repos"
+   :gap/repos ["kotoba-lang/action-loop-system-dynamics"
+               "kotoba-lang/loop-innen"
+               "kotoba-lang/loop-lei-catalog"
+               "kotoba-lang/skill-loop-system-dynamics"]
+   :gap/note "prefix-carrying repos with no resources/repository-rules.edn upstream"}
+
+  {:gap/id :forbidden-suffix-still-registered
+   :gap/measured-at "2026-07-29"
+   :gap/measured-by "scripts/verify-repository-roles.cljs --prefix-audit"
+   :gap/repos ["com-junkawasaki/multiformats-clj"]
+   :gap/note "west.yml still registers a -clj entry, and it is a duplicate: com-junkawasaki/multiformats-clj resolves by GitHub redirect to kotoba-lang/io-multiformats, which west already registers separately at the same revision 310724803db65840f00d2d98d7887f2b6a512bd3 — so the same repository is cloned twice at two paths. Removing the stale entry changes fleet-db/west.yml pins and is deliberately left to a separate change rather than folded into this one."}]}

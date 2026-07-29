@@ -1,16 +1,29 @@
 name: kotoba repository roles
 
+# The check verifies declarations that live in CHILD repositories, so tying it
+# only to changes in this repo meant it never fired: between 2026-07-26 and
+# 2026-07-29 it ran twice (both failing) and in the meantime five child repos
+# drifted — production dependencies were added without updating :depends-on,
+# and nothing reported it. The schedule is what makes the check real.
+# ADR-2607299000.
+
 on:
   pull_request:
     paths:
       - 'scripts/verify-repository-roles.cljs'
+      - 'manifest/repository-rules.edn'
       - '.github/workflows/kotoba-repository-roles.yml'
       - '90-docs/adr/2607266000-kotoba-stack-responsibility-split-t0-t3.edn'
+      - '90-docs/adr/2607299000-repository-rules-workspace-authority.edn'
   push:
     branches: [main]
     paths:
       - 'scripts/verify-repository-roles.cljs'
+      - 'manifest/repository-rules.edn'
       - '.github/workflows/kotoba-repository-roles.yml'
+  schedule:
+    # Weekly, so child-repo drift is caught without a superproject change.
+    - cron: '17 3 * * 1'
   workflow_dispatch: {}
 
 permissions:
@@ -30,7 +43,8 @@ jobs:
           cache-dependency-path: root/package-lock.json
       - run: npm ci
         working-directory: root
-      - name: Check out declared repositories
+
+      - name: Check out stack-tier repositories
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -41,6 +55,19 @@ jobs:
                       security codebase mesh provider-transport tender-component; do
             gh repo clone "kotoba-lang/$repo" "repos/$repo"
           done
+
+      # Laid out as orgs/<org>/<repo> so --prefix-audit can resolve the west
+      # manifest paths and tell "no declaration" apart from "checkout absent".
+      - name: Check out name-prefix repositories
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p ws/orgs/kotoba-lang
+          for repo in loop-ux-kaizen loop-system-dynamics loop-innen loop-lei-catalog \
+                      skill-loop-system-dynamics action-loop-system-dynamics; do
+            gh repo clone "kotoba-lang/$repo" "ws/orgs/kotoba-lang/$repo"
+          done
+
       - name: Verify declarations, real dependencies, direction, and cycles
         run: |
           npx nbb scripts/verify-repository-roles.cljs \
@@ -51,5 +78,14 @@ jobs:
             ../repos/provider-postgres ../repos/fleet \
             ../repos/kotoba-core-contracts ../repos/kotoba-lang ../repos/security \
             ../repos/codebase ../repos/mesh ../repos/provider-transport \
-            ../repos/tender-component
+            ../repos/tender-component \
+            ../ws/orgs/kotoba-lang/loop-ux-kaizen \
+            ../ws/orgs/kotoba-lang/loop-system-dynamics
+        working-directory: root
+
+      # Reports which prefix-carrying repos declare a contract and which do not.
+      # Known gaps are recorded in manifest/repository-rules.edn :gaps, so this
+      # surfaces drift from that record rather than re-failing on known gaps.
+      - name: Audit name-prefix coverage
+        run: npx nbb scripts/verify-repository-roles.cljs --prefix-audit --workspace ../ws
         working-directory: root
