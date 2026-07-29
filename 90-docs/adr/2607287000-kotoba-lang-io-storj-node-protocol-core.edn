@@ -22,9 +22,9 @@
    "adr-2607254100-kotoba-lang-sigv4-shared-signer-and-kotoba-byte-slice"
    "adr-2606302300-org-taxonomy-library-placement"]
   :adr/decision-summary
-  "{:repos [\"kotoba-lang/io-storj-node\" \"kotoba-lang/proto\"], :namespaces [storj.node.id storj.node.pb storj.node.orders storj.node.piece storj.node.identity storj.node.der storj.node.protocols storj.node.bytes storj.node.host.verify storj.node.certificate storj.node.mint storj.node.pem storj.node.tls storj.node.host.keys storj.node.host.tls storj.node.host.rpc proto.wire], :in-scope [:node-id :signing-form-bytes :order-limit-admission :piece-layout :v1-piece-header :peer-certificate-rules :node-id-derivation-from-ca-key :signature-verification :identity-generation :identity-files :mutual-tls :unary-drpc-call], :out-of-scope [:call-multiplexing :the-rpcs-themselves :settlement :retain-gc :graceful-exit :streaming :uplink-side], :deps [io.github.kotoba-lang/proto io.github.kotoba-lang/io-multiformats io.github.kotoba-lang/drpc], :verification [:storj-own-encoder-vectors :published-satellite-node-ids :real-generated-identity-fixture :real-storj-signatures :minted-identity-accepted-by-storj :byte-identical-certificate-reconstruction :byte-identical-pem :identity-directory-loaded-by-storj :live-mutual-tls-handshake-with-tlsopts :drpc-call-over-that-connection :two-runtime-parity :negative-controls], :live-satellite-request :never-performed}"
+  "{:repos [\"kotoba-lang/io-storj-node\" \"kotoba-lang/proto\"], :namespaces [storj.node.id storj.node.pb storj.node.orders storj.node.piece storj.node.identity storj.node.der storj.node.protocols storj.node.bytes storj.node.host.verify storj.node.certificate storj.node.mint storj.node.pem storj.node.tls storj.node.host.keys storj.node.host.tls storj.node.host.rpc storj.node.contact storj.node.retain proto.wire drpc.session], :in-scope [:node-id :signing-form-bytes :order-limit-admission :piece-layout :v1-piece-header :peer-certificate-rules :node-id-derivation-from-ca-key :signature-verification :identity-generation :identity-files :mutual-tls :unary-drpc-call :check-in :retain-bloom-filter :call-multiplexing], :out-of-scope [:settlement :graceful-exit :deletion-wiring :settlement :retain-gc :graceful-exit :streaming :uplink-side], :deps [io.github.kotoba-lang/proto io.github.kotoba-lang/io-multiformats io.github.kotoba-lang/drpc], :verification [:storj-own-encoder-vectors :published-satellite-node-ids :real-generated-identity-fixture :real-storj-signatures :minted-identity-accepted-by-storj :byte-identical-certificate-reconstruction :byte-identical-pem :identity-directory-loaded-by-storj :live-mutual-tls-handshake-with-tlsopts :drpc-call-over-that-connection :check-in-parsed-by-storj-io-common :every-bloom-answer-from-storjs-own-filter :two-runtime-parity :negative-controls], :live-satellite-request :never-performed}"
   :adr/artifacts
-  "{:repo \"orgs/kotoba-lang/io-storj-node\", :pin \"89ade1a83258c2a0dc568ed9c18096ab24f8553b\", :vector-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_vectors.go\", :vectors \"orgs/kotoba-lang/io-storj-node/testdata/vectors.edn\", :identity-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_identity.go (-verify in CI)\", :identity-fixture \"orgs/kotoba-lang/io-storj-node/testdata/identity.edn\", :signature-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_sigs.go (-verify in CI)\", :signature-fixture \"orgs/kotoba-lang/io-storj-node/testdata/sigs.edn\", :verifier \"orgs/kotoba-lang/io-storj-node/src/storj/node/host/verify.cljc\", :mint-verifier \"orgs/kotoba-lang/io-storj-node/testdata/verify_minted.go\", :mint-script \"orgs/kotoba-lang/io-storj-node/scripts/mint_identity.cljc\", :pem-fixture \"orgs/kotoba-lang/io-storj-node/testdata/identity.cert (go run gen_identity.go -pem, deterministic, diffed in CI)\", :tls-peer-go \"orgs/kotoba-lang/io-storj-node/testdata/tls_peer.go (storj.io/common tlsopts, and storj.io/drpc drpcserver in -drpc mode)\", :tls-peer-cljc \"orgs/kotoba-lang/io-storj-node/scripts/tls_peer.cljc\", :wire-codec \"orgs/kotoba-lang/proto/src/proto/wire.cljc\", :evidence {:as-of \"2026-07-29\", :io-storj-node {:jvm \"106 tests / 406 assertions, 0 failures 0 errors\", :cljs \"nbb — same 106 tests / 406 assertions\", :go-verify \"gen_identity.go -verify 9/9, gen_sigs.go -verify 9/9, gen_vectors.go and identity.cert byte-identical, verify_minted.go 24/24 on identity directories written by both runtimes, tls_peer.go live mutual-TLS handshake in all four client/server x JVM/nbb combinations, plus a DRPC call answered over that connection from both runtimes\", :lint \"clj-kondo 0 errors 0 warnings\", :negative-controls \"27 in total: 6 protocol core, 11 verifier across both runtimes, 8 minting, 8 identity files\"}, :proto {:jvm \"11 tests / 67 assertions\", :cljs \"9 tests / 57 assertions\"}}}"
+  "{:repo \"orgs/kotoba-lang/io-storj-node\", :pin \"a052da65bccd0ede9959b513f8c58a53ce4ca2a7\", :vector-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_vectors.go\", :vectors \"orgs/kotoba-lang/io-storj-node/testdata/vectors.edn\", :identity-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_identity.go (-verify in CI)\", :identity-fixture \"orgs/kotoba-lang/io-storj-node/testdata/identity.edn\", :signature-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_sigs.go (-verify in CI)\", :signature-fixture \"orgs/kotoba-lang/io-storj-node/testdata/sigs.edn\", :verifier \"orgs/kotoba-lang/io-storj-node/src/storj/node/host/verify.cljc\", :mint-verifier \"orgs/kotoba-lang/io-storj-node/testdata/verify_minted.go\", :mint-script \"orgs/kotoba-lang/io-storj-node/scripts/mint_identity.cljc\", :pem-fixture \"orgs/kotoba-lang/io-storj-node/testdata/identity.cert (go run gen_identity.go -pem, deterministic, diffed in CI)\", :tls-peer-go \"orgs/kotoba-lang/io-storj-node/testdata/tls_peer.go (storj.io/common tlsopts, and storj.io/drpc drpcserver in -drpc mode)\", :tls-peer-cljc \"orgs/kotoba-lang/io-storj-node/scripts/tls_peer.cljc\", :wire-codec \"orgs/kotoba-lang/proto/src/proto/wire.cljc\", :evidence {:as-of \"2026-07-29\", :io-storj-node {:jvm \"134 tests / 521 assertions, 0 failures 0 errors\", :cljs \"nbb — same 134 tests / 521 assertions\", :go-verify \"gen_identity.go -verify 9/9, gen_sigs.go -verify 9/9, gen_vectors.go and identity.cert byte-identical, verify_minted.go 24/24 on identity directories written by both runtimes, tls_peer.go live mutual-TLS handshake in all four client/server x JVM/nbb combinations, plus a DRPC call answered over that connection from both runtimes, a real CheckInRequest parsed by storj.io/common on the accepted and refused paths, and all 32 bloom-filter answers matching Storj own filter\", :lint \"clj-kondo 0 errors 0 warnings\", :negative-controls \"27 in total: 6 protocol core, 11 verifier across both runtimes, 8 minting, 8 identity files\"}, :proto {:jvm \"11 tests / 67 assertions\", :cljs \"9 tests / 57 assertions\"}}}"
   :adr/body
   "# Context
 
@@ -70,6 +70,8 @@ ADR-2607254000 が native uplink を退けた根拠（erasure coding + satellite
 | `storj.node.tls` | Storj の TLS 接続とは何か（データ）と、誰を通すか |
 | `storj.node.host.tls` | socket。この repo で唯一「何も判定しない」namespace |
 | `storj.node.host.rpc` | 検証済み接続の上の DRPC 呼び出し — 最後の継ぎ目 |
+| `storj.node.contact` | check-in — node が最初に言うこと |
+| `storj.node.retain` | どのピースを残すか、そして**どれを何があっても残すか** |
 | `storj.node.host.keys` | 参照 `IKeyMaterial` — 鍵生成・署名・乱数 |
 
 **非対象（README に明記）**: TLS ハンドシェイクと socket / identity 生成（PoW と
@@ -322,6 +324,63 @@ DRPC は多重化するが `call` はしない。実 node は 1 接続で複数�
 packet を待っている呼び出しへ振り分ける reader が要る —— それは**スケジューラ**であり、
 2 人目の呼び出し側が現れる前に書くのは要件の当て推量になる。
 
+## 2.11. check-in と、塞いだ 3 つの穴（2026-07-29 追加）
+
+到達範囲でなく**成熟度**の回。
+
+**依存 pin が自分の修正より 2 コミット古かった。** io-storj-node は proto `0eba39ed` に
+pin されていて、drpc を書いていて見つけて proto では直した varint shift overflow の修正
+（`cd8b83ad`）が入っていなかった。10 byte varint（どんな peer でも送れる）で JVM long を
+overflow する codec を、修正が landed した後も積んでいた。
+
+**`storj.node.host.rpc` にユニットテストが無かった。** 前日に書いた時点で CI の
+end-to-end しか無く、それは happy path しか通らない。実 loopback socket で両 runtime を
+覆った（error packet と code / 途中で切る peer / 別 stream に答える peer / 黙って timeout /
+呼び出し後も socket を閉じない）。fake でなく実 socket なのは、JVM と Node の API が
+違いすぎて fake が 2 つになり、**2 つの fake が一致してもどちらの runtime についても
+何も証明しない**から。
+
+**check-in。** request は `pb.Marshal` と byte 一致。Go peer が `storj.io/common` の
+生成コードで parse し実 `CheckInResponse` を返す（受理・拒否とも）。
+**check-in には署名が無く、それは欠落ではない** —— 下の mutual TLS が既に node を
+名指ししているので、署名は同じことを二度認証するだけ。`ping_node_success` は satellite が
+**dial し返せたか**の報告なので、transport 的に全部成功していて node が載っていない応答が
+ありうる。素の truthy 判定でなく `admitted?` / `refusal` を置いた。
+
+**同じ罠に 2 度。** `NodeVersion.timestamp` は `(gogoproto.nullable) = false` なので
+gogo は `time.Time` 値を marshal し、ゼロ値も値なので未設定でも出る。省いた結果
+`pb.Marshal` より 11 byte 短い request になった。**それを捕まえた生成器には、まさにその罠
+についての警告コメントが（この誤りを犯す前に）書いてある。**
+
+## 2.12. retain と多重化（2026-07-29 追加）
+
+### 多重化は drpc 側（`drpc.session`）
+
+「どの到着 packet がどの待機中の呼び出しのものか」は DRPC の判断なので `kotoba-lang/drpc`。
+stream id は増加のみ（reader が退行を拒否）で `NewClientStream` は last+1 —— この 2 つから:
+**stream id は再利用しない**（共有すると互いの答えを受け取り合い、どちらも気付かない）、
+**完了した呼び出しは忘れる**（その stream はもう話されないし、node の satellite 接続は
+長寿命なので溜め込みは「スタックトレースの無いリーク」になる）。
+
+### retain —— node が唯一「顧客データを壊す」操作
+
+**フィルタに無いことは削除理由として不十分。** `RetainRequest` は `creation_date` を
+一緒に運ぶ。フィルタはその瞬間に作られたので**それ以降に受け取ったピースは原理的に
+入っていない** —— 不在だけで消すと、satellite が最も最近預けたピースをちょうど破壊する。
+作成時刻が不明なピースも残す。
+
+### bucket を間違えると、消すピースが変わる
+
+- **seed は「どこから探り始めるか」と「何バイト進むか」の両方を決める**
+  （`initialConditions` は seed を 32 で割って `rangeOffsets` を引く）。vector の seed が
+  200 なのはそのため —— **range offset を先頭に決め打ちした実装は seed 0 のテストを全部通る。**
+- 各 probe は little-endian u64 を table size で割る。**その数は JavaScript の double に
+  収まらない**ので、値を組み立てず上位バイトから畳んで剰余を取る（parse 時に精度を検査）。
+
+Go に無い拒否を 1 つ: **空の table**（Go は最初の probe で、ピースを手にしてから分かる）。
+検証は round trip でなく、**同じ id 群に対する Storj 自身のフィルタの答え 32 件全部**との
+一致（fill rate も 6 桁一致）。
+
 ## 3. 検証 — 自分の出力を自分に assert しない
 
 この protocol の要点は自己検証できない。`encode-order-limit-for-signing` が
@@ -516,7 +575,8 @@ JS で `Uint8Array` を要求し、base58 decode の戻り値も分岐する）�
   **DRPC を接続の上で話すところも同日に完了**（`storj.node.host.rpc`）——
   `tlsopts` かつ `drpcserver` で組んだ Go peer に対し、mutual TLS → node id 検証 →
   呼び出し → 応答が両 runtime で通る。
-  **残るのは (a) 1 接続での呼び出し多重化（スケジューラ）と (b) RPC の中身**
-  （check-in / settlement / retain / graceful exit）。**運ぶ層はできた。
-  何を言うかがまだ無い。**
+  **check-in・多重化（`drpc.session`）・retain も同日に完了。**
+  **残るのは settlement**（streaming rpc なので transport 側の作業が先）、
+  **graceful exit**、そして**実際に削除する配線**（`retain` は判定するだけで
+  `IBlobStore` と繋がっていない）。
 "}]
