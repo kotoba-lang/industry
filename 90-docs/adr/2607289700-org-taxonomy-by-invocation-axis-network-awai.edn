@@ -575,10 +575,10 @@ Phase 4 に着手する前に潰すべきものとして記録する。**移送�
 5. ~~manimani 3 件の行き先~~ **決定 (2026-07-28): 3 件とも network-awai**
 6. ~~cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断~~ **決定 (2026-07-29): retire 2 件 (`ads` / `oshikatsu`) を archive。残りは app / library / data で actor 契約の対象外 — blueprint 起票という作業自体が存在しなかった (D5 の前提誤りを訂正)**。派生して残る唯一の未決は下記 9
 7. ~~`gftdcojp/ai-gftd-cyber-drill` と `cloud-itonami/cyber-drill`~~ **決定 (2026-07-29): `ai-gftd-cyber-drill` を archive、bare name は動く方 (cloud-itonami) が保持**
-10. etzhayyim 26 repo の上流 rename への west 追随 (21 件が bare name 衝突 — `<org>-<basename>` + `repo-path:` 変換が要る)
-11. `:manifest.repos/extra-projects` の陳腐化解消 (`gen-west-manifest.cljs --check` STALE の主因)
 8. ~~`cloud-itonami/ai-gftd-kaisya` (Clojure runtime) と `cloud-itonami/kaisya` (BPMN 5 点)~~ **決定 (2026-07-29): `ai-gftd-kaisya` を archive、bare name は BPMN 側が保持**
-9. `cloud-itonami/jp-ashiba` を cloud-itonami の governor 契約 (langgraph-clj StateGraph + 独立 Governor + append-only 台帳) に載せるか。現状は `actor/actor-manifest.jsonld` が Python/LangGraph pod を記述し、実体は cljc 8 モジュール + テストで governor を持たない"
+9. `cloud-itonami/jp-ashiba` を cloud-itonami の governor 契約 (langgraph-clj StateGraph + 独立 Governor + append-only 台帳) に載せるか。現状は `actor/actor-manifest.jsonld` が Python/LangGraph pod を記述し、実体は cljc 8 モジュール + テストで governor を持たない
+10. etzhayyim 26 repo の上流 rename への west 追随 (21 件が bare name 衝突 — `<org>-<basename>` + `repo-path:` 変換が要る)
+11. `:manifest.repos/extra-projects` の陳腐化解消 (`gen-west-manifest.cljs --check` STALE の主因)"
 
   :adr/decision-summary
   ["D1: org 判定軸を目的(公益/事業)から起動主体(:repo/kind)へ移す。6 org: kotoba-lang=lib / etzhayyim=organism のみ / cloud-itonami=呼ばれて動く基盤 / gftdcojp=B2B/B2G security service / network-awai=AWAI Network L.L.C. の consumer network(p2p/crypto/blockchain)+adult / com-junkawasaki=cloud+data+個人"
