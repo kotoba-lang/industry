@@ -1,0 +1,174 @@
+[{:db/id -1
+  :adr/id "2607299960-dougaka-murakumo-compute-kotobase-storage"
+  :adr/title "ADR-2607299960: dougaka の生成計算を murakumo.cloud に、成果物の保管を kotobase.net に置く"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "dougaka-production-plane"
+  :adr/date "2026-07-29"
+  :adr/last_verified "2026-07-29"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["dougaka / minidrama 系 creator actor の生成計算はすべて murakumo.cloud の公開 generation API を通ること"
+   "production 中間成果物の保管先が kotobase.net の content-addressed archive (PUT/GET /ipfs/:cid) であること"
+   "degrade が leg 単位で報告され、placeholder が成功として読めないこと"
+   "shot の :speaker 役語彙と VOICEVOX / fleet TTS 話者の対応"]
+  :adr/related
+  ["adr-2607071300-aozora-creator-actors-minidrama"
+   "adr-2607071500-minidrama-mesh-reside-aozora-actor-integration"
+   "adr-2607171800-ai-gftd-dougaka-vector-video-workflow"
+   "adr-2607182130-dougaka-live-action-internal-demo-i2v-handoff"
+   "adr-2607252500-cloud-itonami-media-generate-video"
+   "adr-2607173100-murakumo-main-alias"
+   "adr-2607299800-person-isekai-hajime-game-producer-yakuwari-murakumo-residency"]
+  :adr/body
+  "# ADR-2607299960: dougaka の生成計算を murakumo.cloud に、保管を kotobase.net に置く
+
+**Status**: accepted
+**Date**: 2026-07-29
+**Deciders**: Jun Kawasaki（指示: 「整えて 計算は murakumo.cloud, storage は kotobase.net」）
+
+## Context — 何が実際に出ていたか
+
+aozora.app には 2026-07-28 から毎日、縦型 60 秒の動画が自動投稿されている。
+実測（2026-07-29、appview `app.bsky.feed.getTimeline` + PDS `getBlob`）:
+
+| 作者 | DID | 投稿 |
+|---|---|---|
+| 【動画家】dougaka-actor | did:key:z6MktbX2… | asaichi-no-koori 07-29 01:32Z / amaoto-no-arcade 07-28 01:31Z |
+| 【ミニドラマ座】minidrama | did:key:z6MkkHZB… | bench-no-tegami 07-29 00:33Z / alarm-ai 07-28 00:31Z |
+
+**シナリオ・音声・投稿は本物だった。** `videos/asaichi-no-koori.edn` は 3 幕 8 ショット、
+各ショットが `:duration` `:speaker` `:prompt`（英語の画像生成プロンプト）`:subtitle` を持つ
+完成した発注書で、Governor gate を通って commit されている。音声も実在し、minidrama の
+公開 mp4 はショット単位の基本周波数実測で `:boy` の 1 ショットだけ 173 Hz に落ちる
+（他は 296–393 Hz）= VOICEVOX の演じ分けが実際に効いていた。
+
+**欠けていたのは絵と、台詞の間だった。**
+
+- `:prompt` は動画モデル向けに書かれていたのに行き先が無く、`dougaka.comfy` は
+  `COMFY_POD_URL` 未設定で placeholder に落ち、`write-keyframe!` が単色板を書いていた。
+  実測: 公開 mp4 は 47 kbps、37 カット、各ショットが別々の**単色**（薄紫/水色/緑）。
+- BGM leg が存在しなかった。`douga.ffmpeg/bgm-mix-cmd` は実装済みなのに
+  `dougaka.pipeline` が一度も呼んでいない。実測: 60 秒中 **38.4 秒が完全な無音**
+  （−45dB/0.6s で 8 箇所）。台詞 2.9 秒 → 無音 4.7 秒の繰り返し。
+- SFX leg は production 経路に 1 行も無い（`bgm|sfx|ongakuka|cues` の grep がゼロ件）。
+  cue モデルがあるのは dougaka-vector だけで、そこも plan を吐くのみ、消費側の
+  `bin/assemble.cljs` は自称 NON-AUTHORITATIVE。
+- `:speaker :narrator` が `speaker-map` に無く（あるのは `:narrator-f`/`:narrator-m`）、
+  実写ミニドキュメンタリーのナレーション 8 本すべてが default = ずんだもん
+  （AI・機械役）に落ちていた。実測でも 8 ショット中 6 つが推定上限に張り付き。
+- production 中間物はラップトップの `target/dougaka/<id>/` にしか無く、翌朝には消える。
+  再カットも再採点も監査もできず、生き残るのは aozora blob の中の最終 mp4 だけだった。
+
+## Decision
+
+### 1. 計算 = murakumo.cloud（`POST /api/v1/generation`）
+
+生成のあらゆる段を fleet に出す。公開 API（`cloud-murakumo.public-generation`）の
+type と、`murakumo.edn` が実際に serve している function の対応:
+
+| production の段 | type | fleet function | 既定モデル |
+|---|---|---|---|
+| shot `:prompt` → 動く絵 | `video` | `:video`(comfy) | ltx-2.3 |
+| shot `:subtitle` → ナレーション | `voice` | `:voice`(tts) | cosyvoice2(ja) |
+| genre+logline → 音楽ベッド | `sound` (`sound_kind=music`) | `:music`(audio) | ace-step |
+| shot `:sfx` → 効果音 | `sound` (`sound_kind=sfx`) | `:sfx`(audio) | stable-audio-open |
+
+**モデル id を焼かない。** `model` を省略すると murakumo が function の `:default` を
+解決するので、fleet 側のモデル入れ替えがこの repo の release なしに届く
+（ADR-2607173100 の murakumo-main 規則を generation 面へ適用）。呼び出し側は
+必要なら明示 pin できる。
+
+実装: `dougaka.murakumo-job`（純粋 — body 構築・応答解析・poll backoff）+
+`dougaka.murakumo`（JVM I/O — submit → poll → artifact download）。この repo の
+`.cljc`/`.clj` 分割規約どおりで、新しい依存は増えていない（JDK HttpClient）。
+
+### 2. 保管 = kotobase.net（`PUT/GET /ipfs/:cid`）
+
+すべての artifact を**自分のバイト列の sha2-256 = raw CIDv1** で置く。
+`kotobase.archive-put` はサーバ側で digest を再計算して不一致を 422 で弾くので、
+CID の付け間違いが誤ったバイト列を保管することは構造的に起きない。同じバイト列は
+同じ名前になるので再保管は冪等 = 再実行が無料。
+
+実装: `dougaka.kotobase`（純粋 — base32/CID）+ `dougaka.archive`（JVM I/O — PUT）。
+これで production は「ラップトップの path 群」ではなく **CID 群**で再現できる。
+
+### 3. degrade は leg 単位で、正直に
+
+fleet clip が無い shot は従来の keyframe 経路（ComfyUI → 単色板）へ、ナレーションは
+murakumo → VOICEVOX → `say` → 無音へ、ベッドと cue は単に不在になる。
+**pipeline は必ず再生可能な動画を返す**（never-throw honesty rule は不変）が、
+`produce!` の返り値に `:legs` を足し、shot ごとに
+`:murakumo`/`:comfy`/`:operator-image`/`:placeholder`、音声は
+`:murakumo`/`:local`/`:silent` を記録する。**placeholder が成功として読めないようにする** —
+呼び出し側は degrade した cut の publish を拒否できる。
+
+### 4. 役語彙を 1 か所に揃える
+
+`speaker-map` に `:narrator`/`:narration` を追加（→ 九州そら 16）。さらに
+`fleet-voice-map` を新設し、同じ役語彙を fleet TTS の話者名へ写す —
+VOICEVOX が無い機械でも演じ分けが失われない。
+
+### 5. douga（craft lib）側に足したもの
+
+- `audio-overlay-mix-cmd` — ループするベッドと時刻付き cue を、組み上がった動画の
+  自前音声の上に混ぜる 1 本の builder。`duration=first` で動画長が正本、
+  `normalize=0` で amix がナレーションを潰さない。映像は stream copy。
+- `video-segment-cmd` に `:audio-path` と `tpad=stop_mode=clone` —
+  生成クリップがナレーションを載せられるように、また計画尺より短いクリップが
+  黒味を残さず最終フレームで持つように。
+
+## Verification
+
+- **douga**: 20 tests / 110 assertions green。実 ffmpeg でも検証 — 20 秒ベッドを
+  ループ + 7.5 秒に cue を、60 秒のナレーション動画へ混ぜて 60.08 秒、
+  無音区間が **8 → 0**。2 秒 768x448 クリップ → 7 秒 720x1280@30（210 frames）。
+- **dougaka**: 31 tests / 126 assertions green（**着地済み douga sha に対して**、
+  local override 無し）。
+- **CID エンコーダは実物で検証**: 現在公開中の asaichi-no-koori.mp4 の sha2-256 から
+  aozora の実 CID `bafkreidaqutrnhk2pa4zsesrmxsfvqpmtyhb77kbf4ks3cwjo5k6czzlcy` を
+  完全一致で再導出。canonical な空オブジェクト CID も一致。
+- **E2E（token 無し）**: 実際の 8 ショット plan で 60.042667s / 720x1280 / h264+aac —
+  現在出荷中のものと同一形状。`:legs` は全 shot `:placeholder`、音声 `:local`、
+  `:bed false` を正直に報告し、skip の理由を 1 行ずつ stderr に出す。**degrade 経路に
+  regression は無い。**
+
+## Not done（正直な現在地）
+
+**murakumo / kotobase の実経路はまだ live で叩けていない。** この環境に
+`MURAKUMO_GENERATION_TOKEN` と `KOTOBASE_ARCHIVE_TOKEN` が無く、前者を mint するために
+secrets-location-map が指す kagi item `MURAKUMO_GENERATION_TOKEN_SECRET`
+（compartment gftdcojp）が **ローカル vault で `no such item`** を返す
+（vault.edn は 2026-07-17 付。ADR-2607161750 の記載どおりなら在るはず）。
+安全床⑦により vault の総当たり列挙はしないので、ここはオーナーに渡す。
+ADR-2607182130 の `:i2v-blocked-on-token-issuance` は**同じ壁のまま**であり、
+generation job はこのコードから 1 件も submit されていない。
+
+再開手順（オーナー実行）:
+
+```bash
+# 1. generation-scope token
+cd orgs/network-awai/cloud-murakumo
+MURAKUMO_TOKEN_SECRET=$(orgs/kotoba-lang/kagi/bin/kagi get MURAKUMO_GENERATION_TOKEN_SECRET) \\
+  clojure -M:token issue dougaka generation 7776000
+# 2. kotobase archive の write token（kotobase-protocols-worker WRITE_TOKEN 系）
+# 3. 本番実行
+MURAKUMO_GENERATION_TOKEN=… KOTOBASE_ARCHIVE_TOKEN=… \\
+  clojure -M -m dougaka.pipeline videos/asaichi-no-koori.edn
+#    → :legs が全 shot :murakumo、:bed true になれば絵と音が入っている
+```
+
+## Consequences
+
+- (+) `:prompt` が初めて行き先を持つ。shot list は最初から動画モデル向けに書かれていた。
+- (+) 60 秒中 38 秒の無音が埋まる（ベッド + cue）。
+- (+) production が CID で再現・監査できる。中間物が一晩で消えなくなる。
+- (+) degrade が数えられるので、「絵が入らなかった回」を publish 前に落とせる。
+- (−) fleet を通す分、1 本あたりの制作時間と GPU コストが上がる（ltx-2.3 の実測は
+  49 frames で 94.6 秒、ADR-2607171100）。8 ショットの直列 submit は数分〜十数分。
+- (−) token が入るまで実挙動は未証明。入るまでは今までどおり単色板が出続ける
+  （壊れてはいないが、直ってもいない）。
+- (−) SFX は shot に `:sfx` を書いた時だけ動く opt-in。既存 catalog は誰も書いていないので、
+  cue を入れるには plan 側の追記が要る。
+"}]
