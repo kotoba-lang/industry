@@ -716,7 +716,90 @@ cljc 側が canonical に読める。
 **key 集合は 75/9/3/3 で完全に不変**であることを機械確認し、値だけを差し替えた。残る
 `com-etzhayyim-*` 参照 19 件は etzhayyim に残る repo なので正しい。
 
-### 未着手として残るもの
+### 後片付け — manifest の実態整合と登録バックログ (2026-07-29)
+
+移送を終えたあと、GitHub の全 repo (7 org / 3,994 件) と west entry を突き合わせて残った
+歪みを潰した。
+
+#### 実在しない west entry 8 件
+
+west にあるのに GitHub に無い entry が 8 件あった。7 件は rename / transfer 済みで移送先が
+**既に west に登録されている重複**で、旧 path は GitHub の redirect で解決するため fetch は
+通り気付けない状態だった (`cloud-itonami-isic-7500` -> `-750` / `com-junkawasaki/kotodama` ->
+`kotoba-lang/kotodama` / `multiformats-clj` -> `io-multiformats` / `org-arxiv-kotoba` ->
+`kotoba-lang/arxiv` / `spirit-in-physics` -> `org-spirit-in-physics` / `kotoba-git` ->
+`bonsai` / `kotoba-rad` -> `nekko`)。pin を比較すると **2 件は消す側が先行**していたので
+生存側へ載せてから削除した。8 件目 `app-kotoba-torrent` は repo 自体が削除済み
+(redirect 無しの 404、`git ls-remote` も Repository not found) で、fetch できない entry は
+`west update` を壊すため削除した。
+
+#### west.yml の構造破損 1 件
+
+commit `6ebf4b4b5fc` (loop-jiten の登録、Contents API single-entry commit) が
+**project ブロックを `remotes:` セクション内に挿入**していた。`remotes:` の要素は
+`{name, url-base}` なので `path:`/`revision:` を持つブロックが混ざると west が remote として
+誤解釈しうる。generator は正しく `projects:` に置こうとするため `--check` は STALE に
+なっていた。ブロックを `projects:` へ移して解消した。
+
+#### `:local/root` の壊れたエッジ 15 本
+
+`west-orphan-audit --blocking` が **fresh checkout で依存解決が落ちる**エッジを検出した。
+実体はすべて移送/改名に consumer 側の相対パスが追随していないもので、子リポ 15 ファイルを
+Contents API で修正した:
+
+| 参照先 | 変更 | consumer |
+|---|---|---:|
+| `cloud-murakumo` | gftdcojp -> network-awai | 11 |
+| `social-publication` | etzhayyim -> kotoba-lang | 2 |
+| `kotodama` | com-junkawasaki -> kotoba-lang | 1 |
+| `cloud-mamori` | -> `cloud-kyusai` | 1 |
+
+`mangaka` の remote は `../../cloud-murakumo` (= `orgs/cloud-itonami/cloud-murakumo`、
+存在しない path) を指しており、一度直された形跡があるのに行き先が違っていた。
+`kaname` / `kuni-umi` への書き込みは **HTTP 307** で失敗した — `manifest/cleanup-workflow.edn`
+が `:renamed-repo` trap として記録するとおり、GitHub は GET と `-f` POST は redirect するが
+`--input` POST には 307 を返し `gh` は追わない。`gh api repos/<slug> --jq .full_name` で実 slug
+に解決してから再実行した。対応する west pin 15 件も前進させた (全件 `status=ahead` を確認)。
+
+#### 登録バックログ 103 件を登録、`fastlane-certs` だけ除外
+
+未登録 172 件を分類し、実体のある 103 件を登録した (pin は各 default branch HEAD)。
+
+| 分類 | 件数 | 扱い |
+|---|---:|---|
+| workspace repo (live) | 104 | **103 を登録**、`fastlane-certs` のみ除外 |
+| personal / fork 相当 (com-junkawasaki) | 40 | west scope 外 |
+| migration leftover (`com-etzhayyim-*`、stay 対象) | 20 | 別途 |
+| archived | 7 | 登録不要 |
+| org-meta (`.github`) | 1 | project ではない |
+
+登録分の内訳は kotoba-lang 88 (**`capability-*` 50 が 1 件も登録されていなかった** /
+`app-*` 18 / その他 20) / gftdcojp 13 / cloud-itonami 1 / etzhayyim 1。
+
+**`gftdcojp/fastlane-certs` は登録しない。** Fastlane match の証明書ストアで、中身は
+`certs/distribution/*.p12` (秘密鍵) と `profiles/appstore/*.mobileprovision`。west に登録すると
+既定の `west update` で**全 clone に署名鍵が展開される**。CLAUDE.md の安全床および
+cleanup-workflow.edn の「credential-looking paths は skip」に従い除外し、ここに記録する。
+
+結果: project **3,822 -> 3,925**、`gen-west-manifest.cljs --check` = `west.yml is up to date`、
+`west-orphan-audit --blocking` の blocking は **0 件**。
+
+### 未着手として残るもの — ADR-2607261601 Phase 5 (統合リファクタ)
+
+移送は終わったが、同 ADR が「別途設計」とした**重複クラスタの統合**は手つかず。実測 (2026-07-29):
+
+| クラスタ | 現状 |
+|---|---|
+| `oil-*` 7 分割 | `cloud-itonami/oil-{coverage,distribution,midstream,refining,shipping,trading,upstream}` が現存 |
+| `kaname` 7 ドメイン集中 | `cloud-itonami/kaname` 1 repo に `charter`/`ethics`/`land`/`member`/`religious`/`tithe`/`treasury` の 7 cell-prefix route が集中 |
+| KAMI 創作 | `kami-mangaka-*` 8 repo |
+| ERP | `*erp*` 5 repo |
+| ERP (kyber 系) | 3 repo |
+| Web クロール | 3 repo |
+
+これらは「7 repo を 1 つに畳む」「1 repo を 7 つに割る」という**設計判断そのもの**で、
+配置の付け替えではない。どれが正本になり何が壊れるかを決めてからでないと動かせないので、
+本セッションでは計測のみ行い実行していない。
 
 ## Consequences
 
