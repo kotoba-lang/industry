@@ -41,6 +41,7 @@
 |---|---|---|---|
 | 1 | [`kotoba-lang/erasure`](https://github.com/kotoba-lang/erasure) | `6b6b95eb` | lint 0 / JVM 27 tests 859 assertions / CLJS 20 tests 241 assertions |
 | 2 | [`kotoba-lang/kura`](https://github.com/kotoba-lang/kura) | `d2485630` | lint 0 / JVM 53 tests 542 assertions / CLJS 48 tests 196 assertions |
+| 3 | [`kotoba-lang/kura-node`](https://github.com/kotoba-lang/kura-node) | `9bb8bd4c` | lint 0 / JVM 36 tests 446 assertions / CLJS 36 tests 446 assertions |
 
 `kura` が所有するのは §0 の表どおり 5 面 — placement / manifest / repair /
 audit / order。**バイトは一切動かさない**（小さい値を取り小さい値を返す判断のみ。
@@ -64,6 +65,24 @@ audit / order。**バイトは一切動かさない**（小さい値を取り小
 - **§2 の監査数値を訂正**: `ceil(ln(0.001)/ln(0.99))` は 687.32 の切り上げで
   **688**（本 ADR は当初 687 と書いた — 切り捨て誤り）。44 MiB/round・
   年 528 MiB = 10 TB node の容量の 0.005%・月次フルスクラブ比 99.9996% 削減は不変。
+- **§8 の Phase 0 に穴があった — backend の独立性は宣言させないと成立しない。**
+  借り物 backend を pseudo-node にするのは正しいが、**1 つの B2 アカウント上の
+  26 pseudo-node は 1 node である**。符号側からは区別できず、26 か所に 26 shard
+  があるように見えて任意 7 消失耐性を報告してしまう。実際に得ているのは B2 の
+  耐久性で、そのために 1.625 倍を払っている。よって `kura-node` では
+  `independence-profiles`（`:independent` / `:shared-provider` /
+  `:shared-substrate`）を閉じた集合とし**既定値を置かず宣言必須**にし、
+  `store/audit` が崩壊を報告する。適合スイートはこの宣言を検査**しない** —
+  2 つの bucket が control plane を共有するかは API の性質ではなく世界の事実で、
+  宣言は運用者が責任を負う主張である。これは Phase 0 の欠陥ではなく、
+  **Phase 0 が可視化するために存在する事実**。
+- **§5 の「機構は 1 関数」が実装で確定した。** `kura.node.gf` が係数ごとの
+  256 byte テーブルで内ループを添字ロード + xor に落とし、byte 等価 gate
+  （テーブルは全 65,536 積、`scale-add` は全 256 係数、encode は実 k=16/r=4/g=6
+  を shard 単位で照合）で拘束している。テーブルは `erasure.gf/mul-def`
+  （テーブル無しの定義）から作る — テーブル駆動の `erasure.gf/mul` から作ると
+  高速路が自分の oracle とバグを共有しうる。JVM の byte 符号付き
+  （200 が -56 として読め、-56 は添字にならない）が実害なので両ホストで回す。
 - **配置ハッシュだけは注入にできない。** client / coordinator / auditor が独立に
   同じ node set を計算できないとネットワークに「どこに何があるか」の共通了解が
   無くなる。よって 32bit 演算で固定し、`.kotoba` 移植を等価性 gate で拘束した
@@ -489,8 +508,9 @@ on-chain 継続証明とは別物である。cold archive の公開証明性が�
    repair (grace + margin) / audit (sampling + merkle-sum) / order (admission)
    .kotoba 配置演算 + 等価性 parity gate
 
-3. kotoba-lang/kura-node（機構）
-   kura-node 契約の裏に B2 / R2 / S3 / io-storj を pseudo-node として実装
+3. [DONE 2026-07-29] kotoba-lang/kura-node — pin 9bb8bd4c、west 登録済み
+   store 契約 + 適合スイート / memory・S3 互換 backend / 高速 GF (byte 等価 gate)
+   / 監査応答 (store から commit、manifest からではない) / order 課金 (chunk 毎)
 
 4. kotoba-lang/kura-bugyo（DO 単一 writer + D1）
    metadata 1 ref / repair スケジューラ / audit 発行 / epoch 集計
