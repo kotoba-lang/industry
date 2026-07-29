@@ -270,8 +270,14 @@ west 既知の project 名 (未知 0 件)。使用時の罠も 2 つ実測して
 
 ## 実施しないこと (次段、別 PR)
 
-- **`repository-rules.edn` の workspace 規約への昇格** — 現在 kotoba-lang の 5 repo に
-  コピーが散在。統合は別 ADR
+- ~~**`repository-rules.edn` の workspace 規約への昇格**~~ — **完了 (2026-07-29、ADR-2607299000)**。
+  「5 repo に散在するコピー」という上の見立ては実測と違った: 同じ schema 文字列の下に
+  互換性のない 2 語彙 (stack-tier / name-prefix) が同居し、前者の辺表は検証器に
+  ハードコード、後者の権威はリーフ repo loop-ux-kaizen の中にあった。
+  manifest/repository-rules.edn を権威にし、検証器を 2 語彙 dispatch にし、
+  murakumo fleet の gate として実行するようにした (GitHub Actions は課金停止中)。
+  過程で子 repo 5 件の宣言乖離が判明し、うち 1 件は責任反転 (T1 library -> T4 assurance)
+  で :exceptions に記録・オーナー判断待ち
 - **person entity の追加** — D6 のとおり穴として記録するに留める
 ### D10. repo-maturity は incremental (west pin 不変なら API を叩かない) で回す
 
