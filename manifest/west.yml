@@ -215,6 +215,11 @@ manifest:
       groups: [cloud-itonami]
       userdata:
         rad-rid: rad:zCJJKo7FEwJMwGMWk4kQYVzeChTd
+    - name: cloud-itonami-app
+      remote: cloud-itonami
+      revision: bee5ee31c0c88992bf0c9ef238829cb35da531d3
+      path: orgs/cloud-itonami/cloud-itonami-app
+      groups: [cloud-itonami]
     - name: cloud-itonami-assoc-0126-idn-gapki
       remote: cloud-itonami
       revision: f6d90ced5c648ad91f5c2a266d3036a0e719976a
@@ -11945,8 +11950,9 @@ manifest:
       userdata:
         datalad: true
         annex-remote: b2
-    - name: sha256d
+    - name: com-junkawasaki-sha256d
       remote: com-junkawasaki
+      repo-path: sha256d
       revision: 1b5284c0ea686b91573dd4d1c1410a5c3077259c
       path: orgs/com-junkawasaki/sha256d
       groups: [com-junkawasaki]
@@ -13417,6 +13423,11 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z4Nayck1ggdVwskrVmTfsGwV4JsJp
+    - name: gov.sec.edgar
+      remote: etzhayyim
+      revision: 4097f45946954b22dcce7537f634fba66f6c5632
+      path: orgs/etzhayyim/gov.sec.edgar
+      groups: [etzhayyim]
     - name: jp.go.meti.enecho
       remote: etzhayyim
       revision: cc2d7e4f5400a1d6c06b6d8fa60345e37d8473b2
@@ -13466,6 +13477,21 @@ manifest:
       groups: [etzhayyim]
       userdata:
         rad-rid: rad:z25akfEPutY4wo29H1Za3J1AP9PvT
+    - name: 240301-olsp-dbguide-web
+      remote: gftdcojp
+      revision: f752e18b98c46a0be8b1de8fca4b0b98411c252c
+      path: orgs/gftdcojp/240301-olsp-dbguide-web
+      groups: [gftdcojp]
+    - name: 250130-riken-suggest-edit
+      remote: gftdcojp
+      revision: 14bfb274c5a355f74d17188814cf1567b0bffcbe
+      path: orgs/gftdcojp/250130-riken-suggest-edit
+      groups: [gftdcojp]
+    - name: 250305-jp-gftd-le-case-kaonavi
+      remote: gftdcojp
+      revision: 66365b08f540dcb0d84f2b9e364efc4af003f8d6
+      path: orgs/gftdcojp/250305-jp-gftd-le-case-kaonavi
+      groups: [gftdcojp]
     - name: ai-gftd-cyber-drill
       remote: gftdcojp
       revision: ddeb57dd88b9203754f822dbc20724f989b12bfb
@@ -13524,6 +13550,16 @@ manifest:
       revision: 39c5bbb847368f98affccb32d531c5c39388d5b1
       path: orgs/gftdcojp/arms
       groups: [gftdcojp]
+    - name: bpmn-engine-ts
+      remote: gftdcojp
+      revision: e586b4578710ae3ecf5d806ae41c30201bbc97b9
+      path: orgs/gftdcojp/bpmn-engine-ts
+      groups: [gftdcojp]
+    - name: bpmn-sdk-rs
+      remote: gftdcojp
+      revision: 90baa151476ef3725323a62a2585c00800a8099d
+      path: orgs/gftdcojp/bpmn-sdk-rs
+      groups: [gftdcojp]
     - name: gftdcojp-business-manager
       remote: gftdcojp
       repo-path: business-manager
@@ -13555,6 +13591,11 @@ manifest:
       revision: 770b5863de75b5d3a864c48657b2c810bba9fb19
       path: orgs/gftdcojp/defence
       groups: [gftdcojp]
+    - name: effect-actor
+      remote: gftdcojp
+      revision: 16abb505655e3f6584d387989bee395162ebc1ce
+      path: orgs/gftdcojp/effect-actor
+      groups: [gftdcojp]
     - name: emotional-analytics
       remote: gftdcojp
       revision: 3707bc7b42b170be0693646d676b0fd4e27c6bd9
@@ -13577,6 +13618,16 @@ manifest:
       remote: gftdcojp
       revision: 383171d4c9e86d2fa1234e20db29894976e4554d
       path: orgs/gftdcojp/fashion
+      groups: [gftdcojp]
+    - name: gftd
+      remote: gftdcojp
+      revision: 623e15367e2dd662c9817d747176a57a7083adf2
+      path: orgs/gftdcojp/gftd
+      groups: [gftdcojp]
+    - name: gftd-llm-dataset
+      remote: gftdcojp
+      revision: d181d0caffb786482567adb5c1a22fa6d0de3cfd
+      path: orgs/gftdcojp/gftd-llm-dataset
       groups: [gftdcojp]
     - name: ghosthacker-shiropico-assets
       remote: gftdcojp
@@ -13640,6 +13691,11 @@ manifest:
       revision: 6e3ecb248f88b0b0d186dfc21d7e7d5e3dd7519a
       path: orgs/gftdcojp/mamori
       groups: [gftdcojp]
+    - name: manimani-operations
+      remote: gftdcojp
+      revision: 5669e4d53b5676f70d50904e5636dd308d879eb8
+      path: orgs/gftdcojp/manimani-operations
+      groups: [gftdcojp]
     - name: mehikari
       remote: gftdcojp
       revision: b75a1421ff98bf69539651cacea50cfdef92eb5b
@@ -13665,6 +13721,12 @@ manifest:
       groups: [gftdcojp]
       userdata:
         rad-rid: rad:zLT6UrkWfUzHNzWXfgSzYXnoDWDm
+    - name: gftdcojp-ontology
+      remote: gftdcojp
+      repo-path: ontology
+      revision: 057bd02b06537cafb6e03f0f043fce10b5313c01
+      path: orgs/gftdcojp/ontology
+      groups: [gftdcojp]
     - name: person-isekai-hajime
       remote: gftdcojp
       revision: ccc330adb7b55d2c33e89c7b880358dfc2272e97
@@ -13675,6 +13737,16 @@ manifest:
       revision: d7369db7490cd2f0f66d25a11e106441a342ba99
       path: orgs/gftdcojp/router
       groups: [gftdcojp]
+    - name: rs-jsonnet
+      remote: gftdcojp
+      revision: 6968bde09c08323eeefa6b156c34779daaf45666
+      path: orgs/gftdcojp/rs-jsonnet
+      groups: [gftdcojp]
+    - name: shigarami
+      remote: gftdcojp
+      revision: 09f9b5912152d891397412e9414d3d66f51cdce1
+      path: orgs/gftdcojp/shigarami
+      groups: [gftdcojp]
     - name: shirabe
       remote: gftdcojp
       revision: e2c315ed97d5801650ba2344e0c369d5a410d3a6
@@ -13684,6 +13756,11 @@ manifest:
       remote: gftdcojp
       revision: 8eba7c9cf6b34f94d36c1da6998834629cf60f95
       path: orgs/gftdcojp/smishing
+      groups: [gftdcojp]
+    - name: sparql-ts
+      remote: gftdcojp
+      revision: 40767d32001d9aadc8c909167537db4051d85399
+      path: orgs/gftdcojp/sparql-ts
       groups: [gftdcojp]
     - name: stripe
       remote: gftdcojp
@@ -13828,6 +13905,76 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z4ZddShysWsWB6x32E8zeZv2fvMus
+    - name: app-briefing
+      remote: kotoba-lang
+      revision: 923da4d34bec43c3156f0907ed79e80eee1f687c
+      path: orgs/kotoba-lang/app-briefing
+      groups: [kotoba-lang]
+    - name: app-browser
+      remote: kotoba-lang
+      revision: 882e42032a508703d258627bc736b070bcd02d13
+      path: orgs/kotoba-lang/app-browser
+      groups: [kotoba-lang]
+    - name: app-calendar
+      remote: kotoba-lang
+      revision: 5b5209a21e6aaa49ed4958b91dcd642fe024c568
+      path: orgs/kotoba-lang/app-calendar
+      groups: [kotoba-lang]
+    - name: app-comfyui
+      remote: kotoba-lang
+      revision: 05348d305ef707c748c56d29269a945679e55cda
+      path: orgs/kotoba-lang/app-comfyui
+      groups: [kotoba-lang]
+    - name: app-contacts
+      remote: kotoba-lang
+      revision: aa14fca58784f05e3fe8b0d03aad7b2aec8c947b
+      path: orgs/kotoba-lang/app-contacts
+      groups: [kotoba-lang]
+    - name: app-docs
+      remote: kotoba-lang
+      revision: bf2154814a6f94559d1500607829f7548b9f2e28
+      path: orgs/kotoba-lang/app-docs
+      groups: [kotoba-lang]
+    - name: app-drive
+      remote: kotoba-lang
+      revision: 5d1d8ec462664a458e0d76844379443029dfc226
+      path: orgs/kotoba-lang/app-drive
+      groups: [kotoba-lang]
+    - name: app-editor
+      remote: kotoba-lang
+      revision: 2bd3e72a1c8da86b19dea6dad3b9981ed74c53d6
+      path: orgs/kotoba-lang/app-editor
+      groups: [kotoba-lang]
+    - name: app-forms
+      remote: kotoba-lang
+      revision: 62b881f1b874301c472b49add70be7364c47ffb1
+      path: orgs/kotoba-lang/app-forms
+      groups: [kotoba-lang]
+    - name: app-i18n
+      remote: kotoba-lang
+      revision: c64c2efad620c17e47833c2a6eae3a9a4f1ddef4
+      path: orgs/kotoba-lang/app-i18n
+      groups: [kotoba-lang]
+    - name: app-mailer
+      remote: kotoba-lang
+      revision: e8cdce6e6808460f06b84c04efbf42b2b76c372a
+      path: orgs/kotoba-lang/app-mailer
+      groups: [kotoba-lang]
+    - name: app-murakumo
+      remote: kotoba-lang
+      revision: abd8ef33dd88da8952f9e2d3dd5c462995677ccd
+      path: orgs/kotoba-lang/app-murakumo
+      groups: [kotoba-lang]
+    - name: app-phone
+      remote: kotoba-lang
+      revision: 6bbbc10a9642779cf623997ef1d985a3822994e5
+      path: orgs/kotoba-lang/app-phone
+      groups: [kotoba-lang]
+    - name: app-playwright
+      remote: kotoba-lang
+      revision: 4b8cb3fbd8199110eb4f2d494ad0a14d06841da6
+      path: orgs/kotoba-lang/app-playwright
+      groups: [kotoba-lang]
     - name: app-reviewer
       remote: kotoba-lang
       revision: e11f1d6f7570dc50e46fbfc1d10b6b732a77800c
@@ -13835,6 +13982,26 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z4PFRkCRV5ZtyTb1cPQVsLtYgoPf
+    - name: app-search
+      remote: kotoba-lang
+      revision: 5d3c643e36d03ff1034b6a822904ea5cb7b200f3
+      path: orgs/kotoba-lang/app-search
+      groups: [kotoba-lang]
+    - name: app-sheets
+      remote: kotoba-lang
+      revision: a9ac6bdaed640b1cec0c056f560eb8bf0daaa959
+      path: orgs/kotoba-lang/app-sheets
+      groups: [kotoba-lang]
+    - name: app-slides
+      remote: kotoba-lang
+      revision: d85750b13612b06cee5ab173dd2e6fd79f1ca4fb
+      path: orgs/kotoba-lang/app-slides
+      groups: [kotoba-lang]
+    - name: app-wire
+      remote: kotoba-lang
+      revision: 622f58fad46a955dc9fcf0735cb9e8a512d0a8d4
+      path: orgs/kotoba-lang/app-wire
+      groups: [kotoba-lang]
     - name: appkit
       remote: kotoba-lang
       revision: 03b1c5373817229060f3fac9e41e97775c320997
@@ -14085,6 +14252,256 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z249a3Rv5xpQiNT11QLdYAmJ7JpEo
+    - name: capability-audio-io
+      remote: kotoba-lang
+      revision: 0c0483ef1089f1f1bc2500149170085bfc41778c
+      path: orgs/kotoba-lang/capability-audio-io
+      groups: [kotoba-lang]
+    - name: capability-ble-scan
+      remote: kotoba-lang
+      revision: f287d6c18adebcb30215aedc3682184c485730a0
+      path: orgs/kotoba-lang/capability-ble-scan
+      groups: [kotoba-lang]
+    - name: capability-calendar-read
+      remote: kotoba-lang
+      revision: 1fe6970ccccdd3b8d68193e981e1675bfedd1c1f
+      path: orgs/kotoba-lang/capability-calendar-read
+      groups: [kotoba-lang]
+    - name: capability-cc-cdx-query
+      remote: kotoba-lang
+      revision: 824c7de569853fdd3ebc7b286a9eb7948fc09915
+      path: orgs/kotoba-lang/capability-cc-cdx-query
+      groups: [kotoba-lang]
+    - name: capability-cc-warc-extract
+      remote: kotoba-lang
+      revision: ea457e7f2d0b0905b40df3247ba64711d0848cf1
+      path: orgs/kotoba-lang/capability-cc-warc-extract
+      groups: [kotoba-lang]
+    - name: capability-clipboard-text
+      remote: kotoba-lang
+      revision: bf546fe845eccad5293f7a708ca49a4835721f95
+      path: orgs/kotoba-lang/capability-clipboard-text
+      groups: [kotoba-lang]
+    - name: capability-clock-monotonic
+      remote: kotoba-lang
+      revision: 751152392ba02ceaa2f7738fd8d9ce68d284649f
+      path: orgs/kotoba-lang/capability-clock-monotonic
+      groups: [kotoba-lang]
+    - name: capability-component-database
+      remote: kotoba-lang
+      revision: e0d0323dd40e75fd6981b599412c69f8be4a2f28
+      path: orgs/kotoba-lang/capability-component-database
+      groups: [kotoba-lang]
+    - name: capability-component-http
+      remote: kotoba-lang
+      revision: 174c0b1a1bd2577476db80750a0b66f43d03627b
+      path: orgs/kotoba-lang/capability-component-http
+      groups: [kotoba-lang]
+    - name: capability-contacts-read
+      remote: kotoba-lang
+      revision: 6cfca01323219afa93a9c0c47cfc597b38664344
+      path: orgs/kotoba-lang/capability-contacts-read
+      groups: [kotoba-lang]
+    - name: capability-corpus-append
+      remote: kotoba-lang
+      revision: 4cb4d10e2c38673c848d58a2200f99430a1d8fa8
+      path: orgs/kotoba-lang/capability-corpus-append
+      groups: [kotoba-lang]
+    - name: capability-corpus-publish
+      remote: kotoba-lang
+      revision: d533458358467a17abe2aaec0130766c22ab3d62
+      path: orgs/kotoba-lang/capability-corpus-publish
+      groups: [kotoba-lang]
+    - name: capability-crypto-tls
+      remote: kotoba-lang
+      revision: d279c437b4758ada5dc1755f1039824654128f27
+      path: orgs/kotoba-lang/capability-crypto-tls
+      groups: [kotoba-lang]
+    - name: capability-data-cbor
+      remote: kotoba-lang
+      revision: 0e9ad4ab88d097860d4d39041ab914f1ba2714ef
+      path: orgs/kotoba-lang/capability-data-cbor
+      groups: [kotoba-lang]
+    - name: capability-data-json
+      remote: kotoba-lang
+      revision: aa1abda24c58f8a82bf54f9286b1e4bc008ff447
+      path: orgs/kotoba-lang/capability-data-json
+      groups: [kotoba-lang]
+    - name: capability-dma-map
+      remote: kotoba-lang
+      revision: 0a2693a99af60034b1671a1d1670f9d7be7e8a24
+      path: orgs/kotoba-lang/capability-dma-map
+      groups: [kotoba-lang]
+    - name: capability-fs-app-data
+      remote: kotoba-lang
+      revision: fa3323d5aee9c22f09528663c2c5aafbdeed8c96
+      path: orgs/kotoba-lang/capability-fs-app-data
+      groups: [kotoba-lang]
+    - name: capability-gpu-clear
+      remote: kotoba-lang
+      revision: e3a7e394780d8c4cda72fc587bb3afabb2b13c0b
+      path: orgs/kotoba-lang/capability-gpu-clear
+      groups: [kotoba-lang]
+    - name: capability-gpu-draw-frame
+      remote: kotoba-lang
+      revision: 7d16d782b780c90549dece717192b54fff6f3539
+      path: orgs/kotoba-lang/capability-gpu-draw-frame
+      groups: [kotoba-lang]
+    - name: capability-gpu-set-position
+      remote: kotoba-lang
+      revision: aea110cfc48c6cfec1e5272271af9e90611a8310
+      path: orgs/kotoba-lang/capability-gpu-set-position
+      groups: [kotoba-lang]
+    - name: capability-graph-kotoba
+      remote: kotoba-lang
+      revision: 044a594d95078a371c423af9b421004efee47238
+      path: orgs/kotoba-lang/capability-graph-kotoba
+      groups: [kotoba-lang]
+    - name: capability-hash-sha256
+      remote: kotoba-lang
+      revision: af99aa1445039adf969454d76e8931ef8c7c4db4
+      path: orgs/kotoba-lang/capability-hash-sha256
+      groups: [kotoba-lang]
+    - name: capability-http-fetch
+      remote: kotoba-lang
+      revision: c769181bfa7b4e2262d9107ec2791c1e21d78c50
+      path: orgs/kotoba-lang/capability-http-fetch
+      groups: [kotoba-lang]
+    - name: capability-http-post
+      remote: kotoba-lang
+      revision: def028e29504f58363c911a706d847b12555e8db
+      path: orgs/kotoba-lang/capability-http-post
+      groups: [kotoba-lang]
+    - name: capability-identity-keypair
+      remote: kotoba-lang
+      revision: f045a63d07c57935c7b711fedf1a131009c57487
+      path: orgs/kotoba-lang/capability-identity-keypair
+      groups: [kotoba-lang]
+    - name: capability-identity-sign
+      remote: kotoba-lang
+      revision: 52a092eb246381075ff2bbd391106b8ca76344b5
+      path: orgs/kotoba-lang/capability-identity-sign
+      groups: [kotoba-lang]
+    - name: capability-identity-verify
+      remote: kotoba-lang
+      revision: 1a3ad2f9f084d65e669c76ffe23322fa25b2f8f9
+      path: orgs/kotoba-lang/capability-identity-verify
+      groups: [kotoba-lang]
+    - name: capability-irq-subscribe
+      remote: kotoba-lang
+      revision: 8625b6c4e819f07e056a5dfaaa41bd038b82e452
+      path: orgs/kotoba-lang/capability-irq-subscribe
+      groups: [kotoba-lang]
+    - name: capability-kami-engine
+      remote: kotoba-lang
+      revision: 2f39f7a5d07d758ee39449c9e333fee07cb1b4df
+      path: orgs/kotoba-lang/capability-kami-engine
+      groups: [kotoba-lang]
+    - name: capability-keychain-text
+      remote: kotoba-lang
+      revision: fb108f8a1b4fbfd69f8a3ef42455d77504274a85
+      path: orgs/kotoba-lang/capability-keychain-text
+      groups: [kotoba-lang]
+    - name: capability-ledger-append
+      remote: kotoba-lang
+      revision: 92b0360d8de29faf0fd16b81130e0de6a31d381d
+      path: orgs/kotoba-lang/capability-ledger-append
+      groups: [kotoba-lang]
+    - name: capability-llm-infer
+      remote: kotoba-lang
+      revision: a4023231870ac25cc8a970c036fc8acb1ed89bef
+      path: orgs/kotoba-lang/capability-llm-infer
+      groups: [kotoba-lang]
+    - name: capability-log-read
+      remote: kotoba-lang
+      revision: 85299f865b4c8f2a32911ffe60867d8da9c28cd6
+      path: orgs/kotoba-lang/capability-log-read
+      groups: [kotoba-lang]
+    - name: capability-log-write
+      remote: kotoba-lang
+      revision: ebe47a30c1b20c07471934366da1c8af7c1b2da6
+      path: orgs/kotoba-lang/capability-log-write
+      groups: [kotoba-lang]
+    - name: capability-math-cos
+      remote: kotoba-lang
+      revision: 9ea2941f6f584e55c856284a0b24b101db14e10f
+      path: orgs/kotoba-lang/capability-math-cos
+      groups: [kotoba-lang]
+    - name: capability-math-sin
+      remote: kotoba-lang
+      revision: 0e96e54f4dacdaa31de04a5a7cb557bfe374707e
+      path: orgs/kotoba-lang/capability-math-sin
+      groups: [kotoba-lang]
+    - name: capability-mmio-map
+      remote: kotoba-lang
+      revision: d0918c6e9dfe4947cdb6af5764e4bae89c5cef5b
+      path: orgs/kotoba-lang/capability-mmio-map
+      groups: [kotoba-lang]
+    - name: capability-motion-read
+      remote: kotoba-lang
+      revision: bcec2954f50e67fa9ac3df6ced5ede6592b49ef7
+      path: orgs/kotoba-lang/capability-motion-read
+      groups: [kotoba-lang]
+    - name: capability-net-connect
+      remote: kotoba-lang
+      revision: a7ee479a3c3f8b2e749a82f1971c8287595755cd
+      path: orgs/kotoba-lang/capability-net-connect
+      groups: [kotoba-lang]
+    - name: capability-net-transport
+      remote: kotoba-lang
+      revision: 460bd530e5cf119bdd864770b164cf73a6b7ddc5
+      path: orgs/kotoba-lang/capability-net-transport
+      groups: [kotoba-lang]
+    - name: capability-notify-show
+      remote: kotoba-lang
+      revision: 8c0338d969c6a307426725c727c9e363a0f02040
+      path: orgs/kotoba-lang/capability-notify-show
+      groups: [kotoba-lang]
+    - name: capability-pci-config
+      remote: kotoba-lang
+      revision: 2a57af812669d4cc19ab18d3c13e541064b253ab
+      path: orgs/kotoba-lang/capability-pci-config
+      groups: [kotoba-lang]
+    - name: capability-random-bytes
+      remote: kotoba-lang
+      revision: f1f39c15e2ec48519f1ca60d9962590d61f0e77e
+      path: orgs/kotoba-lang/capability-random-bytes
+      groups: [kotoba-lang]
+    - name: capability-render-galactic-frame
+      remote: kotoba-lang
+      revision: d6ae3b9cb0ccb6a13d402cb7eb1465e332d5f131
+      path: orgs/kotoba-lang/capability-render-galactic-frame
+      groups: [kotoba-lang]
+    - name: capability-secret-use-postgresql-cancel
+      remote: kotoba-lang
+      revision: ce821a72afa2a1c2edd0470e4fa4412cc008c203
+      path: orgs/kotoba-lang/capability-secret-use-postgresql-cancel
+      groups: [kotoba-lang]
+    - name: capability-secret-use-scram-sha256
+      remote: kotoba-lang
+      revision: 3255858c19312a79b84e2d3877b720c092be7387
+      path: orgs/kotoba-lang/capability-secret-use-scram-sha256
+      groups: [kotoba-lang]
+    - name: capability-time-now-days
+      remote: kotoba-lang
+      revision: e740760e2e2b76bf909f39110a7f9f57ea4107fd
+      path: orgs/kotoba-lang/capability-time-now-days
+      groups: [kotoba-lang]
+    - name: capability-topic-publish
+      remote: kotoba-lang
+      revision: 257c2c11f01f9d2f3bad4d795da4d6fe9d245a8d
+      path: orgs/kotoba-lang/capability-topic-publish
+      groups: [kotoba-lang]
+    - name: capability-topic-subscribe
+      remote: kotoba-lang
+      revision: a13e672cedd548a02a807f22a72669eb0e2f313f
+      path: orgs/kotoba-lang/capability-topic-subscribe
+      groups: [kotoba-lang]
+    - name: capability-wifi-info
+      remote: kotoba-lang
+      revision: f5dcfeda29eb48efc535c9d407f2735f8200a388
+      path: orgs/kotoba-lang/capability-wifi-info
+      groups: [kotoba-lang]
     - name: capnp
       remote: kotoba-lang
       revision: 8814f287d23d11430f9717b2fd8c8f58ce3610c0
@@ -14221,6 +14638,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z2BGP3xsMyG9GmpPfk8deg8kBKM9R
+    - name: cnc-toolpath
+      remote: kotoba-lang
+      revision: f7afd6d583bfbba466b5a995869651d39b275704
+      path: orgs/kotoba-lang/cnc-toolpath
+      groups: [kotoba-lang]
     - name: code-graph
       remote: kotoba-lang
       revision: 702633688a7177a7d946ff8c4707d3d9f7e60cb4
@@ -21004,6 +21426,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z46HW3DZQXps5us1w8AGBhgMKhabP
+    - name: com-unity-api-services
+      remote: kotoba-lang
+      revision: 478187e2ea4cc5fd127ca2ecd98c27596b06f56e
+      path: orgs/kotoba-lang/com-unity-api-services
+      groups: [kotoba-lang]
     - name: com-unity-mars
       remote: kotoba-lang
       revision: b6ff84c14fa2ffa5b8127e391f976111c983f817
@@ -21840,6 +22267,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z2AXZByGrD69ZQMcD8uune5wMuWrJ
+    - name: diskspace
+      remote: kotoba-lang
+      revision: f2f126c45ca838c7690e067731538b983628426b
+      path: orgs/kotoba-lang/diskspace
+      groups: [kotoba-lang]
     - name: distill
       remote: kotoba-lang
       revision: c2a53421d68131af7669590f8068a727a9ea43c1
@@ -22047,6 +22479,11 @@ manifest:
       revision: 0040a5c92da2ddb2bea69de3466536db9063d0ec
       path: orgs/kotoba-lang/erc20
       groups: [kotoba-lang]
+    - name: esign
+      remote: kotoba-lang
+      revision: 5f9bc9d0fdba9f09410f05e6d8d63ae0e574f9d2
+      path: orgs/kotoba-lang/esign
+      groups: [kotoba-lang]
     - name: eth-crypto
       remote: kotoba-lang
       revision: 702293e35624f1051b592030a2aaff851c821912
@@ -22110,6 +22547,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z21EAq6iLqiKrcLFuhE1Yw5K7CeRZ
+    - name: first-breath
+      remote: kotoba-lang
+      revision: b17a45e28ae84cd955260a999529ef045b67ca84
+      path: orgs/kotoba-lang/first-breath
+      groups: [kotoba-lang]
     - name: kotoba-lang-fleet
       remote: kotoba-lang
       repo-path: fleet
@@ -23212,6 +23654,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z422dvnwQkmsrL15Zazv4sCAFmt6i
+    - name: kami-sensor-sim
+      remote: kotoba-lang
+      revision: 4ac27dc1649e4c311f391a43012be6924b1ccd49
+      path: orgs/kotoba-lang/kami-sensor-sim
+      groups: [kotoba-lang]
     - name: kami-skeleton-scene
       remote: kotoba-lang
       revision: 86d009edfb4c6ad617f1f019f9ad39662e3bcaf7
@@ -23282,6 +23729,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:zu7nx2Dge6LceKxNGgBR2n6t7kdK
+    - name: karakuri
+      remote: kotoba-lang
+      revision: f878f8b7ecd0340503436010d0b718fe5306caf0
+      path: orgs/kotoba-lang/karakuri
+      groups: [kotoba-lang]
     - name: kasane
       remote: kotoba-lang
       revision: aed49dcdb643dc55f6a1967523633f964561395b
@@ -23398,6 +23850,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z31EtCUbFjvApiJSVEMzEubEvRu3a
+    - name: kotoba-actors
+      remote: kotoba-lang
+      revision: 0d63399a16f30e68e0f32683cb4a43fb36f15fef
+      path: orgs/kotoba-lang/kotoba-actors
+      groups: [kotoba-lang]
     - name: kotoba-adapter-contracts
       remote: kotoba-lang
       revision: ae7fa0334a54011e5190d8f614d9fc443f06f87e
@@ -24362,8 +24819,9 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z3mdgcqYVMbZvEToc3tBZUf1PyC8q
-    - name: ontology
+    - name: kotoba-lang-ontology
       remote: kotoba-lang
+      repo-path: ontology
       revision: d782983922e8a69929c5379d4956218c5e9a306d
       path: orgs/kotoba-lang/ontology
       groups: [kotoba-lang]
@@ -25026,6 +25484,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z3mFLsER7cLmPUFGdBTd9qVo1E1Q1
+    - name: organisms
+      remote: kotoba-lang
+      revision: 11441105dbdc1f0304fa267f0b16a52f60c3456a
+      path: orgs/kotoba-lang/organisms
+      groups: [kotoba-lang]
     - name: os
       remote: kotoba-lang
       revision: 58b545747474d1f127581cc7ee7e36879687f5b1
@@ -25103,6 +25566,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:zWGUTVLPWfhVBm4cDHDJkqiviVRb
+    - name: pedigree
+      remote: kotoba-lang
+      revision: f85784211422a651fea26f448f601abfba2e7d61
+      path: orgs/kotoba-lang/pedigree
+      groups: [kotoba-lang]
     - name: phone
       remote: kotoba-lang
       revision: f176f0867819c26e59f037158e398b2e3cd3e810
@@ -25187,6 +25655,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z2KU1J5XGxNPwqbaJMU8ALLqxtU56
+    - name: pregel
+      remote: kotoba-lang
+      revision: 165a5c1fea9b0978aedb2cd7a946e9fbb03c29d1
+      path: orgs/kotoba-lang/pregel
+      groups: [kotoba-lang]
     - name: presentationml
       remote: kotoba-lang
       revision: 5707bcb6809ba16c3ba92580b3871dc8e6fad04d
@@ -25422,6 +25895,26 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:zBwg4yrxhzSXXH89CWht6goJc3eo
+    - name: sdk
+      remote: kotoba-lang
+      revision: 12314a0cc5ac2feb49dd9789d5c002398acb6988
+      path: orgs/kotoba-lang/sdk
+      groups: [kotoba-lang]
+    - name: sdk-auth
+      remote: kotoba-lang
+      revision: 1b2d068c9089e4b318be24d7b4c229df65055c80
+      path: orgs/kotoba-lang/sdk-auth
+      groups: [kotoba-lang]
+    - name: sdk-mock
+      remote: kotoba-lang
+      revision: c857ff9be5310bf433bfe1e8d3c0f677e213d667
+      path: orgs/kotoba-lang/sdk-mock
+      groups: [kotoba-lang]
+    - name: sdk-py
+      remote: kotoba-lang
+      revision: 6cd818b03fbc56ff5f624870ec9b9c2e0a208e9b
+      path: orgs/kotoba-lang/sdk-py
+      groups: [kotoba-lang]
     - name: search
       remote: kotoba-lang
       revision: 11ab1f8f4b35875e3132c5bb82520bc29e5cf1df
@@ -25464,6 +25957,12 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z2MSLyewjCH6gC79tQgxJoxppQA12
+    - name: kotoba-lang-sha256d
+      remote: kotoba-lang
+      repo-path: sha256d
+      revision: 5fd4e64d0fc5a616b798edbca7327da33c78eb02
+      path: orgs/kotoba-lang/sha256d
+      groups: [kotoba-lang]
     - name: shacl
       remote: kotoba-lang
       revision: 68bff82758c6c42bbd187e88e650b3d9e8beed1f
@@ -25692,6 +26191,16 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z4Kf38mgv5dvjpbVJ6wxDkfcmKh6c
+    - name: sumitsubo
+      remote: kotoba-lang
+      revision: cc9426527a2270f5b86965821dc66522010fc8a8
+      path: orgs/kotoba-lang/sumitsubo
+      groups: [kotoba-lang]
+    - name: sumitsubo-cad
+      remote: kotoba-lang
+      revision: 225cbf26faa1964e39366ecd69de5ba0ca7a6c7e
+      path: orgs/kotoba-lang/sumitsubo-cad
+      groups: [kotoba-lang]
     - name: svelte-auth
       remote: kotoba-lang
       revision: ad28c5497d4182fb8d0d79d118746529e93eda72
@@ -25775,6 +26284,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z6LnfFD5NSy2mSr3soBmrF9hi6KU
+    - name: tedai
+      remote: kotoba-lang
+      revision: 9c946eaed923dbba5342f66188b547ad282f0b4b
+      path: orgs/kotoba-lang/tedai
+      groups: [kotoba-lang]
     - name: teian
       remote: kotoba-lang
       revision: f6fdbdecb67a723ca457e036f0ec6b35d85c79f2
@@ -25877,6 +26391,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:zcgDWqUE7vCY1gRpbowNWZRqRzpM
+    - name: torrent-app
+      remote: kotoba-lang
+      revision: e1df6daa5c35458cb7f65441b5dc4dea5b2f006f
+      path: orgs/kotoba-lang/torrent-app
+      groups: [kotoba-lang]
     - name: toshokan
       remote: kotoba-lang
       revision: 06d1f36e79dfe9f16f46215902d68ab73cca18af
