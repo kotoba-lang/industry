@@ -215,18 +215,101 @@ flat 形では冗長ではない — **最も問い合わせられやすい面�
    `->flat-tx`（ref 無し・keyword id で値 join）なら通る。**one-ref 制約とは別問題**で、
    こちらは wire 上の shape の問題。
 
+## UI/UX: デジタル庁デザインシステム（DADS）へ（2026-07-29 追記、オーナー指示）
+
+「jiten や kotobase の uiux を jp-go-digital-design-system を使って, murakumo-cloud も同様に」。
+`kotoba-lang/jp-go-digital-design-system`（ADR-2607141915）を3サイトに適用した。
+
+**3サイトで手段が違う。**
+
+| サイト | 手段 | 理由 |
+|---|---|---|
+| jiten | 実 `dads-*` component（`dads-heading` / `dads-table` / `dads-card` / `dads-chip-label` / `dads-divider` / `dads-notification-banner` / `dads-link`）+ `dds-ext-*` layout | 小さく新しいので忠実な経路が取れる |
+| kotobase.net | token bridge（markup 無改造） | 4ページとも kotoba-ui 製で既に `--hig-*` を話す |
+| murakumo.cloud | token bridge（markup 無改造） | 同上。SPA の `views.cljc` は pure UI IR |
+
+**murakumo は書き直し不要だった。** 当初「手書きの dark HTML なので全面書き直しが要る」と
+報告したが、それは **72 commits 遅れたローカル checkout** を見ていた誤りで、`origin/main` は
+既に kotoba-ui へ移行済みで `--hig-*` を全面的に話していた。実際の作業は kotobase と同じ
+2行の bridge 追加だった。
+
+### 実測で見つけた最重要の副作用: **DADS はブランド色を上書きする**
+
+`hig->dads` は `--hig-color-tint` → `var(--color-key-900)` = **`#0017c1`**（デジタル庁 key blue）
+を張っている。`--hig-color-tint` は accent token そのもの（kotoba-ui theme map の `:accent` が
+ここに落ちる）なので、**bridge をそのまま当てると全プロダクトが同じ青になり、各サイトの
+ブランド色は出なくなる**。government design system としては正しい既定（統一が目的）だが、
+「DADS を使う」という指示から自明に導かれる結果ではない。
+
+実際に消えるはずだったもの: kotobase の teal `#0f766e`、murakumo の indigo `#7C9CFF`
+（後者は kotoba-ui 移行時に「the site was designed dark, so the dark appearance is where the
+brand color must not drift」と明文を残して byte-exact で維持されていた）。
+
+**対応**: `jp-go-dds.tokens` に `bridge-css-except` / `brand-tokens` を追加（merged `b9a4e20`、
+26 tests / 237 assertions）。除外した token は再定義されないので `shitsuke.hig` の元の値が
+そのまま残る（未定義参照にはならない — `hig->dads` に載っていない token と同じ経路）。
+オーナー判断で **「typography・neutral・spacing・component は DADS、accent はプロダクトのもの」**
+を採用。live で検証済み: kotobase.net は `--hig-color-label: var(--color-neutral-solid-gray-800)`
+（bridge 有効）と `--hig-color-tint: #0f766e`（brand 維持）が同時に出ている。
+
+### DADS は light 専用（実測）
+
+vendored `dds.css` に `prefers-color-scheme` は **0 件**、dark token も **0 件**。
+docstring の引用ではなく実測。したがって「DADS + dark」はデジタル庁が発行していない
+色を約30個捏造することになり、この repo 自身の規則（raw hex 禁止・上流忠実）に反する。
+3サイトとも light 専用になった:
+
+- kotobase.net: `:appearance :auto → :light`。`site_theme.cljc` の
+  **「public pages must follow the OS appearance」という明文の要件を放棄した**。
+- murakumo.cloud: 同じく `:light`。`:accent-dark #7C9CFF` は inert になった。
+- jiten: 元々 `:auto` だったが新規サイトなので影響なし。
+
+いずれも1行で revert できる（bridge CSS を出さないだけ）。
+
+### 8.6KB の primitive 切り出し
+
+`jp-go-dds.tokens/root-css` を追加（merged `f58059b`）。bridge は DADS primitive が定義済み
+である前提で `--hig-*` を再定義するので primitive も出す必要があるが、`dads-*` markup を
+使わない consumer にとって component CSS 込みの 72KB は無駄。`:root` ブロックだけを
+**切り出す**（写さない — 再 vendor から取り残されないため）。見つからなければ nil を返さず
+throw する: 未定義 CSS 変数はエラーにならず宣言が黙って無効になるだけなので、原因から
+遠い場所で色が消える形でしか表面化しない。
+
+## デプロイ（2026-07-29）
+
+| | URL | 検証 |
+|---|---|---|
+| jiten | https://jiten.04-feasts-minded.workers.dev | 9ページ、design-quality **100.00**、`dads-*` 41 箇所 |
+| kotobase.net | https://kotobase.net | `/` `/health` `/signup` 200、配信 HTML が build と byte 一致（88,168）、23 tests / 120 assertions、landing/signup **100.00** |
+| murakumo.cloud | https://murakumo.cloud | 200、296 tests / 1180 assertions |
+| corpus | `kotobase-storage-d1.aozora.app` ref `kotobase/db/did:key:z6MkuXfw…/jiten` | schema 200 → corpus 200 → read-back 2本 200、`basis-t 17` |
+
+**両 live サイトとも `origin/main` の clean worktree からデプロイした** — 共有 checkout は
+net-kotobase が 158 commits・murakumo が 72 commits 遅れで他セッションの WIP を抱えており、
+そこから出荷すると他人の作業を巻き戻す（CLAUDE.md が記録する 2026-07-25 の実インシデント）。
+kotobase.net は CI デプロイが無く手動出荷なので、進行中の D1 head-plane cutover を含む
+158 commits の出荷はオーナー確認を取ってから実行した。
+
 ## 未達（正直に）
 
-- **人が見られる URL はまだ無い。** `/v1/q` は認証必須（未認証は 401）なので、公開ページには
-  credential を持つ read proxy Worker が要る。未実装。
-- **`manifest/edn-query.cljs` に jiten loader を追加していない。** corpus は起きたので次に
-  入れる価値がある（今は kotobase 側にだけ載っていて superproject の統合面には無い）。
-- **UI は無い。** 記事ページ・編集・差分表示・カテゴリは別層。`.kotoba` 移行計画
+- **`manifest/edn-query.cljs` に jiten loader が無い。** corpus は kotobase 側にだけ載っており、
+  superproject の統合クエリ面（104,137 entity）からは引けない。載せれば `:jiten.entry/subject`
+  で innen に、`:company/lei` で market-intel に join できる。**次の最短の一手はこれ。**
+- **編集 UI が無い。** 記事の追加・編集・差分表示・カテゴリは未実装。`.kotoba` 移行計画
   （ADR-2607279200 Delivery #6）が「string-only SSR を最終的な抽象にしない」と定めており、
   レンダリングを今作り込むのは早い。
-- **常駐化していない。** `loop-jiten` の cycle は手動実行。launchd / routine 化は未着手。
-- **`innen.tx/edge-id` も `~` を使っている**（同じ潜在バグ）。innen は flat plane 経由でしか
-  射影を出していないため今は顕在化していないが、kotobase に載せた瞬間に同じ 400 になる。
+- **常駐化していない。** `loop-jiten` の cycle も corpus publish も site 生成も手動実行。
+  launchd / routine 化は未着手。
+- **jiten の site 生成は corpus の変更に自動追従しない。** `render_site.cljs` は手動実行で、
+  生成物は `basis-t` を明示するが、corpus が進んでも再生成されない。
+- **`innen.tx/edge-id` が `~` を使っている**（jiten と同じ潜在バグ、未修正）。innen は flat
+  plane 経由でしか射影を出していないため現在は顕在化していないが、kotobase に載せた瞬間に
+  同じ InvalidDatomicRequest になる。
+- **murakumo の generated ページは design-quality 53.56**（変更の前後で同一）。これらは
+  stylesheet を link していて inline しないため audit が CSS を読めないことによる計測上の
+  限界で、この作業による regression ではない。inline 化するか audit を link 追従させるかは別件。
+- **kotobase.net の dark 復帰**を望むなら bridge を外す1行。DADS を保ったまま dark にする
+  経路は存在しない（上記の実測）。
 
 ## Alternatives considered
 
