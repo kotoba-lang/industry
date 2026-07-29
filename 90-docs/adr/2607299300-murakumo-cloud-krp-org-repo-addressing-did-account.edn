@@ -1,0 +1,186 @@
+[{:db/id -1
+  :adr/id "adr-2607299300-murakumo-cloud-krp-org-repo-addressing-did-account"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-07-29"
+  :adr/last_verified "2026-07-29"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2607299300: murakumo.cloud は KRP §4 の /{org}/{repo} を公開面にし、/{did}/{repo} にはしない。DID は authority 座標として名前の背後で解決し、account は authn.kotobase.net の accountDid/activeDid をそのまま消費する"
+  :adr/topic "murakumo-cloud-krp-org-repo-addressing-did-account"
+  :adr/repos ["orgs/network-awai/cloud-murakumo"]
+
+  :adr/authoritative_for
+  ["murakumo.cloud の公開 URL 形の正本: KRP §4 の `/{org}/{repo}[/{collection-route}[/{key}]]`。DID を人間向け path に入れない（`/{did}/{repo}` は却下）。DID は `:kotoba/authority` 座標として名前の背後で解決する"
+   "murakumo.cloud の authority DID: `did:web:murakumo.cloud`（`/.well-known/did.json` で公開。署名しない＝鍵を持たない）"
+   "murakumo.cloud の account 識別子: 独自に発行しない。authn.kotobase.net が既に serve している `{valid, did, accountDid, activeDid, handle}` を消費する（ADR-2607252000 の contract をそのまま consumer 側に実装）"
+   "組織と個人の表現: org = authority DID、個人 = activeDid、membership = CACAO delegation。org 用の別 identity 体系を新設しない"
+   "collection route は宣言のみ（`cloud-murakumo.krp/collection-routes`）。pluralization 等の文字列変換で collection を導出しない。NSID registry は衝突を拒否する（テストで injective を検査）"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/related
+  ["90-docs/protocols/kotoba-resource-protocol.edn（KRP 0.1/0.2 — 本 ADR が実装する addressing 契約。§3 の四 identity、§4 の HTTP projection 8 rules、§5 の AT projection）"
+   "90-docs/adr/2607252000-authn-kotobase-net-identity-service.edn（accountDid/activeDid の分離と viewer payload。本 ADR はその consumer を1つ増やす）"
+   "90-docs/adr/2607177000-kotobase-protocols-per-did-cacao-auth.edn（atproto surface の iss==repo 構造的一致。CACAO 経路の正本はここに残る）"
+   "90-docs/adr/2607257500-murakumo-resident-workers-and-fleet-read-surface.edn（fleet 常駐の実測状態。本 ADR の『常駐はあるが名前が無かった』の根拠）"
+   "90-docs/adr/2607071500-kotoba-lang-kotoba-protocol-atprotocol-layering.edn（L0–L5 層表。L3 authority = did:key + CACAO chain）"
+   "orgs/kotoba-lang/kotobase-protocols README（git/s3/atproto/ipfs/pinning surface。git.kotobase.net/{org}/{repo} の先行実装）"]
+
+  :adr/problem
+  "オーナーの問い（2026-07-29）は3つ: (1) murakumo.cloud は murakumo.cloud/{org}/{repo} のように組織・repo を host して常駐化できるようになっているか (2) cloud-itonami などとアカウントを共通化したい、DID で p2p・分散的に共通化する方法はあるか (3) その場合 murakumo.cloud/{did}/repo の方が良いか、atproto を参考にすると。
+
+実測（2026-07-29）で判明した現在地: murakumo.cloud/{org}/{repo} は **存在しない**（`/kotoba-lang/murakumo` → 404 'not found' を worker の :else 分岐が返す）。apex は Workers static assets の SPA + 推論 gateway（/api/v1、/api/store/checkout、/x402/*）だけ。`orgs/kotoba-lang/murakumo/cloud.edn` は `:cloud/control-url \"https://murakumo.cloud/xrpc\"` を宣言しているが XRPC 面は未実装（`/xrpc/_health` → 404）。
+
+一方で **常駐そのものは既に存在した**（ADR-2607257500）: fleet 10 台中 5 台に `/Library/LaunchDaemons/com.murakumo.kotoba-mesh.plist`（RunAtLoad=true / KeepAlive=true）で kotoba-server が launchd 管理の常駐サービスとして動き、CID でアドレスされた WASM component を gossipsub auction で配置し on-http/on-tick/on-kse で発火させている。つまり欠けていたのは『常駐実行基盤』ではなく **『{org}/{repo} という人間向けの名前でそれを公開する面』** だった。
+
+account 側も同様に、作るべきものはほぼ既にあった: authn.kotobase.net は live（`/health` 200、`/v1/session` 200 で unauthed は `{\"valid\":false}`）、`kotobase.net/.well-known/did.json` は did:web:kotobase.net を返し、itonami.cloud には passkey→did:key→CACAO が本番稼働している（`POST /api/webauthn/challenge` → 200）。"
+
+  :adr/decision
+  "### 1. 公開 URL は `/{org}/{repo}`。`/{did}/{repo}` は却下する
+
+KRP（`90-docs/protocols/kotoba-resource-protocol.edn`）が既にこの問いに答えている。§1 は本件と同じ衝突を名指しで問題提起している（『`/{org}/{repo}` meaning both a project and a game』）。§3 は1つのリソースに4つの直交する identity を与える:
+
+  §3.1 Name      https://murakumo.cloud/kotoba-lang/murakumo   人間向け・可変
+  §3.2 Record    at://did:web:murakumo.cloud/<nsid>/<rkey>     所有者スコープ
+  §3.3 Content   ipfs://bafy…                                   不変
+  §3.4 Location  https://github.com/kotoba-lang/murakumo        消えてよい
+
+そして §3.2 が決定的: **『KRP uses DID authorities for durable output; handles are presentation aliases only.』** §4 は universal public pattern を `/{org}/{repo}[/{collection-route}[/{key}]]` と定める。
+
+DID を人間向け path に入れることは §3.1 と §3.2 の混同であり、実務上も (a) `did:key` は公開鍵そのものなので鍵 rotation で URL が壊れる (b) 人間が読めず共有できない (c) `did:web:host:tenant:x` はコロンを含み path segment としてエスケープ問題を起こす。atproto も同じ分離をしている（`bsky.app/profile/{handle}` を見せて内部で did:plc に解決、record は `at://did:plc:…`）。
+
+したがって **DID は捨てず、path から出して `:kotoba/authority` 座標に置く**。
+
+### 2. authority は `did:web:murakumo.cloud`
+
+`/.well-known/did.json` で公開する。`did:web` であって `did:key` ではないのは、この識別子が何も署名しないから — 鍵を作れば custody risk だけが増えて得るものが無い（`authn.viewer/account-did` が `did:web:kotobase.net:tenant:<user>` について記録しているのと同じ理由）。
+
+DID document には **live な surface しか書かない**。murakumo.cloud は XRPC を serve していない（実測 404）ので `AtprotoPersonalDataServer` entry は claim しない — `cloud.edn` の `:cloud/control-url` は設計意図であって deployed surface ではない。
+
+### 3. repository registry は宣言データ。path が parse できるだけでは存在を意味しない
+
+`cloud-murakumo.krp/repositories` に登録された repository だけが resolve する。未登録は 404（§4 rule 8: 『Unknown resources return 404 and never fall through to a homepage』）。location も **repository ごとに宣言**し、名前から導出しない — 実測で `git.kotobase.net/kotoba-lang/murakumo` は 404 なので、mirror が存在しないのに URL 形が合うからという理由で claim すれば嘘になる（テスト `locations-are-declared-not-derived` がこれを機械的に禁じる）。
+
+### 4. account は新設せず、authn.kotobase.net の viewer を消費する
+
+`authn.viewer`（ADR-2607252000）が既に固定している形をそのまま consumer 側に実装する:
+
+  accountDid  did:web:kotobase.net:tenant:<user>   1人1つ。鍵を持たず署名しない
+  activeDid   did:key:z6Mk…                        いま行為している credential
+
+self-custodied（`accountDid == activeDid`）を `:self-custodied?` として明示的に持つ — 自分の鍵を持つ者に platform 側 account record を捏造しない、という ADR-2607252000 の規則を消費側でも落とさないため。
+
+**cookie は apex を越えない。それは欠陥ではなく設計の要点である。** `authn.viewer/set-cookie` は `gftd_session` を `Domain=kotobase.net` に閉じるので、ブラウザは murakumo.cloud（別の registrable domain）にそれを送らない。したがって murakumo.cloud は session token を明示的な `Authorization: Bearer <token>` から読み、upstream には `GET /v1/session` が実際に読む cookie ヘッダとして転送する（実測: この endpoint は cookie ヘッダのみから認証する）。**apex を越えて可搬なのは cookie ではなく DID である** — オーナーの問い『p2p・分散的にアカウント共通化』の答えがまさにこれ。
+
+### 5. 組織 = authority DID、個人 = activeDid、membership = CACAO delegation
+
+atproto に組織アカウントという一級概念は無い（DID は1つの repo の所有者）。新しいモデルを発明せず、既存の CACAO chain（kotoba-protocol L3: 『Ed25519 did:key, 鍵由来 IPNS, CACAO chain — サーバは authority ではない』）に載せる: org が authority DID を持ち、個人の did:key へ capability を委譲する。これは ADR-2607252000 の accountDid/activeDid 分離を org/member に一般化したものであって、別体系ではない。"
+
+  :adr/implementation
+  "{:repo \"orgs/network-awai/cloud-murakumo\"
+    :added
+    [{:file \"src/cloud_murakumo/krp.cljc\"
+      :what \"KRP §4/§5 の pure な projection。collection-routes（宣言のみ）、nsid registry（衝突拒否）、reserved-segments、repositories registry、parse / repository-path / canonical-url / at-uri / did-document / resolve-path\"}
+     {:file \"src/cloud_murakumo/viewer.cljc\"
+      :what \"authn.kotobase.net viewer contract の consumer 側。cookie-value / session-token（Bearer 優先）/ did? / from-authn-payload / ->wire\"}
+     {:file \"test/cloud_murakumo/krp_test.cljc\" :what \"KRP rule ごとに名前を付けたテスト\"}
+     {:file \"test/cloud_murakumo/viewer_test.cljc\" :what \"viewer contract のテスト\"}
+     {:file \"test/worker_krp_smoke.cljs\"
+      :what \"compiled bundle（dist/worker.js）を実際に叩く nbb smoke harness。pure ns のテストではなく出荷する artifact を検証する\"}]
+    :modified
+    [{:file \"src/cloud_murakumo/site_worker.cljs\"
+      :what \"GET /.well-known/did.json、GET /api/v1/viewer（resolve-viewer! 経由）、:else 分岐に KRP router を asset fallthrough の前に配置\"}]
+    :routes-added
+    {\"GET /.well-known/did.json\" \"did:web:murakumo.cloud\"
+     \"GET /api/v1/viewer\" \"viewer（§4 rule 7: command は resource を装わない。/api/v1 配下に置く）\"
+     \"GET /{org}/{repo}\" \"KRP resolve document（Name → Record/Location）\"
+     \"GET /{org}/{repo}/components[/{key}]\" \"宣言済み collection / record\"}}"
+
+  :adr/verification
+  "{:offline {:runner \"clojure -M:test（JVM、cognitect test-runner）\"
+              :new-namespaces {:tests 24 :assertions 115 :failures 0 :errors 0}}
+    :compiled-artifact {:build \"shadow-cljs release worker（resource guard 経由）: 66 files, 16 compiled, 0 warnings\"
+                        :harness \"nbb --classpath test -m worker-krp-smoke（dist/worker.js を直接 import して fetch）\"
+                        :checks 10 :failures 0
+                        :includes [\"did document\" \"repository resolves（canonical + at:// record + locations）\"
+                                   \"declared collection route\" \"record → AT URI\"
+                                   \"rule 8: 未登録は 404\" \"rule 3: 未宣言 route は collection にしない\"
+                                   \"DID 形の path は Name ではない\" \"viewer: 署名なしは 200 {valid false}\"
+                                   \"viewer: 不正 session は authn.kotobase.net へ実際に往復して anonymous に落ちる（live）\"
+                                   \"既存 /api/v1 capability payload は不変\"]}
+    :live-measurements-2026-07-29
+    {\"https://murakumo.cloud/\" \"200 text/html（SPA）\"
+     \"https://murakumo.cloud/kotoba-lang/murakumo\" \"404 text/plain（本 ADR 以前）\"
+     \"https://murakumo.cloud/xrpc/_health\" \"404 — cloud.edn の control-url は未実装\"
+     \"https://api.murakumo.cloud/health\" \"200\"
+     \"https://api.murakumo.cloud/nodes\" \"200\"
+     \"https://kotobase.net/.well-known/did.json\" \"200 did:web:kotobase.net + AtprotoPersonalDataServer\"
+     \"https://authn.kotobase.net/v1/session\" \"200 {\\\"valid\\\":false}（unauthed）\"
+     \"https://authn.kotobase.net/rpc/verify-session\" \"404 — 内部 service binding 専用で public route ではない\"
+     \"https://atproto.kotobase.net/xrpc/_health\" \"501（XRPC router は live、当該 nsid 未実装）\"
+     \"https://s3.kotobase.net/ · https://pinning.kotobase.net/\" \"401（live、認証必須）\"
+     \"https://git.kotobase.net/kotoba-lang/murakumo/info/refs\" \"404 — mirror は存在しない\"
+     \"https://itonami.cloud/api/webauthn/challenge\" \"200 — passkey→did:key→CACAO は本番稼働\"}}"
+
+  :adr/known-gaps
+  "[{:gap \"murakumo.cloud は presented CACAO を自分では検証しない\"
+     :why \"cacao.edge.verify（kotoba-lang/org-chainagnostic-cacao）と npm crypto deps をこの build に足す必要があり、本 ADR の範囲外\"
+     :today \"per-DID CACAO の経路は既に enforce されている場所に残る: atproto.kotobase.net の iss==repo（ADR-2607177000、e2e 実測済み）\"}
+    {:gap \"org 用の authority DID をまだ発行していない\"
+     :why \"§5 の org = authority DID / membership = CACAO delegation は decision として確定したが、org DID の発行主体（kotobase tenant を再利用するか murakumo.cloud が独自に did:web:murakumo.cloud:org:<org> を切るか）は未決。account の primary key を1つに保つ方針からは前者が有力\"}
+    {:gap \"repositories registry はコンパイル時の宣言データで、fleet の実配置とは自動同期しない\"
+     :why \"Worker が読める registry backing（KV/D1）も、fleet の hosted component を repository に紐づける経路も未配線。今日 `/components` は listing を持たず §3.4 Location として api.murakumo.cloud/nodes を指すだけ\"}
+    {:gap \"cloud.edn の :cloud/control-url が宣言する murakumo.cloud/xrpc は依然として未実装\"
+     :note \"本 ADR は KRP の HTTP projection だけを実装した。XRPC surface を建てるかは別 ADR\"}
+    {:gap \"itonami.cloud 側はまだ authn.kotobase.net の consumer になっていない\"
+     :note \"itonami は自前の passkey→did:key→CACAO を本番で持っており（cloud_itonami.edge.webauthn）、そちらの方が authn.kotobase.net より先に進んでいる面がある。統合方向は『itonami を authn の consumer にする』ではなく『cacao.edge.mint の抽出を進めて両者が同じ substrate を共有する』側が正しい可能性が高い — 測ってから決める\"}
+    {:gap \"orgs/network-awai/cloud-murakumo の共有 west checkout が origin/main から 28 commits ahead / 66 behind で乖離している\"
+     :note \"別セッションの未 push WIP。本 ADR の作業は origin/main から切った sibling worktree で行っており共有 checkout には触れていない。棚卸しは git-cleanup-conflict の retirement 手順で別途\"}]"
+
+  :adr/body
+  "# ADR-2607299300: murakumo.cloud の addressing と account
+
+## 一行で
+
+**常駐は既にあった（fleet 5 台の LaunchDaemon）。account の contract も既にあった（authn.kotobase.net）。欠けていたのは、その両方を指す人間向けの名前 `/{org}/{repo}` と、その名前が解決する authority DID だけだった。**
+
+## `/{did}/{repo}` を却下した理由
+
+オーナーの問いは『atproto を参考にすると `/{did}/repo` の方が良いか』だった。atproto を参考にすると、答えは逆になる。atproto は handle と DID を**分けて**いる — `bsky.app/profile/{handle}` を見せ、内部で `did:plc:…` に解決し、record は `at://did:plc:…/{collection}/{rkey}`。handle は可搬な presentation alias で、DID が durable な錨。
+
+このワークスペースの KRP は同じことを既に明文化していた（§3.2『KRP uses DID authorities for durable output; handles are presentation aliases only』）。だから `/{did}/{repo}` は『atproto に寄せる』ではなく『atproto がわざわざ分けたものを再び混ぜる』になる。
+
+## 実装した形
+
+```
+人間向け     https://murakumo.cloud/kotoba-lang/murakumo
+authority    did:web:murakumo.cloud            (/.well-known/did.json)
+record       at://did:web:murakumo.cloud/cloud.murakumo.repository/kotoba-lang:murakumo
+location     https://github.com/kotoba-lang/murakumo
+```
+
+rkey の `:` は atproto の rkey 文字集合に入っていて `/` は入っていないため区切りに選んだ。org/repo 名は `segment-re` により `:` を含み得ないので `repository <-> rkey` は全単射で、テスト `rkey-round-trips` がそれを固定している（推測ではなく検査）。
+
+## account: cookie ではなく DID が apex を越える
+
+これがオーナーの『p2p・分散的にアカウント共通化』への直接の答えになる。
+
+`gftd_session` cookie は `Domain=kotobase.net` に閉じているので murakumo.cloud には届かない。**それを回避しようとするのが誤り** — cookie は same-site の便宜であって、apex を越えて可搬なのは DID の方だからだ。したがって:
+
+- session token は明示的な `Authorization: Bearer` で受け取り、upstream には cookie ヘッダとして転送する（`GET /v1/session` が実際に読む形）。
+- 恒久的には、他 apex に対して提示すべき credential は CACAO（did:key 署名）であって cookie ではない。その経路は `atproto.kotobase.net` で既に end-to-end で動いている（ADR-2607177000）。murakumo.cloud 自身での CACAO 検証は follow-up。
+
+## 正直な現在地
+
+- `/{org}/{repo}` は **宣言済み registry の 8 repository に対してのみ** resolve する。path が parse できることは存在の証明ではない。
+- `/components` collection は identity を解決するだけで listing を持たない — fleet の hosted component と repository を結ぶ配線がまだ無い。持っていない一覧を mirror するより、§3.4 Location として `api.murakumo.cloud/nodes` を指す方が正直だと判断した。
+- DID document は live な surface しか claim しない。XRPC は serve していないので PDS entry は無い。
+
+## Consequences
+
+- murakumo.cloud が KRP の HTTP projection を持つ最初の surface になった。同じ規則は他の apex にも横展開できる（`krp.cljc` は pure `.cljc` で、2nd consumer が現れた時点で共有ライブラリへ抽出する — ADR-2607141654 の抽出規則）。
+- account の primary key は DID のまま1つに保たれた。murakumo.cloud は identity を発行せず、消費するだけになった。
+- `/{did}/{repo}` を選ばなかったことで、鍵 rotation が URL を壊さない。"}]
