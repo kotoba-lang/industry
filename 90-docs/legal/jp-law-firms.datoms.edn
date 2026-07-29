@@ -1,0 +1,4376 @@
+;; 日本国内の法律事務所（弁護士数上位 + 分野特化ブティック + Legal 500 掲載事務所）
+;; 出典:
+;;   - 所属弁護士数 / 所在地 / 拠点数: https://no-limit.careers/guide/15280/ （日弁連登録情報ベースの公開ランキング TOP300、取得 2026-07-29）
+;;   - 交差検証用の第二ランキング: https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/
+;;   - 英語名 / 一部の公式サイト: Legal 500 Japan の事務所プロフィール
+;;   - :firm/website は実際に取得して事務所名がページ内に出現することを確認したものだけを載せる
+;;     （:firm/website-evidence がその根拠。未確認の URL は載せない）
+;; 結合キー: :firm/id（法人格表記を除去して正規化した事務所名）。
+;;   ランキングは :ranking/firm-id、弁護士は :lawyer/firm-id で同じ値を指す。
+
+[
+ {:firm/id "西村あさひ法律事務所"
+  :firm/name-ja "弁護士法人西村あさひ法律事務所"
+  :firm/lawyer-count 797
+  :firm/headcount-rank 1
+  :firm/prefecture "東京都"
+  :firm/office-count 5
+  :firm/website "https://www.nishimura.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/legal500-slug "nishimura-asahi"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Nishimura & Asahi"}
+
+ {:firm/id "森・濱田松本法律事務所"
+  :firm/name-ja "弁護士法人森・濱田松本法律事務所"
+  :firm/lawyer-count 717
+  :firm/headcount-rank 2
+  :firm/prefecture "東京都"
+  :firm/office-count 8
+  :firm/website "https://www.morihamada.com/en"
+  :firm/website-evidence "legal500-profile"
+  :firm/legal500-slug "mori-hamada"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Mori Hamada"}
+
+ {:firm/id "アンダーソン・毛利・友常法律事務所"
+  :firm/name-ja "弁護士法人アンダーソン・毛利・友常法律事務所"
+  :firm/lawyer-count 688
+  :firm/headcount-rank 3
+  :firm/prefecture "東京都"
+  :firm/office-count 3
+  :firm/website "https://www.amt-law.com/"
+  :firm/website-title "アンダーソン・毛利・友常法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :firm/legal500-slug "anderson-mori-tomotsune"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Anderson Mori & Tomotsune"}
+
+ {:firm/id "TMI総合法律事務所"
+  :firm/name-ja "TMI総合法律事務所（弁護士法人）"
+  :firm/lawyer-count 660
+  :firm/headcount-rank 4
+  :firm/prefecture "東京都"
+  :firm/office-count 7
+  :firm/website "https://www.tmi.gr.jp/"
+  :firm/website-title "TMI総合法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :firm/legal500-slug "tmi-associates"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "TMI Associates"}
+
+ {:firm/id "長島・大野・常松法律事務所"
+  :firm/name-ja "弁護士法人長島・大野・常松法律事務所"
+  :firm/lawyer-count 630
+  :firm/headcount-rank 5
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.nagashima.com/"
+  :firm/website-title "長島・大野・常松法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :firm/legal500-slug "nagashima-ohno-tsunematsu"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Nagashima Ohno & Tsunematsu"}
+
+ {:firm/id "ベリーベスト法律事務所（※1）"
+  :firm/name-ja "ベリーベスト法律事務所（弁護士法人 ※1）"
+  :firm/lawyer-count 450
+  :firm/headcount-rank 6
+  :firm/prefecture "東京都"
+  :firm/office-count 76
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "渥美坂井法律事務所"
+  :firm/name-ja "渥美坂井法律事務所弁護士法人"
+  :firm/lawyer-count 243
+  :firm/headcount-rank 7
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :firm/website "https://www.aplawjapan.com/"
+  :firm/website-title "トップ | 渥美坂井法律事務所・外国法共同事業"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :firm/legal500-slug "atsumi-sakai"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Atsumi & Sakai"}
+
+ {:firm/id "アディーレ法律事務所（※2）"
+  :firm/name-ja "アディーレ法律事務所（弁護士法人 ※2）"
+  :firm/lawyer-count 225
+  :firm/headcount-rank 8
+  :firm/prefecture "東京都"
+  :firm/office-count 65
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "シティユーワ法律事務所"
+  :firm/name-ja "弁護士法人シティユーワ法律事務所"
+  :firm/lawyer-count 215
+  :firm/headcount-rank 9
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.city-yuwa.com/"
+  :firm/website-title "シティユーワ法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :firm/legal500-slug "city-yuwa-partners"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "City-Yuwa Partners"}
+
+ {:firm/id "大江橋法律事務所"
+  :firm/name-ja "弁護士法人大江橋法律事務所"
+  :firm/lawyer-count 181
+  :firm/headcount-rank 10
+  :firm/prefecture "大阪府"
+  :firm/office-count 3
+  :firm/website "https://www.ohebashi.com/jp/"
+  :firm/website-title "大江橋法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :firm/legal500-slug "oh-ebashi-lpc-partners"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Oh-Ebashi LPC & Partners"}
+
+ {:firm/id "ALG&Associates"
+  :firm/name-ja "弁護士法人ALG＆Associates"
+  :firm/lawyer-count 132
+  :firm/headcount-rank 11
+  :firm/prefecture "東京都"
+  :firm/office-count 13
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "北浜法律事務所"
+  :firm/name-ja "弁護士法人北浜法律事務所"
+  :firm/lawyer-count 123
+  :firm/headcount-rank 12
+  :firm/prefecture "大阪府"
+  :firm/office-count 3
+  :firm/website "https://www.kitahama.or.jp/"
+  :firm/website-title "北浜法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "岩田合同法律事務所"
+  :firm/name-ja "岩田合同法律事務所"
+  :firm/lawyer-count 118
+  :firm/headcount-rank 13
+  :firm/prefecture "東京都"
+  :firm/office-count 3
+  :firm/website "https://www.iwatagodo.com/"
+  :firm/website-title "岩田合同法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :firm/legal500-slug "iwata-godo"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Iwata Godo"}
+
+ {:firm/id "御堂筋法律事務所"
+  :firm/name-ja "弁護士法人御堂筋法律事務所"
+  :firm/lawyer-count 115
+  :firm/headcount-rank 14
+  :firm/prefecture "大阪府"
+  :firm/office-count 4
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ベーカー&マッケンジー法律事務所"
+  :firm/name-ja "弁護士法人ベーカー＆マッケンジー法律事務所"
+  :firm/lawyer-count 114
+  :firm/headcount-rank 15
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.bakermckenzie.co.jp"
+  :firm/website-evidence "legal500-profile"
+  :firm/legal500-slug "baker-mckenzie"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Baker McKenzie (Gaikokuho Joint Enterprise)"}
+
+ {:firm/id "TLEO虎ノ門法律経済事務所"
+  :firm/name-ja "弁護士法人TLEO虎ノ門法律経済事務所"
+  :firm/lawyer-count 112
+  :firm/headcount-rank 16
+  :firm/prefecture "東京都"
+  :firm/office-count 39
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "エムパートナーズ"
+  :firm/name-ja "弁護士法人エムパートナーズ"
+  :firm/lawyer-count 110
+  :firm/headcount-rank 17
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "岡野法律事務所"
+  :firm/name-ja "弁護士法人岡野法律事務所"
+  :firm/lawyer-count 103
+  :firm/headcount-rank 18
+  :firm/prefecture "広島県"
+  :firm/office-count 21
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "Authense法律事務所"
+  :firm/name-ja "弁護士法人Authense法律事務所"
+  :firm/lawyer-count 98
+  :firm/headcount-rank 19
+  :firm/prefecture "東京都"
+  :firm/office-count 7
+  :firm/website "https://www.authense.jp/"
+  :firm/website-title "Authense法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "淀屋橋・山上合同"
+  :firm/name-ja "弁護士法人淀屋橋・山上合同"
+  :firm/lawyer-count 82
+  :firm/headcount-rank 20
+  :firm/prefecture "大阪府"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "中央総合法律事務所"
+  :firm/name-ja "弁護士法人中央総合法律事務所"
+  :firm/lawyer-count 78
+  :firm/headcount-rank 21
+  :firm/prefecture "大阪府"
+  :firm/office-count 3
+  :firm/website "https://www.clo.jp/"
+  :firm/website-title "弁護士法人中央総合法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "モリソン・フォースター法律事務所"
+  :firm/name-ja "弁護士法人モリソン・フォースター法律事務所"
+  :firm/lawyer-count 74
+  :firm/headcount-rank 22
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "心"
+  :firm/name-ja "弁護士法人心"
+  :firm/lawyer-count 73
+  :firm/headcount-rank 23
+  :firm/prefecture "愛知県"
+  :firm/office-count 36
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "牛島総合法律事務所"
+  :firm/name-ja "牛島総合法律事務所"
+  :firm/lawyer-count 72
+  :firm/headcount-rank 24
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.ushijima-law.gr.jp/"
+  :firm/website-title "牛島総合法律事務所｜Ushijima & Partners"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :firm/legal500-slug "ushijima-partners"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Ushijima & Partners"}
+
+ {:firm/id "瓜生・糸賀法律事務所"
+  :firm/name-ja "弁護士法人瓜生・糸賀法律事務所"
+  :firm/lawyer-count 69
+  :firm/headcount-rank 25
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "のぞみ総合法律事務所"
+  :firm/name-ja "のぞみ総合法律事務所"
+  :firm/lawyer-count 63
+  :firm/headcount-rank 26
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ネクスパート法律事務所（※3）"
+  :firm/name-ja "ネクスパート法律事務所（弁護士法人 ※3）"
+  :firm/lawyer-count 62
+  :firm/headcount-rank 27
+  :firm/prefecture "東京都"
+  :firm/office-count 14
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "DT"
+  :firm/name-ja "DT弁護士法人"
+  :firm/lawyer-count 61
+  :firm/headcount-rank 28
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "法律事務所ZeLo"
+  :firm/name-ja "法律事務所ZeLo"
+  :firm/lawyer-count 61
+  :firm/headcount-rank 28
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://zelojapan.com/"
+  :firm/website-title "法律事務所ZeLo"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/incumbent true
+  :firm/note "現顧問事務所。乗り換え先検討の起点（2026-07-29 オーナー申告）"}
+
+ {:firm/id "AZX総合法律事務所"
+  :firm/name-ja "弁護士法人AZX総合法律事務所"
+  :firm/lawyer-count 60
+  :firm/headcount-rank 30
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :firm/website "https://www.azx.co.jp/"
+  :firm/website-title "AZX – スタートアップ企業等に対し、法務・特許・税務会計などのサービスをワンストップで提供"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "阿部・井窪・片山法律事務所"
+  :firm/name-ja "弁護士法人阿部・井窪・片山法律事務所"
+  :firm/lawyer-count 58
+  :firm/headcount-rank 31
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/legal500-slug "abe-ikubo-katayama"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Abe, Ikubo & Katayama"}
+
+ {:firm/id "島田法律事務所"
+  :firm/name-ja "弁護士法人島田法律事務所"
+  :firm/lawyer-count 58
+  :firm/headcount-rank 31
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "T&K法律事務所"
+  :firm/name-ja "T＆K法律事務所"
+  :firm/lawyer-count 58
+  :firm/headcount-rank 31
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東京丸の内法律事務所"
+  :firm/name-ja "東京丸の内法律事務所"
+  :firm/lawyer-count 56
+  :firm/headcount-rank 34
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "三宅法律事務所"
+  :firm/name-ja "弁護士法人三宅法律事務所"
+  :firm/lawyer-count 55
+  :firm/headcount-rank 35
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "松田綜合法律事務所"
+  :firm/name-ja "松田綜合法律事務所"
+  :firm/lawyer-count 55
+  :firm/headcount-rank 35
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://jmatsuda-law.com/"
+  :firm/website-title "松田綜合法律事務所｜顧問弁護士 | 松田綜合法律事務所（東京・大手町）は、顧問弁護士、企業法務、知的財産権、事業再生、M&A、クロスボーダープラクティスをはじめ、AIや自動運転など専門性の高い法律業務にも取り組んでいます。"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "あさひ法律事務所"
+  :firm/name-ja "あさひ法律事務所"
+  :firm/lawyer-count 53
+  :firm/headcount-rank 36
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "愛知総合法律事務所"
+  :firm/name-ja "弁護士法人愛知総合法律事務所"
+  :firm/lawyer-count 53
+  :firm/headcount-rank 36
+  :firm/prefecture "愛知県"
+  :firm/office-count 21
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "桃尾・松尾・難波法律事務所"
+  :firm/name-ja "弁護士法人桃尾・松尾・難波法律事務所"
+  :firm/lawyer-count 51
+  :firm/headcount-rank 38
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "賢誠総合法律事務所"
+  :firm/name-ja "弁護士法人賢誠総合法律事務所"
+  :firm/lawyer-count 49
+  :firm/headcount-rank 39
+  :firm/prefecture "京都府"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "第一法律事務所"
+  :firm/name-ja "弁護士法人第一法律事務所"
+  :firm/lawyer-count 48
+  :firm/headcount-rank 40
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :firm/website "https://daiichi-law.gr.jp/"
+  :firm/website-title "名古屋第一法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ひかり総合法律事務所"
+  :firm/name-ja "弁護士法人ひかり総合法律事務所"
+  :firm/lawyer-count 48
+  :firm/headcount-rank 40
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "大西総合法律事務所"
+  :firm/name-ja "弁護士法人大西総合法律事務所"
+  :firm/lawyer-count 48
+  :firm/headcount-rank 40
+  :firm/prefecture "東京都"
+  :firm/office-count 7
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "片岡総合法律事務所"
+  :firm/name-ja "弁護士法人片岡総合法律事務所"
+  :firm/lawyer-count 46
+  :firm/headcount-rank 43
+  :firm/prefecture "東京都"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "田辺総合法律事務所"
+  :firm/name-ja "弁護士法人田辺総合法律事務所"
+  :firm/lawyer-count 45
+  :firm/headcount-rank 44
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東京スタートアップ法律事務所（※5）"
+  :firm/name-ja "東京スタートアップ法律事務所（弁護士法人 ※5）"
+  :firm/lawyer-count 44
+  :firm/headcount-rank 45
+  :firm/prefecture "東京都"
+  :firm/office-count 26
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "光和総合法律事務所"
+  :firm/name-ja "光和総合法律事務所"
+  :firm/lawyer-count 44
+  :firm/headcount-rank 45
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東京国際法律事務所"
+  :firm/name-ja "弁護士法人東京国際法律事務所"
+  :firm/lawyer-count 43
+  :firm/headcount-rank 47
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/legal500-slug "tokyo-international-law-office"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Tokyo International Law Office"}
+
+ {:firm/id "響"
+  :firm/name-ja "弁護士法人響"
+  :firm/lawyer-count 43
+  :firm/headcount-rank 47
+  :firm/prefecture "東京都"
+  :firm/office-count 8
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "虎門中央法律事務所"
+  :firm/name-ja "弁護士法人虎門中央法律事務所"
+  :firm/lawyer-count 42
+  :firm/headcount-rank 49
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "三宅坂総合法律事務所"
+  :firm/name-ja "三宅坂総合法律事務所"
+  :firm/lawyer-count 42
+  :firm/headcount-rank 49
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "早稲田リーガルコモンズ"
+  :firm/name-ja "弁護士法人早稲田リーガルコモンズ"
+  :firm/lawyer-count 41
+  :firm/headcount-rank 51
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "法律事務所ASCOPE"
+  :firm/name-ja "弁護士法人法律事務所ASCOPE"
+  :firm/lawyer-count 41
+  :firm/headcount-rank 51
+  :firm/prefecture "東京都"
+  :firm/office-count 5
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "OneAsia"
+  :firm/name-ja "弁護士法人One Asia"
+  :firm/lawyer-count 40
+  :firm/headcount-rank 53
+  :firm/prefecture "東京都"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "関西法律特許事務所"
+  :firm/name-ja "弁護士法人関西法律特許事務所"
+  :firm/lawyer-count 40
+  :firm/headcount-rank 53
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "大知"
+  :firm/name-ja "弁護士法人大知"
+  :firm/lawyer-count 40
+  :firm/headcount-rank 53
+  :firm/prefecture "熊本県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "クリフォードチャンス法律事務所"
+  :firm/name-ja "クリフォードチャンス法律事務所外国法共同事業"
+  :firm/lawyer-count 40
+  :firm/headcount-rank 53
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "鳥飼総合法律事務所"
+  :firm/name-ja "鳥飼総合法律事務所"
+  :firm/lawyer-count 39
+  :firm/headcount-rank 57
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.torikai.gr.jp/"
+  :firm/website-title "鳥飼総合法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "石嵜・山中総合法律事務所"
+  :firm/name-ja "弁護士法人石嵜・山中総合法律事務所"
+  :firm/lawyer-count 37
+  :firm/headcount-rank 58
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ほくと総合法律事務所"
+  :firm/name-ja "弁護士法人ほくと総合法律事務所"
+  :firm/lawyer-count 37
+  :firm/headcount-rank 58
+  :firm/prefecture "東京都"
+  :firm/office-count 4
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "柳田国際法律事務所"
+  :firm/name-ja "柳田国際法律事務所"
+  :firm/lawyer-count 37
+  :firm/headcount-rank 58
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "協和綜合パートナーズ法律事務所"
+  :firm/name-ja "弁護士法人協和綜合パートナーズ法律事務所"
+  :firm/lawyer-count 36
+  :firm/headcount-rank 61
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "梅ヶ枝中央法律事務所"
+  :firm/name-ja "弁護士法人梅ヶ枝中央法律事務所"
+  :firm/lawyer-count 36
+  :firm/headcount-rank 61
+  :firm/prefecture "大阪府"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "PwC"
+  :firm/name-ja "PwC弁護士法人"
+  :firm/lawyer-count 36
+  :firm/headcount-rank 63
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東京法律事務所"
+  :firm/name-ja "東京法律事務所"
+  :firm/lawyer-count 36
+  :firm/headcount-rank 63
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.tokyolaw.gr.jp/"
+  :firm/website-title "東京法律事務所 – 人と暮らしをまもるパートナー 1955 年設立から長年にわたり労働事件に力を尽くし、解雇・賃金・残業代・人事・労災・過労死など労働者の権利を確保する裁判事件を数多く担当し、労働者の権利擁護のために活動してきました。B型肝炎訴訟事務局事務所としても活動しています。"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "きっかわ総合法律事務所"
+  :firm/name-ja "弁護士法人きっかわ総合法律事務所"
+  :firm/lawyer-count 35
+  :firm/headcount-rank 65
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "朝日中央綜合法律事務所"
+  :firm/name-ja "弁護士法人朝日中央綜合法律事務所"
+  :firm/lawyer-count 35
+  :firm/headcount-rank 65
+  :firm/prefecture "東京都"
+  :firm/office-count 6
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "内田・鮫島法律事務所"
+  :firm/name-ja "弁護士法人内田・鮫島法律事務所"
+  :firm/lawyer-count 35
+  :firm/headcount-rank 65
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.uslf.jp/"
+  :firm/website-title "知財や技術・特許の相談なら弁護士法人内田・鮫島法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "さくら共同法律事務所"
+  :firm/name-ja "さくら共同法律事務所"
+  :firm/lawyer-count 35
+  :firm/headcount-rank 65
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "梅田総合法律事務所"
+  :firm/name-ja "弁護士法人梅田総合法律事務所"
+  :firm/lawyer-count 34
+  :firm/headcount-rank 69
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "デイライト法律事務所"
+  :firm/name-ja "弁護士法人デイライト法律事務所"
+  :firm/lawyer-count 34
+  :firm/headcount-rank 69
+  :firm/prefecture "福岡県"
+  :firm/office-count 4
+  :firm/website "https://www.komon-lawyer.jp/"
+  :firm/website-title "顧問弁護士なら企業法務に強いデイライト法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "平松剛法律事務所"
+  :firm/name-ja "弁護士法人平松剛法律事務所"
+  :firm/lawyer-count 34
+  :firm/headcount-rank 69
+  :firm/prefecture "東京都"
+  :firm/office-count 13
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "アトム法律事務所"
+  :firm/name-ja "アトム法律事務所弁護士法人"
+  :firm/lawyer-count 34
+  :firm/headcount-rank 69
+  :firm/prefecture "東京都"
+  :firm/office-count 7
+  :firm/website "https://atombengo.com/"
+  :firm/website-title "刑事事件に強い弁護士【アトム法律事務所】｜アトム弁護士相談"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "稲葉総合法律事務所"
+  :firm/name-ja "稲葉総合法律事務所"
+  :firm/lawyer-count 34
+  :firm/headcount-rank 69
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "キャストグローバル"
+  :firm/name-ja "弁護士法人キャストグローバル"
+  :firm/lawyer-count 33
+  :firm/headcount-rank 74
+  :firm/prefecture "東京都"
+  :firm/office-count 8
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "堂島法律事務所"
+  :firm/name-ja "弁護士法人堂島法律事務所"
+  :firm/lawyer-count 33
+  :firm/headcount-rank 74
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "プロテクトスタンス"
+  :firm/name-ja "弁護士法人プロテクトスタンス"
+  :firm/lawyer-count 32
+  :firm/headcount-rank 76
+  :firm/prefecture "東京都"
+  :firm/office-count 8
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "色川法律事務所"
+  :firm/name-ja "弁護士法人色川法律事務所"
+  :firm/lawyer-count 32
+  :firm/headcount-rank 76
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :firm/website "https://www.irokawa.gr.jp/"
+  :firm/website-title "色川法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "高橋法律事務所"
+  :firm/name-ja "弁護士法人高橋法律事務所"
+  :firm/lawyer-count 32
+  :firm/headcount-rank 76
+  :firm/prefecture "愛知県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東京八丁堀法律事務所"
+  :firm/name-ja "東京八丁堀法律事務所"
+  :firm/lawyer-count 32
+  :firm/headcount-rank 76
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "名古屋第一法律事務所"
+  :firm/name-ja "名古屋第一法律事務所"
+  :firm/lawyer-count 32
+  :firm/headcount-rank 76
+  :firm/prefecture "愛知県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "のぞみ法律事務所"
+  :firm/name-ja "弁護士法人のぞみ法律事務所"
+  :firm/lawyer-count 31
+  :firm/headcount-rank 81
+  :firm/prefecture "栃木県"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "奧野総合法律事務所"
+  :firm/name-ja "弁護士法人奧野総合法律事務所"
+  :firm/lawyer-count 31
+  :firm/headcount-rank 81
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "鴻聖"
+  :firm/name-ja "弁護士法人鴻聖"
+  :firm/lawyer-count 31
+  :firm/headcount-rank 81
+  :firm/prefecture "福岡県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東京新宿法律事務所"
+  :firm/name-ja "弁護士法人東京新宿法律事務所"
+  :firm/lawyer-count 31
+  :firm/headcount-rank 81
+  :firm/prefecture "東京都"
+  :firm/office-count 4
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "法律事務所リンクレーターズ"
+  :firm/name-ja "外国法共同事業法律事務所リンクレーターズ"
+  :firm/lawyer-count 31
+  :firm/headcount-rank 81
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ディーエルエイ・パイパー東京パートナーシップ法律事務所"
+  :firm/name-ja "ディーエルエイ・パイパー東京パートナーシップ外国法共同事業法律事務所"
+  :firm/lawyer-count 30
+  :firm/headcount-rank 86
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "旬報法律事務所"
+  :firm/name-ja "旬報法律事務所"
+  :firm/lawyer-count 30
+  :firm/headcount-rank 86
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://junpo.org/"
+  :firm/website-title "旬報法律事務所は労働者の側に立った労働問題解決のエキスパートです"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "丸の内総合法律事務所"
+  :firm/name-ja "丸の内総合法律事務所"
+  :firm/lawyer-count 30
+  :firm/headcount-rank 86
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ホワイト&ケース法律事務所"
+  :firm/name-ja "ホワイト＆ケース法律事務所"
+  :firm/lawyer-count 30
+  :firm/headcount-rank 86
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "よつば総合法律事務所"
+  :firm/name-ja "弁護士法人よつば総合法律事務所"
+  :firm/lawyer-count 29
+  :firm/headcount-rank 90
+  :firm/prefecture "千葉県"
+  :firm/office-count 6
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "春田法律事務所（※4）"
+  :firm/name-ja "春田法律事務所（弁護士法人 ※4）"
+  :firm/lawyer-count 29
+  :firm/headcount-rank 90
+  :firm/prefecture "東京都"
+  :firm/office-count 13
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "Y&P法律事務所"
+  :firm/name-ja "弁護士法人Y＆P法律事務所"
+  :firm/lawyer-count 29
+  :firm/headcount-rank 90
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "三村小松法律事務所"
+  :firm/name-ja "三村小松法律事務所"
+  :firm/lawyer-count 29
+  :firm/headcount-rank 90
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "名城法律事務所"
+  :firm/name-ja "弁護士法人名城法律事務所"
+  :firm/lawyer-count 28
+  :firm/headcount-rank 94
+  :firm/prefecture "愛知県"
+  :firm/office-count 8
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東町法律事務所"
+  :firm/name-ja "弁護士法人東町法律事務所"
+  :firm/lawyer-count 27
+  :firm/headcount-rank 95
+  :firm/prefecture "兵庫県"
+  :firm/office-count 4
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "モノリス法律事務所"
+  :firm/name-ja "弁護士法人モノリス法律事務所"
+  :firm/lawyer-count 27
+  :firm/headcount-rank 95
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :firm/website "https://monolith.law/"
+  :firm/website-title "モノリス法律事務所 - IT・インターネット・ビジネスに強い大手町の法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 21
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "原後綜合法律事務所"
+  :firm/name-ja "弁護士法人原後綜合法律事務所"
+  :firm/lawyer-count 27
+  :firm/headcount-rank 95
+  :firm/prefecture "東京都"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "一新総合法律事務所"
+  :firm/name-ja "弁護士法人一新総合法律事務所"
+  :firm/lawyer-count 27
+  :firm/headcount-rank 95
+  :firm/prefecture "新潟県"
+  :firm/office-count 9
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "GT東京法律事務所"
+  :firm/name-ja "弁護士法人GT東京法律事務所"
+  :firm/lawyer-count 27
+  :firm/headcount-rank 95
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "GVA法律事務所"
+  :firm/name-ja "弁護士法人GVA法律事務所"
+  :firm/lawyer-count 27
+  :firm/headcount-rank 95
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://gvalaw.jp/"
+  :firm/website-title "GVA Professional Group｜GVA法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "潮見坂綜合法律事務所"
+  :firm/name-ja "潮見坂綜合法律事務所"
+  :firm/lawyer-count 27
+  :firm/headcount-rank 95
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.shiomizaka.com/"
+  :firm/website-title "美味しい食事と無料足湯で疲れを癒やす「道の駅 潮見坂」"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "横浜綜合法律事務所"
+  :firm/name-ja "横浜綜合法律事務所"
+  :firm/lawyer-count 27
+  :firm/headcount-rank 95
+  :firm/prefecture "神奈川県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ユア・エース"
+  :firm/name-ja "弁護士法人ユア・エース"
+  :firm/lawyer-count 26
+  :firm/headcount-rank 103
+  :firm/prefecture "東京都"
+  :firm/office-count 7
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "グレイス"
+  :firm/name-ja "弁護士法人グレイス"
+  :firm/lawyer-count 26
+  :firm/headcount-rank 103
+  :firm/prefecture "東京都"
+  :firm/office-count 6
+  :firm/website "https://fukuoka.gracelaw.jp/"
+  :firm/website-title "福岡での弁護士への相談は弁護士法人グレイス｜企業法務・家事・交通事故の法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 21
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "LM虎ノ門南法律事務所"
+  :firm/name-ja "LM虎ノ門南法律事務所"
+  :firm/lawyer-count 26
+  :firm/headcount-rank 103
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "琥珀法律事務所"
+  :firm/name-ja "弁護士法人琥珀法律事務所"
+  :firm/lawyer-count 25
+  :firm/headcount-rank 106
+  :firm/prefecture "東京都"
+  :firm/office-count 7
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "あいち刑事事件総合法律事務所"
+  :firm/name-ja "弁護士法人あいち刑事事件総合法律事務所"
+  :firm/lawyer-count 25
+  :firm/headcount-rank 106
+  :firm/prefecture "愛知県"
+  :firm/office-count 12
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 23
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "日比谷見附法律事務所"
+  :firm/name-ja "日比谷見附法律事務所"
+  :firm/lawyer-count 25
+  :firm/headcount-rank 106
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "明倫国際法律事務所"
+  :firm/name-ja "弁護士法人明倫国際法律事務所"
+  :firm/lawyer-count 24
+  :firm/headcount-rank 109
+  :firm/prefecture "福岡県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 23
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "小林法律事務所"
+  :firm/name-ja "弁護士法人小林法律事務所"
+  :firm/lawyer-count 24
+  :firm/headcount-rank 109
+  :firm/prefecture "山口県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "隼あすか法律事務所"
+  :firm/name-ja "弁護士法人隼あすか法律事務所"
+  :firm/lawyer-count 24
+  :firm/headcount-rank 109
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "佐野総合"
+  :firm/name-ja "弁護士法人佐野総合"
+  :firm/lawyer-count 24
+  :firm/headcount-rank 109
+  :firm/prefecture "千葉県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "親和法律事務所"
+  :firm/name-ja "弁護士法人親和法律事務所"
+  :firm/lawyer-count 24
+  :firm/headcount-rank 109
+  :firm/prefecture "東京都"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 22
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "真和総合法律事務所"
+  :firm/name-ja "真和総合法律事務所"
+  :firm/lawyer-count 24
+  :firm/headcount-rank 109
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "紀尾井町法律事務所"
+  :firm/name-ja "紀尾井町法律事務所"
+  :firm/lawyer-count 24
+  :firm/headcount-rank 109
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 23
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "奥・片山・佐藤法律事務所"
+  :firm/name-ja "奥・片山・佐藤法律事務所"
+  :firm/lawyer-count 24
+  :firm/headcount-rank 109
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 23
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "ヴァスコ・ダ・ガマ法律会計事務所"
+  :firm/name-ja "ヴァスコ・ダ・ガマ法律会計事務所"
+  :firm/lawyer-count 24
+  :firm/headcount-rank 109
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "法律事務所アルシエン"
+  :firm/name-ja "法律事務所アルシエン"
+  :firm/lawyer-count 24
+  :firm/headcount-rank 109
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 22
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "半蔵門総合法律事務所"
+  :firm/name-ja "弁護士法人半蔵門総合法律事務所"
+  :firm/lawyer-count 23
+  :firm/headcount-rank 119
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 23
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "清水法律事務所"
+  :firm/name-ja "弁護士法人清水法律事務所"
+  :firm/lawyer-count 23
+  :firm/headcount-rank 119
+  :firm/prefecture "北海道"
+  :firm/office-count 4
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "アイエイ"
+  :firm/name-ja "アイエイ弁護士法人"
+  :firm/lawyer-count 23
+  :firm/headcount-rank 119
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "丸の内ソレイユ法律事務所"
+  :firm/name-ja "弁護士法人丸の内ソレイユ法律事務所"
+  :firm/lawyer-count 23
+  :firm/headcount-rank 119
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 22
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "第一芙蓉法律事務所"
+  :firm/name-ja "第一芙蓉法律事務所"
+  :firm/lawyer-count 23
+  :firm/headcount-rank 119
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 22
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "東京新生法律事務所"
+  :firm/name-ja "東京新生法律事務所"
+  :firm/lawyer-count 23
+  :firm/headcount-rank 119
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 23
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "スプリング法律事務所"
+  :firm/name-ja "スプリング法律事務所"
+  :firm/lawyer-count 23
+  :firm/headcount-rank 119
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 21
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "大和エスジー吉川法律事務所"
+  :firm/name-ja "弁護士法人大和エスジー吉川法律事務所"
+  :firm/lawyer-count 22
+  :firm/headcount-rank 125
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "谷口法律事務所"
+  :firm/name-ja "弁護士法人谷口法律事務所"
+  :firm/lawyer-count 22
+  :firm/headcount-rank 125
+  :firm/prefecture "大阪府"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "中本総合"
+  :firm/name-ja "弁護士法人中本総合"
+  :firm/lawyer-count 22
+  :firm/headcount-rank 125
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "みらい総合法律事務所"
+  :firm/name-ja "弁護士法人みらい総合法律事務所"
+  :firm/lawyer-count 22
+  :firm/headcount-rank 125
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 22
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "VSG"
+  :firm/name-ja "VSG弁護士法人"
+  :firm/lawyer-count 22
+  :firm/headcount-rank 125
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "池田・染谷法律事務所"
+  :firm/name-ja "弁護士法人池田・染谷法律事務所"
+  :firm/lawyer-count 22
+  :firm/headcount-rank 125
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 19
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "リーガルプラス"
+  :firm/name-ja "弁護士法人リーガルプラス"
+  :firm/lawyer-count 22
+  :firm/headcount-rank 125
+  :firm/prefecture "東京都"
+  :firm/office-count 10
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "King&WoodMallesons法律事務所"
+  :firm/name-ja "King＆Wood Mallesons法律事務所・外国法共同事業"
+  :firm/lawyer-count 22
+  :firm/headcount-rank 125
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "新麹町法律事務所"
+  :firm/name-ja "新麹町法律事務所"
+  :firm/lawyer-count 22
+  :firm/headcount-rank 125
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "三多摩法律事務所"
+  :firm/name-ja "三多摩法律事務所"
+  :firm/lawyer-count 22
+  :firm/headcount-rank 125
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 21
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "北海道合同法律事務所"
+  :firm/name-ja "北海道合同法律事務所"
+  :firm/lawyer-count 22
+  :firm/headcount-rank 125
+  :firm/prefecture "北海道"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "名川・岡村法律事務所"
+  :firm/name-ja "弁護士法人名川・岡村法律事務所"
+  :firm/lawyer-count 21
+  :firm/headcount-rank 126
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 19
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "小野総合法律事務所"
+  :firm/name-ja "弁護士法人小野総合法律事務所"
+  :firm/lawyer-count 21
+  :firm/headcount-rank 126
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "フェアネス法律事務所"
+  :firm/name-ja "弁護士法人フェアネス法律事務所"
+  :firm/lawyer-count 21
+  :firm/headcount-rank 126
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 19
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "淀屋橋法律事務所"
+  :firm/name-ja "弁護士法人淀屋橋法律事務所"
+  :firm/lawyer-count 21
+  :firm/headcount-rank 126
+  :firm/prefecture "大阪府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 21
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "祝田法律事務所"
+  :firm/name-ja "弁護士法人祝田法律事務所"
+  :firm/lawyer-count 21
+  :firm/headcount-rank 126
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 19
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "フォーサイト総合法律事務所"
+  :firm/name-ja "弁護士法人フォーサイト総合法律事務所"
+  :firm/lawyer-count 21
+  :firm/headcount-rank 126
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "東京共同法律事務所"
+  :firm/name-ja "東京共同法律事務所"
+  :firm/lawyer-count 21
+  :firm/headcount-rank 126
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "御池総合法律事務所"
+  :firm/name-ja "御池総合法律事務所"
+  :firm/lawyer-count 21
+  :firm/headcount-rank 126
+  :firm/prefecture "京都府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 21
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "EY"
+  :firm/name-ja "EY弁護士法人"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 22
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "共栄法律事務所"
+  :firm/name-ja "弁護士法人共栄法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "大阪府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 22
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "旭合同法律事務所"
+  :firm/name-ja "弁護士法人旭合同法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "愛知県"
+  :firm/office-count 6
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "豊島総合法律事務所"
+  :firm/name-ja "弁護士法人豊島総合法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 17
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "K&LGates法律事務所"
+  :firm/name-ja "K＆L Gates外国法共同事業法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "小島国際法律事務所"
+  :firm/name-ja "小島国際法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "http://www.kojimalaw.jp"
+  :firm/website-evidence "legal500-profile"
+  :firm/legal500-slug "kojima-law-offices"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"
+  :firm/name-en "Kojima Law Offices"}
+
+ {:firm/id "杜若経営法律事務所"
+  :firm/name-ja "杜若経営法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.labor-management.net/"
+  :firm/website-title "【企業側】労働問題・労務問題に強い弁護士への相談なら杜若経営法律事務所｜労務ネット"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "中村合同特許法律事務所"
+  :firm/name-ja "中村合同特許法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 19
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "第一中央法律事務所"
+  :firm/name-ja "第一中央法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "城北法律事務所"
+  :firm/name-ja "城北法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "京都第一法律事務所"
+  :firm/name-ja "京都第一法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "京都府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 19
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "芝綜合法律事務所"
+  :firm/name-ja "芝綜合法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "オリンピア法律事務所"
+  :firm/name-ja "オリンピア法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "愛知県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "高橋綜合法律事務所"
+  :firm/name-ja "高橋綜合法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "アクアシス法律事務所"
+  :firm/name-ja "アクアシス法律事務所"
+  :firm/lawyer-count 20
+  :firm/headcount-rank 134
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/legal500-slug "aquaxis-law-office"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "八重洲日本橋法律事務所"
+  :firm/name-ja "弁護士法人八重洲日本橋法律事務所"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "松尾綜合法律事務所"
+  :firm/name-ja "弁護士法人松尾綜合法律事務所"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "山田法律事務所"
+  :firm/name-ja "弁護士法人山田法律事務所"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "静岡県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "サリュ"
+  :firm/name-ja "弁護士法人サリュ"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "山口県"
+  :firm/office-count 10
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "和田倉門法律事務所"
+  :firm/name-ja "弁護士法人和田倉門法律事務所"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "桜橋総合"
+  :firm/name-ja "弁護士法人桜橋総合"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "梶谷綜合法律事務所"
+  :firm/name-ja "梶谷綜合法律事務所"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "東京合同法律事務所"
+  :firm/name-ja "東京合同法律事務所"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 20
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "日比谷パーク法律事務所"
+  :firm/name-ja "日比谷パーク法律事務所"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 19
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "石井法律事務所"
+  :firm/name-ja "石井法律事務所"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "坂東総合法律事務所"
+  :firm/name-ja "坂東総合法律事務所"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 19
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "虎ノ門総合法律事務所"
+  :firm/name-ja "虎ノ門総合法律事務所"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "札幌総合法律事務所"
+  :firm/name-ja "札幌総合法律事務所"
+  :firm/lawyer-count 19
+  :firm/headcount-rank 150
+  :firm/prefecture "北海道"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 19
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "大樹法律事務所"
+  :firm/name-ja "弁護士法人大樹法律事務所"
+  :firm/lawyer-count 18
+  :firm/headcount-rank 163
+  :firm/prefecture "愛知県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 17
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "グリーンリーフ法律事務所"
+  :firm/name-ja "弁護士法人グリーンリーフ法律事務所"
+  :firm/lawyer-count 18
+  :firm/headcount-rank 163
+  :firm/prefecture "埼玉県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "英知法律事務所"
+  :firm/name-ja "弁護士法人英知法律事務所"
+  :firm/lawyer-count 18
+  :firm/headcount-rank 163
+  :firm/prefecture "大阪府"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 17
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "小沢・秋山法律事務所"
+  :firm/name-ja "弁護士法人小沢・秋山法律事務所"
+  :firm/lawyer-count 18
+  :firm/headcount-rank 163
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "VanguardTokyo法律事務所"
+  :firm/name-ja "Vanguard Tokyo法律事務所"
+  :firm/lawyer-count 18
+  :firm/headcount-rank 163
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/legal500-slug "vanguard-lawyers-tokyo"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"
+  :firm/name-en "Vanguard Lawyers Tokyo"}
+
+ {:firm/id "大江・田中・大宅法律事務所"
+  :firm/name-ja "大江・田中・大宅法律事務所"
+  :firm/lawyer-count 18
+  :firm/headcount-rank 163
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "東京南部法律事務所"
+  :firm/name-ja "東京南部法律事務所"
+  :firm/lawyer-count 18
+  :firm/headcount-rank 163
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "野村綜合法律事務所"
+  :firm/name-ja "野村綜合法律事務所"
+  :firm/lawyer-count 18
+  :firm/headcount-rank 163
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "岡村綜合法律事務所"
+  :firm/name-ja "岡村綜合法律事務所"
+  :firm/lawyer-count 18
+  :firm/headcount-rank 163
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "桜川協和法律事務所"
+  :firm/name-ja "桜川協和法律事務所"
+  :firm/lawyer-count 18
+  :firm/headcount-rank 163
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "馬場・澤田法律事務所"
+  :firm/name-ja "馬場・澤田法律事務所"
+  :firm/lawyer-count 18
+  :firm/headcount-rank 163
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "あおぞら法律事務所"
+  :firm/name-ja "弁護士法人あおぞら法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "神奈川県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "静岡法律事務所"
+  :firm/name-ja "弁護士法人静岡法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "静岡県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "プログレ・TNY国際法律事務所"
+  :firm/name-ja "弁護士法人プログレ・TNY国際法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "あすなろ"
+  :firm/name-ja "弁護士法人あすなろ"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "北千住パブリック法律事務所"
+  :firm/name-ja "弁護士法人北千住パブリック法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 17
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "匠総合法律事務所"
+  :firm/name-ja "弁護士法人匠総合法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 5
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "グラス・オランジュ法律事務所"
+  :firm/name-ja "弁護士法人グラス・オランジュ法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "大阪府"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "TH"
+  :firm/name-ja "TH弁護士法人"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東京パブリック法律事務所"
+  :firm/name-ja "弁護士法人東京パブリック法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 17
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "ユニヴィス法律事務所"
+  :firm/name-ja "弁護士法人ユニヴィス法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 17
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "東京東部法律事務所"
+  :firm/name-ja "東京東部法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "日比谷総合法律事務所"
+  :firm/name-ja "日比谷総合法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "本間合同法律事務所"
+  :firm/name-ja "本間合同法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "川崎合同法律事務所"
+  :firm/name-ja "川崎合同法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "神奈川県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "堀総合法律事務所"
+  :firm/name-ja "堀総合法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "西東京共同法律事務所"
+  :firm/name-ja "西東京共同法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 17
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "虎ノ門第一法律事務所"
+  :firm/name-ja "虎ノ門第一法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "フレッシュフィールズ法律事務所"
+  :firm/name-ja "フレッシュフィールズ法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 23
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "堂野法律事務所"
+  :firm/name-ja "堂野法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "山下総合法律事務所"
+  :firm/name-ja "山下総合法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "レイ法律事務所"
+  :firm/name-ja "レイ法律事務所"
+  :firm/lawyer-count 17
+  :firm/headcount-rank 174
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "アイウィル"
+  :firm/name-ja "弁護士法人アイウィル"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "香川県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "長谷川法律事務所"
+  :firm/name-ja "弁護士法人長谷川法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "広島総合法律会計事務所"
+  :firm/name-ja "弁護士法人広島総合法律会計事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "広島県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "大手町法律事務所"
+  :firm/name-ja "弁護士法人大手町法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "福岡県"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ブレインハート法律事務所"
+  :firm/name-ja "弁護士法人ブレインハート法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 5
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "創・佐藤法律事務所"
+  :firm/name-ja "弁護士法人創・佐藤法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/legal500-slug "so-sato-law-offices"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "So & Sato Law Offices"}
+
+ {:firm/id "アンビシャス総合法律事務所"
+  :firm/name-ja "弁護士法人アンビシャス総合法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "北海道"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "法律事務所ロイヤーズ・ハイ"
+  :firm/name-ja "弁護士法人法律事務所ロイヤーズ・ハイ"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "大阪府"
+  :firm/office-count 6
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "港国際法律事務所"
+  :firm/name-ja "弁護士法人港国際法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "神奈川県"
+  :firm/office-count 6
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "かなめ"
+  :firm/name-ja "弁護士法人かなめ"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "大阪府"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "アレンオーヴェリーシャーマンスターリング法律事務所"
+  :firm/name-ja "アレンオーヴェリーシャーマンスターリング法律事務所外国法共同事業"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "敬和綜合法律事務所"
+  :firm/name-ja "敬和綜合法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "村松法律事務所"
+  :firm/name-ja "村松法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "北海道"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "グローバル法律事務所"
+  :firm/name-ja "グローバル法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "大阪府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "インテグラル法律事務所"
+  :firm/name-ja "インテグラル法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "東京神谷町綜合法律事務所"
+  :firm/name-ja "東京神谷町綜合法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "東京グリーン法律事務所"
+  :firm/name-ja "東京グリーン法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "楠井法律事務所"
+  :firm/name-ja "楠井法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "三重県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 17
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "日比谷中田法律事務所"
+  :firm/name-ja "日比谷中田法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "村島・穂積法律事務所"
+  :firm/name-ja "村島・穂積法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "新丸の内総合法律事務所"
+  :firm/name-ja "新丸の内総合法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ひふみ総合法律事務所"
+  :firm/name-ja "ひふみ総合法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "Kollectパートナーズ法律事務所"
+  :firm/name-ja "Kollectパートナーズ法律事務所"
+  :firm/lawyer-count 16
+  :firm/headcount-rank 195
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東京総合法律事務所黒須室"
+  :firm/name-ja "弁護士法人東京総合法律事務所黒須室"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "京都総合法律事務所"
+  :firm/name-ja "弁護士法人京都総合法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "京都府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東京フレックス法律事務所"
+  :firm/name-ja "弁護士法人東京フレックス法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "多摩パブリック法律事務所"
+  :firm/name-ja "弁護士法人多摩パブリック法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "住田法律事務所"
+  :firm/name-ja "弁護士法人住田法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "愛知県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "三浦法律事務所"
+  :firm/name-ja "弁護士法人三浦法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 5
+  :firm/website "https://www.miura-partners.com/"
+  :firm/website-title "三浦法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :firm/legal500-slug "miura-partners"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/name-en "Miura & Partners"}
+
+ {:firm/id "琉球スフィア"
+  :firm/name-ja "弁護士法人琉球スフィア"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "沖縄県"
+  :firm/office-count 5
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "LM総合法律事務所"
+  :firm/name-ja "弁護士法人LM総合法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "神奈川県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "LEON"
+  :firm/name-ja "弁護士法人LEON"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "柏木総合法律事務所"
+  :firm/name-ja "柏木総合法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "・ジョーンズ・デイ法律事務所"
+  :firm/name-ja "外国法共同事業・ジョーンズ・デイ法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 17
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "ハーバート・スミス・フリーヒルズ外国法事務弁護士事務所"
+  :firm/name-ja "ハーバート・スミス・フリーヒルズ外国法事務弁護士事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ブレークモア法律事務所"
+  :firm/name-ja "ブレークモア法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 18
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "きづがわ共同法律事務所"
+  :firm/name-ja "きづがわ共同法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "大阪府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "横浜合同法律事務所"
+  :firm/name-ja "横浜合同法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "神奈川県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "飯沼総合法律事務所"
+  :firm/name-ja "飯沼総合法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "埼玉総合法律事務所"
+  :firm/name-ja "埼玉総合法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "埼玉県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "横浜法律事務所"
+  :firm/name-ja "横浜法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "神奈川県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "桜田通り総合法律事務所"
+  :firm/name-ja "桜田通り総合法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "佐藤総合法律事務所"
+  :firm/name-ja "佐藤総合法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "シティライツ法律事務所"
+  :firm/name-ja "シティライツ法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "リーガルキュレート総合法律事務所"
+  :firm/name-ja "リーガルキュレート総合法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "八雲法律事務所"
+  :firm/name-ja "八雲法律事務所"
+  :firm/lawyer-count 15
+  :firm/headcount-rank 218
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "創知法律事務所"
+  :firm/name-ja "弁護士法人創知法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "黒田法律事務所"
+  :firm/name-ja "弁護士法人黒田法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "けやき法律事務所"
+  :firm/name-ja "弁護士法人けやき法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "福島県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "岡山パブリック法律事務所"
+  :firm/name-ja "弁護士法人岡山パブリック法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "岡山県"
+  :firm/office-count 5
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "中村綜合法律事務所"
+  :firm/name-ja "弁護士法人中村綜合法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "さくら総合法律事務所"
+  :firm/name-ja "弁護士法人さくら総合法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "鹿児島県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "深沢綜合法律事務所"
+  :firm/name-ja "弁護士法人深沢綜合法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "山本総合法律事務所"
+  :firm/name-ja "弁護士法人山本総合法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "群馬県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "シグマ麹町法律事務所"
+  :firm/name-ja "弁護士法人シグマ麹町法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "龍馬"
+  :firm/name-ja "弁護士法人龍馬"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "群馬県"
+  :firm/office-count 5
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "TXL"
+  :firm/name-ja "弁護士法人TXL"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "みお"
+  :firm/name-ja "弁護士法人みお"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "大阪府"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "マイタウン法律事務所"
+  :firm/name-ja "弁護士法人マイタウン法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "神奈川県"
+  :firm/office-count 8
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"
+  :firm/lawyer-count-alt 16
+  :firm/lawyer-count-alt-source "https://legal-job-board.com/media/legal-apprentice/lawyer-ranking-2026/"}
+
+ {:firm/id "常磐法律事務所"
+  :firm/name-ja "弁護士法人常磐法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "神奈川県"
+  :firm/office-count 4
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "S&W国際法律事務所"
+  :firm/name-ja "弁護士法人S＆W国際法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "大阪府"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ノーサイド法律事務所"
+  :firm/name-ja "弁護士法人ノーサイド法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "増井総合法律事務所"
+  :firm/name-ja "弁護士法人増井総合法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 4
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東京エクセル法律事務所"
+  :firm/name-ja "東京エクセル法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "はばたき綜合法律事務所"
+  :firm/name-ja "はばたき綜合法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "大阪府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "関西合同法律事務所"
+  :firm/name-ja "関西合同法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "大阪府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "安西法律事務所"
+  :firm/name-ja "安西法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "東京富士法律事務所"
+  :firm/name-ja "東京富士法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "千葉第一法律事務所"
+  :firm/name-ja "千葉第一法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "千葉県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "京橋法律事務所"
+  :firm/name-ja "京橋法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "大原法律事務所"
+  :firm/name-ja "大原法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "三好総合法律事務所"
+  :firm/name-ja "三好総合法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "リンク総合法律事務所"
+  :firm/name-ja "リンク総合法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "平沼高明法律事務所"
+  :firm/name-ja "平沼高明法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "田島・寺西・遠藤法律事務所"
+  :firm/name-ja "田島・寺西・遠藤法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "埼玉中央法律事務所"
+  :firm/name-ja "埼玉中央法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "埼玉県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "燕総合法律事務所"
+  :firm/name-ja "燕総合法律事務所"
+  :firm/lawyer-count 14
+  :firm/headcount-rank 241
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "安永法律事務所"
+  :firm/name-ja "弁護士法人安永法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "佐賀県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "大阪芙蓉法律事務所"
+  :firm/name-ja "弁護士法人大阪芙蓉法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "大阪府"
+  :firm/office-count 4
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "はるか"
+  :firm/name-ja "弁護士法人はるか"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 6
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "つくし総合法律事務所"
+  :firm/name-ja "弁護士法人つくし総合法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "京都府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "飛翔法律事務所"
+  :firm/name-ja "弁護士法人飛翔法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "大阪府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "石原・関・猿谷法律事務所"
+  :firm/name-ja "弁護士法人石原・関・猿谷法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "群馬県"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "三ツ星"
+  :firm/name-ja "弁護士法人三ツ星"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "大阪府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "早稲田大学リーガル・クリニック"
+  :firm/name-ja "弁護士法人早稲田大学リーガル・クリニック"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "三宅・今井・池田法律事務所"
+  :firm/name-ja "弁護士法人三宅・今井・池田法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "一番町綜合法律事務所"
+  :firm/name-ja "弁護士法人一番町綜合法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "Field-R"
+  :firm/name-ja "弁護士法人Field-R"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "咲くやこの花法律事務所"
+  :firm/name-ja "弁護士法人咲くやこの花法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "大阪府"
+  :firm/office-count 1
+  :firm/website "https://kigyobengo.com/"
+  :firm/website-title "企業法務に強い弁護士への相談は大阪「咲くやこの花法律事務所」へ"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "千代田中央法律事務所"
+  :firm/name-ja "弁護士法人千代田中央法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 2
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "Z"
+  :firm/name-ja "弁護士法人Z"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 3
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "渋谷アクア法律事務所"
+  :firm/name-ja "弁護士法人渋谷アクア法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "オリオン法律事務所"
+  :firm/name-ja "弁護士法人オリオン法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 4
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ピクト法律事務所"
+  :firm/name-ja "弁護士法人ピクト法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "オリック東京法律事務所"
+  :firm/name-ja "オリック東京法律事務所・外国法共同事業"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "露木・赤澤法律事務所"
+  :firm/name-ja "露木・赤澤法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "BACeLL法律会計事務所"
+  :firm/name-ja "BACeLL法律会計事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "中之島中央法律事務所"
+  :firm/name-ja "中之島中央法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "大阪府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "福岡城南法律事務所"
+  :firm/name-ja "福岡城南法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "福岡県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "アイ・パートナーズ法律事務所"
+  :firm/name-ja "アイ・パートナーズ法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "愛知県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "フェニックス法律事務所"
+  :firm/name-ja "フェニックス法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "大阪府"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "ユアサハラ法律特許事務所"
+  :firm/name-ja "ユアサハラ法律特許事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "渋谷共同法律事務所"
+  :firm/name-ja "渋谷共同法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "菊地綜合法律事務所"
+  :firm/name-ja "菊地綜合法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "北九州第一法律事務所"
+  :firm/name-ja "北九州第一法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "福岡県"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "外苑法律事務所"
+  :firm/name-ja "外苑法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "今村記念法律事務所"
+  :firm/name-ja "今村記念法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "小笠原国際総合法律事務所"
+  :firm/name-ja "小笠原国際総合法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "骨董通り法律事務所"
+  :firm/name-ja "骨董通り法律事務所"
+  :firm/lawyer-count 13
+  :firm/headcount-rank 272
+  :firm/prefecture "東京都"
+  :firm/office-count 1
+  :firm/website "https://www.kottolaw.com/"
+  :firm/website-title "骨董通り法律事務所 For the Arts"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://no-limit.careers/guide/15280/"
+  :source/retrieved "2026-07-29"
+  :source/note "所属弁護士数・所在地・拠点数は日弁連登録情報に基づく公開ランキング由来（2026-01-04 時点集計）"}
+
+ {:firm/id "morrison-foerster"
+  :firm/name-en "Morrison Foerster"
+  :firm/legal500-slug "morrison-foerster"
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50701-morrison-foerster/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "jones-day"
+  :firm/name-en "Jones Day"
+  :firm/legal500-slug "jones-day"
+  :firm/website "https://www.jonesday.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50505-jones-day/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "white-case-llp"
+  :firm/name-en "White & Case LLP - White & Case Law Offices (Registered Association)"
+  :firm/legal500-slug "white-case-llp"
+  :firm/website "https://www.whitecase.com/locations/asia-pacific/tokyo"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/51054-white-case-llp/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "clifford-chance-llp"
+  :firm/name-en "Clifford Chance (Gaikokuho Kyodo Jigyo)"
+  :firm/legal500-slug "clifford-chance-llp"
+  :firm/website "https://www.cliffordchance.com/contact.html"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/679-clifford-chance-llp/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "kaynex-law-offices"
+  :firm/name-en "Kaynex Law Offices"
+  :firm/legal500-slug "kaynex-law-offices"
+  :firm/website "https://www.kaynex-law.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/34641-kaynex-law-offices/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "milbank"
+  :firm/name-en "Milbank"
+  :firm/legal500-slug "milbank"
+  :firm/website "https://www.milbank.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50677-milbank/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "norton-rose-fulbright"
+  :firm/name-en "Norton Rose Fulbright"
+  :firm/legal500-slug "norton-rose-fulbright"
+  :firm/website "https://www.nortonrosefulbright.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/2511-norton-rose-fulbright/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "ropes-gray-llp"
+  :firm/name-en "Ropes & Gray LLP"
+  :firm/legal500-slug "ropes-gray-llp"
+  :firm/website "https://www.ropesgray.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50844-ropes-gray-llp/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "king-spalding"
+  :firm/name-en "King & Spalding"
+  :firm/legal500-slug "king-spalding"
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50539-king-spalding/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "mayer-brown"
+  :firm/name-en "Mayer Brown GJBJ"
+  :firm/legal500-slug "mayer-brown"
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50636-mayer-brown/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "pwc-legal-japan"
+  :firm/name-en "PwC Legal Japan"
+  :firm/legal500-slug "pwc-legal-japan"
+  :firm/website "https://www.pwc.com/jp/en/about/member/legal.html"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/236496-pwc-legal-japan/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "simpson-thacher-bartlett-llp"
+  :firm/name-en "Simpson Thacher & Bartlett LLP"
+  :firm/legal500-slug "simpson-thacher-bartlett-llp"
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50916-simpson-thacher-bartlett-llp/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "watson-farley-williams-llp"
+  :firm/name-en "Watson Farley & Williams (Gaikokuho Kyodo Jigyo Horitsu Jimusho)"
+  :firm/legal500-slug "watson-farley-williams-llp"
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/3483-watson-farley-williams-llp/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "linklaters-llp"
+  :firm/name-en "Linklaters"
+  :firm/legal500-slug "linklaters-llp"
+  :firm/website "https://www.linklaters.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/2086-linklaters-llp/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "one-asia-lawyers"
+  :firm/name-en "One Asia Lawyers"
+  :firm/legal500-slug "one-asia-lawyers"
+  :firm/website "https://oneasia.legal/en"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/275915-one-asia-lawyers/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "dla-piper-llp-us"
+  :firm/name-en "DLA Piper Tokyo Partnership Gaikokuho Kyodojigyo Horitsu Jimusho"
+  :firm/legal500-slug "dla-piper-llp-us"
+  :firm/website "https://www.dlapiper.com/japan"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/908-dla-piper-llp-us/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "hogan-lovells-cadwalader"
+  :firm/name-en "Hogan Lovells Cadwalader"
+  :firm/legal500-slug "hogan-lovells-cadwalader"
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/2116-hogan-lovells-cadwalader/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "latham-watkins"
+  :firm/name-en "Latham & Watkins Gaikokuho Joint Enterprise"
+  :firm/legal500-slug "latham-watkins"
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50571-latham-watkins/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "morgan-lewis-bockius-llp"
+  :firm/name-en "Morgan Lewis & Bockius LLP"
+  :firm/legal500-slug "morgan-lewis-bockius-llp"
+  :firm/website "https://www.morganlewis.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50696-morgan-lewis-bockius-llp/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "orrick-herrington-sutcliffe"
+  :firm/name-en "Orrick, Herrington & Sutcliffe LLP"
+  :firm/legal500-slug "orrick-herrington-sutcliffe"
+  :firm/website "https://www.orrick.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50752-orrick-herrington-sutcliffe/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "quinn-emanuel-urquhart-sullivan-llp"
+  :firm/name-en "Quinn Emanuel Urquhart & Sullivan, LLP"
+  :firm/legal500-slug "quinn-emanuel-urquhart-sullivan-llp"
+  :firm/website "https://www.quinnemanuel.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50811-quinn-emanuel-urquhart-sullivan-llp/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "hiroe-associates"
+  :firm/name-en "Hiroe & Associates"
+  :firm/legal500-slug "hiroe-associates"
+  :firm/website "http://www.hiroe.co.jp"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/32223-hiroe-associates/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "withers-llp"
+  :firm/name-en "Withers Japan"
+  :firm/legal500-slug "withers-llp"
+  :firm/website "https://www.withersworldwide.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/3597-withers-llp/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "kl-gates"
+  :firm/name-en "K&L Gates"
+  :firm/legal500-slug "kl-gates"
+  :firm/website "https://www.klgates.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/52534-kl-gates/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "sidley-austin-llp"
+  :firm/name-en "Sidley Austin Foreign Law Joint Enterprise"
+  :firm/legal500-slug "sidley-austin-llp"
+  :firm/website "https://www.sidley.com"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/50912-sidley-austin-llp/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "greenberg-traurig"
+  :firm/name-en "Greenberg Traurig Tokyo Law Offices"
+  :firm/legal500-slug "greenberg-traurig"
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/51354-greenberg-traurig/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "hiratsuka-co"
+  :firm/name-en "Hiratsuka & Co"
+  :firm/legal500-slug "hiratsuka-co"
+  :firm/website "https://www.legalbusiness.co.uk/category/in-house/"
+  :firm/website-evidence "legal500-profile"
+  :firm/prefecture "東京都"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.legal500.com/firms/31360-hiratsuka-co/c-japan"
+  :source/retrieved "2026-07-29"
+  :source/note "Legal 500 Japan ランキング掲載事務所（日弁連ベースの所属弁護士数ランキングには非掲載）"}
+
+ {:firm/id "ベリーベスト法律事務所"
+  :firm/name-ja "ベリーベスト法律事務所"
+  :firm/website "https://www.vbest.jp/"
+  :firm/website-title "弁護士への法律相談なら｜ベリーベスト法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.vbest.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "アディーレ法律事務所"
+  :firm/name-ja "弁護士法人アディーレ法律事務所"
+  :firm/website "https://www.adire.jp/"
+  :firm/website-title "【公式】過払い金や債務整理・借金返済ならアディーレ法律事務所！弁護士へ無料相談"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.adire.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "STORIA法律事務所"
+  :firm/name-ja "STORIA法律事務所"
+  :firm/website "https://storialaw.jp/"
+  :firm/website-title "知的財産・IT・人工知能（AI）・ウェブビジネスの法律相談なら【STORIA法律事務所】"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://storialaw.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "早稲田リーガルコモンズ法律事務所"
+  :firm/name-ja "早稲田リーガルコモンズ法律事務所"
+  :firm/website "https://legalcommons.jp/"
+  :firm/website-title "早稲田リーガルコモンズ法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://legalcommons.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "関真也法律事務所"
+  :firm/name-ja "関真也法律事務所"
+  :firm/website "https://www.mseki-law.com/"
+  :firm/website-title "関真也法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.mseki-law.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "高井・岡芹法律事務所"
+  :firm/name-ja "高井・岡芹法律事務所"
+  :firm/website "https://www.law-pro.jp/"
+  :firm/website-title "高井・岡芹法律事務所 | 労働問題、人事労務を主とする会社側・使用者側弁護士"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.law-pro.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "ロア・ユナイテッド法律事務所"
+  :firm/name-ja "ロア・ユナイテッド法律事務所"
+  :firm/website "https://roumu.loi.gr.jp/"
+  :firm/website-title "ロア・ユナイテッド法律事務所｜労務サイトロア・ユナイテッド法律事務所｜労務サイト"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://roumu.loi.gr.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "プロコミットパートナーズ法律事務所"
+  :firm/name-ja "プロコミットパートナーズ法律事務所"
+  :firm/website "https://pcpl.jp/"
+  :firm/website-title "プロコミットパートナーズ法律事務所 | スタートアップ・ベンチャー企業に特化した弁護士事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://pcpl.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "中本総合法律事務所"
+  :firm/name-ja "中本総合法律事務所"
+  :firm/website "https://nakamotopartners.com/"
+  :firm/website-title "中本総合法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://nakamotopartners.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "虎ノ門法律経済事務所"
+  :firm/name-ja "虎ノ門法律経済事務所"
+  :firm/website "https://www.t-leo.com/"
+  :firm/website-title "弁護士法人TLEO 虎ノ門法律経済事務所（東京都港区）"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.t-leo.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "桑原法律事務所"
+  :firm/name-ja "桑原法律事務所"
+  :firm/website "https://www.kuwahara-law.com/"
+  :firm/website-title "福岡の弁護士への法律相談 弁護士法人桑原法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.kuwahara-law.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "伊藤海法律事務所"
+  :firm/name-ja "伊藤海法律事務所"
+  :firm/website "https://kai-law.jp/"
+  :firm/website-title "伊藤海法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://kai-law.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "不二法律事務所"
+  :firm/name-ja "不二法律事務所"
+  :firm/website "https://fuji-law.ne.jp/"
+  :firm/website-title "顧問弁護士なら │ 60年の実績 企業法務なら福岡の「不二法律事務所」"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://fuji-law.ne.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "島総合法律事務所"
+  :firm/name-ja "島総合法律事務所"
+  :firm/website "https://www.shimaben.jp/"
+  :firm/website-title "福岡の顧問弁護士/企業法務INFO ｜島総合法律事務所（弁護士 島 晃一）"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.shimaben.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "本江法律事務所"
+  :firm/name-ja "弁護士法人本江法律事務所"
+  :firm/website "https://www.motoe-law.jp/"
+  :firm/website-title "弁護士法人本江法律事務所 - 福岡・天神で企業法務、人事労務に強い弁護士への相談は【本江法律事務所】へ"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.motoe-law.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "いかり法律事務所"
+  :firm/name-ja "弁護士法人いかり法律事務所"
+  :firm/website "https://ikari-komon.com/"
+  :firm/website-title "【福岡】顧問弁護士・企業法務｜弁護士法人いかり法律事務所 - 福岡の顧問弁護士・企業法務なら弁護士法人いかり法律事務所にお任せください。安心してご相談・ご依頼を頂くために、初回30分の無料法律相談を実施しております。顧問弁護士・企業法務をご検討の方は、お気軽にご相談下さい。"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://ikari-komon.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "三木・佐々木法律事務所"
+  :firm/name-ja "三木・佐々木法律事務所"
+  :firm/website "https://www.mikilo.jp/"
+  :firm/website-title "三木・佐々木法律事務所 〔北海道札幌市・札幌弁護士会所属〕"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.mikilo.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "やなだ総合法律事務所"
+  :firm/name-ja "弁護士法人やなだ総合法律事務所"
+  :firm/website "https://yanada-law.jp/"
+  :firm/website-title "弁護士法人やなだ総合法律事務所 | 札幌の弁護士×司法書士×行政書士によるワンストップ法律相談 |"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://yanada-law.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "桶谷法律事務所"
+  :firm/name-ja "桶谷法律事務所"
+  :firm/website "https://www.oketani-law.com/"
+  :firm/website-title "北海道札幌市の弁護士・総合法律事務所 桶谷法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.oketani-law.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "前田尚一法律事務所"
+  :firm/name-ja "前田尚一法律事務所"
+  :firm/website "https://komon-center.com/"
+  :firm/website-title "札幌の企業法務・顧問弁護士【前田尚一法律事務所】"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://komon-center.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "大阪西総合法律事務所"
+  :firm/name-ja "弁護士法人大阪西総合法律事務所"
+  :firm/website "https://www.osakanishi-law.com/"
+  :firm/website-title "弁護士法人大阪西総合法律事務所 | 顧問弁護士・企業法務の専門家集団"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.osakanishi-law.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "グロース法律事務所"
+  :firm/name-ja "グロース法律事務所"
+  :firm/website "https://growth-law.com/"
+  :firm/website-title "大阪・本町の企業法務でのご相談は弁護士まで｜グロース法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://growth-law.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "あつみ法律事務所"
+  :firm/name-ja "あつみ法律事務所"
+  :firm/website "https://atsumi-law.com/"
+  :firm/website-title "あつみ法律事務所 | あつみ法律事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://atsumi-law.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "杉村萬国特許法律事務所"
+  :firm/name-ja "杉村萬国特許法律事務所"
+  :firm/website "https://sugimura.partners/"
+  :firm/website-title "Sugimura and Partners - Your Bridge to IP Connection"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://sugimura.partners/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "アガルート法律会計事務所"
+  :firm/name-ja "アガルート法律会計事務所"
+  :firm/website "https://agaroot-lawacc.com/"
+  :firm/website-title "中小企業の顧問弁護士ならアガルート法律会計事務所"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://agaroot-lawacc.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "ネクスパート法律事務所"
+  :firm/name-ja "弁護士法人ネクスパート法律事務所"
+  :firm/website "https://nexpert-law.com/"
+  :firm/website-title "ネクスパート法律事務所 | コーポレートサイト"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://nexpert-law.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "So&Sato法律事務所（創・佐藤法律事務所）"
+  :firm/name-ja "So&Sato法律事務所（創・佐藤法律事務所）"
+  :firm/website "https://innovationlaw.jp/"
+  :firm/website-title "Home - So & Sato - Innovative Lawyers - Tokyo (Japan)"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://innovationlaw.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "森法律事務所"
+  :firm/name-ja "森法律事務所"
+  :firm/website "https://www.mori-law.jp/"
+  :firm/website-title "森法律事務所［MORI LAW OFFICE］"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.mori-law.jp/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+ {:firm/id "法律事務所MIRAIO"
+  :firm/name-ja "弁護士法人法律事務所MIRAIO"
+  :firm/website "https://www.miraio.com/"
+  :firm/website-title "法律相談なら法律事務所MIRAIO（ミライオ）"
+  :firm/website-evidence "fetched-page-2026-07-29"
+  :source/dataset "jp-law-firms"
+  :source/url "https://www.miraio.com/"
+  :source/retrieved "2026-07-29"
+  :source/note "分野特化ブティック等。所属弁護士数ランキング TOP300 には非掲載のため人数は未取得"}
+
+]
