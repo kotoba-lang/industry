@@ -347,7 +347,8 @@ D4/D5 の `ai-gftd-` prefix 廃止を実行した。**rename のみで、org 移
 | bare name へ rename | 46 | gftdcojp 26 / cloud-itonami 20 |
 | role suffix へ rename | 1 | `ai-gftd-murakumo` -> `murakumo-mlx` |
 | rename せず archive | 2 | `ai-gftd-kotoba` / `ai-gftd-kotobase` |
-| 保留 (裁定待ち) | 2 | `ai-gftd-cyber-drill` / `ai-gftd-kaisya` |
+| 保留 (裁定待ち) | 1 | `ai-gftd-cyber-drill` |
+| 裁定後に archive | 1 | `ai-gftd-kaisya` (2026-07-29) |
 | 既 archive のため据え置き | 3 | `ai-gftd-dogaka` / `ai-gftd-isekai` / `ai-gftd-shinshi` |
 
 rename 47 件は preflight (source が存在し archived でない / target 名が org 内で空き)
@@ -363,11 +364,17 @@ GitHub の repo 名と一致している必要がある):
 | `gftdcojp/ai-gftd-kotobase` | `kotoba-lang/kotobase` | `MOVED.md.edn` が net-kotobase (現 network-awai) への移設を宣言。`wrangler.jsonc` 自身が「not because this is live」と注記 | archive |
 | `gftdcojp/ai-gftd-murakumo` | `kotoba-lang/murakumo` | 中身は `mlx-distributed/` (MLX tensor-parallel 推論) のみ。相手は WASM mesh control plane で**別物** | `murakumo-mlx` へ rename (CLAUDE.md の role suffix 規則) |
 | `gftdcojp/ai-gftd-cyber-drill` | `cloud-itonami/cyber-drill` | **同一プロダクトの二重抽出**。前者は gftdcojp/ai-gftd-apps-gftdcojp 由来で `:runtime/status :blocked-pending-kami-api-port` (実行不能な保存コピー)、後者は etzhayyim/root 由来で three-renderer WebVR + 鍵ゲート worker を持つ**動く方** | 保留 |
-| `cloud-itonami/ai-gftd-kaisya` | `cloud-itonami/kaisya` | **同一プロダクトの二重抽出**。前者は Clojure langgraph runtime (`:standalone-ready`)、後者は etzhayyim/root 由来の BPMN 5 点のみ (`:kind :standalone-app-artifact`) | 保留 |
+| `cloud-itonami/ai-gftd-kaisya` | `cloud-itonami/kaisya` | **同一プロダクトの二重抽出**。前者は Clojure langgraph runtime (`:standalone-ready`)、後者は etzhayyim/root 由来の BPMN 5 点のみ (`:kind :standalone-app-artifact`) | **archive** (2026-07-29 オーナー裁定) |
 
-保留 2 件は mamori と同じ「同名だが実体が違う」ではなく **同じものが 2 系統から抽出されて
+保留にした 2 件は mamori と同じ「同名だが実体が違う」ではなく **同じものが 2 系統から抽出されて
 両方生き残っている**ケースで、どちらが正本かを決めるのは配置ではなく製品の裁定なので
-本 phase では触っていない。role suffix で機械的に逃がすと二重管理を固定化する。
+機械的な role suffix では逃がさなかった (逃がすと二重管理を固定化する)。
+
+**`ai-gftd-kaisya` は 2026-07-29 のオーナー裁定で archive した。** bare name `kaisya` は
+etzhayyim/root 由来の BPMN 側 (`cloud-itonami/kaisya`) が保持する。archive 側にある
+Clojure langgraph runtime (`clj/src/kaisya/{graphs/registry,server}.cljc`) は消えておらず、
+pin `ab9fe84119` から復元できる。west では `groups: [archived]` にして既定取得対象から外した。
+残る保留は `ai-gftd-cyber-drill` 1 件。
 
 既に GitHub archived だった 3 件 (`ai-gftd-dogaka` / `ai-gftd-isekai` /
 `ai-gftd-shinshi`) は rename しなかった。archived repo の rename は
@@ -419,7 +426,7 @@ unarchive -> rename -> 再 archive を要し、**retired identity を書き換�
 5. ~~manimani 3 件の行き先~~ **決定 (2026-07-28): 3 件とも network-awai**
 6. cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断 (Phase 3 では rename のみ実施、判断は未着手)
 7. `gftdcojp/cyber-drill` (旧 ai-gftd-cyber-drill は保留のまま) と `cloud-itonami/cyber-drill` — 同一プロダクトの二重抽出。どちらを正本にするか (前者は実行不能な vendor-private 保存コピー、後者は動く WebVR + worker)
-8. `cloud-itonami/ai-gftd-kaisya` (Clojure runtime) と `cloud-itonami/kaisya` (BPMN 5 点) — 同上"
+8. ~~`cloud-itonami/ai-gftd-kaisya` (Clojure runtime) と `cloud-itonami/kaisya` (BPMN 5 点)~~ **決定 (2026-07-29): `ai-gftd-kaisya` を archive、bare name は BPMN 側が保持**"
 
   :adr/decision-summary
   ["D1: org 判定軸を目的(公益/事業)から起動主体(:repo/kind)へ移す。6 org: kotoba-lang=lib / etzhayyim=organism のみ / cloud-itonami=呼ばれて動く基盤 / gftdcojp=B2B/B2G security service / network-awai=AWAI Network L.L.C. の consumer network(p2p/crypto/blockchain)+adult / com-junkawasaki=cloud+data+個人"
