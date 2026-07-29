@@ -141,8 +141,9 @@ ADR-2607021800 J1 の no-own-token / no-speculative-finance と、ADR-2607995000
      :note \"Decision 5 のとおり token では動かない。step 1/2 が実際の需要側の作業\"}
     {:gap \"etzhayyim charter の改正手続きそのものは本 ADR の範囲外\"
      :note \"本 ADR は token 1点についての解除を記録する。宗教法人側の内部手続きが別に要るなら owner が判断する\"}
-    {:gap \"west pin の破損を1件発見した（本 ADR の作業中の副産物）\"
-     :detail \"kotoba-lang/dynamics の pin が 439d8dec… だが実在するのは 439d8cec…（1文字違い）。fresh checkout は `upload-pack: not our ref` で失敗する。superproject の manifest 側で別途修正\"}]"
+    {:gap \"（訂正）west pin の破損は存在しなかった — agent の誤読\"
+     :detail \"本 ADR の作業中に kotoba-lang/dynamics の pin が壊れていると報告したが誤りだった。manifest は remote・working tree・HEAD のいずれも 439d8cec… で正しく、その commit は実在し main の tip である。実際の原因は orgs/kotoba-lang/dynamics のローカル checkout が 270c884（pin の祖先、12 commits 遅れ）で stale だったことで、`west update` で解消する通常の状態にすぎない。`upload-pack: not our ref` は agent が誤った sha を明示 fetch した結果であって、上流の force-push でも pin の破損でもない\"
+     :lesson \"CLAUDE.md は `upload-pack: not our ref` を『確度の高い force-push の実サイン』と書いているが、それは pin が正しいことを確認した上での話である。sha を1文字読み違えれば同じエラーが出る。壊れていると報告する前に、その sha を GitHub API で引いて存在を確かめる — 今回それを後からやって誤りが判明した。誤報は loop-system-dynamics d0655e77 の commit message にも入っており、そちらは履歴なので訂正できない\"}]"
 
   :adr/body
   "# ADR-2607299900: tradeable token 方針への転換
