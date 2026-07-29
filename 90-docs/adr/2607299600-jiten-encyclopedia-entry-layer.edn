@@ -180,23 +180,53 @@ flat 形では冗長ではない — **最も問い合わせられやすい面�
 - `coverage` に innen の node id や cloud-itonami の repo path を渡せば、
   **他の corpus が既に列挙している世界のうち、この記録がまだ何も言っていない部分**が出る。
 
+## 到達点（2026-07-29 追記）
+
+**corpus は実在し、live な kotobase ref に載っている。**
+
+- `kotoba-lang/loop-jiten`（library ⊣ orchestrator の分割は innen ⊣ loop-innen と同型）を
+  起こし、`corpus/workspace-2026-07-29.edn` に **8 entries / 25 statements / 16 distinct
+  sources / 全て `:documented` / red link 0** を持つ。各 claim は ingest 時に読んだ record
+  から機械的に導出している（west.yml + 参照した superproject commit、GitHub API + 取得日、
+  ADR ファイル本体）。repo の説明文は **accepted ADR の title** であって、seed に人が書いた
+  散文ではない。
+- **`/v1/*` Datomic API は削除されていなかった** — `kotobase-storage-d1` に rename され
+  `https://kotobase-storage-d1.aozora.app` の Custom Domain で本番稼働中（`/health` 200、
+  未認証の `/v1/*` は 401）。本 ADR 初版が引用した「検証用 Worker は事後に削除した」は
+  別 deployment の話で、この面は生きている。
+- **corpus を実際に transact して読み戻した**（2026-07-29）: schema 200 → corpus 200 →
+  read-back query 2 本とも 200、`basis-t 17`。ref は
+  `kotobase/db/did:key:z6MkuXfwpNbfKRXvzDAR8NykTxd8HVu2GHJgLFVvdEkB4rzn/jiten`。
+  認証は self-mint CACAO（ref が signer の DID で namespace されるので、publisher は
+  自分の namespace について自分を authorize する）。
+
+### 実測で見つかった 2 つの欠陥（どちらも「走らせるまで分からなかった」）
+
+1. **`~` は EDN の keyword に使えない。** `jiten.tx/section-id` と `link-id` が component を
+   `~` で連結しており、print はできるが read で落ちる。メモリ上では reader を通らず、
+   datascript.js 経由でも attr は裸文字列なので通らない——**EDN を wire に乗せて初めて露見**し、
+   server 側 reader が body 全体を InvalidDatomicRequest で弾いた（entry だけ 200、
+   section/statement/link が全部 400）。innen の `:node/1973-oil-crisis` と同型の失敗に
+   別経路で到達した。separator を `$` に変更し、`id-readable?` + 全 composed id の
+   round-trip test を回帰ガードとして追加。
+2. **kotobase の Datomic 面は lookup ref を受け付けない。** `[:jiten.entry/id :entry/a]` を
+   含む entity は 400。live worker に対する二分探索で確定。ADR-2607265000 が「互換の主張は
+   文法と文書化された query subset であって tempid 等は含まない」と書いている線の同じ側。
+   `->flat-tx`（ref 無し・keyword id で値 join）なら通る。**one-ref 制約とは別問題**で、
+   こちらは wire 上の shape の問題。
+
 ## 未達（正直に）
 
-- **実データの corpus はゼロ。** ライブラリと contract だけで、sourced な entry は 1 件も
-  無い。テスト fixture は合成であり、そこに実在の主張を入れることは意図的にしていない
-  （通ったテストの中だけに存在する事実は、検証済みに見えて、実際に証明されたのは
-  コードが文字列を受け取ったことだけ）。
-- **`manifest/edn-query.cljs` に jiten loader を追加していない。** 載せるデータが無い段階で
-  loader だけ足しても count が増えないので、corpus が起きた時点で入れる。
-- **kotobase.net の live ref にはまだ何も transact していない。** 射影が datascript.js で
-  動くことは実証したが、`POST /v1/transact` 経由の実 D1 往復は未実施。
-- **UI が無い。** 記事ページ・編集・差分表示・カテゴリは別の層で、`kotoba-uiux` の
-  design-system スタックに載せる。なお `.kotoba` 移行計画（ADR-2607279200 Delivery #6）は
-  「string-only SSR を最終的な抽象にしない」「共有 logical value と両 renderer が
-  qualify してから切り替えを始める」と定めており、レンダリングを今作り込むのは早い。
-- **`loop-jiten`（常駐 ingest）を起こしていない。** 何を収集するか（Wikidata の
-  description を種にするのか、toshokan の書誌からか、workspace の repo からか）が
-  未決なので、決まってから起こす。
+- **人が見られる URL はまだ無い。** `/v1/q` は認証必須（未認証は 401）なので、公開ページには
+  credential を持つ read proxy Worker が要る。未実装。
+- **`manifest/edn-query.cljs` に jiten loader を追加していない。** corpus は起きたので次に
+  入れる価値がある（今は kotobase 側にだけ載っていて superproject の統合面には無い）。
+- **UI は無い。** 記事ページ・編集・差分表示・カテゴリは別層。`.kotoba` 移行計画
+  （ADR-2607279200 Delivery #6）が「string-only SSR を最終的な抽象にしない」と定めており、
+  レンダリングを今作り込むのは早い。
+- **常駐化していない。** `loop-jiten` の cycle は手動実行。launchd / routine 化は未着手。
+- **`innen.tx/edge-id` も `~` を使っている**（同じ潜在バグ）。innen は flat plane 経由でしか
+  射影を出していないため今は顕在化していないが、kotobase に載せた瞬間に同じ 400 になる。
 
 ## Alternatives considered
 
