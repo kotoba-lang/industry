@@ -17,7 +17,8 @@
    "各 repo の verification oracle (何を正解とみなすか) の選び方"
    "実装していない領域 (PoRep/PoSt・BLS12-381・FVM・state・libp2p・署名・transport) の明示"
    "FRC-0042 method number の導出と、それが calldata と message を繋ぐ唯一の経路であること"
-   "signature type ごとに『何に署名するか』が違い、delegated (3) は message CID を覆わないこと"]
+   "signature type ごとに『何に署名するか』が違い、delegated (3) は message CID を覆わないこと"
+   "secp256k1 署名 (f1 経路) を io-filecoin-signer に置き、io-filecoin の src/ には curve を pin しないこと"]
   :adr/supersedes []
   :adr/body
   "## 文脈
@@ -185,6 +186,64 @@ portable な実装が無い)。delegated message の decode・命名・CID 検�
 現在の pin: io-filecoin `b28b628c`、cloud-filecoin `0b039003`。
 assertion 総計 1,240 (JVM / nbb 両方 green)。
 
+## 追補 (2026-07-29 その2): f1 署名経路が閉じた
+
+`io-filecoin-signer` を新設 (kotoba-lang, public, west 登録済み)。
+`io-filecoin` の `src/` に curve を pin しない方針は変えず、seam を埋める側を
+別 repo にした——curve を pin したい呼び出し側が依存を明示的に取る形。
+
+- 前提として `eth-crypto` に **`ecrecover-pubkey`** を追加した (`702293e`)。
+  従来の `ecrecover` は復元した公開鍵をそのまま keccak して 20 byte に落とす
+  ——それが Ethereum address だから。Filecoin の f1 は **65 byte**
+  (`0x04` ‖ X ‖ Y) の BLAKE2b-160 なので、公開鍵そのものに到達できないと
+  curve 演算を各チェーンが書き直すことになる。両 platform に対称に追加し、
+  既存 `ecrecover` はこれを呼ぶだけにした (既存 vector はそのまま)。
+- **`eth-crypto` は別セッションによって全 API dual-platform 化されていた**
+  (`1dca359`: BigInt keccak lane・pure-cljs HMAC-SHA256・modInverse/modPow、
+  さらに EIP-1559 tx 署名)。したがって **「keccak は JVM 専用」という
+  従来の gap 記述は現在無効**。delegated 経路を塞いでいたのは keccak の不在
+  ではなく、lotus が要求する Filecoin↔EthTransaction round-trip の実装。
+
+### Ethereum との差は最後の 1 段だけ
+
+curve も 65 byte の署名も同じ。違うのは 2 箇所で、どちらも間違えても黙る:
+
+| | Ethereum | Filecoin f1 |
+|---|---|---|
+| address | keccak-256(X‖Y)[12:] | BLAKE2b-160(**0x04**‖X‖Y) |
+| digest | payload の keccak-256 | **message CID の** BLAKE2b-256 |
+
+`0x04` を落とすと「誰も鍵を持たない、しかし完全に妥当な f1 address」ができる。
+digest は CID (既に BLAKE2b-256) を**もう一度** hash する——CID に直接署名すると
+長さの正しい、何にも verify しない署名ができる。両方テストがある。
+
+### 検証は recovery で行う (偽装できない向き)
+
+vector は mainnet の実署名。**他人の wallet が、network が受理した message に
+対して作った署名**を recover して `From` に戻るかを見る。この 1 比較で CBOR
+field 順・message CID・2 度目の BLAKE2b-256・ECDSA recovery・`0x04` prefix・
+BLAKE2b-160 を同時に通す。この library が計算した値は比較の入力に入らない。
+
+RFC-6979 で署名は決定的なので、pin した署名 byte は **実装間比較**にもなる
+(`eth-crypto` は nonce を runtime ごとに別実装している)。
+
+### delegated の形は ADR 初版の訂正よりさらに強い
+
+delegated vector で「recover しても From に戻らない」ことを主張しようとしたら、
+**そもそも 65 byte ですらない**ものがあった (実測):
+
+    EIP-1559 (type 2)   r ‖ s ‖ v          65 byte, v ∈ {0,1}
+    legacy EIP-155      0x02 ‖ r ‖ s ‖ v   mainnet で 67 byte。
+                                           v = chainId·2 + 35 = 663 が 2 byte
+                                           必要で、先頭 byte が種別を示す
+
+(`EthLegacy155TxSignaturePrefix`。lotus は `ToVerifiableSignature` で正規化する。)
+両方の形が vector に入っている。したがって `recover-public-key` の長さ検査は
+過剰ではなく正しい。
+
+現在の pin: io-filecoin-signer `0e679827`。assertion 44 (JVM / nbb 両方 green)。
+**ここで署名した message を network に送ったことはまだ無い。**
+
 ## 未達 / 引き継ぎ
 
 - `nbb scripts/gen-west-manifest.cljs --check` は STALE を報告するが、これは
@@ -196,13 +255,12 @@ assertion 総計 1,240 (JVM / nbb 両方 green)。
   `orgs/network-awai/cloud-mamori` consumers=1) で、どちらも dir 不在かつ
   west 未登録。本 ADR の 5 repo は audit に一切現れない。この 2 件の修復は
   skill `git-cleanup-conflict` の担当で、別タスク。
-- **署名器と transport が無い**のは変わらない。ただし経路は 2 つに分かれた:
-  (a) **native 経路** —— f1 送信者・secp256k1・message CID 署名。message の構築は
-  `filecoin.cloud.evm` で完結したので、残るは secp256k1 署名 (`eth-crypto` に
-  あるが `:clj` 専用) と HTTP だけ。
-  (b) **Ethereum 経路** —— f410f 送信者・delegated 署名。RLP + keccak-256 +
-  EIP-1559 tx 構築が要り、**keccak が JVM 専用**なので portable には作れない。
-  先に (a) を完成させるべき。
+- **(a) native 経路 (f1・secp256k1) は署名まで閉じた。** 残るのは
+  **transport だけ**——`IHttp` の実装がどの repo にも無い。
+- **(b) Ethereum 経路 (f410f・delegated) は依然未実装。** keccak が JVM 専用
+  だという以前の記述は誤り (`eth-crypto` は dual-platform 化済み)。実際に
+  足りないのは lotus が要求する Filecoin↔EthTransaction の byte 一致
+  round-trip と、上記 2 種の署名 shape の組み立て。
 - gas と nonce は chain state で、`GasEstimateMessageGas` / `MpoolGetNonce` の
   呼び出しが要る。request body は `filecoin.rpc` にある。
 - calibration に実際に送るには資金のある testnet 鍵が要る (安全床②により agent は
