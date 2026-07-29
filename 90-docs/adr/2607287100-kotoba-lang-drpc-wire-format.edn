@@ -21,9 +21,9 @@
   ["adr-2607287000-kotoba-lang-io-storj-node-protocol-core"
    "adr-2607254100-kotoba-lang-sigv4-shared-signer-and-kotoba-byte-slice"]
   :adr/decision-summary
-  "{:repo \"kotoba-lang/drpc\", :namespaces [drpc.wire drpc.client], :in-scope [:frame-codec :packet-reassembly :split :reader-state-machine :unary-call-sequence :error-decoding], :out-of-scope [:tls :sockets :service-dispatch :code-generation :streaming-calls], :deps [io.github.kotoba-lang/proto], :verification [:storj-drpc-own-output :per-kind-and-per-flag-vectors :two-runtime-parity :negative-controls :live-call-answered-by-storj-drpc], :defect-found-in-dependency :varint-shift-long-overflow}"
+  "{:repo \"kotoba-lang/drpc\", :namespaces [drpc.wire drpc.client drpc.session drpc.server], :in-scope [:frame-codec :packet-reassembly :split :reader-state-machine :unary-call-sequence :error-decoding :call-multiplexing :server-side], :out-of-scope [:tls :sockets :service-dispatch :code-generation :streaming-calls :concurrency], :deps [io.github.kotoba-lang/proto], :verification [:storj-drpc-own-output :per-kind-and-per-flag-vectors :two-runtime-parity :negative-controls :live-call-answered-by-storj-drpc :live-call-from-drpcconn-to-this-server], :defect-found-in-dependency :varint-shift-long-overflow}"
   :adr/artifacts
-  "{:repo \"orgs/kotoba-lang/drpc\", :pin \"fbb8e04626679524948c608d487aed207f3d0c13\", :vector-generator \"orgs/kotoba-lang/drpc/testdata/gen_vectors.go\", :vectors \"orgs/kotoba-lang/drpc/testdata/vectors.edn\", :call-vector \"orgs/kotoba-lang/drpc/testdata/client-vectors.edn (echo_server.go -dump, a real drpcconn over a recording transport)\", :echo-server \"orgs/kotoba-lang/drpc/testdata/echo_server.go (storj.io/drpc, no generated code)\", :proto-fix \"kotoba-lang/proto cd8b83ade7a2 (varint shift cap)\", :evidence {:drpc {:jvm \"33 tests / 180 assertions, 0 failures 0 errors\", :cljs \"nbb — same 33 / 180\", :lint \"clj-kondo clean\", :negative-controls \"wire: kind shift 14 failures, keeping abandoned bytes 1; client: 8/8 including flat message ids, omitted CloseSend, little-endian error code, dropped foreign streams\"}, :proto {:jvm \"11 tests / 67 assertions\", :cljs \"9 tests / 57 assertions\"}}}"
+  "{:repo \"orgs/kotoba-lang/drpc\", :pin \"4147d72032ea530a5da699e7bf635134b7d678f3\", :vector-generator \"orgs/kotoba-lang/drpc/testdata/gen_vectors.go\", :vectors \"orgs/kotoba-lang/drpc/testdata/vectors.edn\", :call-vector \"orgs/kotoba-lang/drpc/testdata/client-vectors.edn (echo_server.go -dump, a real drpcconn over a recording transport)\", :echo-server \"orgs/kotoba-lang/drpc/testdata/echo_server.go (storj.io/drpc, no generated code)\", :proto-fix \"kotoba-lang/proto cd8b83ade7a2 (varint shift cap)\", :evidence {:drpc {:jvm \"62 tests / 256 assertions, 0 failures 0 errors\", :cljs \"nbb — same 62 / 256\", :lint \"clj-kondo clean\", :negative-controls \"wire: kind shift 14 failures, keeping abandoned bytes 1; client: 8/8 including flat message ids, omitted CloseSend, little-endian error code, dropped foreign streams\"}, :proto {:jvm \"11 tests / 67 assertions\", :cljs \"9 tests / 57 assertions\"}}}"
   :adr/body
   "# Context
 
@@ -164,6 +164,45 @@ transport の上で本物の `drpcconn.Conn` を回す**ので、期待値は参
 2. nbb 側の client で `let` の `{:keys [state ...]}` が**同名の外側 atom を隠し**、
    `reset!` に map を渡していた。JVM 側は loop で state を回すので同じ形にならず、
    **片方の runtime だけで出る欠陥**だった。
+
+## 2.6. 多重化とサーバ側（2026-07-29 追加）
+
+### `drpc.session` —— どの packet がどの待機中の呼び出しのものか
+
+stream id は増加のみ（reader が退行を拒否）で `NewClientStream` は last+1。この 2 つから:
+**id は再利用しない**（共有すると互いの答えを受け取り合い、どちらも気付かない）、
+**完了した呼び出しは忘れる**（node の satellite 接続は長寿命なので溜め込みは
+「スタックトレースの無いリーク」）、**待機者のいない stream 宛の packet は捨てず報告する**
+（健全なサーバなら起きない。黙って捨てると「ハングする呼び出し」になる）。
+
+`collect` に 3 引数版（畳み込み）を足したが、**それを外す control が全テストを通過した** ——
+実装ではなくカバレッジの穴で、「同じ stream に完了させない packet → 完了させる packet」を
+誰も検査していなかった。
+
+### `drpc.server` —— client 専用ライブラリでは storage node になれない
+
+uplink は node を **dial する側**。それまでこのライブラリは dial しかできず、
+その上に建つものは「自己紹介はできるが何も訊かれない」状態だった。
+
+サーバは Invoke / Message / CloseSend を認識し、**Message → CloseSend**（または Error）で
+答える。**Close ではない** —— それは client がその stream を終える時に送るもので、
+サーバが送ると「答えを読む前に stream は死んだ」と伝えることになる。
+
+順序が直感と逆なものが 2 つあり、**うち 1 つは逆に実装していた**:
+- **CloseSend が来るまで呼び出しは ready でない**（最初の Message で走るハンドラは、
+  途中までしか聞いていない要求に答える）
+- **`InvokeMetadata` は `Invoke` の *前* に来る**（`doInvoke` がそう書く）。
+  invoke 先行を要求するのは「同じ自明な規則」に見えて、**metadata 付きの実クライアントの
+  呼び出しを全部拒否する**。テストが指摘するまでそう出荷していた。
+
+dispatch は意図的に置かない —— どのハンドラが `/piecestore.Piecestore/Upload` を
+serve するかはアプリケーションの領分で、ここに routing table を置くと
+「packet を読む前に全呼び出し側が登録を強いられる registry」になる。
+
+### 証拠の向きがもう一方向に
+
+**本物の `drpcconn.Conn` が、このライブラリで組んだサーバを呼ぶ**（JVM / nbb 両方、
+エラー経路は参照クライアントが「reply でなく error」として報告することまで確認）。
 
 # Consequences
 
