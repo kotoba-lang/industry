@@ -1,0 +1,218 @@
+[{:db/id -1
+  :adr/id "adr-2607299600-jiten-encyclopedia-entry-layer"
+  :adr/title "ADR-2607299600: kotobase.net の EDN 百科事典は新 DB ではなく記事層 — kotoba-lang/jiten（事典）"
+  :adr/status "accepted"
+  :adr/date "2026-07-29"
+  :adr/last-verified "2026-07-29"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "kotobase-encyclopedia"
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["「kotobase.net に wikipedia のような EDN ベースの DB を作りたい」に対する回答 — 何が既にあり、何を新規に作ったか。"
+   "kotoba-lang/jiten の contract（entry / section / statement / notability / link / revision）と、statement を独立 entity にする射影の理由。"
+   "百科事典を新しい DB / 新しい ref に分けない決定（ADR-260726 の one-ref 規則の適用先として）。"]
+  :adr/related
+  ["90-docs/adr/2607258500-innen-historical-dependency-record.edn"
+   "90-docs/adr/2607265000-kotobase-d1-datomic-edn-api.edn"
+   "90-docs/adr/260726-kotobase-query-plane-is-one-ref.edn"
+   "90-docs/adr/2607252600-kawaraban-queryable-datom-archive-world-outlet-coverage.edn"
+   "90-docs/adr/2607252000-unified-query-plane-cross-repo-company-join.edn"
+   "90-docs/adr/2607299000-repository-rules-workspace-authority.edn"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/body
+  "# ADR-2607299600: 百科事典は新 DB ではなく記事層
+
+**Status**: accepted
+**Date**: 2026-07-29
+**Deciders**: Jun Kawasaki (+ Claude)
+
+## Context
+
+オーナーの問い（2026-07-29）は「kotobase.net に wikipedia のようなデータベースを edn ベースで
+作りたいが、そういったものは既にあるか」だった。実測した結果、**土台とコンテンツは既にあり、
+記事層だけが無かった**:
+
+1. **DB エンジンはある** — `kotoba-lang/kotobase*` 17 repo（ADR-2607265000）。`kotobase.datomic`
+   が Datomic の EDN 文法・引数順をそのまま公開し、wire も `application/edn`。
+   `POST /v1/transact|q|pull|datoms|fold|view|tx-range` / `GET /v1/head|ref|basis`。
+   **`:as-of` / `:since` / `:history true` を受けるので、版管理・差分・「3か月前の版」は
+   実装不要**。storage provider は D1 / Postgres / S3-R2 / IPFS / SQLite / git から選べる。
+2. **知識グラフはある** — `kotoba-lang/innen`（ADR-2607258500）。Wikidata から実 ingest した
+   1,330 entity。出典必須の fail-closed、時間区間・BCE 対応、confidence 4 段階。
+3. **コンテンツ corpus は複数ある** — kawaraban（記事 2,712）/ ooyake（公人 1,046）/
+   kouhou（政府公報 53 法域）/ toshokan（国立図書館カタログ・特許 618）/ market-intel
+   （SEC EDGAR）/ cloud-itonami-lei（法人実体 185）/ CommonCrawl datom log。
+   統合クエリ面（`manifest/edn-query.cljs`）は本日実測 **104,137 entity**。
+4. **無かったもの** — 記事本文の schema、人が読み書きする単位、notability の可否判定、
+   claim と citation の対応。
+
+つまり「EDN ベースの DB を作る」は既に済んでおり、必要なのは**その上の記事層**だけだった。
+
+## Decision
+
+### 1. 新しい DB を起こさない。`kotoba-lang/jiten`（事典）を **library** として起こす
+
+`manifest/repository-rules.edn` の `:name-prefix` taxonomy（ADR-2607299000）に従い、
+prefix 無し = library。third-party dep ゼロの portable `.cljc`。storage も rendering も
+持たない。`innen` ⊣ `loop-innen` と同じ分割で、ingest を常駐化する段階になったら
+`loop-jiten` を別に起こす（今回は起こさない — 収集する対象がまだ決まっていない）。
+
+### 2. 単位は「散文のページ」ではなく「出典を持つ statement の列」
+
+Wikipedia の単位は散文のページで、citation は**慣習として**後付けされる。慣習を強制するのは
+他の人間で、事後で、むらがある。
+
+jiten の entry の body は section の vector、section は **statement の vector**、そして
+`:jiten.statement/source` の無い statement は warning ではなく `:error` で、
+`jiten.core/corpus` はそれを含む corpus の構築を**拒否する**。出典の無い散文が
+「非推奨」ではなく**表現不可能**になる。`innen.schema` が依存エッジに対して行ったのと
+同じ操作で、理由も同じ — もっともらしいだけの主張は、言語モデルが何も無いところから
+生成できる典型だから。
+
+ここから残りが導かれる:
+
+- **`sources` が記録を逆から引ける** — 撤回・誤りが判明した citation を与えると、
+  見直すべき claim が正確に返る。ページの山に対してはこれはスクレイピング課題になる。
+- **`diff` が `:jiten.statement/id` で比較する** — レビュアーが見るのは
+  「この claim の citation が変わった」であって、整形し直された散文の行 diff ではない。
+  百科事典が実際に起こす劣化はこれ: **claim と citation を一緒に消す人はいない。
+  claim を編集して citation が合わなくなる。**
+- **`:jiten.entry/abstract` を作らない** — lead 段落は、百科事典で最も確実に
+  「誰も出典を付けなかった主張」が溜まる場所である。要約に見えて主張だから。
+  lead は他と同じ section にする。
+- **subject を rating / rank / score / verdict する属性を1つも作らない** —
+  kawaraban `schema/news.edn` の慣習（G ゲートは属性の不在で表す）に従う。未定義属性は
+  Datomic が `:db.error/not-an-entity` で拒否し、DataScript も解決できない。
+  したがって「書けるが false」ではなく**書けない**。
+
+### 3. notability は議論ではなくデータ
+
+Wikipedia は「記事に値するか」を talk page の議論で決める。つまり答えが query から
+利用できず、時間とともに安定しない。jiten は basis を宣言させ、各 basis に機械検査可能な
+条件を持たせる:
+
+| basis | 条件 |
+|---|---|
+| `:independent-sources` | 出典 2 件以上、かつ同じ citation の二重計上を拒否 |
+| `:registry` | 主体が registry id（LEI / QID / 特許番号 / repo path）を持つ = 存在自体は争点でない |
+| `:workspace` | この workspace の entity。確立する record を `:note` に名指しさせる |
+
+`:disambiguation` / `:index` は notability 免除。**対称的に、statement を持てない。**
+navigational entry が存在するのは「題名が曖昧」という corpus についての事実であって、
+世界についての主張ではないから。
+
+### 4. red link は warning。alien link は error
+
+存在しない entry への link は `:warn` で、決して `:error` にしない。それは百科事典が
+「自分に何が欠けているか」を述べる方法であり、fatal にすると書き手は全部 stub を作るか
+相互参照をやめるかになる。どちらも欠落より悪い。`jiten.core/frontier` はその欠落を
+「既にいくつの entry が指しているか」で順位付ける — 記録が自分の次の仕事を提案する
+（`innen.algo/frontier` と同じ発想）。
+
+一方、entry-id keyword ですらない link 先は `:error`。それは欠落ではなく打ち間違いだから。
+
+### 5. 版管理は kotobase の仕事。`jiten.revision` は編集の意味論だけ持つ
+
+kotobase が既に `:as-of` / `:since` / `:history true` を答えるので、過去版は query であって
+このライブラリが保守するデータ構造ではない。ここで再実装すれば、本物と食い違いうる
+2つ目の劣った歴史ができる。残るのは kotobase が供給できない編集上の部分だけ:
+**誰が**（DID = 認証に使った identity）**なぜ**（空でない reason — 誰も書かなかった編集
+要約は、どの wiki の履歴ページも大半がそれで、数年後のレビューを不可能にする）
+**どの basis に対して**（`:basis-cid`。同時編集と逐次編集を区別できる）**何が**
+（statement 粒度）。
+
+### 6. 射影は entity 3 種、**1 ref**
+
+entry / section / **statement** をそれぞれ entity にする。statement が独自の identity・
+出典・confidence を持つことが、「この citation はどの claim を支えているか」
+「主張のうち何割が estimate か」を Datalog にする。section を（statement への
+denormalize ではなく）entity にするのは、**書き手が開けて空のままにした section を
+往復で失わないため** — 消えると「その話題は検討された」という記録が黙って落ちる。
+
+**すべて同じ kotobase ref に置く。** ADR-260726 のとおり `kotobase.core/open` は
+`:ref-name` を1つしか取らず、join はちょうど ref 1本までしか届かない。書き込み負荷を
+理由に statement を別 DB に切ると、この射影がそう作られている理由の大半である
+source query が引けなくなる。
+
+`:company/lei` と `:innen.node/wikidata` は **verbatim** で持つ（`jiten` 名前空間に
+改名しない）。entry が market-intel / cloud-itonami-lei / innen に無変換で join するために
+そこにあるので、改名はその唯一の理由を壊す。`innen.tx` が `:company/lei` に対して
+同じ選択を同じ理由でしている。
+
+## 実測結果（2026-07-29）
+
+**テスト**: `nbb --classpath \"src:test\" test/run_tests.cljs` → **57 tests / 145 assertions、
+0 failures / 0 errors**。fixture は合成（`:entry/a` / `\"Test org A\"` / 出典 `\"fixture\"`）。
+
+**E2E スモーク**: flat 射影を **npm datascript に実際にロードして Datalog を実行**した
+（superproject root、`nbb --classpath \"orgs/kotoba-lang/jiten/src\"`）。合成 corpus 2 entry →
+11 entity。5 クエリすべてが期待どおり行を返した:
+
+| | query | 結果 |
+|---|---|---|
+| Q1 | `SRC-REGISTRY` を引用している claim | 2 件（撤回時に見直す対象が正確に出る） |
+| Q2 | entry → `:company/lei` → subject | 1 行（market-intel と同じ属性で join できる） |
+| Q3 | confidence 別 claim 数 | documented 3 / attested 1 |
+| Q4 | red link | `entry/acme -> entry/not-written-yet` の 1 件のみ |
+| Q5 | section 見出しと順序 | Lead@0 / Operations@1（空 section も残る） |
+
+**このスモークが設計欠陥を1つ見つけた。** 最初の実装では red link 判定を
+`:jiten.link/to` ref の不在で表していたが、**flat 射影は `de-ref` で ref を全部落とす**ので、
+Q4 が resolved な link まで red と報告した（`entry/acme -> entry/widget` が誤って出た）。
+`:jiten.link/resolved?` を明示 boolean として追加して修正。relational 形では冗長だが
+flat 形では冗長ではない — **最も問い合わせられやすい面で「何が欠けているか」が
+答えられなくなる**ところだった。読んでいるだけでは見つからず、走らせて見つかった。
+
+## Consequences
+
+- kotobase.net 上の百科事典は「新しい DB」ではなく、既存 ref に載る **entity 3 種 +
+  link + revision** になった。版管理・認証（CACAO）・storage provider 選択・履歴 query は
+  すべて既存のものがそのまま効く。
+- entry は `:jiten.entry/subject`（= `:innen.node/id`）で innen の依存グラフに、
+  `:company/lei` で SEC 財務と法人実体に、無変換で join する。**「Walmart の依存構造と
+  財務規模と記事本文」が 1 query になる**（innen が 66 社で実証した join の延長）。
+- **多言語が最初から join されている。** Wikipedia は言語ごとに別の百科事典を持ち、
+  事後に Wikidata で突き合わせる。ここでは `:jiten.entry/subject` が最初から join key
+  なので、2言語が食い違っていることは query 結果であって未発見の fork ではない。
+- `coverage` に innen の node id や cloud-itonami の repo path を渡せば、
+  **他の corpus が既に列挙している世界のうち、この記録がまだ何も言っていない部分**が出る。
+
+## 未達（正直に）
+
+- **実データの corpus はゼロ。** ライブラリと contract だけで、sourced な entry は 1 件も
+  無い。テスト fixture は合成であり、そこに実在の主張を入れることは意図的にしていない
+  （通ったテストの中だけに存在する事実は、検証済みに見えて、実際に証明されたのは
+  コードが文字列を受け取ったことだけ）。
+- **`manifest/edn-query.cljs` に jiten loader を追加していない。** 載せるデータが無い段階で
+  loader だけ足しても count が増えないので、corpus が起きた時点で入れる。
+- **kotobase.net の live ref にはまだ何も transact していない。** 射影が datascript.js で
+  動くことは実証したが、`POST /v1/transact` 経由の実 D1 往復は未実施。
+- **UI が無い。** 記事ページ・編集・差分表示・カテゴリは別の層で、`kotoba-uiux` の
+  design-system スタックに載せる。なお `.kotoba` 移行計画（ADR-2607279200 Delivery #6）は
+  「string-only SSR を最終的な抽象にしない」「共有 logical value と両 renderer が
+  qualify してから切り替えを始める」と定めており、レンダリングを今作り込むのは早い。
+- **`loop-jiten`（常駐 ingest）を起こしていない。** 何を収集するか（Wikidata の
+  description を種にするのか、toshokan の書誌からか、workspace の repo からか）が
+  未決なので、決まってから起こす。
+
+## Alternatives considered
+
+- **kotobase とは別に百科事典専用の DB を立てる** — 却下。ADR-260726 のとおり join は
+  ref 1本までしか届かない。別 DB にすると記事が innen / market-intel / kawaraban の
+  どれとも join できなくなり、この記録を作る理由がほぼ全部消える。
+- **`innen` に記事属性を足す** — 却下。innen の contract は「entity 間の依存エッジ」で、
+  記事は別の意味論（notability・言語・section 順序・編集者・red link）を要する。
+  `dynamics` ⊣ `loop-system-dynamics`、`innen` ⊣ `loop-innen` と同じ役割分離に従い
+  library を新設した。語彙（confidence・topic-kind の先頭10種）と join key
+  （`:company/lei` / `:innen.node/wikidata`）は共有する。
+- **body を Markdown 文字列 1本にする** — 却下。それをやると statement 粒度の diff も
+  source の逆引きも不可能になり、citation は再び「慣習として付いているもの」に戻る。
+  この repo が存在する理由がそれ。
+- **kawaraban の `:news.*` schema を流用する** — 却下。kawaraban は「その日その URL が
+  実際に返した記事のミラー」で、G11 により `:original` が存在しない（自分では書かない）。
+  百科事典は逆に、複数の出典を突き合わせて**書く**ことが仕事。両者は同じ ref に同居して
+  join できればよく、schema を共有する必要はない。
+"}]
