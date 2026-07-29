@@ -67,7 +67,7 @@ audit / order。**バイトは一切動かさない**（小さい値を取り小
 - **配置ハッシュだけは注入にできない。** client / coordinator / auditor が独立に
   同じ node set を計算できないとネットワークに「どこに何があるか」の共通了解が
   無くなる。よって 32bit 演算で固定し、`.kotoba` 移植を等価性 gate で拘束した
-  （3 実装が一致: `key32 "pg-0" = 3505442236`）。32bit なのは compile 経路に
+  （3 実装が一致: `key32` of `pg-0` = 3505442236）。32bit なのは compile 経路に
   `i32-wrapping-mul` はあっても 64bit wrapping multiply が無く、64bit mixer は
   overflow で trap するため。
 
