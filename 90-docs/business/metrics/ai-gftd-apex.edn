@@ -1,24 +1,25 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6349, "ai-gftd-chat-shell" 3},
+ {"magatama-sh1n5h1x" 6363, "ai-gftd-chat-shell" 4},
  :zone
- {:requests-7d 499727,
-  :pageviews-7d 15577,
-  :uniques-7d-sum 4995,
+ {:requests-7d 503007,
+  :pageviews-7d 15600,
+  :uniques-7d-sum 5025,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/k.php", :requests 35}
-   {:path "//wp-includes/assets/", :requests 30}
-   {:path "/4PJcpMFsD8B.php", :requests 22}
-   {:path "//wp-admin/js/index.php", :requests 20}
-   {:path "/favicon.ico", :requests 20}
-   {:path "/zz.php", :requests 19}
-   {:path "/0okj.php", :requests 19}
-   {:path "/wordpress/", :requests 18}],
-  :status-mix {:client-error 1365, :server-error 15444, :ok 903},
+  [{:path "/k.php", :requests 41}
+   {:path "//wp-includes/assets/", :requests 28}
+   {:path "/4PJcpMFsD8B.php", :requests 23}
+   {:path "/favicon.ico", :requests 23}
+   {:path "/xstelth.php", :requests 22}
+   {:path "/v1/generation/jobs/c2153fbd255a44a4bce063eec2753b6c",
+    :requests 22}
+   {:path "/wp-content/themes/index.php", :requests 20}
+   {:path "//wp-admin/js/index.php", :requests 20}],
+  :status-mix {:client-error 1442, :server-error 15477, :ok 925},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,8 +33,8 @@
  :as-of "2026-07-29",
  :traffic-quality {:window "24h", :probe-4xx-pct 8, :error-5xx-pct 87},
  :top-paths
- "上位 page (24h, 2xx/3xx): /k.php 35 · //wp-includes/assets/ 30 · /4PJcpMFsD8B.php 22 · //wp-admin/js/index.php 20 · /favicon.ico 20 | 4xx(probe) 8% · 5xx 87%",
+ "上位 page (24h, 2xx/3xx): /k.php 41 · //wp-includes/assets/ 28 · /4PJcpMFsD8B.php 23 · /favicon.ico 23 · /xstelth.php 22 | 4xx(probe) 8% · 5xx 87%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 499727 req/7d・4995 uniques(日次和)・うち4xx probe 8%(24h)、workers 6352 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 503007 req/7d・5025 uniques(日次和)・うち4xx probe 8%(24h)、workers 6367 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
