@@ -15,7 +15,9 @@
   ["Filecoin を扱う repo の分割 (client / node / onchain-cloud) と、それぞれの reverse-domain 名"
    "org-ietf-blake2 と org-ethereum-abi を独立 repo に切り出した判断とその根拠"
    "各 repo の verification oracle (何を正解とみなすか) の選び方"
-   "実装していない領域 (PoRep/PoSt・BLS12-381・FVM・state・libp2p・署名・transport) の明示"]
+   "実装していない領域 (PoRep/PoSt・BLS12-381・FVM・state・libp2p・署名・transport) の明示"
+   "FRC-0042 method number の導出と、それが calldata と message を繋ぐ唯一の経路であること"
+   "signature type ごとに『何に署名するか』が違い、delegated (3) は message CID を覆わないこと"]
   :adr/supersedes []
   :adr/body
   "## 文脈
@@ -136,6 +138,53 @@ selector 31 件をドキュメントから書いたところ **15 件が誤り**
   `Response.json()` はこれを拒否するので、chain vector generator は CI で
   回らないまま静かに壊れていた。最初の 1 行だけを parse するよう修正。
 
+## 追補 (2026-07-29): calldata と message が繋がった / delegated の訂正
+
+初版の時点では **cloud-filecoin の calldata と io-filecoin の message が
+繋がっていなかった**。FEVM 呼び出しに要る method number をどの repo も
+持っておらず、`filecoin.message` は `:method 0` 既定のままだった
+(io-filecoin 自身の mainnet vector 10 件のうち 3 件が method 3844450837、
+3 件が 1900091594 を使っているのに)。これを埋めた。
+
+### `filecoin.method` — FRC-0042
+
+    digest = BLAKE2b-512(\"1|\" ‖ name)
+    4 byte ずつ big-endian で読み、最初に 2^24 以上になった値を返す
+
+2^24 未満を**捨てて次の 4 byte に進む retry** が要る (その帯域は built-in
+actor の逐次番号のもの)。省いても 256 回に 255 回は正しい —— テストを通って
+から一年後に 1 個だけ間違える形の近道。
+
+vector に載っている mainnet の FRC-0042 番号は**両方とも名前から再導出できた**:
+`InvokeEVM` → 3844450837、`SettleDealPayments` → 1900091594 (To=f05 の 3 件が
+これ)。入力は文字列、出力は network が field に入れた値なので、自己一致では
+通せない。
+
+### `filecoin.cloud.evm` — calldata → message
+
+FEVM contract は f410f を持つ普通の Filecoin actor なので、呼び出しは普通の
+Filecoin message でよい (Ethereum transaction も RLP も keccak も要らない):
+`to` = contract の f410f、`method` = InvokeContract、`params` = **calldata を
+CBOR byte string で包んだもの**。包み忘れ・0x 形式のまま・sender の取り違えは
+いずれも「well-formed だが違う動作をする message」を作る。
+
+### 訂正: delegated (type 3) は message CID に署名しない
+
+初版 (`8e6a753`) の README と `filecoin.signature` は、delegated が
+secp256k1 と同じ「CID に署名する」規則に従うと読める書き方をしていた。
+**誤り。** lotus の `AuthenticateMessage` は message から EthTransaction を
+再構成し、往復が byte 一致することを要求した上で、**RLP encode された未署名
+Ethereum transaction** を keccak-256 hash したものに対して署名を検証する
+(送信者は f410f ‖ keccak256(pubkey)[12:] として復元)。CID は関与しない。
+
+したがって `signing-bytes` は type 1 / 2 専用で、**type 3 の署名 payload は
+この repo では作れない** (RLP も keccak-256 も無く、keccak には workspace 内に
+portable な実装が無い)。delegated message の decode・命名・CID 検証は従来どおり
+動く。3 つの規則を「1 つの規則の変種」として書かず、並べて書き直した。
+
+現在の pin: io-filecoin `b28b628c`、cloud-filecoin `0b039003`。
+assertion 総計 1,240 (JVM / nbb 両方 green)。
+
 ## 未達 / 引き継ぎ
 
 - `nbb scripts/gen-west-manifest.cljs --check` は STALE を報告するが、これは
@@ -147,9 +196,18 @@ selector 31 件をドキュメントから書いたところ **15 件が誤り**
   `orgs/network-awai/cloud-mamori` consumers=1) で、どちらも dir 不在かつ
   west 未登録。本 ADR の 5 repo は audit に一切現れない。この 2 件の修復は
   skill `git-cleanup-conflict` の担当で、別タスク。
-- `cloud-filecoin` は署名も transport も持たないので、実際に動く client に
-  するには `base-l2` の `rpc` + `eth-crypto` の署名を繋ぐ必要がある。
-  `eth-crypto` は EIP-1559 (type-2) tx をまだ署名できない (legacy EIP-155 のみ)。"
+- **署名器と transport が無い**のは変わらない。ただし経路は 2 つに分かれた:
+  (a) **native 経路** —— f1 送信者・secp256k1・message CID 署名。message の構築は
+  `filecoin.cloud.evm` で完結したので、残るは secp256k1 署名 (`eth-crypto` に
+  あるが `:clj` 専用) と HTTP だけ。
+  (b) **Ethereum 経路** —— f410f 送信者・delegated 署名。RLP + keccak-256 +
+  EIP-1559 tx 構築が要り、**keccak が JVM 専用**なので portable には作れない。
+  先に (a) を完成させるべき。
+- gas と nonce は chain state で、`GasEstimateMessageGas` / `MpoolGetNonce` の
+  呼び出しが要る。request body は `filecoin.rpc` にある。
+- calibration に実際に送るには資金のある testnet 鍵が要る (安全床②により agent は
+  資金操作をしない)。署名の正しさは sign → ecrecover → address 一致で検証できるので、
+  送信なしでもそこまでは詰められる。"
 
   :adr/consequences
   ["Filecoin を触るコードは 3 repo のどれかに属し、どこに置くかは client / node / onchain-cloud の境界で決まる"
