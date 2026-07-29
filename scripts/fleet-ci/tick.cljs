@@ -209,6 +209,17 @@
         url (get-in west [:remotes remote])]
     (when url (last (str/split url #"[:/]")))))
 
+(defn gate-id
+  "gates.edn entry の識別子。既定は :name（= repo 名）だが、**1 つの repo に
+  複数の gate を載せたいときは :id を明示する**。:name は org / tip 解決に使う
+  repo 名のままにしておく必要があるので、識別子を分ける。
+
+  これが無いと 2 つ目の entry が (a) state の [:repos <name>] を共有して
+  tip 変化検出を奪い合い (b) gate-name が `test-<name>-<sha7>-murakumo-<host>`
+  で衝突して checks map で潰し合う。superproject は不変条件が増えていく対象
+  なので、1 gate/repo の制約はここで外しておく。"
+  [r] (or (:id r) (:name r)))
+
 (defn replace-revision
   "west.yml の当該 entry の revision 行だけを差し替える（最小 diff）。
   entry が見つからない / revision 行が無い場合は nil（呼び出し側で fail）。"
@@ -850,10 +861,14 @@
         only (when (:only opts) (set (map str/trim (str/split (str (:only opts)) #","))))
         west (parse-west (gh-raw (:repo landing) (:branch landing) (:west landing)))
         repos (cond->> (:repos cfg)
-                only (filter #(contains? only (:name %))))
+                only (filter #(or (contains? only (:name %))
+                                  (contains? only (gate-id %)))))
         ;; 各 repo の tip（fresh）と west pin
         work (vec (for [r repos
                         :let [nm (:name r)
+                              ;; :id は「1 repo に複数 gate」を許すための識別子で、
+                              ;; :name は repo 名のまま（org / tip 解決に使う）。
+                              id (gate-id r)
                               ;; org は west.yml の remote から引くのが既定（drift 防止）。
                               ;; superproject 自身は west project ではないので引けない —
                               ;; そういう対象だけ gates.edn に :org を明示する。
@@ -861,8 +876,9 @@
                               org-repo (str org "/" nm)
                               tip (when org (gh-tip org-repo))
                               pin (get-in west [:projects nm :revision])
-                              last-sha (get-in @state [:repos nm :sha])]]
+                              last-sha (get-in @state [:repos id :sha])]]
                     (assoc r :org org :org-repo org-repo :tip tip :pin pin
+                           :id id
                            :last-sha last-sha
                            :changed? (and tip (not= tip last-sha)))))
         missing (filter #(nil? (:tip %)) work)
@@ -913,14 +929,14 @@
                                          (ship-git-deps! (get-in w [:node :host]) dtxt))))
                                  body (when (:script w)
                                         (str (fs/readFileSync (path/join here (:script w)) "utf8")))
-                                 sfile (path/join tmp (str "gate-" (:name w) ".bash-stdin"))
+                                 sfile (path/join tmp (str "gate-" (:id w) ".bash-stdin"))
                                  _ (fs/writeFileSync sfile (gate-script w (:node w) (:tip w) body))
-                                 gname (str "test-" (:name w) "-" (sha7 (:tip w))
+                                 gname (str "test-" (:id w) "-" (sha7 (:tip w))
                                             "-murakumo-" (get-in w [:node :host]))]
                              (assoc w :tarball tgz :script-file sfile :gate-name gname
                                     :cmd (gate-command {:tarball tgz :script-file sfile
                                                         :host (get-in w [:node :host])
-                                                        :name (:name w) :sha (:tip w)
+                                                        :name (:id w) :sha (:tip w)
                                                         ;; gate のノード側出力をここに残す
                                                         ;; （verdict の grep 対象 + 失敗時の調査用）
                                                         :out-file (path/join tmp (str "gate-" (:name w) ".out"))})))))
@@ -973,7 +989,7 @@
                           (swap! results conj (assoc w :outcome oc :cid (:cid receipt)
                                                      :detail det))
                           (when-not dry?
-                            (swap! state assoc-in [:repos (:name w)]
+                            (swap! state assoc-in [:repos (:id w)]
                                    {:sha (:tip w) :outcome oc :cid (:cid receipt) :at (now)})
                             (save-state!)))))))))))
         ;; ---- Radicle: 落ちたものだけ issue を開く

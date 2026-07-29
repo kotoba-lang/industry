@@ -44,17 +44,17 @@ jobs:
       - run: npm ci
         working-directory: root
 
-      - name: Check out stack-tier repositories
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir repos
-          for repo in kotoba compiler kotoba-kir artifact kgraph grammar kotoba-wasm kotoba-native \
-                      kotoba-component kotoba-verifier tender-native provider \
-                      provider-postgres fleet kotoba-core-contracts kotoba-lang \
-                      security codebase mesh provider-transport tender-component; do
-            gh repo clone "kotoba-lang/$repo" "repos/$repo"
-          done
+      # Runs the SAME gate script the murakumo fleet runs, which in turn calls
+      # the same verifier. Two implementations of one invariant would let a
+      # check pass on one path and fail on the other without anyone noticing.
+      #
+      # It reads its target list from manifest/repository-rules.edn
+      # :checked-repos and fetches the two files per repo from raw
+      # (all public, no token), so this job no longer clones 21 repositories
+      # and no longer carries a second copy of the list.
+      - name: Verify declarations, real dependencies, direction, and cycles
+        run: npx nbb scripts/fleet-ci/gates/repository-roles-check.cljs . --min 20
+        working-directory: root
 
       # Laid out as orgs/<org>/<repo> so --prefix-audit can resolve the west
       # manifest paths and tell "no declaration" apart from "checkout absent".
@@ -67,21 +67,6 @@ jobs:
                       skill-loop-system-dynamics action-loop-system-dynamics; do
             gh repo clone "kotoba-lang/$repo" "ws/orgs/kotoba-lang/$repo"
           done
-
-      - name: Verify declarations, real dependencies, direction, and cycles
-        run: |
-          npx nbb scripts/verify-repository-roles.cljs \
-            ../repos/kotoba ../repos/compiler ../repos/kotoba-kir \
-            ../repos/artifact ../repos/kgraph ../repos/grammar \
-            ../repos/kotoba-wasm ../repos/kotoba-native ../repos/kotoba-component \
-            ../repos/kotoba-verifier ../repos/tender-native ../repos/provider \
-            ../repos/provider-postgres ../repos/fleet \
-            ../repos/kotoba-core-contracts ../repos/kotoba-lang ../repos/security \
-            ../repos/codebase ../repos/mesh ../repos/provider-transport \
-            ../repos/tender-component \
-            ../ws/orgs/kotoba-lang/loop-ux-kaizen \
-            ../ws/orgs/kotoba-lang/loop-system-dynamics
-        working-directory: root
 
       # Reports which prefix-carrying repos declare a contract and which do not.
       # Known gaps are recorded in manifest/repository-rules.edn :gaps, so this

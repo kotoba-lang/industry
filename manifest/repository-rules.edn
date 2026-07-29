@@ -91,6 +91,21 @@
     :instead "short domain name, or a role suffix when the short name is taken"
     :examples ["kami-engine-guest" "kami-mangaka-scene-author"]}]}
 
+ ;; The repositories whose declarations are verified against this authority.
+ ;; Listed here rather than hardcoded in each consumer: the GitHub workflow and
+ ;; the fleet-ci gate previously would each have carried their own copy, which
+ ;; is exactly the drift that let five repos go unchecked (ADR-2607299000).
+ ;; All are public, so a verifier may fetch their two files without any token.
+ :checked-repos
+ [{:org "kotoba-lang" :vocabulary :stack-tier
+   :names ["kotoba" "compiler" "kotoba-kir" "artifact" "kgraph" "grammar"
+           "kotoba-wasm" "kotoba-native" "kotoba-component" "kotoba-verifier"
+           "tender-native" "provider" "provider-postgres" "fleet"
+           "kotoba-core-contracts" "kotoba-lang" "security" "codebase" "mesh"
+           "provider-transport" "tender-component"]}
+  {:org "kotoba-lang" :vocabulary :name-prefix
+   :names ["loop-ux-kaizen" "loop-system-dynamics"]}]
+
  ;; Responsibility edges that exist in production but are not permitted by
  ;; :vocabulary/allowed-role-edges. An entry here does NOT bless the edge — it
  ;; makes it visible and dated. The verifier prints EXCEPTION for each and keeps
