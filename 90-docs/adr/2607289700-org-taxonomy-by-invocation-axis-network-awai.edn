@@ -276,8 +276,8 @@ behind_by=0` かつ default branch (main) の tip** であることを GitHub AP
 D3 の当初リストに入れていたが、移送前の実体確認 (ローカル checkout が 0 file だったため
 GitHub 側を直接確認) で **`com-etzhayyim-app-deai` である**ことが判明した:
 
-- `README.edn`: `:name "com-etzhayyim-app-deai"` /
-  `:source "etzhayyim/root/60-apps/etzhayyim-project-deai"`
+- `README.edn`: `:name \"com-etzhayyim-app-deai\"` /
+  `:source \"etzhayyim/root/60-apps/etzhayyim-project-deai\"`
 - `CLAUDE.md`: `decom.etzhayyim.ai` — Spirit-in-Physics 研究データ収集フロントエンド。
   **主目的は研究データ収集**で、出会い・マッチング機能は参加インセンティブ。
   全データは spirit-in-physics.com (研究 SSoT) に送信される
@@ -336,7 +336,63 @@ live でないと確認できた時点で削除してよい。
 `cloud-mamori` は被害者インテークであることが分かる名前へ改名する。
 どちらも security 面なので org は gftdcojp のまま。**この改名はオーナー裁定待ち。**
 
-### Phase 3-4 — 未着手
+### Phase 3 — 完了 (2026-07-28、main commit は下記)
+
+D4/D5 の `ai-gftd-` prefix 廃止を実行した。**rename のみで、org 移動と retire 判断は
+していない** (D5 が要求する blueprint 起票 / retire の individual 判断は未決 6 のまま)。
+対象は west 登録されていた 54 entry。
+
+| 処置 | 件数 | 内訳 |
+|---|---:|---|
+| bare name へ rename | 46 | gftdcojp 26 / cloud-itonami 20 |
+| role suffix へ rename | 1 | `ai-gftd-murakumo` -> `murakumo-mlx` |
+| rename せず archive | 2 | `ai-gftd-kotoba` / `ai-gftd-kotobase` |
+| 保留 (裁定待ち) | 2 | `ai-gftd-cyber-drill` / `ai-gftd-kaisya` |
+| 既 archive のため据え置き | 3 | `ai-gftd-dogaka` / `ai-gftd-isekai` / `ai-gftd-shinshi` |
+
+rename 47 件は preflight (source が存在し archived でない / target 名が org 内で空き)
+を全件通してから実行し、47/47 成功した。GitHub は rename 後も旧名の redirect を保つ。
+
+**bare name が既に他 repo に取られていた 5 件**を先に判定した (west の `name:` は
+manifest 全体で一意でなければならず、`remote` + `name` から url を組むため
+GitHub の repo 名と一致している必要がある):
+
+| 対象 | 衝突相手 | 実体判定 | 処置 |
+|---|---|---|---|
+| `gftdcojp/ai-gftd-kotoba` | `kotoba-lang/kotoba` | README が「submodule link を切った、別 clone を使え」と述べるだけの **pointer stub、code 0 file** | archive |
+| `gftdcojp/ai-gftd-kotobase` | `kotoba-lang/kotobase` | `MOVED.md.edn` が net-kotobase (現 network-awai) への移設を宣言。`wrangler.jsonc` 自身が「not because this is live」と注記 | archive |
+| `gftdcojp/ai-gftd-murakumo` | `kotoba-lang/murakumo` | 中身は `mlx-distributed/` (MLX tensor-parallel 推論) のみ。相手は WASM mesh control plane で**別物** | `murakumo-mlx` へ rename (CLAUDE.md の role suffix 規則) |
+| `gftdcojp/ai-gftd-cyber-drill` | `cloud-itonami/cyber-drill` | **同一プロダクトの二重抽出**。前者は gftdcojp/ai-gftd-apps-gftdcojp 由来で `:runtime/status :blocked-pending-kami-api-port` (実行不能な保存コピー)、後者は etzhayyim/root 由来で three-renderer WebVR + 鍵ゲート worker を持つ**動く方** | 保留 |
+| `cloud-itonami/ai-gftd-kaisya` | `cloud-itonami/kaisya` | **同一プロダクトの二重抽出**。前者は Clojure langgraph runtime (`:standalone-ready`)、後者は etzhayyim/root 由来の BPMN 5 点のみ (`:kind :standalone-app-artifact`) | 保留 |
+
+保留 2 件は mamori と同じ「同名だが実体が違う」ではなく **同じものが 2 系統から抽出されて
+両方生き残っている**ケースで、どちらが正本かを決めるのは配置ではなく製品の裁定なので
+本 phase では触っていない。role suffix で機械的に逃がすと二重管理を固定化する。
+
+既に GitHub archived だった 3 件 (`ai-gftd-dogaka` / `ai-gftd-isekai` /
+`ai-gftd-shinshi`) は rename しなかった。archived repo の rename は
+unarchive -> rename -> 再 archive を要し、**retired identity を書き換える実益がない**。
+結果として `ai-gftd-` を名前に残す repo は 7 件 (archived 5 + 保留 2) になる。
+
+検証 (すべて実測):
+- **west.yml の revision multiset が編集前と完全一致** = pin 変更 0 件。旧 path の
+  revision が新 path にそのまま乗っていることも 1 件ずつ突き合わせ済み
+- project 数 **3832 で不変**、west `name:` の重複 0、rename で新たに生じた
+  dup basename 0 (生成器が org-basename 形に化ける条件に触れていない)
+- `manifest/repos.edn` の `:path-overrides` 108 -> 155 (+47)、`:archived` 10 -> 12 (+2)
+- `gen-west-manifest.cljs --check` は STALE のままだが、**その drift は本変更由来ではない**。
+  生成器出力との diff は origin/main 時点で 308 行あり、本変更後は **195 行に減った**
+  (prefix 除去で dup basename 判定が解消したため)。差分行に本 phase の 47+3 entry は
+  **1 件も現れない**ことを機械確認済み。既存 drift は ADR-2607289600 D9 の記録どおり
+
+**副次修正**: Phase 3a で書いた `ai-gftd-deai` 節に**エスケープしていない二重引用符が
+4 個**混入しており、本 ADR の EDN が `Invalid symbol` でパースできなくなっていた
+(CLAUDE.md が `tos.journal.edn` の事例で警告している破損と同型 — ローダは黙って nil に
+潰すので count 上は気付けない)。本 commit で escape を修正し、`edn/read-string` が
+通ることを確認した。同時に Phase 3a で付け忘れていた `ai-gftd-isekai` の
+`userdata: archived: true` も補った (archived entry の canonical form)。
+
+### Phase 4 — 未着手
 
 ## Consequences
 
@@ -357,11 +413,13 @@ live でないと確認できた時点で削除してよい。
 
 1. ~~`ai-gftd-isekai` と `network-isekai` の責任分界~~ **決定 (2026-07-28): 別物と確認。著作物を network-isekai へ移送し ai-gftd-isekai は archive**
 2. `ai-gftd-ghosthacker-shiropico` と `ghosthacker-shiropico-assets` の統合
-3. ~~`cloud-mamori` と `ai-gftd-mamori` の統合~~ **統合しない (2026-07-28、別プロダクトと判明)**。代わりに両者の改名がオーナー裁定待ち — 上記「mamori は統合しない」節を参照
+3. ~~`cloud-mamori` と `ai-gftd-mamori` の統合~~ **統合しない (2026-07-28、別プロダクトと判明)**。`ai-gftd-mamori` は Phase 3 で bare name `mamori` へ rename 済み。**`cloud-mamori` の改名 (被害者インテークと分かる名前へ) はオーナー裁定待ち**
 4. ~~`jk-corp` の行き先~~ **決定 (2026-07-28): jk-luxury に残置**
 4b. ~~`ai-gftd-deai` の行き先~~ **決定 (2026-07-28): network-awai/`deai`**
 5. ~~manimani 3 件の行き先~~ **決定 (2026-07-28): 3 件とも network-awai**
-6. cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断"
+6. cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断 (Phase 3 では rename のみ実施、判断は未着手)
+7. `gftdcojp/cyber-drill` (旧 ai-gftd-cyber-drill は保留のまま) と `cloud-itonami/cyber-drill` — 同一プロダクトの二重抽出。どちらを正本にするか (前者は実行不能な vendor-private 保存コピー、後者は動く WebVR + worker)
+8. `cloud-itonami/ai-gftd-kaisya` (Clojure runtime) と `cloud-itonami/kaisya` (BPMN 5 点) — 同上"
 
   :adr/decision-summary
   ["D1: org 判定軸を目的(公益/事業)から起動主体(:repo/kind)へ移す。6 org: kotoba-lang=lib / etzhayyim=organism のみ / cloud-itonami=呼ばれて動く基盤 / gftdcojp=B2B/B2G security service / network-awai=AWAI Network L.L.C. の consumer network(p2p/crypto/blockchain)+adult / com-junkawasaki=cloud+data+個人"
