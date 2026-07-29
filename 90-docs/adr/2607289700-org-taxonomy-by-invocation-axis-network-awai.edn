@@ -385,7 +385,13 @@ GitHub の repo 名と一致している必要がある):
 既に GitHub archived だった 3 件 (`ai-gftd-dogaka` / `ai-gftd-isekai` /
 `ai-gftd-shinshi`) は rename しなかった。archived repo の rename は
 unarchive -> rename -> 再 archive を要し、**retired identity を書き換える実益がない**。
-結果として `ai-gftd-` を名前に残す repo は 7 件 (archived 5 + 保留 2) になる。
+
+このうち `ai-gftd-dogaka` と `ai-gftd-shinshi` は **GitHub 上は archived なのに west 側が
+`groups: [gftdcojp]` のままで既定取得対象に残っていた**ので 2026-07-29 に整合させた
+(`groups: [archived]` + `userdata: archived: true`、pin は据え置き)。
+
+結果として `ai-gftd-` を名前に残す repo は 7 件で、**7 件すべてが GitHub archived かつ
+west `groups: [archived]`** になった。稼働中で `ai-gftd-` を名乗る repo は 0 件。
 
 検証 (すべて実測):
 - **west.yml の revision multiset が編集前と完全一致** = pin 変更 0 件。旧 path の
