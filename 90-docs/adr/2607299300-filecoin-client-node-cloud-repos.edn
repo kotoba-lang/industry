@@ -405,22 +405,7 @@ differential probe。**CI では走らせない** (公開 endpoint 依存・非 
   受理されることも実証した** (上記 differential probe)。**残るのは資金のある
   account での実送信だけ**——gas / nonce の扱いはまだ「議論した」段階で、
   それには資金のある testnet 鍵が要る (安全床②により agent は資金操作をしない)。
-- ~~**(b) Ethereum 経路 (f410f・delegated) は依然未実装。**~~ **2026-07-29 実装済み**
-  (`filecoin.signer.eth`、io-filecoin-signer `7adb018f`)。EIP-1559 (type 2) のみ。
-  calibration に対する three-way differential で検証: 正しい message は
-  `Actor not found` まで到達 (= AuthenticateMessage を完全通過)、署名を1 bit
-  壊すと `Could not recover public key`、method を変えると
-  `failed to reconstruct` —— round-trip 検査と署名検査の**両方が生きていて、
-  かつ我々のものは通っている**ことを node 自身が言っている。資金は動かない
-  (送信元 account は存在したことがなく、balance を先に読んで 0 でなければ
-  push しない)。実装時に見つけた罠: RLP は **priority fee → max fee** の順
-  (message とは逆)・RLP 整数は minimal (0 は空 byte string)・input が空なら
-  params も空 (CBOR 空ではない)・`filecoin.address` は `:calibration` を知らない
-  (address 面では testnet、chain id 面では 314159)・**eth-crypto の cljs RLP は
-  byte string と list を JS 型で区別する** (JS array = byte string、cljs vector
-  = list)。最後のものは JVM では原理的に起きない。
-
-  旧記述: keccak が JVM 専用
+- **(b) Ethereum 経路 (f410f・delegated) は依然未実装。** keccak が JVM 専用
   だという以前の記述は誤り (`eth-crypto` は dual-platform 化済みで、RLP と
   EIP-1559 署名も持つ)。実際に足りないのは lotus が要求する
   Filecoin↔EthTransaction の byte 一致 round-trip と、上記 2 種の署名 shape の
@@ -432,8 +417,35 @@ differential probe。**CI では走らせない** (公開 endpoint 依存・非 
    それには資金のある testnet 鍵が要る (安全床②)。gas / nonce の扱いは
    offline テストと live の `GasEstimateMessageGas` までは通っている。
 2. **delegated / FEVM sender 経路** — 実装可能になったが未着手。
-3. **BLS12-381** — workspace 全体に実装が無い。f3 account の署名、block
-   signature 検証、`bls-aggregate` 検証がすべて不可。単体で最大の欠落。
+3. ~~**BLS12-381**~~ **2026-07-29 検証面を実装** (`filecoin.signer.bls`、
+   io-filecoin-signer `87fe0c9b`)。**暗号は一切自作していない** —— pairing 演算は
+   `@noble/curves`(監査済み・pure JS)から取り、この repo が持つのは Filecoin 固有の
+   部分だけ: DST・どの群に何が乗るか・公開鍵の出どころ。
+
+   signature 96 byte G2 / public key 48 byte G1 /
+   DST `BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_`。末尾 `NUL_` は **basic
+   scheme** で、noble の既定は `POP_` —— hash-to-curve の domain が違うので
+   **全ての署名が「理由の分からないまま」不一致になる**。同じ aggregate を `POP_`
+   で検証して通らないことを assert するテストを置いた。
+
+   **f3 address は公開鍵そのもの**(48 byte を hash せず payload に載せる)なので、
+   block の `BLSAggregate` を **chain state 無しで**検証できる。実際に mainnet の
+   実 block で検証が通った —— message CID・address→鍵の取り出し・DST・G1/G2 の
+   配置・aggregate scheme が**同時に**正しくないと通らない。negative も置いた
+   (message を1つ落とす / 1つ改変する / secp256k1 の二重 hash digest を使う、
+   いずれも false)。
+
+   なお **壊れた aggregate は false ではなく throw する** —— bit を反転すると曲線上の
+   点ですらなくなるため。例外を transport 障害として扱う caller は改竄 block を
+   取り違える。これも独立したテストにしてある。
+
+   **ClojureScript 専用。** pure-Java の BLS12-381 は無く、JVM 側の選択肢は blst の
+   JNI binding で native library と platform を pin することになる。`:clj` 側は
+   操作名を添えて throw する。CLAUDE.md の runtime 優先順位 (cljs > JVM) とも整合。
+   assertion 数が JVM 123 / nbb 126 と**意図的に食い違う**唯一の repo。
+
+   **未実装**: BLS *署名*(この family で f3 署名を作る必要がまだ無い)、
+   および f0 送信者の鍵解決 (`StateAccountKey` が要る)。
 4. **state / FVM / HAMT / AMT** — `parent-state-root` は header に入れて読み
    出せる CID であって、その先は読めない。
 5. **証明生成** (PDP の Merkle path)、event log decode、provider HTTP API。
