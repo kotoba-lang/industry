@@ -14,7 +14,7 @@
                 "adr-2607256000-murakumo-task-plane-distributed-execution"],
   :adr/supersedes [],
   :adr/superseded_by [],
-  :adr/repos ["com-junkawasaki/root" "etzhayyim/com-etzhayyim-yabai" "etzhayyim/tamaki"],
+  :adr/repos ["com-junkawasaki/root" "cloud-itonami/yabai-actor" "etzhayyim/tamaki"],
   :adr/authoritative true,
   :adr/authoritative_for ["ドメインのフィッシング判定が常駐している実体（LaunchAgent com.etzhayyim.yabai.ct-watch-tick + tamaki exec）"
                           "決定論 tick を tamaki loop ではなく tamaki exec で表現する区別"
@@ -195,14 +195,118 @@ suffix 一致が広すぎて subdomain 偽装を飲み込まないことを、�
 （`3450f00..674fa52` を GitHub へ、`tamaki exec` 経由で
 `:mode :external :status :succeeded`）。100 tests / 13509 assertions green。
 
+## 2026-07-29（続き）— 「測っていた数値」が測っていなかったものを直した
+
+**repo が移動した**: `etzhayyim/com-etzhayyim-yabai` → **`cloud-itonami/yabai-actor`**
+（別セッションの作業）。west path も `orgs/cloud-itonami/yabai-actor` に変わった。
+本 ADR 中の旧 path 表記はこの新 path に読み替えること。
+
+### fitness function が最大の欠陥を見られなかった（ADR-0005 を改訂）
+
+既存 5 次元はすべて **自分の山**（brand 数・累積 domain 数・ASN 数）を測っており、
+**watch がレースに負けていること自体を表現できなかった**。実測: 6 cursor が head から
+**29,206,861 entries 遅れ**、消費は **1,998 entries/時**、argon2026h2 の head だけで
+私が 333 取る間に約 230 万進む。山は確かに育つので、全次元がそれを「前進」と読んだ
+（score 508/1000、実カバレッジは発行量の 0.1% 台）。**動かすべきものを動かしても
+動かない指標は、指標が無いより悪い**——それを最適化する agent は永久に同じ細流を
+汲み続ける。
+
+`:issuance-coverage`（消費レート ÷ 発行レート、weight 0.25 で brand-coverage と同率
+最重）を追加し、`:observation-volume` を 0.20 → 0.10 に半減（最も甘く最も情報量が
+少ない項）。tick が `:history`（epoch-ms・head・cursor、96 sample ≈ 4 日）を書くので
+**scoring 時に時計を読まない**（timestamp はデータ）。
+嘘をつきうる 2 経路は塞いでテストで固定した: **測れない時は nil を返し 0 でも 1 でもない**
+（score は次元を落として重みを再正規化し `:maturity/incomplete` と
+`:maturity/scored-out-of` を報告する。0 は新規 clone を罰し、1 は「未測定」を「満点」に
+化けさせる）／**head が止まったら nil**（死んだ upstream を達成カバレッジに見せない）。
+
+### 消費が少なかった真因は fleet ではなく定数だった
+
+`collect-names!` が **64 リクエスト固定 guard** を持ち、argon は 1 応答 ≈ 32 entries を
+返すので、`--entries` が何であれ **1 shard ≈ 2,019 entries で打ち止め**だった
+（4096 要求 → 2019 を実測）。外からは「予算を使い切った」と「guard を使い切った」が
+同一に見えるため、誰も報告しなかった。guard をリクエスト比例（32 + n/16）にし、
+`:stopped`（`:budget`/`:request-cap`/`:log-stalled`）と `:behind` を報告させた。
+併せて **6 shard を並行実行**（log 間のみ並行、log 内は逐次＝1 事業者あたり同時 1 request）。
+共有 cursor は `update-state!` が **lock 内で読み直して**書く——read-once/write-whole-map
+のままなら最後に終わった shard が他 5 本の cursor を 1 時間巻き戻していた。
+
+実測: 36,000 entries の live tick が **wall 278s、全 shard `:stopped :budget`**、
+129 entries/秒（従来の実効 0.55/秒）。常駐 tick を 36,000/時に引き上げ済み（**18 倍**）。
+
+### 正規化が「誰も書いていないブランド」を作っていた
+
+`:contains` が label 境界を越えて一致していた。`<hex>.sni.cloudflaressl` は
+`snicloudflaressl` に正規化され、**dot を消したせいでだけ** `icloud` を含む。CT で最も
+ありふれた名前の一群が毎 tick 全部通過していた。`:contains` は **1 つの dot-label 内**で
+brand が生き残る場合のみに限定した（`mast-crade` のための hyphen 除去は維持）。
+
+**この欠陥は前日すでに見つけており、テストに「MEASURED COST」として固定していた** —
+説明を書き、価格として受け入れていた。価格ではなかった。**欠陥について丁寧な注記を
+書くことと、欠陥だと認識することは別物**で、注記があるぶん「意図的」に見えて 36k tick
+の物量が問題を突きつけるまで生き延びた。当該テストは今は逆を主張し、理由を書いている。
+
+### fan-out は「実行されたことが一度も無い」プレビューだった
+
+`--plan` が吐く task の `:cmd` は `cd <ローカル repo-root> && bb -cp src` ——このラップトップ
+にだけ在り、どの fleet node にも無い path。**接触した瞬間に失敗する batch のプレビュー**
+だったので、ADR-0004 以来一度も実行されていなかった。
+
+`--fanout` を実装した（`rsync src/ → node` → **node 上で純粋 prefilter まで実行** →
+候補だけ返す → ローカルで DNS/scoring/fold）。**firehose は node に留まる**のが設計の要で、
+実測 22,000 entries が node 上で 47,470 SAN 名を処理し、帰ってきたのは 167 名だけ。
+`--slots 1`（1 node あたり同時 1 request）は tuning ではなく設計制約——CT log は公共財で、
+ここを throughput 問題として扱う誘惑に対する明示的な歯止め。
+
+初版が `{:ok true, :attempts 0}`（**1 task も配置していない fan-out を成功と報告**）を
+返した——`task run` は cwd 基準で fleet.edn を解決する。`sh*` に作業ディレクトリを持たせ、
+`:ok` を `(pos? succeeded)` にし、失敗時は murakumo の stderr を判定と一緒に返すようにした。
+
+実測 fan-out（1 コマンド・10 node）: wall 393s / 12 task / 14 attempt / 12 成功 / 2 再試行、
+22,000 entries、167 候補 → 154 解決。前回の手動 fan-out は 11 confirmed / 24 candidate を
+産み、`facebook-account-login-*.{org,net}.ph` クラスタと `instagram-followers-*` 群という
+**常駐 tick が数時間到達しない slice からの実検出**だった。
+
+### fleet 実容量の回復と path 追随
+
+`bb` が naphtali / dan / issachar に**未インストール**だった（PATH ではなく実体が無い）。
+brew で導入し、joseph は一時的 SSH timeout だった。**利用可能 node 8 → 11**
+（xavier は fleet.edn 既知の未解決 host）。
+
+**silent divergence を 1 件未然に潰した**: repo 移動後も常駐 tick は旧 path に書いていた。
+`west update` すれば **新 path に 2 つ目の checkout ができて静かに分岐**し、tick は片方に、
+west/CI/新規 clone は他方を読む状態になっていた。GitHub の redirect が push を通し続ける
+ぶん、誰も気づかない類の破損。`YABAI_ROOT`・runner 既定・未設置の heartbeat plist を
+新 path に追随させ、west pin を `64cb11c → 858d038`（pure ff、単一行 diff）に前進させた。
+
+### 検証
+
+`110–112 tests / 14,029–17,599 assertions green`（変更ごとに実行）。live 検証は
+36,000-entry tick（exit 0、GitHub push 成功）と 1 コマンド fan-out（exit 0）。
+
 **次の一手（優先順）**:
-1. **radicle**: オーナーの `rad auth` 待ち（上記）。それまで両プレーン成長は片肺。
-2. `actors/yabai-phishing-watch.edn` は supervisor から見えており
-   `{:spawn 1 :desired 1}` だが **まだ run を spawn していない**。
-   `bin/tamaki actor status actors/yabai-phishing-watch.edn` から確認する。
-3. maturity の最大の重りは log-coverage / observation-volume。
-   shard あたり 333 entries は 6 分割の結果なので、`YABAI_CT_ENTRIES` を上げる
-   （env が実際に効くようになったので、今度は本当に反映される）。
+1. **radicle — オーナー作業待ち（唯一の human blocker）**。鍵が ssh-agent に無く
+   rad main が GitHub から遅れ続けている。この identity（alias `junkawasaki`,
+   `z6MkpPKis…`）の passphrase は kagi にも Keychain にも無い（安全床①により agent は
+   推測も入力もしない）。`rad auth` 実行 → kagi `personal/radicle-junkawasaki-passphrase`
+   に保存、で解ける。
+2. **`:issuance-coverage` はまだ未測定**（shard あたり history 1 sample、rate には 2 必要）。
+   次の hourly tick で自動的に測定可能になる。**そこで初めて score が全 weight で出る** —
+   それまでの数値は `:maturity/incomplete` 付きの暫定値として読むこと。
+   この次元は**下がる方向に効くはず**（実カバレッジは 1% 未満）なので、
+   score が下がっても退行ではない。
+3. **orphan checkout `orgs/etzhayyim/com-etzhayyim-yabai`** が残っている（west 管理外）。
+   in-flight tick のデータが push 済みであることを確認してから `git-cleanup-conflict` で
+   retire する。**消す前に確認すること** — 常駐 tick が最後に書いた先はここ。
+4. `actors/yabai-phishing-watch.edn` は `{:spawn 1 :desired 1 :running 0}` のまま
+   **一度も run を spawn していない**。「AI agent が自律的に成熟度を上げる」の自律側は
+   依然として仮説で、ここまでの改善はすべて人手（私）による。
+5. 残る coverage の重り: brand roster 25/50・CT log 6/12。
+   なお **log を増やすと `:issuance-coverage` は下がる**（発行量の分母が増える）——
+   これは指標の欠陥ではなく、正直な会計。
+
+**参考: `cloud-itonami/yabai-actor` は public**（2026-07-29 確認）。私は visibility を
+変更していない。脅威インテル corpus が world-readable である事実として記録する。
 
 ## Consequences
 
