@@ -35,8 +35,43 @@
 
 ## 実装状況（2026-07-29）
 
-**実装順序 1 の `kotoba-lang/erasure` は着地済み**（https://github.com/kotoba-lang/erasure、
-pin `6b6b95eb`、west 登録済み）。§1 の符号パラメータは**推定ではなく実測で確定した**:
+**実装順序 1・2 が着地済み。**
+
+| # | repo | pin | 検証 |
+|---|---|---|---|
+| 1 | [`kotoba-lang/erasure`](https://github.com/kotoba-lang/erasure) | `6b6b95eb` | lint 0 / JVM 27 tests 859 assertions / CLJS 20 tests 241 assertions |
+| 2 | [`kotoba-lang/kura`](https://github.com/kotoba-lang/kura) | `d2485630` | lint 0 / JVM 53 tests 542 assertions / CLJS 48 tests 196 assertions |
+
+`kura` が所有するのは §0 の表どおり 5 面 — placement / manifest / repair /
+audit / order。**バイトは一切動かさない**（小さい値を取り小さい値を返す判断のみ。
+ディスクと socket は `kura-node`、coordinator loop は `kura-bugyo`）。
+
+実装して確定した点:
+
+- **§3 の PG 設計は成立する。** object→PG は関数（台帳に持たない）、PG→node set は
+  rendezvous hashing の表。node 追加/離脱時、変化する各グループの変化量は
+  **ちょうど 1 node**（テストで確認）。「攪乱が小さい」は*変化するグループ数*では
+  なく*各グループの変化量*の性質で、26/37 を選ぶ構成では約 70% のグループが変化
+  するのが理論値どおりの正常動作。
+- **failure-domain 上限は score に優先する。** 上限下で埋まらないグループは
+  **underfill として報告**し、黙って埋めない（上限を緩めるか write を拒否するかは
+  呼び手の判断で、判断が発生していること自体を知らせる必要がある）。
+  `repair/policy-headroom` が「上限 > 符号の耐性」を検出する — これが §1 の倍率が
+  仮定で切り捨てている相関故障そのもの。
+- **§7 の Range GET 増幅率 1.0 はテストで固定した。** systematic な data shard を
+  直接読む構成の帰結であって LRC の功績ではない、という帰属もコードで表現している
+  （読み出しは `:hedge-group` を返す — 直接読みが単一 node 依存になる代償の緩和）。
+- **§2 の監査数値を訂正**: `ceil(ln(0.001)/ln(0.99))` は 687.32 の切り上げで
+  **688**（本 ADR は当初 687 と書いた — 切り捨て誤り）。44 MiB/round・
+  年 528 MiB = 10 TB node の容量の 0.005%・月次フルスクラブ比 99.9996% 削減は不変。
+- **配置ハッシュだけは注入にできない。** client / coordinator / auditor が独立に
+  同じ node set を計算できないとネットワークに「どこに何があるか」の共通了解が
+  無くなる。よって 32bit 演算で固定し、`.kotoba` 移植を等価性 gate で拘束した
+  （3 実装が一致: `key32 "pg-0" = 3505442236`）。32bit なのは compile 経路に
+  `i32-wrapping-mul` はあっても 64bit wrapping multiply が無く、64bit mixer は
+  overflow で trap するため。
+
+§1 の符号パラメータは**推定ではなく実測で確定した**:
 
 ```text
 k=16 r=4 g=6 (n=26) 全数探索
@@ -188,7 +223,7 @@ proof-of-retrievability か、経済的担保 + 予測不能な challenge であ
 `q = ln(delta)/ln(1-f)`:
 
 ```text
-f = 1%,   delta = 1e-3  ->  q = 687 challenge
+f = 1%,   delta = 1e-3  ->  q = 688 challenge
 1 challenge = 64 KiB leaf + 約 640 B の Merkle 経路
 1 監査ラウンド = 約 44 MiB / node
 
@@ -449,9 +484,10 @@ on-chain 継続証明とは別物である。cold archive の公開証明性が�
    GF(2^8) 0x11D/alpha=2 -> Cauchy 生成行列 -> LRC 構成 -> ランクベース復元計画
    .kotoba 判断層 + 等価性 parity gate。最小距離は全数探索で d=8 と確定
 
-2. kotoba-lang/kura（契約 + 判断）
-   object manifest schema / PG 配置関数 / repair 判断 / audit challenge
-   / order admission（storj.node.orders の形を踏襲）
+2. [DONE 2026-07-29] kotoba-lang/kura — pin d2485630、west 登録済み
+   placement (PG + rendezvous + failure-domain 上限) / manifest (Range GET) /
+   repair (grace + margin) / audit (sampling + merkle-sum) / order (admission)
+   .kotoba 配置演算 + 等価性 parity gate
 
 3. kotoba-lang/kura-node（機構）
    kura-node 契約の裏に B2 / R2 / S3 / io-storj を pseudo-node として実装
