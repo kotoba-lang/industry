@@ -628,7 +628,95 @@ CLAUDE.md の actor パターンが governor を要求する actuation そのも
 (HSM / actor ごとの永続鍵) ではない。docstring に明記されているが、tier-2/tier-3 の封緘が
 本物だと誤認しないこと。実鍵への配線は governor と同じタイミングで潰すのが自然。
 
-### Phase 4 本体 — 未着手 (ADR-2607261601 Phase 1-3、392 repo)
+### Phase 4 本体 — 完了 (2026-07-29)。ADR-2607261601 の Phase 1-4 を実行しきった
+
+監査コーパス 612 entity のうち **stay/stay-authority を除く 394 件**が移送対象。実行後の
+到達点は **389 移送済み / 4 retired-in-place / 1 保留** で、etzhayyim は **353 -> 235 repo**
+になった (監査の目標 stay + stay-authority = 218)。
+
+| 監査の移送先 | 件数 | 実際の到達先 |
+|---|---:|---|
+| cloud-itonami | 220 | cloud-itonami 220 (うち 13 は `-actor` 化、下記) |
+| kotoba-lang | 108 | kotoba-lang 104 / etzhayyim 4 (archived tombstone 3 + `signal` 保留) |
+| gftdcojp | 64 | **cloud-itonami 58 / gftdcojp 6** |
+| gftdcojp-or-stay | 1 | cloud-itonami (`tsumugu`) |
+| delete | 1 | archived (`com-etzhayyim-business_manager`) |
+
+**gftdcojp 64 件のうち 58 件は cloud-itonami に着いていた** (本セッション以前の作業)。監査は
+gftdcojp を指していたが、中身は `ec` / `casino` / `eigyo` / `contentengine` / `auto-sales-erp`
+等の事業アプリで、**D1 の gftdcojp = B2B/B2G security service には当たらない**。D1 に照らすと
+cloud-itonami (呼ばれて動く基盤) が正しいので、実態を追認し 58 件を動かし直さない。
+ADR-2607261601 が Phase 4 の前提としていた `kotoba-boundaries.edn` 更新は、
+「移送のためのゲート」ではなく**移送後の実態反映**として本 commit で実施した。
+
+#### 15 件は「did:web actor シェル」という単一のクラスだった — `-actor` で解いた
+
+bare name が移送先で埋まっていた 13 件 (cloud-itonami) + `i18n` / `os` (kotoba-lang) を
+個別に開けたところ、**全 15 件が同じ形**だった:
+
+```
+.well-known/did.json          <- did:web:etzhayyim.github.io:com-etzhayyim-<name>
+actor-manifest.jsonld         <- capabilities / convoSystemPrompt / aozora.app 登録
+src/<name>/murakumo.cljc      <- murakumo を呼ぶだけの 1 モジュール
+.nojekyll                     <- GitHub Pages 配信を想定
+```
+
+一方 bare name を持っている側は **実装本体** (appview / clj runtime / PROJECT.jsonld)。
+つまり衝突は「同名の別物」ではなく **実装 (bare name) と DID シェル (役割違い)** の並びの
+問題で、CLAUDE.md の role-suffix 規則と cloud-itonami の既存慣習 (`animeka-actor` /
+`dougaka-actor` / `gftd-audio-actor` / `swachh-actor`) にそのまま当たる。15 件を
+`<name>-actor` として移送した。**サイズで判断しかけたのは誤りだった** — etzhayyim 側が
+大きい例 (`tsukuru` 1258KB vs 51KB) もあるが、それは資産であって役割ではない。
+
+#### 実測: これらの did:web は移送前から解決していない
+
+移送で DID を壊していないかを、**移送していない対照群**で確認した:
+
+| URL | HTTP |
+|---|---|
+| `etzhayyim.github.io/com-etzhayyim-hc/.well-known/did.json` (未移送) | 404 |
+| `etzhayyim.github.io/com-etzhayyim-vin/.well-known/did.json` (未移送) | 404 |
+| `etzhayyim.github.io/` (org root) | 404 |
+| `<name>.etzhayyim.com` (DNS) | 解決しない |
+
+**etzhayyim org は GitHub Pages を 1 つも持っていない**ので、
+`did:web:etzhayyim.github.io:com-etzhayyim-*` は最初から解決していなかった。移送で壊した
+ものは無い。この DID 層は休眠状態であり、D7 の organism 再判定 (前節) が
+「organism registry はプロダクト単位で etzhayyim repo とは別軸」と結論したことと整合する。
+
+#### `credits` の pin 違反を解消した (子リポの main を進めた)
+
+`credits` の pin `57c47033ac` は未 merge branch `engi-r1-r6` の先端で default branch から
+到達できず、repoint すると pin 検証に落ちた。**移送前から origin/main にあった既存の違反**
+だが、pin 検証は変更 entry だけを見るため露見していなかった。実測すると main tip は
+PR #3 merge (2026-07-23T02:56)、branch tip はその 54 分後で 17 commit 先行・0 behind、
+open PR 無し — つまり PR を出し忘れたまま west だけが branch を pin し続けていた。
+pin を main tip に戻すと 17 commit を退行させるので、逆に **`engi-r1-r6` を main へ
+サーバ側 merge した** (`0071aeee3f`)。これで pin は default branch から到達可能になった。
+
+#### `signal` 1 件だけ保留
+
+`etzhayyim/com-etzhayyim-signal` は **TypeScript の Signal Protocol 実装**
+(`src/signal.ts` / `src/transport.ts`)。移送先の `kotoba-lang/signal` は
+「X3DH + Double Ratchet + sender-keys group ratchet の CLJC 再実装」で、Rust crate 撤去
+(kotoba PR #259) の後継として canonical。MIGRATION.edn が別プロジェクトとして参照する
+`com-etzhayyim-org-signal` は既に存在しない (404)。**同じ能力の並行実装をどちらに寄せるかは
+配置ではなく実装方針の裁定**なので触っていない。CLAUDE.md の runtime 優先順位からは
+cljc 側が canonical に読める。
+
+#### `kotoba-boundaries.edn` を実態に更新した
+
+| key | 旧 | 新 |
+|---|---|---|
+| `:owners :domain-actors` | `orgs/etzhayyim/com-etzhayyim-*` | `orgs/cloud-itonami/*` |
+| `:owners :atproto-actors` | `orgs/gftdcojp/app-aozora` | `orgs/network-awai/app-aozora` |
+| `:cell-prefix-routes` の値 | `com-etzhayyim-*` 57 件 | 現在の repo 名 |
+
+この 4 key は `scripts/kotoba-boundary-audit.cljs` (CI `clj-wgsl-parity.yml`) が実際に読む。
+**key 集合は 75/9/3/3 で完全に不変**であることを機械確認し、値だけを差し替えた。残る
+`com-etzhayyim-*` 参照 19 件は etzhayyim に残る repo なので正しい。
+
+### 未着手として残るもの
 
 ## Consequences
 
