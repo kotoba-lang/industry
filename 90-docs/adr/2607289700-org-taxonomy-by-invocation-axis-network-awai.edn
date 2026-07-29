@@ -668,21 +668,33 @@ src/<name>/murakumo.cljc      <- murakumo を呼ぶだけの 1 モジュール
 `<name>-actor` として移送した。**サイズで判断しかけたのは誤りだった** — etzhayyim 側が
 大きい例 (`tsukuru` 1258KB vs 51KB) もあるが、それは資産であって役割ではない。
 
-#### 実測: これらの did:web は移送前から解決していない
+#### 訂正: did:web は 2 形式あり、大半は **live** — ただし repo 位置には依存しない
 
-移送で DID を壊していないかを、**移送していない対照群**で確認した:
+当初この節は「これらの did:web は移送前から解決していない / DID 層は休眠」と書いたが、
+**誤りだったので訂正する**。`etzhayyim.github.io/com-etzhayyim-<name>/.well-known/did.json`
+が 404 なのを見て一般化したが、その URL はほとんどの repo の DID id と一致していなかった。
 
-| URL | HTTP |
-|---|---|
-| `etzhayyim.github.io/com-etzhayyim-hc/.well-known/did.json` (未移送) | 404 |
-| `etzhayyim.github.io/com-etzhayyim-vin/.well-known/did.json` (未移送) | 404 |
-| `etzhayyim.github.io/` (org root) | 404 |
-| `<name>.etzhayyim.com` (DNS) | 解決しない |
+実測 (94 repo を sampling、2026-07-29):
 
-**etzhayyim org は GitHub Pages を 1 つも持っていない**ので、
-`did:web:etzhayyim.github.io:com-etzhayyim-*` は最初から解決していなかった。移送で壊した
-ものは無い。この DID 層は休眠状態であり、D7 の organism 再判定 (前節) が
-「organism registry はプロダクト単位で etzhayyim repo とは別軸」と結論したことと整合する。
+| DID id の形式 | 件数 | 解決 |
+|---|---:|---|
+| `did:web:etzhayyim.com:actor:<name>` | **84** | **200 (live)** — `https://etzhayyim.com/actor/<name>/did.json` |
+| `did:web:etzhayyim.github.io:com-etzhayyim-<name>` | 5 | 404 (dead。etzhayyim org は Pages を持たない) |
+| `.well-known/did.json` 無し | 5 | — |
+
+**移送で壊れていない、という結論自体は変わらないが理由が違う。** live な方は
+**`etzhayyim.com` が repo とは独立に配信している** — 配信されている DID 文書は
+`alsoKnownAs: []` で、service は `pds.aozora.app` (AtprotoPersonalDataServer) と
+`/dnsaddr/etzhayyim.com/p2p/12D3KooW...` (AtprotoXrpc) を指すだけで、GitHub repo を
+一切参照していない。したがって repo をどの org へ移しても DID 解決には影響しない。
+repo 内の `.well-known/did.json` は配信元ではなく**ソース側の控え**である。
+
+dead な 5 件 (`cargo` / `fushin` / `kaname` / `kenchi` / `metsuke`) だけが
+`etzhayyim.github.io` 配信を前提にした古い形式で、これは元から解決していない。
+
+この訂正は D7 の organism 再判定の結論を変えない — organism registry
+(`artificial-organism-actors.json`) はプロダクト単位の `did:key` であって、
+ここで言う actor DID (`did:web`) とは別の層である。
 
 #### `credits` の pin 違反を解消した (子リポの main を進めた)
 
@@ -821,6 +833,28 @@ lexicon + deploy workflow、`com-etzhayyim-okaimono` = `cells/*.edn` ドメイ�
 | ERP | `*erp*` 5 repo |
 | ERP (kyber 系) | 3 repo |
 | Web クロール | 3 repo |
+
+**ただし 5 クラスタのうち 2 つは「重複」ではなかった** (実測 2026-07-29):
+
+- **`kami-mangaka-*` 8 は重複ではなくモジュール族**。scene / expression / scene-author /
+  reader / page / text / qa / render がそれぞれ独立した `deps.edn` + `src/kami/mangaka/*`
+  を持つ意図的な分解で、`capability-*` 50 (各々 `capability.edn` +
+  `src/kotoba/capability/<x>/<y>.cljc`) と同型。**畳んではいけない。**
+- **`oil-*` 7 は「7 分割されたコード」ではなく、コードを持たない did:web シェル 7 件**
+  (各 6-7 file: `.well-known/did.json` + `actor-manifest.jsonld` +
+  `actor-manifest.test.ts` + `.nojekyll` + NOTICE)。しかも DID は
+  `did:web:etzhayyim.com:actor:oil-*` で **live**。統合は「コードの整理」ではなく
+  **7 つの live な DID identity を退役させるか**という外部影響のある判断になる。
+
+本当に重複なのは:
+- **`kyber` 3**: `cloud-itonami/kyber-qzzg06nh` (128 file、appview) /
+  `kotoba-lang/kyber` (32 file、Python langgraph `lg/`) /
+  `etzhayyim/com-etzhayyim-app-open-kyber` (126 file、1.4MB、R2-WORKER-WIRING +
+  SUITE-PY-WASM-MIGRATION の doc 付き) — 同一 ERP の 3 変種
+- **`kaname`**: 66 file / 282KB の実コードに 7 route が集中。分割は設計そのもの
+
+つまり Phase 5 の残作業は ADR-2607261601 が挙げた 5 クラスタではなく、
+**`kyber` の 3 変種統合と `kaname` の分割の 2 件**である。
 
 これらは「7 repo を 1 つに畳む」「1 repo を 7 つに割る」という**設計判断そのもの**で、
 配置の付け替えではない。どれが正本になり何が壊れるかを決めてからでないと動かせないので、
