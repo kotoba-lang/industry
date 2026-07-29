@@ -449,6 +449,44 @@ D4 で `ai-gftd-mamori` が bare name `mamori` を取ったので、同名だっ
 を踏襲。中身は**サイバー犯罪・暗号資産盗難の被害者インテークと referral 起草**で、
 凍結・送金・提出は一切しない (すべて `:pending-approval` 起点で人間が transition する)。
 
+### 未決 6 — 決定 (2026-07-29)。D5 の前提が誤っていたので訂正する
+
+#### 訂正: blueprint.edn の不在は「actor 契約に未登録」の証拠ではない
+
+D5 は「cloud-itonami 内 21 件は blueprint.edn を 0/21 が持たず registry.edn 459 entry にも
+0 件しか載っていない = cloud-itonami の actor 契約に未登録」と書いたが、**これは誤りだった**。
+実測 (2026-07-29):
+
+- ローカルにある **blueprint.edn 1,379 件はすべて `cloud-itonami-*` 命名の repo** に属する
+  (isco / isic / assoc / municipality / unspsc / jsic / ドメインサービス)
+- `kotoba-lang/industry` の **registry.edn 459 entry の `:business-id` も 459/459 が
+  `cloud-itonami-*`**
+- **`gftd-talent-actor` — CLAUDE.md が canonical actor 3 例の 1 つとして名指しする repo —
+  も blueprint.edn を持たない**
+
+つまり blueprint.edn + registry.edn は **`cloud-itonami-*` blueprint フリートの契約**であって、
+名前付きプロダクト actor の契約ではない。blueprint.edn が無いことは、その repo が actor か
+どうかについて何も言っていない。**したがって D5 が想定した「blueprint 起票」という作業は
+これらの repo には存在しない。** 未決 6 は retire 判断だけに縮む。
+
+#### 21 件の内訳 (実測、2026-07-29)
+
+| 分類 | 件数 | repo | 根拠 |
+|---|---:|---|---|
+| **retire (archive 実施)** | 2 | `ads` / `oshikatsu` | 自身の `RUNTIME-STATUS.edn` が `:retired` / `:contract-only` を宣言。デプロイ面なし |
+| 既 archive | 1 | `ai-gftd-kaisya` | 二重抽出の裁定 (2026-07-29) |
+| actor (governor あり) | 2 | `itonami` / `newscaster` | `src/*/governor.cljc` + governor contract test |
+| actor 形 (governor なし、Python 系譜) | 1 | `jp-ashiba` | `actor/actor-manifest.jsonld` + cljc 8 モジュール。`:actor/status :canonicalized-in-flat-repository` |
+| app / library | 14 | `media` `news` `nemuri` `dougaka` `dougaka-kagaku` `dougaka-kodomo` `dougaka-vector` `gameka` `hakken` `mangaka` `animeka` `ongakuka` `syosetsuka` `yukkuri` | 実装 + テスト + (一部) CF worker を持つ稼働物。actor 契約の対象ではない |
+| data corpus | 1 | `pachinko` | 5 blob、実体は `data/topics/yukkuri-pachinko-topics.jsonld` 1.3MB のみ。yukkuri 向けのトピック源 |
+
+retire した 2 件はどちらも `NOT-MIGRATED-VENDOR-REGULATORY` (景表法・特商法 / 資金決済法、
+Settlement 軸で gftd が保持) の記録を持つので、削除でなく archive にして記録を保全した。
+
+**残る作業は「app / library 14 件を actor に仕立てる」ことではない。** それらは actor では
+ないというのが実測の答えで、D5 が二択 (actor か retire か) にしたのが誤りだった。
+`jp-ashiba` を cloud-itonami の governor 契約に載せるかどうかだけが本当の未決として残る。
+
 ### Phase 4 — 未着手
 
 ## Consequences
@@ -474,9 +512,10 @@ D4 で `ai-gftd-mamori` が bare name `mamori` を取ったので、同名だっ
 4. ~~`jk-corp` の行き先~~ **決定 (2026-07-28): jk-luxury に残置**
 4b. ~~`ai-gftd-deai` の行き先~~ **決定 (2026-07-28): network-awai/`deai`**
 5. ~~manimani 3 件の行き先~~ **決定 (2026-07-28): 3 件とも network-awai**
-6. cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断 (Phase 3 では rename のみ実施、判断は未着手)
+6. ~~cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断~~ **決定 (2026-07-29): retire 2 件 (`ads` / `oshikatsu`) を archive。残りは app / library / data で actor 契約の対象外 — blueprint 起票という作業自体が存在しなかった (D5 の前提誤りを訂正)**。派生して残る唯一の未決は下記 9
 7. ~~`gftdcojp/ai-gftd-cyber-drill` と `cloud-itonami/cyber-drill`~~ **決定 (2026-07-29): `ai-gftd-cyber-drill` を archive、bare name は動く方 (cloud-itonami) が保持**
-8. ~~`cloud-itonami/ai-gftd-kaisya` (Clojure runtime) と `cloud-itonami/kaisya` (BPMN 5 点)~~ **決定 (2026-07-29): `ai-gftd-kaisya` を archive、bare name は BPMN 側が保持**"
+8. ~~`cloud-itonami/ai-gftd-kaisya` (Clojure runtime) と `cloud-itonami/kaisya` (BPMN 5 点)~~ **決定 (2026-07-29): `ai-gftd-kaisya` を archive、bare name は BPMN 側が保持**
+9. `cloud-itonami/jp-ashiba` を cloud-itonami の governor 契約 (langgraph-clj StateGraph + 独立 Governor + append-only 台帳) に載せるか。現状は `actor/actor-manifest.jsonld` が Python/LangGraph pod を記述し、実体は cljc 8 モジュール + テストで governor を持たない"
 
   :adr/decision-summary
   ["D1: org 判定軸を目的(公益/事業)から起動主体(:repo/kind)へ移す。6 org: kotoba-lang=lib / etzhayyim=organism のみ / cloud-itonami=呼ばれて動く基盤 / gftdcojp=B2B/B2G security service / network-awai=AWAI Network L.L.C. の consumer network(p2p/crypto/blockchain)+adult / com-junkawasaki=cloud+data+個人"
