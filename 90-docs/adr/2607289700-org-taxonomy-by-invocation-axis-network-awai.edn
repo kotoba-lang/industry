@@ -411,6 +411,44 @@ west `groups: [archived]`** になった。稼働中で `ai-gftd-` を名乗る 
 通ることを確認した。同時に Phase 3a で付け忘れていた `ai-gftd-isekai` の
 `userdata: archived: true` も補った (archived entry の canonical form)。
 
+### 未決 2 / 3 — 決定 (2026-07-29、main commit は下記)
+
+#### `ghosthacker-shiropico-assets` は統合しない — 廃止済みバケットへの dangling ポインタだった
+
+`ghosthacker-shiropico` との統合を検討したが、**統合すると健全な annex に壊れたポインタを
+取り込むことになる**ので archive にした。実測:
+
+- `ghosthacker-shiropico-assets` の 45 blob はすべて **129-137 byte の git-annex ポインタ**で、
+  参照先は既に廃止された別バケット (`s3://ai-gftd-datasets/ghosthacker-shiropico/`、
+  bucket-scoped creds)。現行 dataset の `ASSETS-DATALAD.md` 自身が
+  「**That directory no longer exists on the current machine**」と記録している
+- 一方 42 点の character-ref 画像 (shiro/pico の 12 表情 x 2 + kamishibai) は
+  `cloud-itonami/yukkuri` の `appview/ai-gftd-wasm-yukkuri-y5kk5r1x/svelte/static/img/` に
+  **annex 非依存の実 git blob** (1MB 級、kamishibai 43 + emotions 24) として生存している。
+  これが参照ソースであることは `ASSETS-DATALAD.md` の recovery 記録とも一致した
+- 2 repo のファイル集合の重なりは 45 中 6 (datalad scaffold のみ) で、
+  中身は重複ではなく**世代違い**
+
+`ghosthacker-shiropico` 本体は **com-junkawasaki へ移送**した。D1 の `corpus` -> com-junkawasaki
+にそのまま当たり、姉妹作 `ghosthacker-*` 12 件が既に com-junkawasaki にある
+(`ghosthacker` / `-duet` / `-echoes` / `-family` / `-flow` / `-groove-core` / `-harmony` /
+`-lightning` / `-memorize` / `-timemachine` / `-tuning` / `-vamos`)。D5 の
+「gftdcojp に取り残されている 2 件も cloud-itonami へ移す」のうち本件については、
+同じ D5 の括弧書き「作品 corpus」が正しい行き先を指しており、そちらを採る。
+DataLad dataset なので `:manifest.repos/datalad` のキーも新 path へ移した — **Phase 3 の
+rename でこのキーが 1 件 stale になっていた** (west.yml は entry 行編集なので userdata は
+保たれていたが、生成器を通すと datalad userdata が落ちる状態だった)。repos.edn の
+path キー付き map 全体を監査し、Phase 3 由来の stale はこの 1 件だけと確認済み。
+
+#### `cloud-mamori` -> `cloud-kyusai`
+
+D4 で `ai-gftd-mamori` が bare name `mamori` を取ったので、同名だった別プロダクトを
+改名した。`cloud-kyusai` (救済) は被害者救済という中身をそのまま指し、姉妹 actor の
+和語命名 (助 tasuke / 辿 tadori / 守 mamori / 禊 misogi / 隠 kakure) とも揃う。
+`cloud-` prefix は portfolio 命名 (`cloud-itonami` / `cloud-murakumo` / `cloud-manimani`)
+を踏襲。中身は**サイバー犯罪・暗号資産盗難の被害者インテークと referral 起草**で、
+凍結・送金・提出は一切しない (すべて `:pending-approval` 起点で人間が transition する)。
+
 ### Phase 4 — 未着手
 
 ## Consequences
@@ -431,8 +469,8 @@ west `groups: [archived]`** になった。稼働中で `ai-gftd-` を名乗る 
 ## 未決 (本 ADR では決めない)
 
 1. ~~`ai-gftd-isekai` と `network-isekai` の責任分界~~ **決定 (2026-07-28): 別物と確認。著作物を network-isekai へ移送し ai-gftd-isekai は archive**
-2. `ai-gftd-ghosthacker-shiropico` と `ghosthacker-shiropico-assets` の統合
-3. ~~`cloud-mamori` と `ai-gftd-mamori` の統合~~ **統合しない (2026-07-28、別プロダクトと判明)**。`ai-gftd-mamori` は Phase 3 で bare name `mamori` へ rename 済み。**`cloud-mamori` の改名 (被害者インテークと分かる名前へ) はオーナー裁定待ち**
+2. ~~`ai-gftd-ghosthacker-shiropico` と `ghosthacker-shiropico-assets` の統合~~ **決定 (2026-07-29): 統合しない。assets 側は廃止バケットへの dangling ポインタなので archive、本体は com-junkawasaki へ移送**
+3. ~~`cloud-mamori` と `ai-gftd-mamori` の統合~~ **統合しない (2026-07-28、別プロダクトと判明)**。`ai-gftd-mamori` -> `mamori` (Phase 3)、`cloud-mamori` -> `cloud-kyusai` (2026-07-29) で決着
 4. ~~`jk-corp` の行き先~~ **決定 (2026-07-28): jk-luxury に残置**
 4b. ~~`ai-gftd-deai` の行き先~~ **決定 (2026-07-28): network-awai/`deai`**
 5. ~~manimani 3 件の行き先~~ **決定 (2026-07-28): 3 件とも network-awai**
