@@ -212,6 +212,76 @@ API は artifact の整合性を `contentHash: \"sha256:<hex>\"` で宣言する
 
 37 tests / 160 assertions green（dougaka）、20 tests / 110 assertions green（douga）。
 
+## 共有 lib への切り出し（2026-07-29、オーナー指示「1, 2」）
+
+dougaka がこの API の罠を高い代償で学んだ直後に、**animeka が同型の contract を
+`api.murakumo.cloud` 固定で持っていた**ことが分かった（mangaka / yukkuri も控えている）。
+同じ 400 を 4 回学び直させないため、contract を **`kotoba-lang/murakumo-generation`**
+（public、`.cljc`、依存ゼロ）へ切り出した。
+
+```
+murakumo.generation          request body / 受理レンジ / 応答解析 / retry 分類
+murakumo.generation.digest   sha2-256 hex → raw CIDv1
+murakumo.generation.client   submit → poll → fetch → verify（transport 注入）
+```
+
+`-ka` は JVM 実行器と nbb operator script に分かれているので、JVM 専用 lib にすると
+重複が移動するだけになる。**JSON codec・ファイルダイジェスト・sleep の 4 つだけを
+注入**し、学習コストが高かったもの（ホスト、artifact URL 差し替え、digest 検証、
+cold start、poll schedule）は共有側に置いた。JVM と nbb で同一結果を毎回確認している。
+
+### 移植中に出た 2 つのバグ（どちらも消費者からは見えない）
+
+1. **失敗した submit が status しか出していなかった。** この fleet は 400 の**本文**に
+   制約を全部書く（上記 4 件はすべてそこから分かった）。捨てていたので、1 行の修正が
+   live GPU 相手の当てずっぽうになる。`submit!` は `{:id}｜{:cold}｜{:dead}` を返し、
+   本文込みで log し、`transient-submit?` が status と本文の両方で分類する
+   （400 は既定で非 retry — 同じ body を投げ直しても同じなので）。
+2. その log を入れた**次の実行**が即座に `narration submit 400 params.locale is
+   unsupported` と言った。**分配束縛の `:or` はキーが「無い」時しか発火せず、`nil` で
+   存在する時は発火しない。** `client/narration!` が `{:locale locale}` を nil のまま
+   転送 → default が飛ぶ → prune が落とす → locale 無しで送信 → 400。
+   **ナレーションが 2 回の実行で黙ってローカル TTS に落ちていた。**
+   `(or locale default)` に直し、同型の罠（`sound-body` の `kind` は `(name nil)` で
+   例外、`await-job!` の `timeout-ms` は `(long nil)` で例外、`generate!` の `label`）も
+   すべて掃いた。
+
+### 消費者
+
+- **dougaka**（`9aace5cf`）— 自前 contract を削除。`dougaka.murakumo` はホスト
+  プリミティブ 4 つのみ。`dougaka.kotobase` の base32/CID も共有 digest へ委譲した
+  （同じ artifact が 2 つの base32 実装から別名を得ないように）。24 tests / 85 assertions。
+- **animeka**（`de91ed1d`）— **ホストを修正**（`api.murakumo.cloud` は 401、
+  `generation.murakumo.cloud` は 202 を実測）。**animeka の video 経路は一度も fleet に
+  届いていなかった**。artifact URL 差し替え・digest 検証・geometry snap・cold-start
+  分類を獲得。`default-model \"ltx-2.3\"` を nil にして fleet の `:default` に委ねた
+  （ADR-2607173100。今日の挙動は不変）。ffmpeg 補助関数は別関心なので触っていない。
+  17 tests / 141 assertions。
+
+### 共有 lib での live 検証（2026-07-29）
+
+```
+:legs {:video [:murakumo :murakumo] :voice [:murakumo :murakumo]
+       :sfx [0] :bed true :overlays 2}
+```
+
+全 leg が fleet 生成。**cold-start retry が実地で発火して成功した** —
+`video 1 job …: [Errno 111] Connection refused — fleet is still waking, retrying in 45 s`
+の後、そのショットは `:murakumo` になった。成果物 4 点（mp4 / srt / bgm / sfx）が
+kotobase に載り、episode を CID で取り直してバイト一致
+（`bafkreifwx4vqsve6irxyj6o2f4shbwflabe5qdrtjyvnkdqjxdo5nypnty`、8.05s /
+720x1280 / **scene change 45 / 無音 0**）。lib 20 tests / 107 assertions。
+
+### 手順上の失敗（記録）
+
+`murakumo-generation` の west 登録で、**stale なローカル west.yml から生成した全文を
+PUT し、他セッションが追加していた約 20 entry と複数の pin を一時的に main から
+落とした**（`d905864b`: +13 −145）。ローカル差分は +5 行に見えていた — ベースラインが
+古かったため。現在の main は 3953 → 3954 entry・欠落ゼロで自己修復済み（後続 commit が
+復元）。**`--entry` で生成した全文を PUT するのは「最小 diff」ではない** — CLAUDE.md が
+定める正経路（tip の内容を取得 → 当該行だけ編集 → PUT）に戻し、その後の pin 前進 4 件は
+すべて +1 −1 で着地させた。
+
 ## 残っていること
 
 - **既存 catalog に `:sfx` を書いた shot が 1 つも無い。** cue は opt-in なので、
@@ -219,10 +289,15 @@ API は artifact の整合性を `contentHash: \"sha256:<hex>\"` で宣言する
 - **`hunyuanvideo-1.5` は `params.model is unsupported`** で拒否される
   （murakumo.edn には載っているが gate が受けない）。使えるのは `ltx-2.3`（既定）と
   `wan2.2-ti2v-5b`。
+- **t2v が画面内に架空の文字を描く。** 実測: 市場のショットに \"BEOTI OPON FAYRLEÇ\" が
+  出た。prompt 側の抑制か negative 指定が要る。
 - **毎晩の投稿を回している runner にはまだ token が渡っていない。** 駆動元は
-  このマシンの launchd には無く（cloud routine と推定）、特定できていない。
+  このマシンの launchd に無く（cloud routine と推定）、特定できていない。
   そこに `MURAKUMO_GENERATION_TOKEN` / `KOTOBASE_ARCHIVE_TOKEN` を通すまで、
   公開される動画は単色板のまま。
+- **mangaka / yukkuri は未移植。** mangaka は ComfyUI 経路を持つので murakumo に
+  寄せるかの判断が要る。yukkuri は `scripts/aozora-publish` が bb 実装（nbb-only 方針に
+  反する）で、seed が `AOZORA_PUBLISHER_SEED` 環境変数待ち。
 - 1 本あたりの制作時間は fleet 往復のぶん延びる（8 ショットで十数分規模）。
 
 ## Consequences
@@ -232,9 +307,14 @@ API は artifact の整合性を `contentHash: \"sha256:<hex>\"` で宣言する
 - (+) production が CID で再現・監査できる。中間物が一晩で消えなくなる。
 - (+) degrade が leg 単位で数えられるので、「絵が入らなかった回」を publish 前に落とせる。
 - (+) fleet の contentHash が保管 CID と一致するので、計算面と保管面で名前が割れない。
+- (+) 契約の学習コストが 1 箇所に集約された。animeka は host 1 つの違いで
+  「実装済みに見えて一度も動いていない」状態だった — 同じことが mangaka / yukkuri でも
+  起きうる。
 - (−) fleet を通す分、1 本あたりの制作時間と GPU コストが上がる。
 - (−) cold start の初回は retry で吸収するが、その分だけ最初の 1 本は遅い。
 - (−) SFX は opt-in で、既存 catalog は誰も書いていない。
 - (−) `MURAKUMO_TOKEN_SECRET_2` を使い切ったので、次に generation gate の
   secret を足したい時は空きスロットが無く、rotation か gate 側の拡張が要る。
+- (−) animeka の ffmpeg 補助関数が `murakumo-video` ns に同居したまま。生成の wire とは
+  別関心で、いずれ douga へ移すべき。
 "}]
