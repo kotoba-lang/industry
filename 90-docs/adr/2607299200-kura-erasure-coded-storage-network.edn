@@ -42,6 +42,7 @@
 | 1 | [`kotoba-lang/erasure`](https://github.com/kotoba-lang/erasure) | `6b6b95eb` | lint 0 / JVM 27 tests 859 assertions / CLJS 20 tests 241 assertions |
 | 2 | [`kotoba-lang/kura`](https://github.com/kotoba-lang/kura) | `d2485630` | lint 0 / JVM 53 tests 542 assertions / CLJS 48 tests 196 assertions |
 | 3 | [`kotoba-lang/kura-node`](https://github.com/kotoba-lang/kura-node) | `9bb8bd4a` | lint 0 / JVM 36 tests 446 assertions / CLJS 36 tests 446 assertions |
+| 5 | [`kotoba-lang/kotobase-storage-kura`](https://github.com/kotoba-lang/kotobase-storage-kura) | `8ef345eb` | lint 0 / JVM 12 tests 53 assertions / CLJS 12 tests 53 assertions |
 
 `kura` が所有するのは §0 の表どおり 5 面 — placement / manifest / repair /
 audit / order。**バイトは一切動かさない**（小さい値を取り小さい値を返す判断のみ。
@@ -83,6 +84,19 @@ audit / order。**バイトは一切動かさない**（小さい値を取り小
   （テーブル無しの定義）から作る — テーブル駆動の `erasure.gf/mul` から作ると
   高速路が自分の oracle とバグを共有しうる。JVM の byte 符号付き
   （200 が -56 として読め、-56 は添字にならない）が実害なので両ホストで回す。
+- **§0 の `kotobase-storage-kura` の説明「上記いずれの判断も持たない薄い層」は誤りだった。**
+  実装して 2 つ出てきた。(a) **kura は ref を提供できない。** `kotobase.storage` は
+  不変 CID block と CAS 付き可変 ref の 2 面だが、kura は shard 面であって
+  linearizable な CAS 原始をどこにも持たない。`:single-writer-ref` を宣言して
+  肩をすくめるのは `kotobase.storage/ref-profiles` が警告する当のもの
+  （無視された precondition は成功を返す）。よって `open` は ref 委譲先を**必須**にし、
+  **委譲先の profile をそのまま報告する**（自分で名乗らない）。委譲先が無ければ構築を拒否する。
+  (b) **kotobase の block サイズでは 1.625 倍が成立しない。** kotobase は block を
+  16〜128 KB で刻む。128 KB を k=16 で符号化すると 8 KB shard が 26 個、読み出しは
+  16 node に触る — 複製なら 1 request。よって閾値（既定 1 MiB）未満は 3 重複製にする。
+  **全 block が 64 KB の consumer に 1.625 倍と言うのは、買っているものについての嘘**で、
+  その workload では 3.0 倍である。`effective-multiplier` が実際の分布に対する
+  実効倍率を返す — 混在 workload の正直な数字は定数ではなく混合だから。
 - **配置ハッシュだけは注入にできない。** client / coordinator / auditor が独立に
   同じ node set を計算できないとネットワークに「どこに何があるか」の共通了解が
   無くなる。よって 32bit 演算で固定し、`.kotoba` 移植を等価性 gate で拘束した
@@ -515,8 +529,9 @@ on-chain 継続証明とは別物である。cold archive の公開証明性が�
 4. kotoba-lang/kura-bugyo（DO 単一 writer + D1）
    metadata 1 ref / repair スケジューラ / audit 発行 / epoch 集計
 
-5. kotoba-lang/kotobase-storage-kura
-   既存 kotobase.storage 適合スイートを通す -> kotoba-annex / DataLad が無変更で載る
+5. [DONE 2026-07-29] kotoba-lang/kotobase-storage-kura — pin 8ef345eb、west 登録済み
+   上流の kotobase.storage.contract/verify を通す。ref は委譲必須、
+   閾値未満は複製、durability-report は fleet の実 domain 数を返す
 
 6. 決済面
    pay（USDC bond）+ merkle-sum（payout 証明）+ nexus-x402（顧客課金）を接続
