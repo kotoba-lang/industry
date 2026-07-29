@@ -1,0 +1,54 @@
+[{:db/id -1
+  :adr/id "adr-2607299100-aozora-app-legal-pages-published"
+  :adr/title "ADR-2607299100: aozora.app に法的文書を公開する — /terms /privacy は 404 だった、および main が本番より遅れていた発見"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-29"
+  :adr/last-verified "2026-07-29"
+  :adr/last_verified "2026-07-29"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "aozora-app-legal-pages-published"
+
+  :adr/authoritative_for
+  ["aozora.app の /terms /privacy /company /legal /yoro/terms /yoro/privacy が実在する公開ページであること、およびその生成経路"
+   "app-aozora の legal/*.md が正本で aozora-appview 側に複製を置かないこと"
+   "aozora-appview の静的ページは run_worker_first のため worker/index.mjs の STATIC_DOCUMENT_ROUTES に登録しないと本番に出ないこと"
+   "aozora-appview main が本番より遅れていた事実(codex/seo-foundation 未 merge)とその解消"]
+
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2607289800-app-aozora-awai-network-operator-change"
+   "adr-2607289700-org-taxonomy-by-invocation-axis-network-awai"
+   "adr-2607122200-kotoba-uiux-design-system-paved-road"
+   "adr-2607132300-design-quality-score"
+   "adr-2607173000-nbb-only-script-host"]
+
+  :adr/repos ["orgs/network-awai/aozora-appview" "orgs/network-awai/app-aozora"]
+
+  :adr/decision
+  ["D1: 4つの法的文書 + operator record を aozora.app に公開する。オーナー指示(2026-07-28、選択肢『ToS/Privacy も含め全部公開』)。DRAFT バナー・[DECISION NEEDED]・[CONFIRM] マーカーはそのまま表示する — counsel review 未了という事実を隠さない"
+   "D2: 正本は sibling west project network-awai/app-aozora の legal/*.md。aozora-appview に markdown の複製を置かない(必ず drift する)"
+   "D3: 生成物 HTML は commit 済みビルド成果物として扱う。deploy は再生成しない(sibling checkout が古いと古い operator 名を黙って本番へ出すため)。再生成は `pnpm legal --src ...` の明示操作"
+   "D4: page chrome は kotoba-ui.core のみ(ADR-2607122200)。md→hiccup converter は cloud-itonami site/generate.clj からの移植を ordered list / pipe table / 1段ネストへ拡張"
+   "D5: codex/seo-foundation を main に merge した — 本番で既に動いていたのに未 merge で、main から deploy すると SEO 一式を巻き戻す状態だった"
+   "D6: html_handling を drop-trailing-slash にし、/terms(スラッシュ無し = アプリが実際にリンクする形)を canonical にする"]
+
+  :adr/verify "curl -sS -o /dev/null -w '%{http_code}\\n' -H 'Accept: text/html' https://aozora.app/terms  # 200"
+
+  :adr/evidence
+  ["aozora-appview main 02d71927 -> 2f718e20(server-side merge 4件)、west pin ab19859e -> 2f718e20(single-entry API commit 4回、最終 ff514bde)"
+   "deploy: app-aozora-spa version 7c3775b0-f138-439a-918d-b9ed7c721709(2026-07-29)"
+   "live 検証: /terms /privacy /company /legal /yoro/terms /yoro/privacy すべて 200 + 正しい <title> + AWAI Network, L.L.C. を含む。control: /manga は SSR 200、/zzz-nonsense は 404、/js/main.js は 1571241 bytes"
+   "design-quality: 6ページとも 100.00(10軸・12軸とも)、gate --min 95 PASS"
+   "tests: seo-worker.test.mjs 8/8 pass、shadow-cljs :node-test 280 tests / 894 assertions / 0 failures"]
+
+  :adr/body
+  "# ADR-2607299100: aozora.app に法的文書を公開する\n\n**Status**: accepted\n**Date**: 2026-07-29\n**Deciders**: Jun Kawasaki(オーナー指示、agent 実行)\n\n## Context\n\nADR-2607289800 で app-aozora の Service operator を AWAI Network, L.L.C. に変更したが、\nそれは **repo の中の markdown を書き換えただけ**だった。オーナーの次の指示(『do it』)を\n受けて公開状態を調べたところ、次が判明した。\n\n- **4つの法的文書はどこにも公開されていなかった。**\n- **`/terms` と `/privacy` は死んだリンクだった。** inference-consent モーダル\n  (`yoro-ui.components.inference-consent`)は全ユーザーに同意を求める画面で\n  この2つをリンクしているのに、対応する asset が存在せず\n  `not_found_handling: single-page-application` の catch-all が SPA shell を返し、\n  cljs router が `:not-found` に落としていた。\n\nオーナーは選択肢『ToS/Privacy も含め全部公開』を選び、DRAFT バナーと\n`[DECISION NEEDED]`(『account 作成のどこにも年齢確認が無い』を含む)が\nユーザーに見えることを承知の上で全文公開を指示した。\n\n## 途中で見つかった、より重い問題\n\n### 1. main が本番より遅れていた(codex/seo-foundation 未 merge)\n\n`orgs/network-awai/aozora-appview` の `main` には **本番で既に動いている\nSEO worker(`codex/seo-foundation`、7 commits)が入っていなかった**。\n本番の sitemap は同 branch が生成した 89 URL を配信し、\n`/google7adbda147efc066b.html` は同 branch の verification body を返し、\nナビゲーションは同 branch の SSR shell を返していた。\n\nつまり **main から deploy した人が SEO 基盤一式を黙って巻き戻す状態**\nだった — CLAUDE.md が kotobase.net(2026-07-25)で記録している\nlast-writer-wins そのもの。deploy 前に main へ merge して解消した\n(fast-forward: main は既に ancestor、0 behind / 7 ahead)。\n\n### 2. 静的 asset を置くだけでは本番に出ない\n\n同 branch の `wrangler.jsonc` は `run_worker_first: [\"/*\", ...除外]` を設定して\nおり、除外に無い path は **worker が先に走る**。`pageForPath` も\n`isClientRoute` も `/terms` を知らないので、実測で\n`GET /terms` (Accept: text/html) は **`noindex, nofollow` 付きの 404**、\ntitle は『ページが見つかりません』だった。`worker/index.mjs` に\n`STATIC_DOCUMENT_ROUTES` を足し、6 path を `env.ASSETS.fetch` へ素通しする。\n\n### 3. deps.edn の相対 path が壊れていた\n\n`5f98806d`(numbered layer を west repo へ切り出し)で\n`cljs/deps.edn` の `:paths` が全滅していた(2階層深い旧位置向けだったので\n`../../../../../kotoba-lang` は superproject の外を指し、`40-engine` は消滅)。\n`public/js` は gitignore なので、**この状態で `wrangler deploy` すると\nmain.js の無い asset manifest を配信してアプリ全体が落ちる**。\n`codex/seo-foundation` が同一の修正を独立に入れていた(merge で解消)。\n\n### 4. `assets:manga` が壊れている(未修正、記録のみ)\n\n`scripts/gen-liquid-glass-css.cljs` は parse できない — bb→nbb 移行が\nline 39 に `(require '         '         ')` を残し、さらに `babashka.fs` /\n`classpath/add-classpath`(nbb に相当物なし)に依存する。移行前から\nscript 定義は `bb scripts/*.bb` で `.bb` ファイルは存在しなかったので、\n`pnpm deploy` は長らく最初の step で落ちていた。**deploy chain から外し、\n直し方を README に書いた** — 唯一の出力 `public/css/liquid-glass.css` は\ncommit 済みで本番と byte 一致なので skip しても失うものは無い。\n\n## Decision\n\n`aozora-appview/cljs/scripts/gen-legal-pages.cljs`(nbb、ADR-2607173000)が\nsibling west project の `legal/*.md` から\n`public/{terms,privacy,yoro/terms,yoro/privacy,company,legal}/index.html` を生成する。\n\n- **converter は cloud-itonami `site/generate.clj` からの移植。** 同 file の\n  コメントが『tables / nested lists / links に当たったら依存を増やさず\n  これを拡張しろ』と指示しているのでそうした: ordered list(terms.md の\n  DMCA 通知要件)、pipe table(両 privacy policy の APPI/GDPR 根拠表)、\n  1段ネスト bullet。\n- **初回実行で全 table の最終列が消えた。** `str/split` が末尾の空 field を\n  捨てるため『先頭と末尾を drop』が実列を食っていた — privacy policy の\n  `GDPR legal basis` 列が丸ごと消えていた。修正し、**header と cell 数が\n  食い違う行があれば build を落とす** guard を入れた(privacy policy から\n  列が1つ消えても読者には検知できない)。\n- page chrome は `kotoba-ui.core` のみ、theme map 1つ(accent は\n  `--aozora-sky-zenith` = アプリ自身の空色)、HIG text-style class のみ、\n  raw hex / ad-hoc font-size なし。\n- sitemap は生成器(`generate-seo-catalog.clj`)側に 6 URL を足した(89 → 95)。\n\n## Consequences\n\n- (+) 同意を求めておいて 404 を返す、という状態が解消された。\n- (+) main が本番の superset になった(#1)。\n- (+) `deps.edn` が直り、build/deploy が再び可能になった(#3)。\n- (−) DRAFT バナーと `[DECISION NEEDED]`(年齢確認の不在を含む)が公開面に\n  出ている。オーナーの明示指示であり、counsel review 未了を隠すよりは\n  正直な状態。counsel review が済んだら文書側を直す。\n- (−) `assets:manga` は壊れたまま(#4)。\n- (−) `hello@gftd.co.jp` が連絡先のまま(ADR-2607289800 から不変)。\n- (−) 見た目のブラウザ確認はしていない。Chrome 拡張が未接続で、\n  この machine は多数の並行セッションが focus を奪い合うため\n  computer-use 経路は使わなかった。決定論監査(design-quality 100.00)と\n  HTML 構造の直接確認までが根拠。\n\n## 実行しなかったこと(意図的)\n\n- 法的文書の中身の変更(operator 変更は ADR-2607289800 で完了済み)\n- 準拠法・DRAFT バナー・[DECISION NEEDED] の解消(counsel / owner 判断)\n- `worker/index.mjs` の nbb 移植(369行、別スコープ)\n- `assets:manga` の修復(別スコープ、README に手順を記載)\n"
+
+  :source/dataset "adr"}]
