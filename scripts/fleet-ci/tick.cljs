@@ -497,6 +497,12 @@
 
 (def remote-base "/tmp/fleet-ci")
 
+;; nm は work item の **:id**（repo 名ではない）。1 repo に複数 gate があると、
+;; repo 名で割ると両者が同じ展開ディレクトリと同じ /gate-<nm>.cljs を共有し、
+;; 後から書いた方のスクリプト本体を先の方が自分の引数で実行する。実測
+;; (2026-07-29): root の 2 gate が衝突し、root-repository-roles が
+;; docs-edn-check.cljs を --sub 無しで走らせて 90-docs/gates/ の壊れた EDN を
+;; 報告した（自分の gate が一度も動いていないのに「落ちた」ように見えていた）。
 (defn remote-dir [nm sha] (str remote-base "/" nm "-" (subs sha 0 7)))
 
 ;; **SSH の exit code は信用できない。**
@@ -1038,7 +1044,8 @@
                                  body (when (:script w)
                                         (str (fs/readFileSync (path/join here (:script w)) "utf8")))
                                  sfile (path/join tmp (str "gate-" (:id w) ".bash-stdin"))
-                                 _ (fs/writeFileSync sfile (gate-script w (:node w) (:tip w) body))
+                                 _ (fs/writeFileSync sfile (gate-script (assoc w :name (:id w))
+                                                           (:node w) (:tip w) body))
                                  gname (str "test-" (:id w) "-" (sha7 (:tip w))
                                             "-murakumo-" (get-in w [:node :host]))]
                              (assoc w :tarball tgz :script-file sfile :gate-name gname
