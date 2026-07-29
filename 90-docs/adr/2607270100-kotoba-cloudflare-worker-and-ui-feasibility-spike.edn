@@ -225,7 +225,7 @@ ui-v1 kit が `:declarative-flat-tree`（`:id`/`:parent`/`:kind`/`:text` のフ�
   CSS breakout guard は `string-contains?` 4 本、HTML RAWTEXT は `string-fold-case` +
   `string-contains?` で case-insensitive `</tag` を検出 ③**`or` は bool でなく i64 を返す**ので
   `(not (or ...))` は型エラー、`if` の入れ子で畳む ④escape は `string-replace-all` 4 段
-  （`&` → `<` → `>` → `"` の順で html.core/esc と一致）。
+  （`&` → `<` → `>` → `\"` の順で html.core/esc と一致）。
 - 例外の代わりに `[:result :string :string]` を返す（原典は throw）。
 - **parity gate は KIR インタプリタを同一 JVM で回す**。各ケースを 0 引数の `.kotoba` 関数として
   生成するので、typed value を Clojure 側からマーシャリングする必要が無い。
