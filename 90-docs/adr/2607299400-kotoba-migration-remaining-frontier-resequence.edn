@@ -1,0 +1,197 @@
+[{:db/id -1
+  :adr/id "adr-2607299400-kotoba-migration-remaining-frontier-resequence"
+  :adr/title "ADR-2607299400: Kotoba 移行の残りを実測で再測定し再順序化する — pin 825 commit 遅れの是正と、product-runnable surface に record が無いという単一のボトルネック"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-29"
+  :adr/last-verified "2026-07-29"
+  :adr/last_verified "2026-07-29"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-migration-remaining-frontier-resequence"
+  :adr/authoritative-for
+  ["Kotoba 移行（cljc/cljs → .kotoba）の 2026-07-29 時点の残り作業とその順序"
+   "superproject の west pin が kotoba-lang 系 13 repo で 71–313 commit 遅れていた事実と是正"
+   "pure-product-profile に :record が無いことが product core の醜さの単一原因であるという診断"
+   "ADR-2607289500 の「現在地」節が 2026-07-28 で凍結しており単独では使えないこと"]
+  :adr/related
+  ["adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"
+   "adr-2607289500-kotoba-refactor-agent-handoff-and-capability-repo-cid"
+   "adr-2607270100-kotoba-cloudflare-worker-and-ui-feasibility-spike"]
+  :adr/body
+  "# ADR-2607299400: Kotoba 移行の残りを実測で再測定し再順序化する
+
+**Status**: accepted
+**Date**: 2026-07-29
+
+## Context
+
+オーナーから「残りの移行を計画せよ」「Kotoba は言語として美しい状態か」を問われ、
+superproject 側の正本（ADR-2607289500 + `kotoba-lang` の
+`docs/kotoba-centered-migration-plan.md` / `docs/agent-handoff-kotoba-refactor.md`）と
+実コードを突き合わせた。その過程で、**計画を立てる前に潰さなければならない
+測定上の欠陥**が見つかった。
+
+### superproject の視界が 825 commit 古かった
+
+`manifest/west.yml` の pin と各上流 default branch の差（2026-07-29 実測）:
+
+| repo | 旧 pin | ahead_by |
+|---|---|---|
+| kotoba-lang | `d76ef4666` | **313** |
+| murakumo | `8fcc93f5b` | **157** |
+| compiler | `ae672a217` | **107** |
+| kotoba-component | `a6991f99a` | **100** |
+| provider | `c9de9095d` | **71** |
+| kotoba-kir | `f6c55f483` | 27 |
+| kotoba-core-contracts | `c6c7a284a` | 17 |
+| kotoba-wasm | `443fd1db0` | 12 |
+| kototama | `809112e76` | 9 |
+| kotoba | `02490ade0` | 4 |
+| tamaki | `e5f4fedd4` | 4 |
+| kotoba-native | `502f2921c` | 2 |
+| artifact | `ba29522ec` | 2 |
+
+合計 825 commit。ローカル `compiler` checkout の `docs/adr/` は 0104 までしか無いのに、
+handoff は 0120–0187 を参照していた。**pin を進めずに立てた計画は、既に着地済みの
+作業を再提案する。** 実際、最初に起こした計画案（pure-product profile を admission
+check に昇格 / structural args の ADR / max-parameters の決着 / string kit / 標準
+実行パスの決定）は、pin 前進後に確認したところ **すべて既に upstream に着地して
+いた**（T2.1 compiler#411、T5.1 ADR-reliability-t51、T5.4 keep-5、T4.2 compiler#427/#436、
+T6.1 wasmtime primary）。
+
+### ADR-2607289500 は「現在地」節が 2026-07-28 で凍結している
+
+同 ADR の §2.2 plan Next（ops CLI secret cutover / cljs OS transports / medium
+murakumo pure planner / kbb / capability component 実装）は 5 項目中 4 項目が
+既に完了している。**この ADR を現在地の出典として引用してはならない。** 現在地の
+出典は `kotoba-lang` の living plan と WBS（毎日更新されている）であり、本 ADR は
+その 2026-07-29 断面を superproject 側に固定するもの。
+
+## Decision
+
+### 1. west pin を 13 repo 分前進させた（実施済み）
+
+`scripts/verify-west-pins.cljs` でサーバ側検証済み（全件 fast-forward、pin 退行なし）。
+wholesale 再生成はしていない — 当該 entry の `revision:` 行のみ 13 行の最小 diff。
+
+### 2. 実測に基づく残りの frontier（2026-07-29、kotoba-lang@`6bfef3b` 基準）
+
+**着地済み（再提案禁止）**: T1.2 / T1.4 pilot / T1.5 / T2.1 / T2.2 / T2.4 /
+T3.1 / T3.2 / T3.4 / T4.1 / T4.3 / T4.4 / T5.1 / T5.4 / T6.1 / T6.3 /
+T7.2 / T7.3 / T7.4 / T8.1 / T9.2 / T10.1–T10.3。
+W6 側は murakumo product-shell dual-source 完了（#122–#156）、
+design-system の form-A + Delivery-6 document cutover 5/5、
+kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package 化。
+
+**未着手 / 部分**:
+
+| ID | 内容 | 状態 |
+|---|---|---|
+| **T5.3** | rebalance seats pack → record export | **未着手**（本 ADR の最優先） |
+| T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
+| T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
+| T6.2 | precompiled KIR を product artifact の既定に | 未着手 |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | 未着手 |
+| T8.2 | kit ready checklist の全面適用 | first pass のみ |
+| T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
+| T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
+| T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
+| T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
+| T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
+| T4.2 | string kit | 部分（split-to-collection は deferred） |
+| T4.5 | bounded collections | 部分（3+ source map / stored closure は gate 中） |
+| T9.1 | CLI adapter | 部分（db/git/rad/deploy/hinshitsu は contract-only） |
+| T9.3–T9.5 | test harness / formatter / LSP | 未着手 |
+| T10.4 | deprecation drill | 未着手 |
+
+### 3. 最優先の単一ボトルネック — product-runnable surface に `:record` が無い
+
+`lang/pure-product-profile.edn` は矛盾した状態にある:
+
+- `:structural-args :preference` は `[:record :option :hetero-vector :flat-arity<=5]`
+  と宣言し、`:forbidden-new-public-packs true` を掲げ、`:forbidden-patterns` に
+  base-65536 pack を挙げている
+- しかし `:value-types` は `#{:i64 :string :bool [:option ...] :keyword
+  [:map :i64 :i64] :vector-i64}` で、**`:record` が入っていない**
+
+つまり profile は「record を使え」と言いながら、product KIR で実行できる値型として
+record を認めていない。その帰結が実コードに出ている
+（`orgs/kotoba-lang/murakumo/kotoba/infer_schedule_core.kotoba`）:
+
+```
+;; Guest ABI max arity 5: eligibility flags bit-packed into one i64.
+;;   flags bits: 1 has-engine | 2 has-checkpoint | 4 holds-checkpoint | 8 can-fetch
+(defn rem64 [a :i64 b :i64] :i64 (- a (* (quot a b) b)))
+(defn bit? [flags :i64 mask :i64] :i64 (if (= 0 (rem64 (quot flags mask) 2)) 0 1))
+(defn eligible? [flags :i64 free-bytes :i64 min-free :i64] :i64 ...)
+```
+
+`?` 付き述語が `:bool` でなく `:i64` を返し、4 つの真偽値が i64 のビットに畳まれ、
+`assign-step-3` は複合戻り値を `pick-code-3 + 4 * pack3(nq0,nq1,nq2)` に押し込む。
+これは作者の趣味ではなく **product 実行パスがこれしか許さないから**であり、
+言語仕様（`surface-status.edn` は defrecord / defprotocol / lazy-seq / closure /
+destructuring / loop-recur / match / defmulti を admit する）の限界ではない。
+
+**決定**: 残りの移行の最優先を **`:record` を pure-product `:value-types` に入れ、
+T5.3 で最初の public pack を実際に削除すること**とする。これが済むまで、
+**新しい `*_core.kotoba` の追加は debt を増やす**（今日書くビットパックは T5.3 で
+全部書き直しになる）。
+
+### 4. 再順序化した残りの計画
+
+```
+P1 record を product surface に入れる（compiler + kotoba-kir + kotoba-lang）
+   → :value-types に :record 追加 / dual-backend conformance
+P2 T5.3 パイロット（murakumo）— rebalance seats pack を record export に置換
+   → 続けて infer-schedule の flags:i64 を record 化、:bool 述語に戻す
+   → 新規 public export の has-* / base-N を落とす lint
+P3 T2.3（examples CI）+ T6.2（precompiled KIR を既定 artifact に）
+   ここまでで「書けるコードが美しいか」が測定可能になる
+P4 T8.3 production AOT（network/secret）+ T8.4 live host runner
+   → これが Cloudflare route 移行と残 product shell の律速
+P5 T6.4（cljs/browser で同一 artifact）→ pure mirror の削除
+P6 W4 recursive logical value → design-system の本移行
+   （form-A / Delivery-6 は中間 oracle。string-only SSR を最終 API にしない）
+P7 kotoba repo 自身 — `src/` の 39 本の .clj を
+   forever-host（launcher / IPLD / 署名検証の機構）と
+   Phase 4 後に .kotoba へ行くもの（admission の判断部分）に分類する。
+   aiueos の decision-free C mechanism / judgement-in-kotoba と同じ基準を使う。
+```
+
+並行可: P4 は P1–P3 と独立（capability トラック）。P6 は W4 待ちで着手不可。
+
+### 5. `kotoba-lang/kotoba` 自身の現在地（実測）
+
+`src/` は **76 `.kotoba` / 39 `.clj` / 8 `.cljc` / 1 `.cljs`**、`providers/` に
+20 `.kotoba`。同 repo の `docs/SOURCE-EXTENSION-INVENTORY.md` が正本で、
+`.cljc` 8 本（`kami_host` `sensing_host` `did_adapter` `git_adapter` `rad_adapter` 等）は
+3 target 共有の意図的な残置、機械的リネーム禁止。39 本の `.clj` は host-mechanism 層で
+今回の cutover 対象外。P7 でやるのは移植ではなく**分類の確定**。
+
+## Consequences
+
+- superproject から見た移行の現在地が 2026-07-29 断面に揃った。以後、現在地を
+  引用するときは ADR-2607289500 §2 ではなく **本 ADR と kotoba-lang の living plan**
+  を見る。ADR-2607289500 の capability CID 契約（§3）は引き続き有効。
+- **pin 鮮度そのものが移行のボトルネックになりうる**ことが実証された。kotoba-lang 系は
+  1 日に 20+ commit 着地するため、この面の計画作業に入る前に必ず pin を測り直す。
+- 「Kotoba は美しいか」への回答は分離できる: **capability モデル・
+  `surface-status.edn` の disposition 規律・definition CID による import identity は
+  設計として美しい。書けるコードはまだ美しくない。**両者のギャップは §3 の 1 点に
+  集約されており、言語仕様の限界ではなく実装の追随遅れである。
+
+## Non-goals
+
+- `max-parameters 5` の緩和（ADR-reliability-t54 で keep-5 が決着済み。record で解く）
+- 新しい application DSL の導入（ADR-2607279200）
+- `kotoba-lang` 側 living plan の書き換え — 同 repo は毎時更新されており、
+  本 ADR は superproject 側の断面固定に徹する
+"
+  :adr/consequences
+  ["west pin 13 件を前進（825 commit 分）。verify-west-pins でサーバ側検証済み"
+   "移行の現在地の出典が ADR-2607289500 §2 から本 ADR + kotoba-lang living plan に移る"
+   "pure-product-profile の :value-types に :record を入れることが最優先事項として確定"
+   "T5.3 完了までは新規 *_core.kotoba の追加を抑制する"]}]
