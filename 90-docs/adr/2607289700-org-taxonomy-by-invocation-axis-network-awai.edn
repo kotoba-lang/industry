@@ -487,7 +487,68 @@ Settlement 軸で gftd が保持) の記録を持つので、削除でなく arc
 ないというのが実測の答えで、D5 が二択 (actor か retire か) にしたのが誤りだった。
 `jp-ashiba` を cloud-itonami の governor 契約に載せるかどうかだけが本当の未決として残る。
 
-### Phase 4 — 未着手
+### Phase 4 前段 — organism 再判定を実施 (2026-07-29)。D7 は現状のままでは実行できない
+
+D9 は Phase 4 を「D7 の organism 再判定が終わってから着手」と条件付けていた。再判定を
+実施した結果、**D7「etzhayyim には artificial organism の自律 actor のみ」は repo レベルの
+フィルタとしては実行不可能**であることが分かった。
+
+#### 実測
+
+`80-data/system/artificial-organism-actors.json` に登録された organism は **9 件**で、
+すべて **プロダクト単位の did:key identity** (pds.aozora.app、`<product>-organism.aozora.app`):
+`itonami` / `manimani` / `isekai` / `shinshi` / `yukkuri` / `mangaka` / `babiniku` /
+`dougaka` / `animeka` — 全件 `state: registered`。
+
+- **9 件中 7 件が etzhayyim 側に repo を持つ** (`com-etzhayyim-app-<product>` および
+  `com-etzhayyim-<product>`)。持たないのは `shinshi` / `babiniku` の 2 件
+- しかし **1 organism は 2〜5 repo に分散し、2〜4 org にまたがる**。例: `isekai` は
+  `network-awai/network-isekai` + `kotoba-lang/kami-app-isekai` + `gftdcojp/ai-gftd-isekai`(archived)
+  + `etzhayyim/com-etzhayyim-isekai` + `etzhayyim/com-etzhayyim-app-isekai` の 5 箇所
+- **ADR-2607261601 の監査コーパス (612 entity、`90-docs/audits/etzhayyim-reorg-audit.datoms.edn`) は
+  organism 由来の etzhayyim repo を全件 `stay` に分類している** (`com-etzhayyim-app-itonami`
+  `com-etzhayyim-itonami` `com-etzhayyim-app-isekai` `com-etzhayyim-isekai`
+  `com-etzhayyim-app-manimani` `com-etzhayyim-app-yukkuri` `com-etzhayyim-app-mangaka`
+  `com-etzhayyim-app-dougaka` `com-etzhayyim-app-animeka` — すべて stay)
+- コーパスの移行先内訳 (実測クエリ): cloud-itonami 220 / stay 207 / kotoba-lang 108 /
+  gftdcojp 64 / stay-authority 11 / gftdcojp-or-stay 1 / delete 1 = 612
+
+#### 結論 — D7 を ADR-2607261601 の stay 集合と読み替える
+
+organism registry は**プロダクト単位**、D7 は**repo 単位**の規則なので、そのままでは
+噛み合わない。organism 由来の etzhayyim repo は監査でも全件 stay なので、D7 を機械適用
+しても 1 件も動かない。一方 D7 を字義通り「organism 以外は出す」と読むと、残り約 198 の
+stay repo (care / 相互扶助 / 憲章統治 / 観測 / 布教 / ファクトチェック / 宗教法務 /
+メンバー識別) まで追い出すことになり、**etzhayyim が宗教法人であることと矛盾する**。
+
+したがって **D7 は「etzhayyim = 宗教核 + organism の自律 actor」= ADR-2607261601 の
+`stay` + `stay-authority` (218 件) と読む**。D7 の「organism の自律 actor のみ」という
+記述は、この点で ADR-2607261601 を上書きしない。Phase 4 の実体は
+**ADR-2607261601 の Phase 1-3 (kotoba-lang 108 / cloud-itonami 220 / gftdcojp 64 = 392 repo の移送)**
+であり、その前提として同 ADR が挙げる `manifest/kotoba-boundaries.edn` の
+`:domain-actors` 更新が必要。本 ADR ではそこまで実行しない。
+
+#### 再判定の過程で見つかった manifest の実態乖離 (3 件)
+
+Phase 4 に着手する前に潰すべきものとして記録する。**移送より先にこちらを直す** —
+実態と食い違った manifest の上で 392 repo を動かすと乖離が増幅する。
+
+1. **etzhayyim の 5 repo が GitHub 上 archived なのに west が `groups: [etzhayyim]` のまま**
+   (`com-etzhayyim-business_manager` / `-gov_municipality` / `-infra_utility_connect` /
+   `-kotoba-datom` / `-kuni_umi`)。既定 west update の取得対象に残っていた。
+   **本 commit で整合させた**。ADR-2607261601 Phase 0 の twin 解消の残務にあたる
+   (twin 側の archive は実行済みだった)
+2. **etzhayyim の 26 repo が上流で bare name へ rename 済みなのに west は旧名のまま**
+   (`com-etzhayyim-aburi` -> `aburi` 等)。GitHub の redirect で fetch は通るため気付けない。
+   ただし **26 件中 21 件は bare name が既に他 org の west entry に取られている**ので、
+   追随には generator と同じ `<org>-<basename>` + `repo-path:` 変換が要る。**未実行**
+3. **`:manifest.repos/extra-projects` の陳腐化が `--check` STALE の主因**だった。
+   extra-projects は west.yml に無い旧 path (`orgs/gftdcojp/ai-gftd-ads` 等) を保持しており、
+   generator の `dup-basenames` は west path と extra-projects の**和集合**で計算されるため、
+   実在しない重複が名前を `<org>-<base>` に化けさせていた。Phase 3 で prefix を外したら
+   drift が 308 行 -> 195 行に減ったのはこれが理由。**未実行**
+
+### Phase 4 本体 — 未着手 (ADR-2607261601 Phase 1-3、392 repo)
 
 ## Consequences
 
@@ -514,6 +575,8 @@ Settlement 軸で gftd が保持) の記録を持つので、削除でなく arc
 5. ~~manimani 3 件の行き先~~ **決定 (2026-07-28): 3 件とも network-awai**
 6. ~~cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断~~ **決定 (2026-07-29): retire 2 件 (`ads` / `oshikatsu`) を archive。残りは app / library / data で actor 契約の対象外 — blueprint 起票という作業自体が存在しなかった (D5 の前提誤りを訂正)**。派生して残る唯一の未決は下記 9
 7. ~~`gftdcojp/ai-gftd-cyber-drill` と `cloud-itonami/cyber-drill`~~ **決定 (2026-07-29): `ai-gftd-cyber-drill` を archive、bare name は動く方 (cloud-itonami) が保持**
+10. etzhayyim 26 repo の上流 rename への west 追随 (21 件が bare name 衝突 — `<org>-<basename>` + `repo-path:` 変換が要る)
+11. `:manifest.repos/extra-projects` の陳腐化解消 (`gen-west-manifest.cljs --check` STALE の主因)
 8. ~~`cloud-itonami/ai-gftd-kaisya` (Clojure runtime) と `cloud-itonami/kaisya` (BPMN 5 点)~~ **決定 (2026-07-29): `ai-gftd-kaisya` を archive、bare name は BPMN 側が保持**
 9. `cloud-itonami/jp-ashiba` を cloud-itonami の governor 契約 (langgraph-clj StateGraph + 独立 Governor + append-only 台帳) に載せるか。現状は `actor/actor-manifest.jsonld` が Python/LangGraph pod を記述し、実体は cljc 8 モジュール + テストで governor を持たない"
 
