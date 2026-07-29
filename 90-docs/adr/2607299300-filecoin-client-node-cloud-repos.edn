@@ -1,0 +1,160 @@
+[{:db/id -1
+  :adr/id "adr-2607299300-filecoin-client-node-cloud-repos"
+  :adr/title "ADR-2607299300: Filecoin を io-filecoin / io-filecoin-node / cloud-filecoin の 3 repo に分け、前提の BLAKE2b と EVM ABI をそれぞれ独立 repo に切り出す"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-29"
+  :adr/last-verified "2026-07-29"
+  :adr/last_verified "2026-07-29"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "filecoin-client-node-cloud-repos"
+  :adr/authoritative-for
+  ["Filecoin を扱う repo の分割 (client / node / onchain-cloud) と、それぞれの reverse-domain 名"
+   "org-ietf-blake2 と org-ethereum-abi を独立 repo に切り出した判断とその根拠"
+   "各 repo の verification oracle (何を正解とみなすか) の選び方"
+   "実装していない領域 (PoRep/PoSt・BLS12-381・FVM・state・libp2p・署名・transport) の明示"]
+  :adr/supersedes []
+  :adr/body
+  "## 文脈
+
+`kotoba-lang` に Filecoin の実装は存在しなかった。superproject の ADR 3 件で
+「Filecoin と比べてこうする」という設計比較として言及されるだけで、コードは
+ゼロだった。オーナー指示は「storj とおなじ感じで filecoin も cli, node を
+設計実装」——`io-storj`(client library、CLI バイナリは持たない) と
+`io-storj-node`(node 側) の 2 repo 構成を Filecoin にも適用する、という意味に
+解した。加えて AskUserQuestion で 2 点を確定した:
+
+- BLAKE2b は **`org-ietf-blake2` を新設**して置く (io-filecoin に同梱しない)
+- Onchain Cloud (Synapse / PDP / Warm Storage / Filecoin Pay) も**同時に作る**
+
+## 決定
+
+### 1. 3 つの Filecoin repo に分ける
+
+| repo | 何を所有するか |
+|---|---|
+| `io-filecoin` | client がノードに言うこと: address (f0-f4)・message・署名が覆うバイト列・Lotus JSON-RPC |
+| `io-filecoin-node` | ノード**である**とはどういうことか: block header・tipset・mpool admission・base fee |
+| `cloud-filecoin` | Onchain Cloud: PieceCID v2・PDP・Filecoin Pay・Warm Storage |
+
+`io-storj` / `io-storj-node` と同じ境界。reverse-domain 命名は
+ADR-2607060100 / 2607052300 に従い、Filecoin は `filecoin.io` なので `io-` 接頭辞。
+Onchain Cloud は `filecoin.cloud` を名乗る別サービス面なので `cloud-` 接頭辞
+(`cloud-itonami` 等と同じ)。
+
+### 2. 前提を 2 つ、独立 repo に切り出した
+
+- **`org-ietf-blake2`** (RFC 7693)。Filecoin の address checksum (4 byte)・
+  actor address payload (20 byte)・CID (32 byte) はすべて BLAKE2b で、workspace
+  に存在しなかった。JDK に provider は無く、Node は `blake2b512` しか出さない。
+  そして **BLAKE2b-256 は BLAKE2b-512 の prefix ではない** (digest 長が
+  parameter block に入り初期状態が変わる) ので、512 を切り詰める実装は静かに
+  間違う。この誤解を名指しでテストしている。
+- **`org-ethereum-abi`**。head/tail 引数エンコーディングは Filecoin のもので
+  はない。workspace には既に `base-l2` の `abi.clj` があるが (a) JVM 専用
+  (selector 計算に keccak が要り、`eth-crypto` の keccak は :cljs で意図的に
+  throw する — JS の bitwise が 32bit に落ちるため) (b) **array と tuple で
+  throw する**。Onchain Cloud の contract は両方取る。`org-ietf-blake2` を
+  切り出したのと同じ判断。
+
+`org-ethereum-abi` には **keccak を置かない**。selector は呼び出し側が定数として
+持ち、signature の隣に書き、テストで検証する。これで library が両 runtime に
+残る。
+
+### 3. verification oracle は必ず「自分以外」から採る
+
+各 repo の主張の強さはこれで決まる。自分と一致するだけの実装には価値がない。
+
+| repo | oracle |
+|---|---|
+| `org-ietf-blake2` | CPython `hashlib.blake2b` (25 ケース、`testdata/gen_vectors.py` が生成) |
+| `io-filecoin` | `go-address` の `address_test.go` そのもの + **mainnet の実 message CID 10 件** |
+| `io-filecoin-node` | **mainnet の実 tipset** (9 block、header CID と ticket 順の tipset key) + lotus 自身の `basefee_test.go` の表 |
+| `org-ethereum-abi` | viem の `encodeAbiParameters` (37 ケース) |
+| `cloud-filecoin` | `@filoz/synapse-core/piece` の PieceCID・viem の `toFunctionSelector`・FilOzone 公表の deploy address |
+
+mainnet CID の再計算は 1 assertion で address bytes / sign-magnitude 金額 /
+field 順 / definite-length CBOR / BLAKE2b-256 / multihash prefix / base32 を
+同時に検査し、自己一致では通せない。
+
+**selector を ABI から採る判断は実測で正当化された**: cloud-filecoin の PDP
+selector 31 件をドキュメントから書いたところ **15 件が誤り**だった。特に
+`addPieces` は、もっともらしい `addPieces(uint256,(bytes)[],bytes)` が実際の
+`addPieces(uint256,address,(bytes)[],bytes)` より引数 1 つ少なく、selector は
+まったく別物になる。4 バイトの誤りは call が理由なく revert するまで区別が
+つかない。
+
+### 4. 実装していないことを明示する
+
+- **PoRep / WindowPoSt / 証明生成**: 無い。header の `win-post-proof` は
+  opaque bytes として運ぶだけ。
+- **BLS12-381**: 無い。したがって block signature は検証できず、
+  `bls-aggregate` は bytes。`IVerifier` が seam。
+- **secp256k1**: seam (`kotoba-lang/eth-crypto` に実装はあるが、curve 実装を
+  pin すると portable でなくなる)。
+- **FVM / state / HAMT / AMT**: 無い。`parent-state-root` は header に入れて
+  読み出せる CID であって、その先は読めない。
+- **libp2p / Graphsync / drand**: seam。
+- **署名と transport**: cloud-filecoin は calldata を返すだけ。**ここで組んだ
+  transaction を network に送ったことは一度も無い。**
+- **2^53 超の varint** (namespace / actor ID): **拒否する**。go-address は
+  2^63-1 まで許すが、JVM で 1 つの数・nbb で別の数になる値はエラーより悪い。
+
+## 帰結
+
+- 5 repo すべて public、`kotoba-lang` org。west 登録済み
+  (`manifest/repos.edn :extra-projects` + `--entry` の最小 diff、pin 検証 5 件 OK)。
+- 依存の向き: `cloud-filecoin` → (`io-filecoin`, `org-ethereum-abi`);
+  `io-filecoin-node` → `io-filecoin` → (`org-ietf-blake2`, `io-multiformats`,
+  `org-ietf-cbor`, `json`)。循環なし。
+- テスト総計 1,095 assertion、**JVM と nbb の両方で green**。両方走らせるのは
+  形式ではない: 64bit word (long vs BigInt)、byte の符号、2^53 超の金額、
+  SHA-256 の provider —— ほぼ全行が両者の食い違う場所を通る。
+- `base-l2` の `abi.clj` は `org-ethereum-abi` に置き換えられるが、この ADR では
+  移行しない (JVM 専用の既存利用があり、別スコープ)。
+
+## 実装中に見つけて直したもの (記録)
+
+- `filecoin.bigint/fil->atto` が local `neg?` を束縛して `clojure.core/neg?` を
+  隠し、次の行でそれを呼んで `ClassCastException` になっていた。
+- `filecoin.message/encode` が `:to` の有無で正規化要否を判定していた —— `:to` は
+  「手書きの生 map」にこそ存在するので、文字列 address がそのまま encoder に
+  渡っていた。正規化は冪等なので無条件に呼ぶよう変更。
+- `filecoin.bigint/div` は **Euclidean** (Go の `math/big.Int.Div`)。JVM の
+  `BigInteger.divide` も JS の `/` も 0 方向に切り捨てるので、負の被除数で
+  必ず 1 ずれる。base fee 計算は network が target 未満の epoch (= ほとんどの
+  epoch) で負の積を正の定数で割る。
+- nbb は **required namespace の top-level `(do ...)` 内で def した var を、
+  後続の top-level form から解決できない**。同じファイルを script として
+  実行すると通るので、最初のテストでは露見しない。`ethereum.abi.word` は
+  reader conditional を定義ごとに書く形にした (`blake2.word` が `do` で
+  済んでいるのは、利用側が同じ block 内にあるため)。
+- Glif の public endpoint は**同じ応答を改行区切りで 2 回返す**。
+  `Response.json()` はこれを拒否するので、chain vector generator は CI で
+  回らないまま静かに壊れていた。最初の 1 行だけを parse するよう修正。
+
+## 未達 / 引き継ぎ
+
+- `nbb scripts/gen-west-manifest.cljs --check` は STALE を報告するが、これは
+  **この変更の前から** STALE (他 project の local checkout が pin より進退して
+  いる、CLAUDE.md の言う「pin 退行の罠」)。本 ADR の 5 entry は
+  `--entry` の最小 diff で追加し、5 件とも server 側 pin 検証を通している。
+- `nbb scripts/west-orphan-audit.cljs --blocking` は exit 1。原因は
+  **既存の 2 件** (`orgs/gftdcojp/cloud-murakumo` consumers=10、
+  `orgs/network-awai/cloud-mamori` consumers=1) で、どちらも dir 不在かつ
+  west 未登録。本 ADR の 5 repo は audit に一切現れない。この 2 件の修復は
+  skill `git-cleanup-conflict` の担当で、別タスク。
+- `cloud-filecoin` は署名も transport も持たないので、実際に動く client に
+  するには `base-l2` の `rpc` + `eth-crypto` の署名を繋ぐ必要がある。
+  `eth-crypto` は EIP-1559 (type-2) tx をまだ署名できない (legacy EIP-155 のみ)。"
+
+  :adr/consequences
+  ["Filecoin を触るコードは 3 repo のどれかに属し、どこに置くかは client / node / onchain-cloud の境界で決まる"
+   "BLAKE2b と EVM ABI は Filecoin の外の repo にあるので、他の consumer が使うときに io-filecoin を引かなくてよい"
+   "selector・PieceCID・address はすべて upstream の publish から生成した表と照合されるので、upstream が変えれば CI が落ちる"
+   "署名・transport・証明生成が無いため、この 5 repo だけでは storage deal を実行できない"]
+  :adr/related
+  ["adr-2607060100" "adr-2607052300" "adr-2606302300" "adr-2607254100" "adr-2607211600"]}]
