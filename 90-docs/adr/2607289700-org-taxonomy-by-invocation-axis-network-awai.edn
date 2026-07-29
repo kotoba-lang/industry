@@ -347,8 +347,7 @@ D4/D5 の `ai-gftd-` prefix 廃止を実行した。**rename のみで、org 移
 | bare name へ rename | 46 | gftdcojp 26 / cloud-itonami 20 |
 | role suffix へ rename | 1 | `ai-gftd-murakumo` -> `murakumo-mlx` |
 | rename せず archive | 2 | `ai-gftd-kotoba` / `ai-gftd-kotobase` |
-| 保留 (裁定待ち) | 1 | `ai-gftd-cyber-drill` |
-| 裁定後に archive | 1 | `ai-gftd-kaisya` (2026-07-29) |
+| 裁定後に archive | 2 | `ai-gftd-kaisya` / `ai-gftd-cyber-drill` (いずれも 2026-07-29) |
 | 既 archive のため据え置き | 3 | `ai-gftd-dogaka` / `ai-gftd-isekai` / `ai-gftd-shinshi` |
 
 rename 47 件は preflight (source が存在し archived でない / target 名が org 内で空き)
@@ -363,18 +362,25 @@ GitHub の repo 名と一致している必要がある):
 | `gftdcojp/ai-gftd-kotoba` | `kotoba-lang/kotoba` | README が「submodule link を切った、別 clone を使え」と述べるだけの **pointer stub、code 0 file** | archive |
 | `gftdcojp/ai-gftd-kotobase` | `kotoba-lang/kotobase` | `MOVED.md.edn` が net-kotobase (現 network-awai) への移設を宣言。`wrangler.jsonc` 自身が「not because this is live」と注記 | archive |
 | `gftdcojp/ai-gftd-murakumo` | `kotoba-lang/murakumo` | 中身は `mlx-distributed/` (MLX tensor-parallel 推論) のみ。相手は WASM mesh control plane で**別物** | `murakumo-mlx` へ rename (CLAUDE.md の role suffix 規則) |
-| `gftdcojp/ai-gftd-cyber-drill` | `cloud-itonami/cyber-drill` | **同一プロダクトの二重抽出**。前者は gftdcojp/ai-gftd-apps-gftdcojp 由来で `:runtime/status :blocked-pending-kami-api-port` (実行不能な保存コピー)、後者は etzhayyim/root 由来で three-renderer WebVR + 鍵ゲート worker を持つ**動く方** | 保留 |
+| `gftdcojp/ai-gftd-cyber-drill` | `cloud-itonami/cyber-drill` | **同一プロダクトの二重抽出**。前者は gftdcojp/ai-gftd-apps-gftdcojp 由来で `:runtime/status :blocked-pending-kami-api-port` (実行不能な保存コピー)、後者は etzhayyim/root 由来で three-renderer WebVR + 鍵ゲート worker を持つ**動く方** | **archive** (2026-07-29 オーナー裁定) |
 | `cloud-itonami/ai-gftd-kaisya` | `cloud-itonami/kaisya` | **同一プロダクトの二重抽出**。前者は Clojure langgraph runtime (`:standalone-ready`)、後者は etzhayyim/root 由来の BPMN 5 点のみ (`:kind :standalone-app-artifact`) | **archive** (2026-07-29 オーナー裁定) |
 
 保留にした 2 件は mamori と同じ「同名だが実体が違う」ではなく **同じものが 2 系統から抽出されて
 両方生き残っている**ケースで、どちらが正本かを決めるのは配置ではなく製品の裁定なので
 機械的な role suffix では逃がさなかった (逃がすと二重管理を固定化する)。
 
-**`ai-gftd-kaisya` は 2026-07-29 のオーナー裁定で archive した。** bare name `kaisya` は
-etzhayyim/root 由来の BPMN 側 (`cloud-itonami/kaisya`) が保持する。archive 側にある
-Clojure langgraph runtime (`clj/src/kaisya/{graphs/registry,server}.cljc`) は消えておらず、
-pin `ab9fe84119` から復元できる。west では `groups: [archived]` にして既定取得対象から外した。
-残る保留は `ai-gftd-cyber-drill` 1 件。
+**2 件とも 2026-07-29 のオーナー裁定で archive した。保留は 0 件になった。**
+
+- `ai-gftd-kaisya`: bare name `kaisya` は etzhayyim/root 由来の BPMN 側 (`cloud-itonami/kaisya`)
+  が保持する。archive 側の Clojure langgraph runtime
+  (`clj/src/kaisya/{graphs/registry,server}.cljc`) は消えておらず pin `ab9fe84119` から復元できる
+- `ai-gftd-cyber-drill`: bare name `cyber-drill` は etzhayyim/root 由来で実際に動く方
+  (`cloud-itonami/cyber-drill`、three-renderer WebVR + 鍵ゲート worker `cyber-drill-vendor`)
+  が保持する。archive 側は `RUNTIME-STATUS.edn` 自身が `:blocked-pending-kami-api-port` と
+  宣言する実行不能な保存コピーで、`semiconductor-chem-plant` シナリオ IP は pin `d6bbfcfe02`
+  から復元できる
+
+どちらも west では `groups: [archived]` にして既定取得対象から外した。
 
 既に GitHub archived だった 3 件 (`ai-gftd-dogaka` / `ai-gftd-isekai` /
 `ai-gftd-shinshi`) は rename しなかった。archived repo の rename は
@@ -425,7 +431,7 @@ unarchive -> rename -> 再 archive を要し、**retired identity を書き換�
 4b. ~~`ai-gftd-deai` の行き先~~ **決定 (2026-07-28): network-awai/`deai`**
 5. ~~manimani 3 件の行き先~~ **決定 (2026-07-28): 3 件とも network-awai**
 6. cloud-itonami 内 ai-gftd-* 19 件 (非 actor) の retire / blueprint 起票の individual 判断 (Phase 3 では rename のみ実施、判断は未着手)
-7. `gftdcojp/cyber-drill` (旧 ai-gftd-cyber-drill は保留のまま) と `cloud-itonami/cyber-drill` — 同一プロダクトの二重抽出。どちらを正本にするか (前者は実行不能な vendor-private 保存コピー、後者は動く WebVR + worker)
+7. ~~`gftdcojp/ai-gftd-cyber-drill` と `cloud-itonami/cyber-drill`~~ **決定 (2026-07-29): `ai-gftd-cyber-drill` を archive、bare name は動く方 (cloud-itonami) が保持**
 8. ~~`cloud-itonami/ai-gftd-kaisya` (Clojure runtime) と `cloud-itonami/kaisya` (BPMN 5 点)~~ **決定 (2026-07-29): `ai-gftd-kaisya` を archive、bare name は BPMN 側が保持**"
 
   :adr/decision-summary
