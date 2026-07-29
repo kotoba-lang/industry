@@ -18,7 +18,8 @@
    "実装していない領域 (PoRep/PoSt・BLS12-381・FVM・state・libp2p・署名・transport) の明示"
    "FRC-0042 method number の導出と、それが calldata と message を繋ぐ唯一の経路であること"
    "signature type ごとに『何に署名するか』が違い、delegated (3) は message CID を覆わないこと"
-   "secp256k1 署名 (f1 経路) を io-filecoin-signer に置き、io-filecoin の src/ には curve を pin しないこと"]
+   "secp256k1 署名 (f1 経路) を io-filecoin-signer に置き、io-filecoin の src/ には curve を pin しないこと"
+   "transport (IHttp) と call 順序を io-filecoin-transport に置き、live 検証は read-only に限ること"]
   :adr/supersedes []
   :adr/body
   "## 文脈
@@ -244,6 +245,62 @@ delegated vector で「recover しても From に戻らない」ことを主張�
 現在の pin: io-filecoin-signer `0e679827`。assertion 44 (JVM / nbb 両方 green)。
 **ここで署名した message を network に送ったことはまだ無い。**
 
+## 追補 (2026-07-29 その3): 初めて実ノードに繋いだ
+
+`io-filecoin-transport` を新設 (kotoba-lang, public, west 登録済み)。
+`filecoin.transport` が `IHttp` の実装 (JVM は `java.net.http`、Node/Worker は
+`fetch`。HTTP library は入れない——platform を pin するだけで capability が
+増えない)、`filecoin.client` が **呼ぶ順序**。
+
+順序が本体である理由 (単発の request では現れない失敗):
+①gas 見積もりは **nonce を入れた後**の message に対して行う (見積もりは
+serialize した message から計算され、nonce はその一部) ②`GasEstimateMessageGas`
+は数値3つではなく **message 全体**を返す (GasLimit だけ取って自前の fee cap を
+残すと base fee 割れで pool に滞留する) ③署名は **gas を入れた後**に取る
+(gas を埋めると CID が動く。これはテストで assert している)。
+
+### live 検証 (mainnet、read-only、鍵も資金も無し)
+
+    ok  ChainHead height → 6233477
+    ok  StateNetworkName → "mainnet"
+    ok  MpoolGetNonce → 22067
+    ok  WalletBalance → "27318921114299575156" attoFIL
+    ok  GasEstimateMessageGas → {:gas-limit 926078 :gas-fee-cap "54773194" :gas-premium "101618"}
+    ok  PDPVerifier.getChallengeFinality() via StateCall → ["150"]
+    ok  PDPVerifier.getNextDataSetId() via StateCall → ["1413"]
+    7 checks, 0 failed
+
+`StateCall` は message を現在の state に対して実行して結果を捨てる——署名も
+gas も資金も不要で、chain には何も載らない。最後の2件が本命で、**deployed
+PDPVerifier への実 contract call** を FRC-0042 method number → CBOR params
+wrapper → f410f addressing → selector → ABI decode と通す。**5 repo が同時に
+正しいことは offline テストでは示せない。**
+
+これで各 README の「no live request has ever been made from this code」は
+read 経路については解消した。**write (署名した message の送信) は未実施。**
+
+### live 検証が初回実行で見つけたバグ
+
+`filecoin.rpc/message->json` が `:to` の有無で正規化要否を判定していた——
+`:to` は手書きの生 map にこそ存在するので、文字列がそのまま address encoder に
+渡っていた。`encode` で既に直した罠と同型で、こちらを直し忘れていた。
+lotus の応答は `unmarshaling params: unknown address protocol` で、
+**「正規化していない」ではなく「request が壊れている」ように読める**。
+offline テストは1つも捕まえられず、最初の live `GasEstimateMessageGas` が
+捕まえた (io-filecoin `244db55`)。
+
+### ClojureScript 側だけで壊れていた2件 (JVM からは見えない)
+
+①`reify` は cljs で `IWithMeta` ではないので `with-meta` が throw する
+(recording transport は第2の protocol でログを露出するよう変更)
+②`.then` の中に書いた assertion は `run-tests` が結果を報告した**後**に走る——
+この suite は **両 runtime で green のまま、cljs 側だけ 10 assertion しか
+実行していなかった** (JVM は 19)。`clojure.test/async` を通すよう全 async
+テストを書き直し、両者 20 で一致。**「両方 green」は「両方同じだけ検査した」
+を意味しない。**
+
+現在の pin: io-filecoin `244db55`、io-filecoin-transport `99939bfb`。
+
 ## 未達 / 引き継ぎ
 
 - `nbb scripts/gen-west-manifest.cljs --check` は STALE を報告するが、これは
@@ -255,8 +312,10 @@ delegated vector で「recover しても From に戻らない」ことを主張�
   `orgs/network-awai/cloud-mamori` consumers=1) で、どちらも dir 不在かつ
   west 未登録。本 ADR の 5 repo は audit に一切現れない。この 2 件の修復は
   skill `git-cleanup-conflict` の担当で、別タスク。
-- **(a) native 経路 (f1・secp256k1) は署名まで閉じた。** 残るのは
-  **transport だけ**——`IHttp` の実装がどの repo にも無い。
+- **(a) native 経路 (f1・secp256k1) は transport まで閉じた。** read は実ノードで
+  検証済み。**残るのは write の実行だけで、それには資金のある testnet 鍵が要る**
+  (安全床②により agent は資金操作をしない)。write 経路の失敗様態は現状
+  「議論した」だけで「実証した」ではない。
 - **(b) Ethereum 経路 (f410f・delegated) は依然未実装。** keccak が JVM 専用
   だという以前の記述は誤り (`eth-crypto` は dual-platform 化済み)。実際に
   足りないのは lotus が要求する Filecoin↔EthTransaction の byte 一致
