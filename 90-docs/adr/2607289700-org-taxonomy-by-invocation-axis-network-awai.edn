@@ -784,6 +784,31 @@ cleanup-workflow.edn の「credential-looking paths は skip」に従い除外�
 結果: project **3,822 -> 3,925**、`gen-west-manifest.cljs --check` = `west.yml is up to date`、
 `west-orphan-audit --blocking` の blocking は **0 件**。
 
+#### `com-etzhayyim-` は D4 の prefix 廃止対象ではない — reverse-DNS 識別子である
+
+残っていた `com-etzhayyim-*` 命名を D4 (`ai-gftd-` prefix 廃止) と同じ扱いにするか検討し、
+**しない**と結論した。実測: west には reverse-DNS 接頭辞を持つ entry が
+**`com-*` 1,261 / `org-*` 91 / `io-*` 10 / `net-*` 5 / `tech-*` 1** ある
+(`com-nvidia-isaac-sim` / `com-aave` / `com-abb-robotics` / `com-accela` /
+`org-w3-webgpu` / `org-bluesky-atproto` / `io-ipld` / `io-storj-node` /
+`tech-ipfs-specs-ipns` など)。
+
+つまり `com-etzhayyim-*` は **`com.etzhayyim` という reverse-DNS の identity 接頭辞**で、
+`ai-gftd-` のような vendor 留保マーカーとは別物。D4 の論拠は「vendor 名は identity では
+ない」であって、reverse-DNS の org identity には当たらない。204 件を bare name にすると
+残り 1,361 件の reverse-DNS repo と不整合になるので、**現状維持が正しい**。
+
+(prefix を外した場合の機械的な衝突は 204 中 8 件だけで技術的には可能だったが、
+「できる」と「すべき」は別だった。)
+
+ただし **org を出た repo が `com-etzhayyim-` を名乗り続けるのは別問題**。
+`cloud-itonami/com-etzhayyim-app-lawyer` と `cloud-itonami/com-etzhayyim-okaimono` は
+cloud-itonami へ移送済みだが旧名のまま。中身を開けると did:web シェルではなく
+**別ファセット**だった (`app-lawyer` = appview + PROJECT.jsonld / `lawyer` = AT Protocol
+lexicon + deploy workflow、`com-etzhayyim-okaimono` = `cells/*.edn` ドメインロジック /
+`okaimono` = project record)。bare name 側と役割が違い名前で区別できているので改名せず、
+未登録だった west 登録のみ行った。
+
 ### 未着手として残るもの — ADR-2607261601 Phase 5 (統合リファクタ)
 
 移送は終わったが、同 ADR が「別途設計」とした**重複クラスタの統合**は手つかず。実測 (2026-07-29):
