@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 5070, "kotobase-cf-wasm-staging" 2543},
+ {"net-kotobase" 5091, "kotobase-cf-wasm-staging" 2543},
  :zone
- {:requests-7d 9200,
-  :pageviews-7d 467,
-  :uniques-7d-sum 658,
+ {:requests-7d 9245,
+  :pageviews-7d 470,
+  :uniques-7d-sum 664,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 105}
-   {:path "/", :requests 94}
+  [{:path "/health", :requests 107}
+   {:path "/", :requests 95}
    {:path "/_health", :requests 79}
-   {:path "/robots.txt", :requests 24}
+   {:path "/robots.txt", :requests 25}
    {:path "/llms.txt", :requests 22}
    {:path "/llms-full.txt", :requests 20}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 18}
-   {:path "/.well-known/did.json", :requests 18}],
-  :status-mix {:client-error 867, :server-error 32, :ok 541},
+   {:path "/.well-known/did.json", :requests 18}
+   {:path "/_app/meta", :requests 13}],
+  :status-mix {:server-error 34, :client-error 870, :ok 533},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,12 +30,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-29",
- :traffic-quality {:window "24h", :probe-4xx-pct 60, :error-5xx-pct 2},
+ :traffic-quality {:window "24h", :probe-4xx-pct 61, :error-5xx-pct 2},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 105 · / 94 · /_health 79 · /robots.txt 24 · /llms.txt 22 | 4xx(probe) 60% · 5xx 2%",
- :funnel {:visitors 1506, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 107 · / 95 · /_health 79 · /robots.txt 25 · /llms.txt 22 | 4xx(probe) 61% · 5xx 2%",
+ :funnel {:visitors 1509, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 9200 req/7d・658 uniques(日次和)・うち4xx probe 60%(24h)、workers 7613 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 9245 req/7d・664 uniques(日次和)・うち4xx probe 61%(24h)、workers 7634 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 4,
   :submissions 3,

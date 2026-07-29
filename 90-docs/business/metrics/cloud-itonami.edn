@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-07-29T11:15:44.096Z",
+ :asOf "2026-07-29T12:15:05.821Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,9 +9,9 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 3934,
+ {:requests-7d 4642,
   :pageviews-7d 26,
-  :uniques-7d-sum 124,
+  :uniques-7d-sum 125,
   :zone "itonami.cloud"},
  :agentRuns7d 2328,
  :sources [:cloudflare :health :emitter :itonami-free-path],
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-07-29T11:15:44.772Z",
+  :asOf "2026-07-29T12:15:06.749Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -140,7 +140,7 @@
  :freePathDocs "/docs/free-path.md",
  :paths
  {:ok
-  [{:path "/v1/events/poll", :requests 2235}
+  [{:path "/v1/events/poll", :requests 2930}
    {:path "/itonami/verticals", :requests 6}
    {:path "/join/browser", :requests 5}
    {:path "/robots.txt", :requests 5}
@@ -148,7 +148,7 @@
    {:path "/health", :requests 4}
    {:path "/v1/webhooks/microsoft", :requests 3}
    {:path "/oauth2/v3/certs", :requests 3}],
-  :status-mix {:client-error 1284, :server-error 15, :ok 2272},
+  :status-mix {:client-error 1304, :server-error 15, :ok 2967},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
@@ -189,9 +189,9 @@
   :externalPaid 0,
   :freePathApiAlias "/api/free-path"},
  :ok true,
- :traffic-quality {:window "24h", :probe-4xx-pct 36, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 30, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/events/poll 2235 · /itonami/verticals 6 · /join/browser 5 · /robots.txt 5 · /itonami 5 | 4xx(probe) 36% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/events/poll 2930 · /itonami/verticals 6 · /join/browser 5 · /robots.txt 5 · /itonami 5 | 4xx(probe) 30% · 5xx 0%",
  :freeClaimDocs "/docs/free-path.md",
  :funnel
  {:trials 5,
@@ -201,7 +201,7 @@
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 3934 req/7d・124 uniques(日次和)・うち4xx probe 36%(24h)",
+ "itonami.cloud 実測 4642 req/7d・125 uniques(日次和)・うち4xx probe 30%(24h)",
  :tenants
  {:active 5,
   :external-paid 0,
