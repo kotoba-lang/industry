@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 13112, "etzhayyim-xrpc-proxy" 777},
+ {"etzhayyim-did-web" 13263, "etzhayyim-xrpc-proxy" 778},
  :zone
- {:requests-7d 56138,
-  :pageviews-7d 1811,
-  :uniques-7d-sum 2503,
+ {:requests-7d 56522,
+  :pageviews-7d 1822,
+  :uniques-7d-sum 2520,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 23}
-   {:path "/sitemap.xml", :requests 12}
+  [{:path "/robots.txt", :requests 27}
+   {:path "/sitemap.xml", :requests 13}
    {:path "/xrpc/com.etzhayyim.apps.kotoba.root", :requests 6}
    {:path "/system-dynamics", :requests 4}
+   {:path "/gov", :requests 3}
    {:path "/_shell/liquid-glass.css", :requests 3}
    {:path "/news/wp-includes/wlwmanifest.xml", :requests 3}
-   {:path "/2019/wp-includes/wlwmanifest.xml", :requests 3}
-   {:path "/_shell/shell.css", :requests 3}],
-  :status-mix {:client-error 893, :server-error 966, :ok 259},
+   {:path "/2019/wp-includes/wlwmanifest.xml", :requests 3}],
+  :status-mix {:client-error 907, :server-error 970, :ok 266},
   :window "24h"},
  :as-of "2026-07-29",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 42, :error-5xx-pct 46},
+ {:window "24h", :probe-4xx-pct 42, :error-5xx-pct 45},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 23 · /sitemap.xml 12 · /xrpc/com.etzhayyim.apps.kotoba.root 6 · /system-dynamics 4 · /_shell/liquid-glass.css 3 | 4xx(probe) 42% · 5xx 46%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 27 · /sitemap.xml 13 · /xrpc/com.etzhayyim.apps.kotoba.root 6 · /system-dynamics 4 · /gov 3 | 4xx(probe) 42% · 5xx 45%",
  :signal
- "etzhayyim.com 実測 56138 req/7d・2503 uniques(日次和)・うち4xx probe 42%(24h)、workers 13889 inv/7d"}
+ "etzhayyim.com 実測 56522 req/7d・2520 uniques(日次和)・うち4xx probe 42%(24h)、workers 14041 inv/7d"}

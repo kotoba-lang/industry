@@ -8,20 +8,20 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 14875,
-  "app-aozora-appview" 10141,
-  "app-aozora-spa" 4066},
+ {"app-aozora-pds" 15024,
+  "app-aozora-appview" 10212,
+  "app-aozora-spa" 4120},
  :zone
- {:requests-7d 431443,
-  :pageviews-7d 9948,
-  :uniques-7d-sum 997,
+ {:requests-7d 437938,
+  :pageviews-7d 9999,
+  :uniques-7d-sum 1000,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 150449}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 4003}
+    :requests 151015}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 4140}
    {:path
     "/kotobase-cf-wasm-testnet/ipns/bafyreidwhkvt3omcwb6ytmiy6npf42crhvbekxi7aovgxjhl6hgrmsnvcm.json",
     :requests 253}
@@ -32,11 +32,11 @@
    {:path "/.env.testing", :requests 52}
    {:path "/test", :requests 52}
    {:path "/rest/tags", :requests 49}],
-  :status-mix {:ok 156886, :client-error 1072, :server-error 75},
+  :status-mix {:ok 157573, :client-error 1017, :server-error 83},
   :window "24h"},
  :as-of "2026-07-29",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 150449 · /xrpc/ai.gftd.apps.kotobase.datomic.view 4003 · /kotobase-cf-wasm-testnet/ipns/bafyreidw… 253 · /kotobase-cf-wasm-testnet/ipns/bafyreiax… 178 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 57 | 4xx(probe) 1% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 151015 · /xrpc/ai.gftd.apps.kotobase.datomic.view 4140 · /kotobase-cf-wasm-testnet/ipns/bafyreidw… 253 · /kotobase-cf-wasm-testnet/ipns/bafyreiax… 178 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 57 | 4xx(probe) 1% · 5xx 0%",
  :signal
- "aozora.app 実測 431443 req/7d・997 uniques(日次和)・うち4xx probe 1%(24h)、workers 29082 inv/7d"}
+ "aozora.app 実測 437938 req/7d・1000 uniques(日次和)・うち4xx probe 1%(24h)、workers 29356 inv/7d"}
