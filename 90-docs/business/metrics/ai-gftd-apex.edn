@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6623, "ai-gftd-chat-shell" 4},
+ {"magatama-sh1n5h1x" 6943, "ai-gftd-chat-shell" 4},
  :zone
- {:requests-7d 512903,
-  :pageviews-7d 15694,
-  :uniques-7d-sum 5087,
+ {:requests-7d 515915,
+  :pageviews-7d 15704,
+  :uniques-7d-sum 5101,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
@@ -17,9 +17,9 @@
    {:path "/wordpress/", :requests 24}
    {:path "/dev/", :requests 24}
    {:path "/4PJcpMFsD8B.php", :requests 23}
-   {:path "/wp-content/themes/index.php", :requests 21}
-   {:path "/favicon.ico", :requests 21}],
-  :status-mix {:client-error 1450, :server-error 15828, :ok 883},
+   {:path "/favicon.ico", :requests 23}
+   {:path "/assets/main.js", :requests 22}],
+  :status-mix {:client-error 1453, :server-error 15805, :ok 890},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -36,5 +36,5 @@
  "上位 page (24h, 2xx/3xx): /v1/generation/jobs/c2153fbd255a44a4bce0… 48 · /k.php 40 · //wp-includes/assets/ 32 · /wordpress/ 24 · /dev/ 24 | 4xx(probe) 8% · 5xx 87%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 512903 req/7d・5087 uniques(日次和)・うち4xx probe 8%(24h)、workers 6627 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 515915 req/7d・5101 uniques(日次和)・うち4xx probe 8%(24h)、workers 6947 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
