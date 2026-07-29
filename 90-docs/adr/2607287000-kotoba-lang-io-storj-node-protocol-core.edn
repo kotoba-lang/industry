@@ -22,9 +22,9 @@
    "adr-2607254100-kotoba-lang-sigv4-shared-signer-and-kotoba-byte-slice"
    "adr-2606302300-org-taxonomy-library-placement"]
   :adr/decision-summary
-  "{:repos [\"kotoba-lang/io-storj-node\" \"kotoba-lang/proto\"], :namespaces [storj.node.id storj.node.pb storj.node.orders storj.node.piece storj.node.identity storj.node.der storj.node.protocols storj.node.bytes storj.node.host.verify storj.node.certificate storj.node.mint storj.node.host.keys proto.wire], :in-scope [:node-id :signing-form-bytes :order-limit-admission :piece-layout :v1-piece-header :peer-certificate-rules :node-id-derivation-from-ca-key :signature-verification :identity-generation], :out-of-scope [:tls-handshake :sockets :identity-persistence :settlement :retain-gc :graceful-exit :streaming :uplink-side], :deps [io.github.kotoba-lang/proto io.github.kotoba-lang/io-multiformats], :verification [:storj-own-encoder-vectors :published-satellite-node-ids :real-generated-identity-fixture :real-storj-signatures :minted-identity-accepted-by-storj :byte-identical-certificate-reconstruction :two-runtime-parity :negative-controls], :live-satellite-request :never-performed}"
+  "{:repos [\"kotoba-lang/io-storj-node\" \"kotoba-lang/proto\"], :namespaces [storj.node.id storj.node.pb storj.node.orders storj.node.piece storj.node.identity storj.node.der storj.node.protocols storj.node.bytes storj.node.host.verify storj.node.certificate storj.node.mint storj.node.pem storj.node.host.keys proto.wire], :in-scope [:node-id :signing-form-bytes :order-limit-admission :piece-layout :v1-piece-header :peer-certificate-rules :node-id-derivation-from-ca-key :signature-verification :identity-generation :identity-files], :out-of-scope [:tls-handshake :sockets :settlement :retain-gc :graceful-exit :streaming :uplink-side], :deps [io.github.kotoba-lang/proto io.github.kotoba-lang/io-multiformats], :verification [:storj-own-encoder-vectors :published-satellite-node-ids :real-generated-identity-fixture :real-storj-signatures :minted-identity-accepted-by-storj :byte-identical-certificate-reconstruction :byte-identical-pem :identity-directory-loaded-by-storj :two-runtime-parity :negative-controls], :live-satellite-request :never-performed}"
   :adr/artifacts
-  "{:repo \"orgs/kotoba-lang/io-storj-node\", :pin \"3fe87d519fd70c00d2cd47e3d45fb8d930a20b98\", :vector-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_vectors.go\", :vectors \"orgs/kotoba-lang/io-storj-node/testdata/vectors.edn\", :identity-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_identity.go (-verify in CI)\", :identity-fixture \"orgs/kotoba-lang/io-storj-node/testdata/identity.edn\", :signature-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_sigs.go (-verify in CI)\", :signature-fixture \"orgs/kotoba-lang/io-storj-node/testdata/sigs.edn\", :verifier \"orgs/kotoba-lang/io-storj-node/src/storj/node/host/verify.cljc\", :mint-verifier \"orgs/kotoba-lang/io-storj-node/testdata/verify_minted.go\", :mint-script \"orgs/kotoba-lang/io-storj-node/scripts/mint_identity.cljc\", :wire-codec \"orgs/kotoba-lang/proto/src/proto/wire.cljc\", :evidence {:as-of \"2026-07-29\", :io-storj-node {:jvm \"82 tests / 315 assertions, 0 failures 0 errors\", :cljs \"nbb — same 82 tests / 315 assertions\", :go-verify \"gen_identity.go -verify 9/9, gen_sigs.go -verify 9/9, gen_vectors.go byte-identical, verify_minted.go 18/18 on identities minted by both runtimes\", :lint \"clj-kondo 0 errors 0 warnings\", :negative-controls \"19 in total: 6 protocol core, 11 verifier across both runtimes, 8 minting\"}, :proto {:jvm \"11 tests / 67 assertions\", :cljs \"9 tests / 57 assertions\"}}}"
+  "{:repo \"orgs/kotoba-lang/io-storj-node\", :pin \"21fb27ee81c1f73fc9c4b3489a86843386f01f0f\", :vector-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_vectors.go\", :vectors \"orgs/kotoba-lang/io-storj-node/testdata/vectors.edn\", :identity-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_identity.go (-verify in CI)\", :identity-fixture \"orgs/kotoba-lang/io-storj-node/testdata/identity.edn\", :signature-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_sigs.go (-verify in CI)\", :signature-fixture \"orgs/kotoba-lang/io-storj-node/testdata/sigs.edn\", :verifier \"orgs/kotoba-lang/io-storj-node/src/storj/node/host/verify.cljc\", :mint-verifier \"orgs/kotoba-lang/io-storj-node/testdata/verify_minted.go\", :mint-script \"orgs/kotoba-lang/io-storj-node/scripts/mint_identity.cljc\", :pem-fixture \"orgs/kotoba-lang/io-storj-node/testdata/identity.cert (go run gen_identity.go -pem, deterministic, diffed in CI)\", :wire-codec \"orgs/kotoba-lang/proto/src/proto/wire.cljc\", :evidence {:as-of \"2026-07-29\", :io-storj-node {:jvm \"97 tests / 383 assertions, 0 failures 0 errors\", :cljs \"nbb — same 97 tests / 383 assertions\", :go-verify \"gen_identity.go -verify 9/9, gen_sigs.go -verify 9/9, gen_vectors.go and identity.cert byte-identical, verify_minted.go 24/24 on identity directories written by both runtimes\", :lint \"clj-kondo 0 errors 0 warnings\", :negative-controls \"27 in total: 6 protocol core, 11 verifier across both runtimes, 8 minting, 8 identity files\"}, :proto {:jvm \"11 tests / 67 assertions\", :cljs \"9 tests / 57 assertions\"}}}"
   :adr/body
   "# Context
 
@@ -66,6 +66,7 @@ ADR-2607254000 が native uplink を退けた根拠（erasure coding + satellite
 | `storj.node.host.verify` | 参照 `IVerifier` — Storj が提示する 4 方式の署名検証 |
 | `storj.node.certificate` | Storj identity を成す 2 枚の証明書（書き手） |
 | `storj.node.mint` | proof of work と、それが名付ける identity |
+| `storj.node.pem` | PEM / base64 — identity のディスク上の姿 |
 | `storj.node.host.keys` | 参照 `IKeyMaterial` — 鍵生成・署名・乱数 |
 
 **非対象（README に明記）**: TLS ハンドシェイクと socket / identity 生成（PoW と
@@ -213,6 +214,40 @@ subjectKeyIdentifier を持つかまで、18 項目）。**parser が自分の w
 byte）。parse が通るだけの証明書には「合法だが別の符号化」の余地が残るが、一致には
 残らない。
 
+## 2.8. identity ファイル — 鋳造より読み込みの方が要る（2026-07-29 追加）
+
+**`mint` は面白い方であって、役に立つ方ではない。** node 運用者は数ヶ月前に
+`identity create` を走らせて `ca.cert` / `ca.key` / `identity.cert` /
+`identity.key` の 4 ファイルを持っており、それに対してやるべきことは**読むこと**だけ。
+
+- **鍵ファイルは PEM 包みの PKCS#8**（`pkcrypto.WritePrivateKeyPEM`）。古い identity は
+  SEC1（`EC PRIVATE KEY`）を持ち、`PrivateKeyFromPEM` は今も受理するので**読める必要がある**。
+- **`identity.cert` は leaf → CA の順**（`FullIdentity.Chain()`）。逆順でも parse は通り、
+  **別の node を名乗る**（id は chain の `ca-index` にある証明書から出るため）。
+- base64 は**この repo で書いた** — `io-multiformats` が持つのは base58 と base32 で、
+  それは multihash と CID が要るものだから。60 行の table lookup は依存より安い。
+  RFC 4648 のベクタと、Go が書いた実ファイルの両方に対して検査する。
+
+### Go に寄せる所と、寄せない所
+
+`encoding/pem` は最初の `-----BEGIN` より前を読み飛ばすので**ここも読み飛ばす**
+（実運用の identity ファイルはコメントを持つ。拒否したら本物を拒否することになる）。
+だが **`BEGIN` に対応する `END` が無い場合はエラーにする** — Go の `pem.Decode` は
+残りの入力を返すので、chain を読む呼び出し側は**ファイルにある証明書より 1 枚少ない
+chain を、エラー無しで**受け取る。本当に 1 枚だったファイルと区別が付かない。
+
+### 証拠
+
+`storj.node.identity/chain-pem` の出力は `pkcrypto.WriteCertPEM` と **byte 一致**。
+`testdata/identity.cert` は記録済み証明書に対する Go の出力で、**identity 自体と違って
+決定的**なので CI は再生成して diff する（再検証で済ませない）。さらに minting ジョブは
+**identity ディレクトリを丸ごと書き**、`identity.FullIdentityFromPEM` と
+`FullCAConfig.Load` に読み戻させる（24 項目。各秘密鍵が本当にその証明書の鍵かまで）。
+
+**SEC1 鍵は読めるが import はしない。** SEC1 を PKCS#8 に包むには曲線 OID を手で書く
+ことになり、「ほぼ正しい」を作りやすく、間違えると**誰も受理しない署名**としてしか
+現れない。openssl 一発の方が、テストされていない変換より良い答え。
+
 ## 3. 検証 — 自分の出力を自分に assert しない
 
 この protocol の要点は自己検証できない。`encode-order-limit-for-signing` が
@@ -287,6 +322,17 @@ ed25519 に SPKI 前置を被せない / ed25519 に digest 名を渡す / data 
 失敗を出さない control と結果を出さない control は遠目には同じに見えるが、
 どちらも証拠ではない。
 
+identity ファイル側の negative control も 8 本（base64 の英字を 2 つ入れ替える /
+PEM を 76 桁で折る / END の後の改行を落とす / padding を削らない / 未終端ブロックを
+Go のように読み飛ばす / chain を CA 先頭で書く / 証明書以外のブロックを拒否せず除去する /
+鍵を SEC1 ラベルで書く）。
+
+**うち 1 本は本当に通ってしまい、原因はコードではなくテストだった。** 未終端ブロックの
+検査を丸ごと外しても suite が緑のままだったのは、テストが `thrown?` を使っていて、
+検査が消えた結果出る **NullPointerException を「拒否」として受理していた**から。
+`pem_test.cljc` の拒否テストは全て `thrown-with-msg?` で**どのエラーか**を指定するように
+した。**任意の例外を受理するテストは、名乗っている拒否を検査していない。**
+
 minting 側の negative control は 8 本（拡張の入れ子を潰す / OID 蓄積変数を再束縛から
 初期化 / unused-bit を固定値にする / INTEGER の符号 byte を落とす / difficulty を無視して
 最初の鍵を採る / leaf を自分の鍵で署名する / SKI を SPKI 全体から取る / validity を
@@ -351,9 +397,11 @@ JS で `Uint8Array` を要求し、base58 decode の戻り値も分岐する）�
 - `io-storj-node`: JVM 82 tests / 315 assertions、nbb で同じ 82 / 315、
   clj-kondo 0 errors 0 warnings。negative control は計 19 本（protocol core 6 /
   verifier 11（両 runtime）/ minting 8）。`storj.io/common` に対して
-  `gen_identity.go -verify` 9/9・`gen_sigs.go -verify` 9/9、`gen_vectors.go` は
-  byte 一致、**`verify_minted.go` が両 runtime の鋳造した identity を 18/18 で受理**。
-  実 Storj 証明書の tbsCertificate を byte 単位で再構築（CA 282 / leaf 268）。
+  `gen_identity.go -verify` 9/9・`gen_sigs.go -verify` 9/9、`gen_vectors.go` と
+  `identity.cert` は byte 一致、**`verify_minted.go` が両 runtime の書いた identity
+  ディレクトリを `FullIdentityFromPEM` / `FullCAConfig.Load` 経由で 24/24 受理**。
+  実 Storj 証明書の tbsCertificate を byte 単位で再構築（CA 282 / leaf 268）、
+  PEM も `pkcrypto.WriteCertPEM` と byte 一致。
 - `proto`: JVM 11 tests / 67 assertions、nbb 9 tests / 57 assertions。
   `:raw` を無視すると非正準 length prefix のテストが落ちることを確認済み。
 - 依存の pin: `proto` は `cd8b83ade7a2`（varint overflow 修正込み、
@@ -384,6 +432,7 @@ JS で `Uint8Array` を要求し、base58 decode の戻り値も分岐する）�
   ここで順序を訂正した: Storj は mutual TLS なので identity が無いと握手が始まらず、
   identity 生成は socket 作業の**前**にあった。「残るのは TLS 終端と socket だけ」と
   書いた前回の記述はこの点で不正確だった。
-  **今度こそ残るのは TLS 終端と socket で、これは純粋に機構**（鍵の永続化も host 側:
-  format / 場所 / permission を選ぶのは呼び出し側の判断）。その後 check-in → settlement。
+  **identity ファイル（PEM / 4 ファイル構成）は同日に完了**（`storj.node.pem`）——
+  鋳造より読み込みの方が実運用では要る、というのが理由。
+  **残るのは TLS 終端と socket で、これは純粋に機構。** その後 check-in → settlement。
 "}]
