@@ -31,6 +31,8 @@
 ;;   nbb scripts/fleet-ci/tick.cljs --all             ;; 全 repo を強制的に回す
 ;;   nbb scripts/fleet-ci/tick.cljs --no-cd           ;; pin 前進（CD）だけ止める
 ;;   nbb scripts/fleet-ci/tick.cljs --plan            ;; 何を回すかだけ出して終わる
+;;   nbb scripts/fleet-ci/tick.cljs --no-pr           ;; PR head の検証を止める（tip のみ）
+;;   nbb scripts/fleet-ci/tick.cljs --pr-cap 3        ;; repo あたりの PR 検証上限（既定 10）
 (ns fleet-ci.tick
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]
@@ -342,9 +344,48 @@
   取れるように、名前付き ref も一緒に取る）。"
   (when-not (zero? (:exit (git dir ["cat-file" "-e" (str sha "^{commit}")])))
     (git dir ["fetch" "--quiet" "origin" "+refs/heads/*:refs/heads/*"] {:timeout 1800000}))
+  ;; PR head は refs/heads の外（refs/pull/N/head）に居るので、branch の
+  ;; fetch では届かない。PR 検証のためにここで2段目を引く。
+  (when-not (zero? (:exit (git dir ["cat-file" "-e" (str sha "^{commit}")])))
+    (git dir ["fetch" "--quiet" "origin" "+refs/pull/*/head:refs/pull/*/head"]
+         {:timeout 1800000}))
   (when-not (zero? (:exit (git dir ["cat-file" "-e" (str sha "^{commit}")])))
     (die (str sha " is not reachable in " org-repo " after fetch")))
   dir)
+
+(defn open-prs
+  "org/repo の **open な** PR を [{:number :head}] で返す。API も token も使わない。
+
+  GitHub は PR ごとに refs/pull/N/head を作り、**close すると消えない**ので
+  ls-remote の head だけでは open を判別できない（実測 2026-07-29:
+  com-junkawasaki/root は head 1,411 件に対し open PR 0 件）。一方
+  **refs/pull/N/merge は open かつ mergeable な PR にだけ存在し、close で
+  消える** — これが token 無しで得られる open シグナル。実測で
+  merge ref 数と `gh pr list --state open` の件数が 3 repo とも一致した。
+
+  merge ref が無い open PR（conflict 状態）は取りこぼす。API を使わない代償
+  として明示しておく — 黙って「PR は無い」と報告するより、取りこぼす条件を
+  書いておく方がよい。"
+  [org-repo]
+  (let [{:keys [exit out]} (git nil ["ls-remote" (ssh-url org-repo)
+                                     "refs/pull/*/merge" "refs/pull/*/head"]
+                                {:timeout 180000})]
+    (if-not (zero? exit)
+      []
+      (let [rows (for [l (str/split-lines (str/trim out))
+                       :let [[sha ref] (str/split (str/trim l) #"\s+")]
+                       :when (and sha ref)]
+                   [ref sha])
+            merge-nums (set (keep (fn [[ref _]]
+                                    (second (re-find #"^refs/pull/(\d+)/merge$" ref)))
+                                  rows))
+            heads (into {} (keep (fn [[ref sha]]
+                                   (when-let [n (second (re-find #"^refs/pull/(\d+)/head$" ref))]
+                                     [n sha]))
+                                 rows))]
+        (vec (sort-by :number
+                      (for [n merge-nums :when (get heads n)]
+                        {:number (js/parseInt n 10) :head (get heads n)})))))))
 
 (defn ensure-tree!
   "org/repo の sha の tree を展開して dir を返す（キャッシュ済みなら再展開しない）。
@@ -874,6 +915,17 @@
         repos (cond->> (:repos cfg)
                 only (filter #(or (contains? only (:name %))
                                   (contains? only (gate-id %)))))
+        ;; tip は repo ごとに **1 tick 1 回**だけ解決する。entry ごとに引くと、
+        ;; 同じ repo の 2 gate が別 sha を検証しうる（実測 2026-07-29: root の
+        ;; 2 gate が 49884cd と d802afb に分かれた — main が tick 中に動いた）。
+        ;; tick は一貫したスナップショットであるべきで、ls-remote も減る。
+        tip-of (let [m (into {} (for [org-repo (distinct
+                                                (keep (fn [r]
+                                                        (when-let [o (or (:org r) (org-of west (:name r)))]
+                                                          (str o "/" (:name r))))
+                                                      repos))]
+                                  [org-repo (gh-tip org-repo)]))]
+                 (fn [org-repo] (get m org-repo)))
         ;; 各 repo の tip（fresh）と west pin
         work (vec (for [r repos
                         :let [nm (:name r)
@@ -885,20 +937,58 @@
                               ;; そういう対象だけ gates.edn に :org を明示する。
                               org (or (:org r) (org-of west nm))
                               org-repo (str org "/" nm)
-                              tip (when org (gh-tip org-repo))
+                              tip (tip-of org-repo)
                               pin (get-in west [:projects nm :revision])
                               last-sha (get-in @state [:repos id :sha])]]
                     (assoc r :org org :org-repo org-repo :tip tip :pin pin
                            :id id
                            :last-sha last-sha
                            :changed? (and tip (not= tip last-sha)))))
+        ;; ---- PR head の検証。tip だけを見ていると「壊れたものが main に入った
+        ;; 後で赤を教える」CI にしかならず、merge を止められない。PR head も
+        ;; 同じ gate に通す（ADR-2607255500 :not-done の :pr-head-verification）。
+        ;;
+        ;; :id を "<id>#pr<N>" にすることで state・gate-name・tarball 名がすべて
+        ;; tip 側と自然に分かれる（:id 導入時に得た性質をそのまま使う）。
+        ;; :cd false — PR head で west pin を前進させることは絶対にない。
+        pr-cap (js/parseInt (str (or (:pr-cap opts) (:pr-cap cfg) 10)) 10)
+        ;; repo ごとに 1 回だけ ls-remote する（同じ repo に複数 gate があっても
+        ;; PR 列挙は共有する）。
+        prs-by-repo (when-not (:no-pr opts)
+                      (into {} (for [org-repo (distinct
+                                               (keep (fn [r]
+                                                       (when-let [o (or (:org r) (org-of west (:name r)))]
+                                                         (str o "/" (:name r))))
+                                                     repos))]
+                                 [org-repo (open-prs org-repo)])))
+        _ (doseq [[org-repo prs] prs-by-repo
+                  :when (> (count prs) pr-cap)]
+            ;; 黙って切り捨てない（切り捨てを報告しないと「全部見た」と読める）。
+            (log "PR cap:" org-repo "has" (count prs) "open PRs — verifying the"
+                 pr-cap "lowest-numbered;" (pr-str (mapv :number (drop pr-cap prs)))
+                 "NOT verified"))
+        pr-work
+        (vec (for [r repos
+                   :let [org (or (:org r) (org-of west (:name r)))
+                         org-repo (when org (str org "/" (:name r)))]
+                   :when org-repo
+                   {:keys [number head]} (take pr-cap (get prs-by-repo org-repo))
+                   :let [id (str (gate-id r) "#pr" number)
+                         last-sha (get-in @state [:repos id :sha])]]
+               (assoc r :org org :org-repo org-repo :tip head :pin nil
+                      :id id :pr number :cd false
+                      :last-sha last-sha
+                      :changed? (not= head last-sha))))
+        work (into work pr-work)
         missing (filter #(nil? (:tip %)) work)
         todo (cond
                (:all opts) (remove #(nil? (:tip %)) work)
                only (remove #(nil? (:tip %)) work)
                :else (filter :changed? work))]
     (doseq [m missing] (log "WARN no tip resolved (skipped):" (:name m) (:org-repo m)))
-    (log "tick:" (count repos) "covered," (count todo) "to verify;"
+    (log "tick:" (count repos) "covered,"
+         (count (remove :pr work)) "tip +" (count (filter :pr work)) "PR head,"
+         (count todo) "to verify (" (count (filter :pr todo)) "of them PR);"
          "nodes" (pr-str (mapv (juxt :host :caps) (filter :reachable? nodes))))
     (when (empty? todo)
       (log "nothing changed — no receipt")
