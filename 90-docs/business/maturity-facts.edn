@@ -9,13 +9,13 @@
 ;;   YC design: :acute-problem :wedge :tenx :founder-fit :distribution :defensibility
 ;;   YC traction: :launched (0 idea/1 prototype/2 internal/3 public alpha/4 GA/5 scaled)
 ;;                :users (external traction) / :revenue (0 none/1 billing wired/3 first $/5 repeatable)
-{:as-of "2026-07-20"
+{:as-of "2026-07-29"
  :products
  {:cloud-murakumo
   {:pricing 1 :grounding 5
    :acute-problem 4 :wedge 4 :tenx 4 :founder-fit 5 :distribution 2 :defensibility 4
    :launched 3 :users 1 :revenue 0
-   :note "実測: ai-gftd-murakumo worker 158,768 inv/7d — 社内推論需要は実在・常時運転 (grounding 4→5, launched 2→3)。murakumo.cloud zone は 536 req/7d・uniques 1 = 外部利用ゼロ (users 1 据置)。tok 単価は未実測 (riskiest gate 未通過)。"}
+   :note "実測: ai-gftd-murakumo worker 158,768 inv/7d — 社内推論需要は実在・常時運転 (grounding 4→5, launched 2→3)。murakumo.cloud zone は 536 req/7d・uniques 1 = 外部利用ゼロ (users 1 据置)。 2026-07-29 訂正: 旧 note の『tok 単価は未実測』は誤り — :hyp/murakumo-tok-price は 2026-07-23 に advisor:gate が機械測定して validated 済み (fleet ¥/Mtok 20.04 vs spot 40.55)。facts が as-of 2026-07-20 のまま追いついていなかった。独立検証も同桁で下振れ: infer.murakumo.cloud 実測 70.5 tok/s (単発) / prefill 287.5 tok/s、並列 12 以上で約 460 tok/s に飽和 = 1.66M tok/時。電力・機材償却を仮定して $0.02-0.08/1M tok (M4 mini 60W/$700/3y 〜 M4 Max Studio 140W/$2,500/3y、¥31/kWh)。原価優位は 2 手法で裏付けられた。 ただし tok 単価は riskiest gate ではなかった。実際の制約は次の 2 つで、いずれも未仮説化 (base datoms への新規仮説登録は人間レビュー事項なので本更新では行わない): (1) 容量天井 — 推論はフリート 10 台ではなく head 1 台 (llama-server:8090 + ComfyUI 同居) で約 40M tok/日。市場混合価格 $0.30/1M で完売しても月約 $360 が理論上の収益天井 (稼働率 100%・値引きゼロ)。(2) 出品価格の乖離 — x402 catalog の murakumo 出品 $0.01/req は実測 1req≒270tok より約 $37/1M tok 相当で GPT-4o-mini ($0.15-0.60/1M) の約 100 倍。nexus-x402 users=0 は告知不足である前に値付けの問題である可能性がある。 pricing 1 据置: 原価は確定したが買い手のつく売値は未確立 — 誰も買えない価格は価格ではない。 参考: 同フリートの Monero 採掘は 9,265 H/s・amtDue 0.049 XMR・支払実績 0 で日次見込 約 $0.24 と電力費を回収しておらず、推論の機会費用は $0.001/時 で無視できる。"}
 
   :ai-gftd-apex
   {:pricing 1 :grounding 4
