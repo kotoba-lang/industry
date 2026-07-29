@@ -405,7 +405,22 @@ differential probe。**CI では走らせない** (公開 endpoint 依存・非 
   受理されることも実証した** (上記 differential probe)。**残るのは資金のある
   account での実送信だけ**——gas / nonce の扱いはまだ「議論した」段階で、
   それには資金のある testnet 鍵が要る (安全床②により agent は資金操作をしない)。
-- **(b) Ethereum 経路 (f410f・delegated) は依然未実装。** keccak が JVM 専用
+- ~~**(b) Ethereum 経路 (f410f・delegated) は依然未実装。**~~ **2026-07-29 実装済み**
+  (`filecoin.signer.eth`、io-filecoin-signer `7adb018f`)。EIP-1559 (type 2) のみ。
+  calibration に対する three-way differential で検証: 正しい message は
+  `Actor not found` まで到達 (= AuthenticateMessage を完全通過)、署名を1 bit
+  壊すと `Could not recover public key`、method を変えると
+  `failed to reconstruct` —— round-trip 検査と署名検査の**両方が生きていて、
+  かつ我々のものは通っている**ことを node 自身が言っている。資金は動かない
+  (送信元 account は存在したことがなく、balance を先に読んで 0 でなければ
+  push しない)。実装時に見つけた罠: RLP は **priority fee → max fee** の順
+  (message とは逆)・RLP 整数は minimal (0 は空 byte string)・input が空なら
+  params も空 (CBOR 空ではない)・`filecoin.address` は `:calibration` を知らない
+  (address 面では testnet、chain id 面では 314159)・**eth-crypto の cljs RLP は
+  byte string と list を JS 型で区別する** (JS array = byte string、cljs vector
+  = list)。最後のものは JVM では原理的に起きない。
+
+  旧記述: keccak が JVM 専用
   だという以前の記述は誤り (`eth-crypto` は dual-platform 化済みで、RLP と
   EIP-1559 署名も持つ)。実際に足りないのは lotus が要求する
   Filecoin↔EthTransaction の byte 一致 round-trip と、上記 2 種の署名 shape の
