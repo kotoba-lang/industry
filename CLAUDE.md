@@ -437,12 +437,23 @@ WIP を並行セッションが約40分間隔で退避し続け stash が20個�
 **agent loop の起動・Agent への委譲（fork / fresh agent）・`git worktree add`・
 `git checkout -b` / `git switch -c`・新しい clone からの作業開始 — これらを行う「前」に、
 対象リポジトリを必ず remote と同期する。** 同期していない状態で分岐を作らない。
+「agent loop の起動」には **`Workflow` の実行・`/loop`・スケジュール routine
+（`RemoteTrigger` / cron）の開始**を含む — 反復して agent を起こす仕組みは、1回目の
+base が古ければ以降の全反復が古い base に載る。
 
 ```bash
 git fetch origin
 git merge --ff-only origin/main      # FF 不可なら停止。rebase しない
-# 子リポも触るなら、その repo でも同じことをする
+west update --fetch smart            # 子リポ群を manifest の pin に合わせる
+# 子リポも触るなら、その repo でも fetch + merge --ff-only origin/<default-branch>
 ```
+
+**FF できない（diverged / ahead）場合は、分岐を作る前にその乖離を先に解消する。**
+rebase も force-push もしない — 未着地のローカル commit は feature branch へ push して
+`gh api repos/<org>/<repo>/merges` でサーバ側マージし、それから分岐する（手順は上記
+「Git operations」節と skill `git-cleanup-conflict`）。`manifest/west.yml` の pin だけなら
+GitHub API の single-entry commit で tip に直接載せる方が確実。**乖離を抱えたまま
+「とりあえず枝を切る」は、その乖離を枝の数だけ複製する。**
 
 **分岐元は必ず `origin/main` を明示する**（ローカル `main` ではなく）。これが最も確実で、
 ローカルが遅れていても正しい base から始まる:
@@ -472,6 +483,9 @@ push 直前まで行われなかった。**警告を読むことと同期する�
 `git switch -c` / `git branch <new>`。**分岐元を `origin/<default>` で明示していれば
 ブロックしない**（それが推奨形であり、ローカルの遅れと無関係に正しい base になるため）。
 判定不能時は fail-open（セッションを止めない）。
+
+**同期を省略してよいのは、git を一切書き換えない読み取り専用タスクだけ**（`Explore` での
+検索、既存ファイルの読解、`gh api` の GET など）。書き込みが 1 バイトでもあるなら省略しない。
 
 - **superproject 本体 checkout（このフォルダ）は「統合・閲覧専用」。** ここでは編集・
   commit・ブランチ切替をしない。やってよいのは `git fetch` / `--ff-only` pull /
@@ -558,6 +572,10 @@ fork がそちらを実行許可として拾い、指示範囲を超えて実装
   委譲や loop の起動は git コマンドではないので **PreToolUse hook は止められない** —
   ここだけは prose の規律で守るしかない。委譲前に `git fetch origin &&
   git merge --ff-only origin/main` を済ませてから `Agent` を呼ぶ。
+- **委譲する agent のプロンプトに、同期済み base の commit SHA を書いて渡す。** fresh agent は
+  会話コンテキストを継承しないので、自分がどの base で作業しているかを本人は知らない —
+  SHA を渡しておけば、agent 側が着地時に「自分の base が現 main と一致するか」を自力で
+  検証でき、古い base への上積みが黙って進むのを防げる。
 
 ## 大容量バイナリの扱い（B2 + DataLad）
 
