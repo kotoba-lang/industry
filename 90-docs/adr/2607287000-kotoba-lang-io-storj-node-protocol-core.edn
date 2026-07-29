@@ -5,7 +5,7 @@
   :adr/title "ADR-2607287000: kotoba-lang/io-storj-node — Storj storage node の protocol core（署名対象バイトを Storj 実装から交差検証、DRPC/TLS は非対象）と proto.wire の追加"
   :adr/status "accepted"
   :adr/date "2026-07-28"
-  :adr/last_verified "2026-07-28"
+  :adr/last_verified "2026-07-29"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/source-format "edn"
@@ -22,9 +22,9 @@
    "adr-2607254100-kotoba-lang-sigv4-shared-signer-and-kotoba-byte-slice"
    "adr-2606302300-org-taxonomy-library-placement"]
   :adr/decision-summary
-  "{:repos [\"kotoba-lang/io-storj-node\" \"kotoba-lang/proto\"], :namespaces [storj.node.id storj.node.pb storj.node.orders storj.node.piece storj.node.identity storj.node.der storj.node.protocols storj.node.bytes proto.wire], :in-scope [:node-id :signing-form-bytes :order-limit-admission :piece-layout :v1-piece-header :peer-certificate-rules :node-id-derivation-from-ca-key], :out-of-scope [:tls-handshake :sockets :identity-generation :settlement :retain-gc :graceful-exit :streaming :uplink-side], :deps [io.github.kotoba-lang/proto io.github.kotoba-lang/io-multiformats], :verification [:storj-own-encoder-vectors :published-satellite-node-ids :real-generated-identity-fixture :two-runtime-parity :negative-controls], :live-satellite-request :never-performed}"
+  "{:repos [\"kotoba-lang/io-storj-node\" \"kotoba-lang/proto\"], :namespaces [storj.node.id storj.node.pb storj.node.orders storj.node.piece storj.node.identity storj.node.der storj.node.protocols storj.node.bytes storj.node.host.verify proto.wire], :in-scope [:node-id :signing-form-bytes :order-limit-admission :piece-layout :v1-piece-header :peer-certificate-rules :node-id-derivation-from-ca-key :signature-verification], :out-of-scope [:tls-handshake :sockets :identity-generation :settlement :retain-gc :graceful-exit :streaming :uplink-side], :deps [io.github.kotoba-lang/proto io.github.kotoba-lang/io-multiformats], :verification [:storj-own-encoder-vectors :published-satellite-node-ids :real-generated-identity-fixture :real-storj-signatures :two-runtime-parity :negative-controls], :live-satellite-request :never-performed}"
   :adr/artifacts
-  "{:repo \"orgs/kotoba-lang/io-storj-node\", :pin \"e5c537fbfcb058a8b6e81d329906e30f9c69dcd5\", :vector-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_vectors.go\", :vectors \"orgs/kotoba-lang/io-storj-node/testdata/vectors.edn\", :identity-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_identity.go (-verify in CI)\", :identity-fixture \"orgs/kotoba-lang/io-storj-node/testdata/identity.edn\", :wire-codec \"orgs/kotoba-lang/proto/src/proto/wire.cljc\", :evidence {:as-of \"2026-07-28\", :io-storj-node {:jvm \"51 tests / 191 assertions, 0 failures 0 errors\", :cljs \"nbb — same 51 tests / 191 assertions\", :go-verify \"gen_identity.go -verify — 9/9 checks against storj.io/common\", :lint \"clj-kondo 0 errors 0 warnings\", :negative-controls \"6/6 reintroduced defects fail the suite\"}, :proto {:jvm \"11 tests / 67 assertions\", :cljs \"9 tests / 57 assertions\"}}}"
+  "{:repo \"orgs/kotoba-lang/io-storj-node\", :pin \"45095e87bdcd4d141122dd60716ccad95fd771dd\", :vector-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_vectors.go\", :vectors \"orgs/kotoba-lang/io-storj-node/testdata/vectors.edn\", :identity-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_identity.go (-verify in CI)\", :identity-fixture \"orgs/kotoba-lang/io-storj-node/testdata/identity.edn\", :signature-generator \"orgs/kotoba-lang/io-storj-node/testdata/gen_sigs.go (-verify in CI)\", :signature-fixture \"orgs/kotoba-lang/io-storj-node/testdata/sigs.edn\", :verifier \"orgs/kotoba-lang/io-storj-node/src/storj/node/host/verify.cljc\", :wire-codec \"orgs/kotoba-lang/proto/src/proto/wire.cljc\", :evidence {:as-of \"2026-07-29\", :io-storj-node {:jvm \"62 tests / 236 assertions, 0 failures 0 errors\", :cljs \"nbb — same 62 tests / 236 assertions\", :go-verify \"gen_identity.go -verify 9/9, gen_sigs.go -verify 9/9, gen_vectors.go byte-identical\", :lint \"clj-kondo 0 errors 0 warnings\", :negative-controls \"6/6 for the protocol core, plus 11/11 for the verifier across both runtimes\"}, :proto {:jvm \"11 tests / 67 assertions\", :cljs \"9 tests / 57 assertions\"}}}"
   :adr/body
   "# Context
 
@@ -63,6 +63,7 @@ ADR-2607254000 が native uplink を退けた根拠（erasure coding + satellite
 | `storj.node.der` | X.509 を読むのに要るだけの DER |
 | `storj.node.protocols` | host seam（`IVerifier` / `IClock` / `IBlobStore`） |
 | `storj.node.bytes` | runtime を知っている唯一のファイル |
+| `storj.node.host.verify` | 参照 `IVerifier` — Storj が提示する 4 方式の署名検証 |
 
 **非対象（README に明記）**: TLS ハンドシェイクと socket / identity 生成（PoW と
 CA・leaf 証明書）/ order settlement・check-in・retain GC・graceful exit /
@@ -111,6 +112,58 @@ host は TLS を張っている以上パース済みの証明書を持ってい�
 割る「自明な読み方」だと Storj の identity version 拡張 `2.999.2.1` が
 `24.39.2.1` になり、**全証明書が version 無しに見える**。
 
+## 2.6. signature verification — stub していた唯一の seam を埋める（2026-07-29 追加）
+
+`admit-chain` も `orders/admit` も、`IVerifier` が true を返す stub の上に
+書かれていた。規則はすべてテストされていたが、**それらを意味あるものにする
+唯一のステップが一度も走っていなかった**。`storj.node.host.verify` が参照実装で、
+`storj.node.bytes` と並ぶ「platform API に触る 2 つ目のファイル」。HSM でも
+リモート署名器でも使いたい呼び出し側は `IVerifier` を自分で実装し、これを
+load しない。
+
+### 4 方式ある — うち 2 つは同じ鍵
+
+| keyword | wire 上の鍵 | どこに出るか |
+|---|---|---|
+| `:ecdsa-sha256` | DER SPKI | 現行の全 identity（satellite / node の署名） |
+| `:rsa-pkcs1-sha256` | DER SPKI | X.509 証明書の署名 |
+| `:rsa-pss-sha256` | DER SPKI | RSA 鍵で署名された**メッセージ** |
+| `:ed25519` | 生 32 byte | uplink の piece key |
+
+RSA の 2 行が罠。`pkcrypto` はメッセージを **PSS** で署名・検証するのに、証明書が
+載せるのは `sha256WithRSAEncryption` ＝ **PKCS#1 v1.5**。同じ鍵・同じハッシュで
+padding だけが違う。片方だけ実装して両方の問いに答えても**エラーは出ない** —
+出るのは「正しい署名を無効と報告する」という挙動で、しかも RSA を今でも使って
+いる古い identity 限定でしか現れない。
+
+`:ed25519` も別種の罠で、ここだけ鍵が DER SubjectPublicKeyInfo で来ない。
+`storj.PiecePublicKey` は生 32 byte（Go の ed25519 がそう取るため）なので、
+両 runtime の鍵 API に渡す前に RFC 8410 §4 の 12 byte SPKI 前置を自分で被せる。
+
+### PSS の salt は検出せず計算する
+
+Go は `PSSSaltLengthAuto` で署名する（＝入る最大長）。Node は検証時に自動検出
+できるが JVM はできない。各 runtime の楽な経路を取ると **peer が送れるバイト列に
+ついて 2 つの runtime が違う答えを出す**——`proto.wire` の 10 byte varint で
+JVM が throw し cljs が error を返した、あれと同じ形の欠陥になる。したがって
+salt 長は modulus から Go と同じ算術で portable に導出し、両方へ同じ数を渡す。
+最大長でない salt は**両方で**拒否される。
+
+### 偽造は想定入力であってエラーではない
+
+peer が wire に置けるもの（壊れた鍵・切り詰めた署名・改竄された data）に対しては
+false を返し、throw しない。throw するのは**呼び出し側**が存在しない algorithm を
+指定した時だけで、これは peer についての言明ではなくこのプロセスのバグ。
+
+### 実署名との突き合わせ
+
+`testdata/gen_sigs.go` が `pkcrypto` と `storj.PiecePrivateKey` で署名して記録し、
+CI は `-verify` でそれを Storj 自身のコードに再検証させる（署名は乱数なので
+再生成 diff にできない。gen_identity.go と同じ形）。fixture には**実際に署名された
+OrderLimit** も入っていて、これが pb 層の輪を閉じる: `encode-order-limit-for-signing`
+は `EncodeOrderLimit` の出力と一致することまでは確認済みだったが、**一致する bytes と
+署名が通る bytes は別の主張**だった。
+
 ## 3. 検証 — 自分の出力を自分に assert しない
 
 この protocol の要点は自己検証できない。`encode-order-limit-for-signing` が
@@ -137,7 +190,7 @@ Go のゼロ時刻定義の問題であって、`.proto` を読んで推論す�
   `@noble/hashes` という別実装を通るので、node ID の checksum は両者で別コードが
   計算する。varint は JS の bitwise 32bit 切り捨てと 2^53 境界を跨ぐ。
 
-### 実際に捕まえた 4 件の誤り（すべて「署名が通らない」以外の症状を出さない種類）
+### 実際に捕まえた 5 件の誤り（すべて「署名が通らない」以外の症状を出さない種類）
 
 1. **field 番号**: `limit` / `action` / `satellite_signature` を 8 / 9 / 6 と
    記憶で書いた。正解は **6 / 7 / 10**。公開 `.proto` を取得して発覚。
@@ -153,8 +206,13 @@ Go のゼロ時刻定義の問題であって、`.proto` を読んで推論す�
 4. **OID の先頭アーク**（2026-07-28 追加）: 先頭バイトを無条件に 40 で割ると
    `2.999.2.1` が `24.39.2.1` になり、**全証明書が identity version 無しに見える**。
    80 以上なら第 1 アークは 2、第 2 は値 − 80。
+5. **RSA の padding が 2 種類ある**（2026-07-29 追加）: Storj はメッセージを PSS、
+   証明書を PKCS#1 v1.5 で署名する。1 つの RSA 実装で両方に答えると、エラーを
+   出さずに**正しい署名を無効と報告する**。これは踏んでから気付いたのではなく
+   `pkcrypto/signing.go` を先に読んで見つけた 1 件で、fixture は同じメッセージに
+   対する両方の署名を記録し、互いの bytes で相互に検査する。
 
-**4 件それぞれを再導入して suite が落ちることを確認済み**（落ちない検証は検証ではない）。
+**5 件それぞれを再導入して suite が落ちることを確認済み**（落ちない検証は検証ではない）。
 peer identity 側の negative control は計 3 本: node id を CA でなく leaf から
 導出する（7 assertion 失敗）/ OID を 40 で割る（3 失敗）/ チェーン末尾の自己署名
 検査を外す（2 失敗）。
@@ -163,6 +221,13 @@ peer identity 側の negative control は計 3 本: node id を CA でなく lea
 落ちなかった**——「control が落ちない」を実装の正しさと読まず、control 自体の
 誤りを疑って書き直した結果、正しく落ちるようになった。落ちない control は
 実装が正しい証拠ではなく、control が壊れている可能性の方を先に疑う。
+
+verifier 側の negative control は計 11 本（JVM 6 / cljs 5）: 常に true を返す /
+常に false を返す / PSS を PKCS#1 padding で検証する / salt を hash 長にする /
+ed25519 に SPKI 前置を被せない / ed25519 に digest 名を渡す / data 引数を無視する。
+**うち PSS の control は 1 本目が静かにコンパイルに失敗し、何の結果も出さなかった。**
+失敗を出さない control と結果を出さない control は遠目には同じに見えるが、
+どちらも証拠ではない。
 
 ## 4. 署名は「signature field を消す」ことではない
 
@@ -212,11 +277,13 @@ JS で `Uint8Array` を要求し、base58 decode の戻り値も分岐する）�
 また **署名検証を最後に回す**（内容が既に不整合なら asymmetric crypto を一切
 実行しない）。これは最適化ではなく、malformed な limit の洪水に対する性質。
 
-# Verification（2026-07-28 実測）
+# Verification（2026-07-29 実測）
 
-- `io-storj-node`: JVM 51 tests / 191 assertions、nbb で同じ 51 / 191、
-  clj-kondo 0 errors 0 warnings。negative control 6/6 が失敗を検出。
-  `gen_identity.go -verify` が `storj.io/common` に対して 9/9。
+- `io-storj-node`: JVM 62 tests / 236 assertions、nbb で同じ 62 / 236、
+  clj-kondo 0 errors 0 warnings。negative control は protocol core 6/6 に加え
+  verifier 11/11（両 runtime）。`storj.io/common` に対して
+  `gen_identity.go -verify` 9/9・`gen_sigs.go -verify` 9/9、`gen_vectors.go` は
+  byte 一致。
 - `proto`: JVM 11 tests / 67 assertions、nbb 9 tests / 57 assertions。
   `:raw` を無視すると非正準 length prefix のテストが落ちることを確認済み。
 - 依存の pin: `proto` は `cd8b83ade7a2`（varint overflow 修正込み、
@@ -241,5 +308,8 @@ JS で `Uint8Array` を要求し、base58 decode の戻り値も分岐する）�
   （`kotoba-lang/drpc` / ADR-2607287100、および `storj.node.identity`）。
   framing は予想どおり `proto.wire` の varint の上に載り、その過程で
   `proto.wire` の varint が JVM long を overflow する欠陥も出て修正済み。
-  **次は TLS 終端と socket（＝機構、host 側）、その後 check-in → settlement。**
+  **その下の署名検証は 2026-07-29 に完了**（`storj.node.host.verify`）——
+  これで判定側は「規則」も「規則を意味あるものにする署名の一手」も揃った。
+  **残るのは TLS 終端と socket だけで、これは純粋に機構。** その後
+  check-in → settlement。
 "}]
