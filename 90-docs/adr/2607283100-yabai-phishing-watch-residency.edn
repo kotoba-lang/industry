@@ -14,12 +14,12 @@
                 "adr-2607256000-murakumo-task-plane-distributed-execution"],
   :adr/supersedes [],
   :adr/superseded_by [],
-  :adr/repos ["com-junkawasaki/root" "etzhayyim/com-etzhayyim-yabai" "kotoba-lang/tamaki"],
+  :adr/repos ["com-junkawasaki/root" "etzhayyim/com-etzhayyim-yabai" "etzhayyim/tamaki"],
   :adr/authoritative true,
   :adr/authoritative_for ["ドメインのフィッシング判定が常駐している実体（LaunchAgent com.etzhayyim.yabai.ct-watch-tick + tamaki exec）"
                           "決定論 tick を tamaki loop ではなく tamaki exec で表現する区別"
                           "murakumo を heartbeat ではなく幅（fan-out）に使う判断"],
-  :adr/last_verified "2026-07-28",
+  :adr/last_verified "2026-07-29",
   :adr/body "# ADR-2607283100: フィッシング判定の常駐化
 
 **Status**: accepted, implemented, live
@@ -70,7 +70,7 @@ LaunchAgent が今日の正直な production 経路（`toshokan-tick` / `toshoka
 
 ### tamaki 側の登録（判断作業は loop、心拍は exec）
 
-`kotoba-lang/tamaki` に `actors/yabai-phishing-watch.edn` +
+`etzhayyim/tamaki` に `actors/yabai-phishing-watch.edn` +
 `loops/yabai-phishing-watch.edn` を追加した。これは **watch 本体ではなく、その周りの
 判断作業**（brand roster を増やす・CT shard を増やす・fan-out を実行可能にする）。
 `bin/tamaki-supervisor` は `TAMAKI_LOOP_SPEC` を 1 つしか見ないので、**spec を置いても
@@ -121,18 +121,25 @@ maturity は **231 → 256**（`bb -cp src -m yabai.methods.maturity`）。上�
 infra-breadth 0.317→0.45 と observation-volume 0.111→0.132 で、tick が観測を貯めた分だけ。
 cumulative observations 63 → 104。
 
-**このセッションで起きた事故を記録する（原因未特定、再発時の手掛かりとして）**:
-`orgs/kotoba-lang/tamaki` の共有 checkout を `origin/main` に fast-forward した直後、
-**checkout の中身と supervisor の agent worktree 106 個、`.tamaki/` 状態ディレクトリが
-消えた**（`.tamaki/visual` のみ残存）。私が実行したのは archive → rescue branch push →
-サーバ側 merge → `merge --ff-only` と、scratchpad 配下の `rm -rf` + `git worktree prune`
-だけで、`orgs/` 配下を削除する操作はしていない。ff によって 106 個の worktree の HEAD が
-一斉に canonical checkout から到達可能になり `tamaki maintenance cleanup --execute` が
-まとめて reap した、というのが時系列に最も合うが、**main checkout 本体が空になったことは
-それでは説明できない**。断定しない。復旧は west pin からの再 clone で完了し、
-committed な作業の喪失は無い（GitHub / radicle に全て存在）。失われたのは
-tamaki の `.tamaki/` ローカル AgentRun 履歴。yabai tick の store は
-`~/.tamaki` にあり無傷だった。
+**「tamaki checkout が自壊した」という前言を撤回する（2026-07-29 訂正）**:
+この ADR は当初、`orgs/kotoba-lang/tamaki` の共有 checkout が supervisor 稼働中に
+2 度中身を失った（`.tamaki/` だけが残り書き込まれ続けていた）と記録し、原因未特定と
+していた。**これは誤りで、原因は私の path 誤りだった。**
+
+west manifest における tamaki の path は **`orgs/etzhayyim/tamaki`** であり、
+`orgs/kotoba-lang/tamaki` は west project ではない。登録側の checkout は
+**一度も消えておらず**、今も clean・`family.clj` の修正入り・`bin/tamaki status`
+応答可能な状態にある（2026-07-29 確認、HEAD `17e50d2`）。`orgs/kotoba-lang/tamaki`
+に残っていた `.tamaki/` は、**`TAMAKI_STATE_DIR` 未設定の tamaki が cwd 配下に作る
+ただの state ディレクトリ**——私の runner のコメント自身がその挙動を説明している。
+私はそれを「repo が自分で消えた痕跡」と読み、他コンポーネントの障害として
+ADR 2 本と commit message に書いた。yabai 側の `TAMAKI_BIN` 既定値が
+未登録 path を指していただけで、**症状は最初から最後まで私の typo だった**。
+
+再発防止として残す教訓は cleanup 手順ではなく判断の側にある: **他コンポーネントの
+異常を疑う前に、自分の設定がそのコンポーネントの正本（ここでは west manifest の
+`path:`）と一致しているかを確認する。** 修正は `3450f00`（yabai）。
+なお fast-forward 前後で committed な作業の喪失は無い（GitHub / radicle に全て存在）。
 
 **その過程で fleet 全体の障害を発見・修正した**: `619bede7` が
 `(catch java.nio.file.AtomicMoveNotSupportedException ...)` を `family.clj` に入れており、
@@ -142,11 +149,60 @@ tamaki の `.tamaki/` ローカル AgentRun 履歴。yabai tick の store は
 261 tests / 784 assertions green）。west pin も `619bede7 → e5f4fedd` へ前進させた
 （CLI が起動しない commit を pin し続ける方が悪い）。
 
-**次の一手**: `actors/yabai-phishing-watch.edn` は supervisor から見えており
-`{:spawn 1 :desired 1}`。**まだ run は spawn していない**ので、まず
-`bin/tamaki actor status actors/yabai-phishing-watch.edn` で spawn を確認すること。
-上げるべきは brand roster（5 → 25、`phish-infra/default-brands`）で、これが
-maturity の最大の重り（weight 0.30、現在 0.20）。
+## 2026-07-29 — 常駐が「動いているように見えて動いていなかった」3 点
+
+前日の closing は「毎時 exit 0・6 shard・両プレーンへ push」と書いたが、
+**そのうち 2 つは実際には成立していなかった**。いずれも同じ型の欠陥
+——**失敗が成功として表示される**——で、テスト中に順に露出した。
+
+1. **LaunchAgent の env override が全部死んでいた。** nbb では
+   `(.-env.FOO js/process)` が `process.env.FOO` に解決されず **nil** を返す
+   （実測: dotted nil / `(.. js/process -env -FOO)` と `aget` は正常）。
+   したがって plist の `YABAI_CT_LOG=all` は一度も効いておらず、
+   **常駐 tick は argon2026h2 1 本だけを見ていた**。「6 shard を tail している」
+   という前日の記述は branch 上の事実で、production の事実ではなかった。
+   env は helper 経由に統一し、既定値自体を `"all"` にして
+   「override が届かないと壊れる」構造をやめた。
+2. **push 成否を stdout の grep で判定していた。** git は rejection も
+   `fatal:` も **stderr** に書き、`sh` は stderr と exit code を捨てていたので、
+   **失敗した push は必ず成功として記録された**。`sh*` が
+   `{:out :err :exit}` を返し exit code で判定するよう変更（origin と radicle
+   の両方）。実 rejection に対して `:pushed false` + exit 1 を確認。
+3. **`TAMAKI_BIN` が west 管理外の path を指していた**（上の訂正節）。
+
+**この 2 番目の修正が即座に本物の障害を 1 件掘り当てた**: **radicle plane は
+成長していない。** 鍵が ssh-agent に無く（`Radicle key … is not registered`）、
+rad 側 main は `77be244` で GitHub `674fa52` から **4 commits 遅れ**。
+旧判定ではこれが毎時 `:pushed true` と記録されていた。
+**この identity（alias `junkawasaki`、`z6MkpPKis…`）の passphrase は kagi にも
+Keychain にも無い**（secrets-location-map を訂正済み — 従来「到達不能な別端末の
+もの」と書かれていたが、実際にはこの Mac の `~/.radicle` に存在し、単に
+保管されていない）。安全床①により agent は passphrase を推測も入力もしない
+——**オーナーが `rad auth` を実行し kagi `personal/radicle-junkawasaki-passphrase`
+に保存するまで、radicle の成長は止まったまま**。GitHub 側は無影響。
+
+**6 shard 化で露出した精度欠陥も 1 件修正した**: argon2027h1 の 94 candidate の
+うち 70 が AWS 中国/EU リージョンと Microsoft Fabric 内部ホストだった。
+home 判定が**登録可能ドメイン**同士の比較だったため、`amazonaws.com.cn` /
+`microsoft-int.com` のような地域・内部 estate に届いていない。home を
+**任意の dot-suffix 一致**に変え、estate を 3 件追加。実測 tick の全候補 212 件で
+**212 → 15**（197 drop）、実検出 2 件——`microsoft.com.244778543667.umadb.ro`
+（`.com` を挟んだ subdomain 偽装）と `instagram.novu.eu`——は保持。
+suffix 一致が広すぎて subdomain 偽装を飲み込まないことを、この 2 件を
+テストに固定して担保した。
+
+**現在の実測状態**: 全 6 shard tick が exit 0 で完走
+（`3450f00..674fa52` を GitHub へ、`tamaki exec` 経由で
+`:mode :external :status :succeeded`）。100 tests / 13509 assertions green。
+
+**次の一手（優先順）**:
+1. **radicle**: オーナーの `rad auth` 待ち（上記）。それまで両プレーン成長は片肺。
+2. `actors/yabai-phishing-watch.edn` は supervisor から見えており
+   `{:spawn 1 :desired 1}` だが **まだ run を spawn していない**。
+   `bin/tamaki actor status actors/yabai-phishing-watch.edn` から確認する。
+3. maturity の最大の重りは log-coverage / observation-volume。
+   shard あたり 333 entries は 6 分割の結果なので、`YABAI_CT_ENTRIES` を上げる
+   （env が実際に効くようになったので、今度は本当に反映される）。
 
 ## Consequences
 

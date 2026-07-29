@@ -153,8 +153,23 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   - ADR-2607252200 はこの置き場所を決めていたが**実際には置かれておらず**、
     両方とも `no such item` だった（ADR-2607259600 の Not done にも
     「secrets-location-map に未記載」として残っていた）。両方とも解消済み。
-  - **端末 A（25mbair、alias `junkawasaki`）の passphrase は未記載のまま** —
-    その端末に到達できないため（hostname が解決しない）。
+  - **alias `junkawasaki`（`did:key:z6MkpPKisDoVCDsunNZTtX1eEErH8tcdeNpXrVVfDRkhsWEk`）
+    の passphrase は kagi にも Keychain にも無い（2026-07-29 確認）。**
+    この identity は「到達できない別端末（25mbair）」ではなく、**この Mac の
+    `~/.radicle` に現に存在する**（`rad self` が上記 DID を返す）。前の記述は
+    到達不能を理由に未記載としていたが、端末の問題ではなく単に保管されていない。
+    実測: `rad auth </dev/null` →
+    `A passphrase is required to read your Radicle key`、
+    `security find-generic-password -s radicle` → 該当なし、
+    kagi の `radicle-node-passphrase` は**別 DID**（`z6Mkud1…`、main-2）のもの。
+  - **これが実害を出している**: yabai の CT watch は毎時 GitHub と radicle の
+    両方へ push するが、鍵が ssh-agent に無いため radicle 側は
+    `Radicle key … is not registered; run rad auth` で失敗し続け、
+    rad の main は `77be244` で GitHub `674fa52` から 4 commits 遅れている
+    （ADR-2607283100）。**オーナーが `rad auth` を実行して passphrase を
+    kagi compartment `personal` に `radicle-junkawasaki-passphrase` として
+    保存すれば、以後 agent 側で非対話に unlock できる。** 安全床①により
+    agent は passphrase を推測しない・自分で入力しない。
 - **kagi（`kotoba-lang/kagi`）**: net-kotobase / kotoba-lang 系の新規プロジェクト
   向け secrets は、1Password ではなく **こちらを正**にしていく方針（自己主権
   vault、ADR-2606272330）。**実在する vault の実体は
