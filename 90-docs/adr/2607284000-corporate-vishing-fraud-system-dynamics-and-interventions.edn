@@ -17,7 +17,11 @@
               "kotoba-lang/loop-system-dynamics"
               "cloud-itonami/meibo"
               "etzhayyim/com-etzhayyim-yabai"
-              "gftdcojp/ai-gftd-kabuto"],
+              "gftdcojp/ai-gftd-kabuto"
+              "cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo"
+              "cloud-itonami/cloud-itonami-regulatory-tracker"
+              "cloud-itonami/cloud-itonami-pooled-incidence"
+              "gftdcojp/ai-gftd-cyber-drill"],
   :adr/authoritative true,
   :adr/authoritative_for ["法人向けニセ警察詐欺の system-dynamics モデルと、その計算結果の正本"
                           "この case に対して 3 org のどこに何を実装したか（実装先 repo と merge commit）の正本"
@@ -102,6 +106,42 @@ assoc-* コンプライアンス事実連合が構造上の解になる理由で
 | gftdcojp | scn/vishing-transfer（攻撃経路の対策カバレッジ空白） | `gftdcojp/ai-gftd-kabuto` 17c6eff |
 | — | case 登録＋モデル | `kotoba-lang/loop-system-dynamics` eaa3364 |
 
+### 第2波（2026-07-29、当初「未実装」としていた上位介入をすべて実装）
+
+| 介入 | repo / merge |
+|---|---|
+| 全銀協カタログへの振込限度額ルール事実収載 + `parameter-disposition` | `cloud-itonami/cloud-itonami-assoc-6419-jpn-zenginkyo` 18996a1 |
+| 協会層の遭遇率レジストリ（プーリングの拒否規律） | `cloud-itonami/cloud-itonami-pooled-incidence` 9179774（新規） |
+| 計測付き finance-vishing ドリル | `gftdcojp/ai-gftd-cyber-drill` ddeb57d |
+| 振り込め詐欺救済法 凍結パイプライン + 遅延の第3状態 | `cloud-itonami/cloud-itonami-regulatory-tracker` 81be8ce |
+
+**(f) 協会は既にパラメータを名指ししている。決めていないのは数値であり、
+しかも数値を渡した相手に責任を紐づけている。** 本 ADR は当初「協会が既定値を
+決めれば band/B」と予測したが、2026-07-29 に4文書をライブ検証した結果は
+それより鋭い。2014-05-15 の申し合わせ（会員銀行宛）は限度額条項
+「振込・払戻し等の限度額を必要な範囲内でできるだけ低く設定する」を持つが、
+**設定するのは顧客**である。顧客向け注意喚起も同じ委譲を繰り返す。さらに
+2014-07-17 の補償申し合わせは、補償の可否を**顧客が別紙1の対策を自ら講じて
+いたか**に結びつける。最新の 2024-05-10 申し合わせには数値の閾値が一切ない。
+つまり協会は10年にわたりパラメータを名指しし、数値は決めず、顧客に渡し、
+その渡した先の選択に責任を紐づけている。**(d) が「個社は自社のリスクを構造的に
+測定できない」と示した、まさにその個社に対してである。**
+カタログは `:addressee` と `:parameter-disposition` でこれを機械可読にした
+（`sets-numeric-default-count "transfer-limit"` = 0 / `delegates-to-adopter` = 2）。
+これは**公表記録の不在の記録であって、勧告ではない** — 協会が既定値を決めるべきか
+は本カタログに立場のない統治問題である。
+
+**(g) ドリルは「測れない量」を「測れる単位」に移す装置である。**
+299社年は1社では到達しないが、299 *試行* は8社が40人ずつ実施すれば届く。
+実測（drill → pooled-incidence 連結）: 1社40試行 = `:insufficient-exposure`
+（299に259不足）/ 8社320試行 = `:supported`（上限0.93%）/ 1社が事象定義を
+変えると `:heterogeneous-event-definition` で拒否。
+**ただし試行は社年ではない。** ドリルが測るのは*模擬下の行動失敗率*であって
+事故発生率ではなく、両者の関係自体が未計測である。`:exposure-unit` が両者の
+加算を構造的に禁じている（pooled-incidence が混在プールを拒否する）。
+B3 の instrumentation 0.00 が埋まったのは「行動が測れるようになった」ことまでで、
+行動→事故の写像は依然 `:uncomputable-until-measured` である。
+
 ### meibo — 判定器ではなく引き当て表（新 gate G11）
 
 『Xを名乗る連絡があった』ときに、名乗りを一切評価せず **X自身が公表している窓口** を
@@ -169,10 +209,13 @@ ATT&CK 6技法（T1598/T1656/T1204/T1219/T1621/T1657）+ ノード4 + エッジ6
   band/D（構造）は既に飽和していて、詰まっているのは情報の流れ方だからである
   — 検知は届いていた、統計は存在する、突合できるデータもある。届く先と、届いた後に
   誰が動けるかが間違っている。
-- 未実装のまま残る上位介入: 全銀協カタログへの『振込承認上限 既定値』ルール事実収載
-  （band/B、既定値は1社では band/E だが協会が決めれば全加盟行の全法人顧客に一度に効く）、
-  協会層の遭遇率レジストリ（(d) の直接の帰結）、cyber-drill の計測付き vishing ドリル
-  （B3 の instrumentation 0.00 を埋める唯一の介入）、regulatory-tracker の凍結パイプライン。
+- 当初「未実装のまま残る上位介入」として列挙した4件（全銀協カタログのルール事実収載、
+  協会層の遭遇率レジストリ、計測付き vishing ドリル、凍結パイプライン）は
+  **2026-07-29 にすべて実装・merge した**（上表「第2波」）。band/B 集中という
+  当初の観察は実装後も保たれている: 4件のうち3件は情報の流れ方（誰が数値を決めるか /
+  誰が測るか / 遅延を誰が記録するか）を変えるもので、パラメータそのものは動かしていない。
+- 第2波で分かった、当初の予測より鋭い事実が (f)。協会は既にパラメータを名指ししており、
+  欠けているのは数値だけである。そして数値を渡した先が、(d) で測定不能と示した個社である。
 - 本 ADR は『検知を速くする』提案を却下する根拠として引用してよい。B1 は既に攻撃ループの
   6.25倍速く、送金ウィンドウの18.5%時点で発火していた。
 
@@ -197,10 +240,46 @@ ATT&CK 6技法（T1598/T1656/T1204/T1219/T1621/T1657）+ ノード4 + エッジ6
 - `gftdcojp/ai-gftd-kabuto`: 7 tests / 32 assertions, 0 failures
 - west pin 4件を `--entry` 最小 diff + サーバ側 pin 検証で前進。
 
+第2波（2026-07-29）:
+
+- `cloud-itonami-assoc-6419-jpn-zenginkyo`: 6 tests / 48 assertions, 0 failures
+  （reference evaluator + restricted-JS + wasm32 の3面 parity、clj-kondo clean）。
+  tx-data が Kotoba 正本と一致することを検査する drift テストを新設。
+- `cloud-itonami-regulatory-tracker`: 25 tests / 155 assertions, 0 failures
+  （既存14テストは無改変で通過 = 既定チェーンの後方互換を実証）、clj-kondo clean
+- `cloud-itonami-pooled-incidence`: 15 tests / 74 assertions, 0 failures
+  （**nbb と JVM の両方で実行**）、clj-kondo clean。ADR の 11.29% と 299 を再現。
+- `ai-gftd-cyber-drill`: 14 tests / 60 assertions, 0 failures（nbb）。
+  保存されている `.ts` 側の boundary test も 4/4 のまま。
+- **連結の実測**（drill → pooled-incidence、上記 (g)）: 1社40試行
+  `:insufficient-exposure`（不足259）/ 8社320試行 `:supported`（上限0.93%）/
+  事象定義の差し替えは `:heterogeneous-event-definition` で拒否。
+- west: 新規1件（`cloud-itonami-pooled-incidence`）+ pin 3件を `--entry` 最小 diff で反映、
+  サーバ側 pin 検証 4件すべて OK。
+
+第2波で実装しなかったもの（正直な範囲宣言）:
+
+- **cyber-drill の WebVR ランタイムは依然 blocked。** `RUNTIME-STATUS.edn` の
+  `:blocked-pending-kami-api-port` は変えていない。SDK パッケージが実在しない以上、
+  新規 `.ts` を書くことは同 repo が正しく拒否した互換性の主張になるので、
+  シナリオは EDN データ、検証と計測は nbb で書いた。**画面で動くことは証明していない。**
+- **k>0 の信頼区間**は pooled-incidence に無い（`:not-implemented-for-nonzero-events` /
+  `:indeterminate` として名指しで欠落を宣言）。正規近似で埋めなかった。
+- **交換可能性**（プールした上限が個社に当てはまるか）は検査していない。
+  docstring と README に明記した保証であって、強制ではない。
+
 # 出典
 
 - 株式会社はてな 特別調査委員会報告書（2026-07-24公表）の報道:
   coki.jp/article/news/89967 / news.yahoo.co.jp/expert/articles/88b665c4276a6dc50af7306101a442fda6caa5a8（山口健太, 2026-07-25）
 - 警察庁 令和7年 特殊詐欺及びSNS型投資・ロマンス詐欺の認知・検挙状況（nippon.com/ja/japan-data/h02795 が引用）
 - 警察庁 SOS47 令和7年11月末 暫定値（npa.go.jp/bureau/safetylife/sos47/new-topics/251225/01.html）
-- 各機関の公表窓口（meibo `data/verification-window.edn` に URL と検証日を記録）"}]
+- 各機関の公表窓口（meibo `data/verification-window.edn` に URL と検証日を記録）
+- 全銀協（すべて 2026-07-29 にライブ検証、カタログに URL と検証日を記録）:
+  法人向けインターネット・バンキングに係る預金等の不正な払戻しへの対応について
+  （2014-05-15, zenginkyo.or.jp/news/2014/n3344/）/ 同 補償の考え方について
+  （2014-07-17, /news/2014/n3349/）/ 金融犯罪への対応の徹底に係る申し合わせについて
+  （2024-05-10, /news/2024/n051001/）/ 法人向けインターネット・バンキングにおける
+  不正送金にご注意！（日付表示なし, /topic/detail/nid/3563/）
+- 振り込め詐欺救済法の手続と法定期間（60日以上 / 30日以上 / 支払まで最短90日以上）:
+  zenginkyo.or.jp/hanzai/rescure/（2026-07-29 検証）"}]
