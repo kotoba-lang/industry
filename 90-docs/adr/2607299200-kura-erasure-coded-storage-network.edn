@@ -1,0 +1,475 @@
+[{:db/id -1
+  :adr/id "adr-2607299200-kura-erasure-coded-storage-network"
+  :adr/title "ADR-2607299200: kura — 消失訂正 + 決定論的配置 + 債券担保による暗号資産ストレージネットワークの設計"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-07-29"
+  :adr/last-verified "2026-07-29"
+  :adr/last_verified "2026-07-29"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kura-erasure-coded-storage-network"
+  :adr/authoritative-for
+  ["kura ストレージネットワークの符号・配置・監査・決済の設計と、それを構成する 5 repo の責任分割"
+   "保存倍率の優位が符号ではなく node 母集団と MTTR から来るという訂正（AG-LRC は非 MDS で、同一倍率では RS より worst-case 耐性が低い）"
+   "HDX/LTC を保存証明として critical path に置かないという決定（rational adversary に対して無効・sampling で同じ I/O 削減が達成できる）"
+   "metadata 面を kotobase 1 ref に収める制約と、それを成立させる決定論的 placement group 設計"
+   "GF 行列生成は Kotoba の判断・XOR 内ループは host の機構、という責任境界"
+   "新規トークンを発行せず USDC 建て担保 + order capability + merkle-sum payout 証明で暗号資産面を構成する決定"]
+  :adr/related
+  ["90-docs/adr/2607051000-ciphertext-over-cid-persistence-design.edn"
+   "90-docs/adr/2607093300-nexus-x402-facilitator-gateway.edn"
+   "90-docs/adr/2607266000-kotoba-stack-responsibility-split-t0-t3.edn"
+   "90-docs/adr/2607279200-kotoba-centered-migration-plan"
+   "90-docs/adr/2607160005-fleet-db-vcs-plane"
+   "90-docs/adr/2607141200-merkle-sum-extraction"
+   "manifest/repository-rules.edn"]
+  :adr/body
+  "# ADR-2607299200: kura — 消失訂正 + 決定論的配置 + 債券担保による暗号資産ストレージネットワーク
+
+**Status**: accepted（2026-07-29。Open questions の 1 は未解決のまま — 下記参照）
+**Date**: 2026-07-29
+**Deciders**: Jun Kawasaki
+
+## 実装状況（2026-07-29）
+
+**実装順序 1 の `kotoba-lang/erasure` は着地済み**（https://github.com/kotoba-lang/erasure、
+pin `6b6b95eb`、west 登録済み）。§1 の符号パラメータは**推定ではなく実測で確定した**:
+
+```text
+k=16 r=4 g=6 (n=26) 全数探索
+  t=7    657,800 パターン   失敗 0     -> 任意 7 消失に耐える
+  t=8  1,562,275 パターン   失敗 1,464 -> 8 で破れる
+k=8  r=4 g=3 (n=13) 全数探索  -> d=5、任意 4 消失
+```
+
+真の最小距離は**ちょうど 8**で、Gopalan 上界に**到達している**（近づいているのではない）。
+最小の失敗パターンは局所群 2 つ分のデータを消すもの（`#{0..7}`）で、上界が予測する形。
+単一 shard 喪失は**ちょうど 4 read・乗算ゼロ**で復旧することも検証済み。
+
+検証: clj-kondo 0 warning / JVM 27 tests 859 assertions（`.kotoba` parity gate 含む）/
+ClojureScript 20 tests 241 assertions、すべて green。
+
+§5 の責任分割は実装で確定した: 判断層（体・生成行列・群割当・修復計画）は
+`kotoba/erasure_core.kotoba`（`kotoba/pure`、capability 無し）に移植し、
+`erasure.kotoba-parity-test` が `kotoba-lang/compiler` でコンパイルして KIR
+インタプリタ上で実行し、生成行列 416 エントリ全件を含めて**等価性**で照合する。
+機構は `erasure.gf/scale-add` 1 関数のみ。**shard は Kotoba の値にしない。**
+
+移植で判明した現在地の制約（README にも記載）: `max-parameters` は 5 で、`loop` は
+束縛に加えて**本体が捕捉する外側変数も**その枠に数える／`(= a b)` は `if` 条件には
+使えるが値位置では `:bool` を持たない（`or` が i64 を返すのと同型）／`bit-*` は
+64bit、shift は**リテラル**カウント [0,63]／entryless library は非空の `(:export [...])`
+が要る。
+
+## Context
+
+Storj / Filecoin に代わる分散ストレージを kotoba-lang で作る提案が持ち込まれた。
+提案の骨子は、階層的局所復元符号（AG-LRC）で保存倍率を 1.25〜1.45 倍に下げ、
+高次元エクスパンダ由来の局所検査符号（HDX/LTC）で監査 I/O を 90〜99.9% 削減し、
+クライアント側暗号化と Range GET 最適化を武器にする、というもの。
+
+この workspace には、この設計に必要な部品がほぼ揃っている。**唯一存在しないのが
+消失訂正符号そのもの**である。実測（2026-07-29、west.yml 全 project 名 + 実体走査）:
+
+| 必要な部品 | 既存 repo | 状態 |
+|---|---|---|
+| storage backend 契約（CID block + CAS ref） | `kotoba-lang/kotobase-storage` | 実在。`-put-blocks!` / `-get-blocks` / `-read-ref` / `-compare-and-set-ref!` + 適合スイート |
+| storage node の capability order | `kotoba-lang/io-storj-node` | 実在。`storj.node.orders/admit` が node-id / action / bytes / expiry / 署名を全て検査 |
+| Merkle sum tree + inclusion proof | `kotoba-lang/merkle-sum` | 実在。hasher 注入・zero-dep `.cljc` |
+| CID / multiformats | `kotoba-lang/io-multiformats` | 実在 |
+| p2p gossip / bitswap / sync | `kotoba-lang/p2p` | 実在 |
+| クライアント側暗号化（AES-256-GCM + HPKE wrap + blind index） | ADR-2607051000 / `arrangement` / `kotobase-peer` | 実在・accepted |
+| USDC on Base 決済（鍵保管なし） | `kotoba-lang/pay` | 実在 |
+| x402 facilitator / gateway | `gftdcojp/nexus-x402` | 実在・稼働 |
+| git-annex 外部 special remote | `kotoba-lang/kotoba-annex` | 実在（DataLad/B2 経路の既存出口） |
+| 署名付き quorum ledger | `kotoba-fleet-vcs` / `manifest/fleet-keys.edn` | 実在 |
+| **GF(2^8) 演算 / RS / LRC** | **無し** | `reed-solomon` / `galois` / `erasure` の実装は workspace 全体でゼロ |
+
+したがって設計の仕事は「全部作る」ではなく、**符号の穴を埋め、既存部品を正しい
+責任境界で束ね、提案の数値主張のうち成立しないものを先に潰す**ことである。
+
+## Decision
+
+### 0. 名前と repo 分解
+
+ネットワーク名は **`kura`**（蔵）。`manifest/repository-rules.edn` の `:name-prefix`
+語彙に従い、prefix 無し = reusable library、`kura-*` は同一ネットワークの構成要素と
+して扱う。`-clj` suffix は付けない（ADR-2607102200 addendum 14）。
+
+| repo | tier / role | 所有するもの | 所有しないもの |
+|---|---|---|---|
+| `kotoba-lang/erasure` | library | GF(2^8)/GF(2^16) 演算、RS 生成行列、LRC 構成、復号スケジュール、消去パターン→復元経路の解 | バイト I/O、ネットワーク、配置方針 |
+| `kotoba-lang/kura` | contract + library | object manifest schema、placement group 関数、repair 判断、audit challenge 導出/検証、order capability 発行/受理 | バイト移動、鍵保管、HTTP |
+| `kotoba-lang/kura-node` | provider（機構） | ディスク、shard の read/write、order 提示、challenge 応答、帯域計測 | 配置判断、支払額決定、repair のスケジューリング |
+| `kotoba-lang/kura-bugyo` | placement（奉行 = coordinator） | metadata ref の単一 writer、repair スケジューラ、audit 発行、payout epoch 集計 | 顧客鍵、node 鍵 |
+| `kotoba-lang/kotobase-storage-kura` | provider（adapter） | 既存 `kotobase.storage` 契約の kura 実装 | 上記いずれの判断も持たない薄い層 |
+
+`kotobase-storage-kura` が要点である。これがあれば **既に `kotobase.storage` を
+話している全ての consumer（`kotoba-annex` 経由の DataLad dataset を含む）が、
+コード変更なしで kura に載る**。新しい API を顧客に覚えさせない。
+
+### 1. 訂正1 — 保存倍率の優位は符号ではなく node 母集団と MTTR から来る
+
+提案の中心的主張「1.375 倍で Storj 同等の耐久性」は、**そのままでは成立しない。**
+
+LRC は **非 MDS** である。局所性 r の LRC の最小距離は Gopalan らの上界
+`d <= n - k - ceil(k/r) + 2` に縛られる。提案の構成（k=16、局所群 4×4 で局所
+パリティ 4、大域パリティ 2、n=22）では
+
+```text
+d <= 22 - 16 - 4 + 2 = 4      ->  任意 3 消失まで保証
+```
+
+同じ倍率の MDS 符号 RS(16,22) は `d = n - k + 1 = 7` で **任意 6 消失**。つまり
+同一保存倍率では **LRC は RS の半分しか耐えない**。Storj の 29-of-80 は
+任意 51 消失に耐える。符号を LRC に替えることは、耐性を**下げて**修復通信を
+買う取引であって、耐性と倍率を同時に改善する手段ではない。
+
+では 1.375 倍で 11 nines は不可能か。可能だが、決めるのは符号ではなく node の質と
+修復速度である。単純な独立故障モデル（窓 T 内に 22 shard 中 4 つ以上失う確率、
+`mu = n * lambda * T`、`P(>=4) ~ mu^4/4!`）:
+
+| node 年間喪失率 lambda | MTTR T | mu | object 年間喪失確率 | nines |
+|---|---|---|---|---|
+| 0.05（債券付き DC 級） | 6 時間 | 7.5e-4 | 約 1.9e-11 | 約 10.7 |
+| 0.50（公開 churn 網） | 3 日 | 9.0e-2 | 約 3.3e-4 | 約 3.5 |
+
+**同じ符号で 7 桁動く。** Storj が 2.76 倍を採るのは符号が弱いからではなく、
+家庭回線・不均一・高離脱の母集団で、しかも故障が**相関する**（同一事業者・
+同一 DC・同一停電）からである。任意 3 消失の余裕しかない符号は、相関事象に対して
+実質ゼロマージンになる。Storj の 51 消失マージンの大半は相関保険である。
+
+**したがって kura の推奨パラメータは 1.375 倍ではない:**
+
+```text
+k = 16 データ shard
+r = 4  局所群 4 つ、各群に局所パリティ 1（l = 4）
+g = 6  大域パリティ
+n = 26 保存倍率 1.625 倍
+d <= 26 - 16 - 4 + 2 = 8   ->  任意 7 消失まで保証
+単一 shard 復旧の読出し = 同一局所群の 4 shard
+```
+
+同倍率の RS(16,26) は任意 10 消失に耐えるので、**任意耐性を 3 つ手放して、
+単一ノード復旧の読出しを 16 shard から 4 shard に落としている**。修復事象の
+99% 以上は単一ノード故障なので、この取引は正しい。
+
+正直な帰結:
+
+- Storj 2.76 倍比の物理容量削減は **約 41%**（1.625/2.76）。1.375 倍を前提にした
+  50% ではない。
+- その 41% は「符号を替えたから」ではなく「node に債券と SLA を課し MTTR を
+  6 時間に保つから」得られる。**permissionless のまま同じ倍率を主張してはならない。**
+- 完全 permissionless で運用するなら倍率は 2.0〜2.4 倍まで戻す。それでも Storj の
+  2.76 倍よりは低いが、優位は 15〜27% に縮む。
+
+### 2. 訂正2 — HDX/LTC は保存証明ではない。critical path から外す
+
+提案は高次元エクスパンダ由来の局所検査符号で監査 I/O を 90〜99.9% 削減するとする。
+2 つの理由でこれを設計の中心に置かない。
+
+**(a) 敵対モデルが合っていない。** 局所検査可能性は「**自分が保持している語**が
+符号語にどれだけ近いか」を少数問い合わせで判定する性質である。ストレージネット
+ワークでは語を保持しているのは**検査する側ではなく node** であり、データを消した
+node は少数の問い合わせに対して peer から取り寄せる・再計算することで答えられる。
+LTC は合理的敵対者に対して何も証明しない。必要なのは時間束縛付きの
+proof-of-retrievability か、経済的担保 + 予測不能な challenge である。
+
+**(b) 得るものが sampling を超えない。** LTC は符号全体への近さを言うだけで、
+**どの shard が壊れたかを局所化しない**。結局 Merkle 層で特定し直す必要があり、
+避けたかったコストが戻る。加えて HDX 由来の c3-LTC 構成は定数レート・定数距離を
+達成するものの定数が実用ブロック長から桁で外れている。
+
+**単純な sampling が、求められた削減率をすでに超える。** node が保持データの
+割合 f を削除したことを確率 `1 - delta` で検出するのに必要な challenge 数は
+`q = ln(delta)/ln(1-f)`:
+
+```text
+f = 1%,   delta = 1e-3  ->  q = 687 challenge
+1 challenge = 64 KiB leaf + 約 640 B の Merkle 経路
+1 監査ラウンド = 約 44 MiB / node
+
+10 TB を持つ node に対し月次監査 -> 年間 528 MiB = 容量の 0.005%
+月次フルスクラブ = 年間 容量の 1200%
+削減率 約 99.9996%
+```
+
+HDX 無しで 99.999% 台に届く。**HDX/LTC は研究レーンに置き、production の監査層は
+Merkle commit + VRF 由来の予測不能 challenge + sampling とする。** 提案の監査 I/O
+目標（全容量の月 0.1% 以下）はこれで達成され、しかも敵対者に対して意味を持つ。
+
+VRF challenge の seed は `kura-bugyo` が epoch ごとに公開する。node は次に何を
+聞かれるか事前に知れないので、削除して必要時に取り寄せる戦略は、取り寄せ帯域が
+保存コストを上回るように challenge レートを設定すれば経済的に不合理になる。
+
+### 3. 配置は決定論的 placement group にする（metadata を O(objects) に落とす）
+
+素朴に `shard -> node` を全部台帳に持つと破綻する。1 PB を 64 MiB object に切ると
+約 1,600 万 object、shard は 26 倍で **約 4.2 億行**。これを 1 ref に収めるのは無理。
+
+Ceph CRUSH と同型の 2 段構成にする:
+
+```text
+object-id --(hash)--> placement-group (PG)      ; 台帳に持たない、純関数
+PG        --(台帳)--> node set (26 node)         ; 約 10 万行
+```
+
+- 配置台帳は **PG -> node set** のみ。1 PB でも 10 万行程度。object 数に依存しない。
+- 「node N が死んだ。どの object が危険か」という repair scheduler の中核クエリが
+  **O(PG) で解ける**。N を含む PG は数百。その PG に属する object 群は hash の逆で
+  はなく PG 台帳側の object リスト（あるいは object -> PG の索引）から引く。
+- PG -> node set の決定は `kura` の純関数（重み付き rendezvous hashing +
+  failure-domain 制約）。node 追加・離脱時の再配置量が最小になる。
+
+**これにより metadata 面が 1 ref に収まる。** 収まらなければ次項の制約に違反する。
+
+### 4. metadata 面は kotobase 1 ref に収める。書き込み負荷を理由に分割しない
+
+CLAUDE.md の repo-wide mandatory rule（ADR-260726-kotoba-query-plane-is-one-ref）が
+そのまま効く。`kotobase.core/open` は `:ref-name` を 1 つしか取らず、Datalog join の
+到達範囲はちょうど ref 1 本である。
+
+repair scheduler の中核クエリは、
+
+```text
+{PG -> node set} x {node -> liveness} x {PG -> durability class} x {PG -> 最終監査結果}
+```
+
+の 4 面 join である。これを PG-id で shard したら **「node N の離脱で閾値を割った
+PG を列挙する」ができなくなる**。同様に payout 集計は
+`{node -> 受理済み order}` x `{node -> 担保}` x `{node -> 監査失敗}` の join であり、
+これも分割不能。
+
+したがって:
+
+- 上記 4 面 + order 台帳 + 監査結果は **同一 ref**。
+- 書き込み競合は ref を割って解かない。**`kura-bugyo` を Durable Object として置き、
+  その ref の単一 writer とし、tick 単位でバッチ transact する。** DO はグローバル
+  一意かつシングルスレッドなので「書き手はちょうど 1 人」を実装せずに得られる。
+- **DO の `ctx.storage.sql` に durable plane を置かない。** DO ごとに private な
+  SQLite ができ、datom 面が孤島に割れる。ストレージは D1（共有バックエンド）。
+- 分けるとしたら **監査 raw log**（challenge/response の生ログ）だけ。これは join 先が
+  「node と epoch」しかなく、分けた場合の代償は「監査ログの横断分析は N クエリ +
+  マージになる」と明記する。黙ったシャーディングはしない。
+
+### 5. Kotoba / cljc / host の責任境界 — 行列は判断、XOR は機構
+
+CLAUDE.md の runtime 優先順位（kotoba wasm > clojurewasm > cljs > nbb、Rust 新規禁止）と、
+`compile` 経路の現在地（再帰値なし、string leaf 64 KiB、EDN 1 MiB）を踏まえる。
+
+**256 MiB の shard は今日 Kotoba の値にならない。** だからといって全部 `.cljc` に
+置くのは間違いで、aiueos の先例（ADR-2607241100 D6: C は機構のみを所有し、判断は
+compiler-emit の `.kotoba` object）と同じ切り方をする:
+
+| 層 | 実装 | 理由 |
+|---|---|---|
+| GF 生成行列の構成、LRC の局所群割当、消去パターン -> 復元経路の解 | **`.kotoba`（`kotoba/pure`）** | 26x16 バイト程度。純関数・決定論的・検証したいのはここ。capability 不要 |
+| PG -> node set の配置関数、repair 判断、order admission、audit challenge 導出/検証 | **`.kotoba`（`kotoba/pure`）** | 全て小さい値を取り小さい値を返す判断。`storj.node.orders/admit` と同型 |
+| GF の multiply-accumulate 内ループ（MiB 単位） | **host provider（`.cljc` / WebCrypto / SIMD）** | 判断を含まない機構。バイトは Kotoba に入れない |
+| ディスク、ソケット、鍵 | **`kura-node` host** | capability 経由 |
+
+**適合条件**: host の GF 内ループは、小入力に対して Kotoba 側の参照実装と
+バイト一致することを conformance test で示す。`css` の byte 一致 parity gate
+（kotoba-lang/css#2）と同型。
+
+注意（CLAUDE.md の現在地記述をそのまま引く）: 数値→文字列の組み込みが無い、正規表現が
+無い、`or` は bool でなく i64 を返す、例外の代わりに `[:result T E]` を返す。GF 演算は
+i64 算術と表引きなので、この制約下でも素直に書ける — むしろ Kotoba に非常に向く。
+ただし **flat node 集合 / handle を「Kotoba の書き方」として恒久化しない**
+（ADR-2607279200: handles are not the application programming model）。W4 の再帰的
+論理値が入ったら manifest 表現を見直す。
+
+### 6. 暗号資産面 — 新トークンを発行しない
+
+これが提案でいちばん薄かった部分である。設計は以下。
+
+**(a) 新規トークンを作らない。** 価格は USD 建て、決済は Base L2 の USDC。理由は 2 つ。
+
+1. **security budget の反射性。** ネットワーク固有トークンで担保を積むと、担保価値が
+   下がるのは決まってネットワークが疑われている時であり、必要な瞬間に security が
+   薄くなる。Filecoin / Storj が実地で払った授業料。
+2. **法的位置づけ。** ネットワーク手数料から価値が導かれるトークンは多くの法域で
+   有価証券に当たる。USDC 担保 + 役務対価はそうならない。
+
+Storj 自身も価格は USD 建てである。トークンは調達手段であってプロトコルの必要条件ではない。
+
+**(b) node の担保は USDC 債券。** コミット TB に比例した bond を Base 上にロックする。
+監査失敗・SLA 違反で slash。既存 `kotoba-lang/pay`（USDC on Base、鍵保管ゼロ）を使う。
+
+**(c) 支払の単位は order capability。** `storj.node.orders` の形をそのまま採る:
+`kura-bugyo` が `{node-id, action, piece-id, max-bytes, expiry}` に署名し、node は
+それを検査してから働く（`admit` は理由を全部返す・署名検査は最後、という既存の
+設計判断ごと再利用する）。node は履行した order を蓄積して epoch ごとに提示する。
+
+**(d) payout は merkle-sum で証明可能にする。** epoch ごとに `kura-bugyo` が
+受理済み order を `merkle-sum` tree に集計し、**root を on-chain に投稿**する。
+各 node は自分の payout の inclusion proof を得る。merkle-sum の性質により
+**総額を過少申告すると必ずどれかの leaf の proof と矛盾する**ので、coordinator は
+支払総額を隠せない。`merkle-sum` は proof-of-liabilities 用にすでに抽出済み
+（ADR-2607141200）で、そのまま使える。
+
+**(e) 顧客側の課金は x402。** PUT/GET を `nexus-x402` facilitator でゲートする。
+既存の facilitator API（`POST /verify` / `POST /settle` / `GET /.well-known/x402`）に
+kura を seller として登録するだけで済む。facilitator は鍵を持たない。
+
+**(f) coordinator の中央性を名指しする。** `kura-bugyo` は配置・監査・payout を
+決める信頼点である。Storj の satellite と同じ中央性であり、隠さない。分散化の経路は
+**この workspace に既にある quorum 機構の再利用**: `kotoba-fleet-vcs` の
+`fleet govern`（`manifest/fleet-keys.edn` の署名鍵と append-only ledger）と同型で、
+複数 bugyo の quorum 署名で epoch root を確定する。段階 3 まで着手しない。
+
+### 7. Range GET の優位は systematic + direct-shard-read から来る（符号ではない）
+
+提案は Range GET を優位項目に挙げるが、原因の帰属が曖昧だった。正確には:
+
+Storj は 64 MiB segment を消失訂正し、各 piece は segment 全体の erasure share である。
+したがって segment 内の 1 MiB を読むにも **29 piece を取得して segment を再構成**する
+必要がある。増幅率は約 64 倍。
+
+kura は **systematic 符号を採り、データ shard をそのまま直接読める**ようにする:
+
+```text
+object 64 MiB / k=16  ->  systematic shard = 4 MiB
+1 MiB Range   ->  該当 shard 1 本の部分読み  ->  増幅率 約 1.0
+```
+
+これは符号が LRC だから得られるのではなく、**systematic かつデータ shard を
+直接配信可能にしているから**得られる。RS でも systematic なら同じ。正しく帰属させる。
+
+**代償**: 直接読みは単一 node 依存になり、tail latency が並列 29 本取得より悪くなる。
+緩和は局所群を使ったヘッジ — 保持 node が遅い場合、同一局所群の 4 本から再構成する
+（LRC の局所性がここで二度目の仕事をする）。**同等 TTFB を無条件で主張しない。**
+
+### 8. bootstrap — node ネットワークを作る前に、借り物 backend を node に見立てて計測する
+
+いきなり permissionless 網を作らない。理由は §1 のとおり、**保存倍率の設計は
+lambda（node 年間喪失率）と MTTR の実測なしには決められない**からである。
+
+```text
+Phase 0  借り物 backend を pseudo-node にする
+         B2 / R2 / S3 / Storj 自身（既存 io-storj 経由）を kura-node 契約の裏に置く
+         符号・配置・監査・order の全 plane をここで回し、lambda と MTTR を実測する
+         kotobase-storage-kura 経由で kotoba-annex / DataLad m365-archive を載せる
+
+Phase 1  自前 node（murakumo fleet の M4 群 + 手持ちディスク）を混ぜる
+         failure-domain 制約が効いているかを実測で確認する
+
+Phase 2  債券付き第三者 node を招く。USDC bond + slashing + merkle-sum payout を有効化
+
+Phase 3  bugyo の quorum 化（fleet govern と同型）
+```
+
+Phase 0 の時点で **DataLad + B2 の既存経路（skill `large-binary-datalad`）の上位互換**に
+なっているので、社内で先に価値が出る。whitepaper で終わらない。
+
+## 訂正した目標値
+
+提案の表を、上記の訂正を反映して書き直す。**同一 node 品質・同一ディスク価格を仮定した
+モデル値**であり、Phase 0 の実測で置き換える。
+
+| 指標 | kura（債券付き node） | kura（permissionless） | Storj | 備考 |
+|---|---|---|---|---|
+| 保存倍率 | **1.625 倍** | 2.0〜2.4 倍 | 約 2.76 倍 | 提案の 1.375 倍は任意 3 消失しか耐えず不採用 |
+| 任意消失耐性 | **7 / 26（全数探索で確定）** | 12〜18 / 32〜38 | 51 / 80 | LRC は非 MDS。同倍率 RS より低い |
+| 1 PB の物理容量 | 1.625 PB | 2.0〜2.4 PB | 2.76 PB | 削減 41%（債券付き）/ 15〜27%（公開） |
+| 単一 shard 復旧の読出し | 元 shard の **4 倍** | 同左 | 29 piece | 対 RS(16,26) で 75% 削減 |
+| Range GET 増幅率 | **約 1.0〜1.2** | 同左 | 約 64 倍（segment 内） | systematic 直接読みによる。符号の功績ではない |
+| Range GET の TTFB | 単一 node 依存、局所群ヘッジで緩和 | 同左 | 29 並列で安定 | 無条件の優位を主張しない |
+| 監査読出し（10 TB node） | **年 528 MiB = 容量の 0.005%** | 同左 | Satellite 監査 + 修復 | sampling のみ。HDX 不要 |
+| 単一 shard 復旧の read 数 | **4（実測）** | 同左 | 29 piece | 乗算ゼロ。対 RS(16,26) で 75% 削減 |
+| 監査の敵対者耐性 | VRF challenge + 担保 slashing | 同左 | 監査 + 評判 | HDX/LTC では得られない |
+| クライアント暗号化 | AES-256-GCM + HPKE wrap（既存 ADR-2607051000） | 同左 | 標準対応 | 同等 |
+| 保存原価（$1.50/TB/月 モデル） | **$2,437/PB/月** | $3,000〜3,600 | $4,140 | 差は node 品質由来 |
+| 実装成熟度 | **未着手（erasure が存在しない）** | — | 商用 | 正直に書く |
+
+Filecoin との比較は提案の記述で概ね妥当だが、1 点だけ訂正する。**kura は
+公開検証可能な保存証明を持たない**（§2 で HDX を落としたため）。持つのは
+「担保 + 予測不能 sampling + 署名付き監査ログ」であり、Filecoin の
+on-chain 継続証明とは別物である。cold archive の公開証明性が要件なら Filecoin が正しい。
+
+## Consequences
+
+- **`kotoba-lang/erasure` を新規に起こす必要がある**（workspace 唯一の欠落部品）。
+  GF(2^8) 演算と RS/LRC の構成は `.kotoba` に非常に向く（i64 算術 + 表引き、
+  再帰値も文字列も不要）ので、**最初から `compile` 経路で書く**。legacy emitter
+  （`kotoba wasm emit`）は使わない。
+- 保存倍率 1.625 倍は、**node に債券と SLA を課すことが前提**になる。この前提を
+  外した瞬間に倍率は 2.0〜2.4 倍に戻る。営業資料でこの条件を落とさない。
+- **HDX/LTC を落としたことで、提案の理論的な目玉が 1 つ消える。** 代わりに得られるのは
+  「敵対者に対して実際に意味を持つ監査」であり、I/O 削減率はむしろ向上する。研究
+  レーンとして残すが、production の耐久性主張はこれに依存させない。
+- metadata 面が 1 ref に収まるかは **決定論的 PG 設計が成立するか**に懸かっている。
+  PG を諦めて shard 単位台帳に戻ると 4.2 億行になり、ref 分割が不可避になり、
+  repair scheduler の中核クエリが書けなくなる。**PG は設計の要である。**
+- `kura-bugyo` は信頼点として残る（Phase 3 まで）。これを「分散ストレージ」と称する
+  時は satellite 相当の中央性があることを明記する。
+- Rust は書かない。既存 Rust エンジンも使わない（この設計に該当箇所が無い）。
+- `.sh` を新規に書かない。運用スクリプトは nbb。
+
+## Alternatives considered
+
+- **提案どおり AG-LRC 1.375 倍 + HDX 監査**: 却下。§1 で任意 3 消失しか耐えないこと、
+  §2 で LTC が rational adversary に無効であることを示した。両方とも
+  「同じ node 品質での符号比較」という前提が崩れている。
+- **plain RS のみ（LRC 無し）**: 同倍率で任意耐性は高い（RS(16,26) で 10 消失）が、
+  単一 shard 復旧に 16 shard 読む。修復事象の 99% が単一故障なので、局所性に
+  任意耐性 3 つ払う取引の方が総コストで勝つ。ただし **permissionless 運用に倒す場合は
+  相関故障が支配的になるので plain RS の方が正しくなる**。Phase 0 の lambda 実測で
+  再判断する。
+- **ネットワーク固有トークンの発行**: 却下。§6(a)。調達手段としては有効でも、
+  担保資産としては security budget を反射的にする。
+- **DO の `ctx.storage.sql` に metadata を置く**: 却下。DO ごと private で datom 面が
+  孤島に割れる（CLAUDE.md の mandatory rule）。DO は直列化器としてのみ使い、
+  ストレージは D1。
+- **Storj の上に薄く載せる（io-storj の Gateway-MT を使うだけ）**: Phase 0 の
+  pseudo-node の 1 つとしては採用する。ただしこれ単体では保存倍率も修復通信も
+  Storj のままなので、設計目標を達成しない。
+- **shard 単位の配置台帳（PG 無し）**: 却下。§3。1 PB で 4.2 億行になり 1 ref に
+  収まらず、ref を割ると repair scheduler が書けなくなる。
+
+## Open questions（オーナー判断が要るもの）
+
+1. **母集団の方針**: 債券付き（1.625 倍、41% 削減、招待制）か permissionless
+   （2.0〜2.4 倍、15〜27% 削減、誰でも参加）か。これが保存倍率・価格・法的位置づけの
+   全てを決める分岐で、後から変えると符号パラメータごと作り直しになる。
+2. **Phase 0 の顧客**: 社内（DataLad `m365-archive` / murakumo モデル重み）だけで
+   lambda を実測するか、外部顧客を先に取るか。
+3. **担保額の関数**: コミット TB あたりの USDC bond をいくらにするか。node の
+   期待収益より大きくないと slashing が抑止にならず、大きすぎると node が集まらない。
+4. **`kura-bugyo` の quorum 化を Phase 3 まで待つか**: 待つ間は中央集権であることを
+   公開ドキュメントに明記する必要がある。
+
+## 実装順序
+
+```text
+1. [DONE 2026-07-29] kotoba-lang/erasure — pin 6b6b95eb、west 登録済み
+   GF(2^8) 0x11D/alpha=2 -> Cauchy 生成行列 -> LRC 構成 -> ランクベース復元計画
+   .kotoba 判断層 + 等価性 parity gate。最小距離は全数探索で d=8 と確定
+
+2. kotoba-lang/kura（契約 + 判断）
+   object manifest schema / PG 配置関数 / repair 判断 / audit challenge
+   / order admission（storj.node.orders の形を踏襲）
+
+3. kotoba-lang/kura-node（機構）
+   kura-node 契約の裏に B2 / R2 / S3 / io-storj を pseudo-node として実装
+
+4. kotoba-lang/kura-bugyo（DO 単一 writer + D1）
+   metadata 1 ref / repair スケジューラ / audit 発行 / epoch 集計
+
+5. kotoba-lang/kotobase-storage-kura
+   既存 kotobase.storage 適合スイートを通す -> kotoba-annex / DataLad が無変更で載る
+
+6. 決済面
+   pay（USDC bond）+ merkle-sum（payout 証明）+ nexus-x402（顧客課金）を接続
+
+7. Phase 0 を 3 か月回して lambda と MTTR を実測し、
+   §1 の保存倍率と §Alternatives の LRC/RS 判断を再確定する
+```
+
+完了条件は「設計を書いた」ではなく、**Phase 0 で lambda と MTTR の実測値が出て、
+1.625 倍という数字が実データで裏付くか反証されること**である。それまで対外的な
+耐久性の数値主張はしない。
+"}]
