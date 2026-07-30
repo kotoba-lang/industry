@@ -598,7 +598,7 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
    要求する: `X-CARD-CONSENT-TOKEN` / `X-ESIM-CONSENT-TOKEN` / `X-VOICE-CONSENT-TOKEN`
    （env は `CARD_CONSENT_TOKEN` 等、**未設定は 503 で拒否** = fail closed）。
    **loopback 束縛は認可ではない** — ホスト上の全プロセスがそれを共有する。これが無い間は、
-   ローカルの任意のプロセスが `"status":"approved"` と捏造した passkey-credential-id を
+   ローカルの任意のプロセスが `\"status\":\"approved\"` と捏造した passkey-credential-id を
    載せた proposal を POST でき、実カード発行や回線の provisioning / **transfer**（SIM-swap
    経路）との間に残るのは「人間が同意したと信じた operator の承認」だけだった。
    **governor は影響を受けない**（recorded state から ground truth を再計算する）ので、
@@ -613,9 +613,28 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
    token は config が**変数名を指す**だけで値は環境変数から読む。**未設定でも app は先回りして
    拒否しない** — actor の 503 が記録すべき正直な事実で、app が先に拒否すると actor の設定を
    推測した上に本当の理由と違う理由を報告することになる。ワイヤ上で assert 済み。
-5. **pending の解決は polling のみ。** actor から app への callback は無い。決着を
-   知るのが遅れるだけで嘘にはならないが、operator が決めてから app が気付くまでの
-   窓は残る。**denwaban はこの窓を持たない**（pending を作らないため）。
+5. **pending は「解決が遅れる」のではなく「解決しなかった」（2026-07-31 訂正）。**
+   ここには「`refresh!` は app から問い合わせる形で、決着を知るのが遅れるだけで嘘には
+   ならない」と書いてあったが、**実測すると `refresh!` を呼ぶものが一つも無かった** —
+   session + CSRF を要する HTTP route としてのみ到達可能で、**UI のどこも、タイマーも
+   叩いていない**。つまり `:authority-pending` は、誰かが手で POST を組み立てない限り
+   **永遠に解決しない**状態だった。
+   `api/resolve-pending!` を追加（`cloud-itonami-app` 276c53d3）: その session が待って
+   いるものを一括で問い合わせ、**何が動いたかを報告**し、「pending が無かった」と
+   「pending はあるが authority が無効」を**別々に数え**、1つ失敗しても**残りを続行**する
+   （設定ミスの actor 1つが他の全 proposal を永久に pending にしないため）。
+   **その過程で既存バグを1件発見・修正**: `refresh!` は**到達できない authority を
+   `:authority-refused` として記録**していた。connection error / disabled / endpoint 未設定は
+   **この app 自身が生成する refusal で、governor は何も言っていない** — つまり
+   **誰も出していない拒否を台帳に書いていた**。unknown-reference 分岐が避けるために存在
+   していたのと同じ誤りで、`transport.clj` の docstring 自身が「到達できないことと
+   『no と言われた』ことは別物で、台帳はそれを区別できるべき」と明記している。
+   この3つは `:authority-unreachable-since` を付けて **pending のまま**にした
+   （`:authority-unknown-since` と同型）。**actor から来た refusal は従来どおり解決する**
+   ことにもテストがある（本物の拒否を飲み込む修正はバグより悪いので）。
+   **残る**: UI はまだこの route を呼んでいない（front-end 側の変更）。actor → app の
+   callback は導入していない — 認証付きの逆方向チャネルを増やすより、まず「呼べば解決する」
+   を成立させた。
 6. **D4 の単一 ref が actor 側でまだ成立していない。** app 内では1つの store
    partition で cross-domain 読みが成立するが、actor の ledger は各自 MemStore のみ。
 7. **kotoba-lang の 85 ライブラリが git 座標で消費不能（2026-07-31 に実測し直した）。**
