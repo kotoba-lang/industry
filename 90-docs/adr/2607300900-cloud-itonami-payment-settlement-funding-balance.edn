@@ -1,0 +1,235 @@
+[{:db/id -1
+  :adr/id "adr-2607300900-cloud-itonami-payment-settlement-funding-balance"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-payment-settlement-funding-balance"
+  :adr/title "ADR-2607300900: cloud-itonami-app に funding account（残高の attest）と payment settlement authority を追加する — 誰も推測していない残高の上で支払いを承認記録する"
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/last-verified "2026-07-30"
+  :adr/last_verified "2026-07-30"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative-for
+  ["cloud-itonami-app における funding account（組織に紐づく銀行口座）のデータモデルと、口座番号を保持せず last4 + SHA-256 digest に還元する決定の正本"
+   "残高を attest（人が読んで記録する）値として扱い、銀行が示した :as-of を必須とする決定、および :never-recorded / :fresh / :stale の3値で「不明な残高はゼロでも無制限でもない」を表現する決定の正本"
+   "authority spine 上の4番目の authority として :payment/settle を追加し、資金不足を人に聞く前に拒否する決定（2026年6月の口座振替失敗を gate として符号化）の正本"
+   "重複決済判定を organization スコープかつ :committed のみとする決定の正本"
+   "ADR-2607300300 D4 の SIM-swap hold を銀行振込にも適用する決定の正本"
+   "balance / freshness / funding-account / settlement-history を server 側で計算し request の値を上書きする決定（gate を実効化する強制点）の正本"
+   "この機能の到達上限 — commit は governed settlement RECORD であって送金ではない、資金 gate は review 時点のみ — の明示"]
+  :adr/related "adr-2607300300-esim-voice-reception-card-issuing-integrated-design, adr-260726-kotobase-query-plane-is-one-ref, adr-2607247000-cloud-itonami-emi-electronic-money-institution-actor, adr-2607249000-cloud-itonami-card-issuing-actor"
+  :adr/body "
+# ADR-2607300900: funding account と payment settlement authority
+
+**Status**: accepted
+**Date**: 2026-07-30
+**Deciders**: Jun Kawasaki（+ Claude。オーナー指示「口座情報を cloud-itonami-app の
+jk-corp と紐付けて、残高を把握して、支払いを api 承認処理で決済記録するように
+してほしい」に基づき実行）
+
+## Context — 実在する未払いと、既に一度失敗している事実
+
+これは仮想の要件ではない。JK株式会社は税理士法人TOTAL（担当: 水鳥智仁）に顧問料を
+負っており、**その回収は一度失敗している**。Gmail の実測（jun784@gmail.com、
+2026-07-30 時点）:
+
+- **2026-07-02**（message `19f208ab40cdfb68`）: 令和8年6月分の口座振替が
+  **残高不足により引き落とし未完了**。次回7月分の振替日に6月分を合算して請求する、
+  振替日前日までに **PayPay銀行口座**への資金準備を依頼。
+- **2026-07-30**（message `19fb09e87efe5d1c`、件名『【未納顧問料のご案内】税理士法人
+  TOTALの水鳥です。』）: 7月現在の未納分の顧問料について請求書を添付、**振込**を依頼。
+  添付ファイル名は `税務_未納のお知らせ_03356_ＪＫ㈱様_20260730_Y38500.pdf`。
+- **2026-06-19 〜 06-22**（`19edd577f38ab342`）: MoneyForward クラウド会計の
+  **PayPay銀行 API 連携が期限切れ** → 再連携依頼 → 06-20 に再連携完了、06-22 に
+  先方確認済み。
+
+### 金額について（正直に書く）
+
+**¥38,500 は添付 PDF のファイル名の `Y38500` トークンから読んだ値であり、PDF 本文は
+読んでいない。** 現在の Gmail MCP には添付ファイルを取得する tool が無く
+（`get_message` は attachment の id と filename しか返さない）、本文照合は
+できていない。したがって本 ADR は金額を**未検証**として扱い、実際の決済記録では
+owner が請求書本文の金額を入力する。ファイル名から推測した数値をそのまま
+`amount-minor` に焼くことはしない。
+
+### 設計の入力は「承認の欠落」ではなく「残高を知らなかったこと」
+
+6月に起きたのは承認漏れではない。**誰も当座貸越を承認していない** — 起きたのは、
+銀行が言うまで残高が足りないと分からなかったことである。したがって「承認だけを
+足す」設計は、同じ事故を**署名付きで**繰り返させる。資金 gate が無い承認は、この
+ケースにおいて何の防御にもならない。
+
+一方、consent 側の機構は既に存在する。ADR-2607300300 が入れた
+`cloud.itonami.app.authority` は 4 段階の背骨（決定論的 pre-check → Passkey consent →
+content digest → governed actor への hand-off）で、eSIM / card / voice を載せている。
+card adapter の daily-limit gate は求める形そのもの — **人に聞く前**に評価される
+算術的拒否であり、進めない要求が承認プロンプトになることが無い。
+
+欠けていたのは、金を照合する相手だった。app には銀行コネクタも口座モデルも無い。
+
+## Decision
+
+### D1. funding account は organization に属し、payment instrument を持たない
+
+`cloud.itonami.app.funding` は銀行口座を **Tenant** に紐づける（User ではない）。
+会社の口座は紐付けた個人より長生きし、user スコープにすると owner 交代で全ての
+未払いの資金元が黙って孤児になる。`:linked-by` は誰がやったかを記録するが所有者に
+はしない。
+
+**口座番号は保存しない。** 一度渡してよいが、保持されるのは下4桁と SHA-256 digest
+だけ。digest は consent が必要とする唯一の問い（承認した口座は記録上の口座か）に
+答え、送金には使えない。同じ還元を pre-check 内で**支払先**口座にも適用するので、
+`state.edn` に永続化される proposal にも転用可能な口座番号は入らない。
+
+### D2. 残高は attest され、銀行の時刻で日付が付き、決して推測されない
+
+銀行コネクタは無く、本 ADR でも足さない。残高は人が読んで記録するから存在する:
+
+- `:amount-minor` — 通貨の**最小単位**の整数。exponent は allowlist から引く。
+  未知通貨は default せず拒否する。exponent の推測は数値が 100 倍間違う経路。
+- `:as-of` — **銀行が示した instant**。必須で、now に default しない。3日前の
+  残高照会からの転記は、たった今打ち込んでも3日前の値である。
+- `:source` — `:owner-attested` / `:statement` / `:api` のいずれか。
+
+`funding/freshness` は純関数で `:never-recorded` / `:fresh` / `:stale` を返す。
+解析不能・欠落・**未来**の `:as-of` はすべて `:stale`。これは
+`authority.posture` の fail-closed 方向とは**逆のリテラル値**だが同じ原則である
+（未知は拒否の側へ倒す）。あちらは timestamp が制限を制御し、こちらは許可を制御する。
+
+**不明な残高はゼロでも無制限でもない。不明であり、拒否する。**
+`account-services` が使用量メータについて既に述べている
+（an unavailable meter is never presented as zero usage）のと同じ規律だが、金銭では
+利害が大きい: 大きく default すれば支払いが素通りし、ゼロに default すれば永久に
+全支払いが拒否される。
+
+### D3. :payment は spine 上の4番目の authority
+
+`cloud.itonami.app.authority.payment` は op を1つ（`:payment/settle`）持ち、固有の
+Passkey context type に束縛される。pre-check は純関数（全 fact が引数）で、この順に
+拒否する:
+
+| 拒否 | なぜこの位置か |
+|---|---|
+| `:payment/op-unsupported` | allowlist。default しない |
+| `:payment/posture-unknown` / `:payment/spend-hold` | D4 の cross-domain hold |
+| `:payment/payee-missing` / `:reference-missing` / `:amount-invalid` | 形 |
+| `:payment/account-not-linked` / `:account-inactive` / `:currency-mismatch` | 資金元 |
+| `:payment/settlement-history-unknown` / `:duplicate-settlement` | 既に払った請求書について「残高不足です」と言うのは、誤った問題へ人を送る |
+| `:payment/balance-unknown` | 古い/無い数値は答えではない |
+| `:payment/insufficient-funds` | **6月の失敗を gate として符号化したもの** |
+
+重複判定は請求書 reference をキーに、**organization スコープかつ `:committed` のみ**。
+請求書は会社が負うので、同僚が二重に決済するのが正にこの検査の対象である。また
+rejected / governor が refuse した proposal は何も決済していないので、それを
+settled と数えると未払いが宙に浮く。
+
+### D4. SIM swap は銀行振込も止める
+
+ADR-2607300300 D4 は、同一 subject の eSIM ownership transfer 後 7 日間 card の
+spend と issuance を制限する。回線を奪った者は第二要素を奪っており、典型手順は
+**回線を移し、次に使う**。この手順は、使うのがカードか銀行振込かを区別しない。
+よって `:payment/settle` も同じ hold を継承する。除外すれば不変条件の隣に扉を
+開けたままにすることになる。
+
+これが表現できるのは 4 authority の proposal が単一の store partition を共有して
+いるからで、これは `kotobase.core/open` が `:ref-name` をちょうど 1 本しか取らない
+ことの local な相似形である（ADR-260726）。書き込みスループットのために分割すれば、
+統合を正当化した唯一の不変条件を失う。
+
+### D5. fact は server のもので、caller のものではない
+
+`authority.api` は posture / funding account / balance / freshness / settlement
+history を store から計算し、request に載っていた値を**上書きする**。これが強制点で
+あり、adapter 側の必須入力検査は「忘れられないようにする」だけである。上書きが
+無ければ client は `{:balance {:amount-minor 99999999}}` を送って資金 gate を
+買い抜けられ、gate 全体が単なる助言になる。
+
+request から取るのは `:funding-account-id` だけ（どの口座から出すかは caller の
+決定）。ただし口座は**引き直す**ので、他 organization の id は nil に解決して拒否
+される。「organization の唯一の active 口座に default する」案は却下した — 暗黙の
+資金元は、便利にしてよい対象ではない。
+
+## Consequences
+
+### commit が意味すること
+
+**governed settlement RECORD であって、送金ではない。** この app は銀行 credential を
+持たず、口座番号を保存せず、決済網への経路を持たない。振込は人が銀行で行う。
+記録されるのは、何を負っていたか・どの口座から・誰が承認したか・その条件の digest に
+対する Passkey assertion。fleet の他 actor と同様 settlement actor は propose-only なので
+`:committed` は**governed proposal が記録された**ことを意味する。これを「支払済み」と
+描画する UI は嘘をついている。
+
+### 資金 gate は review 時点のみ
+
+残高は digest material に**意図的に含めない**。含めると無関係な入金のたびに正当な
+承認が無効化される。代償は隠さず明示する: review と commit の間に残高が落ちても
+この adapter は気付かない。`:balance-at-review` を proposal に記録して何を根拠に
+判断したかを読めるようにし、後からの不足を見るのは actor 側 governor の役目とする。
+
+### :payment は disabled で出荷される
+
+`defaults.edn` の他 authority と同様、`:endpoint nil` で。新規インストールに決済面は
+無い。有効化は deployment の判断。
+
+### error status
+
+spine 自身の拒否はこれまで未 mapping で 502 を返していた（無効な authority が
+「サーバが壊れている」と読めた）。`:authority/*` `:funding/*` `:payment/*` を mapping
+した。`:payment/insufficient-funds` は **402**（Payment Required の本来の用途）。
+
+## 未達 / blocker（次の agent と owner のために）
+
+1. **jk-corp organization がまだ存在しない。** `data/state.edn` の唯一の organization は
+   `Personal`（`:organization-id nil` / `:status :pending-profile`）で、user は
+   `:status :pending-passkey` / `:passkey-enrolled? false`。
+   `identity/create-organization!` は `require-passkey!` を通るので、**owner が
+   Passkey 登録を完了するまで jk-corp は作れない**。これは agent が代行できる操作では
+   ない（WebAuthn ceremony であり、安全床①にも触れる）。
+2. **残高が未記録。** 銀行コネクタが無いので owner が PayPay銀行の残高を
+   `POST /api/funding/accounts/{id}/balance` で記録する必要がある。記録するまで
+   `:payment/balance-unknown` で拒否される（これは gate が働いている状態であって
+   不具合ではない）。
+3. **請求書金額が未検証**（上記 Context 参照）。
+4. **settlement actor が存在しない。** `:endpoint` に指す先が無いので、commit は
+   `:endpoint-not-configured` で `:authority-refused` になる。他 3 authority と同じ
+   現在地であり、この app 側の欠落ではない。
+
+### 将来の :api 残高経路
+
+MoneyForward クラウド会計は PayPay銀行と API 連携済み（2026-06-20 再連携、06-22
+先方確認）。`:source :api` はそこから残高を引く経路のために既に用意してあるが、
+**その連携は会計側にあり app 側には無い**。実装する場合も、送金能力を伴う
+credential を app に持たせない設計（読み取り専用）を維持すること — さもなければ
+本 ADR の他の拒否がすべて飾りになる。
+
+## 検証と着地
+
+- `clojure -M:test` — **247 tests / 1157 assertions / 0 failures**（merge 後の tree）。
+  新規: `funding_test.clj`（残高 freshness の純関数、口座番号が state.edn に出ない
+  ことの直接検査、organization スコープ）、`authority/payment_test.clj`（全拒否経路、
+  digest material の被覆、**client が自前の残高を送っても上書きされる**こと）。
+- `clojure -M:lint` — **0 errors**（warning 8 件はすべて既存で、追加分に起因しない）。
+- app 着地: `cloud-itonami/cloud-itonami-app` main `c0b08d6`
+  （branch `agent/payment-authority` → server-side merge）。
+- superproject: `manifest/west.yml` の `cloud-itonami-app` pin を単一 entry の
+  GitHub API commit で `c0b08d6` へ前進（`5afb419`）。**409 で一度弾かれた** —
+  他 agent が同時に main を進めており、optimistic lock が想定どおり働いた。
+  再読込み → 祖先関係を GitHub API で検証（`status: ahead` / `behind_by: 0`）→
+  再 PUT で成立。
+- app 側 ADR: `docs/adr/0005-payment-settlement-authority.md`。
+
+## Alternatives considered
+
+- **銀行から残高を取得する。** この app が使える API が無く、取得すれば送金もできる
+  credential を持つことになり、本 ADR の他の拒否がすべて装飾になる。工数ではなく
+  この理由で却下。
+- **残高欠落を 0 と見なす。** 永久に全支払いを拒否し、欠測ではなくバグに見えるので、
+  検査を外す圧力になる。`:never-recorded` / `:stale` は拒否し、かつ理由を言う。
+- **重複判定を user スコープにする。** 重複検査が存在する唯一のケース（同じ請求書を
+  2人が払う）で素通りする。
+- **reference 必須をやめる。** reference が無いと同じ決済を二重に記録でき、しかも
+  どちらの記録も間違っていない状態になる。台帳が答えられなくなる。
+"}]
