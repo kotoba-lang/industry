@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 5454, "kotobase-cf-wasm-staging" 2638},
+ {"net-kotobase" 5553, "kotobase-cf-wasm-staging" 2638},
  :zone
- {:requests-7d 9809,
-  :pageviews-7d 536,
-  :uniques-7d-sum 741,
+ {:requests-7d 10443,
+  :pageviews-7d 600,
+  :uniques-7d-sum 806,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 99}
-   {:path "/health", :requests 72}
-   {:path "/robots.txt", :requests 47}
+  [{:path "/", :requests 138}
+   {:path "/health", :requests 76}
+   {:path "/robots.txt", :requests 52}
    {:path "/_health", :requests 45}
-   {:path "/api/funnel", :requests 24}
-   {:path "/llms-full.txt", :requests 22}
-   {:path "/.well-known/did.json", :requests 18}
-   {:path "/llms.txt", :requests 17}],
-  :status-mix {:client-error 636, :server-error 26, :ok 450},
+   {:path "/signup", :requests 28}
+   {:path "/api/funnel", :requests 26}
+   {:path "/llms-full.txt", :requests 25}
+   {:path "/.well-known/did.json", :requests 21}],
+  :status-mix {:client-error 1165, :server-error 26, :ok 541},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,12 +30,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-30",
- :traffic-quality {:window "24h", :probe-4xx-pct 57, :error-5xx-pct 2},
+ :traffic-quality {:window "24h", :probe-4xx-pct 67, :error-5xx-pct 2},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 99 · /health 72 · /robots.txt 47 · /_health 45 · /api/funnel 24 | 4xx(probe) 57% · 5xx 2%",
- :funnel {:visitors 1592, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 138 · /health 76 · /robots.txt 52 · /_health 45 · /signup 28 | 4xx(probe) 67% · 5xx 2%",
+ :funnel {:visitors 1621, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 9809 req/7d・741 uniques(日次和)・うち4xx probe 57%(24h)、workers 8092 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 10443 req/7d・806 uniques(日次和)・うち4xx probe 67%(24h)、workers 8191 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 4,
   :submissions 3,
@@ -43,4 +43,5 @@
   :rejections 3,
   :attempt-rate 0.75,
   :settlement-rate 0},
- :by-source {:visitors {:organic 20}, :signups {}, :checkouts {}}}
+ :by-source
+ {:visitors {:openai-ads 2, :organic 47}, :signups {}, :checkouts {}}}

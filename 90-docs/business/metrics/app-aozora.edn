@@ -8,21 +8,21 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 15923,
-  "app-aozora-appview" 10542,
-  "app-aozora-spa" 5246},
+ {"app-aozora-pds" 16063,
+  "app-aozora-appview" 10596,
+  "app-aozora-spa" 5465},
  :zone
- {:requests-7d 636768,
-  :pageviews-7d 10565,
-  :uniques-7d-sum 1016,
+ {:requests-7d 644194,
+  :pageviews-7d 10768,
+  :uniques-7d-sum 1020,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 235947}
+  [{:path "/v1/datoms", :requests 266534}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 167300}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 4337}
+    :requests 168153}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 4331}
    {:path "/v1/transact", :requests 60}
    {:path
     "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
@@ -33,12 +33,12 @@
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
     :requests 49}
-   {:path "/robots.txt", :requests 45}],
-  :status-mix {:ok 409919, :client-error 285, :server-error 234},
+   {:path "/robots.txt", :requests 48}],
+  :status-mix {:ok 441405, :client-error 292, :server-error 246},
   :window "24h"},
  :as-of "2026-07-30",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 235947 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 167300 · /xrpc/ai.gftd.apps.kotobase.datomic.view 4337 · /v1/transact 60 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 55 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 266534 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 168153 · /xrpc/ai.gftd.apps.kotobase.datomic.view 4331 · /v1/transact 60 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 55 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 636768 req/7d・1016 uniques(日次和)・うち4xx probe 0%(24h)、workers 31711 inv/7d"}
+ "aozora.app 実測 644194 req/7d・1020 uniques(日次和)・うち4xx probe 0%(24h)、workers 32124 inv/7d"}
