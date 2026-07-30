@@ -18,7 +18,8 @@
    "重複決済判定を organization スコープかつ :committed のみとする決定の正本"
    "ADR-2607300300 D4 の SIM-swap hold を銀行振込にも適用する決定の正本"
    "balance / freshness / funding-account / settlement-history を server 側で計算し request の値を上書きする決定（gate を実効化する強制点）の正本"
-   "この機能の到達上限 — commit は governed settlement RECORD であって送金ではない、資金 gate は review 時点のみ — の明示"]
+   "この機能の到達上限 — commit は governed settlement RECORD であって送金ではない、資金 gate は review 時点のみ — の明示"
+   "MCP agent surface が session を「迂回する」のではなく「解決する」設計、および承認（Passkey consent）を agent に一切露出しない決定の正本"]
   :adr/related "adr-2607300300-esim-voice-reception-card-issuing-integrated-design, adr-260726-kotobase-query-plane-is-one-ref, adr-2607247000-cloud-itonami-emi-electronic-money-institution-actor, adr-2607249000-cloud-itonami-card-issuing-actor"
   :adr/body "
 # ADR-2607300900: funding account と payment settlement authority
@@ -151,6 +152,31 @@ request から取るのは `:funding-account-id` だけ（どの口座から出�
 される。「organization の唯一の active 口座に default する」案は却下した — 暗黙の
 資金元は、便利にしてよい対象ではない。
 
+### D6. agent surface は session を迂回せず、解決する
+
+`cloud.itonami.app.mcp` の docstring は、mail / calendar / drive / chat を MCP に
+出さない理由をこう書いている — それらは `/api/*` の Passkey session の裏にあり、
+session を持たない面からそこへ回り込むのは app が意図した gate を弱めることになる。
+**金銭はその反論の強い版であって弱い版ではない。**
+
+そこで `cloud.itonami.app.payment-tools` は session を迂回せず**解決する**:
+`CLOUD_ITONAMI_MCP_SESSION` または login Keychain（service `cloud-itonami-app.mcp` /
+account `session-token`）の app session token → `identity/session` →
+`passkey-enrolled?`。token が無い・失効・revoke 済み・Passkey 未登録なら、funding /
+payment tool は **manifest に現れない**（「呼ぶと失敗する tool」ではない。必ず拒否する
+tool を publish するのは client に試行を誘い、理由を何も伝えない）。token は process
+単位で memoize するが **session は毎回再解決**するので、失効・revoke は即座に効く。
+
+**承認できる tool は無い。** `approve/start` / `approve/finish` は descriptor も
+dispatch 分岐も持たない。これは policy ではなく構造である — consent は operator が
+持つ authenticator の user-verifying WebAuthn assertion であり、agent が生成できる
+assertion は存在しない。`payment_commit` を出しているのは、それが**人間が既に digest に
+署名済み**の proposal にしか作用しないから（承認済みのものを authority へ運ぶのは
+使い走りであって判断ではない）で、spine は `:approved` 以外を拒否するので consent 段を
+跨げない。
+
+Keychain 読み出しは service / account を指定した**1件の狙い撃ち**で、列挙はしない。
+
 ## Consequences
 
 ### commit が意味すること
@@ -180,7 +206,15 @@ spine 自身の拒否はこれまで未 mapping で 502 を返していた（無
 「サーバが壊れている」と読めた）。`:authority/*` `:funding/*` `:payment/*` を mapping
 した。`:payment/insufficient-funds` は **402**（Payment Required の本来の用途）。
 
-## 未達 / blocker（次の agent と owner のために）
+## 現在地（2026-07-30 時点）
+
+**稼働済み**: `:payment` authority を local deployment（`data/config.edn`）で有効化、
+app server を新コードで再起動（`/api/funding` `/api/authority/payment/*` が live、
+session 無しで 401 = route 有り・gate 有り）、superproject の `.mcp.json` に
+`cloud-itonami-app` stdio MCP server を登録（session token 未設定なので tool は 0 件 —
+これが設計どおりの既定）。
+
+**未達 / blocker（次の agent と owner のために）**
 
 1. **jk-corp organization がまだ存在しない。** `data/state.edn` の唯一の organization は
    `Personal`（`:organization-id nil` / `:status :pending-profile`）で、user は
@@ -207,18 +241,28 @@ credential を app に持たせない設計（読み取り専用）を維持す�
 
 ## 検証と着地
 
-- `clojure -M:test` — **247 tests / 1157 assertions / 0 failures**（merge 後の tree）。
+- `clojure -M:test` — **276 tests / 1260 assertions / 0 failures**（merge 後の tree）。
   新規: `funding_test.clj`（残高 freshness の純関数、口座番号が state.edn に出ない
   ことの直接検査、organization スコープ）、`authority/payment_test.clj`（全拒否経路、
   digest material の被覆、**client が自前の残高を送っても上書きされる**こと）。
 - `clojure -M:lint` — **0 errors**（warning 8 件はすべて既存で、追加分に起因しない）。
-- app 着地: `cloud-itonami/cloud-itonami-app` main `c0b08d6`
-  （branch `agent/payment-authority` → server-side merge）。
+  MCP 面は `payment_tools_test.clj`（session 無しなら manifest に出ないこと、Passkey
+  未登録 user では session が解決しないこと、revoke が即座に効くこと、承認系 tool 名が
+  存在しないこと、未承認 proposal を commit できないこと）。
+- **実 stdio JSON-RPC でも E2E 検証済み**（unit test だけではない）:
+  `funding_link_account` → `funding_record_balance ¥10,000` →
+  `payment_review ¥38,500` = `payment/insufficient-funds` 拒否 →
+  `funding_record_balance ¥120,000` → `payment_review` = `awaiting-passkey` + digest →
+  未承認 proposal の `payment_commit` = `authority/proposal-not-found` 拒否。
+  途中、`as-of` を未来の instant にした試行が `payment/balance-unknown` で拒否され、
+  「未来の timestamp は stale」の fail-closed 規則が実地で効くことも確認した。
+- app 着地: `cloud-itonami/cloud-itonami-app` main `c0b08d6`（authority）と
+  `254bbab`（MCP surface）、いずれも branch → server-side merge。
 - superproject: `manifest/west.yml` の `cloud-itonami-app` pin を単一 entry の
-  GitHub API commit で `c0b08d6` へ前進（`5afb419`）。**409 で一度弾かれた** —
-  他 agent が同時に main を進めており、optimistic lock が想定どおり働いた。
-  再読込み → 祖先関係を GitHub API で検証（`status: ahead` / `behind_by: 0`）→
-  再 PUT で成立。
+  GitHub API commit で前進（`5afb419` → `c0b08d6`、`09f712d` → `254bbab`）。
+  1回目は **409 で弾かれた** — 他 agent が同時に main を進めており、optimistic lock が
+  想定どおり働いた。再読込み → 祖先関係を GitHub API で検証
+  （`status: ahead` / `behind_by: 0`）→ 再 PUT で成立。
 - app 側 ADR: `docs/adr/0005-payment-settlement-authority.md`。
 
 ## Alternatives considered
