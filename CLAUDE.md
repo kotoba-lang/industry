@@ -129,9 +129,10 @@ skill `new-project-scaffold` を参照。
   （govern）/ `--kagi fleet-owner-root`（head）で読む**（PEM ファイル指定は
   `--key`。1Password は使わない — op CLI が interactive auth timeout）。
   `FLEET_ROOT=<superproject root>` を渡すと kagi bin を解決できる。
-  従来の `gen-west-manifest.cljs --entry` / API single-entry も引き続き有効で、
-  その書き込みは CI（`.github/workflows/fleet-projection-verify.yml`）が
-  `fleet reconcile` で fleet-db に自動吸収する。**fleet-db / ledger /
+  従来の `gen-west-manifest.cljs --entry` / API single-entry も引き続き有効。
+  **その書き込みを fleet-db に自動吸収していた CI は無くなった**（2026-07-30、
+  ADR-2607300900 で GitHub Actions を撤去。`fleet-projection-verify.yml` は
+  murakumo fleet 側に未 port）。当面 `fleet reconcile` は手で回す。**fleet-db / ledger /
   fleet-head.edn を手編集しない**（ledger は追記のみ、head は署名付き）。
 - 並列 sync: `nbb --classpath orgs/kotoba-lang/kotoba-fleet-vcs/src \
   orgs/kotoba-lang/kotoba-fleet-vcs/bin/fleet.cljs sync --db manifest/fleet-db.edn \
@@ -224,9 +225,12 @@ skill `new-project-scaffold` を参照。
   理由を commit message に残す）。**登録・rename・pin 前進は `--entry <name>` で当該
   entry のみの最小 diff を生成する — wholesale 再生成 commit は禁止**（1件の登録の
   つもりが未 push HEAD 由来の壊れた pin を 44 件 main に流した実事故 `90852b86` の
-  再発防止）。CI（`.github/workflows/west-pin-verify.yml`）と PreToolUse hook
-  （`.claude/hooks/west-pin-verify-guard.cljs`。`git push` と `gh api PUT` の両経路）が
-  同じ検証を強制する。
+  再発防止）。強制するのは PreToolUse hook
+  （`.claude/hooks/west-pin-verify-guard.cljs`。`git push` と `gh api PUT` の両経路）と、
+  murakumo fleet の `root-west-pin-policy` gate（policy 層）+ tick.cljs の CD 前
+  `verify-west-pins`（server-side 到達性）。**GitHub Actions の
+  `west-pin-verify.yml` は撤去済み**（2026-07-30、ADR-2607300900 — 16 workflow
+  すべてが job 起動せず赤のままだった）。
 
 - **`git push` / `git pull` / `west update` の前に、manifest の pin が upstream
   GitHub の最新から取り残されていないか（pin 鮮度）を必ず確認する。** `west update`

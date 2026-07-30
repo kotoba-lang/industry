@@ -23,13 +23,17 @@ So the premise of the request is stronger than a platform preference. There is c
 
 4. **Never register a gate that starts red.** A permanently-failing check carries no signal — that is the exact mechanism by which the docs-edn defect was reintroduced twice within hours today (ADR-2607300400). A workflow whose invariant is currently violated gets its breakage fixed first, or gets registered with a declared ratchet, but does not get added as a standing red light.
 
-5. `exit 0` is not a pass. Every ported gate asserts a positive summary from the underlying verifier, as jvm-test asserts `Ran N tests`."
+5. `exit 0` is not a pass. Every ported gate asserts a positive summary from the underlying verifier, as jvm-test asserts `Ran N tests`.
+
+6. **Delete the workflows rather than leaving them red.** Sixteen failing checks are worse than none: they read as coverage. `.github/` is removed from this superproject on 2026-07-30. Git history keeps every recipe, and no required status check exists to strand a PR (branch protection is unavailable on this plan). Two capabilities are removed outright and named as such rather than quietly dropped."
   :adr/consequences
   "Coverage is now 18 gate entries. The invariant that pin regressions are checked at all is restored — it had silently not been running.
 
 Branch protection is the remaining cutover: required status checks still name Actions contexts that never report, so they cannot be satisfied and cannot block anything. Switching them to `fleet-ci/murakumo/*` is what actually makes the fleet authoritative, and it is a repo-settings change, not code.
 
-Two workflows cannot move and need an explicit decision (see body). Until then they stay nominally on Actions, which means they do not run.
+Two capabilities are gone rather than moved: SAST (codeql) and the JupyterLite Pages publish. Both were already not executing, but nothing will restore them automatically — they need an owner decision, recorded in the body.
+
+The fleet is now the only CI plane for this superproject. That also means its coverage gaps are the real ones: nine invariants listed in the body have no home at all until they are ported, and four of those are currently violated.
 
 Trigger latency stays at the 5-minute LaunchAgent poll rather than a webhook. Acceptable for gates; it means a push waits up to 5 minutes for a verdict."
   :adr/body
@@ -71,6 +75,70 @@ Worth stating because it is not obvious from outside: the fleet does things Acti
 - Green **advances the west pin** through server-side verification, so CI and CD are one path.
 - `exit 0` is structurally distrusted: extraction success and a test summary are both asserted, after a real false-pass incident where a `clojure` that dropped to a REPL returned 0.
 - Nodes hold **no credentials**; the operator fetches private trees and streams tarballs over ssh stdin.
+
+## Retirement, 2026-07-30
+
+`.github/` is deleted from this superproject: 16 workflows plus the now-orphaned
+`codeql-config.yml`. The directory held nothing else.
+
+Two findings made this safe rather than merely requested:
+
+- **There are no required status checks.** `GET /branches/main/protection` returns
+  403 — branch protection needs GitHub Pro or a public repo, and this is neither.
+  So no check could ever have blocked a merge here, and deleting a workflow cannot
+  strand a PR waiting on a status that will never arrive. It also retires item 2 of
+  the earlier plan: switching required checks to `fleet-ci/murakumo/*` is not
+  possible on this plan, so fleet commit statuses are informational for this repo.
+- Deletion is reversible. Every workflow stays in git history; this removes the red
+  lights and the misleading appearance of coverage, not the recipes.
+
+### Disposition of all 16
+
+| workflow | disposition |
+|---|---|
+| west-pin-verify | policy half **on the fleet**; API half already operator-side in tick.cljs |
+| kotoba-repository-roles | **on the fleet** (same verifier, rc=0, 23 repos verified) |
+| docs-edn-verify | docs half **on the fleet** for `90-docs/adr`; full scope still red |
+| foundation-deps-verify | invariant **broken** (rc=1) — fix before registering |
+| repo-reality-verify | invariant **broken** (rc=1); structural half already on the fleet |
+| public-runtime-owners | invariant **broken** (rc=1) |
+| istore-freeze-check | needs a **commit range**, not a tree — belongs operator-side |
+| tree-collapse-guard | compares HEAD against HEAD^ — same, operator-side |
+| fleet-projection-verify | portable, needs a clone of kagami at pin |
+| clj-wgsl-parity | portable but heavy (python + west + full west update) |
+| cloud-itonami-live-observe | portable, clones loop-system-dynamics |
+| annex-custody-verify | portable once `git-annex` is provisioned by brew, not apt |
+| repo-maturity-regenerate | **mutates** the repo — bot, opt-in per repo, not a gate |
+| production-gates-bot | **mutates** the repo — same |
+| codeql-analysis | **capability removed** — hosted service, no fleet equivalent |
+| jupyterlite | **capability removed** — build is portable, the Pages deploy is not |
+
+The adr-ledger half of docs-edn-verify was deliberately **not** ported: CLAUDE.md
+retires that mechanism per ADR-2607257000 and says not to reintroduce those
+scripts. Its check passing (rc=0) is not a reason to give a retired mechanism a
+new home.
+
+### What this removes, honestly
+
+`codeql-analysis` was the only SAST in this repo. It has not executed since the
+billing stop, so nothing is lost today, but the workflow will not come back on its
+own if billing is restored. Replacing it means either accepting no SAST or adopting
+a scanner that runs as a plain binary on a node.
+
+`jupyterlite` published to GitHub Pages. Its last run was 2026-06-12 and also
+failed, so whatever is served there is already stale. Moving it means choosing a
+different publish target; Cloudflare Pages is already used in this workspace.
+
+Neither is a decision this work should make silently, so both are named here as
+capability removed pending an owner call.
+
+### Scope
+
+**This superproject only.** 2288 of the 3527 checked-out child repos carry their
+own workflows. The evidence gathered here is specific to com-junkawasaki (plus
+recent kotoba-lang failures); gftdcojp, etzhayyim, network-awai, cloud-itonami and
+jk-luxury were not measured. A sweep of 2288 repos is not something to do on
+evidence from one org.
 
 ## Remaining work, in order
 
