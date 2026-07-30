@@ -1,0 +1,77 @@
+[{:db/id -1
+  :adr/id "2607300400"
+  :adr/title "Undefined CSS custom properties fail silently; the kotoba-shell native web surface is dead"
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/tags ["css" "design-system" "jp-go-dds" "kotoba-shell" "verification" "accessibility"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/context
+  "Adding a Worker tab to cloud-itonami-app required looking at the rendered UI. The Claude-in-Chrome extension was not connected, so the native shell path was investigated as the alternative. Both the CSS and the shell turned out to have silent, pre-existing defects that no test or reviewer had caught, because in each case the failure mode renders as something that looks deliberate."
+  :adr/decision
+  "1. Treat an undefined CSS custom property as a build failure, not a styling preference. Add a test that cross-checks every `var(--token)` in an app's stylesheet against the tokens its design system actually defines. cloud-itonami-app now has one (`app-css-only-references-design-system-tokens-that-exist`); it was verified to fail and name the offending token when a bogus token is injected. Any repo consuming jp-go-dds should carry the same guard.
+
+2. Do not claim a UI is verified from source inspection or from a static HTML render alone. Render it in a real engine and read back computed values. Two of the three worker state chips were transparent while the markup and CSS both read as correct.
+
+3. Do not describe the kotoba-shell native path as showing an app's web surface until the defects below are fixed. `bin/cloud-itonami-app` and local-manimani's `kotoba-shell-dev` both export KOTOBA_SHELL_WEB_URL and both silently get the kotoba:dom surface instead."
+  :adr/consequences
+  "The token guard makes a whole class of silent styling failure loud. It also means adding a token to an app requires the design system to define it first, which is the intended direction.
+
+The kotoba-shell gap is recorded but NOT fixed: see the gap entry below. Until it is, verifying an app's web surface on this machine needs either the Chrome extension or a standalone WKWebView harness."
+  :adr/body
+  "## 1. Undefined CSS custom properties are silent
+
+An undefined custom property does not fall back through the cascade. The declaration becomes **invalid at computed-value time** and resolves to the property's initial (or inherited) value. `background: var(--nope)` therefore yields `transparent` — it does not keep a grey inherited from a base class — and `outline: 4px solid var(--nope)` yields `outline-style: none`.
+
+cloud-itonami-app referenced **21 distinct tokens, of which 7 did not exist** in jp-go-dds (17 usages):
+
+| referenced (nonexistent) | actual effect | replaced with |
+|---|---|---|
+| `--color-focus-yellow` (6x) | every `:focus-visible` computed to `outline-style:none` — **no keyboard focus ring anywhere in the app** | `--color-primitive-yellow-300` |
+| `--color-success-700` (3x) | invisible text | `--color-semantic-success-2` |
+| `--color-success-600` (1x) | invisible status dot | `--color-semantic-success-1` |
+| `--color-success-50` (2x) | transparent chip background | `--color-primitive-green-50` |
+| `--color-error-700` (2x) | invisible text | `--color-semantic-error-1` |
+| `--color-error-50` (2x) | transparent chip background | `--color-primitive-red-50` |
+| `--color-warning-yellow-200` (1x) | transparent chip background | `--color-primitive-yellow-200` |
+
+jp-go-dds names semantic colors `--color-semantic-{success,error,warning-yellow}-{1,2}` and primitives `--color-primitive-{green,red,yellow,...}-{50..1200}`. **It defines no focus token at all and ships no `:focus-visible` rules of its own**, so apps must choose one; `--color-primitive-yellow-300` (#ffd43d) matches the JP-gov focus convention.
+
+Measured before/after in WKWebView: `.state-chip--done` and `--fail` went from `rgba(0, 0, 0, 0)` to `rgb(230, 245, 236)` / `rgb(253, 238, 238)`.
+
+Fixed in cloud-itonami/cloud-itonami-app `ab2c080`.
+
+### Still outstanding elsewhere
+
+`orgs/kotoba-lang/shell/apps/tamaki-observer-web/src/tamaki/observer/style.cljs` references `var(--color-focus-yellow)` once, defines it nowhere, and loads `jp_go_dds/dds.css` via `build_css.clj` — so it has the same missing focus ring. **Not fixed here**: that file was under active modification by another session at the time. Whoever owns tamaki-observer-web should apply the same substitution and guard test.
+
+## 2. The kotoba-shell native web surface never renders
+
+Three stacked defects in `kotoba-lang/shell` (`origin/main` = `d46824a`):
+
+1. **`bin/kotoba-shell-host-macos-window.swift` does not compile** — 10 errors, e.g. `cannot find 'retainedWindowDelegate' in scope`, and `KotobaActionTarget` is missing `endpoints`/`bodies`/`inputValues` and does not conform to `NSTextFieldDelegate` while call sites use all four. Reads as a half-finished refactor. Because `bin/kotoba-shell-app-runtime` rebuilds the host inside `launch()`, **the native shell cannot start for any app**.
+2. **`--web-url` is parsed and discarded** — read once at line 311, never used; `WKWebView(` appears 0 times despite `import WebKit`.
+3. **The runtime never passes `--web-url`** to the host.
+
+### The change that fixes 2 and 3
+
+In the window host: add `--settle-seconds`; add a `writePNG(image:path:)` (the existing `writePNG(view:path:)` uses `cacheDisplay`, which **cannot capture a WKWebView** because it renders out of process — use `takeSnapshot`); inject a `WKUserScript` at `.atDocumentStart` collecting `window.onerror`/`unhandledrejection`/`console.error` into `window.__kotobaErrors` so page failures are reportable with no extension attached; add a `WKNavigationDelegate` that in smoke mode waits for `didFinish` rather than a fixed delay, then reads the errors, snapshots, emits `web/errors` + `visual/captured`, and terminates; mount a `WKWebView` as window content when `webURL != nil` (`loadFileURL` for `file:` URLs) keeping kotoba:dom as the default; and guard the existing fixed-delay smoke block with `webURL == nil`.
+
+In smoke mode use `setActivationPolicy(.accessory)` + `.normal` window level + `orderFrontRegardless()` instead of `makeKeyAndOrderFront` + `activate(ignoringOtherApps:)`. **An observation boundary must not become the active app**: this machine runs many concurrent sessions and stealing activation corrupts whichever one is being typed into.
+
+In `bin/kotoba-shell-app-runtime`, inside `launch()`:
+`[[ -n \"${KOTOBA_SHELL_WEB_URL:-}\" ]] && host_args+=(--web-url \"$KOTOBA_SHELL_WEB_URL\")`
+
+### Why it was not landed
+
+Defect 1 is another session's in-flight refactor of the same file (shared checkout on `agent/organism-2d-view` with uncommitted changes, plus a second worktree). Repairing `KotobaActionTarget` means guessing that refactor's intent, and editing the file risks colliding with it. Landing the additive change without repairing defect 1 would also mean shipping code that cannot be compiled — and enabling verification is the whole point. So it is written down instead.
+
+The mechanism itself **is** verified: it was extracted to a standalone binary that compiles clean and emits `web/loaded` → `web/errors` → `web/probe` → `visual/captured` → `lifecycle/smoke-ready`. That harness is what found the transparent chips."
+  :adr/gaps
+  "1. kotoba-lang/shell: window host does not compile (10 errors, `KotobaActionTarget` refactor incomplete). Blocks the native shell for every app. Owner: whoever holds `agent/organism-2d-view`.
+2. kotoba-lang/shell: `--web-url` unused in the host and unforwarded by the runtime; fix spelled out above.
+3. kotoba-lang/shell: `apps/tamaki-observer-web` uses the nonexistent `--color-focus-yellow`, so it has no focus ring.
+4. cloud-itonami-app: the Worker UI has been verified structurally, over HTTP, and as a real WKWebView render of the real CSS with sample data; it has NOT been driven through a live passkey-authenticated browser session, because that needs a real authenticator.
+5. Workspace: `nbb scripts/gen-west-manifest.cljs --check` reports STALE on plain `origin/main`, independent of any single entry — whole-fleet local-checkout drift. Not addressed; wholesale regeneration is forbidden."
+  :adr/evidence
+  "cloud-itonami/cloud-itonami-app 6297483 (Worker tab), ab2c080 (token fix), dac84a2 (HTTP endpoint tests). Superproject west pin advanced in fe0b4cf6ccc. 28 tests / 206 assertions pass, clj-kondo clean."}]
