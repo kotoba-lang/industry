@@ -110,6 +110,65 @@ inverse-4x4                      top10 圏外（元は 17.7%）
 
 **単一のホットスポットは無く長い裾** = JVM 側の伸び代が減ったシグナル。
 
+### ⚠ この裾の profile と「37 分/エピソード」は intra フレームのものだった（2026-07-30 訂正）
+
+上の裾も 1,226 ms/frame も **`encode-idr-luma-frame`（intra のみ）** の測定で、
+**1800 フレーム中 1799 は P フレーム**である。P 経路を測っていなかった。実測
+（128x128 = 64 MB、IDR は 5 回 median、GOP は 3 回 median、MB 数で 720x1280 に換算）:
+
+```
+IDR :  65.2 ms =  1.019 ms/MB  →  1.88 s/frame @720x1280
+P   : 846.6 ms = 13.228 ms/MB  → 63.78 s/frame @720x1280   （IDR の 13 倍）
+1800 フレーム（1 IDR + 1799 P）→ 約 32 時間   ← 37 分ではない
+```
+
+**32 時間は 128x128 の per-MB コストからの換算で、720x1280 での実測ではない**
+（frame が大きいほど per-MB は悪化する方向なので下限寄り）。かつ内容依存で、実アニメの
+平坦領域は P_Skip になるので実素材では速くなる。
+
+P フレーム 1 枚の sampling profile（1393 sample、最深の `h264.*` frame に帰属）:
+
+```
+42.5%  h264.interp/sample          ← per-pixel の clamp 付き accessor
+10.9%  h264.encode/sad
+ 8.6%  h264.encode/mat-vec-mul     ┐ 有理数 residual solve
+ 8.4%  h264.interp/mc-luma-block   │
+ 7.0%  h264.interp/quarter-pel-luma│
+ 2.4%  h264.interp/six-tap-h       │
+ 1.4%  h264.encode/mat-mul         ┘
+ 1.2%  h264.interp/center-j
+→ interpolation + MC ≒ 61.5%、+ sad = 動き推定/補償が約 72%
+→ 有理数 solve は約 10%
+```
+
+**読んで立てた仮説 2 件を測定が殺した。両方とも報告せず捨てた:**
+
+1. **「全探索 ME が支配的、diamond search で 10〜100×」** —— `search-range` を 8→1
+   （整数候補 289→9）にしても時間は約 5% しか動かず、3 回測定のノイズ内。候補数は
+   レバーではない。効いているのは per-pixel accessor
+2. **「畳んでいない有理数 solver が P の 32%」** —— microbench では
+   `solve-regular-levels` が 258.30 µs/block（folded intra の `solve-ac-levels`
+   13.46 µs の **19 倍**、`inv` は `Ratio`/`BigInt`）で、×16 block/MB = 4.13 ms/MB
+   ＝ 13 ms/MB の 32% と計算した。**profiler は 10% と言う** —— 全 MB が 16 block
+   すべてを非ゼロで符号化するわけではない。**microbench の外挿ではなく profiler を正とする**
+
+### 次のレバー（実測シェア順、いずれも推測でなく上記 profile 由来）
+
+1. **`h264.interp/sample`（42.5%）** —— 代表的な表現の問題で algorithm ではない。
+   flat `int-array` 化と、clamp を内側ループから外に出す（frame ごとに参照面を
+   search margin だけ padding すれば内部 MB では分岐が消える）。すでに稼いだ 7.6× と
+   同種の変更
+2. **`me-subpel-refine` の 49 候補** —— ±3 quarter-pel の直積で、docstring 自身が
+   「redundantly but cheaply」と書いている。標準は half-pel 8 → quarter-pel 8 の 16 候補。
+   `search-range` を下げても縮まないのはこの段だから
+3. **`sad`（10.9%）** —— tight loop だが early termination が無い。現在の best を
+   cutoff として渡し超えたら打ち切るのは結果を変えない（`min-key` は argmin しか要らない）。
+   併せて `apply min-key` が全候補ブロックを先に実体化するのもやめられる
+4. **`solve-regular-levels`（約 10%）** —— **intra 側で実装済み・bit-identity 検証済みの
+   変換をそのまま適用する**: `inv·MT` を行ごとの共通分母を持つ 1 本の厳密整数行列に
+   畳んで `round-div`。258 µs → 14 µs 程度を見込む（intra 側の実測 13.46 µs）。
+   不変条件テストも同じ形（全 52 QP で有理数経路と一致）
+
 ## Phase 2 — filter 段の家は `douga` ではなく `utsushi` だった
 
 私は当初「filter 段は `douga` の領域」と述べたが、**確認せずに言っていた**。実際は
@@ -178,6 +237,33 @@ graph が 1 フレーム分の見積りで通る**）。
 - **障害は backend ではなく入口** —— native backend がコンパイルするのは `.kotoba` で
   codec は `.cljc`。「JVM 無しで codec を走らせる」= hot kernel の `.kotoba` 移植を
   意味し、そこが上記 W4 の値モデルに依存する
+- **具体的に何が足りないか（2026-07-30 追記、`compiler/docs/native-aot-baseline.md`
+  = compiler repo 自身の native track 用 running summary が authority）** ——
+  native の値の世界は **8 byte の機械語ワード 1 個**（rax/x0）＋ **heap arena の
+  `pair`（2 ワード固定セル。string は `pair(offset,length)` そのもの）**だけ。
+  record / variant（ADR 0062/0063）は **独立した実行時表現を持たない** ——
+  codegen 時に synthetic stack slot へ書き換えられ、**関数境界を越えない**
+  （引数にも戻り値にもならない）。f64 field は不可、case 数も「a handful」まで。
+  したがって **921,600 要素の画素面を保持できる型が無い** —— pair chain にすれば
+  16 byte/画素かつ O(n) access で、今の JVM persistent vector より確実に悪い。
+  つまり不足しているのは capability ではなく**値モデル**
+- **W4 のゲートは実在し、待っているものが特定できた** ——
+  `kotoba-lang/lang/performance-workloads.edn`。既存 2 case は **12 要素の collection**
+  で、`:abi-decision` は tagged trie を検討する条件を
+  `:minimum-evidence [:representative-real-programs :allocation-profile
+  :lookup-latency-profile :artifact-size-delta]` ＋
+  \"material end-to-end improvement, not a microbenchmark-only win\" と定めている。
+  **codec kernel はまさにこの representative real program**で、上の P フレーム
+  profile が `:allocation-profile` / `:lookup-latency-profile` の実データになる
+- **capability は codec の律速ではない** —— codec kernel は画素 in / bit out の
+  純関数（`kotoba/pure`）で、clock も storage も http も ui も要らない。これは重要で、
+  native AOT の最も弱い部分がまさに capability だから: 同 doc は
+  \"there is still no native provider/capability mechanism of any kind\" を**2 度**明記し、
+  Wasm track と同等に達するには native の string/keyword 付き record・入れ子・
+  provider/linking 機構が全部必要だと書いている（どれも未実装）。**actor を native 化
+  するなら capability が壁だが、codec なら壁ではない** —— だから codec は
+  「値モデルだけを要求する最も安い最初の native workload」であり、W4 が欲しがっている
+  証拠の種類と要求が一致している
 
 ## Phase 3 — AAC encode（実装済み、`org-iso-aac` `f9053399`）
 
@@ -368,7 +454,18 @@ ffmpeg  : 復号 PCM が ADTS 経路の復号 PCM と byte 完全一致
    ならない。5 回 median で測り直して撤回・訂正した
 4. **「gcd 約分後 47 bit」（docstring）** —— 再測定しておらず実際は 54 bit。テストに
    下限を入れて陳腐化を検出できるようにした
+5. **「37 分/エピソード」（この ADR 自身に書いた数字）** —— `encode-idr-luma-frame`
+   だけを測って 1800 フレームに外挿していた。**1799 フレームは P で、実測すると
+   IDR の 13 倍**。正しくは約 32 時間（換算値）。この ADR は「1800 フレーム全体を
+   通した実績は無い、単一フレームから外挿している」と自ら注記していたのに、
+   **その注記が守るべきだったのは「フレーム数」ではなく「フレームの種類」だった**
+6. **P 経路の最適化候補を 2 回、読んだだけで確信した** —— ①全探索 ME が支配的
+   ②畳んでいない有理数 solver が P の 32%。前者は `search-range` sweep が、後者は
+   sampling profiler が否定した（実際は per-pixel accessor が 42.5%）。
+   **microbench からの外挿も「読んで分かった」と同じ罠**である
 
 いずれも「作る前に / 主張する前に確認する」で防げたものであり、実際に確認した 3 回
 （codec の実在 / filter の家 / guest 上限の根拠）はすべて結論を変えた。
+5 と 6 が示す追加の教訓: **「測った」と言えるのは、実際に走る経路を、その経路の
+支配的な形で測ったときだけ**。
 "}]
