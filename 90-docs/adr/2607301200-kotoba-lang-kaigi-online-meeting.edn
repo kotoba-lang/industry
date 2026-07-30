@@ -151,8 +151,28 @@ Rust 禁止ルールとの衝突も解消した。
   wrangler の OAuth トークンに `calls`/`realtime` スコープが無い（app token の発行は
   dashboard 経由）。`REALTIME_APP_ID` / `REALTIME_APP_TOKEN` の 2 つを入れれば
   コード変更なしで `:sfu` に切り替わる。
-- **TURN 未設定。** 対称 NAT 越えは mesh でも失敗する。`org-ietf-turn` が供給元。
-  コンソールはこれを画面上で告知する（スピナーを眺めさせない）。
+- **TURN は配線済みだが relay 経路は end-to-end 未検証。** 実装済み: `kaigi.turn` が
+  coturn use-auth-secret 形式の ephemeral credential を mint する
+  （`username = \"<expiry>:<participant-id>\"`、server-only secret で HMAC-SHA1）ので
+  常設の relay パスワードがブラウザに渡ることはない／room が接続ごとに mint する／
+  `/api/kaigi/health` が `turn: ok|absent|error: …` を返す（「設定されているか」と
+  「実際に mint できるか」は別で、その差は外から見えない — mint が room 内で throw すると
+  WebSocket が素の 1006 で落ちログに何も出ない）／console は relay 不在を画面上で告知する／
+  `?ice=relay` で relay-only を強制し `e2e-media.cljs --relay` が選択候補型まで assert する
+  （同一マシンの 2 ブラウザは host 候補で繋がるので、強制しない限り TURN が完全に壊れていても
+  全テストが通る）。
+  **未達: Chromium が relay に 1 バイトも送らない。** 実測（2026-07-30）— 有効な mint 済み
+  credential があり、`iceTransportPolicy` が `relay` でも `all` でも、relay が loopback でも
+  LAN アドレスでも、headless-shell でもフル Chrome for Testing でも、TURN 由来の候補は 0 件・
+  `icecandidateerror` も 0 件・relay 側の受信も 0 件だった。
+  **relay 側の問題ではない**: `org-ietf-turn` の `listener_demo.cljs` が実 UDP で 3/3 通過
+  （Allocate / ChannelBind + 双方向 ChannelData / 誤 credential 拒否）し、`kaigi.turn` の
+  テストは mint 形式がその listener の verifier に受理されることを示している。途上で
+  上流の実バグ 1 件を発見・修正した（**`org-ietf-turn` `ede5921`: listener が STUN Binding
+  request を捨てていた** — ICE agent は Allocate より前にこれを送るので、落とすと client は
+  サーバを到達不能と判断し relay 候補を一度も要求しない。listener の docstring は Binding を
+  「無害な未処理トラフィックの例」と明記しており、その想定自体が誤りだった）。必要だったが
+  十分ではなく、残る壁はブラウザ側の ICE サーバ受理条件にある — 未解決。
 
 **E2E が捕まえた実バグ（いずれもユニットテストと validate の両方が見逃した）**:
 
@@ -188,8 +208,11 @@ ADR-2607211600 が廃止したはずのもの）、`git merge` が `unrelated hi
 `git fetch --deepen` でグラフを繋いで解消（CLAUDE.md の判別手順どおり、症状だけで
 force-push と断定しなかった）。
 
-**残（優先順）**: ①Realtime app の provisioning（オーナー 1 アクション、コード変更なし）
-②TURN 配線（`org-ietf-turn`）③録画パイプライン（gijiroku への handoff）
+**残（優先順）**: ①Realtime app の provisioning（オーナー 1 アクション、コード変更なし。
+account に Realtime app が無く、wrangler OAuth に `calls` スコープも無い。keychain の
+Cloudflare トークンも存在せず、agent 側から取得する経路は無い）②relay 経路の未解決
+ブロッカー（上記。ブラウザが ICE サーバを受理しない理由の特定）③録画パイプライン
+（gijiroku への handoff）
 ④`kaisha` チャンネル / `calendar` イベントとの接続（`:kaigi/channel` slot は用意済み、
 読み手が無い）⑤liquid-glass の button/panel に `:attrs` を通す上流修正
 ⑥mesh の 4 人上限を超える会議（= ①の完了で解ける）。
