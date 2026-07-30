@@ -887,6 +887,19 @@ Still open:
 3. Optional: infer-plan usable-bytes wired `-1` → `[:option :i64]`
 
 
+## Progress (2026-07-31aj — plan usable-bytes wired option-i64 + pin)
+
+- murakumo#260 MERGED (`990f79e6`): **infer-plan usable-bytes / usable-gib-milli**
+  `wired` is `[:option :i64]` (drop -1 sentinel). Host: option-i64.
+  ADR-260731-w6-plan-wired-option. Evidence: 93 tests / 1547 assertions.
+- west pin murakumo `8c8a4593` → `990f79e6`.
+
+Still open:
+1. T8.3 production AOT network/secret; W4 recursive values
+2. T5.2 native guest record wire; T8.4 live host runner
+3. Other -1 values in plan (pick indices) remain ordinal no-pick codes by design
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
