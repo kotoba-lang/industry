@@ -36,9 +36,24 @@
 (def text (gh (str "repos/kotoba-lang/" repo "/contents/deps.edn")
               "-H 'Accept: application/vnd.github.raw'"))
 (def parsed (edn/read-string text))
+(defn- org+repo
+  "Resolve a :local/root path to <org>/<repo>.
+
+  The org comes from the PATH, not from an assumption. \"../css\" is a sibling in the
+  same org; \"../../cloud-itonami/cloud-itonami-isic-6311\" is not. Assuming
+  kotoba-lang for every last path segment would have pinned a DIFFERENT repository
+  that happened to share a name -- kotoba-lang/securities was the case that found
+  this, and it only refused because no kotoba-lang repo of that name exists. A repo
+  that did exist would have been pinned silently and wrongly."
+  [root default-org]
+  (let [segs (remove #{"" "." ".."} (str/split root #"/"))]
+    (if (>= (count segs) 2)
+      {:org (nth segs (- (count segs) 2)) :repo (last segs)}
+      {:org default-org :repo (last segs)})))
+
 (def locals (for [[k v] (:deps parsed) :when (and (map? v) (:local/root v))]
-              {:coord k :root (:local/root v)
-               :sibling (last (str/split (:local/root v) #"/"))}))
+              (let [{:keys [org repo]} (org+repo (:local/root v) "kotoba-lang")]
+                {:coord k :root (:local/root v) :org org :sibling repo})))
 
 (when (empty? locals)
   (println repo ": nothing to do (no :local/root in :deps)")
@@ -46,8 +61,8 @@
 
 ;; Resolve each sibling's current default-branch HEAD.
 (def resolved
-  (doall (for [{:keys [sibling] :as l} locals]
-           (assoc l :sha (gh (str "repos/kotoba-lang/" sibling "/commits/HEAD") "--jq .sha")))))
+  (doall (for [{:keys [org sibling] :as l} locals]
+           (assoc l :sha (gh (str "repos/" org "/" sibling "/commits/HEAD") "--jq .sha")))))
 
 (when (some (comp nil? :sha) resolved)
   (println repo ": REFUSED — could not resolve a sibling's HEAD:"
@@ -55,15 +70,16 @@
   (js/process.exit 3))
 
 (defn- rewrite [t]
-  (reduce (fn [acc {:keys [root sibling sha]}]
-            (let [needle (str "{:local/root \"" root "\"}")
-                  repl (str "{:git/url \"https://github.com/kotoba-lang/" sibling ".git\"\n"
+  (reduce (fn [acc {:keys [root org sibling sha]}]
+            (let [url (str "https://github.com/" org "/" sibling ".git")
+                  needle (str "{:local/root \"" root "\"}")
+                  repl (str "{:git/url \"" url "\"\n"
                             "                                     :git/sha \"" sha "\"}")]
               (if (str/includes? acc needle)
                 (str/replace acc needle repl)
                 ;; multi-line form: replace just the :local/root pair inside it
                 (str/replace acc (str ":local/root \"" root "\"")
-                             (str ":git/url \"https://github.com/kotoba-lang/" sibling ".git\"\n"
+                             (str ":git/url \"" url "\"\n"
                                   "         :git/sha \"" sha "\"")))))
           t resolved))
 
@@ -88,7 +104,7 @@
       (js/process.exit 5))
   (do
     (println repo ": resolves standalone ✓  ("
-             (str/join ", " (map #(str (:sibling %) "@" (subs (:sha %) 0 8)) resolved)) ")")
+             (str/join ", " (map #(str (:org %) "/" (:sibling %) "@" (subs (:sha %) 0 8)) resolved)) ")")
     (if-not execute?
       (println "  dry-run: not committed")
       (let [msg (str "deps: name " (str/join " / " (map :sibling resolved))
