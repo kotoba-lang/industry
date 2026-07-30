@@ -137,30 +137,62 @@ Rust 禁止ルールとの衝突も解消した。
 - pure core（model / validate / plan / sfu / signal）: **52 tests / 184 assertions、
   JVM と nbb の両方で緑**。
 - DO シグナリング room: **deploy 済み**（`kaigi.04-feasts-minded.workers.dev`、
-  version `a4b6b629`、binding `env.KAIGI_ROOMS (KaigiRoom)`）。実 WebSocket 2 本 ×
-  実 DO に対する **E2E 22/22、本番で 4 回連続クリーン**。roster 直列化・unicast リレー・
-  glare 解消・publish 伝播・非 host の `:end` 拒否・終了後リレー停止まで実測。
-- **メディアは 1 バイトも流れていない。** ブラウザ半分（UI / `getUserMedia` /
-  `RTCPeerConnection`）は未実装。「シグナリングが動く」と「会議ができる」の間の差がこれ。
+  binding `env.KAIGI_ROOMS (KaigiRoom)`）。実 WebSocket 2 本 × 実 DO に対する
+  **E2E 22/22、本番で 4 回連続クリーン**。roster 直列化・unicast リレー・glare 解消・
+  publish 伝播・非 host の `:end` 拒否・終了後リレー停止まで実測。
+- ブラウザコンソール（`kaigi.ui` pure cljc + `kaigi.app`）: **実装・deploy 済み**。
+  レンダ済みページは design-quality の決定論的 HIG/WCAG 監査で **100.00 / findings ゼロ**。
+- **実通話が成立している（mesh）。** headless Chromium 2 インスタンス（fake device）で
+  **ICE connected、両側で inbound RTP 約 190KB を実測**、本番 3 回連続クリーン。
+  「connected と報告しつつメディアが無い」状態と区別するため、判定は
+  `bytesReceived > 0` に置いた（参加者数・タイル・connection state はいずれも必要だが
+  不十分）。
 - **SFU 経路は実サービスに対して未検証。** この account に Realtime app が存在せず、
   wrangler の OAuth トークンに `calls`/`realtime` スコープが無い（app token の発行は
   dashboard 経由）。`REALTIME_APP_ID` / `REALTIME_APP_TOKEN` の 2 つを入れれば
   コード変更なしで `:sfu` に切り替わる。
 - **TURN 未設定。** 対称 NAT 越えは mesh でも失敗する。`org-ietf-turn` が供給元。
+  コンソールはこれを画面上で告知する（スピナーを眺めさせない）。
 
-**E2E が捕まえた実バグ（ユニットテストと validate の両方が見逃した）**: host 未定の room
-は空 host id で構築され、`kaigi.model/meeting` がそれを忠実に `\"\"` キーの参加者に変える。
-そのプレースホルダが host 確定後も残り、全 roster に無名の幽霊が出ていた。修正と同時に
-`validate` へ `:participant/blank-id` / `:participant/key-id-mismatch` を追加。
-**検証ハーネス自身のバグも 2 つ**: ①ビルド失敗時に `dist/` の旧成果物が残り、verifier が
+**E2E が捕まえた実バグ（いずれもユニットテストと validate の両方が見逃した）**:
+
+1. host 未定の room は空 host id で構築され、`kaigi.model/meeting` がそれを忠実に
+   `\"\"` キーの参加者に変える。そのプレースホルダが host 確定後も残り、全 roster に
+   無名の幽霊が出ていた。修正と同時に `validate` へ `:participant/blank-id` /
+   `:participant/key-id-mismatch` を追加。
+2. **`panel` / `button` は未知の opts を黙って捨てる**（`shitsuke.components/card` /
+   `button` は `:class`（文字列）と `:id`/`:act` のみ読む）。`:attrs {:data-kaigi-tile id}`
+   は「正しく見えるが data 属性が一切無い」markup を生み、ブラウザは video を貼る tile を
+   0 個しか見つけられなかった — エラーはどこにも出ない。data hook は素の wrapper 要素に
+   出し、対象は `:act` 文字列に埋める（`\"admit:rin\"`）。同じ制約でトグルに
+   `aria-pressed` を出せない（**上流ギャップとして記録**、回避策で潰さない）。
+3. `console` が `app-shell` 全体を返すのにブラウザは内側だけ差し替えていたため、初回の
+   ライブレンダで shell と nav が二重に入れ子になっていた。`console` / `page-shell` に
+   分割し、両レンダが同一要素を所有するようにした。
+4. **assets のミスは asset 層の `not_found_handling` ではなく Worker に落ちる。**
+   本番で 2 ブラウザのうち片方だけがコンソールページで 404 を受け、**会議が黙って 1 人に
+   なっていた**（`curl` では再現しない — 非 navigation リクエストは正しく 404 になるため）。
+   navigation には shell を返すよう Worker 側で対応。
+
+**検証ハーネス自身のバグも 3 つ**: ①ビルド失敗時に `dist/` の旧成果物が残り、verifier が
 「コンパイルできないコード」に対して 6 項目グリーンを報告した → 成果物がソースより古ければ
 検証を拒否する staleness guard を追加 ②固定 sleep 依存で、deploy 直後の伝播が遅い 1 回だけ
-存在しない roster 欠陥を報告した → 条件待ちに変更。
+存在しない roster 欠陥を報告した → 条件待ちに変更 ③`clj->js` が keyword の名前空間を落とす
+ため、`kaigi/participants` で読もうとして undefined を掴み「機能が壊れている」ように
+見えた（実際の JS キーは `participants`）。
 
-**残（優先順）**: ①ブラウザ UI + 実メディアで実通話を成立させる ②Realtime app の
-provisioning（オーナー 1 アクション）③TURN 配線 ④録画パイプライン（gijiroku への handoff）
-⑤`kaisha` チャンネル / `calendar` イベントとの接続（`:kaigi/channel` slot は用意済み、
-読み手が無い）。
+**環境側で 1 件**: superproject の checkout に shallow 境界が再発しており（CLAUDE.md /
+ADR-2607211600 が廃止したはずのもの）、`git merge` が `unrelated histories` を返し
+`272 ahead` と誤表示した。サーバ側 compare は `status: ahead` / `behind_by: 0` /
+`merge_base == ローカル HEAD` を返しており、force-push ではなく純粋な fast-forward。
+`git fetch --deepen` でグラフを繋いで解消（CLAUDE.md の判別手順どおり、症状だけで
+force-push と断定しなかった）。
+
+**残（優先順）**: ①Realtime app の provisioning（オーナー 1 アクション、コード変更なし）
+②TURN 配線（`org-ietf-turn`）③録画パイプライン（gijiroku への handoff）
+④`kaisha` チャンネル / `calendar` イベントとの接続（`:kaigi/channel` slot は用意済み、
+読み手が無い）⑤liquid-glass の button/panel に `:attrs` を通す上流修正
+⑥mesh の 4 人上限を超える会議（= ①の完了で解ける）。
 
 ## References
 
