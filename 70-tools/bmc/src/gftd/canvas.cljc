@@ -155,6 +155,82 @@
     :doc/source "gftd canvas (ADR-2607021600); SSoT = portfolio BMC datoms + canvas-ledger"
     :doc/body (render-md idx product {:as-of as-of})}])
 
+(defn render-datoms
+  "Structured, DataScript-transactable projection of one product's FOLDED canvas.
+
+   `render-edn` already exists and is a different thing: it wraps `render-md`'s
+   markdown in `:doc/body`, which reads well and cannot be queried. Nothing could
+   ask 「この product の Problem block の item は何か」 without parsing prose, and
+   nothing outside this repository could render the 9 blocks at all.
+
+   That mattered once a consumer appeared. `cloud-itonami-app`'s business plane
+   (ADR-2607309600) binds a business to a `:canvas/product` and has to show the
+   blocks; it is released on its own, cannot depend on this tool, and re-folding
+   the ledger inside the app would be a second implementation of `apply-event`
+   that drifts. So the fold stays here, once, and emits data.
+
+   The base datoms carry PRE-fold state: the ledger events are not in the docs
+   EDN plane at all, so a `:find` over 90-docs today answers with the canvas as
+   it was first written, not as it stands. This projection is the folded value,
+   tagged `:source/dataset \"canvas-projection\"` so a query can tell the two
+   apart rather than silently mixing them.
+
+   `:gates` is an optional map of hyp-id → the map `gftd.gate/evaluate-hyp`
+   returns. It is passed IN rather than computed here: gate evaluation needs
+   metrics, and this namespace deliberately knows nothing about them. A
+   hypothesis with no entry gets no gate keys at all — an absent evaluation is
+   not a failed one, and writing `:gate/status :blocked` for 「まだ測っていない」
+   would be a measurement of nothing."
+  [idx product {:keys [as-of gates]}]
+  (let [blocks (product-blocks idx product)
+        hyps (product-hyps idx product)]
+    (into
+     [{:db/id -1
+       :projection/id (str "canvas-" (name product))
+       :projection/product product
+       :projection/doc_type "canvas-projection"
+       :projection/as-of (or as-of "base")
+       :projection/layer (product-layer idx product)
+       :projection/blocks (count blocks)
+       :projection/hypotheses (count hyps)
+       :projection/source (str "gftd canvas datoms (ADR-2607021600); "
+                               "SSoT = portfolio BMC datoms + canvas-ledger")
+       :source/dataset "canvas-projection"}]
+     (concat
+      (map-indexed
+       (fn [i {:keys [canvas/id canvas/block canvas/label canvas/items canvas/note]}]
+         (cond-> {:db/id (- (+ i 2))
+                  :canvas/id id
+                  :canvas/product product
+                  :canvas/block block
+                  :canvas/label label
+                  ;; `block-order`'s index, carried as data: a consumer that
+                  ;; renders the 9 blocks as a grid needs the canonical order,
+                  ;; and re-deriving it from a hardcoded list on the other side
+                  ;; is how the two orders drift apart.
+                  :canvas/order i
+                  :canvas/items (vec items)
+                  :source/dataset "canvas-projection"}
+           note (assoc :canvas/note note)))
+       blocks)
+      (map-indexed
+       (fn [i {:keys [hyp/id hyp/claim hyp/gate hyp/risk hyp/status hyp/evidence]}]
+         (let [g (get gates id)]
+           (cond-> {:db/id (- (+ i 2 (count blocks)))
+                    :hyp/id id
+                    :hyp/product product
+                    :hyp/claim claim
+                    :hyp/gate gate
+                    :hyp/risk risk
+                    :hyp/status status
+                    :source/dataset "canvas-projection"}
+             evidence (assoc :hyp/evidence evidence)
+             g (assoc :gate/status (:status g))
+             (:distance g) (assoc :gate/distance (:distance g))
+             (:evidence g) (assoc :gate/evidence (:evidence g))
+             (seq (:needs g)) (assoc :gate/needs (vec (:needs g))))))
+       hyps)))))
+
 (defn render-text
   "Compact terminal rendering of one product's canvas."
   [idx product]

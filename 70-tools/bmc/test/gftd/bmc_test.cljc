@@ -253,6 +253,54 @@
     (is (re-find #"cloud-itonami — business model / lean canvas" md))
     (is (re-find #"\| `:hyp/t1` \| riskiest \| untested \|" md))))
 
+(deftest render-datoms-projects-the-fold-not-the-base
+  (let [idx (canvas/fold (canvas/index base)
+                         [{:event/type :canvas/add-item
+                           :canvas/id :cloud-itonami.problem :event/value "p2"}
+                          {:event/type :canvas/note
+                           :canvas/id :cloud-itonami.uvp :event/value "n1"}])
+        tx (canvas/render-datoms idx :cloud-itonami {:as-of "2026-07-30"})
+        header (first tx)
+        blocks (filter :canvas/block tx)
+        hyps (filter :hyp/id tx)]
+    (testing "the header counts what it actually emitted, so a short projection
+              cannot look complete"
+      (is (= "canvas-cloud-itonami" (:projection/id header)))
+      (is (= "canvas-projection" (:source/dataset header)))
+      (is (= (count blocks) (:projection/blocks header)))
+      (is (= (count hyps) (:projection/hypotheses header))))
+    (testing "items are the FOLDED value, not the base — this is the whole reason
+              the projection exists"
+      (is (= ["p1" "p2"]
+             (:canvas/items (first (filter #(= :lean/problem (:canvas/block %)) blocks)))))
+      (is (= "n1" (:canvas/note (first (filter #(= :lean/uvp (:canvas/block %)) blocks))))))
+    (testing "only this product's entities, and every one is tagged so a query
+              can tell projected state from the pre-fold base"
+      (is (= #{:cloud-itonami} (set (keep :canvas/product tx))))
+      (is (every? #(= "canvas-projection" (:source/dataset %)) tx)))
+    (testing "block order travels as data rather than being re-derived downstream"
+      (is (= [:lean/problem :lean/uvp :lean/key-metrics] (map :canvas/block blocks)))
+      (is (= [0 1 2] (map :canvas/order blocks))))
+    (testing "db/ids are distinct, or a transact would collapse the entities"
+      (is (= (count tx) (count (set (map :db/id tx))))))
+    (testing "no gates were supplied, so no hypothesis claims a gate state —
+              an unmeasured gate is not a failed one"
+      (is (every? #(nil? (:gate/status %)) hyps)))))
+
+(deftest render-datoms-carries-a-supplied-gate-verdict
+  (let [idx (canvas/index base)
+        verdict (gate/evaluate-hyp {} (get gate/gate-specs :hyp/t1))
+        tx (canvas/render-datoms idx :cloud-itonami
+                                 {:gates {:hyp/t1 (merge verdict {:status :measuring
+                                                                  :distance "あと 3"})}})
+        h (first (filter :hyp/id tx))]
+    (is (= :measuring (:gate/status h)))
+    (is (= "あと 3" (:gate/distance h)))
+    (testing "the hypothesis keeps its own status too: :untested is what the
+              ledger says, :measuring is what the metrics say, and collapsing
+              them would lose which one moved"
+      (is (= :untested (:hyp/status h))))))
+
 (deftest cli-help-text
   (testing "global help (nil topic) lists cli desc + every command's usage"
     (let [txt (cli/help-text :itonami nil)]

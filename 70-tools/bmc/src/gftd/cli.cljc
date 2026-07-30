@@ -85,6 +85,7 @@
   [{:cmd "products" :usage ["products                              — 扱える product 一覧"]}
    {:cmd "canvas"   :usage ["canvas show [--product P]             — 端末表示（fold 済）"
                             "canvas md|edn [--product P|--all] [--out-dir D]  — EDN 投影（正本は datoms+ledger）"
+                            "canvas datoms [--product P|--all]     — fold 済 canvas を構造化 EDN で投影（app 等の consumer 向け）"
                             "canvas add|retract <canvas-id> <text> — item 追加/撤回"
                             "canvas note <canvas-id> <text>        — note 差替"]}
    {:cmd "hyp"      :usage ["hyp list [--product P]"
@@ -314,6 +315,29 @@
              (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))
          (when (:dry? run) (println "loop went dry (no more proposals) — 進化は収束"))))
 
+     ;; The folded canvas as data, for consumers that cannot re-fold it.
+     ;; `canvas md` writes prose; this writes the same fold as queryable
+     ;; entities. Gates are attached only where metrics and a spec exist —
+     ;; a hypothesis nobody measured gets no gate keys rather than a red one.
+     (defn canvas-gates [ps idx product flags]
+       (let [metrics (read-metrics ps product flags)]
+         (into {} (for [h (canvas/product-hyps idx product)
+                        :let [spec (get gate/gate-specs (:hyp/id h))]
+                        :when spec]
+                    [(:hyp/id h) (gate/evaluate-hyp metrics spec)]))))
+
+     (defn cmd-canvas-datoms [cli-key ps idx [_ _] flags]
+       (let [products (if (:all flags) (cli-products cli-key idx) [(resolve-product cli-key idx flags)])
+             out-dir (or (:out-dir flags) (:md-out ps))
+             as-of (str (java.time.LocalDate/now))]
+         (doseq [p products]
+           (let [f (java.io.File. (str out-dir "/" (name p) "-canvas.datoms.edn"))
+                 tx (canvas/render-datoms idx p {:as-of as-of
+                                                 :gates (canvas-gates ps idx p flags)})]
+             (.mkdirs (.getParentFile f))
+             (spit f (pr-str tx))
+             (println "wrote" (.getPath f) (str "(" (count tx) " entities)"))))))
+
      (defn cmd-gate [cli-key ps idx flags]
        (let [products (if (or (:all flags) (not (:product flags)))
                         (cli-products cli-key idx)
@@ -408,6 +432,7 @@
              (println (canvas/render-text idx (resolve-product cli-key idx flags)))
 
              ["canvas" "md"] (cmd-canvas-md cli-key ps idx pos flags)
+             ["canvas" "datoms"] (cmd-canvas-datoms cli-key ps idx pos flags)
 
              ["canvas" "add"]
              (governed-append! cli-key ps idx
@@ -686,6 +711,31 @@
              (println "  x governor:" reason "--" (pr-str (:event/value proposal)))))
          (when (:dry? run) (println "loop went dry (no more proposals) — 進化は収束"))))
 
+     ;; The folded canvas as data, for consumers that cannot re-fold it.
+     ;; `canvas md` writes prose; this writes the same fold as queryable
+     ;; entities. Gates are attached only where metrics and a spec exist —
+     ;; a hypothesis nobody measured gets no gate keys rather than a red one.
+     (defn canvas-gates [ps idx product flags]
+       (let [metrics (read-metrics ps product flags)]
+         (into {} (for [h (canvas/product-hyps idx product)
+                        :let [spec (get gate/gate-specs (:hyp/id h))]
+                        :when spec]
+                    [(:hyp/id h) (gate/evaluate-hyp metrics spec)]))))
+
+     (defn cmd-canvas-datoms [cli-key ps idx [_ _] flags]
+       (let [products (if (:all flags) (cli-products cli-key idx) [(resolve-product cli-key idx flags)])
+             out-dir (or (:out-dir flags) (:md-out ps))
+             now (js/Date.)
+             as-of (str (.getFullYear now) "-"
+                        (.padStart (str (inc (.getMonth now))) 2 "0") "-"
+                        (.padStart (str (.getDate now)) 2 "0"))]
+         (doseq [p products]
+           (let [path (str out-dir "/" (name p) "-canvas.datoms.edn")
+                 tx (canvas/render-datoms idx p {:as-of as-of
+                                                 :gates (canvas-gates ps idx p flags)})]
+             (nc/spit path (pr-str tx))
+             (println "wrote" path (str "(" (count tx) " entities)"))))))
+
      (defn cmd-gate [cli-key ps idx flags]
        (let [products (if (or (:all flags) (not (:product flags)))
                         (cli-products cli-key idx)
@@ -780,6 +830,7 @@
              (println (canvas/render-text idx (resolve-product cli-key idx flags)))
 
              ["canvas" "md"] (cmd-canvas-md cli-key ps idx pos flags)
+             ["canvas" "datoms"] (cmd-canvas-datoms cli-key ps idx pos flags)
 
              ["canvas" "add"]
              (governed-append! cli-key ps idx
