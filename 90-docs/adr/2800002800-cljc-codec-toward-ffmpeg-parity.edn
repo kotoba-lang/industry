@@ -258,6 +258,34 @@ stereo 合計       ~97 ms/frame
 
 video 側（37 分/エピソード）に比べれば音声は問題にならない。
 
+### mp4 の音声トラックまで通した（`org-iso-isobmff` `bf8d0b5`）
+
+AAC encode だけでは足りなかった —— **mp4 は codec を宣言する箱を要求する**のに
+`isobmff` は codec config を opaque に扱う設計（`minimal-stsd` は config を持たず、
+remux は source の stsd を丸ごと再利用）で、「これは AAC だ」と書く場所が無かった。
+`isobmff.mux/esds` + `aac-stsd` + `aac-track` を追加してこれを埋めた。
+
+**この repo で唯一「codec config を組み立てる」例外**であることは README に明記した
+（video 側には未だ無い。下記 Not done）。検証は 2 つの独立した reference に対して行った:
+①**実 ffmpeg 自身の箱** —— 既存 fixture `av_sample.mp4` の中に ffmpeg が書いた
+`mp4a`/`esds` があるので、同じ引数を与えたときに同じ field 値・同じ descriptor 入れ子に
+なることを要求する ②**writer とは別に書いた parser** —— それが ffmpeg の bytes も
+読めることを要求する（writer/reader が同じ誤った長さ符号で合意しても捕まる）。
+
+ffmpeg との差分 1 件を「既知の差」として固定した: **ffmpeg の DecoderSpecificInfo は
+mono AAC-LC でも 5 byte** —— 2 byte の AudioSpecificConfig ＋ optional な 0x2B7
+sync extension で `extensionAudioObjectType = SBR, sbrPresentFlag = 0` を明示している
+（素の AAC-LC config は暗黙に同じ意味）。テストがこの bit 列を復号して assert する。
+
+end-to-end（実 ffmpeg）:
+
+```
+PCM → org-iso-aac encoder → aac-track → isobmff.mux → aac_mono.mp4
+ffprobe : Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, mono   （警告なし）
+ffmpeg  : 復号 PCM が ADTS 経路の復号 PCM と byte 完全一致
+        → container は誤差を一切足していない / esds は意図どおり読まれている
+```
+
 ### 限界は機能でなく限界として書いた
 
 - **block switching が無い** ——transient に short window を与えないので pre-echo が出る。
@@ -289,15 +317,15 @@ video 側（37 分/エピソード）に比べれば音声は問題にならな�
 
 ## Not done
 
-- **MP4 の音声トラック（`mp4a` + `esds` sample entry）。** AAC access unit と
-  `AudioSpecificConfig` は揃ったが、**`isobmff.mux` にはまだ AAC を名乗る stsd が無い**
-  —— `handler \"soun\"` / `smhd` の器はあるのに `minimal-stsd` は codec config を持たない
-  opaque entry で、remux 時は source の stsd を丸ごと再利用している。したがって
-  **「ffmpeg を外して mp4 を作る」はまだ成立していない**: 残りは `mp4a`
-  (AudioSampleEntry: channelcount / samplesize / samplerate 16.16) と `esds`
-  (ES_Descriptor → DecoderConfigDescriptor → DecoderSpecificInfo に上記 2 byte) の
-  emit と、`ffmpeg -i out.mp4` が音を返すことの実測。**AAC encode より小さいが、
-  これが埋まるまで「音声トラックが作れる」と書かない**
+- **MP4 の映像トラック（`avc1` + `avcC` sample entry）。** 音声側と同型の穴が video に
+  残っている: `isobmff` に `avc1`/`avcC` を**書く**経路は無い（`avc_sps.kotoba` は
+  parse 専用、grep で writer はゼロ）。したがって **`org-iso-h264` の encode 出力から
+  mp4 を組み立てることはまだできない**（音声トラックはできる）。音声側で実証した手順
+  —— 既存 fixture 内の実 ffmpeg の箱を reference にし、writer とは別の parser で検証する
+  —— がそのまま使える
+- **AAC priming の edit list。** `aac-track` は `elst` を出さないので、先頭 1024 サンプル
+  （filterbank の priming = `aac.encode/encoder-delay`）が再生される。`edts`/`elst` か
+  `iTunSMPB` で隠すのが通例
 - **Phase 1 の裾**（`encode-macroblock!` body / chroma 経路）。あと 2〜3× は見込めるが
   単一ホットスポットは無い
 - **`.kotoba` への移植と native AOT**。W4 の値モデル待ち
@@ -316,12 +344,14 @@ video 側（37 分/エピソード）に比べれば音声は問題にならな�
 - (+) filter 段が native 依存ゼロの経路を得た。層④の op 語彙が初めて実際の
   パイプラインを表現できる
 - (+) W4 が要求していた「hot kernel はどこか」という情報が副産物として出た
-- (+) AAC encode が入り、**実 ffmpeg が読める AAC を純 cljc で出せる**ようになった
-  （2 LSB 一致）。音声側の速度は video 側に対して無視できる（60 秒で約 2 分）
-- (−) **それでも現時点で ffmpeg は外せない** —— 残る一点は `isobmff` の `mp4a`/`esds`
-  sample entry で、access unit と `AudioSpecificConfig` は揃っているのに **mp4 に
-  「これは AAC だ」と書く箱が無い**。AAC encode より小さい作業だが、埋まるまでは
-  「音声トラックが作れる」ではない
+- (+) AAC encode ＋ `mp4a`/`esds` が入り、**mp4 の音声トラックを純 cljc で作れる**
+  ようになった（実 ffmpeg が `aac (LC) (mp4a)` として再生、復号 PCM は ADTS 経路と
+  byte 一致）。音声側の速度は video 側に対して無視できる（60 秒で約 2 分）
+- (−) **それでも ffmpeg は外せない。ただし理由が音声の欠落から video 側に移った**:
+  ①`avc1`/`avcC` を書く経路が無いので **video トラックを mp4 に載せられない**
+  ②h264 encode は 37 分/エピソード（ffmpeg は数十秒）で 2 桁差
+  ③`plane-scale` は ffmpeg と bit-identical でない。**穴の位置が変わっただけで
+  「もう外せる」ではない**ことを明示する
 - (−) `plane-scale` は ffmpeg と bit-identical ではないので、既存出力の再現には使えない
 - (−) 外挿に依拠している。エピソード全体を通す実測はまだ
 - (−) `MURAKUMO_TOKEN_SECRET_2` を使い切った件（ADR-2607299960）と同様、
