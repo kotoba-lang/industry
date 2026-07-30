@@ -8,44 +8,41 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 15434,
-  "app-aozora-appview" 10270,
-  "app-aozora-spa" 5081},
+ {"app-aozora-pds" 15552,
+  "app-aozora-appview" 10339,
+  "app-aozora-spa" 5139},
  :zone
- {:requests-7d 604072,
-  :pageviews-7d 10437,
-  :uniques-7d-sum 984,
+ {:requests-7d 611893,
+  :pageviews-7d 10472,
+  :uniques-7d-sum 995,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 164998}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
-    :requests 210}
+    :requests 165172}
    {:path
-    "/bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3lpa5tyrmwjvzojccf77ya",
-    :requests 170}
+    "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
+    :requests 111}
    {:path
-    "/bafyreigknzqpup4wv566lfcmxtb5sjegwv74mpbhw4euqym3puw7qr6ssm",
-    :requests 96}
+    "/bafyreicwof6vg3l7aopynnj7nh67pgaugg5h6rhjlhuwc6ebtpjotepnb4",
+    :requests 64}
+   {:path "/v1/transact", :requests 59}
    {:path
-    "/bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4eq3q5k2optwu446juce4",
-    :requests 54}
+    "/bafyreicjm25j5og3mu6ewquuupkwisronspkrv7v3xdczmzlknhqpf7vc4",
+    :requests 47}
+   {:path "/robots.txt", :requests 43}
    {:path
-    "/bafyreiahpri4ijgm47o4j2dtzsejpfibmuvuk3wgvpdmgcbswqj7u5vqdu",
-    :requests 29}
+    "/bafyreif3nwiklvjnpdntx2n2h4ltice2fx4tpqt7hvbkpcbbytxjrmzs7q",
+    :requests 38}
    {:path
-    "/bafyreia76soyaxixzax356dt4hrj75muhbkxfffrn6n5jgrhx4aitqo75i",
-    :requests 26}
-   {:path
-    "/kotobase-cf-wasm-testnet/blocks/bafyreihmf6nc6om2gecbwjt2qmapfpntjwyraozzk6bf4magyvwbzq2n7e/bafyreif4afcpz5latrazxff3kyap2rt7hgbcywzu75hglzxd6ddui4f2hy",
-    :requests 26}],
-  :status-mix {:ok 167617, :client-error 212, :server-error 214},
+    "/bafyreihgirii5moetzvx5obvk54iedtvbj37y2vcqx3y52b2quqbs3l36a",
+    :requests 31}],
+  :status-mix {:ok 167418, :server-error 160, :client-error 210},
   :window "24h"},
  :as-of "2026-07-30",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 164998 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 210 · /bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3l… 170 · /bafyreigknzqpup4wv566lfcmxtb5sjegwv74mp… 96 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 54 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 165172 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 111 · /bafyreicwof6vg3l7aopynnj7nh67pgaugg5h6r… 64 · /v1/transact 59 · /bafyreicjm25j5og3mu6ewquuupkwisronspkrv… 47 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 604072 req/7d・984 uniques(日次和)・うち4xx probe 0%(24h)、workers 30785 inv/7d"}
+ "aozora.app 実測 611893 req/7d・995 uniques(日次和)・うち4xx probe 0%(24h)、workers 31030 inv/7d"}
