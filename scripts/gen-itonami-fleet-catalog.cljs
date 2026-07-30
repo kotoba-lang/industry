@@ -25,7 +25,7 @@
 ;; Deliberately NOT recorded: a generation timestamp. It would make every
 ;; regeneration a diff and defeat --check.
 ;;
-;;   nbb scripts/gen-itonami-fleet-catalog.cljs [--out PATH] [--check]
+;;   nbb scripts/gen-itonami-fleet-catalog.cljs [--out PATH] [--rules PATH] [--check]
 
 (ns gen-itonami-fleet-catalog
   (:require ["fs" :as fs]
@@ -34,6 +34,11 @@
             [cljs.reader :as reader]))
 
 (def ^:private fleet-dir "orgs/cloud-itonami")
+(def ^:private default-rules "manifest/repository-rules.edn")
+;; Overridable so the generator can be run against an edited authority before
+;; that edit has landed — the fleet is read relative to the superproject root,
+;; and the rules need not be.
+(def ^:private rules-file (atom default-rules))
 (def ^:private default-out
   "orgs/cloud-itonami/cloud-itonami-app/resources/itonami-fleet-catalog.edn")
 
@@ -62,6 +67,34 @@
    :itonami.blueprint/health-path])
 
 (defn- short-key [k] (keyword (name k)))
+
+(def ^:private prefix-rules
+  "Role/execution rules read from the workspace authority, not restated here.
+  ADR-2607299000 moved this vocabulary into the superproject precisely so a
+  script would stop being a second place the taxonomy lives."
+  (delay
+    (let [doc (reader/read-string (fs/readFileSync @rules-file "utf8"))
+          ;; :name-prefix is a :vocabulary/id VALUE, not a key — the file is a
+          ;; map whose :vocabularies is a vector of vocabulary maps.
+          np (some #(when (= :name-prefix (:vocabulary/id %)) %) (:vocabularies doc))]
+      (when-not np
+        (throw (ex-info "no :name-prefix vocabulary in the authority" {:file @rules-file})))
+      (vec (:vocabulary/rules np)))))
+
+(defn- role+execution
+  "Match a repository name against the authority's prefix rules.
+
+  Returns nil when no rule matches, and nil is deliberate. 459 repositories
+  match cloud-itonami-isic- and are :on-demand; the marketplace, assoc and
+  municipality families match nothing yet. Guessing :on-demand for them because
+  they happen to be reachable would turn an unfinished taxonomy into a
+  confident-looking answer — the absence is the honest signal that the
+  vocabulary does not cover them."
+  [dir]
+  (some (fn [{:keys [prefix role execution]}]
+          (when (and prefix (str/starts-with? dir prefix))
+            (cond-> {} role (assoc :role role) execution (assoc :execution execution))))
+        @prefix-rules))
 
 (defn- read-blueprint
   "Classify one blueprint.edn: {:entry m}, {:non-actor {...}} or {:skipped {...}}.
@@ -96,7 +129,7 @@
             ;; declare an id that another already owns. Without the directory
             ;; name a consumer cannot tell the colliding entries apart, and a
             ;; lookup by id silently returns whichever sorted first.
-            {:entry (into (sorted-map :repo dir)
+            {:entry (into (merge (sorted-map :repo dir) (role+execution dir))
                           (keep (fn [k]
                                   (when-some [v (get m k)]
                                     [(short-key k) v])))
@@ -165,6 +198,8 @@
   (let [args (vec args)
         check? (some #{"--check"} args)
         out (or (second (drop-while #(not= "--out" %) args)) default-out)
+        _ (when-some [r (second (drop-while #(not= "--rules" %) args))]
+            (reset! rules-file r))
         {:keys [catalog skipped non-actors dup-ids]} (build)
         text (render catalog)]
     ;; Skipped files are reported to stderr, always. A loader that swallows

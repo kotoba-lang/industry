@@ -44,31 +44,88 @@
    :vocabulary/originated-in "kotoba-lang/loop-ux-kaizen docs/adr/0001-loop-repository-taxonomy.md"
    :vocabulary/first-instantiation "90-docs/adr/2607220100-skill-action-loop-system-dynamics-scaffold.edn"
    :vocabulary/applies-to "any repo in this workspace whose name carries a role prefix"
-   :vocabulary/declaration-shape {:required [:prefix :role]
+   :vocabulary/declaration-shape {:required [:prefix :role :execution]
                                   :optional [:must :must-not :authority-library :composition]}
+   ;; :execution answers "when does this thing run", which the vocabulary did
+   ;; not previously say and which nothing else in the workspace recorded
+   ;; either. Owner directive 2026-07-30.
+   ;;
+   ;;   :on-demand — wakes for a request and stops. An API or MCP call is the
+   ;;     only reason it runs. It holds no loop and no clock, so serverless is
+   ;;     the natural shape and residency would be waste.
+   ;;   :resident  — carries its own loop and runs whether or not anyone is
+   ;;     asking. It needs a clock and a scheduler.
+   ;;   :none      — not a runnable thing at all; a library or a model.
+   ;;
+   ;; The distinction changes what a MISSING endpoint means. For an
+   ;; :on-demand actor it means "not yet exposed" — unremarkable, since 1,326
+   ;; of them have no deploy config at all. For a :resident actor it means the
+   ;; loop is not running, which is a fault. Collapsing the two would report
+   ;; hundreds of healthy unexposed actors as broken, or a dead organism as
+   ;; fine.
+   :vocabulary/execution-values #{:on-demand :resident :none}
    :vocabulary/discriminator :prefix
    ;; Lifted verbatim from kotoba-lang/loop-ux-kaizen/resources/repository-rules.edn,
    ;; which originated the convention and remains its first example.
    :vocabulary/rules
    [{:prefix "loop-"
      :role :continuous-orchestrator
+     ;; The observe→act cycle is the point; it runs unprompted.
+     :execution :resident
      :must [:observe :evaluate :decide :act :record-evidence]
      :must-not [:own-domain-scoring-truth :bind-to-one-ci-provider]
      :examples ["loop-ux-kaizen" "loop-system-dynamics"]}
     {:prefix "skill-"
      :role :agent-instruction-package
+     ;; Already implied by :must-not :require-resident-runner below — an
+     ;; instruction package is read when an agent needs it, not run.
+     :execution :on-demand
      :must [:define-agent-procedure :declare-inputs :declare-outputs]
      :must-not [:require-resident-runner :own-ci-state]
      :examples ["skill-ux-kaizen"]}
     {:prefix "action-"
      :role :github-action-adapter
+     ;; Fires on a workflow event.
+     :execution :on-demand
      :must [:expose-action-yml :pin-external-revisions :emit-check-result]
      :must-not [:own-domain-contract :hide-provider-neutral-core]
      :examples ["action-ux-kaizen"]}
+    ;; ── the itonami fleet's two execution classes (owner directive
+    ;;    2026-07-30) ──────────────────────────────────────────────────
+    ;; The prefix is written out in full because the auditor matches with
+    ;; starts-with? on the repository basename, and these repos are named
+    ;; cloud-itonami-isic-NNNN. Declaring "isic-" would have matched none of
+    ;; the 459 and produced a rule that reads as governance while enforcing
+    ;; nothing.
+    {:prefix "cloud-itonami-isic-"
+     :role :sector-agent
+     ;; Agent-like, NOT resident: an isic actor exists to answer an API or MCP
+     ;; request about its ISIC sector and then stop. There are 459 of them, and
+     ;; making that many processes resident would cost continuously to sit idle.
+     ;; Cloudflare Pages Functions is the shape already proven by
+     ;; cloud-itonami-isic-6492, which serves /api/loan/* with no residency.
+     :execution :on-demand
+     :must [:answer-a-request :declare-its-isic-code]
+     :must-not [:hold-a-loop :require-a-clock]
+     :examples ["cloud-itonami-isic-6492" "cloud-itonami-isic-5820"]}
+    {:prefix "person-"
+     :role :artificial-organism-actor
+     ;; Resident and autonomous: it holds an operating identity, a mailbox and
+     ;; capabilities, and carries out business under activity → decision →
+     ;; effect → audit whether or not anyone is asking. The model it embodies
+     ;; is kotoba-lang/ao, which is deliberately runner-free and clock-free —
+     ;; the actor supplies both.
+     :execution :resident
+     :must [:hold-an-identity :run-its-own-loop :record-an-audit-trail]
+     :examples ["person-awai-ryo"]}
     {:prefix nil
      :role :library
+     ;; Nothing to run. kotoba-lang/ao is the clearest case: "model only, no
+     ;; CLI, no runner, no storage, no clock — every function takes now-ms from
+     ;; its caller."
+     :execution :none
      :must [:provide-reusable-contract]
-     :examples ["design-quality" "hinshitsu" "browser-agent"]}]
+     :examples ["design-quality" "hinshitsu" "browser-agent" "ao"]}]
    :vocabulary/composition
    {:authority "loop-*"
     :adapters ["action-*" "skill-*"]
