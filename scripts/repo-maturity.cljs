@@ -42,6 +42,8 @@
 ;; 使い方:
 ;;   nbb scripts/repo-maturity.cljs                 ; 全 repo を評価して manifest/repo-maturity.edn を書く
 ;;   nbb scripts/repo-maturity.cljs --limit 20       ; 先頭 N repo だけ（動作確認用）
+;;   nbb scripts/repo-maturity.cljs --paths-from paths.txt --merge-existing
+;;                                                   ; ファイルに列挙した path のみ（位置でなく名前で指定）
 ;;   nbb scripts/repo-maturity.cljs --offset 800 --limit 800 --merge-existing
 ;;                                                   ; 801〜1600 番目だけ再スコアして既存とマージ
 ;;                                                   （長い --full を分割して完走させるため）
@@ -71,6 +73,7 @@
       (case k
         "--limit"      (recur (rest more) (assoc opts :limit (js/parseInt (first more))))
         "--offset"     (recur (rest more) (assoc opts :offset (js/parseInt (first more))))
+        "--paths-from" (recur (rest more) (assoc opts :paths-from (first more)))
         "--batch-size" (recur (rest more) (assoc opts :batch-size (js/parseInt (first more))))
         "--out"        (recur (rest more) (assoc opts :out (first more)))
         "--only"       (recur (rest more) (assoc opts :only (first more)))
@@ -172,6 +175,32 @@
   ;; is the second slice.
   (cond->> all-repos
     (:only opts) (filter #(str/includes? (:path %) (:only opts)))
+    ;; --paths-from names repos EXACTLY, which --offset (positional, over a list other
+    ;; sessions change underneath) cannot.
+    ;;
+    ;; It was added chasing a remainder that turned out not to exist, and the chase is
+    ;; worth recording because two plausible explanations were both wrong. After the
+    ;; five slices, 170 ledger entries still held the old coverage method. First story:
+    ;; "shifting offsets skipped 170 repos." Measured: only FOUR of the 170 are still in
+    ;; west.yml at all; 166 are orphans, paths no longer in the manifest. Second story:
+    ;; "so those four were skipped." Measured: all four are in the `archived` group,
+    ;; which all-repos removes on purpose.
+    ;;
+    ;; THE SWEEP SKIPPED NOTHING. Every non-archived repo in west.yml was rescored. The
+    ;; 170 remnants describe repos this script deliberately never visits, and no flag
+    ;; changes that. The flag stays because addressing a subset by name is useful in its
+    ;; own right -- it is what --only was being used for, one repo at a time.
+    ;; NOTE the shape: `filter` must be the OUTER form, because cond->> threads the
+    ;; collection in as the last argument. Written as (let [...] (filter ...)) the
+    ;; collection lands as a third body form of the `let` and the filter's result is
+    ;; discarded -- the run then scores every repo while looking like it filtered.
+    ;; Which is exactly what happened: it printed "scoring 3956" instead of 4.
+    (:paths-from opts)
+    (filter (let [wanted (->> (str/split-lines (slurp (:paths-from opts)))
+                              (map str/trim)
+                              (remove str/blank?)
+                              set)]
+              #(contains? wanted (:path %))))
     (:offset opts) (drop (:offset opts))
     (:limit opts) (take (:limit opts))))
 
@@ -743,7 +772,7 @@
         ;; So a filtered run that would shrink an existing file now refuses. The escape
         ;; hatch is to say which you meant: --merge-existing to keep the rest, or --out
         ;; to write somewhere that is not the ledger.
-        _ (let [filtered? (or (:only opts) (:limit opts) (:offset opts))
+        _ (let [filtered? (or (:only opts) (:limit opts) (:offset opts) (:paths-from opts))
                 prior (when-not (:self-test opts)
                         (try (count (edn/read-string (slurp out-path)))
                              (catch :default _ 0)))]
@@ -783,6 +812,14 @@
        ";;                                activity .15/impl .2/coverage .2, renormalized when an axis is nil).\n"
        ";;\n"
        ";; Generated: " (.toISOString (js/Date.)) "\n"
+       ;; Say how many entries describe repos this script does not visit, so the entity
+       ;; count cannot be read as fleet coverage. Measured 2026-07-30: 4,180 entities vs
+       ;; 3,956 repos, the difference being orphans (path gone from west.yml) plus
+       ;; archived-group repos whose entries predate their archiving.
+       ";; Not in west.yml (orphaned or archived): "
+       (let [live (set (map :path all-repos))]
+         (count (remove #(contains? live (:repo/path %)) merged)))
+       " of " (count merged) "\n"
        ";; Coverage: " (count merged) "/" (if (:limit opts) (count target-repos) (count all-repos)) " scored"
        (str " (" (count reused) " reused at unchanged west pin)")
        (if (:limit opts) (str " (--limit " (:limit opts) " run)") "") "\n\n")
