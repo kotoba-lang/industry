@@ -53,7 +53,8 @@
 ;; repo の内容はバイト同一なので、内容由来の 4 軸は必ず同じ値になる）。再利用した entity は
 ;; :maturity/reused-at-pin true を持ち、:maturity/computed-at は前回のまま = いつの値か
 ;; 監査できる。pin と独立に動く activity 軸も据え置きになるので、全軸を取り直すなら --full。
-(require '[scripts.nbb-compat :as io :refer [slurp spit format]]
+(require '["fs" :as node-fs]
+         '[scripts.nbb-compat :as io :refer [slurp spit format]]
          '[clojure.string :as str]
          '[clojure.edn :as edn])
 
@@ -787,7 +788,16 @@
        (if (:limit opts) (str " (--limit " (:limit opts) " run)") "") "\n\n")
 
         body (str "[\n" (str/join "\n" (map #(str " " (pr-str %)) merged)) "\n]\n")]
-    (spit out-path (str header body))
+    ;; ATOMIC: write a sibling temp file and rename over the target.
+    ;;
+    ;; A plain spit truncates first, so anything reading the ledger during a run sees
+    ;; a partial file or none at all. Hit twice while sweeping in slices -- once a
+    ;; comparison script read 1 entity mid-write, once it failed outright with ENOENT
+    ;; on a path that certainly existed. A rename on the same filesystem is atomic, so
+    ;; a reader sees either the old ledger or the new one.
+    (let [tmp (str out-path ".tmp")]
+      (spit tmp (str header body))
+      (node-fs/renameSync tmp out-path))
     (println (str "repo-maturity: wrote " out-path " (" (count merged) " entities)"))
     :done))
 
