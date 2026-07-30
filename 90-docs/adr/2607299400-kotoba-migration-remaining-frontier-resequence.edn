@@ -452,10 +452,23 @@ Still open:
   ADR-260731-w6-flags3-bool. Evidence: 88 tests / 1584 assertions green.
 - west pin murakumo `147c3496` (covers #228 loadtime + #227 + #230).
 
-Still open:
+## Progress (2026-07-31l — profile-5 murakumo consumer residual CLOSED)
+
+- murakumo#229 MERGED (`1224b5a` → tip ancestors): plan/rebalance `ok-for` +
+  `pick-bump-3` ok-t|m|p → `:bool`; active from `weight-pos?`; bumped trackers
+  `:bool`. ADR-260731-w6-bump-ok-bool. Evidence: 92 tests / 1602 assertions green.
+- **Profile-5 murakumo product-shell residual is closed:**
+  1. every export ending in `?` returns `:bool` (107 predicates; 0 `*? :i64`)
+  2. pick/assign ok·warm surfaces are `:bool` (scalars + flags3 records)
+  3. ranking pairwise `better-*` / `rank-better?` are `:bool` (#222)
+  4. pack better2/3 fields are `:bool` (#224)
+- **Numeric by design (not incomplete bool work):** queue/fill/load triples,
+  pick codes, `task-score-code` ternary (0|1|2), seat arithmetic.
+- west pin murakumo still `147c3496` (includes #229 ancestry under #230 tip).
+
+Still open (non-bool frontier):
 1. T6.4 cljs mirror body deletion (preload guarantee)
 2. T8.3 production AOT network/secret; W4 recursive values
-3. task-score-code ternary; plan/rebalance pick-bump residual numeric
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
