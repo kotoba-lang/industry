@@ -182,6 +182,29 @@
       (:revision w) (assoc :revision (:revision w))
       (:path w) (assoc :path (:path w)))))
 
+(defn- commit-date
+  "Author date of a pinned commit, via the GitHub API. nil if it cannot be read.
+
+  Fetched only for :reference-only entries — eighteen calls, not 1,208 — since
+  those are the ones with no blueprint to describe them, and all eight resident
+  actors are among them.
+
+  What this is: the age of the PIN. What it is not: liveness. A loop- repo does
+  commit what it produces (loop-system-dynamics carries evidence/ and ledger/
+  and writes to them), so a pin that has not moved in months means either the
+  loop stopped or nobody advanced the pin — both worth looking at, and this
+  cannot tell them apart. Named :revision-committed-at rather than anything
+  suggesting health."
+  [remote name revision]
+  (try
+    (let [out (.execSync (js/require "child_process")
+                         (str "gh api repos/" remote "/" name "/commits/" revision
+                              " --jq .commit.author.date 2>/dev/null")
+                         #js {:encoding "utf8" :timeout 20000})
+          t (str/trim (str out))]
+      (when (seq t) t))
+    (catch :default _ nil)))
+
 (defn- build []
   (let [dirs (->> (fs/readdirSync fleet-dir)
                   (js->clj)
@@ -219,6 +242,8 @@
                                   :reference-only true)
                       rx
                       (reference w)
+                      (when-some [d (commit-date (:remote w) nm (:revision w))]
+                        {:revision-committed-at d})
                       ;; The model this actor embodies, as a pin rather than a
                       ;; dependency: resolved from the authority's
                       ;; :authority-library through west.
