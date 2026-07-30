@@ -120,7 +120,21 @@
     (catch :default _ false)))
 
 (def ^:private junk-re
-  #"(^|/)(node_modules|\.cpcache|\.shadow-cljs|\.wrangler|target|dist|build|out|\.DS_Store|.*\.log)(/|$)")
+  "着地させないビルド副産物 / ランタイム残骸。
+
+  `cljs-runtime` と `.fleet-run` は 2026-07-30 に追加。実測:
+  orgs/network-awai/cloud-murakumo の untracked 111 件のうち **107 件がこの2つ**
+  だった（`public/mobile/js/cljs-runtime/` に cljs コンパイラ出力 97 件、
+  `organism/.fleet-run/tmp/` に fleet 実行の audit/lease/journal EDN 7 件）。
+  `.shadow-cljs` は入っていたが、shadow が吐く *出力先* である cljs-runtime は
+  入っていなかったため、:additive（= PR を作って **merge する**クラス）として
+  111 件が計上されていた。本物の新規コンテンツは legal/docs の 4 件だけで、
+  そのまま流していればコンパイラ出力を repo に commit するところだった。
+
+  `.*-cache\\.json` は contracts/cache/solidity-files-cache.json（foundry の
+  ビルドキャッシュ）向け。`cache` 単体を足すと正当な `cache/` ディレクトリまで
+  巻き込むので、ファイル名の形で絞る。"
+  #"(^|/)(node_modules|\.cpcache|\.shadow-cljs|cljs-runtime|\.fleet-run|\.wrangler|target|dist|build|out|\.DS_Store|.*\.log|.*-cache\.json)(/|$)")
 
 (def max-bytes (* 2 1024 1024))
 
