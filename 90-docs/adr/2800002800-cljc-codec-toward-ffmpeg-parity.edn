@@ -239,9 +239,55 @@ worst accumulator は **18,957,811,712（約 2^34.1）** —— AC 経路の約 
 long に 28 bit の余裕（AC は 9 bit）、かつ **cljs double の mantissa 内**（AC は 1 bit 外）。
 テストはこの 3 つの境界すべてを assert する。
 
+### 実装したもの: sub-pel 探索の half-sample 面共有（`org-iso-h264` `380c741`、2.32x）
+
+**呼び出し元別に帰属させた**ところ（最深フレームではなく、stack に含まれる stage で分類）、
+`me-subpel-refine` が **P フレームの約 61%** —— 整数探索・residual 符号化・最終再構成の
+合計より大きかった。49 候補が画素ごとに参照面から 6-tap を再実行していた。
+
+**再実行は不要だった。** 4 の倍数の周り ±3 quarter-sample は整数位置 `ix-1` か `ix` に
+しか落ちないので、**49 候補は同じ小さな整数近傍を読む**。そして §8.4.2.2.1 の 16 位置は
+どれも「整数サンプル」か「3 つの half-sample 値のうち 2 つの丸め平均」である。よって
+`interp/subpel-planes` が探索ごとに **1 回だけ**その面を作る。水平 6-tap 和は**二重に**
+共有される —— `half-h` はその丸めであり、`center-j` はその上の垂直 6-tap（これは FFmpeg の
+`h264_qpel_hv_lowpass` の two-pass 形そのもので、`h264.interp` 自身の注記が
+「説明はしたが採らなかった」と書いていた形）。
+
+```
+sub-pel 段の参照面読み取り（1 MB あたり）: 529   ← 約 231,000 から
+```
+
+**そこで第 2 のコストが露出した**（この commit が 2 部構成である理由）: 読み取りが消えると、
+残ったのは **fraction を決める 16 分岐 cond が画素ごとに**（1 MB で 12,544 回）走ることだった
+—— fraction は候補ごとに定数なのに。`interp/subpel-selector` が 1 回だけ
+`{:a array :ao offset :b array :bo offset}` に解決し、内側ループは配列 2 読み + 平均になる。
+stage share: **48.4% → 29.3%**（面の共有）→ **20.4%**（dispatch の巻き上げ）。
+
+**交互測定・4 round の median**（load average 13、他セッションの JVM あり）:
+
+```
+P frame 128x128: BASE 11.80/13.87/13.61/17.60 → AFTER 4.74/5.98/5.87/6.70 ms/MB
+median 13.74 → 5.93 ms/MB = 2.32x       （720x1280 換算 49.5 → 21.3 s/frame）
+```
+
+この段の効果は**ノイズに対して頑健**である —— 本作業の前半で扱った 15% 級の効果と違い、
+**新しい 4 run の最も遅いものが、古い 4 run の最も速いものより速い**。出力は全 8 run で
+byte 一致、`h264.me-test` の等価性テスト（全候補が同点になる場合を含む）も不変で通る。
+
 ### 次のレバー（実測シェア順、いずれも推測でなく上記 profile 由来）
 
-2 段の実装後に再 profile した P フレームの姿（840 sample）:
+面共有まで入れた後の stage 帰属（514 sample、IDR の絶対時間は不変なのでその share が物差し）:
+
+```
+33.1%  me-full-search                    ← 現在の最大 stage
+24.5%  encode-idr / intra（不変）
+20.4%  me-subpel-refine                  （48.4% から）
+10.3%  encode-inter-16x16（residual）
+ 8.4%  mc-predict（最終再構成）
+```
+
+（面共有より前、fused SAD + inter fold の 2 段だけ入れた時点の最深フレーム profile は
+840 sample で以下。interpolation cluster が約 57% だった:）
 
 ```
 37.9%  h264.interp/sample     ┐
@@ -254,18 +300,21 @@ long に 28 bit の余裕（AC は 9 bit）、かつ **cljs double の mantissa 
  3.0%  h264.encode/mat-mul    ← QP ごと 1 回の fold のみ（元 14.9%）
 ```
 
-1. ~~**`h264.interp/sample` を support window で**~~ —— **実装して撤回**（上記）。
-   正しい形は **FFmpeg の two-pass 中間バッファ**（水平パスを 1 回だけ計算する）で未実施。
-   **fold 後は interpolation cluster が約 57% で、単独で最大のレバー**
-2. **`me-subpel-refine` の 49 候補** —— ±3 quarter-pel の直積で、docstring 自身が
-   「redundantly but cheaply」と書いている。**ただしこれは bit-identity を破る**
-   —— 候補集合を変えれば選ばれる MV が変わり bitstream が変わるので、Decision 2 の
-   不変条件の**明示的な例外**として、速度と同時に rate/歪みの代償を測ってからでないと
-   入れてはいけない。**bit-identical な代替**として、49 候補が同じ整数近傍を共有している
-   ことを使い half-sample 面を 1 回だけ計算して共有する道がある（レバー 1 の two-pass と
-   同じ性質の変更）——こちらを先に検討する
+1. ~~**`h264.interp/sample` を support window で**~~ —— **実装して撤回**。
+   two-pass 形は **`subpel-planes` の中で実現した**（水平 6-tap 和を 1 回計算して
+   `half-h` と `center-j` で共有）—— つまりレバー 1 の「正しい形」は独立した変更ではなく、
+   レバー 2 の bit-identical 版の一部として入った
+2. ~~**`me-subpel-refine` の 49 候補**~~ —— **bit-identical 版を実装済み**（面共有、2.32x。上記）。
+   **候補数そのものを削る案は入れていない**: 候補集合を変えれば選ばれる MV が変わり
+   bitstream が変わるので、Decision 2 の不変条件の**明示的な例外**であり、速度と同時に
+   rate/歪みの代償を測らずに入れてはいけない。面共有で 1 候補あたりのコストが大きく
+   下がった今、候補削減の見返りは以前より**小さい**
 3. ~~**`sad`（10.9%）**~~ —— **実装済み**（fused SAD + 早期打ち切り、1.71x。上記）
 4. ~~**`solve-regular-levels`（14.9%）**~~ —— **実装済み**（inter fold、関数単体 17.4x。上記）
+5. **`me-full-search`（現 33.1%、最大）** —— 289 候補すべて整数位置（`fx=fy=0`）なのに、
+   画素ごとに汎用の補間入口を通って 1 回の clamp 付き読み取りに辿り着いている。
+   整数位置専用の SAD 経路（補間を経ず、行の基底インデックスを巻き上げた直接読み）が
+   bit-identical に取れる。**次はこれ**
 
 ## Phase 2 — filter 段の家は `douga` ではなく `utsushi` だった
 
