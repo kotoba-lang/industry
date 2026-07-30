@@ -344,7 +344,50 @@ proposal を「発行済み」と表示してはならない。
    - **build 中に langgraph の resume idiom を取り違えた**: `interrupt-before` からの継続は
      `input` が nil か `:resume? true` の時だけ成立し、前状態を丸ごと input として渡すと
      **fresh run** になる（`langgraph.graph/run*`）。テストと sim の両方で誤っていた。
-5. `cloud.itonami.app.authority` 背骨を実装（bitcoin PSBT 経路の一般化。bitcoin は当面現状維持）。
+5. ✅ **done（2026-07-30）** `cloud.itonami.app.authority` 背骨を実装
+   （app pin `ea23fddb`、CI green、**87 tests / 497 assertions**（変更前 69/440 → +18 tests /
+   +57 assertions）、clj-kondo 0 errors・新規 warning なし）。bitcoin PSBT 経路の一般化で、
+   bitcoin 側は現状維持。
+   - **4性質を全 domain に与える**: **ORDER**（`start-approval!` は `review!` が作った
+     proposal しか受けない。pre-check が拒否したら何も保存しない）/ **CONTENT BINDING**
+     （`review!` が material を hash、`finish-approval!` が再検証 — start と finish の間で
+     編集された proposal は他の全検査を通りこれだけで落ちる）/ **TWO GATES**（authority の
+     拒否を `:authority-refused` として記録。**Passkey consent は licence ではなく、
+     governor clearance は consent ではない** = D3 をコードにした部分）/ **SINGLE USE**
+     （approved proposal の commit は1回、両 terminal status は terminal）。
+   - **`approval-match-issues` を純関数に切り出した。** digest binding が最重要検査なのに、
+     実 WebAuthn assertion 経由でしか到達できないと**実質テストされない**。18 deftest のうち
+     5つがこの検査を直接突く。
+   - **`digest` は map ではなく string を要求する。** Clojure の map 反復順は array-map
+     閾値以下でしか安定せず（`css.core/declarations` が宣言8件超で順序を変える実例が
+     この workspace にある）、key 数に暗黙依存する digest は binding にならない。
+   - **`passkey.clj` に `start-authorization!` / `finish-authorization!` を追加した。**
+     これは新規 API の発明ではない — **main に commit 済みの `bitcoin_wallet.clj` が既に
+     両関数を呼んでいて、`passkey.clj` が実装していなかった**（契約は committed コードが
+     規定済み）。context は**サーバ側で束縛**（client が echo する形だと同意後に差し替え可）、
+     `:authorization` は `:assertion` と**別 kind**（同一だと単なるサインインの assertion を
+     `finish-authorization!` に渡せ、ログインしただけのユーザーが操作を承認したように見える）。
+   - **背骨は credential を持たず、domain logic を実装せず、actuate しない。** fleet の
+     authority は全て propose-only なので、`:committed` は「governed proposal が記録された」
+     だけを意味する。docstring にそう書いた — UI が `:committed` を「完了」と読むと嘘になる。
+
+   **この step で見つかった2件（いずれも記録しておく）:**
+   - **手順違反（自分の）**: 共有 west checkout `orgs/cloud-itonami/cloud-itonami-app` を
+     直接編集していた（CLAUDE.md 禁止事項）。気付いたのは main 同期がブロックされた時で、
+     その checkout は **origin/main から 38 commits 遅れ**・**他セッションの未コミット編集が
+     17ファイル**混在していた。自分の3ファイルだけを取り出し origin/main から切った worktree で
+     再検証して着地させた（他者 WIP には触れていない）。**worktree を最初から使えば起きなかった。**
+   - **`cloud-itonami-app` の committed 状態に phantom がある（既存問題、私の変更ではない）**:
+     `bitcoin_wallet.clj` は commit されているが (a) `passkey/start-authorization!` /
+     `finish-authorization!` を呼ぶのに実装が無かった（← step 5 で実装した）(b)
+     `cloud.itonami.app.bitcoin` と `.bitcoin-node` を require するのに**どちらも commit
+     されていない**。**ただし main は壊れていない** — `bitcoin_wallet` を require するものが
+     他に無いので suite（69 tests）もサーバも通る、孤立した dead file。当初「main が壊れている」と
+     判断したが、テストを実際に走らせて訂正した。(b) は別問題として手を付けていない（残件）。
+   - 残件: この app repo の lint は既存 phantom 由来の warning 8件を出す
+     （`agent_control` の `store/update-agent-control!` / `provider/agent-turn`、
+     `mail_sync` の `identity/provider-access-token!` / `connected-providers`）。
+     errors は 0 で、私の追加ファイルには 0 件。
 6. 3領域の typed adapter + `defaults.edn` の設定面（既定 disabled、AgentRun と同じく opt-in）。
 7. 単一 ref の監査面と、SIM-swap ⇒ card posture の cross-domain 不変条件をテストで固定。
 
