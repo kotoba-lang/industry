@@ -497,7 +497,7 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
    `cloud-itonami-card-issuing` / `denwaban` の3つとも server/http/handler/worker 系
    ファイルが0件で、advisor/governor/operation/phase/registry/sim/store だけのライブラリ。
    **app 側は完成しているが渡す先が無い。** 塞ぐには actor 側に `POST /commit` 相当
-   （proposal を受け governor を通し `{"ok":…}` を返す）が必要。
+   （proposal を受け governor を通し `{\"ok\":…}` を返す）が必要。
 2. **D4 の単一 ref が actor 側でまだ成立していない。** app 内では1つの store partition で
    cross-domain 読みが成立するが、**actor の ledger は各自 MemStore のみ**
    （実測: esim actor の store に kotobase/Datomic 参照0件）。①を実装する時に actor の store を

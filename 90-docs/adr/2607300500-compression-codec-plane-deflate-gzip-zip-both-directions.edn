@@ -4,7 +4,8 @@
   :adr/status "accepted"
   :adr/date "2026-07-30"
   :adr/tags ["compression" "codec" "deflate" "zlib" "gzip" "zip" "zip64" "org-ietf-deflate"
-             "org-pkware-zip" "bonsai" "kotoba-lang" "portability" "maturity"]
+             "org-pkware-zip" "bonsai" "tar" "xz" "lzma" "7z" "zstd" "brotli" "woff2"
+             "org-w3-woff" "kotoba-lang" "portability" "maturity"]
   :adr/supersedes ""
   :adr/superseded-by ""
   :adr/doc_type "adr"
@@ -15,7 +16,8 @@
              "orgs/kotoba-lang/org-tukaani-xz"
              "orgs/kotoba-lang/org-7-zip-7z"
              "orgs/kotoba-lang/org-ietf-zstd"
-             "orgs/kotoba-lang/org-ietf-brotli"]
+             "orgs/kotoba-lang/org-ietf-brotli"
+             "orgs/kotoba-lang/org-w3-woff"]
 
   :adr/context
   "An audit of the workspace's compression surface (prompted by 'are zip/zlib/7zip codecs designed and implemented?') found decompression-only implementations with three structural gaps.
@@ -62,7 +64,15 @@ Adjacent finding, unchanged by this work: `codec-primitives` is video-codec (H.2
 
    Decoding is complete for what the reference encoder produces at every quality — which matters more for brotli than for other codecs, because `-q` turns *format features* on and off rather than merely tuning a match finder. Covered: window sizes 10-24, compressed/uncompressed/empty/metadata meta-blocks, three block categories with up to 256 block types each, literal context modelling in all four modes, context maps with run-length coding and inverse move-to-front, simple and complex prefix codes with both repeat mechanisms, the 16 recent-distance symbols with NPOSTFIX/NDIRECT and the distance ring buffer, and dictionary references with all 121 transforms. No encoder, deliberately: brotli is expensive-encode/cheap-decode by design.
 
-   **This also unblocks WOFF2** in `org-w3-woff`, deferred since ADR-2606272100 for exactly this missing dictionary."
+   **This also unblocked WOFF2** in `org-w3-woff`, deferred since ADR-2606272100 for exactly this missing dictionary — see item 11, where it was then built.
+
+11. **Fourth wave: WOFF2 (`org-w3-woff`), the first consumer of brotli.** Item 10 unblocked it; it is now implemented, transforms included. WOFF2 is not `WOFF with brotli` — three tables are pre-processed before compression and have to be rebuilt: `glyf`/`loca` from seven parallel substreams walked in lockstep glyph by glyph (with bounding boxes computed from the decoded points wherever the bitmap says they were dropped), `hmtx` from the glyph bounding boxes when its left-side-bearing arrays were elided, and the sfnt itself — records sorted by tag, every `checkSum` recomputed, `head.checkSumAdjustment` recomputed over the finished font.
+
+   **Byte-exactness is not available here, and pretending otherwise would have been the bug.** §5.1 permits any valid encoding of a glyph`s points and explicitly forbids rejecting a font because the reconstruction differs in size from `origLength`; §6 makes an encoder set `head` flags bit 11. So conformance is asserted on decoded *outlines* — a test-side sfnt/glyf reader (`test/woff/sfnt_compare.cljc`) exists for exactly that comparison — with byte equality still demanded for every table the format does not license to change. The end-to-end statement is stronger than agreement with the reference decoder: original TTF → reference `woff2_compress` → this decoder → outlines identical to the *original font*.
+
+   The spec-table discipline of item 9 held, with one refinement worth recording: `tools/extract_woff2_tables.cljs` first anchored on the prose marker above each table and picked up the wrong one (the table directory`s field list, which sits next to the tag list). It now selects tables **by content** — the tag table is the one containing both `cmap` and `Sill` — and, since W3C publishes no check values, validates structurally instead: exactly 63 tags, and every one of the 128 triplet rows satisfying `byteCount = 1 + (xBits + yBits) / 8`. That invariant is what catches a mis-parse of the spec`s rowspan-heavy HTML, where most rows inherit their byte count from the row above rather than stating it.
+
+   No WOFF2 *encoder*, and font collections (`ttcf`) are refused by name."
 
   :adr/consequences
   "- Compression exists in this workspace without a host codec for the first time. A Git object store, a ZIP writer, or a gzip producer can now run on any Clojure dialect — JVM, browser, nbb — with identical bytes and identical error semantics.
@@ -74,7 +84,7 @@ Adjacent finding, unchanged by this work: `codec-primitives` is video-codec (H.2
 - Decode still accumulates output in a persistent vector, so peak memory is well above the output size for large rasters. The 128 MiB default ceiling bounds the damage; streaming decode is not implemented."
 
   :adr/gaps
-  "1. **WOFF2 is now unblocked but not done.** `org-w3-woff` still reads WOFF 1.0 only; WOFF2 needs brotli (now available in `org-ietf-brotli`) plus the transformed-glyf reconstruction. That is the natural next consumer of this work.
+  "1. **No WOFF2 writer.** WOFF2 *decoding* landed in `org-w3-woff` in this session`s fourth wave (decision item 11), so the gap that opened this list is closed; what remains is that nothing here can produce a WOFF2 file, and font collections (`ttcf`) are refused rather than reconstructed. A writer needs a brotli encoder first (gap 2), and the transforms in reverse — including the choice of which glyphs get an explicit bounding box.
 2. **No entropy-coding encoders.** deflate is the only format in the workspace that can actually compress. org-tukaani-xz, org-7-zip-7z and org-ietf-zstd write valid containers with stored/raw/uncompressed payloads, verified by xz -t, 7z t and zstd -t respectively. Adding a real LZMA or zstd encoder means the price model and the match finder, in that order, with the oracle asserting the reference accepts every level at every step.
 3. **No streaming anywhere.** Every codec here is whole-buffer in, whole-buffer out; :max-output bounds a hostile input but peak memory is still proportional to the output. This is the limit that matters first for large real inputs.
 4. **Unsupported-but-named:** xz BCJ filters (x86/ARM/ARM64/PowerPC/IA64/SPARC/RISC-V); 7z BZip2, PPMd, Deflate64, BCJ, BCJ2, ARM64, RISC-V; ZIP bzip2/LZMA/zstd/xz/PPMd methods; zstd dictionaries; xz SHA-256 checks without an injected hash. Each raises with the format's own name for what it found, never silent passthrough. AES-256 in 7z and ZIP encryption are refusals by policy, not gaps.
@@ -108,4 +118,9 @@ Third wave, merged to its default branch: org-ietf-brotli 8ef3bdc24687b7790d3274
 - org-ietf-brotli: 131 assertions (JVM) / 56 (nbb). The reference brotli binary is the oracle across qualities 0/1/2/5/9/11 over ten input shapes, four window sizes (--lgwin 10/16/20/24), an input that can only compress via the static dictionary, sizes either side of the meta-block boundaries (500/2000/20000/60000 lines), and a 2 MB file; plus a cross-check that the reference *decoder* agrees on the same bytes. The portable suite carries 18 recorded reference streams so the dictionary path also runs on ClojureScript, and asserts the RFC`s own worked examples for the first six transformations. All five generated tables are CRC-verified at generation time.
 - Bugs caught: the transform-suffix escaping described in decision item 10; `zero?` used as a loop binding (which calls a boolean); and a prefix code with a single used symbol consuming no bits, which otherwise fails at the first symbol of any stream containing one.
 
-Totals across the eight repos: 1,388 JVM assertions and 696 ClojureScript assertions, clj-kondo clean everywhere, and a CI job per repo that runs the portable suite on ClojureScript."}]
+Fourth wave, merged to its default branch: org-w3-woff 4a6a2a472989d2ae48e037dea0b031e9c8afb556, pin advanced in manifest/west.yml (verify-west-pins: fast-forward, reachable from main).
+
+- org-w3-woff: 673 assertions (JVM) / 582 (nbb), clj-kondo clean — the whole repo suite, WOFF 1.0 included. The portable suite decodes a recorded WOFF2 file with no shell and no filesystem and compares it against the original font it was compressed from: every table byte-identical except glyf/loca/head, head differing only in checkSumAdjustment and flags bit 11, and every glyph outline identical. The JVM suite adds the reference woff2_compress/woff2_decompress over whatever real fonts the machine has — Arial (3381 glyphs, composite glyphs with scaled components), Georgia, a CFF-flavoured font with no glyf at all, and a >200 KB case asserting composites are actually present — comparing tables and outlines and parsing the result as OpenType. CI installs the woff2 tools and DejaVuSans so that sweep runs there too.
+- The hmtx transform has no fixture: woff2_compress does not apply it to any font on this machine, so it is covered by a direct unit test instead, and that fact is recorded in the repo`s CLAUDE.md so nobody deletes the test as redundant.
+
+Totals across the nine repos: 2,061 JVM assertions and 1,278 ClojureScript assertions, clj-kondo clean everywhere, and a CI job per repo that runs the portable suite on ClojureScript."}]
