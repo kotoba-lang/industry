@@ -198,35 +198,52 @@ shadow deploy 以降 production の head read が発生していない。
 作業ツリーは `orgs/network-awai/net-kotobase/kotobase-cf-wasm`（west path が正。ローカルの
 `orgs/gftdcojp/net-kotobase` は旧 org path の残置 checkout）。
 
-## A. production を authoritative に上げる（唯一の gate は証拠であって時間ではない）
+## A. production authoritative — 完了（2026-07-30、version a677fec7）
 
-1. shadow が seed した head を数える。**0 行なら flip してはいけない**（production の
-   head read がまだ発生していない）。
+**flip 済み。** shadow window は意図した証拠を出さなかった: `kotobase_heads` は
+~20 時間 0 行のままで、backend.kotobase.net が datom head read を 1 件も
+serve しなかった（shadow は traffic が触れたものしか記録しない）。待っても変わらない。
 
-       npx wrangler d1 execute kotobase-heads-production --remote -y --command <SQL-1>
+**それでも安全だった理由**: shadow が hedge していたリスクはこの flag に無い。
+締めた record 検査（name == graph）は `verified-state` にあり B2 経路も通るので、
+shadow 期間中ずっと live だった（その間 production は healthy）。この flag が足すのは
+「D1 が read に答える」だけで、D1 行は **検査を通った B2 record か勝った CAS 以外から
+生まれない**。全 D1 経路は error 時 B2 に fallback し、`wrangler rollback --env=` で戻せる。
 
-   SQL-1: SELECT COUNT(*) AS graphs, MIN(updated_at), MAX(updated_at) FROM kotobase_heads;
+flip 後の検証: backend/apex health 200（3 連続）、edge-gate は 401 のまま（security 不変）。
 
-2. 行があれば signer が1つに揃っているかを見る。これは signer pin を warn から
-   enforce に上げてよいかの判定でもある。
+## A-2. signer enforce — 証拠に到達できず（3 経路を実際に潰した）
 
-       npx wrangler d1 execute kotobase-heads-production --remote -y --command <SQL-2>
+production の**既存** head record が締めた検査を通るかは、以下すべてが塞がっている。
 
-   SQL-2: SELECT json_extract(record, '$.public_key_multibase') AS signer, COUNT(*)
-          FROM kotobase_heads GROUP BY signer;
+1. **traffic 待ち** — 上記のとおり 20 時間 0 件。cloud-itonami 等の consumer worker は
+   存在するが idle。
+2. **認証付き read** — backend への直接呼び出しは CACAO を積んでも
+   `401 this backend is reachable only through the kotobase.net edge`。edge
+   （kotobase.net）は authn service の viewer を要求し、生の CACAO では 401。
+   **副作用の発見**: これは `scripts/kotobase-ingest-cloud-itonami-lei.cljs` の
+   documented invocation（endpoint = backend.kotobase.net 直）が**もう動かない**
+   ことを意味する。あの job は edge 経由に直すか、operator 用の bypass が必要。
+3. **B2 record を offline 検査** — live kagi vault（`$HOME/.kagi`）が
+   `plaintext identity requires migration` で落ち、非対話では secret を 1 件も
+   取り出せない。**kagi 依存の他の経路（fleet-ci の Radicle 反映、marketplace seed
+   等）も同じ理由で今は読めない。** これは head plane より広い影響を持つ別件。
 
-3. 両方 OK なら `kotobase-cf-wasm/wrangler.jsonc` の production `vars` を
-   `KOTOBASE_HEAD_D1` を shadow から authoritative へ（signer が1つなら
-   `KOTOBASE_HEAD_SIGNER` も warn から enforce へ）編集し、**先に origin/main と同期して**
-   から deploy する。
+**owner が塞げるもの（どちらか一方で足りる）**:
+- kagi の identity migration を通す → B2 key を狙い撃ちで取り、`ipns/` を list して
+  record の `name` と `public_key_multibase` を offline で検算できる。
+- kotobase.net に 1 回ログインして既存 graph を read する → authoritative なので
+  seed-on-read が走り、`kotobase_heads` に行が入る。行が入れば下の SQL で signer が
+  1 種類か判定でき、それが enforce の可否をそのまま決める。
 
-       git fetch origin && git merge --ff-only origin/main
-       node <root>/scripts/resource-guard.mjs run deploy -- npx wrangler deploy --env=
+判定 SQL: SELECT json_extract(record, '$.public_key_multibase') AS signer, COUNT(*)
+FROM kotobase_heads GROUP BY signer;
 
-4. 直後に検証する。壊れていたら `npx wrangler rollback --env=` で即戻す。
-
-       npx nbb slo/probe.cljs
-       npx nbb slo/resilience_probe.cljs https://kotobase-cf-wasm-testnet.aozora.app
+**code から言えること（測定ではない、と明示して扱う）**: この bucket の
+`ipns/<graph>.json` を書いたのは常にこの Worker だけで、`write-head!` は必ず
+`:name graph` を operator seed で署名する。だから name 検査は構造的に通るはずで、
+signer も 1 種類のはず。**これは論拠であって receipt ではない** — これに基づいて
+enforce へ上げるなら、そう明記して上げること。
 
 ## B. バッチングを Durable Object でやり直す
 
