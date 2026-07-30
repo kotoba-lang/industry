@@ -55,7 +55,7 @@
 | 層 | 責務 | 受電 | カード発行 | eSIM |
 |---|---|---|---|---|
 | **records** | 国際標準のレコード形（no I/O, no credential, portable `.cljc`） | `kotoba-lang/phone`（E.164 / SIP / CDR / SMS） | `kotoba-lang/card`（ISO/IEC 7812 PAN + Luhn / ISO 8583 / authorization contract） | **欠落 → `kotoba-lang/esim` を新設（D5）** |
-| **ports** | host 注入される protocol（SDK も鍵も持たない） | `kotoba-lang/koe`（`ITelephony`/`ISTT`/`IDialog`/`ITTS`/`IBooking`） | **欠落 → `kotoba-lang/card` に `ports.cljc` を追加（D5）** | **欠落 → `kotoba-lang/esim` に同梱（D5）** |
+| **ports** | host 注入される protocol（SDK も鍵も持たない） | `kotoba-lang/koe`（`ITelephony`/`ISTT`/`IDialog`/`ITTS`/`IBooking`） | ✅ `kotoba.card.ports`（+ `kotoba.card.lifecycle`、2026-07-30） | ✅ `kotoba.esim.ports`（2026-07-30） |
 | **governed actor** | Advisor ⊣ Governor + append-only ledger、propose のみ | `cloud-itonami/denwaban` | `cloud-itonami/cloud-itonami-card-issuing` | **欠落 → `cloud-itonami/cloud-itonami-esim` を新設（D6）** |
 | **consent surface** | subject 束ね・deterministic pre-check・Passkey consent | **3領域とも欠落 → `cloud-itonami-app`（D2/D3）** | 同 | 同 |
 
@@ -244,7 +244,41 @@ proposal を「発行済み」と表示してはならない。
      enabled profile 無しで接続を失う）、`:enable` は incumbent を名指しして
      `:enable/would-displace` で拒否する（eUICC の enabled profile は最大1本なので、
      黙って現用回線を落とさない。displacement は2つの明示的決定として表現可能）。
-2. `kotoba-lang/card` に `ports.cljc` を追加（`koe.ports` と同型。既存 records は無変更）。
+2. ✅ **done（2026-07-30）** `kotoba-lang/card` に ports 層を追加（pin `879feb55`、
+   CI green、29 tests / 163 assertions。既存 records は無変更）。
+   - `kotoba.card.ports`: `ICardholderProvisioning`（`:cardholder/intake`）/
+     `ICardProgram`（`:bin/assess` `:bin/sponsor`）/ `ICardIssuance`（`:card/issue`
+     `:card/lifecycle`）/ `IAuthorizationDecision`（`:authorization/decide`）/
+     `IDisputeInitiation`（`:dispute/initiate`）。**op 名は issuer 側 actor が
+     既に使っている語彙そのまま**にしたので、実装側が境界で翻訳しなくてよい。
+   - **全 operation は propose-only** であることを docstring に明記した
+     （「このメソッドの中で actuate する host は、licensed act を query に見える
+     interface の裏に移したことになる」）。本 ADR の到達上限を構造にした部分。
+   - **protocol の分割は装飾ではなく効いている**: contract test が
+     「`IAuthorizationDecision` だけ実装した host は、card 発行や BIN sponsor を
+     propose する能力を得ない」ことを検証する。authorization は唯一の hot path
+     （per transaction・latency 束縛・発行可否とは独立に稼働）、BIN sponsorship は
+     program ごと1回の licensing 行為なので、同じ port に置かない。
+   - **acquirer 側は意図的に入れない**（settlement / chargeback hold release は
+     `cloud-itonami-isic-6619`）。1つの actor が dispute の両側を持つのは、
+     この分割が防いでいる利益相反そのもの。
+   - **ADR の字面（`ports.cljc` を追加）を少し超えて `kotoba.card.lifecycle` も
+     追加した。** reachability の authority が無い lifecycle port は曖昧さを
+     移動させるだけで、step 5 が呼ぶ先が無くなる。event は issuer 側 actor の
+     `:card/lifecycle` が既に受ける `#{:activate :block :reissue :close}` に厳密に
+     一致させ（5つ目を作っていないことをテストで固定）、2つの読みを決定として明記:
+     `:activate` は `:blocked` からも可（**unblock は activation である** — issuer
+     語彙に `:unblock` は無く、作れば境界で翻訳が必要になる）、`:close` は
+     `:reissued` から不可（既に terminal で、1つの card reference に terminal
+     レコードが2つ立つ）。`:reissue` は `:card/successor :not-created-here` を返す
+     — 黙って後継カードを作る reissue は、発行という決定を lifecycle event の裏に
+     隠すことになる。
+   - 副産物の訂正: card の README は `51 assertions` と書いていたが、変更前の実測は
+     既に 16 tests / 66 assertions で stale だった。現在値に直した。
+   - **未修正の発見**: issuer 側 actor `cardissuing.registry` は `luhn-check-digit` /
+     `luhn-valid?` を**自前で再実装している**（`kotoba.card/luhn-valid?` があるのに）。
+     別 repo の変更なので step 2 では触っていない。step 4/6 で actor を触る際に
+     ライブラリ委譲へ寄せる。
 3. `denwaban` / ADR-2606271930 の参照 drift 修正（`koe` / `com-*`）。
 4. `cloud-itonami/cloud-itonami-esim` actor を新設（D6）。
 5. `cloud.itonami.app.authority` 背骨を実装（bitcoin PSBT 経路の一般化。bitcoin は当面現状維持）。
