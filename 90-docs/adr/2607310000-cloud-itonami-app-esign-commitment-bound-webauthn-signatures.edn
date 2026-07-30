@@ -282,25 +282,36 @@ ceremony 検査（origin / credential 所有 / counter / 発行した request �
 
 ### まだ無いもの（「実装済み」と読まないこと）
 
-1. **RFC 3161 タイムスタンプ**。`org-ietf-asn1` → `org-ietf-cms` → `org-ietf-rfc3161`
-   が要る（workspace に ASN.1/X.509/CMS 実装が 1 つも無い）。**これが無い間、対外
-   取引の電帳法要件は満たせない。** 社内署名（決議・同意取得）は今の面で成立する。
-2. **RFC 4998 ERS の archive timestamp chain**。`timestamps: []` は空 vector として
-   出しており、「該当なし」ではなく「無い」を意味する。アルゴリズム老朽化と証明書
-   失効に対する長期検証は未対応。
-3. **PAdES 出力**。外部相手は我々の検証器を走らせない。`org-iso-pdf` は 424 行の
-   parser で署名 dict / ByteRange / incremental update を書けない。`org-etsi-pades`
-   が要る。
-4. **JPKI（当事者型）**。`com-mynumber` は clean-room scaffold。
-5. **`forget-content!` は Drive の文書を消さない**（`documents/purge!` は別の決定）。
-   また `architecture.md` の「compaction/retraction of historical datoms is not yet
-   implemented」も未解消で、**crypto-shredding（DEK 破棄）は未実装** — 現状の
-   `forget-content!` は state から outline を落とすだけ。
-6. **電帳法の検索要件（日付・金額・取引先）**。`contracts.clj` が E2E について既に
-   記録しているのと同型の緊張がある。索引をクライアント側に置くか暗号化検索可能索引
-   にするか、緩和措置に依るかは**法務確認事項**。
-7. **UI は実ブラウザ・実 Passkey で未検証**。routes は live server で確認したが、
-   `navigator.credentials.get` を通す署名フローは人の指を要するため実行していない。
+**2026-07-30 後刻、7 件のうち 6 件は実装した（ADR-2607310100）。** 下記は当時の記述を
+現在地に書き換えたもの。
+
+1. ~~RFC 3161 タイムスタンプ~~ → **実装**。`org-ietf-asn1` → `x509` → `cms` →
+   `rfc3161` を起こし、app の `esign/timestamp.clj` に配線した。`timeAttestation` は
+   `app-attested` / `tsa-attested` / `accredited` の 3 値になり、電子帳簿保存法が
+   名指しするのは 3 つ目だけであることを field が保持する。**実際の認定 TSA への接続は
+   deployment 作業**（`:esign {:timestamp {:url … :accredited-roots […]}}`）。
+2. ~~RFC 4998 archive timestamp chain~~ → **library は実装**（`org-ietf-ers`）。
+   envelope 単位の evidence には token が入る。**複数 envelope を 1 つの hash tree に
+   束ねて renewal を回す orchestration は未配線。**
+3. ~~PAdES 出力~~ → **B-B を実装**（`org-etsi-pades`）。B-T / B-LT / B-LTA は未実装で、
+   `profile` が level を報告する。
+4. ~~JPKI~~ → **検証側を実装**（`org-jpki`）。カード側のセレモニーはハードウェアを要し
+   未実装。失効確認は認定・届出事業者だけが J-LIS に接続できるため行わず、
+   `:revocation :not-checked` を常に返す。**fixture は合成で、実カードとの相互運用性は
+   未証明。**
+5. ~~crypto-shredding 未実装~~ → **実装**（`esign/vault.clj`）。`forget-content!` は
+   map から entry を消すのではなく **AES-256-GCM の鍵を壊す**。旧実装が消していたのは
+   live view だけで、古い `state.edn`・バックアップ・未上書きのディスクブロックは
+   そのまま残っていた。
+6. ~~電帳法の検索要件 vs E2E の緊張~~ → **決めた**（`esign/retention.clj`）。法が保存を
+   義務づける 3 項目だけを content と分けて平文で持ち、`forget-content!` を生き延びさせる。
+   代償（取引先名は個人情報になり得て消去後も残る）は隠さず、`:retention/basis` の明示を
+   運用者に要求する。**法域ごとの当てはめは引き続き法務確認事項。**
+7. **実ブラウザ・実 Passkey での署名フローは依然として未検証。** routes は live server で
+   確認したが、`navigator.credentials.get` を通す完全なフローは人の指を要する。CDP の
+   virtual authenticator で代替すると `credential_assurance.clj` が名指ししている hazard
+   そのものを使うことになり、証明できるのは配線であって鍵の所在ではない。**やる価値は
+   あるが、証明できることを正確に書いた上でやるべきで、現時点では未実施。**
 
 ### なぜ `kotoba-lang/esign` を使わなかったか
 
