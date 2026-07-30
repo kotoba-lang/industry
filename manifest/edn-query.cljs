@@ -22,6 +22,19 @@
 ;;   nbb manifest/edn-query.cljs count
 ;;   nbb manifest/edn-query.cljs q '[:find ?id ?status :where
 ;;                                   [?e "adr/id" ?id] [?e "adr/status" ?status]]'
+;;   nbb manifest/edn-query.cljs mcp     # 常駐 MCP server（stdio, JSON-RPC）
+;;
+;; MCP client の設定（この面を datalog を知らなくても聞けるようにする）:
+;;
+;;   {"mcpServers": {"kotoba-query-plane": {
+;;      "command": "nbb",
+;;      "args": ["--classpath", ".:scripts/nbb_compat", "manifest/edn-query.cljs", "mcp"],
+;;      "cwd": "<superproject root>"}}}
+;;
+;; tools: plane_query（生 datalog）/ company_profile（LEI 結合済みの企業像）/
+;; dataset_counts。ロードは初回 query 時に 1 回だけ（約 46 秒）、以後の query は
+;; 十数 ms（実測 2026-07-30）。cwd が superproject root である必要があるのは、
+;; 入力パスを git rev-parse --show-toplevel から解決しているため。
 
 (require '[scripts.nbb-compat :refer [slurp file-seq format]]
          '[clojure.edn :as edn]
@@ -1324,9 +1337,203 @@
      :innen-count (count innen-tx)
      :awai-yakuwari-count (count awai-tx)}))
 
-(defn -main [& args]
-  (let [[mode query-str] args
-        {:keys [conn adr-count docs-count manifest-count foreign-adr-count biz-count
+;; ---------- MCP mode（常駐して JSON-RPC で答える） ----------
+;;
+;; 実測 2026-07-30: この面を 1 query するのに 37 秒かかっていた。内訳を測ると
+;; **ロードが全部**で、ロード済みの db に対する 3-way join は 14〜33 ms だった。
+;; つまり遅さの原因は query ではなくプロセスの寿命で、CLI が毎回 3,405 ファイルを
+;; 読み直して 116,392 entity を transact していたことに尽きる。
+;;
+;; 最初は db をファイルにキャッシュしようとして捨てた: DataScript の
+;; serializable/from-serializable はこの db を往復できない（属性値に JS object が
+;; 入っており from_serializable が EDN reader で "No reader function for tag
+;; object." を投げる）。キャッシュを repo 直下に置くと root の mtime が変わって
+;; 指紋が自分を無効化する、という別の穴も踏んだ。正解はファイルではなく常駐だった。
+;;
+;; なので: 1 回ロードして持ち続け、以後は ms で答える。`initialize` と
+;; `tools/list` は面をロードせずに即答し、最初に query 系 tool が呼ばれた時点で
+;; 初めてロードする（client が握手で 50 秒待たされない）。
+;;
+;; kernel（kotoba-lang/org-anthropic-mcp）を使っていないのは意図的で、
+;; cloud-itonami-app の MCP server では使っている。あちらは server が独立した
+;; 名前空間なので素直に require できるが、この CLI に持ち込むと (a) client の
+;; 設定に --classpath を 1 本増やし、(b) SCI は defn の評価時に alias を解決する
+;; ため条件付き require が効かず、MCP 実装全体を `when` の中に入れ子にする必要が
+;; ある。30 行を節約するために CLI 全体の起動要件を変えるのは釣り合わない。
+
+(def ^:private mcp-tools
+  [{:name "plane_query"
+    :description
+    (str "Run a Datalog query against the unified EDN plane: "
+         "116k entities across 26 datasets — ADRs, business metrics, fleet state, "
+         "SEC EDGAR financials, legal entities, ToS archives, patents, passive DNS. "
+         "Attributes are BARE STRINGS, not keywords (\"company/lei\", not "
+         ":company/lei). Datasets are distinguished by \"source/dataset\". "
+         "Example: [:find ?id :where [?e \"adr/id\" ?id] [?e \"adr/status\" \"accepted\"]]")
+    :input-schema {:type "object"
+                   :properties {"query" {:type "string"
+                                         :description "Datalog query as EDN text."}}
+                   :required ["query"]}}
+   {:name "company_profile"
+    :description
+    (str "Everything the plane knows about a company, joined on :company/lei — "
+         "SEC EDGAR revenue, legal name, jurisdiction, and Terms-of-Service URL. "
+         "Takes an LEI or part of a legal name. This is the join no single dataset "
+         "can answer: financials, legal identity and ToS sit in three different "
+         "repositories.")
+    :input-schema {:type "object"
+                   :properties {"company" {:type "string"
+                                           :description "LEI, or a substring of the legal name (case-insensitive)."}}
+                   :required ["company"]}}
+   {:name "dataset_counts"
+    :description "Entity count per dataset in the plane, and the total."
+    :input-schema {:type "object" :properties {}}}])
+
+(def ^:private plane (atom nil))
+
+(defn- plane!
+  "面を 1 回だけ組む。ロードは stderr に報告する（client 側で最初の呼び出しが
+   数十秒かかる理由が見えるように）。"
+  []
+  (or @plane
+      (let [t0 (js/Date.now)
+            _ (js/console.error "edn-query/mcp: loading the plane (first query only)…")
+            built (build-conn)]
+        (js/console.error (str "edn-query/mcp: plane ready in "
+                               (quot (- (js/Date.now) t0) 1000) "s"))
+        (reset! plane built))))
+
+(defn- q* [query]
+  (js->clj (.q ds query (.db ds (:conn (plane!))))))
+
+(defn- pairs->index
+  "[[k v] …] -> {k v}。同じ k が複数あれば最初を採る。"
+  [rows]
+  (reduce (fn [m [k v]] (if (contains? m k) m (assoc m k v))) {} rows))
+
+(defn- company-profile [needle]
+  (let [needle (str/lower-case (str needle))
+        names (q* "[:find ?lei ?legal :where [?b \"company/lei\" ?lei] [?b \"company/legal-name\" ?legal]]")
+        revenue (pairs->index
+                 (q* (str "[:find ?lei ?rev :where [?a \"company/lei\" ?lei] "
+                          "[?a \"source/dataset\" \"market-intel\"] [?a \"company/revenue-usd\" ?rev]]")))
+        juris (pairs->index
+               (q* "[:find ?lei ?j :where [?b \"company/lei\" ?lei] [?b \"company/jurisdiction\" ?j]]"))
+        tos (pairs->index
+             (q* "[:find ?lei ?u :where [?c \"company/lei\" ?lei] [?c \"tos/source-url\" ?u]]"))
+        hits (->> names
+                  (filter (fn [[lei legal]]
+                            (or (= (str/lower-case (str lei)) needle)
+                                (str/includes? (str/lower-case (str legal)) needle))))
+                  (sort-by second))]
+    {:matched (count hits)
+     :companies (mapv (fn [[lei legal]]
+                        (cond-> {:lei lei :legal-name legal}
+                          (get juris lei) (assoc :jurisdiction (get juris lei))
+                          (get revenue lei) (assoc :revenue-usd (get revenue lei))
+                          (get tos lei) (assoc :tos-url (get tos lei))))
+                      hits)}))
+
+(defn- counts-summary []
+  (let [p (plane!)]
+    (-> (dissoc p :conn)
+        (assoc :total (reduce + (vals (dissoc p :conn)))))))
+
+(defn- mcp-invoke [tool-name args]
+  (try
+    (case tool-name
+      "plane_query"
+      (let [query (get args "query")]
+        (if (str/blank? (str query))
+          {:error "query is required"}
+          {:rows (q* query)}))
+
+      "company_profile"
+      (let [c (get args "company")]
+        (if (str/blank? (str c))
+          {:error "company is required"}
+          (company-profile c)))
+
+      "dataset_counts" (counts-summary)
+
+      {:error (str "unknown tool: " tool-name)})
+    (catch :default e
+      ;; tool の失敗で常駐プロセスを落とさない。落ちると以後の全 query が死ぬ。
+      {:error (str (.-message e))})))
+
+(defn- mcp-response [id result]
+  (clj->js {"jsonrpc" "2.0" "id" id "result" result}))
+
+(defn- mcp-handle [req]
+  (let [method (get req "method")
+        id (get req "id")
+        params (get req "params" {})]
+    (case method
+      "initialize"
+      (mcp-response id {"serverInfo" {"name" "kotoba-query-plane" "version" "1"}
+                        "capabilities" {"tools" {}}})
+
+      "tools/list"
+      (mcp-response
+       id {"tools" (mapv (fn [t]
+                           {"name" (:name t)
+                            "description" (:description t)
+                            "inputSchema" (:input-schema t)})
+                         mcp-tools)})
+
+      "tools/call"
+      (let [tool-name (get params "name")
+            args (get params "arguments" {})
+            known (some #(when (= tool-name (:name %)) %) mcp-tools)]
+        (if-not known
+          (clj->js {"jsonrpc" "2.0" "id" id
+                    "error" {"code" -32601 "message" (str "tool not found: " tool-name)}})
+          (let [required (get-in known [:input-schema :required] [])
+                missing (remove #(contains? args %) required)]
+            (if (seq missing)
+              (clj->js {"jsonrpc" "2.0" "id" id
+                        "error" {"code" -32602
+                                 "message" (str "missing required param: " (first missing))}})
+              (let [result (mcp-invoke tool-name args)]
+                (mcp-response
+                 id {"content" [{"type" "text" "text" (pr-str result)}]
+                     "isError" (contains? result :error)
+                     "structuredContent" (clj->js result)}))))))
+
+      (clj->js {"jsonrpc" "2.0" "id" id
+                "error" {"code" -32601 "message" (str "Method not found: " method)}}))))
+
+(defn- mcp-serve!
+  "newline-delimited JSON-RPC on stdin/stdout。id の無い notification には
+   返さない（spec 上禁止で、client は握手直後に notifications/initialized を
+   送ってくる）。"
+  []
+  (let [buf (atom "")
+        emit! (fn [v] (.write js/process.stdout (str (js/JSON.stringify v) "\n")))]
+    (.setEncoding js/process.stdin "utf8")
+    (.on js/process.stdin "data"
+         (fn [chunk]
+           (swap! buf str chunk)
+           (loop []
+             (let [s @buf
+                   i (.indexOf s "\n")]
+               (when (>= i 0)
+                 (let [line (str/trim (subs s 0 i))]
+                   (reset! buf (subs s (inc i)))
+                   (when-not (str/blank? line)
+                     (let [req (try (js->clj (js/JSON.parse line) :keywordize-keys false)
+                                    (catch :default _ nil))]
+                       (cond
+                         (nil? req)
+                         (emit! (clj->js {"jsonrpc" "2.0" "id" nil
+                                          "error" {"code" -32700 "message" "parse error"}}))
+                         (contains? req "id") (emit! (mcp-handle req))
+                         :else nil)))
+                   (recur)))))))
+    (.on js/process.stdin "end" (fn [] (js/process.exit 0)))))
+
+(defn- run-cli [mode query-str]
+  (let [{:keys [conn adr-count docs-count manifest-count foreign-adr-count biz-count
                 kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                 narrative-count company-count fleet-count yabai-count tadori-count patent-count
@@ -1352,7 +1559,17 @@
       "q"
       (println (pr-str (js->clj (.q ds query-str (.db ds conn)))))
 
-      (do (println "usage: nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs [count | q '<datalog-query>']")
+      (do (println (str "usage: nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs "
+                        "[count | q '<datalog-query>' | mcp]"))
           (scripts.nbb-compat/exit 1)))))
+
+(defn -main [& args]
+  (let [[mode query-str] args]
+    ;; mcp モードは面をここでは組まない。握手には面が要らないので、client を
+    ;; 数十秒待たせずに initialize / tools/list を返し、最初の query 系 tool 呼び出しで
+    ;; 初めてロードする（plane! が 1 回だけ組む）。
+    (if (= "mcp" mode)
+      (mcp-serve!)
+      (run-cli mode query-str))))
 
 (apply -main *command-line-args*)
