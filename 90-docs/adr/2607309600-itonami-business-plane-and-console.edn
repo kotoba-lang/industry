@@ -487,9 +487,24 @@ inline JS を `node --check`、app CSS に raw hex 0 件。
 
 **残っている穴**（どれも「実装していない」ではなく「データ側の穴」）:
 
-1. **leverage ledger は今も fleet の repo 登録 backlog を模型化している。** 事業の
-   経済を模型化した ledger は無い（ADR-2607310100 で XMILE 側は実測モデルを 1 つ
-   作ったが、leverage 側は手を付けていない）。
+1. **leverage ledger は今も fleet の repo 登録 backlog を模型化している。** ただし
+   **迂回路は付けた**（同日追記）: 「どこに介入すれば効くか」を tractability の採点
+   なしで出すために、Loops pane が**感度**を計算する。各 leaf 定数を +10% して同じ
+   engine で再実行し、stock の変化率 / パラメータの変化率＝弾力性を出す。無次元なので
+   `tenants/day` の rate と `days` の window を並べられる。
+
+   3 つを拒否して honest にした: leaf 定数だけを parameter にする（他の変数を参照する
+   式を固定値で上書きするのは感度ではなく別モデル）／弾力性 0 を**構造的に曖昧解消**
+   する（どの式からも参照されない定数は「未接続」と報告する。素の 0 は「効かない」と
+   「繋がっていない」を混ぜる）／尺度の無い弾力性は 0 ではなく `:undefined`。
+
+   実モデル実測（+10%、`Paying_Tenants` への効果）: `Tenant_Signup` +0.58 /
+   初期 `Non_Paying_Tenants` +0.42 / 転換率上限 +0.18 / `Observation_Window_Days`
+   −0.20 / **traffic 2 定数は未接続** — traffic→signup の転換率が未計測である限り
+   traffic は funnel を動かせない、とモデルが述べている。
+
+   **これは ledger 側の穴を埋めてはいない。** 存在するモデルについて迂回しただけで、
+   ledger の限界は同じ pane に出したままにしている。
 2. **`maturity-scores.edn` は markdown blob** なので構造化して読めない。
    Metrics pane は触らず、prose を parse しない選択をした。
 3. **Business は手で作って手で紐付ける。** どの repo / canvas がどの事業かは判断で
