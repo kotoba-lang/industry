@@ -484,7 +484,42 @@ proposal を「発行済み」と表示してはならない。
      `:transport-failed`、未設定は `:endpoint-not-configured` を返す。
      **これは app 側を完成させたが、fleet を到達可能にはしていない。**
 
-**build order は 8 step 完了（当初 7 + 抜けていた 8）。** ただし本 ADR の「到達上限」節は不変で、
+9. ✅ **done（2026-07-30）** actor 側 HTTP 面と、**wire の第3状態**
+   （esim actor pin `7ee49fd0` CI green・41 tests / 213 assertions、
+   app merge `1c4a33cf` CI green・**222 tests / 1,020 assertions**）。
+   - **actor 自身が fork できなかった。** `deps.edn` が `:local/root` を使っており、
+     README が「qualified operator が fork して deploy できる」と謳っているのに
+     **それが事実でなかった**（同日に library 3本で直したのと同じ欠陥）。git 座標に直し、
+     CI から sibling checkout を外したので **CI が forkability を証明する**。
+     副次的発見: 旧 `:dev` override は `io.github.com-junkawasaki/langchain-clj` という
+     langgraph が宣言していない座標名を指しており **no-op** だった。
+   - **状態は2つでは足りなかった。** `POST /commit` の答えは3状態:
+     `committed`（governor clear **かつ** phase-auto）/ `held`（governor が HARD 拒否）/
+     **`pending`（受理、この actor 自身の operator 承認待ち）**。
+     **Passkey consent は operator approval ではない**ので「subject は同意した、licensed
+     operator はまだ決めていない」は成功でも拒否でもなく、boolean はそれをどちらかに
+     分類することを強制していた。spine に `:authority-pending`（**非 terminal**）を追加。
+     `commit!` では **pending を `ok?` より先に判定する** — pending は `ok? false` かつ
+     refusal 無しなので、`ok?` を先に見ると refused として記録されてしまう。
+   - **app の adapter が送れる3 op はどの phase の `:auto` にも無い**ので、**正常な proposal は
+     必ず `pending` になり `committed` にはならない。** これは統合が動いていないのではなく
+     2枚 gate が動いていることで、docstring と README に明記した。
+   - **テストが本物のバグを捕まえた**: graph の thread-id に proposal id を使っていたため、
+     同じ proposal への再 POST が langgraph の checkpoint 経由で前回 run の state を継承し
+     （`base (if latest (merge base (:state latest)))`）、caller が1回目に送った `:approval` が
+     2回目に持ち越されて**ループの3回目が commit した**。各 POST を fresh thread にして修正。
+     2回の POST は2つの独立した試行になる。`:approval`/`:disposition`/`:verdict`/`:status` を
+     proposal の外と中の両方に混入させ、全て `pending` で終わることを固定した。
+   - **自分のテストの嘘も1つ直した**: `(is (= #{\"committed\"…} #{\"committed\"…}))` という
+     tautology を書いていたので、**実ソケット上に stub actor を立てて3状態のマッピングを
+     検証する本物のテスト**に置き換えた（socket / status code / JSON decode / status mapping、
+     不正 status の拒否、**旧 boolean contract を受け付けないこと**まで）。
+   - transport は3状態のみを受け付け、**旧 boolean 形も拒否する** — 黙って honour すると
+     未移行の actor が「問題なさそうな答え」の裏に隠れる。
+   - actor の HTTP 面は **loopback 束縛・自前の認証なし**（公開に晒すと consent 境界が
+     飾りになる）。store は per-process MemStore のまま（gap 2 は別変更）。
+
+**build order は 9 step 完了（当初 7 + 抜けていた 8・9）。** ただし本 ADR の「到達上限」節は不変で、
 背後の actor は全て `:effect :propose` only なので、`:committed` は
 「governed proposal が記録された」だけを意味する。
 
@@ -493,22 +528,31 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
 
 ## 残る gap（2026-07-30 時点、優先順）
 
-1. **fleet のどの actor も HTTP 面を持たない（最大）。** `cloud-itonami-esim` /
-   `cloud-itonami-card-issuing` / `denwaban` の3つとも server/http/handler/worker 系
-   ファイルが0件で、advisor/governor/operation/phase/registry/sim/store だけのライブラリ。
-   **app 側は完成しているが渡す先が無い。** 塞ぐには actor 側に `POST /commit` 相当
-   （proposal を受け governor を通し `{\"ok\":…}` を返す）が必要。
-2. **D4 の単一 ref が actor 側でまだ成立していない。** app 内では1つの store partition で
+1. **pending な proposal を進める手段が無い（新規、step 9 で生まれた）。**
+   `:authority-pending` は非 terminal だが、app には operator の最終判断を知る
+   **callback も poll も無い**ので、pending の proposal は動かないまま残る。
+   terminal にすれば消えるが、それは分かっていないことについて嘘をつくことになるので
+   しない。塞ぐには actor 側に「この reference の決着」を問える読み口と、app 側に
+   それを反映する経路が必要。
+2. **`card-issuing` と `denwaban` に HTTP 面が無い。** eSIM は step 9 で解消
+   （`POST /commit`、loopback、41 tests）。残る2つは server/http/handler/worker 系
+   ファイルが0件のままなので、`:endpoint-not-configured` / `:transport-failed` を返す。
+   eSIM の `esimprovisioning.http` がそのまま雛形になる。
+3. **actor の HTTP 面に自前の認証が無い。** loopback 束縛で塞いでいるが、
+   共有ホストに置くなら consent 境界が飾りになる。公開する前に認証が必要。
+4. **D4 の単一 ref が actor 側でまだ成立していない。** app 内では1つの store partition で
    cross-domain 読みが成立するが、**actor の ledger は各自 MemStore のみ**
    （実測: esim actor の store に kotobase/Datomic 参照0件）。①を実装する時に actor の store を
    共有 backend に向けるのが自然な合流点。
-3. **`denwaban` に CI が無い。** 6 tests / 16 assertions がローカル実行のみを証拠にしている。
+5. **`denwaban` に CI が無い。** 6 tests / 16 assertions がローカル実行のみを証拠にしている。
    一番安く直る。
-4. **kotoba-lang の 199 ライブラリが git 座標で消費不能。** 1,828 中 199
+6. **kotoba-lang の 199 ライブラリが git 座標で消費不能。** actor repo にも同じ
+   欠陥があった（step 9 で `cloud-itonami-esim` を修正）ので、これは library だけの
+   問題ではない — **fork して deploy すると謳う repo が fork できないのは、より重い。** 1,828 中 199
    （`card`/`phone`/`esim` は修正済み）。同一クラスの欠陥で、各 CI が sibling を `../` に
    clone しているため全て green のまま。**sibling を clone する CI は consumability を
    何も証明しない。**
-5. 小さいもの: `cloud-itonami-app` の既存 phantom 8件（`identity/*` /
+7. 小さいもの: `cloud-itonami-app` の既存 phantom 8件（`identity/*` /
    `store/update-agent-control!` / `provider/agent-turn`）と未 commit の
    `bitcoin.clj`/`bitcoin_node.clj` / `cardissuing.registry` の Luhn 重複実装 /
    `kotoba-lang/esim` に `ui.cljc` が無い。
