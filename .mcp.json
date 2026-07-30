@@ -9,6 +9,15 @@
         "orgs/gftdcojp/cloud-itonami/scripts/mcp-server.cljs"
       ],
       "env": {}
+    },
+    "cloud-itonami-app": {
+      "type": "stdio",
+      "command": "/bin/sh",
+      "args": [
+        "-c",
+        "cd orgs/cloud-itonami/cloud-itonami-app && exec clojure -M:mcp"
+      ],
+      "env": {}
     }
   }
 }
