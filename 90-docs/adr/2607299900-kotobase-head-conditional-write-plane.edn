@@ -143,12 +143,7 @@ publish。store.cljs の `head-get`/`head-put!` を chain buffer にすること
 **動いた**: commit は正しく連鎖し（各 `previous_commit` が直前の commit）、各 caller は
 自分の結果を受け取った。
 
-**外した理由**: Workers では **runner になったリクエストが、バッチ全員分の I/O を自分の
-subrequest / CPU / wall 予算で実行する**。25 並行 writer で予算を超え、**単独なら成功して
-いた 25 件中 15 件が 5xx** になった。lost-write invariant は保たれていた（corruption では
-なく availability の失敗）が、**1 リクエストの上限がバッチ全員の failure domain になる**。
-
-**正しい置き場所は Durable Object**（自前の実行コンテキストと予算を持つ）。
+**外した理由（2026-07-30 に実測して確定。当初の説明は誤りだった）**: 当初この ADR と commit 34843f7 は「runner が subrequest / CPU / wall 予算を使い切った」と書き、翌朝 RangeError を見て「無限再帰」と書いた。**どちらも誤り**——前者は失敗リクエストの cpuTime が 3ms で engine phase は 0ms、かつこの account は Workers Paid（subrequest 上限 1000）。後者の RangeError は翌朝の error-labelling 変更で自分が入れた別バグ（parse-json の自己呼び出し、b4e078f → 77c2d4d で修正）で、batch 失敗より 1 日後のもの。\n\n実測した答えはもっと単純だった: **isolate-local な queue はほとんど batch しない。** `KOTOBASE_WRITE_BATCH_MAX=4` と意図的な 50ms gather window を付けて 1 graph に 8 並行 write を投げたところ、publish された batch は **size 1 と 2 だけ**（26 batch 観測、single colo）。Cloudflare は並行リクエストを colo 内の多数の isolate に散らすので、queue で出会うはずの writer がそもそも同じ isolate に来ない。**天井があるのではなく、機構がほぼ no-op**。最良でも約 2 倍、しかも稀——queue と cross-request の解決経路を抱える代償に見合わない。receipt: `slo/receipts/2026-07-30-batch-diagnosis.edn`。\n\n**正しい置き場所は Durable Object** — ただし理由は「予算」ではなく、**1 graph の writer 全員が出会える場所がそこしか無い**（`idFromName` で graph 単位に addressable）から。なお DO は cross-request の制約を自動で解決しない（ある DO request が別の DO request が開始した I/O を await する形は isolate と同じ制約に当たる）ので、現実的な設計は alarm handler から publish して caller は poll / socket で受け取る形になる。**「queue を DO に移すだけ」ではない。**
 ADR-2607142200 は「CF 固有機構を *required* にしない」限りこれを許す — D1 head plane と
 同じ optional 形にすればよい。別変更・別検証とする。**batch-max を小さくして誤魔化さない**
 （この並行度で症状が隠れるだけで構造は変わらない）。
