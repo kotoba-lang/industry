@@ -1,0 +1,73 @@
+;; kotoba-lang GitHub Pages アプリの宣言。scripts/build-kotoba-pages.cljs が正本の
+;; 生成器で、この EDN が入力。index.html は生成物なので手編集禁止。
+;;
+;; :lead / :sample-js / :create-label / :storage-key / :download は移行前の
+;; docs/index.html から機械抽出したもの(手で打ち直すと内容が変わるため)。
+;; ADR-2607301400。
+
+{:family/edn-editor
+ {:repos
+  [
+   {:repo "briefing"
+    :title "kotoba-lang/briefing"
+    :create-label "Create Briefing"
+    :storage-key "kotoba-lang/briefing/edn"
+    :download "briefing.edn"
+    :lead "Local kotoba-lang editor for briefings, agenda items, decisions, actions, risks, metrics, and sources. This page runs at <code>kotoba-lang.github.io/briefing/</code> and does not redirect to an external host."
+    :sample-js "\"{:briefing/id \\\"briefing-1\\\"\\n :briefing/title \\\"Morning brief\\\"\\n :briefing/items [{:kind :decision :text \\\"Ship the editor\\\"}\\n                  {:kind :action :text \\\"Review Pages UI\\\"}]}\""}
+
+   {:repo "calendar"
+    :title "kotoba-lang/calendar"
+    :create-label "Create Calendar"
+    :storage-key "kotoba-lang/calendar/edn"
+    :download "calendar.edn"
+    :lead "Local kotoba-lang editor for events, attendees, resources, and deterministic time windows. This page runs at <code>kotoba-lang.github.io/calendar/</code> and does not redirect to an external host."
+    :sample-js "\"{:calendar/id \\\"event-1\\\"\\n :calendar/title \\\"Design review\\\"\\n :calendar/start \\\"2026-07-01T10:00:00+09:00\\\"\\n :calendar/end \\\"2026-07-01T11:00:00+09:00\\\"\\n :calendar/attendees [\\\"team\\\"]}\""}
+
+   {:repo "contacts"
+    :title "kotoba-lang/contacts"
+    :create-label "Create Contacts"
+    :storage-key "kotoba-lang/contacts/edn"
+    :download "contacts.edn"
+    :lead "Local kotoba-lang editor for people, organizations, emails, handles, tags, and validation. This page runs at <code>kotoba-lang.github.io/contacts/</code> and does not redirect to an external host."
+    :sample-js "\"{:contacts/id \\\"person-1\\\"\\n :contacts/name \\\"Kotoba User\\\"\\n :contacts/emails [\\\"user@example.com\\\"]\\n :contacts/tags #{:editor :reviewer}}\""}
+
+   {:repo "docs"
+    :title "kotoba-lang/docs"
+    :create-label "Create Docs"
+    :storage-key "kotoba-lang/docs/edn"
+    :download "docs.edn"
+    :lead "Local kotoba-lang editor for documents, ordered blocks, outlines, decisions, and refs. This page runs at <code>kotoba-lang.github.io/docs/</code> and does not redirect to an external host."
+    :sample-js "\"{:docs/id \\\"doc-1\\\"\\n :docs/title \\\"Project note\\\"\\n :docs/blocks [{:type :heading :text \\\"Project note\\\"}\\n               {:type :paragraph :text \\\"Write here.\\\"}]}\""}
+
+   {:repo "drive"
+    :title "kotoba-lang/drive"
+    :create-label "Create Drive"
+    :storage-key "kotoba-lang/drive/edn"
+    :download "drive.edn"
+    :lead "Local kotoba-lang editor for folders, files, object refs, and local workspace organization. This page runs at <code>kotoba-lang.github.io/drive/</code> and does not redirect to an external host."
+    :sample-js "\"{:drive/id \\\"file-1\\\"\\n :drive/name \\\"deck.pptx\\\"\\n :drive/media-type \\\"application/vnd.openxmlformats-officedocument.presentationml.presentation\\\"\\n :drive/object-ref \\\"sha256:...\\\"}\""}
+
+   {:repo "forms"
+    :title "kotoba-lang/forms"
+    :create-label "Create Forms"
+    :storage-key "kotoba-lang/forms/edn"
+    :download "forms.edn"
+    :lead "Local kotoba-lang editor for forms, fields, submissions, required checks, and typed validation. This page runs at <code>kotoba-lang.github.io/forms/</code> and does not redirect to an external host."
+    :sample-js "\"{:forms/id \\\"form-1\\\"\\n :forms/title \\\"Intake\\\"\\n :forms/fields [{:id \\\"name\\\" :label \\\"Name\\\" :type :text :required true}\\n                {:id \\\"email\\\" :label \\\"Email\\\" :type :email}]}\""}
+
+   {:repo "search"
+    :title "kotoba-lang/search"
+    :create-label "Create Search"
+    :storage-key "kotoba-lang/search/edn"
+    :download "search.edn"
+    :lead "Local kotoba-lang editor for local index records, query text, field weights, and deterministic scoring. This page runs at <code>kotoba-lang.github.io/search/</code> and does not redirect to an external host."
+    :sample-js "\"{:search/id \\\"index-1\\\"\\n :search/docs [{:id \\\"deck\\\" :title \\\"Deck\\\" :body \\\"EDN to PPTX\\\"}\\n               {:id \\\"note\\\" :title \\\"Note\\\" :body \\\"workspace graph\\\"}]\\n :search/query \\\"pptx\\\"}\""}
+
+   {:repo "sheets"
+    :title "kotoba-lang/sheets"
+    :create-label "Create Sheets"
+    :storage-key "kotoba-lang/sheets/edn"
+    :download "sheets.edn"
+    :lead "Local kotoba-lang editor for workbooks, tabs, cells, ranges, and formula placeholders. This page runs at <code>kotoba-lang.github.io/sheets/</code> and does not redirect to an external host."
+    :sample-js "\"{:sheets/id \\\"book-1\\\"\\n :sheets/tabs [{:id \\\"plan\\\"\\n                :cells {\\\"A1\\\" \\\"Metric\\\" \\\"B1\\\" \\\"Value\\\" \\\"A2\\\" \\\"Revenue\\\" \\\"B2\\\" 120}}]}\""}]}}
