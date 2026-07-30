@@ -172,6 +172,33 @@
             :else (recur (rest ls) cur out)))
         (cond-> out cur (assoc (:name cur) cur))))))
 
+(defn- evidence-of
+  "The newest evidence a resident actor recorded: {:evidence-at :evidence-entries}.
+
+  `repository-rules.edn` makes :record-evidence an obligation of every loop-*, and
+  the convention is an append-only `evidence/*.ledger.edn`. This reads the last
+  line's timestamp rather than the file mtime, because a git checkout rewrites
+  mtimes and would report every freshly-cloned loop as having just run.
+
+  nil when the actor keeps no ledger — absent evidence is reported as absent, not
+  as zero, so a loop that has never run cannot be read as one that ran and found
+  nothing."
+  [repo-path]
+  (when repo-path
+    (let [dir (path/join repo-path "evidence")]
+      (when (fs/existsSync dir)
+        (let [ledgers (->> (seq (fs/readdirSync dir))
+                           (filter #(str/ends-with? % ".ledger.edn"))
+                           sort)]
+          (when-some [f (last ledgers)]
+            (let [lines (->> (str/split-lines (fs/readFileSync (path/join dir f) "utf8"))
+                             (remove str/blank?))]
+              (when-some [last-line (last lines)]
+                (let [e (try (reader/read-string last-line) (catch :default _ nil))]
+                  (cond-> {:evidence-entries (count lines)}
+                    (:tick/at e) (assoc :evidence-at (:tick/at e))
+                    (:tick/outcome e) (assoc :evidence-outcome (:tick/outcome e))))))))))))
+
 (defn- reference
   "The pin: repository name, remote and revision. Never any content."
   [w]
@@ -269,6 +296,15 @@
                       (when (= :resident (:execution rx))
                         (when-some [d (commit-date (:remote w) nm (:revision w))]
                           {:revision-committed-at d}))
+                      ;; Liveness for a resident actor. cloud.itonami.app.fleet
+                      ;; says so itself: a loop-* has no HTTP surface by design,
+                      ;; so "is it alive" is "did it record evidence recently",
+                      ;; and the catalog did not carry that. A pin date is a poor
+                      ;; proxy — it says when someone last committed, not when
+                      ;; the loop last ran, and those diverge the moment the loop
+                      ;; is healthy and nobody is editing it.
+                      (when (= :resident (:execution rx))
+                        (evidence-of (some-> (:path w))))
                       ;; The model this actor embodies, as a pin rather than a
                       ;; dependency: resolved from the authority's
                       ;; :authority-library through west.
