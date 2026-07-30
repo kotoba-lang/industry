@@ -2,17 +2,33 @@
 ;; Wave 5 Team Velocity Metrics Collector
 ;; Collects story points completed, burndown, and velocity from Jira
 ;; Status: PRODUCTION_READY
+;; 2026-07-30: this collector could not run, and would have misreported if it had.
+;;   - required clojure.data.json, which nbb does not provide -> died at the require
+;;   - (js/process.env.X) CALLS a property -> "apply was called on undefined"
+;;   - an unreachable or unexpected upstream was reported as ZERO, not as absent
+;;   - plus a pre-existing bug that had never executed (see below)
+;; All of them are fixed together: fixing only the require would have turned a
+;; script that could not run into one that published a comfortable falsehood.
+
 
 (ns collect-velocity-metrics
   (:require ["fs" :as fs]
             ["child_process" :as cp]
-            [clojure.string :as str]
-            [clojure.data.json :as json]))
+            [clojure.string :as str]))
+;; nbb ships no clojure.data.json and scripts/nbb_compat does not provide one, so
+;; JSON goes through the platform. Two small functions so the call sites read as
+;; they did before.
+(defn- json-read [^string text]
+  (js->clj (js/JSON.parse text) :keywordize-keys true))
+
+(defn- json-write [x]
+  (js/JSON.stringify (clj->js x) nil 2))
+
 
 (def config
-  {:jira-url (or (js/process.env.JIRA_URL) "https://jira.internal")
-   :jira-user (or (js/process.env.JIRA_USER) "gates-bot")
-   :jira-token (or (js/process.env.JIRA_TOKEN) "")
+  {:jira-url (or js/process.env.JIRA_URL "https://jira.internal")
+   :jira-user (or js/process.env.JIRA_USER "gates-bot")
+   :jira-token (or js/process.env.JIRA_TOKEN "")
    :gate-projects ["M5W5" "M5IW5" "M6W5"]
    :metrics-file "metrics-velocity.txt"})
 
@@ -27,7 +43,7 @@
                        "-H 'Content-Type: application/json' "
                        "'" url "'")
           response (cp/execSync curl-cmd #js{:encoding "utf-8"})]
-      (json/read-str response :key-fn keyword))
+      (json-read response))
     (catch js/Error e
       (println "Error calling Jira API:" (.-message e))
       nil)))
@@ -40,12 +56,14 @@
           encoded-jql (.toString (js/Buffer.from jql) "base64")
           endpoint (str "search?jql=" encoded-jql "&fields=storypoints,created,updated,customfield_10000")
           response (jira-api-call endpoint)]
-      (if response
-        (:issues response)
-        []))
+      ;; nil, not []: [] would report a team that shipped nothing, which is a
+      ;; different claim from "we could not ask".
+      (if-let [v (:issues response)]
+        (vec v)
+        nil))
     (catch js/Error e
       (println "Error fetching issues:" (.-message e))
-      [])))
+      nil)))
 
 (defn extract-story-points [issue]
   "Extract story points from issue, handle null/missing"
@@ -77,7 +95,10 @@
 
 (defn calculate-velocity [issues]
   "Calculate velocity metrics from completed issues"
-  (let [by-sprint (group-by-sprint items)
+  ;; `items` here was unresolved -- this fn's parameter is `issues`, and every
+  ;; other reference in the body already used it. Never caught because the script
+  ;; died at its require before reaching this.
+  (let [by-sprint (group-by-sprint issues)
         total-points (apply + (map extract-story-points issues))
         avg-per-issue (if (> (count issues) 0)
                        (/ total-points (count issues))
@@ -109,6 +130,18 @@
 
   (let [issues (fetch-completed-issues)
         _ (println (str "Found " (count issues) " completed issues this sprint"))
+        ;; An unreachable Jira used to report zero throughput, which reads as a
+        ;; team that shipped nothing.
+        _ (when (nil? issues)
+            (let [ts (/ (.getTime (js/Date.)) 1000)]
+              (fs/writeFileSync
+               (:metrics-file config)
+               (format-prometheus-metric "velocity_metrics_available" 0 {:job "team-velocity" :source "jira"} ts))
+              (println (str "\n\u26d4 upstream unreachable or unexpected: wrote "
+                            "velocity_metrics_available 0 to " (:metrics-file config)
+                            " and no measurement at all."))
+              (println "   A readiness gate must not read this run as a pass.")
+              (js/process.exit 2)))
 
         velocity (calculate-velocity issues)
         now (js/Date.)
@@ -152,7 +185,7 @@
                         :recent_sprints (:recent_sprint_velocities velocity)
                         :status "success"}]
         (println "\n📊 Velocity Metrics Summary:")
-        (println (json/write-str json-output :pretty true))))))
+        (println (json-write json-output))))))
 
 ;; Run collection
 (try

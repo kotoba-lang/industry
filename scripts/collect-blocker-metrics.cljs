@@ -2,18 +2,34 @@
 ;; Wave 5 Gate Blocker Metrics Collector
 ;; Collects blocker counts and SLA status from Jira
 ;; Status: PRODUCTION_READY
+;; 2026-07-30: this collector could not run, and would have misreported if it had.
+;;   - required clojure.data.json, which nbb does not provide -> died at the require
+;;   - (js/process.env.X) CALLS a property -> "apply was called on undefined"
+;;   - an unreachable or unexpected upstream was reported as ZERO, not as absent
+;;   - plus a pre-existing bug that had never executed (see below)
+;; All of them are fixed together: fixing only the require would have turned a
+;; script that could not run into one that published a comfortable falsehood.
+
 
 (ns collect-blocker-metrics
   (:require ["fs" :as fs]
             ["child_process" :as cp]
-            [clojure.string :as str]
-            [clojure.data.json :as json]))
+            [clojure.string :as str]))
+;; nbb ships no clojure.data.json and scripts/nbb_compat does not provide one, so
+;; JSON goes through the platform. Two small functions so the call sites read as
+;; they did before.
+(defn- json-read [^string text]
+  (js->clj (js/JSON.parse text) :keywordize-keys true))
+
+(defn- json-write [x]
+  (js/JSON.stringify (clj->js x) nil 2))
+
 
 (def config
-  {:jira-url (or (js/process.env.JIRA_URL) "https://jira.internal")
-   :jira-user (or (js/process.env.JIRA_USER) "gates-bot")
-   :jira-token (or (js/process.env.JIRA_TOKEN) "")
-   :jql (or (js/process.env.JQL) "project in (M5W5, M5IW5, M6W5) AND status = Blocked")
+  {:jira-url (or js/process.env.JIRA_URL "https://jira.internal")
+   :jira-user (or js/process.env.JIRA_USER "gates-bot")
+   :jira-token (or js/process.env.JIRA_TOKEN "")
+   :jql (or js/process.env.JQL "project in (M5W5, M5IW5, M6W5) AND status = Blocked")
    :metrics-file "metrics-blockers.txt"})
 
 (defn jira-api-call [endpoint]
@@ -27,7 +43,7 @@
                        "-H 'Content-Type: application/json' "
                        "'" url "'")
           response (cp/execSync curl-cmd #js{:encoding "utf-8"})]
-      (json/read-str response :key-fn keyword))
+      (json-read response))
     (catch js/Error e
       (println "Error calling Jira API:" (.-message e))
       nil)))
@@ -38,12 +54,15 @@
     (let [encoded-jql (.toString (js/Buffer.from (:jql config)) "base64")
           endpoint (str "search?jql=" (str/replace encoded-jql #"=" "%3D"))
           response (jira-api-call endpoint)]
-      (if response
-        (:issues response)
-        []))
+      ;; nil, not []: "we could not ask Jira" and "Jira says nothing is blocked"
+      ;; are opposite conclusions, and [] is the comfortable one. A readiness gate
+      ;; reading zero blockers concludes the release is clear.
+      (if-let [v (:issues response)]
+        (vec v)
+        nil))
     (catch js/Error e
       (println "Error fetching blockers:" (.-message e))
-      [])))
+      nil)))
 
 (defn calculate-blocker-age [created-date]
   "Calculate blocker age in hours from creation date"
@@ -105,6 +124,19 @@
 
   (let [issues (fetch-blocked-issues)
         _ (println (str "Found " (count issues) " blocked issues"))
+        ;; An unreachable Jira used to report zero blocked issues, which a
+        ;; readiness gate reads as nothing blocking the release. That is the
+        ;; most expensive direction this collector can fail in.
+        _ (when (nil? issues)
+            (let [ts (/ (.getTime (js/Date.)) 1000)]
+              (fs/writeFileSync
+               (:metrics-file config)
+               (format-prometheus-metric "blocker_metrics_available" 0 {:job "gate-blockers" :source "jira"} ts))
+              (println (str "\n\u26d4 upstream unreachable or unexpected: wrote "
+                            "blocker_metrics_available 0 to " (:metrics-file config)
+                            " and no measurement at all."))
+              (println "   A readiness gate must not read this run as a pass.")
+              (js/process.exit 2)))
 
         metrics (analyze-blockers issues)
         now (js/Date.)
@@ -127,8 +159,12 @@
     (println (str "  Average age: " (double (:avg_age_hours metrics)) "h"))
 
     ;; Check SLA
+    ;; The `when` closed after its first form here, and a stray paren at the end of
+    ;; the third closed the OUTER `let` -- which is why `metrics`, `labels`,
+    ;; `timestamp` and `sla-breached` were unresolved through the entire emitter
+    ;; below. The two detail lines are breach detail, so the `when` wraps all three.
     (when sla-breached
-      (println "\n🔴 CRITICAL: Blocker SLA BREACH DETECTED"))
+      (println "\n🔴 CRITICAL: Blocker SLA BREACH DETECTED")
       (println (str "  P1 blockers: " (:p1_count metrics) " (threshold: 0)"))
       (println (str "  Oldest P1 age: " (double (:oldest_age_hours metrics)) "h (SLA: 4h)")))
 
@@ -174,7 +210,7 @@
                         :sla_status (if sla-breached "BREACH" "healthy")
                         :status (if sla-breached "warning" "success")}]
         (println "\n📊 Blocker Metrics Summary:")
-        (println (json/write-str json-output :pretty true))
+        (println (json-write json-output))
 
         ;; Output for GitHub Actions
         (println (str "\np1_count=" (:p1_count metrics)))
