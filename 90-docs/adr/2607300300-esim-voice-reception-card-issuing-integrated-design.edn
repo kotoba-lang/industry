@@ -602,10 +602,24 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
    窓は残る。**denwaban はこの窓を持たない**（pending を作らないため）。
 6. **D4 の単一 ref が actor 側でまだ成立していない。** app 内では1つの store
    partition で cross-domain 読みが成立するが、actor の ledger は各自 MemStore のみ。
-7. **kotoba-lang の 199 ライブラリが git 座標で消費不能。** `card` / `phone` / `esim` /
-   `io-stripe-issuing` と actor 3 repo は修正済み。**sibling を `../` に clone する CI は
-   consumability を何も証明しない** — `cloud-itonami-card-issuing` で実際に、
-   CI が「fork が持たないレイアウト」を自分で用意していたために、published repo が
+7. **kotoba-lang の 85 ライブラリが git 座標で消費不能（2026-07-31 に実測し直した）。**
+   ここには「199 件」と書いてあったが、**2つの別物を混ぜていた**。default branch を実測した
+   内訳（`nbb scripts/consumability-audit.cljs` で再現可能。west.yml の kotoba-lang project
+   1,927 件が対象）: `clean 1629` / **`deps-local-root 85`（ライブラリ自体が消費不能）** /
+   `alias-local-root 74`（**ライブラリは消費可能** — 自分の `:test`/`:lint`/`:dev` が workspace を
+   要るだけで、消費側が他人の `:test` alias を実行することは無い）/ `deps.edn なし 137` /
+   `parse 不能 2`。
+   **測り方の訂正も記録する**: `orgs/*/deps.edn`（ローカル checkout）を数えると 115 件になるが
+   これは誤りで、作業コピーは進みも遅れもする。`kotoba-lang/phone` はローカルでは消費不能に
+   見えるが **main では 2026-07-30 に修正済み**（checkout が修正より古いだけ）。安い方法
+   （ローカル走査）が嘘をつくので、script は各 repo の **default branch** を読む。
+   修正済み: `card` / `phone` / `esim` / `io-stripe-issuing` / actor 3 repo に加え、
+   **`uikit`**（2026-07-31）。app が従うべき UI 規約は「`kotoba-ui.core` + platform binding」で、
+   `appkit` は既に座標指定なのに `uikit` だけが `:local/root` だった — **2つある binding のうち
+   touch/mobile 側だけが使えなかった**。sibling の無いディレクトリに複製して `clojure -Spath` が
+   `~/.gitlibs` から解決すること、その classpath で 4 tests が緑になることで検証した。
+   **sibling を `../` に clone する CI は consumability を何も証明しない** — `cloud-itonami-card-issuing`
+   で実際に、CI が「fork が持たないレイアウト」を自分で用意していたために、published repo が
    classpath を作れないことを検出できていなかった。
 8. 小さいもの: `cloud-itonami-app` の既存 lint warning 11 件（うち 8 件は phantom
    require）/ `cloud-itonami-app` の full suite 5 回中 1 回だけ 1 failure が出た
