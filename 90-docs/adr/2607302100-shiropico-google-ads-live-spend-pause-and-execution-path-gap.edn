@@ -25,6 +25,13 @@
                           "実際に稼働していた出稿経路(Playwright web UI)が設計経路(provider MCP)と別物であるという gap の記録"],
   :adr/last_verified "2026-07-30",
   :adr/source-format "edn-only (ADR-2607171600)",
+  :adr/tracking-issues ["cloud-itonami/cloud-itonami-app#21 [tracking] Paid-media execution path: current state and the work to open it"
+                        "cloud-itonami/cloud-itonami-app#16 MCC リンクによる API 経路の開通 (blocked-owner)"
+                        "cloud-itonami/cloud-itonami-app#17 コンバージョン計測の設置"
+                        "cloud-itonami/cloud-itonami-app#18 app が provider 経路を配線するかの決定"
+                        "cloud-itonami/cloud-itonami-app#19 支出の governor 可視化と旧経路の退役"
+                        "cloud-itonami/cloud-itonami-app#20 棚卸しの完了 (2FA 待ち、blocked-owner)"],
+  :adr/disclosure-boundary "cloud-itonami/cloud-itonami-app は PUBLIC、com-junkawasaki/root は PRIVATE。よって公開 issue にはアカウント CID・支出実額・API 連絡先メールアドレス・どのトークンがベーシックかを転記していない。公開側は「何を作る必要があるか」だけを持ち、具体値は本 ADR を参照させる。この境界を後から緩める場合はオーナー判断で行う。",
   :adr/primary-sources ["ads.google.com — Chrome 拡張経由でオーナーのセッションを使い 2026-07-30 に直接読み取り(アカウント選択画面 authuser=0..3、ゆっくりサイバーch のキャンペーン表 全期間 2026-06-10〜07-30)"
                         "orgs/network-awai/cloud-itonami/src/cloud_itonami/adnetwork_providers.cljc — provider catalog / routing contract"
                         "orgs/network-awai/cloud-itonami/src/cloud_itonami/adnetwork.cljc, advertiser_ops.cljc, adnetwork_onboarding.cljc"
@@ -304,6 +311,33 @@ production-blocker と正確に対応する:
 - `260615-ads-api-tool-design.md` は Google に申告した構造(MCC 配下に
   ゆっくりサイバーch がリンクされている)が実体と食い違っている。リンクを
   張れば一致するので、張る側で直す。放置すると申告と実態の乖離が残る。
+
+## 継続作業の置き場 — cloud-itonami/cloud-itonami-app の issue 群
+
+本 ADR は「何が起きたか」の正本であり続けるが、**これ以降の作業状態は
+`cloud-itonami/cloud-itonami-app` の issue で追う**(2026-07-30、オーナー指示)。
+親 issue は #21。
+
+| issue | 内容 | 状態 |
+|---|---|---|
+| #21 | tracking(親)。現在地と子 issue の順序 | open |
+| #16 | MCC リンクによる API 経路の開通 | open / **blocked-owner** |
+| #17 | コンバージョン計測の設置(#16 と並行可) | open |
+| #19 | 支出の governor 可視化 → 経路置換 → 旧経路の退役(#16 の後) | open |
+| #18 | app が provider 経路を配線するかの決定 | open |
+| #20 | 棚卸しの完了(2FA 待ち) | open / **blocked-owner** |
+
+`blocked-owner` ラベルは「認証情報・パスキー・法人格/請求の判断を伴うため
+agent が実行しない」という意味で、本リポジトリの安全床をラベルとして機械可読に
+したもの。
+
+**公開境界**: `cloud-itonami-app` は PUBLIC、`com-junkawasaki/root` は PRIVATE。
+アカウント CID・支出実額・API 連絡先メール・どのトークンがベーシックかは公開側に
+転記していない(`:adr/disclosure-boundary` 参照)。公開 issue を読んだだけでは
+どのアカウントの話かは分からない設計にしてある。
+
+**GitHub Projects は未作成** — `gh` トークンに `project` スコープが無く、agent 側から
+作成できない。オーナーが `gh auth refresh -s project` を実行した後に作成する。
 
 ## Alternatives considered
 
