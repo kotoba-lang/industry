@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist production path (ADR 0161 #45); **ops/network AOT Components still open** |
-| T8.4 | host-parity L5 | **partial** — JVM 16 + Node 11 live (#96–#103; tls-open/transport-close inject); pg/pool still open |
+| T8.4 | host-parity L5 | **partial** — JVM 19 + Node 11 live (#96–#104; transport-read/write + loopback); pg/pool still open |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -1086,6 +1086,19 @@ Still open:
 Still open:
 1. T8.3 ops/network AOT Components (http/secret wasm packages)
 2. T8.4 remaining matrix (pg/pool live; transport-read/write success paths)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31aw — T8.4 transport-read/write inject + loopback)
+
+- kototama#104 MERGED (747a379e): **T8.4 transport-read/write live**
+  — fail-closed unknown-handle inject for write/read (-1); loopback
+  ServerSocket echo success path (write+read 2 bytes). JVM corpus **19**.
+- west pin kototama ded6ad41 → 747a379e.
+
+Still open:
+1. T8.3 ops/network AOT Components (http/secret wasm packages)
+2. T8.4 remaining matrix (pg/pool live; tls-server-end-point success)
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
