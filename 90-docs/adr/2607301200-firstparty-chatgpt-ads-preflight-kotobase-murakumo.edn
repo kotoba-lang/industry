@@ -29,8 +29,8 @@
                    "pixel / Conversions API(OpenAI 固有の実装)は未着手。流入元別 funnel 計器は入ったが、媒体側 pixel は一次情報が読めるまで着手しない(パラメータ名を推測しない)。"
                    "7310 の west pin (22e3f57) が子リポ main より 7 commit 遅れている。本 ADR の実行は子リポ checkout (4201aee) に対して行った。"
                    "uikit の west pin が origin/main より 2 commit 遅れている(pin 鮮度の follow-up)。"
-                   "kotoba-ui / shitsuke / liquid-glass-ui の *checkout* が pin より遅れていた(pin 自体は最新)。west update で解消するが、liquid-glass-ui は別セッションの未コミット WIP があるため触っていない。この skew が解けるまで net-kotobase のサイト HTML は再生成しない。"
-                   "signup.html の再生成が保留のため、signup_page.cljc に入れた client 側 source 送出はまだ本番に出ていない(server 側 Referer fallback が同じ役目を果たしている)。"],
+                   "kotoba-ui / shitsuke / liquid-glass-ui の *checkout* が pin より遅れていた(pin 自体は最新)。net-kotobase のサイトは別セッションが DADS(jp-go-dds)ベースへ移行し kotoba-ui 依存自体が外れたため、この skew は net-kotobase の再生成をもう塞いでいない。"
+                   "(解消) signup.html の再生成保留は、別セッションの DADS 移行が私の client 側変更ごと再生成したため消えた。client 側 source 送出・return_to の query 保持とも本番配信中(2026-07-30 実測)。"],
   :adr/verification "cloud-itonami-isic-7310 の checkout (4201aee) に対し clojure -M:dev で自社2プロダクト x 2 category の 4 campaign を :campaign/intake -> :media-plan/verify -> :platform/verify -> :risk/screen -> :actuation/place-campaign まで通し、hold rule を実際に発火させて記録した。子リポは無変更(read-only consumer として実行)。net-kotobase 側は clojure -M:test → 73 tests / 405 assertions, 3 failures(いずれも本 diff が触らない既存失敗: uncataloged JS provider sources x2 と worker/js artifact)、kotobase.funnel-test 単独では 13 tests / 87 assertions, 0 failures。本番デプロイは repo-wide build lock が別セッションに保持されていたため未実施。",
   :adr/body
   "## Context
@@ -188,16 +188,30 @@ US だけである。今回の2プロダクトはそこに当たらないが、�
 
 - 実出稿の TODO が hold リストとして機械可読に固定された。閉じるべき順序も
   seed doc の表に載っている。
-- 流入元別 funnel 計器が net-kotobase main (`3fddd36`) に着地した。
-  **ただし本番へは未デプロイ** — repo-wide resource governor の `build` lock を
-  別セッションが保持しており(かつ `clj-edge/node_modules` 未 install)、
-  ESM 再ビルドができなかった。lock が空いたら
-  `cd clj-edge && npm install && node ../../../../scripts/resource-guard.mjs run build -- npm run build`
-  → `cd ../worker && npm run deploy`。checkout は `network-awai/main` と同期済み
-  (0 ahead / 0 behind)なので deploy guard は通る。
-- owner 側に残る決定は 1 件に減った: **広告予算の実額承認**
-  (`budget-supply.edn` の placeholder 置換)。出稿主体は AWAI Network, L.L.C. /
-  USA に確定した。account 開設時の本人確認・カード登録は owner 実行。
+- 流入元別 funnel 計器が net-kotobase main (`3fddd36`) に着地し、**本番稼働中**
+  (Worker Version ID `80bf9a46-444c-45a1-95d3-2c638b80d97b`、2026-07-30)。
+  ライブ検証(同日):
+
+      GET /api/funnel
+        by-source: {visitors: {openai-ads: 1, organic: 22}, signups: {}, checkouts: {}}
+      POST /api/funnel/event  (referer: /signup?utm_source=openai-ads, event: noop)
+        -> {ok: true, counted: false, source: openai-ads}
+
+  検証は **stage に写らない event 名**で行い、`signups`(=3)を汚していない ——
+  出稿判断に使う数字を検証で動かすのは本末転倒だから。`visitors` は実 GET なので
+  1 件増えており、それは実訪問として正しい。
+- 途中で別セッションが DADS 移行(`signup_page.cljc` 168 行書き換え)と bundle 再ビルドを
+  着地させたが、**私の client 側変更はコメントごと保存されていた**ので、ローカル再ビルドを
+  破棄して上流の artifact に揃えてから出荷した。古い checkout から出して他セッションの
+  変更を巻き戻す事故(CLAUDE.md の wrangler 同期規則)を避けるため、出荷直前に毎回 ff と
+  marker 確認を行った。
+- **advertiser account は開設済み**(owner 実行、2026-07-30)。これで chatgpt-ads の
+  必須表明は 3 件 → **2 件**に減り、残るのはどちらも creative 依存
+  (`:distinguishable-from-product-ui` / `:landing-page-consistency`)で owner 作業ではない。
+  ただし OpenAI 側の本人確認が pending の場合、`:advertiser-identity-verified` の表明は
+  撤回する ——「開設した」と「審査を通った」は別である。
+- owner 側に残る決定は **広告予算の実額承認** 1 件
+  (`budget-supply.edn` の placeholder 置換)。
 - agent 側に残る作業: (a) 一次情報の再読による ad-category 確定(browser 経路が
   必要) (b) creative + 3 表明 (c) design-system checkout skew が解けてからの
   サイト再生成。
