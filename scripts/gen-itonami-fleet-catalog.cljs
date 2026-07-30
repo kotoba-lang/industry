@@ -58,7 +58,8 @@
    :itonami.blueprint/robotics
    :itonami.blueprint/orchestrator
    :itonami.blueprint/endpoint
-   :itonami.blueprint/endpoint-kind])
+   :itonami.blueprint/endpoint-kind
+   :itonami.blueprint/health-path])
 
 (defn- short-key [k] (keyword (name k)))
 
@@ -91,7 +92,11 @@
             {:skipped {:repo dir :reason "not a map"}}
 
             (string? (:itonami.blueprint/id m))
-            {:entry (into (sorted-map)
+            ;; :repo is carried because :id is NOT unique — three repositories
+            ;; declare an id that another already owns. Without the directory
+            ;; name a consumer cannot tell the colliding entries apart, and a
+            ;; lookup by id silently returns whichever sorted first.
+            {:entry (into (sorted-map :repo dir)
                           (keep (fn [k]
                                   (when-some [v (get m k)]
                                     [(short-key k) v])))
@@ -114,7 +119,10 @@
         entries (vec (sort-by :id (keep :entry results)))
         skipped (vec (sort-by :repo (keep :skipped results)))
         non-actors (vec (keep :non-actor results))
-        callable (filterv :endpoint entries)]
+        callable (filterv :endpoint entries)
+        dup-ids (->> entries (map :id) frequencies
+                     (keep (fn [[id n]] (when (> n 1) id)))
+                     sort vec)]
     {:catalog {:schema "cloud.itonami.fleet-catalog.v1"
                :source "cloud-itonami/*/blueprint.edn"
                :generator "scripts/gen-itonami-fleet-catalog.cljs"
@@ -124,8 +132,12 @@
                ;; repository count: not every repo with a blueprint.edn is an
                ;; actor.
                :company-record-count (count non-actors)
+               ;; Shipped so a consumer can see the collisions instead of
+               ;; discovering them through a wrong lookup.
+               :duplicate-ids dup-ids
                :actors entries}
      :non-actors non-actors
+     :dup-ids dup-ids
      :skipped skipped}))
 
 (defn- render [catalog]
@@ -144,6 +156,7 @@
        " :count " (:count catalog) "\n"
        " :callable-count " (:callable-count catalog) "\n"
        " :company-record-count " (:company-record-count catalog) "\n"
+       " :duplicate-ids " (pr-str (:duplicate-ids catalog)) "\n"
        " :actors\n ["
        (str/join "\n  " (map pr-str (:actors catalog)))
        "]}\n"))
@@ -152,7 +165,7 @@
   (let [args (vec args)
         check? (some #{"--check"} args)
         out (or (second (drop-while #(not= "--out" %) args)) default-out)
-        {:keys [catalog skipped non-actors]} (build)
+        {:keys [catalog skipped non-actors dup-ids]} (build)
         text (render catalog)]
     ;; Skipped files are reported to stderr, always. A loader that swallows
     ;; shape mismatches makes `:count` read as "everything is here" when it is
@@ -162,6 +175,12 @@
                "repos carry a blueprint.edn that is a :company/* legal-entity"
                "record, not an actor — they belong to the cloud-itonami-lei"
                "dataset and are counted, not cataloged."))
+    (when (seq dup-ids)
+      (binding [*print-fn* *print-err-fn*]
+        (println "WARNING:" (count dup-ids)
+                 "id(s) are declared by more than one repository — a lookup by"
+                 "id cannot resolve these:")
+        (doseq [id dup-ids] (println "  -" id))))
     (when (seq skipped)
       (binding [*print-fn* *print-err-fn*]
         (println "WARNING:" (count skipped) "blueprint(s) skipped:")
