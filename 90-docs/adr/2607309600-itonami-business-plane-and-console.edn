@@ -418,6 +418,84 @@ DADS が light 固定なので範囲外（ADR-2607262000）。
 `clojure -M:lint` errors 0 / 自分のファイルの warning 0。`page-html` を実 render し、
 inline JS を `node --check`、app CSS に raw hex が無いことも確認。
 
+## Phase 4 — 着地したもの（2026-07-30）。これで Phase 1–4 が全部揃った
+
+どちらも生成ファイルを読むだけで write path を持たない。共通しているのは、
+Phase 1 から積んできた 1 つの規律だけ: **誰も測っていない数値は 0 ではない。**
+
+### Repos — 未評価の軸に bar を描かない
+
+`repo-taxonomy.edn` と `repo-maturity.edn` を `:repo/path` で join する。
+maturity の生成器は自分の header で「0.0-1.0, **nil when not computable — no
+fabricated defaults**」と約束しており、実際そうなっている: **`:maturity/stage-score`
+は 3,899 repo のうち 2,732（70%）が nil** — stage marker を持たない repo が大半。
+
+- 未評価の軸は **bar を描かず数値も出さない**。幅 0 の bar と score 0.0 は
+  見分けが付かず、fleet の 70% を「誰も評価していない軸の最下位」に置くことになる。
+- composite 平均は**評価済みだけ**で取り、除外件数を隣に出す。欠損を 0 として平均に
+  畳むのは、maturity dashboard が「誰も評価していない仕事についての嘘」になる仕方。
+- 各軸は `-method` を持って回る（`:impl` は `size-and-scaffold-marker-heuristic`、
+  `:stage` は parse された marker）。同じ見た目の小数 5 つでは、どれが proxy か
+  分からない。
+- repo の出自を区別する: `:business/repos` は owner が名指しした path、
+  `:business/adoptions` は事業者が運用を表明した blueprint。後者の workspace path は
+  **fleet catalog から取る** — org と repo を文字列連結して推測しない。
+
+### Metrics — 鮮度を最初に出す
+
+`metrics/<product>.edn` を canvas product で引く。実測 12 ファイルのうち **11 は
+同日、`ai-gftd-yukkuri` は 28 日前**だった。`:as-of` を
+`:metrics-max-age-days`（既定 3 日 = emitter は日次なので 1 回の欠落は staleness では
+ないが 3 回はそう）と比べ、`:fresh` / `:stale` / `:undated` を返す。**`:undated` は
+独立した状態** — 日付の無いファイルは「遅れて測った」のではなく「いつ測ったか
+言っていない」で、直し方が違う。
+
+2 つを拒否する:
+
+- **`:funnel` を統一しない。** 実測で 3 product が別々の形を持つ
+  （`{:trials :freeClaims :paid}` / `{:visitors :chatters :paying}` /
+  `{:visitors :signups :checkouts}`）。`freeClaim` を `signup` と同一視するのは
+  product の判断で、このアプリに根拠が無い。未知のキーは product 固有としてそのままの
+  キー名で通す。
+- **`requests-7d` を `probe-4xx-pct` / `error-5xx-pct` と同じ塊でしか返さない。**
+  実測で 508,284 requests のうち **80% が 5xx** のファイルがあり、probe 4xx が 57% の
+  ファイルもある。request 数だけを渡された renderer は誤った事実を述べることになる。
+
+### 同じ上書きバグを test が 2 回捕まえた
+
+`:detail` を `cond->` で同じキーに 2 回 `assoc` していたため、後の条件が前を静かに
+上書きし、**2 つとも真な理由のうち 1 つしか残らなかった**（catalog に無い ∧ 参与が無い →
+後者だけ。それを直した後、path が生成 plane にも無い場合に両方を上書き）。追記を
+`add-note` という名前の関数にした — 覚えておく習慣ではなく。**`cond->` が同じキーを
+2 回通るのは accumulation ではなく静かな overwrite。**
+
+### 検証
+
+`clojure -M:test` **566 tests / 2393 assertions, 0 failures 0 errors**
+（repos 系 8 + metrics 系 9 test を追加、origin/main マージ後の再実行）。
+`clojure -M:lint` errors 0 / 自分のファイルの warning 0。`page-html` を実 render し
+inline JS を `node --check`、app CSS に raw hex 0 件。
+
+### Phase 1–4 の到達点と、残っている穴
+
+| Phase | 面 | 状態 |
+|---|---|---|
+| 1 | Business entity + Portfolio | 着地 |
+| 2 | Canvas（fold 済み投影の読み + governed proposal） | 着地 |
+| 3 | Loops（実 XMILE 実行 + Meadows leverage） | 着地 |
+| 4 | Repos + Metrics | 着地 |
+
+**残っている穴**（どれも「実装していない」ではなく「データ側の穴」）:
+
+1. **leverage ledger は今も fleet の repo 登録 backlog を模型化している。** 事業の
+   経済を模型化した ledger は無い（ADR-2607310100 で XMILE 側は実測モデルを 1 つ
+   作ったが、leverage 側は手を付けていない）。
+2. **`maturity-scores.edn` は markdown blob** なので構造化して読めない。
+   Metrics pane は触らず、prose を parse しない選択をした。
+3. **Business は手で作って手で紐付ける。** どの repo / canvas がどの事業かは判断で
+   あって導出ではないので、自動生成しない。誰も作らなければ Portfolio は空のまま
+   （正しく）。
+
 ## Consequences
 
 - **良い**: 4 面が 1 entity で join できる。「この事業は今どこが未計測か」が
