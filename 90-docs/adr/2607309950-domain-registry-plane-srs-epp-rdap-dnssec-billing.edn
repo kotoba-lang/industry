@@ -261,10 +261,15 @@ ICANN fee は登録年あたりの pass-through で、total とは別に報告�
 
 **残る穴（優先順）:**
 
-1. **IPNS の DHT publish/resolve** — 分散型を名乗る上の最大の穴。`ipns.head` は
-   署名付き可変レコードを持つが解決経路が kotobase.net という単一権威。
-   alt-root の中に中央集権点が1つ残っている。DHT に置き換えるか、単一権威のまま
-   と明示的に決めるか。
+1. ~~**IPNS の DHT publish/resolve**~~ → **格下げ済み。ADR-2607309970 を参照**
+   (2026-07-30)。着手して分かったのは、より根本的に **publish していたレコードが
+   そもそも IPNS Record ではなかった**こと（`ipns.head` は kotobase 独自 shape で、
+   どの IPFS 実装も検証できない）。`dev-protobuf` + `ipns.record` で本物の形式にし、
+   `io-libp2p-specs-kad-dht` の HTTP delegated routing で複数の独立 router を
+   quorum 付きで引くようにした。**record は相互運用可能になり解決は単一サーバー
+   依存でなくなったが、このプロセスは DHT node ではない** — 残るのは libp2p
+   transport（multiaddr / TCP or QUIC / Noise XX(実装済) / multistream-select /
+   Yamux / identify / k-buckets）。
 2. **DNSSEC の crypto provider** — `sign-fn`/`digest-fn` の JVM 実装がまだ無い。
    `kotoba-lang/ed25519` が JVM 専用で存在するので接続は小さい仕事。
 3. **NSEC3** — 上記。
