@@ -318,6 +318,24 @@ task-eligible?, failed?, can-retry?, authorized?, write-ok?.
 3. T6.2 precompiled KIR default; T8.3 production AOT; W4 recursive values
 
 
+
+## Progress (2026-07-31d — product gate bools + wasm has-bool-value cleanup)
+
+- **murakumo#216 MERGED** (`9d29708f`): product gate predicates → `:bool`
+  (`charge-allow?`, `reply-is-value?`, sealed-alg/fields, `known-adapter?`,
+  `plan-fits-total?`/`span-fits?`, `marker-prefix?`, fleet selector/offline,
+  connect serves-*, stream `ack-accepted?`)
+- **kotoba-wasm#45 MERGED** (`854c258e`): remove dead `has-bool-value?` gate
+  (typed-bool-value already always-on; ADR 0042)
+- west pins: murakumo `9d29708f`, kotoba-wasm `854c258e`
+
+**Still open:**
+1. Ranking / pick-code / name-match codes stay `:i64` by design
+   (`better-*`, `starts-with?`, `command-is-dial?`, `known-secret-name?`,
+   `plan-fits-1/2/3` go/no-go codes)
+2. T6.2 precompiled KIR default; T8.3 production AOT; W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
