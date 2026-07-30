@@ -259,6 +259,55 @@ spine 自身の拒否はこれまで未 mapping で 502 を返していた（無
 「サーバが壊れている」と読めた）。`:authority/*` `:funding/*` `:payment/*` を mapping
 した。`:payment/insufficient-funds` は **402**（Payment Required の本来の用途）。
 
+### D8. 実際に登録を試みて分かったこと — 登録は一度も成功したことがなかった
+
+D7 を入れたあと実機で Touch ID 登録を試み、**3つの障害が順に現れた**。うち2つは
+D7 とは無関係の実バグで、D7 を入れなければ発見されないままだった。
+
+**① テストスイートが実データを上書きしていた（`d45b76d` で修正）。**
+`config/data-dir` が `./data` に既定していたため、リポジトリのルートで
+`clojure -M:test` を走らせるとテストが**実ストアに書く**。テスト内の
+`store/transact!` は18箇所あり、うち2つ（本セッションで追加した
+`payment_tools_test/seed-identity!` と既存の `core_test`）は `:identity` を
+丸ごと差し替える。実測: 本物の仮ユーザーが `{:id "user-1" :display-name "Owner"}`
+（`:email` も `:user-handle` も無い）に置き換わり、state.edn が 6617→1564 バイトに
+縮んだ。**着弾したのは本セッションで書いたフィクスチャであり、この点は当方の責任。**
+修正は `:test` alias が `-Dcloud.itonami.data-dir=target/test-data` を渡す形で、
+**システムプロパティが環境変数に勝つ**（通常と逆。プロパティは特定の起動が明示的に
+設定し、環境変数はシェルに残留しうる。env が勝つと `CLOUD_ITONAMI_DATA_DIR` を
+export した端末でスイートを走らせた瞬間に再発する）。18箇所を個別に直す案は却下
+（同期し続けるリストになり、19個目が載らない）。
+
+**② DID 導出が COSE を読めていなかった（`45a9dee` で修正）。**
+`did-key-from-cose` は Jackson の `readValue(bytes, Map.class)` を使うが、これは
+JSON 意味論（オブジェクトキーは常に文字列）を適用するため **CBOR の整数キーを
+文字列に変換する**。COSE_Key のラベルは整数（1=kty, -1=crv, -2=x, -3=y）なので
+`cose-value` の lookup は全て nil を返し、`(long kty)` が NullPointerException を
+投げ、catch-all が `:did/invalid-public-key` を報告していた。
+**どの credential でも、どのマシンでも、この関数が書かれて以来ずっと。**
+つまり **このアプリで Passkey 登録が完了したことは一度も無い**。隠れていた理由は
+2つ: `did_test.clj` が存在しなかったこと、そして `:did/*` がサーバのステータス表に
+無く `502 Bad Gateway` として出ていたこと（インフラ障害の顔をしていた）。今は
+**422** を返す。新しい `did_test.clj` は**実際に CBOR エンコードした COSE_Key**で
+テストする（手書き map ではラウンドトリップごとバグを飛ばすため）。shape ガードが
+到達可能になったことも検査する — 修正前は `(long kty)` が先に throw するので
+`:did/unsupported-public-key` は一度も発火できなかった。
+
+**③ ページにフォーカスが無く WebAuthn が起動しない（未解決・環境要因）。**
+①②を直した後も credential は記録されなかった。JS から直接 ceremony を叩いて確定:
+
+```
+NotAllowedError: The operation is not allowed at this time
+                 because the page does not have focus.
+```
+
+**MCP が操作するタブは前面ウィンドウではないため、`navigator.credentials.create()`
+が即座に reject される。** agent のクリックはページには届くが **OS フォーカスは
+与えない**ので、Touch ID のシートは一度も表示されていなかった。これはアプリのバグ
+ではなく、agent 主導のブラウザから WebAuthn を駆動することの構造的限界である。
+**この最後の一歩は人間が前面ウィンドウで押すしかない** — そしてそれは D7 が
+意図した性質そのもの（agent は承認できない）が、登録段階にも現れたということ。
+
 ## 現在地（2026-07-30 時点）
 
 **稼働済み**: `:payment` authority を local deployment（`data/config.edn`）で有効化、
@@ -269,12 +318,17 @@ session 無しで 401 = route 有り・gate 有り）、superproject の `.mcp.j
 
 **未達 / blocker（次の agent と owner のために）**
 
-0. **Passkey 登録（Touch ID）だけが残っている最初の一歩。** 登録要求は実測で
+0. **Passkey 登録（Touch ID）が唯一の残作業。ブロッカーは技術ではなくフォーカス。**
+   サーバ側は全て通ることを実測済み: `onboarding/resume` 200 →
+   `register/start` 200、返る options は
    `authenticatorAttachment "platform"` / `userVerification "required"` /
-   `residentKey "required"` / `attestation "direct"` を返すことを確認済み。
-   WebAuthn ceremony は代行できない（安全床①、かつ原理的に不可能）ので、owner が
-   ブラウザで Touch ID に触れる必要がある。その後 `GET /api/passkeys/assurance` を
-   読めば、実機で `:platform-attested` に届くかが分かり、floor を上げられる。
+   `residentKey "required"` / `attestation "direct"`。
+   **再開手順**: (a) `localhost:1339` の Chrome ウィンドウを**クリックして最前面に
+   する**（タブ切替では不足。OS フォーカスが要る） (b) 「Passkey 登録を再開」を押す
+   (c) Touch ID に触れる。その後 `GET /api/passkeys/assurance` で実機の到達段
+   （`:platform-claimed` か `:platform-attested` か）を読み、届いていれば
+   `defaults.edn` の `:min-assurance` を上げる。**agent がこの手順を代行することは
+   できない**（D8 ③）。
 
 1. **jk-corp organization がまだ存在しない。** `data/state.edn` の唯一の organization は
    `Personal`（`:organization-id nil` / `:status :pending-profile`）で、user は
@@ -301,7 +355,10 @@ credential を app に持たせない設計（読み取り専用）を維持す�
 
 ## 検証と着地
 
-- `clojure -M:test` — **336 tests / 1475 assertions / 0 failures**（merge 後の tree）。
+- `clojure -M:test` — **360 tests / 1533 assertions / 0 failures**（merge 後の tree）。
+  追加: `did_test.clj`（実 CBOR COSE_Key、shape ガード到達性）、
+  `data_isolation_test.clj`（スイートの書き込み先が実ストアでないこと、
+  `store/state-file` が実際にその下にあること — 両者が食い違えば検査は無意味）。
   新規: `funding_test.clj`（残高 freshness の純関数、口座番号が state.edn に出ない
   ことの直接検査、organization スコープ）、`authority/payment_test.clj`（全拒否経路、
   digest material の被覆、**client が自前の残高を送っても上書きされる**こと）。
@@ -318,7 +375,9 @@ credential を app に持たせない設計（読み取り専用）を維持す�
   「未来の timestamp は stale」の fail-closed 規則が実地で効くことも確認した。
 - app 着地: `cloud-itonami/cloud-itonami-app` main `c0b08d6`（authority）/
   `254bbab`（MCP surface）/ `70d2152`（PayPay メール残高コネクタ）/
-  `46e9841`（platform authenticator assurance）、いずれも branch → server-side merge。
+  `46e9841`（platform authenticator assurance）/ `d45b76d`（テストのデータ隔離）/
+  `45a9dee`（DID/COSE 修正）、いずれも branch → server-side merge。全6件が main の
+  祖先であることを `gh api compare` で確認済み（behind_by=0）。
 - 支払い台帳: `90-docs/finance/payables.datoms.edn`（30 record、全件に根拠 Gmail
   message id 付き）。**PayPay銀行は引落予定日の2日前に口座残高を平文でメールする**
   という発見がここに記録されている（`fin-finding-balance-from-mail`）。
