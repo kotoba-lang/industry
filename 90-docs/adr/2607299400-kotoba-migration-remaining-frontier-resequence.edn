@@ -94,7 +94,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
-| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete** through schedule/rebalance/engine#247 (+ driver/runtime#246 …); report/config/plan/credits still open |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete** through plan+credits#249 (+ sched/engine#247 driver#246 …) + preload; remaining report/config/task/deploy/… |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
@@ -744,9 +744,27 @@ Still open:
 - west pin murakumo 2124b895 -> b925751.
 
 Still open:
-1. T6.4 remaining hosts (report/config/plan/credits/task.plan/reconcile/deploy/…)
+1. T6.4 remaining hosts (report/config/task.plan/reconcile/deploy/provision/cloud/dash/…)
 2. T8.3 production AOT network/secret; W4 recursive values
 3. Residual 0/1 i64 param projections
+
+
+## Progress (2026-07-31ab — T6.4 infer plan+credits mirror-delete + pin)
+
+- murakumo#249 MERGED (`bcf6528f`): **infer.plan + infer.credits** delete cljs
+  host mirrors — GiB/defaults/usable-bytes/choose-strategy and credits
+  defaults/memory-time-weight/charge-allow? require shipped KIR; partition walk
+  + float settle folds stay host.
+  ADR-260731-w6-t64-infer-plan-credits-mirror-delete.
+  Evidence: 103 tests / 1622 assertions green.
+- west pin murakumo `b9257513` → `bcf6528f`.
+
+Still open:
+1. T6.4 remaining large shells: report, config, task.plan, reconcile, deploy,
+   provision, cloud, dash
+2. T8.3 production AOT network/secret; W4 recursive values
+3. Residual 0/1 i64 params: config pinned-exists, engine option flags, dash
+   health-from-present, tunnel pick-exit has-rc
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
