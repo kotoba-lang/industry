@@ -29,7 +29,7 @@
   :adr/known-gaps ["producer は環境変数に URL があることを到達可能性とみなす。到達しない URL は served leg として報告される。murakumo task plane 上では node の :requires gate が capability を担保するが、実 probe への置き換えは未実施。"
                    "episode 1-10 は shotlist が無いため catalog に載っていない。ep01 は既に motion-comic と panel が存在するので、過去分をどう扱うか(遡及登録するか、済として扱うか)は未決定。"
                    "producer は :legs を報告するだけで、実際のレンダリングは行っていない。backend が配線された時に :murakumo leg が本当に画を出すかは未検証。"
-                   "ghosthacker(シリーズ)側の channel 化は保留。後継 kami-app-sip-clj がこの checkout に存在せず、生産経路を特定できていない。"
+                   "ghosthacker(シリーズ)の channel 化は依然として未実施だが、理由は変わった。deprecated だからではなく、producer がまだ無いから(shiropico と同じ状態)。"
                    "loop-ka-production 自体の常駐(誰が cron/tick を打つか)は本 ADR の範囲外。既存 4 channel と同じ状態のまま。"],
   :adr/body
   "## Context
@@ -120,14 +120,34 @@ episode+language を別 catalog id にすると、1 話の running order が 10 
 ものが無い。render できない catalog entry は、無い entry より悪い —
 ループがそれを admit し、そのうえで採点することになる。
 
-### D5. ghosthacker(シリーズ)の channel 化は保留
+### D5. ghosthacker(シリーズ)の deprecation を撤回する(2026-07-30 改訂)
 
-`com-junkawasaki/ghosthacker` は README 冒頭で **2026-06 に DEPRECATED** と宣言
-されている(TypeScript/SvelteKit + Go パイプライン。後継は `kami-app-sip-clj` の
-`sip.render`/`sip.page`/`sip.storyboard`)。その後継はこの checkout に存在せず
-(`kami-engine` は `orgs/kotoba-lang/kami-engine` に移動済み、`kami-app-sip-clj` は
-未発見)、生産経路を特定できない。**deprecated repo を production channel として
-登録しない。**
+**当初の判断は誤りだったので撤回する。** 起票時は README 冒頭の
+「DEPRECATED (2026-06) / kami-app-sip-clj に superseded / kept for
+reference/history only」を根拠に channel 化を見送った。オーナー指摘
+(「kami-app-sip-clj に ghost hacker があるのは不適切」)を受けて確認した結果、
+その根拠が成立していなかった:
+
+- `kotoba-lang/kami-engine/kami-app-sip-clj` は `.shadow-cljs/` と `public/` の
+  2 ディレクトリのみ。`src/` も `deps.edn` も無い。**superseded する側の実体が無い。**
+- `kami-engine` 全体を `ghosthacker` で検索して **0 件**。シリーズは移されていない。
+- `com-junkawasaki/ghosthacker` は note 後も稼働しており、**2026-07 だけで 39 commit**
+  (komawari export ADR-2607172250、edn-datomize bb→nbb ADR-2607173000 Wave 1)。
+
+**GitHub 上は最初から archive されていない**(ghosthacker-* 13 repo すべて
+`isArchived: false`)。workspace 内で実在する archive マーカーは
+`ghosthacker-shiropico-assets` の west group `\"archived\"` だけで、これは
+git-annex 上の意図的な判断であり本 repo とは無関係。
+
+よって README の deprecation を撤回した(`738552c`)。JSON-LD→EDN 変換により
+TS/Go loader が stale であること、および 2026-07-10 / 2026-07-13 の
+doc/code mismatch note は事実として残す。
+
+**シリーズを 3D/render engine の app ディレクトリに置くこと自体が層の取り違え**
+であり、後継の有無とは独立に不適切だった。
+
+channel 登録自体は引き続き未実施 — ただし理由は deprecated だからではなく、
+shiropico と同じく **producer がまだ無いから**である。
 
 ## 実装 — 実行して検証した
 
