@@ -578,11 +578,23 @@
                      (count @parse-errors) (count @not-tx)
                      (count @split-strings)
                      (count @path-md-hits) (count @sf-hits)))
+    (when (seq md-left)
+      (println (str "=== .md UNDER 90-docs (" (count md-left) ") ==="))
+      (println "  The EDN-only policy (ADR-2607171600) is not finished. This is not a")
+      (println "  handful of stragglers: measured 2026-07-31, they cluster in gates (20),")
+      (println "  business/revenue-agent-loop/runs (20), deployment (10) and business (10).")
+      (println "  Until they are migrated or the policy is scoped to exclude them, this")
+      (println "  command cannot pass -- so read the checks below, not the exit code.")
+      (doseq [f (take 10 md-left)] (println " " (str f)))
+      (when (< 10 (count md-left))
+        (println (str "  … and " (- (count md-left) 10) " more"))))
     (when (seq @parse-errors)
       (println "=== PARSE ERRORS ===")
       (doseq [[f m] (take 20 @parse-errors)] (println " " f "->" m)))
     (when (seq @not-tx)
-      (println "=== NOT TX-DATA (adr) ===")
+      (println (str "=== NOT TX-DATA — reported, not fatal (" (count @not-tx) ") ==="))
+      (println "  These lack :db/id, which is the house shape. They ARE readable:")
+      (println "  edn-query.cljs assigns its own tempid to every entity it loads.")
       (doseq [f (take 20 @not-tx)] (println " " f)))
     (when (seq @split-strings)
       (println "=== SPLIT STRINGS (parses, but a literal ended early) ===")
@@ -612,7 +624,18 @@
           seen (set (map (comp relative first) @parse-errors))
           new-errors (sort (remove known seen))
           fixed (sort (remove seen known))
-          hard-fail? (or (seq md-left) (seq @not-tx) (seq @split-strings)
+          ;; not-tx is REPORTED but does not hard-fail, and the distinction is
+          ;; measured rather than assumed. Those seven ADRs lack :db/id, which is the
+          ;; house tx-data shape -- but `edn-query.cljs` REASSIGNS :db/id from its own
+          ;; tempid counter for every entity it loads, so a missing one changes nothing
+          ;; about whether the document is readable. All seven were queried by
+          ;; :adr/id on 2026-07-31 and all seven answered.
+          ;;
+          ;; Keeping them as a hard failure put a style deviation in the same bucket as
+          ;; a body truncated by an unescaped quote, and that conflation is part of why
+          ;; this command was permanently red and the real corruption was invisible in
+          ;; it. Unreadable fails; unconventional is reported.
+          hard-fail? (or (seq md-left) (seq @split-strings)
                          (seq @path-md-hits) (seq @sf-hits))]
       (when (seq new-errors)
         (println "=== NEW PARSE ERRORS (not in the accepted baseline) ===")
