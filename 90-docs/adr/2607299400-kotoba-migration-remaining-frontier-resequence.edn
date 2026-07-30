@@ -6,8 +6,8 @@
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-07-29"
-  :adr/last-verified "2026-07-30"
-  :adr/last_verified "2026-07-30"
+  :adr/last-verified "2026-07-31"
+  :adr/last_verified "2026-07-31"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "kotoba-migration-remaining-frontier-resequence"
@@ -275,10 +275,31 @@ the residual list tracked since ADR-2607299400 (seats through name-bits / task e
   - `eligible?` / `holds-warm?` return `:bool` (nested if, gensym-stable KIR)
   - host boolean projection + `oracle/record` `:bool` case
   - pins compiler@b2291313 + kotoba-kir@15e208ea; 80/1260 green
-- **Still open:**
-  1. `task/eligibility` same bool treatment
-  2. other product 0/1 fields / predicates
+- **Still open (superseded by Progress 2026-07-31b):**
+  1. ~~`task/eligibility` same bool treatment~~ → #209
+  2. other product 0/1 fields / predicates → partial (#210 failed/can-retry, #211 authorized/write-ok)
   3. wasm `has-bool-value?` dead-flag cleanup (import already always-on in base list)
+
+
+## Progress (2026-07-31b — task eligibility + failed/retry + authorized/write-ok)
+
+- **murakumo#209 MERGED**: `task-eligible?` + `:task/eligibility` fields → `:bool`
+  (mirror of schedule#207/#208; host `oracle/bool->host`)
+- **murakumo#210 MERGED**: `failed?` (timeout arg `:bool`) + `can-retry?` → `:bool`
+- **murakumo#211 MERGED**: `kekkai authorized?` + `persist write-ok?` → `:bool`
+- west pin murakumo advanced to `ed96d4b1` (covers #209–#211)
+
+**Product-facing :bool predicates now landed:** schedule eligible?/holds-warm?,
+task-eligible?, failed?, can-retry?, authorized?, write-ok?.
+
+**Still open (profile 5 residual):**
+1. String helpers `blank?` / `ws?` (and similar) still return `:i64` 0/1 across
+   provision/reconcile/report/secret/overlay — convert when hosts stop treating
+   them as numeric words
+2. Ranking / pick-code paths (`better-*`, ok0/ok1 tournament flags) stay `:i64`
+   by design
+3. wasm `has-bool-value?` dead-flag cleanup; T6.2 / T8.3 / W4
+
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
