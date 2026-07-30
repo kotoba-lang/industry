@@ -39,7 +39,7 @@
   "D7: 2 表示面で共有するのは projection と semantic markup 語彙だけ。component 実装は共有しない — cockpit は kotoba-ui/appkit、cloud-itonami-app は jp-go-digital-design-system で、共有すると片方が paved road から降りる"
   "D8: 共有層は kotoba-lang/yakuwari-view (prefix 無し = reusable library)。yakuwari モデルに対して generic であり awai 固有ではない"
   "D9: outward role (sales / supporter / director) のみ person-* 運用 identity を持つ。inward role (engineer / designer / marketer) は定義のみ"
-  "D10: person-* は責任で命名する (person-isekai-sales)。18 人の架空人物を発明しない — person-awai-ryo の README 自身が「自然人の存在を主張しない」と警告している"
+  "D10: person-* は責任で命名する (person-isekai-sales)。15 人の架空人物を発明しない — person-awai-ryo の README 自身が「自然人の存在を主張しない」と警告している"
   "D11: 役割集合はビジネスごとに仕立てる。欠けている役割は businesses.edn に「なぜ無いか」を明記する — 目的を述べられない役割は review 不能 (yakuwari.spec が objective 無しを拒否するのと同じ理由)"],
 
  :adr/problem
@@ -62,7 +62,7 @@
    {\"kotoba-lang/yakuwari\" {:status :exists :role \"役割モデル (objective/scale/runners/policy)。この設計は既存を再発明しない\"},
     \"kotoba-lang/yakuwari-view\" {:status :new :role \"共有層 — projection (registry + runs -> display model, pure) + semantic hiccup。design-system component を呼ばない\"},
     \"network-awai/loop-yakuwari\" {:status :new :role \"awai instance data + reconcile + murakumo 常駐。loop-* = continuous orchestrator\"},
-    \"network-awai/person-<business>-<role>\" {:status :new :count 18 :role \"outward role の運用 identity (mailbox + did:web)\"}},
+    \"network-awai/person-<business>-<role>\" {:status :new :count 15 :role \"outward role の運用 identity (mailbox + did:web)\"}},
    :data-tiers
    [{:tier :definitions :what \"yakuwari/<business>/<role>.edn + businesses.edn + fleet.edn\" :where \"plain git\" :queryable :always}
     {:tier :journal-current-window :what \"直近の run / decision / receipt\" :where \"plain git, append-only\" :queryable :always}
@@ -84,7 +84,7 @@
 
  :adr/honesty
  "{:implementation-state \"この ADR は設計を固定する。実装の到達点は :adr/body の実装状況節が正本で、phase が landing するたびに書き換える (append しない — ADR-2607257000)\",
-   :person-repo-naming \"責任命名 (person-isekai-sales) は agent 判断。owner が persona 名を望むなら rename が要る — 18 件の identity を勝手に人格化しない方を選んだ\",
+   :person-repo-naming \"責任命名 (person-isekai-sales) は agent 判断。owner が persona 名を望むなら rename が要る — 15 件の identity を勝手に人格化しない方を選んだ\",
    :datalad-archive \"journal archive の rollover 閾値と実際の DataLad dataset 化は、journal が実際に大きくなるまで実行しない。今から annex に入れると query できないだけで利得がない\",
    :tamaki-vocabulary \"tamaki の actors/*.edn は :actor/* の旧語彙のまま。この設計は :yakuwari/* を使い tamaki を書き換えない (yakuwari README 自身が tamaki 未切替を既知の follow-up として記録している)\"}",
 
@@ -95,7 +95,7 @@
     \"query 面に載るので『承認待ちを抱えた役割をビジネス横断で数える』が 1 query になり、repo-taxonomy / market-intel と join できる\"
     \"共有境界を projection に引いたので、両表示面がそれぞれの paved road に留まれる\"]
    :negative
-   [\"person-* 18 repo は west entry / pin / mailbox が 18 件増える。outward role に限ったので 36 ではないが軽くはない\"
+   [\"person-* 15 repo は west entry / pin / mailbox が 15 件増える。outward role に限り、かつ sales を持つ business が 3 つだけなので 36 でも 18 でもなく 15 だが、軽くはない\"
     \"journal archive の 2 層構造は、過去分を引くのに annex-get という追加手順を要求する\"
     \"loop-yakuwari が落ちると 6 ビジネス分の役割が同時に止まる (repo 分散なら独立していた)\"]
    :gaps
@@ -248,9 +248,9 @@ markup」) 先例と同形なので、cockpit 側の既存パターンに素直�
 **outward role (sales / supporter / director) のみ** `person-*` 運用 identity
 (mailbox + did:web) を持つ。inward role (engineer / designer / marketer) は定義のみ。
 
-`person-*` は**責任で命名する** (`person-isekai-sales`)。18 人の架空人物を
+`person-*` は**責任で命名する** (`person-isekai-sales`)。15 人の架空人物を
 発明しない — `person-awai-ryo` の README 自身が「'awai ryo' という自然人が存在する
-という主張ではない」と警告しており、それを 18 件に増やすのは逆方向。mailbox は
+という主張ではない」と警告しており、それを 15 件に増やすのは逆方向。mailbox は
 各ビジネス自身のドメイン (`sales@isekai.network` 等)。`awai.network` は network
 代表 `person-awai-ryo` のみ。
 
@@ -271,9 +271,61 @@ markup」) 先例と同形なので、cockpit 側の既存パターンに素直�
 | 2 | `kotoba-lang/yakuwari-view` (28 tests / 57 assertions、両 host) | landed `a819aff` |
 | 3 | `network-awai/loop-yakuwari` (31 役割 / 29 tests、`check: OK`) | landed `7097291` |
 | 4 | `manifest/edn-query.cljs` の `awai-yakuwari` loader | landed |
-| 5 | itonami.cloud cockpit の役割 pane | 未着手 |
-| 6 | `cloud-itonami-app` の役割面 | 未着手 |
-| 7 | `person-*` **15** repo (18 ではない — sales を持つ business が 3 つだけ) | 未着手 |
+| 5 | itonami.cloud cockpit の役割 pane | landed `aed8e3a4` (network-awai/cloud-itonami) |
+| 6 | `cloud-itonami-app` の役割面 | **未着手** |
+| 7 | `person-*` **15** repo (18 ではない — sales を持つ business が 3 つだけ) | **未着手** |
+
+### 検証の記録 (2026-07-30)
+
+| 対象 | 実行したもの | 結果 |
+|---|---|---|
+| `kotoba-lang/yakuwari` | `npm test` / `clojure -M:test` / `clojure -M:lint` | 24 tests 61 assertions、**両 host 一致**、0 failure、lint 0 |
+| `kotoba-lang/yakuwari-view` | `npm test` / `clojure -M:test` / `clojure -M:lint` | 28 tests 57 assertions、**両 host 一致**、0 failure、lint 0 |
+| `network-awai/loop-yakuwari` | `npm test` | 29 tests 52 assertions、0 failure |
+| `loop-yakuwari` 実データ | `nbb bin/awai.cljs check` | `businesses 6 \\| roles 31 \\| outward 15 \\| narrowed by ceiling 0`、OK |
+| query 面 | `edn-query.cljs count` / 2 query | `awai-yakuwari=38`（31 役割 + 6 business + 1 fleet）。roles-per-business = club-shinshi 6 + 5 業種 × 5。approval-required 横断 = 59 行 |
+| cockpit | `clojure -M -e (require …)` ×2 ns | `BOTH_NS_COMPILE_OK` |
+| cockpit 成果物 | `write-public-cockpit!` → `public/index.html` を grep | 119,686 bytes、**role card 31 / group 6 / outward badge 15 / gated capability 75 / raw hex 0** — registry の 31/6/15 と一致 |
+| west pin | `verify-west-pins`（3 件） | 2 件は default branch から到達可能な新規 entry、1 件は fast-forward |
+
+**実行できなかったもの（正直に記録）**: `network-awai/cloud-itonami` の
+`clojure -M:test` は**コンパイル自体が通らない** —
+`bonsai/repo.cljc:41` が `arr/restore` を呼ぶが sibling の `arr` checkout に
+その var が無い。**この破損は既存で、本変更と無関係**（変更した 2 ファイルは
+どちらも bonsai を参照しない: grep 0 件）。cockpit の検証は上記の
+「成果物を実際に build して数える」経路で代替した。
+
+### resume point — 次に打つコマンド
+
+```bash
+west update --fetch smart yakuwari yakuwari-view loop-yakuwari
+cd orgs/network-awai/loop-yakuwari && npm test && nbb bin/awai.cljs check
+nbb bin/awai.cljs identities        # phase 7 が作るべき 15 repo の一覧
+```
+
+phase 6 / 7 の最短経路:
+
+- **phase 6**: `cloud-itonami/cloud-itonami-app` に `yakuwari-view` を
+  `:local/root` で足し、`model/hil-queue` を DADS で描く。同 repo は既に
+  `kotoba-lang/agent` と `kotoba-lang/hil` に依存しているので、承認キューの
+  受け皿は既にある。共有するのは projection のみ（component は共有しない）。
+- **phase 7**: `nbb bin/awai.cljs identities` の 15 行がそのまま作るべき repo と
+  mailbox。**責任命名**（`person-isekai-sales`）にしてあり、架空人物名は
+  発明していない。mailbox は Cloudflare Email Routing の zone token を要する
+  **owner action**。
+
+### 残っている gap の優先順位
+
+1. **dispatcher が無い** — `:spawn` effect を `agent.run` にする実装が無く、
+   31 役割すべてが `:starved` に射影される（正しいラベルであってバグではない）。
+   これが無い限り loop は「決める」までしかしない。
+2. **常駐が install されていない** — `deploy/install.cljs` は dry-run 検証済みだが
+   LaunchAgent は未 install。install すれば 300 秒ごとに tick が回り journal が
+   伸び始める。
+3. **phase 6 / 7**（上記）。
+4. **capability ceiling が実データで何も narrow していない** — 配線と test は
+   あるが load-bearing ではない。
+5. **LEI 未記録** — `:company/lei` join が引けない。
 
 ### phase 0 — 設計中に見つかった実バグ
 
@@ -297,7 +349,7 @@ normalized を validate すると `normalize-decision` が未知値を `:blocked
 - **person-* repo を 36 件 (6 business × 6 role)** — 却下。yakuwari は役割定義で
   あって AO ではないので repo を専有する理由がなく、36 件の west entry / pin /
   mailbox は定義を置くための対価として高すぎる。outward role に限れば identity が
-  必要な 18 件だけになる。
+  必要な 15 件だけになる (sales を持つ business が 3 つだけなので 18 でもない)。
 - **各ビジネス repo が自分の `yakuwari/` を持つ (6 repo)** — 却下。役割を操作対象と
   colocate できる利点はあるが、共有 WIP 予算 (`fleet.edn`) と横断 cockpit が
   6 ソースに割れる。tamaki が 1 repo に集めているのはこの理由。
