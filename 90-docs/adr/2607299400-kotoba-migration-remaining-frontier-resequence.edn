@@ -90,7 +90,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 
 | ID | 内容 | 状態 |
 |---|---|---|
-| **T5.3** | rebalance seats pack → record export | **core landed** murakumo#193–#198; residual pack3 + bool surface |
+| **T5.3** | rebalance seats pack → record export | **landed** murakumo#193–#199 (incl. schedule assign packs #199); residual: bool-typed predicates + other modules packs |
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | 未着手 |
@@ -198,6 +198,21 @@ Compiler record ergonomics: 2-arity `record-get` (compiler#441), schema refs
 4. T8.3 production AOT network/secret; T6.4 cljs same artifact; W4 recursive values
 
 **Do not re-propose:** record-kit dual-backend, T5.1/T5.4, T5.3 seats/eligibility/plan.
+
+
+## Progress (2026-07-30b — schedule assign packs)
+
+**T5.3 schedule assign residual — landed** murakumo#199 (`40e8312`).
+`infer_schedule_core` deletes `lane-base`/`pack3`/`pack-get`; named schemas
+`:schedule/better2|assign2|triple|better3|assign3`. Parity 8/70 green.
+Host production path was already pack-free (pick/score/queue-inc).
+
+**Still open after T5.3 pure-planner core:**
+1. bool-typed comparisons / bool export ABI (opt-in language slice)
+2. rebalance *internal* pool-weight packs (not public seats)
+3. other modules with residual packs (task/reconcile/credits as applicable)
+4. T6.2 precompiled KIR default; T8.3 production AOT; W4 recursive values
+
 
 ## Consequences
 
