@@ -19,7 +19,8 @@
    "ADR-2607300300 D4 の SIM-swap hold を銀行振込にも適用する決定の正本"
    "balance / freshness / funding-account / settlement-history を server 側で計算し request の値を上書きする決定（gate を実効化する強制点）の正本"
    "この機能の到達上限 — commit は governed settlement RECORD であって送金ではない、資金 gate は review 時点のみ — の明示"
-   "MCP agent surface が session を「迂回する」のではなく「解決する」設計、および承認（Passkey consent）を agent に一切露出しない決定の正本"]
+   "MCP agent surface が session を「迂回する」のではなく「解決する」設計、および承認（Passkey consent）を agent に一切露出しない決定の正本"
+   "支払いを承認できる authenticator を Secure Enclave + Touch ID とする決定、および「platform を要求すること」と「platform であると検証すること」を区別する assurance ladder の正本"]
   :adr/related "adr-2607300300-esim-voice-reception-card-issuing-integrated-design, adr-260726-kotobase-query-plane-is-one-ref, adr-2607247000-cloud-itonami-emi-electronic-money-institution-actor, adr-2607249000-cloud-itonami-card-issuing-actor"
   :adr/body "
 # ADR-2607300900: funding account と payment settlement authority
@@ -177,6 +178,58 @@ assertion は存在しない。`payment_commit` を出しているのは、そ�
 
 Keychain 読み出しは service / account を指定した**1件の狙い撃ち**で、列挙はしない。
 
+### D7. 承認できる authenticator を Secure Enclave + Touch ID に限る（2026-07-30 オーナー判断）
+
+D6 は「agent は承認できない、consent は operator が持つ authenticator の WebAuthn
+assertion だから」と書いた。**これは authenticator が本当に operator の持ち物である
+場合にだけ真**で、WebAuthn 自体はそれを保証しない:
+
+- 登録要求の `authenticatorSelection` は **client への「お願い」**であり、client こそが
+  制約したい対象である。
+- 応答の `authenticatorAttachment` は **client 申告で署名されていない**。
+- Chrome DevTools には **virtual authenticator** があり、`platform` を名乗り、user
+  verification を自動で通し、人間不在でプログラム的に署名する。その assertion は完全に
+  検証を通る。
+
+つまり D7 以前の正直な表現は「virtual authenticator を思いつかない agent なら承認
+できない」であり、これは安全性ではない。オーナーは **Secure Enclave + Touch ID**
+（鍵は非抽出、署名ごとにセンサー）を選択した。D7 はそれを願望でなく強制にする。
+
+**要求**: `authenticatorAttachment: platform` / `residentKey: required` /
+`userVerification: required` / **`attestation: direct`**。direct は理由が1つ —
+`none` ではブラウザが privacy のため **AAGUID をゼロ埋め**し、AAGUID は**署名済み**
+authenticator data に入る唯一の機種識別子だから。
+
+**検証**: `cloud.itonami.app.credential-assurance`（純関数）が段階付けする:
+`:unknown` < `:platform-claimed`（client の申告。**未署名**） <
+`:platform-attested`（署名済み authData 内の AAGUID が既知の hardware-backed 機種と
+一致） < `:hardware-attested`（attestation chain が設定済み root まで検証済み）。
+**証拠と呼べるのは下2段だけ。** AAGUID の許可リストは **Windows Hello の software
+profile を意図的に除外**している — これは本物の platform authenticator だが鍵が
+secure element に無い。`platform` と `hardware-backed` は別の性質で、agent の署名を
+止めるのは後者だけである。ゼロ埋め AAGUID は「疑わしい」ではなく「ブラウザが伏せた」
+なので、拒否せず1段下げる。
+
+**強制**: `authority/finish-approval!` に3つ目の gate として入る。既存2つとは別の問い
+に答える（match =「この提案に対する assertion か」、Governor =「免許事業者として
+admissible か」、いずれも**どんな authenticator が署名したかを問わない**）。credential
+は assertion の結果からではなく **store から id で引く** — 応答に自分自身を説明させたら
+意味がない。
+
+**出荷時の floor は `:platform-claimed`** で、これは最強の段ではない。理由を隠さず書く:
+このマシンのブラウザが direct attestation で実 AAGUID を出すかは**測定可能であって
+推測すべきものではない**。ハードウェアが超えられない floor を置くと、登録は成功して
+以後すべての支払いが拒否され、バグに見えて検査ごと消される圧力になる。
+`GET /api/passkeys/assurance` が達成レベル・その根拠・どの authority が受理するかを
+返すので、**1回登録してから証拠に基づいて floor を上げる**。**今日の floor では
+virtual authenticator も通る** — これを黙っていると読み手が「agent はもう排除された」
+と誤解するので明記する。
+
+`at-least?` は**両方向に fail-closed**（未知の level は最下段、未知の floor は
+充足不能）。誤字の floor が gate を黙って無効化するのが、この namespace が防ぐべき
+まさにその失敗だから。自分のテストが最初この permissive な挙動を assert していたので、
+テストではなくコードを直した。
+
 ## Consequences
 
 ### commit が意味すること
@@ -216,6 +269,13 @@ session 無しで 401 = route 有り・gate 有り）、superproject の `.mcp.j
 
 **未達 / blocker（次の agent と owner のために）**
 
+0. **Passkey 登録（Touch ID）だけが残っている最初の一歩。** 登録要求は実測で
+   `authenticatorAttachment "platform"` / `userVerification "required"` /
+   `residentKey "required"` / `attestation "direct"` を返すことを確認済み。
+   WebAuthn ceremony は代行できない（安全床①、かつ原理的に不可能）ので、owner が
+   ブラウザで Touch ID に触れる必要がある。その後 `GET /api/passkeys/assurance` を
+   読めば、実機で `:platform-attested` に届くかが分かり、floor を上げられる。
+
 1. **jk-corp organization がまだ存在しない。** `data/state.edn` の唯一の organization は
    `Personal`（`:organization-id nil` / `:status :pending-profile`）で、user は
    `:status :pending-passkey` / `:passkey-enrolled? false`。
@@ -241,7 +301,7 @@ credential を app に持たせない設計（読み取り専用）を維持す�
 
 ## 検証と着地
 
-- `clojure -M:test` — **276 tests / 1260 assertions / 0 failures**（merge 後の tree）。
+- `clojure -M:test` — **336 tests / 1475 assertions / 0 failures**（merge 後の tree）。
   新規: `funding_test.clj`（残高 freshness の純関数、口座番号が state.edn に出ない
   ことの直接検査、organization スコープ）、`authority/payment_test.clj`（全拒否経路、
   digest material の被覆、**client が自前の残高を送っても上書きされる**こと）。
@@ -256,8 +316,14 @@ credential を app に持たせない設計（読み取り専用）を維持す�
   未承認 proposal の `payment_commit` = `authority/proposal-not-found` 拒否。
   途中、`as-of` を未来の instant にした試行が `payment/balance-unknown` で拒否され、
   「未来の timestamp は stale」の fail-closed 規則が実地で効くことも確認した。
-- app 着地: `cloud-itonami/cloud-itonami-app` main `c0b08d6`（authority）と
-  `254bbab`（MCP surface）、いずれも branch → server-side merge。
+- app 着地: `cloud-itonami/cloud-itonami-app` main `c0b08d6`（authority）/
+  `254bbab`（MCP surface）/ `70d2152`（PayPay メール残高コネクタ）/
+  `46e9841`（platform authenticator assurance）、いずれも branch → server-side merge。
+- 支払い台帳: `90-docs/finance/payables.datoms.edn`（30 record、全件に根拠 Gmail
+  message id 付き）。**PayPay銀行は引落予定日の2日前に口座残高を平文でメールする**
+  という発見がここに記録されている（`fin-finding-balance-from-mail`）。
+- app ADR: `docs/adr/0005-payment-settlement-authority.md` /
+  `docs/adr/0006-which-authenticator-may-approve.md`。
 - superproject: `manifest/west.yml` の `cloud-itonami-app` pin を単一 entry の
   GitHub API commit で前進（`5afb419` → `c0b08d6`、`09f712d` → `254bbab`）。
   1回目は **409 で弾かれた** — 他 agent が同時に main を進めており、optimistic lock が
