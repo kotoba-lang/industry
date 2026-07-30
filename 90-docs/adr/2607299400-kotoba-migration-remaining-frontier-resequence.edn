@@ -90,7 +90,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 
 | ID | 内容 | 状態 |
 |---|---|---|
-| **T5.3** | rebalance seats pack → record export | **landed** murakumo#193–#199 (incl. schedule assign packs #199); residual: task-score-code ternary + plan/rebalance bump indices; schedule/task ok·warm flags3 landed #230 |
+| **T5.3** | rebalance seats pack → record export | **landed** murakumo#193–#199 (incl. schedule assign packs #199); residual: task-score-code ternary + plan/rebalance bump indices (numeric by design); flags3 #230 + label flags #232 |
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
@@ -469,6 +469,23 @@ Still open:
 Still open (non-bool frontier):
 1. T6.4 cljs mirror body deletion (preload guarantee)
 2. T8.3 production AOT network/secret; W4 recursive values
+
+
+## Progress (2026-07-31m — label flags :bool + pin)
+
+- murakumo#232 MERGED (`89465618`): residual product-surface **label flags**
+  0/1 → `:bool` — report (peered/online/ssh/artifact-ok/cid-present/running-empty),
+  join `needs-relay?` inbound, reconcile name-order + better-target? tie-break.
+  Hosts drop `as-i64 (if x 1 0)`. ADR-260731-w6-label-flags-bool.
+  Evidence: 110 tests / 1739 assertions green.
+- west pin murakumo `147c3496` → `89465618`.
+- Note: Progress 31l closed `*?` predicate residual; this tick closes non-`?`
+  **parameter** flags still projected as 0/1 i64 on product shell.
+
+Still open:
+1. T6.4 cljs mirror body deletion (preload guarantee)
+2. T8.3 production AOT network/secret; W4 recursive values
+3. Numeric by design: queue triples, task-score-code, pick/bump indices, tier codes
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
