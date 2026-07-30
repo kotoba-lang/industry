@@ -1,0 +1,195 @@
+[{:db/id -1,
+  :adr/id "adr-2607309900-shiropico-loop-ka-channel-not-a-new-loop-repo",
+  :adr/title "ADR-2607309900: shiropico は loop-ka-production の channel として常駐させる — gftdcojp に loop-* を新設しない。ghosthacker は deprecated repo のため保留",
+  :adr/status "accepted",
+  :adr/doc_type "adr",
+  :adr/date "2026-07-30",
+  :adr/deciders ["Jun Kawasaki (+ Claude)"],
+  :adr/topic "shiropico-loop-ka-channel",
+  :adr/related ["adr-2607299000-repository-rules-workspace-authority"
+                "adr-2607302100-shiropico-google-ads-live-spend-pause-and-execution-path-gap"
+                "adr-2607012000-shiropico-publish-actor"
+                "adr-2607011816-ghosthacker-shiropico-standalone-repo"
+                "adr-2607100900-ghosthacker-anime-shiropico-lead-cljc-kotoba-workflows"],
+  :adr/supersedes [],
+  :adr/superseded_by [],
+  :adr/repos ["com-junkawasaki/root"
+              "kotoba-lang/loop-ka-production"
+              "com-junkawasaki/ghosthacker-shiropico"],
+  :adr/authoritative true,
+  :adr/authoritative_for ["shiropico の常駐生産を loop-ka-production の channel として行うという決定と、gftdcojp に loop-* を新設しないという決定"
+                          "shiropico の production-catalog の粒度(1 episode 1 file、言語は内側)と、episode 1-10 を載せない理由"
+                          "producer が :legs で「実際に何が動いたか」だけを報告するという契約"
+                          "ghosthacker を channel 化しない理由(repo が deprecated、後継が未 checkout)"],
+  :adr/last_verified "2026-07-30",
+  :adr/source-format "edn-only (ADR-2607171600)",
+  :adr/landed ["com-junkawasaki/ghosthacker-shiropico 2d673653ef44a36d7ea8de4f3733fdc1aa467357 (producer + production-catalog + tests + PRODUCING.md)"
+               "kotoba-lang/loop-ka-production dac40aaf045d91d3f38c07d17daccffa1ae61ba8 (channels.edn に :shiropico を登録)"],
+  :adr/verification "実行して検証した(inspection ではない)。producer 単体: backend 無し -> 23 :placeholder / 61 :silent、MURAKUMO_BACKEND_URL -> :murakumo / :murakumo、COMFY_URL のみ -> :comfy / :silent、COMFY_URL + VOICE_LOCAL_CMD -> :comfy / :local。テスト 3 tests / 15 assertions green。ループ結合: nbb bin/loop.cljs observe --workspace <root> -> DUE shiropico -> episode-11 (5 of 5)、plan -> tasks.edn に murakumo task plane 用の cmd が入り、その cmd をそのまま実行して 23 shots / 61 lines・全 leg degraded を確認。content repo 同期前は同じ channel が catalog-unreadable を返し、「読めなかった」と「空だった」の区別が機能していることも確認した。",
+  :adr/known-gaps ["producer は環境変数に URL があることを到達可能性とみなす。到達しない URL は served leg として報告される。murakumo task plane 上では node の :requires gate が capability を担保するが、実 probe への置き換えは未実施。"
+                   "episode 1-10 は shotlist が無いため catalog に載っていない。ep01 は既に motion-comic と panel が存在するので、過去分をどう扱うか(遡及登録するか、済として扱うか)は未決定。"
+                   "producer は :legs を報告するだけで、実際のレンダリングは行っていない。backend が配線された時に :murakumo leg が本当に画を出すかは未検証。"
+                   "ghosthacker(シリーズ)側の channel 化は保留。後継 kami-app-sip-clj がこの checkout に存在せず、生産経路を特定できていない。"
+                   "loop-ka-production 自体の常駐(誰が cron/tick を打つか)は本 ADR の範囲外。既存 4 channel と同じ状態のまま。"],
+  :adr/body
+  "## Context
+
+オーナー指示: 「shiropico, ghosthacker を cloud-itonami-app の gftd org の repo と
+して配置して、actor として loop-, worker として常駐化, murakumo.cloud で動くように
+してほしい」。
+
+`manifest/repository-rules.edn`(ADR-2607299000)は `loop-` を
+`:role :continuous-orchestrator` / **`:execution :resident`** /
+`:must [:observe :evaluate :decide :act :record-evidence]` と定義しており、
+指示の「actor として loop-」「worker として常駐化」はこの語彙にそのまま対応する。
+
+## 調査で分かったこと
+
+**同型のループが既に存在した。** `kotoba-lang/loop-ka-production`(west 登録済み)は
+README で層をこう定めている:
+
+| 層 | 所有 | 場所 |
+|---|---|---|
+| loop repo | cadence, admission, verdict, evidence | `loop-ka-production` |
+| resident execution | placement, slots, load, retry | **`kotoba-lang/murakumo` task plane** |
+| human 管理 | run の閲覧・publish 承認 | `cloud-itonami/cloud-itonami-app` |
+
+しかもこの repo は **「各チャンネルが自前のループを複製していたのを止めるために
+作られた」**と明記している —
+> Each channel carried its own copy (`dougaka.outer-loop`, animeka's
+> `production-loop.cljs`, a `produce-video.bb`), and the thing they all skipped
+> was checking whether the episode they had just built actually contained
+> anything.
+
+常駐の実体も実在する: `nbb scripts/run-task.cljs task run --tasks batch.edn`
+(配置 → SSH 実行 → 回収 → リトライ)。`channels.edn` は既に
+`orgs/etzhayyim/...` と `orgs/cloud-itonami/...` を混在登録しており org を跨げる。
+
+**欠けていたのは loop ではなく producer だった。** `ghosthacker-shiropico` には
+12 話分の脚本、ep11/ep12 の shotlist(10 言語)、`clj/` の publish actor
+(advisor ⊣ PolicyGovernor ⊣ ledger)が揃っていたが、**`-main` が無く実行可能な
+入口が存在しなかった**。
+
+## Decision
+
+### D1. gftdcojp に `loop-shiropico` / `loop-ghosthacker` を新設しない
+
+新設は loop-ka-production が撲滅した複製をもう 2 つ作る行為であり、
+`loop-*` の `:must-not :own-domain-scoring-truth` とも整合しない
+(1 作品のループが自前で持つ truth はほとんど無い)。
+
+オーナーは当初 gftdcojp への新設を選んだが、それは loop-ka-production の存在を
+知らない状態での選択だった。存在を提示したうえで channel 登録へ変更している。
+
+### D2. shiropico を `channels.edn` の channel として登録する
+
+```clojure
+{:id :shiropico
+ :repo \"orgs/com-junkawasaki/ghosthacker-shiropico\"
+ :producer [\"nbb\" \"--classpath\" \"src\" \"bin/produce.cljs\"]
+ :produces :episode-from-catalog
+ :catalog \"production-catalog\"
+ :actor \"shiropico.aozora.app\"
+ :slots 1
+ :requires #{:ffmpeg :nbb}}
+```
+
+`:catalog` は既存の `catalog/` **ではない**。あちらは `ai-gftd-datasets.json` を
+持つ無関係なディレクトリで、`.edn` が 0 件なので「catalog が尽きた」と読めてしまう
+— yukkuri が `content/` で踏んだ罠と同型。
+
+### D3. producer は「実際に何が動いたか」だけを報告する
+
+`:legs` の値は意図ではなく実績:
+
+| leg | 値 | degraded |
+|---|---|---|
+| `:video`(scene ごと) | `:murakumo` `:comfy` `:placeholder` | `:placeholder` |
+| `:voice`(dialogue 行ごと) | `:murakumo` `:local` `:silent` | `:silent` |
+
+backend が無ければ全 leg が degraded になり、ループは publish せず hold する。
+**これが正しい結末**であって回避すべきバグではない — loop-ka-production は
+「2 週間、平坦なパステルのカードが毎晩公開され、誰も生成脚が動いたか見ていなかった」
+から作られている。
+
+### D4. catalog は 1 episode 1 file、言語は内側
+
+episode+language を別 catalog id にすると、1 話の running order が 10 晩分になる。
+
+**episode 1-10 は載せない。** 脚本はあるが shotlist が無く producer が render する
+ものが無い。render できない catalog entry は、無い entry より悪い —
+ループがそれを admit し、そのうえで採点することになる。
+
+### D5. ghosthacker(シリーズ)の channel 化は保留
+
+`com-junkawasaki/ghosthacker` は README 冒頭で **2026-06 に DEPRECATED** と宣言
+されている(TypeScript/SvelteKit + Go パイプライン。後継は `kami-app-sip-clj` の
+`sip.render`/`sip.page`/`sip.storyboard`)。その後継はこの checkout に存在せず
+(`kami-engine` は `orgs/kotoba-lang/kami-engine` に移動済み、`kami-app-sip-clj` は
+未発見)、生産経路を特定できない。**deprecated repo を production channel として
+登録しない。**
+
+## 実装 — 実行して検証した
+
+producer 単体(backend の 4 パターン):
+
+| 設定 | video | voice |
+|---|---|---|
+| なし | 23 × `:placeholder` | 61 × `:silent` |
+| `MURAKUMO_BACKEND_URL` | 23 × `:murakumo` | 61 × `:murakumo` |
+| `COMFY_URL` のみ | 23 × `:comfy` | 61 × `:silent` |
+| `COMFY_URL` + `VOICE_LOCAL_CMD` | 23 × `:comfy` | 61 × `:local` |
+
+ループ結合(実 workspace に対して):
+
+```
+observe -> DUE shiropico  shiropico/2026-07-30/0  -> episode-11   (5 of 5)
+plan    -> tasks.edn:
+   cd '.../ghosthacker-shiropico' && 'nbb' '--classpath' 'src' 'bin/produce.cljs' 'episode-11'
+その cmd をそのまま実行 -> 23 shots / 61 lines、全 leg degraded => :degraded、hold
+```
+
+content repo を同期する前は同じ channel が `catalog-unreadable` を返した。
+`catalog-entries` が「読めなかった」と「空だった」を分けている設計が実際に効いている。
+
+## 動かして初めて見つかった 3 つのバグ
+
+**inspection では 1 つも見つからなかった。** すべて「静かに嘘の成功を報告する」型。
+
+1. **`clojure.string/replace` は文字列マッチで全出現を置換する。**
+   `\"shotlist.episode%s.%s\"` に episode を先に入れると
+   `\"shotlist.episode11.11\"` になり、全行が非 scene と読まれる。shotlist は 0 件に
+   parse され、**中身のあるエピソードが「空」として報告される**ところだった。
+2. **84 は行数であって shot 数ではない。** ep11 は 23 scene + 61 dialogue。
+   最初の catalog は `:plan/shots 84` と書いていた(= 捏造した数値)。
+3. **voice leg を scene で index していた。** voice は dialogue 行に属する。
+
+加えて **`(js->clj js/process.env)` は nbb では機能しない**(Function を返し全 lookup
+が nil)。この状態では **node をどう設定しても producer は全 leg を degraded と報告
+する**。`aget` で直接読むよう修正した。
+
+## Consequences
+
+- shiropico は 5 channel 目として loop-ka-production の対象になった。ループを回せば
+  今夜から episode-11 が admit される。
+- ただし **render backend を配線するまで全 run は `:degraded` で hold される。**
+  これは仕様どおりだが、「動いている」ことと「成果物が出る」ことは別である。
+- `loop-ka-production` 自体を誰が定期起動するかは未解決で、既存 4 channel と同じ
+  状態のまま。本 ADR はそこを変えていない。
+- gftdcojp には何も作っていない。オーナーが gftd 所有を望む場合、動かす対象は
+  loop ではなく producer / content 側になる。
+
+## Alternatives considered
+
+- **gftdcojp に loop-shiropico / loop-ghosthacker を新設**: 却下(D1)。
+  loop-ka-production が存在を理由に撲滅した複製を再生産する。
+- **loop-ka-production ごと gftdcojp へ transfer**: 却下。既存 4 channel の所有権まで
+  巻き込む。channel 登録で目的は達せられる。
+- **`catalog/` をそのまま `:catalog` に指定**: 却下(D2)。`.edn` が 0 件で
+  「尽きた catalog」と読め、誤設定が正常系に見える。
+- **episode 1-10 も catalog に載せる**: 却下(D4)。render 対象が無い entry を admit
+  して採点することになる。
+- **backend 未配線を検出したら exit 1 で落とす**: 却下(D3)。degradation を crash の
+  裏に隠すことになる。ループは verdict として記録できる形で受け取るべき。
+- **ghosthacker を channel 登録する**: 却下(D5)。repo が deprecated で後継が不明。
+"}]
