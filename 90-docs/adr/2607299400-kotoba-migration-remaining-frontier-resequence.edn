@@ -264,9 +264,21 @@ schedule assign, plan, seats, eligibility, credits shares, reconcile targets.
 the residual list tracked since ADR-2607299400 (seats through name-bits / task eligibility).
 
 **Next frontier is language-level, not product packs:**
-1. ~~bool-typed comparisons + wasm bool export ABI~~ **landed** compiler#451 + wasm#42/#44 + script#74 (west pins 23721b8c); residual = consumer C-migration + profile-4 window
+1. ~~bool-typed comparisons + wasm bool export ABI~~ **landed** compiler#451 + wasm#42/#44 + script#74 (west pins 23721b8c); residual = task/eligibility bool + other consumer C-migration; schedule eligibility bool landed murakumo#208
 2. T6.2 precompiled KIR default; T8.3 production AOT; W4 recursive values
 
+
+## Progress (2026-07-31a — murakumo schedule eligibility :bool)
+
+- **murakumo#208 MERGED**: first product consumer of language profile 5
+  - `:schedule/eligibility` fields `:i64` → `:bool`
+  - `eligible?` / `holds-warm?` return `:bool` (nested if, gensym-stable KIR)
+  - host boolean projection + `oracle/record` `:bool` case
+  - pins compiler@b2291313 + kotoba-kir@15e208ea; 80/1260 green
+- **Still open:**
+  1. `task/eligibility` same bool treatment
+  2. other product 0/1 fields / predicates
+  3. wasm `has-bool-value?` dead-flag cleanup (import already always-on in base list)
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
