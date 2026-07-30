@@ -94,7 +94,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
-| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done** #221+#223+#225+#226+#228; **mirror-delete** kekkai #233 + token #235 + secret #236 + preload; other hosts open |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done** #221+#223+#225+#226+#228; **mirror-delete** kekkai #233 token #235 secret #236 identity #237; other hosts open |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
@@ -546,6 +546,22 @@ Still open:
 2. T8.3 production AOT network/secret; W4 recursive values
 3. Residual 0/1 i64 params: config pinned-exists, engine option flags, moe shared?,
    dash health-from-present, tunnel rc-present
+
+
+## Progress (2026-07-31q — T6.4 identity mirror-delete + pin)
+
+- murakumo#237 MERGED (2b75bdf): **identity** deletes cljs host mirrors —
+  seed/JWT/seps require shipped :identity KIR; SHA-256/base32/b64url stay host.
+  ADR-260731-w6-t64-identity-mirror-delete. Evidence: 20 tests / 129 assertions.
+- murakumo#236 already on tip ancestry (secret mirror-delete + classify-fetched :bool).
+- west pin murakumo 81c3add -> 2b75bdf.
+
+T6.4 mirror-deleted hosts: kekkai #233, token #235, secret #236, identity #237.
+
+Still open:
+1. T6.4 remaining hosts (persist/connect/tunnel/report/plan/...)
+2. T8.3 production AOT network/secret; W4 recursive values
+3. Residual 0/1 i64 param projections (config/engine/moe/dash/tunnel)
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
