@@ -1,0 +1,158 @@
+[{:db/id -1
+  :adr/id "adr-2607301300-itonami-cloud-org-repo-site-publishing-rule"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/last_verified "2026-07-30"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2607301300: itonami.cloud/{org}/{repo} を GitHub Pages 相当の公開サイト面にする。宣言レジストリに載ったものだけが resolve し、未登録は 404 —— SPA catch-all に落とさない。最初の実物は cloud-itonami/inkan（印影ジェネレータ）"
+  :adr/topic "itonami-cloud-org-repo-site-publishing-rule"
+  :adr/repos ["orgs/network-awai/cloud-itonami" "orgs/cloud-itonami/inkan"]
+
+  :adr/authoritative_for
+  ["itonami.cloud の公開サイト面の正本: KRP §4 の `/{org}/{repo}[/…]`。GitHub Pages と同じく、repo ごとの静的サイトをこの形で配信する"
+   "公開の宣言は `sites.edn`（手書き）。ディレクトリを置いただけでは公開されない。`:source` は repository ごとに宣言し、名前から導出しない（ADR-2607299300 §3 と同じ規律）"
+   "未登録 `{org}/{repo}` は 404。登録済みサイトでも宣言ファイル一覧に無いパスは 404（KRP §4 rule 8）"
+   "予約 first-segment（`api` / `docs` / `css` …）は `public/` と `functions/` の実在エントリから生成する。手書きリストにしない"
+   "サイト実体の置き場は Pages deploy 同梱（`public/sites/{org}/{repo}/`）。R2 ではない"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/related
+  ["90-docs/protocols/kotoba-resource-protocol.edn（KRP §4 の HTTP projection 8 rules。rule 8 『Unknown resources return 404 and never fall through to a homepage』が本 ADR の中心）"
+   "90-docs/adr/2607299300-murakumo-cloud-krp-org-repo-addressing-did-account.edn（murakumo.cloud に同じ addressing を決めた先行 ADR。本 ADR はそれを itonami.cloud で**実装した**もの。§3『registry は宣言データ。path が parse できるだけでは存在を意味しない』『location は宣言する。名前から導出しない』を継承する）"
+   "90-docs/adr/2607122200-kotoba-lang-ui-hig-semantic-layer-topology.edn（公開サイトの UI が乗る design system。skill kotoba-uiux）"
+   "orgs/cloud-itonami/inkan（印影の組版エンジン。最初の公開サイトの中身）"]
+
+  :adr/problem
+  "オーナーの問い（2026-07-30）は『itonami.cloud/{org}/{repo} で公開できるんだっけ?』で、答えは**半分だけ Yes** だった。
+
+実測（2026-07-30）:
+
+- `/api/{org}/{repo}/…` は**実在し live**。`functions/api/[org]/[repo]/` 配下に metrics / drive / chat / calendar / register 等が実装済みで、`/api/gftdcojp/cloud-itonami/metrics` は 200 JSON を返す。
+- **裸の `/{org}/{repo}` は存在しなかった。** `/cloud-itonami/tate`・`/zzz-nonexistent/qqq`・apex の3つが**バイト同一**（84,530 バイト、SHA `c214b4de…`）の cockpit SPA HTML を 200 で返していた。原因は `public/_redirects` の最終行 `/* /index.html 200`。
+- これは KRP §4 rule 8（未知は 404、homepage に fall through しない）への違反であり、同時に『存在しないものが存在するように見える』面でもあった —— agent がこの URL を叩くと、404 ではなく**もっともらしい HTML** が返る。
+
+ADR-2607299300 が `/{org}/{repo}` を公開面とする決定を既に出していたが、あれは **murakumo.cloud についての決定**で、しかもそこでも未実装（実測 404）。itonami.cloud に適用された事実は無かった。
+
+置き場の選択も推測ではなく実測で決めた: この環境の Cloudflare OAuth token の Token Permissions に **r2 が無い**（`pages (write)` / `workers_kv (write)` / `d1 (write)` はある）。したがって R2 backed の配信は今日は選べない。"
+
+  :adr/decision
+  "### 1. 公開 URL は `/{org}/{repo}[/…]`、実体は Pages deploy 同梱
+
+`public/sites/{org}/{repo}/…` に置いた静的アセットを、`functions/[org]/[repo]/`
+のルータが `env.ASSETS` 経由で返す。R2 ではないのは上記の scope 実測による ——
+『将来 R2 にする』とも書かない（必要になった時に決める）。
+
+`_redirects` には `/sites/* /sites/:splat 200` を catch-all の**前**に足す。
+これが無いと `/*` が拾って SPA が返り、`env.ASSETS` 経由の取得まで index.html
+になる（この repo の `_redirects` が `/docs/*` 等に同じ identity rewrite を
+持っているのと同じ理由）。
+
+### 2. 宣言されたサイトだけが resolve する
+
+正本は `sites.edn`（手書き、org/repo/title/description/source/dir）。
+ファイル一覧と予約語は `scripts/generate-sites-registry.cljs` が生成し、
+`functions/edge/sites-registry.js`（Function が import）と
+`public/sites/registry.json`（discovery 面）に出す。
+
+`:source` は **repository ごとに宣言する。名前から導出しない。** URL の形が
+`{org}/{repo}` に合うからといって `github.com/{org}/{repo}` があるとは限らず、
+導出すれば嘘を claim することになる（ADR-2607299300 §3 の
+`locations-are-declared-not-derived` と同じ規律）。
+
+### 3. 未登録は 404。**宣言ファイル一覧が安全境界**
+
+登録済みサイトでも、宣言された `:files` に無いパスは `env.ASSETS` を叩く前に
+404 にする。ASSETS の miss 時の挙動（`_redirects` の catch-all に落ちて SPA が
+200 で返る）に安全性を依存させないため。副作用としてパストラバーサルもここで
+塞がる（`../../_redirects` も `%2e%2e` 版も whitelist 照合で落ちる）。
+
+### 4. 予約 first-segment は生成する
+
+`public/` と `functions/` の実在エントリの和（`_` 始まりを除く、38 件）。
+手書きリストにすると、新しいページを足した人がここを更新し忘れた瞬間に
+そのページが `{org}/{repo}` ルータに食われる —— 生成なら構造的に起きない。
+
+### 5. 判断は純 .cljc、機構だけ JS
+
+`cloud-itonami.sites/resolve-request`（純 `.cljc`）が
+`:pass-through` / `:redirect` / `:asset` / `:not-found` を返し、
+`cloud-itonami.edge.sites` が Response を組む。shadow-cljs `:sites-api`
+（`:esm` / `:advanced`）で `functions/edge/sites-core.js` に出す。
+`:edge-api` 共有バンドルに足さないのは `:nudge-api` / `:register-api` と同じ理由
+（あれは procurement→approval→store.cljc の `fs` require で現在ビルド不能）。
+`cloud-itonami.sites` が引くのは `clojure.string` だけなので単体でビルドできる。
+
+### 6. 最初の公開サイトは cloud-itonami/inkan（印影ジェネレータ）
+
+規則だけ作って中身が無いと、その規則が本当に動くか分からない。実物として
+**印影ジェネレータ**を同時に公開する（GMOサインの電子印鑑 —— 丸-縦/丸-横/丸-日付/
+角-1〜3列 —— を下敷きに、法人実印の二重丸を足した8型）。
+
+組版エンジンは別 repo `cloud-itonami/inkan` の純 `.cljc`。ブラウザでは
+**同じ .cljc を scittle が読む**（この repo の marketplace ページと同じ手）——
+JS に書き直すと組版が2実装になり、SVG と PNG が必ず食い違う。
+
+書体は **OFL のみ**（Shippori Mincho / Zen Old Mincho / Yuji Syuku / Yuji Boku /
+Noto Serif JP、Google Fonts の unicode-range サブセットで漢字を完全カバー）。
+**篆書体・印相体・古印体・隷書体は未対応**（探した範囲で OFL の実用フォントが
+無い）。似た別の書体で代用はしない —— 『無い』を『それらしい何か』で埋めない。"
+
+  :adr/consequences
+  "**得られたもの**
+
+- `itonami.cloud/{org}/{repo}` が GitHub Pages と同じ感覚で使える。新しいサイトの追加は `sites.edn` に 6 行と、`public/sites/{org}/{repo}/` にアセットを置いてレジストリ再生成するだけ。
+- 未知のリソースが 404 を返すようになり、KRP §4 rule 8 違反が解消した。agent が存在しない URL を叩いたときに『もっともらしい HTML』ではなく機械可読な 404 が返る。
+- 既存の全経路は無傷（予約 prefix で `context.next()`）。`/api/*` の html-leak guard も従来どおり効く。
+
+**代償・限界（正直に）**
+
+- **サイト更新に Pages deploy が要る。** R2 backed なら deploy 無しで差し替えられたが、token に r2 scope が無いので今日は選べない。
+- **`/sites/{org}/{repo}/…` という生パスでも同じバイトが取れる。** Pages のアセットは deploy dir に居るのでこれは構造的。正準 URL は `/{org}/{repo}/` の方で、registry.json もそう宣言している。
+- **クロスリポジトリのビルドは自動化されていない。** `cloud-itonami/inkan` の変更をサイトに反映するには `scripts/generate-inkan-site.cljs` を回して commit する。west の pin 前進に連動する仕組みは無い。
+- **印影の SVG は閲覧側フォントに依存する。** グリフをアウトライン化していない（フォントの glyf/CFF 解析はこの repo が持つべき機構ではないと判断した）。自己完結が要るなら PNG（canvas でラスタライズ）を使う。
+- **印影そのものに法的効力は無い。** 実印の効力は印鑑登録に、電子契約の効力は電子署名法上の電子署名に由来する。この道具は見た目を作るだけで署名も認証もしない —— 公開ページにもそう明記した。"
+
+  :adr/evidence
+  "**実装前の状態（この ADR の出発点）**
+
+    curl https://itonami.cloud/cloud-itonami/tate      -> 200 text/html 84,530B
+    curl https://itonami.cloud/zzz-nonexistent/qqq     -> 200 text/html 84,530B
+    curl https://itonami.cloud/                        -> 200 text/html 84,530B
+    shasum -> 3件とも c214b4deea2923e5b79706db468d5ba3053741bd
+
+    wrangler whoami -> account ai-gftd-cloud / Token Permissions に pages(write)、r2 は無い
+
+**テスト**
+
+- `cloud-itonami.sites-test` — 5 tests / 43 assertions、0 failures。予約 prefix の pass-through、未登録の 404、宣言ファイル一覧が安全境界（`../../_redirects`・`%2e%2e` 版・`..%2f` 版がすべて 404）、301 の trailing-slash 寄せ、パーセントエンコード解決。
+- `inkan.geometry-test` / `inkan.svg-test` — 15 tests / 357 assertions、0 failures。枠外逸脱ゼロ（丸は中心距離、角は矩形）、縦書きの読み順が右→左・上→下、文字落ちゼロ、升目詰めで重ならない、XML エスケープ。
+
+**テストが実際に捕まえた欠陥（3件、いずれも『通ってから直した』ではなく落ちて直した）**
+
+1. 横書きの読み順が逆（`grid-glyphs` が ci=0 を右端に置くのに、入力を反転して渡していた）。
+2. 丸印の横書きが枠外へ 9.72mm（枠半径 9.0mm）—— 1行 N 文字の升目に文字を引き伸ばしていた。丸印の升目を正方形にし、最後に `fit-into-circle` で必ず収める不変条件を足して解消。
+3. **幾何テスト全通過の状態で `:square-1` が判読不能だった** —— 升目の縦横比 4:1 に字面を引き伸ばしていた。これは数値テストでは捕まらず、`scripts/preview.cljs` を実ブラウザでレンダリングした目視で発見（字面の縦横比を [0.5, 2.0] に締める修正）。**『測っていない品質は演出』の実例**として、目視面をコードで用意しておく価値がここにある。
+
+**ビルド**
+
+    shadow-cljs release sites-api -> functions/edge/sites-core.js 114,587B、`eval(` 0 件
+    （Cloudflare の deploy pipeline は到達不能でも eval() を含む Worker script を静的に弾く）
+
+**scittle の適合確認（推測でなく実測）**
+
+    reader conditional `#?(:cljs …)` -> :browser 枝を取る
+    defmulti / defmethod            -> 動く
+    多 namespace の require          -> 動く
+    src 読み込みの .cljc をそのまま  -> inkan.svg/seal が 762 文字の SVG を返す
+
+**発見した実装上の罠（2件）**
+
+1. **scittle の script は `<head>` ではなく body 末尾に置く。** head に置くと `page.cljs` が body 生成前に走り、`getElementById` が全部 nil を返して**何も起きないまま静かに終わる**（プレビューが空、status が『読み込んでいます』で固着）。
+2. **shitsuke の `button` は `:id` を DOM に出さない**（`:class`/`:act`/`:disabled`/`:title`/`:type` だけ）。`:id` でボタンを取ろうとすると配線が黙って外れる。hook は `:act` → `data-act` で取る。"
+
+  :source/dataset "adr"}]
