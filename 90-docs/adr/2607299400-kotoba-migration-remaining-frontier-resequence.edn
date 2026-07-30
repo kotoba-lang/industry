@@ -255,6 +255,18 @@ schedule assign, plan, seats, eligibility, credits shares, reconcile targets.
 2. bool-typed predicate surface (language opt-in, multi-repo)
 3. T6.2 / T8.3 / W4
 
+
+## Progress (2026-07-30f — reconcile name-order)
+
+- murakumo#206 `name-bits` → `:reconcile/name-order` record; reconcile module free of base-N and bit packs
+
+**T5.3 murakumo pure-planner/product-shell pack+flag cutover is complete** for
+the residual list tracked since ADR-2607299400 (seats through name-bits / task eligibility).
+
+**Next frontier is language-level, not product packs:**
+1. bool-typed comparisons + wasm bool export ABI (opt-in multi-repo)
+2. T6.2 precompiled KIR default; T8.3 production AOT; W4 recursive values
+
 ## Consequences
 
 - superproject から見た移行の現在地が 2026-07-29 断面に揃った。以後、現在地を
