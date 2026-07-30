@@ -1013,6 +1013,170 @@
     (warn-skipped! "innen corpus" @skipped)
     out))
 
+;; ---------- awai-yakuwari（network-awai の6ビジネスの運営役割。ADR-2607300800） ----------
+;;
+;; 正本は orgs/network-awai/loop-yakuwari:
+;;   fleet.edn                 fleet 方針（global WIP / weights / capability ceiling）
+;;   businesses.edn            6 ビジネスと役割集合、および「意図的に無い役割」
+;;   yakuwari/<business>.edn   役割そのもの（1 ファイル = 1 ビジネス、複数 entity）
+;;
+;; **authored file は :db/id を持たない素の map。** ここで後付けするのは fleet-db /
+;; innen / market-intel と同じ慣習で、pre-wrapped tx-data なのは 90-docs/adr/*.edn
+;; だけ。こうしておくと同じファイルを yakuwari.spec/validate がそのまま読める。
+;;
+;; **入れ子 map は平坦化する。** `:yakuwari/scale {:min 0 :desired 1 :max 2}` を
+;; そのまま渡すと `->ds-value` が pr-str の blob 文字列にするので `:desired` で
+;; query できない。innen-flatten-interval と同じ手で scalar 属性に展開し、無損失の
+;; ため `-edn` blob も残す。capabilities は decision ごとの cardinality-many 属性に
+;; 展開する（「承認待ちを抱えた役割をビジネス横断で数える」を 1 query にするため）。
+;;
+;; join 可能な先: `:repo/path` → repo-taxonomy / repo-maturity。
+;; `:company/lei` での market-intel / cloud-itonami-lei との join は **まだできない**
+;; — fleet.edn は Delaware file no. しか持っておらず LEI を持たないので、ここで
+;; LEI を捏造しない（記録されたら 1 行足すだけで繋がる）。
+
+(defn- awai-dir [] (io/file root "orgs" "network-awai" "loop-yakuwari"))
+
+(defn- awai-flatten-scale
+  "`:yakuwari/scale` の {:min :desired :max} を scalar 属性へ。元 map は
+   `:yakuwari.scale/edn` に pr-str して残す（この面の入れ子値の慣習）。"
+  [e]
+  (if-let [s (:yakuwari/scale e)]
+    (cond-> (dissoc e :yakuwari/scale)
+      true (assoc :yakuwari.scale/edn (pr-str s))
+      (:min s) (assoc :yakuwari.scale/min (:min s))
+      (contains? s :min) (assoc :yakuwari.scale/min (:min s))
+      (contains? s :desired) (assoc :yakuwari.scale/desired (:desired s))
+      (contains? s :max) (assoc :yakuwari.scale/max (:max s)))
+    e))
+
+(defn- awai-flatten-capabilities
+  "`:yakuwari/capabilities` の [{:capability :decision :note}] を
+   decision ごとの cardinality-many 属性へ:
+
+     :yakuwari.policy/autonomous        #{cap …}
+     :yakuwari.policy/voice-required    #{cap …}
+     :yakuwari.policy/approval-required #{cap …}
+     :yakuwari.policy/blocked           #{cap …}
+     :yakuwari/capability               #{全 cap}
+
+   decision 名は yakuwari.policy の語彙をそのまま属性名に使う（別名を作ると
+   2 語彙が並立する）。未知の decision は落とさず :yakuwari.policy/unknown に
+   入れる — 黙って消すと typo が『その capability は無い』ように読める。"
+  [e]
+  (let [caps (:yakuwari/capabilities e)]
+    (if-not (sequential? caps)
+      e
+      (let [known #{:autonomous :voice-required :approval-required :blocked}
+            grouped (reduce (fn [acc {:keys [capability decision]}]
+                              (if (nil? capability)
+                                acc
+                                (let [d (if (contains? known decision) decision :unknown)]
+                                  (update acc d (fnil conj []) (kw->attr capability)))))
+                            {} caps)]
+        (cond-> (-> e
+                    (dissoc :yakuwari/capabilities)
+                    (assoc :yakuwari.capabilities/edn (pr-str caps)
+                           :yakuwari.capabilities/count (count caps)
+                           :yakuwari/capability
+                           (vec (keep #(some-> (:capability %) kw->attr) caps))))
+          (:autonomous grouped) (assoc :yakuwari.policy/autonomous (:autonomous grouped))
+          (:voice-required grouped) (assoc :yakuwari.policy/voice-required (:voice-required grouped))
+          (:approval-required grouped) (assoc :yakuwari.policy/approval-required (:approval-required grouped))
+          (:blocked grouped) (assoc :yakuwari.policy/blocked (:blocked grouped))
+          (:unknown grouped) (assoc :yakuwari.policy/unknown (:unknown grouped)))))))
+
+(defn- awai-role-entity [f e]
+  (-> e
+      awai-flatten-scale
+      awai-flatten-capabilities
+      ;; :yakuwari/project is "<org>/<repo>"; repo-taxonomy and repo-maturity
+      ;; key on "orgs/<org>/<repo>", so emit the joinable form explicitly
+      ;; rather than making every query rebuild it.
+      (as-> m (if-let [p (:yakuwari/project m)]
+                (assoc m :repo/path (str "orgs/" p))
+                m))
+      ;; The role's kind (:sales) apart from its full id
+      ;; (:net-kotobase/sales), so "every supporter across the fleet" is one
+      ;; clause instead of a string match.
+      (as-> m (if-let [id (:yakuwari/id m)]
+                (assoc m :yakuwari/kind (name id))
+                m))
+      (assoc :source/dataset "awai-yakuwari" :source/file (str f))
+      (dissoc :yakuwari/mandate)
+      (as-> m (if-let [md (:yakuwari/mandate e)]
+                (assoc m :yakuwari.mandate/edn (pr-str md))
+                m))))
+
+(defn awai-yakuwari-entities [next-tempid!]
+  (let [dir (awai-dir)
+        roles-dir (io/file dir "yakuwari")
+        skipped (atom [])]
+    (if-not (.exists dir)
+      ;; loop-yakuwari が未 checkout のときは黙ってスキップする（他の子リポ
+      ;; ローダと同じ。ただし「0 件」と「未 checkout」は区別できるよう、
+      ;; checkout があるのに 0 件のときだけ WARNING を出す）。
+      []
+      (let [role-files (when (.exists roles-dir)
+                         (->> (file-seq roles-dir)
+                              (filter #(str/ends-with? (str %) ".edn"))
+                              ;; sort-by str, not sort: File objects are not
+                              ;; comparable, and plain `sort` throws.
+                              (sort-by str)))
+            roles (vec (mapcat (fn [f]
+                                 (let [es (try (slurp-edn f) (catch :default _ nil))]
+                                   (if (and (vector? es) (seq es) (every? map? es))
+                                     (map #(awai-role-entity f %) es)
+                                     (do (swap! skipped conj (str f)) []))))
+                               role-files))
+            bf (io/file dir "businesses.edn")
+            businesses (when (.exists bf)
+                         (let [c (try (slurp-edn bf) (catch :default _ nil))]
+                           (if-let [bs (:awai.businesses/businesses c)]
+                             (for [b bs]
+                               (-> b
+                                   ;; :roles / :roles-absent are a vector of
+                                   ;; keywords and a vector of maps; the first
+                                   ;; survives as an array, the second must be
+                                   ;; a blob, so name them apart.
+                                   (dissoc :business/roles-absent)
+                                   (assoc :business/role-count (count (:business/roles b))
+                                          :business/roles-absent-edn
+                                          (pr-str (vec (:business/roles-absent b)))
+                                          :business/roles-absent-count
+                                          (count (:business/roles-absent b))
+                                          :repo/path (str "orgs/" (:business/repo b))
+                                          :source/dataset "awai-yakuwari"
+                                          :source/file (str bf))))
+                             (do (swap! skipped conj (str bf)) nil))))
+            ff (io/file dir "fleet.edn")
+            fleet (when (.exists ff)
+                    (let [c (try (slurp-edn ff) (catch :default _ nil))]
+                      (when (map? c)
+                        [(-> c
+                             (dissoc :awai.fleet/capability-ceiling
+                                     :awai.fleet/principal :awai.fleet/resources
+                                     :awai.fleet/weights :awai.fleet/authority
+                                     :awai.fleet/journal :awai.fleet/residency
+                                     :awai.fleet/runners)
+                             (assoc :awai.fleet/capability-ceiling-edn
+                                    (pr-str (:awai.fleet/capability-ceiling c))
+                                    :awai.fleet/global-wip
+                                    (:global-wip (:awai.fleet/resources c))
+                                    :awai.fleet/principal-name
+                                    (:principal/name (:awai.fleet/principal c))
+                                    :awai.fleet/principal-registration
+                                    (:principal/registration (:awai.fleet/principal c))
+                                    :source/dataset "awai-yakuwari"
+                                    :source/file (str ff)))])))]
+        (when (and (.exists roles-dir) (empty? roles))
+          (warn-skipped! "loop-yakuwari yakuwari/*.edn" ["(checkout present but no roles parsed)"]))
+        (warn-skipped! "loop-yakuwari" @skipped)
+        (concat
+         (for [e roles] (assoc e :db/id (next-tempid!)))
+         (for [e (or businesses [])] (assoc e :db/id (next-tempid!)))
+         (for [e (or fleet [])] (assoc e :db/id (next-tempid!))))))))
+
 ;; ---------- schema (manifest/schema.edn -> datascript createConn schema) ----------
 
 (defn schema-path [] (io/file root "manifest" "schema.edn"))
@@ -1027,6 +1191,17 @@
     ;; patent/applicant-norm is a vector of normalized names — join many-to-one
     ;; against company/legal-name-norm (gap 2: applicant × LEI cross-corpus join).
     (aset obj "patent/applicant-norm" (js-obj ":db/cardinality" ":db.cardinality/many"))
+    ;; awai-yakuwari (ADR-2607300800): a role holds several capabilities per
+    ;; decision, so these must be cardinality-many or datascript keeps only the
+    ;; last value and every "which roles need an approval" query silently
+    ;; under-reports. Declared here rather than in manifest/schema.edn because
+    ;; that file is generated and must not be hand-edited — same reason
+    ;; patent/applicant-norm sits here.
+    (doseq [a ["yakuwari.policy/autonomous" "yakuwari.policy/voice-required"
+               "yakuwari.policy/approval-required" "yakuwari.policy/blocked"
+               "yakuwari.policy/unknown" "yakuwari/capability"
+               "yakuwari/runners" "business/roles"]]
+      (aset obj a (js-obj ":db/cardinality" ":db.cardinality/many")))
     obj))
 
 ;; ---------- build + query ----------
@@ -1073,6 +1248,7 @@
         tadori-tx (tadori-threat-intel-entities next-tempid!)
         patent-tx (toshokan-patents-entities next-tempid!)
         innen-tx (innen-entities next-tempid!)
+        awai-tx (awai-yakuwari-entities next-tempid!)
         all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
                                                      biz-tx canvas-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
@@ -1080,7 +1256,8 @@
                                                      proc-registry-tx merged-kotoba-tx
                                                      working-doc-tx narrative-tx
                                                      company-tx fleet-tx
-                                                     yabai-tx tadori-tx patent-tx innen-tx)))]
+                                                     yabai-tx tadori-tx patent-tx innen-tx
+                                                     awai-tx)))]
     (.transact ds conn all-tx)
     {:conn conn
      :adr-count (count adr-tx)
@@ -1101,7 +1278,8 @@
      :yabai-count (count yabai-tx)
      :tadori-count (count tadori-tx)
      :patent-count (count patent-tx)
-     :innen-count (count innen-tx)}))
+     :innen-count (count innen-tx)
+     :awai-yakuwari-count (count awai-tx)}))
 
 (defn -main [& args]
   (let [[mode query-str] args
@@ -1109,23 +1287,24 @@
                 kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                 narrative-count company-count fleet-count yabai-count tadori-count patent-count
-                innen-count]}
+                innen-count awai-yakuwari-count]}
         (build-conn)
         total (+ adr-count docs-count manifest-count foreign-adr-count biz-count
                  kj-count rad-count
                  etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                  narrative-count company-count fleet-count yabai-count tadori-count patent-count
-                 innen-count)]
+                 innen-count awai-yakuwari-count)]
     (case mode
       "count"
       (println (format (str "adr=%s docs=%s manifest=%s foreign-adr=%s biz=%s kj=%s rad=%s "
                              "etzhayyim-80-data=%s proc-registry=%s merged-kotoba=%s working-doc=%s "
-                             "narrative=%s company=%s fleet=%s yabai=%s tadori=%s patent=%s innen=%s total=%s")
+                             "narrative=%s company=%s fleet=%s yabai=%s tadori=%s patent=%s innen=%s "
+                             "awai-yakuwari=%s total=%s")
                         adr-count docs-count manifest-count foreign-adr-count biz-count
                         kj-count rad-count
                         etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                         narrative-count company-count fleet-count yabai-count tadori-count patent-count
-                        innen-count total))
+                        innen-count awai-yakuwari-count total))
 
       "q"
       (println (pr-str (js->clj (.q ds query-str (.db ds conn)))))
