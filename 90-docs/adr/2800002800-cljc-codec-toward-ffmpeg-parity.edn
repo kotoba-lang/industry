@@ -326,6 +326,107 @@ Annex B をそのまま `mdat` に写した muxer は、**parse でき codec も
 source の値が要らないので生き延びていたが、ここで起こすトラックでは致命的。宣言しない
 トラックは 0 のまま = remux 出力は不変、これも assert）。
 
+### ffmpeg 側を初めて実測した —— 差は 1,120 倍で、アルゴリズム差ではない
+
+これまで「ffmpeg は数十秒」は**二次情報の引き写しで、一度も測っていなかった**。同一の
+720x1280 YUV を、x264 を**我々と同じスコープ**（B なし・参照 1 枚・CAVLC・16x16 のみ・
+trellis なし）＋**同じ全探索（`me=esa` merange=8）**＋**同じ 1 thread** に設定して測った:
+
+```
+x264 (esa ±8, subme=7, 1 thread) : 16.2 ms/frame   → 1800 フレームで 29 秒
+我々（289 + 49 候補, 1 thread）  : 18,140 ms/frame → 9.07 時間
+                                   1,120 倍
+x264 を dia+subme=1 に落としても 10.8 ms —— esa との差は 1.5 倍しかない
+```
+
+**探索範囲・候補数・thread 数を揃えてこの差である。探索を賢くしても埋まらない。**
+（この 18,140 ms は 720x1280 の**実測**。従来の数字はすべて 128x128 からの換算だったが、
+換算値 4.783 に対し実測 5.039 ms/MB で、外挿は妥当だった。）
+
+### 内訳を実測で分解した
+
+同じ 16x16 SAD を、**表現だけ**変えて測る:
+
+```
+行ベクタのベクタ + nth（当時の実装） 3051 ns/SAD  11.92 ns/px
+フラット persistent vector + nth     4051 ns/SAD  15.83 ns/px
+int-array + aget                      183 ns/SAD   0.72 ns/px   ← 16.6x
+byte-array + aget                     195 ns/SAD   0.76 ns/px
+```
+
+| 要因 | 倍率 | 根拠 |
+|---|---|---|
+| **データ表現** | **16.6x** | 上表の実測 |
+| SIMD | ~10x | **推定**。ARM64 NEON は 1 命令 16 byte、最良スカラ 0.72 ns/px から幅で割った値 |
+| その他（補間構築・残差・エントロピー・候補ごとの間接） | ~7x | 上 2 つで割った残り |
+
+### 実装したもの: ME 経路の配列化（`org-iso-h264` `30f36c0`、1.26x）
+
+`interp/plane->array` が参照面を**フレームに 1 回**、`grid->array` が 16x16 source block を
+**MB に 1 回**配列化する（それぞれに対する読みは 10⁶ 回規模）。撤回した support window との
+違いはここで、あれは候補ごとに**複製する仕事を足した**が、これは**読みが通る表現を変えて
+仕事を減らす**。残差・エントロピー経路は row-vector grid のまま —— 読みが集中しているのは
+ME だけだから。
+
+```
+交互 10 round median: 5.150 → 4.095 ms/MB = 1.26x（7/10 round 優位、分布は重なる）
+出力は全 20 run で byte 一致
+```
+
+**1.26x であって 16.6x ではない —— そしてこの 2 つの差が要点である。** 16.6x は 1 関数を
+単体で測った値で、フレームには sub-pel 面構築・残差符号化・再構成・エントロピー符号化・
+intra フレームがあり、kernel 測定はそれらを含まない。この ADR は有理数 solver の推定が
+3 倍外れたときに既に「**microbench からの外挿も「読んで分かった」と同じ罠**」と書いていたのに、
+ここで同じことを繰り返した（予測 33 分/エピソード、実測 約 7.2 時間 —— **1 桁以上の外れ**）。
+
+達成できたことは時計ではなく profile に出ている: **P フレームの 37.9% だった
+`interp/sample` が上位から消え、profile が平坦になった**（最大 15.6%：sad-mc-integer 15.6 /
+sad-mc-planes 9.2 / subpel-planes 9.2 / encode-macroblock! 7.5）。**残っているのは
+アクセスではなく演算である。**
+
+### SIMD —— kotoba-lang に基盤が存在しない（調査結果、2026-07-30）
+
+「SIMD を入れる」指示に対して、まず基盤の実在を確認した。**無い。**
+
+```
+kotoba-lang/compiler の src/ docs/ lang/ を横断:
+  v128  0件   simd  0件   i8x16  0件   neon  0件   avx  0件
+（docs/ の xmm 1件は native backend baseline が「無い」と書いている箇所）
+kotoba-lang 全 repo:  jdk.incubator.vector / IntVector / ByteVector  0件
+```
+
+したがって SIMD の選択肢は現在:
+
+1. **JVM Vector API** —— JVM 専用（cljs target が死ぬ）、incubator（CI の JDK 17/21 で
+   API が違う）、全 consumer に `--add-modules jdk.incubator.vector` が必要。そして
+   **CLAUDE.md の runtime 優先順位では JVM は最後の手段**であり、そこに SIMD を積むのは
+   方針と逆行する。**採らない**
+2. **kotoba compiler が wasm SIMD proposal / native の vector register を獲得する** ——
+   未実装。これが本来の置き場所で、`docs/native-aot-baseline.md` の値モデル
+   （8 byte ワード + 2 ワード heap pair のみ）と同じ層の欠落
+3. **既に実在する hardware 経路 = `org-w3-webcodecs`** —— ブラウザの hardware encode/decode。
+   macOS なら VideoToolbox が同位
+
+### 結論: scalar Clojure で x264 に追いつく路線は成立しない
+
+**900 倍を残した状態で profile は平坦になった。** つまり JVM 側のデータ構造作業で取れる
+ぶんは概ね取り終わっており、残りは演算そのもの —— SIMD 無しには縮まない。そして SIMD の
+基盤は無い。
+
+したがって **「純 cljc encoder を x264 の速度に近づける」は目標として成立しない**。
+この経路の価値は速度ではなく:
+
+- **可搬性** —— native 依存ゼロで、ブラウザでも nbb でも同じ bitstream を出す
+- **適合性の oracle** —— 実 ffmpeg が復号でき byte 一致する参照実装として、
+  hardware 経路の出力を検証できる
+- **W4 が要求している representative performance workload** ——
+  `kotoba-lang/lang/performance-workloads.edn` の既存 2 case は 12 要素の collection で、
+  ABI 判断は「representative real programs + allocation profile + lookup latency profile」を
+  要求している。**上記の profile と 16.6x 測定がまさにその証拠**である
+
+**実運用で 900 倍を埋める手は platform の hardware encoder への dispatch**
+（`org-w3-webcodecs` / VideoToolbox）であり、scalar 最適化の追加増分ではない。
+
 ### 次のレバー（実測シェア順、いずれも推測でなく上記 profile 由来）
 
 面共有まで入れた後の stage 帰属（514 sample、IDR の絶対時間は不変なのでその share が物差し）:
@@ -364,11 +465,16 @@ source の値が要らないので生き延びていたが、ここで起こす�
 3. ~~**`sad`（10.9%）**~~ —— **実装済み**（fused SAD + 早期打ち切り、1.71x。上記）
 4. ~~**`solve-regular-levels`（14.9%）**~~ —— **実装済み**（inter fold、関数単体 17.4x。上記）
 5. ~~**`me-full-search`（33.1%）**~~ —— **実装済み**（whole-pel SAD 経路、1.17x。上記）
-6. **interpolation の残り** —— `mc-predict`（最終再構成、8.4%）と decoder 側の
+6. **これ以上の scalar 最適化は「次のレバー」ではない** —— 上記の結論のとおり、profile が
+   平坦になり残りは演算で、SIMD 基盤が無い。続けるなら取れるのは `mc-predict`（10.9%）と
+   残差/再構成経路（約 19.5%）の配列化で合計 1.3〜1.4x 程度 —— **900 倍に対して意味を持たない**。
+   優先すべきは hardware dispatch（`org-w3-webcodecs` / VideoToolbox）と、
+   compiler 側の SIMD 基盤（wasm SIMD proposal / native vector register）
+7. **interpolation の残り** —— `mc-predict`（最終再構成、8.4%）と decoder 側の
    `mc-luma-block` はまだ画素ごとに 6-tap を再実行している。`subpel-planes` と同型の
    共有が効くはずだが、**1 MB に 1 回しか呼ばれない**ので 49 候補ぶんの償却が無い。
    着手前に必ず再 profile する
-7. **エピソード全体を実素材で 1 度通す** —— 現状すべて 128x128 の合成映像・9〜15 フレームの
+8. **エピソード全体を実素材で 1 度通す** —— 現状すべて 128x128 の合成映像・9〜15 フレームの
    実測からの換算である。**720x1280 の実クリップで 1 本通すまで、時間の数字は換算値**
 
 ### 現在地（4 段の実装後）
