@@ -187,7 +187,7 @@
     :decision-criteria
     {:proceed "Ready for final cutover, all SLOs green, team confident"
      :hold "Minor concern (e.g., GC pause trending up), extend observation"
-     :rollback "Issue found, abort canary"}}
+     :rollback "Issue found, abort canary"}}}
 
   :canary/stage-3b-cutover
   {:seq 4
@@ -249,7 +249,7 @@
     :decision-criteria
     {:proceed "Cutover successful, 100% cljc stable, ready to drain Rust pool"
      :hold "Want more observation time, delay drain to next day"
-     :rollback "Issue detected, abort to 99%"}}
+     :rollback "Issue detected, abort to 99%"}}}
 
   :canary/graceful-rust-drain
   {:seq 5
@@ -321,7 +321,7 @@
      "5. Alert: if needed to restore, full restore takes ~5 min (pre-flight gate 7 days before)"]
     :standby-duration-days 7
     :owner "murakumo-ops-lead"
-    :note "After 7 days (2026-09-21), Rust pool can be decommissioned (if no rollbacks triggered)"}
+    :note "After 7 days (2026-09-21), Rust pool can be decommissioned (if no rollbacks triggered)"}}
 
   :canary/post-cutover-validation
   {:seq 6
