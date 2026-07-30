@@ -115,4 +115,22 @@
   ;; 置かない不変条件はそのまま）。
   {:name "root" :id "root-repository-roles" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/repository-roles-check.cljs" :script-args ["--min" "20"]
-   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}]}
+   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+
+  ;; superproject の 3 本目。manifest が宣言することと GitHub の実態の乖離を見る。
+  ;; 検査ロジックは kotoba-lang/manifest-reality（純 .cljc、IO なし）が正本で、
+  ;; gate は west.yml / repos.edn を渡して呼ぶだけ — repository-roles gate と
+  ;; 同じ理由（Actions 側と fleet 側で別実装を持つと片方だけ通る状態が生まれる）。
+  ;;
+  ;; **GitHub 突合は既定で走らない。** unregistered / orphan / duplicate /
+  ;; credential-shaped は API を約 4,000 コール使い、5,000/h の予算を 1 tick で
+  ;; ほぼ使い切る。ここが毎 tick 走らせるのはファイルだけで完結する検査
+  ;; （構造 / org 整合 / stale path key）に限る。突合を足すときは日次の別 entry に
+  ;; して --with-reality を付ける。
+  ;;
+  ;; :include-ext に ".yml" が要る（manifest/west.yml）。".edn" と併せて ~1,900 件で、
+  ;; docs-edn gate と同じ桁。**キャッシュキーに filter が入る**ので他 gate の
+  ;; tarball を掴む事故（2026-07-29）は起きない。
+  {:name "root" :id "root-manifest-reality" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/manifest-reality-check.cljs"
+   :include-ext [".edn" ".yml"] :min-files 1500 :cd false}]}
