@@ -31,9 +31,12 @@
                         "orgs/cloud-itonami/cloud-itonami-isic-7310/README.md および src/advertising/*.cljc"
                         "orgs/cloud-itonami/yukkuri/lg/lg_yukkuri/graphs/manage_ads.py (396 行)"
                         "orgs/cloud-itonami/yukkuri/260615-ads-api-tool-design.md — Google Ads API developer token 申請文書"
-                        "orgs/cloud-itonami/cloud-itonami-app/ — 全文検索で ads/campaign 実装コードが 0 件であることを確認"],
+                        "orgs/cloud-itonami/cloud-itonami-app/ — 全文検索で ads/campaign 実装コードが 0 件であることを確認"
+                        "ads.google.com/aw/apicenter — yukkuri MCC と GFTD Ads Manager MCC の API センターを 2026-07-30 に直接読み取り(トークン値は表示していない。アクセス権とデベロッパーの詳細のみ)"
+                        "ads.google.com/aw/accountaccess/managers — ゆっくりサイバーch(798-261-2098)の管理者タブを 2026-07-30 に直接読み取り"],
   :adr/known-gaps ["root@junkawasaki.com の Google 広告アカウント(741-964-8074)は 2 段階認証必須で閲覧できていない。2FA の有効化はセキュリティ設定の変更なので agent は行わない(安全床)。このアカウントに shiropico/ghosthacker のキャンペーンが無いことは未確認。"
-                   "260615-ads-api-tool-design.md が記す CID(MCC 970-623-7410 / client 557-039-4054)と、2026-07-30 のアカウント選択画面が表示した CID(yukkuri MCC 459-659-5747 / ゆっくりサイバーch 798-261-2098)が一致しない。Ads の URL には両方の番号が別パラメータ(__c と __e)として現れるため同一アカウントの別 ID 面である可能性が高いが、確認していない。"
+                   "yukkuri MCC のトークンがベーシックに上がっていない理由(申請未送信 / 審査中 / 却下)は API センターの画面からは読めない。承認メールの有無を確認していない。"
+                   "GFTD Ads Manager MCC 配下の唯一のサブアカウント 640-633-3631(表示名『Google 広告アカウント』)が何の広告主なのかを確認していない。"
                    "コンバージョン 0.00 が「本当に 0」なのか「計測タグ未設置で観測できていない」のかを区別していない。自社の AW- コンバージョンタグは workspace 内に 1 つも存在しないため後者の疑いが強いが、Ads 側の目標設定画面を見ていない。"
                    "yk-shiropico-ep01-en-infeed-260719 を誰が(どのツールで)作成したかは変更履歴を見ておらず断定していない。命名規約が manage_ads.py の yk-<topic>-<lang>-<arm>-<yymm> と一致することからの推定にとどまる。manage_ads.py の PLAN dict に shiropico の項目は無い。"
                    "yk-cyber-* のうち 5 件は status が有効のまま(終了日 2026-06-24 は経過)。配信はされていないが、status を揃えるかどうかは未決定。"],
@@ -154,8 +157,10 @@ API/browser 実装を持ち、MCP 経由で公開する。この ns は vendor A
   マジックリンクを LLM に露出させず、provider adapter が credential 境界の内側で
   消費して receipt だけ返す。
 
-**readiness は `:partial`。Google Ads API の developer token が未承認で、
-2026-07-20 の smoke test では campaign-read すら通っていない。**
+**readiness は `:partial`。2026-07-20 の smoke test では campaign-read が通らず、
+failure は `:target-customer-not-accessible`。その理由は下記『API 登録の実態』の
+とおりで、「トークンが無い」ではなく「使えるトークンと対象アカウントが繋がって
+いない」である。**
 `kotoba-lang/com-googleapis-googleads` は west manifest に存在しない(近い名前で
 `etzhayyim/com-google-ads` があるが、これは別物 — 監視広告技術の構造的反転を
 狙った charter-clean な outreach actor で、R0 設計 scaffold・`src/` 無し)。
@@ -200,8 +205,56 @@ in the actor` を明記。ADR-2607301200 が定めたとおり **判定層であ
 
 `260615-ads-api-tool-design.md` は Google Ads API の developer token 申請文書
 (`yukkuri-ads-ops`、audit / pause / budget の 3 機能、OS キーチェーン保管、
-日次上限 10,000 円)。**申請はしたが承認されておらず**、それが (1) の
-`:developer-token-not-approved` と同じ壁である。
+日次上限 10,000 円)。
+
+## API 登録の実態 — トークンは 2 つあり、片方はベーシック
+
+オーナーの指摘(「api を登録したはずなんですが」)は**正しい**。API センターを
+直接読んだ結果、開発者トークンは **2 つ**存在した。トークン値は表示していない
+(アクセス権とデベロッパーの詳細のみ読み取り)。
+
+| | yukkuri MCC 459-659-5747 (jun784@gmail.com) | GFTD Ads Manager MCC 557-192-1235 (jun@gftd.group) |
+|---|---|---|
+| 開発者トークン | あり | あり |
+| **アクセス権** | **テスト アカウント** | **ベーシック アクセス** |
+| 会社名 | Gftd Works 株式会社 | Gftd Japan株式会社 |
+| 会社タイプ | 広告主 | 代理店、SEM |
+| 用途 | youtube 動画の広告出稿 | 自社及び顧客の広告の出向管理、広告代理店 |
+| API 連絡先 | jun784+yukkuri@gmail.com | jun@gftd.group |
+| 管理下アカウント | **0 件** | **640-633-3631 のみ** |
+
+そして決定的な事実:
+
+**ゆっくりサイバーch (798-261-2098) の管理者タブは「まだエントリはありません」。
+この広告アカウントは、どの MCC 配下にも入っていない。**
+
+`260615-ads-api-tool-design.md` は次の構造を Google に申告している:
+
+```
+Manager account (MCC) 970-623-7410   ← developer token issued here
+        └── linked ── Client account 557-039-4054 (ゆっくりサイバーch)
+```
+
+`__c=9706237410` で API センターを開くと yukkuri MCC が表示されるので、
+**970-623-7410 = yukkuri MCC(459-659-5747 と同一アカウントの別 ID 面)、
+557-039-4054 = ゆっくりサイバーch(798-261-2098 の別 ID 面)** で間違いない
+(以前の版でこれを CID 不一致の疑いとして gap に挙げていたが、解消した)。
+しかし **その linked 関係は今日存在しない**。申請文書が申告した構造が、実体と
+一致していない。
+
+つまり詰まっているのは 3 点であり、`adnetwork_providers.cljc` の 2 つの
+production-blocker と正確に対応する:
+
+1. `:developer-token-basic-or-standard-access` — **yukkuri 側のトークンが
+   テストアカウント専用**。テストアカウント以外は呼べない。
+2. `:target-customer-account-link` — **shiropico が載っている 798-261-2098 に
+   マネージャーが 1 つも無い**。どのトークンからも `login_customer_id` 経由で
+   到達できない。
+3. GFTD 側のトークンは**ベーシックで即使えるが**、管理下が 640-633-3631 だけ
+   なので、やはり 798-261-2098 には届かない。
+
+2026-07-20 の smoke が `:target-customer-not-accessible` で落ちたのは、リンクが
+壊れたからではなく **一度も存在しなかったから**である。
 
 ## この gap が実際に何を起こしたか
 
@@ -231,13 +284,26 @@ in the actor` を明記。ADR-2607301200 が定めたとおり **判定層であ
 - 次に閉じるべき穴は 3 つ、この順:
   1. **計測**。CV 0 の解釈が確定しない限り、この 2,376 円から学べることが無い。
      自社の AW- コンバージョンタグは workspace 内に存在しない。
-  2. **経路の一本化**。(4) が出す支出を (1) の provider 契約
-     (`campaigns.list` / `metrics.report`)から見えるようにするか、developer token を
-     取得して (4) を退役させるか。どちらにせよ **支出が governor から不可視のまま**に
-     しない。
-  3. **cloud-itonami-app への統合可否の決定**。現状「app は 7310 を知っているが
+  2. **API 経路の開通(アカウントリンク)**。トークンは既にあるので、必要なのは
+     取得ではなく**接続**である。選択肢は 2 つで、どちらも取り返しのつく操作ではあるが
+     法人格・請求・所有権に触るためオーナー判断:
+     - **(A) 798-261-2098 を GFTD Ads Manager MCC(557-192-1235)にリンクする** —
+       トークンが既にベーシックなので**審査待ちなしで即日開通**する。ただし
+       Gftd Japan(広告代理店)が個人チャンネルの広告アカウントを管理する構造になる。
+     - **(B) 798-261-2098 を yukkuri MCC(459-659-5747)にリンクし、yukkuri
+       トークンのベーシック昇格を申請する** — 所有構造は自然(同一 Google
+       アカウント、Gftd Works 名義で申請済み)だが、昇格審査を待つ必要がある。
+     どちらも Google 側で**パスキーが要求される機密操作**(ユーザー追加・アカウント
+     リンク)なので、agent は実行しない。オーナーが実施する。
+  3. **経路の一本化**。開通後、(4) が出す支出を (1) の provider 契約
+     (`campaigns.list` / `metrics.report`)から見えるようにする。どちらにせよ
+     **支出が governor から不可視のまま**にしない。
+  4. **cloud-itonami-app への統合可否の決定**。現状「app は 7310 を知っているが
      呼んでいない」。統合するのかしないのかを決めていないだけの状態を続けない。
 - 741-964-8074 の確認はオーナーが 2FA を有効化した後に行う。
+- `260615-ads-api-tool-design.md` は Google に申告した構造(MCC 配下に
+  ゆっくりサイバーch がリンクされている)が実体と食い違っている。リンクを
+  張れば一致するので、張る側で直す。放置すると申告と実態の乖離が残る。
 
 ## Alternatives considered
 
@@ -250,4 +316,10 @@ in the actor` を明記。ADR-2607301200 が定めたとおり **判定層であ
   記録し、経路一本化の決定と一緒に扱う。
 - **cloud-itonami-app に広告機能が『あるはず』として探し続ける**: 却下。全文検索で
   0 件という結果を、そのまま結論にする。
+- **agent がアカウントリンクを実行してしまう**: 却下。Google 側でパスキーを要求される
+  機密操作であり、安全床①(認証情報を自分でフォーム入力しない)に当たる。加えて
+  どの MCC 配下に置くかは法人格・請求・所有権の選択で、オーナーの判断に属する。
+- **『developer token が未承認だから API は使えない』で止める**: 却下。実際には
+  ベーシックのトークンが既に存在した。ブロッカーはトークンの有無ではなく
+  **トークンと対象アカウントの接続**であり、両者を混同すると打ち手を間違える。
 "}]
