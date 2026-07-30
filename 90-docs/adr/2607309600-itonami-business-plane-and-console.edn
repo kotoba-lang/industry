@@ -40,32 +40,36 @@ menu を「対象」と「道具」に分ける。
 
 ## Context
 
-### 実測した現在地（2026-07-30、cloud-itonami-app HEAD 254bbab）
+### 実測した現在地（2026-07-30、cloud-itonami-app `origin/main` = cc0d24b）
 
-**1. app に business を管理する UI は 1 つも無い。**
-menu は 9 項目（`web.clj:2755-2764`）で、Chat / Worker / Organisms / Inbox /
-Projects / Drive / Scheduler / Storage / Settings。スコープの単位は
-Organization(Tenant) だけで、これは membership の境界（`docs/tenant-model.md`）
-であって事業モデルの器ではない。
+**1. business を管理する UI は無い。** menu は 12 項目（Portfolio 追加前:
+Chat / Worker / Organisms / Inbox / Projects / Drive / Scheduler / Storage /
+Fleet / 事業者 / Contracts / Settings）で、道具と対象が 1 つの平らなリストに
+混在していた。スコープの単位は Organization(Tenant) だけで、これは membership の
+境界（`docs/tenant-model.md`）であって事業モデルの器ではない。
 
-**2. fleet 1,212 actor に UI 面が無い。**
-`rg fleet src/cloud/itonami/app/web.clj` は 0 hit。`/api/*` は 14 prefix
-（authority / chat / cloud / connections / filecoin / funding / identity / oauth /
-organism-workers / passkeys / session / state / workers / workspace）で、fleet も
-business も無い。fleet directory は MCP tool と in-app agent 経由でしか触れない
-（`fleet.clj` / `mcp.clj`）。
+**2. fleet には UI 面がある。** `Fleet` view（catalog 検索 + facet）、`事業者`
+view（`operator.clj`: 発見 → 適合 → 要件 → 表明 → 稼働）、`Contracts` view が
+あり、`/api/*` は 17 prefix で `/api/fleet` `/api/operator` `/api/contracts` を
+含む。**足りないのは「fleet が見えないこと」ではなく、見えている repo・参与・
+canvas・XMILE・法人実体を 1 つの事業として束ねるものが無いこと。**
 
-**3. 185 の法人実体は catalog から意図的に落ちている。**
+**3. 参与の単位は repo であって事業ではない。** `operator.clj` の
+`:operator-adoptions` は `:adoption/repo` を鍵に持ち、`operator/profile` は
+インストール単位の**単一**レコード（organization scoped ではない）。つまり
+「1 事業者が N 個の blueprint を運用する」は表せるが、「1 会社が N 個の事業を
+持ち、各事業が M 個の blueprint と 1 つの canvas を持つ」は表せない。
+
+**4. 185 の法人実体は catalog から意図的に落ちている。**
 `scripts/gen-itonami-fleet-catalog.cljs:168-172` が `:company/lei` を持つ
 blueprint を `:non-actor` に分類するので、生成物にはカウント
 （`:company-record-count 185`）だけが残り、実体は出荷されない。
 
-**4. Projects view は 1 repo ハードコード + 装飾の view-switcher。**
+**5. Projects view は 1 repo ハードコード + 装飾の view-switcher。**
 `workspace.clj:283-290` が `owner=kotoba-lang` `repo=kotoba` を固定している。
-`web.clj:2713-2716` の Table / Board / Roadmap は `aria-pressed` を付け替える
-だけで再描画しない — 現状は装飾。
+Table / Board / Roadmap は `aria-pressed` を付け替えるだけで再描画しない。
 
-**5. 3 つの分析面はどれも app に繋がっていない。**
+**6. 3 つの分析面はどれも app に繋がっていない。**
 `deps.edn` に `dynamics` / `org-oasis-open-xmile` / `70-tools/bmc` への依存が
 1 つも無い。
 
@@ -103,6 +107,18 @@ blueprint を `:non-actor` に分類するので、生成物にはカウント
   出荷する。Portfolio view が callable 数や法人数を出すなら、この欠陥をそのまま
   UI に出すことになる。
 
+### この ADR の初版が間違っていた点（同日訂正）
+
+初版は「fleet に UI 面が無い」「menu は 9 項目」「`/api` は 14 prefix」と書いた。
+**どれも誤りで、原因は監査を `origin/main` から 58 commits 遅れた west checkout の
+上で取ったこと。** その checkout には Fleet / 事業者 / Contracts の 3 view が
+まだ存在しなかった。上の実測は `origin/main`（cc0d24b）で取り直した値に差し替えた。
+
+これは前節の「生成物が checkout の完全性に依存している」と**同じ欠陥クラス**で、
+対象が生成物ではなく監査そのものだった、というだけの違い。west pin が遅れた
+checkout は、そこで読んだコードについての結論も遅れさせる。**現在地を主張する前に、
+その checkout が `origin/main` を含んでいるかを確かめる。**
+
 ## Decision
 
 ### 1. business の単位は Tenant 配下の第一級 entity `Business` とする
@@ -115,16 +131,26 @@ blueprint を `:non-actor` に分類するので、生成物にはカウント
   なので、そこに事業モデルを載せると「事業を 1 つ増やす」が「会社を 1 つ増やす」
   になる。
 
-### 2. Business は 4 面の join key を 1 entity に集める
+`operator.clj` の `:operator-adoptions` が repo を鍵に持つことは、この決定と
+矛盾しない: adoption は「この事業者がこの blueprint を運用する」という記録で、
+Business はその**上**に立ち、1 事業が複数の adoption を束ねる。adoption を
+business に昇格させないことが、この決定の内容である。
+
+### 2. Business は 5 面の join key を 1 entity に集める
 
 ```clojure
-{:business/id      :cloud-itonami-5820           ; slug（Tenant-scoped）
- :business/tenant  #uuid \"…\"                    ; 所属 Tenant
- :business/canvas  :cloud-itonami                ; → :canvas/product（BMC 面）
- :business/repos   [\"orgs/cloud-itonami/…\"]      ; → :repo/path（repo-taxonomy / repo-maturity）
- :business/lei     \"ZSN2LWNPYW6ISMRUC664\"        ; → :company/lei（market-intel / ToS。任意）
- :business/model   \"…xmile\"}                     ; → XMILE モデル（SD 面）
+{:business/slug       \"cloud-itonami-5820\"        ; organization 内で一意
+ :organization-id     \"org-…\"                     ; funding account と同じ scoping
+ :business/canvas     :cloud-itonami               ; → :canvas/product（BMC 面）
+ :business/model      \"…xmile\"                    ; → XMILE モデル（SD 面）
+ :business/adoptions  [\"cloud-itonami-isic-5820\"] ; → :adoption/repo（operator 面）
+ :business/repos      [\"orgs/cloud-itonami/…\"]    ; → :repo/path（repo-taxonomy）
+ :business/lei        \"ZSN2LWNPYW6ISMRUC664\"}     ; → :company/lei（法人実体。任意）
 ```
+
+初版は 4 面（canvas / repos / lei / model）と書いた。`:adoptions` は 5 面目で、
+`operator.clj` が repo 鍵の参与記録を出荷済みだから分ける: 参与を表明した repo は
+「存在する repo path」より強い事実で、両者を畳むとその差が消える。
 
 **これが本 ADR の核。view より先にこの entity を作る。** 無いまま view を作ると
 view ごとに別の business 概念ができ、いまの 3 面分裂を再生産する。
@@ -225,6 +251,49 @@ app ADR-0001（jp-go-digital-design-system 採用）を踏襲し、`dds/*` +
 `:callable-count 10` と ADR-2607300200 の callable 67 の齟齬を先に潰す
 （`nbb scripts/gen-itonami-fleet-catalog.cljs`）。UI が古い生成物を権威として
 出さないため。
+
+## Phase 1 — 着地したもの（2026-07-30）
+
+`cloud-itonami-app` に入ったのは entity と read-only な Portfolio だけで、解析
+view は入っていない。
+
+- **`cloud.itonami.app.business`** — 5 面の鍵を持つ Tenant-scoped entity。
+  `create!` / `bind!` は自分の `:businesses` partition しか書かず、
+  `binds-only-locally?` がその面を返して test が固定する。
+- **`/api/business`（GET / POST）と `/api/business/{id}/bind`（POST）** — 読みも
+  session 必須。fleet directory は公開 OSS なので unauthenticated だが、「ある組織が
+  どの blueprint を自分の事業と決めたか」はその組織自身の記録。
+- **Portfolio pane** — 5 面それぞれの state と、どの事業にも紐付かない参与の
+  未割当 bucket。`:workspace-root` 既定 nil なので、素の状態では全ての面が
+  `:unresolvable` で設定名を示す。
+- **menu を 2 段に分けた** — BUSINESS（Portfolio / Fleet / 事業者 / Contracts）/
+  WORKSPACE（Chat…Storage）/ SETTINGS。group heading は装飾で、各 button は
+  従来どおり自分の `data-view` を持つ（group が「先に開くもの」にならない）。
+- app 側の記録は `docs/adr/0008-business-is-the-join-of-five-planes.md`
+  （0007 は上流が drive の document surface に先に使った）。
+
+**値は出さない。** canvas の項目・leverage band・maturity score・market-intel の
+収益はこの phase に無い。3 つの解析 view を載せる前に join が成立することを
+証明するのが phase の内容。
+
+### 検証
+
+`clojure -M:test` 471 tests / 1987 assertions、0 failures 0 errors
+（うち business 系 20 test — entity・face state・tenant 分離・書き込み面の固定と、
+実 HTTP での route/status/CSRF）。`clojure -M:lint` errors 0（warning 11 件は
+すべて既存で、追加分は 0）。`page-html` を実 render（299 KB）して Portfolio の
+markup を確認し、inline JS を `node --check` で構文検査。
+
+### 副産物として見つけた既存 bug（同時に修正）
+
+`clojure.data.json/write-str` は **keyword キーの名前空間を落とす**（`:business/id`
+→ `"id"`）。このため `renderOperator` が読んでいた `['operator/name']` /
+`['adoption/repo']` / `['adoption/stage']` などは **undefined** で、事業者 pane の
+参与一覧とプロファイル名が空だった。documents / sheets / slides / forms の
+`['docs/blocks']` 系が壊れていないのは、**あちらのキーが server 側で文字列**
+（`read-json-raw` が keywordize しない）で素通りするから。両者が同じ見た目で
+片方だけ動くのが、この bug が見逃されていた理由。wire 契約を web.clj のコメントに
+固定し、HTTP test が実際の wire キーで assert するようにした。
 
 ## Consequences
 
