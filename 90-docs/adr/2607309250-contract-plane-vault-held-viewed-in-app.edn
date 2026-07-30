@@ -1,5 +1,5 @@
 [{:db/id -1
-  :adr/id "2607309200"
+  :adr/id "2607309250"
   :adr/title "契約（サブスク）を kagi vault に E2E で保管し、cloud-itonami-app で確認する — Storj/Proton 型。E2E の代償は隠さない"
   :adr/status "accepted"
   :adr/date "2026-07-30"
@@ -59,7 +59,9 @@ Proton/Storj 型の substrate は既に存在した。ADR-2607170500 で kagi va
 - Grok は 2 entry に分けた（`supergrok` = xAI 直課金、`x-premium` = X 同梱）。請求経路が違い、間違った経路で解約しても課金は止まらないため、self-submit の第 1 手順が「請求経路の特定」になっている。X Premium は開示ガイダンス『自動更新の 24 時間以上前に解約』を `notice-days 1` として持つ（0 に丸めると「更新当日に気付いても手遅れ」という事実が消える）。
 - 実装中に見つけた実バグ 1 件: `vault-ledger` の svc-id が ASCII slug 由来で、日本語だけの名前が空文字に潰れて全部 `svc:` に合流していた（別々の契約が 1 本の縁になる）。item id への fallback で修正、回帰テスト付き。
 - **残る制約（次に効く順）**: (a) `kagi push` は vault 単位の last-writer-wins（ADR-2607170500 follow-up (b)）。Mac と iPhone で同時に契約を編集すると片方が黙って消える。多デバイス運用の前に item 粒度 sync が要る。(b) 利用実績の入力経路が無い間、`analyze` の解約推奨は構造的に出せない（`gaps` がそう報告する）。(c) 明細からの自動検出（kaiyaku `meisai_ingest` ← `kakeibo` ← `statement-fetch`）は未接続。`statement-fetch` の認証は `:handoff` で argv にコンパイルされないので、人間の手が要る設計のまま。(d) `~/.kagi` の vault はまだ `kagi push` していない（クラウド永続化は経路として存在するが、この契約データについては未実行）。
-- kaiyaku の README が `methods/handoff_ingest.py` を指しているが実体は `.cljc`（stale）。`bb.edn` も残っており ADR-2607173000 の退役対象。今回は触っていない。"
+- kaiyaku の README が `methods/handoff_ingest.py` を指しているが実体は `.cljc`（stale）。`bb.edn` も残っており ADR-2607173000 の退役対象。今回は触っていない。
+- **証拠をどこから取るか（メール / 1Password / カード明細）と、証拠を契約に結びつける規則は ADR-2607309260。** 本 ADR は「契約をどこに保管し、どう見るか」までを定める。
+- 当初この ADR は id `2607309200` を持っていたが、同日別セッションの `2607309200-local-root-convention-and-west-orphans` と衝突していた（datom 面で 1 つの id に 2 entity）。相手の文書と参照を壊さないよう、**自分の側**を `2607309250` に付け替えた（外部参照はどちらにも無いことを確認済み）。"
 
   :adr/alternatives
   "- **メタデータだけ平文にしてサーバ側集計を可能にする**: 次回課金リマインダや横断集計をサーバに置けるが、金額と日付が漏れる。「storj, proton スタイル」という指示はこれを選ばないという意味なので採らない。採らなかった代償（クエリ不可）は画面に書く方を選んだ。
