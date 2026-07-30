@@ -990,6 +990,20 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31aq — T8.4 Node live host runner)
+
+- kototama#98 MERGED (`1b2bb9ec`): **T8.4 Node/browser live host-parity runner**
+  — `web/verify-host-parity-live.mjs` proves 8 cases on Node WebAssembly +
+  actor-host; `run-node-live` integrates from Clojure. Complements JVM #96/#97.
+  Evidence: 4 tests / 47 assertions + node script green.
+- west pin kototama → `1b2bb9ec`.
+
+Still open:
+1. T8.3 ops/network AOT Components (http/secret)
+2. T8.4 broader import coverage (pg/llm/http-post/kagi live)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
