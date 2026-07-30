@@ -629,18 +629,61 @@
 ;; `:company/*` の属性名は 3 者で共有されるので、出自の区別は `:source/dataset`
 ;; で行う（属性名を書き換えて出自を埋め込むと結合キーが壊れるため、そうしない）。
 
-(defn market-intel-company-facts-file []
-  (io/file root "orgs" "gftdcojp" "cloud-murakumo-market-intel" "data" "company-facts.edn"))
+(defn west-project-path
+  "west.yml が宣言する project の `path:`（例 \"orgs/network-awai/foo\"）。
+
+   org をパスに焼き込まないためにこれを通す。この関数が無かった間、
+   market-intel は `orgs/gftdcojp/...` を直接指しており、west が repo を
+   `orgs/network-awai/...` へ移した時点で存在しないディレクトリを見に行き、
+   **黙って 0 entity を返していた**。結果 CLAUDE.md が主力機能として挙げる
+   「財務 × 法人実体 × ToS を 1 クエリ」が `[]` を返し続けた（実測 2026-07-30:
+   `company/revenue-usd` は 0 entity、dataset 一覧に market-intel が不在）。
+   west が正である以上、パスは west から引く。"
+  [project-name]
+  (let [f (io/file root "manifest" "west.yml")]
+    (when (.exists f)
+      (loop [lines (str/split-lines (slurp f)) cur nil]
+        (when-let [l (first lines)]
+          (let [t (str/trim l)]
+            (cond
+              (str/starts-with? t "- name:")
+              (recur (rest lines) (str/trim (subs t 7)))
+
+              (and (= cur project-name) (str/starts-with? t "path:"))
+              (str/trim (subs t 5))
+
+              :else (recur (rest lines) cur))))))))
+
+(defn market-intel-company-facts-file
+  "SEC EDGAR 財務ファンダメンタルズの実ファイル。west が宣言する path 配下を見る。"
+  []
+  (when-let [p (west-project-path "cloud-murakumo-market-intel")]
+    (apply io/file root (concat (str/split p #"/") ["data" "company-facts.edn"]))))
 
 (defn company-facts-entities [next-tempid!]
   (let [f (market-intel-company-facts-file)]
-    (if (.exists f)
+    (cond
+      (nil? f)
+      (do (js/console.error
+           (str "edn-query: WARNING market-intel: west.yml に "
+                "cloud-murakumo-market-intel の path が無い — 財務データは "
+                "load されない（:company/revenue-usd は 0 件になる）"))
+          [])
+
+      (not (.exists f))
+      ;; 黙って [] を返すのがこの面を壊した経路そのもの。存在しないなら言う。
+      (do (js/console.error
+           (str "edn-query: WARNING market-intel: " f
+                " が無い — 財務データは load されない。west update が未実行か、"
+                "repo が移動している"))
+          [])
+
+      :else
       (for [e (or (vector-of-maps-entities f) [])]
         (assoc e
                :db/id (next-tempid!)
                :source/dataset "market-intel"
-               :source/file (str f)))
-      [])))
+               :source/file (str f))))))
 
 (defn lei-repo-dirs
   "orgs/cloud-itonami/cloud-itonami-lei-<lei> ディレクトリの一覧。親を
