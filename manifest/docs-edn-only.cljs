@@ -477,6 +477,30 @@
       (println (format "adr md=%s edn=%s (tx-data=%s multi=%s bare/other=%s bad=%s) other-90-docs-md=%s"
                        (count mds) (count edns) @tx @multi @bare @bad other-md)))))
 
+(defn split-string-keys
+  "Keys that are not keywords in an ADR entity — the fingerprint of a string
+  literal that ended early.
+
+  An unescaped `\"` inside `:adr/body` terminates the string, and the rest of
+  the document becomes stray map keys and values. If the quote count happens to
+  stay even the file still PARSES, so `parse-errors` says nothing: measured
+  2026-07-30, ADR-2607299300 had a `:adr/body` truncated at 9,684 of 22,649
+  characters (probe output containing \"mainnet\" and [\"1413\"]), and four
+  addenda were invisible to every query over \"adr/body\" for a whole session.
+
+  Scoped to entities carrying `:adr/id`, which are always keyword-keyed, so a
+  legitimate string- or number-keyed table elsewhere in 90-docs is not flagged."
+  [content]
+  (let [entities (cond (map? content) [content]
+                       (sequential? content) (filter map? content)
+                       :else [])]
+    (->> entities
+         (filter #(contains? % :adr/id))
+         (mapcat #(remove keyword? (keys %)))
+         (map pr-str)
+         distinct
+         vec)))
+
 (defn verify!
   "EDN が 90-docs の唯一の正本であることを機械検証する。
    - 90-docs 配下に .md が無い
@@ -493,6 +517,7 @@
         bad-sf-re #":(?:adr|doc)/source-format\s+\"(?:md-migrated|edn\+md-merged)\""
         parse-errors (atom [])
         not-tx (atom [])
+        split-strings (atom [])
         path-md-hits (atom [])
         sf-hits (atom [])]
     (doseq [f edns]
@@ -510,12 +535,15 @@
             (when (and (str/includes? (str f) "/adr/")
                        (not (multi-entity-tx? content))
                        (not (already-tx-data? content)))
-              (swap! not-tx conj (str f))))
+              (swap! not-tx conj (str f)))
+            (when-let [ks (seq (split-string-keys content))]
+              (swap! split-strings conj [(str f) ks])))
           (catch :default e
             (swap! parse-errors conj [(str f) (ex-message e)])))))
-    (println (format "verify: md=%s edn=%s parse-errors=%s not-tx=%s path-md-refs=%s source-format-residue=%s"
+    (println (format "verify: md=%s edn=%s parse-errors=%s not-tx=%s split-strings=%s path-md-refs=%s source-format-residue=%s"
                      (count md-left) (count edns)
                      (count @parse-errors) (count @not-tx)
+                     (count @split-strings)
                      (count @path-md-hits) (count @sf-hits)))
     (when (seq @parse-errors)
       (println "=== PARSE ERRORS ===")
@@ -523,6 +551,10 @@
     (when (seq @not-tx)
       (println "=== NOT TX-DATA (adr) ===")
       (doseq [f (take 20 @not-tx)] (println " " f)))
+    (when (seq @split-strings)
+      (println "=== SPLIT STRINGS (parses, but a literal ended early) ===")
+      (doseq [[f ks] (take 20 @split-strings)]
+        (println " " f "-> stray keys:" (str/join " " (take 6 ks)))))
     (when (seq @path-md-hits)
       (println "=== 90-docs/*.md PATH REFS ===")
       (doseq [f (take 20 @path-md-hits)] (println " " f)))
@@ -530,7 +562,7 @@
       (println "=== source-format residue ===")
       (doseq [f (take 20 @sf-hits)] (println " " f)))
     (let [ok? (and (empty? md-left) (empty? @parse-errors) (empty? @not-tx)
-                   (empty? @path-md-hits) (empty? @sf-hits))]
+                   (empty? @split-strings) (empty? @path-md-hits) (empty? @sf-hits))]
       (if ok?
         (do (println "verify: OK — 90-docs is EDN-only SSoT")
             0)

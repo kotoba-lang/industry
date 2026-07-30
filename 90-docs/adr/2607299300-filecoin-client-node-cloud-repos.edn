@@ -385,13 +385,26 @@ differential probe。**CI では走らせない** (公開 endpoint 依存・非 
 
 ### 次の agent が最初に打つコマンド
 
-    cd orgs/kotoba-lang/io-filecoin-transport && npm run live
+    cd orgs/kotoba-lang/io-filecoin-transport
+    npm run live              # chain 面: 8/8 なら stack は健全
+    npm run probe:provider    # storage 面: PieceCID を再計算するまで通す
 
-これが 8/8 なら stack は健全。write 経路を進めるなら
-`scripts/live.cljs` の `probe-write` が出発点。
+`probe:provider` は「provider が :present と答える」ことと「正しい bytes を
+返す」ことが別だと実測で示す (2026-07-30 は 13 件中 2 件だけが verified)。
+数が減っていても慌てない —— provider 側の状態であってこの stack の異常ではない。
+1 件でも verified が出れば取得経路は生きている。
+
+write 経路を進めるなら `scripts/live.cljs` の `probe-write` が出発点。
 
 ## 未達 / 引き継ぎ
 
+- **superproject の CI は runner が割り当てられない** (2026-07-30 実測:
+  `west-pin-verify` / `docs-edn-verify` 他が 1-4 秒で `runner_name: \"\"` のまま
+  failure。`68270606` 等の以前の commit でも同じ)。quota 系の外部要因で、
+  この変更とは無関係。**child repo 側 (kotoba-lang org) は green**。pin は
+  代わりに GitHub API で直接検証した —— 3 件とも旧 pin から `ahead / behind=0`
+  かつ default branch tip と `identical`。CI が戻ったら west-pin-verify に
+  再確認させる。
 - `nbb scripts/gen-west-manifest.cljs --check` は STALE を報告するが、これは
   **この変更の前から** STALE (他 project の local checkout が pin より進退して
   いる、CLAUDE.md の言う「pin 退行の罠」)。本 ADR の 5 entry は
@@ -417,6 +430,14 @@ differential probe。**CI では走らせない** (公開 endpoint 依存・非 
    それには資金のある testnet 鍵が要る (安全床②)。gas / nonce の扱いは
    offline テストと live の `GasEstimateMessageGas` までは通っている。
 2. **delegated / FEVM sender 経路** — 実装可能になったが未着手。
+2b. **`IHttp` を binary に広げる** (io-filecoin)。`body` が String と規定されて
+   いるので piece が protocol を通れず、probe と cloud-itonami-app は
+   `arrayBuffer` / `ofByteArray` で bypass している (どちらも理由をコメントに
+   書いてある)。**この 2 箇所の bypass が、広げるべき箇所の一覧そのもの。**
+2c. **SP registry の `getProviderWithProduct` decode** (cloud-filecoin)。転送面は
+   実装済みだが provider *discovery* だけ SDK 依存が残っている。nested struct を
+   `org-ethereum-abi` で decode できれば、cloud-itonami-app の
+   `FILECOIN_PROVIDER_URL` 設定も不要になる。
 3. ~~**BLS12-381**~~ **2026-07-29 検証面を実装** (`filecoin.signer.bls`、
    io-filecoin-signer `87fe0c9b`)。**暗号は一切自作していない** —— pairing 演算は
    `@noble/curves`(監査済み・pure JS)から取り、この repo が持つのは Filecoin 固有の
