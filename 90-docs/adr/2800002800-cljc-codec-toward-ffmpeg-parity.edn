@@ -274,6 +274,58 @@ median 13.74 → 5.93 ms/MB = 2.32x       （720x1280 換算 49.5 → 21.3 s/fra
 **新しい 4 run の最も遅いものが、古い 4 run の最も速いものより速い**。出力は全 8 run で
 byte 一致、`h264.me-test` の等価性テスト（全候補が同点になる場合を含む）も不変で通る。
 
+### 実装したもの: 整数探索の whole-pel SAD 経路（`org-iso-h264` `26b077d`、1.17x）
+
+レバー 5。`me-full-search` の候補は**すべて whole-pel** で補間の必要が無いのに、画素ごとに
+汎用の quarter-sample 入口に入り、dispatch を歩き、座標 2 つを clamp して、1 回の
+plane 読みに辿り着いていた。`sad-mc-integer` が直接読む。内側ループから出したのは 2 つ:
+行の基底インデックス（行ごと 1 回）と、行分割が完全に画面内という共通ケースの判定
+（**ブロックごと 1 回**、以降 clamp を一切しない）。範囲内の座標の clamp は恒等写像なので
+bit-identical で、端に掛かるブロック用の clamp 経路は残してある。
+
+**測定は控えめで、そう報告する。** 交互 10 round の median 5.617 → 4.783 ms/MB = **1.17x**、
+10 round 中 7 round が新側優位、ただし**両分布は重なる**（BASE 4.69〜6.55、AFTER 3.63〜5.75）。
+このマシンでは 1.17x を明快には解像できない —— sub-pel の 2.32x と違い、ノイズが効果と同程度。
+疑いが無いのは機構（1 サンプルあたり厳密に演算が減り、増える演算は無い）と、出力が
+全 20 run で byte 一致すること。
+
+**速度以外に 2 つの理由でこれを入れた**（測定が控えめでも入れる根拠）:
+
+- `best-mv` が cost 関数を取る形になり、整数探索と sub-pel 探索がそれぞれ自分の位置に
+  特化した SAD を使いつつ、**選択規則（tie で最後を採る）が 1 箇所だけ**に戻った。
+  面共有の実装時に `me-subpel-refine` へ複製していた —— 規則の複製は間違える機会の複製
+- 任意 fraction 用の汎用 `sad-mc` を**削除**した。両探索が特化形を得た時点で dead になり、
+  codec の dead path は負債。cutoff/tie の根拠は残る 2 つの上の節コメントへ移した
+
+### 実装したもの: `avc1`/`avcC` —— そして音声+映像の mp4 が実際に再生された
+
+**ADR が謳っていた目的に到達した。** `isobmff.mux/avcc` + `avc-stsd` + `avc-track`
+（`org-iso-isobmff` `491ca74`）で映像トラックの codec 宣言が書けるようになり、
+**1 つの mp4 に音声と映像の両方を入れて実 ffmpeg が両方読む**ことを確認した:
+
+```
+ffprobe av_both.mp4:
+  Stream #0:0  Video: h264 (Baseline) (avc1 / 0x31637661), yuv420p, 128x96, 30 fps
+               encoder : kotoba-lang/org-iso-h264
+  Stream #0:1  Audio: aac (LC) (mp4a / 0x6134706D), 44100 Hz, mono
+ffmpeg 復号: video 276,480 bytes / audio 47,104 bytes —— いずれも期待値ちょうど、警告なし
+→ PCM と画素から mp4 までの生成経路に ffmpeg が 1 箇所も無い
+```
+
+`avcC` の検証は field 一致より強い: **ffmpeg 自身の parameter set を与えると、この writer は
+ffmpeg の bytes と完全一致する**（AAC 側は ffmpeg が optional な SBR sync extension を
+足すので一致しなかった）。profile/compatibility/level は引数ではなく **SPS から読む**
+（記録が SPS と食い違えば decoder 側の問題になるから）。High profile は拡張が要るので
+黙って切り詰めず throw する。
+
+**箱よりも間違えやすいのは sample 側だった**: mp4 は **length-prefix された NAL** を運び、
+Annex B の start code ではない。かつ parameter set は `avcC` に属し sample には入らない。
+Annex B をそのまま `mdat` に写した muxer は、**parse でき codec も解像度も正しく報告され、
+それでも何も復号されない**ファイルを作る。`annexb->sample` を独立関数にして単体で
+テストしたのはこのため。`tkhd` も width/height を運ぶようにした（従来 0 固定。remux では
+source の値が要らないので生き延びていたが、ここで起こすトラックでは致命的。宣言しない
+トラックは 0 のまま = remux 出力は不変、これも assert）。
+
 ### 次のレバー（実測シェア順、いずれも推測でなく上記 profile 由来）
 
 面共有まで入れた後の stage 帰属（514 sample、IDR の絶対時間は不変なのでその share が物差し）:
@@ -311,10 +363,25 @@ byte 一致、`h264.me-test` の等価性テスト（全候補が同点になる
    下がった今、候補削減の見返りは以前より**小さい**
 3. ~~**`sad`（10.9%）**~~ —— **実装済み**（fused SAD + 早期打ち切り、1.71x。上記）
 4. ~~**`solve-regular-levels`（14.9%）**~~ —— **実装済み**（inter fold、関数単体 17.4x。上記）
-5. **`me-full-search`（現 33.1%、最大）** —— 289 候補すべて整数位置（`fx=fy=0`）なのに、
-   画素ごとに汎用の補間入口を通って 1 回の clamp 付き読み取りに辿り着いている。
-   整数位置専用の SAD 経路（補間を経ず、行の基底インデックスを巻き上げた直接読み）が
-   bit-identical に取れる。**次はこれ**
+5. ~~**`me-full-search`（33.1%）**~~ —— **実装済み**（whole-pel SAD 経路、1.17x。上記）
+6. **interpolation の残り** —— `mc-predict`（最終再構成、8.4%）と decoder 側の
+   `mc-luma-block` はまだ画素ごとに 6-tap を再実行している。`subpel-planes` と同型の
+   共有が効くはずだが、**1 MB に 1 回しか呼ばれない**ので 49 候補ぶんの償却が無い。
+   着手前に必ず再 profile する
+7. **エピソード全体を実素材で 1 度通す** —— 現状すべて 128x128 の合成映像・9〜15 フレームの
+   実測からの換算である。**720x1280 の実クリップで 1 本通すまで、時間の数字は換算値**
+
+### 現在地（4 段の実装後）
+
+```
+P frame : 4.783 ms/MB（交互 10 round median）→ 17.2 s/frame @720x1280
+1800 フレーム換算: 約 8.6 時間   ← 本作業開始時点の約 30.6 時間から
+```
+
+**各段の交互測定比を掛け算しないこと**（1.71 × ~1.14 × 2.32 × 1.17 = 5.3x になるが、
+実測の絶対値は 30.6 → 8.6 時間 = 3.6x）。各比はそれぞれ自分の baseline を自分の負荷窓で
+測ったもので、負荷が窓ごとに違う。**信頼できるのは「各段の交互比」と「現在の絶対値」の
+2 つで、両者を掛け合わせて総合比を作る操作は正しくない。**
 
 ## Phase 2 — filter 段の家は `douga` ではなく `utsushi` だった
 
@@ -550,15 +617,12 @@ ffmpeg  : 復号 PCM が ADTS 経路の復号 PCM と byte 完全一致
 
 ## Not done
 
-- **MP4 の映像トラック（`avc1` + `avcC` sample entry）。** 音声側と同型の穴が video に
-  残っている: `isobmff` に `avc1`/`avcC` を**書く**経路は無い（`avc_sps.kotoba` は
-  parse 専用、grep で writer はゼロ）。したがって **`org-iso-h264` の encode 出力から
-  mp4 を組み立てることはまだできない**（音声トラックはできる）。音声側で実証した手順
-  —— 既存 fixture 内の実 ffmpeg の箱を reference にし、writer とは別の parser で検証する
-  —— がそのまま使える
 - **AAC priming の edit list。** `aac-track` は `elst` を出さないので、先頭 1024 サンプル
   （filterbank の priming = `aac.encode/encoder-delay`）が再生される。`edts`/`elst` か
-  `iTunSMPB` で隠すのが通例
+  `iTunSMPB` で隠すのが通例。**映像と音声の頭が 1024 サンプル（約 23 ms）ずれる**ので、
+  A/V sync を気にする用途ではこれが最初に効く
+- **B-frame / `ctts`。** encoder が B を出さないので composition offset は要らないが、
+  出すようになれば `mux` 側に `ctts` が必要になる
 - **Phase 1 の裾**（`encode-macroblock!` body / chroma 経路）。あと 2〜3× は見込めるが
   単一ホットスポットは無い
 - **`.kotoba` への移植と native AOT**。W4 の値モデル待ち
@@ -580,11 +644,16 @@ ffmpeg  : 復号 PCM が ADTS 経路の復号 PCM と byte 完全一致
 - (+) AAC encode ＋ `mp4a`/`esds` が入り、**mp4 の音声トラックを純 cljc で作れる**
   ようになった（実 ffmpeg が `aac (LC) (mp4a)` として再生、復号 PCM は ADTS 経路と
   byte 一致）。音声側の速度は video 側に対して無視できる（60 秒で約 2 分）
-- (−) **それでも ffmpeg は外せない。ただし理由が音声の欠落から video 側に移った**:
-  ①`avc1`/`avcC` を書く経路が無いので **video トラックを mp4 に載せられない**
-  ②h264 encode は 37 分/エピソード（ffmpeg は数十秒）で 2 桁差
-  ③`plane-scale` は ffmpeg と bit-identical でない。**穴の位置が変わっただけで
-  「もう外せる」ではない**ことを明示する
+- (+) **mp4 の生成経路から ffmpeg が消えた** —— 音声 + 映像を 1 ファイルに入れて実 ffmpeg が
+  両方読む（`avc1`/`avcC` + `mp4a`/`esds`、上記）。**「機能として作れない」段階は終わった**
+- (−) **それでも実運用では ffmpeg を外せない。理由は「機能の欠落」から「速度と精度」に
+  移った**:
+  ①h264 encode は約 **8.6 時間/エピソード**（ffmpeg は数十秒）で、4 段の kaizen 後も
+  **まだ 3 桁差**。ここが実運用の律速
+  ②`plane-scale` は ffmpeg と bit-identical でない（MAE 1.001）ので既存出力の再現に使えない
+  ③AAC priming の edit list が無いので A/V の頭が約 23 ms ずれる
+  **穴の位置が変わっただけで「もう外せる」ではない**ことを明示する。①は 3 桁差なので、
+  「あと数段の kaizen で追いつく」類の距離ではない
 - (−) `plane-scale` は ffmpeg と bit-identical ではないので、既存出力の再現には使えない
 - (−) 外挿に依拠している。エピソード全体を通す実測はまだ
 - (−) `MURAKUMO_TOKEN_SECRET_2` を使い切った件（ADR-2607299960）と同様、
