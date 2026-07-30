@@ -427,6 +427,52 @@ kotoba-lang 全 repo:  jdk.incubator.vector / IntVector / ByteVector  0件
 **実運用で 900 倍を埋める手は platform の hardware encoder への dispatch**
 （`org-w3-webcodecs` / VideoToolbox）であり、scalar 最適化の追加増分ではない。
 
+### 実装したもの: backend カタログと選択（`utsushi` `de77ca1`）
+
+**utsushi 自身が最初からこの結論を書いていた。** 層③の CLAUDE.md:
+
+> libavcodec を `.kotoba`/cljc で再実装しない。codec 内側ループは純 cljc では framerate で
+> 回らない（**SIMD/threads 無し**・fuel・streaming 不可）
+
+上の 1,120 倍の実測はこの不変条件を**裏付けた**。そして `utsushi.codec/decode` / `/encode` は
+第一引数に `_policy` を取りながら**使っておらず**、docstring は「実体は capability-gated
+native host word」と書いていた —— つまり「どの実装が走るか」を決める場所が用意されたまま
+空だった。新しい層を作らず、そこを埋めた。
+
+**設計で 2 つの能力を分けたのが要点で、最初これを混同して既存テスト 4 件を壊した**:
+
+| | 何をするか | codec | 実体 |
+|---|---|---|---|
+| `facade-ops`（`:encode`/`:decode`） | opaque passthrough + コンテナ metadata | **任意**（`:h265` も通る） | `:opaque` backend = 既存契約そのもの |
+| `pixel-ops`（`:encode-pixels`/`:decode-pixels`） | 実画素処理 | h264/aac 等 | façade は**一切やっていない** —— 画素は `utsushi.pipeline.*` が org-iso-h264 を直接呼び、façade を通らない |
+
+つまり **native host word の座は、画素については今も空である**。
+
+status が主張を制御する。**`:executor-absent` は「使える」ではない** —— `select` は既定で
+選ばない。`:webcodecs` は `org-w3-webcodecs` に**実物の binding があり**（能力プローブ
+`video-encoder-config-supported!` まで）、無いのは utsushi 側の executor。そう書いてあることが
+重要で、「hardware 対応済み」と読めてはいけない。`:ffmpeg` は `:out-of-layer` ——
+utsushi は「①②④ は純 cljc + EDN、外部依存ゼロ」なので spawn は書かず**宣言だけ**置く。
+宣言する理由は、**production が現に ffmpeg に依存している事実を、隠れた前提から選択対象に
+引き上げる**ため。
+
+`select` は選べないとき**却下理由を全 backend ぶん添えて投げる** ——「backend が無い」だけでは
+platform 違いか status か codec 非対応かが呼び手に伝わらない。
+
+policy への配線 2 点:
+
+- `check-graph` が backend の実行可能性まで見る。既定は façade op として（既存契約を保つ）、
+  `:require-pixel-backend? true` のときだけ画素として検査する。**実行時に VideoEncoder
+  undefined を踏むより早く、原因も具体的に落ちる**
+- `graph-gas` / `node-gas` が backend の実測倍率を掛ける。同じ `:encode` node のコストが
+  `:cljc` 18,140 ms/frame と `:ffmpeg` 16 ms/frame で**3 桁違う**ので、op だけで決めた
+  見積りはどちらが走るかによって 1000 倍外れる
+
+**測定値は測ったものだけを書く**（`:measured/ms-per-frame` が nil = 測っていない、の意味で
+あり「速い」の省略ではない）。テストがそれを検査する —— 実測値には必ず測定条件が付くこと、
+oracle を主張するのは `:cljc` だけであること、実行可能 status は `:opaque` と `:cljc` だけで
+あること。**カタログが将来「hardware 対応済み」に読み替わらないための歯止め**である。
+
 ### 次のレバー（実測シェア順、いずれも推測でなく上記 profile 由来）
 
 面共有まで入れた後の stage 帰属（514 sample、IDR の絶対時間は不変なのでその share が物差し）:
@@ -465,6 +511,12 @@ kotoba-lang 全 repo:  jdk.incubator.vector / IntVector / ByteVector  0件
 3. ~~**`sad`（10.9%）**~~ —— **実装済み**（fused SAD + 早期打ち切り、1.71x。上記）
 4. ~~**`solve-regular-levels`（14.9%）**~~ —— **実装済み**（inter fold、関数単体 17.4x。上記）
 5. ~~**`me-full-search`（33.1%）**~~ —— **実装済み**（whole-pel SAD 経路、1.17x。上記）
+0. **hardware executor** —— カタログはできたが `:webcodecs` の executor（filtergraph の
+   `:encode-pixels` node を `VideoEncoder` の呼び出し列に落とす部分）は**無い**。900 倍を
+   埋めるのはこれで、scalar 最適化ではない。browser 限定なので、macOS の production には
+   VideoToolbox 相当が別途必要（FFI が要り、CLAUDE.md の Rust 禁止と JVM 最後手段の方針の
+   両方に触るので、設計判断から始める必要がある）。**現時点の production の正解は `:ffmpeg`
+   backend を選ぶことであり、カタログはそれを隠れた前提でなく選択として表明できるようにした**
 6. **これ以上の scalar 最適化は「次のレバー」ではない** —— 上記の結論のとおり、profile が
    平坦になり残りは演算で、SIMD 基盤が無い。続けるなら取れるのは `mc-predict`（10.9%）と
    残差/再構成経路（約 19.5%）の配列化で合計 1.3〜1.4x 程度 —— **900 倍に対して意味を持たない**。
