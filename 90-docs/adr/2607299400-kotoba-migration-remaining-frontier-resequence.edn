@@ -91,7 +91,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | ID | 内容 | 状態 |
 |---|---|---|
 | **T5.3** | rebalance seats pack → record export | **landed** murakumo#193–#199 (incl. schedule assign packs #199); residual: task-score-code ternary + plan/rebalance bump indices (numeric by design); flags3 #230 + label flags #232 |
-| T5.2 | host bridge map/record ↔ guest record | **call-record expanded** #155+#261+#262+#263 (map boundaries); **native guest record wire deferred** (T5.3 path) |
+| T5.2 | host bridge map/record ↔ guest record | **call-record expanded** #155+#261–#264 (map boundaries); **native guest record wire deferred** (T5.3 path) |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
@@ -955,6 +955,20 @@ Still open:
 
 Still open:
 1. T8.3 ops/network AOT Components (http/secret) — pure-allowlist production path closed
+2. T5.2 native guest record wire (deferred)
+3. T8.4 live host runner; W4 recursive values
+
+
+## Progress (2026-07-31ao — T5.2 call-record wave 4 + pin)
+
+- murakumo#264 MERGED (`588d813d`): **T5.2 wave 4** — call-record on
+  keyring epoch/key-id/derive, persist rkey/uri/url, peer choose-via,
+  component-authority place/revoke-epoch + next-sequence.
+  ADR-260731-w6-t52-call-record-expand4. Evidence: 21 tests / 124 assertions.
+- west pin murakumo `bc3d2bb5` → `588d813d`.
+
+Still open:
+1. T8.3 ops/network AOT Components (http/secret); pure-allowlist production path closed (#45)
 2. T5.2 native guest record wire (deferred)
 3. T8.4 live host runner; W4 recursive values
 
