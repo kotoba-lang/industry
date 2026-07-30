@@ -388,8 +388,72 @@ proposal を「発行済み」と表示してはならない。
      （`agent_control` の `store/update-agent-control!` / `provider/agent-turn`、
      `mail_sync` の `identity/provider-access-token!` / `connected-providers`）。
      errors は 0 で、私の追加ファイルには 0 件。
-6. 3領域の typed adapter + `defaults.edn` の設定面（既定 disabled、AgentRun と同じく opt-in）。
-7. 単一 ref の監査面と、SIM-swap ⇒ card posture の cross-domain 不変条件をテストで固定。
+6. ✅ **done（2026-07-30）** 3領域の typed adapter + `defaults.edn` の設定面
+   （app pin `a293554a`、CI green、**107 tests / 608 assertions**）。
+   - 各 adapter は「op allowlist + 決定論的 pre-check + digest material + hand-off」だけを持つ。
+     事実は全て委譲: esim → `kotoba.esim/validate-eid` `validate-iccid`
+     `lifecycle/apply-operation`、card → `kotoba.card/luhn-valid?` `card.lifecycle`、
+     voice → `kotoba.phone/normalize-e164`（validity と canonical form の両方）。
+   - **最重要の性質を property として test した**: **全 (state, operation) 組で adapter が
+     library と厳密に一致する**（eSIM 16組、card 20組）。governor より緩い pre-check は
+     この仕組みの存在理由を壊す。同様に「結果を変える全フィールドが digest material を
+     変える」も各 adapter で検証（material から漏れたフィールドは同意後に改変できる）。
+   - **3つの拒否は素朴な実装が fail-open するところで fail-closed にした**:
+     voice の allowlist は**空リストなら何も許可しない**（`nil`=未設定、`[]`=まだ誰も許可
+     していない。空を permissive と読むのが漏れる方向）/ 同意なき録音保持は**拒否**
+     （transient への黙った降格ではない — 頼まれたのと違う要求に答えるのは同意が意味を
+     失う経路）/ card は**不明な日次上限を拒否**（無い上限は無制限ではない）。
+   - card は reissue で `:mints-successor?` を出す — issuer は同じ操作で後継カードを作るので、
+     それを言わない同意は同意内容を過小申告している。
+   - `:authorities` は**全て disabled**（`:agent-control` と同じ姿勢）、`:endpoint nil` なので
+     enabled にしても渡す先が無い。
+   - **step 6 は自分の step 1 成果物の実欠陥修正から始まった。** app の CI は
+     `clojure -M:test`（`:dev` なし）なので全依存が git 座標で解決できる必要があるが、
+     `kotoba-lang/esim` は sibling を `:local/root` で参照しており **monorepo の外から
+     一切消費できなかった**（実測: `Error building classpath. Local lib
+     io.github.kotoba-lang/phone not found: ~/.gitlibs/libs/.../esim/phone`）。
+     **同じ欠陥が chain 全体（esim → card → phone → html/css）にあり、各 CI は全て green
+     だった** — 各 CI が sibling を `../` に clone していたため。**教訓: sibling を clone する
+     CI は「siblings の隣で compile できる」ことしか証明せず、誰かが消費できるかは何も
+     証明しない。捕まえられる検査が、誰も走らせていない検査だった。** 3リポを依存順に修正
+     （`card` `488ec325` / `phone` `4e9e01fb` / `esim` `7bfa343a`、いずれも CI green）、
+     各 CI から sibling clone を外して素の git 経路にした（consumability の回帰が CI で落ちる）。
+     clean な外部プロジェクトから8 namespace が全部読めることを実測確認済み。
+
+7. ✅ **done（2026-07-30）** 単一 ref の監査面と cross-domain 不変条件をテストで固定
+   （app pin は step 7 merge `18153aa4`、**134 tests / 722 assertions**、clj-kondo 0 errors）。
+   **これが D4 の核心で、3領域を統合した実際の価値。**
+   - `cloud.itonami.app.authority.posture`: **eSIM ownership transfer が同一 subject の
+     card authorization posture を落とす。** 電話番号を奪った者は他の全ての second factor を
+     奪っており、手順は「回線を移す → 使う」。**どちらの authority も単独ではこの並びを
+     見られない。両方を読むものだけが見られる** — それが D4 が3領域を1つの面に置くことを
+     要求する理由。書き込みスループットのために分割すればスループットは得られるが、
+     統合を正当化していた唯一の不変条件を失う。
+   - `for-subject` は **pure**（proposals + instant → posture）なので clock も store も無しで
+     テストできる。**4つの選択がいずれも fail-closed 側**:
+     ①**試みられた** transfer が数える（`:awaiting-passkey` `:approved` `:committed`
+     `:authority-refused` 全て restrict）— 成功を待つのは攻撃者にこの窓を渡すこと
+     ②人間の `:rejected` だけが解除する（subject 自身が「頼んでいない」と言った最強の証拠）
+     ③**読めない/欠落した timestamp は窓の内側**として扱う（いつか分からないものを古いと
+     扱えば restriction が黙って外れる）④**window 0 でも「今」の transfer は restrict する**
+     （window 0 はルールを切る手段ではない）。
+   - restricted op は `:authorization/decide` と `:card/issue` に**限定**。`:card/lifecycle` と
+     `:dispute/initiate` は**意図的に開けたまま** — 侵害されたカードの block と charge の
+     dispute は**乗っ取りの最中に被害者ができる必要があること**で、救済手段まで塞ぐ
+     restriction は防御ではない。
+   - **「聞かなければ回避できる」を塞いだ**: `:posture` は restricted op の**必須入力**で
+     （`:daily-limit` と同じ）、不在なら拒否。posture は **digest material にも入る**ので、
+     `:normal` で review した proposal を、swap 後に `:restricted` になった状態で
+     そのまま commit できない。
+   - **必須化したことで step 6 の 6 assertion が落ちた** — posture を黙って省略していた
+     箇所が露出したので、検査が仕事をした証拠。
+   - 攻撃手順そのものを scenario test で固定: normal では spend が通る → eSIM transfer が
+     **提案されただけ** → card pre-check が拒否する。1つの subject の transfer が他の
+     subject を restrict しないことも固定。
+
+**build order は全 7 step 完了。** ただし本 ADR の「到達上限」節は不変で、
+背後の actor は全て `:effect :propose` only なので、`:committed` は
+「governed proposal が記録された」だけを意味する。
 
 各段の完了条件は「実装した」ではなく、pre-check の決定論性・context type 不一致の拒否・
 Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が **test で示されていること**。
