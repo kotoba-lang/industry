@@ -21,7 +21,18 @@
  ;; pin 前進も governance quorum も持たない（漏れても append-only の fleet-ci.edn に
  ;; 偽の行を足せるだけ）。machine ごとに別 identity を enroll する運用なので、
  ;; 鍵を machine 間でコピーしない（ADR-2607178000 の murakumo-ci は別マシンの identity）。
- :signer-kagi "fleet-agent-murakumo-ci-tip"
+ ;; 2026-07-30: `fleet-agent-murakumo-ci-tip` は fleet-agents.edn に enroll 済み
+ ;; （公開鍵 2aa25c7c、DID z6MkhKgm…）だが、**秘密鍵がこのマシンの kagi にも
+ ;; PEM にも無い** — 狙い撃ちで両 compartment を確認して不在、vault 自体は
+ ;; unlock 可能（lock 障害ではない）。そのため tick は gate を 1 本も実行できず
+ ;; `no such item` で死んでいた。
+ ;;
+ ;; そこで **このマシン専用の identity を新規 enroll した**（README の
+ ;; 「machine ごとに別 identity」に従う）。既存 `-tip` の鍵を推測で作り直すと
+ ;; enroll 済み公開鍵と一致せず receipt の検証が壊れるので、名前を分ける。
+ ;; 秘密鍵は kagi と ~/.gftd/fleet-ci-signer-tip.pem（mode 600、plist が期待
+ ;; する路 = ADR-2607178000 §3 が認めた launchd 経路）の両方に置いた。
+ :signer-kagi "fleet-agent-murakumo-ci-tip-25mbair"
  :landing {:repo "com-junkawasaki/root"
            :branch "main"
            :receipts "manifest/fleet-ci.edn"
