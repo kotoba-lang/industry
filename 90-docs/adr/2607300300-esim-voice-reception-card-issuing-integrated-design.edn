@@ -213,10 +213,10 @@ proposal を「発行済み」と表示してはならない。
 - 代償: gate が2枚あるので、ユーザから見た承認ステップが増える。D3 のとおりこれは削らない。
 - 代償: 単一 ref に集約するため、書き込み並列度は単一 writer のバッチングで解く必要がある。
   ref を割る誘惑が構造的に残るので D4 を repo-wide の判断として固定した。
-- リスク: `denwaban` の docstring は kernel を `com-junkawasaki/koe-clj` と呼んでいるが、
-  実体は **`kotoba-lang/koe`**（`-clj` suffix 廃止 + 配置ルール）。同様に ADR-2606271930 が
-  参照する `etzhayyim/root/20-actors/{twilio,whisper,elevenlabs}-compat` は
-  `kotoba-lang/com-*` へ移動済み。統合作業の最初にこの参照 drift を直す。
+- ~~リスク: `denwaban` の参照 drift~~ → **解消済み（2026-07-30、step 3）**。実際には
+  docstring だけでなく `deps.edn` の実依存まで移動先を指していなかった。GitHub の
+  redirect が生きていたため「壊れていないので気付かない」形で残っていた点が教訓 —
+  **redirect は drift を修復せず隠蔽する。** 詳細は build order step 3。
 
 ## Build order（依存順。飛ばすと下流が壊れる）
 
@@ -279,7 +279,38 @@ proposal を「発行済み」と表示してはならない。
      `luhn-valid?` を**自前で再実装している**（`kotoba.card/luhn-valid?` があるのに）。
      別 repo の変更なので step 2 では触っていない。step 4/6 で actor を触る際に
      ライブラリ委譲へ寄せる。
-3. `denwaban` / ADR-2606271930 の参照 drift 修正（`koe` / `com-*`）。
+3. ✅ **done（2026-07-30）** `denwaban` / ADR-2606271930 の参照 drift 修正
+   （denwaban pin `6b673aff`、ADR-2606271930 は `proposed` → `accepted`）。
+   - **drift は docstring だけではなく `deps.edn` の実依存だった。** GitHub の
+     redirect が生きているため deps は解決しテストも通り、**壊れていないので誰も
+     気付かないまま** manifest が存在しない topology を記述し続けていた。
+   - 各書き換えは **pinned SHA が候補 repo に実在することを確認してから** URL を
+     変えた。名前から推測すると2件間違える:
+     `com-junkawasaki/koe-clj` → `kotoba-lang/koe`、
+     `etzhayyim/com-etzhayyim-social-publication` → `kotoba-lang/social-publication`、
+     `etzhayyim/com-etzhayyim-yotei` → **`cloud-itonami/yotei`**（`kotoba-lang/yotei`
+     という別 repo が実在するが当該 SHA を持たない）、
+     `kotoba-lang/net` → **`kotoba-lang/io-libp2p`**（`kotoba-lang/webrtc` も実在するが
+     当該 SHA を持たない）、`*-compat` → `kotoba-lang/com-{twilio,whisper,elevenlabs}`。
+   - **repo rename は namespace rename ではない**: social-publication の namespace は
+     pinned SHA と HEAD の両方で `etzhayyim.social.publication` のままなので、
+     `denwaban.social` の `:require` は意図的に無変更。
+   - **意図的に未解決にした点**: `io-libp2p` という名前の repo が ADR-2606271800 の
+     WebRTC `ITelephony` transport を供給しているのは不自然で、別に
+     `kotoba-lang/webrtc` も実在する。当て推量で「直さず」、`manifest.edn` に
+     `:review :binding-provenance-unsettled` を記録し、pipeline の該当 stage は
+     repo 名ではなく **transport 名（`"webrtc"`）** をラベルにした（データが支えられない
+     ことを主張しないため）。WebRTC ingress を R0 から進める人が決着させる。
+   - **`bb.edn` を撤去した**（ADR-2607173000 で bb は script host として退役）。
+     依存座標の2枚目のコピーが、そもそも URL が黙って乖離できた原因だったため。
+     テストは既存 `run_tests.clj` を `clojure -M:test` で回す。
+   - **検証**: 6 tests / 16 assertions green（manifest が既に申告していた数値と一致）。
+     **ただしこの repo に CI workflow が無いので、ローカル実行が唯一の検証**である。
+     CI 追加は step 3 の範囲外として手を付けていない（残件）。
+   - ADR-2606271930 側: `:adr/related` の8パスを west 実パスへ差し替え、status を
+     `accepted` に更新（設計は R0 で実装済み・2607300300 が依存）。**accepted は
+     actuation を意味しない** ことを本文に明記 — R0 のままで `run-session` は
+     G7 で raise し続ける。
 4. `cloud-itonami/cloud-itonami-esim` actor を新設（D6）。
 5. `cloud.itonami.app.authority` 背骨を実装（bitcoin PSBT 経路の一般化。bitcoin は当面現状維持）。
 6. 3領域の typed adapter + `defaults.edn` の設定面（既定 disabled、AgentRun と同じく opt-in）。
