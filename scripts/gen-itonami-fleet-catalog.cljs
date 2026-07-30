@@ -185,9 +185,11 @@
 (defn- commit-date
   "Author date of a pinned commit, via the GitHub API. nil if it cannot be read.
 
-  Fetched only for :reference-only entries — eighteen calls, not 1,208 — since
-  those are the ones with no blueprint to describe them, and all eight resident
-  actors are among them.
+  Fetched only for the eight :resident actors. Pin age is a liveness proxy for
+  something that runs a loop; for an on-demand agent that is merely undeployed
+  it says nothing worth a network call. An earlier version fetched it for every
+  reference entry, which was fine at eighteen and timed the generator out once
+  the vocabulary matched most of west.
 
   What this is: the age of the PIN. What it is not: liveness. A loop- repo does
   commit what it produces (loop-system-dynamics carries evidence/ and ledger/
@@ -206,8 +208,25 @@
     (catch :default _ nil)))
 
 (defn- build []
-  (let [dirs (->> (fs/readdirSync fleet-dir)
-                  (js->clj)
+  (let [west (west-projects)
+        ;; Directories are enumerated FROM WEST, not from the filesystem.
+        ;;
+        ;; Scanning orgs/cloud-itonami/* was wrong and produced three phantom
+        ;; actors, which then showed up as three colliding ids. None of the
+        ;; three was a duplicate repository:
+        ;;   cloud-itonami-isic-7500  — a stale checkout under the pre-rename
+        ;;     name; GitHub reports its canonical .name as cloud-itonami-isic-750
+        ;;   cloud-itonami-commitment-ledger-component — 404 on GitHub
+        ;;   cloud-itonami-marketplace-order-codex     — 404 on GitHub
+        ;; The last two were never pushed; they are local working directories.
+        ;;
+        ;; west registers exactly one of each, which is the whole reason it is
+        ;; the reference plane. Trusting the filesystem instead let a stale
+        ;; rename and two unpushed scratch directories into a shipped artifact.
+        dirs (->> (vals west)
+                  (keep :path)
+                  (filter #(str/starts-with? % (str fleet-dir "/")))
+                  (map #(last (str/split % #"/")))
                   (filter #(fs/existsSync (path/join fleet-dir % "blueprint.edn")))
                   sort)
         results (keep read-blueprint dirs)
@@ -215,7 +234,6 @@
         skipped (vec (sort-by :repo (keep :skipped results)))
         non-actors (vec (keep :non-actor results))
         callable (filterv :endpoint entries)
-        west (west-projects)
         ;; Every entry gains its west pin. An actor that lives in
         ;; orgs/cloud-itonami is looked up by directory name.
         entries (mapv (fn [e] (merge e (reference (get west (:repo e))))) entries)
@@ -242,8 +260,15 @@
                                   :reference-only true)
                       rx
                       (reference w)
-                      (when-some [d (commit-date (:remote w) nm (:revision w))]
-                        {:revision-committed-at d})
+                      ;; Only for :resident actors — eight of them. Pin age is
+                      ;; a liveness proxy for something that runs a loop, and
+                      ;; means little for an on-demand agent that is simply not
+                      ;; deployed yet. Fetching it for every reference entry
+                      ;; meant hundreds of gh calls and a generator that timed
+                      ;; out once the vocabulary started matching most of west.
+                      (when (= :resident (:execution rx))
+                        (when-some [d (commit-date (:remote w) nm (:revision w))]
+                          {:revision-committed-at d}))
                       ;; The model this actor embodies, as a pin rather than a
                       ;; dependency: resolved from the authority's
                       ;; :authority-library through west.
