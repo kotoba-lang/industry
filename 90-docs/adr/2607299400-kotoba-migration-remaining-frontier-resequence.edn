@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist production path (ADR 0161 #45); **ops/network AOT Components still open** |
-| T8.4 | host-parity L5 | **partial** — JVM 11 + Node 10 live (#96–#99); kagi/pg/transport still open |
+| T8.4 | host-parity L5 | **partial** — JVM 12 + Node 10 live (#96–#100; random-bytes tender+actor-host); kagi/pg/transport still open |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -1010,6 +1010,26 @@ Still open:
   — JVM: loopback SSRF fail-closed + injected llm; Node: inject paths.
   JVM corpus **11**, Node **10**. Evidence: 4 tests / 55 assertions.
 - west pin kototama → `66726db3`.
+
+Still open:
+1. T8.3 ops/network AOT Components (http/secret wasm packages)
+2. T8.4 remaining matrix (kagi/pg/transport live)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31as — T8.4 random-bytes tender + actor-host)
+
+- wasm-webcomponent main `3feb419c`: **actor-host `random-bytes`**
+  (`random_bytes`; default maxRandomBytes 0; fill cap 4096; Web Crypto /
+  opts.randomBytes). Merged via server-side merges API.
+- kototama#100 MERGED (`00961ffd`): **T8.4 tender `:random-bytes`**
+  — contract `#{:crypto :write}` + SecureRandom host-fn + guest field +
+  browser host-impl; JVM live corpus **12** (random-bytes + prior 11);
+  Node CDN pin → `3feb419c` (10 proofs incl. random-bytes). Evidence:
+  contract+browser+host-parity-live 19 tests / 190 assertions; Node 10/10
+  via CDN.
+- west pin: kototama → `00961ffd`, wasm-webcomponent → `3feb419c`
+  (`67d9c1cd` west.yml single-entry).
 
 Still open:
 1. T8.3 ops/network AOT Components (http/secret wasm packages)
