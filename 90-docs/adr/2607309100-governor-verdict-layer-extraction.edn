@@ -75,21 +75,30 @@ HARD 不変条件を並べても交わらなかった:
 
 **報告の訂正**: ADR-2607309000 の Consequences 末尾『次にやるなら (c) isco-2611 / isic-6910-legalsupport との関係整理——どちらが正本かを決める必要がある』は**誤り**。3リポは別軸・別ゲートであり、正本を決める対象ではない。統合すべきだったのは actor パターンの定型層で、それが本 ADR。
 
-**追調査の結果（2026-07-30、同日）**:
+**追調査の結果（2026-07-30、同日、2回の追跡を経た最終状態）**:
 
-**(a) 抽出できなかった 30 は壊れていたのではなく、第2の方言だった。** 24 が enum 方言 `{:decision :proceed|:human-approval|:hold}`、残る6は `animeka-actor` / `dougaka-actor` / `kouhou` / `tashikame`（`:decision` enum を持たない別形）と `com-etzhayyim-minidrama` / `com-etzhayyim-tomoshibi`（`governor.cljc` 自体が無い）。**enum 方言では isco-5419 の欠陥が構造的に表現不能** — slot が1つしかないので「永久に拒否」と「承認待ち」を同時に言えない。`governor` に `decision` / `verdict->decision` / `decision->verdict` / `decision-conformance-failures` を追加し、新規 actor は enum を選ぶべきと明記した（pin `a16a832b`、20 tests / 169 assertions）。
+**(a) 抽出できなかった 30 は壊れていたのではなく、別の方言だった。** 最終的に fleet 376 件の分類が閉じた:
 
-**(b) `confidence-floor` の 0.4 / 0.7 は誤検出だった**（最初の regex が `(def ^:private ...)` 等を拾い損ねていた）。再測定では宣言のあるものはすべて 0.6。
+| 方言 | 件数 | 形 | 乖離しうるか |
+|---|---|---|---|
+| boolean | 345 | `{:ok? :hard? :escalate?}` 独立3フラグ | **する**（isco-5419 が壊れた場所） |
+| enum | 24 | `{:decision …}`（`:proceed` / `:human-approval` / `:hold` の1値） | しない（slot が1つ） |
+| flag-enum | 1（`network-awai/cloud-itonami`） | 1つの flag 値を `eq-flag` で比較 | しない |
+| publication | 6 | `{:ok? :violations :warnings}` 二値、**承認経路なし** | しない |
 
-**(c) 代わりに本物の divergence が見つかった。** enum 方言 24 件は**全件** `(or (:confidence proposal) 1.0)` — `:confidence` を持たない提案を「完全に信頼」として `:proceed` させていた。boolean 方言 346 件は全件 0.0 で、isco-5419 はそれを明示的にテストしている（『A proposal with no :confidence key at all is treated as 0.0 confidence, **never silently treated as trustworthy**』）。さらに `cloud-itonami-isco-4321` の advisor docstring は『LLM parse failures always yield :confidence 0.0 (never fabricate confidence), which forces the governor to escalate/hold』と、自分の governor と反対のことを書いていた。
+345 + 24 + 1 + 6 = 376。全件分類済み。
 
-実測した blast radius: 24 件のいずれにもこの既定を通るテストは無く、advisor を持つ4件（1212 / 1321 / 4321 / 7126）では advisor が常に `:confidence` を明示するので、live な欠陥ではなく**未検証の潜在 hazard**だった。残る20件は `governor` + `store` だけの scaffold で advisor も actor も無く、`assess` が公開面そのもの。
+**(b) publication 方言は「承認経路の欠落」ではなく doctrine であり、直してはならない。** `animeka-actor` / `dougaka-actor` / `kouhou` / `tashikame` / `com-etzhayyim-minidrama` / `com-etzhayyim-tomoshibi` の6件。ソース自身が理由を書いている——`tashikame.phase` は投稿ごとの人的承認を「per-post prior restraint」と呼んで拒否し、`tomoshibi.governor` は「is NOT an external operator/Council prior restraint — it is tomoshibi's OWN seed rail (the off-switch is the revocable member CACAO leash, not a per-post approval)」と書く。公開は既定で autonomous（ADR-2606281500）で、制御は publishing capability を1回失効させることであって投稿ごとに人が通すことではない。低確信度は gate ではなく**公開物に付く透明性タグ**（`:warnings`）。**これを機械的に boolean 方言へ「修正」すると speech actor に事前抑制を足すことになる。** `governor` の `publication-conformance-failures` は逆に、publication verdict に `:escalate?` / `:decision` / `:hard?` が**付いていること**をエラーとして扱う。
 
-**24 件すべてを 0.0 に修正し、未検証だった経路にテストを追加した**（各 repo で `clojure -M:test` 緑を確認してから着地）。`assess` の signature は 24 件とも `[env proposal]` で、`1.0` の出現も各1箇所と完全に一様だったため機械的な sweep が安全に成立した。
+**(c) `confidence-floor` の分布（最終、測り直し済み）**: 0.6 ×365 / **0.4 ×5**（publication 族。gate ではなく透明性タグの閾値なので低くて整合する）/ **0.7 ×5**（`isco-3131`〜`3139` の plant-ops ブロック。`forbidden-ops` に generator-start・turbine-control・grid-sync を持つ電力プラント actor で、高い floor は妥当）/ 宣言なし ×1（`tomoshibi`。confidence を持たず `:gate-result` で判定する）。
 
-**残っている未確認**: 上記6件（`animeka-actor` / `dougaka-actor` / `kouhou` / `tashikame` の別形と、`governor.cljc` を持たない etzhayyim 2件）は目視していない。また `cloud-itonami` 本体の `kv/verdict-is-escalate?` 経路も未確認。
+> **本 ADR は当初この項に『0.4 / 0.7 は誤検出だった（regex の取りこぼし）』と書いていたが、それ自体が誤りだったので上記に差し替えた。** 最初の測定が正しく、2回目の regex（`(def ^:private ...)` を要求する形）が publication 族と plant-ops ブロックを取りこぼしていた。どれも設計として筋が通っており、統一すべき divergence ではない。
 
-**次にやるなら**: 移行済み以外の boolean 方言 repo に `conformance-failures` の1行テストだけを足す PR を fleet-ci の tick で自動生成することは可能だが、340 超の PR を無人で開けるのが良いかは別判断。"
+**(d) 本物の divergence は enum 方言の confidence 既定だった。** 24 件**全件**が `(or (:confidence proposal) 1.0)` — `:confidence` を持たない提案を「完全に信頼」として `:proceed` させていた。boolean 方言 346 件は全件 0.0 で、isco-5419 はそれを明示的にテストしている（『never silently treated as trustworthy』）。さらに `cloud-itonami-isco-4321` の advisor docstring は『LLM parse failures always yield :confidence 0.0 ... which forces the governor to escalate/hold』と、自分の governor と反対のことを書いていた。
+
+blast radius の実測: 24 件のいずれにもこの既定を通るテストは無く、advisor を持つ4件（1212 / 1321 / 4321 / 7126）では advisor が常に `:confidence` を明示するので、live な欠陥ではなく**未検証の潜在 hazard**。残る20件は `governor` + `store` だけの scaffold で `assess` が公開面そのもの。`assess` の signature は 24 件とも `[env proposal]`、`1.0` の出現も各1箇所と完全に一様だったため機械的な sweep が安全に成立し、**24 件すべてを 0.0 に修正して未検証だった経路にテストを追加**、各 repo で `clojure -M:test` 緑を確認してから着地させた。
+
+**未確認として残っているもの**: `true-orphan-git` 34 件（west 未登録の git repo）は中身を見ていない。boolean 方言の未移行 repo（342 件）に `conformance-failures` の1行テストだけを足す PR を fleet-ci の tick で自動生成することは可能だが、340 超の PR を無人で開けるのが良いかは別判断。"
 
   :adr/evidence
   ["376 の governor.cljc を静的解析: :escalate? 式の異なり 42 種、上位は (and (not hard?) (or low? always-risky?)) ×146 / (and (not hard?) (or low? risky-op?)) ×107 / stakes? ×13 / escalating-op? ×9"
@@ -101,6 +110,11 @@ HARD 不変条件を並べても交わらなかった:
    "enum 方言 24 件は全件 (or (:confidence proposal) 1.0)、boolean 方言 346 件は全件 0.0 — 24 件を 0.0 に統一し、24 repo すべてで clojure -M:test 緑を確認して着地"
    "24 件の assess signature は全件 [env proposal]、1.0 の出現も各1箇所（機械 sweep が安全に成立した根拠）"
    "24 件のいずれにも missing-confidence を通るテストは存在しなかった（修正前）"
+   "最終分類: boolean 345 / enum 24 / flag-enum 1 / publication 6 = 376 全件"
+   "publication 6 件は承認経路を意図的に持たない（tashikame.phase「per-post prior restraint」/ tomoshibi.governor「NOT an external operator/Council prior restraint」）"
+   "confidence-floor 最終: 0.6 ×365 / 0.4 ×5（publication）/ 0.7 ×5（isco-313x plant-ops）/ 宣言なし ×1（tomoshibi）"
+   "kotoba-lang/governor 最終 d1fe777ade511caac9a34283b9a4a621be03b9f6: 24 tests / 203 assertions green, lint warnings 0, 依存ゼロ"
+   "closing 時監査: 触れた 31 repo すべてで west pin == default-branch HEAD、自分の open PR / agent branch / worktree はゼロ"
    "isco-5419: 40 tests / 123 assertions green（修正後）"
    "isco-2611: 15 tests / 40 assertions green, operator-console.html 再生成で byte 差分ゼロ"
    "lawfirm: 81 tests / 377 assertions green, lawyer-console.html 再生成で byte 差分ゼロ"]}]
