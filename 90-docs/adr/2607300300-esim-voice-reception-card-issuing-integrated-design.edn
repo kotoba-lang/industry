@@ -642,7 +642,23 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
    - **相互依存の環**: `cssom ⇄ dom-gpu` が互いに `:local/root`。**pin では解けない** —
      どちらを先に直しても、相手は「修正前の commit」を指すことになり推移的に失敗する。
      ソース側で依存の環を切るしかない（`browser` / `htmldom` はこの環の下流）。
-   - **deps.edn を持たない sibling 待ち**: `ocio`（`yaml`）。
+     **2026-07-31 に環の原因を特定した（両脚とも実コードの require であり、片方が
+     comment だけという救いは無い）**:
+     `cssom.core` が **`kotoba.wasm.dom`** を require し、その namespace は **dom-gpu**
+     （`src/kotoba/wasm/dom.cljc`）に住んでいる。逆向きは dom-gpu の
+     `host/retained.cljc`（+ `demo_document.cljs`）が `cssom.*` を require する。
+     つまり **DOM tree 型が dom-gpu 側にあり、その型に対して cascade を解く cssom が
+     dom-gpu に依存し、renderer である dom-gpu が cascade に依存する**。
+     解法は「`kotoba.wasm.dom` を独立ライブラリに切り出して両者がそれに依存する」だが、
+     これは dom-gpu / cssom / htmldom / browser の**モジュール境界を変える設計判断**なので
+     ここでは実施しない（pin 直しの延長でやってよい種類の変更ではない）。
+   - **依存先が空リポジトリ**: `ocio` は `../yaml` を宣言し、`ocio/core.cljc` は
+     `kotoba.yaml` を require して `yaml/ytag` を呼ぶが、**`kotoba-lang/yaml` は main も
+     ローカル checkout も README.md 1 枚しか無い**（`Initial commit` のみ）。
+     deps.edn を足しても解決しない — **依存先にコードが存在しない**。
+     なお「`kotoba.yaml` が他のどこかに在るか」は**確認できていない**:
+     `gh search code` はこの環境で既知の文字列にもヒットを返さず（権限/スコープの問題）、
+     使えなかった。よってここで言えるのは「`ocio` が指している repo にはコードが無い」まで。
    - **別 org の壊れた repo 待ち**: `securities`（`cloud-itonami/cloud-itonami-isic-6311`）。
    - 他 sibling 待ち: `dtn` / `eda-flow-demo` / `kami-gen-ml3d`。
    **script の潜在バグを1件修正**: `:local/root` の**org を path から導出する**ようにした。
