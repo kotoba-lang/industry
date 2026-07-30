@@ -8,41 +8,37 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 15648,
-  "app-aozora-appview" 10403,
-  "app-aozora-spa" 5164},
+ {"app-aozora-pds" 15798,
+  "app-aozora-appview" 10473,
+  "app-aozora-spa" 5241},
  :zone
- {:requests-7d 619569,
-  :pageviews-7d 10491,
-  :uniques-7d-sum 1006,
+ {:requests-7d 627516,
+  :pageviews-7d 10560,
+  :uniques-7d-sum 1010,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 166153}
-   {:path
-    "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 109}
-   {:path
-    "/bafyreicwof6vg3l7aopynnj7nh67pgaugg5h6rhjlhuwc6ebtpjotepnb4",
-    :requests 64}
+  [{:path "/v1/datoms", :requests 196651}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
+    :requests 166250}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 4325}
    {:path "/v1/transact", :requests 60}
    {:path
-    "/bafyreicjm25j5og3mu6ewquuupkwisronspkrv7v3xdczmzlknhqpf7vc4",
-    :requests 47}
-   {:path "/robots.txt", :requests 44}
+    "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
+    :requests 55}
    {:path
-    "/bafyreif3nwiklvjnpdntx2n2h4ltice2fx4tpqt7hvbkpcbbytxjrmzs7q",
-    :requests 38}
+    "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
+    :requests 51}
    {:path
-    "/bafyreihgirii5moetzvx5obvk54iedtvbj37y2vcqx3y52b2quqbs3l36a",
-    :requests 31}],
-  :status-mix {:ok 168424, :client-error 197, :server-error 128},
+    "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
+    :requests 49}
+   {:path "/robots.txt", :requests 45}],
+  :status-mix {:ok 369545, :client-error 284, :server-error 219},
   :window "24h"},
  :as-of "2026-07-30",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 166153 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 109 · /bafyreicwof6vg3l7aopynnj7nh67pgaugg5h6r… 64 · /v1/transact 60 · /bafyreicjm25j5og3mu6ewquuupkwisronspkrv… 47 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 196651 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 166250 · /xrpc/ai.gftd.apps.kotobase.datomic.view 4325 · /v1/transact 60 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 55 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 619569 req/7d・1006 uniques(日次和)・うち4xx probe 0%(24h)、workers 31215 inv/7d"}
+ "aozora.app 実測 627516 req/7d・1010 uniques(日次和)・うち4xx probe 0%(24h)、workers 31512 inv/7d"}

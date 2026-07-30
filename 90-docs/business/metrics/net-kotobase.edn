@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 5337, "kotobase-cf-wasm-staging" 2638},
+ {"net-kotobase" 5348, "kotobase-cf-wasm-staging" 2638},
  :zone
- {:requests-7d 9539,
-  :pageviews-7d 467,
-  :uniques-7d-sum 670,
+ {:requests-7d 9676,
+  :pageviews-7d 474,
+  :uniques-7d-sum 682,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 92}
-   {:path "/_health", :requests 64}
-   {:path "/", :requests 59}
+  [{:path "/health", :requests 73}
+   {:path "/", :requests 63}
+   {:path "/_health", :requests 45}
    {:path "/robots.txt", :requests 31}
-   {:path "/api/funnel", :requests 24}
-   {:path "/llms-full.txt", :requests 20}
-   {:path "/llms.txt", :requests 18}
-   {:path "/.well-known/did.json", :requests 16}],
-  :status-mix {:client-error 592, :server-error 26, :ok 426},
+   {:path "/api/funnel", :requests 25}
+   {:path "/_app/meta", :requests 15}
+   {:path "/llms-full.txt", :requests 15}
+   {:path "/.well-known/did.json", :requests 15}],
+  :status-mix {:client-error 652, :server-error 26, :ok 362},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,12 +30,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-30",
- :traffic-quality {:window "24h", :probe-4xx-pct 57, :error-5xx-pct 2},
+ :traffic-quality {:window "24h", :probe-4xx-pct 63, :error-5xx-pct 3},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 92 · /_health 64 · / 59 · /robots.txt 31 · /api/funnel 24 | 4xx(probe) 57% · 5xx 2%",
- :funnel {:visitors 1562, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 73 · / 63 · /_health 45 · /robots.txt 31 · /api/funnel 25 | 4xx(probe) 63% · 5xx 3%",
+ :funnel {:visitors 1567, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 9539 req/7d・670 uniques(日次和)・うち4xx probe 57%(24h)、workers 7975 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 9676 req/7d・682 uniques(日次和)・うち4xx probe 63%(24h)、workers 7986 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 4,
   :submissions 3,
