@@ -632,7 +632,22 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
    この3つは `:authority-unreachable-since` を付けて **pending のまま**にした
    （`:authority-unknown-since` と同型）。**actor から来た refusal は従来どおり解決する**
    ことにもテストがある（本物の拒否を飲み込む修正はバグより悪いので）。
-   **残る**: UI はまだこの route を呼んでいない（front-end 側の変更）。actor → app の
+   **残る（2026-07-31 に判明した、より大きい事実）**: **この統合には UI が存在しない。**
+   `web.clj` は `/api/authority` の **17 route のどれも参照していない** — つまり
+   **app 自身の画面から、人間はこの統合に一切到達できない**。Passkey 同意を持つのは app
+   だという設計なのに、同意する画面が無い。route は API として完備しているので client を
+   書けば動くが、**出荷されている web UI はその client ではない**。
+   panel を作るのは**プロダクトの判断**であって、埋めるべき gap として即興で作るものでは
+   ないので、**記録に留めた**。代わりに **17 route を実 HTTP で叩くテストを追加**した
+   （`cloud-itonami-app` 238ae6c3）— これらは次に来る client にとっての**契約そのもの**
+   なのに、既存テストは全部 route を素通りして api namespace を直接呼んでおり、
+   **到達可能かどうかすら誰も検査していなかった**。
+   実測して**そのまま固定**した3点: disabled は **501**（全体 overview は 200 で
+   「無効」を描けるのに、per-authority read は拒否する — 2つの read、2つの契約）／
+   **未知の authority も 「disabled」 と答える**（別の authority には届かないという肝心の
+   性質は保たれるが、client は綴り間違いと deployment の設定を区別できない。
+   *望ましい*とは主張せず、*現状*として固定 — 変えるなら契約変更）／JSON は keyword の
+   namespace を落とすので `:authority/posture` は `{posture: normal}` という namespace 無しの形で届く。actor → app の
    callback は導入していない — 認証付きの逆方向チャネルを増やすより、まず「呼べば解決する」
    を成立させた。
 6. **D4 の単一 ref が actor 側でまだ成立していない。** app 内では1つの store
