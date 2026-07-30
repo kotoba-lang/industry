@@ -267,6 +267,18 @@ the residual list tracked since ADR-2607299400 (seats through name-bits / task e
 1. bool-typed comparisons + wasm bool export ABI (opt-in multi-repo)
 2. T6.2 precompiled KIR default; T8.3 production AOT; W4 recursive values
 
+
+## Progress (2026-07-30g — bool design authority)
+
+- compiler#448 lands ADR 0191 (language profile 5 bool-typed predicates design;
+  implementation **not** on main; remaining A/B/C measured)
+- kotoba-lang#348 docs: T5.3 through murakumo#206; bool residual → ADR 0191
+
+**Next implementation order for bool (do not reorder):**
+A. `typed-bool-value` unbox for aggregate `:bool` slots (wasm + hosts)
+B. `:bool` export wrappers at wasm boundary
+C. expectation/golden migration (keep equal-family as `:i64`)
+
 ## Consequences
 
 - superproject から見た移行の現在地が 2026-07-29 断面に揃った。以後、現在地を
