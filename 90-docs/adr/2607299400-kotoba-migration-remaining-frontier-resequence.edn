@@ -384,7 +384,22 @@ task-eligible?, failed?, can-retry?, authorized?, write-ok?.
 - west pins: murakumo f6951e93, compiler tip (bool-remainder #452).
 
 Still open:
-1. T6.4 remainder: apply oracle-required pattern to other host ns; then delete cljs mirrors when preload guaranteed
+1. T6.4 remainder: oracle-required on kekkai/crypto/stream/token; expand to report/provision/cloud/…
+2. T8.3 production AOT network/secret; W4 recursive values
+
+
+
+## Progress (2026-07-31h — T6.4 oracle-required batch crypto/stream/token)
+
+- murakumo#225 MERGED (6b82f878): extend oracle-required JVM pattern to
+  overlay.crypto, overlay.stream, murakumo.token (AES/HMAC host remains).
+  cljs private mirrors only as fail-closed fallback.
+- west pin murakumo 6b82f878 (covers #222 ranking, #223 kekkai, #225 batch).
+
+Oracle-required hosts now: kekkai.gate, overlay.crypto, overlay.stream, token.
+
+Still open:
+1. T6.4 remainder: apply oracle-required to remaining host ns (report, provision, cloud, inventory, …)
 2. T8.3 production AOT network/secret; W4 recursive values
 
 
