@@ -917,6 +917,19 @@ Still open:
 3. T8.4 live host runner
 
 
+## Progress (2026-07-31al — provider pin to T8.3 tip)
+
+- west pin **provider** `f59cda01` → `678b0ec0` (provider#36–#43): signed kit/wasm
+  receipts, package-manifest, real wasm pilot, pure-allowlist grant-binding, CI.
+  T8.3 production AOT Component + readiness `:signed-wasm :ready` still open.
+- murakumo T5.2 call-record waves already on pin `e1feda2f` (#261+#262).
+
+Still open:
+1. T8.3 production AOT network/secret Components + flip readiness only when admissible
+2. T5.2 native guest record wire (deferred; `oracle/record` used on T5.3 path)
+3. T8.4 live host runner; W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
