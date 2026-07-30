@@ -94,7 +94,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
-| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete** through config#251 (+ task/reconcile#250 plan/credits#249 …) + preload; remaining report/deploy/provision/cloud/dash |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete** through dash#252 (+ config#251 …); report/deploy/provision/cloud open |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
@@ -796,6 +796,20 @@ Still open:
 2. T8.3 production AOT network/secret; W4 recursive values
 3. Residual 0/1 i64 params: config pinned-exists, engine option flags, dash
    health-from-present, tunnel pick-exit has-rc
+
+
+## Progress (2026-07-31ae — T6.4 dash.state mirror-delete + pin)
+
+- murakumo#252 MERGED (c7de009): **dash.state** deletes cljs host mirrors —
+  pure display/probe/parse + defaults require shipped :dash-state KIR.
+  ADR-260731-w6-t64-dash-mirror-delete. Evidence: 17 tests / 144 assertions.
+- murakumo#251 already on tip ancestry (config mirror-delete).
+- west pin murakumo 71bd7ff3 -> c7de009.
+
+Still open:
+1. T6.4 remaining XL hosts (report/deploy/provision/cloud)
+2. T8.3 production AOT network/secret; W4 recursive values
+3. Residual 0/1 i64 param projections
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
