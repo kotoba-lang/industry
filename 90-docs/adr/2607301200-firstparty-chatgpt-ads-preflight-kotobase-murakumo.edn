@@ -12,23 +12,26 @@
                 "adr-2607122300-cloud-murakumo-captive-demand-first-network-participant-growth"],
   :adr/supersedes [],
   :adr/superseded_by [],
-  :adr/repos ["com-junkawasaki/root"],
+  :adr/repos ["com-junkawasaki/root" "network-awai/net-kotobase"],
   :adr/authoritative true,
-  :adr/authoritative_for ["自社プロダクト(kotobase.net / murakumo.cloud)を ChatGPT Ads に出稿する際の pre-flight 判定を cloud-itonami-isic-7310 で行うという決定"
+  :adr/authoritative_for ["出稿主体を AWAI Network, L.L.C.(デラウェア LLC / 法域 USA)とする決定"
+                          "自社プロダクト(kotobase.net / murakumo.cloud)を ChatGPT Ads に出稿する際の pre-flight 判定を cloud-itonami-isic-7310 で行うという決定"
                           "7310 は判定層であって出稿実行層ではないという境界"
                           "ad-category 未確定を推測で埋めないという規律の first-party 適用"],
   :adr/last_verified "2026-07-30",
   :adr/source-format "edn-only (ADR-2607171600)",
   :adr/primary-sources ["cloud-itonami/cloud-itonami-isic-7310 @ 4201aee — clojure -M:dev で Campaign Governor を自社2プロダクトに対して実行した出力(2026-07-30)"
-                        "90-docs/business/net-kotobase-business-model.edn — landing 訪問 246 / signup 0"
+                        "GET https://kotobase.net/api/funnel (2026-07-30 実測) — visitors 1565 / signups 3 / checkouts 0、x402 submissions 3 / rejections 3。BMC の 246 / 0 はこれに置き換わる"
                         "90-docs/business/cloud-murakumo-business-model.edn — 訪問→実推論 run 転換 1%"
                         "90-docs/business/budget-supply.edn — :supply/note が自ら placeholder と明記"],
   :adr/secondary-sources ["ads.openai.com の advertiser 要件(登記9カ国に JPN 含む・配信7カ国・国と通貨は setup 時固定・最低日予算 USD 25・Max CPC・postpay・JCT 非課税)は 2026-07-30 の web 検索由来の二次情報。openai.com / help.openai.com は WebFetch・curl とも 403 (bot wall) で一次確認できていない。"],
   :adr/known-gaps ["ad-category が未確定。graph-DB BaaS / 推論クラウドが :digital-products-education(4媒体すべて permitted)か :software-download(chatgpt-ads で closed-set により not-permitted)かは openai.com/policies/ad-policies/ の再読が必要で、2026-07-30 時点で 403 により blocked。"
-                   "advertiser account を開設する法人(どの登記主体か)が未決定。account の国と通貨は setup 時に固定され後から変更できないため、これは取り返しのつかない選択。"
-                   "pixel / Conversions API の実装は未着手。入れずに出稿すると効果が事後に測定不能。"
-                   "7310 の west pin (22e3f57) が子リポ main より 7 commit 遅れている。本 ADR の実行は子リポ checkout (4201aee) に対して行った。"],
-  :adr/verification "cloud-itonami-isic-7310 の checkout (4201aee) に対し clojure -M:dev で自社2プロダクト x 2 category の 4 campaign を :campaign/intake -> :media-plan/verify -> :platform/verify -> :risk/screen -> :actuation/place-campaign まで通し、hold rule を実際に発火させて記録した。子リポは無変更(read-only consumer として実行)。",
+                   "pixel / Conversions API(OpenAI 固有の実装)は未着手。流入元別 funnel 計器は入ったが、媒体側 pixel は一次情報が読めるまで着手しない(パラメータ名を推測しない)。"
+                   "7310 の west pin (22e3f57) が子リポ main より 7 commit 遅れている。本 ADR の実行は子リポ checkout (4201aee) に対して行った。"
+                   "uikit の west pin が origin/main より 2 commit 遅れている(pin 鮮度の follow-up)。"
+                   "kotoba-ui / shitsuke / liquid-glass-ui の *checkout* が pin より遅れていた(pin 自体は最新)。west update で解消するが、liquid-glass-ui は別セッションの未コミット WIP があるため触っていない。この skew が解けるまで net-kotobase のサイト HTML は再生成しない。"
+                   "signup.html の再生成が保留のため、signup_page.cljc に入れた client 側 source 送出はまだ本番に出ていない(server 側 Referer fallback が同じ役目を果たしている)。"],
+  :adr/verification "cloud-itonami-isic-7310 の checkout (4201aee) に対し clojure -M:dev で自社2プロダクト x 2 category の 4 campaign を :campaign/intake -> :media-plan/verify -> :platform/verify -> :risk/screen -> :actuation/place-campaign まで通し、hold rule を実際に発火させて記録した。子リポは無変更(read-only consumer として実行)。net-kotobase 側は clojure -M:test → 73 tests / 405 assertions, 3 failures(いずれも本 diff が触らない既存失敗: uncataloged JS provider sources x2 と worker/js artifact)、kotobase.funnel-test 単独では 13 tests / 87 assertions, 0 failures。本番デプロイは repo-wide build lock が別セッションに保持されていたため未実施。",
   :adr/body
   "## Context
 
@@ -94,19 +97,61 @@ google/meta/microsoft を記憶から seed することを拒んだのと同じ�
 
 ### D4. funnel と計器が先、出稿が後
 
-BMC の実測は net-kotobase が landing 訪問 246 -> signup **0**(転換 0% / 目標 3%)、
-cloud-murakumo が訪問 -> 実推論 run **1%**(目標 2%)。転換 0% の funnel に有料流入を
-買うのは CAC を無限にする行為である。さらに ads.openai.com は pixel /
-Conversions API を提供しており、それを入れない出稿は効果が事後に測定不能。
+**BMC に書かれていた「訪問 246 -> signup 0」は陳腐化していた。** 2026-07-30 に
+`GET https://kotobase.net/api/funnel` を実際に叩いた値:
 
+    visitors 1565 / signups 3 / checkouts 0
+    x402: challenges 4 / submissions 3 / settlements 0 / rejections 3
+
+つまり landing -> signup クリックが **0.19%**(目標 3%)、signup -> checkout が
+**0/3 = 0%**。計器そのものは動いている(signups が 0 でなく 3 なので、
+「クリックが記録されない不具合」ではなく本当にクリックされていない)。
+x402 側は submission 3 件が **3 件とも reject** されており、agent 決済経路は
+別の実バグを抱えている(本 ADR の範囲外、別 follow-up)。
+
+転換 0.19% の funnel に有料流入を買うのは CAC を無限にする行為である。
 これは「広告を出さない」決定ではなく**順序の決定**である。
 
-### D5. 決済情報の入力は agent が行わない
+### D4b. 総数だけの funnel では有料出稿を判断できない — 流入元別に割る
 
-advertiser account の本人確認と支払手段登録は owner 実行。安全床①(認証情報・
-カード情報を自分でフォーム入力しない)は「標準作業の常時許可」でも上書きされない。
-account の国と通貨は setup 時に固定され後から変更できないため、どの登記主体で
-開設するかは取り返しのつかない選択であり、owner の判断に属する。
+出稿の可否を左右するのは総数ではなく「**その媒体から来た訪問のうち何件が
+転換したか**」である。着地前の計器は3つの総数しか持たず、この問いに構造的に
+答えられなかった。実装(net-kotobase main `3fddd36`):
+
+- `utm_source` を**閉じた allowlist に clamp** して stage ごとに JSON 1 個で
+  持つ(`funnel:<stage>:by-source`)。allowlist は飾りではない —
+  `utm_source` は URL バーから誰でも書ける値なので、そのまま鍵にすると
+  keyspace を無制限に膨らませられる。未知の値は捨てずに `\"other\"` に入れる
+  (未知の流入も実在する流入である)。
+- 流入元は「client が送った値 > リクエストの `Referer`」の順で解決する。
+  Referer fallback がこの変更を**今日デプロイ可能にしている**: signup.html は
+  ビルド時生成物で、client 側の変更は次の再生成まで本番に出ないが、
+  `/signup?utm_source=…` からの same-origin POST の Referer は今日すでに
+  campaign tag を運んでいる。
+- `return_to` が query string を落としていたバグを修正。修正前は authn 往復の
+  後の checkout POST が、広告由来の転換を organic として報告していた ——
+  有料出稿がまさに判断される 1 個の数字である。
+- `kotobase.funnel-test` が aggregate runner に**入っていなかった**ので追加した
+  (funnel の unit test は事実上一度も走っていなかった)。
+
+### D5. 出稿主体は AWAI Network, L.L.C.(デラウェア LLC)、法域は USA
+
+オーナー判断(2026-07-30)。AWAI Network, L.L.C. は etzhayyim 傘下の営業主体で、
+**既に cloud-itonami の operator** でもあるので、広告出稿主体としても同一線上に
+ある(ADR-2607289700)。ads.openai.com の advertiser account は登記国=US /
+通貨=USD で開設し、`advertising.facts` 側の法域は `\"USA\"`(FTC Act 第5条 /
+FTC Endorsement Guides)を使う。
+
+USA を選ぶと chatgpt-ads では JPN より条件がよい: 当該媒体の
+`:restricted-category-jurisdictions` は `#{\"USA\"}` なので、制限カテゴリ
+(financial-services / healthcare-medical)が広告主承認付きで可能になる法域は
+US だけである。今回の2プロダクトはそこに当たらないが、同じ account が将来
+使える範囲は広い。
+
+**決済情報の入力は agent が行わない。** 本人確認と支払手段登録は owner 実行 ——
+安全床①(認証情報・カード情報を自分でフォーム入力しない)は「標準作業の常時許可」
+でも上書きされない。account の国と通貨は setup 時に固定され後から変更できないので、
+この選択自体が不可逆である点も owner に属する理由になる。
 
 ## 実測 — :actuation/place-campaign が挙げた HARD hold
 
@@ -143,9 +188,24 @@ account の国と通貨は setup 時に固定され後から変更できない�
 
 - 実出稿の TODO が hold リストとして機械可読に固定された。閉じるべき順序も
   seed doc の表に載っている。
-- owner 側に 2 件の決定が残る: (a) どの登記主体で advertiser account を開くか
-  (国と通貨が固定されるため不可逆) (b) 広告予算の実額承認。
-- agent 側に 3 件の作業が残る: (a) 一次情報の再読による category 確定
-  (browser 経路が必要) (b) creative + 表明 (c) pixel / Conversions API と funnel。
-- 7310 の west pin が子リポ main より 7 commit 遅れていることが判明した(別 follow-up)。
+- 流入元別 funnel 計器が net-kotobase main (`3fddd36`) に着地した。
+  **ただし本番へは未デプロイ** — repo-wide resource governor の `build` lock を
+  別セッションが保持しており(かつ `clj-edge/node_modules` 未 install)、
+  ESM 再ビルドができなかった。lock が空いたら
+  `cd clj-edge && npm install && node ../../../../scripts/resource-guard.mjs run build -- npm run build`
+  → `cd ../worker && npm run deploy`。checkout は `network-awai/main` と同期済み
+  (0 ahead / 0 behind)なので deploy guard は通る。
+- owner 側に残る決定は 1 件に減った: **広告予算の実額承認**
+  (`budget-supply.edn` の placeholder 置換)。出稿主体は AWAI Network, L.L.C. /
+  USA に確定した。account 開設時の本人確認・カード登録は owner 実行。
+- agent 側に残る作業: (a) 一次情報の再読による ad-category 確定(browser 経路が
+  必要) (b) creative + 3 表明 (c) design-system checkout skew が解けてからの
+  サイト再生成。
+- 副産物として3つの既存欠陥が判明した: `kotobase.funnel-test` が一度も走って
+  いなかった / `return_to` が query string を落としていた /
+  jp-go-digital-design-system の checkout が pin より 8 commit 遅れていて
+  `clojure -M:render-site` が `No such var: dds-tokens/root-css-resource` で
+  落ちていた(checkout を pin に合わせて解消)。
+- 7310 の west pin が子リポ main より 7 commit 遅れ、uikit の pin が 2 commit
+  遅れていることも判明した(いずれも別 follow-up)。
 "}]
