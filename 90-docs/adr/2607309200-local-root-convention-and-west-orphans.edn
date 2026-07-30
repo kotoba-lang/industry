@@ -42,11 +42,27 @@
 
 **注意（次の agent 向け）**: `west-orphan-audit` は**ローカルの working tree**（`manifest/west.yml` とローカル子 checkout）を読む。superproject 本体が `origin/main` から遅れていると、既に main で解消済みの項目を報告し続ける。実際 closing 時点で本体は 127 commits behind で、監査は古い6件を出したままだった。監査の結果を信じる前に `git fetch origin && git merge --ff-only origin/main && west update --fetch smart` を通すこと。
 
-**残っている未処置**: `true-orphan-git` 34 件（west 未登録の git repo）。今回は `org-microsoft-riff` / `org-xiph-flac` の2件しか見ていない。残り32件は中身も push 状態も未確認で、`--all` を付けて一覧を出すところから。"
+**この登録で west.yml を壊した（自己申告）。** `org-microsoft-riff` / `org-xiph-flac` を登録した際、**別セッションが同じ2件を既に登録済み**だったことに気づかず重複を作り、west.yml が parse 不能になった（`FATAL ERROR: Malformed manifest file ... project name org-microsoft-riff used twice`）。原因は、重複の有無を**遅れたローカルの west.yml**に対して `grep -c` で確認し、実際に書き込む **tip** に対して確認しなかったこと。書き込み自体は tip を読んで行っていたので、楽観ロックは正しく働いていた——確認の対象を間違えた。
+
+`repos.edn` の `:extra-projects` にも同じ2件が重複した。両方を除去して復旧（west.yml `85a16b23c4dc866e0ee31e87d3c2e60ba15a0e09` / repos.edn `39899a7419d750e4c3edce876f3ff695b9784526`）、`west list` が 3,947 project を列挙することを確認した。
+
+**再発防止を入れた**（`scripts/verify-west-pins.cljs`、merge `5860a1abcda94c056ec05d972be29d1e34920e0a`）。PreToolUse hook は正しく発火して verifier を呼んでいたのに素通りしており、理由は2つあった:
+
+1. `parse-west` が entries を name キーの map に集めるので、重複が静かに1件へ畳まれ**そもそも観測できなかった** → `:project-names` を出現順の生ベクタで保持するようにした。
+2. 追加した entry の revision が既存と同一だったため `changed` が空になり、「変更された pin はありません。OK.」で **exit 0** していた → 重複検査を `changed` の計算より前、無条件に置いた。
+
+事故を起こした west.yml を再現して回帰テスト済み: 修正前の verifier は `OK` / exit 0、修正後は FAIL 列挙 / exit 1、現行の正常な west.yml では exit 0。**pin が不正な west.yml は誤った checkout を生むが、name が重複した west.yml は fleet 全体で `west` を止める。より重い欠陥に検査が無かった。**
+
+**最終監査（ローカル同期後）**: `local-root-broken` 6 → **1**。残る1件は `orgs/com-junkawasaki/kotodama`（`local-manimani` の**ローカル checkout** が pin より古く、main では既に解消済み）。`west update` は他セッションのライブ WIP（変更6件 + 未追跡10件、新規ソース・テスト・ADR を含む）でブロックされたため、**破棄せず放置した** — 監査の1行を緑にするために他人の作業を壊す取引は割に合わない。そのセッションが着地させれば自然に解消する。
+
+**残っている未処置**: `true-orphan-git` 20 件（同期後の再計測。当初 34 件と報告したのは同期前の値）（west 未登録の git repo）。今回は `org-microsoft-riff` / `org-xiph-flac` の2件しか見ていない。残り32件は中身も push 状態も未確認で、`--all` を付けて一覧を出すところから。"
 
   :adr/evidence
   ["相対 :local/root: 2,614 箇所 / 921 repo（上位 langchain ×703, langgraph ×585, langchain-store ×313）"
    "west-orphan-audit --blocking: local-root-broken 6 件（うち実処置が必要だったのは kaiyaku の3参照と未登録2 repo のみ）"
    "com-etzhayyim-kaiyaku: base :deps は clojure -Spath で解決成功（影響は :dev alias のみ）"
    "org-xiph-flac 0647dc2 / org-microsoft-riff 1d1229d — いずれも GitHub に push 済み、west 未登録だった"
-   "6件すべてを origin/main tip の内容で再判定し解消を確認"]}]
+   "6件すべてを origin/main tip の内容で再判定し解消を確認"
+   "自己申告の事故: 同2件の重複登録で west.yml が parse 不能になり、west list が全 fleet で停止した。west.yml 85a16b23 / repos.edn 39899a74 で復旧、west list = 3,947 project を確認"
+   "再発防止 5860a1ab: 事故を起こした west.yml で 修正前 verifier=exit 0（素通り）/ 修正後=exit 1、正常な west.yml では exit 0（回帰なし）"
+   "ローカル同期後の最終監査: local-root-broken 6→1、true-orphan-git 20、registered-elsewhere 10"]}]
