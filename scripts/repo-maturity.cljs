@@ -42,6 +42,9 @@
 ;; 使い方:
 ;;   nbb scripts/repo-maturity.cljs                 ; 全 repo を評価して manifest/repo-maturity.edn を書く
 ;;   nbb scripts/repo-maturity.cljs --limit 20       ; 先頭 N repo だけ（動作確認用）
+;;   nbb scripts/repo-maturity.cljs --offset 800 --limit 800 --merge-existing
+;;                                                   ; 801〜1600 番目だけ再スコアして既存とマージ
+;;                                                   （長い --full を分割して完走させるため）
 ;;   nbb scripts/repo-maturity.cljs --batch-size 40  ; GraphQL バッチサイズ変更（既定 20）
 ;;   nbb scripts/repo-maturity.cljs --full           ; incremental を無効化し全 repo を再取得
 ;;
@@ -66,6 +69,7 @@
     (if-let [[k & more] (seq args)]
       (case k
         "--limit"      (recur (rest more) (assoc opts :limit (js/parseInt (first more))))
+        "--offset"     (recur (rest more) (assoc opts :offset (js/parseInt (first more))))
         "--batch-size" (recur (rest more) (assoc opts :batch-size (js/parseInt (first more))))
         "--out"        (recur (rest more) (assoc opts :out (first more)))
         "--only"       (recur (rest more) (assoc opts :only (first more)))
@@ -160,8 +164,14 @@
        (distinct)))
 
 (def target-repos
+  ;; --offset exists so the stage-rule sweep can be finished in slices. A single
+  ;; --full pass over ~3,950 repos is long enough that it kept being interrupted
+  ;; (once at batch 44 of 198), and --limit alone can only ever rescore the same
+  ;; front of the list again. Offset first, then limit: `--offset 800 --limit 800`
+  ;; is the second slice.
   (cond->> all-repos
     (:only opts) (filter #(str/includes? (:path %) (:only opts)))
+    (:offset opts) (drop (:offset opts))
     (:limit opts) (take (:limit opts))))
 
 (println (str "repo-maturity: " (count all-repos) " repos in west.yml (excl. datalad/archived), "
