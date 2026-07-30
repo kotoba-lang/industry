@@ -501,6 +501,91 @@
          distinct
          vec)))
 
+(def known-md-files
+  "The .md files still under 90-docs, accepted as a BASELINE.
+
+  ADR-2607171600 makes EDN the only source of truth here, and seventy files have not been
+  migrated: gates 20, business/revenue-agent-loop/runs 20, deployment 10, business 10,
+  and a handful at the root. That is a real, unfinished migration -- listing them is not
+  approval of it.
+
+  It is listed because the alternative was worse. While every run failed on these
+  seventy, nothing could report that a SEVENTY-FIRST had appeared, which is the only
+  question a gate can usefully answer about a migration in progress. Same reasoning as
+  known-parse-errors, and asserted in the same two directions: a file here that no longer
+  exists must be removed from the list."
+  [
+   "90-docs/business/cloud-itonami-5820-crm-go-to-market.md"
+   "90-docs/business/cloud-itonami-5820-dogfood-execution.md"
+   "90-docs/business/cloud-itonami-5820-validation-sprint-order-form.md"
+   "90-docs/business/cloud-itonami-6399-6310-acquisition-audit.md"
+   "90-docs/business/cloud-itonami-commercial-closure.md"
+   "90-docs/business/cloud-itonami-e2e-checkout-verification.md"
+   "90-docs/business/cloud-itonami-energy-systemdynamics-estimate.md"
+   "90-docs/business/cloud-itonami-maturity-loop.md"
+   "90-docs/business/net-kotobase-graphdb-baas-execution-plan-2026-07-24.md"
+   "90-docs/business/portfolio-priority-2026-07-24.md"
+   "90-docs/business/revenue-agent-loop/COMMERCIAL-GO-NO-GO.md"
+   "90-docs/business/revenue-agent-loop/README.md"
+   "90-docs/business/revenue-agent-loop/RUN-TEMPLATE.md"
+   "90-docs/business/revenue-agent-loop/runs/0001-club-shinshi-first-external-payment.md"
+   "90-docs/business/revenue-agent-loop/runs/0002-cloud-itonami-existing-tenant-paid-pilot.md"
+   "90-docs/business/revenue-agent-loop/runs/0003-cloud-itonami-7810-public-prospects.md"
+   "90-docs/business/revenue-agent-loop/runs/0004-net-babiniku-payment-preflight.md"
+   "90-docs/business/revenue-agent-loop/runs/0005-commercial-readiness-gate.md"
+   "90-docs/business/revenue-agent-loop/runs/0006-net-kotobase-standard-closure.md"
+   "90-docs/business/revenue-agent-loop/runs/0007-net-kotobase-privacy-inventory.md"
+   "90-docs/business/revenue-agent-loop/runs/0008-net-kotobase-account-deletion.md"
+   "90-docs/business/revenue-agent-loop/runs/0009-net-kotobase-legacy-index-and-processors.md"
+   "90-docs/business/revenue-agent-loop/runs/0010-provider-evidence-and-counsel-packet.md"
+   "90-docs/business/revenue-agent-loop/runs/0011-net-kotobase-stripe-boundary-e2e.md"
+   "90-docs/business/revenue-agent-loop/runs/0012-cloud-itonami-5820-offer-integrity.md"
+   "90-docs/business/revenue-agent-loop/runs/0013-cloud-itonami-operator-selection.md"
+   "90-docs/business/revenue-agent-loop/runs/0014-cloud-itonami-collection-agreement-execution-copy.md"
+   "90-docs/business/revenue-agent-loop/runs/0015-cloud-itonami-collection-adr.md"
+   "90-docs/business/revenue-agent-loop/runs/0016-cloud-itonami-stripe-test-credential-audit.md"
+   "90-docs/business/revenue-agent-loop/runs/0017-cloud-itonami-5820-order-form.md"
+   "90-docs/business/revenue-agent-loop/runs/0018-cloud-itonami-legal-owner-approval.md"
+   "90-docs/business/revenue-agent-loop/runs/0019-cloud-itonami-legal-site.md"
+   "90-docs/business/revenue-agent-loop/runs/0020-capital-allocation-governor.md"
+   "90-docs/business/revenue-agent-loop/SCORECARD.md"
+   "90-docs/deployment/MONTH-3-CANARY-DEPLOYMENT-PLAN.md"
+   "90-docs/deployment/MONTH-3-DEPLOYMENT-READINESS.md"
+   "90-docs/deployment/MONTH-3-FINAL-CHECKLIST-2026-09-08.md"
+   "90-docs/deployment/MONTH-3-INDEX.md"
+   "90-docs/deployment/MONTH-3-PRE-FLIGHT-README.md"
+   "90-docs/deployment/MONTH-3-ROLLBACK-PROCEDURE.md"
+   "90-docs/deployment/MONTH-3-STRANGLER-FIG-EXECUTION-PLAN.md"
+   "90-docs/deployment/MONTH-3-STRANGLER-FIG-SUMMARY.md"
+   "90-docs/deployment/MONTH-3-TIMELINE-INTEGRATION.md"
+   "90-docs/deployment/README.md"
+   "90-docs/fleet-migration-month-3-monitoring-guide.md"
+   "90-docs/fleet-migration-rust-fleet-decommissioning.md"
+   "90-docs/gates/ACTIVATION-STATUS-WAVE5.md"
+   "90-docs/gates/calendar-setup-guide.md"
+   "90-docs/gates/decision-rule-and-escalation-summary.md"
+   "90-docs/gates/DEPLOYMENT-ARTIFACTS-CHECKLIST.md"
+   "90-docs/gates/DEPLOYMENT-QUICK-REFERENCE.md"
+   "90-docs/gates/DEPLOYMENT-SUMMARY.md"
+   "90-docs/gates/DISTRIBUTION-ACTIVATION-SUMMARY-2026-07-21.md"
+   "90-docs/gates/EXECUTION-KICKOFF-REPORT-WAVE5-M5M6.md"
+   "90-docs/gates/EXECUTION-LEAD-QUICK-REFERENCE-2026-07-21.md"
+   "90-docs/gates/EXECUTION-READINESS-FINAL-CHECKLIST-2026-08-21.md"
+   "90-docs/gates/FINAL-DISTRIBUTION-READINESS-CHECK-2026-07-21.md"
+   "90-docs/gates/KICKOFF-EXECUTION-COMPLETE-2026-07-21.md"
+   "90-docs/gates/kickoff-meeting-slides.md"
+   "90-docs/gates/KICKOFF-PREPARATION-SUMMARY-2026-07-21.md"
+   "90-docs/gates/metrics-deployment-procedure.md"
+   "90-docs/gates/PRODUCTION-READINESS-GO-NO-GO-GATE-2026-07-21.md"
+   "90-docs/gates/README.md"
+   "90-docs/gates/team-notifications-email-templates.md"
+   "90-docs/gates/team-onboarding-checklist.md"
+   "90-docs/gates/week-11-checkpoint-procedures.md"
+   "90-docs/MONTH-3-EXECUTION-SUMMARY.md"
+   "90-docs/MONTH-3-PREFLIGHT-CHECKLIST.md"
+   "90-docs/WAVE-2-EXECUTION-SUMMARY-2026-07-21.md"
+   "90-docs/wave-2-task-board.md"])
+
 (def known-parse-errors
   "Files under 90-docs that have not parsed as EDN for some time, accepted as a
   BASELINE so that a new breakage is visible.
@@ -635,18 +720,38 @@
           ;; a body truncated by an unescaped quote, and that conflation is part of why
           ;; this command was permanently red and the real corruption was invisible in
           ;; it. Unreadable fails; unconventional is reported.
-          hard-fail? (or (seq md-left) (seq @split-strings)
-                         (seq @path-md-hits) (seq @sf-hits))]
+          known-md (set known-md-files)
+          seen-md (set (map (comp relative str) md-left))
+          new-md (sort (remove known-md seen-md))
+          gone-md (sort (remove seen-md known-md))
+          ;; path-md-refs follows md-left: while seventy .md files legitimately exist,
+          ;; a document that references one is not carrying a dangling link. Measured --
+          ;; the two ADRs flagged point at gates/*.md files that are right there. The
+          ;; check earns its keep once the migration finishes; until then it is
+          ;; reporting the same unfinished work twice.
+          hard-fail? (or (seq @split-strings) (seq @sf-hits)
+                         (seq new-md) (seq gone-md))]
       (when (seq new-errors)
         (println "=== NEW PARSE ERRORS (not in the accepted baseline) ===")
         (doseq [f new-errors] (println " " f)))
       (when (seq fixed)
         (println "=== BASELINE IS STALE — these parse now, remove them from known-parse-errors ===")
         (doseq [f fixed] (println " " f)))
+      (when (seq new-md)
+        (println "=== NEW .md UNDER 90-docs (not in the accepted baseline) ===")
+        (println "  EDN is the source of truth here; a new .md moves the migration backwards.")
+        (doseq [f new-md] (println " " f)))
+      (when (seq gone-md)
+        (println "=== BASELINE IS STALE — these .md files are gone, remove them from known-md-files ===")
+        (doseq [f gone-md] (println " " f)))
       (if (and (not hard-fail?) (empty? new-errors) (empty? fixed))
-        (do (println (str "verify: OK — 90-docs is EDN-only SSoT ("
-                          (count known) " known-unparseable files accepted; "
-                          "every other check clean)"))
+        (do (println (str "verify: OK — no NEW breakage ("
+                          (count known) " known-unparseable and "
+                          (count known-md) " un-migrated .md accepted as baselines; "
+                          "nothing else is wrong)"))
+            (println "  Neither baseline is approval: ADR-2607171600's EDN-only migration")
+            (println "  is unfinished, and those files are unreadable to every query over")
+            (println "  this plane. What OK means is that nothing got worse.")
             0)
         (do (println "verify: FAIL")
             (nc/exit 1)
