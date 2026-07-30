@@ -94,7 +94,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
-| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete** through cauth#244 (+ fleet.inv#243 tunnel#242 …) + preload; remaining report/config/driver/… |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete** through infer join/relay/gc/moe#245 (+ cauth#244 fleet.inv#243 …); report/config/plan/credits/schedule still open |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
@@ -697,6 +697,22 @@ Still open:
 2. T8.3 production AOT network/secret; W4 recursive values
 3. Residual 0/1 i64 params: config pinned-exists, engine option flags, moe shared?,
    dash health-from-present, tunnel pick-exit has-rc
+
+
+## Progress (2026-07-31y — T6.4 infer join/relay/gc/moe mirror-delete + pin)
+
+- murakumo#245 MERGED (5a4ce7b): **infer join + relay + gc + moe** delete cljs
+  host mirrors — pure helpers require shipped KIR; folds/state stay host.
+  ADR-260731-w6-t64-infer-small-mirror-delete. Evidence: 40 tests / 201 assertions.
+- murakumo#244 already on tip ancestry (component-authority mirror-delete).
+- west pin murakumo ae3aaaeb -> 5a4ce7b.
+
+T6.4 mirror-deleted (batch): …fleet.inventory#243 cauth#244 join/relay/gc/moe#245.
+
+Still open:
+1. T6.4 remaining hosts (report/config/plan/credits/schedule/engine/driver/runtime/…)
+2. T8.3 production AOT network/secret; W4 recursive values
+3. Residual 0/1 i64 param projections (incl. moe shared? flag)
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
