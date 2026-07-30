@@ -140,13 +140,90 @@ recent kotoba-lang failures); gftdcojp, etzhayyim, network-awai, cloud-itonami a
 jk-luxury were not measured. A sweep of 2288 repos is not something to do on
 evidence from one org.
 
+## Live verification, 2026-07-30 — the fleet tick cannot complete
+
+Ran the fleet for real after retiring Actions. **The premise of that retirement was
+half wrong and this is the correction.**
+
+### What works
+
+The gate mechanism is sound, proved on real hardware rather than inferred:
+
+- filtered tree shipped over ssh stdin to `asher` (mac mini, Darwin arm64): 1988
+  `.edn` / 2142 `.edn+.cljs` / 2001 `.edn+.yml` files selected by pathspec, tarball
+  9.7 MB, extract OK
+- `west-pin-policy-check.cljs` executed on the node: `3 cases OK`, sentinel
+  `FLEET-CI-EXIT: 0`
+- nodes reachable with `npx` available: asher, judah, levi, simeon, joseph, benjamin
+
+### What does not work
+
+**`scripts/fleet-ci/tick.cljs` cannot complete a tick on this machine.** It dies
+before any gate runs:
+
+    no such item: fleet-agent-murakumo-ci-tip
+    batch 0 ci-verify exit 1 (4s)
+    ERROR no receipt produced for batch 0
+
+The signing identity `gates.edn` names is not provisioned here — the kagi item is
+absent and so is the PEM the plist expects (`~/.gftd/fleet-ci-signer-tip.pem`).
+A targeted lookup of the one other documented name found `fleet-agent-murakumo-ci`
+present, but `gates.edn` says that is a **different machine's identity** and that
+keys are not copied between machines, so pointing at it would break the design
+rather than fix it.
+
+**The receipts in the ledger did not come from this code.** Six landed today
+between 02:02 and 04:00, signed by `did:key:z6MkhKgm9LbcxSN5uVDBJAhZ3B7s31MHXfS2omgkmCnWu3Ve`.
+The loaded LaunchAgent is `com.gftd.fleet-ci-murakumo-tick`, not the repo's
+`com.gftd.fleet-ci-tip-tick`, and it runs `~/.gftd/run-fleet-ci-murakumo-tick.cljs`
+— an out-of-repo script of 209 lines with a **hardcoded repo list that never reads
+gates.edn**.
+
+So `gates.edn` exists precisely to replace hardcoding (its own header says the
+ADR-2607178000 runner hardcoded 14 repos and nodes), and the hardcoded runner is
+still the one executing. The four `root` gates — docs-edn, repository-roles,
+manifest-reality, and the west-pin policy gate added today — are **not in the
+running rotation.**
+
+### Consequence for the Actions retirement
+
+Actions was retired because it executes nothing, which remains true and measured.
+But the fleet plane that was supposed to be carrying these invariants is not
+carrying them either. Restoring Actions would restore nothing, since its jobs do
+not start. The honest position: **this superproject's real CI coverage is whatever
+the 209-line hardcoded runner checks, and nothing else.**
+
+### Also found and fixed: scratch retention cannot keep up
+
+`asher` was at **100% disk, 117 MiB free**, with 20 GB under `/tmp/fleet-ci` across
+474 directories — and **zero of them older than one day**, so the prune in
+`gate-command` (`-mtime +1`) could never reclaim anything. A full node fails at
+`tar` with `No space left on device`, so its gates die before running.
+
+Pruned entries untouched for 60+ minutes (no gate was in flight; the only live nbb
+process was an unrelated murakumo service): 20 GB to 89 MB, 117 MiB to 20 GiB free.
+Then changed the policy from `-mtime +1` to `-mmin +120`, which bounds usage to
+about two hours of production instead of a day, with a 4x margin over the 30-minute
+gate timeout. Also added `-mindepth 1`: the original expression matched the base
+directory itself.
+
 ## Remaining work, in order
 
-1. Fix the three failing invariants above, then register them as gates (decision 4).
-2. Switch branch-protection required checks to `fleet-ci/murakumo/*`. Until this happens nothing is enforced, whichever plane runs.
-3. Decide codeql and jupyterlite.
-4. Issue the two fine-grained PATs so the LaunchAgent stops skipping (GitHub Web UI, human step) — otherwise ticks only run from an interactive session.
-5. Refresh `scripts/fleet-ci/README.md`, which still lists PR-head verification as not-done."
+0. **Blocking, before anything else: give this machine a signer identity.** Enroll
+   `fleet-agent-murakumo-ci-tip` (or place the PEM the plist expects at
+   `~/.gftd/fleet-ci-signer-tip.pem`, the path ADR-2607178000 §3 permits) and grant
+   it in `fleet-agents.edn`. Until then `tick.cljs` dies before any gate runs and
+   none of the four root gates execute. Do not repoint `gates.edn` at
+   `fleet-agent-murakumo-ci` — that is another machine's identity.
+1. **Decide which runner is authoritative.** `~/.gftd/run-fleet-ci-murakumo-tick.cljs`
+   is what actually produces receipts and it ignores `gates.edn`; the repo's
+   `tick.cljs` reads `gates.edn` and cannot sign. One of them has to become the
+   single plane, or the data-driven matrix stays decorative.
+2. Fix the three failing invariants above, then register them as gates (decision 4).
+3. Switch branch-protection required checks to `fleet-ci/murakumo/*`. Until this happens nothing is enforced, whichever plane runs.
+4. Decide codeql and jupyterlite.
+5. Issue the two fine-grained PATs so the LaunchAgent stops skipping (GitHub Web UI, human step) — otherwise ticks only run from an interactive session.
+6. Refresh `scripts/fleet-ci/README.md`, which still lists PR-head verification as not-done."
   :adr/verification
   "The ported gate was proved to both pass and fail before registering it:
 
