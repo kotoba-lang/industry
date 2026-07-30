@@ -1,0 +1,233 @@
+[{:db/id -1
+  :adr/id "adr-2607300300-esim-voice-reception-card-issuing-integrated-design"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-subject-three-authority-integration"
+  :adr/title "ADR-2607300300: eSIM・受電・カード発行を cloud-itonami-app の1つの identity subject に統合する設計 — records/ports/governed-actor/consent-surface の4層と、単一 ref 上の cross-domain 監査面"
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/last-verified "2026-07-30"
+  :adr/last_verified "2026-07-30"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative-for
+  ["eSIM（GSMA SGP.22/SGP.02）・受電（inbound voice reception）・カード発行（issuer-side）の3領域を cloud-itonami-app に統合する際の層分割（records / ports / governed actor / consent surface）と、各層がどの org のどの repo に属するかの正本"
+   "cloud-itonami-app 側に追加する単一の proposal→consent→commit 背骨（cloud.itonami.app.authority）の設計と、bitcoin PSBT 経路をその先行実装と見なす判断"
+   "app 側 Passkey consent gate と actor 側 Governor gate が別物であり互いを代替しないという境界定義"
+   "3領域の監査 datom を kotobase の単一 ref に置く決定と、その根拠となる cross-domain 不変条件（eSIM ownership transfer ⇒ card authorization posture）"
+   "この統合が今日actuationできないこと（3 actor すべて :effect :propose only、denwaban run-session は G7 raise、いずれも無免許）という到達上限の明示"
+   "kotoba-lang 側の eSIM records/ports ライブラリ欠落を埋める決定と、既存 com-gsma-opengateway をそれに使わない理由"]
+  :adr/related "adr-2606271930-denwaban-voice-reception-auto-booking-actor, adr-2607249000-cloud-itonami-card-issuing-actor, adr-2607247000-cloud-itonami-emi-electronic-money-institution-actor, adr-260726-kotobase-query-plane-is-one-ref, adr-2604280000-telecom-tmf-esim-phases17-18, adr-2607102000-cloud-itonami-mobilenetwork-6120-blueprint"
+  :adr/body "
+# ADR-2607300300: eSIM・受電・カード発行の統合設計
+
+**Status**: accepted
+**Date**: 2026-07-30
+**Deciders**: Jun Kawasaki（+ Claude、オーナー指示「設計統合してください」に基づき実行）
+
+## Context
+
+棚卸しの結果（本 ADR の起点となった実測、2026-07-30）:
+
+- **`cloud-itonami-app` には3領域とも一切入っていない。** `app.kotoba.edn` の
+  `:local/contracts` と `docs/architecture.md` の権限表が capability 面の正本で、
+  載っているのは推論プロバイダ・Passkey/`did:key`・EIP-4361 wallet の Account Link・
+  mail/projects/drive/calendar の読み取りモデル・AgentRun・bitcoin 境界・
+  service entitlement だけ。`src/` の `card` ヒットは全部 CSS クラス名
+  （`.local-card` / `.connector-card` / `.quota-card`）、`inbound` は `mail.inbound` のみ、
+  `esim` / `iccid` / `eUICC` / telephony はゼロ件。
+- **fleet 側に素材は既にある**が、互いに接続されていない:
+  受電 = `cloud-itonami/denwaban`（R0 scaffold）、
+  カード発行 = `cloud-itonami/cloud-itonami-card-issuing`（R0、ADR-2607249000）、
+  eSIM = **存在しない**。
+- eSIM の実装が唯一あるのは別 org・別スタックの `gftdcojp/ai-gftd-apps-gftdcojp`
+  （ADR-2604280000 Phase 18、ATProto lexicon + BPMN + Python/pyzeebe）。
+  kotoba-lang でも cloud-itonami-app でもなく、この統合には直接使えない。
+
+## Decision
+
+### D1. 4層に分ける。層をまたぐ実装を1つの repo に置かない
+
+3領域はすべて同じ形をしている。統合とは「3つの機能を app に足す」ことではなく、
+**この4層を3領域で揃え、最下層で1つの identity subject に束ねる**ことである。
+
+| 層 | 責務 | 受電 | カード発行 | eSIM |
+|---|---|---|---|---|
+| **records** | 国際標準のレコード形（no I/O, no credential, portable `.cljc`） | `kotoba-lang/phone`（E.164 / SIP / CDR / SMS） | `kotoba-lang/card`（ISO/IEC 7812 PAN + Luhn / ISO 8583 / authorization contract） | **欠落 → `kotoba-lang/esim` を新設（D5）** |
+| **ports** | host 注入される protocol（SDK も鍵も持たない） | `kotoba-lang/koe`（`ITelephony`/`ISTT`/`IDialog`/`ITTS`/`IBooking`） | **欠落 → `kotoba-lang/card` に `ports.cljc` を追加（D5）** | **欠落 → `kotoba-lang/esim` に同梱（D5）** |
+| **governed actor** | Advisor ⊣ Governor + append-only ledger、propose のみ | `cloud-itonami/denwaban` | `cloud-itonami/cloud-itonami-card-issuing` | **欠落 → `cloud-itonami/cloud-itonami-esim` を新設（D6）** |
+| **consent surface** | subject 束ね・deterministic pre-check・Passkey consent | **3領域とも欠落 → `cloud-itonami-app`（D2/D3）** | 同 | 同 |
+
+`kotoba-lang/koe` がこの層分割の**既存の模範**である（ports だけを定義し、
+`denwaban` が twilio-compat / whisper-compat / elevenlabs-compat / yotei を注入する）。
+新設分はこの形に合わせる。逆に `records` 層に I/O や credential を入れない、
+`ports` 層に具体 vendor を入れない、を守る。
+
+### D2. app 側は3つの機能領域ではなく、1本の proposal→consent→commit 背骨を足す
+
+`cloud.itonami.app.authority` を新設し、3領域はその上の薄い typed adapter にする。
+**これは新しい発明ではなく、`bitcoin_wallet.clj` が既に証明している経路の一般化である**:
+
+```
+create-psbt-review!      ; deterministic pre-check（max-fee-sats / max-fee-ratio）で
+                         ; approval を出す前に拒否する。:status :awaiting-passkey
+start-psbt-approval!     ; passkey/start-authorization! に typed context を載せる
+finish-psbt-approval!    ; context type と proposal id の一致を検証
+attach-signed-psbt!      ; 署名済み artifact は外から戻る。app は鍵を持たない
+```
+
+`authority` はこの4段を領域非依存にする。各領域が供給するのは
+(a) proposal の shape、(b) **決定論的な** pre-check 述語、(c) passkey context type、
+(d) commit 先の actor endpoint。context type は領域ごとに分ける:
+`:card/authorization-approval`・`:card/lifecycle-transition`・
+`:esim/profile-transition`・`:esim/ownership-transfer`・`:voice/answer-authority`。
+
+pre-check は **LLM を通さない**。bitcoin の `max-fee-sats` と同じく、
+プログラムで判定できるものだけを pre-check に置く（例: カードの authorization が
+funding account の記録済み日次上限を超えていないか、eSIM の遷移が
+記録済み現在状態から SGP.22 上到達可能か、着信が許可済み時間帯・番号か）。
+判定に判断や法令解釈が要るものは pre-check に**入れない** — それは D3 の actor 側 Governor の仕事。
+
+### D3. gate は2枚。互いを代替しない
+
+- **app 側 Passkey consent gate** = 「この human subject が同意したか」。
+  subject の意思のみを問う。actor の admission 判断はしない。
+- **actor 側 Governor gate** = 「licensed operator にとって admissible か」
+  （管轄・sanctions・license status・上限・escalation）。subject の同意は問わない。
+
+どちらも独立に拒否できる。**どちらも他方の代わりにならない。**
+app が Passkey を取ったことを理由に Governor を省略してはならず、
+Governor が通したことを理由に Passkey consent を省略してはならない。
+2枚あることを冗長と見なして片方を外す最適化を禁じる。
+
+### D4. 監査 datom は単一 ref に置く。書き込み負荷を理由に領域ごとに割らない
+
+統合の産物は cross-domain な問いに答えられることであり、その代表例:
+
+> **eSIM の ownership transfer / SIM swap が起きたら、同一 subject のカードの
+> authorization posture を落とす。**
+
+これは SIM-swap 詐欺に対する実際の防御であり、**3領域が同じ ref に載っていない限り
+表現できない**。`kotobase.core/open` は `:ref-name` を1つしか取らず、
+`q` / `pull` / `datoms` はその1本から hydrate した db value に対してのみ動く
+（ADR-260726-kotobase-query-plane-is-one-ref、repo-wide mandatory）。したがって:
+
+- 3領域の監査 datom は **`did:key` subject を結合キーに1本の ref** に置く。
+- **書き込み負荷を理由に領域ごと・subject ごとに ref を割らない。** 先に
+  「その ref を所有する単一 writer を置いてバッチングする」を採る。
+- Durable Object の `ctx.storage.sql` に durable plane を置かない（per-object private で
+  datom 面が孤島に割れる）。DO は直列化器・realtime room として使い、storage は共有バックエンド。
+
+同じ理由で答えられるようになる問い: どの line がこの authorization の直前に着信を受けたか /
+この cardholder の番号が port out されたか / この通話の録音が保持されたか。
+逆に、ここを割った瞬間これらは N クエリ + マージに落ちる。**黙ったシャーディングを禁じる。**
+
+### D5. kotoba-lang に `esim` を新設する。`com-gsma-opengateway` は使わない
+
+`com-gsma-opengateway` の schema は `Subscriber(imsi/msisdn)` / `Session(apn)` /
+`Message` / `Number` / `Terminal` / `UsageRecord` までで、
+**eUICC・EID・ICCID・profile state・SM-DP+ / SM-DS を一切持たない**（実測）。
+clean-room compat actor であって records 層のライブラリでもない。これを eSIM 面に
+転用すると、持っていない概念を後付けで生やすことになる。
+
+代わりに `kotoba-lang/esim`（prefix なし = reusable library、
+`manifest/repository-rules.edn` の taxonomy 準拠）を新設する。既存 family と同じ規律:
+
+- GSMA **SGP.22 Consumer** + **SGP.02 M2M** の *records*、wire format ではない
+  （`card` が ISO 8583 を、`rcs` が SIP/MSRP を records に留めているのと同じ判断）。
+- E.164 は再実装せず **`kotoba-lang/phone` の `e164-valid?` に委譲**する
+  （`rcs` が既に取っている形）。
+- profile lifecycle は state machine として持つ:
+  `provision-euicc` → `download-profile` → `enable` / `disable` → `delete`、
+  加えて `register-smds-event`・`audit-euicc-state`・`transfer-ownership`（SGP.22 Annex H）。
+  **遷移の到達可能性判定を pure に持つ**（D2 の pre-check がこれを呼ぶ）。
+- ports（`IProfileProvisioning` / `IEventRegistration`）を同梱し、SM-DP+ / SM-DS の
+  具体接続は host 注入にする。**credential も endpoint もライブラリに焼かない。**
+- 言語面は CLAUDE.md の runtime 優先順位に従い portable `.cljc`。
+  `.kotoba` 化は `css` 系の移行順序が片付いてから別 ADR で判断する（今は前提にしない）。
+
+### D6. eSIM actor は 6120 に足さず、新設する
+
+`cloud-itonami-isic-6120`（MNO）は一見近いが、**その `blueprint.edn` の
+`:implemented-slice` が明示するとおり primary entity は SITE（cell tower / base station）**
+であり、`:spectrum-license-status` と `:site-access-record` を軸に組まれている。
+同 repo の ADR-0002 correction history は、初期実装が sibling 6190 を誤って写して
+「subscriber-identity/MSISDN-provisioning model with ZERO site/tower/spectrum modeling」を
+作ってしまったことを**是正した記録**である。ここに eSIM profile lifecycle を足すのは
+その是正を巻き戻す方向になる（README の記述は現行実装より古く、
+`MSISDN provisioning` を掲げているが実装の軸は site である — 別途 README を実装に合わせる）。
+
+よって `cloud-itonami/cloud-itonami-esim` を新設する
+（**eSIM Provisioning Advisor ⊣ eSIM Provisioning Governor**）。
+`:effect :propose` only、`transfer-ownership` は常に human escalation
+（SIM-swap 詐欺の主要経路であるため categorical に自動承認しない）。
+
+### D7. PII 規律は3領域の既存判断を app 側でも保持する
+
+- **EID / ICCID は device-bound quasi-PII → sha256 hashed で保持**（ADR-2604280000 の既決を踏襲）。
+- **PAN は raw で永続化しない**（`kotoba-lang/card` 自身の規約。tokenization は別層）。
+- **通話録音は `:transient`、明示同意なしに保持しない**（denwaban G1）。
+- そして追加規律: **loopback 束縛の app が PAN / EID / 録音の着地先になってはならない。**
+  app が持つのは proposal・consent・hash・参照であって、素の識別子や音声ではない。
+  `:privacy {:bind-loopback-only? true}` は egress を止めるが、
+  ローカルに何を溜めてよいかは規定していない — ここで規定する。
+
+## Non-goals（明示的にやらない）
+
+- 3領域の domain logic を app に実装しない。app は surface と consent gate であって authority ではない。
+- `ai-gftd-apps-gftdcojp` の eSIM/cards lexicon 群を移植しない（別スタック・別 org。
+  技術知識としては参照してよいが、Python/pyzeebe/BPMN 実装をこの4層に持ち込まない）。
+- カードの acquirer 側（`cloud-itonami-isic-6619`）と e-money 発行体（`cloud-itonami-emi`）は
+  本統合で作り直さない。card-issuing は EMI wallet を **funding source として参照するだけ**
+  （ADR-2607249000 の Non-goals をそのまま維持）。
+- MVNO/MNO の実運用（spectrum, RAN）は 6120 の範囲。本統合は line の *provisioning 面* だけを扱う。
+
+## 到達上限 — 今日この統合は actuation できない（重要）
+
+これを書かないと設計が嘘になるので明示する。実測に基づく現在地:
+
+- `cloud-itonami-isic-6120` の7 ops は **すべて `:effect :propose` only**、
+  さらに `:operate-tower-equipment` と `:finalize-spectrum-license-decision` は
+  **permanently blocked（override なし）**。
+- `cloud-itonami-card-issuing` は **R0**。README 自身が、この actor は
+  BIN を実際に sponsor する license も、実カードを発行する能力も持たないと述べている。
+- `denwaban` は **R0 scaffold**。`plan-session` は pure だが
+  **`run-session` は G7 outward-gate で raise する** — socket なし・実発着信なし・fixtures のみ。
+  設計 ADR-2606271930 は今も `status "proposed"`。
+- `cloud-itonami-emi` も同型で、e-money 発行 license を持たない。
+
+したがって**統合された成果物が今日 end-to-end でできること**は:
+1つの `did:key` subject を3本の governed proposal stream に束ね、
+実際の human consent（Passkey）と実際の監査（append-only ledger、単一 ref）を付けること。
+**できないこと**: 実カードの発行、実 eSIM profile の download/enable、実電話の応答。
+それらは licensed operator が instance を deploy し、card scheme / carrier / SM-DP+ への
+接続と license を供給して初めて成立する。**app の UI 上でも同じ区別を出す** —
+proposal を「発行済み」と表示してはならない。
+
+## Consequences
+
+- 良い: 3領域が同じ背骨に載るので、4本目（例: EMI wallet、port-in/port-out）を足すコストが
+  adapter 1枚に下がる。bitcoin 経路も事後的にこの背骨へ寄せられる。
+- 良い: SIM-swap ⇒ card freeze が構造的に表現可能になる（D4 を守る限り）。
+- 代償: gate が2枚あるので、ユーザから見た承認ステップが増える。D3 のとおりこれは削らない。
+- 代償: 単一 ref に集約するため、書き込み並列度は単一 writer のバッチングで解く必要がある。
+  ref を割る誘惑が構造的に残るので D4 を repo-wide の判断として固定した。
+- リスク: `denwaban` の docstring は kernel を `com-junkawasaki/koe-clj` と呼んでいるが、
+  実体は **`kotoba-lang/koe`**（`-clj` suffix 廃止 + 配置ルール）。同様に ADR-2606271930 が
+  参照する `etzhayyim/root/20-actors/{twilio,whisper,elevenlabs}-compat` は
+  `kotoba-lang/com-*` へ移動済み。統合作業の最初にこの参照 drift を直す。
+
+## Build order（依存順。飛ばすと下流が壊れる）
+
+1. `kotoba-lang/esim` を新設（records + state machine + ports、`phone` に E.164 委譲）。
+2. `kotoba-lang/card` に `ports.cljc` を追加（`koe.ports` と同型。既存 records は無変更）。
+3. `denwaban` / ADR-2606271930 の参照 drift 修正（`koe` / `com-*`）。
+4. `cloud-itonami/cloud-itonami-esim` actor を新設（D6）。
+5. `cloud.itonami.app.authority` 背骨を実装（bitcoin PSBT 経路の一般化。bitcoin は当面現状維持）。
+6. 3領域の typed adapter + `defaults.edn` の設定面（既定 disabled、AgentRun と同じく opt-in）。
+7. 単一 ref の監査面と、SIM-swap ⇒ card posture の cross-domain 不変条件をテストで固定。
+
+各段の完了条件は「実装した」ではなく、pre-check の決定論性・context type 不一致の拒否・
+Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が **test で示されていること**。
+"}]
