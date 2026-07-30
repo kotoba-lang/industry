@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 5515, "kotobase-cf-wasm-staging" 2588},
+ {"net-kotobase" 5121, "kotobase-cf-wasm-staging" 2582},
  :zone
- {:requests-7d 9685,
-  :pageviews-7d 501,
-  :uniques-7d-sum 711,
+ {:requests-7d 9261,
+  :pageviews-7d 447,
+  :uniques-7d-sum 643,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 118}
-   {:path "/", :requests 95}
-   {:path "/_health", :requests 80}
-   {:path "/robots.txt", :requests 29}
-   {:path "/llms.txt", :requests 23}
-   {:path "/llms-full.txt", :requests 23}
-   {:path "/.well-known/did.json", :requests 20}
-   {:path "/api/funnel", :requests 16}],
-  :status-mix {:server-error 36, :client-error 989, :ok 571},
+  [{:path "/health", :requests 116}
+   {:path "/", :requests 99}
+   {:path "/_health", :requests 77}
+   {:path "/robots.txt", :requests 32}
+   {:path "/llms.txt", :requests 22}
+   {:path "/llms-full.txt", :requests 22}
+   {:path "/.well-known/did.json", :requests 21}
+   {:path "/api/funnel", :requests 17}],
+  :status-mix {:client-error 986, :server-error 36, :ok 576},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -29,13 +29,13 @@
   :murakumo-paid-amount-minor 0,
   :charges-total 90,
   :last-charge-epoch 1604224274},
- :as-of "2026-07-29",
+ :as-of "2026-07-30",
  :traffic-quality {:window "24h", :probe-4xx-pct 62, :error-5xx-pct 2},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 118 · / 95 · /_health 80 · /robots.txt 29 · /llms.txt 23 | 4xx(probe) 62% · 5xx 2%",
- :funnel {:visitors 1540, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 116 · / 99 · /_health 77 · /robots.txt 32 · /llms.txt 22 | 4xx(probe) 62% · 5xx 2%",
+ :funnel {:visitors 1544, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 9685 req/7d・711 uniques(日次和)・うち4xx probe 62%(24h)、workers 8103 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 9261 req/7d・643 uniques(日次和)・うち4xx probe 62%(24h)、workers 7703 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 4,
   :submissions 3,

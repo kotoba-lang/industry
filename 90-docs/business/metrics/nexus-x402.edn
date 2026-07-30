@@ -1,16 +1,27 @@
-{:as-of "2026-07-29",
+{:as-of "2026-07-30",
  :sources [:cloudflare :health :emitter],
- :workers-invocations-7d {"nexus-x402" 1812},
+ :workers-invocations-7d {"nexus-x402" 1319},
  :health-status 200,
  :catalog
  {:x402Version 1,
   :service "nexus-x402",
   :count 4,
   :items
-  [{:seller "kotobase",
+  [{:seller "murakumo",
+    :method "POST",
+    :path-prefix "/x402/v1/messages",
+    :gateway "https://x402.nexus/gateway/murakumo/x402/v1/messages…",
+    :price
+    {:usd "0.01",
+     :micros "10000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :description nil}
+   {:seller "kotobase",
     :method "GET",
-    :path-prefix "/x402/ipfs/{cid}",
-    :gateway "https://x402.nexus/gateway/kotobase/x402/ipfs/{cid}…",
+    :path-prefix "/x402/ipfs/",
+    :gateway "https://x402.nexus/gateway/kotobase/x402/ipfs/…",
     :price
     {:usd "0.001",
      :micros "1000",
@@ -20,22 +31,11 @@
     :description nil}
    {:seller "kotobase",
     :method "POST",
-    :path-prefix "/x402/xrpc/{method}",
-    :gateway "https://x402.nexus/gateway/kotobase/x402/xrpc/{method}…",
+    :path-prefix "/x402/xrpc/",
+    :gateway "https://x402.nexus/gateway/kotobase/x402/xrpc/…",
     :price
     {:usd "0.002",
      :micros "2000",
-     :asset "USDC",
-     :network "base",
-     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
-    :description nil}
-   {:seller "murakumo",
-    :method "POST",
-    :path-prefix "/x402/v1/messages",
-    :gateway "https://x402.nexus/gateway/murakumo/x402/v1/messages…",
-    :price
-    {:usd "0.01",
-     :micros "10000",
      :asset "USDC",
      :network "base",
      :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
@@ -56,4 +56,4 @@
    :usd-total 0,
    :agent-hint {:agent 0, :human 0, :unknown 0},
    :sources {}}}, 
- :signal "workers 1812 inv/7d"}
+ :signal "workers 1319 inv/7d"}
