@@ -139,7 +139,7 @@ Download の実 blob と filename / 390px で横スクロール無し / dads-but
     `:family/edn-editor` には入らない —— repo ごとに page 構造を組む必要がある。
     `aiueos`（179 行、direct-serve）も同様。
   - **shadow-cljs SPA 系（`cad` / `genome` / `plm`）は当初『14 行の placeholder』と
-    読み違えた。** 実測すると `docs/index.html` は `<div id="root">` +
+    読み違えた。** 実測すると `docs/index.html` は `<div id=\"root\">` +
     `js/main.js` + `kotoba.<app>.app.init()` の **SPA シェル**で、UI の実体は
     `src/` の re-frame/reagent component 側にある（`npm run build` =
     `shadow-cljs release app` が `js/main.js` を作る）。したがってここの UI/UX 移行は
