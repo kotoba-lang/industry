@@ -94,7 +94,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
-| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done** #221+#223+#225+#226+#228; **mirror-delete pilot** #233 kekkai + preload contract; remaining hosts still have cljs mirrors |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done** #221+#223+#225+#226+#228; **mirror-delete** kekkai #233 + token #235 + preload contract; other hosts open |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
@@ -505,6 +505,25 @@ Still open:
 
 Still open:
 1. T6.4 expand mirror-delete to remaining dual-source hosts (same preload contract)
+2. T8.3 production AOT network/secret; W4 recursive values
+3. Residual 0/1 i64 param projections (config/secret/engine/moe/dash/tunnel)
+
+
+## Progress (2026-07-31o — T6.4 token mirror-delete + pin)
+
+- murakumo#234 MERGED: deterministic KIR for eligible? (ADR 0191 shape).
+- murakumo#235 MERGED (057cacfb): **token** deletes cljs host mirrors —
+  pure wire/claims require shipped :token KIR on every platform; HMAC/base64
+  stay host. ADR-260731-w6-t64-token-mirror-delete.
+  Evidence: 95 tests / 2167 assertions green (token+kekkai+cljs-load+authority).
+- west pin murakumo 60ef608a -> 057cacfb (covers #234+#235 on top of #233).
+
+T6.4 status: same-artifact + JVM oracle-required + **two hosts** (kekkai, token)
+mirror-deleted with preload contract. Remaining dual-source hosts still keep
+cljs mirror fallbacks.
+
+Still open:
+1. T6.4 remaining hosts mirror delete (secret/identity/persist/report/...)
 2. T8.3 production AOT network/secret; W4 recursive values
 3. Residual 0/1 i64 param projections (config/secret/engine/moe/dash/tunnel)
 
