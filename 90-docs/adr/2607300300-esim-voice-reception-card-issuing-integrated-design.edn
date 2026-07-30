@@ -637,6 +637,19 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
    **新たに判明した第3の詰まり**: `deps.edn を持たない 137 repo` は「データが無い」のではなく
    **git 依存として消費できない**（実測: `ocio` は `yaml` に依存しているが `yaml` に deps.edn が
    無く、`Manifest file not found` で解決不能 → script が commit を拒否した）。
+
+   **2026-07-31 第2 pass: 50 → 9 件（計 76 件修正）。** 残り 9 件はすべて構造的にブロック:
+   - **相互依存の環**: `cssom ⇄ dom-gpu` が互いに `:local/root`。**pin では解けない** —
+     どちらを先に直しても、相手は「修正前の commit」を指すことになり推移的に失敗する。
+     ソース側で依存の環を切るしかない（`browser` / `htmldom` はこの環の下流）。
+   - **deps.edn を持たない sibling 待ち**: `ocio`（`yaml`）。
+   - **別 org の壊れた repo 待ち**: `securities`（`cloud-itonami/cloud-itonami-isic-6311`）。
+   - 他 sibling 待ち: `dtn` / `eda-flow-demo` / `kami-gen-ml3d`。
+   **script の潜在バグを1件修正**: `:local/root` の**org を path から導出する**ようにした。
+   従来は最後の path segment だけを取って `kotoba-lang/<name>` と仮定しており、
+   `../../cloud-itonami/cloud-itonami-isic-6311` のような cross-org 指定で**同名の別 repo を
+   黙って pin し得た**（`securities` で発覚。その名の kotoba-lang repo が存在しなかったため
+   拒否されただけで、存在していれば誤った code を指したまま classpath は解決していた）。
 8. 小さいもの: `cloud-itonami-app` の既存 lint warning 11 件（うち 8 件は phantom
    require）/ `cloud-itonami-app` の full suite 5 回中 1 回だけ 1 failure が出た
    （出力を読む前に truncate してしまい **原因未特定**。以降 4 回は green。新規の
