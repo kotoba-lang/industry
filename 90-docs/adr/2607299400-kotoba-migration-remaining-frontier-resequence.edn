@@ -264,9 +264,32 @@ schedule assign, plan, seats, eligibility, credits shares, reconcile targets.
 the residual list tracked since ADR-2607299400 (seats through name-bits / task eligibility).
 
 **Next frontier is language-level, not product packs:**
-1. bool-typed comparisons + wasm bool export ABI (opt-in multi-repo)
+1. ~~bool-typed comparisons + wasm bool export ABI~~ **landed** compiler#451 + wasm#42/#44 + script#74 (west pins 23721b8c); residual = consumer C-migration + profile-4 window
 2. T6.2 precompiled KIR default; T8.3 production AOT; W4 recursive values
 
+
+## Progress (2026-07-30h — language profile 5 A+B frontend landed)
+
+- **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
+  (frontend + pins + goldens + expectation migration). Focused suite green;
+  full CI green (24 checks).
+- **Companion pins on main (west advanced `23721b8c`):**
+  - `kotoba-script@97ffd746` — PR #74 comparisons/`=` type+emit as host bool
+  - `kotoba-wasm@92eccdd7` — PR #42 word-inside + PR #44 dual-function export wrappers
+  - `compiler@b2291313` — ADR 0191 A surface (host `bool-value`) + B wrappers + frontend
+- **Corpus note:** bare `(defn main [] 1.5)` is valid under unannotated-result
+  inference; negative `floating-literal` is now explicit `:i64 1.5` mismatch.
+- **Representation contract locked by land:**
+  - KIR / wasm32 module interior: `:bool` is 0/1 word
+  - js-kotoba-v1 / host ABI: JS boolean (export wrappers + script emit)
+- **Still open (profile 5 residual / follow-ups):**
+  1. Ungate `has-bool-value?` emit path when aggregate unbox is always-on (A complete
+     on host; emit wiring may still be gated per consumer-conformance)
+  2. Version-policy deprecation window for profile-4 i64-as-bool idioms
+     (`(+ (zero? x) …)` style) — fixtures already use `(if p 1 0)`
+  3. C-layer expectation migration in remaining consumers outside compiler suite
+  4. murakumo product fields still on `:i64` 0/1 where bool surface would help
+    (eligibility etc. — language now ready)
 
 ## Progress (2026-07-30g — bool design authority)
 
