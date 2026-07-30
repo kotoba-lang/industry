@@ -61,7 +61,9 @@
 4. HTTP の入口が無い。コンソールの `:act` ボタンは SSR の意味論しか持たない。
 5. スケールしたときに壊れるものを `docs/partner-recruitment.md` §8 に先に書いた（book が厚くなるほど `:screened` 転換率が構造的に落ちる、`:active` の定義が緩められやすい、`:role` が形骸化しうる）。
 
-**次にやるなら**: (a) `Store` の永続実装と Worker ingress（cljs）、(b) 単位会の休日カレンダー投入、(c) `cloud-itonami-isco-2611` / `cloud-itonami-isic-6910-legalsupport` との関係整理——3リポが法律実務に重複して触れており、6910-legalsupport の「紹介料を取らない」結論はここで実行可能なコードになったので、どちらが正本かを決める必要がある。"
+**次にやるなら**: (a) `Store` の永続実装と Worker ingress（cljs）、(b) 単位会の休日カレンダー投入。
+
+**訂正（2026-07-30、ADR-2607309100）**: 本 ADR は当初ここに『(c) `cloud-itonami-isco-2611` / `cloud-itonami-isic-6910-legalsupport` との関係整理——3リポが法律実務に重複して触れており、どちらが正本かを決める必要がある』と書いていた。**これは誤りだったので削除した。** 実測すると `isic-` は事業（ISIC Rev.5、460 repo、`:role :sector-agent`）、`isco-` は職業（ISCO-08、340 repo、`:role :occupation-agent`）という意図的な別軸で、HARD 不変条件も交わらない（isic-6910 は制裁リストと登記状態、6910-legalsupport は収益・役務モデルの admissibility、isco-2611 は受任範囲と利益相反、lawfirm は事務所運営）。`:conflict-check-not-cleared` を持つ repo は isco-2611 と lawfirm の2つだけ。統合すべきだったのは法律ドメインではなく **actor パターンの定型層**で、それは ADR-2607309100 で `kotoba-lang/governor` として抽出した（本 repo も採用済み、pin `974b94ff`）。"
 
   :adr/evidence
   ["cloud-itonami/lawfirm 0c65a1d99dd3b4f3d71a5aa5985dc162a4c64f95 — 36 files changed, 5167 insertions, 789 deletions"
