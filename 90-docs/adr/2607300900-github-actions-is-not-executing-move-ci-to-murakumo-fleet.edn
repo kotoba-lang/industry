@@ -207,6 +207,47 @@ about two hours of production instead of a day, with a 4x margin over the 30-min
 gate timeout. Also added `-mindepth 1`: the original expression matched the base
 directory itself.
 
+## Closing state, 2026-07-30 06:5x
+
+Fleet CI is live. Receipts landed at 06:41:38 and 06:53:04 under
+`fleet-ci/tip-verify/v1`, signed by the identity enrolled in this session
+(`murakumo-ci-tip-25mbair`). Before it, the repo tick could not complete at all —
+it died on a missing signer before running a single gate.
+
+Verified at `origin/main`, not against the commits this work created:
+
+    docs plane   md=76 edn=1859 parse-errors=17 not-tx=7 split-strings=1
+                 path-md-refs=7 source-format-residue=0
+    fleet gates  4 root gates execute on the mac minis; docs-edn fails on a real
+                 defect, the other three pass
+    sweeper      LaunchAgent loaded, ran unattended, threshold and idempotence
+                 both observed in its own log
+
+What moved this session: parse-errors 22 to 17, split-strings 4 to 0, ~186 GiB
+reclaimed across ten nodes, GitHub Actions retired, and the fleet tick unblocked.
+
+### The treadmill is real and measurable
+
+split-strings is back to **1** — `2607300500-compression-codec-plane…` acquired the
+same unescaped-quote defect after this session cleared all four. That is the third
+instance today of a document breaking within hours of the class being fixed, and it
+is the strongest argument for the ratchet recommended above: instance repair does
+not hold, and nothing currently fails a build when it regresses.
+
+### Commit SHAs from this session no longer resolve
+
+Seven of the superproject commits made here are not ancestors of `origin/main`
+though the objects still exist locally — history was rewritten by something else
+during the session. **The content survived**: every file and every edit was checked
+individually and is present, including the escapes in
+`2607274000-marketplace-seven-actors-one-ref.edn` (verified by parsing it: all keys
+keyword, body 6,299 chars, unchanged).
+
+Recorded because a future reader searching for those SHAs will not find them, not
+because work was lost. A first pass at this check reported the escapes as missing —
+that was a broken shell grep pattern, not a broken file, and the difference is worth
+stating so the next person does not re-raise the same false alarm.
+
 ## Remaining work, in order
 
 0. **Blocking, before anything else: give this machine a signer identity.** Enroll
