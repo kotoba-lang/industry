@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 7546, "ai-gftd-chat-shell" 6},
+ {"magatama-sh1n5h1x" 7559, "ai-gftd-chat-shell" 6},
  :zone
- {:requests-7d 510631,
-  :pageviews-7d 10987,
-  :uniques-7d-sum 5073,
+ {:requests-7d 513434,
+  :pageviews-7d 10991,
+  :uniques-7d-sum 5094,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
@@ -15,11 +15,11 @@
    {:path "/reop3.php", :requests 22}
    {:path "//wp-includes/block-bindings/", :requests 21}
    {:path "//wp-includes/assets/", :requests 20}
+   {:path "/ops.php", :requests 18}
    {:path "/v1/generation/jobs/65fd92950db04cf798e0d6c8b49352b8",
     :requests 18}
-   {:path "//wp-admin/js/index.php", :requests 17}
-   {:path "/k.php", :requests 16}],
-  :status-mix {:client-error 2824, :ok 892, :server-error 15273},
+   {:path "/k.php", :requests 18}],
+  :status-mix {:client-error 2875, :ok 911, :server-error 15283},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -37,5 +37,5 @@
  "上位 page (24h, 2xx/3xx): /wp-json/gravitysmtp/v1/tests/mock-data 35 · /google-credentials.json 24 · /reop3.php 22 · //wp-includes/block-bindings/ 21 · //wp-includes/assets/ 20 | 4xx(probe) 15% · 5xx 80%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 510631 req/7d・5073 uniques(日次和)・うち4xx probe 15%(24h)、workers 7552 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 513434 req/7d・5094 uniques(日次和)・うち4xx probe 15%(24h)、workers 7565 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
