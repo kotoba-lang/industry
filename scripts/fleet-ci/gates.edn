@@ -133,4 +133,26 @@
   ;; tarball を掴む事故（2026-07-29）は起きない。
   {:name "root" :id "root-manifest-reality" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/manifest-reality-check.cljs"
-   :include-ext [".edn" ".yml"] :min-files 1500 :cd false}]}
+   :include-ext [".edn" ".yml"] :min-files 1500 :cd false}
+
+  ;; superproject の 4 本目。west pin guard の policy 層（Actions の
+  ;; west-pin-verify.yml の 1 本目の job と同じ verifier）。
+  ;;
+  ;; **これを fleet に置くのは、GitHub Actions が実際に実行されていないから。**
+  ;; 2026-07-30 実測: com-junkawasaki/root の 16 workflow すべてが最新 run で
+  ;; failure、かつ job の steps が 1 件も記録されておらず log も存在しない
+  ;; （= job が起動していない。gates.edn 冒頭が記録している 2026-07-26 の
+  ;; 課金停止と同じ症状）。pin 退行の保護が、あると思われていて実際は
+  ;; どこからも走っていなかった。
+  ;;
+  ;; port したのは policy 層だけ。west-pin-verify.yml の 2 本目（変更 pin の
+  ;; server-side 到達性検証）は GitHub API 認証を要し、ノードに credential を
+  ;; 置かない不変条件 3 と両立しない。そちらは既に operator 側にある —
+  ;; tick.cljs が CD の pin 前進前に verify-west-pins.cljs を通している
+  ;; （不変条件 5）。欠けていたのは認証の要らない policy 層だけ。
+  ;;
+  ;; :include-ext ".cljs" — policy test 本体と scripts/nbb_compat shim を送るため。
+  ;; ".edn" は deps/manifest 読みのため。:min-files は他の root gate と同じ床。
+  {:name "root" :id "root-west-pin-policy" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/west-pin-policy-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}]}

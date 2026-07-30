@@ -1,0 +1,100 @@
+[{:db/id -1
+  :adr/id "2607300900"
+  :adr/title "GitHub Actions is not executing for this org; move repo-wide CI to the murakumo fleet"
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/tags ["ci" "cd" "fleet-ci" "murakumo" "github-actions" "gates"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/context
+  "Asked to move CI/CD repo-wide off GitHub Actions and onto murakumo.cloud. Two things turned out to be true before any design was needed.
+
+First, most of the work already exists. `scripts/fleet-ci/` runs commit-triggered gates on the murakumo mac-mini fleet, signs receipts into an append-only ledger, writes commit statuses back, and advances west pins when green — ADR-2607178000 plus ADR-2607255500. Measured 2026-07-30: 17 gate entries, 23 units per tick including 6 PR heads, fanned across 6 capable nodes. Its README lists PR-head verification as not-done, but tick.cljs implements it (line ~962 closes that item explicitly); the README is stale, not the system.
+
+Second, and decisively: **GitHub Actions is not running at all here.** All 16 workflows in com-junkawasaki/root show `failure` on their latest run, and inspecting those runs shows **zero steps recorded and no logs** — the signature of a job that never started, not of a check that failed. gates.edn already recorded the cause on 2026-07-26: Actions billing stopped for com-junkawasaki and gftdcojp, so jobs do not launch. kotoba-lang/kotoba is now failing too.
+
+So the premise of the request is stronger than a platform preference. There is currently no CI. Sixteen red lights have been standing in for gating, and nothing behind them has run for weeks."
+  :adr/decision
+  "1. The murakumo fleet (`scripts/fleet-ci/`) is the CI/CD plane for this workspace. GitHub Actions is treated as unavailable, not as a second opinion.
+
+2. Port each workflow's **invariant**, never its implementation. A gate script ships inputs and calls the repo's own verifier; two implementations of one invariant let a check pass on one path and fail on the other unnoticed. This is already the rule for repository-roles and manifest-reality gates.
+
+3. **Credentials never reach a node** (existing invariant 3). This splits every workflow rather than moving it wholesale: the part that needs only the source tree becomes a node-side gate; the part needing GitHub API auth stays operator-side in tick.cljs, which already holds tokens and already runs verify-west-pins before advancing a pin.
+
+4. **Never register a gate that starts red.** A permanently-failing check carries no signal — that is the exact mechanism by which the docs-edn defect was reintroduced twice within hours today (ADR-2607300400). A workflow whose invariant is currently violated gets its breakage fixed first, or gets registered with a declared ratchet, but does not get added as a standing red light.
+
+5. `exit 0` is not a pass. Every ported gate asserts a positive summary from the underlying verifier, as jvm-test asserts `Ran N tests`."
+  :adr/consequences
+  "Coverage is now 18 gate entries. The invariant that pin regressions are checked at all is restored — it had silently not been running.
+
+Branch protection is the remaining cutover: required status checks still name Actions contexts that never report, so they cannot be satisfied and cannot block anything. Switching them to `fleet-ci/murakumo/*` is what actually makes the fleet authoritative, and it is a repo-settings change, not code.
+
+Two workflows cannot move and need an explicit decision (see body). Until then they stay nominally on Actions, which means they do not run.
+
+Trigger latency stays at the 5-minute LaunchAgent poll rather than a webhook. Acceptable for gates; it means a push waits up to 5 minutes for a verdict."
+  :adr/body
+  "## The evidence that Actions is dead
+
+| check | result |
+|---|---|
+| workflows in com-junkawasaki/root | 16, all `runs-on: ubuntu-latest` |
+| latest run conclusion | **failure on all 16** |
+| steps recorded in those jobs | **0** |
+| logs for the failed job | **absent** (`log not found`) |
+| contrast | kotoba-lang/kotoba latest 3 runs also `failure` |
+
+Zero steps and no logs mean the runner never picked the job up. Combined with the billing note already in gates.edn, this is a startup failure, not a verification failure.
+
+## Workflow → fleet mapping
+
+**Already on the fleet (3).** docs-edn-verify (as `docs-edn-check`, scoped to `90-docs/adr`), kotoba-repository-roles (same verifier), repo-reality-verify's structural half (as `manifest-reality-check`).
+
+**Ported here (1).** west-pin-verify's policy job → `gates/west-pin-policy-check.cljs`. Its second job (server-side reachability of changed pins) is deliberately not ported: it needs GitHub API auth, which invariant 3 forbids on a node — and it is already operator-side, since tick.cljs runs `verify-west-pins.cljs` before every CD pin advance. What was missing was only the auth-free policy layer, which nothing was running.
+
+**Portable, not yet ported (9).** foundation-deps-verify, public-runtime-owners, fleet-projection-verify, istore-freeze-check, tree-collapse-guard, clj-wgsl-parity, cloud-itonami-live-observe, annex-custody-verify (needs `git-annex` provisioned via brew rather than apt), and the full-scope docs-edn check. Each is a thin gate script plus one gates.edn line.
+
+**Blocked on their own breakage — decision 4 applies.** Measured directly, with real exit codes: `check-foundation-deps.cljs` rc=1, `90-docs/repo-reality/ci_gate.cljs` rc=1, `verify-public-runtime-owners.mjs` rc=1. Only `west-pin-guard-policy-test.cljs` passed (rc=0), which is why it is the one ported. These invariants are genuinely violated right now; nobody has seen them since Actions stopped. Fix, then register.
+
+*(Method note: the first attempt at that measurement read `$?` after a pipe into `tail`, so every script looked like rc=0. The fleet-ci README's own invariant — do not trust exit 0 — applies to the person doing the survey too.)*
+
+**Write/bot workflows, need care (2).** repo-maturity-regenerate and production-gates-bot mutate the repo rather than checking it. fleet-ci has a landing path (branch + contents PUT + server-side merge, never direct push to main) so they fit, but a bot that commits on every tick is a different risk class from a gate and should be opt-in per repo.
+
+**Cannot move (2).**
+- `codeql-analysis` — `github/codeql-action` is a hosted GitHub service. A self-hosted CodeQL CLI is possible but is a separate project with its own licensing question. Options: accept no SAST, or adopt a scanner that runs as a plain binary on a node.
+- `jupyterlite` — the *build* is portable, but it ends in `actions/upload-pages-artifact` and deploys to GitHub Pages, which is a GitHub product. Moving it means publishing somewhere else (Cloudflare Pages is already used in this workspace).
+
+## Why the fleet architecture is the right target
+
+Worth stating because it is not obvious from outside: the fleet does things Actions did not.
+
+- Receipts are **signed** into an append-only ledger (`manifest/fleet-ci.edn`), with a weak-permission key that can only append — it holds neither pin-advance nor governance quorum.
+- Green **advances the west pin** through server-side verification, so CI and CD are one path.
+- `exit 0` is structurally distrusted: extraction success and a test summary are both asserted, after a real false-pass incident where a `clojure` that dropped to a REPL returned 0.
+- Nodes hold **no credentials**; the operator fetches private trees and streams tarballs over ssh stdin.
+
+## Remaining work, in order
+
+1. Fix the three failing invariants above, then register them as gates (decision 4).
+2. Switch branch-protection required checks to `fleet-ci/murakumo/*`. Until this happens nothing is enforced, whichever plane runs.
+3. Decide codeql and jupyterlite.
+4. Issue the two fine-grained PATs so the LaunchAgent stops skipping (GitHub Web UI, human step) — otherwise ticks only run from an interactive session.
+5. Refresh `scripts/fleet-ci/README.md`, which still lists PR-head verification as not-done."
+  :adr/verification
+  "The ported gate was proved to both pass and fail before registering it:
+
+- against the real tree: rc=0, `west-pin-guard-policy: 3 cases OK`
+- tree missing the policy test → rc=**90** (`missing after extract`)
+- tree missing `scripts/nbb_compat` → rc=**90** (classpath would be broken)
+- verifier present but emitting no summary → rc=**93** (`refusing to report a pass`)
+
+A gate that cannot fail is worth nothing, so the negative paths were exercised rather than assumed. `tick.cljs --plan` then reported coverage 17 → **18 covered**, confirming registration.
+
+Not verified: node-side execution of this gate. That needs a real tick against the mac minis, which the LaunchAgent cannot do until the two PATs exist; the gate was therefore exercised locally against the same tree shape a node receives."
+  :adr/resume
+  "1. `nbb scripts/fleet-ci/tick.cljs --only root --dry-run` — run the new gate on a real node once credentials allow, confirming the shipped-tree path matches the local run.
+2. Fix `check-foundation-deps.cljs`, `90-docs/repo-reality/ci_gate.cljs`, `verify-public-runtime-owners.mjs` (all rc=1 today), then add one gates.edn line each.
+3. Switch branch protection to `fleet-ci/murakumo/*`; nothing is enforced until this is done.
+4. Owner decisions: codeql replacement, and where jupyterlite publishes.
+5. Issue the two fine-grained PATs (README lists the exact scopes)."
+  :adr/evidence
+  "gates.edn now carries 18 entries; gates/west-pin-policy-check.cljs added. Measured against com-junkawasaki/root main on 2026-07-30. Prior art: ADR-2607178000 (standing runner), ADR-2607255500 (tip-driven CI/CD), ADR-2607300400 (why a permanently-red gate carries no signal)."}]
