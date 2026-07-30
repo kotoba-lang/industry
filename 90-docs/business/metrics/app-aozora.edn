@@ -8,24 +8,24 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 14850,
-  "app-aozora-appview" 10020,
-  "app-aozora-spa" 4869},
+ {"app-aozora-pds" 15030,
+  "app-aozora-appview" 10090,
+  "app-aozora-spa" 5003},
  :zone
- {:requests-7d 572338,
-  :pageviews-7d 10245,
+ {:requests-7d 580163,
+  :pageviews-7d 10359,
   :uniques-7d-sum 981,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 161017}
+    :requests 162238}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
-    :requests 165}
+    :requests 198}
    {:path
     "/bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3lpa5tyrmwjvzojccf77ya",
-    :requests 140}
+    :requests 147}
    {:path
     "/bafyreigknzqpup4wv566lfcmxtb5sjegwv74mpbhw4euqym3puw7qr6ssm",
     :requests 80}
@@ -41,11 +41,11 @@
    {:path
     "/bafyreifgjboyi7qpuzgxczpz5r2p6nr4l2vc6y5d73f6yk2emxfoi2w46y",
     :requests 25}],
-  :status-mix {:ok 163448, :client-error 497, :server-error 202},
+  :status-mix {:ok 164660, :client-error 419, :server-error 209},
   :window "24h"},
  :as-of "2026-07-30",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 161017 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 165 · /bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3l… 140 · /bafyreigknzqpup4wv566lfcmxtb5sjegwv74mp… 80 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 54 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 162238 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 198 · /bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3l… 147 · /bafyreigknzqpup4wv566lfcmxtb5sjegwv74mp… 80 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 54 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 572338 req/7d・981 uniques(日次和)・うち4xx probe 0%(24h)、workers 29739 inv/7d"}
+ "aozora.app 実測 580163 req/7d・981 uniques(日次和)・うち4xx probe 0%(24h)、workers 30123 inv/7d"}
