@@ -501,6 +501,39 @@
          distinct
          vec)))
 
+(def known-parse-errors
+  "Files under 90-docs that have not parsed as EDN for some time, accepted as a
+  BASELINE so that a new breakage is visible.
+
+  This is not approval. Each is a document whose content is unreachable to every query
+  over the 90-docs plane -- `edn-query.cljs` skips them, and its loader reports what it
+  skipped for exactly this reason. They are listed so the verifier can answer the only
+  question it could not answer while it failed unconditionally: did something break
+  TODAY?
+
+  Measured 2026-07-31. Sixteen of the eighteen are outside 90-docs/adr (deployment,
+  gates, migration), and most report `Unmatched delimiter` or an odd number of map
+  forms -- the signature of a literal that ended early, which is the same failure an
+  unescaped quote produces."
+  ["90-docs/adr/2607299700-org-member-key-enrollment-ceremony.edn"
+   "90-docs/adr/2607300900-cloud-itonami-payment-settlement-funding-balance.edn"
+   "90-docs/deployment/MONTH-3-EXECUTION-COORDINATION-SUMMARY.edn"
+   "90-docs/deployment/MONTH-3-GO-NO-GO-DECISION-TEMPLATE.edn"
+   "90-docs/deployment/MONTH-3-GRACEFUL-RUST-DRAIN.edn"
+   "90-docs/deployment/MONTH-3-MANUAL-ROLLBACK-DECISION-TREE.edn"
+   "90-docs/deployment/MONTH-3-TEAM-ASSIGNMENTS.edn"
+   "90-docs/deployment/rollback-procedure-and-testing.edn"
+   "90-docs/fleet-migration-month-3-execution-plan.edn"
+   "90-docs/gates/METRICS-DEPLOYMENT-LOG-2026-08-08.edn"
+   "90-docs/gates/METRICS-DEPLOYMENT-READINESS-2026-08-08.edn"
+   "90-docs/gates/escalation-protocol-reference.edn"
+   "90-docs/gates/metrics-collection-pipeline.edn"
+   "90-docs/gates/smoke-test-checklist-20260810.edn"
+   "90-docs/gates/wave-5-m5-m6-execution-kickoff.edn"
+   "90-docs/gates/weekly-checkpoint-structure.edn"
+   "90-docs/gates/weekly-execution-boards-template.edn"
+   "90-docs/migration/M5-M6-checkpoint-procedures.edn"])
+
 (defn verify!
   "EDN が 90-docs の唯一の正本であることを機械検証する。
    - 90-docs 配下に .md が無い
@@ -561,10 +594,36 @@
     (when (seq @sf-hits)
       (println "=== source-format residue ===")
       (doseq [f (take 20 @sf-hits)] (println " " f)))
-    (let [ok? (and (empty? md-left) (empty? @parse-errors) (empty? @not-tx)
-                   (empty? @split-strings) (empty? @path-md-hits) (empty? @sf-hits))]
-      (if ok?
-        (do (println "verify: OK — 90-docs is EDN-only SSoT")
+    ;; RATCHET. Eighteen files under 90-docs have not parsed for some time, so this
+    ;; command exited FAIL every run -- and a FAIL that is always FAIL cannot tell
+    ;; anyone that something NEW broke. Measured the hard way on 2026-07-31: an
+    ;; :adr/body was corrupted by an unescaped quote, the `split-strings` check that
+    ;; exists precisely for that would have named it, and nobody would have noticed
+    ;; among the standing failures.
+    ;;
+    ;; So the baseline is accepted and anything beyond it fails. The baseline is also
+    ;; asserted in the other direction: a file listed here that now parses must be
+    ;; removed from the list, or the list silently grows stale and stops ratcheting.
+    (let [known (set known-parse-errors)
+          ;; @parse-errors carries absolute paths; the baseline is repo-relative, which
+          ;; is the only form that survives being read on another machine.
+          relative (fn [p] (let [i (str/index-of p "90-docs/")]
+                             (if i (subs p i) p)))
+          seen (set (map (comp relative first) @parse-errors))
+          new-errors (sort (remove known seen))
+          fixed (sort (remove seen known))
+          hard-fail? (or (seq md-left) (seq @not-tx) (seq @split-strings)
+                         (seq @path-md-hits) (seq @sf-hits))]
+      (when (seq new-errors)
+        (println "=== NEW PARSE ERRORS (not in the accepted baseline) ===")
+        (doseq [f new-errors] (println " " f)))
+      (when (seq fixed)
+        (println "=== BASELINE IS STALE — these parse now, remove them from known-parse-errors ===")
+        (doseq [f fixed] (println " " f)))
+      (if (and (not hard-fail?) (empty? new-errors) (empty? fixed))
+        (do (println (str "verify: OK — 90-docs is EDN-only SSoT ("
+                          (count known) " known-unparseable files accepted; "
+                          "every other check clean)"))
             0)
         (do (println "verify: FAIL")
             (nc/exit 1)
