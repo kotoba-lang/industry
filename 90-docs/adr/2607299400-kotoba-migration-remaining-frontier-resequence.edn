@@ -94,7 +94,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
-| T6.4 | cljs/browser で同じ pure artifact を実行 | **mostly** #221+#223+#225+#226 JVM oracle-required; cljs mirror delete open |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM load-time+call-site done** #221+#223+#225+#226+#228; cljs mirror delete open |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
@@ -415,6 +415,26 @@ Still open:
 
 T6.4 status: same-artifact proof + nearly all product-shell hosts oracle-required on JVM.
 Remaining: delete cljs mirror bodies when entrypoints guarantee preload; ad-hoc load-time soft-fallback in a few defs.
+
+Still open:
+1. T6.4 cljs mirror body deletion (preload guarantee)
+2. T8.3 production AOT network/secret; W4 recursive values
+
+
+
+## Progress (2026-07-31j — T6.4 load-time + residual call-site oracle-required)
+
+- murakumo#228 MERGED (`8ed2894d`): load-time soft-fallback closed —
+  config/secret → oracle-str-const; engine/rebalance/gc/credits →
+  oracle-i64-const (+ oracle-ratio-const for head/protocol frac); join
+  max-res-for-tier JVM throw. Residual call sites in fleet.inventory /
+  dash.state / task.plan → try-oracle. ADR-260731-w6-t64-oracle-required-loadtime.
+- Focused suite: 120 tests / 860 assertions green.
+- west pin murakumo `8ed2894d`.
+
+T6.4 status: JVM product-shell path is oracle-required at load-time constants
+and pure call sites. Remaining: delete cljs mirror bodies when entrypoints
+guarantee preload.
 
 Still open:
 1. T6.4 cljs mirror body deletion (preload guarantee)
