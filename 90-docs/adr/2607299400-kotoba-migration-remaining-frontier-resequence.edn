@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist production path (ADR 0161 #45); **ops/network AOT Components still open** |
-| T8.4 | host-parity L5 | **partial** — JVM 13 + Node 10 live (#96–#101; transport-connect inject); kagi/pg still open |
+| T8.4 | host-parity L5 | **partial** — JVM 14 + Node 11 live (#96–#102; kagi-sign tender+inject); pg/pool still open |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -1051,6 +1051,24 @@ Still open:
 Still open:
 1. T8.3 ops/network AOT Components (http/secret wasm packages)
 2. T8.4 remaining matrix (kagi/pg live)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31au — T8.4 kagi-sign tender + live inject)
+
+- wasm-webcomponent main `68805af9`: **actor-host `kagi-sign`** Node inject
+  (`kagiSigner.authorizedSign` + `kagiDecisions`; maxKagiSigns default 0).
+- kototama main `8c028179`: **T8.4 tender `:kagi-sign`** — contract
+  `#{:crypto}` + decision-aware host-fn (`:kagi-client` / `:kagi-decisions`);
+  browser intentional `:no`; JVM live corpus **14**; Node **11** (CDN pin
+  `68805af9`). Evidence: contract+browser+host-parity-live 19 tests / 233
+  assertions; Node 11/11 via CDN.
+- west pin: kototama → `8c028179`, wasm-webcomponent → `68805af9`
+  (`9f3fcc89` west.yml single-entry).
+
+Still open:
+1. T8.3 ops/network AOT Components (http/secret wasm packages)
+2. T8.4 remaining matrix (pg/pool live; remaining TLS/transport ops)
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
