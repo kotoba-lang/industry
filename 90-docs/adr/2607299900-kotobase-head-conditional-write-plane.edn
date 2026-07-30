@@ -247,8 +247,7 @@ enforce へ上げるなら、そう明記して上げること。
 
 ## B. バッチングを Durable Object でやり直す
 
-削除したコードは net-kotobase の履歴にある（merge 63cc05a の親側、
-`git log -S 'batched head publication'` で辿れる）。設計はそのまま使える。isolate 版が
+**削除したコードは git 履歴に無い**（2026-07-30 実測: `git log --all -S` が `enqueue-write!` / `batch-attempt` / `batched head publication` のいずれも見つけない）。実装から撤去までを 1 つの worktree 内で行い、**commit する前に消した**ため——撤去を説明するコメントだけが landed していて、実装は landed していない。本 ADR は当初「履歴にある、`git log -S` で辿れる」と書いていたが誤りで訂正した。再実装が必要で、生き残っているのは `store.cljs` の chain buffer と `claim-fold!` だけ。設計はそのまま使える。isolate 版が
 落ちた実測と DO に移す理由は上記のとおり。**必須条件は DO を required にしないこと**
 （binding が無ければ現状動作に degrade する、D1 head plane と同じ形）。
 
