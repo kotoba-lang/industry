@@ -175,6 +175,15 @@
      :execution :on-demand
      :must [:answer-a-request] :must-not [:hold-a-loop]
      :examples ["cloud-itonami-crowdfunding-pledge"]}
+    {:prefix "cloud-itonami-partners"
+     :role :franchise-recruitment-service
+     ;; ScreeningAdvisor with a sealed LLM behind an independent
+     ;; PartnerGovernor: it screens an application when one arrives and stops.
+     ;; The territory grant itself waits on a human, permanently, so nothing
+     ;; here runs unprompted.
+     :execution :on-demand
+     :must [:answer-a-request] :must-not [:hold-a-loop]
+     :examples ["cloud-itonami-partners"]}
     {:prefix "cloud-itonami-esim"
      :role :provisioning-service
      ;; Landed in west after the first classification pass and surfaced as
