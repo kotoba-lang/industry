@@ -244,6 +244,17 @@ schedule assign, plan, seats, eligibility, credits shares, reconcile targets.
 3. bool-typed comparisons + wasm bool export ABI (opt-in, multi-repo)
 4. T6.2 / T8.3 / W4
 
+
+## Progress (2026-07-30e — task eligibility record)
+
+- murakumo#205 `task-eligible?` flag bit-word → `:task/eligibility` record
+  (mirrors schedule eligibility #195; live host dual-source via oracle/record)
+
+**Residual after T5.3 pack/flag cutovers:**
+1. reconcile `name-bits` (3 pairwise name-order flags for first-of-3)
+2. bool-typed predicate surface (language opt-in, multi-repo)
+3. T6.2 / T8.3 / W4
+
 ## Consequences
 
 - superproject から見た移行の現在地が 2026-07-29 断面に揃った。以後、現在地を
