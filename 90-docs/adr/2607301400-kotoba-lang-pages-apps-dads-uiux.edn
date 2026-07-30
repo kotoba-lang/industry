@@ -131,10 +131,30 @@ Download の実 blob と filename / 390px で横スクロール無し / dads-but
   この面の技術的最適解ではない。
 - **34 repo のうち着地したのは 8 repo だけ**（この ADR 時点）。残り 26 は未了で、
   内訳と難易度が異なる:
-  - workflow build 系（kami-app-* 10 件 / eda / cad / office / lab / kotoba / plm /
-    svgraph / genome / cae-solver / kotoba-lang / kotoba-v2025 / kotoba-pages-poc）は
-    **各 repo の CI が自分の `build.clj` を回す**ので、repo ごとに jp-go-dds を
-    dep に足して生成器を書き換える必要がある。superproject の生成器では届かない。
+  - **pure upload 系（`svgraph` / `kotoba` / `kotoba-lang` / `lab`）** は workflow が
+    build step を持たず `docs/`（`lab` は `.`、`kotoba-lang` は `docs/site`）を
+    そのまま upload するだけなので、Stage 1 と同じく『生成して commit』で届く。
+    ただし中身は 4 件とも別物（svgraph 123 行のグラフ可視化 / kotoba 549 行 /
+    kotoba-lang 87 行の org サイト / lab 137 行の LLM playground）で、
+    `:family/edn-editor` には入らない —— repo ごとに page 構造を組む必要がある。
+    `aiueos`（179 行、direct-serve）も同様。
+  - **shadow-cljs SPA 系（`cad` / `genome` / `plm`）は当初『14 行の placeholder』と
+    読み違えた。** 実測すると `docs/index.html` は `<div id="root">` +
+    `js/main.js` + `kotoba.<app>.app.init()` の **SPA シェル**で、UI の実体は
+    `src/` の re-frame/reagent component 側にある（`npm run build` =
+    `shadow-cljs release app` が `js/main.js` を作る）。したがってここの UI/UX 移行は
+    『シェルを差し替える』のではなく **reagent component の書き換え + release build**
+    であり、Stage 1 とは別種の作業量。しかも `shadow-cljs release` は repo-wide の
+    resource governor 経由（`scripts/resource-guard.mjs run build --`）で
+    **同時 1 本**に制限されるので直列になる。
+  - **kami-app-* 10 件 + `kami-studio` / `kami-creative-studio` / `cae-solver`** は
+    各 repo の CI が自分の `build.clj` を回すので、repo ごとに jp-go-dds を dep に
+    足して生成器を書き換える必要がある。加えて CLAUDE.md の 3D 規則により
+    **viewport の正本は engine 側（WebGPU/WebGL）で不変**なので、DADS が塗るのは
+    panel/toolbar 等の chrome だけ。
+  - `office`（`_site` を CI の `run:` で組む）/ `kototama` / `wasm-webcomponent`
+    （`main:/`、ローカルに index.html が無い）/ `kotoba-pages-poc`（`gh-pages` branch）
+    / `kotoba-v2025`（`_archive` 配下に旧 workflow）は個別調査が要る。
   - `slides`（644 行）と `eda`（602 行）は kotoba-ui/HIG で書かれた**本物の UI 層**を
     持つ（`src/slides/web/*.cljc` の views/styles/enhance/dispatch/events、
     `--hig-*` 344 / 308 箇所）。ここは『手書き HTML を差し替える』のではなく
