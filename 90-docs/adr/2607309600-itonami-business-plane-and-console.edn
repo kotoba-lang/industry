@@ -295,6 +295,64 @@ markup を確認し、inline JS を `node --check` で構文検査。
 片方だけ動くのが、この bug が見逃されていた理由。wire 契約を web.clj のコメントに
 固定し、HTTP test が実際の wire キーで assert するようにした。
 
+## Phase 2 — 着地したもの（2026-07-30）
+
+Canvas 面を出すのに 1 つ足りなかった: **fold 済み canvas がデータとして存在しない**。
+`gftd canvas md` は prose を `:doc/body` に包むのでクエリできず、あのツールの外では
+9 block を描けなかった。
+
+### 上流（superproject）— fold は 1 箇所のまま、データを出す
+
+- **`gftd.canvas/render-datoms` + `gftd canvas datoms`** を追加。
+  `90-docs/business/<product>-canvas.datoms.edn` を 12 product 分生成
+  （1 header + 9 block + 仮説）。`:source/dataset "canvas-projection"` で
+  **fold 前の base datoms と区別できる** — ledger event は docs EDN 面に載って
+  いないので、今まで `90-docs` を `:find` すると「最初に書かれたときの canvas」が
+  返っていた（実測: `hyp/t1` は base で `untested`、projection で `measuring`）。
+- **gate は渡す側が評価する**（`:gates` opt）。評価が無い仮説には gate キーを
+  一切付けない。「まだ測っていない」を `:gate/status :blocked` と書けば、
+  何も測っていないことの測定値になる。
+- `:canvas/order` をデータとして持たせた。9 block を grid で描く consumer が
+  block 順を自分で持つと、2 つの順序が別々に drift する。
+
+### app 側 — 読みは投影、書きは提案
+
+- **`cloud.itonami.app.canvas`** が投影を読み、**fold は一切しない**。
+  `apply-event` の 2 つ目の実装は drift する（rolling-observation window
+  ——block ごとに「観測 (signal):」を直近 3 件だけ残す——は ledger 形式を読んで
+  再現できる挙動ではない）。
+- **ledger へ書く route は存在しない。** 失敗する route ではなく、無い。
+  `propose!` は app の store に記録し、適用に使う `gftd` コマンドを描画する。
+  `writes-only-locally?` が `[[:canvas-proposals]]` を返し、投影ファイルの
+  バイト列が提案前後で同一であることを test が固定する。
+- **着地したかは毎回投影を読んで判定する**（保存しない）。`:landed` は governor が
+  受理して投影が再生成された後にしか真にならない。retraction は **block が実際に
+  読めた時だけ** landed とする——さもないと「消えた」と「見ていない」が同じ答えに
+  なる。checkout が無ければ `:unverifiable` で、どちらでもない。
+- Canvas view: 9 block の grid（`record-browser` は使わない — あれは多数から 1 つを
+  選ぶ list+detail で、canvas は全体を読むもの）、仮説には **2 つの chip**
+  （ledger の `:hyp/status` と metrics の `:gate/status`）、riskiest は
+  `:hyp/risk :riskiest` に従って強調（マークが無い canvas は強調しない）。
+
+### この過程で見つけた wire の衝突
+
+`clojure.data.json` は keyword キーの名前空間を落とすので、投影には strip 後に
+衝突する組が 3 つある: `:db/id`/`:canvas/id`、**`:hyp/status`/`:gate/status`**、
+`:hyp/evidence`/`:gate/evidence`。衝突はエラーにならず map の反復順で片方が勝つ。
+そして 2 つの `status` は、この pane が分けて見せるために存在する組そのもの
+（ledger の判定 vs metrics の判定）だった。**投影の datom を素通しせず app 側で
+明示的に再キーし**、id は名前空間ごと文字列で送り、「strip して同名になるキーが
+無い」ことを test で固定した。Phase 1 で直した `renderOperator` の
+`['operator/name']` undefined と同じ規則の別の現れ方。
+
+### 検証
+
+`clojure -M:test` 496 tests / 2090 assertions, 0 failures 0 errors
+（canvas 系 18 test を追加）。`clojure -M:lint` errors 0（warning 12 件はすべて既存で、
+追加分は 0）。`page-html` を実 render し inline JS を `node --check` で構文検査。
+上流は `nbb run-tests` 36 tests / 220 assertions, 0 failures。投影が datom 面に load され、**仮説 × block の join が通ること**を
+実クエリで確認（12 product × 9 block）。
+
 ## Consequences
 
 - **良い**: 4 面が 1 entity で join できる。「この事業は今どこが未計測か」が
