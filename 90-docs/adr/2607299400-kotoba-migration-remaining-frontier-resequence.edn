@@ -94,7 +94,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
-| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete** through dash#252 (+ config#251 …); report/deploy/provision/cloud open |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete** through report#253 (+ dash#252 config#251 …) + preload; remaining deploy/provision/cloud |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
@@ -807,9 +807,25 @@ Still open:
 - west pin murakumo 71bd7ff3 -> c7de009.
 
 Still open:
-1. T6.4 remaining XL hosts (report/deploy/provision/cloud)
+1. T6.4 remaining XL hosts (deploy/provision/cloud)
 2. T8.3 production AOT network/secret; W4 recursive values
 3. Residual 0/1 i64 param projections
+
+
+## Progress (2026-07-31af — T6.4 report mirror-delete + pin)
+
+- murakumo#253 MERGED (`5ae50b56`): **report** deletes cljs host mirrors —
+  CSV folds, line builders, table helpers require shipped `:report-core` KIR;
+  map projection + reconcile-lines mapcat stay host.
+  ADR-260731-w6-t64-report-mirror-delete.
+  Evidence: 79 tests / 1563 assertions green.
+- west pin murakumo `c7de0092` → `5ae50b56`.
+
+Still open:
+1. T6.4 remaining XL hosts: deploy, provision, cloud (largest remaining shells)
+2. T8.3 production AOT network/secret; W4 recursive values
+3. Residual 0/1 i64 params: config pinned-exists, engine option flags, tunnel
+   pick-exit has-rc
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
