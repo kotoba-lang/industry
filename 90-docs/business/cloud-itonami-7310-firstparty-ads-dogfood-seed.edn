@@ -3,7 +3,7 @@
   :doc/title "cloud-itonami 7310 first-party dogfood — kotobase.net / murakumo.cloud を ChatGPT Ads に出稿する前の pre-flight"
   :doc/doc_type "dogfood-seed"
   :doc/path "90-docs/business/cloud-itonami-7310-firstparty-ads-dogfood-seed.edn"
-  :doc/source "ADR-2607301200 + cloud-itonami-isic-7310 @ 4201aee の Campaign Governor 実行出力 (2026-07-30) + net-kotobase / cloud-murakumo の BMC funnel 実測"
+  :doc/source "ADR-2607301200 + cloud-itonami-isic-7310 @ 4201aee の Campaign Governor 実行出力 (2026-07-30) + GET https://kotobase.net/api/funnel のライブ実測 (2026-07-30)"
   :doc/body
   "# 7310 first-party dogfood — 自社2プロダクトの出稿 pre-flight
 
@@ -21,9 +21,10 @@ seed した事実はすべて今日の実態であって、通したい値では
 - creative/LP の対応が未確定      -> :landing-page-consistency 未表明
 - オーナー承認済み広告予算が無い  -> :authorized-budget 0
   (90-docs/business/budget-supply.edn は :supply/note で自ら placeholder と明記)
-- :proposed-media-spend 112500    -> ads.openai.com の最低日予算 USD 25 x 30日 を
-                                     JPY 150/USD で換算した最小構成 (二次情報)
-- :jurisdiction JPN               -> advertiser account の国は登記国に従い setup 時に固定
+- :proposed-media-spend 750       -> ads.openai.com の最低日予算 USD 25 x 30日 (USD 建て、二次情報)
+- :jurisdiction USA               -> 出稿主体は AWAI Network, L.L.C. (デラウェア LLC、
+                                     etzhayyim 傘下の営業主体で既に cloud-itonami の operator)。
+                                     account の国/通貨は登記国に従い setup 時に固定される
 
 ## ad-category は未確定 — だから両方の候補を走らせた
 
@@ -46,9 +47,9 @@ WebFetch/curl とも 403 (bot wall)、Chrome 拡張も未接続のため **未�
 ```edn
 {:campaigns
  {\"kotobase-dpe\" {:id \"kotobase-dpe\" :client-name \"net-kotobase (kotobase.net) — graph-DB BaaS\"
-                  :jurisdiction \"JPN\" :status :intake
+                  :jurisdiction \"USA\" :status :intake
                   :target-platform \"chatgpt-ads\" :ad-category :digital-products-education
-                  :proposed-media-spend 112500 :authorized-budget 0
+                  :proposed-media-spend 750 :authorized-budget 0
                   :advertiser-approval-on-file? false :attestations {}
                   :requested-placement-contexts []
                   :misleading-claim-risk-unresolved? false :campaign-placed? false
@@ -67,7 +68,7 @@ WebFetch/curl とも 403 (bot wall)、Chrome 拡張も未接続のため **未�
 
 1. `:evidence-incomplete` — 法域の必要書類(クライアントブリーフ/媒体計画/
    クリエイティブ承認/予算承認)が未整備
-2. `:media-spend-exceeds-authorized-budget` — 提案媒体費 112500 が承認予算 0 を超過
+2. `:media-spend-exceeds-authorized-budget` — 提案媒体費 750 (USD) が承認予算 0 を超過
 3. `:risk-screen-missing` — 誤認表示リスクスクリーニングの完了記録が無い
 4. `:platform-check-incomplete` — :platform/verify 未実施
 5. `:platform-attestation-missing` — chatgpt-ads の必須表明 3 件が未取得
@@ -91,9 +92,19 @@ WebFetch/curl とも 403 (bot wall)、Chrome 拡張も未接続のため **未�
 
 有料流入を買っても、受け皿の転換率が 0 なら CAC は無限になる。BMC 実測:
 
-- net-kotobase: landing 訪問 246 -> signup **0** (転換 0% / 目標 3%)
-- cloud-murakumo: murakumo.cloud 訪問 -> 実推論 run 転換 **1%** (目標 2%)
+**BMC の「246 -> 0」は陳腐化していた。** 2026-07-30 の live `GET /api/funnel`:
 
-さらに ads.openai.com は pixel / Conversions API を提供しており、これを入れない
-出稿は「効いたかどうか」が事後に分からない。**funnel と計器が先、出稿が後。**
+    visitors 1565 / signups 3 / checkouts 0
+    x402: challenges 4 / submissions 3 / settlements 0 / rejections 3
+
+landing -> signup クリック **0.19%** (目標 3%)、signup -> checkout **0/3 = 0%**。
+signups が 0 でなく 3 なので「クリックが記録されない不具合」ではなく本当に
+クリックされていない。x402 は submission 3 件が 3 件とも reject (別 follow-up)。
+cloud-murakumo は訪問 -> 実推論 run 転換 **1%** (目標 2%、BMC 値)。
+
+**流入元別の計器は net-kotobase main `3fddd36` に着地済み** (stage ごとに
+`utm_source` を閉じた allowlist に clamp した JSON 1 個 + client 値 > Referer の
+解決順)。ただし repo-wide build lock が別セッションに保持されており **本番未デプロイ**。
+媒体固有の pixel / Conversions API は一次情報が 403 で読めないため未着手 ——
+パラメータ名を推測して実装しない。**funnel と計器が先、出稿が後。**
 "}]
