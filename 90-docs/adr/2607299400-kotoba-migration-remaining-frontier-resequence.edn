@@ -214,6 +214,21 @@ Host production path was already pack-free (pick/score/queue-inc).
 4. T6.2 precompiled KIR default; T8.3 production AOT; W4 recursive values
 
 
+
+## Progress (2026-07-30c — reconcile targets + credits)
+
+- murakumo#200 credits two-lane shares → record
+- murakumo#202 reconcile pick-targets pack → `:reconcile/targets` record
+
+**T5.3 pure-planner / product-shell pack cutovers landed through:**
+schedule assign, plan, seats, eligibility, credits shares, reconcile targets.
+
+**Still open:**
+1. rebalance *internal* pool-weight + demand 5-lane packs
+2. task_plan flag/load packs
+3. reconcile `name-bits` residual
+4. bool-typed predicate surface (language opt-in)
+
 ## Consequences
 
 - superproject から見た移行の現在地が 2026-07-29 断面に揃った。以後、現在地を
