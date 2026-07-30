@@ -21,6 +21,9 @@ tip 変化を検出 → gate をノードへ fan-out → 署名 receipt を flee
 | `tick.cljs` | 本体（tip 検出 → gate 実行 → receipt → status → pin 前進） |
 | `gates/docs-edn-check.cljs` | EDN-only ドキュメント repo 用の gate（ノードへ配って実行） |
 | `com.gftd.fleet-ci-tip-tick.plist` | 5 分間隔の LaunchAgent（install 手順はファイル冒頭のコメント） |
+| `sweep.edn` | **ディスク回収ポリシー（allowlist）**。1 行足せば対象が増える |
+| `sweep.cljs` | ノードのディスクを回収する（既定 dry-run、`--apply` で実行） |
+| `com.gftd.fleet-ci-sweep.plist` | 日次 04:17 の sweep LaunchAgent |
 
 状態・ログはリポジトリ外（`~/.gftd/`）:
 `fleet-ci-state.edn`（repo → 最後に検証した sha）/ `fleet-ci-tick.log`（正本ログ）/
@@ -47,6 +50,36 @@ cp scripts/fleet-ci/com.gftd.fleet-ci-tip-tick.plist ~/Library/LaunchAgents/
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.fleet-ci-tip-tick.plist
 launchctl kickstart -p gui/$(id -u)/com.gftd.fleet-ci-tip-tick   # 1 回だけ手動起動
 ```
+
+## ディスクを回収する（sweep）
+
+**満杯のノードは gate を走らせる前に殺す。** `tar` が "No space left on device" で
+落ちるので、CI は赤にすらならず signal が一切出ない。2026-07-30 に `asher` が実際に
+この状態（空き 117MiB / 使用率 100%）で、`dan` 847MiB・`issachar` 1.2GiB も同様。
+この 4 ノードは probe の capability が空で、fleet の実行プールから外れていた。
+
+```bash
+nbb scripts/fleet-ci/sweep.cljs                 # dry-run（既定）。何を消すかだけ出す
+nbb scripts/fleet-ci/sweep.cljs --apply         # 実際に消す
+nbb scripts/fleet-ci/sweep.cljs --all           # low-water(20GiB) を無視して全ノード
+nbb scripts/fleet-ci/sweep.cljs --only dan,levi # ノードを絞る
+```
+
+対象は `sweep.edn` の **allowlist**。`~/.ollama/models`（21G/ノードの実データ）や
+`~/comfyui` は *列挙されていないので触られない* — denylist だと新しい実データが
+増えたとき黙って巻き込む。
+
+**消す前に孤児であることを証明する。** `:require-absent-binaries` /
+`:require-no-launchd-match` / `:require-untouched-days` のどれか 1 つでも
+満たされなければ、その entry は skip して理由を出す。実例: llama.cpp cache は
+10 ノードで 173G あったが、稼働中の推論は全ノード `ollama serve`、llama バイナリは
+未インストール、参照する launchd も 0、最終書き込みは 4 週間前 — この 4 つが
+揃って初めて「退役した serving 経路の残骸」と言える。
+
+回収量は **df の前後差で実測**する（コマンドの exit code は成功の証拠にしない）。
+
+初回実績（2026-07-30）: 安全 cache で +13.2GiB、llama.cpp 孤児で +173.1GiB。
+`dan` は 848MiB → 31.4GiB。
 
 ## 対象を増やす
 
