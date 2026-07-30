@@ -1,25 +1,25 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 7360, "ai-gftd-chat-shell" 5},
+ {"magatama-sh1n5h1x" 7405, "ai-gftd-chat-shell" 5},
  :zone
- {:requests-7d 489365,
-  :pageviews-7d 10941,
-  :uniques-7d-sum 4924,
+ {:requests-7d 493390,
+  :pageviews-7d 10949,
+  :uniques-7d-sum 4958,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
   [{:path "/v1/generation/jobs/c2153fbd255a44a4bce063eec2753b6c",
     :requests 48}
+   {:path "/wp-css.php", :requests 26}
+   {:path "/reop3.php", :requests 26}
    {:path "/google-credentials.json", :requests 24}
-   {:path "//wp-includes/assets/", :requests 23}
-   {:path "/assets/main.js", :requests 22}
-   {:path "/reop3.php", :requests 22}
-   {:path "/wp-css.php", :requests 21}
-   {:path "/wp-content/themes/index.php", :requests 20}
-   {:path "/4PJcpMFsD8B.php", :requests 20}],
-  :status-mix {:client-error 2960, :ok 946, :server-error 16080},
+   {:path "/assets/main.js", :requests 24}
+   {:path "/wp-content/themes/index.php", :requests 23}
+   {:path "//wp-includes/block-bindings/", :requests 22}
+   {:path "//wp-includes/assets/", :requests 22}],
+  :status-mix {:client-error 2804, :ok 997, :server-error 16092},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
   :last-charge-epoch 1604224274},
  :as-of "2026-07-30",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 15, :error-5xx-pct 80},
+ {:window "24h", :probe-4xx-pct 14, :error-5xx-pct 81},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/generation/jobs/c2153fbd255a44a4bce0… 48 · /google-credentials.json 24 · //wp-includes/assets/ 23 · /assets/main.js 22 · /reop3.php 22 | 4xx(probe) 15% · 5xx 80%",
+ "上位 page (24h, 2xx/3xx): /v1/generation/jobs/c2153fbd255a44a4bce0… 48 · /wp-css.php 26 · /reop3.php 26 · /google-credentials.json 24 · /assets/main.js 24 | 4xx(probe) 14% · 5xx 81%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 489365 req/7d・4924 uniques(日次和)・うち4xx probe 15%(24h)、workers 7365 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 493390 req/7d・4958 uniques(日次和)・うち4xx probe 14%(24h)、workers 7410 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
