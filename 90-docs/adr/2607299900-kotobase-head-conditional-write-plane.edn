@@ -193,6 +193,60 @@ other 19）で検知し、3 リクエストの burst で body を読んで特定
 `authoritative` への flip は**依然として証拠待ち**: `kotobase_heads` は 0 行のままで、
 shadow deploy 以降 production の head read が発生していない。
 
+# Resume point（会話履歴なしで再開するための具体手順、2026-07-30 時点）
+
+作業ツリーは `orgs/network-awai/net-kotobase/kotobase-cf-wasm`（west path が正。ローカルの
+`orgs/gftdcojp/net-kotobase` は旧 org path の残置 checkout）。
+
+## A. production を authoritative に上げる（唯一の gate は証拠であって時間ではない）
+
+1. shadow が seed した head を数える。**0 行なら flip してはいけない**（production の
+   head read がまだ発生していない）。
+
+       npx wrangler d1 execute kotobase-heads-production --remote -y --command <SQL-1>
+
+   SQL-1: SELECT COUNT(*) AS graphs, MIN(updated_at), MAX(updated_at) FROM kotobase_heads;
+
+2. 行があれば signer が1つに揃っているかを見る。これは signer pin を warn から
+   enforce に上げてよいかの判定でもある。
+
+       npx wrangler d1 execute kotobase-heads-production --remote -y --command <SQL-2>
+
+   SQL-2: SELECT json_extract(record, '$.public_key_multibase') AS signer, COUNT(*)
+          FROM kotobase_heads GROUP BY signer;
+
+3. 両方 OK なら `kotobase-cf-wasm/wrangler.jsonc` の production `vars` を
+   `KOTOBASE_HEAD_D1` を shadow から authoritative へ（signer が1つなら
+   `KOTOBASE_HEAD_SIGNER` も warn から enforce へ）編集し、**先に origin/main と同期して**
+   から deploy する。
+
+       git fetch origin && git merge --ff-only origin/main
+       node <root>/scripts/resource-guard.mjs run deploy -- npx wrangler deploy --env=
+
+4. 直後に検証する。壊れていたら `npx wrangler rollback --env=` で即戻す。
+
+       npx nbb slo/probe.cljs
+       npx nbb slo/resilience_probe.cljs https://kotobase-cf-wasm-testnet.aozora.app
+
+## B. バッチングを Durable Object でやり直す
+
+削除したコードは net-kotobase の履歴にある（merge 63cc05a の親側、
+`git log -S 'batched head publication'` で辿れる）。設計はそのまま使える。isolate 版が
+落ちた実測と DO に移す理由は上記のとおり。**必須条件は DO を required にしないこと**
+（binding が無ければ現状動作に degrade する、D1 head plane と同じ形）。
+
+## C. 現状の合格状態を再現する検証コマンド
+
+       cd orgs/network-awai/net-kotobase/kotobase-cf-wasm
+       node <root>/scripts/resource-guard.mjs run build -- npm run test:cljs
+       node test/smoke-live.mjs https://kotobase-cf-wasm-testnet.aozora.app
+       node test/write-bench.mjs https://kotobase-cf-wasm-testnet.aozora.app 6
+       npx nbb slo/resilience_probe.cljs https://kotobase-cf-wasm-testnet.aozora.app
+
+期待値: unit 133 tests / 304 assertions / 0 failures、smoke ALL GREEN、contention は
+`final-datom-count == ok + 1`（消失ゼロ）かつ 5xx なし。write phase の内訳を見るには
+testnet の `KOTOBASE_TIMING=1`（既に on）と `wrangler tail`。
+
 # Alternatives considered
 
 - **Durable Object を直列化器にする** — ADR-2607142200 が「KV も DO も read/write/recovery/sequencing に *required* にしてはならない」と定めており、また ADR-260726（query plane is one ref）が DO storage を durable plane にしないと定めている。DO を*任意の*直列化器として使う案は今も有効だが、D1 の方が「binding が無ければ完全に元の挙動」という degrade が素直に書ける。
