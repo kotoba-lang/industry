@@ -444,9 +444,27 @@
         declared (parse-declared-coverage text)]
     (cond
       declared [(:pct declared) {:method :declared :source (:source declared) :raw-pct (:raw declared)}]
-      (and tree (pos? (+ (:src-files tree) (:test-files tree))))
+      ;; TESTS PER SOURCE FILE, not tests as a share of all files.
+      ;;
+      ;; The previous formula was tf/(sf+tf), which has two measured problems:
+      ;;
+      ;;   - a repo with ONE TEST FILE PER SOURCE FILE -- this workspace's own
+      ;;     convention, and the best a file-level proxy can observe -- scored 0.5,
+      ;;     i.e. read as "half covered". 1,452 of the 3,042 repos scored by this
+      ;;     method were at 1:1 or better and every one of them was pinned near 0.5.
+      ;;     Nothing could exceed 0.5 without MORE test files than source files, which
+      ;;     nobody aims for, so the axis systematically understated the whole fleet.
+      ;;   - 8 repos with ZERO source files and one or two test files scored 1.0:
+      ;;     nothing to cover read as perfectly covered.
+      ;;
+      ;; So: tf/sf clamped to 1.0, and no source files is NOT COMPUTABLE rather than
+      ;; perfect -- the same "nil when not computable, never a fabricated default"
+      ;; rule the other axes follow. Method tag is :file-ratio-v2 so entries scored
+      ;; under either formula stay tellable apart.
+      (and tree (pos? (:src-files tree 0)))
       (let [sf (:src-files tree) tf (:test-files tree)]
-        [(clamp01 (/ tf (+ sf tf))) {:method :file-ratio :src-files sf :test-files tf}])
+        [(clamp01 (/ tf sf))
+         {:method :file-ratio-v2 :src-files sf :test-files tf}])
       :else nil)))
 
 (defn- needs-tree?
@@ -454,7 +472,7 @@
      (a) README/CLAUDE.md に coverage 宣言がある -> coverage-score-from-data は
          tree を見ずに :declared を返す
      (b) HEAD に src/ も test/ も tests/ も無い -> 数え上げは 0/0 になり
-         :file-ratio 分岐の (pos? (+ ...)) が偽 -> nil
+         :file-ratio-v2 分岐の (pos? (:src-files ...)) が偽 -> nil
    どちらも短絡してもスコアの値は変わらない。実測でこの REST が repo あたり ~0.6s、
    フルラン時間の大半だった (GraphQL 本体は 20 repo ~1.5-3.4s = ~0.1s/repo)。"
   [gql]
@@ -520,9 +538,27 @@
          ["coverage-score-from-data: declared wins over file-ratio"
           (first (coverage-score-from-data {:readme {:text "Coverage: 70%"}}
                                             {:src-files 10 :test-files 1})) 0.70]
-         ["coverage-score-from-data: file-ratio"
+         ;; Was 0.50 under tf/(sf+tf). One test file per source file is the best a
+         ;; file-level proxy can see, so it is 1.0 now -- see the comment on
+         ;; coverage-score-from-data for the 1,452 repos this was understating.
+         ["coverage-score-from-data: one test per source file is full file-level coverage"
           (first (coverage-score-from-data {:readme {:text "no mention"}}
-                                            {:src-files 6 :test-files 6})) 0.50]
+                                            {:src-files 6 :test-files 6})) 1.0]
+         ["coverage-score-from-data: half the source files covered"
+          (first (coverage-score-from-data {:readme {:text "no mention"}}
+                                            {:src-files 10 :test-files 5})) 0.5]
+         ["coverage-score-from-data: more test files than source does not exceed 1.0"
+          (first (coverage-score-from-data {:readme {:text "no mention"}}
+                                            {:src-files 4 :test-files 9})) 1.0]
+         ["coverage-score-from-data: nothing to cover is not computable, not perfect"
+          (coverage-score-from-data {:readme {:text "no mention"}}
+                                     {:src-files 0 :test-files 2}) nil]
+         ["coverage-score-from-data: source files with no tests is 0.0, not nil"
+          (first (coverage-score-from-data {:readme {:text "no mention"}}
+                                           {:src-files 7 :test-files 0})) 0.0]
+         ["coverage-score-from-data: a declared figure still wins over the ratio"
+          (first (coverage-score-from-data {:readme {:text "Coverage: 70%"}}
+                                           {:src-files 6 :test-files 6})) 0.70]
          ["coverage-score-from-data: nil when no signal"
           (coverage-score-from-data {:readme {:text ""}} nil) nil]
          ["composite: all-1.0 -> 1.0"
@@ -693,6 +729,32 @@
             (println (str "repo-maturity: merge-existing kept " (- (count merged) (count scored-now))
                           " repos from prior run (merged total " (count merged) "/"
                           (count all-repos) ").")))
+        ;; REFUSE TO SHRINK THE LEDGER BY ACCIDENT.
+        ;;
+        ;; A filtered run (--only / --limit / --offset) without --merge-existing writes
+        ;; ONLY the repos it scored, silently replacing every other entry with nothing.
+        ;; That is right for `--out somewhere-else.edn` and almost never right for the
+        ;; ledger. Measured the hard way: `--only kotoba-lang/card --limit 1`, meant as a
+        ;; one-repo sanity check, cut manifest/repo-maturity.edn from 3,899 entities to 1,
+        ;; and nothing said so -- it was only noticed because a later comparison joined
+        ;; against it and matched zero rows.
+        ;;
+        ;; So a filtered run that would shrink an existing file now refuses. The escape
+        ;; hatch is to say which you meant: --merge-existing to keep the rest, or --out
+        ;; to write somewhere that is not the ledger.
+        _ (let [filtered? (or (:only opts) (:limit opts) (:offset opts))
+                prior (when-not (:self-test opts)
+                        (try (count (edn/read-string (slurp out-path)))
+                             (catch :default _ 0)))]
+            (when (and filtered? (not (:merge-existing opts))
+                       prior (> prior (count merged)))
+              (println (str "repo-maturity: REFUSED. This is a filtered run (--only/--limit/"
+                            "--offset) without --merge-existing, and it would shrink "
+                            out-path " from " prior " entities to " (count merged) "."))
+              (println (str "  Add --merge-existing to keep the " (- prior (count merged))
+                            " entries this run did not score, or --out <path> to write "
+                            "somewhere that is not the ledger."))
+              (io/exit 4)))
         header
         (str ";; manifest/repo-maturity.edn — generated by scripts/repo-maturity.cljs. DO NOT EDIT BY HAND.\n"
        ";; Regenerate: nbb scripts/repo-maturity.cljs\n"
