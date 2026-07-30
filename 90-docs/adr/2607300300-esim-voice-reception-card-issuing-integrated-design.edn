@@ -666,8 +666,15 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
      transfer *要求* で subject を付け替える store を渡すと
      `a-transfer-request-does-not-reassign-the-subject` で落ちる（SIM-swap 経路そのもの）。
      「全部走らせる」ヘルパが**黙って0件選ぶと永遠に通る**ので、10件以上選ぶことも別途 assert。
-   - **残り**: `cloud-itonami-card-issuing` と `denwaban` の contract test は同じ
-     ハードコード問題を抱えたまま。共有 backend 自体もまだ無い。
+   - `cloud-itonami-card-issuing` も同様に修正（962f020f）。**壊れた実装で確認**:
+     sanctions hit を持つ cardholder `ch-3` を欠いた seed を渡すと read-parity が
+     **その hit と名簿の両方**で落ちる（record を1件失った backend は、governor が
+     訊くまで健康に見える）。
+   - **前の版でここに『denwaban も同じ問題』と書いたのは誤り**だった。実測すると
+     **denwaban には store が無い**（`cells` / `http` / `session` / `social` のみ）ので、
+     store contract test も存在しない。
+   - **残り**: 共有 backend そのものがまだ無い。今できたのは「swap で済む」という主張を
+     **検査可能にした**ことであって、swap そのものではない。
 7. **kotoba-lang の 85 ライブラリが git 座標で消費不能（2026-07-31 に実測し直した）。**
    ここには「199 件」と書いてあったが、**2つの別物を混ぜていた**。default branch を実測した
    内訳（`nbb scripts/consumability-audit.cljs` で再現可能。west.yml の kotoba-lang project
