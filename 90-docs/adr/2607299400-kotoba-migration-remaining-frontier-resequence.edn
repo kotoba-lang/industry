@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist production path (ADR 0161 #45); **ops/network AOT Components still open** |
-| T8.4 | host-parity L5 | **partial** — fixtures + **JVM live runner** (kototama#96); Node/browser expansion open |
+| T8.4 | host-parity L5 | **partial** — fixtures + **JVM live runner expanded** (kototama#96+#97, 9 proofs); Node/full matrix open |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -973,17 +973,20 @@ Still open:
 3. T8.4 live host runner; W4 recursive values
 
 
-## Progress (2026-07-31ap — T8.4 JVM live host runner first slice)
+## Progress (2026-07-31ap — T8.4 JVM live host runner first slice + expand)
 
 - kototama#96 MERGED (`9a9f2287`): **T8.4 live host runner (JVM first slice)** —
   `host-parity-live` proves sha256-hex / clock-monotonic / log-write /
   gen-keypair on Chicory, mapped to host-parity case ids.
   Browser remains verify-actor-host.mjs. Evidence: 3 tests / 22 assertions.
-- west pin kototama → `9a9f2287`.
+- kototama#97 MERGED (`54e3fd60`): **T8.4 expand** — log-read, sign, verify
+  (multi-import), cbor-encode, json-encode; corpus **9 live proofs**.
+  Evidence: 3 tests / 42 assertions.
+- west pin kototama `9a9f2287` → `54e3fd60` (root#1493).
 
 Still open:
 1. T8.3 ops/network AOT Components (http/secret)
-2. T8.4 Node live runner + broader import coverage; browser expansion
+2. T8.4 Node live runner + remaining matrix (pg/llm/http-post/kagi/random-bytes)
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
