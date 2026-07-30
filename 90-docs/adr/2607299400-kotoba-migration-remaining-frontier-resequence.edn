@@ -90,7 +90,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 
 | ID | 内容 | 状態 |
 |---|---|---|
-| **T5.3** | rebalance seats pack → record export | **landed** murakumo#193–#199 (incl. schedule assign packs #199); residual: bool-typed predicates + other modules packs |
+| **T5.3** | rebalance seats pack → record export | **landed** murakumo#193–#199 (incl. schedule assign packs #199); residual: task-score-code ternary + plan/rebalance bump indices; schedule/task ok·warm flags3 landed #230 |
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
@@ -439,6 +439,23 @@ guarantee preload.
 Still open:
 1. T6.4 cljs mirror body deletion (preload guarantee)
 2. T8.3 production AOT network/secret; W4 recursive values
+
+
+
+## Progress (2026-07-31k — profile-5 flags3 + pin catch-up)
+
+- murakumo#227 MERGED (ff62f2a): pick ok flags are :bool (pick-idx / assign-step-2 /
+  pick-fold / task pick helpers). ADR-260731-w6-ok-flags-bool.
+- murakumo#230 MERGED (`147c3496`): schedule/task ok·warm leave i64 triples —
+  new :schedule/flags3 / :task/flags3 (:bool) + flags3-record; assign-pick-3 /
+  assign-step-3 / assign-task-*-3 take flags3. Queue/fill/load stay i64 triples.
+  ADR-260731-w6-flags3-bool. Evidence: 88 tests / 1584 assertions green.
+- west pin murakumo `147c3496` (covers #228 loadtime + #227 + #230).
+
+Still open:
+1. T6.4 cljs mirror body deletion (preload guarantee)
+2. T8.3 production AOT network/secret; W4 recursive values
+3. task-score-code ternary; plan/rebalance pick-bump residual numeric
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
