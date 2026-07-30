@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist production path (ADR 0161 #45); **ops/network AOT Components still open** |
-| T8.4 | host-parity L5 | **partial** — JVM 14 + Node 11 live (#96–#102; kagi-sign tender+inject); pg/pool still open |
+| T8.4 | host-parity L5 | **partial** — JVM 16 + Node 11 live (#96–#103; tls-open/transport-close inject); pg/pool still open |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -1069,6 +1069,23 @@ Still open:
 Still open:
 1. T8.3 ops/network AOT Components (http/secret wasm packages)
 2. T8.4 remaining matrix (pg/pool live; remaining TLS/transport ops)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31av — T8.4 tls-open + transport-close inject live)
+
+- kototama main  (agent/t84-tls-open-live merged): **T8.4**
+  live-prove  (invalid handle → 0) and
+   (unknown handle → -1) via
+  transport-provider inject. JVM corpus **16**. Evidence: host-parity-live
+  4 tests / 75 assertions.
+- Note: concurrent kagi-sign already on Progress 31au (); this pin
+  advances past it.
+- west pin kototama  → .
+
+Still open:
+1. T8.3 ops/network AOT Components (http/secret wasm packages)
+2. T8.4 remaining matrix (pg/pool live; transport-read/write success paths)
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
