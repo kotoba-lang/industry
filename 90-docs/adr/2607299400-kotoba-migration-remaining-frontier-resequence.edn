@@ -366,9 +366,26 @@ task-eligible?, failed?, can-retry?, authorized?, write-ok?.
 - west pins: murakumo 3526e3b3, kotoba-kir 767f2f2f
 
 **Still open:**
-1. T6.4 remainder: wholesale mirror-* deletion when cljs entrypoints preload
+1. T6.4 remainder: oracle-required pilot #223 (kekkai); expand to other hosts + cljs mirror delete
 2. T8.3 production AOT network/secret; W4 recursive values
 3. Ranking / pick-code stay :i64 by design
+
+
+
+## Progress (2026-07-31g — ranking bool #222 + T6.4 kekkai oracle-required)
+
+- murakumo#222 MERGED: pairwise ranking better-*/rank-better? return :bool
+  (rank-better?, better-score?, better-target?, better-bump?, before-pool?,
+  better-fill?, better-mem?, challenger-wins?). Still i64: better-task-score? ternary
+  and packed better2/better3 helpers.
+- murakumo#223 MERGED: T6.4 remainder pilot — kekkai.gate requires shipped KIR on
+  JVM; cljs keeps private mirrors only as fail-closed fallback
+  (ADR-260731-w6-t64-kekkai-oracle-required).
+- west pins: murakumo f6951e93, compiler tip (bool-remainder #452).
+
+Still open:
+1. T6.4 remainder: apply oracle-required pattern to other host ns; then delete cljs mirrors when preload guaranteed
+2. T8.3 production AOT network/secret; W4 recursive values
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
