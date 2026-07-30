@@ -6,8 +6,8 @@
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-07-29"
-  :adr/last-verified "2026-07-29"
-  :adr/last_verified "2026-07-29"
+  :adr/last-verified "2026-07-30"
+  :adr/last_verified "2026-07-30"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "kotoba-migration-remaining-frontier-resequence"
@@ -136,9 +136,12 @@ record を認めていない。その帰結が実コードに出ている
 destructuring / loop-recur / match / defmulti を admit する）の限界ではない。
 
 **決定**: 残りの移行の最優先を **`:record` を pure-product `:value-types` に入れ、
-T5.3 で最初の public pack を実際に削除すること**とする。これが済むまで、
-**新しい `*_core.kotoba` の追加は debt を増やす**（今日書くビットパックは T5.3 で
-全部書き直しになる）。
+T5.3 で最初の public pack を実際に削除すること**とする。
+
+**2026-07-30 着地**: P1 は kotoba-lang#345 で完了（`:record` + `:record-ops`）。
+T5.3 の seats/eligibility/plan は murakumo#193–#198 で完了。残りの最優先は
+schedule assign pack3 の record 化と、bool-typed predicate surface
+（opt-in、破壊的・計測済み — ADR-reliability-record-access-and-bool-comparisons）。
 
 ### 4. 再順序化した残りの計画
 
@@ -171,6 +174,31 @@ P7 kotoba repo 自身 — `src/` の 39 本の .clj を
 3 target 共有の意図的な残置、機械的リネーム禁止。39 本の `.clj` は host-mechanism 層で
 今回の cutover 対象外。P7 でやるのは移植ではなく**分類の確定**。
 
+
+## Progress (2026-07-30)
+
+**P1 pure-product `:record` — landed.**
+`kotoba-lang` #345 / pin `7b8b4abe` adds `:record` to `:value-types` and
+declares `:record-ops` (`record-new` / `record-get`). The preference/profile
+contradiction that motivated this ADR is closed.
+
+**T5.3 core rewrites — landed** (murakumo#193–#198):
+rebalance seats → `:rebalance/lanes`; schedule eligibility → record (flag
+bit-word deleted); plan model / largest-remainder / residual packs → records.
+Compiler record ergonomics: 2-arity `record-get` (compiler#441), schema refs
+(compiler#443).
+
+**Residual frontier (reordered):**
+1. schedule assign `pack3` queue folds (still exported; host pick uses sort-by)
+2. bool-typed comparisons + bool export ABI — **measured as breaking**, opt-in
+   profile required (ADR-reliability-record-access-and-bool-comparisons; do not
+   land as a silent fix)
+3. T2.3 examples CI already enforced pure-product (compiler#438); T6.2 precompiled
+   KIR default still open
+4. T8.3 production AOT network/secret; T6.4 cljs same artifact; W4 recursive values
+
+**Do not re-propose:** record-kit dual-backend, T5.1/T5.4, T5.3 seats/eligibility/plan.
+
 ## Consequences
 
 - superproject から見た移行の現在地が 2026-07-29 断面に揃った。以後、現在地を
@@ -193,5 +221,5 @@ P7 kotoba repo 自身 — `src/` の 39 本の .clj を
   :adr/consequences
   ["west pin 13 件を前進（825 commit 分）。verify-west-pins でサーバ側検証済み"
    "移行の現在地の出典が ADR-2607289500 §2 から本 ADR + kotoba-lang living plan に移る"
-   "pure-product-profile の :value-types に :record を入れることが最優先事項として確定"
-   "T5.3 完了までは新規 *_core.kotoba の追加を抑制する"]}]
+   "pure-product :value-types に :record を入れる P1 は 2026-07-30 着地 (kotoba-lang#345)"
+   "T5.3 core 着地後の残りは schedule pack3 + bool-typed predicates (opt-in)"]}]
