@@ -25,7 +25,9 @@
   ["90-docs/protocols/kotoba-resource-protocol.edn（KRP §4 の HTTP projection 8 rules。rule 8 『Unknown resources return 404 and never fall through to a homepage』が本 ADR の中心）"
    "90-docs/adr/2607299300-murakumo-cloud-krp-org-repo-addressing-did-account.edn（murakumo.cloud に同じ addressing を決めた先行 ADR。本 ADR はそれを itonami.cloud で**実装した**もの。§3『registry は宣言データ。path が parse できるだけでは存在を意味しない』『location は宣言する。名前から導出しない』を継承する）"
    "90-docs/adr/2607122200-kotoba-lang-ui-hig-semantic-layer-topology.edn（公開サイトの UI が乗る design system。skill kotoba-uiux）"
-   "orgs/cloud-itonami/inkan（印影の組版エンジン。最初の公開サイトの中身）"]
+   "orgs/cloud-itonami/inkan（印影の組版エンジン。最初の公開サイトの中身）"
+   "orgs/kotoba-lang/jp-go-digital-design-system（DADS。この公開サイトの UI スタック。README が『採用する repo は理由を ADR に書くこと』と定めており、その理由は本 ADR の decision 7）"
+   "90-docs/adr/2607141915（ai-gftd-itad が kotoba-ui から DADS へ opt-out した先行 ADR）"]
 
   :adr/problem
   "オーナーの問い（2026-07-30）は『itonami.cloud/{org}/{repo} で公開できるんだっけ?』で、答えは**半分だけ Yes** だった。
@@ -108,7 +110,22 @@ JS に書き直すと組版が2実装になり、SVG と PNG が必ず食い違�
 書体は **OFL のみ**（Shippori Mincho / Zen Old Mincho / Yuji Syuku / Yuji Boku /
 Noto Serif JP、Google Fonts の unicode-range サブセットで漢字を完全カバー）。
 **篆書体・印相体・古印体・隷書体は未対応**（探した範囲で OFL の実用フォントが
-無い）。似た別の書体で代用はしない —— 『無い』を『それらしい何か』で埋めない。"
+無い）。似た別の書体で代用はしない —— 『無い』を『それらしい何か』で埋めない。
+
+### 7. この公開サイトの UI は kotoba-ui ではなく DADS（デジタル庁デザインシステム）
+
+オーナー指示（2026-07-30）。このモノレポの標準 UI スタックは kotoba-ui
+（ADR-2607122200 / skill `kotoba-uiux`）だが、`kotoba-lang/jp-go-digital-design-system`
+は **『日本の公共・行政文脈のサービス』向けの明示的な opt-out 先**として置かれて
+おり（README が『採用する repo は理由を ADR に書くこと』と定めている）、印影は
+印鑑登録・契約書・行政手続きの文脈そのものなので、ここがまさにその適用先。
+先行例は `gftdcojp/ai-gftd-itad`（ADR-2607141915）。
+
+**代償を明記する: light mode 固定になる。** 上流デジタル庁に dark palette が
+無いため、DADS を選ぶことは dark を捨てることと同義。dark が要るなら kotoba-ui へ
+戻すのが正しい分岐であって、**dark を自作しない**（jp-go-dds README の指示）。
+外部リクエストは webfont だけ opt-in する（DADS 自体は外部リクエストゼロが既定だが、
+印影の書体そのものが Google Fonts の OFL フォントなので、ここは落とせない）。"
 
   :adr/consequences
   "**得られたもの**
@@ -184,6 +201,20 @@ Noto Serif JP、Google Fonts の unicode-range サブセットで漢字を完全
 (2) は Pages のアセットサーバの正規化挙動で、同じく本番経路にしか無い。
 **『ローカルで全部通った』は『本番で動く』の証明ではない**という、この面では
 繰り返し確認される事実の実例。デプロイ後の live 実測を手順から外さないこと。
+
+**DADS 移行で見つけた欠陥（2件）—— どちらも例外にならず静かに壊れる**
+
+1. **`jp-go-dds.core/select` は `[opts options]` の順**（`[options opts]` ではない）。
+   逆に渡しても vector の map destructure は例外にならないので**黙って壊れ**、
+   `<option value=":id">f-kind</option>` のような選択肢が出る。
+2. **同 `select` は現在値を表現できなかった。** placeholder しか `selected` に
+   せず、`:value` が無い。既定値を持つフォームでは consumer が『18mm を既定に
+   した』つもりでも実際に選ばれるのは options の先頭で、**見た目は正常**なので
+   気付かない（実測: 印影が 18.0mm のつもりで 12.0mm で描画されていた ——
+   プレビュー SVG が 168px = 12 × 14px/mm）。→ 回避策で誤魔化さず
+   **jp-go-dds 側に `:value` を実装**した（`kotoba-lang/jp-go-digital-design-system`
+   commit `c787de2`、12 assertion 追加、既存 246 assertion 通過）。この欠陥は
+   DADS を使う**すべての**フォームに影響していたので、consumer 側で直すのは誤り。
 
 **発見した実装上の罠（2件）**
 
