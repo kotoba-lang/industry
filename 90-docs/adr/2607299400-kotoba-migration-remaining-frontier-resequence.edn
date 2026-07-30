@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
+| T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist production path (ADR 0161 #45); **ops/network AOT Components still open** |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -941,6 +941,21 @@ Still open:
 Still open:
 1. T8.3 production AOT network/secret Components + readiness `:signed-wasm :ready`
 2. T5.2 native guest record wire (deferred; `oracle/record` on T5.3 path)
+3. T8.4 live host runner; W4 recursive values
+
+
+## Progress (2026-07-31an — T8.3 pure-allowlist publisher policy)
+
+- provider#45 MERGED (`f97168af`): **ADR 0161 pure-allowlist publisher policy** —
+  pure kits may set readiness `:signed-wasm :ready`; 8 pure-allowlist rows flipped;
+  grant-binding production-admissible for math-sin with signed receipts.
+  Ops/network (http/secret) stay `:signed-wasm :pending` (AOT Component open).
+  Evidence: 61 tests / 373 assertions.
+- west pin provider `678b0ec0` → `f97168af`.
+
+Still open:
+1. T8.3 ops/network AOT Components (http/secret) — pure-allowlist production path closed
+2. T5.2 native guest record wire (deferred)
 3. T8.4 live host runner; W4 recursive values
 
 
