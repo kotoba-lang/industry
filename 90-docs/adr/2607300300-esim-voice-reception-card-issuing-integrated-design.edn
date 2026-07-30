@@ -451,10 +451,69 @@ proposal を「発行済み」と表示してはならない。
      **提案されただけ** → card pre-check が拒否する。1つの subject の transfer が他の
      subject を restrict しないことも固定。
 
-**build order は全 7 step 完了。** ただし本 ADR の「到達上限」節は不変で、
+8. ✅ **done（2026-07-30）** HTTP 面 + transport
+   （app pin `e74439d8`、CI green、**188 tests / 920 assertions**、clj-kondo 0 errors）。
+   **これは当初の build order に無かった step で、私の設計 ADR の抜けだった** — step 7 まで
+   終えた時点で spine と adapter は完成・検証済みだったが、`server.clj` に authority ルートが
+   **0件**、`:endpoint` から commit-fn を組み立てるコードも存在せず、**統合は自分のテストの中
+   でだけ成立していた**。
+   - `authority.transport`: commit-fn を設定から組み立て、3種の拒否を**throw ではなく refusal
+     として返す**（「authority に届かない」と「authority が拒否した」は別の結果で、ledger が
+     区別できるべき）: `:authority-disabled`（既定）/ `:endpoint-not-configured`
+     （**enabled は reachable ではない**）/ `:transport-failed`。
+     actor の governor 拒否は**エラーではない** — 人間が同意し licensed operator が
+     それでも否と言った、という2枚 gate の正常動作。
+   - `authority.api`: ルートを3行に保ち、その下を HTTP 無しでテスト可能にする層。
+     adapter が自力で強制できない2点を強制する:
+     ①**disabled な authority は read も含めて surface を持たない**（disabled なのに proposal が
+     あるかのように答えるのは、拒否より悪い）
+     ②**posture をサーバ側で計算し、リクエストに来たものを上書きする。**
+     **これが cross-domain 不変条件の実際の強制点。** client が posture を送れるなら不変条件は
+     単なる助言で、攻撃者は `{:authority/posture :normal}` を送るだけでよい。adapter 側の
+     「必須入力」チェックは*忘れる*のを防ぐだけ。transfer を持つ subject が `:normal` を
+     送っても hold が発火することをテストで固定した。
+   - 7ルート（`GET /api/authority` / `GET /api/authority/:a` / `review` /
+     `approve/start` / `approve/finish` / `reject` / `commit`）。他の write surface と同じく
+     app session + origin + CSRF を要求。**commit を finish-approval! と別呼び出しにしたのは
+     意図的** — hand-off は拒否されうるし、その拒否は「既に起きた同意の失敗」ではなく
+     見せるべき結果だから。
+   - **正直に書いておく到達状況**: **fleet のどの actor も HTTP 面を持たない**
+     （実測: `cloud-itonami-esim` / `cloud-itonami-card-issuing` / `denwaban` の3つとも
+     server/http/handler/worker 系ファイルが0件、中身は advisor/governor/operation/phase/
+     registry/sim/store のみ）。よって今の fleet では設定済み endpoint は必ず
+     `:transport-failed`、未設定は `:endpoint-not-configured` を返す。
+     **これは app 側を完成させたが、fleet を到達可能にはしていない。**
+
+**build order は 8 step 完了（当初 7 + 抜けていた 8）。** ただし本 ADR の「到達上限」節は不変で、
 背後の actor は全て `:effect :propose` only なので、`:committed` は
 「governed proposal が記録された」だけを意味する。
 
 各段の完了条件は「実装した」ではなく、pre-check の決定論性・context type 不一致の拒否・
 Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が **test で示されていること**。
+
+## 残る gap（2026-07-30 時点、優先順）
+
+1. **fleet のどの actor も HTTP 面を持たない（最大）。** `cloud-itonami-esim` /
+   `cloud-itonami-card-issuing` / `denwaban` の3つとも server/http/handler/worker 系
+   ファイルが0件で、advisor/governor/operation/phase/registry/sim/store だけのライブラリ。
+   **app 側は完成しているが渡す先が無い。** 塞ぐには actor 側に `POST /commit` 相当
+   （proposal を受け governor を通し `{"ok":…}` を返す）が必要。
+2. **D4 の単一 ref が actor 側でまだ成立していない。** app 内では1つの store partition で
+   cross-domain 読みが成立するが、**actor の ledger は各自 MemStore のみ**
+   （実測: esim actor の store に kotobase/Datomic 参照0件）。①を実装する時に actor の store を
+   共有 backend に向けるのが自然な合流点。
+3. **`denwaban` に CI が無い。** 6 tests / 16 assertions がローカル実行のみを証拠にしている。
+   一番安く直る。
+4. **kotoba-lang の 199 ライブラリが git 座標で消費不能。** 1,828 中 199
+   （`card`/`phone`/`esim` は修正済み）。同一クラスの欠陥で、各 CI が sibling を `../` に
+   clone しているため全て green のまま。**sibling を clone する CI は consumability を
+   何も証明しない。**
+5. 小さいもの: `cloud-itonami-app` の既存 phantom 8件（`identity/*` /
+   `store/update-agent-control!` / `provider/agent-turn`）と未 commit の
+   `bitcoin.clj`/`bitcoin_node.clj` / `cardissuing.registry` の Luhn 重複実装 /
+   `kotoba-lang/esim` に `ui.cljc` が無い。
+
+**意図的に開けているもの（gap ではなく決定）**: jurisdiction spec-basis catalog の不在 /
+EID checksum を検証しない / `io-libp2p` vs `webrtc` の binding provenance 未決。
+いずれも「未検証のものを書かない」という同じ理由で、当て推量で埋めない。
 "}]
