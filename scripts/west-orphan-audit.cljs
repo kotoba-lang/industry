@@ -80,6 +80,29 @@
          (map second)
          set)))
 
+(defn west-rev->path
+  "west.yml の revision → path map。
+
+  ある local repo の HEAD がここに載っていれば、その中身は **別の path で既に
+  west 登録済み**であり、orphan ではなく旧 path の残骸である。repos.edn の
+  :path-overrides に載っていないリネーム（org 移動・改名）はこの表でしか捕まらない。
+
+  実測 2026-07-30: true-orphan-git 270 件のうち **257 件**がこれだった。
+  etzhayyim/root の multirepo 抽出（2026-07-19/20）で、successor を push・登録した
+  あと旧 path の checkout が残ったもので、HEAD が pin と完全一致する
+  （com-etzhayyim-app-arbitrage の HEAD 412fa8ae = orgs/cloud-itonami/arbitrage の
+  pin、app-aidesk → cloud-itonami/aidesk、app-aima → kotoba-lang/aima …）。
+  この判定を入れる前は 270 件が「登録 or 退役」として報告され、本当に未登録だった
+  6 件が埋もれていた。"
+  []
+  (let [text (or (read-text (node-path.join root "manifest/west.yml")) "")]
+    (into {} (for [[_ rev p] (re-seq #"(?m)^\s+revision:\s+(\S+)\n\s+path:\s+(\S+)" text)]
+               [rev p]))))
+
+(defn git-head [rel]
+  (let [{:keys [exit out]} (sh "git" "-C" (node-path.join root rel) "rev-parse" "HEAD")]
+    (when (zero? exit) (not-empty (str/trim out)))))
+
 (defn parse-string-map-blob
   "repos.edn 内の string 化された map リテラルから \"k\" \"v\" ペアを抜く。"
   [blob]
@@ -164,7 +187,7 @@
 
 (defn classify-unregistered
   "local にあって west path に無いものを分類。"
-  [local west overrides]
+  [local west overrides rev->path]
   (let [unreg (filter #(not (contains? west %)) local)]
     (reduce
      (fn [acc rel]
@@ -193,13 +216,21 @@
          (update acc :tracked-superproject conj
                  {:path rel :tracked (tracked-file-count rel)})
 
+         ;; HEAD が別 path の pin と一致 = 登録済み repo の旧 path 残骸。
+         ;; :path-overrides に無いリネームはこの表でしか捕まらない（west-rev->path 参照）。
+         (and (git? rel) (some-> (git-head rel) rev->path))
+         (update acc :registered-elsewhere conj
+                 {:path rel :head (git-head rel)
+                  :registered-at (rev->path (git-head rel))})
+
          (git? rel)
          (update acc :true-orphan-git conj
                  {:path rel :origin (or (git-remote rel) "")})
 
          :else
          (update acc :true-orphan-nongit conj {:path rel})))
-     {:path-override-leftover []
+     {:registered-elsewhere []
+      :path-override-leftover []
       :personal []
       :worktree-scratch []
       :worktree-of-registered []
@@ -282,6 +313,9 @@
     (println (str "  worktree-of-registered: " (count (:worktree-of-registered unregistered))))
     (println (str "  tracked-superproject: " (count (:tracked-superproject unregistered))
                   "  (NOT orphans — 消さないこと)"))
+    (println (str "  registered-elsewhere (HEAD == another path's pin): "
+                  (count (:registered-elsewhere unregistered))
+                  "  (旧 path 残骸。orphan ではない)"))
     (println (str "  true-orphan-git: " (count (:true-orphan-git unregistered))))
     (println (str "  true-orphan-nongit: " (count (:true-orphan-nongit unregistered))))
     (println (str "  local-root-broken (blocking): " (count local-root-broken)))
@@ -338,11 +372,12 @@
         west (west-paths)
         overrides (path-overrides)
         local (local-org-projects)
-        unreg (classify-unregistered local west overrides)
+        unreg (classify-unregistered local west overrides (west-rev->path))
         broken (scan-local-root-deps west)
         report {:counts {:local (count local)
                          :west (count west)
-                         :unregistered (+ (count (:path-override-leftover unreg))
+                         :unregistered (+ (count (:registered-elsewhere unreg))
+                                          (count (:path-override-leftover unreg))
                                           (count (:personal unreg))
                                           (count (:worktree-scratch unreg))
                                           (count (:worktree-of-registered unreg))
