@@ -79,15 +79,28 @@
 
 **既存テストに1度捕まった。** `core-test` の `app-css-only-references-design-system-tokens-that-exist` が、私の書いた `--color-semantic-error-4` / `--color-semantic-success-4` を「jp-go-dds が定義していないトークン」として弾いた。jp-go-dds は各 semantic 色に `-1` と `-2` しか持たない。**捏造したトークンを CI が止めた**ので `-1`/`-2` に直した。この repo の「実在するものしか使わない」規律が働いた実例として記録する。
 
-## 未解決 — ADR-2607309600 との衝突（重要）
+## ADR-2607309600 との衝突 — 解消済み（相手側が解消した）
 
-同日 accepted の **ADR-2607309600（itonami-business-plane-and-console）が cloud-itonami-app の sidebar menu 構造の正本**であり、「9 項目に平らに足さず BUSINESS（対象）/ WORKSPACE（道具）の 2 段に分ける」と決めている。さらに `Canvas / Loops / Portfolio / **Repos**` の 4 view を設計しており、その `Repos` は本 ADR の `Fleet` と**同じものを指している**。
+本 ADR は当初この節を「未解決」として書いていた。事実は次のとおりで、**解消済みに書き換えた**。
 
-**本 ADR の実装はこの決定に反している。** `Fleet` と `事業者` を平置きの nav に足し、11 項目にした。2607309600 のコードはまだ着地しておらず（app main は drive 作業の `cc0d24b`）、私はその ADR を読まずに実装した。
+同日 accepted の **ADR-2607309600（itonami-business-plane-and-console）が cloud-itonami-app の sidebar menu 構造の正本**であり、「12 項目が平らに並んでいた状態」を BUSINESS（対象）/ WORKSPACE（道具）/ SETTINGS の 3 段に分けると決め、`Canvas / Loops / Portfolio / Repos` の 4 view を設計していた。その `Repos` は本 ADR の `Fleet` と同じものを指していた。
 
-したがって本 ADR は **menu 構造と view 名について一切の authority を主張しない**。その正本は 2607309600 である。本 ADR が正本なのは operator の領域モデルと2つの honesty rail だけで、これらは 2607309600 の Business entity 設計と競合しない（あちらは BMC / system dynamics / fleet の join key、こちらは事業者の参与）。
+**私はその ADR を読まずに実装し、平置きの nav に 2 項目足した。** これは 2607309600 の決定に反する実装で、しかもこのセッションで繰り返し「作る前に既存の仕組みを確認する」と書いていた規律を、自分が `90-docs/adr/` の同日分を見ずに UI 構造を決めることで破った。
 
-**追随すべき変更（次に触る人へ）**: `Fleet` view を 2607309600 の `Repos` に統合し、`事業者` を BUSINESS 段に置く。両者は同じ catalog を読んでいるので、統合の障害は命名と配置だけのはず。
+**その後 2607309600 側が着地し、私の 2 項目を自分で正しい場所に統合した**（app main `799a34d` 時点）:
+
+    (nav-group "BUSINESS")
+    (nav-item "portfolio" ...) (nav-item "canvas" ...)
+    (nav-item "fleet" ...)     (nav-item "operator" "事業者" ...)
+    (nav-item "contracts" ...)
+    (nav-group "WORKSPACE")  … 8 項目 …
+    (nav-group "SETTINGS")
+
+**`Repos` は作られず、私の `Fleet` 命名がその枠に採用された。** view panel に重複は無く（14 view、いずれも1件ずつ）、`/api/operator` 系 7 経路と両 panel は無傷。両者が混ざった main で `clojure -M:test` 512 tests / 2,156 assertions green、`clojure -M:lint` errors 0 を確認した。
+
+したがって本 ADR は **menu 構造と view 名について一切の authority を主張しない**——その正本は 2607309600 である。本 ADR が正本なのは operator の領域モデルと2つの honesty rail だけで、これらは 2607309600 の Business entity 設計と競合しない（あちらは BMC / system dynamics / fleet の join key、こちらは事業者の参与）。
+
+**教訓として残す**: 平行セッションが同じアプリの同じ面を同日に触る前提では、ADR を書く前ではなく**実装を始める前**に `90-docs/adr/` の同日分を読む必要がある。今回は相手側が寛容に吸収したので実害が出なかっただけで、逆順（私が後から着地）なら menu を2度壊していた。
 
 ## その他の限界
 
@@ -104,4 +117,5 @@
    "catalog 再生成の差分は pin 更新 82 件 + deploy-config 11 件 + 新規 loop-consumability のみ（構造比較で確認）"
    "clojure -M:test 442 tests / 1,865 assertions green、clojure -M:lint errors 0"
    "core-test が捏造トークン --color-semantic-error-4 / --color-semantic-success-4 を検出し修正させた（jp-go-dds は -1 と -2 のみ定義）"
-   "ADR-2607309600 が menu 構造と Repos view の正本であり、本実装の nav 平置きはそれに反している（app main cc0d24b 時点で 2607309600 のコードは未着地）"]}]
+   "ADR-2607309600 が menu 構造と Repos view の正本。本実装の nav 平置きはそれに反していたが、2607309600 側が着地時に fleet / operator を BUSINESS 段へ統合し、Repos ではなく Fleet 命名を採用して解消した（app main 799a34d）"
+   "解消後の main で clojure -M:test 512 tests / 2,156 assertions green、lint errors 0、view panel 14 件に重複なし、/api/operator 7 経路が無傷"]}]
