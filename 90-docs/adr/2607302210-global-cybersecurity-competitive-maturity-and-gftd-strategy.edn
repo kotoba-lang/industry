@@ -1,0 +1,56 @@
+[{:db/id -1,
+  :adr/id "adr-2607302210-global-cybersecurity-competitive-maturity-and-gftd-strategy",
+  :adr/title "ADR-2607302210: グローバル cybersecurity 製品の成熟度比較(TrendAI / Zscaler / Wiz / Black Hat USA 2026)と、gftd としての戦略 — CNAPP/EDR/SSE を作らず「agent 権限の証跡面」に賭ける",
+  :adr/status "accepted",
+  :adr/doc_type "adr",
+  :adr/date "2026-07-30",
+  :adr/deciders ["Jun Kawasaki"],
+  :adr/topic "cybersecurity-competitive-maturity-and-strategy",
+  :adr/related ["adr-2607284000-corporate-vishing-fraud-system-dynamics-and-interventions"
+                "adr-2607203000-system-dynamics-loop-all-entities"
+                "adr-2607021600-bmc-lean-loop-cli"],
+  :adr/supersedes [],
+  :adr/superseded_by [],
+  :adr/repos ["com-junkawasaki/root"
+              "gftdcojp/kabuto"
+              "gftdcojp/ai-gftd-cybersecurity"],
+  :adr/authoritative true,
+  :adr/authoritative_for ["gftd の cybersecurity 領域における参入位置(何を作り、何を作らないか)"
+                          "競合成熟度の測り方(6軸ルーブリックの所在と運用)"
+                          "自社 cybersecurity 資産の現在地と昇格ゲート"],
+  :adr/last_verified "2026-07-30",
+  :adr/source-format "edn-only (ADR-2607171600)",
+  :adr/scope "gftdcojp の cybersecurity プロダクト戦略。他 org(cloud-itonami / kotoba-lang)の actor・言語基盤は前提として参照するが、それら自体の方針はここで決めない。",
+  :adr/decision-summary "CNAPP / EDR / SSE を自作しない。agent・MCP 境界の『誰がどの agent に何を許可したか』を署名付き append-only 台帳として残し、NIST CSF 2.0 と IPA SCS 2026 へ写して調達で使える証跡にする面(Agent Authorization Ledger)を wedge にする。まず自社 fleet で dogfood し、live-service 検証 0 件という前提条件を先に潰す。",
+  :adr/decision ["D1: CNAPP / EDR / SSE / MDR を自作しない。M3(テレメトリ深度)で CrowdStrike・TrendAI に、runtime 深度で Sysdig・Upwind・Sweet に、in-line 構造で Zscaler に構造的に勝てないため。既存製品は消費する側に立つ。"
+                 "D2: wedge は『Agent Authorization Ledger(AAL)』とする — agent/MCP 境界の許可決定を、policy 版に束ねた署名付き append-only 台帳として残し、CSF 2.0 / IPA SCS 2026 へ写して監査証跡としてエクスポートする面。inline 強制ではなく証跡と統治で戦う(Zscaler AI Broker のような仲介の『裏の台帳』になれる位置)。"
+                 "D3: ai-gftd-cybersecurity の live-service 検証を 0→1 にすることを、他のいかなる機能追加より先に置く。実 AWS 1 アカウント read-only で cloud/inventory + posture を1回通す。これは製品戦略ではなく信用の前提条件。"
+                 "D4: 競合成熟度の正本は gftdcojp/kabuto の data/market-maturity.edn(6軸 × assessment、全件 as-of + source + basis 付き)。ADR や資料に数値を再掲するときは必ずこの面から引く。手作業の表を別に作らない。"
+                 "D5: kabuto の attack-graph に agent 面(ai-agent / mcp-server ノードと対応する edge)と AI 系カテゴリ(mcp-security / nhi / ai-spm)を、countermeasure 配置とセットで追加する。配置を伴わない taxonomy 拡張は test が拒否する。"
+                 "D6: 日本市場を第一市場とする。IPA SCS 2026(7大分類 / 16中分類 / 43要求 / 153評価基準)を第一級データとして持っているのは我々だけで、これは 3 メジャーが持たない調達上の資産である。"
+                 "D7: 人を売る MDR / SOC 運用受託はやらない。国内は実務者が約11万人不足しており、人手を前提にした事業は我々の構造(少人数 + agent fleet)と逆行する。"],
+  :adr/consequences ["C1: 短期の売上機会(CNAPP 代理販売・SOC 運用受託)を明示的に捨てる。M1=0 の状態が当面続く。"
+                     "C2: 我々の差別化は『証跡の改変不能性』に依存するため、台帳が欠損したら製品価値が消える。欠損は隠さず gap として数える運用が必須(ai-gftd-cybersecurity の :capability/verified と同じ規律)。"
+                     "C3: Zscaler / Wiz / Palo Alto が agent 権限の台帳を platform 機能として内製した時点で wedge は消える。したがって『彼らの仲介の裏に入る』統合可能性を最初から設計に入れる(競合ではなく補完として売れる形)。"
+                     "C4: 自社 fleet を dogfood 対象にするため、我々自身の agent 運用が観測対象になる。都合の悪い挙動も台帳に残る。それを消す運用を作った瞬間に製品の主張が嘘になる。"
+                     "C5: TrendAI が PE 買収で国内エンタープライズへの投資を絞るなら国産の空白が広がり、逆に独立を維持して AI 路線を強めるなら正面の競合が増える。どちらでも D2 の位置は変わらないが、D6 の追い風は前者で強まる。"],
+  :adr/body "## 何を調べたか(2026-07-30 時点)\n\nTrend Micro(TrendAI)・Zscaler・Wiz を中心に、Black Hat USA 2026 に出ている研究・OSS を含めて比較し、成熟度を 6 軸で評価した。数値の正本は gftdcojp/kabuto の `clj/resources/data/market-maturity.edn`(この ADR と同日 merge、PR #2)であり、本文はその読み方と、そこから導いた我々の位置だけを記す。\n\n### 6軸ルーブリック\n\nM1 市場成熟度(ARR 規模・成長・収益性) / M2 単一データ面の統合度(買収の縫い目が漏れないか) / M3 テレメトリ深度(kernel/eBPF ↔ agentless API) / M4 独立検証(MITRE・Forrester・Gartner・Pwn2Own・公開 IR) / M5 agentic・MCP 対応 / M6 研究者コミュニティでの実出力。\n\n売上だけで測ると 2026 年の実力を見誤る。逆にスコアだけあって軸の定義が無いものは読めないので、軸自体を `:mat.axis/*` として data で持たせた。\n\n### 現在地(mean 降順、kabuto から)\n\nCrowdStrike 4.50(ARR $4.24B 開示) > TrendAI 4.17 > Microsoft 4.00 > Wiz 3.83 / Palo Alto 3.83 / Sysdig 3.83 / Zscaler 3.83 > Upwind 3.17 > Noma・Oasis・Sweet 2.67 > Runlayer 2.33 > **自社 ai-gftd-cybersecurity 1.17**。\n\n- **TrendAI**: 技術成熟度は最上位、事業成熟度が足枷。FY2025 売上 ¥276B / 営業利益 ¥58B は過去最高だが全社成長 +2.8%(大企業向け platform ARR だけ +58%)。ZDI と Pwn2Own を自社運営し世界の 0-day が最初に集まる構造を持つのはここだけ(Pwn2Own Berlin 2026: 47 unique 0-day / $1,298,250、対象に AI DB・coding agent・ローカル推論・NVIDIA インフラ)。2026-03-23 に enterprise 事業を TrendAI へ改称。PE(Bain / Advent / EQT / KKR)による take-private 交渉は 2026-07-30 時点で未決 — この不確実性自体が M1 の減点要因。\n- **Zscaler**: 事業成熟度と agentic 先行が最上位、endpoint 深度が構造的弱点。Q3 FY2026 で ARR $3,525M(+25%、Red Canary $127M を除く organic は $3,398M / +21%)、non-GAAP 営業利益率 23% で過去最高。全通信が in-line proxy を通る構造がそのまま agent 間通信と MCP の仲介に効く(AI Broker + Agent Registry、AI Access Graph は Symmetry Systems $175M 由来)。kernel telemetry は持たず Red Canary と Endpoint AI Security で外から埋めている。\n- **Wiz(Google)**: 独立検証が最強、統合コストがこれから。$32B 全額現金で 2026-03-11 クローズ(Google 史上最大)。米当局が 2025-11 に『multicloud 維持』のコミットを条件に承認したため、AWS/Azure 対応の打ち切りは当面できない — 顧客のロックイン懸念は構造的に下がった。ARR ~$1B は買収額 ÷ 約32倍という報道からの **derived** で開示値ではない。Forrester Wave CNAPP Q1 2026 で Leader・Current Offering 最高スコア。Wiz MCP を 2026-07-02 GA。\n- **runtime-first の挑戦者**を無視できない: Sysdig は Forrester Wave CNAPP Q1 2026 の Leader 3社の1つで mean は Wiz/Zscaler/Palo Alto と同値。Upwind は eBPF runtime fabric、Sweet は単一 eBPF sensor で 9 カテゴリを賄う。Wiz の agentless が構造的に取れない層をそのまま取っている。\n\n### Black Hat USA 2026(8/1–6、Briefings 8/5–6)が示す評価軸の移動\n\n出ているのは製品ではなく研究と OSS なので、読むべきは『攻撃の単価がいくらまで下がったか』である。\n\n- NVIDIA: fine-tune 済み 30B OSS モデルで exploit 成功率 56%、frontier model の **1/70〜1/125 のコスト**。\n- Novee: Anthropic / Google / OpenAI 横断の agent **trust hand-off** 失敗。Rubrik Zero Labs: 文書アップロードによる **Copilot sandbox → host 脱出**(初の文書化)。Rein: 米大手小売の AI アシスタント侵害 — prompt/response 監視だけでは実行リスクを見落とす。\n- Arsenal: MCP のスキャナ・**agent とツールの間に挟む proxy**・runtime monitor、AIBOM。\n- keynote が主題を一言で言っている: Microsoft David Weston 『The End of Rare: Defending When Offense Is Cheap』。\n\nつまり成熟度の判定基準が **『kernel telemetry の深さ』から『agent / MCP 境界に何を強制できるか』へ移りつつある**。3社ともここに賭けている(AI Broker / Wiz MCP + Red Agent / Cybertron)。\n\n### 3社が揃って弱い1点\n\n**agent の許可決定が製品内部の可変 state にある。** 誰がどの agent に何を許可したか、その時どの policy 版だったか、を改変不能な形で外部に出す面を誰も配っていない。同時に、3社とも**自社の検証レベルを製品と一緒に配らない** — ai-gftd-cybersecurity が `resources/capabilities.edn` と release manifest で `:capability/verified` を同梱するのは、上位ベンダーがやっていない設計である(ただし現状の中身は live-service 0 件・既知 gap 41 件であり、規律が良いことと製品が強いことは別)。\n\n### 日本市場の条件\n\n実務者は約11万人不足(METI 推計)。MSS / MDR・SOC-as-a-Service が 2031 年まで CAGR 13.62% で最速。METI は 2025-03 に国産セキュリティ製品の創出を狙う産業振興戦略を出している。世界の情報セキュリティ支出は 2026 年 $244.2B(+13.3%)、クラウドセキュリティが +28.8% で最速(Gartner 4Q25 予測)。\n\nagentic AI security への調達は合計 $3.6B に達しているが、**MCP security の開示済み調達は市場全体で約 $40M しかない** — カテゴリが生まれた直後で、まだ統合されていない。Runlayer は seed $11M で launch 後 4ヶ月に unicorn / 公開企業 8社を含む数十社を取っている。小さいチームが早く入れる窓はここだけである。\n\n## 戦略(D1–D7 の根拠)\n\n正面は全部埋まっている。CNAPP は Wiz + Sysdig + Upwind + Sweet + Prisma、EDR は CrowdStrike + TrendAI + Defender、SSE は Zscaler + Netskope + Palo Alto。**規模で負け、深度で負け、検証実績で負ける**ので、そこに入るのは資源の焼却である(D1)。\n\n代わりに我々が持っているものを数える: (a) 単一 EDN データ面 + NIST CSF 2.0 106 Subcategory + **IPA SCS 2026** の正規化、(b) governor ⊣ sealed-intelligence + append-only 監査台帳という actor パターンの実装実績(cloud-itonami / robotaxi-actor / gftd-talent-actor)、(c) Kotoba の capability deny-by-default と署名付き quorum VCS(fleet-db)、(d) 毎日大量の agent を実運用している自社 fleet = 正直な最初の顧客。\n\nこの 4 つが交差する点が **agent 権限の証跡面**(D2)であり、Black Hat 2026 が示した需要と、3社が揃って空けている穴の位置に一致する。inline 強制で Zscaler と殴り合わない — 彼らの仲介の**裏の台帳**として売れる形を最初から取る(C3)。\n\n## 昇格ゲート(満たすまで次に進まない)\n\n- **G1**: `:capability/verified :live-service` が 1 件以上になり、既知 gap 41 件が実際に減る。減る前に減ったと言わない。\n- **G2**: 自社 fleet の agent 台帳が 30 日連続で欠損なく残る。欠損は gap として数える。\n- **G3**: pilot 1社、または IPA SCS 準拠を要求する調達 1件で評価に載る。\n- **G4**: kabuto に agent topology が入り、`uncovered-edges` が agent 面を『ゼロ』ではなく**名前付きの不足**として返す。\n\n## この ADR の限界\n\n- kabuto の 6 軸スコアは `:mat/score-basis :judgment` — 我々の読みであって開示値ではない。Wiz の ARR は derived。Upwind / Sweet / Sysdig / Runlayer / Oasis / Noma は非公開企業で財務が測れない。\n- MITRE ATT&CK Evaluations Enterprise 2026(初の Total Evaluation Score)は結果公開が 2026-12 で、この比較には入っていない。公開後に M4 は必ず動く。\n- Black Hat USA 2026 は 8/1 開始でまだ開催前。briefing の内容は公開スケジュールと二次記事に基づき、実演を見た評価ではない。\n- `npm test` を実 green で確認していない(6本の shadow-cljs release build を含むため resource-guard 経由の実行が必要)。G1 に着手する時点で最初に潰す。",
+  :adr/references ["kabuto data/market-maturity.edn (競合成熟度の正本): https://github.com/gftdcojp/kabuto/pull/2"
+                   "Trend Micro Q4/FY2025 決算: https://newsroom.trendmicro.com/2026-02-18-Trend-Micro-Reports-Earnings-Results-for-Q4-2025-and-FY-2025"
+                   "TrendAI への改称: https://newsroom.trendmicro.com/2026-03-23-Trend-Micros-Enterprise-Business-is-now-TrendAI-TM"
+                   "Pwn2Own Berlin 2026 (ZDI): https://www.trendmicro.com/en_us/research/26/f/pwn2own-berlin-2026.html"
+                   "Zscaler Q3 FY2026 決算: https://ir.zscaler.com/news-releases/news-release-details/zscaler-announces-strong-third-quarter-fiscal-2026-results"
+                   "Zscaler agentic AI 新製品 (AI Broker / AI Access Graph): https://www.zscaler.com/press/zscaler-unveils-new-product-innovations-secure-agentic-ai"
+                   "Google が Wiz 買収を完了 (2026-03-11): https://cloud.google.com/blog/products/identity-security/google-completes-acquisition-of-wiz"
+                   "Wiz: Forrester Wave CNAPP Q1 2026 Leader: https://www.wiz.io/blog/forrester-wave-cnapp-2026"
+                   "Wiz MCP GA: https://www.wiz.io/blog/introducing-mcp-server-for-wiz"
+                   "Palo Alto Networks が CyberArk 買収を完了 (2026-02): https://markets.financialcontent.com/stocks/article/marketminute-2026-2-12-palo-alto-networks-completes-historic-25-billion-cyberark-acquisition-to-solidify-identity-security-pillar"
+                   "Black Hat USA 2026 keynotes: https://finance.yahoo.com/technology/ai/articles/black-hat-usa-2026-keynotes-120000475.html"
+                   "Black Hat USA 2026 AI 攻撃系 briefings: https://novee.security/blog/black-hat-2026-briefings-ai-offensive-security/"
+                   "Black Hat Arsenal 2026 preview (MCP proxy / AIBOM): https://safeguard.sh/resources/blog/black-hat-arsenal-2026-preview"
+                   "agentic AI security の調達動向 ($3.6B / MCP security $40M): https://softwarestrategiesblog.com/2026/03/28/agentic-ai-security-startups-funding-mna-rsac-2026/"
+                   "Runlayer launch: https://techcrunch.com/2025/11/17/mcp-ai-agent-security-startup-runlayer-launches-with-8-unicorns-11m-from-khoslas-keith-rabois-and-felicis"
+                   "Gartner 2026 情報セキュリティ支出 $244.2B: https://softwarestrategiesblog.com/2026/03/24/information-security-spending-2026/"
+                   "METI サイバーセキュリティ産業振興戦略 (2025-03): https://www.meti.go.jp/press/2024/03/20250305001/20250305001-2.pdf"
+                   "MITRE ATT&CK Evaluations (Enterprise 2026 は 2026-12 公開): https://evals.mitre.org/"],
+  :adr/last "2026-07-30"}]
