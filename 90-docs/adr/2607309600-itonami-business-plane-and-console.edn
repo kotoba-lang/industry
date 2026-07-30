@@ -136,7 +136,7 @@ checkout は、そこで読んだコードについての結論も遅れさせ�
 Business はその**上**に立ち、1 事業が複数の adoption を束ねる。adoption を
 business に昇格させないことが、この決定の内容である。
 
-### 2. Business は 5 面の join key を 1 entity に集める
+### 2. Business は 6 面の join key を 1 entity に集める
 
 ```clojure
 {:business/slug       \"cloud-itonami-5820\"        ; organization 内で一意
@@ -145,7 +145,8 @@ business に昇格させないことが、この決定の内容である。
  :business/model      \"…xmile\"                    ; → XMILE モデル（SD 面）
  :business/adoptions  [\"cloud-itonami-isic-5820\"] ; → :adoption/repo（operator 面）
  :business/repos      [\"orgs/cloud-itonami/…\"]    ; → :repo/path（repo-taxonomy）
- :business/lei        \"ZSN2LWNPYW6ISMRUC664\"}     ; → :company/lei（法人実体。任意）
+ :business/lei        \"ZSN2LWNPYW6ISMRUC664\"      ; → :company/lei（法人実体。任意）
+ :business/leverage   \"…/ledger/…-leverage-ledger.edn\"} ; → Meadows leverage ranking
 ```
 
 初版は 4 面（canvas / repos / lei / model）と書いた。`:adoptions` は 5 面目で、
@@ -352,6 +353,66 @@ Canvas 面を出すのに 1 つ足りなかった: **fold 済み canvas がデ�
 追加分は 0）。`page-html` を実 render し inline JS を `node --check` で構文検査。
 上流は `nbb run-tests` 36 tests / 220 assertions, 0 failures。投影が datom 面に load され、**仮説 × block の join が通ること**を
 実クエリで確認（12 product × 9 block）。
+
+## Phase 3 — 着地したもの（2026-07-30）
+
+`:business/leverage` が 6 面目として加わった。leverage ranking と stock-flow モデルは
+別の artifact で、一方の path から他方を推測するのは `fleet` が endpoint を
+発明しないのと同じ理由で却下する。決定 2 の「5 面」はこれで 6 面になる。
+
+### エンジンは依存として消費する（第2のシミュレータを書かない）
+
+- **`org-oasis-open-xmile`（OASIS XMILE 1.0、Euler/RK4）と `dynamics`（Meadows band）を
+  app の git 依存に追加した。** どちらも標準の repo なので Phase 2 の canvas と違い
+  projection を挟む必要がない — **実エンジンをそのまま実行できる**。
+- `cloud.itonami.app.loops` がやるのは、XML を `xmile.xml/parse-doc` が読む形に
+  parse し、XMILE 1.0 に従って document 側 `<sim_specs>` を model に解決して渡すこと
+  だけ。積分は 1 行も書いていない。band label / weight も `dynamics.core` から読む
+  （言い換えない）。
+- XML parser は DOCTYPE を拒否する。入力は owner 自身の checkout なので脅威モデルでは
+  ないが、external entity を解決する parser は敵対的な 1 ファイルで filesystem を
+  読める状態であり、ここでその能力は要らない。
+
+### 2 つを拒否する
+
+- **計算できなかった軌跡。** `run` が throw する条件（array-dimensioned 変数、
+  未対応 method、sim-specs 無し）はそれぞれ `:unsimulatable` になり、**engine 自身の
+  メッセージ**を運ぶ。系列は付けない — 空の系列は
+  「シミュレーションした結果、全部ゼロ」と読めてしまう別の主張になる。
+- **推測入力からの強度スコア。** `loop-structural-strength` が返す nil は
+  `:uncomputable-until-measured` として運び、0 にしない。初版は
+  `:state :computed :value false` を出荷していた（`if-some` が
+  `(and (map? nil) …)` の `false` を「値がある」と扱うため）— test が捕まえた。
+
+### 形は small multiples（1 つの多系列グラフではない）
+
+XMILE 変数は自分の単位を持つので、stock（repos）と flow（repos/日）を 1 つの y 軸に
+載せるのは dual-axis の誤りそのもの。**変数ごとに 1 panel・独自スケール・単位を明記**
+とした。1 panel = 1 系列なので legend を落とす心配も categorical palette を間違える
+余地も無い。表 view を併置し、欠損値は `—`（0 ではない）。種別は色と**テキストの
+両方**で示す。3 色は DADS primitive（blue-800 / orange-700 / cyan-700）で、
+categorical の 6 checks を all-pairs CVD separation まで通したもの
+（`dataviz` の validator を実行して確認、目視判断はしていない）。dark mode は
+DADS が light 固定なので範囲外（ADR-2607262000）。
+
+### UI に出す 2 つの限界
+
+- document が複数 model を宣言したとき、**どれを実行したか**（先頭を選ぶのは判断なので
+  隠さない）。
+- **今の leverage ledger が模型化しているのは fleet 自身の repo 登録 backlog** で、
+  事業の経済（売上・顧客・現金）ではない。これは Phase 1 で「未決」として記録した
+  gap そのもので、埋まっていないことを UI が黙らない。
+- **workspace に `.xmile` ファイルはまだ 1 つも無い**（実測 0 件）。したがってエンジン
+  経路は test で証明されており、出荷済みモデルでは証明されていない。実モデルを書くのは
+  後続作業。
+
+### 検証
+
+`clojure -M:test` 525 tests / 2209 assertions, 0 failures 0 errors
+（loops 系 13 test を追加。実 XMILE を実 engine で走らせ、`Backlog` が
+28→26→24→22→20 と Euler 積分されることまで assert している）。
+`clojure -M:lint` errors 0 / 自分のファイルの warning 0。`page-html` を実 render し、
+inline JS を `node --check`、app CSS に raw hex が無いことも確認。
 
 ## Consequences
 
