@@ -149,9 +149,20 @@ cohort 面は k 未満を**丸めずに落とし**(丸めた数は差分攻撃�
 ## まだ無いもの（正直に）
 
 - UI(入力フォーム・印刷レイアウト)、`職務経歴書`、nekko RID 配線、x402 課金。
-- **kagi の SealedBlockStore の B2/IPFS/Storj adapter が未実装**(kagi 自身の既知の穴、
-  README 明記)。封筒面は現状ローカルにしか着地しない。これが次に潰すべき最大の穴。
-- `io-storj` は west 登録済みだがこの経路には未配線。
+- **封筒面の保存先は kagi 側で解決済み**(2026-07-30、kotoba-lang/kagi `d0c71a58`)。
+  `kagi.store/object-sealed-block-store` が `{:get-object :put-object :exists?}` を取り、
+  `storj.store/store-fns` 経由で **Storj Gateway-MT と Backblaze B2** に着地する
+  (B2 は S3 互換面なので endpoint 違いだけ)。kagi は io-storj に依存しない
+  (4 関数を受け取るだけ、依存するのは配線するアプリ側)。検証はネットワークに出ず、
+  `storj.protocols/IHttp` に偽 S3 を差して**本物の** `storj.core` に署名・URL 組み立て・
+  応答解釈をさせる 161 tests/641 assertions。
+  残るのは `cloud-itonami-rirekisho` 側にその 4 関数を受け取る口が無いこと。
+- **IPFS は未対応**(kagi 側も)。immutable な content addressing は「キーを上書きしない」
+  の前提が S3 系と別物なので、同じアダプタには載らない。
+- 実装中に判明: `SealedBlockStore` の docstring は長く「content-addressed」と称して
+  いたが、実際に届く id は `kagi.operation` が作る `cid:<item-id>:v<version>` という
+  **パス**で、バイト列を検証できるハッシュではない。検証できないものを検証すると
+  謳う代わりに docstring を訂正し、「1 キー = 1 版」を上書き拒否で守る形にした。
 
 ## Consequences
 
