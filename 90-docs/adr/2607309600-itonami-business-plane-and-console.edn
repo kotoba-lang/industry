@@ -1,0 +1,266 @@
+[{:db/id -1
+  :adr/id "adr-2607309600-itonami-business-plane-and-console"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-business-plane-and-console"
+  :adr/title "ADR-2607309600: cloud-itonami-app に business 面を作る — BMC / system dynamics(XMILE) / fleet の 3 面を 1 つの Business entity で束ね、menu を「対象」と「道具」に分ける"
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/last-verified "2026-07-30"
+  :adr/last_verified "2026-07-30"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative-for
+  ["cloud-itonami-app における business（事業）の単位の正本 — Tenant 配下の第一級 entity `Business` とし、repo=business / Tenant=business を却下する決定"
+   "BMC(:canvas/product) / system dynamics(entities-seed の :id) / fleet(:repo/path・:company/lei) という 3 面のキー分裂を、Business entity 1 つに join key を集めて解消する決定の正本"
+   "cloud-itonami-app の sidebar menu 構造の正本 — 9 項目に平らに足さず BUSINESS（対象）/ WORKSPACE（道具）の 2 段に分ける決定"
+   "Canvas / Loops / Portfolio / Repos の 4 view の設計境界（書き込みは governed proposal まで、未計測は穴として描く、未割当 repo は隔離）の正本"]
+  :adr/related
+  ["adr-2607021500-portfolio-bmc-lean"
+   "adr-2607021600-portfolio-bmc-lean-cli-react-loop"
+   "adr-2607021700-portfolio-maturity-score"
+   "adr-2607021800-portfolio-bmc-collect-operate"
+   "adr-2607072350-kotoba-lang-org-oasis-open-xmile-system-dynamics"
+   "adr-2607203000-system-dynamics-loop-analysis-all-entities"
+   "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2607262000-local-itonami-and-uiux-skin-seam"
+   "adr-2607289600-repo-taxonomy-three-faces"
+   "adr-2607257000-docs-latest-state-only"
+   "adr-2607300200-itonami-fleet-callable-67-actors"
+   "adr-2607254000-itonami-maturity-local-loop-design"]
+  :adr/body "
+# ADR-2607309600: cloud-itonami-app に business 面を作る
+
+**Status**: accepted
+**Date**: 2026-07-30
+
+BMC / system dynamics(XMILE) / fleet の 3 面を 1 つの Business entity で束ね、
+menu を「対象」と「道具」に分ける。
+
+## Context
+
+### 実測した現在地（2026-07-30、cloud-itonami-app HEAD 254bbab）
+
+**1. app に business を管理する UI は 1 つも無い。**
+menu は 9 項目（`web.clj:2755-2764`）で、Chat / Worker / Organisms / Inbox /
+Projects / Drive / Scheduler / Storage / Settings。スコープの単位は
+Organization(Tenant) だけで、これは membership の境界（`docs/tenant-model.md`）
+であって事業モデルの器ではない。
+
+**2. fleet 1,212 actor に UI 面が無い。**
+`rg fleet src/cloud/itonami/app/web.clj` は 0 hit。`/api/*` は 14 prefix
+（authority / chat / cloud / connections / filecoin / funding / identity / oauth /
+organism-workers / passkeys / session / state / workers / workspace）で、fleet も
+business も無い。fleet directory は MCP tool と in-app agent 経由でしか触れない
+（`fleet.clj` / `mcp.clj`）。
+
+**3. 185 の法人実体は catalog から意図的に落ちている。**
+`scripts/gen-itonami-fleet-catalog.cljs:168-172` が `:company/lei` を持つ
+blueprint を `:non-actor` に分類するので、生成物にはカウント
+（`:company-record-count 185`）だけが残り、実体は出荷されない。
+
+**4. Projects view は 1 repo ハードコード + 装飾の view-switcher。**
+`workspace.clj:283-290` が `owner=kotoba-lang` `repo=kotoba` を固定している。
+`web.clj:2713-2716` の Table / Board / Roadmap は `aria-pressed` を付け替える
+だけで再描画しない — 現状は装飾。
+
+**5. 3 つの分析面はどれも app に繋がっていない。**
+`deps.edn` に `dynamics` / `org-oasis-open-xmile` / `70-tools/bmc` への依存が
+1 つも無い。
+
+### 3 面のキー分裂（これが本題）
+
+| 面 | キー | 粒度 | datom 面（`manifest/edn-query.cljs`）に居るか |
+|---|---|---|---|
+| BMC / Lean | `:canvas/product` | 12 product | 居る（12×9=108 entity）。ただし `:source/dataset` も `:company/lei` も `:repo/path` も **0 件** |
+| system dynamics | entities-seed の `:id` + `:org` | org 単位 | **居ない**。`loop-system-dynamics/ledger/*.edn` は edn-query の読み込み範囲（90-docs + manifest + 指定した子 repo の adr dir）の外 |
+| itonami fleet | `:repo/path` / `:company/lei` | repo 単位 | 居る（repo-taxonomy 5,311 / repo-maturity 3,813 / itonami-fleet-audit 1,223 / cloud-itonami-lei 185 / cloud-itonami-lei-tos 187 / market-intel 5,200） |
+
+3 つとも互いに join できない。BMC の datoms と entities-seed には
+`company/lei` も `repo/path` も 1 件も無い（grep で確認）。
+
+### 粒度も食い違っている
+
+- BMC では cloud-itonami が **12 product のうちの 1 つ**（`70-tools/bmc/src/gftd/cli.cljc:45`
+  の registry で `:itonami {:products [:cloud-itonami]}`）。
+- itonami-app では cloud-itonami が **portfolio 全体**（1,212 actor）。
+- 既存の SD モデルが模型化しているのは **fleet の repo 登録 backlog**
+  （`loop-system-dynamics/ledger/cloud-itonami-fleet-xmile-ledger.edn` の
+  `:per-category` = isic / isco / lei / assoc / municipality の backlog と
+  depletion-day）で、事業の経済（売上・顧客・現金）ではない。
+- XMILE エンジン（`org-oasis-open-xmile`、OASIS XMILE 1.0、Euler/RK4）は実在し、
+  `dynamics.xmile` が橋渡しも持っているのに、事業に向いていない。
+
+### 生成物が checkout の完全性に依存している（この設計が継承してしまう欠陥）
+
+- 出荷済み catalog は `:callable-count 10` だが、ADR-2607300200（accepted）は
+  callable 67 と言っている。
+- 生成器の docstring は「534 が `:company/*` の法人実体」と書くが、west 登録も
+  disk も **185**（`rg -c 'name: cloud-itonami-lei-' manifest/west.yml` = 185、
+  `ls orgs/cloud-itonami | rg -c '^cloud-itonami-lei-'` = 185）。docstring が陳腐化している。
+- catalog は生成時の checkout を反映するので、部分 checkout で生成すると小さい数を
+  出荷する。Portfolio view が callable 数や法人数を出すなら、この欠陥をそのまま
+  UI に出すことになる。
+
+## Decision
+
+### 1. business の単位は Tenant 配下の第一級 entity `Business` とする
+
+却下した 2 案:
+
+- **repo = business**: 1,212 個になり管理不能。actor は事業の *実装* であって
+  事業ではない。
+- **Tenant = business**: 1 社が複数事業を持てない。Tenant は membership の境界
+  なので、そこに事業モデルを載せると「事業を 1 つ増やす」が「会社を 1 つ増やす」
+  になる。
+
+### 2. Business は 4 面の join key を 1 entity に集める
+
+```clojure
+{:business/id      :cloud-itonami-5820           ; slug（Tenant-scoped）
+ :business/tenant  #uuid \"…\"                    ; 所属 Tenant
+ :business/canvas  :cloud-itonami                ; → :canvas/product（BMC 面）
+ :business/repos   [\"orgs/cloud-itonami/…\"]      ; → :repo/path（repo-taxonomy / repo-maturity）
+ :business/lei     \"ZSN2LWNPYW6ISMRUC664\"        ; → :company/lei（market-intel / ToS。任意）
+ :business/model   \"…xmile\"}                     ; → XMILE モデル（SD 面）
+```
+
+**これが本 ADR の核。view より先にこの entity を作る。** 無いまま view を作ると
+view ごとに別の business 概念ができ、いまの 3 面分裂を再生産する。
+
+### 3. 4 面は同じ kotobase ref に置く
+
+ADR-260726-kotobase-query-plane-is-one-ref（repo-wide mandatory）: Datalog join の
+到達範囲はちょうど ref 1 本。business / canvas / SD / repo を別 ref・別データベースに
+分けたら二度と join できない。書き込み負荷を理由に分けない。
+
+### 4. menu は 9 項目に足さず、BUSINESS（対象）/ WORKSPACE（道具）の 2 段に分ける
+
+```text
+[Organization ▾]              既存（会社 = Tenant）
+── BUSINESS ──────────────
+  ▦ Portfolio               複数 business（決定 7）
+  [事業スイッチャ ▾]
+    ◱ Canvas                BMC / Lean 9 block + 仮説 + gate
+    ∞ Loops                 stock-flow-loop / XMILE / leverage
+    ⌗ Repos                 org/repo バインディング + maturity
+    ⌸ Metrics               funnel / score / 予算配分
+── WORKSPACE ─────────────
+  ✦ Chat  ◐ Worker  ◎ Organisms  □ Inbox
+  ▦ Projects  ◇ Drive  ○ Scheduler  ◈ Storage
+── ⚙ Settings
+```
+
+理由: 現在の 9 項目は道具（Chat / Worker / Inbox / Drive / Scheduler / Storage）と
+対象（Organisms / Projects）が既に混在している。business を平らに足すと混在が悪化する。
+
+### 5. Canvas view は grid、書き込みは governed proposal まで
+
+- **`record-browser`（list + detail）を使わない。** BMC は 9 block の空間配置が
+  意味を持つ（左 = 供給 / 右 = 需要 / 下 = 経済）ので grid。
+- riskiest 仮説を持つ block をハイライトし、gate（測定値 / 目標までの距離）を
+  block 内に inline で出す。「今どの block を検証中か」が一目で分かることが
+  BMC UI の価値。
+- **UI から datoms を直接書かない。** `90-docs/business/canvas-ledger.edn` は
+  governor 付き append-only（ADR-2607021600 / 2607021800）で、UI が直接書くと
+  governor を迂回する。UI の書き込みは event proposal を出すところまでとし、
+  governor が拒否できる形にする。既存 Organisms view の Governed intent
+  （`web.clj:2882-2903`、admit は実行完了ではない）と同じ語彙にする。
+- canvas-ledger は **append-only の明示例外のまま**（ADR-2607257000）。UI が
+  これを最新状態上書きに変えない。
+- BMC base datoms（ADR-2607021500）は書き換え禁止のまま。UI から product を
+  新規登録しない。
+
+### 6. Loops view は XMILE を実行し、未計測を穴として描く
+
+- 因果ループ図は 2D なので DOM / SVG でよい（3D mandatory rule は viewport の話
+  であって diagram の話ではない）。
+- trajectory は `org-oasis-open-xmile`（Euler / RK4）で出す。**第 2 のシミュレータを
+  書かない** — `dynamics.xmile` の docstring がまさにこれを禁じている。
+- leverage は `dynamics.core` の Meadows band A–E。
+- **`loop-structural-strength` が nil を返す所（cycle time 未観測）は「—」で描き、
+  0 と書かない。** pool-tap 型の介入は conversion-rate が未計測なら
+  `:uncomputable-until-measured` と表示する。既存の funding 面が unknown balance を
+  ¥0 と描かない規律（app README）と同型。
+
+### 7. Portfolio view は matrix、未割当 repo は隔離する
+
+- 行 = business、列 = 4 面の現在地（Canvas 充填 / riskiest gate 距離 /
+  repo maturity / SD leverage band / 直近 metrics）。値は必ず
+  **測定済 / stale / 未計測** を区別できる chip で出す。
+- 行を展開すると org/repo リスト（repo-taxonomy の `:repo/kind` + repo-maturity の
+  score）。
+- **business に紐づかない repo は「未割当」bucket に隔離する。** 1,212 actor を
+  business と混ぜない。この分離自体が可視化になる。
+
+### 8. Table / Board / Roadmap は実装するか消す
+
+装飾のまま残さない。Board = 成熟度レーン、Roadmap = gate 期日として実装するか、
+markup を消す。押せるのに何も起きない control を出荷し続けない。
+
+### 9. SD ledger を datom 面に載せる
+
+`loop-system-dynamics/ledger/*.edn` は今 join 対象にすらなっていない。
+`manifest/edn-query.cljs` の読み込み範囲に入れる。入れないなら「この境界を跨ぐ
+分析は N クエリ + マージになる」と代償を明記する（kotobase 規則の要求）。
+**黙った分割はしない。**
+
+### 10. 設計系は jp-go-dds + `--hig-*` skin 契約
+
+app ADR-0001（jp-go-digital-design-system 採用）を踏襲し、`dds/*` +
+`page/->page` で書く。色・字は ADR-2607262000 の `jp-go-dds.tokens/skin-css` が
+発行する `--hig-*` 契約に載せる。**app CSS に橋渡しを手書きしない**（itad が
+手書きして repo ごとに `--hig-color-tint` が別の DADS 色に落ちた壊れ方の再発防止）。
+
+### 11. Phase
+
+1. `Business` entity + Portfolio view（read-only、既存 EDN を読むだけ）
+2. Canvas view（read = fold 済 canvas、write = governed proposal）
+3. Loops view（XMILE 実行、未計測は穴）
+4. Repos / Metrics view
+
+### 12. Phase 1 の前に catalog を再生成する
+
+`:callable-count 10` と ADR-2607300200 の callable 67 の齟齬を先に潰す
+（`nbb scripts/gen-itonami-fleet-catalog.cljs`）。UI が古い生成物を権威として
+出さないため。
+
+## Consequences
+
+- **良い**: 4 面が 1 entity で join できる。「この事業は今どこが未計測か」が
+  1 クエリで出る。
+- **良い**: 1,212 actor と 12 product という別粒度が、business を挟むことで
+  初めて同じ画面に乗る。
+- **悪い**: `Business` は手で作る entity なので、誰も作らなければ Portfolio は
+  空のまま。**自動生成しない** — どの repo がどの事業かは判断であって導出ではない。
+- **悪い**: canvas への書き込みを proposal に限ると UI から即座に編集できない。
+  governor を迂回しないことの代償として受ける。
+- **未決**: SD モデルを事業の経済（売上・顧客・現金）に向ける作業は本 ADR の範囲外。
+  今の SD ledger は fleet の登録 backlog を模型化しているので、Loops view は
+  まず既存 ledger を出すだけになる。この限界を UI 上に明示する。
+
+## やらないこと
+
+- 1,212 actor を business として扱わない。
+- BMC base datoms（ADR-2607021500）を UI から書き換えない。
+- canvas-ledger を最新状態上書きに変えない（append-only 例外を維持）。
+- design system を 1 つに畳まない（ADR-2607262000: 畳むと light+dark が要る app か
+  官公庁文脈の app のどちらかが必ず割を食う）。
+- 3 面のどれかを app 内に再実装しない。`dynamics` / `org-oasis-open-xmile` /
+  `70-tools/bmc` を消費する側に留まる。
+
+## 却下した代替案
+
+- **BMC / SD / fleet をそれぞれ別 view にして join しない**: いまの状態そのまま。
+  「この事業の仮説と、その仮説を検証する repo と、その repo の maturity」が
+  1 画面に出ない。
+- **`:canvas/product` をそのまま business にする**: 12 product は gftdcojp
+  portfolio の単位で、cloud-itonami 自身の中の事業を表せない。かつ base datoms は
+  書き換え禁止なので business を増やせない。
+- **`:company/lei` を business の主キーにする**: LEI を持つのは法人実体だけ。
+  LEI 前の事業と、1 法人が回す複数事業を表せない。LEI は `:business/lei` として
+  任意 attribute にする。
+- **repo を business の主キーにする**: 事業は複数 repo に跨がる。1:1 にすると
+  repo 分割のたびに事業が分裂する。
+"}]
