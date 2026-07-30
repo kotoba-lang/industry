@@ -6,8 +6,8 @@
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-07-29"
-  :adr/last-verified "2026-07-29"
-  :adr/last_verified "2026-07-29"
+  :adr/last-verified "2026-07-30"
+  :adr/last_verified "2026-07-30"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "filecoin-client-node-cloud-repos"
@@ -262,12 +262,12 @@ serialize した message から計算され、nonce はその一部) ②`GasEsti
 ### live 検証 (mainnet、read-only、鍵も資金も無し)
 
     ok  ChainHead height → 6233477
-    ok  StateNetworkName → "mainnet"
+    ok  StateNetworkName → \"mainnet\"
     ok  MpoolGetNonce → 22067
-    ok  WalletBalance → "27318921114299575156" attoFIL
-    ok  GasEstimateMessageGas → {:gas-limit 926078 :gas-fee-cap "54773194" :gas-premium "101618"}
-    ok  PDPVerifier.getChallengeFinality() via StateCall → ["150"]
-    ok  PDPVerifier.getNextDataSetId() via StateCall → ["1413"]
+    ok  WalletBalance → \"27318921114299575156\" attoFIL
+    ok  GasEstimateMessageGas → {:gas-limit 926078 :gas-fee-cap \"54773194\" :gas-premium \"101618\"}
+    ok  PDPVerifier.getChallengeFinality() via StateCall → [\"150\"]
+    ok  PDPVerifier.getNextDataSetId() via StateCall → [\"1413\"]
     7 checks, 0 failed
 
 `StateCall` は message を現在の state に対して実行して結果を捨てる——署名も
@@ -448,7 +448,9 @@ differential probe。**CI では走らせない** (公開 endpoint 依存・非 
    および f0 送信者の鍵解決 (`StateAccountKey` が要る)。
 4. **state / FVM / HAMT / AMT** — `parent-state-root` は header に入れて読み
    出せる CID であって、その先は読めない。
-5. **証明生成** (PDP の Merkle path)、event log decode、provider HTTP API。
+5. **証明生成** (PDP の Merkle path)、event log decode、SP registry の
+   `getProviderWithProduct` decode (provider *discovery*。転送面自体は
+   2026-07-30 に実装済み — 下記追補)。
 6. **`base-l2/abi.clj` の置き換え** — `org-ethereum-abi` が portable で
    array/tuple も扱えるので寄せられるが、JVM 専用の既存利用があり別スコープ。
 
@@ -464,12 +466,98 @@ differential probe。**CI では走らせない** (公開 endpoint 依存・非 
   呼び出しが要る。request body は `filecoin.rpc` にある。
 - calibration に実際に送るには資金のある testnet 鍵が要る (安全床②により agent は
   資金操作をしない)。署名の正しさは sign → ecrecover → address 一致で検証できるので、
-  送信なしでもそこまでは詰められる。"
+  送信なしでもそこまでは詰められる。
+
+## 追補 (2026-07-30): provider 転送面と、mainnet が実際に返すもの
+
+`filecoin.cloud.provider` (cloud-filecoin `67147752`) で、これまで欠けていた
+**bytes を動かす面**を実装した。他の namespace は全部 on-chain で 1 byte も
+運ばない。provider の `serviceURL` を root にした普通の HTTP:
+
+```
+GET  pdp/ping                     生きているか
+GET  pdp/piece?pieceCid=<cid>     200 present / 202 processing / 404 absent
+POST pdp/piece                    upload 開始 (200 = 既に持っている)
+PUT  pdp/piece/upload/<uuid>      bytes 本体
+GET  piece/<cid>                  取得
+```
+
+形は FilOzone 自身の `sp/*.ts` から採った (documentation から推測しない —
+この family では PDP selector 31 件のうち 15 件が推測で間違っていた)。素朴な
+client が外す 3 点:
+
+- **`POST` の 200 は「止まれ」**。PieceCID で dedup された、送るものは無い。
+  200 を「進め」と読むと payload を丸ごと再送する。`Location` 欠落を成功と
+  読むと **黙ってデータを落とす**。
+- **find の 202 は present でも absent でもない**。absent に畳むと、provider が
+  既に持っていて parking 中のデータを再 upload する。
+- **CDN URL は `https://<client-address>.<domain>/<cid>`** —
+  client ごとの *subdomain* で、CID は path の root。`<domain>/piece/<cid>` は
+  解決して 404 するので「piece が無い」に見える (実際に cloud-itonami-app の
+  read-through がこれで壊れていた。失敗は silent nil)。
+
+**upload に認証は無い。これは手抜きではない**: 認可は client が署名する
+on-chain `addPieces` の側にある。provider は誰の bytes でも預かるが、誰かが
+proof の対価を受け取る data set に入るのは署名済み transaction を経てだけ。
+つまり **upload 単体では何も永続化しない**。
+
+### verify-bytes が要る理由 (mainnet 実測 2026-07-30)
+
+PDPVerifier が live と言う 1 piece
+(`bafkzcibet2xqgdjls7iwpgilo53vqicctadkcqwygxujnun7qlfmw5s5ekja4kmtey`、
+204,898 bytes) について、`:present` と答えた provider 13 件:
+
+| 内容 | 件数 |
+|---|---|
+| 27 byte の nginx certbot placeholder を `application/octet-stream` で | 1 |
+| **同一の誤った** 81,918 bytes | 10 |
+| 正しい 204,898 bytes | **2** |
+
+**13 件すべて status 200**。HTTP 層では 11 件が成功と見分けられない。
+content addressing は誰かが照合して初めて価値を持つので、受け取った bytes から
+PieceCID を再計算する `verify-bytes` を通らない読み出し経路を作らない。
+検証 script は io-filecoin-transport の `npm run probe:provider`
+(chain `getPieceCid` → `ping` → `find` → `GET piece/<cid>` → 再計算)。
+
+### 露出した protocol の限界
+
+`filecoin.protocols/IHttp` は `body` を **String** と規定し、
+`filecoin.transport` は `.text()` / `BodyHandlers/ofString` で作る。JSON-RPC
+には正しいが piece には誤り: UTF-8 decode が 0x7f 超の byte を全部書き換える
+ので、**binary は仕様どおりの IHttp を通れない**。probe と app は
+`arrayBuffer` / `ofByteArray` で bypass し、理由を書いた。IHttp を広げるのが
+本当の修正で、これは未着手 (io-filecoin 側)。
+
+### cloud-itonami-app への統合 (PR #6、merge 済み `7113377`)
+
+Storage view として着地。**PR #3 は main と conflict した** (main が web.clj に
+organism 作業 264 行を足していた) ので、rebase せず `origin/main` から切り直して
+replay した。その過程で分かったこと: **cleanup-land が `filecoin.clj` を
+untracked WIP として main に単独で commit していた** — deps.edn も route も
+panel も test も無しで。main の `drive` pin (`90eac285`) は
+`drive/object.cljc` より前なので、main は **load できない namespace を抱えて
+いた** (`:dev` alias の `:local/root` がそれを隠していた)。PR #6 で残り半分と
+pin 前進 (`46605af2`) を入れた。
+
+read-through は **設定されたときだけ**動く (`FILECOIN_PROVIDER_URL` /
+`FILECOIN_CLIENT_ADDRESS`)。既定値を推測しない — 誰も serve できない URL を
+既定にしていたのが元のバグだった。live 検証 (mainnet height 6235666):
+
+```
+ezpdpz-main2   -> 204898 bytes, verified
+pg-pdp-mainnet -> nil (refused; placeholder を返す provider)
+```
+
+UI は read-through on / off の両状態を screenshot で確認済み。47 tests /
+292 assertions green。"
 
   :adr/consequences
   ["Filecoin を触るコードは 3 repo のどれかに属し、どこに置くかは client / node / onchain-cloud の境界で決まる"
    "BLAKE2b と EVM ABI は Filecoin の外の repo にあるので、他の consumer が使うときに io-filecoin を引かなくてよい"
    "selector・PieceCID・address はすべて upstream の publish から生成した表と照合されるので、upstream が変えれば CI が落ちる"
-   "署名・transport・証明生成が無いため、この 5 repo だけでは storage deal を実行できない"]
+   "署名・transport・証明生成が無いため、この 5 repo だけでは storage deal を実行できない"
+   "provider から読んだ bytes は必ず PieceCID を再計算して照合する (mainnet 実測で 13 件中 11 件が status 200 のまま誤った bytes を返した)"
+   "read-through の宛先は設定 (FILECOIN_PROVIDER_URL / FILECOIN_CLIENT_ADDRESS) で与える。既定値を推測しない"
+   "IHttp が body を String と規定しているため binary は protocol を通れない。piece の取得は ofByteArray / arrayBuffer で bypass しており、IHttp を広げるのが本当の修正"]
   :adr/related
   ["adr-2607060100" "adr-2607052300" "adr-2606302300" "adr-2607254100" "adr-2607211600"]}]
