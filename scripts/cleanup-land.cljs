@@ -328,13 +328,32 @@
   (some-> (gitc dir "hash-object" "--" path) str/trim not-empty))
 
 (defn- drop-already-landed
-  "base 側と同一内容のパスを落とす。-> [残り 落としたもの]"
+  "base 側と比べて 3 つに分ける。-> [残り 着地済み base-に既存で内容違い]
+
+  3 つ目が **:additive の安全床**。以前はここが 2-way で、「base に存在し内容が
+  一致」だけを落としていた。**base に存在するが内容が違う**パスは :additive に
+  残り、`server-commit!` が base の tree にそのまま上書き commit していた —
+  `:additive` の定義（「main のどの行も書き換えない」）に真っ向から反する。
+
+  実測事故 2026-07-30、kotoba-lang/compiler PR #444: untracked と報告された 5 件
+  のうち 3 件（host_profile.clj / host_profile_test.clj / linear_resource_test.clj）
+  は main に存在し、Phase B 抽出前の古い版で上書きされた。351 行が消え、
+  `kotoba.artifact.core` の require が削除済み ns へ巻き戻り、ADR 0103 の
+  ingress-methods 分離も消えて **main の test suite が起動不能**になった。
+  commit message は「Purely additive: none of these paths exist on main」と
+  書いており、その主張自体が偽だった。
+
+  ローカルで untracked に見えることは、base に無いことを意味しない（別ブランチに
+  parked された共有 checkout では日常的に起きる）。**判定は git status ではなく
+  base tree に対して行う。** 内容が違うものは :review（PR のみ、auto-merge 禁止）
+  に回す。"
   [dir base-map paths]
   (if (empty? base-map)
-    [paths []]
-    (let [landed? (fn [p] (and (contains? base-map p)
-                               (= (get base-map p) (local-blob-sha dir p))))]
-      [(vec (remove landed? paths)) (vec (filter landed? paths))])))
+    [paths [] []]
+    (let [on-base? (fn [p] (contains? base-map p))
+          same?    (fn [p] (= (get base-map p) (local-blob-sha dir p)))
+          {landed true differs false} (group-by same? (filter on-base? paths))]
+      [(vec (remove on-base? paths)) (vec landed) (vec differs)])))
 
 (defn- server-commit!
   "base branch の tip の上に paths を載せた commit を作り、branch ref を作る。
@@ -528,16 +547,32 @@
                                        (count (live-branches dir base)))))
     :else
     (if-not apply?
-      (do (when (seq additive) (println (format "  plan :additive  %d files → PR → merge" (count additive))))
-          (when (seq tracked) (println (format "  plan :review    %d files → PR のみ（merge しない）" (count tracked)))))
+      ;; dry-run も base tree を引いて分類する。引かないと「:additive N files →
+      ;; PR → merge」と表示したものが apply で :review に降格し、plan が嘘になる。
+      (let [base-map (base-blobs slug base)
+            [additive _ demoted] (drop-already-landed dir base-map additive)
+            tracked (vec (concat tracked demoted))]
+        (when (seq demoted)
+          (println (format "  ⚠ untracked だが %s に既存・内容差あり: %d 件 → :review（auto-merge しない）"
+                           base (count demoted)))
+          (doseq [p demoted] (println (str "      " p))))
+        (when (seq additive) (println (format "  plan :additive  %d files → PR → merge" (count additive))))
+        (when (seq tracked) (println (format "  plan :review    %d files → PR のみ（merge しない）" (count tracked)))))
       (let [adir (archive! dir (concat additive (mapcat val skipped)))
             base-map (base-blobs slug base)
-            [additive landed-additive] (drop-already-landed dir base-map additive)
-            [tracked landed-tracked] (drop-already-landed dir base-map tracked)]
+            [additive landed-additive demoted] (drop-already-landed dir base-map additive)
+            [tracked landed-tracked tracked-differs] (drop-already-landed dir base-map tracked)
+            ;; base に存在するのに untracked と報告されたものは :additive ではない。
+            ;; :review へ落として auto-merge の対象から外す（PR #444 の再発防止）。
+            tracked (vec (concat tracked tracked-differs demoted))]
         (println (format "  archived → %s" adir))
         (when (seq (concat landed-additive landed-tracked))
           (println (format "  already landed on %s（内容一致でスキップ）: %d 件"
                            base (count (concat landed-additive landed-tracked)))))
+        (when (seq demoted)
+          (println (format "  ⚠ untracked だが %s に既存・内容差あり: %d 件 → :review へ降格（auto-merge しない）"
+                           base (count demoted)))
+          (doseq [p demoted] (println (str "      " p))))
         (when (and (empty? additive) (empty? tracked))
           (println "  → 全て着地済み。新規 PR なし。"))
         ;; :additive — untracked のみ。main のどの行も書き換えないので merge する。
