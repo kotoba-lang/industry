@@ -220,7 +220,30 @@ proposal を「発行済み」と表示してはならない。
 
 ## Build order（依存順。飛ばすと下流が壊れる）
 
-1. `kotoba-lang/esim` を新設（records + state machine + ports、`phone` に E.164 委譲）。
+1. ✅ **done（2026-07-30）** `kotoba-lang/esim` を新設。
+   `kotoba.esim`（EID 32桁 + telecom MII / ICCID は E.118 で Luhn を
+   `kotoba.card/luhn-valid?` に委譲 / profile descriptor / SGP.22 activation code
+   roundtrip / notification / SM-DS event registration は consumer 限定 /
+   ownership transfer / issue-seq validator）、`kotoba.esim.lifecycle`（total・
+   deterministic・no I/O の state machine）、`kotoba.esim.ports`（`koe.ports` と同型。
+   `IOwnershipTransfer` は `IProfileProvisioning` から**意図的に分離** — provisioning port
+   を持っただけで transfer に到達できないようにする）、`kotoba.esim.export`
+   （EID/ICCID は既定マスク）。25 tests / 152 assertions green、clj-kondo 0/0。
+   west 登録済み。
+   - **MSISDN は validity だけでなく canonical form も `phone` に委譲した。**
+     `phone/e164-valid?` は裸の国内番号列も normalizable として受けるため、
+     入力をそのまま保存すると1本の回線が2つのレコードになる。`profile` は
+     `normalize-e164` の `+<digits>` を保存する。
+   - **`eid-valid?` は EID checksum を検証しない。** GSMA は checksum を規定しているが、
+     この build では仕様書本文に対してアルゴリズムを検証できておらず、当て推量で
+     実装すると valid な EID を弾く。clause / annex 番号も同じ理由でどこにも書かない
+     （document 名のみ引用）。6120 の ADR-0002 が記録した「未検証の規制引用の捏造」を
+     繰り返さないための明示的な選択。
+   - lifecycle の2つは transcription ではなく**決定**として docstring に明記した:
+     `:delete` は `:disabled` からのみ（保守的な読み。誤ると subject が
+     enabled profile 無しで接続を失う）、`:enable` は incumbent を名指しして
+     `:enable/would-displace` で拒否する（eUICC の enabled profile は最大1本なので、
+     黙って現用回線を落とさない。displacement は2つの明示的決定として表現可能）。
 2. `kotoba-lang/card` に `ports.cljc` を追加（`koe.ports` と同型。既存 records は無変更）。
 3. `denwaban` / ADR-2606271930 の参照 drift 修正（`koe` / `com-*`）。
 4. `cloud-itonami/cloud-itonami-esim` actor を新設（D6）。
