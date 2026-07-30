@@ -69,6 +69,13 @@ blocker が 5〜6 件、機械的に列挙された。
 立っており、実 API 連携は **human-approved order の下流**に属する。判定層に
 ネットワーク I/O を持ち込むと、governor が自分の出稿を承認する構造になる。
 
+その「下流」の置き場所は **`kotoba-lang/com-openai` でもない**。あれは Datomic 裏で
+OpenAI 互換 API を*提供*する clean-room **サーバ**であって、外部への*クライアント*を
+入れると repo の意味が反転する(`com-googleads` も同型なので、ads API の先例として
+引くのは誤り)。今日の消費者は kotobase.net だけ ——**広告を出される当事者が、
+conversion を報告する当事者**でもある —— なので `net-kotobase` 内に置き、
+2 番目の消費者が現れた時点で `kotoba-lang` へ抽出する(投機ではなく second use)。
+
 ### D2. dogfood seed は superproject に置く
 
 `90-docs/business/cloud-itonami-7310-firstparty-ads-dogfood-seed.edn`。
@@ -133,6 +140,63 @@ x402 側は submission 3 件が **3 件とも reject** されており、agent �
   有料出稿がまさに判断される 1 個の数字である。
 - `kotobase.funnel-test` が aggregate runner に**入っていなかった**ので追加した
   (funnel の unit test は事実上一度も走っていなかった)。
+
+### D4c. 公式 MCP は無いが公式 API はある。第三者 MCP は使わない
+
+`ads.chatgpt.com` は `ads.openai.com` へリダイレクトする同一プロダクト。
+**OpenAI は ads 専用の公式 MCP server を出していない**(2026-07-30 時点)。
+第三者製は複数実在する —— `HYPD-AI/openai-ads-mcp`(OSS・自ホスト・read-only)、
+Markifact / Bluegrass / Trakkr(hosted、Bluegrass は 65 tools の read+write)。
+
+**hosted 系は採らない。** Ads API キーは **1 ad account に 1 対 1 でスコープ**され
+(`Each Ads API key is scoped to one ad account`)、預けた先はその広告アカウントの
+全権を持つ。安全床①(credential を第三者に渡さない)に直接触れる。
+
+より重要な発見: **`developers.openai.com` は bot wall の外にある。**
+403 で塞がれていたのは `openai.com` と `help.openai.com` だけで、Advertiser API と
+Conversions API の仕様は一次情報として読める。したがって第三者の要約に依存する
+理由が無い。
+
+### D4d. 一次情報から転記した API 面(2026-07-30)
+
+- Advertiser API: `https://api.ads.openai.com/v1`、`Authorization: Bearer`、
+  キーは Ads Manager → Settings 発行。**write 可**
+  (`POST /campaigns` `/ad_groups` `/ads` `/upload`)、`GET /ad_account`、
+  insights は 4 スコープ。campaign は `budget.lifetime_spend_limit_micros`
+  (最小 1,000,000)、ad group は `bidding_config.{billing_event_type,max_bid_micros}`。
+- **API に業種カテゴリを申告するフィールドは無い**(`/ads/llms-full.txt` で確認)。
+  ad group の `context_hints` は自由記述キーワードであって taxonomy ではない。
+  カテゴリ可否は **policy 審査**として `review_status`
+  (`in_review` / `rejected` / `approved`)に現れる。よって D3 の
+  「ad-category を推測で埋めない」は依然有効だが、**API が category を要求する**
+  という誤解は解けた —— 間違いの帰結は 400 ではなく広告の却下である。
+- Conversions API: `POST https://bzr.openai.com/v1/events?pid=<PIXEL-ID>`
+  (Advertiser API とは**別ホスト**)。`validate_only` で保存せず検証可、
+  1 batch 1,000 件、`timestamp_ms` は過去 7 日〜未来 10 分、`id`+`type` で重複排除。
+  email / external_id は SHA-256(trim+lowercase、64 桁小文字 hex)必須で、
+  **生値・電話番号ハッシュの送信は禁止**。
+- **click id パラメータ(gclid/oaiq 相当)は文書に無い。** よって `utm_source` +
+  `source_url` による first-party 属性付けが、公式 click-id が現れるまでの正しい形。
+
+### D4e. 実装: 報告するが、既定では送らない
+
+`kotobase.conversions`(純 payload)+ `kotobase.openai-ads`(リクエスト構築と
+制約検証)+ Worker 配線。funnel stage は vendor の標準 event 名へ写す
+(`page_viewed` / `registration_completed` / `checkout_started`)。
+
+**signup を `lead_created` にも `trial_started` にもしない。** 営業リードの
+引き渡しではないし、カード不要の P2P プランでもクリック時点は enrolment ではない
+——どちらも**広告アカウントが最適化する対象を水増しする**。テストで固定した。
+
+**`user` オブジェクトは一切送らない。** vendor は生 email / 生 external_id /
+電話番号ハッシュを禁じ SHA-256 を要求するが、この 3 stage の時点で kotobase は
+検証済み識別子を持たない(identity 引き渡しは報告対象 event の**後**に authn 側で
+起きる)。ハッシュ要件は「持っている識別子への要件」であって「識別子を捏造する
+許可」ではない。`opt_out` も同じ理由で立てない。
+
+安全側の 3 性質: ①設定が無ければ**完全 no-op** ②`validate_only` が**既定 true**
+(conversion データは送り直せないので、誤設定は「リクエストの無駄」で済ませ
+広告アカウントの履歴を汚さない) ③エラーは飲み込み `ctx.waitUntil` に渡す。
 
 ### D5. 出稿主体は AWAI Network, L.L.C.(デラウェア LLC)、法域は USA
 
@@ -210,8 +274,15 @@ US だけである。今回の2プロダクトはそこに当たらないが、�
   (`:distinguishable-from-product-ui` / `:landing-page-consistency`)で owner 作業ではない。
   ただし OpenAI 側の本人確認が pending の場合、`:advertiser-identity-verified` の表明は
   撤回する ——「開設した」と「審査を通った」は別である。
-- owner 側に残る決定は **広告予算の実額承認** 1 件
-  (`budget-supply.edn` の placeholder 置換)。
+- Conversions API の配線が本番に載った(Worker Version
+  `22b10be1-0fd3-4296-92a2-047943f2d199`、2026-07-30)。**ただし送信はしていない**
+  —— `OPENAI_ADS_PIXEL_ID` / `OPENAI_ADS_API_KEY` は wrangler.jsonc にも
+  secret list にも存在せず(実測)、設定不在は完全 no-op なので、現時点で外部に
+  出ているイベントは 0 件である。
+- owner 側に残るのは 2 件: **広告予算の実額承認**(`budget-supply.edn` の
+  placeholder 置換)と **Ads Manager → Settings での API キー発行**。キーが入れば
+  agent 側で pixel 作成 → conversion event setting 作成 → `validate_only` で
+  配線検証 → 実送信への切替、まで進む。
 - agent 側に残る作業: (a) 一次情報の再読による ad-category 確定(browser 経路が
   必要) (b) creative + 3 表明 (c) design-system checkout skew が解けてからの
   サイト再生成。
