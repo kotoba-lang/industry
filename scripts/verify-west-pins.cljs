@@ -106,11 +106,16 @@
   (scripts.nbb-compat/exit 2))
 
 (defn- parse-west
-  "west.yml → {:remotes {name url-base}, :entries {name {:remote :repo-path :revision :path}}}
-   remotes と projects は同じインデントの `- name:` を使うのでセクションで区別する。"
+  "west.yml → {:remotes {name url-base}, :entries {name {...}}, :project-names [name ...]}
+
+   remotes と projects は同じインデントの `- name:` を使うのでセクションで区別する。
+
+   `:project-names` は出現順の**生のベクタ**で、重複を潰さない。`:entries` は name を
+   キーにした map なので、同じ name が2回現れても静かに1件に畳まれ、重複が見えない
+   ——それが `duplicate-names` を別に持つ理由。"
   [content]
   (let [remotes (atom {}) entries (atom {}) current (atom nil) rname (atom nil)
-        section (atom nil)]
+        section (atom nil) order (atom [])]
     (doseq [line (str/split-lines content)]
       (cond
         (re-find #"^  remotes:\s*$" line)  (reset! section :remotes)
@@ -127,6 +132,7 @@
         (do
           (when-let [n (second (re-find #"^    - name:\s*(\S+)\s*$" line))]
             (when-let [c @current] (swap! entries assoc (:name c) c))
+            (swap! order conj n)
             (reset! current {:name n}))
           (when @current
             (when-let [v (second (re-find #"^      remote:\s*(\S+)" line))]
@@ -139,10 +145,43 @@
               (swap! current assoc :path v))))
         nil))
     (when-let [c @current] (swap! entries assoc (:name c) c))
-    {:remotes @remotes :entries @entries}))
+    {:remotes @remotes :entries @entries :project-names @order}))
 
 (def baseline (parse-west baseline-content))
 (def candidate (parse-west candidate-content))
+
+;; --- 重複 name 検査 ---------------------------------------------------------
+;; west は同名 project を2つ持つ manifest を **読み込めない**
+;; ("Malformed manifest file ... project name X used twice")。pin が不正な west.yml は
+;; 誤った checkout を生むが、name が重複した west.yml は fleet 全体で `west` コマンド
+;; そのものを止める。したがって pin 検証より前に、無条件で見る。
+;;
+;; この検査は 2026-07-30 の実事故で追加した。API single-entry 経路で
+;; org-microsoft-riff / org-xiph-flac を登録した際、**別セッションが同じ2件を既に
+;; 登録済み**だったことに気づかず重複を作り、west.yml が parse 不能になった。
+;; PreToolUse hook は正しく発火して本 script を呼んだのに素通りした。理由は2つあり、
+;; 両方ここで塞いでいる:
+;;   1. `parse-west` が entries を name キーの map に集めるので、重複が静かに畳まれて
+;;      そもそも観測できなかった（→ :project-names を生のまま持つようにした）。
+;;   2. 追加した entry の revision が既存と同一だったため `changed` が空になり、
+;;      下の early-exit が「変更された pin はありません。OK.」で exit 0 していた
+;;      （→ この検査を changed の計算より前に置いた）。
+(def duplicate-names
+  (->> (:project-names candidate)
+       frequencies
+       (filter (fn [[_ n]] (> n 1)))
+       (map first)
+       sort
+       vec))
+
+(when (seq duplicate-names)
+  (println (str "FAIL 重複 project name: " (str/join ", " duplicate-names)))
+  (println (str "  west はこの manifest を読み込めません"
+                "(Malformed manifest file: project name ... used twice)。"))
+  (println (str "  既に登録済みでないか、**書き込み先の tip** を見て確認してください"
+                "(ローカルの west.yml は遅れていることがあります)。"))
+  (println "verify-west-pins: 1 件の検証に失敗しました。west.yml を main に載せる前に修正してください。")
+  (scripts.nbb-compat/exit 1))
 
 (defn- owner-of [url-base]
   (second (re-find #"github\.com[:/]([^/\s]+)/?$" (or url-base ""))))
