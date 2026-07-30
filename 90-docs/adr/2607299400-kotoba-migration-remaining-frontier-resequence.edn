@@ -93,7 +93,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | **T5.3** | rebalance seats pack → record export | **landed** murakumo#193–#199 (incl. schedule assign packs #199); residual: bool-typed predicates + other modules packs |
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
-| T6.2 | precompiled KIR を product artifact の既定に | 未着手 |
+| T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | 未着手 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
@@ -265,7 +265,7 @@ the residual list tracked since ADR-2607299400 (seats through name-bits / task e
 
 **Next frontier is language-level, not product packs:**
 1. ~~bool-typed comparisons + wasm bool export ABI~~ **landed** compiler#451 + wasm#42/#44 + script#74 (west pins 23721b8c); residual = task/eligibility bool + other consumer C-migration; schedule eligibility bool landed murakumo#208
-2. T6.2 precompiled KIR default; T8.3 production AOT; W4 recursive values
+2. ~~T6.2 precompiled KIR default~~ → murakumo#220; T8.3 production AOT; W4 recursive values
 
 
 ## Progress (2026-07-31a — murakumo schedule eligibility :bool)
@@ -333,7 +333,25 @@ task-eligible?, failed?, can-retry?, authorized?, write-ok?.
 1. Ranking / pick-code / name-match codes stay `:i64` by design
    (`better-*`, `starts-with?`, `command-is-dial?`, `known-secret-name?`,
    `plan-fits-1/2/3` go/no-go codes)
-2. T6.2 precompiled KIR default; T8.3 production AOT; W4 recursive values
+2. ~~T6.2 precompiled KIR default~~ → murakumo#220; T8.3 production AOT; W4 recursive values
+
+
+
+## Progress (2026-07-31e — T6.2 murakumo + bool gates #215/#217)
+
+- **murakumo#220 MERGED** (`bb804fbd`): **T6.2 closed for murakumo**
+  - catalog-wide gensym-normalized KIR drift (32 cores)
+  - completeness: discover ↔ shipped ↔ `oracle/ready?`
+  - prod classpath: compiler `:test`-only; `kotoba-kir` prod
+  - ADR `ADR-260731-w6-t62-precompiled-kir-default`
+- **murakumo#215 MERGED**: token/starts-with/flag string gates → `:bool`
+- **murakumo#217 MERGED**: join/gc/relay/action pure gates → `:bool`
+- west pin murakumo → `bb804fbd` (covers #215–#217 + #220)
+
+**Still open:**
+1. Ranking / pick-code helpers stay `:i64` by design
+2. T6.4 cljs/browser same artifact (drop pure mirrors)
+3. T8.3 production AOT network/secret; W4 recursive values
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
