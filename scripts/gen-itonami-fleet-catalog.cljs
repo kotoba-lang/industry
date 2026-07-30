@@ -34,6 +34,7 @@
             [cljs.reader :as reader]))
 
 (def ^:private fleet-dir "orgs/cloud-itonami")
+(def ^:private west-file "manifest/west.yml")
 (def ^:private default-rules "manifest/repository-rules.edn")
 ;; Overridable so the generator can be run against an edited authority before
 ;; that edit has landed — the fleet is read relative to the superproject root,
@@ -91,9 +92,12 @@
   confident-looking answer — the absence is the honest signal that the
   vocabulary does not cover them."
   [dir]
-  (some (fn [{:keys [prefix role execution]}]
+  (some (fn [{:keys [prefix role execution authority-library]}]
           (when (and prefix (str/starts-with? dir prefix))
-            (cond-> {} role (assoc :role role) execution (assoc :execution execution))))
+            (cond-> {}
+              role (assoc :role role)
+              execution (assoc :execution execution)
+              authority-library (assoc :authority-library authority-library))))
         @prefix-rules))
 
 (defn- read-blueprint
@@ -143,6 +147,41 @@
         (catch :default e
           {:skipped {:repo dir :reason (str "parse error: " (.-message e))}})))))
 
+(defn- west-projects
+  "name -> {:repo :remote :revision :path :groups} from manifest/west.yml.
+
+  west is the reference plane: it already pins every repository in the
+  workspace to a revision, so an entry can point at a repo and a hash without
+  the catalog carrying any of its content. That is the whole mechanism for
+  including the resident actors — person-* and loop-* have no blueprint.edn
+  and are not going to grow one just to be listed."
+  []
+  (let [lines (str/split-lines (fs/readFileSync west-file "utf8"))]
+    (loop [ls lines cur nil out {}]
+      (if-let [l (first ls)]
+        (let [t (str/trim l)]
+          (cond
+            (str/starts-with? t "- name:")
+            (recur (rest ls) {:name (str/trim (subs t 7))} (cond-> out cur (assoc (:name cur) cur)))
+            (and cur (str/starts-with? t "remote:"))
+            (recur (rest ls) (assoc cur :remote (str/trim (subs t 7))) out)
+            (and cur (str/starts-with? t "revision:"))
+            (recur (rest ls) (assoc cur :revision (str/trim (subs t 9))) out)
+            (and cur (str/starts-with? t "path:"))
+            (recur (rest ls) (assoc cur :path (str/trim (subs t 5))) out)
+            :else (recur (rest ls) cur out)))
+        (cond-> out cur (assoc (:name cur) cur))))))
+
+(defn- reference
+  "The pin: repository name, remote and revision. Never any content."
+  [w]
+  (when w
+    (cond-> {}
+      (:name w) (assoc :repo-name (:name w))
+      (:remote w) (assoc :remote (:remote w))
+      (:revision w) (assoc :revision (:revision w))
+      (:path w) (assoc :path (:path w)))))
+
 (defn- build []
   (let [dirs (->> (fs/readdirSync fleet-dir)
                   (js->clj)
@@ -153,6 +192,40 @@
         skipped (vec (sort-by :repo (keep :skipped results)))
         non-actors (vec (keep :non-actor results))
         callable (filterv :endpoint entries)
+        west (west-projects)
+        ;; Every entry gains its west pin. An actor that lives in
+        ;; orgs/cloud-itonami is looked up by directory name.
+        entries (mapv (fn [e] (merge e (reference (get west (:repo e))))) entries)
+        ;; Repositories the authority classifies as runnable but which carry no
+        ;; blueprint.edn — person-*, loop-*, skill-*, action-* — enter the
+        ;; catalog BY REFERENCE. They contribute a repo, a remote and a pinned
+        ;; revision, plus the role and execution the prefix rule already
+        ;; determines. No file is read from them and no code is copied: the
+        ;; hash is the whole payload, and it is west's, already verified there.
+        ;;
+        ;; Libraries (:execution :none) are excluded — there are ~3,500 of them
+        ;; and a directory of things that do not run is a different artifact.
+        ;; A library that an actor depends on is reachable through that actor's
+        ;; :authority-library instead.
+        have (into #{} (map :repo) entries)
+        referenced
+        (vec (for [[nm w] (sort west)
+                   :let [rx (role+execution (or (some-> (:path w) (str/split #"/") last) nm))]
+                   :when (and rx
+                              (not= :none (:execution rx))
+                              (not (contains? have (some-> (:path w) (str/split #"/") last))))]
+               (merge (sorted-map :repo (or (some-> (:path w) (str/split #"/") last) nm)
+                                  :id nm
+                                  :reference-only true)
+                      rx
+                      (reference w)
+                      ;; The model this actor embodies, as a pin rather than a
+                      ;; dependency: resolved from the authority's
+                      ;; :authority-library through west.
+                      (when-some [lib (:authority-library rx)]
+                        {:authority-library
+                         (or (reference (get west lib)) {:repo-name lib})}))))
+        entries (vec (sort-by (juxt :repo :id) (into entries referenced)))
         dup-ids (->> entries (map :id) frequencies
                      (keep (fn [[id n]] (when (> n 1) id)))
                      sort vec)]

@@ -116,8 +116,12 @@
      ;; is kotoba-lang/ao, which is deliberately runner-free and clock-free —
      ;; the actor supplies both.
      :execution :resident
+     ;; The organism model these actors embody. Referenced, not vendored: `ao`
+     ;; is deliberately runner-free and clock-free, so an actor supplies both
+     ;; and holds a pin to the model rather than a copy of it.
+     :authority-library "ao"
      :must [:hold-an-identity :run-its-own-loop :record-an-audit-trail]
-     :examples ["person-awai-ryo"]}
+     :examples ["person-awai-ryo" "person-isekai-hajime"]}
     {:prefix nil
      :role :library
      ;; Nothing to run. kotoba-lang/ao is the clearest case: "model only, no
