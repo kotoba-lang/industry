@@ -1,0 +1,159 @@
+[{:db/id -1
+  :adr/id "2607309970"
+  :adr/date "2026-07-30"
+  :adr/status "accepted"
+  :adr/title "ADR-2607309970: IPNS を本物の Record 形式にし、単一 XRPC registry から複数 delegated router 経由の実 DHT 解決へ移す — dev-protobuf / ipns.record / io-libp2p-specs-kad-dht"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "## Context
+
+ADR-2607309950 が registry 面の残る穴の第1位として挙げたのがこれ:
+「IPNS が libp2p DHT ではなく kotobase.net の XRPC registry で解決されている。
+alt-root の中に中央集権点が1つ残っている」。オーナー指示「最大は IPNS が
+libp2p DHT で解決するようにして」を受けて着手した。
+
+### 実測で分かった、より根本的な問題
+
+DHT 経路を作る前に、**そもそも publish するレコードが IPNS Record ではなかった**。
+
+`ipns.head` が署名しているのは kotobase 独自 shape
+（`{:name :value :sequence :valid_until :public_key_multibase :signature_multibase}`）で、
+これは kotobase.net の XRPC lexicon の形。**どの IPFS 実装もこれを検証できない。**
+このバイト列を DHT に置いても全 peer が reject する。
+
+つまり「DHT に繋ぐ」は transport の問題である前に **record format の問題**であり、
+順序を間違えると「繋がったのに何も解決しない」になる。実際の IPNS Record
+（specs.ipfs.tech/ipns/ipns-record）は:
+
+- protobuf `IpnsEntry`（value=1, signatureV1=2, validityType=3, validity=4,
+  sequence=5, ttl=6, pubKey=7, signatureV2=8, data=9）
+- `data` は DAG-CBOR map（`Value`/`Validity`/`ValidityType`/`Sequence`/`TTL`）
+- **signatureV2 は `\"ipns-signature:\" || data` を覆う**（protobuf ではない）
+
+さらに **protobuf codec が workspace に存在しなかった**（IPNS Record も
+Kademlia message も protobuf）。一方で必要な部品は揃っていた:
+`io-multiformats`（varint/multihash/CID/sha256）・`org-ietf-cbor`（DAG-CBOR）・
+`noise`（**XX パターン実装済み** — libp2p の security handshake そのもの）・
+`ed25519`・`kekkai-node`（UDP/STUN/NAT traversal の実績）。
+
+## Decision
+
+依存順に3層を実装した。
+
+| repo | 役割 | tests |
+|---|---|---|
+| `kotoba-lang/dev-protobuf`（新規） | protobuf wire format（schema は EDN、codegen 無し） | 15 / 58 |
+| `tech-ipfs-specs-ipns` の `ipns.record`（追加） | 本物の IPNS Record + 検証 + routing key | 23 / 71（12/40 から） |
+| `kotoba-lang/io-libp2p-specs-kad-dht`（新規） | Kademlia keyspace / wire message / lookup / delegated routing | 28 / 75 |
+
+合計 **66 tests / 204 assertions**。すべて `.cljc`、crypto・socket・clock なし。
+
+### 到達点と、到達していない点（これを曖昧にしない）
+
+| | 状態 |
+|---|---|
+| どの IPFS 実装でも検証できる IPNS Record | **達成**（`ipns.record`） |
+| 実 DHT への publish / read | **達成**（`kad.routing`、HTTP delegated routing `/routing/v1`） |
+| 単一サーバーに依存しない解決 | **達成**（複数 router に quorum、各レコードは呼び出し側が検証） |
+| **このプロセスが DHT node であること** | **未達** |
+
+delegated router は「DHT node である HTTP エンドポイントが代理で答える」もの。
+そこを通した record は **どの Kubo node も取得できる同じ署名済み record が
+同じ DHT key に載る**。だが自分は routing table を持たず、誰のクエリにも答えず、
+ネットワークを「訊いたエンドポイント越しにしか」見ていない。
+
+**単一の proprietary registry からは実質的に前進している**（record が
+相互運用可能になり、router は交換可能・複数・別々の運営者）。**しかし
+「DHT に参加した」とは違う。** ここを言い換えないことが本 ADR の要点。
+
+**完全参加に足りないものの名指し**: multiaddr、TCP または QUIC transport、
+security handshake（**Noise XX — `kotoba-lang/noise` に実装済み**）、
+multistream-select 1.0.0、stream muxer（Yamux）、identify、k-bucket routing table。
+**プロトコル側は既にある**（`kad.message` が `/ipfs/kad/1.0.0`、`kad.lookup` が
+アルゴリズム）。残るのは transport で、これは patch ではなく project。
+
+## 設計上、静かに壊れる箇所（各々テストがある）
+
+### record format
+
+- **署名は CBOR を覆い、protobuf を覆わない。** protobuf に署名するのが
+  一見正しく見える誤りで、どの実装も受け付けない署名ができる（validator は
+  受け取った `data` から入力を再構成する）。
+- **protobuf 側は `data` の内容を重複して持つ**（pre-V2 reader 用）。
+  `validate` は両者の一致を検査する。これが無いと、攻撃者は CBOR に署名して
+  から未署名の protobuf 側を書き換えられる —— **署名は依然として検証を通り、
+  レコードはどちらの半分を見るかで違う内容に読める**。テストで再現している。
+- **V1-only は拒否。** V1 署名は未署名フィールドの書き換えで偽造可能で、
+  それが V2 の存在理由。「互換のため」受け入れると穴が再び開く。
+- **routing key は `/ipns/` + バイナリ multihash**。テキスト名でも CID でもない。
+  `\"/ipns/k51…\"` から作ると全ての正しい実装と違う key を計算し、record は
+  **保存に成功して誰も見ないアドレスに置かれる**。
+- `ttl` は**ナノ秒**、`validity` は**小数9桁固定の RFC 3339**。緩い形式を
+  受け入れると byte-identical に再現できない record を受け入れることになり、
+  署名が壊れる。
+- 未知の `ValidityType` は EOL と仮定せず拒否する。
+
+### protobuf
+
+- **未知フィールドが byte-for-byte 生存する。** 新しい Kubo が書いた record は
+  こちらのスキーマが知らないフィールドを持つ。落とすと **round-trip できず**、
+  署名済みメッセージにとってそれは互換性の不便ではなく**検証失敗**（署名が
+  もう存在しないバイトを覆っている）。
+- 負の varint は**両ホストで拒否**。encode は 10 group、decode は JVM で
+  Long/MAX 超・CLJS で 2^53 超を要する。片側だけ対応すると「片方でエンコード
+  できて片方でデコードできない」になる。`sint32/sint64` が正しい経路。
+- decode は 9 group で拒否し、**その判定を乗数を進める前に**行う
+  （128^9 がちょうど Long/MAX+1 なので、後で判定すると拒否する前に overflow する）。
+
+### DHT
+
+- **バイト列が2つあり、混同が典型バグ。** record key は `/ipns/<multihash>`、
+  DHT key は その SHA-256。距離は後者で測る。前者で測る node は
+  ネットワーク全体と違う topology を計算する —— エラーにはならず、
+  ただ lookup が違う peer を返し record が誰も引かない場所に載る。
+- **hash は必須で最適化ではない。** 任意の2つの IPNS record key は `/ipns/`
+  共有により **54 bit 一致**する（テストで実測）。hash 無しでは全 IPNS 名が
+  keyspace の一隅に堆積し Kademlia の保証が消える。
+- **進捗は最近傍で測る、shortlist のサイズではない。** 50 個の新 peer を
+  返したが誰も近くない round は**進捗なし**であり、それが停止条件。
+  「shortlist が伸びたか」で測ると大規模ネットワークでは決して停止しない。
+- **失敗した peer を失敗として記憶する。** さもないと最も近い到達不能 peer が
+  毎 round 選ばれ続ける（queried にならないので常に候補、かつ常に最近傍）。
+- **違う key に答えた応答は検査できるし、しなければならない。** peer は何を
+  返してもよい。`key-matches?` が無いと、ある名前の lookup が**別の名前の
+  正しく署名された有効な record** で答えられ、署名検査は全て通り resolver は
+  違う値を返す。**署名は誰が書いたかを証明するが、どの問いへの答えかは
+  決して証明しない。**
+- quorum は**検証済み** record を数える。未検証を数えると、先に答えた router が
+  名前を取れる。
+- `:not-found` と `:all-routers-failed` は別の答え。素直な書き方
+  （「失敗した応答は全部 404 か？」）は**失敗が1つも無いとき true になる**ので、
+  全 router が答えて何も検証を通らなかった場合を「誰もこの名前を持っていない」と
+  報告してしまう。
+
+## Non-goals
+
+- **NSEC3 相当の隠蔽は無い**（DHT 側の話ではない）。
+- **RSA 名は非対応**（`pubKey` フィールド経路）。Ed25519 の `k51…` のみ。
+  半端に作らず「無い」と書いた。
+- **`ipns.head` は撤去しない。** kotobase.net の registry に既にあるレコードの
+  形式であり、それ自体は間違っていない —— *local registry の* レコードである
+  というだけ。docstring にそう明記した。
+
+## Consequences
+
+**残る穴（優先順）:**
+
+1. **libp2p transport**（上記の名指しリスト）。これが埋まると `kad.message` +
+   `kad.lookup` がそのまま native DHT node になる。Noise XX が既にあるのは大きい。
+2. **k-bucket routing table** — node になるとき必要。lookup の shortlist とは別物。
+3. **crypto provider の配線** — `ipns.record` の `sign-fn`/`verify-fn` に
+   `kotoba-lang/ed25519` を繋ぐ薄い層。JVM 側は即座にできる。
+4. **kotobase.net の resolver を `kad.routing` 経由に切り替える** — 本 ADR は
+   ライブラリを作っただけで、`net-kotobase` 側の解決経路はまだ XRPC registry のまま。
+
+**ADR-2607309950 の gap 1 は「解消」ではなく「格下げ」。** record は
+相互運用可能になり、解決は単一サーバー依存でなくなった。中央集権点は
+「kotobase.net という1つの registry」から「自分で選べる複数の delegated
+router」に変わった —— これは実質的な前進だが、DHT への完全参加ではない。"}]
