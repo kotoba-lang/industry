@@ -89,12 +89,12 @@
 
 **その後 2607309600 側が着地し、私の 2 項目を自分で正しい場所に統合した**（app main `799a34d` 時点）:
 
-    (nav-group "BUSINESS")
-    (nav-item "portfolio" ...) (nav-item "canvas" ...)
-    (nav-item "fleet" ...)     (nav-item "operator" "事業者" ...)
-    (nav-item "contracts" ...)
-    (nav-group "WORKSPACE")  … 8 項目 …
-    (nav-group "SETTINGS")
+    (nav-group \"BUSINESS\")
+    (nav-item \"portfolio\" ...) (nav-item \"canvas\" ...)
+    (nav-item \"fleet\" ...)     (nav-item \"operator\" \"事業者\" ...)
+    (nav-item \"contracts\" ...)
+    (nav-group \"WORKSPACE\")  … 8 項目 …
+    (nav-group \"SETTINGS\")
 
 **`Repos` は作られず、私の `Fleet` 命名がその枠に採用された。** view panel に重複は無く（14 view、いずれも1件ずつ）、`/api/operator` 系 7 経路と両 panel は無傷。両者が混ざった main で `clojure -M:test` 512 tests / 2,156 assertions green、`clojure -M:lint` errors 0 を確認した。
 
