@@ -594,9 +594,25 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
    `:dev` alias を空にして CI が既に叩くコマンド（`-M:dev:test`）が git 座標を
    解決するようにした**（workflow 側の sibling checkout は死重として残る）。
    `gh auth refresh -s workflow` の後に、workflow 側を掃除できる。
-4. **consent surface に transport security が無い。** operator surface は token で
-   守られている（esim / card）が、consent surface は無認証のまま loopback 束縛で
-   塞いでいる。共有ホストに置くなら consent 境界が飾りになる。
+4. **consent surface の transport security は閉じた（2026-07-31）。** 3面すべてが token を
+   要求する: `X-CARD-CONSENT-TOKEN` / `X-ESIM-CONSENT-TOKEN` / `X-VOICE-CONSENT-TOKEN`
+   （env は `CARD_CONSENT_TOKEN` 等、**未設定は 503 で拒否** = fail closed）。
+   **loopback 束縛は認可ではない** — ホスト上の全プロセスがそれを共有する。これが無い間は、
+   ローカルの任意のプロセスが `"status":"approved"` と捏造した passkey-credential-id を
+   載せた proposal を POST でき、実カード発行や回線の provisioning / **transfer**（SIM-swap
+   経路）との間に残るのは「人間が同意したと信じた operator の承認」だけだった。
+   **governor は影響を受けない**（recorded state から ground truth を再計算する）ので、
+   これは「何をコミットしてよいか」ではなく **「誰が『subject が同意した』と主張してよいか」**
+   を gate する — **governor が再計算できない唯一のもの**（同意は別の場所で起きたので）。
+   **2つの token は別物**で、card にはそのテストがある（app の consent token で自分の提案を
+   承認できない。共有シークレットは改善に見えて 2 gate を静かに 1 つにする）。
+   `/healthz` は 3面とも開けたまま: subject データを持たず、**token を得る前に「actor が
+   生きているか」を訊けなければならない**（denwaban では特に、`can-answer-calls false` を
+   知る手段そのもの）。
+   app 側は authority key から**ヘッダ名を導出**し（`:card` → `X-CARD-CONSENT-TOKEN`)、
+   token は config が**変数名を指す**だけで値は環境変数から読む。**未設定でも app は先回りして
+   拒否しない** — actor の 503 が記録すべき正直な事実で、app が先に拒否すると actor の設定を
+   推測した上に本当の理由と違う理由を報告することになる。ワイヤ上で assert 済み。
 5. **pending の解決は polling のみ。** actor から app への callback は無い。決着を
    知るのが遅れるだけで嘘にはならないが、operator が決めてから app が気付くまでの
    窓は残る。**denwaban はこの窓を持たない**（pending を作らないため）。
