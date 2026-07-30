@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 5570, "kotobase-cf-wasm-staging" 2638},
+ {"net-kotobase" 5606, "kotobase-cf-wasm-staging" 2638},
  :zone
- {:requests-7d 10529,
-  :pageviews-7d 608,
-  :uniques-7d-sum 817,
+ {:requests-7d 10750,
+  :pageviews-7d 613,
+  :uniques-7d-sum 841,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 142}
-   {:path "/health", :requests 78}
-   {:path "/robots.txt", :requests 51}
+  [{:path "/", :requests 148}
+   {:path "/health", :requests 77}
+   {:path "/robots.txt", :requests 53}
    {:path "/_health", :requests 45}
    {:path "/signup", :requests 29}
-   {:path "/api/funnel", :requests 28}
+   {:path "/api/funnel", :requests 27}
    {:path "/llms-full.txt", :requests 25}
    {:path "/.well-known/did.json", :requests 21}],
-  :status-mix {:client-error 1236, :server-error 26, :ok 545},
+  :status-mix {:client-error 1455, :server-error 26, :ok 553},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,12 +30,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-30",
- :traffic-quality {:window "24h", :probe-4xx-pct 68, :error-5xx-pct 1},
+ :traffic-quality {:window "24h", :probe-4xx-pct 72, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 142 · /health 78 · /robots.txt 51 · /_health 45 · /signup 29 | 4xx(probe) 68% · 5xx 1%",
- :funnel {:visitors 1628, :signups 3, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): / 148 · /health 77 · /robots.txt 53 · /_health 45 · /signup 29 | 4xx(probe) 72% · 5xx 1%",
+ :funnel {:visitors 1632, :signups 3, :checkouts 0},
  :signal
- "kotobase.net 実測 10529 req/7d・817 uniques(日次和)・うち4xx probe 68%(24h)、workers 8208 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 10750 req/7d・841 uniques(日次和)・うち4xx probe 72%(24h)、workers 8244 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 4,
   :submissions 3,
@@ -44,4 +44,4 @@
   :attempt-rate 0.75,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 53}, :signups {}, :checkouts {}}}
+ {:visitors {:openai-ads 3, :organic 57}, :signups {}, :checkouts {}}}
