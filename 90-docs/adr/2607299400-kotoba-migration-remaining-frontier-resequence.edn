@@ -91,7 +91,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | ID | 内容 | 状態 |
 |---|---|---|
 | **T5.3** | rebalance seats pack → record export | **landed** murakumo#193–#199 (incl. schedule assign packs #199); residual: task-score-code ternary + plan/rebalance bump indices (numeric by design); flags3 #230 + label flags #232 |
-| T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
+| T5.2 | host bridge map/record ↔ guest record | **call-record expanded** #155+#261+#262 (map boundaries); **native guest record wire deferred** (T5.3 path) |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
@@ -898,6 +898,23 @@ Still open:
 1. T8.3 production AOT network/secret; W4 recursive values
 2. T5.2 native guest record wire; T8.4 live host runner
 3. Other -1 values in plan (pick indices) remain ordinal no-pick codes by design
+
+
+## Progress (2026-07-31ak — T5.2 call-record expand waves + pin)
+
+- murakumo#261 MERGED (`b617508b`): **T5.2 wave 1** — project-field `:bool`;
+  call-record on plan usable-bytes, config bins/wit, inventory/provision ports.
+  ADR-260731-w6-t52-call-record-expand.
+- murakumo#262 MERGED (`e1feda2f`): **T5.2 wave 2** — token claims/expired/
+  parts-present, report status-row, tunnel pick-exit via call-record.
+  ADR-260731-w6-t52-call-record-expand2. Evidence: 40 tests / 367 assertions.
+- west pin murakumo `990f79e6` → `e1feda2f` (#261+#262).
+
+Still open:
+1. T8.3 production AOT network/secret; W4 recursive values
+2. T5.2 native guest record wire (T5.3 `oracle/record` path already used by
+   schedule/task eligibility — full rewrite deferred)
+3. T8.4 live host runner
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
