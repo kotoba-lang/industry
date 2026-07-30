@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xmile version="1.0">
+  <header>
+    <name>cloud-itonami SaaS funnel — external tenants to paying tenants</name>
+    <vendor>com-junkawasaki/root, 90-docs/business</vendor>
+    <caption>Every initial value and every rate below is a MEASURED, DATED figure
+      from this workspace's own metrics, or an explicitly named derivation from
+      two dated observations. No parameter is estimated, and revenue is
+      deliberately absent because no price is measured here.
+
+      Sources, both real files in this repository:
+        A. 90-docs/business/metrics/cloud-itonami.edn, :asOf
+           "2026-07-30T11:11:56.942Z" — the emitter's live read of
+           itonami.cloud's own /api/fleet/metrics and Cloudflare zone.
+        B. orgs/kotoba-lang/loop-system-dynamics/resources/entities-seed.edn,
+           entity :cloud-itonami-saas-product, observation dated 2026-07-20,
+           itself citing file A as of that date.
+
+      STRUCTURE: signups flow into Non_Paying_Tenants; conversion moves a tenant
+      from there into Paying_Tenants. Conversion is an outflow of one stock and
+      an inflow of the other, so paying tenants can never exceed everyone who
+      ever signed up.
+
+      WHAT THIS MODEL CLAIMS: given 5 external tenants and 0 paying tenants
+      observed on 2026-07-30, and a signup rate of 0.1 tenants/day measured
+      from the 4 -> 5 change between the two dated observations, the number of
+      paying tenants is bounded above by the trajectory below. The conversion
+      rate used is the 95% UPPER BOUND consistent with zero conversions in 5
+      trials (dynamics.core/upper-bound-rate-from-zero-events, n=5), not a
+      point estimate — a point estimate would require at least one observed
+      conversion, and there is none.
+
+      WHAT IT DOES NOT CLAIM: that any tenant will convert. The measured
+      conversion is 0/5. The run below is the CEILING that is still consistent
+      with that measurement, which is a different and weaker statement than a
+      forecast. Read Paying_Tenants as 「これ以上にはならない」, never as
+      「これだけ増える」.
+
+      NOT MODELLED: revenue. Nothing in this workspace measures the price a
+      paying tenant pays, so a revenue variable would be the one fabricated
+      number in an otherwise measured model.</caption>
+  </header>
+
+  <sim_specs method="euler" time_units="days">
+    <start>0</start>
+    <stop>90</stop>
+    <dt>1</dt>
+  </sim_specs>
+
+  <model>
+    <variables>
+      <stock name="Non_Paying_Tenants">
+        <eqn>5</eqn>
+        <inflow>Tenant_Signup</inflow>
+        <outflow>Conversion</outflow>
+        <units>tenants</units>
+        <non_negative/>
+        <doc>MEASURED 5 = 5 external tenants minus 0 paying, both measured.
+          Source A, :tenants {:external-total 5 :active 5
+          :selfRegisteredOwners 5}, 2026-07-30. Source B recorded 4 on
+          2026-07-20, which is where Tenant_Signup's rate comes from.
+
+          CAVEAT carried from source B: itonami.cloud publishes an
+          agent-executable free-tier claim path (/isco-1212/agent.json), and
+          the same product reports 2,173 agent runs against 147 weekly human
+          uniques. Some of these tenants may be agents evaluating the product
+          rather than businesses considering a purchase. Source B records this
+          as a well-evidenced open possibility, not a finding; this model
+          therefore counts tenants as measured without asserting they are
+          buyers.</doc>
+      </stock>
+
+      <flow name="Tenant_Signup">
+        <eqn>0.1</eqn>
+        <units>tenants/day</units>
+        <non_negative/>
+        <doc>MEASURED 0.1/day = (5 - 4) tenants / 10 days, from the two dated
+          observations: 4 on 2026-07-20 (source B) and 5 on 2026-07-30
+          (source A). One tenant over ten days is a thin basis for a rate and is
+          stated as such: it is the observed rate over the only window this
+          workspace has two endpoints for, not a trend.</doc>
+      </flow>
+
+      <stock name="Paying_Tenants">
+        <eqn>0</eqn>
+        <inflow>Conversion</inflow>
+        <units>tenants</units>
+        <non_negative/>
+        <doc>MEASURED 0. Source A, :tenants {:external-paid 0} and
+          :funnel {:paid 0}; Stripe reports :activeSubscriptions 0 on the same
+          read. Source B independently recorded 0 on 2026-07-20 and separately
+          verified the checkout mechanism as live and complete
+          (stripeConfigured=true, webhookReady=true, readyForLiveCheckout=true)
+          — so this zero is a measured absence of conversions, not an absent
+          payment path.</doc>
+      </stock>
+
+      <flow name="Conversion">
+        <eqn>Non_Paying_Tenants * Conversion_Rate_Upper_Bound / Observation_Window_Days</eqn>
+        <units>tenants/day</units>
+        <non_negative/>
+        <doc>A CEILING, not a forecast. The per-trial upper bound is spread over
+          the observation window that produced it, which is the assumption this
+          flow makes explicit rather than burying: the bound is a probability per
+          trial, and turning it into a per-day rate requires naming a window.
+          Observation_Window_Days is that window, and it is measured.
+
+          It is an OUTFLOW of Non_Paying_Tenants as well as an inflow of
+          Paying_Tenants, so a converted tenant moves between the two stocks
+          instead of appearing in one. The first version of this model omitted
+          the outflow and was run before being committed: Paying_Tenants reached
+          38.3 while total tenants reached 14, i.e. more paying customers than
+          customers. A model that does not conserve its own population produces
+          numbers that look like a projection and are arithmetic nonsense, which
+          is worse than no model.</doc>
+      </flow>
+
+      <aux name="Total_Tenants">
+        <eqn>Non_Paying_Tenants + Paying_Tenants</eqn>
+        <units>tenants</units>
+        <doc>The conservation check, carried as a variable so it is visible in
+          any renderer instead of only asserted in this file's caption. It must
+          equal 5 + 0.1 * t at every step, because signup is the only inflow to
+          the pair and conversion only moves a tenant between them. Verified over
+          all 91 steps to within 1e-9 before this model was committed. If a later
+          edit breaks it, this line is where it shows.</doc>
+      </aux>
+
+      <aux name="Conversion_Rate_Upper_Bound">
+        <eqn>0.4507197283469411</eqn>
+        <units>dimensionless</units>
+        <doc>COMPUTED, not estimated: 1 - (1 - 0.95)^(1/5) = 0.4507197283469411,
+          the exact 95% upper bound on a Bernoulli rate given zero successes in
+          n=5 trials. Produced by
+          dynamics.core/upper-bound-rate-from-zero-events with n=5, the tenant
+          count from source A. n comes from a measurement, so this bound moves
+          when the measurement does: at n=4 (source B, 2026-07-20) it was
+          0.527129195498412.
+
+          This is the number that replaces both of the wrong answers — treating
+          an unconverted funnel as unquantifiable, and treating it as a rate of
+          exactly 0.</doc>
+      </aux>
+
+      <aux name="Observation_Window_Days">
+        <eqn>10</eqn>
+        <units>days</units>
+        <doc>MEASURED 10 days: 2026-07-20 (source B) to 2026-07-30 (source A).
+          The window over which zero of five tenants converted.</doc>
+      </aux>
+
+      <aux name="Weekly_Human_Uniques">
+        <eqn>147</eqn>
+        <units>uniques/week</units>
+        <doc>MEASURED 147. Source A, :zone {:uniques-7d-sum 147}, itonami.cloud
+          Cloudflare zone, trailing 7 days, 2026-07-30. Source B recorded 74 on
+          2026-07-20.
+
+          Held constant on purpose, and NOT wired into Tenant_Signup. Two dated
+          points give a change (+73 over 10 days) but not a measured
+          traffic-to-signup conversion, and multiplying traffic by an unmeasured
+          conversion rate is the single most common way this kind of analysis
+          goes wrong. It is carried as an observed context variable so a reader
+          can see the funnel's mouth beside its throat.</doc>
+      </aux>
+
+      <aux name="Agent_Runs_Per_Week">
+        <eqn>2173</eqn>
+        <units>runs/week</units>
+        <doc>MEASURED 2173. Source A, :agentRuns7d, 2026-07-30. Source B
+          recorded 34381 on 2026-07-20 — a 94% fall, unexplained by anything in
+          these two files, and recorded here rather than smoothed away. Present
+          because the agent:human ratio is the reason External_Tenants carries
+          its provenance caveat.</doc>
+      </aux>
+    </variables>
+  </model>
+</xmile>

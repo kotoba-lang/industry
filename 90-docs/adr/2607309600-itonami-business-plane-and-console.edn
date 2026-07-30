@@ -402,9 +402,13 @@ DADS が light 固定なので範囲外（ADR-2607262000）。
 - **今の leverage ledger が模型化しているのは fleet 自身の repo 登録 backlog** で、
   事業の経済（売上・顧客・現金）ではない。これは Phase 1 で「未決」として記録した
   gap そのもので、埋まっていないことを UI が黙らない。
-- **workspace に `.xmile` ファイルはまだ 1 つも無い**（実測 0 件）。したがってエンジン
-  経路は test で証明されており、出荷済みモデルでは証明されていない。実モデルを書くのは
-  後続作業。
+- ~~**workspace に `.xmile` ファイルはまだ 1 つも無い**~~ → **解消**（同日、
+  ADR-2607310100）。`90-docs/business/cloud-itonami-saas-funnel.xmile` が実測値だけで
+  書かれた最初の実モデル: external tenants 5 / paying 0 / signup 0.1-per-day はすべて
+  日付・出典付きの実測、転換は 0/5 なので点推定でも 0 でもなく 95% 上限 0.4507 を使う。
+  revenue は価格が未計測なので意図的に入れていない。`loops/model` 経由で
+  end-to-end 確認済み。**leverage ledger 側の gap（fleet backlog を模型化しており事業の
+  経済ではない）はこれとは別の話として残る。**
 
 ### 検証
 
