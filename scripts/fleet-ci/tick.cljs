@@ -655,7 +655,15 @@
   (let [d (remote-dir name sha)
         ssh-opts "-o BatchMode=yes -o ConnectTimeout=20"]
     (str "cat " tarball " | ssh " ssh-opts " " host
-         " \"find " remote-base " -maxdepth 1 -type d -mtime +1 -exec rm -rf {} + 2>/dev/null;"
+         ;; 保持は **分** で切る。`-mtime +1`（1 日）だと回収が生産に追いつかない:
+         ;; 実測 2026-07-30、asher の /tmp/fleet-ci は 474 dir / 20GB まで育ち
+         ;; ディスクを 100% 使い切っていたが、**1 日より古い dir は 0 件**だった
+         ;; ため prune は何も回収できなかった（gate は展開のたびに ~40MB 置き、
+         ;; 1 日あたり数百回走る）。ディスクが満杯のノードでは tar が
+         ;; "No space left on device" で落ち、gate は走る前に死ぬ。
+         ;; gate timeout は 30 分なので 120 分は 4 倍の余裕があり、走っている
+         ;; gate の dir を消す危険は無い。保持量は 24 時間分から 2 時間分に下がる。
+         " \"find " remote-base " -maxdepth 1 -mindepth 1 -type d -mmin +120 -exec rm -rf {} + 2>/dev/null;"
          " rm -rf " d "; mkdir -p " d "; tar xz -C " d " --strip-components=1"
          " && echo FLEET-CI-EXTRACT-OK\" > " out-file ".extract 2>&1; "
          "grep -q FLEET-CI-EXTRACT-OK " out-file ".extract"
