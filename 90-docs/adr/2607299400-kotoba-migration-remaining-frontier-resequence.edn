@@ -94,7 +94,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
-| T6.4 | cljs/browser で同じ pure artifact を実行 | 未着手 |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | **partial** murakumo#221 same-artifact; mirror delete open |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
@@ -350,8 +350,25 @@ task-eligible?, failed?, can-retry?, authorized?, write-ok?.
 
 **Still open:**
 1. Ranking / pick-code helpers stay `:i64` by design
-2. T6.4 cljs/browser same artifact (drop pure mirrors)
+2. T6.4 partial #221 (same-artifact proof); mirror delete still open
 3. T8.3 production AOT network/secret; W4 recursive values
+
+
+
+## Progress (2026-07-31f — T6.4 same-artifact + residual bool #219)
+
+- **murakumo#219 MERGED**: residual char/eq gates →  (digit-val?, alnum-char?,
+  constant-time-eq, weight-pos?, move-needed)
+- **murakumo#221 MERGED** (): **T6.4 first slice** — full catalog
+  same-artifact proof on cljs load path ( / classpath);
+  0-arity call≡ir/execute; kotoba-kir pin bool-at-return
+  (ADR-260731-w6-t64-same-artifact-cljs-load). Mirrors retained as fail-closed fallback.
+- west pins: murakumo , kotoba-kir tip
+
+**Still open:**
+1. T6.4 remainder: wholesale  deletion when cljs entrypoints preload
+2. T8.3 production AOT network/secret; W4 recursive values
+3. Ranking / pick-code stay  by design
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
