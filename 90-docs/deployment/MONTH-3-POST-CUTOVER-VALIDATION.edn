@@ -76,7 +76,7 @@
     :decision "All 6 checks must PASS to proceed to Phase 2"
     :if-all-pass "Proceed to extended validation (Phase 2)"
     :if-any-fail "Escalate to canary-lead for decision (rollback or continue with caveats)"
-    :owner-contact "murakumo-owner + platform-lead"}
+    :owner-contact "murakumo-owner + platform-lead"}}
 
   :validation/phase-2-early-validation
   {:seq 2
@@ -143,7 +143,7 @@
     :if-all-pass "Proceed to Phase 3 (extended 48h validation)"
     :if-any-fail "Escalate: investigate, determine if critical or acceptable caveat"
     :morning-briefing "Monitoring-lead prepares handoff: SLO graph, alert summary, any issues"
-    :owner-contact "murakumo-owner for morning review call"}
+    :owner-contact "murakumo-owner for morning review call"}}
 
   :validation/phase-3-extended-validation
   {:seq 3
@@ -243,7 +243,7 @@
     {:pass "Checks 1-7 all PASS, SLOs stable, no user impact, data integrity verified"
      :pass-with-caveats "1-2 checks have acceptable violations (e.g., transient latency spike, known limitation documented)"
      :fail "Any critical failure (data loss, user impact, SLO sustained violation, cascading failure)"}
-    :owner-contact "murakumo-owner makes final decision"}
+    :owner-contact "murakumo-owner makes final decision"}}
 
   :validation/final-decision
   {:seq 4
@@ -279,7 +279,7 @@
      "3. If restore: emergency rollback within 5 min (Rust pool standby ready)"
      "4. If investigate: keep cljc at 100%, debug for < 24 hours"
      "5. Post-incident: ADR documenting root cause and prevention"]
-    :documentation "90-docs/adr/MONTH-3-INCIDENT-CUTOVER-ABORT-<date>.edn"}
+    :documentation "90-docs/adr/MONTH-3-INCIDENT-CUTOVER-ABORT-<date>.edn"}}
 
   :validation/rollback-to-rust-procedure
   {:scenario "At any point during Phase 1-3, critical issue forces rollback"
