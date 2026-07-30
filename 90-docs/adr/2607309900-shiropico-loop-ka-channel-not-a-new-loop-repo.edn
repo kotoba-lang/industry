@@ -29,7 +29,7 @@
   :adr/known-gaps ["producer は環境変数に URL があることを到達可能性とみなす。到達しない URL は served leg として報告される。murakumo task plane 上では node の :requires gate が capability を担保するが、実 probe への置き換えは未実施。"
                    "episode 1-10 は shotlist が無いため catalog に載っていない。ep01 は既に motion-comic と panel が存在するので、過去分をどう扱うか(遡及登録するか、済として扱うか)は未決定。"
                    "producer は :legs を報告するだけで、実際のレンダリングは行っていない。backend が配線された時に :murakumo leg が本当に画を出すかは未検証。"
-                   "ghosthacker(シリーズ)の channel 化は依然として未実施だが、理由は変わった。deprecated だからではなく、producer がまだ無いから(shiropico と同じ状態)。"
+                   "ghosthacker の catalog は 6 話。arc0-1-origin は 257 パネル中 255 が生成済みで、残り 2 コマだけのために 1 話まるごと admit される。既生成分を尊重する差分生産は未実装。"
                    "loop-ka-production 自体の常駐(誰が cron/tick を打つか)は本 ADR の範囲外。既存 4 channel と同じ状態のまま。"],
   :adr/body
   "## Context
@@ -146,8 +146,29 @@ doc/code mismatch note は事実として残す。
 **シリーズを 3D/render engine の app ディレクトリに置くこと自体が層の取り違え**
 であり、後継の有無とは独立に不適切だった。
 
-channel 登録自体は引き続き未実施 — ただし理由は deprecated だからではなく、
-shiropico と同じく **producer がまだ無いから**である。
+**その後、channel 登録も完了した(2026-07-30)。** 生産単位はオーナー指示により
+**1話 = `260123-jump/resources/episodes/` 配下の 1 ディレクトリ**。実在 6 話を
+catalog 化した(`ep1-komawari-redesign` は episodeId 無し・panel 0 の
+レイアウト成果物なので除外)。
+
+| plan id | pages | panels | 生成済み |
+|---|---|---|---|
+| arc0-1-origin | 46 | 257 | **255** |
+| arc0-2-private-account | 56 | 273 | 0 |
+| arc0-3-digital-footprint | 43 | 167 | 0 |
+| 260123-cschool-defamation | 18 | 72 | 0 |
+| 260123-cschool-yami-baito | 18 | 71 | 0 |
+| 260125-parent-smartphone-safety | 32 | 128 | 0 |
+
+**manga なので leg の意味が video channel と違う。** `:video` は**パネル**を index
+する(パネルが画を得る単位)。`:voice` は **空**にする — マンガに narration leg は
+無く、`silent-shots` は `[]` に対して `[]` を返すので degraded にならない。
+パネルごとに `:silent` を出すと、**やる必要が無かったことを理由に全 run が永久に
+degraded になる**。`:bed false` / `:sfx []` も同じ理由で、最良でも `:thin`。
+
+`:requires` は `#{:nbb}` で **`:ffmpeg` を入れない**。mux する物が無いので、
+video channel からコピーすると placer が使わない capability を要求して
+実行できるノードを外す。
 
 ## 実装 — 実行して検証した
 
