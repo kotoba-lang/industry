@@ -216,6 +216,51 @@
 ;; markdown noise (**bold**, whitespace, an optional colon) commonly sits between a
 ;; label and its value -- e.g. "**Status**: R0" -- so labels tolerate up to 10
 ;; non-alphanumeric filler chars rather than a strict "label: value" match.
+;; A CODE SAMPLE IS NOT A STATUS DECLARATION, and this cost a real score.
+;;
+;; kotoba-lang/card's composite fell 0.73 -> 0.53 the moment its README documented
+;; the card lifecycle, because `:blocked` -- a CARD STATE, appearing inside fenced
+;; code blocks and an ASCII state diagram -- matched the `blocked` marker and was
+;; read as "this repository is blocked" (0.15, the lowest tier). io-stripe-issuing
+;; scored the same way off its state-mapping table. Documenting a domain that
+;; happens to contain the word made the repo look abandoned.
+;;
+;; So: strip fenced blocks and inline code before looking for markers, and require
+;; the WORD markers to sit in a status-ish context the way the R-tiers already do.
+;; Emoji stay bare -- ✅ / 🟡 / ⏳ are markers by nature and nobody writes them as
+;; domain vocabulary.
+(defn- strip-code
+  "Remove fenced code blocks and inline code spans. What is left is prose, which is
+  the only place a repository declares its own stage."
+  [text]
+  (-> (or text "")
+      (str/replace #"(?s)```.*?```" " ")
+      (str/replace #"(?s)~~~.*?~~~" " ")
+      (str/replace #"`[^`\n]*`" " ")))
+
+;; The window a word marker must share with a status-ish label, mirroring the
+;; R-tier patterns' own tolerance for markdown noise ("**Status**: blocked").
+(def ^:private status-label "(?:status|stage|maturity|state of (?:this|the) (?:repo|project)|進捗|状態)")
+
+(defn- labelled
+  "A regex matching `word` only when a status-ish label precedes it closely, or when
+  a list/table marker introduces it (`- blocked`, `| blocked |`).
+
+  The leading marker character is MANDATORY. Allowing a bare line start looked
+  reasonable and was wrong: these READMEs are hard-wrapped at ~72 columns, so any
+  word can land at the start of a line. cloud-itonami-card-issuing scored
+  :proposed-marker off the word `scaffold` opening a wrapped line in the middle of a
+  sentence about a compliance scaffold -- prose, not a status."
+  [word]
+  (re-pattern (str "(?im)(?:"
+                   ;; a status-ish label introduces it
+                   status-label "[^a-zA-Z0-9]{0,14}" word "\\b"
+                   ;; a list item is exactly this marker
+                   "|^[ \\t]*[-*+>][ \\t]*" word "\\b"
+                   ;; a table cell STARTS with it (`| blocked |`, `| blocked on … |`)
+                   "|\\|[ \\t]*" word "\\b[^|\\n]*\\|"
+                   ")")))
+
 (def stage-patterns
   ;; [regex score source-tag] — 最初にマッチしたものを採用。順序が優先度。
   [[#"(?i)status[^a-zA-Z0-9]{0,10}R5\b" 1.0 :status-r5]
@@ -226,15 +271,26 @@
    [#"(?i)status[^a-zA-Z0-9]{0,10}R0\b" 0.1 :status-r0]
    [#":implemented\b" 0.8 :spec-implemented]
    [#":spec\b" 0.2 :spec-only]
-   [#"✅|shipped|🟢|landed(?!\?)" 0.9 :landed-marker]
-   [#"🟡|proposed|scaffold" 0.3 :proposed-marker]
-   [#"⏳|blocked" 0.15 :blocked-marker]])
+   [#"✅|🟢" 0.9 :landed-marker]
+   [(labelled "(?:shipped|landed)") 0.9 :landed-marker]
+   [#"🟡" 0.3 :proposed-marker]
+   [(labelled "(?:proposed|scaffold)") 0.3 :proposed-marker]
+   [#"⏳" 0.15 :blocked-marker]
+   [(labelled "blocked") 0.15 :blocked-marker]])
+
+(def stage-score-method
+  "Recorded on every entity so a reader can tell which entries were scored with the
+  code-stripped, label-anchored rules and which still carry the older bare-word
+  ones. Entries without this key predate the fix and are only rescored when their
+  west pin moves (or on a --full run)."
+  :anchored-markers-code-stripped)
 
 (defn- stage-score [text]
-  (when (seq (str/trim (or text "")))
-    (some (fn [[re score tag]]
-            (when (re-find re text) [score tag]))
-          stage-patterns)))
+  (let [prose (strip-code text)]
+    (when (seq (str/trim prose))
+      (some (fn [[re score tag]]
+              (when (re-find re prose) [score tag]))
+            stage-patterns))))
 
 (defn- clamp01 [x] (max 0.0 (min 1.0 x)))
 
@@ -409,6 +465,12 @@
                :maturity/structural-detail structural-detail
                :maturity/activity-score activity
                :maturity/impl-score-method :size-and-scaffold-marker-heuristic
+               ;; Unconditional, like :maturity/impl-score-method: it describes HOW
+               ;; the axis was computed, which matters just as much when the answer
+               ;; is nil. Inside the `stage` branch it would be absent on exactly the
+               ;; entries whose nil needs explaining -- "no marker found by the fixed
+               ;; rules" would be indistinguishable from "scored before the fix".
+               :maturity/stage-score-method stage-score-method
                :maturity/computed-at (.toISOString (js/Date.))}
         stage        (assoc :maturity/stage-score stage :maturity/stage-source stage-tag)
         impl         (assoc :maturity/impl-score impl :maturity/impl-detail impl-detail)
@@ -441,7 +503,41 @@
          ["composite: all-1.0 -> 1.0"
           (composite 1.0 1.0 1.0 1.0 1.0) 1.0]
          ["composite: nil coverage renormalizes to 1.0"
-          (composite 1.0 1.0 1.0 1.0 nil) 1.0]]
+          (composite 1.0 1.0 1.0 1.0 nil) 1.0]
+
+         ;; The regression this fix exists for: a card lifecycle documented in a
+         ;; code fence must not read as a blocked project. This is kotoba-lang/card's
+         ;; actual README shape, reduced.
+         ["stage-score: :blocked inside a fence is not a blocked project"
+          (stage-score "# card\n\nStatus: R2\n\n```clojure\n(lc/reachable? :blocked :reissue)\n```\n")
+          [0.4 :status-r2]]
+         ["stage-score: a state diagram naming blocked scores nothing on its own"
+          (stage-score ":issued --activate--> :active --block--> :blocked\n")
+          nil]
+         ["stage-score: inline `:blocked` in prose does not count"
+          (stage-score "one is a card that was working and was `blocked` by a human.\n")
+          nil]
+         ["stage-score: a real status line still counts"
+          (stage-score "**Status**: blocked on a vendor decision\n") [0.15 :blocked-marker]]
+         ["stage-score: a list marker still counts"
+          (stage-score "- blocked: waiting on the scheme\n") [0.15 :blocked-marker]]
+         ["stage-score: an emoji marker still counts bare"
+          (stage-score "| feature | ⏳ |\n") [0.15 :blocked-marker]]
+         ["stage-score: 'shipped' in prose about someone else does not count"
+          (stage-score "The vendor shipped their SDK in 2024, which is not our status.\n")
+          nil]
+         ;; The second false positive: hard-wrapped prose puts an ordinary word at a
+         ;; line start. This is cloud-itonami-card-issuing's actual README, reduced.
+         ["stage-score: a wrapped line beginning with 'scaffold' is prose"
+          (stage-score (str "the software supplies the governed, spec-cited, audited execution\n"
+                            "scaffold so that operator does not have to build the compliance\n"))
+          nil]
+         ["stage-score: a table cell still counts"
+          (stage-score "| write paths | blocked |\n") [0.15 :blocked-marker]]
+         ["stage-score: R-tier wins over a later word marker"
+          (stage-score "Status: R4\n\n- proposed follow-ups below\n") [0.8 :status-r4]]
+         ["strip-code: fenced and inline code both go"
+          (str/includes? (strip-code "a ```x :blocked x``` b `:blocked` c") "blocked") false]]
         failures (for [[label actual expected] cases
                        :when (not= actual expected)]
                    (str "  FAIL " label ": expected " expected ", got " actual))]
