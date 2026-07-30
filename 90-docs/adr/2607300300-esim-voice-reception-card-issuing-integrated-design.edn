@@ -621,6 +621,22 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
    **sibling を `../` に clone する CI は consumability を何も証明しない** — `cloud-itonami-card-issuing`
    で実際に、CI が「fork が持たないレイアウト」を自分で用意していたために、published repo が
    classpath を作れないことを検出できていなかった。
+
+   **2026-07-31 の sweep: 85 → 50 件。** `nbb scripts/make-consumable.cljs <repo> [--execute]`
+   で 1 件ずつ直す（`consumability-audit.cljs` が母集団、こちらが個体）。**検証は欠陥の定義
+   どおり**: `clojure -Spath` は deps.edn しか要らないので、書き換えた 1 ファイルを**空
+   ディレクトリ**に置いて解決させる（= fork した人の状況であり、workspace が決して再現しない
+   状況）。解決しなければコミットしない。
+   直した 35 件: `uikit` / `geojson` `iso3166` `mathml` `musicxml` `graphml` `atom` `otio`
+   `mrz` `wire` / `atprotocol` `character` `cofog` `ctf` `denrei` `diskspace` `kenchi` `kobo`
+   `kotoba-worker-demo` `kotodama-mcp` `loop-jiten` `occupation` `oidc` `org-ieee-verilog`
+   `org-ietf-turn` `qa-governor` `shoko` `signal-integrity` `toshokan` `watchlist-screen`
+   `banking` `insurance` `kami-studio` `hls` `koyomi` `omise`。
+   **順序の制約**: 座標で pin しても、その sibling 自身が消費不能なら解決しない。85 件のうち
+   63 件は全 sibling が clean（今すぐ直せる）、22 件は別の壊れた sibling 待ちだった。
+   **新たに判明した第3の詰まり**: `deps.edn を持たない 137 repo` は「データが無い」のではなく
+   **git 依存として消費できない**（実測: `ocio` は `yaml` に依存しているが `yaml` に deps.edn が
+   無く、`Manifest file not found` で解決不能 → script が commit を拒否した）。
 8. 小さいもの: `cloud-itonami-app` の既存 lint warning 11 件（うち 8 件は phantom
    require）/ `cloud-itonami-app` の full suite 5 回中 1 回だけ 1 failure が出た
    （出力を読む前に truncate してしまい **原因未特定**。以降 4 回は green。新規の
