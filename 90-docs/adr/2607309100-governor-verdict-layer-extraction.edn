@@ -1,0 +1,89 @@
+[{:db/id -1
+  :adr/id "2607309100"
+  :adr/title "itonami actor の verdict 層を kotoba-lang/governor に抽出する — 376 の手写しのうち1件が実際に乖離していた"
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/last-verified "2026-07-30"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/tags ["governor" "actor" "itonami" "duplication" "drift" "kotoba-lang"
+             "cloud-itonami" "langgraph"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/authoritative-for
+  ["itonami actor の verdict 組み立て（:ok?/:hard?/:escalate?/:escalation-reason）と provenance 4規則の正本が kotoba-lang/governor であるという決定の正本"
+   "cloud-itonami-isco-5419 の :escalate? 乖離とその修正の記録の正本"
+   "この移行を漸進（触るついでに1件ずつ）で行い、fleet 一括書き換えをしないという決定の正本"]
+
+  :adr/context
+  "ISIC / ISCO / lawfirm の3リポが法律実務に重複して触れていると報告したところ、オーナーから『ちょっとづつ違ったりしない?』という指摘があった。**指摘が正しく、報告が誤っていた。**
+
+実測すると: `isic-` は README 一行目が Open **Business** Blueprint for ISIC Rev.5（事業、460 repo）、`isco-` は Open **Occupation** Blueprint for ISCO-08（職業、340 repo）で、`manifest/repository-rules.edn` も `:role :sector-agent` / `:occupation-agent` と別ロールを与えている。2本の国際標準を意図的に別軸として張っており、同じドメインが両方に現れるのは設計であって重複ではない。
+
+HARD 不変条件を並べても交わらなかった:
+
+  isic-6910（会社設立・登記代理、14件）  sanctions-hit / kyc-incomplete / no-registry-number / already-dissolved / post-filing-intake-blocked …
+  isic-6910-legalsupport（本人支援、8件） no-licensed-reviewer / referral-compensation-refused-by-design / revenue-mode-not-admissible / service-mode-not-admissible
+  isco-2611（弁護士の職務、6件）          billable-hours-exceeds-scope / conflict-check-not-cleared
+  lawfirm（事務所の運営、13件）           資格確認・委任契約・期限徒過・預り金3種・紹介料・書面精査・privilege
+
+同じ ISIC 6910 の2つですら、片方は制裁リストと登記番号を、もう片方は収益モデルの admissibility をゲートしている。`:conflict-check-not-cleared` を持つ repo は isco-2611 と lawfirm の2つだけだった。
+
+**本物の重複は別の場所にあった。** `:no-actuation` / `:no-client` / `:unknown-matter` / `:matter-wrong-client` の4規則と、その周りの verdict 組み立て5行が、**376 の `governor.cljc` に手で複製されていた**。"
+
+  :adr/decision
+  "verdict 層を `kotoba-lang/governor`（prefix なし = reusable library、依存ゼロ）に抽出し、**漸進移行**する。
+
+**376 ファイルの実測（2026-07-30）**:
+  - 346 が同一の5行 shape。違うのは escalation trigger のローカル名だけ（`always-risky?` ×146 / `risky-op?` ×107 / `stakes?` ×13 / `escalating-op?` ×9 …）。
+  - 365 が `confidence-floor` 0.6（5件が 0.4、5件が 0.7 — これは意図的）。
+  - **1件が乖離していた。**
+
+**乖離**: `cloud-itonami-isco-5419` が `:escalate? (or hard? low? escalating-op?)`。346 の兄弟は `(and (not hard?) (or low? escalating-op?))`。
+
+グラフ上の誤ルーティングは起きていない——`actor/route` が `:hard?` を先に見るので hold に落ちる。**壊れていたのは verdict を読む他の消費者への報告**で、しかもこの actor では意味が重い: `forbidden-ops`（use-of-force / arrest-or-detention / armed-response）と `:flag-security-concern` は、governor 自身の docstring が「no human approval can grant it one — there is no override path」「not merely an escalation … this actor has no authority to act on a safety concern in any way and **must not appear to**」と書いている HARD stop なのに、verdict は「承認待ち」と言っていた。まさに appear to していた。
+
+さらに **テストがその不具合の側を assert していた**: `test-flag-security-concern-always-hard-stops-even-at-high-confidence` が `(is (true? (:escalate? verdict)))` を持ち、deftest 名と governor docstring の両方に矛盾したまま緑だった。複製元に合わせて書かれたテストは、複製元の欠陥ごと固定する。
+
+**ライブラリが持つもの**: `verdict`（5行の組み立て）/ `disposition`（`:govern` からの conditional edge）/ `no-actuation` / `missing-subject` / `unknown-scope` / `scope-owner-mismatch` / `violations` / `conformance-failures`。
+
+**持たないもの**: domain 規則・Store プロトコル・`:detail` 文言。各 actor の `:detail` はその actor の言語で書かれた利用者向けテキストで、Store はその actor のもの。だから全関数が **store ではなく呼び出し側が既に読んだ値**を受け取り、rule keyword と detail は上書きできる。依存ゼロ（376 の actor が全ての書込・開示・提出・送金を通すゲートなので、依存物はそのゲートの trusted base に入る）。
+
+**保証**: 3つの disposition は排他で `:hard?` が勝つ。**HARD violation は決して escalatable として報告されない** — 人が承認できるものではないし、できると言えば誰かが試す。`disposition` も `:hard?` を先に見るので、どこかから来た malformed な verdict でも fail closed する。
+
+**最も安い採用形は1行のテスト**: 自前の `check` を一切変えずに `(is (empty? (gov/conformance-failures (governor/check …))))` を足すだけで、この乖離クラスは検出できる。
+
+**漸進移行**: 触るついでに1件ずつ。376 を一度に触る移行は起きない移行であり、未読のまま一括書き換えするのは `west.yml` pin 退行事故 `90852b86` の起き方そのもの。"
+
+  :adr/consequences
+  "**着地**:
+  - `kotoba-lang/governor` = `8df632b6610d30f6fef4edd9782cb1659bedb727`（新規、public、依存ゼロ、15 tests / 104 assertions green、lint warnings 0）
+  - `cloud-itonami/cloud-itonami-isco-5419` = `0c02c5775f16a20ec92f7b1cadb4ce04482f7d72` — **乖離の修正**。テストの誤った assert も訂正し、literal でなく性質を pin する `test-every-verdict-is-well-formed` を追加（40 tests / 123 assertions green）
+  - `cloud-itonami/cloud-itonami-isco-2611` = `38a71e40daac2c578e969237093878fd9ea1ff48` — 純粋なリファクタ。`docs/samples/operator-console.html` を再生成して **byte 差分ゼロ**（15 tests / 40 assertions green）
+  - `cloud-itonami/lawfirm` = `974b94ffe0a550029b779644a815c83c383be1dd` — 同じく純粋なリファクタ。`docs/samples/lawyer-console.html` 再生成で byte 差分ゼロ（81 tests / 377 assertions green）
+  - `manifest/repos.edn` `19d9c0a70562be11e8a890dfb829e9decb3427e0`（`:extra-projects` に登録）/ `manifest/west.yml` `624e2df5429c67a6a6f327c9c7fa3df63a4c17d8`（entry 追加 + 3 pin 前進、diff は 4 箇所のみ）
+
+**残り約373 repo は手書きの verdict のまま。** これは意図した速度であって未完了ではない。誰かがそのファイルを開く理由ができたときに移す。
+
+**同じ故障様式の3件目**（先行2件はいずれも CLAUDE.md 記載）:
+  1. `cacao.clj` — 約25 repo に「keep in sync」コメント付きで複製され、**実際に乖離した**（`denrei` は共有 `ed25519.core` と multi-cap grant を持つが、`gijiroku` は自前 JDK Ed25519 で multi-cap 無し）。ADR-2607268000。
+  2. `langchain-store` の `enc`/`dec` codec — 190 repo に complete-identical。ADR-2607141600。
+  3. これ。
+
+手で同期する取り決めは機能しない、が3回目の観測で確認された。
+
+**報告の訂正**: ADR-2607309000 の Consequences 末尾『次にやるなら (c) isco-2611 / isic-6910-legalsupport との関係整理——どちらが正本かを決める必要がある』は**誤り**。3リポは別軸・別ゲートであり、正本を決める対象ではない。統合すべきだったのは actor パターンの定型層で、それが本 ADR。
+
+**次にやるなら**: (a) 30 repo は verdict 式を静的に抽出できなかった（`cloud-itonami` 本体は `kv/verdict-is-escalate?` という別アーキテクチャ）ので、そこは別途の目視が要る。(b) `confidence-floor` 0.4 / 0.7 の10件が意図的かどうかは各 ADR を読んでいない。(c) 移行済み3件を除く残りに対し、`conformance-failures` だけを足す1行 PR を fleet-ci の tick で自動生成することは可能だが、376 の PR を無人で開けるのが良いかは別判断。"
+
+  :adr/evidence
+  ["376 の governor.cljc を静的解析: :escalate? 式の異なり 42 種、上位は (and (not hard?) (or low? always-risky?)) ×146 / (and (not hard?) (or low? risky-op?)) ×107 / stakes? ×13 / escalating-op? ×9"
+   "confidence-floor: 0.6 ×365, 0.4 ×5, 0.7 ×5, 宣言なし ×1"
+   ":escalate? が hard? でガードされていない repo: cloud-itonami-isco-5419 のみ（他1件は cloud-itonami 本体で別アーキテクチャ）"
+   ":rule :conflict-check-not-cleared を持つ repo は cloud-itonami-isco-2611 と lawfirm の2つだけ — 法律3リポは重複していない"
+   "isic 460 repo / isco 340 repo、manifest/repository-rules.edn が :sector-agent / :occupation-agent と別ロールを付与"
+   "kotoba-lang/governor: 15 tests / 104 assertions green, lint warnings 0, 依存ゼロ"
+   "isco-5419: 40 tests / 123 assertions green（修正後）"
+   "isco-2611: 15 tests / 40 assertions green, operator-console.html 再生成で byte 差分ゼロ"
+   "lawfirm: 81 tests / 377 assertions green, lawyer-console.html 再生成で byte 差分ゼロ"]}]
