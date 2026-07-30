@@ -666,11 +666,24 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
    `../../cloud-itonami/cloud-itonami-isic-6311` のような cross-org 指定で**同名の別 repo を
    黙って pin し得た**（`securities` で発覚。その名の kotoba-lang repo が存在しなかったため
    拒否されただけで、存在していれば誤った code を指したまま classpath は解決していた）。
-8. 小さいもの: `cloud-itonami-app` の既存 lint warning 11 件（うち 8 件は phantom
-   require）/ `cloud-itonami-app` の full suite 5 回中 1 回だけ 1 failure が出た
-   （出力を読む前に truncate してしまい **原因未特定**。以降 4 回は green。新規の
-   socket テストが ephemeral port を掴むのは**可能性のある**原因で、確定ではない）/
-   `cardissuing.registry` の Luhn 重複実装 / `kotoba-lang/esim` に `ui.cljc` が無い。
+8. **`cloud-itonami-app` の phantom var 警告は「小さいもの」ではなかった（2026-07-31 実測）。**
+   `store/update-agent-control!` は clj-kondo が phantom として報告していたもののひとつだが、
+   **`agent_control.clj` はこれを 4 箇所で呼び、`store` はこの var を定義していない** →
+   **この namespace は alias の有無に関わらずコンパイルできない**。
+   `fleet.clj` のコメントは「`agent.run` が `:dev` の west layout でしか解決しないから
+   agent-control のテストが無い」と説明していたが、**それは理由の半分**だった:
+   `kotoba-lang/agent` と `kotoba-lang/hil` は実在し **git 座標で名指しできる**（実際に
+   `:deps` に足すとロードが始まるところまで進む）。その先で上記の phantom var で落ちる。
+   さらに **src/ の中で agent-control を require しているものは無い**（`mcp.clj` /
+   `fleet.clj` の言及はコメントのみ）。つまり **684 行が到達不能かつコンパイル不能**のまま
+   出荷されている。
+   **直さず記録した**: 足りない関数を書けば dead code がロードされるようになるだけで、
+   agent-control を完成させるのか削除するのかは**プロダクト範囲の判断**であってテスト gap
+   ではない。コメント側は「alias を直せばテストできる」と読めてしまう記述を実測で訂正した
+   （`cloud-itonami-app` 01bda447）。
+   その他の小さいもの: `cardissuing.registry` の Luhn 重複実装 / `kotoba-lang/esim` に
+   `ui.cljc` が無い / `cloud-itonami-app` の full suite が 5 回中 1 回だけ 1 failure を
+   出した件（原因未特定、以降再現せず）。
 
 **意図的に開けているもの（gap ではなく決定）**: jurisdiction spec-basis catalog の不在 /
 EID checksum を検証しない / `io-libp2p` vs `webrtc` の binding provenance 未決 /
