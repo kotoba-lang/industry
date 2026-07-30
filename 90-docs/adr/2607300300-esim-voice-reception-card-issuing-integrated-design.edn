@@ -519,7 +519,42 @@ proposal を「発行済み」と表示してはならない。
    - actor の HTTP 面は **loopback 束縛・自前の認証なし**（公開に晒すと consent 境界が
      飾りになる）。store は per-process MemStore のまま（gap 2 は別変更）。
 
-**build order は 9 step 完了（当初 7 + 抜けていた 8・9）。** ただし本 ADR の「到達上限」節は不変で、
+10. ✅ **done（2026-07-30）** pending の決着を問える／下せるようにした
+   （esim actor pin `c072ad15` CI green・**50 tests / 249 assertions**、
+   app pin `3e668275` CI green・**286 tests / 1,289 assertions**）。
+   step 9 が作った gap を閉じる。
+   - **決着を下す口は app が到達できない場所に置いた。** pending を待っているのは
+     **actor 自身の operator** なので、decide を consent surface に置くと
+     **app が自分の proposal を自分で承認でき、D3 が boundary ではなくコメントになる**。
+     2つのリスナーに分けた: consent（`POST /commit` / `GET /proposals/<ref>` /
+     `GET /healthz`）と operator（`POST /proposals/<ref>/decide`）。consent surface は
+     listen していないので decide に**到達できない** — ポリシーチェックではなく構造的分離。
+     テストが3つの path 形すべてで 404 かつ proposal が pending のままであることを固定。
+     **app の config には operator surface のアドレスを持たせない。**
+   - operator surface は `X-ESIM-OPERATOR-TOKEN` を要求し、**`ESIM_OPERATOR_TOKEN`
+     未設定なら全 decide を拒否（503）**。fail-open だと**誰も設定していない時に
+     最も危険**になる。`by`（承認者）も必須 — **名前のない承認は監査できない**。
+   - **「知らない」を「拒否された」にしない。** `GET /proposals/<ref>` は未知の reference に
+     `unknown` を返す（checkpointer が in-memory なので再起動前の reference は全部これ）。
+     app の `refresh!` はこれを受けても proposal を **refused にしない** —
+     **誰も拒否していないのに governor 拒否として ledger に書くと、誰も下していない決定を
+     記録することになる**。pending のまま `:authority-unknown-since` を記録する。
+     「到達できない」と「authority が知らない」も別扱い。
+   - **contract を構造で強制した**: `:authority/status` を domain contract の**必須**に。
+     「pending と答えられるのに、それがどうなったか聞けない authority」は動かない proposal を
+     残すので、`valid-domain?` が要求し `review!` が拒否する。
+   - `:endpoint` の意味を「commit URL」から **base URL** に変更（transport が `/commit` と
+     `/proposals/<ref>` を導出）。既定が nil で誰も依存していなかったので、未使用ノブの改名。
+     `interpret` を commit と refresh で共有し、同じ wire 語を別に読むことを防ぐ。
+   - **別セッションの作業への影響**: 並行して**別セッションが本 spine の上に
+     `authority.payment` adapter を作っていた**。contract 変更で壊れたので**同じ形で拡張して
+     直した** — 彼らのテストは無変更で通る。落ちたまま放置していない。
+   - **報告**: app main の tip（`b36658f4`、別セッションの drive optimistic-locking マージ）は
+     **CI が赤い** — `core_test` の worker タイミング assertion（`:worker/finished` 待ちの race）で、
+     authority 系 namespace は全て通っている。本作業由来ではないので触っていないが、
+     pin は赤い tip ではなく **green な `3e668275`** に留めた。
+
+**build order は 10 step 完了（当初 7 + 抜けていた 8・9・10）。** ただし本 ADR の「到達上限」節は不変で、
 背後の actor は全て `:effect :propose` only なので、`:committed` は
 「governed proposal が記録された」だけを意味する。
 
@@ -528,18 +563,17 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
 
 ## 残る gap（2026-07-30 時点、優先順）
 
-1. **pending な proposal を進める手段が無い（新規、step 9 で生まれた）。**
-   `:authority-pending` は非 terminal だが、app には operator の最終判断を知る
-   **callback も poll も無い**ので、pending の proposal は動かないまま残る。
-   terminal にすれば消えるが、それは分かっていないことについて嘘をつくことになるので
-   しない。塞ぐには actor 側に「この reference の決着」を問える読み口と、app 側に
-   それを反映する経路が必要。
-2. **`card-issuing` と `denwaban` に HTTP 面が無い。** eSIM は step 9 で解消
-   （`POST /commit`、loopback、41 tests）。残る2つは server/http/handler/worker 系
-   ファイルが0件のままなので、`:endpoint-not-configured` / `:transport-failed` を返す。
-   eSIM の `esimprovisioning.http` がそのまま雛形になる。
-3. **actor の HTTP 面に自前の認証が無い。** loopback 束縛で塞いでいるが、
-   共有ホストに置くなら consent 境界が飾りになる。公開する前に認証が必要。
+1. **`card-issuing` と `denwaban` に HTTP 面が無い（最大）。** eSIM は step 9/10 で
+   完了（consent + operator の2面、50 tests）。残る2つは server/http/handler/worker 系
+   ファイルが0件のままで、`:authority/status` が contract 必須になった今、
+   **adapter は答えを求めるのに実体が無い**状態（`:endpoint-not-configured` が返る）。
+   `esimprovisioning.http` がそのまま雛形になる。
+2. **consent surface に transport security が無い。** operator surface は token で
+   守られたが（step 10）、consent surface は無認証のまま loopback 束縛で塞いでいる。
+   共有ホストに置くなら、consent 境界が飾りになるので先に認証が必要。
+3. **pending の解決は polling のみ。** `refresh!` は app から問い合わせる形で、
+   actor から app への callback は無い。決着を知るのが遅れるだけで嘘にはならないが、
+   operator が決めてから app が気付くまでの窓は残る。
 4. **D4 の単一 ref が actor 側でまだ成立していない。** app 内では1つの store partition で
    cross-domain 読みが成立するが、**actor の ledger は各自 MemStore のみ**
    （実測: esim actor の store に kotobase/Datomic 参照0件）。①を実装する時に actor の store を
