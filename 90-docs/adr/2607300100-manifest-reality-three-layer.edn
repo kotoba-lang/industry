@@ -109,5 +109,54 @@ tenant-neutral な core ではなく `profiles/` に置く。
 - 壊れていた時点の `west.yml` (`6ebf4b4b5fc`) に対して `:west/stray-block` を
   line 19 / `:remotes` として正しく検出
 - gate を実 superproject に対して試走し exit 0
-"
-  :adr/artifact "kotoba-lang/manifest-reality"}]
+\"
+  :adr/artifact \"kotoba-lang/manifest-reality
+
+## 実施状況 (2026-07-30 closing)
+
+**着地済み**: library `kotoba-lang/manifest-reality` (main tip `0773406252ca`、public、open PR 0)、
+gate `scripts/fleet-ci/gates/manifest-reality-check.cljs`、`gates.edn` の `root-manifest-reality`
+entry、west 登録 (pin = `0773406252ca`)。superproject default branch commit: `a49709b7854`。
+
+**検証 (すべて実測)**:
+
+| 検査 | 結果 |
+|---|---|
+| library の nbb テスト | 10 tests / 23 assertions、0 failures |
+| 実 `west.yml` に対する audit | **0 error / 8 warn** — 手作業で「意図的に残した」と判断した 8 件 (archived tombstone 5 + `.github` + `kotoba-git` + `kami-engine-hud`) と完全一致 |
+| 回帰: 壊れていた `west.yml` (`6ebf4b4b5fc`) | `:west/stray-block` を line 19 / `:remotes` として検出 |
+| gate の試走 (実 superproject / sparse checkout) | どちらも exit 0 |
+| `gen-west-manifest.cljs --check` | **pin 中立な文脈で** west.yml is up to date |
+| `west-orphan-audit --blocking` | **1 件残** (下記) |
+
+**`--check` は checkout の文脈で結果が変わる。** `orgs/` を持つメイン checkout で走らせると
+STALE になるが、これは west.yml が canonical でないからではない — generator が
+`working-head`（ローカル HEAD）で pin するため、pin より進んだ/遅れたローカル checkout が
+あると「差分あり」と出る（CLAUDE.md が記録する「pin 退行の罠」そのもの）。
+**canonicality を見るときは `orgs/` を持たない sparse worktree で走らせる。** 本 closing では
+そちらで up to date を確認した。gate も同じ理由で `orgs/` を送らない tree で走る。
+
+**残 1 件の blocking は本 ADR の変更由来ではない。** `orgs/com-junkawasaki/kotodama` を
+`orgs/network-awai/local-manimani/deps.edn` が参照している状態だが、**remote は既に修正済み**
+(pin `93c6f7c9d427` の `:local/root` は `\"../../kotoba-lang/kotodama\"`)。ローカル checkout が
+古い pin のままなだけで、当該 repo に**他者の未コミット WIP が 16 件**あるため `west update` を
+かけていない (CLAUDE.md「オーナーの未コミット WIP は破棄しない」)。WIP を着地させた後に
+`west update local-manimani` で解消する。同種の 7 件 (gftd-*-actor) は clean だったので
+本 closing で同期済み。
+
+## Resume point — 次にやること
+
+1. **cloud-itonami-app 側の receipt 表示** (`profiles/` に置く、`manifest/fleet-ci.edn` を read-only)。
+   **app を第二の権威にしない** — receipt は `fleet-agent-murakumo-ci-tip` 署名の append-only 台帳
+2. **GitHub 突合を日次 gate として `gates.edn` に追加** (`:script-args [\"--with-reality\"]`、別 `:id`)。
+   毎 tick には載せない (API 約 4,000 コール)
+3. **Common Crawl actor の配線** — `kotobase-commoncrawl-actor` が
+   `net-kotobase-commoncrawler` を消費せず CDX/fetch を二重実装している (ADR-2607289700 参照)
+4. `oil-*` 7 件 (コードなしの did:web シェル、DID は live) の identity 退役判断
+
+最初のコマンド:
+```bash
+nbb scripts/fleet-ci/gates/manifest-reality-check.cljs .            # 0 error を確認
+nbb --classpath \".:scripts/nbb_compat\" scripts/west-orphan-audit.cljs --blocking
+```
+"}]
