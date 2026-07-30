@@ -100,6 +100,30 @@
               authority-library (assoc :authority-library authority-library))))
         @prefix-rules))
 
+(def ^:private deploy-configs
+  "Filename → the deploy path it declares. Presence is a FACT read off the
+  repository, never an inference: a repo that ships `wrangler.jsonc` has a
+  Cloudflare deploy path an operator can actually run, and one that does not
+  has none that this generator can see.
+
+  Fourteen of ~1,200 repositories carry one. That number is the honest answer
+  to an operator asking \"can I deploy this?\" — for almost every blueprint the
+  answer is that they would be building the deployment themselves, and a UI
+  that offered a deploy button anyway would be inventing a path. Same rule as
+  `:endpoint`: never guess an address, and never guess a way to create one."
+  {"wrangler.jsonc" :cloudflare
+   "wrangler.toml" :cloudflare
+   "fly.toml" :fly
+   "Dockerfile" :container})
+
+(defn- deploy-config
+  "The deploy paths a repository actually ships, or nil."
+  [dir]
+  (let [found (into [] (keep (fn [[f kind]]
+                               (when (fs/existsSync (path/join fleet-dir dir f)) kind)))
+                    deploy-configs)]
+    (when (seq found) (vec (distinct found)))))
+
 (defn- read-blueprint
   "Classify one blueprint.edn: {:entry m}, {:non-actor {...}} or {:skipped {...}}.
 
@@ -133,7 +157,9 @@
             ;; declare an id that another already owns. Without the directory
             ;; name a consumer cannot tell the colliding entries apart, and a
             ;; lookup by id silently returns whichever sorted first.
-            {:entry (into (merge (sorted-map :repo dir) (role+execution dir))
+            {:entry (into (merge (sorted-map :repo dir)
+                                 (role+execution dir)
+                                 (when-some [d (deploy-config dir)] {:deploy-config d}))
                           (keep (fn [k]
                                   (when-some [v (get m k)]
                                     [(short-key k) v])))
