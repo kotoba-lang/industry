@@ -288,7 +288,7 @@ markup を確認し、inline JS を `node --check` で構文検査。
 ### 副産物として見つけた既存 bug（同時に修正）
 
 `clojure.data.json/write-str` は **keyword キーの名前空間を落とす**（`:business/id`
-→ `"id"`）。このため `renderOperator` が読んでいた `['operator/name']` /
+→ `\"id\"`）。このため `renderOperator` が読んでいた `['operator/name']` /
 `['adoption/repo']` / `['adoption/stage']` などは **undefined** で、事業者 pane の
 参与一覧とプロファイル名が空だった。documents / sheets / slides / forms の
 `['docs/blocks']` 系が壊れていないのは、**あちらのキーが server 側で文字列**
@@ -306,7 +306,7 @@ Canvas 面を出すのに 1 つ足りなかった: **fold 済み canvas がデ�
 
 - **`gftd.canvas/render-datoms` + `gftd canvas datoms`** を追加。
   `90-docs/business/<product>-canvas.datoms.edn` を 12 product 分生成
-  （1 header + 9 block + 仮説）。`:source/dataset "canvas-projection"` で
+  （1 header + 9 block + 仮説）。`:source/dataset \"canvas-projection\"` で
   **fold 前の base datoms と区別できる** — ledger event は docs EDN 面に載って
   いないので、今まで `90-docs` を `:find` すると「最初に書かれたときの canvas」が
   返っていた（実測: `hyp/t1` は base で `untested`、projection で `measuring`）。
