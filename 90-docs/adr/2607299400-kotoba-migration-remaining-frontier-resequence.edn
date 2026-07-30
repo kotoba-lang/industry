@@ -229,6 +229,21 @@ schedule assign, plan, seats, eligibility, credits shares, reconcile targets.
 3. reconcile `name-bits` residual
 4. bool-typed predicate surface (language opt-in)
 
+
+## Progress (2026-07-30d — task + rebalance residual packs)
+
+- murakumo#203 task assign packs → records
+- murakumo#204 rebalance pool-demand / class-demand / seat-order → records
+  (`:rebalance/lanes|demand|order`); module free of base-N packing
+
+**T5.3 public/base-N pack cutover for pure-planner oracles is effectively complete.**
+
+**Still open:**
+1. reconcile `name-bits` (3 pairwise name-order flags)
+2. task/schedule eligibility still uses `:i64` 0/1 fields (bool-typed predicates = language slice)
+3. bool-typed comparisons + wasm bool export ABI (opt-in, multi-repo)
+4. T6.2 / T8.3 / W4
+
 ## Consequences
 
 - superproject から見た移行の現在地が 2026-07-29 断面に揃った。以後、現在地を
