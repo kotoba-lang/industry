@@ -262,21 +262,34 @@
                    ")")))
 
 (def stage-patterns
-  ;; [regex score source-tag] — 最初にマッチしたものを採用。順序が優先度。
-  [[#"(?i)status[^a-zA-Z0-9]{0,10}R5\b" 1.0 :status-r5]
-   [#"(?i)status[^a-zA-Z0-9]{0,10}R4\b" 0.8 :status-r4]
-   [#"(?i)status[^a-zA-Z0-9]{0,10}R3\b" 0.6 :status-r3]
-   [#"(?i)status[^a-zA-Z0-9]{0,10}R2\b" 0.4 :status-r2]
-   [#"(?i)status[^a-zA-Z0-9]{0,10}R1\b" 0.25 :status-r1]
-   [#"(?i)status[^a-zA-Z0-9]{0,10}R0\b" 0.1 :status-r0]
-   [#":implemented\b" 0.8 :spec-implemented]
-   [#":spec\b" 0.2 :spec-only]
-   [#"✅|🟢" 0.9 :landed-marker]
-   [(labelled "(?:shipped|landed)") 0.9 :landed-marker]
-   [#"🟡" 0.3 :proposed-marker]
-   [(labelled "(?:proposed|scaffold)") 0.3 :proposed-marker]
-   [#"⏳" 0.15 :blocked-marker]
-   [(labelled "blocked") 0.15 :blocked-marker]])
+  ;; [regex score source-tag scope] — 最初にマッチしたものを採用。順序が優先度。
+  ;;
+  ;; SCOPE MATTERS, and getting it wrong the first time cost 552 repos. Stripping code
+  ;; from ALL patterns removed :implemented / :spec on 552 of the first 800 repos
+  ;; rescored, because those markers are EDN KEYWORDS and this workspace writes them
+  ;; exactly where you would expect a keyword: inside a fenced EDN snippet. Mean
+  ;; composite fell 0.04 with 562 repos down and 43 up -- so the "fix" was, on balance,
+  ;; a bigger error than the bug. Caught by diffing a bulk rescore against the ledger
+  ;; before landing it.
+  ;;
+  ;;   :full  -- match the whole document. For patterns that are already unambiguous:
+  ;;             a keyword form (:implemented) or a label-anchored one (Status: R3).
+  ;;   :prose -- match only outside code. For bare words, which mean nothing without
+  ;;             context and collide with domain vocabulary (`:blocked` the CARD STATE).
+  [[#"(?i)status[^a-zA-Z0-9]{0,10}R5\b" 1.0 :status-r5 :full]
+   [#"(?i)status[^a-zA-Z0-9]{0,10}R4\b" 0.8 :status-r4 :full]
+   [#"(?i)status[^a-zA-Z0-9]{0,10}R3\b" 0.6 :status-r3 :full]
+   [#"(?i)status[^a-zA-Z0-9]{0,10}R2\b" 0.4 :status-r2 :full]
+   [#"(?i)status[^a-zA-Z0-9]{0,10}R1\b" 0.25 :status-r1 :full]
+   [#"(?i)status[^a-zA-Z0-9]{0,10}R0\b" 0.1 :status-r0 :full]
+   [#":implemented\b" 0.8 :spec-implemented :full]
+   [#":spec\b" 0.2 :spec-only :full]
+   [#"✅|🟢" 0.9 :landed-marker :prose]
+   [(labelled "(?:shipped|landed)") 0.9 :landed-marker :prose]
+   [#"🟡" 0.3 :proposed-marker :prose]
+   [(labelled "(?:proposed|scaffold)") 0.3 :proposed-marker :prose]
+   [#"⏳" 0.15 :blocked-marker :prose]
+   [(labelled "blocked") 0.15 :blocked-marker :prose]])
 
 (def stage-score-method
   "Recorded on every entity so a reader can tell which entries were scored with the
@@ -286,10 +299,12 @@
   :anchored-markers-code-stripped)
 
 (defn- stage-score [text]
-  (let [prose (strip-code text)]
-    (when (seq (str/trim prose))
-      (some (fn [[re score tag]]
-              (when (re-find re prose) [score tag]))
+  (let [full (or text "")
+        prose (strip-code full)]
+    (when (seq (str/trim full))
+      (some (fn [[re score tag scope]]
+              (let [haystack (if (= :prose scope) prose full)]
+                (when (re-find re haystack) [score tag])))
             stage-patterns))))
 
 (defn- clamp01 [x] (max 0.0 (min 1.0 x)))
@@ -534,6 +549,16 @@
           nil]
          ["stage-score: a table cell still counts"
           (stage-score "| write paths | blocked |\n") [0.15 :blocked-marker]]
+         ;; The regression the first version of this fix caused, on 552 repos: an EDN
+         ;; keyword marker belongs inside a code fence, and stripping code lost it.
+         [":implemented inside a fence still counts"
+          (stage-score "# x\n\n```edn\n{:status :implemented}\n```\n") [0.8 :spec-implemented]]
+         [":spec inside a fence still counts"
+          (stage-score "```edn\n{:status :spec}\n```\n") [0.2 :spec-only]]
+         ["but a bare word inside a fence still does not"
+          (stage-score "```clojure\n(def x :blocked)\n```\n") nil]
+         ["a Status: line inside a fence is still a status"
+          (stage-score "```\nStatus: R3\n```\n") [0.6 :status-r3]]
          ["stage-score: R-tier wins over a later word marker"
           (stage-score "Status: R4\n\n- proposed follow-ups below\n") [0.8 :status-r4]]
          ["strip-code: fenced and inline code both go"
