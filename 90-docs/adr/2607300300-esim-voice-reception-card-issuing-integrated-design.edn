@@ -194,7 +194,7 @@ clean-room compat actor であって records 層のライブラリでもない�
   BIN を実際に sponsor する license も、実カードを発行する能力も持たないと述べている。
 - `denwaban` は **R0 scaffold**。`plan-session` は pure だが
   **`run-session` は G7 outward-gate で raise する** — socket なし・実発着信なし・fixtures のみ。
-  設計 ADR-2606271930 は今も `status "proposed"`。
+  設計 ADR-2606271930 は今も `status \"proposed\"`。
 - `cloud-itonami-emi` も同型で、e-money 発行 license を持たない。
 
 したがって**統合された成果物が今日 end-to-end でできること**は:
@@ -299,7 +299,7 @@ proposal を「発行済み」と表示してはならない。
      WebRTC `ITelephony` transport を供給しているのは不自然で、別に
      `kotoba-lang/webrtc` も実在する。当て推量で「直さず」、`manifest.edn` に
      `:review :binding-provenance-unsettled` を記録し、pipeline の該当 stage は
-     repo 名ではなく **transport 名（`"webrtc"`）** をラベルにした（データが支えられない
+     repo 名ではなく **transport 名（`\"webrtc\"`）** をラベルにした（データが支えられない
      ことを主張しないため）。WebRTC ingress を R0 から進める人が決着させる。
    - **`bb.edn` を撤去した**（ADR-2607173000 で bb は script host として退役）。
      依存座標の2枚目のコピーが、そもそも URL が黙って乖離できた原因だったため。

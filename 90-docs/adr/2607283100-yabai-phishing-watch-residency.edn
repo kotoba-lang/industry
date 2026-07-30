@@ -161,7 +161,7 @@ ADR 2 本と commit message に書いた。yabai 側の `TAMAKI_BIN` 既定値�
    したがって plist の `YABAI_CT_LOG=all` は一度も効いておらず、
    **常駐 tick は argon2026h2 1 本だけを見ていた**。「6 shard を tail している」
    という前日の記述は branch 上の事実で、production の事実ではなかった。
-   env は helper 経由に統一し、既定値自体を `"all"` にして
+   env は helper 経由に統一し、既定値自体を `\"all\"` にして
    「override が届かないと壊れる」構造をやめた。
 2. **push 成否を stdout の grep で判定していた。** git は rejection も
    `fatal:` も **stderr** に書き、`sh` は stderr と exit code を捨てていたので、
