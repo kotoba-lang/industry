@@ -1,0 +1,73 @@
+[{:db/id -1
+  :adr/id "2607300500"
+  :adr/title "Compression codec plane: DEFLATE/zlib/gzip and ZIP now work in both directions, in portable .cljc"
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/tags ["compression" "codec" "deflate" "zlib" "gzip" "zip" "zip64" "org-ietf-deflate"
+             "org-pkware-zip" "bonsai" "kotoba-lang" "portability" "maturity"]
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/doc_type "adr"
+  :adr/repo ["orgs/kotoba-lang/org-ietf-deflate"
+             "orgs/kotoba-lang/org-pkware-zip"
+             "orgs/kotoba-lang/bonsai"]
+
+  :adr/context
+  "An audit of the workspace's compression surface (prompted by 'are zip/zlib/7zip codecs designed and implemented?') found decompression-only implementations with three structural gaps.
+
+1. `org-ietf-deflate` implemented `inflate` and `inflate-raw` and nothing else — 153 lines, no compressor. Anything in the workspace that needed to *compress* therefore reached for a host codec. `bonsai` (the Git object model) called `java.util.zip.Deflater` on the JVM and node's `zlib` on ClojureScript, directly contradicting the runtime priority order (ADR-2607198300: the shipped artifact must not depend on a JVM or JS host). There was no gzip (RFC 1952) support at all, no CRC-32 or Adler-32, the zlib header was skipped without validation, and the Adler-32 trailer was ignored entirely.
+
+2. `org-pkware-zip` (56 lines) read ZIP archives but could not write them, and had three silent-corruption paths: an unimplemented compression method returned the *compressed* bytes as though they were the member's content (`case method 0 raw 8 inflate raw`), CRC-32 was never read let alone verified, and an encrypted member yielded ciphertext. No ZIP64, so a >4 GiB or >65535-entry archive was misread rather than refused. `parse` eagerly decompressed every member, so listing an archive cost a full decompression.
+
+3. Because the two halves of each format were never checked against a reference in both directions, nothing in either repo could have detected an encoder that only its own decoder can read — the classic DEFLATE failure (data elements are packed LSB-first, Huffman codes MSB-first; swap them and self-round-trips still pass).
+
+Adjacent finding, unchanged by this work: `codec-primitives` is video-codec (H.264/AV1) transform/quantisation scaffolding, not general compression, and the format-specific small codecs (GIF LZW, TIFF LZW + PackBits, PSD PackBits) are deliberately duplicated inside their format repos per ADR-2607082500's layering principle."
+
+  :adr/decision
+  "Complete both directions of the formats the workspace actually depends on, and gate the claim with conformance tests against a reference implementation — rather than start new repos for formats nobody consumes yet.
+
+1. **org-ietf-deflate covers RFC 1950/1951/1952 both ways.** New namespaces: `deflate.compress` (LZ77 over 32 KiB hash chains, greedy with one-step lazy matching, then a per-block choice between stored / fixed-Huffman / dynamic-Huffman priced exactly in bits), `deflate.huffman` (canonical codes both directions plus length-limited Huffman from a histogram), `deflate.lz77`, `deflate.gzip`, `deflate.zlib`, `deflate.checksum` (Adler-32 + CRC-32), `deflate.tables` (the RFC constants, shared so the two directions cannot drift), `deflate.bits`. `deflate.core` stays the facade and keeps its old API.
+
+2. **A histogram that cannot be coded within the format's 15-bit ceiling is reported, not emitted.** `huffman/lengths-from-freqs` flattens and retries, and returns nil if it still cannot; the encoder then falls back to fixed Huffman. An encoder must never emit a tree no decoder will accept.
+
+3. **Decoding is strict and bounded by default.** Reserved block type, LEN/NLEN mismatch, back-reference before the start of the stream, over-long code lengths, invalid zlib header (CM/CINFO/check bits), FDICT without a dictionary, Adler-32/CRC-32/ISIZE mismatch — each raises `ex-info` with a `:reason`. A 128 MiB output ceiling (`:max-output`, nil to disable) means a hostile kilobyte cannot exhaust the process. This is a deliberate behaviour change: `inflate` previously skipped the header blind and never checked the trailer.
+
+4. **org-pkware-zip reads and writes, including ZIP64.** `zip.write/build` emits local headers, central directory, EOCD and (when a count/size/offset no longer fits, or on request) the ZIP64 record and locator. Archives are reproducible — MS-DOS epoch timestamps and constant header fields — so a content-addressed .docx/.epub/.sketch is possible. Reading widens saturated 32-bit fields from the 0x0001 extra field driven by *which slots read 0xFFFFFFFF* (as the spec requires, and as Python's zipfile does), not by the extra field's length. Listing (`entries`) is separated from extraction (`read-entry`); `parse` keeps the eager behaviour for existing callers.
+
+5. **Unsupported ZIP methods, encrypted members and CRC mismatches raise.** bzip2 (12), LZMA (14), zstd (93), xz (95) and PPMd (98) are named in the error but not decoded. Returning undecoded bytes as content is worse than failing.
+
+6. **bonsai stops using a host codec.** `java.util.zip` is gone from its `src/` entirely: loose-object deflate/inflate and pack-entry inflate use `org-ietf-deflate`, and the pack index CRC-32 uses its checksum. The pack reader uses the codec's reported stream end for 'how many compressed bytes did this object consume', which the pack format needs because it stores no per-object length.
+
+7. **Both repos gate two runtimes.** A `.cljc` portable suite runs under `clojure -M:test` and `nbb run-tests.cljs`, and CI has a ClojureScript job. `java.util.zip` appears only in the JVM suites, as an oracle, in both directions.
+
+Not done, deliberately: 7-Zip/LZMA/xz, zstd, brotli and tar have no repo and no implementation. Nothing in the workspace consumes them today; brotli additionally needs a 122 KB static dictionary (already deferred by ADR-2606272100 for WOFF2). An optimal parse (zopfli-style) and encoder-side preset dictionaries are also out of scope. See :adr/gaps."
+
+  :adr/consequences
+  "- Compression exists in this workspace without a host codec for the first time. A Git object store, a ZIP writer, or a gzip producer can now run on any Clojure dialect — JVM, browser, nbb — with identical bytes and identical error semantics.
+- `bonsai`'s ClojureScript path gained rejections it structurally could not perform before: node's `inflateSync` cannot report trailing bytes or a preset dictionary, so `:trailing-zlib` and `:zlib-dictionary` were JVM-only. The cljs path silently accepted a loose object with junk appended.
+- `inflate` validating headers and verifying Adler-32 by default is a behaviour change for the four consumers that pin this repo. All four suites were run against the new code before their pins moved (see :adr/evidence). Callers that deliberately feed truncated streams pass `:verify-checksum false`.
+- ZIP callers that relied on the old passthrough of unsupported methods now get an exception. That is the point: they were reading compressed bytes as content.
+- Compression ratio is a few percent behind zlib at the same level (greedy + one-step lazy, not an optimal parse). The suite pins a 1.5× bound against zlib -9 to catch a *collapse* rather than to claim parity.
+- Neither repo is `kotoba/pure`-compilable: bit cursors are `volatile!` cells and `deflate.lz77` uses typed arrays behind reader conditionals for the hash chains. A `.kotoba` port stays future work and is not claimed anywhere in the docs.
+- Decode still accumulates output in a persistent vector, so peak memory is well above the output size for large rasters. The 128 MiB default ceiling bounds the damage; streaming decode is not implemented."
+
+  :adr/gaps
+  "1. **No 7-Zip / LZMA / xz.** An LZMA range decoder plus the .xz container is the most tractable next codec (well specified, no large dictionary); the 7z container is a bigger job because its header is itself LZMA-compressed. Nothing consumes them today.
+2. **No zstd, no brotli.** zstd needs FSE + Huffman + sequence decoding; brotli needs the 122 KB static dictionary (which is also what still blocks WOFF2 in `org-w3-woff`, deferred in ADR-2606272100).
+3. **No tar.** `.tar.gz` is now half-possible (gzip works, the archiver does not exist). Small and self-contained if a consumer appears.
+4. **Host zlib remains elsewhere in the workspace** and was not migrated here: `tsumugi/methods/publish_ipfs.cljc` (GZIPOutputStream, vendored into many com-* repos), `comfyui/src/comfyui/png_deno.cljs` and `gftdcojp/tia/src/tia/png.cljs` (PNG via node zlib). Each is now a one-line swap; none was in this ADR's scope.
+5. **Encoder-side preset dictionaries** (RFC 1950 FDICT) are unimplemented; decode supports them.
+6. **ZIP: no encryption, no split archives**, and the ZIP64 write path was exercised at the 65600-entry boundary but not past 4 GiB (an in-memory reader cannot hold such an archive; `zip.bytes/u64` refuses values past 2^53 rather than rounding them on a JavaScript runtime).
+7. **Streaming APIs** do not exist in either repo: everything is whole-buffer. This is the limit that matters first for large real inputs.
+8. **ID collision, recorded for the reader's sake:** the commits in the three child repos reference 'ADR-2607300400', which was already taken by `2607300400-undefined-css-tokens-and-dead-native-web-surface.edn` from a concurrent session. This ADR is 2607300500; the child-repo commit messages are not rewritten, because rewriting pushed history is forbidden."
+
+  :adr/evidence
+  "Merged to default branches: kotoba-lang/org-ietf-deflate 430d754313e9082114ec00554e0b6770d9d318c5, kotoba-lang/org-pkware-zip fe8ec8c36ab9c19c615caed2303bae251a8ca0b7, kotoba-lang/bonsai c3d3c4742169bfb81ac941d667892e544b93abac.
+
+Test evidence, all run locally before merge:
+- org-ietf-deflate: 32 tests / 480 assertions on the JVM; 21 tests / 194 assertions of the same `.cljc` suite under nbb; clj-kondo clean. `java.util.zip.Inflater` reads our raw and zlib output at levels 0/1/4/6/9 across nine input shapes; `GZIPInputStream` reads our gzip members; we read the reference's output at all ten levels for raw, zlib and gzip; CRC-32 and Adler-32 match `java.util.zip.CRC32`/`Adler32`; a 1 MB round-trip; ratio within 1.5× of zlib -9.
+- org-pkware-zip: 30 tests / 101 assertions on the JVM; 17 tests / 64 assertions under nbb; clj-kondo clean. Our archives are read back by both `ZipFile` (central directory) and `ZipInputStream` (local headers — the check that catches a drift between the two copies of every size/CRC field), including a 65600-entry archive that forces ZIP64 and a `:zip64 false` refusal on it.
+- bonsai: 57 tests / 153 assertions with java.util.zip removed from src/. `loose-file-is-readable-by-git` writes our compressed loose object into a real `.git/objects/` and reads it back with `git cat-file -p` — real git accepts what this compressor emits. Under nbb the same object encodes to 21 bytes with oid ce013625030ba8dba906f756967f9e9ca394464a (identical to the JVM and to git), `:inflated-limit` fires, and `:trailing-zlib` is detected where the node path could not detect it at all.
+- Consumers verified against the new deflate with `:override-deps` before any pin moved: org-w3-png (3 tests / 11 assertions), org-adobe-tiff (4 / 15), org-w3-woff (1 / 6), org-iso-pdf (5 / 20), kasane (22 / 92 — its OOXML suite reads real .docx/.xlsx/.pptx through zip.core). All green.
+
+Docs: both repos gained a CLAUDE.md recording the invariants (no host codec in src/, both directions conformance-tested, unsigned bytes in the API, every failure an ex-info with :reason) and the traps (two bit orders, the 15-bit ceiling, conditional-but-positional ZIP64 fields, the two copies of every ZIP size field)."}]
