@@ -94,7 +94,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
-| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done** #221+#223+#225+#226+#228; **mirror-delete** kekkai #233 token #235 secret #236 identity #237; other hosts open |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete** kekkai#233 token#235 secret#236 identity#237 crypto+stream#238 + preload; other hosts open |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
@@ -562,6 +562,26 @@ Still open:
 1. T6.4 remaining hosts (persist/connect/tunnel/report/plan/...)
 2. T8.3 production AOT network/secret; W4 recursive values
 3. Residual 0/1 i64 param projections (config/engine/moe/dash/tunnel)
+
+
+## Progress (2026-07-31r — T6.4 crypto+stream mirror-delete + pin)
+
+- murakumo#238 MERGED (`671c1137`): **overlay.crypto + overlay.stream** delete
+  cljs host mirrors — pure packaging tokens/gates require shipped
+  `:overlay-crypto` / `:overlay-stream` KIR on every platform; AES-GCM/nonce
+  (JVM) and stream-id/frame maps stay host.
+  ADR-260731-w6-t64-crypto-stream-mirror-delete.
+  Evidence: 79 tests / 1484 assertions green.
+- west pin murakumo `2b75bdf4` → `671c1137`.
+
+T6.4 mirror-deleted hosts: kekkai #233, token #235, secret #236, identity #237,
+crypto+stream #238 (**5 surfaces / 6 ns**).
+
+Still open:
+1. T6.4 remaining hosts (persist/connect/tunnel/report/plan/driver/runtime/...)
+2. T8.3 production AOT network/secret; W4 recursive values
+3. Residual 0/1 i64 params: config pinned-exists, engine option flags, moe shared?,
+   dash health-from-present, tunnel rc-present
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
