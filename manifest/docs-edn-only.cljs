@@ -496,19 +496,23 @@
         path-md-hits (atom [])
         sf-hits (atom [])]
     (doseq [f edns]
-      (try
-        (let [raw (slurp f)
-              content (edn/read-string {:default (fn [_tag v] v)} raw)]
-          (when (re-find path-md-re raw)
-            (swap! path-md-hits conj (str f)))
-          (when (re-find bad-sf-re raw)
-            (swap! sf-hits conj (str f)))
-          (when (and (str/includes? (str f) "/adr/")
-                     (not (multi-entity-tx? content))
-                     (not (already-tx-data? content)))
-            (swap! not-tx conj (str f))))
-        (catch :default e
-          (swap! parse-errors conj [(str f) (ex-message e)]))))
+      ;; The text-level checks must not sit behind the parse: when they did, a
+      ;; parse error masked them for that file, so every parse fix surfaced
+      ;; "new" md-path and source-format hits that had been there all along and
+      ;; the totals understated the real work.
+      (let [raw (slurp f)]
+        (when (re-find path-md-re raw)
+          (swap! path-md-hits conj (str f)))
+        (when (re-find bad-sf-re raw)
+          (swap! sf-hits conj (str f)))
+        (try
+          (let [content (edn/read-string {:default (fn [_tag v] v)} raw)]
+            (when (and (str/includes? (str f) "/adr/")
+                       (not (multi-entity-tx? content))
+                       (not (already-tx-data? content)))
+              (swap! not-tx conj (str f))))
+          (catch :default e
+            (swap! parse-errors conj [(str f) (ex-message e)])))))
     (println (format "verify: md=%s edn=%s parse-errors=%s not-tx=%s path-md-refs=%s source-format-residue=%s"
                      (count md-left) (count edns)
                      (count @parse-errors) (count @not-tx)

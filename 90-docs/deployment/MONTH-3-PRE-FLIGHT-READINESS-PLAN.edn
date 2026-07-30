@@ -190,7 +190,7 @@
 
     :gating-criteria "Phase 3 COMPLETE when: all 7 checklist items PASS + fire-drill successful + GO/NO-GO decision recorded"}]
 
-  :readiness/7-item-checklist-brief
+  :readiness/seven-item-checklist-brief
   "The 7 pre-flight checklist items (source: MONTH-3-PRE-FLIGHT-CHECKLIST.edn):
    1. Parity Validation: divergence < 0.01% (owner: metrics-lead)
    2. Latency & Performance SLO: p99 ≤ 100ms (owner: performance-lead)
@@ -243,7 +243,7 @@
    {:risk "Fire-drill reveals critical issue in rollback procedure"
     :likelihood "MEDIUM (fire drills find edge cases)"
     :impact "MEDIUM (fixable before canary)"
-    :mitigation "2-hour fire-drill window, fixes implement + re-test by gate"
+    :mitigation "2-hour fire-drill window, fixes implement + re-test by gate"}
    {:risk "Load balancer misconfiguration during traffic ramp"
     :likelihood "LOW"
     :impact "CRITICAL"
