@@ -202,9 +202,38 @@
                 not-empty))
       "main"))
 
+(defn- real-path [p] (try (.realpathSync node-fs p) (catch :default _ nil)))
+
+(defn- own-repo-root?
+  "`dir` それ自身が git repo の toplevel か。**`.git` が存在するだけでは repo ではない。**
+
+  git は無効な `.git`（objects/refs を持たない中断クローン、あるいは中身が
+  `stash-archive-*` だけのスタブ）を見つけると *上方向に探索を続け*、superproject の
+  `.git` を掴む。その状態で `git -C <dir> status` を叩くと **superproject の**
+  untracked が返るので、この script はそれを子リポの :additive 集合と誤認し、
+  `com-junkawasaki/root` に commit しようとする。
+
+  実測 2026-07-30: `find orgs -maxdepth 3 -name .git -type d` が拾った 4 path
+  （com-junkawasaki/net-kotobase-commoncrawler・gftdcojp/ai-gftd-itonami・
+  gftdcojp/net-isekai-gen・kotoba-lang/com-line-messaging）が全て superproject に
+  解決し、4 件とも slug が `com-junkawasaki/root` になった。うち
+  net-kotobase-commoncrawler の `.git` は中身が `stash-archive-20260730/` だけ
+  ——**前回の cleanup 自身の archive! が作った産物**で、それが次の survey に
+  「ここは repo だ」と誤認させる自己増殖ループになっていた。commit が失敗したのは
+  偶然で、設計上の防御ではなかった。"
+  [dir]
+  (let [top (some-> (gitc dir "rev-parse" "--show-toplevel") str/trim not-empty)]
+    (boolean (and top (some? (real-path dir)) (= (real-path top) (real-path dir))))))
+
 ;; ---------- archive（drop はしないが、着地前に必ず退避する） ----------
 
 (defn- archive! [dir untracked]
+  ;; `.git` を新規に作ってはならない。`:recursive true` の mkdir は `.git` 自体を
+  ;; 生やすので、repo でない path にスタブ `.git` が残り、次回の survey がそこを
+  ;; repo と誤認する（own-repo-root? の docstring にある自己増殖ループの発生源）。
+  (when-not (.existsSync node-fs (str dir "/.git"))
+    (throw (js/Error. (str "archive!: " dir " に .git が無い。repo でない path に "
+                           ".git を作らない（own-repo-root? を通してから呼ぶこと）"))))
   (let [adir (str dir "/.git/stash-archive-" stamp)]
     (.mkdirSync node-fs adir #js {:recursive true})
     (.writeFileSync node-fs (str adir "/untracked-files.txt") (str/join "\n" untracked))
@@ -636,6 +665,7 @@
        :out str/trim str/split-lines sort
        (map #(subs % 0 (- (count %) 5)))
        (remove annex?)
+       (filter own-repo-root?)
        (filter (fn [d] (if only-names (some #(str/ends-with? d (str "/" %)) only-names) true)))))
 
 (def plans

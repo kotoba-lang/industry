@@ -286,12 +286,40 @@
                                      (seq (:nopr row))
                                      (:nopr-skipped row)))))
 
+(def js-fs (js/require "node:fs"))
+
+(defn- real-path [p] (try (.realpathSync js-fs p) (catch :default _ nil)))
+
+(defn- own-repo-root?
+  "`dir` それ自身が git repo の toplevel か。**`.git` が存在するだけでは repo ではない。**
+
+  git は無効な `.git`（objects/refs を持たない中断クローン、あるいは中身が
+  `stash-archive-*` だけのスタブ）を見つけると *上方向に探索を続け*、superproject の
+  `.git` を掴む。その状態で `git -C <dir> status` を叩くと **superproject の**
+  untracked が返るので、この survey はそれを子リポの WIP と誤認して報告する（書込側の cleanup-land.cljs では
+  `com-junkawasaki/root` への commit 試行にまで至った）。
+
+  実測 2026-07-30: `find orgs -maxdepth 3 -name .git -type d` が拾った 4 path
+  （com-junkawasaki/net-kotobase-commoncrawler・gftdcojp/ai-gftd-itonami・
+  gftdcojp/net-isekai-gen・kotoba-lang/com-line-messaging）が全て superproject に
+  解決し、4 件とも slug が `com-junkawasaki/root` になった。うち
+  net-kotobase-commoncrawler の `.git` は中身が `stash-archive-20260730/` だけ
+  ——**前回の cleanup 自身の archive! が作った産物**で、それが次の survey に
+  「ここは repo だ」と誤認させる自己増殖ループになっていた。commit が失敗したのは
+  偶然で、設計上の防御ではなかった。"
+  [dir]
+  (let [top (some-> (gitc dir "rev-parse" "--show-toplevel") str/trim not-empty)]
+    (boolean (and top (some? (real-path dir)) (= (real-path top) (real-path dir))))))
+
 (when-not skip-sub?
   (hr "子リポ survey: UNLANDED 判定（detached-HEAD + manifest-rev のみは通常状態）")
   (println "凡例: untracked=commit すらされていない / unpushed=push 未了 / nopr=push 済みだが PR 無し")
   (println)
   (let [repos (->> (sh "find" "orgs" "-maxdepth" "3" "-name" ".git" "-type" "d")
-                   :out str/trim str/split-lines (remove str/blank?) sort)
+                   :out str/trim str/split-lines (remove str/blank?) sort
+                   (map #(subs % 0 (- (count %) 5)))
+                   (filter own-repo-root?)
+                   (map #(str % "/.git")))
         total (count repos)
         ;; 0 件は「fleet が綺麗」ではなく「orgs/ が展開されていない checkout で
         ;; 走らせた」の意味である（west project は submodule ではないので、
