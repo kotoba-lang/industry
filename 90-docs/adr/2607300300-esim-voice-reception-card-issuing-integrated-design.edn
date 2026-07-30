@@ -650,8 +650,24 @@ Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が 
    namespace を落とすので `:authority/posture` は `{posture: normal}` という namespace 無しの形で届く。actor → app の
    callback は導入していない — 認証付きの逆方向チャネルを増やすより、まず「呼べば解決する」
    を成立させた。
-6. **D4 の単一 ref が actor 側でまだ成立していない。** app 内では1つの store
-   partition で cross-domain 読みが成立するが、actor の ledger は各自 MemStore のみ。
+6. **D4 の単一 ref が actor 側でまだ成立していない（2026-07-31 に境界の実態を確認）。**
+   app 内では1つの store partition で cross-domain 読みが成立するが、actor の ledger は
+   各自 MemStore のみ。**「Store protocol が境界だから swap で済む」という論拠を検査した**:
+   - 3 actor とも `Store` protocol + `MemStore` record を持つ（境界はある）が、
+     **第2の実装が無いので、protocol が十分かを何も証明していない**。
+   - `store_contract_test` は3 actor とも docstring で「将来の Datomic / kotoba-server
+     backend は**新しい constructor に対してこれらを再実行するだけ**で同じ contract の
+     裏に差し込める」と書いていたが、**constructor をハードコードしていた** — つまり
+     編集せずに再実行することはできず、**その主張はそれ自身については偽**だった。
+     **2回実行できない境界は、境界ではなく主張**。
+   - `cloud-itonami-esim` で修正（ef63bbe9）: constructor を dynamic var にし、
+     `verify-contract!` が namespace 内の全 assertion を**渡された実装に対して**走らせる。
+     第2 backend は deftest 1つで足りる。**壊れた実装を実際に食わせて確認済み** —
+     transfer *要求* で subject を付け替える store を渡すと
+     `a-transfer-request-does-not-reassign-the-subject` で落ちる（SIM-swap 経路そのもの）。
+     「全部走らせる」ヘルパが**黙って0件選ぶと永遠に通る**ので、10件以上選ぶことも別途 assert。
+   - **残り**: `cloud-itonami-card-issuing` と `denwaban` の contract test は同じ
+     ハードコード問題を抱えたまま。共有 backend 自体もまだ無い。
 7. **kotoba-lang の 85 ライブラリが git 座標で消費不能（2026-07-31 に実測し直した）。**
    ここには「199 件」と書いてあったが、**2つの別物を混ぜていた**。default branch を実測した
    内訳（`nbb scripts/consumability-audit.cljs` で再現可能。west.yml の kotoba-lang project
