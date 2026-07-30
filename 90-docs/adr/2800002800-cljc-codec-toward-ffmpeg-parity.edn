@@ -573,17 +573,52 @@ ffprobe    : h264,720,1280,12
 8. **エピソード全体を実素材で 1 度通す** —— 現状すべて 128x128 の合成映像・9〜15 フレームの
    実測からの換算である。**720x1280 の実クリップで 1 本通すまで、時間の数字は換算値**
 
-### 現在地（4 段の実装後）
+### 現在地（closing 時点、2026-07-30）
 
 ```
-P frame : 4.783 ms/MB（交互 10 round median）→ 17.2 s/frame @720x1280
-1800 フレーム換算: 約 8.6 時間   ← 本作業開始時点の約 30.6 時間から
+h264 P frame : 720x1280 の実測 5.039 ms/MB = 18.14 s/frame（配列化の前、org-iso-h264 26b077d）
+               配列化で 1.26x → 約 7.2 時間/エピソード
+x264 同条件   : 16.2 ms/frame → 1800 フレームで 29 秒        差は約 1,120 倍
 ```
 
-**各段の交互測定比を掛け算しないこと**（1.71 × ~1.14 × 2.32 × 1.17 = 5.3x になるが、
-実測の絶対値は 30.6 → 8.6 時間 = 3.6x）。各比はそれぞれ自分の baseline を自分の負荷窓で
-測ったもので、負荷が窓ごとに違う。**信頼できるのは「各段の交互比」と「現在の絶対値」の
-2 つで、両者を掛け合わせて総合比を作る操作は正しくない。**
+**720x1280 の実測はこの 1 点だけで、他はすべて 128x128 の per-MB からの換算である**
+（換算 4.783 に対し実測 5.039 ms/MB だったので、換算自体は妥当だった）。配列化後の
+720x1280 は測っていない —— 7.2 時間は「実測 5.039 × 交互測定の 1.26x」であって実測値ではない。
+
+**各段の交互測定比を掛け算しないこと**（1.71 × ~1.14 × 2.32 × 1.17 × 1.26 = 6.6x になるが、
+実測の絶対値の比はそこまで行かない）。各比はそれぞれ自分の baseline を自分の負荷窓で測った
+もので、このマシンは負荷が窓ごとに 2 倍違った。**信頼できるのは「各段の交互比」と
+「現在の絶対値」の 2 つで、両者を掛け合わせて総合比を作る操作は正しくない。**
+
+### このセッションで default branch に着地したもの
+
+| repo | commit | 内容 | 検証 |
+|---|---|---|---|
+| `org-iso-aac` | `f9053399` | AAC-LC encode 一式（順 MDCT / 量子化 + rate control / Huffman encode / ADTS + ASC） | 33 tests・932 assertions。実 ffmpeg が復号し 2 LSB 一致 |
+| `org-iso-isobmff` | `bf8d0b5` | `mp4a` + `esds`（MP4 音声トラック） | ffprobe が `aac (LC) (mp4a)` と認識、復号 PCM は ADTS 経路と byte 一致 |
+| `org-iso-isobmff` | `491ca74` | `avc1` + `avcC`（MP4 映像トラック） | 25 tests・232 assertions。**ffmpeg 自身の `avcC` と byte 一致**、復号 YUV は Annex B 経路と byte 一致 |
+| `org-iso-h264` | `4d943ab` | fused SAD + 早期打ち切り | 1.71x、byte 一致 |
+| `org-iso-h264` | `b490bfe` | inter residual solve の fold | 関数単体 17.4x、byte 一致 |
+| `org-iso-h264` | `380c741` | sub-pel の half-sample 面共有 + dispatch 巻き上げ | 2.32x、byte 一致 |
+| `org-iso-h264` | `26b077d` | 整数探索の whole-pel SAD 経路 | 1.17x（ノイズと同程度）、byte 一致 |
+| `org-iso-h264` | `30f36c0` | ME 経路の配列化 | 1.26x、byte 一致。124 tests・7077 assertions |
+| `utsushi` | `de77ca1` | codec backend カタログと選択（層③ façade の空席を埋める） | 49 tests・319 assertions |
+| `utsushi` | `0d00c52` | provider による executor 注入 | 実 ffmpeg provider を注入して端から端まで実証 |
+
+**closing 時点の検証**: 4 repo 合計 **231 tests / 8,560 assertions、0 failures / 0 errors**、
+lint は全 repo で errors 0（warning 2 件はいずれも本作業以前からのもの）。
+west pin は 4 件とも `HEAD == pin == remote main` を確認済み。
+
+### 到達したことと、到達していないこと
+
+**到達**: PCM と画素から mp4 まで、**生成経路に ffmpeg が 1 箇所も無い**
+（`av_both.mp4` を実 ffmpeg が音声・映像とも読み、いずれも期待バイト数ちょうど）。
+そして速い実装を選べる seam（provider 注入）が動く。
+
+**未到達**: h264 encode は**約 7.2 時間/エピソード**で x264 の 29 秒に対し**まだ 3 桁差**。
+profile は平坦で残りは演算、SIMD 基盤は kotoba-lang に存在しない。
+**したがって scalar 最適化の追加増分でこの差は埋まらない** —— 埋めるのは各 platform の
+provider 実装である（下記レバー 0）。
 
 ## Phase 2 — filter 段の家は `douga` ではなく `utsushi` だった
 
