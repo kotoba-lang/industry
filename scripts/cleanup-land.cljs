@@ -137,8 +137,30 @@
 (defn- annex? [dir]
   (or (.exists (io/file dir ".git" "annex")) (.exists (io/file dir ".datalad"))))
 
+(def primary-remote
+  "この repo の upstream remote 名。**`origin` 決め打ちにしてはいけない。**
+
+  west は remote を manifest の remote 名（`cloud-itonami` / `kotoba-lang` /
+  `gftdcojp` …）で作るので、west 管理下の repo には `origin` が無いことの方が
+  多い。実測 2026-07-30: ローカルに存在する west project 3,353 のうち **1,644**
+  に `origin` が無かった。`origin` 決め打ちだと repo-slug が nil に落ち、その
+  repo は `(no-remote)` → 「remote が無いので着地先が無い。報告のみ。」として
+  静かに全件スキップされる。この行は所見のように読めて失敗に見えないため、
+  **バックログの実サイズが過小に見える**のが最大の害だった（着地漏れそのものより、
+  漏れていることが分からないことが問題）。
+
+  `origin` があればそれを優先し（人が clone した repo・ensure-remote! が作った
+  repo はこちら）、無ければ最初の remote を使う。remote が1つも無ければ nil で、
+  これは本当に着地先が無いケース。"
+  (memoize
+   (fn [dir]
+     (let [rs (->> (str/split-lines (or (gitc dir "remote") ""))
+                   (map str/trim) (remove str/blank?) vec)]
+       (cond (some #{"origin"} rs) "origin"
+             (seq rs)              (first rs))))))
+
 (defn- repo-slug
-  "origin URL から slug を採り、**GitHub 上の canonical 名に解決する**。
+  "upstream remote の URL から slug を採り、**GitHub 上の canonical 名に解決する**。
 
   rename 追従が必須。この workspace は `-clj` サフィックス廃止（ADR-2607102200
   addendum 14）等で改名が多く、ローカルの remote URL は旧名のまま残る。GitHub は
@@ -147,8 +169,9 @@
   kotoba-lang/bonsai）で blob 作成が全件 307 で落ちた。読み取りは通るのに書き込み
   だけ落ちるので、canonical 化しないと「なぜか commit だけ失敗する」形で現れる。"
   [dir]
-  (some-> (gitc dir "remote" "get-url" "origin") str/trim
-          (as-> u (second (re-find #"github\.com[:/](.+?)(?:\.git)?$" u)))))
+  (when-let [r (primary-remote dir)]
+    (some-> (gitc dir "remote" "get-url" r) str/trim
+            (as-> u (second (re-find #"github\.com[:/](.+?)(?:\.git)?$" u))))))
 
 (defn- canonical-slug
   "raw slug -> GitHub 上の現在名。**着地対象がある repo にだけ呼ぶこと**。
@@ -158,8 +181,11 @@
   (when raw (or (gh-str "api" (str "repos/" raw) "--jq" ".full_name") raw)))
 
 (defn- default-branch [dir]
-  (or (some-> (gitc dir "symbolic-ref" "--quiet" "refs/remotes/origin/HEAD")
-              str/trim (str/replace #"^refs/remotes/origin/" "") not-empty)
+  (or (when-let [r (primary-remote dir)]
+        (some-> (gitc dir "symbolic-ref" "--quiet" (str "refs/remotes/" r "/HEAD"))
+                str/trim
+                (str/replace (re-pattern (str "^refs/remotes/" r "/")) "")
+                not-empty))
       "main"))
 
 ;; ---------- archive（drop はしないが、着地前に必ず退避する） ----------
@@ -213,7 +239,8 @@
   (let [tmp (str (.tmpdir node-os) "/cl-" (str/replace path #"[^A-Za-z0-9._-]" "_"))
         head-f (str tmp ".head") main-f (str tmp ".main")
         head-out (sh "git" "-C" dir "show" (str "HEAD:" path))
-        main-out (sh "git" "-C" dir "show" (str "origin/" base ":" path))]
+        main-out (sh "git" "-C" dir "show"
+                     (str (or (primary-remote dir) "origin") "/" base ":" path))]
     (if-not (and (zero? (:exit head-out)) (zero? (:exit main-out)))
       ;; 片側に存在しない → 3-way の基準が無い。従来どおり作業ツリーを載せる。
       (create-blob! slug dir path)
@@ -418,15 +445,24 @@
 (defn- land-repo! [{:keys [dir slug base additive skipped tracked deleted]}]
   ;; canonical 化はここ（着地対象がある repo だけ）。plan 段階ではやらない。
   (let [branch-work? (and branches? (seq (live-branches dir base)))
+        ;; raw-slug（= remote が実在するか）と slug（= canonical 化して着地に使う名）
+        ;; を混同しないこと。slug は「着地対象がある repo」でだけ計算するので、
+        ;; junk しか無い repo では nil になる。以前はこの nil をそのまま
+        ;; `(no-remote)` と「remote が無いので着地先が無い」として印字していたため、
+        ;; **remote が正常にある repo が remote 欠損として報告されていた**
+        ;; （実測 2026-07-30: orgs/cloud-itonami/animeka は remote を3つ持つのに
+        ;; `.cpcache` しか untracked が無いというだけで no-remote 表示。この誤表示は
+        ;; 「所見」に見えて失敗に見えないので、バックログの実態を誤読させる）。
+        raw-slug slug
         slug (when (or (seq additive) (seq tracked) branch-work?)
-               (if slug
-                 (canonical-slug slug)
+               (if raw-slug
+                 (canonical-slug raw-slug)
                  ;; remote が無いなら作る（オーナー指示 2026-07-25「remote がなければ
                  ;; repo を作って ok」）。dry-run では作らない。
                  (when apply?
                    (println (format "\n%s  (remote 無し → 作成する)" dir))
                    (create-remote! dir))))]
-  (println (format "\n%s  (%s)" dir (or slug "no-remote")))
+  (println (format "\n%s  (%s)" dir (or slug raw-slug "no-remote")))
   (when (seq deleted)
     (println (format "  skip deleted        %d 件（削除は main に適用しない）: %s"
                      (count deleted) (str/join ", " (take 4 deleted)))))
@@ -434,7 +470,13 @@
     (println (format "  skip %-18s %d 件: %s" (name k) (count v)
                      (str/join ", " (take 4 v)))))
   (cond
-    (nil? slug) (println "  → remote が無いので着地先が無い。報告のみ。")
+    (and (nil? slug) (nil? raw-slug))
+    (println "  → remote が無いので着地先が無い。報告のみ。")
+
+    ;; remote はある。着地対象が無いだけ（junk/credential/large を除いた結果ゼロ）。
+    (nil? slug)
+    (println "  → 着地対象なし（remote はある。skip 分のみ）")
+
     (and (empty? additive) (empty? tracked))
     (cond
       (not branches?) (println "  → 着地対象なし")
@@ -512,7 +554,8 @@
   [dir base]
   (->> (str/split-lines (or (gitc dir "for-each-ref" "--format=%(refname:short)" "refs/heads/") ""))
        (remove #{"" "main" "master" "synced/main" "git-annex" "manifest-rev"})
-       (remove #(gitc dir "merge-base" "--is-ancestor" % (str "origin/" base)))
+       (remove #(gitc dir "merge-base" "--is-ancestor" %
+                      (str (or (primary-remote dir) "origin") "/" base)))
        vec))
 
 (defn- land-branches!
@@ -523,14 +566,15 @@
   ローカル branch 67本、slides は 90本超）では打ち切って必ず報告する。"
   [dir slug base]
   ;; stale な remote-tracking ref を先に落とす。has-remote? は
-  ;; refs/remotes/origin/<b> の存在で判定するので、upstream から消えた
+  ;; refs/remotes/<remote>/<b> の存在で判定するので、upstream から消えた
   ;; (あるいは一度も存在しなかった) branch のローカルキャッシュが残っていると
   ;; 「push 済み」と誤判定し、push をスキップして PR 作成に回り、それが失敗して
   ;; 「PR 作成に失敗（差分なし等）」という無害そうな行になる。実測 2026-07-27:
   ;; 残存 102 本のうち 100 本がこれで、この機械にしか無い commit を保全するという
   ;; このクラスの唯一の目的が静かに達成されていなかった。
-  (gitc dir "fetch" "--prune" "--quiet" "origin")
-  (let [live (live-branches dir base)
+  (let [remote (or (primary-remote dir) "origin")]
+   (gitc dir "fetch" "--prune" "--quiet" remote)
+   (let [live (live-branches dir base)
         cap 20]
     (when (seq live)
       (println (format "  branches: 未着地 %d 本" (count live)))
@@ -538,16 +582,16 @@
         (println (format "  → %d 本は上限 %d 超のため未処理（branch farm。個別に扱うこと）"
                          (count live) cap))
         (doseq [b live]
-          (let [has-remote? (gitc dir "rev-parse" "--verify" "--quiet" (str "refs/remotes/origin/" b))
+          (let [has-remote? (gitc dir "rev-parse" "--verify" "--quiet" (str "refs/remotes/" remote "/" b))
                 ahead (when has-remote?
-                        (some-> (gitc dir "rev-list" "--count" (str "origin/" b ".." b)) str/trim parse-long))]
+                        (some-> (gitc dir "rev-list" "--count" (str remote "/" b ".." b)) str/trim parse-long))]
             (cond
               (not has-remote?)
-              (let [{:keys [exit]} (sh "git" "-C" dir "push" "-u" "origin" b)]
+              (let [{:keys [exit]} (sh "git" "-C" dir "push" "-u" remote b)]
                 (println (format "    %-46s %s" b (if (zero? exit) "pushed (新規)" "push 失敗"))))
 
               (and ahead (pos? ahead))
-              (let [{:keys [exit]} (sh "git" "-C" dir "push" "origin" b)]
+              (let [{:keys [exit]} (sh "git" "-C" dir "push" remote b)]
                 (println (format "    %-46s %s" b (if (zero? exit) (str "pushed (+" ahead ")") "push 失敗"))))
 
               :else
@@ -566,7 +610,7 @@
                                             "🤖 Generated with [Claude Code](https://claude.com/claude-code)")
                                        true)]
                   (println (format "    %-46s PR 作成 %s" b url))
-                  (println (format "    %-46s PR 作成に失敗（差分なし等）" b)))))))))))
+                  (println (format "    %-46s PR 作成に失敗（差分なし等）" b))))))))))))
 
 ;; ---------- main ----------
 
