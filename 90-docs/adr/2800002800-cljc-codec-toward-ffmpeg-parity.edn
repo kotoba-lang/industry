@@ -473,6 +473,44 @@ policy への配線 2 点:
 oracle を主張するのは `:cljc` だけであること、実行可能 status は `:opaque` と `:cljc` だけで
 あること。**カタログが将来「hardware 対応済み」に読み替わらないための歯止め**である。
 
+### 実装したもの: provider による executor 注入（`utsushi` `0d00c52`）—— hardware 経路が使える状態に
+
+**設計の前に kototama / compiler / aiueos を確認した**（指示による）。結果が設計を決めた:
+
+| repo | 確認結果 |
+|---|---|
+| **kototama** | **本物の機構があった。** `kototama.contract` の actor:host import surface（`:import/id`/`:import/effects`）と、`component-provider` の provider 契約 + grant 強制。maturity は R1 stable（JVM/Chicory が実 `.wasm` を fuel/memory 制限付きで実行）、R2 qualified（browser 14/14 linkable） |
+| **compiler** | `kotoba.compiler.accelerator` は**本物のコンパイラ** —— WGSL/CUDA/MSL を実際に emit し content-addressed に seal し regeneration まで検証する。だが **runtime/provider が無く**（grep で触るのは自身とテストと ADR 2 本だけ）、dtype は `:f32` のみ・op は ewise(add/sub/mul/div) と reduce(sum/max/min) のみで **SAD が書けない**（`abs` が無く、2D block/stride addressing も無い）。GPU 経路の正しい置き場所ではあるが、今日は codec を表現できない |
+| **aiueos** | broker/virtio/net/image/execute はあるが、codec / hardware encoder の capability は無い |
+| **`bind_evm`/`bind_btc`** | utsushi の docstring が引用しているが **kototama にも compiler にも 0 件** —— 存在しないパターンを指していた |
+
+したがって executor 機構は発明せず、**`kototama.component-provider/prepare!` を写した**。
+あちらが強制する 3 点をそのまま強制する: ①providers のキーは granted と厳密一致
+②capability 名だけでは authority ではない ③provider は invocation adapter を露出する。
+
+**設計の要点は「status を書き換えないこと」である。** カタログの `:webcodecs`
+`:executor-absent` は「utsushi 単体では executor が無い」という**恒久的に正しい事実**で、
+provider の有無は**その deployment の**事実だから、policy 側に住む。`select` は provider が
+あれば status を待たずに実行可能として扱うが、**platform 制約は超えられない**
+（browser で外部プロセスは動かない）。`invoke!` は provider が無ければ投げる ——
+**カタログに在ることと実行できることの区別を実行時に潰さない**。
+
+**使える状態であることを実物で確かめた。** utsushi の**外**に書いた ffmpeg provider
+（production の呼び手が書く形そのもの）を注入して:
+
+```
+selection  : :ffmpeg（status は :out-of-layer のまま、executor 注入済み）
+             provider 無しなら :cljc
+check-graph: OK
+gas 見積り : ffmpeg 16  vs  cljc 18000   ← 3 桁差がコストモデルに反映される
+invoke!    : 実 ffmpeg が 274,625 bytes を生成（720x1280 12 frame）
+ffprobe    : h264,720,1280,12
+```
+
+**spawn するコードは utsushi に 1 行も入っていない** —— 「①②④ は純 cljc + EDN、
+外部依存ゼロ」は保たれる。WebCodecs provider は同じ形で、`w3.webcodecs` の呼び出しに
+置き換えて browser 側で登録するだけである。
+
 ### 次のレバー（実測シェア順、いずれも推測でなく上記 profile 由来）
 
 面共有まで入れた後の stage 帰属（514 sample、IDR の絶対時間は不変なのでその share が物差し）:
@@ -511,12 +549,18 @@ oracle を主張するのは `:cljc` だけであること、実行可能 status
 3. ~~**`sad`（10.9%）**~~ —— **実装済み**（fused SAD + 早期打ち切り、1.71x。上記）
 4. ~~**`solve-regular-levels`（14.9%）**~~ —— **実装済み**（inter fold、関数単体 17.4x。上記）
 5. ~~**`me-full-search`（33.1%）**~~ —— **実装済み**（whole-pel SAD 経路、1.17x。上記）
-0. **hardware executor** —— カタログはできたが `:webcodecs` の executor（filtergraph の
-   `:encode-pixels` node を `VideoEncoder` の呼び出し列に落とす部分）は**無い**。900 倍を
-   埋めるのはこれで、scalar 最適化ではない。browser 限定なので、macOS の production には
-   VideoToolbox 相当が別途必要（FFI が要り、CLAUDE.md の Rust 禁止と JVM 最後手段の方針の
-   両方に触るので、設計判断から始める必要がある）。**現時点の production の正解は `:ffmpeg`
-   backend を選ぶことであり、カタログはそれを隠れた前提でなく選択として表明できるようにした**
+0. ~~**hardware executor**~~ —— **seam は実装済み**（provider 注入、実 ffmpeg で実証）。
+   残っているのは各 platform の provider 実装であって機構ではない:
+   - **WebCodecs provider**（browser）: `w3.webcodecs` の binding は揃っているので、
+     `:encode-pixels` を `make-video-encoder` → `configure-video-encoder!` →
+     `encode-video-frame!` → `video-encoder-flush!` の列に落とすだけ。**browser でしか
+     検証できない**ので、`org-w3-webcodecs/test/e2e/run_e2e.cljs` の harness を使う
+   - **VideoToolbox provider**（macOS）: FFI が要り、CLAUDE.md の Rust 禁止と JVM 最後手段の
+     両方に触るので**設計判断から**始める必要がある。JVM なら Panama、node なら native addon
+   - **GPU provider**: `kotoba.compiler.accelerator` が正しい置き場所だが、KIR が
+     `:f32` の ewise/reduce しか表現できず SAD が書けない。runtime も無い。
+     **kernel 語彙（整数 dtype・`abs`・2D block addressing）と provider の両方が要る**
+   現時点の production の正解は **`:ffmpeg` provider を注入すること**で、それは今日できる
 6. **これ以上の scalar 最適化は「次のレバー」ではない** —— 上記の結論のとおり、profile が
    平坦になり残りは演算で、SIMD 基盤が無い。続けるなら取れるのは `mc-predict`（10.9%）と
    残差/再構成経路（約 19.5%）の配列化で合計 1.3〜1.4x 程度 —— **900 倍に対して意味を持たない**。
