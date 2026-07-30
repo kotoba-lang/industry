@@ -77,12 +77,20 @@ ADR-2607299300 が `/{org}/{repo}` を公開面とする決定を既に出して
 手書きリストにすると、新しいページを足した人がここを更新し忘れた瞬間に
 そのページが `{org}/{repo}` ルータに食われる —— 生成なら構造的に起きない。
 
-### 5. 判断は純 .cljc、機構だけ JS
+### 5. 判断は純 .cljc、機構だけ JS。**入口は route ではなく middleware**
 
 `cloud-itonami.sites/resolve-request`（純 `.cljc`）が
 `:pass-through` / `:redirect` / `:asset` / `:not-found` を返し、
 `cloud-itonami.edge.sites` が Response を組む。shadow-cljs `:sites-api`
 （`:esm` / `:advanced`）で `functions/edge/sites-core.js` に出す。
+
+**呼び出し口は `functions/_middleware.js`。`functions/[org]/[repo]/` という
+route ファイルにしてはいけない。** route にすると `functions/api/health.js` の
+ような同じ深さの静的ルートを覆い、しかも **route handler の `context.next()` は
+『次に match する route 関数』ではなくアセットサーバへ直行する**ので、覆われた
+関数が永久に呼ばれなくなる。middleware の `next()` は正しく後続の route 関数へ
+続く。`handle` は管轄外で **`nil` を返し、`next()` を呼ばない** —— 呼ぶと
+middleware 自身の後続処理（`/api/*` の html-leak guard）まで飛ぶ。
 `:edge-api` 共有バンドルに足さないのは `:nudge-api` / `:register-api` と同じ理由
 （あれは procurement→approval→store.cljc の `fs` require で現在ビルド不能）。
 `cloud-itonami.sites` が引くのは `clojure.string` だけなので単体でビルドできる。
@@ -149,6 +157,33 @@ Noto Serif JP、Google Fonts の unicode-range サブセットで漢字を完全
     defmulti / defmethod            -> 動く
     多 namespace の require          -> 動く
     src 読み込みの .cljc をそのまま  -> inkan.svg/seal が 762 文字の SVG を返す
+
+**本番デプロイして初めて出た欠陥（2件）—— ローカルの検証では出なかった**
+
+これが本 ADR でいちばん重要な記録。**45 の unit assertion も 17 の bundle 検査も
+ローカルのブラウザ検証も全部通った状態で、本番に出した瞬間に2つ壊れた。**
+
+1. **`/api/*` の 2 セグメント経路が全滅（502）。** `/api/health`・`/api/status`・
+   `/api/metrics`・`/api/jobs`・`/api/badge`・`/api/freepath`・`/api/org` を実測で
+   確認。原因は `functions/[org]/[repo]/index.js` が `functions/api/health.js` と
+   同じ深さで match し、**route handler の `context.next()` が「次に match する
+   route 関数」ではなくアセットサーバへ直行する**こと。health.js が呼ばれず SPA が
+   返り、既存の html-leak guard がそれを 502 に変えていた（guard が無ければ、
+   API が HTML を返していることに誰も気付かなかった）。→ middleware に移して解決。
+   4 セグメントの `/api/{org}/{repo}/metrics` は静的セグメント優先で正しく
+   解決していたため、**浅い経路だけが壊れるという見つけにくい形**をしていた。
+2. **`/{org}/{repo}/` が内部パスへ 308 リダイレクトしていた。** Pages のアセット
+   サーバは `…/index.html` を `…/` へ 308 する。`env.ASSETS` にそのまま投げて
+   結果を素通ししていたので、`/cloud-itonami/inkan/` が
+   `/sites/cloud-itonami/inkan/` へ 308 —— 内部レイアウトが Location として外に
+   漏れ、正準 URL も壊れていた。→ ディレクトリは最初から `index.html` を付けずに
+   取り、それでも 3xx が返ったら Location を公開形に書き戻す。
+
+**なぜローカルで出なかったか**: (1) は Pages の route 解決と `next()` の意味論
+そのもので、`wrangler pages dev` を通さない静的サーバ検証では再現しない。
+(2) は Pages のアセットサーバの正規化挙動で、同じく本番経路にしか無い。
+**『ローカルで全部通った』は『本番で動く』の証明ではない**という、この面では
+繰り返し確認される事実の実例。デプロイ後の live 実測を手順から外さないこと。
 
 **発見した実装上の罠（2件）**
 
