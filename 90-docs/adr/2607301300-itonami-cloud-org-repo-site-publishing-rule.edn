@@ -254,4 +254,64 @@ repo で完結した `document` を組むので、プラットフォームが `<
 1. **scittle の script は `<head>` ではなく body 末尾に置く。** head に置くと `page.cljs` が body 生成前に走り、`getElementById` が全部 nil を返して**何も起きないまま静かに終わる**（プレビューが空、status が『読み込んでいます』で固着）。
 2. **shitsuke の `button` は `:id` を DOM に出さない**（`:class`/`:act`/`:disabled`/`:title`/`:type` だけ）。`:id` でボタンを取ろうとすると配線が黙って外れる。hook は `:act` → `data-act` で取る。"
 
+  :adr/status_2607302200
+  "**closing 時点（2026-07-30）の現在地。**
+
+## 着地済み（すべて default branch 上、live 実測で確認）
+
+    network-awai/cloud-itonami   2d13f9e5  公開ルール + 共通クローム + 生成器 + テスト
+    cloud-itonami/inkan          6dea1812  組版エンジン + 公開ページ（新規 repo）
+    kotoba-lang/jp-go-dds        c787de2   select に :value（現在値の表現）
+    com-junkawasaki/root         5d22dad6  本 ADR / 24901389 + 7629bf38 west.yml
+                                           b70a4274 repos.edn :extra-projects
+
+live（2026-07-30 最終確認）:
+
+    /cloud-itonami/inkan/                      200 text/html
+    /cloud-itonami/inkan                       301 → 末尾スラッシュ
+    /cloud-itonami/cloud-itonami-rirekisho/    200 text/html（共通クローム入り）
+    /cloud-itonami/inkan/secret.env            404 json（宣言外ファイル）
+    /zzz-nonexistent/qqq                       404 json（未登録）
+    /sites/registry.json                       200 json
+    /api/health /api/status /api/{org}/{repo}/metrics  200 json（回帰なし）
+    / /marketplace/ /isco-1212/ /docs/ /css/   200（既存面すべて無傷）
+
+## 検証（closing 時に再実行した実測値）
+
+    cloud-itonami sites+chrome    17 tests / 102 assertions   0 failures
+    verify-sites-bundle           17 checks                   all passed
+    generate-sites-registry --check  canonical (2 sites, 37 reserved)
+    inkan geometry+svg            15 tests / 357 assertions   0 failures
+    jp-go-dds 全体                 27 tests / 246 assertions   0 failures
+
+## 未実装・既知のギャップ（次の担当者向け）
+
+1. **自動ゲートが無い。** `verify-sites-bundle.cljs` も `--check` も手で回す。
+   この repo の GitHub Actions は ADR-2607300900 で撤去済みで、murakumo fleet 側へ
+   未 port。**クローム検査もレジストリ生成時にしか働かない**ので、生成器を通さず
+   `public/sites/` を手で置けばすり抜ける。
+2. **クロス repo ビルドが自動化されていない。** `inkan` / `rirekisho` の変更を
+   サイトへ反映するには生成器を手で回して commit する。west pin 前進に連動しない。
+3. **design-quality スコアを取っていない。** skill `kotoba-uiux` は
+   `design-quality.cli score` を求めるが、両サイトとも未計測。DADS 面に対して
+   `--hig-*` 前提の audit をどう当てるか（`jp-go-dds.tokens/skin-css` の bridge を
+   通すか）が未決なので、**通していないことを明示して未計測のままにした** ——
+   走らせずに『refined』と言わないため。
+4. **`inkan` の SVG はアウトライン化していない**（閲覧側フォント依存）。自己完結が
+   要るなら PNG。フォント glyf/CFF 解析はこの repo が持つべき機構ではないと判断。
+5. **篆書体・印相体は未対応**（OFL の実用フォントが見つからない）。代用しない。
+6. `/sites/{org}/{repo}/…` の生パスでも同じバイトが取れる（Pages のアセットは
+   deploy dir に居るので構造的）。正準 URL は `/{org}/{repo}/`。
+7. 観測（本 ADR の対象外・別担当）: `jp-go-dds` に `test/jp_go_dds/skin_test.cljc`
+   があるが `test/run_tests.cljs` に登録されておらず走っていない。
+
+## 次の一手（resume point）
+
+    cd orgs/network-awai/cloud-itonami
+    nbb scripts/verify-sites-bundle.cljs && nbb scripts/generate-sites-registry.cljs --check
+
+3 番（design-quality の当て方）を決めるのが最も価値が高い。決めるまでは
+『DADS 面の品質は未計測』が正しい表明であって、スコアを出さずに良し悪しを
+主張しない。"
+
   :source/dataset "adr"}]
