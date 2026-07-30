@@ -5,7 +5,7 @@
   :adr/doc_type "adr"
   :adr/topic "dougaka-production-plane"
   :adr/date "2026-07-29"
-  :adr/last_verified "2026-07-29"
+  :adr/last_verified "2026-07-30"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/authoritative_for
@@ -282,6 +282,84 @@ PUT し、他セッションが追加していた約 20 entry と複数の pin �
 定める正経路（tip の内容を取得 → 当該行だけ編集 → PUT）に戻し、その後の pin 前進 4 件は
 すべて +1 −1 で着地させた。
 
+## yukkuri と mangaka（2026-07-30、オーナー指示「do it」）
+
+### yukkuri — bb を退役させ、seed を kagi に置いた（`cbf71879`）
+
+`scripts/aozora-publish/` はこの repo に残る**最後の bb エントリポイント**で、独自の
+JVM CACAO 依存を抱え、text 投稿しかできず、seed は `AOZORA_PUBLISHER_SEED` env
+だけから読んでいた——**murakumo secret を失ったのと同じ形**（どこにも durable に
+保管されていない）。
+
+- **seed を kagi へ**（`yukkuri-aozora-publisher-seed`、compartment `net-kotobase`、
+  発行済み）。env は CI override として残す。kagi read は単一 item 狙い撃ち（`ls` は
+  使わない）で、`KAGI_HOME` を live vault に固定する——`bin/kagi` は自身の repo root へ
+  `cd` するので、既定では repo 内の古い vault を読んでしまう。
+- **エピソードが mp4 を `app.aozora.embed.video` として持てる**ようにした。yukkuri の
+  エピソードが dougaka / minidrama と同じ live /videos feed に並ぶ。rkey はエピソード
+  id 由来なので再投稿は複製ではなく置換。
+- 暗号は `kotobase.cacao`（kotobase-client）。`kotoba.cacao` の写しは fleet 内に
+  **既に 5 つ**あった（dougaka-actor / minidrama / dougaka-kodomo / syosetsuka /
+  yukkuri。うち 2 つは 223 行中 24 行しか違わない）ので、6 つ目を作らなかった。
+
+サーバ由来の知見 2 件を、コメントではなく**名前付き・テスト付きの定数**として保全した
+（後の編集で黙って消えないように）:
+
+- `now-iso` は**秒単位切り捨て**。小数秒は createRecord 内部の
+  `Cannot read properties of null (reading 'length')` を踏む。
+- `account-bootstrap-order` は **createSession 先**。既登録 DID に対する createAccount
+  の再呼び出しがアカウント状態をサーバ側で壊し、その後は fresh session でも
+  createRecord が generic InternalError になった記録がある。dougaka-vector の publisher は
+  createAccount を先に呼んで成功しているが、実際に壊れた観測がある方を採る。
+
+**live 検証**: seed を kagi から解決 → self-CACAO → createAccount → createRecord、
+PDS から読み戻し確認（`did:key:z6MkfmLS…`、rkey `1785370350567`）。6 tests /
+27 assertions。動画経路は dry-run まで（手元の mp4 が dougaka のものだけで、
+yukkuri 名義で出すと取り違えになるため未投稿）。
+
+### mangaka — stub ではなく fleet 自身のモデルでパネルを生成する（`1ad8d814`）
+
+`mangaka.video` は `default-model` を **`\"seedance-2.0\"`（hosted fal.ai）に固定**して
+いた。murakumo.edn 自身が「実 API キーでの実行は未実施」と記録しており、
+`backend-token` は何も返さないので、`generate-video!` は**毎回 placeholder SVG を
+返していた**。panel-from-video pipeline は一度もパネルを出していない。
+
+自リポの docstring は「既に cloud-murakumo に in-process 依存しているので HTTP client は
+不要」と論じていた。依存については正しく、**結果については誤り**——in-process の
+どちらの経路にも使える資格情報が無い。`:seedance` は誰も発行していないキーを要求し、
+`:comfy`（executor は実際に駆動できる）は到達可能な ComfyUI endpoint を要求する——
+dougaka が毎晩単色板を出していたのと同じ未設定の `COMFY_POD_URL`。**今日動く経路は
+公開 API だけ**なので、`mangaka.murakumo-http` が共有 client を束ねる（host
+primitive 4 つだけ。API の罠はすべて lib 側）。
+
+`default-model` は nil にして murakumo の `:video :default` に委ねる
+（ADR-2607173100）。`\"seedance-2.0\"` を名指しした時だけ hosted in-process 経路。
+
+**この作業で既存の破損 2 件が表面化した。どちらも一度も実行されていないコード**:
+
+- `clj/deps.edn` が douga を `156667e9`（`ffprobe-duration-cmd` 実装前、6 commits 手前）
+  に pin していたのに `video.cljc` はそれを呼んでいた。**この ns は自分の pin に対して
+  コンパイルできていなかった**。pin を `b957073d` へ前進。
+- `backend-token` を 2 引数で呼んでいた（実際は 1 引数）。**キーが存在した瞬間に
+  ArityException で落ちる**状態で、キーが無い分岐が先に返るので誰も到達していなかった。
+
+**live 検証**: prompt「a lone streetlamp on a rainy night, manga panel composition,
+high contrast ink」で `source \"murakumo-fleet\"`、実 h264 クリップ 306 KB
+（768x448 / 49 frames / 2.04s、cid `bafkreiano34qpe5dbzn5c2m3ojbdwcn2kz6skfqjhvki42cxc5o7kjwmze`）、
+`sample-frames!` がそこから 4 枚のパネル候補を抽出——雨の筋・街灯・建物が
+高コントラストのインク調で、指示どおりの絵。9 tests / 37 assertions。
+
+### 移植状況（-ka 6 本）
+
+| repo | 生成 | 公開 | 状態 |
+|---|---|---|---|
+| dougaka | murakumo（共有 client） | aozora 毎日 | 移植済み・live |
+| animeka | murakumo（共有 client） | 未 | 移植済み（host 修正で初めて到達可能に） |
+| mangaka | murakumo（共有 client） | 未 | 移植済み・live（stub を脱した） |
+| yukkuri | ComfyUI + VOICEVOX | nbb publisher・live | publisher 移植済み。生成側は未移植 |
+| ongakuka | 無（BGM カタログ台帳） | 未 | 生成 pipeline 自体が無い |
+| syosetsuka / gameka | 無（テキスト / specs） | 未 | 同上 |
+
 ## 残っていること
 
 - **既存 catalog に `:sfx` を書いた shot が 1 つも無い。** cue は opt-in なので、
@@ -294,10 +372,13 @@ PUT し、他セッションが追加していた約 20 entry と複数の pin �
 - **毎晩の投稿を回している runner にはまだ token が渡っていない。** 駆動元は
   このマシンの launchd に無く（cloud routine と推定）、特定できていない。
   そこに `MURAKUMO_GENERATION_TOKEN` / `KOTOBASE_ARCHIVE_TOKEN` を通すまで、
-  公開される動画は単色板のまま。
-- **mangaka / yukkuri は未移植。** mangaka は ComfyUI 経路を持つので murakumo に
-  寄せるかの判断が要る。yukkuri は `scripts/aozora-publish` が bb 実装（nbb-only 方針に
-  反する）で、seed が `AOZORA_PUBLISHER_SEED` 環境変数待ち。
+  公開される動画は単色板のまま。**これが最後の 1 マイル。**
+- **yukkuri の生成側（ComfyUI + VOICEVOX）は未移植。** publisher だけが新しい。
+- **`kotoba.cacao` の写しがまだ 4 つ残っている**（dougaka-actor / minidrama /
+  dougaka-kodomo / syosetsuka）。この 2 つは毎日実際に publish している唯一の経路
+  なので、意図的に触っていない——動いているものを共有化するのは別の、慎重な pass。
+- **animeka の ffmpeg 補助関数が `murakumo-video` ns に同居したまま。** 生成の wire とは
+  別関心で、いずれ douga へ。
 - 1 本あたりの制作時間は fleet 往復のぶん延びる（8 ショットで十数分規模）。
 
 ## Consequences
@@ -307,14 +388,15 @@ PUT し、他セッションが追加していた約 20 entry と複数の pin �
 - (+) production が CID で再現・監査できる。中間物が一晩で消えなくなる。
 - (+) degrade が leg 単位で数えられるので、「絵が入らなかった回」を publish 前に落とせる。
 - (+) fleet の contentHash が保管 CID と一致するので、計算面と保管面で名前が割れない。
-- (+) 契約の学習コストが 1 箇所に集約された。animeka は host 1 つの違いで
-  「実装済みに見えて一度も動いていない」状態だった — 同じことが mangaka / yukkuri でも
-  起きうる。
+- (+) 契約の学習コストが 1 箇所に集約された。**animeka は host 1 つの違いで、mangaka は
+  誰も持っていないキーの既定固定で、どちらも「実装済みに見えて一度も動いていない」
+  状態だった。** 共有化はその 2 件を同時に暴いた。
+- (+) bb がこの fleet の operator host から 1 つ消えた（yukkuri が最後の 1 つ）。
 - (−) fleet を通す分、1 本あたりの制作時間と GPU コストが上がる。
 - (−) cold start の初回は retry で吸収するが、その分だけ最初の 1 本は遅い。
 - (−) SFX は opt-in で、既存 catalog は誰も書いていない。
 - (−) `MURAKUMO_TOKEN_SECRET_2` を使い切ったので、次に generation gate の
   secret を足したい時は空きスロットが無く、rotation か gate 側の拡張が要る。
-- (−) animeka の ffmpeg 補助関数が `murakumo-video` ns に同居したまま。生成の wire とは
-  別関心で、いずれ douga へ移すべき。
+- (−) publisher 実装が fleet 内で 5 つに分かれたまま（yukkuri だけが共有 cljs CACAO を
+  使う）。統一は動いているものを触る pass になるので別途。
 "}]
