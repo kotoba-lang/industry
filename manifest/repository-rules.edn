@@ -108,6 +108,78 @@
      :must [:answer-a-request :declare-its-isic-code]
      :must-not [:hold-a-loop :require-a-clock]
      :examples ["cloud-itonami-isic-6492" "cloud-itonami-isic-5820"]}
+    ;; The rest of the itonami fleet, classified 2026-07-30 on the same
+    ;; evidence: each family is keyed by a classification code or a
+    ;; jurisdiction, each blueprint carries a :domain and a :governor and no
+    ;; loop, and the one family member that is deployed (isic-6492, on Pages
+    ;; Functions) answers a request and stops. None of them is resident, so
+    ;; none of them should pay to sit idle. The :role differs because what an
+    ;; actor is keyed BY is the useful thing to know about it.
+    {:prefix "cloud-itonami-isco-"
+     :role :occupation-agent
+     :execution :on-demand
+     :must [:answer-a-request :declare-its-isco-08-code]
+     :must-not [:hold-a-loop :require-a-clock]
+     :examples ["cloud-itonami-isco-0110"]}
+    {:prefix "cloud-itonami-iso3166-"
+     :role :jurisdiction-agent
+     :execution :on-demand
+     :must [:answer-a-request :declare-its-iso3166-code]
+     :must-not [:hold-a-loop :require-a-clock]
+     :examples ["cloud-itonami-iso3166-ago"]}
+    {:prefix "cloud-itonami-municipality-"
+     :role :municipal-agent
+     :execution :on-demand
+     :must [:answer-a-request :declare-its-municipality]
+     :must-not [:hold-a-loop :require-a-clock]
+     :examples ["cloud-itonami-municipality-are-abu-dhabi"]}
+    {:prefix "cloud-itonami-assoc-"
+     :role :association-compliance-agent
+     :execution :on-demand
+     :must [:answer-a-request :declare-its-association]
+     :must-not [:hold-a-loop :require-a-clock]
+     :examples ["cloud-itonami-assoc-6411-jpn-boj"]}
+    {:prefix "cloud-itonami-marketplace-"
+     :role :marketplace-service
+     ;; Measured rather than inferred: seven of these are deployed Workers and
+     ;; each answers /health and its own REST surface per request.
+     :execution :on-demand
+     :must [:answer-a-request]
+     :must-not [:hold-a-loop]
+     :examples ["cloud-itonami-marketplace-order"]}
+    {:prefix "cloud-itonami-commitment-"
+     :role :commitment-service
+     ;; Deployed on Pages with Functions under /api/commitment/*.
+     :execution :on-demand
+     :must [:answer-a-request]
+     :must-not [:hold-a-loop]
+     :examples ["cloud-itonami-commitment-ledger"]}
+    ;; Smaller code systems, same shape. Separate prefixes because the auditor
+    ;; matches with starts-with? and these share no common one.
+    {:prefix "cloud-itonami-cofog-"
+     :role :classification-agent :execution :on-demand
+     :must [:answer-a-request] :must-not [:hold-a-loop]}
+    {:prefix "cloud-itonami-unspsc-"
+     :role :classification-agent :execution :on-demand
+     :must [:answer-a-request] :must-not [:hold-a-loop]}
+    {:prefix "cloud-itonami-gtin-"
+     :role :classification-agent :execution :on-demand
+     :must [:answer-a-request] :must-not [:hold-a-loop]}
+    {:prefix "cloud-itonami-jsic-"
+     :role :classification-agent :execution :on-demand
+     :must [:answer-a-request] :must-not [:hold-a-loop]}
+    {:prefix "cloud-itonami-crowdfunding-"
+     :role :crowdfunding-service
+     ;; A five-part service split by stage — pledge, collection, fulfillment,
+     ;; payout, campaign — the same request-per-stage shape as marketplace.
+     :execution :on-demand
+     :must [:answer-a-request] :must-not [:hold-a-loop]
+     :examples ["cloud-itonami-crowdfunding-pledge"]}
+    {:prefix "cloud-itonami-hygiene-"
+     :role :commercialization-service
+     :execution :on-demand
+     :must [:answer-a-request] :must-not [:hold-a-loop]
+     :examples ["cloud-itonami-hygiene-access"]}
     {:prefix "person-"
      :role :artificial-organism-actor
      ;; Resident and autonomous: it holds an operating identity, a mailbox and
