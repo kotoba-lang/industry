@@ -311,7 +311,39 @@ proposal を「発行済み」と表示してはならない。
      `accepted` に更新（設計は R0 で実装済み・2607300300 が依存）。**accepted は
      actuation を意味しない** ことを本文に明記 — R0 のままで `run-session` は
      G7 で raise し続ける。
-4. `cloud-itonami/cloud-itonami-esim` actor を新設（D6）。
+4. ✅ **done（2026-07-30）** `cloud-itonami/cloud-itonami-esim` actor を新設
+   （pin `600c23ec`、CI green（lint + test + demo runner）、31 tests / 167 assertions、
+   clj-kondo 0/0）。**eSIM Provisioning Advisor ⊣ eSIM Provisioning Governor**、
+   6 ops すべて `:effect :propose` only
+   （`:coverage/report` `:euicc/register` `:profile/download` `:profile/lifecycle`
+   `:smds/register` `:ownership/transfer`）。
+   - **`kotoba-lang/esim` を単一 authority にし、actor は規則の2枚目のコピーを持たない。**
+     identifier 構造・reachability・single-enabled-profile 不変条件・masking を全て委譲
+     （masking は alias で、再実装していない）。これは step 2 で露呈した2つの問題の是正:
+     card-issuing は `kotoba.card/luhn-valid?` があるのに Luhn を自前実装し、lifecycle
+     allowlist を governor だけに持っていたため library を後追いで mirror にする必要が生じた。
+   - **governor は全 ground-truth を library 経由 + store の記録から再計算し、proposal から
+     読まない**（自己申告 `:confidence` が高くても HARD violation は通らない）。
+   - **store が適用するのは governor が計算した結果**（`governor/cleared-transition` →
+     `operation/commit-record`）**であって advisor の payload ではない。** build 中の実バグ:
+     store が `:outcome` を期待していたが、それを計算するのは governor で、commit record は
+     advisor の `:value` しか運んでいなかった。advisor 供給の profile vector が store に
+     届く経路があると reachability check は飾りになる。
+   - `:profile/download` / `:profile/lifecycle` / `:ownership/transfer` は **phase 3 を含む
+     全 phase の `:auto` から不在**（恒久。rollout milestone ではない）。transfer は
+     approve されても `:executed false` で記録され、**subject of record を移さない** —
+     実行は licensed operator の行為で本 actor の外。
+   - **jurisdiction spec-basis catalog は R0 で意図的に持たず、coverage をゼロと報告する。**
+     telecom licensing + GSMA SAS-SM が該当するが、未検証の管轄要件を書くのは
+     isic-6120 の ADR-0002 が記録した捏造そのもの。空で hold するのは誠実、捏造は不誠実。
+   - advisor trace を `:audit` channel だけでなく **ledger にも書く**（checkpointer は
+     in-memory / per-thread、hold された提案の中身は hold fact の rules だけでは分からない。
+     identifier は masked）。
+   - **MemStore のみ**。EDN-blob codec も `:db.unique/identity` schema も無いので
+     `langchain-store` は未依存 — 実 backend を足す時に依存になる。
+   - **build 中に langgraph の resume idiom を取り違えた**: `interrupt-before` からの継続は
+     `input` が nil か `:resume? true` の時だけ成立し、前状態を丸ごと input として渡すと
+     **fresh run** になる（`langgraph.graph/run*`）。テストと sim の両方で誤っていた。
 5. `cloud.itonami.app.authority` 背骨を実装（bitcoin PSBT 経路の一般化。bitcoin は当面現状維持）。
 6. 3領域の typed adapter + `defaults.edn` の設定面（既定 disabled、AgentRun と同じく opt-in）。
 7. 単一 ref の監査面と、SIM-swap ⇒ card posture の cross-domain 不変条件をテストで固定。
