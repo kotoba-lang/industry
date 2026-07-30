@@ -561,37 +561,84 @@ proposal を「発行済み」と表示してはならない。
 各段の完了条件は「実装した」ではなく、pre-check の決定論性・context type 不一致の拒否・
 Governor 拒否の伝播・単一 ref 上での cross-domain query の成立が **test で示されていること**。
 
-## 残る gap（2026-07-30 時点、優先順）
+## 残る gap（2026-07-30 更新、優先順）
 
-1. **`card-issuing` と `denwaban` に HTTP 面が無い（最大）。** eSIM は step 9/10 で
-   完了（consent + operator の2面、50 tests）。残る2つは server/http/handler/worker 系
-   ファイルが0件のままで、`:authority/status` が contract 必須になった今、
-   **adapter は答えを求めるのに実体が無い**状態（`:endpoint-not-configured` が返る）。
-   `esimprovisioning.http` がそのまま雛形になる。
-2. **consent surface に transport security が無い。** operator surface は token で
-   守られたが（step 10）、consent surface は無認証のまま loopback 束縛で塞いでいる。
-   共有ホストに置くなら、consent 境界が飾りになるので先に認証が必要。
-3. **pending の解決は polling のみ。** `refresh!` は app から問い合わせる形で、
-   actor から app への callback は無い。決着を知るのが遅れるだけで嘘にはならないが、
-   operator が決めてから app が気付くまでの窓は残る。
-4. **D4 の単一 ref が actor 側でまだ成立していない。** app 内では1つの store partition で
-   cross-domain 読みが成立するが、**actor の ledger は各自 MemStore のみ**
-   （実測: esim actor の store に kotobase/Datomic 参照0件）。①を実装する時に actor の store を
-   共有 backend に向けるのが自然な合流点。
-5. **`denwaban` に CI が無い。** 6 tests / 16 assertions がローカル実行のみを証拠にしている。
-   一番安く直る。
-6. **kotoba-lang の 199 ライブラリが git 座標で消費不能。** actor repo にも同じ
-   欠陥があった（step 9 で `cloud-itonami-esim` を修正）ので、これは library だけの
-   問題ではない — **fork して deploy すると謳う repo が fork できないのは、より重い。** 1,828 中 199
-   （`card`/`phone`/`esim` は修正済み）。同一クラスの欠陥で、各 CI が sibling を `../` に
-   clone しているため全て green のまま。**sibling を clone する CI は consumability を
-   何も証明しない。**
-7. 小さいもの: `cloud-itonami-app` の既存 phantom 8件（`identity/*` /
-   `store/update-agent-control!` / `provider/agent-turn`）と未 commit の
-   `bitcoin.clj`/`bitcoin_node.clj` / `cardissuing.registry` の Luhn 重複実装 /
-   `kotoba-lang/esim` に `ui.cljc` が無い。
+> 前回版の gap 1（card-issuing と denwaban に HTTP 面が無い）は **閉じた**。両者とも
+> `POST /commit` を提供し、`transport.clj` の docstring・`defaults.edn` の注記も
+> 実態に合わせた。**ただし閉じたのは「訊けない」問題だけで、到達上限は動いていない。**
+
+1. **Stripe Issuing の write path が Stripe test mode で一度も走っていない（最大）。**
+   `io-stripe-issuing` は 21 tests / 73 assertions すべて recorded transport のみ。
+   read shape（`GET /v1/issuing/cards`・status `active|inactive|canceled`・type
+   `virtual|physical`）は 2026-07-30 に live spec で検証したが、**POST body は
+   知識から書いたもので未検証** — MCP 面が Issuing の read しか出さないため。
+   `describe` が `:write-paths-unexercised true` を返すのはこのため。
+   **オーナー判断が必要な未決事項**: test mode で始めるか live key を使うか。
+   provider は `:test` 既定で、`:mode :live` は明示指定を要求する。
+2. **phase 3 では Stripe cardholder を作る承認経路が存在しない（新規に判明）。**
+   `:cardholder/intake` は phase 3 の `:auto` にいる唯一の op なので operator 承認を
+   持たず、`actuation/precheck` は名前のない承認を拒否する → auto-commit は
+   `\"actuation\":\"not-attempted\"` + `\"auto-committed-without-operator-approval\"` を
+   返す（`\"committed\"` が「Stripe に cardholder がある」と読まれないように）。
+   一方 `:card/issue` は Stripe の cardholder id（`ich_…`）を要求し、この actor 自身の
+   `ch-1` で代用すると**存在しない、あるいは他人の cardholder に対してカードを作る**ので
+   `:stripe-cardholder-unknown` で outbound 前に拒否する。結果として phase 3 では
+   id を外部から供給するか、phase 2（intake が operator gate になるが `:card/issue` が
+   `:writes` から外れる）で運用するしかない。**actor の phase 表由来の構造的な穴**で、
+   HTTP 面の性質ではない。
+3. **`denwaban` に CI が無い（この session では直せなかった）。** 17 tests /
+   56 assertions がローカル実行のみを証拠にしている。**原因は token scope**:
+   `.github/workflows/*` への書き込みには `workflow` scope が必要で、この session の
+   token は `repo` のみ（GitHub は push を reject、Contents API は 404 を返す）。
+   同じ理由で `cloud-itonami-card-issuing` の CI workflow も直せず、**代わりに
+   `:dev` alias を空にして CI が既に叩くコマンド（`-M:dev:test`）が git 座標を
+   解決するようにした**（workflow 側の sibling checkout は死重として残る）。
+   `gh auth refresh -s workflow` の後に、workflow 側を掃除できる。
+4. **consent surface に transport security が無い。** operator surface は token で
+   守られている（esim / card）が、consent surface は無認証のまま loopback 束縛で
+   塞いでいる。共有ホストに置くなら consent 境界が飾りになる。
+5. **pending の解決は polling のみ。** actor から app への callback は無い。決着を
+   知るのが遅れるだけで嘘にはならないが、operator が決めてから app が気付くまでの
+   窓は残る。**denwaban はこの窓を持たない**（pending を作らないため）。
+6. **D4 の単一 ref が actor 側でまだ成立していない。** app 内では1つの store
+   partition で cross-domain 読みが成立するが、actor の ledger は各自 MemStore のみ。
+7. **kotoba-lang の 199 ライブラリが git 座標で消費不能。** `card` / `phone` / `esim` /
+   `io-stripe-issuing` と actor 3 repo は修正済み。**sibling を `../` に clone する CI は
+   consumability を何も証明しない** — `cloud-itonami-card-issuing` で実際に、
+   CI が「fork が持たないレイアウト」を自分で用意していたために、published repo が
+   classpath を作れないことを検出できていなかった。
+8. 小さいもの: `cloud-itonami-app` の既存 lint warning 11 件（うち 8 件は phantom
+   require）/ `cloud-itonami-app` の full suite 5 回中 1 回だけ 1 failure が出た
+   （出力を読む前に truncate してしまい **原因未特定**。以降 4 回は green。新規の
+   socket テストが ephemeral port を掴むのは**可能性のある**原因で、確定ではない）/
+   `cardissuing.registry` の Luhn 重複実装 / `kotoba-lang/esim` に `ui.cljc` が無い。
 
 **意図的に開けているもの（gap ではなく決定）**: jurisdiction spec-basis catalog の不在 /
-EID checksum を検証しない / `io-libp2p` vs `webrtc` の binding provenance 未決。
-いずれも「未検証のものを書かない」という同じ理由で、当て推量で埋めない。
+EID checksum を検証しない / `io-libp2p` vs `webrtc` の binding provenance 未決 /
+**denwaban に operator 面を置かないこと**（G7 が閉じている間は承認が実行に変わらないので、
+decide endpoint を置くこと自体が gate の見せかけになる）。いずれも「未検証のものを
+書かない」という同じ理由で、当て推量で埋めない。
+
+## build order の続き（2026-07-30、step 11-14）
+
+| step | 対象 | 結果 |
+|---|---|---|
+| 11 | `kotoba-lang/card` に `kotoba.card.actuation`（承認後の contract） | done。`required-approval-keys`・`precheck`（outbound 前）・`state-mapping-complete?`（畳み込み禁止） |
+| 12 | `kotoba-lang/io-stripe-issuing`（新 repo、live provider） | done。21 tests / 73 assertions、CI green、west 登録済み。write path は未実行 |
+| 13 | `cloud-itonami-card-issuing` の HTTP 面 + Stripe 結線 | done。63/223 → **82 tests / 279 assertions**。4 wire state（`approved-not-actuated` を含む） |
+| 14 | `denwaban` の HTTP 面 | done。6/16 → **17 tests / 56 assertions**。listener は1つ、`pending` は存在しない |
+| 15 | app 側で 4 番目の state を解釈 | done。**396 tests / 1651 assertions**。`approved-not-actuated` を `:transport-failed` と読んでいた（= operator が承認して Stripe が断ったのに「actor に到達できない」と人間に伝える）のを修正 |
+
+**step 13 で見つけた実バグ2件**（deploy 後ではなく test 中に見つかった）:
+`actuate!` が commit record の `:payload` から op を読んでいたが payload は store
+mutation で op を持たないので**全 actuation が静かに `:op-has-no-live-counterpart` に
+落ちる**状態だった／`:card/issue` に actor 自身の cardholder id を渡していた（上記 gap 2）。
+
+**運用上の記録**: 共有 superproject working tree で生成した `west.yml` が、別セッションの
+pull で**未コミットのまま消えた**。CLAUDE.md が「superproject 本体は閲覧専用」と言うのは
+これのこと。以後の pin 前進は tip を取得して当該行だけ書き換え、blob SHA の
+precondition で landing している（1 回 409 が出て、それが lock が働いた証拠）。
+`--entry` は**検証する pin を限定するだけで書き込む pin は限定しない**ので、
+`--entry denwaban` の出力に未検証の `io-multiformats` pin 変更が混ざっていた
+（採らず、手で1行だけ直した）。
 "}]
