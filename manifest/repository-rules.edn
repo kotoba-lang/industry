@@ -175,6 +175,14 @@
      :execution :on-demand
      :must [:answer-a-request] :must-not [:hold-a-loop]
      :examples ["cloud-itonami-crowdfunding-pledge"]}
+    {:prefix "cloud-itonami-esim"
+     :role :provisioning-service
+     ;; Landed in west after the first classification pass and surfaced as
+     ;; unclassified, which is what that state is for. Same evidence as the
+     ;; other service families: a governor, no loop, a request to answer.
+     :execution :on-demand
+     :must [:answer-a-request] :must-not [:hold-a-loop]
+     :examples ["cloud-itonami-esim"]}
     {:prefix "cloud-itonami-hygiene-"
      :role :commercialization-service
      :execution :on-demand
