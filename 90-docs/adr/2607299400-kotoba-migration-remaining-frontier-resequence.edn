@@ -872,6 +872,21 @@ Still open:
 3. Optional: join mem-bytes → `[:option :i64]` instead of -1 sentinel
 
 
+## Progress (2026-07-31ai — join option-i64 + connect plane :bool + pin)
+
+- murakumo#258 MERGED (`a7610e3`): **join clamp-resident mem → `[:option :i64]`**
+  (drop -1 sentinel) + **connect serves-* http?/common? → real `:bool`**
+  (drop option-i64 presence tags). Hosts: option-i64 / boolean projection.
+- murakumo#259 MERGED (`8c8a459`): ADR-260731-w6-join-option-connect-bool.
+- west pin murakumo `12b5c8e5` → `8c8a4593`.
+- Evidence: join/connect parity+unit (+ authority) green on tip.
+
+Still open:
+1. T8.3 production AOT network/secret; W4 recursive values
+2. T5.2 native guest record wire; T8.4 live host runner
+3. Optional: infer-plan usable-bytes wired `-1` → `[:option :i64]`
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
