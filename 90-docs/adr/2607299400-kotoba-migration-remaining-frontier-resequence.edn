@@ -94,7 +94,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
-| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM load-time+call-site done** #221+#223+#225+#226+#228; cljs mirror delete open |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done** #221+#223+#225+#226+#228; **mirror-delete pilot** #233 kekkai + preload contract; remaining hosts still have cljs mirrors |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
@@ -483,9 +483,30 @@ Still open (non-bool frontier):
   **parameter** flags still projected as 0/1 i64 on product shell.
 
 Still open:
-1. T6.4 cljs mirror body deletion (preload guarantee)
+1. T6.4 cljs mirror body deletion for remaining ~30 dual-source hosts (preload contract landed)
 2. T8.3 production AOT network/secret; W4 recursive values
 3. Numeric by design: queue triples, task-score-code, pick/bump indices, tier codes
+4. Residual product-surface 0/1 i64 **params** outside report/join/reconcile
+   (config pinned-exists, secret missing/blank, engine option flags, moe shared?,
+   dash health-from-present, tunnel rc-present)
+
+
+## Progress (2026-07-31n — T6.4 kekkai mirror-delete pilot + pin)
+
+- murakumo#233 MERGED (`60ef608a`): **T6.4 mirror-deletion pilot**
+  - `murakumo.kekkai.gate` deletes all `#?(:cljs mirror-*)` pure reimplementations
+  - pure helpers require shipped `:kekkai-gate` KIR on every platform
+  - `oracle/require-ready!`, `preload!`, `preload-catalog!` preload contract
+  - nbb `ops.cljs` / `task.cljs` preload oracle ids **before** product-shell requires
+  - ADR-260731-w6-t64-kekkai-mirror-delete
+  - Evidence: 90 tests / 2124 assertions green
+- murakumo#232 already on tip ancestry (label flags :bool)
+- west pin murakumo `89465618` → `60ef608a` (covers #232 + #233)
+
+Still open:
+1. T6.4 expand mirror-delete to remaining dual-source hosts (same preload contract)
+2. T8.3 production AOT network/secret; W4 recursive values
+3. Residual 0/1 i64 param projections (config/secret/engine/moe/dash/tunnel)
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
