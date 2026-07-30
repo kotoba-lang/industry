@@ -1074,14 +1074,14 @@ Still open:
 
 ## Progress (2026-07-31av — T8.4 tls-open + transport-close inject live)
 
-- kototama main  (agent/t84-tls-open-live merged): **T8.4**
-  live-prove  (invalid handle → 0) and
-   (unknown handle → -1) via
+- kototama main ded6ad41 (agent/t84-tls-open-live merged, PR #103): **T8.4**
+  live-prove :tls-open-jvm-inject-available (invalid handle → 0) and
+  :transport-close-jvm-inject-available (unknown handle → -1) via
   transport-provider inject. JVM corpus **16**. Evidence: host-parity-live
   4 tests / 75 assertions.
-- Note: concurrent kagi-sign already on Progress 31au (); this pin
+- Note: concurrent kagi-sign already on Progress 31au (8c028179); this pin
   advances past it.
-- west pin kototama  → .
+- west pin kototama 8c028179 → ded6ad41.
 
 Still open:
 1. T8.3 ops/network AOT Components (http/secret wasm packages)
