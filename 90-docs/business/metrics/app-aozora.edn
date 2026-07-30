@@ -1,31 +1,24 @@
-{:engagement
- {:dau nil,
-  :active-authors-window {:window 200, :distinct-authors 2},
-  :posts 4,
-  :human {:posts 4, :engagement 0},
-  :organism {:posts 0, :engagement 0},
-  :organism-engagement-ratio nil},
- :health-status 200,
+{:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 14297,
-  "app-aozora-appview" 9743,
-  "app-aozora-spa" 4571},
+ {"app-aozora-pds" 14421,
+  "app-aozora-appview" 9815,
+  "app-aozora-spa" 4580},
  :zone
- {:requests-7d 542625,
-  :pageviews-7d 9946,
-  :uniques-7d-sum 964,
+ {:requests-7d 549933,
+  :pageviews-7d 9956,
+  :uniques-7d-sum 965,
   :zone "aozora.app"},
- :sources [:cloudflare :health :emitter],
+ :sources [:cloudflare :health],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 158002}
+    :requests 158639}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.transact",
-    :requests 149}
+    :requests 151}
    {:path
     "/bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3lpa5tyrmwjvzojccf77ya",
-    :requests 139}
+    :requests 140}
    {:path
     "/bafyreigknzqpup4wv566lfcmxtb5sjegwv74mpbhw4euqym3puw7qr6ssm",
     :requests 80}
@@ -35,11 +28,11 @@
    {:path "/.env.testing", :requests 52}
    {:path "/test", :requests 52}
    {:path "/.git/refs/heads/main", :requests 48}],
-  :status-mix {:ok 160614, :client-error 399, :server-error 200},
+  :status-mix {:ok 161272, :client-error 400, :server-error 200},
   :window "24h"},
  :as-of "2026-07-30",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 158002 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 149 · /bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3l… 139 · /bafyreigknzqpup4wv566lfcmxtb5sjegwv74mp… 80 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 54 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 158639 · /xrpc/ai.gftd.apps.kotobase.datomic.tran… 151 · /bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3l… 140 · /bafyreigknzqpup4wv566lfcmxtb5sjegwv74mp… 80 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 54 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 542625 req/7d・964 uniques(日次和)・うち4xx probe 0%(24h)、workers 28611 inv/7d"}
+ "aozora.app 実測 549933 req/7d・965 uniques(日次和)・うち4xx probe 0%(24h)、workers 28816 inv/7d"}
