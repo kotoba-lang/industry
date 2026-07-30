@@ -284,19 +284,77 @@ live（2026-07-30 最終確認）:
     inkan geometry+svg            15 tests / 357 assertions   0 failures
     jp-go-dds 全体                 27 tests / 246 assertions   0 failures
 
+## gap 3 / 2 / 1 の解消（2026-07-30、closing 後の追加作業）
+
+**3 と 1 は、私が記録したギャップの前提そのものが誤っていた。** 下の「未実装」節は
+その訂正後の状態に書き換えてある。
+
+### 3. design-quality —— bridge は要らなかった。ただ走らせればよかった
+
+『`--hig-*` 前提の audit を DADS 面にどう当てるか未決』と書いたが、
+`kotoba-lang/design-quality` の監査は **token 非依存**だった —— rendered HTML +
+inline CSS を HIG/WCAG ヒューリスティクス（viewport / safe-area / dvh /
+tap-target 44px / focus-visible / reduced-motion / overflow / color-scheme /
+responsive / semantics / input-zoom / contrast）で見るだけで、`--hig-*` を参照しない。
+`jp-go-dds` README の token bridge の記述から、監査も token を見ると思い込んでいた。
+
+    scripts/score-sites.cljs   登録済み全サイトを 12 軸で採点（--min で gate）
+
+対象はレジストリから引く（名前を手書きすると新サイトが黙って採点対象から漏れる）。
+design-quality の **CLI は core 10 軸しか出せず** `input-zoom` / `contrast` を
+有効にするフラグを持たないので、ライブラリを直接呼ぶ。
+
+実測: **inkan 100.00 / rirekisho 100.00、findings ゼロ**（12 軸）。
+**空振りで満点になっていないことも裏取りした** —— `100vh` / `transition` /
+`animation` / `@keyframes` がいずれも 0 件なので、`:dynamic-viewport` と
+`:reduced-motion` の 1.0 は『直すものが無い』という正しい挙動。
+
+### 2. クロス repo ビルド
+
+    scripts/build-sites.cljs           全サイト build → レジストリ再生成 → 採点
+    scripts/build-sites.cljs --check   publish 鮮度検査（古ければ exit 1）
+
+ビルド手順（`:generator` / `:classpath` / `:env` / `:source-dir`）は `sites.edn` の
+1 エントリに宣言する —— サイトを 1 つ足す作業を 1 箇所に閉じ、README や人の記憶に
+置かないため。レジストリは `sourceCommit` を記録するようになり、source repo の HEAD と
+比較できる。**判定不能（source 未 checkout / 記録なし）を『新鮮』と読み替えない。**
+
+### 1. 自動ゲート —— GitHub Actions は死んでいなかった
+
+『Actions は job 起動せず赤のまま』と書いたが、それは **superproject**
+（ADR-2607300900）の話。**この repo の CI は動いており job も起動する**（実測:
+CI conclusion=success、jobs=4）。ADR の記述を別 repo に読み替えて適用していた。
+
+`ci.yml` に STRICT job `sites` を追加（`nbb scripts/run-task.cljs test-sites`）。
+**standalone checkout で確実に動くものだけ**入れた:
+
+    sites-registry-check   レジストリ canonical（共通クローム有無の検査を含む）
+    sites-bundle-verify    sites-core.js を実 import して 17 検査
+
+`score-sites` と `build-sites --check` は west sibling / source repo checkout が
+要るので**入れていない** —— continue-on-error の飾りにしない。この `ci.yml` 自身が
+『`bb` 未インストールのまま何ヶ月も黙って死んでいた』失敗を記録している。
+
+### 訂正（この作業中に自分が出した誤り）
+
+`fb0393b8` の commit message に『rirekisho の公開物が古い commit のままだった』と
+書いたが**検証していない**。実際に起きたのは「ローカル source checkout が 2 commit
+古くビルドが失敗した」ことで、同期後の再ビルド出力は既存の公開物と**バイト同一**
+だった。`sourceCommit` の記録は今回が初なので、それ以前の publish 鮮度は判定できない。
+訂正は `4c530966` の merge commit message に残してある（履歴は書き換えない）。
+
 ## 未実装・既知のギャップ（次の担当者向け）
 
-1. **自動ゲートが無い。** `verify-sites-bundle.cljs` も `--check` も手で回す。
-   この repo の GitHub Actions は ADR-2607300900 で撤去済みで、murakumo fleet 側へ
-   未 port。**クローム検査もレジストリ生成時にしか働かない**ので、生成器を通さず
-   `public/sites/` を手で置けばすり抜ける。
-2. **クロス repo ビルドが自動化されていない。** `inkan` / `rirekisho` の変更を
-   サイトへ反映するには生成器を手で回して commit する。west pin 前進に連動しない。
-3. **design-quality スコアを取っていない。** skill `kotoba-uiux` は
-   `design-quality.cli score` を求めるが、両サイトとも未計測。DADS 面に対して
-   `--hig-*` 前提の audit をどう当てるか（`jp-go-dds.tokens/skin-css` の bridge を
-   通すか）が未決なので、**通していないことを明示して未計測のままにした** ——
-   走らせずに『refined』と言わないため。
+1. **CI ゲートは standalone で動く 2 つだけ。** `score-sites` と
+   `build-sites --check` は west レイアウトが要るため CI に載っておらず、**人が
+   ローカルで回す前提**。生成器を通さず `public/sites/` を手で置けばクローム検査も
+   すり抜ける（レジストリ生成を経由しないため）。
+2. **build は人が起動する。** `sites-build` / `sites-fresh-check` は cron にも
+   west pin 前進にも繋がっていない。鮮度が「見える」ようにはなったが「自動で直る」
+   わけではない。
+3. **`Deploy itonami.cloud` workflow が壊れている（本 ADR の対象外だが重大）。**
+   push-to-main の deploy が `CLOUDFLARE_API_TOKEN` 未設定で毎回 failure。つまり
+   **本番反映は手動 deploy でしか起きていない。** 修復は secret 設定＝オーナー作業。
 4. **`inkan` の SVG はアウトライン化していない**（閲覧側フォント依存）。自己完結が
    要るなら PNG。フォント glyf/CFF 解析はこの repo が持つべき機構ではないと判断。
 5. **篆書体・印相体は未対応**（OFL の実用フォントが見つからない）。代用しない。
