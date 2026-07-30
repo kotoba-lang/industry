@@ -223,6 +223,36 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     読み出しを持つため。**代わりに 1Password に置くべきは kagi の recovery
     passphrase**（単一障害点を分ける）—— これはオーナー手動。
 
+## itonami fleet 共有 identity seed (2026-07-30)
+
+- **`itonami-fleet-kotobase-seed`（kagi vault、compartment `personal`、
+  `KAGI_HOME=$HOME/.kagi`）** — cloud-itonami 艦隊（~1,197 actor）が**共有する**
+  Ed25519 seed（base64 32 byte）。did は
+  `did:key:z6MkqTPSr5ZUnLdroq3wMWVk9dxmNEKCLxbhse9Ec3Te6y28`（公開値）。
+  取得: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get itonami-fleet-kotobase-seed`。
+  - **なぜ艦隊で 1 本か（オーナー判断 2026-07-30）**: `:apex` は graph scope ==
+    issuer DID を要求するので、**鍵の本数がそのまま Datalog で結合できる範囲**に
+    なる。CLAUDE.md の kotobase 規則「一緒にクエリしたいものは同じ ref に置く」
+    「黙ったシャーディングを禁じる」に従い 1 本。actor ごとに鍵を持つと 1,197 ref
+    に割れ、セクター横断の問いが永久に立てられなくなる。
+  - **代償（発見でなく明示）**: この 1 本が漏れれば艦隊全体に及ぶ。actor ごとの
+    帰属は鍵ではなく `marketplace.persist/stream-ctx` の per-actor 台帳が担保する。
+  - **marketplace 7 actor は別本**（`itonami-marketplace-kotobase-seed`、ref
+    `marketplace`）のまま。統合するかは別判断で、今回は触っていない。
+  - **投入先**: dispatch namespace `ai-gftd-repository-dispatch` の user Worker の
+    `KOTOBASE_SECRET_KEY`。現時点で `cloud-itonami-isic-0111` のみ。
+
+### ⚠ Workers for Platforms への secret 投入は `wrangler secret put` ではできない
+
+**`wrangler secret put` に `--dispatch-namespace` は存在しない。** namespace 内の
+user Worker には届かない。`.dev.vars` も dispatch-namespace deploy では**拾われ
+ない**（実測: アップロードは成功するのに `did: null` のままだった）。
+
+正しい経路は **`wrangler deploy --dispatch-namespace <ns> --secrets-file <file>`**。
+成功すると binding が報告される（`env.KOTOBASE_SECRET_KEY ("(hidden)")`）ので、
+その行が出ないときは入っていない。ファイルは `.env` 形式（`KEY=value`）、
+`.gitignore` 必須、投入後に削除する。残る ~1,196 actor すべてでこの経路を使う。
+
 ## kagi の cloud 同期と端末登録（2026-07-27）
 
 - **`kagi push` / `pull` / `sync` は 2026-07-27 まで一度も動いていなかった**
