@@ -357,18 +357,18 @@ task-eligible?, failed?, can-retry?, authorized?, write-ok?.
 
 ## Progress (2026-07-31f — T6.4 same-artifact + residual bool #219)
 
-- **murakumo#219 MERGED**: residual char/eq gates →  (digit-val?, alnum-char?,
+- **murakumo#219 MERGED**: residual char/eq gates → :bool (digit-val?, alnum-char?,
   constant-time-eq, weight-pos?, move-needed)
-- **murakumo#221 MERGED** (): **T6.4 first slice** — full catalog
-  same-artifact proof on cljs load path ( / classpath);
-  0-arity call≡ir/execute; kotoba-kir pin bool-at-return
+- **murakumo#221 MERGED** (3526e3b3): **T6.4 first slice** — full catalog
+  same-artifact proof on cljs load path (register-kir! / classpath);
+  0-arity call equals ir/execute; kotoba-kir pin bool-at-return
   (ADR-260731-w6-t64-same-artifact-cljs-load). Mirrors retained as fail-closed fallback.
-- west pins: murakumo , kotoba-kir tip
+- west pins: murakumo 3526e3b3, kotoba-kir 767f2f2f
 
 **Still open:**
-1. T6.4 remainder: wholesale  deletion when cljs entrypoints preload
+1. T6.4 remainder: wholesale mirror-* deletion when cljs entrypoints preload
 2. T8.3 production AOT network/secret; W4 recursive values
-3. Ranking / pick-code stay  by design
+3. Ranking / pick-code stay :i64 by design
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
