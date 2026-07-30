@@ -1,0 +1,39 @@
+[{:db/id -1
+  :adr/id "adr-2607301500-dev-yaoi-pairing-first-bl-platform"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-07-30"
+  :adr/last_verified "2026-07-30"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2607301500: network-awai に dev-yaoi (yaoi.dev) を起こす —— club-shinshi の女性向けは性別反転ではなく『単位の入れ替え』。カタログの中心をキャラクターからカップリング (CP) に移す"
+  :adr/topic "dev-yaoi-pairing-first-bl-platform"
+  :adr/repos ["orgs/network-awai/dev-yaoi" "orgs/network-awai/club-shinshi"]
+
+  :adr/authoritative_for
+  ["yaoi.dev のドメインモデルの正本: 中心エンティティは pairing (CP)。character はその構成要素、episode は pairing にぶら下がる連載話数"
+   "攻 × 受 の順序の扱い: A×B と B×A は別 CP。両方向を同一視するのは reversible フラグを立てた CP だけ"
+   "レーティング階層: 全年齢 / R-15 / R-18 の 3 階層。同意は同意した階層までしか効かない"
+   "dev-yaoi の repo 命名: TLD-name 規約 (dev-yaoi = yaoi.dev)、club-shinshi = shinshi.club と同型"]
+
+  :adr/context
+  "network-awai org には男性向けの club-shinshi (shinshi.club) が既にある。そこへ女性向けを足すにあたり、最も安易な設計は『同じ実装のキャラクターを男性に差し替える』だった。実際 club-shinshi のカタログはキャラクター単体 (247 モデル × 5 シーン) を単位にしており、actress / scene の 2 テーブルが中心にある。\n\nしかしこの単位を女性向けにそのまま持ち込むと、BL の読者が実際に行う探し方が一つも表現できない。BL/腐向けの消費単位は一人のキャラクターではなく『二人の関係』(カップリング、CP) であり、(1) 検索は CP 名か関係性タグで行われる、(2) 攻 × 受 の順序に意味があり入れ替えたものは別の CP として扱われる (両方向を同一視するのは『リバ』と宣言された場合だけ)、(3) 消費されるのは単発の絵ではなく連載で、話数をまたいだ関係の変化そのものが商品である。\n\nつまり『女性向け club-shinshi』は性別反転ではなく、単位の入れ替えである。"
+
+  :adr/decision
+  "1. カタログの中心エンティティを pairing (CP) にする。character は CP の構成要素、episode は CP にぶら下がる。トップページの動線も『CP を探す』『関係性タグから掘る』の 2 本にする。\n\n2. 攻 × 受 の非対称性をスキーマで保持する。pairing(seme_id, uke_id) は順序付きで、UNIQUE(seme_id, uke_id) により A×B と B×A は別行として共存できる。CHECK (seme_id <> uke_id) で自己 CP を禁じる。reversible フラグを立てた CP だけが両方向を同一視し、表示上も × と ⇄ で区別する。\n\n3. 関係性タグを 4 分類にする —— 関係性 / 力学 / 舞台 / 空気感、計 39 件。『関係性』と『力学』を分けるのは、同じ『上司×部下』でも溺愛とじれじれでは読者が別物として探すため。この分類はサンプルデータではなくスキーマの一部として d1/migrations/0002_trope_taxonomy.sql に置く。\n\n4. レーティングを 3 階層にする —— 全年齢 / R-15 / R-18。club-shinshi の単一 18禁ゲートを踏襲しない。全年齢の入口作品から R-18 本編へ読者が移動する導線が実際の読まれ方で、単一フラグに潰すと検索流入もカタログ表示も成立しない。年齢確認は R-15 以上のページに入る時にだけ挟み、同意は同意した階層までしか効かない (R-15 の同意で R-18 は開かない)。\n\n5. 全ページ SSR、SPA を持たない。club-shinshi は re-frame SPA + Worker の二本立て (約 15,700 行) だが、yaoi.dev のインタラクションは年齢ゲートのフォーム送信だけで足りる。Worker の中で kotoba-ui.core/->page を呼んで HTML を返し、クライアント JS をゼロにする。\n\n6. UI は kotoba-lang の design system paved road (shitsuke.hig → liquid-glass-ui → kotoba-ui → uikit) の上に構築する。生の hex はテーマ map 1 枚だけ、レイアウトは shell scaffold から組む。"
+
+  :adr/consequences
+  "kotoba-ui が Worker のランタイム依存になる。cloud-manimani のように :render-site alias へ隔離できない (あちらはビルド時に静的 HTML を吐くだけ)。deps.edn が :local/root ../../kotoba-lang/* を使うため、dev-yaoi のビルドは west superproject の checkout を前提とする —— 単独 clone した CI ではビルドが通らない。意図的に受け入れた制約で、解消するなら vendoring か上流の Clojars 公開が要る。\n\nclub-shinshi とはコードを共有しない。単位が違う以上 actress/scene のスキーマも UI も再利用できず、共有するのは運用規約 (18+ 不変条件、NSFW セルフラベル、Cloudflare Worker + D1 の形) だけになる。\n\nCP 一覧でトロープを 1 CP ずつ引くと D1 のラウンドトリップが CP 数に比例するため、全件を 1 回取って CP スラッグでグルーピングして配る (yaoi.worker/attach-tropes)。\n\n年齢ゲートは戻り先をクエリと隠しフィールドで運ぶので、yaoi.gate/safe-return-to を必ず通す。プロトコル相対 (//)・絶対 URL・/\\・CRLF を潰し、テストで固定している。"
+
+  :adr/alternatives
+  "club-shinshi のフォークにする —— 却下。単位が違うので actress/scene スキーマも UI も流用できず、フォークは『使わないコードを継承する』だけになる。実際に共有できたのは運用規約だけだった。\n\nキャラクター中心 + CP をタグとして表現する —— 却下。CP が一級市民でないと攻受の順序を型で守れず、リバの扱いも運用の約束事に落ちる。実際の検索軸を二級市民にする設計になる。\n\n単一の 18禁ゲート —— 却下。理由は decision 4 のとおり。\n\nre-frame SPA を持つ —— 却下。現時点で必要なインタラクションが年齢ゲートの form POST だけなので、SPA を持つと初期ペイロードとクライアント JS を対価に何も得ない。チャットや投稿 UI を足す段階で再評価する。"
+
+  :adr/verification
+  "clojure -M:test → 38 tests / 192 assertions / 0 failures / 0 errors (2026-07-30 実測)。design-quality の決定論的 HIG/WCAG 監査 (12 軸) → 代表 8 ページすべて 100.00、finding ゼロ (clojure -M:render-preview で再現可能。テストの floor は 98)。素の kotoba-ui スタックは上流の既知ギャップ (tap-targets / input-zoom) で ~87–92 に落ちるが、.y-tap / .y-cta の min-height 44px と dvh フォールバックをアプリ側で当てて閉じている。\n\nshadow-cljs release worker → dist/worker.js (1,686 KiB / gzip 218 KiB) ビルド成功。D1 `yaoi` (bb38503d-3dc7-43e9-add2-84ebd9da7595, APAC) にマイグレーション 2 本を適用し、trope 39 / character 6 / pairing 3 / episode 5 / pairing_trope 15 / pairing_public 3 を実測確認。\n\nwrangler deploy → yaoi.dev + www.yaoi.dev の custom domain に配備。実測で見つけて直した不具合が 1 件: D1 の stmt.bind は可変長引数であって配列 1 個ではないため、(.bind stmt (to-array args)) では /api/tropes が CF error 1104、/api/pairings が 500 になった。.apply で展開し、プレースホルダを持たないクエリでは bind 自体を呼ばないように修正 (yaoi.worker/bind*)。"
+
+  :adr/repo_naming
+  "dev-yaoi は TLD-name 規約 (dev-yaoi = yaoi.dev) であり、club-shinshi = shinshi.club / net-kotobase = kotobase.net / app-aozora = aozora.app / cloud-itonami = itonami.cloud と同型。manifest/repository-rules.edn の :name-prefix taxonomy が扱うロール接頭辞 (loop- / skill- / action- / cloud-itonami-* / person-) とは別系統で、club- / net- / app- / network- / local- 同様 taxonomy には登録しない。"
+
+  :adr/body
+  "## 現在地 (2026-07-30)\n\n本番稼働中。https://yaoi.dev が Cloudflare Worker (dev-yaoi) で配信され、D1 `yaoi` を読んでいる。\n\n### リポジトリ\n\n`network-awai/dev-yaoi` (private)。west manifest の `orgs/network-awai/dev-yaoi` に登録。\n\n### 実装の形\n\n```\nCloudflare Worker (cljs, ESM)      ← 全ページ SSR\n  ├─ yaoi.router   .cljc           パス → ルート記述子\n  ├─ yaoi.gate     .cljc           年齢ゲートの Cookie 面 + return_to 検証\n  ├─ yaoi.domain   .cljc           レーティング階層 / CP 表記 / 不変条件\n  ├─ yaoi.data     .cljc           D1 の SQL と 行 → ドメイン map\n  ├─ yaoi.views    .cljc           純粋 hiccup (kotoba-ui paved road)\n  ├─ yaoi.pages    .cljc           ->page でドキュメント化\n  └─ yaoi.worker   .cljs           ここだけがホスト依存\nCloudflare D1 `yaoi`\n```\n\nホスト依存を worker.cljs の 1 ファイルに閉じ込めてあるので、ルーティング・ゲート判定・SQL の形・HTML はすべて Worker を起こさずに JVM でテストできる。\n\n### 不変条件と、それをどこで守るか\n\n| 不変条件 | 守る場所 |\n|---|---|\n| 登場人物はすべて 18 歳以上の架空の人物 | `character.age CHECK (age >= 18)` + `yaoi.domain/validate-character` |\n| 攻 × 受 の順序は意味を持つ | `pairing UNIQUE(seme_id, uke_id)` + `CHECK (seme_id <> uke_id)` |\n| 未知のレーティングは R-18 に倒す | `yaoi.domain/rating` (fail closed) |\n| 同意した階層より上は表示しない | `yaoi.domain/may-view?` (rank 比較) |\n| 下書きは公開面に出さない | `pairing_public` ビュー + `status = 'published'` |\n| return_to はオープンリダイレクタにならない | `yaoi.gate/safe-return-to` |\n\n各不変条件には、それを破るケースのテストが 1 つ以上ある。\n\n### 未了 / follow-up\n\n- **単独 clone でビルドできない** (kotoba-ui / uikit が :local/root)。CI を組むなら west checkout を前提にするか、vendoring するか、上流を Clojars に出すかの判断が要る。\n- **挿絵 (scene テーブル) は schema だけあって配信経路が無い。** club-shinshi の R2 (`shinshi-scenes`) と同型のバケットと `GET /b/<cid>` を足す段階で再訪する。\n- **投稿・創作者向け UI が無い。** 現状は D1 への直接投入のみ。ここを足す段階で SPA の要否を再評価する (ADR alternatives 4)。\n- **シードはデモ用の非露骨な最小データ** (`d1/seed/0001_demo.sql`)。実コンテンツは創作者が投入する前提で、R-18 の段はゲートが機能することを示すためにレーティングだけ R-18 に置いてある。"}]
