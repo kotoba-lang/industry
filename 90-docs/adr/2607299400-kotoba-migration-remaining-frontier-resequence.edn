@@ -94,7 +94,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T5.2 | host bridge map/record ↔ guest record | 部分（murakumo#155 は positional projection。**native guest record wire は deferred**） |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
-| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete** through report#253 (+ dash#252 config#251 …) + preload; remaining deploy/provision/cloud |
+| T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256 (deploy#254 provision#255 + report#253 …) + preload; residual 0/1 i64 params only |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **open (XL)** — 署名 receipt API と package-manifest は着地、fixture でない実 wasm は pure allowlist のみ |
 | T8.4 | host-parity L5 | 部分（fixture 45 件は着地、**live host runner が残**） |
@@ -826,6 +826,32 @@ Still open:
 2. T8.3 production AOT network/secret; W4 recursive values
 3. Residual 0/1 i64 params: config pinned-exists, engine option flags, tunnel
    pick-exit has-rc
+
+
+## Progress (2026-07-31ag — T6.4 deploy + provision + cloud mirror-delete; T6.4 XL closed)
+
+- murakumo#254 MERGED (`12acf00e`): **deploy.plan** deletes cljs host mirrors —
+  path/url + probe + argv flags + pin path + shell tokens require shipped
+  `:deploy-plan` KIR. Host: regex extract, argv vectors, node folds, FS probes.
+  ADR-260731-w6-t64-deploy-mirror-delete. Evidence: 14 tests / 163 assertions.
+- murakumo#255 MERGED (`b691ec1e`): **provision.plan** deletes cljs host mirrors —
+  path/port + launchctl/rsync/peer shell + peer-id scan + plist placeholders
+  require shipped `:provision-plan` KIR. Host: collection walks, connect class
+  checks, inventory port, XML plist body. ADR-260731-w6-t64-provision-mirror-delete.
+  Evidence: 14 tests / 169 assertions.
+- murakumo#256 MERGED (`9104d811`): **cloud.plan** deletes cljs host mirrors —
+  defaults/endpoints/CLI/parse-flags/$type/caps require shipped `:cloud-plan`
+  KIR. Host: record assembly, choose-relay sort, width fmt, policy walk.
+  ADR-260731-w6-t64-cloud-mirror-delete. Evidence: 17 tests / 183 assertions.
+- west pin murakumo `5ae50b56` → `9104d811` (#254+#255+#256).
+- **No `try-oracle` / `oracle-str-const` / `oracle-i64-const` remain under
+  `src/murakumo/**/*.cljc`.** T6.4 product-shell mirror-delete is complete.
+
+Still open:
+1. T8.3 production AOT network/secret; W4 recursive values
+2. Residual 0/1 i64 params: config pinned-exists, engine option flags, tunnel
+   pick-exit has-rc
+3. T5.2 native guest record wire; T8.4 live host runner
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
