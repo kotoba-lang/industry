@@ -875,7 +875,28 @@ lexicon + deploy workflow、`com-etzhayyim-okaimono` = `cells/*.edn` ドメイ�
 `kotoba-lang/kotobase-commoncrawl-actor` (197KB / 40 file、GOVERNANCE.md 付きの OSS repo) と
 `com-junkawasaki/net-kotobase-commoncrawler` (34KB / 23 file、`src/net_kotobase/commoncrawler/actor/{graph,nodes}.cljc`)。
 3 件目の `kotoba-lang/common-crawl` は appview なので層だが、この 2 件は
-どちらも「Common Crawl を読む actor」で重なる可能性がある。ただし今回は未確認。
+どちらも「Common Crawl を読む」が、**確認したところ重複ではなく未配線の層**だった
+(2026-07-30 実測):
+
+| repo | 役割 |
+|---|---|
+| `kotoba-lang/kotobase-commoncrawl-actor` (197KB) | **governed actor**。operator が保守する seed list -> CDX 参照 -> 本文抽出 -> LLM 分類/要約 + embedding -> **独立 Governor** -> CACAO 自己発行 -> net-kotobase へ ingest。langgraph StateGraph で `gftd-talent-actor` / `robotaxi-actor` / `cloud-itonami` と同じ actor パターン |
+| `net-kotobase-commoncrawler` (34KB) | **WARC -> Datom 変換ライブラリ**。`warc.cljc` (range-fetch)、`html.cljc`、`images.cljc`、`ingest.cljc` (CDX 照会)、`store.cljc` (`kotobase.store/IStore` 経由の永続化)。Governor も CACAO も持たない |
+| `kotoba-lang/common-crawl` (117KB) | **appview** (Svelte + wrangler + xrpc)。別層 |
+
+問題は重複そのものではなく、**actor が library を消費していない**こと。actor の `deps.edn` は
+langgraph / langchain-store / cacao / ed25519 / cbor を git deps で pin するだけで
+`net-kotobase-commoncrawler` を参照しておらず、CDX 照会と capture 取得を各々が実装している。
+library 側の consumer は 0 件だった。
+
+**実施 (2026-07-30)**: `net-kotobase-commoncrawler` を **com-junkawasaki -> kotoba-lang** へ
+移送した。再利用可能な `.cljc` ライブラリなので D1 の
+「kotoba-lang = 言語・ライブラリ / com-junkawasaki = 個人 corpus」に照らして配置が誤っていた。
+consumer 0 件なので移送の影響は無い。名前は据え置き (どの product 向けかが名前に出ており、
+`kotoba-lang/common-crawl` (appview) との紛れも避けられる)。
+
+**未実施**: actor 側を library 消費へ配線して CDX/fetch の二重実装を解消すること。
+これはテストを伴う実装作業なので配置の整理とは分けた。
 
 これらは「7 repo を 1 つに畳む」「1 repo を 7 つに割る」という**設計判断そのもの**で、
 配置の付け替えではない。どれが正本になり何が壊れるかを決めてからでないと動かせないので、
