@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 7576, "ai-gftd-chat-shell" 6},
+ {"magatama-sh1n5h1x" 7607, "ai-gftd-chat-shell" 6},
  :zone
- {:requests-7d 518880,
-  :pageviews-7d 11011,
-  :uniques-7d-sum 5153,
+ {:requests-7d 521867,
+  :pageviews-7d 11247,
+  :uniques-7d-sum 5171,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/", :requests 855}
-   {:path "/favicon.ico", :requests 139}
-   {:path "/config/.env", :requests 29}
+  [{:path "/", :requests 853}
+   {:path "/favicon.ico", :requests 140}
+   {:path "/config/.env", :requests 37}
    {:path "/test.php", :requests 25}
+   {:path "/docker/.env", :requests 24}
    {:path "/graphql", :requests 24}
    {:path "/@fs/.env", :requests 24}
-   {:path "//wp-includes/block-bindings/", :requests 21}
-   {:path "/inputs.php", :requests 21}],
-  :status-mix {:client-error 3631, :ok 2040, :server-error 15272},
+   {:path "//wp-includes/block-bindings/", :requests 21}],
+  :status-mix {:ok 2092, :client-error 3640, :server-error 15294},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,8 +33,8 @@
  :traffic-quality
  {:window "24h", :probe-4xx-pct 17, :error-5xx-pct 73},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 855 · /favicon.ico 139 · /config/.env 29 · /test.php 25 · /graphql 24 | 4xx(probe) 17% · 5xx 73%",
+ "上位 page (24h, 2xx/3xx): / 853 · /favicon.ico 140 · /config/.env 37 · /test.php 25 · /docker/.env 24 | 4xx(probe) 17% · 5xx 73%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 518880 req/7d・5153 uniques(日次和)・うち4xx probe 17%(24h)、workers 7582 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 521867 req/7d・5171 uniques(日次和)・うち4xx probe 17%(24h)、workers 7613 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
