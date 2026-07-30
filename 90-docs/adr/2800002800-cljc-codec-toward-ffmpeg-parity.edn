@@ -1,0 +1,241 @@
+[{:db/id -1
+  :adr/id "2800002800-cljc-codec-toward-ffmpeg-parity"
+  :adr/title "ADR-2800002800: ffmpeg 相当を目指す純 cljc codec 経路 — 実測駆動の kaizen、filter 層の家、AAC encode と native 化の残り"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "cljc-media-codec-performance"
+  :adr/date "2026-07-30"
+  :adr/last_verified "2026-07-30"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["純 cljc codec 経路の性能現在地と、そこへ至った実測手順"
+   "org-iso-h264 encoder の最適化不変条件（bit-identity を崩さない）"
+   "画素 filter の置き場所（utsushi 層④、douga ではない）"
+   "ffmpeg 置換に残っている穴（AAC encode / 精度差 / native 化）"
+   ".kotoba guest の上限が security 由来ではないこと、および guest 改善の入口"]
+  :adr/related
+  ["adr-2607299960-dougaka-murakumo-compute-kotobase-storage"
+   "adr-2800002700-ka-production-three-layer-split"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"
+   "adr-2607072000-kotoba-lang-rust-to-cljc"
+   "adr-2607122000-h264-r05-pixel-decode-scope"
+   "adr-2606272200-utsushi-video-edn-filtergraph"
+   "adr-2607279200-kotoba-centered-migration-plan"]
+  :adr/body
+  "# ADR-2800002800: ffmpeg 相当を目指す純 cljc codec 経路
+
+**Status**: accepted
+**Date**: 2026-07-30
+**Deciders**: Jun Kawasaki（指示: 「2, 3 を kaizen して ffmpeg 相当まで改善する計画を立てて, kotoba-lang repo で完結したい」→「設計実装」→「p1, p2」）
+
+## Context
+
+ADR-2607299960 で dougaka の制作は murakumo 計算 + kotobase 保管に載ったが、
+**組み立て段（concat / mix / scale / pad）は ffmpeg のまま**だった。
+オーナーから「ffmpeg の代わりの codec が kotoba-lang にあったはず」との指摘があり、
+実際に存在した。当初私は「ffmpeg の代わりは無い」と述べており、**これは誤りだった**。
+
+実在するもの（すべて `kotoba-lang`、portable `.cljc`）:
+
+| repo | 中身 |
+|---|---|
+| `org-iso-h264` | H.264 encode + decode。CAVLC + CABAC、intra + P-slice inter、sub-pel MC。逆変換は FFmpeg リファレンスから 1:1 移植で bit-exact |
+| `org-iso-isobmff` | MP4 の mux / demux / remux（`concat-streams` 込み） |
+| `codec-primitives` | DCT / quant / scan / motion の共有プリミティブ |
+| `audio` | mixer / filter / effects / wav / synth |
+| `org-aomedia-av1` | AV1（encode + decode） |
+| `org-w3-webcodecs` | WebCodecs バインディング（ブラウザのハードウェア経路） |
+
+## 測定が計画を決めた
+
+**方法**: 実 murakumo 生成クリップから 720x1280 の生 YUV を取り出し、
+`h264.encode/encode-idr-luma-frame` に通す。**5 回実行の median**（このマシンは
+並行セッションで同一ビルドが 1.4 倍ばらつくため。単発測定は使わない）。
+
+### Phase 0 — 現在地
+
+初回測定 11,957 ms/frame。1800 フレーム（60 秒 @30fps）換算で **5.5 時間**。
+ffmpeg は同じものを数秒で焼く。**3〜4 桁の差**。
+
+原因の特定に 3 段の検証を要した:
+
+1. **boxed vector 説は外れた** — 要素アクセスは 0.042 µs/px（全体 12.97 µs/px の 0.3%）
+2. **`solve-ac-levels` が実質 100%** — 4x4 ブロックごとに Clojure の**有理数演算**で
+   15x16 + 15x15 の行列積。合成ベンチで 13,923 ms/frame（~242 µs/block）
+3. **達成可能な下限は 21 ms/frame** — 行列を 1 本に畳んで配列 + 固定小数点の
+   タイトループ（661×）
+
+### Phase 1 — 実装した 3 増分
+
+| 増分 | 内容 |
+|---|---|
+| **AC solve の畳み込み** | `(MacT·Mac)⁻¹·MacT` はブロックに依存しない固定 15x16 行列。QP ごとに 1 回畳み、**行ごとの共通分母上の厳密な整数**として持つ |
+| **`sad` / `inverse-4x4`** | 前者は nested `map`/`reduce` で 1 回 ~272 cons、後者は `assoc` ごとに 16 要素ベクトルを作り直し（1 回 32 個）。両方タイトループへ。加えて **DC のみ入力の閉形式** `((dc+32)>>6)` を追加（全係数域で検証、仮定せず） |
+| **residual の二重計算** | 同じブロックを `raw-dc` と AC ループで 2 回抽出。115,200 → 57,600 回 |
+
+**結果（同条件・5 回 median）**:
+
+```
+baseline (0939fb5):  9,373 ms  (min 8,739 / max 11,780)  → 281 分/エピソード
+増分1後:             2,039 ms                              →  61 分
+増分2後:             1,226 ms  (2940 1601 1225 1164 1032)  →  37 分
+```
+
+**7.6×、出力は全段 byte-identical**（66,677 bytes の Annex B）。
+
+### 守った不変条件
+
+**bit-identity。** このリポは「memorized MF table は cross-coefficient leakage
+~20%、この pipeline は ~2%」という測定を根拠に厳密解を選んでいる。速くする代わりに
+その性質を買い戻したら**勝利に見せかけた退行**なので、新経路は**全 52 QP ×
+ランダム 20 本 + 丸め境界の退化ベクトル**で有理数経路と一致することを assert した。
+`inverse-4x4` は decoder も使い、そちらは FFmpeg 参照実装に bit-exact なので同様。
+
+行ごとの分母にしたのも設計判断で、行列全体の共通分母では worst-case accumulator が
+62 bit になる。行ごと + gcd 約分で 54 bit（long に 9 bit 余裕）。テストはこの上限と
+**下限**の両方を assert する（数字が黙って陳腐化しないため）。
+
+### 残っている裾
+
+```
+encode-macroblock! 自身の body  最大
+chroma-component-plan            12%
+solve-ac-levels                  10%  （元は ~100%）
+reconstruct-chroma-plane          9%
+sad                               7%  （元は 634 ms）
+choose-pred-mode / chroma         5% / 5%
+inverse-4x4                      top10 圏外（元は 17.7%）
+```
+
+**単一のホットスポットは無く長い裾** = JVM 側の伸び代が減ったシグナル。
+
+## Phase 2 — filter 段の家は `douga` ではなく `utsushi` だった
+
+私は当初「filter 段は `douga` の領域」と述べたが、**確認せずに言っていた**。実際は
+`kotoba-lang/utsushi`（映し）が「ffmpeg 的な時間ベースメディアを扱う純 cljc + EDN
+ライブラリ」として存在し、**層④ = filtergraph** が設計済みだった（`utsushi.graph` が
+DAG を正規化 EDN で組み、`utsushi.policy` が effect/gas を持つ）。`douga` は ffmpeg の
+argv builder で別の役割。
+
+層④ にはオーケストレーションはあったが**画素 op が無く**、op 語彙は
+`:demux/:decode/:encode/:mux` だけだった。実際の filter は全部 ffmpeg の `-vf`
+文字列として外で組まれていた。
+
+**`utsushi.raster` を追加**（`80379b3c`）: `scale` / `pad` / `fit`(scale+pad) /
+`hold`(`tpad=stop_mode=clone`) / `zoompan`(4 モーション)。平面表現は
+**`h264.encode` が既に使っている形**（フラット row-major + `:width`/`:height`）に
+合わせたので、filter の出力がそのまま encoder の入力になる。新しいフレーム型は作らない。
+
+`utsushi.policy` への配線も同じ commit に入れた —— コードにあって policy に無い op は
+graph 検査を素通りするか弾かれるかのどちらかで両方壊れている。effect は 5 つとも nil
+（純粋。`:media-decode` を付けたら effect モデルが嘘になる）、gas は実測に合わせて
+encode より 1 桁小さく、画素 4 つは `per-frame?` に入れた（**漏らすと 1800 フレームの
+graph が 1 フレーム分の見積りで通る**）。
+
+**精度は ffmpeg と同一ではない。** 実フレームで
+`ffmpeg -vf scale=360:640:flags=bilinear` と比較して **平均絶対差 1.001 / 最大 32 /
+1 以内 83.8%**、速度 67 ms（ffmpeg ~5 ms、13×）。swscale の \"bilinear\" は教科書的な
+双線形ではない（固定小数点のタップ生成と彩度考慮が違う）。生成映像を素材にする用途では
+視認できないが、docstring に明記し、既存出力のバイト再現が必要な場面は ffmpeg を使えと
+書いた。
+
+## `.kotoba` guest の上限は security 由来ではない
+
+「guest 側を改善してもいいのでは? security 的な問題? compiler の成熟度の限界?」への
+調査結果:
+
+1. **grammar 全体で security 由来の上限は 1 つだけ** ——
+   `:abi-bound {:max-arity 5 :disposition :intentional-security-constraint}`。
+   128 要素 vector / 32 pair / Cartesian 16-4-2 には security disposition が無い
+2. **なぜ 128 か** —— `:doseq {:desugars-to \"admission-bounded guarded vector unroll\"}`。
+   コンパイラがループを実際に展開するので、128 は unroller の限界
+3. **この設計の安全性は別の場所から来る** —— 「安全性の境界は purity ではなく
+   ambient authority の排除」。サイズ上限は determinism と fuel 会計のためで、
+   W4 はそれを「小さな固定上限」から「明示的な node/depth/byte budget」に置き換える計画
+4. **W4 は handle/linear-memory 方式を名指しで否定している** ——
+   \"Implementations may use arenas and handles, but **handles are not the
+   application programming model**\"。私が当初勧めかけた `mem-i32-at` 方式はこれに反する
+5. **W4 は止まっていて、待っているものが我々の手にある** ——
+   \"**Add representative performance workloads before selecting** HAMT/vector-trie,
+   arena, rope, or region implementations\"
+
+したがって **guest 改善は許されているどころか次の一手として文書化されており、
+代表的な性能ワークロードの提供を待っている**。codec の hot kernel がそれである。
+
+## native 化 — AOT は正解、Rust は方針で閉じている
+
+「compiler だと jvm に依存しないようにできるのでは? aot, jit or rust runtime」への回答:
+
+- **AOT は実在する** —— `compiler/src/kotoba/compiler/backend/x86_64.cljc`（43 KB）/
+  `aarch64.cljc`（40 KB）が生の機械語を cljc から emit し、
+  `native_executor_test.clj`（859 行）が実プロセス実行を証明。ADR-2607198300 が
+  「実行は最終的に JVM/Node/Rust を経由しない」を定めている。**JIT は不要**（AOT で
+  機械語まで落ちる）
+- **Rust は選択肢に入らない** —— ADR-2607072000 が kotoba-lang 全体に「Rust が必要な
+  実装は全て cljc」を定め、根拠は kotoba 自身の約 38 万行 Rust crate 群の撤去実績。
+  CLAUDE.md にもオーナー指示として明記
+- **障害は backend ではなく入口** —— native backend がコンパイルするのは `.kotoba` で
+  codec は `.cljc`。「JVM 無しで codec を走らせる」= hot kernel の `.kotoba` 移植を
+  意味し、そこが上記 W4 の値モデルに依存する
+
+## Decision
+
+1. **純 cljc codec 経路を維持し、実測駆動で kaizen する。** 推測で最適化しない。
+   before/after は同一手法（5 回 median）で測る。単発測定を根拠にしない
+2. **bit-identity を最適化の不変条件とする。** 精度特性を買い戻す高速化はしない
+3. **画素 filter は `utsushi` 層④に置く。** `douga` は argv builder のまま
+4. **ffmpeg との精度差は明記する。** 「相当」と「同一」を混同しない
+5. **guest 改善（W4）は codec の hot kernel を representative workload として駆動する。**
+   handle/linear-memory 方式を programming model にしない。上限は削除ではなく
+   budget に置き換える
+6. **Rust runtime は導入しない。** native 化は kotoba compiler の AOT backend で行う
+
+## Not done
+
+- **AAC encode**（週規模、ffmpeg 相当の絶対条件）。`org-iso-aac` は decode のみ
+  （`imdct`/`huffman`/`dequant`/`ics`/`stereo`/`adts`）。必要なのは
+  ①順 MDCT（`imdct` の厳密な逆を導出 —— `h264.transform` の
+  `forward-luma-dc-hadamard` を「probe して反転」で作った先例と同型）
+  ②量子化 + rate control（scalefactor band ごと）
+  ③Huffman encode（`huffman_tables.cljc` を逆引き再利用 —— `h264.cavlc` が同じ
+  テーブルを decode/encode 両用にした先例あり）
+  ④ADTS / AudioSpecificConfig 書き出し（`adts.cljc` の逆）。
+  **これが無いと mp4 の音声トラックが作れない**（aozora の embed は `video/mp4` + AAC）
+- **Phase 1 の裾**（`encode-macroblock!` body / chroma 経路）。あと 2〜3× は見込めるが
+  単一ホットスポットは無い
+- **`.kotoba` への移植と native AOT**。W4 の値モデル待ち
+- **音声 mix の配線** —— `audio.mixer`/`filter` は実在するが filtergraph op として
+  未登録（video 側 5 op のみ入れた）
+- **1800 フレームのエピソード全体を cljc 経路で通した実績は無い。** 単一フレームの
+  実測から外挿している
+
+## Consequences
+
+- (+) 5.5 時間 → 37 分。まだ ffmpeg（数十秒）には 2 桁足りないが、**性質が変わった**
+  —— 単一のホットスポットから長い裾へ
+- (+) 全段 byte-identical なので、既存の出荷物と差が出ない
+- (+) filter 段が native 依存ゼロの経路を得た。層④の op 語彙が初めて実際の
+  パイプラインを表現できる
+- (+) W4 が要求していた「hot kernel はどこか」という情報が副産物として出た
+- (−) AAC encode が無い限り mp4 は作れないので、**現時点で ffmpeg は外せない**
+- (−) `plane-scale` は ffmpeg と bit-identical ではないので、既存出力の再現には使えない
+- (−) 外挿に依拠している。エピソード全体を通す実測はまだ
+- (−) `MURAKUMO_TOKEN_SECRET_2` を使い切った件（ADR-2607299960）と同様、
+  ここでも「測ってから決める」を守るコストが時間として乗る
+
+## 訂正した自分の誤り（記録）
+
+このセッションで、確認せずに述べて後に実測で覆した主張が 4 件ある。再発防止のため記録する。
+
+1. **「ffmpeg の代わりは無い」** —— あった。`org-iso-h264` は CABAC の算術符号化
+   エンジンまで書かれている
+2. **「filter 段は `douga` の領域」** —— `utsushi` 層④が設計済みだった
+3. **「2.9× 改善」** —— 単発測定。同一ビルドが 1.4 倍ばらつくマシンでの単発は根拠に
+   ならない。5 回 median で測り直して撤回・訂正した
+4. **「gcd 約分後 47 bit」（docstring）** —— 再測定しておらず実際は 54 bit。テストに
+   下限を入れて陳腐化を検出できるようにした
+
+いずれも「作る前に / 主張する前に確認する」で防げたものであり、実際に確認した 3 回
+（codec の実在 / filter の家 / guest 上限の根拠）はすべて結論を変えた。
+"}]
