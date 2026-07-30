@@ -64,6 +64,8 @@
 
 **murakumo の PWA が offline で崩れる穴を1つ塞いだ。** `mobile_sw.cljs` は3 asset を cache していて stylesheet を含んでいなかった。link 先が `/css/theme.css` から `/css/dds.css` に変わったので、そのままなら offline install が無 style で描画される。cache list に追加し cache name を v3 へ。
 
+**pin 前進は「最後の commit の後」に行う。** 今回 cloud-murakumo の pin を前進させた後にもう1つ commit（SPA shell の color-scheme 宣言）を landed + deploy したため、west.yml が main より2 commit 遅れ、**fresh clone + west update では deploy 済みの状態を再現できない**状態が一時的に生じた。closing の pin 監査（pin == main tip を全件照合）で検出して修正。deploy と pin 前進が別操作である限り、この順序ミスは再発しうる。
+
 **west pin を5件前進させた。** 子 checkout 3件が remote より遅れており（net-kotobase は着手時 180 commits）1件はオーナーの未 commit WIP を抱えていたため、`gen-west-manifest --entry` はローカル HEAD を pin する罠になる。GitHub API の server-side single-entry commit（blob SHA の optimistic lock）で書き、5件すべて compare API で `status=ahead` / `behind_by=0` を確認した。"
 
   :adr/related ["adr-2607141915-jp-go-digital-design-system"
@@ -93,4 +95,7 @@
    "live 検証（deploy 後、curl で実 HTML）: kotobase / signup / admin / explore、murakumo /docs /blog/ /gpu-market /gpu/ /join/mobile、x402.nexus / /cohort —— 全て 200 かつ dads-*/dds-ext-* を含み --hig-* / kotoba-shell__ を含まない"
    "murakumo /css/theme.css は deploy 後 404（一時的に 200 を返したのは CDN cache の残り）"
    "net-kotobase は作業中に origin/main が4 commit 進み（ADR-2607301200 の P2P quota 512 MiB / 50 pins）、生成 HTML 4件が conflict。marker 手編集ではなく再生成で解決し、新 quota copy が DADS ページに届いていることを確認してから merge した"
-   "west.yml: 変更行はちょうど5行（entry ごとに revision 1行のみ）。commit 9965b1c"]}]
+   "west.yml: 変更行はちょうど5行（entry ごとに revision 1行のみ）。commit 9965b1c"
+   "SPA shell（public/index.html、手書きで generator の外）は color-scheme/theme-color/viewport-fit の宣言が漏れていたため追加し再 deploy（dbd6521、version 86e7c58d）。生成ページは chrome/document から得ていた"
+   "closing の pin 監査で cloud-murakumo の pin が main より2 commit 遅れているのを検出（上の SPA 修正を pin 前進の後に landed したため）。dbd6521 へ修正（commit 7795ebd）—— 5件すべて pin == main tip を再確認"
+   "live SPA を browser で確認: dads-button 5 / dads-table 1（display:table）/ dds-ext-card 5、legacy class 0、stylesheet は /css/dds.css 単独、横スクロール無し"]}]
