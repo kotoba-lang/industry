@@ -292,13 +292,30 @@ the residual list tracked since ADR-2607299400 (seats through name-bits / task e
 **Product-facing :bool predicates now landed:** schedule eligible?/holds-warm?,
 task-eligible?, failed?, can-retry?, authorized?, write-ok?.
 
-**Still open (profile 5 residual):**
-1. String helpers `blank?` / `ws?` (and similar) still return `:i64` 0/1 across
-   provision/reconcile/report/secret/overlay — convert when hosts stop treating
-   them as numeric words
+**Still open (profile 5 residual — superseded by Progress 2026-07-31c):**
+1. ~~String helpers `blank?` / `ws?`~~ → #212; secret valid-env/path → #214
 2. Ranking / pick-code paths (`better-*`, ok0/ok1 tournament flags) stay `:i64`
    by design
 3. wasm `has-bool-value?` dead-flag cleanup; T6.2 / T8.3 / W4
+
+
+
+## Progress (2026-07-31c — blank/ws string gates + secret env/path)
+
+- **murakumo#212 MERGED** (`fa5e1d6`): `blank?` / `ws?` / `err-ws?` → `:bool` across
+  overlay/secret/report/identity/component/provision/reconcile/deploy/tunnel;
+  derivatives `missing-manifest?` / `missing-operator-seed?` /
+  `operator-seed-missing?` / `identifier?` / `identifier-len-ok?` /
+  `absolute-unix-git-bin?` → `:bool`
+- **murakumo#214 MERGED** (`c044230b`): residual secret
+  `valid-env-var-name?` / `valid-path-ref-unix?` → `:bool`
+- west pin murakumo advanced to `c044230b` (covers #212+#214; #209–#211 already on pin path)
+
+**Still open (profile 5 residual):**
+1. Ranking / pick-code / name-match codes (`better-*`, `starts-with?`,
+   `command-is-dial?`, `known-secret-name?`, tournament ok0/ok1) stay `:i64`
+2. wasm `has-bool-value?` dead-flag cleanup
+3. T6.2 precompiled KIR default; T8.3 production AOT; W4 recursive values
 
 
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
