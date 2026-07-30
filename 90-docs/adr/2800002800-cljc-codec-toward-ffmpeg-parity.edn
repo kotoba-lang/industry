@@ -203,21 +203,69 @@ fraction ごとに padding を変える（fraction が 0 の軸は padding 無�
 **次に測るべきはそれで、support window ではない。** この否定的結果は次の人が見る場所
 （`h264.interp` の namespace docstring）に書いた。
 
+### 実装したもの: inter residual solve の fold（`org-iso-h264` `b490bfe`、関数単体 17.4x）
+
+下記レバー 4。intra 側の `ac-solver-int` と**同一の変換**を inter 側に適用した
+（`inv·Mᵗ` を QP ごとに 1 回、行ごと共通分母の厳密整数 16x16 行列へ畳み、
+1 行につき整数内積 1 回 + `round-div`）。
+
+**なぜ取り残されていたか**は明快で、記録に値する: intra の fold を駆動した profile が
+`encode-idr-luma-frame` で取られており、そこは `solve-regular-levels` を一度も通らない。
+一方 1799 フレームは P で、1 MB あたり 16 回通る。
+
+**負荷に頑健な指標で測った**（load average 12〜18、他セッションの JVM 9 個。約 15% の効果に
+対し wall-clock A/B は解像しなかった —— **baseline 自身が run 間で 8.2〜16.5 ms/MB と
+ばらついた**。median で誤魔化さずそう書く）:
+
+```
+solve-regular-levels : 258.30 → 14.86 µs/block = 17.4x
+                       （folded intra の 12.66 µs と同水準になった）
+1 MB の luma 16 block: 4.13 → 0.24 ms
+P frame の sampling profile（同一 run 内比率なので負荷が相殺する）:
+  mat-vec-mul  12.6% → 消滅
+  mat-mul       2.3% →  3.0%（QP ごと 1 回の fold だけになった）
+→ 除去シェアから全体 1.14x 程度の見込み。これは profile からの予測で wall-clock 実測ではない
+```
+
+bit-identity は全 52 QP ＋ 丸め境界の退化ベクトルで、テスト内に全文を書いた有理数経路に対して
+assert した（intra と同じ基準・同じ理由。memorized MF table は ~20% の
+cross-coefficient leakage、この pipeline は ~2%。速い solve が level を 1 つでも動かせば
+その leakage を買い戻すことになる）。encoder 出力は全ベンチ run で byte 一致。
+
+**accumulator の上限は継承せず導出し直した —— そして最初のテストはまさにその理由で落ちた**
+（AC 経路の 2^50 床を、そこに全く届かない数値に当てていた）。regular solver は `ac-solver` が
+除外する DC 列を含み、素の 16x16 `Mᵗ·M` は DC を抜いた行列よりずっと条件が良いので、
+worst accumulator は **18,957,811,712（約 2^34.1）** —— AC 経路の約 2^54 に対して
+long に 28 bit の余裕（AC は 9 bit）、かつ **cljs double の mantissa 内**（AC は 1 bit 外）。
+テストはこの 3 つの境界すべてを assert する。
+
 ### 次のレバー（実測シェア順、いずれも推測でなく上記 profile 由来）
 
-1. ~~**`h264.interp/sample`（42.5%）を support window で**~~ —— **実装して撤回**（上記）。
-   正しい形は **FFmpeg の two-pass 中間バッファ**（水平パスを 1 回だけ計算する）で、
-   これは未実施。42.5% のうち `center-j` 経路の 6 重再評価がどれだけかを先に測る
+2 段の実装後に再 profile した P フレームの姿（840 sample）:
+
+```
+37.9%  h264.interp/sample     ┐
+ 7.6%  h264.interp/six-tap-h  │ interpolation cluster 約 57%
+ 7.0%  h264.interp/quarter-pel-luma
+ 2.9%  h264.interp/six-tap-v  │
+ 1.0%  h264.interp/half-v     ┘
+ 9.8%  h264.encode/sad-mc
+ 4.9%  h264.encode/encode-macroblock!
+ 3.0%  h264.encode/mat-mul    ← QP ごと 1 回の fold のみ（元 14.9%）
+```
+
+1. ~~**`h264.interp/sample` を support window で**~~ —— **実装して撤回**（上記）。
+   正しい形は **FFmpeg の two-pass 中間バッファ**（水平パスを 1 回だけ計算する）で未実施。
+   **fold 後は interpolation cluster が約 57% で、単独で最大のレバー**
 2. **`me-subpel-refine` の 49 候補** —— ±3 quarter-pel の直積で、docstring 自身が
-   「redundantly but cheaply」と書いている。標準は half-pel 8 → quarter-pel 8 の 16 候補。
-   `search-range` を下げても縮まないのはこの段だから。fused SAD 後は候補削減の効果が
-   以前より**大きく**出るはず（1 候補あたりのコストが下がった分、候補数が支配的に近づく）
+   「redundantly but cheaply」と書いている。**ただしこれは bit-identity を破る**
+   —— 候補集合を変えれば選ばれる MV が変わり bitstream が変わるので、Decision 2 の
+   不変条件の**明示的な例外**として、速度と同時に rate/歪みの代償を測ってからでないと
+   入れてはいけない。**bit-identical な代替**として、49 候補が同じ整数近傍を共有している
+   ことを使い half-sample 面を 1 回だけ計算して共有する道がある（レバー 1 の two-pass と
+   同じ性質の変更）——こちらを先に検討する
 3. ~~**`sad`（10.9%）**~~ —— **実装済み**（fused SAD + 早期打ち切り、1.71x。上記）
-4. **`solve-regular-levels`（約 10%）** —— **intra 側で実装済み・bit-identity 検証済みの
-   変換をそのまま適用する**: `inv·MT` を行ごとの共通分母を持つ 1 本の厳密整数行列に
-   畳んで `round-div`。258 µs → 14 µs 程度を見込む（intra 側の実測 13.46 µs）。
-   不変条件テストも同じ形（全 52 QP で有理数経路と一致）。**fused SAD で ME の絶対時間が
-   下がった今、このシェアは相対的に上がっている**ので再 profile してから着手する
+4. ~~**`solve-regular-levels`（14.9%）**~~ —— **実装済み**（inter fold、関数単体 17.4x。上記）
 
 ## Phase 2 — filter 段の家は `douga` ではなく `utsushi` だった
 
