@@ -1,0 +1,99 @@
+[{:db/id -1
+  :doc/id "cloud-itonami-7310-firstparty-ads-dogfood-seed"
+  :doc/title "cloud-itonami 7310 first-party dogfood — kotobase.net / murakumo.cloud を ChatGPT Ads に出稿する前の pre-flight"
+  :doc/doc_type "dogfood-seed"
+  :doc/path "90-docs/business/cloud-itonami-7310-firstparty-ads-dogfood-seed.edn"
+  :doc/source "ADR-2607301200 + cloud-itonami-isic-7310 @ 4201aee の Campaign Governor 実行出力 (2026-07-30) + net-kotobase / cloud-murakumo の BMC funnel 実測"
+  :doc/body
+  "# 7310 first-party dogfood — 自社2プロダクトの出稿 pre-flight
+
+cloud-itonami-isic-7310 は本来『代理店に売る B2B ソフト』(顧客 = agency) だが、
+ここでは **自社プロダクトを advertiser として自分の governor に通す**
+(5820 の dogfood と同じ自己言及パターン)。目的は「出稿できるか」を人の記憶で
+判断せず、**足りないものを機械に列挙させる**こと。
+
+## 捏造ゼロ (honest current state, 2026-07-30)
+
+seed した事実はすべて今日の実態であって、通したい値ではない:
+
+- advertiser account 未開設        -> :advertiser-identity-verified 未表明
+- creative 未作成                 -> :distinguishable-from-product-ui 未表明
+- creative/LP の対応が未確定      -> :landing-page-consistency 未表明
+- オーナー承認済み広告予算が無い  -> :authorized-budget 0
+  (90-docs/business/budget-supply.edn は :supply/note で自ら placeholder と明記)
+- :proposed-media-spend 112500    -> ads.openai.com の最低日予算 USD 25 x 30日 を
+                                     JPY 150/USD で換算した最小構成 (二次情報)
+- :jurisdiction JPN               -> advertiser account の国は登記国に従い setup 時に固定
+
+## ad-category は未確定 — だから両方の候補を走らせた
+
+chatgpt-ads は :closed-category-set? true (未掲載カテゴリは一律不許可) なので、
+category の選択が可否をそのまま決める。
+
+| candidate | chatgpt-ads | google-ads | meta-ads | microsoft-advertising |
+|---|---|---|---|---|
+| :digital-products-education | permitted | permitted | permitted | permitted |
+| :software-download | **not-permitted** | permitted | permitted | restricted |
+
+graph-DB BaaS / 推論クラウドがどちらに落ちるかは
+<https://openai.com/policies/ad-policies/> の再読が必要。2026-07-30 時点で
+WebFetch/curl とも 403 (bot wall)、Chrome 拡張も未接続のため **未解決**。
+推測で :digital-products-education と申告して通すことはしない
+(ADR-2607261200 D2 が禁じた捏造と同型)。
+
+## Seed data (edn/read-string 可能、7310 の campaign shape に整合)
+
+```edn
+{:campaigns
+ {\"kotobase-dpe\" {:id \"kotobase-dpe\" :client-name \"net-kotobase (kotobase.net) — graph-DB BaaS\"
+                  :jurisdiction \"JPN\" :status :intake
+                  :target-platform \"chatgpt-ads\" :ad-category :digital-products-education
+                  :proposed-media-spend 112500 :authorized-budget 0
+                  :advertiser-approval-on-file? false :attestations {}
+                  :requested-placement-contexts []
+                  :misleading-claim-risk-unresolved? false :campaign-placed? false
+                  :creator-eligibility-issue? false :tieup-ordered? false}
+  \"kotobase-swd\" {:id \"kotobase-swd\" :ad-category :software-download}
+  \"murakumo-dpe\" {:id \"murakumo-dpe\" :client-name \"cloud-murakumo (murakumo.cloud) — inference cloud\"
+                  :ad-category :digital-products-education}
+  \"murakumo-swd\" {:id \"murakumo-swd\" :ad-category :software-download}}}
+```
+
+(swd/murakumo 行は :ad-category / :client-name 以外 kotobase-dpe と同一。)
+
+## 実行結果 — :actuation/place-campaign が挙げた HARD hold (verbatim)
+
+`:digital-products-education` (通る可能性のある category) でも 5 件 hold:
+
+1. `:evidence-incomplete` — 法域の必要書類(クライアントブリーフ/媒体計画/
+   クリエイティブ承認/予算承認)が未整備
+2. `:media-spend-exceeds-authorized-budget` — 提案媒体費 112500 が承認予算 0 を超過
+3. `:risk-screen-missing` — 誤認表示リスクスクリーニングの完了記録が無い
+4. `:platform-check-incomplete` — :platform/verify 未実施
+5. `:platform-attestation-missing` — chatgpt-ads の必須表明 3 件が未取得
+   (:advertiser-identity-verified :distinguishable-from-product-ui
+   :landing-page-consistency)
+
+`:software-download` はこれに `:platform-prohibited-category` が加わる
+(未掲載カテゴリの一律不許可)。
+
+## この hold リストがそのまま実出稿の TODO
+
+| hold | 閉じる条件 | 誰が |
+|---|---|---|
+| platform-attestation-missing (advertiser-identity-verified) | ads.openai.com で advertiser account を開設し本人確認を通す。登記名/番号/住所と支払手段の名義・国が一致していること | owner (安全床①: 決済情報の入力は agent が行わない) |
+| media-spend-exceeds-authorized-budget | budget-supply.edn の placeholder を実額に置き換え、広告予算を明示的に承認 | owner |
+| platform-attestation-missing (distinguishable-from-product-ui / landing-page-consistency) | creative を作り、ChatGPT の生成応答と視覚的に区別できることと LP と内容が一致することを表明 | agent 可 |
+| evidence-incomplete / risk-screen-missing / platform-check-incomplete | 7310 の手続き順 (:media-plan/verify -> :platform/verify -> :risk/screen) を通す | agent 可 |
+| ad-category 未確定 | openai.com/policies/ad-policies/ を再読して B2B 開発者向け SaaS の帰属を確定 | 要 browser/owner (現在 403 で blocked) |
+
+## 出稿の前に直すべきもの (この seed の外)
+
+有料流入を買っても、受け皿の転換率が 0 なら CAC は無限になる。BMC 実測:
+
+- net-kotobase: landing 訪問 246 -> signup **0** (転換 0% / 目標 3%)
+- cloud-murakumo: murakumo.cloud 訪問 -> 実推論 run 転換 **1%** (目標 2%)
+
+さらに ads.openai.com は pixel / Conversions API を提供しており、これを入れない
+出稿は「効いたかどうか」が事後に分からない。**funnel と計器が先、出稿が後。**
+"}]

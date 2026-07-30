@@ -1,0 +1,151 @@
+[{:db/id -1,
+  :adr/id "adr-2607301200-firstparty-chatgpt-ads-preflight-kotobase-murakumo",
+  :adr/title "ADR-2607301200: kotobase.net / murakumo.cloud の ChatGPT Ads 出稿 — 7310 は判定層として使い、出稿実行は別問題として分離する",
+  :adr/status "accepted",
+  :adr/doc_type "adr",
+  :adr/date "2026-07-30",
+  :adr/deciders ["Jun Kawasaki (+ Claude)"],
+  :adr/topic "firstparty-chatgpt-ads-preflight",
+  :adr/related ["adr-2607261200-advertising-7310-media-platform-layer"
+                "adr-2607271400-advertising-7310-multi-platform-catalog"
+                "adr-2607081900-cloud-itonami-advertising-7310-coverage"
+                "adr-2607122300-cloud-murakumo-captive-demand-first-network-participant-growth"],
+  :adr/supersedes [],
+  :adr/superseded_by [],
+  :adr/repos ["com-junkawasaki/root"],
+  :adr/authoritative true,
+  :adr/authoritative_for ["自社プロダクト(kotobase.net / murakumo.cloud)を ChatGPT Ads に出稿する際の pre-flight 判定を cloud-itonami-isic-7310 で行うという決定"
+                          "7310 は判定層であって出稿実行層ではないという境界"
+                          "ad-category 未確定を推測で埋めないという規律の first-party 適用"],
+  :adr/last_verified "2026-07-30",
+  :adr/source-format "edn-only (ADR-2607171600)",
+  :adr/primary-sources ["cloud-itonami/cloud-itonami-isic-7310 @ 4201aee — clojure -M:dev で Campaign Governor を自社2プロダクトに対して実行した出力(2026-07-30)"
+                        "90-docs/business/net-kotobase-business-model.edn — landing 訪問 246 / signup 0"
+                        "90-docs/business/cloud-murakumo-business-model.edn — 訪問→実推論 run 転換 1%"
+                        "90-docs/business/budget-supply.edn — :supply/note が自ら placeholder と明記"],
+  :adr/secondary-sources ["ads.openai.com の advertiser 要件(登記9カ国に JPN 含む・配信7カ国・国と通貨は setup 時固定・最低日予算 USD 25・Max CPC・postpay・JCT 非課税)は 2026-07-30 の web 検索由来の二次情報。openai.com / help.openai.com は WebFetch・curl とも 403 (bot wall) で一次確認できていない。"],
+  :adr/known-gaps ["ad-category が未確定。graph-DB BaaS / 推論クラウドが :digital-products-education(4媒体すべて permitted)か :software-download(chatgpt-ads で closed-set により not-permitted)かは openai.com/policies/ad-policies/ の再読が必要で、2026-07-30 時点で 403 により blocked。"
+                   "advertiser account を開設する法人(どの登記主体か)が未決定。account の国と通貨は setup 時に固定され後から変更できないため、これは取り返しのつかない選択。"
+                   "pixel / Conversions API の実装は未着手。入れずに出稿すると効果が事後に測定不能。"
+                   "7310 の west pin (22e3f57) が子リポ main より 7 commit 遅れている。本 ADR の実行は子リポ checkout (4201aee) に対して行った。"],
+  :adr/verification "cloud-itonami-isic-7310 の checkout (4201aee) に対し clojure -M:dev で自社2プロダクト x 2 category の 4 campaign を :campaign/intake -> :media-plan/verify -> :platform/verify -> :risk/screen -> :actuation/place-campaign まで通し、hold rule を実際に発火させて記録した。子リポは無変更(read-only consumer として実行)。",
+  :adr/body
+  "## Context
+
+オーナーの問い: 「今の cloud-itonami に ChatGPT 広告などを出稿する business は
+設計実装されているか。kotobase.net と murakumo.cloud を出稿したい」。
+
+調査結果は **半分ある**。`cloud-itonami-isic-7310`(ISIC Rev.5 7310 = 広告代理業)は
+ADR-2607081900 で actor 化され、ADR-2607261200/2607271400 で 4 媒体
+(chatgpt-ads / google-ads / meta-ads / microsoft-advertising)のポリシーカタログと
+媒体側 HARD check 6 種を持つ。ChatGPT Ads は転記済みの一級市民である。
+
+しかし足りないものが 2 つあった:
+
+1. **出稿の実行層が無い。** 子リポの CLAUDE.md が明記するとおり
+   `No network calls in the actor` で、`:actuation/place-campaign` は監査台帳に
+   placement レコードを起票するだけ。`ads.openai.com` に投げるクライアントは
+   workspace 内に存在しない(`kotoba-lang/com-openai` は推論 API の clean-room 実装、
+   `kotoba-lang/adnet` は自社 ad network = publisher 側で買い付け側ではない)。
+2. **顧客モデルが agency。** `docs/business-model.md` は「顧客は advertiser ではなく
+   agency」と明言しており、自社プロダクトを first-party に出稿するワークフローは
+   モデル化されていなかった。kotobase / murakumo は advertiser としても campaign
+   としても登録が無かった。
+
+## Decision
+
+### D1. 7310 は判定層として使う。出稿実行層をここに足さない
+
+自社プロダクトを 7310 の Campaign Governor に通し、**実出稿の前に何が足りないかを
+機械に列挙させる**。これは 5820 CRM の dogfood(ADR-2607172600)と同じ自己言及
+パターンで、実際に穴が出た: 記憶で「たぶん出せる」と判断していたら見落としていた
+blocker が 5〜6 件、機械的に列挙された。
+
+一方で `ads.openai.com` を叩くクライアントを 7310 に足すことはしない。子リポの
+`No network calls in the actor` は D7(第2の actuation op を作らない)と同じ根拠に
+立っており、実 API 連携は **human-approved order の下流**に属する。判定層に
+ネットワーク I/O を持ち込むと、governor が自分の出稿を承認する構造になる。
+
+### D2. dogfood seed は superproject に置く
+
+`90-docs/business/cloud-itonami-7310-firstparty-ads-dogfood-seed.edn`。
+5820 の `cloud-itonami-5820-dogfood-seed.edn` と同じ置き場所・同じ shape。
+自社の advertiser レコードを子リポの `demo-data` に混ぜない —
+`demo-data` は console の byte 同一性を `drivers-test` が固定している
+決定論的デモであり、かつ**売り物の中に自社の営業データを混ぜない**。
+
+### D3. ad-category は推測で埋めない
+
+`chatgpt-ads` は `:closed-category-set? true` なので category の選択が可否を
+そのまま決める。実測:
+
+| candidate | chatgpt-ads | google-ads | meta-ads | microsoft-advertising |
+|---|---|---|---|---|
+| `:digital-products-education` | permitted | permitted | permitted | permitted |
+| `:software-download` | **not-permitted** | permitted | permitted | restricted |
+
+graph-DB BaaS / 推論クラウドがどちらに落ちるかは一次情報の再読が必要で、
+2026-07-30 時点で openai.com は WebFetch・curl とも 403(bot wall)、Chrome 拡張も
+未接続のため確定できない。**通したい方(`:digital-products-education`)を選んで
+先に進めることはしない** — それは ADR-2607261200 D2 が
+google/meta/microsoft を記憶から seed することを拒んだのと同じ失敗である。
+違うのは、ここでは間違えた場合の帰結が gate の hold ではなく**媒体側の広告拒否
+またはアカウント問題**という点で、より重い。
+
+### D4. funnel と計器が先、出稿が後
+
+BMC の実測は net-kotobase が landing 訪問 246 -> signup **0**(転換 0% / 目標 3%)、
+cloud-murakumo が訪問 -> 実推論 run **1%**(目標 2%)。転換 0% の funnel に有料流入を
+買うのは CAC を無限にする行為である。さらに ads.openai.com は pixel /
+Conversions API を提供しており、それを入れない出稿は効果が事後に測定不能。
+
+これは「広告を出さない」決定ではなく**順序の決定**である。
+
+### D5. 決済情報の入力は agent が行わない
+
+advertiser account の本人確認と支払手段登録は owner 実行。安全床①(認証情報・
+カード情報を自分でフォーム入力しない)は「標準作業の常時許可」でも上書きされない。
+account の国と通貨は setup 時に固定され後から変更できないため、どの登記主体で
+開設するかは取り返しのつかない選択であり、owner の判断に属する。
+
+## 実測 — :actuation/place-campaign が挙げた HARD hold
+
+`:digital-products-education` でも 5 件 hold する:
+
+1. `:evidence-incomplete` — 法域の必要書類(ブリーフ/媒体計画/クリエイティブ承認/
+   予算承認)が未整備
+2. `:media-spend-exceeds-authorized-budget` — 提案媒体費 112,500 が承認予算 **0** を超過
+3. `:risk-screen-missing` — 誤認表示リスクスクリーニングの記録が無い
+4. `:platform-check-incomplete` — `:platform/verify` 未実施
+5. `:platform-attestation-missing` — chatgpt-ads の必須表明 3 件が未取得
+   (`:advertiser-identity-verified` / `:distinguishable-from-product-ui` /
+   `:landing-page-consistency`)
+
+`:software-download` ではこれに `:platform-prohibited-category` が加わる。
+
+2 が示しているのは技術的な穴ではなく事実である: **オーナー承認済みの広告予算が
+存在しない**(`budget-supply.edn` は `:supply/note` で自ら placeholder と明記)。
+
+## Alternatives considered
+
+- **7310 に ads.openai.com クライアントを足して端から端まで自動化する**: 却下(D1)。
+  判定層に I/O を入れると governor が自分の出稿を承認する構造になる。実 API 連携は
+  human-approved order の下流に、別 repo として置く。
+- **自社 campaign を子リポの demo-data に足す**: 却下(D2)。console の byte 同一性を
+  壊し、売り物のデモデータに自社営業データが混入する。
+- **`:digital-products-education` と決めて先に進む**: 却下(D3)。403 は「読めなかった」で
+  あって「読んだ」ではない。
+- **funnel を直す前に小額でテスト出稿する**: 却下(D4)。転換 0% の受け皿と計器なしの
+  出稿では、失敗しても原因(creative / category / LP のどれか)が切り分けられない。
+  切り分けられない実験に金を払うことになる。
+
+## Consequences
+
+- 実出稿の TODO が hold リストとして機械可読に固定された。閉じるべき順序も
+  seed doc の表に載っている。
+- owner 側に 2 件の決定が残る: (a) どの登記主体で advertiser account を開くか
+  (国と通貨が固定されるため不可逆) (b) 広告予算の実額承認。
+- agent 側に 3 件の作業が残る: (a) 一次情報の再読による category 確定
+  (browser 経路が必要) (b) creative + 表明 (c) pixel / Conversions API と funnel。
+- 7310 の west pin が子リポ main より 7 commit 遅れていることが判明した(別 follow-up)。
+"}]
