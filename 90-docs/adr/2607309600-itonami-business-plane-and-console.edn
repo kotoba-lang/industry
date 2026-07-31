@@ -555,6 +555,43 @@ inline JS を `node --check`、app CSS に raw hex 0 件。
    あって導出ではないので、自動生成しない。誰も作らなければ Portfolio は空のまま
    （正しく）。
 
+## 決定 7 の matrix を実データで埋めた（2026-07-31）
+
+Phase 1 の Portfolio には face の解決状態しか入っていなかった。列に必要な 4 つの
+pane がまだ無かったから。揃ったので `cloud.itonami.app.portfolio` が各面に各事業を
+問い合わせ、1 つのグリッドに並べる（`GET /api/portfolio/matrix`）。
+
+列: Canvas / riskiest gate / 成熟度 / Loops / Repos / 実測。
+
+### 無の種類を 4 つ、決して畳まない
+
+| 状態 | 意味 | 直し方 |
+|---|---|---|
+| `:unbound` | この事業がその面を名指していない | Portfolio で紐付ける |
+| `:unresolvable` | 名指したが workspace checkout が無い | `:workspace-root` を設定 |
+| `:missing` | 解決可能で、存在しない | 生成する / 紐付けを直す |
+| `:measured` | 実際の値 | — |
+
+5 つ目の `:stale` は **metrics だけ**が持つ——遅れうる日付を持つのが metrics だけ
+だから。各セルは状態の隣に理由を置く。説明の無い灰色の語のグリッドは、この pane が
+「そうでないため」に在る。集計は「まだ何も測れていない」を灰色の画面ではなく**数**に
+する。
+
+### test が捕まえた bug は、同じ族の 3 件目
+
+`repos-cell` が「事業が repo を 1 つも紐付けていない」より先に plane の状態を見て
+いたため、何も紐付けていない事業に「解析不能」と出していた——正しくは「未紐付け」で、
+**直し方が違う**。2 つとも真な文の順序が、読み手に見える方を決めていた。前の 2 件は
+`cond->` が `:detail` を上書きしたもの。**この plane で 3 回、欠陥は「2 つの真の間の
+優先順位」だった。**
+
+### コストを隠さず設計に織り込んだ
+
+matrix は紐付いた XMILE モデルを全部再実行し（感度掃引のため定数 1 つにつき 1 回追加）、
+4.8 MB の repo plane を読む。だから**起動時に走る `/api/business` には入れず**、独立
+endpoint にして pane を開いたときに取る。`repos/planes` を切り出して、plane を
+「事業ごとに 1 回」ではなく「request ごとに 1 回」読むようにした。
+
 ## Consequences
 
 - **良い**: 4 面が 1 entity で join できる。「この事業は今どこが未計測か」が
