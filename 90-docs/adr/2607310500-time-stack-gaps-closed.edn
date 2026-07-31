@@ -200,6 +200,22 @@ ingest は、労働者の個人データ store への公開書き込み経路。
   （36協定 が未評価のため）。これは正しい — 7 日で年上限は判定できない。consumer は
   `:unevaluated/reason` を見て振り分ける必要がある。
 
+## 検証（2026-07-31、closing 時点）
+
+| | |
+|---|---|
+| test | 7 repo 合計 290 tests / 905 assertions、0 failures 0 errors |
+| lint | 7 repo とも clj-kondo errors 0 warnings 0 |
+| CI | 7 repo とも pin した SHA に対して GitHub Actions `ci=success` |
+| collector | `collect-vcs` を実 repo（138 commits → 2 sessions / 164 分）、`collect-calendar` を実 .ics（3 events、declined 1 件除外、floating-time 警告発火）で実行確認 |
+| edge | 3 actor の `:cljs` 分岐を実 CACAO 依存込みで ClojureScript compile 成功 |
+| west | pin == repo HEAD == remote HEAD（7 件）、サーバ側到達性検証 OK |
+
+**CI は最初 3 actor で赤かった**（`langchain-store` とその依存 `langchain` を CI が
+clone していなかった）。ローカルは workspace 全体があるので通っていた。sibling chain を
+clone するよう workflow を直して green。**`:local/root` sibling を足したら CI の
+clone list も同時に直す。**
+
 ## 未実装（次に来るもの）
 
 - **edge の store は per-request `MemStore`**。Pages Function は stateless なので、
