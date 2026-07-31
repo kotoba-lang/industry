@@ -2573,6 +2573,27 @@ Still open:
    after compiler); W4 recursive values
 
 
+## Progress (2026-07-31ea — T5.2 native guest record expansion relay+persist+moe)
+
+- murakumo#282 MERGED (`28fc1e81`): **T5.2 native guest record wire** for
+  **relay** + **persist** + **moe** —
+  `make-id` → `:relay/id`, `lease-expired?` → `:relay/lease`;
+  snapshot/reconcile-rkey → `:persist/rkey`, `repo-uri` → `:persist/uri`;
+  `expert-ratio-milli` → `:moe/ratio`, `verdict-name` → `:moe/verdict`,
+  `resident-est` → `:moe/resident`.
+  Side fix: engine `head-cmd-front` authority residual → `:engine/head-front`.
+  ADR-260731-w6-t52-native-record-relay-persist-moe.
+  Evidence: 96 tests / 1691 assertions green.
+- west pin murakumo advanced to `28fc1e81`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 further expansion (remaining multi-arg pure without options;
+   option-in-record after compiler); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
