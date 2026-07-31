@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject (0214–0222); true-set (0223–0227); multi-file CLI (0228) + pure multi-export set (0229) + multi-ns reject (0230) + **linked monomorph synthetics (compiler 0193) + multi-level peel**; W4 recursive nested EDN / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject (0214–0222); true-set (0223–0227); multi-file CLI (0228) + pure multi-export set (0229) + multi-ns reject (0230) + **linked monomorph synthetics (compiler 0193) + multi-level peel**; **kit-shaped set-of-header-records (0231)**; W4 recursive nested EDN / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2816,6 +2816,24 @@ Still open:
 3. T5.2 residual: **option-string-in-record compiler gap** is the main
    product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
    digit-scanner multi-arg internals optional; W4 recursive values
+
+
+## Progress (2026-08-01gq — T8.3 pure kit-shaped request set-of-header-records)
+
+- provider#119 MERGED (`397568ad`): **ADR 0231** pure http-request-set-record —
+  guest request record with kit-shaped headers as set-of-header-records plus
+  parallel name-set uniqueness. EDN skeleton uses headers-n (no typed-set
+  iterator). Package sha `59a182cc…`; KIR main → **-9002**.
+  Evidence: **83 tests / 797 assertions** green.
+- west pin: provider → `397568ad`
+- Honesty: bounded sets ≤32; not W4 recursive nested EDN ADT. Full set→vector
+  EDN fold residual. Does **not** flip `:wasm-aot :implemented`.
+
+Still open:
+1. T8.3 residual: typed-set fold/seq for full headers EDN; W4 recursive nested
+   EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
 
 
 ## Progress (2026-08-01gp — T8.3 linked monomorph synthetics + multi-level peel)
