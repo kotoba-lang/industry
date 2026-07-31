@@ -1748,6 +1748,24 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31cj — T8.3 typed-string HTTP header set packing)
+
+- provider#77 MERGED (`de9ea4cb`): **T8.3 ADR 0189** — typed-string header
+  **set packing walk** `http_headers_begin` / `http_headers_pair` /
+  `http_headers_end` (remaining-count host sequence; composes 0187+0188).
+  Codes: `-4` n∉[0,32], pair name/value as 0188, `-7` incomplete, `-8` extra.
+  `main` → `-3647`. No uniqueness (W4 set storage).
+  Evidence: 46 tests / 308 assertions; browser-host green.
+- west pin provider e164b374 → de9ea4cb (`0a949494`).
+
+Still open:
+1. T8.3 residual: full EDN request/result codec AOT (**response variant**/
+   status + body compose); pure memory-scan one-shot; typed Component world
+2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
+   interop harness)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31ci — T8.3 typed-string http_header_name_ok)
 
 - provider#74 MERGED (`77ea650c`): **T8.3 ADR 0187** — typed-string
