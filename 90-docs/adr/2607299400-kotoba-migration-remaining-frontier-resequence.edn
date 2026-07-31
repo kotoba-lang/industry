@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — ops through 0230 multi-ns reject + **0231 kit-shaped request set-of-header-records** + **0232 secret reply fixed-depth EDN**; **typed-set-nth fold full headers EDN (0233)**; **full request EDN set-record (0234)**; W4 recursive nested EDN / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — ops through 0230 multi-ns reject + **0231 kit-shaped request set-of-header-records** + **0232 secret reply fixed-depth EDN**; **typed-set-nth fold full headers EDN (0233)**; **full request EDN set-record (0234)**; **result-variant EDN set-record (0235)**; W4 recursive nested EDN / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2816,6 +2816,22 @@ Still open:
 3. T5.2 residual: **option-string-in-record compiler gap** is the main
    product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
    digit-scanner multi-arg internals optional; W4 recursive values
+
+
+## Progress (2026-08-01gu — T8.3 result-variant EDN kit-shaped set-record)
+
+- provider#123 MERGED (`63dc5dcd`): **ADR 0235** pure http-result-edn-set-record —
+  ok arm with set-of-header-records + typed-set-nth fold; error arm fixed-depth
+  code/message/retryable. Package sha `954b1bff…`; KIR main → **-9002**.
+  Evidence: **87 tests / 839 assertions** green.
+- west pin: provider → `63dc5dcd`
+- Honesty: fixed-depth variant arms only; not W4 recursive nested EDN ADT.
+  Does not flip wasm-aot to implemented. Closes Progress gt result-variant residual.
+
+Still open:
+1. T8.3 residual: W4 recursive nested EDN; only then wasm-aot implemented
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
 
 
 ## Progress (2026-08-01gt — T8.3 browser-host set-nth + live wasm fold)
