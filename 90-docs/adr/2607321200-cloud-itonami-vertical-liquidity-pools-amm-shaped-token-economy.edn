@@ -564,7 +564,11 @@ step 8  curve と share の発行                                               
     {:gap \"（解消 2026-07-31）agent_control.clj の envelope 挿入点\"
      :resolved \"advance! のループ頭。:agent.run/budget {:max-turns :max-tool-calls} が >= で行動前に throw する形が既にあり、欠けているのは金額次元だけ。HIL は tool call ごと（hil/approval-request → decide! は :held からのみ → append-audit! は実行前）で、envelope が動かすのはこの粒度\"}
     {:gap \"（解消 2026-07-31）itonami.cloud の x402 面が意図的に無いのか未実装なのか\"
-     :resolved \"未実装。rail は既にある — billing_x402.cljc が nexus-x402 の admin API に cloud-itonami を seller 登録する propose→approve→execute アクターとして実在する。欠けているのは murakumo/kotobase と同型の discovery 文書だけで、step 1 のコストは当初見積もりより小さい\"}
+     :resolved \"未実装。worker（orgs/network-awai/cloud-itonami）の src/cloud_itonami/edge/ に x402 コードも .well-known ルートも無い。seat 課金専用という設計判断の痕跡も無い\"
+     :correction \"当初『欠けているのは discovery 文書だけ』と書いたが誤り。discovery 文書は自前 origin 402（murakumo 型）を含意し、pay/x402 + treasury/core の vendor と handler で約540行を要する。正しい経路は gateway 登録で、そちらは origin コードが要らない。decision §4b 参照\"}
+    {:gap \"per-path 帰属は gateway 経由の seller にしか効かない\"
+     :impact \"自前 origin 402（murakumo 型、ADR-2607093100）は nexus-x402 を呼ばず treasury/verify-payment で自己完結するので、settlement が SETTLEMENTS_KV に入らず :path も :by-path も得られない。2026-07-31 に着地した実装の明示的な限界\"
+     :note \"cloud-itonami は gateway 経由（B）を採ることでこれを回避する。既存 murakumo 収益を path 別に見たければ gateway 移行か handle-settle 側での path 記録が別途要る\"}
     {:gap \"（解消 2026-07-31）business-governor が本番経路から呼ばれているか\"
      :resolved \"呼ばれている。business_loop.cljc:188 の tick! が governor/censor を実行し、ops_governor.cljc は自分の語彙以外の全 kind を business-governor/check に委譲する。強制は kernels/*.kotoba を SSoT とする propose/censor/execute の3点 defense in depth\"
      :lesson \"同日の前の反復はこれを『どこからも呼ばれていない』と誤報した。原因は grep を head -12 で切ったこと。ADR-2607259800 が『静かに間違った数値を生む欠陥』として記録した World Bank API の無警告 truncate と同型の失敗を、自分の道具で犯した。**出力を切った grep を根拠に「存在しない」と主張しない。**\"}
@@ -572,8 +576,8 @@ step 8  curve と share の発行                                               
      :note \"ns docstring が『store/approval-queue の配線は these pure fns の上の thin follow-up』と書いており、pure 層の存在は確認したが approval queue への接続は読んでいない。business-governor が :adnet.campaign/* を委譲されている旨は advertiser_ops.cljc:27 にあるが、tick! の proposal 生成側にキャンペーン kind が載っているかは未確認\"}
     {:gap \"本 ADR は loop-system-dynamics に namespace を追加していない — 採点は scratchpad\"
      :note \"採択後に cloud_itonami_vlp_levers.cljs として正式配置する\"}
-    {:gap \"itonami.cloud の x402 面が『無い』ことは確認したが、意図的か未実装かは未確認\"
-     :note \"cloud-itonami は seat 課金（Stripe）を主戦場に設計されており、per-request 課金が不要と判断された可能性がある。step 1 の前に確認する\"}]"
+    {:gap \"vertical ごとの path-prefix 設計そのものが未着手\"
+     :note \"gateway seller rule を 458 vertical 分どう名付け、どう登録するか（1 seller 多 rule か、vertical ごとに seller を分けるか）は未決。settlement は seller 単位で保存されるので、seller を分けると :by-path すら不要になる代わりに KV エントリが 458 本に増える\"}]"
 
   :adr/body
   "# ADR-2607321200: vertical liquidity pool — AMM で初期駆動する分散型 SaaS
