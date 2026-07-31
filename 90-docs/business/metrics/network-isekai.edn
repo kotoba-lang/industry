@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 9452,
-  :pageviews-7d 5346,
-  :uniques-7d-sum 422,
+ {:requests-7d 9625,
+  :pageviews-7d 5460,
+  :uniques-7d-sum 424,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 89}
-   {:path "/robots.txt", :requests 49}
-   {:path "/feed/fork-stats.edn", :requests 26}
-   {:path "/js/app.js", :requests 11}
+  [{:path "/", :requests 88}
+   {:path "/robots.txt", :requests 50}
+   {:path "/feed/fork-stats.edn", :requests 25}
    {:path "/kototama/kototama_bg.wasm", :requests 10}
    {:path "/kototama/kototama.js", :requests 10}
-   {:path "/api/liveops", :requests 9}
+   {:path "/js/app.js", :requests 10}
+   {:path "/sitemap.xml", :requests 9}
    {:path "/api/scores", :requests 8}],
-  :status-mix {:ok 2265, :server-error 31, :client-error 5},
+  :status-mix {:ok 2191, :server-error 31, :client-error 5},
   :channel-mix
-  {:channel 271, :probe 1747, :unclassified 247, :ok-total 2265},
+  {:channel 269, :probe 1684, :unclassified 238, :ok-total 2191},
   :window "24h"},
  :as-of "2026-07-31",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx・channel-allowlist済): / 89 · /robots.txt 49 · /feed/fork-stats.edn 26 · /js/app.js 11 · /kototama/kototama_bg.wasm 10 | 4xx(probe) 0% · 5xx 1% · probe(200-fallback) 77% · unclassified 11%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): / 88 · /robots.txt 50 · /feed/fork-stats.edn 25 · /kototama/kototama_bg.wasm 10 · /kototama/kototama.js 10 | 4xx(probe) 0% · 5xx 1% · probe(200-fallback) 77% · unclassified 11%",
  :signal
- "isekai.network 実測 9452 req/7d・422 uniques(日次和)・うち4xx probe 0%(24h)",
+ "isekai.network 実測 9625 req/7d・424 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
