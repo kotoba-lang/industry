@@ -2021,6 +2021,39 @@ Still open:
 
 
 
+
+## Progress (2026-07-31cy — T8.3 multi-export response package)
+
+- kotoba-component#90 MERGED (`5ac1641e`): **response package multi-export** —
+  `:http-response-package-with-main` (http_status_ok + http_response_ok + main).
+  Provider `http_response_ok.kotoba` → `main()` **-1012**.
+  Evidence: 31 tests / 364 assertions; provider E2E green.
+- west pin kotoba-component 10584366 → 5ac1641e (`a2f50919`).
+
+Still open:
+1. T8.3 residual: multi-export **error package**; flip wasm-aot only when admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31cz — T8.3 multi-export error package + helper admission)
+
+- kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
+  `:http-error-package-with-main` (http_error_ok + http_result_arm_ok + main).
+- kotoba-component#92 MERGED (`f857f8e3`): admit helper-mediated `code-ok` frontend
+  so provider `http_error_result_ok.kotoba` compiles `--target component`;
+  `main()` → **-13501**, bad-char → -3.
+  Evidence: 32 tests / 377 assertions; full provider source E2E green.
+- west pin kotoba-component 5ac1641e → f857f8e3 (`9e63490f`).
+
+Still open:
+1. T8.3 residual: provider registry **Component re-emit** of typed packages;
+   nested EDN pack / full kit body; flip `:wasm-aot :implemented` only when
+   full kit body admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
