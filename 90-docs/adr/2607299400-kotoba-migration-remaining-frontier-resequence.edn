@@ -2818,6 +2818,25 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fd — T5.2 seats-record seats-in budget-safe)
+
+- murakumo main `8a489bf8`: **seats-record** public API takes `:rebalance/seats-in`;
+  multi-scalar body kept as unexported `seats-record-go` (folding body into every
+  projection exhausted compiler lowering budget 100000). `seats-of-*` /
+  `pool-seats-of-*` project **lanes**; host `largest-remainder` calls seats-record
+  once. `seats-for-online-record` replaces three online exports.
+  ADR-260801-w6-t52-seats-record-budget.
+  Evidence: rebalance parity+authority 80/1512 green.
+- west pin murakumo `6f2d271b` → `8a489bf8`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 multi-arg pure residual closed for product pure (field constructors +
+   internal seats-record-go only); W4 recursive values
+
+
 ## Progress (2026-08-01fc — T5.2 pool-demand-record residual)
 
 - murakumo main `6f2d271b`: **pool-demand-record** multi-arg pure →
