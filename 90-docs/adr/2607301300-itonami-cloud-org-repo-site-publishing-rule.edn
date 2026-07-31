@@ -343,6 +343,36 @@ CI conclusion=success、jobs=4）。ADR の記述を別 repo に読み替えて�
 だった。`sourceCommit` の記録は今回が初なので、それ以前の publish 鮮度は判定できない。
 訂正は `4c530966` の merge commit message に残してある（履歴は書き換えない）。
 
+### STRICT gate を入れた直後に自分で赤くした（2026-07-31、2 件とも自分の欠陥）
+
+**gate を入れることと、gate が通る状態を作ることは別物だった。** 追加した
+`publishing surface` job は main で 2 回連続して赤くなり、どちらも私の欠陥だった。
+
+**1. レジストリを環境依存にしてしまった。** 鮮度検査のために `sourceCommit`
+（source repo の HEAD）を `registry.json` に混ぜたが、これは環境に依存する値で、
+source repo が checkout されない CI では再生成が `null` になる。結果
+`generate-sites-registry.cljs --check` が**構造的に必ず STALE** を返し、gate が
+恒久的に赤くなった。
+
+  → レジストリは `sites.edn` と実ファイルだけから決まる projection に戻した。
+    **『どこで生成しても同じ内容』が `--check` の成立条件**である、というのが
+    ここで学んだ不変条件。publish 鮮度は `public/sites/build-state.json` に分離し、
+    `build-sites.cljs` が書き `--check` がそれを読む。
+
+**2. 検査の fake が本番と違い、Node のバージョンで結果が変わった。**
+`verify-sites-bundle.cljs` の fake context が `request` を素のオブジェクト
+（`#js {:url … :headers #js {:get fn}}`）にしていた。handler はそれを
+`new Request(url, request)` の init に渡すので、undici はこの偽 headers を dict と
+して読み `get` 関数をヘッダ値と解釈して落ちる。**Node 26（手元）では通り
+Node 22（CI）で落ちる**という環境依存の偽陰性。
+
+  → 本物の `Request` を渡す形にした。本番の workerd は本物の Request を渡すので、
+    現実に寄せた fake の方が検査としても正しい。
+
+**再発防止として実際にやったこと**: 修正のたびに `git archive HEAD` で
+**siblings の無い展開先を作り、CI と同条件で `test-sites` を回してから** push した。
+手元で通ることは standalone で通ることを意味しない —— この 2 件はどちらもその差で出た。
+
 ## 未実装・既知のギャップ（次の担当者向け）
 
 1. **CI ゲートは standalone で動く 2 つだけ。** `score-sites` と
