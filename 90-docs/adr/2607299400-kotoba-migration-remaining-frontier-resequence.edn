@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — Components (0165–0170); pure/typed policy AOT 0171–0188 (http headers name/value 0187–0188); full EDN request/result codec AOT still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — Components (0165–0170); pure/typed policy AOT 0171–0192 (http request 0186–0189 + result 0190–0192); pure one-shot + request packing open |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -1761,6 +1761,27 @@ Still open:
 Still open:
 1. T8.3 residual: full EDN request/result codec AOT (**response variant**/
    status + body compose); pure memory-scan one-shot; typed Component world
+2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
+   interop harness)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+
+## Progress (2026-07-31cl — T8.3 typed-string HTTP result packing walk)
+
+- provider#78 MERGED (`9e347a0d`): **T8.3 ADR 0190** — `http_status_ok` /
+  `http_response_ok` (status/headers-n/body). `main` → `-1012`.
+- provider#79 MERGED (`8201a4d9`): **T8.3 ADR 0191** — `http_error_ok` +
+  `http_result_arm_ok`. `main` → `-13501` (concurrent).
+- provider#80 MERGED (`be00bad0`): **T8.3 ADR 0192** — typed-string **result
+  packing walk** (begin / status|headers|body or code|message|retryable / end).
+  Composes 0190+0191 without nested guest values. `main` → `-12061`.
+  Evidence: 52 tests / 350 assertions; browser-host green.
+- west pin provider 8201a4d9 → be00bad0 (`ec14893c`).
+
+Still open:
+1. T8.3 residual: pure memory-scan one-shot; request-side packing walk;
+   typed Component world
 2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
    interop harness)
 3. T5.2 native guest record wire (deferred); W4 recursive values
