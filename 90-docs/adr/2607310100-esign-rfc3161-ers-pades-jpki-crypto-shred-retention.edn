@@ -237,7 +237,7 @@ fast-forward）。すべて GitHub API の single-entry commit 経路。
 supersede しない。あの ADR の設計判断（commitment に束縛された challenge、exhaustive
 outline、content と evidence の分離、凍結 status list、ETSI 3 値）はすべて有効なまま。
 本 ADR が変えたのは「まだ無いもの」の 7 件のうち 6 件で、あの ADR の当該節は本 ADR を
-指すよう書き換えた。"
+指すよう書き換えた。
 
 ## 成熟度パス（2026-07-31）
 
@@ -269,14 +269,14 @@ outline、content と evidence の分離、凍結 status list、ETSI 3 値）は
   新しい JDK を拾っていたから。JDK 25 を pin して green。
 - **gitleaks の 3 件は全部誤検知**（テストの `did:key:z…`。DID は定義上、識別子が公開鍵
   そのもの）。指紋を 1 件ずつ `.gitleaksignore` に列挙した。**regex allowlist は捨てた** —
-  最初の版（`regexTarget = \"line\"`）は DID の 2 行隣の実 secret まで黙らせ、狭めた版は
+  最初の版（`regexTarget = \\\"line\\\"`）は DID の 2 行隣の実 secret まで黙らせ、狭めた版は
   再現する回帰テストを書けなかった。**検証できない allowlist は赤い scan より悪い。**
 
 ### 非 hermetic なテスト
 
-`scheduler_http_test` の \"and nothing was written\" が `(= [] items)` を assert していた。
+`scheduler_http_test` の \\\"and nothing was written\\\" が `(= [] items)` を assert していた。
 この endpoint は app の event と**マシンのカレンダー**を merge するので、これは
 オーナーの予定表についての assertion だった。カレンダーのあるマシンでは失敗し、失敗出力に
 実際の予定を 15 件印字していた。意図どおり「拒否された write が何も作らなかった」に直した。
 
-**805 tests / 3554 assertions, 0 failures** — このマシンで初めて suite 全体が通った。}]
+**805 tests / 3554 assertions, 0 failures** — このマシンで初めて suite 全体が通った。"}]
