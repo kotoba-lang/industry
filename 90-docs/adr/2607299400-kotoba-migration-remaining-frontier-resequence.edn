@@ -2732,6 +2732,29 @@ Still open:
    W4 recursive values
 
 
+## Progress (2026-07-31ei — T5.2 native guest record option-i64 residual)
+
+- murakumo main `42d677f3`: **T5.2 native guest record wire** for
+  **`[:option :i64]` multi-arg residual** —
+  token `claim-exp`/`expired?` → `:token/{claim-exp,expired}`;
+  fleet `resolve-port` → `:fleet/ports`;
+  provision `resolve-p2p-port` → `:provision/p2p-ports`;
+  report `status-row` → `:report/status-row`.
+  **Measured gap:** `[:option :string]` in-record still rejects
+  (type mismatch vs option-i64) — left positional (`parts-present?`,
+  `failed?`, `sealed-fields-present?`, `choose-via`, `action-name`, …).
+  ADR-260731-w6-t52-native-record-option-i64.
+  Evidence: parity+call-record 46/543; authority+unit 90/1546 green.
+- west pin murakumo `5299f745` → `42d677f3`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: **option-string-in-record compiler gap** + residual scanners;
+   W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
