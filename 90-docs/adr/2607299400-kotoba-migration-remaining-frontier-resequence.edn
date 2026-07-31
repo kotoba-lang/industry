@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist (0161); ops real-bytes (0162–0163); policy (0164); **http+secret Components + signed-wasm ready** (0165–0166 #49–#50); compiler-AOT kit body + other ops still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist (0161); http/secret/entropy Components + signed-wasm ready (0165–0167); process/scoped-fs/git + compiler-AOT still open |
 | T8.4 | host-parity L5 | **partial** — JVM 31 + Node 14 live (#96–#109; fetch/headers/json-extract both); SCRAM/PG + T8.3 open |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -1255,6 +1255,22 @@ Still open:
 Still open:
 1. T8.3 residual: compiler-AOT kit body for ops; process/scoped-fs/git/entropy
    real-bytes/Component path
+2. T8.4 residual: live SCRAM/PG success (qualification suite);
+   pg component-link beyond pool
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31bh — T8.3 entropy Component + signed-wasm ready)
+
+- provider#51 MERGED (`b4cc2077`): **T8.3 ADR 0167** — entropy pure draw-size
+  policy module+Component; ops kit set adds `:entropy`; packaging accepts
+  audit `:n/a`. Readiness **entropy** `:signed-wasm :ready`. Evidence: 71
+  tests / 455 assertions.
+- west pin provider 5f8fe91a → b4cc2077.
+
+Still open:
+1. T8.3 residual: process/scoped-fs/git real-bytes/Component;
+   compiler-AOT kit body for ops
 2. T8.4 residual: live SCRAM/PG success (qualification suite);
    pg component-link beyond pool
 3. T5.2 native guest record wire (deferred); W4 recursive values
