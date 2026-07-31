@@ -1,0 +1,198 @@
+[{:db/id -1
+  :adr/id "adr-2608019000-keyword-values-do-not-survive-a-json-boundary"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-01"
+  :adr/last_verified "2026-08-01"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2608019000: keyword の「値」は JSON 境界を越えない — 3度別々に踏んだ欠陥クラスと、実際に効く唯一の予防（往復でテストする）"
+  :adr/topic "json-boundary-keyword-values"
+  :adr/repos ["orgs/network-awai/nexus-x402"
+              "orgs/network-awai/cloud-itonami"]
+
+  :adr/authoritative_for
+  ["`:keywordize-keys true` / `json/parse-string s true` は**キーだけ**を戻し、**値には何もしない**という事実と、その帰結の正本"
+   "この欠陥クラスの症状: 例外を出さず、空にも見えず、**もっともらしい値**を返す。したがって型検査でも smoke test でも捕まらない"
+   "実際に効く唯一の予防: **手で組んだ fixture ではなく、実際の往復を通した値でテストする**。fixture を手書きした瞬間、テストは wire ではなく著者の思い込みを検証する"
+   "この規則が適用される境界の列挙（KV/D1 への JSON 永続化、worker 間の JSON API、`clj->js`/`js->clj`、`cheshire` の keywordize parse）"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+
+  :adr/related
+  ["90-docs/adr/2607300100-x402-credits-acceptance-session-and-duplicated-truth-defect-class.edn（同じ『欠陥クラスとして名前を付ける』形式の先行 ADR）"
+   "90-docs/adr/2607259800-token-economy-and-monetary-system-dynamics.edn（『静かに間違った数値を生む欠陥』の方法論。本 ADR はその一種を特定したもの）"
+   "90-docs/adr/2607321200-cloud-itonami-vertical-liquidity-pools-amm-shaped-token-economy.edn（instance 2 が発生した設計作業）"
+   "90-docs/adr/2607105200-portfolio-add-nexus-x402.edn（instance 3 が汚染していた :hyp/nexus-x402-agent-demand ゲート）"
+   "orgs/network-awai/cloud-itonami/src/cloud_itonami/edge/account_store.cljc（instance 1 の修正。値の再 keyword 化を実装済みで、本 ADR の模範）"]
+
+  :adr/problem
+  "**同じ欠陥を、この workspace は少なくとも3回、別々に踏んで別々に直している。** 共通の記述が無かったので、毎回ゼロから発見された。
+
+### 機構
+
+`clj->js` / `js/JSON.stringify` は keyword を文字列にする。読み側の `:keywordize-keys true`（および `cheshire` の `parse-string s true`）は **キーだけ** を keyword に戻し、**値には何もしない**。
+
+```clojure
+(-> {:agent-hint :agent} clj->js js/JSON.stringify js/JSON.parse
+    (js->clj :keywordize-keys true))
+;; => {:agent-hint \"agent\"}     ← キーは戻り、値は文字列のまま
+```
+
+書いたときの `:agent` は、読んだときには `\"agent\"` である。
+
+### 症状（これが厄介な理由）
+
+**例外を出さない。空にも見えない。もっともらしい値を返す。**
+
+- keyword と比較する `case` / `=` / set 参照は静かに false になる
+- `update` / `assoc` は新しい文字列キーを作り、既存の keyword バケットを 0 のまま残す
+- lookup は miss し、それは「そこには何も無かった」と区別が付かない
+
+したがって **型検査でも、例外監視でも、smoke test でも捕まらない。** 捕まるのは数字を実データと突き合わせたときだけで、多くの場合それは誰もやらない。
+
+### 実際に踏んだ3例
+
+| # | 日付 | 場所 | 症状 |
+|---|---|---|---|
+| 1 | 2026-07-26 | `cloud-itonami/edge/account_store.cljc` | 「書けたのに全フィールドが nil で読める」→ **サインインが常に失敗**。ns 自身が『例外にならないので気付きにくい』と記録 |
+| 2 | 2026-08-01 | `cloud-itonami/vertical_revenue.cljc` | path lookup が往復後に**必ず miss**。miss は「そのリソースには記録が無い」と同形なので、`revenue-known = pass` で**自信のあるゼロ**を返し、envelope が永久に seed floor に張り付く |
+| 3 | 2026-08-01 | `nexus-x402/settlements.cljc` | `agent-hint-breakdown` が永続 settlement を全て数え落とし `{:agent 0 :human 0 :unknown 0 \"agent\" 1}` を返す。これが `/stats` 経由で **`:hyp/nexus-x402-agent-demand` 事業仮説ゲート**に入っていた |
+
+**instance 1 は正しく直っており（`(some-> ... keyword)` で値を再 keyword 化）、本 ADR の模範である。** 問題は、その知見がその ns の docstring の中にしか無く、隣の repo が同じ穴に落ちたことである。
+
+### なぜテストが通り続けたか
+
+**3例とも、テストは手で組んだ fixture に対して書かれていた。** fixture は著者が「こう来るはず」と思う形で書かれるので、**テストは wire ではなく著者の思い込みを検証する。** instance 2 と 3 では、既存スイート（それぞれ 1330 / 47 テスト）が全部緑のまま、本番の値が間違っていた。"
+
+  :adr/decision
+  "### 1. 事実として固定する
+
+**`:keywordize-keys true` は値を戻さない。** `cheshire` の `parse-string s true` も同じ。JSON を跨いだ時点で、keyword だった値は文字列である。**「型が合っているはず」で通さない。**
+
+### 2. 書く側で keyword 値を避けるか、読む側で正規化するか、どちらかを必ず選ぶ
+
+どちらでもよいが、**選んだことがコードから読めること**。
+
+- **読み側で正規化**（instance 1 と 3 が採った形。既存データも直るので移行バッチが要らない）
+
+  ```clojure
+  (defn normalize-hint [h]
+    (let [k (cond (keyword? h) h (string? h) (keyword h) :else nil)]
+      (if (contains? known-hints k) k :unknown)))   ; 未知は独自バケットを作らず fail-safe
+  ```
+
+- **書き側で文字列にする**（新しい面ならこちらが単純。ただし既存データは読み側の対応が要る）
+
+**未知の値は独自バケットを作らせない。** 呼び出し元は形（キー集合）に依存しているので、`:unknown` 等の既存の「記録が無い」表現に寄せる。
+
+### 3. 予防は1つしかない — **往復でテストする**
+
+**手で組んだ fixture を使ったテストは、この欠陥に対して無力である。** 3例がそれを実証した。
+
+```clojure
+;; ❌ 著者の思い込みを検証している
+(def fixture {:agent-hint :agent})
+
+;; ✅ wire を検証している
+(def fixture
+  (js->clj (js/JSON.parse (js/JSON.stringify (clj->js (write-side-value))))
+           :keywordize-keys true))
+```
+
+**新しい回帰テストは、修正前のコードで実際に落ちることを確認してから landing する。** 前後どちらでも通るテストは、この欠陥に対しては何も守っていない（instance 2 と 3 ではいずれも revert して落ちることを確認した）。
+
+### 4. 適用範囲
+
+この境界を跨ぐ全ての経路:
+
+- Cloudflare KV / D1 への JSON 永続化（`js/JSON.stringify (clj->js …)` → `js->clj … :keywordize-keys true`）
+- worker 間の JSON API（nexus-x402 の `/admin/*` → cloud-itonami の `nexus-request!` 等）
+- `cheshire/parse-string s true` を使う JVM 側の HTTP consumer
+- **EDN 永続化はこの規則の対象外**（EDN は keyword を保つ）。JSON かどうかで判断する
+
+### 5. `clj->js` の別の落とし穴も同じ箇所にある（instance 1 が記録済み）
+
+`clj->js` は**名前空間付き keyword の名前空間を捨てる**（`:account/address` → `\"address\"`）。値だけでなくキーでも壊れるので、名前空間付きキーを JSON に載せるときは `:keyword-fn` を渡す:
+
+```clojure
+(js/JSON.stringify (clj->js x :keyword-fn (fn [k] (subs (str k) 1))))
+```"
+
+  :adr/implementation
+  "{:done
+    [{:instance 1 :date \"2026-07-26\" :where \"cloud-itonami/edge/account_store.cljc\"
+      :fix \"->json に :keyword-fn、->clj で値を (some-> ... keyword) 再 keyword 化。名前空間が落ちた旧データも読む\"
+      :note \"本 ADR の模範。ただし知見がこの ns の docstring 内に留まったことが instance 2/3 を招いた\"}
+     {:instance 2 :date \"2026-08-01\" :where \"cloud-itonami/vertical_revenue.cljc\"
+      :fix \"network-awai/cloud-itonami 697d9bb6 — :by-path のキーを文字列へ正規化してから lookup。非文字列 path は :path-not-a-string で refuse\"
+      :verified \"回帰テスト4件（keywordize 済みの形 / 両形の一致 / 非文字列 path / cheshire 実往復）が修正前のソースで FAIL することを revert して確認\"}
+     {:instance 3 :date \"2026-08-01\" :where \"nexus-x402/settlements.cljc\"
+      :fix \"network-awai/nexus-x402 f83ddda — normalize-hint が両形を受け、未知は独自バケットを作らず :unknown\"
+      :verified \"振る舞いで確認: 修正前 {:agent 0 :human 0 :unknown 0 \\\"agent\\\" 1} / 修正後 {:agent 1 :human 0 :unknown 0}\"
+      :collateral \"同じ境界で兄弟関数を点検し無傷を確認 — :path / :source / :payer は値も文字列なので revenue-by-path・source-breakdown・demand-summary は影響なし\"}]
+    :not-done
+    [{:what \"cloud-itonami の edge/ 配下で keywordize-keys を使う残り約12 ns の監査\"
+      :why \"推論で広く浅く断定すると、この ADR が戒めている『もっともらしいが未検証の主張』そのものになる。実往復で1つずつ確かめる必要があり、1セッションに収まらない\"
+      :how \"各 ns について『keyword 値を書いているか』→『読み側で keyword と比較しているか』の2点を実往復で確認する\"}]}"
+
+  :adr/known-gaps
+  "[{:gap \"残り約12 ns（cloud-itonami edge/）が未監査\"
+     :note \"account_store・vertical-revenue は確認済み。billing.cljc は clj->js を送信 body にしか使っておらず永続化していないので対象外。他は未確認\"}
+    {:gap \"この規則を機械的に検査する手段が無い\"
+     :note \"clj-kondo の lint では『keyword 値を書いて keyword で読む』を跨いだ検出はできない。往復テストを書く規律に依存している\"}
+    {:gap \"instance 1 の知見が3か月近く1 ns の docstring に留まっていた理由は分析していない\"
+     :note \"本 ADR はその再発を止めるために書かれたが、『知見が横に伝わらない』こと自体の対処ではない\"}]"
+
+  :adr/body
+  "# ADR-2608019000: keyword の「値」は JSON 境界を越えない
+
+## 一行で
+
+**`:keywordize-keys true` はキーだけを戻す。値には何もしない。** 書いたときの `:agent` は、読んだときには `\"agent\"` である。
+
+## なぜ ADR にするか
+
+**同じ欠陥を3回、別々に踏んで別々に直した。** 1例目は正しく修正され、その ns の docstring に丁寧な記録まで残っていた —— しかしそれは**その ns の中にしか無く**、2か月後に隣の repo が同じ穴に落ちた。
+
+知見が1ファイルの docstring に留まると横に伝わらない。だから面を1つ上げる。
+
+## 症状
+
+**例外を出さない。空にも見えない。もっともらしい値を返す。**
+
+| 実例 | 見え方 |
+|---|---|
+| account_store | 書けたのに全フィールドが nil → **サインインが常に失敗** |
+| vertical-revenue | lookup が必ず miss → 「記録が無い」と同形なので **自信のあるゼロ** |
+| agent-hint-breakdown | 全バケット 0 のまま + 文字列キーが増える → **事業仮説ゲートが常に 0** |
+
+3つとも、型検査でも例外監視でも smoke test でも捕まらない。**数字を実データと突き合わせたときだけ**捕まる。
+
+## 予防は1つしかない
+
+**手で組んだ fixture は、この欠陥に対して無力である。**
+
+fixture は著者が「こう来るはず」と思う形で書かれる。だから **テストは wire ではなく著者の思い込みを検証する。** instance 2 と 3 では、既存スイートが全部緑のまま本番の値が間違っていた。
+
+```clojure
+;; ❌ 思い込みを検証している        ;; ✅ wire を検証している
+{:agent-hint :agent}               (round-trip {:agent-hint :agent})
+```
+
+そして **新しい回帰テストは、修正前のコードで実際に落ちることを確認してから landing する。** 前後どちらでも通るテストは、この欠陥に対して何も守っていない。
+
+## 何を直すか
+
+読み側で正規化するか、書き側で文字列にするか、**どちらかを選んだことがコードから読めること**。未知の値は独自バケットを作らせず、既存の「記録が無い」表現（`:unknown` 等）に寄せる —— 呼び出し元は形に依存している。
+
+## 対象外
+
+**EDN 永続化はこの規則の対象外。** EDN は keyword を保つ。JSON かどうかで判断する。
+
+## 正直に残す
+
+**cloud-itonami の edge/ 配下には `keywordize-keys` を使う ns がまだ約12ある。** 監査していない。推論で広く浅く「たぶん大丈夫」と書くことは、この ADR が戒めている当のことなので、**未監査は未監査として残す。**"}]
