@@ -2818,6 +2818,39 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fn — css T5.2 guest records form-A)
+
+- css#5 MERGED (`5cdc74fb`): **css_core** multi-arg pure → guest records
+  (`:css/number-value` / `:css/declaration` / `:css/declarations-from` /
+  `:css/rule`). Internal calls + parity / form-A oracle via `record-new`.
+  Compiler pin → `98b56bdb` (record-new/get sugar). No `:export` so KIR
+  zero-arg case harness keeps working.
+  Evidence: 19 tests / 200 assertions green.
+- west pin css `4654260a` → `5cdc74fb`
+
+Still open:
+1. css_document multi-arg fold (decl / rule-doc / render-decls); html / shitsuke
+2. T8.3 residual: full multi-export request-edn reject composition; W4 recursive ADT
+3. T8.4 residual; murakumo seats-record-go / option-string-in-record
+
+
+## Progress (2026-08-01fm — T8.3 reject-path edn_quoted Component)
+
+- provider main `d8382c33`: **T8.3 ADR 0214** — reject-path `edn_quoted`
+  Component via kotoba-component `:edn-quoted` (#103). UTF-8 quote/backslash
+  scan; empty on reject else wrap. Full multi-export request-edn reject
+  composition still open. `:wasm-aot` stays `:partial`.
+  Evidence: registry sha tests + live wasmtime ok/reject.
+- west pin provider `644e7fe1` → `d8382c33`
+
+Still open:
+1. T8.3 residual: full multi-export request-edn reject composition;
+   true set / W4 recursive ADT; full multi-file kit body
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. design-system T5.2 multi-arg residual (css form-A landed this tick; document /
+   html / shitsuke remain)
+
+
 ## Progress (2026-08-01fl — com-cloudflare-compat T5.2 guest records)
 
 - com-cloudflare-compat main `aaaf6291`: **parse-nat / fact-attr / id-with-prefix**
