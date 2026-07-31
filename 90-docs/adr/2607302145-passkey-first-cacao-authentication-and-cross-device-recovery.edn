@@ -1,0 +1,301 @@
+[{:db/id -1,
+  :adr/id "adr-2607302145-passkey-first-cacao-authentication-and-cross-device-recovery",
+  :adr/title "ADR-2607302145: itonami.cloud / kotobase.net は Passkey-first、CACAO authorization、複数端末・復旧可能な account identity を採用する",
+  :adr/status "accepted; target architecture, current implementations partially conform",
+  :adr/doc_type "adr",
+  :adr/date "2026-07-30",
+  :adr/deciders ["Jun Kawasaki (+ Codex)"],
+  :adr/topic "passkey-first-cacao-cross-device-recovery",
+  :adr/related ["adr-2607252000-authn-kotobase-net"
+                "cloud-itonami-adr-0030-workspace-cloud-m365-scale-architecture"
+                "cloud-itonami-adr-0038-zero-access-mailbox-encryption"],
+  :adr/supersedes [],
+  :adr/superseded_by [],
+  :adr/repos ["com-junkawasaki/root"
+              "network-awai/cloud-itonami"
+              "network-awai/net-kotobase"
+              "kotoba-lang/webauthn"
+              "kotoba-lang/authentication"],
+  :adr/authoritative true,
+  :adr/authoritative_for ["itonami.cloud と kotobase.net の人間向け標準認証方式"
+                          "Passkey と CACAO / SIWE の責務分離"
+                          "別端末ログイン、複数 credential、端末紛失時復旧の要求"
+                          "WebAuthn user verification と backup-state の最低保証"
+                          "Passkey-gated server custody と self-custodied CACAO の境界"],
+  :adr/last_verified "2026-07-30",
+  :adr/source-format "edn-only (ADR-2607171600)",
+  :adr/primary-sources ["W3C Web Authentication Level 3, Credential Backup State and Credential Loss and Key Mobility: https://www.w3.org/TR/webauthn-3/"
+                        "Apple Platform Security, iCloud Keychain security overview: https://support.apple.com/guide/security/icloud-keychain-security-overview-sec1c89c6f3b/web"
+                        "Google Chrome Help, Manage passkeys in Chrome: https://support.google.com/chrome/answer/13168025"
+                        "FIDO Alliance, Synced Passkey Deployment — Emerging Practices for Consumer Use Cases: https://fidoalliance.org/wp-content/uploads/2024/05/Synced-Passkey-Deployment_-Emerging-Practices-for-Consumer-Use-Cases_2024-May-31.pdf"
+                        "network-awai/cloud-itonami resources/site/signin.js and src/cloud_itonami/edge/webauthn.cljc @ working tree inspected 2026-07-30"
+                        "network-awai/net-kotobase authn/resources/authn/passkey.js, authn/src/authn/{passkey,worker,account}.cljs @ working tree inspected 2026-07-30"
+                        "Live GET https://itonami.cloud/signin/, https://itonami.cloud/onboarding/, and https://authn.kotobase.net/sign-in on 2026-07-30"],
+  :adr/known-gaps ["cloud-itonami の WebAuthn browser request は userVerification=preferred で、edge verifier は authenticatorData の UP bit は検証するが UV bit を抽出・必須検証していない。"
+                   "cloud-itonami の workforce account は単一 :account/did を主に保持し、利用者が自分で複数 Passkey を列挙・追加・失効する account-level credential management と完成した recovery UI が無い。"
+                   "cloud-itonami の古い product-specific Passkey 導線には residentKey=preferred と localStorage credential-id 依存が残る。正本の /signin は residentKey=required と discoverable login に進んでいるが、全導線は統一されていない。"
+                   "kotobase の browser request も userVerification=preferred を指定している。target は required であり、client option、verifier、contract test の三者を同じ policy に固定する必要がある。"
+                   "kotobase の Passkey bridge が使う Ed25519 key は server-custodied で、AUTHN_KEK と credential storage を同時に支配する認証基盤は利用者として署名できる。Passkey-gated は zero-knowledge / self-custody を意味しない。"
+                   "両サービスとも WebAuthn BE/BS flag の保存・表示・policy evaluation と、単一端末 credential しか持たない account への予備 factor 登録要求が未完成。"
+                   "同期 Passkey の PRF 出力が provider 内の別端末で同一かは provider / authenticator 実装に依存する。通常ログインの可搬性と zero-access mailbox keyslot の可搬性を同一視しない。"],
+  :adr/verification "Read-only audit。2026-07-30 に現行 source、生成済み browser assets、live sign-in pages、W3C WebAuthn Level 3、Apple iCloud Keychain、Google Password Manager、FIDO Alliance の一次資料を突合した。本ファイル単体は cljs.reader で tx-data 1 entity として parse 済み。repo-wide docs-edn-only verify は本ファイルを parse error / not-tx / split-string に挙げなかったが、既存の別ファイルに parse-errors 18、not-tx 7、split-strings 2、path-md-refs 6 があり全体としては FAIL。認証 ceremony の変更・本番 deploy・別端末での実機 E2E は本 ADR 作成時には実施していない。",
+  :adr/body
+  "## Context
+
+オーナーの問いは二つだった。
+
+1. 現行の `cloud-itonami`（canonical host は `itonami.cloud`）と
+   `kotobase.net` は Passkey と SIWE のどちらを基本認証としているか。
+2. その設計はモダンな環境で最も安全・安定か。別端末でも同じ identity に
+   ログインするには何が必要か。
+
+現行の責務は次のように分かれている。
+
+    human authentication UX: WebAuthn Passkey
+                         ↓ verified ceremony
+    service credential: did:key / CACAO
+                         ↓ scoped, short-lived authorization
+    application API: tenant/account/resource operation
+
+したがって **Passkey と SIWE は競合する二択ではない**。Passkey は人間の
+authentication ceremony、CACAO は downstream authorization credential である。
+SIWE / Ethereum EIP-191 は kotobase が受理できる CACAO signer の一つだが、
+Ed25519 `did:key`、EIP-1271、BIP-322 と並ぶ option であり、標準 browser UX
+ではない。
+
+Passkey は phishing-resistant で、site ごとに異なる公開鍵 credential を使うため、
+password credential stuffing と reusable secret の漏洩を構造的に減らす。一方、
+Passkey を採用しただけでは端末紛失、provider account 喪失、単一 credential、
+account recovery、server-side custody の問題は解決しない。W3C WebAuthn Level 3
+自身が、single-device credential しかない account には追加 authenticator または
+recovery process を用意し、同一 account に複数 credential を登録できるようにする
+ことを推奨している。
+
+## Observed current state
+
+### itonami.cloud
+
+- `/signin/` は勤務先 email で tenant を発見し、初回だけ single-use initial
+  password を Passkey enrollment ticket に交換する。二回目以降の標準ログインは
+  Passkey。
+- canonical `/signin/` の新規 registration は `residentKey: required` と
+  `requireResidentKey: true`。別端末で local credential id が無い場合は
+  `allowCredentials` を省略し、synced / discoverable Passkey または QR cross-device
+  picker に発見させる。
+- 古い non-discoverable credential を救うため、同じ端末では credential id を
+  localStorage に保持して allow-list hint として使う。これは legacy fallback であり、
+  account authority ではない。
+- verified Passkey の server-side bridge は KEK-wrapped Ed25519 key から短命 CACAO
+  を mint し、API は `Authorization: CACAO ...` を受ける。
+- client は `userVerification: preferred`。server verifier は origin、RP ID hash、
+  UP、signature、sign counter を検証するが、UV bit を policy として必須化していない。
+- workforce account は単一 DID を中心にした形で、複数 Passkey inventory と
+  self-service recovery は完成していない。ADR-0030 の maturity ledger も recovery、
+  device trust、risk session を未達としている。
+
+### kotobase.net
+
+- browser は `authn.kotobase.net` の Passkey が第一導線。email one-time code と
+  self-custodied CACAO は alternative credential path。
+- registration は `residentKey: required`、login は空の `allowCredentials` で
+  discoverable credential を選ぶため、synced Passkey と cross-device authentication
+  に適した shape。
+- Passkeyごとに server-custodied Ed25519 `did:key` が生成され、AES-256-GCM で
+  `AUTHN_KEK` 下に wrap される。assertion 成功後だけ unwrap して CACAO を mint する。
+- credential identity と account identity は分離されている。既存 session を保持した
+  状態で二つ目の credential ceremony を完了すると、同じ account DID に link される。
+- これは利用者にとって managed identity であり wallet ではない。storage と KEK を
+ 支配できる server compromise に対する self-custody は提供しない。sole custody が
+ 必要な caller は自分の `did:key` / wallet で CACAO を発行する。
+
+## Decision
+
+### D1. 人間向け標準は Passkey-first、SIWE-first にはしない
+
+`itonami.cloud` と `kotobase.net` の browser UX は Passkey を第一導線とする。
+password は恒久 credential にしない。cloud-itonami の initial password は一回限りの
+enrollment bootstrap に限定する。email code は recovery / alternative proof であり、
+Passkey より上位の保証とは呼ばない。
+
+SIWE wallet prompt を一般利用者の既定にしない。self-custodied CACAO は CLI、agent、
+wallet、規制・sovereignty 要件を持つ caller の明示的 alternative とする。
+
+### D2. CACAO は authentication UX ではなく短命・scope付き authorization とする
+
+Passkey assertion を arbitrary SIWE plaintext への署名として扱わない。WebAuthn は
+`authenticatorData || SHA-256(clientDataJSON)` に署名するため、assertion を独立検証し、
+その後に service key で CACAO を mint する現行 bridge を維持する。
+
+発行する CACAO は以下を満たす。
+
+- 短命である。
+- audience、tenant、resource、capability を明示する。
+- nonce を単回使用とし replay を拒否する。
+- 別サービス・別resource用 CACAO の capability confusion を拒否する。
+- browser session へ交換した場合も session rotation、logout-all、revocation を持つ。
+
+### D3. account identity と credential identity を分離する
+
+人間・組織の account identity は Passkey credential ID や、その credential に対応する
+`did:key` と同一にしない。一つの account は複数の linked credential を持てる。
+
+    account
+      ├─ synced Passkey A
+      ├─ hardware security key B
+      ├─ device-bound Passkey C
+      └─ pre-verified recovery identity（policy が許す場合）
+
+Passkey の追加・交換・失効で account DID、tenant ownership、billing identity、
+audit ownership が変わってはならない。kotobase の account DID / active DID 分離を
+共通 target とし、cloud-itonami の単一 `:account/did` model は account-level
+credential collection へ移行する。
+
+### D4. 新規 credential は discoverable を必須とする
+
+browser registration は `residentKey: required` とする。login は account enumeration
+を避けながら、原則空または省略した `allowCredentials` で authenticator picker に
+discoverable credential を選ばせる。
+
+legacy non-discoverable credential の credential-id hint は移行互換として保持してよいが、
+localStorage を account authority、唯一の復旧情報、または長期 identity store にしない。
+
+### D5. user verification を client と server の両方で必須化する
+
+通常の account login、credential enrollment、credential removal、recovery factor 変更、
+high-risk authorization は `userVerification: required` とする。server は assertion の
+UV bit を必ず抽出し、UV=false を拒否する。UP=true だけでは『認証器に触れた』ことしか
+保証せず、PIN・生体認証・端末unlockによる user verification を保証しない。
+
+互換性のためにUVを任意にする lane が必要なら、同じ『signed in』保証として混ぜず、
+明示的な lower-assurance session とし、機密データ・billing・credential management・
+tenant administration を拒否する。既定 lane を可用性のため黙って `preferred` に
+落とさない。
+
+### D6. 別端末ログインは synced Passkey と WebAuthn cross-device を標準とする
+
+別端末での正常系は二つ。
+
+1. 同じ Passkey provider に同期済み:
+   - Apple Account + iCloud Keychain
+   - Google Account + Google Password Manager
+   - 同じ 1Password 等の vault
+   - 新端末の picker で同じ discoverable Passkey を選ぶ。
+2. 同期していない:
+   - browser の『スマートフォンを使用』『別のデバイス』を選ぶ。
+   - 既存 phone で QR を読み、近接 cross-device authentication を行う。
+
+QR login は credential を新端末へ複製しない。新端末を独立して使い続けるなら、
+QRで作った live session の直後に recent-auth を要求して新しい Passkey を同じ
+accountへ追加する。
+
+RP ID は origin identity なので、`itonami.cloud` の credential は typo host
+`cloud.itonami` や別domainでは使えない。kotobase は
+`authn.kotobase.net` を RP ID とする。
+
+### D7. 一つの端末・一つのproviderを復旧計画にしない
+
+全 account は最低二つの独立した access path を持つ。
+
+- 一般利用者: synced Passkey + recovery用 hardware key または別provider Passkey。
+- tenant administrator / billing owner: device-bound hardware keyを二本、別々に保管。
+  synced Passkeyを日常用に併用してよいが、それだけを唯一のadmin recoveryにしない。
+- service / agent: self-custodied keyの暗号化backupと明示的rotation。人間のPasskey
+  recoveryと混ぜない。
+
+SMSを唯一の recovery factor にしない。email recoveryを使う場合は、accountが正常な
+うちに verified identity として linkし、短命・単回code、rate limit、通知、recent
+activity auditを必須とする。admin / credential resetはemail単独で即時実行せず、
+第二factor、管理者承認、または時間遅延付き audited recoveryを要求する。
+
+### D8. BE / BS と credential inventory を保存・表示する
+
+server は WebAuthn authenticatorData の Backup Eligibility (BE) と Backup State (BS)
+を registration / authentication ごとに保存する。
+
+- BE=0 の single-device credential しかない account には、第二credential登録を促す。
+- BE=1, BS=0 は同期可能だが未backupとして扱う。
+- BSが1から0へ変わった場合、復旧経路を再確認させる。
+- credential management UI は provider推測ではなく、credential名、作成日時、
+  最終利用、BE/BS、transport、失効状態を表示する。
+- credential追加・削除には recent UV-authenticated session を要求する。
+- 最後の有効credentialを、別の復旧経路なしに削除できない。
+
+### D9. server custody は明示し、強化する
+
+Passkey-gated server-custodied Ed25519 key を wallet / self-custody / zero-access と
+表示しない。managed UXとして維持する場合は:
+
+- global secret一つへの依存を縮小し、versioned wrapping keyとrotationを持つ。
+- 可能な環境では KMS / HSM または同等の non-exportable key boundary を使う。
+- credentialごとまたはaccountごとのwrapped data keyを使い、master key rotationで
+  全credentialを一括再暗号化しなくてよい envelope encryption にする。
+- unwrap / sign を assertion成功後の短い処理に限定し、監査eventを残す。
+- service compromise が利用者として署名できる residual risk を threat model と
+  product UI に書く。
+
+sovereigntyを必要とする利用者には self-custodied `did:key` / SIWE / hardware wallet
+CACAO laneを残す。managed laneとself-custodied laneは同じ wire verificationに収束して
+よいが、custody assuranceは別々に表示する。
+
+## Consequences
+
+### Positive
+
+- phishing、credential stuffing、password reuseへの耐性が高い。
+- everyday userはFace ID / Touch ID / Windows Helloで入れる。
+- synced Passkeyにより端末交換と単一端末紛失に強くなる。
+- hardware keyと複数credentialによりprovider account喪失にも備えられる。
+- APIは一つのCACAO authorization modelを維持でき、browser、CLI、agent、walletを
+  downstreamで統一できる。
+- credentialの追加・失効がtenant/account identityを壊さない。
+
+### Costs and trade-offs
+
+- synced Passkeyはavailabilityを上げるが、Apple / Google / password-manager accountの
+  recovery securityを新しいtrust boundaryとして受け入れる。
+- hardware keyは強いが、二本の購入・保管・棚卸しが必要。
+- multiple credential、BE/BS、recovery、session assuranceのstate machineは、
+  単一DID/単一credentialより実装と監査が増える。
+- server-custodied signing keyはUXを簡単にする代わりに、認証service compromiseの
+  blast radiusを持つ。
+- `userVerification: required` はUVを持たない古いauthenticatorを拒否する。これは
+  silent downgradeではなく、明示的compatibility laneかcredential upgradeで扱う。
+
+## Delivery order
+
+1. 両browser clientを `userVerification: required` にし、serverでUV bitを必須検証する。
+2. regression test: UV=false、UP=false、wrong RP ID、wrong origin、challenge replay、
+   non-increasing counterをすべて拒否する。
+3. cloud-itonamiをaccount identity + credential collectionへ移行し、既存DID mappingを
+   accountを壊さず移送する。
+4. credential management UI/API（list、add、name、last-used、revoke）を両サービスに
+   用意する。
+5. BE/BSを保存し、single-device-only accountへbackup credential enrollmentを促す。
+6. old-device-present enrollment、QR login後のnew-device enrollment、provider同期、
+   hardware key二本、全端末喪失のrecoveryを実機E2Eする。
+7. audited recoveryとadmin policyを入れ、最後のcredential喪失をproduction runbookで
+   演習する。
+8. server custodyのwrapping key versioning、rotation、KMS/HSM boundaryを実装・検証する。
+
+## Acceptance criteria
+
+- 同じsynced Passkeyで二台以上から同じaccount DID / tenantへ入れる。
+- QR cross-device login後、新端末に第二Passkeyを追加して旧端末なしで再loginできる。
+- 二つの異なるcredentialが同じaccountにlinkされ、一方の失効後も他方で入れる。
+- UV=false assertionはsignatureが正しくても拒否される。
+- single-device credentialしかないaccountが無警告で『復旧可能』と表示されない。
+- credential inventoryとBE/BSが利用者・監査者から確認できる。
+- 最後のcredentialは代替factorなしに削除できない。
+- CACAOはscope外resource、期限切れ、nonce replayで拒否される。
+- managed custodyとself-custodyの違いがUI、docs、threat modelで明示される。
+
+## Non-decisions
+
+- Passkey providerをApple、Google、1Passwordのいずれか一社に固定しない。
+- synced Passkeyとdevice-bound hardware keyの一方だけを全利用者へ強制しない。
+  threat modelとroleで組み合わせる。
+- PasskeyをEthereum walletへ変換した、またはPasskeyがSIWE plaintextを直接署名した
+  とはみなさない。
+- zero-access mailboxのkey recoveryは本ADRだけでは決めない。通常login credentialが
+  別端末で使えることと、WebAuthn PRF-derived mailbox keyslotが別端末で同じsecretを
+  再現できることは別問題であり、ADR-0038の実機gateに従う。"}]
