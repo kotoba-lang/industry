@@ -2616,6 +2616,25 @@ Still open:
    option-in-record residual positional elsewhere); W4 recursive values
 
 
+## Progress (2026-07-31ec — T5.2 native guest record expansion config+connect)
+
+- murakumo main `5a41bd2b`: **T5.2 native guest record wire** for
+  **config** + **connect** —
+  `kotoba-dir-from` → `:config/kotoba-dir`, `kotoba-bin` → `:config/kotoba-bin`,
+  `resolve-local-bin` → `:config/local-bin`, `resolve-wit-dir` → `:config/wit-dir`;
+  `node-class-name` → `:connect/node-class`, `serves-plane?` → `:connect/plane`.
+  ADR-260731-w6-t52-native-record-config-connect.
+  Evidence: config/connect parity + call-record 26/291; authority 76/1487 green.
+- west pin murakumo `7a86e762` → `5a41bd2b`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 further expansion (provision/report multi-arg pure string builders;
+   option residual positional); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
