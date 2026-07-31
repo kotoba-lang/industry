@@ -1160,6 +1160,23 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31bb — T8.3 ops/network real-bytes pilot http-post)
+
+- provider#46 MERGED (`eeab5058`): **T8.3 ADR 0162** — ops/network real
+  non-fixture Wasm package pilot for http-post (`http-post-v1.wasm` host-import
+  forwarder; digest-matched registry; kit `:wasm-aot :partial`). Readiness
+  `:signed-wasm :pending` (pure-allowlist publisher policy does not cover ops).
+  Evidence: 63 tests / 388 assertions.
+- west pin provider f97168af → eeab5058.
+
+Still open:
+1. T8.3 residual: full AOT Component packaging for http/secret; secret real-bytes
+   pilot; ops publisher policy before `:signed-wasm :ready`
+2. T8.4 residual: live SCRAM/PG success (qualification suite);
+   Node expansion for fetch/headers; pg component-link beyond pool
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
