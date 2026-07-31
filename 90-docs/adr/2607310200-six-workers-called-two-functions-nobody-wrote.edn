@@ -3,7 +3,7 @@
   :adr/doc-type "adr"
   :adr/doc_type "adr"
   :adr/topic "marketplace-edge-run-outcome-and-worker-repair"
-  :adr/title "ADR-2607310200: marketplace actor の Worker 6本が「存在しない関数」を呼んでいた（edge/run・edge/outcome）— 実装・テスト・settlement Worker の修復と本番 deploy、および短払いの追い請求"
+  :adr/title "ADR-2607310200: marketplace actor の Worker 6本が「存在しない関数」を呼んでいた（edge/run・edge/outcome）— 実装・テスト・6本すべての修復と本番 deploy、および短払いの追い請求"
   :adr/status "accepted"
   :adr/date "2026-07-31"
   :adr/last-verified "2026-07-31"
@@ -19,7 +19,8 @@
    "settlement Worker に POST /captures・POST /refunds・GET /acceptances を追加する決定、および /captures が『PSP 署名を検証できない、CACAO が信頼境界』であることを明示する決定の正本"
    "settleops.store の capture 書き込みを『2件目は top-up、上書きではない』に変更する決定（assoc-in による先行入金の消失は実バグだった）の正本"
    "marketplace.acceptance/shortfall-minor・top-up-request・apply-top-up による短払いの追い請求の正本"
-   "governor の :duplicate-capture / :top-up-not-derivable 拒否の正本"]
+   "governor の :duplicate-capture / :top-up-not-derivable 拒否の正本"
+   "marketplace actor 6本すべての pin を marketplace 7ed9642 に前進させ、本番 Worker を再 deploy した記録（6本とも compile 0 warnings・全 suite 緑）の正本"]
   :adr/related "adr-2607309960-settlement-refunds-and-cljs-runtime-parity, adr-2607309800-settlement-funds-gate-unpaid-order-could-be-released, adr-2607309500-cloud-itonami-code-payment-acceptance-rail"
   :adr/body "
 # ADR-2607310200: 6本の Worker が存在しない関数を呼んでいた
@@ -129,11 +130,32 @@ top-up でない2件目は `:duplicate-capture` で名指し拒否、library が
   なるため）。
 - west pin を single-entry commit で前進（**`d5b68bd`**）。
 
+## 6本すべての修復（2026-07-31 完了）
+
+残り5本も同日中に修復・deploy した。各 repo は marketplace `2bdd9b6`（`edge/run` が
+存在しない pin）に留まっていたので、`7ed9642` へ前進させた:
+
+| actor | main | tests | compile | deployed version |
+|---|---|---|---|---|
+| onboarding | `639d360` | 37 / 129 | 0 warnings | `477120e4` |
+| returns | `107cb38` | 21 / 54 | 0 warnings | `705606fc` |
+| listing (buyer) | `0166a88` | 32 / 90 | 0 warnings | `80f82d9e` |
+| crossborder | `fc0da58` | 35 / 132 | 0 warnings | `6fbd5754` |
+| fulfillment | `4b900a7` | 22 / 64 | 0 warnings | `1326026e` |
+
+全 repo で `clojure -M:lint` 0 errors / 0 warnings、deploy 後の `/health` 200。
+**generic な `run` が6 actor すべてに対して正しいことを、pin を上げる前に確認した**:
+`check [request context proposal store]` / `gate [phase request disposition]` /
+`hold-fact [request context verdict]` / `verdict->disposition [verdict]` の
+arglist が6本とも一致している。west pin は5件を single-entry commit で前進
+（**`b3cfb01`**、1回目は 409 で弾かれ tip を読み直して再 PUT）。
+
+**auth を越えた先の動作は6本とも未検証**（本番 ref への書き込みになるため）。
+確認できているのは「compile が undeclared var を出さない」「deploy 後 `/health` が
+200」「未認証 POST が 401 = route が存在する」まで。
+
 ## 残る gap
 
-- **他の5 Worker は未修復**（onboarding / returns / listing / crossborder /
-  fulfillment）。`edge/run` が実装されたので**pin を上げれば直る**が、各 repo の
-  pin 前進・ビルド・deploy はまだ行っていない。**これが本 ADR 最大の未完項目**。
 - PSP 署名の検証は依然できない（D3。vendor repo の責務）。
 - 解放後の訂正経路（chargeback）は `resolve-dispute` の人間裁定のみ。
 - 収納代行 / 資金移動業の判断は owner のもの。
