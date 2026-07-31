@@ -515,9 +515,19 @@ step 8  curve と share の発行                                               
                 \"network-awai/nexus-x402 79f31ea (GET /admin/settlements/<seller> の :by-path fold)\"]
       :verified \"47 tests / 189 assertions green、clj-kondo 0 errors、shadow-cljs release worker 0 warnings\"
       :note \"lever thread-path-into-the-settlement-entry (5.95) の実装。消費側 billing_x402/snapshot! は応答全体を通すので無変更で :by-path を受け取る\"}
-     {:what \"11 lever の採点、θ(v) と envelope の数値表、LP 必要収益、fleet gap、0-event 上限\"
-      :how \"nbb --classpath orgs/kotoba-lang/dynamics/src <scratchpad>/{itonami_amm_rank,itonami_vlp_economics}.cljs\"
-      :note \"scratchpad で実行。loop-system-dynamics への namespace 追加は採択後\"}]
+     {:what \"envelope kernel — pooled capital のうち agent が焼いてよい額（θ の実装）\"
+      :commits [\"network-awai/cloud-itonami b24df79a (kernels/envelope)\"
+                \"network-awai/cloud-itonami 6a2ab4df (wasm twin が無いことを docstring に明記)\"]
+      :verified \"1323 tests / 8844 assertions、envelope 分は全通過。残り 19 failures は着手前と同一の既存セット\"
+      :note \"θ 自体は式から消える — θ = k·revenue/capital なので θ·capital = k·revenue。capital が約分され除算と divide-by-zero が消えた。refusal（revenue-known=0 なら revenue 引数を読まず seed floor に落ちる）がこの kernel の核心\"}
+     {:what \"vertical-revenue — :by-path を envelope の refusal flag に読み込む繋ぎ\"
+      :commits [\"network-awai/cloud-itonami 749abd7f\"]
+      :verified \"1330 tests / 8881 assertions、私の分は全通過。既存 19 failures は不変\"
+      :note \"別々に着地して繋がっていなかった2つを接続した。revenue-known が主張するのは『収益がゼロでない』ではなく『名乗る source から来た読める形で path 別 fold を持つ』。expected-source は既定値なしの必須引数（既定値が x402 の数字を Stripe 形の判断へ流す経路そのもの）。usd→micros は切り捨て。**下界であり θ には適するが LP 配当には適さない**（:unrecorded 分を稼いだ者を過少に払う）\"}
+     {:what \"lever ranking を再現可能にした\"
+      :commits [\"kotoba-lang/loop-system-dynamics 50ca93b / merge 6323eed\"]
+      :verified \"8 tests / 102 assertions\"
+      :note \"11 反復ぶん、本 ADR が引用するスコアはセッション用一時ファイルにしか無かった。honesty 制約を prose でなくテストが持つ（却下項目の分離 / 全体最高スコアが却下項目である assert / dynamics.core との一致 / landed と designed の区別 / 0-event 上限）\"}]
     :not-done-deliberately
     [{:what \"share / curve / splitter のデプロイ、資金の移動\"
       :why \"CLAUDE.md 安全床②。加えて ADR-2607320500 の反転はオーナーと弁護士の判断\"}
@@ -525,15 +535,32 @@ step 8  curve と share の発行                                               
       :why \"本 ADR は設計であり、step 1 の採否をオーナーが決める前に本番面を増やさない\"}
      {:what \"cloud-itonami-app の authority / funding への変更\"
       :why \"不変条件2と4の作り直しを含むので、実装前に設計判断が要る\"}]
+    :chain-status
+    \"純関数の連鎖はここまで繋がった（2026-08-01）。**ただし本番の呼び出し元は依然ゼロである。**
+
+     gateway settle → :path 記録 ✅ → /admin/settlements の :by-path ✅
+       → snapshot! が素通し ✅ → vertical-revenue が refusal 付きで読む ✅
+       → kernels/envelope が枠を決める ✅
+       → ??? 誰も呼んでいない                                      ← 未接続の最後の1本
+
+     未接続の端は step 3（envelope を authority に載せる）1本に減った。それ以外の
+     未着地項目は全て owner 判断待ちである（下記 :next の :blocked-by を参照）。\"
     :next
-    [{:step 1 :what \"itonami.cloud/.well-known/x402\" :blocked-by nil}
-     {:step 2 :what \"settlement-record に vertical 次元\" :blocked-by nil}
-     {:step 3 :what \"envelope proposal 型（policy digest + 単調カウンタ + auto-halt、admission は policy.kotoba）\" :blocked-by \"設計判断\"}
-     {:step 4 :what \"θ(v) 実装\" :blocked-by \"step 3\"}
+    [{:step 1 :what \"vertical ごとに gateway seller rule を別 path-prefix で登録する（discovery 文書ではない — §4b/§4c）\"
+      :blocked-by \"tier 境界を引く実測データが無い（外部有償 0）。owner 判断\"}
+     {:step 2 :what \"（着地済み）settlement に vertical 次元 = :path\"
+      :status :landed :commits [\"nexus-x402 5349cea / 79f31ea\"]}
+     {:step 3 :what \"envelope proposal 型（policy を束縛する digest + 単調カウンタ + auto-halt）\"
+      :blocked-by \"authority.clj の不変条件2（CONTENT BINDING）と4（SINGLE USE）の作り直しを含む。card/eSIM/voice/payment が依存する consent 背骨なので owner レビューを要する\"
+      :note \"**これが未接続の最後の1本である。** 決定層（kernels/envelope + vertical-revenue）は着地済みで、欠けているのは authority 側の受け口だけ\"}
+     {:step 4 :what \"（着地済み）θ 実装 = kernels/envelope + vertical-revenue\"
+      :status :landed :commits [\"cloud-itonami b24df79a / 6a2ab4df / 749abd7f\"]}
      {:step 5 :what \"replay slashing harness\" :blocked-by \"step 3\"}
-     {:step 6 :what \"情報預入の vest 規則\" :blocked-by \"step 5 + 台帳の帰属粒度の確認\"}
+     {:step 6 :what \"情報預入の vest 規則（vertical 粒度なら今日のスキーマで可能）\" :blocked-by \"step 5\"}
      {:step 7 :what \"actuation path\" :blocked-by \"意図的除外。資格・credential・custody\"}
-     {:step 8 :what \"curve と share\" :blocked-by \"ADR-2607320500 の再検討（オーナー + 弁護士）\"}]}"
+     {:step 8 :what \"curve と share\" :blocked-by \"ADR-2607320500 の再検討（オーナー + 弁護士）\"}
+     {:step :x :what \"settlements の DO 直列化（LP 配当の前提条件）\"
+      :blocked-by \"x402.nexus は live 本番カスタムドメインで、DO migration は実質不可逆。現在の settlement 流量ゼロの潜在欠陥であり、本番決済インフラの構成変更は owner 判断\"}]}"
 
   :adr/open-decisions
   "[{:id :side-c-vs-custody
