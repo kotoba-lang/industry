@@ -143,6 +143,62 @@ multistream-select 1.0.0、stream muxer（Yamux）、identify、k-bucket routing
 
 ## Consequences
 
+## 2026-07-31 追記 — gateway 面と本番デプロイ
+
+`tech-ipfs-specs-http-gateway`（新規、25 tests / 81 assertions）を足し、
+**kotobase.net の公開 archive gateway に本番デプロイした**（Version
+`de315c12`）。
+
+### 直した実欠陥
+
+`clj-edge/src/kotobase/b2_write.cljc` の `serve-archive-target` の proxy
+fallback が `(if (= target-type "ipfs") "public, max-age=300" "public,
+max-age=60")` を直書きしていた。両方とも損の大きい方向に誤り:
+
+- **`/ipfs/` は immutable なのに 5 分**。識別子がバイト列のハッシュなので変わり
+  ようがなく再検証は無駄なのに、上流ゲートウェイから毎時12回・永久に同じバイト列を
+  取り直していた。content addressing の最大の利点を捨てていた。すぐ上の B2 ヒット
+  経路（`immutable-resp`）は正しく immutable を付けており、**proxy fallback だけが
+  誤っていた** —— 本番は `KOTOBASE_B2_ARCHIVE_CIDS=0` なので、そこが全
+  `/ipfs/` `/ipns/` リクエストのホットパスだった。
+- **`/ipns/` は 60 秒固定**で TTL を無視。この Worker は解決せず proxy するので
+  レコードを持たない ⇒ 上流の `Cache-Control` から TTL を読み、自分の境界で
+  再クランプする（`upstream-max-age` + `gateway.cache`）。
+
+### live 検証（2026-07-31）
+
+    /ipfs/  cache-control: public, max-age=29030400, immutable
+            etag: W/"bafkrei…" / x-ipfs-path / accept-ranges
+    /ipns/  cache-control: public, max-age=60, stale-while-revalidate=60
+
+デプロイ直後の1リクエストが旧ヘッダを返したため24回サンプリング → **24/24 が新
+ヘッダ**（Cloudflare のバージョン伝播中の一過性）。回帰確認: `/` `/health`
+`/.well-known/did.json` `/explore/ipfs/…` すべて 200。
+
+### 検証の限界（正直に）
+
+**clj-edge 自身のテストは実行できていない。** `shadow-cljs.edn` が
+`:node-test` は `kotobase.edge-cacao` 経由で require 時にクラッシュする
+（multiformats@13 が ESM-only、CJS shim が読めない）と自ら記録している既存問題。
+今回の検証は **ビルド成功 + ライブラリ側 25/81 + live HTTP** の3点で、
+**リポジトリ内の統合テストは含まない**。
+
+### 副次的に見つけて直した既存不整合
+
+`worker/package-lock.json` が自分の `package.json` と矛盾していた
+（package.json は wrangler 4.112.0 / workers-types 5.20260719.1 を exact pin、
+lock は 4.99.0 / 4.20260611.1）。結果 **`npm ci` が worker/ で一切動かず**、
+再現可能インストール経路が壊れていた。regenerate して解消（依存の引き上げではなく、
+package.json が既に宣言していた版に lock を合わせただけ）。
+
+### プレーン切替の現在地
+
+**`net-kotobase` の解決経路そのものはまだ切り替えていない。** 今回入れたのは
+gateway のキャッシュ方針であり、`gateway.resolve` のプレーン router
+（k51 → DHT、それ以外 → registry）は**ライブラリとしては存在するが clj-edge には
+未配線**。kotobase の graph 名は k51 ではないので、配線しても今日の挙動は変わらない
+（それが migration であって cutover でないという設計の要点）。
+
 **残る穴（優先順）:**
 
 1. **libp2p transport**（上記の名指しリスト）。これが埋まると `kad.message` +
