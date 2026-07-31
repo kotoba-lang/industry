@@ -2755,6 +2755,28 @@ Still open:
    W4 recursive values
 
 
+## Progress (2026-07-31ej — T5.2 native guest record infer-engine residual)
+
+- murakumo main `f165a877`: **T5.2 native guest record wire** for
+  **infer-engine residual** multi-arg cmd builders —
+  `embed-head-front/back` → `:engine/embed-{front,back}`,
+  `mlx-moe-front` → `:engine/mlx-moe`,
+  `opt-i64-flag`/`opt-str-flag` → `:engine/opt-{i64,str}`,
+  `tensor-split-3` → `:engine/tensor-3`,
+  `mlx-launch-front` → `:engine/mlx-launch`,
+  `rpc-csv-2/3` → `:engine/rpc-csv-{2,3}`.
+  ADR-260731-w6-t52-native-record-infer-engine-residual.
+  Evidence: infer-engine parity + authority 79/1452 green.
+- west pin murakumo `42d677f3` → `f165a877` (also absorbs option-i64 tip pin)
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: **option-string-in-record compiler gap** + overlay/reconcile
+   internal `starts-with?` multi-arg scanners; W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
