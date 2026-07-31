@@ -99,14 +99,14 @@
    :sla-response "4h (or 2h if P1)"
    :example "upstream repo pin not advanced, integration test hangs"}
 
-  {:dependency-blocker
-   :description "Blocks cross-team synchronization (affects multi-team)"
+  :dependency-blocker
+  {:description "Blocks cross-team synchronization (affects multi-team)"
    :sla-response "2h"
    :escalate-to "L2 (phase-owner)"
    :example "M5 blocks M6 preflight check"}
 
-  {:infrastructure-blocker
-   :description "CI/metrics/deploy infrastructure failure"
+  :infrastructure-blocker
+  {:description "CI/metrics/deploy infrastructure failure"
    :sla-response "1h"
    :escalate-to "L2 immediately (platform-lead)"
    :example "Prometheus down, Grafana unavailable, CI job timeout"}}
@@ -117,20 +117,20 @@
    :decision "Go (advance to next week)"
    :documentation "Gate decision memo (Jira issue)"}
 
-  {:consensus-no-go
-   :description "Multi-team agreement: blocker unresolved OR metric breach critical"
+  :consensus-no-go
+  {:description "Multi-team agreement: blocker unresolved OR metric breach critical"
    :decision "No-Go (extend gate until blocker cleared)"
    :timeline-extension "48h max (then escalate to platform-lead)"
    :documentation "Gate decision + mitigation plan (Jira)"}
 
-  {:escalation-override
-   :description "Teams cannot reach consensus after 1h discussion"
+  :escalation-override
+  {:description "Teams cannot reach consensus after 1h discussion"
    :decision "Phase-owner + platform-lead decide (majority or L3 authority)"
    :process "15 min escalation call → decision memo"
    :documentation "Escalation decision + justification (Jira)"}
 
-  {:gate-halt
-   :description "2+ teams critical-path blocked on same item, unresolvable in 4h"
+  :gate-halt
+  {:description "2+ teams critical-path blocked on same item, unresolvable in 4h"
    :decision "Halt gate execution (freeze all deployments until resolved)"
    :process "15 min critical call (phase-owner + platform-lead)"
    :window "30 min to decision (extended if multi-phase impact)"

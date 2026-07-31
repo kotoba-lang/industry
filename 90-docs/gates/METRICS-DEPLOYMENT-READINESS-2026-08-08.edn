@@ -166,23 +166,23 @@
    :collection-interval "15 minutes"
    :sla "p99 < 12 min (720 sec)"
    :query-ready "curl -s 'http://prometheus:9090/api/v1/query?query=build_duration_seconds{quantile=\"p99\"}'"}
-  {:coverage
-   :metric-name "code_coverage_percent"
+  :coverage
+  {:metric-name "code_coverage_percent"
    :collection-interval "1 hour"
    :sla "coverage >= 92%"
    :query-ready "curl -s 'http://prometheus:9090/api/v1/query?query=code_coverage_percent'"}
-  {:deployment-success
-   :metric-name "deployment_success_rate"
+  :deployment-success
+  {:metric-name "deployment_success_rate"
    :collection-interval "1 hour"
    :sla "success >= 99.5%"
    :query-ready "curl -s 'http://prometheus:9090/api/v1/query?query=deployment_success_rate'"}
-  {:gate-blockers
-   :metric-name "blocker_count"
+  :gate-blockers
+  {:metric-name "blocker_count"
    :collection-interval "5 minutes"
    :sla "reported < 2 min after Jira status change"
    :query-ready "curl -s 'http://prometheus:9090/api/v1/query?query=blocker_count'"}
-  {:team-velocity
-   :metric-name "story_points_completed"
+  :team-velocity
+  {:metric-name "story_points_completed"
    :collection-interval "1 hour"
    :sla "tracked for burndown"
    :query-ready "curl -s 'http://prometheus:9090/api/v1/query?query=story_points_completed'"}}

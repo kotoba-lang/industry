@@ -229,8 +229,8 @@
     "Post-cutover 48h: all SLOs stable, zero user impact"]}
 
   :coordination/risk-mitigation-summary
-  {:risk-latency-regression
-   :mitigation "Automatic rollback trigger (p99 > 200ms sustained > 5 min) + manual monitoring"
+  :risk-latency-regression
+  {:mitigation "Automatic rollback trigger (p99 > 200ms sustained > 5 min) + manual monitoring"
    :risk-parity-divergence
    :mitigation "Automatic FULL rollback (> 1% divergence) + 7-day pre-flight sentinel"
    :risk-reliability-spike
