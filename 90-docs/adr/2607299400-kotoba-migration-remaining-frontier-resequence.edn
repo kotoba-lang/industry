@@ -1446,6 +1446,24 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31bs — T8.3 compiler-AOT http-post bounds kit body)
+
+- provider#55 MERGED (`60b7ddc6`): **T8.3 ADR 0171** — first **compiler-AOT**
+  ops kit body slice. Pure `http_post_bounds_ok` from `.kotoba` via
+  kotoba-compiler wasm32 (url/headers/body/timeout limits); Component embed;
+  registry `:http-post-bounds{,-component}` with `:builder :kotoba-compiler/v1`.
+  Host http-post I/O + full request/result EDN codec AOT still open
+  (`:wasm-aot` stays `:partial`). Evidence: ops-kit + kit-package suites green;
+  live Node vectors for 0/-1/-2/-3/-4.
+- west pin provider 1bfd7d75 → 60b7ddc6 (root `563af533`).
+
+Still open:
+1. T8.3 residual: **full** request/result EDN codec AOT for ops kits;
+   re-emit secret/process/… pure policies via compiler (hand WAT remain)
+2. T8.4 residual: live SCRAM/PG success (qualification suite)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
