@@ -127,8 +127,11 @@ gh api \"repos/com-junkawasaki/root/compare/<HEAD>...<origin/main>\" \\
      :resolved \"git ではない。`innen record tick` CLI の引数であり本件と無関係\"}
     {:gap \"`~/.gftd/` で git を fetch するスクリプトは2件あり、**2件とも** ADR-2607211600 に違反していた\"
      :note \"母数が2で違反が2。偶発ではなく、この死角に置かれたスクリプトは repo の規約から外れるのが既定だと考えるべき\"}
-    {:gap \"修正の実効は次の定期実行まで未検証\"
-     :note \"最大6時間後。`git rev-parse --is-shallow-repository` が false のままなら成功\"}]"
+    {:gap \"（半分解消 2026-08-01）修正の実効\"
+     :verified \"**fleet-ci-murakumo tick は本番で検証済み。** 修正 04:34 → tick の log 最終更新 05:29（修正後に実走）→ `org-spirit-in-physics-comics` は shallow=false のまま。以前ならこの実行で再び潰れていた\"
+     :pending \"**qwen36 tick は未検証。** 修正 04:05 に対し log 最終更新は 02:43（修正前）で、まだ走っていない。次回は約 08:43（02:43 + 21600 秒）。`git rev-parse --is-shallow-repository` が false のままなら成功\"}
+    {:gap \"検査は landing したが、どこからも呼ばれていない\"
+     :note \"`scripts/audit-gftd-scripts.cljs`（ed8f6ef2）は手で実行する読み取り専用レポータ。hook にも CI にも繋いでいない —— 繋ぐ判断は owner のもので、かつ現在 3 件の既知違反（`.sh` × 3、うち 2 件 launchd 稼働中）があるため、繋げば即座に落ちる\"}]"
 
   :adr/body
   "# ADR-2608019100: superproject を6時間ごとに shallow へ戻していたもの
