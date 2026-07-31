@@ -120,14 +120,20 @@ JVM の char 演算で、JS では文字列が偶然正しく型強制される�
   （ADR-2607300900）。宣言であって実行証跡ではない、と workflow のコメントにも
   README にも明記した。当面の実行経路はローカルの `npm run test:cljs`。
 
-## 残る gap
+## 残る gap（2026-07-31 更新）
 
 - **PSP client は無いまま**（意図的。attestation を持ち込む host が無い）。
-- **`:mpm-static` の差額請求フロー**が無い（`:short` を拒否するだけ）。
+- ~~**`:mpm-static` の差額請求フロー**~~ — **2026-07-31 に解消（ADR-2607310200）**。
+  `shortfall-minor` / `top-up-request` / `apply-top-up`。着手時に、settleops の store が
+  2件目の capture で1件目を**上書きしていた実バグ**も判明し、加算に修正した。
 - **chargeback / dispute 経路**は `resolve-dispute`（人間）のみ。解放後の訂正を
   actor が扱う経路は無い（意図的）。
 - 収納代行 / 資金移動業の判断は依然 owner のもの。
-- `edge/worker.cljs` は依然どちらの runtime でもテストされていない（host 半分）。
+- ~~`edge/worker.cljs` は未テスト~~ — **2026-07-31 に着手し、そこで
+  `marketplace.edge/run`・`outcome` が一度も存在しなかったこと**（Worker 6本が
+  壊れていたこと）が判明した。ADR-2607310200 で実装・テスト・6本の修復と deploy まで
+  完了。**ただし worker 自体の unit test は今も無い** — 検証は compile 0 warnings と
+  deploy 後の `/health` 200 / 未認証 401 まで。
 
 ## Alternatives considered
 
