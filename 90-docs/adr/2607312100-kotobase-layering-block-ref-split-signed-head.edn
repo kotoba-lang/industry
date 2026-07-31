@@ -155,9 +155,9 @@ cache は CID キーなので正しさの議論が要らない（内容が変わ
 
 | 層 | repo | 状態 |
 |---|---|---|
-| L0 | `multiformats` | 実在。**west 未登録** |
-| L0 | `ipld`（`ipld.value` 含む） | 実在。**west 未登録** |
-| L0 | `cbor` | kotoba-lang に無し（所在未確認） |
+| L0 | `io-multiformats` | **登録済み・checkout 済み** |
+| L0 | `io-ipld`（`ipld.value` / `cbor.core` を含む） | **登録済み・checkout 済み** |
+| L0 | `cbor` | 独立 repo としては存在しない。ns は `io-ipld` 側にある |
 | L1 | `erasure` | 登録済み |
 | L2+L3 | `kotobase-storage` | **束ねている。D2 の分割対象** |
 | L4 | `prolly-tree` / `kotobase-peer`(merkle-lsm) | 登録済み |
@@ -172,15 +172,19 @@ cache は CID キーなので正しさの議論が要らない（内容が変わ
 （配置・修復・監査・支払い順序）、`kura-node` がディスクとソケットと鍵、`kura-bugyo` が
 コーディネータループ。判断と機構が分かれている。
 
-**L0 の 2 repo が west 未登録なのは実害がある**: fresh checkout が依存を解決できない
-（`west-orphan-audit` が拾う種類の問題）。D2 に着手する前に登録する。
+**訂正（2026-07-31）**: 当初この節は「`multiformats` と `ipld` が west 未登録で、fresh checkout が
+依存を解決できない実害がある」と書いていたが**誤り**だった。実際に依存されているのは
+`io-multiformats` / `io-ipld` で、**両方とも登録済み・checkout 済み**である。誤判定の原因は
+名前で、`multiformats` / `ipld` は GitHub のリネーム転送により古い名前でも解決するため、
+別の未登録 repo が存在するように見えた。同じ日に `west-orphan-audit --blocking` が exit 0 で
+通っていたのが反証だったのに、それを裏付けとして扱わなかった。**L0 の登録作業は不要。**
 
 # 実装順（依存の向きを変えない順）
 
 1. **L2/L3 分割**（`kotobase-storage` の protocol を 2 つに割る）。既存バックエンドは
    block 面だけ実装すればよくなり、ref 面の実装は 1 つに絞る。
 2. **署名付き head**（D3）。`kotobase.ipns` の既存実装を ref 面の実装として持ち上げる。
-3. **L0 repo の west 登録**（1 の前に済ませてよい。独立）。
+3. ~~L0 repo の west 登録~~ — **不要**（上記の訂正参照。既に登録済みだった）。
 4. `fold!` の全体 hydrate 除去（`commit-delta!` を使う。ADR-2607311800 系列の続き）。
 5. クエリ実行を client/peer に寄せる（D5）。edge は cache に降格。
 
