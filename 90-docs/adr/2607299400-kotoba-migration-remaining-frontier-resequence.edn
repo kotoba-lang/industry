@@ -1483,6 +1483,24 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31bu — T8.3 compiler-AOT secret name-length)
+
+- provider#58 MERGED (`96ec2898`): **T8.3 ADR 0173** — compiler-AOT pure
+  `secret_name_len_ok(len)` (empty→-1, >128→-2) + Component. Char-class
+  memory-scan remains hand WAT (typed-string emit needs `kotoba:typed`, not
+  pure Component). `:wasm-aot` stays `:partial`. Evidence: 55 tests / 405
+  assertions; Node live `[-1,0,0,-2]`.
+- west pin provider 16ec1f22 → 96ec2898.
+
+Still open:
+1. T8.3 residual: full request/result EDN codec AOT; secret/scoped-fs
+   **char-class memory-scan** compiler re-emit (typed-string / pure mem path);
+   scoped-fs path policy AOT
+2. T8.4 residual: live SCRAM/PG success (qualification suite; local PG not up
+   this tick)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
