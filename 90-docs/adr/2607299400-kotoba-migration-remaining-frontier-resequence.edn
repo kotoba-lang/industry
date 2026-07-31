@@ -1966,6 +1966,22 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31cv — T8.3 multi-export https-url-ok + live main)
+
+- kotoba-component#86 MERGED (`7088dcb9`): **multi-export live main** —
+  shape `:https-url-ok-with-main` (policy + `main` let of string-lit calls +
+  pure i64 arith). Provider `http_url_ok.kotoba` compiles
+  `--target component`; `main()` → **-130**, empty → **-1**.
+  Evidence: +9 assertions; full provider source E2E green.
+- west pin kotoba-component 5577dca3 → 7088dcb9 (`77829d3f`).
+
+Still open:
+1. T8.3 residual: multi-export for request-ok/response-ok packages; provider
+   registry re-emit typed wasm as Component; flip wasm-aot only when admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31ct — T8.3 https-url-ok compiler E2E)
 
 - kotoba-component#82 MERGED (`d7058a4e`): **https-url-ok E2E** —
