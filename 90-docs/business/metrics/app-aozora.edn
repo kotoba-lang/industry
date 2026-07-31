@@ -8,31 +8,31 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 16057,
-  "app-aozora-appview" 10324,
-  "app-aozora-spa" 5955},
+ {"app-aozora-pds" 16194,
+  "app-aozora-appview" 10386,
+  "app-aozora-spa" 6040},
  :zone
- {:requests-7d 790740,
-  :pageviews-7d 10454,
-  :uniques-7d-sum 983,
+ {:requests-7d 798638,
+  :pageviews-7d 10485,
+  :uniques-7d-sum 991,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 787120}
+  [{:path "/v1/datoms", :requests 788633}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 178405}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 4460}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1705}
-   {:path "/v1/transact", :requests 98}
-   {:path "/federation-pilot/did.json", :requests 92}
-   {:path "/", :requests 80}
-   {:path "/xrpc/com.atproto.sync.getBlob", :requests 66}],
-  :status-mix {:ok 974629, :client-error 2708, :server-error 7257},
+    :requests 178328}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 4451}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1704}
+   {:path "/v1/transact", :requests 104}
+   {:path "/federation-pilot/did.json", :requests 93}
+   {:path "/xrpc/com.atproto.sync.getBlob", :requests 60}
+   {:path "/hito-federates/did.json", :requests 52}],
+  :status-mix {:ok 975944, :client-error 2743, :server-error 7254},
   :window "24h"},
  :as-of "2026-07-31",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 787120 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 178405 · /xrpc/ai.gftd.apps.kotobase.datomic.view 4460 · /xrpc/com.atproto.sync.subscribeRepos 1705 · /v1/transact 98 | 4xx(probe) 0% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 788633 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 178328 · /xrpc/ai.gftd.apps.kotobase.datomic.view 4451 · /xrpc/com.atproto.sync.subscribeRepos 1704 · /v1/transact 104 | 4xx(probe) 0% · 5xx 1%",
  :signal
- "aozora.app 実測 790740 req/7d・983 uniques(日次和)・うち4xx probe 0%(24h)、workers 32336 inv/7d"}
+ "aozora.app 実測 798638 req/7d・991 uniques(日次和)・うち4xx probe 0%(24h)、workers 32620 inv/7d"}
