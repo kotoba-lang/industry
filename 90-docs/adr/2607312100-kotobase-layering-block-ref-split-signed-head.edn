@@ -28,7 +28,7 @@
 
   :adr/decision-summary
   ["D1: L0-L10 の層を定め、依存は下向きのみとする"
-   "D2: block 面(L2, 不変, CAS なし)と ref 面(L3, 可変)を別 protocol に割る。B2 が優秀な block ストアかつ劣悪な ref ストアであることが実測論拠"
+   "D2: block 面と ref 面を別々の provider に載せられるようにする。protocol は元から分かれており、束ねていたのは backend の定義（両方の実装を要求）だった。B2 が優秀な block ストアかつ劣悪な ref ストアであることが実測論拠。実装済み: kotobase-storage 9296e91"
    "D3: ref は provider の CAS ではなく署名付き head record にする。どの block ホストでも成立し、検証が client 側で完結する。provider CAS は最適化に降格"
    "D4: ref を writer ごとに分けない。ADR-260726(join は ref 1 本)と正面衝突するため、分散より結合を取る"
    "D5: クエリは client/peer で回す。edge は cache と fallback であって権威ではない。現行の blind key + AEAD value は既にこれを前提にした形"
@@ -73,8 +73,14 @@
 
 ## D2. L2 と L3 を別 protocol に割る
 
-現行の `kotobase-storage` は blocks と refs を 1 protocol に束ね、全バックエンドに両方の実装を
-強いている。割ると:
+**訂正（2026-07-31、実装時に判明）**: 当初この節は「1 protocol に束ねている」と書いていたが
+**誤り**だった。`IBlockStore` と `IRefStore` は最初から別 protocol で、ns docstring にも意図的に
+分けたと明記されている。実際に束ねていたのは **backend の定義**の方である: `backend?` が両方の
+実装を要求し、`ports` が 1 つの store を両方の役割に使っていたため、**provider は blocks と refs の
+両方を提供できなければ使えなかった**。割るべきは protocol ではなく backend だった。
+
+その分離を入れると（`kotobase-storage` 9296e91、`block-capabilities` /
+`validate-block-store!` / `compose`）:
 
 - **block 面は信用不要・不特定多数・消去符号ありでよい**（IPFS / Storj / B2 / R2 / S3）
 - **ref 面は「合意が取れる 1 箇所」だけに絞れる**
