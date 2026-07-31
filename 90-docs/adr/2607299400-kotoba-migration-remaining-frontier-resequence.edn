@@ -91,7 +91,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | ID | 内容 | 状態 |
 |---|---|---|
 | **T5.3** | rebalance seats pack → record export | **landed** murakumo#193–#199 (incl. schedule assign packs #199); residual: task-score-code ternary + plan/rebalance bump indices (numeric by design); flags3 #230 + label flags #232 |
-| T5.2 | host bridge map/record ↔ guest record | **call-record expanded** #155+#261–#264 (map boundaries); **native guest record wire deferred** (T5.3 path) |
+| T5.2 | host bridge map/record ↔ guest record | **call-record waves 1–6** #155+#261–#266+#268; **native guest record wire deferred** (T5.3 path) |
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | **landed** kotoba-lang#352 (ADR-reliability-t23; 4 examples / 10 cases) |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
@@ -2352,6 +2352,24 @@ Still open:
    actor-host providers first
 3. T5.2 native guest record wire (deferred); W4 recursive values
    (positional call-record expansion continues on remaining multi-arg hosts)
+
+
+## Progress (2026-07-31dp — T5.2 call-record wave 6 + pin)
+
+- murakumo#268 MERGED: **T5.2 wave 6** — call-record on
+  connect class/reach, dash join/clamp/health, overlay.crypto sealed map.
+  ADR-260731-w6-t52-call-record-expand6.
+  Evidence: oracle-call-record + connect/dash/crypto parity 31 tests / 243 assertions.
+- west pin murakumo → 7745e5de.
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**; flip `:wasm-aot :implemented` only if admissible
+2. T8.4 residual: optional further live corpus; Node transport/pg needs
+   actor-host providers first
+3. T5.2 native guest record wire (deferred); W4 recursive values
+   (positional call-record may continue on remaining multi-arg hosts:
+   task.plan / infer.* / overlay.driver|runtime)
 
 
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
