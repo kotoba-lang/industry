@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist (0161); http/secret/entropy/process/scoped-fs Components + signed-wasm ready (0165–0169); git + compiler-AOT still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist (0161); **all ops kits** http/secret/entropy/process/scoped-fs/git Components + signed-wasm ready (0165–0170); compiler-AOT kit body still open |
 | T8.4 | host-parity L5 | **partial** — JVM 31 + Node 14 live (#96–#109; fetch/headers/json-extract both); SCRAM/PG + T8.3 open |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -1302,6 +1302,21 @@ Still open:
 
 Still open:
 1. T8.3 residual: git real-bytes/Component; compiler-AOT kit body for ops
+2. T8.4 residual: live SCRAM/PG success (qualification suite);
+   pg component-link beyond pool
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31bk — T8.3 git Component + signed-wasm ready)
+
+- provider#54 MERGED (`1bfd7d75`): **T8.3 ADR 0170** — git pure run bounds
+  policy module+Component (`git_run_bounds_ok`); ops kit set adds `:git`.
+  Readiness **git** `:signed-wasm :ready`. Git binary host-injected.
+  Evidence: 49 tests / 351 assertions.
+- west pin provider 336592fe → 1bfd7d75.
+
+Still open:
+1. T8.3 residual: compiler-AOT kit body for ops (all ops Components landed)
 2. T8.4 residual: live SCRAM/PG success (qualification suite);
    pg component-link beyond pool
 3. T5.2 native guest record wire (deferred); W4 recursive values
