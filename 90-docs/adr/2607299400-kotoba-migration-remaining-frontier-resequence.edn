@@ -2675,6 +2675,25 @@ Still open:
    option residual positional); W4 recursive values
 
 
+## Progress (2026-07-31ef — T5.2 native guest record expansion deploy-plan)
+
+- murakumo main `b863c436`: **T5.2 native guest record wire** for
+  **deploy-plan** — `join-path` → `:deploy/join-path`,
+  `app-manifest-path` → `:deploy/app-manifest`,
+  `component-build-cmd` → `:deploy/component-build`,
+  `app-deploy-cmd` → `:deploy/app-deploy`.
+  ADR-260731-w6-t52-native-record-deploy.
+  Evidence: deploy parity + call-record 34/388; authority 70/1419 green.
+- west pin murakumo `25567d56` → `b863c436`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 further expansion (report multi-arg pure string builders;
+   option residual positional); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
