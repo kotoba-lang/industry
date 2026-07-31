@@ -1624,6 +1624,23 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31cc — T8.3 pure multi-step scoped-fs path walk)
+
+- provider#68 MERGED (`cee63b85`): **T8.3 ADR 0181** — pure multi-step
+  `fs_path_begin` / `fs_path_next` / `fs_path_end` composing path-len + gates
+  into one host-walk protocol (pure i64 + Component). Complements typed-string
+  fs_path_ok (0180) and secret walk (0179). Evidence: 71 tests / 499 assertions;
+  Node live empty/ok/abs/home/backslash/dotdot.
+- west pin provider 25b97e4c → cee63b85.
+
+Still open:
+1. T8.3 residual: full request/result EDN codec AOT; pure memory-scan
+   one-shot without host walk; production kotoba:typed Component world
+2. T8.4 residual: live SCRAM/PG success (provider-postgres needs real
+   scram-session guest wasm — interop harness not yet restored)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
