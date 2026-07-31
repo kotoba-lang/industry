@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — Components (0165–0170); pure/typed policy AOT 0171–0186 (incl. http request_ok 0186); full EDN request/result codec AOT still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — Components (0165–0170); pure/typed policy AOT 0171–0188 (http headers name/value 0187–0188); full EDN request/result codec AOT still open |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -1727,6 +1727,25 @@ Still open:
    interop harness)
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
+
+
+
+## Progress (2026-07-31ci — T8.3 typed-string HTTP header value/pair)
+
+- provider#74 MERGED (`77ea650c`): **T8.3 ADR 0187** — typed-string
+  `http_header_name_ok` (RFC 7230 tchar; concurrent).
+- provider#76 MERGED (`e164b374`): **T8.3 ADR 0188** — typed-string
+  `http_header_value_ok` + `http_header_pair_ok` (CTL/length; pair compose).
+  `main` → `-3036`. Request-surface header strings toward EDN codec.
+  Evidence: 44 tests / 295 assertions; browser-host green.
+- west pin provider 789e72b8 → e164b374.
+
+Still open:
+1. T8.3 residual: full EDN request/result codec AOT (header set packing,
+   response variant); pure memory-scan one-shot; typed Component world
+2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
+   interop harness)
+3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
 ## Progress (2026-07-31ci — T8.3 typed-string http_header_name_ok)
