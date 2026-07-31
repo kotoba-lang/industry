@@ -2818,6 +2818,23 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01ff — T8.3 fixed-depth nested EDN encode)
+
+- provider main `b0234e95`: **http-request-edn-v1.wasm** — fixed-depth nested EDN
+  encode (`edn_quoted` / `http_header_edn` / `http_request_edn0`, main→27005800).
+  ADR 0209. No `kotoba:typed`; multi-header set / result variant / W4 recursive
+  ADT still open; `:wasm-aot` stays `:partial`.
+  Evidence: ops kit packages 67/600 green.
+- west pin provider `6025cd24` → `b0234e95`
+
+Still open:
+1. T8.3 residual: multi-header set + result-variant EDN; Component twin;
+   full multi-file kit body; W4 recursive value identity for true nested
+   request/result records
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 product multi-arg pure residual closed; W4 recursive values
+
+
 ## Progress (2026-08-01fe — T5.2 assign-step-3 + demand-inc residual)
 
 - murakumo main `a8331f92`: **assign-pick/step-3** (schedule+task) multi-record pure →
