@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — pure/typed policy 0171–0198; typed Component compositions: string ops + url-ok + request-ok + response-ok + **error-ok/arm-ok** + multi-export main (kotoba-component#79–#88); wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — pure/typed policy 0171–0198; typed Component compositions: string ops + url/request/response packages + multi-export main (kotoba-component#79–#90); error multi-export residual; wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -1997,6 +1997,24 @@ Still open:
 
 Still open:
 1. T8.3 residual: multi-export **response-ok** (3 exports: status/response/main);
+   provider registry Component re-emit; flip wasm-aot only when admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+
+## Progress (2026-07-31cx — T8.3 multi-export response package)
+
+- kotoba-component#90 MERGED (`5ac1641e`): **response package multi-export** —
+  shape `:http-response-package-with-main` (http_status_ok + http_response_ok +
+  live main). Frontend let+or response admission; pure-i64 status before :scalar.
+  Provider `http_response_ok.kotoba` compiles `--target component`; `main()` →
+  **-1012**, status 200→0 / 99→-1, response headers 40→-2.
+  Evidence: 31 tests / 364 assertions; full provider source E2E green.
+- west pin kotoba-component 10584366 → 5ac1641e (`a2f50919`).
+
+Still open:
+1. T8.3 residual: multi-export **error package** (error_ok + arm_ok + main);
    provider registry Component re-emit; flip wasm-aot only when admissible
 2. T8.4 residual: live SCRAM/PG success
 3. T5.2 native guest record wire (deferred); W4 recursive values
