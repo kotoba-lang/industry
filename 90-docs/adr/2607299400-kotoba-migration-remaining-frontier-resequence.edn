@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — Components (0165–0170); pure/typed policy AOT 0171–0198; typed Component world: string-length/eq/substring + **https-url-ok composition** (kotoba-component#79–#81); packing walks / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — pure/typed policy AOT 0171–0198; typed Component: string-length/eq/substring + https-url-ok + **http-post-request-ok packing** (kotoba-component#79–#84); result packing / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -1928,6 +1928,24 @@ Still open:
 1. T8.3 residual: broader if-let composition for **packing walks**
    (request/result multi-field); flip `:wasm-aot :implemented` only when
    admissible for full kit body
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+
+## Progress (2026-07-31ct — T8.3 typed Component http-post-request-ok packing)
+
+- kotoba-component#82 MERGED (`d7058a4e`): https-url-ok let-form + underscore
+  export E2E (concurrent).
+- kotoba-component#84 MERGED (`e38251f2`): **http-post-request-ok composition**
+  — multi-param packing (url string + headers-n + body string + timeout-ms)
+  without kotoba:typed. Live: ok→0, empty→-1, http→-3, headers→-4, timeout→-6.
+  Evidence: 25 tests / 306 assertions.
+- west pin kotoba-component d7058a4e → e38251f2 (`25626da4`).
+
+Still open:
+1. T8.3 residual: **result_ok / response packing** composition; multi-export
+   live main; flip `:wasm-aot :implemented` only when full kit body admissible
 2. T8.4 residual: live SCRAM/PG success
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
