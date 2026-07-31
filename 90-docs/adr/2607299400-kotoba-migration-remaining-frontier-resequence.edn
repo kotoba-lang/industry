@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — Components (0165–0170); pure/typed policy AOT 0171–0195 (http pure memory-scan 0194–0195 + typed packing 0186–0193); typed Component world compiler-blocked (ADR 0076); wasm-aot :partial |
+| T8.3 | network/secret の **production AOT Component** | **partial** — Components (0165–0170); pure/typed policy AOT 0171–0196 (http pure memory-scan 0194–0196 + typed packing 0186–0193); typed Component world compiler-blocked (ADR 0076); wasm-aot :partial |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -1840,6 +1840,23 @@ Still open:
    kotoba:typed packages — ADR 0076 4a; flip wasm-aot only when admissible)
 2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
    interop harness)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+
+## Progress (2026-07-31cp — T8.3 pure header set packing memory-scan)
+
+- provider#84 MERGED (`78905bd3`): **T8.3 ADR 0196** — pure hand-WAT
+  `http_headers_set_scan(n, table_ptr)` over n×(name_ptr,len,value_ptr,len)
+  records (+ Component). Live `[0,0,-3,-6,-4]`. Complements typed 0189 +
+  pair scan 0195. No uniqueness (W4).
+  Evidence: 60 tests / 404 assertions.
+- west pin provider 19a06ea4 → 78905bd3 (`66501678`).
+
+Still open:
+1. T8.3 residual: **typed Component world** (compiler ADR 0076 4a —
+   kotoba:typed not WIT-bindable; flip wasm-aot only when admissible)
+2. T8.4 residual: live SCRAM/PG success
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
