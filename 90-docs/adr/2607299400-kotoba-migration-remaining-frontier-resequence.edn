@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist production path (ADR 0161 #45); **ops real-bytes pilot** http-post (ADR 0162 #46); full AOT Component + secret + ops signed-wasm still open |
-| T8.4 | host-parity L5 | **partial** — JVM 31 + Node 11 live (#96–#108; http-fetch/headers/json-extract); SCRAM/PG + T8.3 open |
+| T8.4 | host-parity L5 | **partial** — JVM 31 + Node 14 live (#96–#109; fetch/headers/json-extract both); SCRAM/PG + T8.3 open |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -1149,7 +1149,7 @@ Still open:
 
 - kototama#108 MERGED (`37a2cfe3`): **T8.4 live-prove http-fetch +
   http-post-headers + json-extract-field** — loopback SSRF fail-closed for
-  GET and POST-with-headers; pure host extract `{"x":"ok"}` → 2.
+  GET and POST-with-headers; pure host extract `{\"x\":\"ok\"}` → 2.
   JVM corpus **28 → 31**. Evidence: host-parity-live 4 tests / 135 assertions.
 - west pin kototama 76deacc3 → 37a2cfe3.
 
@@ -1174,6 +1174,22 @@ Still open:
    pilot; ops publisher policy before `:signed-wasm :ready`
 2. T8.4 residual: live SCRAM/PG success (qualification suite);
    Node expansion for fetch/headers; pg component-link beyond pool
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31bc — T8.4 Node fetch/headers/json-extract live)
+
+- kototama#109 MERGED (`02f0070e`): **T8.4 Node live-prove** http-fetch +
+  http-post-headers inject + json-extract-field pure. Node corpus
+  **11 → 14** (JVM still 31). Also: maxHttpFetches + allowedUrlPrefixes.
+  Evidence: node script 14/14 + host-parity-live-test 4 tests / 135 assertions.
+- west pin kototama 37a2cfe3 → 02f0070e.
+
+Still open:
+1. T8.3 residual: full AOT Component packaging for http/secret; secret real-bytes
+   pilot; ops publisher policy before `:signed-wasm :ready`
+2. T8.4 residual: live SCRAM/PG success (qualification suite);
+   pg component-link beyond pool inject
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 

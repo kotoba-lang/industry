@@ -269,7 +269,7 @@ D7 とは無関係の実バグで、D7 を入れなければ発見されない�
 `clojure -M:test` を走らせるとテストが**実ストアに書く**。テスト内の
 `store/transact!` は18箇所あり、うち2つ（本セッションで追加した
 `payment_tools_test/seed-identity!` と既存の `core_test`）は `:identity` を
-丸ごと差し替える。実測: 本物の仮ユーザーが `{:id "user-1" :display-name "Owner"}`
+丸ごと差し替える。実測: 本物の仮ユーザーが `{:id \"user-1\" :display-name \"Owner\"}`
 （`:email` も `:user-handle` も無い）に置き換わり、state.edn が 6617→1564 バイトに
 縮んだ。**着弾したのは本セッションで書いたフィクスチャであり、この点は当方の責任。**
 修正は `:test` alias が `-Dcloud.itonami.data-dir=target/test-data` を渡す形で、
@@ -321,8 +321,8 @@ session 無しで 401 = route 有り・gate 有り）、superproject の `.mcp.j
 0. **Passkey 登録（Touch ID）が唯一の残作業。ブロッカーは技術ではなくフォーカス。**
    サーバ側は全て通ることを実測済み: `onboarding/resume` 200 →
    `register/start` 200、返る options は
-   `authenticatorAttachment "platform"` / `userVerification "required"` /
-   `residentKey "required"` / `attestation "direct"`。
+   `authenticatorAttachment \"platform\"` / `userVerification \"required\"` /
+   `residentKey \"required\"` / `attestation \"direct\"`。
    **再開手順**: (a) `localhost:1339` の Chrome ウィンドウを**クリックして最前面に
    する**（タブ切替では不足。OS フォーカスが要る） (b) 「Passkey 登録を再開」を押す
    (c) Touch ID に触れる。その後 `GET /api/passkeys/assurance` で実機の到達段

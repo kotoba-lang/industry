@@ -600,9 +600,9 @@
   gates, migration), and most report `Unmatched delimiter` or an odd number of map
   forms -- the signature of a literal that ended early, which is the same failure an
   unescaped quote produces."
-  ["90-docs/adr/2607299700-org-member-key-enrollment-ceremony.edn"
-   "90-docs/adr/2607300900-cloud-itonami-payment-settlement-funding-balance.edn"
-   "90-docs/deployment/MONTH-3-EXECUTION-COORDINATION-SUMMARY.edn"
+  ;; Two ADRs left this list on 2026-07-31: both were a pr-str'd map inside a string
+  ;; where some quotes were escaped and the rest were not, and both are repaired.
+  ["90-docs/deployment/MONTH-3-EXECUTION-COORDINATION-SUMMARY.edn"
    "90-docs/deployment/MONTH-3-GO-NO-GO-DECISION-TEMPLATE.edn"
    "90-docs/deployment/MONTH-3-GRACEFUL-RUST-DRAIN.edn"
    "90-docs/deployment/MONTH-3-MANUAL-ROLLBACK-DECISION-TREE.edn"
