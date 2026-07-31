@@ -92,7 +92,16 @@ subject=`awai-apex` / scope=`generation` / ttl 90 日として mint し、Worker
    黙って `arg` 扱いになり既定の 30 秒が効く。フリートの往復はそれより長いので、
    製品のバグに見えるタイムアウトが出ていた。
 
-どちらも読んでは見つからず、実際に動かして見つけた。
+3. **完成した動画が再生できなかった。** 完了ジョブが返す artifact URL は
+   `murakumo.cloud` を指すが、そのホストは別 Worker・別 secret で 401
+   （実測）。動くホスト（`generation.murakumo.cloud`）でも Bearer token が要り、
+   ブラウザに置けない。つまり返ってきた URL は**二重に**使えず、`<video>` が
+   黙って読み込みに失敗していた（ジョブ自体は成功していた）。`job-status` が
+   same-origin の `/api/generation/jobs/:id/artifact` を返し、Worker が bytes を
+   stream する形にした。実測で byte 一致（285,262 bytes、sha256 5ebb4f3d…、
+   API が申告する contentHash と一致）。
+
+どれも読んでは見つからず、実際に動かして見つけた。
 
 ## Consequences
 
@@ -110,7 +119,7 @@ subject=`awai-apex` / scope=`generation` / ttl 90 日として mint し、Worker
 
 ## Verification (2026-07-31)
 
-- `clojure -M:local:test` — 34 tests / 121 assertions / 0 failures
+- `clojure -M:local:test` — 35 tests / 124 assertions / 0 failures
 - `shadow-cljs release app worker` — 0 warnings
 - ローカル real-Chromium（`scripts/verify-e2e.cljs`）— 19 checks / 0 failures。
   画像ピッカーが live scan で埋まること、OS dark でも light、320px で横スクロール
@@ -119,12 +128,12 @@ subject=`awai-apex` / scope=`generation` / ttl 90 日として mint し、Worker
 - 本番 smoke（`scripts/prod-smoke.cljs`、deploy 後）— 5 checks / 0 failures。
   フリートからの実ストリーム応答、`<think>` トレースの非漏洩、douga ジョブの受理と
   ポーリング、live な画像ピッカー。
-- API 直叩きの実測: image / video とも 202、job status ポーリングが progress を返す。
-  cross-origin の `/api/chat` は 403。
+- API 直叩きの実測: image / video とも 202、job status ポーリングが progress を返し、
+  video ジョブは `done` / 100% / 285KB の mp4 まで到達。cross-origin の `/api/chat` は 403。
 
 ## References
 
-- 実装: network-awai/network-awai-apex `8417ca1`
+- 実装: network-awai/network-awai-apex `372edab`
 - 姉妹 ADR: ADR-2607321000（gftd.ai apex、同じ skin）
 - モデル alias 規約: ADR-2607173100
 - 設計システム: ADR-2607141915 / ADR-2607309900
