@@ -1985,6 +1985,23 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31cw — T8.3 multi-export http-post-request-ok + main)
+
+- kotoba-component#89 MERGED (`10584366`): **request-ok multi-export** —
+  (1) admit frontend let+or desugar of ADR 0186 policy; (2) shape
+  `:http-post-request-ok-with-main` with mixed string/i64 lit live vector.
+  Provider `http_post_request_ok.kotoba` compiles `--target component`;
+  `main()` → **-13406**, ok→0, `http://`→-3.
+  Evidence: +9 assertions; full provider source E2E green.
+- west pin kotoba-component 3774b5ca → 10584366 (`4d9f4533`).
+
+Still open:
+1. T8.3 residual: multi-export **response-ok** (3 exports: status/response/main);
+   provider registry Component re-emit; flip wasm-aot only when admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31cv — T8.3 multi-export https-url-ok + live main)
 
 - kotoba-component#86 MERGED (`7088dcb9`): **multi-export live main** —
