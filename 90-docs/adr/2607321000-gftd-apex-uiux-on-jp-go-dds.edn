@@ -1,0 +1,95 @@
+[{:db/id -1
+  :adr/id "2607321000"
+  :adr/title "gftd.ai apex の UI/UX を kotoba-ui から jp-go-dds (DADS) へ移す"
+  :adr/status "accepted"
+  :adr/date "2026-07-31"
+  :adr/repos "gftdcojp/apex"
+  :adr/supersedes "ADR-2607122200 の gftd.ai 部分（kotoba-ui paved road）"
+  :adr/body
+  "## Context
+
+オーナー指示（2026-07-31）: 「https://gftd.ai/ の uiux を jp-go-dds を使うようにして」。
+
+前提の確認に手間取ったので記録しておく。**gftd.ai の apex を serve しているのは
+`gftdcojp/apex`（Cloudflare Pages project `ai-gftd-apex`）** であって、
+`gftdcojp/chat-shell` / `etzhayyim/com-etzhayyim-app-ai-gftd-chat-shell`
+（SvelteKit）ではない。後者は同じ名前を持つ別実装で、apex route を持たない。
+判別は Cloudflare API で行った（zone の worker routes に apex は無く、Pages
+project の domains に `gftd.ai` があった）。**`gftdcojp/apex` は west にも
+fleet-db にも登録されていない** — 本番の apex を serve する repo が manifest の
+外にあるのは別途の gap（下記 Consequences）。
+
+移行前の skin は kotoba-ui（shitsuke.hig + liquid-glass material、theme map で
+accent/accent-dark/:appearance :auto）。jp-go-dds は skill `kotoba-uiux` が定める
+**明示的な opt-out 先**であり、日本の公的文脈のサービスに使う skin として
+ADR-2607141915 / ADR-2607309900 で既に位置づけられている。
+
+## Decision
+
+**skin だけを入れ替える。state は re-frame のまま、`gftd.chat.views` の構造も維持する。**
+入れ替えは 1 箇所（`gftd.chat.ui`）で起きる。
+
+1. `gftd.chat.ui` は同じ helper API を保ったまま、実装を `jp-go-dds.core` に載せ替える。
+   DADS が持つもの（button / chip / accordion / textarea / input / select /
+   notification-banner / divider / card）は**上流のコンポーネントをそのまま使う**。
+2. DADS が持たないもの（avatar / nav bar / popover menu / spinner / scrim /
+   list rail / chat bubble）は token から自作し `apex-*` prefix を付ける。
+   **上流の `dads-*` の中に混ぜない** — jp-go-dds 自身が `dds-ext-*` で
+   同じ規律を守っている。行政手続きのページに chat bubble が要らないのは当然で、
+   無いことは欠陥ではない。
+3. **light 固定**。DADS 上流に dark palette は無く `jp-go-dds.page` が
+   `color-scheme: light` を張る。theme map と `scripts/gen-theme-css.cljs` は
+   意味を失うので削除。**dark を自作しない**。
+4. **CSS は inline 1 本**。jp-go-dds は「1 ページあたり外部リクエスト 0」を
+   設計目標にしており `jp-go-dds.page` がそれを実装している。SPA は 1 文書なので
+   inline の方が render-blocking link 3 本より良い。`public/style.css` と
+   `<link>` は撤去。`public/css/theme.css` は `viewer.html` 専用として残し、
+   中身を DADS token slice に差し替えた。
+5. **`--hig-*` 契約は維持する**。`jp-go-dds.tokens` が DADS primitive の上に
+   再定義するので、view / SVG / design-quality の決定論 audit が同じ語彙を
+   話し続ける。app CSS に raw hex は書かない。
+6. **コピーは日本語**。デジタル庁デザインシステムの上に英語の chrome が乗るのは
+   不整合で、`relative-time` は元々書き換えが必要だった。
+
+## 実装中に出た本物のバグ（ブラウザ実行で発見）
+
+**jp-go-dds は自分の `class` を caller の `:attrs` の *後* に merge する**
+（consumer に component の同一性を壊させないための意図的な設計）。結果として
+`:attrs` 経由で渡した `:class` は**黙って落ちる**。`.menu-btn` がこれで class を
+失い、**320px でドロワーを開くトリガーが存在しなくなっていた**。読んでも気付かず、
+real-Chromium の E2E が拾った。seam 側で「構築後に class を追記する」形に直し
+（`dads-button` は残り、こちらは併走する）、テストで固定した。
+
+## Consequences
+
+- gftd.ai は light 固定になった。OS の dark 設定には従わない。E2E は**逆の
+  assertion** を持つ: OS が dark を要求しても light で描画されること
+  （flip したら dark palette が紛れ込んだということ）。
+- glass material は消えた。`--liquid-glass-*` の参照が残ると透明に描画されるので、
+  app CSS から一掃した。
+- accent はデジタル庁の key blue `#0017c1`。gftd の brand accent `#1a56db` は
+  出ない。`jp-go-dds.tokens/brand-tokens` + `bridge-css-except` で brand accent を
+  残す選択肢もあるが、**今回は取らなかった** — 指示は「DADS を使う」であり、
+  統一が government design system の目的だから。brand を戻したくなったらこの
+  一行で戻せる。
+- **`gftdcojp/apex` が manifest 未登録である gap は残っている。** 本番 apex を
+  serve する repo が west/fleet-db の外にあり、pin verification も orphan audit も
+  効かない。今回のスコープ外だが、次にこの repo を触る作業で解消すべき。
+
+## Verification (2026-07-31)
+
+- `clojure -M:pin:local:test-portable` — 58 tests / 267 assertions / 0 failures
+- `shadow-cljs release app viewer pages-worker` — 0 warnings
+- real-Chromium E2E（`scripts/verify-e2e.cljs`）— 26 checks / 0 failures。
+  OS dark 下でも light、fast-typing のキーストローク欠落なし、Enter 送信、
+  ストリーム完了、503 のエラーバブル、320px でドロワー開閉と横スクロール無し、
+  viewer が light かつ hex-free、コントラスト 11.29:1（label）/ 9.91:1（key blue）。
+- 本番 deploy 後の実測: `https://gftd.ai/` が DADS inline shell を返し
+  （`dads-*` class 42 個）、`/api/health` が chat/generation とも configured。
+
+## References
+
+- 実装: gftdcojp/apex `86d06eb`（PR merge commit）
+- 設計システム: ADR-2607141915（jp-go-dds）/ ADR-2607309900（DADS を選ぶ意味）
+- 直前の skin: ADR-2607122200（kotoba-ui paved road）
+- 姉妹 ADR: ADR-2607321100（awai.network apex、同じ skin）"}]
