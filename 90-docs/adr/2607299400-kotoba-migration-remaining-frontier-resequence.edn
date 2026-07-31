@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — ops through 0230 multi-ns reject + **0231 kit-shaped request set-of-header-records** + **0232 secret reply fixed-depth EDN**; **typed-set-nth fold full headers EDN (0233)**; **full request EDN set-record (0234)**; **result-variant EDN set-record (0235)**; W4 recursive nested EDN / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — HTTP kit pure EDN through 0235 + **secret request/reply EDN package (0236/0237)**; W4 recursive nested EDN / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2818,6 +2818,23 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01gv — T8.3 secret request EDN + multi-export package)
+
+- provider#124 MERGED (`fd23a822`): **ADR 0236** fixed-depth `secret_request_edn`
+  (main → **-2306**, sha `fde508bf…`) + **ADR 0237** multi-export secret
+  request+reply EDN package (main → **-2307**, sha `14c3a61d…`).
+  Evidence: **89 tests / 853 assertions** green.
+- west pin: provider → `fd23a822`
+- Honesty: completes secret kit pure fixed-depth EDN surface (request+reply).
+  Does **not** flip `:wasm-aot :implemented` (W4 recursive nested EDN +
+  host-fetch kit body still open).
+
+Still open:
+1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
+
+
 ## Progress (2026-08-01gu — T8.3 result-variant EDN kit-shaped set-record)
 
 - provider#123 MERGED (`63dc5dcd`): **ADR 0235** pure http-result-edn-set-record —
@@ -2829,7 +2846,7 @@ Still open:
   Does not flip wasm-aot to implemented. Closes Progress gt result-variant residual.
 
 Still open:
-1. T8.3 residual: W4 recursive nested EDN; only then wasm-aot implemented
+1. T8.3 residual: secret request EDN package (→ Progress gv); W4 recursive nested EDN; only then wasm-aot implemented
 2. T8.4 residual (optional L5 / real Node sockets)
 3. murakumo residual; other W4 work
 
