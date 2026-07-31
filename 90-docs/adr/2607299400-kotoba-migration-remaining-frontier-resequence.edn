@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — multi-export packages + helper admission (kotoba-component#79–#96); pure Component re-emit url/request/response/error (provider#87 / ADR 0199) + header_name (provider#88 / ADR 0200) + header_value/pair (provider#89 / ADR 0201); set packing + nested EDN residual; wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — multi-export packages (kotoba-component#79–#97); pure Component re-emit url/request/response/error (provider#87 / ADR 0199) + header name/value/set (provider#88–#91 / ADR 0200–0202); request/result packing walks + nested EDN residual; wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2119,6 +2119,24 @@ Still open:
    only when admissible
 2. T8.4 residual: live SCRAM/PG success
 3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31dd — T8.3 headers-set packing Component re-emit)
+
+- kotoba-component#97 MERGED (`f4e0fa6d`): **Canonical headers-set package**
+  `:http-headers-set-package-with-main` (begin + pair + end + nested live main).
+  Nested live-main expressions; WAT tchar name + CTL value. Live main → **-3647**.
+  Evidence: 128 tests / 912 assertions.
+- provider#91 MERGED (`7554fa4`): **T8.3 ADR 0202** pure Component re-emit
+  `:http-headers-set-ok-component` (no kotoba:typed); live main → **-3647**.
+- west pin kotoba-component f7749976 → f4e0fa6d; provider ac6807fc → 7554fa4.
+
+Still open:
+1. T8.3 residual: request/result **packing walks** Component re-emit;
+   nested EDN / full kit body; flip `:wasm-aot :implemented` only when admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
 
 
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
