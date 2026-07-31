@@ -259,6 +259,98 @@ ICANN fee は登録年あたりの pass-through で、total とは別に報告�
 （ops governance）と合わせて、`godaddy-dns` が「他人の registrar API を叩く」
 だったところに「自分が registry である」経路ができた。
 
+## 2607-07-31 追記 — 残っていた穴を閉じた
+
+ADR 起票時に Non-goals として記録した項目のうち、以下を実装した。
+
+| 項目 | repo | tests |
+|---|---|---|
+| host object (RFC 5732) | `srs.host` | 38→48 / 137→172 |
+| host object mapping | `org-ietf-epp` | 22→28 / 65→81 |
+| nameserver lookup | `org-ietf-rdap` | 28→33 / 83→98 |
+| NSEC3 (RFC 5155) | `dnssec.nsec3` | 25→38 / 88→141 |
+| crypto provider + 実鍵での検証 | `dnssec.provider` | 16→25 / 60→88 |
+
+### host object — 文字列では答えられない2つの問い
+
+`srs` は nameserver をドメイン上の裸の文字列として持っていた。これで答えられ
+ないのが2つある。
+
+**この nameserver はまだ使われているか。** どのドメインからも参照されている
+host は削除できない（RFC 5732 §3.2.2）。`delete` は **2305**（object
+association prohibits operation、そのコード本来の意味）で拒否し、参照している
+ドメイン名を返す —— registrar が lock ではなく association を探せばよいと分かる。
+association は count ではなく **set**。count だと同じドメインが2回 link された
+後に1回 unlink すると、使われていない host が永久に削除不能になるか、逆に使用中
+の host が削除できてしまう。テストで再現している。
+
+**glue が要るか。** `example.com` を配信する `ns1.example.com` は **in-zone** で
+アドレス必須（それが無いと解決に自分自身の解決が要る、それが glue の存在理由）。
+`ns1.example.net` は **out-of-zone** でアドレス禁止。RFC 5732 §1.1 は両方向を
+書いているが、実装は後者をよく飛ばす —— 権威を持たない名前のアドレスを持つのは
+親切に見えて、他人のデータの second stale copy をレジストリが配ることになる。
+両方向を強制し、`update-addresses` も再検査する（ゾーン名変更で host は側を
+移りうるため）。
+
+`linked` は導出 status で保存しない。保存すると、要約対象の association と
+食い違える。`info` は list ではなく count を返す —— どのドメインがどの
+nameserver を使っているかは公開応答が列挙してよいものではない。
+
+### NSEC3 — iterations はセキュリティのつまみではない
+
+NSEC は前後の名前を平文で渡すので、chain を辿ればゾーン内の**全名前**が読める。
+名簿が商売そのもののレジストリには理論上の話ではない。
+
+実装で最も間違えられる2点:
+
+- **iterations を上げても安全にならない。** 攻撃側は候補名1つにつき1回払うだけ
+  で、ゾーン名は短く辞書由来なのでコストは候補リストに支配される。一方
+  **validator は否定応答のたびに**同じコストを払う。高い値は自分に向けた DoS
+  増幅器。RFC 9276 は iterations 0 / salt 空を推奨しており、それを既定にして
+  大きい値は拒否する。
+- **base32hex であって標準 base32 ではない。** 標準は `A-Z2-7`、base32hex は
+  `0-9A-V` で**全記号が違う**。取り違えると owner name の整列が変わり何にも
+  一致しない —— 正しく見えて何も証明しない chain ができる。RFC 4648 の
+  テストベクタをスイートに入れた。
+
+他に静かに壊れる2点: hash は名前の**正準 wire 形式**に対して取る（テキストに
+対して取ると validator が再現できない chain になる）、salt は**毎回**の
+iteration で付ける（初回だけ、が定番の誤り）。`covers?` は chain 末尾の
+**wrap**（next が自分より小さい区間）を扱う —— 素直な `lo < x < hi` ではその
+区間だけ被覆されず、そこは攻撃者が狙う場所そのもの。
+
+**opt-out は意図的に生成しない。** 未署名委任の NSEC3 を省ける仕組みで大手 TLD
+が採用した理由でもあるが、その委任が存在しないことを証明できなくなる。
+パラメータではなく別のセキュリティモデルなので、既存ゾーンを読むための
+`flags` は残しつつ、こちらからは出さない。
+
+### crypto provider — 署名がバイトシャッフルでないことの証明
+
+`dnssec.sign` は crypto を注入で受けるので、スイートは echo signer で
+**どのバイトが署名されるか**しか証明していなかった。`dnssec.provider` が
+Ed25519（`kotoba-lang/ed25519`）と SHA-2 を配線し、`provider_test` が実鍵で
+署名してから **validator と同じ手順で blob を再構築**して検証する。併せて2つの
+失敗も固定した: RRset の1オクテット変更で壊れること、そして original TTL では
+なくレコード現在の TTL で署名すると壊れること（origin では通り全キャッシュから
+失敗する、あの障害）。
+
+境界は緩めていない —— `canonical`/`sign` は依然 crypto を import せず、それらを
+require しても provider は読み込まれない。
+
+## 更新後の残る穴
+
+1. **libp2p transport**（native DHT node 化）。プロトコル側は
+   `kad.message` + `kad.lookup` で揃っており、Noise XX も実装済み。残りは
+   multiaddr / TCP or QUIC / multistream-select / Yamux / identify / k-buckets。
+2. **contact object（RFC 5733）**。EPP は `contact-1.0` を 2307 で拒否、RDAP の
+   `/entity` は 501。registrant は現状ドメイン上の不透明な handle。
+3. **RDAP の DNSLink プレーン**（`gateway.resolve` の `:dnslink` は routing だけ
+   あって未実装。`org-ietf-dns` の DoH クライアントが使える）。
+4. **RFC 9537 redaction signalling**（redact はしているが、何を伏せたかを述べる
+   `redacted` member をまだ出していない）。
+5. **署名の検証**（本 stack は signer。`dnssec.provider/verify-fn` は自分の出力を
+   検査するためのもので、resolver 側の validator ではない）。
+
 **残る穴（優先順）:**
 
 1. ~~**IPNS の DHT publish/resolve**~~ → **格下げ済み。ADR-2607309970 を参照**
