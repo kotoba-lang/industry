@@ -2818,6 +2818,22 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fl — com-cloudflare-compat T5.2 guest records)
+
+- com-cloudflare-compat main `aaaf6291`: **parse-nat / fact-attr / id-with-prefix**
+  multi-arg pure → `:compat/digits-go` / `entity-field` / `id-prefix`;
+  `oracle/record` ported; compiler `98b56bdb` + kir `767f2f2`.
+  ADR-0005-t52-compat-guest-records.
+  Evidence: 20 tests / 213 assertions green.
+- west pin com-cloudflare-compat `cc0499d4` → `aaaf6291`
+
+Still open:
+1. T8.3 residual: reject-path request-edn Component (if/let/substring composition);
+   true set / W4 recursive ADT; full multi-file kit body
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. murakumo field constructors / seats-record-go; W4 recursive values
+
+
 ## Progress (2026-08-01fk — T8.3 multi-export EDN trust Component package)
 
 - kotoba-component#102 MERGED (`90b5c8b3`): **`:string-expression-package`** —
