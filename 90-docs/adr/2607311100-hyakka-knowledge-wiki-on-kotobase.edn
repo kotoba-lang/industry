@@ -36,12 +36,13 @@
    "D7: 拡大の前に 10M / 100M datom の実測 receipt を要求する。満たさない場合の応答は materialized view であって ref の分割ではない"
    "D8: archive の実体バイトは既定で非公開。公開するのは citation metadata と snippet のみで、全文の公開配信は source license 単位の opt-in"
    "D9: 網羅性を主張しない。coverage は data として持ち、サイト上でも未収録を未収録として表示する"
-   "D10: multi-entity join は live 未実証（本番クエリは全て単一 entity scan）。P1 の最初の作業として実証し、倒れたら edge-side join に落とす。ref 分割はこの fallback に含めない"]
+   "D10: multi-entity join は 2026-07-31 に live で実証済み（two-hop が期待どおり 2 行）。edge-side join の fallback は不要になった。ただし到達経路は /xrpc ではなく Datomic Client API (/api/*, kotobase-client の :transport :direct-v1) — /xrpc の q は triple pattern しか解さず、map 形式 Datalog は黙って 0 行を返す"]
 
   :adr/artifact
   ["network-awai/app-hyakka e40bd60 (17 tests / 235 assertions, JVM Clojure + ClojureScript 双方 0-fail)"
    "network-awai/net-kotobase b8ffb5b (docs/adr/260718 に wiki.kotobase.net の委譲を記録)"
-   "（P1 で追記）kotobase.net テナント DID / graph CID"
+   "tenant DID did:key:z6MkuEj8M1GKrAqW8ZsenbickiLvpfzJFLpNpxgyggcm1DKv (seed は kagi `hyakka-kotobase-seed`, compartment personal)"
+   "P1 join probe PASS (2026-07-31): two-hop rows=2 / control-claim rows=2"
    "（P1 で追記）two-hop join probe の結果"]
 
   :adr/verify
@@ -214,7 +215,32 @@ coverage は data として持ち（どのコーパスのどの範囲をいつ�
 
 # P1 で最初に潰す未検証点 — multi-entity join
 
-**この設計の中心（D2 の two-hop join）は、live の engine に対して未実証である。**
+**解決済み（2026-07-31 実測）。** two-hop join は live plane で期待どおり動いた:
+
+    PASS  control-claim  (single-entity scan)  rows=2
+    PASS  two-hop        (MULTI-ENTITY JOIN)   rows=2
+
+したがって edge-side join の fallback は採らない。以下は経緯と、同じ穴に落ちないための記録。
+
+**ただし到達経路が違った。** 書き込みは `/xrpc/…datomic.transact` に届いていた（head CID が前進、
+novelty 9→10→11）のに、読みは `datoms` を含めて全部 0 行だった。原因はレスポンス自身が言っていた:
+`{"deprecated":true,"prefer":"/api/*"}`（sunset 2026-11-01）。**`/xrpc` の `q` は triple pattern
+しか解さず、map 形式 Datalog を投げると黙って 0 行を返す。** 後継は Datomic Client API
+（`POST /api/{q,transact,pull,datoms,…}`）で、kotobase-client からは `:transport :direct-v1` で届く。
+**この repo の実装はすべて direct-v1 を使うこと。**
+
+**instant 属性は `#inst` リテラルでなければ通らない。** ISO-8601 文字列も epoch millis も拒否され、
+3 つとも同じ不透明な `400 InvalidDatomicRequest` になる。`hyakka.claim/->wire` が境界で 1 回だけ変換する。
+
+**conjunctive pattern の穴が 2 回出た。** engine は data pattern の AND しか持たない（`or` が無い）ので、
+「片方しか持たない属性」を両方要求するクエリは黙って 0 行になる。`:claim/value` /
+`:claim/value-item`、および item の `label` / `label-ja` / `aliases` / `class` は、**未知でも空文字で
+必ず assert する**。後者は probe の control が拾った実バグで、日本語ラベルを持たない Wikidata の
+ゲームが索引と検索から丸ごと消えていた。
+
+---
+
+以下は実証前の記録（経緯として残す）。当時の現在地:
 コードベースを実際に確認した結果（2026-07-31）:
 
 - kotobase.net で本番稼働している `:find`/`:where` クエリは **すべて単一 entity の scan**
