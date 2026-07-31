@@ -5,13 +5,13 @@
   :adr/title "ADR-2607301200: kotoba-lang/kaigi — online meeting (Zoom/Meet 相当) を自前で持つ。SFU は Cloudflare Realtime（マネージド）、シグナリングは Durable Object"
   :adr/status "accepted"
   :adr/date "2026-07-30"
-  :adr/last_verified "2026-07-30"
+  :adr/last_verified "2026-07-31"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/source-format "edn"
   :adr/authoritative_for
   ["online meeting をホストする surface repo が kotoba-lang/kaigi であること"
-   "SFU を自前実装せずマネージド（Cloudflare Realtime）に寄せる決定と、その理由が repo-wide の Rust 禁止ルールであること"
+   "SFU を自前実装せずマネージドに寄せる決定と、その理由が repo-wide の Rust 禁止ルールであること" "媒体面として Cloudflare RealtimeKit を採用し、kaigi.sfu は削除せず残す決定（2026-07-31 オーナー判断）" "RealtimeKit が kaigi.model を置き換えず、admission/role/同意の権威は model に残り、継ぎ目は token 発行であること"
    "シグナリングを Durable Object に置く決定（ADR-2607124000 で一度却下された共有 DO 案の、kaigi スコープでの復活）"
    "録画は全会一致の明示同意がなければ armed にならない不変条件（gijiroku G3 の kaigi 内での enforcement point）"
    "mesh を fallback ではなく設定で選ばれる第一級 transport として持つこと、およびその上限を data として報告すること"
@@ -69,7 +69,37 @@ workspace には会議を**ホストする**面が無かった。棚卸しの実
 だけを所有する: admission（lobby と承認）・role（host/cohost/participant）・media state・
 録画同意・メディアトポロジの決定。
 
-### 2. SFU は自前実装せずマネージド（Cloudflare Realtime）
+### 2. 媒体面は Cloudflare **RealtimeKit**（2026-07-31 オーナー判断で確定）
+
+当初は Realtime **SFU** を選んだが、**2 つは別製品で認証情報も API も互換ではない**。
+実測（2026-07-31）: ダッシュボードで作った RealtimeKit の app id を SFU API に投げると、
+全ゼロ UUID と**まったく同じ `not_found`** が返る。ドキュメントの
+\"RealtimeKit sits on top of Realtime SFU\" はアーキテクチャの話で、資格情報の共通性では
+なかった。
+
+| | SFU | RealtimeKit |
+|---|---|---|
+| host | `rtc.live.cloudflare.com/v1/apps/{app}` | `api.cloudflare.com/client/v4/accounts/{acct}/realtime/kit/{app}` |
+| 資格情報 | app secret | **Cloudflare API トークン** |
+| 抽象 | session と track（room すら無い） | meeting と participant |
+
+**RealtimeKit は `kaigi.model` を置き換えない。** RealtimeKit 自身が meeting と participant
+を持つので丸ごと乗せると 1 つの系に**権威が 2 つ**でき、preset が「誰が喋ってよいか」を、
+model が「誰が入室を許されたか」を決めて、**ホストが誰かを拒否した瞬間に食い違う**。
+そこで model が admission/role/同意の権威のまま、RealtimeKit はメディアだけを運ぶ。
+継ぎ目は `kaigi.realtimekit/token-refusal` — model が `:admitted` と言う参加者にしか
+participant token を発行しない。**発行の瞬間が唯一のゲート**（発行済み token は既に参加
+可能で、取り消す機会が存在しない）。
+
+`kaigi.plan/transport` は `:realtimekit` → `:sfu` → `:mesh` の順で選ぶ。両方設定されたら
+RealtimeKit が勝つ — 層ではなく代替で、両方積むと同じ参加者に 2 系統が track を確保する。
+
+### 2b. kaigi.sfu は削除せず残す
+
+binding は公開 OpenAPI に対して書かれテスト済みで、SFU は raw track 制御の下位オプション
+として残る。消すと次に必要になったときにワイヤ形式を再発見することになる。
+
+### 2c. 自前 SFU 実装を選ばなかった理由（当初決定、変わらず有効）
 
 **理由は性能ではなくルール。** `kami-engine-sdk-svelte` の README が予告していた
 \"planned pure-Rust SFU\" は、現在の repo-wide 規則（CLAUDE.md「Rust を新規に書かない」/
@@ -132,90 +162,63 @@ mesh では `mesh-initiator` が participant id 上の全順序を与え、**off
 function で手に入った。SFU 未採用状態（ADR-2607124000）は「マネージドに寄せる」で決着し、
 Rust 禁止ルールとの衝突も解消した。
 
-**実測した現在地（2026-07-30）**:
+**実測した現在地（2026-07-31 closing 時点）**:
 
-- pure core（model / validate / plan / sfu / signal）: **52 tests / 184 assertions、
-  JVM と nbb の両方で緑**。
-- DO シグナリング room: **deploy 済み**（`kaigi.04-feasts-minded.workers.dev`、
-  binding `env.KAIGI_ROOMS (KaigiRoom)`）。実 WebSocket 2 本 × 実 DO に対する
-  **E2E 22/22、本番で 4 回連続クリーン**。roster 直列化・unicast リレー・glare 解消・
-  publish 伝播・非 host の `:end` 拒否・終了後リレー停止まで実測。
-- ブラウザコンソール（`kaigi.ui` pure cljc + `kaigi.app`）: **実装・deploy 済み**。
-  レンダ済みページは design-quality の決定論的 HIG/WCAG 監査で **100.00 / findings ゼロ**。
-- **実通話が成立している（mesh）。** headless Chromium 2 インスタンス（fake device）で
-  **ICE connected、両側で inbound RTP 約 190KB を実測**、本番 3 回連続クリーン。
-  「connected と報告しつつメディアが無い」状態と区別するため、判定は
-  `bytesReceived > 0` に置いた（参加者数・タイル・connection state はいずれも必要だが
-  不十分）。
-- **SFU 経路は実サービスに対して未検証。** この account に Realtime app が存在せず、
-  wrangler の OAuth トークンに `calls`/`realtime` スコープが無い（app token の発行は
-  dashboard 経由）。`REALTIME_APP_ID` / `REALTIME_APP_TOKEN` の 2 つを入れれば
-  コード変更なしで `:sfu` に切り替わる。
-- **TURN は配線済みだが relay 経路は end-to-end 未検証。** 実装済み: `kaigi.turn` が
-  coturn use-auth-secret 形式の ephemeral credential を mint する
-  （`username = \"<expiry>:<participant-id>\"`、server-only secret で HMAC-SHA1）ので
-  常設の relay パスワードがブラウザに渡ることはない／room が接続ごとに mint する／
-  `/api/kaigi/health` が `turn: ok|absent|error: …` を返す（「設定されているか」と
-  「実際に mint できるか」は別で、その差は外から見えない — mint が room 内で throw すると
-  WebSocket が素の 1006 で落ちログに何も出ない）／console は relay 不在を画面上で告知する／
-  `?ice=relay` で relay-only を強制し `e2e-media.cljs --relay` が選択候補型まで assert する
-  （同一マシンの 2 ブラウザは host 候補で繋がるので、強制しない限り TURN が完全に壊れていても
-  全テストが通る）。
-  **未達: Chromium が relay に 1 バイトも送らない。** 実測（2026-07-30）— 有効な mint 済み
-  credential があり、`iceTransportPolicy` が `relay` でも `all` でも、relay が loopback でも
-  LAN アドレスでも、headless-shell でもフル Chrome for Testing でも、TURN 由来の候補は 0 件・
-  `icecandidateerror` も 0 件・relay 側の受信も 0 件だった。
-  **relay 側の問題ではない**: `org-ietf-turn` の `listener_demo.cljs` が実 UDP で 3/3 通過
-  （Allocate / ChannelBind + 双方向 ChannelData / 誤 credential 拒否）し、`kaigi.turn` の
-  テストは mint 形式がその listener の verifier に受理されることを示している。途上で
-  上流の実バグ 1 件を発見・修正した（**`org-ietf-turn` `ede5921`: listener が STUN Binding
-  request を捨てていた** — ICE agent は Allocate より前にこれを送るので、落とすと client は
-  サーバを到達不能と判断し relay 候補を一度も要求しない。listener の docstring は Binding を
-  「無害な未処理トラフィックの例」と明記しており、その想定自体が誤りだった）。必要だったが
-  十分ではなく、残る壁はブラウザ側の ICE サーバ受理条件にある — 未解決。
+- pure core（model / validate / plan / sfu / **realtimekit** / turn / **recording** /
+  signal / ui）: **82 tests / 293 assertions、JVM と nbb の両方で緑**。
+- DO シグナリング room: deploy 済み。実 WebSocket 2 本 × 実 DO の **E2E 22/22**。
+- ブラウザコンソール: 実装・deploy 済み。design-quality **100.00 / findings ゼロ**。
+- **実通話（mesh）が成立している**: headless Chromium 2 台で ICE connected、両側で
+  inbound RTP 約 190KB を実測、本番 3 回連続クリーン。
+- **録画が成立している**: 各参加者が自分のストリームを録り、**約 300KB の実 WebM が
+  4 オブジェクト**、`object-key` が定める通りのキーで R2 に着地（E2E 9/9）。同意撤回が
+  共有値を off にし全レコーダーを停止、飛行中パートは 409 で拒否されることまで実測。
+- **RealtimeKit が本番で稼働**: `transport: realtimekit`、**実 participant token が返る**
+  （698 文字の JWT）。**kaigi が実サービスに到達したのはこれが初めて**。入室承認ゲートも
+  本番確認済み — `remove` された参加者が再接続すると admission が `:requested` に戻り
+  plan フレーム自体が来ない = token も出ない。
+- **ブラウザ側は RealtimeKit SDK をまだ読み込まない。** token は届いているが未使用で、
+  実メディアは依然 mesh 経路。ここが入って初めて「RealtimeKit で通話している」と言える。
+- **SFU 経路は実サービス未検証のまま**（この account に SFU app が無い。RealtimeKit app は
+  SFU では使えないことを実測済み）。binding とテストは残してある。
+- **TURN の relay 経路は未解決**。Chromium が relay に 1 バイトも送らない（policy
+  relay/all、loopback/LAN、headless-shell/フル Chrome の全組み合わせで候補 0・
+  icecandidateerror 0・relay 受信 0）。relay 側は正常で `org-ietf-turn` の listener_demo が
+  実 UDP 3/3 通過。途上で上流の実バグを 1 件修正（**ede5921**: listener が STUN Binding を
+  落としていた — ICE agent は Allocate より前にこれを送る）。必要だったが十分ではなかった。
 
 **E2E が捕まえた実バグ（いずれもユニットテストと validate の両方が見逃した）**:
 
-1. host 未定の room は空 host id で構築され、`kaigi.model/meeting` がそれを忠実に
-   `\"\"` キーの参加者に変える。そのプレースホルダが host 確定後も残り、全 roster に
-   無名の幽霊が出ていた。修正と同時に `validate` へ `:participant/blank-id` /
-   `:participant/key-id-mismatch` を追加。
-2. **`panel` / `button` は未知の opts を黙って捨てる**（`shitsuke.components/card` /
-   `button` は `:class`（文字列）と `:id`/`:act` のみ読む）。`:attrs {:data-kaigi-tile id}`
-   は「正しく見えるが data 属性が一切無い」markup を生み、ブラウザは video を貼る tile を
-   0 個しか見つけられなかった — エラーはどこにも出ない。data hook は素の wrapper 要素に
-   出し、対象は `:act` 文字列に埋める（`\"admit:rin\"`）。同じ制約でトグルに
-   `aria-pressed` を出せない（**上流ギャップとして記録**、回避策で潰さない）。
-3. `console` が `app-shell` 全体を返すのにブラウザは内側だけ差し替えていたため、初回の
-   ライブレンダで shell と nav が二重に入れ子になっていた。`console` / `page-shell` に
-   分割し、両レンダが同一要素を所有するようにした。
-4. **assets のミスは asset 層の `not_found_handling` ではなく Worker に落ちる。**
-   本番で 2 ブラウザのうち片方だけがコンソールページで 404 を受け、**会議が黙って 1 人に
-   なっていた**（`curl` では再現しない — 非 navigation リクエストは正しく 404 になるため）。
-   navigation には shell を返すよう Worker 側で対応。
+1. host 未定 room の空 id プレースホルダが roster に幽霊として残る。`validate` に
+   `:participant/blank-id` / `:participant/key-id-mismatch` を追加。
+2. **`panel` / `button` は未知の opts を黙って捨てる**（`shitsuke` の card/button は
+   `:class`（文字列）と `:id`/`:act` のみ）。「正しく見えるが data 属性が一切無い」markup を
+   生み、ブラウザは video を貼る tile を 0 個しか見つけられなかった。
+3. `console` が app-shell 全体を返すのにブラウザは内側だけ差し替えており、初回ライブ
+   レンダで shell と nav が二重に入れ子になった。
+4. **assets のミスは asset 層の `not_found_handling` ではなく Worker に落ちる。** 本番で
+   2 ブラウザのうち片方だけがコンソールページで 404 を受け、**会議が黙って 1 人になって
+   いた**（`curl` では再現しない）。
+5. **DO が素の room を `:scheduled` のまま作っており `m/start` を呼ぶものが無かった。**
+   `live?` に依存するものが全部黙って無効になり、症状は「押しても何も起きない録画開始
+   ボタン」でエラーはどこにも出ない。
 
-**検証ハーネス自身のバグも 3 つ**: ①ビルド失敗時に `dist/` の旧成果物が残り、verifier が
-「コンパイルできないコード」に対して 6 項目グリーンを報告した → 成果物がソースより古ければ
-検証を拒否する staleness guard を追加 ②固定 sleep 依存で、deploy 直後の伝播が遅い 1 回だけ
-存在しない roster 欠陥を報告した → 条件待ちに変更 ③`clj->js` が keyword の名前空間を落とす
-ため、`kaigi/participants` で読もうとして undefined を掴み「機能が壊れている」ように
-見えた（実際の JS キーは `participants`）。
+**検証ハーネス自身のバグ 3 件**: ビルド失敗時の stale 成果物へのグリーン報告（staleness
+guard を追加）／固定 sleep 由来のフレーク（条件待ちへ）／`clj->js` が keyword の名前空間を
+落とすため undefined を掴んで「機能が壊れている」ように見えた件。
 
-**環境側で 1 件**: superproject の checkout に shallow 境界が再発しており（CLAUDE.md /
-ADR-2607211600 が廃止したはずのもの）、`git merge` が `unrelated histories` を返し
-`272 ahead` と誤表示した。サーバ側 compare は `status: ahead` / `behind_by: 0` /
-`merge_base == ローカル HEAD` を返しており、force-push ではなく純粋な fast-forward。
-`git fetch --deepen` でグラフを繋いで解消（CLAUDE.md の判別手順どおり、症状だけで
-force-push と断定しなかった）。
+**移植性のトラップ 2 件**（二重ランタイムゲートが捕捉）: `.padStart` は JS のみ（JVM で
+3 errors）／`(int ch)` は cljs で常に 0（招待コードの定数時間比較が**同じ長さの文字列を
+すべて一致と判定**していた = 任意のコードで招待が通る状態だった）。
 
-**残（優先順）**: ①Realtime app の provisioning（オーナー 1 アクション、コード変更なし。
-account に Realtime app が無く、wrangler OAuth に `calls` スコープも無い。keychain の
-Cloudflare トークンも存在せず、agent 側から取得する経路は無い）②relay 経路の未解決
-ブロッカー（上記。ブラウザが ICE サーバを受理しない理由の特定）③録画パイプライン
-（gijiroku への handoff）
-④`kaisha` チャンネル / `calendar` イベントとの接続（`:kaigi/channel` slot は用意済み、
-読み手が無い）⑤liquid-glass の button/panel に `:attrs` を通す上流修正
-⑥mesh の 4 人上限を超える会議（= ①の完了で解ける）。
+**運用面の事故と修復**: ①共有 checkout で作業して別セッションの WIP にテストを壊された
+（以後は隔離 worktree）②**pin を退行させた** — landing スクリプトに前進検査が無く、
+`status: behind` を素通りさせて他セッションの 3 commits を巻き戻した。即修復し、スクリプトに
+`assert-forward!` を追加して同じ退行が拒否されることを実 SHA で確認した。
+
+**残（優先順）**: ①ブラウザ側の RealtimeKit SDK 読み込み（token は届いている）
+②TURN relay のブラウザ側ブロッカー ③gijiroku が録画 handoff record を読む
+④SFU app の provisioning（使うなら）⑤`kaisha` チャンネル / `calendar` との接続。
 
 ## References
 
