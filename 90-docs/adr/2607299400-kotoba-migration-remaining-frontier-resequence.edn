@@ -2389,6 +2389,27 @@ Still open:
    (positional call-record may continue on task.plan / infer.* multi-arg hosts)
 
 
+## Progress (2026-07-31dr — T5.2 call-record wave 8+9 + pin)
+
+- murakumo#272 MERGED (`a2aaa58`): **T5.2 wave 8** — task.plan slots/unsched/failed,
+  infer.moe/join/gc multi-arg, driver dial-ok residual.
+  ADR-260731-w6-t52-call-record-expand8.
+- murakumo#273 MERGED (`e7b63682`): **T5.2 wave 9** — infer.engine cmd builders,
+  infer.schedule score/queue-inc, task residual wave/slot/summary.
+  ADR-260731-w6-t52-call-record-expand9.
+  Evidence: 50 tests / 371 assertions (wave 9 focused + parity).
+- west pin murakumo `13ffe134` → `e7b63682` (covers #272+#273).
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**; flip `:wasm-aot :implemented` only if admissible
+2. T8.4 residual: optional further live corpus; Node transport/pg needs
+   actor-host providers first
+3. T5.2 native guest record wire (deferred); W4 recursive values
+   (positional call-record nearly complete on product shells; residual may
+   remain on sparse single-arg constants and T5.3 oracle/record paths)
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
