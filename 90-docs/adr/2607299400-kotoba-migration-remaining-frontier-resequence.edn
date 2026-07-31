@@ -2818,6 +2818,25 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01gf — kotoba-ui document-plane multi-arg guest records)
+
+- kotoba-ui#11 MERGED (`80445c9d`): **theme_document** multi-arg pure →
+  guest records (`:uidoc/*`: theme, theme-appearance, hex helpers, join-nl,
+  layer-wrap). Completes design-system document-plane cutover
+  (css → html → shitsuke → liquid-glass → **kotoba-ui**). document-in-record
+  compiler `7691b1ae`; liquid-glass `5edd719a`; shitsuke `eeacdb93`; css
+  `ba212138`.
+  Evidence: **29 tests / 210 assertions** green.
+- west pin kotoba-ui → `80445c9d`
+- **Design-system document-plane complete (5/5).**
+
+Still open:
+1. T8.3 residual: true set uniqueness / W4 recursive values; only then
+   `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
+
+
 ## Progress (2026-08-01ge — liquid-glass document-plane multi-arg guest records)
 
 - liquid-glass-ui#12 MERGED (`5edd719a`): **tokens_document** multi-arg pure →
