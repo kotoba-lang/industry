@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist (0161); **all ops kits** http/secret/entropy/process/scoped-fs/git Components + signed-wasm ready (0165–0170); compiler-AOT kit body still open |
-| T8.4 | host-parity L5 | **partial** — JVM 49 + Node 16 live (#96–#115; full wire inject fail-closed); SCRAM/PG live success still qualification |
+| T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -1426,6 +1426,23 @@ Still open:
    thin Component packages, not multi-file kit EDN AOT)
 2. T8.4 residual: **live SCRAM/PG success** (qualification suite) — inject
    surface for wire+SCRAM imports is complete
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+
+## Progress (2026-07-31br — T8.4 host-parity matrix inject status)
+
+- kotoba-lang#355 MERGED (`d95cf90f`): **T8.4 matrix honesty** — L5 host-parity
+  SSoT marks pg wire / SCRAM / pool jvm+node `:inject` (linkable) matching
+  kototama fail-closed inject surface; browser `:no`. Conformance +8 fixtures
+  (total 53). Evidence: host-parity-test 6 tests / 25 assertions.
+- west pin kotoba-lang → d95cf90f.
+
+Still open:
+1. T8.3 residual: compiler-AOT kit body for ops (all ops Components landed;
+   thin/policy Components, not multi-file kit EDN AOT)
+2. T8.4 residual: **live SCRAM/PG success** (qualification suite only) —
+   inject surface + matrix linkability complete
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
