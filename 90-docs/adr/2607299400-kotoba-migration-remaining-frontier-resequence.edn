@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist (0161); **all ops kits** http/secret/entropy/process/scoped-fs/git Components + signed-wasm ready (0165–0170); compiler-AOT kit body still open |
-| T8.4 | host-parity L5 | **partial** — JVM 33 + Node 14 live (#96–#110; pg-cancel inject); SCRAM/PG success + broader component-link still open |
+| T8.4 | host-parity L5 | **partial** — JVM 33 + Node 16 live (#96–#111; pg-cancel + Node cbor/json); SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -1334,6 +1334,20 @@ Still open:
 1. T8.3 residual: compiler-AOT kit body for ops (all ops Components landed)
 2. T8.4 residual: live SCRAM/PG success (qualification suite);
    broader pg component-link (query/prepare beyond pool+cancel)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31bm — T8.4 Node cbor/json-encode live)
+
+- kototama#111 MERGED (`c37f6798`): **T8.4 Node live-prove** cbor-encode +
+  json-encode pure flat-pairs. Node corpus **14 → 16** (JVM still 33).
+  Evidence: node 16/16 + host-parity-live-test 4 tests / 143 assertions.
+- west pin kototama 617b6c37 → c37f6798.
+
+Still open:
+1. T8.3 residual: compiler-AOT kit body for ops
+2. T8.4 residual: live SCRAM/PG success (qualification suite);
+   pg component-link beyond pool+cancel
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
