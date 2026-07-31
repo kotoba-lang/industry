@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — HTTP packing + secret_name_ok + fs_path_ok pure Components (ADR 0199–0207); nested EDN/full kit body W4-gated; wasm-aot :implemented still open |
-| T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success restored (kototama#120 SCRAM-SHA-256-PLUS via postgresql-interop) |
+| T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; wire+SCRAM+pool fail-closed; live SCRAM/PG success (#120); **scram-sha256 host crypto live** (kototama#121) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -2257,6 +2257,26 @@ Still open:
 1. T8.3 residual: nested EDN codec / full multi-file kit body under **W4**;
    flip `:wasm-aot :implemented` only when admissible
 2. T8.4 residual: optional host_parity_live corpus expansion; Node kagi inject
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31dk — T8.4 scram-sha256 host crypto live in corpus)
+
+- kototama#121 MERGED (`d806b9e1`): **T8.4 host_parity_live expansion**
+  - Wire matrix case `:scram-sha256-jvm-available` into JVM live corpus
+    (was data-only after #120 restored purpose-bound tender host)
+  - Success: credentials inject + allowlist + `allow-secret-imports?` → **64**
+    (client-proof||server-signature; PBKDF2/HMAC host-side; no live PG)
+  - Deny: no allowlist/credentials → **-1** fail-closed
+  - JVM live corpus **54 → 56**; Node 16 unchanged
+  Evidence: host-parity-live-test 4 tests / 235 assertions green.
+- west pin kototama 000b987d → d806b9e1.
+
+Still open:
+1. T8.3 residual: nested EDN codec / full multi-file kit body under **W4**;
+   flip `:wasm-aot :implemented` only when admissible
+2. T8.4 residual: optional further host_parity expansion; Node kagi env /
+   browser kagi absent (Node inject already live-proven 16/16)
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
