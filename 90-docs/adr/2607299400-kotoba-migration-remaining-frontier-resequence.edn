@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist (0161); **all ops kits** http/secret/entropy/process/scoped-fs/git Components + signed-wasm ready (0165–0170); compiler-AOT kit body still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — Components+signed-wasm (0165–0170); compiler-AOT pure bounds http (0171) + process/entropy/git (0172); secret/scoped-fs hand-WAT + full request/result codec AOT still open |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -1460,6 +1460,25 @@ Still open:
 Still open:
 1. T8.3 residual: **full** request/result EDN codec AOT for ops kits;
    re-emit secret/process/… pure policies via compiler (hand WAT remain)
+2. T8.4 residual: live SCRAM/PG success (qualification suite)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+
+## Progress (2026-07-31bt — T8.3 compiler-AOT process/entropy/git bounds)
+
+- provider#56 MERGED (`16ec1f22`): **T8.3 ADR 0172** — re-emit process/entropy/git
+  pure numeric bounds via kotoba-compiler wasm32 (`process_spawn_bounds_ok`,
+  `entropy_draw_ok`, `git_run_bounds_ok`) + Components; registry
+  `:*-bounds{,-component}` with `:builder :kotoba-compiler/v1`. Hand WAT
+  pilots retained. Secret/scoped-fs memory-scan stay hand-WAT. `:wasm-aot`
+  remains `:partial`. Evidence: ops-kit-packages 12 tests / 107 assertions;
+  Node live vectors process/git 0/-1/-2/-3/-4; entropy 0/-1.
+- west pin provider 60b7ddc6 → 16ec1f22.
+
+Still open:
+1. T8.3 residual: full request/result EDN codec AOT; secret/scoped-fs
+   memory-scan policy compiler re-emit (needs string surface)
 2. T8.4 residual: live SCRAM/PG success (qualification suite)
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
