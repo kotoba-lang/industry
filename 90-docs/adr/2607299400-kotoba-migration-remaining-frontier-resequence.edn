@@ -2818,6 +2818,24 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fs — kotoba-ui form-A T5.2 guest records; design-system 5/5)
+
+- kotoba-ui#10 MERGED (`53c83681`): **theme_core** multi-arg pure → guest
+  records (`:ui/*` schemas: hex-digit-at, hex-byte-at, nibble-byte, rgba-of,
+  hex-rgba, join-nl, layer-wrap). Compiler `98b56bdb`; shitsuke → `832d2bd0`;
+  liquid-glass-ui → `c9f11baf`; css → `19274463`. Document plane multi-arg
+  left multi-arg (document-in-record closed profile still open).
+  Evidence: **29 tests / 210 assertions** green (design-quality gate 100.0).
+- west pin kotoba-ui → `53c83681`
+- **Design-system form-A T5.2 complete** for css / html / shitsuke /
+  liquid-glass-ui / kotoba-ui (5/5).
+
+Still open:
+1. document-plane residual blocked on **document-in-record** closed profile
+2. T8.3 full multi-export request-edn reject composition; T8.4; murakumo residual
+3. W4 recursive logical values (post design-system form-A intermediate oracle)
+
+
 ## Progress (2026-08-01fr — liquid-glass-ui form-A T5.2 guest records)
 
 - liquid-glass-ui#11 MERGED (`c9f11baf`): **tokens_core** multi-arg pure →
