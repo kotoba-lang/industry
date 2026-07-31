@@ -2818,6 +2818,22 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-07-31eu — T5.2 rebalance pairs + task max2/min2)
+
+- murakumo main `ce1cd9d8`: **rebalance residual multi-arg** → `:rebalance/pair`/
+  `:triple`/`:seats-in` (seats-equal, pipeline, move-needed, reason, take,
+  pool-seats-of/seats-for-online); **task max2/min2** → `:task/pair`.
+  ADR-260731-w6-t52-rebalance-pair-records. Evidence: 90/1612 green.
+- west pin murakumo `82e7553b` → `ce1cd9d8`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: digit-scanner multi-arg internals optional; plan partition
+   multi-arg with model ref; identifier-len-ok?; W4 recursive values
+
+
 ## Progress (2026-07-31et — T5.2 assign-step-2 + reconcile tournament)
 
 - murakumo main `82e7553b`: **schedule assign-step-2** + **reconcile tournament**
