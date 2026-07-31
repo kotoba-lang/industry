@@ -202,6 +202,83 @@ gateway のキャッシュ方針であり、`gateway.resolve` のプレーン ro
 kotobase の graph 名は k51 ではないので、配線しても今日の挙動は変わらない
 （それが migration であって cutover でないという設計の要点）。
 
+## 2607-07-31 追記2 — transport 側も、socket を残して全部揃った
+
+前回の追記で「残るのは transport で、これは patch ではなく project」と書いた
+部分を進めた。**プロトコル層は全部そろい、残るのは socket そのものだけ**。
+
+| 追加 | repo | tests |
+|---|---|---|
+| k-bucket routing table | `kad.table` | 31→40 / 84→108 |
+| multiaddr | `multiformats.multiaddr` | +31 / +121 |
+| multistream-select 1.0.0 + Yamux | `io-libp2p-specs-transport`（新規） | 25 / 119 |
+
+### k-bucket の eviction 規則が eclipse 防御そのもの
+
+table は「最も近い k ピア」ではなく**全距離スケールに k ピアずつ**持つ。
+bucket 0 は keyspace の半分、bucket 255 は1点。最も近い k ピアだけの table は
+keyspace の遠い半分について何も知らず、そこへのクエリを routing できない。
+
+bucket が満杯のとき Kademlia §2.2 は古いピアを追い出さない。**least recently
+seen に ping し、応答があればそのピアが残り新参が捨てられる。** 逆に見えるが、
+長生きしたピアはさらに生き残りやすく、そして **identity を量産できる攻撃者が
+現れただけでは既存ピアを追い出せない**。arrival で evict する table は、誰でも
+ノードのネットワーク観測を丸ごと置き換えられる —— それが eclipse 攻撃。
+`note-seen` は自分で evict せず `:probe` を返して結果を待つ。fresh identity を
+50個投げても incumbent が応答する限り table を奪えないテストがある。
+
+### multiaddr — バイナリ形式が同一性
+
+`/ip4/127.0.0.1/tcp/4001` は特定のオクテット列であり、2つのアドレスが同じ
+アドレスなのはオクテットが一致するとき。文字列で比較すると `/tcp/04001` が
+別アドレスになり、1つのピアが routing table に2エントリを占める。
+
+**CI が JVM テストでは出ない CLJS 固有バグを捕まえた**: `(int \c)` は JVM と
+CLJS で意味が違い（前者は code point、後者は NaN）、全ての文字列値
+（`/dns4/…`、`/unix/…`）がゼロに潰れて空白として復号されていた。明示的な
+UTF-8 変換に置き換え、両プラットフォームで検証し直した。
+
+### multistream / Yamux — 各1つの決定的な落とし穴
+
+**multistream: 改行は length の内側。** それを外すと peer が frame できない
+ストリームになり、最初のメッセージがプロトコル ID なので**framing バグでは
+なく「相手が知らないプロトコルを喋っている」ように見える**。また
+**echo が受諾そのもの**で `ok` は無い —— 想定外メッセージを成功と解釈する
+dialer は、誰も合意していないプロトコルを喋り始める。
+
+**Yamux: `length` の意味が type で変わる。** DATA ではバイト数でその分続くが、
+WINDOW_UPDATE では**クレジット差分で何も続かない**。後者で length 分読むと
+次フレームのヘッダを payload として食い、**エラーも出ずに接続が恒久的に
+desync する**（バイト列は構造的に妥当なので）。stream ID の偶奇が唯一の衝突
+回避機構で、無いと両端がいつか同じ ID を別ストリームに使い互いのデータを
+自分のものとして読む。
+
+## 現在地
+
+**native DHT node に残るのは socket 層だけ**:
+
+    TCP socket        ← 残っているのはここだけ
+      multistream(/noise)   ✅ io-libp2p-specs-transport
+      Noise XX              ✅ kotoba-lang/noise（既存）
+      multistream(/yamux)   ✅
+      Yamux                 ✅
+      /ipfs/kad/1.0.0       ✅ io-libp2p-specs-kad-dht
+      k-buckets / lookup    ✅
+      multiaddr             ✅ multiformats.multiaddr
+
+socket 層は `nameserver.server`（org-ietf-dns の JVM 専用 UDP/TCP listener）と
+同じ位置づけになる —— 純粋層は全て `.cljc` のまま、socket だけが host 依存。
+
+**残る穴（優先順）:**
+
+1. **socket 層**（TCP listener/dialer + 上記スタックの配線 + identify）。
+2. **contact object（RFC 5733）** —— EPP は `contact-1.0` を 2307、RDAP の
+   `/entity` は 501。
+3. **RDAP の DNSLink プレーン**（`gateway.resolve` の `:dnslink` は routing の
+   み。`org-ietf-dns` の DoH クライアントが使える）。
+4. **RFC 9537 redaction signalling**。
+5. **QUIC**（multistream + Yamux の両層を包含する別プロジェクト）。
+
 **残る穴（優先順）:**
 
 1. **libp2p transport**（上記の名指しリスト）。これが埋まると `kad.message` +
