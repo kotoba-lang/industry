@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 12359, "etzhayyim-xrpc-proxy" 529},
+ {"etzhayyim-did-web" 12667, "etzhayyim-xrpc-proxy" 531},
  :zone
- {:requests-7d 51569,
-  :pageviews-7d 1564,
-  :uniques-7d-sum 2353,
+ {:requests-7d 52303,
+  :pageviews-7d 1584,
+  :uniques-7d-sum 2369,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
@@ -15,15 +15,15 @@
    {:path "/.git/config", :requests 4}
    {:path "/actor/tomoshibi/did.json", :requests 4}
    {:path "/organism/organism.json", :requests 4}
+   {:path "/actor/projector/did.json", :requests 3}
    {:path "/gov", :requests 3}
-   {:path "/.well-known/actors.json", :requests 3}
-   {:path "/hashtag/ai", :requests 3}],
-  :status-mix {:ok 231, :client-error 896, :server-error 6734},
+   {:path "/.well-known/actors.json", :requests 3}],
+  :status-mix {:ok 225, :client-error 1030, :server-error 6622},
   :window "24h"},
  :as-of "2026-07-31",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 11, :error-5xx-pct 86},
+ {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 84},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 18 · /.well-known/did.json 5 · /.git/config 4 · /actor/tomoshibi/did.json 4 · /organism/organism.json 4 | 4xx(probe) 11% · 5xx 86%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 18 · /.well-known/did.json 5 · /.git/config 4 · /actor/tomoshibi/did.json 4 · /organism/organism.json 4 | 4xx(probe) 13% · 5xx 84%",
  :signal
- "etzhayyim.com 実測 51569 req/7d・2353 uniques(日次和)・うち4xx probe 11%(24h)、workers 12888 inv/7d"}
+ "etzhayyim.com 実測 52303 req/7d・2369 uniques(日次和)・うち4xx probe 13%(24h)、workers 13198 inv/7d"}
