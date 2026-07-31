@@ -1411,6 +1411,24 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31bq — T8.4 pg SCRAM open/close inject)
+
+- kototama#116 MERGED (`0a165d8b`): **T8.4 SCRAM wire inject** — `:pg-open-scram`,
+  `:pg-open-scram-random`, `:pg-open-scram-cancellable-random` (handle 0),
+  `:pg-cancel-authority-use` / `:pg-close-scram` (-1) via postgresql-wire-provider.
+  JVM corpus **49 → 54** (Node 16). Focused suite 26 tests / 623 assertions.
+- kototama#118 MERGED (`19280f74`): TCB digests refresh (browser/contract/guest +
+  pre-existing tender.clj drift) so CLJC gate passes.
+- west pin kototama c6af111a → 19280f74.
+
+Still open:
+1. T8.3 residual: compiler-AOT kit body for ops (all ops Components landed;
+   thin Component packages, not multi-file kit EDN AOT)
+2. T8.4 residual: **live SCRAM/PG success** (qualification suite) — inject
+   surface for wire+SCRAM imports is complete
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
