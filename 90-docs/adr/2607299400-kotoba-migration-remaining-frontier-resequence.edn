@@ -2818,6 +2818,45 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-07-31eo — T5.2 credits multi-arg residual records)
+
+- murakumo main `9337d82e`: **credits residual multi-arg pure** → single guest
+  records — `token-cost`/`unit-cost` → `:credits/mul`, `cut` → `:credits/cut-in`,
+  `pool` → `:credits/pool-in`, `mt-sum-2/3` → `:credits/mt-pair`/`:mt-triple`,
+  `share-floor` → `:credits/share-in`, `job-cost-2/3` → `:credits/job2`/`:job3`,
+  `share-record-2` → `:credits/shares-w`, `settle-pool-shares-2` → `:credits/settle-w`.
+  Host float `job-cost`/`settle` stay host. ADR-260731-w6-t52-credits-multi-arg-records.
+  Evidence: focused credits parity + authority 75/1451 green.
+- west pin murakumo `e2c9edac` → `9337d82e`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: digit-scanner multi-arg internals optional; schedule
+   better-score?/queue-inc-if + plan/task tournament multi-arg helpers → guest
+   records; W4 recursive values
+
+
+## Progress (2026-07-31en — T5.2 classify-run-flags multi-option-string)
+
+- murakumo main `e2c9edac`: **classify-run-flags** folds five `[:option :string]`
+  unit/kind tokens into guest `:rebalance/run-flags` (images/video/audio/swarm/tokens).
+  Host `demand-from-runs` projects presence → `oracle/record` + `call-record` `:raw`;
+  class codes 0–5 unchanged. Closes the last product multi-option-string pure after
+  Progress 31em compiler unlock. ADR-260731-w6-t52-classify-run-flags.
+  Evidence: focused rebalance parity + authority green on land.
+- west pin murakumo `468a4c1c` → `e2c9edac`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: digit-scanner multi-arg internals optional; remaining multi-arg
+   pure (credits cut/pool/job-cost/mt-sum/share-floor; schedule better-score?/queue-inc-if;
+   plan/task tournament helpers) → guest records; W4 recursive values
+
+
 ## Progress (2026-07-31em — T5.2 option-string-in-record closed + product unlock)
 
 - **compiler** main `98b56bdb`: if-some desugar resolves `[:option T]` from
