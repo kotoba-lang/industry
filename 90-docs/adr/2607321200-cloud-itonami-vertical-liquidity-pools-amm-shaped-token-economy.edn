@@ -375,6 +375,37 @@ billing_x402/propose-x402-rule!  (org/repo, seller, path-prefix, usd, pay-to)
   → vertical 別収益 → θ(v)
 ```
 
+### 4c. seller をいくつ作るか — 価格の粒度が決める（2026-07-31 実測）
+
+registry の代数を読むと選択肢が絞れる:
+
+- `registry/upsert-seller` は **seller キーで丸ごと置換**する（`(mapv #(if (= seller (:seller %)) rule %) ...)`）。
+  **1 seller = 1 rule** であり、「1 seller に複数 rule」は存在しない。
+- `facilitator/rule->requirements` は `(:usd rule)` を使う。**価格は rule 単位**で、path ごとには変えられない。
+- `handle-gateway` の `path` は **seller 以降の全体**（`/gateway/cloud-itonami/isic-5820/crm/leads`
+  → `/isic-5820/crm/leads`）。したがって1 seller の下でも **vertical は `:path` の第1セグメントで判別できる。**
+
+| | (i) vertical ごとに seller | (ii) seller 1つ |
+|---|---|---|
+| registry | **458 entry が単一 JSON 配列**（key `\"registry\"`）に入り、upsert のたび全体を書き直す | 1 entry |
+| settlements KV | 458 key | **1 key**（CAS 無し read-modify-write に集中する） |
+| 承認回数 | propose→承認 を **458 回** | 1 回 |
+| vertical 別収益 | seller 単位で自明 | **`:by-path` で得る** ← 本日実装 |
+| **価格** | **vertical ごとに設定可** | **全 458 vertical 一律** |
+
+**どちらの極も採らない。** 一律価格は製品として成立しない（規制業種の agent run と小売業種のそれは価値が違う）
+一方、458 seller は承認 458 回・単一 registry 配列の肥大・KV key 458 本を招く。
+
+> **決定: seller は「価格 tier」ごとに作る**（例 `itonami-basic` / `itonami-pro` / `itonami-regulated` の3〜5個）。
+> vertical は tier に割り当て、**tier 内の vertical 別収益は `:by-path` で分解する。**
+> registry も settlements key も承認回数も tier 数（3〜5）で済み、価格は tier 粒度で設定でき、
+> vertical 粒度の帰属は本日実装した fold がそのまま担う。
+
+**コストは明記する**: tier を跨いだ vertical の値付け変更は seller の付け替え（= 新しい rule 登録と
+path-prefix 変更）になる。また settlements が少数 key に集中するので、**上に記した CAS 無し
+read-modify-write の欠損リスクはこの構成で悪化する** —— DO 直列化の修正は tier 構成を採るなら
+配当開始前の必須項目になる。
+
 **step 1 の再定義**: 「itonami.cloud に discovery 文書を置く」ではなく
 **「vertical ごとに gateway seller rule を別 path-prefix で登録する」**。前者は (A) を含意しており
 約540行の実装を必要とするが、後者は既存の propose→承認→登録フローに乗るだけである。**データ経路は
@@ -576,8 +607,12 @@ step 8  curve と share の発行                                               
      :note \"ns docstring が『store/approval-queue の配線は these pure fns の上の thin follow-up』と書いており、pure 層の存在は確認したが approval queue への接続は読んでいない。business-governor が :adnet.campaign/* を委譲されている旨は advertiser_ops.cljc:27 にあるが、tick! の proposal 生成側にキャンペーン kind が載っているかは未確認\"}
     {:gap \"本 ADR は loop-system-dynamics に namespace を追加していない — 採点は scratchpad\"
      :note \"採択後に cloud_itonami_vlp_levers.cljs として正式配置する\"}
-    {:gap \"vertical ごとの path-prefix 設計そのものが未着手\"
-     :note \"gateway seller rule を 458 vertical 分どう名付け、どう登録するか（1 seller 多 rule か、vertical ごとに seller を分けるか）は未決。settlement は seller 単位で保存されるので、seller を分けると :by-path すら不要になる代わりに KV エントリが 458 本に増える\"}]"
+    {:gap \"（解消 2026-07-31）seller をいくつ作るか\"
+     :resolved \"価格 tier ごと（3〜5個）。registry/upsert-seller は seller キーで丸ごと置換するので 1 seller = 1 rule であり『1 seller 多 rule』は存在せず、facilitator/rule->requirements は (:usd rule) を使うので価格は rule 単位。一律価格は製品として不成立、458 seller は承認 458 回と単一 registry 配列の肥大を招くため、両極を採らず tier 分割にする。tier 内の vertical 別収益は :by-path が担う。decision §4c 参照\"}
+    {:gap \"tier 構成は settlements KV の欠損リスクを悪化させる\"
+     :impact \"settlement が少数 key に集中するので、CAS 無し read-modify-write の last-write-wins が当たる確率が上がる。LP 配当を出すなら DO 直列化は必須の前提条件になる\"}
+    {:gap \"どの vertical をどの tier に置くかの基準が無い\"
+     :note \"規制業種と小売業種で agent run の価値が違うという定性的な理由までは言えるが、tier 境界を引く実測データ（vertical 別の支払意思・原価）は存在しない。外部有償 0 の現状では測れない\"}]"
 
   :adr/body
   "# ADR-2607321200: vertical liquidity pool — AMM で初期駆動する分散型 SaaS
