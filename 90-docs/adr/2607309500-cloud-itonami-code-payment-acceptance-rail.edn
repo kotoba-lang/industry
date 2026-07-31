@@ -146,14 +146,20 @@ ADR-2606302300 の layer test を落ちるので kotoba-lang capability library 
    加盟店契約と PSP の審査が前提。この ADR はそこに踏み込まない。
 2. **ライセンスは取得していない** — D2 の旗が立つだけ。収納代行 / 資金移動業の
    判断は owner の意思決定であって library の出力ではない。
-3. **escrow への配線がまだ無い** — `covers-plan?` で plan の
-   `:plan/buyer-charge-minor` と突き合わせるところまで。capture 済み acceptance を
-   escrow の funding evidence として要求する配線は次段。
-4. **`cloud-itonami-app` は無変更** — payment authority は settlement RECORD の
-   ままでよく、コード決済のために app に credential を持たせる変更は一切していない
-   （ADR-2607300900 の到達上限をそのまま維持）。
-5. **actor の operation graph に phase を足していない** — `settleops` 側は拒否の
-   1点だけ。受入フローを actor として運転するのは別 ADR。
+3. ~~**escrow への配線がまだ無い**~~ — **2026-07-30 に解消（ADR-2607309800）**。
+   custodial flow では PSP attest 済み capture が store に無い限り escrow を開くことも
+   release を承認することもできない（HARD check 7）。
+4. **`cloud-itonami-app` は無変更**（現在も維持）— payment authority は settlement
+   RECORD のままでよく、コード決済のために app に credential を持たせる変更は一切
+   していない（ADR-2607300900 の到達上限をそのまま維持）。
+5. ~~**actor の operation graph に phase を足していない**~~ — **2026-07-30〜31 に解消**。
+   `:record-payment-capture`（ADR-2607309800）と `:propose-refund`（ADR-2607309960）を
+   op として追加。いずれも always-escalate でどの phase でも auto 禁止。HTTP surface
+   （`POST /captures` `POST /refunds` `GET /acceptances`）は ADR-2607310200 で追加し
+   本番 deploy 済み。
+
+**この節で「未実装」と書いたもののうち、現在も未実装なのは 1・2・4 だけ。** 3・5 は
+後続 ADR で解消済みであり、ここを根拠に「受入は library の純関数だけ」と引用しないこと。
 
 ## Alternatives considered
 
