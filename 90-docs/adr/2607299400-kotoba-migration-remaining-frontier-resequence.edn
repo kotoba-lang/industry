@@ -2818,6 +2818,23 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01ge — liquid-glass document-plane multi-arg guest records)
+
+- liquid-glass-ui#12 MERGED (`5edd719a`): **tokens_document** multi-arg pure →
+  guest records (`:lgdoc/*`: entry, group, nested, render-from, line-from,
+  join-nl). document-in-record compiler `7691b1ae`; shitsuke `eeacdb93`;
+  css `ba212138`.
+  Evidence: **66 tests / 687 assertions** green.
+- west pin liquid-glass-ui → `5edd719a`
+- Design-system document-plane: css ✅ + html ✅ + shitsuke ✅ + liquid-glass ✅;
+  remaining **kotoba-ui**.
+
+Still open:
+1. kotoba-ui theme_document multi-arg fold (last design-system document step)
+2. T8.3 residual: true set / W4; `:wasm-aot :implemented`
+3. T8.4; murakumo residual; W4 recursive values
+
+
 ## Progress (2026-08-01gd — shitsuke document-plane multi-arg guest records)
 
 - shitsuke#11 MERGED (`eeacdb93`): **tokens_document + hig_document** multi-arg
