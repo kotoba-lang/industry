@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject (0214–0222); true-set pure/wasm32 (0223–0224) + **Component twin names-add (0225)**; multi-export fold / W4 recursive EDN / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject (0214–0222); true-set pure/wasm32 (0223–0224) + names-add Component (0225–0226) + **map-element-bound append (0227)**; W4 recursive nested EDN / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2818,6 +2818,27 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01gk — T8.3 map-element-bound headers-edn-append uniqueness)
+
+- kotoba-component#115 MERGED (`7e017bbc`): Canonical `:headers-edn-append`
+  uniqueness upgraded from free substring `:name "…"` marker to
+  **map-element-bound** name field (`{` after `[`/space + `{:name "…"}`).
+  Same `$has-name-field` in multi-export reject package. Prefix non-collision
+  (Host + Ho). Evidence: **54 tests / 620 assertions** green.
+- provider#115 MERGED (`5346157f`): **ADR 0227** re-ship
+  `http-headers-edn-append-component` sha `ed8d6a1f…` +
+  `http-edn-reject-package-component` sha `e1de58c7…`.
+  Evidence: **81 tests / 768 assertions** green.
+- west pins: kotoba-component → `7e017bbc`; provider → `5346157f`
+- Honesty: map + name-list planes both element-bound on Components. Does
+  **not** flip `:wasm-aot :implemented` (W4 recursive nested EDN open).
+
+Still open:
+1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
+
+
 ## Progress (2026-08-01gj — T8.3 multi-export reject package folds names-add)
 
 - kotoba-component#114 MERGED (`d931faca`): multi-export `:http-edn-reject-package`
@@ -2833,7 +2854,7 @@ Still open:
   :implemented` (W4 recursive nested EDN open).
 
 Still open:
-1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+1. T8.3 residual: map-element-bound append (→ Progress gk); W4 recursive nested EDN; only then `:wasm-aot :implemented`
 2. T8.4 residual (optional L5 / real Node sockets)
 3. murakumo residual; other W4 work
 
