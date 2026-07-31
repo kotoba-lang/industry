@@ -2507,6 +2507,31 @@ Still open:
    single record param); W4 recursive values
 
 
+## Progress (2026-07-31dx — T5.2 native guest record expansion token+retry)
+
+- murakumo main `abaebd2b`: **T5.2 native guest record wire expansion #2**
+  (server-side merge of `agent/t52-native-record-token-failed`; PR create raced
+  with merge so history message is `(#)` without number).
+  - `token_core`: `encode-claims-json` / `wire-token` / `constant-time-eq` /
+    `scope-allows?` → single `:token/{claims,wire,eq,scope-check}` records
+  - `task_plan_core`: `can-retry?` → single `:task/retry` record
+  - option-bearing `expired?` / `parts-present?` / `failed?` stay positional
+    (compiler option-in-record gap)
+  - Host: `oracle/record` + `call-record` `:raw`; authority live-execute
+    fixtures for schedule/task `eligible?` residual from #277 fixed
+  - ADR-260731-w6-t52-native-record-token-retry
+  - Evidence: 112 tests / 1818 assertions green
+- west pin murakumo `fda6d454` → `abaebd2b` (`ae9b9780`)
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**; flip wasm-aot only if admissible
+2. T8.4 residual: optional host-parity L5 full-table coverage; real Node sockets
+   (fail-closed inject complete for actor:host pg/transport)
+3. T5.2 native guest record wire **further expansion** (more multi-arg pure
+   exports without option fields → single record param); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
