@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — HTTP typed packages + packing walks pure Component (provider#87–#94 / ADR 0199–0204); secret_name_ok Component (provider#97 / ADR 0206; kotoba-component#100 denylist + header misfit fix); nested EDN codec + full kit body residual; wasm-aot :implemented still open |
-| T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
+| T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success restored (kototama#120 SCRAM-SHA-256-PLUS via postgresql-interop) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -2215,6 +2215,29 @@ Still open:
    fs-path-ok Component; flip wasm-aot only when admissible
 2. T8.4 residual: live SCRAM/PG success
 3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31di — T8.4 live SCRAM-SHA-256-PLUS qualification restored)
+
+- kototama#120 MERGED (`000b987d`): **T8.4 live SCRAM/PG success path**
+  - Restore purpose-bound `:scram-sha256` tender host fn (PBKDF2/HMAC;
+    password never leaves host)
+  - Register import on contract/guest/browser + `max-scram-proofs` /
+    `scram-credential-allowlist` limits
+  - Restore `postgresql-interop` harness (removed ADR-2607266000 Phase B
+    without replacement — residual was this hole)
+  - Proven: `clojure -M:postgresql-interop` → **SCRAM-SHA-256-PLUS ok**
+    (ephemeral PG 17, TLS, tx/prepared/portal/copy/batch/pool/cancel/rotation)
+  Evidence: contract+tender 81/302; live interop success.
+- west pin kototama → 000b987d.
+
+Still open:
+1. T8.3 residual: nested EDN / full multi-file kit body under **W4**;
+   fs-path-ok Component (if not already); flip wasm-aot only when admissible
+2. T8.4 residual: optional host_parity_live corpus expansion; Node kagi
+   inject env gap
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
 
 
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
