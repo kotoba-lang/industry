@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — pure/typed policy 0171–0198; typed Component compositions: string ops + url/request/response/**error** packages + multi-export main (kotoba-component#79–#91); provider re-emit residual; wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — pure/typed policy 0171–0198; multi-export packages + helper admission (kotoba-component#79–#92); **pure Component re-emit** of url/request/response/error (provider#87 / ADR 0199); nested EDN pack + full kit body residual; wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2050,6 +2050,29 @@ Still open:
 1. T8.3 residual: provider registry **Component re-emit** of typed packages;
    nested EDN pack / full kit body; flip `:wasm-aot :implemented` only when
    full kit body admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31da — T8.3 pure Component re-emit of typed HTTP packages)
+
+- provider#87 MERGED (`c368beef`): **ADR 0199** re-emits four typed policy packages
+  as pure Canonical Components (`kotoba compile --target component`, no
+  `kotoba:typed` import):
+  | package | live `main()` |
+  |---|---|
+  | `:http-url-ok-component` | **-130** |
+  | `:http-post-request-ok-component` | **-13406** |
+  | `:http-response-ok-component` | **-1012** |
+  | `:http-error-result-ok-component` | **-13501** |
+  Registry twins + provenance; http kit notes updated. **Does not** flip
+  `:wasm-aot :implemented`.
+  Evidence: ops-kit 66 tests / 486 assertions; kit-package 41 / 287 green.
+- west pin provider 80766862 → c368beef (`5912140f`).
+
+Still open:
+1. T8.3 residual: nested request/result **EDN pack** Component; header typed
+   package Component re-emit; full kit body; flip wasm-aot only when admissible
 2. T8.4 residual: live SCRAM/PG success
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
