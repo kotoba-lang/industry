@@ -2818,6 +2818,24 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fw — T8.3 reject-path http_request_edn0 Component)
+
+- kotoba-component#109 MERGED (`1325aa15`): **`:http-request-edn0`** Canonical
+  `string × string × i64 → string` — dual UTF-8 quote/backslash scan on url/body;
+  timeout-ms ≥ 0; i64 decimal. Builds `{:url "…" :headers [] :body "…"
+  :timeout-ms N}`. Composition on `edn_quoted`. Multi-header request-edn still open.
+- provider main `64edf388`: **http-request-edn0** (wasm32 + Component). ADR 0219.
+  Digest `c249a623…`. `:wasm-aot` stays `:partial`.
+  Evidence: ops kit 76/703 + live wasmtime ok/zero/neg/bad-atom.
+- west pin kotoba-component `4344df77` → `1325aa15`; provider `e2f61369` → `64edf388`
+
+Still open:
+1. T8.3 residual: multi-header **http_request_edn** reject-path; true set / W4;
+   full multi-export kit body
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. document-in-record closed profile; murakumo residual; W4 recursive values
+
+
 ## Progress (2026-08-01fv — T8.3 reject-path http_result_ok_edn Component)
 
 - kotoba-component#107 MERGED (`4344df77`): **`:http-result-ok-edn`** Canonical
