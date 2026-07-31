@@ -325,6 +325,32 @@ O(n) で、KV の value サイズ上限に向かって伸び続ける。
 シングルスレッドなので『**書き手はちょうど1人**』を実装せずに得られる —— 自前の write lease や fencing
 epoch を書かない」。
 
+**着地済み（2026-07-31、network-awai/nexus-x402 main）**:
+
+```
+5349cea  feat(settlements): record the gateway path a payment bought
+79f31ea  feat(admin): fold per-path revenue into GET /admin/settlements/<seller>
+```
+
+- `settlement-entry` に `:path`。thin facilitator `/settle` 経路では nil で、
+  これは「課金 path に帰属しない」であって「金額不明」ではない
+- `revenue-by-path` — path 別 `{:count :usd-total}`。**path を持たないエントリは
+  `:unrecorded` に集める**（捨てれば seller 総額を過少にし、既存 path に畳めば
+  稼いでいないリソースに収益を付ける）。テストは per-path 分割が `summary` の
+  総額と突合することを assert する
+- fold は `/admin/settlements/<seller>` に置いた。**`/stats` には置かない** ——
+  あちらは全 seller を concat しており、2 seller が同じ path を課金しうるので、
+  path キーの fold は別 seller の収益を静かに混ぜる
+- 検証: 47 tests / 189 assertions green、clj-kondo 0 errors、
+  `shadow-cljs release worker` 61 files / 18 compiled / 0 warnings
+
+**消費側は無変更で受け取る。** `billing_x402/snapshot!` は `(assoc resp :source \"x402\")`
+で応答全体を通すので、`:by-path` はそのまま cloud-itonami に届く。
+
+**残る接続**: path → vertical の対応付け（vertical ごとに別 path-prefix で x402 rule を
+登録する）と、そもそも itonami.cloud に x402 面が無いこと（step 1）。**データ経路は
+通ったが、まだ 1 vertical も課金 path を持っていない。**
+
 **そして実現収益は、静かに間違う経路を4つ持つ**（`billing.cljc` が自ら列挙している）:
 
 1. **2017年の ¥0 legacy subscription**（`group_monthly`）が active 数を膨らませる
@@ -424,6 +450,11 @@ step 8  curve と share の発行                                               
       :how \"advertiser_ops.cljc / business_governor.cljc / billing_x402.cljc / agent_control.clj / crm/phase.cljc を読み、grep で src/ 内の呼び出し元を確認\"
       :finding \"envelope の pure 決定層は既にある（ground policy + 前払い USDC gate + micros 整数 SSoT + facts-passed-in）。**強制は kernels/*.kotoba を SSoT とし propose/censor/execute の3点から参照する defense in depth** で、business-governor は business_loop.cljc:188 の tick! から実際に呼ばれている。allowlist に届いていない kind は x402 rail だけ\"
       :self-correction \"同日の前の反復は『governor はどこからも呼ばれない』『duplicated truth の実例』と報告したが両方とも誤り。原因は grep を head -12 で切って src/ のヒットを見落としたこと。marketing.cljc の『Same gates as business-governor』は同じ kernel 関数の呼び出しであって複製ではなく、billing.cljc は自ら defense in depth と明記している\"}
+     {:what \"nexus-x402 に per-path 収益帰属を実装して main に着地\"
+      :commits [\"network-awai/nexus-x402 5349cea (settlement-entry :path + revenue-by-path)\"
+                \"network-awai/nexus-x402 79f31ea (GET /admin/settlements/<seller> の :by-path fold)\"]
+      :verified \"47 tests / 189 assertions green、clj-kondo 0 errors、shadow-cljs release worker 0 warnings\"
+      :note \"lever thread-path-into-the-settlement-entry (5.95) の実装。消費側 billing_x402/snapshot! は応答全体を通すので無変更で :by-path を受け取る\"}
      {:what \"11 lever の採点、θ(v) と envelope の数値表、LP 必要収益、fleet gap、0-event 上限\"
       :how \"nbb --classpath orgs/kotoba-lang/dynamics/src <scratchpad>/{itonami_amm_rank,itonami_vlp_economics}.cljs\"
       :note \"scratchpad で実行。loop-system-dynamics への namespace 追加は採択後\"}]
