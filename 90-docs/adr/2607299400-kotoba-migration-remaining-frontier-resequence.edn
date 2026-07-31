@@ -2818,6 +2818,22 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fh — T8.3 header name uniqueness on EDN fold)
+
+- provider main `70bfae30`: **headers_edn_has_name** + **headers_edn_append**
+  rejects duplicate `:name "…"` markers (substring scan, not W4 set type).
+  main→**27005851950**. ADR 0211. Component twin still needs Canonical
+  package shape in kotoba-component (typed import blocker measured).
+  Evidence: ops kit packages 67/606 green.
+- west pin provider `ffae209b` → `70bfae30`
+
+Still open:
+1. T8.3 residual: Component twin (Canonical lowering package shape);
+   true set type / W4 recursive ADT; full multi-file kit body
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 product multi-arg pure residual closed; W4 recursive values
+
+
 ## Progress (2026-08-01fg — T8.3 multi-header + result EDN encode)
 
 - provider main `ffae209b`: **http-request-edn-v1.wasm** extended — host-sequenced
