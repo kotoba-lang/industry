@@ -2818,6 +2818,26 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01gg — T8.3 true header-name set uniqueness + set-in-record)
+
+- compiler#464 MERGED (`8952a068`): **set-in-record** — guest records carry
+  `[:set T]` fields (unary productive constructors documented + KIR locked).
+  Evidence: set_in_record_test + full suite **774 tests / 6241 assertions**.
+- provider#110 MERGED (`fe2846c3`): **ADR 0223** `http-headers-name-set` —
+  true header-name uniqueness via `[:set :string]` guest record (not substring
+  `:name` scan). main → `-9002`. Package sha `5b61d178…`.
+  Evidence: **79 tests / 744 assertions** (ops_kit_packages_test).
+- west pins: compiler → `8952a068`; provider → `fe2846c3`.
+- Honesty: **does not** flip `:wasm-aot :implemented` — W4 recursive nested
+  EDN ADT + Component twin on set uniqueness still open.
+
+Still open:
+1. T8.3 residual: wire set uniqueness into reject-path EDN Components;
+   W4 recursive EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
+
+
 ## Progress (2026-08-01gf — kotoba-ui document-plane multi-arg guest records)
 
 - kotoba-ui#11 MERGED (`80445c9d`): **theme_document** multi-arg pure →
