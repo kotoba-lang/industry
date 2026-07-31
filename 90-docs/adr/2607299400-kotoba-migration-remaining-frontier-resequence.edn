@@ -2694,6 +2694,25 @@ Still open:
    option residual positional); W4 recursive values
 
 
+## Progress (2026-07-31eg — T5.2 native guest record expansion report-core)
+
+- murakumo main `8cb21894`: **T5.2 native guest record wire** for
+  **report-core** — mesh-status, CLI line builders (deploy/pin/alert/…),
+  pad/field, nodes-row, reconcile title/action-detail/app-row/line/reach,
+  join/csv folds via `:report/*` schemas. `status-row`/`health-label`
+  option residual stays positional.
+  ADR-260731-w6-t52-native-record-report.
+  Evidence: report parity+unit 9/150; authority 70/1415; call-record 20/225.
+- west pin murakumo `b863c436` → `8cb21894`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 further expansion (remaining option residual + residual multi-arg
+   scanners); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
