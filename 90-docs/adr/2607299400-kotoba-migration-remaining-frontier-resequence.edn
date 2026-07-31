@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string Component surface complete http+secret+fs (ADR 0199–0208); nested EDN/full multi-file kit body **W4-gated**; wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string Component surface complete http+secret+fs (ADR 0199–0208); EDN reject path through header_edn (ADR 0214–0215); multi-export append/uniqueness/result + multi-file kit body **W4-gated**; wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2816,6 +2816,26 @@ Still open:
 3. T5.2 residual: **option-string-in-record compiler gap** is the main
    product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
    digit-scanner multi-arg internals optional; W4 recursive values
+
+
+## Progress (2026-08-01fq — T8.3 reject-path http_header_edn composition)
+
+- kotoba-component#104 MERGED (`ce4a15c5`): **`:http-header-edn`** Canonical
+  `string × string → string` — dual UTF-8 quote/backslash scan; empty on
+  reject else `{:name "…" :value "…"}`. Composition on `edn_quoted` (0214).
+  Trust-named pure concat stays `:string-expression`.
+- provider main `5a5871e8`: **http-header-edn** (wasm32 + Component). ADR 0215.
+  Digest `c386f6cb…`. Multi-export append/uniqueness/result still open.
+  `:wasm-aot` stays `:partial`.
+  Evidence: ops kit registry tests + live wasmtime ok/reject.
+- west pin kotoba-component `026ed2f8` → `ce4a15c5`; provider `d8382c33` → `5a5871e8`
+
+Still open:
+1. T8.3 residual: multi-export request-edn reject composition (append/
+   uniqueness/result on top of header_edn); true set / W4 recursive ADT;
+   full multi-file kit body
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. murakumo field constructors / seats-record-go; W4 recursive values
 
 
 ## Progress (2026-08-01fp — shitsuke form-A T5.2 guest records)
