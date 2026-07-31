@@ -2867,6 +2867,22 @@ Still open:
 3. T5.2 product multi-arg pure residual closed; W4 recursive values
 
 
+## Progress (2026-08-01ff — com-cloudflare T5.2 native guest records)
+
+- com-cloudflare main `841de520`: **T5.2 native guest records** for multi-arg pure
+  across client/deploy/zones/pages_bulk/stream/logpush; `oracle/record` ported;
+  compiler `98b56bdb` + kir `767f2f2`. ADR-0017-t52-native-guest-records.
+  Evidence: 94 tests / 519 assertions green.
+- west pin com-cloudflare `8bdfe856` → `841de520`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. com-cloudflare analytics_parse map-tally multi-arg residual; murakumo field
+   constructors / seats-record-go; W4 recursive values
+
+
 ## Progress (2026-08-01fe — T5.2 assign-step-3 + demand-inc residual)
 
 - murakumo main `a8331f92`: **assign-pick/step-3** (schedule+task) multi-record pure →
