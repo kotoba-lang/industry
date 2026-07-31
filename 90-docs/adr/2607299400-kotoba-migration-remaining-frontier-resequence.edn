@@ -1805,6 +1805,24 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31cn — T8.3 pure memory-scan one-shot HTTP)
+
+- provider#82 MERGED (`b4f9d706`): **T8.3 ADR 0194** — pure hand-WAT **memory-
+  scan one-shot** `http_request_scan` / `http_response_scan` /
+  `http_error_scan` / `http_result_arm_ok` (+ Component embed). No
+  `kotoba:typed`; builder `:hand-wat/v1`. Complements typed walks 0192–0193.
+  Evidence: 56 tests / 380 assertions; Node live vector
+  `[0,-3,-1,0,-1,0,-1,-3,0,-1]`.
+- west pin provider e3ff5756 → b4f9d706 (`cea877e8`).
+
+Still open:
+1. T8.3 residual: **typed Component world** (compiler-AOT Component packaging
+   for typed-string packages; flip wasm-aot only when admissible)
+2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
+   interop harness)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31ck — T8.3 typed-string HTTP response surface)
 
 - provider#78 MERGED (`9e347a0d`): **T8.3 ADR 0190** — typed-string
