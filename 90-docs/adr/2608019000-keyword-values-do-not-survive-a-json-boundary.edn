@@ -134,14 +134,23 @@
       :fix \"network-awai/nexus-x402 f83ddda — normalize-hint が両形を受け、未知は独自バケットを作らず :unknown\"
       :verified \"振る舞いで確認: 修正前 {:agent 0 :human 0 :unknown 0 \\\"agent\\\" 1} / 修正後 {:agent 1 :human 0 :unknown 0}\"
       :collateral \"同じ境界で兄弟関数を点検し無傷を確認 — :path / :source / :payer は値も文字列なので revenue-by-path・source-breakdown・demand-summary は影響なし\"}]
-    :not-done
-    [{:what \"cloud-itonami の edge/ 配下で keywordize-keys を使う残り約12 ns の監査\"
-      :why \"推論で広く浅く断定すると、この ADR が戒めている『もっともらしいが未検証の主張』そのものになる。実往復で1つずつ確かめる必要があり、1セッションに収まらない\"
-      :how \"各 ns について『keyword 値を書いているか』→『読み側で keyword と比較しているか』の2点を実往復で確認する\"}]}"
+     {:instance :audit :date \"2026-08-01\" :where \"cloud-itonami edge/ 全 13 ns\"
+      :what \"`keywordize-keys` を使う edge/ 全 ns を screen。**これ以上の該当は無し**\"
+      :how \"読み側優先 —— この欠陥は読み側に現れるので『JSON 由来の値を keyword で dispatch しているか』を探す。候補3件（projection_outbox の case / tenant の = :primary・= :verified / calendar_store の = :error）が出て、3件とも別々の理由で健全\"
+      :finding \"**この repo の edge 層は既に概ね正しい。** 踏んだ3例のうち2例に相当する経路（account_store・tenant）は模範実装で、独立に同じ対処へ到達していた。欠陥が出たのは隣 repo の新しい面と、本 ADR 執筆者が新規に書いた面だけ。**規約は存在していた。書き留められていなかっただけである**\"
+      :limit \"exhaustive ではない。全フィールドに往復テストを書いたのではなく1パターンを screen した。動的に組まれた keyword 値や間接参照を経た比較は捕まえていない\"}]}"
 
   :adr/known-gaps
-  "[{:gap \"残り約12 ns（cloud-itonami edge/）が未監査\"
-     :note \"account_store・vertical-revenue は確認済み。billing.cljc は clj->js を送信 body にしか使っておらず永続化していないので対象外。他は未確認\"}
+  "[{:gap \"（解消 2026-08-01）cloud-itonami edge/ の未監査 ns\"
+     :resolved \"`keywordize-keys` を使う edge/ 全 13 ns を screen し、**これ以上の該当は無し**。方法は本 ADR Decision 3 のとおり読み側優先 —— この欠陥は読み側に現れるので、書き側を数えるより『JSON 由来の値を keyword で dispatch しているか』を探す方が確実\"
+     :findings
+     [\"projection_outbox — `(case (:kind event) ...)` が往復後の値に当たるが、:kind の値は最初から文字列（\\\"kotobase/project\\\" / \\\"mail/send\\\"）で case の枝も文字列。健全。同 ns の `(keyword (aget % \\\"status\\\"))` は正しい明示変換\"
+      \"tenant — `(= :primary (:organization.domain/role %))` と `(= :verified (:organization.domain/status ...))` を持つが、読み側 `qualify-domain-record` が `(some-> ... keyword)` で両方を戻し、書き側は名前空間を保つ `->qualified-js` を使う。**account_store と同じ対処が独立に実装されている。** 健全\"
+      \"calendar_store — `(= :error (:calendar/severity %))` を持つが `problems` は in-process の `validate/problems` 由来で JSON を通らない。かつ永続化は `pr-str`（EDN）であり本 ADR の対象外。健全\"
+      \"jobs_sources — `:error` に keyword 値を持つが `clj->js`/`JSON.stringify`/`.put` が 0 件で永続化しない。健全\"
+      \"projection_outbox の `{:journal :not-configured}` — Promise の戻り値であって保存されない。健全\"]
+     :interpretation \"**この repo の edge 層は既に概ね正しい。** 実際に踏んだ3例のうち2例（account_store・tenant）に相当する経路はむしろ模範実装であり、欠陥が出たのは (a) 隣の repo の新しい面（nexus-x402 settlements）と (b) 本 ADR 執筆者が新規に書いた面（vertical-revenue）だった。**規約は存在していたが、書き留められていなかった** —— 本 ADR はその欠落を埋めるものであって、規律の不在を指摘するものではない\"
+     :limit \"exhaustive ではない。各 ns の全フィールドに往復テストを書いたわけではなく、『JSON 由来の値に対する keyword dispatch』というパターンを screen した。別の形（例: 動的に組まれた keyword 値、間接参照を経た比較）は捕まえていない\"}
     {:gap \"この規則を機械的に検査する手段が無い\"
      :note \"clj-kondo の lint では『keyword 値を書いて keyword で読む』を跨いだ検出はできない。往復テストを書く規律に依存している\"}
     {:gap \"instance 1 の知見が3か月近く1 ns の docstring に留まっていた理由は分析していない\"
@@ -193,6 +202,24 @@ fixture は著者が「こう来るはず」と思う形で書かれる。だか
 
 **EDN 永続化はこの規則の対象外。** EDN は keyword を保つ。JSON かどうかで判断する。
 
-## 正直に残す
+## 監査した（2026-08-01）
 
-**cloud-itonami の edge/ 配下には `keywordize-keys` を使う ns がまだ約12ある。** 監査していない。推論で広く浅く「たぶん大丈夫」と書くことは、この ADR が戒めている当のことなので、**未監査は未監査として残す。**"}]
+`keywordize-keys` を使う edge/ 全 13 ns を screen し、**これ以上の該当は無かった。**
+
+**方法は読み側優先。** この欠陥は読み側に現れるので、書き側を数えるより「JSON 由来の値を keyword で dispatch しているか」を探す方が確実である。候補は3件出て、3件とも別々の理由で健全だった:
+
+| ns | 候補 | なぜ健全か |
+|---|---|---|
+| projection_outbox | `(case (:kind event) ...)` | `:kind` の値が最初から文字列で case の枝も文字列 |
+| tenant | `(= :primary (:...\\/role %))` | 読み側が `(some-> ... keyword)` で戻し、書き側は `->qualified-js` |
+| calendar_store | `(= :error (:calendar/severity %))` | `problems` は in-process 由来。かつ永続化は `pr-str`（EDN） |
+
+## 一番意外だった結論
+
+**この repo の edge 層は既に概ね正しい。** 実際に踏んだ3例のうち2例に相当する経路（account_store・tenant）は、むしろ**模範実装**だった —— どちらも独立に同じ対処に到達している。
+
+欠陥が出たのは (a) 隣の repo の新しい面と (b) **この ADR の執筆者が新規に書いた面**である。つまり **規約は存在していた。書き留められていなかっただけである。** 本 ADR はその欠落を埋めるものであって、規律の不在を指摘するものではない。
+
+## この監査の限界
+
+exhaustive ではない。各 ns の全フィールドに往復テストを書いたわけではなく、上記1パターンを screen した。動的に組まれた keyword 値や、間接参照を経た比較は捕まえていない。"}]
