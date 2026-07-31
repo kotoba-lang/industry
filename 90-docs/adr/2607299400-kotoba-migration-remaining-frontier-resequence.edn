@@ -2818,6 +2818,22 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fg — T8.3 multi-header + result EDN encode)
+
+- provider main `ffae209b`: **http-request-edn-v1.wasm** extended — host-sequenced
+  multi-header fold (`headers_edn_empty`/`headers_edn_append`), `http_request_edn`,
+  result arms `http_result_ok_edn`/`http_result_err_edn`, main→**2700585195**.
+  ADR 0210. `:wasm-aot` stays `:partial` (no Component twin; no W4 recursive ADT).
+  Evidence: ops kit packages 67/605 green.
+- west pin provider `b0234e95` → `ffae209b`
+
+Still open:
+1. T8.3 residual: Component twin for request-edn; header name uniqueness (W4 set);
+   full multi-file kit body; W4 recursive value identity
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 product multi-arg pure residual closed; W4 recursive values
+
+
 ## Progress (2026-08-01ff — T8.3 fixed-depth nested EDN encode)
 
 - provider main `b0234e95`: **http-request-edn-v1.wasm** — fixed-depth nested EDN
