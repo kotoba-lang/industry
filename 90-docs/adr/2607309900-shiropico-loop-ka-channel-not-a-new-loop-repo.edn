@@ -30,7 +30,7 @@
                    "episode 1-10 は shotlist が無いため catalog に載っていない。ep01 は既に motion-comic と panel が存在するので、過去分をどう扱うか(遡及登録するか、済として扱うか)は未決定。"
                    "producer は :legs を報告するだけで、実際のレンダリングは行っていない。backend が配線された時に :murakumo leg が本当に画を出すかは未検証。"
                    "shiropico の voice leg は全て :silent。TTS が未配線(murakumo の :tts は :via :proc で HTTP endpoint が無く、fleet head node で応答するものが無かった)。よって shiropico の run は常に :degraded で hold される。"
-                   "tick は plan までで、batch の実行(GPU 消費)はしない。自律生産にはなっていない。"],
+                   "batch の placing は実装済みだが LOOP_KA_PLACE=0 で止めてある。murakumo の task plane が今日の T6.4 移行(b578f1c)で読み込めなくなっているため。それが直れば 1 と設定するだけで動く。"],
   :adr/body
   "## Context
 
@@ -377,6 +377,70 @@ hold される。これは正しい結末であって回避すべき不具合で
 launchd 配下で手動キックして exit 0。`observe` が 6/6 due を出し、
 `plan` が 6 タスクの batch を書き、置くコマンドを印字して終了することを
 ログで確認した。
+
+## 「TTS / prose→タグ / 自動実行」の 3 つ全部(2026-07-31)
+
+オーナーが 3 つとも指示。順序は **3 → 2 → 1**(品質を上げ、voice の可否を確定させ、
+最後に自動実行を入れる)にした。結果は 1 勝 1 分 1 敗で、正直に分ける。
+
+### 3. prose→タグ = 部分的に改善したが、直っていない
+
+`shiropico-produce.prompt` を追加。コンマで分割し、長い断片を主語と情景を分ける
+前置詞で **1 回だけ**切る(毎回切ると `a black lava plateau at near-arctic dawn` が
+参照先を失う断片に砕ける)。**何も発明せず何も落とさない** — 出力タグが全て原文に
+含まれることを test で固定した。
+
+**それでもショットは直らなかった。** タグ化して再生成しても発電所は出ず、地平線に
+塔の影が 2 つ出ただけ。主語を最前面に出して短く切る手動変種では配管と噴煙が出たが、
+それでも「地熱発電所の俯瞰」ではない。
+
+制約はおそらく checkpoint 側(`Illustrious-XL` はアニメ/キャラクタ寄りで、
+工業建築は得意でない)。scene shot 用に別 checkpoint を選ぶかは craft の問題で
+`loop-*` の `:must-not :own-domain-scoring-truth` によりこのループが決めることでは
+ない。**次の人が同じ 2 実験を繰り返さないよう、試したことを証拠付きで残す。**
+
+### 2. TTS = 見つからない。立てられない
+
+| 探した先 | 結果 |
+|---|---|
+| murakumo の `:tts` | `:via :proc`(CosyVoice2/Kokoro)。HTTP endpoint が無い |
+| fleet head node `gad` への ssh | **拒否**。`tailscale: failed to look up local user` |
+| `gad` の TTS 候補ポート | 全て無応答 |
+| localhost 50021/50121/10101 | 全て無応答 |
+| VOICEVOX.app | 未インストール |
+
+**到達できるものが無く、立てる手段も無い**(gad に入れない)。よって shiropico の
+voice leg は全て `:silent` のままで、run は `:degraded` で hold される。
+ここは塞がっている。
+
+### 1. 自動実行 = 実装したが、別セッターの進行中作業に阻まれている
+
+tick に place ステップを追加し、`LOOP_KA_PANEL_LIMIT`(既定 8)で 1 tick あたりの
+描画数を各チャンネルで縛れるようにした(producer 側が env を読む。`--limit` は
+明示指定が勝つ)。1 話 273 パネルを共有 GPU 1 台で一晩に全部やらせないため。
+
+途中で 2 つ直した:
+1. **loop-ka が印字する置き方コマンドはそのままでは動かない。**
+   `nbb ../murakumo/scripts/run-task.cljs ...` は cwd 依存で murakumo.* を解決するので
+   `ENOENT: src/murakumo/task.cljs` になる。murakumo checkout を cwd にして
+   tasks.edn を絶対パスで渡す必要がある。
+2. env の limit が producer に届いていなかった(`--limit` は channels.edn の argv 側で、
+   scheduler からは渡せない)。producer が `LOOP_KA_PANEL_LIMIT` を読むようにした。
+
+**それでも placing は動かない。** murakumo の task plane が読み込めない:
+
+```
+murakumo.task.plan:45  Cannot convert a BigInt value to a number
+   (long (o 'default-max-slots []))
+```
+
+Kotoba oracle の i64 export を `long` に渡している。これは **今日の commit
+`b578f1c`(T6.4: task.plan + reconcile.plan delete cljs host mirrors)で入った
+回帰**であり、別セッションが進行中の移行。**他人の refactor の途中を patch しない。**
+
+よって placing は **実装済み・配線済みだが `LOOP_KA_PLACE=0` で止めてある**。
+最後の一歩で必ず失敗すると分かっている job を毎晩走らせるのは residency ではなく
+ノイズだから。task plane が直れば **1 に変えるだけ**で動く。
 
 ## Alternatives considered
 
