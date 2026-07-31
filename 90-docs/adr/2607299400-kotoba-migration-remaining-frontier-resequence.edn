@@ -2553,6 +2553,26 @@ Still open:
    multi-arg pure, option-in-record after compiler); W4 recursive values
 
 
+## Progress (2026-07-31dz — T5.2 native guest record expansion identity+keyring)
+
+- murakumo#280 MERGED (`f20a68df`): **T5.2 native guest record wire** for
+  **identity** + **overlay.keyring** multi-scalar pure preimages —
+  `seed-node`/`seed-p2p` → `:identity/node-seed`, `seed-overlay` →
+  `:identity/overlay-seed`, `did-derive-cmd` → `:identity/did-cmd`;
+  `epoch` → `:keyring/epoch-in`, `key-id-input` → `:keyring/key-id-in`,
+  `derive-key-input` → `:keyring/derive-in`.
+  ADR-260731-w6-t52-native-record-identity-keyring.
+  Evidence: 97 tests / 1716 assertions green.
+- west pin murakumo `3d76dcf8` → `f20a68df`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**; flip wasm-aot only if admissible
+2. T8.4 residual: optional host-parity L5 full-table coverage; real Node sockets
+3. T5.2 further expansion (relay/persist/moe multi-arg pure; option-in-record
+   after compiler); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
