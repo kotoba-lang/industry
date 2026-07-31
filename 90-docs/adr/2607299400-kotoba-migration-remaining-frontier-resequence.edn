@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject (0214–0222); true-set (0223–0227); multi-file Component CLI (0228); pure multi-export true-set (0229); **multi-ns reject Component (0230)**; W4 recursive nested EDN / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject (0214–0222); true-set (0223–0227); multi-file CLI (0228) + pure multi-export set (0229) + multi-ns reject (0230) + **linked monomorph synthetics (compiler 0193) + multi-level peel**; W4 recursive nested EDN / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2818,6 +2818,25 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01gp — T8.3 linked monomorph synthetics + multi-level peel)
+
+- compiler#466 MERGED (`20f21046`): **ADR 0193** — multi-file monomorph second
+  pass admits desugared `__kotoba_or_*` / `__kotoba_and_*` via
+  `:admit-linked-synthetics?`. Unblocks multi-file Components that use `or`/`and`
+  (status bounds). Evidence: **778 tests / 6261 assertions** green.
+- kotoba-component main (`58c88f03`): **multi-level peel** of monomorph export
+  wrappers (export → module-local → dependency helper, depth ≤8) for reject
+  package role classification. Evidence: **147 tests / 1112 assertions** green.
+- west pins: compiler → `20f21046`; kotoba-component → `58c88f03`
+- Honesty: does **not** flip `:wasm-aot :implemented` (W4 recursive nested EDN
+  open). Complements Progress go multi-ns reject package (ADR 0230).
+
+Still open:
+1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
+
+
 ## Progress (2026-08-01go — T8.3 multi-ns reject package Component)
 
 - kotoba-component#116+#117 MERGED (`b11e945b`): private helpers allowed on
@@ -2832,7 +2851,8 @@ Still open:
   flip `:wasm-aot :implemented` (W4 recursive nested EDN open).
 
 Still open:
-1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+1. T8.3 residual: linked monomorph or/and (→ Progress gp); multi-level peel;
+   W4 recursive nested EDN; only then `:wasm-aot :implemented`
 2. T8.4 residual (optional L5 / real Node sockets)
 3. murakumo residual; other W4 work
 
