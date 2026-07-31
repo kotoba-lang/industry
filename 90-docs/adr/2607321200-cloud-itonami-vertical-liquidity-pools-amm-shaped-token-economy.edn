@@ -347,8 +347,37 @@ epoch を書かない」。
 **消費側は無変更で受け取る。** `billing_x402/snapshot!` は `(assoc resp :source \"x402\")`
 で応答全体を通すので、`:by-path` はそのまま cloud-itonami に届く。
 
-**残る接続**: path → vertical の対応付け（vertical ごとに別 path-prefix で x402 rule を
-登録する）と、そもそも itonami.cloud に x402 面が無いこと（step 1）。**データ経路は
+**課金面の作り方は2通りあり、片方しか :path を記録しない**（2026-07-31 実測、step 1 の再定義）:
+
+| | (A) 自前 origin 402 | (B) gateway 経由 |
+|---|---|---|
+| 例 | murakumo（ADR-2607093100） | nexus-x402 `/gateway/<seller>/…` |
+| origin 側のコード | `pay/x402` + `treasury/core` を vendor（約400行）+ `x402.cljs` 約140行 | **ゼロ** |
+| 検証 | 自前 facilitator（`treasury/verify-payment`、on-chain 直読み） | gateway が実施 |
+| settle 経路 | 自己完結。**nexus-x402 を一切呼ばない** | `serve-and-proxy!` |
+| **`:path` の記録** | **されない** | **される** |
+
+**つまり上で着地した per-path 帰属は、gateway 経由の seller にしか効かない。** murakumo は (A) なので
+`/x402/v1/messages` の収益は nexus の SETTLEMENTS_KV に入らず、path 別に分解できない。これは今回の実装の
+**明示的な限界**であって、後で気付くより先に書いておく。
+
+**したがって cloud-itonami は (B) を採る。** origin コードが要らないうえ、**θ(v) が計算できる唯一の経路**だから。
+そして (B) の登録機構は既にある —— `billing_x402/propose-x402-rule!` が `org` / `repo` / `seller` /
+**`:path-prefix`** / `:usd` / `:pay-to` を取り、承認後に nexus-x402 の `PUT /admin/sellers/<seller>` を叩く。
+
+```
+billing_x402/propose-x402-rule!  (org/repo, seller, path-prefix, usd, pay-to)
+  → 人間承認 → nexus-x402 PUT /admin/sellers/<seller>
+  → 買い手が x402.nexus/gateway/<seller>/<path> を叩く
+  → serve-and-proxy! が :path を記録              ← 2026-07-31 実装
+  → /admin/settlements/<seller> が :by-path を fold ← 同上
+  → billing_x402/snapshot! が無変更で受け取る
+  → vertical 別収益 → θ(v)
+```
+
+**step 1 の再定義**: 「itonami.cloud に discovery 文書を置く」ではなく
+**「vertical ごとに gateway seller rule を別 path-prefix で登録する」**。前者は (A) を含意しており
+約540行の実装を必要とするが、後者は既存の propose→承認→登録フローに乗るだけである。**データ経路は
 通ったが、まだ 1 vertical も課金 path を持っていない。**
 
 **そして実現収益は、静かに間違う経路を4つ持つ**（`billing.cljc` が自ら列挙している）:
@@ -412,10 +441,10 @@ gross
 ### 7. 実行順
 
 ```
-step 1  itonami.cloud に .well-known/x402 の**discovery 文書**                    依存なし・今日
-        ※ rail は既にある（billing_x402.cljc が nexus-x402 の admin API に
-          seller 登録する propose→approve→execute アクター）。欠けているのは
-          murakumo/kotobase が配信しているのと同型の discovery 文書だけ
+step 1  vertical ごとに **gateway seller rule** を別 path-prefix で登録する
+        （billing_x402/propose-x402-rule! → 承認 → PUT /admin/sellers/<seller>）
+        ※ 自前 origin 402（murakumo 型）は選ばない —— 約540行を要するうえ
+          settle が nexus を通らないので :path が記録されず θ(v) が計算できない
 step 2  settlement-record に vertical 次元（分配の記録面。on-chain 分割はしない）  step 1
 step 3  envelope 上限を kernels/envelope.kotoba として書く（既存5 kernel と同型）
         + x402 rail の kind を business-governor の allowlist に入れる
