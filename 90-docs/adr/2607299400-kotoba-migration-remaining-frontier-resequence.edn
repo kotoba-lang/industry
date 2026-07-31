@@ -2452,6 +2452,24 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31du — T8.4 Node pg-pool/wire/scram inject)
+
+- wasm-webcomponent#18 MERGED (`e5b5c0d1`): **Node pg-pool/wire/cancel +
+  scram-sha256 inject** on actor-host (fail-closed defaults; scram host
+  crypto via Node pbkdf2/HMAC when credentials+allowlist).
+- kototama#124 MERGED (`67597f23`): host-impl Node inject honesty for
+  pg-pool/wire/scram; Node live corpus **21 to 29** (+8). Evidence:
+  node live runner 29/29.
+- west pin kototama + wasm-webcomponent advanced.
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**; flip wasm-aot only if admissible
+2. T8.4 residual: deeper wire (prepare/portal/copy/batch) Node inject optional;
+   host-parity L5 table coverage optional
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
