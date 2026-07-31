@@ -2818,6 +2818,23 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fe — T5.2 assign-step-3 + demand-inc residual)
+
+- murakumo main `a8331f92`: **assign-pick/step-3** (schedule+task) multi-record pure →
+  `:schedule/pick3-in` / `apply-pick3` / `assign3-in` and `:task/pick3-in` /
+  `apply-pick3` / `assign3-in`; **demand-inc** → `:rebalance/demand-step`.
+  ADR-260801-w6-t52-assign3-demand-inc-records.
+  Evidence: rebalance/schedule/task parity + authority 98/1685 green.
+- west pin murakumo `8a489bf8` → `a8331f92`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 multi-arg pure residual closed for product pure (field constructors +
+   internal seats-record-go only); W4 recursive values
+
+
 ## Progress (2026-08-01fd — T5.2 seats-record seats-in budget-safe)
 
 - murakumo main `8a489bf8`: **seats-record** public API takes `:rebalance/seats-in`;
