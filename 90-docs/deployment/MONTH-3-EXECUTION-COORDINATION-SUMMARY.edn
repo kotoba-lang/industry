@@ -211,7 +211,7 @@
     "SLO dashboards (Grafana snapshots, archived)"]
 
    :post-validation "2026-09-15 onwards"
-   :generated-documents
+   :post-validation-documents
    ["MONTH-3-CUTOVER-COMPLETE.edn (success record, if PASS)"
     "MONTH-3-CUTOVER-COMPLETE-WITH-CAVEATS.edn (if PASS WITH CAVEATS)"
     "MONTH-3-INCIDENT-*.edn (if ABORT or critical issue, root cause ADR)"
@@ -229,22 +229,23 @@
     "Post-cutover 48h: all SLOs stable, zero user impact"]}
 
   :coordination/risk-mitigation-summary
-  :risk-latency-regression
-  {:mitigation "Automatic rollback trigger (p99 > 200ms sustained > 5 min) + manual monitoring"
+  {
+   :risk-latency-regression
+   {:mitigation "Automatic rollback trigger (p99 > 200ms sustained > 5 min) + manual monitoring"}
    :risk-parity-divergence
-   :mitigation "Automatic FULL rollback (> 1% divergence) + 7-day pre-flight sentinel"
+   {:mitigation "Automatic FULL rollback (> 1% divergence) + 7-day pre-flight sentinel"}
    :risk-reliability-spike
-   :mitigation "Automatic rollback trigger (5xx > 1% sustained > 2 min)"
+   {:mitigation "Automatic rollback trigger (5xx > 1% sustained > 2 min)"}
    :risk-memory-leak
-   :mitigation "Automatic rollback trigger (heap > 512MB sustained > 2 min) + heap dump analysis"
+   {:mitigation "Automatic rollback trigger (heap > 512MB sustained > 2 min) + heap dump analysis"}
    :risk-graceful-drain-hang
-   :mitigation "60-second grace period + force shutdown policy + Rust standby restore (5 min)"
+   {:mitigation "60-second grace period + force shutdown policy + Rust standby restore (5 min)"}
    :risk-cascading-failure
-   :mitigation "Circuit breaker + connection pool limits + automatic load reduction on error spike"
+   {:mitigation "Circuit breaker + connection pool limits + automatic load reduction on error spike"}
    :risk-team-fatigue
-   :mitigation "24/7 on-call rotation (no single person > 8h shift) + clear escalation paths"
+   {:mitigation "24/7 on-call rotation (no single person > 8h shift) + clear escalation paths"}
    :risk-communication-gap
-   :mitigation "Hourly status updates + Slack thread for all decisions + email confirmation"}}
+   {:mitigation "Hourly status updates + Slack thread for all decisions + email confirmation"}}
 
   :coordination/metrics-and-monitoring
   {:pre-flight-metrics
@@ -285,7 +286,7 @@
     "Escalate to platform-lead (emergency decision call)"
     "Option 1: Rollback to Rust (< 5 min restore)"
     "Option 2: Keep cljc at 100%, investigate issue (high risk)"
-    "Post-incident: root cause ADR, retry plan for 2026-09-18 or later"]}}
+    "Post-incident: root cause ADR, retry plan for 2026-09-18 or later"]}
 
   :coordination/document-location
   {:directory "/Users/junkawasaki/github/com-junkawasaki/90-docs/deployment/"

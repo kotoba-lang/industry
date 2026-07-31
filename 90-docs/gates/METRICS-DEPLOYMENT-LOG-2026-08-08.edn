@@ -75,7 +75,7 @@
     {:scenario "Metrics not appearing in Prometheus"
      :action "Verify API tokens in /etc/prometheus/secrets/, check collector logs"}
     {:scenario "Storage space insufficient"
-     :action "Check du -sh /prometheus/data, extend retention policy or add storage"}]}
+     :action "Check du -sh /prometheus/data, extend retention policy or add storage"}]
    :rollback-plan "Revert prometheus.yml from backup, restart service, retain all collected data"}
 
   {:phase 2
@@ -121,7 +121,7 @@
     {:scenario "Grafana dashboard shows no data"
      :action "Verify Prometheus datasource URL, test Prometheus connectivity from Grafana UI"}
     {:scenario "Alert routing not working"
-     :action "Check Slack webhook URL, verify PagerDuty API key, test manual alert trigger"}]}
+     :action "Check Slack webhook URL, verify PagerDuty API key, test manual alert trigger"}]
    :rollback-plan "Disable workflow in GitHub UI, remove dashboard from Grafana (retain config as JSON), retain all Prometheus data"}
 
   {:phase 3

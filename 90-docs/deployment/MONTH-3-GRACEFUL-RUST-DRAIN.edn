@@ -306,7 +306,7 @@
    :owner-decision "Revert to 50% Rust traffic (abort drain)"
 
    :rollback-procedure
-   ["1. Escalation-lead: '[ROLLBACK FROM DRAIN] cljc issue detected. Aborting drain.'
+   ["1. Escalation-lead: '[ROLLBACK FROM DRAIN] cljc issue detected. Aborting drain.'"
     "2. Traffic-controller: execute abort: `murakumo-cli pool drain-abort --pool rust-kotoba-server`"
     "3. Restore: resume accepting new connections on Rust pool"
     "4. Traffic: ramp Rust traffic back to 50% (from 0%)"

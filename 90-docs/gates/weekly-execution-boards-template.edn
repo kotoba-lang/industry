@@ -76,7 +76,7 @@
     "Weekly metrics snapshot (Jira issue type: weekly-metrics-snapshot)"
     "Escalation summary if any (Jira issue type: blocker-escalation)"
     "Next-week forecast + dependencies (Trello cards created)"
-    "Archive: move completed cards from Trello → Done"]}
+    "Archive: move completed cards from Trello → Done"]}}
 
  :automation/board-sync
  {:source "Prometheus + CI gate bot"
@@ -120,4 +120,4 @@
    {:name "Metrics Trending (6-week)" :type "line-chart" :metrics ["build-times" "coverage" "deploy-success"]}
    {:name "Blocker Queue (SLA Countdown)" :type "table" :source "Jira + escalation-protocol"}
    {:name "Team Velocity Burndown" :type "burndown" :source "Jira story-points"}
-   {:name "Escalation History (Week by Week)" :type "timeline" :source "prod-gates-wave5 Slack"}]}}
+   {:name "Escalation History (Week by Week)" :type "timeline" :source "prod-gates-wave5 Slack"}]}}}

@@ -125,7 +125,7 @@
    :status "✅ ARMED"
    :sla-definitions "4h alert response, 2h critical blocker response"
    :channels ["Slack #prod-gates-wave5" "Email gates-escalation@gftd.group" "PagerDuty prod-gates service"]
-   :notes "Ready for deployment, team contacts need final verification"}}}
+   :notes "Ready for deployment, team contacts need final verification"}}
 
  :team-readiness
  {:roles-assigned
@@ -204,7 +204,7 @@
   [{:risk "Minor dashboard panel rendering delay"
     :mitigation "Grafana auto-refresh set to 30s, well within p99 2s threshold"}
    {:risk "Alert message formatting issues"
-    :mitigation "Alert templates tested in staging"}]}
+    :mitigation "Alert templates tested in staging"}]
   :overall-risk-level "✅ LOW"
   :confidence-level "✅ VERY_HIGH (95%+)"}
 
