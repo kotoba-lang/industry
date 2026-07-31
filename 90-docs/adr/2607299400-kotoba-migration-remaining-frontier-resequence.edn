@@ -2818,6 +2818,21 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fa — T5.2 ct-scan + URL scheme/host residual)
+
+- murakumo main `3150ff73`: **token ct-scan** + **runtime find-scheme-end/**
+  **find-host-end** multi-arg pure → `:token/ct-scan` (`a`/`b`/`i`/`n`/`acc`) and
+  `:runtime/scan` (`s`/`i`/`n`). ADR-260801-w6-t52-ct-scan-scheme-records.
+  Evidence: token+runtime parity 9/80 + authority/call-record 90/1645 green.
+- west pin murakumo `91d98453` → `3150ff73`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 multi-arg pure residual closed for known scanners; W4 recursive values
+
+
 ## Progress (2026-08-01ez — T5.2 string-scan + digit-scanner residual)
 
 - murakumo main `91d98453`: **string-scan + digit-scanner multi-arg pure** →
