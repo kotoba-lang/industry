@@ -29,7 +29,7 @@
   :adr/known-gaps ["producer は環境変数に URL があることを到達可能性とみなす。到達しない URL は served leg として報告される。murakumo task plane 上では node の :requires gate が capability を担保するが、実 probe への置き換えは未実施。"
                    "episode 1-10 は shotlist が無いため catalog に載っていない。ep01 は既に motion-comic と panel が存在するので、過去分をどう扱うか(遡及登録するか、済として扱うか)は未決定。"
                    "producer は :legs を報告するだけで、実際のレンダリングは行っていない。backend が配線された時に :murakumo leg が本当に画を出すかは未検証。"
-                   "レンダリングは ghosthacker のみ実装。shiropico の producer はまだ leg を報告するだけで、実生成は未配線。"
+                   "shiropico の voice leg は全て :silent。TTS が未配線(murakumo の :tts は :via :proc で HTTP endpoint が無く、fleet head node で応答するものが無かった)。よって shiropico の run は常に :degraded で hold される。"
                    "loop-ka-production 自体の常駐(誰が cron/tick を打つか)は本 ADR の範囲外。既存 4 channel と同じ状態のまま。"],
   :adr/body
   "## Context
@@ -288,6 +288,60 @@ checkpoint(`Illustrious-XL-v2.0`)・832×1216・steps 28 / cfg 5.0 ・
 prompt 追従と画風は `loop-*` の `:must-not :own-domain-scoring-truth` により
 このループが採点するものではないが、「PNG が出た」を「正しいコマが出た」と
 読まれないよう記録する。
+
+## shiropico も実生成に配線した / 共有ライブラリへ抽出(2026-07-31)
+
+オーナー指示「1」(= shiropico にも同じ実生成を入れる)。
+
+### 複製を作らず `kotoba-lang/comfyui` に抽出した
+
+ghosthacker で書いた node-graph builder と native client を、2 つ目の consumer
+が要るとわかった時点で **`comfyui.native` / `comfyui.native-client`** として
+`kotoba-lang/comfyui` に移した(`comfyui.gateway` の隣)。同じファイルを 2 つの
+content repo に置けば `cacao.clj` が約 25 repo で乖離したのと同じ道を辿る。
+
+craft の選択(カラー checkpoint / サイズ / sampler)は library ではなく **各 repo
+側**に残した。library の default は generic。
+
+### shiropico の leg
+
+| | |
+|---|---|
+| `:video` | scene ごと。render 結果から(`:comfy` / `:placeholder`) |
+| `:voice` | dialogue 行ごと。**全て `:silent`** |
+
+**voice を空にしなかったのは意図的。** shiropico は動画チャンネルなので、manga と
+違って voice leg が**実在する**。ただし TTS が未配線(murakumo の `:tts` は
+`:via :proc` で HTTP endpoint が無く、fleet head node の候補ポートはいずれも
+応答しなかった)。空にすれば `:thin` になり、**パイプラインの半分が欠けている事実が
+通過扱いの verdict の裏に隠れる**。`:silent` のままにして `:degraded` で hold させる。
+
+### 実測
+
+| 経路 | 結果 |
+|---|---|
+| COMFY_URL 無し | video 23 `:placeholder` / voice 61 `:silent` |
+| :8189(落ちている) | 同上(**設定済み ≠ 到達可能**) |
+| `--limit 2` | video 2 `:comfy` / 21 `:placeholder`、実 PNG 2 枚 832×1216、scene_key 名 |
+| ghosthacker(共有 lib 経由) | `--limit 1` で実 PNG 1 枚(1.47 MB) |
+
+### 動かして見つかった追加バグ
+
+**`(int c)` は `.cljc` で可搬でない。** ClojureScript では seq した文字列が
+1 文字の**文字列**になり `(int 「k」)` は 0 なので、seed のハッシュが **key の内容を
+無視して長さだけに依存**していた。同じ長さの key は全て同じ seed。プロンプトが
+違えば画は違うので**動いているように見えていた** — seed が何もしていなかった。
+test で固定した。
+
+### craft の正直な注記 — prose prompt は追従が弱い
+
+shiropico の shotlist は **prose** の `scene_prompt`(「Aerial wide shot of a
+massive geothermal power plant on a black lava plateau at near-arctic dawn,
+...」)。最初の render は溶岩台地・夜明け・teal のデータ線を出したが
+**発電所そのものが出なかった** — 主題が落ちた。SDXL はタグ列に反応するので
+(ghosthacker の panel はその形)、タグ化するか prose を扱える checkpoint を選ぶかは
+未決の craft 課題。`loop-*` の `:must-not :own-domain-scoring-truth` により
+このループが決めることではない。
 
 ## Alternatives considered
 
