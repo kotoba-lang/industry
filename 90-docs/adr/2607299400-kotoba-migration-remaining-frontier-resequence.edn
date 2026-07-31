@@ -2197,6 +2197,26 @@ Still open:
 
 
 
+
+## Progress (2026-07-31dh — T8.3 secret_name_ok Component + header-name misfit fix)
+
+- kotoba-component#100 MERGED (`7bf2da5e`): **Canonical secret_name_ok**
+  denylist (NUL/TAB/LF/SPACE asterisk slash question backslash); exclude
+  secret_* from header-name tchar shape (**bugfix**: tchar accepted `*`).
+  Shape `:secret-name-ok-with-main`; full provider source `main()` → **-130**,
+  `ok*` → **-3**. Evidence: 42 tests / 476 assertions.
+- provider#97 MERGED (`e522ccd1`): **ADR 0206** pure Component re-emit
+  `:secret-name-ok-component`. Evidence: ops-kit 66 tests / 575 assertions.
+- west pin kotoba-component 180f1302 → 7bf2da5e; provider 5b42a4fd → e522ccd1
+  (`353b88b5`).
+
+Still open:
+1. T8.3 residual: nested EDN codec / full multi-file kit body under **W4**;
+   fs-path-ok Component; flip wasm-aot only when admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
