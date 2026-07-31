@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject path single-export arms (0214–0220) + multi-export kit body empty+append+request (ADR 0221); true set / W4 / result-in-package / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject path single-export (0214–0220) + multi-export kit body with result arms (ADR 0221–0222); true set / W4 / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2816,6 +2816,22 @@ Still open:
 3. T5.2 residual: **option-string-in-record compiler gap** is the main
    product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
    digit-scanner multi-arg internals optional; W4 recursive values
+
+
+## Progress (2026-08-01fz — T8.3 result arms in http-edn-reject-package)
+
+- kotoba-component#112 MERGED (`bee9c87a`): **result-ok + result-err** export
+  cases in `:http-edn-reject-package` multi-export kit body.
+- provider main `16c359f6`: **http-edn-reject-package** re-shipped with 5 exports
+  (empty + append + request + result-ok + result-err). ADR 0222.
+  Digest `574dcb55…`. True set / W4 still open; `:wasm-aot` stays `:partial`.
+  Evidence: ops kit registry + live wasmtime ok/err/reject.
+- west pin kotoba-component → `bee9c87a`; provider → `16c359f6`
+
+Still open:
+1. T8.3 residual: true set / W4; `:wasm-aot :implemented`
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. document-in-record closed profile; murakumo residual; W4 recursive values
 
 
 ## Progress (2026-08-01fy — T8.3 multi-export http-edn-reject-package kit body)
