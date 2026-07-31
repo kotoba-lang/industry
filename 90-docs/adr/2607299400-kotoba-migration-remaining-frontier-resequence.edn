@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — ops through 0230 multi-ns reject + **0231 kit-shaped request set-of-header-records** + **0232 secret reply fixed-depth EDN**; W4 recursive nested EDN / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — ops through 0230 multi-ns reject + **0231 kit-shaped request set-of-header-records** + **0232 secret reply fixed-depth EDN**; **typed-set-nth fold full headers EDN (0233)**; W4 recursive nested EDN / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2816,6 +2816,25 @@ Still open:
 3. T5.2 residual: **option-string-in-record compiler gap** is the main
    product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
    digit-scanner multi-arg internals optional; W4 recursive values
+
+
+## Progress (2026-08-01gr — T8.3 typed-set-nth + full headers EDN fold)
+
+- kotoba-kir#28 MERGED (`4213cc7a`): **ADR 0024** typed-set-nth (sorted items; OOB trap).
+- kotoba-wasm#47 MERGED (`0ec47a66`): emit set-nth-i64/ref host imports.
+- compiler#467 MERGED (`97c17f54`): **ADR 0194** frontend + pins for typed-set-nth.
+- provider#121 MERGED (`61759fcb`): **ADR 0233** full headers EDN fold via
+  typed-set-nth over kit-shaped set-of-header-records; package sha `530f9936…`;
+  KIR main → **-9002**. Evidence: **85 tests / 816 assertions** green.
+- west pins: kir → `4213cc7a`; wasm → `0ec47a66`; compiler → `97c17f54`;
+  provider → `61759fcb`
+- Honesty: closes typed-set fold residual from Progress gq. Bounded sets only;
+  does **not** flip `:wasm-aot :implemented` (W4 recursive nested EDN open).
+
+Still open:
+1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
 
 
 ## Progress (2026-08-01gq — T8.3 kit request set-record + secret reply EDN)
