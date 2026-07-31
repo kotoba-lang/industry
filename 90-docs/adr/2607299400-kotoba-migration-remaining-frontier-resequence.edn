@@ -2532,6 +2532,27 @@ Still open:
    exports without option fields → single record param); W4 recursive values
 
 
+## Progress (2026-07-31dy — T5.2 native guest record expansion gc)
+
+- murakumo#279 MERGED (`3d76dcf8`): **T5.2 native guest record wire** for
+  **infer.gc** policy math — `need-bytes` / `free-after` / `target-met?` /
+  `rank-better?` / `comfy-evictable?` take single `:gc/{need,free-after,target,rank,comfy}`
+  records. ADR-260731-w6-t52-native-record-gc.
+  Evidence: 101 tests / 1678 assertions green.
+- Note: #279 is this gc PR (credits+rebalance landed earlier as `a2bace1` on
+  main with a commit message that also cited #279 — history ambiguity; pin
+  was `a2bace1` then advanced here).
+- west pin murakumo `a2bace1b` → `3d76dcf8` (`576a9bbe`)
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**; flip wasm-aot only if admissible
+2. T8.4 residual: optional host-parity L5 full-table coverage; real Node sockets
+   (fail-closed inject complete for actor:host pg/transport)
+3. T5.2 native guest record wire **further expansion** (identity/keyring/relay
+   multi-arg pure, option-in-record after compiler); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
