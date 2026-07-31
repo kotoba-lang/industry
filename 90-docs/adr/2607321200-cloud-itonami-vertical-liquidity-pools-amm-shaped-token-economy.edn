@@ -21,7 +21,8 @@
    "agent が運用する原資の同意単位は payment ではなく **envelope**（上限・期間・費目）である。ただし authority.clj の4不変条件のうち CONTENT BINDING と SINGLE USE は envelope 化で必ず作り直しが要る"
    "θ(v)（pooled capital のうち agent が焼いてよい割合）は実現収益の関数であり定数ではない。seed floor は実測済みの GTM 実験1回分で建てる"
    "この設計は ADR-2607320500 の custody 回避決定を反転させる要求である、という認識。両立しないものを両立するかのように書かない"
-   "**S(v)（vertical share）と ADR-2607299900 の TOKEN は別々の instrument であり、収益源は交わらない。VLP は TOKEN を必要とせず、両者の採否は独立に判断できる**（§5b）"]
+   "**S(v)（vertical share）と ADR-2607299900 の TOKEN は別々の instrument であり、収益源は交わらない。VLP は TOKEN を必要とせず、両者の採否は独立に判断できる**（§5b）"
+   "**cloud-itonami は既に非エクイティを選んでおり、`guard-non-equity!` と `kernels.substance/equity-blocklist` がそれをコードで強制している（ADR-0010、根拠は FIEA）。Side C はこの選択と衝突し、Side I はこの枠にそのまま乗る** —— 2辺は法的性質の点で対称ではない（§5a）"]
 
   :adr/supersedes []
   :adr/superseded_by []
@@ -447,6 +448,26 @@ gross
 | $10,000 | 20%/yr | 0.2 | $10,000/yr | 20.8 席 |
 
 **1 vertical あたり有償 2 席で $1,000 の LP が 20% で回る。** 一方 fleet 全体では 458 × $1,000 = $458,000 の調達に対し年 $458,000 の gross が要り、今日の実測 $513.09/yr に対し **893 倍**の隔たり。**vertical 単位では手が届き、fleet 全体では venture 規模の賭けである。**
+
+### 5a. **cloud-itonami は既に非エクイティを選んでおり、コードがそれを強制している**（2026-08-01 実測、本 ADR で最も重い発見）
+
+`cloud-itonami.funding` の ns docstring:
+
+> これは意図的に **cap table でも securities/investment vehicle でもない**。`:contribution` は money in（donation/sponsorship — Open Collective / GitHub Sponsors の形）、`:distribution` は money out（**contributor/maintainer への compensation**、または透明な経費）。**どのスキーマ属性も所有割合や約束された利回りを表さない**。`guard-non-equity!` はそれを付そうとする memo の記録を**拒否する** —— **通貨が fiat か crypto かは FIEA の分類を変えないので**（ADR-0010 Context）。全 entry は常に `:itonami.effect/risk :financial` で、常に承認ゲートを通る。
+
+schema 側にも同じ制約が書かれている（`funding-directions`: 「`:contribution` は **profit-participation right を伴わない**」「`:distribution` は……**never a dividend on a stake**」）。強制は `kernels.substance/equity-blocklist`（kotoba-wasm SSoT）にある。
+
+**これは「法務待ち」ではない。この製品は既に非エクイティを選び、その判断を kernel レベルで強制している。**
+
+#### 本 ADR にとっての帰結
+
+**Side C（資本 lock → 収益シェア）は、この選択と真っ向から衝突する。** S(v) は vertical 収益の所有割合であり、その分配は「dividend on a stake」そのもので、funding ledger が名指しで拒否している当のものである。§7 で挙げた ADR-2607320500 の custody 回避や Howey は**米国側の制約**だったが、こちらは**この製品自身の設計判断で、日本の FIEA を根拠に、コードで強制されている**。制約は2つの法域から来ている。
+
+**Side I（情報 lock）は逆に、この形にそのまま乗る。** `:distribution` の定義は「**contributor/maintainer への compensation**」であり、これは blueprint 貢献者への credits 報酬そのものの形である。§3 で「膜規則の改正は不要」と書いたが、**より強い形で正しかった** —— cloud-itonami 側の funding ledger も、情報 LP を compensation として記録する語彙を既に持っている。
+
+> **したがって本 ADR の2辺は、法的性質の点で対称ではない。** Side I は既存の非エクイティ枠にそのまま収まり、Side C はその枠を出る。§7 の open-decision `:side-c-vs-custody` に、この FIEA 側の制約を加えて読むこと。
+
+**本 ADR は 27 反復のあいだ、この制約を見つけていなかった。** 米国側（Howey / custody）は早期に特定していたが、**この製品自身が同じ問いに既に答えを出していた**ことを見落としていた。設計を書く前に、その製品の funding ledger の docstring を読むべきだった。
 
 ### 5b. S(v) と TOKEN の関係 — **VLP は TOKEN を必要としない**
 
