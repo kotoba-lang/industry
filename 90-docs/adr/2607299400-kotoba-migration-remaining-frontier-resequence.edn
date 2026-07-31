@@ -1501,6 +1501,22 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31bv — T8.3 compiler-AOT scoped-fs path-length)
+
+- provider#60 MERGED (`aa82545b`): **T8.3 ADR 0174** — compiler-AOT pure
+  `fs_path_len_ok(len)` (empty→-1, >1024→-2) + Component. Path escape/dot/slash
+  scan remains hand WAT. `:wasm-aot` stays `:partial`. Evidence: 57 tests /
+  416 assertions; Node live `[-1,0,0,-2]`.
+- west pin provider 96ec2898 → aa82545b.
+
+Still open:
+1. T8.3 residual: full request/result EDN codec AOT; secret/scoped-fs
+   **char-class / path-scan** compiler re-emit (typed-string or pure mem);
+   length halves done for secret (0173) + scoped-fs (0174)
+2. T8.4 residual: live SCRAM/PG success (qualification suite)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
