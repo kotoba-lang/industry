@@ -1,0 +1,279 @@
+[{:db/id -1
+  :adr/id "adr-2607319500-murakumo-aethir-shaped-developer-compute-two-workloads"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "proposed"
+  :adr/date "2026-07-31"
+  :adr/last_verified "2026-07-31"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2607319500: murakumo.cloud を Aethir 型「developer compute」として設計する — inference と CI の2 workload、node registry の一本化、CI 労働への credits 発行、供給者 80 / protocol 20"
+  :adr/topic "murakumo-aethir-shaped-developer-compute"
+  :adr/repos ["orgs/network-awai/cloud-murakumo" "orgs/kotoba-lang/murakumo" "com-junkawasaki/root (scripts/fleet-ci)"]
+
+  :adr/authoritative_for
+  ["murakumo.cloud が売るものを『decentralized GPU marketplace』ではなく『developer compute（監査可能な実行）』と定義すること。Aethir が DefiLlama で DePIN ではなく Developer Tools に分類され、DePIN カテゴリ全体の 14 倍を1社で稼いでいる事実に基づく"
+   "workload class を first-class にすること: :inference（LLM/生成）と :ci（開発者の CI/CD ジョブ）。両者は同じ fleet・同じ台帳・同じ receipt 連鎖を共有し、価格と capability 要件だけが異なる"
+   "node registry は1つであること。実測 probe された registry が正で、能力の自己申告に定数を書いてはならない（定数は測定ではない）"
+   "労働裏付け発行を settled CI gate に拡張すること（ADR-2607995000 §3 が witness duty に対して行った拡張と同型）"
+   "分配率を Aethir 型 供給者 80% / protocol 20% とし、head cut は供給側 80 の内側に置くこと（head は仕事をしているので供給者である）"
+   "token holder への収益還流を持たないこと（Aethir は $0）。ADR-2607299900 の sink 順序を (a)BME 先行から (b)work-token 先行に入れ替え、いずれも settled volume ≠ 0 を前提条件とする"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends
+  ["90-docs/adr/2607030030（労働裏付け発行を settled CI gate に拡張。『settled run が credits を生む』→『settled run / settled witness duty / settled CI gate が credits を生む』）"
+   "90-docs/adr/2607995000（§3 の労働定義に CI gate を追加。膜規則・非償還性・credits↔EN 分離はすべて不変）"
+   "90-docs/adr/2607299900（Decision 3 の sink 順序を入れ替え。sink 集合そのものは変えない）"
+   "90-docs/adr/2607178000 / 2607255500 / 2607300900（fleet-ci を『CI 基盤』から『murakumo の第2の商品かつ第2の労働源』へ再定義）"]
+
+  :adr/related
+  ["90-docs/adr/2607319000-murakumo-operator-awai-and-crypto-value-accrual-comparison.edn（前提となる value-accrual 実測。本 ADR はその Decision 4 の帰結）"
+   "90-docs/adr/2607300100（duplicated-truth 欠陥クラス。本 ADR の Finding 1 は同クラスの最も重い実例）"
+   "scripts/fleet-ci/nodes.edn / gates.edn / tick.cljs、manifest/fleet-ci.edn（実測された supply と 103 件の署名済み receipt）"
+   "orgs/kotoba-lang/murakumo/src/murakumo/infer/credits.cljc、kotoba/infer_credits_core.kotoba（head 1/10・protocol 1/20 の定数）"]
+
+  :adr/problem
+  "オーナー指示（2026-07-31）: 「Aethir を参考にして, adr, murakumo.cloud を設計してみて, murakumo.cloud では cdci とかもあるけれど?」
+
+前段の ADR-2607319000 が、AI compute において **保有者還流と需要が逆相関している**ことを実測で示した — Aethir が fees $88.26M/yr を稼いで保有者に $0、95〜100% 還す Render / Filecoin / Livepeer は $0.7〜2.5M。そして murakumo 自身は settled 0。
+
+オーナーの「cdci とかもあるけれど?」という指摘が、この設計の要になる。**調べた結果、murakumo の needle を動かしている workload は推論ではなく CI だった。**"
+
+  :adr/finding
+  "[{:id :two-node-registries-and-the-economy-pays-from-the-fake-one
+     :severity :critical
+     :class \"ADR-2607300100 の『同じ真実が2箇所にある』欠陥クラス。本 workspace で見つかった中で最も重い実例\"
+     :registry-a {:where \"scripts/fleet-ci/nodes.edn\"
+                  :nature \"probe.cljs が実測して生成（:probed-at 2026-07-29T00:18:25Z、手編集禁止）\"
+                  :contents \"10 ノード（zebulun/asher/judah/levi/naphtali/simeon/dan/joseph/…）、Apple M4、:cores 10、:free-gb は 1〜56 と実際にばらついている、:caps #{:jvm :node} が 6 台 / #{} が 4 台、:max-parallel 2\"
+                  :status \"実際に仕事をしている。103 件の署名済み receipt がこの registry のノード名を記録している\"}
+     :registry-b {:where \"https://api.murakumo.cloud/infer/nodes\"
+                  :nature \"ノードの自己申告\"
+                  :contents \"45 ノード全部が tier=browser（webgpu-wasm）、非ブラウザノード 0 件。44 件が :mem-bytes 34359738368 = ちょうど 32 GiB を申告 — 全件同一なので測定値ではなく定数。合計 1408 GiB は実容量ではない\"
+                  :status \"Mac fleet はここに1台も載っていない\"}
+     :why-critical \"murakumo.infer.credits/settle は run の credits を memory×time（常駐シャードバイト × 実行時間）比例で node に分配する。その memory は registry-b の自己申告から来る。**つまり経済は、実在しない容量を申告する registry から支払い、実際に仕事をしている 10 台には 1 credit も払っていない。** 全ノードが同一定数を申告している以上、memory×time による差別化は現状すべて同着になり、planner の『plan IS the cap table of the run』という設計意図も成立していない\"
+     :verified \"2026-07-31 実測。/infer/nodes を取得して tier/engine/mem-bytes を集計、scripts/fleet-ci/nodes.edn を読み比較\"}
+
+    {:id :ci-is-the-only-workload-with-real-settled-demand
+     :severity :high
+     :what \"manifest/fleet-ci.edn に 103 件の署名済み receipt。tip-driven（:trigger :tip-change）で継続的に実行され、各 receipt が :ci/subject に repos / tips / pins / **nodes**（どのノードが走らせたか）を、:checks に gate ごとの :pass/:fail を持ち、fleet-agent-murakumo-ci-tip-25mbair が署名している\"
+     :contrast \"同時点で x402 settled 0 / Stripe 有効サブスク 0 / acceptance density は density 1・holdable 0（受領者は全員 fixture）\"
+     :significance \"**receipt の形は、credits の台帳が必要としているものとほぼ同一である** — 署名付き・append-only・ノード帰属あり・決定論的な pass/fail 判定あり。ADR-2607995000 §7 が『外部参加者受け入れ前に必須』とした署名 gate を、CI 側は既に満たしている\"}
+
+    {:id :ci-labor-earns-nothing
+     :severity :high
+     :what \"fleet-ci と credits の間に双方向とも一切の linkage が無い（grep 実測: scripts/fleet-ci/*.cljs,*.edn に credit/earn/settle//infer/runs への参照ゼロ。credits.cljc に ci/gate の概念ゼロ）\"
+     :consequence \"労働裏付け発行を掲げる経済圏で、**実際に行われている唯一の継続的な労働が発行対象になっていない**。ADR-2607030030 の『settled run だけが credits を生む』を字義通り実装した結果、run が 0 なので発行も 0 になっている\"}
+
+    {:id :aethir-is-classified-as-developer-tools-not-depin
+     :severity :informational
+     :what \"DefiLlama 上 Aethir の :category は 'Developer Tools'。DePIN カテゴリではない。methodology は 'Service fees paid by developers to use aethir GPU services' / 'Revenue: 20% protocol fees charged by aethir' / 'SupplySideRevenue: 80% of the service fees goes to GPU service providers' / 'ProtocolRevenue: All revenue goes to protocol'\"
+     :numbers \"fees 1y $88,262,729 / all-time $173,606,087 / 30d $3,062,621、chain Arbitrum、holders revenue $0\"
+     :caveat \"**trailing 1y は現在の run-rate ではない。** 30d を年率換算すると $37.27M で、trailing 1y はその 2.37 倍。$88M を『今の Aethir』として引用しない\"
+     :significance \"DePIN カテゴリ全体（6 プロトコル）の合計が $6.23M/yr であるのに対し、Developer Tools に分類された1社がその 14 倍を稼いでいる。**分類は後付けのラベルではなく、誰に何を売っているかの記述である**\"}]"
+
+  :adr/decision
+  "### D1. murakumo が売るものを『developer compute』と定義する（Aethir の framing を採る）
+
+Aethir が DePIN ではなく **Developer Tools** に分類され、DePIN カテゴリ全体の 14 倍を1社で稼いでいるのは分類の綾ではない。Aethir の methodology は 'Service fees paid by **developers** to use aethir GPU services' である —— 売り先が開発者であり、売り物が「GPU 秒」ではなく「開発者が仕事を終わらせる手段」として記述されている。
+
+**murakumo は既に開発者に compute を売れる形を2つ持っている。** そのうち需要が実在するのは CI の方である。
+
+### D2. workload class を first-class にする
+
+```
+workload :inference   LLM / 生成。x402 $0.01/req、credits 建て。settled 0
+workload :ci          開発者の CI/CD ジョブ。fleet-ci、103 receipt。課金 0（内部利用のみ）
+```
+
+両者は **同じ fleet・同じ node registry・同じ receipt 連鎖・同じ credits 台帳**を共有し、異なるのは **単価と capability 要件だけ**とする。
+
+- `:inference` の capability 要件: メモリ常駐（memory×time が希少資源）
+- `:ci` の capability 要件: `:caps #{:jvm :node}`、`:free-gb`、`:max-parallel`（既に `nodes.edn` が持っている）
+
+`murakumo.infer.credits/unit-prices` は既に `:tokens :images :video-seconds` 等の multi-unit 課金を持つ。**`:ci-gate-seconds`（または `:ci-gate`）を1単位追加すれば、価格面の変更はそれで足りる** —— settle / balances のフォールドは workload を知る必要がない。
+
+### D3. node registry を一本化する。probe された方が正
+
+**`scripts/fleet-ci/nodes.edn` を唯一の supply registry とし、`/infer/nodes` はそれを投影したものにする。**
+
+- probe された capability（`:cores` / `:free-gb` / `:caps` / `:max-parallel`）が正本。`nodes.edn` の冒頭が既に「generated by probe.cljs. DO NOT EDIT BY HAND」と宣言している
+- **browser ノードは実測した capability を申告しなければならない。定数は測定ではない。** 44 件が同一の 32 GiB を申告している現状は、memory×time 分配を全ノード同着にし、planner の『plan IS the cap table』という設計意図を無効化している
+- 申告値が実測でないノードは `:capability-unmeasured` としてマークし、**memory×time の分母から除外する**（0 として扱うのではない —— ADR-2607259800 の「未計測は 0 ではない」）
+
+### D4. 労働裏付け発行を settled CI gate に拡張する
+
+ADR-2607030030 の発行規則を次に改める（ADR-2607995000 §3 が witness duty に対して行った拡張と同型で、**発行が労働裏付けであるという原則は不変、労働の種類が増えるだけ**）:
+
+> **settled run** および **settled witness duty** および **settled CI gate** が credits を生む。
+
+実装は新規設計を要しない。`manifest/fleet-ci.edn` の receipt は既に必要なものを全部持っている:
+
+| credits 台帳が要求するもの | fleet-ci receipt が既に持つもの |
+|---|---|
+| 誰が働いたか | `:ci/subject :nodes {\"root\" \"judah\"}` |
+| 何をしたか | `:ci/subject :repos` / `:tips` / `:pins` |
+| 決定論的な成否判定 | `:checks [{:name … :outcome :pass/:fail}]` |
+| 署名 | `fleet-agent-murakumo-ci-tip-25mbair` |
+| append-only | `manifest/fleet-ci.edn`（追記のみ） |
+
+報酬は **finalize された gate 数に対する定額**とする（witness duty と同じ形。実行時間に比例させると、遅いノードほど儲かる逆インセンティブが立つ）。
+
+### D5. 分配率を Aethir 型 供給者 80% / protocol 20% にする
+
+現行: nodes **85%** / head **10%**（`head-num/head-den` = 1/10）/ treasury **5%**（`protocol-num/protocol-den` = 1/20）。
+
+提案: **供給側 80%（nodes + head）/ protocol 20%**。head cut は供給側 80 の内側に置く —— **head は API を終端し自分の層も計算しているので供給者である**。
+
+5% は protocol が何もしていない時期に設定された数値である。今の protocol は scheduling / recompute 検証 / receipt 連鎖 / gate オーケストレーション / pin 到達性検証を実際に行っており、Aethir が同じ機能に 20% を取っているのは機能に対する対価として整合する。
+
+**そして Aethir の 20% は保有者ではなく protocol treasury に行く。** これは D6 と噛み合う。
+
+### D6. token holder への収益還流を持たない（Aethir 型）
+
+ADR-2607319000 が測ったとおり、AI compute で最大の収益を持つ Aethir は保有者還流 **$0** である。murakumo もそうする。
+
+ADR-2607299900 の **sink 集合は変えず、順序だけ入れ替える**:
+
+```
+現行  (a) BME burn  →  (b) work-token bond  →  (c) stake 加重 governance
+提案  (b) work-token bond  →  (a) BME burn  →  (c) は保留
+```
+
+- **(b) を先に**: BME の burn は「支払量」の関数で、支払量が 0 なら発行しても掛ける相手がいない。work-token の需要は「供給者参加」の関数で、**顧客需要より先に存在しうる唯一の accrual 源**である。ADR 自身が (b) を「最も小さい」と書いている
+- **(c) を保留**: live の terms.md が MCC について 'provides no … governance …' と公に宣言しており、(c) はそれと正面から矛盾する（ADR-2607319000 の finding）。Aethir 型を採るなら (c) は不要
+- **どちらも settled volume ≠ 0 を前提条件とする。** これは技術的 gate ではなく経済的 gate である
+
+### D7. 差別化は GPU 時間ではなく「検証可能な実行」
+
+Aethir は GPU 時間を売る。murakumo が 10 台の M4 で GPU 時間の価格競争に勝つことはない。
+
+**売れるのは receipt 連鎖そのものである** —— 署名付き・append-only・ノード帰属つき・決定論的 recompute で検証可能な実行記録。ADR-2607030030 の『売るのは FLOPS ではなく主権と監査』は、fleet-ci が既にそれを**実装してしまっている**ことに誰も気付いていなかっただけである。
+
+ADR-2607319000 が記録した Monero の教訓（還流 0・恒久希薄化で $6.65B、accrual 機構を持つ3件より高い）はここに効く: **誰も供給していない用途の独占は、コモディティ用途の上に載せた精巧な sink に勝つ。** 「監査可能な CI」は「安い GPU 秒」より競合が薄い。"
+
+  :adr/open-decisions
+  "[{:id :protocol-take-5-to-20
+     :question \"protocol の取り分を 5% から 20% に引き上げるか（D5）\"
+     :note \"経済政策の変更であり agent 判断では確定しない。Aethir が同機能に 20% を取っている事実と、murakumo の protocol が実際に行う仕事が増えた事実が根拠。settled volume が 0 の現在、実質的な影響はゼロなので、変えるなら今が最も安い\"
+     :owner \"owner\"}
+    {:id :sell-ci-externally
+     :question \"CI を外部に売るか。現在 fleet-ci は 100% 内部利用（対象 repo は com-junkawasaki/root のみ）\"
+     :note \"売らないなら D1〜D4 は『内部原価配賦と労働記録の整合』にとどまり、acceptance density は動かない。売るなら murakumo は Aethir と同じ『Developer Tools』の売り方をすることになり、価格・SLA・サポートの設計が要る\"
+     :owner \"owner\"}
+    {:id :mcc-contradiction-still-open
+     :question \"ADR-2607319000 の MCC 矛盾（terms の 'no governance' vs sink (c)）は未解決のまま\"
+     :note \"D6 が (c) を保留にすることで矛盾は当面顕在化しないが、terms が MCC を transferable utility token として既に公に記述している事実は変わらない\"
+     :owner \"owner + 弁護士\"}
+    {:id :browser-tier-economic-role
+     :question \"browser tier（webgpu-wasm、現在 45 件）を経済的にどう扱うか\"
+     :note \"実測 capability を申告させれば supply として計上できるが、実測させるまでは D3 により memory×time の分母から除外される。除外は罰ではなく、測っていないものを測ったことにしないという規律\"
+     :owner \"owner\"}]"
+
+  :adr/implementation
+  "{:done []
+    :not-done-deliberately
+    [{:what \"本 ADR の実装は一切行っていない\"
+      :why \"D5（分配率）と D6（sink 順序）は accepted な経済政策 ADR の変更であり、:adr/status も proposed である。オーナー指示は『設計してみて』であって『実装して』ではない\"}]
+    :next
+    [{:step 1 :what \"node registry 一本化（D3）— probe.cljs の出力を /infer/nodes の供給元にし、browser ノードの 32 GiB 定数申告を実測または :capability-unmeasured に置き換える\"
+      :blocked-by nil
+      :note \"**token も価格も待たずに今日できて、しかも経済の支払先を実在させる唯一の変更である。** 現在 credits は実在しない容量に対して分配する設計になっている\"}
+     {:step 2 :what \"CI receipt → credits の合流（D4）— fleet-ci.edn の receipt を /infer/runs の run record に変換する。ADR-2607995000 是正3（x402 収益の credits fold 合流、cloud-murakumo 8a06668）と同型の作業\"
+      :blocked-by \"step 1（分配先のノードが registry に居ること）\"}
+     {:step 3 :what \"unit-prices に :ci-gate を追加（D2）\" :blocked-by \"step 2\"}
+     {:step 4 :what \"分配率の変更（D5）\" :blocked-by \":protocol-take-5-to-20 のオーナー判断\"}
+     {:step 5 :what \"sink 順序の入れ替え（D6）\" :blocked-by \"settled volume != 0\"}]}"
+
+  :adr/known-gaps
+  "[{:gap \"CI を外部に売った先例を測っていない\"
+     :note \"Aethir は GPU compute であって CI ではない。GitHub Actions / CircleCI / Buildkite 等の中央集権 CI 市場規模は本 ADR では未取得で、『CI は developer compute だから Aethir と同じ売り方ができる』は類推であって測定ではない\"}
+    {:gap \"CI gate 1本の原価も適正価格も不明\"
+     :note \":gate-timeout-ms 1800000（30分）は上限であって実績ではない。receipt に実行時間が記録されているなら分布を出せるはずだが、本 ADR では未集計\"}
+    {:gap \"10 台のうち 4 台は :caps #{} で CI gate を実行できない\"
+     :note \"naphtali/dan/zebulun 他。:free-gb も 1〜2 GB と逼迫している個体がある。supply として数えられるのは実質 6 台\"}
+    {:gap \"D5 の 80/20 は Aethir の数値をそのまま採っている\"
+     :note \"murakumo の protocol が Aethir と同じ量の仕事をしている根拠は無い。20% は『機能に対する対価』という論法で正当化しているが、機能の量は比較していない\"}
+    {:gap \"browser tier 45 件が実在するかも未検証\"
+     :note \"全件が同一定数を申告している以上、ノード数自体の信憑性も本 ADR は保証しない。実測 capability の要求（D3）は同時にこの検証にもなる\"}
+    {:gap \"Aethir の $88.26M は現在の run-rate ではない\"
+     :note \"30d 年率換算 $37.27M に対し trailing 1y はその 2.37 倍。参考にするのは分配構造（80/20・holder $0・Developer Tools 分類）であって水準ではない\"}]"
+
+  :adr/body
+  "# ADR-2607319500: murakumo.cloud を Aethir 型 developer compute として設計する
+
+## 一行で
+
+**「cdci とかもあるけれど?」が設計の答えだった。** murakumo の needle を動かしている workload は推論ではなく CI であり、CI 側には既に実測された supply・継続的な需要・署名付き台帳が揃っている。足りないのは、経済がそちらを見ていないことだけである。
+
+## Aethir から採るもの、採らないもの
+
+| | Aethir | murakumo への適用 |
+|---|---|---|
+| 分類 | **Developer Tools**（DePIN ではない） | 採る。売り先は開発者、売り物は仕事が終わること |
+| 分配 | 供給者 80 / protocol 20 | 採る（head は供給側 80 の内側） |
+| 保有者還流 | **$0** | 採る。sink は work-token 先行、settled≠0 が前提 |
+| 売り物 | GPU 時間 | **採らない。** 10 台の M4 で GPU 秒の価格競争には勝てない |
+| 水準 | fees 1y $88.26M | 参考にしない（30d 年率換算は $37.27M、trailing は 2.37 倍） |
+
+**分類は後付けのラベルではない。** DePIN カテゴリ全体（6 プロトコル）の合計が $6.23M/yr であるのに対し、Developer Tools に分類された1社がその 14 倍を稼いでいる。Aethir は「分散 GPU ネットワーク」を売らず「開発者の GPU サービス」を売った。
+
+## 一番重い発見 — 経済は実在しない容量に払っている
+
+murakumo には node registry が2つあり、**経済は偽物の方から支払っている。**
+
+```
+scripts/fleet-ci/nodes.edn        /infer/nodes
+probe.cljs が実測（2026-07-29）    ノードの自己申告
+10 台の Apple M4                  45 件すべて browser tier、実機 0 台
+:free-gb 1〜56（ばらついている）   44 件が全部 34359738368 = ちょうど 32 GiB
+:caps #{:jvm :node} が 6 台        合計「1408 GiB」は実容量ではない
+103 件の署名済み receipt あり      仕事の記録なし
+        ↑                                  ↑
+   実際に仕事をしている          credits/settle が memory×time で払う先
+```
+
+`murakumo.infer.credits` の設計思想は「**plan IS the cap table of the run**」——planner が分割に使う量（memory×time）と報酬配分が同一であることが、経済と配置を1つのシステムにする、というものだった。**全ノードが同一定数を申告している以上、この差別化は現在すべて同着になり、設計意図は成立していない。**
+
+そして実際に仕事をしている 10 台は registry に載っていないので、1 credit も受け取っていない。
+
+これは ADR-2607300100 が命名した「同じ真実が2箇所にある」欠陥クラスの、この workspace で見つかった中で最も重い実例である。7件を数えたあの ADR は決済面を見ていた。同じ欠陥が supply 面にもあった。
+
+## CI 側は、経済が要求するものを既に全部持っている
+
+`manifest/fleet-ci.edn` の 103 件の receipt:
+
+| credits 台帳が要求 | receipt が既に持つ |
+|---|---|
+| 誰が働いたか | `:nodes {\"root\" \"judah\"}` |
+| 何をしたか | `:repos` / `:tips` / `:pins` |
+| 決定論的な成否 | `:checks [{:outcome :pass}]` |
+| 署名 | `fleet-agent-murakumo-ci-tip-25mbair` |
+| append-only | `manifest/fleet-ci.edn` |
+
+ADR-2607995000 §7 は「外部参加者を受け入れる前に CACAO 署名・署名付き receipt・witness quorum を必須にせよ」を gate に置いた。**CI 側はその gate を既に通過している。** 推論側が `:who` 自己申告を信頼していた頃に、CI 側は署名付き台帳を回していた。
+
+にもかかわらず **fleet-ci と credits の間には双方向とも linkage が1本も無い**（grep 実測）。労働裏付け発行を掲げる経済圏で、実際に行われている唯一の継続的な労働が発行対象になっていない。
+
+## だから設計はこうなる
+
+```
+D1  売り物を「developer compute（検証可能な実行）」と定義する
+D2  workload class を :inference と :ci の2つにする（台帳は共通、単価と capability 要件だけ違う）
+D3  node registry を1つにする。probe された方が正。定数申告は測定ではない
+D4  労働裏付け発行を settled CI gate に拡張する（receipt の形は既に正しい）
+D5  分配を 供給者 80 / protocol 20 にする（head は供給側の内側）
+D6  保有者還流は持たない。sink は work-token 先行、いずれも settled≠0 が前提
+D7  差別化は GPU 時間ではなく receipt 連鎖
+```
+
+**最初の1手は D3 である。** token も価格も待たずに今日でき、しかも「経済の支払先を実在させる」唯一の変更だからである。現状は、実在しない容量に対して分配する設計に、実在する労働が接続されていない、という二重の空振りになっている。
+
+## 正直に言っておくこと
+
+- **CI を外部に売る決定はしていない。** 現在 fleet-ci の対象は `com-junkawasaki/root` のみで 100% 内部利用である。売らないなら D1〜D4 は「内部原価配賦と労働記録の整合」にとどまり、acceptance density は 1 のまま動かない。
+- **10 台のうち CI gate を実行できるのは実質 6 台**（4 台は `:caps #{}`、`:free-gb` が 1〜2 GB の個体もある）。
+- **「CI は developer compute だから Aethir と同じ売り方ができる」は類推であって測定ではない。** Aethir は GPU compute であって CI ではなく、中央集権 CI 市場（GitHub Actions / CircleCI 等）の規模は本 ADR では取得していない。
+- **CI gate 1本の原価も適正価格も不明。** `:gate-timeout-ms` の 30 分は上限であって実績ではない。
+- **80/20 は Aethir の数値をそのまま採った。** murakumo の protocol が同じ量の仕事をしている根拠は無い。settled volume が 0 の今なら実質影響ゼロなので、変えるなら今が最も安い、という以上のことは言えない。"}]
