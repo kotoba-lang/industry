@@ -2818,6 +2818,26 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01gj — T8.3 multi-export reject package folds names-add)
+
+- kotoba-component#114 MERGED (`d931faca`): multi-export `:http-edn-reject-package`
+  optional **`:headers-names-add`** (shared `has-name-element` true-set).
+  Evidence: **54 tests / 618 assertions** green.
+- provider#114 MERGED (`aab89f81`): **ADR 0226** re-ship reject package with
+  six exports (empty+append+**names-add**+request+results). Component sha
+  `0befd905…`.
+  Evidence: **81 tests / 766 assertions** green.
+- west pins: kotoba-component → `d931faca`; provider → `aab89f81`
+- Honesty: header-**map** append uniqueness still marker scan; name-**list**
+  plane is true-set on same Component. Does **not** flip `:wasm-aot
+  :implemented` (W4 recursive nested EDN open).
+
+Still open:
+1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
+
+
 ## Progress (2026-08-01gi — T8.3 Component twin headers-names-add true-set)
 
 - kotoba-component#113 MERGED (`dfba9407`): **Canonical `:headers-names-add`**
