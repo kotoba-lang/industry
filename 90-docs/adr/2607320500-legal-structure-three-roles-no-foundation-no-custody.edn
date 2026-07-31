@@ -134,9 +134,21 @@ Q3. 発行前に必ず解消するもの
 
 **現在の推奨は Q1 = NO であり、その場合 §2 のとおり法人は増えない。**
 
+**そして『既存 chain 軸に載せる』という選択肢は、見た目より重い。** ADR-2607021800 の J1 の原文は方針ではなく**構造**の記述である:
+
+> **J1** no token mint — HAKARI is a unit of account; **no ERC-20 deploy path exists**.
+
+（同様に **J12** も `EN net-zero untouched — basket code has no EN mint/burn surface.` と、コードに surface が無いことを述べている。）
+
+ADR-2607299900 §1 は J1 を『charter の禁止条項』として token 1点について解除したが、**J1 が述べているのは junbi actor に ERC-20 を deploy する経路が存在しないという事実であり、方針を解除しても経路は生まれない。** したがって「既存 chain 軸（etzhayyim junbi Safe）に発行体を載せる」は、`repos.edn` の設定変更のような軽い作業ではなく、**準備金 treasury actor 本体に mint 経路を新設する**ことを意味する —— J1/J12 が構造で守ってきた不変条件に穴を開ける改修である。
+
+これは §2（今は作らない）の判断を弱めるのではなく強める。**発行体を「既存の軸に載せるだけ」で済ませられる選択肢は、実際には存在しない。**
+
 ### 5. 前提条件 — etzhayyim の法人格を文書化する
 
 **etzhayyim の法人格を記した文書が workspace に1つも無い。** ADR にも `legal/company.md` にも無い。それでいて dual-axis doctrine は etzhayyim を chain 軸の custodian と定め、`MURAKUMO_TREASURY_ADDR` が指す Safe の保有主体としている。
+
+（探索範囲: `90-docs/adr/*.edn` 全件を `etzhayyim` × `法人|charter|incorporat|entity|religio` で走査してヒット 0、`orgs/network-awai/*/legal/company.md` 全件で `etzhayyim` のヒット 0。**「見つからなかった」であって「存在しない」ではない** —— オーナーが登記情報を持っている可能性は十分にあり、その場合これは記録の欠落である。）
 
 > **決定: etzhayyim の法人格（法域・種別・登記情報、あるいは『法人ではない』という事実）が `legal/company.md` 相当に記録されるまで、etzhayyim に新しい custody 責任を追加しない。**
 
@@ -245,7 +257,13 @@ x402 は既に custody-free である —— 買い手から seller の treasury
 
 ## 前提条件 — etzhayyim の法人格が書かれていない
 
-**etzhayyim の法人格を記した文書が workspace に1つも無い。** ADR にも `legal/company.md` にも無い。それでいて dual-axis doctrine は etzhayyim を chain 軸の custodian と定め、x402 の USDC はその Safe に向いている。
+**etzhayyim の法人格を記した文書が workspace に1つも無い。** ADR 全件と `legal/company.md` 全件を走査してヒット 0。それでいて dual-axis doctrine は etzhayyim を chain 軸の custodian と定め、x402 の USDC はその Safe に向いている。（**「見つからなかった」であって「存在しない」ではない。** オーナーが登記情報を持っているなら、これは記録の欠落にすぎない。）
+
+そしてもう1つ、**発行体を「既存 chain 軸に載せる」という選択肢は実際には存在しない。** J1 の原文は方針ではなく構造の記述だからである:
+
+> **J1** no token mint — HAKARI is a unit of account; **no ERC-20 deploy path exists**.
+
+ADR-2607299900 §1 は J1 を「charter の禁止条項」として解除したが、**方針を解除しても deploy 経路は生まれない。** etzhayyim を発行体にするには準備金 treasury actor 本体に mint 経路を新設する必要があり、それは J1/J12 が構造で守ってきた不変条件に穴を開ける改修である。§2（今は作らない）はこれで強まる。
 
 ①② は Delaware file number と法人番号を持つのに、**③ だけが無い。これは構成の穴である。**
 
