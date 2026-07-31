@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string Component surface complete http+secret+fs (ADR 0199–0208); EDN reject path through headers_edn_append (ADR 0214–0216); request/result multi-export + multi-file kit body **W4-gated**; wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject path header/append/result arms (ADR 0214–0218); **http_request_edn** multi-export + multi-file kit body **W4-gated**; wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2816,6 +2816,24 @@ Still open:
 3. T5.2 residual: **option-string-in-record compiler gap** is the main
    product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
    digit-scanner multi-arg internals optional; W4 recursive values
+
+
+## Progress (2026-08-01fv — T8.3 reject-path http_result_ok_edn Component)
+
+- kotoba-component#107 MERGED (`4344df77`): **`:http-result-ok-edn`** Canonical
+  `i64 × string × string → string` — status 0..999 decimal, headers `[…]`
+  shape, body quote/backslash reject. Complements result-err-edn (#106).
+- provider main `e2f61369`: **http-result-ok-edn** (wasm32 + Component). ADR 0218.
+  Digest `1d061693…`. Request multi-export still open. `:wasm-aot` stays `:partial`.
+  Evidence: ops kit registry tests + live wasmtime ok/reject.
+- west pin kotoba-component `b2aa65c1` → `4344df77`; provider `2c650bf7` → `e2f61369`
+
+Still open:
+1. T8.3 residual: **http_request_edn** reject-path composition (url/body quote +
+   headers shape + timeout i64-str); multi-export package; true set / W4;
+   multi-file kit body
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. murakumo field constructors / seats-record-go; W4 recursive values
 
 
 ## Progress (2026-08-01fu — T8.3 reject-path http_result_err_edn Component)
