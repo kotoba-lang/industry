@@ -2713,6 +2713,25 @@ Still open:
    scanners); W4 recursive values
 
 
+## Progress (2026-07-31eh — T5.2 native guest record expansion dash+fleet+kekkai)
+
+- murakumo main `5299f745`: **T5.2 native guest record wire** for
+  **dash_state** (join/hosted append, clamp-at, pair-i64 index math),
+  **fleet_inventory** (`selector-wants-name?` → `:fleet/selector-name`),
+  **kekkai_gate** (`denial-line-of` → `:kekkai/denial`).
+  ADR-260731-w6-t52-native-record-dash-fleet-kekkai.
+  Evidence: dash/fleet/kekkai parity + authority 95/1580 green.
+- west pin murakumo `8cb21894` → `5299f745`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: option residual positional + multi-arg scanners
+   (overlay starts-with?, infer_engine residual embed/mlx/rpc-csv, …);
+   W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
