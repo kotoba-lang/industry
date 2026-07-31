@@ -1570,6 +1570,25 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31bz — T8.3 typed-string secret_name_ok)
+
+- provider#65 MERGED (`5d5a0726`): **T8.3 ADR 0178** — compiler-AOT
+  typed-string single-call `secret_name_ok(:string)` (kotoba:typed host;
+  not pure Component). `main` live vector → `-130` under browser-host.
+  Completes typed-string packaging residual after pure len/char gates +
+  path state-machine (0177). `:wasm-aot` stays `:partial`. Evidence: 65
+  tests / 463 assertions.
+- west pin provider 0cc131b3 → 5d5a0726.
+
+Still open:
+1. T8.3 residual: full request/result EDN codec AOT; scoped-fs typed-string
+   path single-call; production Component world for kotoba:typed
+2. T8.4 residual: live SCRAM/PG success (qualification; PG 17 started this
+   tick but interop harness lives in provider-postgres / removed from
+   kototama `:postgresql-interop`)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
