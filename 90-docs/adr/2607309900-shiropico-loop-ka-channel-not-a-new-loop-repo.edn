@@ -442,6 +442,67 @@ Kotoba oracle の i64 export を `long` に渡している。これは **今日�
 最後の一歩で必ず失敗すると分かっている job を毎晩走らせるのは residency ではなく
 ノイズだから。task plane が直れば **1 に変えるだけ**で動く。
 
+## follow-up 3 件の結果(2026-07-31、2 巡目)
+
+オーナーが再び「1, 2, 3」。結果は **2 勝 1 引き継ぎ**。
+
+### 1. murakumo の T6.4 回帰 → issue + ブランチで引き継いだ(修正はしない)
+
+`task/plan.cljc` の 11 箇所が oracle の i64 export を `long` に渡していた。
+`oracle/i64->host` が**まさにこのために既に存在**し、`tunnel.cljc` /
+`provision/plan.cljc` は正しく使っている。そこだけ漏れていた。
+
+修正すると `test-task` が **0 tests(ロード不能) → 11 tests / 59 assertions**
+まで進む。**しかし task plane は動かない** — 同じ移行の別箇所で 2 つ落ちる:
+
+- `task-id` / `expand` — string substring out of bounds(残り 4 error の内訳)
+- `murakumo.tunnel/connect-timeout-opt` — 同種。`task run` はここで死ぬ
+
+**3 箇所壊れており、いずれも T6.4(`b578f1c`、今日)由来。** 他人の進行中 refactor を
+これ以上追いかけない。issue `kotoba-lang/murakumo#265` に 4 件の所見と再現手順を
+書き、修正は `agent/task-plan-i64-clean` として push だけした(merge しない)。
+併せて「loop-ka が印字する置き方コマンドは cwd 依存で動かない」も報告した。
+
+### 2. gad への ssh → **解決**。ただし TTS は入っていない
+
+原因: Tailscale SSH が `com-junkawasaki@github` を **gad に存在しないローカル
+ユーザー `junkawasaki`** にマップしていた。
+
+**動く形: `ssh root@100.82.98.110`。** bare `ssh gad` を通したければ Tailscale
+ACL 側の user マッピングを直す(admin console)。
+
+root が取れたので TTS を探したが、**gad にも入っていない**:
+`ls /home/gad` に CosyVoice / Kokoro / VOICEVOX / TTS 系のディレクトリは無く、
+listen しているのは ComfyUI(8188)・Ollama(11434)ほか少数のみ。8189(bridge)も
+やはり落ちたまま。
+
+**TTS を新規に入れるかは共有 GPU ホストへのインストール判断**なので、ここで止めた。
+shiropico の voice は引き続き `:silent`。
+
+### 3. scene 用 checkpoint → **解決**。測って決めた
+
+同じ prompt(`geothermal_plant_dawn`)を server にある 4 checkpoint 全部に通した:
+
+| checkpoint | 結果 |
+|---|---|
+| `Illustrious-XL-v2.0`(library 既定) | 風景とネオン線のみ、**発電所が出ない** |
+| **`animagine-xl-4.0`** | **配管・プラント構造・teal のデータ線** |
+| `noobai-XL-1.1` | 抽象的な塔。プラントではない |
+| `waiREALCN_v150` | フォトリアルの単塔。作品の画風に合わない |
+
+Illustrious は**キャラクタ**モデルで、だから工業主題を落とし続けていた。
+shiropico の shot は establishing shot なので `animagine-xl-4.0` に切替
+(`scene-config` で channel 単位の上書き。library 既定は触らない)。
+
+**ghosthacker は意図的に Illustrious のまま** — パネルはキャラクタ中心の manga で、
+かつ arc0-1 は 257 中 255 が既にその画で描かれている。切り替えると 1 話の中で
+画風が割れる。
+
+実 producer 経路でも確認済み(以前は空の台地しか出なかった同じシーンから配管と
+プラント構造が出た)。**まだ完璧ではない** — 再生成はプロンプトが要求する俯瞰では
+なく仰角になった。フレーミングはさらに craft の問題で、このループが決めることでは
+ない。
+
 ## Alternatives considered
 
 - **gftdcojp に loop-shiropico / loop-ghosthacker を新設**: 却下(D1)。
