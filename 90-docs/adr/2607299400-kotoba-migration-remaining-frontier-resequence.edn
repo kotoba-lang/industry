@@ -2818,6 +2818,21 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fp — shitsuke form-A T5.2 guest records)
+
+- shitsuke#10 MERGED (`832d2bd0`): **tokens_core + hig_core** multi-arg pure →
+  guest records (`:tok/*` + `:hig/*` schemas: css-var-name, decl, scalar-decl,
+  nested-decl, group-from/group-css, nested-from/nested-css, text-style-props,
+  join-nl, group-scalar-decl). Compiler `98b56bdb`; html dep → `6788e68b`.
+  Evidence: 67 tests / 388 assertions green.
+- west pin shitsuke → `832d2bd0`
+
+Still open:
+1. liquid-glass-ui / kotoba-ui form-A multi-arg (next design-system steps)
+2. document-plane residual blocked on **document-in-record** closed profile
+3. T8.3 full multi-export request-edn reject composition; T8.4; murakumo residual
+
+
 ## Progress (2026-08-01fo — design-system T5.2: css form-A + document decl + html form-A)
 
 - css main `19274463` (css#5+#6):
