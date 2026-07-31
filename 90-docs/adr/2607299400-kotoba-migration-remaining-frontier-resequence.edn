@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string Component surface complete http+secret+fs (ADR 0199–0208); nested EDN/full multi-file kit body **W4-gated**; wasm-aot :implemented still open |
-| T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); **Node inject honesty** (kotoba-lang#356: only kagi/http-post/llm on Node; transport/tls/pg/scram :no) |
+| T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -2315,6 +2315,25 @@ Still open:
    body under **W4**; flip `:wasm-aot :implemented` only if admissible
 2. T8.4 residual: optional further live corpus; browser kagi/native boundaries
    remain intentional; Node transport/pg inject would need actor-host work
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31dn — T8.4 kototama host-impl Node honesty sync)
+
+- kototama#122 MERGED: **browser/host-impl Node status** aligned with
+  kotoba-lang#356 / wasm-webcomponent actor-host surface
+  - transport/TLS/pg wire+pool/scram-sha256 → Node `:no` (was overclaimed
+    `:inject`)
+  - Keep real Node inject: kagi-sign, http-post/fetch/headers, llm-infer
+  - parity-score totals: 58 total / 19 browser-yes / 39 browser-no
+  Evidence: browser-test 7 tests / 307 assertions green.
+- west pin kototama d806b9e1 → a6e318b3.
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**; flip `:wasm-aot :implemented` only if admissible
+2. T8.4 residual: optional further live corpus; Node transport/pg needs
+   actor-host providers first
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
