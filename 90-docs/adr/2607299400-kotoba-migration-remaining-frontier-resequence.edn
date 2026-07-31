@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist (0161); ops real-bytes (0162–0163); ops policy (0164); **http Component + signed-wasm ready** (0165 #49); secret Component + compiler-AOT still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist (0161); ops real-bytes (0162–0163); policy (0164); **http+secret Components + signed-wasm ready** (0165–0166 #49–#50); compiler-AOT kit body + other ops still open |
 | T8.4 | host-parity L5 | **partial** — JVM 31 + Node 14 live (#96–#109; fetch/headers/json-extract both); SCRAM/PG + T8.3 open |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -1238,6 +1238,23 @@ Still open:
 Still open:
 1. T8.3 residual: secret Component; compiler-AOT kit body for ops;
    process/scoped-fs/git/entropy real-bytes/Component path
+2. T8.4 residual: live SCRAM/PG success (qualification suite);
+   pg component-link beyond pool
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31bg — T8.3 secret-get Component + signed-wasm ready)
+
+- provider#50 MERGED (`5f8fe91a`): **T8.3 ADR 0166** — secret
+  `:wasm-component` (`secret-get-v1.component.wasm` embeds pure name-policy
+  core). Readiness **secret** `:signed-wasm :ready`. Host-injected fetch still
+  authority boundary; wasm-aot stays `:partial`. Evidence: 41 tests / 290
+  assertions.
+- west pin provider c85a003f → 5f8fe91a.
+
+Still open:
+1. T8.3 residual: compiler-AOT kit body for ops; process/scoped-fs/git/entropy
+   real-bytes/Component path
 2. T8.4 residual: live SCRAM/PG success (qualification suite);
    pg component-link beyond pool
 3. T5.2 native guest record wire (deferred); W4 recursive values
