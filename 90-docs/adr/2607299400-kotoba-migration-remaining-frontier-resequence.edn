@@ -2410,6 +2410,29 @@ Still open:
    remain on sparse single-arg constants and T5.3 oracle/record paths)
 
 
+## Progress (2026-07-31ds — T5.2 call-record wave 10+11 + pin)
+
+- murakumo#274 MERGED (`c67e9bf4`): **T5.2 wave 10** — report multi-arg CLI
+  formatters + first call-record on overlay.stream / infer.credits /
+  infer.rebalance. ADR-260731-w6-t52-call-record-expand10.
+- murakumo#275 MERGED (`0a35e3ab`): **T5.2 wave 11** — cloud lines/endpoints,
+  provision folds/paths, token residual, plan strategy, relay make-id,
+  tunnel scp-dest, dash take residual, fleet selector, cauth id-len.
+  ADR-260731-w6-t52-call-record-expand11.
+  Evidence: 119 tests / 1092 assertions (wave 11 focused + parity).
+- west pin murakumo `e7b63682` → `0a35e3ab` (covers #274+#275; pin commit
+  may be subsequent single-entry west.yml update).
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**; flip `:wasm-aot :implemented` only if admissible
+2. T8.4 residual: optional further live corpus; Node transport/pg needs
+   actor-host providers first
+3. T5.2 native guest record wire (deferred); W4 recursive values
+   (positional call-record product-shell multi-arg residual closed;
+   only T5.3 eligibility `oracle/record` multi-arg paths remain)
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
