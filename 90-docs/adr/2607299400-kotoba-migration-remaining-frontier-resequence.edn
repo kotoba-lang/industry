@@ -1728,6 +1728,23 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+
+## Progress (2026-07-31ci — T8.3 typed-string http_header_name_ok)
+
+- provider#74 MERGED (`77ea650c`): **T8.3 ADR 0187** — typed-string
+  single-call `http_header_name_ok(name)` (RFC 7230 tchar + length [1,128]).
+  Next request-surface field after 0186 toward EDN codec AOT. `main` → `-130`.
+  Evidence: 111 tests / 719 assertions; browser-host green.
+- west pin provider 789e72b8 → 77ea650c.
+
+Still open:
+1. T8.3 residual: full request/result EDN codec AOT (header **value** strings,
+   response variant / status); pure memory-scan one-shot; typed Component world
+2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
+   interop harness)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
