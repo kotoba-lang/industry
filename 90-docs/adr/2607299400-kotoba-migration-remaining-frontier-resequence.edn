@@ -2777,6 +2777,26 @@ Still open:
    internal `starts-with?` multi-arg scanners; W4 recursive values
 
 
+## Progress (2026-07-31ek — T5.2 native guest record starts-with + dial-reason)
+
+- murakumo main `2b387929`: **T5.2 native guest record wire** for
+  **starts-with? scanners + dial-ok-reason** —
+  overlay-driver `:driver/starts-with` + `:driver/dial-reason`,
+  overlay-runtime `:runtime/starts-with`,
+  reconcile-plan `:reconcile/starts-with` (flag-is-*/watch/snapshot recompose
+  via `record-new`).
+  ADR-260731-w6-t52-native-record-starts-with.
+  Evidence: driver/runtime/reconcile parity + authority 78/1539 green.
+- west pin murakumo `f165a877` → `2b387929`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: **option-string-in-record compiler gap** (+ remaining
+   digit-scanner multi-arg internals); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
