@@ -2818,6 +2818,25 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01ga — document-in-record closed guest-record field)
+
+- compiler#463 MERGED (`7691b1ae`): **document-in-record** — schema closed
+  profile admits `:document` as a guest-record field primitive. Frontend
+  value-types + KIR already supported `:document`; schema gate was residual.
+  Evidence: schema + document-in-record KIR tests (rule-doc guest record
+  projects selector; decls vector count=2).
+- west pin compiler `98b56bdb` → `7691b1ae`
+- Unlocks design-system document-plane multi-arg folds (css rule-doc /
+  render-decls; html_document; tokens/hig document constructors).
+
+Still open:
+1. Product folds: css/html/shitsuke/liquid-glass/kotoba-ui document multi-arg
+   → guest records (now unblocked)
+2. T8.3 residual: true set / W4; `:wasm-aot :implemented` (multi-export kit body
+   + result arms landed in 08-01fy/fz)
+3. T8.4; murakumo residual; W4 recursive values
+
+
 ## Progress (2026-08-01fz — T8.3 result arms in http-edn-reject-package)
 
 - kotoba-component#112 MERGED (`bee9c87a`): **result-ok + result-err** export
