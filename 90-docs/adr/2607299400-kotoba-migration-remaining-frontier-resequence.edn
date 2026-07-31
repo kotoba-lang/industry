@@ -2818,6 +2818,25 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01gt — T8.3 browser-host set-nth + live wasm fold)
+
+- compiler main (`4b006d05`): complete ADR 0194 host path — browser-host
+  allowlist + `set-nth-i64`/`set-nth-ref` over sorted items (OOB reject);
+  golden refresh after wasm pin; typed-set-nth-test registered. Live Node
+  browser-host fold → `"AcceptHost"`. Evidence: **781 tests / 6264 assertions**
+  green.
+- west pin: compiler `97c17f54` → `4b006d05`
+- Honesty: closes host gap for 0233/0234 packages under browser-host. Does
+  **not** flip `:wasm-aot :implemented` (W4 recursive nested EDN; result-variant
+  EDN from kit-shaped set-record still open).
+
+Still open:
+1. T8.3 residual: result-variant EDN from kit-shaped set-record; W4 recursive
+   nested EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
+
+
 ## Progress (2026-08-01gs — T8.3 full request EDN kit-shaped set-record)
 
 - provider#122 MERGED (`e87eee81`): **ADR 0234** pure http-request-edn-set-record —
@@ -2830,8 +2849,8 @@ Still open:
   Does **not** flip `:wasm-aot :implemented`.
 
 Still open:
-1. T8.3 residual: result-variant EDN from kit-shaped set-record; W4 recursive
-   nested EDN; only then `:wasm-aot :implemented`
+1. T8.3 residual: browser-host set-nth (→ Progress gt); result-variant EDN;
+   W4 recursive nested EDN; only then `:wasm-aot :implemented`
 2. T8.4 residual (optional L5 / real Node sockets)
 3. murakumo residual; other W4 work
 
