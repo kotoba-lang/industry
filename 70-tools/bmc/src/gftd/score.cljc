@@ -114,6 +114,86 @@
                        " | " (fmt (get-in bmc [:dims :validation]))
                        " | " (str/join ", " weak) " |\n"))))))
 
+(def dim-source
+  "Where each dimension's number comes from.
+
+  `:auto` is computed from the canvas and the ledger by this namespace.
+  `:facts` is a judgement somebody recorded in `maturity-facts.edn`. They are
+  different kinds of claim and `render-md` flattens them into one row of
+  decimals, so the projection carries the distinction as data."
+  (into {}
+        (concat (for [[k _ src] bmc-dims] [k (or src :facts)])
+                (for [[k] (concat yc-design-dims yc-traction-dims)] [k :facts]))))
+
+(defn render-datoms
+  "DataScript-transactable projection of the portfolio's maturity scores.
+
+  `render-md` already exists and is a different thing: it writes a markdown
+  table into `:doc/body`, which reads well and cannot be queried. Nothing could
+  ask 「この product の validation 次元は何点か」 without parsing prose, and no
+  consumer outside this repository could read a score at all — which is why
+  `cloud-itonami-app`'s business plane recorded it as an open gap.
+
+  Two facts travel per dimension that the markdown cannot carry:
+
+  `:dim/source` — `:auto` (computed here from the canvas and ledger) versus
+  `:facts` (a judgement recorded in `maturity-facts.edn`). A reader comparing two
+  products should know which of the eleven numbers were derived and which were
+  entered.
+
+  `:dim/recorded?` — whether the fact was actually present. `score-product` reads
+  facts with `(get f k 0)`, so an unrecorded judgement scores as the WORST
+  possible value rather than as absent, and the composite silently absorbs it.
+  Measured on 2026-07-30 this is latent and not firing: all 12 products carry all
+  11 fact dimensions. It is carried anyway, because the day a thirteenth product
+  is added without facts it would otherwise appear as a product assessed and
+  found lacking on everything."
+  [scores facts]
+  (into
+   [{:db/id -1
+     :projection/id "maturity-scores"
+     :projection/doc_type "maturity-score-projection"
+     :projection/as-of (:as-of facts)
+     :projection/products (count scores)
+     :projection/source (str "gftd score datoms (ADR-2607021700); "
+                             "SSoT = portfolio BMC datoms + canvas-ledger + maturity-facts.edn")
+     :source/dataset "maturity-scores"}]
+   (mapcat
+    (fn [[i [p {:keys [bmc yc note]}]]]
+      (let [recorded (get-in facts [:products p] {})
+            dims (concat (for [[k] bmc-dims] [k (get (:dims bmc) k)])
+                         (for [[k] (concat yc-design-dims yc-traction-dims)]
+                           [k (get (:dims yc) k)]))
+            missing (->> dims
+                         (remove (fn [[k]] (or (= :auto (dim-source k))
+                                               (contains? recorded k))))
+                         (mapv first))]
+        (into
+         [(cond-> {:db/id (- (+ (* i 100) 2))
+                   :score/product p
+                   :score/bmc (:score bmc)
+                   :score/yc (:score yc)
+                   ;; Named rather than left to a reader counting nils: a
+                   ;; composite built partly from absent inputs is a weaker claim
+                   ;; than one built from recorded ones.
+                   :score/unrecorded-dims (count missing)
+                   :source/dataset "maturity-scores"}
+            note (assoc :score/note note)
+            (seq missing) (assoc :score/unrecorded (mapv name missing)))]
+         (map-indexed
+          (fn [j [k v]]
+            (let [src (dim-source k)]
+              {:db/id (- (+ (* i 100) 3 j))
+               :dim/product p
+               :dim/id (keyword (str (name p) "." (name k)))
+               :dim/name k
+               :dim/value v
+               :dim/source src
+               :dim/recorded? (or (= :auto src) (contains? recorded k))
+               :source/dataset "maturity-scores"}))
+          dims))))
+    (map-indexed vector scores))))
+
 (defn render-md
   [scores facts]
   (str "# portfolio maturity scores — BMC 成熟度 / YC bench 成熟度\n\n"

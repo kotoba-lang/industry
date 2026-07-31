@@ -96,7 +96,7 @@
    {:cmd "gate"     :usage ["gate [--product P|--all]                     — 仮説 gate の現況（測定/距離/需）"]}
    {:cmd "funnel"   :usage ["funnel show [--product P]                    — 獲得→収益ファネルの現況"
                             "funnel analyze [--product P|--all]           — bottleneck に GTM 提案（governor 経由 ledger）"]}
-   {:cmd "score"    :usage ["score [md]                                   — 成熟度スコア表示 / md 出力"]}
+   {:cmd "score"    :usage ["score [md|datoms]                            — 成熟度スコア表示 / md 出力 / 構造化 EDN 投影"]}
    {:cmd "allocate" :usage ["allocate [--budget N] [--epsilon E] [--iters K] [--score-key bmc|yc]"
                             "                                              — OT (Sinkhorn) 予算配分表示（ADR-2607194500）"
                             "allocate md                                   — portfolio-allocation.edn 再生成"
@@ -326,6 +326,12 @@
                         :when spec]
                     [(:hyp/id h) (gate/evaluate-hyp metrics spec)]))))
 
+     (defn persist-projection! [path tx]
+       (let [f (java.io.File. path)]
+         (.mkdirs (.getParentFile f))
+         (spit f (pr-str tx))
+         (println "wrote" (.getPath f) (str "(" (count tx) " entities)"))))
+
      (defn cmd-canvas-datoms [cli-key ps idx [_ _] flags]
        (let [products (if (:all flags) (cli-products cli-key idx) [(resolve-product cli-key idx flags)])
              out-dir (or (:out-dir flags) (:md-out ps))
@@ -479,6 +485,12 @@
                               (cli-products cli-key idx)
                               [(resolve-product cli-key idx flags)])]
                (print (score/render-table (score/score-all idx facts products))))
+             ["score" "datoms"]
+             (let [facts (edn/read-string (slurp (:facts ps)))
+                   scores (score/score-all idx facts (cli-products :gftd idx))
+                   tx (score/render-datoms scores facts)]
+               (persist-projection! (str (:md-out ps) "/maturity-scores.datoms.edn") tx))
+
              ["score" "md"]
              (let [facts (edn/read-string (slurp (:facts ps)))
                    scores (score/score-all idx facts (cli-products :gftd idx))
@@ -722,6 +734,10 @@
                         :when spec]
                     [(:hyp/id h) (gate/evaluate-hyp metrics spec)]))))
 
+     (defn persist-projection! [path tx]
+       (nc/spit path (pr-str tx))
+       (println "wrote" path (str "(" (count tx) " entities)")))
+
      (defn cmd-canvas-datoms [cli-key ps idx [_ _] flags]
        (let [products (if (:all flags) (cli-products cli-key idx) [(resolve-product cli-key idx flags)])
              out-dir (or (:out-dir flags) (:md-out ps))
@@ -877,6 +893,12 @@
                               (cli-products cli-key idx)
                               [(resolve-product cli-key idx flags)])]
                (print (score/render-table (score/score-all idx facts products))))
+             ["score" "datoms"]
+             (let [facts (edn/read-string (nc/slurp (:facts ps)))
+                   scores (score/score-all idx facts (cli-products :gftd idx))
+                   tx (score/render-datoms scores facts)]
+               (persist-projection! (str (:md-out ps) "/maturity-scores.datoms.edn") tx))
+
              ["score" "md"]
              (let [facts (edn/read-string (nc/slurp (:facts ps)))
                    scores (score/score-all idx facts (cli-products :gftd idx))

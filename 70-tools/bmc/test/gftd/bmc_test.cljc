@@ -301,6 +301,78 @@
               them would lose which one moved"
       (is (= :untested (:hyp/status h))))))
 
+(deftest render-datoms-carries-what-the-markdown-cannot
+  (let [idx (canvas/index base)
+        facts {:as-of "2026-07-30"
+               :products {:cloud-itonami {:pricing 3 :grounding 4 :acute-problem 4
+                                          :wedge 3 :tenx 3 :founder-fit 5
+                                          :distribution 2 :defensibility 2
+                                          :launched 3 :users 1 :revenue 0}}}
+        scores (score/score-all idx facts [:cloud-itonami])
+        tx (score/render-datoms scores facts)
+        header (first tx)
+        product (first (filter :score/product tx))
+        dims (filter :dim/name tx)
+        by-name (into {} (map (juxt :dim/name identity)) dims)]
+    (testing "the header counts what it emitted, so a short projection cannot
+              look complete"
+      (is (= "maturity-scores" (:projection/id header)))
+      (is (= "maturity-scores" (:source/dataset header)))
+      (is (= 1 (:projection/products header)))
+      (is (= "2026-07-30" (:projection/as-of header))))
+    (testing "the composite scores survive as numbers rather than as table cells"
+      (is (number? (:score/bmc product)))
+      (is (number? (:score/yc product)))
+      (is (= (get-in scores [:cloud-itonami :bmc :score]) (:score/bmc product))))
+    (testing "fourteen dimensions — 5 BMC + 9 YC — each queryable on its own"
+      (is (= 14 (count dims)))
+      (is (= :cloud-itonami.pricing (:dim/id (by-name :pricing)))))
+    (testing "a computed dimension and a recorded judgement are different kinds of
+              claim, and the markdown table flattens them into one row"
+      (is (= :auto (:dim/source (by-name :completeness))))
+      (is (= :facts (:dim/source (by-name :pricing))))
+      (is (true? (:dim/recorded? (by-name :completeness))))
+      (is (true? (:dim/recorded? (by-name :pricing)))))
+    (testing "db/ids are distinct, or a transact would collapse the entities"
+      (is (= (count tx) (count (set (map :db/id tx))))))))
+
+(deftest an-unrecorded-judgement-is-marked-not-silently-scored-zero
+  (let [idx (canvas/index base)
+        ;; :defensibility and :revenue never recorded. score-product reads facts
+        ;; with (get f k 0), so they score as the WORST value rather than as
+        ;; absent — the projection carries that distinction even though the
+        ;; arithmetic does not.
+        facts {:as-of "2026-07-30"
+               :products {:cloud-itonami {:pricing 3 :grounding 4 :acute-problem 4
+                                          :wedge 3 :tenx 3 :founder-fit 5
+                                          :distribution 2 :launched 3 :users 1}}}
+        tx (score/render-datoms (score/score-all idx facts [:cloud-itonami]) facts)
+        product (first (filter :score/product tx))
+        by-name (into {} (map (juxt :dim/name identity)) (filter :dim/name tx))]
+    (is (= 2 (:score/unrecorded-dims product)))
+    (is (= #{"defensibility" "revenue"} (set (:score/unrecorded product))))
+    (testing "the value is still 0 — this projection reports the arithmetic, it
+              does not change it — but 0-because-absent is now distinguishable
+              from 0-because-assessed"
+      (is (= 0.0 (:dim/value (by-name :defensibility))))
+      (is (false? (:dim/recorded? (by-name :defensibility))))
+      (is (true? (:dim/recorded? (by-name :pricing)))))
+    (testing "an :auto dimension is never counted as unrecorded — nobody enters it"
+      (is (true? (:dim/recorded? (by-name :validation)))))))
+
+(deftest render-datoms-keeps-products-apart
+  (let [idx (canvas/index base)
+        facts {:as-of "2026-07-30" :products {}}
+        tx (score/render-datoms (score/score-all idx facts [:cloud-itonami :etzhayyim])
+                                facts)]
+    (is (= 2 (count (filter :score/product tx))))
+    (is (= 28 (count (filter :dim/name tx))))
+    (is (= (count tx) (count (set (map :db/id tx)))))
+    (testing "with no facts at all, every :facts dimension is unrecorded — and
+              says so rather than reading as a portfolio scored at zero"
+      ;; 14 dimensions less the 3 :auto ones this namespace computes itself.
+      (is (every? #(= 11 (:score/unrecorded-dims %)) (filter :score/product tx))))))
+
 (deftest cli-help-text
   (testing "global help (nil topic) lists cli desc + every command's usage"
     (let [txt (cli/help-text :itonami nil)]
