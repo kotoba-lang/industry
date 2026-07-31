@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 5757, "kotobase-cf-wasm-staging" 2261},
+ {"net-kotobase" 5771, "kotobase-cf-wasm-staging" 2261},
  :zone
- {:requests-7d 14526,
-  :pageviews-7d 668,
-  :uniques-7d-sum 972,
+ {:requests-7d 14563,
+  :pageviews-7d 669,
+  :uniques-7d-sum 974,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
   [{:path "/health", :requests 237}
-   {:path "/", :requests 77}
+   {:path "/", :requests 75}
    {:path "/sparql", :requests 64}
    {:path "/_diag/health", :requests 47}
    {:path "/api/funnel", :requests 24}
    {:path "/.well-known/did.json", :requests 17}
    {:path "/llms-full.txt", :requests 16}
    {:path "/_app/meta", :requests 15}],
-  :status-mix {:client-error 3137, :server-error 74, :ok 595},
+  :status-mix {:client-error 3160, :server-error 74, :ok 593},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,12 +30,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-07-31",
- :traffic-quality {:window "24h", :probe-4xx-pct 82, :error-5xx-pct 2},
+ :traffic-quality {:window "24h", :probe-4xx-pct 83, :error-5xx-pct 2},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 237 · / 77 · /sparql 64 · /_diag/health 47 · /api/funnel 24 | 4xx(probe) 82% · 5xx 2%",
- :funnel {:visitors 1718, :signups 5, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 237 · / 75 · /sparql 64 · /_diag/health 47 · /api/funnel 24 | 4xx(probe) 83% · 5xx 2%",
+ :funnel {:visitors 1719, :signups 5, :checkouts 0},
  :signal
- "kotobase.net 実測 14526 req/7d・972 uniques(日次和)・うち4xx probe 82%(24h)、workers 8018 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 14563 req/7d・974 uniques(日次和)・うち4xx probe 83%(24h)、workers 8032 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 5,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.6,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 146},
+ {:visitors {:openai-ads 3, :organic 147},
   :signups {:organic 2}, 
   :checkouts {}}}
