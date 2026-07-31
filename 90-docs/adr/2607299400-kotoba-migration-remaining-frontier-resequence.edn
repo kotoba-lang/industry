@@ -2818,6 +2818,22 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01gb — css document-plane rule-doc/render-decls records)
+
+- css#7 MERGED (`ba212138`): **css_document** `rule-doc` → `:doc/rule` and
+  `render-decls` → `:doc/render-from` guest records with `:document` fields.
+  Compiler pin → document-in-record `7691b1ae`. Form-A + css.core byte parity
+  preserved.
+  Evidence: **19 tests / 200 assertions** green.
+- west pin css `19274463` → `ba212138`
+- First product fold on the document-in-record unlock (Progress ga).
+
+Still open:
+1. html_document / shitsuke / liquid-glass / kotoba-ui document multi-arg folds
+2. T8.3 residual: true set / W4; `:wasm-aot :implemented`
+3. T8.4; murakumo residual; W4 recursive values
+
+
 ## Progress (2026-08-01ga — document-in-record closed guest-record field)
 
 - compiler#463 MERGED (`7691b1ae`): **document-in-record** — schema closed
