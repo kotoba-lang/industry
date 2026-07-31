@@ -1843,6 +1843,25 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31cp — T8.3 typed Component string-length Canonical)
+
+- kotoba-component#79 MERGED (`af7f096e`): **T8.3 typed Component world first
+  slice** — Canonical lowering `:string-length` for pure
+  `(string-length|string-byte-length s) → :i64` without `kotoba:typed`
+  import (ADR 0076 §4a). Live wasmtime `len("")`→0 / `len("hello")`→5 /
+  `len("安全")`→6. `kotoba compile --target component` E2E green.
+  Evidence: 10 assertions; compiler component target ok.
+- west pin kotoba-component d8343b09 → af7f096e (`01628e10`).
+
+Still open:
+1. T8.3 residual: typed Component **composition** (string-substring /
+   string=? / if-let) for full http_url_ok / packing packages; flip wasm-aot
+   only when admissible
+2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
+   interop harness)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 
 ## Progress (2026-07-31cp — T8.3 pure header set packing memory-scan)
 
