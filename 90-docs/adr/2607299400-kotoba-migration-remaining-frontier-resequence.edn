@@ -6,8 +6,8 @@
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-07-29"
-  :adr/last-verified "2026-07-31"
-  :adr/last_verified "2026-07-31"
+  :adr/last-verified "2026-08-01"
+  :adr/last_verified "2026-08-01"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "kotoba-migration-remaining-frontier-resequence"
@@ -2816,6 +2816,25 @@ Still open:
 3. T5.2 residual: **option-string-in-record compiler gap** is the main
    product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
    digit-scanner multi-arg internals optional; W4 recursive values
+
+
+## Progress (2026-08-01fk — T8.3 multi-export EDN trust Component package)
+
+- kotoba-component#102 MERGED (`90b5c8b3`): **`:string-expression-package`** —
+  N pure string-concat exports share memory/realloc/data. Single-export
+  `:string-expression` unchanged (same emitter).
+- provider main `644e7fe1`: **http-edn-trust-package** (wasm32 + Component) —
+  6 exports (empty/one header, request, result ok/err trust path). ADR 0213.
+  Host pre-validates atoms + pre-renders i64 fields. Reject path remains
+  `http-request-edn`. Component digest `f2ea2037…`. `:wasm-aot` stays `:partial`.
+  Evidence: ops kit registry tests + live wasmtime 6-export invokes.
+- west pin kotoba-component `0fde9a04` → `90b5c8b3`; provider `b825c4e0` → `644e7fe1`
+
+Still open:
+1. T8.3 residual: reject-path request-edn Component (if/let/substring composition);
+   true set / W4 recursive ADT; full multi-file kit body
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. murakumo field constructors / seats-record-go; W4 recursive values
 
 
 ## Progress (2026-08-01fj — com-cloudflare analytics_parse guest records)
