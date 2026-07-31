@@ -2818,6 +2818,22 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-07-31ev — T5.2 LR bump tournament + identifier-len)
+
+- murakumo main `a6ba3ccd`: **plan+rebalance** `better-bump?`/`ok-for`/`pick-bump-3`
+  → bump-cmp/ok-for/bump3-in records; **component_authority** `identifier-len-ok?`
+  → `:cauth/id-len` (+ host call-record `:raw`). ADR-260731-w6-t52-bump-tournament-id-len.
+  Evidence: plan/rebalance/cauth parity + authority + call-record 117/1892 green.
+- west pin murakumo `ce1cd9d8` → `a6ba3ccd`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: digit-scanner multi-arg internals optional; plan partition
+   multi-arg with model ref (layer-wsum/plan-fits-n/…); W4 recursive values
+
+
 ## Progress (2026-07-31eu — T5.2 rebalance pairs + task max2/min2)
 
 - murakumo main `ce1cd9d8`: **rebalance residual multi-arg** → `:rebalance/pair`/
