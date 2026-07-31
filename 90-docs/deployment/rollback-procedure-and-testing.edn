@@ -633,10 +633,9 @@
       {
         :question "Murakumo control plane unreachable for 1 min?"
         :yes {:action "page Level 1 + Level 3 (owner)" :note "nodes continue serving from cache, no traffic loss expected"}
-        :no {:action "investigate"}}
+        :no {:action "investigate"}
       }
     }
-  }
 
   :deployment/rollback-runbook-quick-reference
   {
