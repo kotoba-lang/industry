@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — pure/typed policy 0171–0198; multi-export packages + helper admission (kotoba-component#79–#92); **pure Component re-emit** of url/request/response/error (provider#87 / ADR 0199); nested EDN pack + full kit body residual; wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — pure/typed policy 0171–0198; multi-export packages + helper admission (kotoba-component#79–#92); **pure Component re-emit** of url/request/response/error (provider#87 / ADR 0199) + header_name_ok (provider#88 / ADR 0200; kotoba-component#93–#94); header value/pair/set + nested EDN pack residual; wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2075,6 +2075,28 @@ Still open:
    package Component re-emit; full kit body; flip wasm-aot only when admissible
 2. T8.4 residual: live SCRAM/PG success
 3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31db — T8.3 header_name_ok Component + re-emit)
+
+- kotoba-component#93 MERGED (`9e5ae697`): **Canonical http-header-name-ok**
+  + multi-export live main (RFC 7230 tchar WAT; main → **-130**).
+- kotoba-component#94 MERGED (`cfcc0a23`): admit frontend loop-desugar
+  `(__kotoba_loop_*)` so real provider `http_header_name_ok.kotoba` compiles
+  `--target component` (charset -3 stays in unexported loop / WAT).
+  Evidence: 35 tests / 405 assertions.
+- provider#88 MERGED (`bdc29d81`): **T8.3 ADR 0200** pure Component re-emit
+  `:http-header-name-ok-component` (no kotoba:typed); live main → **-130**.
+  Evidence: 66 tests / 501 assertions.
+- west pin kotoba-component f857f8e3 → cfcc0a23; provider c368beef → bdc29d81.
+
+Still open:
+1. T8.3 residual: header **value/pair** + headers-set packing Component re-emit;
+   request/result packing walks; nested EDN / full kit body; flip `:wasm-aot
+   :implemented` only when admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
 
 
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
