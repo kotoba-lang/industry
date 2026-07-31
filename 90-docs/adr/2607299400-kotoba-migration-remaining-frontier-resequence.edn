@@ -2635,6 +2635,24 @@ Still open:
    option residual positional); W4 recursive values
 
 
+## Progress (2026-07-31ed — T5.2 native guest record expansion cloud-plan)
+
+- murakumo main `52688bf1`: **T5.2 native guest record wire** for
+  **cloud-plan** — region/score/ids, host-port endpoints, transport,
+  CLI lines (summary/dial/authorized/from-to/address-family/policy),
+  `starts-with?`. ADR-260731-w6-t52-native-record-cloud-plan.
+  Evidence: cloud-plan parity 6/115 + unit 11/68; authority 70/1415;
+  call-record 20/225 green.
+- west pin murakumo advanced to `52688bf1`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 further expansion (remaining multi-arg pure: provision/deploy/report/…);
+   W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
