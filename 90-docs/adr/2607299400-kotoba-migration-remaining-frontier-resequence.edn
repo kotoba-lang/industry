@@ -1658,6 +1658,23 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31cd — T8.3 pure multi-step process spawn walk)
+
+- provider#70 MERGED (`49cec113`): **T8.3 ADR 0183** — pure multi-step
+  `process_spawn_begin` / `process_spawn_arg` / `process_spawn_end` over argv
+  lengths (`:arg-bytes 4096`) + max_out/timeout. Complements single-shot
+  bounds (0172) and secret/fs multi-step walks (0179/0181). Evidence: 75
+  tests / 523 assertions; Node live ok/empty/argc/arg-len/missing/extra/timeout.
+- west pin provider 8d3a9297 → 49cec113.
+
+Still open:
+1. T8.3 residual: full request/result EDN codec AOT; pure memory-scan
+   one-shot without host walk; production kotoba:typed Component world
+2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
+   interop harness still missing)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
