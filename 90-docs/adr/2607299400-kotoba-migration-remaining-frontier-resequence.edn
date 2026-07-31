@@ -2337,6 +2337,23 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31do — T5.2 call-record wave 5 + pin)
+
+- murakumo#266 MERGED (`5a52f052`): **T5.2 wave 5** — call-record on
+  identity seeds/DID, deploy path helpers, secret classify/reply/valid-*.
+  ADR-260731-w6-t52-call-record-expand5.
+  Evidence: 48 tests / 424 assertions (call-record + identity/deploy/secret).
+- west pin murakumo `e8af1e66` → `5a52f052`.
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**; flip `:wasm-aot :implemented` only if admissible
+2. T8.4 residual: optional further live corpus; Node transport/pg needs
+   actor-host providers first
+3. T5.2 native guest record wire (deferred); W4 recursive values
+   (positional call-record expansion continues on remaining multi-arg hosts)
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
