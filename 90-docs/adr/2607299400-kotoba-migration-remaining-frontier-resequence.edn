@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject path single-export (0214–0220) + multi-export kit body (0221–0222); **true-set name uniqueness pure/wasm32** (set-in-record + ADR 0223); Component twin on set uniqueness / W4 recursive EDN / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject (0214–0222); true-set pure/wasm32 (0223–0224) + **Component twin names-add (0225)**; multi-export fold / W4 recursive EDN / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2816,6 +2816,27 @@ Still open:
 3. T5.2 residual: **option-string-in-record compiler gap** is the main
    product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
    digit-scanner multi-arg internals optional; W4 recursive values
+
+
+## Progress (2026-08-01gi — T8.3 Component twin headers-names-add true-set)
+
+- kotoba-component#113 MERGED (`dfba9407`): **Canonical `:headers-names-add`**
+  — EDN string-vector name list with **element-bound exact equality**
+  (not `:name "…"` substring scan, no kotoba:typed). Evidence: 14 assertions
+  (wasmtime live empty/second/dup/prefix/bad).
+- provider#112 MERGED (`031434f9`): **ADR 0225**
+  `http-headers-names-add-component` package sha `939b4bfd…`. Complements
+  ADR 0223 wasm32 typed-set + ADR 0224 pure EDN-append-set.
+  Evidence: registry digest **6 assertions** green.
+- west pins: kotoba-component → `dfba9407`; provider → `031434f9`
+- Honesty: does **not** fold into multi-export reject package; does **not**
+  flip `:wasm-aot :implemented` (W4 recursive EDN + multi-export fold open).
+
+Still open:
+1. T8.3 residual: fold names-add into multi-export reject package; W4
+   recursive EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
 
 
 ## Progress (2026-08-01gh — T8.3 pure EDN append true-set uniqueness)
