@@ -152,12 +152,39 @@
               (path/basename p)))
           plists)))
 
+(def sensitive-extensions
+  "**開いたら事故になる拡張子**（`~/.gftd/` に実在する）。allowlist に入っていない
+   ことを起動時に毎回確かめるためだけに存在する —— 検査の allowlist が将来
+   広げられたとき、これが無ければ誰も気づかない。"
+  #{".pem" ".json" ".edn" ".log" ".tgz" ".plist" ".key" ".p12"})
+
+(defn- assert-allowlist-excludes-secrets!
+  "**この script の安全性は allowlist 1つに乗っている。** 実際のディレクトリに
+   対して、走査対象に危険な拡張子が1つも入らないことを毎回確かめる。
+
+   定数どうしの比較ではなく実ディレクトリで確かめるのは、`~/.gftd/` に新しい
+   種類の秘密が置かれた場合も捕まえるため。"
+  [entries scanned]
+  (let [bad (filter #(contains? sensitive-extensions (path/extname %)) scanned)]
+    (when (seq bad)
+      (println "安全確認に失敗: 走査対象に開いてはならない拡張子が含まれている。")
+      ;; ファイル名自体を出さない —— 秘密の存在と名前を漏らさないため、件数と
+      ;; 拡張子だけ報告する。
+      (println (str "  " (count bad) " 件 / 拡張子: "
+                    (pr-str (sort (distinct (map path/extname bad))))))
+      (js/process.exit 2))
+    ;; 逆向きも確かめる: 実際に秘密が「在る」のに除外できていた、という状態を
+    ;; 確認しておかないと、単に対象が空でも通ってしまう。
+    (let [present (set (filter #(contains? sensitive-extensions (path/extname %)) entries))]
+      {:excluded (count present) :scanned (count scanned)})))
+
 (defn -main []
   (run-self-tests!)
   (if-not (fs/existsSync gftd-dir)
     (do (println (str "~/.gftd/ が無い。監査対象なし: " gftd-dir))
         (js/process.exit 0))
-    (let [files (->> (fs/readdirSync gftd-dir)
+    (let [entries (fs/readdirSync gftd-dir)
+          files (->> entries
                      (filter #(contains? readable-extensions (path/extname %)))
                      ;; .bak-* 等の退避コピーは現行の運用対象ではないので除く。
                      (remove #(str/includes? % ".bak"))
@@ -168,12 +195,15 @@
                         (filter #(str/ends-with? % ".plist"))
                         (map #(path/join launch-agents %)))
                    [])
+          safety (assert-allowlist-excludes-secrets! entries files)
           findings (->> files
                         (mapcat (fn [f]
                                   (concat (remove nil? [(sh-file-finding f)])
                                           (scan-file f)))))]
       (println (str "監査対象: " (count files) " ファイル（.cljs/.sh のみ）"
                     " / launchd plist " (count plists) " 件"))
+      (println (str "安全確認: 秘密になりうる拡張子 " (:excluded safety)
+                    " 件を走査対象から除外（開いていない）"))
       (println (apply str (repeat 78 "-")))
       (if (empty? findings)
         (println "違反なし。")
