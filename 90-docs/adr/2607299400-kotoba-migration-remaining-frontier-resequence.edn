@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — pure/typed policy AOT 0171–0198; typed Component: string ops + https-url-ok + request-ok + **response-ok** (kotoba-component#79–#85); error_ok / multi-export main / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — pure/typed policy 0171–0198; typed Component compositions: string ops + url-ok + request-ok + response-ok + **error-ok/arm-ok** + multi-export main (kotoba-component#79–#88); wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -1962,6 +1962,25 @@ Still open:
 Still open:
 1. T8.3 residual: **http-error-ok** composition; multi-export live main;
    flip `:wasm-aot :implemented` only when full kit body admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+
+## Progress (2026-07-31cv — T8.3 typed Component http-error-ok + arm-ok)
+
+- kotoba-component#86 MERGED (`7088dcb9`): multi-export https-url-ok + live main
+  vector (concurrent).
+- kotoba-component#88 MERGED (`3774b5ca`): **http-error-ok** + **http-result-arm-ok**
+  composition without kotoba:typed. Error: charset + msg/retryable; arm ∈{0,1}.
+  Live: ok/empty/bad-char/retryable; arm 0/1/3.
+  Evidence: 29 tests / 341 assertions.
+- west pin kotoba-component 7088dcb9 → 3774b5ca (`b0be4aca`).
+
+Still open:
+1. T8.3 residual: multi-export **request/result packages** with live main;
+   provider recompile via component target; flip `:wasm-aot :implemented`
+   only when full kit body admissible
 2. T8.4 residual: live SCRAM/PG success
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
