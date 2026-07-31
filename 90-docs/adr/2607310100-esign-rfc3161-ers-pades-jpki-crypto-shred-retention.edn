@@ -237,4 +237,46 @@ fast-forward）。すべて GitHub API の single-entry commit 経路。
 supersede しない。あの ADR の設計判断（commitment に束縛された challenge、exhaustive
 outline、content と evidence の分離、凍結 status list、ETSI 3 値）はすべて有効なまま。
 本 ADR が変えたのは「まだ無いもの」の 7 件のうち 6 件で、あの ADR の当該節は本 ADR を
-指すよう書き換えた。"}]
+指すよう書き換えた。"
+
+## 成熟度パス（2026-07-31）
+
+**「portable `.cljc`」は 7 library すべてが主張していて、どれも JVM でしか動かして
+いなかった。** nbb で回して 3 件のバグが出た。
+
+1. **rfc3161 の nonce が platform で違うバイト列になっていた。**
+   `0x7d82213101890cc3` が nbb で `…890c00`、JVM で `…890cc3`。ClojureScript の数値は
+   double なので encoder に届く前に丸められている。nonce は「古い応答の再生」と
+   「新しい応答」を区別するためにあるので、**cljs で作った request は毎回 nonce 検証に
+   落ちる** — 誰にも見えない理由で。`asn1/integer` は正確に表現できない値を拒否し、
+   `rfc3161` の `:nonce` は hex 文字列になった（破壊的変更）。
+2. **`org-iso-pdf/write-document` が cljs で全部ゼロを出していた**（上流で修正・merge、
+   kotoba-lang/org-iso-pdf#2）。String は JVM で Character、cljs で 1 文字の String として
+   反復されるので `(int c)` の意味が違う。同ファイルに `code` という helper が既にあり、
+   parser は使っていて writer は使っていなかった。
+3. **同じバグが `pades/text->` にもあった。** 自分のコード。2 つの library、1 ファイル
+   違いで同じ間違い。**`.cljc` を第 2 platform で誰も回さないと、これが起きる。**
+
+8 repo すべてに portable job を追加（すべて green）。`asn1` は同じ suite を両 platform で
+回すので 2 つが乖離しない。他は「署名の手前まで」を nbb で回す — JVM job より小さい主張
+であり、README と job のコメントにそう書いてある。
+
+### app の CI は全員に対して赤だった
+
+- **`setup-java` が無く、runner 既定の JDK 21 に ML-DSA-65（JDK 24+）が無かった。**
+  kagitaba の署名がそれを要求するので、その依存が入って以来 `main` の CI は
+  contracts-test で 11 errors。ローカルで通っていたのは local の `clojure` がたまたま
+  新しい JDK を拾っていたから。JDK 25 を pin して green。
+- **gitleaks の 3 件は全部誤検知**（テストの `did:key:z…`。DID は定義上、識別子が公開鍵
+  そのもの）。指紋を 1 件ずつ `.gitleaksignore` に列挙した。**regex allowlist は捨てた** —
+  最初の版（`regexTarget = \"line\"`）は DID の 2 行隣の実 secret まで黙らせ、狭めた版は
+  再現する回帰テストを書けなかった。**検証できない allowlist は赤い scan より悪い。**
+
+### 非 hermetic なテスト
+
+`scheduler_http_test` の \"and nothing was written\" が `(= [] items)` を assert していた。
+この endpoint は app の event と**マシンのカレンダー**を merge するので、これは
+オーナーの予定表についての assertion だった。カレンダーのあるマシンでは失敗し、失敗出力に
+実際の予定を 15 件印字していた。意図どおり「拒否された write が何も作らなかった」に直した。
+
+**805 tests / 3554 assertions, 0 failures** — このマシンで初めて suite 全体が通った。}]
