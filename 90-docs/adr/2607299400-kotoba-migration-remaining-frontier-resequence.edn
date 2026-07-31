@@ -2594,6 +2594,28 @@ Still open:
    option-in-record after compiler); W4 recursive values
 
 
+## Progress (2026-07-31eb — T5.2 native guest record expansion join+tunnel)
+
+- murakumo main `7a86e762`: **T5.2 native guest record wire** for
+  **join** + **tunnel** (server-side merge of agent/t52-native-record-next) —
+  `can?` → `:join/can`, `needs-relay?` → `:join/relay`,
+  `clamp-resident` → `:join/clamp` (option mem in-record),
+  `eligible-for-work?` → `:join/work`;
+  `scp-dest` → `:tunnel/scp`, `forward-spec` → `:tunnel/ports`,
+  `ensure/replace-forward-command` → `:tunnel/forward`,
+  `pick-exit` → `:tunnel/exit`.
+  ADR-260731-w6-t52-native-record-join-tunnel.
+  Evidence: authority 70/1415 green; focused join/tunnel/call-record green.
+- west pin murakumo advanced to `7a86e762`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 further expansion (remaining multi-arg pure without options;
+   option-in-record residual positional elsewhere); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
