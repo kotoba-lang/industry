@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — HTTP typed packages + packing walks pure Component (provider#87–#94 / ADR 0199–0204); secret_name_ok Component (provider#97 / ADR 0206; kotoba-component#100 denylist + header misfit fix); nested EDN codec + full kit body residual; wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — HTTP packing + secret_name_ok + fs_path_ok pure Components (ADR 0199–0207); nested EDN/full kit body W4-gated; wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success restored (kototama#120 SCRAM-SHA-256-PLUS via postgresql-interop) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2238,6 +2238,26 @@ Still open:
    inject env gap
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
+
+
+
+## Progress (2026-07-31dj — T8.3 fs_path_ok Component + header-name tighten)
+
+- kotoba-component#101 MERGED (`0fde9a04`): **Canonical fs_path_ok** path
+  state machine (abs/home/NUL/backslash/dotdot); require `header` in
+  header-name-ok export names (**bugfix**: path misfit of tchar WAT gave
+  wrong codes). Shape `:fs-path-ok-with-main`; full provider source
+  `main()` → **-15470**. Evidence: 44 tests / 493 assertions.
+- provider#98 MERGED (`df46209e`): **ADR 0207** pure Component re-emit
+  `:fs-path-ok-component`. Evidence: ops-kit 66 tests / 590 assertions.
+- west pin kotoba-component 7bf2da5e → 0fde9a04; provider e522ccd1 → df46209e
+  (`551180ef`).
+
+Still open:
+1. T8.3 residual: nested EDN codec / full multi-file kit body under **W4**;
+   flip `:wasm-aot :implemented` only when admissible
+2. T8.4 residual: optional host_parity_live corpus expansion; Node kagi inject
+3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
