@@ -2818,6 +2818,25 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01gh — T8.3 pure EDN append true-set uniqueness)
+
+- provider#111 MERGED (`ff5bf4e3`): **ADR 0224** `http-headers-edn-append-set`
+  — pure reject-path multi-header EDN append with true set uniqueness
+  (`[:set :string]` on `:hdr/edn-acc`), dual-scan quote/backslash gate.
+  Wires ADR 0223 set ADT into EDN append surface (not WAT marker scan).
+  main → `-9002`. Package sha `26f6d2aa…`.
+  Evidence: **80 tests / 757 assertions** green.
+- west pin provider → `ff5bf4e3`
+- Honesty: Canonical WAT 0216 / multi-export reject Component still substring;
+  does **not** flip `:wasm-aot :implemented` (Component twin + W4 recursive EDN open).
+
+Still open:
+1. T8.3 residual: Component twin of set uniqueness; fold into multi-export
+   reject package; W4 recursive EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
+
+
 ## Progress (2026-08-01gg — T8.3 true header-name set uniqueness + set-in-record)
 
 - compiler#464 MERGED (`8952a068`): **set-in-record** — guest records carry
