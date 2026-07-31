@@ -92,7 +92,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 |---|---|---|
 | **T5.3** | rebalance seats pack → record export | **landed** murakumo#193–#199 (incl. schedule assign packs #199); residual: task-score-code ternary + plan/rebalance bump indices (numeric by design); flags3 #230 + label flags #232 |
 | T5.2 | host bridge map/record ↔ guest record | **call-record expanded** #155+#261–#264 (map boundaries); **native guest record wire deferred** (T5.3 path) |
-| T2.3 | `examples/` の pure-product が CI で KIR 実行 | 未着手 |
+| T2.3 | `examples/` の pure-product が CI で KIR 実行 | **landed** kotoba-lang#352 (ADR-reliability-t23; 4 examples / 10 cases) |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
@@ -1364,6 +1364,21 @@ Still open:
 1. T8.3 residual: compiler-AOT kit body for ops
 2. T8.4 residual: live SCRAM/PG success (qualification suite);
    pg component-link beyond pool+cancel
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31bn — T2.3 pure-product examples KIR CI)
+
+- kotoba-lang#352 MERGED (`e2ed38cf`): **T2.3** pure-product examples living
+  contract — `examples/pure-product-examples.edn` + runner
+  `clojure -M:pure-product-examples` + CI job. 4 examples / 10 KIR cases.
+  ADR-reliability-t23. (ADR 0188 was runner-half only.)
+- west pin kotoba-lang → e2ed38cf.
+
+Still open:
+1. T8.3 residual: compiler-AOT kit body for ops
+2. T8.4 residual: live SCRAM/PG success (qualification suite);
+   pg component-link beyond pool
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
