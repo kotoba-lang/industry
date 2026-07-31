@@ -2818,6 +2818,21 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fj — com-cloudflare analytics_parse guest records)
+
+- com-cloudflare main `de58cd0b`: **analytics_parse** multi-arg pure →
+  `:parse/pair|triple|quad` (sum2/3/4) and `:parse/str-get|str-add|i64-get|i64-add`
+  (map-typed record fields for tallies). ADR-0018-t52-analytics-parse-records.
+  Evidence: 94 tests / 519 assertions green.
+- west pin com-cloudflare `841de520` → `de58cd0b`
+
+Still open:
+1. T8.3 residual: multi-export request-edn Component package shape;
+   true set / W4 recursive ADT; full multi-file kit body
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. murakumo field constructors / seats-record-go; W4 recursive values
+
+
 ## Progress (2026-08-01fi — T8.3 Component twin first slice for EDN)
 
 - provider main `b825c4e0`: **string-expression Components** —
