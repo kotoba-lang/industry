@@ -101,8 +101,8 @@
   [{:type "slack"
     :channel "#prod-gates-wave5"
     :severity-thresholds
-    {:warning "dev alert (thread in channel)"}
-    {:critical "mention @gates-escalation-on-call"}}
+    {:warning "dev alert (thread in channel)"
+     :critical "mention @gates-escalation-on-call"}}
    {:type "email"
     :list "gates-escalation@gftd.group"
     :severity-filter "critical only"}
@@ -234,4 +234,4 @@
   :zero-data-gaps "week 11–16"
   :alert-delivery-sla "< 2 min, tested"
   :dashboard-usable "for Friday gate review (4 PM)"
-  :team-satisfaction "collected in post-gate survey"]}
+  :team-satisfaction "collected in post-gate survey"]}}

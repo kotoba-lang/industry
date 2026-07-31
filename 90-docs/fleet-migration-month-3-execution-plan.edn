@@ -75,7 +75,7 @@
      :failure-actions
      [{:trigger "p99 latency > 110ms sustained 5min" :action "revert to 50%, investigate GC pause"}
       {:trigger "parity divergence > 0.1% sustained 1min" :action "full revert to Rust (0%), debug app logic"}
-      {:trigger "5xx rate > 1% sustained 2min" :action "full revert to Rust (0%), investigate panic logs"}]}
+      {:trigger "5xx rate > 1% sustained 2min" :action "full revert to Rust (0%), investigate panic logs"}]
      :gate-decision "Pass → continue to 75% on Day 3. Fail → revert and troubleshoot"
      :audit-log "Timestamp, traffic %, metrics snapshot, decision"}
 
@@ -131,7 +131,7 @@
      [{:trigger "p99 > 110ms sustained 5min" :action "revert to 90%"}
       {:trigger "parity > 0.1% sustained 1min" :action "full revert to Rust (0%)"}
       {:trigger "5xx > 1% sustained 2min" :action "full revert to Rust (0%)"}]
-     :gate-decision "Pass → execute final 100% cutover on Day 7 (Week 2). Fail → revert"}}
+     :gate-decision "Pass → execute final 100% cutover on Day 7 (Week 2). Fail → revert"}]
 
    :sentinel-checklist
    ["Monday-Tuesday: owner decision gate (all Month 2 metrics reviewed)"
