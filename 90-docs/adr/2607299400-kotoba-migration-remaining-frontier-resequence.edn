@@ -1659,7 +1659,7 @@ Still open:
 
 
 
-## Progress (2026-07-31ce — T8.3 pure multi-step git run walk)
+## Progress (2026-07-31cf — T8.3 pure multi-step git run walk)
 
 - provider#71 MERGED (`15f7d74b`): **T8.3 ADR 0184** — pure multi-step
   `git_run_begin` / `git_run_arg` / `git_run_end` over arg lengths
@@ -1684,6 +1684,23 @@ Still open:
   bounds (0172) and secret/fs multi-step walks (0179/0181). Evidence: 75
   tests / 523 assertions; Node live ok/empty/argc/arg-len/missing/extra/timeout.
 - west pin provider 8d3a9297 → 49cec113.
+
+Still open:
+1. T8.3 residual: full request/result EDN codec AOT; pure memory-scan
+   one-shot without host walk; production kotoba:typed Component world
+2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
+   interop harness still missing)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31cg — T8.3 pure multi-step http-post bounds walk)
+
+- provider#72 MERGED (`f3a61596`): **T8.3 ADR 0185** — pure multi-step
+  `http_post_begin` / `url` / `headers` / `body` / `end` phased bounds walk
+  (url/headers/body/timeout + phase errors). Complements single-shot 0171 and
+  typed URL 0182; pairs with process/git multi-step walks (0183/0184).
+  Evidence: 79 tests / 548 assertions; Node live `[0,-1,-2,-3,-4,-5]`.
+- west pin provider 15f7d74b → f3a61596.
 
 Still open:
 1. T8.3 residual: full request/result EDN codec AOT; pure memory-scan
