@@ -29,7 +29,7 @@
   :adr/known-gaps ["producer は環境変数に URL があることを到達可能性とみなす。到達しない URL は served leg として報告される。murakumo task plane 上では node の :requires gate が capability を担保するが、実 probe への置き換えは未実施。"
                    "episode 1-10 は shotlist が無いため catalog に載っていない。ep01 は既に motion-comic と panel が存在するので、過去分をどう扱うか(遡及登録するか、済として扱うか)は未決定。"
                    "producer は :legs を報告するだけで、実際のレンダリングは行っていない。backend が配線された時に :murakumo leg が本当に画を出すかは未検証。"
-                   "shiropico の voice leg は全て :silent。TTS が未配線(murakumo の :tts は :via :proc で HTTP endpoint が無く、fleet head node で応答するものが無かった)。よって shiropico の run は常に :degraded で hold される。"
+                   "kokoro-http は gad にしか無い単一ノード。落ちれば voice leg は :silent に戻る(それは正しく degraded として出る)。冗長化はしていない。"
                    "batch の placing は実装済みだが LOOP_KA_PLACE=0 で止めてある。murakumo の task plane が今日の T6.4 移行(b578f1c)で読み込めなくなっているため。それが直れば 1 と設定するだけで動く。"],
   :adr/body
   "## Context
@@ -502,6 +502,55 @@ shiropico の shot は establishing shot なので `animagine-xl-4.0` に切替
 プラント構造が出た)。**まだ完璧ではない** — 再生成はプロンプトが要求する俯瞰では
 なく仰角になった。フレーミングはさらに craft の問題で、このループが決めることでは
 ない。
+
+## TTS を入れた — voice leg が結果になった(2026-07-31)
+
+`gad` に root で入れるようになったので TTS を導入した(オーナー指示)。
+
+**選定**: `kokoro-onnx`。murakumo の `:tts` が宣言している runtime
+(`CosyVoice2/Kokoro`)に一致し、82M と小さく、**CPU で回る** — gad は AMD ROCm
+なので CUDA 前提のものを避ける必要があり、かつ 32 コアある。実測 2.75 秒の音声を
+**0.46 秒**で合成。
+
+**構成**:
+
+```
+/home/gad/tts-venv                      venv(system python を汚さない)
+/home/gad/tts/kokoro-v1.0.onnx  311M
+/home/gad/tts/voices-v1.0.bin    27M    54 voices
+/home/gad/tts/kokoro_http.py           stdlib のみ、OpenAI 形の subset
+/etc/systemd/system/kokoro-http.service enabled + active(User=gad)
+```
+
+port **8190**。`POST /v1/audio/speech {input, voice, speed, lang} -> audio/wav`、
+`GET /health`、`GET /voices`。
+
+`comfy_openai_bridge.py` と同じ carve-out(モデルと同居する stdlib Python の
+infra glue。この箱に Node は無い)。**`response_format` は wav のみ** — Kokoro は
+float サンプルを返すので mp3 化にはエンコーダが要り、それをこの箱に持たせるより、
+wav を mp3 と偽って渡さない方がよい。
+
+### leg が結果になった
+
+`legs/report` は行の**結果**を取るようになった。voice は configuration から
+導かれていた最後の leg だった。
+
+| line | voice leg |
+|---|---|
+| この run が喋った | `:kokoro` |
+| 失敗 / text 無し / backend 無し | `:silent` |
+
+話者マッピングは SHIRO / PICO が各自の声、それ以外(ナレーション等)は
+**ナレーション声**。主役の声を黙って借りない。
+
+### 実測(両 backend 実接続)
+
+`--limit 3` で `video {:comfy 3, :placeholder 20}` / `voice {:kokoro 3, :silent 58}`、
+PNG 3 枚と wav 3 本(`1-shiro` `2-pico` `3-shiro`)がディスクに出た。
+
+`-main` は `produce-images` / `produce-voice` に分割した。
+reachable? → render → reachable? → speak のネストが深く paren を落としたが、
+それは typo ではなく**形が悪い**という兆候だった。
 
 ## Alternatives considered
 
