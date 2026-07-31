@@ -224,7 +224,7 @@ coverage は data として持ち（どのコーパスのどの範囲をいつ�
 
 **ただし到達経路が違った。** 書き込みは `/xrpc/…datomic.transact` に届いていた（head CID が前進、
 novelty 9→10→11）のに、読みは `datoms` を含めて全部 0 行だった。原因はレスポンス自身が言っていた:
-`{"deprecated":true,"prefer":"/api/*"}`（sunset 2026-11-01）。**`/xrpc` の `q` は triple pattern
+`{\"deprecated\":true,\"prefer\":\"/api/*\"}`（sunset 2026-11-01）。**`/xrpc` の `q` は triple pattern
 しか解さず、map 形式 Datalog を投げると黙って 0 行を返す。** 後継は Datomic Client API
 （`POST /api/{q,transact,pull,datoms,…}`）で、kotobase-client からは `:transport :direct-v1` で届く。
 **この repo の実装はすべて direct-v1 を使うこと。**
