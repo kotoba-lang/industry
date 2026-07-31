@@ -1913,6 +1913,24 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31cs — T8.3 typed Component string=? + substring)
+
+- kotoba-component#80 MERGED (`a7cf38c6`): **T8.3 typed Component composition**
+  — Canonical lowerings `:string-eq` (`string=?` → 1/0 i64; param/param or
+  param/literal) and `:string-substring` (UTF-8 byte range → string). No
+  `kotoba:typed` import (ADR 0076 §4a). Complements `:string-length` (#79).
+  Live wasmtime `eq("ab","ab")`→1; `slice("hello",1,4)`→`"ell"`.
+  Evidence: 13+8+10 assertions; compiler `--target component` E2E green.
+- west pin kotoba-component af7f096e → a7cf38c6 (`58c947a6`).
+
+Still open:
+1. T8.3 residual: typed Component **if/let composition** for full
+   `http_url_ok` / packing packages; multi-export live main; flip wasm-aot
+   only when admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31ck — T8.3 typed-string HTTP response surface)
 
 - provider#78 MERGED (`9e347a0d`): **T8.3 ADR 0190** — typed-string
