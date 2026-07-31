@@ -2280,6 +2280,24 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+
+## Progress (2026-07-31dl — T8.3 kit-readiness inventory ADR 0208)
+
+- provider#99 MERGED (`6025cd24`): **ADR 0208** kit-readiness lists
+  secret-name-ok (0206) + fs-path-ok (0207) pure Component twins; declare ops
+  typed-string Component surface complete (http+secret+scoped-fs). Nested EDN
+  residual remains **W4-gated**; wasm-aot stays `:partial`.
+  Evidence: kit-package 42 tests / 292 assertions green.
+- west pin provider df46209e → 6025cd24 (`95f24652`).
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**; flip `:wasm-aot :implemented` only if admissible
+2. T8.4 residual: optional further host_parity expansion; Node kagi env /
+   browser kagi absent
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
