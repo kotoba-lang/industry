@@ -1,0 +1,33 @@
+;; kotobase maturity on the IPLD / IPFS / IPNS premise — APPEND-ONLY.
+;;
+;; One EDN map per line, newest appended at the end. This is a measurement
+;; series, not a document: it is exempt from the rewrite-in-place rule
+;; (ADR-2607257000) for the same reason canvas-ledger and
+;; design-quality-ledger are — the time series IS the value, and overwriting
+;; a past reading destroys the trend it exists to show.
+;;
+;; RULES, so a later reading can be trusted:
+;;   * :score only where :evidence names something re-runnable. No score from
+;;     reasoning, docs, or a plausible argument.
+;;   * an axis with no measurement is :unmeasured, NEVER 0. Zero is a claim
+;;     that it was tested and failed; unmeasured is a claim about us.
+;;   * :evidence is a command or a commit, not a description.
+;;   * a reading that contradicts an earlier one is appended, not edited. The
+;;     contradiction is the finding.
+;;
+;; SCALE (0-5), deliberately coarse:
+;;   0 measured and broken · 1 works on a fixture only · 2 works on real data
+;;   3 works on the live plane · 4 bounded//qualified under load
+;;   5 bounded, qualified, and regression-gated in CI
+
+{:seq 1 :at "2026-07-31" :axis "block-plane/immutable-cid-store" :score 3 :evidence "kotobase-storage 9296e91 block-capabilities / validate-block-store!; 9 tests / 36 assertions" :note "block 面が ref 面と独立に検証・構成できるようになった。live での大量書き込みは未計測なので 4 ではない"}
+{:seq 2 :at "2026-07-31" :axis "ref-plane/host-independence" :score 3 :evidence "kotobase-storage 6440c96 signed-head; 17 tests / 53 assertions" :note "条件付き書き込みを持たないホスト(B2/IPNS/erasure network)でも ref を置ける。fork 検出・偽造 head 拒否・敗者の敗北検知を実測。合意は与えない(:single-writer-ref)"}
+{:seq 3 :at "2026-07-31" :axis "safety/provider-qualification" :score 3 :evidence "kotobase-storage-s3 4e7ff95 test/race.cljs, test/teeth.cljs" :note "逐次 contract は precondition を無視するプロバイダを PASS させる(CAS は並行性の性質)。2 writer 1 ref で ignores-If-Match は winners=2、honours は 1。この区別ができるようになった"}
+{:seq 4 :at "2026-07-31" :axis "write-amplification/incremental-update" :score 4 :evidence "prolly-tree e91eefc insert/insert-many; arrangement d95ec63 commit-delta!; 2064 + 147 assertions" :note "増分挿入が全体再構築と byte 一致。1 チャンク 16 行の読み取りは run が 5 block でも 500 block でも 3 block。CI gate は未設定なので 5 ではない"}
+{:seq 5 :at "2026-07-31" :axis "compaction/bounded-memory" :score 4 :evidence "kotobase-peer 2695f33 clojure -M:chunk-bench 20000 80000 320000" :note "peak live set 7.3 / 7.7 / 8.8 MB(16 倍のデータで +1.5 MB)。従来は 1M datom で 6.93 GB。in-chunk peak は未計測、CI gate 未設定"}
+{:seq 6 :at "2026-07-31" :axis "query/multi-entity-join-on-live-plane" :score 3 :evidence "app-hyakka out/p1-probe.js (HYAKKA_SEED から実行)" :note "two-hop join が live で rows=2、control-claim rows=2。ただし transport は /xrpc ではなく Datomic Client API(:direct-v1)。/xrpc の q は triple pattern しか解さず map 形式 Datalog を黙って 0 行にする"}
+{:seq 7 :at "2026-07-31" :axis "query/at-corpus-scale" :score 0 :evidence "app-hyakka out/read-bisect.js — 全 q が 0 行、datoms は 55,953 行返るが components/limit を無視" :note "1,094,672 entity / 推定 5M+ datom を投入した状態で実コーパスへの q が返らない。fold も 503(Worker exceeded resource limits、--max-novelty 10 でも)。measured-and-broken なので 0"}
+{:seq 8 :at "2026-07-31" :axis "ipfs/network-participation" :score :unmeasured :evidence nil :note "kotobase.net の /ipfs/* /ipns/* は B2 上の CAR アーカイブ control plane で、API-CONTRACT が DHT/Bitswap ノードではないと明記。IPLD はデータモデルとして使用中、IPFS はネットワークとして未参加。次反復の測定対象"}
+{:seq 9 :at "2026-07-31" :axis "ipns/signed-head-live" :score :unmeasured :evidence nil :note "kotobase-client の kotobase.ipns は JVM と byte 一致検証済みだが、signed-head ref store(6440c96)を実 IPNS publish に繋いだ計測はまだ無い。次反復の測定対象"}
+{:seq 10 :at "2026-07-31" :axis "encryption/at-rest" :score 2 :evidence "arrangement index-root: blind-fn/encrypt-fn は REQUIRED、leaf key はブラインド、value は AEAD" :note "永続化フォーマットに組み込まれている(任意ではない)。ただし本セッションの計測は identity 関数で行っており、実 MAC/AEAD 下での性能は未計測。分散暗号(kura/erasure)との接続も未計測"}
+{:seq 11 :at "2026-07-31" :axis "blocker/kotobase-peer-schema-version-2" :score 0 :evidence "kotobase-peer で arrangement を d95ec63 に上げると 259 tests 中 22 failures / 8 errors" :note "arrangement 42803e81 が leaf value を kotoba.value.v1 / schema-version 2 に移した。kotobase-peer は v1 前提。prolly-tree 単独の前進では 114 tests / 292 assertions 0-fail なので prolly-tree は無罪。これが fold! 接続のブロッカー"}

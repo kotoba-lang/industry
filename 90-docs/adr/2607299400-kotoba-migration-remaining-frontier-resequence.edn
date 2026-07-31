@@ -2372,6 +2372,23 @@ Still open:
    task.plan / infer.* / overlay.driver|runtime)
 
 
+## Progress (2026-07-31dq — T5.2 call-record wave 7 + pin)
+
+- murakumo#271 MERGED (`13ffe134`): **T5.2 wave 7** — call-record on
+  kekkai.gate, overlay.driver/runtime + dash residual (short-cid, interval).
+  ADR-260731-w6-t52-call-record-expand7. Supersedes conflicting #269 after #268.
+  Evidence: 59 tests / 420 assertions (call-record + host/parity suites).
+- west pin murakumo `7745e5de` → `13ffe134`.
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**; flip `:wasm-aot :implemented` only if admissible
+2. T8.4 residual: optional further live corpus; Node transport/pg needs
+   actor-host providers first
+3. T5.2 native guest record wire (deferred); W4 recursive values
+   (positional call-record may continue on task.plan / infer.* multi-arg hosts)
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
