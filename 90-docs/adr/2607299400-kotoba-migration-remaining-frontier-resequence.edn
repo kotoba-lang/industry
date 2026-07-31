@@ -2818,6 +2818,26 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01ft — T8.3 reject-path headers_edn_append Component)
+
+- kotoba-component#105 MERGED (`db026a32`): **`:headers-edn-append`** Canonical
+  `string × string × string → string` — dual UTF-8 quote/backslash scan,
+  `:name "…"` substring uniqueness (not true set/W4), vector splice into
+  `[]` or existing vector. Composition on `http-header-edn` / `edn_quoted`.
+- provider main `11ba7846`: **http-headers-edn-append** (wasm32 + Component).
+  ADR 0216. Digest `c139ff32…`. Request/result multi-export still open.
+  `:wasm-aot` stays `:partial`.
+  Evidence: ops kit registry tests + live wasmtime empty/second/dup/reject.
+- west pin kotoba-component `ce4a15c5` → `db026a32`; provider `5a5871e8` → `11ba7846`
+
+Still open:
+1. T8.3 residual: request/result reject-path composition (http_request_edn /
+   result ok/err on top of append); true set / W4 recursive ADT;
+   full multi-file kit body
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. murakumo field constructors / seats-record-go; W4 recursive values
+
+
 ## Progress (2026-08-01fs — kotoba-ui form-A T5.2 guest records; design-system 5/5)
 
 - kotoba-ui#10 MERGED (`53c83681`): **theme_core** multi-arg pure → guest
