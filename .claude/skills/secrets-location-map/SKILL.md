@@ -207,6 +207,29 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     kagi:itonami-org-root ...` で再 mint**)。merge 時は
     `bin/kagi get itonami-<dept>-head-chain > /tmp/chain.edn` で取り出す。
 
+## kaigi / Cloudflare RealtimeKit (2026-07-31)
+
+- **`REALTIMEKIT_API_TOKEN`（kagi vault、compartment `personal`、`KAGI_HOME=$HOME/.kagi`）**
+  — Cloudflare **Account API token**（`cfat_…`）。`Realtime Read` + `Realtime Admin` を
+  ai-gftd-cloud account 全体に、**無期限・IP 制限なし**で発行したもの（token 名
+  `260731-little-salad-2a4f`）。取得:
+  `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get REALTIMEKIT_API_TOKEN`。
+  - **用途**: `kaigi` Worker が RealtimeKit の meeting 作成と participant token の mint に
+    使う（`kaigi.realtimekit`）。Worker secret 名も同じ `REALTIMEKIT_API_TOKEN`。
+  - ⚠ **この token は発行時に会話ログへ平文で貼られている。** 用途が固まったら rotate する
+    のが望ましい。権限も必要より広い（Realtime だけで足りるが account 全体・無期限）。
+  - **1Password には未登録**（`op` が Touch ID 承認を要求し非対話で通らなかった。オーナーが
+    `op signin` してから登録する）。登録したらこの行を更新する。
+
+- **非機密の識別子**（secret ではないので参照先だけでなく値をここに書いてよい）:
+  - `REALTIMEKIT_ACCOUNT_ID` = `4da88288dc30d9ee257f319d3c33ecf0`
+  - `REALTIMEKIT_APP_ID` = `dbdc47c6-e97b-4573-919c-d47258bc40d3`（RealtimeKit app
+    `260731`）。**SFU の app id とは別物** — この id を SFU API に投げると全ゼロ UUID と
+    同じ `not_found` が返る（実測 2026-07-31）。SFU を使うなら別途 SFU app を作る。
+  - `REALTIMEKIT_PRESET` — app 作成時に自動生成された preset 名を使う
+    （`group_call_host` / `group_call_participant` / `group_call_guest` 等）。
+    一覧: `GET /accounts/{acct}/realtime/kit/{app}/presets`。
+
 ## marketplace 共有 identity seed (ADR-2607275000、2026-07-27)
 
 - **`itonami-marketplace-kotobase-seed`（kagi vault、compartment `personal`）** —
