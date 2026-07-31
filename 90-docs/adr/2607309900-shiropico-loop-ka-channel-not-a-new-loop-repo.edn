@@ -552,6 +552,47 @@ PNG 3 枚と wav 3 本(`1-shiro` `2-pico` `3-shiro`)がディスクに出た。
 reachable? → render → reachable? → speak のネストが深く paren を落としたが、
 それは typo ではなく**形が悪い**という兆候だった。
 
+## 現在地と再開点(closing、2026-07-31)
+
+### 動いているもの
+
+| 面 | 状態 | 確認方法 |
+|---|---|---|
+| cadence | mac の launchd `com.kotoba-lang.loop-ka-tick`、毎日 03:10 | `launchctl list` で loop-ka を探す |
+| plan | 6 channel、`tasks.edn` を生成 | `tail ~/.gftd/loop-ka-tick.stdout.log` |
+| 画像 | ComfyUI 0.22.0 @ `100.82.98.110:8188` | `curl .../system_stats` |
+| 音声 | kokoro-http @ `:8190`、systemd enabled+active | `curl .../health` |
+
+producer 単体は両 backend に実接続して動く。**ループ経由の自動生産だけが止まっている。**
+
+### 唯一のブロッカー
+
+`kotoba-lang/murakumo` の task plane が読み込めない(今日の T6.4 移行 `b578f1c`
+由来、3 箇所)。issue **kotoba-lang/murakumo#265**、修正候補は
+`agent/task-plan-i64-clean`(未 merge)。
+
+**再開の最初の 1 手**: #265 が閉じたら plist の `LOOP_KA_PLACE` を `0` → `1` に
+して `launchctl unload && load`。他に変更は要らない。確認は
+
+```
+launchctl start com.kotoba-lang.loop-ka-tick && sleep 60 && tail -20 ~/.gftd/loop-ka-tick.stdout.log
+```
+
+### 既知の未解決(優先順)
+
+1. **placing**(上記 #265 待ち)
+2. **日本語音声が未検証** — Kokoro の 54 voices は英語中心で、shotlist は 10 言語ある
+3. **kokoro-http は gad 単一ノード** — 落ちれば voice は `:silent` に戻る(degraded として正しく出る)。冗長化なし
+4. **フレーミング** — checkpoint 切替で主題は出るようになったが、俯瞰指定が仰角になる
+5. **ghosthacker の shotlist 欠落** — episode 1-10 は脚本のみで catalog 未登録
+6. **`comfy-openai-bridge`(:8189)は落ちたまま** — native 経路にしたので不要だが、他の consumer が居るなら別途
+
+### この作業で触っていないもの
+
+`agent/form-submissions` 等の superproject の他 branch、stash 3 件、comfyui の
+`agent/diffusers-*` / `agent/native-checkpoint-dtype`、murakumo の `.nbb/` は
+**すべて他セッションのもので、触っていない。**
+
 ## Alternatives considered
 
 - **gftdcojp に loop-shiropico / loop-ghosthacker を新設**: 却下(D1)。
