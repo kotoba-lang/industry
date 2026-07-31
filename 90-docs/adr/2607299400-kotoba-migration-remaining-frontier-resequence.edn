@@ -2818,6 +2818,23 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01gd — shitsuke document-plane multi-arg guest records)
+
+- shitsuke#11 MERGED (`eeacdb93`): **tokens_document + hig_document** multi-arg
+  pure → guest records (`:tokdoc/*` entry/group/nested/render-from/line-from;
+  `:higdoc/*` same shape with fixed hig prefix). document-in-record compiler
+  `7691b1ae`; html pin `709a38f2`.
+  Evidence: **67 tests / 388 assertions** green.
+- west pin shitsuke → `eeacdb93`
+- Design-system document-plane: css ✅ + html ✅ + shitsuke ✅; remaining
+  liquid-glass / kotoba-ui.
+
+Still open:
+1. liquid-glass / kotoba-ui document multi-arg folds
+2. T8.3 residual: true set / W4; `:wasm-aot :implemented`
+3. T8.4; murakumo residual; W4 recursive values
+
+
 ## Progress (2026-08-01gc — html document-plane multi-arg guest records)
 
 - html#5 MERGED (`709a38f2`): **html_document** multi-arg pure → guest records
