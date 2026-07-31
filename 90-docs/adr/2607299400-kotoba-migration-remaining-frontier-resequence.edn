@@ -2818,6 +2818,23 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fi — T8.3 Component twin first slice for EDN)
+
+- provider main `b825c4e0`: **string-expression Components** —
+  `http-headers-edn-empty-v1.component.wasm` (literal `[]`) and
+  `http-header-edn-trust-v1.component.wasm` (pure nested concat). ADR 0212.
+  Full multi-export `http-request-edn` Component still needs broader Canonical
+  package shape; `:wasm-aot` stays `:partial`.
+  Evidence: ops kit packages 69/623 green.
+- west pin provider `70bfae30` → `b825c4e0`
+
+Still open:
+1. T8.3 residual: multi-export request-edn Component package shape;
+   true set / W4 recursive ADT; full multi-file kit body
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 product multi-arg pure residual closed; W4 recursive values
+
+
 ## Progress (2026-08-01fh — T8.3 header name uniqueness on EDN fold)
 
 - provider main `70bfae30`: **headers_edn_has_name** + **headers_edn_append**
