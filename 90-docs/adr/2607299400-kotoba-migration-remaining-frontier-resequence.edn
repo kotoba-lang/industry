@@ -2818,6 +2818,23 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-07-31er — T5.2 task tournament residual)
+
+- murakumo main `c5ab005d`: **task tournament multi-arg pure** → guest records —
+  `capacity` → `:task/capacity-in`, `pick-task-idx-2` → `:task/pick2`,
+  `assign-task-step-2` → `:task/assign2-in`. `slots` composes capacity via
+  `record-new`. ADR-260731-w6-t52-native-record-task-tournament.
+  Evidence: task parity + authority + call-record 100/1746 green.
+- west pin murakumo `59617f0e` → `c5ab005d`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: digit-scanner multi-arg internals optional; plan multi-arg
+   (better-bump?/plan-lr/pick-bump-3/…); W4 recursive values
+
+
 ## Progress (2026-07-31eq — T5.2 pick-fold-step guest record)
 
 - murakumo main `59617f0e`: **pick-fold-step** folds remaining multi-arg
