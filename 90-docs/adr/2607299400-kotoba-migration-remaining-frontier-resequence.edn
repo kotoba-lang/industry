@@ -2818,6 +2818,46 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01ex — T5.2 plan ends-idx residual)
+
+- murakumo main `f9c6a6cf` (tip pin `2e97d098` also absorbs concurrent rebalance
+  seat-order residual): **infer_plan ends-at/lo/hi** multi-arg pure →
+  `:plan/ends-idx` (`hi0`/`hi1`/`hi2`/`idx`).
+  ADR-260731-w6-t52-ends-idx-records.
+  Evidence: plan parity 12/98 + authority 70/1420 green.
+- west pin murakumo `eae17fc3` → `2e97d098`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: digit-scanner multi-arg internals optional; W4 recursive values
+
+
+## Progress (2026-07-31ey — T5.2 rebalance seat-order residual)
+
+- murakumo main `2e97d098`: **rebalance seat-order residual** — `count-active`/
+  `min2`/`max2`/`seat-of`/`before-pool?`/`seat-order-record`/`order-nth` → guest
+  records. ADR-260731-w6-t52-rebalance-seat-order-records.
+  Evidence: rebalance parity + authority 80/1511 green.
+- west pin murakumo `f9c6a6cf` → `2e97d098`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: digit-scanner multi-arg internals optional; string-scan helpers
+   (find-prefix-at/take-alnum/last-slash/flag-value-after); W4 recursive values
+
+
+## Progress (2026-07-31ex — T5.2 plan ends-at/lo/hi)
+
+- murakumo main `f9c6a6cf`: **ends-at/ends-lo/ends-hi** → `:plan/ends-idx`
+  (hi0/hi1/hi2 + idx). Concurrent land after partition wm. Evidence: plan parity
+  green on land.
+- west pin murakumo `eae17fc3` → `f9c6a6cf` (then advanced in 31ey)
+
+
 ## Progress (2026-07-31ew — T5.2 plan partition weight+model records)
 
 - murakumo main `eae17fc3`: **infer_plan partition surface** multi-arg pure →
