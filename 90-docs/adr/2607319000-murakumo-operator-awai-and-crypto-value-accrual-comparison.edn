@@ -58,8 +58,10 @@
 理由は事務ではなく設計である:
 
 - **ADR-2607299900 Decision 4 が『発行体は運営者と同一にしない』を要求している。** 比較した5例すべて（Filecoin / Livepeer / Akash 等）が発行体と運営者を分離しており、米国法人では Howey の common enterprise + efforts of others が同一主体に揃うのが最も厳しい姿勢だからである。
-- 運営者が AWAI Network になった今、**etzhayyim を chain 軸に残すことがその分離そのものになる**。custody まで AWAI に寄せると、運営者・custodian・発行体が1法人に揃い、ADR-2607299900 が満たそうとした条件が崩れる。
-- したがって本 ADR は運営母体の変更を **『分離が壊れた』のではなく『分離が具体化した』**と記録する。dual-axis doctrine（ADR-2607071000）の chain 軸 = etzhayyim junbi Safe / fiat 軸 = gftdcojp は不変で、そこに **operator 軸 = AWAI Network** が明示的に加わった形になる。
+- ~~運営者が AWAI Network になった今、**etzhayyim を chain 軸に残すことがその分離そのものになる**~~ **← 誤り。2026-07-31 にオーナーが訂正: etzhayyim の法人格は AWAI Network, L.L.C. である（米国法人）。**
+- **訂正（2026-07-31、ADR-2607320500 §1 で正本化）**: etzhayyim は独立した法人ではなく AWAI Network, L.L.C. の内部の機能名である。したがって **operator と chain custodian は同一の法人**であり、**ADR-2607299900 Decision 4 が要求する『発行体 ≠ 運営者』の分離は現時点で存在しない。** 本 ADR の初稿は dual-axis doctrine の「chain 軸 / fiat 軸」を**法人の分離**と読み違えていた —— あれは1法人内の**機能の分離**である。
+- したがって「運営母体の変更で分離が具体化した」という初稿の結論は成り立たない。正しくは **分離は最初から無く、作るなら新設が唯一の道である**（ADR-2607320500 §2 はそれでもなお「今は作らない」と決めている）。
+- **この訂正は custody 方針を変えない。** `MURAKUMO_TREASURY_ADDR` は AWAI 自身の treasury であり、**自社の売上を自社が受け取ることは custody ではない**（custody とは他者の資金を預かること）。他者資金に触れない設計は ADR-2607320500 §3 が担う。
 - なお Safe の署名者・threshold の変更は資金を動かす操作であり、CLAUDE.md 安全床②により agent は実行しない。Ethereum 2-of-3 / Base 1-of-1 の非対称（ADR-2607300100 §4）を揃える作業は引き続き owner 側の in-flight 項目である。
 
 ### 3. value-accrual cohort — 10 entity を同一 source・同一日付で測る
@@ -154,11 +156,23 @@ cohort 合計: fees **$2.80B** / holders **$1.33B**（47.5%）。うち **Hyperl
 
 ```
 運営者   AWAI Network, L.L.C.     ← 既に真。本 ADR が正本を与える
-custody  etzhayyim junbi Safe     ← 維持する（下記）
+custody  etzhayyim junbi Safe     ← ★同じ AWAI Network, L.L.C.（下記の訂正）
 charter  etzhayyim no-own-token   ← token 1点は既に解除済み（ADR-2607299900 §1）
 ```
 
-**custody を AWAI に寄せない**のは事務上の都合ではない。ADR-2607299900 Decision 4 は「発行体は運営者と同一にしない」を要求しており、根拠は Howey の common enterprise と efforts of others が同一主体に揃うのを避けることである。運営者が AWAI になった今、**etzhayyim を chain 軸に残すことがその分離そのもの**になる。3つを1法人に集めると、token 政策が満たそうとした条件が崩れる。
+### 訂正（2026-07-31、オーナー確認）— 分離は存在しなかった
+
+初稿はここで「**custody を AWAI に寄せないことが ADR-2607299900 Decision 4 の分離そのものになる**」と書いた。**これは誤りである。**
+
+オーナー確認（2026-07-31）: **etzhayyim の法人格は AWAI Network, L.L.C.（米国法人）である。** etzhayyim は独立した法人ではなく、AWAI 内部の機能名・プロジェクト名である。
+
+したがって:
+
+- **operator と chain custodian は同一の法人**であり、**Decision 4 が要求する『発行体 ≠ 運営者』の分離は現時点で存在しない。**
+- 初稿は dual-axis doctrine の「chain 軸 / fiat 軸」を**法人の分離**と読み違えた。あれは1法人内の**機能の分離**である。この読み違いは、法人番号を持つ ①（Delaware file 10704996）② （法人番号 1011101086505）に対して ③ だけ登記情報が無いという、初稿自身が §5 相当で気付いていた非対称の説明にもなっていた —— **③ に登記情報が無かったのは、③ が別法人ではなかったからである。**
+- 正しい結論は「運営母体の変更で分離が具体化した」ではなく、**分離は最初から無く、作るなら新設が唯一の道**である。ADR-2607320500 §2 はそれを踏まえてなお「今は作らない」と決めている。
+
+**この訂正は custody 方針を変えない。** `MURAKUMO_TREASURY_ADDR` は AWAI 自身の treasury であり、**自社の売上を自社が受け取ることは custody ではない**（custody とは他者の資金を預かること）。他者資金に触れない設計は ADR-2607320500 §3 が担う。
 
 ## 測って分かった4つのこと
 

@@ -12,11 +12,12 @@
   :adr/repos ["orgs/network-awai/cloud-murakumo" "orgs/network-awai/net-kotobase" "orgs/kotoba-lang/pay"]
 
   :adr/authoritative_for
-  ["murakumo / kotobase 経済圏の法的構成: 役割は3つ（①サービス運営 ②日本国内の雇用・現地業務 ③chain 資産の保管）で、それぞれ AWAI Network, L.L.C. / Gftd Japan 株式会社 / etzhayyim junbi Safe に帰属する"
+  ["murakumo / kotobase 経済圏の法的構成: 役割は3つ（①サービス運営 ②日本国内の雇用・現地業務 ③chain 資産の保管）だが**法人は2つ**である。①と③はともに AWAI Network, L.L.C.（etzhayyim は法人ではなく AWAI 内部の機能名 —— オーナー確認 2026-07-31）、②のみ Gftd Japan 株式会社"
    "**新しい財団・発行体法人を現時点で設立しない**という決定。設立は token を出すと決めた後の2番目の決定であり、順序を逆にしない"
    "**protocol fee を on-chain の原子的分割ではなく請求（invoice）で受け取る**という決定。これにより第三者資金の custody を発生させない"
    "**bond を要求しない現行設計（`:ordering` floor 0）を当面維持する**という決定。これも custody を発生させないための選択であり、Sybil 耐性が無いことは既知のコストとして受け入れる"
-   "etzhayyim の法人格が文書化されるまで、etzhayyim に新しい custody 責任を追加しないこと"
+   "『発行体 ≠ 運営者』（ADR-2607299900 Decision 4）を満たす既存の受け皿が存在しないこと。満たすには新設が唯一の道であり、token を出さない限りこの穴は実害を持たない"
+   "オーナー要件『資産は預からないが手数料は欲しい』（2026-07-31）を満たす形は invoice + registry 停止であること。回収の梃子は資金ではなく役務である"
    "agent が決めるのは**構成**であり、証券性・送金業該当性・税務の**性質決定は弁護士に回す**という境界"]
 
   :adr/supersedes []
@@ -49,7 +50,9 @@ ADR-2607299900 が `:open-decisions` に `:issuing-entity`（発行体をどこ�
 
 **③ と ⑤ は token とは無関係で、『第三者の資金を預かるか』という1点だけに依存している。** そして Aethir が供給側に $70.6M/yr を配れているのは、token があるからではなく custody が動いているからである（ADR-2607319800）。
 
-さらに実測で分かったこと: **etzhayyim の法人格は、ADR にも `legal/company.md` にも一切記録がない。** dual-axis doctrine が chain 軸の custodian として名指しし、`MURAKUMO_TREASURY_ADDR` が指す Safe を保有する主体でありながら、それがどの法域のどの法人格なのか（あるいは法人ですらないのか）を書いた文書が workspace に存在しない。"
+さらに実測で分かったこと: **etzhayyim の法人格は、ADR にも `legal/company.md` にも一切記録がなかった。**
+
+**オーナー回答（2026-07-31）: 法人格は AWAI Network, L.L.C.（米国法人）。** つまり etzhayyim は独立した法人ではなく AWAI 内部の機能名であり、**operator と chain custodian は同一法人**である。記録が無かったのは、別法人ではなかったからである。あわせてオーナーは要件を明示した: **「資産預かりたくないけど、手数料は欲しい」。**"
 
   :adr/decision
   "### 0. この ADR が決めるものと、決めないもの
@@ -60,7 +63,7 @@ ADR-2607299900 が `:open-decisions` に `:issuing-entity`（発行体をどこ�
 
 （本 ADR 執筆時点の agent の知識は 2026-05 であり、この領域は法改正が速い。構成の記述を法的助言として読まないこと。）
 
-### 1. 役割は3つ。既存の3主体に固定する
+### 1. 役割は3つ。ただし**法人は2つ**（オーナー確認 2026-07-31）
 
 ```
 ① サービス運営      AWAI Network, L.L.C.（Delaware LLC, file 10704996, 2026-07-20 設立）
@@ -72,8 +75,22 @@ ADR-2607299900 が `:open-decisions` に `:issuing-entity`（発行体をどこ�
    ・収納代行       インフラ vendor。**Service operator ではない**
 
 ③ chain 資産の保管  etzhayyim junbi Safe（0xA00366234D29d4F882088048c0B2fa0dB7302D4E）
-                    x402 の USDC 受領先。**法人格が未文書化 → §5 の前提条件**
+                    ★保有法人は **AWAI Network, L.L.C.**（= ①と同一。米国法人）
+                    etzhayyim は法人ではなく AWAI 内部の機能名・プロジェクト名
 ```
+
+**役割は3つだが、法人は2つである。** ①と③は同一の法人であり、別法人なのは②だけである。
+
+**この事実は ADR-2607299900 Decision 4 の前提を崩す。** 同 ADR は「発行体は運営者と同一にしない」を要求し、その根拠を「比較した5例すべてが分離しており、米国法人では Howey の common enterprise + efforts of others が同一主体に揃うのが最も厳しい」に置いた。**その分離は現時点で存在しない。** dual-axis doctrine の「chain 軸 / fiat 軸」は**1法人内の機能の分離**であって、法人の分離ではない。
+
+**ADR-2607319000 Decision 2 の『etzhayyim を chain 軸に残すことがその分離そのものになる』は誤りであり、同 ADR 側で訂正済みである。**
+
+そしてこれは、初稿が §5 で「①②は登記情報を持つのに③だけ無い」と書いた非対称の説明でもある —— **③ に登記情報が無かったのは、③ が別法人ではなかったからである。**
+
+**帰結:**
+- 「発行体 ≠ 運営者」を満たす**既存の受け皿は無い**。満たすには**新設が唯一の道**である
+- したがって §2（今は作らない）は弱まらない。むしろ「既存の軸に載せるだけ」という安い選択肢が**二重に**存在しないことになる（§4 の J1 は構造上も deploy 経路が無いことを示す）
+- **custody 回避（§3）の重要性は上がる。** 他者資金を預かれば、それは運営会社そのものに直接乗る
 
 ①②は既に真であり（ADR-2607242100 / 2607269500 / 2607319000）、本 ADR はそれを法的構成の正本として固定する。**新規に作る法人は無い。**
 
@@ -97,6 +114,8 @@ ADR-2607319800 は「③ と ⑤ を止めているのは同じ1つの決定（�
 
 現在の x402 は既に custody-free である: 買い手 → seller の treasury に**直行**し、facilitator は鍵を1本も持たない（`:collectible?` が常に false なのはそのため）。20% を原子的に分割しようとした瞬間だけ splitter contract が必要になり、そこで初めて他人の資金を預かることになる。
 
+**これはオーナーの明示要件である**（2026-07-31）: **「資産預かりたくないけど、手数料は欲しい」。** 本節はその2条件を同時に満たす唯一の形として書かれている。
+
 > **決定: protocol fee は `settlement-record` に基づく事後請求（invoice）として受け取る。** seller は自分の treasury で全額を受け取り、AWAI Network が 20% を B2B の役務対価として請求する。
 
 これで:
@@ -104,6 +123,16 @@ ADR-2607319800 は「③ と ⑤ を止めているのは同じ1つの決定（�
 - splitter contract のデプロイも監査も不要
 - `settlement-record` は既に全行に seller を載せており（ADR-2607995000 addendum）、**請求根拠のデータは既に存在する**
 - 代償は「取りっぱぐれ得る」こと。これは信用リスクであって規制リスクではなく、**通常の B2B 債権**として扱える
+
+**「預からない」と「取り損ねない」を両立させる手段は、資金ではなく役務を握ること。**
+
+原子的分割を捨てると回収の強制力を失うように見えるが、facilitator は**別の梃子**を持っている —— それは discovery と routing である。seller は `nexus-x402` の registry に載ることで買い手から到達可能になっており、`register-seller` / rule 登録はその registry の書き込み操作である。
+
+> **未払いに対して行うのは資金の差し押さえではなく、registry からの一時停止（= 役務の停止）である。**
+
+これは custody を全く伴わない。**資金を握るのではなく、売り先への到達性を握る。** 加えて custody 不要のまま強度を上げる手段が2つある: (a) 前払い/デポジット（seller が先に払う。預かるのは**自社の売上代金**であって他者資金ではない）(b) net 決済期間の短縮。
+
+**「自社の売上を自社が受け取ること」は custody ではない。** custody とは他者の資金を預かることであり、`MURAKUMO_TREASURY_ADDR` に AWAI 自身の x402 売上が入るのはこれに当たらない。オーナー要件の「預かりたくない」が禁じているのは、**80% の供給側取り分や witness bond のように、最終的に他人のものになる資金を経由させること**である。
 
 **③ 供給者担保 — bond を要求しない現行設計を維持する。**
 
@@ -144,17 +173,17 @@ ADR-2607299900 §1 は J1 を『charter の禁止条項』として token 1点�
 
 これは §2（今は作らない）の判断を弱めるのではなく強める。**発行体を「既存の軸に載せるだけ」で済ませられる選択肢は、実際には存在しない。**
 
-### 5. 前提条件 — etzhayyim の法人格を文書化する
+### 5. 【解消済み】etzhayyim の法人格 — AWAI Network, L.L.C.
 
-**etzhayyim の法人格を記した文書が workspace に1つも無い。** ADR にも `legal/company.md` にも無い。それでいて dual-axis doctrine は etzhayyim を chain 軸の custodian と定め、`MURAKUMO_TREASURY_ADDR` が指す Safe の保有主体としている。
+初稿はここを未解決の前提条件として置いた（`90-docs/adr/*.edn` 全件と `orgs/network-awai/*/legal/company.md` 全件を走査してヒット 0）。**2026-07-31、オーナーが回答した: 法人格は AWAI Network, L.L.C.（米国法人）。**
 
-（探索範囲: `90-docs/adr/*.edn` 全件を `etzhayyim` × `法人|charter|incorporat|entity|religio` で走査してヒット 0、`orgs/network-awai/*/legal/company.md` 全件で `etzhayyim` のヒット 0。**「見つからなかった」であって「存在しない」ではない** —— オーナーが登記情報を持っている可能性は十分にあり、その場合これは記録の欠落である。）
+つまり **etzhayyim は独立した法人ではなく、AWAI 内部の機能名である**。これが、①② が登記情報を持つのに ③ だけ無かった理由でもある —— **別法人ではなかったから登記が無かった。**
 
-> **決定: etzhayyim の法人格（法域・種別・登記情報、あるいは『法人ではない』という事実）が `legal/company.md` 相当に記録されるまで、etzhayyim に新しい custody 責任を追加しない。**
+**残る作業は「記録すること」**: `orgs/network-awai/cloud-murakumo/public/legal/company.md` 相当に、junbi Safe の保有法人が AWAI Network, L.L.C. であり etzhayyim が法人ではないことを明記する。これが無いと、次に読む者が dual-axis doctrine を再び**法人の分離**と読み違える（実際にこの ADR 群の初稿がそう読み違えた）。
 
-これは etzhayyim を疑うものではなく、**法的構成は「誰が何を保有するか」の記述であり、主体の法的存在が不明なら構成は書けない**という単純な理由による。①② は Delaware file number と法人番号を持っているのに ③ だけが無いのは、構成の穴である。
+**この事実が持ち込む本当の問題は、法人格の不明ではなく分離の不在である**（§1 の帰結）。ADR-2607299900 Decision 4 が要求した「発行体 ≠ 運営者」は、**満たされていないのではなく、満たす手段が現在存在しない。**
 
-既知の関連問題: Safe の threshold が Ethereum 2-of-3 / Base 1-of-1 で非対称であり、**x402 の価格は `network=base` で quote されるので実際に収益を保持するのは弱い方**（ADR-2607300100 §4）。法人格の文書化と threshold の是正は同じ作業の一部として扱う。
+**関連して重みが増した既知問題**: Safe の threshold が Ethereum 2-of-3 / Base 1-of-1 で非対称であり、**x402 の価格は `network=base` で quote されるので、実際に収益を保持するのは弱い方**（ADR-2607300100 §4）。これは etzhayyim という別主体の内部事情ではなく、**運営会社そのものの chain 売上を単一の鍵が握っている**という話になる。優先度は初稿の想定より高い。
 
 ### 6. 弁護士に聞くこと（agent は決めない）
 
@@ -179,7 +208,7 @@ ADR-2607299900 §1 は J1 を『charter の禁止条項』として token 1点�
      {:what \"terms.md の MCC 条項の改訂\" :why \"弁護士設問3。公開済みの法的文書\"}
      {:what \"invoice 方式の実装\" :why \"本 ADR は構成の決定。実装は次段\"}]
     :next
-    [{:step 1 :what \"etzhayyim の法人格を legal/company.md 相当に記録する（§5）\" :blocked-by \"owner が事実を持っている\"
+    [{:step 1 :what \"junbi Safe の保有法人が AWAI Network, L.L.C. であり etzhayyim が法人でないことを public/legal/company.md に記録する（§5、オーナー回答 2026-07-31 で事実は判明済み）\" :blocked-by nil
       :note \"①② は Delaware file number / 法人番号を持つのに ③ だけ無い。構成の穴であり、他の全部より先に埋まる\"}
      {:step 2 :what \"protocol fee の invoice 実装（§3）— settlement-record から請求書データを生成する。splitter contract は作らない\" :blocked-by nil
       :note \"**法的決定を待たずに着手できる。** ADR-2607319800 が『custody 待ち』と診断した ⑤ は、これで解ける\"}
@@ -194,8 +223,8 @@ ADR-2607299900 §1 は J1 を『charter の禁止条項』として token 1点�
      :note \"外部参加者 0 の間だけの選択であり、恒久的な設計ではない。引き上げトリガは engi.metrics の :external-counterparties で客観的に定義済みだが、そのトリガが発火したときに escrow をどう用意するかは本 ADR では決めていない\"}
     {:gap \"agent は証券性・送金業該当性を判断していない。§6 はチェックリストであって答えではない\"
      :note \"本 ADR 執筆時点の agent の知識は 2026-05。この領域は法改正が速く、構成の記述を法的助言として読んではならない\"}
-    {:gap \"etzhayyim の法人格が不明なまま、既に x402 の USDC がその Safe に向いている\"
-     :note \"本 ADR は『新しい custody 責任を追加しない』と決めたが、既存の受領先を変更するとは決めていない。変更は資金移動を伴い owner の領域\"}
+    {:gap \"『発行体 != 運営者』を満たす手段が現在存在しない（新設が唯一の道）\"
+     :note \"etzhayyim = AWAI Network, L.L.C.（オーナー回答 2026-07-31）なので operator と custodian は同一法人。ADR-2607299900 Decision 4 は満たされていないのではなく、満たす受け皿が無い。token を出さない限り実害は無いが、出すと決めた瞬間に新設が前提条件になる。加えて Base 側 Safe が 1-of-1 である件は、別主体の内部事情ではなく運営会社の chain 売上を単一鍵が握るという話になり、優先度が上がった\"}
     {:gap \"§1 の3役割は murakumo / kotobase 圏を対象としており、他プロダクト（club-shinshi 等、別 org）は範囲外\"
      :note \"jk-luxury 系など別 org のプロダクトは別途\"}
     {:gap \"Gftd Japan の収納代行が invoice 方式でどう機能するかを詰めていない\"
@@ -255,9 +284,19 @@ x402 は既に custody-free である —— 買い手から seller の treasury
 
 **コストは隠さない**: 無 bond の set に **Sybil 耐性は無い**。これは外部参加者が 0 の間だけの選択であって、恒久的な設計ではない。
 
-## 前提条件 — etzhayyim の法人格が書かれていない
+## 解消 — etzhayyim は AWAI Network, L.L.C. だった（そして分離は存在しない）
 
-**etzhayyim の法人格を記した文書が workspace に1つも無い。** ADR 全件と `legal/company.md` 全件を走査してヒット 0。それでいて dual-axis doctrine は etzhayyim を chain 軸の custodian と定め、x402 の USDC はその Safe に向いている。（**「見つからなかった」であって「存在しない」ではない。** オーナーが登記情報を持っているなら、これは記録の欠落にすぎない。）
+走査では ADR 全件・`legal/company.md` 全件でヒット 0 だった。**オーナー回答（2026-07-31）: 法人格は AWAI Network, L.L.C.（米国法人）。**
+
+**記録が無かったのは、別法人ではなかったからである。** etzhayyim は AWAI 内部の機能名であり、①（operator）と③（chain custodian）は**同一の法人**である。
+
+これは前提条件を1つ解消すると同時に、**もっと重い事実を1つ持ち込む**:
+
+> **ADR-2607299900 Decision 4 が要求する「発行体 ≠ 運営者」の分離は、存在しない。**
+
+dual-axis doctrine の「chain 軸 / fiat 軸」は**1法人内の機能の分離**であって、法人の分離ではなかった。**ADR-2607319000 Decision 2 に私が書いた『etzhayyim を chain 軸に残すことがその分離そのものになる』は誤りで、同 ADR 側で訂正した。**
+
+したがって §2（財団を作らない）は弱まらない。「既存の軸に載せるだけ」という安い選択肢は、**法人の面でも（受け皿が無い）コードの面でも（J1 に deploy 経路が無い）二重に存在しない。**
 
 そしてもう1つ、**発行体を「既存 chain 軸に載せる」という選択肢は実際には存在しない。** J1 の原文は方針ではなく構造の記述だからである:
 
@@ -303,5 +342,6 @@ after    ③ 担保     bond を取らない → 今すぐ動く（Sybil 耐性�
 ## 正直に言っておくこと
 
 - **agent は証券性も送金業該当性も判断していない。** §6 はチェックリストであって答えではない。執筆時点の知識は 2026-05 で、この領域は法改正が速い
-- **etzhayyim の法人格が不明なまま、既に x402 の USDC がその Safe に向いている。** 本 ADR は「新しい責任を追加しない」と決めただけで、既存の受領先を変えるとは決めていない（資金移動は owner の領域）
+- **「発行体 ≠ 運営者」を満たす受け皿が無い。** etzhayyim = AWAI Network, L.L.C. なので operator と custodian は同一法人である。token を出さない限り実害は無いが、出すと決めた瞬間に新設が前提条件になる
+- **Base 側 Safe の 1-of-1 は、別主体の内部事情ではなく運営会社の chain 売上を単一鍵が握るという話**になった。優先度は初稿の想定より高い
 - **invoice 方式は seller が増えたときに再訪が要る。** 外部 seller 0 の今は信用リスクも 0 だが、それは需要が無いことの裏返しでしかない"}]
