@@ -1787,6 +1787,24 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31cm — T8.3 typed-string HTTP request packing walk)
+
+- provider#81 MERGED (`e3ff5756`): **T8.3 ADR 0193** — typed-string **request
+  packing walk** `http_request_begin` / `url` / `headers` / `body` /
+  `end(timeout)` (composes 0182+0186; symmetric to 0192).
+  Codes: `-1/-2/-3` url, `-4` headers-n, `-5` body, `-6` timeout, `-7`
+  incomplete, `-10` phase. `main` → `-13467`.
+  Evidence: 54 tests / 365 assertions; browser-host green.
+- west pin provider be00bad0 → e3ff5756 (`eaf4eb6f`).
+
+Still open:
+1. T8.3 residual: **pure memory-scan one-shot** of request+result bytes;
+   typed Component world
+2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
+   interop harness)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31ck — T8.3 typed-string HTTP response surface)
 
 - provider#78 MERGED (`9e347a0d`): **T8.3 ADR 0190** — typed-string
