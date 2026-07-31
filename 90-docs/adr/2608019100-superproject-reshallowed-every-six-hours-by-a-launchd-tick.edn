@@ -119,8 +119,14 @@ gh api \"repos/com-junkawasaki/root/compare/<HEAD>...<origin/main>\" \\
   "[{:gap \"`~/.gftd/` のスクリプトはバージョン管理外で、repo の規約検査がまったく届かない\"
      :impact \"本件も ADR-2607173000 の bb 退役も、この死角で規約から外れた。hook・lint・grep のいずれも repo の外は見ない\"
      :note \"これらを repo に取り込むか、少なくとも一覧と規約適合の点検経路を作るかは別の決定。本 ADR では提起のみ\"}
-    {:gap \"run-fleet-ci-murakumo-tick.cljs の `git fetch origin --depth 1` は残っている\"
-     :note \"cwd が sip-checkout（superproject ではない）ため本件の原因ではないが、その checkout を shallow 化している可能性はある。未調査\"}
+    {:gap \"（解消 2026-08-01）run-fleet-ci-murakumo-tick.cljs の `git fetch origin --depth 1`\"
+     :resolved \"**実際に west 管理下の子リポを潰していた。** cwd の sip-checkout は `orgs/com-junkawasaki/org-spirit-in-physics-comics` で、west.yml に登録済みの project である。実測: shallow=true / graft 3 / **到達可能 commit が 1 件**（ADR-2607211600 が superproject で測った『reachable commit はわずか2件』と同じ病理）。同 plist も StartInterval 21600 秒＝6時間\"
+     :impact \"west pin のローカル到達性検証が原理的に不可能な状態だった。さらに同スクリプトは直後に `git fetch origin <sha>` を行っており、shallow な repo に対する特定 sha の fetch は新しい graft を積む\"
+     :fix \"`--depth 1` を除去（backup: run-fleet-ci-murakumo-tick.cljs.bak-20260801）。clj-kondo parse 通過。checkout も unshallow し、**到達可能 commit 1 → 56** を確認\"}
+    {:gap \"（除外）run-innen-tick.cljs の `--depth`\"
+     :resolved \"git ではない。`innen record tick` CLI の引数であり本件と無関係\"}
+    {:gap \"`~/.gftd/` で git を fetch するスクリプトは2件あり、**2件とも** ADR-2607211600 に違反していた\"
+     :note \"母数が2で違反が2。偶発ではなく、この死角に置かれたスクリプトは repo の規約から外れるのが既定だと考えるべき\"}
     {:gap \"修正の実効は次の定期実行まで未検証\"
      :note \"最大6時間後。`git rev-parse --is-shallow-repository` が false のままなら成功\"}]"
 
@@ -172,6 +178,18 @@ gh api \"repos/<org>/<repo>/compare/<HEAD>...<origin/main>\" \\
   --jq '{status,ahead_by,behind_by,merge_base:.merge_base_commit.sha}'
 ```
 
+## 同じ死角にもう1件あった（2026-08-01、同日追記）
+
+`~/.gftd/` で **git を fetch するスクリプトは2件**あり、**2件とも**同じ違反をしていた。
+
+`run-fleet-ci-murakumo-tick.cljs` は `orgs/com-junkawasaki/org-spirit-in-physics-comics`（west 登録済みの子リポ）を `--depth 1` で fetch していた。実測すると **到達可能 commit が 1 件** —— ADR-2607211600 が superproject で測った「reachable commit はわずか2件」と同じ状態である。west pin のローカル到達性検証が原理的にできない。しかも同スクリプトはその直後に `git fetch origin <sha>` を行っており、shallow な repo に特定 sha を足す操作は graft をもう1つ積む。
+
+同じく `--depth 1` を外し、checkout を unshallow した（**到達可能 commit 1 → 56**）。plist の間隔も同じく 21600 秒。
+
+**母数が2で違反が2である。** 偶発ではない。この死角に置かれたスクリプトは、repo の規約から外れるのが既定だと考えるべきである。
+
+（`run-innen-tick.cljs` の `--depth` は `innen record tick` CLI の引数で git ではない。除外。）
+
 ## 正直に残す
 
-修正の実効は**次の定期実行（最大6時間後）まで未検証**である。スクリプトは末尾に `(-main)` を持ち、読み込むと worktree 作成と push が走るので、確認のために手で実行はしていない。"}]
+修正の実効は**次の定期実行（最大6時間後）まで未検証**である。両スクリプトとも末尾に `(-main)` を持ち、読み込むと worktree 作成や push が走るので、確認のために手で実行はしていない。`git rev-parse --is-shallow-repository` が両 repo で false のままなら成功である。"}]
