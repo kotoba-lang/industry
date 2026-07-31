@@ -1766,6 +1766,38 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31ck — T8.3 typed-string HTTP response surface)
+
+- provider#78 MERGED (`9e347a0d`): **T8.3 ADR 0190** — typed-string
+  `http_status_ok` + `http_response_ok` (status [100,599], headers-n [0,32],
+  body len [0,65536]). `main` → `-1012`. Result `:ok` arm surface.
+  Evidence: browser-host green; registry digest.
+- west pin intermediate → `9e347a0d`.
+
+Still open:
+1. T8.3 residual: **error/result variant** + nested EDN pack; pure memory-scan;
+   typed Component world
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31cl — T8.3 typed-string HTTP error arm + result tag)
+
+- provider#79 MERGED (`8201a4d9`): **T8.3 ADR 0191** — typed-string
+  `http_error_ok(code,message,retryable)` + `http_result_arm_ok(arm)`
+  (`0`=:ok, `1`=:error). Code charset `[A-Za-z0-9/_:.-]`; message ≤65536;
+  retryable ∈{0,1}. `main` → `-13501`.
+  Evidence: 50 tests / 332 assertions; browser-host green.
+- west pin provider `9e347a0d` → `8201a4d9` (`668105f3`).
+
+Still open:
+1. T8.3 residual: **nested EDN pack** of request/result records; pure
+   memory-scan one-shot; typed Component world
+2. T8.4 residual: live SCRAM/PG success (scram guest wasm + provider-postgres
+   interop harness)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31ci — T8.3 typed-string http_header_name_ok)
 
 - provider#74 MERGED (`77ea650c`): **T8.3 ADR 0187** — typed-string
