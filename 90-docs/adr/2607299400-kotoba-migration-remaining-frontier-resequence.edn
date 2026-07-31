@@ -1397,6 +1397,20 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31bp — T8.4 pg portal/execute/copy/batch inject)
+
+- kototama#115 MERGED (`c6af111a`): **T8.4** remaining wire imports —
+  query-state, prepare-typed, execute-params{,2}, bind/fetch/close-portal,
+  copy-in/out, execute-batch fail-closed inject. JVM corpus **39 → 49**.
+  Evidence: 26 tests / 573 assertions.
+- west pin kototama → c6af111a.
+
+Still open:
+1. T8.3 residual: compiler-AOT kit body for ops
+2. T8.4 residual: live SCRAM/PG success path (qualification suite only)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
