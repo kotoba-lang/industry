@@ -2818,6 +2818,28 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fo — design-system T5.2: css form-A + document decl + html form-A)
+
+- css main `19274463` (css#5+#6):
+  - **form-A css_core** multi-arg → guest records (`:css/number-value` /
+    `:css/declaration` / `:css/declarations-from` / `:css/rule`); compiler
+    `98b56bdb` (`5cdc74fb`).
+  - **css_document decl** → `:doc/decl` (prop+value). **rule-doc /
+    render-decls stay multi-arg**: `:document` is outside closed guest-record
+    schema profile (compiler schema reject). Evidence: 19 tests / 200 assertions.
+- html main `6788e68b` (html#4): **html_core** multi-arg pure → guest records
+  (`:html/attr` / `style-decl` / `style-from` / `attrs-from` / `void-el` /
+  `el` / `raw-pair`). Compiler pin → `98b56bdb`.
+  Evidence: 22 tests / 86 assertions green.
+- west pin css `4654260a` → `19274463`; html `aa57f273` → `6788e68b`
+
+Still open:
+1. shitsuke tokens/hig multi-arg pure fold (same closed-profile record pattern)
+2. document-plane multi-arg residual blocked on **document-in-record** closed
+   profile (css rule-doc/render-decls; html_document constructors)
+3. T8.3 full multi-export request-edn reject composition; T8.4; murakumo residual
+
+
 ## Progress (2026-08-01fm — T8.3 reject-path edn_quoted Component)
 
 - kotoba-component#103 MERGED (`026ed2f8`): **`:edn-quoted`** Canonical
