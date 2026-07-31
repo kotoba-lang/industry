@@ -2818,6 +2818,23 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-07-31ew — T5.2 plan partition weight+model records)
+
+- murakumo main `eae17fc3`: **infer_plan partition surface** multi-arg pure →
+  `:plan/wm*` records (`ul`/`dense-units`/`wm`/`wm-i`/`wm-range`/`wm-adv`/
+  `wm-u1/2/3`/`wm-asg`/`wm-step`/`band`; partition-target/min2/max2/cut-state via
+  pair/triple). ADR-260731-w6-t52-plan-partition-wm-records.
+  Evidence: plan parity 12/98 + authority green.
+- west pin murakumo `a6ba3ccd` → `eae17fc3`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: digit-scanner multi-arg internals optional; ends-lo/hi residual;
+   W4 recursive values
+
+
 ## Progress (2026-07-31ev — T5.2 LR bump tournament + identifier-len)
 
 - murakumo main `a6ba3ccd`: **plan+rebalance** `better-bump?`/`ok-for`/`pick-bump-3`
