@@ -592,6 +592,82 @@ matrix は紐付いた XMILE モデルを全部再実行し（感度掃引のた
 endpoint にして pane を開いたときに取る。`repos/planes` を切り出して、plane を
 「事業ごとに 1 回」ではなく「request ごとに 1 回」読むようにした。
 
+## セッション終了時の現在地（2026-07-31 closing）
+
+会話履歴なしで再開できるように、**何が default branch に在り、何が検証済みで、何が
+残っているか**をここに固定する。
+
+### default branch に着地済み（すべて main、branch も worktree も残っていない）
+
+`cloud-itonami/cloud-itonami-app`:
+
+| namespace | 面 | 主な不変条件 |
+|---|---|---|
+| `business.clj` | Business entity + Portfolio | 6 面の join key。`binds-only-locally?` が書込面を固定 |
+| `canvas.clj` | Canvas + 成熟度 | fold 済み投影を読む。ledger へ書く route は**存在しない**。着地判定は投影を読み直す |
+| `loops.clj` | Loops | 実 XMILE engine で実行。感度は再実行で測る。未接続の定数を「効果 0」と混ぜない |
+| `repos.clj` | Repos | 未評価の軸に bar を描かない。平均は評価済みのみ |
+| `metrics.clj` | Metrics | 鮮度が先。`:funnel` を統一しない。requests は quality と同じ塊 |
+| `portfolio.clj` | matrix | 無の種類 4 つ + stale を畳まない |
+
+route: `/api/business`（GET/POST）・`/api/business/{id}/bind`・`/canvas`（+ propose /
+withdraw）・`/loops`・`/repos`・`/metrics`・`/api/portfolio/matrix`。
+app 側の記録は `docs/adr/0008-business-is-the-join-of-five-planes.md`。
+
+`com-junkawasaki/root`:
+
+- `70-tools/bmc`: `gftd canvas datoms` / `gftd score datoms`（clj・cljs 両 branch）
+- `90-docs/business/*-canvas.datoms.edn`（12 product）
+- `90-docs/business/maturity-scores.datoms.edn`（181 entity）
+- `90-docs/business/cloud-itonami-saas-funnel.xmile` + ADR-2607310100
+
+### 検証（測った値のみ。推定は書かない）
+
+- app: `clojure -M:test` **804 tests / 3546 assertions, 0 failures 0 errors**
+  （着地 commit `1878f99`、merge `281dadd` 時点）。`clojure -M:lint` errors 0、
+  自作ファイルの warning 0。`page-html` を実 render し inline JS を `node --check`、
+  app CSS に raw hex 0 件。
+- superproject: `nbb 70-tools/bmc/run-tests.cljs` **39 tests / 244 assertions,
+  0 failures**。生成投影が datom 面に load され join が通ることを実クエリで確認。
+- XMILE モデルは保存則（total = 5 + 0.1t）を全 91 step で 1e-9 以内、`loops/model`
+  経由の end-to-end も確認。
+- **closing 時に main で再確認済み**: 他セッションが 2 commit 進めた後の
+  `cloud-itonami-app` main（`1967194`）に対して suite を流し直し、同じく
+  **804 tests / 3546 assertions, 0 failures 0 errors**。つまりこの ADR が
+  「緑」と言っているのは私の着地 commit だけでなく、closing 時点の main である。
+
+### 残っている穴は 1 つだけ
+
+**leverage ledger が今も fleet の repo 登録 backlog を模型化しており、事業の経済では
+ない。** 感度分析（弾力性を再実行で測る）で*迂回*したが、ledger 自体は未着手。
+本当に閉じるには介入ごとの tractability を人が [[0,1]] で採点する必要があり、捏造すれば
+推測値が答えの中心に座る。**owner の判断を要する** — agent が勝手に埋めてはならない。
+
+意図的に閉じていないもの: Business は手で作り手で紐付ける（どの repo / canvas が
+どの事業かは判断であって導出ではない）。誰も作らなければ Portfolio は空のままで、
+それが正しい。
+
+### 再開時の最初のコマンド
+
+```bash
+# 1) 同期
+git fetch origin && git merge --ff-only origin/main
+cd orgs/cloud-itonami/cloud-itonami-app   # ※ 共有 checkout は他セッションの WIP で dirty。
+                                          #   触らず、作業は origin/main から worktree を切る
+# 2) 緑であることを確認（これが再開の基準線）
+node scripts/resource-guard.mjs run build -- clojure -M:test
+# 3) 投影が古ければ superproject 側で再生成
+nbb 70-tools/bmc/bin/gftd.cljs canvas datoms --all
+nbb 70-tools/bmc/bin/gftd.cljs score datoms
+```
+
+### この plane で 3 回起きた欠陥（次の実装者へ）
+
+**欠陥は毎回「2 つの真の間の優先順位」だった。** `cond->` が同じキーに 2 回 `assoc`
+して後が前を静かに上書き（2 回）、`cond` の分岐順が「未紐付け」より「解析不能」を先に
+見せた（1 回）。どれも test が捕まえた。追記は `add-note` のような**名前のある関数**に
+する。習慣で覚えない。
+
 ## Consequences
 
 - **良い**: 4 面が 1 entity で join できる。「この事業は今どこが未計測か」が
