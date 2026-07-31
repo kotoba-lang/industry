@@ -235,4 +235,59 @@ ADR-2607301300 の `:square-1`（幾何テスト全通過で判読不能だっ�
   構造的に無いはずだが、**はず**であって実測ではない。Pages の再ビルド後に
   8 URL を実際に叩くのが残っている。"
 
+  :adr/resume-point
+  "**着地済み（2026-07-31 closing 時点で実測確認）**
+
+- 8 repo（briefing/calendar/contacts/docs/drive/forms/search/sheets）が main に着地し、
+  `https://kotoba-lang.github.io/<repo>/` が 200 で DADS を配信している（dads-button 46 個 /
+  旧テンプレートの `--ink:#17202a` は 0 件）。west pin は 8 件とも repo main と identical。
+- **他セッションが docs/forms/sheets の main を先へ進めたが、この移行は生きている**
+  （それぞれ doc-images / choice-options / insert-rows。`docs/index.html` は触っていない）。
+  pin もそれぞれのセッションが前進済み。
+- `nbb --classpath \"orgs/kotoba-lang/jp-go-digital-design-system/src:orgs/kotoba-lang/html/src:orgs/kotoba-lang/css/src\" scripts/build-kotoba-pages.cljs --check`
+  -> 8 件すべて canonical（手編集による drift 無し）。
+
+**再開の最初の 1 手**
+
+残り 26 repo のうち、**着手コストが最も低いのは pure upload 系の 4 件**
+（`svgraph` / `kotoba` / `kotoba-lang` / `lab`）と `aiueos`。workflow に build step が
+無く `docs/`（`lab` は `.`、`kotoba-lang` は `docs/site`）をそのまま upload するだけなので、
+Stage 1 とまったく同じ『生成して commit』で届く。ただし 5 件とも中身が別物なので、
+`manifest/kotoba-pages.edn` の `:family/edn-editor` には入らない —— **新しい family を
+足す**（生成器は family ごとに view 関数を持てる形にしてある）。
+
+    # 1) 現状把握（この 5 件は今なお移行前）
+    cd orgs/kotoba-lang/design-quality && nbb -m design-quality.cli score \\
+      ../svgraph/docs/index.html ../kotoba/docs/index.html \\
+      ../kotoba-lang/docs/site/index.html ../lab/index.html ../aiueos/docs/index.html
+    # 2) family を足したら必ずこの 2 つを通す（片方だけでは不足 —— 下記参照）
+    nbb --classpath \"<上記 CP>\" scripts/build-kotoba-pages.cljs --check
+    nbb scripts/verify-kotoba-pages.cljs
+
+**次に着手する者へ（この移行で実際に踏んだ罠）**
+
+1. **audit の 100.00 を『ページが正しい』と読まない。** 上流 `.dads-textarea` の
+   inline span 問題は audit 100.00 + 機能 check 10 件を全部通り抜け、**目視でしか
+   出なかった**。新しい family を足したら screenshot を必ず 1 回は目で見る。
+2. **`west.yml` の PUT 前にスナップショットを取り直す。** 作業中に別セッションが
+   別 entry の pin を進めるので、古い snapshot を PUT すると**他人の pin を巻き戻す**。
+   実際に pin-verify hook が 5 件の退行を検出してブロックした（cloud-itonami /
+   loop-yakuwari / org-ietf-dns / xml / yakuwari-view）。取り直して 8 行だけ当て直す。
+3. **registry の内容は旧ページから機械抽出する。手で打ち直さない。**
+4. **dark は自作しない。** light 固定はオーナーの選択（決定 2）。dark が要ると
+   判断が変わったら kotoba-ui へ戻すのが正しい分岐。
+
+**このセッションで触っていないもの（他セッターの資産、保全済み）**
+
+- `orgs/kotoba-lang/drive`: 別セッションの未コミット WIP（`README.md` 変更 +
+  `src/drive/workspace.cljc` / `test/drive/workspace_test.cljc` の未追跡）。
+  `docs/index.html` だけを commit し、他は一切触っていない。関連して
+  `kotoba-lang/drive#8`（DO-NOT-MERGE cleanup PR）が別セッションにより open。
+- superproject working tree: 別セッションの未コミット変更
+  （`90-docs/adr/2607301200…` / `90-docs/business/cloud-itonami-7310…` /
+  `manifest/repo-maturity.edn` / `manifest/west.yml` / `scripts/repo-maturity.cljs`）と
+  未追跡 ADR 2 件、stash 2 件。**すべて温存**。この checkout は origin/main より
+  遅れているが、同期はその WIP の持ち主が行うべきなので触っていない。
+- 別セッションの worktree `/private/tmp/root-refund` は残置（自分のものだけ撤去した）。"
+
   :source/dataset "adr"}]
