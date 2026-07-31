@@ -605,8 +605,10 @@ step 8  curve と share の発行                                               
      :lesson \"同日の前の反復はこれを『どこからも呼ばれていない』と誤報した。原因は grep を head -12 で切ったこと。ADR-2607259800 が『静かに間違った数値を生む欠陥』として記録した World Bank API の無警告 truncate と同型の失敗を、自分の道具で犯した。**出力を切った grep を根拠に「存在しない」と主張しない。**\"}
     {:gap \"advertiser-ops 自身の配線（store/approval-queue）は未確認\"
      :note \"ns docstring が『store/approval-queue の配線は these pure fns の上の thin follow-up』と書いており、pure 層の存在は確認したが approval queue への接続は読んでいない。business-governor が :adnet.campaign/* を委譲されている旨は advertiser_ops.cljc:27 にあるが、tick! の proposal 生成側にキャンペーン kind が載っているかは未確認\"}
-    {:gap \"本 ADR は loop-system-dynamics に namespace を追加していない — 採点は scratchpad\"
-     :note \"採択後に cloud_itonami_vlp_levers.cljs として正式配置する\"}
+    {:gap \"（解消 2026-08-01）採点が scratchpad にしか無かった\"
+     :resolved \"kotoba-lang/loop-system-dynamics の src/loop_system_dynamics/cloud_itonami_vlp_levers.cljs として着地（50ca93b / merge 6323eed）。本 ADR が引用する全スコアはこれで再現可能。実行: nbb --classpath 'src:<dynamics>/src' -e \\\"(require '[loop-system-dynamics.cloud-itonami-vlp-levers :as v]) (v/-main)\\\"\"
+     :why \"11 反復ぶん、ADR の decision 本文が引用する数字がセッション用一時ファイルにしか存在しなかった。再計算できない数字は小数点を付けた主張であって計算ではなく、ADR-2607259800 が終わらせようとした当のもの\"
+     :tests \"8 tests / 102 assertions。honesty 制約を prose でなくテストで持つ: 却下項目は別キーに分離（:ranking を回す呼び出し元が却下を助言と読めない）/ 全体最高スコアが却下項目であることを assert（式は leverage を測り safety を測らない）/ 各スコアが dynamics.core の計算と一致することを assert（局所再実装の drift 防止）/ landed と designed の区別 / 0-event 上限\"}
     {:gap \"（解消 2026-07-31）seller をいくつ作るか\"
      :resolved \"価格 tier ごと（3〜5個）。registry/upsert-seller は seller キーで丸ごと置換するので 1 seller = 1 rule であり『1 seller 多 rule』は存在せず、facilitator/rule->requirements は (:usd rule) を使うので価格は rule 単位。一律価格は製品として不成立、458 seller は承認 458 回と単一 registry 配列の肥大を招くため、両極を採らず tier 分割にする。tier 内の vertical 別収益は :by-path が担う。decision §4c 参照\"}
     {:gap \"kernels/envelope に .kotoba/wasm twin が無い — 他の 5 kernel は全て持っている\"
