@@ -98,14 +98,28 @@ Table / Board / Roadmap は `aria-pressed` を付け替えるだけで再描画�
 
 ### 生成物が checkout の完全性に依存している（この設計が継承してしまう欠陥）
 
-- 出荷済み catalog は `:callable-count 10` だが、ADR-2607300200（accepted）は
-  callable 67 と言っている。
-- 生成器の docstring は「534 が `:company/*` の法人実体」と書くが、west 登録も
-  disk も **185**（`rg -c 'name: cloud-itonami-lei-' manifest/west.yml` = 185、
-  `ls orgs/cloud-itonami | rg -c '^cloud-itonami-lei-'` = 185）。docstring が陳腐化している。
 - catalog は生成時の checkout を反映するので、部分 checkout で生成すると小さい数を
   出荷する。Portfolio view が callable 数や法人数を出すなら、この欠陥をそのまま
   UI に出すことになる。
+- 生成器の docstring は「534 が `:company/*` の法人実体」と書くが、west 登録も
+  disk も **185**（`rg -c 'name: cloud-itonami-lei-' manifest/west.yml` = 185、
+  `ls orgs/cloud-itonami | rg -c '^cloud-itonami-lei-'` = 185）。docstring が陳腐化している。
+- ~~出荷済み catalog は `:callable-count 10` だが ADR-2607300200 は callable 67 と
+  言っている~~ → **解消（2026-07-31、決定 12 の実行）。1,215 actors / 77 callable。**
+  経緯は下記「決定 12」。
+
+**この欠陥の実体は「lag が 2 層ある」ことだった**（2026-07-31 実測）。catalog が
+読むのは working tree で、そこには独立した 2 つの遅れが積む:
+
+1. **checkout が pin より遅れる** — cloud-itonami 1,710 entry のうち 134 が pin と
+   不一致、243 は未 clone だった。
+2. **pin が upstream default branch より遅れる** — `:endpoint` を持つ commit が
+   pin に入っていない。31 entry がこれ。
+
+**`west update` は 1 層目しか直さない。** pin に checkout を合わせるだけで、pin
+自体は動かさない（CLAUDE.md が明記しているとおり）。両方を直して初めて生成物が
+fleet の現在地に一致する。これは Portfolio view が出す全ての数（callable 数・法人数・
+maturity）に同じ形で効くので、view を作る前にこの 2 層を分けて測る。
 
 ### この ADR の初版が間違っていた点（同日訂正）
 
@@ -247,11 +261,41 @@ app ADR-0001（jp-go-digital-design-system 採用）を踏襲し、`dds/*` +
 3. Loops view（XMILE 実行、未計測は穴）
 4. Repos / Metrics view
 
-### 12. Phase 1 の前に catalog を再生成する
+### 12. Phase 1 の前に catalog を再生成する — 実行済み（2026-07-31）
 
-`:callable-count 10` と ADR-2607300200 の callable 67 の齟齬を先に潰す
-（`nbb scripts/gen-itonami-fleet-catalog.cljs`）。UI が古い生成物を権威として
-出さないため。
+`:callable-count 10` と ADR-2607300200 の callable 67 の齟齬を潰した。UI が古い
+生成物を権威として出さないため。
+
+**catalog: 1,213 → 1,215 actors、10 → 77 callable**（`itonami-fleet-dispatch`
+経由の 67 + 自前 address を持つ既存 10）。cloud-itonami-app `5d023ad`。
+`clojure -M:test` 781 tests / 3442 assertions, 0 failures 0 errors。
+
+そこに至るのに必要だった前提（上記「lag が 2 層ある」）:
+
+- `west update` で 1,710 entry 中 1,706 を pin に到達させた（134 stale → 4、
+  243 未 clone → 0）。
+- **31 の iso3166 pin を前進**（`gen-west-manifest.cljs --entry`。31 件すべて
+  compare API で `status:ahead` / `behind_by:0` / `merge_base == 旧 pin` を
+  事前確認し、生成時の `verify-west-pins` でも再検証）。west.yml `3f6a3e6`。
+- **壊れて解決不能だった pin を 2 件修復**（これが `west update` を恒久的に
+  失敗させていた）:
+  - `cloud-itonami-isic-6810` — pin `bfa2d61b14241f…` に対し実在は
+    `bfa2d61b14241b…`。**13 文字目 1 文字だけ違う**。stale ではなく破損で、
+    fetch では絶対に直らない。
+  - `lawyer` — pin `7c76d0a2…` が上流に存在せず、checkout は
+    `refs/heads/init_placeholder` の unborn HEAD だった。
+- **数を blueprint の自己申告で信じない。** dispatch endpoint 8 件を live で叩き、
+  全て 200 `ok:true` を確認した上で 77 を出荷している。
+
+**west.yml は全再生成せず Contents API の single-entry commit で書いた。** 全再生成は
+`cloud-itonami-app` の pin を **177 commits 巻き戻す**（共有 checkout が別セッションの
+未コミット作業で古い HEAD に留まっているため）。CLAUDE.md の「pin 退行の罠」が
+実際に発火する条件が揃っていた事例。
+
+**残った 2 件は本 ADR の範囲外の既存 gap**: `cloud-itonami-app` の共有 checkout は
+dirty（他セッターの WIP）で west が正しく skip、`cloud-itonami-isco-5153` は同期済み。
+`oteint` は actor blueprint でも company record でもなく generator が skip している
+（WARNING として出力される。黙って落としてはいない）。
 
 ## Phase 1 — 着地したもの（2026-07-30）
 
