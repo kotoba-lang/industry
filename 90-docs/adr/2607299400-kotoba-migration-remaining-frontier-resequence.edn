@@ -97,7 +97,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
 | T8.3 | network/secret の **production AOT Component** | **partial** — pure-allowlist (0161); **all ops kits** http/secret/entropy/process/scoped-fs/git Components + signed-wasm ready (0165–0170); compiler-AOT kit body still open |
-| T8.4 | host-parity L5 | **partial** — JVM 36 + Node 16 live (#96–#113; pg wire open/query/simple-query); SCRAM/PG success + remaining wire still open |
+| T8.4 | host-parity L5 | **partial** — JVM 39 + Node 16 live (#96–#114; pg prepare/session/close-stmt); SCRAM/PG success + portal/copy still open |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
 | T7.1 | true tail call | 部分（desugar された `loop` は zero-charge。**任意の相互再帰 TCO は open**） |
@@ -1379,6 +1379,21 @@ Still open:
 1. T8.3 residual: compiler-AOT kit body for ops
 2. T8.4 residual: live SCRAM/PG success (qualification suite);
    pg component-link beyond pool
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+## Progress (2026-07-31bn — T8.4 pg prepare/session-reset/close-statement inject)
+
+- kototama#114 MERGED (`0c462f5e`): **T8.4 pg wire expand** — `:pg-prepare` /
+  `:pg-session-reset` / `:pg-close-statement` fail-closed inject via
+  postgresql-wire-provider. JVM corpus **36 → 39** (Node 16). Evidence: 26
+  tests / 473 assertions.
+- west pin kototama 41006fe2 → 0c462f5e.
+
+Still open:
+1. T8.3 residual: compiler-AOT kit body for ops (all ops Components landed)
+2. T8.4 residual: live SCRAM/PG success (qualification suite);
+   remaining wire (portal/copy/scram-open)
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
