@@ -2818,6 +2818,26 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-07-31es — T5.2 plan multi-arg residual)
+
+- murakumo main `5de04485`: **infer plan residual multi-arg pure** → guest records —
+  `plan-lr-record`/`plan-lr-l0/1/2` → `:plan/weights3`,
+  `plan-fits-total?`/`span-fits?`/`assignment-span`/`fits-and`/`layers-range-str`/
+  `pick-max-idx-2` → `:plan/pair`,
+  `pick-max-idx-3` → `:plan/triple`.
+  ADR-260731-w6-t52-plan-multi-arg-records.
+  Evidence: plan parity + authority 82/1518 green.
+- west pin murakumo `c5ab005d` → `5de04485`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: digit-scanner multi-arg internals optional; plan-fits-1/2/3 +
+   schedule assign-step-2 still multi-arg; reconciler tournament helpers;
+   W4 recursive values
+
+
 ## Progress (2026-07-31er — T5.2 task tournament residual)
 
 - murakumo main `c5ab005d`: **task tournament multi-arg pure** → guest records —
