@@ -2836,6 +2836,27 @@ Still open:
 3. murakumo residual; other W4 work
 
 
+## Progress (2026-08-01gq — T8.3 kit request set-record + secret reply EDN)
+
+- provider#119 MERGED (`397568ad`): **ADR 0231** pure `http-request-set-record`
+  — kit-shaped `:headers [:set [:ref header]]` + parallel name-set uniqueness;
+  fixed-depth EDN skeleton with headers-n; `main` → **-9002**. Package sha
+  `59a182cc…`. Evidence: **83 tests / 797 assertions** green.
+- provider#120 MERGED (`1cb7c20e`): **ADR 0232** fixed-depth secret reply EDN
+  (`secret_reply_value_edn` / `secret_reply_error_edn`); dual scan; `main` →
+  **-2302**. Package sha `5b7be773…`. Evidence: **84 tests / 805 assertions**
+  green; KIR main → -2302.
+- west pin: provider → `1cb7c20e`
+- Honesty: fixed-depth / bounded sets only; does **not** flip `:wasm-aot
+  :implemented` (W4 recursive nested EDN + typed-set fold/seq still open).
+
+Still open:
+1. T8.3 residual: W4 recursive nested EDN; typed-set fold for full headers EDN;
+   only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
+
+
 ## Progress (2026-08-01gp — T8.3 linked monomorph synthetics + multi-level peel)
 
 - compiler#466 MERGED (`20f21046`): **ADR 0193** — multi-file monomorph second
@@ -2850,7 +2871,8 @@ Still open:
   open). Complements Progress go multi-ns reject package (ADR 0230).
 
 Still open:
-1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+1. T8.3 residual: kit request set-record + secret reply EDN (→ Progress gq);
+   W4 recursive nested EDN; only then `:wasm-aot :implemented`
 2. T8.4 residual (optional L5 / real Node sockets)
 3. murakumo residual; other W4 work
 
