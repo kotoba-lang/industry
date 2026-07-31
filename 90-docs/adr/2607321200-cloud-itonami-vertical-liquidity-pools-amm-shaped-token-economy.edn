@@ -20,7 +20,8 @@
    "**cloud-itonami の資金統治は murakumo の資金統治とは別物である**という区別。cloud-itonami は kekkai を使わない（`orgs/cloud-itonami/` 全 1155 repo で使用 0 件）。正しい substrate は `cloud.itonami.app.authority`（proposal→consent→commit の4不変条件）+ `cloud.itonami.app.funding`（残高 attest）+ `authority.payment`（決定論的 funds gate）"
    "agent が運用する原資の同意単位は payment ではなく **envelope**（上限・期間・費目）である。ただし authority.clj の4不変条件のうち CONTENT BINDING と SINGLE USE は envelope 化で必ず作り直しが要る"
    "θ(v)（pooled capital のうち agent が焼いてよい割合）は実現収益の関数であり定数ではない。seed floor は実測済みの GTM 実験1回分で建てる"
-   "この設計は ADR-2607320500 の custody 回避決定を反転させる要求である、という認識。両立しないものを両立するかのように書かない"]
+   "この設計は ADR-2607320500 の custody 回避決定を反転させる要求である、という認識。両立しないものを両立するかのように書かない"
+   "**S(v)（vertical share）と ADR-2607299900 の TOKEN は別々の instrument であり、収益源は交わらない。VLP は TOKEN を必要とせず、両者の採否は独立に判断できる**（§5b）"]
 
   :adr/supersedes []
   :adr/superseded_by []
@@ -446,6 +447,50 @@ gross
 | $10,000 | 20%/yr | 0.2 | $10,000/yr | 20.8 席 |
 
 **1 vertical あたり有償 2 席で $1,000 の LP が 20% で回る。** 一方 fleet 全体では 458 × $1,000 = $458,000 の調達に対し年 $458,000 の gross が要り、今日の実測 $513.09/yr に対し **893 倍**の隔たり。**vertical 単位では手が届き、fleet 全体では venture 規模の賭けである。**
+
+### 5b. S(v) と TOKEN の関係 — **VLP は TOKEN を必要としない**
+
+ADR-2607299900（accepted）は準圏に tradeable TOKEN を置くことを許可し、sink を3つ
+定めた（x402 の TOKEN 払い割引 + 受領分 burn / witness bond / treasury release の
+stake 加重）。**本 ADR の初版はその TOKEN に一度も言及していなかった** —— オーナーの
+問いが「トークンエコノミー」だったのに、S(v) と TOKEN の関係が空白だった。埋める。
+
+**結論: 2つは別々の instrument であり、収益源は交わらない。VLP 側から TOKEN は要らない。**
+
+**(1) 同じ1ドルを取り合わせない。** ADR-2607319000 の実測がこの判断を既に済ませている
+—— Uniswap の fees $850M/yr のうち保有者に届くのは 3.3%（V4 は 0%）で、残りは供給側
+（LP）に行く。同 ADR の一般則は「**供給者に払うと決めた時点で、token は残余請求権では
+ないと決めている**」。S(v) が vertical の収益を取るなら、**TOKEN はそこから何も取らない**。
+これは欠陥ではなく、既に下された選択の帰結である。
+
+**(2) S(v) は USDC 建てにする。TOKEN 建てにしない。** 理由は3つとも実務的である:
+
+- **θ の収益入力が信念で汚染される。** §4b の決定（不明なら refuse、過大読みは
+  稼いでいない burn を資金供給する）は、収益が実額であることを前提にしている。
+  TOKEN 建てにすると、実現収益が TOKEN 価格の関数になり、**流量ゼロの段階では
+  純粋な信念**である。自分で置いた規則を裏口から壊すことになる。
+- **x402 rail は USDC で決済する**（実測: murakumo / kotobase の `.well-known/x402`
+  はいずれも `asset: USDC`）。建値を変えると rail と pool の間に為替が挟まる。
+- **LP に二重のリスクを負わせる。** vertical の venture リスクは既に全損しうる（§一行）。
+  そこに TOKEN 価格リスクを重ねても、**得られる機能は1つも増えない**。
+
+**(3) 却下: TOKEN を curation / gauge 層にする（veCRV 型）。** 458 vertical で
+permissionless listing を開けば curation は確かに希少財になるので、一見もっともらしい。
+**しかし本 ADR は既に objective な品質 oracle を持っている** —— `attribution-replay-slashing`
+（決定台帳の決定論的 replay）である。stake 加重の curation はそれを、**主観的で
+capture 可能な機構で二重化する**。ADR-2607995000 の slashing 原則は「決定論的に証明
+できる不正のみ、異議申立て機構不要」と定めており、投票より決定論的証明を選んでいる。
+同じ理由で curation も投票に寄せない。
+
+**(4) 2つが実際に触れる唯一の場所** は既存の膜規則にある: `TOKEN → credits`（一方向 mint、
+ADR-2607299900 で追加済み）。TOKEN 保有者は credits に変換でき、credits は vertical の
+agent run を買える。**つまり TOKEN は vertical の需要を資金供給できるが、vertical に対する
+請求権にはならない。** この非対称は既に書かれていて、本 ADR は何も追加しない。
+
+> **したがって VLP の採否と TOKEN 発行の採否は独立に判断できる。** 片方をもう片方の
+> 人質にしない。TOKEN を出さなくても VLP は成立し（S(v) は USDC 建て）、VLP を作らなくても
+> TOKEN は3つの sink で成立する。**2つを1つの決定として扱うと、法務で止まっている側が
+> 止まっていない側を止める。**
 
 ### 6. 計算されたランキング（`dynamics.core/rank-interventions`）
 
