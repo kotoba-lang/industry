@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — Components (0165–0170); pure bounds/gates/walks 0171–0179 (incl. typed-string single-call 0178 + multi-step walk 0179); full request/result EDN codec AOT still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — Components (0165–0170); pure/typed policy AOT 0171–0180 (secret+fs length/gates/walk/typed-string); full request/result EDN codec AOT still open |
 | T8.4 | host-parity L5 | **partial** — JVM 54 + Node 16 live (#96–#118 inject; #355 matrix inject status); wire+SCRAM+pool fail-closed complete; live SCRAM/PG success still qualification |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -1604,6 +1604,23 @@ Still open:
    single-call path; pure memory-scan one-shot without host walk
 2. T8.4 residual: live SCRAM/PG success (qualification; PG up, harness in
    provider-postgres)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
+
+## Progress (2026-07-31cb — T8.3 typed-string scoped-fs path single-call)
+
+- provider#67 MERGED (`25b97e4c`): **T8.3 ADR 0180** — typed-string
+  single-call `fs_path_ok(:string)` via kotoba:typed host (mirror secret
+  0178). Codes empty/oversize/NUL/backslash/abs/home/dotdot; `main` live
+  vector `-15470`. Not pure Component. Evidence: 28 tests / 199 assertions;
+  browser-host main green.
+- west pin provider 40c69d0f → 25b97e4c.
+
+Still open:
+1. T8.3 residual: full request/result EDN codec AOT; pure memory-scan
+   one-shot without host/typed walk; production typed Component world
+2. T8.4 residual: live SCRAM/PG success (qualification; PG may be down)
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
