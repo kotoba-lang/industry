@@ -1517,6 +1517,24 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+
+## Progress (2026-07-31bw — T8.3 compiler-AOT secret/fs value-length)
+
+- provider#62 MERGED (`a1233dc2`): **T8.3 ADR 0175** — pure
+  `secret_value_len_ok` (secret-bytes 8192) + `fs_value_len_ok` (value-bytes
+  65536) via kotoba-compiler + Components. Completes length halves with
+  ADR 0173 name-len and 0174 path-len. Char/escape scan still hand WAT.
+  `:wasm-aot` stays `:partial`. Evidence: ops-kit-packages-test green
+  (18 tests / 143 assertions on suite).
+- west pin provider aa82545b → a1233dc2.
+
+Still open:
+1. T8.3 residual: full request/result EDN codec AOT; char/path-scan re-emit
+   needs typed-string host packaging (not pure i64 Component)
+2. T8.4 residual: live SCRAM/PG success (qualification suite)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
