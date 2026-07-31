@@ -2818,6 +2818,22 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01fc — T5.2 pool-demand-record residual)
+
+- murakumo main `6f2d271b`: **pool-demand-record** multi-arg pure →
+  `:rebalance/demand` input. `seats-record` stays multi-scalar (compiler
+  lowering budget exhausted when folded). ADR-260801-w6-t52-seats-pool-demand-records.
+  Evidence: rebalance parity 10/91 + authority 70/1420 green.
+- west pin murakumo `f63c5bb8` → `6f2d271b`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2: seats-record max-arity-5 budget hold; intentional field constructors;
+   W4 recursive values
+
+
 ## Progress (2026-08-01fb — T5.2 rem64 residual → pair records)
 
 - murakumo main `f63c5bb8`: **rem64** internal multi-arg pure → existing pair
