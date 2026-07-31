@@ -609,6 +609,10 @@ step 8  curve と share の発行                                               
      :note \"採択後に cloud_itonami_vlp_levers.cljs として正式配置する\"}
     {:gap \"（解消 2026-07-31）seller をいくつ作るか\"
      :resolved \"価格 tier ごと（3〜5個）。registry/upsert-seller は seller キーで丸ごと置換するので 1 seller = 1 rule であり『1 seller 多 rule』は存在せず、facilitator/rule->requirements は (:usd rule) を使うので価格は rule 単位。一律価格は製品として不成立、458 seller は承認 458 回と単一 registry 配列の肥大を招くため、両極を採らず tier 分割にする。tier 内の vertical 別収益は :by-path が担う。decision §4c 参照\"}
+    {:gap \"kernels/envelope に .kotoba/wasm twin が無い — 他の 5 kernel は全て持っている\"
+     :cost \"完全な twin は4点セットを要する: (1) 手書きの .kotoba-bundle（baked-in case の main battery 付き）(2) scripts/split-kotoba-kernels.bb で生成する *_part_NN.kotoba (3) checked-in の wasm/kernels/*.wasm (4) kernels/wasm-host-test.cljs への登録（Node の WebAssembly.instantiate で main() を呼び .cljc の battery-pass-count と一致を assert）。この parity 検査こそが『同じ判断が wasm で走る』を検証済みの主張にしている\"
+     :blocker \"splitter が scripts/split-kotoba-kernels.bb であり、ADR-2607173000 が bb を script host として退役させている。着手前に nbb 移植か既存例外扱いかの判断が要る（x402 kind の allowlist 拡張が `bb emit-kernel-wasm` を要するのと同じ問題）\"
+     :note \"battery と parity 検査を伴わない手書き bundle は追加しない。支出上限の未検証な第二実装は、実装が1つだけの状態より悪い —— wasm 経路が担保されていると呼び出し元に誤認させる。2026-08-01 に envelope.cljc の docstring へ同趣旨を明記した\"}
     {:gap \"tier 構成は settlements KV の欠損リスクを悪化させる\"
      :impact \"settlement が少数 key に集中するので、CAS 無し read-modify-write の last-write-wins が当たる確率が上がる。LP 配当を出すなら DO 直列化は必須の前提条件になる\"}
     {:gap \"どの vertical をどの tier に置くかの基準が無い\"
