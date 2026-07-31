@@ -29,7 +29,7 @@
   :adr/known-gaps ["producer は環境変数に URL があることを到達可能性とみなす。到達しない URL は served leg として報告される。murakumo task plane 上では node の :requires gate が capability を担保するが、実 probe への置き換えは未実施。"
                    "episode 1-10 は shotlist が無いため catalog に載っていない。ep01 は既に motion-comic と panel が存在するので、過去分をどう扱うか(遡及登録するか、済として扱うか)は未決定。"
                    "producer は :legs を報告するだけで、実際のレンダリングは行っていない。backend が配線された時に :murakumo leg が本当に画を出すかは未検証。"
-                   "ghosthacker の catalog は 6 話。arc0-1-origin は 257 パネル中 255 が生成済みで、残り 2 コマだけのために 1 話まるごと admit される。既生成分を尊重する差分生産は未実装。"
+                   "レンダリングは ghosthacker のみ実装。shiropico の producer はまだ leg を報告するだけで、実生成は未配線。"
                    "loop-ka-production 自体の常駐(誰が cron/tick を打つか)は本 ADR の範囲外。既存 4 channel と同じ状態のまま。"],
   :adr/body
   "## Context
@@ -219,6 +219,68 @@ content repo を同期する前は同じ channel が `catalog-unreadable` を返
   状態のまま。本 ADR はそこを変えていない。
 - gftdcojp には何も作っていない。オーナーが gftd 所有を望む場合、動かす対象は
   loop ではなく producer / content 側になる。
+
+## 画像 backend は murakumo.cloud に無い(2026-07-31 追記)
+
+オーナーの問い「image backend は murakumo.cloud にないかな」に対する実測:
+
+| 対象 | 結果 |
+|---|---|
+| `murakumo.cloud/api/v1/*` | text 推論のみ(`/chat/completions` `/responses` `/messages`)。**images 面は無い**。401 は `/api/v1/*` 全体の認証ゲートであって images ルートの存在を意味しない |
+| fleet head node `gad` :8188 | **ComfyUI 0.22.0 稼働中**。checkpoint 7 件(Illustrious-XL / animagine-xl / noobai-XL 等、いずれも SDXL アニメ系でタグ形式 prompt と噛み合う) |
+| 同 :8189 (`comfy-openai-bridge`) | **落ちている** |
+
+`kotoba-lang/comfyui` の `comfyui.gateway` は OpenAI-images 形式で喋るので、
+実 ComfyUI の前に `comfy-openai-bridge` を要求する。**その翻訳中間層だけが
+落ちていて、ComfyUI 本体は動いていた** — 静かに落ちる中間層は
+loop-ka-production が存在する理由そのものなので、オーナー判断(選択肢 B)により
+**ネイティブ protocol を直接喋る**ことにした。
+
+```
+POST /prompt  {prompt: <node graph>, client_id} -> {prompt_id}
+GET  /history/{id}                              -> outputs
+GET  /view?filename&subfolder&type              -> bytes
+```
+
+### leg は結果から作る
+
+旧版は **環境変数が設定されているか**から leg を決めていた。これは work では
+なく configuration についての主張で、**誰も listen していない URL に対して
+served leg を報告する**。現在は render 結果から作る:
+
+| panel | leg |
+|---|---|
+| この run が描いた | `:comfy` |
+| 既に画像がある | `:comfy`(flat card ではない。ただしこの run が描いたという主張ではない) |
+| 失敗 / 未着手 | `:placeholder` |
+
+内訳は `:panels-rendered` / `:panels-already` / `:panels-failed` /
+`:panels-skipped` として leg の横に出す。
+
+既生成パネルは `--force` 無しでは skip する — これで前版の known-gap
+(arc0-1-origin の残り 2 コマのために 257 枚描き直す)は閉じた。
+
+### データが決めない選択は default-config に明示する
+
+checkpoint(`Illustrious-XL-v2.0`)・832×1216・steps 28 / cfg 5.0 ・
+`euler_ancestral`/`karras`。**`:gh/sdxlModel` は全パネル `\"gpt-4o-mini\"` で、
+これは prompt を書いた LLM であって画像モデルではない** — checkpoint 名に使うと
+サーバ側 enum エラーになる。test で固定した。
+
+### 実測(4 経路すべて実行)
+
+| 経路 | 結果 |
+|---|---|
+| COMFY_URL 無し | 72 `:placeholder` / skipped 72 |
+| :8189(落ちている)を指定 | 72 `:placeholder` / skipped 72 (**設定済み ≠ 到達可能**) |
+| `--dry-run` arc0-1-origin | 255 `:comfy` / 2 `:placeholder`、already 255 |
+| `--limit 3` cschool-defamation | 3 `:comfy` / 69 `:placeholder`、実 PNG 3 枚 832×1216 各 1MB 前後 |
+
+**craft についての正直な注記**: 最初の 1 枚は prompt への追従が緩かった
+(タグは `students`(複数)・`casual attire` だが、出力は制服の 1 人)。
+prompt 追従と画風は `loop-*` の `:must-not :own-domain-scoring-truth` により
+このループが採点するものではないが、「PNG が出た」を「正しいコマが出た」と
+読まれないよう記録する。
 
 ## Alternatives considered
 
