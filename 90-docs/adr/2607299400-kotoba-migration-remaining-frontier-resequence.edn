@@ -1193,6 +1193,22 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31bd — T8.3 ops secret real-bytes pilot)
+
+- provider#47 MERGED (`cbbaeba7`): **T8.3 ADR 0163** — ops secret real
+  non-fixture Wasm package pilot (`secret-get-v1.wasm` pure name policy;
+  no ambient read). Kit `:wasm-aot :partial`; readiness `:signed-wasm :pending`.
+  Evidence: 66 tests / 404 assertions.
+- west pin provider eeab5058 → cbbaeba7.
+
+Still open:
+1. T8.3 residual: full AOT Component packaging for http/secret; ops publisher
+   policy before `:signed-wasm :ready`
+2. T8.4 residual: live SCRAM/PG success (qualification suite);
+   pg component-link beyond pool
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
