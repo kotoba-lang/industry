@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject (0214–0222); true-set pure/wasm32 (0223–0224) + names-add Component (0225–0226) + **map-element-bound append (0227)**; W4 recursive nested EDN / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — ops typed-string complete (0199–0208); EDN reject (0214–0222); true-set (0223–0227); **multi-file Component CLI first slice (compiler ADR 0192 / provider 0228)**; W4 recursive nested EDN / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2818,6 +2818,25 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+## Progress (2026-08-01gm — T8.3 multi-file project Component CLI first slice)
+
+- compiler#465 MERGED (`b94cad96`): **ADR 0192** — `--target component
+  --source-path` links closed multi-file graph → `compile-component`.
+  `compile-project` routes component targets. Live wasmtime multi-file
+  `main()→42`. Evidence: **776 tests / 6254 assertions** green.
+- provider#117 MERGED (`a413b94b`): **ADR 0228** kit-readiness honesty —
+  multi-file CLI gate closed; residual is W4 recursive nested EDN ADT only.
+  Evidence: **81 tests / 768 assertions** green (docs-only).
+- west pins: compiler → `b94cad96`; provider → `a413b94b`
+- Honesty: does **not** flip `:wasm-aot :implemented` (W4 recursive nested
+  EDN open). Does not split real HTTP reject kit into multi-ns yet.
+
+Still open:
+1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
+
+
 ## Progress (2026-08-01gl — T8.3 kit-readiness honesty after 0227)
 
 - provider#116 MERGED (`d96b930`): kit-readiness HTTP summary + note refresh —
@@ -2829,7 +2848,7 @@ Still open:
 - Honesty: docs-only; does **not** flip `:wasm-aot :implemented`.
 
 Still open:
-1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+1. T8.3 residual: multi-file Component CLI (→ Progress gm); W4 recursive nested EDN; only then `:wasm-aot :implemented`
 2. T8.4 residual (optional L5 / real Node sockets)
 3. murakumo residual; other W4 work
 
