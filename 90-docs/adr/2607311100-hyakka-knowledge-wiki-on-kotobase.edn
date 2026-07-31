@@ -35,14 +35,19 @@
    "D6: 第一コーパスはゲーム攻略（複数タイトル）。第二コーパスでスキーマがゲーム形に歪んでいないことを検証してから拡大する"
    "D7: 拡大の前に 10M / 100M datom の実測 receipt を要求する。満たさない場合の応答は materialized view であって ref の分割ではない"
    "D8: archive の実体バイトは既定で非公開。公開するのは citation metadata と snippet のみで、全文の公開配信は source license 単位の opt-in"
-   "D9: 網羅性を主張しない。coverage は data として持ち、サイト上でも未収録を未収録として表示する"]
+   "D9: 網羅性を主張しない。coverage は data として持ち、サイト上でも未収録を未収録として表示する"
+   "D10: multi-entity join は live 未実証（本番クエリは全て単一 entity scan）。P1 の最初の作業として実証し、倒れたら edge-side join に落とす。ref 分割はこの fallback に含めない"]
 
   :adr/artifact
-  ["（P1 で追記）network-awai/app-hyakka 初期 commit"
-   "（P1 で追記）kotobase.net テナント DID / graph CID"]
+  ["network-awai/app-hyakka e40bd60 (17 tests / 235 assertions, JVM Clojure + ClojureScript 双方 0-fail)"
+   "network-awai/net-kotobase b8ffb5b (docs/adr/260718 に wiki.kotobase.net の委譲を記録)"
+   "（P1 で追記）kotobase.net テナント DID / graph CID"
+   "（P1 で追記）two-hop join probe の結果"]
 
   :adr/verify
   ["cd orgs/network-awai/app-hyakka && npm test"
+   "cd orgs/network-awai/app-hyakka && clojure -M:test   ; cljc portability"
+   "cd orgs/network-awai/app-hyakka && HYAKKA_SEED=<kagi> npm run probe   ; P1 join gate"
    "cacao.conformance を wiki.kotobase.net の deploy に対して実行し 0-fail"
    "curl -s https://wiki.kotobase.net/health | jq -e '.ok == true'"]
 
@@ -201,11 +206,43 @@ coverage は data として持ち（どのコーパスのどの範囲をいつ�
 | | 内容 | 完了条件 |
 |---|---|---|
 | P0 | 本 ADR + net-kotobase への委譲追記 + repo 起こし | ADR accepted / repo 登録（west orphan audit exit 0） |
-| P1 | schema 投入 → kotobase.net テナント（seed は kagi）→ wiki.kotobase.net 疎通 | 50 facts / 3 クエリ / 1 pin（kotobase 自身の activation 定義）+ cacao.conformance 0-fail |
+| P1 | schema 投入 → kotobase.net テナント（seed は kagi）→ wiki.kotobase.net 疎通 → **multi-entity join の実証（下記）** | 50 facts / 3 クエリ / 1 pin（kotobase 自身の activation 定義）+ cacao.conformance 0-fail + two-hop join が実データで行を返す |
 | P2 | 読み取り面: item ページ・claim 表（出典付き）・グラフ由来の自動一覧・日本語検索（ASCII 語 + CJK bigram）・head CID キーの edge cache | 1 ページ 1 クエリ / cache hit p95 < 100ms |
 | P3 | 薄い admin: Passkey → CACAO、編集・rank 変更・差し戻し、DO 直列化 | owner と actor の同時書き込みで lost update ゼロ（実測） |
 | P4 | ingest: ゲーム攻略 adapter + 共通 Governor（出典必須・重複排除・confidence）、archive 保存（CID → :source/archived-cid） | 出典なし assert を実際に reject する fixture |
 | P5 | 公開 + 第二コーパスでスキーマ検証 → D7 gate の receipt | 公開 / 2 本目が属性追加のみで載る |
+
+# P1 で最初に潰す未検証点 — multi-entity join
+
+**この設計の中心（D2 の two-hop join）は、live の engine に対して未実証である。**
+コードベースを実際に確認した結果（2026-07-31）:
+
+- kotobase.net で本番稼働している `:find`/`:where` クエリは **すべて単一 entity の scan**
+  である。`web.search`・`geo.search`・`mail.list` のいずれも全 clause が同じ `?e` に
+  束縛されており、**異なる entity 変数を跨ぐ join の実例が 1 つも無い**。
+- `clj-edge/src/kotobase/merkle.cljc` には「kotobase の `:datoms` route が信頼できる
+  読み経路であり、`:find`/`:where` は現在空の行を返す」という注記が残っている
+  （ADR-2607101100 参照）。map 形式 `query_edn` が Datalog engine に届いていなかった
+  バグ自体は kotobase-server#1 で 2026-07-08 に修正され、単一 entity scan は現に動いて
+  いるが、**join が動く証拠にはならない**。
+
+したがって P1 の最初の作業は、小さな fixture を transact して
+`hyakka.query/two-hop` を live に投げ、実際に行が返ることを確認することとする
+（実装済み: `npm run probe`。単一 entity の control を 2 本先に走らせ、空振りが
+「join 非対応」なのか「書き込み失敗」なのかを切り分ける — 切り分けられない空振りが、
+2 日で 5 障害を全部同じ症状に見せた原因だった）。これを P2 の実装より前に置く理由は、
+ここが倒れると設計の前提が変わるからである。
+
+**倒れた場合の fallback（先に決めておく）**: join を engine でなく edge で行う。
+単一 entity scan を 2 回（`?c1` 側と `?c2` 側）投げ、Worker 側で `?mid` を突き合わせる。
+`web.search` が既に採っている「engine は data pattern、計算は edge」の分業と同型であり、
+実現可能性は高い。ただし代償を明示する: (1) 1 ページ 1 クエリが 1 ページ 2 クエリになり、
+実測 read 床 ~400ms が二重に効く (2) candidate cap が join の前に掛かるので、cap を
+超えた先の組み合わせは**取りこぼす**（=「この build に要る素材を落とすボス」が
+不完全になりうる）。この取りこぼしは UI 上で cap 到達として表示する（D9 と同じ理由で、
+黙って部分結果を全体のように見せない）。
+
+**ref を分割する案は、この fallback の選択肢に含めない**（D7 と同じ理由）。
 
 # Non-goals
 
