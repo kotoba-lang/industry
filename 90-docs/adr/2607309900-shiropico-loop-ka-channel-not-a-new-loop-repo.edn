@@ -30,7 +30,7 @@
                    "episode 1-10 は shotlist が無いため catalog に載っていない。ep01 は既に motion-comic と panel が存在するので、過去分をどう扱うか(遡及登録するか、済として扱うか)は未決定。"
                    "producer は :legs を報告するだけで、実際のレンダリングは行っていない。backend が配線された時に :murakumo leg が本当に画を出すかは未検証。"
                    "shiropico の voice leg は全て :silent。TTS が未配線(murakumo の :tts は :via :proc で HTTP endpoint が無く、fleet head node で応答するものが無かった)。よって shiropico の run は常に :degraded で hold される。"
-                   "loop-ka-production 自体の常駐(誰が cron/tick を打つか)は本 ADR の範囲外。既存 4 channel と同じ状態のまま。"],
+                   "tick は plan までで、batch の実行(GPU 消費)はしない。自律生産にはなっていない。"],
   :adr/body
   "## Context
 
@@ -342,6 +342,41 @@ massive geothermal power plant on a black lava plateau at near-arctic dawn,
 (ghosthacker の panel はその形)、タグ化するか prose を扱える checkpoint を選ぶかは
 未決の craft 課題。`loop-*` の `:must-not :own-domain-scoring-truth` により
 このループが決めることではない。
+
+## loop を常駐させた(2026-07-31)
+
+「TTS を探すか、prose→タグ変換か、loop の定期起動か」から **定期起動**を選んだ。
+元の指示は「worker として常駐化」であり、他の 2 つは**一度も起動しないループの
+上の磨き込み**だから。
+
+workspace の既存パターン(`~/.gftd/run-*-tick.cljs` + launchd LaunchAgent、
+9 スクリプト / 8 エージェントが稼働中)に合わせた。`loop-innen`
+(`com.kotoba-lang.innen-tick`)が loop-* repo の先例なのでそれを手本にした。
+
+- `~/.gftd/run-loop-ka-tick.cljs`
+- `~/Library/LaunchAgents/com.kotoba-lang.loop-ka-tick.plist`(毎日 03:10、
+  `RunAtLoad false`)
+
+### tick は plan まで。batch の実行はしない
+
+これが本決定の要点。`observe` と `plan` は安価で副作用が無いが、batch を実行すると
+**due な全エピソードが murakumo の単一共有 GPU 上でレンダリングされる**
+(ghosthacker 1 話で 257 パネル)。**cadence を on にすることが、暗黙に GPU 支出を
+on にしてはならない。** tick は tasks.edn を書き、置くためのコマンドを印字して
+終わる。
+
+plist は **`COMFY_URL` を意図的に設定していない**。よって launchd 環境の producer は
+到達可能な backend を持たず、leg は `:placeholder`、verdict は `:degraded`、
+hold される。これは正しい結末であって回避すべき不具合ではない。
+
+**つまり今日入ったのは「cadence の常駐」であって「自律生産」ではない。**
+ログを読む人がどちらを見ているか分かるよう、tick 自身が mode=plan-only と印字する。
+
+### 実測
+
+launchd 配下で手動キックして exit 0。`observe` が 6/6 due を出し、
+`plan` が 6 タスクの batch を書き、置くコマンドを印字して終了することを
+ログで確認した。
 
 ## Alternatives considered
 
