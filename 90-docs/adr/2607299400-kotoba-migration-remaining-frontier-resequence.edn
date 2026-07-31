@@ -1535,6 +1535,23 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31bx — T8.3 compiler-AOT secret char-class gate)
+
+- provider#63 MERGED (`41d8395f`): **T8.3 ADR 0176** — pure
+  `secret_name_char_ok(c)` for forbidden code points (NUL/TAB/LF/space/*/?/\\)
+  via kotoba-compiler + Component. Host walks name; hand WAT ptr/len scan
+  retained. Complements name-len (0173) + value-len (0175). `:wasm-aot` stays
+  `:partial`. Evidence: 61 tests / 441 assertions; Node live ok/forbidden set.
+- west pin provider a1233dc2 → 41d8395f.
+
+Still open:
+1. T8.3 residual: full request/result EDN codec AOT; scoped-fs **path
+   state-machine** (dot/slash) compiler re-emit; pure multi-step guest that
+   composes len+char without host loop; typed-string single-call packaging
+2. T8.4 residual: live SCRAM/PG success (qualification; PG/docker not up)
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-30h — language profile 5 A+B frontend landed)
 
 - **compiler#451 MERGED** (`b2291313`): language profile 5 bool-typed predicates
