@@ -1,0 +1,41 @@
+[{:db/id -1,
+  :adr/id "adr-2607310300-daichou-agent-action-ledger",
+  :adr/title "ADR-2607310300: kotoba-lang/daichou — agent 行為を承認ごと改ざん耐性の連鎖として残す自己ホストの台帳を起こす",
+  :adr/status "accepted",
+  :adr/doc_type "adr",
+  :adr/date "2026-07-31",
+  :adr/deciders ["Jun Kawasaki"],
+  :adr/topic "daichou-agent-action-ledger",
+  :adr/related ["adr-2607302210-global-cybersecurity-competitive-maturity-and-gftd-strategy"],
+  :adr/supersedes [],
+  :adr/superseded_by [],
+  :adr/repos ["kotoba-lang/daichou"
+              "com-junkawasaki/root"
+              "gftdcojp/ai-gftd-cybersecurity"
+              "gftdcojp/kabuto"],
+  :adr/authoritative true,
+  :adr/authoritative_for ["agent 行為の受領証と連鎖の形式"
+                          "承認を欠いた記録を作れないという不変条件"
+                          "正規形が両 runtime で一致するという契約"],
+  :adr/last_verified "2026-07-31",
+  :adr/source-format "edn-only (ADR-2607171600)",
+  :adr/scope "agent 行為の台帳ライブラリそのもの。証跡の規制様式への写像は ai-gftd-cybersecurity、競合の実測データは kabuto が持つ。",
+  :adr/decision-summary "ADR-2607302210 D42(独立製品として賭ける)の柱②として、kotoba-lang/daichou を起こした。prefix 無し = 再利用ライブラリ、pure な .cljc、IO 無し。差別化は2点だけ — (1)承認を欠いた受領証を作れない (2)完全性が手元で完結する(第三者クラウドへ送れない組織で使える)。実装後に両 runtime で走らせて移植性の欠陥を1つ見つけ、設計を狭めて解消した。",
+  :adr/decision ["D1: 記録するだけの層は作らない。microsoft/agent-governance-toolkit(MIT・無料)、Microsoft Agent 365(GA・$15/user/月)、Asqav(Elastic License 2.0)が既にある。daichou が主張するのは2点だけに絞る。"
+                 "D2: **承認を欠いた受領証を作れない**。`:approval`(誰が・何を決めたか・どの policy 版で)が無いと `receipt/make` は例外を投げる。後から承認を書き足す余地を残さない。決定は :allow / :deny / :review のいずれか。これが ADR-2607302210 D13/D42 の『承認が記録の中にある』の実装形。"
+                 "D3: **完全性が手元で完結する**。Asqav を実際にインストールして確認したところ、`local_sign` は署名せず `{... :status \"pending\"}` の素の JSON をキューに積むだけで、署名・ハッシュ・連鎖はすべてサーバ側だった(README も 'All cryptography runs server-side')。**agent の行為を第三者クラウドへ送れない組織では、あちらの改ざん耐性は一切得られない。**daichou はその制約下で動く。"
+                 "D4: **浮動小数を受け付けない**。実装後に nbb と JVM の両方で走らせたところ、ClojureScript は 1 と 1.0 を同じ値として扱うため『整数と小数を区別する』正規化が JVM でしか成り立たないと判明した。両 runtime で同じ連鎖にならない台帳は台帳として無いのと同じ(nbb で作った受領証を JVM の検証器に出せない)。区別する代わりに受け付けず、金額や計測値は文字列か整数(最小単位)で入れる。**`.cljc` が『両方でコンパイルできる』ことは『両方で同じ値を計算する』ことを意味しない** — ai-gftd-cybersecurity の SigV4 事例と同型で、片方でしか走らない suite からは見えない。golden hash を test で固定して両者の一致を保証した。"
+                 "D5: **検証は壊れた位置を返す**(`:broken-at` / `:reason`)。壊れた事実だけを返す検証器は、運用では『台帳全体が信用できない』としか読めず捨てられる。位置が出れば、そこから前は使える。改変・削除・順序入替のいずれも検出する(署名だけでは順序入替を検出できない)。"
+                 "D6: **鍵と送信を持たない**。署名鍵の取得は kagi 経路を使い(kagami と同じ流儀)、第二の keyring を作らない。クラウドへ送るかどうかは利用側の判断で、この層は関与しない。"
+                 "D7: 隣接する `kagami`(旧 kotoba-fleet-vcs)とは**ドメインが違う**。あちらは repo の pin 事象の台帳で、こちらは agent の行為。同じ『署名付き append-only 台帳』という原始形を共有するが、統合はしない(scaffold 前にこの重複確認を行った)。"],
+  :adr/consequences ["C1: 浮動小数を拒否するので、利用側は金額・計測値の表現を決める必要がある(最小単位の整数か文字列)。これは制約だが、両 runtime で検証できる台帳を得るための代償として受け入れる。"
+                     "C2: 署名をまだ持たない。現時点で得られるのは**ハッシュ連鎖による改変検出**であって、**誰が書いたかの証明ではない**。署名は kagi 経路で足す(D6)。それまでは『改変は検出できるが、台帳そのものを差し替える攻撃者は防げない』と正直に言う。"
+                     "C3: 記録の**送信**を持たないので、外部監査人への提示経路は利用側が用意する。ai-gftd-cybersecurity の evidence 出力がその場になる想定。"
+                     "C4: kotoba-lang は public org なので、この台帳は公開される。競合(Microsoft / Asqav)も読める。**それでよい** — 差別化は実装の秘匿ではなく、承認を強制する設計と自己ホストという位置にある。"],
+  :adr/body "## 何を作ったか\n\n`kotoba-lang/daichou`(public、MIT 相当の org 既定)。prefix 無し = 再利用ライブラリ(`manifest/repository-rules.edn` の `:name-prefix` 語彙)、`:execution :none`、core は pure な `.cljc` で IO 無し。\n\n- `daichou.canonical` — 受領証に入れる値の正規形(RFC 8785 / JCS の考え方を EDN へ)。map のキーは文字列化して昇順、キー衝突は潰さず例外、**浮動小数は拒否**。\n- `daichou.hash` — SHA-256。**ここだけが実行環境に依存する**(`node:crypto` / `MessageDigest`)。\n- `daichou.receipt` — 受領証1件。`:receipt/action-ref`(行為の正規形の SHA-256)・`:receipt/previous-hash`・`:receipt/hash`(自分自身を除いた部分から計算するので再計算で検証できる)。**`:approval` が無いと作れない。**\n- `daichou.chain` — 連鎖の追加と検証、`approvals-by`(誰の承認で何件動いたか)。\n\n## 実装後に見つけた欠陥(記録に残す価値のあるもの)\n\n最初の正規化は『整数と浮動小数は別の値』としていた。JVM では成り立つ。**ClojureScript では成り立たない** — `1` と `1.0` は同じ値なので、`(integer? 1.0)` が真になり、同じ文字列が出る。つまり **nbb で作った受領証を JVM の検証器に出すと、連鎖が壊れていないのに壊れて見える**(あるいは逆に、違う値が同じハッシュに潰れる)。\n\nこれは `.cljc` の典型的な罠で、`ai-gftd-cybersecurity` の README が SigV4 の事例(`(map int text)` が JVM では code point、CLJS では 0 に潰れ、秘密鍵がほぼ無視されていた)で警告しているものと同型である。**片方でしか走らない suite からは見えない。**\n\n対処は区別ではなく**拒否**にした。浮動小数を受領証に入れられないようにし、golden hash(`5d8093aa…`)を test で固定して、nbb と JVM が同じ値を計算することを両方で確認する。両 runtime とも 5 tests / 20 assertions / 0 failures。\n\n## 位置づけ\n\nADR-2607302210 の D33 ②(手元に残る配線)と D42(独立製品として賭ける)の柱。①(上流へ出す枠組み dict)は `ai-gftd-cybersecurity/resources/agent-governance/` にあり、競合の実測は `gftdcojp/kabuto` が持つ。この repo はその中で**台帳そのもの**だけを持つ。",
+  :adr/references ["kotoba-lang/daichou: https://github.com/kotoba-lang/daichou"
+                   "上位の戦略 ADR: 90-docs/adr/2607302210-global-cybersecurity-competitive-maturity-and-gftd-strategy.edn"
+                   "Asqav の実測(local_sign は署名しない): https://github.com/gftdcojp/kabuto/commit/1adb1605af7da4902ad4343bef4a5e511a4ccc09"
+                   "統制対応表と証跡試作: https://github.com/gftdcojp/ai-gftd-cybersecurity/tree/main/resources/agent-governance"
+                   "repository-rules の語彙: manifest/repository-rules.edn(ADR-2607299000)"],
+  :adr/last "2026-07-31"}]
