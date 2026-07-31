@@ -1932,6 +1932,24 @@ Still open:
 3. T5.2 native guest record wire (deferred); W4 recursive values
 
 
+## Progress (2026-07-31ct — T8.3 https-url-ok compiler E2E)
+
+- kotoba-component#82 MERGED (`d7058a4e`): **https-url-ok E2E** —
+  (1) `wit-name` underscores→hyphens so source export `http_url_ok` packages
+  as `http-url-ok`; (2) admit frontend `let [n (string-byte-length url)]`
+  if-tree. `kotoba compile --target component` on ADR 0182 source shape
+  live: https→0 / empty→-1 / http→-3.
+  Evidence: +9 assertions; compiler component target green.
+- west pin kotoba-component b6270e9a → d7058a4e (`fd21bfe1`).
+
+Still open:
+1. T8.3 residual: multi-export live `main` + provider re-emit of typed
+   packages as Components; packing-walk composition; flip wasm-aot only when
+   admissible
+2. T8.4 residual: live SCRAM/PG success
+3. T5.2 native guest record wire (deferred); W4 recursive values
+
+
 ## Progress (2026-07-31cs — T8.3 typed Component string=? + substring)
 
 - kotoba-component#80 MERGED (`a7cf38c6`): **T8.3 typed Component composition**
