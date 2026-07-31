@@ -2653,6 +2653,28 @@ Still open:
    W4 recursive values
 
 
+## Progress (2026-07-31ee — T5.2 native guest record expansion provision-plan)
+
+- murakumo main `25567d56`: **T5.2 native guest record wire** for
+  **provision-plan** —
+  `multiaddr` → `:provision/multiaddr`, `local-bin-path` → `:provision/bin-path`,
+  `remote-bin-dest` → `:provision/remote-dest`, `label-kv` → `:provision/label-kv`,
+  `peer-entry` → `:provision/peer-entry`,
+  `join/bootstrap/labels/roles-append` → `:provision/{join,bootstrap,labels,roles}`,
+  `plist-replace` → `:provision/plist-replace`,
+  `write-plist-shell` → `:provision/write-plist`.
+  ADR-260731-w6-t52-native-record-provision.
+  Evidence: provision parity+call-record 27/360; authority+unit 77/1449 green.
+- west pin murakumo `52688bf1` → `25567d56`
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 further expansion (report/deploy multi-arg pure string builders;
+   option residual positional); W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
