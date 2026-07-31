@@ -2797,6 +2797,27 @@ Still open:
    digit-scanner multi-arg internals); W4 recursive values
 
 
+## Progress (2026-07-31el — T5.2 native guest record task/secret/reconcile residual)
+
+- murakumo main `2668e921`: **T5.2 native guest record wire** for residual
+  multi-arg pure (no option-string) —
+  **task**: slots/wave/pair helpers/score/challenger/pick-fold/unsched;
+  **secret**: classify-fetched → `:secret/fetched`;
+  **reconcile**: deficit → `:reconcile/deficit`.
+  ADR-260731-w6-t52-native-record-task-secret-reconcile-residual.
+  Evidence: 91 tests / 1646 assertions green.
+- west pin murakumo `2b387929` → `2668e921` (also absorbs infer-engine +
+  starts-with tip pins)
+
+Still open:
+1. T8.3 residual: nested kit request/result **EDN codec** + full multi-file kit
+   body under **W4**
+2. T8.4 residual: optional L5 full-table / real Node sockets
+3. T5.2 residual: **option-string-in-record compiler gap** is the main
+   product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
+   digit-scanner multi-arg internals optional; W4 recursive values
+
+
 ## Progress (2026-07-31cy — T8.3 multi-export error package)
 
 - kotoba-component#91 MERGED (`396368ca`): **error package multi-export** —
