@@ -1,0 +1,124 @@
+[{:db/id -1
+  :adr/id "adr-2608011400-kotobase-query-plane-as-composable-sources"
+  :adr/title "ADR-2608011400: kotobase の query plane を差し替え可能な source の組み合わせにする — 外部DBとの比較と、O(DB) 天井の解消"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-01"
+  :adr/last-verified "2026-08-01"
+  :adr/last_verified "2026-08-01"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotobase-query-plane-as-composable-sources"
+  :adr/authoritative-for
+  ["kotobase のクエリ経路のアーキテクチャ選択肢と、その組み合わせ方"
+   "PostgreSQL / Neo4j / ArangoDB / NebulaGraph / ClickHouse / RisingWave との位置関係"
+   "O(database) per query という天井の所在と解消順序"
+   "各改善を「書き換え」ではなく独立 lib として持つ理由"]
+  :adr/related
+  ["adr-2608011200-partitioned-root-vs-single-lane-writers"
+   "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2608010940-evm-state-datom-indexer"
+   "adr-2608010930-kotobase-chain-and-evm-compatibility-scope"]
+  :adr/body
+  "# ADR-2608011400: query plane を差し替え可能な source の組み合わせにする
+
+**Status**: accepted（seam + 2 実装は着地済み。brick 2/3/4 は未着手）
+**Date**: 2026-08-01
+
+## Context — 天井は merge ではなかった
+
+「Datalog の join は全 datom を必要とするので merge が要る、という設計自体が長期的な限界では」という問いから測った。**方向は正しく、犯人が違った。**
+
+**merge のコスト**（facts 2000 固定、20 クエリ）:
+
+| k | eager merge | block reads | fold 1 回 | compacted の 1 クエリ |
+|---|---|---|---|---|
+| 1 | 1567ms | 200 | 56ms | 1ms |
+| 50 | 4408ms | 2260 | 170ms | 0ms |
+| 200 | 9697ms | 8260 | 966ms | **0ms** |
+
+**merge が高いのではなく、クエリ経路で merge するのが高い。** 畳んでから引けば per-query は 0ms。全 LSM エンジンが到達した結論と同じで、答えも同じ（background compaction）。
+
+**本当の天井**（k=1、partition が無関係な条件）:
+
+| facts | hydrate | block reads |
+|---|---|---|
+| 2,000 | 57ms | 50 |
+| 8,000 | 152ms | 155 |
+| 32,000 | 678ms | 640 |
+
+**結果サイズではなくデータベースのサイズに比例する。** `arrangement.query/query` と `arrangement.datalog/q` は materialize 済みの `db` を取り、`arrangement.core/restore` はそれを `pt/scan-prefix get-fn root \"\"`（木全体）で作る。外挿すると 10^6 datoms で ~21s / ~20,000 block reads。Worker + D1 では block read がネットワーク往復なので、CPU 律速ですらない。
+
+**そしてこれはアーキテクチャの限界ではなく未実装だった。** leaf key は `(pr-str [blind(a) blind(b) blind(c)])` — **各成分が独立に blind されて連結**されている。blind 鍵を持つ読み手は任意の先頭成分の prefix を復号なしで導出でき、`prolly-tree/scan-prefix` は既に key-range pruned（\"descending into O(path) blocks for a keyed read instead of the whole tree\"）。**primitive は揃っていて、query を store に繋いだ人がいなかっただけ。**
+
+## 外部システムとの位置関係
+
+**注記: これらを同一ワークロードでベンチしていない。** storage engine の構造と計算量の比較であって測定ではない。決定的な軸は 1 つ — **1 クエリが O(結果) を読むか O(DB) を読むか**。
+
+| | storage engine | クエリ計算量 | 書き込み | multi-hop | 検証可能 | edge |
+|---|---|---|---|---|---|---|
+| PostgreSQL | heap + B-tree, MVCC | O(log n + result) | primary 1 | recursive CTE、深いと劣化 | ✗ | ✗ |
+| ClickHouse | MergeTree = ソート済み part + 背景 merge | O(スキャンした granule) | 並行 insert 多数 | join が弱い | ✗ | ✗ |
+| Neo4j | ネイティブ隣接リスト | **1 hop O(1)** | primary 1 | **クラス最強** | ✗ | ✗ |
+| ArangoDB | RocksDB (LSM) | O(log n + result) | sharded | 良好 | ✗ | ✗ |
+| NebulaGraph | RocksDB, vertex hash shard, Raft | O(log n + result) + hop ごと往復 | **scale-out** | shard 跨ぎは往復 | ✗ | ✗ |
+| RisingWave | Hummock LSM on S3 | **O(1)**（join を書き込み時に済ませる） | 多 writer | MV 次第 | ✗ | ✗ |
+| **kotobase（改善前）** | prolly-tree, content-addressed | **O(DB)** | **1** | **書けない** | **✓** | **✓** |
+| kotobase（本 ADR 後） | 同上 | **O(log n + result)** | N（ADR-2608011200） | 未実装 | ✓ | ✓ |
+
+**(a) ClientHouse の MergeTree は、我々が ADR-2608011200 で作った partitioned root + compaction と同じ設計。** 再発明だが、収束先が正しいことの証拠。
+**(b) RisingWave は「read で join しない」別解**（incremental MV）。brick 3 はその特殊ケース。
+**(c) Neo4j の index-free adjacency は構造的に欠けている。** prefix scan を入れても埋まらない（brick 4）。
+
+**kotobase が勝てる軸は throughput ではなく、検証可能・content-addressed・暗号的にテナント分離された事実をエッジから配ること**（上の 6 つは全部 ✗）。スキャン量で ClickHouse に、走査で Neo4j に勝とうとするのは筋が悪い。
+
+## Decision — 書き換えず、独立した lib を組み合わせる
+
+**どの戦略が正しいかを、どれも測る前に決めない。** そのために seam を切る。
+
+**`kotoba-lang/datom-source`（新規、依存ゼロ）** — 契約のみ:
+
+```
+(defprotocol IPatternSource
+  (-scan [this pattern]))   ; [s p o]、nil = wildcard → #{{:s :p :o}}
+```
+
+combinator: `of-quads`（参照実装）/ `merged`（k 個を 1 つに = partitioned root の読み）/ `filtered`（`visible?`）/ `counting`（設計の比較には wall-clock でない数値が要る）。combinator 自身が source なので入れ子になる。
+
+**そして conformance suite**。これが「似ている」を「交換可能」に変える部分。`check` は deftest ではなく**データを返す** — 実装側リポにこちらのテストフレームワークを強制する suite は契約ではなく依存。suite 自体が「object 位置を無視する source を REJECT する」ことをテストしている（何でも通る suite は何も証明しない）。
+
+### brick の依存関係
+
+```
+datom-source（契約・依存ゼロ）
+  ├─ arrangement.source/materialized   ← 現状の materialize 経路。baseline
+  ├─ arrangement.source/cursor         ← prefix scan。★実装済み
+  ├─ [brick 2] compaction              ← merged を畳んで 1 source に
+  ├─ [brick 3] materialized view       ← 書き込み時に畳む（RisingWave 型）
+  └─ [brick 4] adjacency               ← multi-hop（Neo4j 型）
+```
+
+storage を読む実装は、その storage を所有する lib に置く（`arrangement` の index format は `arrangement` の知識）。seam は契約と combinator と conformance だけを持つ。
+
+## 実測（brick 1、着地済み）
+
+`arrangement` `1183d1a9`。**20,000 facts で `[_ p _]` の scan が 3 block、full hydrate が 72 block — 24 倍。** この比はデータベースが大きくなるほど開く（片方は O(path + result)、もう片方は O(DB)）。
+
+**conformance suite が production のバグを 1 件見つけた。** `arrangement.query/query*` に `[_ _ o]`（値だけ束縛）の分岐が無く、`:else` に落ちて**データベース全体を返していた** — 与えられた object を無視して。単一 clause のクエリが誤答し、その形の Datalog clause は全 datom の中間集合を作っていた。索引が無い形なので正直な O(DB) スキャンで修正（`:ocp` は ref 値の object しか張らない。Datomic の AVET も `[a v e]` で同じ穴を持つ）。
+
+## Consequences
+
+- **各 brick は独立に着脱・比較できる。** 同じ conformance を通り、同じ `counting` で測れる。「最終的な kotobase のアーキテクチャ」は brick の組み合わせとして選ぶもので、あらかじめ決めるものではない。
+- **`blind-input` を public にした。** docstring 自身が「cold reader が prefix seek のために再導出する」と書いていたのに private で、そのせいで読み手ごとに再実装が必要だった（crypto 入力の複製が乖離する典型）。
+- **`cursor` は当面 JVM のみ。** cljs では `decrypt-fn` が Promise を返すので scan 全体が async になり、protocol の形が変わる。同期スタブで偽装していない。
+- **`[_ _ o]` はどの実装でも O(DB)。** この index 族の構造的性質であって実装の手抜きではない。
+
+## 未着手（順序は効果降順）
+
+1. **brick 2 compaction** — `merged` を畳んで k をクエリ経路から外す（ADR-2608011200 で per-query 0ms を実測済み）
+2. **brick 3 incremental MV** — 既知クエリを書き込み時に畳む
+3. **brick 4 adjacency** — multi-hop。1〜3 とは別物で一番重い
+4. **`arrangement.datalog/q` を source 上で動かす** — 今は `db` を取る。ここを繋ぐまで、cursor の利得は単一 pattern scan に限られ Datalog クエリには届かない
+"}]
