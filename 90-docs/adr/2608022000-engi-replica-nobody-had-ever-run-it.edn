@@ -1,0 +1,100 @@
+[{:db/id -1
+  :adr/id "adr-2608022000-engi-replica-nobody-had-ever-run-it"
+  :adr/title "adr-2608022000: 誰もこれを走らせたことがなかった — 10 の namespace、1000 の assertion、そして replica がゼロ"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "engi-replica-nobody-had-ever-run-it"
+  :adr/authoritative-for
+  ["engi の replica 合成 (engi.replica)"
+   "実 socket 上での consensus 検証 (script/network.cljs)"
+   "witness id の正規形 (wire 形式)"]
+  :adr/related
+  ["adr-2607993000-engi-l1-byzantine-consensus-en-currency"
+   "adr-2608021630-engi-quorum-is-one-predicate"
+   "adr-2608021700-engi-quorum-size-states-the-property"
+   "adr-2608021900-torihiki-terminal-never-loaded-its-client"]
+  :adr/evidence ["https://github.com/kotoba-lang/engi/commit/50fd4b6f425f1836661dd8343363a1622b861c7d"]
+  :adr/body
+  "# ADR-2608022000: 誰もこれを走らせたことがなかった
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+10 の namespace、1000 の assertion、そして **replica がゼロ**。
+
+`engi.consensus` は block と証明書を作り、`engi.pacemaker` は view の失敗を判定し、`engi.sync` は遅れた replica が何を信じてよいか決め、`engi.attest` は署名し検証し、`engi.net` は誰に帯域を使うか決め、`engi.wire` は message とは何かを定めていた。**すべて test 済み。どれも合成されていなかった。**
+
+**block が propose され、投票され、certify され、commit されたことは一度も無かった。**
+
+これは test suite からは見えない。そして**これは、compile され deploy され page から一度も参照されなかった terminal の client と同じ形**である —— 部品はすべて green、全体は一度も実行されていない。
+
+## Decision
+
+### 1. `engi.replica` が合成である
+
+pure、message 駆動、`[state' outbox]`。`hash-fn` は他と同様に注入。socket も clock も持たない。
+
+### 2. `script/network.cljs` が実 socket 上で 4 replica を走らせる
+
+実 WebSocket、実 SHA-256 block hash。
+
+```
+four replicas on ports 19301–19304 · quorum 3 of 4
+  w1  height 86  committed 84 (85 blocks)  msgs 644in/107out
+  w2  height 86  committed 84 (85 blocks)  msgs 642in/108out
+  w3  height 86  committed 84 (85 blocks)  msgs 640in/108out
+  w4  height 86  committed 84 (85 blocks)  msgs 642in/107out
+  common committed prefix: 85 blocks
+  all replicas agree     : true
+```
+
+## 3 つのバグ、決定論的 test はどれも見られなかった
+
+**map を transport にした test には clock も wire も無い。**
+
+### ① replica が自分の投票を記録していなかった
+
+certify できるだけの投票を持つのは **leader だけ**だった —— 他 3 つを受け取るのが leader だけだったから。**transport の細部が quorum の閾値を黙って決めていた。**
+
+### ② 投票が `[view block-hash]` で keying されていた
+
+懸念自体は正しい（2 つの view が同じ height の block を certify しうる）が、**hash が既にそれに答えている** —— hash は height・parent・proposals・proposer・timestamp を覆うので、2 つの view が 1 つの hash を作ることはない。
+
+key の中の view が実際にやっていたのは、**投票者のローカル view による分割**。replica は少しずつ違う瞬間に timeout するので、**同じ block への 3 票が 3 つの bucket に分かれ、誰も quorum に到達しなかった。**
+
+**timeout が 1 度も起きなければ、2 つの key は同じ key である。**
+
+### ③ replica が view ごとに 1 票だった
+
+**view は timeout で進み、height は前進で進む。** だから view 0 で height 1 に投票した replica は、何かが timeout するまで height 2 に投票できない —— そして **timeout するはずのものは、その replica が今まさに延長を拒否した chain だった。** height 2 で停止し、全 replica が続行に十分な票を持ったまま止まっていた。
+
+**持つべき性質は「height ごとに 1 票」**であり、今はそうなっている。
+
+## そして wire が既に予言していた 1 つ
+
+`engi.wire/wire-id` は keyword `:w1` を文字列 `w1` として送る。その docstring はこう書いていた:
+
+> a certificate assembled from wire messages and one assembled locally would disagree about who signed it
+
+**まさにそれ。** replica は自分の投票を keyword で、peer の投票を文字列で記録した —— **1 つの物理的 witness が 2 つに数えられ、3 票の quorum が「2 replica、うち 1 つは二重」でありえた。**
+
+`engi.replica` に入るすべての id は wire 形式に正規化される（自分自身の id も）。**正しく encode することは半分でしかなかった。**
+
+## Consequences
+
+- (+) consensus が実際に走る。実 socket 上で 4 replica、86 block、全員一致。
+- (+) 合成が pure なので、決定論的 test と実 socket harness の両方が同じ code を検査する。
+- (−) **投票は署名されていない。** `engi.attest` は存在するが replica は使っていない —— 現状の harness は正直な replica しか含まないので、署名は付いていても検査を強めない。次の段階。
+- (−) **`script/network.cljs` は 1 プロセス内で 4 replica を走らせる。** socket は本物だが OS 分離は無い。
+- (−) leader は round-robin（ADR-2607993000 の意図的な v1 単純化）。
+- (−) commit された block は何も実行しない —— `engi.core` の transfer に接続されていない。
+"}]
