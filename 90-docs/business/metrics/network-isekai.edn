@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 10219,
-  :pageviews-7d 5720,
-  :uniques-7d-sum 420,
+ {:requests-7d 10279,
+  :pageviews-7d 5767,
+  :uniques-7d-sum 423,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 100}
-   {:path "/robots.txt", :requests 28}
+  [{:path "/", :requests 105}
+   {:path "/robots.txt", :requests 29}
    {:path "/feed/fork-stats.edn", :requests 23}
    {:path "/api/murakumo-generation", :requests 14}
-   {:path "/api/analytics", :requests 10}
-   {:path "/api/scores", :requests 9}
+   {:path "/api/analytics", :requests 9}
+   {:path "/api/scores", :requests 8}
    {:path "/api/events", :requests 8}
    {:path "/kototama/kototama.js", :requests 7}],
-  :status-mix {:ok 1894, :server-error 118, :client-error 15},
+  :status-mix {:ok 1910, :server-error 118, :client-error 15},
   :channel-mix
-  {:channel 265, :probe 1314, :unclassified 315, :ok-total 1894},
+  {:channel 270, :probe 1328, :unclassified 312, :ok-total 1910},
   :window "24h"},
  :as-of "2026-08-01",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 6},
  :top-paths
- "上位 page (24h, 2xx/3xx・channel-allowlist済): / 100 · /robots.txt 28 · /feed/fork-stats.edn 23 · /api/murakumo-generation 14 · /api/analytics 10 | 4xx(probe) 1% · 5xx 6% · probe(200-fallback) 69% · unclassified 17%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): / 105 · /robots.txt 29 · /feed/fork-stats.edn 23 · /api/murakumo-generation 14 · /api/analytics 9 | 4xx(probe) 1% · 5xx 6% · probe(200-fallback) 70% · unclassified 16%",
  :signal
- "isekai.network 実測 10219 req/7d・420 uniques(日次和)・うち4xx probe 1%(24h)",
+ "isekai.network 実測 10279 req/7d・423 uniques(日次和)・うち4xx probe 1%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
