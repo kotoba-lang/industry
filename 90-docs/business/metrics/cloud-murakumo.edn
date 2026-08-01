@@ -1,23 +1,23 @@
 {:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 157058},
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 158153},
  :zone
- {:requests-7d 158149,
-  :pageviews-7d 622,
-  :uniques-7d-sum 637,
+ {:requests-7d 158514,
+  :pageviews-7d 629,
+  :uniques-7d-sum 643,
   :zone "murakumo.cloud"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/infer/hwmetrics", :requests 8229}
-   {:path "/v1/chat/completions", :requests 207}
-   {:path "/", :requests 96}
+  [{:path "/infer/hwmetrics", :requests 8230}
+   {:path "/v1/chat/completions", :requests 213}
+   {:path "/", :requests 97}
    {:path "/infer/model-map", :requests 22}
    {:path "/infer/cost", :requests 22}
    {:path "/robots.txt", :requests 18}
    {:path "/infer/models/murakumo-main", :requests 12}
    {:path "/api/v1/generation", :requests 10}],
-  :status-mix {:client-error 769, :ok 8688, :server-error 4},
+  :status-mix {:client-error 740, :ok 8696, :server-error 4},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -31,7 +31,7 @@
  :as-of "2026-08-01",
  :traffic-quality {:window "24h", :probe-4xx-pct 8, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8229 · /v1/chat/completions 207 · / 96 · /infer/model-map 22 · /infer/cost 22 | 4xx(probe) 8% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /infer/hwmetrics 8230 · /v1/chat/completions 213 · / 97 · /infer/model-map 22 · /infer/cost 22 | 4xx(probe) 8% · 5xx 0%",
  :cost
  {:spot-ref
   {:spot-usd-per-hour 1.8,
@@ -39,11 +39,11 @@
    :fx-yen-per-usd 162.2},
   :federation {:active-demand-apps 0, :demand-apps []},
   :spot-yen-per-mtok 40.55,
-  :fleet-yen-per-mtok 20.288340048112055,
-  :ratio 0.5003289777586204,
+  :fleet-yen-per-mtok 20.171127719203987,
+  :ratio 0.4974384147769171,
   :coeffs {:load-w 64.1, :yen-per-kwh 40.49},
   :pass? true,
-  :fleet-tokens 70262,
+  :fleet-tokens 70506,
   :runs-count 200},
  :signal
- "murakumo.cloud 実測 158149 req/7d・637 uniques(日次和)・うち4xx probe 8%(24h)、workers 157058 inv/7d、Stripe active subs 0"}
+ "murakumo.cloud 実測 158514 req/7d・643 uniques(日次和)・うち4xx probe 8%(24h)、workers 158153 inv/7d、Stripe active subs 0"}
