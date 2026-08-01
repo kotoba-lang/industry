@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — pure EDN codec/wire/wraps/factories **0256–0259** + guest host_post **0260** + entropy prod EDN-audit **0261**; residual **host-injected authority** only; wasm-aot stays :partial by design |
+| T8.3 | network/secret の **production AOT Component** | **partial** — pure EDN **0256–0259** + host_post **0260** + entropy factories **0261** + inject **0262** + HTTP W4 roundtrip **0263** + remaining ops W4 roundtrips **0264**; residual **host-injected authority** by design; wasm-aot stays :partial |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
