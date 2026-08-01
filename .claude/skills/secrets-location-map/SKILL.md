@@ -380,6 +380,31 @@ KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get <ITEM>
   （local-murakumo、`MURAKUMO_PROXY_TOKEN` 系）は**別の secret** — この item では
   ローテーションも検証もできない。
 
+## api.murakumo.cloud mk1 capability-token 署名鍵 (ADR-2608011400、2026-08-01)
+
+- **`MURAKUMO_API_TOKEN_SECRET`（kagi vault、compartment `network-awai`）** —
+  `api.murakumo.cloud`（Worker `local-murakumo`）が `/v1/messages` `/v1/embeddings`
+  で検証する **mk1 capability token の署名鍵**。同じ値が Worker secret
+  `MURAKUMO_TOKEN_SECRET` に入っている（wrangler で投入済み、redeploy を跨いで永続）。
+  取得: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get MURAKUMO_API_TOKEN_SECRET`。
+- **新規発行**（2026-08-01）。この Worker には従来 mk1 の署名鍵が存在せず、
+  共有の静的 `ANTHROPIC_PROXY_TOKEN` / `_2` しか無かった（本マップの
+  「Murakumo chat gate secondary secret」節が『api.murakumo.cloud は別の secret』と
+  注記しているとおり）。mk1 受理を足すにあたって新設したので、**rotation ではなく追加**
+  —— 既存の共有トークン経路は一切変わらない。
+- **鍵の mint**（CLI / MCP のどちらも同じ実装 `murakumo.apikey`）:
+  ```
+  cd orgs/kotoba-lang/murakumo
+  MURAKUMO_TOKEN_SECRET=$(kagi get MURAKUMO_API_TOKEN_SECRET) \
+    nbb --classpath src scripts/run-task.cljs token issue --sub <who> --scope chat --ttl 604800
+  ```
+  MCP: `claude mcp add murakumo -- nbb --classpath "src:../org-anthropic-mcp/src" scripts/mcp-server.cljs`
+  → tool `murakumo.issue_api_key`（同じ env が要る）。
+- **境界**: scope は `chat|image|all` のみ、TTL は 90 日上限。**失効リストは無い**
+  （ステートレス検証なので期限が失効そのもの）—— 長命鍵を作らず再発行する。
+- live 検証済み（2026-08-01、CLI 発行・MCP 発行のどちらも本番 `/v1/messages` で 200、
+  scope 不足は 401）。
+
 ## kotobase.net archive write token (2026-07-29)
 
 - **`KOTOBASE_ARCHIVE_TOKEN`（kagi vault、compartment `net-kotobase`）** —
