@@ -142,6 +142,14 @@ MVP を実装して本番投入した（`net-kotobase` `bbc355ff`）。
 **恒久対応は keyed provider の URL を `KOTOBASE_EVM_RPC` に入れること**（秘密なので
 コードに書けない）。これは owner 判断待ちの唯一の残件。
 
+暫定緩和として、成功した応答を **Cache API** に保持し、全プロバイダが拒否したときは
+それを `stale: true` + `stale-age-seconds` + `stale-reason`（どの endpoint が何と言ったか）
+付きで返す。**KV では機能しなかった**: KV の書き込み伝播は最大 1 分かかるため、成功直後の
+失敗が cache miss になり 502 のままだった（実測: 連続 6 回中 4 回が 502）。Cache API は
+colo ローカルで即座に読めるのでこの用途には合う。代償: 記憶が colo ごとなので、別 edge に
+当たった呼び出しは miss して正直に 502 を返す（他人の stale を返さない）。実測で
+`stale=True age=5s` が返ることを確認済み。
+
 ### 副作用として塞いだ x402 の silent failure
 
 `kotobase.x402` の RPC caller は `.error` を見ずに `.result` を読んでいたため、
