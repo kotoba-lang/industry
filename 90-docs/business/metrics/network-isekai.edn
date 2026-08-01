@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 10187,
-  :pageviews-7d 5715,
-  :uniques-7d-sum 419,
+ {:requests-7d 10219,
+  :pageviews-7d 5720,
+  :uniques-7d-sum 420,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 102}
-   {:path "/robots.txt", :requests 29}
-   {:path "/feed/fork-stats.edn", :requests 24}
-   {:path "/api/murakumo-generation", :requests 12}
-   {:path "/api/analytics", :requests 9}
-   {:path "/api/scores", :requests 8}
+  [{:path "/", :requests 100}
+   {:path "/robots.txt", :requests 28}
+   {:path "/feed/fork-stats.edn", :requests 23}
+   {:path "/api/murakumo-generation", :requests 14}
+   {:path "/api/analytics", :requests 10}
+   {:path "/api/scores", :requests 9}
    {:path "/api/events", :requests 8}
-   {:path "/kototama/kototama.js", :requests 5}],
-  :status-mix {:ok 1895, :server-error 96, :client-error 13},
+   {:path "/kototama/kototama.js", :requests 7}],
+  :status-mix {:ok 1894, :server-error 118, :client-error 15},
   :channel-mix
-  {:channel 262, :probe 1327, :unclassified 306, :ok-total 1895},
+  {:channel 265, :probe 1314, :unclassified 315, :ok-total 1894},
   :window "24h"},
  :as-of "2026-08-01",
- :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 5},
+ :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 6},
  :top-paths
- "上位 page (24h, 2xx/3xx・channel-allowlist済): / 102 · /robots.txt 29 · /feed/fork-stats.edn 24 · /api/murakumo-generation 12 · /api/analytics 9 | 4xx(probe) 1% · 5xx 5% · probe(200-fallback) 70% · unclassified 16%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): / 100 · /robots.txt 28 · /feed/fork-stats.edn 23 · /api/murakumo-generation 14 · /api/analytics 10 | 4xx(probe) 1% · 5xx 6% · probe(200-fallback) 69% · unclassified 17%",
  :signal
- "isekai.network 実測 10187 req/7d・419 uniques(日次和)・うち4xx probe 1%(24h)",
+ "isekai.network 実測 10219 req/7d・420 uniques(日次和)・うち4xx probe 1%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
