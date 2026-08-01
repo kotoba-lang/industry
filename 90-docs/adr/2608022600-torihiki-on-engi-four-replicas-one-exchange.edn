@@ -1,0 +1,72 @@
+[{:db/id -1
+  :adr/id "adr-2608022600-torihiki-on-engi-four-replicas-one-exchange"
+  :adr/title "adr-2608022600: 4 replica、1 つの取引所 — torihiki を engi の合意層の上で走らせる"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "torihiki-on-engi"
+  :adr/authoritative-for
+  ["torihiki を engi 合意上で走らせる統合の実測"
+   "engi の machine seam が initial state を thunk で取ること"]
+  :adr/related
+  ["adr-2608022500-engi-committed-blocks-execute"
+   "adr-2608021800-torihiki-collateral-source-and-a-real-order-form"]
+  :adr/evidence ["https://github.com/kotoba-lang/engi/commit/b3a4f66be562de1156b54aa57a9be5a818b2011f"]
+  :adr/body
+  "# ADR-2608022600: 4 replica、1 つの取引所
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+`script/network.cljs` は**その場のために書いた machine** で合意が動くことを示した。`torihiki-node` は**単一 Durable Object sequencer**（自身の `/head` が `consensus: none` と言う）の上で取引所が動くことを示した。
+
+**それぞれの半分が、もう半分の身代わりに対して実証されていた。**
+
+## Decision
+
+`script/torihiki-on-engi.cljs` が接合。実 WebSocket 上の 4 replica が、engi が commit した block に対して `torihiki.state/apply-block` を実行する。注文は**同じ瞬間に、異なる replica へ**投入する —— **単一 sequencer には問えない事例**であり、**2 人のトレーダーが 2 つの node を叩いたときに約定が定義される唯一の理由。**
+
+```
+  common committed blocks: 123
+  exchange at that block : {:root \"0ff3920f…\", :best-bid 994, :best-ask 996,
+                            :resting 69, :last 995, :rejected 0,
+                            :positions {1 58, 2 -29, 3 -29}}
+  every replica the same : true
+```
+
+**新しい engine も新しい合意も無い。** `torihiki.state` は無変更、`engi.replica` は**既にあった machine seam** でそれを取る —— **seam はそのためにあった**（engi は transaction が何かを知らないし、ここでも学ばない）。
+
+## 途中の 2 つの失敗（記録に値する）
+
+### ① 4 replica が「空の板」で完全一致した
+
+すべての注文が `:bad-account` で拒否されていた（harness が account を設定していなかった）。そして**拒否された transaction も commit される** —— だから外からは**「合意が動いている」と「誰も取引していない」が同一に見える。**
+
+report は rejection を数えるようになった。**この種の green が最悪の green** だから。
+
+### ② commit した block では一致し、板上の残注文数が 200 件ずれた
+
+**torihiki の板は typed array の構造体** —— それが速度の論拠そのもの —— なので、**出来合いの exchange を持つ machine map は 4 replica 全員に同じ板を渡していた。**
+
+machine の初期状態は**値として共有するのではなく `:init-fn` の thunk として産出する**ようにした。**state machine は可変構造を持ちうるし、「共有しないこと」を呼び出し側が覚えておくべき事柄にしてはならない。**
+
+## Consequences
+
+- (+) **取引専用 chain が BFT 合意の上で動く。** HyperBFT + HyperCore に対応する構成が、両側とも open な実装で存在する。
+- (+) machine seam が「可変構造を持つ machine」で実証された。
+- (−) **transaction は未認証で適用される。** torihiki-node が per-transaction Ed25519 を live node に対して既に実証済みで、ここで重ねると同じものを 2 度検査しつつ state の一致を見えにくくする。**合意は「誰が block を提案したか」を認証し、「account が transaction を承認したか」は別層** —— この run はそこを行使していない。
+- (−) **1 プロセス内**。socket は本物だが OS 分離は無い。
+- (−) **proposal に transaction の JSON を直接載せている。** 実配備は payload をアドレスで指し、取り出しに fetch を払う。
+- (−) **`torihiki-node` は依然として単一 sequencer。** この統合は harness であって、deploy された node ではない。
+- (−) 証拠は保持されるが slash されない。証拠は伝播しない。
+
+200 tests / 1119 assertions。`network.cljs` は Byzantine validator と forger を入れたまま pass。JVM/nbb parity 一致。
+"}]
