@@ -95,7 +95,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T2.3 | `examples/` の pure-product が CI で KIR 実行 | **landed** kotoba-lang#352 (ADR-reliability-t23; 4 examples / 10 cases) |
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
-| T8.2 | kit ready checklist の全面適用 | **audit+deny second pass** — ops **0269**, object/storage audit **0271**, object deny **0272**; residual: object/storage **signed-wasm pending** |
+| T8.2 | kit ready checklist の全面適用 | **deny+audit second pass complete** — ops **0269**, object/storage audit **0271**, object deny **0272**, storage deny **0273**; residual: object/storage **signed-wasm pending** only |
 | T8.3 | network/secret の **production AOT Component** | **partial** — guest host + inject parity **0256–0270**; residual **host I/O authority only** by design; wasm-aot stays :partial |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
