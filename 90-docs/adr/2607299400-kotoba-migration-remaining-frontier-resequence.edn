@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — fixed-depth 0244 + secret Component 0245 + W4 headers 0246 + request/result 0247 + **true-kv maps ≤3 (0248)**; nested records in variants + ADT depth for 4+ fields + host I/O / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — W4 recursive EDN through **0248** true-kv maps (3-field) + **kir/compiler ADT depth 12** (0025/0196 unlocks 4+ field spines); true :record-in-variant + host I/O / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2818,6 +2818,28 @@ Still open:
    digit-scanner multi-arg internals optional; W4 recursive values
 
 
+
+
+## Progress (2026-08-01hd — T8.3/W4 true-kv EDN + ADT depth 12)
+
+- provider MERGED (`6becf77`): **ADR 0248** recursive-kv-edn — true
+  `pair(atom k, atom v)` map spines (header/request/result ≤3 fields under
+  historical depth 8); main → **-2403**, sha `540e939d…`.
+  Evidence: **168+ tests** green on tip.
+- kotoba-kir#? MERGED (`ee62427a`): **ADR 0025** `adt-depth-limit` **8→12**
+  (document depth stays 8). Evidence: **61 tests / 260 assertions**.
+- compiler MERGED (`9da7a60`): **ADR 0196** pin kir + `:parametric-adt-depth 12`
+  + browser-host runtime value depth 12.
+- west pins: kir → `ee62427a`; compiler → `9da7a60`; provider → `6becf77`
+- Honesty: true-kv under pair ADT landed; depth 12 unlocks 4+ field spines next.
+  Still not `:record` arms on recursive variants; host I/O open. Does **not**
+  flip `:wasm-aot :implemented`.
+
+Still open:
+1. T8.3 residual: 4+ field true-kv (now unblocked by depth 12) and/or true
+   :record-in-variant; host-fetch kit body; only then wasm-aot :implemented
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; design-system cutover (W4 Delivery 6)
 
 
 ## Progress (2026-08-01hc — T8.3/W4 recursive HTTP request/result EDN ADT)
