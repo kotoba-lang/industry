@@ -28,7 +28,9 @@
    "D3: L4 の二重は『どちらが正か未決着』ではなく『2 つの entry point がそれぞれ別の物理ストアを使っている』。live /v1/fold は arrangement+prolly-tree、object store Worker は merkle-lsm。両者は互いを require していない"
    "D4: datalog 抽出の seam は arrangement.source の未使用 require を落とすことで復活する。ipld への唯一の結合は ref? の既定値なので、注入に変えれば新 repo は ipld 依存ゼロになる"
    "D5: CID 検証は IBlockStore を包む decorator 1 つに集約する。現在 6 箇所以上に重複し、最も熱い読み経路には無い"
-   "D6: kotobase-peer/core.cljc の分割線は ≈ line 920。pt/ と cd/ の出現が前半 0 / 後半 15 で、境界は既に事実として存在する"]
+   "D6: kotobase-peer/core.cljc の分割線は ≈ line 920。pt/ と cd/ の出現が前半 0 / 後半 15 で、境界は既に事実として存在する"
+   "D7: 段 6 の範囲は当初想定より狭い。契約は live Datomic 経路では既に採用済み(d1_worker.cljs が IBlockStore/IRefStore/IBackendCapabilities を実装)。未採用は object store Worker のみ"
+   "着地: 段 1 = kotoba-lang/datalog 54b5c2b(west 登録 cf0bc4d)。段 2 = kotobase-storage 7f89027(pin f0bf0b7)。段 3/4 は性質が変わり、段 5/6 は未着手"]
 
   :adr/verify
   ["cd orgs/kotoba-lang/kotobase-peer && grep -c 'pt/' <(awk 'NR<920' src/kotobase_peer/core.cljc)   ; => 0"
@@ -129,9 +131,63 @@ ADR-2607312100 D7 は「arrangement/prolly-tree と merkle-lsm が並存し、AD
    `verified-node`(line 57-64、重複した CID 検証 → 段 2 の decorator が吸収)と
    `ipld/link?` を `ref?` の既定値にしている箇所(line 181/219/261 → 段 1 と同じ注入化)。
 
-6. **peer を storage 契約に合流させる** — 経路 B(Worker)が `kotobase.storage` を
-   src でも deps でも参照せず自前 object store を持つ。契約を採用させるか、
-   明示的に契約外と宣言するか。**曖昧なまま両方が育つのが最大の構造的コスト。**
+6. **object store Worker を契約に合流させる** — 当初「peer を合流させる」と書いたが
+   範囲が広すぎた。実測すると**契約は live Datomic 経路では既に採用されている**:
+   `d1_worker.cljs` は `storage/IBlockStore` / `IRefStore` / `IBackendCapabilities` を
+   実装している。未採用は**経路 B(`object_store/worker.cljs` 6,096 行、
+   `kotobase.storage` 参照 0)だけ**。したがって判断は「Worker を provider として
+   実装させるか、明示的に契約外と宣言するか」に絞られる。
+   **曖昧なまま両方が育つのが最大の構造的コスト。**
+
+# 着地したもの(2026-08-01)
+
+## 段 1 — `kotoba-lang/datalog` 54b5c2b(west 登録 cf0bc4d)
+
+`datalog.index`(純 index、core.cljc 31-82 のみ)/ `datalog.query`(逐語)/
+`datalog.core`(engine)。**追加のみ — `arrangement` は 1eda462 のまま無変更。**
+
+seam が成立した理由は本文の 2 点(dead require の除去と `ref?` の注入化)。
+`ref?` は既定値を与えず**必須引数**にした: 既定値を発明することは呼び手のデータモデルへの
+当て推量であり、外すと逆引き index(`:ocp`)が静かに空または過剰になる。
+
+**runtime 依存は `datom-source` ただ 1 つで、機械検証済み**: `clojure -Spath` の解決結果は
+`src` + datom-source gitlib + clojure core のみ、ipld/multiformats/prolly の一致は 0 件
+(`datom-source` 自身が `:deps {}` なので、これが推移閉包の全体)。
+
+検証: JVM 58 tests / 83 assertions / 0 failures、shadow-cljs `:node-test` も同数、
+clj-kondo 0 errors 0 warnings、CI 両 job green。fresh clone で再実行し同一結果。
+
+判明した追加ギャップ(README に明記): `pull` 不在。rule の否定は非対応(層化未実装、
+明示的に throw)。**`not-join` は `arrangement` にも存在しない**(docstring に「意図的に
+省略」とあるだけ)——当初の指示が移動対象に挙げていたのは誤りで、実態を移植した。
+query planner 無し(clause は左から右へ結合)、`[_ _ o]` は正直な O(database) scan、
+関数 clause は固定ホワイトリスト(regex は ReDoS ベクタとして意図的に除外)。
+
+## 段 2 — `verifying-block-store`(kotobase-storage 7f89027、pin f0bf0b7)
+
+CID 検証を store の性質にする decorator。**失敗ポリシーは throw**
+(`:kotobase.storage/cid-mismatch`)で、`signed_head` の「検証できない head は不在扱い」とは
+**意図的に逆**。理由は不在の意味が違うから: ref の不在は「未 publish」という実在の状態だが、
+**block の不在は「存在しない部分木」と区別がつかない**——改竄ブロックを省略すると破損した
+store が「短い答え」に化け、行が静かに消えたままどこにもエラーが出ない。さらに
+CID を訊くのは何かがそれを指したからなので、不一致は「ホストが持っていない」ではなく
+**ホストが違うバイトを返した積極的証拠**である。
+
+緩和ノブ(`:on-mismatch`)は置かず、代わりに `classify` を用意して唯一の正当な緩い呼び手
+(scrub/repair パス)にだけ逃げ道を与えた。async 版も同梱——動機になった呼び出し箇所
+(Worker の `get-node!`)が async 側なので、sync だけでは適用できない。
+`IRefStore` は wrapped store が実装している時だけ委譲する(常に実装すると
+`backend?` が block-only store に対して true を返す嘘になる)。
+
+zero-runtime-dep は維持(`cid-of` は注入、`io-multiformats` は test-only のまま)。
+検証: JVM 46 tests / 156 assertions / 0 failures、nbb 13 oracles green。
+感度測定済み——ポリシーを一時的に omit に変えると JVM 7 失敗 + async oracle 失敗。
+
+# 残り
+
+段 3(L1 実装所有者の決定)、段 4(2 entry point の命名・分離)、段 5(mega-seam の分割)、
+段 6(object store Worker の契約合流)は未着手。段 5 は段 1-2 の成果物が前半の汚れ
+(`verified-node` と `ipld/link?` 既定値)を消してから着手するのが正しい順序。
 
 # Non-goals
 
