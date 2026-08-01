@@ -22,7 +22,8 @@
    "θ(v)（pooled capital のうち agent が焼いてよい割合）は実現収益の関数であり定数ではない。seed floor は実測済みの GTM 実験1回分で建てる"
    "この設計は ADR-2607320500 の custody 回避決定を反転させる要求である、という認識。両立しないものを両立するかのように書かない"
    "**S(v)（vertical share）と ADR-2607299900 の TOKEN は別々の instrument であり、収益源は交わらない。VLP は TOKEN を必要とせず、両者の採否は独立に判断できる**（§5b）"
-   "**cloud-itonami は既に非エクイティを選んでおり、`guard-non-equity!` と `kernels.substance/equity-blocklist` がそれをコードで強制している（ADR-0010、根拠は FIEA）。Side C はこの選択と衝突し、Side I はこの枠にそのまま乗る** —— 2辺は法的性質の点で対称ではない（§5a）"]
+   "**cloud-itonami は既に非エクイティを選んでいる（ADR-0010、根拠は FIEA）。Side C はこの選択と衝突し、Side I はこの枠にそのまま乗る** —— 2辺は法的性質の点で対称ではない（§5a）"
+   "**その選択を止めているのは「意図」であって substring filter ではない** —— `equity-blocklist` は memo 部分一致で、`revenue share` / `revenue distribution` は通り抜ける（実測）。ADR で「コードが強制している」と書かないこと（§5a 訂正）"]
 
   :adr/supersedes []
   :adr/superseded_by []
@@ -457,7 +458,29 @@ gross
 
 schema 側にも同じ制約が書かれている（`funding-directions`: 「`:contribution` は **profit-participation right を伴わない**」「`:distribution` は……**never a dividend on a stake**」）。強制は `kernels.substance/equity-blocklist`（kotoba-wasm SSoT）にある。
 
-**これは「法務待ち」ではない。この製品は既に非エクイティを選び、その判断を kernel レベルで強制している。**
+**これは「法務待ち」ではない。この製品は既に非エクイティを選んでいる。**
+
+#### 訂正: 「コードで強制している」は言い過ぎだった（2026-08-01 実測）
+
+本節の初版は「その判断を kernel レベルで強制している」と書いた。**設計意図は明確だが、強制は memo 文字列の部分一致であり、VLP の最も自然な言い方は通り抜ける。** 実際に `equity-blocklist` に当てて測った:
+
+| memo | 結果 |
+|---|---|
+| `LP dividend on vertical 5820` | **BLOCK**（`dividend`） |
+| **`revenue share for LP`** | **pass** ← VLP Side C の最も自然な言い方 |
+| **`pro-rata revenue distribution to S(v) holders`** | **pass** |
+| `profit share for pool participants` | BLOCK（`profit share`） |
+| `vertical pool ownership stake` | BLOCK（`ownership stake`） |
+| `payout to blueprint contributor as compensation` | pass ← Side I。正しく通る |
+| `配当の支払い` / `利益分配` | BLOCK |
+
+blocklist は `#{\"equity\" \"dividend\" \"shares\" \"share of profit\" \"profit share\" \"profit-share\" \"ownership stake\" \"cap table\" \"cap-table\" \"投資持分\" \"持分\" \"配当\" \"株式\" \"出資比率\" \"議決権\" \"利益分配\"}`。**`revenue share` / `revenue distribution` が入っていない。**
+
+> **したがって正しい表現はこうである: 設計意図（docstring・schema・ADR-0010）は曖昧さなく非エクイティを選んでいる。強制はその意図に届いていない箇所がある。** 本 ADR の Side C を止めるのは**意図**であって、substring filter ではない。
+
+**これは guard 側の gap でもある。** 同 blocklist の docstring は「**Deliberately broad/over-inclusive** —— false positive はただ memo を言い換えれば済み、それがこの機構の趣旨」と書いている。その趣旨に照らすと、profit-participation の最も一般的な言い方である `revenue share` が抜けているのは**意図された緩さではなく漏れ**に見える。
+
+**ただし本 ADR ではこの blocklist を変更していない。** これは FIEA コンプライアンスの制御であり、**何を弾くようになるかは owner が知った上で決めるべき**である。閉じるなら `\"revenue share\"` と `\"revenue distribution\"`（および `\"収益分配\"`）の追加で足りる、というところまでを記録に留める。
 
 #### 本 ADR にとっての帰結
 
