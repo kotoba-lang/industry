@@ -140,8 +140,33 @@ ADR-2607310900 訂正3)。
 immutable object への range GET。既存 receipt
 (`2026-07-21-materialized-view-100k.edn`、100k rows / 196 blocks / 8.3MB pack)
 では local query kernel が point p50 13.1ms、実 R2 range GET (NRT) が p50
-21ms、合成して warm point ~34ms。NamiDB の warm 1-3ms に対して 10-30x —
-hydrate 経路の ~1000x とは 2 桁違う。**速さを語るならこちらの数字を出す。**
+21ms、合成して warm point ~34ms。**速さを語るならこちらの数字を出す。**
+
+NamiDB の公表値 (namidb.com/benchmarks、LDBC SNB SF1 = 540K elements、
+bench client は LATAM、cloud worker は Hetzner CCX13 / 独、R2 EU) と、
+kotobase の既存 receipt を並べるとこうなる:
+
+| | NamiDB | kotobase |
+|---|---|---|
+| warm query (server-side) | 0.95-2.88 ms (IC02/07/08/09) | hydrate 経路 2,491 ms / MV 経路 ~34 ms |
+| cold | ~370 ms (IC09)、Kuzu・Neo4j の warm-disk より 5-50x 遅いと自認 | hydration 2,282 ms |
+| bulk write | 51.5K elem/s (cloud in-region) / 394K (engine in-mem) | 732-1,235 rows/s (暗号化 + content addressing 込み) |
+| 検証規模 | 540K elements | 10M datoms (2026-07-25 gate) |
+| Neo4j local との比 | IC02 で 1.09 対 0.61 ms (1.8x 遅い) | LDBC harness の receipt 待ち |
+
+注意すべき非対称: ①NamiDB の R2 microbench (PUT 1KiB p50 845ms、GET cold
+432ms、TTFB 140-170ms) は LATAM→EU の大陸横断で、cloud write の 31.9K elem/s も
+これ。プラットフォームの床ではない ②kotobase は全値 AES-256-GCM 暗号化・
+全キー HMAC blind・CID 検証を通っており、NamiDB は平文 — write の差の相当部分は
+製品定義の差である ③NamiDB の 1-3ms は多段 traversal、kotobase の既存
+head-to-head は単一属性 point lookup で、**そもそも同じ質問に答えていない**
+(これを埋めるのが §5 の harness)。
+
+NamiDB が持っていて kotobase が持たないもの: vector search (DiskANN)、BM25、
+RRF hybrid、`CALL algo.*` (PageRank/Louvain/FastRP)、Bolt 互換、Cypher の
+完全な surface。kotobase が持っていて NamiDB が持たないもの: content
+addressing による不変履歴と time travel、commit DAG、CACAO 認証テナント分離、
+edge worker で動くこと。
 
 ### 5. LDBC SNB harness (公表値と同じ土俵)
 
