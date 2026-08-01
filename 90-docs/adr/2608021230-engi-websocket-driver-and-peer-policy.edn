@@ -1,0 +1,75 @@
+[{:db/id -1
+  :adr/id "adr-2608021230-engi-websocket-driver-and-peer-policy"
+  :adr/title "adr-2608021230: WebSocket driver — 方針は純粋に、driver は何も決めない。fake ではなく実ソケットで検証する"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "engi-websocket-driver-and-peer-policy"
+  :adr/authoritative-for
+  ["engi の peer session 方針（backoff・キュー上限・strike）"
+   "WebSocket driver の責務境界"
+   "driver の検証方法"]
+  :adr/related
+  ["adr-2608021130-engi-wire-codec-total-decode-and-identifier-mangling"
+   "adr-2608021030-engi-cljs-first-transport-and-qc-view-bug"
+   "adr-2608020830-engi-pacemaker-view-change"]
+  :adr/evidence ["https://github.com/kotoba-lang/engi"]
+  :adr/body
+  "# ADR-2608021230: WebSocket driver と peer 方針
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+ADR-2608021030 で transport を WebSocket に決め、ADR-2608021130 で運ぶものを定めた。**運ぶ実体が残っていた。**
+
+## Decision
+
+### 1. 方針は純粋に切り出す。driver は何も決めない
+
+`engi.net` が「いつ dial するか・何を queue するか・いつ見限るか」を純粋なデータとして持つ。**方針にはテストする価値のある失敗様態があり、socket には無い。**
+
+素朴な peer ループが間違える 3 点:
+
+1. **即座に再接続する。** 落ちている peer はしばらく落ちている。tight loop は死んだホストに CPU を、SYN に帯域を使う。backoff は pacemaker の view と同じ形で、**伸びなければならず、伸び止まらなければならない**（復帰時間が停止時間に比例しないため）。
+2. **送信キューが無制限。** consensus は broadcast protocol なので、**まだ死んだと判定されていない peer** のキューは**全 proposal と全 vote**になり、**不正なデータを 1 つも含まずに**プロセスがメモリで死ぬ。上限を置き、**古い方**を落とす——consensus では**古い vote は無価値**で、意味があるのは最新のもの。
+3. **不正メッセージを雑音として扱う。** ゴミを送る peer は壊れているか敵対的で、どちらにせよ replica は支出を止めるべき。strike を数え、閾値で drop する。ただし**良いメッセージの連続**で減衰させる——deploy 中の version skew で一度詰まった peer を永久に断罪しないため。**連続**を要求するのは、**ゴミと挨拶を交互に送る peer が永久に生き延びる**のを防ぐため。
+
+### 2. `WebSocket` は global から取る。package を require しない
+
+`(:require [\"ws\"])` は**ブラウザと Worker を壊す**——WebSocket を選んだ理由そのものを潰す。Node 22+ / ブラウザ / Worker はすべて global を持つ。
+
+### 3. fake ではなく実ソケットで検証する
+
+**fake は driver の帳簿を検証するだけで、「話せるか」については何も証明しない。**
+
+`script/check-ws.cljs` が localhost の `ws` server に対して driver を client として繋ぎ、実 certificate を載せた `new-view` を送り、返ってきた vote を decode し、意図的なゴミで strike を 1 つ立てる。
+
+**witness が `[\"w1\" \"w2\" \"w3\"]` のまま届く**——ADR-2608021130 の識別子修正が実線上でも保たれていることの確認。
+
+## 実ソケット検証が見つけたバグ
+
+- **`update-peer!` を peer 引数なしで 5 箇所呼んでいた。** 全 session 遷移が何も更新していなかった。
+- **`(ctor. x)` はローカルに束縛した constructor には使えない。** `new` が要る。
+- （別途）**最初の再接続が base-backoff の 2 倍待っていた。** 遅延に increment 後の失敗数を使っていたため。**表示どおりでない調整済み定数は、未調整の定数より悪い。**
+
+## Consequences
+
+- (+) メッセージが実際に線の上を渡る。Node で実測済み。
+- (+) 方針が純粋なので、分断・低速 peer・敵対 peer を値としてテストできる。
+- (−) **署名集約が無い。**
+- (−) **server 側が無い。** これは dial する側で、**inbound 接続の受理は Worker の仕事**として未実装。
+- (−) ブラウザと Worker での実測はしていない。**global を使うので動くはず**だが、それは主張であって測定ではない——このセッションで繰り返し痛い目を見た型なので明記する。
+- (−) パラメータ（backoff 500ms / queue 512 / strikes 16）は選定値。
+
+## 残りギャップ
+
+1〜6 完了。**7 は pacemaker・sync・wire・net driver が完了**、署名集約と server 側が残り。8 bridge・監査。
+"}]
