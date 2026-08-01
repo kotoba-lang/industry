@@ -1,6 +1,6 @@
 [{:db/id -1,
   :adr/id "adr-2608011200-kotobase-tenant-audit-log-and-admin-console",
-  :adr/title "ADR-2608011200: kotobase.net の enterprise 面 — メール認証は既にあった、監査ログは記録から作った、管理画面はセッションの裏に入れた",
+  :adr/title "ADR-2608011200: kotobase.net の enterprise 面 — メール認証は既にあった、監査ログは記録から作った、管理画面はセッションの裏に入れた、サインインページを DADS に揃えた",
   :adr/status "accepted",
   :adr/doc_type "adr",
   :adr/date "2026-08-01",
@@ -14,9 +14,12 @@
   :adr/repos ["com-junkawasaki/root" "network-awai/net-kotobase"],
   :adr/authoritative true,
   :adr/authoritative_for ["kotobase.net の edge request audit log(kotobase.audit / GET /v1/audit)の意味と、ライブラリ側 guarded read-receipt 面との境界"
+                          "authn.kotobase.net /sign-in を jp-go-dds で作る決定と、その代償(dark mode 喪失)"
+                          "west checkout が pin に追随していないことが繰り返しビルドを壊すという観測と、その運用ギャップ"
                           "/admin をセッションの裏に置く決定と、browser には 302 / API client には 401 という分岐の理由"
                           "enterprise 面で「実装済み」と「未実装」の現在地(2026-08-01 実測)"],
   :adr/last_verified "2026-08-01",
+  :adr/session-closed "2026-08-01",
   :adr/source-format "edn-only (ADR-2607171600)",
   :adr/primary-sources ["live 実測 2026-08-01: authn.kotobase.net /sign-in 200(email フォーム実在) / POST /v1/email/start 400→200 / kotobase.net /v1/audit 401 / /admin 302(browser) 401(API)"
                         "net-kotobase main f601c0b(audit)・671a20e(console)、Worker Version fec286b6 → 7eacff9b"
@@ -27,8 +30,10 @@
                    "OAuth provider は google/github の 2 つのみ、かつ本番未設定(サインイン画面が「No third-party sign-in providers are configured.」と表示)。"
                    "Enterprise プランが謳う 99.999% SLA の裏付け(uptime 計測・status page・インシデント記録)が無い。"
                    "audit は transparency-log / audit-anchor に anchoring されていない。KV の best-effort・結果整合。"
-                   "authn.gftd.ai は今も 301 → auth.gftd.ai → 404。kotobase.net はもう参照していないが、他に参照するものがあれば壊れている。"],
-  :adr/verification "clojure -M:test → 98 tests / 586 assertions(既存 3 failure は本 diff 非関連の component-test: uncataloged JS provider sources x2 と worker/js artifact)。clojure -M:site-test → 29 tests / 164 assertions, 0 failures。shadow-cljs release clean(undeclared-var 警告 3 件は kotobase.x402 の既存分)。live: /v1/audit は無ヘッダ/偽装 DID/不正 Bearer/不正 cookie の 4 パターンとも 401、/admin は browser 302・API 401、/ /signup /health /api/funnel は 200 のまま。",
+                   "authn.gftd.ai は今も 301 → auth.gftd.ai → 404。kotobase.net はもう参照していないが、他に参照するものがあれば壊れている。"
+                   "sign-in ページの dark mode は DADS 移行で失われた(DADS にダークパレットが無い)。復帰させるなら design system 側の課題。"
+                   "west checkout が pin に追随していない状態が常態化している(本セッションで 4 回ビルドを壊した)。ルール化も自動検査も未着手。"],
+  :adr/verification "clojure -M:test → 98 tests / 586 assertions(既存 3 failure は本 diff 非関連の component-test: uncataloged JS provider sources x2 と worker/js artifact)。clojure -M:site-test → 29 tests / 164 assertions, 0 failures。shadow-cljs release clean(undeclared-var 警告 3 件は kotobase.x402 の既存分)。live: /v1/audit は無ヘッダ/偽装 DID/不正 Bearer/不正 cookie の 4 パターンとも 401、/admin は browser 302・API 401、/ /signup /health /api/funnel は 200 のまま。authn 側: clojure -M:test → 7 tests / 60 assertions, 0 failures。design-quality の決定論的 HIG/WCAG 監査は移行後 100.00・移行前も 100.00(findings なし)。live /sign-in 200 で dads-heading x32、liquid-glass / shitsuke__ / hig- は 0 件、form action 3 本と passkey DOM 契約 4 点は保持、未置換スロットは 0 件。",
   :adr/body
   "## Context
 
@@ -155,6 +160,54 @@ needle は性質に置き換えた** — 描画結果を `sk-…` / `Bearer …`
 で走査する。**「秘密は埋め込みません」と書いた文は、誰かが秘密を貼り付けた後も通り
 続ける。**
 
+### D9. サインインページも DADS に揃える(2026-08-01 追加)
+
+kotobase.net の 4 ページは 2026-07-30 に DADS へ移ったが、**その受け渡し先である
+`authn.kotobase.net` /sign-in は kotoba-ui/liquid-glass のままだった**。
+`/signup → sign-in → 戻る` は歩く人にとって 1 つの流れであり、継ぎ目は
+**訪問者が「これに ID を預けるか」を判断するその段階**に落ちていた。
+
+DOM 契約が load-bearing なので、保持したうえで**生成物に対して実測で確認**した
+(仮定しない): `{{RETURN_TO}}` x4 / `{{EMAIL}}` `{{OAUTH}}` `{{ERROR}}` 各 x1、
+`[data-return-to]` `#passkey-status` `data-act=passkey-create/-use` 各 x1、
+form action 3 本(`/v1/cacao/session` `/v1/email/start` `/v1/email/verify`)、
+旧スタック(`liquid-glass` / `shitsuke__` / `hig-` / `kotoba-shell`)は 0 件。
+
+DADS の `button` が `:attrs` を透過するので `data-act` を**本物の DADS ボタン**に
+載せられた。手書きボタンにすれば DADS の CSS を app 側へ複製することになっていた。
+
+**危うく壊すところだった**: 一度 `passkey-js` の def を消したが、
+`scripts/render_pages.clj` がそれを読んで `/passkey.js` を生成している。出していれば
+passkey 認証が丸ごと死んでいた。原文のまま戻し、再生成後 byte 同一を確認した。
+
+**得られなかったものと失ったものを両方書く**:
+- 決定論的 HIG/WCAG 監査は移行後 100.00 だが**移行前も 100.00**。旧版が既に上限
+  だったので、この移行の根拠は測定値ではなく hand-off の一貫性である。
+  数値が上がったかのように書かない。
+- **dark mode を失った。** 旧版は `:appearance :auto`。DADS はダークパレットを
+  持たず(vendored CSS に `prefers-color-scheme` が 1 行も無い)、`jp-go-dds.page` が
+  `color-scheme: light` を打つ。選んだ design system の代償であってバグではない。
+
+### D10. 繰り返し観測 — pin は正しく、checkout が追随していない
+
+本セッションで**同じ型のビルド破壊が 4 回**起きた。いずれも pin は正しく、
+ローカル checkout が pin と別の commit にいたことが原因である:
+
+1. `jp-go-digital-design-system` が 8 behind → `clojure -M:render-site` が
+   `No such var: dds-tokens/root-css-resource` で全滅(新規 clone でもサイト再生成不能)
+2. `kotoba-ui` / `shitsuke` / `liquid-glass-ui` の checkout が pin より古い →
+   再生成すると CSS が巻き戻る(`data-appearance` の dark/light ブロックが消える)寸前
+3. `clj-edge/node_modules` が消えていた → `shadow-cljs: command not found`
+4. `webauthn` が pin `4f8a5976` でなく `3ee6c51`(= `edge.cljs` が入る前)で detached、
+   `authentication` も pin 外 → `namespace webauthn.adapters.edge is not available`
+
+CLAUDE.md は「**pin を前進させる**」側を詳細に規定しているが、
+「**checkout を pin に追随させる**」側が運用として抜けている。ビルド前に対象
+project の checkout が pin と一致するかを確かめる一行(`west update --fetch smart
+<name>`)があれば 4 件すべて防げた。**ルール化も自動検査も未着手**(known-gap)。
+候補は (a) CLAUDE.md への明文化 (b) `scripts/resource-guard.mjs` の build スコープに
+checkout==pin の照合を噛ませる、のいずれか。
+
 ## Consequences
 
 - `GET /v1/audit` が稼働(Worker `fec286b6`)。無ヘッダ・偽装 DID・不正 Bearer・不正
@@ -166,4 +219,9 @@ needle は性質に置き換えた** — 描画結果を `sk-…` / `Bearer …`
   次に企業レビューを止めるのはそこになる。
 - Enterprise プランは 99.999% SLA を謳い続けているが裏付けが無い。**謳うのをやめる**
   判断も選択肢として残っている。
+- `authn.kotobase.net` が DADS で稼働(Worker `5ef07226`)。`/signup → sign-in → 戻る`
+  が 1 つの design system になった。
+- `authn/package-lock.json` を追跡下に入れた。この repo の他 6 パッケージはすべて
+  lockfile を持っており、authn だけが例外だった —— identity service のビルドが
+  「その日 npm が解決したもの」で決まる状態だった。
 "}]
