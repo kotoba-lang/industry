@@ -349,7 +349,28 @@ Rust を書く / `.sh` `.mjs` を書く / D1・KV に object を置く /
 presign 鍵を持たない provider（memory、embedded）が「presign できるふり」をして最初の
 upload で落ちるのを、配線時に落とすため。ref profile と同じ設計語彙。
 
-**次（G1）**: `sigv4.request/presigned` は現状 host しか署名しない
+**G1 の入口ブロッカーは解消済み（2026-08-01）**: `sigv4` に `presigned-request` を追加し、
+渡された `:headers` を**署名対象に含める**ようにした（pin 610e66c、west 前進済み）。返り値は
+`{:url :method :headers :signed-headers :expires-seconds}` で、client が送り返すべきヘッダを
+そのまま返す。`presigned`（URL 文字列だけ）は後方互換のまま。期待署名は独立実装（Node crypto）
+で算出し、**99999 バイトなら必要になる別署名**も併せて pin してあるので、binding が主張でなく
+実証になっている。JVM 32 tests / 93 assertions + cljs 経路（`scripts/verify-cljs.cljs`）green。
+B2 形の provider を組んで `kotobase.storage.object-contract/verify` を通すところまで実測確認済み
+（failures 0、`bound-put-grant?` true、URL に `X-Amz-SignedHeaders=content-length%3Bhost`）。
+
+途中で cljs 側のバグを1つ発見・修正した: `presigned` が promise の callback に裸の `:url`
+keyword を渡していた。JVM では適用されるが、JS では **Keyword は typeof function ではない**ため
+Promise 仕様が callback を無視し、入力（map 全体）がそのまま解決される。**JVM のテストは全部
+通っていて、cljs 経路の検証だけが捕まえた** — 同型の罠は他の `then` 経路にもありうる。
+
+**次（G1 の残り）**: **large-object 契約の非同期版が要る**。cljs では `-presign-*` も
+`-stat-object` も Promise を返すので、`kotobase.storage.object-contract`（同期）では Worker 側
+provider を検証できない（実測: nbb で同じ provider を流すと href が nil になり
+`invalid large-object transfer grant` で落ちる — これは port の欠落であって sigv4 の問題ではない）。
+block 面には既に `contract.cljc` + `async_contract.cljs` の対があるので、同じ対を object 面にも
+作る。その後 B2 provider（`kotobase-storage-s3`）→ net-kotobase の route。
+
+**旧記述（解消済み、参考）**: `sigv4.request/presigned` は host しか署名しない
 （`sigv4/request.cljc` の `presigned` が headers も signed-headers も host 固定のまま
 `v4/canonical-request` を作る）ので、`content-length` を署名対象に含める拡張が要る。それが無い限り
 PUT grant は白紙小切手のままで、契約 suite の `bound-put-grant?` は**正しく**落ち続ける。
@@ -357,9 +378,9 @@ PUT grant は白紙小切手のままで、契約 suite の `bound-put-grant?` �
 **再開の最初の一手**（この ADR だけ読めば再開できるように）:
 
 ```
-# 1. sigv4 に署名対象ヘッダを足す（現状 host 固定）
-#    orgs/kotoba-lang/sigv4/src/sigv4/request.cljc の presigned に signed-headers を通す
-cd orgs/kotoba-lang/sigv4 && clojure -M:test
+# 1. 済: sigv4 の presigned-request（pin 610e66c）
+# 1b. object 面の async contract を作る（block 面の async_contract.cljs と同じ対）
+#     orgs/kotoba-lang/kotobase-storage/src/kotobase/storage/object_async_contract.cljs
 # 2. B2/R2 provider に IPresignedTransfer を実装し、契約 suite を通す
 #    bound-put-grant? が green になったら G1 の半分
 cd orgs/kotoba-lang/kotobase-storage-s3 && clojure -M:test
@@ -367,7 +388,7 @@ cd orgs/kotoba-lang/kotobase-storage-s3 && clojure -M:test
 #    解決済みの stat/grant を渡す — kotobase-lfs の README の The engine does no I/O
 ```
 
-**まだ無いもの（G1 以降、着手ゼロ）**: presign 拡張 / B2 provider / net-kotobase の
+**まだ無いもの（G1 以降）**: object 面の async contract / B2 provider / net-kotobase の
 LFS route と CACAO 認証 / `git-credential-kotobase` / annex adapter の grant 経路への
 差し替えと `CHECKPRESENT` の tenant 化 / holding + refcount の datom / DataLad sibling。
 **production は無変更**（`/ipfs/:cid`・directory store・B2 S3 special remote のまま、
