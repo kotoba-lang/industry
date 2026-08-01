@@ -433,3 +433,32 @@ KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get <ITEM>
   ＋ LaunchAgent `com.gftd.playtest-coscientist`）が `MURAKUMO_CLAUDE_TOKEN` として
   これを読む。新しい `/v1/messages` consumer も同じ secondary スロットで rotation
   なしにオンボードできる。
+
+## murakumo x402 ingest service token (ADR-2608010000、2026-08-01)
+
+- **`MURAKUMO_SERVICE_TOKEN`（kagi vault、compartment `gftdcojp`、
+  `KAGI_HOME=$HOME/.kagi`）** — `murakumo.cloud` の `POST /x402/ingest`（フリートが
+  検証済み USDC-transfer view を push する経路）の Bearer。Worker `murakumo-cloud`
+  の同名 secret と同値。取得:
+  `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get MURAKUMO_SERVICE_TOKEN`。
+  - **2026-08-01 に新規発行した（ローテーションではない）。** 発行前は kagi にも
+    Worker secret list にも存在せず、`/x402/ingest` は設計どおり 503 を返していた。
+    消費者ゼロを `wrangler secret list` で確認した上で作成しているので、既存の
+    caller を壊していない。
+  - ⚠ **`cloud-murakumo` の `post-to-ledger!` も同名の env を読む**（`/infer/runs`
+    への bearer）。未設定時は単にヘッダを付けない実装なので今回の追加で挙動は
+    変わらないが、**将来この値を rotate するときは ingest と ledger POST の両方に
+    効く**ことを忘れないこと。
+  - **launchd 経路は kagi ではなくファイル**: `~/.gftd/murakumo-service-token`
+    （mode 600）。**launchd 下では kagi が Keychain unlock prompt を出せずに
+    timeout する**ため（fleet-ci が先に踏んだ壁、ADR-2607178000 §3 と同じ答え）。
+    LaunchAgent plist は world-readable なので plist 本体には絶対に書かない。
+    常駐: `com.gftd.murakumo-x402-ingest`（60秒間隔）。
+  - 消費側: `orgs/network-awai/cloud-murakumo/scripts/x402-ingest.cljs`
+    （env → `MURAKUMO_SERVICE_TOKEN_FILE` の順で解決。argv には載せない）。
+
+- **`murakumo-base-rpc-url`（kagi、compartment `personal`）— まだ存在しない。**
+  keyed Base RPC エンドポイント（`https://base-mainnet.g.alchemy.com/v2/<key>` 等）を
+  置く先として `scripts/provision-rpc-key.cljs` が読む item 名。**アカウント登録と
+  鍵発行はオーナー作業**（安全床①）。設定すると Worker secret `MURAKUMO_BASE_RPC`
+  として最優先の RPC になる。未設定でも公開エンドポイントへフォールバックする。
