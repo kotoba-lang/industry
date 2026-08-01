@@ -223,9 +223,57 @@ schema-version を読んで codec を選ぶようにして 3 箇所すべてを�
 判断したのが誤り。** 残る問題は「書けない」ではなく「遅い」で、それは index-free
 adjacency か fixpoint 評価の改善という別の作業。
 
+## brick 5/6: cache stack（2026-08-01、実測付き）
+
+外部分析（Hummock がなぜ速いか）を突き合わせた結果、**分析が挙げる速さの要因の
+うち kotobase に無いのはキャッシュ層だけ**だと分かった。調べた結果:
+
+| Hummock の要因 | kotobase |
+|---|---|
+| immutable append-only SST / block 単位 Range read / block サイズ制御 / compaction 分離 / MVCC / incremental MV | ✅ すべてある |
+| **block cache** | ❌ 無い |
+| **metadata cache** | ❌ `verified-node` が毎回 再読込＋再ハッシュ |
+| **index 読み経路の Bloom** | ❌（view にはある） |
+| **local tier** | ❌ |
+
+そして multi-hop が遅い原因も同じだった。**再帰クエリは同一パターンを 22 回
+スキャンしている**（distinct patterns = 1）。magic sets の問題ではなく
+**キャッシュミスの問題**。
+
+2 つの lib として実装し、engine を 1 行も変えずに**包んで**足せるようにした:
+
+- **`kotoba-lang/block-cache`** — CID キーの block cache。**content-addressed
+  なので invalidation が原理的に不要**（TTL も coherence protocol も要らない）。
+  bound は entry 数ではなく **byte**（kotobase の block は 16–128KB なので
+  「1000 entries」は 16MB にも 128MB にもなり、128MB Worker では致命的）。
+  `:verify!` は **miss 時のみ** — 変わりようのないものを毎回再ハッシュしても
+  何も証明しない。
+- **`datom-source/cached`** — scan 単位。**pattern は version ではない**ので
+  1 クエリ / immutable snapshot にスコープする（block cache の安全性は
+  こちらには継承されない。テストで staleness を固定してある）。
+
+**実測**（`clojure -M:cache-bench`、再帰クエリ）:
+
+| composition | k=40 | k=80 | k=160 |
+|---|---|---|---|
+| cursor（baseline） | 43 blocks | 83 | 163 |
+| + block-cache | **2** | **2** | **2** |
+| + scan-cache | **2** | **2** | **2** |
+| + 両方 | **2** | **2** | **2** |
+
+**O(k) → 定数 2。定数はデータ量で動かない。**
+
+⚠ **blocks 列を読むこと、ms 列ではなく。** ベンチの store は in-memory map で
+block read のコストがゼロなので、**block cache は時間の勝ちを示せない**（
+bookkeeping を足すだけ）。その価値は block read の実コストに比例し、production
+では R2/D1 の往復。実際 k=160 で block-cache 単独が baseline より遅い行が出る —
+**存在しないコストに対して最適化を測るとこうなる**という見本。
+
 ## 未着手
 
-1. **multi-hop の高速化**（上記。100 ノードで 854ms は on-chain の資金追跡には遅い） — multi-hop（Neo4j の index-free adjacency 相当）。他 3 つとは
+1. **kotobase-peer への適用** — 上の 2 lib は `arrangement` 層で実測しただけで、
+   production の `verified-node` / `cold-datoms` にはまだ入れていない
+2. **multi-hop の高速化**（上記。100 ノードで 854ms は on-chain の資金追跡には遅い） — multi-hop（Neo4j の index-free adjacency 相当）。他 3 つとは
    別物で、`arrangement` に新しい索引が要る。prefix scan では埋まらない。
 2. **kotobase 本体への適用** — brick はすべて `arrangement`/`datom-source` の層にあり、
    kotobase の durable plane（kotobase-peer / D1 / DO）はまだ materialize 経路。
