@@ -3,7 +3,7 @@
   :adr/doc_type "adr"
   :adr/source-format "edn"
   :adr/authoritative true
-  :adr/status "proposed"
+  :adr/status "accepted"
   :adr/date "2026-08-01"
   :adr/last_verified "2026-08-01"
   :adr/deciders ["Jun Kawasaki"]
@@ -40,7 +40,7 @@
   :adr/body
   "# ADR-2608012600: 大容量オブジェクト面は1つ、protocol adapter は2つ
 
-**Status**: proposed（設計のみ。実装ゼロ。現に動いている経路は directory store と B2 S3 special remote のままで、この ADR はそれを止めない）
+**Status**: accepted（G0 着地。G1 以降は未着手。現に動いている経路は directory store と B2 S3 special remote のままで、この ADR はそれを止めない）
 **Date**: 2026-08-01
 
 ## Context — 今どこにいるか（実コードで確認した現在地）
@@ -322,5 +322,33 @@ Rust を書く / `.sh` `.mjs` を書く / D1・KV に object を置く /
   従わせる。B2 の last-writer-wins に載せない。
 - **wire の作法が面ごとに違う**（XRPC は 200+ok:false、LFS は HTTP status）。両方を1つの
   worker が話すので、ルーティングの根で作法を分けないと ADR-2607175000 (3) の鏡像事故になる。
-- **この ADR は設計であり、実装は1行も無い**。現在動いている経路（directory store、
-  B2 S3 special remote、`/ipfs/:cid`）は何も変わらない。"}]
+- **実装は G0 までで、production は何も変わっていない**。現に動いている経路
+  （directory store、B2 S3 special remote、`/ipfs/:cid`）はそのまま。kotobase.net に
+  LFS の口はまだ無い。
+
+## 実装状況（2026-08-01）
+
+**G0 着地済み。**
+
+| 何 | どこ | 検証 |
+|---|---|---|
+| `ILargeObjectStore` 系 3 protocol + transfer profile + 契約 suite + memory 実装 | `kotobase-storage`（`kotobase.storage.object` / `object-memory` / `object-contract`、pin 84abcc4） | JVM 32 tests / 118 assertions、nbb で cljs 分岐も実行 |
+| identity（lfs oid ⇄ annex key ⇄ CID、導出不可は fail-closed） | `kotobase.storage.object-id`（zero-dep、`io-multiformats` と test で突き合わせ） | 同上 |
+| LFS wire（pointer / batch / engine、locks は 501） | 新規 `kotoba-lang/kotobase-lfs`（west 登録済み、pin 9c47398） | JVM 23 tests / 74 assertions、nbb で再実行 |
+
+**設計の訂正 1（D11 の補強、実装中に判明）**: engine を「store を注入して engine が呼ぶ」
+形にすると **Worker で成立しない** — cljs では `-stat-object` も SigV4 presign も Promise を
+返すので、JVM では通り production では未解決の Promise を返す。**engine は I/O をせず、
+解決済みの stat と grant を受け取る**形に直した（`grants-needed` で「grant が要る object」
+だけを先に列挙できるので、caller は必要な分だけ await すればよい）。同期 store 用の
+`stat-fn` / `proxy-grant-fn` で元の1行呼び出しにも畳める。**`kotobase-storage` が block 面で
+既に引いていた同期/非同期の線と同じ線**であり、LFS 面だけ例外にはできなかった。
+
+**設計の訂正 2（transfer profile を増やした理由）**: D4 は presigned だけを想定していたが、
+`:presigned-transfer` / `:proxied-transfer` の2択を **provider に申告させる**形にした。
+presign 鍵を持たない provider（memory、embedded）が「presign できるふり」をして最初の
+upload で落ちるのを、配線時に落とすため。ref profile と同じ設計語彙。
+
+**次（G1）**: `sigv4.request/presigned` は現状 `host` しか署名しないので、`content-length` を
+署名対象に含める拡張が要る（それが無い限り PUT grant は白紙小切手のままで、契約 suite の
+`bound-put-grant?` は正しく落ち続ける）。その後 B2 provider → net-kotobase の route。"}]
