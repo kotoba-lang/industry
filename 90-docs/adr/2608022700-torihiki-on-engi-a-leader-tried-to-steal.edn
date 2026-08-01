@@ -1,0 +1,82 @@
+[{:db/id -1
+  :adr/id "adr-2608022700-torihiki-on-engi-a-leader-tried-to-steal"
+  :adr/title "adr-2608022700: 合意は「誰が block を提案したか」を言い、「誰が金を所有するか」は言わない — Byzantine leader が account を先取りし、run は pass と報告した"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "torihiki-on-engi-authentication"
+  :adr/authoritative-for
+  ["engi 合意上での torihiki transaction 認証"
+   "BFT 下での account 先取り攻撃と、genesis binding という緩和"]
+  :adr/related
+  ["adr-2608022600-torihiki-on-engi-four-replicas-one-exchange"
+   "adr-2608020230-torihiki-authenticated-transactions"]
+  :adr/evidence ["https://github.com/kotoba-lang/engi/commit/09d28e392cecbbf3a92f3d01d26dc9d45701a02d"]
+  :adr/body
+  "# ADR-2608022700: leader が盗もうとした
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+**transaction を未認証で適用するということは、validator が任意の account の代理で transaction を block に入れられるということ。**
+
+すべての正直な replica がそれを適用し、結果に合意し、一致する state root を produce する。**何も間違って見えない —— replica たちは「他人があなたの position を使うこと」について完璧に合意している。**
+
+**合意は「誰が block を提案したか」を言う。「誰が金を所有するか」については何も言わない。**
+
+## Decision
+
+transaction は署名付き envelope とし、`torihiki.auth` が **`apply-block` の内側で**検査する（nonce と鍵束縛は server state ではなく **consensus state**）。
+
+Byzantine **leader** を set に置く: w4 が、自分が提案するすべての block に「account 1 としての注文、自分の validator 鍵で署名」を注入する。
+
+## 1 回目、泥棒が勝ち、run は pass と報告した
+
+**`torihiki` は account id を「最初にその id で認証に成功した公開鍵」に束縛する。**
+
+**単一 sequencer では所有者が常に先**であり、だからこれは今まで問題にならなかった。**BFT では block を提案するのは Byzantine leader** なので、**誰も触っていない id に対しては、それが account を先取りする** —— そして**正当な所有者は自分の account で、永久に、すべての transaction を `:wrong-key` で拒否される。**
+
+実際にそうなった。**account 1 は -50 で終わった —— ちょうど泥棒の注文の大きさ**で、その間**所有者自身の transaction が 34 件拒否**されていた。
+
+**run は PASS と報告した。拒否が存在するかを見て、それが誰のものかを見ていなかったから。**
+
+### 緩和と、正しい解
+
+**account は genesis で束縛する** —— 実配備で bridge の入金がやることと同じで、**account を作るものが鍵を知っている**。
+
+一般解は**鍵から導出したアドレス**であり、`torihiki.auth` 自身が既に「それが正しい答えで、アドレス形式ができるまで先送りする」と書いている。
+
+**捕まえられたはずの assertion** も入れた: **account 1 は買いしか出さないので、short position は「他人がその代理で売った」ことを意味する。**
+
+## 途中の小さい 2 件
+
+- **`apply-block` は block ごとに `:rejected` を reset する** ので、100 block を畳むと**最後の 1 block の拒否しか残らない**。これは「一度も拒否されていない」と読め、**泥棒が拒否されていないと報告しつつ position は別のことを言っていた**理由。累積するようにした。
+- **期待値が `:bad-signature` と書いていて、engine が `:wrong-key` と答えたのが正しかった** —— 束縛は署名より先に検査され、それは**より安価でより良い答え**。このセッション 10 度目の「test が間違い、code は正しい」。
+
+## 実測
+
+```
+  positions {1 38, 2 -30, 3 -8}   account 1 は long（買いしか出していない）
+  rejected {:wrong-key 34}        すべて泥棒のもの
+  every replica the same : true
+```
+
+## Consequences
+
+- (+) 合意経路上で transaction が認証される。**validator は他人の金を動かせない。**
+- (+) BFT 特有の account 先取り攻撃が**具体的に実証され**、緩和された。
+- (−) **genesis binding は harness の緩和であって、torihiki の設計変更ではない。** 鍵導出アドレスが正しい解として残っている。
+- (−) 1 プロセス内。proposal に transaction JSON を直接載せている。
+- (−) **`torihiki-node` は依然として単一 sequencer** —— これは harness であって deploy された node ではない。
+- (−) 証拠は保持されるが slash されない。証拠は伝播しない。
+
+200 tests / 1119 assertions。`network.cljs` も pass。JVM/nbb parity 一致。
+"}]
