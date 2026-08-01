@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "shinshi.club",
  :zone
- {:requests-7d 13118,
-  :pageviews-7d 9142,
-  :uniques-7d-sum 1595,
+ {:requests-7d 13133,
+  :pageviews-7d 9146,
+  :uniques-7d-sum 1605,
   :zone "shinshi.club"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
   [{:path "/xrpc/ai.gftd.apps.shinshi.listAuthorFeed", :requests 1148}
-   {:path "/", :requests 95}
+   {:path "/", :requests 92}
    {:path "/express/.env.credentials", :requests 64}
    {:path "/shared/.env.smtp", :requests 64}
    {:path "/docker/.env.local", :requests 64}
    {:path "/build/.env.dev", :requests 64}
    {:path "/backend/backup.sql.gz", :requests 60}
    {:path "/.heroku/.env.sendgrid", :requests 60}],
-  :status-mix {:ok 4348, :client-error 274},
+  :status-mix {:ok 4293, :client-error 274},
   :window "24h"},
  :source "shinshi.d1:pv_daily+chat_event_daily+pay_run",
  :window "7d",
  :as-of "2026-08-01",
  :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 1148 · / 95 · /express/.env.credentials 64 · /shared/.env.smtp 64 · /docker/.env.local 64 | 4xx(probe) 6%",
- :funnel {:visitors 1374, :chatters 231, :scenes 0, :paying 0},
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.shinshi.listAuthorFee… 1148 · / 92 · /express/.env.credentials 64 · /shared/.env.smtp 64 · /docker/.env.local 64 | 4xx(probe) 6%",
+ :funnel {:visitors 1377, :chatters 231, :scenes 0, :paying 0},
  :signal
- "shinshi.club 実測 13118 req/7d・1595 uniques(日次和)・うち4xx probe 6%(24h)"}
+ "shinshi.club 実測 13133 req/7d・1605 uniques(日次和)・うち4xx probe 6%(24h)"}
