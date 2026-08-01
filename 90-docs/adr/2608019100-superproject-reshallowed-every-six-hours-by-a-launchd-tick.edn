@@ -127,9 +127,10 @@ gh api \"repos/com-junkawasaki/root/compare/<HEAD>...<origin/main>\" \\
      :resolved \"git ではない。`innen record tick` CLI の引数であり本件と無関係\"}
     {:gap \"`~/.gftd/` で git を fetch するスクリプトは2件あり、**2件とも** ADR-2607211600 に違反していた\"
      :note \"母数が2で違反が2。偶発ではなく、この死角に置かれたスクリプトは repo の規約から外れるのが既定だと考えるべき\"}
-    {:gap \"（半分解消 2026-08-01）修正の実効\"
-     :verified \"**fleet-ci-murakumo tick は本番で検証済み。** 修正 04:34 → tick の log 最終更新 05:29（修正後に実走）→ `org-spirit-in-physics-comics` は shallow=false のまま。以前ならこの実行で再び潰れていた\"
-     :pending \"**qwen36 tick は未検証。** 修正 04:05 に対し log 最終更新は 02:43（修正前）で、まだ走っていない。次回は約 08:43（02:43 + 21600 秒）。`git rev-parse --is-shallow-repository` が false のままなら成功\"}
+    {:gap \"（完全に解消 2026-08-01）修正の実効 — **両方とも本番で検証済み**\"
+     :fleet-ci-murakumo \"修正 04:34 → log 最終更新 05:29（修正後に実走）→ `org-spirit-in-physics-comics` は shallow=false のまま\"
+     :qwen36 \"修正 04:05 → **08:43 に実走**（予測 02:43 + 21600 秒と一致）→ superproject は shallow=false、`.git/shallow` は存在せず、**到達可能 commit 18,209**。修正前ならこの実行で再び潰れていた（07-31 20:42 と 08-01 02:43 で実際にそうなっていた）\"
+     :script-health \"編集後に初めて走った実行で、tick は正常終了している —— `landed on main: d28861c6a1d8` の後 `=== run end`、launchctl の最終終了コード 0。ログ先頭の `Could not find namespace: kotobase.client` は **116 run 中 144 回**出現する長期の既存事象で、git fetch のフラグ2箇所しか触っていない本修正とは無関係\"}
     {:gap \"検査は landing したが、どこからも呼ばれていない\"
      :note \"`scripts/audit-gftd-scripts.cljs`（ed8f6ef2）は手で実行する読み取り専用レポータ。hook にも CI にも繋いでいない —— 繋ぐ判断は owner のもので、かつ現在 3 件の既知違反（`.sh` × 3、うち 2 件 launchd 稼働中）があるため、繋げば即座に落ちる\"}]"
 
@@ -193,6 +194,15 @@ gh api \"repos/<org>/<repo>/compare/<HEAD>...<origin/main>\" \\
 
 （`run-innen-tick.cljs` の `--depth` は `innen record tick` CLI の引数で git ではない。除外。）
 
-## 正直に残す
+## 検証完了（2026-08-01）
 
-修正の実効は**次の定期実行（最大6時間後）まで未検証**である。両スクリプトとも末尾に `(-main)` を持ち、読み込むと worktree 作成や push が走るので、確認のために手で実行はしていない。`git rev-parse --is-shallow-repository` が両 repo で false のままなら成功である。"}]
+**両方とも本番の定期実行で確認した。** 手で走らせず、実際のスケジュール実行を待った —— 両スクリプトとも末尾に `(-main)` を持ち、読み込みが即実行（worktree 作成・push）になるため。
+
+| tick | 修正 | 実走 | 結果 |
+|---|---|---|---|
+| fleet-ci-murakumo | 04:34 | 05:29 | `org-spirit-in-physics-comics` は shallow=false のまま |
+| qwen36 | 04:05 | **08:43** | superproject は shallow=false、`.git/shallow` 無し、**到達可能 commit 18,209** |
+
+qwen36 の実走時刻は予測（02:43 + 21600 秒）と一致した。**修正前なら、この実行がまさに superproject を再び潰していた** —— 07-31 20:42 と 08-01 02:43 で実際にそうなっていたのがそれである。
+
+編集後の初回実行で tick 自体も正常終了している（`landed on main: d28861c6a1d8` → `=== run end`、終了コード 0）。ログ先頭の `Could not find namespace: kotobase.client` は 116 run 中 144 回出る長期の既存事象で、git fetch のフラグ2箇所しか触っていない本修正とは無関係である。"}]
