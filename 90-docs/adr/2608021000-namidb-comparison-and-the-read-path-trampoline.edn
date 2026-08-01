@@ -183,37 +183,65 @@ subset は決定的で、内訳を receipt に書く: 全 person (9,892) と全 
 サンプルしない。message は creationDate 降順で N 件の Post + その返信木を
 丸ごと (IC08 の返信・IC07 の like が実際の深さを持つように)。
 
-**状態: harness は着地済み、receipt はまだ無い。** 2026-08-01 の実行は
-3 回とも完走しなかった — この workstation の load average が実行中に
-130 → 430 まで上がり、JVM が `jstack` にも 10 秒以内に応答しないところまで
-枯渇した (load 43 まで回復した窓でも 1 プロセスが 1 コアの 4-20% しか
-取れない)。**数字を捏造するくらいなら receipt を出さない。**
-再現コマンド:
+**receipt が出た (2026-08-01、4 回目の実行で完走)。**
+`kotobase-peer/bench/results/2026-08-01-ldbc-snb-interactive.edn`。
 
-```
-clojure -M:ldbc-snb-bench <ldbc-sf1>/dynamic 3000 15
-```
+**まず正しさ**: IC02/IC07/IC08/IC09 の 4 本すべてで両エンジンの答えが
+一致した (`:answers-agree {:ic02 true :ic07 true :ic08 true :ic09 true}`)。
+時間を測る前にこれを assert する設計で、通った。
 
-その試行で harness 側の欠陥が 3 つ見つかり、**receipt が存在する前に**
-直した (うち 2 つは kotobase に、1 つは Neo4j に不利な数字を出すところだった —
-どちらも「データベースについての数字」ではなく「harness についての数字」に
-なっていた):
-①IC09 が 1-2 hop の友人集合を解いた後、**到達した人ごとに point query を
-発行**していた。高次数の LDBC start person は 2 hop で ~1,300 人に届くので、
-これは Neo4j の可変長パス展開に対して Clojure のループを測っていた —
-2 本の join の union に直した。②loader が `comment_0_0.csv` と likes 2 本を
-全行 vector 化してから捨てており、数 % しか残さない subset に対して RSS
-4.7GB を使っていた — reducing function での streaming に直し、返信森を先に
-(細い replyOf ファイルだけで) 解いてから 2M 行の本文ファイルを 1 回流す形に
-した。③Neo4j の relationship 投入が `MATCH (a:X {..}), (b:Y {..})` の
-カンマ形と平文 index だった。カンマ形は両方の property 述語が seek に
-押し込まれない限り**2 つの node scan の cartesian product** に計画され、
-統計が空のままの index は `NodeByLabelScan` に負けうる。実測症状: node と
-constraint は入っているのに store ファイルが一切成長せず、1 コアの ~20% で
-数十分回り続けた。unique constraint (planner が必ず UniqueIndexSeek を取る) と
-**MATCH 句の分離** (cartesian の選択肢自体を消す) に直した。プロセスを
-kill する前に `EXPLAIN` を採っていないので、これは症状に対する最有力の原因
-であって確認済みの原因ではない — 直し自体はどちらにせよ正しい。
+dataset: 実 LDBC SNB SF1 の subset 210,389 elements (person 9,892 / knows
+180,623 / message 7,355 = post 3,000 + comment 4,355 / hasCreator 7,355 /
+replyOf 4,355 / like 809)。kotobase 側は 409,877 quads (knows 両方向 +
+like の reify)。build: kotobase 8.9s / Neo4j load 47.3s。
+
+**p50 (15 start person、同一 JVM、同一データ):**
+
+| | kotobase | Neo4j embedded | 比 |
+|---|---|---|---|
+| IC02 recent messages | 182.5 ms | 23.7 ms | 7.7x |
+| IC07 recent likers | 20.9 ms | 3.4 ms | 6.2x |
+| IC08 recent replies | 105.6 ms | 1.1 ms | 97.5x |
+| IC09 friends-of-friends | **21,008 ms** | 246 ms | **85.3x** |
+
+**これは 2026-07-25 の receipt をちょうど反転させる。** 単一属性の point
+lookup では kotobase が Neo4j embedded に 10x 勝ち、**graph database が
+実際に判定されるクエリでは 1〜2 桁負ける**。どちらも前から真だったが、
+測られていたのは片方だけだった。
+
+**IC09 の 21 秒が、手を打つ価値のある発見である。** 機械のノイズではない —
+同じプロセスの中で同じデータに対し Neo4j が 246ms で答えている。
+
+計測時の host は load average ~190 で、それは p95 に出ている (Neo4j IC08 は
+p50 1.1ms / p95 1,652ms)。**絶対値は輻輳しており、静かな機械で採った数字
+(NamiDB の公表値を含む) と直接比べてはならない。** 使えるのは、両エンジンが
+1 つの JVM の中で同じ輻輳下に交互に走った**クエリ内の比**だけである。
+同じ理由で、この receipt の Neo4j 値 (IC02 p50 23.7ms) は NamiDB が公表する
+Neo4j local (IC02 0.61ms) と 39 倍違う — **ものさし自体が安定していないので、
+Neo4j 経由で NamiDB と正規化比較することは現時点でできない。**
+
+その 4 回の試行で harness 側の欠陥が 3 つ見つかり、**receipt が存在する前に**
+直した (2 つは kotobase に、1 つは Neo4j に不利な数字を出すところだった —
+どれも「データベースについての数字」ではなく「harness についての数字」に
+なっていた): ①IC09 が 1-2 hop の友人集合を解いた後、**到達した人ごとに
+point query を発行**していた (高次数 start person で ~1,300 回)。これは
+Neo4j の可変長パス展開に対して Clojure のループを測っていた — 2 本の join の
+union に直した。②loader が `comment_0_0.csv` と likes 2 本を全行 vector 化
+してから捨てており、数 % しか残さない subset に対して RSS 4.7GB を使っていた
+— streaming に直した。③Neo4j の relationship 投入が `MATCH (a:X {..}),
+(b:Y {..})` のカンマ形 + 平文 index だった。カンマ形は 2 つの node scan の
+cartesian product に計画されうるので、unique constraint + MATCH 句分離に
+直した。
+
+**③の根拠として当初挙げた観察は誤りだった (訂正)。** 「store ファイルが
+一切成長しない」と書いたが、それは ⑴ディレクトリ全体の `du` が
+**preallocate されたファイル**に支配されていたこと ⑵Neo4j の store ファイルは
+**checkpoint まで 0 バイトのまま**で、進捗が出るのは
+`neostore.transaction.db.0` の方であること、の二重の誤読だった。実際には
+transaction log は伸びており、書き込みは進んでいた。**③が直した Cypher は
+どちらにせよ正しい書き方だが、当時の停滞の原因は cartesian product ではなく
+単に CPU 枯渇 (load 300-430) だった可能性が高い。** 4 回目が完走したのは
+load が下がったからであって、③の修正が効いたからだと主張できる証拠は無い。
 
 harness が受け入れた 3 つの非対称性 (平均で均さず receipt に明記する):
 ①kotobase の query language に ORDER BY / LIMIT が無いので、top-20 は join
@@ -224,12 +252,44 @@ harness が受け入れた 3 つの非対称性 (平均で均さず receipt に�
 kotobase に辺プロパティが無いので like を entity に reify する (3 datom/like)。
 両エンジンの答えが一致することを**時間を測る前に assert する**。
 
+### 6. 次にやるとよいこと (優先順)
+
+**1. IC09 の 21 秒 — Datalog の join 順序を疑う。** 2 hop 展開
+`[?p \"knows\" ?f1] [?f1 \"knows\" ?f2] [?msg \"hasCreator\" ?f2]
+[?msg \"message/creationDate\" ?date]` で、`datalog-query-plan` の
+cost-ordered plan が何を選んでいるかをまず出す。同じデータで Neo4j が
+246ms なので、**85x は data 量ではなく計画の問題**である可能性が高い。
+`knows` を両方向持つため 361k quads あり、中間結果の大きさが順序に強く効く。
+着手前に plan を印字すること — 推測で index を足さない。
+
+**2. query language に ORDER BY / LIMIT を入れる。** 今 IC02/IC09 は
+**join の全結果を materialize してから harness の Clojure で上位 20 件を
+取っている**。Neo4j は LIMIT を計画に押し下げる。これは harness の都合で
+あると同時に**製品の穴**で、top-N を言語で表現できれば同じクエリの仕事量が
+桁で減る。IC09 の 21 秒にも直接効く。
+
+**3. novelty queue の bounded segment 化** (上記 §3)。これは serving path の
+latency (hydration 2,282ms) を削る話で、1・2 とは独立に効く。
+
+**4. subset を 540K elements まで上げて再測**。今回は 210,389 elements で、
+NamiDB が公表する規模 (540K) の 4 割。**静かな機械で**採り直せば、
+Neo4j をものさしにした NamiDB との正規化比較が初めて成立する
+(今回は Neo4j 側が 39 倍ぶれていて成立しなかった)。
+
+**やらないこと**: block DAG の並列 prefetch 再挑戦 (木は既に 2-3 waves)、
+fold 閾値の引き下げ (読みの逐次項を書きへ移すだけ)、
+輻輳した機械での再計測を「速くなった」の根拠にすること。
+
 ## Consequences
 
 - 「kotobase は Datomic の 144x 速い」は単一属性 point lookup の話であって、
-  graph database としての主張ではない。**LDBC harness の receipt が出るまで、
-  NamiDB との query engine 比較はしない** — harness は着地したが receipt は
-  まだ無い (上記 §5、機械の飽和で 2 回とも完走せず)。
+  graph database としての主張ではない。**receipt が出た今、正しい言い方は
+  「最も安いクエリでは Neo4j embedded より 10x 速く、多段 traversal では
+  6-100x 遅い」である。** 片方だけを引用しない。
+- NamiDB との query engine 比較は**まだできない**。Neo4j をものさしに
+  正規化するつもりだったが、輻輳下で採った Neo4j 値が NamiDB 公表の
+  Neo4j local と 39 倍違い、ものさしが安定しなかった。静かな機械での
+  再測が前提条件 (§6-4)。
 - 速さの主張を出す場所は materialized view 経路。hydrate 経路の p50 を
   NamiDB や Neo4j Aura と並べない (ADR-2607310900 の同じ結論を維持)。
 - `dag_shape_bench` は count を測るので、負荷の高い共有 workstation でも
