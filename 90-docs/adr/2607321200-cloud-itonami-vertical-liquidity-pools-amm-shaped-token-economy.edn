@@ -227,7 +227,15 @@ Phase 0 read-only / 1 assisted / 2 +dispute / 3 supervised-auto
 
 **つまり cloud-itonami の3層は自律度が違う**: app の authority は propose-only、business-governor は「hold か、承認待ちか」、vertical actor の phase 3 は低リスク op のみ auto-commit。**envelope はこの3層目の粒度に効く。**
 
-その上で、app 側の `cloud.itonami.app.authority` が持つ **4つの不変条件**を壊さないことが条件になる:
+その上で、app 側の `cloud.itonami.app.authority` が持つ **4つの不変条件**を壊さないことが条件になる。
+
+**これらは実装で確認済みである**（2026-08-01、§5a で docstring を測らずに断定した誤りを受けて、本節の前提も実コードに当て直した）:
+
+- **ORDER / SINGLE USE** —— `owned-proposal!` が `(= expected (:status p))` を要求して throw する。`commit!` は `:approved` を渡すので、pre-check を経ていないものは commit できず、commit 後は status が終端に移るため2度目は同じ検査で落ちる
+- **CONTENT BINDING** —— `approval-match-issues` に明示の節がある。**`(not= (:digest proposal) (:digest context))` → `:context/digest-mismatch`、`(nil? (:digest context))` → `:context/digest-absent`。** コメントも『start-approval! と finish-approval! の間で編集された proposal は、上の全検査を通り**この節だけで落ちる**』と書いている
+- しかも `approval-match-issues` は **pure** である。ns 自身の理由がこの ADR の規律と同じ: 「security-critical な比較を pure にしてユニットテスト可能にした —— さもなくば digest binding は hardware authenticator を要する integration 経路にしか覆われず、**実務上それは何にも覆われていないということである**」
+
+> **§5a と対照的に、ここは docstring が実装に裏付けられている。** 本 ADR が envelope の設計前提としている「2 と 4 は作り直しが要る」は、実在する強制の上に立っている。
 
 ```
 1. ORDER            start-approval! は review! が作った proposal しか受けない
