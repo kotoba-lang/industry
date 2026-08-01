@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 4554, "kotobase-cf-wasm-staging" 1120},
+ {"net-kotobase" 4577, "kotobase-cf-wasm-staging" 1120},
  :zone
- {:requests-7d 12137,
-  :pageviews-7d 675,
-  :uniques-7d-sum 993,
+ {:requests-7d 12215,
+  :pageviews-7d 682,
+  :uniques-7d-sum 1006,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 100}
-   {:path "/evm/receipts", :requests 23}
+  [{:path "/evm/receipts", :requests 23}
    {:path "/llms-full.txt", :requests 21}
    {:path "/.well-known/did.json", :requests 19}
    {:path "/llms.txt", :requests 18}
    {:path "/receipts", :requests 18}
    {:path "/_app/meta", :requests 16}
-   {:path "/signup", :requests 16}],
-  :status-mix {:client-error 2784, :ok 296, :server-error 60},
+   {:path "/signup", :requests 16}
+   {:path "/v1/sso/callback", :requests 13}],
+  :status-mix {:client-error 2795, :ok 202, :server-error 60},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,12 +30,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-01",
- :traffic-quality {:window "24h", :probe-4xx-pct 89, :error-5xx-pct 2},
+ :traffic-quality {:window "24h", :probe-4xx-pct 91, :error-5xx-pct 2},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 100 · /evm/receipts 23 · /llms-full.txt 21 · /.well-known/did.json 19 · /llms.txt 18 | 4xx(probe) 89% · 5xx 2%",
- :funnel {:visitors 1804, :signups 5, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /evm/receipts 23 · /llms-full.txt 21 · /.well-known/did.json 19 · /llms.txt 18 · /receipts 18 | 4xx(probe) 91% · 5xx 2%",
+ :funnel {:visitors 1807, :signups 5, :checkouts 0},
  :signal
- "kotobase.net 実測 12137 req/7d・993 uniques(日次和)・うち4xx probe 89%(24h)、workers 5674 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 12215 req/7d・1006 uniques(日次和)・うち4xx probe 91%(24h)、workers 5697 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 7,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.42857142857142855,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 235},
+ {:visitors {:openai-ads 3, :organic 238},
   :signups {:organic 2}, 
   :checkouts {}}}
