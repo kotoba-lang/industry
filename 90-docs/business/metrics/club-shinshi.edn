@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "shinshi.club",
  :zone
- {:requests-7d 11850,
-  :pageviews-7d 9099,
-  :uniques-7d-sum 1570,
+ {:requests-7d 12864,
+  :pageviews-7d 9111,
+  :uniques-7d-sum 1574,
   :zone "shinshi.club"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 129}
+  [{:path "/", :requests 135}
+   {:path "/js/app.js", :requests 69}
    {:path "/express/.env.credentials", :requests 64}
    {:path "/shared/.env.smtp", :requests 64}
    {:path "/docker/.env.local", :requests 64}
    {:path "/backend/backup.sql.gz", :requests 60}
    {:path "/.heroku/.env.sendgrid", :requests 60}
-   {:path "/storage/secrets.env", :requests 60}
-   {:path "/backend/config.json", :requests 60}],
-  :status-mix {:ok 2963, :client-error 226},
+   {:path "/storage/secrets.env", :requests 60}],
+  :status-mix {:ok 3068, :client-error 230},
   :window "24h"},
  :source "shinshi.d1:pv_daily+chat_event_daily+pay_run",
  :window "7d",
  :as-of "2026-08-01",
  :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 129 · /express/.env.credentials 64 · /shared/.env.smtp 64 · /docker/.env.local 64 · /backend/backup.sql.gz 60 | 4xx(probe) 7%",
- :funnel {:visitors 1301, :chatters 231, :scenes 0, :paying 0},
+ "上位 page (24h, 2xx/3xx): / 135 · /js/app.js 69 · /express/.env.credentials 64 · /shared/.env.smtp 64 · /docker/.env.local 64 | 4xx(probe) 7%",
+ :funnel {:visitors 1354, :chatters 231, :scenes 0, :paying 0},
  :signal
- "shinshi.club 実測 11850 req/7d・1570 uniques(日次和)・うち4xx probe 7%(24h)"}
+ "shinshi.club 実測 12864 req/7d・1574 uniques(日次和)・うち4xx probe 7%(24h)"}
