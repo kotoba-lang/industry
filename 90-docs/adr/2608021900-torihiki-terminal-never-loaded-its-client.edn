@@ -1,0 +1,81 @@
+[{:db/id -1
+  :adr/id "adr-2608021900-torihiki-terminal-never-loaded-its-client"
+  :adr/title "adr-2608021900: terminal は自分自身の絵だった — client は書かれ、compile され、deploy され、document から一度も参照されていなかった"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "torihiki-terminal-never-loaded-its-client"
+  :adr/authoritative-for
+  ["torihiki-terminal の bundle 参照と build gate"
+   "deploy 済みページのブラウザ検証 (script/verify.cljs)"]
+  :adr/related
+  ["adr-2608021800-torihiki-collateral-source-and-a-real-order-form"]
+  :adr/evidence ["https://torihiki.pages.dev"]
+  :adr/body
+  "# ADR-2608021900: terminal は自分自身の絵だった
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Context
+
+前回の iteration は「browser の DOM 配線は未検証」と正直に書いて出荷した。**未検証だったのは配線ではなかった —— そもそも何ひとつ実行されていなかった。**
+
+**「live client」の全期間を通じて、この build は `<script>` タグを 1 つも出していなかった。** `client.cljs` は書かれ、`public/js/app.js` に compile され、deploy のたびに upload され、**document から一度も参照されていなかった。**
+
+したがって deploy 済みページは build が描いた zero frame を保持し、status 行は永久に `connecting to the node…` を表示していた —— **これは「node の応答が遅い terminal」と見分けがつかない。** 何も間違って見えなかった。
+
+### その間、他はすべて green だった
+
+- build は成功した
+- bundle は存在し、出荷されていた
+- HTML は valid だった
+- **design audit は、何もしないページに 100.00 を付けた**
+- engine は 140 tests を通した
+- **直前の commit は「node を poll して panel を再描画する client」を記述していた。その client は production で一度も実行されていなかった。**
+
+これは**それが置き換えた position panel と同じ欠陥の 1 階層上**である: **隣が全部検証済みなので検証済みに見えるもの。**
+
+## Decision
+
+### 1. build は bundle を参照しない document を書くことを拒否する
+
+bundle が未 compile の場合も拒否する。**これはこのバグを正確に捕まえたはずのもの。**
+
+### 2. `script/verify.cljs` が deploy 済みページを実際に click する
+
+session panel が埋まるのを待ち、faucet を click し、価格と数量を入力し、chip を toggle し、Buy を click し、**chain が動いたことを assert する。** 動かなければ **exit 非ゼロ**——**常に pass する検証は、常に描画されるページと同じ種類の物体**だから。
+
+**HTML についての assertion は、ページが動くことを教えてくれない。click することだけが教える。だから両方存在する。**
+
+## 実測（修正後、production に対して）
+
+```
+scripts: [\"https://torihiki.pages.dev/js/app.js\"]
+status: live · block 35 | account: 87200752 | nonce 1
+FAUCET -> accepted at block 36    collateral $100,000.00  nonce 2
+post-only chip data-tk-on: \"1\"
+BUY -> accepted at block 37       live · block 37  nonce 3
+VERIFY: pass
+```
+
+**直前の commit の主張は今や真である —— それを書いた時点では偽だった。**
+
+## probe を書く途中で見つけた、時間を実際に食った 2 点
+
+- **docstring 内の未エスケープの二重引用符**は以降の散文を symbol に変え、**read 時にその文中の単語を名指しするエラー**（`connecting is not ISeqable`）で落ちる。
+- `playwright` は node の解決経路によって **namespace object のまま来るか `.default` に包まれて来る**。
+
+## Consequences
+
+- (+) terminal が実際に動く。ブラウザで click して確認済み。
+- (+) この種のバグに対する gate が 2 つ（静的・動的）。
+- (−) `verify.cljs` は CI に接続されていない。手で回す。
+- (−) nbb + playwright は `.evaluate` に arrow function 文字列を渡すと nil を返す（式なら動く）。回避しているが、原因は未調査。
+"}]
