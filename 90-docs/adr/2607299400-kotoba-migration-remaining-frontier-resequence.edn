@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — HTTP kit through **0242** + secret/process/git/scoped-fs/entropy fixed-depth EDN packages; browser-host set-of-record **0195**; W4 recursive nested EDN / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — ops fixed-depth EDN packages + HTTP kit **0242** + entropy **0244** + **secret-request-edn Component twin 0245** (component ADR 0118); browser-host set-of-record **0195**; W4 recursive nested EDN / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2817,6 +2817,27 @@ Still open:
    product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
    digit-scanner multi-arg internals optional; W4 recursive values
 
+
+
+## Progress (2026-08-01ha — T8.3 secret-request-edn Component twin)
+
+- kotoba-component#118 MERGED (`22a1c704`): **ADR 0118** Canonical
+  `:secret-request-edn` string→string (empty/long/quote-backslash reject;
+  `{:name "…"}`). Evidence: **148 tests / 1122 assertions**.
+- compiler pin component → `22a1c704` (main `b79a131a`).
+- provider#132 MERGED (`8c019b4f`): **ADR 0245** Component twin package
+  `secret-request-edn-v1.component.wasm` sha `906d9032…`. Policy-only source
+  (live main remains wasm32). Evidence: **165 tests / 1362 assertions**.
+- west pins: kotoba-component → `22a1c704`; compiler → `b79a131a`;
+  provider → `8c019b4f`
+- Honesty: first secret kit EDN **Component** twin (not multi-export package
+  Component; not host-fetch AOT). Does **not** flip `:wasm-aot :implemented`
+  (W4 recursive nested EDN open).
+
+Still open:
+1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
 
 
 ## Progress (2026-08-01gz — T8.3 entropy kit fixed-depth EDN package + pin)
