@@ -1,7 +1,47 @@
 claim_id	artifact_id	value	method_status	source_dataset_ids	notes
-FIG1_SOURCE_SHA256	FIG1	2f24e959dcca94aca864d8b9e736117905af5bc9d1bf918c9135bac4c4746909	L1_RECALCULATED	DS_GWAS_CURRENT	prespec band A (exact)
-FIG1_VALID_VARIANTS	FIG1	362797	L1_RECALCULATED	DS_GWAS_CURRENT	prespec band A (exact); 0 rows dropped by the M01 validity filter
-FIG1_LAMBDA_GC	FIG1	1.0536825577354483	L1_RECALCULATED	DS_GWAS_CURRENT	prespec band B (continuous); displays as 1.054
 FIG1_GW_THRESHOLD	FIG1	5e-08	L1_RECALCULATED	DS_GWAS_CURRENT	prespec band A (exact); contract constant
-FIG1_SUGGESTIVE_THRESHOLD	FIG1	1e-05	L1_RECALCULATED	DS_GWAS_CURRENT	prespec band A (exact); contract constant
+FIG1_LAMBDA_GC	FIG1	1.0536825577354483	L1_RECALCULATED	DS_GWAS_CURRENT	prespec band B (continuous); displays as 1.054
 FIG1_PANEL_COUNT	FIG1	2	L1_RECALCULATED	DS_GWAS_CURRENT	prespec band A (exact); Manhattan + QQ
+FIG1_SOURCE_SHA256	FIG1	2f24e959dcca94aca864d8b9e736117905af5bc9d1bf918c9135bac4c4746909	L1_RECALCULATED	DS_GWAS_CURRENT	prespec band A (exact)
+FIG1_SUGGESTIVE_THRESHOLD	FIG1	1e-05	L1_RECALCULATED	DS_GWAS_CURRENT	prespec band A (exact); contract constant
+FIG1_VALID_VARIANTS	FIG1	362797	L1_RECALCULATED	DS_GWAS_CURRENT	prespec band A (exact); 0 rows dropped by the M01 validity filter
+TABLE1_NORMALIZED_SHA256	TABLE1	e26ae7b2879c59c3987ba6183b17b41cb856d9a1bba139ad817294c07fd25e4a	L2_RECONSTRUCTED	DS_TABLE1_CHECKPOINT	prespec band A; sha256 of the delivered file as-is (no normalisation applied)
+TABLE1_ROW_COUNT	TABLE1	10	L2_RECONSTRUCTED	DS_TABLE1_CHECKPOINT	prespec band A; re-ranked independently from DS_GWAS_CURRENT
+TABLE1_TOP_VARIANT_ID	TABLE1	rs146572333	L2_RECONSTRUCTED	DS_GWAS_CURRENT;DS_TABLE1_CHECKPOINT	prespec band A
+FIG2_CATEGORY_COUNTS	FIG2	"{""East Asian enriched"": 5, ""European enriched"": 7, ""Similar frequency"": 5}"	L2_RECONSTRUCTED	DS_FIG2_FREQUENCY_CHECKPOINT	prespec band A; every label independently recomputed from the EAS/EUR ratio
+FIG2_LEAD_ROW_COUNT	FIG2	17	L2_RECONSTRUCTED	DS_FIG2_FREQUENCY_CHECKPOINT;DS_LD_PRIMARY	prespec band A; equals the DS_LD_PRIMARY lead set
+FIG2_SERIES_COUNT	FIG2	5	L2_RECONSTRUCTED	DS_FIG2_FREQUENCY_CHECKPOINT	prespec band A; Case_MAF, Control_MAF, ToMMo_38KJPN_MAF, gnomAD_EAS_MAF, gnomAD_EUR_MAF
+FIG2_SOURCE_SHA256	FIG2	8aa77e097bd3f678dae1d4dce812c0d28520e7c6dfdecb7d79807ce993fd1eae	L2_RECONSTRUCTED	DS_FIG2_FREQUENCY_CHECKPOINT	prespec band A
+FIG3_K1000_BINOMIAL_P	FIG3	0.0024308681959370653	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band C; recomputed one-sided exact binomial vs 0.5
+FIG3_K1000_CONCORDANCE	FIG3	0.545	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band B; recomputed as n_concordant/K
+FIG3_K1000_N_CONCORDANT	FIG3	545	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band A
+FIG3_K100_BINOMIAL_P	FIG3	0.13562651203691772	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band C; recomputed one-sided exact binomial vs 0.5
+FIG3_K100_CONCORDANCE	FIG3	0.56	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band B; recomputed as n_concordant/K
+FIG3_K100_N_CONCORDANT	FIG3	56	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band A
+FIG3_K2000_BINOMIAL_P	FIG3	0.0022511311158268875	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band C; recomputed one-sided exact binomial vs 0.5
+FIG3_K2000_CONCORDANCE	FIG3	0.532	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band B; recomputed as n_concordant/K
+FIG3_K2000_N_CONCORDANT	FIG3	1064	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band A
+FIG3_K500_BINOMIAL_P	FIG3	0.004130710908491251	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band C; recomputed one-sided exact binomial vs 0.5
+FIG3_K500_CONCORDANCE	FIG3	0.56	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band B; recomputed as n_concordant/K
+FIG3_K500_N_CONCORDANT	FIG3	280	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band A
+FIG3_PANEL_A_SOURCE_SHA256	FIG3	54ee7a42d23e52eb779d31b5514c88ae338ae37cf76f377b37da19f1d523ceb5	L2_RECONSTRUCTED	DS_FIG3_PANEL_A	prespec band A
+FIG3_PANEL_B_SOURCE_SHA256	FIG3	b2bd63474b5928050f2859e320d72f18ccfa59be6ac4fd00bd72d987ace64854	L2_RECONSTRUCTED	DS_FIG3_PANEL_B	prespec band A
+FIG3_PRIMARY_R010_KB500_N_LEADS	FIG3	86681	L2_RECONSTRUCTED	DS_FIG3_PANEL_B;DS_EAS_LD_PGEN;DS_EAS_LD_PVAR;DS_EAS_LD_PSAM	prespec band A; genome-wide LD-clumped leads, not the 17 retained loci
+FIG3_PRIMARY_R010_KB500_P	FIG3	0.001317563696094512	L2_RECONSTRUCTED	DS_FIG3_PANEL_B	prespec band C; recomputed as the upper standard-normal tail of Z
+FIG3_PRIMARY_R010_KB500_Z	FIG3	3.007377	L2_RECONSTRUCTED	DS_FIG3_PANEL_B	prespec band B; transcribed - per-lead sign/weight data is not in Package A, so Z cannot be rebuilt from primitives at L2
+FIG3_SENS_R2_005_KB500_N_LEADS	FIG3	65916	L2_RECONSTRUCTED	DS_FIG3_PANEL_B;DS_EAS_LD_PGEN;DS_EAS_LD_PVAR;DS_EAS_LD_PSAM	prespec band A; genome-wide LD-clumped leads, not the 17 retained loci
+FIG3_SENS_R2_005_KB500_P	FIG3	0.0020474962235378963	L2_RECONSTRUCTED	DS_FIG3_PANEL_B	prespec band C; recomputed as the upper standard-normal tail of Z
+FIG3_SENS_R2_005_KB500_Z	FIG3	2.87075	L2_RECONSTRUCTED	DS_FIG3_PANEL_B	prespec band B; transcribed - per-lead sign/weight data is not in Package A, so Z cannot be rebuilt from primitives at L2
+FIG3_SENS_R2_010_KB1000_N_LEADS	FIG3	86340	L2_RECONSTRUCTED	DS_FIG3_PANEL_B;DS_EAS_LD_PGEN;DS_EAS_LD_PVAR;DS_EAS_LD_PSAM	prespec band A; genome-wide LD-clumped leads, not the 17 retained loci
+FIG3_SENS_R2_010_KB1000_P	FIG3	0.0013017556156235928	L2_RECONSTRUCTED	DS_FIG3_PANEL_B	prespec band C; recomputed as the upper standard-normal tail of Z
+FIG3_SENS_R2_010_KB1000_Z	FIG3	3.011044	L2_RECONSTRUCTED	DS_FIG3_PANEL_B	prespec band B; transcribed - per-lead sign/weight data is not in Package A, so Z cannot be rebuilt from primitives at L2
+FIG3_SENS_R2_010_KB250_N_LEADS	FIG3	88430	L2_RECONSTRUCTED	DS_FIG3_PANEL_B;DS_EAS_LD_PGEN;DS_EAS_LD_PVAR;DS_EAS_LD_PSAM	prespec band A; genome-wide LD-clumped leads, not the 17 retained loci
+FIG3_SENS_R2_010_KB250_P	FIG3	0.0006039861069534601	L2_RECONSTRUCTED	DS_FIG3_PANEL_B	prespec band C; recomputed as the upper standard-normal tail of Z
+FIG3_SENS_R2_010_KB250_Z	FIG3	3.236991	L2_RECONSTRUCTED	DS_FIG3_PANEL_B	prespec band B; transcribed - per-lead sign/weight data is not in Package A, so Z cannot be rebuilt from primitives at L2
+FIG3_SENS_R2_020_KB500_N_LEADS	FIG3	116706	L2_RECONSTRUCTED	DS_FIG3_PANEL_B;DS_EAS_LD_PGEN;DS_EAS_LD_PVAR;DS_EAS_LD_PSAM	prespec band A; genome-wide LD-clumped leads, not the 17 retained loci
+FIG3_SENS_R2_020_KB500_P	FIG3	6.480407470490998e-05	L2_RECONSTRUCTED	DS_FIG3_PANEL_B	prespec band C; recomputed as the upper standard-normal tail of Z
+FIG3_SENS_R2_020_KB500_Z	FIG3	3.827202	L2_RECONSTRUCTED	DS_FIG3_PANEL_B	prespec band B; transcribed - per-lead sign/weight data is not in Package A, so Z cannot be rebuilt from primitives at L2
+SUPPTABLE_S1_CATEGORY_COUNTS	SUPPTABLE_S1	"{""East Asian enriched"": 5, ""European enriched"": 7, ""Similar frequency"": 5}"	L2_RECONSTRUCTED	DS_TABLE_S1_CURRENT;DS_FIG2_FREQUENCY_CHECKPOINT	prespec band A; lead rows only, independently recomputed
+SUPPTABLE_S1_LEAD_COUNT	SUPPTABLE_S1	17	L2_RECONSTRUCTED	DS_TABLE_S1_CURRENT;DS_LD_PRIMARY	prespec band A
+SUPPTABLE_S1_ROW_COUNT	SUPPTABLE_S1	26	L2_RECONSTRUCTED	DS_TABLE_S1_CURRENT	prespec band A; 17 leads + 9 correlated non-lead members
+SUPPTABLE_S1_SHA256	SUPPTABLE_S1	0e60722b21a9e7481f40b0427aaf1b044dfef19197da0148451ef6e9745734fd	L2_RECONSTRUCTED	DS_TABLE_S1_CURRENT	prespec band A

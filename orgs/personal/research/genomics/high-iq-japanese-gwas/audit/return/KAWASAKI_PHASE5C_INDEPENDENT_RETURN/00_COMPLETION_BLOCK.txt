@@ -2,19 +2,30 @@ KAWASAKI PHASE 5C INDEPENDENT RECONSTRUCTION — COMPLETION BLOCK
 
 STATUS: IN PROGRESS — NOT READY FOR HASH LOCK
 
-Claims complete   : 6 of 91
-Artifacts complete: FIG1 (L1)
-Artifacts pending : FIG2, FIG3, FIG4, TABLE1, TABLE2, SUPPTABLE_S1, SUPPFIG_S1
+Claims complete   : 46 of 91
+Artifacts complete: FIG1 (L1), TABLE1 (L2), FIG2 (L2), SUPPTABLE_S1 (L2), FIG3 (L2)
+Artifacts pending : FIG4 (34 claims), TABLE2 (6), SUPPFIG_S1 (5)
 
 Input hash audit  : 25 of 25 datasets MATCH against SHA256SUMS.txt
-Open findings     : F-01 (post hoc rs376128944 exclusion absent from
-                    DS_GWAS_CURRENT qc_status and from every method contract)
+Verifications run : 42 derived-field and cross-artifact checks, 40 PASS / 2 FAIL
+                    (both FAIL entries are recorded findings, not defects in the
+                    reconstruction: F-03 and F-05)
+
+Open findings
+  F-01  post hoc rs376128944 exclusion absent from DS_GWAS_CURRENT qc_status and
+        from every method contract
+  F-02  M03 defines no rule for censored frequency values ('<0.0001', '>100')
+  F-03  DS_TABLE_S1_CURRENT is not the submitted Supplementary Table S1; the
+        payload carries a truncated fold difference (38.6 vs 38.7) and an
+        earlier Notes cell
+  F-04  DS_FIG3_PANEL_A stores the binomial P at 4 significant digits where the
+        claim matrix asks for full precision
+  F-05  enrichment category labels are capitalised in the checkpoints but
+        lower-case in M03
 
 Package B accessed: NO
 Agreement criteria: prespecified and committed before any claim was computed
                     (audit/PRESPEC_AGREEMENT_CRITERIA.md)
 
 RETURN_MANIFEST.tsv and SHA256SUMS.txt are generated only at final lock and are
-deliberately absent while this block reads IN PROGRESS. Per
-RESULT_LOCK_PROTOCOL.md, Package B must not be requested until the completed
-archive hash has been recorded by the custodian.
+deliberately absent while this block reads IN PROGRESS.
