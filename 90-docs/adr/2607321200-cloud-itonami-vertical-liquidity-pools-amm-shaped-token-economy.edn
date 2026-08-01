@@ -267,6 +267,17 @@ Phase 0 read-only / 1 assisted / 2 +dispute / 3 supervised-auto
 
 ### 4. 天井 — 今日、この app は金を動かせない（設計として）
 
+**精密化（2026-08-01 実測）。** 本節の初版は各層の docstring を並べて「送れない」と読める書き方をしていたが、**実際には送る**。`authority/transport.clj` は `java.net.http.HttpClient` を持ち、consent 済み proposal を **governed actor へ HTTP で引き渡す**（`cloud-itonami-esim` は既に `POST /commit` を loopback で serve しており、到達可能である）。銀行 API を叩く経路は adapter 群・settlement actor・funding のいずれにも無い（grep で確認）。
+
+**天井の正体は「送れない」ではなく「受け手が決して自動で確定しない」である。** 同 ns が明記している:
+
+> actor が返す状態は **3つ**である —— `committed`（governor が通した）/ `held`（governor が拒んだ）/ **`pending`（受理したが、その actor 自身の operator の判断待ち）**。
+> **今日の fleet では 3 番目が、正しく組まれた proposal が得られる唯一の答えでもある —— consent surface が送れる op は、どの phase の `:auto` 集合にも、恒久的に含まれていない。**
+
+つまり `:authority/commit!` が成功しても、返るのは `pending` である。これは §3 で見た vertical actor 側の phase 梯子と同じ機構で、**`:lead/convert` がどの phase でも `:auto` に入らないのと同じ理由**（レコードを MINT する操作は自動化しない）。
+
+**この精密化は設計の結論を変えない。むしろ強める** —— 天井は transport の欠落という偶然ではなく、**受け手側の phase 梯子による恒久的な設計判断**だからである。LP 資金を実際に動かすには、この判断を変えることになる。
+
 各層が独立に同じことを書いている:
 
 - `authority.clj`: 「commit! は **それ自体が propose-only** の actor に渡す。……committed は governed proposal が記録されたという意味であって、**カードが発行されたという意味ではない**」
