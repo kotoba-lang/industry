@@ -33,7 +33,11 @@ high-iq-japanese-gwas/
 │   ├── MS.docx                      manuscript
 │   ├── SI.docx                      supplementary information
 │   ├── Cover.docx                   cover letter + suggested reviewers
-│   └── Supplementary_Table_S1.csv   26 variants × 23 annotation fields
+│   ├── Supplementary_Table_S1.csv   26 variants × 23 annotation fields
+│   └── ja/                          unofficial Japanese reference translations
+│       ├── MS-ja.md
+│       ├── SI-ja.md
+│       └── Cover-ja.md
 └── reconstruction-package-a-v1.1/   ← Package A v1.1, as received
     ├── 00_README_FIRST.md
     ├── 01_SCOPE_AND_AUTHORIZATION/  authorization, scope, result-lock protocol
@@ -45,6 +49,17 @@ high-iq-japanese-gwas/
     ├── PACKAGE_A_MANIFEST.tsv
     └── SHA256SUMS.txt
 ```
+
+## Japanese reference translations
+
+`submission/ja/` holds unofficial Japanese translations of the three documents
+Tainaka-sensei assembled (MS, SI, Cover), for internal reference only. **The
+submitted English `.docx` files are authoritative**; where wording differs, the
+English wins. Numbers, statistics, gene symbols, and rsIDs are carried across
+verbatim. The manuscript's inline equations are Word equation objects that do
+not survive text extraction, so those spots are marked 〔数式は原文参照〕 rather
+than reconstructed from guesswork. Being under `submission/**`, these files are
+annexed like the rest of the unpublished manuscript set.
 
 ## Data handling — read before touching `04_DATA_PAYLOAD/`
 
