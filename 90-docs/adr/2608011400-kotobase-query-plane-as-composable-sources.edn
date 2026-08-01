@@ -156,9 +156,58 @@ compacted snapshot を conformance suite 全体に通すテストがある（等
 **retraction は非対応** — 集合への追加は monotonic だが除去はそうでなく、撤回された
 事実を黙って保持する view は view が無いより悪い。
 
+## ⚠ 重大な訂正（2026-08-01、brick 4 に着手する前に判明）
+
+**「kotobase のクエリは O(DB)」という本 ADR の前提は、production には当たらない。**
+
+測っていたのは `arrangement` 単体だった。**production の kotobase は
+`kotobase-peer` の Merkle-LSM で動いており、既に range-pruned read を持っている**
+（ADR-2607201600 / 2607211343 / 2607244000、いずれも accepted・deploy 済み）:
+
+- `kotobase-peer/core.cljc` の `cold-datoms`: 「Touches only the chosen index tree's
+  blocks along the components prefix path (range-pruned via
+  `prolly-tree.core/scan-prefix`) ... a keyed read stays small **regardless of graph
+  size**」— **brick 1 が既にある。**
+- `kotobase_peer/compaction.cljc`（325 行）— **brick 2 が既にある。**
+- `kotobase_peer/materialized_view.cljc`（747 行）— **brick 3 が既にある。**
+- ADR-2607201600 は Hummock 型 sorted runs を明示参照 — 本 ADR が「RisingWave 型」と
+  して brick 3 に挙げたものを、**先に借りていた。**
+
+**`arrangement.blind-input` の docstring が最初から書いていた**（「a cold reader
+re-derives to seek by prefix (`kotobase-peer`'s `cold-datoms`)」）。それを
+「prefix seek は可能である」の根拠として読み、**「既に実装されている」と読まなかった。**
+`arrangement` は精査したが、**「arrangement は production kotobase が実際に使う経路か」を
+一度も問わなかった**のが原因。CLAUDE.md が繰り返し要求している「作る前に、同種の重なる
+仕組みが既にないか確認する」の失敗例。
+
+### それでも残る価値
+
+- **`[_ _ o]` の correctness バグは本物で、production に live だった**（下記）。
+  conformance suite が無ければ見つかっていない。
+- seam（`datom-source`）は `arrangement` と `kotobase-peer` の 2 つの実装系を
+  同じ契約で比較できるようにする面がまだある — ただし**それは本 ADR が主張した
+  「O(DB) を解消する」ではなく、「2 系統を統一する」という別の価値**。
+- 数値（24x / 10.1x / 25x）は `arrangement` 単体に対しては正しいが、**production
+  kotobase に対する改善量ではない。**
+
+## production に live だった correctness バグ
+
+`kotobase-peer/q` は値だけを束縛したパターン `[nil nil \"30\"]` に対して
+**グラフ内の全 quad** を返していた。Datalog も
+`{:find [?e ?a] :where [[?e ?a \"30\"]]}` に対して**全 (s,p) 組**を返していた
+（当初「unification が literal を再チェックするので Datalog 側は性能問題止まり」と
+推論したが、**実測が誤りを訂正した** — 他 2 位置が変数のとき literal は再チェック
+されない）。
+
+`kotobase-peer` `0e48dbef` で修正。pin は arrangement main ではなく **backport**
+（`maint/value-only-pattern` `221e3f3b`）— main へ上げると commit-delta/insert-many
+系が入り、kotobase-peer 自身の 259 test 中 30 件が落ちる（実測: bump 前 0 failures、
+bump 後 22 failures + 8 errors）。その upgrade は別作業。
+
 ## 未着手
 
-1. **brick 4 adjacency** — multi-hop（Neo4j の index-free adjacency 相当）。他 3 つとは
+1. **`kotobase-peer` の arrangement pin を main へ上げる**（上記 30 件の解消）
+2. **brick 4 adjacency** — multi-hop（Neo4j の index-free adjacency 相当）。他 3 つとは
    別物で、`arrangement` に新しい索引が要る。prefix scan では埋まらない。
 2. **kotobase 本体への適用** — brick はすべて `arrangement`/`datom-source` の層にあり、
    kotobase の durable plane（kotobase-peer / D1 / DO）はまだ materialize 経路。
