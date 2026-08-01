@@ -2820,6 +2820,24 @@ Still open:
 
 
 
+## Progress (2026-08-01hc — T8.3/W4 recursive HTTP request/result EDN ADT)
+
+- provider MERGED (`3c328514`): **ADR 0247** recursive-http-edn —
+  recursive headers spine + request_tree_edn + result_ok/err_tree_edn
+  (entry-atom pair spine; main → **-2402**, sha `d2a07804…`).
+  Evidence: **167 tests / 1385 assertions** green.
+- west pin: provider → `3c328514`
+- Honesty: second W4 ops slice after headers 0246. Nested records inside
+  recursive variants still outside closed schema depth; host I/O open.
+  Does **not** alone flip `:wasm-aot :implemented`.
+
+Still open:
+1. T8.3 residual: nested-record-in-variant recursive identity + host-fetch
+   kit body; only then wasm-aot :implemented
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; design-system cutover (W4 Delivery 6)
+
+
 ## Progress (2026-08-01hb — T8.3/W4 recursive nested EDN headers ADT first slice)
 
 - provider#133 MERGED (`f04f81d3`): **ADR 0246** recursive-headers-edn —
