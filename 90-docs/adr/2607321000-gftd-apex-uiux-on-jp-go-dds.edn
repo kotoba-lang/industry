@@ -94,6 +94,45 @@ page error 0 件。
 （`index.html` は revalidate して hash 付きを名指す）、このセッションの資格情報では
 purge できなかった（wrangler OAuth は zone:read のみ）。期限切れを待つ。
 
+## skin を product に混ぜない（2026-08-01、オーナー指摘）
+
+「サービス内容まで dads.. になってしまっているんですが, gftd.ai は proton のように
+機密性を保持したまま生成できるのが特徴です」。**これは移行時のこちらの誤り。**
+skin を差し替える作業の中で、デザインシステムが**プロダクト自身の言葉**にまで
+入り込んでいた:
+
+- welcome message が「デザインシステム: デジタル庁デザインシステム (DADS)」と
+  自分の stylesheet を名乗っていた
+- sidebar の brand line が `gftd.ai · デジタル庁デザインシステム`
+- meta description が「デジタル庁デザインシステムで実装した…」と実装で始まっていた
+- suggestion prompt に「行政サービスのダッシュボード画面のビジュアル案」
+- 空状態の見出しが「どのようなご用件でしょうか？」— 役所の窓口の言い回し
+
+**gftd.ai の特徴は機密を保ったまま生成できること**（privacy contract:
+ADR-2606301210 / 2606301220）。既定で揮発し、メールアドレスや電話番号なしで使え、
+生成はポリシー経路を通るのでブラウザが provider の鍵を持たない。デザインシステムは
+presentation であって、サービスが何であるかについて何も言わない。
+
+**規則: skin の名前を product copy に出さない。** DADS への attribution は
+vendored CSS 先頭の MIT notice が各ページに inline されることで既に満たされている
+（visible chrome に出す必要はない）。回帰テストで固定した — welcome / meta
+description / 全 suggestion がデザインシステム名を含まないこと、かつ welcome が
+実際の主張（揮発）を述べていること。
+
+**新しい copy の主張はすべてコードが守っているものに限った**: edge worker は
+prompt も completion も保存しない、quota は salted な一方向の日次バケット、
+identity は端末ローカルの opaque id、生成は murakumo policy proxy 経由。
+end-to-end 暗号化は**主張していない**（実装していないため）。
+
+### 副産物として見つかった renderer のバグ
+
+copy を直した瞬間に発覚: `parse-inline` がループを `split` の parts だけで
+回しており、`split` は末尾の空文字列を落とすため、**行全体が 1 トークンの場合**
+（`**機密を保ったまま、生成する。**`）に parts が空になり、ループが nil を返して
+段落ごと消えていた。welcome の冒頭文が痕跡なく失われ、空の `<p>` が描画されていた。
+**bold で始まる assistant の応答も同様に食われていた**はず。両方の列で回すよう修正し、
+6 ケース（行全体・先頭・末尾・囲み）をテストで固定。
+
 ## Consequences
 
 - gftd.ai は light 固定になった。OS の dark 設定には従わない。E2E は**逆の
@@ -112,7 +151,7 @@ purge できなかった（wrangler OAuth は zone:read のみ）。期限切れ
 
 ## Verification (2026-07-31)
 
-- `clojure -M:pin:local:test-portable` — 59 tests / 271 assertions / 0 failures
+- `clojure -M:pin:local:test-portable` — 62 tests / 301 assertions / 0 failures
 - `shadow-cljs release app viewer pages-worker` — 0 warnings
 - real-Chromium E2E（`scripts/verify-e2e.cljs`）— 26 checks / 0 failures。
   OS dark 下でも light、fast-typing のキーストローク欠落なし、Enter 送信、
@@ -123,7 +162,7 @@ purge できなかった（wrangler OAuth は zone:read のみ）。期限切れ
 
 ## References
 
-- 実装: gftdcojp/apex `86d06eb`（DADS 移行）/ `42ae0e7`（cache-bust）
+- 実装: gftdcojp/apex `86d06eb`（DADS 移行）/ `42ae0e7`（cache-bust）/ `0a719cf`（copy 是正 + markdown 修正）
 - 設計システム: ADR-2607141915（jp-go-dds）/ ADR-2607309900（DADS を選ぶ意味）
 - 直前の skin: ADR-2607122200（kotoba-ui paved road）
 - 姉妹 ADR: ADR-2607321100（awai.network apex、同じ skin）"}]
