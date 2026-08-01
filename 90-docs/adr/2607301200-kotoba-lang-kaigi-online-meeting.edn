@@ -5,7 +5,7 @@
   :adr/title "ADR-2607301200: kotoba-lang/kaigi — online meeting (Zoom/Meet 相当) を自前で持つ。SFU は Cloudflare Realtime（マネージド）、シグナリングは Durable Object"
   :adr/status "accepted"
   :adr/date "2026-07-30"
-  :adr/last_verified "2026-07-31"
+  :adr/last_verified "2026-08-01"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/source-format "edn"
@@ -156,36 +156,105 @@ mesh では `mesh-initiator` が participant id 上の全順序を与え、**off
 これは gijiroku の憲章 G3 を **kaigi 側で enforce** する — host はまさにこれを省略する
 圧力がかかる層だから、host に委ねない。保存するのは `:asset-ref` のみ（G4）。
 
+### 2d. 媒体面は「設定」だけでなく「クライアントが駆動できる面」との交渉で決める（2026-08-01）
+
+当初は `transport` を**設定だけ**の関数にしていた（「人数で切り替えない」ため）。これが
+本番を無音にした。RealtimeKit の secret が live Worker に入った時点でブラウザ bundle は
+まだ mesh しか駆動できず、`transport` は `:realtimekit` を返し、クライアントの plan 適用は
+mesh 以外を no-op した。実測（2026-08-01、本番）: roster は 2 人・コントロールは効き・
+mute はタブ間で伝播しているのに **PeerConnection 0・inbound RTP 0**、ログには何も出ない。
+
+**誰も駆動できない面は面ではない。** クライアントは `hello` で駆動可能な面を申告し、
+`kaigi.plan/negotiate` が設定側の面と積を取って最良を選び、空なら mesh に落ちる。交渉は
+**参加者ごとではなく room 単位**（mesh は両端が合意しないと offer できないので、一部しか
+持たない面は room が使える面ではない）。未申告（nil）は「意見なし」として積から除外する
+— 空集合として扱うと接続途中の socket 1 本で room 全体が mesh に落ちる。
+
+これは「人数で切り替えない」規則と矛盾しない。人数は常に変動し何も予測しないが、
+「現在の面を駆動できない参加者」はその人にとって無音が確定している状態で、全員が駆動
+できる面へ揃って移ることだけが通話が成立し続ける唯一の結末である。
+
+`?transport=mesh` で 1 タブの申告を絞れる（絞る方向のみ。bundle に無い面は主張できない）。
+現場診断（RealtimeKit 抜きで動くか）と、RealtimeKit 設定済み Worker 上で mesh が RTP を
+運ぶことを E2E で証明する継ぎ目を兼ねる。
+
+### 5. 会議は「リンクそのもの」— landing / 会議コード / 参加前チェック（2026-08-01）
+
+これ以前、`?meeting=` の無い URL は `lobby` という名の会議に参加していた。**query string
+無しで来た訪問者は全員その 1 部屋に一緒に入っていた**し、新しい会議の id を手に入れる
+導線が存在しなかった（手で考えるしかない）。会議をホストする面を持ちながら、会議に
+招待する面が無かった。
+
+`kaigi.invite`（pure `.cljc`、I/O なし）が 2 つだけ決める。**①コードは英小文字 10 文字を
+3-4-3 に区切る**（`abc-defg-hij`）— コードは電話越しに読み上げられ、見ずに打たれるので
+区切る。数字を入れないのは、聞き間違えるペア（`0`/`O`、`1`/`l`）が音声で生じるものと
+完全に一致するため。26^10 ≒ 1.4e14 なので総当たりは入口にならない。これは Meet と同じ
+取引で、扉と鍵の両方が要る会議のために `:approval-required` を残してある理由でもある。
+**②乱数は引数で受け取る** — `rand-int` を呼ばないのでブラウザは `crypto.getRandomValues`
+を渡せ、関数はテスト可能なまま。エントロピーが足りなければ nil を返す（予測可能な末尾を
+持つコードは、コードが無いより悪い）。
+
+画面は 3 つで差し替え先は 1 つ（`#kaigi-console` を `:view` で分岐）: landing / 参加前
+チェック（カメラプレビューと名前、`localStorage` に記憶）/ 会議本体（招待リンクとコピー
+ボタンを会議の中に置く — 誰かが足りないと気づく瞬間には既に通話の中にいる）。
+**名前を訊く画面が無かったので、クライアントはタブごとのランダム id を表示名として送って
+おり、roster は `u-a1b2c3` と読めていた。**
+
 ## Consequences
 
 **得たもの**: 会議をホストする面が、他の workspace surface と同じ pure EDN + pure
 function で手に入った。SFU 未採用状態（ADR-2607124000）は「マネージドに寄せる」で決着し、
 Rust 禁止ルールとの衝突も解消した。
 
-**実測した現在地（2026-07-31 closing 時点）**:
+**実測した現在地（2026-08-01）**:
 
-- pure core（model / validate / plan / sfu / **realtimekit** / turn / **recording** /
-  signal / ui）: **82 tests / 293 assertions、JVM と nbb の両方で緑**。
-- DO シグナリング room: deploy 済み。実 WebSocket 2 本 × 実 DO の **E2E 22/22**。
-- ブラウザコンソール: 実装・deploy 済み。design-quality **100.00 / findings ゼロ**。
-- **実通話（mesh）が成立している**: headless Chromium 2 台で ICE connected、両側で
-  inbound RTP 約 190KB を実測、本番 3 回連続クリーン。
-- **録画が成立している**: 各参加者が自分のストリームを録り、**約 300KB の実 WebM が
-  4 オブジェクト**、`object-key` が定める通りのキーで R2 に着地（E2E 9/9）。同意撤回が
-  共有値を off にし全レコーダーを停止、飛行中パートは 409 で拒否されることまで実測。
-- **RealtimeKit が本番で稼働**: `transport: realtimekit`、**実 participant token が返る**
-  （698 文字の JWT）。**kaigi が実サービスに到達したのはこれが初めて**。入室承認ゲートも
-  本番確認済み — `remove` された参加者が再接続すると admission が `:requested` に戻り
-  plan フレーム自体が来ない = token も出ない。
-- **ブラウザ側は RealtimeKit SDK をまだ読み込まない。** token は届いているが未使用で、
-  実メディアは依然 mesh 経路。ここが入って初めて「RealtimeKit で通話している」と言える。
-- **SFU 経路は実サービス未検証のまま**（この account に SFU app が無い。RealtimeKit app は
-  SFU では使えないことを実測済み）。binding とテストは残してある。
-- **TURN の relay 経路は未解決**。Chromium が relay に 1 バイトも送らない（policy
-  relay/all、loopback/LAN、headless-shell/フル Chrome の全組み合わせで候補 0・
-  icecandidateerror 0・relay 受信 0）。relay 側は正常で `org-ietf-turn` の listener_demo が
-  実 UDP 3/3 通過。途上で上流の実バグを 1 件修正（**ede5921**: listener が STUN Binding を
-  落としていた — ICE agent は Allocate より前にこれを送る）。必要だったが十分ではなかった。
+- pure core（model / validate / plan / **invite** / sfu / realtimekit / turn / recording /
+  signal / ui）: **97 tests / 336 assertions、JVM と nbb の両方で緑**。
+- DO シグナリング room: **E2E 22/22**。mesh のみを申告したクライアントが RealtimeKit 設定済み
+  room から mesh を返されることも assert に入れた（無音事故の回帰テスト）。
+- ブラウザコンソール: design-quality **100.00 / findings ゼロ**（参加前チェック画面を
+  SSR するようにした後も維持）。
+- **RealtimeKit で実際に通話している（本番 5/5）**: SDK が両側で join、互いを media plane 上で
+  認識、**リモート video が実フレームを描画**。前回の「token は届くが SDK が未配線」は解消。
+- **mesh も生きている（本番 8/8）**: RealtimeKit 設定済みの Worker に対し `?transport=mesh` で
+  両側 inbound RTP 約 204KB を実測。設定が bundle を追い越しても無音にならないことの証明。
+- **招待フローが成立している（本番 9/9）**: bare URL は landing を出す（`lobby` に落ちない）/
+  1 クリックで `abc-defg-hij` 形式の自分の URL に着地 / 2 人目はリンクを開くだけで参加 /
+  各自が打った名前で roster に出る（`u-xxxxxx` ではない）/ ハイフン無し大文字で打った
+  コードが同じ会議に届く。
+- **録画**: 変更なしで E2E 9/9（各参加者が自分のストリームを録り R2 に着地、同意撤回が
+  全レコーダーを停止、飛行中パートは 409）。
+- **SFU 経路は実サービス未検証のまま**（この account に SFU app が無い）。binding とテストは残す。
+- **TURN の relay 経路は未解決**。Chromium が relay に 1 バイトも送らない（policy relay/all、
+  loopback/LAN、headless-shell/フル Chrome の全組み合わせで候補 0・icecandidateerror 0・
+  relay 受信 0）。relay 側は正常（`org-ietf-turn` の listener_demo が実 UDP 3/3）。RealtimeKit を
+  既定面にしたことで実害は大きく下がった（SDK が自前の relay を持つ）が、mesh に落ちた
+  room では依然として対称 NAT 配下が繋がらない。
+
+**2026-08-01 に E2E が捕まえた実バグ（4 件、すべてユニットテストは緑のまま）**:
+
+1. **本番が無音だった**（上記 2d）。設定だけで面を決めていたこと自体が原因。
+2. **`render!` が入力中のテキストを破壊していた。** コンソール subtree を丸ごと差し替える
+   ので、参加前画面が SSR 文書に載っている以上「bundle 起動前に打てる名前欄」が存在し、
+   `init` の初回レンダがそれを消していた。**名前を打った参加者が、その名前が置き換える
+   はずだったランダム id で参加していた。** 以後 `render!` は差し替え前にフィールドを
+   state に畳む。
+3. **`join!` が `capture!` を待たずに socket を開いていた。** 参加ボタンも初回ペイントから
+   押せるので、`getUserMedia` 解決前に押されると **track が 1 本も無い offer**（m-line 0）が
+   出て ICE は走らず、両タブが PeerConnection 1 本ずつを持ったまま何も流れない。
+4. **RealtimeKit meeting が room ごとに 2 つ作られていた。** DO はシングルスレッドだが
+   シングル**タスク**ではない。2 人分の `hello` はマイクロ秒差で着き、両方が
+   `:rk-meeting-id` を nil のまま見て両方が create を投げた。**両タブとも join に成功し、
+   互いに 0 人に見えた。** 解決済み id ではなく**飛行中の promise** を memo 化する
+   （`rk-creating`。`room-states` は `handle-frame` が古いスナップショットから丸ごと
+   書き戻すので別 atom）。
+
+**SDK 統合で判明した 2 点**: `Client.init` が返すのは `join()` を持つ `Client` で、
+`joinRoom()` は内部の socket/room クラス側にある（型定義に両方あるので読み手の頭では
+型が通り、実行時に落ちる）。および **npm パッケージの CJS エントリは Closure が
+コンパイルを拒否する**（`dist/index.cjs.js:8` の arrow function 内 `super()`）ため、
+prebuilt の `dist/browser.js` を静的アセットとして vendor し `<script>` で読む
+（`vendor-realtimekit.cljs`）。副作用として mesh 運用の deploy は 650KB を落とさない。
 
 **E2E が捕まえた実バグ（いずれもユニットテストと validate の両方が見逃した）**:
 
@@ -216,9 +285,10 @@ guard を追加）／固定 sleep 由来のフレーク（条件待ちへ）／`
 `status: behind` を素通りさせて他セッションの 3 commits を巻き戻した。即修復し、スクリプトに
 `assert-forward!` を追加して同じ退行が拒否されることを実 SHA で確認した。
 
-**残（優先順）**: ①ブラウザ側の RealtimeKit SDK 読み込み（token は届いている）
-②TURN relay のブラウザ側ブロッカー ③gijiroku が録画 handoff record を読む
-④SFU app の provisioning（使うなら）⑤`kaisha` チャンネル / `calendar` との接続。
+**残（優先順）**: ①RealtimeKit 面の画面共有（`start-share` は model 値と mesh 経路だけを
+動かしており SDK の screen-share API を誰も呼んでいない）②TURN relay のブラウザ側ブロッカー
+③gijiroku が録画 handoff record を読む ④SFU app の provisioning（使うなら）
+⑤`kaisha` チャンネル / `calendar` との接続。
 
 ## References
 
