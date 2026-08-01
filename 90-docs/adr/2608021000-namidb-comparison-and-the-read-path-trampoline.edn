@@ -252,29 +252,96 @@ harness が受け入れた 3 つの非対称性 (平均で均さず receipt に�
 kotobase に辺プロパティが無いので like を entity に reify する (3 datom/like)。
 両エンジンの答えが一致することを**時間を測る前に assert する**。
 
-### 6. 次にやるとよいこと (優先順)
+### 6. 実施した 3 件 (2026-08-01/02) と、次にやるとよいこと
 
-**1. IC09 の 21 秒 — Datalog の join 順序を疑う。** 2 hop 展開
-`[?p \"knows\" ?f1] [?f1 \"knows\" ?f2] [?msg \"hasCreator\" ?f2]
-[?msg \"message/creationDate\" ?date]` で、`datalog-query-plan` の
-cost-ordered plan が何を選んでいるかをまず出す。同じデータで Neo4j が
-246ms なので、**85x は data 量ではなく計画の問題**である可能性が高い。
-`knows` を両方向持つため 361k quads あり、中間結果の大きさが順序に強く効く。
-着手前に plan を印字すること — 推測で index を足さない。
+#### 6-1 実施済み: IC09 の join — 仮説は外れ、真因は別だった
 
-**2. query language に ORDER BY / LIMIT を入れる。** 今 IC02/IC09 は
-**join の全結果を materialize してから harness の Clojure で上位 20 件を
-取っている**。Neo4j は LIMIT を計画に押し下げる。これは harness の都合で
-あると同時に**製品の穴**で、top-N を言語で表現できれば同じクエリの仕事量が
-桁で減る。IC09 の 21 秒にも直接効く。
+「plan を印字してから」の指示どおり印字した結果、**私の仮説
+(planner が `:in` 束縛を無視して順序を誤る) は誤り**だった。
+`datalog-query-plan` は束縛を probe パターンに代入しており、選んだ順序も正しい。
+receipt: `2026-08-01-ic09-diagnosis.edn`。45.3 秒の内訳:
 
-**3. novelty queue の bounded segment 化** (上記 §3)。これは serving path の
-latency (hydration 2,282ms) を削る話で、1・2 とは独立に効く。
+| | | |
+|---|---|---|
+| cardinality probes | 4.0 s | 9% |
+| planning | 3.4 s | 7% |
+| **join 実行** | **35.6 s** | **79%** |
 
-**4. subset を 540K elements まで上げて再測**。今回は 210,389 elements で、
-NamiDB が公表する規模 (540K) の 4 割。**静かな機械で**採り直せば、
-Neo4j をものさしにした NamiDB との正規化比較が初めて成立する
-(今回は Neo4j 側が 39 倍ぶれていて成立しなかった)。
+同一プロセス・同一データの 1-hop 対照は probes 187ms / join 819ms — 膨張は
+binding 数が爆発する段に固有で、機械のせいではない。
+
+**真因**: `arrangement.datalog/join-clause` が **binding ごとに 1 回 scan を
+発行**していた。2-hop の段は約 31,750 bindings を運ぶが、それらは数千通りの
+パターンにしか展開されない — つまり同じ質問を何万回も繰り返し、毎回結果
+セットを構築し `visible?` を回していた。
+
+**修正** (`kotoba-lang/arrangement` `db55c493`): binding を展開後パターンで
+グループ化し、**distinct パターンごとに 1 回だけ scan**。意味論は不変。
+91 tests / 204 assertions、0 failures。
+
+**効果の検証** (`2026-08-02-ic09-after-join-batching.edn`): two-hop の
+end-to-end 45,308ms → 2,652ms、生の比で 17x。**ただし 17x はコードの効果では
+ない。** 同じ receipt の中で **probe パスは未変更コード**なのに 3.66x 速く
+なっている (同じ 361,246 行に対し 3,859.7ms → 1,071.3ms) — baseline は
+load 150-190、再測定は 40-80 で走った。割り戻すと**コード起因は約 4.7x**。
+行数は同一 (6,733) で何も引き換えにしていない。
+**未変更パスを同じ receipt に残していたことが headline より価値があった** —
+無ければ 17x と報告して 4 倍間違えていた。
+
+#### 6-2 実施済み: ORDER BY / LIMIT — 言えるようになったが、まだ安くない
+
+`:order-by [[?date :desc] [?msg :asc]]` / `:limit 20` を
+`arrangement.datalog/q` に追加。`:find` に無いキーはエラー (黙って任意順を
+返さない)。順序を要求されたときだけ戻り値が **set → vector** になる
+(順序付き結果は集合では表現できない)。
+
+**limit は完成した射影に適用されるので join は全仕事をする。** top-N を
+「言えるように」しただけで「安く」はしていない。LDBC harness が全結果を
+host 側で sort していたのを言語側に移せる。join への押し下げは、順序節から
+反復を駆動すれば可能 (値順インデックスは既に `[p o s]` を `o` 順に返す) が、
+それは別の変更でありこの変更の主張ではない。
+
+#### 6-3 実施済み: novelty queue の segment 化
+
+1 tx = 1 ブロックを **16 entry/segment** に (`novelty-index-segment-size` と
+同じ値・同じ形)。64 hops → 4 hops。`kotoba-lang/kotobase-peer` `13bfd2bd`、
+268 tests / 832 assertions、0 failures。
+
+**移行は無い。** live chain は単一 entry ノードだらけなので walker が両方の形を
+読み、legacy な head は書き換えず新 entry が新セグメントを作ってそれを指す。
+**代償**: push が head セグメント (≤16 entry) を読んで再エンコードする。
+これは kotobase-peer#16 への逆戻りではない — あの issue は
+**backlog と共に増える**構造の再エンコードの話で、こちらは 16 で上限が決まる。
+読みから線形項を消すために、書きに有界な定数を払う取引。
+
+最初のテスト実行で自分のバグを 2 件捕まえた: `newest-novelty-cid` が
+セグメントを知らず NPE、legacy テストの fixture ビルダーが旧ノード形しか
+読めなかった。
+
+#### 6-4 次にやるとよいこと (優先順)
+
+**1. hash join への切り替え。** 6-1 の修正後も **index-nested-loop のまま**で、
+2,652ms は Neo4j embedded の 246ms に対してまだ 10 倍以上ある。節の関係全体が
+小さいとき (この dataset で `hasCreator` は 7,355 行) **1 回スキャンして hash
+join する方が数千回の seek より速い**。そして `datalog-query-plan` は選択に
+必要な `:estimated-rows` を**既に節ごとに計算している** — executor に渡すのが
+残っている作業。**ここが gap を閉じる一手。**
+
+**2. `:query-statistics` を実際に使う。** `[?f1 \"knows\" ?f2]` の probe は
+静かな機械でも 361,246 行を毎回セットに materialize して 1,071ms 使う —
+ただ数を知るためだけに。これをスキップする入力は既に存在し、使われていない。
+
+**3. limit の join 押し下げ / projection pushdown。** 6-2 は top-N を言える
+ようにしただけ。値順インデックスが `[p o s]` を `o` 順に返すので、順序節から
+反復を駆動すれば早期打ち切りできる。あわせて IC09 の `:find` は
+`[?f2 ?msg ?date]` なのに bindings が `?f1` を最後まで運んでおり、
+≤9,892 の distinct `?f2` で足りるところに ~31,750 bindings が存在している。
+
+**4. subset を 540K elements まで上げて静かな機械で再測**。今回は 210,389
+elements で NamiDB 公表規模の 4 割、しかも load 190 下。**静かな機械で**
+採り直せば、Neo4j をものさしにした NamiDB との正規化比較が初めて成立する
+(今回は Neo4j 側が 39 倍ぶれていて成立しなかった)。6-1 の「未変更パスを
+対照に置く」やり方は、この再測定でもそのまま使うこと。
 
 **やらないこと**: block DAG の並列 prefetch 再挑戦 (木は既に 2-3 waves)、
 fold 閾値の引き下げ (読みの逐次項を書きへ移すだけ)、
