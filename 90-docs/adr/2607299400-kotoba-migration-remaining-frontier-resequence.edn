@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — HTTP kit pure EDN through 0235 + **secret request/reply EDN package (0236/0237)**; **process EDN package (0238/0239)**; **git EDN package (0240/0241)**; W4 recursive nested EDN / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — HTTP kit pure EDN through 0235 + multi-export **0242** + secret 0236/0237 + process/git EDN; browser-host set-of-record **compiler 0195**; W4 recursive nested EDN / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2817,6 +2817,26 @@ Still open:
    product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
    digit-scanner multi-arg internals optional; W4 recursive values
 
+
+
+## Progress (2026-08-01gy — T8.3 browser-host set-of-record + HTTP kit EDN package)
+
+- compiler#468 MERGED (`ab504901`): **ADR 0195** browser-host `compareValue`
+  resolves schema refs — unlocks live set-of-record conj/sort for kit-shaped
+  header packages (0231–0235 / 0242). Evidence: **783 tests / 6267 assertions**.
+- provider#127 MERGED (`6a9f2c48`): **ADR 0242** multi-export HTTP kit
+  request+result set-record EDN package (main → **-9242**, sha `b3b734ed…`).
+  kit-readiness EDN quote hygiene; pure-allowlist test excludes `:ops-*`.
+  Evidence: **162 tests / 1336 assertions**. Live browser-host main -9242
+  (with 0195 host).
+- west pins: compiler → `ab504901`; provider → `6a9f2c48`
+- Honesty: fixed-depth / bounded sets only. Does **not** flip `:wasm-aot
+  :implemented` (W4 recursive nested EDN + full host-fetch kit body still open).
+
+Still open:
+1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
 
 
 ## Progress (2026-08-01gx — T8.3 git kit fixed-depth EDN package)
