@@ -602,18 +602,19 @@
   unescaped quote produces."
   ;; Two ADRs left this list on 2026-07-31: both were a pr-str'd map inside a string
   ;; where some quotes were escaped and the rest were not, and both are repaired.
-  ["90-docs/deployment/MONTH-3-EXECUTION-COORDINATION-SUMMARY.edn"
-   "90-docs/deployment/MONTH-3-GO-NO-GO-DECISION-TEMPLATE.edn"
-   "90-docs/deployment/MONTH-3-GRACEFUL-RUST-DRAIN.edn"
+  ;;
+  ;; Six more left it on 2026-08-01 -- they had been repaired at some earlier point
+  ;; but never removed from here, so the verifier reported "BASELINE IS STALE" and
+  ;; exited 1 on every run. A baseline that stays stale fails exactly as
+  ;; uninformatively as the unconditional FAIL it replaced, which is why `fixed`
+  ;; is a hard failure rather than a note: the list has to be pruned when a file
+  ;; is repaired, in the same commit.
+  ["90-docs/deployment/MONTH-3-GRACEFUL-RUST-DRAIN.edn"
    "90-docs/deployment/MONTH-3-MANUAL-ROLLBACK-DECISION-TREE.edn"
    "90-docs/deployment/MONTH-3-TEAM-ASSIGNMENTS.edn"
-   "90-docs/deployment/rollback-procedure-and-testing.edn"
-   "90-docs/gates/METRICS-DEPLOYMENT-LOG-2026-08-08.edn"
    "90-docs/gates/METRICS-DEPLOYMENT-READINESS-2026-08-08.edn"
    "90-docs/gates/smoke-test-checklist-20260810.edn"
-   "90-docs/gates/wave-5-m5-m6-execution-kickoff.edn"
    "90-docs/gates/weekly-checkpoint-structure.edn"
-   "90-docs/gates/weekly-execution-boards-template.edn"
    "90-docs/migration/M5-M6-checkpoint-procedures.edn"])
 
 (defn verify!
