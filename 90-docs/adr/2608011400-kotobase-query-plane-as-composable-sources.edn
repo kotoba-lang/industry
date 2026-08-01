@@ -313,10 +313,46 @@ snapshot node は小さく、`block-sizing` が data block を 16–128KB に保
   point lookup 用）。**Bloom が効くのはその狭い場合だけで、当初「無い」と書いたのは
   過大評価だった。**
 
-## 未着手
+## 未着手（次に再開する人へ、具体的なコマンド付き）
 
-1. **local tier の live 検証** — `cache-api` は実装したが Workers 上で未実測
-2. **kotobase-peer への適用（旧項目）** — 上の 2 lib は `arrangement` 層で実測しただけで、
+1. **local tier を Workers 上で実測する。** `block.cache.worker/cache-api` は
+   実装済み・未計測。in-memory store では block cache は時間の勝ちを示せない
+   （実 I/O が無い）ので、**実 R2/D1 の後ろでないと数字が出ない**。
+   再開点: `kotobase-peer.cache/cached-get-fn` を `net-kotobase` の
+   `KOTOBASE_D1_URL` 経路に噛ませ、`/evm/receipts` と同じ要領で block read 数を
+   比較する。
+2. **Bloom を本当にやるか判断する。** `merkle-lsm` は range pruning
+   （`select-run-refs-by-first-component` / `overlapping-run-ranges` /
+   `build-range-directory`）を既に持つので、Bloom が効くのは **range が重なる
+   point lookup** だけ。やる前にその頻度を測ること — 測らずに作ると今日 4 回
+   繰り返した「既にあるものを作る」になる。
+3. **multi-hop のキャッシュで説明できない分。** 再帰クエリの block read は
+   `datom-source/cached` で O(k)→定数になったが、`ms` はまだ k に対して伸びる
+   （fixpoint の binding 集合操作）。magic sets / sideways information passing が
+   本命だが、`arrangement.datalog` は他セッションが触っている領域
+   （`agent/datalog-join-frontier` 等）なので、**着手前に突き合わせること**。
+
+## このセッションで学んだこと（次に繰り返さないために）
+
+**「無い」と書く前に、production が実際に使う経路を確認する。** 今日 4 回、
+存在するものを存在しないと書いた:
+
+| 主張 | 実際 |
+|---|---|
+| 「kotobase のクエリは O(DB)」 | `arrangement` 単体の話。production は `kotobase-peer` の Merkle-LSM で range-pruned |
+| 「brick 1/2/3 が無い」 | `cold-datoms` / `compaction.cljc` / `materialized_view.cljc` として既存 |
+| 「multi-hop が書けない」 | 再帰ルール（semi-naive fixpoint）で書ける。Gremlin surface だけを見ていた |
+| 「index 経路の Bloom が無い」 | range pruning が主機構として実装済み。Bloom は狭い補完 |
+
+共通の原因は **「そのライブラリは production が使う経路か」を問わなかったこと**。
+`arrangement` は精査したが、`kotobase-peer` を見なかった。**証拠は
+`blind-input` の docstring に最初からあった**（「a cold reader re-derives to
+seek by prefix (`kotobase-peer`'s `cold-datoms`)」）— それを「可能である」の
+根拠として読み、「既に実装されている」と読まなかった。
+
+**それでも conformance suite は元が取れた**: production に live だった
+correctness バグ（`[_ _ o]` が全 DB を返す）を見つけた。これは
+`kotobase-peer/q` と Datalog の両方に効いていた。 — 上の 2 lib は `arrangement` 層で実測しただけで、
    production の `verified-node` / `cold-datoms` にはまだ入れていない
 2. **multi-hop の高速化**（上記。100 ノードで 854ms は on-chain の資金追跡には遅い） — multi-hop（Neo4j の index-free adjacency 相当）。他 3 つとは
    別物で、`arrangement` に新しい索引が要る。prefix scan では埋まらない。
