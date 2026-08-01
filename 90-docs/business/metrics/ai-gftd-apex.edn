@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 12081, "ai-gftd-chat-shell" 5},
+ {"magatama-sh1n5h1x" 12090, "ai-gftd-chat-shell" 5},
  :zone
- {:requests-7d 500828,
-  :pageviews-7d 3010,
-  :uniques-7d-sum 5042,
+ {:requests-7d 504342,
+  :pageviews-7d 3036,
+  :uniques-7d-sum 5136,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/.env.dev", :requests 110}
-   {:path "/.env.old", :requests 108}
+  [{:path "/.env.dev", :requests 166}
+   {:path "/.env.old", :requests 163}
    {:path "/xstelth.php", :requests 35}
-   {:path "/ops.php", :requests 30}
-   {:path "/wp-content/themes/index.php", :requests 28}
+   {:path "/ops.php", :requests 31}
+   {:path "/wp-content/themes/index.php", :requests 29}
    {:path "/0okj.php", :requests 28}
    {:path "/as.php", :requests 28}
-   {:path "/auDSb1pcgtR.php", :requests 24}],
-  :status-mix {:ok 1739, :client-error 1281, :server-error 15381},
+   {:path "//wp-admin/js/index.php", :requests 25}],
+  :status-mix {:ok 1842, :client-error 1300, :server-error 15423},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-01",
- :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 84},
+ :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 83},
  :top-paths
- "上位 page (24h, 2xx/3xx): /.env.dev 110 · /.env.old 108 · /xstelth.php 35 · /ops.php 30 · /wp-content/themes/index.php 28 | 4xx(probe) 7% · 5xx 84%",
+ "上位 page (24h, 2xx/3xx): /.env.dev 166 · /.env.old 163 · /xstelth.php 35 · /ops.php 31 · /wp-content/themes/index.php 29 | 4xx(probe) 7% · 5xx 83%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 500828 req/7d・5042 uniques(日次和)・うち4xx probe 7%(24h)、workers 12086 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 504342 req/7d・5136 uniques(日次和)・うち4xx probe 7%(24h)、workers 12095 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
