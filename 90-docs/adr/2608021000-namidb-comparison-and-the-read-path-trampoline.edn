@@ -184,17 +184,20 @@ subset は決定的で、内訳を receipt に書く: 全 person (9,892) と全 
 丸ごと (IC08 の返信・IC07 の like が実際の深さを持つように)。
 
 **状態: harness は着地済み、receipt はまだ無い。** 2026-08-01 の実行は
-2 回とも完走しなかった — この workstation の load average が実行中に
-130 → 430 まで上がり、最後は JVM が `jstack` にも 10 秒以内に応答しない
-ところまで枯渇した。**数字を捏造するくらいなら receipt を出さない。**
+3 回とも完走しなかった — この workstation の load average が実行中に
+130 → 430 まで上がり、JVM が `jstack` にも 10 秒以内に応答しないところまで
+枯渇した (load 43 まで回復した窓でも 1 プロセスが 1 コアの 4-20% しか
+取れない)。**数字を捏造するくらいなら receipt を出さない。**
 再現コマンド:
 
 ```
 clojure -M:ldbc-snb-bench <ldbc-sf1>/dynamic 3000 15
 ```
 
-その 2 回の試行で harness 側の欠陥が 2 つ見つかり、**receipt が存在する前に**
-直した (どちらも kotobase に不利な数字を出すところだった):
+その試行で harness 側の欠陥が 3 つ見つかり、**receipt が存在する前に**
+直した (うち 2 つは kotobase に、1 つは Neo4j に不利な数字を出すところだった —
+どちらも「データベースについての数字」ではなく「harness についての数字」に
+なっていた):
 ①IC09 が 1-2 hop の友人集合を解いた後、**到達した人ごとに point query を
 発行**していた。高次数の LDBC start person は 2 hop で ~1,300 人に届くので、
 これは Neo4j の可変長パス展開に対して Clojure のループを測っていた —
@@ -202,7 +205,15 @@ clojure -M:ldbc-snb-bench <ldbc-sf1>/dynamic 3000 15
 全行 vector 化してから捨てており、数 % しか残さない subset に対して RSS
 4.7GB を使っていた — reducing function での streaming に直し、返信森を先に
 (細い replyOf ファイルだけで) 解いてから 2M 行の本文ファイルを 1 回流す形に
-した。
+した。③Neo4j の relationship 投入が `MATCH (a:X {..}), (b:Y {..})` の
+カンマ形と平文 index だった。カンマ形は両方の property 述語が seek に
+押し込まれない限り**2 つの node scan の cartesian product** に計画され、
+統計が空のままの index は `NodeByLabelScan` に負けうる。実測症状: node と
+constraint は入っているのに store ファイルが一切成長せず、1 コアの ~20% で
+数十分回り続けた。unique constraint (planner が必ず UniqueIndexSeek を取る) と
+**MATCH 句の分離** (cartesian の選択肢自体を消す) に直した。プロセスを
+kill する前に `EXPLAIN` を採っていないので、これは症状に対する最有力の原因
+であって確認済みの原因ではない — 直し自体はどちらにせよ正しい。
 
 harness が受け入れた 3 つの非対称性 (平均で均さず receipt に明記する):
 ①kotobase の query language に ORDER BY / LIMIT が無いので、top-20 は join
