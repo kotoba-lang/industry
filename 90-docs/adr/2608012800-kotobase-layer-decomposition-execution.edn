@@ -183,11 +183,73 @@ zero-runtime-dep は維持(`cid-of` は注入、`io-multiformats` は test-only 
 検証: JVM 46 tests / 156 assertions / 0 failures、nbb 13 oracles green。
 感度測定済み——ポリシーを一時的に omit に変えると JVM 7 失敗 + async oracle 失敗。
 
+## 段 3 — `kotoba-lang/blind` 5b6bf6f(L1)
+
+抽出ではなく**実装**として着地。keyed MAC(HMAC-SHA256)+ AEAD(AES-256-GCM)、
+zero-dep(platform crypto のみ)、JVM 同期 / cljs Promise の契約は既存呼び手に合わせて保存。
+
+**nonce は plaintext 由来の決定的導出が既定**。`core.cljc:2601` が自ら
+「random-nonce の `encrypt-fn` は fold determinism を静かに壊す」と警告していたため。
+代償(**平文の同一性が漏れる** — 同じ値は同じ暗号文になる)は docstring・README・
+commit message の 3 箇所に明記。`:nonce :random` は opt-in で、determinism を
+失うことをテストで assert している。
+
+検証は self-consistency ではなく**公表ベクタ**: RFC 4231 §4 全 7 ケース、
+NIST CAVP `gcmEncryptExtIV256.rsp`(Keylen=256/IVlen=96/Taglen=128)、RFC 4648 §10。
+合成部分の golden は **`node:crypto` という第 3 実装**から生成しているので、
+JVM 合格 = javax.crypto ≡ node、cljs 合格 = WebCrypto ≡ node、ゆえに両者一致。
+JVM/cljs とも 16 tests / 80 assertions。**感度確認済み**(RFC ベクタを 1 つ壊すと
+ちょうど 1 件落ちる)。
+
+## 段 4 — `kotoba-lang/merkle-lsm` 202c365(L4)
+
+経路 B の物理ストアに名前と境界を与えた。依存は `io-ipld` のみ。`compaction` も同梱
+(core が compaction の**機構**を持ち、compaction は**方針**(scheduling / L0 sub-level /
+lease / GC / safe-epoch pin)を持つ — 名前が誤解を招くので両 docstring に明記)。
+44 tests / 165 assertions、両 runtime。
+
+なお実ファイルは brief の想定より大きく `merkle_lsm.cljc` は 1155 行だった。
+README には ADR の未解決 gap のうちコードから確認できたものだけを書いた:
+cache effect descriptor に解釈器が無い / bloom filter・prefetch は無い(ただし
+block は `logical-min`/`logical-max` の粗い範囲 index を持つ)/ safe-epoch MVCC が未配線 /
+streaming compaction は Stage A が未達で Stage B が bounded。
+
+## 段 5 — `kotoba-lang/datom-model` 97835a1(L5)
+
+**境界は実測どおり成立した**が、正確な分割線は 920 ではなく **870**
+(`;; ── persistence ──` の区切りコメント。ファイルは 2766 行で、想定より 20 行長かった)。
+`pt/` 0/4、`cd/` 0/11、`get-fn` 3/258 は測定どおりで、前半 3 つの `get-fn` は
+すべて `verified-node` の中 — 予定どおり落とした。
+
+**依存は `datalog` + `datom` のみ**で、`arrangement` も `io-ipld` も入らない。
+これは段 1 の狙いどおりで、model 半分の `arrangement.core` 呼び出し 25 箇所すべてが
+`datalog.index` に arity ごと 1:1 で載った。
+
+想定と違った点が 2 つ:
+- `retraction-filters`/`remove-retracted` は 870 より上にあるが呼び手は全部下
+  (`hot-datoms`/`fold!`)なので persistence 側に残した。結果 **`edn->link` の
+  使用が消え**、残る IPLD 面は `link->edn` 1 箇所だけになった。
+- `kotobase-peer.statistics` の 3 関数(純粋)が model 半分から使われていたので同梱。
+  無いと `transact-with-statistics` と `datalog-query-plan` が来られない。
+
+`link->edn` は**注入**にした(`io-ipld` を足すと multiformats + cbor まで引き込み、
+段 1 が買ったものを打ち消すため。model は Link を構築も参照も比較もせず、
+「参照かどうか」と「どう文字列化するか」しか要らない)。既定値も与えていない —
+`pr-str` は非参照値には正しいので誘惑があるが、Link を持つ呼び手が忘れると
+`#object[ipld.core.Link 0x...]` が `:v_edn` に入って**黙って wire を壊す**。
+
+65 tests / 124 assertions、両 runtime。`ref?` 必須化の副産物として、
+`transact-with-schema` の `:db/valueType \"ref\"` 判定が同じ呼び出しの `ref?` とは
+**独立に** `ipld/link?` をハードコードしていた drift も直った。
+
 # 残り
 
-段 3(L1 実装所有者の決定)、段 4(2 entry point の命名・分離)、段 5(mega-seam の分割)、
-段 6(object store Worker の契約合流)は未着手。段 5 は段 1-2 の成果物が前半の汚れ
-(`verified-node` と `ipld/link?` 既定値)を消してから着手するのが正しい順序。
+- **段 6 の D1/D2**(Worker に protocol を被せ、env var を declared profile に写し、
+  conformance を回す)。D3(cljs CI)は着地済み。詳細は ADR-2608012900。
+- **再統合**: 4 つの新 lib はすべて**追加のみ**で着地しており、
+  `arrangement` / `kotobase-peer` はまだ新 lib を向いていない。
+  向け直しは既存 consumer を壊すリスクがあるので別段。
+- **novelty-segments の Promise 版 cljs mirror**(コード内に OWED と明記)。
 
 # Non-goals
 

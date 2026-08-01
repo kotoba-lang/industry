@@ -1,0 +1,155 @@
+[{:db/id -1
+  :adr/id "adr-2608012900-object-store-worker-joins-the-storage-contract"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/title "object store Worker を storage 契約に合流させる — 挙動を変えるためではなく、race する conformance を継承するため"
+  :adr/topic "object-store-worker-joins-the-storage-contract"
+  :adr/status "accepted"
+  :adr/date "2026-08-01"
+  :adr/last-verified "2026-08-01"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+
+  :adr/authoritative-for
+  ["kotobase-peer の object store Worker と kotobase-storage 契約の関係"
+   "Worker の ref 面(cas-head!)が契約のどの profile に当たるか"
+   "kotobase-peer に CI を入れる決定"]
+
+  :adr/related
+  ["adr-2608012800-kotobase-layer-decomposition-execution"
+   "adr-2607312100-kotobase-layering-block-ref-split-signed-head"
+   "adr-2607299950-storage-contract-maturity-closing"]
+
+  :adr/decision-summary
+  ["D1: Worker は契約を採用する。ただし挙動を変えるためではなく、4 writer を競走させる conformance suite を継承するため"
+   "D2: Worker の CAS は素朴ではない — S3 では明示的な opt-in 無しに実行を拒否する。契約の ref-profile と同じ規律を env var で表現している"
+   "D3: 実際の穴は CAS の質ではなく『宣言が無い』『並行テストが無い』『CI が無い』の 3 点"
+   "D4: kotobase-peer の CI に ClojureScript job を足す。JVM job は元からあった — 無かったのは cljs 側で、それは本番が動く runtime の方だった。実行したら 1 failure + 3 errors が出た(着地済み: kotobase-peer 0b599e0)"]
+
+  :adr/verify
+  ["grep -c 'kotobase.storage' orgs/kotoba-lang/kotobase-peer/src/kotobase_peer/object_store/worker.cljs   ; => 0"
+   "grep -c 'linearizable-ref|single-writer-ref|IBackendCapabilities' .../worker.cljs   ; => 0"
+   "ls orgs/kotoba-lang/kotobase-peer/.github/workflows   ; => 存在しない"]
+
+  :adr/body
+  "# Context
+
+ADR-2608012800 D7 で段 6 の範囲が絞られた: **storage 契約は live Datomic 経路では既に
+採用されている**(`kotobase-storage-d1/src-cljs/.../d1_worker.cljs` が
+`storage/IBlockStore` / `IRefStore` / `IBackendCapabilities` を実装している)。
+未採用なのは **object store Worker(`kotobase_peer/object_store/worker.cljs`、6,096 行、
+`kotobase.storage` 参照 0)だけ**である。
+
+# 先に公平を期す — Worker の CAS は素朴ではない
+
+「契約を通っていない実装は危ない」と決めつける前に読んだ。**危なくなかった。**
+
+`cas-head!`(line 316-)は 2 経路を持つ:
+
+- **R2**: ネイティブの条件付き put(`onlyIf {:etagMatches etag}` / `{:etagDoesNotMatch \"*\"}`)
+- **S3**: `if-match` / `if-none-match` を送るが、**`MERKLE_S3_CONDITIONAL_HEAD=true` が
+  明示的に設定されていなければ実行を拒否する** — 「Set MERKLE_S3_CONDITIONAL_HEAD=true
+  only for a backend with conditional PutObject」
+
+つまり **B2 に条件付き書き込みが無いという実測ハザードを、黙って受け入れるのではなく
+拒否することで処理している。** これは契約の `ref-profiles` が
+`:linearizable-ref` / `:single-writer-ref` で符号化しているのと**同じ規律**を、
+declared property ではなく env var として表現したものである。409/412 を
+「CAS に負けた」(false)として扱う点も正しい。
+
+さらに、ADR-2607299950 が記録した実際に出荷された事故 — Closure `:advanced` が
+`.etag` を潰して全 ref version が nil になり、4/4 writer が publish 成功を返した —
+**の再発も既に避けている**。Worker の ETag 読み出しは全箇所 `gobj/get`(advanced-safe)か
+Headers の実メソッド `.get` であって、`.-etag` のプロパティアクセスは 1 つも無い。
+
+**したがって本 ADR は「危ない実装を契約で矯正する」話ではない。**
+
+# 本当の穴は 3 つ、いずれも CAS の質ではない
+
+1. **宣言が無い。** Worker は ref profile も capability も declare していない
+   (該当 grep 0 件)。`MERKLE_S3_CONDITIONAL_HEAD` は**実行時の**性質なので、
+   呼び手からは「この head が linearizable かどうか」が見えない。契約はそれを
+   `validate-backend!` が検査する**宣言された**性質にする。
+
+2. **並行テストが無い。** Worker のテストは 22 deftest あり ETag/CAS 系も複数含む
+   (`compare-and-exchange-head-adapts-async-etag-cas` 等)。**しかし全て逐次である。**
+   ADR-2607299950 が確立したとおり、**逐次テストは現実的なハザードでは落ちない** —
+   まさにそれが契約の conformance に並行半分(4 writer を実スレッド/Promise で競走させ、
+   ちょうど 1 つが勝ち、敗者全員が勝者を観測することを要求)が追加された理由である。
+   出荷された `.etag` バグは、あらゆる逐次テストを通過した。
+
+3. **CI の半分が無い。**
+
+   **訂正(2026-08-02)**: 当初この節は「`kotobase-peer/.github/workflows` は存在しない」と
+   書いていたが**誤り**だった。読んだのが共有 checkout の `codex/fold-async-reads`
+   ブランチで、そこに workflow が無かっただけである。`origin/main` には
+   `ci.yml` があり、`clojure -M:test` の job を 1 つ持っている。
+   **本セッションで 3 度目の「stale checkout を origin と取り違える」誤り**であり、
+   この面の判断は必ず origin 側で取り直すべきことをもう一度示している。
+
+   実際に無かったのは **ClojureScript job** の方で、そちらが重要だった:
+   **このコードが実際に動く runtime は ClojureScript**(object store Worker は
+   Cloudflare Worker)なので、**テストされていない半分が本番の半分**だった。
+
+   実行したところ **1 failure + 3 errors** が出た(いずれも cljs のみ。JVM は
+   268 tests / 832 assertions green):
+
+   - `chunk-is-deterministic` — `(= (seq bytes-a) (seq bytes-b))` が false。
+     cljs では `js/Uint8Array` に対する `seq` が `ISeq` は実装するが `IEquiv` を
+     実装しない列を返すため、`=` が参照同一性に退化する。**自分自身と比べても
+     false**(`(= (seq a) (seq a))` => false、nbb で最小再現)。
+     ライブラリは正しく、bytes は 1394 要素で完全一致、上の行の CID assertion は
+     通っていた。**determinism の欠陥ではなく、typed-array の列等価という
+     runtime の性質を測っていた assertion**。`vec` に修正。
+   - `novelty-segments-test` の 3 件 — `hot-datoms`/`fold!` を同期的に呼んでいる。
+     JVM では正しい(javax.crypto は同期)が cljs では crypto が Promise を返すので
+     null 参照になる。`#?(:clj)` で囲い、**Promise 版 cljs mirror を OWED として
+     明記**した(黙って落とさない)。
+
+   着地: `kotobase-peer` `0b599e0`。JVM 268/832(不変)、cljs 271/1083、
+   いずれも 0 failures 0 errors。
+
+# Decision
+
+## D1. Worker は契約を採用する — 挙動のためでなく conformance のため
+
+Worker は既に `put-block!` / `get-block!` / `get-head` / `cas-head!` を持っており、
+これは **`IBlockStore` + `IRefStore` そのもの**である。protocol を実装するのは
+薄いラッパで足り、**挙動は変えない**。
+
+得られるものは `async-contract/verify` の継承である:
+逐次 8 check に加え、`:linearizable-ref` を宣言した場合は 4 writer の競走 2 ラウンド
+= 計 14 check。`:single-writer-ref` なら 8 check で
+`:concurrency :not-claimed` と報告されるので、**通ったことが backend の主張を超えて
+読まれることがない。**
+
+## D2. env var を declared profile に写す
+
+`MERKLE_S3_CONDITIONAL_HEAD` の有無は、そのまま
+`:linearizable-ref` / `:single-writer-ref` の別に対応する。R2 経路は
+`:linearizable-ref`。宣言にすれば `storage/linearizable?` で呼び手が分岐でき、
+`validate-backend!` が「どちらも宣言していない/両方宣言している」を拒否する。
+
+## D3. kotobase-peer に CI を入れる
+
+既存 22 deftest + merkle_lsm/compaction 等の `.cljc` スイートを JVM と
+ClojureScript の両方で回す。**これは D1/D2 より先に効く** — 契約を採用しても
+それを回すものが無ければ意味が無いからである。
+
+# Non-goals
+
+- Worker の自前 sigv4 S3 client を `kotobase-storage-s3` に置き換えること。
+  重複ではあるが、Worker 側は R2 binding と S3 の 2 経路 + GC/backup/retention の
+  ポインタ CAS を持っており、置換は本 ADR の範囲を超える。**まず契約を被せ、
+  conformance を通す。** 統合はその後に評価する。
+- 段 4(2 つの entry point の分離)をここで決めること。別 ADR。
+
+# 現在地
+
+- **D3 は着地済み**(`kotobase-peer` `0b599e0`、pin 前進済み)。cljs job が入り、
+  それが見つけた 2 件の欠陥も修正した。**残る負債は novelty-segments の
+  Promise 版 cljs mirror**(コード内に OWED と明記)。
+- **D1/D2 は未実装。** Worker に protocol を被せ、env var を declared profile に
+  写し、`async-contract/verify` を回すところまでが残り。D3 が先に入ったので、
+  それを回す土台はできている。
+"}]
