@@ -1,0 +1,120 @@
+[{:db/id -1
+  :adr/id "adr-2608010940-evm-state-datom-indexer"
+  :adr/title "ADR-2608010940: EVM チェーン状態を datom 面に載せる indexer — 合意も EVM 実行も持たずに「クエリできる」側だけ取る"
+  :adr/status "proposed"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-01"
+  :adr/last-verified "2026-08-01"
+  :adr/last_verified "2026-08-01"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "evm-state-datom-indexer"
+  :adr/authoritative-for
+  ["EVM チェーン状態を kotobase の datom 面に取り込む方法"
+   "indexer の schema と ref 配置（one-ref 規則への適合）"
+   "reorg の扱い"
+   "EVM 互換のうち read subset をどう提供するか"]
+  :adr/related
+  ["adr-2608010930-kotobase-chain-and-evm-compatibility-scope"
+   "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2607252000-edn-query-plane-cross-repo-join"
+   "adr-2607279000-kotobase-d1-permanent-worker"]
+  :adr/body
+  "# ADR-2608010940: EVM チェーン状態を datom 面に載せる indexer
+
+**Status**: proposed（設計のみ。実装未着手）
+**Date**: 2026-08-01
+
+## Context
+
+ADR-2608010930 で「kotobase はチェーンを自作せず、EVM 互換は読む側に限定する」と決めた。その「読む側」の具体設計がこの ADR。
+
+狙いの position は The Graph / Dune — **チェーンの状態を、チェーンでは書けないクエリ言語で引けるようにする**こと。kotobase は既にその出力面（`sparql|cypher|gremlin.kotobase.net` + Datalog）を live で持っており、欠けているのは入力側だけ。
+
+既に効く資産:
+
+- `kotoba-lang/org-ethereum-jsonrpc`（`kotobase.ethereum.rpc`、`.cljc`）— `eth_*` 呼び出し
+- `kotoba-lang/chain` — 取り込んだ range を parent-linked に commit する WAL
+- `kotoba-lang/prolly-tree` / `arrangement` — content-addressed な 4 index
+- `kotobase-storage-d1` / `net-kotobase` の Durable Object 直列化器
+- `treasury/core.cljc` — 既に Base RPC から receipt を引いて USDC Transfer ログ（topic0 `0xddf252ad…`）を parse している。**つまり「log を引いて意味に変える」最小経路は既に本番で動いている。** indexer はその一般化。
+
+## Decision
+
+### 1. 面は 1 本。全チェーン・全コントラクトを同じ ref に置く
+
+ADR-260726 のとおり Datalog join は ref 1 本しか届かない。**チェーンごと / コントラクトごとに ref を割らない。** 割った瞬間に「この token の holder が、あの protocol で何をしたか」という、この製品の存在理由そのものが N クエリ + 手マージに落ちる。
+
+書き込み負荷を理由に分割しない。indexer は本質的に **単一 writer**（ブロックは全順序で来る）なので、DO を ref の所有者にしてバッチ commit すれば CAS 競合は構造的に起きない。ストレージは D1（DO のローカル SQLite に置かない — per-object private で他から引けず、datom 面が孤島に割れる）。
+
+### 2. Schema
+
+`:source/dataset` で出自を区別する既存の慣習（ADR-2607252000）に揃える。属性名にチェーン名を埋め込まない — **埋め込むと結合キーが壊れる。**
+
+```
+;; block
+{:evm/chain-id 8453 :evm/block-number 12345678 :evm/block-hash \"0x…\"
+ :evm/parent-hash \"0x…\" :evm/timestamp 1785000000
+ :evm/finalized? true :source/dataset \"evm-base\"}
+
+;; tx
+{:evm/tx-hash \"0x…\" :evm/block-number 12345678 :evm/tx-index 3
+ :evm/from \"0x…\" :evm/to \"0x…\" :evm/value-wei \"0\"
+ :evm/status 1 :evm/gas-used 21000 :source/dataset \"evm-base\"}
+
+;; log（生。decode 前）
+{:evm/log-id \"0x…:3:7\" :evm/tx-hash \"0x…\" :evm/log-index 7
+ :evm/address \"0x…\" :evm/topic0 \"0x…\" :evm/topics [\"0x…\"]
+ :evm/data \"0x…\" :source/dataset \"evm-base\"}
+
+;; decode 済みイベント（ABI が登録されているコントラクトのみ）
+{:evm/log-id \"0x…:3:7\" :evm/event \"Transfer\"
+ :evm/arg {\"from\" \"0x…\" \"to\" \"0x…\" \"value\" \"1000\"}
+ :source/dataset \"evm-base\"}
+```
+
+**生 log と decode 済みイベントを別 entity にし、`:evm/log-id` で結合する。** ABI が後から登録された時に、生 log を捨てずに decode だけ足せる。ABI が無いコントラクトも取りこぼさない。
+
+`:evm/address` は既存の `:company/lei` と同じ役割の結合キー。**将来 `:company/lei` を持つ entity と EVM address を橋渡しする対応表を足せば、SEC 財務（`market-intel`）× 法人実体（`cloud-itonami-lei`）× on-chain 活動が 1 クエリで引ける** — これがこの面の本当の価値であり、チェーンを自作しても得られないもの。
+
+### 3. Reorg は「確定待ち + 明示的 retract」で扱う
+
+state proof を持たない以上、reorg 耐性は自前で作るしかない。
+
+- **finality lag**: `:evm/finalized? false` で先行取り込みし、N confirmations（Base は L1 finality に依存するので保守的に 64 block 以上）を超えたら `true` に更新する。クエリ側は既定で finalized のみを見る。
+- **reorg 検出**: 取り込み済みの `:evm/parent-hash` が新しい block の親と食い違ったら分岐点まで巻き戻す。
+- **巻き戻しは retract**（datom の追加ではなく撤回）。ここは「文書は最新状態のみ」という repo 全体の方針（ADR-2607257000）と同じ形 — 履歴は `chain` の commit 列が持つので、datom 面は現在地だけを表す。
+
+**未確定ブロックを finalized と混ぜて配ることは絶対にしない。** それをやると「クエリ結果が後から静かに変わる」という、この製品が一番売ってはいけない性質になる。
+
+### 4. EVM 互換として提供するのは read subset のみ
+
+`eth_getLogs` / `eth_getBlockBy*` / `eth_getTransactionBy*` / `eth_getTransactionReceipt` / `eth_blockNumber` / `eth_chainId` は取り込んだ datom から直接応答できる。
+
+**提供しないものを明示する**: `eth_call` / `eth_estimateGas`（EVM 実行が要る）、`eth_sendRawTransaction`（我々は mempool を持たない）、`eth_getProof`（MPT を持たない、ADR-2608010930 の 3）。**「eth_ で始まるから互換」と言わない** — 出せるメソッドを列挙して名乗る。
+
+### 5. keccak は `@noble/hashes` で edge に持ち込む
+
+topic0 の算出と ABI decode に Keccak-256 が要る。`kotoba-lang/eth-crypto` は JVM-only（zero CLJS portability）なので**経路にならない**。Workers 側は既に `@noble/curves` を Ed25519 で使っているので、`@noble/hashes` の `keccak_256` を足す。ABI decode 自体は `kotoba-lang/abi` の `.cljc` を参照するが、`base-l2.abi` は `.clj` なのでそのままは使えない。
+
+## Consequences
+
+- **合意も EVM 実行も要らない。** この ADR の範囲に consensus / VM / mempool は一切入らない。失敗しても壊れるのは indexer だけで、kotobase 本体の可用性に影響しない。
+- **正しさは上流 RPC 依存。** 我々は state proof を検証しないので、**この面の真正性は使っている RPC provider を信じることに等しい**。trustless ではない。複数 RPC で cross-check する余地はあるが、初版はやらない — **やらないことを黙らない。**
+- **コストはブロック数に比例して増え続ける。** Base は 2 秒ブロック。全 log を無期限に持つと D1 が破裂するので、初版は **登録されたコントラクトの log だけ**を取り込む allowlist 方式にする（全チェーン indexer を名乗らない）。
+- **one-ref に全部入れる決定は、将来の書き込み並列度を恒久的に諦めることを意味する。** 単一 writer の上限（DO 1 個のスループット）がこの面の上限になる。ADR-260726 が要求するとおり、**この代償をここに明記する。**
+
+## 未解決（実装前に決めること）
+
+1. どのコントラクトを allowlist の初期セットにするか。少なくとも kotobase 自身の treasury（`0xA00366…D4E`）の USDC 受領は入る — **自分の売上をこの面で引けることが最初の dogfood。**
+2. finality lag の具体値（Base の L1 finality をどう見るか）。
+3. `:evm/address` ↔ `:company/lei` の対応表をどこが所有するか。
+
+## Alternatives considered
+
+- **The Graph の subgraph を使う。** 却下しない（実際に安い）が、それだと kotobase の datom 面と join できず、この ADR の目的（1 クエリで跨ぐ）を満たさない。
+- **チェーンごとに ref を分ける。** 却下。ADR-260726 が名指しで禁じている「黙ったシャーディング」そのもの。
+- **full archive node を持つ。** 却下。Cloudflare Workers 上では不可能で、持てたとしても差別化しない。
+"}]
