@@ -1,0 +1,7 @@
+artifact_id	step	contract_method	implemented_method	reason	expected_impact	status
+FIG1	QQ expectation	(i-0.5)/m stated as contract default	(i-0.5)/m	no deviation; convention declared as M01 requires	none	NO_DEVIATION
+FIG1	lambda_GC	median(chi2_1 inverse-survival(P)) / median(chi2_1)	scipy.stats.chi2.isf(p,1) median / chi2.ppf(0.5,1)	contract formula implemented literally via a standard library rather than a hand-rolled quantile	none	NO_DEVIATION
+FIG1	inter-chromosome gap	declared constant gap, value left to implementer	20,000,000 bp constant	free choice the contract requires to be declared, not matched	x-axis spacing only; no effect on any claim value	DECLARED_CHOICE
+FIG1	validity filter	finite position and 0 < p_value <= 1	finite position, 0 < p <= 1, finite p, chromosome in 1..22	autosome restriction added from the M01 'autosomes 1-22' scope line	0 rows affected; all 362,797 rows already satisfied every condition	DECLARED_CHOICE
+FIG1	qc_status handling	preserve qc_status; do not silently restore absent variants	preserved and reported; never used to drop rows	contract does not authorise dropping on qc_status	none	NO_DEVIATION
+FIG1	suggestive variant set	M01 gives no instruction on the post hoc rs376128944 exclusion	plotted all 27 variants with P < 1e-5 as present in DS_GWAS_CURRENT	see FINDING F-01; excluding it would require an instruction the contract does not give	Manhattan shows 27 points below the suggestive line where the manuscript describes 26 retained; no effect on lambda_GC, valid-variant count, or the genome-wide count	OPEN_FINDING

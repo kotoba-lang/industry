@@ -132,7 +132,7 @@ assistance log) and `06_RETURN_PACKAGE_SPECIFICATION/`.
 
 ## Dataset index
 
-26 datasets; full table in `04_DATA_PAYLOAD/00_INDEX/DATASET_MASTER_INDEX.tsv`,
+25 datasets; full table in `04_DATA_PAYLOAD/00_INDEX/DATASET_MASTER_INDEX.tsv`,
 field definitions in `DATA_DICTIONARY.tsv`, dependencies in
 `ARTIFACT_DEPENDENCY_GRAPH.tsv`.
 

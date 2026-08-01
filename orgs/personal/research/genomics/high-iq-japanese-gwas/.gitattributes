@@ -30,3 +30,22 @@ submission/**                                       annex.largefiles=anything
 # which DATA_SECURITY_AND_AI_RULES.md explicitly permits.
 .gitattributes                                      annex.largefiles=nothing
 README.md                                           annex.largefiles=nothing
+
+# Audit implementation stays readable. The verifier attestation claims the
+# reconstruction used "independently implemented code"; a reviewer cannot check
+# that claim against an annex symlink. The code carries no restricted rows.
+audit/code/**                                       annex.largefiles=nothing
+
+# Top-level return tables are the audit trail (claim values, input hash audit,
+# deviation log, software environment, visual QA, AI assistance log). They hold
+# hashes, counts, aggregate statistics and prose only. The single-level glob
+# deliberately does NOT reach the subdirectories below.
+audit/return/KAWASAKI_PHASE5C_INDEPENDENT_RETURN/*.tsv   annex.largefiles=nothing
+audit/return/KAWASAKI_PHASE5C_INDEPENDENT_RETURN/*.txt   annex.largefiles=nothing
+
+# Bulk outputs stay annexed. M05 requires individual scores to remain inside the
+# encrypted return package, and these two directories are where per-artifact
+# outputs land — including, later, the Figure 4 chain. Annexing them by rule
+# means a future individual-level file cannot reach plain git by accident.
+audit/return/KAWASAKI_PHASE5C_INDEPENDENT_RETURN/02_ARTIFACT_FILES/**   annex.largefiles=anything
+audit/return/KAWASAKI_PHASE5C_INDEPENDENT_RETURN/03_SOURCE_TABLES/**   annex.largefiles=anything
