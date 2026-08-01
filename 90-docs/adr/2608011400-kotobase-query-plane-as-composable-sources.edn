@@ -269,9 +269,54 @@ bookkeeping を足すだけ）。その価値は block read の実コストに�
 では R2/D1 の往復。実際 k=160 で block-cache 単独が baseline より遅い行が出る —
 **存在しないコストに対して最適化を測るとこうなる**という見本。
 
+## kotobase-peer への適用（2026-08-01、実測付き）
+
+**`:cache/get` / `:cache/put` は `merkle-lsm` が最初から宣言していて、
+何も解釈していなかった。** この 2 つの effect type を repo 全体で grep すると
+定義箇所の 2 回しか出てこない — **設計は block cache の穴を空けてあり、
+誰も埋めていなかった。** だから全 read が object store に行き、全 block が
+到着のたびに再ハッシュされていた。
+
+`kotobase-peer.cache`（`5c30211b`）が埋めた。**engine の read path は 1 行も
+変えていない** — `get-fn` は host が渡すので、host が包むだけ。
+
+**実測（実 read path、fake reader ではなく）**: `cold-datoms` の point read を
+5 回で **uncached 15 blocks → cached 3（5.0x）**。検証は read ごとから
+**block ごと 1 回**に（`verified-node` は今も毎回再ハッシュしている）。
+壊れた block が cache 越しでも throw することはテストで固定した — verify-on-miss
+は verify-never ではない。
+
+### metadata cache は「サイズで分ける」ことで実現した
+
+Hummock が metadata cache と block cache を分けるのは bookkeeping ではなく
+**eviction** のため。metadata は小さく hot、data block は大きく cold で、
+**1 回の広い scan が共有 LRU の hot metadata を全部追い出す**（LRU は recency
+のヒューリスティックで、広い scan はそれを破る典型パターン）。
+
+kotobase は自明な場所でこの分割ができない — `get-fn` は `(fn [cid] bytes)` で、
+CID は「snapshot node か data block か」を語らない。**しかしサイズが語る。**
+snapshot node は小さく、`block-sizing` が data block を 16–128KB に保つ。
+`block.cache/segmented` は byte 閾値（8KB）で 2 つの独立予算に分ける。
+**「共有 cache は同じ総容量でも metadata を失う」ことをテストで対にして固定した**
+（良い方だけ見せる eviction の主張はテストではない）。
+
+### local tier と Bloom
+
+- **local tier**: `block.cache.worker/cache-api`（Workers Cache API）を実装。
+  Promise ベースなので同期 `IBlockCache` には載らず、**async 用の別 protocol**に
+  した（同期シムで偽装していない）。per-colo なので **edge ごとに初回 miss** が
+  正常であり、global hit rate を期待しない。
+- **index 経路の Bloom は、思ったほどの穴ではなかった。** `merkle-lsm` は既に
+  `select-run-refs-by-first-component` / `overlapping-run-ranges` /
+  `build-range-directory`（paged 版も）を持っており、**range による run pruning が
+  実装済み**。sorted-run LSM では range pruning が主で Bloom は従（range が重なる
+  point lookup 用）。**Bloom が効くのはその狭い場合だけで、当初「無い」と書いたのは
+  過大評価だった。**
+
 ## 未着手
 
-1. **kotobase-peer への適用** — 上の 2 lib は `arrangement` 層で実測しただけで、
+1. **local tier の live 検証** — `cache-api` は実装したが Workers 上で未実測
+2. **kotobase-peer への適用（旧項目）** — 上の 2 lib は `arrangement` 層で実測しただけで、
    production の `verified-node` / `cold-datoms` にはまだ入れていない
 2. **multi-hop の高速化**（上記。100 ノードで 854ms は on-chain の資金追跡には遅い） — multi-hop（Neo4j の index-free adjacency 相当）。他 3 つとは
    別物で、`arrangement` に新しい索引が要る。prefix scan では埋まらない。
