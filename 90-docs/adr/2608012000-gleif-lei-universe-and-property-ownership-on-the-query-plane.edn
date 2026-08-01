@@ -132,8 +132,53 @@ repo 移動で黙って 0 件になる — 実際に market-intel でそれが�
   load 85 秒 / RSS 614 MB、60 万 entity = load 290 秒 / RSS 1,200 MB
   （node --max-old-space-size、この 32 GB マシン）。
 - ingest 速度: 50,000 行で user 52 秒。全 339 万行の実行はこのマシンの
-  load average 60-80（多数の並行セッション）下で約 15% CPU しか得られず、
-  数時間かかる。"
+  load average 60-210（多数の並行セッション）下で 5-25% CPU しか得られず、
+  実測で数時間かかった。
+
+## 実行時に踏んだ落とし穴（再発防止のため記録する）
+
+**zsh は変数を単語分割しない** — shard 起動時に `extra=\"--limit 678283\"` を
+`... --skip $skip $extra ...` と展開したところ、zsh はこれを **1 個の引数
+`--limit 678283`** として渡し、`--limit` は一致しないまま nil になった。結果、
+5 本の shard がすべて「skip 後ファイル末尾まで」を処理し、互いに重複した
+（shard-2 は 678,283 行のはずが 2,034,847 行）。CLAUDE.md が west コマンドの
+文脈で明記している zsh の挙動そのもので、collector 側のバグではない
+（`--skip 1000 --limit 5` を個別引数で渡した smoke test は正しく 5 件で停止して
+いた）。重複 shard は破棄し、`--skip 0` の shard-0 がそのまま全 3,391,413 件の
+完全な corpus になったのでそれを採用した。**shard 引数は必ず個別の語として
+渡すこと**（`--limit 678283` を 1 変数に入れて渡さない）。"
+
+  :adr/resume-point "**次にやること**: corpus から projection を切って commit する。
+
+  ```bash
+  # 1. corpus が完成しているか（3,391,413 行 + manifest 1 行 = 3,391,414）
+  wc -l ~/.cache/gleif/gleif-lei-corpus-20260801.edn
+
+  # 2. 面に既出の LEI を抜き出す（2026-08-01 実測 2,756 件）
+  cd <superproject> && nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs \\
+    q '[:find ?lei :where [?e \"company/lei\" ?lei]]' 2>/dev/null \\
+    | grep -oE '\"[A-Z0-9]{20}\"' | tr -d '\"' | sort -u > /tmp/plane-leis.txt
+
+  # 3. join 駆動 projection（既存 dataset と結合する会社をすべて GLEIF で裏付ける）
+  cd orgs/kotoba-lang/property
+  nbb -cp src scripts/project_gleif_corpus.cljs \\
+    --corpus ~/.cache/gleif/gleif-lei-corpus-20260801.edn \\
+    --lei-file /tmp/plane-leis.txt --out data/gleif-lei-joined.datoms.edn
+
+  # 4. JP slice（規模を確認してから。数万件なら面に載せてよい）
+  nbb -cp src scripts/query_gleif_corpus.cljs \\
+    --corpus ~/.cache/gleif/gleif-lei-corpus-20260801.edn --jurisdiction JP --status ISSUED
+  nbb -cp src scripts/project_gleif_corpus.cljs --corpus <同上> \\
+    --jurisdiction JP --status ISSUED --out data/gleif-lei-jp.datoms.edn
+
+  # 5. property repo に commit → PR → merge → west pin 前進（API single-entry）
+  ```
+
+  corpus 自体は `~/.cache/gleif/`（git 対象外）。消えていれば
+  `collect_gleif_golden_copy.cljs` を Golden Copy の最新 publish で回し直す
+  （日次更新なので publish id と sha256 は変わる）。恒久保存するなら
+  skill `large-binary-datalad` の B2 + DataLad 経路に載せる — この ADR では
+  まだやっていない。"
 
   :adr/measured-state "2026-08-01 時点の実測カバレッジ（主張ではなく測定値）:
 
