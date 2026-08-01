@@ -60,6 +60,40 @@ ADR-2607141915 / ADR-2607309900 で既に位置づけられている。
 real-Chromium の E2E が拾った。seam 側で「構築後に class を追記する」形に直し
 （`dads-button` は残り、こちらは併走する）、テストで固定した。
 
+## デプロイが半分しか着地しない問題（2026-08-01、オーナー報告で発覚）
+
+移行を deploy した翌日、オーナーから「style が適切に jp-go-dads になっていない?」と
+スクリーンショット付きで報告があった。**デザインシステムが当たっていなかったのではなく、
+当たっていた相手が古い app だった。**
+
+新しい `index.html`（DADS を inline 済み）が配信される一方、Cloudflare の edge は
+以前の `/assets/main.js` を返し続けていた（`cf-cache-status: HIT`、`age: 56837`、
+`cache-control: public, max-age=2592000`）。そのバイト列にはまだ "How can I help" が
+入っており、日本語 chrome は 0 件だった。**layout の class 名は新旧で共通だった**ため、
+サイドバーやグリッドだけが効いて component は素の browser 既定という「壊れた skin」に
+見えた。
+
+原因は bundle のファイル名が内容によらず不変だったこと。30 日の cache entry が
+deploy を跨いで生き残れる。対処は 3 点セット（どれか 1 つでは効かない）:
+
+- `:module-hash-names 8` — 内容ハッシュ入りのファイル名。bytes が変われば URL が
+  変わるので、古い entry は「運悪く当たる」ものではなく**到達不能**になる。
+- `gftd.chat.site` が `public/assets/manifest.edn` を読み、shadow-cljs が実際に
+  出した名前を引用する。生成器がビルドから乖離できない。manifest が無い場合は
+  警告を出す（unhashed fallback を出荷することがこの仕組みが防ぎたい失敗そのもの）。
+  `deploy` は release build を shell 生成の**前**に回す順序へ変更。
+- `public/_headers` — asset は 1 年 immutable（hash 付きなので正しい）、
+  `index.html` と token bundle は常に revalidate（deploy が即座に拾われる）。
+  `/viewer-assets/*` も revalidate — `viewer.html` は手書きで固定名を参照するため。
+
+本番実測（fix 後）: `/assets/main.B4333149.js` を配信、「新しいチャット」ボタンが
+`dads-button new-chat-btn` で key blue `rgb(0, 23, 193)`、chrome は日本語、
+page error 0 件。
+
+**残: 旧 `/assets/main.js` は最大 30 日 edge cache に残る。** 参照するものは無く
+（`index.html` は revalidate して hash 付きを名指す）、このセッションの資格情報では
+purge できなかった（wrangler OAuth は zone:read のみ）。期限切れを待つ。
+
 ## Consequences
 
 - gftd.ai は light 固定になった。OS の dark 設定には従わない。E2E は**逆の
@@ -78,7 +112,7 @@ real-Chromium の E2E が拾った。seam 側で「構築後に class を追記�
 
 ## Verification (2026-07-31)
 
-- `clojure -M:pin:local:test-portable` — 58 tests / 267 assertions / 0 failures
+- `clojure -M:pin:local:test-portable` — 59 tests / 271 assertions / 0 failures
 - `shadow-cljs release app viewer pages-worker` — 0 warnings
 - real-Chromium E2E（`scripts/verify-e2e.cljs`）— 26 checks / 0 failures。
   OS dark 下でも light、fast-typing のキーストローク欠落なし、Enter 送信、
@@ -89,7 +123,7 @@ real-Chromium の E2E が拾った。seam 側で「構築後に class を追記�
 
 ## References
 
-- 実装: gftdcojp/apex `86d06eb`（PR merge commit）
+- 実装: gftdcojp/apex `86d06eb`（DADS 移行）/ `42ae0e7`（cache-bust）
 - 設計システム: ADR-2607141915（jp-go-dds）/ ADR-2607309900（DADS を選ぶ意味）
 - 直前の skin: ADR-2607122200（kotoba-ui paved road）
 - 姉妹 ADR: ADR-2607321100（awai.network apex、同じ skin）"}]
