@@ -52,7 +52,7 @@ USA（TRID が加算）と DEU（§491 の Immobiliar 区分 + §311b が加算�
 - **fetch できなかった面がある。** FCA Handbook は rule text を client-side render するため MCOB の逐語は取れず、`mba.org` / `ukfinance.org.uk` / `pfandbrief.de` は WebFetch を 403/404 で拒否した。この制約が (C) の対象を MBA/UK Finance ではなく EMF（hypo.org は fetch 可能）にした — 選定理由が『最も代表的な団体』ではなく『検証可能な団体』である点は明示的な妥協。
 - **(C) は siblings より弱い。** 7件の located source のうち fetch して引用できたのは2件、self-regulatory code は0件。EMF/消費者団体の Voluntary Code of Conduct on Pre-contractual Information for Home Loans（MCD の ESIS の前身）は hypo.org 上に発見できず、記憶から URL を捏造せず gap として記録した。
 
-**捏造ゼロを構造で強制した。** 3 repo すべてで honesty contract を test にした（mortgage-registry 8 tests/132 assertions、assoc-6492-eu-emf 7 tests/69 assertions、isic-6492 は既存4に4追加して 8 tests/35 assertions、いずれも nbb で green）。強制内容:
+**捏造ゼロを構造で強制した。** 3 repo すべてで honesty contract を test にした（mortgage-registry 21 tests/229 assertions、assoc-6492-eu-emf 7 tests/69 assertions、isic-6492 は既存4に4追加して 8 tests/35 assertions、いずれも nbb で green）。強制内容:
 - 出典 URL と retrieved-at の無い主張を置けない
 - `:verification :not-verified` が空だと test が落ちる（『完全である』と読める状態を作れない）
 - verbatim 引用は実際に fetch したページにしか付けられない（`:url-provenance` を site / site-index / site-file の3段階に分離）
@@ -67,7 +67,7 @@ USA（TRID が加算）と DEU（§491 の Immobiliar 区分 + §311b が加算�
 
   :adr/evidence
   "**新規 repo（いずれも public、west 登録済み・server-side pin 検証 OK）**
-- https://github.com/cloud-itonami/mortgage-registry — 初期 commit fba6629
+- https://github.com/cloud-itonami/mortgage-registry — main ce2c80d7ed417a8e83378d988d96ceb546ac6fe6（初期 seed fba6629 → 全世界 coverage plan を追加。plan は ADR-2608011800 が正本）
 - https://github.com/cloud-itonami/cloud-itonami-assoc-6492-eu-emf — 初期 commit 9634b2f
 
 **既存 repo への変更**
@@ -90,7 +90,8 @@ USA（TRID が加算）と DEU（§491 の Immobiliar 区分 + §311b が加算�
 - https://hypo.org/about-emf, https://hypo.org/emf"
 
   :adr/related
-  ["2607141700-cloud-itonami-compliance-fact-federation — assoc-* family の設計 ADR"
+  ["2608011800 — 全世界 188 法域への coverage plan（この ADR の後続。wave / 近道 / 実測コスト / 未決定3件）"
+   "2607141700-cloud-itonami-compliance-fact-federation — assoc-* family の設計 ADR"
    "cloud-itonami-isic-6492 docs/adr/0002-http-edge-loan-intake.md"
    "cloud-itonami-isic-6810 docs/adr/0002-netherlands-owner-sale-profile.md"
    "2607173000 — script host は nbb のみ（3 repo とも bb.edn / .sh を持たない）"
