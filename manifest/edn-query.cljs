@@ -840,6 +840,84 @@
     (warn-skipped! "cloud-itonami-lei tos.journal.edn" @skipped)
     out))
 
+;; ---------- GLEIF LEI universe + 不動産 ownership（category J、ADR-2608012000） ----------
+;;
+;; kotoba-lang/property の `data/*.datoms.edn`（committed projection）を読む。
+;; corpus 本体（GLEIF Golden Copy 全 3.4M 社、~1.2 GB）は **この面には載らない**。
+;; 載せない理由と、それが何を犠牲にするかを明示しておく（CLAUDE.md の
+;; 「分けるときは何が join できなくなるかを名指しで書く」）:
+;;
+;;   実測: この DataScript ローダは 20 万 entity で 85 秒 / 614 MB、60 万 entity で
+;;   290 秒 / 1.2 GB。3.4M 社は約 30 分 / 6 GB 常駐になり、CLI の 1 query ごとに
+;;   払える値段ではない（この面の既存 116k entity 全体で 46 秒）。
+;;
+;;   **犠牲**: projection に入っていない LEI は Datalog で join できない。
+;;   market-intel の財務・cloud-itonami-lei の ToS・property の ownership と
+;;   突合したい会社は、先に projection に含める必要がある
+;;   （`property/scripts/project_gleif_corpus.cljs --lei-file` / `--jurisdiction`）。
+;;   corpus 全体に対する集計は join なしの streaming scan
+;;   （`property/scripts/query_gleif_corpus.cljs`）でのみ答えられる。
+;;   join 面を広げる正しい操作は「projection を広げる」であって
+;;   「別のストアに分ける」ではない。
+
+(defn corpus-line-entities
+  "manifest 行付き edn-lines corpus を読む。1 行目が `{:corpus/manifest true ...}`
+   ならその `:source/*` を各レコードへ配る（provenance を 1 ファイル 1 回だけ
+   書く形式。全レコードに複製すると corpus が数百 MB 太る）。"
+  [f next-tempid!]
+  (try
+    (let [lines (slurp-edn-lines f)
+          head (first lines)
+          manifest (when (and (map? head)
+                              (or (:corpus/manifest head) (:corpus/projection head)))
+                     head)
+          provenance (into {} (filter (fn [[k _]] (= "source" (namespace k)))) manifest)
+          records (if manifest (rest lines) lines)]
+      (for [r records :when (map? r)]
+        (merge provenance r {:db/id (next-tempid!) :source/file (str f)})))
+    (catch :default _ nil)))
+
+(defn property-data-files
+  "kotoba-lang/property の committed projection 群。west が宣言する path 配下を
+   見る（org をパスに焼かない — market-intel が repo 移動で黙って 0 件になった
+   のと同じ轍を踏まないため）。"
+  [glob-prefix]
+  (when-let [p (west-project-path "property")]
+    (let [dir (apply io/file root (concat (str/split p #"/") ["data"]))]
+      (when (.exists dir)
+        (->> (seq (.listFiles dir))
+             (filter #(let [n (last (str/split (str %) #"/"))]
+                        (and (str/starts-with? n glob-prefix)
+                             (str/ends-with? n ".datoms.edn"))))
+             (sort-by str))))))
+
+(defn gleif-lei-entities
+  "GLEIF LEI projection（`data/gleif-lei-*.datoms.edn`）。複数ファイルを読むので、
+   jurisdiction 別 projection を足すのは data/ にファイルを 1 つ置くだけで済む。"
+  [next-tempid!]
+  (let [files (property-data-files "gleif-lei-")]
+    (if (empty? files)
+      (do (js/console.error
+           (str "edn-query: WARNING gleif-lei: kotoba-lang/property の "
+                "data/gleif-lei-*.datoms.edn が無い — LEI universe は load されない"
+                "（west update 未実行か、projection 未生成）"))
+          [])
+      (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
+
+(defn property-ownership-entities
+  "公開不動産 ownership claim（`data/property-ownership.datoms.edn`）。
+   `:ownership/*` は kotoba.property.ownership の可搬コントラクトそのままなので、
+   property repo が同梱する Datalog クエリがこの面でも動く。"
+  [next-tempid!]
+  (let [files (property-data-files "property-ownership")]
+    (if (empty? files)
+      (do (js/console.error
+           (str "edn-query: WARNING property-ownership: kotoba-lang/property の "
+                "data/property-ownership.datoms.edn が無い — 不動産 ownership は "
+                "load されない"))
+          [])
+      (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
+
 ;; ---------- patent bibliographic（category J — toshokan-patents、ADR-2607251552） ----------
 ;; toshokan-patents repo の 80-data/public/*.journal.edn（quads [entity attr value tx op]
 ;; — toshokan と同じ ADR-2607072300 形）。lei-tos と同型でロードする。
@@ -1296,7 +1374,9 @@
                               (ghosthacker-manga-log-entities next-tempid!))
         company-tx (concat (company-facts-entities next-tempid!)
                             (lei-blueprint-entities next-tempid!)
-                            (lei-tos-entities next-tempid!))
+                            (lei-tos-entities next-tempid!)
+                            (gleif-lei-entities next-tempid!))
+        property-tx (property-ownership-entities next-tempid!)
         fleet-tx (concat (fleet-state-entities next-tempid!)
                           (fleet-db-entities next-tempid!)
                           (fleet-ci-entities next-tempid!))
@@ -1311,7 +1391,7 @@
                                                      hirameki-corpus-tx jinushi-tx
                                                      proc-registry-tx merged-kotoba-tx
                                                      working-doc-tx narrative-tx
-                                                     company-tx fleet-tx
+                                                     company-tx property-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx innen-tx
                                                      awai-tx)))]
     (.transact ds conn all-tx)
@@ -1330,6 +1410,7 @@
      :working-doc-count (count working-doc-tx)
      :narrative-count (count narrative-tx)
      :company-count (count company-tx)
+     :property-count (count property-tx)
      :fleet-count (count fleet-tx)
      :yabai-count (count yabai-tx)
      :tadori-count (count tadori-tx)
