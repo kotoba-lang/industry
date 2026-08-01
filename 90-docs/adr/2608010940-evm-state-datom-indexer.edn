@@ -1,7 +1,7 @@
 [{:db/id -1
   :adr/id "adr-2608010940-evm-state-datom-indexer"
   :adr/title "ADR-2608010940: EVM チェーン状態を datom 面に載せる indexer — 合意も EVM 実行も持たずに「クエリできる」側だけ取る"
-  :adr/status "proposed"
+  :adr/status "accepted"
   :adr/doc_type "adr"
   :adr/doc-type "adr"
   :adr/source-format "edn"
@@ -24,7 +24,7 @@
   :adr/body
   "# ADR-2608010940: EVM チェーン状態を datom 面に載せる indexer
 
-**Status**: proposed（設計のみ。実装未着手）
+**Status**: accepted（MVP 実装済み・本番稼働中。永続化は未着手）
 **Date**: 2026-08-01
 
 ## Context
@@ -106,11 +106,58 @@ topic0 の算出と ABI decode に Keccak-256 が要る。`kotoba-lang/eth-crypt
 - **コストはブロック数に比例して増え続ける。** Base は 2 秒ブロック。全 log を無期限に持つと D1 が破裂するので、初版は **登録されたコントラクトの log だけ**を取り込む allowlist 方式にする（全チェーン indexer を名乗らない）。
 - **one-ref に全部入れる決定は、将来の書き込み並列度を恒久的に諦めることを意味する。** 単一 writer の上限（DO 1 個のスループット）がこの面の上限になる。ADR-260726 が要求するとおり、**この代償をここに明記する。**
 
-## 未解決（実装前に決めること）
+## 実装状況（2026-08-01）
 
-1. どのコントラクトを allowlist の初期セットにするか。少なくとも kotobase 自身の treasury（`0xA00366…D4E`）の USDC 受領は入る — **自分の売上をこの面で引けることが最初の dogfood。**
-2. finality lag の具体値（Base の L1 finality をどう見るか）。
-3. `:evm/address` ↔ `:company/lei` の対応表をどこが所有するか。
+MVP を実装して本番投入した（`net-kotobase` `bbc355ff`）。
+
+- **`kotobase.evm-index`（pure `.cljc`）** — 上記 schema への projection、ERC-20
+  `Transfer` decode、finality 判定、reorg 検出（parent-hash 不一致）と retraction、
+  block range の分割計画。金額は end-to-end で **10 進文字列**（uint256 は double に
+  入らない。1 ETH = 1e18 wei に対し 2^53 ≈ 9.0e15）。
+- **`GET /evm/receipts`** — dogfood。実測で動作:
+  `{count 1, finalized {units \"100000\", decimal \"0.100000\"},
+  window {blocks-covered 50000, rpc-calls 6, truncated false}}`
+  — treasury `0xA00366…D4E` が **0.1 USDC を実際に受領している**（tx
+  `0x50c58ac4…`、block 49351743、finalized）。**x402 の settlements は 0 のままなので、
+  この入金は x402 経由ではない**（別経路の送金）。
+- テスト 285 / assertion 1414 green。
+
+### 実装して初めて分かったこと: keyless RPC は単体ではこのワークロードを賄えない
+
+**5 プロバイダを Worker から実測した結果、単独で足りるものは 1 つも無かった。**
+
+| endpoint | 実測 |
+|---|---|
+| `mainnet.base.org` | source IP でレート制限。**Worker は colo の egress IP を共有するので常時引っかかる** |
+| `base-rpc.publicnode.com` | `eth_blockNumber` は可。**履歴 `eth_getLogs` は有料トークン必須で全拒否** |
+| `base.drpc.org` | 両方可・10k blocks/call。ただし**自身の public rate limit に当たる** |
+| `1rpc.io/base` | `eth_getLogs` が **50 blocks 上限** |
+| `base.meowrpc.com` | `eth_getLogs` **未実装** |
+
+したがって RPC endpoint は**定数ではなく順に試すリスト**にした（`KOTOBASE_EVM_RPC_<CHAIN>`
+→ `KOTOBASE_EVM_RPC` → 既定リスト）。「メソッド未対応」と「レート制限」は呼び出し側から
+見れば同じ error であり、どちらも**別のプロバイダに聞けば回避できる**。全滅した時だけ
+失敗し、その時はどの endpoint が何と言ったかを列挙する。
+
+**恒久対応は keyed provider の URL を `KOTOBASE_EVM_RPC` に入れること**（秘密なので
+コードに書けない）。これは owner 判断待ちの唯一の残件。
+
+### 副作用として塞いだ x402 の silent failure
+
+`kotobase.x402` の RPC caller は `.error` を見ずに `.result` を読んでいたため、
+**レート制限された応答が `receipt = undefined` になり「該当 Transfer なし」に落ち、
+402 として返っていた**。つまり**プロバイダに絞られただけで実際の支払いが拒否され、
+funnel 上は不正な支払いと区別が付かなかった**。決済検証を上記の raise する caller に
+統合して解消。`settlements 0` の一因がこれだった可能性がある。
+
+## 未解決
+
+1. **永続化**（この ADR の本命）。現在は read-through projection で、datom 面に書いて
+   いない。書くには one ref を所有する単一 writer（DO）が要る。
+2. **keyed RPC provider の選定**（上記）。
+3. allowlist を treasury 以外に広げる基準。
+4. finality lag の具体値（現在 64 confirmations 固定）。
+5. `:evm/address` ↔ `:company/lei` の対応表をどこが所有するか。
 
 ## Alternatives considered
 
