@@ -68,7 +68,7 @@ real-Chromium の E2E が拾った。seam 側で「構築後に class を追記�
 
 新しい `index.html`（DADS を inline 済み）が配信される一方、Cloudflare の edge は
 以前の `/assets/main.js` を返し続けていた（`cf-cache-status: HIT`、`age: 56837`、
-`cache-control: public, max-age=2592000`）。そのバイト列にはまだ "How can I help" が
+`cache-control: public, max-age=2592000`）。そのバイト列にはまだ \"How can I help\" が
 入っており、日本語 chrome は 0 件だった。**layout の class 名は新旧で共通だった**ため、
 サイドバーやグリッドだけが効いて component は素の browser 既定という「壊れた skin」に
 見えた。

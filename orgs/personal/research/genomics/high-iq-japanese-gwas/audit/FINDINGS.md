@@ -2,9 +2,14 @@
 
 Package B 開封前の暫定所見。判定基準は `PRESPEC_AGREEMENT_CRITERIA.md` に事前規定済み。
 
-進捗: 91 claim 中 **46 件確定**（FIG1 / TABLE1 / FIG2 / SuppTable S1 / FIG3）。
-導出値・横断整合の検証 42 件中 40 件 PASS、2 件 FAIL（いずれも下記の所見であり
-再構成側の欠陥ではない）。
+進捗: **91 claim すべて確定**（過不足なし）。導出値・横断整合の検証 105 件中
+103 件 PASS、2 件 FAIL（いずれも下記の所見であり再構成側の欠陥ではない）。
+
+| artifact | claim | 水準 |
+|---|---|---|
+| FIG1 | 6 | L1 独立再計算 |
+| TABLE1 / FIG2 / FIG3 / FIG4 / TABLE2 / SuppTable S1 | 80 | L2 checkpoint 再構成 |
+| SuppFig S1 | 5 | L3 視覚再構成 |
 
 | ID | 内容 | 深刻度 |
 |---|---|---|
@@ -221,16 +226,42 @@ Package B との正式突合ではない。
 
 ---
 
-## 未確定
+## PGS 連鎖で検証できたこと（FIG4 / TABLE2 / SuppFig S1）
 
-残り 45 claim: **FIG4 34 / TABLE2 6 / SuppFig S1 5**。
+| 検証 | 結果 |
+|---|---|
+| Panel A の 12 集計値を個票 91 件から再計算（n・z_mean・z_sd(ddof1)・z_min・z_max・z_lt_0・bandwidth・grid 境界・bin 数・control 平均/SD） | 12/12 一致 |
+| KDE バンド幅 = `case_sample_SD × n^(-1/5)` | 小数 9 桁まで一致 |
+| KDE 600 点・正規 600 点の密度値を再計算 | 一致 |
+| ヒストグラム 18 ビンの度数を再計算、合計 = 91 | 一致 |
+| Panel B 全 7 tier を 6,000 行の PRSice2 スキャンと突合（SNP 数・R²・P） | 7/7 一致 |
+| Table 2 が Panel B の表示丸めであること | 一致 |
+| Table 2 の 3 AUC が独立の `DS_ROC_AUC_SOURCE` と一致、かつ PGS < 共変量 < フル | 一致 |
+| ROC ラスタ 2 枚が 1920×1440 であること、対角較正が正方であること | 一致 |
 
-FIG4 と TABLE2 は PGS 連鎖で、`DS_NOGAWA_WORKBOOK`（プロバイダ内部 workbook）と
-`DS_PRSICE_THRESHOLD_SCAN` を共有する。M05 は Panel A の密度再構成について
-バンド幅 `case_sample_SD * n^(-1/5)`、600 点グリッド、18 等幅ビン、ddof=1 を
-明示しており、**ライブラリ既定値に任せず明示設定する**必要がある。また
-**個票スコアは暗号化返却パッケージ内に留めること**が M05 で要求されているため、
-集計出力のみを返す。
+**個票の取り扱い**: 個票スコアは 1 関数スコープ内でのみ読み、出力・記録・送信は
+一切していない。返却パッケージに個票は含まれない（M05 の要求どおり）。
 
-SuppFig S1 は L3 で、数値検証は AUC 注記のみ。クロップは x=201:1864, y=108:1264
-（1920×1440）が canonical と指定されている。
+**軸較正の落とし穴**（deviation log に `DECLARED_CHOICE` として記録）: M06 の
+canonical crop は**軸矩形**であり約 5% のマージンと枠線を含む。これをそのまま
+`[0,1]` に写すと曲線が全辺で 5% 内側にずれる。crop 全体の ink 境界でも枠線を
+拾って機能しない。対角参照線が定義上 (0,0)–(1,1) を張る性質で較正した——
+参照線の端点を読むだけなので、M06 が禁じる「曲線座標のトレース・捏造」には
+当たらない。実際に中間版でこのずれが出て、目視 QA で検出した。
+
+---
+
+## 残る作業（オーナー実施）
+
+1. **F-03 を custodian と解決する。** どちらの Supplementary Table S1 が canonical か
+   確認し、payload が古い場合は `SUPPTABLE_S1` claim を再発行データから
+   導出し直すか判断する。**lock 前に処理すれば Round 2 を回避できる。**
+2. **attestation に署名する。** 意図的に未署名で残してある（AI/cloud 条項の留保と、
+   第三者独立性ではない旨の 2 点を明記済み）。
+3. **AES-256 暗号化アーカイブを作成し SHA-256 を記録する。** パスフレーズを要するため
+   自動化していない（認証情報の取り扱いは対象外）。
+4. ハッシュ・completion block・署名済み attestation を custodian へ送付。
+   custodian がハッシュを記録して初めて Package B を開封できる。
+
+返却ツリー内の `RETURN_MANIFEST.tsv` / `SHA256SUMS.txt` は**平文ツリーの目録**であって
+result lock ではない。lock は手順 3 で作る暗号化アーカイブの SHA-256 である。

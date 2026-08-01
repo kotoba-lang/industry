@@ -1848,8 +1848,8 @@ Still open:
 - kotoba-component#79 MERGED (`af7f096e`): **T8.3 typed Component world first
   slice** — Canonical lowering `:string-length` for pure
   `(string-length|string-byte-length s) → :i64` without `kotoba:typed`
-  import (ADR 0076 §4a). Live wasmtime `len("")`→0 / `len("hello")`→5 /
-  `len("安全")`→6. `kotoba compile --target component` E2E green.
+  import (ADR 0076 §4a). Live wasmtime `len(\"\")`→0 / `len(\"hello\")`→5 /
+  `len(\"安全\")`→6. `kotoba compile --target component` E2E green.
   Evidence: 10 assertions; compiler component target ok.
 - west pin kotoba-component d8343b09 → af7f096e (`01628e10`).
 
@@ -2884,7 +2884,7 @@ Still open:
 
 - kotoba-component#118 MERGED (`22a1c704`): **ADR 0118** Canonical
   `:secret-request-edn` string→string (empty/long/quote-backslash reject;
-  `{:name "…"}`). Evidence: **148 tests / 1122 assertions**.
+  `{:name \"…\"}`). Evidence: **148 tests / 1122 assertions**.
 - compiler pin component → `22a1c704` (main `b79a131a`).
 - provider#132 MERGED (`8c019b4f`): **ADR 0245** Component twin package
   `secret-request-edn-v1.component.wasm` sha `906d9032…`. Policy-only source
@@ -3011,7 +3011,7 @@ Still open:
 - compiler main (`4b006d05`): complete ADR 0194 host path — browser-host
   allowlist + `set-nth-i64`/`set-nth-ref` over sorted items (OOB reject);
   golden refresh after wasm pin; typed-set-nth-test registered. Live Node
-  browser-host fold → `"AcceptHost"`. Evidence: **781 tests / 6264 assertions**
+  browser-host fold → `\"AcceptHost\"`. Evidence: **781 tests / 6264 assertions**
   green.
 - west pin: compiler `97c17f54` → `4b006d05`
 - Honesty: closes host gap for 0233/0234 packages under browser-host. Does
@@ -3180,8 +3180,8 @@ Still open:
 ## Progress (2026-08-01gk — T8.3 map-element-bound headers-edn-append uniqueness)
 
 - kotoba-component#115 MERGED (`7e017bbc`): Canonical `:headers-edn-append`
-  uniqueness upgraded from free substring `:name "…"` marker to
-  **map-element-bound** name field (`{` after `[`/space + `{:name "…"}`).
+  uniqueness upgraded from free substring `:name \"…\"` marker to
+  **map-element-bound** name field (`{` after `[`/space + `{:name \"…\"}`).
   Same `$has-name-field` in multi-export reject package. Prefix non-collision
   (Host + Ho). Evidence: **54 tests / 620 assertions** green.
 - provider#115 MERGED (`5346157f`): **ADR 0227** re-ship
@@ -3222,7 +3222,7 @@ Still open:
 
 - kotoba-component#113 MERGED (`dfba9407`): **Canonical `:headers-names-add`**
   — EDN string-vector name list with **element-bound exact equality**
-  (not `:name "…"` substring scan, no kotoba:typed). Evidence: 14 assertions
+  (not `:name \"…\"` substring scan, no kotoba:typed). Evidence: 14 assertions
   (wasmtime live empty/second/dup/prefix/bad).
 - provider#112 MERGED (`031434f9`): **ADR 0225**
   `http-headers-names-add-component` package sha `939b4bfd…`. Complements
@@ -3437,7 +3437,7 @@ Still open:
 
 - kotoba-component#109 MERGED (`1325aa15`): **`:http-request-edn0`** Canonical
   `string × string × i64 → string` — dual UTF-8 quote/backslash scan on url/body;
-  timeout-ms ≥ 0; i64 decimal. Builds `{:url "…" :headers [] :body "…"
+  timeout-ms ≥ 0; i64 decimal. Builds `{:url \"…\" :headers [] :body \"…\"
   :timeout-ms N}`. Composition on `edn_quoted`. Multi-header request-edn still open.
 - provider main `64edf388`: **http-request-edn0** (wasm32 + Component). ADR 0219.
   Digest `c249a623…`. `:wasm-aot` stays `:partial`.
@@ -3473,7 +3473,7 @@ Still open:
 
 - kotoba-component#106 MERGED (`b2aa65c1`): **`:http-result-err-edn`** Canonical
   `string × i64 → string` — UTF-8 quote/backslash scan on code; retryable ∈
-  {0,1}; else empty. Builds `{:tag :error :code "…" :retryable true|false}`.
+  {0,1}; else empty. Builds `{:tag :error :code \"…\" :retryable true|false}`.
   Composition on `edn_quoted` (0214). Request-edn0 / result-ok still open.
 - provider main `2c650bf7`: **http-result-err-edn** (wasm32 + Component). ADR 0217.
   Digest `d7b42482…`. `:wasm-aot` stays `:partial`.
@@ -3491,7 +3491,7 @@ Still open:
 
 - kotoba-component#105 MERGED (`db026a32`): **`:headers-edn-append`** Canonical
   `string × string × string → string` — dual UTF-8 quote/backslash scan,
-  `:name "…"` substring uniqueness (not true set/W4), vector splice into
+  `:name \"…\"` substring uniqueness (not true set/W4), vector splice into
   `[]` or existing vector. Composition on `http-header-edn` / `edn_quoted`.
 - provider main `11ba7846`: **http-headers-edn-append** (wasm32 + Component).
   ADR 0216. Digest `c139ff32…`. Request/result multi-export still open.
@@ -3545,7 +3545,7 @@ Still open:
 
 - kotoba-component#104 MERGED (`ce4a15c5`): **`:http-header-edn`** Canonical
   `string × string → string` — dual UTF-8 quote/backslash scan; empty on
-  reject else `{:name "…" :value "…"}`. Composition on `edn_quoted` (0214).
+  reject else `{:name \"…\" :value \"…\"}`. Composition on `edn_quoted` (0214).
   Trust-named pure concat stays `:string-expression`.
 - provider main `5a5871e8`: **http-header-edn** (wasm32 + Component). ADR 0215.
   Digest `c386f6cb…`. Multi-export append/uniqueness/result still open.
@@ -3686,7 +3686,7 @@ Still open:
 ## Progress (2026-08-01fh — T8.3 header name uniqueness on EDN fold)
 
 - provider main `70bfae30`: **headers_edn_has_name** + **headers_edn_append**
-  rejects duplicate `:name "…"` markers (substring scan, not W4 set type).
+  rejects duplicate `:name \"…\"` markers (substring scan, not W4 set type).
   main→**27005851950**. ADR 0211. Component twin still needs Canonical
   package shape in kotoba-component (typed import blocker measured).
   Evidence: ops kit packages 67/606 green.
@@ -4150,7 +4150,7 @@ Still open:
   — Canonical lowerings `:string-eq` (`string=?` → 1/0 i64; param/param or
   param/literal) and `:string-substring` (UTF-8 byte range → string). No
   `kotoba:typed` import (ADR 0076 §4a). Complements `:string-length` (#79).
-  Live wasmtime `eq("ab","ab")`→1; `slice("hello",1,4)`→`"ell"`.
+  Live wasmtime `eq(\"ab\",\"ab\")`→1; `slice(\"hello\",1,4)`→`\"ell\"`.
   Evidence: 13+8+10 assertions; compiler `--target component` E2E green.
 - west pin kotoba-component af7f096e → a7cf38c6 (`58c947a6`).
 
