@@ -1,0 +1,101 @@
+[{:db/id -1
+  :adr/id "adr-2608012050-nix-shaped-supply-chain-properties-aiueos"
+  :adr/title "ADR-2608012050: aiueos に nix 的設計はどこまであるか — 外部 TCB を content-address 化し、残る穴を名指しする"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-01"
+  :adr/last-verified "2026-08-01"
+  :adr/last_verified "2026-08-01"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "nix-shaped-supply-chain-properties"
+  :adr/authoritative-for
+  ["aiueos が持つ nix 的性質と持たない性質の区別"
+   "外部依存の content-address 化の規則（何を content address と認めるか）"
+   "TCB inventory / deps.edn / security-adoption.edn の三者一致規則"
+   "content-addressed store を bare-metal catalog に入れない判断"]
+  :adr/related
+  ["adr-2607241100-kotoba-stack-topology-design-cleanup"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"]
+  :adr/evidence
+  ["https://github.com/kotoba-lang/aiueos/pull/139"
+   "kotoba-lang/aiueos 90-docs/adr/0016-content-addressed-external-tcb.md"]
+  :adr/body
+  "# ADR-2608012050: aiueos の nix 的性質
+
+**Status**: accepted
+**Date**: 2026-08-01
+
+## Context
+
+オーナーの問い「今の aiueos は nix 的な設計は考慮、統合されている?」に対する監査の結果。
+
+**リテラルな答えは no** — `nix` / `nixos` / `nixpkgs` / `flake` は aiueos リポジトリ全体（origin/main 含む）に **0 件**。nix 的設計が明示的に検討・統合されたことは一度もない。
+
+**有用な答え**は、nix が知られている性質のいくつかに aiueos は**独立に到達している**（ただし build purity ではなく capability security と evidence gate の側から）一方、欠けているものの欠け方には段階がある、というもの。どれがどれかを名指しすることがこの ADR の目的で、それは「再現ビルドは既にやっている」が真に近すぎて、**やっていない部分を誰も見に行かなくなっていた**ため。
+
+### 独立に到達していた性質
+
+| 性質 | 実装 |
+|---|---|
+| 再現ビルド | `scripts/build-hvt-guest.cljs` / `build-hvt-kotoba-guest.cljs` が fixture を再生成して byte 一致を要求。release media は `SOURCE_DATE_EPOCH` 対応 |
+| digest gated admission | hosted profile は `:aiueos/wasm-sha256` + Ed25519 の identity↔artifact binding（ADR-0003/0012）、bare-metal profile は SHA-256 + RSA-2048 の catalog/ELF/journal admission（ADR-0013） |
+| 宣言的設定 + deny-by-default | EDN manifest、`aiueos.policy` の grant 解決、provider graph からの boot order 導出 |
+| atomic update + rollback | primary ESP と byte-identical な recovery partition、`apply-update`、破損 update の rollback を QEMU gate で証明 |
+
+### 到達していなかった箇所（実害）
+
+**TCB の外部半分は記録されていたが一度も検査されていなかった。** `aiueos.tcb/validate` は `:tcb/external` を件数カウントするだけで、中身を何も検証していなかった（`src/aiueos/tcb.clj:56`）。その陰で 2 件の誤りが堆積していた:
+
+1. `io.github.kotoba-lang/security` が `:source :local-root :path \"../security\"` と記録されていた（**path は何もアドレスしない**）のに、`deps.edn` は既に `:git/sha \"49fc4ce…\"` に移行済み。`docs/tcb-inventory.md` はこれを「隠さず記録した assurance gap」と説明していたが、実際には**記述された形ではもう存在しない gap の陳腐化した記録**になっていた。
+2. `io.github.kotoba-lang/abi` — `deps.edn` の `:deps` にある実行時依存、つまり classpath 上、つまり TCB 内 — が inventory に**一件も存在しなかった**。
+
+**記録する対象について間違いうるのに間違いを検出できない記録は、evidence ではない。**
+
+## Decision
+
+### 1. 外部依存は content address で pin し、検査を fail-closed にする
+
+inventory version 2。各 entry は `:source` を宣言し、content で pin する:
+
+| `:source` | content address |
+|---|---|
+| `:maven` | resolve 済み jar の `:sha256` |
+| `:git` | `:git-sha`（git 自身の tree に対する content address） |
+| `:platform` | リポジトリ内部からは不可能 — 明示的な `:assurance-gap` を必須とする |
+
+`aiueos.tcb/validate` が強制する 3 つの fail-closed 不変条件:
+
+1. **unpinned な依存を許さない** — content address も `:assurance-gap` も無い entry はエラー
+2. **黙った drift を許さない** — inventory の version/commit は `deps.edn` と一致必須、shared security の commit はさらに `security-adoption.edn` とも一致必須。**3 つのファイルが 1 つの事実を記録しているなら、食い違ってはならない**
+3. **inventory の外の依存を許さない** — `deps.edn` の `:deps` の全 coordinate が `:tcb/external` に存在必須
+
+変更前の inventory を新しい checker に通すと、上記 2 件がそのまま報告される（+ `:unsupported-version`）。これが「この検査は装飾ではなく荷重を受けている」ことの evidence。
+
+jar digest 検査は CI ステップも新しい環境前提も要らない — **checker を走らせる JVM が起動できている時点で jar は resolve 済み**であり、`clojure -M:test` が既に `aiueos.tcb-test` を回している。
+
+### 2. git commit を content address として認める（caveat 付きで）
+
+git の commit id は tree をアドレスするので `:git-sha` は version label ではなく content address である。ただし SHA-1 のそれ。当面これを受け入れる — 代替の canonical SHA-256 tree digest は無料ではない（`~/.gitlibs` の checkout は `.git` を含むので単純な全ディレクトリ digest は非決定的、正しくやるには canonicalisation の定義が要る）。**future work として記録し、無かったことにはしない。** nix 自身の `fetchGit` も `narHash` 以前はこれと同じ。
+
+### 3. 閉じずに記録する 2 つの限界
+
+- **推移閉包** — inventory は**直接**の実行時依存集合のみを覆う。shared security package が `org.clojure/clojure 1.12.4` を引いており、どの entry もそれを名指ししていない。閉じるには `deps.edn` ではなく resolved basis が要る。
+- **`java.base`** — `:minimum-version 25`、リポジトリ内部からは検証不能なので `:assurance-gap :platform-runtime-not-content-addressed` を付けた。**ADR 執筆中に気付いた別件**: `.github/workflows/ci.yml` は temurin 21 を provision しており、宣言された floor を満たしていない。この矛盾を検出するものが無い。**floor と runner のどちらが誤りかはオーナー判断**（勝手に 21 へ下げも 25 へ上げもしない）。この ADR はその主張を無印のまま放置することだけを拒否する。
+
+### 4. 意図的に採用しないもの
+
+**bare-metal の object store は name-addressed のまま据え置く。** `:kotoba-app-catalog` は 16 バイト id（`\"app/hello\"`）で application を引き、SHA-256 は admission にしか使っていない。これを content-addressed に変えれば（digest→bytes を主テーブル、id→digest を第二テーブルに）multi-version 共存と generation list が構造的に付いてくるが、**現在の store は `:capacity 4` / 1 application 12 KiB 上限 / `:rollback-window 1`** であり、**今日その store を縛っているのは addressing 方式ではない**。この bound が動いてから再検討する。先にやると、効かない場所を作り直すことになる。
+
+## Consequences
+
+- inventory は両半分とも「間違っていたら落ちる記録」になった。
+- 実行時依存を 1 つでも進めるには同じ commit で inventory を更新する必要がある — 意図的な摩擦であり、`:tcb/files` が既に in-repo source に課している規律と同型。
+- `deps.edn` / `security-adoption.edn` / inventory が相互検査されるので、shared security の pin が片方だけ進む事故が構造的に起きない（直近の pin revert #138 がまさにこの状況）。
+- release artifact の SBOM / SLSA provenance（`docs/deployment-profiles.md` の `regulated`）は未実装のまま。その 2 つの入力である「byte-identical な再現ビルド」と「content-addressed な依存記録」は**両方揃った**ので、次に着手するならここ。
+
+## workspace 全体への含意
+
+この ADR は aiueos の話だが、同じ検査の欠落は**同じ形の記録を持つ他 repo にも当てはまりうる**: 「pin を記録したファイルが 2 つ以上あるが、一致を検査するものが無い」構造。superproject 側では `manifest/west.yml` の pin が `scripts/verify-west-pins.cljs` + PreToolUse hook + murakumo fleet gate で server-side 検査されており、この class は既に閉じている。子 repo 側で pin を複数箇所に持つものは、同型の検査があるかを確認する価値がある。"}]
