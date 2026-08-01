@@ -168,7 +168,7 @@ CLAUDE.md の runtime 優先順位（kotoba wasm > clojurewasm > cljs > nbb、JV
 
 1. **CLAUDE.md の native backend 記述を直す。** ADR-2607198300 が指す `compiler/src/kotoba/compiler/backend/{x86_64,aarch64}.cljc` は main に無い（実体は `kotoba-lang/kotoba-native`）。この誤りは native 経路の成熟度を過大評価させ、他の判断も誤らせる。
 2. **静かなマシンで性能を再測定する。**
-3. Phase 2: `kotoba-lang/chain` を WAL にした単一 sequencer と署名ブロック。「sequencer であって consensus ではない」と正直に呼ぶ（ADR-2608010930 Decision 5）。
+3. ~~Phase 2: `kotoba-lang/chain` を WAL にした単一 sequencer と署名ブロック。~~ **完了（2026-08-01、ADR-2608011600）** — `torihiki.log` @ `deab904e`。`verify-chain`（改竄されていない）と `replay`（state root が正しい）が別物であることを、捏造チェーンのテストで固定した。実鍵の配線と永続化は未了。
 4. multi-market を実際に走らせる。
 5. cljs 側の replay parity を実測する（現状「動くはず」であって「動かした」ではない）。
 
