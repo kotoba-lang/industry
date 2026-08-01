@@ -65,7 +65,7 @@
 ### 前提となる現在地（同日実測、CLAUDE.md の記述との差分を含む）
 
 1. **`kotoba-lang/engi` の consensus は安全規則だけ。** `consensus.cljc` 155 行が quorum 算術（n=3f+1）・block/vote/QC・3-chain commit・round-robin leader を持つ。ns docstring 自身が「wire transport / vote signing / transfer semantics は OWN しない」と宣言。**pacemaker / view-change のタイムアウト機構が無い＝ liveness の本体が未着手。**
-2. **`engi` は west 未登録だった**（`en` と `engi-witness-escrow` は登録済み）。GitHub には存在（2026-07-25 push）。
+2. **`engi` は west 登録済みである。**（2026-08-01 訂正。本 ADR は当初「未登録」と書いたが誤りだった。）west.yml には **`kotoba-lang-engi`** という名前で存在し、pin `d934e746` は remote main と一致している。誤認の原因は `- name: engi` で grep したこと——**org 間で basename が衝突すると生成器が west 名を `<org>-<name>` に dedup する**（`orgs/gftdcojp/engi` と衝突。`gen-west-manifest.cljs` の `west-name` / `dup-basenames`）。素の repo 名での grep は west.yml に対して偽陰性を返す。照会は `repos.edn :extra-projects` か `path:` 行で行う。
 3. **native AOT backend の場所が CLAUDE.md の記述と違う。** ADR-2607198300 は `kotoba-lang/compiler` の `src/kotoba/compiler/backend/{x86_64,aarch64}.cljc` と書くが、main のそこには `backend/cljs.clj` しかない。実体は ADR-2607266000 の分割で **`kotoba-lang/kotoba-native`** に移っている（`x86_64.cljc` 801行 / `aarch64.cljc` 735行 / `elf64.clj` 425行）。compiler 側の同名ファイルは `.claude/worktrees/agent-*` の中だけ＝未着地。
 4. **native AOT の成熟度は印象よりずっと低い。** `compiler/docs/native-aot-baseline.md` が自認: 「there is still no native provider/capability mechanism at all」。record は codegen 時のスタックスロットに展開されるだけで**関数境界を越えられず**、`record-assoc` / nested record / f64 フィールドは閉じている。
 5. **`murakumo/overlay` の QUIC は `quic_driver.clj` = JVM 限定。** portable な `driver.cljc` は dial argv 検証と session record 生成の planning 層であって実トランスポートではない。
@@ -150,7 +150,8 @@ CLAUDE.md の runtime 優先順位（kotoba wasm > clojurewasm > cljs > nbb、JV
 1. **最初の 115k ops/sec を「boxing のせい」と診断して macro 化したら、逆に遅くなった（75k）。** boxing は確かに存在したが支配項ではなかった。推測をやめて `best` 単体を計測したら 570 ns/op で、原因は record フィールドが Object のまま `clojure.lang.Numbers.multiply(Object,Object)` に入っていたこと。**症状から原因を推測せず、部分を単独で測る。**
 2. **`^long` を関数名に付けて `AbstractMethodError`。** primitive の戻り型ヒントは**引数ベクタ**に付ける。名前に付けると var の `:tag` になり、`invokePrim` が Object 戻りで宣言されて全呼び出しが落ちる。
 3. **最後まで残った 9,941 ns/op は、エンジンではなくベンチマーク側の欠陥だった。** tape を引数ベクタで分配束縛したときに `^ints` ヒントが落ち、`aget` が反射呼び出しになっていた。チャンク単位で計測し直したら**エンジンは最初から ~1,000 ns/op で、しかも板の大きさに対してフラット**だった。`(set! *warn-on-reflection* true)` をベンチ ns に入れて再発を止めた。**計測器を測っていないか、まず疑う。**
-4. **`python` の `s.replace` によるパッチが、パターン不一致で黙って no-op していた。** `best` への修正が当たっていないことに、生成物を読むまで気付かなかった。以後、失敗が声を上げる編集手段を使う。
+4. **west.yml に entry が「無い」と grep 一発で結論した。** `- name: engi` はヒットしないが、実体は `kotoba-lang-engi` として登録済みだった——org 間 basename 衝突時の dedup 命名を知らずに、名前の不在を登録の不在と読んだ。**生成物への grep は、生成規則を知らなければ否定の証拠にならない。**
+5. **`python` の `s.replace` によるパッチが、パターン不一致で黙って no-op していた。** `best` への修正が当たっていないことに、生成物を読むまで気付かなかった。以後、失敗が声を上げる編集手段を使う。
 
 同様に、テストが落ちた 4 件のうち **1 件だけが実バグで、3 件は私のテスト側の算術誤り**だった（maintenance margin の境界値、isolated 証拠金の額）。落ちたテストを「コードが悪い」と決めてかからない。
 
@@ -165,12 +166,11 @@ CLAUDE.md の runtime 優先順位（kotoba wasm > clojurewasm > cljs > nbb、JV
 
 ## Follow-up（優先順）
 
-1. **`kotoba-lang/engi` を west に登録する。** 現状 orphan。Phase 3 の土台がマニフェストに載っていない。
-2. **CLAUDE.md の native backend 記述を直す。** ADR-2607198300 が指す `compiler/src/kotoba/compiler/backend/{x86_64,aarch64}.cljc` は main に無い（実体は `kotoba-lang/kotoba-native`）。この誤りは native 経路の成熟度を過大評価させ、他の判断も誤らせる。
-3. **静かなマシンで性能を再測定する。**
-4. Phase 2: `kotoba-lang/chain` を WAL にした単一 sequencer と署名ブロック。「sequencer であって consensus ではない」と正直に呼ぶ（ADR-2608010930 Decision 5）。
-5. multi-market を実際に走らせる。
-6. cljs 側の replay parity を実測する（現状「動くはず」であって「動かした」ではない）。
+1. **CLAUDE.md の native backend 記述を直す。** ADR-2607198300 が指す `compiler/src/kotoba/compiler/backend/{x86_64,aarch64}.cljc` は main に無い（実体は `kotoba-lang/kotoba-native`）。この誤りは native 経路の成熟度を過大評価させ、他の判断も誤らせる。
+2. **静かなマシンで性能を再測定する。**
+3. Phase 2: `kotoba-lang/chain` を WAL にした単一 sequencer と署名ブロック。「sequencer であって consensus ではない」と正直に呼ぶ（ADR-2608010930 Decision 5）。
+4. multi-market を実際に走らせる。
+5. cljs 側の replay parity を実測する（現状「動くはず」であって「動かした」ではない）。
 
 ## ADR-2608010930 との関係
 
