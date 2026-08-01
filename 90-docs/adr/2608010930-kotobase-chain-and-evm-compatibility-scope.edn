@@ -68,7 +68,21 @@
 
 5. **合意層は「単一 writer + CAS = sequencer であって consensus ではない」と正直に呼ぶ。** 今の DO 直列化 + D1 は L2 sequencer の形であり、L1 の合意ではない。分散合意を名乗るまでは名乗らない。`bitcoin-consensus` が cljc で書けている事実は「やれば書ける」ことの証拠だが、**書いていないものを書いたことにしない。**
 
-6. **順序: x402 の settlement 1 件目が先。** 2026-08-01 時点で `/metrics` は challenges 5 / submissions 3 / **settlements 0**、signups 5。決済レールが一度も成立していない段階でチェーンを足すのは順序が逆。ADR-2607093100 の rail を実際に通すことが、どのチェーン設計より優先。
+6. **x402 の `exact`（EIP-3009）は実装済みで、testnet なら credential 無しで証明できる。**
+   Base mainnet の `exact` は keyed facilitator（実質 Coinbase CDP）が要り、これは owner
+   判断。ただし無料の public facilitator（`x402.org/facilitator`）は **base-sepolia でなら
+   `exact` を settle する**ので、`KOTOBASE_X402_NETWORK=base-sepolia` +
+   `KOTOBASE_X402_FACILITATOR=https://x402.org/facilitator` を入れれば **全経路
+   （402 challenge → requirement 選択 → payload 検証 → facilitator settle → receipt）が
+   実際に動くところを見られる**。protocol shape は実 facilitator に投げて確認済み:
+   `{isValid false, invalidReason \"invalid_exact_evm_signature\", payer \"0x…01\"}` —
+   payload を parse し payer を抽出した上で、dummy 署名だけを弾いている。
+   ⚠ この過程で罠を1つ塞いだ: asset を `treasury.core` の table から引くと**未知チェーンで
+   黙って Base に fallback する**ため、testnet の 402 が**mainnet USDC を支払い対象として
+   広告**しかねなかった（自分の 402 に従った買い手が実弾を送る）。asset は
+   `evm-index` 側から network に従って引くようにした。
+
+7. **順序: x402 の settlement 1 件目が先。** 2026-08-01 時点で `/metrics` は challenges 5 / submissions 3 / **settlements 0**、signups 5。決済レールが一度も成立していない段階でチェーンを足すのは順序が逆。ADR-2607093100 の rail を実際に通すことが、どのチェーン設計より優先。
 
 ## Consequences
 

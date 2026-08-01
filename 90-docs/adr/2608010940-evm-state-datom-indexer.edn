@@ -124,14 +124,18 @@ MVP を実装して本番投入した（`net-kotobase` `bbc355ff`）。
 
 ### 実装して初めて分かったこと: keyless RPC は単体ではこのワークロードを賄えない
 
-**5 プロバイダを Worker から実測した結果、単独で足りるものは 1 つも無かった。**
+**9 プロバイダを実測した。壊れ方が全部違う。**
 
 | endpoint | 実測 |
 |---|---|
-| `mainnet.base.org` | source IP でレート制限。**Worker は colo の egress IP を共有するので常時引っかかる** |
+| `base.gateway.tenderly.co` | **`eth_getLogs` を 20 万 blocks 1 回で返す。8 連続 call でも絞られない** — 桁違いに良い |
+| `base.drpc.org` | 可。ただし 10k blocks/call かつ**自身の public rate limit に当たる** |
 | `base-rpc.publicnode.com` | `eth_blockNumber` は可。**履歴 `eth_getLogs` は有料トークン必須で全拒否** |
-| `base.drpc.org` | 両方可・10k blocks/call。ただし**自身の public rate limit に当たる** |
+| `mainnet.base.org` | source IP でレート制限。**Worker は colo の egress IP を共有するので常時引っかかる** |
+| `base-mainnet.public.blastapi.io` | `eth_getLogs` が **10 blocks 上限** |
 | `1rpc.io/base` | `eth_getLogs` が **50 blocks 上限** |
+| `rpc.ankr.com/base` | API キー必須になった |
+| `base.api.onfinality.io/public` | キー無しで 429 |
 | `base.meowrpc.com` | `eth_getLogs` **未実装** |
 
 したがって RPC endpoint は**定数ではなく順に試すリスト**にした（`KOTOBASE_EVM_RPC_<CHAIN>`
@@ -139,8 +143,10 @@ MVP を実装して本番投入した（`net-kotobase` `bbc355ff`）。
 見れば同じ error であり、どちらも**別のプロバイダに聞けば回避できる**。全滅した時だけ
 失敗し、その時はどの endpoint が何と言ったかを列挙する。
 
-**恒久対応は keyed provider の URL を `KOTOBASE_EVM_RPC` に入れること**（秘密なので
-コードに書けない）。これは owner 判断待ちの唯一の残件。
+**当初は「keyed provider を買うのが恒久対応・唯一の残件」と書いていたが、買う前に測って
+撤回した。** Tenderly の public gateway を先頭に置いた後の実測は **8 連続 call が
+8/8 成功（fresh 7 / stale 1、502 ゼロ）** — その前は 6 回中 4 回が 502 だった。keyed
+provider は **あると良いものであって、この route が動くための前提ではない**。
 
 暫定緩和として、成功した応答を **Cache API** に保持し、全プロバイダが拒否したときは
 それを `stale: true` + `stale-age-seconds` + `stale-reason`（どの endpoint が何と言ったか）
@@ -162,7 +168,8 @@ funnel 上は不正な支払いと区別が付かなかった**。決済検証�
 
 1. **永続化**（この ADR の本命）。現在は read-through projection で、datom 面に書いて
    いない。書くには one ref を所有する単一 writer（DO）が要る。
-2. **keyed RPC provider の選定**（上記）。
+2. keyed RPC provider の選定 — **もはや blocker ではない**（Tenderly public gateway で
+   8/8 成功）。SLA が要るようになったら `KOTOBASE_EVM_RPC` に入れる。
 3. allowlist を treasury 以外に広げる基準。
 4. finality lag の具体値（現在 64 confirmations 固定）。
 5. `:evm/address` ↔ `:company/lei` の対応表をどこが所有するか。
