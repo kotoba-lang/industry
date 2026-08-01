@@ -115,10 +115,53 @@ storage を読む実装は、その storage を所有する lib に置く（`arr
 - **`cursor` は当面 JVM のみ。** cljs では `decrypt-fn` が Promise を返すので scan 全体が async になり、protocol の形が変わる。同期スタブで偽装していない。
 - **`[_ _ o]` はどの実装でも O(DB)。** この index 族の構造的性質であって実装の手抜きではない。
 
-## 未着手（順序は効果降順）
+## brick の現在地（2026-08-01 時点、すべて実測付き）
 
-1. **brick 2 compaction** — `merged` を畳んで k をクエリ経路から外す（ADR-2608011200 で per-query 0ms を実測済み）
-2. **brick 3 incremental MV** — 既知クエリを書き込み時に畳む
-3. **brick 4 adjacency** — multi-hop。1〜3 とは別物で一番重い
-4. **`arrangement.datalog/q` を source 上で動かす** — 今は `db` を取る。ここを繋ぐまで、cursor の利得は単一 pattern scan に限られ Datalog クエリには届かない
+| brick | 状態 | 実測 |
+|---|---|---|
+| **seam** `datom-source` | ✅ | 2 実装が同じ conformance を通過（seam が検証済み） |
+| **1 cursor** | ✅ `arrangement` `1183d1a9` | 20,000 facts で `[_ p _]` scan が **3 block vs full hydrate 72（24x）** |
+| **datalog を seam 上へ** | ✅ `1c0f86a0` | 2-clause join が **7 block vs hydrate 71（10.1x）** |
+| **2 compaction** | ✅ `1c0f86a0` | k=50 で **merged 50 block/scan → compacted 2（25x）** |
+| **3 view** | ✅ `datom-source` `cd069ba4` | 被覆パターンは map lookup。`absorb` は O(new-quads × patterns) |
+| **4 adjacency** | ❌ 未着手 | — |
+
+### datalog を seam に載せた話（当初「最優先」としていたもの）
+
+cursor が単一 scan を 72→3 block にしても、`arrangement.datalog/q` が
+materialized `db` を取る限り**実際の Datalog クエリには 1 つも届かなかった** —
+join が始まる前に全部 hydrate されるので。
+
+engine が clause を解決している場所は**ちょうど 2 箇所**（positive 1 / negated 1）
+だった。両方を `scan*` 経由にした。`scan*` は materialized db（従来の引数、無変更）と
+`IPatternSource` の両方を受ける。**この 1 つの間接化で join engine 全体が seam に乗る** —
+cursor に差し替えると join のコストが変わるが、join のロジックは 1 行も変わらない。
+
+`visible?` を両分岐で同一に適用しているのは意図的。source 側が
+`arrangement.query/query` と違う絞り方をすると、**negation が positive clause から
+見えない事実を観測できてしまう** — 性能の詳細ではなく正しさの穴。
+
+### compaction が「ただの snapshot」を作ることの意味
+
+`compact-root!` の出力は**通常の snapshot** なので `cursor` がそのまま読む。
+**読み手は compaction を知らなくてよい** — これがブリックであることの条件で、
+compacted snapshot を conformance suite 全体に通すテストがある（等価だと主張する
+コメントではなく）。
+
+### view の限界は docstring に書いてある（発見させない）
+
+**view は source を追わない**（`absorb` するまで新しい事実は見えない = 自信を保ったまま
+静かに陳腐化する）。**被覆は厳密**（`[nil \"knows\" nil]` が被覆でも
+`[\"alice\" \"knows\" nil]` は別）。`{:fallback? false}` で未被覆パターンを例外にできる。
+**retraction は非対応** — 集合への追加は monotonic だが除去はそうでなく、撤回された
+事実を黙って保持する view は view が無いより悪い。
+
+## 未着手
+
+1. **brick 4 adjacency** — multi-hop（Neo4j の index-free adjacency 相当）。他 3 つとは
+   別物で、`arrangement` に新しい索引が要る。prefix scan では埋まらない。
+2. **kotobase 本体への適用** — brick はすべて `arrangement`/`datom-source` の層にあり、
+   kotobase の durable plane（kotobase-peer / D1 / DO）はまだ materialize 経路。
+3. **cljs 対応** — `cursor` は JVM のみ（`decrypt-fn` が cljs では Promise を返すため
+   scan 全体が async になり protocol の形が変わる）。同期スタブで偽装していない。
 "}]
