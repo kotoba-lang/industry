@@ -96,7 +96,7 @@ kbb ability gap COMPLETE、pure capability allowlist 8 本が実 wasm package �
 | T6.2 | precompiled KIR を product artifact の既定に | **landed murakumo** #220; other products pattern-ready |
 | T6.4 | cljs/browser で同じ pure artifact を実行 | **JVM done**; **mirror-delete complete** through cloud#256; **residual presence flags → :bool** murakumo#257 |
 | T8.2 | kit ready checklist の全面適用 | first pass のみ |
-| T8.3 | network/secret の **production AOT Component** | **partial** — HTTP kit pure EDN through 0235 + multi-export **0242** + secret 0236/0237 + process/git EDN; browser-host set-of-record **compiler 0195**; W4 recursive nested EDN / wasm-aot :implemented still open |
+| T8.3 | network/secret の **production AOT Component** | **partial** — HTTP kit through **0242** + secret/process/git/scoped-fs/entropy fixed-depth EDN packages; browser-host set-of-record **0195**; W4 recursive nested EDN / wasm-aot :implemented still open |
 | T8.4 | host-parity L5 | **partial** — JVM 56 + Node 16 live; SCRAM host crypto (#121); Node inject honesty matrix (#356) + **kototama host-impl sync** (#122) |
 | T1.3 | 全 backend conformance | 進行中（pure-product dual-green **52** 件） |
 | T3.3 | KIR trap → source map | 部分（関数 + call-stack まで。form-level span は open） |
@@ -2817,6 +2817,24 @@ Still open:
    product blocker left (parts-present?/failed?/sealed/choose-via/action-name/…);
    digit-scanner multi-arg internals optional; W4 recursive values
 
+
+
+## Progress (2026-08-01gz — T8.3 entropy kit fixed-depth EDN package + pin)
+
+- provider#130 MERGED (`f08b934c`): **ADR 0244** pure entropy-edn-package —
+  `entropy_req_edn(n∈[1,64])` + hex/error reply arms; dual scan; main →
+  **-2315**; sha `aa2d8c8e…`. CSPRNG remains host-injected.
+  Evidence: **164 tests / 1356 assertions** green; live browser-host -2315.
+- Tip also holds scoped-fs **ADR 0243** (provider#128/#129) after Progress gy.
+- west pin: provider `6a9f2c48` → `f08b934c`
+- Honesty: ops-kit fixed-depth EDN codec surface now covers secret/process/git/
+  scoped-fs/entropy (+ HTTP kit multi-export 0242). Does **not** flip
+  `:wasm-aot :implemented` (W4 recursive nested EDN + host-fetch kit bodies open).
+
+Still open:
+1. T8.3 residual: W4 recursive nested EDN; only then `:wasm-aot :implemented`
+2. T8.4 residual (optional L5 / real Node sockets)
+3. murakumo residual; other W4 work
 
 
 ## Progress (2026-08-01gy — T8.3 browser-host set-of-record + HTTP kit EDN package)
