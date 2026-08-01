@@ -204,10 +204,28 @@ re-derives to seek by prefix (`kotobase-peer`'s `cold-datoms`)」）。それを
 系が入り、kotobase-peer 自身の 259 test 中 30 件が落ちる（実測: bump 前 0 failures、
 bump 後 22 failures + 8 errors）。その upgrade は別作業。
 
+## 解消済み（2026-08-01）
+
+**arrangement pin を main へ上げた**（`kotobase-peer` `282768fa`）。30 件の失敗は
+1 つの原因が複数の顔で出ていたもので、**schema-version 2 の leaf を version 1 として
+decode していた**。これは大声で失敗しない — typed wrapper を triple として decode する
+ので行数は合い、フィールドだけが入れ替わる（`{:e 16 :a [[4 \"alice\"] ...] :v_edn \"nil\"}`）。
+その壊れた component が `blind-input` に届いたものが
+「component is not a blindable scalar」だった。`leaf-decoder` が snapshot の
+schema-version を読んで codec を選ぶようにして 3 箇所すべてを修正（JVM / cljs /
+`cold-datoms-async`。最後のは `snap` が decode 地点でスコープ外だったので構造を変えた）。
+259 tests / 811 assertions green（pin 移動前と同数）。backport
+`maint/value-only-pattern` は依存経路から外れた。
+
+**brick 4「multi-hop が書けない」は誤りだった。** `arrangement.datalog` は再帰ルール
+（semi-naive fixpoint）を持ち、推移閉包は実際に計算できる（実測: chain 長 5/20/50/100 で
+64/90/327/854ms、正答）。**Gremlin surface（5 ステップ）だけを見て「書けない」と
+判断したのが誤り。** 残る問題は「書けない」ではなく「遅い」で、それは index-free
+adjacency か fixpoint 評価の改善という別の作業。
+
 ## 未着手
 
-1. **`kotobase-peer` の arrangement pin を main へ上げる**（上記 30 件の解消）
-2. **brick 4 adjacency** — multi-hop（Neo4j の index-free adjacency 相当）。他 3 つとは
+1. **multi-hop の高速化**（上記。100 ノードで 854ms は on-chain の資金追跡には遅い） — multi-hop（Neo4j の index-free adjacency 相当）。他 3 つとは
    別物で、`arrangement` に新しい索引が要る。prefix scan では埋まらない。
 2. **kotobase 本体への適用** — brick はすべて `arrangement`/`datom-source` の層にあり、
    kotobase の durable plane（kotobase-peer / D1 / DO）はまだ materialize 経路。
