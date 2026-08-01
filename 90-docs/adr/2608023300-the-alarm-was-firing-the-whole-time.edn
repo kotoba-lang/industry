@@ -1,0 +1,68 @@
+[{:db/id -1
+  :adr/id "adr-2608023300-the-alarm-was-firing-the-whole-time"
+  :adr/title "adr-2608023300: alarm はずっと発火していた — 計器は 2 iteration 前に「次はこれを見る」と書かれ、使われていなかった"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "validator-alarm-diagnosis"
+  :adr/authoritative-for
+  ["Durable Object の deploy 反映（versioned DO name）"
+   "torihiki-validator の現在の稼働状態"]
+  :adr/related ["adr-2608023200-validator-outbox-batching-clock-still-down"]
+  :adr/evidence ["https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w1"]
+  :adr/body
+  "# ADR-2608023300: alarm はずっと発火していた
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## 計器を使ったら 30 秒で終わった
+
+`wrangler tail`: **alarm 起動 153 回、outcome ok、例外ゼロ。**
+
+**動いていない時計に 2 iteration ぶんの修正を投じていた。** そして**それを決着させた計器は、2 iteration 前に「次に見るべきもの」として名指しされ、使われていなかった。**
+
+## その時点の実際のバグ
+
+**`tickNow` は tick 自身の outbox だけを `dispatch` に渡し**、`ingest` が queue した buffer を**誰も drain していなかった。** queue は 1 通のまま、chain は 1 block のまま —— **すべての症状が「alarm が死んだ」を指していた。**
+
+以前の編集が **`step` を patch して `tickNow` を patch していなかった** —— **同じことをする 2 箇所。**
+
+## そのあと 3 回の deploy が何もしなかった、2 つの理由
+
+### ① self-rescheduling alarm を持つ DO は永久に evict されない
+
+**DO は evict されるまで起動時のコードを走らせ続ける。** 400ms で自分を再予約する alarm を持つ DO は**決して idle にならない** —— **running chain にしている当の機構が、更新を不可能にしている。**
+
+**完全な沈黙 3 分でも evict されず**、しかも **「新版が live か」を polling で確認する行為自体が、旧版を生かし続けていた。**
+
+**DO の id に code version を入れた** —— deploy が新しい object を作る。**外側の fetch handler は常に新しいコードなので、新しい方を addressing する。**
+
+### ② build が 2 回失敗していたのを `| tail -1` が隠した
+
+wrangler は**前回の artifact を 2 回 deploy** し、**10 分が「旧コードが旧コードらしく振る舞うのを見る」ことに消えた。**
+
+原因は **docstring 内の不正なエスケープ** —— **このセッションで docstring が build を壊した 3 度目**であり、**silenced command が失敗を隠した 2 度目。**
+
+## 現在地（正確に）
+
+**alarm は発火し、queue は drain し、4 replica は一致し、chain は height 1 で証明書ゼロ。**
+
+**投票が quorum に届いておらず、理由は分かっていない。**
+
+**この commit の修正はすべて「実際に壊れていたもの」を直している。そのどれも、今壊れているものではない。**
+
+## Consequences
+
+- (+) deploy が確実に反映される（versioned DO name）。
+- (+) 「self-rescheduling alarm を持つ DO は更新できない」が記録された。
+- (+) 「build を `| tail -1` に通すな」が 2 度目の実例付きで記録された。
+- (−) **deploy 済み chain は height 1 で止まっている。** 原因未特定。
+- (−) in-process harness（`script/torihiki-on-engi.cljs`）は 123 block まで正常に進む —— **壊れているのは deploy 経路だけ。**
+"}]
