@@ -111,9 +111,22 @@ com-junkawasaki/root
       :correction \"audit script の `shell-script` 規則は当初『既存も nbb へ移す対象』と書いていたが、それは実物を読む前の決めつけだった。CLAUDE.md が禁じているのは**新規作成**である。**過剰に強い報告は読み手に報告全体を無視させる**ので、inventory（.sh が在る）を述べて判断は人に委ねる表現へ直した\"}
      {:what \"stash 3 件の処分\"
       :why \"他セッションのもの。読み取りのみで棚卸し済み —— **3 件とも未着地の新規登録を含まない**（extra-projects のプロジェクト名集合に差が無く、stash@{1} の fleet-ci 4 ファイルは main とバイト同一）。残る差分はフィールド値と、main が既に追い越した ADR 版\"}]
-   :pending-verification
-   [{:what \"qwen36 tick の修正の実効\"
-     :state \"fleet-ci-murakumo 側は本番実走で検証済み（修正 04:34 → log 05:29 → shallow=false 維持）。qwen36 側は log 最終 02:43 で未実走、次回 約 08:43\"}]}"
+   :verification-complete
+   [{:what \"shallow 修正の実効 — **両方とも本番実走で検証済み**\"
+     :fleet-ci-murakumo \"修正 04:34 → 05:29 実走 → org-spirit-in-physics-comics は shallow=false 維持\"
+     :qwen36 \"修正 04:05 → **08:43 実走**（予測と一致）→ superproject は shallow=false、到達可能 commit 18,209。tick 自体も正常終了（landed on main → run end、終了コード 0）\"}
+    {:what \"**ADR-2607321200 の load-bearing な主張を全て実装に当て直した**\"
+     :why \"§5a で docstring だけを根拠に『コードで強制している』と断定して外したため、同じ過ちが他に無いかを全節に対して見直した\"
+     :results [\"§3 authority の4不変条件 — **裏付けられた**。owned-proposal! の status 前提条件、approval-match-issues の明示 digest 比較（:context/digest-mismatch / :context/digest-absent）。しかも pure で、その理由が本 ADR の規律と同じ\"
+               \"§4 天井 — **精密化**。transport は実際に HTTP を送る（governed actor 宛、esim は到達可能）。天井は『送れない』ではなく『**consent surface が送れる op はどの phase の :auto 集合にも恒久的に含まれない**ので受け手が常に pending を返す』。結論は変わらず、むしろ強まる\"
+               \"§4b θ の収益入力 — 実測（実出力 fixture）\"
+               \"§4c seller/tier — 実コード読解（upsert-seller / rule->requirements / handle-gateway）\"
+               \"§5a 非エクイティ — **訂正**。設計意図は明確だが equity-blocklist は memo 部分一致で `revenue share` / `revenue distribution` を通す（実測）。止めているのは意図であって filter ではない\"]}]
+   :closing-state
+   {:date \"2026-08-01\"
+    :landed \"全 4 repo で default branch 上。私の local/remote branch・worktree は 0 件、未コミット 0 件、open PR 0 件\"
+    :loop \"CronDelete 407231df で停止済み（30分間隔・32 反復）\"
+    :others-wip \"**触っていない**: stash 3 件（root、読み取り棚卸し済み）/ local branch 6 件（cloud-itonami、全て他セッション）/ worktree 3 件（tamaki-workspaces）/ branch agent/form-submissions（root）/ open PR network-awai/nexus-x402#6（07-30 の別セッションの DO-NOT-MERGE cleanup PR）\"}}"
 
   :adr/known-gaps
   "[{:gap \"VLP は proposed のまま、本番の呼び出し元がゼロ\"
@@ -166,4 +179,33 @@ curve は **収益請求権**に貼る（希少で cold start がある）。**b
 
 ## 正直に
 
-**VLP は proposed のまま、本番の呼び出し元はゼロである。** 純関数の連鎖は通ったが、誰も呼んでいない。ADR-2607259800 が『追加した機構は全て未配線』と自己記録したのと同じ状態であり、同じ言葉で残しておく。"}]
+**VLP は proposed のまま、本番の呼び出し元はゼロである。** 純関数の連鎖は通ったが、誰も呼んでいない。ADR-2607259800 が『追加した機構は全て未配線』と自己記録したのと同じ状態であり、同じ言葉で残しておく。
+
+## 次の人が最初に打つコマンド
+
+```bash
+# 1. VLP の現在地を1画面で読む
+nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+  '[:find ?id ?st :where [?e \"adr/id\" ?id] [?e \"adr/status\" ?st]
+    [?e \"adr/topic\" \"cloud-itonami-vertical-liquidity-pools\"]]'
+
+# 2. lever ranking を再計算する（数字は全て再現可能）
+nbb --classpath \"orgs/kotoba-lang/loop-system-dynamics/src:orgs/kotoba-lang/dynamics/src\" \\
+  -e \"(require '[loop-system-dynamics.cloud-itonami-vlp-levers :as v]) (v/-main)\"
+
+# 3. ~/.gftd の死角を点検する（現在の既知違反は .sh 3 件のみ）
+nbb scripts/audit-gftd-scripts.cljs
+
+# 4. 連鎖が動くことを確かめる（nexus-x402 の実出力に対する契約テスト）
+cd orgs/network-awai/cloud-itonami && clojure -M:test
+#    → 1337 tests / 8903 assertions。19 failures は本セッション着手前と同一の既存セット
+```
+
+## owner の判断待ち（優先順）
+
+1. **VLP の採否**（ADR-2607321200 を accepted にするか）—— これが決まらないと以降が動かない
+2. **step 3 の可否** —— envelope を `authority.clj` に載せる。card/eSIM/voice/payment が依存する consent 背骨の不変条件 2 と 4 を作り直す話
+3. **`equity-blocklist` に `revenue share` / `revenue distribution` /「収益分配」を足すか** —— FIEA guard の実測された漏れ。1行で閉じる
+4. audit script を hook/CI に繋ぐか（繋げば現在 3 件で即座に落ちる）
+5. `.sh` 残り 2 件（`heartbeat.sh` / `worker.sh` —— 後者は呼び出し元の特定が先）
+6. stash 3 件の処分（読み取り棚卸し済み、**未着地の新規登録は含まれない**）"}]
