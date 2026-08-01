@@ -1,0 +1,173 @@
+[{:db/id -1
+  :adr/id "adr-2608011930-high-iq-gwas-independent-reconstruction"
+  :adr/title "ADR-2608011930: 高 IQ 日本人 GWAS — 投稿一式の集約と Package A 独立再構成（91/91 完了、lock 前で停止）"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-01"
+  :adr/last-verified "2026-08-01"
+  :adr/last_verified "2026-08-01"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "high-iq-gwas-independent-reconstruction"
+  :adr/authoritative-for
+  ["高 IQ 日本人 GWAS 投稿一式と Package A v1.1 の保管場所と取扱い規則"
+   "独立再構成（Phase 5C）の進捗・所見・resume point"
+   "この監査が立証する独立性の種類と、立証しないもの"
+   "制限データを外部 AI サービスに露出させた事実の開示"]
+  :adr/related
+  ["adr-2607171600-docs-edn-only"
+   "adr-2607211600-full-history-not-shallow"]
+  :adr/evidence
+  ["e272d0dd2fb 投稿一式 + Package A v1.1 の集約"
+   "288143986d2 日本語参考訳"
+   "6e6b71b97c3 一致判定基準の事前規定（計算前に単独コミット）"
+   "87f339d20e9 FIG1 (L1) + 入力ハッシュ監査"
+   "754580a14d5 LD 連鎖 TABLE1/FIG2/SuppTable S1/FIG3"
+   "ffb372d0b54 PGS 連鎖 FIG4/TABLE2/SuppFig S1 — 91/91 到達"]
+  :adr/body
+  "# ADR-2608011930: 高 IQ 日本人 GWAS — 集約と独立再構成
+
+**Status**: accepted
+**Date**: 2026-08-01
+
+## Context
+
+Tainaka 先生がまとめた Scientific Reports 投稿一式（MS/SI/Cover +
+Supplementary Table S1、2026-07-31 投稿）と、`KAWASAKI_CODE_INDEPENDENT_FIGURE_
+TABLE_RECONSTRUCTION_INPUTS_v1.1`（Package A）を受領した。論文は
+「Ancestry-enriched and shared polygenic signals associated with high IQ in a
+Japanese extreme-phenotype cohort」（Kawasaki, Nogawa, Tainaka）。
+Zenodo DOI 10.5281/zenodo.21711574。
+
+Package A は資料ではなく**実行可能な監査仕様**である。`ARTIFACT_CLAIM_MATRIX_
+OUTPUTS_WITHHELD.tsv` に 91 claim があり全て `expected_value = WITHHELD`。
+監査とはこれを独立に埋めて hash-lock し、その後 Package B（answer key）と
+突き合わせる作業を指す。**プロトコルを設計する必要はなかった。**
+
+## Decision
+
+### 保管場所
+
+`orgs/personal/research/genomics/high-iq-japanese-gwas/`。
+`com-junkawasaki/root`（**private**）内、既存 `research/genomics/` の下。
+
+候補だった `cloud-itonami/researcher-bio-gene` と `kotoba-lang/genome` は
+**いずれも public** のため不採用。`orgs/personal/` は git-annex サブツリーで、
+データ実体は git に平文で入らず、B2 / IPFS へ送る際も `encryption=hybrid` で
+暗号化される — 今回の資料要件に適合する唯一の場所だった。
+
+### 取扱い経路（`.gitattributes` で強制）
+
+- `reconstruction-package-a-v1.1/04_DATA_PAYLOAD/**` → 拡張子によらず annex
+- `submission/**`（日本語訳 `submission/ja/` を含む）→ annex
+- `audit/code/**` と返却ツリー直下の TSV/TXT → plain git（レビュー可能性のため）
+- `audit/return/.../02_ARTIFACT_FILES/**` と `03_SOURCE_TABLES/**` → annex
+  （将来 Figure 4 連鎖の個票由来物が落ちる場所であり、規則で塞ぐ）
+
+### 独立性の定義（過大主張の防止）
+
+本作業が立証するのは **実装独立性**（method contract から再実装、元解析コードを
+再利用しない）と **Package B に対する盲検**のみ。**第三者独立性は立証しない** —
+検証者は論文の著者本人である。`00_README_FIRST.md` 自身も fully result-blinded
+ではないと明記する。
+
+**呼称は \"code-independent internal reconstruction with result lock\" とし、
+\"independent audit\" と呼ばない。** 査読者・編集者は後者を第三者監査と読む。
+
+### 検証水準の非均一性
+
+91 claim を全部埋めても検証の強さは一様でない。
+
+- **L1**（FIG1、6 claim）— 唯一の真の再計算。解析そのものの誤りを捕捉できる
+- **L2**（80 claim）— checkpoint **以降**の導出のみ。上流の誤りは忠実に再現される
+- **L3**（SuppFig S1、5 claim）— 視覚的意味のみ
+
+**「91/91 完了」を「全結果を検証した」と読み替えてはならない。**
+
+## Status（2026-08-01 時点）
+
+### 完了
+
+- 投稿一式 + Package A を無改変で集約。57 ファイルの SHA-256 全件 OK
+- 日本語参考訳 3 点（MS 508 行 / SI 265 行 / Cover 98 行）。数式は Word 数式
+  オブジェクトのため復元せず〔数式は原文参照〕と明示（MS 3・SI 3 箇所）
+- 一致判定基準を**計算前に単独コミット**（順序を履歴に残すため）
+- 入力ハッシュ監査 25/25 MATCH
+- **91/91 claim 確定**（過不足なし）。検証 105 件中 103 PASS
+
+### 所見
+
+- **F-01** 事後除外バリアント `rs376128944` が `DS_GWAS_CURRENT` に
+  `PASS_DIRECTLY_GENOTYPED` のまま残る。除外は原稿 prose と Table S1 の
+  Notes 欄（`rs75790544` が WDHD1 の置換リード）にしかなく、method contract に
+  機械可読な指示がない。契約に従う再構成者は 27 件を得る（原稿は 26 retained）
+- **F-03（最重要）** `DS_TABLE_S1_CURRENT` が投稿版と一致しない。rs146572333 の
+  `EAS_EUR_Fold_Difference` が payload 38.6（真値 38.6515970515970516 の切り捨て）、
+  投稿版 38.7（正しい四捨五入）。`Notes` も payload 側が旧版。
+  **古いのは論文ではなく package の checkpoint**
+- **F-02** 打ち切り値（`<0.0001` / `>100`）の規則が M03 に無い
+- **F-04** `DS_FIG3_PANEL_A` の二項 P が 4 有効数字のみ（claim matrix は full
+  precision を要求、同ファイルの CP 境界は小数 6 桁）
+- **F-05** カテゴリラベルの大小文字が M03 と checkpoint で不一致。**実害あり** —
+  M03 の綴りでグループ化すると中央カテゴリが黙って 0 件になり Figure 2 が壊れる
+
+### 未完了（resume point、オーナー実施）
+
+1. **F-03 を custodian と解決する。** lock 後に発覚すると `RESULT_LOCK_PROTOCOL`
+   により Round 2（新アーカイブ・新ハッシュ）が必要になる
+2. `09_VERIFIER_ATTESTATION.md` に署名（意図的に未署名）
+3. AES-256 暗号化アーカイブ作成と SHA-256 記録 —
+   **パスフレーズを要するため自動化していない**
+4. ハッシュ・completion block・署名済み attestation を custodian へ送付
+
+返却ツリー内の `SHA256SUMS.txt` は**平文目録**であって result lock ではない。
+lock は手順 3 の暗号化アーカイブの SHA-256。
+
+## Consequences
+
+### 制限データの外部 AI サービス露出（開示）
+
+資料整理中、`IQ_PGS_caseonly.md` の構造確認で `head -6` を実行し、
+**ヘッダと個票 5 行（仮名化 ID と PRS 値）が外部モデル（Claude Opus 5、Anthropic）の
+コンテキストに入った。** workbook 行・全 91 行・サンプル表は露出していない。
+
+attestation テンプレートの「did not upload raw or individual data to an external
+AI/cloud service」は**無条件には署名できない**。`08_AI_ASSISTANCE_LOG.tsv` に
+該当行を作成し、attestation 本体にも留保を明記済み。
+
+再構成本体では個票を 1 関数スコープ内に閉じ、出力・記録・送信していない。
+
+### commit 前に塞いだ2つの漏洩経路
+
+1. 親 `orgs/personal/.gitattributes` は `**/*.md` を annex 対象外にしていた。
+   正準データセット `DS_CASE_PGS_CANONICAL` の実体が `.md` だったため、
+   個票 91 行が平文で GitHub に載る寸前だった
+2. plain `git add` は symlink 方式 annex では `annex.largefiles` を参照せず、
+   64 ファイル全部を平文 blob として stage した。`git annex add` で是正
+
+**いずれも commit 前のスモークテストで検知したため、実際の漏洩は発生していない。**
+教訓: ポリシーの正しさと実際に stage された形式は別物であり、
+**stage 内容そのものを検査して初めて確認になる。**
+
+### 実装スタック
+
+監査に限り Python + numpy/scipy/pandas/matplotlib を採用（`.venv-audit`、
+gitignore 済み）。理由は独立性ではなく**信頼性** — 正確二項検定・Clopper-Pearson・
+χ² 分位点をゼロから書くと監査対象より監査コードが疑わしくなる。独立性は
+「元の解析コードを再利用しない」ことであり、標準ライブラリの回避ではない。
+むしろ元実装（PLINK / PRSice2）と別のエコシステムを選ぶ方が独立性は強まる。
+CLAUDE.md の nbb 優先規約からの逸脱であり、`06_SOFTWARE_ENVIRONMENT.tsv` に
+全て申告済み。
+
+### 目視 QA が捕まえた実誤り
+
+自動チェック全 PASS でも図は誤りうる。実際に 2 件検出した。
+
+- Figure 2: F-05 の大小文字差により群区切りとラベルが崩れた
+- SuppFig S1: M06 の canonical crop は**軸矩形**で約 5% マージンと枠線を含む。
+  そのまま `[0,1]` に写すと曲線が全辺 5% 内側にずれる。crop 全体の ink 境界も
+  枠線を拾って機能しない。対角参照線が定義上 (0,0)–(1,1) を張る性質で較正して
+  解決（参照線の端点を読むだけで、M06 が禁じる曲線トレースには当たらない）
+"}]
