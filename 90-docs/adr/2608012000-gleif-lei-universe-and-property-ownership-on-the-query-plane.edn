@@ -148,42 +148,50 @@ repo 移動で黙って 0 件になる — 実際に market-intel でそれが�
 完全な corpus になったのでそれを採用した。**shard 引数は必ず個別の語として
 渡すこと**（`--limit 678283` を 1 変数に入れて渡さない）。"
 
-  :adr/resume-point "**次にやること**: corpus から projection を切って commit する。
+  :adr/resume-point "**完了済み**: join 駆動 projection は API 経路で埋めた
+  （`data/gleif-lei-joined.datoms.edn`、2,756 requested / 2,756 written /
+  0 missing。property d297128、west pin 397a515）。corpus を待つ必要は無かった —
+  面に既出の LEI は 2,756 件しかなく、GLEIF API は 200 件ずつ受けるので
+  14 requests で済む。**corpus は universe / 管轄単位の slice のための道具**で、
+  数千件の名指しリストに使う道具ではない。
 
-  ```bash
-  # 1. corpus が完成しているか（3,391,413 行 + manifest 1 行 = 3,391,414）
-  wc -l ~/.cache/gleif/gleif-lei-corpus-20260801.edn
+  **残っていること**:
 
-  # 2. 面に既出の LEI を抜き出す（2026-08-01 実測 2,756 件）
-  cd <superproject> && nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs \\
-    q '[:find ?lei :where [?e \"company/lei\" ?lei]]' 2>/dev/null \\
-    | grep -oE '\"[A-Z0-9]{20}\"' | tr -d '\"' | sort -u > /tmp/plane-leis.txt
-
-  # 3. join 駆動 projection（既存 dataset と結合する会社をすべて GLEIF で裏付ける）
-  cd orgs/kotoba-lang/property
-  nbb -cp src scripts/project_gleif_corpus.cljs \\
-    --corpus ~/.cache/gleif/gleif-lei-corpus-20260801.edn \\
-    --lei-file /tmp/plane-leis.txt --out data/gleif-lei-joined.datoms.edn
-
-  # 4. JP slice（規模を確認してから。数万件なら面に載せてよい）
-  nbb -cp src scripts/query_gleif_corpus.cljs \\
-    --corpus ~/.cache/gleif/gleif-lei-corpus-20260801.edn --jurisdiction JP --status ISSUED
-  nbb -cp src scripts/project_gleif_corpus.cljs --corpus <同上> \\
-    --jurisdiction JP --status ISSUED --out data/gleif-lei-jp.datoms.edn
-
-  # 5. property repo に commit → PR → merge → west pin 前進（API single-entry）
-  ```
-
-  corpus 自体は `~/.cache/gleif/`（git 対象外）。消えていれば
-  `collect_gleif_golden_copy.cljs` を Golden Copy の最新 publish で回し直す
-  （日次更新なので publish id と sha256 は変わる）。恒久保存するなら
-  skill `large-binary-datalad` の B2 + DataLad 経路に載せる — この ADR では
-  まだやっていない。"
+  1. **JP など管轄単位の projection**（corpus が要る）。corpus ingest は
+     このセッション終了時点で **まだ走っている**（nohup、`nice -n 5`、
+     `~/.cache/gleif/shard-0.edn.partial`、約 900 MB / 見込み 1.22 GB）。
+     完了すると `.partial` が外れる。load average 150+ の環境で 5-25% CPU しか
+     取れず、単独 worker で数時間かかっている。
+     ```bash
+     wc -l ~/.cache/gleif/shard-0.edn   # 3,391,414（manifest 1 行 + 3,391,413 社）
+     mv ~/.cache/gleif/shard-0.edn ~/.cache/gleif/gleif-lei-corpus-20260801.edn
+     cd orgs/kotoba-lang/property
+     nbb -cp src scripts/query_gleif_corpus.cljs --corpus <corpus> \\
+       --jurisdiction JP --status ISSUED          # 先に件数を測る
+     nbb -cp src scripts/project_gleif_corpus.cljs --corpus <corpus> \\
+       --jurisdiction JP --status ISSUED --out data/gleif-lei-jp.datoms.edn
+     ```
+     **面への追加コストを測ってから入れること**: このローダは entity あたり
+     約 0.43 ms なので、3 万件の JP projection は毎回のロードに約 13 秒足す
+     （現状 46 秒）。
+  2. **corpus の永続化**。今は `~/.cache/gleif/`（git 対象外、このマシンのみ）。
+     恒久化するなら skill `large-binary-datalad` の B2 + DataLad 経路に載せる。
+     消えていれば `collect_gleif_golden_copy.cljs` を最新 publish で回し直す
+     （日次更新なので publish id と sha256 は変わる）。
+  3. **不動産の管轄拡大**。これはコードでなくライセンスの問題
+     （ADR-2607112400 の `:governed-license` / `:unknown`）。"
 
   :adr/measured-state "2026-08-01 時点の実測カバレッジ（主張ではなく測定値）:
 
 - GLEIF LEI universe: 3,391,413 社が corpus として ingest 可能（Golden Copy 全量）。
-- 統合面で join 可能な法人: projection 次第。join 駆動の既定 projection は
-  面に既出の 2,756 LEI。
+  corpus 生成そのものはセッション終了時点で進行中（上記 resume-point）。
+- **統合面に実際に載っている GLEIF 法人: 2,756 社**（`gleif-lei` dataset、
+  main で実測）。うち **2,322 社が market-intel の :company/revenue-usd と
+  :company/lei で join する** — この join は本 ADR 以前は 0 件だった（面に
+  GLEIF レコードが 1 件も無かったため）。4 者 join（GLEIF identity × EDGAR 財務
+  × ToS アーカイブ）も main で確認済み: THE BOEING COMPANY / US-DE /
+  89,463,000,000 / boeing.com の site terms 等。
+- projection に入っていない残り約 338 万社は **join できない**。corpus への
+  streaming scan で集計だけできる。
 - 不動産 ownership: 2,088 claim / 1 authority（US-NY-NYC、公的主体のみ）。
   他の全管轄は :unknown。世界カバレッジではない。"}]
