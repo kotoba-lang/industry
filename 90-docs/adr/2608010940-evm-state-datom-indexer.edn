@@ -168,6 +168,29 @@ funnel 上は不正な支払いと区別が付かなかった**。決済検証�
 
 1. **永続化**（この ADR の本命）。現在は read-through projection で、datom 面に書いて
    いない。書くには one ref を所有する単一 writer（DO）が要る。
+
+   **2026-08-01 に書き込み経路を実測して特定した。**
+   - **前提だった障害は解消済み**: この Worker は CACAO を**検証**しかできず、書き込みには
+     `proxy/operator-bearer`（未署名の `{\"alg\":\"none\"}` JWT、どの backend も受け付けない
+     既知の gap）しか無かった。`kotobase.edge-cacao/mint-cacao` を実装して自分で署名できる
+     ようにした（net-kotobase `35cef4a0`）。テストはすべて production の `verify-cacao` /
+     `verify-cacao-scoped` に通して往復検証している（minter 自身の出力を信じない）。
+   - **使うべき経路は `kotobase-client` の `:auth-profile :apex`**。実測: `db_name` を使う
+     tenant-cap profile で自己 mint CACAO を投げると、**edge は認可するが backend が
+     401/403 で拒否する**。`:apex` は **graph scope == issuer DID** を要求するので、
+     `kotobase/db/<did>/<name>` 由来の graph を使う tenant-cap profile とは別物。
+     `:apex` 側は `kotoba-lang/marketplace` の ~1,197 itonami actor が本番で使っている
+     実績経路（`marketplace/edge.cljs` の `make-client`、seed は Worker secret
+     `KOTOBASE_SECRET_KEY`）。
+   - **残作業**: ①`kotobase-client` を clj-edge に vendor する（この repo は west
+     workspace 無しで単独 build するため。`pay/x402.cljc` と同じ理由・同じやり方）
+     ②writer 用 Ed25519 seed を発行して kagi（compartment `net-kotobase`）と Worker
+     secret に入れる ③cursor を持つ単一 writer DO ④`scheduled`（既に 6 時間 cron あり）
+     から tick ⑤`/evm/receipts` を永続面から読む。
+   - **注意**: `:apex` は graph scope == issuer DID なので、**鍵 1 本 = join 可能範囲
+     1 つ**。EVM datom を既存の itonami fleet ref と一緒にクエリしたいなら同じ seed を
+     使うことになり、分けるなら join できなくなる。ADR-260726 の「黙ったシャーディングを
+     禁じる」に従い、**どちらを採るかは実装前に明示的に決める**。
 2. keyed RPC provider の選定 — **もはや blocker ではない**（Tenderly public gateway で
    8/8 成功）。SLA が要るようになったら `KOTOBASE_EVM_RPC` に入れる。
 3. allowlist を treasury 以外に広げる基準。
