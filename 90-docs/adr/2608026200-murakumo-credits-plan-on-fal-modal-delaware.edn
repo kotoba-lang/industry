@@ -21,6 +21,8 @@
    "月次 allowance（繰越無し）と購入済み top-up（期限なし stored value）を台帳で別勘定にすること。消費は allowance から先に食うこと"
    "Stripe 統合において `invoice.paid` が月次 allowance を付与する正経路であり、webhook は `event.id` で冪等であること"
    "identity はサインアップ・メールを導入するが、did:key を置き換えず束ねること（did:key = 台帳の口座キー、メール/Stripe Customer = 復旧・請求・法定住所）"
+   "**束ねの正本は murakumo の台帳（`:run/bind`）であり、Stripe の `metadata.did` はキャッシュにすぎないこと。** webhook は mint 前に台帳と照合し、食い違えば fail closed で mint しない。付け替えは旧 did の署名つき `:run/rebind` を要する。メール平文を署名付き append-only feed に入れず、ソルト付きハッシュのみを置くこと（消去権と追記専用台帳の衝突を避ける）"
+   "**frontier tier は Higgsfield に価格で勝つこと**（オーナー判断 2026-08-02。前版の『価格で追いかけない』を撤回）。主力は原価割れしない `video/frontier-fast` 35cr/秒（$2.80 / 8秒、粗利 49%）。完全版 `video/frontier` の promo 35cr/秒 は原価割れなので **plan 月次 credits の 15% を上限**とし、超過分と top-up には適用しない。`frontier-fast` と完全版を同一視して表示しない"
    "原価が未確認の modality には掲示価格を付けないこと（3D は保留）"
    "Modal は原価削減の手段ではないこと。fal が既に serve している model を Modal で再実装しない"]
 
@@ -50,7 +52,7 @@
 | 品目 | fal 価格 |
 |---|---|
 | video / Wan 2.5 級 | **$0.05 / 出力秒** |
-| video / Veo 3 級 | **$0.40 / 出力秒** |
+| video / Veo 3.1 + audio（720p/1080p） | **$0.40 / 出力秒**（音声なし $0.20、Veo 3.1 Fast $0.18。Google Vertex 直は $0.75 — §3-2） |
 | image / Seedream V4 級 | **$0.03 / 枚** |
 | voice / Inworld TTS-1.5 Max | **$0.01 / 1,000 文字** |
 | music / ACE-Step | 60秒 ≈ **$0.012**（≈ $0.0002/秒） |
@@ -83,12 +85,58 @@
 | tier | fal 原価 | 掲示価格 | 備考 |
 |---|---|---|---|
 | `video/oss`（Wan 2.5 級 720p） | $0.05/秒 | **10 cr / 秒** | 主戦場 |
-| `video/frontier`（Veo 3 級 + audio） | $0.40/秒 | **80 cr / 秒** | 価格で勝たない（下記リスク 1） |
+| `video/frontier-fast`（Veo 3.1 Fast、音声なし） | $0.18/秒 | **35 cr / 秒** | **Higgsfield に勝つ主力**（§3-2） |
+| `video/frontier-silent`（Veo 3.1、音声なし 720p/1080p） | $0.20/秒 | **40 cr / 秒** | |
+| `video/frontier`（Veo 3.1 + audio、720p/1080p） | $0.40/秒 | **promo 35 / 定価 80 cr / 秒** | promo は原価割れ。上限つき（§3-2） |
 | `image` | $0.03/枚 | **6 cr / 枚** | |
 | `voice`（TTS） | $0.01/1,000字 | **2 cr / 1,000字** | |
 | `music/oss` | ≈ $0.0002/秒 | **1 cr / 10秒**（最低 5 cr/job） | 単価が微小なのでジョブ最低額を置く |
 | `music/premium` | $0.0133/秒 | **3 cr / 秒** | |
 | `3d` | **未確認** | **付けない（保留）** | 原価不明のものに掲示価格を付けない ── `job-cost` の fail-closed と同じ規律を、価格表を作る側にも適用する |
+
+### 3-2. frontier tier ── Higgsfield に勝つ（オーナー判断 2026-08-02）
+
+**オーナー判断: frontier tier は Higgsfield に負けない価格設定にしてよい。** 前版は『価格で追いかけない』としていた。**撤回する。** ただし同じオーナーの『赤字にならないように』も同時に満たす必要があるので、**構造で勝てるところは構造で勝ち、原価割れが要るところだけを上限つきの promo にする。**
+
+**まず原価の前提を1つ訂正する（2026-08-02 再調査）:**
+
+| 経路 | Veo 3.x + audio |
+|---|---|
+| **fal** | **$0.40/秒**（720p/1080p） |
+| **Google Vertex AI 直** | **$0.75/秒** |
+
+**fal は Veo の中間業者として上乗せしているのではなく、直より安い。** 『Google と直接契約して原価を下げる』という手は**存在しない**（1.9 倍になる）。前版で示唆した『direct 交渉』の線は消える。fal を base に置く判断はここでも正しい。
+
+**代わりに効く原価の分岐が2つ見つかった:**
+- **音声を外すと半額**（fal $0.40 → **$0.20/秒**）
+- **Veo 3.1 Fast** は fal で **$0.18/秒**
+
+比較対象（Higgsfield の Veo 3 + audio 720p 8 秒 = 58cr）:
+
+| murakumo | 8 秒の価格 | Higgsfield $2.84（Plus 実効）比 | murakumo 粗利 |
+|---|---|---|---|
+| **`frontier-fast` 35 cr/秒** | **$2.80** | **勝ち** | **49%** |
+| `frontier-silent` 40 cr/秒 | $3.20 | 負け | 50% |
+| `frontier` **promo 35 cr/秒** | **$2.80** | **勝ち** | **−14%（原価割れ）** |
+| `frontier` 定価 80 cr/秒 | $6.40 | 負け | 50% |
+
+**主力は `frontier-fast`。$2.80 で Higgsfield の $2.84 を下回りながら粗利 49% を残す** ── 原価割れをせずに勝てる唯一の行で、価格表の先頭に置く。**ただし Veo 3.1 Fast は Higgsfield が 58cr で出す完全版 Veo 3 と同じ品質ではない。** 同一視して表示しない（それは silent substitution であり、ADR-2608026100 §2 が禁じている『tier を隠す』ことそのもの）。両方を並べ、違いを書く。
+
+**完全版 `frontier` の promo 35 cr/秒 は意図的な原価割れ。** 1 秒あたり $0.40 − $0.35 = $0.05、収入側 6% を含めて **$0.071/秒の損失**。青天井にすると plan が沈むので上限を計算した:
+
+Ultra（$129 / 12,900cr）が全額を promo frontier に使うと 368.6 秒 = fal 原価 $147.43 ── **寄与 −$24.41。1 人で月 24 ドル溶ける。**
+
+promo を plan の月次 credits の一定割合に制限した場合の Ultra 寄与:
+
+| promo 上限 | 寄与 |
+|---|---|
+| 30% | $26.59（20.6%）── floor 割れ |
+| 20% | $35.30（27.4%）── floor 割れ |
+| **15%** | **$39.66（30.7%）── ✅ §5-5 の 30% floor を満たす** |
+
+**決定: promo 35 cr/秒 は「その月の plan credits の 15% まで」。** 超えた分は定価 80 cr/秒。**購入 top-up credits には promo を適用しない**（top-up は青天井なので、そこに上限の無い原価割れを置くと損失も青天井になる）。
+
+**そして heavy な frontier 利用者には BYOK が最善**（§11 P7）。顧客が自分の Higgsfield / fal 鍵で回し、murakumo は orchestration + アーカイブだけを 20cr/job 取る。顧客の実費は自分の契約単価のままで、murakumo は **90% 粗利**。**『Higgsfield に勝つ』が murakumo の利益を増やす唯一の形がこれ** ── 他の3行はどれも利益を削って勝つ。
 
 **ペグ（$1 = 100cr、ADR-2607030030）は変えない。** 変えると既存台帳の全残高の意味が変わり、労働発行分（`settle` でノード運用者が得た credits）まで再解釈することになる。Higgsfield が $0.05/cr なので、murakumo の数字は見かけ上 5 倍になるだけ。
 
@@ -191,9 +239,27 @@ $X − (100X × $0.00545) − ($0.029X + $0.30) = 0.426X − 0.30
 | **did:key**（据え置き） | credits 台帳の**口座キー**。`settle` / `spend` / `transfer` / `receipt` の署名主体。可搬性・暗号的所有証明 |
 | **メール + Stripe Customer**（新設） | 復旧（鍵を失った時）、請求、dunning（決済失敗の回収）、**法定の請求先住所** |
 
-`credits-topup-args` は既に checkout session の `metadata.did` で mint 先を決めているので、**この束ね方は既存実装をそのまま活かせる** ── サインアップ時に did:key を生成して Stripe Customer の metadata に固定し、以後どの決済からでも同じ口座に着地させる。
+**束ねの正本は murakumo の台帳（決定、オーナー指示 2026-08-02『束ねて』）。** 前版は『どちらかにする』と保留していた。決める:
 
-**そして請求先住所が入ることが §6 の escheat 分析を実質的に変える。**
+```
+:run/bind   {:did \"did:key:z6Mk…\" :stripe-customer \"cus_…\" :email-hash \"…\"}
+:run/rebind {:did-old … :did-new … :sig <did-old の署名>}
+```
+
+**なぜ Stripe 側ではなく台帳が正本か:**
+
+1. **残高の権威と所有者の権威が別々にあってはならない。** 台帳は既に balances の authority（`balances` / `ledger-violations`）。誰のものかが別の場所で定義されている残高は、well-defined ではない
+2. **Stripe の metadata は可変で、他人のインフラにある。** 台帳は署名 + ハッシュ連鎖（`receipt`）で改竄検出できる
+3. **決済事業者の可搬性。** 第2の決済手段を足す / Stripe を離れる時、束ねが生き残る
+4. duplicated-truth 欠陥クラス（ADR-2607300100）の回避 ── **1つが authority、他は projection**
+
+**Stripe の `metadata.did` は残す。ただし「キャッシュ」と明示し、webhook は mint 前に台帳と照合する。** 食い違ったら **fail closed で mint しない**（間違った口座に credits を入れるのは、入れないより悪い）。現行 `credits-topup-args` が session と payment_intent の両方に did を載せているのは追加 API 呼び出しを避けるための最適化であって、正本の主張ではない ── その位置づけを docstring に書く。
+
+**束ねは 1:1 かつ set-once。** 付け替えは `:run/rebind` を**旧 did の署名つき**で要求する。これが無いと、メールを乗っ取った者が credits 残高ごと口座を奪える（メールは復旧経路であって所有証明ではない）。
+
+**メールアドレスそのものを署名付き append-only feed に入れない。** 台帳に入れるのは**ソルト付きハッシュ**（一回きり trial の重複排除に必要なのは同一性判定だけで、平文は要らない）。平文は可変のアカウントストアと Stripe に置く。理由は GDPR/CCPA の**消去権と追記専用台帳が原理的に衝突する**から ── 平文 PII を不変構造に書くと、消去要求に応えるには台帳を書き換えるしかなくなり、署名とハッシュ連鎖が壊れる。
+
+**そして請求先住所が入ることが §7 の escheat 分析を実質的に変える。**
 
 ### 5-4. 『無制限プラン』は出さない
 
@@ -361,7 +427,9 @@ ModelsLab が $199/月 unlimited を出せるのは自前 GPU を持っている
   :adr/risks
   "## 落とし穴
 
-1. **frontier tier で Higgsfield に価格で負ける ── 意図的にそうしている。** Veo 3 の 8 秒は murakumo 640cr = **$6.40** に対し Higgsfield **$2.84**、**2.25 倍**。breakage を収益にできない以上これは埋まらない。**価格で追いかけない。** 追いかけると原価割れを自分で選ぶことになる。答えは2つ: frontier は『必要なら在る』honest cost-plus に留める、あるいは **BYOK**（顧客の鍵で回し、murakumo は orchestration + アーカイブだけ課金）。後者は価格差を構造的に消す。
+1. **frontier promo は本物の原価割れであり、上限が唯一の防御。** §3-2 の 15% 上限が実装で緩めば（あるいは top-up にも適用されれば）、Ultra 1 人で月 $24 溶ける。**上限は UI の表示ではなく admission gate に置く** ── promo 枠を使い切ったら定価 80cr/秒に切り替わることを、課金の直前に台帳残高で判定する。`job-cost` が価格を引く時点で promo 枠の残りを見なければ、枠は存在しないのと同じ。
+
+   加えて、**`frontier-fast` と完全版 `frontier` を同一視して表示しない。** 価格表で `frontier-fast $2.80` だけを見せて『Higgsfield より安い』と言うのは、Veo 3.1 Fast と完全版 Veo 3 の品質差を隠すことになる。これは ADR-2608026100 §2 が『隠せないもの』に挙げた tier / model の同一性そのもの。両方を並べ、違いを書く。
 
 2. **fal の値上げが直撃する。** 掲示価格は固定、原価は相手が決める。単価を全プラン揃えたことで耐性は 3.3% → **19%** に広がったが、それを超えれば 30% floor を割る。**原価表の `:verified-at` staleness gate（ADR-2608026000）と §5-5 の不変条件 5（掲示 ÷ 原価 ≥ 1.8）が防御**で、これが緩むと気付かないまま薄利で走る。四半期ごとの掲示価格見直しを前提に、terms に価格改定条項を置く（年払いの価格ロックはその裏返しなので、ロック期間の値上げリスクは murakumo が負う）。
 
@@ -379,10 +447,16 @@ ModelsLab が $199/月 unlimited を出せるのは自前 GPU を持っている
 
 9. **dunning（決済失敗）で購入済み credits に触らない。** allowance の停止と stored value の没収は別の話で、混ぜると前払い済みの財産を取り上げることになる。§6-3 の表がその境界だが、実装で1行間違えれば消える。
 
-10. **サインアップ導入で新しい責務が増える。** メールアドレス = 個人データ（GDPR/CCPA）、パスワードまたは magic link の運用、アカウント復旧の詐称リスク、そして **did:key との束ねが壊れた時に『誰の口座か』が二重定義になる**（この repo が繰り返し踏んでいる duplicated-truth 欠陥クラス、ADR-2607300100）。**束ねの正本を1つに決める** ── Stripe Customer の metadata に did:key を置くのか、murakumo 側の台帳に Stripe Customer ID を置くのか、どちらかにする。両方に書くと必ずずれる。"
+10. **サインアップ導入で新しい責務が増える。** メールアドレス = 個人データ（GDPR/CCPA）、パスワードまたは magic link の運用、アカウント復旧の詐称リスク。**束ねの正本は §5-3 で台帳に決めた**ので二重定義は塞がったが、残る危険は2つ ── ①Stripe 側キャッシュとの照合を webhook が省略すると、正本を決めた意味が消える（照合は性能上の誘惑に負けやすい箇所なので、テストで固定する）②`:run/rebind` の署名検証を緩めると、**メールを乗っ取った者が credits 残高ごと口座を奪える**。メールは復旧経路であって所有証明ではない。
+
+11. **`frontier-fast` は fal の価格改定に最も脆い。** 粗利 49% は $0.18/秒 という**再調査で初めて分かった数値**に依存しており、実契約で確認していない。ここが $0.28/秒 になれば粗利は 20% に落ち、Higgsfield 比の優位（$2.80 対 $2.84）は 4 セント差しかないので**値上げ一回で消える**。frontier 価格は §5-5 の不変条件 5 とは別に、**月次で原価を確認する**（四半期では遅い）。"
 
   :adr/verification
-  "外部価格（2026-08-02、公開情報。**実契約での確認はしていない**）: fal ── video Wan 2.5 級 $0.05/出力秒、Veo 3 $0.40/秒、Seedream V4 $0.03/枚、Inworld TTS-1.5 Max $0.01/1,000字、ACE-Step 60秒 ≈$0.012、ElevenLabs Music 60秒 $0.80、GPU H100 $1.89/h・A100 $0.99/h、成功出力のみ課金。Modal ── H100 $3.95–4.29/h、A100 80GB ≈$2.50/h、cold start 7B+ で 15–30 秒。Higgsfield ── Plus $49/1,000cr、top-up $5/100cr、月次 credits 繰越無し、top-up 90 日失効、Kling 3.0 720p 5秒 7cr、Veo 3+audio 720p 8秒 58cr。
+  "**Veo 原価の再調査（2026-08-02、公開情報）**: fal の Veo 3.x は 720p/1080p で **音声つき $0.40/秒・音声なし $0.20/秒**、**Veo 3.1 Fast が約 $0.18/秒**。一方 **Google Vertex AI 直は音声つき $0.75/秒**（音声なし $0.50/秒、Veo 3.1 Fast は $0.10/秒〜）── **fal は Veo の中間業者として上乗せしておらず、直より安い。** 前版が示唆した『Google と直接契約して原価を下げる』手は存在しない（1.9 倍になる）。frontier 価格の全計算はこの再調査値に依存しており、**実契約では未確認**（リスク 11）。
+
+frontier promo 上限の検算（Ultra $129 / 12,900cr、promo 35cr/秒 = $0.35/秒 に対し fal 原価 $0.40/秒）: 全額 promo なら 368.6 秒・fal 原価 $147.43 → 寄与 **−$24.41**。promo を月次 credits の 30% に制限 → $26.59（20.6%）、20% → $35.30（27.4%）、**15% → $39.66（30.7%）で §5-5 の 30% floor を満たす**。よって上限 15%。
+
+外部価格（2026-08-02、公開情報。**実契約での確認はしていない**）: fal ── video Wan 2.5 級 $0.05/出力秒、Veo 3.x 音声つき $0.40/秒、Seedream V4 $0.03/枚、Inworld TTS-1.5 Max $0.01/1,000字、ACE-Step 60秒 ≈$0.012、ElevenLabs Music 60秒 $0.80、GPU H100 $1.89/h・A100 $0.99/h、成功出力のみ課金。Modal ── H100 $3.95–4.29/h、A100 80GB ≈$2.50/h、cold start 7B+ で 15–30 秒。Higgsfield ── Plus $49/1,000cr、top-up $5/100cr、月次 credits 繰越無し、top-up 90 日失効、Kling 3.0 720p 5秒 7cr、Veo 3+audio 720p 8秒 58cr。
 
 法人実測: `orgs/network-awai/cloud-murakumo/legal/company.md` ── AWAI Network, L.L.C.、Delaware LLC、file 10704996、2026-07-20 設立、registered agent Legalinc Corporate Services Inc.、『operates cloud-murakumo and murakumo.cloud alone』。`legal/terms.md` L123-148 に credits 条項（『not money, stored value』、購入は最終・返金不可、失効を想定した文言、Stripe 決済、reversal 時の負残高処理）。
 
