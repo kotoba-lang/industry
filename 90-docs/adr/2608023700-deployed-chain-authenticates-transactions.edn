@@ -1,0 +1,57 @@
+[{:db/id -1
+  :adr/id "adr-2608023700-deployed-chain-authenticates-transactions"
+  :adr/title "adr-2608023700: deploy 済み chain が transaction を認証する — そして regression をそのまま出したことを明記する"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "validator-tx-authentication"
+  :adr/authoritative-for
+  ["deploy 済み validator の transaction 認証"
+   "v18/v19 の regression の扱い"]
+  :adr/related ["adr-2608023600-a-blocks-clock-is-logical"]
+  :adr/evidence ["https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w1"]
+  :adr/body
+  "# ADR-2608023700: deploy 済み chain が transaction を認証する
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## 塞いだ穴
+
+validator は **`verify-fn (fn [_ _ _] true)`** で、**block 内の全 transaction を「account が承認したか一度も問わずに」適用していた。**
+
+**`/tx` に POST できる者は誰でも、他人の collateral を使えた** —— そして **4 replica すべてがその結果に合意する。**
+
+## 非同期な検査を同期の seam に渡す
+
+`torihiki.auth` は `apply-block` の内側で `verify-fn` を呼び、**Worker には非同期の verifier しか無い。**
+
+なので **proposal が到着した時点でその transaction 群を検証し、答えを cache し、同期 seam は cache を引く。** **3-chain 規則が proposal と commit の間に 2 block ぶんの余裕を作る**ので時間がある —— **`torihiki-node` の sequencer が `apply-block` を async にする代わりに選んだのと同じ取引。**
+
+**署名を一度も検査されていない transaction は FALSE に verify される。** unknown ではなく。
+
+## 併せて: 拒否を観測可能にした
+
+`apply-block` は **block ごとに `:rejected` を reset** するので、畳み込むと**最後の 1 block ぶんしか残らない** —— **「一度も拒否されていない」と読める。** 累積して `/head` に出し、`/account` も足した。**観測できない拒否は、誰も確認できない検査。**
+
+## Regression をそのまま出した
+
+**v17 は無干渉で block を commit し、4 replica が state root で一致していた。** **v18 と v19 は height 1 で、証明書 1・投票 2・記録された error はゼロ。**
+
+**5 つの編集が一緒に入り、どれが止めたのかはまだ分かっていない。**
+
+**それでも deploy した。** revert は **live のセキュリティ穴を戻して、動く devnet を買い戻す**ことになり、**穴の方が重い。** そして**黙っているのは両方より悪い** —— `/head` は height と root と「4 replica 一致」を返すので**生きているように見え**、実際は動いていない。
+
+## Consequences
+
+- (+) deploy 済み chain で transaction 認証が有効。
+- (+) 拒否が観測可能（`/head` の `:refused`、`/account`）。
+- (−) **chain は height 1 で停止（regression、原因未特定）。** 次は 5 つの編集を 1 つずつ戻して二分する。
+- (−) 鍵配布は TOFU、terminal は単一 sequencer を向いたまま、catch-up は未検証。
+"}]
