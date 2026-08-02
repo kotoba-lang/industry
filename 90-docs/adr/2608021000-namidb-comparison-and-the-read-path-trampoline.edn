@@ -364,12 +364,66 @@ kotobase-protocols-worker `313e298` で既に自分に課した基準である�
 **35.8x も 21.6x も「改善」であって「良い」ではない** — Neo4j は IC08 を
 0.7-0.8ms で返す。
 
-#### 6-5 次にやるとよいこと (優先順)
+#### 6-5 実施済み: 本番 deploy (C) — 出荷した。速くなった証拠はまだ無い
 
-**1. IC02 を診断する (推論しない)。** 7.7x → 14.7x → 19.2x と 3 回連続で
-悪化しており、ノイズではない。**原因は未修正ではなく未解明。** IC09 で
-うまくいったやり方——probe コストと join コストを節ごとに分離し、プランを
-印字してから手を打つ——を当てる。**2 つ目の機構を提案するのではなく、計測する。**
+`kotobase-protocols-worker` を deploy (version `047b3afa`、7 ドメイン:
+s3 / atproto / pinning / sparql / cypher / gremlin / graphql .kotobase.net)。
+テスト 44 tests / 163 assertions、0 failures。
+
+**載せたもの**: join batching + hash join、B-1 (planner が count する)、
+B-3 (projection pushdown)、novelty queue の segment 化、read path の async 化
+(`hydrate!` は 2026-07-18 から本番済み、`doc-point-query` を今回追加)。
+**載せなかったもの: B-2** — revert 済みで、pin を戻し `ordered-driver` 0 件を
+確認してからビルドした。
+
+**deploy 後の検証**: 7 ドメインすべて応答。6 つは deploy 前と同じ 401
+(認証要求 = 正常)。`atproto.kotobase.net` だけ `/` が 404 / p50 3.4s。
+
+**これは回帰ではない。** 同じホストで `/_diag/health` (hydrate しない) が
+0.13s、`/health` (hydrate する) が 4.5s — ADR-2607310900 訂正3 とまったく
+同じ形である。`/_diag/health` は `novelty_size: 18` を返しており、
+`2026-08-01-dag-shape.edn` の機構 (未 fold novelty 1 件 = 逐次 round trip
+1 回) で 18 hops × 90-250ms = 1.6-4.5s、実測と一致する。直前の deploy は
+2026-07-31 で今日の変更を一切含まないので、この遅さはそれ以前から在る。
+
+**正直に言うべきこと: この deploy で hydration が速くなる証拠はまだ無い。**
+segment 化が圧縮するのは **deploy 後に書かれた novelty だけ**で、既存の 18
+ノードは単一 entry のまま残る (移行しない設計なので当然)。今この瞬間に改善が
+見えないことは、機構と整合している。
+
+**反証可能な予測**: fold 閾値は 64、現在 18。この graph が書き込みを積んで
+次に 64 に達するとき、novelty は 64 ノードではなく **4 ノード**になるはず。
+そこで `/health` の p50 を測れば改善したか否かが決まる。測るまで
+「本番が速くなった」とは言わない。
+
+**deploy 手順で 3 回同じ失敗をした**ので記録する。依存 20 repo の照合で
+①source-paths を `head` で切って 12 個と読み (実際は 21) ②全部 west に
+あると仮定し (`datom-source` は未展開) ③clean かどうかだけ見て
+**revision を pin と照合しなかった** (5 個が不一致)。どれもビルドエラーが
+教えてくれたが、最初から 20 件を機械的に突き合わせれば 1 回で済んだ。
+**deploy は判断ではなく照合の作業である。**
+
+他セッションの WIP (`kotobase-protocols` 15 dirty、`kotobase` 21 dirty) は
+一切動かしていない — pin の revision を別途 clone した隔離ツリーでビルドした。
+
+#### 6-6 次にやるとよいこと (優先順)
+
+**1. B-2 (limit の join 押し下げ) をやり直す。** 一度実装して **revert した**
+(`arrangement 6a179a31`)。同値性テストは全部通ったが**遅くなった** — 値グループ
+ごとに残り節を最初から再実行するので、駆動変数に依存しない節がグループ数だけ
+再導出される。IC02 では `[?person knows ?friend]` の 882 行が 7,355 回で
+6.5M 行。正しい形は「駆動独立な節をループ外で1回評価し、グループごとには
+依存節だけ走らせて semi-join する」= join の並べ替え。**最初の見立て
+(executor + planner) が正しく、途中で「planner は不要」と翻したのが誤りだった。**
+
+**2. 本番 novelty の再測定。** §6-5 の反証可能な予測 —— この graph が fold
+閾値 64 に達したとき novelty が 64 ノードでなく 4 ノードになるはず —— を、
+そのタイミングで `/health` の p50 を採って検証する。
+
+**3. IC02 の LDBC 比を「未解決の回帰」として引用しない。** 3 回の receipt で
+7.7x → 14.7x → 19.2x と見えたが、`2026-08-02-scan-instrumentation.edn` で
+**回帰ではなかった**ことが確定している (両ピンで scan 1,793 / rows 2,702 が
+完全一致)。分母の Neo4j IC02 が 5ms と小さすぎて対照にならなかっただけ。
 
 **2. `:query-statistics` を実際に使う。** `[?f1 \"knows\" ?f2]` の probe は
 静かな機械でも 361,246 行を毎回セットに materialize して 1,071ms 使う —
