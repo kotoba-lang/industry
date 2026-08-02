@@ -8,31 +8,31 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 16398,
-  "app-aozora-appview" 9965,
-  "app-aozora-spa" 7290},
+ {"app-aozora-pds" 16516,
+  "app-aozora-appview" 10022,
+  "app-aozora-spa" 7349},
  :zone
- {:requests-7d 1121221,
-  :pageviews-7d 7774,
-  :uniques-7d-sum 809,
+ {:requests-7d 1128625,
+  :pageviews-7d 7783,
+  :uniques-7d-sum 811,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 802509}
+  [{:path "/v1/datoms", :requests 802083}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 178548}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 4556}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 2119}
-   {:path "/federation-pilot/did.json", :requests 116}
-   {:path "/minidrama-fedtest/did.json", :requests 73}
-   {:path "/hito-diag-fed/did.json", :requests 71}
-   {:path "/hito-final-verify/did.json", :requests 71}],
-  :status-mix {:ok 990234, :client-error 3059, :server-error 394},
+    :requests 178472}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 4577}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 2146}
+   {:path "/federation-pilot/did.json", :requests 115}
+   {:path "/minidrama-fedtest/did.json", :requests 74}
+   {:path "/hito-final-verify/did.json", :requests 70}
+   {:path "/hito-diag-fed/did.json", :requests 69}],
+  :status-mix {:ok 989743, :client-error 3082, :server-error 396},
   :window "24h"},
  :as-of "2026-08-02",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 802509 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 178548 · /xrpc/ai.gftd.apps.kotobase.datomic.view 4556 · /xrpc/com.atproto.sync.subscribeRepos 2119 · /federation-pilot/did.json 116 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 802083 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 178472 · /xrpc/ai.gftd.apps.kotobase.datomic.view 4577 · /xrpc/com.atproto.sync.subscribeRepos 2146 · /federation-pilot/did.json 115 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 1121221 req/7d・809 uniques(日次和)・うち4xx probe 0%(24h)、workers 33653 inv/7d"}
+ "aozora.app 実測 1128625 req/7d・811 uniques(日次和)・うち4xx probe 0%(24h)、workers 33887 inv/7d"}
