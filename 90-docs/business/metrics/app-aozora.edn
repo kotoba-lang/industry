@@ -8,31 +8,31 @@
  :health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 17332,
-  "app-aozora-appview" 10446,
-  "app-aozora-spa" 7421},
+ {"app-aozora-pds" 17496,
+  "app-aozora-appview" 10507,
+  "app-aozora-spa" 7461},
  :zone
- {:requests-7d 1182431,
-  :pageviews-7d 7853,
-  :uniques-7d-sum 841,
+ {:requests-7d 1190123,
+  :pageviews-7d 7860,
+  :uniques-7d-sum 852,
   :zone "aozora.app"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 800996}
+  [{:path "/v1/datoms", :requests 804100}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 178651}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 4509}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 2166}
-   {:path "/federation-pilot/did.json", :requests 121}
-   {:path "/minidrama-fedtest/did.json", :requests 74}
-   {:path "/hito-diag-fed/did.json", :requests 65}
-   {:path "/hito-postfix-fed/did.json", :requests 60}],
-  :status-mix {:ok 988495, :client-error 3210, :server-error 396},
+    :requests 178604}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 4553}
+   {:path "/federation-pilot/did.json", :requests 118}
+   {:path "/minidrama-fedtest/did.json", :requests 72}
+   {:path "/hito-diag-fed/did.json", :requests 63}
+   {:path "/hito-postfix-fed/did.json", :requests 59}
+   {:path "/hito-federates/did.json", :requests 56}],
+  :status-mix {:client-error 3308, :ok 989357, :server-error 397},
   :window "24h"},
  :as-of "2026-08-02",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 800996 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 178651 · /xrpc/ai.gftd.apps.kotobase.datomic.view 4509 · /xrpc/com.atproto.sync.subscribeRepos 2166 · /federation-pilot/did.json 121 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 804100 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 178604 · /xrpc/ai.gftd.apps.kotobase.datomic.view 4553 · /federation-pilot/did.json 118 · /minidrama-fedtest/did.json 72 | 4xx(probe) 0% · 5xx 0%",
  :signal
- "aozora.app 実測 1182431 req/7d・841 uniques(日次和)・うち4xx probe 0%(24h)、workers 35199 inv/7d"}
+ "aozora.app 実測 1190123 req/7d・852 uniques(日次和)・うち4xx probe 0%(24h)、workers 35464 inv/7d"}
