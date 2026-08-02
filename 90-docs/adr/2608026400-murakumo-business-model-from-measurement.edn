@@ -3,7 +3,7 @@
   :adr/doc_type "adr"
   :adr/source-format "edn"
   :adr/authoritative true
-  :adr/title "実測から business / marketing / support / produce / consume を組み直す — 価格を最適化していた店に、入口が1つも無かった"
+  :adr/title "実測から business / marketing / support / produce / consume を組み直す — 転換 0% の原因は入口ではなく、did:key の手入力と桁違いの単価だった"
   :adr/status "proposed"
   :adr/date "2026-08-02"
   :adr/last_verified "2026-08-02"
@@ -26,7 +26,7 @@
   :adr/related
   ["90-docs/adr/2608026300（調達と XMILE 最適価格。本 ADR はその SCENARIO を実測に突き合わせて訂正する）"
    "90-docs/adr/2608026200（plan 表）、2608026100（credits）、2608026000（provider 分離）"
-   "90-docs/adr/2607320000（4つの扉。『入口が1枚も無い』を 2026-07-31 に記録済み。**本 ADR は 2026-08-02 時点でそれが未解消であることを live で確認した**）"
+   "90-docs/adr/2607320000（4つの扉。『入口が1枚も無い』を 2026-07-31 に記録。**本 ADR §2 は実ブラウザでそれを訂正する —— SPA が nav と Store CTA を描画しており、入口は在る**）"
    "90-docs/adr/2607021500（portfolio BMC base datoms）・2607021600/1700/1800（CLI / 成熟度 / 運転）"
    "90-docs/business/{cloud-murakumo-canvas.datoms.edn,cloud-murakumo-business-model.edn,maturity-scores.edn,canvas-ledger.edn}"
    "90-docs/system-dynamics/business.cljs（本 ADR の再現スクリプト）"]
@@ -50,19 +50,33 @@ CLAUDE.md の必須ルール（BMC/Lean Loop を作る前に `70-tools/bmc/` の
 | fleet 原価 **¥20.04/Mtok**（vs spot ¥40.55）— `:hyp/murakumo-tok-price` **validated** 2026-07-23 | 同上 |
 | x402 出品 **$0.01/req ≒ $37/1M tok** = GPT-4o-mini（$0.15–0.60/1M）の**約 100 倍** | 同上 |
 
-## 2. **入口が無い** — 2026-08-02 に live で確認
+## 2. 入口 —— **本節の初版は誤りだった。実ブラウザで訂正する**
 
-ADR-2607320000 が 2026-07-31 に『バックエンドはほぼ揃っていて、入口が1枚も無い』と記録した。**今日、未解消であることを確認した:**
+**初版はこう書いた**: 『`/` の `href` は `/css/dds.css` の 1 本だけ。リンクが1つも無い。買う方法がサイト上に存在しない』。
 
-| path | 実測（2026-08-02） |
+**これは `curl` で server-rendered HTML だけを見た結果であり、誤りだった。** murakumo.cloud は SPA（`public/index.html` + `js/main.js`、hash routing）で、**nav も CTA も JS が実行時に描画する**。curl は JS を実行しないので何も見えない。**client-rendered なサイトを curl で判定してはいけない** —— このセッションで私が犯した誤りであり、同種の判定を今後 curl だけで行わない。
+
+**実ブラウザ（Claude-in-Chrome、2026-08-02）で見えるもの:**
+
+| 要素 | 実測 |
 |---|---|
-| `/` | 200。**`href` は `/css/dds.css` の 1 本だけ** —— リンクが1つも無い |
-| `/pricing` `/signup` `/join` `/store` `/plans` | **すべて 404** |
-| `/docs` | 200 |
+| nav | Overview / Playground / Studio / **Store** / Blog / Docs / GPU Market / Source |
+| hero CTA | 「実モデルを試す(無料・登録不要)」/ **「Credits を購入」** / 「スケジューラ・デモ」 |
+| `#store` | **完全に動く**。国別（日本/中国/US/EU）、税制注記、Terms 同意、SKU 5 件（Credits $10/$50/$200 + ノード $2,000/$6,000）、各 SKU に「Pay with card (Stripe)」 |
 
-**18 tick にわたる転換率 0% は、価格の問題でも marketing の問題でもない。買う方法がサイト上に存在しない。**
+**入口はある。** `/pricing` `/signup` `/join` `/plans` が 404 なのは事実だが（server-rendered な共有可能・被クロール可能ページが無い、という別の欠点）、**『買う方法が存在しない』は誤りだった。**
 
-**このセッションで私が3本の ADR を費やして設計してきたもの —— credits plan、tier 別掲示価格、Higgsfield に勝つ frontier 価格、XMILE による最適価格 —— は、入口の無い店の値札だった。** 価格を 10cr/秒 にするか 8cr/秒 にするかを minimax regret で論じたが、どちらの値札も誰も見られない。
+### 2-1. では実際のブロッカーは何か（実ブラウザで特定した3つ）
+
+| # | ブロッカー | 実測 |
+|---|---|---|
+| **B1** | **did:key の手入力を要求している** | 購入手前に「Enter your did:key before buying credits」＋ placeholder `did:key:z6Mk...` の**テキスト入力**。**生成ボタンは見当たらない。** 一般の購入者は did:key が何かを知らず、作る手段も持たない。しかも ADR-2607320000 が『ブラウザ生成の did:key は did:key ではない』（base64→英数字除去→32字切り詰め、失敗時は鍵素材ゼロの timestamp）と記録済み |
+| **B2** | **決済直前のレイアウト破綻** | did:key 入力欄と Terms 同意文が視覚的に衝突し、ボタンが文にかぶって一部が切れている（スクリーンショット取得済み）。**転換の最終ステップで起きている** |
+| **B3** | **単価が桁違いの可能性** | `murakumo.infer.credits/default-per-token` = **1 credit / token**。mint は $1 = 100cr（ADR-2607030030）。**両者を合わせると $0.01/token = $10,000 / 1M token** —— GPT-4o-mini($0.15–0.60/1M)の 4 桁上。media の掲示価格は未登録なので `job-cost` は例外になる。**live 課金でこの値が実際に適用されるかは未検証**（§11 P0 で確認する）が、もし適用されているなら $10 パックは約 1,000 token（段落1つ分）で尽きる |
+
+**18 tick の転換率 0% を説明するのは『入口が無い』ではなく、この 3 つ**（とくに B1 と B3）。B1 は**オーナー判断で解禁されたサインアップ・メール導入がそのまま解**であり、B3 は**価格そのものの決定**なので実装前にオーナー判断が要る。
+
+**このセッションで設計した掲示価格（10cr/秒 等）は、B3 が解決するまで公開できない。** 現行の live 単価が 1cr/token のままなら、新しい価格表を出すことは『壊れた値札を別の壊れた値札に替える』ことにしかならない。
 
 ## 3. 転換率には点推定が無い（0 件観測の上界だけがある）
 
@@ -121,7 +135,7 @@ aggregator に切り替えた場合、1 顧客の月次寄与は **$19.85**（AR
 
 **この表は『CPC $0.59 まで出してよい』という意味ではない。** 転換率が上界なので CPC も上界で、真の転換率が 0.045%（上界の 1/10）なら許容 CPC は $0.06 になる。**広告出稿は `:uncomputable-until-measured`**（ADR-2607203000 の規律: 大きな pool に未計測の転換率を掛けて期待値を捏造しない）。
 
-**marketing の最初の一手は広告ではなく、入口を作ること**（§2）。そして 2026-08-02 のオーナー判断で**サインアップ・メールの導入が解禁された**ので、ADR-2607320000 が『did:key だけでは口座が作れない』として抱えていた前提条件も同時に外れた。**入口を塞いでいた技術的・方針的な理由は、今日どちらも無い。**
+**marketing の最初の一手は広告ではなく、§2-1 の B1〜B3 を潰すこと。** とくに B3（単価）は、直さないまま露出を増やすと壊れた値札を多くの人に見せるだけになる。B1 は 2026-08-02 のオーナー判断で解禁されたサインアップ・メール導入がそのまま解で、ADR-2607320000 が『did:key だけでは口座が作れない』として抱えていた前提条件も同時に外れた。
 
 ## 7. support — self-serve は前提条件であって選択肢ではない
 
@@ -165,18 +179,25 @@ aggregator に切り替えた場合、1 顧客の月次寄与は **$19.85**（AR
 
 ## 11. 段階
 
+**§2-1 で入口の実測が変わったので、段階も組み直した。**
+
 | phase | 内容 | 完了条件 |
 |---|---|---|
-| **P0** | **入口を作る** —— `/pricing` `/signup` を実装し、`/` からリンクする | 3 つとも 200 を返し、トップから到達できる |
-| **P1** | サインアップ + Stripe（ADR-2608026200 §6 の `invoice.paid` 含む） | 外部の人間が自力で有料になれる |
-| **P2** | **有料顧客 1 人**（社内アプリのユーザーから） | 転換率の**点推定**が初めて存在する |
-| **P3** | 点推定でモデル再実行 → 広告の可否を判定 | `:uncomputable-until-measured` が解消する |
-| **P4** | x402 出品価格を実勢へ（$37/1M tok → 帯内） | nexus-x402 の users=0 が値付け起因かどうかが分離できる |"
+| **P0** | **B3 の検証** —— 実際に 1 回課金して、live の単価が本当に 1cr/token なのかを確かめる | live の実効単価が数値で確定する。**これはオーナー判断の入力であって実装ではない** |
+| **P1** | **価格の決定（オーナー）** —— 1cr/token を実勢へ直す。x402 の $0.01/req（≒$37/1M tok）も同じ判断に含まれる | 掲示できる単価が存在する。**ここまで `/pricing` を公開しない** |
+| **P2** | **B1: 口座の入手可能化** —— サインアップ + メールで did:key を裏で生成・束ねる（ADR-2608026200 §5-3 の `:run/bind`）。手入力を要求しない | did:key を知らない人が購入まで到達できる |
+| **P3** | **B2: 決済直前のレイアウト修復** | 入力欄と Terms が衝突しない |
+| **P4** | `/pricing` を server-rendered で公開（`site.*` + DADS、`clojure -M:site`）し nav から張る | 共有可能・被クロール可能な価格ページが 200 を返す |
+| **P5** | Stripe subscription（ADR-2608026200 §6-2 の `invoice.paid`）+ `event.id` 冪等 | plan が売れる。2 か月目に credits が入る |
+| **P6** | **有料顧客 1 人**（社内アプリのユーザーから） | 転換率の**点推定**が初めて存在する |
+| **P7** | 点推定でモデル再実行 → 広告の可否を判定 | `:uncomputable-until-measured` が解消する |
+
+**順序が変わった点が重要**: 初版は『入口を作る』を P0 に置いていたが、入口はある。**先に価格を直さないと、入口を増やすほど壊れた値札への露出が増える。**"
 
   :adr/risks
   "## 落とし穴
 
-1. **『入口を作れば売れる』と読まない。** §2 は 0% 転換の**必要条件**の欠落を特定しただけで、入口ができれば転換するという証拠は無い。P2 で 1 件出るまで、転換率は上界のまま。
+1. **§2 初版の誤りを一般化する: client-rendered なサイトを curl で判定しない。** SPA の nav も CTA も JS 実行後にしか存在しない。同種の『到達可能か』判定は実ブラウザで行う。そして B1〜B3 を潰しても売れるという証拠は無い —— P6 で 1 件出るまで転換率は上界のまま。
 
 2. **社内移管を『顧客獲得』と数えない。** 社内アプリを fal 経由に移しても、それは自分から自分への売上であって外部転換率の証拠にならない。**maturity の `users` / `revenue` を社内実績で上げると、captive demand を market validation と取り違える**（ADR-2607122300 が既に扱っている論点）。
 
@@ -193,7 +214,7 @@ aggregator に切り替えた場合、1 顧客の月次寄与は **$19.85**（AR
   :adr/verification
   "**既存 BMC システムの確認（CLAUDE.md 必須手順）**: `git sparse-checkout add 70-tools/bmc 70-tools/scripts 90-docs/business` の上で `GFTD_ROOT=$(pwd) nbb 70-tools/bmc/bin/gftd.cljs products` → cloud-murakumo は『L1 LLM 推論 — infra（Civitai × exo）』として登録済み。`canvas show --product cloud-murakumo` で 9 ブロック（problem/segments/uvp/solution/channels/revenue/cost/metrics/unfair）+ `:hyp/murakumo-tok-price [validated]` を確認。`maturity-scores.edn`: BMC 84 / YC bench 51.7 / validation 5 / 主な不足 revenue=0, pricing=1。**新規の追跡系は作っていない。**
 
-**live 実測（2026-08-02、読み取りのみ）**: `https://murakumo.cloud/` → 200、**HTML 中の href は `/css/dds.css` の 1 本のみ**。`/pricing` `/signup` `/join` `/store` `/plans` → **すべて 404**。`/docs` → 200。ADR-2607320000（2026-07-31）が記録した状態が未解消であることの再確認。
+**live 実測（2026-08-02）**: ①curl（server-rendered）—— `/` は 200 だが HTML 中の href は `/css/dds.css` の 1 本のみ、`/pricing` `/signup` `/join` `/plans` は 404、`/docs` は 200。②**実ブラウザ（Claude-in-Chrome）** —— SPA が nav（Overview/Playground/Studio/**Store**/Blog/Docs/GPU Market/Source）と hero CTA（「実モデルを試す」/**「Credits を購入」**/「スケジューラ・デモ」）を描画し、`#store` は国別・Terms 同意・SKU 5 件・Stripe 決済ボタンまで完動する。**①だけで『入口が無い』と判定した本 ADR 初版は誤りで、②が正。client-rendered なサイトを curl で判定しない。**
 
 **計算の再現**:
 ```bash
