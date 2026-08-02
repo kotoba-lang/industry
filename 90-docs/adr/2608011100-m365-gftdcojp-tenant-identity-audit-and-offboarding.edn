@@ -4,8 +4,8 @@
   :adr/status "accepted"
   :adr/authoritative true
   :adr/topic "m365-tenant-identity-governance"
-  :adr/last_verified "2026-08-01"
-  :adr/related ["2606271700-cloud-itonami-business-os"]
+  :adr/last_verified "2026-08-02"
+  :adr/related ["2606271700-cloud-itonami-business-os" "2608021200-m365-shared-mailbox-archive-and-query-plane"]
   :adr/title "ADR-2608011100: gftd.co.jp M365 テナントの棚卸しと退職者オフボーディング"
   :adr/body "# ADR-2608011100: gftd.co.jp M365 テナントの棚卸しと退職者オフボーディング
 
@@ -111,15 +111,36 @@ Teams アーカイブ（取得時点 2026-06-17）だけでは活動実態を過
 - Entra ID Premium が無い限り、サインイン履歴に基づく自動的な休眠検知はできない。
   導入するか、Exchange 側の指標で代替するかを別途判断する。
 
-## Kaizen backlog（未着手・優先度順）
+## Kaizen backlog（2026-08-02 現在）
 
-1. 退職者 5 名の委任権限（FullAccess / SendAs 52 件）の剥奪
-2. 退職者メールボックス 5 件の共有メールボックス変換（データ消失前）
-3. `Set-RemoteDomain Default -AutoForwardEnabled $false` + 外部転送の例外整理
-4. `GftdJapan1`（SchedulingMailbox）の Bookings 依存有無の確認
-5. 論理削除メールボックス 60 件超の保持方針決定
-6. 共有メールボックスのサインイン無効化状態の点検
-7. MFA 登録状況の把握とセキュリティ既定値 / 条件付きアクセスの評価
+1. 退職者 5 名の委任権限（FullAccess / SendAs 52 件）の剥奪 — **未着手**
+2. 退職者メールボックス 5 件の共有メールボックス変換 — **未着手**。ただしデータ消失
+   リスクは後述の権限付与とアーカイブで大幅に下がった（ADR-2608021200）
+3. `Set-RemoteDomain Default -AutoForwardEnabled $false` + 外部転送の例外整理 — **未着手**
+4. `GftdJapan1`（SchedulingMailbox）の Bookings 依存有無の確認 — **未着手**
+5. 論理削除メールボックス 60 件超の保持方針決定 — **未着手**
+6. 共有メールボックスのサインイン無効化状態の点検 — **未着手**
+7. MFA 登録状況の把握とセキュリティ既定値 / 条件付きアクセスの評価 — **未着手**
+
+## 2026-08-02 の追加変更（本 ADR のテナント状態を更新する）
+
+ADR-2608021200（共有メールボックスのアーカイブ）の実施に伴い、テナントに次の変更を
+加えた。identity governance の観点でここに記録する。
+
+- **Entra アプリ `gftd-m365-archive` に委任スコープ `Mail.Read.Shared` を付与**
+  （テナント全体 / AllPrincipals）。`Mail.Read` はサインインユーザー自身の受信箱しか
+  読めないため、共有メールボックスの取得には必須。
+- **退職者 5 名のメールボックス（h.sendachi / f.tanaka / t.chikada / y.sakamoto /
+  a.oda）に `j.kawasaki` の FullAccess を付与**。従来 `a.nakamura` にのみ委任されて
+  おり、取り込みを実行する j.kawasaki からは Graph が 404 を返していた
+  （権限が無いと「存在しない」と応答する）。`-AutoMapping:$false` を指定し、
+  オーナーの Outlook に退職者メールボックスが自動マウントされないようにしている。
+  `Remove-MailboxPermission` で可逆。
+
+**この付与は backlog #1（退職者の委任権限剥奪）と方向が逆に見えるが、対象が違う。**
+#1 が剥奪するのは「退職者が共有メールボックスに対して持つ権限」であり、ここで付与した
+のは「現役の管理者が退職者のメールボックスに対して持つ権限」。前者は再有効化時の
+攻撃面、後者は保全と監査のための経路であり、両立する。
 
 ## 実行環境の変更
 
