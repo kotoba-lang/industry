@@ -1,0 +1,65 @@
+[{:db/id -1
+  :adr/id "adr-2608023500-engi-replay-a-restart-must-come-back-where-it-was"
+  :adr/title "adr-2608023500: 再起動した replica は元の場所に戻らなければならない — 戻らなければ、自分自身に対する equivocation になる"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "engi-replica-replay"
+  :adr/authoritative-for
+  ["engi.replica/replay の契約（何を戻し、何を再検証しないか）"
+   "deploy 済み validator の永続化"]
+  :adr/related ["adr-2608023400-replica-state-in-memory-cannot-survive-eviction"]
+  :adr/evidence ["https://github.com/kotoba-lang/engi/commit/c7e3b43a4b560dfff400375f15922d4c467471ed"]
+  :adr/body
+  "# ADR-2608023500: 再起動した replica は元の場所に戻る
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## Decision: `engi.replica/replay`
+
+**この replica が既に受け入れた block を、再検証せずに採用する。**
+
+再検証しないのは、`torihiki.state/apply-block` が replay mode を持ち `engi.sync` が verifier を option で取るのと同じ理由 —— **再検査は、この replica が既に下して記録した決定を蒸し返すこと。**
+
+## 戻すのは 3 つで、どれも要る
+
+1. **chain と machine** —— 畳み込みで。
+2. **証明書** —— 無ければ **leader は「延長できない chain の上に座る」**ことになり、**復帰が半分**にしかならない。
+3. **既に投票した height** —— **無ければ、再起動が「既に投票した height」で 2 度目の投票をする。それは equivocation** —— **このシステムが slash する唯一の罪を、事故で、自分自身に対して犯す。**
+
+## なぜ必要か
+
+**記憶に state を置く replica が再起動すると genesis に戻り、genesis に戻った leader は「既に提案した height」に新しい block を提案する。** 再起動のたびに**両立しない候補**が増え、**どの 2 票も同じ決定に対するものでなくなり、quorum は永久に形成されない。**
+
+Cloudflare の 4 validator がまさにそれをやった: **3 票、3 つの block hash、1 つの height。**
+
+**1 プロセスでは起こりえない —— 何も再起動しないから。** harness が繰り返し 100 block 超まで走る一方、**deploy された方は 1 block を越えられなかった。**
+
+## 現在地（正確に）
+
+**永続化は入った。それでも height 1 で 3 hash のまま。**
+
+**永続化が不十分なのか、効いていないのかは、まだ分かっていない。** height 1 の leader は w2 で、**次に見るべきは「w2 が 2 回以上提案しているか」「提案の前に `persist!` が完了しているか」。**
+
+**「永続化を入れたから直った」と記録するのは、発火していた時計に scheduling 修正を 3 回入れたのと同じ間違い。**
+
+## 併記: docstring の二重引用符が build を 4 回壊した
+
+**docstring 内の `\"` は文字列を終わらせ、以降の散文を symbol に変える。** 今日 4 つの別ファイルで 4 回起き、**うち 2 回は `| tail -1` の裏に隠れて、前回の artifact が deploy された。**
+
+**build は最終行ではなく exit status を見る。docstring の散文に二重引用符を書かない。**
+
+## Consequences
+
+- (+) 再起動が安全になった（equivocation を含めて）。
+- (+) `replay` は冪等で、test がそれを assert する。
+- (−) **deploy 済み chain は依然 height 1。**
+- (−) engi 206 tests / 1130 assertions、parity 不変、in-process harness は pass。
+"}]
