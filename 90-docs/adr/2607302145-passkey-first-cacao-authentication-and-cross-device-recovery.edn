@@ -1,7 +1,7 @@
 [{:db/id -1,
   :adr/id "adr-2607302145-passkey-first-cacao-authentication-and-cross-device-recovery",
   :adr/title "ADR-2607302145: itonami.cloud / kotobase.net は Passkey-first、CACAO authorization、複数端末・復旧可能な account identity を採用する",
-  :adr/status "accepted; target architecture, current implementations partially conform",
+  :adr/status "accepted; delivery 1/2 完了・5 は半分、3/4/6/7/8 未着手。実装は default branch に着地済みだが未 deploy",
   :adr/doc_type "adr",
   :adr/date "2026-07-30",
   :adr/deciders ["Jun Kawasaki (+ Codex)"],
@@ -22,7 +22,7 @@
                           "別端末ログイン、複数 credential、端末紛失時復旧の要求"
                           "WebAuthn user verification と backup-state の最低保証"
                           "Passkey-gated server custody と self-custodied CACAO の境界"],
-  :adr/last_verified "2026-07-30",
+  :adr/last_verified "2026-08-02",
   :adr/source-format "edn-only (ADR-2607171600)",
   :adr/primary-sources ["W3C Web Authentication Level 3, Credential Backup State and Credential Loss and Key Mobility: https://www.w3.org/TR/webauthn-3/"
                         "Apple Platform Security, iCloud Keychain security overview: https://support.apple.com/guide/security/icloud-keychain-security-overview-sec1c89c6f3b/web"
@@ -31,14 +31,14 @@
                         "network-awai/cloud-itonami resources/site/signin.js and src/cloud_itonami/edge/webauthn.cljc @ working tree inspected 2026-07-30"
                         "network-awai/net-kotobase authn/resources/authn/passkey.js, authn/src/authn/{passkey,worker,account}.cljs @ working tree inspected 2026-07-30"
                         "Live GET https://itonami.cloud/signin/, https://itonami.cloud/onboarding/, and https://authn.kotobase.net/sign-in on 2026-07-30"],
-  :adr/known-gaps ["cloud-itonami の WebAuthn browser request は userVerification=preferred で、edge verifier は authenticatorData の UP bit は検証するが UV bit を抽出・必須検証していない。"
-                   "cloud-itonami の workforce account は単一 :account/did を主に保持し、利用者が自分で複数 Passkey を列挙・追加・失効する account-level credential management と完成した recovery UI が無い。"
-                   "cloud-itonami の古い product-specific Passkey 導線には residentKey=preferred と localStorage credential-id 依存が残る。正本の /signin は residentKey=required と discoverable login に進んでいるが、全導線は統一されていない。"
-                   "kotobase の browser request も userVerification=preferred を指定している。target は required であり、client option、verifier、contract test の三者を同じ policy に固定する必要がある。"
-                   "kotobase の Passkey bridge が使う Ed25519 key は server-custodied で、AUTHN_KEK と credential storage を同時に支配する認証基盤は利用者として署名できる。Passkey-gated は zero-knowledge / self-custody を意味しない。"
-                   "両サービスとも WebAuthn BE/BS flag の保存・表示・policy evaluation と、単一端末 credential しか持たない account への予備 factor 登録要求が未完成。"
-                   "同期 Passkey の PRF 出力が provider 内の別端末で同一かは provider / authenticator 実装に依存する。通常ログインの可搬性と zero-access mailbox keyslot の可搬性を同一視しない。"],
-  :adr/verification "Read-only audit。2026-07-30 に現行 source、生成済み browser assets、live sign-in pages、W3C WebAuthn Level 3、Apple iCloud Keychain、Google Password Manager、FIDO Alliance の一次資料を突合した。本ファイル単体は cljs.reader で tx-data 1 entity として parse 済み。repo-wide docs-edn-only verify は本ファイルを parse error / not-tx / split-string に挙げなかったが、既存の別ファイルに parse-errors 18、not-tx 7、split-strings 2、path-md-refs 6 があり全体としては FAIL。認証 ceremony の変更・本番 deploy・別端末での実機 E2E は本 ADR 作成時には実施していない。",
+  :adr/known-gaps ["cloud-itonami の workforce account は単一 :account/did を主に保持し、利用者が自分で複数 Passkey を列挙・追加・失効する account-level credential management と完成した recovery UI が無い（D3 / delivery 3・4。未着手）。"
+                   "BE/BS は両サービスとも保存・refresh・API 応答での報告まで実装したが、『単一端末 credential しか持たない account に予備 factor 登録を促す』UI と policy evaluation は未実装（D8 の後半 / delivery 5 の残り）。"
+                   "localStorage の credential-id hint は cloud-itonami の /signin に legacy fallback として残る。discoverable credential の発見を待たずに済ませるためのもので account authority ではないが、撤去時期は決めていない。"
+                   "kotobase の Passkey bridge が使う Ed25519 key は server-custodied で、AUTHN_KEK と credential storage を同時に支配する認証基盤は利用者として署名できる。Passkey-gated は zero-knowledge / self-custody を意味しない（D9 / delivery 8。未着手）。"
+                   "old-device-present enrollment、QR login 後の new-device enrollment、hardware key 2本、全端末喪失の recovery を実機で通す E2E が未実施（delivery 6・7）。実機とハードウェアが要るため本 session では扱えない。"
+                   "同期 Passkey の PRF 出力が provider 内の別端末で同一かは provider / authenticator 実装に依存する。通常ログインの可搬性と zero-access mailbox keyslot の可搬性を同一視しない。"
+                   "cloud-itonami の JVM suite には本件と無関係な既存 failure が 6 件 + error 14 件ある（doctor / kotoba-xrpc / aozora wasm guest / ops-keys）。edge cljs suite も mailbox-store-test が done を二重に呼んで途中で止まる。UV 変更とは独立に存在することを未変更 checkout で確認済み。"],
+  :adr/verification "2026-07-30 に read-only audit（現行 source、生成済み browser assets、live sign-in pages、W3C WebAuthn Level 3、Apple iCloud Keychain、Google Password Manager、FIDO Alliance の一次資料を突合）。2026-08-02 に delivery 1・2・5 を実装し着地させた。実行した検証: kotoba-lang/webauthn の nbb ceremony smoke 26 checks 全 pass（UV=0 の登録/認証の拒否、誤記 policy でも拒否、明示 :preferred lane の受理、BE/BS の往復を実署名 assertion で確認）/ `clojure -M:test` 12 tests・18 assertions 0 failures。cloud-itonami の edge cljs webauthn suite 42 tests・139 assertions 0 failures、portable cljs suite 631 tests・5975 assertions 0 failures、JVM suite 1346 tests（site.signin-test / native.signin-test は pass、既存 failure は :adr/known-gaps 参照）。net-kotobase authn `clojure -M:test` 21 tests・158 assertions 0 failures、`shadow-cljs release entry` 0 warnings。**未実施**: 本番 deploy と、別端末・hardware key を使った実機 E2E。したがって itonami.cloud / authn.kotobase.net の live worker は本 ADR 作成時点の挙動のまま",
   :adr/body
   "## Context
 
@@ -85,10 +85,16 @@ recovery process を用意し、同一 account に複数 credential を登録で
 - 古い non-discoverable credential を救うため、同じ端末では credential id を
   localStorage に保持して allow-list hint として使う。これは legacy fallback であり、
   account authority ではない。
+- 旧 product-specific 導線（onboarding / isic-6492 / isic-7320 / isco-1212 /
+  isco-4227 / native WebView）も `residentKey: required` + `requireResidentKey`
+  + `userVerification: required` に揃えた（2026-08-02、D4）。
 - verified Passkey の server-side bridge は KEK-wrapped Ed25519 key から短命 CACAO
   を mint し、API は `Authorization: CACAO ...` を受ける。
-- client は `userVerification: preferred`。server verifier は origin、RP ID hash、
-  UP、signature、sign counter を検証するが、UV bit を policy として必須化していない。
+- client は `userVerification: required`、server verifier は origin、RP ID hash、UP、
+  **UV**、signature、sign counter を検証する（2026-08-02、delivery 1・2 実装済み）。
+  UV=0 は登録で 400、login で 401。BE/BS は credential record に保存され、
+  login のたびに書き直され、BS が 1→0 に落ちたことは `backup-state-regressed?`
+  として応答に載る。
 - workforce account は単一 DID を中心にした形で、複数 Passkey inventory と
   self-service recovery は完成していない。ADR-0030 の maturity ledger も recovery、
   device trust、risk session を未達としている。
@@ -97,6 +103,11 @@ recovery process を用意し、同一 account に複数 credential を登録で
 
 - browser は `authn.kotobase.net` の Passkey が第一導線。email one-time code と
   self-custodied CACAO は alternative credential path。
+- registration / login とも `userVerification: required`。UV の強制は共有 library
+  `kotoba-lang/webauthn` の `webauthn.adapters.edge` にあり、`:user-verification` は
+  既定 `:required`、`:preferred` という**厳密な keyword 以外は required 扱い**
+  （誤記した policy が黙って check を無効化しないため）。BE/BS は credential record に
+  保存され login ごとに更新される（2026-08-02）。
 - registration は `residentKey: required`、login は空の `allowCredentials` で
   discoverable credential を選ぶため、synced Passkey と cross-device authentication
   に適した shape。
@@ -263,19 +274,29 @@ CACAO laneを残す。managed laneとself-custodied laneは同じ wire verificat
 
 ## Delivery order
 
-1. 両browser clientを `userVerification: required` にし、serverでUV bitを必須検証する。
-2. regression test: UV=false、UP=false、wrong RP ID、wrong origin、challenge replay、
-   non-increasing counterをすべて拒否する。
-3. cloud-itonamiをaccount identity + credential collectionへ移行し、既存DID mappingを
-   accountを壊さず移送する。
-4. credential management UI/API（list、add、name、last-used、revoke）を両サービスに
-   用意する。
-5. BE/BSを保存し、single-device-only accountへbackup credential enrollmentを促す。
-6. old-device-present enrollment、QR login後のnew-device enrollment、provider同期、
+1. **完了（2026-08-02）** 両browser clientを `userVerification: required` にし、
+   serverでUV bitを必須検証する。登録でも拒否する——UV無しで登録された credential は
+   以後 UV assertion を出せないので、通してしまうと『登録は成功するが二度と
+   sign in できない account』ができる。
+2. **完了（2026-08-02）** regression test: UV=false、UP=false、wrong RP ID、
+   wrong origin、challenge replay、non-increasing counterをすべて拒否する。
+   webauthn library 側は実署名の virtual authenticator で flag byte だけを変えた
+   assertion を使う。
+3. 未着手。cloud-itonamiをaccount identity + credential collectionへ移行し、
+   既存DID mappingをaccountを壊さず移送する。
+4. 未着手。credential management UI/API（list、add、name、last-used、revoke）を
+   両サービスに用意する。
+5. **半分完了（2026-08-02）** BE/BSの保存・login毎の更新・API応答での報告は実装した。
+   single-device-only accountへ backup credential enrollment を促すUIとpolicyは未実装。
+6. 未着手。old-device-present enrollment、QR login後のnew-device enrollment、provider同期、
    hardware key二本、全端末喪失のrecoveryを実機E2Eする。
-7. audited recoveryとadmin policyを入れ、最後のcredential喪失をproduction runbookで
+7. 未着手。audited recoveryとadmin policyを入れ、最後のcredential喪失をproduction runbookで
    演習する。
-8. server custodyのwrapping key versioning、rotation、KMS/HSM boundaryを実装・検証する。
+8. 未着手。server custodyのwrapping key versioning、rotation、KMS/HSM boundaryを実装・検証する。
+
+**未 deploy。** 1・2・5 は default branch に着地しているが、itonami.cloud と
+authn.kotobase.net の live worker はまだ旧 bundle で動いている。deploy するまで、
+本番で UV=0 の assertion は通り続ける。
 
 ## Acceptance criteria
 
