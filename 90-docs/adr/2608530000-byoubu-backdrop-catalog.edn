@@ -182,15 +182,58 @@ design system を使わない app からも使える。
   ままだが、byoubu の catalog はそのまま sample corpus になる（背景 × サンプル UI の
   全組み合わせ）。`docs/demo.html` がその最初の形。
 - T0 が実在するので、T1/T2 が無いまま consumer は今日から使える。これは意図した順序で、
-  「素材が揃うまで何も出せない」状態を作らないための三層設計。"
+  「素材が揃うまで何も出せない」状態を作らないための三層設計。
+
+## 追記 2026-08-02 — T1 が動き、計測が facts 層をひっくり返した
+
+同日中に T1（poster レンダラ）と kotoba-ui 統合まで進めた。上の「未実装（明示）」節を
+以下で置き換える。
+
+**T1 は実装済み。posters は SVG。** `render/byoubu/render/poster.cljc` +
+`bin/render.cljs`。silhouette は `terrain.noise/fbm-noise`（spec が名指ししている
+実ライブラリ。noise の再実装ではない）。SVG にしたのは 3D ルールが thumbnail /
+明示的 fallback には SVG を許しており（live scene は WebGPU のまま authoritative）、
+かつ **出力がテキストになる**ため — diff が取れ、PR でレビューでき、git に入る。
+結果として **この tier では `byoubu-assets`（DataLad/B2）が不要になった**ので作らない。
+
+**計測で declared content-band が間違っていると判明した。** poster を Chrome で
+サンプリング（全幅・フレーム高の 30%〜75% の平均 sRGB）したところ、content は主に
+**空**の上に載っており、authored な地面主体の mix より 3〜19 倍明るかった。実測では
+`:cobalt-dune` が **3.97:1（AA 未達）**だったのに、declared facts は 15.42:1 と
+report していた。palette を暗くして修正。以後 `:byoubu/measured` が plate / poster
+両 tier の実測値を持ち、facts は declared mix より実測を優先し、poster を持つ backdrop
+は「計測済みであること」をテストで要求する。**authored な重み付けから導出した facts は、
+数字が付いただけの当て推量だった。**
+
+**「T0 と T2 は同じ輝度に載る」は誤りだったので撤回する。** 実測では T0 の content band は
+暗い backdrop すべてで T1 の約半分の明るさ。正しくは **tier 間で共有されるのは ink と
+appearance であって輝度ではない**。facts は代表 tier ではなく **最悪 tier** で ink を選ぶ
+（client は自分がどの tier を受け取るか選べない）ので、AA 保証はどの tier でも成立する。
+両 tier とも計測し、ライブラリの算出値は Chrome の実測と小数点 2 桁まで一致した。
+
+**kotoba-ui 統合も完了。** `kotoba-ui.core` が `backdrop` / `backdrop-theme` /
+`backdrop-facts` / `backdrop-poster-url` / `backdrop-glass-surface` / `backdrops` /
+`backdrop-css` を再輸出し、`kotoba-ui.theme` に `resolve-theme` を追加した。theme map が
+`:backdrop` を名乗れるようになり、`(theme-css {:backdrop :purple-desert})` だけで
+accent / label ink / data-appearance / `<meta theme-color>` がその backdrop の**実測**
+palette から揃う。明示キーは常に勝つ。plate stylesheet は backdrop を名乗った時だけ
+bundle に付く（使わない要素のための stacking/print/reduced-motion 規則を全ページに
+背負わせない）。依存の向きは一方向のまま。**37 tests / 239 assertions green、
+design-quality gate は 100.0（floor 98.0）を維持。**
+
+**依然として未実装: T2。** `generator :tier-2 :pin` は nil のまま。scene spec は
+sky / atmosphere / camera / grade を持つが、それを消費するのは live renderer だけで、
+T1 は terrain と atmosphere の項を使い残りは近似している。"
 
   :adr/consequences
   ["design system は初めて「後ろに敷く画」を持つ。liquid-glass の材質が前提としていた背景が実在するようになった"
    "背景の可読性は authored ではなく derived になり、AA 未達はテストで落ちる"
    "byoubu の zero-dep により、背景だけ欲しい web app が kami render stack / compiler を背負わない"
-   "T1/T2 は未実装。generator :pin は nil のまま。最初の GPU レンダーが spec の誤りを見つける工程になる"
-   "kotoba-ui からの backdrop 再輸出は当該 repo 側の follow-up"
-   "byoubu-assets（DataLad/B2）は必要になるまで作らない"]
+   "T1 は実装済み（SVG poster、terrain.noise の実 FBM 由来）。T2 は未実装で generator :tier-2 :pin は nil のまま"
+   "計測により declared content-band が誤りと判明し cobalt-dune は AA 未達だった。facts は実測優先・最悪 tier で ink 選択に変更"
+   "「T0 と T2 は同じ輝度」は撤回。共有されるのは ink と appearance であって輝度ではない"
+   "kotoba-ui 統合済み。theme map が :backdrop を名乗れる。design-quality gate は 100.0 を維持"
+   "SVG poster がテキストなので、この tier では byoubu-assets（DataLad/B2）が不要になった"]
 
   :adr/evidence
   ["grep(background-image|<video>|object-fit) over shitsuke/liquid-glass-ui/kotoba-ui/uikit/appkit src => 1 hit (liquid-glass avatar img object-fit)"
@@ -200,4 +243,6 @@ design system を使わない app からも使える。
    "byoubu-ui: 23 tests / 110 assertions green on nbb and JVM"
    "docs/demo.html を Chrome で目視確認: salt-flat = light appearance / ink #12100f / 14.22:1、他 3 件 = dark appearance / light ink"
    "manifest/repository-rules.edn:214 — {:prefix nil :role :library :execution :none}"
+   "poster 実測(Chrome, 全幅 30-75%): purple-desert plate #4d3d6c(0.060) / poster #725b94(0.132)、cobalt-dune は修正前 poster 3.97:1 で AA 未達"
+   "byoubu 28 tests / 308 assertions、byoubu-ui 24/113、kotoba-ui 37/239、いずれも green。kotoba-ui design-quality gate 100.0 (floor 98.0)"
    "scripts/verify-repository-roles.cljs assert-prefix-declarations! は nil prefix に str/starts-with? を呼ぶ"]}]
