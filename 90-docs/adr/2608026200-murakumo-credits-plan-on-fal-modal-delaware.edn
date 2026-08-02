@@ -361,14 +361,19 @@ ModelsLab が $199/月 unlimited を出せるのは自前 GPU を持っている
 
 **Higgsfield の『top-up は 90 日で失効』を真似ない。** 失効を付けることは、それを最も gift card らしく見せる操作であり、CARD Act の有効期限下限（gift certificate / store gift card に 5 年）とも衝突しうる。**期限を付けないほうが、規制上も会計上も安全で、しかも顧客に対して誠実である。**
 
-## 8. Modal は原価削減の手段ではない（実数で確認した）
+## 8. Modal は原価削減の手段ではない
 
-| | H100 時間単価 |
+**⚠ 訂正（ADR-2608026300）: 旧版はここで『Modal は fal の 2.1〜2.3 倍（$3.95–4.29 対 $1.89）』と書いていたが、その比較が誤りだった** —— Modal の**定価**と fal の**要コミット割引価格**を並べていた。定価同士の実価格は:
+
+| 調達先 | H100 時間単価（定価） |
 |---|---|
-| fal 自身の GPU 借り | **$1.89/h** |
-| Modal | **$3.95–4.29/h** |
+| **RunPod Community** | **$2.39/h** ← 最安 |
+| RunPod Secure | $2.99/h |
+| **fal serverless** | **$3.99/h**（$1.89 は要コミット・営業契約） |
+| **Modal** | **$3.95–4.29/h** |
+| RunPod Serverless | $4.55/h |
 
-**Modal は fal の 2.1〜2.3 倍。** 自分の graph を他人の GPU で回すなら、fal の GPU 借りのほうが安い。
+**定価同士なら Modal ≒ fal。最も安い生 GPU は RunPod Community。** 結論『fal が serve 済みの model を Modal で再実装しない』は変わらないが、**理由が『Modal が高いから』ではなく『損益分岐（ADR-2608026300 §2）を越えないから』に変わる。**
 
 **損益分岐（自前 OSS video を回して、fal から Wan 2.5 級を買うより安いか）**: 出力 2.04 秒（49 frames ÷ 24fps、`murakumo-generation` README の 8n+1 制約下の実測形）の原価予算は $0.05 × 2.04 = **$0.102**。
 

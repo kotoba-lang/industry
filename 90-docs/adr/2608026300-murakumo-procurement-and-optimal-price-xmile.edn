@@ -1,0 +1,202 @@
+[{:db/id -1
+  :adr/id "2608026300"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/title "調達先の実価格と XMILE による最適価格 — 価格は最も弱いレバーで、最適値の 5 倍の散らばりは未計測の 1 数値から来ている"
+  :adr/status "proposed"
+  :adr/date "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "murakumo-procurement-optimal-price"
+  :adr/repos ["orgs/network-awai/cloud-murakumo" "orgs/kotoba-lang/murakumo"
+              "orgs/kotoba-lang/dynamics" "orgs/kotoba-lang/org-oasis-open-xmile"]
+
+  :adr/authoritative_for
+  ["murakumo の GPU 調達先の実価格比較（OpenRouter / fal / RunPod / Modal）と、自前実行 vs 従量購入の損益分岐"
+   "**調達の床（mandatory）: 予約 GPU の実効単価が fal の従量価格を超えるなら借りないこと。** この規則の有無で寄与率が −20.9% と +45.6% に分かれる"
+   "掲示価格の最適値は XMILE stock-flow で解いた結果に基づくこと。ADR-2608026200 の 10cr/秒 は floor を全シナリオで満たすが、minimax-regret 上の最良は 8cr/秒 であること"
+   "**最適価格が 2〜10cr/秒 に散らばる原因は、H100 が 1 出力秒あたり何 GPU 秒を要するかという未計測の 1 数値であること。** 価格を選ぶ前にこれを測る"
+   "Meadows leverage 上、掲示価格そのものは band E（最弱、score 1.0）であり、測定（band B, 7.0）・調達の床（band B, 6.3）・全プラン同一単価（band B, 7.0）より下位であること"
+   "モデルの Bass 係数・弾力性・ARPU・市場規模は SCENARIO であり実測値として引用してはならないこと"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["2608026200"]
+
+  :adr/related
+  ["90-docs/adr/2608026200（plan 表と掲示価格。本 ADR はその §8 Modal 比較を訂正し、価格を検証する）"
+   "90-docs/adr/2608026000（provider 分離）、2608026100（credits を unit of account に）"
+   "90-docs/adr/2607203000（system dynamics は kotoba-lang/dynamics を使う。entity を categorical に除外しない。pool-tap は未計測なら :uncomputable-until-measured）"
+   "90-docs/adr/2607072350（XMILE を kotoba-lang の system dynamics 計算基盤とする）"
+   "90-docs/system-dynamics/{pricing,regret,leverage}.cljs（本 ADR の再現スクリプト）"]
+
+  :adr/problem
+  "オーナー指示（2026-08-02）: 『調達先を調査してみて、openrouter, fal, runpod, modal で。その上で system dynamics, xmile を使って最適価格を設計してみて』。
+
+ADR-2608026200 の掲示価格（`video/oss` 10cr/秒）は **fal の従量価格に 2.0 倍を掛けただけ**で決めており、①他の調達先の方が安いかを調べていない ②需要が価格にどう反応するかを一切モデル化していない、という2つの穴があった。"
+
+  :adr/decision
+  "## 1. 調達先の実価格（2026-08-02、公開リスト）
+
+### 1-1. GPU を借りて自分で回す
+
+| 調達先 | H100 $/時 | 課金 | 遊休時間 | 備考 |
+|---|---|---|---|---|
+| **RunPod Community** | **$2.39** | 秒 | **払う** | marketplace。可用性が変動 |
+| **RunPod Secure** | $2.99 | 秒 | **払う** | SLA / SOC2 / 専有ホスト |
+| **fal serverless（定価）** | $3.99 | 秒 | 払わない | $1.89 は**コミット + 営業契約が要る割引**であって定価ではない |
+| **Modal** | $3.95–4.29 | 秒 | 払わない | DX 最良。cold start 7B+ で 15–30 秒 |
+| **RunPod Serverless** | $4.55 | ミリ秒 | 払わない | cold start と 5 秒の idle も課金対象 |
+
+**⚠ ADR-2608026200 §8 の訂正。** 同 §8 は『Modal は fal の 2.1〜2.3 倍（$3.95–4.29 対 $1.89）』と書いたが、これは **Modal の定価と fal の『要コミット割引価格』を比べていた**。**定価同士なら Modal ≈ fal（$3.95–4.29 対 $3.99）で、実際に最も安い生 GPU は RunPod Community の $2.39。** 『Modal は高い』という §8 の結論は、根拠にした比較が誤りだった。**ただし §8 の主結論『fal が既に serve している model を Modal で再実装しない』は生き残る** —— 理由が『Modal が高いから』ではなく『§2 の損益分岐を越えないから』に変わる。
+
+### 1-2. 出力を買う（自分では回さない）
+
+| 調達先 | 課金単位 | 価格 |
+|---|---|---|
+| **fal**（media） | 出力単位 | video Wan2.5 級 **$0.05/秒**、Veo 3.1+audio $0.40/秒、Veo 3.1 Fast $0.18/秒、image $0.03/枚、TTS $0.01/1,000字、music ACE-Step ≈$0.0002/秒。**成功出力のみ課金** |
+| **OpenRouter**（LLM のみ） | token | **provider 定価に上乗せしない。** credits 購入時に 5.5%（最低 $0.80）、BYOK は無料枠超過分に 5% |
+
+**OpenRouter は media を扱わないので、本 ADR の video/3D/music/voice の調達先候補ではない。** LLM 側の調達先としては『定価 + 5.5%』で、その 5.5% が買うのは**銘柄の幅と自動フェイルオーバー**。murakumo の chat は自前 fleet（`murakumo-main`）で回っているので、これは fleet 障害時の待避先として意味を持つ。
+
+## 2. 自前実行 vs 従量購入の損益分岐（**未計測パラメタなしで解ける部分**）
+
+`video/oss` を fal から買うと **$0.05/出力秒**。自分で回す場合の単価は:
+
+```
+単価 = (時間単価 / 3600) × (GPU秒 / 出力秒) / 稼働率
+```
+
+fal を下回るのに必要な **GPU秒/出力秒**（稼働率 75%、予約型）:
+
+| 調達先 | 損益分岐 GPU秒/出力秒 |
+|---|---|
+| RunPod Community $2.39/h | **56.5** |
+| RunPod Secure $2.99/h | 45.2 |
+| fal serverless 定価 $3.99/h | 33.8 |
+| Modal $4.29/h | 31.5 |
+| RunPod Serverless $4.55/h | 29.7 |
+
+（serverless は遊休を払わないので稼働率 1.0 で読み直すと fal 45.1 / Modal 42.0 / RunPod SL 39.6。ただし cold start がこの予算を食う）
+
+**実測されているのは 1 点だけ**: gad（Radeon 8060S APU、ROCm）の wan2.2-ti2v-5b が 149.5 秒で 2.04 秒の動画 = **73.3 GPU秒/出力秒**。**どの損益分岐も上回っている → gad 相当の速度なら、全調達先で『fal から買う方が安い』。**
+
+**H100 の速度は測っていない。** ここが次節の全てを決める。
+
+## 3. XMILE stock-flow モデル
+
+`kotoba-lang/org-oasis-open-xmile`（OASIS XMILE 1.0、実 Euler/RK4 シミュレータ）で実際に走らせた。再現: `90-docs/system-dynamics/pricing.cljs`。
+
+**★ plan 制の構造を正しく置くこと**（最初のモデルはここを間違えた）: 顧客は**月額を固定で払い**、掲示価格(cr/出力秒)は『いくら受け取れるか』を決める。**価格を下げても売上は増えず、原価だけが増える** —— 増えるのは顧客数だけ。従量課金の最適価格問題とは別物。
+
+```
+stock  Customers, Pods, Cum_Profit
+flow   adoption   = (p + q·Customers/M)·(M − Customers)      ; Bass
+       pod_adjust = (desired_pods − Pods) / 7                ; 容量調整の遅れ
+aux    M          = base_market · (ref_price/price)^ε        ; 弾力性
+       demand     = Customers · (ARPU·100/price)/30
+       desired_pods = 【調達の床】· demand · wall / 86400 / 0.75
+       spill      = MAX(0, demand − reserved_capacity)
+       profit     = revenue·(1−fees) − cost_reserved − cost_spill
+```
+
+ループ:
+- **R1 (+)** 低価格 → 秒/ドル↑ → 到達市場↑ → 顧客↑ → 需要↑ → GPU 稼働率↑ → 単価↓
+- **B1 (−)** 需要↑ → 予約容量超過 → fal 従量へスピル → 単価↑
+- **B2 (−)** 容量調整の 7 日遅れ → 成長局面ほどスピル比率が上がる
+- **B3 (−)** 低価格 → 顧客あたり配布秒数↑ → 顧客あたり原価↑ → 寄与率↓
+
+### 3-1. 最初のモデルは非合理な運用を模型化していた
+
+`desired_pods` に**調達の床**（fal より高いなら借りない）を入れる前は、モデルが『買った方が安いのに借り続ける』挙動をしていた。その結果 Modal×低速シナリオの寄与率が **−20.9%** になり、minimax-regret が『20cr/秒まで上げろ』という歪んだ答えを出した。床を入れると同じシナリオが **+45.6%** になる。
+
+**モデルの欠陥ではなく、設計の発見だった**: 調達は容量コミットではなく**単位あたりの床**として実装すべきで、そうすれば下限は常に fal の $0.05 に固定される。**予約 GPU は純粋な上振れになり、下振れが構造的に消える。**
+
+## 4. 最適価格
+
+`base_market` 4000、ARPU $49/月、Bass p=0.008 q=0.35、**breakage ゼロ（消化率 100% = 最悪ケース）**、730 日。**これらは全て SCENARIO。**
+
+| シナリオ | 最適 cr/出力秒 | 10cr/秒 の寄与率 |
+|---|---|---|
+| fal 従量で買う（wall 73.3、および Modal 全域） | **8–10** | 45.6% |
+| RunPod Community + H100 が 2x 速い（36.7） | **4–6** | 63.1% |
+| RunPod Community + H100 が 4x 速い（18.3） | **2–3** | 79.4% |
+
+**最適価格が 2〜10cr/秒 と 5 倍に散らばる。その散らばりの原因は、弾力性でも市場規模でもなく、`wall`（H100 が 1 出力秒に要する GPU 秒）という測っていない 1 数値。**
+
+### 4-1. minimax regret（`90-docs/system-dynamics/regret.cljs`、24 シナリオ）
+
+| cr/秒 | 最悪後悔 | 寄与率 30% floor を割るシナリオ |
+|---|---|---|
+| 4 | 810.6% | 20 / 24 |
+| 6 | **82.1%（最小）** | 12 / 24 |
+| **8** | 91.7% | **0 / 24** |
+| **10（現行）** | 95.5% | **0 / 24** |
+| 12 | 97.3% | 0 / 24 |
+
+**floor を全シナリオで満たす価格のうち最悪後悔が最小なのは 8cr/秒。** 現行の 10cr/秒 も floor は全シナリオで満たす。
+
+**ただしこの 8 対 10 の差（91.7% 対 95.5%）を過大評価しない。** 後悔の値はどれも 90% 超で、その大部分は『H100 が 4x 速い』枝の巨大な上振れが作っている —— 保守的な価格はどれもその枝に対しては大敗する。**8 と 10 の差はノイズに近く、本当の意思決定は『どちらの価格か』ではなく『測るかどうか』。**
+
+## 5. Meadows leverage — 価格は最も弱いレバー
+
+`dynamics.core/rank-interventions`（`90-docs/system-dynamics/leverage.cljs`）:
+
+| score | band | 介入 |
+|---|---|---|
+| **7.0** | B（情報フロー構造） | **H100 の wall time を 1 回測る** |
+| **7.0** | B（ルール） | 全プラン同一単価（volume discount を置かない） |
+| **6.3** | B（ルール） | **調達の床**（fal より高いなら借りない） |
+| 3.5 | C（ループ利得） | frontier を BYOK にする |
+| 1.8 | D（遅れ） | 容量調整の 7 日を短縮 |
+| **1.0** | **E（パラメタ）** | **掲示価格を 10 → 8cr/秒 にする** |
+| 0.8 | E | 広告で顧客獲得（期待収穫 **:uncomputable-until-measured**） |
+
+**『最適価格を設計して』という問いに対する構造的な答えは、価格が最下位のレバーだということ。** 上位3つは全て band B（ルールと情報）で、うち2つは既に ADR-2608026200 で決めた設計（同一単価・BYOK）、残る1つが**まだ実行していない 1 回の測定**。
+
+顧客獲得が `:uncomputable-until-measured` なのは、到達市場 4000 に掛ける転換率を測っていないから（ADR-2607203000 の規律。大きな pool に未計測の転換率を掛けて期待値を捏造しない）。
+
+## 6. 決定
+
+1. **掲示価格 `video/oss` は 10cr/秒 のまま据え置く。** 8cr/秒 が minimax 上わずかに良いが、差はノイズであり、**測定前に動かす理由にならない**（band E の介入に band B の情報が要る、という順序を守る）。
+2. **調達の床を実装する（mandatory）**: 予約 GPU の実効単価が対応する fal 従量価格を超えるなら借りない。これで下限が fal に固定され、予約は上振れのみになる。
+3. **H100 の wall time を測る。** RunPod Community で 1 時間 $2.39。`video/oss` の各モデル（ltx-2.3 / wan2.2-ti2v-5b / hunyuanvideo-1.5）で GPU秒/出力秒 を出す。**56.5 を下回れば自前実行が fal より安くなり、価格を 4–6cr/秒 へ下げる根拠になる。**
+4. 測定後にモデルを再実行し、その結果で価格を改定する（`90-docs/system-dynamics/` のスクリプトはそのために置いてある）。"
+
+  :adr/risks
+  "## 落とし穴
+
+1. **SCENARIO を実測値として引用しない。** Bass の p=0.008 / q=0.35、弾力性 1.0–3.0、base_market 4000、ARPU $49 は**どれも murakumo では測っていない**。モデルが出す『2 年累積利益 $X』は**構造の比較のための相対値**であって、事業計画に載せる金額ではない。`dynamics` README が `bass-diffusion-model` の docstring で明示的に禁じている誤用がこれ。
+
+2. **wall=73.3 は Radeon 8060S APU の実測で、H100 の値ではない。** 2x / 4x は根拠のない仮置き。**倍率を仮定して意思決定しない** —— §6-3 の測定がそのために要る。
+
+3. **最悪後悔が全価格で 90% 超なのは、シナリオ集合が広すぎることの症状。** 測定で `wall` が確定すれば枝が 1/3 に減り、後悔の値も意味を持つようになる。**今の regret 表を『どの価格も同じくらい悪い』と読まない** —— 『測る前は選べない』と読む。
+
+4. **スピル率が最終時点で 0% なのは、730 日が Bass 飽和後だから。** 成長局面のスピル（B2 の遅れが作る高原価期間）は累積利益には効いているが、最終値の表には現れない。**成長期のキャッシュフローを見るには時系列を出す必要がある**（現スクリプトは最終値しか報告しない）。
+
+5. **モデルは単一 modality（`video/oss`）しか持たない。** 実際の顧客は video/image/voice/music を混ぜて使い、それぞれ原価構造が違う。混合比が変われば最適価格も動く。
+
+6. **RunPod Community は marketplace で可用性が変動する。** 単価 $2.39 は最安だが、**容量が要るときに取れる保証が無い**。損益分岐の表に可用性リスクは入っていない —— SLA が要るなら Secure $2.99（分岐 45.2）で読み直す。
+
+7. **fal の $1.89/h は営業契約つきの割引で、murakumo は現在それを持っていない。** 定価 $3.99 で計算している。規模が出てから交渉すれば分岐が動く（33.8 → 71.4）。"
+
+  :adr/verification
+  "**再現方法**（実行済み、2026-08-02）:
+
+```bash
+nbb --classpath \"orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dsl-core/src:90-docs/system-dynamics\" \\
+    90-docs/system-dynamics/regret.cljs
+nbb --classpath \"orgs/kotoba-lang/dynamics/src:90-docs/system-dynamics\" \\
+    90-docs/system-dynamics/leverage.cljs
+```
+
+`org-oasis-open-xmile`・`dynamics`・`dsl-core` は west checkout 済みを確認。XMILE は Euler dt=1、0–730 日、`MIN`/`MAX`/`^` は実装済みビルトイン。
+
+**外部価格（公開情報、実契約での確認なし）**: RunPod H100 SXM = Community $2.39/h・Secure $2.99/h・Serverless $4.55/h（2026-07-27 更新）。Modal H100 $3.95–4.29/h、A100 80GB ≈$2.50/h、cold start 7B+ で 15–30 秒。fal H100 定価 $3.99/h、$1.89/h は要コミット・営業契約。fal 出力課金は前掲。OpenRouter は provider 定価に上乗せせず、credits 購入 5.5%（最低 $0.80）/ BYOK 超過分 5%。
+
+**実測（この workspace 内）**: `engine.cljc` の gad 実測 wan2.2-ti2v-5b = 149.5 秒 wall / 49 frames ÷ 24fps = 2.04 出力秒 → **73.3 GPU秒/出力秒**（Radeon 8060S、ROCm）。**H100 の同等値は未測定。**
+
+**モデル出力**（SCENARIO 依存。金額は相対比較用）: 調達の床あり・RunPod Community・弾力性 1.0–3.0 で最適 8–10cr/秒（wall 73.3）／4–6cr/秒（wall 36.7）／2–3cr/秒（wall 18.3）。24 シナリオ横断の最悪後悔は 8cr/秒 で 91.7%、10cr/秒 で 95.5%、いずれも寄与率 30% floor を 24/24 で満たす。6cr/秒 は最悪後悔 82.1% だが floor を 12/24 で割る。
+
+**床を入れる前後の対比**（§3-1 の根拠）: Modal×wall 73.3×10cr/秒 の定常寄与率は床なしで **−20.9%**、床ありで **+45.6%**。"}]
