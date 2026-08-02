@@ -1,0 +1,225 @@
+[{:db/id -1
+  :adr/id "2608026200"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/title "fal + Modal を原価にした murakumo credits plan — Higgsfield の値段は breakage で成立しており、Delaware LLC はその breakage を自分のものにできない"
+  :adr/status "proposed"
+  :adr/date "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "murakumo-credits-plan"
+  :adr/repos ["orgs/network-awai/cloud-murakumo" "orgs/kotoba-lang/murakumo"]
+
+  :adr/authoritative_for
+  ["murakumo の plan 表・掲示価格・volume discount の具体値と、その根拠になる fal 原価"
+   "掲示価格は fal 実原価の 2.0 倍（粗利 50%）を基準に置き、plan の volume discount は 7.5% / 14% を上限とすること"
+   "metered backend の上では volume discount に原価的根拠が存在しないこと。あらゆる割引は under-utilization への賭けであり、原価削減ではないこと"
+   "plan は breakage ゼロで成立していなければならないこと。AWAI Network, L.L.C. は Delaware LLC であり、住所不明の未使用残高は second-priority rule で Delaware へ escheat しうるため、breakage を収益として当てにしてはならない"
+   "原価が未確認の modality には掲示価格を付けないこと（3D は保留）"
+   "Modal は原価削減の手段ではないこと。fal が既に serve している model を Modal で再実装しない"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["2608026100"]
+
+  :adr/related
+  ["90-docs/adr/2608026100（credits を unit of account に。掲示価格 / tier / solvency gate の枠組み。本 ADR はその具体値を埋める）"
+   "90-docs/adr/2608026000（provider 分離・eligibility・BYOK）"
+   "90-docs/adr/2607030030（$1 = 100cr のペグ。本 ADR はこれを維持する）"
+   "90-docs/adr/2607320000（4つの扉。did:key・メール無し・住所無しという identity 設計が、本 ADR の escheat 分析の前提）"
+   "orgs/network-awai/cloud-murakumo `legal/company.md`（AWAI Network, L.L.C. / Delaware file 10704996 / 2026-07-20 設立）、`legal/terms.md` L123-148（credits 条項）"]
+
+  :adr/problem
+  "オーナー指示（2026-08-02）: 『murakumo として fal, modal をベースにした時に成立する credits plan を設計して。higgsfield を参考に。運営法人は awai network、米国法人』。
+
+『fal + Modal をベース』は、ADR-2608026100 の値付け原則（掲示価格は hosted 原価から決め、fleet の安さは上振れとして扱う）を**最も保守的な形で確定させる**ということ ── fleet の寄与をゼロと仮定して plan が黒字になるか、を問うている。
+
+そして『米国法人』が分析の枠を変えた。実測（`legal/company.md`）: 運営法人は **AWAI Network, L.L.C.、Delaware LLC、file 10704996、2026-07-20 設立**。ADR-2608026100 で書いた日本の資金決済法の分析は**主たる枠ではなくなる**（日本の顧客に売る場合の従たる論点として残る）。代わりに効いてくるのは Delaware の unclaimed property law、州の money transmitter law、ASC 606、そして sales tax / VAT。
+
+参考にせよと言われた Higgsfield の実数を原価に当てて計算したところ、**参考にしてはいけない部分が特定できた**（§2）。"
+
+  :adr/decision
+  "## 1. 原価（fal 実価格、2026-08-02 公開情報）
+
+| 品目 | fal 価格 |
+|---|---|
+| video / Wan 2.5 級 | **$0.05 / 出力秒** |
+| video / Veo 3 級 | **$0.40 / 出力秒** |
+| image / Seedream V4 級 | **$0.03 / 枚** |
+| voice / Inworld TTS-1.5 Max | **$0.01 / 1,000 文字** |
+| music / ACE-Step | 60秒 ≈ **$0.012**（≈ $0.0002/秒） |
+| music / ElevenLabs Music 級 | 60秒 **$0.80**（≈ $0.0133/秒） |
+| GPU 借り（fal 自身） | H100 **$1.89/h**、A100 **$0.99/h** |
+| GPU 借り（Modal） | H100 **$3.95–4.29/h**、A100 80GB ≈ **$2.50/h**、cold start 7B+ で 15–30 秒 |
+
+**fal は成功した出力にだけ課金し、キュー待ちとサーバエラーは無課金。** 失敗コストを murakumo が飲む必要が無い ── これは plan の粗利計算を大きく安定させる（自前 GPU なら失敗も電気代がかかる）。
+
+## 2. Higgsfield の値段を原価に当てる ── 参考にできる部分とできない部分
+
+実数: Plus $49 / 1,000cr（= **$0.049/cr**）、top-up $5/100cr（= $0.05/cr）、月次 plan credits は**繰り越さない**、top-up は **90 日で失効**。Kling 3.0 720p 5秒 = 7cr、**Veo 3 + audio 720p 8秒 = 58cr**。
+
+| | Higgsfield 売価 | fal 実原価 | 差 |
+|---|---|---|---|
+| Veo 3 + audio、8 秒 | 58cr × $0.049 = **$2.84** | $0.40 × 8 = **$3.20** | **−11%（赤字）** |
+| Kling 3.0 720p、5 秒 | 7cr × $0.049 = **$0.343** | ≈ $0.05 × 5 = $0.25 | +27% |
+
+**Higgsfield の frontier tier の掲示価格は、fal のリスト原価を下回っている。** 100% 消化を仮定すると赤字。ところが利用率 70% なら実効単価は $49/700cr = **$0.07/cr** になり、同じ 58cr が $4.06 ── 原価 $3.20 に対して +21% で黒字に転じる。
+
+**つまり Higgsfield の値段は breakage（使われなかったクレジット）で成立している。** 繰り越し無しの月次配布と 90 日失効は、その margin engine そのものであって、UX の都合ではない。
+
+**参考にする部分**: plan の階層構造（Free / Starter / Plus / Ultra / Team seat）、tier で credit 単価を変える設計、top-up を plan と別建てにすること。
+**参考にしてはいけない部分**: **価格水準そのもの**と、**breakage 前提の割引率**。§5 で述べる理由により、Delaware LLC はその breakage を収益にできない。
+
+## 3. 掲示価格（credits、1cr = $0.01 のペグを維持）
+
+掲示 = **fal 実原価 × 2.0**（粗利 50%）。
+
+| tier | fal 原価 | 掲示価格 | 備考 |
+|---|---|---|---|
+| `video/oss`（Wan 2.5 級 720p） | $0.05/秒 | **10 cr / 秒** | 主戦場 |
+| `video/frontier`（Veo 3 級 + audio） | $0.40/秒 | **80 cr / 秒** | 価格で勝たない（§6） |
+| `image` | $0.03/枚 | **6 cr / 枚** | |
+| `voice`（TTS） | $0.01/1,000字 | **2 cr / 1,000字** | |
+| `music/oss` | ≈ $0.0002/秒 | **1 cr / 10秒**（最低 5 cr/job） | 単価が微小なのでジョブ最低額を置く |
+| `music/premium` | $0.0133/秒 | **3 cr / 秒** | |
+| `3d` | **未確認** | **付けない（保留）** | 原価不明のものに掲示価格を付けない ── `job-cost` の fail-closed と同じ規律を、価格表を作る側にも適用する |
+
+**ペグ（$1 = 100cr、ADR-2607030030）は変えない。** 変えると既存台帳の全残高の意味が変わり、労働発行分（`settle` でノード運用者が得た credits）まで再解釈することになる。Higgsfield が $0.05/cr なので、murakumo の数字は見かけ上 5 倍になるだけ。
+
+## 4. Plan 表
+
+| plan | 月額 | 込み credits | 実効 $/cr | 割引 | **100% 消化時の粗利（Stripe 控除後）** |
+|---|---|---|---|---|---|
+| **Free** | $0 | 100 cr/月（繰越無し） | — | — | **−$0.50/人/月**（純粋な獲得費用。人数上限を置く） |
+| **Starter** | $15 | 1,500 cr | $0.0100 | 0% | **45.1%** |
+| **Plus** | $49 | 5,300 cr | $0.00925 | 7.5% | **42.4%** |
+| **Ultra** | $129 | 15,000 cr | $0.0086 | 14% | **38.7%** |
+| **Team** | $79/seat | 9,000 cr/seat（プール共有） | $0.00878 | 12% | **≈40%** |
+| **Top-up** | $1 = 100 cr | ── | $0.0100 | 0% | **45%〜** |
+
+検算（Starter）: 収入 $15 − 原価 1,500cr × $0.005 = $7.50 − Stripe($15×2.9%+$0.30 = $0.735) = **$6.765 = 45.1%**。
+（Ultra）: $129 − $75.00 − $4.041 = **$49.96 = 38.7%**。
+
+**Free は 100cr = OSS 動画 10 秒。** 『動くことが分かる』最小量で、原価は $0.50/人/月。無制限にすると fal への実支払いが人数に比例して増えるので、**同時 Free 人数に上限を置く**（fleet と違い、遊休 GPU で吸収できない）。
+
+## 5. **これが一番重要**: metered backend の上では volume discount に原価的根拠が無い
+
+自前 GPU なら、量が増えるほど固定費が薄まるので割引に**原価の裏付けがある**。fal から買う場合、10 倍買えば**きっかり 10 倍**払う。
+
+**従って plan の割引（Plus 7.5% / Ultra 14%）は、原価削減ではなく under-utilization への賭けである。** 全員が 100% 消化すれば、割引分はそのまま粗利から消える（上表の 45.1% → 38.7% がそれ）。
+
+帰結が3つある:
+
+1. **割引は浅く保つ。** Higgsfield の実効割引（$0.049/cr 対 top-up $0.05/cr、さらに frontier tier では原価割れ）を真似ない。上表の 7.5% / 14% が、breakage ゼロでも 38% 以上の粗利を残す上限。
+2. **『無制限プラン』は metered backend の上では構造的に不可能。** ModelsLab が $199/月 unlimited を出せるのは自前 GPU を持っているから（限界原価が電気代）。fal を原価にして unlimited を売るのは、**自社の成功に対するショートポジション**を取ることに等しい。出さない。
+3. **plan は breakage ゼロで黒字でなければならない。** 上表はその条件を満たしている。breakage は上振れであって予算ではない ── そして §6 のとおり、その上振れは自分のものにならない可能性がある。
+
+## 6. Delaware ── breakage を当てにできない法的理由
+
+**AWAI Network, L.L.C. は Delaware LLC。** これが最悪の組み合わせを作る。
+
+1. **Delaware は stored value / gift card の未使用残高を 5 年で escheat させる。** de minimis 免除は**額面 $5 以下**のみ ── credits パックには実質使えない。
+2. **second-priority rule**: 保有者の記録に所有者の最終住所が無い財産は、**設立州**に報告される。Delaware は全米の『住所不明』未請求財産の受け皿になっている。
+3. **murakumo の identity 設計が、住所不明を保証している。** ADR-2607320000 は『サインアップ・メール・パスワードを導入しない、did:key が口座そのもの』と決めた。**つまり未使用残高は構造的に全件 address-unknown で、second-priority rule により Delaware へ向かう。**
+4. **ASC 606-10-55-49**: escheat 対象の前受金は **breakage を収益認識できない**（負債のまま残る）。
+5. Delaware では gift card breakage をめぐる qui tam 訴訟で小売業者の責任が陪審に認められた例がある ── 理論上のリスクではない。
+
+**結論: Higgsfield が回している margin engine は、AWAI Network が回せない engine である。** プライバシー志向の identity 設計（良いもの）と、breakage 依存の価格設計は**直接衝突する**。片方を選ぶ。本 ADR は identity 設計を守り、**breakage ゼロで成立する価格**を選ぶ。
+
+**構造的な分割で緩和する:**
+
+| 種類 | 性質 | 期限 | 扱い |
+|---|---|---|---|
+| **plan 込み credits** | 月額サービスの**利用枠**（allowance） | 月次で消滅、繰越無し | stored value ではなくサービス提供枠として設計・表示する |
+| **購入 top-up credits** | 前払の **stored value** | **期限を設けない** | escheat 引当を負債として持つ。収益認識は消費時 |
+
+**Higgsfield の『top-up は 90 日で失効』を真似ない。** 失効を付けることは、それを最も gift card らしく見せる操作であり、CARD Act の有効期限下限（gift certificate / store gift card に 5 年）とも衝突しうる。**期限を付けないほうが、規制上も会計上も安全で、しかも顧客に対して誠実である。**
+
+## 7. Modal は原価削減の手段ではない（実数で確認した）
+
+| | H100 時間単価 |
+|---|---|
+| fal 自身の GPU 借り | **$1.89/h** |
+| Modal | **$3.95–4.29/h** |
+
+**Modal は fal の 2.1〜2.3 倍。** 自分の graph を他人の GPU で回すなら、fal の GPU 借りのほうが安い。
+
+**損益分岐（自前 OSS video を回して、fal から Wan 2.5 級を買うより安いか）**: 出力 2.04 秒（49 frames ÷ 24fps、`murakumo-generation` README の 8n+1 制約下の実測形）の原価予算は $0.05 × 2.04 = **$0.102**。
+
+- Modal H100（$0.001192/秒）→ wall time **86 秒以内**なら勝つ
+- fal H100（$0.000525/秒）→ wall time **194 秒以内**なら勝つ
+
+そして Modal の cold start は 7B+ で 15〜30 秒 ── **86 秒の予算の 17〜35% をモデルのロードが食う**。warm pool を張れば解決するが、warm pool は遊休時間の課金なので分岐点がさらに動く。
+
+**従って Modal の役割は『安く回す』ではない:**
+
+- fal が serve **していない** model（自前 fine-tune / LoRA / 長い尾）
+- fal に**等価物が無い pipeline 段**（TRELLIS → UniRig auto-rig、kisekae VRM compose、kami-render 段）
+- scale-to-zero が効く、山谷の激しい低頻度ワークロード
+
+**fal が既に serve している model を Modal で再実装しない。** それは高い方法で同じものを作る作業になる。
+
+## 8. 運転資本と solvency（ADR-2608026100 の gate に数字を入れる）
+
+前払 credits は metered backend に対して**正しい構造**である ── 支払う前に受け取るので float が正になる。ただし前受は負債であり、その裏付け fiat は使い込めない。
+
+**保持すべき fiat 準備:**
+
+```
+準備 ≥ 未消費 credits × 0.5（原価率）
+      + 未決済 hold の予想外部原価
+      + fal の請求 30 日分バッファ
+      + escheat 引当（Delaware 5 年、住所不明分）
+```
+
+下回ったら hosted routing を閉じ、ジョブは fleet の空きを待つ列に入る（掲示価格は守られ、遅くなるだけ）。
+
+## 9. 法務チェックリスト（着手前に counsel と潰す。**これは法的助言ではない**）
+
+| 論点 | 状態 |
+|---|---|
+| **closed-loop = money transmission ではない**（自社役務にのみ使える限り） | 通常は該当しない。**ただし `transfer`（保有者間譲渡）が既に実装済み**で、第三者売り手に使えるようになると open-loop 側に寄り、50 州の MTL 免許が要る。**counsel レビューまで、法定通貨で購入した credits の保有者間譲渡を無効化する**（`accepting-sellers` の受容密度目標と正面から衝突する。承知の上で止める） |
+| **CARD Act / Reg E** の gift certificate 有効期限下限 | credits が該当するかは counsel 判断。該当するなら 90 日失効は違法。**期限を設けない設計はこの論点を回避する** |
+| **Delaware escheat** | §6。5 年、de minimis $5 以下のみ、second-priority で住所不明分が Delaware 行き |
+| **ASC 606** | credits 販売 = 契約負債。収益は消費時。**escheat 対象分は breakage 収益に振り替えない**（606-10-55-49） |
+| **Sales tax / VAT** | Wayfair 以降の economic nexus で州ごとに digital goods 課税。米国外 B2C は EU OSS / UK / 日本の消費税の登録閾値。**『credits の販売』と『役務の消費』のどちらを課税時点にするかを決めて文書化する** |
+| **既存 terms との整合** | `legal/terms.md` L123-148 は credits を『not money, stored value』と記述し、失効を想定した文言がある。**呼称は実質を支配しない。** 本 ADR の allowance / stored value 二分に合わせて改訂する |
+
+## 10. 段階
+
+| phase | 内容 | 完了条件 |
+|---|---|---|
+| **P0** | §3 の掲示価格を model registry に入れ、`job-cost` を production 経路から呼ぶ | 3D は価格を持たないので fail closed する（それが正しい挙動） |
+| **P1** | §4 の plan 表を storefront SKU に。Free の同時人数上限 | 100% 消化シナリオの粗利がテストで固定される |
+| **P2** | allowance / stored value の二分を台帳と terms の両方に | 月次 allowance が期末で消え、購入 credits が消えないことが台帳で示せる |
+| **P3** | counsel レビュー（§9）。譲渡の無効化。escheat 引当 | MTL・CARD Act・escheat の3点に書面の判断がある |
+| **P4** | frontier tier の BYOK（§6 の価格差を消す唯一の手） | 顧客の鍵で frontier を回し、murakumo は orchestration + 保管だけを credits で取る |"
+
+  :adr/risks
+  "## 落とし穴
+
+1. **frontier tier で Higgsfield に価格で負ける ── 意図的にそうしている。** Veo 3 の 8 秒は murakumo 640cr = **$6.40** に対し Higgsfield **$2.84**、**2.25 倍**。breakage を収益にできない以上これは埋まらない。**価格で追いかけない。** 追いかけると原価割れを自分で選ぶことになる。答えは2つ: frontier は『必要なら在る』honest cost-plus に留める、あるいは **BYOK**（顧客の鍵で回し、murakumo は orchestration + アーカイブだけ課金）。後者は価格差を構造的に消す。
+
+2. **fal の値上げが直撃する。** 掲示価格は固定、原価は相手が決める。$0.05/秒 が $0.08/秒 になれば粗利 50% は 20% に落ちる。**原価表の `:verified-at` staleness gate（ADR-2608026000）が唯一の防御**で、これが緩むと気付かないまま薄利で走る。四半期ごとの掲示価格見直しを前提に、terms に価格改定条項を置く。
+
+3. **Free の原価は人数に比例する。** 自前 fleet なら遊休 GPU で吸収できるが、fal では 1 人 $0.50/月が現金で出ていく。招待制・上限・レート制限のいずれかが要る。
+
+4. **3D の価格を『だいたい』で置かない。** fal の 3D 価格が確認できていない。§3 で保留にしたのは、`job-cost` が価格欠落を例外にする規律を、価格表を書く人間の側にも適用したから。確認するまで 3D は売らない。
+
+5. **`transfer` を止めることは事業目標を止めること。** ADR-2607995000 の分析は『受容密度 1 が credits 圏の binding constraint』と特定していた。それを解く手段が MTL リスクの源でもある。**どちらを取るかは counsel の判断が出るまで保留し、その間は止める側に倒す**（間違えた時のコストが非対称）。
+
+6. **plan 込み credits を『allowance』と呼ぶだけでは足りない。** 呼称は実質を支配しない。繰越無し・現金価値無し・返金不可・購入分と別勘定、を台帳と UI の両方で一貫させて初めて主張が成り立つ。
+
+7. **粗利計算に入れていないコストがある**: kotobase への永続保管（ADR-2608026000 の差別化要素であり、一度の課金に対して**永続的に発生する**）、egress、サポート、返金・チャージバック。`unit-prices` に既にある `:gb-months` を使うか、保管期間を有限にするか、どちらかを P1 までに決める ── **決めないと、売れば売るほど増える負債を無償で抱える。**"
+
+  :adr/verification
+  "外部価格（2026-08-02、公開情報。**実契約での確認はしていない**）: fal ── video Wan 2.5 級 $0.05/出力秒、Veo 3 $0.40/秒、Seedream V4 $0.03/枚、Inworld TTS-1.5 Max $0.01/1,000字、ACE-Step 60秒 ≈$0.012、ElevenLabs Music 60秒 $0.80、GPU H100 $1.89/h・A100 $0.99/h、成功出力のみ課金。Modal ── H100 $3.95–4.29/h、A100 80GB ≈$2.50/h、cold start 7B+ で 15–30 秒。Higgsfield ── Plus $49/1,000cr、top-up $5/100cr、月次 credits 繰越無し、top-up 90 日失効、Kling 3.0 720p 5秒 7cr、Veo 3+audio 720p 8秒 58cr。
+
+法人実測: `orgs/network-awai/cloud-murakumo/legal/company.md` ── AWAI Network, L.L.C.、Delaware LLC、file 10704996、2026-07-20 設立、registered agent Legalinc Corporate Services Inc.、『operates cloud-murakumo and murakumo.cloud alone』。`legal/terms.md` L123-148 に credits 条項（『not money, stored value』、購入は最終・返金不可、失効を想定した文言、Stripe 決済、reversal 時の負残高処理）。
+
+法令の参照（公開解説による。**弁護士確認を経ていない**）: Delaware は gift card / stored value の未使用残高を 5 年で escheat、de minimis 免除は額面 $5 以下のみ。second-priority rule により所有者の最終住所が記録に無い財産は設立州へ。ASC 606-10-55-49 は escheat 対象額の breakage 収益認識を認めない。Delaware では gift card breakage の qui tam 訴訟で陪審が小売業者の責任を認めた例がある。
+
+粗利の検算（本文 §4 と同じ計算を再掲）: Starter $15 − (1,500cr × $0.005) − ($15×2.9%+$0.30) = $6.765 → 45.1%。Plus $49 − $26.50 − $1.721 = $20.78 → 42.4%。Ultra $129 − $75.00 − $4.041 = $49.96 → 38.7%。原価率 0.5 は §3 の『掲示 = 原価 × 2.0』から。**保管・egress・サポート・チャージバックは未算入**（§7 のリスク）。
+
+Modal 損益分岐: 出力 2.04 秒（49 frames ÷ 24fps）の fal 原価 $0.102 に対し、Modal H100 $0.001192/秒 → wall 85.6 秒、fal H100 $0.000525/秒 → wall 194 秒。参考の実測 wall time（`engine.cljc` の gad 実測、Radeon 8060S）は ltx-2.3 94.6 秒 / wan2.2-ti2v-5b 149.5 秒 / hunyuanvideo-1.5 849.8 秒 ── **H100 での実測ではないので分岐点との直接比較はできない。P0 で 1 本測る。**"}]
