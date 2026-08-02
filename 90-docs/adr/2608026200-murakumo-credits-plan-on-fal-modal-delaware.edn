@@ -3,7 +3,7 @@
   :adr/doc_type "adr"
   :adr/source-format "edn"
   :adr/authoritative true
-  :adr/title "fal + Modal を原価にした murakumo credits plan — Higgsfield の値段は breakage で成立しており、Delaware LLC はその breakage を自分のものにできない"
+  :adr/title "赤字にならない credits plan — 単価は全プラン同一、割引は売らず能力を売る。Higgsfield の値段は breakage で成立しているが、それは当てにできない"
   :adr/status "proposed"
   :adr/date "2026-08-02"
   :adr/last_verified "2026-08-02"
@@ -12,10 +12,15 @@
   :adr/repos ["orgs/network-awai/cloud-murakumo" "orgs/kotoba-lang/murakumo"]
 
   :adr/authoritative_for
-  ["murakumo の plan 表・掲示価格・volume discount の具体値と、その根拠になる fal 原価"
-   "掲示価格は fal 実原価の 2.0 倍（粗利 50%）を基準に置き、plan の volume discount は 7.5% / 14% を上限とすること"
-   "metered backend の上では volume discount に原価的根拠が存在しないこと。あらゆる割引は under-utilization への賭けであり、原価削減ではないこと"
-   "plan は breakage ゼロで成立していなければならないこと。AWAI Network, L.L.C. は Delaware LLC であり、住所不明の未使用残高は second-priority rule で Delaware へ escheat しうるため、breakage を収益として当てにしてはならない"
+  ["murakumo の plan 表・掲示価格・変動費の内訳と、その根拠になる fal 原価"
+   "掲示価格は fal 実原価の 2.0 倍（変動費率 50%）を基準に置くこと"
+   "**クレジット単価は全プラン同一（$1 = 100cr）であり、volume discount を置かないこと。** metered backend の上では割引に原価的根拠が存在せず、あらゆる割引は under-utilization（= breakage）への賭けになる。上位 plan は安い単価ではなく、追加原価がゼロか極小の便益（同時実行・優先ルーティング・込み保管・BYOK・seat/SSO・価格ロック）を売る"
+   "plan は breakage ゼロ・利用率 100% で寄与率 30% 以上を保つこと。これは主張ではなく機械で検査する不変条件であること（§5-5）"
+   "無制限プランを出さないこと。無料枠は月次の自動付与ではなく、一回きりの trial または予算枠つき promo grant であること"
+   "top-up の最低取引額を $5 とすること（Stripe の固定費 $0.30 が小額決済の寄与を消すため）"
+   "月次 allowance（繰越無し）と購入済み top-up（期限なし stored value）を台帳で別勘定にすること。消費は allowance から先に食うこと"
+   "Stripe 統合において `invoice.paid` が月次 allowance を付与する正経路であり、webhook は `event.id` で冪等であること"
+   "identity はサインアップ・メールを導入するが、did:key を置き換えず束ねること（did:key = 台帳の口座キー、メール/Stripe Customer = 復旧・請求・法定住所）"
    "原価が未確認の modality には掲示価格を付けないこと（3D は保留）"
    "Modal は原価削減の手段ではないこと。fal が既に serve している model を Modal で再実装しない"]
 
@@ -27,7 +32,7 @@
   ["90-docs/adr/2608026100（credits を unit of account に。掲示価格 / tier / solvency gate の枠組み。本 ADR はその具体値を埋める）"
    "90-docs/adr/2608026000（provider 分離・eligibility・BYOK）"
    "90-docs/adr/2607030030（$1 = 100cr のペグ。本 ADR はこれを維持する）"
-   "90-docs/adr/2607320000（4つの扉。did:key・メール無し・住所無しという identity 設計が、本 ADR の escheat 分析の前提）"
+   "90-docs/adr/2607320000（4つの扉。**その『サインアップ・メール・パスワードを導入しない』はオーナー判断 2026-08-02 で撤回された** ── 本 ADR §5-3 が後継。扉①（x402、identity 不要）は残る）"
    "orgs/network-awai/cloud-murakumo `legal/company.md`（AWAI Network, L.L.C. / Delaware file 10704996 / 2026-07-20 設立）、`legal/terms.md` L123-148（credits 条項）"]
 
   :adr/problem
@@ -69,7 +74,7 @@
 **つまり Higgsfield の値段は breakage（使われなかったクレジット）で成立している。** 繰り越し無しの月次配布と 90 日失効は、その margin engine そのものであって、UX の都合ではない。
 
 **参考にする部分**: plan の階層構造（Free / Starter / Plus / Ultra / Team seat）、tier で credit 単価を変える設計、top-up を plan と別建てにすること。
-**参考にしてはいけない部分**: **価格水準そのもの**と、**breakage 前提の割引率**。§5 で述べる理由により、Delaware LLC はその breakage を収益にできない。
+**参考にしてはいけない部分**: **価格水準そのもの**と、**breakage 前提の割引率**。§7 で述べる理由により、Delaware LLC はその breakage を安全に収益にできない。
 
 ## 3. 掲示価格（credits、1cr = $0.01 のペグを維持）
 
@@ -78,7 +83,7 @@
 | tier | fal 原価 | 掲示価格 | 備考 |
 |---|---|---|---|
 | `video/oss`（Wan 2.5 級 720p） | $0.05/秒 | **10 cr / 秒** | 主戦場 |
-| `video/frontier`（Veo 3 級 + audio） | $0.40/秒 | **80 cr / 秒** | 価格で勝たない（§6） |
+| `video/frontier`（Veo 3 級 + audio） | $0.40/秒 | **80 cr / 秒** | 価格で勝たない（下記リスク 1） |
 | `image` | $0.03/枚 | **6 cr / 枚** | |
 | `voice`（TTS） | $0.01/1,000字 | **2 cr / 1,000字** | |
 | `music/oss` | ≈ $0.0002/秒 | **1 cr / 10秒**（最低 5 cr/job） | 単価が微小なのでジョブ最低額を置く |
@@ -87,41 +92,195 @@
 
 **ペグ（$1 = 100cr、ADR-2607030030）は変えない。** 変えると既存台帳の全残高の意味が変わり、労働発行分（`settle` でノード運用者が得た credits）まで再解釈することになる。Higgsfield が $0.05/cr なので、murakumo の数字は見かけ上 5 倍になるだけ。
 
-## 4. Plan 表
+## 4. 変動費の全部（fal 原価だけを見ると赤字になる）
 
-| plan | 月額 | 込み credits | 実効 $/cr | 割引 | **100% 消化時の粗利（Stripe 控除後）** |
-|---|---|---|---|---|---|
-| **Free** | $0 | 100 cr/月（繰越無し） | — | — | **−$0.50/人/月**（純粋な獲得費用。人数上限を置く） |
-| **Starter** | $15 | 1,500 cr | $0.0100 | 0% | **45.1%** |
-| **Plus** | $49 | 5,300 cr | $0.00925 | 7.5% | **42.4%** |
-| **Ultra** | $129 | 15,000 cr | $0.0086 | 14% | **38.7%** |
-| **Team** | $79/seat | 9,000 cr/seat（プール共有） | $0.00878 | 12% | **≈40%** |
-| **Top-up** | $1 = 100 cr | ── | $0.0100 | 0% | **45%〜** |
+粗利を『掲示価格 − fal 原価』で見ると 50% あるが、それは請求書の一部でしかない。**credits 1 単位（掲示 $0.01）にぶら下がる変動費を全部積む:**
 
-検算（Starter）: 収入 $15 − 原価 1,500cr × $0.005 = $7.50 − Stripe($15×2.9%+$0.30 = $0.735) = **$6.765 = 45.1%**。
-（Ultra）: $129 − $75.00 − $4.041 = **$49.96 = 38.7%**。
+| 項目 | 率 | 根拠 |
+|---|---|---|
+| fal 従量原価 | **50.0%** | §3、掲示 = 原価 × 2.0 |
+| 再試行・失敗の吸収 | **2.5%** | 従量原価の 5%。fal は自社エラーを課金しないが、cold-start spill と murakumo 側リトライは murakumo 持ち |
+| 保管 + egress | **2.0%** | §4-2 |
+| Stripe 決済 | **2.9% + $0.30/件** | 固定費 $0.30 が小額決済を殺す（§4-3） |
+| Stripe Tax（売上税 / VAT 計算） | **0.5%** | |
+| チャージバック・返金引当 | **1.0%** | Stripe の異議申立手数料は 1 件 $15 |
+| **合計（Stripe 固定費を除く）** | **58.9%** | |
 
-**Free は 100cr = OSS 動画 10 秒。** 『動くことが分かる』最小量で、原価は $0.50/人/月。無制限にすると fal への実支払いが人数に比例して増えるので、**同時 Free 人数に上限を置く**（fleet と違い、遊休 GPU で吸収できない）。
+**つまり実質の変動費率は 50% ではなく 約 56%（Stripe 変動分を除く）〜59%。** 前版の plan 表はここを見ておらず、Ultra の粗利が実質 30% を割っていた。
 
-## 5. **これが一番重要**: metered backend の上では volume discount に原価的根拠が無い
+### 4-2. 保管は思ったほど怖くないが、青天井にはしない
 
-自前 GPU なら、量が増えるほど固定費が薄まるので割引に**原価の裏付けがある**。fal から買う場合、10 倍買えば**きっかり 10 倍**払う。
+ADR-2608026000 が差別化要素にした『成果物を永久保管する』は、**一度の課金に対して永続的に発生する費用**なので、量を測った。
 
-**従って plan の割引（Plus 7.5% / Ultra 14%）は、原価削減ではなく under-utilization への賭けである。** 全員が 100% 消化すれば、割引分はそのまま粗利から消える（上表の 45.1% → 38.7% がそれ）。
+実測: `engine.cljc` の i2v 検証記録で 49 frames / 768x448 の mp4 が **200,157 bytes** ── 出力 2.04 秒あたり 0.2 MB（≈ 0.1 MB/秒）。品質を上げた場合を見て **0.5 MB/秒**で見積もる。
 
-帰結が3つある:
+Ultra 利用者が毎月 12,900cr を全部 `video/oss`（10cr/秒）に使うと 1,290 秒/月 = 645 MB/月 = **7.7 GB/年**。5 年で 38.7 GB。Cloudflare R2（$0.015/GB/月、**egress 無料**）で 5 年目の月額は **$0.58** ── 収入 $129 に対して **0.45%**。
 
-1. **割引は浅く保つ。** Higgsfield の実効割引（$0.049/cr 対 top-up $0.05/cr、さらに frontier tier では原価割れ）を真似ない。上表の 7.5% / 14% が、breakage ゼロでも 38% 以上の粗利を残す上限。
-2. **『無制限プラン』は metered backend の上では構造的に不可能。** ModelsLab が $199/月 unlimited を出せるのは自前 GPU を持っているから（限界原価が電気代）。fal を原価にして unlimited を売るのは、**自社の成功に対するショートポジション**を取ることに等しい。出さない。
-3. **plan は breakage ゼロで黒字でなければならない。** 上表はその条件を満たしている。breakage は上振れであって予算ではない ── そして §6 のとおり、その上振れは自分のものにならない可能性がある。
+**怖くないが、青天井にはしない。** plan ごとに**込みの保管容量**を置き、超過分は `unit-prices` に既にある `:gb-months` で課金する。これで『無限に増える無償の負債』が『価格の付いた商品』になる。R2 を選ぶのは egress がゼロだから ── 顧客がアーカイブを繰り返しダウンロードしても費用が増えない（B2 は 3 倍を超える egress に $0.01/GB かかる）。
 
-## 6. Delaware ── breakage を当てにできない法的理由
+### 4-3. Stripe の固定費 $0.30 が小額決済を殺す
+
+top-up $X（= 100X cr）1 件の寄与:
+
+```
+$X − (100X × $0.00545) − ($0.029X + $0.30) = 0.426X − 0.30
+```
+
+- **$1 top-up → $0.111（11.1%）** ── 決済手数料が売上の 33%
+- $2.38 で寄与率 30% に到達
+- **$5 → $1.83（36.6%）**
+
+**top-up の最低額を $5 にする。** 『$1 から買える』は、Stripe に 3 割渡す設計。
+
+## 5. Plan 表 ── **クレジット単価は全プラン同一（$1 = 100cr）**
+
+前版は Higgsfield 型の volume discount（Plus 7.5% / Ultra 14%）を置いていた。**それを撤回する。** 検算すると Ultra は寄与 32.0% しか残らず、しかも **fal が 3.3% 値上げしただけで 30% を割る**（$129 − 15,000×$0.00545 − $5.976 = $41.27、floor $38.7 まで余裕 $2.57）。metered backend の上でその割引を出す原資が無い。
+
+| plan | 月額 | 込み credits | $/cr | 込み保管 | 同時実行 | **100% 消化・breakage ゼロ時の寄与** |
+|---|---|---|---|---|---|---|
+| **Starter** | $15 | 1,500 | $0.0100 | 10 GB | 2 | **$5.87 → 39.1%** |
+| **Plus** | $49 | 4,900 | $0.0100 | 100 GB | 8 | **$19.84 → 40.5%** |
+| **Ultra** | $129 | 12,900 | $0.0100 | 500 GB | 24 | **$52.72 → 40.9%** |
+| **Team** | $79/seat | 7,900/seat（プール） | $0.0100 | 250 GB/seat | 24 | **$32.17 → 40.7%** |
+| **Top-up** | $5 以上、$1 = 100cr | ── | $0.0100 | ── | ── | **36.6%〜** |
+| **年払い** | 12 か月を 11 か月分 | ×12 | $0.00917 | ── | ── | **36.1%**（全プラン同率） |
+
+検算（Plus）: $49 − 4,900×$0.00545 − ($49×4.4% + $0.30) = 49 − 26.71 − 2.46 = **$19.84**。
+（Ultra）: $129 − $70.31 − $5.98 = **$52.72**。
+（Plus 年払い）: $539 − 58,800×$0.00545 − ($539×4.4%+$0.30) = 539 − 320.46 − 24.02 = **$194.52 → 36.1%**。
+
+**単価を揃えたことで、寄与率が plan にも利用率にも超過分にも依存しなくなった。** どの plan の 1 ドルも同じマージンを運ぶ。これが『赤字にならない』ことの構造的な保証であって、個別プランの検算の積み上げではない。fal 値上げへの耐性も **3.3% → 19%** に広がる。
+
+### 5-1. 大きい plan が売るのは「安い単価」ではなく「能力」
+
+自前 GPU なら量が増えるほど固定費が薄まるので割引に原価の裏付けがある。**fal から買うなら 10 倍買えば きっかり 10 倍払う。** 割引の原資はどこにも無い ── あるとすれば under-utilization（= breakage）だけで、§7 のとおり Delaware LLC はそれを自分のものにできない。
+
+だから上位 plan は**原価がゼロか極小の便益**を積む:
+
+| 便益 | 追加原価 |
+|---|---|
+| 同時実行数・レート上限の引き上げ | **ゼロ**（fal のキューは弾性。murakumo 側の policy 数値） |
+| 優先ルーティング（内部キューで先に出る） | **ゼロ** |
+| 込み保管容量 | 極小（§4-2、収入の 0.5% 未満） |
+| BYOK（frontier を顧客の鍵で回す） | **マイナス**（murakumo の従量原価が消える） |
+| Team seat / SSO / 請求書払い / 監査ログ | 実装費のみ、従量ゼロ |
+| 価格ロック（12 か月） | ゼロ（§9 の価格改定条項の裏返し） |
+
+### 5-2. 無料枠 ── サインアップ導入で『一回きり』が成立する
+
+**オーナー判断（2026-08-02）: サインアップ・メールを導入してよい。** ADR-2607320000 の『サインアップ・メール・パスワードを導入しない』は撤回された。
+
+これで無料枠の設計が変わる。**did:key だけの世界では、識別子が無料で無限に作れるため、アカウント単位の自動付与は上限の無い損失**だった（100cr/月 = $0.545/月/アカウントが休眠アカウントにも永久に付く）。メール検証 + Stripe Customer による重複排除が入れば、**一回きりの付与**が成立する。
+
+| 導線 | 設計 | 費用 |
+|---|---|---|
+| **扉①: x402**（identity 不要、従来どおり） | 1 リクエスト = 掲示価格を USDC で。アカウント不要 | **ゼロ**（損しない） |
+| **Free trial**（サインアップ後、**一回きり** 200cr） | メール検証 + Stripe Customer で重複排除。**月次の繰り返し付与にしない** | **$1.09 / 獲得**（有界。SaaS の CAC としては破格） |
+| **promo grant** | murakumo が意図して配る。発行数・総額・期限つきで費用計上 | 予算枠内 |
+
+**『毎月無料 100cr』を復活させない。** メールで重複排除できても、休眠アカウントに毎月費用が発生する構造は変わらない（fleet と違い遊休 GPU で吸収できない）。一回きりなら獲得費用として有界。
+
+超過は**割引なしの top-up レート**で課金する。plan レートより高いので、超過は plan より儲かる ── 損失の穴にならない。
+
+### 5-3. identity は did:key を「置き換えず」に「束ねる」
+
+サインアップ導入を『did:key をやめてメール/パスワードにする』と読まない。**両方を別の役割で持つ:**
+
+| 層 | 担うもの |
+|---|---|
+| **did:key**（据え置き） | credits 台帳の**口座キー**。`settle` / `spend` / `transfer` / `receipt` の署名主体。可搬性・暗号的所有証明 |
+| **メール + Stripe Customer**（新設） | 復旧（鍵を失った時）、請求、dunning（決済失敗の回収）、**法定の請求先住所** |
+
+`credits-topup-args` は既に checkout session の `metadata.did` で mint 先を決めているので、**この束ね方は既存実装をそのまま活かせる** ── サインアップ時に did:key を生成して Stripe Customer の metadata に固定し、以後どの決済からでも同じ口座に着地させる。
+
+**そして請求先住所が入ることが §6 の escheat 分析を実質的に変える。**
+
+### 5-4. 『無制限プラン』は出さない
+
+ModelsLab が $199/月 unlimited を出せるのは自前 GPU を持っているから（限界原価が電気代）。**fal を原価にして unlimited を売るのは、自社の成功に対するショートポジションを取ることに等しい。** 出さない。
+
+### 5-5. 赤字にならないことを機械で検査する
+
+主張ではなく不変条件にする（この repo の他の gate と同じ形。テストで固定する）:
+
+```
+1. 寄与率(plan, 利用率 = 1.0, breakage = 0) ≥ 30%
+2. top-up レートからの総割引 ≤ 10%（年払いを含む）
+3. 単一取引の寄与 > 0 ⇒ 最低取引額 $5
+4. 全 plan の $/cr が同一（volume discount を新設できない）
+5. 掲示価格 ÷ 原価 ≥ 1.8（fal 値上げ後も 30% floor を割らない）
+```
+
+5 を破った時点で掲示価格の改定が要る、という信号になる。**原価表の `:verified-at` staleness gate（ADR-2608026000）はこの検査の入力**であって、独立した規律ではない。
+
+## 6. Stripe 決済の統合 ── 既にあるものと、plan 事業に足りないもの
+
+**オーナー指示（2026-08-02）: Stripe 決済も統合する。** 実測すると、**部品は3つとも既にあって、繋がっていない**（この repo で繰り返し出る形）。
+
+### 6-1. 既にあるもの（実測）
+
+| 場所 | 実装 |
+|---|---|
+| `site_worker.cljs:334-405` `/api/store/checkout` | Checkout Session 作成。**`mode: \"payment\"`（一回払い）**。`metadata.did` を session と payment_intent の**両方**に載せる（webhook が追加 API 呼び出し無しで mint 先を解決できるように） |
+| `stripe_webhook.cljc` | 署名検証（HMAC-SHA256、**定数時間比較**、tolerance 判定、生バイト列で検証）+ `credits-topup-args`（`checkout.session.completed` → mint）+ `credits-refund-args`（`charge.refunded` → 台帳の逆仕訳） |
+| `billing_gateway.cljs` | **`mode: \"subscription\"` の Checkout、subscription 照会、cancel/resume**。ただし Bearer 認証の**別ゲートウェイ**として独立している |
+| `storefront.cljc` | SKU・国別価格・zero-decimal 通貨・`unit-amount-for`。**UI が表示する価格と Worker が課金する価格が絶対にずれない**設計 |
+
+### 6-2. 決定的に欠けているもの: **`invoice.paid` が credits を mint しない**
+
+`stripe_webhook.cljc` が処理するイベントは `checkout.session.completed` と `charge.refunded` の**2つだけ**。subscription の**更新**は `invoice.paid` として届くが、誰も見ていない。
+
+**つまり今日 subscription を売ると、初月は入金され（`checkout.session.completed` が発火する）、2 か月目以降は課金だけされて credits が入らない。** plan 事業の中核がここで途切れている。
+
+### 6-3. 統合設計
+
+**① イベント表を埋める**（すべて `credits-*-args` と同じ純関数の形、`.cljc`、IO は Worker 側）
+
+| Stripe event | 台帳への作用 |
+|---|---|
+| `checkout.session.completed` (mode=payment) | **既存** ── top-up を mint |
+| `checkout.session.completed` (mode=subscription) | Customer ↔ did:key を束ね、**初月の allowance を付与** |
+| **`invoice.paid`** | **新規・最重要** ── 月次 allowance を付与。前月の未使用 allowance を失効させる（繰越無し） |
+| **`invoice.payment_failed`** | **新規** ── dunning 開始。allowance を付与しない。猶予期間後に plan を停止（**購入済み top-up credits には触らない** ── あれは前払い済みの stored value） |
+| **`customer.subscription.deleted`** | **新規** ── allowance 停止。top-up 残高は残す |
+| `charge.refunded` | **既存** ── 逆仕訳 |
+| **`charge.dispute.created`** | **新規** ── 当該口座の消費を即時停止（§4 のチャージバック引当が効くのはここ） |
+
+**冪等性が必須。** Stripe は同じイベントを再送する。`event.id` を台帳の一意キーにして、既に処理済みなら no-op で 200 を返す ── これが無いと、再送のたびに credits が二重に mint される。
+
+**② allowance と stored value を別勘定にする**（ADR-2608026100 §7 の二分を Stripe 側に落とす）
+
+```
+:run/allowance-grant  {account cr} :period \"2026-08\"   ; invoice.paid で付与、月末で消滅
+:run/allowance-expire {account cr} :period \"2026-07\"   ; 繰越無しを台帳で表現する
+:run/mint             {account cr}                      ; 購入 top-up。期限なし
+```
+
+消費は **allowance を先に食う**（消えるものから使う。顧客に有利で、murakumo の負債も先に減る）。
+
+**③ 2つのゲートウェイを1つにする**
+
+`billing_gateway.cljs`（subscription、Bearer 認証）と `site_worker.cljs`（top-up、did 検証）が別の入口で別の認証を持っている。**plan と top-up が同じ口座に着地する以上、認証と口座解決は1つでなければならない。** `mk1` capability token（ADR-2608011400、既に live gateway が受理する）を共通の認証にし、Stripe Customer の metadata に did:key を固定する。
+
+**④ Stripe Tax を有効にする**（§4 の 0.5% はこの費用）
+
+`automatic_tax: {enabled: true}` + `customer_update: {address: \"auto\"}`。**請求先住所が集まることが §7-Delaware の escheat 分析を実質的に変える**（first-priority rule が働く）ので、これは税務要件であると同時に**負債構造の改善**でもある。価格は**税抜**で提示する ── 税込と解釈されると EU B2C で 20% 前後が粗利から消える。
+
+**⑤ Customer Portal を使う**（自前で作らない）
+
+プラン変更・解約・支払方法更新・請求書ダウンロードは Stripe の Billing Portal に委ねる。自前実装は PCI 面と保守を増やすだけで、`billing_gateway.cljs` の `mutate!`（cancel/resume）はこれに置き換えられる。
+
+**⑥ 最低取引額 $5 を checkout で強制する**（§4-3）。`storefront.cljc` の SKU 定義に最低額を持たせ、`credits-checkout-error` と同じ形で fail closed にする。
+
+## 7. Delaware ── breakage を当てにできない法的理由
 
 **AWAI Network, L.L.C. は Delaware LLC。** これが最悪の組み合わせを作る。
 
 1. **Delaware は stored value / gift card の未使用残高を 5 年で escheat させる。** de minimis 免除は**額面 $5 以下**のみ ── credits パックには実質使えない。
 2. **second-priority rule**: 保有者の記録に所有者の最終住所が無い財産は、**設立州**に報告される。Delaware は全米の『住所不明』未請求財産の受け皿になっている。
-3. **murakumo の identity 設計が、住所不明を保証している。** ADR-2607320000 は『サインアップ・メール・パスワードを導入しない、did:key が口座そのもの』と決めた。**つまり未使用残高は構造的に全件 address-unknown で、second-priority rule により Delaware へ向かう。**
+3. **旧設計では住所不明が保証されていた ── が、これは 2026-08-02 に解消された。** ADR-2607320000 は『サインアップ・メール・パスワードを導入しない』と決めており、その下では未使用残高が構造的に全件 address-unknown で second-priority rule により Delaware へ向かっていた。**オーナー判断でサインアップ・メールを導入することになったので、この構造的欠陥は塞がる** ── Stripe Tax が売上税 / VAT 計算のために請求先住所を要求するので、**住所は法定の必要から自然に集まる**。住所が記録にあれば **first-priority rule** が働き、未請求財産は**顧客の州**に報告される。多くの州は gift card を escheat 対象から外しているか、期限付きのものだけに限定している。
+
+   **ただし『Delaware でなくなった』は『breakage が自由に使える』ではない。** 3〜5 年の休眠期間後に escheat する州は依然として多く、州ごとに扱いが違う（50 州分の判定が要る）。**従って §5 の『breakage ゼロで plan が成立する』要件は維持する** ── これは規制の話ではなく設計の話で、当てにしないものが手に入るのは常に良い。
 4. **ASC 606-10-55-49**: escheat 対象の前受金は **breakage を収益認識できない**（負債のまま残る）。
 5. Delaware では gift card breakage をめぐる qui tam 訴訟で小売業者の責任が陪審に認められた例がある ── 理論上のリスクではない。
 
@@ -136,7 +295,7 @@
 
 **Higgsfield の『top-up は 90 日で失効』を真似ない。** 失効を付けることは、それを最も gift card らしく見せる操作であり、CARD Act の有効期限下限（gift certificate / store gift card に 5 年）とも衝突しうる。**期限を付けないほうが、規制上も会計上も安全で、しかも顧客に対して誠実である。**
 
-## 7. Modal は原価削減の手段ではない（実数で確認した）
+## 8. Modal は原価削減の手段ではない（実数で確認した）
 
 | | H100 時間単価 |
 |---|---|
@@ -160,7 +319,7 @@
 
 **fal が既に serve している model を Modal で再実装しない。** それは高い方法で同じものを作る作業になる。
 
-## 8. 運転資本と solvency（ADR-2608026100 の gate に数字を入れる）
+## 9. 運転資本と solvency（ADR-2608026100 の gate に数字を入れる）
 
 前払 credits は metered backend に対して**正しい構造**である ── 支払う前に受け取るので float が正になる。ただし前受は負債であり、その裏付け fiat は使い込めない。
 
@@ -175,35 +334,38 @@
 
 下回ったら hosted routing を閉じ、ジョブは fleet の空きを待つ列に入る（掲示価格は守られ、遅くなるだけ）。
 
-## 9. 法務チェックリスト（着手前に counsel と潰す。**これは法的助言ではない**）
+## 10. 法務チェックリスト（着手前に counsel と潰す。**これは法的助言ではない**）
 
 | 論点 | 状態 |
 |---|---|
 | **closed-loop = money transmission ではない**（自社役務にのみ使える限り） | 通常は該当しない。**ただし `transfer`（保有者間譲渡）が既に実装済み**で、第三者売り手に使えるようになると open-loop 側に寄り、50 州の MTL 免許が要る。**counsel レビューまで、法定通貨で購入した credits の保有者間譲渡を無効化する**（`accepting-sellers` の受容密度目標と正面から衝突する。承知の上で止める） |
 | **CARD Act / Reg E** の gift certificate 有効期限下限 | credits が該当するかは counsel 判断。該当するなら 90 日失効は違法。**期限を設けない設計はこの論点を回避する** |
-| **Delaware escheat** | §6。5 年、de minimis $5 以下のみ、second-priority で住所不明分が Delaware 行き |
+| **Delaware escheat** | §7。5 年、de minimis $5 以下のみ、second-priority で住所不明分が Delaware 行き |
 | **ASC 606** | credits 販売 = 契約負債。収益は消費時。**escheat 対象分は breakage 収益に振り替えない**（606-10-55-49） |
 | **Sales tax / VAT** | Wayfair 以降の economic nexus で州ごとに digital goods 課税。米国外 B2C は EU OSS / UK / 日本の消費税の登録閾値。**『credits の販売』と『役務の消費』のどちらを課税時点にするかを決めて文書化する** |
 | **既存 terms との整合** | `legal/terms.md` L123-148 は credits を『not money, stored value』と記述し、失効を想定した文言がある。**呼称は実質を支配しない。** 本 ADR の allowance / stored value 二分に合わせて改訂する |
 
-## 10. 段階
+## 11. 段階
 
 | phase | 内容 | 完了条件 |
 |---|---|---|
 | **P0** | §3 の掲示価格を model registry に入れ、`job-cost` を production 経路から呼ぶ | 3D は価格を持たないので fail closed する（それが正しい挙動） |
-| **P1** | §4 の plan 表を storefront SKU に。Free の同時人数上限 | 100% 消化シナリオの粗利がテストで固定される |
-| **P2** | allowance / stored value の二分を台帳と terms の両方に | 月次 allowance が期末で消え、購入 credits が消えないことが台帳で示せる |
-| **P3** | counsel レビュー（§9）。譲渡の無効化。escheat 引当 | MTL・CARD Act・escheat の3点に書面の判断がある |
-| **P4** | frontier tier の BYOK（§6 の価格差を消す唯一の手） | 顧客の鍵で frontier を回し、murakumo は orchestration + 保管だけを credits で取る |"
+| **P1** | **`invoice.paid` の処理**（§6-2 の致命的な穴）+ `event.id` 冪等 + `invoice.payment_failed` / `subscription.deleted` / `dispute.created` | subscription の 2 か月目に credits が入る。同一 event の再送が二重 mint しない ── **これをテストで固定するまで subscription を売らない** |
+| **P2** | §5 の plan を storefront SKU に。最低取引額 $5。Stripe Tax 有効化 + 税抜表示。Customer Portal | §5-5 の不変条件 5 本がテストとして走る。`automatic_tax` が有効で請求先住所が集まっている |
+| **P3** | allowance / stored value の二分を台帳と terms の両方に。消費は allowance 優先 | 月次 allowance が期末で消え、購入 credits が消えないことが台帳で示せる。dunning が stored value に触らない |
+| **P4** | サインアップ（メール検証）+ did:key との束ね。**束ねの正本を1つに決める**（リスク 10）。一回きり trial 200cr の重複排除 | 同じメール / 同じ Stripe Customer で trial を2回取れない。鍵を失っても口座を復旧できる |
+| **P5** | 2つのゲートウェイの統合（`billing_gateway.cljs` と `site_worker.cljs` を `mk1` 認証に寄せる） | plan と top-up が同じ認証・同じ口座解決を通る |
+| **P6** | counsel レビュー（§10）。譲渡の無効化。escheat 引当 | MTL・CARD Act・escheat の3点に書面の判断がある |
+| **P7** | frontier tier の BYOK（リスク 1 の価格差を消す唯一の手） | 顧客の鍵で frontier を回し、murakumo は orchestration + 保管だけを credits で取る |"
 
   :adr/risks
   "## 落とし穴
 
 1. **frontier tier で Higgsfield に価格で負ける ── 意図的にそうしている。** Veo 3 の 8 秒は murakumo 640cr = **$6.40** に対し Higgsfield **$2.84**、**2.25 倍**。breakage を収益にできない以上これは埋まらない。**価格で追いかけない。** 追いかけると原価割れを自分で選ぶことになる。答えは2つ: frontier は『必要なら在る』honest cost-plus に留める、あるいは **BYOK**（顧客の鍵で回し、murakumo は orchestration + アーカイブだけ課金）。後者は価格差を構造的に消す。
 
-2. **fal の値上げが直撃する。** 掲示価格は固定、原価は相手が決める。$0.05/秒 が $0.08/秒 になれば粗利 50% は 20% に落ちる。**原価表の `:verified-at` staleness gate（ADR-2608026000）が唯一の防御**で、これが緩むと気付かないまま薄利で走る。四半期ごとの掲示価格見直しを前提に、terms に価格改定条項を置く。
+2. **fal の値上げが直撃する。** 掲示価格は固定、原価は相手が決める。単価を全プラン揃えたことで耐性は 3.3% → **19%** に広がったが、それを超えれば 30% floor を割る。**原価表の `:verified-at` staleness gate（ADR-2608026000）と §5-5 の不変条件 5（掲示 ÷ 原価 ≥ 1.8）が防御**で、これが緩むと気付かないまま薄利で走る。四半期ごとの掲示価格見直しを前提に、terms に価格改定条項を置く（年払いの価格ロックはその裏返しなので、ロック期間の値上げリスクは murakumo が負う）。
 
-3. **Free の原価は人数に比例する。** 自前 fleet なら遊休 GPU で吸収できるが、fal では 1 人 $0.50/月が現金で出ていく。招待制・上限・レート制限のいずれかが要る。
+3. **無料枠は『一回きり』を守らないと人数に比例して出血する。** メール検証と Stripe Customer による重複排除が入っても、月次の自動付与に戻せば休眠アカウント 1 件につき毎月 $0.545 が現金で出る。自前 fleet と違い遊休 GPU で吸収できない。**一回きり 200cr = $1.09 の獲得費用**という有界な形を崩さない。
 
 4. **3D の価格を『だいたい』で置かない。** fal の 3D 価格が確認できていない。§3 で保留にしたのは、`job-cost` が価格欠落を例外にする規律を、価格表を書く人間の側にも適用したから。確認するまで 3D は売らない。
 
@@ -211,7 +373,13 @@
 
 6. **plan 込み credits を『allowance』と呼ぶだけでは足りない。** 呼称は実質を支配しない。繰越無し・現金価値無し・返金不可・購入分と別勘定、を台帳と UI の両方で一貫させて初めて主張が成り立つ。
 
-7. **粗利計算に入れていないコストがある**: kotobase への永続保管（ADR-2608026000 の差別化要素であり、一度の課金に対して**永続的に発生する**）、egress、サポート、返金・チャージバック。`unit-prices` に既にある `:gb-months` を使うか、保管期間を有限にするか、どちらかを P1 までに決める ── **決めないと、売れば売るほど増える負債を無償で抱える。**"
+7. **§4 の変動費表に**まだ**入っていないもの**: 人件費・Cloudflare/D1 等の固定費・不正利用（盗んだカードで credits を買い即消費する形。credits は非償還なので換金目的の詐欺は起きにくいが、生成物自体が目的なら成立する）。寄与率 40% はこれらを賄う原資であって、利益ではない。
+
+8. **`invoice.paid` の冪等性を落とすと credits が二重に mint される。** Stripe は同じイベントを再送する仕様なので、これは『起きるかもしれない』ではなく**必ず起きる**。`event.id` の一意制約を台帳に持たせるのが唯一の防御で、`credits-topup-args` の現行実装にはまだ無い。
+
+9. **dunning（決済失敗）で購入済み credits に触らない。** allowance の停止と stored value の没収は別の話で、混ぜると前払い済みの財産を取り上げることになる。§6-3 の表がその境界だが、実装で1行間違えれば消える。
+
+10. **サインアップ導入で新しい責務が増える。** メールアドレス = 個人データ（GDPR/CCPA）、パスワードまたは magic link の運用、アカウント復旧の詐称リスク、そして **did:key との束ねが壊れた時に『誰の口座か』が二重定義になる**（この repo が繰り返し踏んでいる duplicated-truth 欠陥クラス、ADR-2607300100）。**束ねの正本を1つに決める** ── Stripe Customer の metadata に did:key を置くのか、murakumo 側の台帳に Stripe Customer ID を置くのか、どちらかにする。両方に書くと必ずずれる。"
 
   :adr/verification
   "外部価格（2026-08-02、公開情報。**実契約での確認はしていない**）: fal ── video Wan 2.5 級 $0.05/出力秒、Veo 3 $0.40/秒、Seedream V4 $0.03/枚、Inworld TTS-1.5 Max $0.01/1,000字、ACE-Step 60秒 ≈$0.012、ElevenLabs Music 60秒 $0.80、GPU H100 $1.89/h・A100 $0.99/h、成功出力のみ課金。Modal ── H100 $3.95–4.29/h、A100 80GB ≈$2.50/h、cold start 7B+ で 15–30 秒。Higgsfield ── Plus $49/1,000cr、top-up $5/100cr、月次 credits 繰越無し、top-up 90 日失効、Kling 3.0 720p 5秒 7cr、Veo 3+audio 720p 8秒 58cr。
@@ -220,6 +388,21 @@
 
 法令の参照（公開解説による。**弁護士確認を経ていない**）: Delaware は gift card / stored value の未使用残高を 5 年で escheat、de minimis 免除は額面 $5 以下のみ。second-priority rule により所有者の最終住所が記録に無い財産は設立州へ。ASC 606-10-55-49 は escheat 対象額の breakage 収益認識を認めない。Delaware では gift card breakage の qui tam 訴訟で陪審が小売業者の責任を認めた例がある。
 
-粗利の検算（本文 §4 と同じ計算を再掲）: Starter $15 − (1,500cr × $0.005) − ($15×2.9%+$0.30) = $6.765 → 45.1%。Plus $49 − $26.50 − $1.721 = $20.78 → 42.4%。Ultra $129 − $75.00 − $4.041 = $49.96 → 38.7%。原価率 0.5 は §3 の『掲示 = 原価 × 2.0』から。**保管・egress・サポート・チャージバックは未算入**（§7 のリスク）。
+寄与の検算（本文 §5 と同じ計算を再掲）。credits 1 単位あたり変動費 $0.00545 = 従量 $0.005 × 再試行 1.05 + 保管 $0.0002。収入側控除 4.4% = Stripe 2.9% + Tax 0.5% + チャージバック引当 1.0%、加えて Stripe 固定費 $0.30/件:
+
+- Starter $15 − 1,500×$0.00545 − ($15×4.4%+$0.30) = 15 − 8.175 − 0.96 = **$5.87（39.1%）**
+- Plus $49 − 4,900×$0.00545 − ($49×4.4%+$0.30) = 49 − 26.705 − 2.456 = **$19.84（40.5%）**
+- Ultra $129 − 12,900×$0.00545 − ($129×4.4%+$0.30) = 129 − 70.305 − 5.976 = **$52.72（40.9%）**
+- Team $79 − 7,900×$0.00545 − ($79×4.4%+$0.30) = 79 − 43.055 − 3.776 = **$32.17（40.7%）**
+- Plus 年払い $539 − 58,800×$0.00545 − ($539×4.4%+$0.30) = **$194.52（36.1%）**
+- top-up $5 − 500×$0.00545 − ($5×2.9%+$0.30) = **$1.83（36.6%）**、$1 → **$0.111（11.1%）**
+
+**撤回した前版の数値**（記録として残す。参照しないこと）: volume discount 込みの Plus 5,300cr / Ultra 15,000cr は、変動費を fal 従量分だけで見て 42.4% / 38.7% としていた。全変動費を積むと Ultra は 32.0% で、**fal が 3.3% 値上げすれば 30% floor を割った**。
+
+**§4 の変動費表に未算入**: 人件費、Cloudflare/D1 等の固定費、不正利用（リスク 7）。
+
+保管の試算根拠: `engine.cljc` の i2v 検証記録にある実成果物 **200,157 bytes / 49 frames / 768x448**（= 出力 2.04 秒）から 0.1 MB/秒。品質向上を見込んで 0.5 MB/秒で見積もり、Cloudflare R2 の $0.015/GB/月・egress 無料を適用。**R2 の価格は公開情報で、実請求での確認はしていない。**
+
+Stripe 実装の実測（`orgs/network-awai/cloud-murakumo`）: `stripe_webhook.cljc` が処理するイベントは `checkout.session.completed` と `charge.refunded` の **2 つのみ**（`invoice.paid` は未処理 ＝ subscription の 2 か月目以降は課金だけされて credits が入らない）。`site_worker.cljs:334-405` の checkout は `mode: \"payment\"`、`metadata.did` を session と payment_intent の両方に設定。`billing_gateway.cljs` は `mode: \"subscription\"` の checkout と subscription の照会・cancel/resume を持つが、Bearer 認証の別ゲートウェイとして独立し、credits 台帳に接続していない。`storefront.cljc` に最低取引額の概念は無い。
 
 Modal 損益分岐: 出力 2.04 秒（49 frames ÷ 24fps）の fal 原価 $0.102 に対し、Modal H100 $0.001192/秒 → wall 85.6 秒、fal H100 $0.000525/秒 → wall 194 秒。参考の実測 wall time（`engine.cljc` の gad 実測、Radeon 8060S）は ltx-2.3 94.6 秒 / wan2.2-ti2v-5b 149.5 秒 / hunyuanvideo-1.5 849.8 秒 ── **H100 での実測ではないので分岐点との直接比較はできない。P0 で 1 本測る。**"}]
