@@ -1,0 +1,6 @@
+[{:db/id -1
+  :adr/id "2608036000"
+  :adr/title "throughput の天井は replay コスト — eviction のたびに genesis から chain を再適用している"
+  :adr/status "accepted"
+  :adr/date "2026-08-03"
+  :adr/body "## 観測\n\nchain は停止するというより**登るのをやめる**。15秒で 133 block、60秒で 163 block。毎秒9 block から、毎秒 0.67 block へ。\n\n説明になりそうだった状態は増えていない: 163 block 時点で `votes 5`・`new-views 2`・`first-vote 13`。増えるのは **chain 本体**と、それに伴う `qcs`/`by-hash`。そして **`evict!` は毎秒 `replay` を chain 全体に走らせ**、memory にあったものを再構築するため全 block を machine に再適用する。chain が長いほど replay が長く、追いつく前に再び evict される。\n\n```\n  EVICT_MS=1000    60s   162 blocks\n  EVICT_MS=100000  60s   380 blocks\n```\n\n**eviction を退けると 2.3 倍**。コストが「進捗1 block あたり」でなく「履歴1 block あたり」なので、**差は height とともに開く**。\n\n## これが deploy の 225\n\n139 まで速く、遅くなり、止まった。Durable Object は絶えず evict され、**snapshot が無いので戻るたびに chain 全体の代金を払う**。`EVICT_MS` は次の測定でこの変数を固定できるように置いた。\n\n## 決定\n\n修正は snapshot。gap list に `node snapshot` として既にあったが、**あれば嬉しい程度の扱いだった。実際は throughput の天井**である。\n\n## 副次的な訂正\n\n「3回とも寸分違わず 225 なら race でなく limit」と書いたのは読み過ぎ。**chain は決定的**（提案は空、ts は親から導出、鍵も名前から導出）なので、状態依存のバグは必ず同じ height で出る。決定性は「数値的な上限がある」ことの証拠にならない。\n\nengi `2eb1d9df`、229 tests / 1173 assertions、0 failures。"}]
