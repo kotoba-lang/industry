@@ -13,7 +13,7 @@
 
   :adr/authoritative_for
   ["murakumo.cloud の参加導線を『4つの扉』として定義すること: ①使う(x402、identity 不要) ②買う(credits、did:key 必要) ③貢献する(node enroll、did:key + 実測 capability) ④token(現在は閉じている)"
-   "did:key は murakumo の口座そのものであり、参加の前提条件であること。サインアップ・メール・パスワードを導入しない"
+   "**改訂（2026-08-02、ADR-2608026200 §5-3）: 『サインアップ・メール・パスワードを導入しない』はオーナー判断で撤回された。** did:key は引き続き credits 台帳の口座キー（署名主体・可搬性）だが、メール + Stripe Customer を『復旧・請求・法定住所』の層として**束ねる**（置き換えではない）。請求先住所が集まることで、住所不明の未使用残高が Delaware へ escheat する構造的欠陥も塞がる。扉①（x402、identity 不要）はそのまま残る"
    "did:key 生成は失敗したら fail closed であること。鍵素材を持たない識別子を発行してはならない"
    "『valid did:key』の判定は系全体で1つであること。storefront と acceptance metric が別々の定義を持つ現状は欠陥である"
    "token の扉は、token が実在するまで**閉じていると明示表示する**こと。『近日公開』等で実在を含意しない"]
