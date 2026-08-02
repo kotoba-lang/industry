@@ -1,5 +1,5 @@
 [{:db/id -1
-  :adr/id "2608024100"
+  :adr/id "2608026000"
   :adr/doc_type "adr"
   :adr/source-format "edn"
   :adr/authoritative true
@@ -19,14 +19,15 @@
    "engine（どの graph/runtime か）と provider（誰の GPU で誰が課金するか）を別の軸として分離すること。現在 :fn/engine がこの2つを兼ねているのは欠陥である"
    "video / 3D / music / voice の課金単位を modality ごとに正規化し、価格表を持たない model へは dispatch しないこと（無償労働の禁止・fail closed）"
    "hosted provider の成果物は必ず取得・ハッシュ・kotobase 保管してから返すこと。provider の期限付き URL をそのまま顧客に渡さないこと"
-   "route（どの provider に流すか）は要求されたものであり、推測されたものであってはならない。cold-start spill だけが唯一の自動遷移で、それも応答と台帳に記録する"]
+   "route（どの provider に流すか）は price tier の内側でのみ自由であり、tier を跨ぐ差し替えは禁止であること。provider の決定は台帳に必ず記録する（ADR-2608026100 で改訂: 顧客への開示はしない）"]
 
   :adr/supersedes []
   :adr/superseded_by []
   :adr/amends []
 
   :adr/related
-  ["90-docs/adr/2607170500（Seedance 2.0 を fal.ai queue 経由で hosted engine として入れた先行実装。本 ADR はこれを一般化する）"
+  ["90-docs/adr/2608026100（**本 ADR の §5 価格建てと §6 開示方針を改訂する**。価格は credits 建ての掲示価格になり、provider は顧客に非開示になる）"
+   "90-docs/adr/2607170500（Seedance 2.0 を fal.ai queue 経由で hosted engine として入れた先行実装。本 ADR はこれを一般化する）"
    "90-docs/adr/2607171330（:video の第一経路は fleet の self-hosted OSS、hosted は候補・fallback に降格）"
    "90-docs/adr/2607173100（murakumo-main alias — 具体 model id を焼かない。本 ADR は media modality へ拡張する）"
    "90-docs/adr/2607030030（inference economy GTM — credits $1=100cr / treasury 5%）"
@@ -160,12 +161,15 @@ OpenRouter は $/1M token へ正規化すれば済む。**メディアには単�
 | voice | 1,000 文字（または音声秒） | 話者クローン有無 |
 | image | メガピクセル | — |
 
-価格表は `{[provider model] → {:unit :video-second :amount N :currency :usd :verified-at \"2026-08-02\"}}`。
+**改訂（ADR-2608026100）: 表は2枚に分かれる。**
+
+1. **掲示価格（顧客向け、credits 建て、tier ごと）** ── `{[modality tier] → {:unit :video-second :credits N}}`。provider に依存せず、意図的に固定された数。
+2. **原価表（内部、USD 建て、provider×model ごと）** ── `{[provider model] → {:unit :video-second :usd N :verified-at \"2026-08-02\"}}`。eligibility とマージン gate だけが読む。
 
 **2つの fail closed を入れる:**
 
-1. **価格エントリが無い model へは dispatch しない。** 見積もれない仕事を無料でやってしまう経路を作らない（`gen/resolve-model` の『提供外→例外、silent fallback しない』と同じ規律）。
-2. **`:verified-at` が古い価格では見積もらない。** 焼き込んだ価格は UI と課金の間ではずれないが（storefront パターンの利点）、**提供者の実価格からは必ずずれていく**。N 日超過の価格で quote を返すのは『間違った数字を自信をもって返す』ことなので、拒否する方が安い。
+1. **掲示価格を持たない tier へは dispatch しない。** 見積もれない仕事を無料でやってしまう経路を作らない（`gen/resolve-model` の『提供外→例外、silent fallback しない』と同じ規律）。既存の `murakumo.infer.credits/job-cost` が既にこの規律を実装済み。
+2. **`:verified-at` が古い『原価』では eligibility を判定しない。** 掲示価格は固定でよいが、原価が上がってもマージン gate が古い数字を見ていれば赤字 provider が eligible のまま残る。staleness gate はこちら側に置く。
 
 **サブスク型（ModelsLab / Higgsfield）は原価が出ない問題**がある。月額を『その月の実行本数』で割った**実効単価**を台帳から後追いで出し、次月の価格表に `:derived-from :subscription-amortized` として入れる。最初の1ヶ月は route policy の `:cheapest` の対象にしない（実効単価が未知のものを最安と主張しない）。
 
@@ -183,11 +187,11 @@ CLAUDE.md と `gen.cljc` の両方が silent fallback を禁じている。従�
 **唯一の自動遷移: cold-start spill。** murakumo-generation README が実測記録している『生成関数は scale-to-zero なので、アイドル後の最初のジョブが GPU worker の起動と競合して `[Errno 111] Connection refused` / `[Errno 104] Connection reset` で落ちる。どちらも次のジョブは完走した』——これは hosted provider を持つ**最大の実務的根拠**である。fleet は温まっていれば最安、hosted は cold start に対する答え。
 
 ただし spill は次を満たす時だけ:
-- policy が `:on-cold-start :spill-to-hosted` を**明示している**
-- spill 先の provider に価格エントリがあり、見積もりが requester の上限内
-- 応答ヘッダ `x-murakumo-provider` と run 台帳に **spill した事実と理由**が残る
+- spill 先が**同じ price tier の eligible provider** である（tier を跨がない）
+- spill 先に原価エントリがあり、掲示価格に対してマージン条件を満たす
+- run 台帳に **spill した事実と理由**が残る
 
-『速くて安いので黙って別の会社に流した』は、この設計では起きない。
+**改訂（ADR-2608026100）: 応答ヘッダ `x-murakumo-provider` による provider 開示は取り下げる。** credits が掲示価格である以上、どの provider で走ったかは顧客の受け取るものを変えない ── 変えてしまう要素（tier / model の同一性、出力ライセンス、失敗の事実）は隠さない、という形に不変条件を移した。台帳への記録は必須のまま（非開示と未記録は別物）。
 
 ## 7. 資格情報 — platform key と BYOK
 
@@ -217,10 +221,10 @@ hosted provider は**期限付きの自社 CDN URL** を返す。murakumo は既
 GET /v1/models
   -> [{:id \"video/bytedance/seedance-2.0\"
        :modality :video
-       :providers [{:id :fal :price {:unit :video-second :amount 0.05 :currency :usd
-                                     :verified-at \"2026-08-02\"}
-                    :status :serving :p50-seconds 62}]
-       :default-provider :fal
+       :tier :video/frontier
+       :price {:unit :video-second :credits 50}   ; 掲示価格。provider は出さない
+       :status :serving
+       :p50-seconds 62
        :alias-of nil}
       …]
 GET /v1/models/video-main      ; alias 解決（chat の /infer/models/murakumo-main と同じ形）
