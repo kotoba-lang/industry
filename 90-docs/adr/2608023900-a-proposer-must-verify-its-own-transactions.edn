@@ -1,0 +1,62 @@
+[{:db/id -1
+  :adr/id "adr-2608023900-a-proposer-must-verify-its-own-transactions"
+  :adr/title "adr-2608023900: 提案者は自分の transaction を検証しなければならない — 誰が何を検査するかの非対称が、replica 間の不一致を作った"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-02"
+  :adr/last-verified "2026-08-02"
+  :adr/last_verified "2026-08-02"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "validator-proposer-self-verification"
+  :adr/authoritative-for
+  ["公開鍵の符号化が account 同一性の一部であること"
+   "提案者による自己 transaction 検証"
+   "deploy 済み BFT chain の transaction 経路の実測"]
+  :adr/related ["adr-2608023800-the-watchdog-was-starving-the-clock"]
+  :adr/evidence ["https://torihiki-validator.04-feasts-minded.workers.dev/head?w=w1"]
+  :adr/body
+  "# ADR-2608023900: 提案者は自分の transaction を検証する
+
+**Status**: accepted
+**Date**: 2026-08-02
+
+## 実測（deploy 済み、end-to-end）
+
+```
+  deposit  -> queued, accepted
+  order    -> queued, accepted
+  forged   -> refused at the edge, bad-signature
+  w1..w4   h 153 com 151 root 578396c936f1, refused {}
+  w1..w4   collateral 100000000, next-nonce 3
+```
+
+**Cloudflare 上の 4 validator が state root で一致し、署名済み transaction を適用し、偽造を拒否する。**
+
+## バグ ①: 公開鍵の符号化が account 同一性の一部だった
+
+**同じ鍵を raw 32 byte で export したものと SPKI DER で export したものは、別の account に hash される。**
+
+別の符号化を選んだ client は**誰も同意しない id を導出し、それに対して署名し、拒否される** —— そして**拒否は署名を名指しする**ので、**誰も見に行かない場所を指す。**
+
+**deploy 済み validator に対してまさにこれが起きていた**: 正規の transaction が全部拒否され、**その間ずっと consensus を見ていた。**
+
+正本は **raw base64** —— browser の `exportKey` が返すもので、node が import するもの。`torihiki.address` にそう書いた。
+
+## バグ ②: 提案者が自分の transaction を検証していなかった
+
+検証は **proposal が到着した時**に走る —— **提案した本人以外の全員をカバーする。提案者は自分の block を受け取らない**ので、**今まさに自分が入れた transaction について cache に答えが無い。**
+
+**自分の `apply-block` はそれを `:bad-signature` で拒否し、peer は受理する** —— **同じ account について 2 つの replica が別の残高を持つ**。**このプロトコルが存在する理由そのものの不一致が、「誰が何を検査するか」の非対称から生まれた。**
+
+**submit 時にも検証**し、通らなければ端で拒否する。**これは権威ではない** —— 全 replica は今も `apply-block` の内側で検査する（そこが本来の場所）—— **提案者が、自分の block について問う前に答えを出しているだけ。**
+
+## Consequences
+
+- (+) **deploy 済み BFT chain の transaction 経路が end-to-end で動く。**
+- (+) 偽造は端で拒否され、正規は 4 者一致で適用される。
+- (−) 鍵配布は TOFU、terminal は単一 sequencer を向いたまま、catch-up は未検証。
+- (−) 提案者の自己検証は「端での拒否」であって権威ではない —— 権威は各 replica の `apply-block`。
+"}]
