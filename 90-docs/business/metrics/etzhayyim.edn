@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 13949, "etzhayyim-xrpc-proxy" 439},
+ {"etzhayyim-did-web" 14042, "etzhayyim-xrpc-proxy" 439},
  :zone
- {:requests-7d 57696,
-  :pageviews-7d 1302,
-  :uniques-7d-sum 2147,
+ {:requests-7d 58296,
+  :pageviews-7d 1325,
+  :uniques-7d-sum 2181,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 23}
-   {:path "/sitemap.xml", :requests 12}
+  [{:path "/robots.txt", :requests 29}
+   {:path "/sitemap.xml", :requests 13}
+   {:path "/system-dynamics", :requests 6}
    {:path "/_shell/liquid-glass.css", :requests 4}
    {:path "/organism/health.json", :requests 4}
-   {:path "/system-dynamics", :requests 4}
+   {:path "/.well-known/actors.json", :requests 4}
    {:path "/_shell/liquid-glass-adapter.css", :requests 4}
-   {:path "/.well-known/did.json", :requests 4}
-   {:path "/.well-known/actors.json", :requests 3}],
-  :status-mix {:ok 256, :server-error 6970, :client-error 1091},
+   {:path "/.well-known/did.json", :requests 4}],
+  :status-mix {:ok 289, :server-error 6882, :client-error 1037},
   :window "24h"},
  :as-of "2026-08-02",
  :traffic-quality
  {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 84},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 23 · /sitemap.xml 12 · /_shell/liquid-glass.css 4 · /organism/health.json 4 · /system-dynamics 4 | 4xx(probe) 13% · 5xx 84%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 29 · /sitemap.xml 13 · /system-dynamics 6 · /_shell/liquid-glass.css 4 · /organism/health.json 4 | 4xx(probe) 13% · 5xx 84%",
  :signal
- "etzhayyim.com 実測 57696 req/7d・2147 uniques(日次和)・うち4xx probe 13%(24h)、workers 14388 inv/7d"}
+ "etzhayyim.com 実測 58296 req/7d・2181 uniques(日次和)・うち4xx probe 13%(24h)、workers 14481 inv/7d"}
