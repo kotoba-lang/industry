@@ -883,6 +883,45 @@ code-size から算術しており、スロット数を変えると同時に変�
 本セッションはすでに長く、ここは新しい文脈で丁寧にやる方が安い。
 
 
+## 完了: record を case payload に持つ variant — **`clock-v1` の全 4 形が native で動く**
+
+前節で「あと 1 形」と書いたものを閉じた。**`clock-v1` が宣言している形はすべて
+native で compile / verify / 実行できる。**
+
+| `clock-v1` の形 | native |
+|---|---|
+| `:request` = bool payload の variant | **OK** |
+| `:result` の `wall` record | **OK** |
+| `:result` の `error` record (`:keyword` + `:string`) | **OK** |
+| `:result` 全体 = record を case payload に持つ variant | **OK** (本節) |
+
+**何も実行時表現を得ていない。** payload は、record フィールドが外側 record の
+スロットへ平坦化されるのとまったく同じように、dispatch のスロットへ平坦化される。
+
+`emit-variant-dispatch` の変更は 3 点: payload を `expand-binding` で展開する /
+**各 branch が自分の宣言 payload 型に従ってスロット領域を記述する** (record の
+case は record を見、スカラの case はワードを見る) / `dispatch-depth` と
+cleanup (2 スロット固定だった) が領域幅に追随する。
+
+**領域は「構築された case」ではなく「最も広い宣言 case」で確保する。** 構築された
+case だけが materialise されるが**全 branch が emit される**ので、宣言 payload が
+より広い branch は押されていないスロットを名指し、**フレームの外へ出る変位の
+load を emit**してしまう。到達不能だが emit すべきものではない。テストは
+「他の case がより広い variant の、狭い case を構築する」形でこれを踏む。
+
+**分岐変位は変更不要だった** — 各 body の実測サイズから導出されているので、
+スロット数を仮定せず追随する。
+
+verifier 側は、**各 branch の binder に自分の case payload スキーマを束縛する**
+ようにした。これが無いと binder にスキーマが無く、branch 内の projection が
+すべて拒否される。
+
+検証: kotoba-native 40 tests / 2,040 assertions。実 AArch64 プロセスで 4 本 —
+`wall` record の両フィールド / `error` record の `:string` フィールド。compiler は
+固定 checkout で **baseline と patched がともに 862 tests / 6,527 assertions・
+0 failures**、conformance 8/8。
+
+
 ## 残ったギャップ (2026-08-03 時点の実測)
 
 ## 続き: `i32-operations` (同日、最大の残存 portable ギャップを閉じた)
