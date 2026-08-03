@@ -182,18 +182,49 @@
 ;; radicle plane (readable with the node stopped — that is the point)
 ;; ---------------------------------------------------------------------------
 
-(defn probe-rad [n]
+(defn probe-rad
+  "Sample the radicle store and classify each repo's canonical head AGAINST ITS OWN
+  local checkout, with direction.
+
+  The first version of this bucketed a rad head that matched neither a live HEAD
+  nor a west pin as one undifferentiated :matches-neither, and reported that as
+  'the radicle plane drifted'. Checking one such repo by hand (kotoba-lang/kagami,
+  2026-08-04) showed the opposite: rad held d258b7b and the local checkout was
+  four commits behind at cb09b93. Measuring 556 repos for direction then gave
+  rad-ahead 3.8% against rad-behind 0.2% -- so the undirected bucket was reporting
+  a stale LOCAL CHECKOUT as a stale radicle plane, which is backwards.
+
+  So: ancestry, per repo, in the local clone (which is where both commits can be
+  compared when it has them). A rad commit the local clone does not have is its
+  own bucket -- undetermined, not assumed."
+  [entries n]
   (let [store (str (os/homedir) "/.radicle/storage")]
     (when (and (pos? n) (fs/existsSync store))
-      (let [all (vec (fs/readdirSync store))
-            step (max 1 (js/Math.floor (/ (count all) n)))
-            pick (take n (take-nth step all))]      ; deterministic stride, not RNG
-        {:total (count all)
-         :sampled (count pick)
-         :heads (into {} (keep (fn [rid]
-                                 (when-let [h (git (str store "/" rid) "rev-parse" "refs/heads/main")]
-                                   [rid h]))
-                               pick))}))))
+      (let [with-rid (filterv #(and (:rad-rid %) (:path %)) entries)
+            step (max 1 (js/Math.floor (/ (count with-rid) n)))
+            pick (take n (take-nth step with-rid))
+            classify
+            (fn [{:keys [rad-rid path]}]
+              (let [rid (str/replace (str rad-rid) #"^rad:" "")
+                    sd (str store "/" rid)
+                    local (str root "/" path)]
+                (cond
+                  (not (fs/existsSync sd)) :no-rad-storage
+                  (not (fs/existsSync (str local "/.git"))) :no-local-checkout
+                  :else
+                  (let [radh (git sd "rev-parse" "refs/heads/main")
+                        loch (git local "rev-parse" "HEAD")]
+                    (cond
+                      (or (nil? radh) (nil? loch)) :unreadable
+                      (= radh loch) :equal
+                      (nil? (git local "cat-file" "-e" (str radh "^{commit}")))
+                      :rad-commit-absent-locally
+                      (some? (git local "merge-base" "--is-ancestor" radh loch)) :rad-behind
+                      (some? (git local "merge-base" "--is-ancestor" loch radh)) :rad-ahead
+                      :else :diverged)))))]
+        (merge {:total (count (fs/readdirSync store))
+                :sampled (count pick)}
+               (frequencies (map classify pick)))))))
 
 ;; ---------------------------------------------------------------------------
 ;; aggregate
@@ -210,15 +241,7 @@
         comparable (filter #(number? (:pin-behind %)) present)
         stale (filter #(pos? (:pin-behind %)) comparable)
         ages (sort (keep :fetch-age-days present))
-        heads (set (keep :head present))
-        pins  (set (keep :revision entries))
-        rad-cls (when rad
-                  (reduce (fn [acc [_ h]]
-                            (update acc (cond (contains? heads h) :matches-local-head
-                                              (contains? pins h)  :matches-pin-only
-                                              :else               :matches-neither)
-                                    (fnil inc 0)))
-                          {} (:heads rad)))]
+        ]
     {:west-entries (count entries)
      :pinned-entries (count (filter :revision entries))
      :rad-rid-entries (count (filter :rad-rid entries))
@@ -248,11 +271,15 @@
                        :p90-days (some-> (quantile ages 0.9) (.toFixed 2) js/parseFloat)
                        :max-days (some-> (last ages) (.toFixed 2) js/parseFloat)
                        :fetched-last-24h (count (filter #(< % 1.0) ages))}
+     ;; Directional. :rad-behind is the only bucket that means "the radicle plane
+     ;; is stale"; :rad-ahead means the LOCAL CHECKOUT is. Reporting one number
+     ;; for both was the defect this replaced.
      :radicle (when rad
-                (merge {:total (:total rad) :sampled (:sampled rad)
-                        :readable (count (:heads rad))}
-                       rad-cls
-                       {:divergence-pct (pct (get rad-cls :matches-neither 0) (count (:heads rad)))}))}))
+                (let [n (:sampled rad)]
+                  (assoc rad
+                         :rad-behind-pct (pct (get rad :rad-behind 0) n)
+                         :rad-ahead-pct (pct (get rad :rad-ahead 0) n)
+                         :equal-pct (pct (get rad :equal 0) n))))}))
 
 ;; ---------------------------------------------------------------------------
 ;; main
@@ -268,7 +295,7 @@
     (-> (pool n-jobs entries probe-repo)
         (.then
          (fn [results]
-           (let [rad (probe-rad rad-n)
+           (let [rad (probe-rad entries rad-n)
                  agg (assoc (aggregate entries results rad)
                             :as-of (subs (.toISOString (js/Date.)) 0 10)
                             :probe "scripts/fleet-sync-probe.cljs"
