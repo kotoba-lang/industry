@@ -166,4 +166,28 @@
   ;; ".edn" は deps/manifest 読みのため。:min-files は他の root gate と同じ床。
   {:name "root" :id "root-west-pin-policy" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/west-pin-policy-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}]}
+   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+
+  ;; net-kotobase（kotobase.net の本体、private）。**network-awai org の GitHub
+  ;; Actions は 2026-08-03T01:10Z 以降 1 本も起動していない**（実測: 全 workflow
+  ;; failure、job は steps 0 件で 1-10 秒で終了。同 org の cloud-itonami /
+  ;; network-isekai も同じ、local-murakumo は 07-20 から）。com-junkawasaki と
+  ;; gftdcojp が 2026-07-26 に落ちたのと同じ症状で、ADR-2607300900 が決めた
+  ;; 「Actions ではなく fleet」をこの org にも適用する。
+  ;;
+  ;; gate が持ってこられるのは **hermetic な半分だけ**（ノードは tailnet のみで
+  ;; npm registry にも kotobase.net にも届かず、credential も持たない）:
+  ;;   enterprise-isolation.yml 全体 / metadata.yml 全体 / worker.yml の syntax 半分 /
+  ;;   sdk.yml の python leg。持ってこられないもの（npm ci 系・live smoke・deploy・
+  ;;   b2-dr-drill）は ADR-2608036600 に理由付きで列挙した。
+  ;;
+  ;; **green の意味は「hermetic subset が通った」であって「出荷可」ではない。**
+  ;; 出荷判断は docs/MURAKUMO-CI.md の `murakumo-worker-check.cljc deploy-ready`
+  ;; （pnpm/npm を要するので現状は operator 側）のまま。
+  ;;
+  ;; :include-ext を付けないのは full tarball が 3.2MB だから（max-ship 200MB）。
+  ;; ノードは bb / node / python3 / git を要求する（gate が不在なら 91 で fail —
+  ;; 「道具が無い」は合格ではない）。実測 pass: judah / asher / levi。
+  {:name "net-kotobase" :gate :nbb-script
+   :script "gates/net-kotobase-hermetic-check.cljs"
+   :script-args ["--min-surfaces" "8" "--min-syntax" "20"] :cd true}]}
