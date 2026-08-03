@@ -359,4 +359,54 @@ native で低ノイズ計測を行うには i64 配列（線形メモリ load/st
 verifier / conformance fixture に跨る **T0-T3 横断変更**なので、別 ADR として
 起票してから着手する。C toolchain（`/usr/bin/cc`）と loader source は
 この機械に揃っていることは確認済み。
+
+## 反復 4 (2026-08-03) — tile-plan の較正を試み、「測れない」を測れるようにした
+
+### 結果: tile は :unvalidated であって :wrong ではない
+
+`traversal/tile-plan` はこの実機に対し **L1d → tile 48 / L2 → tile 256** と予測する。
+blocked ikj matmul (n=768, f64, 3 operand, tile 8..768) で実測したが、
+**どの tile も他から分離しなかった**。同じ sweep の 2 回の run が別々の winner を
+挙げた（384 → 48）。best blocking が unblocked を上回った幅は 1% と 5% で、
+perfgate は両方拒否した。
+
+原因は roofline と同じ: **harness が loop-bound**。Clojure/JVM の内側ループが
+1 反復あたり約 4 ns、対してメモリトラフィックは約 0.15 ns/反復。**blocking が
+動かせるのは全体の数 % で、ノイズを超えられない。**
+
+`traversal` の `tile-model` に `:model/validation {:status :unvalidated}` として
+記録した。**`:wrong` ではない** — capacity rule が間違っているという証拠は何も
+無く、「この機械とこの harness では判定できない」という事実だけがある。
+
+### perfgate に power analysis を追加 (0.2.0) — 走らせる前に「答えが出ない」と言う
+
+これまでの perfgate は**結果が出てから**判定していた。それは、繰り返し起きている
+高価な失敗には 1 手遅い: **自分のノイズより小さい効果の実験を走らせ、平均から
+符号を読む**。この 1 日で 2 例あった（thread scaling の +3%/+31%/-22%、tiling の
+5%）。
+
+新しい統計は入れていない。**分離規則を逆に解いただけ**: qualify は
+`mean_b - mean_c > sd_b + sd_c` を要求するので、この gate が通し得る最小の改善は
+`(sd_b + sd_c) / mean_b`。
+
+- `minimum-detectable-improvement` — この 2 arm のノイズが許す最小の改善
+- `detectable?` — 期待効果がそれを超えるか。**pilot を回してから本番を決める**
+- `samples-needed` — 不足分の 2 乗でスケール。ただし**ノイズが「scheduler が
+  P/E コア間でスレッドを移す」由来のときサンプルを増やすのは間違った答えだと
+  明示する**（この機械がまさにそれ）
+
+### 効果は即座に出た
+
+tiling CLI は pilot を先に通し、**sweep を走らせる前に「最小検出可能改善は 133%、
+10% の効果は検出不能」と出力する**。その後の sweep はそれを追認しただけだった。
+**前の 2 実験は最後まで走らせてから徒労だと分かった。この実験は 5 秒の pilot で
+済む。**
+
+### 3 実験を通した一般則
+
+**メモリ最適化の実験は、メモリ項がループ項を支配するときにしか情報を持たない。**
+`layout/achievable-ratio` がその条件を計算し（`:both-memory-bound?`）、
+`perfgate/detectable?` がノイズ側から同じ問いに答える。**どちらも走らせる前に
+呼べる。** 今日の 3 つの null result は、この 2 つがあれば 3 つとも事前に予測
+できた。
 "}]
