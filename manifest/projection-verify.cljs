@@ -318,7 +318,25 @@
                  (catch :default _ true)))
     (assert (try (validate-contract (assoc-in valid [:projection/rebuild :loader/id] :evil)) false
                  (catch :default _ true)))
-    (println "projection-verify self-test: 5/5 pass")))
+    (.mkdirSync fs (.join path root ".projection-cache") #js {:recursive true})
+    (let [tmp (.mkdtempSync fs (.join path root ".projection-cache/.logical-test-"))
+          a (.relative path root (.join path tmp "a.edn"))
+          b (.relative path root (.join path tmp "b.edn"))
+          logical-contract (-> valid
+                               (assoc :projection/identity-attrs [:adr/id])
+                               (assoc-in [:projection/contracts :schema/path]
+                                         "manifest/projection-schemas/agent-source-query-adr.edn"))]
+      (try
+        (.writeFileSync fs (inside-root a)
+                        (pr-str [{:db/id -1 :adr/id "same" :adr/repos ["a" "b"]}]))
+        (.writeFileSync fs (inside-root b)
+                        (pr-str [{:db/id -99 :adr/id "same" :adr/repos ["b" "a"]}]))
+        (assert (= (:logical-sha256 (output-measurement logical-contract a))
+                   (:logical-sha256 (output-measurement logical-contract b))))
+        (assert (not= (:physical-sha256 (output-measurement logical-contract a))
+                      (:physical-sha256 (output-measurement logical-contract b))))
+        (finally (.rmSync fs tmp #js {:recursive true :force true}))))
+    (println "projection-verify self-test: 7/7 pass")))
 
 (defn usage []
   (println "usage: projection-verify.cljs check|verify|measure <projection.edn> | verify-all | self-test"))
