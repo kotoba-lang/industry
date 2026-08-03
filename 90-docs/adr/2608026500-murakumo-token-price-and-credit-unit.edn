@@ -4,7 +4,7 @@
   :adr/source-format "edn"
   :adr/authoritative true
   :adr/title "トークン単価は誰も選んでいなかった — i64 の最小値がそのまま価格になっていた。実勢に接続し、課金単位を Mtok にする"
-  :adr/status "proposed"
+  :adr/status "accepted"
   :adr/date "2026-08-02"
   :adr/last_verified "2026-08-02"
   :adr/deciders ["Jun Kawasaki"]
@@ -162,4 +162,8 @@ USDC on Base の手数料と facilitator の取り分があるので、真の原
 
 **計算結果**: 現行 $0.01/token = $10,000/Mtok = 実勢の 20,000 倍。採用価格 $0.10/$0.40 での寄与率は出力 66.6% / 入力 67.3%（収入側 4.4% 控除後）、ADR-2608026200 §5-5 の 30% floor を大きく超える。40M tok/日 完売時の月商 $480。x402 は 1 req ≒ 270 tok より新価格相当 $0.000108 で、$0.01/req は 93 倍。$0.01 = 25,000 出力トークン。
 
-**未検証**: live 課金で実際に `default-per-token` が適用されているか（ADR-2608026400 §11 P0）。本 ADR はコード経路から『適用されればこの値になる』ことを示したが、実課金の 1 件確認はしていない。"}]
+**実装済み（2026-08-03）**。`job-cost` は `:tokens` の既定を撤去し、全 unit が『価格キー欠落は例外』に揃った。価格の供給側は `murakumo.infer.prices`（`resources/murakumo/prices.edn` を JVM は `io/resource`、Worker は `prices-embed` のコンパイル時マクロで読む —— 写しも同期手順も無い）。実際の課金は`local-murakumo.spend-admission/decide` 1 箇所に集約し、`routes.cljc` と `worker.cljs` の両方がそれを呼ぶ。
+
+順序は本 ADR §5 のとおり『価格登録が先、fail-closed 化が後』を守った。**実測で分かったのは、社内推論の停止リスクは元々存在しなかったこと**: `/infer/spend` の外部呼び出し元は 0 件、`credits/charge` と `credits/settle` の本番呼び出し元も 0 件で、158,768 inv/7d はこの経路を通っていない。リスクを先に見積もって順序を決めたこと自体は正しかったが、見積もりの大きさは**測る前は分からなかった**。
+
+**未検証のまま残るもの**: 実際の有料課金 1 件。ledger 上の stripe 由来 topup は`ch_demo` / `ch_demo2` の手動エントリだけで、実顧客の課金は 0 件のまま。つまり『この価格で課金される』はコードとテストで固定されたが、『誰かがこの価格を払う』はまだ 1 件も観測していない。"}]
