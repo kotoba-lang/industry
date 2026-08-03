@@ -26,7 +26,11 @@
   ["kotoba-lang/kotoba-native f555a40ff30d31bc70176314cf652305e25243b7"
    "kotoba-lang/kotoba-verifier 0816622811ca3d1fe7d095b95ea91f5d7ed2bf5f"
    "kotoba-lang/compiler d1d527fb17ea82ceb67ed74e8b817452f18b882f"
-   "com-junkawasaki/root f19bdc3b021cfac0eda567bd5e15ff3194c6af98"]
+   "com-junkawasaki/root f19bdc3b021cfac0eda567bd5e15ff3194c6af98"
+   "kotoba-lang/kotoba-native 08bf86dea8fd501914645be0f8c990dfbe3aaf7b"
+   "kotoba-lang/kotoba-verifier a79f5b7c018396b1bedff227b0f0f1522b637e6b"
+   "kotoba-lang/compiler a50331bc36a9fbfbeace6327f296825c9a7db61b"
+   "com-junkawasaki/root e069b3af05e3f9151fe6f7fe55336b88fc9aed7b"]
   :adr/body
   "# ADR-2608039600: native backend の ISA parity を契約化する
 
@@ -170,12 +174,70 @@ merge_base == 旧 pin / default branch と identical を確認)。
 **教訓: 上流に merge しただけでは成熟度は上がらない。consumer の pin を
 進めるまでが 1 単位。**
 
+## 続き: `i64-operations` (同日、同じクラスの残りを閉じた)
+
+上記の修正で診断が NPE から `ex-info` になった直後、同じ探索を frontend の
+operator 表全体に広げたところ、**同じクラスがもう 1 家族残っていた**:
+`bit-not` / `i64-shift-left` / `i64-shift-right` / `u64-shift-right`
+(frontend の `i64-operations`)。frontend が全 native target で admit し、
+`kotoba.kir` の評価器も実装済み (つまり compile-time oracle は最初から
+合意していた) なのに、**両バックエンドが emit せず、検証器も admit しない**。
+`emit-call` に落ちて 'unknown call target' — 「存在しない関数を呼んだ」と
+読める誤った診断で報告されていた。
+
+**閉じた**:
+
+- x86-64 は `NOT r/m64` (group 3 `/2`、隣の `neg` `/3` と opcode を共有) と
+  `shl`/`sar`/`shr rax,cl`。AArch64 は `MVN` (= `Rn=xzr` の `ORN`。
+  `mov-reg` が `Rn=xzr` の `ORR` であるのと同型) と `LSLV`/`ASRV`/`LSRV`
+  (同ファイルの SDIV `0x9ac10c00` に対して base と Rm 配置をクロスチェック)。
+- **レンジ検査は両 ISA とも emit しない。** frontend が shift count を
+  **[0,63] の整数リテラルに限定**しているため、`CL` / LSLV の count
+  レジスタが持つ mod-64 切り捨ては到達不能。これが「両 ISA が明示的な
+  マスク無しで一致する」理由であり、同時に**両者が `kotoba.kir` の
+  `checked-shift64` (範囲外は wrap でなく trap) と一致し続ける**理由。
+  count が常にリテラルなので、ADR-2608039500 の `emit-rhs-window` は
+  ここでは必ず定数経路を取り、count を直接 `rcx` / `x1` に載せる。
+- **`i64-shift-right` は算術、`u64-shift-right` は論理** (`kotoba.kir` の
+  `i64-shr` / `u64-shr` に一致)。取り違えると**全ての負のオペランドで
+  封印済み oracle 値と emit されたコードが食い違う**ため、テストは
+  「両方が存在する」ではなく「2 つの符号化が異なる」ことを assert する。
+- 検証器側は `arithmetic` に畳まず**独立の集合**として持つ — shift だけが
+  他の算術に無いオペランド制限 (リテラル [0,63]) を負っており、それが
+  backend のレンジ検査省略を正当化している唯一の根拠だから。非リテラルや
+  範囲外を admit する検証器は、コードと oracle が食い違う artifact を
+  admit することになる。
+
+検証: kotoba-native 27 tests / 1,930 assertions、compiler 786 tests /
+6,300 assertions + native-conformance 5/5、実 AArch64 プロセスでの差分実行
+12 本 (`-1 >> 63` が算術で `-1`・論理で `1` を含む)、JVM/nbb バイト単位一致。
+
+## 残ったギャップ (2026-08-03 時点の実測)
+
+- **診断の系統的欠陥は未解決**: frontend が admit するのに backend が
+  未実装の operator は、今も `finalize` で 'unknown call target' として
+  弾かれる。`xorshift32` が現にこの状態 (`i32-operations` の他の多くは
+  `:target` phase で正しく拒否されるのに、これだけ漏れる)。**正しくは
+  `:target` phase で operator 名を挙げて拒否すべき**で、そのためには
+  backend が supported operation 集合を publish する必要がある (T2 契約の
+  拡張)。
+- `i32-operations` 一族 (i32 値表現) は native に無い。
+- record/variant が関数境界を越えられない・相互ネスト不可・
+  string/keyword フィールド不可 (compiler ADR 0062/0063 の Remaining gaps)。
+- typed collections と f64 は `:target` で clean rejection されており、
+  ゲートは正しく効いている (診断欠陥の対象外)。
+- **native に provider/capability 機構が一切無い**。capability kit は
+  8/8 が `:native-aot :pending` (`:reference` は 8/8 implemented)。
+- AArch64 privileged surface が未定義 (意図的に open)。
+
 ## Consequences
 
 - native の operator surface が両 ISA で揃い、以後の drift は
   `isa-parity-test` が落とす。
-- `bit-or` が全 native target で初めて実行可能になった。
-- 残る非対称は AArch64 の privileged surface が未定義であることだけで、
-  これは意図的に open。
+- `bit-or` と `i64-operations` 4 種が全 native target で初めて実行可能に
+  なった。
 - 検証器の独立再導出は維持されるので、同種の drift は今後も起こりうる。
-  起きたときに **安全側に倒れる**ことは今回実証された。"}]
+  起きたときに **安全側に倒れる**ことは今回 2 度実証された
+  (`bit-or`、`i64-operations` とも検証器が reject 側に倒れていた)。
+- 次に取るべきは**診断の系統的修正** — operator 単位で塞ぐ限り、
+  同じ探索を毎回やり直すことになる。"}]
