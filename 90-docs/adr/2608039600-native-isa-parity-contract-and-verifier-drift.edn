@@ -580,6 +580,50 @@ entry では定数畳み込み oracle が substring をコンパイル時に評�
 添字・連結を通る。compiler は固定 checkout で baseline と同じ 824 tests /
 6,401 assertions、native-conformance **8/8**。
 
+## 訂正: 「native に capability 機構が無い」は誤読を招く — **実プロセスで動く**
+
+残ギャップの筆頭を「capability/provider (8/8 `:native-aot :pending`)、最大の
+構造的穴」と繰り返し書いてきたが、実測すると**そうではなかった**。
+
+**実測 (2026-08-03、target `aarch64-kotoba-v1`)**:
+
+| 形 | native |
+|---|---|
+| `(cap-call 1 5)` | compile し、**実プロセスで実行して `{:status :ok, :result 6}`** |
+| `(typed-cap-call 1 :i64 :i64 7)` | COMPILED |
+| `(typed-cap-call 1 :string :string \"ab\")` を i64 に消費 | COMPILED |
+
+**capability call は loader の context callback 経由で end-to-end に動いている。**
+最初 `typed string` が `:phase :verify` で落ちたが、名前付き条件の診断が
+`:condition :signature-result` と即答した — **entry が文字列を返す**ための拒否で
+あって capability のギャップではない。**3 度目の「測定の交絡を診断が一手で解いた」
+事例。**
+
+### では `:native-aot :pending` は何を意味しているのか
+
+kit descriptor を読むと分かる。`clock-v1` の `:request` は **bool payload の
+variant**、`:result` は **`:i64` / `:keyword` / `:string` フィールドを持つ
+レコードの variant**。つまり kit の native 資格化が要求しているのは
+**「capability 機構」ではなく「値表現」** — string/keyword フィールド付きの
+record/variant が capability 境界を越えること。
+
+`native-aot-baseline.md` 自身がその前提を列挙している
+(「string/keyword フィールド付き record/variant、相互ネスト、native
+provider/capability-linking 機構」)。ただし同ファイルの
+'there is still no native provider/capability mechanism of any kind' という
+表現は、**Component Model 流の provider 合成が無い**ことを指すなら正確だが、
+**capability が native で動かない**と読めてしまう。実際には動く。
+
+### 帰結: 「最大の穴」は 2 つではなく 1 つ
+
+**kit 資格化と「record/variant が関数境界を越えられない」は同じ作業**であり、
+残ギャップ一覧で 2 項目に分けていたのは重複だった。native の capability を
+前進させる道は provider 機構の新設ではなく、**値表現を広げること**である。
+
+なお ADR-2607266000 決定 4 が定めるとおり、native は**実行面**であって
+Component 契約面ではない — Component 流の provider 合成を native に持ち込む
+こと自体が目標ではない。
+
 ## 残ったギャップ (2026-08-03 時点の実測)
 
 ## 続き: `i32-operations` (同日、最大の残存 portable ギャップを閉じた)
@@ -629,8 +673,9 @@ failures (クリーン再実行)、conformance 5/5。
   string/keyword フィールド不可 (compiler ADR 0062/0063 の Remaining gaps)。
 - typed collections と f64 は `:target` で clean rejection されており、
   ゲートは正しく効いている (診断欠陥の対象外)。
-- **native に provider/capability 機構が一切無い**。capability kit は
-  8/8 が `:native-aot :pending` (`:reference` は 8/8 implemented)。
+- **capability kit の native 資格化** (8/8 `:native-aot :pending`) — ただし
+  これは capability 機構の欠如ではなく**値表現**の問題で、下の record/variant
+  項目と同じ作業 (上記訂正)。
 - AArch64 privileged surface が未定義 (意図的に open)。
 
 ## Consequences
