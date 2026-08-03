@@ -335,10 +335,10 @@ n=8M（64 MiB、L2 12 MiB を大きく超える）で同一値なので、キャ
 
 | # | 門 | repo | エラー |
 |---|---|---|---|
-| 1 | target gate | `compiler/core.clj:344` | "floating-point values require the kotoba-script or Wasm target" |
-| 2 | KIR admission | `kotoba-kir` `only-native-word-typed-features?` | "typed values currently require ... the qualified native one-word slice" |
-| 3 | verifier op list | `kotoba-verifier` | "runtime KIR operation rejected {:operation f64-to-bits}" |
-| 4 | compatibility seal | `kotoba-verifier` | "native compatibility metadata rejected" |
+| 1 | target gate | `compiler/core.clj:344` | 「floating-point values require the kotoba-script or Wasm target」 |
+| 2 | KIR admission | `kotoba-kir` `only-native-word-typed-features?` | 「typed values currently require ... the qualified native one-word slice」 |
+| 3 | verifier op list | `kotoba-verifier` | 「runtime KIR operation rejected {:operation f64-to-bits}」 |
+| 4 | compatibility seal | `kotoba-verifier` | 「native compatibility metadata rejected」 |
 
 **門 1-3 は allow-list への追加で通せることを実測で確認した**（順に通し、次の門に
 到達することを確認済み）。それぞれの正当化:
@@ -346,7 +346,7 @@ n=8M（64 MiB、L2 12 MiB を大きく超える）で同一値なので、キャ
 - **門 1**: f32 と f64 を**分離**する。native は f64 を実装し f32 は実装していないので、
   まとめて許可すると f32 が emit できない backend に流れる。
 - **門 2**: native の f64 値は**整数レジスタ内の 1 語の IEEE-754 ビットパターン**で、
-  この述語が許可する "native word" そのもの。allocate せず memory に触れない。
+  この述語が許可する 「native word」 そのもの。allocate せず memory に触れない。
 - **門 3**: arity check + operand walk。整数演算と同じ扱い。
 
 ### 門 4 は allow-list ではない — ここで止めた
@@ -481,4 +481,37 @@ source は **signature に f64 を置く**（f64 のベクタ・レコードが�
 
 **3 回とも、コードを読んで推論した結論より、i32 と f64 を並べて測った 1 回のほうが
 正しかった。**
+
+## native 上の計測ループは fuel/heap の pin で不可能 — stage 2 の上限も同じ場所で決まる
+
+前回の締めで「native の rel-stdev は 0.003–0.009 なので、perfgate が拒否し続けてきた
+実験が qualify できるはず」と書いた。**これは間違いだった。** 測ろうとして分かった。
+
+まず収穫: **f64 の native 実行を値レベルで確認できた**（conformance fixture の固定値
+照合より強い）。tail 再帰で `f64-add` を 100 回累積して 100.0 を得た
+（compile → sign → trust → kexe execute の全経路）。
+
+しかし N を上げると `fuel-exhausted`。原因は budget ではなく、**tender-native
+(`f92f390`) の evidence validator が定数を assert している**こと
+（`kototama/native/executor.clj:539`）:
+
+    (= 512 (:initial fuel))
+    (= 4096 (:capacity heap))
+
+fuel は `compile-source` の budget でも run CLI の flag でもない
+（`:budgets {:fuel n}` は `compile-component` にしか無く、native pilot は
+`compile-source` を通る）。**report が valid であるための条件**なので、上げれば
+evidence 検証が落ちる。よってループ上限は ~510 iteration、一方 `execute` の固定費は
+実測 **420 ms/回**（loader subprocess + object 実体化）。per-element 分解能に対して
+約 10^6 倍 — 9 桁足りない。**native の loop floor はこの経路では測れない。**
+
+**これは stage 2 のロードマップを並べ替える。** vector-f64 を backend に実装しても、
+同じ validator が heap を 4096 バイトに pin しているので **native の vector は f64 で
+512 要素が上限**であり、測定ループには依然届かない。stage 2 の真の前提は
+「backend の型実装」ではなく **upstream tender-native の validator を parameterize
+すること**。順序を入れ替える。
+
+**教訓 9: 次の一歩を宣言するとき、その一歩を可能にする定数が誰の持ち物か確認する。**
+fuel を自分の budget だと思っていたが、実際は上流の evidence 契約だった。所有者を
+確かめていれば、宣言の時点で不可能と分かっていた。
 "}]
