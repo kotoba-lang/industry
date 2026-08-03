@@ -1,0 +1,118 @@
+[{:db/id -1
+  :adr/id "2608039980-concept-index-name-to-function"
+  :adr/title "ADR-2608039980: 概念の索引 — 名前が機能を示さない repo を「作る前に」見つける"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "discoverability-concept-index"
+  :adr/date "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["「この workspace に X はあるか」を有界に答える索引の在り処と生成手順"
+   "manifest/concept-vocabulary.edn（手書きの語彙）と 90-docs/concept/concept.datoms.edn（生成物）の責任分界"
+   "索引のカバレッジ申告義務 —— 索引に無いことを不在の証拠にしない"]
+  :adr/related
+  ["90-docs/adr/2606301000-kotoba-kobo-kuro-terminal-editor.edn  # この失敗が起きた対象"
+   "scripts/gen-surface-index.cljs                               # 同日・同じ理由で作られた HTTP 面の索引"
+   ".claude/hooks/duplication-warn.cljs                          # 面レベルの重複警告"]
+
+  :adr/context
+  "2026-08-03、オーナーの『kotoba-lang に terminal, console は設計実装されている?』に
+「端末エミュレータも対話シェルも REPL も存在しない」と答えた。**誤りだった。**
+`kotoba-lang/kuro`（terminal model）と `kotoba-lang/kobo`（workbench）は 2026-06-30 から
+在り、ADR-2606301000 が両者の設計を持っていた。オーナーが『kuro みたいな名前で実装した
+記憶もある』と指摘して初めて見つかった。
+
+原因は 2 つあり、どちらも「もっと注意深く grep する」では直らない。
+
+**1. 無界な検索は切られる。** 実行した grep は
+`grep -rn '\\b(terminal|console)\\b' --include=README.md orgs/kotoba-lang/` で、これは
+`kuro/README.md:3`（`kuro is the Kotoba terminal model for kobo`）に**当たっていた**。
+出力を `head -40` で切ったので、その行を見ていない。4,050 repo に対する全文検索の出力は
+常に数百行になり、常に切られ、切られたことに気付く手段が無い。**当たっていたのに
+「無い」と報告した**のがこの事故の性質であって、検索語の選択の問題ではない。
+
+**2. 名前が機能を一文字も示さない。** `kuro`（黒）も `kobo`（工房）も terminal /
+console / editor と字面を共有しない。`ls | grep -i term` のような名前ベースの経路が
+原理的に存在しない。ADR-2606301000 は命名候補を 7 つ比較して短い方を選んでおり、
+`kotoba-terminal` は rank 6 で退けられていた —— 選択は妥当だが、**説明可能性を
+別の場所で補う必要**があった。
+
+同じ日に、同じ「見る場所が無い」という理由で `scripts/gen-surface-index.cljs`
+（どのホストがどのパスを提供しているかの索引）が作られている。あれは **HTTP の面**、
+これは **概念**。CLAUDE.md の『作る前に、同種の重なる仕組みが既にないか確認する』が
+2 度続けて効かなかったのは意思ではなく、**確認する先が無かった**ため。"
+
+  :adr/decision
+  "**概念 → repo の索引を持つ。**
+
+1. **語彙は手書き** —— `manifest/concept-vocabulary.edn`。
+   『端末 と terminal と TTY と console は同じものを指す』は repo の中身から導出
+   できない。**推論できない事実の側**なので小さく明示的に持つ。語は経験から選ぶ
+   （名前から機能が推測できない repo が実在すると確認できた概念だけ）。増やしすぎると
+   雑音になり、雑音は無視され、無視される索引は存在しないのと同じ。
+
+2. **索引本体は生成物** —— `90-docs/concept/concept.datoms.edn`、
+   `scripts/gen-concept-index.cljs`。手書きの索引は必ず腐る。README の lede
+   （H1 + 冒頭散文）と `##` 見出しから、語彙の綴りを**語境界付きで**照合する。
+   README 全文は見ない（依存の羅列や例に概念語が現れると、その repo がその概念の
+   実装であるかのように索引される）。
+
+3. **綴りの衝突を畳まない。** `console` はこの workspace で 3 つの別物を指す ——
+   対話端末 / operator console（read-only 運用ダッシュボード、23 repo の規約）/
+   家庭用ゲーム機（`gpu` の backend tier）。概念を 1 つに畳むとどれかが消えるので、
+   **別概念として並べ、同じ綴りを両方に持たせる**。`console` で引いた人には両方出る。
+
+4. **未実装も概念として持つ。** `:terminal-emulator`（VT/ANSI 解釈）と `:repl` は
+   0 repo で載っている。『端末エミュレータはあるか』に**根拠のある「無い」**を返せる
+   ことが、索引の価値の半分である。
+
+5. **カバレッジを申告する。** 索引は `:concept/coverage` entity を 1 件持ち、
+   README の無い repo 数を記録する。`concept-lookup` は毎回それを表示する ——
+   **索引に無いことは存在しないことの証拠にならない**。この一行が無いと、索引は
+   grep より危険な嘘をつく（『索引を引いたが無かった』が不在の証明として使われる）。
+
+6. **west 登録状況を持つ。** `:concept/registered?`。未登録 = 正本とは限らない
+   作業コピーで、そこを直しても何も起きない（surface 索引が同日に実測した欠陥）。
+
+7. **引く経路は 2 つ。** `nbb scripts/concept-lookup.cljs <語>`（順位付き、綴りを
+   いくつ引き当てたかが主 —— `kuro` は terminal/tty/pty/shell session/console の
+   5 つに当たり、`console` 1 つの operator console repo より上に来る）と、
+   `manifest/edn-query.cljs` の datom 面（`:source/dataset \"concept\"`、
+   `:concept/repo` が repo-taxonomy の `:repo/path` と同形なので join 可能）。
+
+8. **repo 側にも書く。** 名前が機能を示さない repo は、README の冒頭で
+   『terminal を探しているならここ』と名乗る。索引は入口を増やすが、
+   repo に辿り着いた人が確信を持てるかは README の仕事。"
+
+  :adr/consequences
+  "**実測（2026-08-03）**
+
+- 3,590 repo を走査、README のあるもの 3,346（**244 は索引不能**として申告）、
+  359 entry。
+- 動機になった当のケースが出ることを確認: `端末` → 1 位 `kuro`、2 位 `kobo`。
+  `terminal` も同順。`terminal-emulator` → **0 repo**（正しい「無い」）。
+- `manifest/edn-query.cljs` に `index` ローダを追加（`surface` も同時に登録 ——
+  こちらは作られた当日から query 面に載っていなかった）。
+
+**初版が壊れていた（surface 索引と同じ轍）**
+
+最初の照合は `str/includes?` の部分一致で、2,752 entry のうち 1 件目が
+『aburi は IDE』だった —— `ide` が `provide` に、`repl` が `replication` に、
+`auth` が `authoritative` に当たっていた。語境界照合に変えて 359 entry。
+**当たりすぎる索引は当たらない索引と同じく使われない。**
+
+**限界（正直に）**
+
+- README の lede と見出ししか見ない。README がその repo の機能を書いていなければ
+  索引できない。244 repo は README 自体が無い。
+- 語彙は 10 概念しかない。語彙に無い語で引くと gloss の素通し検索に落ちる
+  （順位無し）。そのときは語彙に足すよう促す。
+- `--check` は完全な checkout でしか意味を持たない（sparse checkout では
+  走査対象が減り、別の出力になる）。surface 索引と同じ制約。
+- **これは hook ではない。** 面レベルの重複は `duplication-warn.cljs` が
+  Write / `gh repo create` で警告するが、概念レベルの『それ既にあります』は
+  自動では出ない。引くのは人と agent の意思に依存する。CLAUDE.md に
+  『無いと結論する前に索引を引く』を書いたが、prose に頼る規律が 2 度失敗した
+  ことはこの ADR 自身が記録している —— 次に同じ事故が起きたら hook 化する。"}]

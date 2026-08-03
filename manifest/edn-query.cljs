@@ -1005,6 +1005,43 @@
     (warn-skipped! "fleet state" @skipped)
     out))
 
+;; ---------- 索引データ（category L） ----------
+;; 「作る前に、既に在るものを見る」ための 2 つの索引。どちらも生成物で、
+;; `90-docs/**/…datoms.edn` の vector-of-maps なので同じローダを共有する。
+;;
+;;   surface  — どのホストがどのパスを提供しているか（HTTP の面）
+;;              scripts/gen-surface-index.cljs、`:surface/repo`
+;;   concept  — どの repo がどの概念を実装しているか（名前が機能を示さない
+;;              repo を見つける経路）。scripts/gen-concept-index.cljs、
+;;              `:concept/repo`
+;;
+;; どちらも `:concept/repo` / `:surface/repo` が repo-taxonomy の `:repo/path`
+;; と同形なので join できる。concept は `:concept/coverage` entity を 1 件持ち、
+;; 索引できなかった repo 数を申告する —— 索引を引いて出なかったことが
+;; 「存在しない」の証拠に使われるため、カバレッジを query 側から読めることが要る。
+
+(defn index-sources []
+  [["surface" (io/file root "90-docs" "surface" "surface.datoms.edn")]
+   ["concept" (io/file root "90-docs" "concept" "concept.datoms.edn")]])
+
+(defn index-entities [next-tempid!]
+  (let [skipped (atom [])
+        out (doall
+             (mapcat
+              (fn [[dataset f]]
+                (if (.exists f)
+                  (let [es (or (vector-of-maps-entities f) [])]
+                    (when (empty? es) (swap! skipped conj dataset))
+                    (for [e es]
+                      (assoc e
+                             :db/id (next-tempid!)
+                             :source/dataset dataset
+                             :source/file (str f))))
+                  []))
+              (index-sources)))]
+    (warn-skipped! "index" @skipped)
+    out))
+
 ;; fleet-db.edn は west.yml の **上流の正本**（ADR-2607160005、west.yml はその
 ;; projection）。トップレベルは単一 map で、query したい実体はその中の
 ;; `:fleet/repos`（実測 2,996 件、`:repo/name` `:repo/remote` `:repo/revision`
@@ -1435,6 +1472,7 @@
         fleet-tx (concat (fleet-state-entities next-tempid!)
                           (fleet-db-entities next-tempid!)
                           (fleet-ci-entities next-tempid!))
+        index-tx (index-entities next-tempid!)
         yabai-tx (yabai-passive-dns-entities next-tempid!)
         tadori-tx (tadori-threat-intel-entities next-tempid!)
         kakekomi-tx (kakekomi-entities next-tempid!)
@@ -1449,7 +1487,7 @@
                                                      working-doc-tx narrative-tx
                                                      company-tx property-tx relationship-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx innen-tx
-                                                     awai-tx kakekomi-tx)))]
+                                                     awai-tx kakekomi-tx index-tx)))]
     (.transact ds conn all-tx)
     {:conn conn
      :adr-count (count adr-tx)
@@ -1472,7 +1510,8 @@
      :tadori-count (count tadori-tx)
      :patent-count (count patent-tx)
      :innen-count (count innen-tx)
-     :awai-yakuwari-count (count awai-tx)}))
+     :awai-yakuwari-count (count awai-tx)
+     :index-count (count index-tx)}))
 
 ;; ---------- MCP mode（常駐して JSON-RPC で答える） ----------
 ;;
