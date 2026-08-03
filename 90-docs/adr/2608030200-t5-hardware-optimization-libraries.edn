@@ -1,0 +1,200 @@
+[{:db/id -1
+  :adr/id "adr-2608030200-t5-hardware-optimization-libraries"
+  :adr/title "ADR-2608030200: T5(機構)のハードウェア最適化を 6 つの独立 repo に分解する — machine / layout / traversal / paging / ioplan / perfgate"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-03"
+  :adr/last-verified "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "t5-hardware-optimization-libraries"
+  :adr/authoritative-for
+  ["T5(機構)におけるハードウェア最適化の責任分割 (machine / layout / traversal / paging / ioplan / perfgate)"
+   "ハードウェア記述子の契約と provenance 規約 (:measured / :vendor-declared / :assumed)"
+   "性能主張の admission 規約 (測定なき plan を claim できない)"
+   "kami.gpu (capability) と kami.gpu.launch (geometry) の責任境界"
+   "cost model を値として持ち歩く規約 (:cost/model / :model/does-not-model)"]
+  :adr/related
+  ["adr-2607266000-kotoba-stack-responsibility-split-t0-t3"
+   "adr-2607299000-repository-rules-workspace-authority"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"
+   "adr-2607241100-kotoba-stack-topology-and-design-cleanup"
+   "adr-2607102200-kami-render-stack-deps-authority-rename"]
+  :adr/body
+  "# ADR-2608030200: T5(機構)のハードウェア最適化を 6 repo に分解する
+
+**Status**: accepted
+**Date**: 2026-08-03
+
+## Context
+
+オーナーの問い: 「kotoba-lang compiler はどれぐらいハードウェア最適化されているか。
+OS に依存しない page cache や、データ配置・読み取り順序を hardware 構造に最適化する
+設計はあるか」。
+
+実測 (2026-08-03、この ADR を書く前の調査):
+
+- **compiler 側にハードウェア最適化は事実上存在しない。** `cache line` / `prefetch` /
+  `NUMA` / `huge page` / `SIMD` / `vectoriz` / `loop unroll` / `branch predict` /
+  `register alloc` / `peephole` はいずれも 0 hit。ネイティブバックエンド
+  (`kotoba-native/src/kotoba/native/{x86_64,aarch64}.cljc`、1,536 行) はスタックマシン
+  codegen で、全ての値が 8 バイトのスタックスロットに push される。レジスタアロケータも
+  命令スケジューリングも無い。バックエンド中の `align?` は `call` 前の SysV 16 バイト
+  スタック整列のみで、キャッシュラインとは無関係。存在する最適化は末尾自己再帰と
+  cljs 経路の定数畳み込みだけで、後者の目的も速度ではなく JVM とのバイト一致。
+- **データ配置は決定論のための layout であってハードウェアのためではない。**
+  `kotoba-wasm/canonical_abi.cljc` の `align-up` / フィールドオフセット / variant payload
+  整列は Component Model Canonical ABI 準拠であって、64 バイト線の概念は出てこない。
+  ヒープは linear memory 上の単一 bump arena (pair のみ)。
+- **その先送りは明示的に記録されている。** `kotoba-lang/docs/kotoba-centered-migration-plan.md`
+  W4 は「Add representative performance workloads before selecting HAMT/vector-trie,
+  arena, rope, or region implementations」、第 9 スライス (2026-07-27, compiler#347) は
+  「HAMT/arena selection is not yet claimed」。
+- **OS レイヤーの page cache は存在しない。** `aiueos` に `NUMA` / `cache line` /
+  `prefetch` / `readahead` / `page cache` / `I/O scheduler` / `block device` / `NVMe` /
+  `DMA` / `TLB shootdown` は 0 hit。`paging.c` の `PTE_HUGE` は 2 MiB 識別マップという
+  ブート定石で、TLB ポリシーではない。ブロックデバイスドライバもファイルシステムも
+  バッファキャッシュも無い。
+- **ハードウェア形状を意識した実装は 2 箇所だけ存在した。**
+  `compiler/src/kotoba/compiler/accelerator.clj` (135 行、WGSL/CUDA/MSL への決定論的
+  lowering。coalesced access と shared-memory tree reduction を持つが f32 の 2 op のみ) と、
+  `kotobase-peer` の block cache (CID キーなので無効化不要、hot small / cold 16-128 KB の
+  セグメント分割)。後者はオブジェクトストア往復の最適化であって CPU キャッシュではない。
+
+そして **T5 (機構) は ADR-2607266000 が明示的にスコープ外と宣言した唯一の tier** だった
+(『T5 は本 ADR の対象外 (aiueos ADR-0013 の bare-metal profile が扱う)』)。つまり
+「ハードウェアを誰が握るか」に答える repo が 1 つも無く、各 planner が自前の定数を
+発明する以外に道が無い状態だった。定数の発明は、まさに *optimization fossil* —
+誰かが一度測った機械では正しく、その後どこでも静かに間違っている数値 — の作られ方。
+
+## Decision
+
+### 1. T5 を単一 repo に集約せず、6 つの独立 repo に分ける
+
+| repo | tier | role | 責任 |
+|---|---|---|---|
+| `kotoba-lang/machine` | T0 | contract | ハードウェアとは何か (cache/page/TLB/NUMA/DRAM/SIMD/GPU/storage) を検証済みデータとして |
+| `kotoba-lang/layout` | T5 | library | 集約体のバイトがどこに置かれるか (AoS/SoA/AoSoA) |
+| `kotoba-lang/traversal` | T5 | library | どの順に訪れるか (線形化・タイリング・ループ順序) |
+| `kotoba-lang/paging` | T5 | library | OS に属さない page cache ポリシー |
+| `kotoba-lang/ioplan` | T5 | library | I/O 要求をデバイスが欲しい形に整える |
+| `kotoba-lang/perfgate` | T5 | assurance | 測定の無い plan を claim させない gate |
+
+依存は `machine` (T0 contract) に一本化し、planner 同士は互いに依存しない。
+`:library` の role edge は `#{:contract :library}` なので taxonomy 上も整合する。
+`perfgate` は `:assurance` (`#{:contract :library :assurance}`)。
+
+**なぜ 1 repo にまとめないか。** これらは異なる速度で変わり、異なる相手に依存され、
+異なる理由で間違う。layout を触るために page cache の履歴を読む必要は無いし、
+`machine` は下流全部が依存するので何にも依存してはならない。1 repo にすると
+`machine` が自分の consumer と同じ repo に住むことになり、compiler が検証器を
+同居させて自己検証にしかならなかった ADR-2607266000 と同じ失敗になる。
+
+### 2. 記述子は provenance を持ち、planner は「黙って既定値を使わない」
+
+`machine` の記述子は `:machine/provenance` (`:measured` / `:vendor-declared` /
+`:assumed`) と `:machine/source` を必ず持つ。`measured` は空 source を拒否する。
+全アクセサは未申告のセクションに `nil` を返し、`require-fact` は欲しかった path を
+添えて throw する。**`(or (line-bytes m) 64)` が fossil の入口で、`require-fact` が
+その代替。** 出荷プロファイルは `portable-64` (保守的な床、`:assumed`) と `unknown`
+(valid だが事実ゼロ) の 2 つだけで、**製品名を持つプロファイルは出荷しない** —
+誰も測っていない数値を `apple-m4` と名付けることが、この契約が防ごうとしている
+fossil そのものだから。
+
+検証は型ではなく転記ミスを捕まえる: 容量 = ways x line x sets、レベルごとの容量が
+単調増加、NUMA 自己距離が最小、huge page が base より大きい、workgroup >= subgroup。
+
+### 3. cost model は値として持ち歩き、「モデル化していないもの」を名指しする
+
+`layout/cost` は `:cost/model` を、`traversal/tile-plan` は `:tile/model` を、
+`ioplan/plan` は `:model` を返す。各 model は `:model/assumes` と
+`:model/does-not-model` を持つ。`recommend` は勝者だけでなく敗者も返す。
+**根拠を印刷できない layout 選択は、半年後に誰も再導出できず誰も消せない最適化になる。**
+
+### 4. 性能主張は測定で admission する (perfgate)
+
+7 つの拒否理由: `:insufficient-samples` / `:too-noisy` / `:no-baseline` /
+`:not-separated-from-noise` / `:machine-mismatch` / `:metric-mismatch` /
+`:provenance-too-weak`。**unqualified な結果には artifact を作らない**
+(`:qualified? false` の記録は一週間でスライドに載る)。claim は測定した機械の
+fingerprint を持ち、`applicable` が機械変更で stale 側に落とす — これが
+「誰も見ていなくても最適化が引退する」唯一の機構。
+
+統計は mean / 標本分散 / median / p95 に限り、分離判定は『差が標準偏差の和を超える』
+という **明示されたヒューリスティックであって p 値ではない**。実装していない有意差
+検定を主張することは、1 階層上の同じ失敗になる。
+
+### 5. kami.gpu (capability) と kami.gpu.launch (geometry) を分ける
+
+既存の `kotoba-lang/gpu` は `kami.gpu` = 「この backend はこの pass を走らせられるか」
+(compute / storage / instancing の tier 表)。これは *能力* の問いで、*形状* の問いとは
+別 — デバイス帯域の 8% で走る pass も「走らせられる pass」であり、tier 表はどちらかを
+区別できない。`kami.gpu.launch` を追加して後者を担当させ、`machine` と `traversal` に
+依存させる。**GPU ファイルの中に 2 つ目の Morton 実装を生やさない。**
+
+## Consequences
+
+### 測定して分かった、直感に反する結果 (実装の副産物、テストに固定済み)
+
+1. **空間充填曲線は平均近傍距離では勝たない。** 16x16 グリッドで Morton の平均近傍
+   距離は row-major と *完全に同じ* 8.5、Hilbert は *悪い* 9.92。両曲線は中程度の
+   跳躍を少数の巨大な跳躍と交換しており、平均はその裾に支配される。勝っているのは
+   **ブロック共存率** (80% 対 50%) — キャッシュラインやページが実際に問うている質問。
+   `neighbour-locality` は平均も返し続ける (直感的な指標が間違った質問に答えることの
+   リマインダとして)。
+2. **scan 耐性は挿入位置ではなく昇格規則でなければならない。** readahead を LRU の
+   cold 端に挿すと、次の投機 fill が前の投機ページを追い出し、scan が到達する前に
+   readahead が自壊する。`:slru` の second-touch 規則 (既に demand を 1 回果たした
+   ページのヒットだけが protected へ昇格) は、8 ページのキャッシュを 40 ページの scan が
+   通っても 3 ページの working set を保つ。素の `:lru` は 0 ページ。
+   **この失敗はテストで assert している** (実装していない scan 耐性を主張する方が悪い)。
+3. **readahead window はセグメント容量の半分で cap しなければならない。** これは
+   チューニングノブではなく正しさの境界: 上限無しでは 8 ページのセグメントで window が
+   32 まで倍増し、stream が到達する前に自分の結果を追い出す (実測 readahead accuracy 2%)。
+4. **パディングが無く全フィールドを触る pass では、AoS と SoA は同じバイト数を fetch する。**
+   compulsory-line モデルは両者を分離できない。差が出るのは部分フィールドか、SoA が
+   払わないパディングがある場合だけ。**モデルは自分が分離できないことを明記する。**
+5. **`:cost/streams` が必要な理由。** ライン数は layout が開く逐次ストリーム数を何も
+   言わない。prefetcher は有限個しか追跡できないので、多フィールド SoA はライン数が
+   無料と言っていても無料ではない。
+
+### 実装した内容 (すべてテスト green)
+
+| repo | tests | assertions |
+|---|---|---|
+| machine | 16 | 50 |
+| layout | 14 | 72 |
+| traversal | 16 | 1,846 |
+| paging | 24 | 72 |
+| ioplan | 18 | 50 |
+| perfgate | 18 | 54 |
+| gpu (launch 追加後) | 19 | 77 |
+
+全て pure `.cljc`、host object 無し、I/O 無し、wall clock 無し。`machine` は production
+依存ゼロ。
+
+### 残るギャップ (この ADR は埋めていない)
+
+- **compiler / kotoba-native はまだこれらを消費していない。** レジスタアロケータも
+  SIMD も命令スケジューリングも無いままで、本 ADR はそれを変えない。これらのライブラリは
+  「消費者が現れたときに定数を発明しなくて済む」状態を作るもので、バックエンドの成熟度
+  そのものではない。
+- **W4 (recursive logical values) の構造選定は依然として未着手。** `layout` はその選定を
+  *行う* ための道具であって、選定そのものではない。HAMT / vector-trie / rope / region の
+  比較は、代表ワークロード + `perfgate` の qualification を通してから claim する。
+- **`machine` の記述子を実機から作る host probe は無い。** sysctl / cpuid /
+  `/sys/devices/system/cpu` / `navigator.gpu.limits` の読み取りは host の effect であり、
+  contract の責任ではない (`must-not [:probe-hardware]`)。したがって現状 `:measured` の
+  記述子は誰も作れず、`perfgate` の `:provenance-too-weak` は当面ほぼ常に発火する。
+  **これは意図した順序** — 測定経路が無いのに測定済みを騙る記述子を出荷する方が悪い。
+  probe は host 側 (aiueos / provider 層) の別 ADR とする。
+- **aiueos に page cache は依然として無い。** `paging` はポリシーであってドライバでは
+  ない。ブロックデバイス / ファイルシステム / buffer cache は未実装のまま。なお aiueos の
+  規約 (『C は機構のみ、判断は compiler-emit の .kotoba』) の下では I/O スケジューラや
+  readahead ヒューリスティックは *判断* なので `.kotoba` 側に置く必要があり、Kotoba には
+  fs / block capability がまだ無い (ADR-2607270100 既知ブロッカー 4)。ここは二重に塞がって
+  いる。
+"}]
