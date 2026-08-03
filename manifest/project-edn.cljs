@@ -1,17 +1,18 @@
 #!/usr/bin/env nbb
-;; Deterministically concatenate tx-data EDN inputs declared by an
-;; ADR-2608039700 projection contract. Input order and entity order are
-;; preserved; output is one canonical `pr-str` vector plus a newline.
+;; Build canonical Datomic/DataScript-shaped tx-data from the Git EDN inputs
+;; declared by an ADR-2608039700 projection contract.
 ;;
-;;   nbb manifest/project-edn.cljs project <projection.edn> <output.edn>
+;; This loader is intentionally narrow: it reads Git-resident EDN only. Annex
+;; retrieval and age decryption are explicit capabilities handled before this
+;; loader; their identities remain bound by the projection contract.
 
 (require '[clojure.edn :as edn]
-         '[clojure.string :as str]
-         '[clojure.java.shell :as shell])
+         '[clojure.string :as str])
 
 (def fs (js/require "node:fs"))
 (def path (js/require "node:path"))
-(def root (str/trim (:out (shell/sh "git" "rev-parse" "--show-toplevel"))))
+(def root (or (some-> (.-env js/process) (aget "PROJECTION_ROOT"))
+              (.cwd js/process)))
 
 (defn fail! [message data]
   (throw (ex-info message data)))
@@ -29,6 +30,60 @@
 (defn read-edn [p]
   (edn/read-string (.readFileSync fs (inside-root p) "utf8")))
 
+(defn stable-key [x] (pr-str x))
+(defn stable-compare [a b] (compare (stable-key a) (stable-key b)))
+
+(defn canonical-value [x]
+  (cond
+    (map? x) (into (sorted-map-by stable-compare)
+                   (map (fn [[k v]] [k (canonical-value v)]) x))
+    (set? x) (into (sorted-set-by stable-compare) (map canonical-value x))
+    (vector? x) (mapv canonical-value x)
+    (sequential? x) (mapv canonical-value x)
+    :else x))
+
+(defn schema-index [schema-path]
+  (let [schema (read-edn schema-path)]
+    (when-not (and (vector? schema) (every? map? schema))
+      (fail! "projection schema must be a vector of attribute maps"
+             {:path schema-path}))
+    (into {} (map (juxt :db/ident identity) schema))))
+
+(defn value-type? [value-type value]
+  (case value-type
+    :db.type/string (string? value)
+    :db.type/keyword (keyword? value)
+    :db.type/boolean (boolean? value)
+    :db.type/long (integer? value)
+    :db.type/bigint (integer? value)
+    :db.type/double (number? value)
+    :db.type/float (number? value)
+    :db.type/bigdec (number? value)
+    :db.type/ref true
+    :db.type/uuid true
+    :db.type/instant true
+    :db.type/bytes true
+    false))
+
+(defn many-values [value]
+  (when-not (or (set? value) (sequential? value))
+    (fail! "cardinality-many attribute requires a collection" {:value value}))
+  value)
+
+(defn validate-attribute! [schema attr value]
+  (when-not (= attr :db/id)
+    (let [{:db/keys [valueType cardinality] :as spec} (get schema attr)]
+      (when-not spec
+        (fail! "projection entity uses an attribute absent from schema"
+               {:attribute attr}))
+      (let [values (if (= cardinality :db.cardinality/many)
+                     (many-values value)
+                     [value])]
+        (doseq [v values]
+          (when-not (value-type? valueType v)
+            (fail! "projection attribute value does not match schema"
+                   {:attribute attr :expected valueType :value v})))))))
+
 (defn tx-entities [p]
   (let [x (read-edn p)
         entities (cond
@@ -42,24 +97,46 @@
       (fail! "projection entity is missing :db/id" {:path p}))
     entities))
 
+(defn entity-identity [identity-attrs entity]
+  (let [missing (remove #(contains? entity %) identity-attrs)]
+    (when (seq missing)
+      (fail! "projection entity is missing a declared identity attribute"
+             {:missing (vec missing) :db/id (:db/id entity)}))
+    (mapv (fn [attr] [attr (canonical-value (get entity attr))]) identity-attrs)))
+
 (defn project! [contract-path output-path]
   (let [contract (read-edn contract-path)
         inputs (->> (:projection/inputs contract)
                     (filter #(= :git (:input/type %)))
                     (map :input/path)
-                    vec)]
+                    vec)
+        schema-path (get-in contract [:projection/contracts :schema/path])
+        identity-attrs (:projection/identity-attrs contract)
+        schema (schema-index schema-path)]
     (when-not (seq inputs)
       (fail! "projection contract has no Git EDN inputs" {:contract contract-path}))
     (when-not (every? #(str/ends-with? (str/lower-case %) ".edn") inputs)
       (fail! "project-edn accepts only .edn Git inputs" {:inputs inputs}))
+    (when-not (and (vector? identity-attrs) (seq identity-attrs)
+                   (every? keyword? identity-attrs))
+      (fail! "projection contract requires keyword :projection/identity-attrs" {}))
     (let [entities (vec (mapcat tx-entities inputs))
-          output (inside-root output-path)]
-      (.mkdirSync fs (.dirname path output) #js {:recursive true})
-      (.writeFileSync fs output (str (pr-str entities) "\n"))
-      (println (pr-str {:projection/output output-path
-                        :projection/entities (count entities)
-                        :projection/inputs (count inputs)}))
-      entities)))
+          identities (mapv #(entity-identity identity-attrs %) entities)]
+      (doseq [entity entities
+              [attr value] entity]
+        (validate-attribute! schema attr value))
+      (when-not (= (count identities) (count (distinct identities)))
+        (fail! "projection entity identity is not unique" {:identities identities}))
+      (let [ordered (->> (map vector identities entities)
+                         (sort-by (comp stable-key first))
+                         (mapv (fn [[_ entity]] (canonical-value entity))))
+            output (inside-root output-path)]
+        (.mkdirSync fs (.dirname path output) #js {:recursive true})
+        (.writeFileSync fs output (str (pr-str ordered) "\n"))
+        (println (pr-str {:projection/output output-path
+                          :projection/entities (count ordered)
+                          :projection/inputs (count inputs)}))
+        ordered))))
 
 (defn usage []
   (println "usage: project-edn.cljs project <projection.edn> <output.edn>"))

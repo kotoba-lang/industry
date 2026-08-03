@@ -168,6 +168,16 @@
    :script "gates/west-pin-policy-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
+  ;; Projection contracts are rebuilt from the exact Git-tip snapshot shipped
+  ;; by the fleet operator. The archive has no .git directory, so this gate
+  ;; uses snapshot mode: current input/schema/loader hashes plus logical and
+  ;; physical outputs are verified; source-commit ancestry remains the local
+  ;; pre-push/agent gate's responsibility.
+  {:name "root" :id "root-projection-rebuild" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/projection-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+
   ;; net-kotobase（kotobase.net の本体、private）。**network-awai org の GitHub
   ;; Actions は 2026-08-03T01:10Z 以降 1 本も起動していない**（実測: 全 workflow
   ;; failure、job は steps 0 件で 1-10 秒で終了。同 org の cloud-itonami /

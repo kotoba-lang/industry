@@ -801,7 +801,9 @@ diff → verify/query → commit → review/merge → handoff/restart` という
 - projection を追加・変更したら
   `nbb --classpath ".:scripts/nbb_compat" manifest/projection-verify.cljs verify <projection.edn>`
   をgateにする。contractはsource commit、input Git hash / annex key / CID、schema/loader hash、
-  shellを介さないrebuild argv、output hash/entity countを固定する。custody確認は別途
+  allowlist済みloader ID（contract由来のargvは禁止）、logical datom hash、任意の
+  physical hash、entity countを固定する。loaderはdataset固有schemaとstable identity属性を
+  実際に検証し、出力先は`.projection-cache/<projection-id>.edn`だけを宣言できる。custody確認は別途
   `scripts/annex-custody-verify.cljs` が担い、identity検証とavailability検証を混ぜない。
 
 ## LLM モデル選択 — murakumo-main alias（repo-wide mandatory、2026-07-17、ADR-2607173100）
