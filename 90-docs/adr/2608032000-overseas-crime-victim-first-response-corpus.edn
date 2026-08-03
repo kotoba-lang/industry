@@ -192,6 +192,42 @@ external には**構造的に将来も API が無い**——警察は endpoint �
   flat/handle 設計へ逃げない（計画側が \"handles are not the application
   programming model\" と明示している）。
 
+## 着地（2026-08-03、closing 監査で再確認）
+
+- superproject: merge commit `c5454e0a8d34`（`agent/kakekomi-register` → main）。
+  以後 main は他セッションの commit で前進しているが、west.yml の kakekomi entry /
+  cloud-kyusai の pin `330ad55f6400` / `edn-query.cljs` の `kakekomi-entities` /
+  `repos.edn` の `:extra-projects` はいずれも main 上に存在することを再確認済み。
+- `cloud-itonami/kakekomi`: default branch main = `f4d6abf`（public）。open PR 無し、
+  remote branch は main のみ。
+- `gftdcojp/cloud-kyusai`: default branch main = `330ad55`（merge commit、private）。
+  open PR 無し。remote branch `agent/cleanup-review-20260725` が残っているが
+  2026-07-25 の別セッションのもので本 ADR の作業とは無関係（削除していない）。
+- 作業用 worktree / branch（`agent/kakekomi-register` / `agent/kyusai-physical-crime`）は
+  local・remote とも撤去済み。superproject・両子リポとも stash 無し・dirty 無し。
+- 完了ゲート: `west-orphan-audit --blocking` exit 0（`local-root-broken: 0`）。
+
+## Resume point — 次に着手するなら
+
+1. **緊急番号 46 件の一次情報確認**（最大のギャップ）。`data/jurisdiction.edn` の
+   `:fact/verification` を `:pending-primary-source` → `:verified-primary-source` へ
+   上げ、`:fact/primary-source` と確認日を埋める。整合性検査
+   （`run-tests.cljs` の `verified-entities-cite-a-source`）が出典 URL と確認日を
+   強制するので、埋めずに verified を名乗るとテストが落ちる。
+2. **法域の追加**（現在 42/249）。`data/jurisdiction.edn` に entity を 1 つ足し、
+   `data/coverage.edn` の `:coverage/seeded` を必ず同時に更新する（不一致は
+   `coverage-is-declared-and-honest` が落とす）。コード変更は不要。
+3. **犯罪類型の穴を埋める**（`:coverage/known-gaps`: 誘拐・拘束 / 逮捕された場合 /
+   交通事故 / drink spiking / 同行者の被害）。playbook を足したら
+   `cloud-kyusai` の `cloud-mamori.case/crime-types` にも手で足す——**両者の同期を
+   機械検査するものは無い**。
+4. 日本国籍者以外の領事手続き。`:consular/nationality` で分岐できる形にはしてあるが
+   データが無い。
+5. 検証コマンド:
+   `nbb --classpath src:test run-tests.cljs`（kakekomi、15 tests / 205 assertions）/
+   `clojure -M:test`（cloud-kyusai、16 tests / 101 assertions）/
+   `nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q '[:find (count ?e) . :where [?e \"source/dataset\" \"kakekomi\"]]'` → 67。
+
 ## Rejected alternatives
 
 - **corpus を gftdcojp に置く** — 事業主体が合わない。gftdcojp の事業主体は
