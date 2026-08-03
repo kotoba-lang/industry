@@ -87,12 +87,30 @@
             ;; -F/--field content=@<file> 経路(repos.edn :manifest-workflow の正経路が
             ;; この形。file は raw base64)。path が $VAR 等で解決できない場合は従来通り
             ;; fail-open(hook はシェル展開前のコマンド文字列しか見えない)。
-            field-b64 (some-> (re-find (re-pattern (str "(?:-F|--field)[=\\s]+content=@(" path-tok-src ")")) cmd)
-                              second strip-quotes
-                              ((fn [f] (when (and f (.exists (io/file f))) (compat/slurp f)))))
+            field-path (some-> (re-find (re-pattern (str "(?:-F|--field)[=\\s]+content=@(" path-tok-src ")")) cmd)
+                               second strip-quotes)
+            field-b64 (when (and field-path (.exists (io/file field-path)))
+                        (compat/slurp field-path))
             b64   (or (:content body) field-b64)]
-        (if-not b64
-          (allow!)   ; content を取り出せない形は fail-open
+        (case (policy/payload-decision (boolean (or input field-path)) (boolean b64))
+          ;; payload path が名指しされているのに読めない = 検証すべき content が
+          ;; 存在しない。従来ここは fail-open で、**payload を書く処理と PUT が同じ
+          ;; 1コマンドに入っていると素通りしていた**(hook はコマンド実行前に走るので
+          ;; ファイルはまだ無いか、前回の残骸)。実測 2026-08-03: 前回の残骸を読んで
+          ;; tip にも新 payload にも無い pin を報告した。deny して2段階に分けさせる。
+          :unreadable
+          (deny! (str "west.yml への PUT の payload を検証できません: "
+                      (or input field-path) " が読めません。\n\n"
+                      "PreToolUse hook はコマンド**実行前**に走るので、payload を書く処理と "
+                      "gh api PUT が同じコマンドに入っていると、hook は「まだ無いファイル」か "
+                      "「前回の残骸」しか見られません。payload 生成と PUT を**別の呼び出しに"
+                      "分けて**ください。\n\n"
+                      "推奨: nbb scripts/west-pin-put.cljs <entry> <sha> "
+                      "(tip から読んだ pin に対して検証し、同じ blob SHA を precondition に書く)"))
+
+          :unknown (allow!)   ; payload path が無い形(inline / $VAR / wrapper)は従来どおり fail-open
+
+          :verify
           (let [decoded (try (.toString (.from js/Buffer (str/replace b64 #"\s" "") "base64") "utf8")
                              (catch :default _ nil))]
             (if-not decoded
