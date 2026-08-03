@@ -1,0 +1,181 @@
+[{:db/id -1
+  :adr/id "adr-2608039600-native-isa-parity-contract-and-verifier-drift"
+  :adr/title "ADR-2608039600: native backend の ISA parity を契約化する — 3 つのギャップと、それを隠していた到達不能な guard"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-03"
+  :adr/last-verified "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "native-isa-parity"
+  :adr/authoritative-for
+  ["native backend 間の operator parity 契約 (何が portable で何が ISA 固有か)"
+   "kernel-privileged-operations が x86 専用である理由"
+   "producer と verifier の allowlist drift の扱い"
+   "ADR-2608039500 の検証記述の訂正 (override 不発)"]
+  :adr/related
+  ["adr-2608039500-native-backend-codegen-back-half-size-preserving-peephole"
+   "adr-2607266000-kotoba-stack-responsibility-split-t0-t3"
+   "kotoba-lang/kotoba-native PR #6"
+   "kotoba-lang/kotoba-verifier PR #5"
+   "kotoba-lang/compiler PR #480"]
+  :adr/evidence-commits
+  ["kotoba-lang/kotoba-native f555a40ff30d31bc70176314cf652305e25243b7"
+   "kotoba-lang/kotoba-verifier 0816622811ca3d1fe7d095b95ea91f5d7ed2bf5f"
+   "kotoba-lang/compiler d1d527fb17ea82ceb67ed74e8b817452f18b882f"
+   "com-junkawasaki/root f19bdc3b021cfac0eda567bd5e15ff3194c6af98"]
+  :adr/body
+  "# ADR-2608039600: native backend の ISA parity を契約化する
+
+**Status**: accepted
+**Date**: 2026-08-03
+
+## Context
+
+ADR-2608039500 の副産物として `bit-xor`/`bit-and`/`bit-or` が AArch64 バックエンドに
+無いことを報告した。追跡した結果、それは単独のギャップではなく、**parity を維持する
+仕組みが存在しなかった**ことの症状だった。
+
+### 症状を隠していたもの — 到達不能な guard
+
+両バックエンドは未知の operator を `emit-call` に落とす。したがって「片方の ISA に
+実装され、もう片方で忘れられた operator」は「存在しない関数の呼び出し」と区別できない。
+これが許容できるのは、失敗が **target を名指しする** 場合だけ。
+
+x86-64 はそうしていた。AArch64 はしていなかった:
+
+```clojure
+(let [absolute (...) target (get offsets (:call token))
+      displacement (- target absolute)]     ; ← target が nil だとここで NPE
+  (when-not target
+    (throw (ex-info \"unknown AArch64 call target\" ...)))   ; ← 到達しない
+```
+
+guard は書かれていたが、同じ `let` の中で `displacement` を先に束縛していたため
+**dead code** だった。未実装 operator は診断可能な `ex-info` ではなく、素の
+NullPointerException として現れていた。
+
+### 沈黙の裏に溜まっていた 3 つのギャップ
+
+1. **AArch64 に `bit-and`/`bit-or`/`bit-xor` が無い** — `kotoba.compiler.frontend`
+   の `arithmetic` が全 native target に対して admit し、x86-64 は常に emit して
+   いた portable な算術。
+2. **x86-64 に `kernel-load-u32`/`kernel-store-u32` が無い** — frontend の
+   `kernel-memory-operations` のうち AArch64 だけが実装していた 2 つ。frontend が
+   `x86_64-aiueos-kernel-v1` 向けに admit したプログラムが、ずっと後の `finalize`
+   で 'unknown call target' として初めて弾かれていた。
+3. **verifier が `bit-or` を拒否していた** — 下記。
+
+### 3 つ目が最も重い — producer と verifier の drift
+
+`kotoba-verifier` の `arithmetic` は `#{+ - * quot bit-xor bit-and}` で、
+**`bit-or` が無かった**。`bit-or` は frontend にも `kotoba.kir` の評価器にも
+x86-64 バックエンド (ADR-2607254600 D2) にも入っていたが、検証器だけ更新されて
+いなかった。検証器は全コンパイル・全実行で走るので、結果として
+**`bit-or` は x86-64 を含むあらゆる native target で使えなかった**。
+
+これは検証器を producer から独立に再導出する設計 (ADR-2607266000 決定 2) の
+**コストであり、同時にその設計が働いた証拠**でもある。drift は安全側に倒れた —
+検証器は未検査のものを admit するのではなく reject した。だからこそ気付かれ
+なかった: 何も壊れず、機能が静かに死んでいただけ。
+
+## Decision
+
+### 1. 3 つのギャップを閉じる
+
+- AArch64 に logical shifted-register 符号化で 3 つの bitwise を追加
+  (Rm=x1 / Rn=x0 / Rd=x0。`mov-reg` 自身の `0xaa0003e0` が Rn=xzr の ORR base
+  なので opcode ビットが独立にクロスチェックされる)。
+- x86-64 に u32 kernel memory ops を追加。検査は u8 形を写すが、**1 点だけ
+  意図的に異なる** — AArch64 自身の `bounds-check-u32` に合わせ、4 バイト
+  アクセスは `index < length` ではなく **`index + 4 <= length`** を要求する
+  (`lea` で widen し unsigned 比較)。バッファ末尾 3 バイトを踏み越えられない。
+- `finalize` の guard を `displacement` の計算より前に移す。
+
+### 2. `kernel-privileged-operations` は x86 専用のままとする
+
+cr2 / cr3 / invlpg / cli / sti / hlt / pause / out はいずれも AArch64 に対応物の
+無い x86 の facility を名指ししている。AArch64 は system register・`tlbi`・
+`msr daifset/daifclr`・memory-mapped I/O を使うので、**これらは翻訳して埋める
+ギャップではない** — AArch64 の privileged surface は別の operator 集合であり、
+別途決める。
+
+### 3. verifier の allowlist を frontend に追随させる
+
+`bit-or` を `arithmetic` と strictly-binary arity 集合の両方に追加。
+**独立再導出は維持する** (producer の集合を import しない)。import すれば
+検証器は producer の決定を追認するだけになり、検証ではなくなる。
+
+### 4. parity を契約として検査する (再発防止の本体)
+
+`kotoba.native.isa-parity-test` が以下を pin する:
+
+- portable operator は両 ISA で emit できる
+- privileged 集合は **設計上 x86 専用**であり、明示列挙される
+- 解決不能な operator は**両 ISA で診断可能**である (NPE ではない)
+- u32 の境界は u8 より 4 バイト広い
+
+初稿の portable 一覧には `not`/`zero?`/`pos?`/`neg?` も入れており、両 ISA で
+対称に失敗した — 正しい答えだが問いが間違っていた。frontend が KIR 以前に
+比較へ lower するので、これらはバックエンドに到達しない。**KIR まで生き残る
+operator だけがこの一覧に属する。**
+
+## Verification
+
+| 対象 | 結果 |
+|---|---|
+| kotoba-native | 25 tests / 1,904 assertions |
+| compiler (pin 前進後、override 無し) | **785 tests / 6,294 assertions、0 failures** — `native-executor-test` / `verifier-profile-test` を含む |
+| `clojure -M:native-conformance` | 5/5 (`aarch64-kotoba-v1`) |
+| 差分ネイティブ実行 | `bit-and`/`bit-or`/`bit-xor` とその合成が実 AArch64 プロセスで正しい値を返す。未修正版は NPE |
+| JVM vs nbb | 3 operator すべて両 ISA でバイト単位一致 |
+
+`(bit-xor 1 2 4 8)` は修正後も `:phase :subset` の 'invalid arithmetic arity' で
+拒否される — bitwise は strictly binary という frontend の意図的な制限で、
+検証器の arity 集合もこれに合わせた。
+
+## ADR-2608039500 の訂正
+
+**ADR-2608039500 に記録した '785 tests / 6290 assertions を patched backend に対して'
+という検証記述は誤りだった。** `-Sdeps '{:override-deps ...}'` をトップレベルに
+渡していたが、`:override-deps` は **alias キー**であり、alias を活性化しない限り
+無視される。`-Spath` で確認したところ classpath には pin 済みの
+`~/.gitlibs/.../502f2921.../src` が入っており、あの実行は patched backend では
+なく **pin 済み backend** に対するものだった。同じ理由で、あの ADR の
+'差分ネイティブ実行 12 本が baseline と一致' も baseline 同士の比較で、何も
+証明していなかった。
+
+正しい指定は `-Sdeps '{:aliases {:ovr {:override-deps {...}}}}' -M:ovr:test`。
+
+**結論自体は現在は正しく、実測で裏付けられている** — peephole は
+`kotoba-native` main に入り、本 ADR の pin 前進で compiler がそれを実際に
+ビルドするようになった上で、上表の 785 tests / 6,294 assertions と
+native-conformance 5/5 が通っている。誤っていたのは当時引用した証拠であって
+結論ではないが、証拠が無効だった以上そう記録する。
+
+## 発見: pin が古すぎて上流の成果が効いていなかった
+
+compiler の `deps.edn` は `kotoba-native` を `502f2921` (8 commit 遅れ)、
+`kotoba-verifier` を `af28d272` (4 commit 遅れ) に固定していた。つまり
+**peephole も f64 算術も本 ADR の修正も、この repo が実際にビルドするものには
+一切効いていなかった。** `bit-or` が全 native target で死んでいた直接の原因も
+これ (frontend は admit するのに、pin された検証器がそれを知らない)。
+PR #480 で両 pin を前進させ、superproject の west pin も 3 件揃えた
+(`f19bdc3`、diff 3 行、全件 server-side で ahead / behind_by 0 /
+merge_base == 旧 pin / default branch と identical を確認)。
+
+**教訓: 上流に merge しただけでは成熟度は上がらない。consumer の pin を
+進めるまでが 1 単位。**
+
+## Consequences
+
+- native の operator surface が両 ISA で揃い、以後の drift は
+  `isa-parity-test` が落とす。
+- `bit-or` が全 native target で初めて実行可能になった。
+- 残る非対称は AArch64 の privileged surface が未定義であることだけで、
+  これは意図的に open。
+- 検証器の独立再導出は維持されるので、同種の drift は今後も起こりうる。
+  起きたときに **安全側に倒れる**ことは今回実証された。"}]
