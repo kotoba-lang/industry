@@ -231,7 +231,52 @@
                     {:score 1.0 :note "the issue doc's specific evidence claim now matches source -- :aiueos/signer-status found in contract.cljc; re-verify the safety-enforcement axis event too."}
                     {:score 0.1 :note "confirmed: the issue doc still claims 'Added CLJC policy-level :aiueos/signer-status lifecycle states' as resolution evidence, but that exact keyword is absent from contract.cljc (the file the issue itself points to) -- the doc's own cited evidence does not exist; a silent overclaim, not a disclosed gap."}))
                 {:score 0.5 :note "expected resolution-evidence wording no longer found verbatim in the issue doc -- content may have been reworded; re-verify by hand."}))
-            {:score 0.0 :note "docs/issues/security-key-lifecycle-signer-revocation.md no longer exists -- claim's cited source file is gone; re-verify."}))}])
+            {:score 0.0 :note "docs/issues/security-key-lifecycle-signer-revocation.md no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   ;; ---- 2026-08-03 weekly claim-discovery additions: ADR-0016 TCB java.base/CI contradiction,
+   ;; ADR-0017's disclosed SBOM-attestation wiring gap, and an undisclosed sealed-storage
+   ;; evidence-is-a-placeholder gap for key-lifecycle checkpoints. --------------------------
+   {:claim :claim/aiueos-tcb-java-base-ci-version-contradiction :axis :axis/doc-code-drift :layer :lint
+    :fn (fn []
+          (let [adr (slurp* "90-docs/adr/0016-content-addressed-external-tcb.md")
+                tcb (slurp* "qualification/tcb-inventory.edn")
+                ci (slurp* ".github/workflows/ci.yml")]
+            (cond
+              (not (has? tcb #":minimum-version 25"))
+              {:score 0.4 :note "qualification/tcb-inventory.edn no longer records java.base :minimum-version 25 -- inventory may have been revised; re-verify whether the CI-version contradiction was actually resolved."}
+              (not (has? ci #"java-version:\s*\"21\""))
+              {:score 0.6 :note "ci.yml no longer provisions java-version 21 -- if it was bumped to >=25, the contradiction ADR-0016 disclosed may now be resolved; re-verify and consider raising this score, since a real fix here would be genuine progress."}
+              :else
+              {:score 1.0 :note "confirmed: qualification/tcb-inventory.edn still records java.base :minimum-version 25 with :assurance-gap :platform-runtime-not-content-addressed, and .github/workflows/ci.yml still provisions java-version 21 -- ADR-0016's self-disclosed contradiction ('nothing detects the contradiction') still holds and is still undetected by any gate."})))}
+
+   {:claim :claim/aiueos-sbom-attestation-not-wired-to-release-pipeline :axis :axis/production-readiness :layer :lint
+    :fn (fn []
+          (if (exists? "os/aiueos/scripts/build-release-image.sh")
+            (let [adr (slurp* "90-docs/adr/0017-release-attestations.md")
+                  script (slurp* "os/aiueos/scripts/build-release-image.sh")
+                  script-has-attest? (has? script #"(?i)attest|sbom|provenance")]
+              (cond
+                (not (has? adr #"does not yet call `clojure -M:attest`"))
+                {:score 0.4 :note "ADR-0017's 'Not done' section no longer discloses build-release-image.sh lacking the attest call verbatim -- either the wiring landed (re-verify, would be real progress) or wording changed; re-verify by hand."}
+                script-has-attest?
+                {:score 0.6 :note "os/aiueos/scripts/build-release-image.sh now references attest/sbom/provenance where it previously had none -- the disclosed wiring gap may have started closing; re-verify whether clojure -M:attest is actually invoked with the receipt's digest before raising this score to 1.0."}
+                :else
+                {:score 1.0 :note "confirmed: ADR-0017 still discloses that build-release-image.sh does not call clojure -M:attest and no gate requires an attestation for a release, and the 26-line script still has zero attest/sbom/provenance references -- the disclosed gap matches the code exactly."}))
+            {:score 0.0 :note "os/aiueos/scripts/build-release-image.sh no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   {:claim :claim/aiueos-key-checkpoint-storage-evidence-is-literal-not-computed :axis :axis/evidence-linkage :layer :lint
+    :fn (fn []
+          (let [profile (slurp* "src/aiueos/deployment_profile.cljc")
+                producers (filter #(and (exists? %) (has? (slurp* %) #":key-checkpoint-storage"))
+                                   ["src/aiueos/key_lifecycle.clj" "src/aiueos/launcher.cljc"
+                                    "src/aiueos/sealed_state.clj" "src/aiueos/sealed_audit.clj"])]
+            (cond
+              (not (has? profile #":key-checkpoint-storage"))
+              {:score 0.5 :note "deployment_profile.cljc no longer references :key-checkpoint-storage -- the check may have been removed or renamed; re-verify by hand."}
+              (seq producers)
+              {:score 0.7 :note (str "found :key-checkpoint-storage referenced in " (str/join ", " producers) " beyond the check-site/test-fixture -- a real producer for this evidence field may now exist; re-verify whether it actually persists a checkpoint into sealed storage before raising this score to 1.0.")}
+              :else
+              {:score 0.2 :note "confirmed: :key-checkpoint-storage still appears only at the deployment_profile.cljc check site and in test fixtures -- no code in key_lifecycle.clj, launcher.cljc, sealed_state.clj, or sealed_audit.clj actually produces/persists this evidence field into sealed monotonic storage. docs/key-lifecycle.md's 'enforced regulated baseline' status makes no exception for this gap, unlike ADR-0017's disclosed SBOM gap -- a silent placeholder, not a disclosed one."})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

@@ -201,6 +201,31 @@
   :claim/self-caveat false,
   :claim/axis [:axis/safety-enforcement :axis/doc-code-drift]}
 
+ ;; ---- claim catalog: aiueos (extended 2026-08-03, weekly claim-discovery pass) ------------
+ {:claim/id :claim/aiueos-tcb-java-base-ci-version-contradiction,
+  :claim/project :project/aiueos,
+  :claim/source "orgs/kotoba-lang/aiueos/90-docs/adr/0016-content-addressed-external-tcb.md:125-131; qualification/tcb-inventory.edn:78-84; .github/workflows/ci.yml:44-45",
+  :claim/text "ADR-0016's TCB inventory records 'java.base' with ':minimum-version 25' and an explicit ':assurance-gap :platform-runtime-not-content-addressed', and self-discloses in the same breath: '.github/workflows/ci.yml provisions temurin 21, which does not satisfy that floor, and nothing detects the contradiction.' Confirmed against source: qualification/tcb-inventory.edn's java.base entry carries the identical assurance-gap and explanatory comment, and .github/workflows/ci.yml does provision temurin/21 -- the contradiction is real and, by the ADR's own words, unenforced by any CI gate.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/doc-code-drift :axis/evidence-linkage]}
+
+ {:claim/id :claim/aiueos-sbom-attestation-not-wired-to-release-pipeline,
+  :claim/project :project/aiueos,
+  :claim/source "orgs/kotoba-lang/aiueos/90-docs/adr/0017-release-attestations.md:93-98; os/aiueos/scripts/build-release-image.sh (26 lines, whole file)",
+  :claim/text "ADR-0017 states the new aiueos.sbom SBOM/provenance generator (clojure -M:attest) is implemented and tested, but its own 'Not done' section discloses: 'os/aiueos/scripts/build-release-image.sh does not yet call clojure -M:attest with the receipt's digest, and no gate requires an attestation to exist for a release.' Confirmed: build-release-image.sh (26 lines) has zero references to attest/sbom/provenance anywhere in the file -- the disclosed wiring gap matches the code exactly.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/production-readiness]}
+
+ {:claim/id :claim/aiueos-key-checkpoint-storage-evidence-is-literal-not-computed,
+  :claim/project :project/aiueos,
+  :claim/source "orgs/kotoba-lang/aiueos/docs/key-lifecycle.md:1,3,26-27; src/aiueos/deployment_profile.cljc:172-173; test/aiueos/deployment_profile_test.cljc:80,132-138; src/aiueos/key_lifecycle.clj (219 lines, whole file)",
+  :claim/text "docs/key-lifecycle.md (Status: 'enforced regulated baseline') states 'The node checkpoint must be stored in sealed monotonic storage,' and deployment_profile.cljc's key-checkpoint-violations check requires evidence field :key-checkpoint-storage = :sealed-monotonic for regulated admission. Grepping the actual current source: :key-checkpoint-storage appears ONLY at the check site (deployment_profile.cljc) and as a hardcoded keyword literal in test fixtures (deployment_profile_test.cljc) -- no code anywhere in src/ (including key_lifecycle.clj, read in full) actually persists a key-lifecycle checkpoint into sealed storage. Unlike ADR-0017's SBOM-digest gap (claim/aiueos-sbom-attestation-not-wired-to-release-pipeline), which the project discloses as 'not done', this evidence-is-a-placeholder gap for :key-checkpoint-storage is not disclosed anywhere as open -- the 'enforced regulated baseline' status header makes no exception for it.",
+  :claim/self-reported-level "enforced regulated baseline",
+  :claim/self-caveat false,
+  :claim/axis [:axis/evidence-linkage :axis/safety-enforcement]}
+
  ;; ---- claim catalog: kotoba (extended 2026-07-15) -----------------------------------------
  {:claim/id :claim/kotoba-maturity-m6,
   :claim/project :project/kotoba,
@@ -276,6 +301,23 @@
   :claim/self-caveat false,
   :claim/axis [:axis/safety-enforcement]}
 
+ ;; ---- claim catalog: kotoba (extended 2026-08-03, weekly claim-discovery pass) ------------
+ {:claim/id :claim/kotoba-reproducible-emit-gate-71-of-74,
+  :claim/project :project/kotoba,
+  :claim/source "orgs/kotoba-lang/kotoba/docs/ADR-reproducible-emit-gate.md:46-49,88-102; qualification/emit-digests.edn (74 src/*.kotoba entries, 3 :unsupported); test/kotoba/test_runner.clj:35,88",
+  :claim/text "ADR-reproducible-emit-gate.md adds a cross-machine reproducibility gate: every src/**.kotoba source's expected emitted-wasm digest is checked into qualification/emit-digests.edn (bound to a source+policy pair), and kotoba.reproducible-emit-test (registered in test-runner.clj) fails CI on mismatch. The ADR states 71 of 74 sources emit successfully with the recorded policies; the other 3 are recorded as :unsupported with named :problem-kinds, not silently skipped. Confirmed: emit-digests.edn has exactly 74 'src/*.kotoba' entries, and exactly 3 (demo_kbb_fs_report.kotoba :unknown-form; demo_string_host_sugar.kotoba and q8_capability_port.kotoba :capability-not-granted) carry :unsupported :wasm/check-failed -- matching the ADR's own numbers precisely. The ADR's own Consequences section discloses this closes only 'the reproducible-build half' of security-assurance item T-08 (signed binary/JAR, SBOM, provenance, independent audit retest remain open), that wiring the digest into a signed qualification record is 'deliberately not done here', and that coverage is src/**.kotoba only -- the cljs emit backend shares the gate but is explicitly 'not covered ... left as follow-up rather than claimed.'",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/evidence-linkage :axis/production-readiness]}
+
+ {:claim/id :claim/kotoba-issues-edn-stale-open-status-vs-fixed-code,
+  :claim/project :project/kotoba,
+  :claim/source "orgs/kotoba-lang/kotoba/.issues/issues.edn:1 (issue security-rad-build-needs-package-lock-scaffolding, github issues/281, finding F-001, :status :open); docs/issues/security-rad-build-needs-package-lock-scaffolding.md:24,27,37,45,54; src/kotoba/rad_adapter.cljc:62-69,91-96,135-143,152-162; test/kotoba/rad_adapter_test.clj:81-101",
+  :claim/text ".issues/issues.edn still tracks GitHub issue #281 as :status :open, whose body describes 'rad build'/'rad export' as 'entirely non-functional' because kotoba.rad-adapter's :build step re-dispatches 'wasm emit' without --package-lock and 'rad new' scaffolds no lock file, naming the regression test launcher-executes-rad-lifecycle-end-to-end as currently failing. This is contradicted by the current source in the same commit: rad_adapter.cljc already has a lock-path fn, scaffold-files already writes a kotoba.lock.edn (lines 91-96), and both :build (line 143) and :export (line 162) steps already pass '--package-lock' (lock-path project). test/kotoba/rad_adapter_test.clj's launcher-executes-rad-lifecycle-end-to-end (the exact test the issue names) asserts full success end-to-end (:rad/executed for new/test/build/export, plus real .wasm magic bytes) rather than the failure the issue describes -- the issue tracker's :open status and 'entirely non-functional' description are stale relative to code that already fixes the described bug.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/doc-code-drift]}
+
  ;; ---- claim catalog: kotoba-lang (extended 2026-07-15) ------------------------------------
  {:claim/id :claim/kotoba-lang-maturity-m6,
   :claim/project :project/kotoba-lang,
@@ -343,6 +385,31 @@
   :claim/self-caveat false,
   :claim/axis [:axis/doc-code-drift :axis/safety-enforcement]}
 
+ ;; ---- claim catalog: kotoba-lang (extended 2026-08-03, weekly claim-discovery pass) -------
+ {:claim/id :claim/kotoba-lang-ops-catalog-registered-not-aot-implemented,
+  :claim/project :project/kotoba-lang,
+  :claim/source "orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-t83-ops-capability-catalog-wire-ids-19-23.md:1-4,33-38,44; lang/capability-catalog.edn:56-71; test/kotoba/lang/capability_catalog_test.clj:16-26; docs/agent-handoff-kotoba-refactor.md:90",
+  :claim/text "ADR-t83 (2026-08-01, Accepted) registers ops capability wire ids 19-23 (fs/transact, process/spawn, secret/get, git/run, entropy/draw) in lang/capability-catalog.edn, but self-discloses this registration 'does not flip :wasm-aot :implemented' -- 'Host authority (spawn/fetch/store/git/CSPRNG) remains open by design,' and compiler-side vendoring of the same catalog is deferred to 'a separate PR on kotoba-lang/compiler.' Confirmed: capability-catalog.edn has entries for all 5 with :compiler-wire-id 19-23 and :source-status :friendly-qualified (not an AOT-implemented marker), and capability_catalog_test.clj's tripwire test asserts exactly [19 20 21 22 23] for these 5 operations and (= 23 (count entries)) -- the registration is real and landed, but the ADR's own disclosed AOT/host-authority gap is also real and current. docs/agent-handoff-kotoba-refactor.md independently corroborates: 'host I/O wasm-aot remains partial by design.'",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/production-readiness]}
+
+ {:claim/id :claim/kotoba-lang-host-parity-critical-imports-capability-absent,
+  :claim/project :project/kotoba-lang,
+  :claim/source "orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-w6-t84-host-parity-critical-fixtures.md:1-4,19-26; lang/host-parity.edn:203,210,249-315 (16 :capability-absent keyword entries)",
+  :claim/text "ADR-w6-t84 (2026-07-28, Accepted) self-discloses: '`:component-link` remains outside linkable-statuses -- fixtures assert :capability-absent for jvm/node http-get until signed AOT packaging makes component-linked providers first-class,' and lists as non-claims 'Does not implement live host runners in kototama/wasm-webcomponent' and 'Does not flip kit readiness :signed-wasm.' Confirmed: lang/host-parity.edn has 16 :capability-absent keyword-value entries spanning http-get, transport-connect, tls-open, tls-server-end-point, llm-infer, scram-sha256, pg-open, pg-open-scram, pg-pool-open, and pg-cancel across jvm/node/browser hosts -- the disclosed gap is broad (not limited to http-get as the headline sentence alone implies) and the compiled resources/kotoba/lang/host-parity.edn copy is byte-identical to the source, so no packaging drift has crept in between the two copies.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/production-readiness :axis/functional-completeness]}
+
+ {:claim/id :claim/kotoba-lang-q9-f64-codegen-missing-upstream,
+  :claim/project :project/kotoba-lang,
+  :claim/source "orgs/kotoba-lang/kotoba-lang/lang/q9-wave1-tranche-2.edn:44-51 (as-of 2026-07-20); independently verified against orgs/kotoba-lang/kotoba/src/kotoba/wasm_exec.clj:753-756 and src/kotoba/runtime.clj:4837-4840 (kotoba HEAD 616f0a0, 2026-08-01)",
+  :claim/text "kotoba-lang's own Q9 tranche-2 investigation record states 'kotoba-lang/kotoba's own kotoba.runtime/wasm-binary (the direct/reference WASM emitter -- a separate codebase from kotoba-lang/compiler) does not yet implement codegen for f64-* ops at its own current main (ecb805348a1495b7aac19d3e8af8058baee06fb6), so this tranche's dual-backend ... qualification pattern cannot pass for any float-using source regardless of pin choice.' This is a claim ABOUT a different repo (kotoba-lang/kotoba), so it was independently checked against that repo's own current source rather than taken on kotoba-lang's word alone: kotoba/src/kotoba/runtime.clj's wasm-valtypes map (line 4837) is exactly {:i32 0x7f :i64 0x7e :f32 0x7d} with no :f64 entry, and wasm_exec.clj's call-main docstring (lines 753-756) self-confirms from the OTHER side: 'No :f64 case -- kotoba.runtime/wasm-valtypes has no :f64 entry and the compiler has no f64 literal/ops, so no real compiled module can ever declare an f64 main result.' Both repos' own current source independently agree: f64 is a genuine, current gap in kotoba's reference WASM emitter, not a stale or one-sided claim.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/functional-completeness :axis/doc-code-drift]}
+
  ;; ---- claim catalog: kotobase (extended 2026-07-15) ---------------------------------------
  {:claim/id :claim/kotobase-istore-seam,
   :claim/project :project/kotobase,
@@ -385,6 +452,31 @@
   :claim/self-reported-level "",
   :claim/self-caveat false,
   :claim/axis [:axis/safety-enforcement]}
+
+ ;; ---- claim catalog: kotobase (extended 2026-08-03, weekly claim-discovery pass) ----------
+ {:claim/id :claim/kotobase-adr-topology-deps-drift,
+  :claim/project :project/kotobase,
+  :claim/source "orgs/kotoba-lang/kotobase/docs/ADR-stack-topology.md:18-24; deps.edn:1-23,33-34",
+  :claim/text "ADR-stack-topology.md states: 'Verified against deps.edn 2026-07-24: this repo's runtime deps are security only; the kotoba dependency appears solely in the :integration test alias.' Confirmed against the current deps.edn: the kotoba half holds (io.github.kotoba-lang/kotoba only appears under the :integration alias's :extra-deps, lines 33-34), but the 'security only' half does not -- the top-level :deps map now lists FOUR runtime deps: io.github.kotoba-lang/security, io.github.kotoba-lang/abi, io.github.kotoba-lang/kotobase-storage, and io.github.kotoba-lang/kotobase-engine. This is a live doc-vs-code drift as of the current clone HEAD, distinct from the already-resolved claim/kotobase-m5-doc-inconsistency, and plausibly an artifact of the storage-plane split (docs/storage-architecture.md) landing after ADR-stack-topology.md was written without the ADR being updated.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/doc-code-drift]}
+
+ {:claim/id :claim/kotobase-critical-path-cljc-ci-red-bug,
+  :claim/project :project/kotobase,
+  :claim/source "orgs/kotoba-lang/kotobase/test/kotobase/critical_path_test.clj:1-16 (docstring)",
+  :claim/text "critical_path_test.clj's own docstring self-reports a CI-breaking bug: as a .cljc file it linted for both JVM and ClojureScript, but the file walks the source tree with clojure.java.io/file-seq/slurp, which do not exist under cljs -- so 'clojure -M:lint failed and took CI red from 2026-07-30, while the 80 tests underneath it kept passing. The extension was the bug.' Confirmed: the file is named critical_path_test.clj (not .cljc) at the current HEAD commit, whose own merge message is 'Merge agent/cljc-jvm-only-fns: critical-path is a build-time check, so it is .clj' -- the fix (renaming to .clj) is the literal tip of the repo.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/production-readiness]}
+
+ {:claim/id :claim/kotobase-transparency-retention-implemented,
+  :claim/project :project/kotobase,
+  :claim/source "orgs/kotoba-lang/kotobase/docs/transparency-retention.md:1-16; src/kotobase/transparency_log.clj:23-56,61,86-107; test/kotobase/transparency_log_test.clj (4 deftests)",
+  :claim/text "docs/transparency-retention.md claims transparency checkpoints bind an append-only receipt root, tree size, key id, monotonically increasing key epoch, prior checkpoint CID, and distinct operations/auditor witnesses, with unknown/expired key epochs, rollback, missing witnesses, and signature drift failing closed; and that receipt retention is class-based with legal-hold override and crypto-shredding gated on a newer witnessed checkpoint. Confirmed in source: verify-checkpoint (transparency_log.clj:30-56) checks :transparency/key-epoch, :transparency/checkpoint-chain, :transparency/witness-threshold, and :transparency/rollback exactly as described, and retention-decision (lines 86-107) implements the legal-hold-always-wins / checkpoint-newer?-gated crypto-shred/delete logic -- this is genuinely wired, matching the doc closely, not an overclaim.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/safety-enforcement :axis/evidence-linkage]}
 
  ;; ---- claim catalog: kototama (extended 2026-07-15) ---------------------------------------
  {:claim/id :claim/kototama-r3-stable,
@@ -434,4 +526,29 @@
   :claim/self-reported-level "R2 advanced-partial (README.md) vs R2 qualified (docs/maturity.md)",
   :claim/self-caveat false,
   :claim/axis [:axis/doc-code-drift]}
+
+ ;; ---- claim catalog: kototama (extended 2026-08-03, weekly claim-discovery pass) ----------
+ {:claim/id :claim/kototama-t84-host-parity-live-partial,
+  :claim/project :project/kototama,
+  :claim/source "orgs/kotoba-lang/kototama/docs/grade-a-host-parity-live-runner.md:1-5,101-114; test/kototama/host_parity_live_test.clj:70-71,87-88",
+  :claim/text "docs/grade-a-host-parity-live-runner.md self-declares 'Status: partial (JVM 56 + Node 38 inject/live ...)' and lists explicit non-claims including 'Not signed ops AOT Components (T8.3)', 'Does not replace pure matrix run-conformance', and 'Not claim T8.4 complete'. Confirmed: host_parity_live_test.clj hard-asserts (= 56 (:total r)) for the JVM live corpus and (= 38 (:total r)) for the Node live corpus, matching the doc's own numbers exactly -- the partial status and counts are test-backed, not narrative inflation.",
+  :claim/self-reported-level "T8.4 partial",
+  :claim/self-caveat true,
+  :claim/axis [:axis/functional-completeness :axis/evidence-linkage]}
+
+ {:claim/id :claim/kototama-tcb-t01-in-progress-unaudited,
+  :claim/project :project/kototama,
+  :claim/source "orgs/kotoba-lang/kototama/docs/grade-a-tcb-inventory.md:21-24; qualification/tcb-inventory.edn:2,76-88; src/kototama/tcb.clj:26-64",
+  :claim/text "docs/grade-a-tcb-inventory.md states 'T-01 remains in-progress until mutation/adversarial coverage is complete and an independent reviewer audits these boundaries and verifies the remediation retest.' qualification/tcb-inventory.edn (:tcb/as-of 2026-07-31) names three concrete unmitigated risks under :tcb/native-unsafe: the Chicory unsafe execution listener ('unstable runtime hook; runtime upgrade requires containment retest'), the JDK HttpClient/DNS resolver ('resolver cannot pin validated address; DNS rebinding remains open'), and same-process JVM/JIT isolation ('not a hardware or process sandbox'). Confirmed: src/kototama/tcb.clj's validate fn implements exactly the automated checks the doc describes (:missing-file, :duplicate-path, :missing-role, :digest-drift, :unversioned-external-boundary) -- the automated half is real, but the doc's own required gate (independent audit, mutation/adversarial coverage) is admittedly not done, and the DNS-rebinding / non-sandboxed-isolation risks are the project's own admission, not inferred.",
+  :claim/self-reported-level "T-01 in-progress",
+  :claim/self-caveat true,
+  :claim/axis [:axis/safety-enforcement :axis/production-readiness]}
+
+ {:claim/id :claim/kototama-scheduled-qualification-workflows-undocumented-in-ci,
+  :claim/project :project/kototama,
+  :claim/source "orgs/kotoba-lang/kototama/docs/adr/0011-linear-resource-recovery-and-browser-surface.md:4,16-23; docs/postgresql-qualification.edn:31-35 (:scheduled-soak); .github/workflows/ci.yml (111 lines, whole file); package.json; src/kototama/component_provider.cljc:10-13",
+  :claim/text "ADR 0011 (Accepted, 2026-07-26) states in the indicative present tense: 'The scheduled Component requalification workflow detects upstream wasm-tools, Wasmtime, and jco drift and opens one actionable qualification issue,' describing a third qualified execution surface as 'jco-transpiled Component in Chromium' run in CI. Separately, docs/postgresql-qualification.edn declares a :scheduled-soak with :cadence :weekly. Confirmed: .github/workflows/ci.yml is the only workflow file in the repo, triggers only on pull_request/push (zero 'schedule:' triggers anywhere in the repo, grepped across all *.yml/*.yaml), package.json has no jco dependency at all (only workerd as a devDependency), and :jco-component appears in component_provider.cljc only as an inert enum value in supported-runtimes/component-runtimes sets -- never dispatched to a real jco transpile/Chromium invocation anywhere in the repo. Neither doc discloses that the described recurring automation is unbuilt.",
+  :claim/self-reported-level "",
+  :claim/self-caveat false,
+  :claim/axis [:axis/doc-code-drift :axis/production-readiness]}
 ]

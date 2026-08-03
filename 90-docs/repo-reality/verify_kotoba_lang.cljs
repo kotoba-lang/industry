@@ -139,7 +139,61 @@
                 any-check-script? (exists? "scripts/check-package-contract.bb")]
             (if (or any-conformance-dir? any-check-script?)
               {:score 0.6 :note "lang/package-conformance/ or scripts/check-package-contract.bb now exists where neither did before -- partial progress on F-001's actual safety mechanism (unsafe package references made non-conforming); re-verify how complete it is."}
-              {:score 0.1 :note "confirmed: no package-conformance negative-fixture directory and no package-contract check script exist anywhere in the repo -- the safety mechanism F-001 is meant to add (unsafe package references unambiguously rejected) is not present in the codebase regardless of what .issues/issues.edn claims."})))}])
+              {:score 0.1 :note "confirmed: no package-conformance negative-fixture directory and no package-contract check script exist anywhere in the repo -- the safety mechanism F-001 is meant to add (unsafe package references unambiguously rejected) is not present in the codebase regardless of what .issues/issues.edn claims."})))}
+
+   ;; ---- 2026-08-03 weekly claim-discovery additions: T8.3 ops catalog ADR, T8.4 host-parity
+   ;; critical-fixtures ADR, and a cross-repo f64-codegen self-report checked against kotoba's
+   ;; own source (root here is orgs/kotoba-lang/kotoba-lang/, so "../kotoba/..." reaches the
+   ;; sibling orgs/kotoba-lang/kotoba/ west checkout). ------------------------------------------
+   {:claim :claim/kotoba-lang-ops-catalog-registered-not-aot-implemented :axis :axis/production-readiness :layer :lint
+    :fn (fn []
+          (let [adr (slurp* "docs/adr/ADR-t83-ops-capability-catalog-wire-ids-19-23.md")
+                catalog (slurp* "lang/capability-catalog.edn")
+                test (when (exists? "test/kotoba/lang/capability_catalog_test.clj")
+                       (slurp* "test/kotoba/lang/capability_catalog_test.clj"))]
+            (cond
+              (not (has? adr #"does \*\*not\*\* flip"))
+              {:score 0.4 :note "expected 'does **not** flip :wasm-aot :implemented' disclosure language no longer found verbatim in ADR-t83 -- either AOT landed for real (re-verify, would be genuine progress) or wording changed; re-verify by hand."}
+              (not (and (has? catalog #":compiler-wire-id 19") (has? catalog #":compiler-wire-id 23")))
+              {:score 0.3 :note "expected :compiler-wire-id 19/23 entries no longer found verbatim in lang/capability-catalog.edn -- catalog may have been restructured; re-verify."}
+              (not (and test (has? test #"\[19 20 21 22 23\]")))
+              {:score 0.5 :note "capability_catalog_test.clj no longer asserts the [19 20 21 22 23] wire-id tripwire for fs/transact/process/spawn/secret/get/git/run/entropy/draw -- re-verify test coverage for this registration."}
+              :else
+              {:score 1.0 :note "confirmed: ADR-t83 still discloses that registering wire ids 19-23 does not flip :wasm-aot :implemented and that host authority remains open by design, lang/capability-catalog.edn still has the 5 entries with :compiler-wire-id 19-23, and capability_catalog_test.clj still hard-asserts the [19 20 21 22 23] tripwire -- the registration is real and the self-disclosed AOT gap is honestly stated alongside it."})))}
+
+   {:claim :claim/kotoba-lang-host-parity-critical-imports-capability-absent :axis :axis/production-readiness :layer :lint
+    :fn (fn []
+          (let [adr (slurp* "docs/adr/ADR-w6-t84-host-parity-critical-fixtures.md")
+                parity (slurp* "lang/host-parity.edn")
+                absent-count (count (re-seq #":capability-absent" parity))]
+            (cond
+              (not (has? adr #"`:component-link` remains outside linkable-statuses"))
+              {:score 0.4 :note "expected ':component-link remains outside linkable-statuses' disclosure no longer found verbatim in ADR-w6-t84 -- either component-linked providers landed (re-verify, would be real progress) or wording changed; re-verify by hand."}
+              (< absent-count 10)
+              {:score 0.5 :note (str "lang/host-parity.edn now has only " absent-count " :capability-absent entries (previously 17) -- some critical-import fixtures may have flipped to real providers; re-verify which ones closed before raising this score.")}
+              :else
+              {:score 1.0 :note (str "confirmed: ADR-w6-t84 still discloses :component-link as outside linkable-statuses pending signed AOT packaging, and lang/host-parity.edn still has " absent-count " :capability-absent fixture entries spanning http-get/transport-connect/tls/llm-infer/scram/pg-* across jvm/node/browser hosts -- the disclosed gap remains broad and current.")})))}
+
+   {:claim :claim/kotoba-lang-q9-f64-codegen-missing-upstream :axis :axis/functional-completeness :layer :evidence-link
+    :fn (fn []
+          (let [tranche (slurp* "lang/q9-wave1-tranche-2.edn")
+                tranche-still-claims-gap? (has? tranche #"does not yet implement\s+codegen")
+                kotoba-runtime (when (exists? "../kotoba/src/kotoba/runtime.clj")
+                                 (slurp* "../kotoba/src/kotoba/runtime.clj"))
+                kotoba-wasm-exec (when (exists? "../kotoba/src/kotoba/wasm_exec.clj")
+                                   (slurp* "../kotoba/src/kotoba/wasm_exec.clj"))
+                kotoba-still-lacks-f64? (and kotoba-runtime kotoba-wasm-exec
+                                             (has? kotoba-runtime #"\{:i32 0x7f\s*:i64 0x7e\s*:f32 0x7d\}")
+                                             (has? kotoba-wasm-exec #"No :f64 case"))]
+            (cond
+              (not tranche-still-claims-gap?)
+              {:score 0.4 :note "lang/q9-wave1-tranche-2.edn no longer states kotoba's wasm-binary emitter lacks f64 codegen -- either the tranche record was revised or the upstream gap closed; re-verify by hand."}
+              (nil? kotoba-runtime)
+              {:score 0.5 :note "could not read ../kotoba/src/kotoba/runtime.clj from this checkout -- the sibling orgs/kotoba-lang/kotoba west project may not be checked out; re-run after `west update` to independently re-verify the cross-repo half of this claim."}
+              kotoba-still-lacks-f64?
+              {:score 1.0 :note "confirmed on BOTH sides: kotoba-lang's own q9-wave1-tranche-2.edn still states kotoba.runtime/wasm-binary lacks f64-* codegen, and kotoba's own current source independently agrees -- runtime.clj's wasm-valtypes map is still exactly {:i32 0x7f :i64 0x7e :f32 0x7d} (no :f64), and wasm_exec.clj's call-main docstring still says 'No :f64 case'. The cross-repo self-report and the referenced repo's own source have not diverged."}
+              :else
+              {:score 0.6 :note "kotoba-lang's tranche record still claims the f64 gap, but kotoba's own current source no longer matches the expected 'no :f64 entry' / 'No :f64 case' text -- f64 codegen may have actually landed in kotoba since this claim was written; re-verify by hand before revising claim/self-caveat."})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

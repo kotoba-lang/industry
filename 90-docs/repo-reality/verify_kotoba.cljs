@@ -131,7 +131,43 @@
                         (has? test #"wasm-run-rejects-missing-package-lock")))
               {:score 0.5 :note "admission-gated's F-001 docstring is present, but the two named regression tests (wasm-emit-rejects-missing-package-lock / wasm-run-rejects-missing-package-lock) are no longer both found in launcher_test.clj -- re-verify test coverage."}
               :else
-              {:score 1.0 :note "confirmed: launcher.clj's admission-gated fn (shared by wasm-emit-result/wasm-run-result/cljs-emit-result) still documents --package-lock as mandatory with no opt-out (F-001), and launcher_test.clj still has wasm-emit-rejects-missing-package-lock + wasm-run-rejects-missing-package-lock asserting :package/missing-lock-option on a missing flag -- the CHANGELOG's 'no opt-out' claim is backed by real, currently-passing-shaped test coverage, not just prose."})))}])
+              {:score 1.0 :note "confirmed: launcher.clj's admission-gated fn (shared by wasm-emit-result/wasm-run-result/cljs-emit-result) still documents --package-lock as mandatory with no opt-out (F-001), and launcher_test.clj still has wasm-emit-rejects-missing-package-lock + wasm-run-rejects-missing-package-lock asserting :package/missing-lock-option on a missing flag -- the CHANGELOG's 'no opt-out' claim is backed by real, currently-passing-shaped test coverage, not just prose."})))}
+
+   ;; ---- 2026-08-03 weekly claim-discovery additions: reproducible-emit-gate ADR, and a stale
+   ;; issue-tracker status contradicted by already-fixed code. --------------------------------
+   {:claim :claim/kotoba-reproducible-emit-gate-71-of-74 :axis :axis/evidence-linkage :layer :evidence-link
+    :fn (fn []
+          (if (exists? "qualification/emit-digests.edn")
+            (let [digests (slurp* "qualification/emit-digests.edn")
+                  total (count (re-seq #"\"src/[^\"]+\.kotoba\"" digests))
+                  unsupported (count (re-seq #":unsupported :wasm/check-failed" digests))
+                  test-runner (when (exists? "test/kotoba/test_runner.clj") (slurp* "test/kotoba/test_runner.clj"))]
+              (cond
+                (not (has? test-runner #"reproducible-emit-test"))
+                {:score 0.3 :note "kotoba.reproducible-emit-test is no longer registered in test_runner.clj -- the gate may have been unwired from CI; re-verify by hand."}
+                (and (= total 74) (= unsupported 3))
+                {:score 1.0 :note (str "confirmed: qualification/emit-digests.edn still has exactly " total " src/*.kotoba entries with exactly " unsupported " :unsupported :wasm/check-failed, matching the ADR's own 71-of-74 figure, and kotoba.reproducible-emit-test is still registered in test_runner.clj.")}
+                :else
+                {:score 0.6 :note (str "emit-digests.edn now has " total " total entries (expected 74) and " unsupported " :unsupported entries (expected 3) -- the corpus or its emit-success rate has changed since the ADR was written; re-verify whether this is healthy growth (more sources added) or a real regression.")}))
+            {:score 0.0 :note "qualification/emit-digests.edn no longer exists -- claim's cited evidence file is gone; re-verify."}))}
+
+   {:claim :claim/kotoba-issues-edn-stale-open-status-vs-fixed-code :axis :axis/doc-code-drift :layer :lint
+    :fn (fn []
+          (if (exists? ".issues/issues.edn")
+            (let [issues (slurp* ".issues/issues.edn")
+                  adapter (when (exists? "src/kotoba/rad_adapter.cljc") (slurp* "src/kotoba/rad_adapter.cljc"))
+                  test-src (when (exists? "test/kotoba/rad_adapter_test.clj") (slurp* "test/kotoba/rad_adapter_test.clj"))]
+              (cond
+                (not (has? issues #"security-rad-build-needs-package-lock-scaffolding"))
+                {:score 0.5 :note "the security-rad-build-needs-package-lock-scaffolding issue entry no longer found in .issues/issues.edn -- issue may have been closed/removed; re-verify whether it was closed because the code fix (below) was finally recognized."}
+                (not (and adapter (has? adapter #"--package-lock\" \(lock-path project\)")))
+                {:score 0.4 :note "src/kotoba/rad_adapter.cljc no longer passes --package-lock via lock-path in its :build/:export steps as expected -- either the fix regressed (bad) or the mechanism was restructured; re-verify by hand."}
+                (not (and test-src (has? test-src #"launcher-executes-rad-lifecycle-end-to-end")
+                          (has? test-src #":rad/executed \(:kotoba.cli/code export-result\)")))
+                {:score 0.5 :note "launcher-executes-rad-lifecycle-end-to-end no longer asserts full :rad/executed success through export -- re-verify whether the test coverage changed."}
+                :else
+                {:score 0.2 :note "confirmed: .issues/issues.edn still tracks issue #281 as :status :open with its 'entirely non-functional' description, but rad_adapter.cljc's :build/:export steps still pass --package-lock via lock-path, and launcher-executes-rad-lifecycle-end-to-end still asserts full end-to-end success (:rad/executed through export, real .wasm bytes) -- the issue tracker's open/broken status remains stale relative to code that already fixes the described bug. Scored low on doc-code-drift because an unclosed tracker entry actively misdescribes current, working behavior."}))
+            {:score 0.0 :note ".issues/issues.edn no longer exists -- claim's cited source file is gone; re-verify."}))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

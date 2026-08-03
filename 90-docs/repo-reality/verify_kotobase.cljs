@@ -94,7 +94,52 @@
                 {:score 1.0 :note "confirmed: both :sensitive-operations the manifest names are genuinely wired -- kotobase.kotobase/authorize-xrpc requires kotoba.security.abac and calls abac/evaluate before permitting an operation, and kotobase.code-graph/revoke-pin! requires kotoba.security.effect and wraps its state transition in effect/guard! -- the manifest describes real enforcement, not aspirational policy."}
                 :else
                 {:score 0.3 :note (str "security-adoption.edn still declares authorize-xrpc->abac and revoke-pin!->effect as required, but source no longer confirms both wirings (authorize-xrpc wired=" authorize-wired? ", revoke-pin! wired=" revoke-wired? ") -- re-verify by hand, this is exactly the kind of drift periodic re-runs are meant to catch.")}))
-            {:score 0.0 :note "security-adoption.edn no longer exists -- claim's cited source file is gone; re-verify."}))}])
+            {:score 0.0 :note "security-adoption.edn no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   ;; ---- 2026-08-03 weekly claim-discovery additions: ADR-stack-topology vs deps.edn drift,
+   ;; a self-disclosed CI-red bug fixed at the tip commit, and the transparency-retention module.
+   {:claim :claim/kotobase-adr-topology-deps-drift :axis :axis/doc-code-drift :layer :lint
+    :fn (fn []
+          (let [adr (slurp* "docs/ADR-stack-topology.md")
+                deps (slurp* "deps.edn")
+                dep-names ["io.github.kotoba-lang/security" "io.github.kotoba-lang/abi"
+                           "io.github.kotoba-lang/kotobase-storage" "io.github.kotoba-lang/kotobase-engine"]
+                present (filter #(has? deps (re-pattern (str "(?i)" (str/replace % "/" "\\/")))) dep-names)]
+            (cond
+              (not (has? adr #"runtime deps are\s*\n?\s*`security` only"))
+              {:score 0.4 :note "ADR-stack-topology.md no longer states 'runtime deps are security only' verbatim -- either the ADR was corrected to match deps.edn (a genuine fix; re-verify) or reworded; re-verify by hand."}
+              (= (count present) 1)
+              {:score 0.2 :note "ADR-stack-topology.md still claims 'runtime deps are security only', and deps.edn's top-level :deps now genuinely has only 1 of the 4 previously-observed deps -- the drift may have been resolved (deps trimmed back down); re-verify by hand and consider retiring this claim if confirmed."}
+              :else
+              {:score 0.3 :note (str "confirmed: ADR-stack-topology.md still states runtime deps are 'security only', but deps.edn's top-level :deps map has " (count present) "/4 of security/abi/kotobase-storage/kotobase-engine present -- the drift persists. Scored low on doc-code-drift because the ADR's own account of its dependency surface is stale relative to current deps.edn.")})))}
+
+   {:claim :claim/kotobase-critical-path-cljc-ci-red-bug :axis :axis/production-readiness :layer :evidence-link
+    :fn (fn []
+          (cond
+            (exists? "test/kotobase/critical_path_test.cljc")
+            {:score 0.2 :note "test/kotobase/critical_path_test.cljc exists again (the .cljc extension is back) -- this is exactly the bug the docstring described (file-seq/slurp do not exist under cljs); re-verify whether this is a regression of the original CI-red bug."}
+            (exists? "test/kotobase/critical_path_test.clj")
+            (let [doc (slurp* "test/kotobase/critical_path_test.clj")]
+              (if (has? doc #"took CI red from 2026-07-30")
+                {:score 1.0 :note "confirmed: test/kotobase/critical_path_test.clj is still a .clj file (not .cljc), and its docstring still self-discloses the 2026-07-30 CI-red incident and the fix ('The extension was the bug.') -- the fix has held."}
+                {:score 0.6 :note "critical_path_test.clj still has the correct .clj extension, but the self-disclosing docstring about the 2026-07-30 CI-red incident is no longer present verbatim -- may have been trimmed/reworded; re-verify by hand."}))
+            :else
+            {:score 0.0 :note "neither test/kotobase/critical_path_test.clj nor .cljc exists -- claim's cited source file is gone; re-verify."}))}
+
+   {:claim :claim/kotobase-transparency-retention-implemented :axis :axis/safety-enforcement :layer :lint
+    :fn (fn []
+          (if (exists? "src/kotobase/transparency_log.clj")
+            (let [src (slurp* "src/kotobase/transparency_log.clj")
+                  checks-present? (and (has? src #":transparency/key-epoch")
+                                       (has? src #":transparency/checkpoint-chain")
+                                       (has? src #":transparency/witness-threshold")
+                                       (has? src #":transparency/rollback"))
+                  retention-present? (and (has? src #"defn retention-decision")
+                                          (has? src #"legal-holds"))]
+              (if (and checks-present? retention-present?)
+                {:score 1.0 :note "confirmed: transparency_log.clj's verify-checkpoint still checks :transparency/key-epoch, :transparency/checkpoint-chain, :transparency/witness-threshold, and :transparency/rollback, and retention-decision still consults legal-holds -- the doc's description of fail-closed checkpoint verification and class-based retention with legal-hold override is genuinely wired, not aspirational."}
+                {:score 0.4 :note (str "transparency_log.clj no longer has the expected checkpoint-verification checks (found=" checks-present? ") and/or retention-decision/legal-holds wiring (found=" retention-present? ") -- module may have been refactored; re-verify by hand whether the doc's claims still hold.")}))
+            {:score 0.0 :note "src/kotobase/transparency_log.clj no longer exists -- claim's cited source file is gone; re-verify."}))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]
