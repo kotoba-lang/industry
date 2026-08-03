@@ -111,6 +111,93 @@ evidence contract（両者が B2 の別リージョンであること）を書�
 | 24x7 rota・独立 status 面 | 人と外部ホスティング |
 | 性能 gate（LDBC を CI に） | データセットの置き場所。ノードは egress が無いので operator 側 tick（本 ADR の slo tick と同型）が現実的な次の一手 |
 
+# closing — 2026-08-03 セッションの着地点と再開点
+
+## 着地したもの（すべて default branch 上を確認済み）
+
+**com-junkawasaki/root**
+
+| commit | 内容 |
+|---|---|
+| `2ada8333` | net-kotobase の CI を murakumo fleet に載せる gate + ADR-2608036600 |
+| `3255479` | fleet-ci の verdict out-file を `:id` で割る（false pass の修正） |
+| `b60fe1b` | ADR-2607250100 を 8 軸とも 2026-08-03 の実測に同期 |
+| `69faa8de` | 本 ADR |
+| `07028434` / `4c456ba9` / `57558e91` | west pin 3 本を remote HEAD へ（single-entry API commit） |
+
+**network-awai/net-kotobase**
+
+| commit | 内容 |
+|---|---|
+| `496f707` | dependabot の Actions 版数 5 本 + `expected_uses` allowlist |
+| `41e7687` | ipld-crypto group（major）+ それが必要とする noble v2 import 移行 |
+| PR #272-277 | shadow-cljs 3.4.11（6 workspace）—— 全て実ビルド/テスト後に merge |
+| PR #238 / #294 | hono patch / ipld-cacao-auth（cborg major を含む） |
+| `4f81578` | operator ホストでの可用性計測 tick + LaunchAgent |
+| `1037e7a` | 並行書き込みの競合を `docs/API-CONTRACT.md` に開示 |
+
+PR #257 / #269（DO-NOT-MERGE）は **merge せず close**。branch は残し、patch を
+`orgs/network-awai/net-kotobase/.git/stash-archive-2026-08-03/` に退避済み。
+
+## 検証したこと（数と、やらなかったこと）
+
+- fleet gate 単体（judah/asher/levi）+ **感度測定 2 通り**（matrix から required
+  surface を抜く / ns form 直後に壊れた form を入れる）—— どちらも赤になることを確認。
+- shadow-cljs 6 workspace: clj-edge 304 tests/1513 assertions・cf-wasm
+  137/312 + advanced release build・protocols-worker 44/163・authn/mail-worker
+  build・migrations は **main の control も同一の 45 failures**（bump 由来ではない）。
+- ipld-crypto: cf-wasm 137/312 + release build（542,900 bytes）、clj-edge 304/1513、
+  protocols-worker 44/163、mail-worker build。
+- ipld-cacao-auth: worker unit tests 全通過（DAG-CBOR IPLD block の直列化を含む）+
+  `wrangler --dry-run` ビルド。
+- SLO: apex p95 118ms / backend p95 155ms / edge-only p95 25ms / unauth-write 拒否 /
+  testnet read、resilience（240 req 持続負荷・敵対入力・25-way 書込競合）とも pass。
+- **やっていない検証**: Actions 版数 5 本が「動くこと」。この org では Actions が
+  起動しないので実行して確かめる手段が無い。確認したのは workflow と allowlist の
+  一致だけ。
+
+## 稼働している常駐（このマシン）
+
+| LaunchAgent | 間隔 | 状態 |
+|---|---|---|
+| `com.gftd.fleet-ci-tip-tick` | 300s | 稼働中。net-kotobase を含む 19 repo + PR head を検証し、green で west pin を前進 |
+| `com.gftd.kotobase-slo-tick` | 300s | 稼働中。receipt は `~/.gftd/kotobase-slo.ndjson` |
+
+**CD が実際に回った証拠**: net-kotobase の pin は最後の merge 後に fleet-ci が
+自動で `1037e7a1`（= remote HEAD）まで前進させた。
+
+## 保全した他者の WIP（触っていない）
+
+- `orgs/kotoba-lang/prolly-tree` — 未コミット 2 件、local head は pin より 14 遅れ。
+  west が skip した（正しい挙動）。**触っていない。**
+- `orgs/network-awai/net-kotobase` — branch `codex/absorb-cljc-worker-migration-260718`
+  の 07-18 commit 上に修正 47 / 削除 1 / 未追跡 30。**リセットしていない。**
+  working diff（2.1MB）と未追跡リストを `.git/stash-archive-2026-08-03/` に退避済み。
+  実測: 48 modified のうち 17 は PR #269 が捕まえていた分、**31 はどの PR にも
+  入っていない**。処分にはオーナーの判断が要る。
+- superproject の未追跡（`.agents/` `docs/` `orgs/cloud-itonami/` 等）は
+  セッション開始時から存在。**触っていない。**
+
+## 再開点（次の人が最初に打つコマンド）
+
+```bash
+# 1. 計測が生きているか
+tail -3 ~/.gftd/kotobase-slo.ndjson
+launchctl print gui/$(id -u)/com.gftd.kotobase-slo-tick | grep -E 'runs|last exit'
+
+# 2. fleet CI が回っているか
+tail -20 ~/.gftd/fleet-ci-tick.log
+nbb scripts/fleet-ci/tick.cljs --plan
+
+# 3. 次の一手（性能 gate）: LDBC を operator 側 tick にする
+#    雛形は kotobase-cf-wasm/slo/operator_tick.cljs（同じ形）
+#    bench 本体: orgs/kotoba-lang/kotobase-peer の kotobase-peer.ldbc-snb-bench
+```
+
+**優先順**（ADR-2607250100 Decision 2 と同じ）: ①計測の恒久化（ホスト非依存へ）
+②性能 gate ③storage DR（**別リージョンの B2 アカウント 1 つ**でブロック解除）
+④表面の実装/明記 ⑤性能そのもの。
+
 # Consequences
 
 - 「可用性を測っている」と言えるようになったが、**その主張の有効範囲を receipt
