@@ -74,25 +74,50 @@ repo が gftdcojp と jk-luxury に散在している。
 
 ## Decision
 
-### D1. org の判定軸を「起動主体」にする
+### D1. org の判定軸は「起動主体 × 事業主体」の 2 軸（2026-08-03 改訂）
 
-ADR-2607289600 が確立した **runtime 面 `:repo/kind`** をそのまま org 軸に採用する。
-「誰が起動するか」は repo 内の証拠から機械判定でき、目的の解釈に依存しない。
+ADR-2607289600 が確立した **runtime 面 `:repo/kind`** から導かれる**起動主体**
+（誰が起こすか）を第一軸に採る。「誰が起動するか」は repo 内の証拠から機械判定でき、
+目的の解釈に依存しない。
 
-| org | 法人格 | 軸 | 主たる `:repo/kind` |
+**ただし起動主体だけでは org は決まらない。** 第二軸として**事業主体**
+（どの法人の事業か）を対等に置き、**org = f(起動主体, 事業主体)** とする:
+
+| | religious | security | consumer network | OSS / library | personal |
+|---|---|---|---|---|---|
+| **resident**（自分の loop と clock を持つ） | **etzhayyim** | — | **network-awai** | — | com-junkawasaki |
+| **on-demand**（呼ばれて動く） | **cloud-itonami** | **gftdcojp** | **network-awai** | kotoba-lang | com-junkawasaki |
+| **none**（lib / corpus） | — | — | — | **kotoba-lang** | **com-junkawasaki** |
+
+| org | 法人格 | 起動主体 | 事業主体 |
 |---|---|---|---|
-| **kotoba-lang** | — (OSS) | 言語・ライブラリ。呼ばれるだけ | `lib` |
-| **etzhayyim** | 宗教法人 (任意団体、did:web:etzhayyim.com) | **artificial organism の自律 actor のみ** — 自分で起きる (heartbeat)、自分の did で対外発話する | `organism` |
-| **cloud-itonami** | — (AGPL OSS fleet) | **人間または actor が使う基盤** — 呼ばれて動く (request-scoped) | `actor` / `lib` / `organisation-record` |
-| **gftdcojp** | Gftd Japan K.K. | **B2B/B2G security service** | `service` |
-| **network-awai** | **AWAI Network, L.L.C.** (DE) | **etzhayyim 傘下の営業主体**。p2p / crypto / blockchain 中心の consumer network + adult | `service` / `app` |
-| **com-junkawasaki** | 個人 | cloud + data + 個人研究 | `corpus` |
+| **kotoba-lang** | —（OSS） | none / on-demand | 言語・ライブラリ |
+| **etzhayyim** | 宗教法人（任意団体、did:web:etzhayyim.com） | **resident** | 宗教 |
+| **cloud-itonami** | —（AGPL OSS fleet） | **on-demand** | 宗教核の基盤・産業 actor |
+| **gftdcojp** | Gftd Japan K.K. | on-demand | **B2B/B2G security** |
+| **network-awai** | **AWAI Network, L.L.C.**（DE） | resident / on-demand | **consumer network**（p2p / crypto / adult / creative） |
+| **com-junkawasaki** | 個人 | 任意 | cloud + data + 個人研究 |
 
-**jk-luxury は解散する** (D6)。
+判定手順: `:repo/kind` を `manifest/repo-taxonomy.edn` から引いて起動主体を、
+blueprint / 運営ドメイン / 収納主体から事業主体を決め、上表で org を引く。
 
-判定手順: `:repo/kind` を `manifest/repo-taxonomy.edn` から引き、上表で org を決める。
-kind が `service` の場合のみ第二軸が要る — **security なら gftdcojp、consumer network /
-p2p / crypto / adult なら network-awai**。
+**なぜ 2 軸にしたか（2026-08-03、証拠ベース再判定の結果）。** 初版の D1 は起動主体
+1 軸で org を決め、第二軸は「kind が `service` の場合のみ」要るとしていた。これは
+**resident kind でも成り立たない**ことが実測で分かった: `cloud-itonami/yukkuri` は
+`clj/src/yukkuri/cron.cljc` + `clj/src/yukkuri/aozora.cljc` + `did:web:yukkuri.gftd.ai` を
+実装した正真正銘の resident organism で、9 つの登録 organism identity の 1 つ
+（`yukkuri-organism.aozora.app`）でもある。1 軸の D1 に素直に通すと **etzhayyim（宗教法人）
+に落ちる**が、yukkuri は AWAI Network, L.L.C. が運営する consumer creative product で
+あって宗教法人の資産ではない。**自起動することは宗教法人の資産であることを意味しない。**
+
+同じ理由で、逆向きの誤配置も 1 軸では防げない。`cloud-itonami/yomi` は README で
+\"News Intelligence artificial organism\" と名乗るが heartbeat も resident loop も持たない
+request-scoped な StateGraph actor で、on-demand × 宗教 → cloud-itonami が正しい。
+2 軸ならどちらも一意に決まる（上表の ✅ 3 例）。
+
+**第一軸を機械判定するときは宣言でなく実装を見る**（`scripts/organism-readjudicate.cljs`）。
+README 宣言ベースの判定は取りこぼすより**過大報告**する — 実測では宣言だけの
+`yomi` / `kyoninka` / `sng` が 3 件、実装だけの `yukkuri` が 1 件だった。
 
 ### D2. network-awai — Awai network 法人で動く 7 ドメイン
 
@@ -591,11 +616,67 @@ checkout の重複**で、`orgs/etzhayyim` を実態より 2 倍近く大きく�
 | HEAD がサーバに存在しない (404) | 14 | 未 push のローカル commit | **保全** |
 | 未コミット WIP あり | 2 | `ipaddress` (RIR datom + ops) / `kawase-yui` (lex/wire 11 file + docs/adr) | **保全** (patch を archive) |
 
-98 件を削除し、`orgs/etzhayyim` の実ディレクトリは **209 -> 111** になった。保全した 16 件は
-`.git/stash-archive-2026-08-03-etz-orphan/preserved-unlanded.txt`、削除した一覧は同
-ディレクトリの `deleted-orphan-checkouts.txt`、WIP 2 件の patch は同ディレクトリに置いた。
-**保全した 16 件の未着地 commit を twin へ着地させるのは未実行** — これが Phase 4 の
-次の具体的作業になる。
+98 件を削除し、`orgs/etzhayyim` の実ディレクトリは **209 -> 111** になった。削除した
+一覧は `.git/stash-archive-2026-08-03-etz-orphan/deleted-orphan-checkouts.txt`。
+
+#### 保全した 16 件を着地させた (2026-08-03) — live 側に actor identity が欠けていた
+
+未 push commit を持つ 14 件と未コミット WIP 2 件を調べたところ、**etz 側と live 側は
+ahead/behind ではなく別系統の抽出**だった。live 側は
+`Extract 60-apps/etzhayyim-project-<n> from etzhayyim/root`、etz 側は ADR-2606231200 の
+`pilot: com-etzhayyim-<n> — sovereign actor repo snapshot`。`compare` API が 404 を返したのは
+そのため（SHA がそもそも相手に存在しない）。
+
+内容を突き合わせると、**live 側に sovereign actor の identity 一式が落ちていた**:
+`.well-known/did.json` / `actor-manifest.jsonld` / `.nojekyll`、多くは加えて
+`src/<n>/murakumo.cljc` + contract test。**これが organism 再判定で `did-declared?` が
+軒並み false になっていた原因**でもある — identity 面の証拠が orphan checkout に
+取り残されていた。
+
+全 16 件をまず `rescue/etz-orphan-20260803` として live repo に push し（履歴を失わない）、
+そのうえで **live に存在しないファイルだけを加算**して main へ merge した
+（既存ファイルの上書き・削除はしない = 新しい live 側の作業を巻き戻さない）:
+
+| repo | 復元 file 数 |
+|---|---:|
+| tsukuru | 186 |
+| yabai | 64 |
+| ipaddress | 22 |
+| insatsu / port / vessel | 8 |
+| demining / intel / vin | 7 |
+| graph-sos-intel / handotai | 5 |
+| jp-ashiba | 4 |
+| hc | 3 |
+| junbi / sng | 0（完全包含） |
+| kawase-yui | 0（1 件の ADR は既に main にあった） |
+
+検証: 13 repo で `.well-known/did.json` と `actor-manifest.jsonld` の両方が main 上に
+存在することを `gh api` で確認（`tsukuru` は元から actor-manifest.jsonld を持たない別形）。
+
+**`ipaddress` の `data/public-rir.datoms.kotoba.edn`（70 MB）は main に入れなかった** —
+CLAUDE.md の large-binary 方針（skill `large-binary-datalad`）。rescue branch には
+残っているので、B2 + DataLad 経路へ移すのが follow-up。
+
+着地確認後に 16 件の checkout を削除し、`orgs/etzhayyim` の実ディレクトリは
+**111 -> 95** になった。
+
+#### boundaries の残 drift を解消 (2026-08-03)
+
+`d41026419fe` が `:cell-prefix-routes` の値 57 件を現在の repo 名へ直したが、
+key 集合の不変性だけを検査していたため **値が west に存在しない 6 件が残っていた**。
+実測して直した（key 集合 4/9/3/75 が不変であることは再確認済み、
+`kotoba-boundary-audit.cljs` は `:total 0` で通る）:
+
+| key | 旧値 | 新値 | 根拠 |
+|---|---|---|---|
+| `:primitive-routes` × 3 | `orgs/gftdcojp/app-aozora` | `orgs/network-awai/app-aozora` | D2 Phase 1 で移送済み。同 commit は `:atproto-actors` は直したが `:primitive-routes` を見落としていた |
+| `:cell-prefix-routes` `yorishiro` | `com-etzhayyim-yorishiro` | `com-etzhayyim-app-yorishiro` | west に実在するのは `app-` 付きの方 |
+
+**残る dangling は 2 件**（`elv` / `moto` -> `com-etzhayyim-moto`）。この repo は
+GitHub 上にも存在しない（redirect でなく 404）ので**後継が特定できない**。
+勝手な移送先を発明せず、cell prefix に所有者がいない状態として記録する。
+`elv` = end-of-life vehicle、`moto` = 自動車系のセルなので、`vin-actor` に寄せるか
+retire するかは実装の裁定であって配置の問題ではない。
 
 #### 再判定の過程で見つかった manifest の実態乖離 (3 件)
 
@@ -1002,7 +1083,7 @@ consumer 0 件なので移送の影響は無い。名前は据え置き (どの 
 11. ~~`:manifest.repos/extra-projects` の陳腐化解消~~ **決定 (2026-07-29): 3,465 -> 234 に整理、`:datalad` の stale キー 9 件も再キー。`--check` が `west.yml is up to date` になった**"
 
   :adr/decision-summary
-  ["D1: org 判定軸を目的(公益/事業)から起動主体(:repo/kind)へ移す。6 org: kotoba-lang=lib / etzhayyim=organism のみ / cloud-itonami=呼ばれて動く基盤 / gftdcojp=B2B/B2G security service / network-awai=AWAI Network L.L.C. の consumer network(p2p/crypto/blockchain)+adult / com-junkawasaki=cloud+data+個人"
+  ["D1 (2026-08-03 改訂): org = f(起動主体, 事業主体) の 2 軸。起動主体(resident/on-demand/none)だけでは org は決まらない — yukkuri は resident organism だが AWAI Network の consumer product であり、1 軸だと etzhayyim(宗教法人)に誤配置される。resident x religious=etzhayyim / on-demand x religious=cloud-itonami / any x security=gftdcojp / any x consumer-network=network-awai / none=kotoba-lang or com-junkawasaki。第一軸は宣言でなく実装で測る(organism-readjudicate.cljs)"
    "D2: Awai network 法人で動く 7 ドメイン(itonami.cloud/murakumo.cloud/isekai.network/kotobase.net/aozora.app/babiniku.net/shinshi.club)の repo を network-awai へ。org 名と product 名の衝突はパスで区別し rename しない"
    "D3: adult は Charter Rider v2.0 に違反しない(オーナー判断)。ai-gftd-livecam の NOT-MIGRATED-CHARTER-VIOLATION マーカーは失効・削除。adult 4 件は network-awai へ"
    "D4: ai-gftd- prefix を廃止し bare name へ。デプロイ先 DNS が既に bare name であることが裏付け。gftdcojp に残る security は 9 件"
