@@ -251,6 +251,37 @@ ADR-2607300300 と同じ規律で明示する:
    「先頭 1000 件」しか見ないことは caller に伝わらない。ADR-2607300300 の
    『no silent caps』に照らすと、limit に達したことを返り値で言うべき。
 
+7. **`:number` の route を実 HTTP で叩くテストが無い。** route は path segment で
+   authority を取る汎用実装なので `/api/authority/number/...` は動くが、それを
+   確かめているのは overview の集合 assertion だけで、review→approve→commit を
+   ワイヤで通したものは無い。ADR-2607300300 gap 5 が「route は API として完備でも
+   到達可能か誰も検査していなかった」と記録したのと同じ形の穴を、今回また1つ足した。
+
+## 検証（2026-08-03 実測、実行したものと実行していないもの）
+
+| 対象 | コマンド | 結果 |
+|---|---|---|
+| kotoba-lang/phone | `clojure -M:test` | **40 tests / 177 assertions、0 failures 0 errors**（追加前は 41 assertions） |
+| kotoba-lang/phone | `clojure -M:lint` | errors 0 / warnings 3 — 全て既存（`ui.cljc` の unused binding、`export_test` の未使用 refer 2件） |
+| cloud-itonami-app | `clojure -M:test` | **929 tests / 4015 assertions、0 failures 0 errors** |
+| cloud-itonami-app | `clojure -M:lint` | errors 0 / warnings 7 — 全て既存（known-broken namespace 由来） |
+| west pin | `scripts/west-pin-put.cljs` | phone `4e9e01f→9626a93`（ahead 2 / behind 0）、app `46a17f4→d876ff5`（ahead 10 / behind 0）。両者とも上流 main と identical |
+
+**実行していないもの（正直に）**:
+
+- **ClojureScript / SCI での実行**。追加した 5 namespace は `.cljc` を名乗るが
+  **JVM でしか回していない**。移植性のために `nth` を使わず `str/index-of` +
+  `subs` で桁を扱う等の配慮はしてあるが、それを確かめる runner が repo に無い
+  （既存の `kotoba.phone` / `esim` / `card` も同じ状態）。
+- **`nbb scripts/gen-west-manifest.cljs --check`**。ローカル checkout が pin より
+  古い（phone は detached `f176f08`、app は別ブランチ + 未コミット変更）ため、
+  生成器はこの変更と無関係な差分を大量に出す。**pin の正しさは
+  `west-pin-put.cljs` のサーバ側検証（default branch 到達性 + 旧 pin から純前進 +
+  blob SHA precondition）で担保した**——ローカル ancestry には頼っていない。
+- **`:number` actor に対する結線テスト**。actor が存在しないので、transport は
+  `:endpoint-not-configured` の refusal を返す経路しか通っていない（それを
+  assert するテストはある）。
+
 ## 意図的に開けているもの（gap ではなく決定）
 
 - **jurisdiction ごとの numbering spec catalog を作らない**（ADR-2607300300 と同じ
