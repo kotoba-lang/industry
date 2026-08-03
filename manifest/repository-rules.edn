@@ -261,17 +261,7 @@
  ;; makes it visible and dated. The verifier prints EXCEPTION for each and keeps
  ;; going; without an entry the edge is a hard failure. Every entry must name
  ;; what would resolve it. Delete the entry when the edge is gone.
- :exceptions
- [{:exception/id :kotoba-lang-library-depends-on-assurance
-   :exception/from "kotoba-lang/kotoba-lang"
-   :exception/from-role :library
-   :exception/to "kotoba-lang/security"
-   :exception/to-role :assurance
-   :exception/recorded "2026-07-29"
-   :exception/evidence "kotoba-lang/deps.edn declares io.github.kotoba-lang/security as a production dependency for kotoba.lang.release-admission"
-   :exception/why-not-allowed "ADR-2607266000 lists assurance as a dependency of T3 execution (kotoba, provider-transport), not of T1 language libraries. A T1 library reaching into T4 authority inverts the tier direction."
-   :exception/was-hidden-by "the declaration simply omitted the dependency, so nothing reported it until this check was made to run (2026-07-29)"
-   :exception/resolve "owner decision: move kotoba.lang.release-admission out of the T1 library, or reclassify the repo/tier. Not resolvable by editing the declaration."}]
+ :exceptions []
 
  ;; Measured 2026-07-29 by scripts/verify-repository-roles.cljs --prefix-audit.
  ;; Recorded as a gap rather than fabricated: these repos carry a role prefix
