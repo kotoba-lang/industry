@@ -903,7 +903,7 @@ block 境界に floor するので各片は aligned のまま。`:stats :splits`
 
 ### 契約に曲線を持たせた (`machine` 0.3.0)
 
-- `:bandwidth {:by-stride {128 24.1 ...} :source "..." :runtime :jvm}`
+- `:bandwidth {:by-stride {128 24.1 ...} :source \"...\" :runtime :jvm}`
 - `bandwidth-at-stride` が stride で引く。**測定点の間は下側**を取り、
   最後の測定点より先は**外挿しない**
 - 曲線が無い機械は `nil` を返す（他の事実と同じ `require-fact` 契約）
