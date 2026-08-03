@@ -460,6 +460,21 @@ KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get <ITEM>
 
 ## Murakumo chat gate secondary secret (ADR-2607171800 addendum 2、2026-07-16)
 
+- ⚠ **2026-08-03 実測: `MURAKUMO_CHAT_TOKEN_SECRET_2` は live vault
+  （`KAGI_HOME=$HOME/.kagi`）に存在しない** — `no such item`。下記の記述は実態と乖離して
+  いる（2026-07-29 に `MURAKUMO_GENERATION_TOKEN_SECRET` / この item で起きた乖離のうち、
+  generation 側だけが再発行され、chat 側は残ったまま）。**この item を前提にしたスクリプトは
+  動かない。** `murakumo.cloud/api/v1/chat/completions` は 401 のまま。
+  - **今日動く chat 経路は `api.murakumo.cloud/v1/chat/completions`**（OpenAI 互換、実測 200）。
+    token は下記「api.murakumo.cloud mk1 capability-token 署名鍵」の
+    `MURAKUMO_API_TOKEN_SECRET`（compartment `network-awai`、実在確認済み）から mint する:
+    `cd orgs/kotoba-lang/murakumo && MURAKUMO_TOKEN_SECRET=$(kagi get MURAKUMO_API_TOKEN_SECRET)
+     nbb --classpath src scripts/run-task.cljs token issue --sub <who> --scope chat --ttl 604800`
+  - 実害: ADR-2608031500 の storyboard 生成でこれを踏んだ。`murakumo.cloud` gate を
+    復旧したい場合は secret の再発行が要る（オーナー承認が要る操作）。
+  - 以下は復旧時の参照用に残す。**現状は上記のとおり存在しない。**
+
+
 - **`MURAKUMO_CHAT_TOKEN_SECRET_2`（kagi vault、compartment `gftdcojp`）** —
   `murakumo.cloud` site Worker（chat/inference gate）の**第2検証 secret**
   `MURAKUMO_TOKEN_SECRET_2` の正本。primary の `MURAKUMO_TOKEN_SECRET` は
