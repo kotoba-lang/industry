@@ -110,8 +110,12 @@
                 :embed-a-second-renderer]
      ;; Where the shared behaviour lives. An app- repo that browses a set of
      ;; items states sort/filter/group/search/selection semantics by asking
-     ;; mokuroku, the same way a loop- repo asks dynamics for scoring truth.
+     ;; mokuroku, the same way a loop- repo asks dynamics for scoring truth --
+     ;; and draws the window by asking mokuroku-ui rather than assembling one
+     ;; from kotoba-ui parts. The two are split so a host that renders some
+     ;; other way can still use the kernel (byoubu / byoubu-ui precedent).
      :authority-library "mokuroku"
+     :authority-view "mokuroku-ui"
      :composition {:domain-model "portable .cljc + bounded .kotoba profile"
                    :ui "kotoba-ui.core (+ appkit.core | uikit.core)"
                    :effects "capability-* packages, host-injected"}
