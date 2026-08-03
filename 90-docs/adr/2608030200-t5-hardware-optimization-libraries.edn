@@ -197,4 +197,92 @@ fingerprint を持ち、`applicable` が機械変更で stale 側に落とす �
   readahead ヒューリスティックは *判断* なので `.kotoba` 側に置く必要があり、Kotoba には
   fs / block capability がまだ無い (ADR-2607270100 既知ブロッカー 4)。ここは二重に塞がって
   いる。
+
+## 実測 (2026-08-03、同日第2反復。このオーナー指示: 「今の mac book を使って計測してチューニングして」)
+
+**この ADR を書いた時点の「残るギャップ」のうち 2 件が閉じ、代わりに実測でしか
+分からない結果が 3 件出た。**
+
+### 追加 repo
+
+| repo | tier | role | 責任 |
+|---|---|---|---|
+| `kotoba-lang/machine-probe` | T5 | assurance | 実機を読んで `:measured` 記述子にする + その機械で計測する |
+
+`machine` は `:must-not [:probe-hardware]`、`perfgate` は `:must-not
+[:run-benchmarks]` を宣言しているので、**誰もデバイスに触れられなかった** —
+`:measured` 記述子は作れず、`perfgate` の判定は常に `:provenance-too-weak` だった。
+この repo が唯一その effect を行う。parse は pure で effect は注入なので、
+M1 Max の `sysctl` 出力を fixture として checked in してあり CI に Mac は要らない。
+role が `:provider` でなく `:assurance` なのは `layout` (library) に依存するため
+（provider の role edge は library を許さない）。
+
+### 実機と接触して契約が 2 箇所壊れた (machine 0.2.0)
+
+1. **`:ways` を必須にしていたが macOS は associativity を一切公開しない。** サイズ・
+   line 幅・page サイズ・cluster topology は `sysctl` で採れるが ways は無い。必須の
+   ままでは probe は「大半のキャッシュがそうである 8 を捏造する」か「この機械を記述
+   できないと言う」かの二択になり、どちらも「不明と記録する」より悪い。**契約を機械に
+   合わせた**（読み取りを契約に合わせたのではない）。Linux は ways を公開するので
+   Linux parser は載せている。
+2. **CPU が heterogeneous だった。** M1 Max = 性能コア 8（L1d 128 KiB、L2 12 MiB を
+   4 コアで共有）+ 効率コア 2（L1d 64 KiB、L2 4 MiB を 2 コアで共有）。フラットな
+   `:cache` 1 本では表現できず、どちらかを採ると**残り半分に対して静かに誤った計画を
+   立てる**（private L2 share が 1.5 倍違う = 別の tile になる）。よって
+   `cache-at` / `private-cache-bytes` は heterogeneous な機械では **throw** し、
+   `for-cluster` が既存 planner がそのまま受け取れるフラット記述子を返す。cluster を
+   名指しするコストだけが増え、それは正しいコスト。`line-bytes` は最大値なので単一の
+   答えがあり従来どおり答える。フラット `:cache` と `:clusters` の同時宣言は拒否する
+   — それが「planner がフラット側を読んで静かに間違える」形そのものだから。
+
+### この MacBook の実測値と、portable-64 との差
+
+| | portable-64 (`:assumed`) | Apple M1 Max (`:measured`) |
+|---|---|---|
+| cache line | 64 B | **128 B** |
+| page | 4096 B | **16384 B** |
+| CPU | homogeneous | **P 8 + E 2** |
+| L2 private share | 262144 B | **3145728 B** (P) / 2097152 B (E) |
+
+**出荷していた保守的な床は、実機の 2 つの基本値を両方とも外していた。** これが
+「製品名プロファイルを出荷しない・provenance を必須にする」という判断が正しかった
+直接の証拠になる。
+
+### cost model の較正 — 予測 16x に対し実測 2.02x
+
+`layout` の `compulsory-lines-v1` は最初から `:model/does-not-model [:prefetch ...]`
+と宣言していた。**その省略がいくら分なのかを実測した**（`layout` の
+`:model/calibration` に機械名・日付つきで記録済み）:
+
+| element 幅 | 予測 line 比 | 実測 wall 比 | 実現率 | perfgate |
+|---|---|---|---|---|
+| 16 doubles (128 B) | 16.00x | **2.02x** | 12.6% | **QUALIFIED** (51% 改善) |
+| 4 doubles (32 B) | 4.00x | **1.01x** | 0.25% | REFUSED (noise 内) |
+
+- 逐次走査では **hardware prefetcher が latency を隠す**ので、残るのは帯域差だけ。
+  M1 Max の帯域では 244 MiB 対 16 MiB が wall-clock 2 倍にしかならない。
+- 32 B element では**そもそも測定不能**: 要素あたりのループコストがメモリコストの
+  約 50 倍で、メモリ系がボトルネックにならない。**perfgate はこれを拒否した** —
+  これが正しい結果であり、拒否経路が存在する理由。
+- 結論: **`:cost/lines` 比は達成可能な高速化の上限であって推定値ではない。**
+
+### 最初の qualified claim
+
+`clojure -M:bench 2000000 16 20 40` → SoA 5.562 ms 対 AoS 11.253 ms、51% 改善、
+rel-stdev 0.017 / 0.069、**QUALIFIED**、claim 封印済み（fingerprint 1907294590、
+machine fingerprint 1533672245）、`stale-on? portable-64 => true`。
+**設計時に意図した経路が端から端まで実際に動いた**: probe → 記述子 → layout の予測
+→ 実測 → gate → 封印 → 機械変更で失効。
+
+### まだ閉じていないもの
+
+- **`perfgate` の noise 判定は 1 回目の run を落とした**（AoS rel-stdev 0.128 > 0.10）。
+  warmup 20 / reps 40 で 0.017 まで下がって通った。**閾値を緩めずサンプルを増やして
+  通した**のが正しい順序であり、記録しておく価値がある。
+- **マルチスレッド帯域飽和は未計測。** SoA の勝ちは帯域の勝ちなので、8 P コアで
+  同時に走査して初めて line 比に近づくはず。次の反復候補。
+- **JVM 計測の限界**: JIT・GC・thermal governor が全部入っている。`:machine/source`
+  に記録済みだが、より低ノイズな計測経路（native / kotoba-native）への移行は未着手。
+- compiler / kotoba-native がこれらを消費していない点、W4 の構造選定、aiueos の
+  page cache 不在は、上記のとおり依然として未着手。
 "}]
