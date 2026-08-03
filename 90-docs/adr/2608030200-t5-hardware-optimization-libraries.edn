@@ -1352,4 +1352,43 @@ CLI は curve 全体を `runs` 回（既定 3）測り、**全 run が qualify �
 **教訓 16: gate を 1 回通ったことは、通し続けることの証拠ではない。** 出力が事実を名乗る
 なら、事実が再現することまでを gate する。
 
+
+
+## lever 監査が一巡した — と、自分で計測を汚した話（2026-08-04、layout `9fcad3d`）
+
+「bound はどのレバーを縛るか」の監査を T5 全体にかけ終えた。
+
+| repo | bound | 状態 |
+|---|---|---|
+| `paging` | `:bounds :replacement-only` | 既に持っていた（prefetch 対 Belady で一度壊れて直した後） |
+| `ioplan` | `:bounds :merging-and-ordering` | **欠けていた**。captured 1.05 を報告していた。修正済み |
+| `machine-probe` | — | **統計が不一致**（min 報告 / mean gate）。修正済み |
+| `perfgate` | — | **無実**。`samples-needed` は自分で caveat を書いていた |
+| `layout` | `:model/bounds :layout-only` | ほぼ健全。2 点だけ補強 |
+
+`layout` は良い状態だった: `cost` は既に `:capacity-misses` を免責しており、
+`achievable-ratio` は layout plan しか受け取らないので **API の構造上この不一致が
+入りにくい**。残っていた 2 点:
+
+1. **`roofline-model` が継承を書いていなかった。** `bytes-fetched` は `cost` 由来＝
+   compulsory only なので、**reuse を通じて効く変更（blocking）は原理的に見えない**。
+   今日 clock-free で測ったとおり tiling は miss を最大 23 倍動かすが、この ratio には
+   一切映らない。`roofline-model` だけを読んだ人には分からなかった。
+   `:capacity-misses` / `:reuse-from-blocking` を免責に追加し、**合成モデルが被消費
+   モデルの免責を継承していることを test で固定**した（片方だけ外すと落ちる）。
+2. **どちらのモデルも lever を名乗っていなかった。** `:model/bounds :layout-only` を
+   付け、convention を test で検査する（覚えておく運用にしない）。
+
+### 自分で計測を汚した
+
+同じ反復で 3-run TLB qualification を background で走らせながら、**同じ機械で layout の
+test suite を回していた**。load は 6.5 → 14.9 に上がり、12 arm 全部が拒否された。
+**noise に敏感な計測の最中に、自分で別の負荷をかけた。** harness にはそれを知る術がない。
+
+これは multi-run 要件（教訓 16）の追加の論拠でもある——一時的な汚染は 1 run では
+見分けられないが、複数 run の不一致としては現れる。
+
+**教訓 17: 計測中は計測だけをする。** 並行して走らせた自分の作業は、他人の負荷と
+区別がつかない。
+
 "}]
