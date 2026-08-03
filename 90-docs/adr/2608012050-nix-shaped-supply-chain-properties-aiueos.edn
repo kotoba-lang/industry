@@ -94,7 +94,7 @@ git の commit id は tree をアドレスするので `:git-sha` は version la
 - inventory は両半分とも「間違っていたら落ちる記録」になった。
 - 実行時依存を 1 つでも進めるには同じ commit で inventory を更新する必要がある — 意図的な摩擦であり、`:tcb/files` が既に in-repo source に課している規律と同型。
 - `deps.edn` / `security-adoption.edn` / inventory が相互検査されるので、shared security の pin が片方だけ進む事故が構造的に起きない（直近の pin revert #138 がまさにこの状況）。
-- release artifact の SBOM / SLSA provenance（`docs/deployment-profiles.md` の `regulated`）は未実装のまま。その 2 つの入力である「byte-identical な再現ビルド」と「content-addressed な依存記録」は**両方揃った**ので、次に着手するならここ。
+- release artifact の SBOM / SLSA provenance（`docs/deployment-profiles.md` の `regulated`）は**実装済み**（2026-08-02、aiueos ADR-0017 / PR #141）。`aiueos.sbom` が TCB inventory から SBOM component を導出し、provenance と `regulated` evidence を署名付きで生成して `kotoba.security.supply-chain/evaluate-attestations` に食わせる。`:sbom-digest` / `:provenance-digest` / `:tcb-inventory-digest` / `:tcb-drift-check?` は test literal ではなく inventory と実文書から来る。**残る 3 点**: ①`build-release-image.sh` は まだ `clojure -M:attest` を呼ばず、attestation の存在を要求する gate も無い（pipeline 結線）②文書は EDN で in-toto/DSSE envelope ではない ③`evaluate-reproducibility` の証拠（独立ビルド 2 本の artifact digest）は未接続 — 入力（ADR-0013 の byte 比較 gate）は既にある。
 
 ## workspace 全体への含意
 
