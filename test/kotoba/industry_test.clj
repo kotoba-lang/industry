@@ -1,6 +1,51 @@
 (ns kotoba.industry-test
   (:require [clojure.test :refer [deftest is testing]]
-            [kotoba.industry :as industry]))
+            [kotoba.industry :as industry]
+            [kotoba.technology :as technology]))
+
+(def ^:private unresolvable-technology-industries
+  "ISIC ids whose `:required-technologies`/`:optional-technologies` name
+  a technology no entry in `kotoba-lang/technology` provides.
+
+  `kotoba.technology/of` THROWS `unknown technology` on these, so
+  `technology-stack` -- and therefore `execution-plan` and
+  `readiness` -- blows up for every one of them. Twelve ids are missing:
+  :notifications (6 industries, all REQUIRED), :corporate-intelligence,
+  :quota-tracking, :scheduling, :langgraph-clj, :forest-ecology,
+  :heat-recovery, :leak-detection, :pressure-monitoring,
+  :sea-state-monitoring, :sustainability-metrics,
+  :temperature-monitoring, :weather-forecasting.
+
+  Recorded rather than fixed: deciding whether each of these is a
+  missing technology entry or a wrong industry reference is a judgement
+  about what those industries actually need, and it is not this test's
+  to make. What the test can do is stop the list growing. It is asserted
+  EXACTLY, so adding a new dangling reference fails here, and fixing one
+  fails here too -- shrink the list when you fix it."
+  #{"0210" "0311" "0312" "0321" "0322" "1910" "3520" "3530" "4210" "4220"
+    "4290" "4329" "4330" "4390" "6411" "6419" "6420" "6430" "6499" "6511"
+    "6512" "6612" "6621" "6622" "6630" "6810" "6910" "6920" "862"})
+
+(deftest every-required-technology-resolves-except-the-known-broken-set
+  ;; A required-technology id that names nothing in the technology
+  ;; registry is the failure ADR-2800002200 corrected by hand for 5110
+  ;; (an industry claiming a capability no repo provides). This checks
+  ;; the whole registry for it instead of one entry at a time.
+  (let [known (set (map :id (:technologies (technology/registry))))
+        broken (set (for [{:keys [id required-technologies optional-technologies]}
+                          (:industries (industry/registry))
+                          :when (some #(not (contains? known %))
+                                      (concat required-technologies optional-technologies))]
+                      id))]
+    (is (= unresolvable-technology-industries broken)
+        "the set of industries with dangling technology references must only shrink")))
+
+(deftest travel-agency-requires-and-resolves-fare-shopping
+  (let [ids (set (map :id (industry/technology-stack "7911")))]
+    (is (contains? ids :fare-shopping)
+        "7911 shops third-party inventory; :reservation alone cannot price that")
+    (is (contains? ids :reservation)
+        "and it still settles against its own filed vendor rates")))
 
 (deftest registry-loads
   (let [reg (industry/registry)]
