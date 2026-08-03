@@ -223,13 +223,64 @@ design-quality gate は 100.0（floor 98.0）を維持。**
 
 **依然として未実装: T2。** `generator :tier-2 :pin` は nil のまま。scene spec は
 sky / atmosphere / camera / grade を持つが、それを消費するのは live renderer だけで、
-T1 は terrain と atmosphere の項を使い残りは近似している。"
+T1 は terrain と atmosphere の項を使い残りは近似している。
+
+## 追記 2026-08-03 — T2 完了。executor の一般バグを 2 つ直して着地した
+
+**T2 は実装済み・実機検証済み。** `kotoba-lang/byoubu-gpu` を起こした。同じ
+`:byoubu/scene` を `kami.wgsl`（WGSL-as-data の SSoT）で WGSL に変換し、
+**`kami.webgpu` に render graph を渡す**（レンダラを書いていない）。engine の frame loop は
+EDN 駆動で、default graph 自体が mesh 無しで 3 頂点を描く fullscreen pipeline
+（`:atmosphere` / `:bloom` / `:ssao`）を持っているので、backdrop は
+「shader 1 / uniform 1 / fullscreen pipeline 1 / pass 1」で表現でき、device・resize・
+submission は executor がやる。
+
+**executor に足りなかった 1 機能は、迂回せず上流に足した。** `build-bind` が認識する
+uniform bind は engine 所有の固定サイズ 4 種だけで、domain package が自前 uniform を
+graph で表現する手段が無かった。`:uniforms {<name> {:size n}}` + `{:uniform <name>}` +
+`write-uniform!` を `kotoba-lang/webgpu` に追加（未宣言名は throw — 未 bind の uniform は
+ゼロ埋めフレームを描き、typo が見つかるまで shader バグに見える）。
+
+**ついでに executor の実バグを 1 つ発見・修正した。** `adaptive-ssao-graph` の
+enabled 分岐が `(assoc-in [:targets :ssao :scale] …)` を無条件に行うため、SSAO target を
+宣言していない graph に `:color`/`:depth` の無い target が生え、`createTexture` が
+`format: null` で落ちていた。**つまりカスタム graph は全て init で死んでおり**、しかも
+真の error は WebGL2 fallback の `.catch` に飲まれて
+「Neither WebGPU nor WebGL2 is available」という無関係な文言になっていた。
+`:targets` に `:ssao` が無ければ graph をそのまま返すよう修正（default graph は宣言
+しているので挙動不変）。
+
+**実機検証（Chrome / 実 WebGPU device）:** 4 backdrop すべて `tier: gpu` で init し、
+自前 192 byte uniform を bind して present。初回描画で skyline に暗いスリットが出たので
+（ridge が base fill より下に振れた領域）base を far-ridge 色に変更して解消。
+
+**T2 の content band も実測して catalog に入れた**（`:byoubu/measured :gpu`）。GPU の帯は
+暗い backdrop すべてで plate と poster の中間に来る。全 tier・全 backdrop が今も AA を
+クリアし、ライブラリの算出値は Chrome 実測と小数点 2 桁まで一致:
+
+```
+                 declared   plate    poster   gpu
+purple-desert      16.64     8.61      5.20   7.42
+cobalt-dune        16.21    10.12      7.54   9.69
+ember-mesa         16.19     7.60      5.03   6.50
+salt-flat          14.22    13.63     11.94  14.45   (dark ink)
+```
+
+**残る gap: live scene の WebGL 2.0 経路が無い。** これは見落としではなく、workspace の
+3D ルール（WebGPU first / WebGL 2.0 fallback）に対する実際の未達として記録する。engine の
+WebGL 経路は **naga で build 時に WGSL→GLSL 変換した生成物**（`kami.webgl.glsl`）を走らせる
+ので、任意の WGSL はその変換工程を足さない限り届かない。代わりに `mount!` は
+`{:tier :poster}` を返し、caller は byoubu-ui の plate（T1 静止画 + T0 gradient）を
+そのまま使う — 空の canvas ではなく完全な backdrop だが、ルールが求める WebGL 2.0 経路
+そのものではない。"
 
   :adr/consequences
   ["design system は初めて「後ろに敷く画」を持つ。liquid-glass の材質が前提としていた背景が実在するようになった"
    "背景の可読性は authored ではなく derived になり、AA 未達はテストで落ちる"
    "byoubu の zero-dep により、背景だけ欲しい web app が kami render stack / compiler を背負わない"
-   "T1 は実装済み（SVG poster、terrain.noise の実 FBM 由来）。T2 は未実装で generator :tier-2 :pin は nil のまま"
+   "T1・T2 とも実装済み・実機検証済み。T2 は byoubu-gpu で kami.webgpu に render graph を渡す形（レンダラは書いていない）"
+   "executor に caller-supplied uniform を追加し、adaptive-ssao-graph がカスタム graph を全て init で殺していた実バグを修正した"
+   "live scene の WebGL 2.0 fallback は無い（naga build 経路が要る）。未達として明記し、poster/gradient に degrade する"
    "計測により declared content-band が誤りと判明し cobalt-dune は AA 未達だった。facts は実測優先・最悪 tier で ink 選択に変更"
    "「T0 と T2 は同じ輝度」は撤回。共有されるのは ink と appearance であって輝度ではない"
    "kotoba-ui 統合済み。theme map が :backdrop を名乗れる。design-quality gate は 100.0 を維持"
