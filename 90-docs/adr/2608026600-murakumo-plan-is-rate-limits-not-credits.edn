@@ -4,7 +4,7 @@
   :adr/source-format "edn"
   :adr/authoritative true
   :adr/title "plan は credits ではなく rate limit にする — 5時間 + 週次の二重窓。繰越問題も stored value 問題も、構造ごと消える"
-  :adr/status "proposed"
+  :adr/status "accepted"
   :adr/date "2026-08-03"
   :adr/last_verified "2026-08-03"
   :adr/deciders ["Jun Kawasaki"]
@@ -157,4 +157,12 @@ Ultra $129 で週 300 秒 = 月約 21.5 分の `video/oss`。Higgsfield Ultra $1
 
 **Higgsfield 比**: Ultra $129 で murakumo 週 300 秒（月 ≈21.5 分）に対し、Higgsfield Ultra $129/3,000cr は Kling 3.0 720p 5 秒 = 7cr 換算で月 ≈35 分。約 1.6 倍。**Higgsfield 側は公開情報からの換算で、実際の利用条件（モデル選択・解像度）で変動する。**
 
-**未実装**: 窓カウンタ、admission gate、plan SKU の差し替え、webhook の変更。本 ADR は設計のみで、コードはまだ ADR-2608026200 の credits 型 plan のまま（`plans-fulfillable? true` で販売中）。**販売中の plan と本 ADR の設計が食い違っている期間がある。**"}]
+**実装済み（2026-08-03）**。`murakumo.infer.windows`（5 時間 + 7 日のローリング窓）/ `local-murakumo.plan-admission`（期間イベント → 現在の上限）/ `local-murakumo.spend-admission`（価格 → 窓 → 残高 の唯一の判定）/ `POST /itonami/plan-period` `/itonami/plan-suspend`（両ルーティング表）/ `itonami/plan-period-entry`（Stripe の秒 → ミリ秒。残高を動かさない）。plan は 2026-08-03 に本番で購入可能になった —— did:key 付きで Stripe の live checkout URL が返り、did 無しは課金前に 400 で止まる。
+
+結線して初めて出た欠陥が 2 つある。どちらも、部品それぞれは正しく、**関係だけが誰からも見えていなかった**:
+
+1. **分割不能なジョブが短窓より大きい。** Plus は 1,140 unit/週 → 短窓 285 に対し、Seedance 2.0 の 5 秒動画が 61×5 = 305 unit。短窓で弾くと Plus 契約者は frontier 動画を 1 本も作れず、しかも待っても永久に入らないので 429 の retry-after が来ない回復を約束することになる。`windows/admit` は、短窓より大きい 1 ジョブを短窓では弾かず週窓に委ねる（通した後は短窓が超過するので、バースト防止が緩むのは 1 ジョブ分だけ）。
+
+2. **plan は did:key に結び付くのに、plan の checkout が did を要求していなかった。** did が無いと `plan-period-args` が nil を返し、webhook の『作用なし』枝が 200 を返す —— 課金だけが毎月走り、上限は永久に有効にならず、Stripe は再送しないので誰も気付かない。`checkout-error` が plan にも did を要求し（課金の前に止める）、`unfulfillable-plan-invoice?` が『plan の請求なのに did が無い』形を 503 に変える（沈黙 → 可視の障害）。
+
+**販売可否は宣言でなく実測に変えた。** `plans-fulfillable?`（人間が書き換える定数）を `plans-implemented?`（宣言）と `fulfillment-reachable!`（実測 probe）に分け、plan の checkout は 両方が真のときだけ通る。2026-08-02 に『履行先が 404 のまま plan を売った』ときに閉じ直したのは前者だけで、つまり次も人間が正しく宣言することに賭けていた。"}]
