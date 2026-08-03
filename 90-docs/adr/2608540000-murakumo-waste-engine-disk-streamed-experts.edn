@@ -57,7 +57,7 @@ memplan は tools/memplan.py の印字桁で一致する（port として忠実�
 
 **Kimi-Linear を実際に変換して実推論した（2026-08-03、同日）。** 92 GB の公開重みを取得し、waste 0.6.3 の tools/convert.py --jobs 3 で約54分（M4）かけて変換（26 layers × 651 MB + trunk 1354 MB）、container 19,171,317,244 bytes。
 
-**訂正**: 初版で『Kimi-Linear は上流公表値と ~1% 一致』と書いたのは**単位の取り違え**だった。上流の "1.28 GB minimum RAM" は GiB で、比較対象にした 1.27 は decimal GB。実測との差は:
+**訂正**: 初版で『Kimi-Linear は上流公表値と ~1% 一致』と書いたのは**単位の取り違え**だった。上流の \"1.28 GB minimum RAM\" は GiB で、比較対象にした 1.27 は decimal GB。実測との差は:
   RAM floor    解析 1.18 GiB  vs 実測 1.28 GiB   -8%
   expert set   解析 11.63 GiB vs 実測 16.53 GiB  -30%
   working set  解析 0.36 GiB  vs 実測 0.54 GiB   -32%
