@@ -1003,4 +1003,70 @@ stride で引く**ようにした。各 arm が使った `:stride-bytes` と
 
 `clojure -M:perarm` の判定は 3 分岐で、**そのうち 1 つは「置き換え前より悪い」**。
 自分の変更を評価する道具が、肯定しか返せない形では意味がない。
+
+
+## TLB — 契約に穴があり、埋める前に「免責が正しいか」を測った（2026-08-03）
+
+`machine` の fact schema は `:tlb` を宣言しているが **`machine-probe` は一度も埋めて
+いない**。`traversal` は `tile-plan` / `tiling-benefit` の両方で `:model/does-not-model`
+に `:tlb-reach` を明記している。契約が宣言し、probe が埋めず、モデルが明示的に免責する
+——一貫してはいるが、**その免責が正しいかを誰も測っていなかった**。
+
+### 計測 1: 変換コストは実在し、大きい（依存 chase）
+
+cache と TLB を分離する設計: **1 ページにつき 1 line だけ触る**。cache 圧力（line 数）を
+固定したままページ数だけ変えれば、差は変換コストしかありえない。同じ 2048 line /
+256 KiB（L2 に余裕で収まる）:
+
+| pages | lines/page | ns/access |
+|---|---|---|
+| 16–128 | 128–16 | 16.8–20.9 |
+| 256 | 8 | 23.6 |
+| 512 | 4 | 29.1 |
+| 1024 | 2 | 70.7 |
+| 2048 | 1 | 84.5 |
+
+**同一データを広いページに散らすだけで 5 倍。** 膝は 128–256 entry 付近。
+
+### 計測 2: しかし streaming tile では桁違いに小さい
+
+計測 1 は **依存ロード鎖**で memory-level parallelism がゼロ = 最悪ケース。tile 走査は
+streaming で prefetcher が効く。交絡を断つため **tile 形状と連続 run 長を固定し、行
+stride だけ変えて**同じ tile が載るページ数を変えた:
+
+config A（128 行 × 512 列 = 512 KiB tile、4 KiB run）: 32 → 128 pages で **1.00 → 1.06x**
+
+config B（512 行 × 128 列 = 512 KiB tile、1 KiB run）:
+
+| pages/tile | ns/elem | vs best |
+|---|---|---|
+| 32 | 1.111 | 1.00x |
+| 128 | 1.179 | 1.06x |
+| 512 | 1.403 | 1.26x |
+| 512（stride 32 KiB） | 1.506 | 1.36x |
+
+**streaming では 512 ページでも 1.36 倍 — chase の 5 倍とは桁が違う。**
+
+### 判断
+
+- `tile-plan` の `:tlb-reach` 免責は**妥当**。ただし「無料」ではない。
+- **設計に使う数字は chase の 5 倍ではなく streaming の 1.06–1.36 倍。** 最悪ケースの
+  定数でモデルを作ると、tile を無用に小さくして cache 再利用のほうを捨てる。
+- 実測ガイド: **tile あたり 128 ページまでは 10% 未満、512 ページで 1.3–1.4 倍。**
+  現在の tile-plan の出力（L2 private share 3 MiB × occupancy 0.5 = 1.5 MiB、連続なら
+  96 ページ）は安全側にある。2D tile が数百ページに達する形状でだけ効く。
+- 最後の 2 行はどちらも 512 ページと数えているのに 1.403 / 1.506 と違う。現在の
+  page 数式は行数で飽和し、**stride が page より大きいときの page-table 側 footprint 差**
+  を捉えていない。数式の限界として記録する。
+
+### 次
+
+`machine` に measured な `:tlb` fact（chase と streaming の両方の定数を、どちらが design
+用かを明記して持つ）、`tile-plan` に pages-per-tile の出力。**免責を黙って外すのではなく、
+測った penalty を添えて外す。**
+
+**教訓 10: `:model/does-not-model` は「測らない理由」ではなく「まだ測っていないという
+宣言」。免責そのものが計測対象。** そして今回も最悪ケースのマイクロベンチが設計定数に
+ならなかった——lesson 4 の再演。
+
 "}]
