@@ -31,10 +31,34 @@
   ([reg isic] (:optional-technologies (get-industry reg isic))))
 
 (defn technology-stack
-  "Resolve the required technology records for an ISIC business."
+  "Resolve the required technology records for an ISIC business.
+
+  Returns only what `kotoba-lang/technology` actually provides. An
+  industry may require a technology nobody has built yet — that is a
+  backlog entry, not a programming error, and it is what
+  `unprovided-technologies` reports. This used to call
+  `technology/stack`, which throws on an unknown id, so 29 of the 651
+  industries could not be queried AT ALL: the exception took down the
+  whole call, including the part that would have said what was missing."
   ([isic] (technology-stack (registry) isic))
   ([reg isic]
-   (technology/stack (required-technologies reg isic))))
+   (:resolved (technology/resolve-stack (required-technologies reg isic)))))
+
+(defn unprovided-technologies
+  "The technology ids this ISIC declares that nothing in
+  `kotoba-lang/technology` provides — required and optional both.
+
+  `{:required [id ..] :optional [id ..]}`, each possibly empty. This is
+  the fleet's build backlog expressed as data: an entry here says a real
+  industry needs something no repo supplies yet.
+
+  `readiness` answers a different question and always could — it is pure
+  set arithmetic over the ids a CALLER says it has available, so it
+  never resolved a record and never threw."
+  ([isic] (unprovided-technologies (registry) isic))
+  ([reg isic]
+   {:required (:unknown (technology/resolve-stack (required-technologies reg isic)))
+    :optional (:unknown (technology/resolve-stack (optional-technologies reg isic)))}))
 
 (defn readiness
   "Return an execution-readiness summary for an ISIC and available technology IDs."
@@ -66,6 +90,11 @@
      :operating-states (:operating-states industry)
      :ui-ready? (some :ui? stack)
      :export-ready? (some :export? stack)
+     ;; What this industry declares that nothing provides yet. Carried on
+     ;; the plan itself so a consumer reading an execution plan can see
+     ;; the hole rather than inferring readiness from a stack that is
+     ;; quietly shorter than the declared requirements.
+     :unprovided-technologies (unprovided-technologies isic)
      :technology-stack (mapv #(select-keys % [:id :name :layer :capabilities :repos :contracts :ui? :export?])
                              stack)}))
 
