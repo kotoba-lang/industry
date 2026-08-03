@@ -1,0 +1,134 @@
+[{:db/id -1
+  :adr/id "adr-2608030300-kotoba-native-f64-vector-parity"
+  :adr/title "ADR-2608030300: kotoba-native は KIR が既に宣言している f64 / vector 系 op を実装していない — backend parity gap として埋める"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-03"
+  :adr/last-verified "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-native-f64-vector-parity"
+  :adr/authoritative-for
+  ["kotoba-native が実装すべき KIR op family の範囲 (f64 scalar / vector / vector-f64)"
+   "native backend の parity gap を「契約設計」ではなく「backend 実装欠落」と分類する判断"
+   "T5 計測基盤 (machine-probe) が JVM から native へ移行するための前提条件"]
+  :adr/related
+  ["adr-2608030200-t5-hardware-optimization-libraries"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"
+   "adr-2607266000-kotoba-stack-responsibility-split-t0-t3"
+   "adr-2607252500-kotoba-wasm-component-first-execution-boundary"]
+  :adr/body
+  "# ADR-2608030300: kotoba-native の f64 / vector parity gap
+
+**Status**: accepted
+**Date**: 2026-08-03
+
+## Context
+
+### 発端: T5 の計測が JVM のループコストに潰されている
+
+ADR-2608030200 の反復 1-5 で、layout / traversal のモデルを実機較正しようとした
+実験が **3 回連続で null result** になった。原因はすべて同じ:
+
+> **要素あたりのループコストがメモリコストを支配しており、メモリ系が見えない。**
+
+実測 (Apple M1 Max、JVM):
+
+| ループ | ns/要素 | AoS/SoA 比 |
+|---|---|---|
+| 直列総和 | 2.87 | 2.12x |
+| 4 蓄積器に展開 | **0.87** | **6.63x** |
+
+直列版は浮動小数点加算の**レイテンシ**で走っていた (1 load + 1 add に約 10 cycle)。
+4 本の独立した蓄積器で依存鎖を切ると 3.3 倍速くなり、レイアウト比も 2.12x →
+6.63x へ動いた。**測っていたのはレイアウトではなく依存鎖だった。**
+
+しかし **まだ足りない**: SoA arm は 0.87 ns/要素で loop-bound のままで、メモリコストは
+0.36 ns/要素。`both-memory-bound?` を満たすには **約 1 cycle/要素** が要り、それは
+JVM が確実には出さない SIMD を意味する。**次のレバーは安いループではなく安い
+ランタイム。**
+
+### 調査して分かったこと: これは契約設計の問題ではない
+
+前回の報告で私は「native に i64 配列 op を足すのは kotoba-kir(T0) / compiler /
+native 2 backend / wasm parity / verifier / conformance に跨る T0-T3 横断変更」と
+書いた。**これは誤りだった。** 実測 (2026-08-03):
+
+- **`kotoba-kir` (T0 契約) は既に宣言している**:
+  `vector-new` / `vector-at` / `vector-assoc` / `vector-conj` / `vector-count` /
+  `vector-drop` / `vector-get`、**`vector-f64-*` 7 種**、`hetero-vector-*` 5 種、
+  そして **f64 scalar op 18 種**。
+- **`kotoba-wasm` は実装済み**: `f64` 参照 167 箇所、`vector-f64` 15 箇所、
+  vector op family 14 種。
+- **`kotoba-native` は 1 つも実装していない**: `x86_64.cljc` / `aarch64.cljc` とも
+  `rg -i 'f64|float|double'` が **0 hit**。heap-call 面は `pair` / `pair-first` /
+  `pair-second` / `kgraph-*` / `string-*` のみ。
+
+**つまり契約は既に存在し、参照実装 (wasm) も既に存在する。欠けているのは
+native backend の実装だけ。** 新しい op を設計する話ではなく、**宣言済み契約に
+対する backend の穴を埋める話**である。
+
+## Decision
+
+### 1. これを `backend parity gap` として分類する
+
+`kotoba-native` は `kotoba-kir` が宣言し `kotoba-wasm` が実装している
+f64 scalar / vector / vector-f64 の op family を実装する。**新規 op の設計・
+KIR への追加・frontend surface の拡張は行わない** — 必要なものは全て既にある。
+
+これにより変更範囲は次に限定される:
+
+| repo | 変更 |
+|---|---|
+| `kotoba-native` | x86_64 / aarch64 backend に op 実装を追加 |
+| `compiler` | `resources/kotoba/lang-conformance/native/` に fixture 追加 |
+| `kotoba-verifier` | 既存の検証経路で通るか確認 (変更不要の見込み) |
+| `kotoba-kir` / frontend | **変更しない** |
+
+### 2. 実装順序
+
+依存順に段階化する。各段は前段の conformance fixture が green になってから進む。
+
+1. **f64 scalar** — SSE2 (x86_64: `movsd` / `addsd` / `mulsd` 等) と
+   NEON (aarch64: `ldr d` / `fadd d` / `fmul d` 等)。KIR の f64 op 18 種。
+   これ単体で `native_executor_test` に f64 fixture を足せる。
+2. **`vector-f64-*`** — 既存の pair heap arena と同じ線形メモリ上に
+   長さ付きバッファとして置く。`vector-f64-at` / `-assoc` が f64 load/store に
+   落ちる。**ここまでで T5 の計測が native に載る。**
+3. **`vector-*` (i64)** — 同型。f64 版が通ってからで良い。
+4. **`hetero-vector-*`** — 最後。tagged 表現が要るので独立した設計判断を含む。
+
+### 3. 完了条件
+
+- `compiler` の `:native-conformance` alias が新 fixture を含めて green
+- `kotoba-wasm` と `kotoba-native` が同一 `.kotoba` に対して**同一の結果**を返す
+  (既存の dual-backend parity 経路)
+- `machine-probe` の計測ループを native で走らせ、**要素あたり 0.36 ns 未満**を
+  達成する (これが T5 のモデルを検証可能にする閾値。ADR-2608030200 参照)
+
+## Consequences
+
+- **T5 の計測基盤が JVM から離れられる。** JIT / GC / thermal governor がノイズに
+  入らなくなり、`perfgate` が `:too-noisy` で拒否し続けている実験が qualify
+  できるようになる見込み。
+- **ADR-2607198300 の「JVM を使わない実行」が、実際に使える範囲へ広がる。**
+  現状の native 経路は i64 + pair + kgraph + string handle だけで、数値計算を
+  何も表現できない。f64 と vector が入って初めて「実行経路」と呼べる。
+- **wasm backend が参照実装として機能する。** 同じ KIR op に対する 2 つの
+  backend が既に存在するので、native 側の正しさは wasm 側との差分で検証できる
+  (自己検証にならない — ADR-2607266000 が検証器を分離した理由と同じ構造)。
+- **やらないこと**: SIMD ベクトル化 (1 要素 1 命令のスカラ実装から始める)、
+  自動ベクトル化、レジスタアロケータの導入。段 2 の閾値 0.36 ns/要素が
+  スカラ実装で届かなければ、そこで初めて SIMD を別 ADR として検討する。
+
+## 訂正
+
+前回 (2026-08-03、同セッション) の報告で本件を「T0-T3 横断変更」と述べたのは、
+`kotoba-native` の backend ファイルだけを grep して「f64 が無い」と確認し、
+**`kotoba-kir` と `kotoba-wasm` を確認しなかった**ことによる誤り。契約と参照実装は
+最初から存在していた。**「無い」を報告する前に、無いのが契約なのか実装なのかを
+分けて確認する。**
+"}]

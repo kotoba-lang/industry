@@ -409,4 +409,48 @@ tiling CLI は pilot を先に通し、**sweep を走らせる前に「最小検
 `perfgate/detectable?` がノイズ側から同じ問いに答える。**どちらも走らせる前に
 呼べる。** 今日の 3 つの null result は、この 2 つがあれば 3 つとも事前に予測
 できた。
+
+## 反復 5 (2026-08-03) — ループを直したら比が 2.12x → 6.63x へ動いた。そして roofline の「検証」は循環だった
+
+### 1. 依存鎖が犯人だった
+
+直列総和は **浮動小数点加算のレイテンシ**で走っていた（1 load + 1 add に約 10 cycle）。
+4 本の独立した蓄積器で鎖を切ると:
+
+| ループ | ns/要素 | AoS/SoA 比 |
+|---|---|---|
+| 直列 | 2.87 | 2.12x |
+| 4 蓄積器 | **0.87** | **6.63x** |
+
+**測っていたのはレイアウトではなく依存鎖だった。** 3 つの null result はすべて
+この 1 つの原因に帰着する。n=8e6 では比が **20.2x** に達し、バイトモデルの 16x を
+**超えた** — 1 GiB 配列が TLB reach を使い切るためで、これもモデルの
+`:model/does-not-model` に載っている効果（逆方向）。
+
+### 2. 訂正: roofline の「一致」は検証ではなく恒等式だった
+
+反復 3 で「roofline が実測 2.28x を 2.30x と予測した」と報告したが、**loop floor を
+candidate arm から、bandwidth を baseline arm から取っている**ので、どちらの項も
+clamp しない限り式は**その 2 つの比を構成的に返す**。predictionではなく分解。
+`achievable-ratio` の docstring と `:model/calibration` に訂正を記録した。
+
+**本当の検証に必要なもの**: L1 常駐サイズでの loop floor 測定と、streaming read での
+bandwidth 測定を**独立に**取り、**測っていない構成**を予測して当てる。未実施。
+
+### 3. まだ足りない — 次のレバーはランタイム
+
+SoA arm は 0.87 ns/要素で loop-bound のまま（メモリコストは 0.36 ns/要素）。
+`both-memory-bound?` を満たすには **約 1 cycle/要素**が要り、JVM が確実には出さない
+SIMD を意味する。これが ADR-2608030300 の動機。
+
+### 4. 前回の scope 見積もりも誤りだった (ADR-2608030300 で訂正)
+
+「native に配列 op を足すのは T0-T3 横断変更」と述べたが、**`kotoba-kir` は既に
+`vector-*` / `vector-f64-*` / f64 scalar 18 種を宣言しており、`kotoba-wasm` は既に
+実装している**（f64 参照 167 箇所）。**`kotoba-native` だけが 0 実装。** つまり
+契約設計の問題ではなく **backend parity gap**。範囲は native backend 2 本 +
+conformance fixture に限定される。
+
+**教訓**: 「無い」を報告する前に、無いのが契約なのか実装なのかを分けて確認する。
+私は native backend ファイルだけを grep して結論を出していた。
 "}]
