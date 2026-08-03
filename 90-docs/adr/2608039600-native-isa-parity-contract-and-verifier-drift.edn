@@ -638,7 +638,7 @@ Component 契約面ではない — Component 流の provider 合成を native �
 | record: ~~`let` 束縛~~ **完了** | OK | **OK** (下記) |
 | record: **関数境界を越える** | OK | `:phase :target` — gate が拒否 |
 | record: ~~`:string` フィールド~~ **完了** | OK | **OK** (下記) |
-| record: **`:keyword` フィールド** | OK | `:phase :target` |
+| record: ~~`:keyword` フィールド~~ **完了** | OK | **OK** (下記) |
 | record: **record を入れ子にしたフィールド** | OK | `:phase :target` |
 
 **5 点の内訳が重要**: 4 点は gate (`:phase :target`) が止めており、
@@ -728,6 +728,42 @@ projection / 文字列を projection して測長 / `let` 束縛で両フィー�
 文字列を取り出して測長。compiler は固定 checkout で **baseline と patched が
 ともに 833 tests / 6,430 assertions、失敗も同じ 3 件の wall-clock 予算のみ**、
 conformance 8/8。
+
+## 完了: `:keyword` フィールド / payload — kit の error 形が native で動く
+
+残り 3 点のうち 1 点を閉じた。`:string` と違い**backend 側の実装も要った**が、
+それは既存の文字列リテラル経路の再利用で済んだ。
+
+**表現**: keyword は文字列と同じ 1 ワードの `pair(offset,length)` handle として
+運ぶ。中身はその**印字テキスト** (`:z` → 2 バイト `:z`) で、これは
+`kotoba.wasm.core` が keyword リテラルに既に選んでいた表現。文字列リテラル経路が
+持っている以上のものを要さない。
+
+修正前は、keyword リテラルが `emit-expr` に届くと **IllegalArgumentException** に
+なっていた — 診断可能な拒否ですらなく、keyword を呼び出しとして分解しようとして
+落ちるだけだった。
+
+同じテキストの keyword と文字列は実行時に区別できなくなるが、frontend が遥か
+手前で型を分けており、この backend には区別を載せる descriptor が無いので安全。
+
+**admit したのは keyword の値であって演算ではない。** `keyword-name` /
+`keyword-from-string` は実行時 handle に対する一般の substring と連結を要し、
+未実装。
+
+**3 箇所が keyword を知らなかった。いずれも読んで見つけたのではなく走らせて
+見つけた**: gate の `native-word-field-types` / gate の walk が
+`(keyword? form) false` で全ての式位置の keyword リテラルを拒否していた /
+verifier の `verify-expr!` の値ケース / verifier の `lowered-cost` — 最後のものは
+keyword に対して `(seq form)` を呼んで例外になっていた。
+
+**`:string` が既に入っていたので、`clock-v1` の error record 形
+`[[:code :keyword] [:message :string]]` が native でコンパイルでき実行できる** —
+capability kit 資格化が要求する形そのもの。
+
+検証: 実 AArch64 プロセスで 5 本 — keyword フィールドから i64 を projection /
+`let` 束縛 / variant の keyword payload / **kit error 形** / kit error 形の
+`let` 束縛。compiler は固定 checkout で **baseline と patched がともに
+847 tests / 6,486 assertions**、失敗は wall-clock 予算のみ、conformance 8/8。
 
 ## 残ったギャップ (2026-08-03 時点の実測)
 
