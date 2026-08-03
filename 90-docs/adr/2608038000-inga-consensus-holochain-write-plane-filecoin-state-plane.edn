@@ -226,8 +226,10 @@ ADR-2607110300 の labeling 規則をそのまま継承する。**witness が全
 | F1 state root の content-addressing | **未着手（0行）** |
 | F2 fuel 計量 `.kotoba` machine | **未着手（0行）**（fuel 自体は compiler に実装済み） |
 | F3 power table の on-chain 化・`:storage` role | **未着手（0行）** |
-| inga への抽出 | **未着手** |
-| kotobase `IRefStore` provider | **未着手（0行）** |
+| `kotoba-lang/inga` repo | **作成済み**（2026-08-03、west 登録済み、`west-orphan-audit --blocking` exit 0） |
+| inga への抽出（13 namespace / 3,166 行） | **未着手** — engi が本日 12 commit の hot な状態なので後述の理由で後回し |
+| `inga.head` / `inga.ref`（ref plane 本体） | **着地済み** — 15 tests / 45 assertions、`kotobase.storage.contract/verify` が `{:profile :linearizable-ref :concurrency :verified}` を返す |
+| kotobase `IRefStore` provider の**機構** | **着地済み**（上記）。**実 datom 面への配線は F1 待ち** |
 | torihiki-node の本番 | **単一 sequencer のまま**（`consensus: none`） |
 | OS プロセス分離 | **無し**（4 replica は 1 プロセス内。socket は本物） |
 | 独立第三者運営者 | **存在しない** → 分散を名乗らない |
@@ -259,7 +261,13 @@ ADR-2607110300 の labeling 規則をそのまま継承する。**witness が全
 
 F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 
-1. **抽出**（決定 1）— inga repo、13 namespace 移動、engi と torihiki の両方を inga に載せ替えるまでを1作業とする。受け入れ試験は `script/torihiki-on-engi.cljs` が同じ結果を出すこと。
+**⚠ 順序を1つ入れ替えた（2026-08-03 実施、理由は下記）。**
+
+0. **repo 作成 + ref plane**（実施済み 2026-08-03）— `kotoba-lang/inga` を作り、`inga.head` / `inga.ref` を先に置いた。**engi のコードには一切触れていない。**
+   - 理由: 抽出（3,166 行、engi と torihiki の同時着地）を**今日の engi にぶつけない**。実測で engi は 2026-08-03 だけで 12 commit（`4e498e1` 00:44 → `a6d4450` 08:25）入っており、CLAUDE.md の並行エージェント規律が禁じている衝突そのものになる。
+   - 代わりに作ったのは**どこにも存在しなかった部品**である。抽出は既存コードの移動だが、ref plane は新規であり、engi の中で作ってから移すと二度手間になる。
+   - **決定 6 の「F1 → 6 の順序は動かせない」に反していない。** その制約は「kotobase の ref が指す先が hydrate 可能でなければならない」＝ *何を* commit するかの話であって、*ref 機構が存在できるか* の話ではない。機構は今日検証でき、**実 datom 面への配線だけが F1 待ち**である。
+1. **抽出**（決定 1）— 13 namespace 移動、engi と torihiki の両方を inga に載せ替えるまでを1作業とする。受け入れ試験は `script/torihiki-on-engi.cljs` が同じ結果を出すこと。**engi の変更が落ち着いた時点で着手する。**
 2. **F1** state root を `prolly-tree` / `arrangement` の root CID にする。判定: 4 replica が同じ CID に到達し、**その CID から hydrate した state が Datalog でクエリできる**こと。
 3. **決定 6** kotobase の `IRefStore` を inga で実装し、`:linearizable-ref` を宣言して `kotobase.storage.contract/verify` の並行半分を通す。判定は**D1 を binding から外した状態で**行う —— D1 が有効なまま通しても、何が CAS を裁定したかが分からない。配備は `storage/compose {:blocks <B2 等> :refs <inga>}` で、block 側は `:conditional-ref` を宣言しないこと。
 4. **F2** machine を fuel 計量 `.kotoba` にする。判定: fuel 上限超過が決定的に同じ block で起きること。
@@ -270,5 +278,7 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 
 ## 改訂
 
-**2026-08-03（同日）**: 決定 6 を書き換えた。初版は inga を「D1 の代わりに使える、より強い `:linearizable-ref` provider」と書いていたが、オーナー指示「D1 には依存しないでほしい」を受けて、**D1 非依存を選択肢ではなく要件に格上げ**した（6-a）。技術的な帰結として、quorum 証明書自体が条件付き書き込みなのでホスト側プリミティブは経路から消え、object store への要求が `#{:immutable-blocks :cid-addressed-read}` だけに下がる。併せて 6-b（signed-head が自分で名指しした「writer を1人置く」穴を quorum が塞ぐこと）と 6-c（D1 は暫定 shim・DO は load-bearing でなくなるが禁止はしない）を追記した。
+**2026-08-03（同日、3回目）**: 実行順序に step 0 を追加し、現在地の表を更新した。`kotoba-lang/inga` を作成して `inga.head` / `inga.ref` を着地させ（15 tests / 45 assertions、`kotobase.storage.contract/verify` が `:linearizable-ref` / `:concurrency :verified`）、west に登録した。**抽出（step 1）より先に ref plane を作ったのは、engi が本日 12 commit 入っている hot な repo であり、3,166 行の抽出をぶつけるのが並行エージェント規律に反するため。** engi のコードには触れていない。
+
+**2026-08-03（同日、2回目）**: 決定 6 を書き換えた。初版は inga を「D1 の代わりに使える、より強い `:linearizable-ref` provider」と書いていたが、オーナー指示「D1 には依存しないでほしい」を受けて、**D1 非依存を選択肢ではなく要件に格上げ**した（6-a）。技術的な帰結として、quorum 証明書自体が条件付き書き込みなのでホスト側プリミティブは経路から消え、object store への要求が `#{:immutable-blocks :cid-addressed-read}` だけに下がる。併せて 6-b（signed-head が自分で名指しした「writer を1人置く」穴を quorum が塞ぐこと）と 6-c（D1 は暫定 shim・DO は load-bearing でなくなるが禁止はしない）を追記した。
 "}]
