@@ -17,6 +17,7 @@
    "producer と verifier の allowlist drift の扱い"
    "未実装 operator の診断規約 (backend は operation 名を名乗る)"
    "target-admission 述語は let 束縛値を walk しなければならない"
+   "native の entry/関数 result が :i64 限定である理由 (KIR の :bool と native の 0/1 語の乖離)"
    "ADR-2608039500 の検証記述の訂正 (override 不発)"]
   :adr/related
   ["adr-2608039500-native-backend-codegen-back-half-size-preserving-peephole"
@@ -38,7 +39,10 @@
    "com-junkawasaki/root 26404fec6e13c94ac5549389c56ea1d316636cb1"
    "kotoba-lang/kotoba-kir 0efe32518a422c2f8ab32de4d9a75720d67780e8"
    "kotoba-lang/compiler 0d694d02b301d84f985636a7c2bbfdffee6780e7"
-   "com-junkawasaki/root 667b8d987ec469e0364ac97758ed0b20479927e5"]
+   "com-junkawasaki/root 667b8d987ec469e0364ac97758ed0b20479927e5"
+   "kotoba-lang/kotoba-verifier cc5b4f94fc25fdc31f6e7c9f19158057c6e9a212"
+   "kotoba-lang/compiler e5a8cf1c27a2550294ec12a5d9c99a67461a1f9a"
+   "com-junkawasaki/root 6bc32324bd096368bcdbb10e6a049771a4676370"]
   :adr/body
   "# ADR-2608039600: native backend の ISA parity を契約化する
 
@@ -300,6 +304,52 @@ one-word slice は今も admit される (穴を outage に交換していない
 「不正な `let` は walk されずに拒否される (この述語は verifier が敵性として
 扱う KIR にも走る)」を pin する。
 
+## 続き: `:bool` を返す関数が native で書けない — これは**バグではなく制約**だった
+
+drift のクラスを系統的に洗うため、frontend の全 operator を native target で
+コンパイルし `:phase :verify` で拒否されるものを探した (`bit-or` と同じ署名)。
+12 件ヒットしたが、kernel 系 7 件は
+'bounded kernel memory operation requires the aiueos kernel target' という
+**target 認識済みの正しい拒否**で偽陽性。残る比較演算子 5 件が本物だった。
+
+**症状**: `(defn main [] (+ 1 1))` は通るのに `(defn main [] (= 1 1))` が
+'runtime KIR module shape rejected' (data 空) で落ちる。`(if (= 1 1) 7 8)` は
+通る。つまり **比較結果を返す関数が native で書けず、比較は `if` の test 位置
+でしか使えない**。しかも **wasm32 / js / cljs では通る** — portable な言語機能を
+native だけが拒否している。
+
+**原因**: 比較は `:result :bool` を推論し、verifier は entry / 各関数の result を
+`:i64` に限定していた。
+
+**当初「1 行で広げられる」と判断したが、それは誤りだった。** `:bool` は native
+両 backend で 0/1 の語としてビット同一で、`kototama.native.executor` も result が
+integer であることしか要求しないため、受理は無害に見えた。実際に広げたところ、
+**verifier 自身の層構造が 3 つ先の検査で弾いた**。実測:
+
+```
+(defn main [] (= 1 1))   lower :oracle-value = nil (畳み込みを拒否)
+                         execute             = true (1 ではなく真偽値)
+(defn main [] (+ 1 1))   両方とも 2
+```
+
+**KIR インタプリタの値モデルには本物の `:bool` があり、native backend には
+0/1 の語しか無い。** この検査は「`true` を封印した oracle 値」と「語 1 を返す
+コード」を持つ artifact を止めているのであって、
+`verify-native-artifact!` の `(= expected-value (:value kexe))` が同じ事実の
+異なる表現を比較する事態を防いでいる。**制約は load-bearing だった。**
+
+**決定**: 制約は維持する。持ち上げるには (a) `kotoba.kir/execute` が `:bool`
+entry に対して 1/0 を返すようにするか、(b) backend が本物の bool 表現を持つか
+のいずれかで、**native の値モデルに関する設計判断**であって集合の widening では
+ない。理由・実測・持ち上げ条件を検査のある場所に書いた。
+
+**副産物として直したもの**: `verify-program!` は 12 個の条件を 1 つの `and` で
+検査し `{}` を報告していた。どれが落ちたかを知るにはプログラムを手で二分探索
+するしかなく、最も頻度の高い落ち方 (entry が比較を返す) が malformed module と
+区別できなかった。各条件に名前を付けて報告するようにした (敵性プログラムは
+早い条件の失敗により後の条件が throw しうるので、各検査を guard し throw も
+その条件の失敗として扱う)。**この診断改善が、上記の原因特定を 1 手にした。**
+
 ## 残ったギャップ (2026-08-03 時点の実測)
 
 - **native に実装すべき operator**: `string-substring`
@@ -307,6 +357,9 @@ one-word slice は今も admit される (穴を outage に交換していない
   なく `string-concat` と同じ string-pool / host-call 経路が要る。
   — `xorshift32` はゲート修正により**この一覧から外れた**。i32 値表現を
   native に入れるかどうかの判断に統合される。
+- **比較結果を返す関数が native で書けない** (`:bool` 対 0/1 語)。制約は
+  load-bearing なので「穴」ではないが、wasm/js/cljs との機能差ではある。
+  解消は native 値モデルの設計判断。
 - `i32-operations` 一族 (i32 値表現) は native に無い。
 - record/variant が関数境界を越えられない・相互ネスト不可・
   string/keyword フィールド不可 (compiler ADR 0062/0063 の Remaining gaps)。
