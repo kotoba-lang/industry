@@ -1,0 +1,196 @@
+[{:db/id -1
+  :adr/id "ADR-2608030700"
+  :adr/title "cloud-itonami-isic-3515 — peer-to-peer electricity trade actor (ISIC Rev.5 3515 Trade of electricity)"
+  :adr/status "accepted"
+  :adr/date "2026-08-03"
+  :source/dataset "adr"
+  :adr/tags ["cloud-itonami" "energy" "isic" "marketplace" "actor" "langgraph"]
+  :adr/repos ["orgs/cloud-itonami/cloud-itonami-isic-3515"]
+  :adr/related ["ADR-2607101800" "ADR-2607141200" "ADR-2607121000" "ADR-2607071320" "ADR-2607141600" "ADR-2800000500"]
+  :adr/body
+  "# Context
+
+オーナー質問「今の cloud-itonami に電力の売買は設計実装されている? 誰でも発電と売買が
+できるような設計実装」に対する監査の結果、**電力の売買は設計にも実装にも存在しなかった**。
+
+既存の ISIC 35 系 5 リポジトリ (3510 送配電 / 3511 SMR 発電 / 3512 コミュニティ再エネ発電 /
+3520 ガス / 3530 熱供給) はすべて「規制順守の記録・承認ワークフロー actor」であり、
+取引・市場・決済ではない。最も近い 3512 は `:actuation/finalize-settlement` を持つが、
+`energy/store.cljc` のスキーマを読むと `:site/settlement-finalized?` と
+`:site/settlement-number` というコンプライアンス記録しか持たず、**kWh も価格も
+カウンターパーティも注文も無い**。動詞はあったが市場は無かった。
+
+## ISIC Rev.5 の該当クラスを確認した (重要な発見)
+
+ISIC Rev.5 group 351 の内訳を実際に調べた結果:
+
+  3511 production of electricity from non-renewable sources
+  3512 production of electricity from renewable sources
+  3513 transmission of electricity
+  3514 distribution of electricity
+  3515 **trade of electricity**
+  3516 storage of electricity
+
+**3515「Trade of electricity」の scope note が、まさにオーナーの要求そのもの**を含む:
+\"sale of electricity to the user, activities of electric power brokers or agents that
+arrange the sale of electricity via power distribution systems operated by others, and
+operation of electricity and transmission capacity exchanges for electric power\"。
+
+したがって role-suffix (`cloud-itonami-isic-3512-p2ptrading`) ではなく、正しいクラス番号
+`cloud-itonami-isic-3515` で起こした。fleet の ISIC index の意味を保つため。
+
+### 副次的発見 — 既存 2 リポの ISIC 番号ずれ (今回は修正しない)
+
+- `cloud-itonami-isic-3510` は README で「ISIC Rev.5 3510」を名乗るが、3510 は Rev.4 の
+  コード。Rev.5 で同リポの内容 (配電事業者) に対応するのは **3514**。
+- `cloud-itonami-isic-3512` は README で「transmission and distribution」と書くが、
+  Rev.5 3512 は production from renewable sources であり、**リポの実装内容は 3512 で正しい**
+  (README の説明文だけが誤り)。
+
+live リポの rename は manifest・GitHub redirect・west pin を巻き込む別種の変更なので、
+今回は着手せず本 ADR に記録して後続セッションが意図的に発見できるようにする。
+
+# Decision
+
+`cloud-itonami-isic-3515` を fleet 標準の actor 形状 (facts / registry / phase / governor /
+advisor / store / operation、langgraph-clj StateGraph、append-only 監査台帳) で実装し、
+電力取引に固有の要素を上に載せる。**Electricity Trade Advisor ⊣ Market Conduct Governor**。
+
+## D1. 注文ログが市場状態の唯一の正本
+
+materialized order book を永続化しない。store が持つのは interval ごとの全順序付き
+注文ログのみで、governor・精算計算・第三者監査人はいずれも
+`trade.matching/replay-book` で板を再導出する。
+
+これが governor の check 5 を可能にしている: governor は「この注文が許容されるか」に
+ついて意見を持たず、**公開ログ上で決定論的エンジンを再実行する**。wash trading は
+エンジン (reject-taker self-trade prevention) で死に、governor はエンジン自身の
+`:reason` を surface するだけ。**規則は議論できるが replay は議論できない。**
+
+ゲートクローズも同じ規律: interval entity の可変フラグではなく、ログ中の
+`:close-gate` イベント。市場が開いているかの source of truth はちょうど 1 つ。
+
+## D2. matching engine は cryptoexchange から派生させる (依存はしない)
+
+`cloud-itonami-isic-6611-cryptoexchange` の `cryptoexchange.matching` は既に正しい
+決定論的エンジン (明示的 composite key による price-time priority、single-sequencer
+全順序、maker price rule、reject-taker self-trade prevention、第三者 replay) を持つ。
+ゼロから再発明せず、これを読んで設計を採用した。
+
+**依存ではなく複製 + credit** にした理由は 2 つ:
+
+1. **fleet 規約**: actor 同士はコードを共有せず、flat な wire shape を共有する
+   (3512 の store docstring が 3510 との no-shared-code linkage について述べている
+   とおり)。共有コードは `kotoba-lang/*` library に置く。
+2. **電力は fungible asset ではない**: crypto の fill は残高を動かして終わり。電力の
+   fill は**特定の未来の 30 分に対する引渡義務**を生み、後で**計量値**と突合され、
+   その差が imbalance — 実際の金と実際の紛争はそこにある。
+   `cryptoexchange.matching` には interval も gate closure も deliver-later 意味論も
+   無く、それを後付けすると現状正しい exchange actor を歪める。
+
+将来 `kotoba-lang/orderbook` を切り出すなら両者ともそこへ移すべき。それまでこの重複は
+意図的であり、namespace docstring に明記した。
+
+## D3. µ単位/Wh の整数 — 金額が丸まらない
+
+数量は watt-hour (Wh) の整数、価格は micro currency unit per watt-hour (µJPY/Wh) の整数。
+fill の金額は `(* qty price)` — 整数乗算のみ、除算なし、したがって紛争時に争う丸め規則が
+存在しない。25 JPY/kWh = 25000 µJPY/Wh、2000 Wh でちょうど 50,000,000 µJPY = 50 JPY。
+
+代替案 (kWh あたり価格 × Wh 数量) は fill ごとに 1000 での除算を強制し、その丸め方針
+自体が統治対象になってしまう。
+
+## D4. actuation は 2 つ、どの phase でも永久に `:auto` 集合の外
+
+`:actuation/place-order` と `:actuation/settle-interval` は phase 3 を含むどの phase でも
+自動コミットしない。独立に 2 回強制: `trade.phase` の全 `:auto` 集合から不在、かつ
+`trade.governor/high-stakes`。`test/trade/phase_test.clj` が phase table 全体に対して
+これを assert する (散文を信用しない)。
+
+理由はこのドメイン固有: **モデルが自らの発意で約定させられる板は、幻覚を引渡義務に、
+そして誰かの電気代に変換する機械である。** 人間の判断 1 回につき注文 1 件。
+
+## D5. advisor は価格を決めない
+
+side・数量・価格は呼び出し側が与える。advisor はそれを正規化し参加者自身の事実を引用
+するだけで、価格を発明せず、何を取引するか選ばず、相手方も選ばない。価格形成は決定論的
+エンジンの仕事。
+
+価格を選ぶ advisor は「コンプライアンス actor の服を着たトレーディングアルゴリズム」で
+あり、モデルの出力が市場ポジションそのものになった時点で containment の議論は崩壊する
+— governor が独立して審査すべきその判断自体を審査することになるから。
+
+## D6. `:permits` を集合にする — 「開いた扉と正直なゲート」
+
+「誰でも発電と売買ができる」を、seed した全法域が実際に立法している非対称性として実装:
+
+- **登録・発電・購入は開放**。登録は任意の role と自己申告容量を受け付け、唯一
+  auto-commit 可能な操作。発電を阻むものは何も無い。買い手に小売ライセンスは不要
+  (`buying-does-not-require-the-sell-right` が assert)。
+- **売却はゲート** — 法域自身の規則により、確定済み verification から読む
+  (proposal からは決して読まない)。
+
+`trade.facts` は `:generate-basis` と `:sell-basis` を別々に記録し、結果の権利を
+**boolean ではなく集合** `:permits` として返す。未登録法域は `#{}` — deny by default。
+
+物理ゲートが第二の関門: `deliverable-wh` は切り捨て (売り手有利に切り上げない)、
+governor は既存ポジションを合算するので注文分割で回避できない。
+
+## D7. 計量されていない電力に対して精算しない
+
+独立 3 層が拒否する: (a) 約定のある参加者に確定計量値が無ければ governor が HARD hold、
+(b) `register-settlement` がそのような record の構築自体で throw、(c) `imbalance-wh` は
+計量値欠損時に「都合の良い 0」ではなく `nil` を返す。
+
+# Verification (実測、2026-08-03)
+
+- `clojure -M:dev:test` — 57 tests / **368 assertions / 0 failures / 0 errors**
+- `clojure -M:lint` (clj-kondo) — **0 errors / 0 warnings**
+- `clojure -M:dev:run` — 完全な取引を通す: 家庭 prosumer が保育園へ 2000 Wh を
+  maker 価格 25 JPY/kWh で売却 (買い手は 26 JPY/kWh を提示したが maker price rule で
+  25 で約定) = ちょうど 50.00 JPY、計量値は売り手が 50 Wh 不足 (imbalance -50 Wh)、
+  interval 精算まで到達。その後 7 種の HARD hold (spec-basis 無し / 売却権限無し /
+  物理容量超過 / self-trade / ゲート閉鎖後 / 市場行為フラグ / 二重精算) を実演し、
+  最後に公開注文ログから板を再導出して同一の fill を再現。
+- `store_contract_test` は MemStore と Datomic-backed store の**両方**に対して全契約を
+  実行 (注文ログ順序の parity を含む — 順序を変える backend は同じ取引から異なる
+  fill を生むので、この parity は装飾ではなく load-bearing)。
+
+法域 catalog の 4 エントリはすべて**当セッションで実際に fetch して読んだ**:
+Electricity Act 1989 s.6 (legislation.gov.uk 逐語)、EnWG § 5 (gesetze-im-internet.de 逐語)、
+電気事業法 27条の27① 発電事業届出 / 2条の2 小売電気事業登録 (ANRE + 日本法令外国語訳)、
+FERC market-based rate authority (FPA s.205 / 18 CFR 35 / Order No. 697)。
+
+# Consequences
+
+**良い点**: fleet の ISIC 351 カバレッジが完成した。公開注文ログを持つ任意の第三者が
+全 fill を再導出できる。取引所は公開の場で再導出できない約定を作れない。小規模参加者は
+門番なしで登録・発電でき、ゲートされる唯一の行為は規制当局が認識する理由でゲートされる。
+
+**コストと限界 (率直に)**:
+
+- **法域は 4 件**であり 194 件ではない。`trade.facts/coverage` が正直に報告する。
+- **免除閾値を一切エンコードしていない**。seed した全法域に存在するが、どれも未検証で
+  あり、未検証の閾値は「数値の付いた捏造」でしかない。
+- **USA は wholesale のみ**。検証したのは FERC の market-based rate authority であり、
+  州の小売規制は未検証。米国単一州内の retail P2P 売買にはここに spec-basis が無い。
+- **銘板容量は上限であって予測ではない**。夜間の太陽光は上限を大きく下回る。この上限は
+  物理的に不可能なものだけを拒否する — 市場行為の床であって天井ではない。
+- **容量は自己申告**。参加者の登録容量が実在するかを本 actor は検証しない。それは資産
+  登録 (Marktstammdatenregister / 発電事業届出) の仕事で、本 actor は evidence として
+  記録するが独立検証はしない。
+- **金銭移動もグリッド連携も無い**。精算は unsigned draft record を生む。決済レール・
+  インバランス料金・TSO/DSO インターフェースは R0 のスコープ外。
+- **matching engine が isic-6611-cryptoexchange と重複**。D2 で意図的に受容。共有
+  library を切り出す際に再検討する。
+
+# Follow-ups
+
+1. `isic-3510` の Rev.5 番号ずれ (→ 3514) の扱いを決める。rename か、README の
+   説明文だけの訂正か。`isic-3512` は README 説明文のみの訂正で足りる。
+2. ISIC Rev.5 3513 (transmission) / 3516 (storage) は未着手。3516 は 3512 の
+   battery dispatch と重なるので、起こす前にスコープ確認が要る。
+3. 法域 catalog の拡張 (免除閾値を、実際に読んだ instrument を引用して追加)。
+4. 決済レール接続 (`cloud-itonami-marketplace-settlement` / `commitment-ledger` /
+   x402 との配線) は別 ADR。
+5. `kotoba-lang/orderbook` 抽出の是非 (cryptoexchange と本 actor の 2 消費者が揃った)。"}]
