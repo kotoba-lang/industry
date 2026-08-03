@@ -528,6 +528,75 @@ stay repo (care / 相互扶助 / 憲章統治 / 観測 / 布教 / ファクト�
 であり、その前提として同 ADR が挙げる `manifest/kotoba-boundaries.edn` の
 `:domain-actors` 更新が必要。本 ADR ではそこまで実行しない。
 
+#### 証拠ベースの再判定 (2026-08-03) — 宣言と実装は逆方向にずれていた
+
+2026-07-29 の再判定は **registry (9 identity) と repo 名の突き合わせ**で行った。D9 が
+本来挙げていた懸念 —「heartbeat 実装を持ちながら宣言していない repo を取りこぼして
+いる」— は repo 内実装を走査しないと答えられないので、そこを別に測った
+(`scripts/organism-readjudicate.cljs`、出力 `90-docs/audits/organism-readjudication.datoms.edn`)。
+
+D1 が定める organism の 2 条件を、宣言ではなく repo 内の証拠として別々に測る:
+**(a) 自分で起きる** = `heartbeat` を含むファイル名、または任意ディレクトリの
+`loop|tick|scheduler|cron|daemon.clj[cs]?`。**(b) 自分の did で対外発話する** =
+did 宣言 (`did:web:` / `did:key:`) かつ `publisher|aozora|cacao|pds.clj[cs]?` の実装。
+
+**旧検出器の盲点 2 つを埋めた**: (1) `README.md` / `readme.md` しか読んでいなかったが、
+`README.md` を持たず `README.edn` / `README.md.edn` だけを持つ repo が **150 件**ある
+(本 workspace の EDN-only 規約の帰結)。(2) README 先頭 4096 byte 打ち切り。
+
+実測 (3,632 present checkout / 4,034 west project):
+
+| verdict | 件数 | repo |
+|---|---:|---|
+| organism (自起動 + 自 did 発話 + 宣言) | 1 | `etzhayyim/com-etzhayyim-tomoshibi` |
+| organism-undeclared (実装あり・宣言なし) | 1 | `cloud-itonami/yukkuri` |
+| organism-partial (2 条件のうち 1 つ) | 7 | `cloud-itonami/kaname` `-/kouhou` `-/tashikame` / `etzhayyim/com-etzhayyim-ibuki` `-/root` `-/tamaki` / `gftdcojp/apps-gftdcojp` |
+
+**D9 の懸念は 1 件だけ当たった**: `yukkuri` は `clj/src/yukkuri/cron.cljc` +
+`clj/src/yukkuri/aozora.cljc` + `did:web:yukkuri.gftd.ai` を実装しており、9 identity の
+1 つ (`yukkuri-organism.aozora.app`) でもあるのに、**README.md を持たないため旧検出器から
+構造的に見えていなかった**。
+
+**だが支配的な誤差は逆方向だった。** `repo-taxonomy.edn` が README 宣言だけで
+`:repo/kind \"organism\"` としていた `yomi` / `kyoninka` / `sng` は、**いずれも
+heartbeat も resident loop も持たない**。`yomi` は publisher 実装も無い
+(`src/yomi/` は governor / intelllm / phase / sim / store / synthesis のみ) — README で
+\"News Intelligence artificial organism\" と名乗る request-scoped な StateGraph actor である。
+**README 宣言ベースの分類器は取りこぼすより過大報告する。**
+
+したがって D1 の etzhayyim 境界を証拠で機械適用すると、**残るのは実質 tomoshibi 1 件**に
+なる。これは前節の結論 (D7 は ADR-2607261601 の stay 集合と読む) を、別の測り方から
+裏付ける — 字義通りの organism フィルタは repo レベルでは機能しない。
+
+**`yukkuri` を etzhayyim へ移す判断はしない。** 自起動することは宗教法人の資産である
+ことを意味しない。yukkuri は AWAI Network L.L.C. が運営する consumer creative product で
+あり、D1 の第二軸 (service なら consumer network = network-awai) が優先する。
+**起動主体軸は org を一意に決めない** — これは D1 の限界として記録する。
+
+#### etzhayyim の orphan checkout 116 件を整理 (2026-08-03)
+
+再判定の走査中に、**west に登録されていない `orgs/etzhayyim/com-etzhayyim-*` の
+ローカル checkout が 122 件**残っているのを実測した。うち 116 件は
+`orgs/cloud-itonami/<bare-name>` に twin があり、GitHub 側は既に transfer 済み
+(`gh api repos/etzhayyim/com-etzhayyim-yomi` は `cloud-itonami/yomi` を返す = redirect)。
+west.yml も cloud-itonami 側だけを登録している。つまり**転送完了後に残った古い
+checkout の重複**で、`orgs/etzhayyim` を実態より 2 倍近く大きく見せていた。
+
+削除の前に 1 件ずつ着地判定した (CLAUDE.md「landed だと確信していても archive してから」):
+
+| 判定 | 件数 | 根拠 | 処置 |
+|---|---:|---|---|
+| HEAD が twin と一致 | 71 | `.git` の ref 直読 | 削除 |
+| HEAD がサーバ側で twin に包含 | 29 | `gh api .../compare/<etz-head>...HEAD` の `merge_base == etz-head` | 削除 |
+| HEAD がサーバに存在しない (404) | 14 | 未 push のローカル commit | **保全** |
+| 未コミット WIP あり | 2 | `ipaddress` (RIR datom + ops) / `kawase-yui` (lex/wire 11 file + docs/adr) | **保全** (patch を archive) |
+
+98 件を削除し、`orgs/etzhayyim` の実ディレクトリは **209 -> 111** になった。保全した 16 件は
+`.git/stash-archive-2026-08-03-etz-orphan/preserved-unlanded.txt`、削除した一覧は同
+ディレクトリの `deleted-orphan-checkouts.txt`、WIP 2 件の patch は同ディレクトリに置いた。
+**保全した 16 件の未着地 commit を twin へ着地させるのは未実行** — これが Phase 4 の
+次の具体的作業になる。
+
 #### 再判定の過程で見つかった manifest の実態乖離 (3 件)
 
 Phase 4 に着手する前に潰すべきものとして記録する。**移送より先にこちらを直す** —
