@@ -321,4 +321,70 @@ n=8M（64 MiB、L2 12 MiB を大きく超える）で同一値なので、キャ
 **段階 5: NEON / SSE2 packed f64。** 段階 2-4 のスカラ実装が通ってから着手する。
 ここまでの測定で「必要である」ことと「十分である」ことの両方が示されているので、
 別 ADR に切り出さず本 ADR の範囲に含める。
+
+## 訂正 (2026-08-03): 段階 1 は「完了」ではなかった — f64 は native に到達できない
+
+段階 1 を「両 backend に f64 scalar 実装、完了」と報告したが、**誤りだった。**
+検証していたのは **emit されたバイト列**（clang のアセンブル結果と照合）だけで、
+**実際に .kotoba から native 実行して正しい値が出るか**は一度も確認していなかった。
+テストは `emit-expr` を直接呼んでおり、**その手前にある admission 経路を全部
+迂回していた。**
+
+実行 conformance fixture を書いたところ、**f64 は native target に到達できない**と
+判明した。経路上に **4 つの門**がある:
+
+| # | 門 | repo | エラー |
+|---|---|---|---|
+| 1 | target gate | `compiler/core.clj:344` | "floating-point values require the kotoba-script or Wasm target" |
+| 2 | KIR admission | `kotoba-kir` `only-native-word-typed-features?` | "typed values currently require ... the qualified native one-word slice" |
+| 3 | verifier op list | `kotoba-verifier` | "runtime KIR operation rejected {:operation f64-to-bits}" |
+| 4 | compatibility seal | `kotoba-verifier` | "native compatibility metadata rejected" |
+
+**門 1-3 は allow-list への追加で通せることを実測で確認した**（順に通し、次の門に
+到達することを確認済み）。それぞれの正当化:
+
+- **門 1**: f32 と f64 を**分離**する。native は f64 を実装し f32 は実装していないので、
+  まとめて許可すると f32 が emit できない backend に流れる。
+- **門 2**: native の f64 値は**整数レジスタ内の 1 語の IEEE-754 ビットパターン**で、
+  この述語が許可する "native word" そのもの。allocate せず memory に触れない。
+- **門 3**: arity check + operand walk。整数演算と同じ扱い。
+
+### 門 4 は allow-list ではない — ここで止めた
+
+verifier は `hir-format` を **KIR format から推論**している:
+
+```clojure
+typed-values? (= :kotoba.kir/v4 kir-format)
+expected (compatibility-profile/descriptor
+          {:hir-format (if typed-values? :kotoba.hir/v3 :kotoba.hir/v2) ...})
+```
+
+実測: f64 プログラムは **`:kotoba.hir/v3`**（typed values）になるが、**KIR v4
+（externref value ABI）は必要としない** — f64 は素の 1 語だから。よって
+verifier は hir/v2 を期待し、compiler は hir/v3 を出し、seal が不一致になる。
+
+**正しい修正は (b): `hir/v3` が `kir/v4` を含意するという推論を精緻化する**
+— v3 の機能が native-word-typed だけのとき（それを `only-native-word-typed-features?`
+が既に証明している）は v4 を要求しない。(a) f64 のために KIR v4 / externref ABI を
+native に持ち込むのは過剰。
+
+**これは security-relevant な seal なので、長いターンの終わりに急いで変えない。**
+今日すでに 4 件の自分の誤りを見つけている。次の増分で、fixture が green で着地する
+1 つの整合した変更として行う。
+
+### この反復で共有 repo に着地させたものは無い
+
+門 1-3 の変更と fixture は**すべて revert した**。理由: fixture だけ入れると CI が
+赤くなり、門だけ入れると「なぜ security gate が広がったのか」を説明するテストが
+無い状態で T0/T2 に部分的な緩和が残る（他セッションが同時に触っている repo）。
+**4 つまとめて 1 つの変更として入れるのが正しい。**
+
+fixture 2 本（`f64_add.kotoba` / `f64_mixed.kotoba`、期待値は 5.5 と 3.0 の
+ビットパターン）は再現可能なので、次の増分で書き直せば良い。
+
+### 教訓（7 つ目）
+
+**「実装した」と「到達できる」は別。** backend に op を足しても、その手前の
+admission 経路が許可しなければ、そのコードは 1 度も実行されない。
+**emit のテストは admission を迂回する** — 実行 fixture だけがそれを捕まえる。
 "}]
