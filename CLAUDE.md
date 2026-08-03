@@ -764,6 +764,46 @@ projection、index、local read accelerator、運用メトリクス。
 とおり、**Cloudflare OAuth token に `r2` scope が無く R2 の `onlyIf.etagMatches` が
 使えなかった**ための暫定選択である。恒久的な答えとして選ばれたことは一度もない。
 
+## agent loop の正本は Git + EDN + DataLad、Datomic/kotobase は query projection（repo-wide mandatory、2026-08-03、ADR-2608039700）
+
+agent loop は database transaction loop ではなく、`checkout → observe → edit/generate →
+diff → verify/query → commit → review/merge → handoff/restart` という artifact loop である。
+したがって **agent-facing な durable source of truth は Git + canonical EDN** とし、Git が
+直接持つべきでない large immutable object だけを **DataLad/git-annex** に分離する。
+
+- **小さい semantic EDN、schema、query、policy、manifest は通常の Git blob** に置く。
+  EDN だからという理由だけで annex 化しない。diff/review と、content 未取得 agent の
+  inspection を失うためである。large EDN shard、raw corpus、weights、Wasm、画像、音声、
+  動画、生成 artifact は annex に置く。
+- **DataScript / Datomic / D1 index / kotobase / arrangement は query・serving projection**
+  として使う。pin された Git commit + annex objects + schema + loader から logical datom set を
+  再構築できなければならない。DB への直接書込みだけで source plane に戻らない mutation は
+  禁止。live input も先に replay 可能な EDN event/shard または content-addressed receipt にする。
+- **共有 Datomic/kotobase は中央集権的でもよいが、安定した read/query service に限定する。**
+  消失時に query が遅くなるのはよい。正本、custody、recovery、正しさが失われるなら
+  projection ではなく premise なので不可（直前の D1 規則と同じ削除・再構築テスト）。
+- **一緒に join するものは同じ logical dataset / kotobase ref に materialize する。** ref を
+  分ける場合は、失われる横断 query を名指しする。projection は `:source/dataset`、source
+  Git commit、dataset version、schema/loader version、annex key/CID を追跡する。
+- **文書・設定は現在値を更新し、履歴を Git に任せる。測定・イベント列は append-only
+  shard とする。** 両方を一律 append-only または一律上書きにしない。
+- **公開 repo + 暗号化 annex は本文の秘匿であって metadata の秘匿ではない。** path、size、
+  更新頻度、author、dataset topology は見える。git-annex の `encryption=shared` は GPG 系で
+  age ではない。age を使う場合は ciphertext を annex 管理し、annex key/CID は plaintext
+  identity でなく ciphertext identity とする。plaintext↔ciphertext 対応表が必要ならそれも
+  暗号化し、decrypt 先は Git 管理外、age identity は明示 capability とする。
+- **Git/DataLad/CID は availability guarantee ではない。** 重要 dataset は `numcopies`、
+  独立した複数 remote、定期 `fsck` / custody verification、recovery drill を持つ。
+- agent/materialization receipt は input commit、annex manifest/key/CID、schema/loader/query/
+  compiler contract、effective policy/capability、output commit/artifact CID、検証結果を結ぶ。
+- protected Git ref / merge queue / single writer を当面の安定した publication として使ってよい。
+  ただし分散合意とは呼ばない。分散 agreement が必要な経路は inga ref へ接続する。
+- projection を追加・変更したら
+  `nbb --classpath ".:scripts/nbb_compat" manifest/projection-verify.cljs verify <projection.edn>`
+  をgateにする。contractはsource commit、input Git hash / annex key / CID、schema/loader hash、
+  shellを介さないrebuild argv、output hash/entity countを固定する。custody確認は別途
+  `scripts/annex-custody-verify.cljs` が担い、identity検証とavailability検証を混ぜない。
+
 ## LLM モデル選択 — murakumo-main alias（repo-wide mandatory、2026-07-17、ADR-2607173100）
 
 - **モデルは能力がすぐ入れ替わる。concrete な model id（`qwen3.6-35b-a3b` 等）を
