@@ -60,6 +60,15 @@
             "statusMessage": "Checking changed 90-docs EDN parses…"
           }
         ]
+      },
+      {
+        "matcher": "Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "nbb /Users/junkawasaki/github/com-junkawasaki/.claude/hooks/duplication-warn.cljs"
+          }
+        ]
       }
     ],
     "PostToolUse": [
