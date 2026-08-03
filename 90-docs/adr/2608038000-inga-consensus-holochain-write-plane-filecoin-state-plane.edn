@@ -223,12 +223,12 @@ ADR-2607110300 の labeling 規則をそのまま継承する。**witness が全
 | equivocation の検出と記録 | **動いている**（伝播しない） |
 | commit した block の決定的実行と state root 一致 | **動いている**（torihiki で 123 block、全 replica 一致） |
 | permissionless staking / stake 加重 quorum | **実装済み・未作動**（bond 供給元が未デプロイ） |
-| F1 state root の content-addressing | **未着手（0行）** |
-| F2 fuel 計量 `.kotoba` machine | **未着手（0行）**（fuel 自体は compiler に実装済み） |
-| F3 power table の on-chain 化・`:storage` role | **未着手（0行）** |
+| **F1** state root の content-addressing | **着地済み** — `inga.state`。`arrangement` の 4 index を prolly-tree に snapshot して CID を返す既存実装を配線（HAMT は導入せず）。4 replica が同一 CID に到達し、**その CID だけを持つ reader が Datalog で引ける**ことを test で確認 |
+| **F2** 計量実行 | **契約は着地済み・`.kotoba` body は未** — `inga.fuel`。exhaustion を state 遷移にし、root が commit する。`.kotoba` machine 本体は compiler の capability kit が `:wasm-aot`/`:native-aot` pending かつ fs/process capability と script host が無いため未（後述） |
+| **F3** power table の committed 化・`:storage` role | **着地済み** — `inga.power`。table を committed state の関数にし、既存 bond market に `:storage` role を追加。**engi.stake の経済は再実装していない** |
 | `kotoba-lang/inga` repo | **作成済み**（2026-08-03、west 登録済み、`west-orphan-audit --blocking` exit 0） |
 | inga への抽出（13 namespace / 3,166 行） | **未着手** — engi が本日 12 commit の hot な状態なので後述の理由で後回し |
-| `inga.head` / `inga.ref`（ref plane 本体） | **着地済み** — 15 tests / 45 assertions、`kotobase.storage.contract/verify` が `{:profile :linearizable-ref :concurrency :verified}` を返す |
+| `inga.head` / `inga.ref`（ref plane 本体） | **着地済み** — `kotobase.storage.contract/verify` が `{:profile :linearizable-ref :concurrency :verified}` を返す。repo 全体で 42 tests / 124 assertions、clj-kondo 0 errors |
 | kotobase `IRefStore` provider の**機構** | **着地済み**（上記）。**実 datom 面への配線は F1 待ち** |
 | torihiki-node の本番 | **単一 sequencer のまま**（`consensus: none`） |
 | OS プロセス分離 | **無し**（4 replica は 1 プロセス内。socket は本物） |
@@ -277,6 +277,12 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 `inga` の repo 作成・west 登録は skill `new-project-scaffold` の常時承認フローに従う。
 
 ## 改訂
+
+**2026-08-03（同日、4回目）**: **F1 / F2 / F3 を `inga` に着地させた**（`kotoba-lang/inga@fffb845`、42 tests / 124 assertions、clj-kondo 0/0）。現在地の表を更新。3つとも**既存資産との合成**であり再実装ではない:
+
+- **F1 `inga.state`** — `arrangement` が既に持っていた「4 index を prolly-tree に snapshot し、dag-cbor で commit を CID 化し、`restore` で戻し、`arrangement.datalog/q` で引く」をそのまま使った。**HAMT は導入していない**（決定 F1 の宣言どおり）。新しく足したのは **`:root-kind`（`:cid` / `:opaque`）と `assert-hydratable!`** — これにより決定 6 の「F1 → 6 の順序」が、読み手が覚えている規則ではなく**コードが保持する規則**になった。`:opaque` も合法のまま残す（typed array の板が合意のために datom になる義務は無い）。受け入れ条件は ADR の記述どおり: 4 replica が同一 CID に到達し、**その CID だけを持つ reader が Datalog で引ける**。
+- **F2 `inga.fuel`** — 一番効く規則は「**exhaustion は state の値であって throw ではない**」。throw した replica は protocol から抜けており、peer が state と root を出すのに自分は何も出さない。決定性は budget / cost-fn / op 順序の3つだけに依存する。コストは op の**前**に引くので budget が概算でなく本物の上限になる。**`.kotoba` machine 本体は未**: compiler の capability kit が `:reference :implemented` で `:wasm-aot`/`:native-aot` は pending、fs/process capability も Kotoba script host も無くビルドを走らせる経路が存在しない。合意が必要とするのは計量の契約と決定性なのでそこまでを着地させ、残りを明示した。
+- **F3 `inga.power`** — **`engi.stake` の経済（admission / stake 加重 quorum / equivocation slashing / role 付き単一 bond market）は再実装していない**（ADR-2608031200 の duplication failure mode）。`engi.stake` が単独でできない唯一のことが F3 の論点である: **bond map を外から渡される**ので、誰が witness かを合意が順序づけない場所で決めている。validator set は peer が食い違ってよいものではない —— quorum を数える対象そのものだから。`inga.power` は table + machine が適用する遷移関数であり、height h の table が committed prefix の関数になる。`:storage` は**既存 market への role 追加**で、外部担保は置き換えない。**`:storage` の power は attested retrieval sampling で与える（`:recompute` と同じ形）—— PoRep/PoSt ではない。** Filecoin 同等の storage 保証を名乗ってはならない。
 
 **2026-08-03（同日、3回目）**: 実行順序に step 0 を追加し、現在地の表を更新した。`kotoba-lang/inga` を作成して `inga.head` / `inga.ref` を着地させ（15 tests / 45 assertions、`kotobase.storage.contract/verify` が `:linearizable-ref` / `:concurrency :verified`）、west に登録した。**抽出（step 1）より先に ref plane を作ったのは、engi が本日 12 commit 入っている hot な repo であり、3,166 行の抽出をぶつけるのが並行エージェント規律に反するため。** engi のコードには触れていない。
 
