@@ -1,0 +1,265 @@
+[{:db/id -1
+  :adr/id "adr-2608034000-msisdn-numbering-origination-integrated-design"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-subject-number-plane-integration"
+  :adr/title "ADR-2608034000: 発信・番号払い出し・MSISDN 管理を ADR-2607300300 の consent spine に統合する — 番号 plane を kotoba-lang/phone に共通化し、支配権の変更を cross-domain posture に一般化する"
+  :adr/status "accepted"
+  :adr/date "2026-08-03"
+  :adr/last-verified "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative-for
+  ["電話を『受電』だけでなく『発信（origination）』『番号払い出し（numbering / allocation）』『MSISDN 管理・可搬性（MNP）』まで含めて ADR-2607300300 の proposal→consent→commit 背骨に統合する設計の正本"
+   "番号 plane の records / reachability / 事前検査ロジックを kotoba-lang/phone に共通化する決定（kotoba.phone.lifecycle / numbering / porting / origination / ports）と、app・actor に第2の実装を置かない境界"
+   "cross-domain posture を『eSIM ownership transfer』から『subject 支配権の変更（SIM swap ∪ number port-out ∪ 再割当）』へ一般化する決定と、restricted が止める op の authority 別の表"
+   "番号リサイクルの quarantine（aging）を状態機械のグラフ形状で強制する決定 — :assign は :released から到達不能で、戻り道は :quarantine -> :recycle のみ"
+   "緊急番号を governed proposal の宛先にしないという絶対規則（人間が自分の電話から直接かける経路には触れない）"
+   "発信者番号は subject が :active で保有しているものに限るという caller-ID spoofing 遮断規則と、それが単一 ref（D4）でしか書けない理由"
+   "この統合の到達上限 — :number actor（cloud-itonami-numbering）は未実装であり、consent surface だけが存在するという現在地"]
+  :adr/related "adr-2607300300-esim-voice-reception-card-issuing-integrated-design, adr-2606271930-denwaban-voice-reception-auto-booking-actor, adr-260726-kotobase-query-plane-is-one-ref, adr-2607102000-cloud-itonami-mobilenetwork-6120-blueprint"
+  :adr/body "
+# ADR-2608034000: 発信・番号払い出し・MSISDN 管理の統合設計
+
+- Status: accepted
+- Date: 2026-08-03
+- Extends: ADR-2607300300（eSIM・受電・カード発行の統合設計）
+- 実装: kotoba-lang/phone `9626a93` / cloud-itonami-app `d876ff5`
+
+## Context
+
+ADR-2607300300 は3領域（eSIM・受電・カード発行）を1つの identity subject に
+統合したが、**電話については『受電』しか入っていなかった**。オーナー指示
+（2026-08-03）は、発信・番号払い出し・MSISDN 管理も同じ設計に統合し、
+**lib / system 関係は kotoba-lang repo で共通化する**こと。
+
+現在地の実測（2026-08-03）:
+
+- `kotoba-lang/phone` は「番号とは何か」（E.164 / SIP URI / CDR / SMS）は持って
+  いたが、**「番号に対して何をしてよいか」を一切持っていなかった** — 状態機械も
+  払い出しも MNP も発信の gate も無い（134 行、41 assertions）。
+- `cloud-itonami-app` の `:voice` authority は `denwaban` に紐づく **inbound
+  専用**で、ops は `:call/answer-authority` と `:call/booking-delegate` の2つ。
+- `posture.clj` の takeover signal は `:esim` × `:ownership/transfer` **だけ**。
+  番号を port-out されても card posture は動かなかった。
+
+つまり「番号が持ち主を変える」という、この統合が防ごうとしている当の事象が、
+**番号の側からは観測されていなかった**。
+
+## Decision
+
+### D1. 電話は1つの authority ではなく2つ。声と番号を分ける
+
+`:voice`（denwaban が持つ、線の上で話す権限）と `:number`（番号そのものを
+払い出す・移す権限）を**別の authority** にする。技術で割らず**権限で割る**：
+
+| authority | ops | 何を賭けているか |
+|---|---|---|
+| `:voice` | `:call/answer-authority` `:call/booking-delegate` **`:call/originate`** | 金と、相手に届くこと |
+| `:number` | `:number/allocate` `:number/assign` `:number/lifecycle` `:number/port-in` `:number/port-out` | 線そのものの帰属 |
+
+発信を `:voice` に置いたのは、通話が成立した後にそれを持つ actor が同じだから。
+ただし consent context type は分ける（`:voice/outbound-origination`）——
+**「うちの受付が電話に出てよい」と同意した人間は「そこから発信してよい」とは
+同意していない**。1つの context type にすると、前者の assertion が後者を
+authorize してしまう。
+
+### D2. 判断は全部 kotoba-lang/phone に置く。app にも actor にも第2の実装を置かない
+
+追加した namespace（いずれも total・deterministic・I/O なし、`.cljc`）:
+
+| ns | 持つもの |
+|---|---|
+| `kotoba.phone.lifecycle` | MSISDN 状態機械（10 states / 12 operations）、`takeover-signals`、one-active-MSISDN-per-profile 不変条件 |
+| `kotoba.phone.numbering` | numbering block、払い出しの事前検査、aging 窓、`available` 列挙 |
+| `kotoba.phone.porting` | MNP の port-in / port-out 事前検査、change-freeze、`control-change-event` |
+| `kotoba.phone.origination` | 宛先分類、緊急番号、short code、発信者番号保有検査、費用検査 |
+| `kotoba.phone.ports` | host 注入 protocol を authority ごとに3分割 |
+
+`kotoba.esim.lifecycle` / `kotoba.card.lifecycle` と**同じ形**にしてある
+（`states` / `operations` / `reachable?` / `transition-issues` / `apply-*` /
+`describe`）。片方を読んだ人が全部読めることが目的で、3つ目の同型実装が
+出たこと自体が「共通 primitive を切り出せ」という信号でもある（下記 gap 4）。
+
+録音保持の同意規則は `kotoba.phone/recording-retention-issues` に1本化した。
+受電側と発信側が同じ規則のコピーを持つ構図になっていた——**2つあるコピーは、
+片方だけ更新されるコピーである。**
+
+### D3. 番号のリサイクルは「チェック」ではなく「グラフの形」で塞ぐ
+
+released された番号は、前の持ち主の**アカウント回復手段ごと**次の人に渡る
+（SMS OTP・パスワード再設定・銀行の折返し）。したがって:
+
+- `:assign` は `:released` から**到達不能**。戻り道は
+  `:release -> :quarantine -> :recycle -> :reserve -> :assign` のみ。
+- `:recycle` は「aging 窓が明けた」という**事実を渡されない限り拒否**する
+  （`:phone/quarantine-elapsed?`、`true?` 判定。nil も truthy な文字列も通らない）。
+- 既定 90 日。これは**規制の引用ではなく選んだ値**で、長い側に倒してある。
+- `:recycle` は subject と iccid を消す。前の持ち主の名残を pool に持ち込まない。
+
+**待ち時間を飛ばしたい呼び出し側は、それを表現する手段を持たない。** これが
+「フラグを足せば通る」設計との違いで、意図的にそうした。
+
+### D4. cross-domain posture を「支配権の変更」へ一般化する
+
+ADR-2607300300 D4 の不変条件は `eSIM ownership transfer ⇒ card posture` だった。
+これを一般化する:
+
+```
+control-change-ops = {:esim   #{:ownership/transfer}
+                      :number #{:number/port-out :number/assign}}
+```
+
+そして restricted が止める op を authority 別の表にする:
+
+```
+restricted-ops-by-authority = {:card   #{:authorization/decide :card/issue}
+                               :voice  #{:call/originate}
+                               :number #{:number/port-out :number/assign}}
+```
+
+3つの追加にはそれぞれ別の理由がある:
+
+- **`:call/originate`** — toll fraud は同じ目的（subject の金）を別のメーターで
+  達成する。card に届かない乗っ取りでも premium-rate 番号には届く。
+- **`:number/port-out`** — 線を**さらに先へ**移すことが、乗っ取りを恒久化する。
+  profile を奪えなくても番号を移せる、という穴が空いていた。port-out は
+  「自分の事業者に言えば戻る」段階を越える一手である。
+- **`:number/assign`** — 別 subject への再割当は、乗っ取りを文書化したもの。
+  `:card/issue` を restricted に入れたのと同じ理屈。
+
+**port-in は意図的に signal ではない。** 届いた番号は「支配権を失った」のでは
+なく「素性が未確定」で、これを takeover 扱いすると回線を集約しただけの subject を
+restrict してしまう。ライブラリ側では
+`kotoba.phone.lifecycle/provenance-unsettled-signals` として**別の集合**に置いた
+（`takeover-signals` としか交差しないことをテストで固定）。
+
+`for-subject` の `:authority/reason` は、signal が eSIM だけなら従来値のまま
+（既存の読み手と保存済み material が依存している）、複数 domain に跨るときだけ
+`:control/change` + `:authority/reasons` で全部を報告する。**SIM swap と
+port-out の両方で restricted なのに片方しか言わない、を作らない。**
+
+### D5. 緊急番号は governed proposal の宛先にできない（絶対規則）
+
+`kotoba.phone.origination/emergency-issue` は policy knob ではなく無条件拒否。
+理由は能力ではなく**非対称性**:
+
+- 誤って拒否された proposal のコスト = 人間が自分の電話で数秒かけ直す。
+- 誤って発信された proposal のコスト = **必要のない場所に救急車が送られ、
+  必要な場所から失われる**。こちら側で記録した consent はそれを取り戻せない。
+
+判定は全ての綴りを拾う（`110` / `+81110` / `0081110`）。国コードを剥がす読み方を
+総当たりし、**全世界の表の和集合**に対して完全一致で判定する（日本の deployment が
+フランスの `18` を拒否しても失うものは無い。逆は救急車を失う）。
+表に無い国は `:short-code` として**明示 allowlist 無しには拒否**される —
+fail-closed が既定。**この規則は誰の dialer の上にも無い。** 人間が自分の電話から
+かける経路には一切触れていない。
+
+### D6. 発信者番号は subject が :active で保有しているものに限る
+
+caller-ID spoofing の遮断。`holds-active-number?` は保有者**と**状態の両方を見る
+（suspend 中の番号は「使えます」と相手に告げてはいけない）。
+
+**この検査は D4 の単一 plane でしか書けない。** numbering records と call records が
+別の store / 別の kotobase ref にあったら、この関数は N 回の読みとマージになり、
+「誰かがマージを覚えている限り成立する不変条件」に劣化する。ADR-2607300300 D4 を
+守る理由がもう1つ増えた。
+
+### D7. security-bearing な事実は app が計算し、request を上書きする
+
+`:records` `:blocks` `:subject` `:posture` `:rate` `:spent-today` は
+`cloud.itonami.app.authority.api` が store と configuration から計算して
+**request の同名フィールドを上書き**する。**caller が records を送れるなら
+`{:phone/subject 自分}` と書くだけで port-out の事前検査を通れる** ——
+この adapter が拒否するために存在する当のものを、拒否できなくなる。
+
+`:blocks` を configuration から採るのは別の理由:どの range を割り当てられたかは
+全ての proposal に先行する deployment の事実で、request で運べるようにすると
+**誰も与えていない range から自分に番号を払い出せる。**
+
+### D8. app の番号 read model は「網の状態」ではなく「governed な主張」
+
+`cloud.itonami.app.numbers` は `[:authority :numbers]` に住み、**committed な
+proposal からしか書かれない**。
+
+- `:number/allocate` / `:number/port-in` → `:assigned` まで。**`:active` にはしない**
+  （activation は別の決定であり、ここで書くと払い出しが黙って「発信に使える番号」を
+  生む）。
+- `apply-transition!` は**現在の records に対して状態機械を再実行**する。review と
+  commit の間に世界が動いていれば拒否して何も書かない — actor と食い違う read model を
+  作るくらいなら、古い proposal と食い違う方がよい。
+- **この app が知らない番号は不在で、不在は拒否される。** operator の申告で seed
+  できるようにすると、なりすまし検査を**検査される側**が答えられることになる。
+
+## 到達上限 — 今日この統合が actuation できないこと（重要）
+
+ADR-2607300300 と同じ規律で明示する:
+
+- **`:number` の actor（`cloud-itonami-numbering`）は存在しない。** 4層のうち
+  layer 3 が空で、enabled にしても endpoint が無いので commit は
+  `:endpoint-not-configured` の refusal になる。**それが正直な結果**であり、
+  既定 disabled の理由。
+- `denwaban` は依然 **R0**（`run-session` は G7 で raise、`can-answer-calls false`）。
+  発信の consent が commit されても、鳴る電話は無い。
+- したがって**今日この追加が end-to-end でできること**は、番号・発信について
+  「1つの subject に紐づく governed proposal stream に、実際の human consent
+  （Passkey）と実際の監査（単一 partition）を付ける」ところまで。
+  **できないこと**: 実際の番号払い出し、実際の MNP、実際の発信。
+- **UI は依然として存在しない**（ADR-2607300300 gap 5 と同じ）。`:number` の
+  17 route 相当も API としては完備だが、`web.clj` はどれも参照していない。
+
+## Consequences
+
+- 良い: 「線が持ち主を変えた」の定義が**ライブラリに1つだけ**あり、consent
+  surface も将来の actor もそれを読む。app に書いていたら actor が別解釈を持つ。
+- 良い: 4本目の authority を足すコストが adapter 1枚のままであることが再確認された
+  （`:number` は adapter + read model のみで、背骨は無改造）。
+- 代償: posture が restricted のとき止まる操作が増えた。SIM 交換した当日に
+  海外へ発信したい正当な subject は7日間待たされる。D3 の窓と同じく、
+  **短い側に倒す誘惑が構造的に残る**ので窓は configuration にした（既定は動かさない）。
+- 代償: app の番号 read model は actor の ledger の影であり、**2つの真実が
+  存在しうる**。`apply-transition!` が状態機械を再実行するのはそのためだが、
+  恒久的な解は D4 どおり共有 backend に載せること（下記 gap 3）。
+
+## 残る gap（優先順、2026-08-03）
+
+1. **`cloud-itonami-numbering` actor が無い（最大）。** 番号を実際に払い出す /
+   移す判断（licensed operator か、その range を本当に持っているか、要求者は
+   本人か）を持つ層が空。consent surface だけが先に立っている状態で、
+   ADR-2607300300 の `cloud-itonami-esim` に相当するものを作る必要がある。
+2. **`kotoba.phone.ports` の実装が1つも無い。** protocol を3分割したが、
+   第2実装が無いので「この分割で足りるか」は何も証明されていない。
+   ADR-2607300300 gap 6 が store contract について指摘したのと同じ形の主張——
+   **2回実行できない境界は、境界ではなく主張**。
+3. **D4 の単一 plane は app 内だけ。** `[:authority :proposals]` と
+   `[:authority :numbers]` は同じ store にあるが、actor 側の ledger は各自 MemStore。
+   共有 backend はまだ無い。
+4. **lifecycle primitive が3つ目の同型実装になった。** card / esim / phone が同じ
+   形（`states` / `operations` / `reachable?` / `transition-issues` / `apply-*`）を
+   手で3回書いている。共通 primitive の切り出しは**やっていない** — 既に3つの
+   consumer（app・actor 2つ）が固定 API に依存しており、切り出しは別スコープの
+   ADR とすべき変更。ここでは**同型であることをテストと docstring で固定した**に
+   留める。
+5. **rate card は class 単位で、実際の課金と結ばれていない。** `:rate-card` は
+   deployment が申告する値で、carrier の実レートではない。未設定は拒否
+   （`:origination/cost-unknown`）なので fail-closed ではあるが、**申告値が
+   実レートとずれても検出できない。** provider（`kotoba.phone.ports/rate`）の
+   実装が現れるまでこれは閉じない。
+6. **`available` の列挙上限 1000 は黙っていない**が、block が大きいときに
+   「先頭 1000 件」しか見ないことは caller に伝わらない。ADR-2607300300 の
+   『no silent caps』に照らすと、limit に達したことを返り値で言うべき。
+
+## 意図的に開けているもの（gap ではなく決定）
+
+- **jurisdiction ごとの numbering spec catalog を作らない**（ADR-2607300300 と同じ
+  理由: 未検証のものを書かない）。
+- **`emergency-numbers` / `premium-rate-prefixes` / `toll-free-prefixes` は
+  representative であって網羅ではない**と明記した上で、網羅でないことが安全側に
+  倒れるよう short-code 既定拒否と組み合わせてある。
+- **denwaban に operator 面を置かない**（ADR-2607300300 の決定を継承。G7 が
+  閉じている間に decide endpoint を置くと gate の見せかけになる）。
+- **STIR/SHAKEN 準拠を主張しない。** 発信者番号の保有検査は attestation の
+  前提条件ではあるが、署名も証明書チェーンも実装していない。
+"}]
