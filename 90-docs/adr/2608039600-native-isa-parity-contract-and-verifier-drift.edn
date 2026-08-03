@@ -596,6 +596,39 @@ op 名・arity・期待値を実装で確かめる、という同じ規律が効
 
 **着地**: compiler `d3ca7b7`、west pin `593ac2c`。
 
+### backend 間の operator パリティを測り、keyword 演算を閉じた (2026-08-04)
+
+**両 backend の dispatch 集合を機械的に diff した。** 差分は**設計上 x86 専用の
+privileged kernel op 11 個だけ**で、それ以外のパリティは完全だった。
+
+(最初の抽出は「AArch64 だけが f64 を持つ」と出したが**私の正規表現の非対称**
+だった — x86 側は opcode をバイト列で、AArch64 側は hex 整数で書くので、片方
+しか一致していなかった。x86 の f64 は実行で確認済みなので即座に疑えた。
+**測定器の非対称を測定結果と読み違えない**。)
+
+**`keyword-name` / `keyword-from-string` を実装した。** `native-word-field-types`
+のコメントが「general substring と concat が runtime handle 上で必要で未実装」と
+していたが、**その substring は同じ日に landed していた**。両 backend で desugar
+する: keyword は印字テキスト (コロン込み) の pair handle なので、name はコロンの
+先の substring、生成はコロン 1 文字との concat。`keyword-name` は subject を先に
+束縛する — オペランドが呼び出しでありうるのに oracle は 1 回しか評価しないため。
+**新しい値表現も ABI 変更も無い。**
+
+古い根拠コメントも同時に直した。**今日 2 度、陳腐化したコメントが次の読者を
+無い障害物へ案内しかけている**のを見つけている (f64 の `:f64` 除外理由、
+keyword 演算のこれ) ので、自分で 3 例目を残さない。
+
+実測: 共有表に 4 行追加し**両 ISA で 137 assertions / 0 failures**
+(長さだけでなく**内容一致**と往復、`:日本` のマルチバイト名を含む)。全体
+**885 tests / 6,761 assertions / 0 failures**、kotoba-native 自身 **43 / 2,052 / 0**。
+
+**着地**: kotoba-native `6ccbc0d` / kotoba-kir `73acba3` / kotoba-verifier
+`ff54fca` / compiler `73bae4b`、west pin 4 件。
+
+(なお直前の commit `efa85df` は内容変更を伴わない空 commit である — この節を
+書く際に EDN 文字列を壊す引用符を自分のガードが弾いて本文が書かれないまま
+PUT だけが走った。履歴に残るが中身は無い。)
+
 修正: 127 を超える offset は disp32 形式 (ModRM 0x91) を使う — offset 128 の
 typed-cap-call が既に使っていた形。127 以下はバイト単位で不変。
 
