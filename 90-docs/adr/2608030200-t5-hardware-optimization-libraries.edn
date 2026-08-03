@@ -285,4 +285,78 @@ machine fingerprint 1533672245）、`stale-on? portable-64 => true`。
   に記録済みだが、より低ノイズな計測経路（native / kotoba-native）への移行は未着手。
 - compiler / kotoba-native がこれらを消費していない点、W4 の構造選定、aiueos の
   page cache 不在は、上記のとおり依然として未着手。
+
+## 反復 3 (2026-08-03) — 「予測 16x 対 実測 2x」の正体は roofline だった
+
+### 結論: モデルは間違っていなかった。読み方が間違っていた
+
+`cost` はバイト数を数えており、それは正しかった。**バイト比が時間比になるのは
+両方の arm が memory-bound のときだけ**で、片方の arm の要素あたりループコストが
+メモリコストを超えた瞬間、その arm はそれ以上速くならず比が頭打ちになる。
+
+`layout/achievable-ratio`（0.3.0、`:kotoba.layout.roofline/v1`）を追加:
+
+```
+per-arm time = max(loop-ns-per-element * n, bytes-fetched / bandwidth)
+```
+
+この MacBook で実測した 2 つの数（SoA の loop floor 3.03 ns/要素、1 スレッドが
+観測した 18.5 GB/s）を入れると、**測定値を説明ではなく再現する**:
+
+| | 予測 | 実測 |
+|---|---|---|
+| AoS 時間 | 13.8 ms | 13.844 ms |
+| SoA 時間 | 6.0 ms | 6.066 ms |
+| 比 | **2.30x** | **2.28x** |
+
+`:both-memory-bound?` が要点。**false のときバイト比はレイアウトが何をしても
+到達不能**で、それを約束する plan はループが許さないものを約束している。
+
+### マルチスレッド帯域飽和 — この harness では答えが出ない (正直な null result)
+
+前回挙げた宿題（8 P コアで競合させれば line 比に近づくはず）を実装したが、
+**3 回連続の run が 1→8 スレッドの変化を +3% / +31% / -22% と出し、perfgate は
+全点を `:too-noisy` で拒否した。** heterogeneous CPU では scheduler が run 中に
+P/E コア間でスレッドを移動させ、この harness は pin していない。
+**`machine` が modelling している heterogeneity が、そのまま測定ノイズとして
+返ってきた形。**
+
+### 自分のツールが自分の gate を迂回していた
+
+**scaling CLI の初版は SUPPORTED / NOT-SUPPORTED の判定を平均値から直接印刷して
+いた。** だから「拒否されたデータ」から 2 回続けて逆の結論が出た。**perfgate が
+防ぐために存在する失敗を、perfgate を消費するツールがやった。** 現在は判定を
+点に対して gate している: 1 点でも unqualified なら trend は INCONCLUSIVE とし、
+パーセンテージには「これを結果として読むな」と明示する。
+
+**教訓は一般的**: gate を作っただけでは足りず、gate の出力を跨いで集計する層も
+同じ gate を通さなければならない。
+
+### 3 回とも安定していた事実（trend より価値がある）
+
+SoA は 6 GB/s 前後で頭打ち、AoS は 35–42 GB/s に達する。**SoA は memory-bound
+ではなく loop-bound**。これが roofline を導いた観測であり、bandwidth 仮説を
+持ち出さずに 16x→2x を説明する。
+
+### kototama についての訂正 (オーナー質問への回答、2026-08-03)
+
+**kototama は JVM を使わない VM ではない。** `kototama/docs/maturity.md` の梯子は
+R1 = **Tender execution (JVM/Chicory)** が唯一の stable 実行層で、R2 は
+**browser**-native（JS ホスト）。machine-native の層は梯子に存在しない。
+kototama は Wasm tender（host = tender、guest = Wasm）でありその host が JVM。
+
+JVM を使わない経路は別物: `kotoba-native` の AOT バックエンド
+（x86_64 801 行 / aarch64 735 行、生機械語 emit）+ `tools/kexe_loader.c` +
+`tender-native`（`kototama.native.executor` 635 行、**JVM 側ドライバ**。JVM は
+ビルド時のみで生成プロセスには入らない）。
+
+**ただし現状の native op 面では今回の計測を移植できない**:
+`rg -i 'f64|float|double' kotoba-native/.../x86_64.cljc` → **0 hit**。
+heap-call 面は `pair` / `pair-first` / `pair-second` / `kgraph-*` / `string-*` のみで、
+**浮動小数点も配列も無い**（i64 + pair ヒープ + kgraph + ハンドル文字列）。
+native で低ノイズ計測を行うには i64 配列（線形メモリ load/store）op の追加が要り、
+これは kotoba-kir(T0) / compiler / native 2 バックエンド / wasm backend parity /
+verifier / conformance fixture に跨る **T0-T3 横断変更**なので、別 ADR として
+起票してから着手する。C toolchain（`/usr/bin/cc`）と loader source は
+この機械に揃っていることは確認済み。
 "}]
