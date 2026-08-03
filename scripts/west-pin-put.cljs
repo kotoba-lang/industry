@@ -47,15 +47,26 @@
 ;; ---------------------------------------------------------------------------
 
 (defn entry-block
-  "The text of one `- name: <entry>` block, or nil. Bounded by the next entry so a
-  rewrite cannot reach into a neighbour."
+  "The text of one PROJECT `- name: <entry>` block, or nil. Bounded by the next
+  entry so a rewrite cannot reach into a neighbour.
+
+  The anchor includes the following `remote:` line, because `- name:` alone
+  does not identify a project. west.yml uses the same key under `remotes:`,
+  where the next line is `url-base:` instead. Any project whose name equals a
+  remote name -- kotoba-lang and network-awai both do -- therefore matched
+  twice and was rejected as ambiguous, which is why advancing those pins had
+  to be done by hand.
+
+  Ambiguity was not the whole bug. `index-of` returned the FIRST match, and the
+  remotes block sorts earlier in the file, so a looser uniqueness check would
+  have selected a block with no `revision:` line to rewrite at all."
   [yml entry]
-  (let [anchor (str "    - name: " entry "\n")]
-    (when (= 1 (count (re-seq (re-pattern (str "(?m)^    - name: "
-                                               (str/replace entry #"([.*+?^${}()|\[\]\\])" "\\\\$1")
-                                               "$"))
-                              yml)))
-      (let [i (str/index-of yml anchor)]
+  (let [quoted (str/replace entry #"([.*+?^${}()|\[\]\\])" "\\\\$1")
+        hits (re-seq (re-pattern (str "(?m)^    - name: " quoted "\n      remote: "))
+                     yml)]
+    (when (= 1 (count hits))
+      (let [anchor (first hits)
+            i (str/index-of yml anchor)]
         (when i
           (let [j (str/index-of yml "    - name:" (+ i (count anchor)))]
             (subs yml i (or j (count yml)))))))))
@@ -90,6 +101,25 @@
        "      revision: " (apply str (repeat 40 "b")) "\n"
        "      path: orgs/kotoba-lang/beta\n"))
 
+(def ^:private collision-yml
+  "The shape west.yml actually has: a `remotes:` section using the same `- name:`
+  key, with a project whose name equals a remote name. kotoba-lang and
+  network-awai are both like this in the real manifest, and both were
+  unadvanceable by this script until entry-block anchored on the `remote:` line.
+
+  Note the ordering: the remotes block comes FIRST, so a fix that only relaxed
+  the uniqueness check would have selected a block with no revision line."
+  (str "manifest:\n  remotes:\n"
+       "    - name: kotoba-lang\n      url-base: git@github.com:kotoba-lang\n"
+       "    - name: network-awai\n      url-base: git@github.com:network-awai\n"
+       "  projects:\n"
+       "    - name: kotoba-lang\n      remote: kotoba-lang\n"
+       "      revision: " (apply str (repeat 40 "a")) "\n"
+       "      path: orgs/kotoba-lang/kotoba-lang\n"
+       "    - name: beta\n      remote: kotoba-lang\n"
+       "      revision: " (apply str (repeat 40 "b")) "\n"
+       "      path: orgs/kotoba-lang/beta\n"))
+
 (def ^:private a40 (apply str (repeat 40 "a")))
 (def ^:private b40 (apply str (repeat 40 "b")))
 (def ^:private c40 (apply str (repeat 40 "c")))
@@ -115,7 +145,29 @@
          ["rewrite refuses when the current pin is not what was verified"
           (rewrite-revision sample-yml "alpha" b40 c40) nil]
          ["rewrite refuses an unknown entry"
-          (rewrite-revision sample-yml "gamma" a40 c40) nil]]
+          (rewrite-revision sample-yml "gamma" a40 c40) nil]
+
+         ;; A project whose name equals a remote name. This was a real defect:
+         ;; every kotoba-lang and network-awai pin advance in this repo had to
+         ;; be done by hand because entry-block reported "not found (or not
+         ;; unique)".
+         ["entry-block selects the PROJECT block, not the identically named remote"
+          (block-revision (entry-block collision-yml "kotoba-lang")) a40]
+         ["entry-block reads the project's path, proving it is not the remotes block"
+          (block-field (entry-block collision-yml "kotoba-lang") "path")
+          "orgs/kotoba-lang/kotoba-lang"]
+         ["the colliding block does not run into the next entry"
+          (str/includes? (entry-block collision-yml "kotoba-lang") "beta") false]
+         ["rewrite advances a colliding project's pin"
+          (block-revision (entry-block (rewrite-revision collision-yml "kotoba-lang" a40 c40)
+                                       "kotoba-lang"))
+          c40]
+         ["rewrite leaves the remotes section untouched"
+          (str/includes? (rewrite-revision collision-yml "kotoba-lang" a40 c40)
+                         "url-base: git@github.com:kotoba-lang")
+          true]
+         ["a remote with no project of that name is still not an entry"
+          (entry-block collision-yml "network-awai") nil]]
         failures (for [[label actual expected] cases :when (not= actual expected)]
                    (str "  FAIL " label ": expected " (pr-str expected)
                         ", got " (pr-str actual)))]
