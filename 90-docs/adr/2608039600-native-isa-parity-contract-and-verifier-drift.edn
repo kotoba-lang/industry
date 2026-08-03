@@ -15,6 +15,7 @@
   ["native backend 間の operator parity 契約 (何が portable で何が ISA 固有か)"
    "kernel-privileged-operations が x86 専用である理由"
    "producer と verifier の allowlist drift の扱い"
+   "未実装 operator の診断規約 (backend は operation 名を名乗る)"
    "ADR-2608039500 の検証記述の訂正 (override 不発)"]
   :adr/related
   ["adr-2608039500-native-backend-codegen-back-half-size-preserving-peephole"
@@ -30,7 +31,10 @@
    "kotoba-lang/kotoba-native 08bf86dea8fd501914645be0f8c990dfbe3aaf7b"
    "kotoba-lang/kotoba-verifier a79f5b7c018396b1bedff227b0f0f1522b637e6b"
    "kotoba-lang/compiler a50331bc36a9fbfbeace6327f296825c9a7db61b"
-   "com-junkawasaki/root e069b3af05e3f9151fe6f7fe55336b88fc9aed7b"]
+   "com-junkawasaki/root e069b3af05e3f9151fe6f7fe55336b88fc9aed7b"
+   "kotoba-lang/kotoba-native 6cea4da1af847335395d2ffcc1daa81ede6dd0ce"
+   "kotoba-lang/compiler cddca6e0982886029679a842f779ba6f98149cbd"
+   "com-junkawasaki/root 26404fec6e13c94ac5549389c56ea1d316636cb1"]
   :adr/body
   "# ADR-2608039600: native backend の ISA parity を契約化する
 
@@ -212,15 +216,48 @@ operator 表全体に広げたところ、**同じクラスがもう 1 家族残
 6,300 assertions + native-conformance 5/5、実 AArch64 プロセスでの差分実行
 12 本 (`-1 >> 63` が算術で `-1`・論理で `1` を含む)、JVM/nbb バイト単位一致。
 
+## 完結: 診断の系統的修正 (同日、クラス全体を閉じた)
+
+上記 2 回の修正はいずれも「operator を 1 つずつ塞ぐ」形で、**同じ census を
+毎回やり直す**運用になっていた。根本は診断にある。
+
+**全 31 operator 家族の全数 census** (target `aarch64-kotoba-v1`) を取ったところ、
+`finalize` まで到達して 'unknown call target' になる operator が **13 個**
+残っていた: `xorshift32` / `string-from-i64` / privileged 11 個。残りの家族
+(f64 30・f32 23・document 34・string 20・typed collections・record/variant・
+decimal・xml・compact-graph 等) はすべて `:phase` 付きの clean rejection で、
+ゲートは正しく効いていた。
+
+**当初案 (backend が `supported-operations` を publish し compiler が照合) は
+破棄した。** 宣言と `cond` 実装が drift する — まさに今直している問題を
+再生産する。
+
+**実際に使った不変条件**: 未解決の呼び出し先は **operator 以外ではありえない**。
+`kotoba.compiler.frontend` は未知の名前を KIR 生成前に
+'operation has no admitted lowering' (`:phase :subset`) で弾き (実測確認済み)、
+KIR を敵性データとして扱う `kotoba.verifier` も再emit前に signature 表外の
+operation を弾き、`emit-program` は宣言された全関数を `offsets` に入れる。
+よって `finalize` で解決できない `{:call op}` は、**frontend が admit したのに
+この backend に `emit-expr` の case が無い operation** に限られる。
+
+**両 backend 1 箇所ずつの変更**で 13 個すべてが自分を名乗るようになった
+(`operation not implemented on this backend`、`:operation op`、`:phase` は
+各ファイルの既存 throw と同じ規約)。宣言集合も cross-repo 契約も不要。
+
+**即座に配当があった**: 13 個のうち 2 個は、**source に書いた名前と実際に
+欠けている operator が違った** — `xorshift32` は `u32-wrap` を、
+`string-from-i64` は `string-substring` を報告する (どちらも frontend で
+desugar される)。旧メッセージのままなら、存在しない `xorshift32` を backend に
+探しに行くところだった。privileged 11 個は AArch64 に**設計上**無いもので、
+これも「壊れたプログラム」ではなく意図的な非対称として読めるようになった。
+
 ## 残ったギャップ (2026-08-03 時点の実測)
 
-- **診断の系統的欠陥は未解決**: frontend が admit するのに backend が
-  未実装の operator は、今も `finalize` で 'unknown call target' として
-  弾かれる。`xorshift32` が現にこの状態 (`i32-operations` の他の多くは
-  `:target` phase で正しく拒否されるのに、これだけ漏れる)。**正しくは
-  `:target` phase で operator 名を挙げて拒否すべき**で、そのためには
-  backend が supported operation 集合を publish する必要がある (T2 契約の
-  拡張)。
+- **native に実装すべき operator (診断が名指しするようになった)**:
+  `u32-wrap` (= source の `xorshift32`)、`string-substring`
+  (= source の `string-from-i64`)。前者は今日追加した shift/xor に 32bit
+  マスクを足せば書ける。後者は**戻り値が文字列**なので register op ではなく
+  `string-concat` と同じ string-pool / host-call 経路が要る。
 - `i32-operations` 一族 (i32 値表現) は native に無い。
 - record/variant が関数境界を越えられない・相互ネスト不可・
   string/keyword フィールド不可 (compiler ADR 0062/0063 の Remaining gaps)。
@@ -239,5 +276,9 @@ operator 表全体に広げたところ、**同じクラスがもう 1 家族残
 - 検証器の独立再導出は維持されるので、同種の drift は今後も起こりうる。
   起きたときに **安全側に倒れる**ことは今回 2 度実証された
   (`bit-or`、`i64-operations` とも検証器が reject 側に倒れていた)。
-- 次に取るべきは**診断の系統的修正** — operator 単位で塞ぐ限り、
-  同じ探索を毎回やり直すことになる。"}]
+- **未実装 operator が自分を名乗るようになったので、以後この class は
+  探しに行かなくても報告される。** 今後 frontend に operator が増えて
+  backend が追随し損ねても、最初に踏んだ人のエラーメッセージがそれを言う。
+- **教訓 2 つ目: 誤った診断は、それが隠すギャップの数だけコストを持つ。**
+  ここでは 13 個 — うち 2 個は「どの operator を実装すべきか」自体を
+  誤らせていた。operator を 1 つずつ塞ぐより、診断を直す方が安かった。"}]
