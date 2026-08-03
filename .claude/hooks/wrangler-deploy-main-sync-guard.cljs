@@ -64,8 +64,16 @@
   "wrangler の直接呼び出しと、npm/pnpm/yarn の deploy script の両方。
    後者を外すと `pnpm run deploy`（net-kotobase の RUNBOOK が指定している
    本番手順そのもの）がガードを素通りする。`wrangler versions deploy` も
-   本番トラフィックを切り替えるので同じ扱い。"
-  #"(?:wrangler\s+(?:versions\s+)?deploy\b|(?:npm|pnpm|yarn)\s+(?:run\s+)?deploy\b)")
+   本番トラフィックを切り替えるので同じ扱い。
+
+   **`pages` を含めるのは 2026-08-03 の実インシデントによる。** それまでこの
+   パターンは `wrangler\\s+deploy` にしかマッチせず、`wrangler pages deploy` —
+   isekai.network の本番デプロイがまさにこの形 — はガードに評価すらされなかった。
+   その日、main より古い依存から作られた bundle が本番に出て全 3D ゲームが
+   boot 不能になり、約25分ダウンした。ガードは黙って何もしていなかった。
+   Pages は Workers と同じく最後に実行した人が勝つので、同じ検査が要る。
+   `deploy-local-root-pin-guard.cljs` の同名パターンと一致させ続けること。"
+  #"(?:wrangler\s+(?:pages\s+)?(?:versions\s+)?deploy\b|wrangler\s+pages\s+deployment\s+create\b|(?:npm|pnpm|yarn)\s+(?:run\s+)?deploy\b)")
 
 (def ^:private named-env-re
   "`--env foo` / `--env=foo`（foo が空でないもの）。空文字 `--env=\"\"` /
