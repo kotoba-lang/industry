@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 5995, "kotobase-cf-wasm-staging" 2001},
+ {"net-kotobase" 6159, "kotobase-cf-wasm-staging" 2417},
  :zone
- {:requests-7d 15309,
-  :pageviews-7d 1058,
-  :uniques-7d-sum 1286,
+ {:requests-7d 15871,
+  :pageviews-7d 1063,
+  :uniques-7d-sum 1292,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 547}
-   {:path "/_health", :requests 432}
-   {:path "/", :requests 159}
+  [{:path "/health", :requests 685}
+   {:path "/_health", :requests 575}
+   {:path "/", :requests 166}
    {:path "/v1/passkey/login/options", :requests 63}
-   {:path "/cdn-cgi/rum", :requests 34}
+   {:path "/cdn-cgi/rum", :requests 35}
    {:path "/v1/passkey/login/verify", :requests 30}
-   {:path "/robots.txt", :requests 27}
+   {:path "/robots.txt", :requests 28}
    {:path "/api/funnel", :requests 25}],
-  :status-mix {:client-error 2717, :server-error 25, :ok 1681},
+  :status-mix {:client-error 2999, :server-error 25, :ok 1972},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,12 +30,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-03",
- :traffic-quality {:window "24h", :probe-4xx-pct 61, :error-5xx-pct 1},
+ :traffic-quality {:window "24h", :probe-4xx-pct 60, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 547 · /_health 432 · / 159 · /v1/passkey/login/options 63 · /cdn-cgi/rum 34 | 4xx(probe) 61% · 5xx 1%",
- :funnel {:visitors 2100, :signups 12, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 685 · /_health 575 · / 166 · /v1/passkey/login/options 63 · /cdn-cgi/rum 35 | 4xx(probe) 60% · 5xx 1%",
+ :funnel {:visitors 2105, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 15309 req/7d・1286 uniques(日次和)・うち4xx probe 61%(24h)、workers 7996 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 15871 req/7d・1292 uniques(日次和)・うち4xx probe 60%(24h)、workers 8576 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 7,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.42857142857142855,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 568},
+ {:visitors {:openai-ads 3, :organic 573},
   :signups {:organic 9}, 
   :checkouts {}}}
