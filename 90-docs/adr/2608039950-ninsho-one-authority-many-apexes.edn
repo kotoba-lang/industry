@@ -1,0 +1,130 @@
+[{:db/id -1
+  :adr/id "2608039950"
+  :adr/title "共通認証基盤 —— authority は 1 つ、apex は多数。新しい identity を作らない"
+  :adr/status "proposed"
+  :adr/date "2026-08-03"
+  :adr/depends-on "ADR-2607252000（authn.kotobase.net）/ ADR-2607320000（did:key が口座）/ kotoba-lang: identity・authentication・authorization・cacao・policy・kagi"
+
+  :adr/context
+  "murakumo.cloud / itonami.cloud / babiniku.net が既に稼働しており、Clerk 相当の
+   共通認証が要る、というのがオーナーの判断（2026-08-03）。設計の前に実測した。
+
+   ## 部品はほぼ全部ある
+
+   - `kotoba-lang/identity` … subject / attestation / evidence の可搬 EDN
+   - `kotoba-lang/authentication` … FaceID / TouchID / WebAuthn / OTP / CACAO /
+     OAuth・OIDC・SAML の factor 統合。**email OTP / magic-link adapter を含む**
+   - `kotoba-lang/authorization` … `policy` + `cacao` へ委譲する facade
+   - `kagi` … PQC vault・AccessGovernor・append-only 台帳・CACAO 自己発行
+   - **`authn.kotobase.net`（稼働中）** … ADR-2607252000。
+     `net-kotobase-enterprise-wave2/authn/` が **2 つ目の独立 deployable Worker**
+
+   ## DID の二層分離も既に設計済み
+
+     accountDid  did:web:kotobase.net:tenant:<user>   人ひとりに 1 つ。鍵を持たず署名しない
+     activeDid   did:key:z6Mk…                        いま動いている credential
+
+   Clerk が User と Session でやることを **DID で既にやっている**。
+
+   ## 重複の実測（2026-08-03）
+
+     repo              authn 参照   自前 did/storage 実装
+     cloud-murakumo        2              12
+     local-murakumo        0               4
+     net-babiniku          0               8
+
+   **authn を消費しているのは 1 repo だけで、残りは各自 did:key と localStorage を
+   自前で扱っている。** 今日 murakumo に `/signup` を手書きしたのがその 3 件目に
+   なりかけた —— これが止めるべき重複。
+
+   ## 全 apex が自分の Cloudflare 上にある
+
+   murakumo.cloud / itonami.cloud / babiniku.net / kotobase.net / etzhayyim.com /
+   gftd.ai / aozora.app / x402.nexus —— すべて自分のゾーン。**第三者ドメインは
+   まだ 1 つも無い。**"
+
+  :adr/decision
+  "## 決定 1: authority は増やさない。`did:web:kotobase.net:tenant:*` のまま
+
+   `cloud-murakumo.viewer` が既に書いている ——『murakumo.cloud does not get its
+   own account system … **instead of minting a second identity**』。
+
+   `ninsho.cloud` を **新しい identity authority** として立てるのは、この決定に
+   正面から反する。しかも DID namespace の移行は two-sided deploy を要するので、
+   **ここだけは取り返しがつかない**。他の判断は後から変えられる。
+
+   ## 決定 2: 必要なのは新 authority ではなく **custom hostname**
+
+   `viewer.cljc` は迂回を自分で書いている ——『`gftd_session` は
+   `Domain=kotobase.net` に scope されるのでブラウザは murakumo.cloud に絶対に
+   送らない。だからこの面は `Authorization: Bearer` から読む』。
+
+   **この Bearer 迂回が匂い。** Clerk が `clerk.hoge.com` を CNAME させるのは
+   ブランドのためではなく、**session cookie をテナントの apex に対して
+   first-party にするため**。各 consumer が token 転送を自前実装しているのは、
+   その仕組みが無いからにすぎない。
+
+   ## 決定 3: 自前 apex なので **Cloudflare for SaaS は要らない**（Phase 1）
+
+   `auth.murakumo.cloud` / `auth.itonami.cloud` / `auth.babiniku.net` は、
+   **同じ authn Worker に custom domain route を足すだけ**。全部自分のゾーンに
+   あるので、第三者ドメイン用の Custom Hostnames（有料・追加設定）は不要。
+
+   第三者に売る段になって初めて Cloudflare for SaaS を足す。**その時に足せる**
+   ので、今その複雑さを前借りしない。
+
+   ## 決定 4: serving surface は分けたまま、authority は共有する
+
+   ADR-2607252000 が既に authn を独立 Worker にしている。`kotobase.net` は
+   CLAUDE.md が『live 共有インフラ』と書く場所なので、**爆発半径の分離は済んで
+   いる**。DID namespace（authority）と Worker（surface）を混同しない。
+
+   ## 決定 5: 名前は今取るが、サービスは立てない
+
+   `ninsho.cloud` は workspace の命名文化（kagi・kototama・kakure・shitsuke・
+   saifu）に合う。**ただし今やるべきは取得であって立ち上げではない** ——
+   立てた瞬間に第 2 authority の誘惑が生まれる。`iam.cloud` は一般名詞すぎる。
+
+   ## 足りない 5 つ（ここが実装対象）
+
+   1. **custom hostname** … `auth.<apex>` を authn Worker に route。cookie が
+      first-party になり Bearer 迂回が消える
+   2. **tenant ≠ user** … 現在 `did:web:kotobase.net:tenant:<user>` は path
+      segment が `tenant` なのに中身が user。**組織を表せない**。Clerk の
+      Organizations に相当する層が無い
+   3. **hosted UI** … 今日 murakumo で手書きした sign-up/sign-in を authn 側へ。
+      **これを移せたことが、重複が減った証拠になる**
+   4. **復旧の紐付け（email ↔ did）** … `authentication.adapters.email` は
+      既にあるのに consumer が無い。今日 murakumo で見つけた穴と同じもの
+   5. **JWKS 公開** … downstream が毎回 authn を呼ばずに検証できるように"
+
+  :adr/consequences
+  "## 実装順（各段で『重複が減った』ことを実測する）
+
+   1. `auth.murakumo.cloud` を authn Worker に route し、murakumo の `/signup` を
+      **置き換える**。cloud-murakumo の『自前 did/storage 実装 12 箇所』が減ること
+      を数える —— 減らなければこの設計は間違っている
+   2. tenant（組織）モデルを DID に入れる。`did:web:kotobase.net:org:<org>` と
+      `…:tenant:<user>` の関係を決める。**ここは移行コストが高いので先に決める**
+   3. email 紐付け（復旧）
+   4. JWKS
+   5. itonami.cloud / babiniku.net を順に載せる
+
+   ## 意図的に受け入れる不利
+
+   - `kotobase.net` が全 apex の identity authority になるので、**DID にその名が
+     出る**。第三者に売る時にブランド上の違和感が出うる。それでも第 2 authority
+     より安い（DID namespace は後から変えられない、ブランドは変えられる）
+   - authn Worker が全サイトの単一障害点になる。ADR-2607252000 が独立 Worker に
+     したのはこのためだが、**落ちれば全サイトのログインが止まる**ことは変わらない
+
+   ## 検討して採らなかった置き場所
+
+   - **`nexus-x402` に載せる**: x402 は『口座を持たずに 1 回払う』仕組みで、
+     認証の**代替**。同じ場所に置くと『誰か』と『払ったか』が混ざる。
+     ただし nexus-x402 は既に **3 registered sellers のテナント登記を持つ
+     マルチテナント gateway** として稼働しており、**運用形は流用に値する** ——
+     repo ではなくパターンを借りる
+   - **`cloud-itonami` の 1 サービス**: あそこは ISIC コード付きの**事業**を
+     actor が回す場所。認証は事業ではなく**インフラ**で、他の全 repo が依存する
+     土台。多数の小サービスに埋めると依存の向きが逆転する"}]
