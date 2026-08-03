@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 14486, "ai-gftd-chat-shell" 4},
+ {"magatama-sh1n5h1x" 14495, "ai-gftd-chat-shell" 4},
  :zone
- {:requests-7d 627201,
-  :pageviews-7d 2994,
-  :uniques-7d-sum 5521,
+ {:requests-7d 630167,
+  :pageviews-7d 3003,
+  :uniques-7d-sum 5529,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/.env.dev", :requests 384}
+  [{:path "/", :requests 741}
+   {:path "/.env", :requests 385}
+   {:path "/storage/logs/laravel.log", :requests 385}
    {:path "/actuator/configprops", :requests 375}
-   {:path "/env", :requests 366}
-   {:path "/wp-trackback.php", :requests 169}
-   {:path "/wp-includes/blocks/file/wp-style.php", :requests 167}
-   {:path "/wp-head.php", :requests 166}
-   {:path "/bs1.php", :requests 162}
-   {:path "/wp-includes/fonts/about.php", :requests 157}],
-  :status-mix {:ok 22664, :server-error 15427, :client-error 1180},
+   {:path "/.env.example", :requests 355}
+   {:path "/favicon.ico", :requests 146}
+   {:path "/222.php", :requests 39}
+   {:path "//sql.php", :requests 25}],
+  :status-mix {:ok 3591, :client-error 1737, :server-error 15415},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-03",
- :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 39},
+ :traffic-quality {:window "24h", :probe-4xx-pct 8, :error-5xx-pct 74},
  :top-paths
- "上位 page (24h, 2xx/3xx): /.env.dev 384 · /actuator/configprops 375 · /env 366 · /wp-trackback.php 169 · /wp-includes/blocks/file/wp-style.php 167 | 4xx(probe) 3% · 5xx 39%",
+ "上位 page (24h, 2xx/3xx): / 741 · /.env 385 · /storage/logs/laravel.log 385 · /actuator/configprops 375 · /.env.example 355 | 4xx(probe) 8% · 5xx 74%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 627201 req/7d・5521 uniques(日次和)・うち4xx probe 3%(24h)、workers 14490 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 630167 req/7d・5529 uniques(日次和)・うち4xx probe 8%(24h)、workers 14499 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
