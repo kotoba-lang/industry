@@ -225,7 +225,7 @@ ADR-2607110300 の labeling 規則をそのまま継承する。**witness が全
 | permissionless staking / stake 加重 quorum | **実装済み・未作動**（bond 供給元が未デプロイ） |
 | **F1** state root の content-addressing | **着地済み** — `inga.state`。`arrangement` の 4 index を prolly-tree に snapshot して CID を返す既存実装を配線（HAMT は導入せず）。4 replica が同一 CID に到達し、**その CID だけを持つ reader が Datalog で引ける**ことを test で確認 |
 | **F2** 計量実行 | **着地済み（部分）** — `inga.fuel` に加え、計量の算術を `kotoba/fuel.kotoba` として実装し `--target wasm32` でコンパイルした `.wasm` を checked in。cljc との conformance を 120 ケースで検証。**「compiler の capability kit 待ちで blocked」という以前の記述は誤りだった** — あの制約は effect の話で、state machine は純粋なので capability を1つも宣言しない。op 適用自体はまだ cljc |
-| **F3** power table の committed 化・`:storage` role | **着地済み** — `inga.power`。table を committed state の関数にし、既存 bond market に `:storage` role を追加。**engi.stake の経済は再実装していない** |
+| **F3** power table の committed 化・`:storage` role | **完了** — `inga.power` が table を committed state の関数にし、`inga.retrieval` が `:storage` role を実際に付与する（content-addressed なので検証は hash 1回と比較1回）。**inga.stake の経済は再実装していない** |
 | `kotoba-lang/inga` repo | **作成済み**（2026-08-03、west 登録済み、`west-orphan-audit --blocking` exit 0） |
 | inga への抽出（13 namespace / 3,166 行） | **完了**（2026-08-03、`inga@8fe122c` / `engi@513b528`）。247 tests / 1204 assertions、parity は JVM/nbb 一致、受け入れ試験 `torihiki-on-inga.cljs` が抽出前（engi から）・抽出後（inga から）とも pass |
 | `inga.head` / `inga.ref`（ref plane 本体） | **着地済み**。`kotobase.storage.contract/verify` を **oracle と本物の合意の両方**に対して通し、どちらも `{:profile :linearizable-ref :concurrency :verified}`（後者は 4 JVM thread の並行半分込み） |
@@ -278,6 +278,20 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 `inga` の repo 作成・west 登録は skill `new-project-scaffold` の常時承認フローに従う。
 
 ## 改訂
+
+**2026-08-03（同日、10回目）**: **F3 を完了させた**（`inga@e857c34`）。JVM 271 / 1275、cljs 276 / 1525、parity 一致。
+
+`inga.power` は `:storage` role を定義していたが、それを**付与するものが無かった**。`inga.retrieval` が付与する。
+
+**なぜここでは安く、Filecoin では高いのか**: Filecoin が PoRep/PoSt を要するのは、そこでの storage proof が「データをどこからでも取得でき、貯蔵しているように見せることで報酬を得る」敵対者に耐えねばならないから。datom 面はずっと弱い主張のためにずっと少ないもので足りる —— **データが content-addressed だから**。「この CID の bytes を返せ」は自己検証する（返ってきたものを hash して比較するだけ）。setup も sector も proving time も無く、検証器全体が hash 1回と比較1回。
+
+**pass が証明するのは「sample 時点でこの witness はこの bytes を produce できた」だけ。** docstring に、依存しようとする人が読む場所に、証明しない3つを書いた: ①**永続保存ではない**（聞かれた瞬間に peer から取ってきた witness も pass する）②**一意保存ではない**（10 witness が物理コピー1つで pass できる）③**将来の可用性ではない**。①への経済的反論（sample が十分頻繁かつ予測不能なら都度取得の方が高くつく）は**論拠であって測定ではない**ので、**これを使う配備は Filecoin 同等の storage 保証を名乗ってはならない**。
+
+テストが固定した判断3つ（いずれも「何も保存していない witness が信用される道」）: **challenge は storage claim の後に・誰でもない者によって固定された値（committed block hash）から導く**（自分の challenge を予測できる witness は聞かれるものだけを保存する。clock や呼び出し側の選択から導くのは裏返しの同じ穴）／**何も claim しない witness は `:pass` でなく `:unproven`**（さもないと storage provider に見える最安の方法は「何も保存していないと申告すること」）／**復元抽出しない**（すると5つの質問が1つになりうる）。
+
+もう1つ、実ダイジェストでしか出ない: `index-from` は hex の**末尾**を読む。multihash 系のエンコーディングは固定 prefix を持ち、**前方から取った index は全入力で同じ数**になる —— 動く selector に見えて永久に1 block しか sample しない。1220 prefix 付き hash を食わせるテストを置いた。
+
+**なお kotobase 本体への配線は前提が無い**: `inga` にも `engi` にも deploy 設定が存在せず、replica は in-process harness でしか走ったことがない。配線の前提は「inga network を実際に走らせる」ことで、その置き場（murakumo fleet）の provisioning は ADR-2607110300 addendum で一度 scope 外と判断されている。**判断が要るので越えていない。**
 
 **2026-08-03（同日、9回目）**: **conformance suite を oracle ではなく本物の合意に対して走らせた**（`inga@cdc4022`）。JVM 261 / 1253、cljs 266 / 1503。
 
