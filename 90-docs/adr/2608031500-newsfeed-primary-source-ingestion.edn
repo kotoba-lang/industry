@@ -31,6 +31,51 @@
    "cloud-itonami/dougaka-vector main 3bd75a99aef02b2d67564eb416e462b28fa86536 — per-run channel identity + brief 出典"
    "network-awai/aozora-engine main 5207381fa5484c54ff2b7ba94a4707d04ed185ca — creator actor 登録（ただし効果なし。下記 D8）"
    "aozora.app 実投稿: at://did:key:z6Mkv4HyP31wtiPQKXKctNc3oEepya6omEYkCrudbnYg9SbB/app.bsky.feed.post/co-design-attention"]
+  :adr/addendum-2608031700
+  "## 追記 2026-08-03: 海運・物流 channel と、feed を持たない発行者という壁
+
+問い: `https://www.mol.co.jp/pr/2026/26022.html` のような企業プレスリリースを取り込めるか。
+**取り込めない。MOL(商船三井) は RSS/Atom を公開していない。** press ページにもトップにも
+autodiscovery link が無く、推測した 4 URL は 200 で空文書。日本郵船・川崎汽船・国土交通省・
+日本海事協会も同じで、**一次情報が HTML しか無い発行者は本 ADR の取得層では構造的に扱えない**。
+測定値付きで 13 件を `resources/sources.edn` の `:rejected` に記録した。
+
+これは roster の穴ではなく取得層の設計境界である。埋めるには (a) HTML を扱う別経路
+(scraper / 構造化抽出) を足すか、(b) その発行者を報じる二次情報で代替するかの二択で、
+今回は (b) を採った。
+
+追加した 10 source (すべて repo の parser で fetch してから列挙、`:newsfeed/verified*` 付き):
+一次情報 = ONE(Ocean Network Express、日本 3 社のコンテナ部門合弁) / METI(この roster で
+唯一の日本語 feed)。トレード press = gCaptain / Splash 247 / The Maritime Executive /
+Container News / Offshore Energy / Journal of Commerce / FreightWaves / Supply Chain Dive。
+
+消費先 = `:itonami-supply-chain` channel(itonami.cloud)。実 digest で
+pool 1,569 -> in-window 177 -> above-threshold 105 -> running order 6 を確認。
+maritime-executive は 1 outlet で 56 item 出るので `max-per-source 2`、FreightWaves は
+トラック輸送・犯罪ニュース比率が高いので `source-bias -2`。
+
+### (b) は今回うまくいっていない — 実測
+
+1,569 article の実 ledger 上、曖昧でない表記での内訳:
+**商船三井 0 件 / 日本郵船 1 件(`NYK moves to absorb NS United in near $1bn deal`) /
+川崎汽船 0 件 / ONE 4 件(自社 feed)**。つまり MOL は発行者としても主題としても
+この 1 週間で 1 件も入らない。トレード press を足せば届く、とは言えない。
+
+### 3 文字略語で誤認しかけた
+
+当初 `MOL Group buys Shell's subsidiary in Cyprus for $720 million` (offshore-energy) を
+商船三井の記事と数え「出来事は届く」と書いたが、これは**ハンガリーの石油会社 MOL Nyrt.**
+だった。`MOL` を keyword にも判定にも使わないことを sources.edn にコメントとして固定し、
+channel の keyword は `商船三井` / `mitsui o.s.k.` という曖昧でない表記だけを持つ。
+**社名が略語の企業を keyword で追うときは、その略語が誰の略語かを先に確かめる。**
+
+### 残る穴
+
+日本語の一般紙・専門紙(日本海事新聞など)が roster に無く、日本語 feed は METI 1 本だけ。
+kawaraban(世界ニュース mirror)は「営利企業を mirror しない」を明示ポリシーに持つ一方、
+newsfeed は NVIDIA / ONE という営利企業の press を既に入れている — **2 つの取得層が
+別ポリシーで動いていることは、まだどこにも記録されていない。**"
+
   :adr/verification
   "実行して検証した（inspection ではない）。取得層: 17 feed すべてを実ネットワークで fetch し 1,336 article を parse、25 tests / 99 assertions が nbb と JVM の両方で green、クラスタリング閾値は実 261 記事の sweep で決定。動画: brief の topic から storyboard 生成（murakumo-main）→ 570 frame render → mp4（h264 1920x1080 / 19.0s / 30fps）→ aozora publish。フレームを実際に目視して黒背景・ネオンの意匠が出ていることを確認（単色板ではない）。publish 後に PDS から読み戻し、post record 取得可・blob は sha256 完全一致・resolveHandle が did:key を返すことを確認。dougaka-vector 23 tests / 116 assertions green。aozora-engine は creator-actors ns の 7 tests / 55 assertions を nbb で green（フルスイートは本変更以前から main で壊れている — byoubu-ui.core 欠落、無変更 checkout でも同一失敗を確認）。"
 
