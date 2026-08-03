@@ -279,6 +279,14 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 
 ## 改訂
 
+**2026-08-03（同日、8回目）**: 抽出 ADR で「未解決」と flag した `inga.attest` / `witness-quorum` の重複を調べたところ、**重複ではなかった**（`inga@0b488c9`）。
+
+- **`consensus.cljc` の docstring が、存在しない依存を3つ主張していた。** ①transport は「murakumo/overlay の QUIC を reused unchanged」→ 実際は `inga.net`（WebSocket）②署名は「witness-quorum の signer/attestation を reused unchanged」→ 実際は `inga.attest`（WebCrypto）で、`deps.edn` は一度も witness-quorum に依存していない ③proposal は `engi.core` の TransferBody CID → その namespace は別 repo に残った。**3つとも設計が計画だった時期に書かれ、実装されるにつれて訂正されなかった。** 特に witness-quorum の記述は読み手を存在しない重複の捜索に送り出す —— 実際に私がそうなった。
+- **実態**: `witness-quorum` は**書き込み後**の CID に対する post-hoc cosign（Certificate Transparency 型、3層 validation membrane）。`inga.attest` は**commit 前**の vote と証明書への署名でプロトコル内部。重なるのは「Ed25519」だけで、そこも意図的に違う —— witness-quorum の cljs signer は npm の `@noble/curves` を取り、`inga.attest.ed25519` は **WebCrypto で依存ゼロ**（Worker で動く必要があるため）。統合は依存を必要としない側に依存を足すことになるので、**分けたままにし理由を書いた**。
+- **私が入れた欠陥も1つ直した**: 抽出時の一括 `engi.` → `inga.` rename が **docstring の散文にも当たり**、存在しない `inga.core` / `inga.crypto` / `inga.metrics` を 14 箇所発明していた。`engi.*` に戻し、別 repo に住むこと・seam の前例として名前が出るだけであることを明記した。
+
+**harness の間欠失敗を、閾値ではなく計測で解決した。** `script/network.cljs` が約4回に1回「an honest replica holds no proof against the equivocator」を報告していた。私はこれを一度「RUN_MS が短い」と書いたが**誤診**だった。equivocating vote の実数を数えると: **成功 run は 75–147 票、失敗 run は 12 票で 3 replica とも 0**。一部が 0 でなく全部が 0 なのは「証拠が旅しなかった」ではなく「**validator がほとんど投票しなかった**」形である。よって catch assertion を equivocator が実際に equivocate した回数に対して条件付きにし、閾値未満は `INCONCLUSIVE` を**大きな声で**（票数付きで）報告するようにした —— 他の assertion は全部通ったままである必要がある。`deliver-all` 自身の docstring が理由を書いている: 間欠テストは無いより悪い、再実行を教えてしまうから。**実際それは私に2度そう教えた。**
+
 **2026-08-03（同日、7回目）**: 「seam はあるが繋がっていない」2件を閉じた（`inga@332b067`）。JVM 260 tests / 1238 assertions、cljs 265 / 1488、parity 一致。**どちらも「閉じたように見えて閉じていない」型であり、テストは緑のままだった。**
 
 - **F1 が合意を経由していなかった。** `inga.state` の受け入れは同じ op 列を4回 fold して1つの root を得ただけで、これは root がデータの関数であることを示すが、**「順序に合意しなければならなかった4 replica が hydrate 可能な root に到達する」という ADR の約束は示していない**（commit 規則を一度も通っていない）。socket harness は commit 規則を通るが、その machine は不透明 digest —— まさに F1 が置き換えた当のもの。**両半分がそれぞれ検証され、接合されていなかった。** `four-replicas-that-had-to-agree-reach-a-hydratable-root` が接合する: 実 replica network で合意させ、共通 committed 高さで root を再計算し、合意した CID を hydrate して Datalog で引く。
