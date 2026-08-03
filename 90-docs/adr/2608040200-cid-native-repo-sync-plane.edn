@@ -32,7 +32,7 @@
   ["manifest/west.yml 1,024,627 B / 4,063 entries; manifest/fleet-db.edn 958,572 B; manifest/fleet-db.ledger.edn 1,441,801 B (2026-08-03)"
    "kotoba-lang/kagami bin/fleet.cljs cmd-head — 署名対象は fleet-db.edn 全体の SHA-256（node-sha256 (slurp db)）"
    "kotoba-lang/kagami src/fleet/objects.cljc — missing-since ベースの block 転送・visibility ACL・pack/unpack・reconstructable?"
-   "kotoba-lang/prolly-tree src/prolly_tree/core.cljc — build-tree/lookup/scan-prefix/insert/insert-many のみ。diff / merge は存在しない（実測）"
+   "kotoba-lang/prolly-tree@1e9b401 src/prolly_tree/diff.cljc — 本 ADR の P0 として実装・merge 済み（27 tests / 2,151 assertions）。merge は依然として無い"
    "cross-repo blob dedup 実測: 325 repo / 240,768 blob entry / distinct 216,092 → entry 10.2%、bytes 15.4%"
    "scripts/fleet-sync-tick.cljs 実測: reconcile 直後の 1 時間で manifest が 9 changed + 6 added 漂流"]
   :adr/decision-summary "{:manifest :prolly-tree-value, :fleet-state-name :root-cid, :head :signed-record-over-root-cid, :objects :bonsai-cid-blocks, :transfer :missing-since-closure, :materialisation :working-set-closure-query, :ref-plane {:single-machine :signed-head-cas, :multi-machine :inga-quorum}, :source-of-truth :git-plus-canonical-edn, :kotobase-role :projection, :delete-test :passes, :cid-wins [:o-diff-comparison :deterministic-key-merge :idempotent-transfer :nameable-state], :cid-non-wins [:cross-repo-dedup-10pct :mutable-refs], :missing-primitive :prolly-tree-diff, :west-yml :generated-interop-projection}"
@@ -170,7 +170,7 @@ query/serving projection」と定める。本設計はそれに従う:
 
 | 必要なもの | 現状 | 規模感 |
 |---|---|---|
-| **`prolly-tree/diff` — 2 root を歩き、子 CID が一致する部分木を skip** | **無い**（`build-tree`/`lookup`/`scan-prefix`/`insert`/`insert-many` のみ、実測） | 本設計の (b)(c) はこれ 1 本に依存する。最初に書く |
+| **`prolly-tree/diff` — 2 root を歩き、子 CID が一致する部分木を skip** | **✅ 2026-08-04 実装・merge 済み**（`prolly-tree.diff/diff` / `diff*`（`:blocks-read` つき）/ `changed-keys`） | 下記「実測」節を参照 |
 | `prolly-tree/merge`（3-way、素キー単位） | 無い | diff の上に載る |
 | manifest を prolly-tree に載せる writer（`fleet` CLI） | 無い（今は 1 枚の EDN） | `fleet.db` の置き換え |
 | head の署名対象を file-hash → root CID に | `cmd-head` は `node-sha256(slurp db)` | 数行だが**署名形式の変更**なので verify も同時に |
@@ -204,6 +204,32 @@ query/serving projection」と定める。本設計はそれに従う:
 | HEAD≠pin の :not-relatable | **141 件** | **0 件（構造的に不可能）** —— 閉包 fetch なので「持っていない pin」に居られない | P3 |
 | fleet refresh period | 15.5 日 | working set 基準で **~1 日** | P3 |
 | head の意味 | 958 KB ファイルの hash | 構造を持つ root CID | P1 |
+
+## 実測（P0 着地後、2026-08-04）
+
+`prolly-tree.diff` を実装して merge した（`kotoba-lang/prolly-tree@1e9b401`、
+27 tests / 2,151 assertions green）。`diff*` は `:blocks-read` を返すので、
+構造 skip が効いているかを**主張でなく測定**できる。実測:
+
+| manifest entry 数 | tree の block 数 | 変更 entry | diff が読んだ block | 比 |
+|---|---|---|---|---|
+| **4,063（今日の fleet）** | **17** | 1 | 4 | 0.24 |
+| 4,063 | 17 | 15 | 20 | 1.18 |
+| 50,000 | 195 | 1 | 6 | 0.03 |
+| 50,000 | 195 | 15 | 38 | 0.19 |
+| 任意 | 任意 | **0（root 一致）** | **0** | — |
+
+**正直な読み方**: 今日の 4,063 entry では tree 全体がわずか **17 block**（1 leaf ≈ 226 entry）
+なので、**block skip の絶対的な得は小さい**。15 entry が動いた比較は両側を読むため 20 block
+＝片側の tree より多い。つまり今日 (b) から得られるものは限定的で、**今日効くのは
+(a) root 一致の比較が 0 block で終わること**と **(c) 素キーの独立更新**である。
+block skip が本当に効き始めるのは manifest が 1 桁増えたとき（50,000 entry で 15 変更なら 19%）、
+および**同じ構造を object 面（block 数が桁違い）に当てたとき**。
+
+**設計判断への影響**: 受け入れ基準の「同期しているか = CID 1 個の比較」は P0 で既に満たせる
+（0 block）。一方「差分コストが O(変更数)」を manifest 面の売りにするのは今日の規模では
+誇張になる。**object 面の閉包 fetch（Plane B）こそが構造 skip の本命**であり、
+P3 の優先度をそのぶん上げる。
 
 ## What this ADR does NOT decide
 
