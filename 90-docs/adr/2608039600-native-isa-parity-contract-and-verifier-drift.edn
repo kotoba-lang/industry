@@ -49,7 +49,12 @@
    "kotoba-lang/kotoba-verifier e78c37083c2c98e5bdbb3a66c8551691c784f5a3"
    "kotoba-lang/tender-native f92f390278bc561a098fab65b7430845900aed6f"
    "kotoba-lang/compiler 3c575e26717afe99b9207519cbdcf183486ea578"
-   "com-junkawasaki/root f9b51ce17bc5a9e67b8c3c1d5385fe55c718621b"]
+   "com-junkawasaki/root f9b51ce17bc5a9e67b8c3c1d5385fe55c718621b"
+   "kotoba-lang/kotoba-native ed96dc8aea330dd55f9e5b81ecec7135bf6c59a3"
+   "kotoba-lang/kotoba-kir 95a1ac0f37c3f43e233eee33470c0007593631f7"
+   "kotoba-lang/kotoba-verifier 677eae9267cfef8bd973bf5f602e5d4b31b7bd82"
+   "kotoba-lang/compiler 9c373ed009256cf8fc89b318c98cb8967240ed4e"
+   "com-junkawasaki/root 14505b7f4d878e94bf70bb4a693e820537bf3a87"]
   :adr/body
   "# ADR-2608039600: native backend の ISA parity を契約化する
 
@@ -413,6 +418,41 @@ pin 前進後は 800 tests / 6,342 assertions・0 failures、conformance 5/5。
 
 ## 残ったギャップ (2026-08-03 時点の実測)
 
+## 続き: `i32-operations` (同日、最大の残存 portable ギャップを閉じた)
+
+wasm32 と js が 9/9、native が 0/9 だった `i32-operations` を両 ISA で実装した。
+
+**新しい値表現は不要だった。** `:i32` という型は存在しない — `kotoba.kir` の
+`:i32` 言及は trap キーワード 1 箇所のみ — つまり 9 op はすべて **i64 語の上の
+32bit wrap 意味論**。区別するのは正規化だけ: `i32-*` の結果は bit 31 から
+**符号拡張** (`unchecked-int` / `i32-wrap` 経由)、`u32-*` は **ゼロ拡張**
+(`u32-wrap`)。
+
+両 ISA が unsigned 側を無償で与える — x86-64 の 32bit 演算も AArch64 の w 形式
+書き込みも上位半分をゼロにする — ので unsigned 形は後処理不要、signed 形は
+`movsxd` / `sxtw` が 1 つ。AArch64 の符号化はすべて隣の 64bit 形の `sf=0` 兄弟。
+
+shift count は既存の binary window で rcx / x1 に載り、**mask は emit しない**:
+frontend が count を literal [0,31] に限定しているので mod-32 切り捨てが到達
+不能 — i64 shift が [0,63] で立てたのと同じ論法。
+
+**`xorshift32` は case を 1 つも書いていない。** frontend がこれらへの `let` に
+desugar するので、9 op が揃った瞬間に動き出した (`(xorshift32 1)` → 270369、
+参照実装と一致)。
+
+**gate は共有集合を触らず native 側だけで例外を作った。** `i32-operations` は
+`non-string-typed-ops` に残す — cljs gate が同じ集合を共有しており、cljs は
+**1/9 しか実装していない** (2026-08-03 実測、wasm32/js は 9/9)。集合から抜くと
+cljs も黙って広がる。テストが両方向を pin する (native は `let` 束縛越しでも
+admit、cljs は今も拒否)。
+
+検証: 実 AArch64 プロセスで 11 本 — `i32-wrap 0xFFFFFFFF` = -1、
+`u32-wrap -1` = 4294967295、負数での算術 vs 論理シフト、桁あふれ wrap — すべて
+KIR oracle と一致。compiler は pin 前進後 807 tests / 6,358 assertions・0
+failures (クリーン再実行)、conformance 5/5。
+
+## 残ったギャップ (2026-08-03 時点の実測)
+
 - **native に実装すべき operator**: `string-substring`
   (= source の `string-from-i64`)。**戻り値が文字列**なので register op では
   なく `string-concat` と同じ string-pool / host-call 経路が要る。
@@ -421,7 +461,6 @@ pin 前進後は 800 tests / 6,342 assertions・0 failures、conformance 5/5。
 - ~~比較結果を返す関数が native で書けない~~ **2026-08-03 に解消** (上記
   「完了」節)。native は `:bool` 境界を渡り、predicate entry が compile /
   verify / 実行できる。
-- `i32-operations` 一族 (i32 値表現) は native に無い。
 - record/variant が関数境界を越えられない・相互ネスト不可・
   string/keyword フィールド不可 (compiler ADR 0062/0063 の Remaining gaps)。
 - typed collections と f64 は `:target` で clean rejection されており、
