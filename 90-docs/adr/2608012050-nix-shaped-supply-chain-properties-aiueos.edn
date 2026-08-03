@@ -6,8 +6,8 @@
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-08-01"
-  :adr/last-verified "2026-08-01"
-  :adr/last_verified "2026-08-01"
+  :adr/last-verified "2026-08-03"
+  :adr/last_verified "2026-08-03"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "nix-shaped-supply-chain-properties"
@@ -21,7 +21,11 @@
    "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"]
   :adr/evidence
   ["https://github.com/kotoba-lang/aiueos/pull/139"
-   "kotoba-lang/aiueos 90-docs/adr/0016-content-addressed-external-tcb.md"]
+   "https://github.com/kotoba-lang/aiueos/pull/142"
+   "https://github.com/kotoba-lang/kotoba/pull/445"
+   "https://github.com/kotoba-lang/kotoba-lang/pull/367"
+   "kotoba-lang/aiueos 90-docs/adr/0016-content-addressed-external-tcb.md"
+   "kotoba-lang/aiueos 90-docs/adr/0017-release-attestations.md"]
   :adr/body
   "# ADR-2608012050: aiueos の nix 的性質
 
@@ -95,6 +99,42 @@ git の commit id は tree をアドレスするので `:git-sha` は version la
 - 実行時依存を 1 つでも進めるには同じ commit で inventory を更新する必要がある — 意図的な摩擦であり、`:tcb/files` が既に in-repo source に課している規律と同型。
 - `deps.edn` / `security-adoption.edn` / inventory が相互検査されるので、shared security の pin が片方だけ進む事故が構造的に起きない（直近の pin revert #138 がまさにこの状況）。
 - release artifact の SBOM / SLSA provenance（`docs/deployment-profiles.md` の `regulated`）は**実装済み**（2026-08-02、aiueos ADR-0017 / PR #141）。`aiueos.sbom` が TCB inventory から SBOM component を導出し、provenance と `regulated` evidence を署名付きで生成して `kotoba.security.supply-chain/evaluate-attestations` に食わせる。`:sbom-digest` / `:provenance-digest` / `:tcb-inventory-digest` / `:tcb-drift-check?` は test literal ではなく inventory と実文書から来る。**残る 3 点**: ①`build-release-image.sh` は まだ `clojure -M:attest` を呼ばず、attestation の存在を要求する gate も無い（pipeline 結線）②文書は EDN で in-toto/DSSE envelope ではない ③`evaluate-reproducibility` の証拠（独立ビルド 2 本の artifact digest）は未接続 — 入力（ADR-0013 の byte 比較 gate）は既にある。
+
+## 現在地 (2026-08-03) — 名指しした穴のうち、閉じたものと残ったもの
+
+この ADR が「記録するが閉じない」とした項目を、閉じられるものから順に閉じた。同じ監査を aiueos の外（kotoba / kotoba-lang / superproject の hook）にも当てた結果、**同型の穴が 3 つ見つかった**: 「control はある、evaluator もある、しかしそれが食う evidence が placeholder か、そもそも誰も突き合わせていない」。
+
+### 閉じたもの
+
+| 対象 | 何が穴だったか | 着地 |
+|---|---|---|
+| aiueos | `java.base :minimum-version 25` と CI の temurin 21 が食い違っていたが検出するものが無かった。**どちらが誤りかは依然オーナー判断** — checker は判断せず「食い違いが正確に記録されているか」だけを見る（runner を 25 に上げても floor を 21 に下げても記録の削除を強制する双方向 gate） | aiueos#142 `e852d033` |
+| aiueos | `src/aiueos/tcb.clj` が `:tcb/files` に無かった＝**drift を報告するか否かを決める当の file だけが drift 自由**だった。`:tcb-inventory-authority` として収録 | 同上 |
+| kotoba | emit coverage 71→**72/74**。2 件は言語の穴ではなく帳簿の穴で、うち 1 件は manifest が sibling policy を shadow していた（`:capability-not-granted` と記録され、ADR 側もそれを「grant する policy が repo に無い」と復唱していた——事実ではなかった）。`:policy-shadows-sibling` gate と `:unknown-forms` を追加 | kotoba#445 `25d5d808` |
+| kotoba-lang | `:nested-let-destructuring` は `:pure-product-run`＝compiler 両 backend を required と宣言する一方、surface-status は compiler がその形を拒否すると測定していた。**各ファイルは単体で無矛盾、突き合わせるものが無かった**。`:orphaned-conformance` を one-off から invariant に昇格（双方向に赤くなる） | kotoba-lang#367 `c28557ad` |
+| superproject | `west-pin-verify-guard` の API 経路が「payload path を名指ししているのに読めない」を fail-open にしていた＝**payload 生成と PUT が同一コマンドなら無検証で通る**。`payload-decision` で 3 状態に分離し `:unreadable` は deny | `34117103` |
+
+### 残ったもの（2026-08-03 時点）
+
+**A. オーナー側の 1 手が要る（設計は済んでいる）**
+
+1. **`.github/workflows/ci.yml` に JDK provisioning**。release media を作る job は `bare-metal-uefi` だけで JDK が無く、`workflow` scope の無い token では `.github/workflows/` に到達できない（push・API とも）。**適用する YAML は aiueos ADR-0017 に逐語で記載済み**。これが入れば release attestation の結線と `evaluate-reproducibility` の証拠（同 job の 2 回目の呼び出しで得られる第 2 digest）が同時に着地する。script 側だけ先に書くのは「CI が一度も実行しない step」を作ることであり、この一連の作業が除去してきた失敗そのもの。
+2. **`java.base` の floor 25 と runner 21 のどちらが誤りか**。上記 gate は判断を代行しない。
+
+**B. 設計変更が要る**
+
+3. compiler の nested vector destructuring（型指向 desugar か、記述子を call site で要求しない accessor）。blocker は `lang/surface-status.edn` に記録済み。
+4. `demo_kbb_fs_report.kotoba` の `str`（legacy emitter に数値→文字列が無い）。compiler 側には `string-from-i64-kit` があるため legacy への実装は投資価値が低い。
+
+**C. 意図的に開けたまま**
+
+5. in-toto/DSSE envelope — 断念の理由を ADR-0017 に明記（payload は JSON、この repo に JSON library が無く、依存追加＝誰も読まない形式のための TCB 拡大／手書き writer＝同 namespace が JSON *parsing* を同じ理由で拒否している面への新規 surface。外部 verifier が release path に入った時に、round-trip verifier と DSSE PAE test vector を同じ commit で）。
+6. git commit id を content address として受容（SHA-1 のそれ）。
+7. bare-metal object store は name-addressed 据え置き（律速は addressing 方式ではない）。
+
+### resume point
+
+次の 1 手は A-1。`.github/workflows/ci.yml` の `bare-metal-uefi` job に ADR-0017 記載の 3 step を貼り、`clojure -M:tcb-check` と `clojure -M:test` が緑のまま release attestation が生成されることを確認する。
 
 ## workspace 全体への含意
 

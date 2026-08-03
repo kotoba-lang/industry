@@ -17,7 +17,7 @@
    "producer と verifier の allowlist drift の扱い"
    "未実装 operator の診断規約 (backend は operation 名を名乗る)"
    "target-admission 述語は let 束縛値を walk しなければならない"
-   "native の entry/関数 result が :i64 限定である理由 (KIR の :bool と native の 0/1 語の乖離)"
+   "native の entry/関数 result が :i64 限定である理由 (:bool box 化を native がまだ渡っていない)"
    "ADR-2608039500 の検証記述の訂正 (override 不発)"]
   :adr/related
   ["adr-2608039500-native-backend-codegen-back-half-size-preserving-peephole"
@@ -42,7 +42,9 @@
    "com-junkawasaki/root 667b8d987ec469e0364ac97758ed0b20479927e5"
    "kotoba-lang/kotoba-verifier cc5b4f94fc25fdc31f6e7c9f19158057c6e9a212"
    "kotoba-lang/compiler e5a8cf1c27a2550294ec12a5d9c99a67461a1f9a"
-   "com-junkawasaki/root 6bc32324bd096368bcdbb10e6a049771a4676370"]
+   "com-junkawasaki/root 6bc32324bd096368bcdbb10e6a049771a4676370"
+   "kotoba-lang/kotoba-verifier ca7efcb82f58a56de0f60a776019c3044f5b56bb"
+   "com-junkawasaki/root 7f1911977aca19a111d50793b27e04f871561081"]
   :adr/body
   "# ADR-2608039600: native backend の ISA parity を契約化する
 
@@ -332,16 +334,45 @@ integer であることしか要求しないため、受理は無害に見えた
 (defn main [] (+ 1 1))   両方とも 2
 ```
 
-**KIR インタプリタの値モデルには本物の `:bool` があり、native backend には
-0/1 の語しか無い。** この検査は「`true` を封印した oracle 値」と「語 1 を返す
-コード」を持つ artifact を止めているのであって、
-`verify-native-artifact!` の `(= expected-value (:value kexe))` が同じ事実の
-異なる表現を比較する事態を防いでいる。**制約は load-bearing だった。**
+### 訂正 (同日、later): 上記の「load-bearing」という結論も誤りだった
 
-**決定**: 制約は維持する。持ち上げるには (a) `kotoba.kir/execute` が `:bool`
-entry に対して 1/0 を返すようにするか、(b) backend が本物の bool 表現を持つか
-のいずれかで、**native の値モデルに関する設計判断**であって集合の widening では
-ない。理由・実測・持ち上げ条件を検査のある場所に書いた。
+初版はここで「KIR の値モデルには本物の `:bool` があり native には 0/1 の語しか
+無い。制約は load-bearing。持ち上げるには `execute` が 1/0 を返すか backend が
+本物の bool 表現を持つか」と結論した。**これも誤り**で、しかも
+**3 日前にオーナーが下していた決定と逆向き**だった。
+
+`kotoba-kir` `38d1bd0` (2026-07-31、'box a :bool result at the execute boundary'):
+
+> `:bool` はこのインタプリタの内部でも、wasm module の内部でも、native backend の
+> setcc 列でも **plain な 0/1 の語**である。しかし **target から出る値は host
+> boolean** である: restricted-ESM emitter は boolean を返し、`kotoba.wasm.core` は
+> boolean を box する export wrapper を emit する。参照実装だけが 1/0 を返していた
+> ため、**3 者が同じ値で一致することを唯一の目的とする shared corpora** が
+> predicate について成立しなかった。
+
+`:bool` **引数**は以前から本物の boolean を要求していたので、box 化は新しい規約の
+導入ではなく **両方向を対称にする**もの。
+
+**私は native backend の内部表現から推論し、cross-target の規約を確認しなかった
+ため、進行中の移行を「意図された不変条件」と読み違えた。**
+
+### 実際の現在地
+
+native は**まだその境界を渡っていない target**というだけ。実際に塞いでいるのは
+`kotoba.kir/lower` の oracle 畳み込みガードが `:i64` 限定であること —
+`:bool` entry では何も封印されず、oracle 検査に比較対象が存在しない。
+**したがって verifier の集合だけを広げても何も変わらない。**
+
+完了に必要なのは 3 点、この順序:
+
+1. `kotoba.kir/lower` が `:bool` entry を畳み込む (box 済み boolean を封印し、
+   `:blocks` は 0/1 の語のまま — `38d1bd0` が内部表現は据え置くと明記している)
+2. verifier の `entry-result-types` が `:bool` を得る
+3. `kototama.native.executor` が `:bool` entry に対して integer ではなく
+   boolean を報告する
+
+3 は executor の report 契約 (`(integer? (:result report))`) を変えるため、
+**owner に見える面**。ここまでを 1 単位として次に実施する。
 
 **副産物として直したもの**: `verify-program!` は 12 個の条件を 1 つの `and` で
 検査し `{}` を報告していた。どれが落ちたかを知るにはプログラムを手で二分探索
@@ -357,9 +388,10 @@ entry に対して 1/0 を返すようにするか、(b) backend が本物の bo
   なく `string-concat` と同じ string-pool / host-call 経路が要る。
   — `xorshift32` はゲート修正により**この一覧から外れた**。i32 値表現を
   native に入れるかどうかの判断に統合される。
-- **比較結果を返す関数が native で書けない** (`:bool` 対 0/1 語)。制約は
-  load-bearing なので「穴」ではないが、wasm/js/cljs との機能差ではある。
-  解消は native 値モデルの設計判断。
+- **比較結果を返す関数が native で書けない**。これは `:bool` の box 化
+  (kotoba-kir 38d1bd0、2026-07-31) を native がまだ渡っていないだけで、
+  設計判断は既に済んでいる。残作業は lower の畳み込み・verifier の集合・
+  executor の report 契約の 3 点 (上記)。
 - `i32-operations` 一族 (i32 値表現) は native に無い。
 - record/variant が関数境界を越えられない・相互ネスト不可・
   string/keyword フィールド不可 (compiler ADR 0062/0063 の Remaining gaps)。
