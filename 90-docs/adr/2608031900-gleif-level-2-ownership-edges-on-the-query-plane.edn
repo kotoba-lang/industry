@@ -185,9 +185,11 @@ datascript.js へ渡る際に `\"is-ultimately-consolidated-by\"` になる。qu
   BKV CORPORATION -> บริษัท บ้านปู จำกัด (มหาชน) (TH, FULLY_CORROBORATED) /
   MINIMED GROUP, INC. -> MEDTRONIC PUBLIC LIMITED COMPANY (IE,
   ENTITY_SUPPLIED_ONLY) 等。この join は本 ADR 以前は 0 件だった。
-- **ただし「SEC filer の最終親会社」が引けるのは 29 社だけ** — 上場会社は
-  たいてい自分が連鎖の頂点であり、child 側に現れないため。価値がある向きは
-  逆（その会社が何を所有しているか）で、そちらは D4 の両端マッチにより引ける。
+- **向きによってカバレッジが 40 倍違う**（D4 の両端マッチが効いた箇所）:
+  「SEC filer の最終親会社」が引けるのは **29 社**だけだが、
+  「SEC filer が所有している先」は **1,148 社**で引ける。上場会社はたいてい
+  自分が連鎖の頂点なので child 側にはほとんど現れない。**child だけに
+  projection を当てていたら、価値のある向きを丸ごと落としていた。**
 - 品質上の注意: 法人名の衝突が実在する（例: 面上で CHUBB LIMITED ->
   CARRIER GLOBAL CORPORATION という edge が出るが、これは Carrier 傘下だった
   Chubb Fire & Security 系の法人であり、保険会社の Chubb Limited とは別法人）。
