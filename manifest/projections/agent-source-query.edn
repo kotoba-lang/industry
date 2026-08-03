@@ -1,0 +1,27 @@
+{:projection/version 1
+ :projection/id "agent-source-query-adr"
+ :projection/source
+ {:git/commit "5ef8479d3ff02199924c11954a8b8bb56be0463c"
+  :dataset/id "com-junkawasaki/root/agent-source-query-adr"}
+ :projection/inputs
+ [{:input/type :git
+   :input/path "90-docs/adr/2608039700-agent-loop-git-datalad-source-kotobase-query-projection.edn"
+   :input/sha256 "fdb0f6bde9e7cf170dcf11088422050f2cf2a702aa6f29986c42934671eb4a73"}]
+ :projection/contracts
+ {:schema/path "manifest/schema.edn"
+  :schema/sha256 "0f02d7b23103266fb349888204dddb541bdf5d3303044d1ef9257cad495bc3ff"
+  :loader/path "manifest/project-edn.cljs"
+  :loader/sha256 "dbdc19d1d9193e144a5e9eae64cc98a7079da1559d9a0b1c1488630d6f1495da"}
+ :projection/rebuild
+ {:argv ["nbb"
+         "--classpath"
+         ".:scripts/nbb_compat"
+         "manifest/project-edn.cljs"
+         "project"
+         "manifest/projections/agent-source-query.edn"
+         ".projection-cache/agent-source-query.edn"]
+  :output/path ".projection-cache/agent-source-query.edn"}
+ :projection/output
+ {:sha256 "dafd4e71238c292edcf09c48176a0301d43eb4122646b1cd775ef2f56a4be8d3"
+  :determinism :physical
+  :entity-count 1}}
