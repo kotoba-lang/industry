@@ -85,18 +85,44 @@
    saifu）に合う。**ただし今やるべきは取得であって立ち上げではない** ——
    立てた瞬間に第 2 authority の誘惑が生まれる。`iam.cloud` は一般名詞すぎる。
 
-   ## 足りない 5 つ（ここが実装対象）
+   ## 『足りない 5 つ』を実測で 2 つに訂正した（2026-08-03）
+
+   初版は 5 つ挙げたが、**3 つは既に実装され稼働していた**。authn のソースと
+   実プローブで確認した結果:
+
+   ### 本当に足りないもの
 
    1. **custom hostname** … `auth.<apex>` を authn Worker に route。cookie が
-      first-party になり Bearer 迂回が消える
-   2. **tenant ≠ user** … 現在 `did:web:kotobase.net:tenant:<user>` は path
-      segment が `tenant` なのに中身が user。**組織を表せない**。Clerk の
-      Organizations に相当する層が無い
-   3. **hosted UI** … 今日 murakumo で手書きした sign-up/sign-in を authn 側へ。
-      **これを移せたことが、重複が減った証拠になる**
-   4. **復旧の紐付け（email ↔ did）** … `authentication.adapters.email` は
-      既にあるのに consumer が無い。今日 murakumo で見つけた穴と同じもの
-   5. **JWKS 公開** … downstream が毎回 authn を呼ばずに検証できるように"
+      first-party になり Bearer 迂回が消える。判定は `viewer/resolve-apex`
+      として着地済み（純粋・テスト済み）だが、**cookie を出す経路はまだ 1 つも
+      切り替えていない** —— `base-domain` の呼び出し 15 箇所のうち 11 箇所に
+      `request` が届いておらず、部分適用すると一部の flow だけ別 apex に
+      cookie を出して同じセッションで不整合になる
+   2. **tenant ≠ user** … `did:web:kotobase.net:tenant:<user>` は path segment が
+      `tenant` なのに中身が user で、**組織を表せない**。`sekisho.tenant` が
+      `:org:` を新設して埋めた（既存 accountDid は改名しない —— 発行済みの
+      識別子で、改名は全部を無効にする）
+
+   ### 足りていなかったのは私の調査だったもの
+
+   3. ~~hosted UI~~ … **既に稼働**。`/sign-in` `/login` `/start` `/callback`。
+      今日 murakumo に手書きした `/signup` が 4 件目の重複になりかけた
+   4. ~~email ↔ did~~ … **既に稼働**。`/v1/email/start` `/v1/email/verify`。
+      ライブラリ（`authentication.adapters.email`）の存在は把握していたが、
+      **consumer が既に動いていることを知らなかった** —— ライブラリの存在と
+      サービスの稼働は別の事実で、前者を見ても後者は分からない
+   5. ~~JWKS 公開~~ … **適用できない。設計上そうしている。**
+      セッションは 256bit の不透明トークンで、SHA-256 ダイジェストを Durable
+      Object のキーにする。**署名が無いので公開する検証鍵も無い。**
+      `session.cljs` が自分で書いているとおり『every session an account holds
+      can be enumerated and revoked together』—— 不透明トークン + 中央検証は
+      **即時失効**が効き、JWT/JWKS はまさにそれができない。`/v1/logout/all` は
+      この設計の上にしか成立しない。**JWKS を足すのは失効を latency と
+      引き換えにすることであって、穴を埋めることではない。**
+
+   この訂正自体が本 ADR の主題の実例になっている —— **『足りない』と書く前に
+   動いているものを確認する**。対策として `90-docs/surface/surface.datoms.edn`
+   （生成物）と `duplication-warn` hook を作った。"
 
   :adr/consequences
   "## 実装順（各段で『重複が減った』ことを実測する）
