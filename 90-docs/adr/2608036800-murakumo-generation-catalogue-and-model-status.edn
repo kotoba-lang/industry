@@ -1,0 +1,210 @@
+[{:db/id -1
+  :adr/id "adr-2608036800-murakumo-generation-catalogue-and-model-status"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-03"
+  :adr/last-verified "2026-08-03"
+  :adr/deciders "Jun Kawasaki"
+  :adr/topic "murakumo-generation-catalogue"
+  :adr/title "ADR-2608036800: murakumo.cloud の生成モデルに per-model :status を持たせ、カタログを公開面へ出す（壊れた既定モデルの撤去を含む）"
+  :adr/authoritative-for ["cloud-murakumo の :gen モデル状態（:status / :broken-for）の意味と既定モデル選定"
+                          "公開 generation カタログ API（GET /api/v1/generation/catalog）の gate 方針"
+                          "murakumo.cloud /models ページの出典と『無いもの』の記述基準"
+                          "public/ 配下の生成物が deploy 経路で stale にならないための取り決め"]
+  :adr/related ["90-docs/adr/2606272330-cloud-murakumo-gpu-cloud.edn"
+                "90-docs/adr/2607170500-seedance-hosted-video.edn"
+                "90-docs/adr/2607171330-video-self-hosted-first.edn"
+                "90-docs/adr/2608031500-seedance-fal-schema-live-verified.edn"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/body
+  "
+# ADR-2608036800: 生成モデルの per-model :status と公開カタログ
+
+**Status**: accepted（2026-08-03、本番反映済み）
+**Date**: 2026-08-03
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー質問「murakumo.cloud で <19 モデル> には対応できている? また marketing 用の
+リソースも公開されている?」の調査で、3 つの独立した欠落が同時に見つかった。いずれも
+根は 1 つ ——「モデルの現在地を持つ場所がどこにも無かった」。
+
+1. **生成モデルが公開面に存在しない。** `/api/v1/generation/*` は全て access-token
+   gate の内側で、`/api/v1/models` は LLM gateway の答え（`qwen3.6-35b-a3b` 1 件）
+   しか返さない。GPU を買わせる marketing（blog 4 本・llms.txt・storefront・x402
+   catalog）はあるが、その GPU が何を作れるのかを外から知る方法が無かった。
+
+2. **既定の video モデルが壊れていた。** `ltx-2.3` は i2v で `status=done` を返し
+   ながら全フレーム真っ黒（輝度 mean 0 / std 0、49frames 45KB）。model 未指定の
+   呼び出しは黙って空の動画を受け取っていた。実測は
+   `resources/video-engine-comparison.edn` の `:rerun-2026-08-03` にあったが、
+   spec 側に status を書く場所が無かったので既定に残り続けた。
+
+3. **公開 spec が 11 日古いまま配信されていた。** live の
+   `https://murakumo.cloud/murakumo.edn` は 7/23 版で、出荷済みの
+   `seedance-2.0-fast` と `hunyuanvideo-1.5` が欠落。`public/murakumo.edn` は
+   `npm run prep` の生成物かつ .gitignore 対象なので、**deploy されるのは deploy
+   した人のディスクにあったコピー**であり、`wrangler deploy` は prep を呼ばない。
+
+## Decision
+
+### 1. per-model `:status` を spec の一級市民にする
+
+`resources/murakumo.edn` の各モデルに `:status` を持たせる。語彙は
+`:production`（live 検証済み）/ `:verified`（fleet で実測動作）/ `:broken`（実測で
+成果物にならない）/ `:pending`（weights か配線が未了）で、**未宣言は
+`:unverified` に落ちる** —— 書き忘れたモデルが「検証済み」として公開カタログに
+出るのを防ぐ（silent over-claim の禁止）。実測日（`:verified-on` /
+`:status-observed`）と根拠（`:status-note`）を併記する。
+
+### 2. `:broken` は隠さず、壊れている粒度だけ塞ぐ
+
+`:broken` なモデルをカタログから消さない。消すと「状態を持つ場所が無い」状態に
+戻り、同じ事故を作り直す。代わりに `:broken-for [:image-to-video]` のように
+**実測された使い方だけ**を宣言し、`gen/assert-usable!` が job 正規化の時点で
+その mode を拒否する。ltx-2.3 の t2v は 2026-07-16 に E2E 実測が通っている
+（768x448/49f/video+audio/94.6s）ので巻き添えで塞がない。
+
+### 3. `:video` の既定を `ltx-2.3` → `wan2.2-ti2v-5b` へ
+
+self-hosted 第一路線（ADR-2607171330）は変えない —— 既定は引き続き無料の fleet
+経路で、wan2.2-ti2v-5b は 2026-07-25 に gad で実測済み（t2v 149.5s/49f、i2v
+キャラ参照 4/4）。**壊れたモデルを既定から降ろしただけ**であり、hosted への
+既定変更ではない。
+
+### 4. カタログは gate の外、生成は gate の内
+
+`GET /api/v1/generation/catalog` を token 不要で公開する。カタログは値段表と
+同じ marketing 面であって capability ではない。`POST /api/v1/generation` は
+従来どおり `generation` scope 必須のまま。この 2 つが 1 つの決定であることを
+test で固定する（片方だけ緩むのを防ぐ）。
+
+worker はモデル表を焼き込まず、`env.ASSETS` の `murakumo.edn` を読んで
+`gen/models-catalog` で射影する。worker に 2 つ目の表を持たせると、今回直した
+stale と同型の事故を worker 側で作り直すことになる。
+
+### 5. `/models` を marketing ページとして持つ
+
+`src/cloud_murakumo/site/models.cljc` → `public/models/index.html`
+（`clojure -M:site`、DADS = jp-go-dds。この site は 2026-07-30 のオーナー判断で
+kotoba-ui でなく DADS）。**事実（モデル id・status・実測コスト・秒数・日付・
+既定）は SSoT から直接引き、英語の散文だけページが持つ。** spec の
+`:status-note` は graph をデバッグする人向けの日本語であって marketing copy では
+ないため、facts は複製せず phrasing だけをページ側に置く。
+`cloud-murakumo.site.models-test` がこの分業を固定する（ページのモデル集合が
+spec と厳密一致しなければ落ちる）。
+
+**『無いもの』の節を marketing の一部として必ず持つ。** 落とすと、serve して
+いないモデルを期待した来訪者が来続ける。
+
+### 6. prep を通らない deploy 経路を無くす
+
+`npm run deploy` = `release`（prep 込み）→ `clojure -M:site` → `wrangler deploy`。
+加えて `cloud-murakumo.generated-assets-test` が、ディスク上のコピーが既に
+ずれていれば deploy 前に落とす。生成物なので fresh clone に無いのは正常
+（落とさない）—— 危険なのは「存在して、かつ古い」状態だけ。
+
+## Consequences
+
+- 公開カタログが増えるので、モデルを足す時に `:status` を書く義務が発生する。
+  これは意図的な摩擦であり、未検証のモデルが `:unverified` として正直に出る。
+- `:broken` / `:pending` の拒否は **breaking change**。従来 silent に空の成果物を
+  受け取っていた呼び出しが、明示的な例外を受け取るようになる。
+- `/models` の英語散文は手で書くので、spec の facts とは別に陳腐化しうる。
+  models-test はモデル集合の drift しか見ない（散文の正しさは見ない）。
+
+## 検証（2026-08-03 実施）
+
+- JVM: 対象 4 namespace で 24 tests / 128 assertions、0 failures。
+- compiled worker への nbb smoke（`test/site_worker_generation_catalog_test.cljs`）
+  10 checks green —— カタログが token 無しで答え、かつ生成は token 無しで
+  通らないことを同一 run で確認。
+- ブラウザ実測（実効 viewport 660px）: body の横スクロール無し、幅の広い表は
+  自身の `overflow-x:auto` 内でスクロール。長文 Notes 列を表から出して定義
+  リストへ分けた結果、video 表は 742px → 613px（横スクロール解消）、行高
+  ~4 行分 → 149px。
+- live 確認: catalog が `default: wan2.2-ti2v-5b` と 6 モデル（status 付き）を
+  返す / `/models` 200 / `POST /api/v1/generation` 401 / `murakumo.edn` が
+  24764 bytes の新版。
+- **既知の未修正**: `x402-offer` と `treasury.core` に 8 failures。本変更の前から
+  存在し、両 namespace は `clojure.string` しか require していないので無関係。
+  未着手のまま残す。
+
+## 本セッションで起こした本番リグレッション（記録として残す）
+
+`npm run deploy` に prep を入れた結果、**`legal/terms.md`(7/23) が
+`public/legal/terms.md`(8/3) を上書きして本番に出た。** 消えたのは §4.1/§4.2 ——
+murakumo は compute を売るのであって publisher ではないこと、CSAM・NCII の絶対
+禁止、NCMEC 通報と記録保全、初回違反での即時解約。**約 15 分間、本番の利用規約
+からこれが欠落していた。**
+
+原因は `public/legal/` が .gitignore かつ tracked で、公開側のコピーが直接編集
+されており、両者を比較するものが無かったこと。手動 deploy では prep が走らない
+ため表面化していなかった。復旧は 8/3 版を**ソース側**（`legal/terms.md`）へ昇格
+させて再 deploy（`fix/terms-source-of-truth`）。パイプラインではなくソースが
+誤っていたので `npm run deploy` は戻していない。privacy.md / company.md は
+一致を確認済み。
+
+**教訓**: 生成物を tracked のまま .gitignore に入れると、「ソースと公開コピーの
+どちらが新しいか」を誰も検査しない状態ができる。prep を強制する変更は、その
+不整合を*直す*のではなく*出荷する*。
+
+## fal 経由の adapter 追加可能性（2026-08-03 調査、未実装）
+
+オーナー質問「fal 経由で adapter を追加できる?」への調査結果。**実装はしていない。**
+
+- fal catalog 1404 endpoint を取得して照合した結果、**質問にあった 19 モデルは
+  全て fal に存在する**。PixVerse V6 = `fal-ai/pixverse/v6/*`、Wan 2.7 は 7
+  endpoint。
+- **既存実装は既に fal 共通部とモデル固有部に割れている**（名前が `seedance-*`
+  なだけ）。共通 = queue プロトコル（submit → `status_url` poll → `response_url`
+  → download）・`Authorization: Key` 認証・ref の data: URI 畳み込み・artifact
+  の SHA-256 確定。固有 = endpoint path・入力キー/enum 翻訳・出力取り出し。
+- 8 endpoint の queue OpenAPI を比較した結果、全て `required: [\"prompt\"]` ひとつ、
+  動画は `{video:{url}}`、画像は `{images:[{url}]}` を返す。割れるのは綴りだけ:
+  duration が `\"4s\"`(veo) / `\"4\"`(seedance) / `4`(pixverse, minimax) / int enum(wan)、
+  resolution が 480p/720p vs 720p/1080p/4k vs 360p〜1080p vs `768P`/`2K`（大文字）、
+  参照画像キーが `image_urls` vs `reference_image_urls`、音声フラグが
+  `generate_audio` vs `generate_audio_switch` vs 無し。
+- したがって `:seedance` engine を `:fal` へ一般化し、モデル固有部を
+  `murakumo.edn` の 1 行（endpoint + 綴りマッピング）にできる。分岐が要るのは
+  動画/画像の 2 出力形だけ。
+- **価格差が判断を要する**: Ideogram 4 $0.0075 / PixVerse V6 $0.025 /
+  Seedream 5 Pro $0.0675 / Nano Banana 2 $0.08 / Wan 2.7・Veo 3.1 fast $0.10 /
+  Nano Banana Pro $0.15 / MiniMax H3 $0.26 に対し、**GPT Image 2 $5.00 /
+  Gemini Omni $21.875**。60〜800 倍のものを既定に混ぜると、今回直した「壊れた
+  既定」と同型の事故を課金側で起こす。
+
+この調査の過程で `/models` の記述誤りを 1 件訂正した（`fix/hosted-models-are-reachable`）:
+Wan 2.7 を「No public weights exist」とだけ書いており「存在しない」と読めた。
+正しくは **hosted なら使える / self-host できない**（公開ウェイトは 2.2 まで）。
+
+## 番号について（正直に記録する）
+
+本 ADR は当初 **ADR-2608036000** として書き、その id を child repo の commit
+message と `resources/murakumo.edn` / test のコメントに埋めてから、その番号が
+既存の `2608036000-replay-cost-is-the-throughput-ceiling.edn` に取られている
+ことに気付いた。正しい id は **ADR-2608036800**。
+
+merge 済みの commit message は履歴書き換え禁止のため直せない —— cloud-murakumo
+の `925605b` / `34b4380` が本文中で「ADR-2608036000」と書いているが、それは
+**本 ADR（2608036800）を指す誤記**であり、実在する 2608036000（replay cost）
+とは無関係。コード内コメントの参照は follow-up commit で 2608036800 へ訂正した。
+
+## Resume point
+
+次に着手するなら `:seedance` → `:fal` の一般化。最初のコマンド:
+
+```sh
+cd orgs/network-awai/cloud-murakumo
+grep -n \"seedance\" src/cloud_murakumo/engine.cljc src/cloud_murakumo/executor.clj src/cloud_murakumo/worker.cljc
+clojure -M:test -n cloud-murakumo.gen-test -n cloud-murakumo.dispatch-test
+```
+
+どのモデルを wire するか（特に $5〜$22 帯を入れるか）はオーナー判断待ち。
+"}]
