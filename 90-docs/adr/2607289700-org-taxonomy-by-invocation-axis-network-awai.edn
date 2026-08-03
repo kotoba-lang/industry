@@ -619,46 +619,57 @@ checkout の重複**で、`orgs/etzhayyim` を実態より 2 倍近く大きく�
 98 件を削除し、`orgs/etzhayyim` の実ディレクトリは **209 -> 111** になった。削除した
 一覧は `.git/stash-archive-2026-08-03-etz-orphan/deleted-orphan-checkouts.txt`。
 
-#### 保全した 16 件を着地させた (2026-08-03) — live 側に actor identity が欠けていた
+#### 保全した 16 件は DID シェルだった (2026-08-03) — 誤ペアリングと、その撤回
 
-未 push commit を持つ 14 件と未コミット WIP 2 件を調べたところ、**etz 側と live 側は
-ahead/behind ではなく別系統の抽出**だった。live 側は
-`Extract 60-apps/etzhayyim-project-<n> from etzhayyim/root`、etz 側は ADR-2606231200 の
-`pilot: com-etzhayyim-<n> — sovereign actor repo snapshot`。`compare` API が 404 を返したのは
-そのため（SHA がそもそも相手に存在しない）。
+未 push commit を持つ 14 件と未コミット WIP 2 件を調べたところ、etz 側と live 側は
+ahead/behind ではなく**別系統**で、`compare` API が 404 を返すのはそのためだった。
 
-内容を突き合わせると、**live 側に sovereign actor の identity 一式が落ちていた**:
-`.well-known/did.json` / `actor-manifest.jsonld` / `.nojekyll`、多くは加えて
-`src/<n>/murakumo.cljc` + contract test。**これが organism 再判定で `did-declared?` が
-軒並み false になっていた原因**でもある — identity 面の証拠が orphan checkout に
-取り残されていた。
+**最初の判断は誤りだった。** `orgs/etzhayyim/com-etzhayyim-<n>` を bare name で
+`orgs/cloud-itonami/<n>` と突き合わせ、live 側に `.well-known/did.json` /
+`actor-manifest.jsonld` / `.nojekyll` / `src/<n>/murakumo.cljc` が「落ちている」と読んで
+13 repo へ復元 merge した。**実際には落ちていない。**
 
-全 16 件をまず `rescue/etz-orphan-20260803` として live repo に push し（履歴を失わない）、
-そのうえで **live に存在しないファイルだけを加算**して main へ merge した
-（既存ファイルの上書き・削除はしない = 新しい live 側の作業を巻き戻さない）:
+`gh api repos/etzhayyim/com-etzhayyim-<n>` の redirect 先は
+**`cloud-itonami/<n>-actor`** であって `cloud-itonami/<n>` ではない。つまりあの
+orphan checkout は本 ADR 自身が記録した **did:web actor シェル 15 件**
+（`d41026419fe` で `<name>-actor` として移送済み）で、実装本体 repo の古い版ではなかった。
+同 commit が「bare name 衝突 13 件は『同名の別物』ではなく、実装本体 (bare name) と
+DID シェル (役割違い) の並びの問題だった」と書いていたのは、まさにこの区別である。
+**bare name 突合せはその区別を潰す。**
 
-| repo | 復元 file 数 |
-|---|---:|
-| tsukuru | 186 |
-| yabai | 64 |
-| ipaddress | 22 |
-| insatsu / port / vessel | 8 |
-| demining / intel / vin | 7 |
-| graph-sos-intel / handotai | 5 |
-| jp-ashiba | 4 |
-| hc | 3 |
-| junbi / sng | 0（完全包含） |
-| kawase-yui | 0（1 件の ADR は既に main にあった） |
+13 repo すべてで `<n>-actor` 側に `did.json` が実在することを確認したうえで、複製を
+撤去した（`demining` 7 / `graph-sos-intel` 5 / `handotai` 5 / `hc` 3 / `insatsu` 8 /
+`intel` 7 / `jp-ashiba` 4 / `port` 8 / `vessel` 8 / `vin` 7 / `yabai` 64 /
+`tsukuru` 186 / `ipaddress` 22 file）。撤去後の blob 数が復元前と一致することを機械確認
+（`tsukuru` 37 -> 37、`yabai` 1458 -> 1458）。作業 branch は削除済み。
 
-検証: 13 repo で `.well-known/did.json` と `actor-manifest.jsonld` の両方が main 上に
-存在することを `gh api` で確認（`tsukuru` は元から actor-manifest.jsonld を持たない別形）。
+**撤回の過程でもう 1 つ誤った**: 最初 `git revert -m 1 <merge>` を使ったが、worktree の
+base に当該 merge が無く revert が失敗し、続く `commit --amend` が直前の commit を
+書き換えた。結果、13 repo に「Revert ...」と題しながら中身は追加のみという
+**誤解を招く commit** が残った（force-push しないので消せない）。実際の撤去は後続の
+`DID シェルの複製 N file を撤去` commit である。
 
-**`ipaddress` の `data/public-rir.datoms.kotoba.edn`（70 MB）は main に入れなかった** —
-CLAUDE.md の large-binary 方針（skill `large-binary-datalad`）。rescue branch には
-残っているので、B2 + DataLad 経路へ移すのが follow-up。
+**残った教訓**: identity 面の証拠が「見つからない」とき、それは欠落ではなく
+**別 repo が所有している**可能性を先に潰す。organism 再判定で `did-declared?` が
+軒並み false だったのも、bare name repo が identity を持たないのは正常だから
+（持っているのは `<n>-actor` 側）であって、証拠の欠落ではなかった。
 
-着地確認後に 16 件の checkout を削除し、`orgs/etzhayyim` の実ディレクトリは
-**111 -> 95** になった。
+実際に twin だったのは `junbi` / `sng` / `kawase-yui` の 3 件のみで、いずれも
+内容は完全包含（復元すべきものは無かった）。全 16 件の元履歴は
+`<n>-actor` または twin 側の `rescue/etz-orphan-20260803` に退避済みで、本件の
+撤回では失われない。checkout は削除済み、`orgs/etzhayyim` は **111 -> 95**。
+
+#### `ipaddress` の 70 MB データセットは DataLad へ移さない (2026-08-03)
+
+`data/public-rir.datoms.kotoba.edn`（70 MB）は当初 B2 + DataLad への移行対象として
+記録したが、実体を確認したところ **`ops/public-rir-collection.edn` が毎時 cron
+（`7 * * * *`）で 5 RIR（apnic/ripe/arin/lacnic/afrinic）の delegated-stats から
+`kotoba.lang.internet-intel.collector/collect-rir!` で収集し、`:dedup :content-cid` で
+書き出す派生物**だった。
+
+**DataLad は代替不能な大容量バイナリのためのもので、再生成可能な収集出力はその対象ではない。**
+git にも DataLad にも入れず、収集 op（main に着地済み）から再生成するのが正しい。
+実体は `cloud-itonami/ipaddress-actor` の `rescue/etz-orphan-20260803` に残っている。
 
 #### boundaries の残 drift を解消 (2026-08-03)
 
@@ -672,11 +683,20 @@ key 集合の不変性だけを検査していたため **値が west に存在�
 | `:primitive-routes` × 3 | `orgs/gftdcojp/app-aozora` | `orgs/network-awai/app-aozora` | D2 Phase 1 で移送済み。同 commit は `:atproto-actors` は直したが `:primitive-routes` を見落としていた |
 | `:cell-prefix-routes` `yorishiro` | `com-etzhayyim-yorishiro` | `com-etzhayyim-app-yorishiro` | west に実在するのは `app-` 付きの方 |
 
-**残る dangling は 2 件**（`elv` / `moto` -> `com-etzhayyim-moto`）。この repo は
-GitHub 上にも存在しない（redirect でなく 404）ので**後継が特定できない**。
-勝手な移送先を発明せず、cell prefix に所有者がいない状態として記録する。
-`elv` = end-of-life vehicle、`moto` = 自動車系のセルなので、`vin-actor` に寄せるか
-retire するかは実装の裁定であって配置の問題ではない。
+**dangling 2 件（`elv` / `moto` -> `com-etzhayyim-moto`）は撤去した**（75 -> 73 key）。
+この repo は GitHub 上にも存在せず（redirect でなく 404）、`elv` / `moto` を prefix に
+持つ cell も workspace 内に 1 件も無い。所有者がいない prefix にダミーの owner を
+残すより、`prefix-route` を nil に落として `com-etzhayyim-TBD`（未所有マーカー）へ
+流す方が正しい。key 集合を不変に保つのは値の差し替え時の不変条件であって、
+死んだ route を温存する理由にはならない。
+
+なお `scripts/kotoba-boundary-audit.cljs` は `orgs/etzhayyim/` を 2 箇所で
+ハードコードしており（`actor-repo` / `prefix-route`）、値が cloud-itonami の bare name に
+なった今は path を誤って組み立てる。ただし audit 対象の
+`orgs/kotoba-lang/kotoba/crates/kotoba-kotodama` は ADR-2607072000 の Rust 撤去で
+既に存在せず、`:total 0` で通る（読む CI も無い — `.github/workflows/` は
+ADR-2607300900 で空）。**この 4 key は現状どこからも実効的に読まれていない**ので、
+audit ごと retire するかは別途判断する。
 
 #### 再判定の過程で見つかった manifest の実態乖離 (3 件)
 
