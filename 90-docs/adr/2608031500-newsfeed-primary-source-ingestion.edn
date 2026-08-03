@@ -1,0 +1,192 @@
+[{:db/id -1
+  :adr/id "2608031500-newsfeed-primary-source-ingestion"
+  :adr/title "ADR-2608031500: kotoba-lang/newsfeed — 一次情報の取得層を実際に作る（murakumo.cloud / kotobase.net の 2 チャンネル向け）"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "news-ingestion-a-layer"
+  :adr/date "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn-only (ADR-2607171600)"
+  :adr/repos ["kotoba-lang/newsfeed" "com-junkawasaki/root"]
+  :adr/authoritative_for
+  ["この workspace の一次情報取得（feed → article datom）が kotoba-lang/newsfeed に住むという決定"
+   "article 属性が cloud-itonami/news の news.schema（:news/* / :news.source/*）を流用するという決定"
+   "ledger は観測、catalog は評価であり、editorial field は読み出し時に catalog から再 join するという規則"
+   "ランキングと running order は別物で、per-source / per-class の上限は channel 側のデータで宣言するという規則"
+   "near-duplicate クラスタリング閾値 0.45 と、同一 source 同士は結合しないという規則"
+   "murakumo-gpu-ai / kotobase-storage の 2 チャンネル定義"]
+  :adr/related
+  ["adr-2607171800-ai-gftd-dougaka-vector-video-workflow"
+   "adr-2607299960-dougaka-murakumo-compute-kotobase-storage"
+   "adr-2607020910-newscaster-broadcast-actor"
+   "adr-2607300100-dead-gftd-host-prune-and-ipfs-kotobase-standup"
+   "adr-2607299000-repository-rules-workspace-authority"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/landed
+  ["kotoba-lang/newsfeed 422300525ab7fab662b68f4a77e42720a85a81ed (初期実装一式)"
+   "com-junkawasaki/root manifest/west.yml + repos.edn :extra-projects への newsfeed 登録"]
+  :adr/verification
+  "実行して検証した（inspection ではない）。17 feed すべてを実ネットワークで fetch し 1,336 article を parse。25 tests / 99 assertions が nbb と JVM の両方で green。クラスタリング閾値は実 261 記事に対する sweep で決定（0.55→0 merge / 0.45→1 merge 0 false / 0.35→1 false / 0.30→2 false / 0.25→4 true 2 false）。両チャンネルの brief を実データで生成し running order を目視確認。"
+  :adr/known-gaps
+  ["ledger は今のところローカルファイル（state/articles.ledger.edn、gitignore 済み）。kotobase の durable plane に載せる ref をまだ決めていない。CLAUDE.md は『最初の write の前に ref を決めよ』と定めているが、この repo はまだ kotobase に一度も write していないので違反ではない — ただし載せる前に決める必要がある。"
+   "loop-ka-production への channel 登録はまだ。producer 側（dougaka-vector を brief 駆動で回す経路）が未接続のため。"
+   "YouTube OAuth（YOUTUBE_CLIENT_ID / _SECRET / _REFRESH_TOKEN）は未確認。dougaka-vector の bin/youtube.cljs は env 注入前提で、kagi に入っているか未検証。"
+   "arXiv abstract の rightsPolicy を fair-use-quote としたが、arXiv の license は投稿ごとに異なる（CC-BY / CC0 / arXiv perpetual license）。headline + link + 短い引用の範囲なので現状の運用では足りるが、本文を長く引くなら per-article license の取得が要る。"
+   "Blocks & Files と Hugging Face は description が空なので、この 2 ソースからの記事は title だけで採点される。結果として summary を持つソースより構造的に低く出る（実測: Blocks & Files の HAMR 記事が 1064、summary 持ちは 1700-2000 台）。本文取得（fetch article page）はしていない。"
+   "The Register は section 別 feed が存在せず全 section feed しか無いので、両チャンネルが同じ feed を読み keyword / url-hint gate で仕分けている。gate の誤りは両チャンネルに同時に出る。"]
+
+  :adr/body
+  "# ADR-2608031500: 一次情報の取得層を実際に作る
+
+**Status**: accepted
+**Date**: 2026-08-03
+**Deciders**: Jun Kawasaki（指示: 「do it」— murakumo.cloud / kotobase.net の
+YouTube チャンネル構想に対し、取得層から作ることを了承）
+
+## Context — 3 層すべてで途切れていた
+
+オーナーの問い「最新 news はどこから取得している?」を実測で辿った結果、
+**どこからも取得していなかった**。設計は 3 層あり、3 層とも別々の理由で切れていた。
+
+| 層 | repo | 実態 |
+|---|---|---|
+| A（一次収集） | `cloud-itonami/news` | RSS ingest の XRPC 口はあるが、fetch 自体は `NEWS_POD_URL/invoke` に委譲。**その pod の実装が workspace 内に存在しない**（`news.rss.resolveSources` / `news.rss.ingestSource` の grep は Worker 側の宣言と設計 md のみ）。host `news.gftd.ai` は Cloudflare DNS には残るが **15 秒でタイムアウト**（同一セッションで murakumo.cloud / kotobase.net は 200）。ADR-2607300100 が片付けた「Worker は消えたのに route だけ残る」6 host と同じ症状で、news.gftd.ai はその 6 件に**入っていない** |
+| B（編成・生成） | `cloud-itonami/newscaster` | 完成した放送 actor（rundown / anchor script / EditorialGovernor / YouTube publisher）。ただし `NewsFeed` port の実装は **`mock-feed` のみ**。README 自身が live 実装を follow-up と明記 |
+| 動画 | `cloud-itonami/dougaka-vector` | 3blue1brown 型のベクターアニメ pipeline。入口は**素の topic 文字列 1 個**で、取得層を持たない |
+
+さらに決定的だったのは、**workspace 全体に feed URL が 1 本も無かった**こと。
+`:news.source/feedUrl` という schema 属性は存在するが、source は runtime に
+Datomic へ登録する設計で seed が無い。「どこから取るか」のリスト自体が空だった。
+
+実際に外部から一次情報を取れているのは `cloud-murakumo-market-intel` の
+SEC EDGAR ingestion だけで、これは企業財務であってニュースではない。
+
+## Decision
+
+**`kotoba-lang/newsfeed`（public、prefix 無し = reusable library、`:execution :none`）
+を新設し、そこに取得層を置く。** 純 `.cljc` + IO は `bin/*.cljs`（nbb）のみ。
+loop も clock も publishing key も持たない。
+
+### D1. 死んだ host は復活させない
+
+`news.gftd.ai` の Worker / pod を作り直す選択肢は採らない。ADR-2607300100 が
+\"Retire rather than repoint\" を明示しており、`ipfs.gftd.ai` を新 Worker に
+向け直すことすら「退役させた決定を取り消す」として拒否している。取得層は nbb で
+書き、article datom を直接 workspace の EDN 面に置く。
+
+### D2. 属性名は借りる（新語彙を作らない）
+
+article は `:news/*`、source は `:news.source/*` を `cloud-itonami/news` の
+`news.schema` から**そのまま**流用する。`art-<sha256hex(url)>` の id 規約も、
+`rightsPolicy` の語彙（`fair-use-quote` / `public-domain` / `gov-open` / …）も同じ。
+A 層は今日到達不能だが、これがこの workspace の既存語彙であり、平行語彙を作れば
+A 層か後継が戻った日に翻訳層が要る。`newscaster` の EditorialGovernor が
+`publish-allowed?` で見るのもこの語彙なので、そのまま gate を通せる。
+
+### D3. ledger は観測、catalog は評価 — 読み出し時に再 join する
+
+`credibility` / `class` / `rightsPolicy` は「その情報源をこちらがどう評価するか」で、
+学習に応じて改訂される。append-only の ledger は改訂できない。したがって
+`newsfeed.catalog/enrich` が **読み出しのたびに現行 catalog を ledger の上に重ねる**。
+ingest 時の値も ledger に書くが、それは provenance（当時どう思っていたか）であって
+読み取り経路ではない。
+
+**これは実測で分かった**: `:news.source/class` を catalog に足しても、
+join が無い間は**何も変わらなかった** — ledger 内の全記事がその field より前に
+ingest されていたため。既存の per-class 上限が黙って per-source 上限に退化していた。
+
+### D4. ランキングは running order ではない
+
+初回の実データで、採点器は正しく動いたのに結果は編集として誤っていた:
+
+- GPU/AI チャンネルの上位 6 件中 **4 件が arXiv preprint**（abstract は構造上
+  キーワード密度が高い）
+- storage チャンネルの上位 6 件中 **5 件が単一の trade 媒体**
+
+どちらも false positive ではない — 全件が on-topic で正しく採点されていた。
+**だからこそ採点器は直す場所ではない。** 直したのは channel 側のデータ:
+`:channel/max-per-source` / `:channel/max-per-class` / `:channel/source-bias`。
+採点器に preprint を不当に低く見させるのは relevance についての嘘になる。
+
+### D5. near-duplicate 閾値は 0.45、かつ同一 source 同士は結合しない
+
+実 261 記事（2026-07-27〜08-03）に対する sweep:
+
+| 閾値 | merge | 内訳 |
+|---|---|---|
+| 0.55 | 0 | 当初の推測。何も結合しなかった |
+| **0.45** | **1** | **Kioxia 液冷 SSD（Tom's Hardware + StorageReview）。false 0** |
+| 0.35 | 2 | 無関係な long-context 論文 2 本を誤結合 |
+| 0.30 | 3 | さらに別々の Dell ノート PC レビュー 2 本を誤結合 |
+| 0.25 | 6 | true 4（AM5 firmware / MinIO / Nutanix-Dell）false 2 |
+
+0.25 は真の重複を 3 件多く拾うが**採らない**。誤りが非対称だから:
+under-merge は同じ話題が 2 回出るだけで、視聴者に見えて許される。
+over-merge は**実在の記事を無関係な記事の傍証として file し、消す** — 誰の目にも
+触れなくなる。冗長は可視、抑圧は不可視。
+
+加えて **同一 source の 2 記事は決して結合しない**。媒体は同じ話を 2 回は出さない
+ので、1 媒体内の高い title 重複は「関連記事」であって重複ではない（実測の
+Dell Pro 5 / Pro 7、Kioxia の別製品 2 件）。閾値を後から下げられても構造的に守る。
+
+### D6. `:channel/sources` は宣言どおり効かせる
+
+当初 digest は channel の source 宣言を無視して全記事を採点していた。宣言を
+honour する側に直した — 宣言していない feed から黙って引く channel は、自分の
+定義を読んでもレビューできない。source は複数 channel に重複して載ってよく
+（The Register は全 section feed 1 本しか無いので両方が読む）、何を取るかは
+keyword / url-hint gate が決める。
+
+## 2 つのチャンネル
+
+| channel | site | sources | window | min-score |
+|---|---|---|---|---|
+| `murakumo-gpu-ai` | murakumo.cloud | 12 | 7 日 | 4 |
+| `kotobase-storage` | kotobase.net | 8 | 7 日 | 4 |
+
+`:brief/topic` は **lead の見出しをそのまま**渡す（deterministic）。ここでモデルに
+言い換えさせると、pipeline が勘定していない 2 つ目の生成段が上流にできて、
+どの引用も主張していないことを動画が言い出す道になる。生成は
+`dougaka-vector` の storyboard actor 1 箇所に閉じたままにする。
+
+## Verification（2026-08-03、実行）
+
+- **17 feed すべてを実 fetch して parse 成功**、1,336 article。候補として probe して
+  落ちたものは `:rejected` に status 付きで残した（arXiv の広告 RSS は 200 で 0 件・
+  Atom API は動く / The Register に section 別 feed は無い / `blog.min.io/rss` は空 /
+  SNIA は非ブラウザ UA を 403）。
+- **25 tests / 99 assertions green を nbb と JVM の両方で**（同一 `.cljc`）。
+- TZ 変換の実測: `Fri, 31 Jul 2026 17:11:03 +0100` → `2026-07-31T16:11:03Z`、
+  `Sun, 02 Aug 2026 20:23:32 -0400` → `2026-08-03T00:23:32Z`（日付繰り上がり）。
+- 実 brief 2 本を生成。murakumo は NVIDIA Technical Blog を lead に vLLM release /
+  StorageReview の KV cache 記事 / Tom's Hardware / arXiv 1 件、kotobase は
+  KIOXIA CM10 を lead に ScaleFlux / The Register / Blocks & Files。
+
+## 実装中に出た 2 つの bug（どちらも消費者からは見えない）
+
+1. **`:score/*` のスケールが不揃いだった。** `:score/total` と `:score/source` は
+   ×100 なのに `:score/keywords` と `:score/url` は生値。合算も比較もできる単位に
+   見えて実際は混在していた。全部を「点の 1/100 単位の整数」に統一した。
+2. **テスト fixture が `clojure.core/cat` を shadow していた。** JVM が警告を出し、
+   名前を変えた際に 2 箇所の参照が `cat` のまま残り、`(catalog/channel cat :c1)` が
+   transducer に対して `:channels` を引いて nil を返していた。テストは通り続けていた —
+   nil channel は `for-channel` が「宣言なし = 全件」と解釈するため。**shadow は
+   テストを黙って無意味にする。**
+
+## Consequences
+
+- (+) `newscaster` の `NewsFeed` port に、初めて live 実装を書ける材料が揃った
+  （article 形が既に `news.schema` なので写像は恒等に近い）。
+- (+) `dougaka-vector` の topic が、手で渡す文字列ではなく出典付きの brief から来る。
+- (+) 引用が ledger の article id なので `cites ⊆ ingested` が構造的に満たされる。
+- (+) 閾値・上限・source の評価がすべて `resources/sources.edn` のデータで、
+  コードを読まずにレビューできる。
+- (−) ledger がまだローカルファイル。kotobase の durable plane に載せる ref は未決定
+  （CLAUDE.md の「最初の write の前に決めよ」に従い、載せる前に決める）。
+- (−) summary を持たない 2 ソースは構造的に低く出る。本文取得はしていない。
+- (−) source の credibility は編集上の重みで、真実性の主張ではない — が、数値で
+  書かれると後者に読まれやすい。catalog の冒頭に明記した。
+"}]
