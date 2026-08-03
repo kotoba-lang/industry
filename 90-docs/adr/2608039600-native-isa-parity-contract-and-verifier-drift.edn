@@ -62,7 +62,11 @@
    "kotoba-lang/kotoba-kir 5d3cb59dae8106ec86c6d2d247e473790699dfbb"
    "kotoba-lang/kotoba-verifier 34818124819589ef3a2225d07cfc63e1eb555c8a"
    "kotoba-lang/compiler eaaaeab997d199ca86e7de11fe748d67ac026c4e"
-   "com-junkawasaki/root 62679488b18cb36d76ca6e00919da21ba7a9b2ee"]
+   "com-junkawasaki/root 62679488b18cb36d76ca6e00919da21ba7a9b2ee"
+   "kotoba-lang/kotoba-native 1c76a0448f51c3d0e6aac18dba227c38abf16a12"
+   "kotoba-lang/kotoba-verifier 50f842dba232e76d541d60507db40bc38ef7a863"
+   "kotoba-lang/compiler 823b376003c3c0f92df5b2eed41c4c52591a680e"
+   "com-junkawasaki/root 62262241a197fba28902569224ac9501e6f8c944"]
   :adr/body
   "# ADR-2608039600: native backend の ISA parity を契約化する
 
@@ -528,6 +532,53 @@ record/variant slice とまったく同じ「狭い受理形をコンパイル�
 
 一般の `string-substring` (pool 文字列・非 ASCII・実行時文字列) は引き続き
 ABI 拡張待ちであり、その差は**明示的に狭い slice として記録する**。
+
+## 完了: `string-substring` の ASCII リテラル slice — **native の未実装 operator はゼロになった**
+
+前回の計測で残っていた唯一の operator (`string-from-i64` → `string-substring`)
+を、**ABI 変更なし**で閉じた。
+
+**一般形は今も ABI 拡張を要する**。`kotoba.kir` の契約はバイト単位だが両端が
+code-point 境界であることを要求し、違反は trap する。その検査には文字列領域の
+バイト読み出しが必要で、emit されたコードは code/literal 領域も runtime string
+pool もアドレスできない (loader が `resolve_string_bytes` で所有)。
+
+**この slice は要さない。** operand が全バイト < 0x80 のリテラルなら**あらゆる
+バイト位置が code-point 境界**なので、境界規則はコンパイル時に決着する。実行時に
+残るのは範囲検査と 1 回の pair 構築 — `pair(offset + start, end - start)` —
+だけ。文字列値は既に `pair(offset,length)` handle であり、リテラルの offset は
+非負で code+literal 領域を直接指す。**host callback も ABI 変更も loader 変更も
+sealed runtime identity の変更も無い。**
+
+既存の native record / variant slice とまったく同じ「狭い受理形をコンパイル時に
+検査する」形であり、`string-from-i64` が必要とするものそのもの: あの operation の
+合成ヘルパーは、ASCII リテラルに対する実行時添字の substring を回す再帰スキャン。
+
+slice の外 (pool 文字列・マルチバイトリテラル・計算された文字列) は fall through
+して `operation not implemented on this backend` と報告される — 正確で fail-closed。
+テストが両方を pin する。
+
+**分岐距離は success ブロックの実測長から導出**しており、直書きしていない。
+そこを変えても分岐が命令の途中を指すことはない。
+
+**emit した範囲検査は defence in depth で、通常経路からは到達しない**: pure な
+entry では定数畳み込み oracle が substring をコンパイル時に評価し、範囲外を
+`:phase :value` で先に拒否する — ADR 0063 が variant dispatch の trap について
+記したのと同じ性質。よって構造的に assert している。
+
+**副産物: 関数の結果型 `:string` が拒否されていた。** verifier の関数 shape 検査は
+`param-types` に `:string` を許しながら**結果型には許していなかった**。native ABI
+では文字列は 1 語の pair handle で、呼び出し境界では i64 と区別がつかない —
+規則ではなく非対称だった。これが `(defn f [n] (string-substring ...))` を
+検証不能にし、frontend が合成する**あらゆる文字列返却ヘルパー**を巻き込んでいた
+(`string-from-i64` を含む)。文字列を返す関数が今まで存在しなかったので誰も
+気づかなかった。entry の結果型は別問題 (host に渡るため boxing が要る) なので
+`entry-result-types` とは分離した。
+
+検証: kotoba-native 31 tests / 1,986 assertions。実 AArch64 プロセスで 14 本 —
+`string-from-i64` の 0 / 7 / 42 / 90210 / 1234567 を含み、再帰ヘルパー・実行時
+添字・連結を通る。compiler は固定 checkout で baseline と同じ 824 tests /
+6,401 assertions、native-conformance **8/8**。
 
 ## 残ったギャップ (2026-08-03 時点の実測)
 
