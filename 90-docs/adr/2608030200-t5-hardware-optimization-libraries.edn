@@ -553,4 +553,47 @@ native + SIMD なら答えを出せる。**
 pin 前進は未了。この superproject の main が数分単位で前進しており、west.yml を
 含む commit が着地前に stale になって push guard に弾かれるため、ADR を先に分離して
 着地させた。pin は別途最小 diff で進める。
+
+## 反復 10 (2026-08-03) — tile-plan の null result を「予測できる」ものにした
+
+反復 4 で tiling sweep が測定不能に終わり、`tile-plan` を `:unvalidated` のまま
+置いていた。反復 9 で確立した **calibrate → predict → 検証**の形を適用する。
+
+`traversal/tiling-benefit` を追加（`:kotoba.traversal.tiling-benefit/v1`）:
+
+```
+time(T) = max(loop-ns * n^3, traffic-bytes(T) / bandwidth)
+traffic: blocked = 2n^3/T + n^2  /  unblocked = n^3 + 2n^2
+```
+
+**blocking はメモリ項しか動かせない。したがってメモリ項が大きい側でなければ意味が
+ない。** 実測した inner loop 3.77 ns/multiply-add と帯域 30 GB/s を入れると:
+
+| | 予測 | 反復 4 の実測 |
+|---|---|---|
+| achievable speedup | **1.00x** | 1.01–1.05x |
+| `:worth-tiling?` | **false** | （測れなかった） |
+
+**モデルは sweep を回す前に「回しても何も出ない」と言う。** 反復 4 は 20 分かけて
+それを発見した。
+
+### より有用な出力: 閾値
+
+`:loop-ns-threshold` = **0.27 ns/multiply-add**（約 1 cycle）。**カーネルがここまで
+速くなって初めて tiling sweep を回す価値が出る。** これは実際のベクトル化 BLAS
+カーネルが живущ領域で、「BLAS では tiling が劇的に効くのにここでは全く効かない」
+理由をそのまま説明する。
+
+### blocking は無限には効かない
+
+loop 0.05 ns/op（ベクトル化カーネル相当）だと、traffic 比は 23 倍だが
+**achievable speedup は 5.3 倍**に留まる。**blocking した側が今度は loop-bound に
+なる**ため。**モデルは traffic 比を約束せず、どこで頭打ちになるかを言う。**
+
+### tile-model の記録を更新
+
+`:model/validation` の `:status :unvalidated` は維持しつつ（tile の大きさ自体は
+依然として未検証）、`:explained-by` を追加して「なぜ測れなかったか」がモデルで
+説明できるようになったことを記録した。**「測れない」と「間違っている」は別物**という
+反復 4 の区別を保ったまま、前者を予測可能にした。
 "}]
