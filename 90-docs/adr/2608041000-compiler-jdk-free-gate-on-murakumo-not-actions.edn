@@ -1,0 +1,152 @@
+[{:db/id -1
+  :adr/id "adr-2608041000-compiler-jdk-free-gate-on-murakumo-not-actions"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/title "kotoba-lang/compiler の JDK-free 経路を murakumo fleet-ci で守る — GitHub Actions を使わない（scope が無いのと、org 単位で止まる実績）"
+  :adr/topic "compiler-jdk-free-gate-on-murakumo"
+  :adr/status "accepted"
+  :adr/date "2026-08-04"
+  :adr/last-verified "2026-08-04"
+  :adr/last_verified "2026-08-04"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+
+  :adr/authoritative-for
+  ["新しい CI 不変条件を GitHub Actions ではなく murakumo fleet-ci に登録する既定"
+   "fleet gate `kotoba-compiler-jdk-free-check.cljs` が何を検証し、何を検証しないか"
+   "compiler の west pin を この gate の green で前進させない判断（:cd false）"]
+
+  :adr/related
+  ["adr-2607300900-github-actions-is-not-executing-move-ci-to-murakumo-fleet"
+   "adr-2608036600-network-awai-actions-dead-move-net-kotobase-ci-to-murakumo"
+   "adr-2607255500-fleet-ci-tip-driven-murakumo-cdci"
+   "adr-2607178000-fleet-ci-murakumo-standing-runner"
+   "adr-2608012050-nix-shaped-supply-chain-properties-aiueos"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"]
+
+  :adr/evidence
+  ["https://github.com/kotoba-lang/compiler/pull/500"
+   "https://github.com/kotoba-lang/compiler/pull/501"
+   "kotoba-lang/compiler docs/adr/0202-jvm-free-dependency-closure.md"
+   "scripts/fleet-ci/gates/kotoba-compiler-jdk-free-check.cljs"
+   "scripts/fleet-ci/gates.edn (:id \"compiler-jdk-free\")"]
+
+  :adr/verify
+  ["npx nbb scripts/fleet-ci/gates/kotoba-compiler-jdk-free-check.cljs <compiler-checkout>   ; => OK — deps-lock fresh + resolver fail-closed + no JVM reached"
+   ":lock/deps-digest を潰して同じ gate   ; => FLEET-CI: 2 of 3 checks failed"
+   "nbb scripts/fleet-ci/tick.cljs --only compiler --dry-run --no-pr --signer-pem ~/.gftd/fleet-ci-signer-tip.pem"]
+
+  :adr/body
+  "# Context
+
+オーナー指示（2026-08-04）「github workflow を使わずに cloud-murakumo の action,
+cdci, workflow を使うようにして」。直前の指示「jdk 依存はしないように進めたい,
+kotoba-native を優先」で作った不変条件を、**どこで守るか**の決定。
+
+ここには 2 つの独立した理由があり、どちらか一方だけでも同じ結論になる。
+
+**理由 1 — Actions は org 単位で止まる。** ADR-2607300900（com-junkawasaki /
+gftdcojp、課金停止）と ADR-2608036600（network-awai）で 2 回測っている。症状は
+「テストが落ちる」ではなく **job が起動しない**（step 0 件、1〜10 秒で failure）。
+kotoba-lang org は今日は健全だが、健全であることは性質ではなく現在の状態である。
+
+**理由 2 — `.github/workflows/` に書けない。** このワークスペースの token の
+scope は `gist, read:org, repo` だけで `workflow` が無い（実測 2026-08-03、
+`gh auth status`）。push でも contents API でも到達できないので、**Actions に
+step を足すという選択肢が物理的に存在しない**。ADR-2608012050 の残件 A-1・
+aiueos ADR-0017 の未結線・compiler の新テストの CI 化 — 3 件が同じ 1 個の理由で
+止まっていた。
+
+fleet-ci は repo にファイルを 1 つ置いて `gates.edn` に 1 行足すだけで登録できる。
+**これが唯一開いている経路であり、かつ既に決まっていた方針でもある。**
+
+# Decision
+
+## 新しい CI 不変条件は既定で murakumo fleet-ci に登録する
+
+Actions に足そうとしない。既存の Actions を積極的に剥がすことまでは決めない
+（kotoba-lang org のものは動いており、browser matrix のように fleet に載らない
+ものが多い）が、**新規は fleet 側に置く**。
+
+## `gates/kotoba-compiler-jdk-free-check.cljs`（`:id \"compiler-jdk-free\"`）
+
+compiler ADR-0202 の JDK-free 経路の不変条件を、3 つ見る:
+
+| # | 内容 |
+|---|---|
+| A | `deps-lock.edn` が `deps.edn` と一致する（= JDK-free 経路が生きている） |
+| B | resolver の fail-closed 一式（repo 自身の `test/nbb/classpath.cljs --hermetic-only`） |
+| C | **A/B を JVM を PATH から隠した状態で回し、stub が 1 度でも呼ばれたら fail** |
+
+**C が本題である。** A/B は JVM があっても通るので、それだけでは「JDK 無しで動く」を
+守れない。gate は `clojure` / `java` / `clj` を exit 127 かつ**呼ばれたら記録する**
+stub で覆い、marker が残っていたら fail する。「JDK 無しで通った」と
+「JVM 経路に一度も落ちなかった」を区別する。
+
+検査ロジックは gate に複製しない — repo 自身の verifier を呼ぶ。fleet 側と repo
+側に別実装を持つと、片方だけ通る状態が黙って生まれる（fleet-ci の既定の作法）。
+
+## `:cd false`
+
+green が意味するのは「JDK-free の不変条件が保たれている」だけで、compiler の CI が
+通ったことではない。browser matrix / wasm-tools / cargo / `clojure -M:test` は
+ノードに registry egress が無く載らない。**狭い slice を根拠に west pin を
+前進させない。** net-kotobase が `:cd true` なのは CI の主要部を移したからで、
+ここは違う。
+
+## 載せられないもの（黙って落とさない）
+
+- **`test/nbb/classpath.cljs` の「checked-in lock resolves」1 群** — 実依存 9 本を
+  `~/.gitlibs` に要求する。ノードは tailnet だけで github.com に route が無い。
+  `ship-git-deps!` はこれを operator 側から配れるが、置くのは `git archive` の
+  展開物で **`.git` が無い**。resolver の `rev-parse HEAD` 照合は
+  *content address の確認そのもの*なので、**CI の都合でそこを緩めない**。
+  `--hermetic-only` が明示的に除外し、除外した事実を出力に残す（黙って skip すると
+  「全部走った」と受領書上で区別できなくなる）。
+- **compiler CI の大半** — browser matrix / safari / android-ndk / wasm-tools /
+  cargo / `npm ci`。egress が要る。
+- **`bin/kotoba` の dispatch shell 自体** — `<root>/node_modules/nbb/cli.js` を
+  spawn するが tarball は `git archive` なので node_modules が無い。dispatch の
+  下にある解決経路（本命）は B/C が直接叩く。
+
+# 実装で分かったこと（実測）
+
+- **lock は merge した瞬間に既に stale だった。** PR #500 が open の間に
+  `deps.edn` の pin が 2 本（kotoba-kir / kotoba-native）進み、merge 後の main の
+  `deps-lock.edn` は main の `deps.edn` と一致していなかった。新しい check が
+  初回実行で捕まえた。
+- **これは edge ではなく通常の腐り方である。** 直近の `deps.edn` を触る commit の
+  うち 3 本が pin 前進。そして stale な lock は `bin/kotoba` を
+  `clojure -Spath` に**黙って**落とす — つまり JDK-free という性質が、誰にも
+  気付かれずに消える。PR #501 で fallback を可聴にした（stderr に理由と直し方）。
+  **gate が毎 tip 回ることが、この性質の唯一の保持機構になる。**
+- **感度測定**（gate が実際に落ちることの証明）: `:lock/deps-digest` を潰すと
+  `FLEET-CI: 2 of 3 checks failed: lock-freshness, resolver`、戻すと
+  `OK — deps-lock fresh + resolver fail-closed + no JVM reached`。
+- **ローカルの `npx` は node の npx とは限らない。** この machine の PATH 先頭は
+  pnpm の `npx@10.2.2` shim で `--yes` を解さず、gate が謎の usage 出力で落ちた。
+  ノード側は gate-script が `PATH=/opt/homebrew/bin:...` を張るので実体は同じ
+  npm の npx になる。検証は `PATH=/opt/homebrew/bin:/usr/bin:/bin` を張って行う。
+
+# Consequences
+
+- compiler の JDK-free 経路は commit ごとに murakumo fleet で守られる。Actions の
+  scope も課金も待たない。
+- **ADR-2608012050 の残件 A-1（オーナー側の 1 手＝`workflow` scope）は、この経路が
+  開いたことで「必須」から「あれば楽」に降格する。** aiueos 側の gate（tcb-check /
+  reproducibility）も同じ形で fleet に載せられる — ただし aiueos の gate は現状
+  JVM を要求するので、載せる前に段①（cljc 化）が要る。**JDK-free 化と fleet 化は
+  同じ 1 本の道の別の区間である**: ノードに JVM があっても、tailnet 制約のため
+  maven 解決が通らない gate は載らない。
+- fleet-ci の gate 数は 9 → 10。`root` 4 + net-kotobase 1 + compiler 1 + 通常の
+  jvm/nbb test 群。
+
+# 残り
+
+- **aiueos を fleet に載せる**（段①の cljc 化が前提）。
+- compiler CI のうち egress を要する部分は Actions のまま。kotoba-lang org が
+  止まったらそこは止まる — 剥がすかどうかは別決定。
+- `ship-git-deps!` が `.git` を持たない展開物を置く件。content address を
+  ノード側で再検証できるようにするか、operator の shipping receipt を信頼の
+  根拠として明示するか。今は**照合を緩めず、その群を除外する**方を選んだ。"}]
