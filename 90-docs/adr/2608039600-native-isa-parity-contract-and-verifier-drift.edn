@@ -636,7 +636,7 @@ Component 契約面ではない — Component 流の provider 合成を native �
 | record: 2 つの projection | OK | **OK** |
 | variant: 直接ネストの `match(new)` (ADR 0063) | OK | **OK** |
 | record: ~~`let` 束縛~~ **完了** | OK | **OK** (下記) |
-| record: **関数境界を越える** | OK | `:phase :target` — gate が拒否 |
+| record: ~~関数境界を越える~~ **完了** | OK | **OK** (下記) |
 | record: ~~`:string` フィールド~~ **完了** | OK | **OK** (下記) |
 | record: ~~`:keyword` フィールド~~ **完了** | OK | **OK** (下記) |
 | record: ~~入れ子フィールド~~ **完了** | OK | **OK** (下記) |
@@ -920,6 +920,49 @@ verifier 側は、**各 branch の binder に自分の case payload スキーマ
 `wall` record の両フィールド / `error` record の `:string` フィールド。compiler は
 固定 checkout で **baseline と patched がともに 862 tests / 6,527 assertions・
 0 failures**、conformance 8/8。
+
+
+## 完了: record が関数境界を越える — **値表現の 5 点がすべて閉じた**
+
+「オーナー判断待ち」としていた最後の 1 点。**再検討で、私が挙げた懸念を回避する
+設計があると分かったので実施した。**
+
+**懸念だったもの**: pair 連鎖でヒープに載せると arena (1 実行 4,096 セル・GC 無し・
+容量で trap) を消費し、**今通るプログラムが落ちるようになる**。ADR 0062 が
+スタックスロットを選んだ理由そのもの。
+
+**回避**: **箱詰めを境界に限定する。** 逃げない record はスロットのまま。境界を
+越える record は**今日そもそもコンパイルできない**ので、**既存のどのプログラムも
+新たに allocation を得ない**。非退行が構造的に保証される。テストが
+「逃げない record は `pair_new` に到達しない」ことを assert するので、この閉じ込めが
+黙って崩れることもない。
+
+**実装は書き換えだけだった**: 呼ばれる側の `record-new` が
+`pair(f0, pair(f1, ... 0))` に、呼ぶ側の projection がその walk になる。どちらも
+既に emit している形なので、**新しい primitive も ABI 変更も loader 変更も
+runtime identity の変更も無い** — `pair`/`pair-first`/`pair-second` は ADR 0062 の
+bounded-pair 作業以来ある arena 契約。
+
+arena コストは新しい形については実在し、それが ADR 0062 が「逃げない形」に
+スロットを選んだ理由である。**その形は今も何も割り当てない。**
+
+### 初稿はエントリまで許可して 14 件の assertion を壊した
+
+`only-native-word-typed-features?` の関数チェックを広げた際、**エントリも含めて
+しまった**。compiler の frontend-extensions テストが「record を返す `main` は
+unsupported typed target すべてで拒否される」という**意図的な negative** を pin して
+おり、14 target 分が落ちた。**テストが正しい** — エントリの結果は host へ出るが、
+host には pair handle を読む術が無い。これは私が `:bool` の作業で
+`entry-result-types` と `function-result-types` を分離したのと同じ境界で、gate 側で
+再現し損ねていた。エントリを除外して解消。
+
+**baseline 比較が無ければ landing していた**。この loop で baseline を毎回取って
+きたことが、ここで効いた。
+
+検証: kotoba-native 42 tests / 2,056 assertions。実 AArch64 プロセスで 5 本 —
+boxed な呼び出し結果と slot-backed な `let` 束縛 record を 1 式で併用する形を含む。
+compiler は固定 checkout で **baseline と patched がともに 868 tests /
+6,563 assertions・0 failures**、conformance 8/8。
 
 
 ## 残ったギャップ (2026-08-03 時点の実測)
