@@ -1,0 +1,232 @@
+[{:db/id -1
+  :adr/id "adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
+  :adr/title "ADR-2608038000: inga（因果）— Holochain の書き込み面 × chained HotStuff の順序面 × Filecoin/FVM の状態・実行面を1つの合意層として engi から抽出する"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-03"
+  :adr/last-verified "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "inga-consensus"
+  :adr/repos ["orgs/kotoba-lang/engi" "orgs/kotoba-lang/inga" "orgs/kotoba-lang/torihiki" "orgs/kotoba-lang/kotobase-storage"]
+  :adr/authoritative-for
+  ["この workspace の『コンセンサス』が何を指すか — inga が正本であり、他に合意層を作らない"
+   "inga の抽出境界（engi のどの namespace が合意層で、どれが application か）"
+   "Holochain から採るもの／採らないもの（source chain・countersign・warrant は採る、無順序は採らない）"
+   "Filecoin SPC / FVM / FEVM から採るもの／採らないもの（state root の content-addressing・fuel 計量・power table は採る、Expected Consensus と MPT と EVM opcode は採らない）"
+   "inga と kotobase の接続点（kotobase.storage.core/IRefStore の :linearizable-ref provider）"
+   "inga / engi / innen の名前の使い分け（3語とも仏教の因果語彙で別物を指す）"
+   "対外的に『分散』『blockchain』を名乗ってよい条件"]
+  :adr/related
+  ["adr-2607993000-engi-l1-byzantine-consensus-en-currency"
+   "adr-2607994000-engi-l1-permissionless-staking-equivocation-slashing"
+   "adr-2607101100-engi-mutual-credit-kotobase-native-design"
+   "adr-2607101200-engi-mutual-credit-dht-substrate-revival"
+   "adr-2608010930-kotobase-chain-and-evm-compatibility-scope"
+   "adr-2607110300-kotoba-lang-net-kotobase-cloud-murakumo-decentralization-roadmap"
+   "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust-at-runtime"
+   "adr-2608031200-extract-without-landing-is-the-duplication-failure-mode"
+   "adr-2607050900-kotobase-client-naming-disambiguation"]
+  :adr/evidence
+  ["kotoba-lang/engi@a6d4450 src/engi/{consensus,quorum,pacemaker,replica,sync,wire,net,attest,stake,parity}.cljc"
+   "https://spec.filecoin.io/systems/filecoin_blockchain/storage_power_consensus/"
+   "https://spec.filecoin.io/algorithms/expected_consensus/"
+   "https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0054.md"
+   "https://developer.holochain.org/resources/glossary/"]
+  :adr/body
+  "# ADR-2608038000: inga（因果）— 合意層を engi から抽出し、Filecoin の半分を落とす
+
+**Status**: accepted
+**Date**: 2026-08-03
+
+## Context
+
+オーナー指示（2026-08-03）: 「Holochain と Filecoin FEVM を cljc, kotoba で設計実装したものをコンセンサスとしたい」。
+
+### 出発点の訂正 — 半分は既に動いている
+
+ADR-2608010930（2026-08-01）は kotobase について『単一 writer + CAS = sequencer であって consensus ではない』と正しく書いた。それは kotobase の話としては**今も正しい**。しかし**同じ workspace の別 repo に、本物の BFT 合意が既に実装され、走っている**。この ADR を書く前にそれを見落としていた。実測（2026-08-03、`kotoba-lang/engi@a6d4450`）:
+
+| namespace | 行数 | 何を持っているか |
+|---|---|---|
+| `engi.consensus` | 186 | chained HotStuff の block/QC、`n=3f+1`／`quorum=2f+1`、3-chain commit 規則、round-robin leader |
+| `engi.quorum` | 107 | quorum 判定が**1つの述語**であること（ADR-2608021630） |
+| `engi.pacemaker` | 225 | view-change / timeout（ADR-2608020830） |
+| `engi.replica` | 1,032 | replica 本体 — adopt/commit、machine seam、equivocation 記録 |
+| `engi.sync` | 201 | catch-up（ADR-2608020930 / 2608022300） |
+| `engi.wire` | 283 | total decode、identifier mangling 対策（ADR-2608021130） |
+| `engi.net` (+`net/server` `net/ws`) | 391 | 実 WebSocket transport（ADR-2608021230 / 2608021330） |
+| `engi.attest` (+`attest/ed25519`) | 274 | 証明書に署名が乗る — sync 経路で偽造履歴を弾く（ADR-2608021430） |
+| `engi.stake` | 387 | 外部担保 bond、stake 加重 quorum、equivocation 限定 slashing |
+| `engi.parity` | 80 | JVM/nbb parity |
+
+合計 **3,166 行**。8/2 だけで ADR が 15 本積まれ（pacemaker → catch-up → wire codec → WebSocket → 証明書署名 → 実鍵 E2E → replica を実際に走らせる → vote/new-view 署名 → equivocation 記録 → commit した block を実行 → torihiki を engi 上で走らせる → replay/restart）、8/3 に throughput と churn の実測が 4 本積まれた。
+
+**到達している最も強い主張**（ADR-2608022600、実測）: 実 WebSocket 上の 4 replica が、engi が commit した block に対して `torihiki.state/apply-block` を実行し、**123 block 時点で全 replica が同一の板（`:root 0ff3920f…`、best-bid 994 / best-ask 996、positions 一致）に到達**。validator set の内側に Byzantine、外側に forger を置いたまま。
+
+### Holochain の半分も既にある
+
+`engi.core` の README が自分で書いている: **『exactly HoloFuel's model』**、**『Holochain の「you can only author your own source chain」制約を、Holochain から写したのではなく kotobase.net の実際の認証モデル（apex CACAO 自己認可）から独立に到達した』**。具体的には agent ごとに `kotobase/db/<did:key>/engi` を1つ持ち、`:engi/seq` + `:engi/prev-hash` の hash chain、両当事者の独立エントリを結ぶ `:engi/transfer-id`（canonical TransferBody の CID）、`:engi/self-sig` + `:engi/counter-sig` の countersignature、そして fork 証拠としての `:engi/warrant`。
+
+### つまり足りないのは Filecoin の半分だけである
+
+そして欠けている場所は正確に名指しできる:
+
+1. **state root が不透明**。`engi.replica` の machine seam は `{:init-fn :apply-fn :root-fn}` を注入させ、`:root-fn` は**任意の文字列 digest**を返す（実測ログの `113:c51298e1f1da50a1`）。replica 同士で**比較はできるが、同期も、クエリも、証明もできない**。
+2. **`apply-fn` が無計量**。任意の関数であり、仕事量に上限が無く、2つの実装が一致する保証も無い。実際 ADR-2608022600 はこれで転んでいる（torihiki の板が typed array の可変構造で、4 replica が同じ板 object を共有していた。`:init-fn` の thunk 化で修正）。
+3. **power table が on-chain object でない**。`engi.stake` は bond map を**外から注入**される。誰が witness かは合意の外で決まる。
+
+### 2つの面が繋がっていない
+
+- kotobase: DO lease + D1 CAS = sequencer、ref 1 本、合意なし（ADR-2608010930 #5）。
+- engi L1: BFT 合意、state root は不透明な digest、kotobase と無接続。
+- torihiki-node: **依然として単一 Durable Object sequencer**（自身の `/head` が `consensus: none` と言う）。engi 上で動く実証は harness であって deploy された node ではない（ADR-2608022600 が自分で書いている）。
+
+## Decision
+
+### 1. 合意層を `kotoba-lang/inga` として engi から抽出する
+
+**根拠は engi 自身が既に書いている。** `engi/consensus.cljc` の docstring:
+
+> engi は transaction が何かを知らないし、知ってはならない — どちらかを import した consensus 層は「ちょうど1つの application のための consensus 層」になる。
+
+その原則を守ってきた結果、**消費者が既に3つある**: `engi.core`（送金台帳）、`torihiki.state`（取引所、4 replica で実証済み）、そして kotobase の datom 面（未接続、下記 6）。合意層が通貨 repo の中に住み続けると、取引所も datom 面も **ENGI を引かないと合意が使えない**。
+
+抽出するもの（上表の 13 namespace / 3,166 行）。engi に残るもの: `engi.core`（280）、`engi.metrics`（262）、`engi.protocol`（317）、`engi.store`（186）、`engi.crypto`（116）— 合計 1,161 行の、ENGI/EN 通貨そのもの。engi は inga の**最初の消費者**になる。
+
+**これは ADR-2608031200（本日）が名指しした duplication failure mode の逆側の失敗**（抽出せずに肥大させる）を避ける操作である。同 ADR の教訓に従い、**抽出は着地とセットで行う** — engi と torihiki の両方が inga を引く状態にするまでが1つの作業であり、inga だけ作って engi に古い copy を残さない。
+
+### 2. Holochain から採るもの／採らないもの
+
+**採る（既に実装済み、inga へ移すか engi 側に残すかを明示する）:**
+
+- **H1 agent ごとの署名 source chain。自分の鍵でしか自分の chain に書けない。** これは `engi.core` の schema と kotobase.net の apex CACAO が既に強制している。**inga は chain の中身を知らない** — block の proposals は **CID の列**であって transaction body ではない（`:engi.block/proposals` の既存 shape）。つまり **inga が順序づけるのは transaction ではなく、agent chain head の前進である**。これが Holochain と BFT を接合できる理由そのもの。
+- **H2 countersignature。** 2者間の原子的 transfer は両者の独立エントリを transfer-id CID で結び、双方が署名する。`engi.core` に実装済み。
+- **H3 warrant。** fork / 違反の証拠を第一級のデータとして持つ。`engi.replica` は equivocation を**記録する**（ADR-2608022400）。
+
+**採らない:**
+
+- **グローバル全順序の放棄。** Holochain の中心的な設計判断（全順序を持たないことで書き込みをスケールさせる）を **inga は採らない**。理由は ADR-260726 —— kotobase の Datalog join は ref 1 本にしか届かず、join したいものは1本の全順序に載せるしかない。**全順序は kotobase の商品そのものであって、捨てられるコストではない。** agent chain の上に BFT 層を載せる理由の全部がここにある。
+- **Rust conductor。** `kotodama-holochain` は既に Rust zome scaffold を撤去した payload 例のみの stub。ランタイムは借りない、プリミティブだけ借りる。
+
+**既知の gap（Holochain 側）:** 証拠は**記録されるが伝播しない**（ADR-2608022500 / 2608022600 が自分で書いている）。Holochain の warrant は gossip することに意味がある。近傍 validator 層は Rust workspace 削除で失われたまま（ADR-2607101200）。
+
+### 3. Filecoin SPC / FVM / FEVM から採る3項目
+
+これが**この ADR で新しく作る部分**である。
+
+- **F1（最優先）state root を不透明 digest から content-addressed な実体にする。**
+  Filecoin の on-chain state は address → actor の **IPLD HAMT** であり、state root は歩ける・差分が取れる・配れる CID である。FEVM は `SLOAD`/`SSTORE` を KAMT への read/write に写像する（FIP-0054）— **Merkle-Patricia Trie を使っていない**。
+  inga は同じ形を採るが **HAMT を新規に導入しない** — workspace に HAMT は存在せず、同じ性質を持つ content-addressed 構造が既に3つある（`prolly-tree` / `arrangement` の 4 index root / `merkle-lsm`）。`:root-fn` の戻り値を**これらの root CID にする**。
+  これが効く理由: 「4 replica が digest で一致する」が「**4 replica が hydrate 可能で Datalog クエリ可能な同一状態に一致する**」に変わる。そして下記 6 の接続点が、これ無しには存在しない。
+
+- **F2 実行を fuel 計量された `.kotoba` にする。**
+  FVM の答えは「actor は WASM、全操作を gas で計量、決定性は VM が強制する」。kotoba には**同じものが既にある** — `kotoba-lang/compiler` の native backend（`backend/x86_64.cljc` / `backend/aarch64.cljc`）に **fuel 計測が実装済み**（ADR-2607198300）で、capability は deny-by-default の registry。
+  したがって `apply-fn` は「注入された任意の関数」から「**fuel 上限つきで走る `.kotoba` module**」になる。ADR-2608022600 が踏んだ可変構造の共有バグは、この形なら**テストではなく構成によって**起きなくなる。ADR-2608010930 決定 #4（実行系をやるなら EVM ではなく Kotoba app-chain）の最初の実体化。
+
+- **F3 power table を committed state の中に置き、`:storage` role を足す。**
+  今 `engi.stake` は bond map を外から注入される。Filecoin の SPC の本質は「power table が chain 状態の一部であり、power の変化が同じ合意で順序づけられる」こと。inga は power table を committed state に入れる。
+  併せて、`engi.stake` が**既に持っている role 制**（`:ordering` / `:recompute`、ADR-2607995000 §5 の単一 bond market）に **`:storage`** を足す。Filecoin の教訓は「Sybil 耐性の資源を、ネットワークが実際にやる有用な仕事にする」であり、この stack でのそれは**datom block を保持して配ること**である。
+  **外部担保 bond を置き換えない。** ADR-2607994000 が EN を bond 資産にしない理由（EN は全 agent で net-zero なので担保にならない）は不変。`:storage` は**既存 market への role 追加**であって新しい経済圏ではない。**v0 は PoRep/PoSt ではなく attested retrieval sampling**（`:recompute` と同じ形、cloud-murakumo の `verify/compute.cljc` が先例）。
+
+### 4. Filecoin から採らないもの
+
+- **Expected Consensus（power 加重リーダー選出 + tipset + weight による chain 選択）を採らない。** inga の順序規則は **chained HotStuff のまま**である（既に実装され、view-change も catch-up も実鍵 E2E も通っている）。SPC からは **power table という概念**を採るのであって、**leader election アルゴリズムは採らない**。確率的重みではなく round 単位の決定的 finality を選ぶ。
+- **Merkle-Patricia Trie を採らない。** ADR-2608010930 決定 #3 のまま。代償は `eth_getProof` 1メソッド（= trustless light client proof と MPT proof に依存する canonical bridge が作れない）。Filecoin が同じ代償で済ませた前例に従う。
+- **EVM opcode を採らない。** F2 のとおり kotoba fuel が VM である。EVM は hot path の外の composability surface に留める（ADR-2608010930 #4、Hyperliquid の HyperEVM と同じ位置）。
+
+### 5. 名前 — `inga`（因果）、ただし disambiguation を必須とする
+
+**採用理由**: 構造が字義どおり因果である。source chain = 因果の履歴、committed state root = 因果の切断面、validation = 「この果はこの因から生じたか」。
+
+**代償を隠さない。この org には仏教の因果語彙が既に2つあり、3語が別物を指すことになる:**
+
+| repo | 語 | 何であるか |
+|---|---|---|
+| `kotoba-lang/engi` | 縁起 | **ENGI/EN 相互信用通貨**。inga の最初の消費者。inga の抽出元。 |
+| `kotoba-lang/innen` | 因縁 | **人類史の依存関係記録ライブラリ**（entity / contract / event、出典付きの依存辺）。合意とは無関係。 |
+| `kotoba-lang/inga` | 因果 | **合意層**。順序・状態・実行。通貨でも歴史記録でもない。 |
+
+`west.yml` 上で `inference` / `inga` / `innen` が隣接行になり、`inga` は抽出元 `engi` と1文字違いである。**この混同は起きる前提で扱う** — ADR-2607050900（`kotobase` / `kotobase-client` / `kotoba-client` の3つ)と同じ扱いにし、**3 repo すべての README 冒頭に上表を置く**。`inga` の README は「ENGI ではない」「innen ではない」を最初の段落で言う。
+
+命名規約の適合: prefix 無し = reusable library（`manifest/repository-rules.edn` の `:name-prefix` vocabulary）。inga は observe しない・schedule しない・ledger を書かない — `loop-` ではない。`-clj` suffix 禁止にも適合。
+
+### 6. kotobase との接続点は `IRefStore` である
+
+**これが inga を kotobase の並行宇宙にしないための唯一の決定である。**
+
+`kotobase.storage.core` は既に正確な seam を持っている: `IRefStore` の `-compare-and-set-ref!` と、閉じた 2 択の ref profile（`:linearizable-ref` / `:single-writer-ref`）。
+
+**inga は kotobase の `:linearizable-ref` provider になる。** ref の前進を D1 の `UPDATE … WHERE sequence = ?` ではなく **2f+1 の quorum が裁定する**。これは D1 より**強い** `:linearizable-ref` である（単一ホストの条件付き書き込みではなく、定足数の合意）。
+
+この接続が成立するのは F1 の後だけである —— kotobase の ref は CID であり、opaque digest では入らない。**F1 → 6 の順序は動かせない。**
+
+**kotobase のクエリ面には一切触らない。** `open` / `q` / `pull` / `datoms` は無変更で、one-ref 規則も無変更。変わるのは「その 1 本の ref を誰が進めるか」だけである。
+
+### 7. 名乗ってよい範囲
+
+ADR-2607110300 の labeling 規則をそのまま継承する。**witness が全員同一運営者配下である間は、Byzantine fault tolerance ではなく crash fault tolerance 相当と正直に呼ぶ。** プロトコルが BFT であることと、配備が BFT の前提を満たすことは別である。
+
+具体的に、**現時点で言ってはいけないこと**:
+- 「分散」「blockchain」「decentralized」 —— ADR-2607110300 Phase 4（独立第三者運営者が経済的コストを負う）まで禁止。
+- 「slashing がある」 —— **bond 供給元が未デプロイなので、証拠は保持されるが slash は実際には起きない**（ADR-2608022500 が自分で書いている）。実装されていることと作動していることを混同しない。
+- 「EVM 互換」 —— `eth_getProof` を出せない（決定 4）。
+
+## 現在地の正直な表（2026-08-03）
+
+| | 状態 |
+|---|---|
+| chained HotStuff（block/QC/3-chain/leader rotation） | **動いている** |
+| pacemaker / view-change | **動いている** |
+| catch-up sync / replay after restart | **動いている** |
+| 実 WebSocket transport・実 Ed25519 鍵の E2E | **動いている** |
+| vote / new-view / 証明書への署名 | **動いている** |
+| equivocation の検出と記録 | **動いている**（伝播しない） |
+| commit した block の決定的実行と state root 一致 | **動いている**（torihiki で 123 block、全 replica 一致） |
+| permissionless staking / stake 加重 quorum | **実装済み・未作動**（bond 供給元が未デプロイ） |
+| F1 state root の content-addressing | **未着手（0行）** |
+| F2 fuel 計量 `.kotoba` machine | **未着手（0行）**（fuel 自体は compiler に実装済み） |
+| F3 power table の on-chain 化・`:storage` role | **未着手（0行）** |
+| inga への抽出 | **未着手** |
+| kotobase `IRefStore` provider | **未着手（0行）** |
+| torihiki-node の本番 | **単一 sequencer のまま**（`consensus: none`） |
+| OS プロセス分離 | **無し**（4 replica は 1 プロセス内。socket は本物） |
+| 独立第三者運営者 | **存在しない** → 分散を名乗らない |
+
+## Consequences
+
+- (+) **この workspace の『コンセンサス』が1つの名前を持つ。** 今後 BFT / 順序 / 状態合意を必要とする repo は inga を引く。**合意層を2つ目を作らない**（この ADR が authoritative）。
+- (+) engi・torihiki・kotobase が同じ順序層を共有できる。torihiki は既に harness で実証済みなので、抽出の受け入れ試験が最初から存在する。
+- (+) F1 が入れば kotobase の ref plane が D1 CAS から quorum 合意へ**上がる**経路ができる（決定 6）。kotobase のクエリ面は無変更。
+- (+) F2 が入れば ADR-2608022600 が踏んだ種類の決定論バグが構成上起きなくなる。
+- (−) **抽出は破壊的な作業である。** engi の 13 namespace が移動し、`deps.edn` / shadow-cljs / 8/2〜8/3 の全 script（`script/network.cljs`・`script/torihiki-on-engi.cljs` 等）が影響を受ける。**着地までを1つの作業として扱う**（決定 1）。
+- (−) **`engi.attest` と `kotoba-lang/witness-quorum` の重複を解消する必要がある。** `engi/consensus.cljc` の docstring は「witness-quorum の signer/attestation を reused unchanged」と書いているが、**engi の `deps.edn` は witness-quorum に依存していない**（依存は `kotobase-client` 1つだけ）。docstring が実装より先走っている。抽出時にどちらが正本かを決める —— `engi.attest` には witness-quorum に無い固有の根拠がある（sync 経路で受け取った他人の証明書を検証する必要。BLS ではなく連結による集約で、証明書サイズが quorum に比例する代償を明示している）ので、**素朴に witness-quorum へ寄せない**。
+- (−) 名前が3語目の因果語彙になる（決定 5）。README 3つの冒頭に disambiguation 表を置く義務が発生する。
+- (−) `:storage` role は attested retrieval sampling までしか作らない。**PoRep/PoSt は作らない**ので、Filecoin と同等の storage proof を名乗らない。
+
+## Alternatives considered
+
+- **engi の中に `engi.state` / `engi.fuel` を足して抽出しない。** 却下。engi 自身の docstring が禁じている形（1 application 専用の合意層）に固定される。消費者が既に3つある。
+- **合意層をゼロから設計する。** 却下。3,166 行が動いており、torihiki が乗り、20 本の ADR が失敗も含めて記録されている。**ADR-2608031200 が本日名指しした duplication failure mode そのもの。**
+- **Holochain をランタイムとして採用する。** 却下。全順序が無く one-ref Datalog join が成立しない（決定 2）。conductor が Rust。プリミティブは既に独立に再発明されている。
+- **Filecoin の Expected Consensus を順序規則にする。** 却下。決定的 finality を確率的重みに置き換える理由が無く、既に動いている HotStuff を捨てることになる。
+- **HAMT を新規実装して Filecoin の state tree に厳密に合わせる。** 却下。workspace に content-addressed map が既に3つある（`prolly-tree` / `arrangement` / `merkle-lsm`）。互換性が目的ではなく、**歩ける state root** が目的である。
+- **名前を `tsumugi` / `kaname` / `goi` にする。** 却下（オーナー判断 2026-08-03）。因果語彙の一貫性を採り、代償は disambiguation 節で払う。
+
+## 実行順序
+
+F1 → 6 の依存だけが硬い。それ以外は独立に進む。
+
+1. **抽出**（決定 1）— inga repo、13 namespace 移動、engi と torihiki の両方を inga に載せ替えるまでを1作業とする。受け入れ試験は `script/torihiki-on-engi.cljs` が同じ結果を出すこと。
+2. **F1** state root を `prolly-tree` / `arrangement` の root CID にする。判定: 4 replica が同じ CID に到達し、**その CID から hydrate した state が Datalog でクエリできる**こと。
+3. **決定 6** kotobase の `IRefStore` を inga で実装し、`:linearizable-ref` を宣言して `kotobase.storage.contract/verify` の並行半分を通す。
+4. **F2** machine を fuel 計量 `.kotoba` にする。判定: fuel 上限超過が決定的に同じ block で起きること。
+5. **F3** power table を committed state へ、`:storage` role を追加。
+6. **bond 供給元のデプロイ** — これが済むまで slashing は作動しない（現在地の表）。
+
+`inga` の repo 作成・west 登録は skill `new-project-scaffold` の常時承認フローに従う。
+"}]
