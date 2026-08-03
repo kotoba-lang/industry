@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 10123,
-  :pageviews-7d 5459,
-  :uniques-7d-sum 409,
+ {:requests-7d 10210,
+  :pageviews-7d 5499,
+  :uniques-7d-sum 410,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 85}
-   {:path "/robots.txt", :requests 33}
-   {:path "/feed/fork-stats.edn", :requests 25}
-   {:path "/sitemap.xml", :requests 10}
-   {:path "/api/fork/feed", :requests 6}
-   {:path "/api/config", :requests 5}
-   {:path "/favicon.ico", :requests 5}
-   {:path "/assets.html", :requests 4}],
-  :status-mix {:ok 1407, :server-error 14, :client-error 10},
+  [{:path "/", :requests 86}
+   {:path "/robots.txt", :requests 32}
+   {:path "/feed/fork-stats.edn", :requests 26}
+   {:path "/favicon.ico", :requests 24}
+   {:path "/js/app.js", :requests 21}
+   {:path "/api/analytics", :requests 14}
+   {:path "/kototama/kototama.js", :requests 13}
+   {:path "/api/fork/feed", :requests 12}],
+  :status-mix {:ok 1561, :server-error 61, :client-error 7},
   :channel-mix
-  {:channel 201, :probe 926, :unclassified 280, :ok-total 1407},
+  {:channel 290, :probe 986, :unclassified 285, :ok-total 1561},
   :window "24h"},
  :as-of "2026-08-03",
- :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 1},
+ :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 4},
  :top-paths
- "上位 page (24h, 2xx/3xx・channel-allowlist済): / 85 · /robots.txt 33 · /feed/fork-stats.edn 25 · /sitemap.xml 10 · /api/fork/feed 6 | 4xx(probe) 1% · 5xx 1% · probe(200-fallback) 66% · unclassified 20%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): / 86 · /robots.txt 32 · /feed/fork-stats.edn 26 · /favicon.ico 24 · /js/app.js 21 | 4xx(probe) 0% · 5xx 4% · probe(200-fallback) 63% · unclassified 18%",
  :signal
- "isekai.network 実測 10123 req/7d・409 uniques(日次和)・うち4xx probe 1%(24h)",
+ "isekai.network 実測 10210 req/7d・410 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
