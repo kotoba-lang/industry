@@ -844,6 +844,45 @@ compiler は固定 checkout で **baseline と patched がともに 857 tests /
 本物の設計分岐 (前節)。
 
 
+## capability kit までの距離を実測 — `clock-v1` は**あと 1 形**
+
+`:string` / `:keyword` / 入れ子が揃ったので、kit の**実際の形**を両 backend に
+直接渡して測った。
+
+| `clock-v1` の形 | backend |
+|---|---|
+| `:request` = bool payload の variant | **EMITS** |
+| `:result` の `wall` record (`:i64` × 2) | **EMITS** |
+| `:result` の `error` record (`:keyword` + `:string`) | **EMITS** |
+| `:result` 全体 = **record を case payload に持つ variant** | 未対応 |
+
+つまり **kit 資格化に残るのは「case payload が record の variant」1 形**。
+
+### 設計は見えている (実装は次に回す)
+
+`emit-variant-dispatch` は ordinal 1 スロット + payload 1 スロットを push し、
+各 branch の binder を `{:let-depth payload-depth}` に束縛する。record payload に
+必要なのは:
+
+1. payload を **N スロットに展開**する (record と同じ `expand-binding`)
+2. **branch ごとに、その case の宣言 payload 型に従って binder を束縛**する —
+   record の case なら record 束縛、スカラの case ならスロット
+3. `dispatch-depth` と cleanup (現在 `add rsp,0x10` 固定) を N に合わせる
+4. スロット領域は**全 case の最大 payload 幅**で確保し、構築された case の
+   payload を先頭に置いて残りを埋める
+
+4 が要るのは、構築された case だけが materialise される一方、**非選択の branch も
+emit される**ため。今日はスカラ payload なので全 binder が同じ 1 スロットを指して
+無害だが、record を混ぜると非選択 branch の束縛が push されていない深さを指しうる。
+実行されないので意味論は壊れないが、**押していない領域への load を emit すること
+自体を避ける**べきで、最大幅で確保すればその状況が構造的に起きない。
+
+**今回実装しなかった理由**: `emit-variant-dispatch` は分岐変位を各 branch の
+code-size から算術しており、スロット数を変えると同時に変位も動く。誤ると
+「emit は通るが分岐先が命令の途中」になりうる — 静かに壊れる種類の誤り。
+本セッションはすでに長く、ここは新しい文脈で丁寧にやる方が安い。
+
+
 ## 残ったギャップ (2026-08-03 時点の実測)
 
 ## 続き: `i32-operations` (同日、最大の残存 portable ギャップを閉じた)
