@@ -224,7 +224,7 @@ ADR-2607110300 の labeling 規則をそのまま継承する。**witness が全
 | commit した block の決定的実行と state root 一致 | **動いている**（torihiki で 123 block、全 replica 一致） |
 | permissionless staking / stake 加重 quorum | **実装済み・未作動**（bond 供給元が未デプロイ） |
 | **F1** state root の content-addressing | **着地済み** — `inga.state`。`arrangement` の 4 index を prolly-tree に snapshot して CID を返す既存実装を配線（HAMT は導入せず）。4 replica が同一 CID に到達し、**その CID だけを持つ reader が Datalog で引ける**ことを test で確認 |
-| **F2** 計量実行 | **契約は着地済み・`.kotoba` body は未** — `inga.fuel`。exhaustion を state 遷移にし、root が commit する。`.kotoba` machine 本体は compiler の capability kit が `:wasm-aot`/`:native-aot` pending かつ fs/process capability と script host が無いため未（後述） |
+| **F2** 計量実行 | **着地済み（部分）** — `inga.fuel` に加え、計量の算術を `kotoba/fuel.kotoba` として実装し `--target wasm32` でコンパイルした `.wasm` を checked in。cljc との conformance を 120 ケースで検証。**「compiler の capability kit 待ちで blocked」という以前の記述は誤りだった** — あの制約は effect の話で、state machine は純粋なので capability を1つも宣言しない。op 適用自体はまだ cljc |
 | **F3** power table の committed 化・`:storage` role | **着地済み** — `inga.power`。table を committed state の関数にし、既存 bond market に `:storage` role を追加。**engi.stake の経済は再実装していない** |
 | `kotoba-lang/inga` repo | **作成済み**（2026-08-03、west 登録済み、`west-orphan-audit --blocking` exit 0） |
 | inga への抽出（13 namespace / 3,166 行） | **完了**（2026-08-03、`inga@8fe122c` / `engi@513b528`）。247 tests / 1204 assertions、parity は JVM/nbb 一致、受け入れ試験 `torihiki-on-inga.cljs` が抽出前（engi から）・抽出後（inga から）とも pass |
@@ -278,6 +278,16 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 `inga` の repo 作成・west 登録は skill `new-project-scaffold` の常時承認フローに従う。
 
 ## 改訂
+
+**2026-08-03（同日、6回目）**: 残 gap のうち**自分で閉じられるものを全て閉じた**（`inga@cf85a80`）。JVM 256 tests / 1227 assertions、cljs 261 / 1477、いずれも 0 failures。
+
+- **cljs 経路を検証した（gap 解消）。** `inga.state` は JVM のみで検証されていた。**nbb では動かない**ことが判明（SCI が transitive dep で `Protocol not found: IEquiv`）ので、kotobase が実際にデプロイに使う **shadow-cljs** で全 suite を回す構成にした。副産物として**移動してきた consensus suite 全体が cljs 検証された**（engi にはこれが無かった）。もう1つ実行してしか分からない発見: **arrangement の platform split は戻り値だけでなく seam にもある** —— cljs では `blind-fn`/`encrypt-fn`/`decrypt-fn` も Promise を返す必要があり、JVM 形の同期 seam を渡すと arrangement 内部で `.then is not a function` になる。
+- **F2 の `.kotoba` は blocked ではなかった（自分の誤りを訂正）。** 試したら `kotoba compile --target wasm32` がそのまま通った —— 挙げていた blocker は**effect** の話で、state machine は effect を持たないので capability を1つも宣言しない。`kotoba/fuel.kotoba` + checked-in `.wasm` + 120 ケースの conformance test を追加。**さらに重要な発見: compiler の fuel は inga の fuel ではない。** コンパイル済みモジュールは instance ごとに自前の budget を持ち、尽きると `unreachable` で **trap** する（実測: `applied(10,1,100)` を 42 回で枯渇）。これは `inga.fuel` が禁じている当のもの（throw した replica は protocol から抜ける）。両者は補完的で、**Kotoba モジュールとして動かす配備は全 replica に同一の初期 fuel を与えねばならない**（`--fuel` / `--fuel-initial`）。さもなくば trap する呼び出し回数が replica ごとに違い、transaction と無関係な理由で分岐する。
+- **証拠が伝播するようになった（gap 解消）。** `:evidence` を wire message にし、①記録前に検証（`verify-equivocation-evidence` で claim 全体を再検査 —— さもないと証拠は誰でも誰かを陥れる手段になる）②`[witness height]` ごとに1回だけ記録 ③**初見のときだけ**転送（全部再送すると1つの証明が恒久的な storm になる）。**測定で示した**: `script/network.cljs` に `BYZANTINE_SPLIT=1`（equivocator の第2 vote を全員ではなく1 peer にだけ送る）を追加 —— 伝播なしでは `w1 14 / w2 0 / w3 0` で **FAIL**、伝播ありで `36 / 8 / 23` で **pass**。peer ごとに違う vote を送る equivocator は伝播が無いと完全に逃げ切る。
+- **quorum が何に耐えるかを宣言させた。** `replica` は quorum 未指定時に**黙って head-count に落ちて**いた。head-count は managed set では正しく、permissionless では Sybil が破るもので、構築後の state はどちらか言っていなかった。`inga.quorum/profiles`（`:head-count` / `:stake-weighted`）を `kotobase.storage.core/ref-profiles` に倣って閉じた集合にし、replica が `:quorum-profile` を持つようにした。既定は変えていない（managed 配備はそれを望む）が、**選択であることが記録される**。
+- **bond 供給元は engineering の gap ではなかった。** `kotoba-lang/engi-witness-escrow` が on-chain custody 半分としてレビュー済み・テスト済みで存在し、**意図的に未デプロイ**。その README が理由を書いている ——「実資金を預かる契約のデプロイは別個の、より高リスクな判断で、独自のレビューを要する」。seam は完成していて未使用なだけであり、**判断はオーナーのもので、CLAUDE.md の安全床（資金操作をしない）にも触れる**ので私は越えない。代わりに帰結を大きな声にした: bond 供給元が無い配備は `:head-count` で走り、**経済的安全性は無い**とコードが言うようにした。
+
+**まだ開いている**（いずれも私が閉じられる性質のものではない、または別 repo）: `:storage` role の retrieval sampling 未実装 / `torihiki-node` が単一 sequencer のまま / x402 settlement 0 件 / bond 供給元のデプロイ判断 / `.kotoba` は計量算術までで op 適用は cljc。
 
 **2026-08-03（同日、5回目）**: **抽出（決定 1）完了**。`inga@8fe122c` / `engi@513b528`。
 
