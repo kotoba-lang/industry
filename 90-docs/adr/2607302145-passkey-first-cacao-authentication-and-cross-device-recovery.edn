@@ -44,7 +44,30 @@
 
 
 
-  :adr/verification "2026-07-30 に read-only audit（現行 source、生成済み browser assets、live sign-in pages、W3C WebAuthn Level 3、Apple iCloud Keychain、Google Password Manager、FIDO Alliance の一次資料を突合）。2026-08-02 に delivery 1・2・5 を実装し着地させた。実行した検証: kotoba-lang/webauthn の nbb ceremony smoke 26 checks 全 pass（UV=0 の登録/認証の拒否、誤記 policy でも拒否、明示 :preferred lane の受理、BE/BS の往復を実署名 assertion で確認）/ `clojure -M:test` 12 tests・18 assertions 0 failures。cloud-itonami の edge cljs webauthn suite 42 tests・139 assertions 0 failures、portable cljs suite 631 tests・5975 assertions 0 failures、JVM suite 1346 tests（site.signin-test / native.signin-test は pass、既存 failure は :adr/known-gaps 参照）。net-kotobase authn `clojure -M:test` 21 tests・158 assertions 0 failures、`shadow-cljs release entry` 0 warnings。**未実施**: 本番 deploy と、別端末・hardware key を使った実機 E2E。したがって itonami.cloud / authn.kotobase.net の live worker は本 ADR 作成時点の挙動のまま",
+  :adr/verification "最終更新 2026-08-03。**着地済み・本番稼働中**（両サービス）。
+
+  ## 実行した検証（今回の closing 時点）
+
+  kotoba-lang/webauthn 5284f67: nbb ceremony smoke 26 checks 全 pass（UV=0 の登録/認証の拒否、誤記 policy でも拒否、明示 :preferred lane の受理、BE/BS の往復を実署名 assertion で確認）/ `clojure -M:test` 12 tests・18 assertions 0 failures。
+
+  network-awai/cloud-itonami e262eb07: edge cljs（webauthn + endpoints + credential endpoints）43 tests・171 assertions 0 failures / portable cljs 650 tests・6060 assertions 0 failures / JVM site.signin-test 9 tests・41 assertions / edge bundle 再ビルド + `verify-edge-bundle.cljs` 7/7 import 実行可 / live UV probe（`nbb --classpath \"src:test\" test/live_uv_probe.cljs`）4 checks。
+
+  network-awai/net-kotobase c7205f82: `clojure -M:test` 32 tests・210 assertions 0 failures / `npm run test:custody` 35 checks / `npm run test:sweep` 9 checks / live e2e passkey 13・credentials 18・email 7 checks（いずれも deploy 後、authn.kotobase.net に対して）。
+
+  ## 実行していない検証（重要）
+
+  - **実機 recovery（delivery 6・7）**: hardware key 2本と2台目の端末が要る。手順は本 ADR body の『## Recovery drill』にある。
+  - **envelope 移行の live 確認**: 旧 direct-wrap レコードが本番で DEK 形式に移行する経路は、unit test の手組みレコードでしか確認していない。過去の probe が作った credential の鍵を保持していないため。**次に本物の利用者がサインインした時が初回**。
+  - **rotation sweep の実走**: cron（17 3 * * *）は登録済みだが、初回実行の log は未確認。現在 KEK は v1 のみなので、実行しても rotate 対象は 0 件のはず。
+  - cloud-itonami の JVM suite 全体（既存 failure 6 + error 14 が本件と無関係に存在。ops-keys は未変更 checkout で pre-existing を確認済み）。
+
+  ## Resume point（次の agent がここから始める）
+
+  1. **cloud-itonami の clone 検出を D1 へ**（最優先。live で false negative を実測した唯一の未修正 weakness）。対象は `src/cloud_itonami/edge/webauthn.cljc` の `login-check-and-persist-counter!`（774行付近、`(aget stored \"counter\")` を KV から読んでいる）。kotobase 側の完成形は `authn/src/authn/clone.cljc`（純粋な規則）+ `authn/src/authn/durable.cljs` の `op-sign-count`（機構）。cloud-itonami は Pages なので DO を持てず、`WORKSPACE_DB`（D1）が強整合な選択肢。
+  2. cloud-itonami の休眠 sweep（Pages に cron が無いので companion Worker か認証付き endpoint が要る。kotobase 側は `authn/src/authn/rotation.cljs`）。
+  3. KMS 境界（外部 KMS を fetch で呼ぶ経路は実在する。トレードオフの判断であって不可能ではない）。
+  4. delivery 6・7 の drill 実施（人間 + hardware）。",
+
   :adr/body
   "## Context
 
