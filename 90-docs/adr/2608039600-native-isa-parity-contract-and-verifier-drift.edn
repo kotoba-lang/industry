@@ -565,6 +565,20 @@ Rosetta 2 でそれを実行できる**。恒久ハーネス
 ターゲットを増やしたら**そのターゲットを実行する手段**も一緒に作る。無ければ
 そのターゲットのコードは**書かれているだけで一度も動いていない**。
 
+**そして「他にも潜んでいないか」を実測で答えた。** サンプリングでなく、
+native_executor_test が AArch64 で検証している面をそのまま x86-64 で実行した:
+算術・比較・再帰・let・bit-not/bit-or・i64/u32 シフト・i32 wrapping・bool-not・
+pair・string=?/string-concat・record projection・option・result・f64 算術・
+**f64 比較 6 種すべて (NaN 行を含む)**・kgraph・capability call。
+**62 assertions、追加のバグは無し。** disp8 が唯一だったことが分かった
+(仮定ではなく測定)。
+
+この過程で私のテスト構成が 4 回間違えた (`string-byte-length` は keyword を
+取らない / record type id は修飾キーワード / cap-call はコンパイル時 policy が
+要る / qualification host の cap-call provider は +1 を返す)。**いずれも
+「ギャップを見つけた」ではなく「私の probe が間違っていた」** — 報告する前に
+op 名・arity・期待値を実装で確かめる、という同じ規律が効いた。
+
 修正: 127 を超える offset は disp32 形式 (ModRM 0x91) を使う — offset 128 の
 typed-cap-call が既に使っていた形。127 以下はバイト単位で不変。
 
