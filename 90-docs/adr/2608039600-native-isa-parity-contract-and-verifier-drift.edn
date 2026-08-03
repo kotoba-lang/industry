@@ -500,6 +500,39 @@ compiler は baseline と同じ 810 tests / 6,372 assertions、conformance 5/5�
 gate されている。**この loop の開始時点から見ると、未実装 operator 面はここまで
 狭まった。**
 
+### 訂正 (2026-08-04): その測定は部分的で、穴はもう 1 つ残っていた
+
+上の「ここまで狭まった」は **operator 面を網羅的に測った結果ではなかった**。
+`string-substring` 一般形の landing 後に「operator 面は閉じた」と報告したが、
+それは測っていない部分を含む主張だった。
+
+網羅測定をやり直した (frontend の `string-operations` 表の各 op について最小
+プログラムを `aarch64-kotoba-v1` にコンパイルし、失敗を phase で分類する):
+
+| op | 結果 |
+|---|---|
+| `string-code-point-at` | **`[:aarch64 operation not implemented on this backend]`** — 本物の穴 |
+| `string-contains?` / `string-split-count` / `string-replace-all` / `string-fold-case` / `keyword-name` / `keyword-from-string` | `:target` phase で gate — typed value が web target 限定という設計上の制限であり **native 固有の穴ではない** |
+| `string-length` / `string-from-i64` | OK |
+
+**phase による分類が効いた**: `:aarch64` で落ちるものだけが backend の穴で、
+`:target` で落ちるものは別の設計判断である。両者を混ぜて数えると、閉じられない
+ものを穴として数え続けることになる。
+
+`string-code-point-at` は context offset **144** の callback として landed した。
+これは**文字列を歩く**ための op で、返り値の code point が自身の UTF-8 幅を決める
+ので 1 op で前進できる。oracle は `kotoba.kir.value/utf8-code-point-at!`、境界は
+`[0, byte-length)` の **排他的**上限 (末尾から始まる code point は無いため、
+substring と違う)。**結果はスカラーなので何も確保しない。**
+verifier の string-operation allowlist にも無かったので arity 2 で admit した。
+
+**教訓**: 「閉じた」と言う前に網羅測定を回す。この loop で「閉じた」と報告した
+主張が実測で覆るのは 2 度目 (1 度目は kit 資格化の予測)。
+
+**着地**: artifact `ae5f670` / kotoba-native `f4167d7` / kotoba-verifier `b4f5c6e`
+/ compiler `d60cf56`、west pin 4 件。実 pin で **878 tests / 6,583 assertions /
+0 failures**、実 AArch64 実行 3 本 (ASCII / 3 バイト decode / pool 由来)。
+
 ### `string-substring` 一般形 — 実装済み (2026-08-04、context offset **136**)
 
 `kotoba.kir` の `string-substring` は**バイト単位だが両端が code-point 境界で
