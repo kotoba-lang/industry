@@ -635,7 +635,7 @@ Component 契約面ではない — Component 流の provider 合成を native �
 | record: 第 2 フィールド | OK | **OK** |
 | record: 2 つの projection | OK | **OK** |
 | variant: 直接ネストの `match(new)` (ADR 0063) | OK | **OK** |
-| record: **`let` 束縛** | OK | `:phase :aarch64` — backend が拒否 |
+| record: ~~`let` 束縛~~ **完了** | OK | **OK** (下記) |
 | record: **関数境界を越える** | OK | `:phase :target` — gate が拒否 |
 | record: **`:string` フィールド** | OK | `:phase :target` |
 | record: **`:keyword` フィールド** | OK | `:phase :target` |
@@ -659,6 +659,45 @@ ADR 0062 自身が「`let` 束縛 record を複数の `record-get` が読む形�
 **capability kit 資格化が要求する形**そのもの (`clock-v1` の `:result` は
 `:i64`/`:keyword`/`:string` フィールドを持つレコードの variant)。順序としては
 `let` 束縛 → 関数境界 → フィールド型の拡大、が自然。
+
+## 完了: `let` 束縛 record — 5 点のうち backend 側の 1 点を閉じた
+
+ADR 0062 が名指しで残ギャップとしていた形 (「`let` 束縛 record を複数の
+`record-get` が読む」)。**5 点のうち唯一 backend 側にあった項目**で、残り 4 点は
+target gate が止めている。
+
+**第 2 の表現は不要だった。** ADR 0062 は record に独立した実行時表現を与えて
+いない — 直接ネストの `record-get` は、通常の多重束縛 `let` が既に使っている
+slot 機構へ書き換えられ、1 フィールド 1 ワードになる。`let` 束縛 record が要る
+のはまさにそれで、違いは**その場で消費されず body まで届く**ことだけ。よって
+**1 束縛が「フィールドごとの 1 束縛」に展開**され (合成名)、record 自身の名前は
+slot ではなくそれらの名前に写る。
+
+結果、slot 数・深さ相対ロード・後片付けはすべて従来のまま。`emit-let` は
+束縛数とは別に `slots` を数えるだけでよい。
+
+**record は今も値として存在しない。** `r` 単体はワードではなく、nil の
+`:let-depth` を持ったまま `load-let` に達すれば**何も名指ししない
+NullPointerException** になるだけ — 以前直した到達不能な `finalize` guard と
+同じ形 — なので `emit-expr` が明示的に拒否する。束縛時と異なるスキーマでの
+projection、未宣言フィールドの projection も拒否する。テストが 3 つとも pin。
+
+**recogniser は構造的**にした。フィールド型がこの backend で運べるかは
+`kotoba.kir/only-native-word-typed-features?` が lowering 前に既に決めているので、
+ここで再導出すれば gate を二重化することになる。
+
+**verifier 側**: `locals` は名前の集合だったが、名前 → 束縛時スキーマの写像に
+なった。record が「自分の `record-get` の直下の `record-new`」としてしか現れ得な
+かった間は、局所について覚えておくべきことが無かった。`let` 束縛を admit する
+には projection を束縛時の形と突き合わせる必要があり、集合では答えられない。
+スキーマは producer から信用せず**再導出**する (この verifier の他の集合と同じ
+方針)。
+
+検証: kotoba-native 34 tests / 2,004 assertions。実 AArch64 プロセスで 7 本 —
+単一 projection・両フィールド・**2 回読む**・スカラ束縛との混在・1 つの `let` に
+2 つの record・`if` の内側・呼ばれた関数の内側。compiler は固定 checkout
+(`ecdce96`) で **baseline と patched がともに 833 tests / 6,430 assertions、
+失敗も同じ 4 件の wall-clock 予算のみ**で完全一致、conformance 8/8。
 
 ## 残ったギャップ (2026-08-03 時点の実測)
 
