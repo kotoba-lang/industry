@@ -204,9 +204,39 @@ CLI: `clojure -M:reproduce <source-commit> <d1> <d2> [--fresh-clone] [--hermetic
 
 ### 残ったもの（2026-08-03 時点）
 
-**A. オーナー側の 1 手が要る（設計は済んでいる）**
+**A0. 方向転換（2026-08-03、オーナー指示「jdk 依存はしないように進めたい, kotoba-native を優先, その次は clojurescript」）**
 
-1. **`.github/workflows/ci.yml` に JDK provisioning**。release media を作る job は `bare-metal-uefi` だけで JDK が無く、**`workflow` scope の無い token では `.github/workflows/` に到達できない**（push・API とも。2026-08-03 実測: token scopes は `gist, read:org, repo`）。**適用する YAML は aiueos ADR-0017 に逐語で記載済み**。これが入れば release attestation の結線と `evaluate-reproducibility` の release-media 証拠（同 job の 2 回目の呼び出しで得られる第 2 digest）が同時に着地する。**evaluator と evidence 生成器は着地済み**（#143）なので、残るのは 2 本目のビルドを起こす CI step だけ — この 1 点が `build-identity.edn` の `:release-media-second-build-not-produced` gap そのもの。script 側だけ先に書くのは「CI が一度も実行しない step」を作ることであり、この一連の作業が除去してきた失敗そのもの。
+**下記 A-1 は、この指示によって「正しい 1 手」ではなくなった。** release job に JDK を足すのは、
+JDK 依存を*増やす*方向である。正しい方向は逆で、**gate 側の JDK 依存を外す**。そうすると
+同時に 2 つが解決する:
+
+- CI blocker が消える（JDK を provision する必要が無くなる）
+- **`java.base` の `:assurance-gap :platform-runtime-not-content-addressed` が消える** —
+  content-address できない唯一の依存は JVM そのものだったので、それが無くなれば
+  closure は完全に content-addressable になる。§4 の floor 25 vs 21 問題も同時に消滅する。
+
+つまり **nix 的性質の最後の穴と CI blocker は同じ根（JVM）を持っていた**。
+
+優先順位は workspace の runtime 規則どおり: **kotoba-native → ClojureScript → nbb**
+（JVM は最後の手段）。設計は aiueos kernel 自身の形（C は機構、判断は `.kotoba`）をそのまま使う:
+**判断（digest 比較・inventory の形式検査・三者一致・reproducibility qualification）は
+`.kotoba`、機構（fs・closure 列挙・SHA-256 のバイト供給）は cljc/nbb。**
+
+**第 1 歩は着地済み** — kotoba-lang/compiler ADR-0202（PR #500）: `bin/kotoba` の nbb fast path が
+JDK 無しで dependency closure を解決できるようになった。実測していた blocker は
+`clojure -Spath`（classpath 解決のためだけの JVM 呼び出し）で、失敗時に空文字を返して
+truncated classpath のまま進む **fail-open** でもあった。`deps-lock.edn`（content-addressed
+closure）+ git のみで再現し、pin と `rev-parse HEAD` を照合する。**parity 実測: 生成される
+`.kexe` は両 resolver で byte-identical。** これで `.kotoba` → native の compile が JDK 無しで
+通る。
+
+**残りの段**: ①aiueos の gate 3 本（`tcb.clj` / `reproducibility.clj` / `sbom.clj`）を
+`.cljc` 化して nbb で走らせる ②判断部分を `.kotoba` へ ③`:tcb/classpath`（JVM classpath 由来の
+推移閉包）を deps-lock 型の content-addressed closure に置き換える —— **③は今より強い**
+（jar が digest で pin される）。aiueos 側の JVM 面は `.clj` 9 本のみで、うち gate は 3 本
+（実測 2026-08-03）。
+
+1. ~~**`.github/workflows/ci.yml` に JDK provisioning**~~（A0 により方針変更。以下は経緯として保持）。release media を作る job は `bare-metal-uefi` だけで JDK が無く、**`workflow` scope の無い token では `.github/workflows/` に到達できない**（push・API とも。2026-08-03 実測: token scopes は `gist, read:org, repo`）。**適用する YAML は aiueos ADR-0017 に逐語で記載済み**。これが入れば release attestation の結線と `evaluate-reproducibility` の release-media 証拠（同 job の 2 回目の呼び出しで得られる第 2 digest）が同時に着地する。**evaluator と evidence 生成器は着地済み**（#143）なので、残るのは 2 本目のビルドを起こす CI step だけ — この 1 点が `build-identity.edn` の `:release-media-second-build-not-produced` gap そのもの。script 側だけ先に書くのは「CI が一度も実行しない step」を作ることであり、この一連の作業が除去してきた失敗そのもの。
 2. **`java.base` の floor 25 と runner 21 のどちらが誤りか**。上記 gate は判断を代行しない。なお floor を 21 に下げるのは agent 側で実行可能（inventory の 1 行）、runner を 25 に上げるのは A-1 と同じ workflow scope 制約に当たる。
 
 **B. 設計変更が要る**
@@ -225,7 +255,17 @@ CLI: `clojure -M:reproduce <source-commit> <d1> <d2> [--fresh-clone] [--hermetic
 
 ### resume point
 
-次の 1 手は A-1。`.github/workflows/ci.yml` の `bare-metal-uefi` job に ADR-0017 記載の 3 step を貼り、`clojure -M:tcb-check` と `clojure -M:test` が緑のまま release attestation が生成されることを確認する。
+次の 1 手は **A0 の段①** — aiueos の gate 3 本（`src/aiueos/{tcb,reproducibility,sbom}.clj`）を
+`.cljc` 化し、`clojure.java.io` → node `fs`、`java.security.MessageDigest` → node `crypto` に
+reader-conditional で分岐させて、`nbb` で `tcb-check` が通ることを確認する。
+`java.class.path` だけは nbb に対応物が無いので、そこで段③（deps-lock 型 closure）に接続する。
+
+**オーナー側に 1 手だけ残る（3 件を同時に塞ぐ）**: GitHub token への `workflow` scope 付与
+（または該当 YAML の手貼り）。現状 `gist, read:org, repo` のみで `.github/workflows/` に
+push も API 書き込みもできず、①aiueos の release attestation 結線 ②compiler の
+`npm run test-nbb-classpath` の CI 実行 ③**JDK を provision しない runner で JDK-free 性を
+証明する job** — の 3 つが同じ理由で止まっている。③は A0 の方向そのものの回帰テストなので、
+これが無いと「JDK 無しで動く」は実測はできても CI で守れない。
 
 ## workspace 全体への含意
 
