@@ -637,7 +637,7 @@ Component 契約面ではない — Component 流の provider 合成を native �
 | variant: 直接ネストの `match(new)` (ADR 0063) | OK | **OK** |
 | record: ~~`let` 束縛~~ **完了** | OK | **OK** (下記) |
 | record: **関数境界を越える** | OK | `:phase :target` — gate が拒否 |
-| record: **`:string` フィールド** | OK | `:phase :target` |
+| record: ~~`:string` フィールド~~ **完了** | OK | **OK** (下記) |
 | record: **`:keyword` フィールド** | OK | `:phase :target` |
 | record: **record を入れ子にしたフィールド** | OK | `:phase :target` |
 
@@ -698,6 +698,36 @@ projection、未宣言フィールドの projection も拒否する。テスト�
 2 つの record・`if` の内側・呼ばれた関数の内側。compiler は固定 checkout
 (`ecdce96`) で **baseline と patched がともに 833 tests / 6,430 assertions、
 失敗も同じ 4 件の wall-clock 予算のみ**で完全一致、conformance 8/8。
+
+## 完了: `:string` フィールド / payload — gate だけの制限だった
+
+残り 4 点のうち 1 点を閉じた。**backend は最初から運べていた。**
+
+gate を迂回して両 backend に string フィールド付き record と string payload の
+variant を直接渡したところ、**4 ケースすべて emit した** (文字列を projection
+して長さを測る形を含む)。理由は単純で、**native の文字列値は既に 1 ワードの
+`pair(offset,length)` handle** であり `:i64` と同じ幅だから — slot 機構が既に
+持っている以上の表現を要さない。止めていたのは gate だけだった。
+
+`native-scalar-record-field-types` を **`native-word-field-types` に改名**した。
+`:string` は scalar ではなく、この集合はもともと scalar ではなく**1 ワードに
+収まるか**を問うものだった。
+
+**`:f64` は据え置き**: 従来の理由が変わっていない — compiler の f32/f64 gate が
+record と無関係に native の f64 を拒否するので、ここで admit すると直交する
+gate を黙って広げることになる。**`:keyword` も据え置き**だが理由は別で、
+**backend に keyword 表現が一切無い** — 直接渡すと clean な拒否ではなく
+IllegalArgumentException になる。
+
+この 1 点は **record と variant の両方**を同時に前進させた (同じ集合を共有して
+いるため)。
+
+検証: 実 AArch64 プロセスで 6 本 — string フィールドの record から i64 を
+projection / 文字列を projection して測長 / `let` 束縛で両フィールド /
+文字列フィールドの比較 / string payload variant の i64 ケース / variant から
+文字列を取り出して測長。compiler は固定 checkout で **baseline と patched が
+ともに 833 tests / 6,430 assertions、失敗も同じ 3 件の wall-clock 予算のみ**、
+conformance 8/8。
 
 ## 残ったギャップ (2026-08-03 時点の実測)
 
