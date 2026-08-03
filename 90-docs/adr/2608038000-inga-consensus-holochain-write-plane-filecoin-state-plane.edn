@@ -228,7 +228,7 @@ ADR-2607110300 の labeling 規則をそのまま継承する。**witness が全
 | **F3** power table の committed 化・`:storage` role | **着地済み** — `inga.power`。table を committed state の関数にし、既存 bond market に `:storage` role を追加。**engi.stake の経済は再実装していない** |
 | `kotoba-lang/inga` repo | **作成済み**（2026-08-03、west 登録済み、`west-orphan-audit --blocking` exit 0） |
 | inga への抽出（13 namespace / 3,166 行） | **完了**（2026-08-03、`inga@8fe122c` / `engi@513b528`）。247 tests / 1204 assertions、parity は JVM/nbb 一致、受け入れ試験 `torihiki-on-inga.cljs` が抽出前（engi から）・抽出後（inga から）とも pass |
-| `inga.head` / `inga.ref`（ref plane 本体） | **着地済み** — `kotobase.storage.contract/verify` が `{:profile :linearizable-ref :concurrency :verified}` を返す |
+| `inga.head` / `inga.ref`（ref plane 本体） | **着地済み**。`kotobase.storage.contract/verify` を **oracle と本物の合意の両方**に対して通し、どちらも `{:profile :linearizable-ref :concurrency :verified}`（後者は 4 JVM thread の並行半分込み） |
 | cljs parity | **着地済み** — `inga.parity` が JVM と nbb で同一 digest（`inga.state` を除く。理由は下記） |
 | kotobase `IRefStore` provider の**機構** | **着地済み**、かつ **2026-08-03 に本物の合意へ接続**（`inga.ref/project`+`outcome`。commit 規則そのものが CAS）。**実 datom 面への配線は残**（kotobase 側の作業） |
 | torihiki-node の本番 | **単一 sequencer のまま**（`consensus: none`） |
@@ -278,6 +278,16 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 `inga` の repo 作成・west 登録は skill `new-project-scaffold` の常時承認フローに従う。
 
 ## 改訂
+
+**2026-08-03（同日、9回目）**: **conformance suite を oracle ではなく本物の合意に対して走らせた**（`inga@cdc4022`）。JVM 261 / 1253、cljs 266 / 1503。
+
+`inga.ref-test` は協調 reference quorum に対して `kotobase.storage.contract/verify` を回しており、それは自分でそう書いている（agreeable な oracle で suite を通すのは偽を信じる一番簡単な方法）。`inga.ref-consensus-test` は**同じ suite** を、`propose!` が 4 replica network に submit → drive → committed order を読む ref store に対して回す —— **並行半分（4 本の実 JVM thread が同じ expected head を奪い合う）込みで** `{:profile :linearizable-ref :concurrency :verified}`。**この store の `:linearizable-ref` 主張が、合意に対して成り立つことの最初の証拠。**
+
+published head が持つ証明書は**合意が既に産出したもの**（その record が乗った block の witness）である。committed block に入らなかった record は証明書を持たない —— 指す先が無いから。oracle 版では oracle が選んだ相手に証明書が捏造されており、それがあれを「adapter の証拠」に留めていた部分である。
+
+**途中の失敗2つを記録に残す**（どちらも「一部が 0」でなく「全部が 0」型の読み違えを生む）:
+- **head record は log だけでなく durable store にも証明書ごと必要。** log は*どの* record が head かを決めるが、record 自体はどこかに住む —— `compose {:blocks … :refs …}` が言っているのはそれ。最初の版は log しか持たず、全 read-back が検証に落ち、全 write が `published? false` を返した。
+- **勝者 0 人は安全性違反と全く同じに読めるが、逆である。** network を固定時刻で1回 drive すると genesis block だけが commit され以降が commit されず、2回目の race は決める block を持たないので 4 writer 全員が負けた。report の「exactly one winner でない」は両方を覆うが、必要な修正は正反対。
 
 **2026-08-03（同日、8回目）**: 抽出 ADR で「未解決」と flag した `inga.attest` / `witness-quorum` の重複を調べたところ、**重複ではなかった**（`inga@0b488c9`）。
 
