@@ -272,7 +272,70 @@ WebGL 経路は **naga で build 時に WGSL→GLSL 変換した生成物**（`k
 ので、任意の WGSL はその変換工程を足さない限り届かない。代わりに `mount!` は
 `{:tier :poster}` を返し、caller は byoubu-ui の plate（T1 静止画 + T0 gradient）を
 そのまま使う — 空の canvas ではなく完全な backdrop だが、ルールが求める WebGL 2.0 経路
-そのものではない。"
+そのものではない。
+
+## 現在地と再開点（2026-08-03 closing 時点）
+
+**成果物（すべて default branch に着地済み、pin == HEAD == origin/main を検証）**
+
+| repo | commit | 役割 |
+|---|---|---|
+| `kotoba-lang/byoubu` | `8f31e0ac` | catalog / facts / spec / T0 plate / T1 poster + manifest |
+| `kotoba-lang/byoubu-ui` | `e430808b` | plate 実装 + theme-for（design system 統合面） |
+| `kotoba-lang/byoubu-gpu` | `817dec07` | T2（WGSL 生成 + render graph + browser mount） |
+| `kotoba-lang/kotoba-ui` | `77981f26` | single entry からの再輸出 + theme の :backdrop 解決 |
+| `kotoba-lang/webgpu` | `4fecfff4` | executor: caller-supplied uniform + SSAO target バグ修正 |
+| `com-junkawasaki/root` | `b06741dd` | ADR + repos.edn 登録 + west pin |
+
+**検証（実行済みのもののみ記載）**
+
+- byoubu 28 tests / 312 assertions、byoubu-ui 24/113、byoubu-gpu 14/68 — いずれも
+  **nbb と JVM の両方**で green。kotoba-ui 37/239 green、design-quality gate 100.0（floor 98.0）。
+- 実ブラウザ（Chrome / 実 WebGPU device）で T0・T1・T2 の content band を実測し、
+  ライブラリ算出値と小数点 2 桁まで一致することを確認。全 tier・全 backdrop が AA をクリア。
+- **未検証**: `kami.webgpu` の `write-uniform!` / `:uniforms` に自動テストは無い
+  （当該 repo のテストは `.cljc` のみ、変更は `.cljs`）。手動のブラウザ実行だけが根拠。
+  T2 全体を継続的に守る CI も無い。
+
+**残ギャップ（優先度順）**
+
+1. **live scene の WebGL 2.0 経路が無い** — workspace 3D ルールに対する唯一の実未達。
+   engine の WebGL 経路は naga で build 時変換した GLSL を走らせるので、byoubu-gpu 側に
+   その変換工程（naga binary）を足す必要がある。現状は `{:tier :poster}` に degrade。
+2. **T2 に自動テストが無い**（上記）。`webgpu` repo には playwright harness
+   （`test/playwright_*_test.clj`、`kami.playwright` + swiftshader）が既にあるが WebGL2 用。
+   WebGPU headless を回すなら Chrome の `--enable-unsafe-webgpu` 経路の追加が要る。
+3. **catalog は 4 件**。1 件追加 = catalog に map 1 つ → `bin/render.cljs` → ブラウザで
+   content band 実測 → `:byoubu/measured` 記入、というループが確立済み。
+4. `90-docs/design-quality/` の `:sample-visual` 層は今も手動パス。byoubu の catalog が
+   そのまま corpus になる（背景 × サンプル UI の全組み合わせ）— 未着手。
+5. `byoubu-ui` の `:loop-src` は配線済みだが動画 artifact は無い。T2 が live で回るので
+   優先度は下がった。
+
+**再開コマンド**
+
+```bash
+# T2 をブラウザで再現
+cd orgs/kotoba-lang/byoubu-gpu
+node ../../../scripts/resource-guard.mjs run build -- npx shadow-cljs compile demo
+(cd public && python3 -m http.server 8793) # → window.byoubuGpu.tiers() が全 gpu
+# backdrop を 1 件足す
+#   1. byoubu/src/byoubu/catalog.cljc に map を追加
+#   2. cd byoubu && nbb --classpath src:render:../terrain/src bin/render.cljs
+#   3. ブラウザで content band を実測し :byoubu/measured に記入
+#   4. nbb bin/test.cljs && clojure -M:test
+```
+
+**このセッションが触っていない既存の問題（自分の作業とは無関係、未着手のまま報告）**
+
+- `west-orphan-audit --blocking` が `orgs/com-junkawasaki/kotodama` で赤。2026-06-27 由来。
+- superproject の open PR #1570 `feat/capability-graph` は別セッションのもの。
+- 作業中、共有 checkout の `manifest/west.yml` に他セッター由来の**未コミット編集**があり
+  discard した。stale と判断した根拠は murakumo pin が `a8331f92` で、直後に main に入った
+  `501fcbb1b12` が「`a8331f92`→`10adb620`」だったこと（残せば pin 退行になる）。
+  念のため SHA: datom-model `97835a14` / torihiki-node `824c212a` / kotoba-lang-engi `3f3cf8aa` /
+  murakumo `a8331f92` / webauthn `4f8a5976` / cloud-itonami `cc0192e9` / net-kotobase `33dab9c9`。
+  west.yml は生成物なので情報源（各子 repo の HEAD）は失われていない。"
 
   :adr/consequences
   ["design system は初めて「後ろに敷く画」を持つ。liquid-glass の材質が前提としていた背景が実在するようになった"
