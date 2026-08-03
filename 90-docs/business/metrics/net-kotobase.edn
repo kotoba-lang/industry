@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 7699, "kotobase-cf-wasm-staging" 5714},
+ {"net-kotobase" 7717, "kotobase-cf-wasm-staging" 5714},
  :zone
- {:requests-7d 20920,
-  :pageviews-7d 1196,
-  :uniques-7d-sum 1368,
+ {:requests-7d 20942,
+  :pageviews-7d 1203,
+  :uniques-7d-sum 1375,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 1732}
+  [{:path "/health", :requests 1720}
    {:path "/_health", :requests 1715}
    {:path "/", :requests 160}
    {:path "/v1/passkey/login/options", :requests 63}
    {:path "/cdn-cgi/rum", :requests 35}
    {:path "/v1/passkey/login/verify", :requests 30}
-   {:path "/api/funnel", :requests 25}
-   {:path "/robots.txt", :requests 25}],
-  :status-mix {:client-error 5040, :server-error 5, :ok 4096},
+   {:path "/robots.txt", :requests 26}
+   {:path "/api/funnel", :requests 24}],
+  :status-mix {:client-error 5027, :server-error 3, :ok 4076},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
  :as-of "2026-08-03",
  :traffic-quality {:window "24h", :probe-4xx-pct 55, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 1732 · /_health 1715 · / 160 · /v1/passkey/login/options 63 · /cdn-cgi/rum 35 | 4xx(probe) 55% · 5xx 0%",
- :funnel {:visitors 2168, :signups 12, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 1720 · /_health 1715 · / 160 · /v1/passkey/login/options 63 · /cdn-cgi/rum 35 | 4xx(probe) 55% · 5xx 0%",
+ :funnel {:visitors 2174, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 20920 req/7d・1368 uniques(日次和)・うち4xx probe 55%(24h)、workers 13413 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 20942 req/7d・1375 uniques(日次和)・うち4xx probe 55%(24h)、workers 13431 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 7,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.42857142857142855,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 636},
+ {:visitors {:openai-ads 3, :organic 642},
   :signups {:organic 9}, 
   :checkouts {}}}
