@@ -590,6 +590,45 @@ fork がそちらを実行許可として拾い、指示範囲を超えて実装
 disk/帯域を抑えたい大容量バイナリは shallow ではなく B2 + DataLad へ移行する
 （`m365-archive` が先行例）。
 
+## 「無い」と言う前に索引を引く（repo-wide mandatory、2026-08-03）
+
+**この workspace に何かが「無い」と結論する前、および新しく何かを作り始める前に、
+2 つの索引を引く。** grep で代替しない —— 4,050 repo に対する全文検索は必ず数百行を
+出し、必ず切られ、**切られたことに気付く手段が無い**。
+
+```bash
+nbb scripts/concept-lookup.cljs terminal      # 概念 → repo（順位付き・有界）
+nbb scripts/concept-lookup.cljs 端末           # 日本語でも引ける
+nbb scripts/concept-lookup.cljs               # 語彙一覧
+```
+
+| 索引 | 何を答えるか | 生成 | ADR |
+|---|---|---|---|
+| `90-docs/concept/concept.datoms.edn` | **どの repo がどの概念を実装しているか** | `nbb scripts/gen-concept-index.cljs` | ADR-2608039980 |
+| `90-docs/surface/surface.datoms.edn` | **どのホストがどのパスを提供しているか** | `nbb scripts/gen-surface-index.cljs` | — |
+
+どちらも生成物（手で編集しない）。語彙 `manifest/concept-vocabulary.edn` だけが手書き
+（「端末 と terminal と TTY は同じ」は repo の中身から導出できないため）。両方とも
+`manifest/edn-query.cljs` の datom 面に載っており（`:source/dataset "concept"` /
+`"surface"`）、`:concept/repo` / `:surface/repo` は `repo-taxonomy` の `:repo/path`
+と join できる。
+
+**なぜ要るか。** 2026-08-03、「kotoba-lang に terminal, console は設計実装されている?」に
+**「無い」と誤答した**。`kotoba-lang/kuro`（terminal model）と `kotoba-lang/kobo`
+（workbench）と ADR-2606301000 は 34 日前から在った。grep は `kuro/README.md:3` に
+**当たっていた**が、出力を `head -40` で切って当の行を見ていない。加えて **`kuro`(黒) も
+`kobo`(工房) も機能を一文字も示さない**ので、名前からの経路も無かった。同じ日に
+`/signup` を 4 件重複させた事故（surface 索引の動機）と同じクラス —— 意思ではなく
+**見る場所が無い**。
+
+**索引に無いことは、存在しないことの証拠にならない。** concept 索引は README のある
+repo だけを見る（未索引の repo 数を `:concept/coverage` entity で申告し、
+`concept-lookup` が毎回表示する）。「索引を引いたが無かった」を不在の証明に使わない。
+
+**名前が機能を示さない repo を作ったら、README の冒頭で名乗る。** 短い名前を選ぶのは
+正しい（ADR-2606301000 は 7 案から `kuro`/`kobo` を選んだ）が、説明可能性は別の場所で
+補う必要がある。
+
 ## 秘密情報の保管場所マップ
 
 B2 / Cloudflare / kagi / 1Password / Keychain の secrets がどの vault・item・

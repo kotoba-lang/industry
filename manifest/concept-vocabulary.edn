@@ -1,0 +1,83 @@
+;; manifest/concept-vocabulary.edn — 概念 → 綴り。**手で書く。生成しない。**
+;;
+;; ## なぜ手書きなのか（索引本体は手書きしないのに）
+;;
+;; `90-docs/concept/concept.datoms.edn` は生成物（手書きの索引は腐る）。だが
+;; 「端末 と terminal と TTY は同じものを指す」は repo の中身から導出できない。
+;; **これは推論できない事実の側**なので、小さく明示的に持つ。
+;;
+;; ## 語は経験から選ぶ
+;;
+;; 2026-08-03、`kotoba-lang に terminal, console は設計実装されている?` に
+;; 「無い」と答えた。実際には `kotoba-lang/kuro`（terminal model）と
+;; `kotoba-lang/kobo`（workbench）が 2026-06-30 から在り、ADR まで在った。
+;; grep は README に当たっていたが 4,050 repo 分の出力を `head -40` で切って
+;; いて、当の行を見ていない。**repo 名（kuro / kobo）が機能を一文字も示さない**
+;; ので、名前からも辿れなかった。
+;;
+;; 増やしすぎると雑音になる。今のところ「名前から機能が推測できない repo が
+;; 実在する」ことが確認できた概念だけを入れる。
+;;
+;; ## :ambiguous — 綴りの衝突を隠さない
+;;
+;; `console` はこの workspace で 3 つの別物を指す:
+;;   - 対話端末（kuro / kobo）
+;;   - operator console（read-only の運用ダッシュボード。23 repo の規約）
+;;   - 家庭用ゲーム機（gpu の backend tier）
+;; 概念を 1 つに畳むとどれかが消える。**別概念として並べ、同じ綴りを両方に
+;; 持たせる** —— `console` で引いた人には両方出るのが正しい。
+
+{:terminal
+ {:label "対話端末 / terminal"
+  :spellings ["terminal" "tty" "pty" "shell session" "command line"
+              "端末" "ターミナル" "コンソール" "console"]
+  :note "kotoba-lang/kuro が model、kobo が workbench。PTY は未実装。"}
+
+ :operator-console
+ {:label "operator console（read-only 運用ダッシュボード）"
+  :spellings ["operator console" "console" "dashboard" "運用コンソール"
+              "ダッシュボード"]
+  :note "kotoba-lang 23 repo の規約。html+css で pure data → markup、write surface 無し。"}
+
+ :editor
+ {:label "code editor / IDE"
+  :spellings ["code editor" "text editor" "ide" "workbench" "buffer"
+              "エディタ" "エディター"]
+  :note "kotoba-lang/kobo（model + read-only console）。event 配線は未実装。"}
+
+ :design-system
+ {:label "design system / UI kit"
+  :spellings ["design system" "ui kit" "component library" "hig"
+              "デザインシステム"]
+  :note "css → html → shitsuke → liquid-glass-ui → kotoba-ui → appkit/uikit。skill kotoba-uiux。"}
+
+ :query-plane
+ {:label "query plane / datom 面"
+  :spellings ["datalog" "datom" "query plane" "datascript" "triple store"]
+  :note "kotobase / arrangement / manifest/edn-query.cljs。"}
+
+ :package-manager
+ {:label "package / dependency management"
+  :spellings ["package manager" "dependency resolution" "registry" "lockfile"]}
+
+ :scheduler
+ {:label "scheduler / durable loop"
+  :spellings ["scheduler" "cron" "durable loop" "agent tick" "supervisor"
+              "スケジューラ"]}
+
+ :auth
+ {:label "authentication / identity"
+  :spellings ["authentication" "sign-in" "signin" "login" "passkey" "webauthn"
+              "oauth" "did:key" "cacao" "認証"]
+  :note "surface 索引（90-docs/surface/）と duplication-warn hook が面レベルを持つ。"}
+
+ :terminal-emulator
+ {:label "端末エミュレータ（VT/ANSI 解釈）"
+  :spellings ["terminal emulator" "ansi escape" "vt100" "xterm" "escape sequence"
+              "端末エミュレータ"]
+  :note "**未実装**。kuro は 1 command 入れて 1 receipt 出るだけで PTY を持たない。"}
+
+ :repl
+ {:label "REPL / 対話評価"
+  :spellings ["repl" "interactive evaluation" "対話評価"]
+  :note "**未実装**。kotoba CLI に repl サブコマンドは無い。"}}
