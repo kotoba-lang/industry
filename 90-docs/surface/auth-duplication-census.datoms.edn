@@ -23,8 +23,15 @@
   :dup/concept :signin
   :dup/built "orgs/network-awai/cloud-murakumo /signup（hosted UI を手書き）"
   :dup/existing "authn.kotobase.net/sign-in（net-kotobase-enterprise-wave2/authn、稼働中）"
-  :dup/status :shipped-then-superseded
-  :dup/cost "実装 + デプロイ + 実ブラウザ検証。置き換え予定"
+  ;; 2026-08-03 更新: 「置き換え予定」と書いていたが、**その置き換えは棄却した**
+  ;; （ADR-2608039950）。cloud-murakumo の checkout は did をリクエスト引数で
+  ;; 受け取るだけで session cookie を読まないので、apex 側 cookie を出しても
+  ;; 読む者が居ない。重複を減らしたのは sekisho（生成 46 行→9 行、
+  ;; localStorage 直触 3→1）であって apex 機構ではなかった。
+  ;;
+  ;; **意図を残したままにすると、次に読む人が未着手の TODO と誤読する。**
+  :dup/status :superseded-by-decision
+  :dup/cost "実装 + デプロイ + 実ブラウザ検証。置き換えは棄却（ADR-2608039950）"
   :dup/why-missed
   "authn Worker が `orgs/<org>/<repo>/<subdir>/wrangler.jsonc` にあり、repo 名からは
    機能が読めなかった。surface 索引の初版もこの階層を見落としていた（深さ 2 まで
@@ -87,5 +94,22 @@
    実在し、cloud-murakumo で localStorage 直触 3→1・生成 46 行→9 行を実測した。
    **重複を数えるときは『似ている』と『同じ』を区別する** —— 区別しないと
    正当な分離まで止めることになる。"
+  :source/dataset "auth-duplication-census"
+  :source/file "90-docs/surface/auth-duplication-census.datoms.edn"}
+
+ ;; ── 重複ではなく「宣言と実装のずれ」（同じ根、別の面）─────────────────────
+ {:db/id -6
+  :dup/id "2608030006-x402-sold-paths"
+  :dup/concept :billing
+  :dup/built "Worker が `/x402/` を route 表で課金判定（priced-resources を見ない）"
+  :dup/existing "cloud-murakumo.x402-offer/priced-resources（唯一の正）"
+  :dup/status :fixed
+  :dup/cost "売っていない path で 402 を出し、払わせ、履行できずに終わっていた"
+  :dup/why-missed
+  "`x402_offer` の docstring は『この namespace が防ぐために存在する drift は
+   まさに二箇所が売り物について食い違うこと』と書いていた —— **その二箇所目が
+   Worker 自身だった。** 宣言を 1 箇所にしても、消費側が別の表を見ていれば
+   ずれは残る。`sells?` / `sold-paths` を足して Worker と 404 文言の両方を
+   宣言から導出させた（2026-08-03、deploy 204b1e46）。"
   :source/dataset "auth-duplication-census"
   :source/file "90-docs/surface/auth-duplication-census.datoms.edn"}]
