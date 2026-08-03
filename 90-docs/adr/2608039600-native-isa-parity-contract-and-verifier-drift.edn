@@ -624,6 +624,42 @@ provider/capability-linking 機構」)。ただし同ファイルの
 Component 契約面ではない — Component 流の provider 合成を native に持ち込む
 こと自体が目標ではない。
 
+## 値表現チェーンの現在地 (2026-08-03 実測) — 残るのは 5 点、うち 1 点は backend
+
+「値表現」を残ギャップの唯一の大物と統合したので、compiler ADR 0062/0063 の
+チェーンがどこまで進んでいるかを wasm と突き合わせて実測した。
+
+| 形 | wasm32 | native (aarch64) |
+|---|---|---|
+| record: 直接ネストの `get(new)` (ADR 0062) | OK | **OK** |
+| record: 第 2 フィールド | OK | **OK** |
+| record: 2 つの projection | OK | **OK** |
+| variant: 直接ネストの `match(new)` (ADR 0063) | OK | **OK** |
+| record: **`let` 束縛** | OK | `:phase :aarch64` — backend が拒否 |
+| record: **関数境界を越える** | OK | `:phase :target` — gate が拒否 |
+| record: **`:string` フィールド** | OK | `:phase :target` |
+| record: **`:keyword` フィールド** | OK | `:phase :target` |
+| record: **record を入れ子にしたフィールド** | OK | `:phase :target` |
+
+**5 点の内訳が重要**: 4 点は gate (`:phase :target`) が止めており、
+**`let` 束縛だけが backend の制限** (`record-new is only supported as the direct
+operand of a matching record-get on the native backend`) — つまり gate は既に
+通しているのに emitter が受けられない、この 1 点だけが性質が違う。
+
+### 次の 1 段は `let` 束縛 record
+
+ADR 0062 自身が「`let` 束縛 record を複数の `record-get` が読む形」を残ギャップ
+として挙げている。ただし**安くはない**: 現在の `emit-record-get-of-new` は
+`(record-get T (record-new T ...) f)` を let スロット機構へ書き換えるが、
+`let` は 1 束縛 = 1 スロットを前提にしている。record を束縛するには
+**`emit-let` が「この束縛は N ワード」を知る**必要があり、env の束縛表現
+(`{:let-depth d}`) と両 backend の symbol 解決を変えることになる。
+
+`:string` / `:keyword` フィールドと入れ子は、そこから先の
+**capability kit 資格化が要求する形**そのもの (`clock-v1` の `:result` は
+`:i64`/`:keyword`/`:string` フィールドを持つレコードの variant)。順序としては
+`let` 束縛 → 関数境界 → フィールド型の拡大、が自然。
+
 ## 残ったギャップ (2026-08-03 時点の実測)
 
 ## 続き: `i32-operations` (同日、最大の残存 portable ギャップを閉じた)
