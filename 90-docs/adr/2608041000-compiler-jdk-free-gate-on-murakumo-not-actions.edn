@@ -142,6 +142,47 @@ green が意味するのは「JDK-free の不変条件が保たれている」�
 - fleet-ci の gate 数は 9 → 10。`root` 4 + net-kotobase 1 + compiler 1 + 通常の
   jvm/nbb test 群。
 
+# 本番 fleet で動いた（2026-08-03T15:43Z、実測）
+
+登録から最初の tick が gate を自動的に拾い、murakumo ノードで実行した:
+
+    pass test-compiler-jdk-free#pr505-040cfdf-murakumo-judah exit 0
+      | C jdk-free: ok — clojure/java/clj were never invoked
+      | OK — deps-lock fresh + resolver fail-closed + no JVM reached
+    fail test-compiler-jdk-free#pr445-0edb2ff-murakumo-asher exit 1
+      | FLEET-CI: missing after extract: deps-lock.edn — refusing to report a pass
+      | FLEET-CI-EXIT: 90
+    fail (tip) → rad issue opened in rad:z4BHBS3bFYKdUsHBfT71yrThaHCqJ
+
+**GitHub Actions を 1 度も経由せずに、commit ごとの検証・受領書・Radicle への
+issue 起票まで通った。** 手動経路でも判定の両側を確認済み（judah: stale lock で
+`2 of 3 checks failed`、fresh lock で `OK`）。
+
+## lock は 1 日に 3 回 stale になった
+
+| # | 何が landed したか | いつ |
+|---|---|---|
+| 1 | `kotoba-kir` + `kotoba-native` の pin 前進 | PR #500 の review 中 |
+| 2 | `kotoba-kir` + `kotoba-verifier` の pin 前進（`60708a4`） | PR #501 の review 中 |
+| 3 | **新規依存** `io-multiformats`（`6a18c53`、CID-pinned module resolution） | PR #503 の review 中 |
+
+gate は 3 回とも捕まえた（signal は効いている）。**問題は頻度である** — pin 前進が
+支配的な commit である repo で、`deps.edn` の digest に縛られた lock は fresh を
+保てない。しかも stale な lock は `bin/kotoba` を黙って `clojure -Spath` に落とす
+＝ JDK-free という性質が誰にも気付かれずに消える（PR #501 で可聴にした）。
+
+**したがって ADR-0202 の follow-up を格上げする**: closure を git だけから導出し、
+root の pin を優先、推移的にしか現れない coordinate で候補が食い違ったときだけ
+fail closed にして JVM 生成器を促す。現状 transitive-only は `security` 1 本
+（候補 1 つ）なので、この規則は今日すでに全域で決定的である。そうなれば lock は
+common path から外れ、腐りようが無くなる。
+
+## 既知のノイズ
+
+`deps-lock.edn` より前の PR head（#445 / #472 等）は `missing after extract` で
+exit 90 になる。**主張としては正しい**（その branch に JDK-free 経路は無い）が、
+古い branch を触っていない人にも赤が出る。rebase されれば消える。
+
 # 残り
 
 - **aiueos を fleet に載せる**（段①の cljc 化が前提）。
