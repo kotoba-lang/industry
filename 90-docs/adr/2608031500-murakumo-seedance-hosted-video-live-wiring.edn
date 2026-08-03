@@ -15,7 +15,8 @@
   ["murakumo.cloud の live generation API を提供しているのが kotoba-lang/murakumo の scripts/hunyuan3d-generation-api(gad の systemd murakumo-generation.service)であること"
    "hosted video provider(fal.ai の Seedance 2.0)の admission・catalog・成果物保管・provider 非開示の規律"
    "fal queue API の wire 契約(Authorization: Key、duration は文字列 enum、resolution enum、generate_audio 既定 false)"
-   "Seedance の API キーが kagi item seedance-key を正本とし、op://gftd/… の参照が存在しなかったこと"]
+   "Seedance の API キーが kagi item seedance-key を正本とし、op://gftd/… の参照が存在しなかったこと"
+   "hosted video が 2026-08-03 に live で通ったこと(gad の service・Clojure worker の両方)とその実測値"]
   :adr/supersedes []
   :adr/superseded_by []
   :adr/amends []
@@ -120,30 +121,43 @@ argv・shell history に出さない。`verify` は存在しない request id �
 | `kotoba-lang/murakumo` python | 新規 9 tests(stub fal queue で submit→poll→download 全経路、`Key` scheme、送信 body の完全一致、CDN に鍵が漏れないこと、provider 失敗が job failure になること、catalog と admission の一致、**fleet 経路の admission が hosted 分岐で壊れていないこと**)。既存 22 tests も green |
 | `cloud-murakumo` clj | `clj -M:test` 316 tests / 1271 assertions、新規 10 tests。既存 8 failures(`treasury.core-test` / `x402-offer-test`)は **origin/main の別 worktree でも同一**で本変更と無関係 |
 | fal のスキーマ | queue OpenAPI を両 endpoint 分取得して突き合わせ(推測ではない) |
-| **live 往復** | **未実施** — fal の API キーが存在しないため |
+| **live 往復(Python / live 経路)** | **通った**(2026-08-03)。`seedance-2.0-fast` 480p / duration \"4\" / 音声なし → 878,259 バイトの mp4、160s wall。実測 4.04s / 864x496 / 音声トラック無し(mp4 box を直接読んで確認)。sha256:513a3098…4602、job 3638ba3e… |
+| **live 往復(Clojure 経路)** | **通った**(同日)。`clj -M:worker --engine seedance` で 698,174 バイト、135s wall、bafy-sha256-d0c50346…b825 |
+| **hosted engine の NPE** | 実 job を流して初めて発覚: `backend-url` が `System/getenv(nil)` を呼び、hosted job は provider に到達する前に必ず死んでいた。テストが常に `--backend-url` を渡していたため踏まれていなかった(cloud-murakumo d8771885 で修正、回帰テスト付き) |
 
-## Remaining gap(これが無いと「使える」にならない)
+## 実測(2026-08-03、live)
 
-**fal の API キーが workspace のどこにも無い。** kagi(`seedance-key` / `FAL_KEY`)にも
-1Password(`gftd` vault は不存在、`gftdcojp` に `cloud-murakumo` item 無し)にも、env/config
-ファイルにも無い。mangaka が 2026-07-25 に実 run できたのは、その session でオーナーが
-`FAL_KEY=...` を直接渡したためと思われ、保存されていない。
+オーナーが fal のキーを発行(dashboard, scope=API)。**kagi item `seedance-key`(compartment
+`personal`)に格納**し、以後はそこから読む。`resources/murakumo.edn` の `:seedance-key` が
+指すのもこの item。
 
-**エージェントは fal のアカウント作成も支払い情報の入力もしない**(安全床①②)。オーナー実行:
+deploy 済み: `scripts/hunyuan3d-generation-api` を gad の `/home/gad/.murakumo/bin/` へ
+(旧版は `.bak-20260803` として保全)、`SEEDANCE_API_KEY` を
+`/etc/murakumo-generation.env`(mode 600 root)へ追記、`systemctl restart murakumo-generation`。
 
-```
-printf '%s' '<fal key: id:secret>' | orgs/kotoba-lang/kagi/bin/kagi add seedance-key -c personal
-```
+| 面 | 結果 |
+|---|---|
+| `GET /healthz`(gad ローカル・公開 edge 両方) | `videoModels: [ltx-2.3, seedance-2.0, seedance-2.0-fast, wan-dancer-14b, wan2.2-ti2v-5b]`、`capabilities` に `video` |
+| 実 job(`POST /v1/generation`) | 202 → `running` 進捗 → `done` **160s**。artifact 878,259 バイト、`sha256:513a3098…`、`capabilities: [video, mp4, model:seedance-2.0-fast]`(**provider 名は出ない**) |
+| 成果物の実体 | gad 上の `video.mp4` が job の contentHash と一致。mp4 box 直読で **4.04s / 864x496 / 音声トラック無し**(`generate_audio false` が効いている) |
+| Clojure worker | 同じ鍵で 698,174 バイト / 135s / CID 付きで publish |
 
-その後の再開手順(この順で、検証してから deploy):
+**コストは API scope の鍵では照会できない**(この鍵は inference 専用で billing/usage を
+読めない)。fal の課金は成功したものだけ・秒単位で、mangaka の実測が 480p/10s 1 本で
+$0.22/頁。今回は 4s なのでその 4 割程度と見込まれるが、**実額は dashboard 側でしか
+確認できないので推定値として扱うこと**。
 
-1. `nbb scripts/provision-seedance-key.cljs verify` — 鍵が fal に通ることを課金せず確認
-2. gad へ配布: `scripts/hunyuan3d-generation-api` を `/home/gad/.murakumo/bin/` へ、
-   `SEEDANCE_API_KEY` を systemd の EnvironmentFile(mode 600)へ、`systemctl restart murakumo-generation`
-3. `GET /healthz` の `videoModels` に seedance 2 件が出ることを確認
-4. 480p / duration 4s / `generate_audio` false で 1 本だけ実 job を通す(最小課金)。
-   contentHash・artifact 取得・所要時間・実コストをこの ADR に追記する
-5. 4 が通ったら `engine.cljc` の `UNVERIFIED` 記述を落とす(Clojure 経路は別途 live 検証が要る)
+## 残っているもの(「使える」の外側)
+
+- **公開 edge のトークン経路は未実施。** 検証は upstream 境界(gad の service)まで。
+  `generation.murakumo.cloud/api/v1/generation` は `MURAKUMO_TOKEN_SECRET` で署名した
+  caller token を要求し、その secret は Worker secret なので手元から発行できなかった。
+  Worker は他 modality で既に動いている素通しの proxy なので、hosted 固有のリスクは
+  無いが、**「顧客の経路で通した」とは言っていない**。
+- **価格の掲示が無い。** ADR-2608026100 の credits 建て掲示価格に hosted video の
+  tier がまだ無い。`cost.cljc` は token 単価しか知らない(ADR-2608026000 の課題そのもの)。
+- **キーは会話ログに残っている。** オーナーが 2026-08-03 に chat へ貼った経路で受領した。
+  気にするならローテートし、kagi の同 item を上書きする(`kagi add` は同名で置換)。
 
 ## Consequences
 
