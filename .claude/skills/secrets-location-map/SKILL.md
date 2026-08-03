@@ -71,6 +71,24 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
       （毎回 1Password 内を探索し直さない）。
   - `Backblaze`（1Password `Private` vault、2 件）— 個人用途、org のプロジェクト
     には使わない。
+- **fal.ai API キー（hosted 生成モデル — Seedance 2.0 等の video / 3D / music / voice）**:
+  - **正本 = kagi item `seedance-key`（compartment `personal`）**。取得は
+    `orgs/kotoba-lang/kagi/bin/kagi get seedance-key`。
+  - 使うときは値を直接扱わず
+    `nbb scripts/provision-seedance-key.cljs run -- <cmd>`（`orgs/network-awai/cloud-murakumo`）
+    経由にする。`check` / `verify`（**課金せずに** fal 側で有効性だけ確認）も同スクリプト。
+  - **live の消費先**: gad の `/etc/murakumo-generation.env`（mode 600 root、
+    `SEEDANCE_API_KEY=`）→ systemd `murakumo-generation.service`。ここに無いと
+    hosted video model は `/healthz` の `videoModels` に出ず admission でも弾かれる
+    （fail closed。ADR-2608031500）。
+  - ⚠ **`resources/murakumo.edn` がかつて指していた `op://gftd/cloud-murakumo/SEEDANCE_API_KEY`
+    は実在しない**（"gftd" という vault がこのアカウントに無い）。2026-08-03 に kagi 参照へ
+    差し替え済み。古い `op://gftd/...` 形式の参照を見かけたら同様に疑うこと。
+  - ⚠ **`op item get` はこの環境で無言でタイムアウトする**（rc=124、出力なし）。これを
+    「該当なし」と読むと**不在の誤判定**になる。1Password を引くときは `op read`
+    （`op://<vault>/<item>/<field>`、エラーメッセージが item/field の存在を区別して返す）を
+    使い、`op vault list` で vault 名を先に確認する。非 ASCII 名の vault（`純真個人_*`）は
+    `op://` 参照に使えないので **vault ID** で引く。
 - **GoDaddy Domains API（DNS レコード書き込み）**:
   - **正本 = 1Password `gftdcojp` vault / item `gftd.godaddy`**
     - `op://gftdcojp/gftd.godaddy/GODADDY_API_KEY`
