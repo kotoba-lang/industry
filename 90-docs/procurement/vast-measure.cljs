@@ -211,9 +211,19 @@
 ;; ── 計測 ─────────────────────────────────────────────────────────────────────
 
 (def comfy-image
-  "ComfyUI + SDXL の測定用イメージ。**cold start の大半はこのイメージの取得**
-   なので、何を測っているかを固定するために image を明示的に固定する。"
-  "vastai/comfy:latest")
+  "ComfyUI の測定用イメージ。**cold start の大半はこのイメージの取得**なので、
+   何を測っているかを固定するために明示的にピン留めする。
+
+   ⚠ **`vastai/comfy:latest` は存在しない。** 実測 2026-08-03、この名前で
+   35 分待って `loading` のままだった —— Docker Hub の `vastai/comfy` は
+   103 タグすべてが `v0.29.2-cuda-12.9-py312` 形式で、`latest` が無い。
+   存在しないタグを pull しようとして永久に `loading` になっていた。
+
+   危ないのは、これが**もっともらしい測定値に見えた**こと。『ComfyUI の
+   cold start は 35 分以上』は数字として成立してしまい、`cold_workers` の
+   設計判断にそのまま使えてしまう。実際に測っていたのは pull の失敗だった。
+   **タグをピン留めするのは再現性のためだけでなく、存在確認のためでもある。**"
+  "vastai/comfy:v0.29.2-cuda-12.9-py312")
 
 (def ^:private poll-interval-ms
   "起動待ちのポーリング間隔。**20 秒**。
@@ -266,6 +276,44 @@
                                (.then (sleep poll-interval-ms) poll)))))))]
       (poll))))
 
+(defn- image-exists?
+  "Docker Hub にそのタグが実在するか（**借りる前に確認する**）。
+
+   → true / false / :unknown（Docker Hub 以外、または確認できなかった）
+
+   実測 2026-08-03 の事故を防ぐためだけに存在する: `vastai/comfy:latest`
+   （存在しないタグ）で 35 分間 `loading` を待ち、$0.014 と 35 分を溶かした。
+   しかも得られた『35 分以上』という数字は**もっともらしく、cold_workers の
+   設計にそのまま使えてしまう**質のものだった。
+
+   `:unknown` では止めない —— 確認できないことと存在しないことは違うし、
+   これは安全境界ではなく利便のガードなので、fail-open が正しい。"
+  [image]
+  (let [[repo tag] (str/split image #":" 2)
+        parts (str/split (or repo "") #"/")]
+    (if (or (nil? tag) (not= 2 (count parts)))
+      (js/Promise.resolve :unknown)
+      (-> (js/fetch (str "https://hub.docker.com/v2/repositories/"
+                         (first parts) "/" (second parts) "/tags/" tag "/"))
+          (.then (fn [^js r] (if (.-ok r) true (if (= 404 (.-status r)) false :unknown))))
+          (.catch (fn [_] :unknown))))))
+
+(defn- assert-image!
+  "存在しないと分かっているタグでは借りない。"
+  [image]
+  (-> (image-exists? image)
+      (.then (fn [ok]
+               (case ok
+                 false (throw (ex-info (str "イメージが Docker Hub に存在しない: " image
+                                            " —— 借りる前に止めた（存在しないタグは "
+                                            "`loading` のまま永久に待つ）")
+                                       {:image image}))
+                 :unknown (do (js/console.error
+                               (str ";; イメージの存在を確認できなかった（Docker Hub 以外？）: "
+                                    image))
+                              image)
+                 image)))))
+
 (defn- rent!
   "オファーを借りて instance id を返す。"
   [o image]
@@ -285,7 +333,8 @@
    生成そのものの秒数は ComfyUI への HTTP が要るので本 harness の対象外。
    **測れていないものを測ったと言わない。**"
   [gpu image deadline-ms]
-  (-> (offers! gpu)
+  (-> (assert-image! image)
+      (.then (fn [_] (offers! gpu)))
       (.then (fn [{:keys [offers]}]
                (when (empty? offers)
                  (throw (ex-info "該当オファーなし" {:gpu gpu})))
