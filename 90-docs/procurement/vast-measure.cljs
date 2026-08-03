@@ -40,36 +40,92 @@
 
 (def base "https://console.vast.ai/api/v0")
 
+(defn- fail!
+  "終了コードを立てる。
+
+   ⚠ `(set! (.-exitCode process) n)` は **nbb では落ちる** ——
+   ns の `:require` で取り込んだ process は ES module の名前空間オブジェクトで、
+   プロパティが読み取り専用だから（TypeError: Cannot assign to property
+   exitCode of [object Module]）。グローバルの `js/process` を使う。
+
+   ⚠⚠ この docstring 自体が 2 度目の事故を起こした。最初の版は
+   module 指定子を生の二重引用符で囲んで書いており、**docstring が
+   そこで終わって残りが引数リストとして読まれた**（`process is not
+   ISeqable`）。同じセッションで ADR の EDN でも 3 回踏んだ欠陥クラスで、
+   docstring に生の二重引用符を置くと、壊れ方が「その行が読めない」ではなく
+   「別の構文として読める」になるので気付きにくい。
+
+   実測 2026-08-03: この 1 行のせいで、計測失敗時のエラーハンドラ自身が
+   例外を投げ、**破棄の成否を報告する経路が壊れていた**。破棄そのものは
+   動いていたが（実測でインスタンス 0 / 消費 $0.0036）、動いたことを
+   確認できない安全網は安全網ではない。"
+  [n]
+  (set! (.-exitCode js/process) n))
+
 (defn api-key []
-  (or (some-> (.-VAST_API_KEY (.-env process)) str/trim not-empty)
+  (or (some-> (.-VAST_API_KEY (.-env js/process)) str/trim not-empty)
       (throw (ex-info "VAST_API_KEY が未設定。鍵をリポジトリに書かないこと" {}))))
 
 (defn- headers []
   #js {"Authorization" (str "Bearer " (api-key))
        "content-type" "application/json"})
 
-(defn- req!
-  "Vast.ai API 呼び出し。non-2xx は例外にする —— 沈黙で nil を返すと、
-   破棄の失敗が『成功』に化ける。"
-  [method path {:keys [body query]}]
-  (let [url (str base path
-                 (when query
-                   (str "?q=" (js/encodeURIComponent (js/JSON.stringify (clj->js query))))))
-        init #js {:method (str/upper-case (name method)) :headers (headers)}]
-    (when body (set! (.-body init) (js/JSON.stringify (clj->js body))))
-    (-> (js/fetch url init)
-        (.then (fn [^js r]
-                 (if (.-ok r)
-                   (.json r)
-                   (.then (.text r)
-                          (fn [t]
-                            (throw (ex-info "vast api error"
-                                            {:status (.-status r) :path path
-                                             :body (subs t 0 (min 400 (count t)))})))))))
-        (.then (fn [j] (js->clj j :keywordize-keys true))))))
-
 (defn- now [] (.getTime (js/Date.)))
 (defn- sleep [ms] (js/Promise. (fn [res] (js/setTimeout res ms))))
+
+(def ^:private max-429-retries 6)
+
+(defn- req!
+  "Vast.ai API 呼び出し。non-2xx は例外にする —— 沈黙で nil を返すと、
+   破棄の失敗が『成功』に化ける。
+
+   ## 429 は例外にせず待って再試行する
+
+   Vast.ai のレート上限は **3 リクエスト**（実測: `limit 3.0`、
+   `retry_after 10`）。5 秒間隔のポーリングで即座に踏んだ。
+
+   429 を単なるエラーにすると、**`destroy!` の確認経路が 429 を引いた瞬間に
+   『破棄されていない』と誤報する** —— 実際には破棄されているのに、運用者は
+   コンソールを見に行かされる。逆に確認を省けば、本物の取り残しを見逃す。
+   どちらも避けるには、確認そのものが 429 に耐える必要がある。
+
+   応答の `retry_after` に従う（自前の推測値を使わない）。上限回数で打ち切り、
+   打ち切りは例外にする —— 無限再試行は課金の垂れ流しと同義。"
+  ([method path opts] (req! method path opts 0))
+  ([method path {:keys [body query] :as opts} attempt]
+   (let [url (str base path
+                  (when query
+                    (str "?q=" (js/encodeURIComponent (js/JSON.stringify (clj->js query))))))
+         init #js {:method (str/upper-case (name method)) :headers (headers)}]
+     (when body (set! (.-body init) (js/JSON.stringify (clj->js body))))
+     (-> (js/fetch url init)
+         (.then (fn [^js r]
+                  (cond
+                    (.-ok r) (.json r)
+
+                    (and (= 429 (.-status r)) (< attempt max-429-retries))
+                    (.then (.text r)
+                           (fn [t]
+                             (let [after (or (some-> (re-find #"\"retry_after\":\s*(\d+)" t)
+                                                     second
+                                                     js/parseInt)
+                                             10)]
+                               (js/console.error (str ";; 429 — " after "s 待って再試行 ("
+                                                      (inc attempt) "/" max-429-retries ") " path))
+                               (.then (sleep (* 1000 (inc after)))
+                                      (fn [_] (req! method path opts (inc attempt)))))))
+
+                    :else
+                    (.then (.text r)
+                           (fn [t]
+                             ;; 原因は **メッセージ本体**に載せる —— ex-data は
+                             ;; sci のエラーラッパを通ると失われ、実測で
+                             ;; 「vast api error」しか出ずに原因が消えた。
+                             (throw (ex-info (str "vast api " (name method) " " path
+                                                  " -> HTTP " (.-status r) " : "
+                                                  (subs t 0 (min 300 (count t))))
+                                             {:status (.-status r) :path path})))))))
+         (.then (fn [j] (if (map? j) j (js->clj j :keywordize-keys true))))))))
 
 ;; ── オファー探索 ─────────────────────────────────────────────────────────────
 
@@ -133,7 +189,7 @@
                     (.catch (fn [de]
                               (js/console.error "!! 破棄失敗 !! 手動で破棄せよ: instance" id)
                               (js/console.error "!!" (ex-message de))
-                              (set! (.-exitCode process) 2)
+                              (fail! 2)
                               nil))
                     (.then (fn [_] (throw e))))))))
 
@@ -159,6 +215,15 @@
    なので、何を測っているかを固定するために image を明示的に固定する。"
   "vastai/comfy:latest")
 
+(def ^:private poll-interval-ms
+  "起動待ちのポーリング間隔。**20 秒**。
+
+   5 秒にしたら Vast.ai のレート上限（3 リクエスト）を即座に踏んだ（実測
+   2026-08-03）。cold start は分単位なので、20 秒の粒度で困らない —— 細かく
+   見たいという理由だけで API を叩く回数を増やすと、測りたかったものより先に
+   レート上限を測ることになる。"
+  20000)
+
 (defn- wait-running
   "running になるまで待つ。上限超過は例外 —— 無限待ちは課金の垂れ流しと同義。"
   [id deadline-ms]
@@ -177,7 +242,7 @@
                                                {:instance-id id :status st}))
 
                                :else
-                               (.then (sleep 5000) poll)))))))]
+                               (.then (sleep poll-interval-ms) poll)))))))]
       (poll))))
 
 (defn- rent!
@@ -242,6 +307,6 @@
         (.catch (fn [e]
                   (js/console.error "ERROR:" (ex-message e) (pr-str (ex-data e)))
                   (js/console.error "取り残し確認: nbb 90-docs/procurement/vast-measure.cljs orphans")
-                  (set! (.-exitCode process) 1))))))
+                  (fail! 1))))))
 
 (apply -main *command-line-args*)
