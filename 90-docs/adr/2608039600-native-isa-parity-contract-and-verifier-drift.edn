@@ -17,7 +17,7 @@
    "producer と verifier の allowlist drift の扱い"
    "未実装 operator の診断規約 (backend は operation 名を名乗る)"
    "target-admission 述語は let 束縛値を walk しなければならない"
-   "native の entry/関数 result が :i64 限定である理由 (:bool box 化を native がまだ渡っていない)"
+   "native の entry/関数 result 型 (:bool box 化は 2026-08-03 に完了、#{:i64 :bool})"
    "ADR-2608039500 の検証記述の訂正 (override 不発)"]
   :adr/related
   ["adr-2608039500-native-backend-codegen-back-half-size-preserving-peephole"
@@ -44,7 +44,12 @@
    "kotoba-lang/compiler e5a8cf1c27a2550294ec12a5d9c99a67461a1f9a"
    "com-junkawasaki/root 6bc32324bd096368bcdbb10e6a049771a4676370"
    "kotoba-lang/kotoba-verifier ca7efcb82f58a56de0f60a776019c3044f5b56bb"
-   "com-junkawasaki/root 7f1911977aca19a111d50793b27e04f871561081"]
+   "com-junkawasaki/root 7f1911977aca19a111d50793b27e04f871561081"
+   "kotoba-lang/kotoba-kir ec7bdb5ea05462757fa10b54f87f7a9177bb9b68"
+   "kotoba-lang/kotoba-verifier e78c37083c2c98e5bdbb3a66c8551691c784f5a3"
+   "kotoba-lang/tender-native f92f390278bc561a098fab65b7430845900aed6f"
+   "kotoba-lang/compiler 3c575e26717afe99b9207519cbdcf183486ea578"
+   "com-junkawasaki/root f9b51ce17bc5a9e67b8c3c1d5385fe55c718621b"]
   :adr/body
   "# ADR-2608039600: native backend の ISA parity を契約化する
 
@@ -371,8 +376,33 @@ native は**まだその境界を渡っていない target**というだけ。�
 3. `kototama.native.executor` が `:bool` entry に対して integer ではなく
    boolean を報告する
 
-3 は executor の report 契約 (`(integer? (:result report))`) を変えるため、
-**owner に見える面**。ここまでを 1 単位として次に実施する。
+### 完了 (2026-08-03)
+
+3 点すべてを実施し、**native が最後の target として `:bool` 境界を渡った**。
+
+- `kotoba-kir` `ec7bdb5`: `lower` が pure `:bool` entry を畳み込み、
+  **box 済み boolean** を封印する。`:blocks` は `:const.i64` が運べる 0/1 の語の
+  まま。`:blocks` のガードは truthy ではなく `some?` — `false` が畳み込み可能な
+  値になったので「oracle 無し」と取り違えてはならない (テストで pin)。
+- `kotoba-verifier` `e78c370`: `entry-result-types` が `:bool` を得る。
+  `verify-native-artifact!` の再実行は `execute` 経由で同じく box するので、
+  封印値と直接比較可能。`#{:i64 :bool}` の外は今も `:signature-result` を
+  名指しして拒否される。
+- `tender-native` `f92f390`: `:evidence :result` を box する。**supervisor の
+  report は整数のまま** (`valid-supervisor-report?` の契約は不変、`:report` は
+  verbatim で返る) — box するのは呼び出し側が「プログラムの答え」として読む
+  値だけ。
+- `compiler` `3c575e2`: 3 つの pin を前進。
+
+実プロセスでの実測: `(= 1 1)` → evidence `true` / raw report `1`、
+`(= 1 2)` → `false` / `0`、`(+ 1 1)` は `2` / `2` で不変。
+
+**検証の帰属について**: 共有 compiler checkout が他セッションの未コミット変更
+(`deps.edn` / `core.clj` / `native-pilot-manifest.edn`) を抱えており、最初に
+取った baseline 比較は信頼できなかった (baseline 側の方が失敗が多く、assertion
+数も一致しなかった)。**固定 commit のクリーンな worktree で取り直した結果、
+baseline と patched がともに 799 tests / 6,339 assertions・0 failures で一致**。
+pin 前進後は 800 tests / 6,342 assertions・0 failures、conformance 5/5。
 
 **副産物として直したもの**: `verify-program!` は 12 個の条件を 1 つの `and` で
 検査し `{}` を報告していた。どれが落ちたかを知るにはプログラムを手で二分探索
@@ -388,10 +418,9 @@ native は**まだその境界を渡っていない target**というだけ。�
   なく `string-concat` と同じ string-pool / host-call 経路が要る。
   — `xorshift32` はゲート修正により**この一覧から外れた**。i32 値表現を
   native に入れるかどうかの判断に統合される。
-- **比較結果を返す関数が native で書けない**。これは `:bool` の box 化
-  (kotoba-kir 38d1bd0、2026-07-31) を native がまだ渡っていないだけで、
-  設計判断は既に済んでいる。残作業は lower の畳み込み・verifier の集合・
-  executor の report 契約の 3 点 (上記)。
+- ~~比較結果を返す関数が native で書けない~~ **2026-08-03 に解消** (上記
+  「完了」節)。native は `:bool` 境界を渡り、predicate entry が compile /
+  verify / 実行できる。
 - `i32-operations` 一族 (i32 値表現) は native に無い。
 - record/variant が関数境界を越えられない・相互ネスト不可・
   string/keyword フィールド不可 (compiler ADR 0062/0063 の Remaining gaps)。
