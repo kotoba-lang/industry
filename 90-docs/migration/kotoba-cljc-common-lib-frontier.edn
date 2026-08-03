@@ -1,5 +1,5 @@
 {:schema :kotoba.cljc-common-lib-frontier/v1
- :as-of "2026-08-02"
+ :as-of "2026-08-03"
  :authority
  {:decision "Migrate shared actor, I/O, and library-dependent semantics before leaf repositories."
   :source "90-docs/adr/2607279200-kotoba-clojure-shaped-safety-elaboration-migration.edn"
@@ -127,7 +127,12 @@
    :reason "clojure.edn/cljs.reader block 113/32 dependency closures"
    :scope [:bounded-reader :bounded-writer :closed-tags :depth-limit :size-limit
            :nil :bool :i64 :f64 :string :keyword :symbol :vector :list :set
-           :document-keyed-map]
+           :document-keyed-map :contextual-document-literal]
+   :authoring {:form "(document closed-edn-tree)"
+               :lowering :existing-document-constructors
+               :authority "kotoba-lang/kotoba-lang#364"
+               :compiler "kotoba-lang/compiler#481"
+               :vendor "kotoba-lang/kotoba#443"}
    :remaining []
    :forbidden [:reader-eval :ambient-class-resolution :unbounded-keyword-interning]}
   {:id :http-routing
