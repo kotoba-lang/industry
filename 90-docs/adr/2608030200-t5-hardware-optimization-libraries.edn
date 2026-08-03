@@ -846,4 +846,52 @@ v1 が 1.00x と予測して実測 2.69x だった原因そのもの。
 **いずれも「fixture が全部同じ regime にいた」ために隠れていた。** particle は 32 B、
 matmul は unit-stride。**regime を跨ぐ fixture が無いモデルは、その regime の外で
 黙って間違う。**
+
+## 反復 16 (2026-08-03) — 同じ監査を paging と ioplan に当て、2 つ見つかった
+
+反復 15 の教訓「regime を跨ぐ fixture が無いモデルは、その regime の外で黙って
+間違う」を、残る 2 ライブラリに適用した。**両方で見つかった。**
+
+### `paging/optimal-misses` は O(n² × capacity) だった
+
+Belady 実装は `next-use[i]` を**事前計算して一度も読んでいなかった** — eviction の
+たびに resident の各キーについてトレース末尾を再走査していた。**この repo の
+fixture は全部 50 アクセス × 8 ページ**なので不可視で、実トレースで初めて効く。
+
+修正: `next-use` を resident キーごとに保持する（テーブルを作った本来の目的）。
+eviction は resident 集合の走査のみ。**20,000 アクセス × 4096 ページが完走する**
+（旧経路は同じ入力に約 10¹¹ ステップ要る）。
+
+テストは**壁時計 assertion ではなく完走 guard** にした — CI で時間 assertion は
+flaky で、かつ quadratic 版は閾値で落ちる前にスイートを固める。
+
+### `ioplan/plan` はデバイスが実行できないコマンドを出していた
+
+`merge-adjacent` は「コマンドを maximum を超えて**成長させない**」だけで、
+「どのコマンドも maximum を超えない」ことは保証していなかった。**両者は別物**で、
+最初から maximum より大きい単一要求はそのまま通り抜けていた。
+
+**1 MiB の read を 128 KiB のデバイスに出すと 1 MiB のコマンドが 1 本**出ていた。
+`merge-adjacent` の docstring は既に「デバイスが表現できないコマンドは plan では
+ない」と書いていた — **宣言されていて誰も強制していない不変条件**だった。
+
+**見つけたのは前反復で入れた `benefit`。** command 床が 8 と言っているのに plan が
+1 を出していた。**plan が自分の下界を下回るのは不整合**で、両方の数字が並んだから
+即座に分かった。**bounds 層が planner の誤りを捕まえたのは 2 度目。**
+
+修正: `split-oversized` を merge の後・order の前に置く（merge が limit ちょうどの
+コマンドを作りうるので後、分割片は device が順に訪れる別コマンドなので前）。
+block 境界に floor するので各片は aligned のまま。`:stats :splits` で費用を報告。
+
+### 今日見つけたモデル/実装バグ 5 件、すべて同じ隠れ方
+
+| 反復 | repo | バグ |
+|---|---|---|
+| 14 | traversal | 帯域定数が pattern 違い |
+| 14 | traversal | `max()` の overlap 仮定 |
+| 15 | layout | 広い element の line 数 32 倍 |
+| 16 | paging | Belady が O(n²) |
+| 16 | ioplan | 過大コマンドを分割しない |
+
+**5 件すべて、fixture が単一 regime に固まっていたために隠れていた。**
 "}]
