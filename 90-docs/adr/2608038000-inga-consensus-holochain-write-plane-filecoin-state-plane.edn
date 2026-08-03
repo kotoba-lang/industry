@@ -230,7 +230,7 @@ ADR-2607110300 の labeling 規則をそのまま継承する。**witness が全
 | inga への抽出（13 namespace / 3,166 行） | **完了**（2026-08-03、`inga@8fe122c` / `engi@513b528`）。247 tests / 1204 assertions、parity は JVM/nbb 一致、受け入れ試験 `torihiki-on-inga.cljs` が抽出前（engi から）・抽出後（inga から）とも pass |
 | `inga.head` / `inga.ref`（ref plane 本体） | **着地済み** — `kotobase.storage.contract/verify` が `{:profile :linearizable-ref :concurrency :verified}` を返す |
 | cljs parity | **着地済み** — `inga.parity` が JVM と nbb で同一 digest（`inga.state` を除く。理由は下記） |
-| kotobase `IRefStore` provider の**機構** | **着地済み**（上記）。**実 datom 面への配線は F1 待ち** |
+| kotobase `IRefStore` provider の**機構** | **着地済み**、かつ **2026-08-03 に本物の合意へ接続**（`inga.ref/project`+`outcome`。commit 規則そのものが CAS）。**実 datom 面への配線は残**（kotobase 側の作業） |
 | torihiki-node の本番 | **単一 sequencer のまま**（`consensus: none`） |
 | OS プロセス分離 | **無し**（4 replica は 1 プロセス内。socket は本物） |
 | 独立第三者運営者 | **存在しない** → 分散を名乗らない |
@@ -278,6 +278,13 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 `inga` の repo 作成・west 登録は skill `new-project-scaffold` の常時承認フローに従う。
 
 ## 改訂
+
+**2026-08-03（同日、7回目）**: 「seam はあるが繋がっていない」2件を閉じた（`inga@332b067`）。JVM 260 tests / 1238 assertions、cljs 265 / 1488、parity 一致。**どちらも「閉じたように見えて閉じていない」型であり、テストは緑のままだった。**
+
+- **F1 が合意を経由していなかった。** `inga.state` の受け入れは同じ op 列を4回 fold して1つの root を得ただけで、これは root がデータの関数であることを示すが、**「順序に合意しなければならなかった4 replica が hydrate 可能な root に到達する」という ADR の約束は示していない**（commit 規則を一度も通っていない）。socket harness は commit 規則を通るが、その machine は不透明 digest —— まさに F1 が置き換えた当のもの。**両半分がそれぞれ検証され、接合されていなかった。** `four-replicas-that-had-to-agree-reach-a-hydratable-root` が接合する: 実 replica network で合意させ、共通 committed 高さで root を再計算し、合意した CID を hydrate して Datalog で引く。
+- **ref plane が協調 oracle にしか繋がっていなかった。** `inga.ref` の `propose!` は注入で、実装はテストの agreeable oracle だけだった —— adapter は正しく、何にも繋がっていなかった。**合意が ref に与えるのは往復ではなく全順序であり、全順序は既に答えを決めている**: `[ref seq]` ごとに committed prefix の**最初**の record が勝ち、以降は負ける。別途投票するものは無い。純粋な半分（`project` / `head-of` / `outcome`）を `inga.ref` に置き、待ちは host に残した（`-compare-and-set-ref!` は同期で commit は非同期だから）。名前を付けておくべき判断3つ: **first-wins**（last-wins なら順序で負けた writer が再提案で勝者を上書きできる＝この面が防ぐ lost update そのもの）、**head-of は連続する seq のみ辿る**（gap を跨ぐと writer が seq を飛ばして中身を黙って落とせる）、**敗者に勝者の CID を返す**（`false` だけ知る呼び出し側は同じ base に永久に再試行する）。`two-writers-race-a-sequence-and-the-commit-rule-decides` が実 network で示す: 同じ seq に**異なる cid** を出す2 writer、形では refuse できず、順序だけが分ける。全 replica が同じ勝者を射影し、ちょうど1人が certified。
+
+**conformance suite の oracle は残す**が、README に**それぞれ何の証拠か**を書いた: `contract/verify` は **adapter** の検査、上記の test は **合意** の検査。
 
 **2026-08-03（同日、6回目）**: 残 gap のうち**自分で閉じられるものを全て閉じた**（`inga@cf85a80`）。JVM 256 tests / 1227 assertions、cljs 261 / 1477、いずれも 0 failures。
 
