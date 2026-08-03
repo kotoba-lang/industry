@@ -107,8 +107,18 @@ shim の除去は consumer が直接 `datalog` を向いた後の follow-up。
 
 - `datalog` は現行 main から再抽出済み（86 tests / 138 assertions、両 runtime green、
   runtime 依存は `datom-source` のみを機械確認）。
-- `arrangement` の向け直しは本 ADR の決定に基づき実施中。
-- `datom-model` の再同期（peer の +121/-25 分）も同時に実施中。
+- **`arrangement` の向け直しは完了**（`096523f`）。src 957 行削除（正味 -788）、
+  test 804 行削除。`arrangement.query`/`.datalog` は compatibility shim として残り、
+  `facade_test.cljc` が **`ns-publics` の包含関係**を assert するので、上流に public var が
+  増えても shim から漏れると落ちる。
+- **shim は `defn` wrapper であって `(def q dc/q)` の alias ではない。** ClojureScript の
+  analyzer は `def` の `:arglists` を init 式から導出して宣言済みのものを上書きするため、
+  alias だと 8 個すべてが cljs で signature を `()` と報告した（JVM では正しい）。
+  **JVM だけのテストなら通って出荷されていた。**
+- `datom-model` の再同期も完了（`6910ef9`、65/124 → 69/134）。
+- **危うく踏んだ罠**: `datalog` @ `8dde87c` は arrangement が revert した limit pushdown を
+  まだ持っていた。「byte 一致」という前提のまま pin していたら、数時間前に revert した
+  病理を静かに再導入していた。抽出 lib の再同期は**上流の revert も運ぶ**必要がある。
 - `merkle-lsm` は向け直し完了（peer から src 1,480 行 + test 890 行を削除、
   カバレッジは 44 tests / 165 assertions が 1:1 で移動）。
 "}]
