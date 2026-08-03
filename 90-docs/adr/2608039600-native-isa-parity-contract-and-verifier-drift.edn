@@ -54,7 +54,10 @@
    "kotoba-lang/kotoba-kir 95a1ac0f37c3f43e233eee33470c0007593631f7"
    "kotoba-lang/kotoba-verifier 677eae9267cfef8bd973bf5f602e5d4b31b7bd82"
    "kotoba-lang/compiler 9c373ed009256cf8fc89b318c98cb8967240ed4e"
-   "com-junkawasaki/root 14505b7f4d878e94bf70bb4a693e820537bf3a87"]
+   "com-junkawasaki/root 14505b7f4d878e94bf70bb4a693e820537bf3a87"
+   "kotoba-lang/kotoba-kir a28ea1194fdde96f3a94a7854d1263a1de191746"
+   "kotoba-lang/compiler c3aa42c58021c153353c4706681d44855d56055a"
+   "com-junkawasaki/root 450621ba6cbf3abf4f26ba2d0d9b67394001a6a1"]
   :adr/body
   "# ADR-2608039600: native backend の ISA parity を契約化する
 
@@ -415,6 +418,42 @@ pin 前進後は 800 tests / 6,342 assertions・0 failures、conformance 5/5。
 区別できなかった。各条件に名前を付けて報告するようにした (敵性プログラムは
 早い条件の失敗により後の条件が throw しうるので、各検査を guard し throw も
 その条件の失敗として扱う)。**この診断改善が、上記の原因特定を 1 手にした。**
+
+## 副産物: `bool-not` が入力に関わらず常に false を返していた (実バグ)
+
+`typed-safe-value-operations` の native 支持を測る過程で、参照インタプリタの
+**実バグ**を見つけた。
+
+`kotoba.kir` の `bool-not` は `(not value)` だった。比較は**語 0/1** に評価
+されるが、Clojure では **0 が truthy** なので `(not 0)` も `(not 1)` も false —
+**`bool-not` は入力に関わらず定数 false** を返していた。`(bool-not (= a b))`
+という「等しくない」の最も自然な書き方が常に false で、二重否定も元の真偽に
+戻らず定数に潰れていた。
+
+**このインタプリタは他 target を突き合わせる oracle なので、これは参照実装
+だけの取りこぼしではなく言語の定義そのものだった。** 既存テストは 1 件も
+捕まえていない。
+
+`if` は同じ判定を**インラインで正しく**持っていた (boolean なら `not`、語なら
+`zero?` — 38d1bd0 が両方を内部で許容するとしているため両方の復号が要る)。
+`bool-not` はその規約を再導出して誤った。規約を `kotoba-false?` として**1 箇所に
+抽出**し両者から使うようにしたので、3 度目の再導出は起きない。
+
+検証: kotoba-kir 79 tests / 354 assertions (従来 76) — 比較の反転、内部 2 表現
+(比較は語、`option-some?` は host boolean)、involution を pin。compiler は固定
+クリーン checkout で修正前後とも 810 tests / 6,372 assertions、conformance 5/5。
+
+## 訂正: `typed-safe-value` の「4 op ギャップ」は測定の誤りだった
+
+前回「wasm 4/10 対 native 0/10」と報告したが、**probe が entry にその型を
+返させていた**ための交絡だった。entry の result 型規則で弾かれていたのであって、
+op が未支持だったのではない。
+
+i64 を返す関数の**内側**で使うと、`option-some` / `option-none` / `option-some?` /
+`option-value` / `result-ok` / `result-err` / `result-ok?` / `result-value` /
+`result-error` は **すべて既に native でコンパイルできる** (native gate も既に
+これらの case を持っている)。この family の真のギャップは **`bool-not` 1 個だけ**
+であり、それも上記のとおりまず意味論が壊れていた。
 
 ## 残ったギャップ (2026-08-03 時点の実測)
 
