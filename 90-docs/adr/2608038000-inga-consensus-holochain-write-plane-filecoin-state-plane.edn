@@ -277,6 +277,51 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 
 `inga` の repo 作成・west 登録は skill `new-project-scaffold` の常時承認フローに従う。
 
+## セッション closing（2026-08-03）— 引継ぎ
+
+**着地物**（すべて default branch 上）:
+
+| repo | commit | 内容 |
+|---|---|---|
+| `kotoba-lang/inga` | `e857c34` | 新規作成。ref plane・F1・F2・F3・抽出した consensus 全体 |
+| `kotoba-lang/engi` | `513b528` | consensus 13 namespace を inga へ移出。engi は inga に依存しない |
+| `com-junkawasaki/root` | 本 ADR + ADR-2608039000 + CLAUDE.md | west pin は inga=`e857c34` |
+
+**検証（この closing 時点で再実行し確認）**:
+
+| | 結果 |
+|---|---|
+| inga JVM `clojure -M:test` | 271 tests / 1275 assertions、0 failures |
+| inga cljs `npm run test:cljs`（shadow-cljs） | 276 tests / 1525 assertions、0 failures |
+| inga `clojure -M:parity` vs nbb | digest 一致 |
+| inga `clojure -M:lint` | 0 errors / 8 warnings（8 件は engi から移動してきたコード由来） |
+| `script/network.cljs`（default / `BYZANTINE_SPLIT=1`） | pass |
+| `script/torihiki-on-inga.cljs` | pass（実 WebSocket 4 replica、実鍵、全 replica 同一 root、他人の account を騙る注文は拒否） |
+| engi `clojure -M:test` | 26 tests / 93 assertions、0 failures |
+
+**完了**: 抽出（決定 1）/ F1（`inga.state`、単体と**合意経由**の両方）/ F2（`inga.fuel` + `kotoba/fuel.kotoba` の計量算術と 120 ケース conformance）/ F3（`inga.power` + `inga.retrieval`）/ 決定 6 の**機構**（`inga.ref`、conformance suite を oracle と本物の合意の両方で通過）/ cljs 検証 / 証拠伝播 / quorum profile 宣言。
+
+**未完（engineering、次の agent が着手できる）**:
+- `.kotoba` は計量算術まで。**op 適用（fold）が cljc のまま**。
+- lint warnings 8 の解消（移動時に整形を混ぜない判断で残した）。
+
+**未完（判断が要る。engineering の問題ではない）**:
+1. **inga network をどこで走らせるか。** `inga`/`engi` のどちらにも deploy 設定が無く、replica は in-process harness でしか走ったことがない。**kotobase 配線（決定 6 の実配線）と ADR-2608039000 の D1 撤去は、この 1 点に全部ぶら下がっている。** 置き場の第一候補は murakumo fleet だが、その provisioning は ADR-2607110300 addendum で一度 scope 外と判断されている。
+2. **escrow のデプロイ**（`kotoba-lang/engi-witness-escrow`、意図的に未デプロイ）。これが無い限り `inga.stake` の slashing は実装済みのまま**発火しない**し、配備は `:head-count` で走り経済的安全性を持たない（コードがそう言うようにした）。
+3. **x402 settlement**（ADR-2608010930 決定 7 が最優先と定めるもの）。
+
+**resume point** —— 次の agent が最初に打つべきコマンド:
+
+```bash
+cd orgs/kotoba-lang/inga
+clojure -M:test && npm run test:cljs        # 271/1275 と 276/1525、0 failures を期待
+nbb --classpath src:../bytes/src script/network.cljs   # pass または INCONCLUSIVE
+```
+
+`INCONCLUSIVE` は失敗ではない —— equivocator が `min-twins-to-judge` 未満しか投票しなかった run で、catch assertion を判定しないという意味である（詳細は同 script の docstring）。
+
+**名乗ってよい範囲は変わっていない**: witness が全員同一運営者配下なので **crash fault tolerance**。「分散」「blockchain」は ADR-2607110300 Phase 4 まで名乗らない。
+
 ## 改訂
 
 **2026-08-03（同日、10回目）**: **F3 を完了させた**（`inga@e857c34`）。JVM 271 / 1275、cljs 276 / 1525、parity 一致。
