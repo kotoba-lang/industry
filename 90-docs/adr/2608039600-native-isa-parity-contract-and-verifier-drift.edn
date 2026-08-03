@@ -57,7 +57,12 @@
    "com-junkawasaki/root 14505b7f4d878e94bf70bb4a693e820537bf3a87"
    "kotoba-lang/kotoba-kir a28ea1194fdde96f3a94a7854d1263a1de191746"
    "kotoba-lang/compiler c3aa42c58021c153353c4706681d44855d56055a"
-   "com-junkawasaki/root 450621ba6cbf3abf4f26ba2d0d9b67394001a6a1"]
+   "com-junkawasaki/root 450621ba6cbf3abf4f26ba2d0d9b67394001a6a1"
+   "kotoba-lang/kotoba-native 1b585fcf761d4b3bc85937bdccb25148a6b9c424"
+   "kotoba-lang/kotoba-kir 5d3cb59dae8106ec86c6d2d247e473790699dfbb"
+   "kotoba-lang/kotoba-verifier 34818124819589ef3a2225d07cfc63e1eb555c8a"
+   "kotoba-lang/compiler eaaaeab997d199ca86e7de11fe748d67ac026c4e"
+   "com-junkawasaki/root 62679488b18cb36d76ca6e00919da21ba7a9b2ee"]
   :adr/body
   "# ADR-2608039600: native backend の ISA parity を契約化する
 
@@ -454,6 +459,26 @@ i64 を返す関数の**内側**で使うと、`option-some` / `option-none` / `
 `result-error` は **すべて既に native でコンパイルできる** (native gate も既に
 これらの case を持っている)。この family の真のギャップは **`bool-not` 1 個だけ**
 であり、それも上記のとおりまず意味論が壊れていた。
+
+## 完了: `bool-not` の native 実装 — typed-safe-value family を閉じた
+
+意味論の修正 (`a28ea11`) の後、backend / gate / verifier を揃えた。**順序が
+本質**で、逆にしていれば壊れた oracle に合わせる実装になっていた。
+
+- `kotoba-native` `1b585fc`: 両 ISA で emit。x86-64 は `test rax,rax` +
+  `sete al` + `movzx`、AArch64 は `subs xzr,x0,#0` + `cset x0,eq` — **どちらも
+  そのファイルの比較が既に出している tail そのもの**なので、`bool-not` と比較が
+  偶然でなく構成上一致する。
+- **bit 0 の反転ではなく零との比較**にした。これにより canonical な 0/1 に
+  限らず**任意の語**に対して `kotoba.kir/kotoba-false?` と同じ復号になる。
+- `kotoba-kir` `5d3cb59`: native gate が admit (共有集合 `non-string-typed-ops`
+  は触らない)。concurrent な f64 gate 変更と同じ `cond` で衝突したため、
+  rebase せず最新 main に当て直した。
+- `kotoba-verifier` `3481812` / `compiler` `eaaaeab`。
+
+検証: 実 AArch64 プロセスで 8 本 — involution、および**インタプリタでは host
+boolean・native では語**になるオペランド (`option-some?`) の混在 — すべて一致。
+compiler は baseline と同じ 810 tests / 6,372 assertions、conformance 5/5。
 
 ## 残ったギャップ (2026-08-03 時点の実測)
 
