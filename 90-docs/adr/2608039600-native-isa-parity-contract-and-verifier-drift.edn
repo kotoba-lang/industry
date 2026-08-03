@@ -16,6 +16,7 @@
    "kernel-privileged-operations が x86 専用である理由"
    "producer と verifier の allowlist drift の扱い"
    "未実装 operator の診断規約 (backend は operation 名を名乗る)"
+   "target-admission 述語は let 束縛値を walk しなければならない"
    "ADR-2608039500 の検証記述の訂正 (override 不発)"]
   :adr/related
   ["adr-2608039500-native-backend-codegen-back-half-size-preserving-peephole"
@@ -34,7 +35,10 @@
    "com-junkawasaki/root e069b3af05e3f9151fe6f7fe55336b88fc9aed7b"
    "kotoba-lang/kotoba-native 6cea4da1af847335395d2ffcc1daa81ede6dd0ce"
    "kotoba-lang/compiler cddca6e0982886029679a842f779ba6f98149cbd"
-   "com-junkawasaki/root 26404fec6e13c94ac5549389c56ea1d316636cb1"]
+   "com-junkawasaki/root 26404fec6e13c94ac5549389c56ea1d316636cb1"
+   "kotoba-lang/kotoba-kir 0efe32518a422c2f8ab32de4d9a75720d67780e8"
+   "kotoba-lang/compiler 0d694d02b301d84f985636a7c2bbfdffee6780e7"
+   "com-junkawasaki/root 667b8d987ec469e0364ac97758ed0b20479927e5"]
   :adr/body
   "# ADR-2608039600: native backend の ISA parity を契約化する
 
@@ -251,13 +255,58 @@ desugar される)。旧メッセージのままなら、存在しない `xorshi
 探しに行くところだった。privileged 11 個は AArch64 に**設計上**無いもので、
 これも「壊れたプログラム」ではなく意図的な非対称として読めるようになった。
 
+## 続き: admission gate の穴 — `let` 束縛が typed op をロンダリングしていた
+
+診断修正が名指しした 2 件を追ったところ、片方は operator の欠落ではなく
+**ゲート自体のバグ**だった。
+
+`kotoba.kir` の 2 つの target-admission 述語
+(`only-native-word-typed-features?` / `only-cljs-provider-typed-features?`) は
+form の `args` を汎用的に walk していた。`let` の第 1 引数は**束縛ベクタ**で、
+**Clojure のベクタは `seq?` が false** — walk は終端 case (native 側は `true`、
+cljs 側は sealed 型記述子のために書かれた明示的な `(vector? form) true`) に
+落ち、**束縛値が一度も検査されなかった**。
+
+結果、同じ operation が書き方で扱いを変えていた:
+
+```
+(u32-wrap 1)             -> :phase :target で拒否
+(let [a (u32-wrap 1)] a) -> 素通りして backend に到達
+```
+
+f32/f64 だけ免れていたのは `uses-f32?`/`uses-f64?` が別に木全体を走査して
+いたから。**それ以外の typed 家族 — i32・typed map・keyword・document — は
+すべて束縛の裏に隠れられた。**
+
+これが `xorshift32` が backend に到達していた機構でもある: frontend が
+まさにこの形の `let` に展開するため。修正後は他の typed-value 機能と同様
+`:phase :target` で拒否される。
+
+**そしてこの分離が重要**: `string-from-i64` は同じ症状に見えていたが別物で、
+`string-substring` に desugar される — **native gate が設計上 admit する
+string operation**であり、backend が本当に未実装なだけ。ゲート修正前は
+この 2 つが同じ問題に見えていた。
+
+修正は両述語で `let` を明示的に destructure し、束縛値と body を walk する。
+binder が symbol であることとベクタの整形式性は検査するがベクタ自体は walk
+しない — record/variant の case が sealed 型記述子に対して既にそうしている
+のと同じ理由で、blanket vector admit はそのまま正しい。
+
+検証: kotoba-kir 72 tests / 331 assertions (従来 68)、compiler 791 tests /
+6,312 assertions 0 failures、native-conformance 5/5。**既存テストは 1 つも
+この穴に依存していなかった。** 回帰テストは「直書きと `let` 束縛が一致する」
+「入れ子や後続束縛でもロンダリングできない」「backend が実際に実装している
+one-word slice は今も admit される (穴を outage に交換していない)」
+「不正な `let` は walk されずに拒否される (この述語は verifier が敵性として
+扱う KIR にも走る)」を pin する。
+
 ## 残ったギャップ (2026-08-03 時点の実測)
 
-- **native に実装すべき operator (診断が名指しするようになった)**:
-  `u32-wrap` (= source の `xorshift32`)、`string-substring`
-  (= source の `string-from-i64`)。前者は今日追加した shift/xor に 32bit
-  マスクを足せば書ける。後者は**戻り値が文字列**なので register op ではなく
-  `string-concat` と同じ string-pool / host-call 経路が要る。
+- **native に実装すべき operator**: `string-substring`
+  (= source の `string-from-i64`)。**戻り値が文字列**なので register op では
+  なく `string-concat` と同じ string-pool / host-call 経路が要る。
+  — `xorshift32` はゲート修正により**この一覧から外れた**。i32 値表現を
+  native に入れるかどうかの判断に統合される。
 - `i32-operations` 一族 (i32 値表現) は native に無い。
 - record/variant が関数境界を越えられない・相互ネスト不可・
   string/keyword フィールド不可 (compiler ADR 0062/0063 の Remaining gaps)。
