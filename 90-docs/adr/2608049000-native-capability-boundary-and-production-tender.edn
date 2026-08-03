@@ -1,0 +1,102 @@
+[{:db/id -1
+  :adr/id "adr-2608049000-native-capability-boundary-and-production-tender"
+  :adr/title "native の kit 資格化に要る 3 つ — 境界の形・provider・要求応答チャネル"
+  :adr/status "proposed"
+  :adr/date "2026-08-04"
+  :adr/body "## 問い
+
+kit の `:native-aot` を `:pending` から動かすには実際に何が要るのか。
+ADR-2608039600 はこれを 2 度言い換えている — 最初は「値表現」、次に
+「real provider semantics」。**どちらも部分的に正しく、どちらも完全ではない。**
+実測すると要るものは **3 つ**あり、順序がある。
+
+## 実測 (2026-08-04)
+
+### 1. capability 境界が運べる形が 4 つしかない
+
+`tools/kexe_loader.c` の `enum kexe_typed_kind_v1` は
+`KEXE_TYPED_STRING = 1` / `KEXE_TYPED_OPTION_I64 = 2` /
+`KEXE_TYPED_RESULT_I64 = 3` の 3 つだけで、これに素の i64 経路を足して **4 形**。
+`kotoba.kir` の admission も同じ 4 組
+(`[:i64 :i64]` `[:string :string]` `[:option-i64 :option-i64]`
+`[:result-i64 :result-i64]`) に限っている。
+
+いっぽう `clock-v1` の request は
+`[:variant :kotoba.clock/request [[:wall :bool] [:monotonic :bool]]]`、
+result は **record を payload に持つ variant** である。**どちらも今日の境界では
+表現できない。** これは関数内の record/variant (ADR 0062/0063、2026-08-04 に
+境界越えまで完了) とは**別の面**で、あちらが閉じてもこちらは閉じない。
+
+### 2. provider の意味論は loader の仕事ではない
+
+`checked_typed_cap_call` は検証だけを行い、provider 本体は**恒等**である。
+コメントが自ら述べている: production tenders replace this callback while
+preserving validation。**つまり恒等なのは欠落ではなく設計**であり、
+`kexe_loader.c` は qualification host として正しい。
+
+### 3. しかし loader は一度も read しない
+
+I/O 面を洗うと、loader は stdout に構造化レポートを、stderr にエラーを
+**書くだけ**で、stdin も他の fd も読まない。したがって「callback を置き換える」
+と言っても、置き換え先が別プロセスの Clojure provider である以上、
+**要求と応答を運ぶ機構が存在しない**。
+
+## 配置は既に決まっている (新規 repo は要らない)
+
+closing 時に私は「production native tender は新規コンポーネントで、まず
+ADR-2607266000 の T3/T5 のどこに置くかを決める必要がある」と書いた。
+**これは誤りだった。** 同 ADR の repo 表を読むと:
+
+- `tender-native` = **T3 実行**、compiler の native-executor から抽出 (635 行)
+- `provider` = **T3**、compiler の provider/ 12 ファイル (2,248 行)
+- `provider-postgres` = **T3**
+
+**実 provider は既に portable `.cljc` として存在する** (clock / entropy / git /
+http / http-ingress / llm / log / object …、各々 `_transport` 対を持つ)。
+`provider.clock` は typed request を受け typed result を返し、ns docstring が
+Host clock functions never cross the ABI と明示する。**必要なのは新しい層では
+なく、既にある T3 の 2 つを繋ぐ機構**である。
+
+## 提案する設計 (実装前にオーナー承認を要する)
+
+**loader に要求/応答チャネルを 1 本足し、`checked_typed_cap_call` の恒等代入
+だけをその往復に置き換える。周囲の検証は 1 行も動かさない。**
+
+- **C は decision-free のまま**: 値をシリアライズして書き、応答を読み、
+  既存の `valid_typed_value` に通す。**何時か・HTTP が何を返すかという判断は
+  すべて Clojure provider 側**に残る (ADR-2607241100 D6 / aiueos ADR-0015 の
+  mechanism 層の定義に合致)。
+- **検証は現状のまま効く**: `checked_typed_cap_call` は request と result の
+  両方を `valid_typed_value` に通しており、result の出所が恒等から往復に
+  変わってもこの検査は変わらない。loader のコメントが想定していた形そのもの。
+
+### ただし TCB は確実に広がる
+
+**loader が read 経路を得ることは micro-TCB の拡大である。** 応答は loader の
+外から来るので、tender が壊れた場合は攻撃者制御の入力になる。guest 由来の値と
+**同じ厳格さ**で検証しなければならない (幸い `valid_typed_value` は既に
+guest を信用しない前提で書かれている)。sealed runtime identity
+(`loader-source-sha256`) も当然動く。**この 1 点があるため、本 ADR は実装前に
+オーナー承認を求める。**
+
+## 順序
+
+**1 が 3 に先行する。** i64 と string しか運べないチャネルを作っても
+`clock-v1` は資格化しない — request が bool payload の variant だからである。
+したがって:
+
+1. capability 境界に variant / record を通す (kind の追加 + 両 backend の
+   marshalling + verifier admission)
+2. 要求/応答チャネル (本 ADR の提案。TCB 拡大につきオーナー承認)
+3. `provider` の実 provider を tender-native から配線し、kit ごとに
+   `:native-aot` を `:implemented` へ
+
+**どの段階でも先に flag を触らない。** compiler ADR 0059 が `:implemented` を
+real provider semantics 込みの end-to-end と定義し、0052-0060 の連鎖は例外なく
+kit descriptor に触れずにきた — 証明した以上を主張する最初の 1 本にならない。
+
+## 状態
+
+**提案 (proposed)。** 実測部分 (境界 4 形 / provider の所在 / loader が read
+しないこと / 配置は既存 T3) は確定した事実。設計と順序は提案であり、
+TCB 拡大の承認を得るまで実装に着手しない。"}]
