@@ -387,4 +387,47 @@ fixture 2 本（`f64_add.kotoba` / `f64_mixed.kotoba`、期待値は 5.5 と 3.0
 **「実装した」と「到達できる」は別。** backend に op を足しても、その手前の
 admission 経路が許可しなければ、そのコードは 1 度も実行されない。
 **emit のテストは admission を迂回する** — 実行 fixture だけがそれを捕まえる。
+
+## 訂正の訂正 (2026-08-03): 門 4 の診断は間違っていた
+
+先に「門 4 は verifier の `hir/v3 ⟺ kir/v4` という**推論が精緻さを欠く**のが原因で、
+正しい修正はその推論を精緻化すること」と記録した。**これは誤りだった。**
+
+`compiler/frontend.cljc` に設計意図が明記されている:
+
+> Scalar f64/f32 ops (incl. `f64-from-bits` and the f64-/f32-comparison ops)
+> **require the typed (KIR v4) emitter**: the untyped v3 path has no lowering
+> for them and would emit a `call nil`. A body may use these while every
+> exported signature stays scalar `:i64`, so scan for them here, not just in
+> signatures.
+
+つまり **f64 は設計上 KIR v4 を要求する**。v3 経路には lowering が無く、
+`call nil` を吐く。そして**私の fixture（`[] :i64` 宣言・本体に f64）は、この
+コメントが名指しで想定している形そのもの**だった。
+
+したがって門 4 は**壊れた推論ではなく、正しく不整合を報告していた**: artifact が
+KIR v3 でありながら HIR v3 を主張していた。**seal は正しく、通そうとした私が
+間違っていた。**
+
+### 正しい方向
+
+f64 を **typed (v4) 経路**に載せる。**seal を緩めるのではない。**
+
+同セッション中に別セッションが `i32-operations` で同じ 4 リポ連鎖を通している
+（`kotoba-native` 実装 → `kotoba-kir` の native gate 限定 admission → `verifier`
+admission → `compiler` pin 前進）。`i32-operations` も `typed-values?` の
+トリガ集合に入っているので、**typed 経路を通す前例が既にある**。f64 も同じ道を
+辿るべきで、私の `only-native-word-typed-features?` への追加はその一部としては
+正しい（あの述語は native の one-word typed slice を証明するもの）。
+
+**残る本当の問い**: native backend が v4/typed artifact をどう扱うか。私が
+「allow-list に足せば通る」と書いた門 1-3 は正しかったが、**門 4 の先にあるのは
+list ではなく value ABI の話**で、そこは未調査のまま。
+
+### 教訓（8 つ目）
+
+**seal が拒否したとき、seal を疑う前に、通そうとしているものが本当に正しいかを
+疑う。** 私は「推論が雑だ」と結論したが、コードには設計意図が明記されており、
+**読んでいなかったのは私のほうだった。** 3 つの門を通した勢いで 4 つ目も
+「同じく緩めれば良い」と考えたのが誤りの経路。
 "}]
