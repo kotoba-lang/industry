@@ -1,44 +1,70 @@
 (ns kotoba.industry-test
   (:require [clojure.test :refer [deftest is testing]]
             [kotoba.industry :as industry]
-            [kotoba.technology :as technology]))
+            [kotoba.technology :as technology]
+            [clojure.set]))
 
-(def ^:private unresolvable-technology-industries
-  "ISIC ids whose `:required-technologies`/`:optional-technologies` name
-  a technology no entry in `kotoba-lang/technology` provides.
+(def ^:private unprovided-technology-ids
+  "Technology ids declared by a real industry that nothing in
+  `kotoba-lang/technology` provides. The fleet's build backlog, as data.
 
-  `kotoba.technology/of` THROWS `unknown technology` on these, so
-  `technology-stack` -- and therefore `execution-plan` and
-  `readiness` -- blows up for every one of them. Twelve ids are missing:
-  :notifications (6 industries, all REQUIRED), :corporate-intelligence,
-  :quota-tracking, :scheduling, :langgraph-clj, :forest-ecology,
-  :heat-recovery, :leak-detection, :pressure-monitoring,
-  :sea-state-monitoring, :sustainability-metrics,
-  :temperature-monitoring, :weather-forecasting.
+  Measured 2026-08-03: 16 such ids across 41 references and 29 of the
+  651 industries. Two of those 16 were not backlog at all and were
+  fixed rather than recorded — `:scheduling` on 0210 was a naming error
+  for `:optimization` (which provides `:optimization/scheduling`), and
+  `:langgraph-clj` on 862 was a category error, naming the actor
+  framework every isic actor runs on rather than a domain technology.
+  The 14 below are genuine: nobody has built them.
 
-  Recorded rather than fixed: deciding whether each of these is a
-  missing technology entry or a wrong industry reference is a judgement
-  about what those industries actually need, and it is not this test's
-  to make. What the test can do is stop the list growing. It is asserted
-  EXACTLY, so adding a new dangling reference fails here, and fixing one
-  fails here too -- shrink the list when you fix it."
-  #{"0210" "0311" "0312" "0321" "0322" "1910" "3520" "3530" "4210" "4220"
-    "4290" "4329" "4330" "4390" "6411" "6419" "6420" "6430" "6499" "6511"
-    "6512" "6612" "6621" "6622" "6630" "6810" "6910" "6920" "862"})
+  They are NOT deleted, because \"0311 marine fishing needs quota
+  tracking\" is true and useful; deleting it would destroy the backlog
+  to make a test pass. They no longer break anything either — since
+  `technology/resolve-stack`, `technology-stack` returns what exists and
+  `unprovided-technologies` names what does not.
 
-(deftest every-required-technology-resolves-except-the-known-broken-set
-  ;; A required-technology id that names nothing in the technology
-  ;; registry is the failure ADR-2800002200 corrected by hand for 5110
-  ;; (an industry claiming a capability no repo provides). This checks
-  ;; the whole registry for it instead of one entry at a time.
+  Asserted EXACTLY, so building one of these fails here (shrink the set)
+  and adding a new dangling reference fails here too."
+  #{:notifications              ; 6 industries, all REQUIRED (4210 4220 4290 4329 4330 4390)
+    :corporate-intelligence     ; 14, all optional (finance / legal / accounting)
+    :quota-tracking             ; 2, REQUIRED (0311 0312 fishing)
+    :emissions-tracking         ; 1, REQUIRED (1910)
+    :forest-ecology             ; 1, REQUIRED (0210)
+    :catch-quality-assurance    ; 2, optional
+    :weather-forecasting        ; 2, optional
+    :pressure-monitoring        ; 3, optional
+    :temperature-monitoring     ; 2, optional
+    :sustainability-metrics     ; 2, optional
+    :byproduct-quality-assurance ; 1, optional
+    :heat-recovery              ; 1, optional
+    :leak-detection             ; 1, optional
+    :sea-state-monitoring})     ; 1, optional
+
+(deftest the-unprovided-technology-backlog-is-exactly-this
   (let [known (set (map :id (:technologies (technology/registry))))
-        broken (set (for [{:keys [id required-technologies optional-technologies]}
-                          (:industries (industry/registry))
-                          :when (some #(not (contains? known %))
-                                      (concat required-technologies optional-technologies))]
-                      id))]
-    (is (= unresolvable-technology-industries broken)
-        "the set of industries with dangling technology references must only shrink")))
+        declared (set (for [{:keys [required-technologies optional-technologies]}
+                            (:industries (industry/registry))
+                        t (concat required-technologies optional-technologies)]
+                    t))]
+    (is (= unprovided-technology-ids (clojure.set/difference declared known))
+        "the backlog must only shrink -- build one, or stop declaring it")))
+
+(deftest every-industry-can-be-queried
+  ;; The property that was false for 29 industries until
+  ;; `technology/resolve-stack`: asking an industry for its plan must
+  ;; produce an answer, including when part of what it needs is unbuilt.
+  (doseq [{:keys [id]} (:industries (industry/registry))]
+    (is (some? (industry/execution-plan id))
+        (str "ISIC " id " must be queryable"))))
+
+(deftest an-unbuilt-requirement-is-reported-on-the-plan-not-hidden
+  (let [plan (industry/execution-plan "4210")]        ; construction of roads and railways
+    (is (= [:notifications] (get-in plan [:unprovided-technologies :required]))
+        "4210 requires notifications and nobody has built it -- say so")
+    (is (seq (:technology-stack plan))
+        "and everything it needs that DOES exist still resolves"))
+  (testing "an industry whose declarations are all provided reports an empty backlog"
+    (let [plan (industry/execution-plan "7911")]
+      (is (= {:required [] :optional []} (:unprovided-technologies plan))))))
 
 (deftest travel-agency-requires-and-resolves-fare-shopping
   (let [ids (set (map :id (industry/technology-stack "7911")))]
