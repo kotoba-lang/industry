@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 7514, "kotobase-cf-wasm-staging" 5714},
+ {"net-kotobase" 7562, "kotobase-cf-wasm-staging" 5714},
  :zone
- {:requests-7d 20699,
-  :pageviews-7d 1160,
-  :uniques-7d-sum 1340,
+ {:requests-7d 20779,
+  :pageviews-7d 1162,
+  :uniques-7d-sum 1343,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 1778}
+  [{:path "/health", :requests 1773}
    {:path "/_health", :requests 1734}
-   {:path "/", :requests 168}
+   {:path "/", :requests 159}
    {:path "/v1/passkey/login/options", :requests 63}
    {:path "/cdn-cgi/rum", :requests 35}
    {:path "/v1/passkey/login/verify", :requests 30}
-   {:path "/sign-in", :requests 27}
+   {:path "/sign-in", :requests 26}
    {:path "/api/funnel", :requests 25}],
-  :status-mix {:client-error 5096, :server-error 13, :ok 4236},
+  :status-mix {:client-error 5055, :server-error 13, :ok 4197},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
  :as-of "2026-08-03",
  :traffic-quality {:window "24h", :probe-4xx-pct 55, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 1778 · /_health 1734 · / 168 · /v1/passkey/login/options 63 · /cdn-cgi/rum 35 | 4xx(probe) 55% · 5xx 0%",
- :funnel {:visitors 2150, :signups 12, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 1773 · /_health 1734 · / 159 · /v1/passkey/login/options 63 · /cdn-cgi/rum 35 | 4xx(probe) 55% · 5xx 0%",
+ :funnel {:visitors 2151, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 20699 req/7d・1340 uniques(日次和)・うち4xx probe 55%(24h)、workers 13228 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 20779 req/7d・1343 uniques(日次和)・うち4xx probe 55%(24h)、workers 13276 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 7,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.42857142857142855,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 618},
+ {:visitors {:openai-ads 3, :organic 619},
   :signups {:organic 9}, 
   :checkouts {}}}
