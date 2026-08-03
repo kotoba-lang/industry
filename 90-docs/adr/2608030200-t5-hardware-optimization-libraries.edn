@@ -596,4 +596,49 @@ loop 0.05 ns/op（ベクトル化カーネル相当）だと、traffic 比は 23
 依然として未検証）、`:explained-by` を追加して「なぜ測れなかったか」がモデルで
 説明できるようになったことを記録した。**「測れない」と「間違っている」は別物**という
 反復 4 の区別を保ったまま、前者を予測可能にした。
+
+## 反復 11 (2026-08-03) — paging にも「走らせる前に上限を出す」層を入れた
+
+`layout` (`achievable-ratio`) と `traversal` (`tiling-benefit`) に続き、`paging` に
+**Belady の OPT** を入れた。ポリシー調整はすべて「埋めるべき差」の話なのに、
+その差を先に測る者がいなかった。
+
+- `compulsory-misses` — distinct page 数。**どんな容量・ポリシーでも下回れない床**
+- `optimal-misses` — Belady の千里眼置換。**どんな online ポリシーも上回れない天井**
+- `headroom` — ポリシーの miss のうち、完全な置換なら避けられた割合
+
+**OPT の近くにいるポリシーは調整しても何も出ない。遠いポリシーには追う価値がある。
+そのどちらかは workload の性質であってポリシーの性質ではない。**
+
+### 間違いが面白かった: 実ポリシーが千里眼の上限を「破った」
+
+**OPT は置換の上限であって prefetch の上限ではない。** 最初の `headroom` は
+readahead 有効のキャッシュを OPT と比べ、**LRU が 4 miss、「最適」が 12 miss** という
+結果を出した — **実ポリシーが千里眼の上限を 3 倍破った**。不可能な結果なので、
+**上限ではなく比較の方が間違っている**という信号だった。
+
+修正: `headroom` は `demand-only`（readahead を切った版）で走らせ、出力に
+`:bounds :replacement-only` を明記する。テストで固定したので黙って戻らない。
+
+**教訓（5 つ目）: 上限を使うときは、その上限がどのレバーを縛っているかを確認する。**
+
+### T5 の 5 ライブラリのうち 4 つが事前に上限を言える
+
+| repo | 事前判定 |
+|---|---|
+| `layout` | `achievable-ratio` — held-out 19% 以内（反復 9） |
+| `traversal` | `tiling-benefit` — 反復 4 の null result を 1.00x と予測（反復 10） |
+| `paging` | `headroom` — Belady OPT との差（本反復） |
+| `perfgate` | `detectable?` — ノイズ側から（反復 4） |
+| `ioplan` | **未** |
+
+### 運用: pin 退行の正体が判明した
+
+数反復にわたり無関係なリポの「pin 退行」で push guard に弾かれ続けていた。原因は
+**guard が push 元の worktree ではなく共有 checkout の `manifest/west.yml` を読む**
+こと。共有 checkout が `origin/main` より遅れていると、隔離 worktree から最小 diff を
+push しても、guard は共有側の古い pin を見て退行と判定する。
+
+**対処: push の前に共有 checkout を `origin/main` に ff 同期する。** worktree 隔離は
+作業の衝突は防ぐが、guard の参照先までは隔離しない。
 "}]
