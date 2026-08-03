@@ -54,16 +54,37 @@
         key-id   (env-or-die "B2_KEY_ID"   nil)
         app-key  (env-or-die "B2_APP_KEY"  nil)
         bucket   (env-or-die "B2_BUCKET"   nil)
-        endpoint (env-or-die "B2_ENDPOINT" "例: s3.us-west-004.backblazeb2.com")]
+        endpoint (env-or-die "B2_ENDPOINT" "例: s3.us-west-004.backblazeb2.com")
+        ;; 任意。既定はバケット直下だが、共有バケットでは必ず指定する（上記参照）。
+        fileprefix (scripts.nbb-compat/getenv "B2_FILEPREFIX")]
 
     (need-tool "datalad")
     (need-tool "git-annex")
 
     ;; 1) データセット作成（既存ならスキップ）。text2git: テキストは通常 git、バイナリは annex。
+    ;;
+    ;; **既にファイルのある repo を dataset にする経路を持つ**（2026-08-03）。
+    ;; 実運用の dataset は大半がこの形で、product-corpus / ghosthacker-shiropico /
+    ;; cloud-itonami-gtm-data はいずれも「先にコードがある repo を後から dataset 化」した。
+    ;; datalad は非空ディレクトリに --force 無しでは create しないので、既存 repo を
+    ;; 渡すとここで必ず落ちていた。
+    ;;
+    ;; その形では **text2git を入れない**。text2git の既定
+    ;; (annex.largefiles=バイナリなら annex) は中身 sniffing であって、実体が
+    ;; テキスト EDN のコーパスだと「git 履歴から外す」という目的を満たさない。
+    ;; 呼び出し側が .gitattributes でパスを明示的に振り分ける前提にする。
     (when-not (fs/exists? (fs/path dataset-dir ".datalad"))
-      (-> (p/process ["datalad" "create" "-c" "text2git" dataset-dir]
-                     {:inherit true})
-          deref :exit (#(when (pos? %) (die "datalad create に失敗しました")))))
+      ;; 「非空か」ではなく「既に git repo か」で判定する。dataset 化したい既存物は
+      ;; 例外なく repo であり、判定が 1 つの述語で済んで誤検出しない。
+      (let [existing? (fs/exists? (fs/path dataset-dir ".git"))
+            cmd (if existing?
+                  ["datalad" "create" "--force" dataset-dir]
+                  ["datalad" "create" "-c" "text2git" dataset-dir])]
+        (when existing?
+          (println (str "既存ファイルのある " dataset-dir " を dataset 化します"
+                        " (--force / text2git 無し。振り分けは .gitattributes 側)")))
+        (-> (p/process cmd {:inherit true})
+            deref :exit (#(when (pos? %) (die "datalad create に失敗しました"))))))
 
     ;; 2) B2 を S3 互換 special remote として登録（既存ならスキップ）。
     ;;    git-annex S3 は AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY を読む → B2 のキーを割り当てる。
@@ -77,11 +98,17 @@
       (if enabled?
         (println (str "既存の special remote '" remote-name "' を有効化しました"))
         (let [{:keys [exit]}
-              (-> (p/process ["git" "annex" "initremote" remote-name
-                              "type=S3" "protocol=https"
-                              (str "host=" endpoint) "port=443"
-                              (str "bucket=" bucket)
-                              "signature=v4" "chunk=50MiB" "encryption=none"]
+              (-> (p/process (cond-> ["git" "annex" "initremote" remote-name
+                                      "type=S3" "protocol=https"
+                                      (str "host=" endpoint) "port=443"
+                                      (str "bucket=" bucket)
+                                      "signature=v4" "chunk=50MiB" "encryption=none"]
+                               ;; 1 バケットを複数 dataset で共有するので、実運用の
+                               ;; dataset は全て fileprefix を持つ（実測: product-corpus は
+                               ;; fileprefix=product-corpus/）。これが無いと全 dataset の
+                               ;; キーがバケット直下に混ざり、どの dataset の実体かを
+                               ;; バケット側から判別できなくなる。
+                               fileprefix (conj (str "fileprefix=" fileprefix)))
                              {:dir dataset-dir :env annex-env :inherit true})
                   deref)]
           (when (pos? exit)
