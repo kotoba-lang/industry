@@ -166,4 +166,59 @@ gap は依然として gap）。
 ### 残り
 
 段階 2 (`vector-f64-*`) 以降は未着手。**T5 の計測が native に載るのは段階 2 から**。
+
+### 段階 2 の設計判断 (2026-08-03): 素直な実装は JVM より遅くなる
+
+段階 2 に着手する前にコードを読んで、**この ADR が段階 2 に書いた実装方針
+（「既存の pair heap arena と同じ線形メモリ上に長さ付きバッファとして置く」）では
+性能目標に到達できない**ことが分かった。方針を改める。
+
+**問題**: native backend の集約値は**すべて host callback** である。`pair` /
+`kgraph-*` / `string=?` / `string-concat` は `emit-heap-call` を通り、
+`kexe_context_v2` の関数ポインタ経由で C に間接呼び出しする
+（`tools/kexe_loader.c` の `pair_new` / `pair_first` 等、offset 56/64/72...）。
+
+**`vector-f64-at` をこのパターンに載せると、要素 1 つ読むごとに関数呼び出しが要る。**
+目標は 0.36 ns/要素、関数呼び出しは概ね数 ns。**置き換えようとしている JVM の
+0.87 ns/要素より遅くなる。** 素直に実装していたら、目的を果たさないどころか
+後退するものを作っていた。
+
+**候補と評価**:
+
+| 表現 | `-at` の hot path | 判定 |
+|---|---|---|
+| **A. pair(base,length) ハンドル**（文字列と同型） | `pair-first` = **host 呼び出し** / 要素。この backend は optimizer を持たないので hoist されない | **目標未達** |
+| **B. 生のベースアドレスを値にする** | inline `ldr d0,[x1,x2,lsl #3]` 1 命令 | 速いが**長さの置き場が無く**、guest 値に無制限の生ポインタが入る。このスタック全体が依存する capability 封じ込めを破る。**不可** |
+| **C. base + length を 2 スロットに持つ fat value** | inline load + inline 境界検査（第 2 スロット）。hot path に host 呼び出し無し | **これ。** 境界が値と一緒に移動するので封じ込めも保たれる |
+
+**C には既存の前例がある**: record 値は既に
+「rewritten at codegen time into TWO synthetic 8-byte stack slots」
+（`x86_64.cljc:426`）として複数スロットで表現されている。新しい機構ではなく、
+既にある機構の再利用。
+
+**したがって段階 2 の順序を改める**:
+
+1. record が使っている synthetic multi-slot 機構を `vector-f64` 値に適用する
+2. `vector-f64-count` = 第 2 スロット読み出し（**host 呼び出し無し**）
+3. `vector-f64-at` = inline 境界検査 + inline `ldr d`（**host 呼び出し無し**）
+4. `vector-f64-new` / `-assoc` / `-conj` / `-drop` のみ host 側 arena が要る
+   （`kexe_loader.c` に callback 追加 + `_Static_assert` + loader source hash 更新）
+
+**hot path（読み出し）は backend だけで閉じ、host 変更は割り当て側だけに要る**という
+分割になるのが、この表現の実利。
+
+**検証済みエンコーディング**（`clang` でアセンブルしてバイト照合）:
+
+| 命令 | ARM64 | x86-64 |
+|---|---|---|
+| f64 load (base) | `ldr d0,[x1]` = 0xFD400020 | `movsd (%rax),%xmm0` = f2 0f 10 00 |
+| f64 store (base) | `str d0,[x1]` = 0xFD000020 | `movsd %xmm0,(%rax)` = f2 0f 11 00 |
+| f64 load (scaled index) | `ldr d0,[x1,x2,lsl #3]` = 0xFC627820 | `movsd (%rax,%rcx,8),%xmm0` = f2 0f 10 04 c8 |
+| f64 store (scaled index) | `str d0,[x1,x2,lsl #3]` = 0xFC227820 | `movsd %xmm0,(%rax,%rcx,8)` = f2 0f 11 04 c8 |
+
+**教訓**（段階 1 の「無いのが契約か実装か」に続く 2 つ目）: **既存パターンに合わせる
+のが常に正しいとは限らない。** `pair` / `string` が host callback なのは、それらの
+操作が要素あたりのループに入らないから成立していた。同じ形を hot path に持ち込むと
+コストの桁が変わる。**パターンを踏襲する前に、そのパターンが成立していた前提が
+自分の用途でも成り立つか確認する。**
 "}]
