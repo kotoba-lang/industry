@@ -430,4 +430,55 @@ list ではなく value ABI の話**で、そこは未調査のまま。
 疑う。** 私は「推論が雑だ」と結論したが、コードには設計意図が明記されており、
 **読んでいなかったのは私のほうだった。** 3 つの門を通した勢いで 4 つ目も
 「同じく緩めれば良い」と考えたのが誤りの経路。
+
+## 解決 (2026-08-03): f64 は native に到達した。8/8 で実行確認
+
+### 実際の原因は `:value-abi` だった（`:hir` ではなかった）
+
+compiler は値 ABI を `(cond (uses-f32? hir) mixed-f32-f64-v3 / (uses-f64? hir)
+**mixed-f64-v2** / typed-values? externref-v1 / :else i64-direct-v1)` で選ぶ。
+verifier は**後ろ 2 分岐しか持っていなかった**ので、compiler が `mixed-f64-v2` を
+刻んだ artifact は**ここで導出できる値と原理的に一致しない**。seal は正しく不整合を
+報告していた。
+
+**発見は推論ではなく測定による**: i32 と f64 のプログラムは**どちらも hir/v3** で、
+i32 は seal を通り f64 は通らない。これで HIR format 説（私の 1 度目・2 度目の診断）が
+両方消え、残ったのが `:value-abi` フィールドだった。
+
+修正は verifier が**自分が保持する KIR から** ABI を導出すること
+（`kotoba.kir/uses-f64?` は compiler が使うのと同じ述語）。artifact の自己申告に
+頼らないので seal の独立性は保たれ、網羅性だけが上がる。
+
+### 4 つの門、すべて通った
+
+| # | repo | 変更 | commit |
+|---|---|---|---|
+| 1 | compiler | target gate を f32 / f64 に分離 | `6085984` |
+| 2 | kotoba-kir | native gate で f64 scalar op を admit | `a1ea526` |
+| 3-4 | kotoba-verifier | op 追加 + **`:value-abi` 導出** | `f422bcc` |
+
+### 実行 fixture — バイト列ではなく演算を証明する
+
+- `f64_add`: 2.0 + 3.5 = 5.5
+- `f64_mixed`: sqrt(abs(neg(4.0))) × 1.5 = 3.0（unary は別コード経路）
+- `i32_probe`: 別セッションの i32 実装にも execution fixture が無かったので追加
+
+**native conformance 8/8（aarch64、この MacBook で実行）。** compiler suite は
+811 tests / 6378 assertions、残る 2 失敗は wall-clock budget test（変更前から失敗、
+同グループの 3 つ目は今回通った）。
+
+### `f64-native-targets-fail-closed` は不変条件を保ち、message regex を失った
+
+source は **signature に f64 を置く**（f64 のベクタ・レコードが境界を跨ぐ）。native に
+その表現は無いので**今も拒否される** — ただし 1 つ後の門で止まる。**message ではなく
+拒否を assert する**形に変え、**反対側を固定する companion test**を足した。両方が
+無ければ「f64 を全面禁止した」場合にもテストが通ってしまう。
+
+### 教訓 8 の訂正
+
+先に「f64 は typed(v4) 経路が要る」と結論したが**それも間違いだった**。f64 は v4 を
+要さず、必要だったのは verifier が f64 用の ABI を導出できることだけ。
+
+**3 回とも、コードを読んで推論した結論より、i32 と f64 を並べて測った 1 回のほうが
+正しかった。**
 "}]
