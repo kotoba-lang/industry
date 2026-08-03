@@ -1,0 +1,156 @@
+[{:db/id -1
+  :adr/id "2608550000-cid-native-codebase-authoring-compile-discovery"
+  :adr/title "ADR-2608550000: kotoba を CID ネイティブにする —— オーサリング / codebase / compile / グローバル discovery"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "cid-native-codebase"
+  :adr/date "2026-08-04"
+  :adr/last_verified "2026-08-04"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotoba-lang/codebase の evaluator / authoring / render / names / fetch / ir"
+   "kotoba-lang/compiler の module-lock（CID 固定 module 解決）"
+   "kotoba-lang/kotoba の codebase CLI と codebase-routing（global discovery）"
+   "「kotoba は Unison / Nix like に CID で依存解決するか」への回答の現在地"]
+
+  :adr/context
+  "オーナー指示（2026-08-04）「オーサリング, codebase, compile, global discovery を
+   cid ベースに, nix, unison like に」。
+
+   着手前の実測（同日）:
+
+   - **compile**: `(:require [app.util :as u])` は `kotoba.compiler.project-files` が
+     namespace を **パス**に変換してソースルートを探索していた。CID はどこにも出てこない。
+   - **codebase**: 定義は CID で識別・保存できたが、実行は *executable source witness*
+     ——定義 CID ごとに保存した元のテキストを再コンパイルする——を経由していた。
+     つまり転送・保存・信頼の対象は定義グラフではなく**ソース**であり、依存が全部
+     揃っていてもファイルが無ければ動かなかった。しかも zero-arity 限定。
+   - **オーサリング**: 通常のファイル編集 + git。hash-native な編集も
+     browse-by-hash も無い（ADR-kotoba-content-addressed-codebase-gap が
+     「Do not claim hash-native authoring」と自ら明記していた）。
+   - **global discovery**: explicit-peer HTTP 転送のみ。「この CID を誰が持っているか」
+     を問う経路は無かった。
+
+   なお着手時、`orgs/kotoba-lang/kotoba` の共有 west checkout には別セッションの
+   未着地 WIP（19 commits + 未コミット差分）が残っており、そこに実装済みに見える
+   コードがあったが、それは origin/main には存在しない。origin/main では
+   `#429 separate language runtime responsibilities` で semantic-code /
+   semantic-codebase は **kotoba-lang/codebase** に、package admission は
+   **kotoba-lang/security** に切り出されていた。実装は origin/main を正として行った。"
+
+  :adr/decision
+  "4 面すべてを CID ベースにする。境界は次のとおり。
+
+   ## L1 codebase — hash から動く（kotoba-lang/codebase @ 484f1a8）
+
+   - `kotoba.codebase.evaluator`: 定義をそのブロックから評価し、依存は **CID で
+     hydrate** する。ファイル・namespace・名前を一切参照しない。source witness は廃止。
+     依存欠落は fail-closed（名前へのフォールバックをしない）。
+   - `kotoba.codebase.ir`: リンク復号 / 参照走査 / **CID 置換**。
+   - `kotoba.codebase.authoring`: scratch buffer を namespace が現在選んでいる名前に
+     対して compile → added / updated / unchanged に分類 → **依存 CID の書き換えで
+     dependents へ伝播**。
+   - `kotoba.codebase.render`: 定義をソースへ射影（`view`）。
+   - `kotoba.codebase.names`: 名前 / CID / `#`短縮ハッシュ、dependents / dependencies。
+   - `kotoba.codebase.fetch`: 注入された transport 経由の bounded / verified hydration。
+
+   ## L2 compile — 固定された入力（kotoba-lang/compiler、module-lock）
+
+   `--module-lock` は lock が CID で名指した module だけを content-addressed block
+   ディレクトリから読み、要求した CID にハッシュ一致しなければ拒否する。**パス探索も
+   フォールバックも無い**。lock が pin していない `:require` はエラー。
+   `lock-cid` が入力集合全体に 1 つの identity を与える。
+   移行口は `kotoba -M module-lock`（既存プロジェクトの pin 化）。
+
+   ## L3 global discovery — 誰が持っているか（kotoba-lang/kotoba、codebase-routing）
+
+   IPFS **Delegated Routing HTTP API v1**（`/routing/v1/providers/{cid}`、DHT + IPNI
+   backed）で provider を引き、**trustless gateway**（`/ipfs/{cid}?format=raw`）から
+   raw block を取る。全バイトを要求 CID に対して検証してから永続化する。
+
+   ## CLI
+
+   `kotoba codebase add | plan | view | run | list | find | dependents | pull`。
+   名前・完全 CID・`#`短縮ハッシュは 1 つの定義を指す互換な言い方。"
+
+  :adr/consequences
+  "## 主張してよいこと（テスト済み）
+
+   - **定義は hash だけで動く。** `evaluator/invoke` はブロックを読み、依存を CID で
+     hydrate する。どの名前も束ねられていない定義がそのまま動くことをテストが示す。
+   - **更新は再コンパイルでなく書き換えで伝播する。** `double` だけを書き直すと、
+     scratch に存在しない `quadruple` も新しい依存 CID を指す新しい identity を得て、
+     新しい実装を通って評価される（推移的にも）。dependent の *ソース* は不要。
+   - **compile 入力は pin されて検証される。** block を差し替えると
+     `does not hash to its CID` で落ち、lock に無い依存は `not pinned` で止まる。
+   - **受け取ったバイトは信じる前に検証される。** 要求 CID へのハッシュ一致に加え、
+     **canonical encoding であること**も検査する（非 canonical な CBOR で同じ値に
+     decode させ、store に「再 encode すると別 CID になるバイト」を置く経路を塞ぐ）。
+     嘘をつく gateway を実際に立てたテストが `:codebase/fetched-cid-mismatch` を返す。
+   - **rename は namespace commit を変え、定義 CID を変えない。**
+   - **曖昧な短縮ハッシュは拒否する**（先頭一致で最初の候補を選ばない）。
+
+   ## 主張してはいけないこと（未実装）
+
+   - **publish しない。** DHT への announce には libp2p ノードが要る。Kotoba の定義
+     ブロックがグローバルに discoverable になるのは、それを持つ何かが provide して
+     からである。**discovery が可能であることは、コンテンツがそこにあることと違う。**
+     `pull` は空の provider 集合をそのまま返す。
+   - browsing UI / semantic diff / rebase / 対話的 conflict 解決は無い。
+   - evaluator は **pure**。capability intrinsic は dispatch せず拒否するので、
+     到達可能性が権限にならない。effectful な実行は従来どおり host 経由。
+
+   ## 実装上の判断（再発防止として明記）
+
+   - **fuel とは独立に call depth を bound した。** 潤沢な fuel が尽きるより先に
+     ホストのスタックが尽き、`StackOverflowError` は Error であって fail-closed な
+     結果ではない（実測で発生した）。深さは **呼び出し時**に数える——再帰グループは
+     `fn` ノードを 1 回だけ評価してその 1 つのクロージャに再入するので、生成時に
+     捕まえた深さは増えない。
+   - **`cbor/tagged?` を `map?` より先に判定する。** CBOR タグは record なので
+     `map?` に真を返し、素朴な再構築はブロック中の全 IPLD リンクを plain map に変えて
+     バイトを変えてしまう。
+   - **`profile` / `hashContract` は fetch で辿らない。** これらは契約**文字列**の CID
+     であってブロックではないので、辿ると毎回 2 ブロック分 incomplete と報告される。
+   - **source-tree CID と definition CID を混ぜない。** 前者はどのバイトを
+     コンパイルしたか、後者は定義が何を**意味する**かを言う。混ぜるとコメント変更が
+     定義 identity を無効化したり、別のソースが同じ identity を主張したりする。
+
+   ## 検証
+
+   - kotoba-lang/codebase: 53 tests / 221 assertions green、lint clean。
+   - kotoba-lang/compiler: module-lock 7 tests / 17 assertions green。フルスイートは
+     840 tests / 6447 assertions で 4 failures —— すべて既存の **soft performance
+     budget**（document_dual_renderer / document_perf_workload、負荷の高いマシンで
+     5s budget に対し 25s）で、本変更とは無関係。
+   - kotoba-lang/kotoba: 新規 6 tests / 20 assertions green。フルスイート 467 tests /
+     8371 assertions で 6 failures —— すべて `backend-qualification` の兄弟リポパス
+     （`../kototama`、`../compiler`）の存在チェックで、west レイアウト外の worktree で
+     走らせた副作用。兄弟を symlink して当該 namespace を再実行すると 0 failures。
+   - global discovery は**実ネットワークで実測**（2026-08-04）: delegated-ipfs.dev が
+     サンプル CID に対し HTTP 到達可能な provider を 6 件返し、trustless gateway から
+     の raw block 取得（119,776 bytes）が成功した。
+
+   ## 着地
+
+   | repo | merge | 内容 |
+   |---|---|---|
+   | kotoba-lang/codebase | 484f1a8 | evaluator / authoring / render / names / fetch / ir |
+   | kotoba-lang/compiler | 4fa7e6d（main は a6e7dc4 に前進済み） | module-lock |
+   | kotoba-lang/kotoba | 6e79ab7 | codebase CLI / codebase-routing |
+   | com-junkawasaki/root | 6f36f6d | manifest pin 前進（codebase / kotoba） |
+
+   `manifest/west.yml` の pin 前進は GitHub API single-entry 経路で行い、サーバ側
+   pin 検証を通した。**`gen-west-manifest.cljs --check` は STALE を返すが、これは
+   ローカル west checkout 群が pin より遅れている / WIP ブランチ上にあるためで
+   （generator はローカル working HEAD で pin するため wholesale 再生成は 34 件の
+   pin 退行を起こす。generator 自身がそれを検出して書き込みを拒否した）、本変更の
+   2 行の pin 編集とは別問題。"
+
+  :adr/related
+  ["kotoba-lang/kotoba/docs/ADR-kotoba-content-addressed-codebase-gap.md"
+   "kotoba-lang/kotoba/docs/ADR-kotoba-package-cid-lock.md"
+   "2607279200-kotoba-clojure-shaped-safety-elaboration-migration"
+   "2608039970-kotoba-datom-plane-not-datalog"
+   "2608039700-agent-loop-git-edn-datalad-source-of-truth"]}]
