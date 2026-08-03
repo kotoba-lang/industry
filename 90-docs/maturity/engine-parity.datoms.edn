@@ -54,11 +54,11 @@
   :parity/target "unity" :parity/subject "kami-engine"
   :parity/axis "render-pipeline"
   :parity/label "レンダパイプライン（PBR / shadow / postfx / 複数パス）"
-  :parity/status :implemented :parity/score 0.60
-  :parity/repos "[\"kotoba-lang/webgpu\" \"kotoba-lang/kami-engine-render\" \"kotoba-lang/kami-postfx-scene\" \"kotoba-lang/kami-engine-hud-gpu\"]"
-  :parity/evidence "WebGPU + WGSL first / WebGL2 fallback が repo-wide 規則（CLAUDE.md）。shadow-map 4 件、instancing 5 件、frustum 4 件。kami-postfx-scene/data/postfx.edn に名前付き mood preset（:nintendo 等）。ADR-2607120100 が cljs 直 WebGPU を標準化。"
-  :parity/probe "grep -ril shadow-map --include='*.clj*' orgs/kotoba-lang/kami-* orgs/kotoba-lang/webgpu"
-  :parity/gap "kami.webgpu（procedural primitive のみ）と kami.webgpu.mesh（実 mesh + skin + texture）が未接続 — ADR-2607121800 Phase 3 が designed-not-implemented のまま。"
+  :parity/status :partial :parity/score 0.45
+  :parity/repos "[\"kotoba-lang/webgpu\" \"kotoba-lang/kami-engine\" \"kotoba-lang/pipelines\" \"kotoba-lang/kami-postfx-scene\"]"
+  :parity/evidence "**2 つの分断がある**（2026-08-04 実測、ADR-2608040400）。分断 A（ADR-2607121800 が既に記録）: kami.webgpu（procedural primitive のみ）と kami.webgpu.mesh（実 mesh + skin + texture）が未接続。分断 B（新規発見、より大きい）: kami-engine/kami-render/src/shaders/ の 17 本の WGSL —— scene_terrain / scene_water / scene_vegetation / scene_voxel / scene_particle / scene_character / scene_atlas / scene_sky / pbr / mtoon / metahuman_skin / metahuman_hair / gaussian_splat / rt_bvh_compute / strand_compute / style_postfx / skinned_mtoon —— と、それを data として記述する kami.pipelines の 8 pipeline が、rendering consumer をひとつも持たない。live な cljs executor は自前の kami.shaders/cascaded-textured-hdr-shader + cascaded-foliage-shadow-shader で描いており、この 17 本を参照しない。"
+  :parity/probe "ls orgs/kotoba-lang/kami-engine/kami-render/src/shaders/*.wgsl | wc -l  # => 17; grep -c 'kami.pipelines' orgs/kotoba-lang/webgpu/src/kami/webgpu.cljs  # => 0"
+  :parity/gap "「AAA に見える機能一式」（terrain / water / vegetation / voxel / particle / toon / metahuman skin+hair / gaussian splat / RT BVH）が書かれているのに描画されない。分断 B の解消は shader を書く仕事ではなく **配線** の仕事なので、分断 A（ADR-2607121800 Phase 3）より安い可能性が高い。"
   :parity/measured-at "2026-08-04"}
 
  {:parity/id :parity/unity-gi
@@ -120,22 +120,22 @@
   :parity/target "unity" :parity/subject "kami-engine"
   :parity/axis "particles-vfx"
   :parity/label "パーティクル / VFX"
-  :parity/status :partial :parity/score 0.45
-  :parity/repos "[\"kotoba-lang/kami-postfx-scene\" \"kotoba-lang/kami-atmosphere-scene\"]"
-  :parity/evidence "particle は kami-*/webgpu のコードで 28 件ヒット（この 20 軸で最も広い痕跡のひとつ）。ただし GPU particle / VFX graph 相当の authoring 面かどうかは未分解。"
-  :parity/probe "grep -ril particle --include='*.clj*' --include='*.edn' orgs/kotoba-lang/kami-* orgs/kotoba-lang/webgpu | wc -l  # => 28"
-  :parity/gap "28 件の内訳（描画実装 / 単なる言及）を分解していない。次イテレーションで分解する。"
+  :parity/status :partial :parity/score 0.25
+  :parity/repos "[\"kotoba-lang/kami-engine\" \"kotoba-lang/pipelines\" \"kotoba-lang/webgpu\"]"
+  :parity/evidence "2026-08-04 に 28 件の内訳を分解した（初回測定の follow-up #1）。実装は本物: kami-engine/kami-render/src/shaders/scene_particle.wgsl は camera-facing billboard quad + age/life アルファフェード + soft edge discard を持つ完成した WGSL。kami.pipelines に :particle {:shader \"scene_particle\" :cull :none :depth-write false :blend :alpha} として data で宣言済み。WIT 契約（kami-engine/wit/kami-interface.edn）も :render/:spawn-particle を持つ。**しかし到達不能** —— この 8 本 pipeline table の唯一の consumer だった native adapter kami_render::scene_pipelines は Rust 撤去で消滅（kami-engine の .rs は 0 件、adapter-registry.edn が :rust-in-default-repo? false を宣言）。cljs-direct WebGPU executor（kami.webgpu、ADR-2607120100 の標準）は自前の pipeline を default-graph に組み立てており kami.pipelines を require しない。"
+  :parity/probe "grep -rn 'kami.pipelines' orgs/kotoba-lang --include='*.clj*' | grep -v '^orgs/kotoba-lang/pipelines/'  # => test / fixture 生成器 / 撤去済み Rust を指す docstring のみ、rendering consumer ゼロ"
+  :parity/gap "shader は在るが描画経路が無い。ADR-2608040400 参照。昇格には kami.pipelines を kami.webgpu の default-graph に接続する必要がある（shader を書く仕事ではなく配線の仕事）。"
   :parity/measured-at "2026-08-04"}
 
  {:parity/id :parity/unity-terrain
   :parity/target "unity" :parity/subject "kami-engine"
   :parity/axis "terrain-vegetation"
   :parity/label "地形 / 植生（heightmap、レイヤ、草木散布）"
-  :parity/status :implemented :parity/score 0.70
-  :parity/repos "[\"kotoba-lang/kami-terrain-scene\" \"kotoba-lang/kami-vegetation-scene\"]"
-  :parity/evidence "kami-terrain-scene/data/biomes.edn が名前付き biome preset（4 レイヤ palette + heightmap パラメータ）を持つことを ADR-2607121800 が実測で記録。terrain は 9 件ヒット。"
-  :parity/probe "grep -n 'biomes.edn' 90-docs/adr/2607121800-*.edn"
-  :parity/gap "terrain 編集ブラシ（Unity の Terrain Tools 相当）の authoring 面が未確認。"
+  :parity/status :partial :parity/score 0.45
+  :parity/repos "[\"kotoba-lang/kami-terrain-scene\" \"kotoba-lang/kami-vegetation-scene\" \"kotoba-lang/kami-engine\"]"
+  :parity/evidence "データ層は本物: kami-terrain-scene/data/biomes.edn が名前付き biome preset（4 レイヤ palette + heightmap パラメータ）を持つ（ADR-2607121800 の実測）。**描画層は分断 B の巻き添え**（2026-08-04、ADR-2608040400）: scene_terrain.wgsl / scene_vegetation.wgsl は実在するが kami.pipelines 経由でしか参照されず、その table に rendering consumer が無い。live な cljs 経路が持つ植生関連は cascaded-foliage-shadow-shader（影のみ）。"
+  :parity/probe "ls orgs/kotoba-lang/kami-engine/kami-render/src/shaders/scene_terrain.wgsl orgs/kotoba-lang/kami-engine/kami-render/src/shaders/scene_vegetation.wgsl; grep -c 'scene_terrain' orgs/kotoba-lang/webgpu/src/kami/webgpu.cljs  # => 0"
+  :parity/gap "biome データと terrain shader は在るが、両者を繋いで実際に地形を描く経路が無い。terrain 編集ブラシ（Unity の Terrain Tools 相当）も未確認。"
   :parity/measured-at "2026-08-04"}
 
  {:parity/id :parity/unity-navigation
@@ -410,7 +410,7 @@
   :parity/label "この台帳自身のカバレッジ申告"
   :parity/status :partial :parity/score 0.0
   :parity/axes-unity 20 :parity/axes-platform 15
-  :parity/evidence "Unity 20 軸 / Roblox+Fortnite+Steam 15 軸を 2026-08-04 に初回測定。判定は grep ベースの痕跡調査であり、ヒット件数の内訳（実装 / 単なる言及）を分解していない軸が複数ある（particles 28 件、pathfind 6 件、anti-cheat 3 件、desktop 7 件）。実行して確かめた軸は 0 — 全 35 軸が静的調査のみ。"
+  :parity/evidence "Unity 20 軸 / Roblox+Fortnite+Steam 15 軸を 2026-08-04 に初回測定。第 2 反復（同日）で particles 28 件の内訳を分解し、分断 B（17 WGSL + 8 pipeline が rendering consumer を持たない）を発見 → ADR-2608040400。その影響で particles 0.45→0.25 / render 0.60→0.45 / terrain 0.70→0.45 に**下方修正**した —— 初回スコアは grep ヒットを実装と読んだため楽観に倒れていた。未分解のまま残っているのは pathfind 6 件 / anti-cheat 3 件 / desktop 7 件。実行して確かめた軸は 1（render 系の shader 実在を webgpu の pipelines gate 10 assertion で実測）、残り 34 は静的調査のみ。"
   :parity/probe "nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q '[:find ?axis ?status ?score :where [?e \"source/dataset\" \"engine-parity\"] [?e \"parity/axis\" ?axis] [?e \"parity/status\" ?status] [?e \"parity/score\" ?score]]'"
-  :parity/gap "(1) grep ヒットの内訳分解が未了 (2) 実行証拠（ブラウザ起動・ベンチ実測）がゼロ (3) kami-* 90 repo のうち行数を測ったのは上位 45 のみ。次イテレーションはこの 3 つのうち最も安いものから潰す。"
+  :parity/gap "(1) pathfind 6 / anti-cheat 3 / desktop 7 の内訳分解が未了 (2) ブラウザ起動による実描画の確認がゼロ —— 分断 B は静的解析で発見したので、実際に何が画面に出ているかは未確認 (3) kami-* 90 repo のうち行数を測ったのは上位 45 のみ。次イテレーションは (2) を優先する: 分断 B が正しければ、royale や at6-texan の実画面には terrain/water/vegetation shader が一切効いていないはずで、それを見れば確定する。"
   :parity/measured-at "2026-08-04"}]
