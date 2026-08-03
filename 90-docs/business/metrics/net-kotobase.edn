@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 6727, "kotobase-cf-wasm-staging" 4019},
+ {"net-kotobase" 7125, "kotobase-cf-wasm-staging" 5096},
  :zone
- {:requests-7d 18104,
-  :pageviews-7d 1077,
-  :uniques-7d-sum 1310,
+ {:requests-7d 19639,
+  :pageviews-7d 1093,
+  :uniques-7d-sum 1326,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 1237}
-   {:path "/_health", :requests 1176}
-   {:path "/", :requests 151}
+  [{:path "/health", :requests 1582}
+   {:path "/_health", :requests 1514}
+   {:path "/", :requests 149}
    {:path "/v1/passkey/login/options", :requests 63}
-   {:path "/cdn-cgi/rum", :requests 35}
+   {:path "/cdn-cgi/rum", :requests 34}
    {:path "/v1/passkey/login/verify", :requests 30}
-   {:path "/robots.txt", :requests 26}
-   {:path "/api/funnel", :requests 25}],
-  :status-mix {:client-error 3979, :server-error 21, :ok 3092},
+   {:path "/api/funnel", :requests 25}
+   {:path "/robots.txt", :requests 24}],
+  :status-mix {:client-error 4703, :server-error 19, :ok 3764},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,12 +30,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-03",
- :traffic-quality {:window "24h", :probe-4xx-pct 56, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 55, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 1237 · /_health 1176 · / 151 · /v1/passkey/login/options 63 · /cdn-cgi/rum 35 | 4xx(probe) 56% · 5xx 0%",
- :funnel {:visitors 2114, :signups 12, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 1582 · /_health 1514 · / 149 · /v1/passkey/login/options 63 · /cdn-cgi/rum 34 | 4xx(probe) 55% · 5xx 0%",
+ :funnel {:visitors 2126, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 18104 req/7d・1310 uniques(日次和)・うち4xx probe 56%(24h)、workers 10746 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 19639 req/7d・1326 uniques(日次和)・うち4xx probe 55%(24h)、workers 12221 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 7,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.42857142857142855,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 582},
+ {:visitors {:openai-ads 3, :organic 594},
   :signups {:organic 9}, 
   :checkouts {}}}
