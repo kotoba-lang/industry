@@ -227,8 +227,9 @@ ADR-2607110300 の labeling 規則をそのまま継承する。**witness が全
 | **F2** 計量実行 | **契約は着地済み・`.kotoba` body は未** — `inga.fuel`。exhaustion を state 遷移にし、root が commit する。`.kotoba` machine 本体は compiler の capability kit が `:wasm-aot`/`:native-aot` pending かつ fs/process capability と script host が無いため未（後述） |
 | **F3** power table の committed 化・`:storage` role | **着地済み** — `inga.power`。table を committed state の関数にし、既存 bond market に `:storage` role を追加。**engi.stake の経済は再実装していない** |
 | `kotoba-lang/inga` repo | **作成済み**（2026-08-03、west 登録済み、`west-orphan-audit --blocking` exit 0） |
-| inga への抽出（13 namespace / 3,166 行） | **未着手** — engi が本日 12 commit の hot な状態なので後述の理由で後回し |
-| `inga.head` / `inga.ref`（ref plane 本体） | **着地済み** — `kotobase.storage.contract/verify` が `{:profile :linearizable-ref :concurrency :verified}` を返す。repo 全体で 42 tests / 124 assertions、clj-kondo 0 errors |
+| inga への抽出（13 namespace / 3,166 行） | **完了**（2026-08-03、`inga@8fe122c` / `engi@513b528`）。247 tests / 1204 assertions、parity は JVM/nbb 一致、受け入れ試験 `torihiki-on-inga.cljs` が抽出前（engi から）・抽出後（inga から）とも pass |
+| `inga.head` / `inga.ref`（ref plane 本体） | **着地済み** — `kotobase.storage.contract/verify` が `{:profile :linearizable-ref :concurrency :verified}` を返す |
+| cljs parity | **着地済み** — `inga.parity` が JVM と nbb で同一 digest（`inga.state` を除く。理由は下記） |
 | kotobase `IRefStore` provider の**機構** | **着地済み**（上記）。**実 datom 面への配線は F1 待ち** |
 | torihiki-node の本番 | **単一 sequencer のまま**（`consensus: none`） |
 | OS プロセス分離 | **無し**（4 replica は 1 プロセス内。socket は本物） |
@@ -277,6 +278,14 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 `inga` の repo 作成・west 登録は skill `new-project-scaffold` の常時承認フローに従う。
 
 ## 改訂
+
+**2026-08-03（同日、5回目）**: **抽出（決定 1）完了**。`inga@8fe122c` / `engi@513b528`。
+
+- **切り口は実測で clean だった**: 移動する 13 namespace のどれも `engi.{core,crypto,store,protocol,metrics}` を require しておらず、逆も無い（grep が示唆した参照はすべて docstring 中の言及だった）。抽出後 engi の残存 suite は 26 tests / 93 assertions で緑。
+- **engi は inga に依存していない。** 残った namespace が consensus を必要としなかったのが clean な切り口の理由であり、同時に **ENGI/EN はまだ inga の上で走っていない**ことを意味する。本 ADR と両 README の「engi が最初の消費者」という記述は誤りだったので訂正した —— 今日の消費者は torihiki harness である。
+- **`:engi.block/*` → `:inga.block/*` は wire 変更ではない**。`inga.wire` の docstring どおり JSON に keyword は無く、`:inga.block/height` は文字列 height として乗る。
+- **衝突を2つ解消した（先送りせず）**: ①`engi.parity` と `inga.parity` を**1つの digest に統合**（parity コマンドが2つあると1つ忘れられる）。②`inga.power` が `inga.stake` 到着前に書いた `eligible`/`stake-for`/`quorum-met?` の簡略版を**削除して stake に委譲**した —— quorum 規則の実装が2つあるのは冗長性ではなく「この block は commit したか」への答えが2つあることである。委譲の過程で自分のバグが1つ露見した: `stake/slash` は `{:bonds :burned :rewarded}` を返し offender の record を丸ごと除去するのに、戻り値を bonds map として使い roles を書き戻して ghost entry を復活させていた（`slashing-lands-at-a-decided-height` が検出）。
+- **受け入れ試験は ADR の記述どおり実行した**: `script/torihiki-on-inga.cljs`（旧 `torihiki-on-engi.cljs`）を**抽出前に engi から**、**抽出後に inga から**回し、両方 pass。実 WebSocket 4 replica、実鍵、43 common committed blocks、全 replica 同一 root、他人の account を騙る注文は拒否。
 
 **2026-08-03（同日、4回目）**: **F1 / F2 / F3 を `inga` に着地させた**（`kotoba-lang/inga@fffb845`、42 tests / 124 assertions、clj-kondo 0/0）。現在地の表を更新。3つとも**既存資産との合成**であり再実装ではない:
 
