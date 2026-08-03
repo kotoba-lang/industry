@@ -1440,4 +1440,65 @@ binding ではないはず」だった。**aligned な計測が 5x を示した�
 そして **教訓 19: 計測が事前の推論を覆したとき、推論を捨てる前に計測を疑う余地が
 残っていないか確認する。** 測定は推論より強い証拠だが、**交絡した測定はそうではない**。
 
+
+
+## 配線を調べた結果 — 顧客が居ない層と、既に居た顧客（2026-08-04）
+
+「compiler が T5 を消費していない」を最大の構造的ギャップとして挙げたが、**配線しようとして
+その framing が半分間違っていたと分かった。**
+
+### T5 内部は既に配線済み
+
+`layout` / `traversal` / `paging` / `ioplan` / `perfgate` / `gpu` / `machine-probe` の**7 つすべてが
+`machine` を消費している**。スタック内部の依存は繋がっている。
+
+### native backend には machine 依存の判断が「まだ無い」
+
+`kotoba-native` を grep しても **hardware 定数のハードコードは 0 件**。定数（8 バイト語 /
+16 バイトスロット / 4096 arena）はすべて **kexe ABI 由来で machine 依存ではない**。
+
+つまり配線先が無いのは怠慢ではなく、**backend が memory hierarchy と相互作用する決定を
+まだ一つも持っていない**から——配列も、データ上のループも、4 KiB を超える arena も無い。
+**stage 2（vector 型）が入るまで、T5 が助言できる対象が存在しない。** native の gap と
+配線の gap は同じ壁の裏表だった。
+
+### 一方 `paging` には、最初から実在の顧客が居た（そして重複していた）
+
+`paging` の docstring は「`kotobase-peer` が block cache を size class で分けるのと同じ理由」と
+**自分で名指ししている**。実際に見に行くと `io.github.kotoba-lang/block-cache`（305 行、
+Cloudflare Worker で本番稼働、`memory`/`tiered`/`segmented`/`null` + `stats`/`hit-rate`）が
+存在した。
+
+**つまり `paging` は、原型を見ながら並行実装を作っていた。** 正直に記録する。
+
+| | `paging` | `block-cache` |
+|---|---|---|
+| 持っている | Belady/compulsory bound、`headroom`、CLOCK/SLRU、readahead、machine 連携 | **本番稼働**、tiered backing、async wrap、CID 検証 |
+| 持っていない | 本番実績 | 「その hit rate は良いのか」を答える手段 |
+
+`block-cache` は `hit-rate` を出すが、**それが天井に近いのか半分捨てているのかを言えない**
+（自分の docstring も「hit count でなく MISS rate を読め」と書くに留まる）。それは
+`paging/headroom` がまさに答える問いで、足りないのは**実 trace を取り出す口**だけだった。
+
+### 配線したもの: `paging/recorder`
+
+read path に挟んで access sequence を捕まえ、`headroom` に渡す。**どちらの向きにも依存を
+作らない**（key を受けて key を返すだけなので `block-cache` の `wrap-get-fn` にも
+`merkle-lsm` の effect handler にも挟まる）。
+
+上限付きで、**溢れたら truncate せず拒否する**——尾を黙って失った trace は headroom を
+**楽観側に**間違えるので、`recorded` は `{:trace ...}` か `{:overflowed n}` を返し、
+裸の vector は返さない。
+
+### 併せて解消した訂正
+
+- `traversal` の fixture に残っていた artifact 値（`2048 5.03` 等）を staggered 値に差し替え
+- `tile-plan` の `:model/validation` を `:unvalidated` → **`:partially-validated`** に更新。
+  wall clock では判定できないままだが、**miss 数については clock-free trace が形を確認した**
+  （ikj 234 対 ijk 5478、合った tile 96、大きすぎる tile 379 = untiled に負ける）
+
+**教訓 20: 「誰も使っていない」の前に「顧客が存在しうるか」を確認する。** compiler には
+まだ判断が無く、`paging` には最初から顧客が居て、しかも自分でそれを引用しながら重複を
+作っていた。
+
 "}]
