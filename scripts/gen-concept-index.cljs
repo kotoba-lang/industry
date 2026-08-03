@@ -33,6 +33,24 @@
 ;;   nbb scripts/gen-concept-index.cljs                      # 生成
 ;;   nbb scripts/gen-concept-index.cljs --check              # 差分があれば非ゼロ終了
 ;;   nbb scripts/gen-concept-index.cljs --scan-root <path>   # orgs/ を別 checkout から読む
+;;
+;; ## `--check` を CI gate にしない
+;;
+;; 出力は **今この checkout に何が展開されているか**に依存する。実測 2026-08-03:
+;; 最初の生成から 15 分で走査対象が 3,590 → 3,731 repo に増えた（並行セッションの
+;; `west update` が repo を追加していた）。sparse checkout ならさらに減る。
+;; つまり `--check` の STALE は「索引が古い」とは限らず「隣の agent が repo を
+;; 増やした」でも出る。**ローカルの再生成の目安**として使い、gate にしない
+;; （常に赤い gate は無視され、無視される gate は存在しないのと同じ）。
+;;
+;; ## `--check` を CI gate にしない
+;;
+;; 出力は **今この checkout に何が展開されているか**に依存する。実測 2026-08-03:
+;; 生成から 15 分で走査対象が 3,590 → 3,731 repo に増えた（並行セッションの
+;; `west update` が repo を追加していた）。sparse checkout ならさらに減る。
+;; つまり `--check` の STALE は「索引が古い」とは限らず「隣の agent が repo を
+;; 増やした」でも出る。**ローカルの再生成の目安**として使い、gate にしない
+;; （常に赤い gate は無視され、無視される gate は存在しないのと同じ）。
 
 (ns gen-concept-index
   (:require ["fs" :as fs]
