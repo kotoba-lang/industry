@@ -173,8 +173,21 @@ diff 1 行、server-side 検証で ahead_by 2 / behind_by 0 / merge_base == 旧 
 | 対象 | 結果 |
 |---|---|
 | kotoba-native 自身 | 13 tests / 1,755 assertions。padding 不変条件を全許容長で、window バイト列を両 ISA で厳密照合 |
-| compiler (この branch で pin を override) | **785 tests / 6,290 assertions、0 failures**。`native-executor-test` (実 supervised native プロセス) と `verifier-profile-test` を含む |
-| 差分ネイティブ実行 12 本 | 未適用バックエンドと結果が完全一致 |
+| compiler (pin 前進後の実測、ADR-2608039600) | **785 tests / 6,294 assertions、0 failures** + `native-conformance` 5/5。`native-executor-test` (実 supervised native プロセス) と `verifier-profile-test` を含む |
+| ~~差分ネイティブ実行 12 本~~ | **当時の記述は無効** — 下記訂正を参照 |
+
+> **訂正 (2026-08-03、ADR-2608039600)**: 本 ADR の初版は
+> 'compiler の 785 tests / 6,290 assertions を **この branch で pin を override して**
+> 通した' と記録していたが、その override は**効いていなかった**。
+> `-Sdeps '{:override-deps ...}'` をトップレベルに渡していたが、`:override-deps` は
+> **alias キー**であり alias を活性化しない限り無視される (`-Spath` で確認したところ
+> classpath には pin 済みの `~/.gitlibs/.../502f2921.../src` が入っていた)。
+> よってあの実行は pin 済み backend に対するもので、'差分ネイティブ実行 12 本が
+> baseline と一致' も baseline 同士の比較であり、何も証明していなかった。
+> 正しい指定は `-Sdeps '{:aliases {:ovr {:override-deps {...}}}}' -M:ovr:test`。
+> **結論は現在正しく実測で裏付けられている** — peephole が `kotoba-native` main に
+> 入り、ADR-2608039600 の pin 前進で compiler が実際にそれをビルドした上で、
+> 上表の数値が通っている。誤っていたのは当時引用した証拠であって結論ではない。
 | JVM vs nbb | 分岐入りプログラムで両 ISA バイト単位一致 (compiler ADR-0004 の dual-runtime parity 維持) |
 
 `kotoba-verifier` は同じ `emit-program` を呼んで再生成する

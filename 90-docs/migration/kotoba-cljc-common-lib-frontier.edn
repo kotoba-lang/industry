@@ -51,7 +51,7 @@
  [{:id :data
    :rule "Pure values and deterministic transforms; no host capability."
    :libraries
-   [{:repo "edn" :authority :mixed :status :bounded-document-profile-general-map-key-gap
+   [{:repo "edn" :authority :mixed :status :bounded-document-profile-complete
      :first-party-deps [] :external-runtime-deps []}
     {:repo "coll" :authority :mixed :status :expand-kotoba-profile
      :first-party-deps [] :external-runtime-deps []}
@@ -123,12 +123,12 @@
  :planned-surfaces
  [{:id :portable-edn
    :target-repo "edn"
-   :status :bounded-document-textual-codec-set-implemented
+   :status :bounded-document-textual-codec-complete
    :reason "clojure.edn/cljs.reader block 113/32 dependency closures"
    :scope [:bounded-reader :bounded-writer :closed-tags :depth-limit :size-limit
            :nil :bool :i64 :f64 :string :keyword :symbol :vector :list :set
-           :keyword-keyed-map]
-   :remaining [:general-map-key]
+           :document-keyed-map]
+   :remaining []
    :forbidden [:reader-eval :ambient-class-resolution :unbounded-keyword-interning]}
   {:id :http-routing
    :target-repo "http"
