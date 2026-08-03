@@ -18,6 +18,7 @@
    "Holochain から採るもの／採らないもの（source chain・countersign・warrant は採る、無順序は採らない）"
    "Filecoin SPC / FVM / FEVM から採るもの／採らないもの（state root の content-addressing・fuel 計量・power table は採る、Expected Consensus と MPT と EVM opcode は採らない）"
    "inga と kotobase の接続点（kotobase.storage.core/IRefStore の :linearizable-ref provider）"
+   "inga の ref plane が D1（および他の単一ベンダの条件付き書き込み）に依存してはならないこと、および D1 が暫定 shim であること"
    "inga / engi / innen の名前の使い分け（3語とも仏教の因果語彙で別物を指す）"
    "対外的に『分散』『blockchain』を名乗ってよい条件"]
   :adr/related
@@ -30,7 +31,10 @@
    "adr-260726-kotobase-query-plane-is-one-ref"
    "adr-2607198300-kotoba-native-aot-no-jvm-node-rust-at-runtime"
    "adr-2608031200-extract-without-landing-is-the-duplication-failure-mode"
-   "adr-2607050900-kotobase-client-naming-disambiguation"]
+   "adr-2607050900-kotobase-client-naming-disambiguation"
+   "adr-2607312100-kotobase-layering-block-ref-split-signed-head"
+   "adr-2607299900-kotobase-head-conditional-write-plane"
+   "adr-2607142200-strong-transactions-native-ipld-federation"]
   :adr/evidence
   ["kotoba-lang/engi@a6d4450 src/engi/{consensus,quorum,pacemaker,replica,sync,wire,net,attest,stake,parity}.cljc"
    "https://spec.filecoin.io/systems/filecoin_blockchain/storage_power_consensus/"
@@ -155,13 +159,44 @@ ADR-2608010930（2026-08-01）は kotobase について『単一 writer + CAS = 
 
 命名規約の適合: prefix 無し = reusable library（`manifest/repository-rules.edn` の `:name-prefix` vocabulary）。inga は observe しない・schedule しない・ledger を書かない — `loop-` ではない。`-clj` suffix 禁止にも適合。
 
-### 6. kotobase との接続点は `IRefStore` である
+### 6. kotobase との接続点は `IRefStore` である。そして **D1 に依存しない**（オーナー指示 2026-08-03）
 
 **これが inga を kotobase の並行宇宙にしないための唯一の決定である。**
 
-`kotobase.storage.core` は既に正確な seam を持っている: `IRefStore` の `-compare-and-set-ref!` と、閉じた 2 択の ref profile（`:linearizable-ref` / `:single-writer-ref`）。
+`kotobase.storage.core` は既に正確な seam を持っている: `IRefStore` の `-compare-and-set-ref!`、閉じた 2 択の ref profile（`:linearizable-ref` / `:single-writer-ref`）、そして **block 面と ref 面を別プロバイダに載せる `compose`**（ADR-2607312100 D2）。その `compose` のコメントが目的を書いている:
 
-**inga は kotobase の `:linearizable-ref` provider になる。** ref の前進を D1 の `UPDATE … WHERE sequence = ?` ではなく **2f+1 の quorum が裁定する**。これは D1 より**強い** `:linearizable-ref` である（単一ホストの条件付き書き込みではなく、定足数の合意）。
+> blocks anywhere that can hold immutable bytes (including untrusted, erasure-coded, content-addressed networks), **the ref wherever agreement is actually available**.
+
+**inga がその「agreement」である。**
+
+#### 6-a. quorum 証明書が条件付き書き込みそのものである
+
+**inga の ref plane は D1（および他のいかなる単一ベンダの条件付き書き込みプリミティブ）にも依存してはならない。** 理由は好みではなく構造である —— **2f+1 の quorum が次の head に合意したという証明書は、それ自体が条件付き書き込みである。** ホスト側の `UPDATE … WHERE sequence = ?` も `onlyIf.etagMatches` も `If-Match` も要らない。CAS をホストに代行させる必要があるのは、書き手が1人しかいなくて誰も裁定してくれないときだけである。
+
+したがって配備は:
+
+```
+(storage/compose {:blocks <dumb immutable block store>   ; B2 / R2 / S3 / IPFS / DataLad — 何でもよい
+                  :refs   <inga>})                        ; :linearizable-ref を宣言するのはこちら
+```
+
+block 側に要求される capability は `block-capabilities` = `#{:immutable-blocks :cid-addressed-read}` **だけ**であり、**`:conditional-ref` はどこにも要らない**。`compose` は ref profile を `refs` 側からのみ採る（block store が偶然 `IRefStore` を実装していても、その主張を合成に貸せない）ので、この分離は型で守られる。
+
+#### 6-b. これは signed-head が自分で名指しした穴を塞ぐ
+
+`kotobase.storage.signed-head` の docstring は、自分が買えないものを正確に書いている:
+
+> 署名は誰が head を出したかを証明するが、他の誰も出していないことは証明しない。だから宣言する profile は `:single-writer-ref` であり、**正しい配備は依然としてその前に writer を1人置く —— Durable Object、actor、lease**。
+
+**inga はその「writer 1人」を quorum に置き換える。** それによって同じ record 形式のまま profile が `:single-writer-ref` → `:linearizable-ref` に上がる —— **ホストの条件付き書き込みを一切使わずに**。record 形式 `kotobase.head/v1 {ref, seq, cid, prev, issuer, sig}` は既にほぼ正しく、変わるのは `issuer`/`sig` が単一署名から **quorum 証明書**（`engi.attest` の連結集約、witness ごとに1署名）になる点だけである。
+
+#### 6-c. D1 と Durable Object の位置づけ
+
+- **D1 は暫定 shim であり、inga の ref plane が着地したら撤去する。** ADR-2607299900 は D1 を選んだ理由を自分で書いている —— 「これは能力の優劣ではなく**今この鍵でできること**による選択で、R2 scope が付いたら再評価に値する」（Cloudflare OAuth token に `r2` scope が無かった）。つまり D1 は最初から恒久的な答えとして選ばれていない。ADR-2607142200 の不変条件（正しさは B2 単独で成立し、Cloudflare 固有プリミティブを read/write/recovery/sequencing のどれにも**必須にしない**）も同じ方向を指している。inga はその不変条件を、off-by-default の回避策ではなく**設計として**満たす。
+- **Durable Object も同じ論法で load-bearing ではなくなる。** DO は今 `KotobaseTenantLock` として「書き手はちょうど1人」を実装せずに得るために使われているが、quorum が順序を決めるならその役割は消える。**DO を禁止はしない** —— realtime room / transport / レイテンシ最適化として残してよい（CLAUDE.md の kotobase 規則どおり）。禁じるのは**正しさが DO に依存すること**である。
+- **B2 に条件付き書き込みが無いことは、もはや欠点ではない。** `kotobase-storage-s3` の `test/race.cljs` が決定的に再現する last-write-wins は ref 面の話であり、block 面には存在しない問題である。B2 は「良い block store であり使えない ref store」だと storage 層自身が書いている —— inga 構成では B2 は **block store としてのみ使われる**ので、その評価がそのまま正しい配備になる。
+
+#### 6-d. 順序と非侵襲性
 
 この接続が成立するのは F1 の後だけである —— kotobase の ref は CID であり、opaque digest では入らない。**F1 → 6 の順序は動かせない。**
 
@@ -202,6 +237,9 @@ ADR-2607110300 の labeling 規則をそのまま継承する。**witness が全
 - (+) **この workspace の『コンセンサス』が1つの名前を持つ。** 今後 BFT / 順序 / 状態合意を必要とする repo は inga を引く。**合意層を2つ目を作らない**（この ADR が authoritative）。
 - (+) engi・torihiki・kotobase が同じ順序層を共有できる。torihiki は既に harness で実証済みなので、抽出の受け入れ試験が最初から存在する。
 - (+) F1 が入れば kotobase の ref plane が D1 CAS から quorum 合意へ**上がる**経路ができる（決定 6）。kotobase のクエリ面は無変更。
+- (+) **storage backend の要求水準が下がる。** ref を inga が持つので、object store 側に要るのは `#{:immutable-blocks :cid-addressed-read}` だけになり、条件付き書き込みを持たないホスト（B2・IPFS・erasure-coded network・DataLad/annex）が**一級の配備先になる**。「条件付き書き込みがあるホストを探す」という制約が消える。
+- (+) **ADR-2607142200 の不変条件が、回避策ではなく設計として満たされる。** 今は「D1 は off が既定、全経路が B2 に fallback」という運用規律で守られているが、inga 構成では Cloudflare 固有プリミティブが**そもそも経路に無い**。
+- (−) **D1 と Durable Object の撤去は別作業として残る。** 本 ADR は「inga が D1 に依存しない」ことを決めるだけで、production の `backend.kotobase.net` が現在 shadow で D1 を使っている事実は変わらない。inga の ref plane が着地するまで D1 経路は動き続ける —— **撤去の完了をこの ADR の着地と混同しない。**
 - (+) F2 が入れば ADR-2608022600 が踏んだ種類の決定論バグが構成上起きなくなる。
 - (−) **抽出は破壊的な作業である。** engi の 13 namespace が移動し、`deps.edn` / shadow-cljs / 8/2〜8/3 の全 script（`script/network.cljs`・`script/torihiki-on-engi.cljs` 等）が影響を受ける。**着地までを1つの作業として扱う**（決定 1）。
 - (−) **`engi.attest` と `kotoba-lang/witness-quorum` の重複を解消する必要がある。** `engi/consensus.cljc` の docstring は「witness-quorum の signer/attestation を reused unchanged」と書いているが、**engi の `deps.edn` は witness-quorum に依存していない**（依存は `kotobase-client` 1つだけ）。docstring が実装より先走っている。抽出時にどちらが正本かを決める —— `engi.attest` には witness-quorum に無い固有の根拠がある（sync 経路で受け取った他人の証明書を検証する必要。BLS ではなく連結による集約で、証明書サイズが quorum に比例する代償を明示している）ので、**素朴に witness-quorum へ寄せない**。
@@ -223,10 +261,14 @@ F1 → 6 の依存だけが硬い。それ以外は独立に進む。
 
 1. **抽出**（決定 1）— inga repo、13 namespace 移動、engi と torihiki の両方を inga に載せ替えるまでを1作業とする。受け入れ試験は `script/torihiki-on-engi.cljs` が同じ結果を出すこと。
 2. **F1** state root を `prolly-tree` / `arrangement` の root CID にする。判定: 4 replica が同じ CID に到達し、**その CID から hydrate した state が Datalog でクエリできる**こと。
-3. **決定 6** kotobase の `IRefStore` を inga で実装し、`:linearizable-ref` を宣言して `kotobase.storage.contract/verify` の並行半分を通す。
+3. **決定 6** kotobase の `IRefStore` を inga で実装し、`:linearizable-ref` を宣言して `kotobase.storage.contract/verify` の並行半分を通す。判定は**D1 を binding から外した状態で**行う —— D1 が有効なまま通しても、何が CAS を裁定したかが分からない。配備は `storage/compose {:blocks <B2 等> :refs <inga>}` で、block 側は `:conditional-ref` を宣言しないこと。
 4. **F2** machine を fuel 計量 `.kotoba` にする。判定: fuel 上限超過が決定的に同じ block で起きること。
 5. **F3** power table を committed state へ、`:storage` role を追加。
 6. **bond 供給元のデプロイ** — これが済むまで slashing は作動しない（現在地の表）。
 
 `inga` の repo 作成・west 登録は skill `new-project-scaffold` の常時承認フローに従う。
+
+## 改訂
+
+**2026-08-03（同日）**: 決定 6 を書き換えた。初版は inga を「D1 の代わりに使える、より強い `:linearizable-ref` provider」と書いていたが、オーナー指示「D1 には依存しないでほしい」を受けて、**D1 非依存を選択肢ではなく要件に格上げ**した（6-a）。技術的な帰結として、quorum 証明書自体が条件付き書き込みなのでホスト側プリミティブは経路から消え、object store への要求が `#{:immutable-blocks :cid-addressed-read}` だけに下がる。併せて 6-b（signed-head が自分で名指しした「writer を1人置く」穴を quorum が塞ぐこと）と 6-c（D1 は暫定 shim・DO は load-bearing でなくなるが禁止はしない）を追記した。
 "}]
