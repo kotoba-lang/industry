@@ -639,7 +639,7 @@ Component 契約面ではない — Component 流の provider 合成を native �
 | record: **関数境界を越える** | OK | `:phase :target` — gate が拒否 |
 | record: ~~`:string` フィールド~~ **完了** | OK | **OK** (下記) |
 | record: ~~`:keyword` フィールド~~ **完了** | OK | **OK** (下記) |
-| record: **record を入れ子にしたフィールド** | OK | `:phase :target` |
+| record: ~~入れ子フィールド~~ **完了** | OK | **OK** (下記) |
 
 **5 点の内訳が重要**: 4 点は gate (`:phase :target`) が止めており、
 **`let` 束縛だけが backend の制限** (`record-new is only supported as the direct
@@ -810,6 +810,38 @@ record は N スロット、関数は 1 ワードを返す。平坦化では越�
 
 **これは測って決まる話ではなくオーナー判断であり、ADR 0062 の明文化された設計
 性質を覆すかどうかの問題**なので、ここで独断で実装しない。
+
+
+## 完了: 入れ子 record と連鎖 projection — **ADR 0062 の性質を保ったまま**
+
+前回「平坦化で解ける」と評価したとおりに閉じた。**record に独立した実行時表現を
+与えないという ADR 0062 の性質は、交換したのではなく保った。**
+
+**平坦化の再帰化**: `let` 束縛 record は既にフィールドごとの束縛へ展開されて
+いたが、その展開が再帰するようになった — フィールド自身が `record-new` なら
+さらに展開され、入れ子 record は外側のスロット列に平坦化される。スロット数は
+束縛数ではなく**展開が到達した深さ**から数える (1 束縛が推移的に任意個を占める
+ため)。
+
+**連鎖 projection は materialise せず解決する**: `record-get` の上の `record-get`
+は `resolve-record-binding` が「symbol」または「record 型フィールドを選ぶ
+`record-get`」を辿って解決するので、**中間の record が値になることは一度もない**。
+record 型フィールドをそれ以外の位置で選ぶことは拒否する — 生むべきワードが無い
+から。テストが pin。
+
+verifier 側も `record-schema-of` が同じ 3 形 (直接の `record-new` / それに束縛
+された局所 / record 型フィールドを選ぶ `record-get`) を**再帰的に**解決する。
+最後の形のスキーマは**外側の型のフィールド表から読み出す**ので、別途追跡する
+必要がない。
+
+検証: kotoba-native 38 tests / 2,028 assertions。実 AArch64 プロセスで 5 本 —
+内側への連鎖 / 連鎖と兄弟フィールドの併用 / 呼ばれた関数の内側での一式。
+compiler は固定 checkout で **baseline と patched がともに 857 tests /
+6,517 assertions**、差は `dual-renderer-soft-performance-workload` 1 件のみで
+これは本セッションを通じて両側で落ちてきた wall-clock 予算。conformance 8/8。
+
+**これで値表現の残りは「関数境界」1 点**であり、それは平坦化では越えられない
+本物の設計分岐 (前節)。
 
 
 ## 残ったギャップ (2026-08-03 時点の実測)
