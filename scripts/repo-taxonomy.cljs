@@ -157,8 +157,18 @@
             has? (fn [pred] (boolean (some pred files)))
             root-file? (fn [nm] (has? #(= % nm)))
             bp (read-blueprint (str root "/blueprint.edn"))
-            readme (or (read-head (str root "/README.md") 4096)
-                       (read-head (str root "/readme.md") 4096))]
+            ;; README.md だけを 4096 byte 読む実装だと、この workspace の EDN-only 規約で
+            ;; README.edn / README.md.edn しか持たない repo (実測 2026-08-03 で 150 件) の
+            ;; 宣言が構造的に見えない。manifest 系も宣言の在り処なので併せて読む。
+            ;; CLAUDE.md / MATURITY.md も含める。実測 2026-08-03: yukkuri の
+            ;; did:web:yukkuri.gftd.ai は CLAUDE.md にしか書かれておらず、README 系だけ
+            ;; 見ると「実装はあるのに did 宣言が無い」と誤判定する。
+            docs (->> ["README.md" "readme.md" "README.edn" "README.md.edn"
+                       "manifest.edn" "manifest.jsonld" "actor-manifest.jsonld"
+                       "CLAUDE.md" "MATURITY.md"]
+                      (keep #(read-head (str root "/" %) 16384))
+                      (str/join "\n"))
+            readme (when (seq docs) docs)]
         {:present?     true
          :truncated?   truncated?
          :file-count   (count files)
@@ -185,6 +195,12 @@
                                     (re-find #"MOVED\.md" b))))
          :ui?          (has? #(or (= (base %) "index.html") (= (base %) "shadow-cljs.edn")))
          :heartbeat?   (has? #(str/includes? (base %) "heartbeat"))
+         ;; ADR-2607289700 D1 の organism 2 条件を、宣言ではなく実装の証拠として測る。
+         ;; (a) 自分で起きる: heartbeat または resident loop
+         ;; (b) 自分の did で対外発話する: did 宣言 + 実際に外へ出す実装
+         :resident-loop? (has? #(re-find #"(?i)(^|/)(loop|tick|scheduler|cron|daemon)\.(clj[cs]?|kotoba)$" %))
+         :did-declared?  (boolean (and readme (re-find #"did:(web|key):" readme)))
+         :publish-impl?  (has? #(re-find #"(?i)(^|/)(publisher|aozora|cacao|pds)\.(clj[cs]?|kotoba)$" %))
          :organism-doc? (boolean (and readme (re-find organism-re readme)))}))))
 
 ;; ---- runtime 面: kind + traits ---------------------------------------------
@@ -205,6 +221,8 @@
     (:ui? ev)          (conj :ui)
     (:heartbeat? ev)   (conj :heartbeat)
     (:organism-doc? ev)(conj :organism-declared)
+    (:resident-loop? ev)(conj :resident-loop)
+    (:publish-impl? ev)(conj :publish-impl)
     (:tombstone? ev)   (conj :tombstone)
     (:identity-edn? ev)(conj :identity-record)))
 
@@ -219,9 +237,22 @@
     (and (:tombstone? ev) (not (:src? ev)))
     ["tombstone" "NOT-MIGRATED / MOVED marker without src"]
 
-    (and (:organism-doc? ev) (or (:heartbeat? ev) (:governor? ev)))
-    ["organism" (str "README organism declaration + "
-                     (if (:heartbeat? ev) "heartbeat substrate" "governor"))]
+    ;; organism は **宣言ではなく実装**で決める (ADR-2608032100)。
+    ;;
+    ;; 旧実装は `README に organism 語 AND (heartbeat OR governor)` だった。
+    ;; governor は actor なら普通に持つので、実質「README にそう書いてあれば organism」
+    ;; と同じで、**取りこぼすより過大報告した** — 実測 2026-08-03 で yomi / kyoninka /
+    ;; sng は heartbeat も resident loop も持たないのに organism と報告され、逆に
+    ;; cron + aozora publisher + did:web を実装する yukkuri は README.md が無いため
+    ;; 落ちていた。
+    ;;
+    ;; D1 の 2 条件を両方満たすことを要求する。宣言は任意 (あれば evidence に出すだけ)。
+    (and (or (:heartbeat? ev) (:resident-loop? ev))
+         (:did-declared? ev)
+         (:publish-impl? ev))
+    ["organism" (str (if (:heartbeat? ev) "heartbeat" "resident loop")
+                     " + did + publisher impl"
+                     (when (:organism-doc? ev) " (declared)"))]
 
     (or (:governor? ev) (:actor-edn? ev))
     ["actor" (if (:governor? ev) "governor.clj* present" "actor.edn present")]

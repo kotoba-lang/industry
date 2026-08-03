@@ -1,0 +1,106 @@
+[{:db/id -1
+  :adr/id "2608032100-organism-classified-by-implementation"
+  :adr/title "ADR-2608032100: repo-taxonomy の organism 判定を宣言ベースから実装ベースへ移す"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/topic "repo-taxonomy-organism-classifier"
+  :adr/date "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/last-verified "2026-08-03"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn-only (ADR-2607171600)"
+  :adr/repos ["com-junkawasaki/root"]
+  :adr/authoritative_for
+  ["repo-taxonomy.cljs の :repo/kind \"organism\" を、README 宣言ではなく repo 内の実装証拠で決めるという規則"
+   "organism の 2 条件（自起動 + 自 did での対外発話）を両方要求し、宣言は任意とすること"
+   "宣言の在り処として README.md 以外（README.edn / README.md.edn / manifest 系 / CLAUDE.md / MATURITY.md）も読むこと"]
+  :adr/related
+  ["adr-2607289700-org-taxonomy-by-invocation-axis-network-awai"
+   "adr-2607289600-repo-taxonomy-three-planes"]
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/body
+  "# ADR-2608032100: organism は宣言ではなく実装で決める
+
+**Status**: accepted　**Date**: 2026-08-03
+
+## Context — 2 つの答えが並存していた
+
+ADR-2607289700 D9 の gate として `scripts/organism-readjudicate.cljs` を作り、
+D1 の organism 2 条件を repo 内の証拠で測った。しかし **`repo-taxonomy.cljs` 本体は
+直していなかった**ので、同じ問いに 2 つの答えが出る状態が残っていた:
+
+| | 旧 repo-taxonomy | re-adjudication |
+|---|---|---|
+| yomi / kyoninka / sng | organism | not-organism |
+| yukkuri | (落ちる) | organism |
+
+`manifest/repo-taxonomy.edn` は fleet 全体の分類の正本なので、そこが誤ったままだと
+D1 の org 判定（`:repo/kind` を引いて org を決める）が誤った入力の上で動く。
+
+## Decision
+
+**`:repo/kind \"organism\"` を実装で決める。**
+
+```clojure
+(and (or (:heartbeat? ev) (:resident-loop? ev))   ; (a) 自分で起きる
+     (:did-declared? ev)                          ; (b) 自分の did で
+     (:publish-impl? ev))                         ;     対外発話する
+```
+
+宣言（README の「artificial organism」等）は **evidence 文字列に出すだけで判定には使わない**。
+
+### 旧実装が壊れていた理由
+
+```clojure
+(and (:organism-doc? ev) (or (:heartbeat? ev) (:governor? ev)))
+```
+
+`governor` は actor なら普通に持つので、この式は実質
+**「README にそう書いてあれば organism」**と同じだった。だから宣言だけの
+yomi / kyoninka / sng が organism になり、実装を持つ yukkuri は
+（README.md が無いので）落ちた。**取りこぼすより過大報告する**分類器だった。
+
+### 宣言の在り処は README.md だけではない
+
+判定に使わなくなった今も evidence として読む必要がある。実測:
+
+- **README.md を持たず README.edn / README.md.edn だけを持つ repo が 150 件**
+  （この workspace の EDN-only 規約の帰結）
+- **`yukkuri` の `did:web:yukkuri.gftd.ai` は `CLAUDE.md` にしか書かれていない** —
+  README 系だけ見ると「実装はあるのに did 宣言が無い」と誤判定する
+
+そこで README 4 形式 + `manifest.edn` / `manifest.jsonld` / `actor-manifest.jsonld` /
+`CLAUDE.md` / `MATURITY.md` を 16 KiB まで読む（旧実装は README.md を 4096 byte だけ）。
+
+## Consequences
+
+`:repo/kind \"organism\"` は **4 件 -> 2 件**になった:
+
+| repo | evidence |
+|---|---|
+| `orgs/etzhayyim/com-etzhayyim-tomoshibi` | resident loop + did + publisher impl |
+| `orgs/cloud-itonami/yukkuri` | resident loop + did + publisher impl |
+
+`organism-readjudicate.cljs` の独立した測定と**完全に一致**した。2 つの答えの並存は解消。
+
+外れた `yomi` / `kyoninka` / `sng` は `governor.cljc` を持つので `actor` に落ちる
+（request-scoped な StateGraph actor という実態と合う）。
+
+**D1 の org 判定への影響**: `yukkuri` は resident だが AWAI Network の consumer
+product なので、2 軸（ADR-2607289700 D1 改訂）で network-awai のまま変わらない。
+`tomoshibi` は resident × religious で etzhayyim のまま。**分類が直っても移送は発生しない** —
+これは 2 軸が正しく効いていることの確認でもある。
+
+**残る限界**: `:did-declared?` はドキュメント中の `did:web:` / `did:key:` 文字列の有無で
+判定するので、他人の did に言及しているだけの repo を拾いうる。実測では 2 件とも
+自分の did だったが、これは偶然ではなく「publisher 実装がある」ことを同時に要求して
+いるから — 3 条件の連言がこの誤検出を実用上抑えている。"
+
+  :adr/verification
+  "実行して検証した。scripts/repo-taxonomy.cljs --workspace <root> --out manifest/repo-taxonomy.edn を再生成し、organism が 4 -> 2 件になり、その 2 件が organism-readjudicate.cljs の独立測定と一致することを確認。identity 面の organism 9 件（80-data/system/artificial-organism-actors.json）も欠落なく 5,529 entity として出ることを確認（sparse-checkout に 80-data/system が無いと registry が読めず 9 件落ちるので、生成時は必ず含める）。"
+  :adr/artifact "scripts/repo-taxonomy.cljs, manifest/repo-taxonomy.edn"
+  :source/dataset "adr"}]
