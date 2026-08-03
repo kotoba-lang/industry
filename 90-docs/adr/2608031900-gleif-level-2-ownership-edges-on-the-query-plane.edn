@@ -127,10 +127,17 @@ corpus の streaming scan（`query_gleif_corpus.cljs`）で集計だけできる
 広げる方法は projection を広げることであって、store を増やすことではない
 （ADR-260726、kotobase one-ref）。
 
-**publish の skew**: relationship projection は 20260803、entity projection は
-20260801 publish から切っている（Level 1 corpus が既にあったため）。両方の
-manifest が自分の publish id と sha256 を持つので skew は**隠れず見える**。
-同一 publish に揃えるのは `project_gleif_corpus.cljs` の再実行だけ。
+**publish の skew は解消済み**（2026-08-03 セッション内で closing 時に実施）。
+当初は relationship が 20260803、entity が 20260801 publish から切られていた
+（Level 1 corpus が既にあったため）。20260803 publish から Level 1 corpus を
+生成し直し（3,391,763 entity / unparsed 0 / sha fcda9a75…）、同じ 18,930 LEI
+allowlist で再 projection して揃えた。**両 projection とも 20260803 publish。**
+
+**その skew が実際いくらだったかを測った**（今後の refresh 頻度の根拠になる）:
+18,930 レコード中 **11 件だけが変化**し、そのうち **4 件が ISSUED → LAPSED**。
+2 日で 0.02% は小さいがノイズではない — LEI 登録が黙って失効した取引先の検出は
+まさにこのデータの存在理由であり、**refresh を止めると最初に腐るのがここ**。
+18,930 件の顔ぶれ自体は 2 日で変わらなかった（kept は両 publish とも 18,930）。
 
 **keyword 値は面上で文字列になる**: `:type :is-ultimately-consolidated-by` は
 datascript.js へ渡る際に `\"is-ultimately-consolidated-by\"` になる。query では
@@ -149,10 +156,12 @@ datascript.js へ渡る際に `\"is-ultimately-consolidated-by\"` になる。qu
 
 ## Follow-ups
 
-1. **同一 publish への揃え直し** — 20260803 の Level 1 corpus を生成中
-   （`~/.cache/gleif/gleif-lei-corpus-20260803.edn`）。完了後
-   `project_gleif_corpus.cljs` を同 corpus で再実行して entity projection を
-   差し替える。
+1. ~~**同一 publish への揃え直し**~~ — **完了**（property `06fb2778`）。
+   両 projection とも 20260803 publish。上記 Consequences に測定結果あり。
+   **次に効くのは refresh の自動化** — 2 日で 4 件が LAPSED した以上、この
+   projection は一度切って終わりではない。corpus は cache（git 外）なので、
+   定期実行は「Golden Copy を落とす → corpus → projection → pin 前進」の
+   4 段になる。toshokan の LaunchAgent tick が同型の先行例。
 2. **toshokan-patents が実質空**（本セッションで west checkout し面に載せたが
    `patent=4`）。seeds.edn は 183 KB あるが harvest が 1 seed しか回っていない。
    ADR-2607251552 は USPTO Open Data first を規定しており、現状の
@@ -177,7 +186,10 @@ datascript.js へ渡る際に `\"is-ultimately-consolidated-by\"` になる。qu
   **ENTITY_SUPPLIED_ONLY 12,707（54%）** / FULLY_CORROBORATED 10,267 /
   PARTIALLY 556。ownership 比率を持つのは 2,009 本のみ。
 - entity projection: 2,756 -> **18,930**（新規相手方 16,174 社、Level 1 corpus
-  20260801 から全件解決 = kept 18,930 / scanned 3,391,413 / unreadable 0）
+  20260803 から全件解決 = kept 18,930 / scanned 3,391,763 / unreadable 0。
+  当初 20260801 corpus（scanned 3,391,413）で切ったものを closing 時に
+  同一 publish へ揃え直した。差分は 11 レコードのみ、うち 4 件が
+  ISSUED → LAPSED）
 - 統合面 total: 77,933 -> **94,121**。dataset 内訳に `gleif-relationship` 23,530 /
   `gleif-lei` 18,930 が出ることを確認。
 - **3 者 join が main で動く**ことを確認（Level 1 × Level 2 × market-intel）:
@@ -196,4 +208,5 @@ datascript.js へ渡る際に `\"is-ultimately-consolidated-by\"` になる。qu
   **join key は LEI であって名前ではない** — 名前で照合すると別会社が混ざる。
 - テスト: property 55 tests / 157 assertions green、clj-kondo errors 0。
   新規 `gleif_rr_golden_copy_test` は 9 tests / 36 assertions。
-- 着地: kotoba-lang/property `fad8bce`（agent/gleif-rr-level2 をサーバ側マージ）。"}]
+- 着地: kotoba-lang/property `fad8bce`（RR reader）→ `06fb2778`（同一 publish 揃え）、
+  com-junkawasaki/root `a1e052b0875`（plane loader + ADR）→ `dc7c4ddc54b`（pin + 測定訂正）。"}]
