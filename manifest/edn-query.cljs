@@ -904,6 +904,30 @@
           [])
       (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
 
+(defn gleif-relationship-entities
+  "GLEIF Level 2 corporate relationship projection
+   （`data/gleif-relationship-*.datoms.edn`、ADR-2608031900）。
+
+   `gleif-lei-*` と別 prefix・別 dataset にしてあるのは、edge を join 対象に
+   しない query が 23,530 本の edge を load しなくて済むようにするため。
+   `:corporate-relation/child-lei` / `-parent-lei` はどちらも `:company/lei` と
+   join できるので、「この会社の最終親会社は誰か」「この会社は何を保有して
+   いるか」を財務・ToS・不動産と同じ 1 クエリで聞ける。
+
+   `:corporate-relation/validation` は GLEIF 自身の証拠階層。
+   `ENTITY_SUPPLIED_ONLY` は「その会社が自己申告し、誰も裏を取っていない」
+   （20260803 publish で 483,263 本中 139,111 本）。**自己申告の edge を検証済み
+   として提示しない** — legalsupport の `:legal/verification` 降格と同じ規律。"
+  [next-tempid!]
+  (let [files (property-data-files "gleif-relationship-")]
+    (if (empty? files)
+      (do (js/console.error
+           (str "edn-query: WARNING gleif-relationship: kotoba-lang/property の "
+                "data/gleif-relationship-*.datoms.edn が無い — 資本関係は load "
+                "されない（west update 未実行か、projection 未生成）"))
+          [])
+      (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
+
 (defn property-ownership-entities
   "公開不動産 ownership claim（`data/property-ownership.datoms.edn`）。
    `:ownership/*` は kotoba.property.ownership の可搬コントラクトそのままなので、
@@ -1405,6 +1429,9 @@
                             (lei-tos-entities next-tempid!)
                             (gleif-lei-entities next-tempid!))
         property-tx (property-ownership-entities next-tempid!)
+        ;; company-tx と別にするのは、entity を聞くだけの query に 23,530 本の
+        ;; edge を load させないため（ADR-2608031900）。
+        relationship-tx (gleif-relationship-entities next-tempid!)
         fleet-tx (concat (fleet-state-entities next-tempid!)
                           (fleet-db-entities next-tempid!)
                           (fleet-ci-entities next-tempid!))
@@ -1420,7 +1447,7 @@
                                                      hirameki-corpus-tx jinushi-tx
                                                      proc-registry-tx merged-kotoba-tx
                                                      working-doc-tx narrative-tx
-                                                     company-tx property-tx fleet-tx
+                                                     company-tx property-tx relationship-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx innen-tx
                                                      awai-tx kakekomi-tx)))]
     (.transact ds conn all-tx)
