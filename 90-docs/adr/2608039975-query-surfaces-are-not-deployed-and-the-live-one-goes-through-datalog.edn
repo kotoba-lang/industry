@@ -1,0 +1,119 @@
+[{:db/id -1
+  :adr/id "adr-2608039975-query-surfaces-are-not-deployed-and-the-live-one-goes-through-datalog"
+  :adr/title "ADR-2608039975: kotobase-query の IVM 接続は今やらない —— query surface 6本は未 deploy で、live な SPARQL は別実装かつ Datalog 経由"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-03"
+  :adr/last-verified "2026-08-03"
+  :adr/last_verified "2026-08-03"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "query-surfaces-not-deployed-live-path-goes-through-datalog"
+  :adr/repos ["orgs/kotoba-lang/kotobase-query"
+              "orgs/kotoba-lang/kotobase-server"
+              "orgs/kotoba-lang/org-w3-sparql-protocol"
+              "orgs/kotoba-lang/datomic-client-shim"
+              "orgs/kotoba-lang/org-postgresql-wire"
+              "orgs/kotoba-lang/org-opencypher-cypher"
+              "orgs/kotoba-lang/org-graphql-http"
+              "orgs/kotoba-lang/org-apache-tinkerpop-gremlin"
+              "orgs/network-awai/net-kotobase"]
+  :adr/authoritative-for
+  ["ADR-2608039970 follow-up 5（bridge の incremental 化を ADR-2607166600 の IVM に接続）を、今は実装しないという決定と、その理由"
+   "IVM 接続の設計スケッチと trigger 条件（再導出させないための記録）"
+   "2026-08-03 時点の query 経路の現在地 —— どの surface が live で、どれがライブラリ止まりか"
+   "live な SPARQL（kotobase.server.sparql）が SPARQL を Datalog に翻訳しているという事実の記録"
+   "SPARQL 実装が2つある状態をどうするかは :not-decided（オーナー判断）であること"]
+  :adr/related
+  ["adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog"
+   "adr-2607166600-kotobase-ipld-materialized-views-ivm"
+   "adr-2607172300-kotobase-query-protocol-extension"
+   "adr-2607172500-kotobase-query-protocol-graphql-gremlin"
+   "adr-2607310900-kotobase-query-materialize-memo"
+   "adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2607250100-kotobase-server-depth-pass"]
+  :adr/evidence
+  ["grep over orgs/ 2026-08-03: kotobase-query を require するのは 6 つの surface repo（+ 自身のテスト）だけで、deploy shell は1つも無い"
+   "kotobase-protocols-worker/src には bridge / db-for / query-memo / query-version の参照がゼロ（git grep on kotoba-lang/main）"
+   "net-kotobase/clj-edge/src/kotobase/worker.cljc:255 — read-query-nsids に graph.sparql / graph.query / datomic.q。clj-edge は XRPC proxy（proxy/resolve-viewer → proxy-to-upstream）"
+   "kotobase-server/src/kotobase/server/sparql.cljc（233行）— 手書き SPARQL subset parser、kotobase.server.query-exec の compiled-query（map-form Datalog engine）に落とす"
+   "kotobase-query/README.md — materialize は毎回 full -list + -get scan、v0.1 の accepted limitation（ADR-2607172300）"
+   "ADR-2607166600 — fold! が merged db から view rows を導出、state に views Link、view-rows = 保存 rows + 未 fold novelty"]
+  :adr/body
+  "# ADR-2608039975: IVM 接続は今やらない —— 前提が実測で崩れた
+
+**Status**: accepted
+**Date**: 2026-08-03
+**Deciders**: Jun Kawasaki
+
+## Context
+
+ADR-2608039970 の follow-up 5 として「`kotobase-query` の `materialize` が毎回 full scan する v0.1 制約を、ADR-2607166600（IPLD materialized views / IVM）に接続して解消する」を検討した。**着手前に実測したところ、この follow-up の前提が2つとも崩れていた。**
+
+### 実測1 —— その full scan の費用を、今払っている人がいない
+
+`kotobase-query` を require しているのは 6 つの surface repo（`datomic-client-shim` / `org-postgresql-wire` / `org-opencypher-cypher` / `org-w3-sparql-protocol` / `org-graphql-http` / `org-apache-tinkerpop-gremlin`）とそれぞれのテストだけで、**deploy shell が1つも無い**。`kotobase-protocols-worker`（`s3`/`ipfs`/`git`/`atproto`/`pinning`/`issues` を実際に配信している worker）には bridge への参照がゼロで、`db-for` / `query-memo` / `query-version` も出てこない —— ADR-2607310900 の memo すら、まだ誰も配線していない。
+
+**6 surface はライブラリとして green なだけで、live ではない。**
+
+### 実測2 —— live な SPARQL は別実装で、しかも Datalog 経由
+
+kotobase.net が実際に答えている SPARQL は `ai.gftd.apps.kotobase.graph.sparql`（XRPC）で、`net-kotobase/clj-edge` の proxy が upstream の PDS に流している。その実装は **`kotobase-server/src/kotobase/server/sparql.cljc`**（233行の手書き subset parser）で、ns docstring が自分で書いているとおり **`kotobase.server.query-exec` の compiled-query shape、すなわち map-form Datalog engine に落とす**。
+
+つまり:
+
+- **SPARQL 実装がこの workspace に2つある。**
+- **deploy されている方が、SPARQL を Datalog に翻訳している** —— ADR-2608039970 がまさに「やめる」と決めた形。
+- ADR-2608039970 の contract（`materialize` + access path、`q` は peer）が記述しているのは、**deploy されていない方**である。
+
+（なお `kotobase.server.sparql` の docstring は UNION / ORDER BY / DISTINCT を「rejected」と列挙しているが、同 ns の `grammar-help` 文字列は UNION / ORDER BY を supported と書いており**両者が食い違っている**。どちらが実装の真かは読まないと分からない。本 ADR では判定しない —— 記録だけ残す。）
+
+## Decision
+
+### D1. IVM 接続は今やらない
+
+ADR-2607172300 は linear materialization を **「real query-volume evidence が出たら」** 見直す accepted limitation として書いた。**evidence は無い。** query volume はゼロで、レイテンシ予算も存在しない。
+
+未 deploy の経路を最適化するのは、推測に対して機構を作ることであり、その機構は「どのくらい速くなったか」を測れないまま残る。**ADR-2608039970 が bridge に対して1回やった失敗（実際の利用を見ずに contract を4本と決め、全面 scan が要ることに後から気づいた）を、性能側で繰り返さない。**
+
+### D2. 設計スケッチと trigger を残す（再導出させない）
+
+**trigger**: bridge 経路を mount する deploy shell が存在し、その `materialize` scan が実測でレイテンシ予算を超えたとき。「超えそう」ではなく実測で。
+
+**接続点はすでにある**: `materialize-memo`（ADR-2607310900）の key は**チェーンの content address**（head CID）で、IVM の `view-rows` も同じチェーンの上にある。両者は content address で会話できる —— 新しい invalidation 経路は要らない。
+
+**案A（効果最大・コスト最大）**: fold 時に **doc → datom explosion** そのものを view row として書く。つまり bridge の `doc->datoms`（top-level key を1 datom ずつに開き、`:kotobase/coll`/`:kotobase/key` を足す）が view spec の derivation になる。`materialize` は1ブロック read に落ちる。コスト: **view spec を「attr filter」から「derivation」へ拡張する**ことになり、PDS 上で任意の導出を走らせる話になる。ADR-2607166600 の spec は今 `{\"attrs\" [...]}` であって、derivation ではない。
+
+**案B（小さい・新機構不要）**: view spec は `doc/*` の attr filter のままにし、bridge は **document row** を view から読む。explosion は従来どおり client 側。全 collection の full scan は消えるが、datom 化は毎回走る。
+
+**どちらでも維持される性質**: `view-rows` は「保存 rows + 未 fold novelty」で常に fresh なので、bridge 側が content address で memo していることと矛盾しない。
+
+### D3. 実際に開いている問題（:not-decided —— オーナー判断）
+
+**SPARQL 実装2つをどうするか。** 本 ADR は選択肢と推奨だけ置き、決めない。
+
+- **(a) surface family を deploy し、`kotobase.server.sparql` を retire する（推奨）。** `org-w3-sparql-protocol` + `kotoba-lang/sparql` の方が algebra が広く（BGP/join/filter/**union**/optional/project/**distinct**/**order-by**/slice）、parser と algebra が分離されていて、materialize-only 経路で ADR-2608039970 に適合している。live 側は SPARQL→Datalog 翻訳で、撤回した形そのもの。
+  **コスト**: deploy shell 1本 + 認証 + endpoint 切替。XRPC NSID（`graph.sparql`）と W3C SPARQL 1.1 Protocol は**別の wire**なので、互換をどうするか（両方出す / NSID を deprecate する）を決める必要がある。
+- **(b) live 側を contract 下に持ってくる。** `kotobase.server.sparql` を `kotoba-lang/sparql` の algebra に載せ替え、`query-exec` 経由をやめる。deploy を触らずに済むが、`org-w3-sparql-protocol` の parser と二重管理が残る。
+- **(c) 両方あることを受け入れ、役割を明記する。** XRPC = tenant data plane、W3C protocol = 相互運用 surface。**そう決めるなら、2つある理由を両方の README に書く** —— 今は誰もそう書いていないので、読んだ人は片方を見落とす。
+
+**推奨は (a)**。ただし live endpoint の切替はオーナー判断であり、agent が黙って進める範囲を超える。
+
+## Consequences
+
+- (+) **測れないものを最適化しない。** IVM 接続は、効果を測れる状況になってから着手される。
+- (+) **現在地が1箇所に書かれた。** 「6 surface は green だが live ではない」「live な SPARQL は別実装」は、どの README にも書かれていなかった。次に触る人が同じ発掘をしなくて済む。
+- (+) ADR-2608039970 の contract が**どこに効いていてどこに効いていないか**が明示された。contract は正しいが、適用先はまだ live ではない。
+- (−) **ADR-2608039970 の follow-up 1/4 の作業は、未 deploy の経路を改善したことになる。** 契約としては正しく、live 化したときにそのまま効くが、**今日ユーザーに見えている挙動は何も変わっていない**。これは正直に書いておく。
+- (−) **SPARQL が2実装あるまま残る。** D3 が決まるまで、どちらを触るべきかは自明でない。触る前にこの ADR を読むこと。
+- (−) full scan は残る。query volume が付いた瞬間に効いてくるので、**deploy を決めたら D2 の trigger を同時に設定する**（後追いにしない）。
+
+## Alternatives considered
+
+- **予定どおり IVM 接続を実装する。** 却下。ADR-2607172300 自身が evidence を条件にしており、evidence が無い。加えて案A は view spec の意味を拡張する変更で、**利用者ゼロの状態で決める設計判断としては重すぎる**。
+- **6 surface を deploy してから測る（本 ADR 内で deploy まで進める）。** 却下。live endpoint と認証に触る判断で、しかも既存 live 実装の去就（D3）が未決。**未決の分岐の下流で deploy を既成事実化しない。**
+- **`kotobase.server.sparql` をこの場で `kotoba-lang/sparql` に載せ替える。** 却下。live な read 経路の書き換えであり、D3 が (b) に決まったときの作業。今やると (a) を選んだ場合に捨てる作業になる。
+- **何も記録せず follow-up 5 を open のままにする。** 却下。次に着手する人が同じ発掘（deploy shell を grep して無いことを確かめ、live 経路を辿って別実装に行き当たる）を繰り返す。**発掘の結果は成果物である。**
+"}]
