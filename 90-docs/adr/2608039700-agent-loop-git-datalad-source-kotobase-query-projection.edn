@@ -121,7 +121,7 @@ rebuild(commit, annex objects, schema, loader version)
 
 これによりprocess death後の再開、別agentによる追試、中央query serviceの再構築を同じ証跡から行える。
 
-実行可能なgateは `manifest/projection-verify.cljs` とする。projection contractはsource Git commit、Git inputのSHA-256、annex key/CID、schema/loaderのSHA-256、shellを介さないrebuild argv、output SHA-256、entity count、`:logical` / `:physical` determinism claimを固定する。`check` は構造だけ、`verify` はcommit存在・file hash・rebuild・output EDNを実測する。annex/CID objectのcustodyは別のcustody gateが担い、identity bindingとavailabilityを混ぜない。
+実行可能なgateは `manifest/projection-verify.cljs` とする。v2 projection contractはsource Git commit、Git inputのSHA-256、annex key/CID、dataset固有schema、stable identity属性、schema/loaderのSHA-256、allowlist済みloader ID、canonical logical datom hash、任意のphysical hash、entity countを固定する。contract由来のargvは禁止し、出力はverifierが作る一時`.projection-cache`だけに制限する。`check` は構造だけ、`verify` はcommit存在・ancestry・file hash・schema validation・rebuild・logical/physical outputを実測し、fleet gateはadmit済みGit tipのsnapshotから全contractを自動再構築する。annex/CID objectのcustodyは別のcustody gateが担い、identity bindingとavailabilityを混ぜない。
 
 ### 7. 可用性はGit/DataLadという名前からは得られない
 

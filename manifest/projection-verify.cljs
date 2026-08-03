@@ -19,7 +19,6 @@
 
 (def allowed-loaders
   {:canonical-edn-v1 {:path "manifest/project-edn.cljs"
-                      :program "nbb"
                       :args ["--classpath" ".:scripts/nbb_compat"
                              "manifest/project-edn.cljs" "project"]}})
 
@@ -230,8 +229,11 @@
 
 (defn run-loader! [contract contract-path output-path]
   (let [loader (get allowed-loaders (get-in contract [:projection/rebuild :loader/id]))
-        result (run-file (:program loader)
-                         (into (:args loader) [contract-path output-path])
+        ;; Reuse the already-running, trusted nbb entrypoint. This avoids PATH
+        ;; lookup and prevents a child from installing or resolving packages.
+        result (run-file (first process-argv)
+                         (into [(second process-argv)]
+                               (into (:args loader) [contract-path output-path]))
                          {:cwd root :env (clean-child-env) :timeout 60000
                           :maxBuffer (* 4 1024 1024)
                           :stdio ["ignore" "pipe" "pipe"]})]
