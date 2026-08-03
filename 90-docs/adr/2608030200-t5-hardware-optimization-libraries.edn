@@ -1265,4 +1265,50 @@ bound 順序のテストは `:bounds` と `:readahead` の**報告値も assert 
 `headroom` を使ったことを覚えている前提にしない。今日それを迂回して LRU 36888 対
 「最適」62859 を出したのが、このテストの由来。
 
+
+
+## bound は「レバー」を縛る — 同じ罠が 2 つ目のライブラリで見つかった（2026-08-04、ioplan `96b6a19`）
+
+`ioplan` の bound は実デバイスに対して一度も走っていなかった。計算可能な trace が無いので、
+**この機械にある実データ**を使った: git packfile のオブジェクト配置（`git verify-pack -v` の
+実オフセットと packed size、pack 全体にわたる 256 個をサンプルして check in）。
+**配置は実物、要求順序は計算**（id 順 = オフセットと無相関）——順序は planner が変えるための
+変数なので、そこだけ合成するのが正しい切り分け。
+
+### 初回実行で bound 違反
+
+    plan: 73 commands   benefit の floor: 82
+
+`:captured :commands` は **1.0517** ——「除去可能な超過の 105% を除去した」という、
+**存在しない量**を平然と報告していた。
+
+原因は bound 側ではない:
+
+| merge-gap | commands | bytes |
+|---|---|---|
+| default (4096) | **73** | 823296 |
+| 0 | 82 | 786432 |
+| **floor** | **82** | **786432** |
+
+`plan` は既定で **seek より小さい gap を橋渡し**し、誰も要求していないバイトを転送して
+command を買う。`benefit` の floor は union-of-ranges なので**この取引が見えず、縛ってもいない**。
+merge-gap 0 にすると**両方の floor にぴったり着地**する。
+
+### 修正は `paging` に既にあった形の複製
+
+`benefit` は内部 plan を `{:merge-gap 0}` で測り、`:bounds :merging-and-ordering` と
+`:gap-bridging :disabled-for-this-comparison` を**報告する**（呼び出し側に推論させない）。
+`:disk` で captured は 1.0 / 1.0 / 1.0 になった。docstring に
+「**`:planned` は既定の `plan` の出力では*ない***、再現には merge-gap 0 が要る」と明記。
+
+`paging` は既に `:bounds :replacement-only` + `demand-only` を持っていた——prefetch する
+cache を demand-paging の bound と比べると LRU が Belady に勝つから。**`ioplan` は同じ
+不一致を持ちながらラベルが無く、無言だった。**
+
+**教訓 15: bound は「あるレバー」を縛る。planner を bound と比べる前に、両者が同じレバーを
+指しているか確認する。** 今日この形を 3 回見た（`paging` の元の bug、私が `headroom` を
+迂回して再現したもの、`ioplan`）。ライブラリを跨いで再発するなら、それは個別の bug では
+なく**設計のチェックリスト項目**。新しい bound を書くときは「何を縛らないか」を
+返り値に書く。
+
 "}]
