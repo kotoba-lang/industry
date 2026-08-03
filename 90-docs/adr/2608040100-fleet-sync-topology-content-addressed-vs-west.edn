@@ -353,6 +353,82 @@ passphrase を要求する** —— node daemon は鍵ファイル自体を読�
 `radicle-junkawasaki-passphrase` として保管する（そうすれば agent 側で非対話に node を
 起動できる）。安全床①により agent は passphrase を推測も入力もしない。
 
+## Closing record（2026-08-04）— 着地物・検証・resume point
+
+### main に着地したもの（すべて `origin/main` から到達可能であることを確認済み）
+
+`com-junkawasaki/root`:
+
+| commit | 内容 |
+|---|---|
+| `8a6b4de` / `48235c9` / `97dd458` | 本 ADR（初版 → 第2サイクル → 向きの訂正） |
+| `11b0b1c` / `37c4d81` | ADR-2608040200（CID ネイティブ同期設計 → P0 実測追記） |
+| `086838e` | fleet-db reconcile（629 changed / 499 added / 201 removed → 1,329 ledger event） |
+| `3294564` | closing reconcile（34 changed / 19 added → 53 event） |
+| `1589c03` / `62e68e6` | `scripts/fleet-sync-probe.cljs`（新規 → 方向つき分類に修正） |
+| `7c5896a` / `593c05a` | `scripts/fleet-sync-tick.cljs` + launchd plist |
+| `ede2efb` / `5518de6` / `4751ff4` / `f7bd5c9` | west pin 前進 4 件（すべて `west-pin-put.cljs` のサーバ側検証を通過） |
+
+子リポ（いずれも `main` と `identical` を確認）:
+- `kotoba-lang/loop-system-dynamics@2b46de2` — モデル v1 → v2（生成 probe 入力・balancing loop・period-ratio）→ 向きの訂正
+- `kotoba-lang/prolly-tree@1e9b401` — `prolly-tree.diff`（27 tests / 2,151 assertions green）
+
+### 検証（実行したもの・件数・結果）
+
+- `clojure -M:test`（prolly-tree、resource-guard 経由）: **27 tests / 2,151 assertions / 0 failures**
+- `fleet reconcile --check`: 両サイクルとも absorb 直後に **clean**
+- `west-pin-put.cljs`: 4 件すべて reachable-from-main / ahead / behind=0
+- `scripts/fleet-sync-probe.cljs`: 6-entry の縮小 manifest で end-to-end 検証 → 4,063 entry のフル実行で完走
+- `com.gftd.fleet-sync-tick`: launchd 下で kickstart 実行し drift 検出を確認（毎時稼働中）
+- **未実行**: モデルの再実行はフル probe の後には行っていない（`resources/fleet-sync-probe.edn` は第2サイクル時点のスナップショット。次サイクルで差し替える）
+
+### handoff 時点の実測（2026-08-04 08:42、フル probe）
+
+```edn
+{:west-entries 4063 :materialised 3649 :unmaterialised 408
+ :head-vs-pin {:equal 3444 :local-ahead 37 :local-behind 30 :not-relatable 138 :diverged-total 205}
+ :pin-behind-origin {:repos 88 :of-comparable 1680 :commits 607 :max 108}
+ :fetch-staleness {:median-days 9.64 :p90-days 16.44 :fetched-last-24h 238 :never-fetched 197}
+ :radicle {:sampled 500 :equal 402 :rad-ahead 14 :rad-behind 2 :diverged 1
+           :rad-commit-absent-locally 41 :no-local-checkout 40}
+ :wip {:tracked-dirty-files 295 :tracked-dirty-repos 29 :untracked-repos 45
+       :stashes 4 :unpushed-commits 124 :unpushed-repos 9}}
+```
+
+fleet-db は closing reconcile 直後で drift 0。**検出は毎時走るが吸収は走らない**ので、
+次に見るときには再び drift しているのが正常。
+
+### 保全した owner WIP（触っていない）
+
+- draft PR 3 本（**merge しない**、`:review` クラス）: `cloud-itonami/cloud-itonami-app#34`（11 file）、
+  `etzhayyim/com-etzhayyim-kawaraban#26`（54 file）、`etzhayyim/root#3376`（36 file）。
+  各 repo の `.git/stash-archive-20260803/` に archive 済み。ローカル working tree は無削除。
+- 他セッションの worktree 7 本・`gap/adr-correct`（origin/main から 6 ahead / 85+ behind）は未着手。
+  この乖離は本セッションの成果物を一切載せていない（全て origin/main 由来の経路で着地させた）。
+
+### resume point — 次の agent が最初に打つコマンド
+
+```bash
+# 1) 現在地を測る（~10 分）
+FLEET_ROOT=$PWD nbb scripts/fleet-sync-probe.cljs --rad-sample 500 --edn ~/.gftd/fleet-sync/probe-$(date +%F).edn
+
+# 2) 溜まった drift を吸収する（検出は毎時走っている。ledger を見れば量が分かる）
+tail -5 ~/.gftd/fleet-sync/ledger.edn
+#   → DRIFT なら origin/main の sparse worktree で:
+#     nbb <kagami>/bin/fleet.cljs reconcile --db manifest/fleet-db.edn --west manifest/west.yml
+```
+
+### 未着手（優先順）
+
+1. **probe mode をスケジュールする** — `com.gftd.fleet-sync-tick` は `check` のみ。
+   6 時間間隔の 2 本目の plist を足せば `:period-ratio` が毎回更新される。1 回 ~10 分の IO なので、
+   このマシンの並行セッション負荷を見てから決める（能力ではなく運用判断）。
+2. **radicle node の passphrase** — owner が `RAD_PASSPHRASE` を kagi
+   `personal/radicle-junkawasaki-passphrase` に保管すれば、以後 agent が非対話に node を起動できる。
+3. **ADR-2608040200 の P1** — `fleet head` の署名対象を fleet-db.edn の SHA-256 から
+   prolly-tree の root CID に差し替える（`prolly-tree.diff` は着地済みなので前提は揃っている）。
+4. **モデルの次サイクル** — `resources/fleet-sync-probe.edn` をフル probe の出力で差し替えて再実行。
+
 ## What this ADR does NOT decide
 
 - git / GitHub の廃止（ADR-2607160005 と同じく interop projection として維持）。
