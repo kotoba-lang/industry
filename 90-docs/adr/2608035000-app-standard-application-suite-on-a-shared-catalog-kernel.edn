@@ -1,0 +1,169 @@
+[{:db/id -1
+  :adr/id "2608035000"
+  :adr/title "kotoba-lang/app-* — Apple 標準app 相当を共有 catalog kernel (mokuroku) の上に起こす"
+  :adr/status "accepted"
+  :adr/date "2026-08-03"
+  :adr/depends-on "ADR-2607299000（repository-rules の workspace authority）/ ADR-2607022800（appkit/uikit の既定 UI/UX）/ ADR-2607279200（kotoba source-surface authority）/ ADR-2607173000（script host は nbb）"
+
+  :adr/context
+  "オーナーの問い（2026-08-03）: 『kotoba-lang org, aiueos に activity monitor,
+   photos, finder, music などの apple の標準app に相当するような app, repo は
+   設計実装されている?』
+
+   ## 実測（west manifest 全 project 名 + ローカル checkout 1,764 repo の README + aiueos 全体）
+
+   **4つとも存在しない。** 名前が近いものはすべて別物だった:
+
+   | 探したもの | 一番近い実在物 | 実際は何か |
+   |---|---|---|
+   | Activity Monitor | `kotoba-lang/activity` | 自動タイムシート記録（Timely/RescueTime 系） |
+   | 〃 | `diskspace` / `macos-inventory` / `machine-probe` | ディスク使用量履歴 / 永続化・権限の read-only 監査 / sysctl 読み |
+   | Photos | `gazo` | browser-local Stable Diffusion 画像 *生成* app |
+   | 〃 | `kasane` / `utsushi` | PSD・AI・PDF parser / ffmpeg 的 filtergraph |
+   | Finder | `fs` / `drive` | IFilesystem protocol（下の層）/ 最大8 item の bounded folder tree |
+   | 〃 | `app-drive` | Google Drive v3 + MS Graph 互換の files **API サーバ** |
+   | Music | `kami-ongaku-*` 5 repo / `kami-app-daw` | DAW（Logic Pro 相当。作る側） |
+   | 〃 | `kotoba-lang/music` | 名前に反して BPMN contract |
+
+   CPU/メモリ使用率を扱う README はローカル repo でゼロ（旧 Rust 世代
+   `kotoba-v2025/_archive` を除く）。EXIF / photo library / album を扱う repo も
+   ゼロ。playlist を扱うのは `hls` と `org-microsoft-riff` だけ。
+
+   ## なぜ無かったか
+
+   この workspace の方針は『app を書く』ではなく『capability library と portable
+   domain model を積む』で、GUI は `kotoba-ui`/`appkit`/`uikit` + `shell`
+   （Tauri 相当）が受け持つ分業になっている。aiueos の GUI も ADR-0009 で
+   browser surface（dom/render, fb/present）が implemented、VM/native の
+   virtio-gpu は proposed 止まり。**土台は揃っているが、その上に載る標準app が
+   1本も書かれていなかった** —— aiueos の `examples/apps/notes.edn`（ユーザーが
+   選んだファイル1つと log だけを import する notes app）が唯一の userland app
+   サンプルだった。
+
+   ## 既に app-* を名乗っている 19 repo
+
+   `app-briefing app-browser app-calendar app-comfyui app-contacts app-docs
+   app-drive app-editor app-forms app-i18n app-mailer app-murakumo app-phone
+   app-playwright app-reviewer app-search app-sheets app-slides app-wire` は
+   etzhayyim から移管された Google Workspace / M365 互換の **API サーバ**群
+   （TypeScript / Go / Python）で、Kotoba では書かれていない。つまり `app-`
+   prefix は既に使われているのに `manifest/repository-rules.edn` の
+   `:name-prefix` vocabulary には **登録が無かった**（`loop-` `skill-` `action-`
+   `cloud-itonami-*` のみ）。"
+
+  :adr/decision
+  "オーナー指示（2026-08-03）『では設計実装, kotoba-lang/app-* としましょう.
+   lib 部分は共通化』に従い、以下を決定する。
+
+   ## 1. `app-` prefix を repository-rules.edn に登録する
+
+   `:role :end-user-application` / `:execution :on-demand`。
+   `:must [:present-a-user-surface :declare-its-capabilities :delegate-domain-truth]`
+   `:must-not [:own-domain-model-truth :hold-ambient-authority :embed-a-second-renderer]`
+   `:authority-library \"mokuroku\"`。
+
+   既存 19 repo は **legacy non-conformant として正直に記録する** —— 外部 API
+   互換サーバであって Kotoba app ではないので、この契約を後付けで満たしたことに
+   しない。
+
+   ## 2. 共有 lib は `kotoba-lang/mokuroku`（目録）— prefix 無し reusable library
+
+   4つを並べると実体は同じ形だった:
+
+       capability 経由の source
+         → item 集合
+         → sort / filter / group / search
+         → selection
+         → inspector projection
+         → command 提案（実行は host の capability effect）
+
+   Activity Monitor はプロセスの、Finder はファイルの、Photos は画像の、Music は
+   楽曲の目録である。**共通化すべきはこの kernel であって UI ではない**（UI は
+   既に `kotoba-ui`/`appkit` が持っている）。`mokuroku` は host effect ゼロの
+   portable `.cljc` + bounded `.kotoba` profile とし、source は protocol 注入。
+
+   ## 3. app-* は 9 本。全部 mokuroku を共有する
+
+   | repo | Apple 相当 | item | source capability |
+   |---|---|---|---|
+   | `app-monitor` | Activity Monitor | process | `process/list` + `system/metrics` |
+   | `app-files` | Finder | file / directory | `fs/browse` |
+   | `app-photos` | Photos | image | `image/metadata` + `fs/browse` |
+   | `app-music` | Music | track | `media/library` + `audio/playback` |
+   | `app-notes` | Notes | note | `fs/app-data`（既存） |
+   | `app-preview` | Preview | document page | `fs/browse`（既存 `kasane` が解析） |
+   | `app-console` | Console | log entry | `log/read`（既存） |
+   | `app-fontbook` | Font Book | font face | `fs/browse`（既存 `glyph` が解析） |
+   | `app-diskutil` | Disk Utility | volume | `system/metrics`（既存 `diskspace` が集計） |
+
+   ## 4. Calculator / Clock / Weather は今回入れない
+
+   共有 kernel を選定理由にしている以上、**kernel を使わない app を数合わせで
+   足すと共有化の主張が嘘になる**。Calculator は目録ではない。Clock と Weather は
+   list ではあるが item が 3〜5 件で sort/filter/group/search/inspector の
+   どれも要らず、mokuroku を通すのは overhead でしかない。必要になったら別 ADR で
+   `app-` に足す（kernel を使わないことを明記して）。
+
+   ## 5. capability を 6 本新設する
+
+   `kotoba-core-contracts` の `capability_contract.edn`（id 251〜）と
+   `capability-effects` / `approval-required-capabilities` を拡張し、
+   `scripts/scaffold_capability_repos.clj` で repo を生成する:
+
+   | capability | id | effects | default policy |
+   |---|---|---|---|
+   | `process/list` | 251 | `#{:system-read :personal-data}` | approval-required |
+   | `system/metrics` | 252 | `#{:system-read}` | autonomous |
+   | `fs/browse` | 253 | `#{:storage-read :personal-data}` | approval-required |
+   | `image/metadata` | 254 | `#{:storage-read :personal-data}` | approval-required |
+   | `media/library` | 255 | `#{:storage-read :personal-data}` | approval-required |
+   | `audio/playback` | 256 | `#{:device-write}` | autonomous |
+
+   `fs/app-data`（既存）はサンドボックス化された app 自身のデータ用で、ユーザーの
+   ディレクトリを *閲覧* する権限とは別物なので `fs/browse` を分ける。同様に
+   `audio/io`（既存、sensor-read を含む録音側）と `audio/playback` を分ける ——
+   再生しかしない app にマイク権限を渡さないため。
+
+   Radicle RID は validate-manifest が `rad:z[1-9A-HJ-NP-Za-km-z]+` を必須にして
+   いるので、`rad` CLI（この machine に v1.9.1 が実在）で実際に mint する。
+   捏造した RID を置かない。
+
+   ## 6. runtime とツールの選択（既存 repo-wide rule に従うだけ）
+
+   - domain model は portable `.cljc`（open-schema 正本）+ bounded `.kotoba`
+     profile（capability-free、`calendar` / `drive` と同型）
+   - UI は `kotoba-ui.core` 単一エントリ（+ `appkit.core`）。raw hex 禁止、
+     layout は shell から。3D は無し（該当なし）
+   - script は nbb。`.sh` / `.mjs` / Rust は書かない"
+
+  :adr/consequences
+  "**得られるもの**: 『kotoba-lang には app が無い』という空白が埋まる。9本が
+   同じ kernel を通るので、sort/filter/search/selection の挙動が app 間で一致し、
+   1箇所直せば9箇所直る。capability を分けたことで、Photos に process 一覧の
+   権限が渡らない・Music にマイク権限が渡らないことが型で保証される。
+
+   **代償と既知の限界（正直に）**:
+
+   1. **`app-` prefix の意味が2つになる。** 既存19本は外部 API 互換サーバ、
+      新規9本は Kotoba app。repository-rules.edn には legacy として記録するが、
+      名前だけ見て区別はつかない。将来どちらかを rename する判断が要る。
+   2. **provider-status は `contract-only` から始まる。** 新設6 capability は
+      契約と CID が確定するだけで、実際に macOS のプロセスを読む provider は
+      別途 signed Wasm component として publish するまで存在しない。**app が
+      実データを表示できるのはその後**であり、それまでは fixture 駆動。
+      『capability を作った』と『実データが出る』を混同しない。
+   3. **`mokuroku` の bounded `.kotoba` profile は再帰値を持てない**
+      （ADR-2607279200 / migration plan W4 待ち）。ディレクトリ木のような任意
+      深度の入れ子は、当面 flat な item 集合 + parent 参照で表す。**これは
+      暫定であって Kotoba の application programming model ではない** ——
+      W4 の recursive logical value が入ったら置き換える。
+   4. **9本 + 6 capability + 1 lib = 16 repo が一度に増える。** west manifest の
+      登録は `--entry` 単位の最小 diff で行い、wholesale 再生成はしない。"
+
+  :adr/verification
+  "各 app repo: `clojure -M:test`（model + validate）と `.kotoba` conformance。
+   `mokuroku`: kernel の性質テスト（同じ source に同じ query を2回かけたら
+   同じ順序 = 決定性、selection が source 更新をまたいで item id で保存される）。
+   capability repo: `clojure -M:test` で `validate-manifest` が空を返すこと
+   （definition CID が canonical DAG-CBOR と一致すること）。
+   superproject: `nbb scripts/gen-west-manifest.cljs --check`。"}]

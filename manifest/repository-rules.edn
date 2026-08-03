@@ -90,6 +90,55 @@
      :must [:expose-action-yml :pin-external-revisions :emit-check-result]
      :must-not [:own-domain-contract :hide-provider-neutral-core]
      :examples ["action-ux-kaizen"]}
+    ;; ── end-user applications (owner directive 2026-08-03,
+    ;;    ADR-2608035000) ─────────────────────────────────────────────
+    ;; The prefix was already in use by 19 repositories before it was ever
+    ;; declared here, which is exactly the drift ADR-2607299000 was written
+    ;; to stop. Declaring it now, and naming the non-conformant set, is
+    ;; preferable to a rule that silently reads as if all 28 satisfied it.
+    {:prefix "app-"
+     :role :end-user-application
+     ;; An application is opened, used, and closed. It holds no loop of its
+     ;; own: anything periodic belongs to a loop- orchestrator that the app
+     ;; reads from, not to the app.
+     :execution :on-demand
+     :must [:present-a-user-surface
+            :declare-its-capabilities
+            :delegate-domain-truth]
+     :must-not [:own-domain-model-truth
+                :hold-ambient-authority
+                :embed-a-second-renderer]
+     ;; Where the shared behaviour lives. An app- repo that browses a set of
+     ;; items states sort/filter/group/search/selection semantics by asking
+     ;; mokuroku, the same way a loop- repo asks dynamics for scoring truth.
+     :authority-library "mokuroku"
+     :composition {:domain-model "portable .cljc + bounded .kotoba profile"
+                   :ui "kotoba-ui.core (+ appkit.core | uikit.core)"
+                   :effects "capability-* packages, host-injected"}
+     :examples ["app-files" "app-monitor" "app-photos" "app-music"]
+     ;; Migrated from etzhayyim (ADR-2608035000 context). These are Google
+     ;; Workspace / Microsoft Graph compatible API servers in TypeScript, Go
+     ;; and Python -- they present no user surface of their own, they own
+     ;; their domain model, and they are not built on mokuroku. They carry
+     ;; the prefix for historical reasons only and are NOT claimed to satisfy
+     ;; the contract above.
+     :legacy-non-conformant
+     ["kotoba-lang/app-briefing" "kotoba-lang/app-browser"
+      "kotoba-lang/app-calendar" "kotoba-lang/app-comfyui"
+      "kotoba-lang/app-contacts" "kotoba-lang/app-docs"
+      "kotoba-lang/app-drive" "kotoba-lang/app-editor"
+      "kotoba-lang/app-forms" "kotoba-lang/app-i18n"
+      "kotoba-lang/app-mailer" "kotoba-lang/app-murakumo"
+      "kotoba-lang/app-phone" "kotoba-lang/app-playwright"
+      "kotoba-lang/app-reviewer" "kotoba-lang/app-search"
+      "kotoba-lang/app-sheets" "kotoba-lang/app-slides"
+      "kotoba-lang/app-wire"]
+     ;; Carry the prefix and are plausibly real applications, but were not
+     ;; examined when this rule was written. Recorded as unknown rather than
+     ;; folded into either list, so nobody reads silence as a pass.
+     :unassessed
+     ["network-awai/app-aozora" "network-awai/app-aozora-svelte"
+      "network-awai/app-hyakka"]}
     ;; ── the itonami fleet's two execution classes (owner directive
     ;;    2026-07-30) ──────────────────────────────────────────────────
     ;; The prefix is written out in full because the auditor matches with
