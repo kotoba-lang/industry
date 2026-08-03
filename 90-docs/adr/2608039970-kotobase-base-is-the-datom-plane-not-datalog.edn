@@ -150,11 +150,26 @@ ADR-2608039000 が D1 について定めた操作的基準をそのまま当て�
 - **byte 面も datom 面に載せたままにする（現状維持）。** 却下。4 MiB 天井という実測済みの代償があり、`kotobase-storage` にはすでに正しい面（`IObjectStore` + transfer profile）が実装されている。使っていないだけである。
 - **ADR を書かず実装だけ直す。** 却下。次に query surface を足す agent は `kotobase-query` の README とこれまでの 6 surface を読み、7 本目も `bridge/q` に繋ぐ。**規則が無い限り、既存の形が規則として機能する。**
 
-## Follow-up（本 ADR では実装しない、起票順）
+## Follow-up の現在地（2026-08-03 更新）
 
-1. `kotobase-query`: access path を公開契約として明記（`datalog.index` の re-export + `visible?` 規律 + README）。`bridge/q` は互換として残す。
-2. `kotobase-protocols`: byte 面を block / object 面に移設（`blocks` → `IBlockStore` + `verifying-block-store`、`git` → sha1 検証込み、`s3` の body → object 面）。段階的、各段で実 clone / 実 GET を検証。
-3. `kotobase`: README の自己記述訂正（D6）。
-4. `org-w3-sparql-protocol` / ADR-2607172300: materialize-only 経路を正規経路として記述訂正。
-5. bridge の incremental 化を ADR-2607166600（IVM）に接続（別 ADR）。
+| # | 内容 | 状態 |
+|---|---|---|
+| 1 | `kotobase-query`: access path を公開契約として明記 | **done** — kotoba-lang/kotobase-query#6（`entity-id` public 化 + `entity-attrs`/`by-predicate`/`by-predicate-value`/`refs-to`、`visible?` 必須、prune）+ #7（`datoms`）。35 tests / 62 assertions、nbb と clj 両方 green |
+| 2 | `kotobase-protocols`: byte 面を block / object 面に移設 | **未着手** — live worker を触るため段階を切る |
+| 3 | `kotobase`: README の自己記述訂正（D6） | **done** — kotoba-lang/kotobase#31 |
+| 4 | `org-w3-sparql-protocol` / ADR-2607172300: materialize-only を正規経路として記述訂正 | **done** — org-w3-sparql-protocol#6（記述訂正 + `(:spo db)` walk を `bridge/datoms` に置換 + kotobase-query pin 前進）、本 ADR 群の記述訂正は ADR-2607172300 に反映済み |
+| 5 | bridge の incremental 化を ADR-2607166600（IVM）に接続 | **未着手**（別 ADR） |
+
+### 実装して分かったこと（D3 の訂正）
+
+**access path を4本（4 covering index）と書いたのは不足だった。** 自前 algebra を持つ surface が
+実際に最初に必要とするのは「面ぜんぶを1回」であり、それは4本のどれでもない。唯一の非 Datalog
+surface である `org-w3-sparql-protocol` は `(:spo db)` を直接 walk していた —— 可視性判断を伴わない
+raw index read で、同 repo は自前で `visible?` を適用して正しく処理していたが、**次の surface は
+それを知っている必要があった**。`bridge/datoms`（lazy 全面 scan、`visible?` 必須）を追加して塞いだ
+（#7）。D3 の access path 一覧はこの5本目を含む。
+
+**`visible?` の強制が「たまたま」だった。** 述語は*呼ばれる*ことで欠落が露見する設計だったが、
+`refs-to` は `:ocp` が空なので何もフィルタせず、**2引数呼び出しが可視性判断ゼロで `{}` を返した**。
+JVM は arity で弾くが nbb/SCI は弾かない。明示チェック（`check-visible!`）に変更済み。
 "}]
