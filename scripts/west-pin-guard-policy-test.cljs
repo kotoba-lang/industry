@@ -17,5 +17,20 @@
       (compat/exit 1))
     (println (str "OK " name))))
 
-(println "west-pin-guard-policy: 3 cases OK")
+(def payload-cases
+  [{:name "payload file read -> verify it"
+    :named? true :read? true :expected :verify}
+   {:name "payload path named but unreadable -> cannot verify, do not fail open"
+    :named? true :read? false :expected :unreadable}
+   {:name "no payload path (inline / $VAR / wrapper) -> nothing to read"
+    :named? false :read? false :expected :unknown}])
+
+(doseq [{:keys [name named? read? expected]} payload-cases]
+  (let [actual (policy/payload-decision named? read?)]
+    (when-not (= expected actual)
+      (println (str "FAIL " name " expected=" expected " actual=" actual))
+      (compat/exit 1))
+    (println (str "OK " name))))
+
+(println "west-pin-guard-policy: 6 cases OK")
 
