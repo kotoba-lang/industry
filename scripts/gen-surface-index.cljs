@@ -95,6 +95,23 @@
          (remove #(< (count (:path %)) 2))
          distinct)))
 
+(defn- west-paths
+  "west.yml が pin している path の集合。
+
+   ## なぜ索引が『正本かどうか』を持つ必要があるか
+
+   実測 2026-08-03: 初版の索引は `authn.kotobase.net` の面を
+   `net-kotobase-enterprise-wave2/3` `net-kotobase-obsidian-story` に帰属させた。
+   **3 つとも west 未登録の作業コピー**で、正本は `net-kotobase`（同じ remote の
+   別チェックアウト）だった。
+
+   『どこにあるか』だけでは足りない —— **そこを編集してよいか**が分からないと、
+   未登録のコピーを直して『やった』と思い込む。今朝の merkle-lsm（本番の
+   コードがコミットに辿れない）と同じ欠陥クラスで、認証基盤で起きればより痛い。"
+  []
+  (let [raw (or (read-safe (path/join root "manifest" "west.yml")) "")]
+    (into #{} (map second) (re-seq #"(?m)^\s+path:\s+(\S+)\s*$" raw))))
+
 (defn- page-like? [p]
   (boolean (re-find #"(?i)(sign|login|logout|signup|register|account|auth|profile|settings|billing|checkout|pricing|store)" p)))
 
@@ -125,7 +142,8 @@
     (vec (walk repo-root 0))))
 
 (defn scan []
-  (let [orgs-dir (path/join root "orgs")]
+  (let [orgs-dir (path/join root "orgs")
+        registered (west-paths)]
     (for [org (dirs orgs-dir)
           repo (dirs (path/join orgs-dir org))
           :let [rp (path/join orgs-dir org repo)]
@@ -142,6 +160,7 @@
       {:host h
        :path (:path p)
        :repo (str "orgs/" org "/" repo)
+       :registered? (contains? registered (str "orgs/" org "/" repo))
        :worker (get cfg "name")
        :kind (if (page-like? (:path p)) :page :api)
        :file (str/replace (:file p) (str root "/") "")})))
@@ -153,6 +172,9 @@
            :surface/host (:host r)
            :surface/path (:path r)
            :surface/repo (:repo r)
+           ;; west 未登録 = **正本とは限らない作業コピー**。編集先を誤らせない
+           ;; ための印（2026-08-03、authn を未登録コピーに帰属させた実測から）。
+           :surface/registered? (:registered? r)
            :surface/worker (:worker r)
            :surface/kind (:kind r)
            :source/dataset "surface"

@@ -71,10 +71,18 @@
          ;; **ホスト+パスで畳む。** 同じ面が複数 repo（wave2/wave3/obsidian-story
          ;; のような並走 checkout）に現れると、同じ 1 行が 3 回出る。
          ;; 雑音は無視され、無視される警告は存在しないのと同じ。
-         (map (fn [d] [(str (:surface/host d) (:surface/path d)) (:surface/repo d)]))
+         (map (fn [d] [(str (:surface/host d) (:surface/path d))
+                       (:surface/repo d) (:surface/registered? d)]))
          (group-by first)
-         (map (fn [[k v]] (str k "  ← " (second (first v))
-                               (when (> (count v) 1) (str " 他 " (dec (count v)) " repo")))))
+         (map (fn [[k v]]
+                ;; **west 登録済みの repo を優先して見せる。** 未登録は正本とは
+                ;; 限らない作業コピーで、そこを編集しても何も起きない（実測
+                ;; 2026-08-03: authn の面 34 個は全部未登録コピー由来だった）。
+                (let [reg (first (filter #(nth % 2) v))
+                      pick (or reg (first v))]
+                  (str k "  ← " (second pick)
+                       (when-not (nth pick 2) "  ⚠west未登録")
+                       (when (> (count v) 1) (str " 他 " (dec (count v)) " repo"))))))
          sort
          (take 5))))
 
