@@ -684,9 +684,12 @@ Datalog join の到達範囲はちょうど ref 1本で、別 ref・別データ
 - **Durable Object のストレージ（`ctx.storage.sql`）に kotobase の durable plane を
   置かない。** 各 DO の SQLite は private で他から引けないので、object の数だけ独立した
   データベースができ、datom 面が孤島に割れる。**DO は直列化器・realtime room として
-  使い、ストレージは D1**（または他の共有バックエンド）。DO はグローバル一意 +
+  使い、ストレージは共有バックエンド**に置く。DO はグローバル一意 +
   シングルスレッドなので、「書き手はちょうど1人」を*実装せずに*得られる — 自前の
   write lease や fencing epoch を書かない。
+  ⚠ **この項は 2026-08-03 に「ストレージは D1」から書き換えた**（下記「D1 を前提に
+  しない」節、ADR-2608039000）。要件は「**共有**バックエンドであること」（＝クエリ面を
+  割らないこと）であって D1 であることではない。分散型経路では D1 を前提にしない。
 - **クエリ到達範囲と書き込み並列度は同じ ref で決まるため常に対立する。** 設計文書は
   どちらを採ったかを明示すること。
 
@@ -704,6 +707,62 @@ datom 面を割る」と退けておきながら、その論拠が自分のシ�
 （実装者に既存の仕組みを作り直させるところだった）。bound parameter 100 も「33 ブロックで
 chunk が要る」と書いたが既存 provider は 1 ブロック 1 INSERT（4 パラメータ）だった。
 **制限の数値を正しく引用できていても、誰の責任かを間違えると設計が嘘になる。**
+
+## blockchain / 分散型経路に D1 を前提にしない（repo-wide mandatory、2026-08-03、ADR-2608039000）
+
+**オーナー指示（2026-08-03）「基本的に blockchain, 分散型経路に d1 は前提にしないで」。**
+blockchain・合意・chain 状態・ref/head・台帳・DID/identity・IPFS/IPNS など、
+**分散性を主張する経路では Cloudflare D1（および他の単一ベンダの条件付き書き込み /
+単一リージョン SQL）を前提（premise）にしてはならない。**
+
+### 判定基準 — 「消して再構築できるか」
+
+禁止と許可の線はここ1本で引く:
+
+> **その D1 データベースを今すぐ削除したとき、データが失われるか、正しさが壊れるか。**
+> - **壊れる → premise。分散型経路では禁止。**
+> - **遅くなるだけで、content-addressed 面から再構築できる → cache / projection。許可。**
+
+具体的に、分散型経路で D1 が担ってはいけない役割:
+
+- **順序 / CAS / 合意の裁定者**（`UPDATE … WHERE sequence = ?` で勝者を決める）
+- **head・ref・chain 状態・台帳の source of truth**
+- **recovery・sequencing・正しさが依存する対象**（＝これが無いと復旧できない）
+
+許可される役割（消して再構築できるもの）: 読み取り高速化 cache、materialized view /
+projection、index、local read accelerator、運用メトリクス。
+
+### 何を代わりに使うか
+
+- **block 面**: content-addressed な immutable object store（B2 / R2 / S3 / IPFS /
+  DataLad-annex）。必要な capability は `#{:immutable-blocks :cid-addressed-read}` だけで、
+  **条件付き書き込みは要らない**。
+- **ref 面**: **inga**（ADR-2608038000）。**2f+1 の quorum 証明書それ自体が条件付き
+  書き込み**なので、ホスト側の `UPDATE … WHERE sequence = ?` / `onlyIf.etagMatches` /
+  `If-Match` は経路から消える。配備は
+  `(storage/compose {:blocks <object store> :refs <inga>})` —— `compose` は ref profile を
+  `refs` 側からのみ採るので、この分離は型で守られる。
+
+### 適用範囲 — これは全面禁止ではない
+
+**普通のアプリで D1 を使うのは従来どおり問題ない。** appview・セッション・管理画面・
+社内ツールなど、分散性を主張していない経路は対象外（実測 2026-08-03 時点で
+`d1_databases` binding を持つ Worker の大半がこれ）。**縛るのは「分散」「decentralized」
+「blockchain」を名乗る経路だけ**であり、そこに単一ベンダの primitive が premise として
+入ると**主張そのものが嘘になる**からである。
+
+### 現在地（2026-08-03 実測、正直に）
+
+| 経路 | D1 の役割 | 判定 |
+|---|---|---|
+| `net-kotobase/kotobase-cf-wasm` head plane | ref の CAS 裁定（testnet=authoritative / production=shadow） | **premise。inga 着地まで暫定 shim として稼働継続、その後撤去** |
+| `kotoba-lang/kotobase-storage-d1` | block+ref backend adapter | **provider としては可。分散型経路の既定にしない** |
+| `gftdcojp/engi`（settlement） | transfer ID の一意記録（replay 防止） | **要再設計。transfer ID は既に CIDv1 —— 正本は content-addressed 面、D1 は index** |
+| appview 各種（mangaka / dougaka / kakure 等 ~25 Worker） | アプリのデータ | **対象外。従来どおり** |
+
+**注意**: D1 が選ばれた経緯は「能力の優劣」ではない —— ADR-2607299900 が自分で書いている
+とおり、**Cloudflare OAuth token に `r2` scope が無く R2 の `onlyIf.etagMatches` が
+使えなかった**ための暫定選択である。恒久的な答えとして選ばれたことは一度もない。
 
 ## LLM モデル選択 — murakumo-main alias（repo-wide mandatory、2026-07-17、ADR-2607173100）
 
