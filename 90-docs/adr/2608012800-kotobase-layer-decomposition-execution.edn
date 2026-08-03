@@ -242,13 +242,50 @@ streaming compaction は Stage A が未達で Stage B が bounded。
 `transact-with-schema` の `:db/valueType \"ref\"` 判定が同じ呼び出しの `ref?` とは
 **独立に** `ipld/link?` をハードコードしていた drift も直った。
 
+# 再統合(2026-08-02 完了分)
+
+抽出を「追加のみ」で着地させた結果、上流が動いてドリフトした。実測:
+`datalog` +322/-21、`datom-model` +121/-25、`merkle-lsm` 0。
+**ドリフト量は抽出から向け直しまでの期間に比例した** —— 教訓は ADR-2608025000 D4。
+
+- **merkle-lsm** —— `kotobase-peer` が repo 依存に切り替わり内部コピーを削除。
+  src 1,480 行 + test 890 行。**カバレッジは 1:1 で移動**(peer JVM 271/840 → 227/675、
+  cljs 274/1091 → 230/926、差分 44/165 = merkle-lsm 自身の suite と完全一致)。
+  ドリフト 0 だったので純粋な重複解消。peer `ea4a8e8`。
+- **arrangement → datalog** —— query 層のコピーが 1 つになった。src 957 行削除
+  (正味 -788)、test 804 行削除。`arrangement.query`/`.datalog` は
+  **compatibility shim として残る**(consumer 7 つが古い pin を指しているので実害なし)。
+  arrangement `096523f`。決定は ADR-2608025000。
+- **datom-model** —— peer `ea4a8e8` に再同期。ただし**再抽出はしなかった**:
+  model 半分だけを新旧 divider(旧 870 / 新 890 行)で切って直接 diff したところ
+  差分は 1 hunk のみ(正味 +20 行)で、残りはすべて persistence 側だった。
+  機械的にやり直しても同じファイルになる一方、手書きの抽出 docstring を失う risk が
+  あった。65/124 → 69/134。datom-model `6910ef9`。
+
+**危うく踏んだ罠**: `datalog` @ `8dde87c` は arrangement が revert した limit pushdown を
+まだ持っていた(arrangement は LDBC が CPU 4-5 分 → 15 分超で kill されて revert)。
+「byte 一致」という前提のまま pin していたら、**数時間前に revert した病理を
+静かに再導入していた**。実装者が気づいて revert を port し、別セッションが同一の
+revert を landed していたのでそちらに pin した(`9db8410`)。
+**抽出 lib の再同期は『上流の revert』も運ぶ必要がある。**
+
 # 残り
 
+- **shim の除去** —— consumer(`kotobase-peer` / `kotobase-query` /
+  `loop-system-dynamics` / `kotoba-git` / `bonsai` / `kotoba-rad` / `nekko` /
+  `net-kotobase`)が `datalog.core` を直接 require した後。
+- **`scan_instrument` の向け直し** —— `kotobase-peer` の
+  `bench/kotobase_peer/scan_instrument.clj:33-34` が **private var**
+  `#'arrangement.datalog/scan*` を `with-redefs` で差し替えている。private var は
+  再輸出できず、**alias にするのは省くより悪い**(redef が alias を束ね直す一方
+  engine は元の関数を呼び続けるので計測が黙って 0 を数える)。shim から意図的に
+  外してあり、peer が pin を上げる時に `#'datalog.core/scan*` へ向け直す必要がある。
+- **`kotoba-git` は現行 arrangement に上げられない** —— 自身の `io-ipld` pin が
+  `ipld.value` より古く `Could not locate ipld/value` で落ちる。**未改変の
+  arrangement main でも同じ**なので、これは kotoba-git 自身の pin 陳腐化。
 - **段 6 の D1/D2**(Worker に protocol を被せ、env var を declared profile に写し、
   conformance を回す)。D3(cljs CI)は着地済み。詳細は ADR-2608012900。
-- **再統合**: 4 つの新 lib はすべて**追加のみ**で着地しており、
-  `arrangement` / `kotobase-peer` はまだ新 lib を向いていない。
-  向け直しは既存 consumer を壊すリスクがあるので別段。
+- **L6 の分離**(`kotobase-persist` を peer から)は未着手。
 - **novelty-segments の Promise 版 cljs mirror**(コード内に OWED と明記)。
 
 # Non-goals
