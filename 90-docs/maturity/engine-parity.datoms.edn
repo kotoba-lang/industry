@@ -1,0 +1,416 @@
+;; engine-parity — kami-engine 家 vs Unity、network-isekai vs Roblox/Fortnite/Steam の
+;; 測定可能な parity 台帳。生成物ではなく手書き（測定結果を都度上書きする「現在値」文書。
+;; 履歴は git log -p が持つ — CLAUDE.md「文書は最新状態のみ」）。
+;;
+;; query 面: manifest/edn-query.cljs の index-sources に "engine-parity" として登録済み。
+;;   nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
+;;     '[:find ?axis ?status ?score :where
+;;       [?e "source/dataset" "engine-parity"] [?e "parity/target" "unity"]
+;;       [?e "parity/axis" ?axis] [?e "parity/status" ?status] [?e "parity/score" ?score]]'
+;;
+;; :parity/status — :implemented（実装があり実測証拠がある） / :partial（部分実装、
+;;   名指しの欠落がある） / :absent（コード面に痕跡が無い。ただし「索引に無いこと」は
+;;   不在の証明ではない — CLAUDE.md。:parity/evidence に探索方法を必ず書く）
+;; :parity/score — 0.0–1.0。target 製品が提供する当該 axis の機能面積に対する被覆率の
+;;   保守的な見積り。実測できない部分は低く置く（楽観に倒さない）。
+;; :parity/measured-at — この行の evidence を実際に取り直した日付。
+;; :parity/probe — その判定を再現するコマンド。再測できない主張は書かない。
+
+[;; ───────────────────────── kami-engine 家 vs Unity ─────────────────────────
+ {:parity/id :parity/unity-editor
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "editor-authoring-gui"
+  :parity/label "統合エディタ（scene 編集 GUI / inspector / hierarchy / play-in-editor）"
+  :parity/status :partial :parity/score 0.45
+  :parity/repos "[\"kotoba-lang/kami-studio\" \"kotoba-lang/kami-creative-studio\" \"kotoba-lang/kami-app-modeler\" \"kotoba-lang/kami-app-sculpt\" \"kotoba-lang/kami-app-animator\" \"kotoba-lang/kami-app-cad\" \"kotoba-lang/kami-app-bim-editor\"]"
+  :parity/evidence "kami-app-* が用途別に 20 以上あり（modeler/sculpt/animator/cad/bim-editor/nle/daw/character-creator）、kami-app-character-creator だけで 51,115 行。ただし Unity の 1 エディタ = 全用途という統合面は無く、hierarchy/inspector/play-in-editor に相当する共通 shell が kami-studio に集約されているかは未検証。"
+  :parity/probe "for d in orgs/kotoba-lang/kami-app-*; do echo $d; done; wc -l orgs/kotoba-lang/kami-studio/**/*.clj*"
+  :parity/gap "用途別 app の集合であって単一統合エディタではない。共通 shell（hierarchy/inspector/play-in-editor）の有無が未測定。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-prefab
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "prefab-instancing-authoring"
+  :parity/label "prefab（再利用可能な entity テンプレート + override + nested prefab）"
+  :parity/status :absent :parity/score 0.10
+  :parity/repos "[\"kotoba-lang/kami-scene-contracts\" \"kotoba-lang/kami-game-scene\"]"
+  :parity/evidence "\"prefab\" は kami-* 全 repo の README/docs で 0 件、コード（clj/cljc/cljs/edn/wit）でも 0 件。scene は EDN の flat な entity 列で、テンプレート化・override・入れ子の仕組みが名前として存在しない。"
+  :parity/probe "grep -ril prefab --include='*.clj' --include='*.cljc' --include='*.cljs' --include='*.edn' --include='*.wit' orgs/kotoba-lang/kami-* orgs/kotoba-lang/webgpu | wc -l  # => 0"
+  :parity/gap "Unity の prefab に相当する再利用単位が無い。scene.edn は毎回フラットに書き下す。GPU instancing（instancing 5 件ヒット）は描画側の話であって authoring 側の prefab とは別物。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-asset-pipeline
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "asset-import-pipeline"
+  :parity/label "アセット取り込み（fbx/gltf/usd/obj/step、import setting、依存解決）"
+  :parity/status :implemented :parity/score 0.70
+  :parity/repos "[\"kotoba-lang/kami-usd-native\" \"kotoba-lang/kami-cad-import\" \"kotoba-lang/org-khronos-gltf\" \"kotoba-lang/org-vrmc-vrm\" \"kotoba-lang/org-openusd\"]"
+  :parity/evidence "USD / glTF / VRM / CAD(STEP) の spec repo が実在し kami-cad-import は 2,759 行。ADR-2607121800 が org-vrmc-vrm の texture 抽出を baseColor のみと名指ししており、normal/metallic-roughness/occlusion/emissive は未対応。"
+  :parity/probe "wc -l orgs/kotoba-lang/kami-cad-import/**/*.clj*; grep -n 'baseColor' 90-docs/adr/2607121800-*.edn"
+  :parity/gap "PBR texture set が baseColor 止まり。import setting（圧縮・mipmap・法線再計算）の面が未確認。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-render
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "render-pipeline"
+  :parity/label "レンダパイプライン（PBR / shadow / postfx / 複数パス）"
+  :parity/status :implemented :parity/score 0.60
+  :parity/repos "[\"kotoba-lang/webgpu\" \"kotoba-lang/kami-engine-render\" \"kotoba-lang/kami-postfx-scene\" \"kotoba-lang/kami-engine-hud-gpu\"]"
+  :parity/evidence "WebGPU + WGSL first / WebGL2 fallback が repo-wide 規則（CLAUDE.md）。shadow-map 4 件、instancing 5 件、frustum 4 件。kami-postfx-scene/data/postfx.edn に名前付き mood preset（:nintendo 等）。ADR-2607120100 が cljs 直 WebGPU を標準化。"
+  :parity/probe "grep -ril shadow-map --include='*.clj*' orgs/kotoba-lang/kami-* orgs/kotoba-lang/webgpu"
+  :parity/gap "kami.webgpu（procedural primitive のみ）と kami.webgpu.mesh（実 mesh + skin + texture）が未接続 — ADR-2607121800 Phase 3 が designed-not-implemented のまま。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-gi
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "lighting-gi-lightmap"
+  :parity/label "大域照明（lightmap ベイク / light probe / reflection probe）"
+  :parity/status :absent :parity/score 0.05
+  :parity/repos "[]"
+  :parity/evidence "\"lightmap\" \"global illumination\" とも kami-* の README/docs・コードで 0 件。照明は per-scene の :render/sky（zenith/horizon/sun-dir/sun/fog/ground）の直接指定のみ。"
+  :parity/probe "grep -ril lightmap --include='*.clj*' --include='*.edn' orgs/kotoba-lang/kami-* orgs/kotoba-lang/webgpu | wc -l  # => 0"
+  :parity/gap "ベイク経路・probe 系が皆無。realtime 直接光のみ。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-culling
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "culling-lod-streaming"
+  :parity/label "可視性最適化（frustum/occlusion culling、LOD、シーンストリーミング）"
+  :parity/status :partial :parity/score 0.40
+  :parity/repos "[\"kotoba-lang/webgpu\" \"network-awai/network-isekai\"]"
+  :parity/evidence "frustum 4 件、lod 5 件（README/docs）。occlusion-cull は 0 件。network-isekai 側に world_streaming.cljc / resource_streaming.cljc が実在し gap-loop に :gap/world-streaming が計上されている。"
+  :parity/probe "grep -ril occlusion-cull --include='*.clj*' orgs/kotoba-lang/kami-* orgs/kotoba-lang/webgpu | wc -l  # => 0"
+  :parity/gap "occlusion culling が無い。LOD は言及止まりで自動生成・切替の実測が無い。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-physics3d
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "physics-3d"
+  :parity/label "3D 物理（rigid body / collider / joint / raycast / CCD）"
+  :parity/status :implemented :parity/score 0.65
+  :parity/repos "[\"kotoba-lang/kami-engine-vphysics\" \"kotoba-lang/kami-engine\" \"kotoba-lang/kami-articulated\" \"kotoba-lang/kami-vehicle\"]"
+  :parity/evidence "kami-engine/kami-physics が「shared Kotoba physics scene contract + realtime rigid body + vehicle ROM + high-fidelity CAE」を README で宣言。kami-articulated（863 行）、kami-vehicle（3,115 行）、kami-engine-cae-solver（21,672 行）。ADR-2607122400 が apply-impulse host import を追加済み。"
+  :parity/probe "head -10 orgs/kotoba-lang/kami-engine/README.md"
+  :parity/gap "ragdoll 0 件、cloth 2 件（言及のみ）。CCD/継続衝突判定の実測が無い。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-physics2d
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "physics-2d"
+  :parity/label "2D 物理（Box2D 相当の rigid body / collider）"
+  :parity/status :partial :parity/score 0.50
+  :parity/repos "[\"kotoba-lang/kami-engine\"]"
+  :parity/evidence "ADR-2607122200 kami-engine-physics-2d-rigid-body-integration が accepted。統合の完了度は未測定。"
+  :parity/probe "ls 90-docs/adr/2607122200-*.edn"
+  :parity/gap "2D 専用 collider 種別・joint・tilemap 連携の面が未確認。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-animation
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "animation"
+  :parity/label "アニメーション（skeletal / blend tree / state machine / IK / retarget）"
+  :parity/status :partial :parity/score 0.55
+  :parity/repos "[\"kotoba-lang/kami-engine-animation\" \"kotoba-lang/kami-skeleton-scene\" \"kotoba-lang/kami-app-animator\" \"kotoba-lang/webgpu\"]"
+  :parity/evidence "kami.webgpu.mesh が 4-joint linear-blend skinning + glTF morph target blending を実装済み（ADR-2607121800 が実測を記録）。kami-skeleton-scene 1,139 行。state machine は 3 件ヒット、animator は 1 件。"
+  :parity/probe "grep -n 'linear-blend skinning' 90-docs/adr/2607121800-*.edn"
+  :parity/gap "blend tree / animator state machine / IK / humanoid retarget の実装痕跡が薄い（言及レベル）。ragdoll 0 件。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-particles
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "particles-vfx"
+  :parity/label "パーティクル / VFX"
+  :parity/status :partial :parity/score 0.45
+  :parity/repos "[\"kotoba-lang/kami-postfx-scene\" \"kotoba-lang/kami-atmosphere-scene\"]"
+  :parity/evidence "particle は kami-*/webgpu のコードで 28 件ヒット（この 20 軸で最も広い痕跡のひとつ）。ただし GPU particle / VFX graph 相当の authoring 面かどうかは未分解。"
+  :parity/probe "grep -ril particle --include='*.clj*' --include='*.edn' orgs/kotoba-lang/kami-* orgs/kotoba-lang/webgpu | wc -l  # => 28"
+  :parity/gap "28 件の内訳（描画実装 / 単なる言及）を分解していない。次イテレーションで分解する。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-terrain
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "terrain-vegetation"
+  :parity/label "地形 / 植生（heightmap、レイヤ、草木散布）"
+  :parity/status :implemented :parity/score 0.70
+  :parity/repos "[\"kotoba-lang/kami-terrain-scene\" \"kotoba-lang/kami-vegetation-scene\"]"
+  :parity/evidence "kami-terrain-scene/data/biomes.edn が名前付き biome preset（4 レイヤ palette + heightmap パラメータ）を持つことを ADR-2607121800 が実測で記録。terrain は 9 件ヒット。"
+  :parity/probe "grep -n 'biomes.edn' 90-docs/adr/2607121800-*.edn"
+  :parity/gap "terrain 編集ブラシ（Unity の Terrain Tools 相当）の authoring 面が未確認。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-navigation
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "navigation-ai"
+  :parity/label "ナビゲーション（navmesh ベイク / agent / obstacle / off-mesh link）"
+  :parity/status :absent :parity/score 0.15
+  :parity/repos "[]"
+  :parity/evidence "\"navmesh\" \"nav-mesh\" とも README/docs・コードで 0 件。pathfind 6 件・a-star 5 件はヒットするが、これは navmesh ベイクではなくグリッド/グラフ探索の可能性が高く未分解。"
+  :parity/probe "grep -ril navmesh --include='*.clj*' orgs/kotoba-lang/kami-* | wc -l  # => 0"
+  :parity/gap "navmesh ベイク・agent 回避・off-mesh link が皆無。pathfind/a-star の 6 件が何を指すかを次イテレーションで分解する。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-audio
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "audio"
+  :parity/label "オーディオ（3D 定位 / ミキサ / エフェクト / 楽曲再生）"
+  :parity/status :implemented :parity/score 0.65
+  :parity/repos "[\"kotoba-lang/kami-ongaku-notation\" \"kotoba-lang/kami-ongaku-sequencer\" \"kotoba-lang/kami-ongaku-sampler\" \"kotoba-lang/kami-ongaku-plugin-host\" \"kotoba-lang/kami-ongaku-project\" \"kotoba-lang/kami-app-daw\"]"
+  :parity/evidence "kami-ongaku-* 5 repo（notation 1,664 / sequencer 1,265 / project 1,237 / plugin-host 936 / sampler 853 行）+ kami-app-daw 2,808 行。network-isekai 側に resources/game-audio-runtime.edn。"
+  :parity/probe "wc -l orgs/kotoba-lang/kami-ongaku-*/**/*.clj*"
+  :parity/gap "ゲーム内 3D 音源定位・オクルージョン・リアルタイムミキサの面は DAW 面とは別で未確認。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-ui
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "ui-toolkit"
+  :parity/label "UI（canvas / レイアウト / テーマ / 入力イベント）"
+  :parity/status :implemented :parity/score 0.75
+  :parity/repos "[\"kotoba-lang/kami-engine-app-sdk\" \"kotoba-lang/kotoba-ui\" \"kotoba-lang/liquid-glass-ui\" \"kotoba-lang/shitsuke\" \"kotoba-lang/uikit\" \"kotoba-lang/appkit\"]"
+  :parity/evidence "design system stack が CLAUDE.md に repo-wide mandatory として規定済み（shitsuke.hig → liquid-glass-ui → kotoba-ui → appkit/uikit）。skill kotoba-uiux が正典レシピを持つ。kami-engine-app-sdk 1,877 行。"
+  :parity/probe "cat .claude/skills/kotoba-uiux/SKILL.md | head -20"
+  :parity/gap "HTML/CSS 面は強いが、3D viewport 内に描く world-space UI（Unity の World Space Canvas 相当）の面が無い。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-input
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "input-system"
+  :parity/label "入力（action map / デバイス抽象 / リバインド / gamepad）"
+  :parity/status :partial :parity/score 0.50
+  :parity/repos "[\"kotoba-lang/kami-engine-input-map\" \"kotoba-lang/kami-input-scene\"]"
+  :parity/evidence "kami-engine-input-map / kami-input-scene が repo として実在（名前が action map 抽象を示す）。行数は未計測。"
+  :parity/probe "wc -l orgs/kotoba-lang/kami-engine-input-map/**/*.clj* orgs/kotoba-lang/kami-input-scene/**/*.clj*"
+  :parity/gap "gamepad / タッチ / リバインド UI の実装度が未測定。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-scripting
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "scripting-runtime"
+  :parity/label "スクリプティング（ゲームロジック記述言語 + hot reload + サンドボックス）"
+  :parity/status :implemented :parity/score 0.70
+  :parity/repos "[\"kotoba-lang/kami-engine-guest\" \"kotoba-lang/kami-engine-script-runtime\" \"kotoba-lang/kotoba\" \"kotoba-lang/kototama\"]"
+  :parity/evidence "kotoba wasm guest + kototama actor:host ABI が E2E 実証済み（ADR-2607062330 addendum 5）。kami-engine-guest 3,617 行。capability import が閉じた表で deny-by-default — Unity の C# より sandbox 面はむしろ強い。"
+  :parity/probe "ls orgs/kotoba-lang/kototama/test/kototama/fixtures/"
+  :parity/gap "hot reload（実行中の差し替え）の経路が未確認。ADR-2607270100 の既知ブロッカー（再帰値型が無い、8 capability kit が :wasm-aot pending）が game logic 記述の表現力を縛る。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-build-targets
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "build-targets"
+  :parity/label "ビルドターゲット（web / desktop / mobile / console / XR）"
+  :parity/status :partial :parity/score 0.35
+  :parity/repos "[\"kotoba-lang/kami-engine-web\" \"kotoba-lang/kami-web\" \"kotoba-lang/kami-webvr\" \"kotoba-lang/kami-engine-host-rs\"]"
+  :parity/evidence "web は実在（kami-web 987 行、Cloudflare Pages/Workers 配信の実績）。kami-webvr が XR 面。kami-engine-host-rs は Rust host だが CLAUDE.md が新規 Rust を禁止しており将来の主経路ではない。"
+  :parity/probe "ls orgs/kotoba-lang/kami-engine-web orgs/kotoba-lang/kami-webvr"
+  :parity/gap "desktop（installer）/ mobile / console 出力が無い。native 経路は kotoba compiler の x86_64/aarch64 backend が候補（ADR-2607198300）だが engine 側と未接続。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-package-manager
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "package-asset-store"
+  :parity/label "パッケージ管理 / アセットストア（再利用可能な機能単位の配布）"
+  :parity/status :partial :parity/score 0.40
+  :parity/repos "[\"com-junkawasaki/root\" \"kotoba-lang/kotoba-fleet-vcs\"]"
+  :parity/evidence "west manifest + fleet-db（署名付き pin 前進、quorum govern）が package 管理に相当し、Unity の UPM より版固定は厳格。network-isekai 側に Asset Hub（local ADR-0008）が実在。"
+  :parity/probe "grep -c 'name:' manifest/west.yml"
+  :parity/gap "「アセットストア」＝第三者が作った機能単位を検索・購入・導入する面が無い。fleet-db は内部向け。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-profiler
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "profiler-frame-debugger"
+  :parity/label "プロファイラ / フレームデバッガ（CPU/GPU/メモリの時系列、draw call 分解）"
+  :parity/status :absent :parity/score 0.20
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "\"profiler\" は kami-* の README/docs・コードともに 0 件。ただし network-isekai 側に :metric/cpu-submit-ms を cohort（adapter/vendor/device/execution/解像度/tier/scene/profile/ssao/warmup/sample）付きで測る performance-cohorts-query が gap_loop.cljc に実在し、これは Unity Profiler の計測面の一部を既に上回る厳密さを持つ。"
+  :parity/probe "grep -n 'performance-cohorts-query' orgs/network-awai/network-isekai/src/isekai/gap_loop.cljc"
+  :parity/gap "engine 側に統合プロファイラ UI が無い。network-isekai の計測は royale 専用でエンジン家に汎用化されていない — ここが最も安い昇格経路。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/unity-netcode
+  :parity/target "unity" :parity/subject "kami-engine"
+  :parity/axis "netcode-multiplayer"
+  :parity/label "ネットコード（権威サーバ / 状態同期 / 予測・補間 / relay）"
+  :parity/status :partial :parity/score 0.50
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "network-isekai に authoritative_transport.cljc が実在。matchmak* が 6 件ヒット。ただし kami-engine 家そのものには netcode 層が無く、network-isekai 側の実装に依存している。"
+  :parity/probe "ls orgs/network-awai/network-isekai/src/isekai/authoritative_transport.cljc"
+  :parity/gap "engine 家に汎用 netcode が無い（game 側実装）。予測・巻き戻し・lag compensation の実測が無い。"
+  :parity/measured-at "2026-08-04"}
+
+ ;; ───────────── network-isekai vs Roblox / Fortnite / Steam ─────────────
+ {:parity/id :parity/roblox-ugc-authoring
+  :parity/target "roblox" :parity/subject "network-isekai"
+  :parity/axis "in-client-ugc-authoring"
+  :parity/label "クライアント内 UGC 制作（プレイヤーが遊びながら作って公開できる）"
+  :parity/status :partial :parity/score 0.55
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "fork.cljc / fork_git.cljc / fork_git_client.cljs / fork_feed.cljc / fork_stats.cljc が実在し、UGC を git fork として扱う設計（ADR-2607121800-ugc-maturity-fork-kotoba-git-rad）。Asset Hub（local ADR-0008）が :model3d/:texture/:audio/:scene の 4 kind を content-addressed で持つ。"
+  :parity/probe "ls orgs/network-awai/network-isekai/src/isekai/fork*.clj*"
+  :parity/gap "Roblox Studio 相当の「その場で作る」GUI が無い（fork は git 操作の抽象）。作ったものを即座に他プレイヤーが遊べる公開ループの実測が無い。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/roblox-user-scripting
+  :parity/target "roblox" :parity/subject "network-isekai"
+  :parity/axis "sandboxed-user-scripting"
+  :parity/label "ユーザースクリプト（Luau 相当のサンドボックス実行）"
+  :parity/status :partial :parity/score 0.60
+  :parity/repos "[\"network-awai/network-isekai\" \"kotoba-lang/kotoba\" \"kotoba-lang/kototama\"]"
+  :parity/evidence "sandbox 3 件ヒット。kotoba wasm guest が deny-by-default の閉じた capability import 表を持ち、これは Luau のサンドボックスより形式的に強い（ADR-2607279200 の capability-registry）。"
+  :parity/probe "grep -ril sandbox --include='*.clj*' orgs/network-awai/network-isekai/src"
+  :parity/gap "ユーザーが書いた kotoba を投稿 → 検証 → 他プレイヤーの環境で実行、という投稿経路の実測が無い。quota/fuel の運用値が未設定。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/roblox-economy
+  :parity/target "roblox" :parity/subject "network-isekai"
+  :parity/axis "economy-marketplace-payout"
+  :parity/label "経済（通貨 / マーケット / クリエイター配当）"
+  :parity/status :implemented :parity/score 0.70
+  :parity/repos "[\"network-awai/network-isekai\" \"gftdcojp/engi\"]"
+  :parity/evidence "economy.cljc 138 行 / economy_ops.cljs / settlement.cljc 266 行 / gacha.cljc 84 行。payout 7 件・refund 7 件ヒット。gftdcojp/engi が settlement 面（transfer ID は CIDv1）。"
+  :parity/probe "wc -l orgs/network-awai/network-isekai/src/isekai/{economy,settlement,gacha}.cljc"
+  :parity/gap "実通貨の入出金（Roblox の DevEx 相当）が本番稼働しているかの証拠が無い。engi の D1 依存は ADR-2608039000 で要再設計と判定済み。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/roblox-persistence
+  :parity/target "roblox" :parity/subject "network-isekai"
+  :parity/axis "player-persistence"
+  :parity/label "プレイヤー永続化（DataStore 相当 / クロスセッション状態）"
+  :parity/status :partial :parity/score 0.50
+  :parity/repos "[\"network-awai/network-isekai\" \"kotoba-lang/kotobase\"]"
+  :parity/evidence "cloud-save 4 件 + \"cloud save\" 2 件ヒット。collection.cljc / daily.cljc / team.cljc が状態を持つ。kotobase が datom 面の永続層。datastore という語は 0 件だが機能は kotobase 側にある。"
+  :parity/probe "grep -ril 'cloud-save' orgs/network-awai/network-isekai/src orgs/network-awai/network-isekai/workers"
+  :parity/gap "kotobase の ref 1 本制約（ADR-260726）を踏まえた player state の join 境界が設計文書に無い。永続化の耐障害性（バックアップ・復旧）が未実証。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/roblox-moderation
+  :parity/target "roblox" :parity/subject "network-isekai"
+  :parity/axis "moderation-safety-rating"
+  :parity/label "モデレーション / 安全性 / 年齢レーティング"
+  :parity/status :implemented :parity/score 0.70
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "moderation.cljc 100 行 / safety.cljs / resources/safety-platform.edn / resources/content-ratings.edn 137 行（この軸で最大のデータ資産）。"
+  :parity/probe "wc -l orgs/network-awai/network-isekai/resources/content-ratings.edn"
+  :parity/gap "UGC の自動審査（Roblox の text/image filter 相当）が投稿経路に接続されているかが未確認。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/roblox-social
+  :parity/target "roblox" :parity/subject "network-isekai"
+  :parity/axis "social-graph"
+  :parity/label "ソーシャル（フレンド / グループ / チャット / プレゼンス）"
+  :parity/status :implemented :parity/score 0.70
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "social.cljc 79 行 / social_chat.cljs / resources/social-platform.edn 152 行 / neighborhood.cljc / team.cljc / guild-events.edn。"
+  :parity/probe "wc -l orgs/network-awai/network-isekai/resources/social-platform.edn"
+  :parity/gap "プレゼンス（誰がどの場所に今いるか）と join-friend の導線が未確認。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/fortnite-scale-netcode
+  :parity/target "fortnite" :parity/subject "network-isekai"
+  :parity/axis "large-scale-netcode"
+  :parity/label "大規模同時接続ネットコード（100 人規模 BR / relevancy / lag compensation）"
+  :parity/status :partial :parity/score 0.35
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "royale ゲームが実在し authoritative_transport.cljc + world_streaming.cljc がある。matchmak* 6 件。ADR-2607121800 Phase 1 で kotoba.level の zone（storm 相当）を royale に配線済み。"
+  :parity/probe "ls orgs/network-awai/network-isekai/public/games/gftd/royale/"
+  :parity/gap "同時接続数の実測が無い。relevancy（見えている相手だけ同期）・lag compensation・予測巻き戻しが未実装。sekaiju MMO 設計（ADR-260726）は kotobase ref 1 本制約に当たって shard 案が却下された経緯があり、その後継設計が未着地。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/fortnite-liveops
+  :parity/target "fortnite" :parity/subject "network-isekai"
+  :parity/axis "seasons-liveops-events"
+  :parity/label "シーズン / バトルパス / ライブイベント"
+  :parity/status :implemented :parity/score 0.65
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "resources/engagement-seasons.edn / ranking-seasons.edn / liveops-platform.edn / guild-events.edn / achievements.edn、liveops.cljs / daily.cljc / collection.cljc。"
+  :parity/probe "ls orgs/network-awai/network-isekai/resources/*season*.edn"
+  :parity/gap "各 edn が 8–22 行と小さく、schema 宣言止まりでコンテンツが入っていない可能性が高い。次イテレーションで中身を分解する。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/fortnite-anticheat
+  :parity/target "fortnite" :parity/subject "network-isekai"
+  :parity/axis "anti-cheat"
+  :parity/label "アンチチート（クライアント検証 / サーバ権威 / 異常検知）"
+  :parity/status :partial :parity/score 0.30
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "anti-cheat 3 件ヒット。authoritative_transport.cljc がサーバ権威の土台。"
+  :parity/probe "grep -riln 'anti-cheat' orgs/network-awai/network-isekai/src orgs/network-awai/network-isekai/90-docs"
+  :parity/gap "3 件が設計言及か実装かを分解していない。異常検知（統計的外れ値）・リプレイ検証が無い。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/fortnite-creator-revenue
+  :parity/target "fortnite" :parity/subject "network-isekai"
+  :parity/axis "creator-tooling-revenue-share"
+  :parity/label "クリエイター向けツール + 収益分配（UEFN + Creator Economy 相当）"
+  :parity/status :partial :parity/score 0.45
+  :parity/repos "[\"network-awai/network-isekai\" \"gftdcojp/engi\"]"
+  :parity/evidence "fork_stats.cljc（fork の統計＝作品ごとの計測）+ settlement.cljc + payout 7 件。ADR-2607121800-ugc-maturity-fork-kotoba-git-rad が UGC を git/radicle で扱う枠組み。"
+  :parity/probe "wc -l orgs/network-awai/network-isekai/src/isekai/fork_stats.cljc"
+  :parity/gap "「プレイ時間に応じてクリエイターへ分配」のループが計測から支払いまで通っている証拠が無い。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/steam-storefront
+  :parity/target "steam" :parity/subject "network-isekai"
+  :parity/axis "storefront-discovery"
+  :parity/label "ストアフロント（作品ページ / 検索 / ウィッシュリスト / レビュー）"
+  :parity/status :partial :parity/score 0.40
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "home.cljc / feed.cljc / feed_index.cljc / isekai-gallery が発見面。34 タイトルが public/games/gftd 配下に実在。"
+  :parity/probe "ls orgs/network-awai/network-isekai/public/games/gftd | wc -l  # => 34"
+  :parity/gap "wishlist 0 件、レビュー機能の痕跡が無い。ストアページ（1 作品 = 1 商品ページ）の構造が無い。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/steam-achievements
+  :parity/target "steam" :parity/subject "network-isekai"
+  :parity/axis "achievements-stats"
+  :parity/label "実績 / 統計 / ランキング"
+  :parity/status :implemented :parity/score 0.65
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "resources/achievements.edn / ranking.cljs / ranking-seasons.edn / analytics-platform.edn。"
+  :parity/probe "cat orgs/network-awai/network-isekai/resources/achievements.edn"
+  :parity/gap "achievements.edn が 18 行 — 実績定義がタイトル横断で入っていない可能性。34 タイトルのうち何本が実績を持つかが未測定。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/steam-workshop
+  :parity/target "steam" :parity/subject "network-isekai"
+  :parity/axis "workshop-mods"
+  :parity/label "Workshop（MOD の投稿・購読・自動適用）"
+  :parity/status :partial :parity/score 0.45
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "\"workshop\" は 0 件だが、機能的等価物として fork 系（fork.cljc / fork_feed.cljc / fork_git.cljc）と Asset Hub が実在する。名前が無いだけで面はある — 索引に無いことは不在の証明ではない。"
+  :parity/probe "grep -ril workshop orgs/network-awai/network-isekai/src | wc -l  # => 0"
+  :parity/gap "「購読して自動で入る」導線が無い（fork は明示的な複製）。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/steam-distribution
+  :parity/target "steam" :parity/subject "network-isekai"
+  :parity/axis "desktop-distribution"
+  :parity/label "デスクトップ配布（インストーラ / 自動更新 / オフライン実行）"
+  :parity/status :absent :parity/score 0.10
+  :parity/repos "[]"
+  :parity/evidence "electron 0 件 / tauri 0 件 / installer 0 件。desktop は 7 件ヒットするがデスクトップ配布ではなく画面幅の意味である可能性が高い（未分解）。配信は Cloudflare Pages/Workers の web のみ。"
+  :parity/probe "grep -ril tauri orgs/network-awai/network-isekai | wc -l  # => 0"
+  :parity/gap "ネイティブ配布経路が皆無。CLAUDE.md が新規 Rust を禁じているため Tauri は素直な選択肢ではない — kotoba compiler の x86_64/aarch64 native backend（ADR-2607198300）が本命候補。"
+  :parity/measured-at "2026-08-04"}
+
+ {:parity/id :parity/steam-cloud-save
+  :parity/target "steam" :parity/subject "network-isekai"
+  :parity/axis "cloud-save-sync"
+  :parity/label "クラウドセーブ（端末間同期 / 競合解決）"
+  :parity/status :partial :parity/score 0.45
+  :parity/repos "[\"network-awai/network-isekai\" \"kotoba-lang/kotobase\"]"
+  :parity/evidence "cloud-save 4 件 + \"cloud save\" 2 件ヒット。kotobase の CAS ref が競合解決の土台になる。"
+  :parity/probe "grep -riln 'cloud-save' orgs/network-awai/network-isekai"
+  :parity/gap "端末間競合の解決規則が文書化されていない。オフライン中の変更をどう畳むかが未定義。"
+  :parity/measured-at "2026-08-04"}
+
+ ;; ─────────────── カバレッジ申告（索引の穴を query から読めるように） ───────────────
+ {:parity/id :parity/coverage
+  :parity/target "meta" :parity/subject "meta"
+  :parity/axis "coverage"
+  :parity/label "この台帳自身のカバレッジ申告"
+  :parity/status :partial :parity/score 0.0
+  :parity/axes-unity 20 :parity/axes-platform 15
+  :parity/evidence "Unity 20 軸 / Roblox+Fortnite+Steam 15 軸を 2026-08-04 に初回測定。判定は grep ベースの痕跡調査であり、ヒット件数の内訳（実装 / 単なる言及）を分解していない軸が複数ある（particles 28 件、pathfind 6 件、anti-cheat 3 件、desktop 7 件）。実行して確かめた軸は 0 — 全 35 軸が静的調査のみ。"
+  :parity/probe "nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q '[:find ?axis ?status ?score :where [?e \"source/dataset\" \"engine-parity\"] [?e \"parity/axis\" ?axis] [?e \"parity/status\" ?status] [?e \"parity/score\" ?score]]'"
+  :parity/gap "(1) grep ヒットの内訳分解が未了 (2) 実行証拠（ブラウザ起動・ベンチ実測）がゼロ (3) kami-* 90 repo のうち行数を測ったのは上位 45 のみ。次イテレーションはこの 3 つのうち最も安いものから潰す。"
+  :parity/measured-at "2026-08-04"}]
