@@ -1,0 +1,151 @@
+[{:db/id -1
+  :adr/id "2608039800"
+  :adr/title "murakumo の backend を決める —— 分岐しているのはコストではなく latency"
+  :adr/status "accepted"
+  :adr/date "2026-08-03"
+  :adr/supersedes "なし（ADR-2608026000 の provider 抽象、ADR-2608026300 の調達分析を実測で確定させる）"
+
+  :adr/context
+  "2026-08-03 に fal / Modal / RunPod / Vast.ai / TensorDock / MojoHost / Akash の
+   規約と価格を一次情報で調べ、Vast.ai については実際に借りて計測した。
+   本 ADR はその結果から backend を決定する。
+
+   ## 実測（この ADR の根拠）
+
+   - Vast.ai RTX 4090（信頼性≥97%・disk≥60G・≥300Mbps、83 件）:
+     最安 $0.244/h、中央値 $0.361/h
+   - **プロビジョニングの床 = 61 秒**（alpine, Texas 767Mbps）
+   - **ComfyUI の cold start = 346 秒**（9.5GB image, Brazil 890Mbps）。
+     内訳はプロビジョニング 61 秒 + イメージ取得 285 秒。
+     実効 267 Mbps = 広告帯域の 30% —— **広告帯域は pull 速度を予測しない**
+   - Modal 公式価格: H100 $3.95/h・L40S $1.95/h・L4 $0.80/h・A100 80G $2.50/h
+   - 規約（一次情報）: Modal §1.4(c) 『indecent or obscene』/ RunPod
+     『pornography or graphic adult content』+ lifetime ban / Vast.ai
+     『obscene』のみ / TensorDock は CSAM と非合意のみ / MojoHost は成人向けの
+     禁止列挙なし（`any lawful purpose`）/ Akash はネットワークに content
+     policy が無く provider 個別
+   - AkashML の Llama 3.3 70B が $0.13 in / $0.40 out per Mtok。murakumo の
+     登録価格 $0.10/$0.40 は**より大きいモデルを出す競合とほぼ同値**で、
+     安売りでも高すぎでもない（ADR-2608026500 の推定が独立に裏付けられた）
+   - 需要の実測: 外部ユニーク 1、有料顧客 0、funnel の paid 0
+
+   ## 前提の訂正
+
+   フリートの adult 対応は Mac に載っていない。Mac mini M4 ×10（うち 5 台
+   down）は `llama`/`ollama` のテキスト専用で、画像/動画/音声は `gad`
+   （AMD Strix Halo、`comfy-render`）にある。「Mac の中身を移す」という
+   移設ではない。"
+
+  :adr/decision
+  "## 分岐しているのは latency であって、コストではない
+
+   これが本 ADR の中心。cold start を含めても、**自前計算は 1 枚目から fal より
+   安い**:
+
+     cold start          $0.25/h × 346s = $0.0240
+     SDXL 1 枚（4 秒想定） $0.25/h × 4s   = $0.000278
+     fal の実原価                        = $0.03/枚
+
+   1 枚しか作らなくても $0.0243 < $0.03。しかも**この結論は生成秒数の仮定に
+   ほぼ依存しない** —— 4 秒を 20 秒に変えても損益分岐は N≈0.84 枚で動かない。
+   cold start が支配的だから。
+
+   つまり fal に払っているのはコストの差ではなく、**346 秒を秒に変える対価**。
+   したがって backend の選択軸は『安いのはどれか』ではなく
+   **『その用途は何秒待てるか』**。
+
+   ## 決定
+
+   ### 1. frontier（Seedance / Veo / Kling 等）→ fal に固定。恒久
+
+   自前で持てない（重みが公開されていない）。価格ではなく可用性の問題なので、
+   将来も交渉対象にならない。ADR-2608026200 §3-2 の frontier 価格はそのまま。
+
+   ### 2. OSS media（SDXL / LTX / SVD / audio / TRELLIS / Hunyuan3D）→ 今は `gad`
+
+   `gad` は所有済みで**限界費用ゼロ**。有料顧客 0 の段階で月額固定費を足すのは
+   順序が逆である。Vast.ai も Modal も MojoHost も、今契約すると
+   『存在しないスケール問題』に金を払うことになる。
+
+   ### 3. text → 自前フリート（Mac + gad head）。変更なし
+
+   稼働率が既に高く、価格も競合と同値であることが確認できた。ここを外部に
+   出す理由が無い。
+
+   ### 4. Modal は **価格ではなく規約で除外**
+
+   §1.4(c) の『indecent or obscene』は fal より広い。オーナーの位置づけ
+   （murakumo は computing であり adult も入りうる）と両立しない。
+   cold start は Modal が最良（sub-1s〜4s）だが、その優位は使えない。
+
+   ### 5. RunPod も規約で除外
+
+   明示禁止 + lifetime ban。パイプラインを作ってから止められるのが最悪なので、
+   最初から候補にしない。
+
+   ## 切り替えのトリガー（推測でなく計算した閾値）
+
+   ### Vast.ai に warm worker を 1 本置く → **1 日 200 枚**
+
+     常時 warm 1 本 = $0.25/h × 730h = 月 $182.5
+     fal 換算       = $182.5 ÷ $0.03/枚 = 6,083 枚/月 = **203 枚/日**
+
+   これを恒常的に超えたら、warm worker の方が安い。下回るうちは fal と `gad`
+   の組み合わせが正しい。**`cold_workers=0` の完全 scale-to-zero は採らない**
+   —— 1 リクエストのために cold start（= SDXL 約 86 枚分）を払う構造になる。
+
+   ### Akash / MojoHost の常設に移す → **稼働率 43%**
+
+     Akash 4090 常設 $0.15/h × 730h = 月 $110
+     Vast.ai serverless 実行分のみ $0.35/h 相当
+     → $110 ÷ $0.35 = 314 GPU時間/月 = 稼働率 43%
+
+   稼働率がこれを超えたら常設が安い。Akash は USDC 決済なので **Stripe を
+   一切通らない**経路にもなる（murakumo は既に x402/USDC の treasury を持つ。
+   ただし Base と Cosmos でブリッジ 1 ホップ）。MojoHost は予測可能性と
+   サポートを買う選択肢（RTX Pro 6000 24GB $349/月）。
+
+   ## 選ばなかったものと、その理由
+
+   - **TensorDock**: 規約は最もクリア（CSAM/非合意のみ）だが **serverless が
+     無く VM 時間貸しのみ**。需要形状に合わない。稼働率 43% を超えたときの
+     候補としては Akash と並ぶ
+   - **Vast.ai の即時採用**: serverless × 規約の唯一の交点だが、今の需要では
+     warm worker の $182.5 を正当化できない。**トリガーを置いて待つ**
+   - **MojoHost の即時採用**: 同上（月 $349 の固定費）"
+
+  :adr/consequences
+  "## この決定が変わる条件
+
+   1. **`gad` の実スループット**（未計測・無料で測れる）。SDXL 1 枚に何秒かかるか
+      が、203 枚/日のトリガーに到達するのが 1 か月後か 1 年後かを決める。
+      **次にやるべき唯一の計測**
+   2. **停止済み worker の再起動時間**（未計測）。イメージがホストに残っていれば
+      速い『はず』だが測っていない。速ければ warm worker のコストが下がり、
+      203 枚/日のトリガーが下がる
+   3. **生成そのものの秒数**（未計測）。上の 86 枚という比率はこれに依存する。
+      ただし損益分岐 N≈0.8 は秒数に鈍感なので、決定自体は揺らがない
+   4. **需要**。有料顧客が 0 から動いたら、全部の閾値を測り直す
+
+   ## 意図的に受け入れる不利
+
+   - fal の frontier は原価が高い（Seedance 標準 $0.30/秒）。掲示価格は ×2.0 で
+     寄与率 47% を確保しているが、**自前化の道は無い**
+   - `gad` は 1 台。冗長性が無く、落ちれば OSS media が止まる。これは
+     『需要が無い間は冗長化に払わない』という意識的な選択であって、
+     見落としではない
+   - Vast.ai を選んだ場合、marketplace なので**ホストの品質が試行ごとに違う**。
+     実測でも Texas と Brazil で条件が揃わなかった
+
+   ## 規約側との整合
+
+   2026-08-03 に murakumo 自身の利用規約 §4 を Vast.ai / TensorDock 型へ改訂した
+   （計算を売る立場・CSAM/NCII は例外なし禁止・合意ある成人間の合法コンテンツは
+   禁止しない・生成物を公開しない）。**backend の選択と自社規約の姿勢が同じ形に
+   揃った**ことになる。Modal / RunPod を外したのはこの一貫性の帰結でもある。"
+
+  :adr/measurements
+  "90-docs/procurement/measurements/2608030001-vast-rtx4090-provisioning.edn
+   90-docs/procurement/measurements/2608030002-vast-rtx4090-comfyui-coldstart.edn
+   計測ツール: 90-docs/procurement/vast-measure.cljs
+   実測の累計コスト $0.0318、失敗 4 回、取り残し 0（API で毎回確認）"}]
