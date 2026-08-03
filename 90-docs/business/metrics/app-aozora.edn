@@ -1,31 +1,31 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 20140,
-  "app-aozora-appview" 10269,
-  "app-aozora-spa" 6292},
+ {"app-aozora-pds" 21026,
+  "app-aozora-appview" 10318,
+  "app-aozora-spa" 6293},
  :zone
- {:requests-7d 1122480,
-  :pageviews-7d 5508,
-  :uniques-7d-sum 770,
+ {:requests-7d 1128365,
+  :pageviews-7d 5509,
+  :uniques-7d-sum 772,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 862765}
+  [{:path "/v1/datoms", :requests 865102}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms",
-    :requests 144073}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 3372}
-   {:path "/v1/transact", :requests 3050}
-   {:path "/xrpc/com.atproto.server.createSession", :requests 1524}
-   {:path "/federation-pilot/did.json", :requests 139}
-   {:path "/hito-diag-fed/did.json", :requests 79}
-   {:path "/hito-federates/did.json", :requests 74}],
-  :status-mix {:client-error 6443, :ok 1017269, :server-error 504},
+    :requests 138302}
+   {:path "/v1/transact", :requests 3858}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.view", :requests 3197}
+   {:path "/xrpc/com.atproto.server.createSession", :requests 1930}
+   {:path "/federation-pilot/did.json", :requests 134}
+   {:path "/hito-diag-fed/did.json", :requests 80}
+   {:path "/hito-federates/did.json", :requests 75}],
+  :status-mix {:client-error 7553, :ok 1014853, :server-error 505},
   :window "24h"},
  :as-of "2026-08-03",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 862765 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 144073 · /xrpc/ai.gftd.apps.kotobase.datomic.view 3372 · /v1/transact 3050 · /xrpc/com.atproto.server.createSession 1524 | 4xx(probe) 1% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 865102 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 138302 · /v1/transact 3858 · /xrpc/ai.gftd.apps.kotobase.datomic.view 3197 · /xrpc/com.atproto.server.createSession 1930 | 4xx(probe) 1% · 5xx 0%",
  :signal
- "aozora.app 実測 1122480 req/7d・770 uniques(日次和)・うち4xx probe 1%(24h)、workers 36701 inv/7d"}
+ "aozora.app 実測 1128365 req/7d・772 uniques(日次和)・うち4xx probe 1%(24h)、workers 37637 inv/7d"}
