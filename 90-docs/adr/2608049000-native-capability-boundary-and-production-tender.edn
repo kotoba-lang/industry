@@ -79,6 +79,46 @@ guest を信用しない前提で書かれている)。sealed runtime identity
 (`loader-source-sha256`) も当然動く。**この 1 点があるため、本 ADR は実装前に
 オーナー承認を求める。**
 
+## 1 の設計 — 記述子は既に在る。発明しない (2026-08-04 実測)
+
+`kind` を整数 1 個で渡す今の形では任意の variant/record を記述できない。
+**が、その解は既に書かれている。**
+
+`kotoba-wasm` の `src/kotoba/wasm/typed.cljc` (479 行) は
+**構造記述子のエンコーディングそのもの**を持つ: primitive tag
+(`:i64` `:string` `:keyword` `:bool` `:f64` … 21 種) に加えて
+`:option` `:result` `:variant` `:vector` `:set` `:map` `:record` `:ref` の
+構造記述子を ULEB128 で符号化し (`encode-descriptor`)、KIR から記述子表を
+作る (`descriptor-table` / `descriptor-indices`)。
+
+**そして wasm 固有ではない。** この ns が require するのは
+`kotoba.kir.cljs-i64` だけ (cljs の bigint 用) で、wasm module にも section
+にも依存しない。`kotoba-wasm` に在るのは**抽出時の経緯であって結合ではない**。
+
+したがって 1 の設計は:
+
+- **記述子エンコーディングを共有する** — native 用に第 2 の形式を作らない。
+  2 つ持てば必ず乖離し、乖離した記述子は**両方の面で正しく見えたまま
+  食い違う** (今日 disp8 で実証したのと同じ構図: 生成側と検証側が同じ誤りに
+  同意する)。置き場所は T0 (`kotoba-kir`) が自然 — 両 T2 backend が
+  依存できる層。
+- **artifact が記述子表を運ぶ** — loader には整数 kind ではなく記述子を
+  渡す。wasm が custom section で運ぶのと同じ役割。
+- **loader は記述子に対して値を歩く** — 構造の走査は判断ではなく機構
+  (`valid_utf8` と同類) なので decision-free C の範囲に収まる。
+
+**未着手**: ここまでが設計判断で、実装 (記述子の共有・artifact 形式・loader の
+検証・両 backend の marshalling・kir/verifier admission・両 ISA テスト) は
+始めていない。sealed runtime identity を動かす規模なので、疲弊した状態で
+着手しない — 今日 disp8 を 2 度出荷したのがまさにその失敗である。
+
+### 次の具体的な一手
+
+    # 記述子エンコーダが本当に wasm 非依存か、移動して両者から使えるか
+    git -C orgs/kotoba-lang/kotoba-wasm show origin/main:src/kotoba/wasm/typed.cljc
+    # kotoba-kir へ移し、kotoba-wasm は再エクスポートに落とす案を評価する
+    # (既存 wasm テストが緑のままであることが移動の受け入れ条件)
+
 ## 順序
 
 **1 が 3 に先行する。** i64 と string しか運べないチャネルを作っても
