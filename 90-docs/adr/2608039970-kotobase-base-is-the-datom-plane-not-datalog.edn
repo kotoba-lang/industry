@@ -155,10 +155,10 @@ ADR-2608039000 が D1 について定めた操作的基準をそのまま当て�
 | # | 内容 | 状態 |
 |---|---|---|
 | 1 | `kotobase-query`: access path を公開契約として明記 | **done** — kotoba-lang/kotobase-query#6（`entity-id` public 化 + `entity-attrs`/`by-predicate`/`by-predicate-value`/`refs-to`、`visible?` 必須、prune）+ #7（`datoms`）。35 tests / 62 assertions、nbb と clj 両方 green |
-| 2 | `kotobase-protocols`: byte 面を block / object 面に移設 | **未着手** — live worker を触るため段階を切る |
+| 2 | `kotobase-protocols`: byte 面を block / object 面に移設 | **stage 1 done** — kotoba-lang/kotobase-protocols#15（ctx の `:blocks` port + `:cid-of` 検証。port 無しなら従来どおり = live worker は無変更）。64 tests / 231 assertions、nbb と clj 両方 green。**stage 2（worker が `:blocks` を R2 に束ねる）は未着手** —— これが実際に bytes を chain から降ろす変更で、live worker を触る |
 | 3 | `kotobase`: README の自己記述訂正（D6） | **done** — kotoba-lang/kotobase#31 |
 | 4 | `org-w3-sparql-protocol` / ADR-2607172300: materialize-only を正規経路として記述訂正 | **done** — org-w3-sparql-protocol#6（記述訂正 + `(:spo db)` walk を `bridge/datoms` に置換 + kotobase-query pin 前進）、本 ADR 群の記述訂正は ADR-2607172300 に反映済み |
-| 5 | bridge の incremental 化を ADR-2607166600（IVM）に接続 | **未着手**（別 ADR） |
+| 5 | bridge の incremental 化を ADR-2607166600（IVM）に接続 | **やらない（今は）** — ADR-2608039975。実測したら前提が2つとも崩れていた: bridge を mount する deploy shell が1つも無く（6 surface は未 deploy）、live な SPARQL は別実装（`kotobase.server.sparql`）でしかも Datalog 経由。設計スケッチと trigger は ADR-2608039975 に記録 |
 
 ### 実装して分かったこと（D3 の訂正）
 
