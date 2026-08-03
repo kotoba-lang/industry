@@ -1,7 +1,7 @@
 [{:db/id -1
   :adr/id "2608039950"
   :adr/title "共通認証基盤 —— authority は 1 つ、apex は多数。新しい identity を作らない"
-  :adr/status "proposed"
+  :adr/status "accepted"
   :adr/date "2026-08-03"
   :adr/depends-on "ADR-2607252000（authn.kotobase.net）/ ADR-2607320000（did:key が口座）/ kotoba-lang: identity・authentication・authorization・cacao・policy・kagi"
 
@@ -125,11 +125,61 @@
    （生成物）と `duplication-warn` hook を作った。"
 
   :adr/consequences
-  "## 実装順（各段で『重複が減った』ことを実測する）
+  "## 現在地（2026-08-03 実測。ここが最新状態）
 
-   1. `auth.murakumo.cloud` を authn Worker に route し、murakumo の `/signup` を
-      **置き換える**。cloud-murakumo の『自前 did/storage 実装 12 箇所』が減ること
-      を数える —— 減らなければこの設計は間違っている
+   ### 着地したもの
+
+   - `viewer/resolve-apex` … host → apex の純粋判定。許可リストのみを信じ、
+     Host ヘッダを決して信用しない
+   - `viewer/parse-apexes` … 許可リストの解釈。**既定 apex は必ず含める**
+     （落とすと全 apex で cookie が出ず、サインインが全滅する）
+   - `worker/env-for-request` … エントリで env を包む。`base-domain` の
+     呼び出し 15 箇所は無変更のまま正しい apex を返す
+   - `viewer/webauthn-usable?` + `worker/passkey-route` … 下記の RP 制約
+   - `test/apex_worker_smoke.cljs` … **ビルド済み Worker を実行**して 9 件検査
+
+   本番 deploy 済み（version 092ea25a）。`AUTHN_APEXES` 未設定なので
+   `authn.kotobase.net` の挙動は完全に不変 —— live で実測確認した
+   （passkey 節あり・スロット全置換・`/v1/passkey/register/options` が実 challenge を返す）。
+
+   ### 発見した制約 —— passkey は RP apex に縛られる
+
+   `AUTHN_RP_ID` は 1 つの登録可能ドメインにしか属せない（WebAuthn の規則）。
+   `auth.murakumo.cloud` から `authn.kotobase.net` の RP は使えず、**サーバは
+   200 を返しブラウザだけが SecurityError で落ちる**。apex ごとに RP を分ければ
+   動くが、murakumo で作った passkey が itonami で使えなくなり SSO が壊れる。
+
+   採った解: **RP は 1 つのまま、使えない apex では passkey 節を出さない**。
+   別 apex で使えるのは email / OAuth / did:key CACAO の 3 つ（origin に
+   縛られないので ceremony ごとその apex で完結する）。
+
+   ### 実装順 1 は棄却する —— murakumo に session の消費者が居ない
+
+   下の『1. auth.murakumo.cloud を route し /signup を置き換える』は
+   **実行しない**。実測: cloud-murakumo の checkout は did を**リクエスト
+   引数として受け取る**（`site_worker.cljs:458`）だけで、session cookie を
+   一切読まない。apex ごとの cookie を発行しても**読む者が居ない**。
+
+   本 ADR 自身が置いた反証条件『減らなければこの設計は間違っている』に
+   照らすと: murakumo の自前 did/storage 実装を減らしたのは **sekisho**
+   （生成 46 行→9 行、localStorage 直触 3→1）であって、apex/cookie 側では
+   なかった。**apex 機構が要るのはサーバ側 session を持つ app であり、
+   murakumo はそれに当たらない。**
+
+   何も使わない公開ホスト名を今作るのは、まさに本 ADR が止めようとしている
+   『先回りの面を増やす』行為なので作らない。
+
+   ### 有効化の条件（1 つの env var で足りる）
+
+   `AUTHN_APEXES` に apex を足し、その apex の host を authn Worker に route する。
+   **引き金は『サーバ側 session を読む app が実在すること』**であって、
+   apex が増えたことではない。
+
+   ## 実装順（各段で『重複が減った』ことを実測する）
+
+   1. ~~`auth.murakumo.cloud` を route し murakumo の `/signup` を置き換える~~
+      **棄却**（上記『現在地』参照。murakumo に session の消費者が居ない）。
+      置き換えの実体は sekisho が既に果たした
    2. tenant（組織）モデルを DID に入れる。`did:web:kotobase.net:org:<org>` と
       `…:tenant:<user>` の関係を決める。**ここは移行コストが高いので先に決める**
    3. email 紐付け（復旧）
