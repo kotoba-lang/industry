@@ -38,6 +38,7 @@
 (def fs (js/require "node:fs"))
 (def path (js/require "node:path"))
 (def crypto (js/require "node:crypto"))
+(def child-process (js/require "node:child_process"))
 (def root
   (str/trim (:out (shell/sh "git" "rev-parse" "--show-toplevel"))))
 
@@ -64,6 +65,25 @@
     (-> (.createHash crypto "sha256")
         (.update (.readFileSync fs absolute))
         (.digest "hex"))))
+
+(defn sha256-bytes [bytes]
+  (-> (.createHash crypto "sha256") (.update bytes) (.digest "hex")))
+
+(defn git-relative-path [p]
+  (let [absolute (inside-root p)
+        relative (.relative path root absolute)]
+    (str/join "/" (js->clj (.split relative (.-sep path))))))
+
+(defn sha256-at-commit [commit p]
+  (let [git-path (git-relative-path p)]
+    (try
+      (sha256-bytes
+       (.execFileSync child-process "git"
+                      #js ["show" (str commit ":" git-path)]
+                      #js {:cwd root :stdio #js ["ignore" "pipe" "pipe"]}))
+      (catch :default e
+        (fail! "declared projection file is absent from source commit"
+               {:git/commit commit :path git-path})))))
 
 (defn require-key [m k where]
   (when-not (contains? m k)
@@ -137,6 +157,17 @@
       (fail! "projection file hash mismatch"
              {:kind kind :path p :expected expected :actual actual}))))
 
+(defn verify-pinned-hash [commit p expected kind]
+  (let [pinned (sha256-at-commit commit p)]
+    (when-not (= expected pinned)
+      (fail! "projection source-commit file hash mismatch"
+             {:kind kind :git/commit commit :path p
+              :expected expected :actual pinned})))
+  ;; Rebuild runs in the current checkout, so also refuse local drift from the
+  ;; pinned blob. This makes the executed bytes exactly the bytes named by the
+  ;; source commit rather than merely another file with a declared hash.
+  (verify-hash p expected kind))
+
 (defn edn-entity-count [p]
   (let [x (edn/read-string (.readFileSync fs (inside-root p) "utf8"))]
     (cond
@@ -156,9 +187,9 @@
       (fail! "projection source commit is not available locally" {:git/commit commit}))
     (doseq [i (:projection/inputs m)
             :when (= :git (:input/type i))]
-      (verify-hash (:input/path i) (:input/sha256 i) :input))
-    (verify-hash (:schema/path contracts) (:schema/sha256 contracts) :schema)
-    (verify-hash (:loader/path contracts) (:loader/sha256 contracts) :loader)
+      (verify-pinned-hash commit (:input/path i) (:input/sha256 i) :input))
+    (verify-pinned-hash commit (:schema/path contracts) (:schema/sha256 contracts) :schema)
+    (verify-pinned-hash commit (:loader/path contracts) (:loader/sha256 contracts) :loader)
     (let [argv (:argv rebuild)
           result (apply shell/sh argv)]
       (when-not (zero? (:exit result))
@@ -202,30 +233,27 @@
     (assert (expect-failure #(validate-contract (assoc-in valid [:projection/output :determinism] :unknown))))
     (let [tmp (.mkdtempSync fs (.join path root ".projection-self-test-"))
           relative #(.relative path root %)
-          input (.join path tmp "input.edn")
-          schema (.join path tmp "schema.edn")
-          loader (.join path tmp "loader.cljs")
+          input "90-docs/adr/2608039700-agent-loop-git-datalad-source-kotobase-query-projection.edn"
+          schema "manifest/schema.edn"
+          loader "manifest/edn-query.cljs"
           output (.join path tmp "output.edn")]
       (try
-        (.writeFileSync fs input "[{:db/id -1 :test/value 1}]\n")
-        (.writeFileSync fs schema "[]\n")
-        (.writeFileSync fs loader ";; self-test loader identity\n")
         (let [head (str/trim (:out (shell/sh "git" "rev-parse" "HEAD")))
-              input-hash (sha256-file (relative input))
+              input-hash (sha256-file input)
               contract {:projection/version 1
                         :projection/id "self-test-rebuild"
                         :projection/source {:git/commit head :dataset/id "test/data"}
                         :projection/inputs [{:input/type :git
-                                             :input/path (relative input)
+                                             :input/path input
                                              :input/sha256 input-hash}]
-                        :projection/contracts {:schema/path (relative schema)
-                                               :schema/sha256 (sha256-file (relative schema))
-                                               :loader/path (relative loader)
-                                               :loader/sha256 (sha256-file (relative loader))}
+                        :projection/contracts {:schema/path schema
+                                               :schema/sha256 (sha256-file schema)
+                                               :loader/path loader
+                                               :loader/sha256 (sha256-file loader)}
                         :projection/rebuild
                         {:argv ["node" "-e"
                                 "require('node:fs').copyFileSync(process.argv[1],process.argv[2])"
-                                input output]
+                                (.resolve path root input) output]
                          :output/path (relative output)}
                         :projection/output {:sha256 input-hash
                                             :determinism :physical
