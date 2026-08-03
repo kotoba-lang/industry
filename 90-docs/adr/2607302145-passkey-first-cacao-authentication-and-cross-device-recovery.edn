@@ -1,7 +1,7 @@
 [{:db/id -1,
   :adr/id "adr-2607302145-passkey-first-cacao-authentication-and-cross-device-recovery",
   :adr/title "ADR-2607302145: itonami.cloud / kotobase.net は Passkey-first、CACAO authorization、複数端末・復旧可能な account identity を採用する",
-  :adr/status "accepted; delivery 1〜5 完了、8 は部分完了、6・7 は実機が要るため未着手。両サービス（itonami.cloud / authn.kotobase.net）とも本番 deploy 済みで、credential inventory・last-path 保護・KEK rotation が稼働している",
+  :adr/status "accepted; delivery 1〜5 完了、8 は KMS boundary を除き完了、6・7 は実機が要るため未着手。両サービス（itonami.cloud / authn.kotobase.net）とも本番 deploy 済み",
   :adr/doc_type "adr",
   :adr/date "2026-07-30",
   :adr/deciders ["Jun Kawasaki (+ Codex)"],
@@ -31,13 +31,15 @@
                         "network-awai/cloud-itonami resources/site/signin.js and src/cloud_itonami/edge/webauthn.cljc @ working tree inspected 2026-07-30"
                         "network-awai/net-kotobase authn/resources/authn/passkey.js, authn/src/authn/{passkey,worker,account}.cljs @ working tree inspected 2026-07-30"
                         "Live GET https://itonami.cloud/signin/, https://itonami.cloud/onboarding/, and https://authn.kotobase.net/sign-in on 2026-07-30"],
-  :adr/known-gaps ["per-credential data key（envelope encryption）と KMS/HSM boundary は未実装（D9 / delivery 8 の残り）。rewrap が既に per-credential かつ lazy なので envelope の間接層は今のところ利得が小さく、Cloudflare Worker から使える KMS boundary も無い。**両サービスとも依然として全利用者として署名できる**——rotation はひとつの secret が有用な期間を縮めるだけで、self-custody にはしない。"
+  :adr/known-gaps ["KMS / HSM boundary は未実装（D9 の残り）。Cloudflare Worker から使える KMS binding が無く、wrapping key は Worker secret のまま。**両サービスとも依然として全利用者として署名できる** —— envelope と rotation はひとつの secret が有用な期間と、rotation が署名鍵に触れる回数（ゼロ）を縮めるだけで、self-custody にはしない。この残余リスクは docstring・ADR・両サービスの sign-in 画面に明記した。"
+                   "休眠 credential を rotate する sweep は**可能になったが未実装**。envelope により rotation は DEK だけを扱い ceremony も署名も要らないので、scheduled job で回せる（`rewrap-dek!` が public なのはそのため）。以前 known-gap に書いた『使われない credential は永久に rotate されない』は envelope 以前の制約で、もう正しくない。"
                    "old-device-present enrollment、QR login 後の new-device enrollment、hardware key 2本、全端末喪失の recovery を実機で通す E2E が未実施（delivery 6・7）。実機とハードウェアが要るため agent からは実行できない。"
-                   "使われない credential / identity は rotate されない（lazy rewrap の帰結）。古い KEK を消すとそれだけが開けなくなる——両サービスとも『どの版が無いか』を名指しするので決定として可視だが、休眠 credential の棚卸し手段は無い。"
-                   "kotobase の inventory が返す backup state と last-use は KV から join しており、書き込み直後は遅れうる（KV は eventually consistent）。**表示用の事実であって last-path 規則の入力ではない**——規則は強整合な Durable Object の identity 行から計算する。"
-                   "cloud-itonami は sign-in path ではなく credential を数える（passkey しか持たないため）。kotobase は provider を問わず sign-in path を数えるので、passkey 1本 + 検証済みメールの account を正しく :multiple と判定する。両者の数え方の差は意図的だが、cloud-itonami に別 provider が増えたら合わせる必要がある。"
+                   "envelope 移行（旧 direct-wrap → DEK）の検証は unit test で手組みした旧形式レコードに対してのみ。**本番の既存 credential が移行する経路は live では未確認** —— 過去の probe が作った credential の鍵を保持していないため。次に本物の利用者がサインインした時が初回。"
+                   "kotobase の inventory が返す backup state と last-use は KV から join しており、書き込み直後は遅れうる（KV は eventually consistent）。表示用の事実であって last-path 規則の入力ではない —— 規則は強整合な Durable Object の identity 行から計算する。"
+                   "cloud-itonami は sign-in path ではなく credential を数える（passkey しか持たないため）。kotobase は provider を問わず sign-in path を数える。差は意図的だが、cloud-itonami に別 provider が増えたら合わせる必要がある。"
                    "同期 Passkey の PRF 出力が provider 内の別端末で同一かは provider / authenticator 実装に依存する。通常ログインの可搬性と zero-access mailbox keyslot の可搬性を同一視しない。"
                    "cloud-itonami の JVM suite には本件と無関係な既存 failure が 6 件 + error 14 件ある（doctor / kotoba-xrpc / aozora wasm guest / ops-keys）。edge cljs suite も mailbox-store-test が done を二重に呼んで途中で止まる。"],
+
 
 
   :adr/verification "2026-07-30 に read-only audit（現行 source、生成済み browser assets、live sign-in pages、W3C WebAuthn Level 3、Apple iCloud Keychain、Google Password Manager、FIDO Alliance の一次資料を突合）。2026-08-02 に delivery 1・2・5 を実装し着地させた。実行した検証: kotoba-lang/webauthn の nbb ceremony smoke 26 checks 全 pass（UV=0 の登録/認証の拒否、誤記 policy でも拒否、明示 :preferred lane の受理、BE/BS の往復を実署名 assertion で確認）/ `clojure -M:test` 12 tests・18 assertions 0 failures。cloud-itonami の edge cljs webauthn suite 42 tests・139 assertions 0 failures、portable cljs suite 631 tests・5975 assertions 0 failures、JVM suite 1346 tests（site.signin-test / native.signin-test は pass、既存 failure は :adr/known-gaps 参照）。net-kotobase authn `clojure -M:test` 21 tests・158 assertions 0 failures、`shadow-cljs release entry` 0 warnings。**未実施**: 本番 deploy と、別端末・hardware key を使った実機 E2E。したがって itonami.cloud / authn.kotobase.net の live worker は本 ADR 作成時点の挙動のまま",
