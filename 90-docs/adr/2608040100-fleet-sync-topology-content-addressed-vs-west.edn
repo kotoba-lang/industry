@@ -299,6 +299,60 @@ reconciler は 6 対中 4 対に**存在する**が、**scheduled は 0**。全�
 murakumo fleet の tick か claude routine のどちらか —— これは能力の不足ではなく**置き場所の
 決定**である。ここを埋めると `:period-ratio` は測定のたびに下がる方向に動く。
 
+## 訂正（2026-08-04）— radicle 面の「漂流」は向きを取り違えていた
+
+**この ADR が 2 サイクルとも報告した radicle の漂流率（18.0% → 10.4%）は、向きを持たない
+分類だった。** probe は「rad の canonical が live な local HEAD とも west pin とも一致しない」
+を `:matches-neither` の 1 バケツにまとめ、それを「radicle 面が漂流した」と読んでいた。
+実際には 3 つの別物が混ざっている: ①rad が古い ②**local checkout が古い** ③判定不能。
+
+**きっかけ**: `kotoba-lang/kagami` を手で見たら rad が `d258b7b`、local checkout が
+4 commit 遅れの `cb09b93` だった。`git fetch && git merge --ff-only` したら local が
+`d258b7b` に追いつき、「漂流」が消えた —— **漂流していたのは rad ではなく手元だった。**
+
+**556 repo で向きを測り直した結果（2026-08-04）**:
+
+| 分類 | 件数 | 比率 | 意味 |
+|---|---|---|---|
+| equal | 477 | **85.8%** | 一致 |
+| rad-commit-absent-locally | 56 | 10.1% | local clone が rad の commit を持たない（判定不能。多くは local が未 fetch） |
+| **rad-ahead** | 21 | **3.8%** | **local checkout が古い** |
+| **rad-behind** | 1 | **0.2%** | **rad が古い（本当の rad 漂流はこれだけ）** |
+| diverged | 1 | 0.2% | 分岐 |
+
+**したがって「radicle 面は書きっぱなしで漂流している」という本 ADR の記述は誤り。**
+rad-behind は 556 中 **1 件**。むしろ **rad の方が local checkout より新しい**ケースが
+20 倍多い。実際、この機の radicle storage は今も他セッションによって更新されている
+（直近 12 時間で 8〜9 repo。例: `kobo` が 2026-08-04 04:09）。plane-multiplication ループの
+「新しい面を足すと漂流する」の**旗艦事例としては成立しない**。
+
+**支配ループの読みへの影響**: sync-cost-avoidance（local checkout が上流から取り残される）
+の方が、測り直すたびに強く出る。`:not-relatable` 141 件も `rad-commit-absent-locally`
+10.1% も、どちらも**同じ 1 つの症状 —— 手元が fetch していない —— の別々の見え方**である。
+
+**probe を直した**: `scripts/fleet-sync-probe.cljs` の `probe-rad` は rid ごとに
+その repo 自身の checkout と ancestry 比較し、`:rad-behind` / `:rad-ahead` /
+`:rad-commit-absent-locally` / `:diverged` / `:equal` に分ける。`:divergence-pct` という
+向きの無い指標は廃止し、`:rad-behind-pct`（面が古い）と `:rad-ahead-pct`（手元が古い）を
+別々に出す。**向きを持たない指標は、誤った側を非難する。**
+
+## 訂正（2026-08-04）— radicle node のブロッカーの正確な形
+
+オーナーが `rad auth` を実行し、`✓ Radicle key already in ssh-agent` を確認した
+（fingerprint は `rad self` の鍵と一致）。それでも **`rad node start` は依然として
+passphrase を要求する** —— node daemon は鍵ファイル自体を読むので ssh-agent では代替できない
+（error は `RAD_PASSPHRASE` を示唆）。
+
+正確なブロッカーは「鍵が使えない」ではなく **「node 起動に要る passphrase がどこにも
+保管されていない」**。ssh-agent 経由の git レベルの rad 操作（`git push rad`）は今日でも動く
+——ただし `.claude/hooks/git-push-main-sync-guard.cljs` が正しく効き、**origin/main より
+遅れた checkout からの rad push はブロックされる**（kagami で実測。rad の canonical を
+手元の古い状態で退行させることを防いだ）。
+
+**残る owner 操作**: `RAD_PASSPHRASE` を kagi compartment `personal` に
+`radicle-junkawasaki-passphrase` として保管する（そうすれば agent 側で非対話に node を
+起動できる）。安全床①により agent は passphrase を推測も入力もしない。
+
 ## What this ADR does NOT decide
 
 - git / GitHub の廃止（ADR-2607160005 と同じく interop projection として維持）。
