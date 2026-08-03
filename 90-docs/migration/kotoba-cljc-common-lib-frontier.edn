@@ -123,11 +123,11 @@
  :planned-surfaces
  [{:id :portable-edn
    :target-repo "edn"
-   :status :bounded-document-textual-codec-symbol-implemented
+   :status :bounded-document-textual-codec-list-implemented
    :reason "clojure.edn/cljs.reader block 113/32 dependency closures"
    :scope [:bounded-reader :bounded-writer :closed-tags :depth-limit :size-limit
-           :nil :bool :i64 :f64 :string :keyword :symbol :vector :keyword-keyed-map]
-   :remaining [:set :list :general-map-key]
+           :nil :bool :i64 :f64 :string :keyword :symbol :vector :list :keyword-keyed-map]
+   :remaining [:set :general-map-key]
    :forbidden [:reader-eval :ambient-class-resolution :unbounded-keyword-interning]}
   {:id :http-routing
    :target-repo "http"
