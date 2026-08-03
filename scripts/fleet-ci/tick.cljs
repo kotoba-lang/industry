@@ -1062,7 +1062,22 @@
                                                         :name (:id w) :sha (:tip w)
                                                         ;; gate のノード側出力をここに残す
                                                         ;; （verdict の grep 対象 + 失敗時の調査用）
-                                                        :out-file (path/join tmp (str "gate-" (:name w) ".out"))})))))
+                                                        ;;
+                                                        ;; **:id + sha で割る（:name ではない）。** verdict は
+                                                        ;; このファイルを `grep '^FLEET-CI-EXIT: 0$'` して決めるので、
+                                                        ;; 同じ batch の 2 つの work item が同じ path を共有すると
+                                                        ;; **互いの出力を上書きし、verdict が取り違わる**。
+                                                        ;; 実測 2026-08-03: net-kotobase の tip 1 + PR head 6 が
+                                                        ;; 同一 batch で全部 `gate-net-kotobase.out` に書き、
+                                                        ;; 落ちた gate が pass と記録され（detail には
+                                                        ;; `FLEET-CI-EXIT: 1` が残っていた）、その pass を根拠に
+                                                        ;; **west pin が前進した**。root の 4 gate も :name が同じ
+                                                        ;; なので同じ競合をずっと起こしていた。
+                                                        ;; ノード側の展開 dir と script は line 500 の事故で既に
+                                                        ;; :id 基準に直っていたが、operator 側のこの 1 箇所だけが
+                                                        ;; :name のまま残っていた。
+                                                        :out-file (path/join tmp (str "gate-" (:id w) "-"
+                                                                                      (sha7 (:tip w)) ".out"))})))))
                     out-file (path/join tmp (str "receipts-" bi ".edn"))
                     _ (fs/writeFileSync out-file "")
                     args (concat ["nbb" "--classpath" (path/join kagami-dir "src") fleet-bin
