@@ -81,6 +81,12 @@
 
 ;; ---------- west / remotes / overrides ----------
 
+(def reclaimed-paths
+  (let [path (node-path.join root "manifest/kotoba-workspace.edn")]
+    (if-let [text (read-text path)]
+      (set (:manifest.kotoba-workspace/reclaimed-paths (edn/read-string text)))
+      #{})))
+
 (defn west-entries
   "[{:name :path :revision} ...]"
   []
@@ -322,7 +328,8 @@
 (defn successor-path
   "path-override または既知の -clj 改名先。登録禁止の旧 path 用。"
   [path name west-map overrides]
-  (or (get overrides path)
+  (or (when-not (contains? reclaimed-paths path)
+        (get overrides path))
       (when (and name (str/ends-with? name "-clj"))
         (let [base (subs name 0 (- (count name) 4))
               ;; common migration: com-junkawasaki/foo-clj -> kotoba-lang/foo
@@ -369,8 +376,10 @@
           (swap! actions conj {:op :clone :path path
                                :url (or url (remote-url-for uorg uname remotes))
                                :org uorg :name uname}))
-        ;; register only when path not in west at all (missing from west map by path)
-        (when (and gh? (not in-west?))
+        ;; Register when absent from west, or when an explicitly reclaimed path
+        ;; has a generated entry but is not yet in repos.edn :extra-projects.
+        (when (and gh? (or (not in-west?)
+                           (and (contains? reclaimed-paths path) (not in-extra?))))
           (swap! actions conj {:op :register :path path :name west-name :org org}))
         (when (and gh? dir? in-west?)
           (let [head (local-head path)

@@ -106,7 +106,8 @@
 ;; GitHub keeps redirects for renamed repositories. An old path can later be
 ;; deliberately reclaimed by a new repository, at which point the historical
 ;; rename must not collapse the new project back into its former target.
-(def reclaimed-paths #{"orgs/kotoba-lang/edn"})
+(def reclaimed-paths
+  (set (:manifest.kotoba-workspace/reclaimed-paths kotoba-workspace)))
 (defn canonical-path [p]
   (if (contains? reclaimed-paths p)
     p
