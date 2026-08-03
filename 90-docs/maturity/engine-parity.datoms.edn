@@ -330,11 +330,11 @@
   :parity/target "fortnite" :parity/subject "network-isekai"
   :parity/axis "anti-cheat"
   :parity/label "アンチチート（クライアント検証 / サーバ権威 / 異常検知）"
-  :parity/status :partial :parity/score 0.30
+  :parity/status :partial :parity/score 0.45
   :parity/repos "[\"network-awai/network-isekai\"]"
-  :parity/evidence "anti-cheat 3 件ヒット。authoritative_transport.cljc がサーバ権威の土台。"
-  :parity/probe "grep -riln 'anti-cheat' orgs/network-awai/network-isekai/src orgs/network-awai/network-isekai/90-docs"
-  :parity/gap "3 件が設計言及か実装かを分解していない。異常検知（統計的外れ値）・リプレイ検証が無い。"
+  :parity/evidence "**2026-08-04 第 5 反復で 3 件を分解した。シミュレーション側は本物** —— sekaiju/field.cljc の入力処理は『クライアントの希望は方向だけを選び、大きさは決して選ばない』という input-to-velocity clamp で、速度定数は clamp と simulation が同じ値を読むので drift しない（コメントで明示）。これは正しい server-authoritative の原型。authoritative_transport.cljc も wire-version 付きフレーム + session lifecycle + :server/wire-rejected を持つ。**ただし識別が無い**（別軸 :parity/player-identity 参照）—— 誰の入力かを検証していないので、clamp が守るのは『物理的にありえない動き』だけで『他人としての操作』は素通しになる。"
+  :parity/probe "grep -n 'anti-cheat' orgs/network-awai/network-isekai/src/isekai/sekaiju/field.cljc  # => 入力 clamp の実装（言及ではない）"
+  :parity/gap "識別が無いことが上限を決めている。異常検知（統計的外れ値）・リプレイ検証も無い。clamp は sekaiju のみで、他 34 タイトルが同じ規律を持つかは未測定。"
   :parity/measured-at "2026-08-04"}
 
  {:parity/id :parity/fortnite-creator-revenue
@@ -403,14 +403,25 @@
   :parity/gap "端末間競合の解決規則が文書化されていない。オフライン中の変更をどう畳むかが未定義。"
   :parity/measured-at "2026-08-04"}
 
+ {:parity/id :parity/player-identity
+  :parity/target "roblox" :parity/subject "network-isekai"
+  :parity/axis "player-identity-auth"
+  :parity/label "プレイヤー識別（なりすまし不能なアカウント）"
+  :parity/status :absent :parity/score 0.15
+  :parity/repos "[\"network-awai/network-isekai\"]"
+  :parity/evidence "**2026-08-04 第 5 反復で発見。realtime room の edge に認証が無い。** workers/sekaiju/src/index.mjs の WebSocket upgrade は `url.searchParams.get(\"char\")` を非空チェックだけで受け取り、その character の durable record を読み込んで入室させる。同じ経路で `/me?char=X`（他人の private view 読み出し）・`/open-box?char=X`（他人の loot box 開封）・`/propose?char=X` も無認証。ADMIN_TOKEN で守られているのは `/grant` だけ。**これはコード自身が宣言した契約の違反** —— authoritative_transport.cljc の docstring は『Session ids are monotonic values, not credentials; an edge adapter must authenticate the player before calling connect-client』と明記しているが、edge adapter は認証していない。social-rooms / stage-rooms も同様に auth の言及ゼロ。識別の素材は project 内に在る（web.cljc は /api/fork へ self-minted did:key で署名、assets.cljc は did:plc handle を扱う）—— room に繋がっていないだけ。"
+  :parity/probe "grep -n 'searchParams.get(\"char\")' orgs/network-awai/network-isekai/workers/sekaiju/src/index.mjs  # => WS upgrade と /me と /open-box が同じ経路で char を受け取る"
+  :parity/gap "**現時点の実害は限定的**（D1 binding は sekaiju-dev = 開発用データベース、本番ユーザーデータではない）。ただし Roblox / Fortnite / Steam のいずれも認証済み識別の上に UGC・経済・永続化・アンチチートが載っており、識別なしにこれらの軸を上げても土台が無い。**識別方式の選択は設計判断**（self-minted did:key / CACAO / kotobase 認証のどれを正とするか）なので agent 判断で勝手に実装せずオーナーに提示する。"
+  :parity/measured-at "2026-08-04"}
+
  ;; ─────────────── カバレッジ申告（索引の穴を query から読めるように） ───────────────
  {:parity/id :parity/coverage
   :parity/target "meta" :parity/subject "meta"
   :parity/axis "coverage"
   :parity/label "この台帳自身のカバレッジ申告"
   :parity/status :partial :parity/score 0.0
-  :parity/axes-unity 20 :parity/axes-platform 15
-  :parity/evidence "Unity 20 軸 / Roblox+Fortnite+Steam 15 軸を 2026-08-04 に初回測定。同日 3 反復回した。第 2 反復: particles 28 件を分解し orphan 層（17 WGSL + 8 pipeline が rendering consumer を持たない）を発見 → ADR-2608040400、particles 0.45→0.25 / render 0.60→0.45 / terrain 0.70→0.45 に下方修正。**第 3 反復: そのうち 2 つを差し戻した** —— render 0.45→0.60、terrain 0.45→0.60。第 2 反復は「live executor が scene_*.wgsl を参照しない」ことだけを見て、live executor が**その機能を自前で実装しているか**を確かめていなかった。実際は PBR + IBL + 4 段 cascade shadow + biome ブレンド + 風揺れ植生を実装済み。particles 0.25 は据え置き（live path に本当に無い）。**測り方の教訓: 「A が B を参照しない」は「A に B の機能が無い」を意味しない。** 未分解: pathfind 6 / anti-cheat 3 / desktop 7。実行証拠のある軸は 1（webgpu pipelines gate 10 assertion）、残り 34 は静的調査。"
+  :parity/axes-unity 20 :parity/axes-platform 16
+  :parity/evidence "Unity 20 軸 / Roblox+Fortnite+Steam 15 軸を 2026-08-04 に初回測定。同日 3 反復回した。第 2 反復: particles 28 件を分解し orphan 層（17 WGSL + 8 pipeline が rendering consumer を持たない）を発見 → ADR-2608040400、particles 0.45→0.25 / render 0.60→0.45 / terrain 0.70→0.45 に下方修正。**第 3 反復: そのうち 2 つを差し戻した** —— render 0.45→0.60、terrain 0.45→0.60。第 2 反復は「live executor が scene_*.wgsl を参照しない」ことだけを見て、live executor が**その機能を自前で実装しているか**を確かめていなかった。実際は PBR + IBL + 4 段 cascade shadow + biome ブレンド + 風揺れ植生を実装済み。particles 0.25 は据え置き（live path に本当に無い）。**測り方の教訓: 「A が B を参照しない」は「A に B の機能が無い」を意味しない。** 第 4 反復: alpha blend を executor に通し webgpu pin を前進（a71def3）。第 5 反復: anti-cheat 3 件 / desktop 7 件を分解し、**realtime room の edge に認証が無い**ことを発見 → 新軸 :parity/player-identity（:absent 0.15）。anti-cheat は clamp 実装が本物だったので 0.30→0.45。desktop 7 件は画面幅（レスポンシブ）の意味で、デスクトップ配布ではないことを確認 —— :parity/steam-distribution の :absent 判定は正しかった。未分解: pathfind 6 のみ。実行証拠のある軸は 1（webgpu pipelines gate 10 assertion）、残り 34 は静的調査。"
   :parity/probe "nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q '[:find ?axis ?status ?score :where [?e \"source/dataset\" \"engine-parity\"] [?e \"parity/axis\" ?axis] [?e \"parity/status\" ?status] [?e \"parity/score\" ?score]]'"
   :parity/gap "(1) pathfind 6 / anti-cheat 3 / desktop 7 の内訳分解が未了 (2) ブラウザ起動による実描画の確認がゼロ —— 分断 B は静的解析で発見したので、実際に何が画面に出ているかは未確認 (3) kami-* 90 repo のうち行数を測ったのは上位 45 のみ。次イテレーションは (2) を優先する: 分断 B が正しければ、royale や at6-texan の実画面には terrain/water/vegetation shader が一切効いていないはずで、それを見れば確定する。"
   :parity/measured-at "2026-08-04"}]
