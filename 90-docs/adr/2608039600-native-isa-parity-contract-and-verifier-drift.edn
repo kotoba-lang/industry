@@ -567,15 +567,41 @@ provider/capability-linking 機構」)。ただし同ファイルの
 表現は、**Component Model 流の provider 合成が無い**ことを指すなら正確だが、
 **capability が native で動かない**と読めてしまう。実際には動く。
 
-### 帰結: 「最大の穴」は 2 つではなく 1 つ
+### 帰結 — およびこの予測が外れたことの記録 (2026-08-04 訂正)
 
-**kit 資格化と「record/variant が関数境界を越えられない」は同じ作業**であり、
-残ギャップ一覧で 2 項目に分けていたのは重複だった。native の capability を
-前進させる道は provider 機構の新設ではなく、**値表現を広げること**である。
+当初ここには **kit 資格化と「record/variant が関数境界を越えられない」は同じ
+作業であり、native の capability を前進させる道は provider 機構の新設ではなく
+値表現を広げることだ**と書いていた。**この予測は、その後の自分の作業によって
+反証された。**
 
-なお ADR-2607266000 決定 4 が定めるとおり、native は**実行面**であって
-Component 契約面ではない — Component 流の provider 合成を native に持ち込む
-こと自体が目標ではない。
+値表現チェーンは 5 点すべて閉じ、境界越えも `string-substring` 一般形も landed
+した。にもかかわらず **8 つの kit の `:native-aot` はすべて `:pending` のまま
+であり、それが正しい。**
+
+理由は 2 つあり、どちらも測定で確認した:
+
+1. **資格の定義がそもそも違う。** compiler ADR 0059 が明文化している —
+   `:implemented` とは **real provider semantics を含めて end-to-end に使える
+   こと**を意味し、ABI crossing が閉じただけでは足りない。同 ADR は 0052–0060 の
+   連鎖が例外なく kit descriptor に触れずにきたことを述べ、**証明した以上を主張
+   する最初の 1 本にはならない**と明示している。
+2. **native の実行ホストは設計上 qualification host である。**
+   `tools/kexe_loader.c` の `checked_typed_cap_call` は検証だけを行い、provider
+   本体は恒等関数で、コメントが `The qualification host's deterministic typed
+   provider is identity. Production tenders replace this callback while
+   preserving validation.` と述べている。つまり **production provider は loader の
+   仕事ではなく、置き換える側 (production tender) の仕事**であり、それは今存在
+   しない。
+
+**したがって残る `:pending` は「閉じ忘れ」ではなく正直な表示であり、フラグを
+編集して閉じる種類のギャップではない。** 必要なのは production native tender と
+いう**コンポーネント**であって、edit ではない。
+
+**値表現の作業が無駄だったわけではない** — ABI crossing は実際に動くように
+なった。**必要ではあったが十分ではなかった**、というのが正しい総括で、当初の
+「同じ作業」という統合が誤りだった。ADR-2607266000 決定 4 (native は実行面で
+あって Component 契約面ではない) は引き続き有効で、Component 流の provider
+合成を native に持ち込むことが目標ではない点も変わらない。
 
 ## 値表現チェーンの現在地 (2026-08-03 実測) — 残るのは 5 点、うち 1 点は backend
 
