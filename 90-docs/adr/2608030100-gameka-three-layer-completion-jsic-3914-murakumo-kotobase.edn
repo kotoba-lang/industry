@@ -236,4 +236,23 @@ jsic カバレッジは 3 分の 1**）。
 | cloud-itonami/gameka | `8db77f0`（merge） |
 | kotoba-lang/loop-ka-production | `d727000`（merge、:gameka channel） |
 | network-awai/cloud-itonami | `0520602`（merge、registry v36） |
+| com-junkawasaki/root | `231cb9d`（merge — west 登録 2 件 + pin 前進 3 件 + 本 ADR） |
+
+すべて default branch に着地済み。open PR / 残存 branch / 残存 worktree は無い。
+
+## Resume point（次の agent へ）
+
+1. **live fleet**: scope `generation` の token を `murakumo.apikey` で発行し
+   kagi に投入 → `cd orgs/cloud-itonami/gameka/clj && MURAKUMO_GENERATION_TOKEN=…
+   clojure -M:produce --spec survivors-zombie-v1 --legs /tmp/legs.edn` で
+   cue が `:murakumo` を返し kotobase に CID が載ることを実測。その後
+   `loop.cljs record --channel gameka --legs /tmp/legs.edn --phase 1` が
+   `:clean` になるはず（現状は `:degraded`）。
+2. **`aerosol-inferno`**: `survivors-zombie-mall` の存在しない進化先。武器を
+   足すか `:weapon/evolves-to` を外すかはオーナー判断。決まるまで
+   jsic-3914 governor が build を hold する（`build_test` に pin 済み）。
+3. **registry の jsic カバレッジ**: jsic-4113 / 4721 が occupation registry に
+   未登録（3 件中 1 件のみ登録済み）。
+4. **concept 索引**: 新規 2 repo は `nbb scripts/gen-concept-index.cljs` を
+   回すまで索引に載らない（README はあるので次回生成時に入る）。
 "}]
