@@ -480,6 +480,55 @@ i64 を返す関数の**内側**で使うと、`option-some` / `option-none` / `
 boolean・native では語**になるオペランド (`option-some?`) の混在 — すべて一致。
 compiler は baseline と同じ 810 tests / 6,372 assertions、conformance 5/5。
 
+## 全数計測: native の未実装 operator は **1 個**だけになった
+
+診断修正 (`operation not implemented on this backend`) は**正確なシグナル**に
+なった — frontend が admit し、target gate も通り、backend に case が無い場合
+にだけ出る。これで frontend の全 operator 表を走査して未実装を厳密に列挙できる。
+
+**結果 (2026-08-03、compiler `eaaaeab`、target `aarch64-kotoba-v1`): 12 個。**
+
+- **11 個は `kernel-privileged-operations`** — 設計上 x86 専用 (cr2/cr3/invlpg/
+  cli/sti/hlt/pause/out)。aarch64 で測っているので当然であり、ギャップではない。
+- **残り 1 個が `string-from-i64`**。
+
+それ以外はすべて compile できるか、`:phase :target` / `:subset` で clean に
+gate されている。**この loop の開始時点から見ると、未実装 operator 面はここまで
+狭まった。**
+
+### `string-substring` は ABI 拡張を要する — が、実際の用途は要しない
+
+`kotoba.kir` の `string-substring` は**バイト単位だが両端が code-point 境界で
+あることを要求**する (違反は trap)。境界検査には文字列領域のバイト読み出しが
+必要だが、**native code は code 領域も string pool も直接アドレスできない** —
+loader が `resolve_string_bytes` で所有している。よって一般実装には新しい
+context callback (offset 128) が要り、`tools/kexe_loader.c` と
+`kexe_loader_windows.c` の両方、`_Static_assert`、そして**封印・計測される
+runtime identity** (`executor/loader-source-sha256`) が変わる。**この loop で
+初めて sealed runtime identity を動かす変更**になる。
+
+**しかし `string-from-i64` はそれを要求しない。** desugar 先は再帰ヘルパーで、
+中身は:
+
+```clojure
+(string-substring \"0123456789\" n (+ n 1))
+```
+
+- 文字列は常に**リテラル** = コード/リテラル領域 (非負 offset) なので、pool の
+  符号依存調整 (`-offset-1` 復号) が不要
+- **リテラルが純 ASCII なので全バイトが code-point 境界** — 境界検査は
+  コンパイル時に決着する
+- 実行時に要るのは `0 <= start <= end <= length` の範囲検査と
+  `pair(offset + start, end - start)` の構築だけ
+
+**したがって host callback も ABI 変更も loader 変更も不要。** 既存の native
+record/variant slice とまったく同じ「狭い受理形をコンパイル時に検査する」
+パターンで届く: *string operand が全バイト ASCII のリテラルである場合に限り
+`string-substring` を native で admit する*。start/end は実行時値でよい。
+
+一般の `string-substring` (pool 文字列・非 ASCII・実行時文字列) は引き続き
+ABI 拡張待ちであり、その差は**明示的に狭い slice として記録する**。
+
 ## 残ったギャップ (2026-08-03 時点の実測)
 
 ## 続き: `i32-operations` (同日、最大の残存 portable ギャップを閉じた)
