@@ -1,0 +1,197 @@
+[{:db/id -1
+  :adr/id "adr-2608031900-gleif-level-2-ownership-edges-on-the-query-plane"
+  :adr/title "ADR-2608031900: GLEIF Level 2（資本関係）を統合クエリ面に載せる — 「誰が誰を所有しているか」は Level 1 では原理的に答えられない"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/date "2026-08-03"
+  :adr/deciders ["Jun Kawasaki (+ Claude、オーナー指示 \"ok, 進めて\")"]
+  :adr/topic "gleif-level-2-ownership-edges-on-the-query-plane"
+  :adr/related ["adr-2608012000-gleif-lei-universe-and-property-ownership-on-the-query-plane"
+                "adr-2607252000-unified-query-plane-cross-repo-company-join"
+                "adr-260726-kotobase-query-plane-is-one-ref"
+                "adr-2607261500-legal-support-jurisdiction-gated-actor"
+                "adr-2607251552-toshokan-patents-worldwide-patent-resident-harvest"]
+  :adr/scope ["orgs/kotoba-lang/property" "manifest/edn-query.cljs"]
+  :adr/authoritative_for ["GLEIF RR (Level 2) golden copy の ingest と projection"
+                          "資本関係 edge を data/ に commit してよい根拠（UBO レジスタとの区別）"
+                          ":corporate-relation/validation を落とさずに運ぶ義務"]
+  :adr/body "# ADR-2608031900: GLEIF Level 2（資本関係）を統合クエリ面に載せる
+
+**Status**: accepted
+**Date**: 2026-08-03
+
+## Context
+
+オーナーの問いは事業側だった —「nintendo や oracle のような法務系ビジネスを
+強めたい。cloud-itonami も踏まえてどのビジネスモデルがいいか」。その検討の中で
+**統合クエリ面が唯一の固有資産である**という仮説を立て、実測して裏を取ろうとした
+ところ、仮説の前提が成立していないことが分かった。
+
+### 実測 1: ADR-2608012000 の決定は実行されていなかった
+
+同 ADR は Golden Copy full file からの bulk ingest を決めているが、面に載っていた
+GLEIF 法人は **2,756 社**、`:projection/source` は `gleif-api-by-lei` — 同 ADR 自身が
+「lookup 経路であって ingest 経路ではない」と退けたページング API の結果だった。
+さらに market-intel と join すると **2,640 社（96%）が重複**しており、GLEIF 側は
+独立した法人を実質 116 社しか足していなかった。
+
+ただしこれは実装漏れではなく**実行漏れ**だった。`scripts/collect_gleif_golden_copy.cljs`
+は完成しており、`~/.cache/gleif/shard-0.edn` に **3,391,413 社の corpus が
+2026-08-02 に生成済み**で置かれていた。ADR-2608012000 の `:measured-state` が
+「corpus 生成はセッション終了時点で進行中」と書いたとおり、**corpus はできて
+projection が作られないままセッションが終わっていた**。面が 2,756 社のままだった
+のはダウンロードの問題ではなく、**join 境界（projection）を誰も広げなかった**ため。
+
+### 実測 2: しかし Level 1 をいくら広げても目的の問いには届かない
+
+事業仮説側で価値があると見立てたのは「この取引先の最終的な支配者は誰か」だが、
+**Level 1 のレコードは edge を持たない**。3.39M 社を全部載せても、entity record に
+親子関係が無い以上この問いは答えられない。答えは GLEIF が LEI2 と同じ publish・
+同じ CC0 で日次公開している **RR (Relationship Record) ファイル**にあり、
+`gleif_golden_copy.cljc` にはその reader が無かった（`grep relationship|parent`
+= 0 件）。
+
+RR は 483,263 行 / 圧縮 24 MB — entity universe より 2 桁小さく、**全量が扱える**。
+
+## Decision
+
+### D1. RR golden copy の ingest 経路を作る
+
+`kotoba.property.gleif-rr-golden-copy`（`.cljc`、I/O 無し）+
+`scripts/collect_gleif_rr_golden_copy.cljs`（streaming）+
+`scripts/project_gleif_rr_corpus.cljs`（projection）。CSV 機構は Level 1 から
+共有する（RR 行も 20 文字 LEI で始まるので `record-start?` がそのまま成立）。
+
+### D2. 属性の綴りは API collector と一致させる
+
+`:corporate-relation/child-lei` / `-parent-lei` / `-type` は
+`kotoba.property.gleif-runtime/normalize-relation`（ページング API）が既に
+出している綴りをそのまま使う。Level 1 で `api-record->record` が存在するのと
+同じ理由 — **bulk と API で綴りが違うと、同じ edge がどちらの collector が書いたかで
+片方の query にしか答えない**。
+
+### D3. dataset を `gleif-relationship` として分ける
+
+`gleif-lei` と別 dataset・別ファイル prefix にする。entity を聞くだけの query に
+23,530 本の edge を load させないため。統合面の loader も
+`gleif-relationship-entities` として独立させた。
+
+### D4. projection は edge の**どちらの端**でも当てる
+
+`--lei-file` は child / parent の両方に対して照合する。child を知っていれば
+「これは誰に所有されているか」、parent を知っていれば「これは何を所有して
+いるか」が引ける。**child だけに当てると、面が既に知っている会社の子会社が
+全部黙って落ちる。**
+
+### D5. `:corporate-relation/validation` を必ず運ぶ
+
+GLEIF 自身の証拠階層を落とさない。`FULLY_CORROBORATED` は managing LOU が
+出典に当たって確認した edge、`ENTITY_SUPPLIED_ONLY` は**その会社が自分の親を
+自己申告し、誰も裏を取っていない** edge。publish 全体で 483,263 本中 139,111 本
+（29%）が後者、**面に載せた 23,530 本に限れば 12,707 本（54%）が後者**。
+
+これは legalsupport（ADR-2607261500）が `:rule/verification` の二次情報のみの
+許可判断を `:unsettled` に降格させるのと同じ規律である。**自己申告を検証済みと
+同じ顔で提示しない。** 慎重に倒せばカバレッジを失うだけだが、逆に倒すと
+「この会社の親会社はここです」という誤った断定を顧客に渡すことになる。
+
+ownership 比率（`:corporate-relation/quantifier-amount`）は publish 全体で
+51,664 / 483,263 本、面上では 2,009 / 23,530 本にしか無い。**無いことは
+「不明」であって「0%」ではない。**
+
+### D6. data/ への commit 根拠 — これは UBO フィードではない
+
+`DATA-GOVERNANCE.md` は EU 一般公開 UBO レジスタと Companies House PSC を
+data/ 禁止としている。RR はそのどちらでもない: **edge の両端が LEI（= 法人）で、
+自然人を一切含まない。** GLEIF が CC0 で publish しており、CJEU の
+beneficial-ownership 一般公開に関する判断はこのデータに届かない。
+
+ただし将来 **この edge の連鎖を辿って頂点の自然人まで解決する** ingest を作る
+なら、それは別 dataset・別レビューであり、本 ADR の許可を継承しない。
+
+## Consequences
+
+**得たもの**（すべて main で実測）:
+
+```
+entity  2,756 -> 18,930    data/gleif-lei-joined.datoms.edn
+edge        0 -> 23,530    data/gleif-relationship-joined.datoms.edn
+```
+
+面が知っていた 2,756 社は 23,530 本の資本関係の上に乗っており、その先に
+**面が一度も見たことのない 16,174 社の相手方**がいた。それを Level 1 から
+projection して名前と法域を与えたので、連鎖は裸の LEI ではなく法人名で解決する。
+
+**失うもの（明示する）**: projection に入らない約 337 万社は依然 join できない。
+corpus の streaming scan（`query_gleif_corpus.cljs`）で集計だけできる。join 面を
+広げる方法は projection を広げることであって、store を増やすことではない
+（ADR-260726、kotobase one-ref）。
+
+**publish の skew**: relationship projection は 20260803、entity projection は
+20260801 publish から切っている（Level 1 corpus が既にあったため）。両方の
+manifest が自分の publish id と sha256 を持つので skew は**隠れず見える**。
+同一 publish に揃えるのは `project_gleif_corpus.cljs` の再実行だけ。
+
+**keyword 値は面上で文字列になる**: `:type :is-ultimately-consolidated-by` は
+datascript.js へ渡る際に `\"is-ultimately-consolidated-by\"` になる。query では
+文字列で照合すること（属性名が裸文字列なのと同じ変換）。
+
+## Alternatives considered
+
+- **Level 1 の projection をひたすら広げる** — 却下。entity record は edge を
+  持たないので、3.39M 社を全部載せても「誰が所有しているか」には 1 件も答え
+  られない。規模の問題ではなく形の問題。
+- **RR も corpus のまま scan で答える** — 却下。scan は join できない。
+  「この会社の親会社の財務」は entity・edge・財務の 3 者 join であって、
+  edge 単体の集計ではない。
+- **validation 階層を落として edge だけ載せる** — 却下。D5 のとおり、面上の
+  edge の 54% が自己申告であり、区別を落とすと推測を事実として報告する。
+
+## Follow-ups
+
+1. **同一 publish への揃え直し** — 20260803 の Level 1 corpus を生成中
+   （`~/.cache/gleif/gleif-lei-corpus-20260803.edn`）。完了後
+   `project_gleif_corpus.cljs` を同 corpus で再実行して entity projection を
+   差し替える。
+2. **toshokan-patents が実質空**（本セッションで west checkout し面に載せたが
+   `patent=4`）。seeds.edn は 183 KB あるが harvest が 1 seed しか回っていない。
+   ADR-2607251552 は USPTO Open Data first を規定しており、現状の
+   google-patents lookup 経路とは別。`:patent/applicant-lei` × `:company/lei` の
+   join は配線としては通っているが、載せる中身が無い。
+3. **`is-fund-managed-by` が面上で 119 本しかない** — publish 全体では最多
+   （148,759）。面の 2,756 社が事業会社中心でファンドをほぼ含まないため。
+   ファンド構造を扱うなら projection の選び方を変える必要がある。"
+
+  :adr/measured-state "2026-08-03 実測（主張ではなく測定値、すべて main）:
+
+- RR ingest: 483,263 行 / **skipped 0** / 5分20秒 / corpus 181 MB
+  （publish `20260803-0000-gleif-goldencopy-rr`、
+  sha256 065b8d4ba6ed4353ffa40a9c9c28a5969eac4338a2deba21d531ec546044b83c）
+- publish 全体の関係種別: IS_FUND-MANAGED_BY 148,759 / IS_ULTIMATELY_CONSOLIDATED_BY
+  132,241 / IS_DIRECTLY_CONSOLIDATED_BY 126,087 / IS_SUBFUND_OF 72,849 /
+  IS_INTERNATIONAL_BRANCH_OF 1,940 / IS_FEEDER_TO 1,387
+- publish 全体の証拠階層: FULLY_CORROBORATED 327,207 / ENTITY_SUPPLIED_ONLY
+  139,111 / PARTIALLY_CORROBORATED 16,945
+- **面に載せた projection: 23,530 edge**。種別は ultimate 15,886 / direct 7,474 /
+  fund-managed 119 / subfund 34 / branch 17。証拠階層は
+  **ENTITY_SUPPLIED_ONLY 12,707（54%）** / FULLY_CORROBORATED 10,267 /
+  PARTIALLY 556。ownership 比率を持つのは 2,009 本のみ。
+- entity projection: 2,756 -> **18,930**（新規相手方 16,174 社、Level 1 corpus
+  20260801 から全件解決 = kept 18,930 / scanned 3,391,413 / unreadable 0）
+- 統合面 total: 77,933 -> **94,121**。dataset 内訳に `gleif-relationship` 23,530 /
+  `gleif-lei` 18,930 が出ることを確認。
+- **3 者 join が main で動く**ことを確認（Level 1 × Level 2 × market-intel）:
+  T-MOBILE US, INC. -> DEUTSCHE TELEKOM AG (DE, FULLY_CORROBORATED) /
+  BKV CORPORATION -> บริษัท บ้านปู จำกัด (มหาชน) (TH, FULLY_CORROBORATED) /
+  MINIMED GROUP, INC. -> MEDTRONIC PUBLIC LIMITED COMPANY (IE,
+  ENTITY_SUPPLIED_ONLY) 等。この join は本 ADR 以前は 0 件だった。
+- **ただし「SEC filer の最終親会社」が引けるのは 29 社だけ** — 上場会社は
+  たいてい自分が連鎖の頂点であり、child 側に現れないため。価値がある向きは
+  逆（その会社が何を所有しているか）で、そちらは D4 の両端マッチにより引ける。
+- 品質上の注意: 法人名の衝突が実在する（例: 面上で CHUBB LIMITED ->
+  CARRIER GLOBAL CORPORATION という edge が出るが、これは Carrier 傘下だった
+  Chubb Fire & Security 系の法人であり、保険会社の Chubb Limited とは別法人）。
+  **join key は LEI であって名前ではない** — 名前で照合すると別会社が混ざる。
+- テスト: property 55 tests / 157 assertions green、clj-kondo errors 0。
+  新規 `gleif_rr_golden_copy_test` は 9 tests / 36 assertions。
+- 着地: kotoba-lang/property `fad8bce`（agent/gleif-rr-level2 をサーバ側マージ）。"}]
