@@ -405,6 +405,26 @@ KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get <ITEM>
 - live 検証済み（2026-08-01、CLI 発行・MCP 発行のどちらも本番 `/v1/messages` で 200、
   scope 不足は 401）。
 
+## api.murakumo.cloud ノード面 service token (ADR-2608031000、2026-08-03)
+
+- **`LOCAL_MURAKUMO_SERVICE_TOKEN`（kagi vault、compartment `network-awai`、
+  `KAGI_HOME=$HOME/.kagi`）** — Worker `local-murakumo`（= `api.murakumo.cloud`）の
+  **write gate** `MURAKUMO_SERVICE_TOKEN` と同値。`/infer/runs` `/infer/spend`
+  `/infer/queue*` と、新設の低速ティア ノード面 `/v1/slow/work*` `/v1/slow/workers/heartbeat`
+  の Bearer。取得:
+  `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get LOCAL_MURAKUMO_SERVICE_TOKEN`。
+  - **2026-08-03 に新規発行（rotation ではない）。** 発行前この Worker には
+    `MURAKUMO_SERVICE_TOKEN` が未設定で、`write-gate/service-authorized?` は
+    **未設定を「全部許可」に倒さない**（fail-closed）ため、該当ルートは常に 401 を
+    返していた＝既存 caller はいない。
+  - ⚠ **`murakumo.cloud`（Worker `murakumo-cloud`、cloud-murakumo）の
+    `MURAKUMO_SERVICE_TOKEN` とは別物。** 同名だが別 Worker・別値で、上の
+    「murakumo x402 ingest service token」節のものは `/x402/ingest` 用。
+    どちらかを rotate しても他方には効かない。
+  - ⚠ **mk1 の署名鍵（`MURAKUMO_API_TOKEN_SECRET`、下記の別節）とも別物。** あちらは
+    顧客面 `/v1/messages` `/v1/embeddings` `/v1/slow/messages` の capability token 検証、
+    こちらはノード/フリート側の write gate。
+
 ## kotobase.net archive write token (2026-07-29)
 
 - **`KOTOBASE_ARCHIVE_TOKEN`（kagi vault、compartment `net-kotobase`）** —
