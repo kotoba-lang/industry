@@ -529,6 +529,56 @@ verifier の string-operation allowlist にも無かったので arity 2 で adm
 **教訓**: 「閉じた」と言う前に網羅測定を回す。この loop で「閉じた」と報告した
 主張が実測で覆るのは 2 度目 (1 度目は kit 資格化の予測)。
 
+### x86-64 の host call が disp8 で壊れていた — 私が 2 回出荷したバグ (2026-08-04)
+
+**`emit-heap-call` は context offset を `call qword ptr [r9+disp8]` として
+出していた。disp8 は符号付き 1 バイトである。** したがって私が landed した
+`string-substring` (offset **136**) は **-120** として、`string-code-point-at`
+(offset **144**) は **-112** として符号化されており、**どちらも意図した slot
+ではなく context の手前にある何かを呼んでいた**。
+
+**何一つ捕らえなかった。** 理由が 3 つ重なっている:
+
+1. **AArch64 は構造的にこの誤りを起こせない** — `ldr-context` の即値は 8 倍
+   スケールの 12 bit 場で 32760 まで届く。
+2. **この機械には AArch64 しかない。** 実行テストは全部 AArch64 で通り、
+   x86-64 は一度も実行されていない。
+3. **verifier の独立再導出が効かない。** verifier は
+   `x86-64/emit-program` を**呼ぶ**ので、producer と同じ関数で同じ誤った
+   バイトを再導出し、一致してしまう。**独立再導出は emitter を共有する層では
+   独立ではない。**
+
+修正: 127 を超える offset は disp32 形式 (ModRM 0x91) を使う — offset 128 の
+typed-cap-call が既に使っていた形。127 以下はバイト単位で不変。
+
+**回帰テストは call site 1 つではなく offset の TABLE を走査する**ので、次に
+127 を超える offset が足されたとき誰も覚えていなくても捕らえる。修正を戻すと
+実際に落ちることを確認済み。
+
+**同時に判明: kotoba-native 自身のテストは main で赤のままだった。**
+`string-substring` 一般形の landing で「非 ASCII / 非リテラルは unimplemented」
+という意図的な negative を陳腐化させたのに、**compiler のスイートだけで検証した
+ため気づかなかった** (12 failures)。テストを新しい振る舞いに書き換えて緑に戻した。
+**教訓は「変更したリポジトリ自身のスイートを回す」** — 下流の統合スイートは
+上流リポジトリのテストを含まない。
+
+### f64 比較を native に追加 (同日)
+
+網羅 probe の副産物。gate と backend は**同じ集合**を持っており (算術のみ)、
+比較 6 個 (`f64-eq/lt/le/gt/ge/unordered`) はどちらにも無かった。ABI 変更なし、
+命令生成のみ。**NaN が肝**: AArch64 は FCMP が unordered で N=0 Z=0 C=1 V=1 を
+立てるので、そこで**偽になる**条件 (EQ/MI/LS/GT/GE、unordered は VS のみ真) を
+選ぶ。x86-64 は UCOMISD が unordered で ZF=PF=CF=1 を立てるため、`setb`/`setbe`
+は unordered で**真になってしまう** — so lt/le はオペランドを入れ替えて
+seta/setae を使う。等値は PF も見る (unordered も ZF を立てるため)。
+
+実 AArch64 で 19 行 (NaN 行含む) を実行検証。**x86-64 は実行できていない** —
+この機械には無い。上の disp8 バグはまさにその穴から出た。
+
+**着地**: kotoba-native `18dccc5` / kotoba-kir `0725a53` / kotoba-verifier
+`bd9a142` / compiler `6bb2d69`、west pin 4 件。実 pin で **880 tests /
+6,606 assertions / 0 failures**、kotoba-native 自身 **43 / 2,052 / 0**。
+
 **着地**: artifact `ae5f670` / kotoba-native `f4167d7` / kotoba-verifier `b4f5c6e`
 / compiler `d60cf56`、west pin 4 件。実 pin で **878 tests / 6,583 assertions /
 0 failures**、実 AArch64 実行 3 本 (ASCII / 3 バイト decode / pool 由来)。
