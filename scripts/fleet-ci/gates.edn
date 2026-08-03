@@ -200,4 +200,33 @@
   ;; 「道具が無い」は合格ではない）。実測 pass: judah / asher / levi。
   {:name "net-kotobase" :gate :nbb-script
    :script "gates/net-kotobase-hermetic-check.cljs"
-   :script-args ["--min-surfaces" "8" "--min-syntax" "20"] :cd true}]}
+   :script-args ["--min-surfaces" "8" "--min-syntax" "20"] :cd true}
+
+  ;; kotoba-lang/compiler の JDK-free 経路（compiler ADR-0202）。
+  ;;
+  ;; **ここに置く理由は 2 つある。** ①ADR-2607300900 の決定（CI は Actions では
+  ;; なく fleet）。kotoba-lang org の Actions は今日は動いているが、他 3 org は
+  ;; org 単位で止まった実績があり、動いている org も同じ理由で止まりうる。
+  ;; ②**`.github/workflows/` に書けない** — このワークスペースの token は
+  ;; `gist, read:org, repo` だけで `workflow` scope が無い（実測 2026-08-03）。
+  ;; Actions 側に step を足す経路が塞がっているので、fleet が唯一の登録先。
+  ;;
+  ;; 検査は repo 自身の verifier（`test/nbb/classpath.cljs`）を `--hermetic-only`
+  ;; で呼ぶだけ。gate 側にロジックを複製しない。**JVM を PATH から隠して回し、
+  ;; stub が 1 度でも呼ばれたら fail する** — 「JDK 無しで通った」だけでなく
+  ;; 「JVM 経路に一度も落ちなかった」まで見る。stale な lock は `bin/kotoba` を
+  ;; `clojure -Spath` に落とすので、その退行がここに出る（実測: PR #500 が
+  ;; merge された時点で既に stale だった。open 中に deps.edn の pin が 2 本進んだ
+  ;; ためで、**pin が動く頻度からしてこれは通常の腐り方**）。
+  ;;
+  ;; :cd false — この gate が green でも意味するのは「JDK-free の不変条件が
+  ;; 保たれている」だけで、compiler の CI が通ったことではない（browser matrix /
+  ;; wasm-tools / cargo / clojure -M:test はノードの egress が無く載らない）。
+  ;; 狭い slice を根拠に pin を前進させない。
+  ;;
+  ;; :include-ext [".edn" ".cljs"] — resolver 本体・その test・lock・deps.edn。
+  ;; 実測 84 件なので :min-files 60 を床にする（filter が壊れて空 tree を
+  ;; 「合格」にしないため）。
+  {:name "compiler" :id "compiler-jdk-free" :gate :nbb-script
+   :script "gates/kotoba-compiler-jdk-free-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 60 :cd false}]}
