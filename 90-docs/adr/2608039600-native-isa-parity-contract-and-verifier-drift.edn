@@ -500,104 +500,57 @@ compiler は baseline と同じ 810 tests / 6,372 assertions、conformance 5/5�
 gate されている。**この loop の開始時点から見ると、未実装 operator 面はここまで
 狭まった。**
 
-### `string-substring` は ABI 拡張を要する — が、実際の用途は要しない
+### `string-substring` 一般形 — 実装済み (2026-08-04、context offset **136**)
 
 `kotoba.kir` の `string-substring` は**バイト単位だが両端が code-point 境界で
-あることを要求**する (違反は trap)。境界検査には文字列領域のバイト読み出しが
-必要だが、**native code は code 領域も string pool も直接アドレスできない** —
-loader が `resolve_string_bytes` で所有している。よって一般実装には新しい
-context callback (offset 128) が要り、`tools/kexe_loader.c` と
-`kexe_loader_windows.c` の両方、`_Static_assert`、そして**封印・計測される
-runtime identity** (`executor/loader-source-sha256`) が変わる。**この loop で
-初めて sealed runtime identity を動かす変更**になる。
+あることを要求**する。境界検査には文字列領域のバイト読み出しが必要だが、
+**native code は code 領域も string pool も直接アドレスできない** — loader が
+`resolve_string_bytes` で所有している。よって一般実装には新しい context
+callback が要り、`tools/kexe_loader.c` と `kexe_loader_windows.c` の両方、
+`_Static_assert`、そして**封印・計測される runtime identity**
+(`executor/loader-source-sha256`) が変わる。**この loop で唯一 sealed runtime
+identity を動かした変更**である。
 
-**しかし `string-from-i64` はそれを要求しない。** desugar 先は再帰ヘルパーで、
-中身は:
+**訂正**: この節は以前 offset を **128** と書いていたが誤り。128 は
+`typed_cap_call` が既に占めており、実際の追加位置は **136**
+(`code_base`/`code_length` は data-only で guest 不可視なので後ろにずらせる)。
+書く前に struct を読んで判明した。
 
-```clojure
-(string-substring \"0123456789\" n (+ n 1))
-```
+**設計上の要点 — 結果は view であって複製ではない。** substring は元文字列の
+連続バイト範囲なので、`string_concat` と違い **string pool を 1 バイトも消費
+しない**。offset 空間は 2 つの半分が**逆向きに走る** (非負は code+literal を
+前進、負は `-offset-1` で pool を指す) ため、`start` バイト進めることは前者では
+加算、後者では**減算**になる。両分岐とも実プロセス実行テストで押さえた。
 
-- 文字列は常に**リテラル** = コード/リテラル領域 (非負 offset) なので、pool の
-  符号依存調整 (`-offset-1` 復号) が不要
-- **リテラルが純 ASCII なので全バイトが code-point 境界** — 境界検査は
-  コンパイル時に決着する
-- 実行時に要るのは `0 <= start <= end <= length` の範囲検査と
-  `pair(offset + start, end - start)` の構築だけ
+**oracle との一致。** 判定は共有 oracle `kotoba.kir.value/utf8-substring!` を
+そのまま写した: 境界 `0 <= start <= end <= length`、次に両 index が code-point
+境界であること。**元バイトが canonical UTF-8 であることは仮定せず検査する** —
+不正 UTF-8 の上では「継続バイトでない」は「code-point 境界」を意味せず、guest は
+任意の pair cell を渡せるため。
 
-**したがって host callback も ABI 変更も loader 変更も不要。** 既存の native
-record/variant slice とまったく同じ「狭い受理形をコンパイル時に検査する」
-パターンで届く: *string operand が全バイト ASCII のリテラルである場合に限り
-`string-substring` を native で admit する*。start/end は実行時値でよい。
+**context-abi は 4 箇所で独立に再導出されている** (`core.clj`、`nbb/cli.cljs`、
+verifier、`admission_test`)。verifier は完全一致を要求するので最初の実行は
+`execution context ABI is not admitted` で弾かれた — **drift detector が設計
+どおり fail-closed した**のであって回帰ではない。4 箇所すべてを揃えて解消。
 
-一般の `string-substring` (pool 文字列・非 ASCII・実行時文字列) は引き続き
-ABI 拡張待ちであり、その差は**明示的に狭い slice として記録する**。
+**この検査は compiler が作った artifact からは到達しない。** entry は零引数しか
+取れず (`main must take zero arguments`)、compile 時に oracle が entry 全体を
+実行するため、境界違反は必ずコンパイル時に落ちる。実行時 trap を書こうとした
+2 つの試み (再帰で畳み込みを避ける / `:args` で動的 index を渡す) はどちらも
+この 2 つの性質で塞がれた。loader が検査するのは `checked_string_concat` が
+overflow を潰すのと同じ理由 — **guest が pair cell に入れた値を信用しない**、
+かつ artifact がこの compiler 由来とは限らないため。この事実をテストの代わりに
+コメントとして記録した (再試行させないため)。
 
-## 完了: `string-substring` の ASCII リテラル slice — **native の未実装 operator はゼロになった**
+**検証**: 実 pin (override なし) で **873 tests / 6,575 assertions / 0 failures**。
+実 AArch64 プロセスでの実行 3 本 — pool 由来 (負 offset)、pool 由来の multi-byte
+内容一致、literal 由来 (正 offset) の multi-byte 内容一致。**非対称性を正直に
+記す: POSIX loader はコンパイルして実行したが、Windows loader はしていない** —
+`windows.h` が要り、この環境に cross-compiler が無い。offset は struct を読んで
+確認し、実 Windows ビルドでは `_Static_assert` が捕らえる。
 
-前回の計測で残っていた唯一の operator (`string-from-i64` → `string-substring`)
-を、**ABI 変更なし**で閉じた。
-
-**一般形は今も ABI 拡張を要する**。`kotoba.kir` の契約はバイト単位だが両端が
-code-point 境界であることを要求し、違反は trap する。その検査には文字列領域の
-バイト読み出しが必要で、emit されたコードは code/literal 領域も runtime string
-pool もアドレスできない (loader が `resolve_string_bytes` で所有)。
-
-**この slice は要さない。** operand が全バイト < 0x80 のリテラルなら**あらゆる
-バイト位置が code-point 境界**なので、境界規則はコンパイル時に決着する。実行時に
-残るのは範囲検査と 1 回の pair 構築 — `pair(offset + start, end - start)` —
-だけ。文字列値は既に `pair(offset,length)` handle であり、リテラルの offset は
-非負で code+literal 領域を直接指す。**host callback も ABI 変更も loader 変更も
-sealed runtime identity の変更も無い。**
-
-既存の native record / variant slice とまったく同じ「狭い受理形をコンパイル時に
-検査する」形であり、`string-from-i64` が必要とするものそのもの: あの operation の
-合成ヘルパーは、ASCII リテラルに対する実行時添字の substring を回す再帰スキャン。
-
-slice の外 (pool 文字列・マルチバイトリテラル・計算された文字列) は fall through
-して `operation not implemented on this backend` と報告される — 正確で fail-closed。
-テストが両方を pin する。
-
-**分岐距離は success ブロックの実測長から導出**しており、直書きしていない。
-そこを変えても分岐が命令の途中を指すことはない。
-
-**emit した範囲検査は defence in depth で、通常経路からは到達しない**: pure な
-entry では定数畳み込み oracle が substring をコンパイル時に評価し、範囲外を
-`:phase :value` で先に拒否する — ADR 0063 が variant dispatch の trap について
-記したのと同じ性質。よって構造的に assert している。
-
-**副産物: 関数の結果型 `:string` が拒否されていた。** verifier の関数 shape 検査は
-`param-types` に `:string` を許しながら**結果型には許していなかった**。native ABI
-では文字列は 1 語の pair handle で、呼び出し境界では i64 と区別がつかない —
-規則ではなく非対称だった。これが `(defn f [n] (string-substring ...))` を
-検証不能にし、frontend が合成する**あらゆる文字列返却ヘルパー**を巻き込んでいた
-(`string-from-i64` を含む)。文字列を返す関数が今まで存在しなかったので誰も
-気づかなかった。entry の結果型は別問題 (host に渡るため boxing が要る) なので
-`entry-result-types` とは分離した。
-
-検証: kotoba-native 31 tests / 1,986 assertions。実 AArch64 プロセスで 14 本 —
-`string-from-i64` の 0 / 7 / 42 / 90210 / 1234567 を含み、再帰ヘルパー・実行時
-添字・連結を通る。compiler は固定 checkout で baseline と同じ 824 tests /
-6,401 assertions、native-conformance **8/8**。
-
-## 訂正: 「native に capability 機構が無い」は誤読を招く — **実プロセスで動く**
-
-残ギャップの筆頭を「capability/provider (8/8 `:native-aot :pending`)、最大の
-構造的穴」と繰り返し書いてきたが、実測すると**そうではなかった**。
-
-**実測 (2026-08-03、target `aarch64-kotoba-v1`)**:
-
-| 形 | native |
-|---|---|
-| `(cap-call 1 5)` | compile し、**実プロセスで実行して `{:status :ok, :result 6}`** |
-| `(typed-cap-call 1 :i64 :i64 7)` | COMPILED |
-| `(typed-cap-call 1 :string :string \"ab\")` を i64 に消費 | COMPILED |
-
-**capability call は loader の context callback 経由で end-to-end に動いている。**
-最初 `typed string` が `:phase :verify` で落ちたが、名前付き条件の診断が
-`:condition :signature-result` と即答した — **entry が文字列を返す**ための拒否で
-あって capability のギャップではない。**3 度目の「測定の交絡を診断が一手で解いた」
-事例。**
+**着地**: artifact `6be99b6` / kotoba-native `02d1a6d` / kotoba-verifier
+`9adda42` / compiler `8ddbec4`、west pin 4 件前進。
 
 ### では `:native-aot :pending` は何を意味しているのか
 
