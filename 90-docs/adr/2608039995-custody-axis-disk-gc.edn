@@ -117,5 +117,41 @@
    surface index を引く**という運用でしか埋まらない。今日はそれを怠って
    `kura` を提案し、既存の 6 repo と衝突した。"
 
+  :adr/closing-state
+  "## closing 監査で出た続き（2026-08-04）—— custody は content だけの話ではない
+
+   custody 軸を content に足した直後、**同じ欠陥が metadata 側に在った**ことが
+   closing の監査で分かった。
+
+   - `m365-archive/gmail` は git remote を持たない独立 repo だった。その
+     `git-annex` branch には `encryption=hybrid` の **cipher（GPG で包んだ共通鍵）**
+     が入っており、これを失うと B2 上の 12,841 objects は GPG 秘密鍵を持っていても
+     **復号できないただの ciphertext** になる。
+   - つまり content を B2 に複製した結果、**復号可能性が 1 台のラップトップに
+     単一依存**する状態を作っていた（私がこの露出を作った）。
+
+   対処済み: `gftdcojp/m365-archive-gmail`（private）を作成し `main` と
+   `git-annex` を push。m365-archive 本体の `git-annex` は origin と分岐していた
+   （別マシン `main-2.local` の location log がある）ので **force せず
+   `git annex sync --no-content` で merge** し、fast-forward を確認してから push。
+   superproject の `git-annex` も push した。
+
+   **教訓: content を複製しても、それを取り出す鍵と索引が単一コピーなら
+   custody は満たされていない。** `copies` を数える対象に location log と
+   cipher を含めること。
+
+   ## 未処理（owner 側 / 別 routine の担当）
+
+   - superproject に mail sync routine の **commit 16 本が未 push**。うち 25 通の
+     `.eml` は origin/main に無い。ただし **annex content は B2 に 2 copies あり**
+     （`whereis` で確認）、失われるのは『どの key がどの message か』の対応。
+     branch が origin/main から 388 behind なので、そのまま push すると
+     west.yml の pin を退行させる（hook が正しく拒否した）。routine 側で
+     clean branch から着地させる必要がある。
+   - `m365-archive` 本体で `gmail/` が **untracked のまま**（subdataset 未登録）。
+     本体は detached HEAD かつ 12 behind なので、同期済み checkout から
+     登録し直すのが正しい。gmail 自体は独立 repo として復旧可能なので緊急ではない。
+   - `:custody/absent` 3,894 件の処遇（再生成 or annex から外す）は未着手。"
+
   :source/dataset "adr"
   :source/file "90-docs/adr/2608039995-custody-axis-disk-gc.edn"}]
