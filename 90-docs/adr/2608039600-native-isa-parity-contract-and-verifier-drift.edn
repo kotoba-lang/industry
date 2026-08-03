@@ -625,6 +625,56 @@ keyword 演算のこれ) ので、自分で 3 例目を残さない。
 **着地**: kotoba-native `6ccbc0d` / kotoba-kir `73acba3` / kotoba-verifier
 `ff54fca` / compiler `73bae4b`、west pin 4 件。
 
+## Resume point (2026-08-04 closing)
+
+### 閉じたもの (すべて default branch 着地・west pin 前進済み)
+
+| 面 | 状態 |
+|---|---|
+| 値表現 5 点 + 関数境界越え | 閉 |
+| `string-substring` 一般形 (context offset 136) | 閉 |
+| `string-code-point-at` (offset 144) | 閉 |
+| f64 比較 6 種 (NaN semantics 込み) | 閉 |
+| `keyword-name` / `keyword-from-string` | 閉 |
+| x86-64 の disp8 バグ (**出荷済みバグの修正**) | 閉 |
+| x86-64 実行検証 (Rosetta 2 + `cc -arch x86_64`) | 常設 |
+| 両 ISA を 1 つの表で実行 | 常設 |
+| backend 間 operator パリティ | 測定済み・差分は設計上の x86 専用 kernel op 11 個のみ |
+
+**検証**: compiler `885 tests / 6,761 assertions / 0 failures`、
+kotoba-native `43 / 2,052 / 0`、共有 ISA 表は両 ISA で `137 assertions / 0`。
+再実行は対象 repo で `clojure -M:test`。
+
+### 残っているもの (優先順)
+
+1. **production native tender** — 8 kit の `:native-aot :pending` を正当に解消
+   する唯一の道。**フラグ編集で閉じてはならない**: compiler ADR 0059 が
+   `:implemented` を real provider semantics 込みの end-to-end と定義しており、
+   `kexe_loader.c` の `checked_typed_cap_call` は**意図的に恒等**
+   (コメント: production tenders replace this callback)。**新規コンポーネントの
+   設計**であり、最初の判断は ADR-2607266000 の層 (T3 実行面 / T5 機構) の
+   どこに tender を置くか。
+2. **`:target` gate に残る typed-set / typed-map / typed-vector / document /
+   f32** — keyword 演算と違い**実際に新しい値表現を要する** (可変長コンテナ、
+   32bit 浮動小数)。keyword が閉じられたのは表現が既にあり演算だけ無かったため。
+3. **7 件の parse-error** (`manifest/docs-edn-only.cljs` の baseline) —
+   診断済み・**機械修復不可**。理由と試して撤回した 2 手はその docstring に
+   記録済み。所有 agent による再生成か、オーナーによる退役判断が要る。
+
+### 次の具体的な一手
+
+新しい面に触る前に**必ず網羅 probe を回す**。この loop で「閉じた」という報告が
+実測で 2 度覆っている (kit 資格化の予測、operator 面)。手順:
+
+    # frontend の op 表の各 op を最小プログラムでコンパイルし、phase で分類する
+    # :aarch64 / :x86-64 で落ちる = backend の穴
+    # :target / :subset で落ちる = 設計 gate (穴ではない)
+    # 型エラー = probe 自身の誤り (op 名・arity・期待値を実装で確かめる)
+
+**測定器の非対称を測定結果と読み違えない**、**変更した repo 自身のスイートを
+回す** (下流の統合スイートは上流 repo のテストを含まない) の 2 点が、この loop で
+実際に事故った箇所である。
+
 (なお直前の commit `efa85df` は内容変更を伴わない空 commit である — この節を
 書く際に EDN 文字列を壊す引用符を自分のガードが弾いて本文が書かれないまま
 PUT だけが走った。履歴に残るが中身は無い。)
