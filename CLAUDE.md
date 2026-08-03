@@ -764,6 +764,32 @@ projection、index、local read accelerator、運用メトリクス。
 とおり、**Cloudflare OAuth token に `r2` scope が無く R2 の `onlyIf.etagMatches` が
 使えなかった**ための暫定選択である。恒久的な答えとして選ばれたことは一度もない。
 
+## kotobase の base は datom 面であって Datalog ではない（repo-wide mandatory、2026-08-03、ADR-2608039970）
+
+同じ「消して再構築できるか」テストを **query 層**に当てた結果。kotobase の層と premise 境界:
+
+| 層 | 実体 | premise か |
+|---|---|---|
+| **L0** block / ref / large-object | `kotobase-storage` の `IBlockStore`(CID) + `IRefStore`(CAS) + `IObjectStore`(transfer profile)。S3/R2・B2・IPFS/IPNS・Postgres・D1・inga は**この境界の provider** | **premise**（消すと全部壊れる） |
+| **L1** datom（triple / EAV）+ immutable value + content-addressed history | `arrangement` / `datalog` の spo・pso・pos・ocp | **premise**（全 query surface の論理モデル） |
+| **L2** query language（Datalog / SQL / Cypher / SPARQL / GraphQL / Gremlin） | `kotobase.core/q`、`kotobase-query` bridge、各 protocol repo | **premise ではない** |
+
+- **Datalog を全 query protocol の必須 IR にしない。** 新しい query surface を足すとき、その言語の
+  algebra が L1 の index access path（`datalog.index` の `entity-attrs`/`by-predicate`/
+  `by-predicate-value`/`refs-to`）に直接束縛できるなら**そちらが正しい**。`bridge/q` 経由は既定では
+  なく選択肢。`org-w3-sparql-protocol` が取った **materialize-only 経路が正規経路**であって例外では
+  ない（SPARQL algebra を Datalog に翻訳して戻すのは no benefit、と実装が自ら書いている）。
+- **逆に L1 を迂回して surface ごとに独自の物理表現を持つのは禁止。** 共有するのは datom（L1）、
+  共有しないと決めたのは Datalog（L2）。この2つを混同しない。
+- **byte を datom 面に載せない。** `s3` の object body・`git` の loose object・`ipfs` の block は
+  block 面（小）/ large-object 面（大、`:presigned-transfer`）に直行する。`PUT /ipfs/:cid` の
+  4 MiB 天井は、この迂回の代償として実測済み。**CID 検証は store の仕事**
+  （`kotobase.storage.verify/verifying-block-store`）であって各 surface の仕事ではない。
+  メタデータ（bucket 一覧・ref→sha・pin request・audit）は datom 面でよい —— 分けるのは bytes。
+- **Datomic 互換（`kotobase.core` の Datalog API / `kotobase.datomic` の EDN grammar）は残すが、
+  位置づけは surface の1つ。** 「kotoba : kotobase = Clojure : Datomic」（ADR-2607032500）は repo 名と
+  用語の由来であって、**設計の前提に昇格させない** —— 全 surface を Datalog 経由にする設計はここから来た。
+
 ## agent loop の正本は Git + EDN + DataLad、Datomic/kotobase は query projection（repo-wide mandatory、2026-08-03、ADR-2608039700）
 
 agent loop は database transaction loop ではなく、`checkout → observe → edit/generate →
