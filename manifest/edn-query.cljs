@@ -1048,6 +1048,34 @@
                  :source/file (str f))))
       [])))
 
+;; kakekomi (cloud-itonami/kakekomi) — 国外で犯罪被害に遭った渡航者の初動 corpus。
+;; data/*.edn はいずれもトップレベルが entity map の vector なので vector-of-maps
+;; でそのまま読める。面をまたぐ結合キーは :jurisdiction/iso3166-alpha3 で、
+;; cloud-itonami-iso3166-<alpha3> 群の法域 entity と文字列一致で join する
+;; （lei-tos / yabai と同型。datascript.js は :db.type/ref を解決しない）。
+;;
+;; **この corpus は網羅していない**（2026-08-03 時点で 42/249 法域）。載って
+;; いない法域は :not-yet-collected であって「該当なし」ではない。data/coverage.edn
+;; の entity がその差を持っているので、集計するときは必ず一緒に読むこと——
+;; jurisdiction を数えて「世界の N 割」と読むと誤る。
+
+(defn kakekomi-entities [next-tempid!]
+  (let [dir (io/file root "orgs" "cloud-itonami" "kakekomi" "data")]
+    (if (.exists dir)
+      (let [skipped (atom [])
+            es (->> (file-seq dir)
+                    (filter #(str/ends-with? (str %) ".edn"))
+                    (sort-by str)
+                    (mapcat (fn [f]
+                              (let [rows (vector-of-maps-entities f)]
+                                (when-not (seq rows) (swap! skipped conj (str f)))
+                                (map #(assoc % :source/file (str f)) (or rows []))))))]
+        (warn-skipped! "kakekomi data/*.edn" @skipped)
+        (when (empty? es) (warn-skipped! "kakekomi" [dir]))
+        (for [e es]
+          (assoc e :db/id (next-tempid!) :source/dataset "kakekomi")))
+      [])))
+
 ;; ---------- 因縁 dependency record（category N。ADR-2607258500） ----------
 ;; kotoba-lang/loop-innen の corpus/*.edn（+ resources/*-corpus.edn）。
 ;; entity 間の**依存エッジ**を持つ唯一の corpus — この面には従来「entity の台帳」
@@ -1382,6 +1410,7 @@
                           (fleet-ci-entities next-tempid!))
         yabai-tx (yabai-passive-dns-entities next-tempid!)
         tadori-tx (tadori-threat-intel-entities next-tempid!)
+        kakekomi-tx (kakekomi-entities next-tempid!)
         patent-tx (toshokan-patents-entities next-tempid!)
         innen-tx (innen-entities next-tempid!)
         awai-tx (awai-yakuwari-entities next-tempid!)
@@ -1393,7 +1422,7 @@
                                                      working-doc-tx narrative-tx
                                                      company-tx property-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx innen-tx
-                                                     awai-tx)))]
+                                                     awai-tx kakekomi-tx)))]
     (.transact ds conn all-tx)
     {:conn conn
      :adr-count (count adr-tx)
