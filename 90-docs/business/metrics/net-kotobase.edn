@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 7125, "kotobase-cf-wasm-staging" 5096},
+ {"net-kotobase" 7263, "kotobase-cf-wasm-staging" 5482},
  :zone
- {:requests-7d 19639,
-  :pageviews-7d 1093,
-  :uniques-7d-sum 1326,
+ {:requests-7d 20191,
+  :pageviews-7d 1103,
+  :uniques-7d-sum 1333,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 1582}
-   {:path "/_health", :requests 1514}
-   {:path "/", :requests 149}
+  [{:path "/health", :requests 1710}
+   {:path "/_health", :requests 1660}
+   {:path "/", :requests 151}
    {:path "/v1/passkey/login/options", :requests 63}
    {:path "/cdn-cgi/rum", :requests 34}
    {:path "/v1/passkey/login/verify", :requests 30}
    {:path "/api/funnel", :requests 25}
-   {:path "/robots.txt", :requests 24}],
-  :status-mix {:client-error 4703, :server-error 19, :ok 3764},
+   {:path "/robots.txt", :requests 25}],
+  :status-mix {:client-error 4964, :server-error 17, :ok 4043},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
  :as-of "2026-08-03",
  :traffic-quality {:window "24h", :probe-4xx-pct 55, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 1582 · /_health 1514 · / 149 · /v1/passkey/login/options 63 · /cdn-cgi/rum 34 | 4xx(probe) 55% · 5xx 0%",
- :funnel {:visitors 2126, :signups 12, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 1710 · /_health 1660 · / 151 · /v1/passkey/login/options 63 · /cdn-cgi/rum 34 | 4xx(probe) 55% · 5xx 0%",
+ :funnel {:visitors 2131, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 19639 req/7d・1326 uniques(日次和)・うち4xx probe 55%(24h)、workers 12221 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 20191 req/7d・1333 uniques(日次和)・うち4xx probe 55%(24h)、workers 12745 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 7,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.42857142857142855,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 594},
+ {:visitors {:openai-ads 3, :organic 599},
   :signups {:organic 9}, 
   :checkouts {}}}
