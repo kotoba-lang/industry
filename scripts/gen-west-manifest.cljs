@@ -103,7 +103,15 @@
 (defn name-of [p] (last (str/split p #"/")))
 (defn nested? [p] (.exists (io/file root p ".gitmodules")))
 (defn remote-of [p] (get (:remote-overrides cfg) p (org-of p)))
-(defn canonical-path [p] (get (:path-overrides cfg) p p))
+;; GitHub keeps redirects for renamed repositories. An old path can later be
+;; deliberately reclaimed by a new repository, at which point the historical
+;; rename must not collapse the new project back into its former target.
+(def reclaimed-paths
+  (set (:manifest.kotoba-workspace/reclaimed-paths kotoba-workspace)))
+(defn canonical-path [p]
+  (if (contains? reclaimed-paths p)
+    p
+    (get (:path-overrides cfg) p p)))
 ;; NOTE: `heavy?` + `clone-depth` emission removed 2026-07-25. ADR-2607211600
 ;; retired shallow as a default in 2026-07-21, but this generator still carried
 ;; the machinery (`heavy?` gating `:defaults :clone-depth`), dormant only because
