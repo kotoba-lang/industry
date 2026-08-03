@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 14947, "ai-gftd-chat-shell" 4},
+ {"magatama-sh1n5h1x" 14968, "ai-gftd-chat-shell" 4},
  :zone
- {:requests-7d 667044,
-  :pageviews-7d 3217,
-  :uniques-7d-sum 5792,
+ {:requests-7d 669964,
+  :pageviews-7d 3221,
+  :uniques-7d-sum 5804,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/.env.dev", :requests 189}
-   {:path "/env", :requests 183}
-   {:path "/.env.old", :requests 182}
-   {:path "/actuator/configprops", :requests 179}
+  [{:path "/.env.dev", :requests 162}
+   {:path "/env", :requests 159}
+   {:path "/.env.old", :requests 155}
+   {:path "/actuator/configprops", :requests 152}
    {:path "/v1/generation/jobs/e95b5891a5064a8695a6b40b642d5da8",
     :requests 92}
    {:path "/v1/generation/jobs/731ec5e8f8af42089641174fea764658",
     :requests 44}
-   {:path "/mgrr.php", :requests 37}
+   {:path "/mgrr.php", :requests 39}
    {:path "/ms-edit.php", :requests 34}],
-  :status-mix {:server-error 15465, :ok 2396, :client-error 1261},
+  :status-mix {:ok 2341, :server-error 15440, :client-error 1278},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -34,8 +34,8 @@
  :as-of "2026-08-03",
  :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 81},
  :top-paths
- "上位 page (24h, 2xx/3xx): /.env.dev 189 · /env 183 · /.env.old 182 · /actuator/configprops 179 · /v1/generation/jobs/e95b5891a5064a8695a6… 92 | 4xx(probe) 7% · 5xx 81%",
+ "上位 page (24h, 2xx/3xx): /.env.dev 162 · /env 159 · /.env.old 155 · /actuator/configprops 152 · /v1/generation/jobs/e95b5891a5064a8695a6… 92 | 4xx(probe) 7% · 5xx 81%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 667044 req/7d・5792 uniques(日次和)・うち4xx probe 7%(24h)、workers 14951 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 669964 req/7d・5804 uniques(日次和)・うち4xx probe 7%(24h)、workers 14972 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
