@@ -73,9 +73,15 @@
 
  :terminal-emulator
  {:label "端末エミュレータ（VT/ANSI 解釈）"
-  :spellings ["terminal emulator" "ansi escape" "vt100" "xterm" "escape sequence"
-              "端末エミュレータ"]
-  :note "**未実装**。kuro は 1 command 入れて 1 receipt 出るだけで PTY を持たない。"}
+  ;; 素の "ansi" は入れない。この workspace では American National Standards
+  ;; Institute の意味でも使われていて（食品機械 blueprint 等が規格として引く）、
+  ;; 実測で無関係な repo が kuro と同順に並んだ。homonym は綴りを具体にして避ける。
+  :spellings ["terminal emulator" "ansi escape" "escape sequence"
+              "vt100" "xterm" "sgr" "端末エミュレータ"]
+  :note "**部分実装**（2026-08-03）。kotoba-lang/kuro の `kuro.ansi` が SGR・`\r` 上書き・
+`CSI K` 行消去・タブ/後退を解釈する。**スクリーンエミュレータではない** ——
+カーソル位置指定もスクロール領域も代替画面も無く、PTY も無い（子は pipe、
+`TERM=dumb`）ので vim/top は動かない。行志向の出力を読むための層。"}
 
  :repl
  {:label "REPL / 対話評価"
