@@ -225,21 +225,42 @@
   20000)
 
 (defn- wait-running
-  "running になるまで待つ。上限超過は例外 —— 無限待ちは課金の垂れ流しと同義。"
+  "running になるまで待ち、**状態遷移を時刻付きで記録して返す**。
+
+   最初の版は running かどうかだけを見て、上限超過で例外にしていた。実測
+   （2026-08-03、`vastai/comfy:latest`）で 15 分待っても `loading` のままで、
+   得られた情報は『15 分では終わらなかった』だけだった —— **どこで時間を
+   使ったのかが分からない**ので、イメージが大きいのか、そのホストが遅いのか、
+   マーケットのプロビジョニング自体が遅いのかを区別できない。
+
+   区別できないと打ち手が決まらない: イメージが原因なら `cold_workers` で
+   償却できるが、プロビジョニングが原因なら serverless の前提が崩れる。
+   状態遷移を残せば、失敗しても次の判断材料になる。
+
+   上限超過は引き続き例外（無限待ちは課金の垂れ流し）だが、**遷移履歴を
+   例外データに載せる**ので、タイムアウトしても測定値は残る。"
   [id deadline-ms]
-  (let [t0 (now)]
-    (letfn [(poll []
+  (let [t0 (now)
+        seen (atom [])]
+    (letfn [(note! [st]
+              (when (not= st (:status (peek @seen)))
+                (swap! seen conj {:status st :at-ms (- (now) t0)})
+                (js/console.error (str ";; " (js/Math.round (/ (- (now) t0) 1000)) "s  " st))))
+            (poll []
               (-> (instances!)
                   (.then (fn [{:keys [instances]}]
                            (let [i (first (filter (fn [x] (= id (:id x))) instances))
-                                 st (:actual_status i)]
+                                 st (or (:actual_status i) "gone")]
+                             (note! st)
                              (cond
                                (= "running" st)
-                               {:ready-ms (- (now) t0) :status st}
+                               {:ready-ms (- (now) t0) :status st :transitions @seen}
 
                                (> (- (now) t0) deadline-ms)
                                (throw (ex-info "起動が上限を超えた"
-                                               {:instance-id id :status st}))
+                                               {:instance-id id :status st
+                                                :waited-ms (- (now) t0)
+                                                :transitions @seen}))
 
                                :else
                                (.then (sleep poll-interval-ms) poll)))))))]
@@ -247,9 +268,9 @@
 
 (defn- rent!
   "オファーを借りて instance id を返す。"
-  [o]
+  [o image]
   (-> (req! :put (str "/asks/" (:id o) "/")
-            {:body {:client_id "me" :image comfy-image :disk 60 :runtype "ssh"}})
+            {:body {:client_id "me" :image image :disk 60 :runtype "ssh"}})
       (.then (fn [r]
                (or (:new_contract r) (:id r)
                    (throw (ex-info "instance id が返らなかった" {:response r})))))))
@@ -263,7 +284,7 @@
 
    生成そのものの秒数は ComfyUI への HTTP が要るので本 harness の対象外。
    **測れていないものを測ったと言わない。**"
-  [gpu]
+  [gpu image deadline-ms]
   (-> (offers! gpu)
       (.then (fn [{:keys [offers]}]
                (when (empty? offers)
@@ -271,7 +292,7 @@
                (let [o (first offers)]
                  (println (str ";; 借用: " (:gpu_name o) " $" (:dph_total o) "/h"
                                " host=" (:host_id o) " geo=" (:geolocation o)))
-                 (-> (rent! o)
+                 (-> (rent! o image)
                      (.then (fn [id]
                               (println (str ";; instance " id
                                             " — 失敗しても `orphans --destroy` で破棄できる"))
@@ -279,31 +300,34 @@
                                 (with-destroy!
                                   id
                                   (fn []
-                                    (-> (wait-running id (* 15 60 1000))
+                                    (-> (wait-running id deadline-ms)
                                         (.then (fn [w]
                                                  (let [ms (- (now) t0)]
                                                    {:gpu gpu
-                                                    :image comfy-image
+                                                    :image image
                                                     :offer (select-keys o [:id :host_id :dph_total
                                                                            :geolocation :inet_down
                                                                            :reliability2 :gpu_ram])
                                                     :provision-ms ms
                                                     :status (:status w)
+                                                    :transitions (:transitions w)
                                                     :usd-spent (* (:dph_total o)
                                                                   (/ ms 3600000.0))})))))))))))))))
 
 ;; ── CLI ──────────────────────────────────────────────────────────────────────
 
 (defn -main [& args]
-  (let [[cmd a] args
-        gpu (or a "RTX 4090")]
+  (let [[cmd a b c] args
+        gpu (or a "RTX 4090")
+        image (or b comfy-image)
+        deadline (* 60 1000 (js/parseInt (or c "25") 10))]
     (-> (case cmd
           "offers" (.then (offers! gpu)
                           (fn [{:keys [offers]}] (pp/pprint (summarize gpu offers))))
           "orphans" (orphans! (= a "--destroy"))
-          "measure" (.then (measure! gpu) pp/pprint)
+          "measure" (.then (measure! gpu image deadline) pp/pprint)
           (js/Promise.resolve
-           (println "usage: offers <gpu> | orphans [--destroy] | measure <gpu>")))
+           (println "usage: offers <gpu> | orphans [--destroy] | measure <gpu> [image] [minutes]")))
         (.catch (fn [e]
                   (js/console.error "ERROR:" (ex-message e) (pr-str (ex-data e)))
                   (js/console.error "取り残し確認: nbb 90-docs/procurement/vast-measure.cljs orphans")
