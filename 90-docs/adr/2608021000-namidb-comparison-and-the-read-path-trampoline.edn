@@ -344,10 +344,28 @@ Neo4j は全実行で未変更コードで、それ自体が 1.6-4.9x 動く (ho
 
 | | baseline | batch+hash | +IC02 試行 |
 |---|---|---|---|
-| IC09 | 85.3x | 35.8x | **21.6x** |
-| IC08 | 97.5x | 53.3x | **38.7x** |
+| IC09 | 85.3x | 35.8x | 21.6x |
+| IC08 | 97.5x | 53.3x | 38.7x |
 | IC07 | 6.2x | 7.0x | 6.0x |
-| IC02 | 7.7x | 14.7x | **19.2x (悪化)** |
+| IC02 | 7.7x | 14.7x | 19.2x |
+
+**⚠ この表の値はすべて壊れた計器で採られている (2026-08-02 判明)。**
+harness は kotobase を 15 サンプル全部走らせてから Neo4j を 15 サンプル走らせて
+おり、比を「負荷不変の列」として提示していたのに**両者は同じ分を見ていなかった**。
+交互実行に直して同じ arrangement main で測り直した値
+(`2026-08-02-ldbc-interleaved.edn`):
+
+| | この表 (逐次) | **交互実行での実測** |
+|---|---|---|
+| IC09 | 21.6x | **12.8x** |
+| IC08 | 38.7x | **12.6x** |
+| IC07 | 6.0x | **2.4x** |
+| IC02 | 19.2x | **17.8x** |
+
+**IC08 と IC09 は実際の約 3 倍悪く報告していた。** join の作業の方向は残る
+(両者ともセッションを通じて大きく改善し、それを示した scan カウント
+143,270 → 885 はこの修正を必要としない) が、**この行以前の比の大きさを
+引用しないこと。**
 
 **IC02 は自分の変更による回帰で、しかも私の説明は間違っていた。**
 「batching の group-by の代償だけ払っている」と考えて修正したが、
@@ -406,7 +424,46 @@ segment 化が圧縮するのは **deploy 後に書かれた novelty だけ**で
 他セッションの WIP (`kotobase-protocols` 15 dirty、`kotobase` 21 dirty) は
 一切動かしていない — pin の revision を別途 clone した隔離ツリーでビルドした。
 
-#### 6-6 次にやるとよいこと (優先順)
+#### 6-6 セッション closing (2026-08-02/03) — 着地状態と再開点
+
+**main に landed**:
+| repo | commit | 内容 |
+|---|---|---|
+| `kotoba-lang/arrangement` | join batching / hash join / ORDER BY・LIMIT / `cardinality` / projection pushdown | 106 tests・240 assertions、0 failures |
+| `kotoba-lang/kotobase-peer` | `c63468f4` | novelty segment 化、planner が count、bench 4本 + receipt 9本 |
+| `kotoba-lang/kotobase-protocols-worker` | `2c965e88` | read path の async 化 + guardrail 拡張 |
+| `network-awai/net-kotobase` | deploy `047b3afa` | 本番 7 ドメイン、44 tests・163 assertions |
+
+**意図的に landed していないもの**: B-2 (limit の join 押し下げ)。
+`kotoba-lang/arrangement` branch `agent/limit-pushdown-v2` (`a8333b31`) に保全。
+**正しいが速いという証拠が無い** — 3 回の試行と欠陥は
+`2026-08-02-limit-pushdown-third-attempt.edn` に全部記録済み。
+
+**再開点 (この順)**:
+1. **B-2 を静かな機械で測る**。`arrangement` を `agent/limit-pushdown-v2` に
+   `:local/root` で向け、両ピンを**同一窓**で
+   `clojure -M:ldbc-snb-bench <sf1>/dynamic 3000 15`。
+   交互実行版の `:paired-ratio` を見る。IC02 が改善し IC08 が悪化しなければ
+   着地、しなければ捨てる。
+2. **本番 novelty の検証** (§6-5 の反証可能な予測)。`atproto.kotobase.net/_diag/health`
+   が `novelty_size` を返す。64 に達したとき novelty が 4 ノードなら segment 化が
+   効いている。`/health` の p50 で確認。
+3. `:query-statistics` を実際に使う (B-1 で fallback は安くなったが probe は残る)。
+4. **540K elements で再測**。現在 210,389 は NamiDB 公表規模の 4 割で、
+   NamiDB との正規化比較はまだ成立しない。
+
+**触っていない他セッターの WIP** (報告のみ、移動も削除もしていない):
+`orgs/kotoba-lang/kotobase-protocols` 15 dirty (`rescue/wip-20260718`、pin より
+35 commit 遅れ、`cid.cljc` 不在でビルド不可)、`orgs/kotoba-lang/kotobase` 21 dirty
+(`agent/persist-execution-identities`)。本番ビルドはこの 2 つを pin から
+別 clone した隔離ツリーで行った。
+
+**このセッションで一番効いた変更は最適化ではなく計器**だった。未変更コードを
+対照に残す・同一窓でしか比較しない・2 エンジンは交互に測る、の 3 つが、
+17x→4.7x、22.6x→11.5x→3.5x、38.7x→12.6x という 3 段階の訂正を生んだ。
+**カウントだけが最初から動かなかった。**
+
+#### 6-7 次にやるとよいこと (優先順)
 
 **1. B-2 (limit の join 押し下げ) をやり直す。** 一度実装して **revert した**
 (`arrangement 6a179a31`)。同値性テストは全部通ったが**遅くなった** — 値グループ
