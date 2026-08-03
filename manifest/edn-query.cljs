@@ -1022,7 +1022,12 @@
 
 (defn index-sources []
   [["surface" (io/file root "90-docs" "surface" "surface.datoms.edn")]
-   ["concept" (io/file root "90-docs" "concept" "concept.datoms.edn")]])
+   ["concept" (io/file root "90-docs" "concept" "concept.datoms.edn")]
+   ;; engine-parity — kami-engine 家 vs Unity / network-isekai vs Roblox・Fortnite・Steam
+   ;; の parity 台帳（手書きの「現在値」文書。ADR-2608040300）。`:parity/subject` は
+   ;; repo-taxonomy の `:repo/path` と同形ではなく org/repo 表記なので join には注意。
+   ;; `:parity/coverage` entity を 1 件持ち、測定できていない面を申告する。
+   ["engine-parity" (io/file root "90-docs" "maturity" "engine-parity.datoms.edn")]])
 
 (defn index-entities [next-tempid!]
   (let [skipped (atom [])
