@@ -579,6 +579,23 @@ pair・string=?/string-concat・record projection・option・result・f64 算術
 「ギャップを見つけた」ではなく「私の probe が間違っていた」** — 報告する前に
 op 名・arity・期待値を実装で確かめる、という同じ規律が効いた。
 
+### 表を 1 つにして両 ISA を回す (2026-08-04)
+
+最初の sweep は**片側だけ**だった: AArch64 は個別 deftest 群、x86-64 は表、
+そして両者が同じプログラムを覆っている保証は無かった。**実際に検査したい性質は
+「1 つのプログラムが両バックエンドで 1 つの値を出す」**なので、表を共有にして
+各行を「ここでビルド・実行できる全 ISA」で回す形にした
+(`test/kotoba/compiler/isa_execution_test.clj`)。
+
+**表を 2 つ持つと、乖離しても両方が緑になりうる。1 つならならない。**
+ビルド・実行できない ISA は**名指しで skip** するので、host しか回らなかった
+実行が「両方回った」ようには読めない。
+
+実測: 両 ISA が実際に走り (skip 無し)、**121 assertions / 0 failures**。
+全体は **885 tests / 6,745 assertions / 0 failures**。
+
+**着地**: compiler `d3ca7b7`、west pin `593ac2c`。
+
 修正: 127 を超える offset は disp32 形式 (ModRM 0x91) を使う — offset 128 の
 typed-cap-call が既に使っていた形。127 以下はバイト単位で不変。
 
