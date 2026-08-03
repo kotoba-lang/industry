@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 12196,
-  :pageviews-7d 5894,
-  :uniques-7d-sum 448,
+ {:requests-7d 12272,
+  :pageviews-7d 5932,
+  :uniques-7d-sum 450,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/js/app.js", :requests 161}
-   {:path "/favicon.ico", :requests 151}
+  [{:path "/js/app.js", :requests 160}
+   {:path "/favicon.ico", :requests 147}
    {:path "/api/liveops", :requests 129}
    {:path "/api/analytics", :requests 120}
    {:path "/kototama/kototama.js", :requests 117}
    {:path "/kototama/kototama_bg.wasm", :requests 107}
-   {:path "/", :requests 105}
+   {:path "/", :requests 93}
    {:path "/api/scores", :requests 46}],
-  :status-mix {:ok 2746, :server-error 337, :client-error 9},
+  :status-mix {:server-error 330, :ok 2554, :client-error 9},
   :channel-mix
-  {:channel 1158, :probe 670, :unclassified 918, :ok-total 2746},
+  {:channel 1139, :probe 596, :unclassified 819, :ok-total 2554},
   :window "24h"},
  :as-of "2026-08-03",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 11},
  :top-paths
- "上位 page (24h, 2xx/3xx・channel-allowlist済): /js/app.js 161 · /favicon.ico 151 · /api/liveops 129 · /api/analytics 120 · /kototama/kototama.js 117 | 4xx(probe) 0% · 5xx 11% · probe(200-fallback) 24% · unclassified 33%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): /js/app.js 160 · /favicon.ico 147 · /api/liveops 129 · /api/analytics 120 · /kototama/kototama.js 117 | 4xx(probe) 0% · 5xx 11% · probe(200-fallback) 23% · unclassified 32%",
  :signal
- "isekai.network 実測 12196 req/7d・448 uniques(日次和)・うち4xx probe 0%(24h)",
+ "isekai.network 実測 12272 req/7d・450 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
