@@ -1120,4 +1120,74 @@ qualified な計測ではない」と明記した（machine `b6b8971`、traversa
 拒否されたときに検定の側を疑うのは自然だが、疑いは仮説であって結論ではない。
 今回は 1 回の測定で片が付いた——lesson 4 / 8 と同じ形が三度目。
 
+
+
+## 時計を使わない検証 — tiling model の最初の validation（2026-08-04）
+
+機械が 7 倍 oversubscribe されていて timing harness が何も qualify できない状態だが、
+**page cache の miss 数は sequence の性質であって時間ではない**。`paging` は実 trace に
+一度もかけていなかったので、ここを突いた。
+
+matmul の page access 列を**計算で**生成し（ijk / ikj / tiled）、`paging` に食わせる。
+n=48、page 512 B、LRU。
+
+### 結果 1: loop order は 47 倍（時計なし）
+
+| order | policy misses | Belady | compulsory |
+|---|---|---|---|
+| ijk（教科書） | 85272 | 62859 | 108 |
+| ikj（loop-order が導く順） | **1800** | 1384 | 108 |
+
+`traversal/loop-order` が first principles から導く ikj が、**miss 数で 47 倍**。
+wall-clock を一切使わない検証。
+
+### 結果 2: tile size は capacity で決まる — 間違えると tiling しない方がマシ
+
+capacity を振ると非単調だった:
+
+| cap | ikj | tiled t=4 | t=8 | t=16 |
+|---|---|---|---|---|
+| 3 | 1.00x | 7.67x | 3.20x | 1.44x |
+| 6 | 1.00x | 8.16x | 7.20x | 3.24x |
+| 12 | 1.00x | **0.28x** | 1.56x | 3.24x |
+| 24 | 1.00x | 0.28x | **0.16x** | 0.42x |
+
+**tiling は効く。ただし capacity に合った tile size のときだけで、外すと tiling しない方が
+3〜12 倍マシ。** 最初に cap 12 / t=8 だけ見て「tiling は ikj より悪い」と書きかけた——
+1 configuration からの一般化で、掃いたら間違いだった。
+
+### 結果 3: byte 規則は page 粒度では 2〜3 倍 over-size する。`pages-touched` は正確に当てる
+
+| cap | tile-plan の byte 規則 | `pages-touched` 規則 | **実測の最良** |
+|---|---|---|---|
+| 12 | 11.3 | ≤ 4 | **4** |
+| 24 | 16.0 | ≤ 8 | **8** |
+
+**両方とも `pages-touched` が実測の最適 tile をぴったり当て、byte 規則は 2〜3 倍大きく出す。**
+理由は今日測った TLB の話と同じ構造: strided な 2D tile は「byte 数」ではなく「whole page を
+いくつ占めるか」でレベルを消費する。
+
+**scope を正確に**: これは **page 粒度のレベル**（page cache）での結果。tile-plan が普段
+対象にする L1/L2 は **line 粒度**で、そこでは byte 規則がもっと近い可能性がある。
+「byte 規則はどこでも間違い」ではなく「**page 粒度のレベルに byte 規則を当てると over-size
+する**」が言えたこと。
+
+`tile-plan` の `:model/validation` は `:status :unvalidated`（「この機械とこの harness では
+判定できない」）のままだったが、**これが最初の部分的 validation** になる——speedup ではなく
+miss 数について、そして時計を使わずに。
+
+### 途中でまた同じ罠を踏んだ
+
+最初 LRU 36888 対 Belady 62859（**0.59x** = clairvoyant に勝つ）が出た。原因は既知:
+readahead が有効なまま demand-paging の bound と比べていた。**`paging` にはこれを防ぐ
+`demand-only` / `headroom` が既にあり、私はそれを使わず自分で比較を書いて再現した。**
+
+**教訓 12: 時計が使えないときこそ、決定論的な検証面が残っていないか探す。**
+そして **教訓 13: ライブラリが既に潰した罠は、そのライブラリの API を迂回すると戻ってくる。**
+
+### 次
+
+`tile-plan` を page 粒度のレベルでは `pages-touched` 規則に切り替えるか判断する。
+証拠はあるが model 変更なのでテスト付きで別途行う（今日 3 つのモデルを壊した経路を繰り返さない）。
+
 "}]
