@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "2608031500-newsfeed-primary-source-ingestion"
-  :adr/title "ADR-2608031500: kotoba-lang/newsfeed — 一次情報の取得層を実際に作る（murakumo.cloud / kotobase.net の 2 チャンネル向け）"
+  :adr/title "ADR-2608031500: 一次情報の取得層（kotoba-lang/newsfeed）と、そこから aozora.app への 1 本目の動画"
   :adr/status "accepted"
   :adr/doc_type "adr"
   :adr/topic "news-ingestion-a-layer"
@@ -26,17 +26,28 @@
   :adr/supersedes []
   :adr/superseded_by []
   :adr/landed
-  ["kotoba-lang/newsfeed 422300525ab7fab662b68f4a77e42720a85a81ed (初期実装一式)"
-   "com-junkawasaki/root manifest/west.yml + repos.edn :extra-projects への newsfeed 登録"]
+  ["kotoba-lang/newsfeed main 422300525ab7fab662b68f4a77e42720a85a81ed — 取得層一式"
+   "com-junkawasaki/root main 3d6cd3e9c870676327e4beef1a0a51618d7db3be — west 登録 + 本 ADR"
+   "cloud-itonami/dougaka-vector main 3bd75a99aef02b2d67564eb416e462b28fa86536 — per-run channel identity + brief 出典"
+   "network-awai/aozora-engine main 5207381fa5484c54ff2b7ba94a4707d04ed185ca — creator actor 登録（ただし効果なし。下記 D8）"
+   "aozora.app 実投稿: at://did:key:z6Mkv4HyP31wtiPQKXKctNc3oEepya6omEYkCrudbnYg9SbB/app.bsky.feed.post/co-design-attention"]
   :adr/verification
-  "実行して検証した（inspection ではない）。17 feed すべてを実ネットワークで fetch し 1,336 article を parse。25 tests / 99 assertions が nbb と JVM の両方で green。クラスタリング閾値は実 261 記事に対する sweep で決定（0.55→0 merge / 0.45→1 merge 0 false / 0.35→1 false / 0.30→2 false / 0.25→4 true 2 false）。両チャンネルの brief を実データで生成し running order を目視確認。"
+  "実行して検証した（inspection ではない）。取得層: 17 feed すべてを実ネットワークで fetch し 1,336 article を parse、25 tests / 99 assertions が nbb と JVM の両方で green、クラスタリング閾値は実 261 記事の sweep で決定。動画: brief の topic から storyboard 生成（murakumo-main）→ 570 frame render → mp4（h264 1920x1080 / 19.0s / 30fps）→ aozora publish。フレームを実際に目視して黒背景・ネオンの意匠が出ていることを確認（単色板ではない）。publish 後に PDS から読み戻し、post record 取得可・blob は sha256 完全一致・resolveHandle が did:key を返すことを確認。dougaka-vector 23 tests / 116 assertions green。aozora-engine は creator-actors ns の 7 tests / 55 assertions を nbb で green（フルスイートは本変更以前から main で壊れている — byoubu-ui.core 欠落、無変更 checkout でも同一失敗を確認）。"
+
   :adr/known-gaps
-  ["ledger は今のところローカルファイル（state/articles.ledger.edn、gitignore 済み）。kotobase の durable plane に載せる ref をまだ決めていない。CLAUDE.md は『最初の write の前に ref を決めよ』と定めているが、この repo はまだ kotobase に一度も write していないので違反ではない — ただし載せる前に決める必要がある。"
-   "loop-ka-production への channel 登録はまだ。producer 側（dougaka-vector を brief 駆動で回す経路）が未接続のため。"
-   "YouTube OAuth（YOUTUBE_CLIENT_ID / _SECRET / _REFRESH_TOKEN）は未確認。dougaka-vector の bin/youtube.cljs は env 注入前提で、kagi に入っているか未検証。"
-   "arXiv abstract の rightsPolicy を fair-use-quote としたが、arXiv の license は投稿ごとに異なる（CC-BY / CC0 / arXiv perpetual license）。headline + link + 短い引用の範囲なので現状の運用では足りるが、本文を長く引くなら per-article license の取得が要る。"
-   "Blocks & Files と Hugging Face は description が空なので、この 2 ソースからの記事は title だけで採点される。結果として summary を持つソースより構造的に低く出る（実測: Blocks & Files の HAMR 記事が 1064、summary 持ちは 1700-2000 台）。本文取得（fetch article page）はしていない。"
-   "The Register は section 別 feed が存在せず全 section feed しか無いので、両チャンネルが同じ feed を読み keyword / url-hint gate で仕分けている。gate の誤りは両チャンネルに同時に出る。"]
+  ["**最大の未解決（resume point）**: 投稿は PDS に実在し公開 URL で取得できるが、aozora.app/videos のフィードに出ない。getVideoFeed は appview の共有 index `yoro-social-v2` を読むが、この repo のレコードがそこに projection されていない（getProfile が not found、dougaka は postsCount 3）。キャッシュではないことを確認済み（未使用 URL limit=37 でも 6 件のまま）。PDS の wrangler.jsonc は PER_ACTOR_DB=1 で「各 write が YORO_DB_NAME へ projection する」と述べており、*/5 の fold cron もあるが、投稿から 20 分以上経っても現れなかった。次の一手は PDS の write path（aozora-engine/pds/src）を読み、projection がどの条件で発火するかを特定すること。"
+   "aozora-engine の creator-actors 登録は意図した効果を持たなかった。appview worker の router はこの ns を一切参照しておらず、消費者は別 repo（aozora-appview）の SPA 側。データ追加として無害で tests も green だが、これで /videos に出るようにはならない。判断を誤った箇所として残す。"
+   "aozora-engine の `npm test` は本変更以前から main で壊れている（byoubu-ui.core が kotoba_ui/theme.cljc から要求されるが解決しない）。無変更の共有 checkout でも同じ失敗を実測。フルスイートでの検証ができないため、変更した ns を nbb で直接検証してから deploy した。"
+   "storyboard actor は flaky。3 attempts では validator に落ち（:scene/template :none、copy-id 欠落）、5 attempts で 1 発目に通った。既定の attempts では足りない。"
+   "kotobase-storage チャンネルは 1 本も publish していないので did:key を持たず、creator-actors にも意図的に未登録（存在しない actor を宣言しないため）。"
+   "loop-ka-production の channels.edn への登録はまだ。そのため murakumo-news の cadence は :active? false（消費者のいない tick を出さないため）。"
+   "MURAKUMO_CHAT_TOKEN_SECRET_2 は secrets-location-map が kagi にあると書いているが live vault に存在しない（no such item）。2026-07-29 に generation secret で起きたのと同型の乖離がもう 1 件。回避策として MURAKUMO_API_TOKEN_SECRET から mk1 token を mint し api.murakumo.cloud/v1/chat/completions を使った（murakumo.cloud/api/v1 は 401）。"
+   "murakumo-news の publisher seed は ~/.gftd/murakumo-news-aozora-identity.edn にしかない。yukkuri の先例（ADR-2607299960）に倣えば kagi へ移すべきで、まだ移していない。"
+   "ledger はローカルファイル（state/articles.ledger.edn、gitignore 済み）。kotobase の durable plane に載せる ref は未決定。まだ一度も kotobase に書いていないので CLAUDE.md の『最初の write の前に ref を決めよ』には違反していないが、載せる前に決める必要がある。"
+   "YouTube は未着手（オーナー指示により aozora で確認できるまで保留）。OAuth の所在も未確認。"
+   "arXiv abstract の rightsPolicy を fair-use-quote としたが、arXiv の license は投稿ごとに異なる。headline + link + 短い引用の範囲では足りるが、本文を長く引くなら per-article license が要る。"
+   "Blocks & Files と Hugging Face は description が空なので title だけで採点され、summary を持つソースより構造的に低く出る（実測: 1064 対 1700-2000 台）。本文取得はしていない。"
+   "The Register は section 別 feed が存在せず、両チャンネルが同じ全 section feed を読んで gate で仕分けている。gate の誤りは両チャンネルに同時に出る。"]
 
   :adr/body
   "# ADR-2608031500: 一次情報の取得層を実際に作る
@@ -175,6 +186,44 @@ keyword / url-hint gate が決める。
    transducer に対して `:channels` を引いて nil を返していた。テストは通り続けていた —
    nil channel は `for-channel` が「宣言なし = 全件」と解釈するため。**shadow は
    テストを黙って無意味にする。**
+
+## D7. 取得層から動画までを実際に通した（2026-08-03）
+
+brief → storyboard → render → mp4 → aozora publish を実データで 1 本通した。
+
+- **LLM**: `api.murakumo.cloud/v1/chat/completions`（mk1 token）。`murakumo.cloud/api/v1` は
+  401 で、その gate の secret（`MURAKUMO_CHAT_TOKEN_SECRET_2`）は secrets-location-map が
+  kagi にあると書いているのに **live vault に無かった**。総当たり列挙はせず、既知の別識別子
+  `MURAKUMO_API_TOKEN_SECRET` で 1 件だけ引いて mint した。
+- **storyboard**: brief の lead 見出しをそのまま topic に渡して 5 scene / en+ja。**flaky** —
+  3 attempts では validator に落ち、5 attempts で通った。
+- **mp4**: 570 frame / 19.0s / 1920x1080 h264。フレームを目視し、黒背景・ネオンの
+  タイトルカードとフローダイアグラムが出ていることを確認した（57 kbps と低いのは
+  意匠が疎なためで、単色板ではない — ADR-2607299960 の事故と同じ疑いを実際に潰した）。
+- **publish**: aozora が主・YouTube は syndication という dougaka-vector の設計どおり、
+  YouTube より先に aozora へ出した（オーナー指示「まず youtube に投稿する前に aozora.app に
+  投稿して確認できるようにして」）。読み戻して blob が sha256 完全一致することを確認。
+
+### dougaka-vector に入れた変更（1 repo が複数チャンネルを回すため）
+
+`--display-name` / `--description` を per-run にした。handle だけでは identity にならず、
+murakumo のニュースを dougaka-vector 名義の displayName/description で出すのは誤帰属になる。
+`--brief` で newsfeed の brief を受け、**投稿本文が lead の出典と URL を名乗り**、catalog
+record が全 citation と topic を持つ。`news-post-text` は **URL を絶対に切らない** —
+切れた URL は引用に見えて何も解決しないので、無いより悪い。尺が足りなければ題が先に譲る。
+
+## D8. aozora の creator-actors 登録は効かなかった（判断の誤り）
+
+投稿は PDS に実在するのに aozora.app/videos に出ないので、appview の
+`aozora.appview.creator-actors` に登録すれば見えるようになると考え、登録・テスト・deploy
+まで実行した（aozora-engine `5207381`、appview version `0b400483`）。
+
+**しかし appview worker の router はこの ns を参照していない。** 消費者は別 repo
+（aozora-appview）の SPA 側で、しかも ADR-2607071300 自身が「profiles work today with no
+server-side graph write」と書いているとおり、これはプロフィール描画の projection であって
+実 post を feed に載せる仕組みではない。データ追加として無害で tests も green だが、
+**目的は達成していない。** 実際の索引経路は PDS 側の `PER_ACTOR_DB=1` による
+`yoro-social-v2` への projection で、なぜ発火しなかったかは未特定（resume point）。
 
 ## Consequences
 
