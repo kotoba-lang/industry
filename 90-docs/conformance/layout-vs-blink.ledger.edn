@@ -63,3 +63,28 @@
               （stylesheet 経路は展開する。htmldom と cssom.core に同じ考えの実装が 2 つあり drift）"
              "cascade 軸: shorthand 展開が var() 置換より前に走るため padding: var(--pad) が展開されない"
              "htmldom: <p> が block-level 開始タグで自動閉じされない（geometry 残差にも出ている）"]}
+
+{:at "2026-08-04"
+ :iteration 29
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp
+          :note "Brave を oracle に復帰。--dump-dom は Brave 151 で完全に死んでおり（0 バイト・stderr 無し、
+                 --headless=old/new/素のいずれでも、--screenshot も不発）harness は毎回 Chrome へ
+                 fall through していた。CDP は正常に応答する。Brave と Chrome の CDP 出力は
+                 202/202 ブロックが byte-identical。full corpus の所要時間 79s → 12s。"}
+ :corpus {:cases 200}
+ :line-structure {:agree 184 :total 190 :pct 97}
+ :geometry {:boxes-agree 634 :boxes-total 719 :pct 88 :clean-cases 164}
+ :computed-style {:values-agree 8501 :values-total 9982 :pct 85 :no-cascade-attributed-mismatch 190}
+ :landed {:cssom ["3be3d3d33d91571d867d2e6ea2f37a09cb401989 — margin 伝播 / 入れ子リスト UA margin / select UA box（幾何 85%→88%, clean 160→164）"
+                  "30ea29b4889be406f33850018e5f562917a29f4e — CDP transport, UNMEASURED guard, --debug-geometry 修正"]}
+ :findings ["harness が計測 0 の軸を 0/0 = 0% として報告していた問題を修正（UNMEASURED + exit 3、ledger 追記なし）"
+            "--debug-geometry が :pass の case にしか boxes を添付しておらず、debug したい case で何も出さなかった"]
+ :remaining ["border-width を border-style 無しで honour している（Chrome は 0px に computed）。
+              cssom 側で直すと browser の 5 test が落ちるため cross-repo 変更が要る（margin agent が証拠付きで
+              node-style の :border-width にコメントとして残した）"
+             "fieldset/legend: legend の out-of-flow 配置は新しい layout 機構が要る"
+             "select の control font が 13 で Chrome は 13.3333。font の平均 advance を出す host hook が無い"
+             "inline style の margin/padding shorthand が longhand 展開されない（cascade 軸 41 値の 34）"
+             "shorthand 展開が var() 置換より前に走る（同 4 値）"
+             "htmldom: <p> が block-level 開始タグで自動閉じされない"
+             "WebGL/WebGPU host の retained/draw-ops 経路は theme を受け取らない（ページが暗色 chrome テーマで描かれる）"]}
