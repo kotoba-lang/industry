@@ -63,7 +63,14 @@
    ;; loop is not running, which is a fault. Collapsing the two would report
    ;; hundreds of healthy unexposed actors as broken, or a dead organism as
    ;; fine.
-   :vocabulary/execution-values #{:on-demand :resident :none}
+   ;; :per-repo-evidence added 2026-08-04 (ADR-2608040150). A prefix that is a
+   ;; KEY rather than a ROLE cannot carry one execution value — see the
+   ;; cloud-itonami-lei- rule, where 154 members are inert records and 31 are
+   ;; actors. Declaring one value for those would have been false for 154 or 31
+   ;; of them whichever way it went. The value means: read :repo/kind from
+   ;; manifest/repo-taxonomy.edn, which derives it from repo evidence
+   ;; (ADR-2607289600), and do not infer it from the name.
+   :vocabulary/execution-values #{:on-demand :resident :none :per-repo-evidence}
    :vocabulary/discriminator :prefix
    ;; Lifted verbatim from kotoba-lang/loop-ux-kaizen/resources/repository-rules.edn,
    ;; which originated the convention and remains its first example.
@@ -144,8 +151,8 @@
      ["network-awai/app-aozora" "network-awai/app-aozora-svelte"
       "network-awai/app-hyakka"]}
     ;; ── capability authorities (owner directive 2026-08-04,
-    ;;    ADR-2608040100) ─────────────────────────────────────────────
-    ;; 56 repositories carried this prefix before it was ever declared here —
+    ;;    ADR-2608040100 / ADR-2608040150) ────────────────────────────
+    ;; 57 repositories carried this prefix before it was ever declared here —
     ;; the same drift as app-, and the largest undeclared role family in the
     ;; workspace. The contract itself was already decided by ADR-2607289500
     ;; ("capability を 1 authority = 1 public repository に分離する"); only its
@@ -166,10 +173,29 @@
                 :hold-ambient-authority
                 :depend-on-a-provider]
      :authority "90-docs/adr/2607289500-kotoba-refactor-agent-handoff-and-capability-repo-cid.edn"
+     ;; This family does NOT declare through resources/repository-rules.edn.
+     ;; It was first recorded as a 57-repo declaration gap on that assumption;
+     ;; measuring it showed every one of the 57 already ships capability.edn,
+     ;; which states the same contract in a typed form the generic file cannot
+     ;; (definition CID, hash contract CID, imports, effects, default policy,
+     ;; provider status). Writing 57 generic declarations would have added a
+     ;; second, weaker source of truth for a contract that already had one.
+     :declaration-file "capability.edn"
+     :declaration-schema "kotoba.capability.repository.v1"
+     ;; Derivable, like the origin plane: the repository name is the capability
+     ;; id with '/' replaced by '-'. Holds for all 57 (measured 2026-08-04), so
+     ;; the check is an equality, not a heuristic.
+     :name-derivation {:from :capability/id
+                       :rule "capability- + (str/replace id \"/\" \"-\")"
+                       :example {"http/fetch" "capability-http-fetch"
+                                 "gpu/draw-frame" "capability-gpu-draw-frame"
+                                 "secret/use-scram-sha256" "capability-secret-use-scram-sha256"}}
+     :verified-by "nbb scripts/verify-repository-roles.cljs --capability-audit"
      ;; Recorded because it bears directly on how much the NAME is allowed to
      ;; mean: ADR-2607289500 decides that a repository name (and a Radicle RID)
      ;; is a discovery alias only, and that identity is the semantic definition
-     ;; CID. So `capability-http-fetch` is a search affordance, not a contract.
+     ;; CID. So `capability-http-fetch` is a search affordance, not a contract —
+     ;; the derivation above checks the affordance, never substitutes for the CID.
      :identity :semantic-definition-cid
      :examples ["capability-http-fetch" "capability-gpu-draw-frame"
                 "capability-identity-sign" "capability-ledger-append"]}
@@ -280,6 +306,33 @@
      :execution :on-demand
      :must [:answer-a-request] :must-not [:hold-a-loop]
      :examples ["cloud-itonami-hygiene-access"]}
+    ;; ── keyed by LEI, but NOT one role (measured 2026-08-04,
+    ;;    ADR-2608040150) ────────────────────────────────────────────────
+    ;; 185 repositories, the largest single unclassified block in the workspace.
+    ;; The obvious reading — "another code-keyed agent family, like assoc- and
+    ;; isic-" — is wrong, and the blueprint says so: an assoc- blueprint carries
+    ;; :itonami.blueprint/domain and :itonami.blueprint/governor, while a lei-
+    ;; blueprint carries :company/legal-name, :company/lei, :company/jurisdiction
+    ;; and :company/website. It is a legal-entity RECORD, not an actor spec.
+    ;;
+    ;; Cross-referencing manifest/repo-taxonomy.edn (evidence-derived, not name
+    ;; glob) settles it: of the 185, 154 are :repo/kind "organisation-record"
+    ;; and 31 are "actor". The prefix names what the repo is KEYED BY, not what
+    ;; it IS — so it gets no single :execution.
+    {:prefix "cloud-itonami-lei-"
+     :role :legal-entity-keyed
+     :execution :per-repo-evidence
+     :execution-source {:file "manifest/repo-taxonomy.edn"
+                        :attribute :repo/kind
+                        :measured-2026-08-04 {"organisation-record" 154 "actor" 31}
+                        :mapping {"organisation-record" :none "actor" :on-demand}}
+     :must [:declare-its-lei]
+     ;; No :must-not :hold-a-loop here. That claim is true of the records
+     ;; trivially and of the actors by the fleet's shape, but asserting it for a
+     ;; set this heterogeneous without measuring each would be governance
+     ;; theatre — the thing ADR-2607299000 exists to stop.
+     :examples ["cloud-itonami-lei-06btx5uwzd0gq5n5y745"]
+     :note "joins market-intel and cloud-itonami-lei datasets on :company/lei"}
     {:prefix "person-"
      :role :artificial-organism-actor
      ;; Resident and autonomous: it holds an operating identity, a mailbox and
@@ -384,7 +437,16 @@
    ;; a bare-name library wearing a costume, and it makes the prefix look like a
    ;; taxonomy when it is a single name.
    :vocabulary/rules
-   [{:family "kami-"     :count 96 :owner "kami-engine"
+   [;; The largest family in the workspace by an order of magnitude, and it was
+    ;; the last one anybody thought to declare — every rule written for it named
+    ;; a sub-prefix (isic- / assoc- / marketplace- / …) and none named the family
+    ;; those sub-prefixes hang off. Declaring it gives the ~200 members that
+    ;; match no role sub-prefix a correct plane instead of dropping them into
+    ;; subject, where a fleet actor plainly does not belong (ADR-2608040150).
+    {:family "cloud-itonami-" :count 1200 :owner "cloud-itonami"
+     :note "role sub-prefixes inside this family are declared in :name-prefix and
+            win by :plane-order; the family plane catches the remainder"}
+    {:family "kami-"     :count 96 :owner "kami-engine"
      :authority "90-docs/adr/2607102200-kami-render-stack-deps-authority-rename.edn"
      :note "the 3D stack; CLAUDE.md makes it mandatory for all 3D in the workspace"}
     {:family "kotoba-"   :count 32 :owner "kotoba"}
@@ -496,19 +558,23 @@
   {:gap/id :origin-domain-unverified
    :gap/measured-at "2026-08-04"
    :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
-   :gap/count 1333
+   :gap/count 1313
    :gap/of 1432
    :gap/note "origin-plane repos with no domain recorded in manifest/origin-domains.edn.
               Reported UNVERIFIED, never CONFORMANT. Not auto-populated from the
               name: deriving the domain from the prefix would assume exactly the
               answer the check exists to test, and would have silently blessed
-              all 77 misfilings below."}
+              all 94 misfilings below. Measured 2026-08-05: the repositories
+              carry no authority URL anywhere, so there is no in-repo evidence to
+              batch from — each needs an external lookup. The DNS sweep recorded
+              in origin-domains.edn narrows the worklist without asserting
+              anything (non-resolution is evidence; resolution is not)."}
 
   {:gap/id :origin-prefix-misfiled
    :gap/measured-at "2026-08-04"
    :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
-   :gap/count 77
-   :gap/of 99
+   :gap/count 94
+   :gap/of 119
    :gap/note "Of the 99 origin-plane repos whose authority domain has been looked
               up, 77 do not start with the prefix their domain derives. Not a
               failure and not scheduled for rename: a repository name is a
@@ -541,25 +607,77 @@
               competing bodies. Each needs an owner decision (move to the subject
               plane, or pick an authority). Candidates in origin-domains.edn."}
 
+  ;; RESOLVED 2026-08-04 — kept rather than deleted because the way it was wrong
+  ;; is the lesson. It was recorded as "56 repos ship no
+  ;; resources/repository-rules.edn", which was true and irrelevant: measuring
+  ;; instead of assuming showed all 57 already ship capability.edn, declaring the
+  ;; same contract in a typed form. Acting on the gap as first written would have
+  ;; created 57 redundant files and a second source of truth. The fix was to
+  ;; point the rule at the declaration that already existed and check it.
   {:gap/id :capability-declaration-missing
+   :gap/status :resolved-as-misdiagnosed
    :gap/measured-at "2026-08-04"
-   :gap/count 56
-   :gap/note "capability-* repos now have a declared prefix rule, but none ships
-              resources/repository-rules.edn stating which contract it claims.
-              Same shape as :name-prefix-declaration-missing, at 14x the size."}
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --capability-audit"
+   :gap/finding {:repos-in-west 57
+                 :checked 57
+                 :ship-capability-edn 57
+                 :schema-conformant 57
+                 :name-derives-from-capability-id 57
+                 :definition-cid-pinned 57
+                 :hash-contract-cid-pinned 57
+                 :repository-field-matches 57
+                 :violations 0}
+   :gap/note "50 verified from local checkouts, 7 fetched from GitHub (public).
+              Zero violations. The capability- plane is fully conformant and is
+              now the only role family with a machine-checked name derivation."}
 
+  ;; RESOLVED 2026-08-04 (ADR-2608040150) for 185 of 196; 11 remain below.
   {:gap/id :role-prefix-outside-every-declared-rule
+   :gap/status :mostly-resolved
+   :gap/measured-at "2026-08-04"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit + manifest/repo-taxonomy.edn"
+   :gap/was 196
+   :gap/now 11
+   :gap/resolution "185 are cloud-itonami-lei-*, now declared. The evidence
+              refused the obvious reading: a lei- blueprint carries :company/*
+              fields, not :itonami.blueprint/domain + :governor like assoc-, and
+              repo-taxonomy splits the 185 into 154 organisation-record + 31
+              actor. So the prefix is a KEY, not a role, and it is declared with
+              :execution :per-repo-evidence rather than a fabricated single
+              value. Separately, cloud-itonami- itself is now declared as a
+              product family, which is what the remainder hangs off."
+   ;; Deliberately not folded into the lei- rule: these share no sub-prefix and
+   ;; repo-taxonomy says they are not one kind either. Each needs its own
+   ;; decision, which is cloud-itonami's to make.
+   :gap/remaining
+   [{:repo "cloud-itonami/cloud-itonami-app" :repo-kind "lib"}
+    {:repo "cloud-itonami/cloud-itonami-licensed-operator" :repo-kind "lib"}
+    {:repo "cloud-itonami/cloud-itonami-pooled-incidence" :repo-kind "lib"}
+    {:repo "cloud-itonami/cloud-itonami-regulatory-tracker" :repo-kind "lib"}
+    {:repo "cloud-itonami/cloud-itonami-response-benchmark" :repo-kind "lib"}
+    {:repo "cloud-itonami/cloud-itonami-rirekisho" :repo-kind "lib"}
+    {:repo "cloud-itonami/cloud-itonami-card-issuing" :repo-kind "actor"}
+    {:repo "cloud-itonami/cloud-itonami-emi" :repo-kind "actor"}
+    {:repo "cloud-itonami/cloud-itonami-pi" :repo-kind "actor"}
+    {:repo "cloud-itonami/cloud-itonami-translation" :repo-kind "actor"}
+    {:repo "cloud-itonami/cloud-itonami-gtm-data" :repo-kind :absent-from-taxonomy
+     :note "not checked out locally and carries no taxonomy row — unknown, not lib"}]
+   :gap/note "They now land on the family plane rather than subject, which is
+              correct but not specific. The 4 actors arguably want a role
+              sub-prefix; the 6 libs arguably want none at all."}
+
+  {:gap/id :undeclared-family-candidates
    :gap/measured-at "2026-08-04"
    :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
-   :gap/count 204
-   :gap/note "cloud-itonami-* repositories that carry the fleet's family prefix but
-              match none of the declared role sub-prefixes (isic-/isco-/iso3166-/
-              municipality-/assoc-/marketplace-/commitment-/cofog-/unspsc-/gtin-/
-              jsic-/crowdfunding-/partners/esim/hygiene-). Examples:
-              cloud-itonami-app, cloud-itonami-card-issuing, cloud-itonami-emi.
-              They fall through to the subject plane, which is wrong for a fleet
-              actor. Classifying them is a cloud-itonami decision, not a naming
-              one, so it is recorded here rather than guessed."}
+   :gap/count 17
+   :gap/note "Head tokens used by >=3 subject-plane repos in orgs other than
+              kotoba-lang and cloud-itonami — open- 17, ghosthacker- 13, ai- 10,
+              gftd- 8, cloud- 8, oil- 7, business- 5, dougaka-/artifact-/
+              murakumo-/club-/aozora-/weight- 4 each, bpmn-/face-/local-/sdk- 3
+              each. Whether each is a real family (one owner, ships as a set) or
+              a coincidence of vocabulary is an org-level question. Listed so the
+              count is visible rather than absorbed silently into subject —
+              exactly how kami- reached 96 undeclared."}
 
   {:gap/id :forbidden-suffix-still-registered
    :gap/measured-at "2026-07-29"

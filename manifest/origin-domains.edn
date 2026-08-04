@@ -181,7 +181,32 @@
   ;; it: BSI's domain is bsigroup.com, so the derived prefix is com-bsigroup and
   ;; the repo is misfiled on the SECOND label while the TLD was never in doubt.
   ;; Left here as the demonstration that the plane is the whole prefix.
-  "kotoba-lang/com-bsi-standards"  "bsigroup.com"}
+  "kotoba-lang/com-bsi-standards"  "bsigroup.com"
+
+  ;; ── second batch, 2026-08-05: found by DNS sweep, not by reading names ──
+  ;; Method: for all 1,054 com-* repos, test whether the first label resolves as
+  ;; <label>.com. 1,029 do; 25 do not. Non-resolution is a real signal that the
+  ;; naive reading is wrong; RESOLUTION IS NOT a signal that it is right (yang.com
+  ;; resolves and says nothing about com-yang-ming-api), so only the 25 were
+  ;; pursued and the other 1,029 stay UNVERIFIED. 5 were already recorded above;
+  ;; these are the 20 new ones, minus 3 moved to :unresolvable.
+  "kotoba-lang/com-accelbyte"          "accelbyte.io"
+  "kotoba-lang/com-acorrd-standards"   "acord.org"
+  "kotoba-lang/com-b-pipe"             "bloomberg.com"
+  "kotoba-lang/com-billcom"            "bill.com"
+  "kotoba-lang/com-boschiot"           "bosch.com"
+  "kotoba-lang/com-d-wave"             "dwavesys.com"
+  "kotoba-lang/com-e-residency"        "gov.ee"
+  "kotoba-lang/com-epiconlineservices" "epicgames.com"
+  "kotoba-lang/com-feishu"             "feishu.cn"
+  "kotoba-lang/com-helion-energy"      "helionenergy.com"
+  "kotoba-lang/com-idnow"              "idnow.io"
+  "kotoba-lang/com-navblue"            "navblue.aero"
+  "kotoba-lang/com-omop-cdm"           "ohdsi.org"
+  "kotoba-lang/com-pix-brazil"         "bcb.gov.br"
+  "kotoba-lang/com-scaleai"            "scale.com"
+  "kotoba-lang/com-tensorrt"           "nvidia.com"
+  "kotoba-lang/com-zendesksell"        "zendesk.com"}
 
  ;; ── unresolvable ───────────────────────────────────────────────────────
  ;; Names that carry an origin prefix but have no single authority domain to
@@ -200,7 +225,29 @@
    :candidates ["census.gov" "osha.gov"]}
   {:repo "kotoba-lang/com-gb-standards"
    :why "Chinese GB standards moved between SAC and SAMR"
-   :candidates ["sac.gov.cn" "samr.gov.cn"]}]
+   :candidates ["sac.gov.cn" "samr.gov.cn"]}
+  ;; From the 2026-08-05 DNS sweep: the first label does not resolve as a .com,
+  ;; and looking further found no publishing authority either.
+  {:repo "kotoba-lang/com-chatdev"
+   :why "a research project (OpenBMB), distributed as a GitHub repo with no
+         authority domain of its own"
+   :candidates []}
+  {:repo "kotoba-lang/com-cobot-assembly"
+   :why "a manufacturing practice, not a specification anyone publishes"
+   :candidates []}
+  {:repo "kotoba-lang/com-serdes-phy"
+   :why "a circuit block; the relevant specs sit under several bodies (OIF,
+         JEDEC, IEEE) with no single owner for the subject as named"
+   :candidates ["oiforum.com" "jedec.org" "ieee.org"]}]
+
+ ;; ── same-plane duplicates found by the sweep ───────────────────────────
+ ;; Forbidden by repository-rules.edn :same-plane-collision. Recorded here
+ ;; because the DNS sweep is what surfaced them: two names, one authority.
+ :same-plane-duplicates
+ [{:authority "epicgames.com"
+   :repos ["kotoba-lang/com-epic-online-services" "kotoba-lang/com-epiconlineservices"]
+   :note "the same product under two spellings of the same words; one is a
+          duplicate registration, not a second subject"}]
 
  ;; ── domain migration ───────────────────────────────────────────────────
  ;; The rule pins the domain AS OF REGISTRATION and does not chase a move.
@@ -223,22 +270,48 @@
  ;; Stated so a reader never mistakes this file for a census. The verifier
  ;; prints these counts on every run.
  :coverage
- {:measured-at "2026-08-04"
+ {:measured-at "2026-08-05"
   :measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
-  :workspace {:repos 4078 :origin-plane 1432 :unverified 1333}
-  :kotoba-lang {:repos 1995 :origin-plane 1193 :unverified 1094}
-  :recorded-here 95
+  :workspace {:repos 4078 :origin-plane 1432 :unverified 1313}
+  :recorded-here 112
   :anchors 18
   :conformant 18
-  :misfiled 77
-  :unresolvable 4
-  :note "1,333 origin-plane repositories have no domain recorded. They are
-         reported UNVERIFIED, not CONFORMANT. Filling them in is mechanical but
-         is 1,333 lookups; it is deliberately left as a stated gap rather than
+  :misfiled 94
+  :unresolvable 7
+  :note "1,313 origin-plane repositories have no domain recorded. They are
+         reported UNVERIFIED, not CONFORMANT. It is deliberately not
          auto-populated from the name, which would assume the answer the check
          exists to test."
   :honest-reading "conformant=18 does NOT mean 18 of 1,432 names are right. It
-                   means 18 have been CHECKED and passed. The 77 misfiled were
-                   found by looking, and the same rate applied to the unverified
-                   remainder would predict far more — which is the argument for
-                   filling the file in, not for treating the count as a score."}}
+                   means 18 have been CHECKED and passed. Every misfiling here
+                   was found by looking; none was found by counting."
+  ;; Why the remaining 1,313 cannot simply be batched: the repositories carry no
+  ;; authority URL anywhere (measured — READMEs name the vendor in prose and link
+  ;; nothing but github.com), so there is no in-repo evidence to extract. Each
+  ;; needs an external lookup. What CAN be done mechanically is narrow the
+  ;; worklist, which is what the DNS sweep below does.
+  :why-not-batched :no-authority-url-inside-the-repositories}
+
+ ;; ── DNS sweep, 2026-08-05 ──────────────────────────────────────────────
+ ;; A way to find candidates without asserting anything: for each com-* repo,
+ ;; test whether its first label resolves as <label>.com.
+ ;;
+ ;; The asymmetry is the whole point. NON-resolution proves the naive reading is
+ ;; wrong. RESOLUTION proves nothing — yang.com resolves and tells you nothing
+ ;; about com-yang-ming-api — so the 1,029 that resolved were left UNVERIFIED
+ ;; rather than quietly marked conformant.
+ :dns-sweep
+ {:date "2026-08-05"
+  :method "dig +short NS <first-label>.com over all com-* repos"
+  :tested 1054
+  :resolved 1029
+  :did-not-resolve 25
+  :already-recorded 5
+  :pursued 20
+  :outcome {:recorded-as-misfiled 17 :moved-to-unresolvable 3 :conformant 0}
+  :hit-rate "17 of 17 pursued-and-resolvable turned out misfiled"
+  :note "Non-resolution was a perfect predictor here, which says the sweep found
+         a genuine seam and not that 1,029 names are fine. Examples it caught:
+         com-acorrd-standards (ACORD, and misspelled), com-b-pipe (Bloomberg
+         B-PIPE), com-tensorrt (NVIDIA), com-pix-brazil (Banco Central do
+         Brasil), com-omop-cdm (OHDSI)."}}
