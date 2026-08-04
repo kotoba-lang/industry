@@ -72,15 +72,33 @@
       これが測定上の最大の損失。"
 
   :adr/consequences
-  "A を採る場合に測っておくべき代償（**未計測、着手前に測ること**）:
+  "A を採る場合の代償:
 
-   1. **DOM op 数の増加。** apply-cascade は `:style/*` を document ノードの属性として
-      書き、kotoba-lang/browser の session はそれを `:dom/set-attr` op として host に
-      送る。比較対象の property は 14 個あり、全要素がそのうち数個〜十数個を UA 由来で
-      得ることになる。**要素数 × 追加属性数だけ op が増える**ので、実測してから決める。
-      緩和案: UA 由来の値を別の namespace（例 `:ua/*`）に書き、computed-style が
-      author 値 → UA 値の順に解決する。op には出さない。ただしこれは A の『単一の真実』を
-      半分に戻すので、計測結果次第。
+   1. **DOM op 数の増加 —— 実測済み（2026-08-04）。当初『未計測、着手前に測ること』と
+      していた項目を測った。結論: 代償は当初の見積もりより 1 桁小さい。**
+
+      Brave で 46 タグについて『UA 既定値が initial と異なる property は何個か』を
+      直接測った（bare span を initial の代理とし、td/tr/li 等は正しい親の中に置いて計測）:
+
+        平均 2.3 個/タグ（14 個ではない）
+        最大 7（th, button）、6（textarea, input）、5（td, h3）
+        0 個: span, label, img, br, a
+        p は 3（display, margin-top, margin-bottom）／div は 1（display のみ）／
+        td は 5（display + padding 四辺）
+
+      a が 0 なのは UA の青色が href を持つ場合にだけ掛かるためで、
+      UA 規則は tag だけでなく属性にも条件付きだという証拠でもある。
+
+      実ページでの op 増加（kotoba-lang/browser の load-html を実行して計測）:
+
+        smoke   要素  5 / 現 op 33 / UA 由来 13 → +39%
+        article 要素 17 / 現 op 63 / UA 由来 41 → +65%
+        form    要素  9 / 現 op 39 / UA 由来 26 → +67%
+
+      全 14 property を無条件に書けば +255〜400% になるが、initial と異なる値だけを
+      書けば +39〜67%。後者が正しい実装であり（initial 値を書くのは冗長）、
+      この範囲なら緩和案（:ua/* 別 namespace）を採らずに A をそのまま実装してよい、
+      というのが実測後の見解。ただし大きな文書での実測は未実施。
 
    2. **layout の挙動が変わりうる箇所。** node-style の連鎖は『author 値が無ければ UA』
       という単純な or ではなく、`ua-control-box` のように tag と type 属性に依存する
