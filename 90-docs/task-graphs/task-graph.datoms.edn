@@ -103,18 +103,20 @@
  {:db/id -8
   :task/id "S2-engi-resume"
   :task/workflow "torihiki-gap-closure"
-  :task/title "engi.replica に resume を足し、chain/by-hash/voted/committed/qcs を有界な tail から再開できるようにする"
+  :task/title "inga.replica に resume を足し、chain/by-hash/voted/committed/qcs を有界な tail から再開できるようにする"
   :task/kind "consensus"
   :task/repo "kotoba-lang/inga"
   :task/requires ["S1-torihiki-snapshot"]
   :task/external-gate false
-  :task/status :started
+  :task/status :completed
   :task/status-at "2026-08-04"
-  :task/status-note "**対象リポは engi ではなく inga。** loop 1 周目に engi を開いて replica.cljc が無いことで判明した: コンセンサス層は 2026-08-03 に kotoba-lang/inga へ移った（engi 1f83b16「Move the consensus layer to kotoba-lang/inga」/ ADR-2608038000 D1）。engi.{consensus,quorum,pacemaker,replica,sync,wire,net,attest,stake,parity} は inga.* になっている。engi 側の理由は自分の docstring —— どちらかのアプリを import する consensus 層は『ちょうど 1 アプリのための consensus 層』になる。
+  :task/status-note "kotoba-lang/inga 844ad1587001 — inga.replica に resume-tail(8) の snapshot / resume。**対象は engi ではなく inga**（コンセンサス層は 2026-08-03 に移動、engi 1f83b16 / ADR-2608038000 D1）。277 tests / 1,298 assertions、0 failures。parity digest は JVM と nbb で一致。lint errors 0。west pin 済み。
 
-  実装で決めたこと（次の周はここから）: (a) `commits` は `(count (:committed state))` で既済を数えており chain の truncate と両立しないので、**height 比較に変える**（`three-chain-commits` の結果から `committed-height` 超のものだけ取る）。これは truncate 抜きでも正しい定式化。(b) `:voted` は watermark `:voted-below` を足し、`(voted? state h)` = `(or (<= h below) (contains? voted h))` にする。**多めに『投票済み』とみなす方向は fail-closed で二重投票しない**が、replica.cljc:457 の『同じ height の proposal が再来したら記録済みの vote を再送する』経路は `:votes` の実体に依存するので、watermark 由来で true になったときに安全に劣化することを確かめる。(c) `:chain` / `:by-hash` は末尾 K 件（K>=8、three-chain-commits は 3 件要る）。`ancestor?` は by-hash が切れたら false を返す＝投票を拒否する fail-closed。(d) `:votes` / `:new-views` / `:first-vote` は resume で捨てる（古い height の equivocation 証拠を失うことは明記する）。
+  投票安全性: :voted の集合を watermark :voted-below（= tip height）に置き換え、`voted?` はそれ以下なら true。**watermark は『投票済み』と答える回数を増やす方向にしか効かない fail-closed** で、resume した replica が tip 以下で投票する必要は原理的に無い。test/inga/resume_test.cljc は実装より先に書き、replica が持つ全ブロックを本人に差し戻して出ていく票を照合する。
 
-  **テストを先に書く**: resume 後に同じ height で二度投票しないこと。境界を 1 つ間違えると、このシステムが唯一 slash する行為を事故で自分に犯す。"}
+  途中で 1 件落ちたが、落ちていたのは**テストの基準の方**だった: replay に末尾 8 件だけ渡すと最初のブロックが genesis を extend せず replica が genesis のまま止まるので基準になっていなかった。全履歴 replay に直したら、resume の票は replica.cljc が height 225 の行き詰まりのために入れた『自分の tip への同じ票の再送』経路だった。
+
+  副作用 2 つ: (1) `commits` を count 比較から height 比較へ —— tail の上では count が list を超え drop が空を返し、**replica は二度と commit しないのに数値は健康に見える**。(2) `:first-vote` を捨てるので tail より下の equivocation 証拠が消える（broadcast 済みは peer が持つ、未 broadcast は失われる）。"}
 
  {:db/id -15
   :task/id "S2b-node-engi-to-inga"
@@ -124,8 +126,15 @@
   :task/repo "kotoba-lang/torihiki-node"
   :task/requires ["S2-engi-resume"]
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "loop 1 周目に判明した新しい gap。**deployed validator は engi@d9c531bd（コンセンサス層が inga へ移る前の commit）を pin している。** その sha は main の祖先だが、main にはもう replica.cljc が無い —— つまり本番は『もう存在しない場所のコード』で動いている。S2 の resume は inga に入るので、node がそこへ移らない限り届かない。ns も engi.* から inga.* へ、block の属性名も :engi.block/* から :inga.block/* へ変わる点に注意。"}
+  :task/status :completed
+  :task/status-at "2026-08-04"
+  :task/status-note "kotoba-lang/torihiki-node b437c2b62505 — engi.* → inga.*、:engi.block/* → :inga.block/*、deps を inga@844ad15 へ。validator 69 files / worker 61 files、どちらも 0 warnings。code-version 78→79 で deploy 済み、4 replica とも inga の上で合意している（height 25-27 / committed 23-25 / equivocators []）。west pin 済み。
+
+  **chain-id \"torihiki-engi-devnet-1\" は変えていない。** 変えたくなる名前だが chain id は domain separation で、全ての vote と transaction envelope がそれに署名している。変えれば既存署名が全部無効になり replica が自分の履歴から切り離される。ライブラリではなくチェーンの名前。理由を docstring に凍結した。
+
+  **deploy が catch-up の嵐を起こし、chain を wipe して戻した（正直に記録）。** deploy は 4 replica 全部を evict し、全員が 2033 ブロックの再生を始めたが、resume が boot に配線されていない（S3 未了）ため 25 ブロック/invocation では追いつく前に reset され、w1 は 449 → 124 と後退した。/wipe で 4 replica × 2,035 キーを排出し genesis から再開させて復旧。**S3 が要る理由の実証そのもの** —— コード入れ替えのたびに devnet を捨てる運用は成立しない。
+
+  元の起票内容: 移動前 engi の pin により、deployed validator は『もう存在しない場所のコード』で動いていた。**deployed validator は engi@d9c531bd（コンセンサス層が inga へ移る前の commit）を pin している。** その sha は main の祖先だが、main にはもう replica.cljc が無い —— つまり本番は『もう存在しない場所のコード』で動いている。S2 の resume は inga に入るので、node がそこへ移らない限り届かない。ns も engi.* から inga.* へ、block の属性名も :engi.block/* から :inga.block/* へ変わる点に注意。"}
 
  {:db/id -9
   :task/id "S3-validator-snapshot-boot"

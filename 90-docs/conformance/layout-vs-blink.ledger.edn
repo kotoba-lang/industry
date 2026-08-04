@@ -395,3 +395,163 @@
  :process-note "Brave が 1 回 CDP で応答せず Chrome へ fall through した（同一エンジンなので数値は同じ）。
                 原因は並行 agent 実行による Brave プロセスの滞留 8 個。再実行で Brave に戻り 115/122 を再現。
                 harness に CDP の 1 回リトライを入れるのが follow-up。"}
+
+{:at "2026-08-04"
+ :iteration 37
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :parser-tree-shape {:agree 118 :total 122 :pct 97 :was "115/122 (94%)" :comment "4/4"}
+ :line-structure {:agree 249 :total 280 :pct 89}
+ :geometry {:boxes-agree 952 :boxes-total 1142 :pct 83}
+ :paint-order {:points-agree 6968 :points-total 7285 :pct 96}
+ :computed-style {:values-agree 13845 :values-total 15956 :pct 87}
+ :landed {:htmldom "5d6677442d32a0679770b9695f33048b7c61e9b0 — comment を実ノードにする"}
+ :note "dom-gpu の comment node type（同日着地）を配線して cross-repo な gap を閉じた。
+        捨てるのは中立ではなく、前後のテキストが 1 ノードに併合される —— 欠けていたのは
+        ノードだけでなく text 構造。harness は dom/comment-tree（DOM 視点）を読むよう変更。
+        層を跨ぐ確認: cssom の 4 軸すべて不変（comment は layout 視点に現れない）、
+        cascade が comment に style を書かないことも直接確認、browser 752 tests 0 failures。"
+ :remaining ["parser 残り 4 件は稀な挙動のみ（</br>, a-in-a, body in flow, &notit;）"
+             "cssom: flex / float（agent 2 体が作業中）、grid、display: table/contents/flow-root、
+              table-layout: fixed、inline 系の細部、cascade の UA stylesheet 所在"]}
+
+{:at "2026-08-04"
+ :iteration 37
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 292}
+ :line-structure {:agree 255 :total 280 :pct 91 :was "249/280 (89%)"}
+ :geometry {:boxes-agree 981 :boxes-total 1142 :pct 86 :clean-cases 220 :was "952/1142 (83%), 207/292"}
+ :paint-order {:points-agree 6978 :points-total 7285 :pct 96 :clean-cases 239}
+ :computed-style {:values-agree 13845 :values-total 15956 :pct 87}
+ :landed {:cssom "3cace9bf8d1110049ad551eda2a078a688bd160a — flex の既定以外を実装"}
+ :note "**:flex/* 28 件が両レイアウト軸で全て clean**、幾何残差に flex は 1 件も残っていない。
+        base commit との per-case 差分で 12 改善・0 退行。実装: order（描画順も含めて並べ替え）/
+        align-self（offset と stretch の両方）/ row-reverse・column-reverse（主軸サイズについて反射
+        させることで justify-content も同時に正しくなる）/ wrap-reverse / display: inline-flex /
+        flex shorthand（cssom.core で宣言 parse 時に展開。flex: 1 は 1 1 0% であって flex-grow: 1 ではない）/
+        flex-basis / shrink の実リサイズ / §9.7 の freeze-and-redistribute による min-content 下限 /
+        align-items: baseline / align-content / 主軸の auto margin / column コンテナの寸法決定。
+        いずれも実装前に Brave で probe している（corpus に無い形は cdp_dump 経由の probe ページ）。"
+ :upstream-race "作業中に upstream が動いた（paint order 軸 b9c29f8）。**rebase せず** main を branch に
+                 merge して全検証をやり直し、その後 server-side merge。"
+ :remaining ["flex-basis: content、flex ループ内の max clamp、column の主軸 grow/shrink、
+              inline-grid（layout-grid に shrink-to-fit 枝が無いので入れると文中に全幅 box が出る）、
+              交差軸の auto margin、wrap-reverse 下の last baseline —— いずれも該当関数にコメントで明記"
+             "float（agent 作業中）、grid の flow/gap/alignment、display: table/contents/flow-root、
+              table-layout: fixed、inline 系の細部、cascade の UA stylesheet 所在"
+             "conformance/README.md の『Result — 2026-08-04』は旧数値のまま（並行作業の衝突を避けて
+              意図的に触っていない）。全部着地したら 1 回更新する。"]}
+
+{:at "2026-08-04"
+ :iteration 37
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 292}
+ :line-structure {:agree 263 :total 280 :pct 94 :was "255/280 (91%)"}
+ :geometry {:boxes-agree 995 :boxes-total 1142 :pct 87 :clean-cases 228 :was "981/1142 (86%), 220/292"}
+ :paint-order {:points-agree 7006 :points-total 7285 :pct 96 :clean-cases 244}
+ :computed-style {:values-agree 13845 :values-total 15956 :pct 87}
+ :landed {:cssom "ecd1fddf712540d1ed7216b8dee4c6f7ff960bb3 — float の band 化（stack / margin / clear / BFC 包含 / escape 伝播）"}
+ :note "float 群 9/13 → **13/13**。8 case が red→green、逆は 0。v1 の band（コンテナ上端に固定した
+        1 個の矩形）を、置かれた float の **margin box のリスト** + 3 つの純関数
+        （float-band / float-clearance-y / place-float、CSS 9.5.1）に置き換えた。"
+ :findings ["**包含と margin collapse は別の問いだった。** 1 つの fc-free? が両方を担っており、
+             border-width は collapse を止めるが BFC を作らない、display: flow-root はどちらの
+             リストにも無い、という取り違えがあった。分離が flow-root の case を直した ——
+             旧コードは float を無条件に包含していたので、その case は**偶然通っていた**。"
+            "**float は inline のグループ化に対して透明でなければならない** —— 行 box に加わらないだけでなく
+             行を**分断してもいけない**。inline-runs の分割から持ち上げ、後続兄弟が入った entry の
+             直前に差し戻す。"
+            "**包含されなかった float は上へ昇る**（:float/escaped を collapsed margin と同じ経路で伝播）。
+             最初の実装は直接の float 子しか見ておらず、overflow:hidden が float の親でないときに
+             clearfix が壊れた。**これを捕まえたのは paint order 軸だけ** —— 幾何は満足しており、
+             その case の 25 個の sample 点が全て何にも当たっていなかった。"
+            "**:page/hero-with-floated-image は engine でなく harness の欠陥だった。** engine の 3 行は
+             正しく、engine-lines の『置換 box の内側か』判定が右下端を**含んで**いたため、x=80 の
+             テキストが 80px の float <img> の内側と見なされ全行が破棄されていた。半開区間に直すと
+             :page/article-with-figure と :page/login-form も直った —— 1 case 限定の細工でなく
+             本物の proxy バグだった証拠。"]
+ :remaining ["band は自分のコンテナの行 box にしか届かない（block **子孫**の行は全幅のまま）。
+              geometry が比較する border box は両方とも正しく、代償は wrap 位置。test で固定済み。"
+             "float-band は行の**上端 scanline** で問い合わせる（layout-inline-run が run 単位で
+              1 つの幅しか取らないため）"
+             "昇った float の隣にある**単独 inline** 子は narrow されない"
+             "clearance が対象 box 自身の margin collapse を抑止しない"
+             "残り 17 case: grid 4 / display 型 3 / absolute 3 / table 2 / text 2 / fixed 1 / button 1 / media-object 1"]}
+
+{:at "2026-08-04"
+ :iteration 38
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 292}
+ :line-structure {:agree 265 :total 280 :pct 95 :was "263/280 (94%)"}
+ :geometry {:boxes-agree 995 :boxes-total 1142 :pct 87 :clean-cases 228}
+ :paint-order {:points-agree 7006 :points-total 7285 :pct 96}
+ :computed-style {:values-agree 13845 :values-total 15956 :pct 87}
+ :landed {:cssom "afbffe43f849c815b67fd3a40ed942b3d0564368 — 語内改行を計測できるようにする"}
+ :note "**エンジンの欠陥ではなく計測の欠陥だった。** 行構造軸は 1 語 = 1 bounding rect で測っており、
+        語が行をまたぐと rect が全行にまたがるため語内改行が原理的に見えなかった。
+        ブラウザと同じ位置で分割していたエンジンが『行数が多い』として誤りと採点されていた。
+        Brave 実測: 90px の箱の `short aaaa...` は 20px 刻みで 3 つの client rect を返す。
+        複数 rect を持つ語だけ 1 文字ずつ測って top でグループ化する。
+        **途中で私自身が誤った推論をした**: 84px の rect を 8.4px/char と仮定して
+        『Brave は 10 文字、engine は 12 文字』と述べたが、実際の advance は 7px で
+        Brave も 12 文字。エンジンは最初から正しかった。"
+ :remaining ["grid（agent 作業中）、display: table/contents/flow-root と table-layout: fixed（agent 作業中）"
+             "absolute 3 件（positioned な祖先が無い / offset 無しの静的位置 / relative な inline が包含ブロック）"
+             "fixed がフローから抜けない、button の nested inline、media-object"
+             "cascade の UA stylesheet 所在（構造的）"]}
+
+{:at "2026-08-04"
+ :iteration 39
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 299 :was 292 :added 7 :area "stacking"}
+ :line-structure {:agree 271 :total 287 :pct 94}
+ :geometry {:boxes-agree 1015 :boxes-total 1164 :pct 87 :clean-cases 234}
+ :paint-order {:points-agree 7174 :points-total 7455 :pct 96 :clean-cases 250}
+ :computed-style {:values-agree 14120 :values-total 16264 :pct 87}
+ :landed {:cssom "c9fff52ae0be9f4531b332427952ce3cbdb72191 — stacking case 4 → 11"}
+ :note "paint order 軸が着地した時点で stacking case は 4 件しか無く、あの軸は主に
+        **別の主題を持つ case の偶発的な重なり**を測っていた。意図的な 7 件を追加。
+        6 件 pass、**1 件が本物の発散**（:stacking/positioned-covers-later-flow-content:
+        absolute な box が後続の in-flow 内容より前に現れるべきところで後ろに来る。
+        :position/absolute-static-position-no-offsets と同根）。"
+ :investigated-not-landed
+ "out-of-flow の静的位置（absolute な子が『もし in-flow だったら置かれた y』を保つ）を調べたが、
+  layout-children-block / partition-flow への侵襲的な変更が要り、**grid と display 型の agent が
+  同じファイルを編集中**だったため着手しなかった。原因は特定済み:
+  (1) 静的位置が失われコンテナの content 原点に落ちる、
+  (2) inline-level-element? が position: static を要求するため **position: relative な inline が
+      block 化される**（relative の最も一般的な用途である『absolute な子の錨』が壊れる）。
+  次 iteration で専任 agent に渡す。"
+ :remaining ["grid（agent 作業中）、display: table/contents/flow-root + table-layout: fixed（agent 作業中）"
+             "out-of-flow の静的位置と relative inline の包含ブロック（上記、原因特定済み）"
+             "fixed がフローから抜けない、button の nested inline、media-object"
+             "cascade の UA stylesheet 所在（構造的）"]}
+
+{:at "2026-08-04"
+ :iteration 39
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 313 :was 299 :added 14 :area "grid"}
+ :line-structure {:agree 289 :total 301 :pct 96 :was "271/287 (94%)"}
+ :geometry {:boxes-agree 1086 :boxes-total 1214 :pct 89 :clean-cases 256 :was "1015/1164 (87%), 234"}
+ :paint-order {:points-agree 7539 :points-total 7805 :pct 97 :clean-cases 265}
+ :computed-style {:values-agree 14782 :values-total 16964 :pct 87}
+ :landed {:cssom "21e2ad01159e38d851d1d136ff5fa7462af1598e — grid の auto トラック / auto-flow: column / gap longhand / justify-items / inline-grid"}
+ :note "grid 群 **37/37（136/136 box）**。per-case 幾何で **22 改善・0 退行**。
+        実装前に Brave で 3 ラウンド・72 形を probe している。"
+ :findings ["**auto トラックの余りは比例配分ではなく均等配分。** 400px で `short` / `a much longer cell` は
+             148.156 / 251.844 = 各トラックの max-content + 213px の余りの半分。比例なら 85/315 で、
+             **どちらも合計 400 になる**ので『コンテナを満たすか』の検査では区別できない。
+             実測しなければ通ってしまう類の誤り。"
+            "**fr があると stretch 段が抑止される。** `auto 1fr` は auto を max-content 41.625 のまま残すが、
+             `auto 100px` は 300 まで伸ばす。"
+            "auto-flow: column は placement 要求を転置して入れ、結果を転置して戻す —— 配置エンジンは 1 つ。"
+            "**row が確定している item が auto 配置カーソルを動かしていた**（CSS Grid §8.5 の step 4 は
+             column 確定または完全 auto の item しか見ない）。:grid/explicit-row-placement の原因。"
+            "inline-grid は layout-grid に shrink-to-fit 枝（トラックの max-content 合計 + gap）を
+             与えてから admit した —— flex agent が『shrink-to-fit が無いから入れない』と留保した
+             理由を解消してから入れており、単に違う挙動にしたのではない。"]
+ :remaining ["justify-content / align-content（コンテナ側）は未実装。node-style が :justify-content を
+              \"flex-start\" 既定にするため、著者の start と既定を区別できず『半分だけ実装』は
+              無実装より悪くなるという判断で見送り —— 実測付きで記録済み。"
+             "row flow での暗黙 column 生成、span する item の intrinsic 寄与、
+              min-content/max-content/fit-content() キーワード、gap と longhand の宣言順"
+             "display 型 + table（agent 作業中）、out-of-flow の静的位置と relative inline（原因特定済み）"]}

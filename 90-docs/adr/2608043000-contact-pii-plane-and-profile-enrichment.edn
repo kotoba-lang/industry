@@ -94,11 +94,36 @@ owner 決定ではない、と明記）。
 別途 Deutsche Bahn AG 単体で電話 `+49 30 2970` と `HRB 83` を取得（bahn.de/impressum、
 JSON-LD が無いので `tel:` href と本文から）。
 
-**代表者の positive な実績はまだゼロである。** 抽出器は実装され、後述の false positive を
-正しく拒否することは確認したが、「正しく1件取れた」ことはまだ示せていない。母集団が
-Anglo-American の上場企業中心で、Impressum 型の代表者開示を持たないため。DE/AT/CH と
-日本のサイトで発火するはずだが、日本語 3 社（東京瓦斯・中部電力・KDDI）では会社概要
-ページに到達できず 0 件だった。**「実装した」と「動いている」を混同しないこと。**
+**この「代表者 0 件」は当初、母集団の性質（Anglo-American の上場企業は Impressum 型の
+開示を持たない）だと書いた。それは誤りだった。バグである。** 同日中に判明し、本節は
+書き換えてある —— 経緯は git log が持つ。
+
+原因は Unicode property escape（p{L} / p{N} / p{Script=Han} 系）。JavaScript はこれを
+`u` フラグ付きでしか解釈せず、ClojureScript の正規表現リテラルはそのフラグを設定できない。
+結果、「Unicode 文字以外」を表すつもりの否定文字クラスが
+**普通の文字を削る文字クラスに退化**し、normalise-entity が会社名をほぼ空文字にし、
+entity-matches? が**自分自身と比較しても nil** を返していた。抽出器は原理的に何も
+出せない状態だった。name-like? の CJK 分岐も同じ理由で死んでおり、日本企業が 1 件も
+出なかったのもこれである。
+
+**測定値のゼロを、測定対象についての発見として読んではならなかった。** 0 が出たときに
+最初に疑うべきは母集団ではなく計器の方だった、というのが本 ADR で最も高くついた教訓。
+
+修正後、**両方向で実証済み**（2026-08-04、`--url` debug mode）:
+`bahn.de/impressum` に対し `DB Fernverkehr AG` として **4 名**（氏名・役職・根拠ラベル）、
+`Deutsche Bahn AG` として **0 名**（gate false）。
+
+同時に見つかった 2 つ:
+- **`HOME` が解決されていなかった**（`(.-env.HOME js/process)` が literal `~/…` を返す）。
+  `read-record` が毎回失敗して nil を返し、**age が毎回新しい annex object を作るのを
+  防ぐための「復号して比較」段が一度も動いていなかった。**
+- ピリオド全面禁止が `Dr. Michael Peterson` を落としていた。略号の中のピリオドだけ
+  許すよう変更（ドイツの役員名簿を大量に取りこぼす）。
+
+なお `--limit 60` の実バッチでは修正後も代表者 0 件だった。これは母集団の話で正しい
+—— LEI 順の 60 社は米英中心で、個別に試した DE 企業（BASF・Flix・Borussia Dortmund）は
+日本からの IP で JP ロケールに geo-redirect され、ドイツ語の Impressum に到達できない。
+**抽出器は動く。この母集団からは出ない。この 2 つは別の主張である。**
 
 ## 最も重要な工学的発見: 子会社の役員を親会社に付けかけた
 
@@ -126,12 +151,19 @@ Deutsche Bahn AG の LEI 配下に書き込んだ。実在するページ、正�
 - 出力に person の氏名を **stdout へ出さない**（件数だけ）。この出力は tick の
   ログファイルに落ちるので、平文の side channel を作らないため。
 - private repo + 暗号化 payload が隠すのは**中身**であって**メタデータではない**。
-  どの LEI に record があるか・サイズ・更新時刻は repo access を持つ者に見える
+  当初はファイル名を `<LEI>.edn.age` にしており、**どの企業に個人データがあるかを
+  repo access を持つ全員に公示していた** —— 営業データセットにおいてはその一覧自体が
+  機微である。現在は **`HMAC-SHA256(k, LEI)`**。鍵は age identity から導出するので
+  第二の秘密が増えない: **復号できる者だけが所在を特定でき、repo access だけの者は
+  どちらもできない。** 引くのは
+  `nbb --classpath scripts scripts/lei-profile-enrich.cljs --read <LEI>`（identity 必須）。
+  検索可能な索引は意図的に持たない。
+- それでも残る露出: record の**個数**・サイズ・更新時刻・author は見える
   （`policy.edn :policy/metadata-exposure`）。
 - 消去要求は record 削除 + `git annex drop --from b2`。annex key が ciphertext
   identity なので実体が消えれば復元できない —— age を annex 層でなく payload 層に
-  置いた実務上の利点。ただし **ファイル名（= LEI）は git 履歴に残る**。
-- **未了**: 代表者抽出の positive 実証、日本語 会社概要 経路、GDPR Art.14 /
-  APPI 21 条の通知実装（これが済むまで outbound 不可）、
+  置いた実務上の利点。ハッシュ化により **git 履歴に残るファイル名からも LEI は読めない**。
+- **未了**: 日本語 会社概要 経路（geo-redirect でドイツ語 Impressum に到達できない
+  問題を含む）、GDPR Art.14 / APPI 21 条の通知実装（これが済むまで outbound 不可）、
   `:policy/sole-trader-check`（母集団を中堅・小規模に広げる**前に**要る）。"}
 ]

@@ -59,7 +59,14 @@
               "kotobase-anchor-fevm"]}
     {:level 5
      :name "product-composition-and-deployment"
-     :owners ["network-awai/net-kotobase"]}]
+     :owners ["network-awai/net-kotobase"]
+     :note
+     "owner は単数だが repo は単数ではない（2026-08-04、ADR-2608051000 で改訂）。
+      net-kotobase は zone・composition policy・delegation 台帳・共通リリース証跡の owner であり、
+      個々の capability は net-kotobase-* family の repo が 1 host ずつ配信する。
+      ADR-260718 が既に持つ zone 所有と hostname 委譲の区別に載る（先例 wiki.kotobase.net）。
+      本 level が禁じ続けるのは『net-kotobase 以外が共通 database/security semantics を fork すること』
+      であって、capability ごとに deploy shell を分けることではない。"}]
    :dependency-rule
    "Dependencies point from a higher layer to a lower layer. Optional capabilities may share lower contracts but must not import one another merely to reuse deployment code."
    :prohibitions

@@ -1,0 +1,251 @@
+[{:db/id -1
+  :adr/id "adr-2608051000-kotobase-one-repo-one-capability-deployment-split"
+  :adr/title "ADR-2608051000: kotobase.net は 1 repo = 1 capability — deploy shell と protocol library の分割、engine 改名、kotobase.gftd.ai 廃止"
+  :adr/status "accepted"
+  :adr/date "2026-08-04"
+  :adr/deciders "Jun Kawasaki"
+  :adr/doc-type "adr"
+  :adr/topic "kotobase-deployment-topology"
+  :adr/source-format "edn"
+
+  :adr/authoritative-for
+  ["kotobase.net の各 host を配信する Worker / repo の名前と所有者"
+   "deploy shell を capability 単位に分割してよいこと、および net-kotobase が何の owner であり続けるか"
+   "kotobase-protocols library を surface ごとに分割する判断（ADR-2607171700 の reject を撤回）"
+   "backend.kotobase.net → engine.kotobase.net の改名と移行期の両走"
+   "kotobase.gftd.ai の廃止範囲と、did:web:kotobase.gftd.ai を壊す判断"]
+
+  :adr/repos
+  ["orgs/network-awai/net-kotobase"
+   "orgs/kotoba-lang/kotobase-protocols"
+   "orgs/gftdcojp/ai-gftd-kotobase"]
+
+  :adr/related
+  ["adr-2608045000-kotobase-capability-topology-peer-retirement"
+   "adr-2607171700-kotobase-storage-protocol-layers"
+   "adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog"
+   "adr-2608039000-d1-is-not-a-premise-in-decentralized-paths"
+   "net-kotobase/docs/adr/260718-runtime-deployment-ownership.md"
+   "net-kotobase/docs/adr/2607201200-datom-authoritative-radicle-shaped-git.md"
+   "net-kotobase/MIGRATION.md"]
+
+  :adr/context
+  "実測 2026-08-04（net-kotobase の default branch tip。この ADR は tip を正とする）。
+   注意: 共有 checkout orgs/network-awai/net-kotobase は west pin より 58 commit、default branch より
+   66 commit 遅れていた（west update が回っていない）。pin 自体は main の 10 commit 手前で、
+   改名後の構成を既に持つ。この ADR の初稿は共有 checkout を読んで改名前の構成を『現状』と書きかけた。
+
+   kotobase.net の 12 host を 6 Worker が配信しており、Worker 名・host 名・実際の責任が一致していない。
+   **ディレクトリ名は tip で既に capability 名へ改名済み**（worker → kotobase-api-gateway、
+   clj-edge → kotobase-api-gateway-cljs、kotobase-cf-wasm → kotobase-graph-database、
+   さらに kotobase-object-store-b2-s3 / kotobase-index-prolly-standalone が独立）だが、
+   **Worker 名と route 分割は未着手**。つまり分割は途中で止まっている。
+
+   | host | Worker（tip で未変更） | 配信元ディレクトリ（tip） | 問題 |
+   |---|---|---|---|
+   | kotobase.net | net-kotobase | kotobase-api-gateway (+ -cljs) | edge と smtp を兼務 |
+   | smtp.kotobase.net | net-kotobase | 同上 | apex Worker が mail を持つ |
+   | backend.kotobase.net | kotobase-cf-wasm-staging | kotobase-graph-database | ディレクトリは改名済みなのに Worker 名が旧のまま。本番を staging と名乗り、実装技術を capability 名の位置に置く |
+   | witness1/2.kotobase.net | kotobase-cf-wasm-witness1/2 | 同上（env） | 同じ嘘を env 名が継承 |
+   | authn.kotobase.net | kotobase-authn | authn | 名前は妥当 |
+   | s3 / atproto / pinning / sparql / cypher / gremlin / graphql | kotobase-protocols-worker | protocols-worker | 7 capability が 1 Worker |
+   | git.kotobase.net | kotobase-git | kotoba-lang/kotobase-protocols | 別 org からの配信。delegation 未記録だった（本 ADR と同日に記録） |
+   | kotobase.gftd.ai | net-kotobase + ai-gftd-project-kotobase | 2 repo | 2 Worker が同一 host を主張 |
+
+   これらは 3 つの規則違反として現れている。(1) ADR-260718 の delegated-hostname 表に git.kotobase.net が
+   無く、apex の pager を持つ人から見えない。(2) deploy は fast-forward 検査を持たず最後に打った人が勝つ
+   ので、7 capability の相乗りは 2026-07-25 の signup funnel 巻き戻し事故と同じ構造を 7 倍にしている。
+   (3) 名前が責任を偽っているため、どの repo を触ればどの host が変わるかが読めない。
+
+   既存 2 ADR との関係も整理が要る。ADR-2607171700 は「surface ごとの別 repo 4 連発」を reject したが、
+   同 ADR は同時に「deploy shell は将来 surface ごとに分けられる」と書いている。ADR-2608045000 は
+   level 5 product-composition-and-deployment の owner を network-awai/net-kotobase と単数で書いている。
+   前者は分割を許し、後者は単一所有を要求するように読める。"
+
+  :adr/decision
+  {:principle
+   "1 repo = 1 capability。capability とは『独立して deploy でき、壊れたときに独立して切り戻せる単位』で
+    あり、host 1 本にほぼ対応する。net-kotobase は capability を配信する repo であることをやめ、
+    zone・composition policy・delegation 台帳・共通リリース証跡の owner になる。"
+
+   :ownership-reconciliation
+   "ADR-2608045000 level 5 の『deployment owner = network-awai/net-kotobase』は repo 単数ではなく
+    owner 単数として読む。ADR-260718 が既に zone 所有と hostname 委譲を区別し、記録を条件に委譲を
+    許している（wiki.kotobase.net → app-hyakka が先例）。本 ADR は net-kotobase-* family 全体を
+    net-kotobase の記録済み委譲とし、level 5 の記述を『net-kotobase が owner、配信は net-kotobase-*
+    family が担う』に改める。ADR-2608045000 はこの一文だけ書き換える（それ以外の層構造は不変）。"
+
+   :deploy-repos
+   [{:capability "edge" :host "kotobase.net" :repo "orgs/network-awai/net-kotobase" :worker "net-kotobase-edge"
+     :owns "auth・quota・tenant 境界・XRPC routing・DID document・delegation 台帳"}
+    {:capability "engine" :host "engine.kotobase.net" :repo "orgs/network-awai/net-kotobase-engine" :worker "net-kotobase-engine"
+     :owns "datom engine（旧 kotobase-cf-wasm-staging）" :from "net-kotobase/kotobase-graph-database"}
+    {:capability "authn" :host "authn.kotobase.net" :repo "orgs/network-awai/net-kotobase-authn" :worker "net-kotobase-authn"
+     :from "net-kotobase/authn"}
+    {:capability "s3" :host "s3.kotobase.net" :repo "orgs/network-awai/net-kotobase-s3" :worker "net-kotobase-s3"
+     :from "net-kotobase/protocols-worker"}
+    {:capability "pinning" :host "pinning.kotobase.net" :repo "orgs/network-awai/net-kotobase-pinning" :worker "net-kotobase-pinning"
+     :from "net-kotobase/protocols-worker"}
+    {:capability "atproto" :host "atproto.kotobase.net" :repo "orgs/network-awai/net-kotobase-atproto" :worker "net-kotobase-atproto"
+     :from "net-kotobase/protocols-worker"}
+    {:capability "sparql" :host "sparql.kotobase.net" :repo "orgs/network-awai/net-kotobase-sparql" :worker "net-kotobase-sparql"
+     :from "net-kotobase/protocols-worker"}
+    {:capability "cypher" :host "cypher.kotobase.net" :repo "orgs/network-awai/net-kotobase-cypher" :worker "net-kotobase-cypher"
+     :from "net-kotobase/protocols-worker"}
+    {:capability "gremlin" :host "gremlin.kotobase.net" :repo "orgs/network-awai/net-kotobase-gremlin" :worker "net-kotobase-gremlin"
+     :from "net-kotobase/protocols-worker"}
+    {:capability "graphql" :host "graphql.kotobase.net" :repo "orgs/network-awai/net-kotobase-graphql" :worker "net-kotobase-graphql"
+     :from "net-kotobase/protocols-worker"}
+    {:capability "smtp" :host "smtp.kotobase.net" :repo "orgs/network-awai/net-kotobase-smtp" :worker "net-kotobase-smtp"
+     :from "net-kotobase/kotobase-api-gateway（route）+ net-kotobase/mail-worker"}
+    {:capability "git" :host "git.kotobase.net" :repo "orgs/network-awai/net-kotobase-git" :worker "net-kotobase-git"
+     :from "kotoba-lang/kotobase-protocols/worker（org を跨いで移管）"}]
+
+   :library-split
+   {:supersedes-clause
+    "ADR-2607171700 の Rejected 節『surface ごとの別 repo 4 連発』を撤回する。撤回理由は当時の根拠
+     （共有 block 空間と router を跨ぐ）が『共有部分を別 repo にする』ことで解けるため。"
+    :repos
+    [{:repo "orgs/kotoba-lang/kotobase-protocol-core" :owns "http・json・hash・blocks・router（共有 block 空間と subdomain dispatch）"}
+     {:repo "orgs/kotoba-lang/kotobase-protocol-s3" :owns "kotobase.protocols.s3"}
+     {:repo "orgs/kotoba-lang/kotobase-protocol-ipfs" :owns "kotobase.protocols.ipfs"}
+     {:repo "orgs/kotoba-lang/kotobase-protocol-atproto" :owns "kotobase.protocols.atproto"}
+     {:repo "orgs/kotoba-lang/kotobase-protocol-git" :owns "kotobase.protocols.git"}]
+    :dependency-rule
+    "各 protocol repo は kotobase-protocol-core にのみ依存する。protocol repo 同士は import しない。
+     kotobase-protocols は 1 compatibility cycle だけ facade として残し、consumer が 0 になったら archive。"
+    :naming-note
+    "kotobase-protocol-* と単数にする。複数形 kotobase-protocols は『全部入り』を意味してしまい、
+     分割後の 1 capability repo の名前として嘘になる。"}
+
+   :engine-rename
+   {:host-change "backend.kotobase.net → engine.kotobase.net"
+    :dual-run "engine. を先に custom_domain として立て、両 host が同一 Worker を指す期間を設ける。
+               backend. の削除は KOTOBA_BACKEND_URL consumer が 0 になってから。"
+    :measured-consumers
+    "実測 2026-08-04: backend.kotobase.net / KOTOBA_BACKEND_URL を参照する repo は 7
+     （gftdcojp の ai-gftd-kotobase・ai-gftd-media・ai-gftd-news・ai-gftd-yukkuri・mamori・
+     apps-gftdcojp・ai-gftd-apps-gftdcojp）。すべて gftdcojp org の appview で、
+     network-awai 側には無い。移行はこの 7 repo の env var 更新で足りる。"
+    :reason "worker 名 kotobase-cf-wasm-staging は 3 重に嘘をついている — 本番を staging と名乗り、
+             実装技術（cf-wasm）を capability 名の位置に置き、実体である peer engine を名乗らない。"}
+
+   :gftd-ai-removal
+   {:decision "kotobase.gftd.ai を route ごと削除する（owner 判断 2026-08-04、hazard 提示後の再確認）"
+    :measured-hazard
+    "did:web:kotobase.gftd.ai は live で 200 を返し AtprotoPersonalDataServer endpoint を宣言している。
+     workspace 内に 15 ファイルの参照があり、うち orgs/gftdcojp/ai-gftd-kotobase/wrangler.jsonc は
+     本番 Worker の KOTOBASE_ACTOR_DID 変数、net-kotobase 側は clj-edge/src/kotobase/worker.cljc の
+     legacy-did 分岐で host-aware に配信し、worker/test/did_document_test.cljc・
+     worker/scripts/public-smoke.cljc・worker/scripts/api-compat-check.cljc・
+     worker/scripts/site-check.cljc の 4 箇所が assert している。
+     削除するとこの DID は解決不能になる。これは既知の代償として受け入れる。"
+    :scope
+    ["net-kotobase/worker/wrangler.jsonc から kotobase.gftd.ai/* route を削除"
+     "clj-edge/src/kotobase/worker.cljc の legacy-did 分岐を削除"
+     "did_document_test / public-smoke / api-compat-check / site-check の legacy-did assertion を削除"
+     "kotobase.net の DID document から alsoKnownAs did:web:kotobase.gftd.ai を削除"
+     "gftdcojp/ai-gftd-kotobase の KOTOBASE_ACTOR_DID を did:web:kotobase.net に変更"
+     "CF DNS から kotobase.gftd.ai を削除"]}
+
+   :secret-retrievability-gate
+   {:rule
+    "**capability を分割する前に、その新スクリプトが必要とする secret を全部『読み戻せる』ことを
+     確認する。1 件でも読み戻せないものがあれば分割してはならない。**
+     Cloudflare の Worker secret は**スクリプト単位かつ write-only** なので、新しい名前の
+     スクリプトを作ることは『secret ゼロの状態から始める』ことと同義であり、既存スクリプトから
+     値を引き継ぐ手段は無い。読み戻せない secret を持つ Worker を改名することは、
+     その capability を復旧不能にする一方通行の操作である。"
+    :measured-2026-08-04
+    {:engine
+     {:needs ["KOTOBA_SEED" "KOTOBASE_B2_KEY_ID" "KOTOBASE_B2_APP_KEY"]
+      :retrievable ["KOTOBA_SEED ← kagi item KOTOBA_SEED_PRODUCTION（compartment net-kotobase、KAGI_HOME=$HOME/.kagi、存在確認済み）"]
+      :not-retrievable
+      ["KOTOBASE_B2_KEY_ID / KOTOBASE_B2_APP_KEY — kagi に mirror が無い
+        （kotobase-graph-database/DEPLOY.md が『that item has no kagi mirror』と自ら記録している）。
+        Cloudflare 側は write-only で読めない。1Password item『BACKBLAZE 260225 application keys』が
+        出所だが、この環境の op は対話 Touch ID 承認を要求し、agent は安全床①によりそれを代行しない。"]
+      :status :blocked
+      :consequence
+      "engine の repo 抽出（network-awai/net-kotobase-engine、e70175db0c6、履歴 18 commit 付き）までは
+       完了しているが、**deploy はしていない**。B2 資格情報を読み戻せないまま新スクリプトを立てると
+       B2 に到達できない engine ができ、既存スクリプトを改名すれば本番 engine が復旧不能になる。"
+      :unblock
+      "オーナーが `op signin` するか、1Password の当該 item から B2 keyId/appKey を kagi
+       compartment net-kotobase へ写す（`KOTOBASE_B2_KEY_ID` / `KOTOBASE_B2_APP_KEY`）。
+       写した時点で engine 以降の分割はすべて非対話で進む。"}}}
+   :precondition-for-all-steps
+   "上記 gate は engine 固有ではない。s3 / pinning / atproto / git の各 shell も
+    WRITE_TOKEN・S3_ACCESS_KEY_ID・S3_SECRET_ACCESS_KEY 等を持つので、分割前に同じ確認を行う。
+    secrets-location-map によればこれらは Keychain service cf:kotobase-protocols-worker に
+    operator copy があるので、engine の B2 より条件は良い可能性が高いが、**未確認**。"
+
+   :route-cutover-procedure
+   "Cloudflare の custom_domain は 1 host = 1 Worker なので、移設は必ず『外して付ける』になり無防備な
+    瞬間が生じる。capability ごとに次の順を守る。逆順にすると host が宙に浮く。
+    1. 新 repo で build と test を通す（通らないうちは deploy しない）
+    2. 新 Worker を routes 無しで deploy し、*.workers.dev で動作確認
+    3. 旧 Worker の wrangler から当該 route を外して deploy
+    4. 新 Worker に custom_domain を付けて deploy
+    5. curl で health と実機能を確認。壊れていたら 3-4 を逆に戻す
+    6. 確認後に ADR-260718 の delegated-hostname 表へ記録"
+
+   :immediate-fixes
+   ["git.kotobase.net を ADR-260718 の delegated-hostname 表に記録する（無記録だった。
+     2026-08-04 に記録済み — net-kotobase aa2dccb7ee）"
+    "kotobase.gftd.ai を 2 Worker が主張している状態を解消する（本 ADR の削除で解ける）"
+    "共有 checkout orgs/network-awai/net-kotobase に west update を回す。実測 2026-08-04 時点で
+     pin より 58 commit 遅れており、そこを読むと改名前の構成が見えた。pin 自体は main の 10 commit
+     手前なので前進させるが、より危険なのは pin ではなく『pin にすら追いついていない共有 checkout』
+     の方だった — 手元の tree を現状の証拠として使う前に、pin と remote の両方と突き合わせる"]}
+
+  :adr/consequences
+  {:positive
+   ["どの repo を触るとどの host が変わるかが名前だけで読める"
+    "1 capability の deploy 事故が他の 11 capability を巻き込まない — 2026-07-25 の巻き戻し事故の再発面積が 1/7 になる"
+    "deploy 頻度の違う capability（git は高頻度、authn は低頻度）が互いの release cadence を縛らない"
+    "protocol library の分割で、s3 だけを使う consumer が atproto と git のコードを引かなくなる"]
+   :negative
+   ["repo が 12 増える（deploy 11 + library 5、うち kotobase-protocols は facade として一時残存）"
+    "共通コード（CACAO 検証・quota・エラー整形）が 11 shell に散る。共有は kotobase-protocol-core と
+     kotobase-server に寄せるが、shell 側の重複は完全には消えない"
+    "route cutover ごとに秒〜分単位の無防備な瞬間が生じる（custom_domain の付け外しが原子的でないため）"
+    "did:web:kotobase.gftd.ai が解決不能になる。既知の保持者は上記 15 参照"
+    "移行期は backend. と engine. の 2 host が同じ engine を指す"]}
+
+  :adr/migration
+  [{:step 0 :action "本 ADR を land し、ADR-2608045000 level 5 と ADR-2607171700 Rejected を書き換える" :risk :none}
+   {:step 1 :action "git.kotobase.net を ADR-260718 delegated-hostname 表に記録" :risk :none}
+   {:step 2 :action "engine: net-kotobase-engine repo 作成 → engine.kotobase.net を追加（backend. は残す）" :risk :low}
+   {:step 3 :action "kotobase.gftd.ai 削除（route・legacy-did 分岐・4 assertion・DNS・下流の ACTOR_DID）" :risk :medium}
+   {:step 4 :action "library 分割: kotobase-protocol-core を切り出し、s3/ipfs/atproto/git を各 repo へ" :risk :low}
+   {:step 5 :action "protocols-worker を s3/pinning/atproto/sparql/cypher/gremlin/graphql の 7 shell に分割し、1 host ずつ cutover" :risk :medium}
+   {:step 6 :action "smtp を apex から分離（mail-worker と統合して net-kotobase-smtp に）" :risk :medium}
+   {:step 7 :action "git を kotoba-lang から network-awai/net-kotobase-git へ移管" :risk :medium}
+   {:step 8 :action "authn を net-kotobase-authn repo へ切り出し" :risk :low}
+   {:step 9 :action "KOTOBA_BACKEND_URL consumer を engine. に移し、backend. を削除" :risk :medium}
+   {:step 10 :action "kotobase-protocols を archive（consumer 0 を確認してから）" :risk :none}]
+
+  :adr/body
+  "kotobase.net は 12 host を 6 Worker で配信しており、名前・repo・責任が一致していない。最も明確な症状は
+   backend.kotobase.net を配信する Worker が kotobase-cf-wasm-staging と名乗っていることで、これは本番を
+   staging と呼び、実装技術を capability 名の位置に置き、実体である datom engine を名乗っていない。
+
+   本 ADR は 1 repo = 1 capability を採る。capability は『独立して deploy でき、壊れたときに独立して
+   切り戻せる単位』であり、実質的に host 1 本に対応する。net-kotobase は capability を配信する repo で
+   あることをやめ、zone・composition policy・delegation 台帳の owner になる。これは ADR-2608045000 の
+   level 5 を否定しない — 同 ADR の owner 単数を repo 単数と読まず、ADR-260718 が既に持っている
+   zone 所有と hostname 委譲の区別に載せ替える。
+
+   分割の根拠は美観ではなく事故の面積である。Cloudflare の deploy は fast-forward 検査を持たず最後に
+   打った人が勝つ。2026-07-25 に古い checkout からの deploy が signup funnel の修正を 11 分後に巻き戻し、
+   誰も気付かなかった。7 capability が 1 Worker に相乗りしている現状は、この失敗の巻き添え範囲を 7 倍に
+   している。ADR-260718 が wiki.kotobase.net を別 script にしたのと同じ論拠を、残り全部に適用する。
+
+   ADR-2607171700 が『surface ごとの別 repo 4 連発』を reject した根拠（共有 block 空間と router を跨ぐ）
+   は、共有部分を kotobase-protocol-core として独立させることで解ける。同 ADR は同時に『deploy shell は
+   将来 surface ごとに分けられる』とも書いており、本 ADR はその『将来』にあたる。
+
+   kotobase.gftd.ai は route ごと削除する。did:web:kotobase.gftd.ai が live で解決し 15 ファイルが参照して
+   いること、うち 1 つが本番 Worker の変数で 4 つがテストの assertion であることは削除前に実測した。
+   この DID が解決不能になるのは既知の代償であり、owner が hazard 提示後に選択した。"}]
