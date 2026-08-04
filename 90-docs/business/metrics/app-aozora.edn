@@ -1,34 +1,36 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 23157,
-  "app-aozora-appview" 10222,
-  "app-aozora-spa" 6684},
+ {"app-aozora-pds" 23266,
+  "app-aozora-appview" 10275,
+  "app-aozora-spa" 6688},
  :zone
- {:requests-7d 1114331,
-  :pageviews-7d 5835,
-  :uniques-7d-sum 770,
+ {:requests-7d 1120179,
+  :pageviews-7d 5839,
+  :uniques-7d-sum 779,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 926694}
-   {:path "/v1/transact", :requests 3301}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 2938}
-   {:path "/xrpc/com.atproto.server.createSession", :requests 1651}
-   {:path "/federation-pilot/did.json", :requests 144}
+  [{:path "/v1/datoms", :requests 929709}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 3217}
+   {:path "/v1/transact", :requests 2445}
+   {:path "/api/q", :requests 299}
    {:path
     "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
-    :requests 130}
+    :requests 157}
+   {:path "/federation-pilot/did.json", :requests 147}
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 119}
-   {:path "/api/q", :requests 114}],
-  :status-mix {:ok 937970, :client-error 24221, :server-error 594},
+    :requests 133}
+   {:path
+    "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
+    :requests 84}],
+  :status-mix {:ok 939047, :client-error 10643, :server-error 1064},
   :window "24h"},
  :as-of "2026-08-04",
- :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 926694 · /v1/transact 3301 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 2938 · /xrpc/com.atproto.server.createSession 1651 · /federation-pilot/did.json 144 | 4xx(probe) 3% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 929709 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 3217 · /v1/transact 2445 · /api/q 299 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 157 | 4xx(probe) 1% · 5xx 0%",
  :signal
- "aozora.app 実測 1114331 req/7d・770 uniques(日次和)・うち4xx probe 3%(24h)、workers 40063 inv/7d"}
+ "aozora.app 実測 1120179 req/7d・779 uniques(日次和)・うち4xx probe 1%(24h)、workers 40229 inv/7d"}
