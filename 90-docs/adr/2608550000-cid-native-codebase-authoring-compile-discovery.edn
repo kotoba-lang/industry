@@ -96,6 +96,31 @@
    backed）で provider を引き、**trustless gateway**（`/ipfs/{cid}?format=raw`）から
    raw block を取る。全バイトを要求 CID に対して検証してから永続化する。
 
+   ## L4 publication — 誰がそう言ったか（publication / codebase-publish）
+
+   block は権限を要らない（CID がバイトと一致するかしないかだけ）。**namespace head
+   はこの系で唯一の可変な主張**で、署名が無ければ意味を持たない。信頼モデルは小さく
+   保つ（代案は PKI の発明になる）:
+
+   - follower は初回 follow で publisher DID を **pin** し、以後それ以外を拒否する
+     （TOFU は「何を検査したか」を正確に言える primitive。鍵を保証する registry は
+     index の顔をした新しい root of trust になる）。
+   - record は **monotonic sequence + 直前 record への link** を持つ。これが無いと、
+     署名を偽造できない攻撃者でも**正規の古い署名済み record を再送**して follower を
+     黙って巻き戻せる。
+   - record は **commit がローカルに存在し検証済みのときだけ**受理する。署名は
+     「誰が話しているか」を言うだけで、話している対象のバイトを湧かせない。
+   - publisher DID は署名 seed から**導出**する（引数で受け取らない）。
+
+   node は **trustless gateway + 自分も serve する follower**。push された block は
+   CID 照合してから保存し、head record は pin した鍵で検証する。ただし node は
+   follower に何も信じさせられない（follower が同じことをもう一度検査する）——
+   だから接続を信頼するのではなく record に署名する。
+
+   CLI: `codebase serve | publish | follow | unfollow | identity`。署名 seed は
+   `KOTOBA_CODEBASE_SEED` から**単一の関数**で読み（供給経路が複数ある seed は漏れる
+   場所が複数ある seed）、`identity` は導出した DID だけを出す。
+
    ## CLI
 
    `kotoba codebase add | plan | view | run | list | find | dependents | pull`。
@@ -123,10 +148,11 @@
 
    ## 主張してはいけないこと（未実装）
 
-   - **publish しない。** DHT への announce には libp2p ノードが要る。Kotoba の定義
-     ブロックがグローバルに discoverable になるのは、それを持つ何かが provide して
-     からである。**discovery が可能であることは、コンテンツがそこにあることと違う。**
-     `pull` は空の provider 集合をそのまま返す。
+   - **DHT へ announce しない。** libp2p ノードが要る。namespace は**それを host する
+     node で到達可能**であって、公衆ネットワークから見つかるわけではない ——
+     これは「published」より小さい主張である。`pull` は空の provider 集合をそのまま返す。
+   - **name registry も鍵配布も無い。** follower は endpoint と publisher DID を
+     何らかの帯域外手段で知っている必要がある。
    - browsing UI / semantic diff / rebase / 対話的 conflict 解決は無い。
      `view` は surface 層のみ（typed 定義のソース射影は未実装）。
    - **codebase は target artifact を出さない**。oracle を回すだけで compile は
@@ -144,6 +170,12 @@
      結果ではない（実測で発生した）。深さは **呼び出し時**に数える——再帰グループは
      `fn` ノードを 1 回だけ評価してその 1 つのクロージャに再入するので、生成時に
      捕まえた深さは増えない。
+   - **link 列挙は「覚えているフィールド名」でなく「実際に在るリンク」を読む。**
+     `fetch` と `store` がそれぞれ独自のフィールド名リストを持ち、**両方とも間違って
+     いた** —— namespace commit（follow が実際に受け取る形）から hydrate すると
+     **1 ブロック取って止まる**（commit は parents と bindings を link するのに
+     どちらもリストに無かった）。`ir/block-links` は構造的に列挙する（例外は
+     `profile`/`hashContract` の 2 つだけ = 契約**文字列**の CID でブロックではない）。
    - **依存収集の walk を eager にする。** `map` は lazy なので、依存集合を副作用で
      集めていると **seq が force される前に atom を読んで空集合が返る** —— body の
      リンクは正しいのに「依存ゼロ」と宣言したブロックが保存され、identity テストは
@@ -162,14 +194,14 @@
 
    ## 検証
 
-   - kotoba-lang/codebase: 68 tests / 247 assertions green、lint clean
-     （typed-code 追加後）。
+   - kotoba-lang/codebase: 78 tests / 267 assertions green、lint clean
+     （typed-code + publication 追加後）。
    - kotoba-lang/compiler: module-lock 7 tests / 17 assertions green。フルスイートは
      840 tests / 6447 assertions で 4 failures —— すべて既存の **soft performance
      budget**（document_dual_renderer / document_perf_workload、負荷の高いマシンで
      5s budget に対し 25s）で、本変更とは無関係。
-   - kotoba-lang/kotoba: 新規 10 tests / 31 assertions green。フルスイート 478 tests /
-     8390 assertions で 2 failures —— すべて `backend-qualification` の兄弟リポパス
+   - kotoba-lang/kotoba: 新規 17 tests / 46 assertions green。フルスイート 485 tests /
+     8405 assertions で 2 failures —— すべて `backend-qualification` の兄弟リポパス
      （`../kototama`、`../compiler`）の存在チェックで、west レイアウト外の worktree で
      走らせた副作用。兄弟を symlink して当該 namespace を再実行すると 0 failures。
    - global discovery は**実ネットワークで実測**（2026-08-04）: delegated-ipfs.dev が
@@ -180,10 +212,10 @@
 
    | repo | merge | 内容 |
    |---|---|---|
-   | kotoba-lang/codebase | 484f1a8 → **2b7e823** | evaluator / authoring / render / names / fetch / ir → **typed-code / typed-eval** |
+   | kotoba-lang/codebase | 484f1a8 → 2b7e823 → **da66ee4** | evaluator / authoring / render / names / fetch / ir → typed-code / typed-eval → **publication / ir.block-links** |
    | kotoba-lang/compiler | 4fa7e6d（main は a6e7dc4 に前進済み） | module-lock |
-   | kotoba-lang/kotoba | 6e79ab7 → **f65f1b8** | codebase CLI / codebase-routing → **codebase-typed（--typed）** |
-   | com-junkawasaki/root | 6f36f6d / **13b71bf** | manifest pin 前進（codebase / kotoba） |
+   | kotoba-lang/kotoba | 6e79ab7 → f65f1b8 → **9d388a7** | codebase CLI / codebase-routing → codebase-typed（--typed）→ **codebase-publish（serve/publish/follow）** |
+   | com-junkawasaki/root | 6f36f6d / 13b71bf / **3408fe0** | manifest pin 前進（codebase / kotoba） |
 
    `manifest/west.yml` の pin 前進は GitHub API single-entry 経路で行い、サーバ側
    pin 検証を通した。**`gen-west-manifest.cljs --check` は STALE を返すが、これは
