@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 14841, "ai-gftd-chat-shell" 3},
+ {"magatama-sh1n5h1x" 15053, "ai-gftd-chat-shell" 3},
  :zone
- {:requests-7d 605081,
-  :pageviews-7d 2673,
-  :uniques-7d-sum 5257,
+ {:requests-7d 607963,
+  :pageviews-7d 2678,
+  :uniques-7d-sum 5275,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/env", :requests 110}
-   {:path "/.env.dev", :requests 108}
-   {:path "/.env.old", :requests 106}
-   {:path "/actuator/configprops", :requests 103}
-   {:path "/v1/generation/jobs/e95b5891a5064a8695a6b40b642d5da8",
+  [{:path "/v1/generation/jobs/e95b5891a5064a8695a6b40b642d5da8",
     :requests 92}
+   {:path "/.env.dev", :requests 84}
+   {:path "/.env.old", :requests 83}
+   {:path "/actuator/configprops", :requests 77}
+   {:path "/env", :requests 76}
    {:path "/v1/generation/jobs/731ec5e8f8af42089641174fea764658",
     :requests 44}
    {:path "/mgrr.php", :requests 41}
-   {:path "/ms-edit.php", :requests 37}],
-  :status-mix {:ok 2241, :server-error 15436, :client-error 1223},
+   {:path "/ms-edit.php", :requests 35}],
+  :status-mix {:ok 2205, :server-error 15394, :client-error 1165},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -34,8 +34,8 @@
  :as-of "2026-08-04",
  :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 82},
  :top-paths
- "上位 page (24h, 2xx/3xx): /env 110 · /.env.dev 108 · /.env.old 106 · /actuator/configprops 103 · /v1/generation/jobs/e95b5891a5064a8695a6… 92 | 4xx(probe) 6% · 5xx 82%",
+ "上位 page (24h, 2xx/3xx): /v1/generation/jobs/e95b5891a5064a8695a6… 92 · /.env.dev 84 · /.env.old 83 · /actuator/configprops 77 · /env 76 | 4xx(probe) 6% · 5xx 82%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 605081 req/7d・5257 uniques(日次和)・うち4xx probe 6%(24h)、workers 14844 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 607963 req/7d・5275 uniques(日次和)・うち4xx probe 6%(24h)、workers 15056 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
