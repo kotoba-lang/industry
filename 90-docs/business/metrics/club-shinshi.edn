@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "shinshi.club",
  :zone
- {:requests-7d 17389,
-  :pageviews-7d 13633,
-  :uniques-7d-sum 1748,
+ {:requests-7d 17596,
+  :pageviews-7d 13830,
+  :uniques-7d-sum 1751,
   :zone "shinshi.club"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 104}
-   {:path "/%2egit/FETCH_HEAD", :requests 60}
-   {:path "/app/config%2ejs", :requests 60}
-   {:path "/data_bags/", :requests 56}
-   {:path "/terraform/modules/database/variables%2etf", :requests 56}
-   {:path "/src/environments/environment%2edev%2ets", :requests 56}
-   {:path "/config/local%2ejson", :requests 56}
-   {:path "/storage/settings%2ejson", :requests 52}],
-  :status-mix {:ok 1172, :client-error 84},
+  [{:path "/", :requests 87}
+   {:path "/js/app.js", :requests 39}
+   {:path "/i18n/en.json", :requests 32}
+   {:path "/chat/cordelia-fire-emblem", :requests 3}
+   {:path "/chat/lucoa-maid-dragon", :requests 2}
+   {:path "/video/actress/jun-kazama-tekken", :requests 2}
+   {:path "/chat/seraphine-league-of-legends", :requests 2}
+   {:path "/chat/lightning-final-fantasy-xiii", :requests 2}],
+  :status-mix {:ok 673},
   :window "24h"},
  :source "shinshi.d1:pv_daily+chat_event_daily+pay_run",
  :window "7d",
  :as-of "2026-08-04",
- :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 104 · /%2egit/FETCH_HEAD 60 · /app/config%2ejs 60 · /data_bags/ 56 · /terraform/modules/database/variables%2e… 56 | 4xx(probe) 7%",
- :funnel {:visitors 1119, :chatters 39, :scenes 0, :paying 0},
+ "上位 page (24h, 2xx/3xx): / 87 · /js/app.js 39 · /i18n/en.json 32 · /chat/cordelia-fire-emblem 3 · /chat/lucoa-maid-dragon 2 | 4xx(probe) 0%",
+ :funnel {:visitors 1121, :chatters 39, :scenes 0, :paying 0},
  :signal
- "shinshi.club 実測 17389 req/7d・1748 uniques(日次和)・うち4xx probe 7%(24h)"}
+ "shinshi.club 実測 17596 req/7d・1751 uniques(日次和)・うち4xx probe 0%(24h)"}
