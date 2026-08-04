@@ -5,7 +5,7 @@
   :adr/authoritative true
   :adr/status "accepted"
   :adr/date "2026-08-01"
-  :adr/last_verified "2026-08-01"
+  :adr/last_verified "2026-08-04"
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "kotobase-large-object-plane-lfs-and-annex"
   :adr/title "ADR-2608012600: kotobase / net-kotobase を git-lfs と git-annex(DataLad) の両方の永続化先にする — 大容量オブジェクト面は1つ、protocol adapter は2つ"
@@ -40,7 +40,7 @@
   :adr/body
   "# ADR-2608012600: 大容量オブジェクト面は1つ、protocol adapter は2つ
 
-**Status**: accepted（G0 着地。G1 以降は未着手。現に動いている経路は directory store と B2 S3 special remote のままで、この ADR はそれを止めない）
+**Status**: accepted（G0 着地。**G1 は provider 半分のみ着地** — 2026-08-04、下記「現在地」。grant endpoint と server-side verify は未着手で、**live の `PUT /ipfs/:cid` は 4 MiB のまま**。現に動いている経路は directory store と B2 S3 special remote のままで、この ADR はそれを止めない）
 **Date**: 2026-08-01
 
 ## Context — 今どこにいるか（実コードで確認した現在地）
@@ -82,6 +82,27 @@
    その内容は失われる。これは性能の問題ではなくデータ喪失の経路である。
 7. **chunk / 暗号化すると key から CID を導出できない**（実測済み）。対応表の置き場所が
    follow-up のまま残っている。
+
+### 現在地（2026-08-04 更新 — G1 の provider 半分が着地）
+
+**着地したもの**（両 repo CI green、west pin 前進済み）:
+
+| repo | 何が入ったか |
+|---|---|
+| `kotobase-storage` | `object-async-contract` — 非同期の大容量オブジェクト contract。**sync 版では presigned profile を検査できない**: presign は canonical request への HMAC-SHA-256 であり、Worker で使える SHA-256 は `crypto.subtle` だけで非同期、よって署名する store は Promise を返し `valid-grant?` が false になる。**sync 版が `:presigned-transfer` として通せる store は「何も署名しない store」だけ**だった — profile のリスク面が丸ごと未検査だったということ。 |
+| `kotobase-storage-s3` | `object-s3` — `objects/<cid>`（`blocks/` `refs/` の隣）の presigned / proxied provider。**profile は client が決める**: credentials を持つ `signed-client` は presigned、R2 **binding** は署名する材料を持たない（Worker 内からしか使えない get/put オブジェクト）ので proxied。これは保守的に振っているのではなく**それが唯一言える真**である。`:require-presigned? true` で黙った降格を拒否できる。`head-object` / `delete-object!` を両 client に追加（どちらも delete 前に head する — R2 の delete も S3 の 204 も「元から無かった」と区別が付かず、`deleted?` は `git annex drop --from` が読む値だから）。 |
+
+**sync 版に無い検査が 2 つ**。どちらも「何も縛らない grant」という 1 つのハザード:
+①PUT grant は `content-length` を**署名に**含めねばならない ②**size 無しの PUT grant 要求は拒否**されねばならない。**後者が本命** — size を渡された時だけ縛る実装は `bound-put-grant?` を通るが、**省略した呼び手には白紙小切手を出し続ける**。それは長さ未知のまま stream する呼び手であり、つまりまさにこの面が存在する理由である大きい object である。oracle 4 種（署名が host だけ / 省略時に unbound / 非 CID id 素通し / 実装していない profile の申告）で suite 自身が落ちうることを固定した。
+
+**contract が初回実行で捕まえた実欠陥**: sigv4 の `:signed-headers` は canonical な \"content-length;host\" **文字列**（`X-Amz-SignedHeaders` の wire 形式）で、`(set \"content-length;host\")` は**文字の集合**なので `content-length` を含まない。素通しすると全 grant が unbound 判定になる。安全側の誤りではあるが誤りには違いなく、逆向きの誤り（署名していないヘッダを署名したと報告する）が金を失う方である。
+
+**着地していないもの — G1 の残り。これが無いので 4 MiB はまだ live に残っている**:
+grant endpoint（worker route）/ tenant scoping と CACAO 認証（D9）/ `:object/*` `:holding/*` datom（D3）/ server-side verify の 3 状態と `crypto.DigestStream` のサイズ別実測（D5）/ `kotoba-annex` の backend 差し替え（D7）/ LFS batch API（D6・G2）。
+
+**したがって上記「無いもの・壊れているもの」2〜7 は 1 つも閉じていない。** 閉じたのは
+**「presigned で置ける provider が存在しない」という前提条件だけ**である。次の 1 手は
+grant endpoint（D4）で、それが載って初めて Context 2 が閉じる。
 
 ### なぜ LFS と annex を同時に設計するのか
 
@@ -286,7 +307,7 @@ Rust を書く / `.sh` `.mjs` を書く / D1・KV に object を置く /
 ケースが fail-closed であることを含む）。`ILargeObjectStore` の conformance suite（既存
 `kotobase.storage.contract` と同じ形）。
 
-**G1 — grant と検証**: `sigv4/presigned` の署名対象ヘッダ拡張。grant endpoint。
+**G1 — grant と検証**（部分着地 2026-08-04）: ~~`sigv4/presigned` の署名対象ヘッダ拡張~~（着地済み）。~~presigned provider とその conformance~~（着地済み — `object-s3` / `object-async-contract`）。**残り: grant endpoint。**
 `crypto.DigestStream` による server-side verify を**サイズ別に実測**し、無理な帯域を
 `:client-attested` として正直に落とす境界を数値で決める。
 
