@@ -109,3 +109,28 @@
              "inline style の margin/padding shorthand 未展開 + var() 置換順（別 agent が作業中）"
              "htmldom: <p> が block-level 開始タグで自動閉じされない"
              "WebGL/WebGPU host の retained/draw-ops 経路が theme を受け取らない"]}
+
+{:at "2026-08-04"
+ :iteration 30
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 200}
+ :line-structure {:agree 184 :total 190 :pct 97}
+ :geometry {:boxes-agree 638 :boxes-total 719 :pct 89 :clean-cases 166}
+ :computed-style {:values-agree 8537 :values-total 9982 :pct 86
+                  :cascade-attributed 5 :no-cascade-attributed-mismatch 197}
+ :landed {:cssom "b261092e69c1725983e3530a2504b860d86d974c — inline style の CSS parse を cssom が所有（htmldom の複製 ~330 行を削除）+ var() を跨ぐ shorthand 展開"
+          :htmldom "ae046f97975051866448d8a83720204beb53279f — 独自 CSS declaration parser を廃し cssom.core に委譲"}
+ :note "cascade 帰責の mismatch 41 → 5、no-cascade-mismatch case 190/200 → 197/200。
+        **geometry は 1 box も動いていない —— これは正しい。** cssom.layout は側面が無いとき
+        uniform な :padding/:margin に fallback する（(or (:padding-left st) (:padding st))）ので、
+        1 値の inline shorthand は元から正しく layout されていた。壊れていたのは computed style
+        （getComputedStyle が実際に報告する値）の方。数値を動かすための調整はしていない。
+        htmldom が cssom に依存する向きになった（HTML parser が style 属性を CSS parser に渡す
+        実ブラウザと同じ向き。cssom は htmldom を require しないので循環は無い）ため、
+        **両 pin は必ず一緒に進める。**"
+ :remaining ["残り 5 件の cascade mismatch は別原因: 4 件は <p> の UA margin: 1em 0 を
+              両者が食い違う font-size で解決している、1 件は disabled input の UA 文字色"
+             "fieldset/legend の out-of-flow 配置"
+             "select の control font 13 vs Chrome 13.3333"
+             "htmldom: <p> が block-level 開始タグで自動閉じされない"
+             "WebGL/WebGPU host の retained/draw-ops 経路が theme を受け取らない"]}
