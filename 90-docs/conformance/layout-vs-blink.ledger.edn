@@ -664,3 +664,25 @@
         大きな文書での実測は未実施と明記。"
  :in-flight ["inline vertical metrics（agent 作業中、幾何残差最大の ~30 box）"
              "position: fixed のフロー離脱 + table cell 内 absolute の +761px（agent 作業中）"]}
+
+{:at "2026-08-04"
+ :iteration 42
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :parser {:corpus 137 :was 122 :agree 130 :pct 95 :was-pct "118/122 (97%)"}
+ :landed {:htmldom "a6a5b905edc8e12383adaec55633964d40da4fb7 — parser corpus 122 → 137 + セミコロン無し legacy 実体参照"}
+ :note "**97% が何を測っていなかったかを知るため**に、group がまるごと無い領域（foreign content、template）と
+        一度も通っていない spec 規則の case を 15 件追加。5 件が新たに落ちた。
+        **分母が増えた上での 95% であり退行ではない。**"
+ :already-correct ["属性内でセミコロン無し参照を解決しない（?x=1&ampy=2 が URL として生き残る）"
+                   "10 進・16 進の数値参照、&#0; → U+FFFD"
+                   "pre / textarea 直後の改行の破棄、属性の重複は先頭勝ち"
+                   "svg / math の基本形と camelCase 属性の保持"]
+ :fixed "セミコロン無しの legacy 実体参照。docstring は『完全な表が無いと本質的に曖昧』としていたが、
+         **セミコロン無しの形はその曖昧さの一部ではない** —— spec は ~106 件の閉じた legacy リストを
+         固定し最長一致で解決する。Brave 実測: &notit; → U+00AC + it; ／ &notarealentity; → U+00AC + arealentity; ／
+         a&ampb → a&b ／ a&middotb → a·b ／ 属性内は不変。
+         **既存 test 1 件がブラウザと異なる挙動を固定していたので実測を理由に更新**
+         （『丸ごとリテラルのまま』は保守的だったのではなく誤りで、同じ誤りが &ampb をソースのまま描画させていた）。"
+ :remaining ["foreign content: svg の自己閉じタグ、svg 内 HTML タグの breakout（2 件）"
+             "template の content が別 fragment にならない（2 件）"
+             "稀な 3 件（</br>, a-in-a, body in flow）"]}
