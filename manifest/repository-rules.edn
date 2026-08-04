@@ -426,6 +426,48 @@
    ;; Absence of a recorded domain is UNVERIFIED, never CONFORMANT.
    :vocabulary/missing-evidence :report-unverified}
 
+  ;; ── org identity: the authority path is <org>/<name>, not <name> ──────
+  ;; Owner directive 2026-08-05 (ADR-2608040170): "family = reverse domain +
+  ;; subdomain". That merges the family plane into the origin plane -- a family
+  ;; is the same reverse-DNS operation one label deeper -- and raises the
+  ;; question the owner then asked: org-kotoba-lang-kami-engine is correct but
+  ;; long.
+  ;;
+  ;; It is long because it says the org TWICE. GitHub already gives us the first
+  ;; path segment. So:
+  ;;
+  ;;   the NAME carries reverse-DNS only for the part the ORG segment does not
+  ;;   already say.
+  ;;
+  ;;   kotoba-lang/kami-engine     org = kotoba-lang.org, name = kami + engine
+  ;;   kotoba-lang/org-ietf-x509   authority is external, so the name carries it all
+  ;;
+  ;; kami-engine is therefore already correct and needs no rename. Measured
+  ;; 2026-08-05: all seven org domains resolve, and three orgs are ALREADY named
+  ;; in reverse-DNS form, which is why cloud-itonami/cloud-itonami-isic-6492
+  ;; states itonami.cloud twice.
+  {:vocabulary/id :org-domain
+   :vocabulary/authority "90-docs/adr/2608040170-authority-path-is-org-plus-name.edn"
+   :vocabulary/applies-to "the org segment of every repository path"
+   :vocabulary/dns-checked-at "2026-08-05"
+   :vocabulary/rules
+   [{:org "cloud-itonami"   :domain "itonami.cloud"    :reversed "cloud-itonami"   :org-name-is-reversed true}
+    {:org "com-junkawasaki" :domain "junkawasaki.com"  :reversed "com-junkawasaki" :org-name-is-reversed true}
+    {:org "network-awai"    :domain "awai.network"     :reversed "network-awai"    :org-name-is-reversed true}
+    {:org "kotoba-lang"     :domain "kotoba-lang.org"  :reversed "org-kotoba-lang" :org-name-is-reversed false
+     :note "org name is the registrable label without the TLD"}
+    {:org "etzhayyim"       :domain "etzhayyim.com"    :reversed "com-etzhayyim"   :org-name-is-reversed false}
+    {:org "gftdcojp"        :domain "gftd.co.jp"       :reversed "jp-co-gftd"      :org-name-is-reversed false
+     :note "compressed form: gftd+co+jp run together"}
+    {:org "jk-luxury"       :domain "jk.luxury"        :reversed "luxury-jk"       :org-name-is-reversed false
+     :note "the only org whose name is in forward order"}]
+   ;; An existing family's established form wins over the elision rule. Joining
+   ;; 459 cloud-itonami-isic-* siblings as a bare isic-NNNN would put two forms
+   ;; in one family, which is worse than the redundancy. The elision binds
+   ;; families created from here on.
+   :vocabulary/existing-family-form-wins true
+   :vocabulary/redundant-but-not-wrong ["cloud-itonami-*" "com-etzhayyim-*"]}
+
   ;; ── product family plane (owner directive 2026-08-04, ADR-2608040100) ──
   ;; 169 repositories in five families, none declared. kami-* alone is 96 —
   ;; larger than every declared role prefix in this file combined.
@@ -454,6 +496,26 @@
      :note "storage/query providers; kotobase-storage-* is a sub-set keyed by backend"}
     {:family "kura-"     :count 6  :owner "kura"}
     {:family "kotodama-" :count 5  :owner "kotodama"}]
+   ;; Owner directive 2026-08-05: family = reverse domain + subdomain. A family
+   ;; claim now costs something real and checkable, the same property that made
+   ;; the origin plane work. What counts as the receipt depends on whether the
+   ;; family serves anything:
+   ;;
+   ;;   SERVING family  -> a real subdomain. open-*.etzhayyim.com is live for
+   ;;                      seven of them; aozora.app has pds/appview/live.
+   ;;   LIBRARY family  -> a declared owning repo, because a subdomain that
+   ;;                      serves nothing is a formality. kami- has no
+   ;;                      kami.* anywhere and does not need one: it is a
+   ;;                      kotoba library family owned by kami-engine.
+   :vocabulary/justification
+   {:serving :real-subdomain
+    :library :declared-owning-repo
+    :measured-2026-08-05
+    {"cloud-itonami-" "itonami.cloud"  "cloud-murakumo" "murakumo.cloud"
+     "app-aozora" "aozora.app"         "net-kotobase" "kotobase.net"
+     "ai-gftd-" "gftd.ai"              "open-" "open-*.etzhayyim.com"
+     "kami-" :library-family-owned-by-kami-engine
+     "cloud-kyusai" :no-domain-kyusai-cloud-does-not-resolve}}
    :vocabulary/must [:share-one-owning-authority :ship-as-a-set]
    :vocabulary/must-not [:be-a-family-of-one :shadow-a-role-prefix]
    ;; Measured, not asserted: these carry a family-shaped prefix but have fewer
@@ -758,6 +820,69 @@
            revisits :forbidden-suffixes, not asserted as a contradiction"}}
    :gap/note "etzhayyim/com-etzhayyim-app-open-swift also ends in a language
               name but was not examined."}
+
+  ;; ── from executing the owner's 2026-08-05 decisions (ADR-2608040170) ──
+  {:gap/id :open-star-duplicates-the-isic-family
+   :gap/measured-at "2026-08-05"
+   :gap/count 9
+   ;; "open 関係は isic に統合" turned out not to be a rename. Every candidate
+   ;; ISIC target already exists, and both sides carry real content -- the same
+   ;; sector is implemented twice under two naming schemes. Renaming cannot fix
+   ;; duplicated work; someone has to decide which implementation survives.
+   :gap/evidence
+   [{:open "cloud-itonami/open-banking" :files 38 :isic "cloud-itonami-isic-6419" :isic-files 40
+     :subject "Core-Banking MVP vs Other monetary intermediation"}
+    {:open "cloud-itonami/open-denki" :files 27 :isic "cloud-itonami-isic-3510" :isic-files 31}
+    {:open "cloud-itonami/open-gas" :files 33 :isic "cloud-itonami-isic-3520" :isic-files 27}
+    {:open "cloud-itonami/open-ports" :files 33 :isic "cloud-itonami-isic-5222" :isic-files 25}]
+   ;; ISIC codes verified against the machine-readable Rev.4 catalog that
+   ;; open-isic (now org-un-isic) itself ships -- not from memory.
+   :gap/isic-assignment-confident
+   {"open-banking" "6419" "open-denki" "3510" "open-gas" "3520" "open-ports" "5222"}
+   :gap/isic-assignment-ambiguous
+   [{:repo "open-rail" :candidates ["4911 Passenger rail transport, interurban"
+                                    "4912 Freight rail transport"]
+     :why "the repo is Railway Operations & Network Design, which spans both"}
+    {:repo "open-network" :candidates ["6110 Wired telecommunications activities"
+                                       "6120 Wireless telecommunications activities"]}
+    {:repo "open-robo" :candidates ["2829 Manufacture of other special-purpose machinery"
+                                    "3240 Manufacture of games and toys"]
+     :why "it is Giemon, a Japanese open-hardware robot KIT brand"}
+    {:repo "open-patent" :candidates ["6910 Legal activities"
+                                      "7490 Other professional, scientific and technical n.e.c."]}
+    {:repo "open-otology-uhl-r" :candidates [] :why "README is empty; subject unknown"}]
+   ;; A third parallel series, found while editing repos.edn.
+   :gap/third-copy
+   {:repos ["etzhayyim/com-etzhayyim-app-open-isic" "etzhayyim/com-etzhayyim-app-open-isco"
+            "etzhayyim/com-etzhayyim-app-open-cofog" "etzhayyim/com-etzhayyim-app-open-unspsc"
+            "etzhayyim/com-etzhayyim-app-open-apqc" "etzhayyim/com-etzhayyim-app-open-banking"]
+    :note "parallel copies of the same catalogs in a third org; deliberately NOT
+           swept up by the rename's substring match"}}
+
+  {:gap/id :kotodama-retirement
+   :gap/measured-at "2026-08-05"
+   :gap/count 6
+   :gap/repos ["kotoba-lang/kotodama" "kotoba-lang/kotodama-cells"
+               "kotoba-lang/kotodama-holochain" "kotoba-lang/kotodama-host"
+               "kotoba-lang/kotodama-mcp" "kotoba-lang/kotodama-py"]
+   ;; Owner directive was "kotodama-... は kototama に統合". Reading them shows two
+   ;; DIFFERENT runtimes sharing two romanisations of 言霊, so a rename would mix
+   ;; unrelated contents into kototama. The direction still holds -- kotodama
+   ;; calls itself legacy and sits on the kotoba-clj stack, whose name is itself
+   ;; banned -- so the operation is a retirement plus a port, not a rename.
+   :gap/self-description {"kotodama" "generic functional-organism runtime on the kotoba-clj stack"
+                          "kototama" "the Kotoba Wasm/Component runtime and engine boundary"}
+   :gap/operation :retirement-and-port-not-rename
+   :gap/note "kototama-cljc-contract also looks misfiled: its README calls it the
+              'KAMI clj-wgsl migration Phase 4 home', which belongs to kami-."}
+
+  {:gap/id :catalog-authority-undetermined
+   :gap/measured-at "2026-08-05"
+   :gap/count 2
+   :gap/repos ["cloud-itonami/open-jpn-gov" "cloud-itonami/open-jpn-mynumber"]
+   :gap/candidates ["e-gov.go.jp" "myna.go.jp" "digital.go.jp"]
+   :gap/note "the other five code-system catalogs were renamed to their authority
+              names on 2026-08-05; these two were left alone rather than guessed."}
 
   {:gap/id :undeclared-family-candidates
    :gap/measured-at "2026-08-04"

@@ -82,8 +82,28 @@ names remain; new west entries must use the new names only.
 |---|---|---|---|
 | 1 | **origin** | 主題が他者の仕様・製品 | 出所の**登録可能ドメインのラベル逆順** + 主題 |
 | 2 | **role** | 実行役割が定まっている | `loop-` `skill-` `action-` `app-` `person-` `capability-` `cloud-itonami-*-` |
-| 3 | **family** | ここが所有する複数 repo の集合 | `kami-` `kotoba-` `kotobase-` `kura-` `kotodama-` |
+| 3 | **family** | ここが所有する複数 repo の集合 | `kami-` `kotoba-` `kotobase-` `kura-` |
 | 4 | **subject** | 上のいずれでもない再利用ライブラリ | bare 名 |
+
+**identity は名前单体ではなく `<org>/<name>` のパス**（2026-08-05、ADR-2608040170）。
+GitHub が第 1 セグメントを与えているので、**名前は org セグメントがまだ言っていない
+部分だけを担う**:
+
+- `kotoba-lang/kami-engine` — org が kotoba-lang.org、名前が `kami`(サブドメイン) +
+  `engine`(主題) → **既に正しい**。`org-kotoba-lang-kami-engine` は org を 2 回言っている
+- `kotoba-lang/org-ietf-x509` — authority が外部なので名前が完全な reverse-DNS を担う
+
+**org→domain は 7 org すべて DNS 実測済み**（`:org-domain` vocabulary）。うち 3 つ
+（`cloud-itonami`=itonami.cloud / `com-junkawasaki`=junkawasaki.com /
+`network-awai`=awai.network）は **org 名自体が既に reverse-DNS**。
+
+- **既存 family の形が elision に優先する** — `cloud-itonami-isic-6419` を bare な
+  `isic-6419` にすると 459 件の family に 2 つの形が混在する。elision が縛るのは
+  **これから作る family**。既存の 1,621 件の org 二重記載は冗長だが誤りではない
+  （`--name-audit` は報告するが fail しない）
+- **family の裏付け**: 配信 family（ホストを持つ）は**実在のサブドメイン**、
+  library family（ホストを持たない `kami-` 等）は**所有 repo の宣言**。
+  何も serve しないサブドメインを登録する必要はない
 
 **`com-` は「商用法人」という分類ではない — stripe.com を逆順にした結果**である
 （オーナー指摘 2026-08-04）。だから origin 面の名前を決めるのに判断は要らない:
