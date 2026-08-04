@@ -114,5 +114,43 @@ point read は Neo4j / Datomic / RisingWave の 3 者すべてに 10x–500x 勝
 - Apache-2.0 §5 により inbound=outbound となり、CLA を運用せずに外部コントリビューションを受け取れる。
 - MIT だった 158 repo が Apache-2.0 になる。単一著作権者なので relicense 可能だが、**MIT 版を既に取得した第三者はその条件を保持する**（遡及しない）。
 - `GOVERNANCE.md` で bus factor 1 を公表することは短期的には不利に見えるが、評価者が依存を取った**後**に発見するより誠実で、maintainer 追加という解消条件も明示している。
-- **未解決**: `kotobase-cljc-worker` が archived。README の stack topology 図はこれを「edge runtime = kotobase.net の PDS」として最上段に置いており、**flagship の README が read-only な repo を指している**。実体は `net-kotobase/kotobase-cf-wasm`（private）に移っているとみられ、README の記述が古いか、archive が誤りかのどちらか。オーナー判断が要る。
-- **未解決**: kotobase README の stack topology が `ipld` / `multiformats` / `dag-cbor` / `commit-dag` という旧名でリンクしている。実体は `io-ipld` / `io-multiformats` / `org-ietf-cbor` / `chain` にリネーム済みで、GitHub のリダイレクトで辛うじて解決している状態。"}]
+- **解決済み（2026-08-04）**: `kotobase-cljc-worker` の archive はオーナー判断で誤りとされ unarchive、Apache-2.0 + NOTICE を適用した。Wave 1 は 32/32 完了。
+- **未解決**: kotobase README の stack topology が `ipld` / `multiformats` / `dag-cbor` / `commit-dag` という旧名でリンクしている。実体は `io-ipld` / `io-multiformats` / `org-ietf-cbor` / `chain` にリネーム済みで、GitHub のリダイレクトで辛うじて解決している状態。
+
+# ライセンスの次に見つかったもの — 公開サイトのリンクが半分死んでいた（2026-08-04）
+
+**ライセンス欠落と同じ性質の障害が、もう一段手前にあった。** 匿名で kotobase.net を
+巡回したところ、**外向きリンク 24 件のうち 13 件が 404** だった（実測、`scratchpad/linkcheck.cljs`）。
+`gh` CLI は自分の認証で private repo を 200 と読むので、**素の fetch で匿名検査しないと
+気付けない**種類の障害である。
+
+死んでいたもの: 利用規約（トップページ）/ セキュリティ報告窓口（`/support` `/contact`）/
+バグ報告 issues/new（`/support`）/ **Pin-service quickstart = 5 分導線そのもの**（`/` `/developers` `/signup`）/
+ENTERPRISE-READINESS / DATA-HANDLING / SUPPLY-CHAIN / OBSIDIAN / PLANS / "Source and examples"。
+
+原因は 2 つ: ①`net-kotobase` が private なのに公開サイトがそこを指していた
+②一部はさらに古い org（`gftdcojp/net-kotobase`）を指したまま残っていた。
+**有料ティアを売っているサービスで利用規約リンクが 404** という状態が続いていた。
+
+**さらに `site-check.cljc` が旧 URL を固定値で持っていたため、gate は緑のままだった。**
+ADR-2608036600 が記録した「exit 0 を信用しない」の別形で、**検査対象を固定値で焼くと
+「検査は通るが対象は壊れている」状態**になる。
+
+## 対処（オーナー選択: 公開 docs 専用 repo）
+
+`kotoba-lang/kotobase-docs`（public / Apache-2.0）を新設し 7 文書を公開。サイト側は
+`marketing_pages` / `site_page` / `signup_page` / `site_chrome` とテスト・`site-check` の
+リンク定数を差し替え、静的 HTML（`clojure -M:render-site` の生成物）を再生成して deploy。
+**結果 0/22 dead を実測確認。**
+
+- **公開前監査**: `ENTERPRISE-READINESS.md` から Worker version UUID / CI run ID と、
+  「どの変更管理・認証情報保護が現在不在か」を名指しした文を除去した。**"Partial" /
+  "Not met" のギャップ記載は一切弱めていない** —— 削ったのは攻撃者向けの地図であって
+  正直さではない。redaction の事実と方針は `kotobase-docs/README.md` に明記している。
+- **コピー方式の代償を明示**: docs repo は正本ではなく公開コピーで、drift しうる。
+  `sync-check.cljs`（private 原本と比較、operator 専用）を同梱し、README に「正本は
+  private 側」と書いた。黙ったコピーにしない。
+- plugin source は公開実体が無いため、リンクを誤ラベルで生かさず該当項目を落とした。
+
+検証: `npm test` 304 tests / 1513 assertions / 0 failures、`npm run site:check` 全 ok、
+deploy 後に匿名 linkcheck で 0/22 dead。"}]
