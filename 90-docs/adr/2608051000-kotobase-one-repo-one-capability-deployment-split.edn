@@ -148,6 +148,38 @@
      "gftdcojp/ai-gftd-kotobase の KOTOBASE_ACTOR_DID を did:web:kotobase.net に変更"
      "CF DNS から kotobase.gftd.ai を削除"]}
 
+   :secret-retrievability-gate
+   {:rule
+    "**capability を分割する前に、その新スクリプトが必要とする secret を全部『読み戻せる』ことを
+     確認する。1 件でも読み戻せないものがあれば分割してはならない。**
+     Cloudflare の Worker secret は**スクリプト単位かつ write-only** なので、新しい名前の
+     スクリプトを作ることは『secret ゼロの状態から始める』ことと同義であり、既存スクリプトから
+     値を引き継ぐ手段は無い。読み戻せない secret を持つ Worker を改名することは、
+     その capability を復旧不能にする一方通行の操作である。"
+    :measured-2026-08-04
+    {:engine
+     {:needs ["KOTOBA_SEED" "KOTOBASE_B2_KEY_ID" "KOTOBASE_B2_APP_KEY"]
+      :retrievable ["KOTOBA_SEED ← kagi item KOTOBA_SEED_PRODUCTION（compartment net-kotobase、KAGI_HOME=$HOME/.kagi、存在確認済み）"]
+      :not-retrievable
+      ["KOTOBASE_B2_KEY_ID / KOTOBASE_B2_APP_KEY — kagi に mirror が無い
+        （kotobase-graph-database/DEPLOY.md が『that item has no kagi mirror』と自ら記録している）。
+        Cloudflare 側は write-only で読めない。1Password item『BACKBLAZE 260225 application keys』が
+        出所だが、この環境の op は対話 Touch ID 承認を要求し、agent は安全床①によりそれを代行しない。"]
+      :status :blocked
+      :consequence
+      "engine の repo 抽出（network-awai/net-kotobase-engine、e70175db0c6、履歴 18 commit 付き）までは
+       完了しているが、**deploy はしていない**。B2 資格情報を読み戻せないまま新スクリプトを立てると
+       B2 に到達できない engine ができ、既存スクリプトを改名すれば本番 engine が復旧不能になる。"
+      :unblock
+      "オーナーが `op signin` するか、1Password の当該 item から B2 keyId/appKey を kagi
+       compartment net-kotobase へ写す（`KOTOBASE_B2_KEY_ID` / `KOTOBASE_B2_APP_KEY`）。
+       写した時点で engine 以降の分割はすべて非対話で進む。"}}}
+   :precondition-for-all-steps
+   "上記 gate は engine 固有ではない。s3 / pinning / atproto / git の各 shell も
+    WRITE_TOKEN・S3_ACCESS_KEY_ID・S3_SECRET_ACCESS_KEY 等を持つので、分割前に同じ確認を行う。
+    secrets-location-map によればこれらは Keychain service cf:kotobase-protocols-worker に
+    operator copy があるので、engine の B2 より条件は良い可能性が高いが、**未確認**。"
+
    :route-cutover-procedure
    "Cloudflare の custom_domain は 1 host = 1 Worker なので、移設は必ず『外して付ける』になり無防備な
     瞬間が生じる。capability ごとに次の順を守る。逆順にすると host が宙に浮く。
