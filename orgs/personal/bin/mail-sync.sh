@@ -77,7 +77,40 @@ done < <("$REG" mail-accounts)
 git annex add "$MSGS"               >>"$LOG" 2>&1
 git annex copy --to b2 -J4 "$MSGS"  >>"$LOG" 2>&1
 if ! git diff --cached --quiet -- "$MSGS"; then
-  git commit -m "personal(mail): periodic sync $(date +%F) ($synced account(s))" -- "$MSGS" >>"$LOG" 2>&1
+  msg="personal(mail): periodic sync $(date +%F) ($synced account(s))"
+  git commit -m "$msg" -- "$MSGS" >>"$LOG" 2>&1
   log "committed new mail pointers"
+
+  # Land it. This step did not exist: the commit was made and nothing else
+  # happened, so pointers piled up on whatever branch the shared checkout was
+  # left on. Measured 2026-08-04: 21 sync commits (33 .eml pointers) stranded
+  # on gap/adr-correct while the superproject drifted to 517 behind / 21 ahead
+  # of main. Nothing was lost -- the blobs were already in B2 -- but nothing
+  # landed either, and the gap grew every 15 minutes.
+  branch="$(git rev-parse --abbrev-ref HEAD)"
+  if [ "$branch" != "main" ]; then
+    # Deliberately not "switch to main and commit there": this routine shares a
+    # working tree with human and agent sessions, and moving their branch out
+    # from under them is worse than not landing. Loud beats clever.
+    log "WARN on branch '$branch', not main -- pointers are committed but NOT landed."
+    log "WARN land them with: git push origin HEAD:refs/heads/routine/mail-sync-$(date +%F)"
+  else
+    rb="routine/mail-sync-$(date +%F)"
+    if git push -q --force-with-lease origin "HEAD:refs/heads/$rb" >>"$LOG" 2>&1; then
+      # Server-side merge, per CLAUDE.md: no local merge, no rebase, never a
+      # push straight to main.
+      if gh api repos/com-junkawasaki/root/merges \
+           -f base=main -f "head=$rb" -f "commit_message=$msg" >>"$LOG" 2>&1; then
+        log "landed $rb on main"
+      else
+        # A race or conflict is not worth failing the sync over: the commit and
+        # the branch both exist, and the next run retries. Silence would be the
+        # real problem, so say so.
+        log "WARN merge of $rb failed -- branch is pushed; it will retry next run"
+      fi
+    else
+      log "WARN push of $rb failed -- pointers remain committed locally; will retry"
+    fi
+  fi
 fi
 log "=== mail-sync done ($synced account(s) synced) ==="
