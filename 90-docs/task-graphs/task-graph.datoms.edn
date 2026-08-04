@@ -186,12 +186,40 @@
   :task/repo "kotoba-lang/inga"
   :task/requires []
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "S4 の検証中に本番で観測。w4 が 3 ブロック遅れたまま復帰せず、**4 replica すべてで last-sync-request が null**。/reset で w4 を height 0 に戻しても再参加しなかった —— コードの /reset は『peer に足りない分を尋ねて再参加するはず、それが sync の役目で何もそれを試していなかった』と書いているが、実際に試したら鳴らなかった。
+  :task/status :completed
+  :task/status-at "2026-08-04"
+  :task/status-note "**要求側は直って本番で確認済み。応答側に別の欠陥が見つかり S11 として起票した。**
+
+  kotoba-lang/inga a19dfd1 / torihiki-node 079c5c0（code-version 84、deploy 済み）。view が timeout したら sync を要求する経路を足した —— **止まっている replica が唯一必ず知っているのは、自分が止まっていること**なので、それを発火条件にする。view ごと 1 回に絞ってある（条件が永久に解けない送信経路は洪水になる。直前に自分でその間違いをしたばかり）。
+
+  本番実測: `sent-types` の sync-request が **0 → 48/49**（以前は 4 replica すべてで last-sync-request が null）。sync-response も 115〜139 件飛んでいる。284 tests / 1,309 assertions、parity は JVM と nbb で一致、lint errors 0。既存テスト once-the-clock-runs-a-stalled-replica-times-out が [:new-view] だけを期待して落ちたので、緩めずに #{:new-view :sync-request} の集合として新しい契約を書いた。
+
+  **ただし遅れた replica は依然として復帰しない。** /reset した w4 は sync-request を出し、peer は sync-response を返しているのに、height 0 のまま last-sync が null —— 何も adopt されていない。原因は S11 に書いた。
+
+  元の起票内容: S4 の検証中に本番で観測。w4 が 3 ブロック遅れたまま復帰せず、**4 replica すべてで last-sync-request が null**。/reset で w4 を height 0 に戻しても再参加しなかった —— コードの /reset は『peer に足りない分を尋ねて再参加するはず、それが sync の役目で何もそれを試していなかった』と書いているが、実際に試したら鳴らなかった。
 
   sync-request が出る経路は 2 つしかない: (a) 親が未知の proposal を受けたとき (b) 自分より高い high-qc を含む new-view を受けたとき。**誰も提案しない膠着では (a) は起きず、(b) も遅れた側が new-view をほとんど受け取らない**（実測 msgs-in 8〜21）ので鳴らない。つまり『遅れると孤立し、孤立すると遅れが直らない』。
 
   直す方向: 遅れを自分で検出する経路（tick で高さの差を見る / vote を受けたときにその height を見る）を足す。テストは『1 replica だけ遅らせた網が自力で追いつくこと』。"}
+
+ {:db/id -18
+  :task/id "S11-cannot-serve-history-after-bounded-resume"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "履歴を出せない replica は peer を治せない — bounded resume が sync の応答を壊した"
+  :task/kind "consensus"
+  :task/repo "kotoba-lang/inga"
+  :task/requires []
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "**S2 の bounded resume が持ち込んだ代償。自分で入れた。** `handle-sync-request` は in-memory の `(:chain state)` から答えるが、`resume` はその chain を末尾 resume-tail(8) 件に切り詰める。だから checkpoint から起動した replica は**自分より古いブロックを一切出せない**。
+
+  本番実測（S10 の検証中）: height 0 に /reset した w4 が sync-request を 49 件送り、peer は sync-response を 115〜139 件返しているのに、w4 は height 0 のまま `last-sync` が null —— 応答が空だから何も adopt されない。**要求が届いても、答えられる者がいない。**
+
+  ブロック自体は失われていない: torihiki-node の Durable Object storage に `blk:` キーとして全部ある。無いのは inga がそれを読む口。
+
+  直す方向: replica に『高さ範囲でブロックを取る』seam を注入する（hash-fn / sign-fn / machine と同じ形）。node はそれを storage 読み出しで実装する。**テストは『bounded resume した replica が、自分の chain より古い範囲の sync-request に答えられること』**。
+
+  優先度: これが無いと 1 台落ちた network は二度と 4/4 に戻らず、quorum 3 に対し稼働 3 の余裕ゼロで回り続ける（実測でその状態になり、devnet を wipe して 4/4 に戻した）。"}
 
  {:db/id -16
   :task/id "S9-quadratic-replay"
