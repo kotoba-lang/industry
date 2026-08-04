@@ -347,3 +347,18 @@
              "inline 系の細部（span y +20、label 3/8、button 4/9、option 2/6）"
              "cascade の UA stylesheet 所在（構造的）"
              "parser: comment node type（cross-repo）、omission 3 件（別 agent が作業中）"]}
+
+{:at "2026-08-04"
+ :iteration 36
+ :landed {:dom-gpu "fbcb08f9478b3ab600f20067360545d2d04d97e8 — comment ノード型（layout 視点と DOM 視点を分ける）+ README 記載"}
+ :note "parser conformance の comment 3 case を塞ぐための cross-repo な前提。
+        このスタックには comment の node type がどこにも無かった。捨てると comment が
+        消えるだけでなく前後のテキストが 1 ノードに併合される（ブラウザは 2 つ保つ）。
+        tree（レイアウト視点）は落とし comment-tree（DOM 視点）は保持する分割にしたので
+        cssom.layout は変更不要。htmldom 側の配線は別 repo・別 agent 作業中のため分離。"
+ :process-note "**commit message をシェル経由で渡してバックティックが展開され、1 件目の message が
+                 壊れた**（`tree` がコマンドとして実行されディレクトリ一覧が混入）。コード・test・
+                 docstring は正しく、壊れたのは git log の記録のみ。follow-up commit で README に
+                 内容を回復。以後 commit message はファイルに書いて -F で渡す。"
+ :verification {:dom-gpu "126 tests / 272 assertions 0 failures、clj-kondo 0 errors"
+                :browser "752 tests 0 failures"}}
