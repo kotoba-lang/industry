@@ -45,6 +45,7 @@
 (ns lei-profile-enrich
   (:require ["fs" :as fs]
             ["path" :as path]
+            ["node:crypto" :as node-crypto]
             ["child_process" :refer [execSync execFileSync]]
             [clojure.string :as str]
             [cljs.reader :as edn]
@@ -59,12 +60,18 @@
 (def only-lei (some-> (flag "--lei") str/upper-case))
 
 (def pii-dir
-  (or (.-env.LEI_PII_DIR js/process)
+  (or (aget (.-env js/process) "LEI_PII_DIR")
       "orgs/cloud-itonami/cloud-itonami-contact-pii"))
 
 (def age-identity
-  (or (.-env.LEI_PII_AGE_IDENTITY js/process)
-      (path/join (or (.-env.HOME js/process) "~") ".config/cloud-itonami/contact-pii.age-identity")))
+  ;; `(.-env.HOME js/process)` did NOT resolve here and silently produced the
+  ;; literal path `~/.config/...`, which no `open(2)` expands. `read-record`
+  ;; then failed on every call, was caught, and returned nil -- so the
+  ;; "decrypt and compare before writing" step that exists to stop age from
+  ;; minting a fresh annex object on every run was never actually running.
+  (or (aget (.-env js/process) "LEI_PII_AGE_IDENTITY")
+      (path/join (or (aget (.-env js/process) "HOME") ".")
+                 ".config/cloud-itonami/contact-pii.age-identity")))
 
 (def ua
   "Identify honestly as an automated collector with a contact route. Pretending
@@ -282,9 +289,33 @@
 
 (def ^:private entity-mention-re
   "A company-like name: a token run ending in a legal form. Used to find which
-  legal entity a section of an Impressum is speaking about."
-  #"(?i)([\p{L}\p{N}&.\-' ]{2,80}?\s(?:AG|Aktiengesellschaft|SE|GmbH|KGaA|KG|OHG|PLC|Ltd\.?|Limited|Inc\.?|Corp\.?|Corporation|N\.V\.|B\.V\.|S\.A\.|SAS|S\.p\.A\.|Oyj|AB|ASA))(?:\b|$)|((?:株式会社[\p{L}\p{N}]{1,30})|(?:[\p{L}\p{N}]{1,30}株式会社))")
+  legal entity a section of an Impressum is speaking about.
 
+  Built with `js/RegExp` and the `u` flag for the same reason as
+  `non-alnum-re`: a `#\"...\"` literal cannot carry it, and without it every
+  `\\p{L}` here matches the literal letters `p`, `{`, `L`, `}` instead of any
+  Unicode letter."
+  (js/RegExp.
+   (str "([\\p{L}\\p{N}&.\\-' ]{2,80}?\\s(?:AG|Aktiengesellschaft|SE|GmbH|KGaA|KG|OHG|PLC|"
+        "Ltd\\.?|Limited|Inc\\.?|Corp\\.?|Corporation|N\\.V\\.|B\\.V\\.|S\\.A\\.|SAS|"
+        "S\\.p\\.A\\.|Oyj|AB|ASA))(?:\\b|$)"
+        "|((?:株式会社[\\p{L}\\p{N}]{1,30})|(?:[\\p{L}\\p{N}]{1,30}株式会社))")
+   "iu"))
+
+;; `\p{...}` is a UNICODE PROPERTY ESCAPE and JavaScript only honours it when the
+;; regex carries the `u` flag. A ClojureScript `#"..."` literal has no way to set
+;; that flag, so `#"[^\p{L}\p{N}]+"` silently degrades to the character class
+;; `[^p{LN}\]` -- which strips ordinary letters instead of keeping them.
+;;
+;; This was not a theoretical defect. `normalise-entity` reduced every company
+;; name to a near-empty string, so `entity-matches?` returned nil for a name
+;; compared against ITSELF and the representative extractor could never emit
+;; anything. The CJK branch of `name-like?` was dead for the same reason, which
+;; is why no Japanese company ever produced a representative either. Both looked
+;; like "the sites don't publish this", and the measured zero was a bug.
+(def ^:private non-alnum-re (js/RegExp. "[^\\p{L}\\p{N}]+" "gu"))
+(def ^:private cjk-name-re (js/RegExp. "^[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}・\\s]{2,20}$" "u"))
+(def ^:private latin-word-re (js/RegExp. "[\\p{L}\\p{N}&.\\-' ]{2,80}?", "u"))
 (defn- name-like?
   "A person's name, conservatively. No digits, no URL/email, not a sentence.
   Latin names are 2-5 whitespace-separated tokens; CJK names are one token of
@@ -296,8 +327,15 @@
          (not (re-find #"[0-9@]|https?://|\.(com|org|net|jp|de)\b" v))
          ;; Unbalanced brackets mean the string was cut mid-list.
          (= (count (re-seq #"[（(]" v)) (count (re-seq #"[)）]" v)))
-         (not (re-find #"[.。!?]" v))
-         (or (re-find #"^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}・\s]{2,20}$" v)
+         ;; A full stop is allowed ONLY inside an abbreviation -- `Dr.`,
+         ;; `Prof.`, `J.` -- so honorifics and initials survive while prose does
+         ;; not. `Dr. Michael Peterson` was being dropped by a blanket
+         ;; period ban, which quietly discards exactly the board members whose
+         ;; published form carries a doctorate, i.e. a lot of German ones.
+         (not (re-find #"[。!?]" v))
+         (every? #(or (not (str/includes? % ".")) (<= (count %) 6))
+                 (str/split v #"\s+"))
+         (or (.test cjk-name-re v)
              (<= 2 (count (str/split v #"\s+")) 5)))))
 
 (def ^:private rep-sentence-re
@@ -305,6 +343,7 @@
   followed by the names on the next line. Common on real Impressum pages, and
   DANGEROUS -- see `entity-matches?`."
   #"(?im)^\s*(?:Die|Der|Das)?\s*([^\n]{2,90}?)\s+(?:wird\s+)?vertreten durch(?:\s+(?:den|die|das))?\s*([^:\n]{0,30}?)\s*[:：]\s*$")
+
 
 (defn- normalise-entity
   "Company names for comparison: lowercase, legal form and punctuation removed.
@@ -314,7 +353,7 @@
   (-> (str s)
       str/lower-case
       (str/replace #"\b(ag|aktiengesellschaft|se|gmbh|kgaa|kg|ohg|plc|ltd|limited|inc|corp|corporation|nv|bv|sa|sas|spa|oyj|ab|as|a/s|株式会社|有限会社)\b" " ")
-      (str/replace #"[^\p{L}\p{N}]+" " ")
+      (str/replace non-alnum-re " ")
       str/trim))
 
 (defn- entity-matches?
@@ -466,7 +505,39 @@
          (filter #(str/starts-with? % "age1"))
          first)))
 
-(defn- record-path [lei] (path/join pii-dir "records" (str lei ".edn.age")))
+(def ^:private record-key
+  "HMAC key for record filenames, derived from the age identity itself.
+
+  The identity file is already the capability that gates reading these records,
+  so deriving from it adds no new secret to manage and no new thing to lose --
+  and it means anyone who can decrypt can also locate, while anyone who merely
+  has repository access can do neither."
+  (delay
+    (let [id (.toString (fs/readFileSync age-identity))]
+      (-> (node-crypto/createHash "sha256")
+          (.update (str "cloud-itonami-contact-pii/record-name/v1\n" id))
+          (.digest)))))
+
+(defn- record-name
+  "`records/<hmac(LEI)>.edn.age`, not `records/<LEI>.edn.age`.
+
+  A private repo with encrypted payloads hides the CONTENTS. It does not hide
+  the FILE NAMES, and `records/529900....edn.age` announces, to everyone with
+  repository access, exactly which companies this fleet holds personal data on
+  -- which is itself the sensitive fact for a sales dataset. Hashing the name
+  under the same capability that decrypts the body closes that channel without
+  adding a second secret.
+
+  Deterministic, so a re-run finds and compares the existing record rather than
+  writing a duplicate under a new name. Reverse lookup is by recomputing the
+  HMAC for a known LEI: this is not a searchable index, on purpose."
+  [lei]
+  (-> (node-crypto/createHmac "sha256" @record-key)
+      (.update (str/upper-case (str lei)))
+      (.digest "hex")
+      (subs 0 32)))
+
+(defn- record-path [lei] (path/join pii-dir "records" (str (record-name lei) ".edn.age")))
 
 (defn- read-record
   "Decrypt the existing record, or nil. Used to compare BEFORE writing: age
@@ -595,7 +666,49 @@
                        (do (js/console.error "FATAL unhandled rejection:" (or (.-stack e) (str e)))
                            (.exit js/process 1)))))))
 
-(defn -main []
+(defn- probe-url!
+  "Operator debug mode: run every extractor against ONE page and print what it
+  found, including person names.
+
+  This is the only place names are printed. The scheduled path prints counts
+  only, because its output lands in a log file -- but an extractor whose output
+  can never be inspected cannot be verified either, and an unverified extractor
+  writing personal data is worse than a visible one. Requires --as so the entity
+  gate has something to check against."
+  [url legal-name]
+  (println "⚠ DEBUG MODE — this prints personal data to the terminal. Do not redirect to a file.")
+  (-> (fetch-html url)
+      (.then (fn [pg]
+               (cond
+                 (blocked? pg) (println "blocked (bot check) — skipped, never bypassed")
+                 (nil? (:body pg)) (println "unreachable:" (:status pg) (:error pg))
+                 :else
+                 (let [b (:body pg)]
+                   (println "final url  :" (:url pg))
+                   (println "phone      :" (or (extract-phone b) "-"))
+                   (println "address    :" (or (extract-address b) "-"))
+                   (println "register   :" (or (extract-registration-number (visible-text b)) "-"))
+                   (println "entity gate: comparing against" (pr-str legal-name))
+                   (let [ls (vec (str/split-lines (visible-text b)))]
+                     (println "lines      :" (count ls)
+                              "| sentence-form hits" (count (filter #(re-find rep-sentence-re %) ls))
+                              "| inline hits" (count (filter #(re-find rep-inline-re %) ls))
+                              "| label-only hits" (count (filter #(re-find rep-label-re %) ls)))
+                     (doseq [i (range (count ls))]
+                       (when-let [m (re-find rep-sentence-re (nth ls i))]
+                         (println "  hit@" i "entity" (pr-str (nth m 1))
+                                  "gate" (entity-matches? legal-name (nth m 1)))
+                         (println "  next " (pr-str (str/trim (or (get ls (inc i)) ""))))
+                         (println "  split" (pr-str (mapv :person/name (split-names (or (get ls (inc i)) ""))))))))
+                   (let [ps (extract-representatives legal-name b)]
+                     (println "persons    :" (count ps))
+                     (doseq [p ps]
+                       (println "   " (pr-str (:person/name p))
+                                "| title" (pr-str (:person/title p))
+                                "| label" (pr-str (:person/source-label p)))))))))
+      (.catch (fn [e] (println "ERROR" (.-message e))))))
+
+(defn- -main-catalog []
   (when-not (fs/existsSync (path/join pii-dir "recipients.txt"))
     (println "PII dataset not found at" pii-dir "-- refusing to run.")
     (println "Person-level facts have nowhere safe to go, and writing them to the")
@@ -644,6 +757,22 @@
                (println "person records were written into" pii-dir "-- they are NOT committed yet.")
                (println "  cd" pii-dir "&& datalad save -m 'records: <n> companies' && datalad push --to b2")))))
       (.catch (fn [e] (println "FATAL:" (.-message e)) (set! (.-exitCode js/process) 1)))))
+
+(defn- read-record!
+  "Decrypt and print one company's record. The only way to look one up now that
+  file names are hashed -- and it needs the age identity, which is the point."
+  [lei]
+  (println "⚠ DEBUG MODE — this prints personal data to the terminal.")
+  (println "file:" (record-path lei))
+  (if-let [r (read-record lei)]
+    (println (pr-str r))
+    (println "no record for" lei)))
+
+(defn -main []
+  (cond
+    (flag "--url") (probe-url! (flag "--url") (or (flag "--as") ""))
+    (flag "--read") (read-record! (str/upper-case (flag "--read")))
+    :else (-main-catalog)))
 
 (install-network-error-guard!)
 (-main)
