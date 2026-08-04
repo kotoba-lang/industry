@@ -2,6 +2,7 @@
   :adr/id "adr-2608041200-cloud-itonami-moneyforward-business-card-statement-plane"
   :adr/title "ADR-2608041200: MF ビジネスカードを cloud-itonami に統合する — authority ではなく attest された statement plane として載せ、確定済み引き落としを funding gate に接続する"
   :adr/status "accepted"
+  :adr/implemented true
   :adr/doc_type "adr"
   :adr/doc-type "adr"
   :adr/source-format "edn"
@@ -26,7 +27,8 @@
   "# ADR-2608041200: MF ビジネスカードを cloud-itonami に統合する
 
 Date: 2026-08-04
-Status: accepted（設計。実装は未着手 — Verification 節に到達点を明記）
+Status: accepted（D1–D7 実装済み・main 着地済み。**完了条件 4 つのうち 1 つは未達** —
+Verification 節を参照）
 
 ## Context
 
@@ -258,47 +260,60 @@ datom 面に載せるときの `:source/dataset` は `\"itonami-card-statement\"
 4. **明細行から請求額を合算して `:confirmed` にする。** 却下（D3 末尾）。
    推定値を確定値として gate に入れると、D5 の refusal が嘘になる。
 
-## Verification
+## Verification（2026-08-04 実測）
 
-**これは設計 ADR であり、コードは 1 行も書いていない。** 以下は到達点であって
-実測ではない。実装の第一歩は「実 CSV を 1 本出して列を実測し、D4 の未確認事項を
-実測で置き換える」こと。
+着地: `cloud-itonami/cloud-itonami-app` main `e9cc53fb4eb4`
+（`agent/card-statement-plane` をサーバ側マージ）。west pin は
+`d876ff5c2fdf → e9cc53fb4eb4`。
 
-次の最初の具体的コマンド:
+実装:
 
-```bash
-# 1) 実 CSV の列を実測する（推測でスキーマを書かない）
-#    MF ビジネスカード → 利用明細 → CSV エクスポート（期間を明示して 10,000 件未満に分割）
-#    → 列名・日付書式・金額書式・取引ID列の有無を記録し、本 ADR D4 を実測で書き換える
+| ファイル | 内容 |
+|---|---|
+| `src/cloud/itonami/app/card_statement.clj`（新規） | RFC4180 パーサ・宣言的な列マッピング・金額/日付の parse・`natural-key` / `external-reference`・`link-card!` / `ingest!` / `record-billing-cycle!` / `billing-cycles` |
+| `src/cloud/itonami/app/funding.clj` | `scheduled-debit`（pure）/ `available`（pure） |
+| `src/cloud/itonami/app/authority/payment.clj` | `:scheduled-debit` を必須入力に追加、`:payment/scheduled-debit-unstated` と `:payment/insufficient-available-funds`、`:scheduled-debit-at-review` を proposal に記録 |
+| `src/cloud/itonami/app/authority/api.clj` | `payment-facts` が 6 番目の fact を server 側計算で**上書き** |
+| `test/cloud/itonami/app/card_statement_test.clj`（新規、21 tests） | 下記の完了条件 |
+| `test/cloud/itonami/app/authority/payment_test.clj` | fixture に `:scheduled-debit {:funding/status :never-recorded}` を追加 |
 
-# 2) parse + dedupe を pure に実装（clock も store も触らない）
-cd orgs/cloud-itonami/cloud-itonami-app
-#    src/cloud/itonami/app/card_statement.clj
-#    test/cloud/itonami/app/card_statement_test.clj
+テスト: `clojure -M:test` → **969 tests / 4184 assertions / 0 failures / 0 errors**。
+`clojure -M:lint` → **errors 0**（warning 7 はすべて既存の別件:
+`account_link_sync` / `agent_control` の unresolved var、`mailbox_http_test` の
+missing require）。
 
-# 3) funding 側に scheduled-debit を足し、payment の gate を接続
-#    src/cloud/itonami/app/funding.clj      … available-balance / scheduled-debit-freshness
-#    src/cloud/itonami/app/authority/payment.clj … :payment/insufficient-available-funds
-#    src/cloud/itonami/app/authority/api.clj     … payment-facts に scheduled-debit を server 計算で追加
+完了条件 4 つのうち **3 つ達成、1 つ未達**:
 
-clojure -M:test
-```
+| # | 条件 | 状態 |
+|---|---|---|
+| 1 | **実 CSV に対する parse の round-trip** | **未達**。export には発行会社コンソールへのログインが要り、それは owner の作業（安全床①）。**代替として「宣言した列と一致しない見出しは ingest 全体を拒否し、期待した列名と実際の見出しの両方を message に出す」ことをテストしてある** — 位置で推測するパーサなら黙って別の列を金額として読むところを、必ず止まる |
+| 2 | 同じ export を二度 ingest しても増えない | ✅ `importing-the-same-export-twice-records-nothing-the-second-time` / `an-overlapping-export-records-only-what-is-new` |
+| 3 | `:never-recorded` が available を balance に丸めない | ✅ `no-cycle-recorded-is-never-recorded-and-never-zero` |
+| 4 | client 供給の `:scheduled-debit` を上書きする | ✅ `a-client-cannot-supply-its-own-schedule`（`{:funding/status :known :funding/amount-minor 0}` を送っても `:payment/insufficient-available-funds` で落ちる） |
 
-完了条件（この 4 つが揃うまで「実装済み」と言わない）:
-
-1. 実 CSV に対する parse の round-trip テスト（合成データだけで通したと言わない）。
-2. 同じ CSV を二度 ingest しても `:card-transaction` が増えないテスト。
-3. `:never-recorded` な scheduled-debit が **available を balance に丸めない**
-   ことのテスト（黙って通る方向の失敗なので、これが無ければ D5 は文章だけ）。
-4. `authority.api/payment-facts` が client 供給の `:scheduled-debit` を
-   **上書きする**ことのテスト（既存 5 facts と同じ enforcement point）。
+**したがって「MF ビジネスカードの実データが通ることは検証していない」。** 通ったのは
+合成 CSV と、実データが期待どおりでなければ**止まる**という性質。次に実 export を
+1 本得たら、その見出し行を `card_statement_test.clj` の `header` に入れ、
+必要なら `default-transaction-columns` を実測で置き換える。それが済むまで D4 の
+未確認事項は未確認のまま。
 
 未測定として名指ししておくもの:
 
-- MF CSV の実列（D4）。
+- MF CSV の実列・取引ID列の有無（上記 #1）。
 - MF ビジネスカードの公式 API の有無（公開ドキュメントに記載が確認できない、
   であって「無い」と確認したわけではない）。
 - `orgs/personal/facts/orgs.edn` の `moneyforward` 項目の実値（west 未登録で
   この checkout に無い）。「ウォレット残高不足が慢性化」は jk-corp 側の
   引用であって、本 ADR で直接検証していない。
+- 実運用の締め日・引き落とし日（`:billing-cycle` は手入力で、まだ 1 件も
+  実データが入っていない）。
+
+## 未実装（この ADR の範囲内で意図的に残したもの）
+
+- **HTTP ルートと UI が無い。** `ingest!` / `link-card!` / `record-billing-cycle!`
+  は関数として存在するが、`server.clj` にルートは生えていない。CSV を渡す経路は
+  現状 CLI/REPL のみ。UI を付けるときは D7 の到達上限（記録であって制御ではない）を
+  画面上でも明示すること。
+- **プリペイド（チャージ口座）残高**は未モデル化。D5 が「別の失敗として分ける」と
+  決めた側で、`:billing-cycle` とは別 entity になる。
 "}]
