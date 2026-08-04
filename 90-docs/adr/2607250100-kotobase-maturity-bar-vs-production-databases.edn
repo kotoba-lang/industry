@@ -110,7 +110,7 @@
   rejected loudly … never silently misread」と宣言していたが、tokenizer の
   正規表現に無い文字を `re-seq` が**黙って捨てて**いたため破れていた:
   ① `-[:r*]->`（可変長パス）が 1 ホップ `-[:r]->` として受理 ②
-  `WHERE a.n =~ "x"`（正規表現マッチ）が**等値比較**として受理。どちらも
+  `WHERE a.n =~ 「x」`（正規表現マッチ）が**等値比較**として受理。どちらも
   エラーを返さず「違う質問の答え」を返し、呼び出し側から検出できない。
   修正 `kotobase-server 3b28df2`（catch-all で loud reject、末尾 `;` のみ明示許可）。
   **宣言はあったが検査するテストが無かった**ことが原因なので `cypher_test.cljc`
@@ -140,8 +140,41 @@
 - 対応として net-kotobase の CI を murakumo fleet に移したが、**移せたのは hermetic な半分だけ**
   （tenant-isolation / metadata / bb syntax / python SDK conformance）。
   **live smoke はノードに egress が無いので載っていない** —— つまり可用性の連続計測は現在ゼロ。
-- 残 gap: Aura BC 99.95% 級の主張に必要な長期稼働実績（カレンダー時間）に加えて、
-  **いま計測そのものが止まっている**という、07-25 には無かった後退。
+- **2026-08-04: 計測を復旧した。ただし GitHub Actions は直していない。**
+  Actions が死んでいる原因は実測で **network-awai が free プラン + private repo** であること
+  ——`public-smoke` が 5 分毎（288 回/日）に走り、月 2,000 分の無料枠を数日で使い切る。
+  これは課金判断なので触っていない。代わりに operator 側の LaunchAgent
+  （`com.gftd.kotobase-slo-tick`、StartInterval 300s）を復旧させた。
+- **復旧の中身は「壊れ方」の方が重要**: LaunchAgent は導入済みだったが、`slo/` の親が
+  `kotobase-cf-wasm` → `kotobase-graph-database` にリネームされた際、**repo 側 plist は
+  追従したのに `~/Library/LaunchAgents/` のコピーが古いまま**で、tick は自分の
+  エントリポイントを ENOENT で開けず即死していた（**自己更新する仕組みが、自分の
+  エントリポイントの移動で更新不能になる** chicken-and-egg）。`launchctl list` の
+  exit status は 1 になっていたが、それを見る者がいなかった。
+  再インストールで復旧し、**同じ故障を次回検出できるよう `:plist-drift` を receipt に
+  出す変更を入れた**（`kotobase-server` ではなく net-kotobase 側、感度測定済み:
+  installed plist に 1 行足すと WARNING と非 nil の drift が出る）。
+- **未解決（closing 時点で開いている）**: 2026-08-04T01:41Z の apex worker deploy 後、
+  `:prod-apex-health` の p95 違反率が **11%（128 run 中 14）→ 50%（28 run 中 14）**、
+  p95 中央値が 316ms → 1295ms、最大 30,334ms に悪化した。**機序は特定できていない。**
+  判定材料は両方向にある:
+  - **deploy 側を疑う根拠**: 失敗 run では apex だけが跳ね、同じ run の他 4 endpoint
+    （backend-health / edge-only / unauth-write / testnet）は限界内。クライアント側の
+    飽和なら全部が遅くなるはず。live version は現在も当該 deploy（`c52e84a4`）で、
+    以後誰も deploy していない。
+  - **deploy 側を否定する根拠**: 変更内容は URL 文字列の差し替え（14 files / +47 −49 行）で
+    bundle はむしろ 250 バイト小さい。全 run で `failures 0`（HTTP は成功、遅いだけ）。
+    p50 は 16-21ms のまま。**closing 時点の実測は PASS**（apex p95 314ms）。
+    違反は deploy 前にも 11% 発生しており、新規事象ではなく頻度の変化。
+  - 計測ホストの load average が 51/81/88 と異常に高い時間帯（他セッション + 本セッションの
+    重いジョブ）と失敗の集中が重なる。
+  **次にやること**: 負荷の低い時間帯に `nbb slo/probe.cljs` を連続実行して違反率を取り直す。
+  それでも 50% 級なら Cloudflare 側の version 差分（`c52e84a4` と前 version `b182669a`）を
+  比較する。単一ホスト計測である限りこの切り分けは常に弱い —— **独立した status surface が
+  無いことが、この軸の本当の gap**。
+- 残 gap: Aura BC 99.95% 級の主張に必要な長期稼働実績（カレンダー時間）、paging の不在、
+  そして **計測が単一の operator ラップトップに依存している**こと（receipt 自身が
+  `single operator host` / `no paging` / `not an independent status surface` と明記している）。
 
 ## 軸 7: client SDK（**二言語 → 五言語**。ただし conformance の相手を読み違えないこと）
 
