@@ -126,7 +126,7 @@ point read は Neo4j / Datomic / RisingWave の 3 者すべてに 10x–500x 勝
 
 死んでいたもの: 利用規約（トップページ）/ セキュリティ報告窓口（`/support` `/contact`）/
 バグ報告 issues/new（`/support`）/ **Pin-service quickstart = 5 分導線そのもの**（`/` `/developers` `/signup`）/
-ENTERPRISE-READINESS / DATA-HANDLING / SUPPLY-CHAIN / OBSIDIAN / PLANS / "Source and examples"。
+ENTERPRISE-READINESS / DATA-HANDLING / SUPPLY-CHAIN / OBSIDIAN / PLANS / 「Source and examples」。
 
 原因は 2 つ: ①`net-kotobase` が private なのに公開サイトがそこを指していた
 ②一部はさらに古い org（`gftdcojp/net-kotobase`）を指したまま残っていた。
@@ -144,8 +144,8 @@ ADR-2608036600 が記録した「exit 0 を信用しない」の別形で、**�
 **結果 0/22 dead を実測確認。**
 
 - **公開前監査**: `ENTERPRISE-READINESS.md` から Worker version UUID / CI run ID と、
-  「どの変更管理・認証情報保護が現在不在か」を名指しした文を除去した。**"Partial" /
-  "Not met" のギャップ記載は一切弱めていない** —— 削ったのは攻撃者向けの地図であって
+  「どの変更管理・認証情報保護が現在不在か」を名指しした文を除去した。**「Partial」 /
+  「Not met」 のギャップ記載は一切弱めていない** —— 削ったのは攻撃者向けの地図であって
   正直さではない。redaction の事実と方針は `kotobase-docs/README.md` に明記している。
 - **コピー方式の代償を明示**: docs repo は正本ではなく公開コピーで、drift しうる。
   `sync-check.cljs`（private 原本と比較、operator 専用）を同梱し、README に「正本は
