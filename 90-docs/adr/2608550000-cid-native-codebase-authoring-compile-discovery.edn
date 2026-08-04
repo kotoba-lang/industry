@@ -123,6 +123,26 @@
    - **hash で browse する。** serve node が `/browse/{namespace}` と `/def/{cid}` を出す。
      リンクは全て hash なので、辿るのはサイト状のコピーでなく**実際のグラフ**。
 
+   ## L5 naming — 実 DHT の名前（codebase-ipns）
+
+   **五度目の pass で「announce には libp2p ノードが要る」と結論したのは、libp2p に
+   ついてではなく workspace について間違っていた。** `kotoba-lang/io-libp2p-specs-kad-dht`
+   には Kademlia keyspace・`/ipfs/kad/1.0.0` メッセージ・反復 lookup・k-bucket table・
+   **multi-router quorum 付きの HTTP delegated-routing client** が既にあり、
+   `kotoba-lang/tech-ipfs-specs-ipns` には**どの IPFS 実装も検証できる IPNS record**が
+   既にあった。**delegated router は DHT ノードそのもの**なので、そこへ publish すれば
+   Kubo が書くのと同じ DHT key に同じ record が載る。
+
+   - IPNS の value は **head record の CID**（namespace commit ではない）。commit に
+     直接着地した resolver は正しいバイトを持つが sequence も chain も検査できない ——
+     「head を知っている」と「head だと言われた」の差。
+   - **name registry も鍵配布も不要になった**（別途の作業ではなく帰結として）。IPNS 名は
+     publisher の公開鍵から導出されるので、`k51…` が鍵そのもの。名前を知る follower は
+     鍵を知っている。`follow-name` に `--publisher` は無く、endpoint は
+     「たまたま block がある場所」に降格した。
+   - 実測（2026-08-04）: `delegated-ipfs.dev` へ publish し、resolve して record CID 一致。
+   - **DHT ノードにはなっていない**（routing table を持たず query に答えない）。
+
    ## L4 publication — 誰がそう言ったか（publication / codebase-publish）
 
    block は権限を要らない（CID がバイトと一致するかしないかだけ）。**namespace head
@@ -175,19 +195,16 @@
 
    ## 主張してはいけないこと（未実装）
 
-   - **自分で DHT へ announce しない。** libp2p ノードが要る。plain HTTP で届くのは
-     **IPFS Pinning Service API** で、pinning service は block を保存し自らを provider と
-     して広告する。service 自身の status は**報告するが信じない**（`queued` は `pinned`
-     ではない）し、`announced?` は **router に訊き直す**（ネットワークが見つけられるかは
-     ネットワークにしか答えられない）。検証は意図的にリトライしない —— 待つと
-     「報告された事実」が「含意された保証」に化ける。**third party に依頼した announce**
-     であって、自分の DHT presence ではない。
+   - **DHT ノードではない**（routing table を持たず、誰の query にも答えない）。
+     ただし **naming は実 DHT で行う** —— 下記 L5 を参照。block の可用性
+     （pinning service への依頼）と naming は別問題として分けてある。
    - **name registry も鍵配布も無い。** follower は endpoint と publisher DID を
      何らかの帯域外手段で知っている必要がある。
    - **対話的な merge UI は無い**（conflict はデータで返るが、選ぶのは呼び出し側）。
    - **effect は policy DSL ではない**し、**revocation も無い**（grant は減衰できるが、
      配った後に取り消す機構は無い）。
-   - **hosted registry / 鍵配布は無い**（follower は endpoint と DID を帯域外で知る）。
+   - **自分で DHT に参加していない**（transport / Noise / muxer / identify が要る。
+     protocol 側は `io-libp2p-specs-kad-dht` に既にある）。
    - surface 層の `evaluator` は依然 **pure**（capability intrinsic を拒否）。
 
    ## 実装上の判断（再発防止として明記）
