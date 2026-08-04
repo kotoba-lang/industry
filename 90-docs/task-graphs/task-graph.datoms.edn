@@ -126,8 +126,15 @@
   :task/repo "kotoba-lang/torihiki-node"
   :task/requires ["S2-engi-resume"]
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "loop 1 周目に判明した新しい gap。**deployed validator は engi@d9c531bd（コンセンサス層が inga へ移る前の commit）を pin している。** その sha は main の祖先だが、main にはもう replica.cljc が無い —— つまり本番は『もう存在しない場所のコード』で動いている。S2 の resume は inga に入るので、node がそこへ移らない限り届かない。ns も engi.* から inga.* へ、block の属性名も :engi.block/* から :inga.block/* へ変わる点に注意。"}
+  :task/status :completed
+  :task/status-at "2026-08-04"
+  :task/status-note "kotoba-lang/torihiki-node b437c2b62505 — engi.* → inga.*、:engi.block/* → :inga.block/*、deps を inga@844ad15 へ。validator 69 files / worker 61 files、どちらも 0 warnings。code-version 78→79 で deploy 済み、4 replica とも inga の上で合意している（height 25-27 / committed 23-25 / equivocators []）。west pin 済み。
+
+  **chain-id \"torihiki-engi-devnet-1\" は変えていない。** 変えたくなる名前だが chain id は domain separation で、全ての vote と transaction envelope がそれに署名している。変えれば既存署名が全部無効になり replica が自分の履歴から切り離される。ライブラリではなくチェーンの名前。理由を docstring に凍結した。
+
+  **deploy が catch-up の嵐を起こし、chain を wipe して戻した（正直に記録）。** deploy は 4 replica 全部を evict し、全員が 2033 ブロックの再生を始めたが、resume が boot に配線されていない（S3 未了）ため 25 ブロック/invocation では追いつく前に reset され、w1 は 449 → 124 と後退した。/wipe で 4 replica × 2,035 キーを排出し genesis から再開させて復旧。**S3 が要る理由の実証そのもの** —— コード入れ替えのたびに devnet を捨てる運用は成立しない。
+
+  元の起票内容: 移動前 engi の pin により、deployed validator は『もう存在しない場所のコード』で動いていた。**deployed validator は engi@d9c531bd（コンセンサス層が inga へ移る前の commit）を pin している。** その sha は main の祖先だが、main にはもう replica.cljc が無い —— つまり本番は『もう存在しない場所のコード』で動いている。S2 の resume は inga に入るので、node がそこへ移らない限り届かない。ns も engi.* から inga.* へ、block の属性名も :engi.block/* から :inga.block/* へ変わる点に注意。"}
 
  {:db/id -9
   :task/id "S3-validator-snapshot-boot"
