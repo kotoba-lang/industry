@@ -504,17 +504,26 @@
     ;; oil.cloud / artifact.app belong to other people, so resolution proves
     ;; nothing. Each of these serves real hosts, which under the rule means the
     ;; prefix should be the reversed domain. None of them is, yet.
+    ;; No :served-domain on purpose. open- is not a subdomain of etzhayyim.com;
+    ;; it is a shared LABEL PREFIX across sibling subdomains, so declaring the
+    ;; registrable domain would match all 196 etzhayyim hosts instead of its 13.
+    ;; Left to the label-prefix fallback.
     {:family "open-" :count 12 :owner nil
-     :served-domain "etzhayyim.com" :implied-prefix "com-etzhayyim-open-"
+     :implied-prefix "com-etzhayyim-open-" :registrable-domain "etzhayyim.com"
      :hosts 13
      :note "open-banking/-gas/-denki/-rail/-ports/-network/-cofog/-airplane
             .etzhayyim.com are live. The family is a shared LABEL PREFIX across
             sibling subdomains, not a subdomain of its own."}
-    {:family "aozora-" :count 4 :owner nil
+    ;; RESOLVED 2026-08-05: the four aozora-* repos were renamed to app-aozora-*,
+    ;; so one domain no longer carries two naming schemes. This family is done;
+    ;; the other five in :gap/serving-family-prefix-lacks-its-tld are not.
+    {:family "app-aozora-" :count 6 :owner nil
      :served-domain "aozora.app" :implied-prefix "app-aozora-"
      :hosts 5
-     :note "app-aozora is already correct; aozora-appview is not, and
-            appview.aozora.app is live. Two forms for one domain."}
+     :renamed-2026-08-05 ["aozora-appview -> app-aozora-appview"
+                          "aozora-design-system -> app-aozora-design-system"
+                          "aozora-engine -> app-aozora-engine"
+                          "aozora-yoro-ui -> app-aozora-yoro-ui"]}
     {:family "murakumo-" :count 5 :owner nil
      :served-domain "murakumo.cloud" :implied-prefix "cloud-murakumo-"
      :hosts 2
@@ -922,37 +931,59 @@
   {:gap/id :serving-family-prefix-lacks-its-tld
    :gap/measured-at "2026-08-05"
    :gap/measured-by "nbb scripts/verify-repository-roles.cljs --family-audit"
-   :gap/count 52
+   :gap/count 48
    ;; Six families serve real hosts, and none of their prefixes is the reversed
    ;; domain they serve -- every one is missing its TLD. Not renamed:
    ;; ADR-2608040170 decided an existing family's form wins over the elision
    ;; rule, and whether that also covers these is the owner's call. The numbers
    ;; are here so it can be decided rather than guessed.
+   :gap/was 52
    :gap/families
    [{:family "kotobase-" :members 25 :implied "net-kotobase-"        :serves "kotobase.net"}
     {:family "open-"     :members 12 :implied "com-etzhayyim-open-"  :serves "etzhayyim.com"}
-    {:family "aozora-"   :members 4  :implied "app-aozora-"          :serves "aozora.app"}
     {:family "murakumo-" :members 4  :implied "cloud-murakumo-"      :serves "murakumo.cloud"}
     {:family "dougaka-"  :members 4  :implied "ai-gftd-dougaka-"     :serves "dougaka.gftd.ai"}
     {:family "bpmn-"     :members 3  :implied "com-etzhayyim-bpmn-"  :serves "bpmn.etzhayyim.com"}]
-   :gap/worth-doing-first
-   {:family "aozora-"
-    :why "two forms already coexist for one domain: app-aozora is correct and
-          aozora-appview is not, while appview.aozora.app is live. Consistency
-          inside a single family is a smaller and clearer call than the rest."}}
+   :gap/done [{:family "aozora-" :members 4 :renamed-to "app-aozora-*" :date "2026-08-05"}]
+   :gap/note "aozora- was done first and is no longer counted here: two forms
+              already coexisted for one domain, which made it the smallest and
+              clearest call. The remaining 48 are a single decision -- move them
+              all, or bind only new families."}
 
+  ;; CORRECTED 2026-08-05 (ADR-2608040190). Recorded as "kotoba-fleet-vcs is not
+  ;; registered", which was wrong: the repo was RENAMED to kotoba-lang/kagami and
+  ;; is registered and checked out under that name. The CLI runs fine. Kept
+  ;; rather than deleted because the misdiagnosis is the point -- an opaque
+  ;; rename (kotoba-fleet-vcs -> kagami/鏡) left CLAUDE.md pointing at a path
+  ;; that no longer exists, and the tool read as missing. Same failure mode as
+  ;; kuro/kobo on 2026-08-03.
   {:gap/id :fleet-vcs-not-registered
+   :gap/status :resolved-as-misdiagnosed
+   :gap/actual "kotoba-lang/kagami (renamed from kotoba-fleet-vcs); registered,
+                checked out, bin/fleet.cljs runs"
+   :gap/note "kotoba-lang/kotoba-fleet is a DIFFERENT repo (parallel-agent
+              fleet-coordination substrate, ADR-2606302000), unrelated to fleet-db."}
+
+  {:gap/id :fleet-db-has-no-rename-path
    :gap/measured-at "2026-08-05"
-   :gap/count 1
-   :gap/repos ["kotoba-lang/kotoba-fleet-vcs"]
-   ;; CLAUDE.md names bin/fleet.cljs in this repo as the only sanctioned writer
-   ;; for manifest/fleet-db.edn, but west.yml does not register it, so it is
-   ;; never checked out and cannot be driven.
-   :gap/consequence "the 2026-08-05 catalog renames landed in west.yml and
-                     repos.edn but not fleet-db.edn, which still carries
-                     open-isic / open-isco / open-cofog / open-unspsc /
-                     open-apqc. Nothing is broken -- GitHub redirects hold --
-                     but the next fleet reconcile has to pick them up."}
+   :gap/measured-by "fleet reconcile --enforce --enforce-repos <the 5 renames>"
+   ;; The two documented write paths contradict each other. CLAUDE.md calls the
+   ;; GitHub API single-entry commit "the only correct path" for a west.yml
+   ;; rename; the signed fleet-db plane then rejects exactly that with
+   ;; "FLIP VIOLATION: west.yml written outside the signed fleet-db path".
+   ;; And the CLI has no operation that would satisfy it: pin-advance advances
+   ;; the pin of an EXISTING entry, import rebuilds the whole db from west.yml.
+   ;; There is no add / remove / rename.
+   :gap/observed "FLIP VIOLATION: west.yml written outside the signed fleet-db path"
+   :gap/in-scope-drift {:changed 0 :added 5 :removed 5}
+   :gap/consequence "repo renames reach west.yml and repos.edn but cannot reach
+                     fleet-db.edn. Nothing breaks -- GitHub redirects hold and
+                     west update reads west.yml -- but fleet-db drifts. As of
+                     2026-08-05 it carries 9 stale names (5 catalogs + 4 aozora)
+                     plus, from other sessions, 7 un-absorbed pin advances and 8
+                     unregistered repos."
+   :gap/needs "an incremental add/remove/rename operation in kagami's fleet CLI,
+               or an explicit decision that renames go fleet-db-first"}
 
   {:gap/id :undeclared-family-candidates
    :gap/measured-at "2026-08-04"
