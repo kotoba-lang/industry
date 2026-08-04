@@ -164,12 +164,26 @@ disposition は 5 つ。ラベルではなく**測定**で決める:
 判定は安い順に:
 
 ```bash
-# 1) base が実質現行か（積集合が空なら revert risk なし）
+# 1) main が同じ file を動かしたか（非空なら stale = revert risk）
 gh api repos/<repo>/compare/<pr.base.sha>...<default> --jq '[.files[].filename]'
 #    ↑ と PR の files の積集合を取る
 # 2) 空でも追加行が既に default branch にあるなら :close-superseded
 # 3) 残ったものだけを人が読む
 ```
+
+**積集合が空 ≠ merge して安全**（この節の初版が間違えた点、2026-08-04 修正）。overlap と
+「PR 自身が削除している行」は**独立した軸**。overlap が空ということは main の該当 file が
+base のままということなので、PR の `-N` 行は**いま main にある行をそのまま消す**。
+
+実測: `io-multiformats#8` は overlap 0 だが `defn-` を 1 つ丸ごと削除、`lab#8` はパース処理を
+削除、`bonsai#14` は doc を削除 — いずれも**未完成のリファクタの途中状態**だった。
+
+したがって preserve 系の既定判定は:
+
+| 削除行数 | disposition |
+|---|---|
+| 0 | `:merge`（何も書き換えない） |
+| 1 行でも有 | `:needs-review`（他人の未完成の編集を main に適用することになる） |
 
 **Never**: `DO-NOT-MERGE` を理由に中身を見ずに放置する（この節ができた理由）/ draft の
 まま放置して「GitHub が merge を防ぐから安全」で終わらせる（防いでいるのは事故だけで、
