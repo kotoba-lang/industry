@@ -30,17 +30,24 @@
    "net-kotobase/MIGRATION.md"]
 
   :adr/context
-  "実測 2026-08-04。kotobase.net の 12 host を 6 Worker が配信しており、Worker 名・repo 名・host 名・
-   実際の責任が一致していない。
+  "実測 2026-08-04（net-kotobase の default branch tip = 090d44f。**west pin より 66 commit 先**で、
+   pin 側の checkout を読むと古い構成が見える。この ADR は tip を正とする）。
 
-   | host | Worker | 配信元 | 問題 |
+   kotobase.net の 12 host を 6 Worker が配信しており、Worker 名・host 名・実際の責任が一致していない。
+   **ディレクトリ名は tip で既に capability 名へ改名済み**（worker → kotobase-api-gateway、
+   clj-edge → kotobase-api-gateway-cljs、kotobase-cf-wasm → kotobase-graph-database、
+   さらに kotobase-object-store-b2-s3 / kotobase-index-prolly-standalone が独立）だが、
+   **Worker 名と route 分割は未着手**。つまり分割は途中で止まっている。
+
+   | host | Worker（tip で未変更） | 配信元ディレクトリ（tip） | 問題 |
    |---|---|---|---|
-   | kotobase.net | net-kotobase | net-kotobase/worker + clj-edge | edge と smtp を兼務 |
+   | kotobase.net | net-kotobase | kotobase-api-gateway (+ -cljs) | edge と smtp を兼務 |
    | smtp.kotobase.net | net-kotobase | 同上 | apex Worker が mail を持つ |
-   | backend.kotobase.net | kotobase-cf-wasm-staging | net-kotobase/kotobase-cf-wasm | 本番を staging と名乗り、実体は peer engine なのに cf-wasm と名乗る |
-   | authn.kotobase.net | kotobase-authn | net-kotobase/authn | 名前は妥当 |
-   | s3 / atproto / pinning / sparql / cypher / gremlin / graphql | kotobase-protocols-worker | net-kotobase/protocols-worker | 7 capability が 1 Worker |
-   | git.kotobase.net | kotobase-git | kotoba-lang/kotobase-protocols | 別 org からの配信で delegation 未記録 |
+   | backend.kotobase.net | kotobase-cf-wasm-staging | kotobase-graph-database | ディレクトリは改名済みなのに Worker 名が旧のまま。本番を staging と名乗り、実装技術を capability 名の位置に置く |
+   | witness1/2.kotobase.net | kotobase-cf-wasm-witness1/2 | 同上（env） | 同じ嘘を env 名が継承 |
+   | authn.kotobase.net | kotobase-authn | authn | 名前は妥当 |
+   | s3 / atproto / pinning / sparql / cypher / gremlin / graphql | kotobase-protocols-worker | protocols-worker | 7 capability が 1 Worker |
+   | git.kotobase.net | kotobase-git | kotoba-lang/kotobase-protocols | 別 org からの配信。delegation 未記録だった（本 ADR と同日に記録） |
    | kotobase.gftd.ai | net-kotobase + ai-gftd-project-kotobase | 2 repo | 2 Worker が同一 host を主張 |
 
    これらは 3 つの規則違反として現れている。(1) ADR-260718 の delegated-hostname 表に git.kotobase.net が
@@ -70,7 +77,7 @@
    [{:capability "edge" :host "kotobase.net" :repo "orgs/network-awai/net-kotobase" :worker "net-kotobase-edge"
      :owns "auth・quota・tenant 境界・XRPC routing・DID document・delegation 台帳"}
     {:capability "engine" :host "engine.kotobase.net" :repo "orgs/network-awai/net-kotobase-engine" :worker "net-kotobase-engine"
-     :owns "datom engine（旧 kotobase-cf-wasm-staging）" :from "net-kotobase/kotobase-cf-wasm"}
+     :owns "datom engine（旧 kotobase-cf-wasm-staging）" :from "net-kotobase/kotobase-graph-database"}
     {:capability "authn" :host "authn.kotobase.net" :repo "orgs/network-awai/net-kotobase-authn" :worker "net-kotobase-authn"
      :from "net-kotobase/authn"}
     {:capability "s3" :host "s3.kotobase.net" :repo "orgs/network-awai/net-kotobase-s3" :worker "net-kotobase-s3"
@@ -88,7 +95,7 @@
     {:capability "graphql" :host "graphql.kotobase.net" :repo "orgs/network-awai/net-kotobase-graphql" :worker "net-kotobase-graphql"
      :from "net-kotobase/protocols-worker"}
     {:capability "smtp" :host "smtp.kotobase.net" :repo "orgs/network-awai/net-kotobase-smtp" :worker "net-kotobase-smtp"
-     :from "net-kotobase/worker（route）+ net-kotobase/mail-worker"}
+     :from "net-kotobase/kotobase-api-gateway（route）+ net-kotobase/mail-worker"}
     {:capability "git" :host "git.kotobase.net" :repo "orgs/network-awai/net-kotobase-git" :worker "net-kotobase-git"
      :from "kotoba-lang/kotobase-protocols/worker（org を跨いで移管）"}]
 
@@ -150,9 +157,12 @@
     6. 確認後に ADR-260718 の delegated-hostname 表へ記録"
 
    :immediate-fixes
-   ["git.kotobase.net を ADR-260718 の delegated-hostname 表に記録する（現在は無記録で、
-     apex の pager を持つ人から見えない）"
-    "kotobase.gftd.ai を 2 Worker が主張している状態を解消する（本 ADR の削除で解ける）"]}
+   ["git.kotobase.net を ADR-260718 の delegated-hostname 表に記録する（無記録だった。
+     2026-08-04 に記録済み — net-kotobase aa2dccb7ee）"
+    "kotobase.gftd.ai を 2 Worker が主張している状態を解消する（本 ADR の削除で解ける）"
+    "net-kotobase の west pin を前進させる。実測 2026-08-04 時点で pin は default branch より
+     66 commit 遅れており、pin 側の checkout を読むと改名前の構成が見える。この ADR の初稿は
+     実際にその古い構成を『現状』と書きかけた — pin の鮮度は読み取りの正しさに直結する"]}
 
   :adr/consequences
   {:positive
