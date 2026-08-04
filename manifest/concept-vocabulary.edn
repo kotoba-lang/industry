@@ -86,4 +86,24 @@
  :repl
  {:label "REPL / 対話評価"
   :spellings ["repl" "interactive evaluation" "対話評価"]
-  :note "**未実装**。kotoba CLI に repl サブコマンドは無い。"}}
+  :note "**未実装**。kotoba CLI に repl サブコマンドは無い。"}
+
+ ;; 2026-08-04 追加。`denchu` は bare 名で機能を示さないうえ、綴りが
+ ;; 電柱 / denchu / utility pole / OOH と 4 通りに割れる。2026-08-04 に
+ ;; 「電柱広告は設計実装されているか」を索引で引いて空振りした（当時は実際に
+ ;; 無かったが、作った後に同じ問いが空振りするのを防ぐ）。
+ :utility-pole-advertising
+ {:label "電柱広告 / utility-pole advertising"
+  :spellings ["電柱広告" "電柱" "denchu" "utility pole" "utility-pole" "power pole"
+              "巻付広告" "袖看板" "屋外広告" "out-of-home" "ooh" "屋外広告物"]
+  :note "kotoba-lang/denchu が domain（在庫・窓口・料金・法令・出稿）、
+loop-denchu-survey が収集 orchestrator、org-openstreetmap-overpass と
+com-mapillary-graph-api が観測ソース。ADR-2608041500。デジタル広告面
+（cloud-itonami/adserver・kotoba-lang/adnet・cloud-itonami の adnetwork 群）とは別の repo 群。"}
+
+ :street-level-imagery
+ {:label "ストリートレベル画像 / 写真からの物体特定"
+  :spellings ["mapillary" "street level imagery" "streetview" "street view"
+              "object detection" "map features" "ストリートビュー" "写真データ"]
+  :note "kotoba-lang/com-mapillary-graph-api（Graph API v4、map_features の
+三角測量済み地物と detections）。OSM 側の地物は org-openstreetmap-overpass。"}}
