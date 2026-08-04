@@ -1,0 +1,115 @@
+[{:db/id -1
+  :adr/id "adr-2608040180-family-justification-is-served-hosts-not-dns"
+  :adr/title "ADR-2608040180: family の裏付けは DNS 解決ではなく「実際に serve しているホスト」。6 family が serving と判明し、規則上 52 repo が移動対象になる"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-05"
+  :adr/last-verified "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "family-justification-surface-index"
+  :adr/authoritative-for
+  ["family 裏付けの判定に DNS 解決を使ってはならないこと（gftd.ai は wildcard）"
+   "判定の正本が 90-docs/surface/surface.datoms.edn（実際に serve しているホスト）であること"
+   "serving family の prefix が、serve しているドメインの逆順であるべきこと"
+   "serving 6 family / library 5 family の分類と、含意される 52 repo の移動"
+   "sdk- が family ではないこと、murakumo- が family であること"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2608040170-authority-path-is-org-plus-name"
+   "adr-2608040100-origin-plane-is-reverse-dns-of-the-real-domain"
+   "manifest/repository-rules.edn"
+   "90-docs/surface/surface.datoms.edn"]
+
+  :adr/body
+  "# ADR-2608040180: family の裏付けは serve しているホスト
+
+**Status**: accepted
+**Date**: 2026-08-05
+**Deciders**: Jun Kawasaki（+ Claude、standing authorization）
+
+## Context
+
+ADR-2608040170 が「配信 family は実在のサブドメイン、library family は所有 repo
+宣言」と決めた。これを機械検査にするには「サブドメインが実在するか」を判定する
+必要がある。
+
+## Decision 1 — 判定に DNS 解決を使わない
+
+最初に DNS で family 候補を sweep したところ、**17 候補中 16 が「裏付けあり」**
+という結果が出た。誤りである。原因は 2 つ:
+
+- **`gftd.ai` は wildcard**（実測: `zzz-nonexistent-abc123.gftd.ai` も
+  `qqq-not-real.gftd.ai` も 172.67.222.17 を返す）。したがって
+  `<何でも>.gftd.ai` は必ず解決する
+- **`oil.cloud` / `artifact.app` / `face.app` は解決するが他人のもの**
+
+これは ADR-2608040150 で確立した非対称性と同じ形である
+（`posix.com` は解決するが `com-posix` は誤配置）。**解決は所有の証拠にならない。**
+
+**正本は `90-docs/surface/surface.datoms.edn`（260 ホスト）** —— 実際に serve
+しているホストの索引。serve していることは運用していることの証拠であり、
+解決していることはそうではない。
+
+## Decision 2 — serving family の prefix は、serve しているドメインの逆順であるべき
+
+surface 索引で照合した結果、**6 family が serving**（宣言済み 11 のうち）:
+
+| family | members | serve しているホスト | 規則が含意する prefix | 移動 |
+|---|---:|---|---|---:|
+| `kotobase-` | 25 | 15 hosts `*.kotobase.net` | `net-kotobase-` | 25 |
+| `open-` | 12 | 13 hosts `open-*.etzhayyim.com` | `com-etzhayyim-open-` | 12 |
+| `aozora-` | 4 | 5 hosts `*.aozora.app` | `app-aozora-` | 4 |
+| `murakumo-` | 4 | 2 hosts `murakumo.cloud` | `cloud-murakumo-` | 4 |
+| `dougaka-` | 4 | 1 host `dougaka.gftd.ai` | `ai-gftd-dougaka-` | 4 |
+| `bpmn-` | 3 | 1 host `bpmn.etzhayyim.com` | `com-etzhayyim-bpmn-` | 3 |
+
+**合計 52 repo が規則上は移動対象。** どれも現在の prefix が TLD を欠いている。
+
+**library family 5 件**は所有 repo 宣言で裏付けられており移動しない:
+`cloud-itonami-`(1,396、owner cloud-itonami) / `kami-`(97、owner kami-engine) /
+`kotoba-`(33) / `kura-`(6) / `kotodama-`(5、ただし retirement 対象)。
+
+`open-` について 1 点: これは**サブドメインではなく、兄弟サブドメイン群に共通の
+ラベル接頭辞**である（`open.etzhayyim.com` は無く、`open-banking.etzhayyim.com`
+等が個別に在る）。したがって family というより「命名の癖」であり、規則上は各
+member が `com-etzhayyim-open-banking` のように独立して並ぶ。
+
+## Decision 3 — 未決 2 件が決着
+
+- **`murakumo-`** は murakumo.cloud を serve している → **family である**
+- **`sdk-`** は serve しているホストも所有 repo 宣言も無い → **family ではない**
+  （所有者でなく役割を表す語。3 repo は subject 面）
+
+## Consequences
+
+- `--family-audit` を追加。surface 索引を読み、serving / library を判定し、
+  serving family の prefix 不一致を **PREFIX 行として報告する（fail しない）**
+- **52 repo の改名は実行していない。** ADR-2608040170 が「既存 family の形が
+  elision に優先する」と決めた趣旨に照らせば、これらも一括で動かすべきか、
+  新規のみ縛るべきかはオーナー判断である。数字が出たので判断できる状態になった
+- `aozora-` は**同一ドメインに 2 つの形が既に共存**している
+  （`app-aozora` は正しく `aozora-appview` は正しくない）。ここだけは
+  一貫性の観点から先に揃える価値がある
+
+### 付随して見つかった欠落
+
+**`kotoba-lang/kotoba-fleet-vcs` が west.yml に登録されていない。** CLAUDE.md は
+fleet-db.edn への書き込み経路としてこの repo の `bin/fleet.cljs` を指定して
+いるが、manifest に無いため checkout されず、駆動できない。2026-08-05 の
+カタログ 5 件改名で fleet-db.edn に旧名が残ったのはこのため
+（west.yml と repos.edn は反映済み、GitHub リダイレクトも効いているので動作上の
+破損は無い）。
+
+## Alternatives considered
+
+- **DNS 解決で family を裏付ける** — 却下。wildcard と他人のドメインで
+  17 候補中 16 が偽陽性になった
+- **52 repo を一括改名** — 保留。既存 family の形を優先する既存決定と衝突しうる
+- **`sdk-` を family として宣言** — 却下。裏付けが何も無い
+"}]
