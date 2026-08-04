@@ -104,32 +104,85 @@
       haishin は disjoint な charter を持つ別 repo として共存する。"
 
   :adr/consequences
-  "- `kotoba-lang/haishin` public 公開済み: https://github.com/kotoba-lang/haishin
-     pin `9397c4690928da4ae786ed14fbb8c7812c77c95e`、west entry `haishin`
-     （`orgs/kotoba-lang/haishin`、groups [kotoba-lang]）。
-     `repos.edn :extra-projects` へ登録 → `gen-west-manifest.cljs --entry haishin`
-     で **5行・当該 entry のみの最小 diff**。サーバ側 pin 検証 OK
-     （『新規 entry, pin 9397c46 は main から到達可能』）。
+  "## 着地済み（default branch 上の事実、2026-08-04 closing 時点で確認）
 
-   - **検証: 20 tests / 82 assertions が nbb と JVM の両方で green。** `.cljc`
-     可搬性は主張でなく実測。この過程で**実バグを1件発見して修正した**:
+   - `kotoba-lang/haishin` **public 公開済み**: https://github.com/kotoba-lang/haishin
+     default branch `main`、pin `9397c4690928da4ae786ed14fbb8c7812c77c95e`。
+   - superproject **`main` に merge 済み**: merge commit
+     `80c0e057e624aa49e9a3c1eef21c7f77f54efe07`（サーバ側 merge、rebase も
+     force-push も使わず）。west entry `haishin`
+     （`orgs/kotoba-lang/haishin`、groups [kotoba-lang]）と本 ADR は
+     `main` 上に存在する。作業 branch `feat/social-haishin` は merge 後に
+     local / remote とも削除済み、worktree も撤去済み。**未着地の作業は無い。**
+   - 登録経路: `repos.edn :extra-projects` へ登録 →
+     `gen-west-manifest.cljs --entry haishin` で **5行・当該 entry のみの最小 diff**。
+     サーバ側 pin 検証 OK（『新規 entry, pin 9397c46 は main から到達可能』）。
+   - 完了ゲート `nbb scripts/west-orphan-audit.cljs --blocking` **exit 0**
+     （true-orphan-git 0 / local-root-broken 0）。
+
+   ## 検証（固定）
+
+   - **20 tests / 82 assertions が nbb（primary）と JVM（`clojure -M:test`）の
+     両方で green。** `.cljc` 可搬性は主張でなく実測。
+   - **公開後に clean clone でも再実行して green** — `git clone` した独立 checkout が
+     pin と同一 SHA `9397c469` を指しており、そこで 20 tests が通ることを確認した。
+     『手元では通る』ではなく『公開物が通る』を押さえている。
+   - **失敗は無い。未実行のものも無い**（このライブラリのテストは外部 I/O を
+     持たないので、skip される条件が存在しない）。
+   - この過程で**実バグを1件発見して修正した**:
      `\\p{L}` / `\\p{N}` の Unicode property escape は JS 正規表現では `u` flag が
      無いと不活性で、CLJS 経路で**日本語タグが丸ごと消えていた**（`#街歩き` → `#`）。
      この workspace のタグは日常的に日本語なので、失敗は部分的でなく全面的だった。
      reader conditional で `(js/RegExp. \"...\" \"gu\")` を明示して解決。
+   - **プロセス上の記録**: push guard（`west-pin-verify-guard`）が、古い base 由来の
+     west.yml が無関係な 9 件の pin を退行させることを正しく検知してブロックした。
+     最新 origin/main tip の上で再生成し直して着地させている。**guard が無ければ
+     静かな pin 退行が main に入っていた** —— CLAUDE.md が警告する罠が実際に発火した実例。
 
-   - **未了（正直に）**: `dougaka` engine repo 側の `channels #{:aozora :youtube}` を
-     haishin に配線する作業は未実施。canonical な `ai-gftd-dougaka` engine repo が
-     west に無く、実測できたのは agent worktree
-     （`orgs/gftdcojp/.ai-gftd-dougaka-tamaki--content-dougaka-grok-0`）のみだったため。
-     seam 自体は `haishin.adapt/tamaki-content->artifact` + `plan->grant` として実装済みで
-     test で押さえてあるので、engine 側は sender を1つ書いて `syndicate!` を呼ぶだけになる。
+   ## 未了（正直に。ライブラリは着地済みだが、まだ1件も実投稿していない）
 
-   - **次に必要なこと（enable する前に）**: ①`:unverified` な5 target の limit を
-     vendor doc に照合する ②各 target の sender を書く（`:youtube` は com-youtube への
-     短いアダプタ、他は新規）③Instagram は `:media/requires-public-url true` ——
-     API が asset を URL から fetch するので、aozora 側で公開 URL が出てからでないと
-     そもそも post を作れない。この構造的制約は plan entry の warning として出る。
+   **現状で live 投稿は1件も起きない。** haishin は sender が無ければ何も送らない
+   設計なので、これは故障ではなく既定状態である。実際に配信を有効化するには
+   下記 R1〜R3 が要る。
+
+   - **R1: `:unverified` な5 target の limit を vendor doc に照合する。**
+     `:youtube` のみ `com-youtube` の独立実装と一致していて corroborated。
+     Instagram / TikTok / X / Vimeo / LinkedIn は未照合。照合したら
+     `haishin.constraints/targets` の該当 entry の `:constraint/provenance` を
+     `:vendor-doc` に、`:constraint/checked-at` を照合日に書き換える
+     （文書は最新状態のみを表す。履歴は git が持つ）。
+     退行検知: `(haishin.core/unverified-targets)` を自分の suite で assert する。
+
+   - **R2: target ごとの sender を書く。** `:youtube` は `com-youtube` の
+     `youtube.videos/insert-video!` への短いアダプタで済む（haishin の
+     `:youtube/videos-insert` request body は `youtube.videos/video-metadata` と
+     同形にしてあるので remap 不要）。他5つは新規。**sender は haishin に入れない**
+     —— 認証情報がこのライブラリに入らないことが不変条件そのもの。
+
+   - **R3: `dougaka` engine 側の配線。** `channels #{:aozora :youtube}` の
+     `:youtube` は 2026-08-04 時点で enum 値だけで upload 実装が無い。
+     seam は `haishin.adapt/tamaki-content->artifact` + `plan->grant` として
+     実装済み・test 済みなので、engine 側は sender を1つ書いて `syndicate!` を
+     呼ぶだけになる。**未実施の理由**: canonical な `ai-gftd-dougaka` engine repo が
+     west に登録されておらず、実測できたのが agent worktree
+     （`orgs/gftdcojp/.ai-gftd-dougaka-tamaki--content-dougaka-grok-0`）だけだったため。
+     着手前にまずこの engine repo の canonical な所在を確定させること。
+
+   - **構造的制約（設計で解けない、順序の問題）**: Instagram は
+     `:media/requires-public-url true` —— API が asset を URL から fetch するので、
+     **aozora 側で公開 URL が出てからでないと post をそもそも作れない**。
+     したがって syndication は aozora publish の *後* にしか走れない。
+     この制約は plan entry の `:target/pulls-from-url` warning として毎回出る。
+
+   ## resume point（次の agent 向け、会話履歴なしで再開できる粒度）
+
+       git clone git@github.com:kotoba-lang/haishin.git && cd haishin
+       nbb run_tests.cljs            # 20 tests / 82 assertions、green のはず
+       clojure -M:test               # JVM 側も同数 green
+
+   R1 に着手するなら `src/haishin/constraints.cljc` の `targets` map だけを触る
+   （他の ns は limit の値を知らない）。R2 に着手するなら sender は消費側の repo に
+   置き、`haishin.core/execute!` の `:senders` に渡す。
 
    - receipt は `:source/dataset \"haishin-receipts\"` を持つので、workspace の
      EDN plane にそのまま transact でき、fleet の他の事実と join できる。"
