@@ -4,7 +4,7 @@
   :adr/status :accepted
   :adr/doc_type "adr"
   :adr/source-format "edn"
-  :adr/title "電柱広告（denchu）— 在庫候補を写真/地図から起こし、窓口・料金・出稿を governed に扱う 4 repo"
+  :adr/title "屋外広告物（okugai / denchu）— 物理媒体の在庫候補を地図・写真から起こし、窓口・料金・法令・出稿を governed に扱う 5 repo"
   :adr/related ["2607093500-adnet-first-party-ad-network"
                 "2608040100-origin-plane-is-reverse-dns-of-the-real-domain"
                 "2608039980-concept-index-name-to-function"
@@ -49,14 +49,29 @@ e.g. digital signage）という enum 値が既にあったが、**対応する 
    Graph API v4。写真検出（map_features）から柱を特定する経路。bbox 0.01 度
    制約に対する決定論的タイル分割、token は env からのみ。
 
-4. `kotoba-lang/loop-denchu-survey` — loop 面（continuous orchestrator）。
-   observe → evaluate → decide → act → record-evidence。domain truth を持たず
-   上記 3 つに委譲する。出力は datom 面に載る *.datoms.edn + 証跡 EDN。
+0. `kotoba-lang/okugai` — **屋外広告物一般**のドメイン（subject 面）。媒体タクソノミー
+   14 種（うち観測で見つかるのは 10）、屋外広告物条例／道路占用／道路使用／
+   建築基準法88条（4m超の工作物確認）／64条（防火地域）／高速道路の法令カタログ、
+   地点の束ね、照会状態、出稿ステートマシン、参考見積。**電柱はこの中の 1 媒体。**
 
-datom 面には `:source/dataset \"denchu-inventory\"` として登録した
-（manifest/edn-query.cljs の `denchu-inventory-entities`）。結合キーは
-`:pole/owner` ↔ `:agency/sells-poles-of`、`:agency/id`。datascript.js は
-:db.type/ref を解決しないので値一致で join する（lei-tos / yabai / kakekomi と同型）。"
+4. `kotoba-lang/loop-okugai-survey` — loop 面（continuous orchestrator）。
+   observe → evaluate → decide → act → record-evidence。domain truth を持たず
+   上記に委譲する。`--media all|poles|<ids>` で媒体を選ぶ。媒体固有の enrichment
+   （電柱の供給区域候補）は `:enrich` hook で受ける。出力は datom 面に載る
+   *.datoms.edn + 証跡 EDN。
+
+datom 面には `:source/dataset \"okugai-inventory\"` として登録した
+（manifest/edn-query.cljs の `okugai-inventory-entities`）。結合キーは
+`:site/medium` ↔ `:medium/id`、`:medium/regulatory-triggers` ↔ `:regulation/id`、
+`:site/operator` ↔ 媒体 repo のカタログ。datascript.js は :db.type/ref を解決しない
+ので値一致で join する（lei-tos / yabai / kakekomi と同型）。
+
+**2026-08-04 の同日中に電柱専用から一般化した。** 最初 `denchu` / `denchu-inventory`
+として電柱だけで起こしたが、オーナーの『電柱ではなく高速道路・ビル・建物なども』
+という指示で、法令と出稿の一般則を `okugai` に引き上げ、survey を全媒体に広げ、
+dataset を `okugai-inventory`（`:site/*` 面）に置き換えた。`denchu-inventory` は
+撤去済み。2 つの法令カタログが並存すると必ず片方だけ更新されてずれるため、
+`denchu.facts` は `okugai.facts` への委譲だけを残した。"
 
   :adr/invariants
   "この領域は『在庫があるように見せる』誘惑が構造的に強いので、嘘を書けない
@@ -83,59 +98,66 @@ datom 面には `:source/dataset \"denchu-inventory\"` として登録した
    なく、見ていない。"
 
   :adr/evidence
-  "実データ収集（2026-08-04、OSM Overpass、認証不要）:
+  "実データ収集（2026-08-04、OSM Overpass、認証不要、8 area / 全 10 観測媒体）:
 
-| area | 管轄 | 観測 | 柱 | 所有者判明 | 窓口確定 | 照会可（区域候補） |
-|---|---|---|---|---|---|---|
-| chiyoda-marunouchi | JP-13 | 0 | 0 | 0 | 0 | 0 |
-| setagaya | JP-13 | 8 | 5 | 0 | 0 | 5 |
-| kyoto-nakagyo | JP-26 | 55 | 55 | 0 | 0 | 55 |
-| sapporo-chuo | JP-01 | 205 | 201 | 0 | 0 | 201 |
-| 計 | | 268 | 261 | 0 | 0 | 261 |
+| area | 管轄 | 地点 | 照会可 |
+|---|---|---|---|
+| chiyoda-marunouchi | JP-13 | 1 | 0 |
+| setagaya | JP-13 | 7 | 5 |
+| kyoto-nakagyo | JP-26 | 67 | 62 |
+| sapporo-chuo | JP-01 | 204 | 202 |
+| tokyo-central | JP-13 | 29 | 23 |
+| osaka-kita | JP-27 | 4 | 1 |
+| nagoya-naka | JP-23 | 0 | 0 |
+| fukuoka-chuo | JP-40 | 0 | 0 |
+| 計 | | 312 | 293 |
 
-datom 面での確認（`manifest/edn-query.cljs q`）:
-- `[?e \"pole/route-status\" ?s] [?e \"pole/id\" ?p] [?e \"source/dataset\" \"denchu-inventory\"]`
-  → `[[\"candidate-by-area\" 261]]`
-- `[?e \"pole/owner\" ?o]` は依然 `[[\"unknown\" 261]]`
-- coverage entity 4 件が area ごとの実数を申告
-- 代理店カタログ 8 社が legal-name + source-url 付きで引ける
+媒体別（datom 面のクエリ）: utility-pole 283 / board 18 / poster-box 4 /
+billboard 3 / screen 2 / column 1 / sign 1。
+照会状態: candidate-by-area 283（電柱、供給区域から候補）/ operator-known 10
+（観測の operator が照会先の手がかり）/ unresolved 19。
 
-**所有者判明が 0 のままなのは設計どおり**（OSM に `operator` タグがほぼ無く、
-denchu は座標から所有者を推測しない）。**しかし出稿導線は通った** —— `denchu.area`
-が供給区域（一般送配電事業者 10 社 + NTT 東西、ISO 3166-2:JP 47 管轄）から
-候補所有者を出し、`:candidate-by-area` として照会できるようにしたため。所有者は
-その照会で確定するのが実務であり、候補は柱ではなく経路に載る。区域境が県境と
-一致しない 5 管轄（静岡・福井・三重・岐阜・兵庫）は候補を畳まず複数返す。
+**電柱以外の 29 地点のうち 10 件（34%）は observation だけで照会先の手がかりが
+立った** —— OSM の `operator` タグ（千代田区・商工中金・株式会社アトレ等）。
+電柱の operator 充足率が実質 0% だったのと対照的で、**広告物の方が観測から
+照会先を得やすい**。ただし `operator` は運営者であって媒体社とは限らないので
+`:operator-known` は『手がかりがある』であって『買える』ではない。
 
-丸の内 0 件も実測値であって障害ではない（無電柱化 + 中心部の柱マッピングが薄い）。
+名古屋・福岡が 0 件なのも実測値であって障害ではない（当該 bbox の OSM 側に
+広告物・電柱のマッピングが無い）。**area の外・要求しなかった媒体に地点が無い
+のではなく、見ていない。**
 
-cloud-itonami 側の配線（`cloud-itonami.denchu-ops`、network-awai/cloud-itonami
-`4c0f1c48`）で `advertising-facts/ad-channels` の `:real` に初めて実体が付いた。
-provider catalog（`adnetwork-providers`）には**載せない** —— あの routing 契約は
-`campaigns.create` / `metrics.report` を要求するが電柱の指定代理店に API は無く、
-載せると『API がある』という嘘になる。`:execution :inquiry` として別に扱う。
-governor は `denchu.order/violations` を自分で再計算し、提案に添えられた違反リストを
-信用しない。候補ルートの問い合わせ本文が推定社名を断定していたら保留する
-（断定すると相手が追認して誤った所有者が確定するため）。
+datom 面での確認（`manifest/edn-query.cljs q`、dataset `okugai-inventory`）:
+- `[?e \"site/medium\" ?m] [?e \"site/id\" ?s]` → 7 媒体 312 地点
+- `[?e \"site/route-status\" ?s]` → candidate-by-area 283 / operator-known 10 / unresolved 19
+- `[?e \"okugai.coverage/areas\" ?a] ...` → area ごとの実数と reachable
+- 媒体カタログ 14 件と規制カタログ 6 件が出典 URL 付きで引ける
 
-テスト: denchu 47 tests / 256 assertions、overpass 8 / 27、mapillary 8 / 32、
-loop 7 / 25、cloud-itonami.denchu-ops 13 / 31。すべて nbb（ClojureScript）で green。
-JVM は使っていない。**cloud-itonami のリポジトリ全体 suite は未実行**（別ゲート）。
+テスト: okugai 29 tests / 155 assertions、denchu 47 / 256、overpass 12 / 42、
+mapillary 8 / 32、loop 8 / 29、cloud-itonami.denchu-ops 13 / 31。
+すべて nbb（ClojureScript）で green。JVM は使っていない。
+**cloud-itonami のリポジトリ全体 suite は未実行**（別ゲート）。
 
 外部事実の出典（すべて 2026-08-04 に実ページで確認）:
 - Mapillary Graph API v4: host graph.mapillary.com、認証必須、bbox < 0.01 度、
   limit 2000、object_values フィルタ。taxonomy 実文字列
   `object--support--utility-pole` / `object--support--pole` / `object--street-light` /
   `object--banner` / `object--sign--advertisement`
-- 東電タウンプランニング（東電PG柱）: 月々2,640円（税込）〜、地域により異なる、
-  TEL 03-6371-8111（月〜金 9:00-17:00）、https://www.ttplan.co.jp/service/ad_pole/
-- テルウェル東日本 東関東支店（NTT東柱・千葉）: 袖広告/巻広告の 2 タイプ、
-  月額 A2,800/B2,600/C2,400/D2,200/E2,000 円（税抜、2025-06-01 改定）、
-  製作費 15,000 円（税抜、取付含む）、https://www.telwel-east.co.jp/denchu-koukoku/fee/
-- 法令: 屋外広告物法 + 各自治体の屋外広告物条例が許可主体、道路上空へ突出する
-  形態は道路法の道路占用許可が別途。多くの条例が電柱への貼り紙・貼り札・広告旗を
-  禁止物件として列挙するが、これは無断の貼付物への規制であり、所有者許諾と条例
-  許可を経た巻付/袖看板とは別扱い —— 『電柱広告は条例で禁止』と要約しない。"
+- OSM `advertising=*` の実分布（都心 bbox 46 件）: board 25 / billboard 9 / screen 7 /
+  poster_box 2 / column 1 / totem 1 / sign 1、うち operator 付き 13 件（28%）
+- 東電タウンプランニング（東電PG柱）: 月々2,640円（税込）〜、TEL 03-6371-8111、
+  https://www.ttplan.co.jp/service/ad_pole/
+- テルウェル東日本 東関東支店（NTT東柱・千葉）: 袖/巻の 2 タイプ、月額
+  A2,800/B2,600/C2,400/D2,200/E2,000 円（税抜、2025-06-01 改定）、製作費 15,000 円
+  （税抜、取付含む）、https://www.telwel-east.co.jp/denchu-koukoku/fee/
+- 建築基準法88条1項（令138条1項3号）: 高さ4m超の広告塔・広告板は工作物確認申請。
+  屋上の広告塔も広告塔部分が4m超なら対象。確認済証前の着工は1年以下の懲役または
+  100万円以下の罰金。https://www.city.ota.tokyo.jp/seikatsu/sumaimachinami/kenchiku/tatemono_tyuuikisei/kousakubutsu.html
+- 建築基準法64条: 防火地域内で建物屋上または高さ3m超は主要部分を不燃材料。
+  https://www.mori-sign.jp/column/sign-building-code-structure
+- 高速道路: 沿道は条例の禁止区域指定・沿道ガイドライン（和歌山県が公開）、
+  区域内・SA/PA は道路管理者系の媒体社（NEXCO 西日本コミュニケーションズ 媒体資料）。
+  https://www.pref.wakayama.lg.jp/prefg/080900/okugaikoukokubutsujyourei/about_okugaikoukokubutsu_d/fil/kousoku_guideline_1.pdf"
 
   :adr/alternatives
   "1. **cloud-itonami の adnetwork_providers に電柱代理店を足す** — 却下。あの
@@ -157,22 +179,26 @@ JVM は使っていない。**cloud-itonami のリポジトリ全体 suite は�
    いう嘘になる。この repo 群が持たないと決めた唯一の機能。"
 
   :adr/next
-  "1. **候補代理店への実照会**（`:inquiry-proposed` → `:inquiry-sent`、
-   `:external-send` risk）。これが所有者を確定させる実務上の唯一の経路であり、
-   261 本すべてが照会可能な状態にある。実送信はまだ 0 件。
-2. **`MAPILLARY_ACCESS_TOKEN` の取得はオーナー作業**（2026-08-04 時点で kagi に
-   `no such item`、狙い撃ち確認済み）。account 登録は資格情報入力になるため
-   agent は行わない（安全床①）。取得できれば (a) 柱番号札を /images +
-   detections から読む所有者確定経路 (b) `--sources both` の 2 source 一致
-   （信頼度 +0.30）の両方が開く。**それまで Mapillary クライアントは fixture に
-   対してしか検証されていない** —— 実 API に対して一度も実行していない。
-3. 代理店窓口のカバレッジ拡大（電力 12 社中 5 社のみ収録。未収録は
-   東北 / 中国 / 四国 / 九州 / 北海道 / 北陸 / 沖縄）。NTT 東西の窓口が全国を
-   覆うので照会自体は全 47 管轄で成立するが、電力柱だった場合の申込先は要調査。
-4. area の拡大。現在 4 area のみ。大規模化したら shard を DataLad/B2 へ
-   （skill large-binary-datalad）。現在 68KB なので今は通常の git blob が正しい
-   （ADR-2608039700『小さい semantic EDN は diff/review を失わないため git に置く』）。
-5. `denchu.facts` の管轄拡大（現在 JPN 1 件）。"
+  "1. **媒体社カタログの拡大が最大のギャップ。** 電柱は 12 事業者中 5 社の窓口を
+   収録し、供給区域から候補を導けるが、**電柱以外の媒体には媒体社カタログが無い**
+   （屋外ビジョン運営会社・看板業者・NEXCO 系媒体社・交通広告）。observation で
+   照会先が立つのは operator タグのある 34% だけ。ここを埋めると unresolved 19 件が
+   動く。NEXCO 西日本コミュニケーションズは媒体資料を PDF 公開しているので着手可能。
+2. **候補代理店・operator への実照会**（`:inquiry-proposed` → `:inquiry-sent`、
+   `:external-send` risk）。312 地点中 293 が照会可能な状態にある。実送信はまだ 0 件。
+3. **`MAPILLARY_ACCESS_TOKEN` の取得はオーナー作業**（2026-08-04 時点で kagi に
+   `no such item`、狙い撃ち確認済み）。account 登録は資格情報入力になるため agent は
+   行わない（安全床①）。取得できれば (a) 柱番号札からの所有者確定 (b) `--sources both`
+   の 2 source 一致（+0.30）(c) OSM に無い媒体（屋上看板は依然不可、壁面・バナーは可）
+   が開く。**それまで Mapillary クライアントは fixture に対してしか検証されていない。**
+4. **高さの取得経路**。建築基準法88条（4m超）の要否が全地点で undetermined のまま
+   で、これは掲出提案が `:permit-filed` に進めないことを意味する。現地調査か
+   媒体社回答でしか埋まらない。
+5. **cloud-itonami の ops 層の一般化**。`cloud-itonami.denchu-ops` は電柱専用のまま
+   （`denchu.order` を使う）。`okugai.order` に載せ替えて全媒体を `:real` チャネルで
+   扱えるようにするのが次段。**今回は未実施。**
+6. area の拡大（現在 8、うち 2 は 0 件）。大規模化したら shard を DataLad/B2 へ。
+7. `okugai.facts` の管轄拡大（現在 JPN 1 件）。"
 
   :adr/body
   "詳細は各 repo の README を正本とする:
