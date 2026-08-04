@@ -232,3 +232,23 @@
   "24 兄弟 / 12 段の margin collapse / 16 段の入れ子 / 20 個の折返しインライン / 12 行テーブルの
    doc 系 7 件中 6 件が全 box 一致。**規模では破綻しない**ことが確認された（豊富な鉱脈だという
    事前の想定は外れ）。"]}
+
+{:at "2026-08-04"
+ :iteration 33
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 292}
+ :line-structure {:agree 249 :total 280 :pct 89}
+ :geometry {:boxes-agree 941 :boxes-total 1142 :pct 82 :clean-cases 200 :clean-total 292}
+ :computed-style {:values-agree 13832 :values-total 15942 :pct 87 :no-cascade-attributed-mismatch 286}
+ :landed {:cssom "13a2cae84d6fde3b39491909b483f7f22b02fb0a — grid-row: span N の crash 修正"}
+ :note "拡張 corpus が最初に見つけた欠陥。292 件中で唯一、答えでなく例外を返していた入力。
+        span-only? が :col しか見ておらず、row 軸の span が明示配置と誤認され {:span n} の map を
+        [start end] として分解していた。占有判定を矩形全体に拡張（先頭行しか見ないと静かに重なる）。
+        期待値は Brave 実測。修正後 4 box 全一致。"
+ :remaining ["corpus 拡張が明らかにした 59 件の発散（percentage 長が px として消費される = 原因 1 つで 9 case、
+              float の clear/margin/包含、flex の既定以外 10 プロパティ、grid の flow/gap/alignment、
+              absolute の包含ブロック 5 種、display: table/contents/flow-root、table-layout: fixed と
+              colgroup、direction: rtl、単位無し line-height、BFC が overflow-x/y を見ない）"
+             "既存の gap: absolute × table cell の +761px、fieldset/legend の out-of-flow、
+              select の control font、UA stylesheet の所在（cascade 軸の構造的 1,400 値）"
+             "parser: comment node type、foster parenting、active formatting 再構築"]}
