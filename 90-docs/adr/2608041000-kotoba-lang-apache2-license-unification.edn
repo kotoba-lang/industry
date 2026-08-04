@@ -97,6 +97,50 @@ canonical 本文は GitHub の `/licenses/apache-2.0` が返す 202 行をその
   `com-quic-http3` `org-w3-rdf`）はいずれも 10〜18 ファイルの `.cljc`/`.cljs`/`.edn`/
   `.kotoba` のみで上流ソースの混入なし。`com-terraform` は説明に
   `Clean-room terraform compat actor` と明記。
+### 走査結果（全 1996 repo、完了）
+
+| signal | 件数 | 判定 |
+|---|---|---|
+| SECOND-LICENSE | 1 | `jp-go-digital-design-system` → MIT へ修正済み |
+| VENDOR-DIR | 7 | 下記 |
+| FOREIGN-SOURCE | 79 | 弱い signal（`aiueos` の C/asm 等、自前コード） |
+| なし | 1909 | — |
+
+VENDOR-DIR 7 件のうち **5 件は自前コードの repo 間コピー**（`kami-web` の
+kami-ui-sdk / `kami-nv-compat` の kami-isaac-sim-wasm / `kami-engine-sdk-svelte` の
+kami-genko / `kami-app-amenominaka` の kotoba-ui.css / `wasm-webcomponent` の
+kami_host.cljc）で第三者由来ではない。**2 件は第三者テストフィクスチャ**
+（`org-iso-16739` の buildingSMART IFC サンプル、`bim` の IfcOpenShell サンプル）。
+
+### `wasm-webcomponent` — 実在した第三者 vendoring。Apache-2.0 を維持する
+
+`@noble/curves` 1.9.7 と `@noble/hashes` 1.8.0（MIT / Paul Miller）を
+`src/vendor/` に逐語 vendoring している。Web Crypto の SubtleCrypto が async
+のみで、WASM host-import には同期 Ed25519 が要るため（理由は
+`src/vendor/README.md` に記録済み）。
+
+**MIT の帰属条件は既に満たされていた** —— `src/vendor/{curves,hashes}/LICENSE`
+に上流本文が保持されている。**`jp-go-digital-design-system` とは性質が違うので
+扱いも変える**:
+
+| | jp-go-dds | wasm-webcomponent |
+|---|---|---|
+| vendor 対象の位置づけ | 成果物そのもの | 隔離された依存（`src/vendor/`） |
+| 変更前の状態 | MIT と判定されていた | ライセンス無し |
+| 結論 | 上流を継承して MIT | **Apache-2.0 のまま** |
+
+「repo 本体は Apache-2.0 ＋ vendor サブツリーは各自の LICENSE を保持」は法的に
+有効かつ標準の形で、MIT は Apache-2.0 作品への同梱を許す。不足していたのは
+可視性だけなので、ルートに `NOTICE` を置いて第三者コンポーネントを明示した
+（`src-cljs/vendor/kotoba/` が第三者でなく自前コードであることも併記 ——
+`vendor/` という名前だけで第三者と誤読されないように）。
+
+### この走査で検出できないもの
+
+**`vendor/` という名前でもなく第二 LICENSE も持たない vendoring** は原理的に
+拾えない。実在した 2 件はいずれも README で由来を明記する運用になっており、
+workspace の慣行としては機能しているが、慣行であって強制ではない。
+
 - **テストフィクスチャは vendoring と区別する。** `bim` の
   `test/fixtures/external/revit2011_wall1.ifc` は出典 URL・pin commit・SHA-256 付きで
   記録された第三者データだが、ライブラリの機能コードではないため repo の
