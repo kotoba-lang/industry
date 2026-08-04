@@ -34,6 +34,42 @@ stashes, diff + commit log for branches, per `:retirement :archive` in the edn) 
 landed. The archive step is what makes the decision reversible; skipping it because
 you're confident is exactly the failure mode this note exists to catch.
 
+## Run `west update` first — before any inventory
+
+```bash
+git fetch origin && git merge --ff-only origin/main   # superproject
+west update --fetch smart                             # children (dirty ones are skipped, exit 1)
+```
+
+Two reasons, both measured 2026-08-04 (owner directive; SSoT: `:west-update` in the edn):
+
+1. **A stale tree gives false verdicts.** Content-containment — the core of every classify
+   decision — asks "do this branch's added lines exist in the child repo's *current*
+   `origin/main`?" Without a fetch, that question cannot be answered. Measured: judged
+   against **pins**, six repos looked ahead (abi +11, bitcoin-node +52, kotoba +19,
+   kotobase +3, kagitaba +1, shell +5). Re-measured against **fetched `origin/main`**,
+   bitcoin-node was 0 ahead (the pin was simply stale) and almost everything else was
+   already landed — only 2 files in `kotoba` were genuinely un-landed. Skipping the
+   update would have meant PR-ing already-landed content and rolling `main` back.
+2. **west's skip set *is* the inventory.** west never destroys a dirty project; it skips
+   it and exits 1. That skip set is the precise population of repos holding local-only
+   work. Measured over 4,022 projects (~4h, full history): **87 skipped** — 83 untracked
+   collisions, 17 tracked-file changes (13 both). Of those, **69 projects / 70 files**
+   were byte-identical spill files (mostly `kotoba-lang/com-*`
+   `schema/<name>.kotoba-schema`) that vanish once you verify the hash and delete;
+   the remaining **18** were real local work.
+
+Then: classify skips into untracked vs localchg; delete **only** untracked files whose
+`git hash-object` matches the pin's blob; leave localchg untouched; and `git fetch origin`
+inside each child repo before judging it.
+
+**Traps.** west checkouts fetch into `refs/west/*`, so `origin/<branch>` remote-tracking
+refs may not exist — check push state with `gh api repos/<slug>/branches/<branch>`, not
+local refs (measured: kotobase's `agent/persist-execution-identities` looked unpushed and
+was not). And huge repos take real time: `gftdcojp/apps-gftdcojp` alone ran ~1 hour (5.4
+GiB pack, then `git index-pack` resolving deltas at 70% CPU) — the parent `git fetch`
+showing 0% CPU is **not** a hang.
+
 ## Finding un-landed work across the fleet (UNLANDED inventory)
 
 When the question is "which child repos still have work that hasn't landed?", run:
@@ -223,7 +259,8 @@ nbb scripts/west-triple-sync.cljs verify --scope blocking
 
 ## Minimum workflow
 
-1. Inventory: `git worktree list --porcelain`, `git branch --show-current`,
+1. Inventory (**after `west update` — see the section above**): `git fetch origin && git merge --ff-only origin/main`, `west update --fetch smart`,
+   `git worktree list --porcelain`, `git branch --show-current`,
    `git stash list`, `git status --short --branch`,
    `gh pr list --state open --json number,title,headRefName,baseRefName,url,mergeable,statusCheckRollup`,
    **`nbb scripts/cleanup.cljs --unlanded`** (child-repo landing ladder — untracked /
