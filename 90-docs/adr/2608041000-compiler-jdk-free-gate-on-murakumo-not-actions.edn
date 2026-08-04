@@ -171,11 +171,35 @@ gate は 3 回とも捕まえた（signal は効いている）。**問題は頻
 保てない。しかも stale な lock は `bin/kotoba` を黙って `clojure -Spath` に落とす
 ＝ JDK-free という性質が誰にも気付かれずに消える（PR #501 で可聴にした）。
 
-**したがって ADR-0202 の follow-up を格上げする**: closure を git だけから導出し、
-root の pin を優先、推移的にしか現れない coordinate で候補が食い違ったときだけ
-fail closed にして JVM 生成器を促す。現状 transitive-only は `security` 1 本
-（候補 1 つ）なので、この規則は今日すでに全域で決定的である。そうなれば lock は
-common path から外れ、腐りようが無くなる。
+ADR-0202 の follow-up はこうである: closure を git だけから導出し、root の pin を
+優先、推移的にしか現れない coordinate で候補が食い違ったときだけ fail closed に
+して JVM 生成器を促す。現状 transitive-only は `security` 1 本（候補 1 つ）なので、
+この規則は今日すでに全域で決定的である。そうなれば lock は common path から外れ、
+腐りようが無くなる。
+
+### ただし「腐り続ける」という予測は、12 時間後の実測で外れた（2026-08-04 03:54Z）
+
+上で「格上げする」と書いたが、**摩擦は実際に効いた**ので優先度を戻す。
+`99b3183`（lock を deps.edn 先頭のルールごと入れた commit）以降、`deps.edn` を
+触る commit は 10 本近くあり、**そのほぼ全てで `deps-lock.edn` が同じ commit で
+動いている**（`a45230c` / `d9603ae` / `d814c7d` / `37579d7` / `21b7d9f` /
+`f0c0951`…、加えて `a30176d \"Regenerate lock after main merge\"` という明示的な
+commit まである）。現在の main の lock は fresh
+（digest `7fb69c2d…` が deps.edn と一致）。
+
+gate の判定も安定して緑:
+
+    2026-08-04T03:54Z pass test-compiler-jdk-free-8c26f19-murakumo-levi   exit 0
+    2026-08-04T03:44Z pass test-compiler-jdk-free#pr523-1a9711e-murakumo-simeon exit 0
+    2026-08-04T03:44Z pass test-compiler-jdk-free#pr524-0de8260-murakumo-simeon exit 0
+
+**「lock は腐り続ける」ではなく「ルールを編集箇所に置き、gate が赤を出せば、
+人と agent は同じ commit で lock を動かす」が実測された。** aiueos の TCB
+inventory が同じ形の摩擦で成立しているのと同じ結果で、驚くべきことではない —
+驚くべきだったのは、その摩擦を置く前の 3 回連続 staling の方だった。
+
+follow-up（git からの導出）は**依然として正しい設計**だが、**緊急ではない**。
+やる価値は「摩擦を無くせる」ことであって「今壊れているのを直す」ことではない。
 
 ## 既知のノイズ
 
@@ -185,7 +209,35 @@ exit 90 になる。**主張としては正しい**（その branch に JDK-free
 
 # 残り
 
-- **aiueos を fleet に載せる**（段①の cljc 化が前提）。
+## resume point — 次の 1 手
+
+**aiueos の gate 3 本（`src/aiueos/{tcb,reproducibility,sbom}.clj`）を `.cljc` 化する。**
+これが aiueos を fleet に載せる前提であり、同時に ADR-2608012050 の
+`:platform-runtime-not-content-addressed` gap を閉じる経路でもある。
+
+    cd orgs/kotoba-lang/aiueos
+    # clojure.java.io -> node fs / java.security.MessageDigest -> node crypto を
+    # reader-conditional で分岐させ、まず tcb-check を nbb で通す
+    npx nbb -e '...'   # あるいは scripts/ に nbb エントリを足す
+
+`java.class.path`（`:tcb/classpath` の推移閉包）だけは nbb に対応物が無い。
+そこで **compiler の `deps-lock.edn` と同じ形（content-addressed closure lock）に
+置き換える**のが接続点で、jar が digest で pin される分だけ今より強くなる。
+
+載せた後の gate は `:gate :nbb-script` で、compiler gate と同じ「JVM を隠して
+回し、stub が呼ばれたら fail」を適用できる。
+
+## その他
+
+- compiler CI のうち egress を要する部分は Actions のまま。kotoba-lang org が
+  止まったらそこは止まる — 剥がすかどうかは別決定。
+- **compiler の既存の赤（fleet とは無関係、他セッションの領分）**:
+  `native-fuzz: coverage baseline does not match loader source`（Linux のみ）と
+  `native_executor_test` の 2 件（`:string` record field を「拒否される」と
+  期待しているが pin 前進で admissible になった）。どちらも 2026-08-03 時点で
+  main に存在。
+- fleet-ci 側の既存の赤: `root-repository-roles`（`kotoba-lang/kotoba-lang` の
+  宣言依存に `dag-cbor` が欠けている）、net-kotobase の複数 PR head。
 - compiler CI のうち egress を要する部分は Actions のまま。kotoba-lang org が
   止まったらそこは止まる — 剥がすかどうかは別決定。
 - `ship-git-deps!` が `.git` を持たない展開物を置く件。content address を
