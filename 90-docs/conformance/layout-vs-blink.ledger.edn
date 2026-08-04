@@ -160,3 +160,24 @@
              "cascade 残り 3 件: <p> の UA margin 1em を両者が食い違う font-size で解決"
              "fieldset/legend の out-of-flow 配置、select の control font 13 vs 13.3333"
              "WebGL/WebGPU host の retained/draw-ops 経路が theme を受け取らない"]}
+
+{:at "2026-08-04"
+ :iteration 32
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :note "このイテレーションは conformance 数値を動かさない（描画 host 側の修正）。
+        直近の実測値は iteration 31 のもの: line 185/190 (97%) / geometry 646/718 (90%) /
+        computed-style 8583/10038 (86%) / parser tree shape 94/108 (87%)。"
+ :landed {:dom-gpu "90d944fb49c20a303f7762ab9765ad44594630e5 — retained/draw-ops と webgl/webgpu host が :theme を受け取る"
+          :browser "5c3d1071e3ed7d10b6c4986433b5a98a5c4f6932 — smoke の両 entry が host にも theme を渡す"}
+ :findings ["**capability があるのに本番に届いていない** の 3 例目。browser.core には light page
+             theme があったが、WebGL/WebGPU host が通る retained/draw-ops 経路は theme を受け取れず、
+             ページは暗色アプリ chrome テーマで描かれていた。実測: visual smoke ページの <h1> が
+             ページ自身の #ffffff の上に #e6ebf5。"
+            "theme は font hook の下に merge する。上に merge すると theme を渡した副作用で
+             measure-text/font-metrics が静かに消え、色の変更に見えて word wrap 全体が退行する。"
+            "新 test が変更前に実際に落ちることを stash して確認した（vacuous test 対策）。"]
+ :remaining ["demo.cljs は theme 概念を持たないため未変更（意図的、範囲外）"
+             "smoke entry の配線自体は test されていない（browser でしか動かない ^:export entry。
+              機構側は dom-gpu の test が押さえている）"
+             "adoption agency L3（omission 群の残り 3 件）、table foster parenting"
+             "fieldset/legend の out-of-flow、select の control font"]}
