@@ -585,3 +585,33 @@
               max-content しか計算できない）／anonymous table box ／caption-side ／inline-table"
              "out-of-flow の静的位置と relative inline（agent 作業中）"
              "cascade の UA stylesheet 所在（構造的 ~2,100 値。display だけで 214/1212）"]}
+
+{:at "2026-08-04"
+ :iteration 41
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 313}
+ :line-structure {:agree 294 :total 301 :pct 98}
+ :geometry {:boxes-agree 1115 :boxes-total 1212 :pct 92 :clean-cases 264}
+ :paint-order {:points-agree 7575 :points-total 7805 :pct 97}
+ :computed-style {:values-agree 14782 :values-total 16964 :pct 87
+                  :causes {:ua-default 2123 :blockified 38 :cascade 11 :ua-inherited 10}}
+ :landed {:root "73278e14ca99db78dd8c537f996fbe6417862da8 — ADR-2800003100（提案）"}
+ :note "**COMPUTED STYLE 軸の不一致 2,182 件のうち 2,123 件（97.3%）が『UA stylesheet が cascade から
+        見えない』という 1 つの設計事実**であることを実測で確定し、ADR として起票した（status: proposed、
+        オーナー判断待ち。コードは 1 行も変えていない）。
+        property 別: display 214/1212 (18%)、margin-top/bottom 82%、padding-* 87-89%、
+        color/font-* /text-align は 95-99%。
+        提案は『UA 規則のデータを cssom.core に置き cascade の最下位優先度として適用、
+        layout は cascade が書いた値を読むだけにする』。
+        **却下した案を実測で裏付けた**: computed-style だけが UA を後付けする案は知識が 2 箇所に
+        分かれる —— この repo は同型の drift を 2 度観測している（inline style の shorthand 展開が
+        htmldom と cssom.core で食い違い cascade 帰責 41 件中 34 件を占めた件、
+        border-spacing の 2px を初期値と取り違えた件）。
+        **未計測の代償を ADR に明記**: apply-cascade が書く :style/* は browser session が
+        :dom/set-attr op として送るため、全要素に UA 由来の属性が増えると op 数が増える。
+        着手前に実測すること、と条件付きで書いた。"
+ :remaining ["out-of-flow の静的位置と relative inline（agent 作業中）"
+             "UA stylesheet の所在（上記 ADR、オーナー判断待ち）"
+             "border-collapse の style 順位付け、col 幅の min-content 床、anonymous table box"
+             "grid の justify-content/align-content、暗黙 column 生成、span item の intrinsic 寄与"
+             "parser 残り 4 件（</br>, a-in-a, body in flow, &notit;）"]}
