@@ -1,29 +1,27 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 15699, "ai-gftd-chat-shell" 3},
+ {"magatama-sh1n5h1x" 15950, "ai-gftd-chat-shell" 3},
  :zone
- {:requests-7d 617719,
-  :pageviews-7d 2691,
-  :uniques-7d-sum 5389,
+ {:requests-7d 622075,
+  :pageviews-7d 2770,
+  :uniques-7d-sum 5415,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
   [{:path "/v1/generation/jobs/e95b5891a5064a8695a6b40b642d5da8",
     :requests 92}
-   {:path "/mgrr.php", :requests 45}
    {:path "/v1/generation/jobs/731ec5e8f8af42089641174fea764658",
     :requests 44}
-   {:path "/ms-edit.php", :requests 38}
+   {:path "/ms-edit.php", :requests 41}
+   {:path "/mgrr.php", :requests 39}
    {:path "/v1/generation/jobs/e9d3454a0ae84d38b6d28d4cfa38887f",
     :requests 33}
-   {:path "/v1/generation/jobs/0c77db76c3e140f78c952ead14f41a58",
-    :requests 29}
-   {:path "/v1/generation/jobs/72fd836daf4b40878abde19757bf0454",
-    :requests 27}
-   {:path "/k.php", :requests 27}],
-  :status-mix {:ok 1919, :server-error 15558, :client-error 1138},
+   {:path "//wp-includes/block-bindings/", :requests 30}
+   {:path "/k.php", :requests 29}
+   {:path "/wp-content/themes/index.php", :requests 27}],
+  :status-mix {:server-error 15588, :client-error 1288, :ok 1999},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -35,10 +33,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-04",
- :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 84},
+ :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 83},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/generation/jobs/e95b5891a5064a8695a6… 92 · /mgrr.php 45 · /v1/generation/jobs/731ec5e8f8af42089641… 44 · /ms-edit.php 38 · /v1/generation/jobs/e9d3454a0ae84d38b6d2… 33 | 4xx(probe) 6% · 5xx 84%",
+ "上位 page (24h, 2xx/3xx): /v1/generation/jobs/e95b5891a5064a8695a6… 92 · /v1/generation/jobs/731ec5e8f8af42089641… 44 · /ms-edit.php 41 · /mgrr.php 39 · /v1/generation/jobs/e9d3454a0ae84d38b6d2… 33 | 4xx(probe) 7% · 5xx 83%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 617719 req/7d・5389 uniques(日次和)・うち4xx probe 6%(24h)、workers 15702 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 622075 req/7d・5415 uniques(日次和)・うち4xx probe 7%(24h)、workers 15953 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
