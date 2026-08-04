@@ -5,7 +5,7 @@
   :adr/title "ADR-2607250100: kotobase 成熟度バー — RisingWave / Neo4j / Datomic 基準の定義と現在地"
   :adr/status "accepted"
   :adr/date "2026-07-25"
-  :adr/last_verified "2026-08-03"
+  :adr/last_verified "2026-08-04"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/source-format "edn"
@@ -93,7 +93,32 @@
   ENTERPRISE-READINESS も Gremlin を「WebSocket GraphSON bytecode subset」と限定している。
 - GraphDB/RDF4J は「independent query deployment」で、deployment ownership が未記録。
 - peer 比: Neo4j Cypher / Datomic datalog のフル表面には未達。差分は列挙済みで silent ではない。
-- 残 gap: property paths / nested OPTIONAL、数値集約の engine push-down（typed value 格納が要る）。
+- **Cypher 表面を初めて外部標準スイートで測った（2026-08-04）。結果は極端に狭い。**
+  openCypher TCK（upstream `370fe27`、220 feature / 問い合わせクエリ 1,644 件）を
+  `kotobase.server.cypher/parse` に流したところ、**受理は 1 件（0.06%）**。
+  別に setup クエリ 728 件があるが Cypher が read-only なので構造的に対象外。
+  receipt: `kotobase-server/qualification/opencypher-tck-2026-08-04.edn`、
+  再実行は `nbb --classpath src scripts/opencypher_tck.cljs <tck/features>`。
+  **これは「文法カバレッジ」であって適合率ではない**（通ったクエリが正しい結果を
+  返すかは未検証）。拒否内訳の最大は `must start with MATCH` 697 /
+  `subset 外の文字` 383 / `bare (var) は束縛しない` 256 / `node must close with )` 151。
+  最大のギャップは **ラベル `(n:Person)` 未対応** —— Cypher で最も基本的な
+  パターンが通らない。低いこと自体は「壊れている」ではなく「主張範囲が狭い」だが、
+  **外から見れば『Cypher を喋る』という製品表現が過大**であることも同時に意味する。
+- **その計測が silent misread を 2 件見つけた（軸 4 で一番重い発見。修正済み）。**
+  `kotobase.server.cypher` の docstring は当初から「every unsupported form is
+  rejected loudly … never silently misread」と宣言していたが、tokenizer の
+  正規表現に無い文字を `re-seq` が**黙って捨てて**いたため破れていた:
+  ① `-[:r*]->`（可変長パス）が 1 ホップ `-[:r]->` として受理 ②
+  `WHERE a.n =~ "x"`（正規表現マッチ）が**等値比較**として受理。どちらも
+  エラーを返さず「違う質問の答え」を返し、呼び出し側から検出できない。
+  修正 `kotobase-server 3b28df2`（catch-all で loud reject、末尾 `;` のみ明示許可）。
+  **宣言はあったが検査するテストが無かった**ことが原因なので `cypher_test.cljc`
+  を新設（6 deftest）。88 tests / 394 assertions / 0 failures。
+  これはバーの 3 条件のうち ③（回帰を検出する仕組み）が欠けていた典型例で、
+  軸 1 の「性能 gate が無い」と同じ穴が query surface にも空いていた。
+- 残 gap: **ラベル対応**（TCK 拒否の主要因かつ Cypher の基本形）、property paths /
+  nested OPTIONAL、数値集約の engine push-down（typed value 格納が要る）。
 
 ## 軸 5: 一貫性・並行性モデル（documented。ref 面が署名付き head record に前進）
 
