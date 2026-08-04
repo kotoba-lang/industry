@@ -1,0 +1,296 @@
+[{:db/id -1
+  :adr/id "adr-2608047000-kotobase-ipld-ipns-filecoin-review-and-name-binding"
+  :adr/title "ADR-2608047000: kotobase の IPLD/IPNS/IPFS 構成レビュー — 名前と鍵の束縛、ref の宛先束縛、fold の非 incremental、Filecoin の使いどころ"
+  :adr/status "accepted"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-04"
+  :adr/last-verified "2026-08-04"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotobase-ipld-ipns-filecoin-review-and-name-binding"
+  :adr/repos ["orgs/kotoba-lang/tech-ipfs-specs-ipns"
+              "orgs/kotoba-lang/kotobase-client"
+              "orgs/kotoba-lang/kotobase-server"
+              "orgs/kotoba-lang/kotobase-storage"
+              "orgs/kotoba-lang/inga"
+              "orgs/kotoba-lang/kotobase-peer"
+              "orgs/kotoba-lang/arrangement"
+              "orgs/kotoba-lang/prolly-tree"
+              "orgs/kotoba-lang/blind"
+              "orgs/kotoba-lang/kotobase-storage-ipfs"
+              "orgs/network-awai/net-kotobase-ipfs"]
+  :adr/authoritative-for
+  ["IPNS 名の authority 判定（名前から鍵を導出して検証する）"
+   "signed head / quorum head の宛先 ref 束縛と issuer 受理方針"
+   "kotobase の datom 面が IPLD/IPNS/IPFS の上で何を前提にしてよいか"
+   "Filecoin を hot path でなく durability/監査面で使うという配置"
+   "blind index + 決定的 AEAD の漏洩記述の粒度"]
+  :adr/supersedes []
+  :adr/related ["adr-2607061800-ipns-head-signed-records-registry-resolved"
+                "adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"
+                "adr-2608039000-blockchain-decentralized-paths-must-not-presume-d1"
+                "adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog"
+                "adr-2608045000-kotobase-capability-topology-peer-retirement"
+                "adr-2607032430-kotobase-log-structured-write-path"
+                "adr-2607051000-kotobase-ciphertext-over-cid-persistence"]
+  :adr/body
+  "## Context
+
+オーナーからの問い（2026-08-04）: 今の kotobase の datomic 面を IPLD / IPNS / IPFS で
+組み立てる設計は効率的か、無理をしていないか。Filecoin actor model を使うとより効率的に
+なりうるか。tree 構造はどう影響するか。暗号は適切に設計・統合されているか。脆弱性はないか。
+
+回答のために実コードを origin/main の現在値で読んだ（west checkout は pin が古く、
+tech-ipfs-specs-ipns は ipns.record を持たない世代だった。以下の所見はすべて各 repo の
+default branch で再確認した値である）。
+
+## 所見 1 — 脆弱性: IPNS head の name と pubkey が束縛されていなかった（最重要）
+
+ipns.core/pubkey->name は「名前 = f(公開鍵)」を定義し、README は holding the Ed25519
+private key is authority over the graph named by pubkey->name, no registrar と主張する。
+ところが検証側は署名しか見ていなかった。
+
+- ipns.head/verify（JVM）: レコード内の public_key_multibase が payload に署名したか
+  だけを検査
+- kotobase.ipns/verify-head（cljs）: 同じ
+- kotobase.server.ipns/verify-and-decide-publish: 上記 verify-head と sequence 単調性
+  だけで publish を許可
+
+どこにも name と pubkey の一致検査が無かった。攻撃者は自分の鍵ペアを生成し、name に
+他人の k51 名を入れ、sequence を現在値より大きくして publish するだけで、kotobase.net
+レジストリ上の任意の名前を奪える。テストのフィクスチャは常に正しく導出された名前で
+作られていたため、不一致ケースが一度も走っていなかった。cljs 側の roundtrip テストは
+k51qzi5uqu5d-placeholder という、どの鍵も指さない文字列を name にして通っていた
+（穴を反対側から見たもの）。
+
+重要な対比: 同じ repo の ipns.record/validate（本物の IPFS IPNS Record 実装）は
+最初から正しく、core/name->pubkey で名前から鍵を導出してそれに対して検証している。
+つまり正しい形は既に repo 内に存在し、local registry 用のレコード形式だけがそれを
+していなかった。
+
+決定: 検証者は必ず名前から authority を導出する。共有述語 ipns.core/name-matches-pubkey?
+（fail-closed、malformed は throw でなく false）を 1 箇所に置き、JVM と cljs の両方が
+それを使う。public_key_multibase は名前の言い換えでしかなく、authority の出所ではない。
+
+## 所見 2 — 脆弱性: signed head / quorum head が宛先 ref に束縛されていなかった
+
+kotobase.storage.signed-head と inga.ref はどちらも、read-head! が untrusted host で
+ありうることを設計の前提に置いている。しかし読み取り時に、返ってきた head の ref
+フィールドを「今読もうとしている ref 名」と比較していなかった。ref は署名/証明の
+対象に含まれるので、ref A の正当な head を ref B の場所に置けば、署名も証明書も
+完全に valid なまま検証を通る。読み手は B に対して A の CID を得る。何も偽造されて
+いないので署名では捕まらない。
+
+signed-head にはもう 1 つあった: verify-fn はレコードが名乗った issuer を渡されて
+呼ばれるので、検査の意味が「誰かが署名した」に退化していた。これは任意の鍵ペアで
+満たせる。untrusted host が自分の鍵で署名した head を置き換えれば通る。この repo の
+既存テストはたまたま verify-fn 内で issuer を pin していたが、ライブラリが
+「呼び出し側が全員それを独立に思いつくこと」に依存してはならない。
+
+inga 側には a-certificate-for-another-ref-does-not-verify というテストが既にあり、
+一見この件をカバーしているように読める。実際にはあれは証明書を別のレコードに
+移植する場合を見ており、レコードと証明書が整合したまま丸ごと別 ref に置かれる
+本件は通してしまう。隣接するテストの存在が、無いカバレッジを有るように見せていた。
+
+決定: 宛先 ref の一致を、署名/証明の検証より前に検査する。別 ref 宛の head が
+「yes と言う検証」に到達しないようにする。signed-head は accept-issuer? を持ち、
+既定は自分の issuer のみ受理とする（挙動変更）。単一 writer が文書化された配備
+モデルなので既定はこれが正しく、鍵ローテーションや意図的な引き継ぎは呼び出し側が
+述語を渡す＝明示された決定になる。
+
+## 所見 3 — 効率: incremental な書き込み経路が実装済みなのに接続されていない
+
+kotobase-peer.core/fold! は arrangement.core/commit! を呼ぶ。これは 4 インデックス
+全 triple を平坦化して prolly-tree を毎回ゼロから作り直す全再構築で、1 回の fold あたり
+概算 12N 回の HMAC と 4N 回の AES-GCM、さらに hydrate-db によるグラフ全体の
+in-memory materialize を要する。Cloudflare Worker の CPU/メモリ予算の中でこれを
+やっている。
+
+ところが arrangement.core/commit-delta!（prolly-tree/insert-many で触れた leaf だけを
+書き換え、全再構築と CID-identical であることをテストで固定している）が既に存在する。
+その docstring 自身が「fold が O(graph) であること」を解くべき問題として名指ししている。
+にもかかわらず kotobase-peer / kotobase-engine / kotobase-server のいずれにも呼び出しが
+1 件も無い。prolly-tree の存在意義そのもの（差分更新で O(log n) ブロックしか書き換え
+ない）を書き込み経路が使っていない。
+
+なお kotobase-engine-prolly は arrangement の差分 API を使う正しい形で書かれており、
+kotobase-engine-lsm / merkle-lsm は write-optimised な代替として存在する。つまり
+これは構造の問題ではなく配線の問題で、kotobase-peer は 2026-08-04 に feature frozen
+（ADR-2608045000）である一方、production の facade kotobase-engine はまだ
+kotobase-peer.core を require している。
+
+決定: fold の incremental 化は本 ADR の対象範囲に含めるが、この transaction では
+実装しない（下記「やっていないこと」）。理由は、正しい着地先が kotobase-peer への
+パッチではなく kotobase-engine-contract 実装への移行であり、ADR-2608045000 の
+retirement-by-extraction と同じ波で扱うべきだからである。
+
+## 所見 4 — tree 構造の影響: 順序が保存されない
+
+leaf key は pr-str [blind(s) blind(p) blind(o)]。blind は HMAC-SHA256 なので:
+
+- 良い影響: キーが一様分布になり、boundary? のチャンク境界分布が理想的になる。
+  平均 fanout 256、100 万 triple で深さ 3 程度。prefix seek は数ブロックで済む。
+- 決定的な影響: 順序保存性が無い。scan-prefix は完全一致 component の prefix しか
+  引けない。kotobase-engine の datomic/index-range は属性の全 AVET 行を取得して
+  復号してから memory で filter しており、AVET インデックスが実質「属性ごとの
+  全件テーブル」に退化している。
+- prolly-tree の chunk_by には上限が無い。境界確率 1/256 の幾何分布なので約 2% の
+  leaf が 1000 entry を超える。ブロックサイズの分散が大きく、キャッシュ効率と
+  部分取得を悪くする。
+- commit! は spo/pso/pos/ocp を無条件に 4 本とも書く。使わないインデックスも常に
+  同じコストを払う。
+
+決定: 順序保存暗号は採らない（漏洩が桁違いに増える）。範囲検索が必要な属性は、
+その属性が機密でないことを明示的に宣言したうえで平文キーの別インデックスを
+持つ経路を将来設計する。それまで index-range のコストは仕様として文書化する。
+
+## 所見 5 — 暗号: 設計と検証は水準以上。ただし記述の粒度が実態より弱い
+
+kotoba-lang/blind は良質である。RFC 4231 の HMAC ベクタ 7 本、NIST CAVP の GCM
+ベクタ、Node crypto という第 3 の実装で生成した golden vector による JVM と cljs の
+一致検証、ex-data に鍵も平文も入れない、round-trip テストだけでは検証にならないと
+明言している。決定的 nonce が平文の等価性を漏らすこと、それが fold 収束のための
+意図的なトレードオフであることも明記されている。
+
+ただし blind index と組み合わせたときに観測可能なものは「等価性」より広い。
+
+- blind(p) ごとの triple 件数分布から、Datomic 型スキーマの属性語彙は小さく偏りが
+  強いため、頻度分析で属性名を確度高く推定できる。bootstrap 属性は構造も既知。
+- blind(s) ごとの次数分布から、エンティティのグラフ位相が見え、特定主体の
+  再識別に使える。
+
+平文そのものは漏れないが、「暗号化されているから中身は分からない」と読める記述は
+実態より強い。
+
+AAD が無いこと、wire に鍵 ID / epoch が無いことは blind の README が自認している。
+位置束縛は trusted root から CID を辿って検証する限り Merkle 構造が代替しており、
+ipld/get-node が必ず再ハッシュしてから decode するため即座に悪用できる穴ではない。
+ただしその前提は所見 1 と 2 が崩すので、多層防御としては痛い。鍵 ID が無いことは
+運用上より深刻で、鍵ローテーションが全インデックス再構築にしかならず、どの blob が
+どの鍵かを判別する手段が無い。
+
+決定: 脅威モデルの記述を上記の粒度まで下げる。AAD と鍵 ID の追加は wire format
+変更なので、fold の incremental 化と同じ移行波で扱う。
+
+## 所見 6 — IPFS/IPNS の実態
+
+IPLD は本物であり、無理をしていない。tag-42 リンク、DAG-CBOR 準拠（tag 42 以外は
+decode で throw）、JVM と ClojureScript で byte-identical な CID を実測検証済み。
+ipld/get-node は必ず再ハッシュしてから decode するので、CID キーで引けたことを
+検証と取り違える経路が無い。
+
+IPNS は 2 系統あり、性格が違う。
+
+- ipns.head は kotobase.net 自身のレジストリ内で解決する独自形式で、DHT には
+  参加しない（ns docstring が明記）。ipns.record が本物の IPNS Record であり、
+  そちらは正しく実装されている。
+- kotobase-storage-ipfs は本物の Kubo 経由だが、name/resolve が sequence を
+  返さないため version は常に nil、CAS は in-process キューによる直列化でしかない。
+  2 プロセスあれば両方が成功と報告して後勝ちで片方が消える。テストがその消失を
+  意図的に assert している。sequence を読まないので、古い head を返すゲートウェイに
+  対するロールバック検出手段が無く、間の commit が静かに落ちうる。
+- ipfs.kotobase.net は Kubo ではなく Backblaze B2 から CAR/raw を配る Worker である。
+
+したがって「IPFS で組み立てている」のは block naming と encoding であって、IPFS
+ネットワークへの参加ではない。これ自体は妥当な選択だが、kotobase-storage-ipfs が
+capability に distributed-blocks を立てているのは対外的表現とのズレである。
+
+無理をしているのは IPNS を ref 面に据えた点だけで、それは設計者が完全に認識しており
+inga（2f+1 quorum 証明書がそのまま条件付き書き込みになる）という正しい代替を
+既に実装している。ADR-2608039000 の D1 を前提にしないという方針は inga で
+実装可能になる。
+
+決定: IPNS を ref 面の authority として使わない。ref 面は inga に寄せる。
+kotobase-storage-ipfs の distributed-blocks 主張は実態に合わせて見直す（follow-up）。
+
+## 所見 7 — Filecoin actor model の使いどころ
+
+hot path には効かない。FVM の actor model を datom の書き込み経路に置くのは、
+epoch 30 秒・gas 計測・全 validator の再実行という性質からデータベースが乗る場所
+ではない。kotobase-anchor-fevm が never imported by the synchronous graph
+transaction path と自分で線を引いているのは正しい。
+
+効くのは 3 つで、どれも既に repo が存在する。
+
+- HAMT/AMT 状態木の規律（状態遷移は必ず差分）: 所見 3 の fold 問題そのもの。
+  inga.state が HAMT を導入しないと判断したのは正しい（prolly-tree が同型だから）。
+  ただし incremental に使っていないので、現状はその利点を捨てている。
+- actor が状態ルートを単独所有することで CAS が要らなくなる構造: inga の quorum が
+  ホスト primitive なしで同じ効果を得る。より一般的でこちらが正解。
+- PDP / Filecoin Pay / Warm Storage: cloud-filecoin と kotobase-anchor-fevm に実装済み。
+
+決定: Filecoin は hot path に入れない。durability の証明（PDP）、課金（Pay）、
+logical checkpoint の anchoring（FEVM、非同期・別経路）に限定して接続する。
+actor model そのものを効率のために持ち込む必要はない。持ち込むべきは actor model
+ではなく state-tree の差分規律であり、それは commit-delta! を呼ぶことで得られる。
+
+## この transaction で着地させたもの
+
+所見 1 と 2 の脆弱性のみ。いずれも設計の問題ではなく検証の書き忘れであり、
+正しい形が同じ workspace 内に既に存在していた（ipns.record/validate）。
+
+- kotoba-lang/tech-ipfs-specs-ipns#1 — ipns.core/name->pubkey* と
+  name-matches-pubkey? を追加し、ipns.head/verify が名前から鍵を導出して検証する。
+  clojure -M:test 25 tests / 90 assertions、clojure -M:lint はエラー 0
+  （main では 2 件のエラーで既に赤く、何も報告できていなかった）。
+- kotoba-lang/kotobase-client#22 — kotobase.ipns/verify-head を同じ規律に揃える。
+  kotobase.cid に base36-decode / ipns-name->ed25519-pub / ipns-name-matches-pub? を
+  追加。これは ipns.core の意図的な第 2 実装であり、この repo は consumer から
+  bare な shadow-cljs source-path として消費されるため deps.edn の git dep は
+  consumer のビルドで解決されないからである。drift 対策として cid_test に
+  ipns.core-test と同一の golden vector（実 Kubo ノード由来のものを含む）を置く。
+  npm test 70 tests / 216 assertions。
+- kotoba-lang/kotobase-storage — signed-head の同期版と非同期版の両方で、宛先 ref
+  一致と accept-issuer? を署名検証より前に検査する。accept-issuer? の既定は
+  自分の issuer のみ受理（挙動変更）。clojure -M:test 50 tests / 171 assertions、
+  nbb test/run.cljs に非同期側の oracle を 2 本追加。
+- kotoba-lang/inga — inga.head/verify-head が ref-name を取り、inga.ref/current-head
+  が渡す。
+
+すべての新規テストは、修正前のソースに対して revert して実際に落ちることを確認した
+（ipns 2 件、client 2 件、storage 3 件 + 非同期 oracle 2 件）。落ちないテストは
+何も証明しないため。
+
+## やっていないこと（follow-up、優先順）
+
+1. fold の incremental 化（所見 3）。arrangement/commit-delta! への切り替え。
+   着地先は kotobase-peer へのパッチではなく kotobase-engine-contract 実装への
+   移行であり、ADR-2608045000 の retirement-by-extraction と同じ波で扱う。
+2. arrangement の cljs pmap-async が無界の Promise.all である点（全 triple 分の
+   Web Crypto 呼び出しを一度に投げる）。kotobase-peer 側は 24 でバッチ化済み。
+3. AEAD wire format への鍵 ID / epoch 追加と AAD。破壊的変更なので 1 と同じ波。
+4. inga の validator set が API のパラメータでない点。verify-cert は distinct な
+   witness を quorum 個数えるだけで、その witness が既知の validator set に
+   属するかは verify-fn 任せである。docstring は witnesses of a known validator
+   set と主張しているが、素直な verify-fn（単に署名検証）を渡すと攻撃者は鍵ペアを
+   quorum 個生成するだけで証明書を偽造できる。quorum は引数で検査されるのに
+   membership は検査できない位置にあるという非対称は事故のもとである。本 ADR で
+   直さなかったのは、permissive な既定を持つ security API を半端に足すより、
+   required な形（quorum と同じ扱い）で入れるべきで、それが既存 caller の
+   破壊的変更になるためである。
+5. ipns.head の valid_until が検証されていない点。レコード形状に含まれるのに
+   verify も verify-and-decide-publish も見ていない。期限切れレコードが無期限に
+   有効である。純粋性を保つため clock の注入形を決めてから入れる。
+6. kotobase-storage-ipfs のロールバック検出（sequence が nil）と
+   distributed-blocks capability 主張の見直し。
+7. kotobase-storage-ipfs の put-block! が Kubo の返す Key が無い場合に
+   expected-cid を返すため、直後の CID 一致チェックが自明に通る点。読み取り時に
+   ipld/get-node が再検証するので影響は限定的だが or は外すべきである。
+8. blind の脅威モデル記述を所見 5 の粒度まで下げる。
+
+## Consequences
+
+- IPNS 名の authority は名前から導出される。public_key_multibase は言い換えで
+  あって出所ではない。この規律は ipns.record が最初から持っていたものであり、
+  新しい発明ではない。
+- untrusted host を前提とする ref 面では、署名の検証と authority の検証は
+  別物である。宛先（どの ref か）と発行者（誰が発行してよいか）を、署名検証より
+  前に検査する。
+- accept-issuer? の既定が strict になったので、複数の issuer が同じ ref に
+  head を発行している配備は述語を明示的に渡す必要がある。単一 writer が
+  文書化された配備モデルなので、これは想定内である。
+- kotobase の datom 面は IPLD の上では無理をしていない。無理をしているのは
+  IPNS を ref 面に据えた点と、prolly-tree を差分更新に使っていない点の 2 つで、
+  どちらも代替実装が既に workspace 内に存在する。
+- Filecoin は durability と監査の面で使う。actor model を hot path に持ち込まない。"}]
