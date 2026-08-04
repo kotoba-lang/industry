@@ -127,6 +127,26 @@
 (def origin-unresolvable
   (into {} (map (juxt :repo identity)) (:unresolvable origin-data [])))
 
+(def org-domain-rules
+  (get-in vocabularies [:org-domain :vocabulary/rules] []))
+
+(def org-reversed
+  (into {} (map (juxt :org :reversed)) org-domain-rules))
+
+(def existing-family-form-wins?
+  (boolean (get-in vocabularies [:org-domain :vocabulary/existing-family-form-wins])))
+
+(defn org-segment-repeated?
+  "The org segment already carries the org's own domain (ADR-2608040170), so a
+   name that restates it says the same thing twice. Detects both shapes: the org
+   name verbatim (cloud-itonami/cloud-itonami-isic-6492) and its reversed form
+   (kotoba-lang/org-kotoba-lang-kami-engine)."
+  [org nm]
+  (let [rev (get org-reversed org)]
+    (boolean (or (str/starts-with? nm (str org "-"))
+                 (and rev (str/starts-with? nm (str rev "-")))))))
+
+
 ;; ------------------------------------------------------------ declarations
 
 (defn normalize-repo [value]
@@ -444,6 +464,20 @@
       (doseq [[head v] undeclared]
         (println (str "  " head "-  " (count v) "  e.g. "
                       (str/join ", " (take 3 (map :name v)))))))
+
+    ;; ADR-2608040170: report, never fail. The redundancy is pre-existing and
+    ;; harmless, and an existing family's form wins over the elision rule --
+    ;; joining 459 cloud-itonami-isic-* siblings as bare isic-NNNN would put two
+    ;; forms in one family. The rule binds NEW families.
+    (let [repeated (filter (fn [{:keys [org name]}] (org-segment-repeated? org name)) planed)
+          by-org (sort-by (comp - val) (frequencies (map :org repeated)))]
+      (println "")
+      (println (str "org segment restated in the name: " (count repeated)
+                    (when existing-family-form-wins?
+                      "   [redundant, not wrong — existing family form wins]")))
+      (doseq [[org n] by-org]
+        (println (str "  " org "  " n "   (org already carries "
+                      (get org-reversed org "?") ")"))))
 
     (println "")
     (println (str "coverage: " (count (get by-status :conformant []))
