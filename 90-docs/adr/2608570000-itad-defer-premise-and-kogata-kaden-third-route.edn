@@ -124,7 +124,22 @@
      `(str \"a\" \"b\")` という文字列のまま LP と JSON-LD に出荷される。この編集で実際に
      やったので、EDN 内の未評価リスト/シンボルを走査して落とすテストを追加した。
    - `web/generate.cljs` が repo path を `orgs/gftdcojp/ai-gftd-itad` 決め打ちで持って
-     おり、2026-08 の `itad` への改名以降 superproject root から実行すると落ちていた。"
+     おり、2026-08 の `itad` への改名以降 superproject root から実行すると落ちていた。
+
+   **この ADR 自体がクエリ面に載ることを確認済み**:
+     nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+       '[:find ?id ?topic :where [?e \"adr/id\" ?id] [?e \"adr/topic\" ?topic]
+                                 [(= ?topic \"itad-licensing\")]]'
+     => [[\"2608570000-itad-defer-premise-and-kogata-kaden-third-route\" \"itad-licensing\"]]
+   stderr は空（ローダが黙って skip した dataset は無い）。
+
+   **ただし所要時間に注意（2026-08-04 実測）**: `edn-query.cljs` は `count` すら
+   110 秒で返らず、この query は 400 秒でも足りず 1,800 秒の予算で完走した。しかも
+   `... | tail -n` に通すと**パイプ最後尾の `tail` の exit 0 が返る**ため、
+   `timeout` の 124 が隠れて『成功したが出力が空』に見える。実際この ADR の検証で
+   4 回続けて空を掴み、一度は『クエリ面に載るか未検証』と報告している。
+   クエリ面を叩くときは (a) 分単位の予算を取る (b) exit code を見たいならパイプに
+   通さない。"
 
   :adr/alternatives
   "**経路A（古物商のみ）に全振りする** —— 産廃免許を完全に回避でき、取得コストも
