@@ -15,6 +15,14 @@
 ;;   B. metadata.yml 全体               bb scripts/check-metadata.cljc
 ;;   C. worker.yml の syntax 半分       bb <script> --syntax-check（root + worker/scripts）
 ;;   D. sdk.yml の python leg           py_compile + unittest test_gremlin.py
+;;   E. 大容量 object grant の判断規則   nbb で kotobase.object-grant-test
+;;
+;; **2026-08-04: レイアウト追従。** 初版は `clj-edge/` `worker/` を前提にしていたが、
+;; main はその後 `kotobase-api-gateway-cljs/` / `kotobase-api-gateway/` に作り替え
+;; られ、west pin (1fd2f4a3) が 55 commit 分それを追っていなかった。pin を main に
+;; 進めた時点でこの gate は `worker/scripts` を見失って即死する（= 検査が 1 つも
+;; 走らないまま赤）ので、pin 前進と同じ commit で追従させる。この gate が
+;; 「main の実体」ではなく「pin の実体」を見ていたことが、ズレに気づけなかった理由。
 ;;
 ;; **持ってこられないもの**（黙って落とさず、ADR に理由付きで列挙する）:
 ;;   - `npm ci` / `pnpm install` / `shadow-cljs` / `cargo` を要するもの
@@ -87,7 +95,7 @@
 
 (def isolation-verifier (path/join root "scripts" "verify-tenant-isolation.mjs"))
 (def root-scripts-dir (path/join root "scripts"))
-(def worker-scripts-dir (path/join root "worker" "scripts"))
+(def worker-scripts-dir (path/join root "kotobase-api-gateway" "scripts"))
 (def py-dir (path/join root "sdk" "kotobase-py"))
 
 (doseq [p [isolation-verifier root-scripts-dir worker-scripts-dir py-dir]]
@@ -169,8 +177,8 @@
 ;; 強くはしていない）。
 (def syntax-skip
   {"scripts/check-metadata.cljc" "no --syntax-check flag (covered bare in check B)"
-   "scripts/cognitect-wire-check.cljc" "nbb script, needs clj-edge/src on the classpath"
-   "worker/scripts/testnet-secrets.cljc" "secrets helper, requires arguments"})
+   "scripts/cognitect-wire-check.cljc" "nbb script, needs kotobase-api-gateway-cljs/src on the classpath"
+   "kotobase-api-gateway/scripts/testnet-secrets.cljc" "secrets helper, requires arguments"})
 
 (def syntax-candidates
   (vec (concat
@@ -179,8 +187,8 @@
           {:cwd root :rel (str "scripts/" f) :key (str "scripts/" f)})
         (for [f (sort (fs/readdirSync worker-scripts-dir))
               :when (str/ends-with? f ".cljc")]
-          {:cwd (path/join root "worker") :rel (str "scripts/" f)
-           :key (str "worker/scripts/" f)}))))
+          {:cwd (path/join root "kotobase-api-gateway") :rel (str "scripts/" f)
+           :key (str "kotobase-api-gateway/scripts/" f)}))))
 
 (def syntax-targets (vec (remove #(contains? syntax-skip (:key %)) syntax-candidates)))
 
@@ -229,8 +237,46 @@
                              (fail! "sdk-python" "unittest exited" rc))))))
 
 ;; ---------------------------------------------------------------------------
+;; E. 大容量 object grant の判断規則（ADR-2608012600 D4）
+;;
+;; hermetic: 純関数の決定ロジックのみで、署名も storage も datom も触らない。
+;; nbb で走るのは対象が Maven 依存を持たない `.cljc` だから（ノードは registry に
+;; 届かない）。検査は複製せず repo 側の test をそのまま呼ぶ。
+;;
+;; **org の Actions は 2026-08-03 以降起動していない**ので、repo 側の
+;; api-gateway.yml に同じ step があっても今日は発火しない。ここが実際に走る唯一の
+;; 場所である。
+
+(let [gw-dir (path/join root "kotobase-api-gateway-cljs")
+      test-file (path/join gw-dir "test" "kotobase" "object_grant_test.cljc")]
+  (if-not (fs/existsSync test-file)
+    (fail! "object-grant" "object_grant_test.cljc が無い —"
+           "gate が対象を見失っている(レイアウト変更?)")
+    (let [{:keys [rc out]}
+          (run "npx" ["nbb" "--classpath" "src:test" "-e"
+                      (str "(require '[clojure.test :as t] 'kotobase.object-grant-test)"
+                           " (t/run-tests 'kotobase.object-grant-test)")]
+               {:cwd gw-dir})
+          n (some-> (re-find #"Ran (\d+) tests?" (str out)) second js/parseInt)
+          summary (re-find #"(\d+) failures?, (\d+) errors?" (str out))]
+      (println "E object-grant:" (str "Ran " n " tests, rc=" rc))
+      (cond
+        (nil? n) (do (println (tail out 10))
+                     (fail! "object-grant" "no `Ran N tests` summary — refusing to"
+                            "report a pass"))
+        (zero? n) (fail! "object-grant" "zero tests ran")
+        ;; nbb の run-tests は失敗しても exit code を立てない。rc だけ見ていると
+        ;; 常に緑になるので、サマリの数字を読む。
+        (nil? summary) (fail! "object-grant" "no failures/errors summary to read")
+        (not= ["0" "0"] [(nth summary 1) (nth summary 2)])
+        (do (println (tail out 15))
+            (fail! "object-grant" (nth summary 1) "failures," (nth summary 2) "errors"))
+        (not (zero? rc)) (do (println (tail out 15))
+                             (fail! "object-grant" "nbb exited" rc))))))
+
+;; ---------------------------------------------------------------------------
 
 (if (seq @failures)
-  (die! 1 (count @failures) "of 4 hermetic checks failed:" (str/join ", " @failures))
+  (die! 1 (count @failures) "of 5 hermetic checks failed:" (str/join ", " @failures))
   (println "OK — tenant-isolation + metadata +" (count syntax-targets)
-           "syntax checks + python sdk conformance"))
+           "syntax checks + python sdk conformance + object-grant decisions"))
