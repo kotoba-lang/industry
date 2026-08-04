@@ -555,3 +555,33 @@
              "row flow での暗黙 column 生成、span する item の intrinsic 寄与、
               min-content/max-content/fit-content() キーワード、gap と longhand の宣言順"
              "display 型 + table（agent 作業中）、out-of-flow の静的位置と relative inline（原因特定済み）"]}
+
+{:at "2026-08-04"
+ :iteration 40
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 313}
+ :line-structure {:agree 294 :total 301 :pct 98 :was "289/301 (96%)"}
+ :geometry {:boxes-agree 1115 :boxes-total 1212 :pct 92 :clean-cases 264 :was "1086/1214 (89%), 256"}
+ :paint-order {:points-agree 7575 :points-total 7805 :pct 97 :clean-cases 269}
+ :computed-style {:values-agree 14782 :values-total 16964 :pct 87}
+ :landed {:cssom ["647ee78a1af13b8072c5afb141e1799b9b32a174 — display: table 系 / contents / colgroup / table-layout: fixed / border-collapse / cell vertical-align"
+                  "1e006f26fa2b9d2362c9b887abbdda2ffd32ae46 — CDP の一時的失敗を 1 回再試行"]}
+ :note "table 群 23/23、display 群 4/4。per-case 幾何で **9 改善・0 退行**。
+        既存の table 機構へ**役割を解決して流す**方針が当たり（第 2 実装を書かない）。
+        draw-op が要素自身の tag を運ぶようになり『table として layout される要素が tag も間違える』
+        という 2 つ目のバグも同時に解消。"
+ :findings ["**border-spacing の 2px は <table> タグに対する UA 規則であって初期値ではない。**
+             div-table では 0px と実測。node-style が全ノードに 2 を既定していたため、
+             CSS 宣言由来の table すべてに幻の spacing が入るところだった。"
+            "cell の vertical-align には**隙間が 2 種類**開く（跨いだ行の中での box と、
+             宣言された height の中での内容）。存在していたのは前者だけで、60px セル 2 つでは
+             box == row なので従来の shift は動かす対象を持っていなかった。"
+            "table の余剰幅は自然幅に**比例**配分と実測（300px を 7/14px セルに → 100/200 ちょうど）。
+             既存の :table/width-percentage の失敗もこれで直った。"]
+ :remaining ["border-collapse は幅だけ解決し、border-style の順位付け（hidden > double > solid）・
+              勝者の色・辺ごとの幅は無し（この box model は 1 box 1 uniform border）。
+              非対称なケース（6px vs 2px）を実測して『何を諦めたか』を記録済み。"
+             "col の幅は与えられたまま使う（実 CSS は min-content で床を張るが、この engine は
+              max-content しか計算できない）／anonymous table box ／caption-side ／inline-table"
+             "out-of-flow の静的位置と relative inline（agent 作業中）"
+             "cascade の UA stylesheet 所在（構造的 ~2,100 値。display だけで 214/1212）"]}
