@@ -726,3 +726,44 @@
              "fixed の bottom / % block offset は :height 未指定時に祖先に対して解決する（scope cut、test 済み）"
              "inline vertical metrics（agent 作業中）"
              "UA stylesheet の所在（ADR-2800003100、op 数実測済み、オーナー判断待ち）"]}
+
+{:at "2026-08-04"
+ :iteration 43
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 316 :parser-cases 137}
+ :line-structure {:agree 300 :total 304 :pct 99}
+ :geometry {:boxes-agree 1172 :boxes-total 1229 :pct 95 :clean-cases 287 :was "1142/1229 (93%), 271"}
+ :paint-order {:points-agree 7718 :points-total 7880 :pct 98 :clean-cases 279}
+ :computed-style {:values-agree 14984 :values-total 17202 :pct 87}
+ :parser-tree-shape {:agree 132 :total 137 :pct 96 :was "130/137 (95%)" :foreign "5/5"}
+ :landed {:cssom "7cfce45b9d2d6796048e9e162b32faa2ff15d98b — inline 行 box モデルの是正"
+          :dom-gpu "8be7365fb69bc25ef8dcb35e8e7d6ff1d3f5a683 — golden 2 件の更新（control box の変更が正当に無効化）"
+          :htmldom "add8971fa7b11d5ffc7c4a58f9961a5b644e8089 — foreign content の自己閉じと breakout"}
+ :note "**inline 行 box は 1 つのモデルが誤っていて 6 つの症状に見えていた。** 35 の行形と
+        10 の face/size 組で Brave を実測してから着手。**19 case 改善・0 退行**、48 case が
+        スコアを動かさずに box を変えた（幾何 93% → 95%、全 box 一致 271 → 287）。"
+ :findings ["leading-ascent: 各 inline box は floor(ascent + halfLeading) だけ baseline の上に届く。
+             **floor が効いている** —— 14px monospace (12/3) を line-height 20 に置くと half-leading 2.5 で
+             Brave はテキストを y=2 に置く（baseline は 14 下、14.5 ではない）。旧コードは floor せずに足して
+             baseline を ceil していた = 二重取り。これが span/code/a/label の +1〜+3 群。"
+            "**フォーム制御の分解が誤っていた。** Brave: input は padding 1px 2px / border 2px、
+             かつ全制御が line-height: normal。したがって content = rows × (ascent+descent) であって
+             rows × font-size ではない。input は 21 = 15+2+4 であり 21 = 13+4+4 ではない ——
+             **合計は同じで分解が違い、baseline はその分解から作られる**。p +3 / button +3.3 / label −2.7 の
+             中央値はこの 1 点だった。"
+            "sub/super の shift は**親の font-size**に対して掛かる（Brave 実測 9.453px = (0.404+0.271) × 14）。
+             **これは他の作業が引き起こした唯一の per-case 退行として見つかった** —— per-case diff が
+             それ自体の元を取った。"
+            "**私の foreign content probe も思い込みを 1 つ訂正した**: span は breakout list に載っており、
+             svg の中に foreign 要素として入るのではなく外に出る。"]
+ :declined ["ua-control-font は 13px のまま（Brave は 13.3333）。前 agent の記録どおり、その 0.33px は
+             intrinsic **幅** モデルの逆方向の誤差と相殺している。片方だけ直すと悪化するので**両方とも**
+             直さなかった。残差 ≤0.4px は許容内で、test の assertion に明記。"
+            "**harness の font metric 丸め: 実測し、記録し、適用しなかった。** Brave は全サイズで整数の
+             fontBoundingBox を返すので harness の線形スケールは実在しない metric を渡している（21 に対し 20.57）。
+             試したところ幾何 1150→1150 / clean 283→284 / line 297→298 / paint 7600→7599 で、
+             form/textarea-with-rows が許容外に出た（制御の ascent+descent を丸め上げると 3 行で累積し、
+             上記の相殺対を突く）。revert し、測定と理由を run.cljs に残した。"]
+ :remaining ["template の content が別 fragment にならない（2 件、cross-repo な dom 概念が要る）+ 稀な 3 件"
+             "vertical-align: top/bottom/middle（完成した行 box が要る）"
+             "UA stylesheet の所在（ADR-2800003100、op 数実測済み、オーナー判断待ち）"]}
