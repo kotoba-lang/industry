@@ -159,7 +159,17 @@ disposition は 5 つ。ラベルではなく**測定**で決める:
 | `:needs-review` | 実質的な追加がある。放置せず「何を確認すれば決まるか」を PR に comment で残す |
 | `:close-superseded` | 追加行が全て default branch に既に存在する（content containment）。archive → close |
 | `:close-stale-revert-risk` | base が古く、PR が触る file を `main` が更新済み。merge すると新しい内容を巻き戻す。archive → close（内容は archive に残る） |
-| `:close-repo-retired` | 対象 repo 自体が退役済み |
+| `:close-repo-retired` | 対象 repo 自体が退役済み（下記 archived 例外に注意） |
+
+**archived repo の PR は close すらできない**（実測 2026-08-04）。read-only なので
+`closePullRequest` / `update-branch` / `merge` が全て 403。さらに GitHub は**1ヶ月以上前の
+workflow run の再実行を拒否**するので、必須チェックが古い失敗のまま固まっていても branch
+更新で CI を回し直す逃げ道が無い。
+
+実測: open 108 件のうち **31 件が archived repo**（`gftdcojp/241001-lifescience-web` 29 +
+`kotoba-lang/kotoba-v2025` 2）。必須チェックは 2026-02 の失敗のまま。owner が unarchive →
+close → re-archive するしかないので**報告して終わりにするのが正しい**。inventory では live
+repo と分けて数える — 混ぜると backlog が永久に減らないように見える。
 
 判定は安い順に:
 
