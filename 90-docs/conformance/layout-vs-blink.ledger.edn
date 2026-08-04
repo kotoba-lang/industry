@@ -440,3 +440,39 @@
               table-layout: fixed、inline 系の細部、cascade の UA stylesheet 所在"
              "conformance/README.md の『Result — 2026-08-04』は旧数値のまま（並行作業の衝突を避けて
               意図的に触っていない）。全部着地したら 1 回更新する。"]}
+
+{:at "2026-08-04"
+ :iteration 37
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 292}
+ :line-structure {:agree 263 :total 280 :pct 94 :was "255/280 (91%)"}
+ :geometry {:boxes-agree 995 :boxes-total 1142 :pct 87 :clean-cases 228 :was "981/1142 (86%), 220/292"}
+ :paint-order {:points-agree 7006 :points-total 7285 :pct 96 :clean-cases 244}
+ :computed-style {:values-agree 13845 :values-total 15956 :pct 87}
+ :landed {:cssom "ecd1fddf712540d1ed7216b8dee4c6f7ff960bb3 — float の band 化（stack / margin / clear / BFC 包含 / escape 伝播）"}
+ :note "float 群 9/13 → **13/13**。8 case が red→green、逆は 0。v1 の band（コンテナ上端に固定した
+        1 個の矩形）を、置かれた float の **margin box のリスト** + 3 つの純関数
+        （float-band / float-clearance-y / place-float、CSS 9.5.1）に置き換えた。"
+ :findings ["**包含と margin collapse は別の問いだった。** 1 つの fc-free? が両方を担っており、
+             border-width は collapse を止めるが BFC を作らない、display: flow-root はどちらの
+             リストにも無い、という取り違えがあった。分離が flow-root の case を直した ——
+             旧コードは float を無条件に包含していたので、その case は**偶然通っていた**。"
+            "**float は inline のグループ化に対して透明でなければならない** —— 行 box に加わらないだけでなく
+             行を**分断してもいけない**。inline-runs の分割から持ち上げ、後続兄弟が入った entry の
+             直前に差し戻す。"
+            "**包含されなかった float は上へ昇る**（:float/escaped を collapsed margin と同じ経路で伝播）。
+             最初の実装は直接の float 子しか見ておらず、overflow:hidden が float の親でないときに
+             clearfix が壊れた。**これを捕まえたのは paint order 軸だけ** —— 幾何は満足しており、
+             その case の 25 個の sample 点が全て何にも当たっていなかった。"
+            "**:page/hero-with-floated-image は engine でなく harness の欠陥だった。** engine の 3 行は
+             正しく、engine-lines の『置換 box の内側か』判定が右下端を**含んで**いたため、x=80 の
+             テキストが 80px の float <img> の内側と見なされ全行が破棄されていた。半開区間に直すと
+             :page/article-with-figure と :page/login-form も直った —— 1 case 限定の細工でなく
+             本物の proxy バグだった証拠。"]
+ :remaining ["band は自分のコンテナの行 box にしか届かない（block **子孫**の行は全幅のまま）。
+              geometry が比較する border box は両方とも正しく、代償は wrap 位置。test で固定済み。"
+             "float-band は行の**上端 scanline** で問い合わせる（layout-inline-run が run 単位で
+              1 つの幅しか取らないため）"
+             "昇った float の隣にある**単独 inline** 子は narrow されない"
+             "clearance が対象 box 自身の margin collapse を抑止しない"
+             "残り 17 case: grid 4 / display 型 3 / absolute 3 / table 2 / text 2 / fixed 1 / button 1 / media-object 1"]}
