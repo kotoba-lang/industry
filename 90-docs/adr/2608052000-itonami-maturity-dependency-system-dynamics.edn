@@ -1,0 +1,307 @@
+[{:db/id -1
+  :adr/id "2608052000"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-maturity-dependency-system-dynamics"
+  :adr/title "cloud-itonami 全 1,720 repo の成熟度・依存関係を計測し、XMILE stock-flow で介入順序を計算する — 算術の正本は Kotoba カーネル"
+  :adr/status :accepted
+  :adr/date "2026-08-04"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["cloud-itonami の repo 単位成熟度スコアの定義（軸・重み・半飽和定数の決め方）"
+   "依存伝播モデル（M_eff）と leverage 順位の計算方法"
+   "fleet 成熟度の XMILE stock-flow モデルと戦略比較の目的関数"
+   "スコア算術の正本が Kotoba カーネルであること、および完全一致パリティゲート"]
+  :adr/related
+  ["adr-2607203000-system-dynamics-all-entities-dynamics-repo"
+   "adr-2607072350-org-oasis-open-xmile-system-dynamics-substrate"
+   "adr-2607289600-repo-taxonomy-three-planes"
+   "adr-2607211900-cloud-itonami-actor-substrate-maturity-loop-charter"
+   "adr-2607122300-cloud-itonami-flagship-maturity-sprint"
+   "adr-2607189300-cloud-itonami-flagship-rollout-wave5"
+   "adr-2607270100-design-system-kotoba-migration"
+   "adr-2607279200-kotoba-centered-migration-plan"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/body
+  "# ADR-2608052000: cloud-itonami の成熟度・依存関係を全数計測し、介入順序を system dynamics で決める
+
+**Status**: accepted / **Date**: 2026-08-04
+
+## Directive
+
+オーナー指示（逐語の意図）: 「今の cloud-itonami で flagship 相当の repo を含めて、
+どの repo から成熟度、依存関係を整えていくと効果的に全体の score が向上するか
+system dynamics, xmile で計算して, 1000repo 以上あるので、全て計算, score に.
+datomic 連携なども考慮に, kotoba 言語を前提に」
+
+## 既存資産の確認（作る前に索引を引いた）
+
+`nbb scripts/repo-search.cljs` と concept 索引で、次が**既に在る**ことを確認してから
+着手した。ゼロから書いたのは計測と結線だけである。
+
+| 既存 | 何を持っているか |
+|---|---|
+| `kotoba-lang/org-oasis-open-xmile` | OASIS XMILE 1.0 の実エンジン（Euler/RK4、DELAY/SMTH desugar 込み） |
+| `kotoba-lang/dynamics` | Meadows leverage band、`dynamics.xmile` bridge |
+| `manifest/repo-taxonomy.edn` | 4,033 repo の kind/traits 分類（生成物） |
+| `manifest/itonami-fleet-audit.edn` | cloud-itonami の status / prod-ready? / ingest gap（2026-07-25） |
+| `90-docs/business/cloud-itonami-flagship-checklist-scan.edn` | 1,349 repo の 7 項目 GTM チェック（2026-08-03） |
+| `kotoba-lang/compiler` | `.kotoba` の frontend/ir/KIR インタプリタ（nbb から駆動できる） |
+
+自前シミュレータは書いていない。XMILE エンジンは既存のものをそのまま呼ぶ
+（ADR-2607072350 / `dynamics.xmile` の docstring が名指しで禁じている再発明）。
+
+## 何を測ったか（観測、2026-08-04）
+
+`scripts/itonami-maturity-scan.cljs` が west 登録の `orgs/cloud-itonami/*` **1,720 件**
+全部と、その `deps.edn` `:local/root` が指す**他 org の substrate repo 90 件**を
+ファイルシステムと git から直接測った（既存の生成物に頼らず、その日の実測）。
+出力 `manifest/itonami-maturity-evidence.edn`、1,810 entity、193 秒。
+
+- present 1,797 / 未 checkout 13（west には在るが手元に無い ＝ 未測定であって 0 ではない）
+- src を持つ 1,452 / test を持つ 1,448 / **`.kotoba` ファイルを持つ 80**
+- 依存辺 2,141（スコア対象内）+ 25（対象外を指す）。グラフは**非巡回**
+
+## スコア（観測 → [0,1]）
+
+7 軸。単位は basis point（10000 = 1.0、整数）。
+
+| 軸 | 測っているもの |
+|---|---|
+| substrate | `src/**` の実バイト数 |
+| test | `test/**` の実バイト数 |
+| governed | governed-actor 7 部品（operation/governor|policy/store/phase/sim/facts/ledger）の充足率 |
+| ingest | facts/catalog/data 内の実 URL 引用数 |
+| docs | README バイト数・ADR 数・operator-quickstart の有無 |
+| surface | demo・cron 再生成 workflow・business-model・pricing の有無 |
+| fresh | 最終 commit からの経過日数 |
+
+**半飽和定数を発明していない。** `sat(x,k)=10000x/(x+k)` の k は fleet 自身の
+正値中央値を使う（src 41,641 B / test 17,139 B / citation 12 / README 4,283 B /
+ADR 1）。「fleet の中央値の repo がその軸で 0.5」という意味になり、外から持ち込んだ
+閾値ではなくなる。freshness の 180 日も発明ではなく、`scripts/itonami-fleet-audit.cljs`
+が既に `:stale` の閾値として使っている値。
+
+**重みは判断であって測定ではない。** repo の kind（repo-taxonomy が正本）ごとに
+重みベクトルを変える — library に governor が無いのは欠陥ではなく category mismatch。
+重みは 1 テーブルに集め、`:model/weights` として出力にもそのまま載せてある
+（後から異論を出せるようにするため）。各行は 10000 bp に足りることを実行時に検査する。
+
+**測っていない軸は 0 でなく分母から外す。** git log が取れなかった repo の freshness は
+nil であって 0 ではない（ADR-2607203000 の原則）。
+
+## 算術の正本は Kotoba カーネル
+
+`90-docs/system-dynamics/kotoba/itonami_maturity_kernel.kotoba`（`kotoba/pure`
+プロファイル、capability ゼロ）がスコア算術の**定義**であり、
+`scripts/itonami-maturity-dynamics.cljs` の同名計算はその**参照実装**である。
+
+**整数 basis point にした理由**: f32/f64 は丸めが実行環境依存なので「同じ入力で
+同じ点数」が runtime をまたいで保証できない。監査対象のスコアに再現性が無いのは
+意味が無い。整数にするとパリティゲートを ε 比較でなく**完全一致**で書ける
+（ε 比較は「どこまでズレてよいか」の判断が検査から漏れる）。
+
+**パリティゲート**: `scripts/itonami-maturity-kernel-parity.cljs` は repo 1 件につき
+引数ゼロの `.kotoba` 関数を 1 個生成し、その repo の観測値を literal で埋めた
+スコア式まるごとを本体に置く。カーネルと一緒にコンパイルして KIR インタプリタで
+実行する。つまり軸の計算も 7 軸の加重畳み込みも**全部 Kotoba の中**で起きる。
+**実測 2026-08-04: 全 1,797 repo が 1 の位まで一致（PASS、147 秒 / 6 バッチ）。**
+
+引数渡しで済ませないのは、`pair` ハンドルが 1 回の `ir/execute` の中でしか
+有効でないため — 畳み込みを host からの複数呼び出しに分けると
+`invalid-pair-handle` で trap する（実測）。KIR のアリーナ寿命の要請であって
+カーネルの制約ではない。
+
+### Kotoba 側の実測制約（現在地であって設計前提ではない）
+
+- **arity 上限 5**（`:abi-bound {:max-arity 5 :disposition
+  :intentional-security-constraint}`）のため、(値,重み)×7 = 14 引数の加重平均関数は
+  書けない。畳み込みは `pair` をアキュムレータにする。
+- **exp が admitted builtins に無い**（`f32sqrt` はある）。freshness を
+  exp(-d/180) でなく双曲減衰 10000·180/(180+d) にした。180 日で 0.5 は同じ、裾が厚い。
+  **式を言語に合わせたので明記する。**
+- 再帰的な値型が無いので repo 1 件の証拠を 1 値として渡せない。W4（recursive
+  logical values）待ちで、handle 設計に逃げない（ADR-2607279200）。
+
+## 依存伝播モデル（ここから先は模型であってデータではない）
+
+    M_eff(r) = M_own(r) · C(r),  C(r) = min over d∈deps(r) of (α + (1-α)·M_eff(d))
+
+最弱リンクが縛る（壊れた依存は自分を壊す）。α = 0.5 は「substrate が maturity 0 でも
+自分の maturity の半分は残る」という床で、**測定値ではない scenario parameter**。
+グラフが非巡回なので topo 順 1 パスで解ける（閉路時は反復にフォールバック）。
+
+**leverage は近似せず摂動で厳密に測る**: repo x の M_own を 1.0 に置いて不動点を
+解き直し、fleet 合計の増分 ΔΣ を取る。1,797 ノード全部について実行（76 秒）。
+`:leverage/ratio` = ΔΣ / (1 - M_own(x))（単位工数あたりの fleet 増分）。
+
+Meadows band は `dynamics.core/meadows-bands` をそのまま使う（再発明しない）。
+hub の定義は**パーセンタイルではなく「fleet の 1% 以上を推移的に gate している」**
+— 推移的 dependents の 95 パーセンタイルは 1 で、閾値として意味を持たないため。
+
+## 結果（2026-08-04 実測）
+
+### fleet 全体
+
+- スコア対象 1,797（未 checkout 13 / tombstone 2 は別枠。**「悪い」ではなく「対象外」**）
+- 平均 M_own = **0.3816** / 平均 M_eff = **0.2947**
+- **substrate drag = 0.0869 — fleet が持っている成熟度の 22.8% が、未成熟な substrate に打ち消されている**
+- 層: substrate hub **18** / flagship **9** / cohort **1,770**
+
+### 上位 3 repo が fleet スコアの 10% を握っている
+
+| repo | M_own | M_eff | 推移的 dependents | fleet gain | band |
+|---|---|---|---|---|---|
+| `kotoba-lang/langchain-store` | 0.223 | 0.177 | 322 | **21.84** | B |
+| `kotoba-lang/langchain` | 0.587 | 0.587 | 736 | **16.48** | B |
+| `kotoba-lang/langgraph` | 0.545 | 0.432 | 717 | **15.28** | B |
+| `kotoba-lang/robotics` | 0.294 | 0.209 | 101 | 1.41 | B |
+| `kotoba-lang/kotobase-client` | 0.325 | 0.325 | 75 | 1.07 | B |
+| （以下 1,792 repo） | | | | ≤1.0 | 主に E |
+
+上位 3 件の合計 53.6 点は fleet 合計（≈530 点）の **10.1%**。repo 数では 0.17%。
+4 位以下は 1.4 点まで落ち、そこから先はほぼ平坦（leverage ratio ≈ 1.0 = 自分の分だけ）。
+**順位に 30〜40 倍の段差がある。これが答えの中心。**
+
+`langchain-store` が 1 位なのは dependents が最多だからではない（322 で 3 位）。
+**M_own が 0.223 と極端に低いまま 322 repo を gate している**からで、伸びしろ ×
+到達範囲の積が最大になる。
+
+### flagship 9 件は自力では既に上位、しかし 25〜41% を drag で失っている
+
+| repo | M_own | M_eff | 損失 |
+|---|---|---|---|
+| isic-6310（kaonavi 置換） | 0.798 | 0.542 | −32% |
+| isic-5820（Salesforce 置換） | 0.771 | 0.457 | −41% |
+| isic-6399（Indeed 置換） | 0.768 | 0.452 | −41% |
+| isic-7810 | 0.734 | 0.432 | −41% |
+| isic-4921 | 0.581 | 0.416 | −28% |
+| isic-851/852/853/854 | 0.51〜0.54 | 0.37〜0.39 | −28% |
+
+**flagship に直接工数を積んでも、この 25〜41% は取り戻せない。** flagship 9 件は
+全件が substrate に依存している（実測 gated share = 1.00）。
+cohort 側の gated share は 0.4294（1,770 件のうち 43% だけが依存を持つ）。
+
+### XMILE stock-flow シミュレーション
+
+3 stock（Substrate / Flagship / Cohort）を実 XMILE モデルにし、
+`xmile.execute/run` の RK4（dt=0.05）で回した。dt を半分にした収束検査で
+最終値の差は 0（数値的に収束済み）。
+
+目的関数はモデルの中に aux として置いた:
+`Fleet_Eff = (n_sub·Substrate + n_flag·Flagship·Flag_Gate + n_coh·Cohort·Coh_Gate)/N`。
+静的な M_eff と同じ構造にしてある — **一度これを raw 平均で書いたら静的解析が
+langgraph に gain 22 を出す一方で動的側が breadth-first を勝たせるという矛盾が出た。
+同じ構造は 1 回だけ書く。**
+
+**層のサイズで work を割っている。** これを忘れると 18 repo の substrate 層と
+1,770 repo の cohort 層を同じ速度で埋められることになり、「土台を先に」のコストが
+タダになる（一度そう書いてしまい、結論が反転した）。
+
+同じ総工数での 60 期比較:
+
+| 戦略 | t=12 | t=24 | t=60 |
+|---|---|---|---|
+| breadth-first (sub .10 / flag .10 / coh .80) | 0.617 | **0.765** | **0.945** |
+| substrate-then-breadth (8 期で切替) | 0.502 | 0.694 | 0.929 |
+| substrate-then-flagship-then-breadth | 0.491 | 0.625 | 0.850 |
+| **cohort-only (sub 0)** | 0.516 | 0.635 | **0.805** |
+| balanced | 0.500 | 0.591 | 0.776 |
+| flagship-first | 0.458 | 0.520 | 0.667 |
+| substrate-first | 0.425 | 0.459 | 0.550 |
+
+### 一番実務的な結果 — substrate 配分の knee は 2〜5%
+
+「土台が先か横展開が先か」は問いの立て方が悪い。substrate 層は 18 repo しかないので、
+**わずかな配分で飽和する。** 残り全部を cohort に回したときの掃引:
+
+| w_sub | Fleet_Eff t=12 | t=24 | t=60 | Substrate@24 |
+|---|---|---|---|---|
+| **0** | 0.516 | 0.635 | 0.805 | 0.467（動かない） |
+| 0.005 | 0.536 | 0.680 | 0.899 | 0.707 |
+| 0.01 | 0.552 | 0.705 | 0.921 | 0.839 |
+| **0.02** | 0.571 | 0.727 | **0.927** | 0.951 |
+| **0.05** | **0.590** | **0.733** | 0.924 | 0.999 |
+| 0.10 | 0.587 | 0.724 | 0.916 | 1.000 |
+| 0.20 | 0.570 | 0.699 | 0.896 | 1.000 |
+
+- w_sub = 0 と 0.05 の差は t=24 で **+15.5%**（0.635 → 0.733）
+- **最適は 2〜5%。10% を超えると過投資で下がる**（18 repo は既に飽和済み）
+- 「substrate-first フェーズ」は要らない。**要るのは substrate をゼロにしないこと**
+
+## 決定
+
+1. **`langchain-store` → `langgraph` → `langchain` の 3 件を最優先で成熟させる。**
+   fleet の 10% がここに乗っており、2 位以下との段差が 30〜40 倍ある。
+   `langchain-store` は M_own 0.223 で 322 repo を gate しており、単体で最大の梃子。
+2. **substrate への配分を総工数の 2〜5% に固定する。** 専用フェーズを切らず、
+   常時この帯を維持する。ゼロにすると t=24 で 15.5% 失い、10% を超えると過投資になる。
+3. **残りは breadth（cohort 横展開）に回す。** cohort が fleet の 98.5% を占めるので、
+   substrate が飽和している限り breadth が最速。
+4. **flagship への直接投資は 3 番目。** flagship 9 件は M_own では既に上位だが
+   25〜41% を drag で失っており、その損失は flagship 側の作業では回収できない。
+5. **スコア算術の正本は Kotoba カーネル**とし、cljs 側を参照実装として
+   完全一致ゲートで縛る。食い違ったらカーネルが正しい。
+
+## クエリ面（Datomic / DataScript）
+
+`90-docs/system-dynamics/itonami-maturity.datoms.edn` を `:source/dataset
+\"itonami-maturity\"` として `manifest/edn-query.cljs` の index 面に登録した。
+`:repo/path` が repo-taxonomy の `:repo/path` と同形なので join できる。
+
+    nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+      '[:find ?p ?kind ?own ?gain :where
+        [?e \"source/dataset\" \"itonami-maturity\"] [?e \"repo/path\" ?p]
+        [?e \"leverage/fleet-gain\" ?gain] [?e \"maturity/own-bp\" ?own]
+        [?t \"repo/path\" ?p] [?t \"source/dataset\" \"repo-taxonomy\"] [?t \"repo/kind\" ?kind]]'
+
+entity は 3 種類が混在する: repo 1 件ごとの行（`:maturity/own-bp` を持つ）/
+`:summary/kind \"fleet-summary\"` 1 件 / `:sim/strategy`・`:sweep/w-substrate` の模型出力。
+fleet-summary は未 checkout / tombstone 件数も申告する — スコアが付いていないことが
+「悪い」ではなく「測っていない/対象外」であるため。
+
+## 測定値と模型値の境界（読み違え防止）
+
+| 属性 | 出所 |
+|---|---|
+| `:maturity/axis-*` | 観測から直接。半飽和定数は fleet 自身の中央値 |
+| `:maturity/own-bp` | 観測 × 重み。**重みは判断**（`:model/weights` に全文） |
+| `:maturity/effective` `:leverage/*` | 依存伝播モデルの出力（α = 0.5 に依存） |
+| `:sim/*` `:sweep/*` | XMILE RK4 の軌道（work-rate = 0.05 は scenario） |
+| `:leverage/tractability` | **代理指標**。実コードがある repo は直しやすい、という仮定 |
+
+## 正直な限界
+
+1. **α（依存の床）と work-rate は測定されていない。** α を変えれば drag の大きさが、
+   work-rate を変えれば時間軸が変わる。順位（上位 3 件の段差）は α に対して頑健だが、
+   knee の位置（2〜5%）は α に依存する。
+2. **重みは判断。** 上位 3 件の結論は重みにほぼ依存しない（dependents 数が支配的）が、
+   cohort 内の順位は重み次第で入れ替わる。
+3. **ADR 数の副軸は事実上 2 値。** 正値中央値が 1 なので、ADR を 1 本持てば満点になる。
+   データ由来の規則が退化したケースで、分布が育てば自然に解消する。
+4. **依存グラフは `deps.edn` `:local/root` だけを見ている。** west pin や実行時の
+   HTTP 依存、`.kotoba` の capability import は入っていない。**この 3 経路の依存は
+   未測定であって存在しないのではない。**
+5. **cohort 層の内部構造をモデル化していない。** 1,770 repo を 1 stock の平均として
+   扱っており、cohort 内の family 差（isco 216 件 / iso3166 147 件などの塊）は
+   軌道に反映されていない。
+6. **未 checkout 13 件は測っていない。** west には登録されているので存在はする。
+
+## 再現手順
+
+    # 1) 観測（本体 checkout を data-root に。west 管理の orgs/ は worktree に無い）
+    nbb scripts/itonami-maturity-scan.cljs --data-root <superproject main checkout>
+
+    # 2) スコア + 依存伝播 + leverage + XMILE
+    nbb --classpath \"<dynamics/src>:<org-oasis-open-xmile/src>\" \\
+      scripts/itonami-maturity-dynamics.cljs --top 30
+
+    # 3) Kotoba カーネルとの完全一致ゲート（全 1,797 repo）
+    nbb --classpath \"<kotoba-lang/compiler/src>\" \\
+      scripts/itonami-maturity-kernel-parity.cljs --batch 300
+
+    # 個別 repo の内訳を見る
+    nbb --classpath \"...\" scripts/itonami-maturity-dynamics.cljs --top 0 \\
+      --explain orgs/cloud-itonami/cloud-itonami-isic-6310
+"
+  :source/dataset "root-adr"}]
