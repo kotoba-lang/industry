@@ -575,13 +575,33 @@
    :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
    :gap/count 94
    :gap/of 119
-   :gap/note "Of the 99 origin-plane repos whose authority domain has been looked
+   ;; ROOT CAUSE, established 2026-08-05 (ADR-2608040160): these are not N
+   ;; independent mistakes. 1,026 of the 1,054 com-* repos are one generated
+   ;; family from ADR-2607041500 (accepted), which states outright that the
+   ;; "com- prefix [was] chosen unconditionally ... rather than
+   ;; per-vendor-accurate reverse-DNS TLD, which is out of scope for a
+   ;; 1,027-item mechanical pass". The correct answer was known and explicitly
+   ;; deferred. So this gap is ONE decision applied 1,026 times, and the origin
+   ;; rule is what un-defers it. Which of the 1,026 are wrong is structural, not
+   ;; random: vendor implementations (com-stripe, com-docker) are right, and
+   ;; specifications / standards bodies / governments (com-posix, com-tcp-ip,
+   ;; com-irs) are wrong by construction.
+   :gap/root-cause "90-docs/adr/2607041500-etzhayyim-compat-catalog-to-kotoba-lang.edn"
+   :gap/note "Of the 119 origin-plane repos whose authority domain has been looked
               up, 77 do not start with the prefix their domain derives. Not a
               failure and not scheduled for rename: a repository name is a
               discovery alias, not identity (ADR-2607289500), so 77 renames would
               churn west pins and inbound references to buy nothing on their own.
               The rule binds NEW registrations; these are visible and dated.
               Full list: --name-audit output."
+   ;; Measured 2026-08-05 over 3,322 deps.edn files: ZERO production
+   ;; dependencies on any of the seven. Every reference is in manifest /
+   ;; inventory / docs (repos.edn, fleet-db.edn, repo-taxonomy.edn,
+   ;; kotoba-lang/lang/q9-inventory.edn). Renaming costs a manifest update plus
+   ;; GitHub's automatic redirect; no code follows. That is much cheaper than
+   ;; assumed when the list was written, and is recorded so the decision is made
+   ;; on the real number.
+   :gap/rename-blast-radius {:deps-edn-scanned 3322 :production-dependents 0}
    :gap/worth-renaming-anyway
    [{:repo "kotoba-lang/com-w3c-specs" :derives "org-w3"
      :why "collides head-on with a 40-strong conformant org-w3-* family"}
@@ -662,14 +682,101 @@
     {:repo "cloud-itonami/cloud-itonami-translation" :repo-kind "actor"}
     {:repo "cloud-itonami/cloud-itonami-gtm-data" :repo-kind :absent-from-taxonomy
      :note "not checked out locally and carries no taxonomy row — unknown, not lib"}]
+   ;; READMEs read 2026-08-05 (ADR-2608040160). They split cleanly, which is why
+   ;; a single sub-prefix would have been wrong for all of them.
+   :gap/read-2026-08-05
+   {:portable-cljc-commons
+    {:repos ["cloud-itonami-licensed-operator" "cloud-itonami-pooled-incidence"
+             "cloud-itonami-regulatory-tracker" "cloud-itonami-response-benchmark"
+             "cloud-itonami-rirekisho" "cloud-itonami-app"]
+     :why "each README says 'portable .cljc technical commons' or equivalent —
+           libraries, matching repo-taxonomy's lib"}
+    :open-business-blueprints
+    {:repos ["cloud-itonami-card-issuing" "cloud-itonami-emi"
+             "cloud-itonami-pi" "cloud-itonami-translation"]
+     :why "each README says 'Open Business Blueprint' — actors"
+     ;; A concrete suggestion rather than a decision, because it is
+     ;; cloud-itonami's to make: emi is an E-Money Institution and pi a Payment
+     ;; Institution, both PSD2 Annex I regulatory LICENCE TYPES. That is a code
+     ;; system exactly like ISIC or ISCO, so these want a keyed sub-prefix
+     ;; (cloud-itonami-license-emi and so on) rather than bare subject names.
+     :suggestion "a regulatory-licence-keyed sub-prefix, by analogy with isic-/isco-"}}
    :gap/note "They now land on the family plane rather than subject, which is
               correct but not specific. The 4 actors arguably want a role
               sub-prefix; the 6 libs arguably want none at all."}
+
+  ;; ── survey findings, 2026-08-05 (ADR-2608040160) ──────────────────────
+  {:gap/id :cross-org-duplicate-names
+   :gap/measured-at "2026-08-05"
+   :gap/measured-by "west path basenames appearing under 2+ orgs"
+   :gap/count 19
+   :gap/repos ["anime" "bim" "business-manager" "business-person" "cad" "cofog"
+               "ekyc" "engi" "fleet" "kenchi" "kyoninka" "okaimono" "omise"
+               "ontology" "sha256d" "states" "svgraph" "tenso" "yotei"]
+   ;; Read, not assumed. Most are fine: the subject plane is org-scoped, so
+   ;; kotoba-lang/cad (a CAD/CAM library) and cloud-itonami/cad (a business
+   ;; blueprint) are different subjects that share a word. omise is three
+   ;; different things in three orgs.
+   :gap/needs-review
+   [{:name "engi"
+     :why "kotoba-lang/engi's README opens 'The consensus layer moved to
+           kotoba-lang/inga (2026-08-03)' — it is effectively a tombstone, and
+           it collides with gftdcojp/engi which is live"}
+    {:name "business-manager"
+     :why "same name in cloud-itonami and gftdcojp, neither has a README, so
+           they cannot be told apart — migration residue rather than homonym"}
+    {:name "business-person" :why "same as business-manager"}]
+   :gap/note "Also noticed: cloud-itonami/fleet's README calls itself
+              com-etzhayyim-fleet — repo name and self-identification disagree."}
+
+  {:gap/id :language-suffixes-beyond-clj
+   :gap/measured-at "2026-08-05"
+   :gap/count 8
+   ;; :forbidden-suffixes lists only -clj. Eight repos carry another language
+   ;; suffix, and they are NOT one category — a blanket ban would be wrong.
+   :gap/classified
+   {:legitimate-binding
+    {:repos ["gftdcojp/sparql-ts" "gftdcojp/bpmn-sdk-rs"
+             "kotoba-lang/sdk-py" "kotoba-lang/kotodama-py"]
+     :why "the language IS the identity here — a Python client for X is a
+           different artifact from a Clojure one, so the -clj rationale
+           ('language is not the package identity') does not reach them"}
+    :fossil
+    {:repos ["kotoba-lang/webgpu-rs"]
+     :why "README: 'pure-CLJC port of the retired Rust' — the contents are CLJC
+           and the name still claims Rust. This is exactly what -clj was banned
+           for, pointing the other way"}
+    :name-contradicts-contents
+    {:repos ["gftdcojp/bpmn-engine-ts"]
+     :why "named -ts, README says 'BPMN 2.0 execution engine for Rust'. One of
+           the two is wrong; which one is not decidable from here"}
+    :role-not-language
+    {:repos ["kotoba-lang/kami-engine-host-rs"]
+     :why "created BY ADR-2607102200, the same rename batch that banned -clj.
+           The -rs reads as 'which host implementation', i.e. a role — but -clj
+           could have claimed the same. Recorded as a question for whoever
+           revisits :forbidden-suffixes, not asserted as a contradiction"}}
+   :gap/note "etzhayyim/com-etzhayyim-app-open-swift also ends in a language
+              name but was not examined."}
 
   {:gap/id :undeclared-family-candidates
    :gap/measured-at "2026-08-04"
    :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
    :gap/count 17
+   ;; Screened 2026-08-05 (ADR-2608040160) by org spread, since a product family
+   ;; :must :share-one-owning-authority. Single-org candidates are plausible
+   ;; families; multi-org ones are either a migration in flight or a coincidence
+   ;; of vocabulary, and neither should be declared a family on count alone.
+   :gap/single-org-plausible {"oil-" "cloud-itonami" "dougaka-" "cloud-itonami"
+                              "artifact-" "com-junkawasaki" "aozora-" "network-awai"
+                              "weight-" "gftdcojp" "sdk-" "kotoba-lang"}
+   :gap/multi-org-not-a-family ["open-" "ghosthacker-" "ai-gftd-" "gftd-"
+                                "business-" "murakumo-" "club-" "bpmn-" "face-"]
+   ;; Two of the head tokens are not families at all: they say WHERE something
+   ;; runs, not who owns it. cloud- spans 4 orgs and 1,404 repos (cloud-itonami-
+   ;; is the family; cloud- is not), and local- marks a deployment variant
+   ;; (local-itonami / local-manimani / local-murakumo).
+   :gap/deployment-variant-not-family ["cloud-" "local-"]
    :gap/note "Head tokens used by >=3 subject-plane repos in orgs other than
               kotoba-lang and cloud-itonami — open- 17, ghosthacker- 13, ai- 10,
               gftd- 8, cloud- 8, oil- 7, business- 5, dougaka-/artifact-/

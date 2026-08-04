@@ -1,0 +1,201 @@
+[{:db/id -1
+  :adr/id "adr-2608040160-origin-misfilings-are-one-deferred-decision"
+  :adr/title "ADR-2608040160: origin 面の誤配置 94 件は 94 個のミスではなく、ADR-2607041500 が明示的に scope 外にした 1 個の決定である（残ギャップ調査）"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-05"
+  :adr/last-verified "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "origin-misfiling-root-cause-and-remaining-gap-survey"
+  :adr/authoritative-for
+  ["com-* 1,026 件が ADR-2607041500 の 1 回の機械的移行で生成され、reverse-DNS 正確性が明示的に scope 外にされたこと"
+   "したがって誤配置は個別のミスではなく 1 個の deferred decision であること"
+   "DNS sweep の「解決する」側が証拠にならないことの実証（posix.com / tcp.com / iso.com）"
+   "改名候補 7 件の実 blast radius がゼロであること"
+   "同名 repo が複数 org に存在する 19 件の内訳（homonym か migration 残渣か）"
+   "-clj 以外の言語サフィックス 8 件の 3 分類"
+   "family 候補 17 件の単一 org / 複数 org 判定"
+   "cloud-itonami 残り 11 件の実体分類"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2608040100-origin-plane-is-reverse-dns-of-the-real-domain"
+   "adr-2608040150-naming-gaps-capability-lei-dns-sweep"
+   "adr-2607041500-etzhayyim-compat-catalog-to-kotoba-lang"
+   "adr-2607102200-kami-render-stack-deps-authority-rename"
+   "manifest/repository-rules.edn"
+   "manifest/origin-domains.edn"]
+
+  :adr/body
+  "# ADR-2608040160: origin 面の誤配置は 1 個の deferred decision
+
+**Status**: accepted
+**Date**: 2026-08-05
+**Deciders**: Jun Kawasaki（+ Claude、standing authorization）
+**Scope**: ADR-2608040100 / 2608040150 が残した 5 項目の調査（実装ではなく調査）
+
+## 1. 根本原因 — 94 個のミスではなく、1 個の scope 外決定
+
+`com-*` 1,054 件のうち **1,026 件が同一の生成テンプレート**を持つ
+（README 先頭が \"Clean Room Actor\" 定型、Provenance が
+`etzhayyim/root/20-actors/<name>-compat` からの移設を述べる）。
+
+出典は **ADR-2607041500（status: accepted）** で、そこにこう書いてある:
+
+> naming rule: new_name = \"com-\" + kebab(strip-suffix(old_dir, \"-compat\")),
+> ASCII-fold diacritics, underscores->hyphens; **com- prefix chosen
+> unconditionally** (matches existing com-etzhayyim-*/com-junkawasaki
+> convention) **rather than per-vendor-accurate reverse-DNS TLD, which is out
+> of scope for a 1,027-item mechanical pass**
+
+**これで話が変わる。** ADR-2608040100 は誤配置を「判断を誤ったのではなく
+**ドメインを引かなかった**」と書いた。機構の説明としては正しいが、
+**この 1,026 件については歴史的に誤り**である —— 引かなかったのではなく、
+**正確な reverse-DNS が正解だと分かった上で、1,027 件の機械パスの scope 外として
+明示的に見送られた**。ADR-2607041500 は間違っていない。自分が何を延期したかを
+書き残した。
+
+したがって:
+
+- **誤配置は 94 個の不注意ではなく、1 個の決定が 1,026 回適用された結果**である
+- ADR-2608040100 の origin 規則は、その延期を**解除するもの**として位置づく
+- 誤配置率の推定は、無作為抽出ではなく **subject が .com 企業かどうか**で決まる。
+  vendor 実装（`com-stripe`, `com-docker`）は正しく、仕様・規格・政府機関
+  （`com-posix`, `com-tcp-ip`, `com-irs`）は構造的に誤り
+
+なお ADR-2607041500 の **title は \"reverse-domain naming\" を名乗る**が、
+body は正確な reverse-DNS を見送ったと述べている。title が実施内容を
+過大に述べている（本 ADR で記録するに留め、書き換えはしない）。
+
+## 2. DNS sweep の「解決する」側が無価値であることの実証
+
+ADR-2608040150 は非対称性（非解決は証拠、解決は証拠でない）を理屈で述べた。
+**実証できた**:
+
+| repo | `<label>.com` | 実際の authority | 判定 |
+|---|---|---|---|
+| `com-posix` | posix.com **解決する** | ieee.org | **誤配置** |
+| `com-tcp-ip` | tcp.com **解決する** | ietf.org | **誤配置** |
+| `com-iso-standards` | iso.com **解決する** | iso.org | **誤配置** |
+
+3 件とも DNS sweep の「解決した 1,029 件」側に入っていながら、いずれも誤配置と
+判明済みである。**解決する側を conformant として扱っていたら、既知の誤配置を
+自分で祝福していた。** UNVERIFIED のまま残した判断が正しかったことの証拠。
+
+## 3. 改名候補 7 件の blast radius は実質ゼロ
+
+`deps.edn` 3,322 件を走査した結果、7 件すべてについて
+**外部からの production 依存は 0 件**。参照はすべて manifest / inventory /
+docs（`repos.edn`, `fleet-db.edn`, `repo-taxonomy.edn`,
+`kotoba-lang/lang/q9-inventory.edn` 等）に限られる。
+
+改名コストは「manifest 群の更新 + GitHub の自動リダイレクト」だけで、
+コード側の追随は要らない。ADR-2608040100 は改名を主目的にしないと決めたが、
+**その 7 件に限れば費用は当初想定よりはるかに低い**。
+
+## 4. 同名 repo が複数 org に存在する 19 件
+
+`anime` `bim` `business-manager` `business-person` `cad` `cofog` `ekyc` `engi`
+`fleet` `kenchi` `kyoninka` `okaimono` `omise` `ontology` `sha256d` `states`
+`svgraph` `tenso` `yotei`（`omise` は 3 org）。
+
+読んだ結果、**大半は homonym で問題ない** —— subject 面は org スコープであり、
+`kotoba-lang/cad`（CAD/CAM ライブラリ）と `cloud-itonami/cad`（事業
+blueprint）は別物である。`omise` は 3 つとも別物（kotoba ライブラリ /
+etzhayyim 出店者 UI / itonami blueprint）。
+
+**ただし 2 種類は migration 残渣に見える**:
+
+- **`engi`** — `kotoba-lang/engi` の README 冒頭が
+  「The consensus layer moved to `kotoba-lang/inga` (2026-08-03)」。
+  実質 tombstone であり、`gftdcojp/engi`（value-accounting 境界）と衝突している
+- **`business-manager` / `business-person`** — cloud-itonami と gftdcojp の
+  両方に同名で存在し、どちらも README を持たないため区別できない
+
+`cloud-itonami/fleet` は README が自分を `com-etzhayyim-fleet` と名乗っており、
+repo 名と自称が一致していない（別件だが同じ移行由来と思われる）。
+
+## 5. `-clj` 以外の言語サフィックス 8 件 —— 3 つに分かれる
+
+`:forbidden-suffixes` は `-clj` 1 件しか挙げていないが、実測すると
+`-ts` 2 / `-rs` 3 / `-py` 2 / `-swift` 1 が存在する。**一律に禁止すべきではない**:
+
+1. **正当な言語バインディング**（言語が identity である）——
+   `sparql-ts`（TypeScript family）/ `bpmn-sdk-rs`（Rust DSL）/
+   `sdk-py`（Python client）/ `kotodama-py`（Python worker）。
+   ある言語向けの SDK は、別言語の SDK と**別物**なので `-clj` の論拠は当たらない
+2. **化石** —— `webgpu-rs` は README が
+   「pure-CLJC port of the **retired** Rust」と述べる。中身は CLJC なのに名前が
+   Rust を主張している。これは `-clj` 禁止の論拠がそのまま当たる
+3. **名前と中身の不一致** —— `bpmn-engine-ts` の README は
+   「BPMN 2.0 execution engine **for Rust**」。名前は `-ts`。
+   どちらかが誤っており、要確認
+
+さらに記録に値する点: **`-clj` を禁止した ADR-2607102200 が、同じ rename batch で
+`kami-engine-host-rs` を作っている**（README に改名の記録あり）。ここでの `-rs` は
+「どのホスト実装か」という役割の区別と読めるが、`-clj` も同じ主張ができた。
+矛盾と断定はせず、規則を見直すときの論点として記録する。
+
+## 6. family 候補 17 件 —— 単一 org 6 / 複数 org 11
+
+product-family は `:must [:share-one-owning-authority]` なので、org 分布が
+一次スクリーニングになる。
+
+**単一 org（family として妥当）**: `oil-` 7（cloud-itonami）/
+`dougaka-` 4（cloud-itonami）/ `artifact-` 4（com-junkawasaki）/
+`aozora-` 4（network-awai）/ `weight-` 4（gftdcojp）/ `sdk-` 3（kotoba-lang）
+
+**複数 org（family ではない、または org を跨いだ移行中）**:
+`open-` 17（itonami+kotoba-lang、公開データ・標準カタログ群）/
+`ghosthacker-` 13（com-junkawasaki のみだが gftdcojp にも 1 件）/
+`ai-gftd-` 10 / `gftd-` 8 / `business-` 5 / `murakumo-` 4 / `club-` 4 /
+`bpmn-` 3 / `face-` 3 / `local-` 3
+
+**`cloud-` は family ではない**（4 org・1,404 件）。`cloud-itonami-` が family で、
+`cloud-` は「クラウド常駐サービス」を表す語であって所有者を表さない。
+`local-` も同型（`local-itonami` / `local-manimani` / `local-murakumo` は
+**デプロイ変種**の接頭辞であって family ではない）。
+
+## 7. cloud-itonami 残り 11 件 —— 6 lib + 4 actor + 1 不明
+
+README を読むと綺麗に割れる:
+
+- **portable `.cljc` technical commons（ライブラリ）** 6 件:
+  `licensed-operator`（許認可の名義人 defer 判定）/ `pooled-incidence`（希少
+  事象の団体内プール）/ `regulatory-tracker`（規制提出追跡）/
+  `response-benchmark`（送金詐欺の応答時間ベンチ）/ `rirekisho`（履歴書の
+  値モデル）/ `app`（local-first AI workspace）
+- **Open Business Blueprint（actor）** 4 件: `card-issuing` / `emi` / `pi` /
+  `translation`
+- **不明** 1 件: `gtm-data`（未 checkout、taxonomy にも行が無い）
+
+注目すべきは **`emi`（E-Money Institution）と `pi`（Payment Institution）が
+PSD2 Annex I の規制ライセンス種別**である点。つまりこれらは ISIC / ISCO と同型の
+**コード keyed な blueprint** であり、`cloud-itonami-license-emi` のような
+role sub-prefix が自然に当たる。ただしこれは cloud-itonami 側の決定なので
+提案に留める。
+
+## Consequences
+
+### ADR-2608040100 の記述を 1 箇所訂正する必要がある
+
+「誤配置は『ドメインを引かなかった』」は、1,026 件の生成分については誤り。
+正しくは「ADR-2607041500 が正確な reverse-DNS を scope 外として明示的に
+延期し、`com-` を無条件に適用した」。機械検査可能という結論は変わらない。
+
+### 実施していないこと（すべて判断待ち）
+
+本 ADR は**調査**であって実装ではない。以下はいずれも未実施:
+
+- 改名 7 件（費用はゼロに近いと判明したが、方針判断はオーナー）
+- `engi` / `business-manager` / `business-person` の重複解消
+- `-ts` / `-rs` / `-py` の扱い（3 分類のうち禁止すべきは化石と不一致のみ）
+- family 6 件の宣言、複数 org 11 件の扱い
+- cloud-itonami 11 件の role 付与
+- origin 面 1,313 件の lookup（1 件ずつの外部作業であることは確定）
+"}]
