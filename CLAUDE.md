@@ -199,14 +199,24 @@ skill `new-project-scaffold` を参照。
   `--key`。1Password は使わない — op CLI が interactive auth timeout）。
   `FLEET_ROOT=<superproject root>` を渡すと kagi bin を解決できる。
   従来の `gen-west-manifest.cljs --entry` / API single-entry も引き続き有効。
-  ⚠ **ただし両者は衝突する**（実測 2026-08-05、ADR-2608040190）。west.yml を先に
-  書いてから `fleet reconcile --enforce` すると **`FLIP VIOLATION: west.yml written
-  outside the signed fleet-db path`** で拒否される。そして fleet CLI には
-  **entry の追加・削除・改名を行う incremental な操作が無い**（`pin-advance` は
-  既存 entry の pin 前進のみ、`import` は west.yml 全体からの再構築のみ）。
-  したがって **repo の改名は現状 fleet-db に反映する経路が無い** — west.yml と
-  repos.edn には反映でき、GitHub リダイレクトが効くので動作は壊れないが、
-  fleet-db は旧名を保持したままドリフトする。
+  **API single-entry で west.yml に書いたあと、フラグ無しの `fleet reconcile` で
+  fleet-db に吸収する**のが Phase 1.5 の正規手順:
+
+  ```bash
+  # 吸収（書き込む）。--check は検査のみ、--enforce* は「拒否」スイッチで書き込み
+  # スコープではない（実測 2026-08-05: --enforce-repos に自分の変更を渡して
+  # FLIP VIOLATION を食らった。scope 外の drift はどのみち吸収される）
+  nbb --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/fleet.cljs \
+    reconcile --db manifest/fleet-db.edn --west manifest/west.yml
+  ```
+
+  ⚠ **reconcile の入力 west.yml は必ず `origin/main` のものにする。** reconcile は
+  fleet-db を west.yml に**一致させる**だけで pin の向きを検査しない。ローカルの
+  west.yml が main より遅れていると、その退行を fleet-db に焼き込む（実測
+  2026-08-05: ローカルの `io-libp2p` が main より 2 commit 遅れており、警告を
+  見ながら実行して退行を書き込んだ。`git show origin/main:manifest/west.yml` を
+  一時ファイルに出して入力にし直した）。**吸収前に、変更される pin が全て
+  fast-forward か `gh api compare` で確認する**（53 件を確認した実績）。
   **その書き込みを fleet-db に自動吸収していた CI は無くなった**（2026-07-30、
   ADR-2607300900 で GitHub Actions を撤去。`fleet-projection-verify.yml` は
   murakumo fleet 側に未 port）。当面 `fleet reconcile` は手で回す。**fleet-db / ledger /

@@ -964,26 +964,27 @@
    :gap/note "kotoba-lang/kotoba-fleet is a DIFFERENT repo (parallel-agent
               fleet-coordination substrate, ADR-2606302000), unrelated to fleet-db."}
 
+  ;; WITHDRAWN 2026-08-05, same day it was filed. It claimed the fleet CLI has no
+  ;; incremental add/remove/rename and that the two documented write paths
+  ;; contradict each other. Both were wrong, and for one reason: --enforce-repos
+  ;; was read as "write only these repos" when the implementation says the
+  ;; opposite -- "only these named repos ... Drift outside the scope is still
+  ;; absorbed". The --enforce* flags are the staged hard-flip REJECTION switch,
+  ;; not a write scope. Passing my own renames to it asked the tool to reject
+  ;; them, and it correctly did.
+  ;;
+  ;; The absorption path is plain `fleet reconcile --db <db> --west <west>`,
+  ;; which is exactly what CLAUDE.md means by "当面 fleet reconcile は手で回す".
+  ;; Run 2026-08-05: {:changed 53, :added 21, :removed 9} -> 83 ledger events,
+  ;; and --check now reports clean. All nine renames are in fleet-db.
+  ;;
+  ;; Kept rather than deleted: the gap was filed with an error message as
+  ;; evidence, which reads as proof until you read the code the message came
+  ;; from.
   {:gap/id :fleet-db-has-no-rename-path
-   :gap/measured-at "2026-08-05"
-   :gap/measured-by "fleet reconcile --enforce --enforce-repos <the 5 renames>"
-   ;; The two documented write paths contradict each other. CLAUDE.md calls the
-   ;; GitHub API single-entry commit "the only correct path" for a west.yml
-   ;; rename; the signed fleet-db plane then rejects exactly that with
-   ;; "FLIP VIOLATION: west.yml written outside the signed fleet-db path".
-   ;; And the CLI has no operation that would satisfy it: pin-advance advances
-   ;; the pin of an EXISTING entry, import rebuilds the whole db from west.yml.
-   ;; There is no add / remove / rename.
-   :gap/observed "FLIP VIOLATION: west.yml written outside the signed fleet-db path"
-   :gap/in-scope-drift {:changed 0 :added 5 :removed 5}
-   :gap/consequence "repo renames reach west.yml and repos.edn but cannot reach
-                     fleet-db.edn. Nothing breaks -- GitHub redirects hold and
-                     west update reads west.yml -- but fleet-db drifts. As of
-                     2026-08-05 it carries 9 stale names (5 catalogs + 4 aozora)
-                     plus, from other sessions, 7 un-absorbed pin advances and 8
-                     unregistered repos."
-   :gap/needs "an incremental add/remove/rename operation in kagami's fleet CLI,
-               or an explicit decision that renames go fleet-db-first"}
+   :gap/status :withdrawn-misread-the-flag
+   :gap/withdrawn-at "2026-08-05"
+   :gap/reconciled {:changed 53 :added 21 :removed 9 :ledger-events 83}}
 
   {:gap/id :undeclared-family-candidates
    :gap/measured-at "2026-08-04"

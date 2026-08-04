@@ -123,10 +123,26 @@ GitHub リダイレクトが効き `west update` は west.yml を読むので**�
 `--enforce-repos` で自分の 5 件だけに絞って試したので、他セッションの
 pin を巻き込んではいない。
 
+> **訂正（同日、後刻）**: 上の「incremental な改名経路が無い」は**誤り**だった。
+> `--enforce-repos` を「この repo だけ書き込む」スコープ指定と読んだが、実装の
+> コメントは逆を言っている —— *\"--enforce-repos: only these named repos (the
+> fleet's own signed-path repos — safe first activation) ... **Drift outside the
+> scope is still absorbed**\"*。つまり `--enforce*` は**段階的 hard-flip の
+> 「拒否」スイッチ**であって書き込みスコープではない。**自分の変更を拒否しろと
+> 指示していた。**
+>
+> **フラグ無しの `fleet reconcile --db <db> --west <west>` が吸収経路**である
+> （Phase 1.5、CLAUDE.md の「当面 `fleet reconcile` は手で回す」がこれ）。実行して
+> 9 件の改名を含む drift を吸収済み: `{:changed 53, :added 21, :removed 9}` →
+> ledger event 83 件。`--check` は `clean: fleet-db == projection of west.yml`。
+>
+> したがって `:fleet-db-has-no-rename-path` gap は取り下げる。矛盾も無い ——
+> API single-entry で west.yml に書き、後で reconcile で吸収する、が設計どおり。
+
 ## Decision
 
 - **fleet-db を強制しない。** 署名された plane を迂回して手編集するのは
-  CLAUDE.md が明示的に禁じている
+  CLAUDE.md が明示的に禁じている（reconcile は迂回ではなく正規経路）
 - **gap として記録する**（`:fleet-db-has-no-rename-path`）。必要なのは
   kagami の CLI に incremental な add/remove/rename を足すか、
   「改名は fleet-db 先行」と決めるかのどちらか
