@@ -617,3 +617,34 @@
              "parser 残り 4 件（</br>, a-in-a, body in flow, &notit;）"]}
 
 {:at "2026-08-04" :note "self-test of the ledger-only path (no pins). If this line is the only change, the guard works."}
+
+{:at "2026-08-04"
+ :iteration 41
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 313}
+ :line-structure {:agree 297 :total 301 :pct 99 :was "294/301 (98%)"}
+ :geometry {:boxes-agree 1120 :boxes-total 1212 :pct 92 :clean-cases 267 :was "1115/1212, 264"}
+ :paint-order {:points-agree 7575 :points-total 7805 :pct 97}
+ :computed-style {:values-agree 14782 :values-total 16964 :pct 87}
+ :landed {:cssom "2136fc98d37fd7770a05bdc02a3a967729f4cf4a — out-of-flow の静的位置 + relative inline の両半分"}
+ :note "**313 case 全ての engine box 列を新旧で diff し、変わったのは 3 件だけ、3 件とも oracle と
+        完全一致になった。** 他は 1px も動いていない —— 共有レイアウト経路への広い変更で
+        最も知りたい数字。partition-flow を廃し、out-of-flow の子を float と同じ扱いで
+        inline-runs の grouping から持ち上げる（行 box に加わらない box は行を分断しても
+        いけない、という同じ規則）。"
+ :findings ["out-of-flow box 自身の上 margin は加算され、直前の兄弟の下 margin と **collapse しない**
+             （Brave 実測: mb 10 + mt 30 も mb 30 + mt 10 も y=60。collapse するなら前者は 80）。"
+            "**私が渡した診断のうち 1 件は誤りだった。** :stacking/positioned-covers-later-flow-content は
+             静的位置のバグではない（abs box は top: 0 を持ち、幾何は元から全 box 一致していた）。
+             両語が (0,0) に重なるため左右順が存在せず、cluster-lines は :left で整列するので
+             同値のとき各側の入力順（ブラウザは DOM 順、engine は描画順）が残るだけ。
+             **対称な是正（両側でテキストにより tie-break）を試したところ :float/clear-left と
+             :float/float-after-text-in-its-container が壊れた** —— そちらの float と隣接テキストも
+             left を共有するが、順序は本物だから。revert し、測定を case の隣に記録した。"]
+ :remaining ["inline の静的位置（offset 無しの out-of-flow box が『書かれた行内の位置』でなく
+              包含ブロックの先頭に落ちる）。行分割器に zero-width marker を通す必要があり、
+              その marker が保留中の空白を消費して `text <abs> more` に余分な空白幅を足すため見送り。
+              該当関数にコメントで明記、corpus に計測 case は無い。"
+             "残り 4 case: fixed がフローから抜けない / button の nested inline / media-object /
+              上記 stacking の tie（レイアウトではなく計測の限界）"
+             "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
