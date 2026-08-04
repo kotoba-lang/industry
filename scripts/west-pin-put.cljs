@@ -32,12 +32,25 @@
          {:exit exit :out (or out "") :err (or err "")})
        (catch :default e {:exit -1 :out "" :err (str e)})))
 
-(defn- gh [& args]
+(defn- gh-raw
+  "gh with the output returned EXACTLY as received.
+
+  Almost every call here wants the trimmed form -- a SHA, a status word -- so
+  `gh` trims. But the file fetch is not one of those: trimming it silently
+  drops west.yml's trailing newline, and since the rewrite is a substring
+  substitution the stripped file is what gets written back. The result was a
+  pin advance that also removed the newline at end of file, so a one-line
+  change was committed as a two-line diff against `west-commands.yml` -- an
+  unrelated line, in a file whose whole point is minimal single-entry diffs."
+  [& args]
   (let [{:keys [exit out err]} (apply sh "gh" args)]
     (when (not= 0 exit)
       (throw (ex-info (str "gh failed: " (str/join " " args) " — " err)
                       {:type :gh/failed :args args})))
-    (str/trim out)))
+    out))
+
+(defn- gh [& args]
+  (str/trim (apply gh-raw args)))
 
 (def superproject "com-junkawasaki/root")
 (def west-path "manifest/west.yml")
@@ -144,6 +157,19 @@
          ;; is there now.
          ["rewrite refuses when the current pin is not what was verified"
           (rewrite-revision sample-yml "alpha" b40 c40) nil]
+         ;; A pin advance must change exactly one line. The file fetch used to
+         ;; go through the trimming `gh`, which dropped west.yml's trailing
+         ;; newline before the substitution, so the write also removed the
+         ;; newline at end of file and the commit touched an unrelated line.
+         ["rewrite preserves a trailing newline"
+          (str/ends-with? (rewrite-revision sample-yml "alpha" a40 c40) "\n") true]
+         ["rewrite preserves the absence of a trailing newline"
+          (str/ends-with? (rewrite-revision (str/trimr sample-yml) "alpha" a40 c40) "\n") false]
+         ["rewrite changes exactly one line"
+          (count (remove true? (map = (str/split-lines sample-yml)
+                                  (str/split-lines (rewrite-revision sample-yml "alpha" a40 c40)))))
+          1]
+
          ["rewrite refuses an unknown entry"
           (rewrite-revision sample-yml "gamma" a40 c40) nil]
 
@@ -201,8 +227,10 @@
   ;; 1. Read the TIP -- both the content and the blob SHA -- in one place, so the
   ;;    thing verified and the thing written are the same thing.
   (let [blob-sha (gh "api" (str "repos/" superproject "/contents/" west-path) "--jq" ".sha")
-        yml (gh "api" (str "repos/" superproject "/contents/" west-path)
-                "-H" "Accept: application/vnd.github.raw")
+        ;; gh-raw, not gh: trimming here would drop the file's trailing
+        ;; newline and write it back stripped.
+        yml (gh-raw "api" (str "repos/" superproject "/contents/" west-path)
+                    "-H" "Accept: application/vnd.github.raw")
         block (entry-block yml entry)
         _ (when-not block
             (println (str "west-pin-put: entry '" entry "' not found (or not unique) in the tip's "
