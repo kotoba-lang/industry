@@ -1,0 +1,151 @@
+[{:db/id -1
+  :adr/id "2800003100-ua-stylesheet-belongs-to-the-cascade"
+  :adr/title "ADR-2800003100: UA stylesheet は cascade が持つ —— cssom.layout の (or (style node :x) <ua default>) 連鎖を移す提案"
+  :adr/status "proposed"
+  :adr/doc_type "adr"
+  :adr/topic "cssom-ua-stylesheet-cascade-vs-layout"
+  :adr/date "2026-08-04"
+  :adr/last_verified "2026-08-04"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotoba-lang/cssom の UA stylesheet をどの層が所有するか"
+   "cssom.core/computed-style（および getComputedStyle 相当の消費者）が返す値の意味"
+   "conformance の COMPUTED STYLE 軸が 87% で止まっている理由"]
+
+  :adr/context
+  "kotoba-lang/cssom を実ブラウザ（Brave 151、CDP 経由）と差分計測している 4 軸のうち、
+   COMPUTED STYLE 軸だけが 87% で止まっている。2026-08-04 実測（corpus 313 case、
+   16,964 値）:
+
+     一致 14,782 / 16,964 = 87%
+     不一致 2,182 の内訳: ua-default 2,123 / blockified 38 / cascade 11 / ua-inherited 10
+
+   **不一致の 97.3% が『UA stylesheet が cascade から見えない』という 1 つの事実の反復**
+   であり、2,123 個のバグではない。property 別の一致率がそれを示す:
+
+     display        214/1212  18%   <- div 410 件が inline -> block、p 172 件、td 102 件…
+     margin-top     995/1212  82%   <- p 168 件が 0 -> 14px
+     margin-bottom  997/1212  82%
+     padding-*     1060-1080/1212  87-89%  <- td 102 件が 0 -> 1px
+     color         1185/1212  98%   <- a 20 件が #000000 -> rgb(0,0,238)
+     font-size / font-weight / font-style / text-align は 95-99%
+
+   原因は所在にある。UA 既定値は `cssom.layout/node-style` の中の
+   `(or (style node :x) <ua default>)` という連鎖、および `ua-control-box` /
+   `ua-margin-scale` / `ua-box-sides` / `inline-level-tags` / `ua-control-font`
+   といった layout 内のテーブルに置かれている。cascade（cssom.core/apply-cascade）は
+   それらを一切書かないので、`cssom.core/computed-style` は `<div>` を `inline`、
+   `<b>` を font-weight 400、`<a>` を黒と報告する。**レイアウトは正しいのに、
+   計算済みスタイルを問い合わせる者だけが嘘を受け取る。**
+
+   影響を受けるのは harness だけではない: devtools パネル、アクセシビリティ投影、
+   `getComputedStyle` 互換 API、スタイル由来の分岐を持つスクリプト —— いずれも
+   cascade の出力を読む。
+
+   なお本 ADR は『87% を上げる』ためのものではない。**2,123 件は engine の欠陥ではなく
+   層の設計**であり、数値はその設計の帰結を可視化しているにすぎない。"
+
+  :adr/decision
+  "**提案（未決定・オーナー判断待ち）: UA stylesheet のデータを cssom.core に置き、
+   cascade の最下位優先度として適用する。** layout は自前の UA 既定連鎖を持たず、
+   cascade が書いた値を読むだけにする。
+
+   選択肢と評価:
+
+   A. **cascade が所有する（提案）** —— UA 規則を cssom.core のデータとして定義し、
+      apply-cascade が author 規則より低い優先度で適用する。layout の
+      `(or (style node :x) <ua default>)` は `(style node :x)` になる。
+      利点: 単一の真実。computed-style / devtools / a11y / harness が一斉に正しくなる。
+      実 CSS の層構造（UA < author < inline）と同型。
+      欠点: 全要素に UA 由来の `:style/*` 属性が増える（下記 consequences）。
+
+   B. **layout が所有したまま、computed-style だけが UA を後付けする** ——
+      知識が 2 箇所になる。**この repo は同じ形の drift を既に 2 度観測している**
+      （inline style の shorthand 展開が htmldom と cssom.core で食い違った件、
+      border-spacing の 2px が tag 規則か初期値かの取り違え）。採らない。
+
+   C. **何もしない** —— 87% を『そういうもの』として受け入れる。
+      レイアウトは正しいので実害は限定的だが、devtools / a11y / script 経路は
+      嘘を受け取り続ける。COMPUTED STYLE 軸は永久に 87% 付近で頭打ちになり、
+      **本物の cascade バグ（現在 11 件）が 2,123 件の背景に埋もれ続ける** ——
+      これが測定上の最大の損失。"
+
+  :adr/consequences
+  "A を採る場合に測っておくべき代償（**未計測、着手前に測ること**）:
+
+   1. **DOM op 数の増加。** apply-cascade は `:style/*` を document ノードの属性として
+      書き、kotoba-lang/browser の session はそれを `:dom/set-attr` op として host に
+      送る。比較対象の property は 14 個あり、全要素がそのうち数個〜十数個を UA 由来で
+      得ることになる。**要素数 × 追加属性数だけ op が増える**ので、実測してから決める。
+      緩和案: UA 由来の値を別の namespace（例 `:ua/*`）に書き、computed-style が
+      author 値 → UA 値の順に解決する。op には出さない。ただしこれは A の『単一の真実』を
+      半分に戻すので、計測結果次第。
+
+   2. **layout の挙動が変わりうる箇所。** node-style の連鎖は『author 値が無ければ UA』
+      という単純な or ではなく、`ua-control-box` のように tag と type 属性に依存する
+      分岐を含む。cascade 側で表現するには UA 規則をセレクタ（`input[type=checkbox]` 等）
+      として書く必要がある。**移行は property 単位で段階的に行い、各段階で 4 軸すべてを
+      再計測する**（幾何 92% / 行構造 98% / paint order 97% を退行させないこと）。
+
+   3. **`display` の blockify との相互作用。** 現在 38 件が blockified 原因で不一致。
+      float / absolute / flex item は computed-value 時に blockify されるが、これは
+      UA stylesheet ではなく cascade 後の別段階。A を実装する際、UA の display 既定と
+      blockify を混同しない。
+
+   4. 期待値: 成功すれば COMPUTED STYLE は 87% から **約 99.6%**（16,964 中の残り 59）
+      になり、**残った不一致がすべて本物**になる。これが本提案の主目的である。
+
+   決めるべきこと: (a) A を採るか、(b) 1 の緩和案（`:ua/*` namespace）を採るか、
+   (c) C のまま据え置くか。**(a)/(b) を採る場合でも、op 数の実測を先に行う。**"
+
+  :adr/body
+  "## 現在地（2026-08-04 実測、Brave 151 / CDP、corpus 313 case）
+
+   | 軸 | 数値 |
+   |---|---|
+   | PARSER TREE SHAPE | 118/122 (97%) |
+   | LINE STRUCTURE | 294/301 (98%) |
+   | GEOMETRY | 1115/1212 (92%)、全 box 一致 264/313 |
+   | PAINT ORDER | 7575/7805 (97%) |
+   | COMPUTED STYLE | 14782/16964 (87%)、cascade 帰責のない case 307/313 |
+
+   ## この ADR が存在する理由
+
+   COMPUTED STYLE 軸を作った agent は、UA baseline を**oracle 側で実測**する仕組みを
+   同時に入れた（bare element を tag ごとに描画して UA 既定を測る）。それが無ければ
+   link の色 19 件を含む全てが cascade の誤りとして計上されていた。つまりこの 2,123 件は
+   **既に『cascade のバグではない』と分類済み**であり、分類の結果として残っている。
+
+   分類できることと直すことは別である。現状は正直だが、次の 2 点で損をしている:
+
+   1. cascade の出力を読む消費者（devtools / a11y / getComputedStyle 互換 / script）は
+      誤った値を受け取る。**レイアウトが正しいことは、これらを救わない。**
+   2. 本物の cascade バグ 11 件が 2,123 件の背景に埋もれる。実際、この loop で見つかった
+      cascade バグ（inline style の shorthand 未展開 34 値、var() 置換順 4 値）は、
+      agent が `ua-default` と `cascade` を**原因別に分類する仕組みを先に作った**から
+      見つかったのであって、総数を見ていたら埋もれていた。
+
+   ## 移行の形（A を採る場合）
+
+   - UA 規則を cssom.core のデータとして定義する（tag セレクタ + `input[type=...]` 等の
+     属性セレクタ）。既存の `ua-control-box` / `ua-margin-scale` / `ua-box-sides` /
+     `inline-level-tags` / `ua-control-font` が持つ知識がそのまま原資になる。
+   - apply-cascade を UA < author < inline の 3 層にする。
+   - layout の `(or (style node :x) <ua default>)` を property 単位で剥がす。
+     **1 property ずつ、4 軸を再計測しながら。**
+   - 各段階で downstream（kotoba-lang/browser 752 tests、dom-gpu 126 tests）を通す。
+
+   ## 却下した案
+
+   - **computed-style だけが UA を後付けする（B）**: 知識が 2 箇所に分かれる。この repo は
+     同型の drift を 2 度実測している。1 度目は inline style の shorthand 展開が htmldom と
+     cssom.core で食い違い、cascade 帰責の不一致 41 件のうち 34 件を占めていた。2 度目は
+     border-spacing の 2px を『初期値』と誤解していた件で、div-table に幻の spacing が
+     入りかけた。**同じ知識を 2 箇所に置くと必ずずれる**、というのがこの repo の実測結果。
+
+   ## 参照
+
+   - 計測系列: `90-docs/conformance/layout-vs-blink.ledger.edn`（append-only）
+   - harness: `kotoba-lang/cssom` の `conformance/run.cljs` と `conformance/README.md`
+   - 4 軸目（paint order）の追加経緯と、幾何が見られない欠陥の実例も上記 ledger にある"}]
