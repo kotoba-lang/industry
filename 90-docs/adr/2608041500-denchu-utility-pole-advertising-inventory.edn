@@ -85,28 +85,42 @@ datom 面には `:source/dataset \"denchu-inventory\"` として登録した
   :adr/evidence
   "実データ収集（2026-08-04、OSM Overpass、認証不要）:
 
-| area | 管轄 | 観測 | 柱 | 所有者判明 | 窓口到達可 |
-|---|---|---|---|---|---|
-| chiyoda-marunouchi | JP-13 | 0 | 0 | 0 | 0 |
-| setagaya | JP-13 | 8 | 5 | 0 | 0 |
-| kyoto-nakagyo | JP-26 | 55 | 55 | 0 | 0 |
-| sapporo-chuo | JP-01 | 205 | 201 | 0 | 0 |
-| 計 | | 268 | 261 | 0 | 0 |
+| area | 管轄 | 観測 | 柱 | 所有者判明 | 窓口確定 | 照会可（区域候補） |
+|---|---|---|---|---|---|---|
+| chiyoda-marunouchi | JP-13 | 0 | 0 | 0 | 0 | 0 |
+| setagaya | JP-13 | 8 | 5 | 0 | 0 | 5 |
+| kyoto-nakagyo | JP-26 | 55 | 55 | 0 | 0 | 55 |
+| sapporo-chuo | JP-01 | 205 | 201 | 0 | 0 | 201 |
+| 計 | | 268 | 261 | 0 | 0 | 261 |
 
 datom 面での確認（`manifest/edn-query.cljs q`）:
-- `[?e \"source/dataset\" \"denchu-inventory\"] [?e \"pole/id\" ?p] [?e \"pole/owner\" ?o]`
-  → `[[\"unknown\" 261]]`
+- `[?e \"pole/route-status\" ?s] [?e \"pole/id\" ?p] [?e \"source/dataset\" \"denchu-inventory\"]`
+  → `[[\"candidate-by-area\" 261]]`
+- `[?e \"pole/owner\" ?o]` は依然 `[[\"unknown\" 261]]`
 - coverage entity 4 件が area ごとの実数を申告
 - 代理店カタログ 8 社が legal-name + source-url 付きで引ける
 
-**この結果の右 2 列が 0 であることが、この ADR が明らかにした最大のギャップ。**
-OSM に柱はマッピングされていても `operator` タグはほぼ付いていないので所有者が
-決まらず、したがって申込先も決まらない。設計が所有者を推測しない以上、これは
-黙って埋まらず `:pole/owner \"unknown\"` / `:pole/routable false` として台帳に出る。
+**所有者判明が 0 のままなのは設計どおり**（OSM に `operator` タグがほぼ無く、
+denchu は座標から所有者を推測しない）。**しかし出稿導線は通った** —— `denchu.area`
+が供給区域（一般送配電事業者 10 社 + NTT 東西、ISO 3166-2:JP 47 管轄）から
+候補所有者を出し、`:candidate-by-area` として照会できるようにしたため。所有者は
+その照会で確定するのが実務であり、候補は柱ではなく経路に載る。区域境が県境と
+一致しない 5 管轄（静岡・福井・三重・岐阜・兵庫）は候補を畳まず複数返す。
+
 丸の内 0 件も実測値であって障害ではない（無電柱化 + 中心部の柱マッピングが薄い）。
 
-テスト: denchu 34 tests / 120 assertions、overpass 8 / 27、mapillary 8 / 32、
-loop 5 / 18。すべて nbb（ClojureScript）で green。JVM は使っていない。
+cloud-itonami 側の配線（`cloud-itonami.denchu-ops`、network-awai/cloud-itonami
+`4c0f1c48`）で `advertising-facts/ad-channels` の `:real` に初めて実体が付いた。
+provider catalog（`adnetwork-providers`）には**載せない** —— あの routing 契約は
+`campaigns.create` / `metrics.report` を要求するが電柱の指定代理店に API は無く、
+載せると『API がある』という嘘になる。`:execution :inquiry` として別に扱う。
+governor は `denchu.order/violations` を自分で再計算し、提案に添えられた違反リストを
+信用しない。候補ルートの問い合わせ本文が推定社名を断定していたら保留する
+（断定すると相手が追認して誤った所有者が確定するため）。
+
+テスト: denchu 47 tests / 256 assertions、overpass 8 / 27、mapillary 8 / 32、
+loop 7 / 25、cloud-itonami.denchu-ops 13 / 31。すべて nbb（ClojureScript）で green。
+JVM は使っていない。**cloud-itonami のリポジトリ全体 suite は未実行**（別ゲート）。
 
 外部事実の出典（すべて 2026-08-04 に実ページで確認）:
 - Mapillary Graph API v4: host graph.mapillary.com、認証必須、bbox < 0.01 度、
@@ -143,17 +157,22 @@ loop 5 / 18。すべて nbb（ClojureScript）で green。JVM は使っていな
    いう嘘になる。この repo 群が持たないと決めた唯一の機能。"
 
   :adr/next
-  "1. **所有者の解決が最優先**（261 本すべて unknown = 出稿導線がまだ 1 本も通らない）。
-   電力会社の柱には番号札が付くので、Mapillary の /images + detections から
-   柱番号札を読む経路が本命。MAPILLARY_ACCESS_TOKEN の取得が前提。
-2. `--sources both` の実走（2 source 一致で信頼度 +0.30）。
-3. cloud-itonami 側に `denchu_ops` を足し、`advertising_facts/ad-channels` の
-   `:real` チャネルに初めて実体を与える（propose→govern→commit、
-   `:inquiry-sent` は `:external-send` risk として承認キュー経由）。
-4. 代理店窓口のカバレッジ拡大（所有者 12 件中 5 件のみ収録。未収録は
-   東北 / 中国 / 四国 / 九州 / 北海道 / 北陸 / 沖縄）。
-5. area の拡大。現在 4 area のみ。大規模化したら shard を DataLad/B2 へ
-   （skill large-binary-datalad）。"
+  "1. **候補代理店への実照会**（`:inquiry-proposed` → `:inquiry-sent`、
+   `:external-send` risk）。これが所有者を確定させる実務上の唯一の経路であり、
+   261 本すべてが照会可能な状態にある。実送信はまだ 0 件。
+2. **`MAPILLARY_ACCESS_TOKEN` の取得はオーナー作業**（2026-08-04 時点で kagi に
+   `no such item`、狙い撃ち確認済み）。account 登録は資格情報入力になるため
+   agent は行わない（安全床①）。取得できれば (a) 柱番号札を /images +
+   detections から読む所有者確定経路 (b) `--sources both` の 2 source 一致
+   （信頼度 +0.30）の両方が開く。**それまで Mapillary クライアントは fixture に
+   対してしか検証されていない** —— 実 API に対して一度も実行していない。
+3. 代理店窓口のカバレッジ拡大（電力 12 社中 5 社のみ収録。未収録は
+   東北 / 中国 / 四国 / 九州 / 北海道 / 北陸 / 沖縄）。NTT 東西の窓口が全国を
+   覆うので照会自体は全 47 管轄で成立するが、電力柱だった場合の申込先は要調査。
+4. area の拡大。現在 4 area のみ。大規模化したら shard を DataLad/B2 へ
+   （skill large-binary-datalad）。現在 68KB なので今は通常の git blob が正しい
+   （ADR-2608039700『小さい semantic EDN は diff/review を失わないため git に置く』）。
+5. `denchu.facts` の管轄拡大（現在 JPN 1 件）。"
 
   :adr/body
   "詳細は各 repo の README を正本とする:
