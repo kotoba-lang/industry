@@ -96,6 +96,33 @@
    backed）で provider を引き、**trustless gateway**（`/ipfs/{cid}?format=raw`）から
    raw block を取る。全バイトを要求 CID に対して検証してから永続化する。
 
+   ## L2.5 compile / effects / receipt（codebase-compile / codebase-effects）
+
+   - **hash から compile する。** assemble した KIR module を backend に渡し、artifact を
+     生の CIDv1 で保存する。build cache の key は**定義グラフの性質**（code closure /
+     compiler contract / target ABI / package lock / policy）なので、rename しても hit し、
+     マシンや checkout を跨いでも安全で、依存が変われば dependent の identity が動くので miss する。
+     **effectful な定義は決してキャッシュしない**（再利用は「答えが同じ」の主張で、外界に触る
+     呼び出しは誰もそれを約束できない）。
+     ⚠ **限界を明記**: compiler contract は emitter と IR 契約を名指すが、**compiler の
+     正確な revision は束ねていない**。したがって emitted bytes が変わる compiler upgrade を
+     cache hit が生き延びる。精密に見える値で誤魔化すより、真である注記を残す。
+   - **effect には天井がある。** provider は compiler 自身の
+     `reference-runtime/instantiate`（allow set の所属 + guest の封印済み契約との厳密一致）
+     を通す —— capability とは何かの答えを 2 つ作らないため。**quota は capability ごと・
+     run ごと**（fuel は計算量を縛るだけで、外界に何回触ったかは何も言わない）。
+     **receipt は ok / denied / trap のいずれでも書く**（成功時だけ存在する記録は
+     evidence ではなく広告）。
+   - **pin された入力と定義 identity を結ぶ。** `codebase add --module-lock` は CID 固定の
+     module graph から namespace を author し、`lock-cid` を持ち回る。lock は
+     「どのバイトを compile したか」、定義 CID は「それが何を意味するか」——
+     どちらも他方を含意しないので、両方名指せることに意味がある。
+   - **typed 定義を読む。** `render/typed-view` は checked KIR を、依存ハッシュを
+     **読み手が選ぶ名前**で描画する。surface source ではない（保存物は checked IR であり、
+     打った `.kotoba` を再構成すると「round-trip する」という嘘を含意する）。
+   - **hash で browse する。** serve node が `/browse/{namespace}` と `/def/{cid}` を出す。
+     リンクは全て hash なので、辿るのはサイト状のコピーでなく**実際のグラフ**。
+
    ## L4 publication — 誰がそう言ったか（publication / codebase-publish）
 
    block は権限を要らない（CID がバイトと一致するかしないかだけ）。**namespace head
@@ -153,14 +180,10 @@
      これは「published」より小さい主張である。`pull` は空の provider 集合をそのまま返す。
    - **name registry も鍵配布も無い。** follower は endpoint と publisher DID を
      何らかの帯域外手段で知っている必要がある。
-   - browsing UI / semantic diff / rebase / 対話的 conflict 解決は無い。
-     `view` は surface 層のみ（typed 定義のソース射影は未実装）。
-   - **codebase は target artifact を出さない**。oracle を回すだけで compile は
-     しない（同じ KIR を backend に渡せば出せるが、その配線と build cache
-     descriptor への接続はまだ）。
-   - **effect は policy engine ではない**。provider registry・quota・receipt・
-     capability policy の適用は未実装で、`typed-cap-call` の dispatcher を
-     注入するかしないかの二値。
+   - semantic diff / rebase / 対話的 conflict 解決は無い。
+   - **compiler の正確な revision を cache key に束ねていない**（上述）。
+   - **effect は policy 言語ではない**。capability の委譲・attenuation・
+     policy DSL は無く、allow set と quota と provider 契約だけ。
    - surface 層の `evaluator` は依然 **pure**（capability intrinsic を拒否）。
 
    ## 実装上の判断（再発防止として明記）
@@ -194,14 +217,13 @@
 
    ## 検証
 
-   - kotoba-lang/codebase: 78 tests / 267 assertions green、lint clean
-     （typed-code + publication 追加後）。
+   - kotoba-lang/codebase: 81 tests / 276 assertions green、lint clean。
    - kotoba-lang/compiler: module-lock 7 tests / 17 assertions green。フルスイートは
      840 tests / 6447 assertions で 4 failures —— すべて既存の **soft performance
      budget**（document_dual_renderer / document_perf_workload、負荷の高いマシンで
      5s budget に対し 25s）で、本変更とは無関係。
-   - kotoba-lang/kotoba: 新規 17 tests / 46 assertions green。フルスイート 485 tests /
-     8405 assertions で 2 failures —— すべて `backend-qualification` の兄弟リポパス
+   - kotoba-lang/kotoba: 新規 30 tests / 87 assertions green。フルスイート 496 tests /
+     8436 assertions で 2 failures —— すべて `backend-qualification` の兄弟リポパス
      （`../kototama`、`../compiler`）の存在チェックで、west レイアウト外の worktree で
      走らせた副作用。兄弟を symlink して当該 namespace を再実行すると 0 failures。
    - global discovery は**実ネットワークで実測**（2026-08-04）: delegated-ipfs.dev が
@@ -212,10 +234,10 @@
 
    | repo | merge | 内容 |
    |---|---|---|
-   | kotoba-lang/codebase | 484f1a8 → 2b7e823 → **da66ee4** | evaluator / authoring / render / names / fetch / ir → typed-code / typed-eval → **publication / ir.block-links** |
+   | kotoba-lang/codebase | … → **cf8f28e** | evaluator / authoring / render / names / fetch / ir → typed-code / typed-eval → **publication / ir.block-links** |
    | kotoba-lang/compiler | 4fa7e6d（main は a6e7dc4 に前進済み） | module-lock |
-   | kotoba-lang/kotoba | 6e79ab7 → f65f1b8 → **9d388a7** | codebase CLI / codebase-routing → codebase-typed（--typed）→ **codebase-publish（serve/publish/follow）** |
-   | com-junkawasaki/root | 6f36f6d / 13b71bf / **3408fe0** | manifest pin 前進（codebase / kotoba） |
+   | kotoba-lang/kotoba | … → **002bc57** | codebase CLI / codebase-routing → codebase-typed（--typed）→ **codebase-publish（serve/publish/follow）** |
+   | com-junkawasaki/root | … / **30068df** | manifest pin 前進（codebase / kotoba） |
 
    `manifest/west.yml` の pin 前進は GitHub API single-entry 経路で行い、サーバ側
    pin 検証を通した。**`gen-west-manifest.cljs --check` は STALE を返すが、これは
