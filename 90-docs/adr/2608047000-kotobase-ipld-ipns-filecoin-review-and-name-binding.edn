@@ -225,32 +225,54 @@ logical checkpoint の anchoring（FEVM、非同期・別経路）に限定し�
 actor model そのものを効率のために持ち込む必要はない。持ち込むべきは actor model
 ではなく state-tree の差分規律であり、それは commit-delta! を呼ぶことで得られる。
 
-## この transaction で着地させたもの
+## この transaction で着地させたもの（すべて default branch にマージ済み）
 
 所見 1 と 2 の脆弱性のみ。いずれも設計の問題ではなく検証の書き忘れであり、
 正しい形が同じ workspace 内に既に存在していた（ipns.record/validate）。
 
-- kotoba-lang/tech-ipfs-specs-ipns#1 — ipns.core/name->pubkey* と
-  name-matches-pubkey? を追加し、ipns.head/verify が名前から鍵を導出して検証する。
-  clojure -M:test 25 tests / 90 assertions、clojure -M:lint はエラー 0
-  （main では 2 件のエラーで既に赤く、何も報告できていなかった）。
-- kotoba-lang/kotobase-client#22 — kotobase.ipns/verify-head を同じ規律に揃える。
-  kotobase.cid に base36-decode / ipns-name->ed25519-pub / ipns-name-matches-pub? を
-  追加。これは ipns.core の意図的な第 2 実装であり、この repo は consumer から
-  bare な shadow-cljs source-path として消費されるため deps.edn の git dep は
-  consumer のビルドで解決されないからである。drift 対策として cid_test に
-  ipns.core-test と同一の golden vector（実 Kubo ノード由来のものを含む）を置く。
-  npm test 70 tests / 216 assertions。
-- kotoba-lang/kotobase-storage — signed-head の同期版と非同期版の両方で、宛先 ref
-  一致と accept-issuer? を署名検証より前に検査する。accept-issuer? の既定は
-  自分の issuer のみ受理（挙動変更）。clojure -M:test 50 tests / 171 assertions、
-  nbb test/run.cljs に非同期側の oracle を 2 本追加。
-- kotoba-lang/inga — inga.head/verify-head が ref-name を取り、inga.ref/current-head
-  が渡す。
+| repo | PR | merge commit | 内容 |
+|---|---|---|---|
+| kotoba-lang/tech-ipfs-specs-ipns | #1 | bca7ca43265a1c50d93e4b678c94989d15a29b51 | ipns.core/name->pubkey* と name-matches-pubkey? を追加、ipns.head/verify が名前から鍵を導出 |
+| kotoba-lang/kotobase-client | #22 | 97d44a184eb4eea5a0cca737d3c9771fde4b73ec | cljs 側 verify-head を同じ規律に、kotobase.cid に base36/name 復号 |
+| kotoba-lang/kotobase-storage | #1 | e7f2218cc687c300f4031f9700ec0d0d542849ec | signed-head の宛先 ref 束縛と accept-issuer?（同期版と非同期版の両方） |
+| kotoba-lang/inga | #1 | 10b4de69bb6daefafd5c3fe5bc052ac06c79354a | quorum head の宛先 ref 束縛 |
+| kotoba-lang/kotobase-server | #31 | 701c13ea61f3f291ccb823fbf4b21d00a3cdab68 | publish gate で takeover を拒否、kotobase-client pin 前進 |
 
-すべての新規テストは、修正前のソースに対して revert して実際に落ちることを確認した
-（ipns 2 件、client 2 件、storage 3 件 + 非同期 oracle 2 件）。落ちないテストは
-何も証明しないため。
+superproject: ADR 追加 431c419202129e2f35971e584c09340374ea935e、west.yml pin 前進
+b7f906ec827c0a130e5c065476f504a581627663（kotobase-client / kotobase-storage / inga /
+kotobase-server の 4 件。tech-ipfs-specs-ipns は書き込み時点で既に目標 SHA だった）。
+pin は全件 gh api compare で behind_by=0 の純 fast-forward であることを確認してから
+書いた。west.yml は single-entry 編集のみで wholesale 再生成はしていない。
+
+kotobase-client への修正は意図的な第 2 実装である。この repo は consumer から bare な
+shadow-cljs source-path として消費される（aozora の各 worker の shadow-cljs.edn が
+../../kotoba-lang/kotobase-client/src を直接指す）ため、deps.edn の git dep は
+consumer のビルドで解決されない。drift 対策として cid_test に ipns.core-test と
+同一の golden vector（実 go-ipfs/Kubo ノード由来のものを含む）を置いた。
+
+### 検証（固定値）
+
+| repo | 実行 | 結果 |
+|---|---|---|
+| tech-ipfs-specs-ipns | clojure -M:test / -M:lint | 25 tests 90 assertions 0 failures / errors 0（main は 2 errors で赤かった） |
+| kotobase-client | npm test（shadow-cljs node-test） | 70 tests 216 assertions 0 failures |
+| kotobase-storage | clojure -M:test / nbb test/run.cljs | 50 tests 171 assertions 0 failures / 非同期 oracle 2 本追加、all green |
+| inga | clojure -M:test / -M:lint | 279 tests 1303 assertions 0 failures / errors 0 |
+| kotobase-server | npm run test:cljs | 92 tests 408 assertions 0 failures |
+
+新規テストはすべて、修正前のソースに revert して実際に落ちることを確認した
+（ipns 2 件、client 2 件、storage 3 件 + 非同期 oracle 2 件、inga 1 件、server 2 件）。
+落ちないテストは何も証明しないため。既知の別件 failure は無い。
+
+修正の過程で判明した副産物: 3 箇所のテストが「どの鍵も指さない名前」を fixture に
+使って通っていた（kotobase-client の k51qzi5uqu5d-placeholder、kotobase-server の
+k51test）。穴を反対側から見たものであり、いずれも実際に導出される名前に直した。
+
+### 挙動変更（配備で確認が要る）
+
+kotobase-storage の accept-issuer? の既定は「自分の issuer のみ受理」である。同じ ref に
+複数の issuer が head を発行している配備があれば読み取りが nil になる。該当する場合は
+open / async-open に述語（例 #(contains? known-issuers %)）を渡すこと。
 
 ## やっていないこと（follow-up、優先順）
 
