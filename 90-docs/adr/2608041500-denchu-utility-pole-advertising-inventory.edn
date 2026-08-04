@@ -151,8 +151,27 @@ Los Angeles は utility-pole 416 に対し広告物 4 件だけ。CN/IN/SA/AE �
 0 件の台帳は『調べて無かった』と読まれるので、全 source が落ちたら shard を書かず
 証跡だけ残して非ゼロ終了し、一部失敗なら coverage に `:source-errors` を刻む。
 
-テスト: okugai 31 tests / 305 assertions、denchu 47 / 256、overpass 12 / 42、
-mapillary 8 / 32、loop 9 / 38、cloud-itonami.denchu-ops 13 / 31。
+法令カタログ 14 法域 / 31 instrument に拡大（+RUS BRA IDN MEX NGA PAK）。
+未収録で人口1億超は BGD ETH EGY の 3 件。**一次情報に到達できなかった**ことを
+`:why` に明記して残す —— 「調べたが見つからなかった」であって「規制が無い」ではない。
+
+媒体社カタログ `okugai.operator`（新）: JCDecaux / Clear Channel Outdoor / Lamar /
+OUTFRONT / Ströer / Focus Media / NEXCO西日本コミュニケーションズ の 7 社。
+これで照会状態が改善した —— Berlin unresolved 153→3、Paris 1456→435。
+**候補であって在庫ではない**（`:candidate-by-catalog`）。SA/PA 内広告のように
+観測では決して見つからない媒体は、カタログが唯一の入口。
+
+`cloud-itonami.okugai-ops`（`denchu-ops` を置換）が `:real` チャネルを全媒体に
+広げた。媒体固有の解決（電柱＝供給区域→指定代理店）を先に試し、無ければ媒体社
+カタログ。**候補を order に載せてから censor する** —— 載せないと『本文が候補を
+断定していないか』を再計算できず、ops-LLM の書き換えを見逃す。
+
+**2 つ目の欠陥も実測中に発見して直した**: 照会可能な状態の集合を `okugai.route` と
+`okugai.order` の 2 箇所に書いていたため、カタログ経路を足したとき片方だけ更新され
+『照会先はあるのに governor が止める』が起きた。集合を route 側に一本化した。
+
+テスト: okugai 37 tests / 418 assertions、denchu 47 / 256、overpass 12 / 42、
+mapillary 8 / 32、loop 9 / 38、cloud-itonami.okugai-ops 14 / 47。
 すべて nbb（ClojureScript）で green。JVM は使っていない。
 **cloud-itonami のリポジトリ全体 suite は未実行**（別ゲート）。
 
@@ -193,26 +212,25 @@ mapillary 8 / 32、loop 9 / 38、cloud-itonami.denchu-ops 13 / 31。
    いう嘘になる。この repo 群が持たないと決めた唯一の機能。"
 
   :adr/next
-  "1. **媒体社カタログの拡大が最大のギャップ。** 電柱は 12 事業者中 5 社の窓口を
-   収録し、供給区域から候補を導けるが、**電柱以外の媒体には媒体社カタログが無い**
-   （屋外ビジョン運営会社・看板業者・NEXCO 系媒体社・交通広告）。observation で
-   照会先が立つのは operator タグのある 34% だけ。ここを埋めると unresolved 19 件が
-   動く。NEXCO 西日本コミュニケーションズは媒体資料を PDF 公開しているので着手可能。
-2. **候補代理店・operator への実照会**（`:inquiry-proposed` → `:inquiry-sent`、
-   `:external-send` risk）。312 地点中 293 が照会可能な状態にある。実送信はまだ 0 件。
-3. **`MAPILLARY_ACCESS_TOKEN` の取得はオーナー作業**（2026-08-04 時点で kagi に
-   `no such item`、狙い撃ち確認済み）。account 登録は資格情報入力になるため agent は
-   行わない（安全床①）。取得できれば (a) 柱番号札からの所有者確定 (b) `--sources both`
-   の 2 source 一致（+0.30）(c) OSM に無い媒体（屋上看板は依然不可、壁面・バナーは可）
-   が開く。**それまで Mapillary クライアントは fixture に対してしか検証されていない。**
-4. **高さの取得経路**。建築基準法88条（4m超）の要否が全地点で undetermined のまま
-   で、これは掲出提案が `:permit-filed` に進めないことを意味する。現地調査か
-   媒体社回答でしか埋まらない。
-5. **cloud-itonami の ops 層の一般化**。`cloud-itonami.denchu-ops` は電柱専用のまま
-   （`denchu.order` を使う）。`okugai.order` に載せ替えて全媒体を `:real` チャネルで
-   扱えるようにするのが次段。**今回は未実施。**
-6. area の拡大（現在 8、うち 2 は 0 件）。大規模化したら shard を DataLad/B2 へ。
-7. `okugai.facts` の管轄拡大（現在 JPN 1 件）。"
+  "1. **実照会がまだ 0 件。** 3,262 地点のうち照会先が立つのは大半だが
+   （`:candidate-by-area` / `:candidate-by-catalog` / `:operator-known`）、
+   `:inquiry-sent` は 1 通も出していない。`cloud-itonami.okugai-ops` の
+   propose→govern→commit は通るので、次は承認キュー経由の実送信。
+2. **媒体社カタログは大手 7 社のみ。** 世界の OOH には数千社の地場事業者がいる。
+   `:candidate-by-catalog` が立った地点でも、実際にその地点を持っているのが
+   カタログ上の会社とは限らない —— 確定は照会でしかできない。
+3. **未収録法域 3 件**（BGD ETH EGY、計約 4.2 億人）。一次情報に到達できず
+   未収録のまま。推測で書くくらいなら空けておく。
+4. **`MAPILLARY_ACCESS_TOKEN` の取得はオーナー作業**（kagi に `no such item`、
+   狙い撃ち確認済み）。account 登録は資格情報入力なので agent は行わない（安全床①）。
+   **Mapillary クライアントは fixture に対してしか検証されていない。**
+5. **高さ・面積が観測から埋まらない。** 建築基準法88条（JP 4m 超）/
+   Landesbauordnung（DE 1m² 超）等の構造審査の要否が全地点で undetermined のまま
+   で、掲出提案は `:permit-filed` に進めない。現地調査か媒体社回答でしか埋まらない。
+6. area の拡大（現在 19、うち 2 は 0 件、1 は Overpass 失敗で shard 無し）。
+   大規模化したら shard を DataLad/B2 へ。
+7. **CN/SA/IN の OSM マッピングが薄い**（Riyadh・Shanghai・Mumbai 南部は 0〜1 件）。
+   これらの市場は observation ではなく媒体社カタログから入るしかない。"
 
   :adr/body
   "詳細は各 repo の README を正本とする:
