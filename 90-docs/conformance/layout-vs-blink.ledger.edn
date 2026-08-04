@@ -181,3 +181,54 @@
               機構側は dom-gpu の test が押さえている）"
              "adoption agency L3（omission 群の残り 3 件）、table foster parenting"
              "fieldset/legend の out-of-flow、select の control font"]}
+
+{:at "2026-08-04"
+ :iteration 33
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 292 :was 200 :added 92 :diverging 59}
+ :line-structure {:agree 248 :total 280 :pct 89 :was "185/190 (97%)"}
+ :geometry {:boxes-agree 937 :boxes-total 1138 :pct 82 :clean-cases 199 :clean-total 291
+            :was "646/718 (90%), 167/200"}
+ :computed-style {:values-agree 13779 :values-total 15886 :pct 87
+                  :no-cascade-attributed-mismatch 285 :of 291 :was "8583/10038 (86%)"}
+ :landed {:cssom "cb93188 — corpus 200 → 292。src は無変更"}
+ :note "**数値の低下は退行ではなく被覆の拡大。** 92 件を追加し 59 件が発散した。
+        200 件の corpus は 47% → 90% の改善の間ずっと固定されており、測っている範囲が
+        相対的に狭くなっていた。分母が 719 → 1138 box に増えたうえでの 82% である。
+        オーケストレータが merge 後の main で全 3 軸を再実行し、agent の報告値を再現した。"
+ :new-findings
+ ["**:grid/row-span-two で cssom.layout が例外を投げる**（nth not supported on this type）。
+   292 件中、答えではなく例外を返す唯一の case。grid-column: span 2 と grid-row: 1 / 3 は
+   正常なので、row 軸の span 形だけの欠陥。最優先。"
+  "**パーセント長が px として消費されている。** parse-int/parse-dbl が js/parseInt を
+   カスケード文字列に直接かけるため \"50%\" → 50px、calc() → NaN → fallback。原因 1 つで 9 case。
+   50% of 100px = 50 で偶然通る対照 case も corpus に入っている。"
+  "margin: 0 auto が raw string のまま展開されず margin-left が 0（cascade 軸にも出る）。
+   負の margin は cascade は正しく持つが layout が落とす。"
+  "float: clear 未実装、float が親の高さに寄与、float 自身の margin が落ちる、入り切らない float が
+   積まれない。"
+  "flex の既定以外 10 プロパティが未実装（align-self / order / row-reverse / column-reverse /
+   wrap-reverse / align-content / flex:1 shorthand / column コンテナでの align-items 軸違い /
+   baseline / min-content 下限）。inline-flex は inline-level でない。"
+  "grid: auto-rows / auto-flow: column / row-gap・column-gap の longhand / justify-items /
+   align-items が無視、template-columns: auto auto が幅 0、grid-row: n の後のカーソル位置。"
+  "absolute の包含ブロック: left+right / top+bottom で寸法が解決しない、包含ブロックを
+   content box として扱っている（正しくは padding box）、auto offset が static 位置を保たない、
+   relative な inline が包含ブロックにならない。既存 case は全て relative な親を持っており未計測だった。"
+  "display: table / table-row / table-cell が実質未実装（div が 1 個の table タグ付き
+   300x2 op になる）。display: contents / flow-root も未実装。"
+  "table-layout: fixed、colgroup/col の幅、table の width がセルに配分されない、border-collapse。"
+  "direction: rtl が parse されるが適用されない。単位無し line-height が係数でなく
+   解決済み長さを継承する（1.5em の対 case は通るので局在が確定）。BFC 判定が
+   overflow-x/overflow-y を見ていない。"]
+ :harness-findings
+ ["corpus 自身の hazard を 2 つ発見して修正済み: タグ不均衡な case が harness の <script> を
+   飲み込む（corpus 全体の均衡検査を追加）／コンテナから逃げた float が**次の case に侵入**する
+   （3 件を overflow: hidden で包み、包みが主題でない旨をコメント）。追加 92 件を単独実行して
+   全ページ実行との幾何差分を取り、残る差は display: contents の空 rect のみと確認済み。"
+  "overflow/scroll-container-reserves-a-scrollbar が通るのは engine でなく **oracle についての事実**
+   （この headless Brave は overlay scrollbar なので gutter が無い）。oracle 設定が変わったら
+   落ちるよう control として残置。"
+  "24 兄弟 / 12 段の margin collapse / 16 段の入れ子 / 20 個の折返しインライン / 12 行テーブルの
+   doc 系 7 件中 6 件が全 box 一致。**規模では破綻しない**ことが確認された（豊富な鉱脈だという
+   事前の想定は外れ）。"]}
