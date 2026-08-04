@@ -476,3 +476,25 @@
              "昇った float の隣にある**単独 inline** 子は narrow されない"
              "clearance が対象 box 自身の margin collapse を抑止しない"
              "残り 17 case: grid 4 / display 型 3 / absolute 3 / table 2 / text 2 / fixed 1 / button 1 / media-object 1"]}
+
+{:at "2026-08-04"
+ :iteration 38
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 292}
+ :line-structure {:agree 265 :total 280 :pct 95 :was "263/280 (94%)"}
+ :geometry {:boxes-agree 995 :boxes-total 1142 :pct 87 :clean-cases 228}
+ :paint-order {:points-agree 7006 :points-total 7285 :pct 96}
+ :computed-style {:values-agree 13845 :values-total 15956 :pct 87}
+ :landed {:cssom "afbffe43f849c815b67fd3a40ed942b3d0564368 — 語内改行を計測できるようにする"}
+ :note "**エンジンの欠陥ではなく計測の欠陥だった。** 行構造軸は 1 語 = 1 bounding rect で測っており、
+        語が行をまたぐと rect が全行にまたがるため語内改行が原理的に見えなかった。
+        ブラウザと同じ位置で分割していたエンジンが『行数が多い』として誤りと採点されていた。
+        Brave 実測: 90px の箱の `short aaaa...` は 20px 刻みで 3 つの client rect を返す。
+        複数 rect を持つ語だけ 1 文字ずつ測って top でグループ化する。
+        **途中で私自身が誤った推論をした**: 84px の rect を 8.4px/char と仮定して
+        『Brave は 10 文字、engine は 12 文字』と述べたが、実際の advance は 7px で
+        Brave も 12 文字。エンジンは最初から正しかった。"
+ :remaining ["grid（agent 作業中）、display: table/contents/flow-root と table-layout: fixed（agent 作業中）"
+             "absolute 3 件（positioned な祖先が無い / offset 無しの静的位置 / relative な inline が包含ブロック）"
+             "fixed がフローから抜けない、button の nested inline、media-object"
+             "cascade の UA stylesheet 所在（構造的）"]}
