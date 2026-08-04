@@ -897,7 +897,7 @@
   ;;
   ;; Counting is not comparing.
   {:gap/id :open-star-duplicates-the-isic-family
-   :gap/status :corrected-not-duplicates
+   :gap/status :migrated-and-archived   ; was :corrected-not-duplicates; all 9 done 2026-08-05
    :gap/measured-at "2026-08-05"
    :gap/measured-by "file-list diff of each pair"
    :gap/overlap
@@ -953,11 +953,21 @@
    :gap/executed-rail {:from "open-rail" :to "cloud-itonami-isic-5221" :files 33
                        :evidence "ISIC Rev.4 5221 :includes operation of railway infrastructure"
                        :verification "remote blobs 61 = 28 original + 33 moved, probe fetched, then archived"}
-   :gap/still-open
-   [{:repo "open-otology-uhl-r" :why "a kotoba AppView for a uhl-right-neural
-      Pregel; 8620 Medical and dental practice is a weak fit for an AppView.
-      Worth re-checking with the same method that solved open-rail -- read the
-      candidate classes' :includes, not their titles."}]}
+   ;; open-otology-uhl-r resolved 2026-08-05 by the method that solved open-rail:
+   ;; read the candidate classes' :includes, not their titles. 7210 lists
+   ;; "research on life sciences"; 8620 / 8610 / 8690 are all clinical PRACTICE
+   ;; (outpatient consultations, inpatient care, physiotherapy). The repo does
+   ;; not practise -- every response it returns carries requiresHumanReview and
+   ;; ethicsCommitteeRequired -- it serves a treatment-research programme.
+   :gap/executed-otology {:from "open-otology-uhl-r" :to "cloud-itonami-isic-7210" :files 30
+                          :evidence "ISIC Rev.4 7210 :includes research on life sciences"
+                          :collision "README.md -- target's kept, incoming stored as README.open-otology-uhl-r.md"
+                          :verification "remote blobs 60 = 30 original + 30 moved, four probes fetched, then archived"}
+   :gap/still-open []
+   ;; All nine open-* sector repos are migrated and archived. Reading :includes
+   ;; instead of nameEn moved three of them (rail 5221, patent 7490, otology
+   ;; 7210) off classes their titles had pointed away from.
+   :gap/method-note "the class TITLE is not the class"}
 
   {:gap/id :kotodama-retirement
    :gap/measured-at "2026-08-05"
