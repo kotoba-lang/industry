@@ -1027,7 +1027,12 @@
    ;; の parity 台帳（手書きの「現在値」文書。ADR-2608040300）。`:parity/subject` は
    ;; repo-taxonomy の `:repo/path` と同形ではなく org/repo 表記なので join には注意。
    ;; `:parity/coverage` entity を 1 件持ち、測定できていない面を申告する。
-   ["engine-parity" (io/file root "90-docs" "maturity" "engine-parity.datoms.edn")]])
+   ["engine-parity" (io/file root "90-docs" "maturity" "engine-parity.datoms.edn")]
+   ;; gtm-icp — 誰に売るかの機械可読な定義（手書きの「現在値」文書。ADR-2608042000）。
+   ;; `:icp/product` は BMC の product id と同形。`:icp/coverage*` を持つ entity を
+   ;; 1 件持ち、ICP の述語のうちデータ面が評価**できない**ものを申告する —— target
+   ;; list を「ICP 適合企業」と読み違えさせないため、その申告を query 側から読めることが要る。
+   ["gtm-icp" (io/file root "90-docs" "business" "gtm-icp.datoms.edn")]])
 
 (defn index-entities [next-tempid!]
   (let [skipped (atom [])
