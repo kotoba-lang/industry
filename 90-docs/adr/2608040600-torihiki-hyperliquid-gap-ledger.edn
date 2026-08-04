@@ -1,0 +1,147 @@
+[{:db/id -1
+  :adr/id "ADR-2608040600"
+  :adr/title "torihiki ⊖ Hyperliquid — gap 台帳（2026-08-04 実測）"
+  :adr/status "accepted"
+  :adr/date "2026-08-04"
+  :adr/tags ["kotoba-lang" "torihiki" "hyperliquid" "gap-ledger" "roadmap"]
+  :adr/body
+  "## この文書の性質
+
+オーナー質問（2026-08-04）『残りの gap は? hyperliquid との差分を記して』への
+回答。**実装を読んで書いた**（記憶ではなく `src/torihiki/*.cljc` の grep と
+live endpoint の実測）。
+
+比較対象の Hyperliquid 側は**公開仕様とドキュメントから既知の範囲**であって
+コードではない —— HyperCore は closed source（`hyperliquid-dex/node` は署名済み
+バイナリとドキュメントを配るだけ）で、torihiki 自身の README がそう書いている。
+したがってこの表は『実装 vs 実装』ではなく『実装 vs 公表された振る舞い』であり、
+HL 側に非公開の差がある可能性は消せない。
+
+**差分には 4 つの性質がある**（末尾の分類を参照）。全部を『やること』として
+読むと設計判断まで巻き込むので、分類を先に見ること。
+
+## A. 板とマッチング
+
+| | Hyperliquid | torihiki | |
+|---|---|---|---|
+| price-time priority | ✓ | ✓ intrusive FIFO + 4 段 bit ladder、実測 3.15M ops/sec | 同等 |
+| 指値 GTC | ✓ | ✓ | 同等 |
+| ALO / post-only | ✓ | ✓ `flag-post-only 2` | 同等 |
+| IOC | ✓ | ✓ `flag-ioc 1` | 同等 |
+| reduce-only | ✓（板に**載る**） | ✓ `flag-reduce-only 4`、**載らない** | **意図的な差** |
+| 成行注文 | 専用 | 攻撃的指値 + IOC で等価。**専用 tx は無い** | 実質同等 |
+| SL / TP trigger | ✓ | ✓ 発火順を作成順に固定（consensus rule 化）| 同等 |
+| TWAP | ✓ | ✗ | 未実装 |
+| Scale orders | ✓ | ✗ | 未実装 |
+| Chase | ✓ | ✗ | 未実装 |
+| 注文の修正（amend） | ✓ | ✗ cancel + 再発注のみ | 未実装 |
+| cancel-all / client order id | ✓ | ✗ `:cancel` は order id 単位のみ | 未実装 |
+
+reduce-only が載らない理由は README に書かれている: 発注時に 1 回だけ検査するのが
+健全なのは、注文が検査対象のポジションより長生きしない場合だけ。HL は載せる。
+**明示された差**であって欠落ではない。
+
+## B. 清算とリスク
+
+| | Hyperliquid | torihiki | |
+|---|---|---|---|
+| cross / isolated margin | ✓ | ✓ 両方（`clearing.cljc`） | 同等 |
+| margin tier | ✓ | ✓ 最終 tier を上限外にも適用 | 同等 |
+| open interest cap | ✓ | ✓ 保守側に倒す（over-reject が安全な向き） | 同等 |
+| maker / taker fee | ✓ | ✓ `fees-collected` に積む | 同等 |
+| funding | 1h ごと F/8、クランプ | ✓ 同型（4%/h cap、5 秒 × 720 サンプル/h） | 同等 |
+| mark price | oracle + clamp(impact-mid − oracle, ±band) | ✓ 同式 | 同等 |
+| oracle | validator の**stake 加重**中央値 | publisher 中央値 + quorum + stale 停止。**stake 加重ではない** | 差分 |
+| 清算 waterfall | book → backstop → insurance → ADL | ✓ 4 段とも実行される | 同等 |
+| **清算の駆動** | 状態機械が自前で走る | **`:liquidate` tx が要る** | **差分（keeper 依存）** |
+| backstop の出し手 | HLP（外部出資を受ける vault） | 普通の口座としての vault。**出資を受ける仕組みが無い** | 差分 |
+
+清算駆動の差は小さく見えて運用上は大きい: 誰も `:liquidate` を送らなければ
+不良債権が積み上がる。HL は誰の善意にも依存しない。
+
+## C. 資産と入出金 —— **最大の欠落**
+
+| | Hyperliquid | torihiki |
+|---|---|---|
+| bridge | Arbitrum USDC →（後にネイティブ） | **seam のみ**。`:bridge-authority` は実装済みだが devnet は nil ＝ **誰でも自分に入金できる**。`/head` が自白する |
+| 出金 | 実際に出る | 残高を減らすが**出金先が存在しない** |
+| spot 板 | ✓ | ✗ |
+| HIP-1 トークン / spot deploy オークション | ✓ | ✗ |
+| HyperEVM | ✓ | ✗ |
+| vault（HLP / ユーザ vault） | ✓ | ✗ |
+| staking / delegation | ✓ | ✗ |
+
+**この列は『実装が足りない』ではなく『取引所として片肺』を意味する。** 執行層が
+どれだけ正しくても、担保が何にも裏付けられていなければ全部の数字が同じだけ
+無意味になる。torihiki README がこれを最初に書いているのは正しい。
+
+## D. 合意と運用
+
+| | Hyperliquid | torihiki |
+|---|---|---|
+| consensus | HyperBFT（本番稼働） | `engi` は chained-HotStuff の safety rule と stake/slashing **のみ**。pacemaker / view change / p2p / 署名集約は無い |
+| validator set / stake 加重 | ✓ | ✗（devnet は 4 replica 固定、鍵は名前から導出） |
+| slashing の実運用 | ✓ | ロジックはあるが運用されていない |
+| **snapshot** | 当然ある | **無い**。boot が O(chain) —— 2026-08-04 の全断（ADR-2608040400）の根本原因で、ページ分割で有界化したが **O(chain) invocation は残っている** |
+| light client 証明 | — | state root は **flat digest**。SHA-256 で署名可能だが Merkle ではないので、**1 残高だけを replay 無しで検証できない** |
+| multi-market | 多数 | 構造（`:books` の map）はあるが **single market しか回していない** |
+| **tx が着地しない**（validator） | — | **2026-08-04 実測、未解明**。nonce が進まず `txs-in-chain` 4 のまま。単一シーケンサには着地する |
+
+## E. データと API
+
+| | Hyperliquid | torihiki |
+|---|---|---|
+| WebSocket 購読 | ✓ | ✗（HTTP polling のみ、1.5 秒） |
+| **candles / 履歴** | ✓ | ✗ tape は **200 件の ring buffer** |
+| user fills 履歴 | ✓ | ✗（`fills-since` はブロック内のみ） |
+| L2 板 | ✓ | ✓ `/book` |
+| open orders / order status | ✓ | 部分（`account-state`） |
+| REST info | 広い | 6 endpoint（`/head /market /book /account /trades /tx`） |
+
+candles の不在が `torihiki-chart` の履歴 200 件制限の直接の原因
+（ADR-2608040300）。**深度図は板から描くのでこの制約を受けない。**
+
+## F. 経済・成長機能
+
+| | Hyperliquid | torihiki |
+|---|---|---|
+| builder codes | ✓ | ✗ |
+| referral | ✓ | ✗ |
+| volume 別 fee tier | ✓ | ✗（固定 maker/taker） |
+| sub-account | ✓ | ✗ |
+| agent / API wallet（委任鍵） | ✓ | ✗ 鍵 = 口座、委任の概念が無い |
+| multi-sig | ✓ | ✗ |
+
+## G. 差分の 4 分類 —— **ここを先に読む**
+
+**1. 意図的な差（直す対象ではない）**
+reduce-only が板に載らない / x 軸がブロックで時刻でない / 全部整数（i53）/
+wall clock を持たない / rejection も state root に入る。
+どれも決定性と検証可能性のために選んだ差で、README とテストが理由を持っている。
+
+**2. 構造的に先に潰さないと他が積めないもの**
+- **snapshot が無い**（boot が O(chain)）—— 今日一度 chain 全体を落とした
+- **state root が flat**（Merkle でない）—— light client が原理的に作れない
+- **bridge が無い**（担保が裏付けられていない）—— 上の全部の数字の前提
+
+**3. 単に未実装（設計上の障害は無い）**
+TWAP / scale / amend / cancel-all、fee tier / builder / referral、
+sub-account / agent wallet、WebSocket / candles / 履歴 API、multi-market の実運用、
+oracle の stake 加重、清算の自動駆動。
+
+**4. 今日の実測で見つかった不具合**
+validator に transaction が着地しない（ADR-2608040400 の未了節）。
+
+## H. 順序についての意見
+
+執行層はもう HyperCore に対して機能被覆が高く、**そこを伸ばしても価値は増えない**。
+次に効くのは、この順:
+
+1. **snapshot**（分類 2）—— これが無い限り運用が続かない。今日の障害が証拠
+2. **validator の tx 着地**（分類 4）—— 直らないと本番で誰も取引できない
+3. **candles / 履歴 endpoint**（分類 3）—— chart が 200 件の窓から出られない
+4. **bridge**（分類 2）—— ただしこれは技術ではなく「何に裏付けられるか」の決定
+5. **Merkle state root**（分類 2）—— light client を主張するなら必須
+
+spot / HyperEVM / vault / staking は**別プロダクトの規模**であり、上の 5 つが
+片付く前に着手すると、動かない土台の上に面積を足すことになる。"}]
