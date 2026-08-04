@@ -884,42 +884,44 @@
               name but was not examined."}
 
   ;; ── from executing the owner's 2026-08-05 decisions (ADR-2608040170) ──
+  ;; CORRECTED 2026-08-05 (ADR-2608040210). Filed as "the same sector is
+  ;; implemented twice under two naming schemes", on the evidence that the file
+  ;; COUNTS were close (38 vs 40, 27 vs 31, 33 vs 27, 33 vs 25). Diffing the
+  ;; actual file lists shows ZERO shared files in all four pairs. They are not
+  ;; duplicates; they are different layers of the same sector:
+  ;;
+  ;;   cloud-itonami-isic-*  blueprint.edn + governance boilerplate + deps.edn
+  ;;                         (the Open Business Blueprint actor)
+  ;;   open-*                bpmn/ dmn/ dodaf/ forms/ kotoba/ worker/
+  ;;                         (executable process + architecture artifacts)
+  ;;
+  ;; Counting is not comparing.
   {:gap/id :open-star-duplicates-the-isic-family
+   :gap/status :corrected-not-duplicates
    :gap/measured-at "2026-08-05"
-   :gap/count 9
-   ;; "open 関係は isic に統合" turned out not to be a rename. Every candidate
-   ;; ISIC target already exists, and both sides carry real content -- the same
-   ;; sector is implemented twice under two naming schemes. Renaming cannot fix
-   ;; duplicated work; someone has to decide which implementation survives.
-   :gap/evidence
-   [{:open "cloud-itonami/open-banking" :files 38 :isic "cloud-itonami-isic-6419" :isic-files 40
-     :subject "Core-Banking MVP vs Other monetary intermediation"}
-    {:open "cloud-itonami/open-denki" :files 27 :isic "cloud-itonami-isic-3510" :isic-files 31}
-    {:open "cloud-itonami/open-gas" :files 33 :isic "cloud-itonami-isic-3520" :isic-files 27}
-    {:open "cloud-itonami/open-ports" :files 33 :isic "cloud-itonami-isic-5222" :isic-files 25}]
-   ;; ISIC codes verified against the machine-readable Rev.4 catalog that
-   ;; open-isic (now org-un-isic) itself ships -- not from memory.
-   :gap/isic-assignment-confident
-   {"open-banking" "6419" "open-denki" "3510" "open-gas" "3520" "open-ports" "5222"}
-   :gap/isic-assignment-ambiguous
-   [{:repo "open-rail" :candidates ["4911 Passenger rail transport, interurban"
-                                    "4912 Freight rail transport"]
-     :why "the repo is Railway Operations & Network Design, which spans both"}
-    {:repo "open-network" :candidates ["6110 Wired telecommunications activities"
-                                       "6120 Wireless telecommunications activities"]}
-    {:repo "open-robo" :candidates ["2829 Manufacture of other special-purpose machinery"
-                                    "3240 Manufacture of games and toys"]
-     :why "it is Giemon, a Japanese open-hardware robot KIT brand"}
-    {:repo "open-patent" :candidates ["6910 Legal activities"
-                                      "7490 Other professional, scientific and technical n.e.c."]}
-    {:repo "open-otology-uhl-r" :candidates [] :why "README is empty; subject unknown"}]
-   ;; A third parallel series, found while editing repos.edn.
-   :gap/third-copy
-   {:repos ["etzhayyim/com-etzhayyim-app-open-isic" "etzhayyim/com-etzhayyim-app-open-isco"
-            "etzhayyim/com-etzhayyim-app-open-cofog" "etzhayyim/com-etzhayyim-app-open-unspsc"
-            "etzhayyim/com-etzhayyim-app-open-apqc" "etzhayyim/com-etzhayyim-app-open-banking"]
-    :note "parallel copies of the same catalogs in a third org; deliberately NOT
-           swept up by the rename's substring match"}}
+   :gap/measured-by "file-list diff of each pair"
+   :gap/overlap
+   [{:pair ["open-banking" "cloud-itonami-isic-6419"] :open-only 38 :isic-only 40 :shared 0}
+    {:pair ["open-denki" "cloud-itonami-isic-3510"] :open-only 27 :isic-only 31 :shared 0}
+    {:pair ["open-gas" "cloud-itonami-isic-3520"] :open-only 33 :isic-only 27 :shared 0}
+    {:pair ["open-ports" "cloud-itonami-isic-5222"] :open-only 33 :isic-only 25 :shared 0}]
+   :gap/disposition :do-not-archive
+   ;; Owner directive 2026-08-05 was "prioritise ISIC; archive open- if it is
+   ;; older or unnecessary". Neither holds. ISIC is the OLDER side (isic-6419
+   ;; created 2026-06-30 vs open-banking 2026-07-19), and open-* is not
+   ;; unnecessary -- every one of its 27-76 files exists nowhere else.
+   :gap/why-not-archived
+   {:older? false :note "ISIC repos predate the open-* migration by weeks"
+    :unnecessary? false
+    :note2 "open-robo alone is 76 files of cad/ cad-spec/ bom/ firmware/ appview/
+            -- a whole hardware product (the Giemon robot kit). Archiving it is
+            not sector tidying."}
+   :gap/correct-order
+   ["move each open-*'s process artifacts under its cloud-itonami-isic-* sibling"
+    "verify the move"
+    "only then archive open-*"]
+   :gap/note "that move is content work, not a naming operation, so it is
+              recorded rather than executed."}
 
   {:gap/id :kotodama-retirement
    :gap/measured-at "2026-08-05"
