@@ -133,6 +133,49 @@ behind, and replaying it can delete work someone else added. **Re-runs must be i
 since landing does not remove the local copy: compare local blob shas against the base tree
 and drop what already matches.
 
+### DO-NOT-MERGE PR は「駐車場」であって判定ではない
+
+`:review` / `:branches` として開かれた `DO-NOT-MERGE` PR は、開いた時点で**誰も中身を
+見ていない**。ラベルは事故を防ぐためのもので、判断の代わりではない。1 件ずつ
+disposition を付けて閉じるまでが cleanup。
+
+実測 2026-08-04: fleet に 98 件が滞留していた。同じラベルなのに中身は 3 つの全く違う
+ものだった — 一括処理してはならない理由そのもの:
+
+| クラスタ | 件数 | 中身 | disposition |
+|---|---|---|---|
+| `fix/khm-repo-name-typo` | 20 | テンプレ複製で他リポ名が残った `CONTRIBUTING.md`/`GOVERNANCE.md` の 2 行 typo。各リポが自分の名前に直すだけ | `:merge` |
+| `wasm-compile-*` | 13 | `.kotoba` source + コンパイル済み `.wasm` + テスト + `deps.edn` 変更。実質的な機能追加 | `:needs-review` |
+| `preserve uncommitted tracked changes` | 60 | 共有 checkout の未コミット編集の退避。base の鮮度次第で revert 装置になる | 測定して決める |
+
+3 つ目が危険な理由は PR body 自身が記録している: **2026-07-26/27 に同型 17 件が自動
+マージされ、`main` から約 913 行が削除された。**
+
+disposition は 5 つ。ラベルではなく**測定**で決める:
+
+| disposition | 条件 |
+|---|---|
+| `:merge` | diff が自明に正しく、base が現行で、`main` 側が同じ file を動かしていない |
+| `:needs-review` | 実質的な追加がある。放置せず「何を確認すれば決まるか」を PR に comment で残す |
+| `:close-superseded` | 追加行が全て default branch に既に存在する（content containment）。archive → close |
+| `:close-stale-revert-risk` | base が古く、PR が触る file を `main` が更新済み。merge すると新しい内容を巻き戻す。archive → close（内容は archive に残る） |
+| `:close-repo-retired` | 対象 repo 自体が退役済み |
+
+判定は安い順に:
+
+```bash
+# 1) base が実質現行か（積集合が空なら revert risk なし）
+gh api repos/<repo>/compare/<pr.base.sha>...<default> --jq '[.files[].filename]'
+#    ↑ と PR の files の積集合を取る
+# 2) 空でも追加行が既に default branch にあるなら :close-superseded
+# 3) 残ったものだけを人が読む
+```
+
+**Never**: `DO-NOT-MERGE` を理由に中身を見ずに放置する（この節ができた理由）/ draft の
+まま放置して「GitHub が merge を防ぐから安全」で終わらせる（防いでいるのは事故だけで、
+判断は誰もしていない）/ archive せずに close する（`:retirement :archive` と同じ
+非交渉ルール）/ 同じラベルのものを 1 クラスタとして一括処理する。
+
 Three kinds of "no remote", needing different handling: has commits (create + push);
 **no commits at all** (create empty repo, land via a parentless root commit through the API,
 never touching the local checkout); **exists upstream but local lost `origin`** (reattach,
