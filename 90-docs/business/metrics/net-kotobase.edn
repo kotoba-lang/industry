@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 14135, "kotobase-cf-wasm-staging" 15515},
+ {"net-kotobase" 14308, "kotobase-cf-wasm-staging" 16086},
  :zone
- {:requests-7d 32804,
-  :pageviews-7d 1330,
-  :uniques-7d-sum 1368,
+ {:requests-7d 33587,
+  :pageviews-7d 1335,
+  :uniques-7d-sum 1374,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -17,11 +17,13 @@
    {:path "/xrpc/ai.gftd.apps.kotobase.engine.canaryTransact",
     :requests 239}
    {:path "/xrpc/ai.gftd.apps.kotobase.engine.bootstrap", :requests 36}
-   {:path "/resources", :requests 22}
-   {:path "/obsidian", :requests 20}
-   {:path "/why-kotobase", :requests 20}
-   {:path "/signup", :requests 20}],
-  :status-mix {:ok 5119, :client-error 2880, :server-error 79},
+   {:path "/__scheduled", :requests 29}
+   {:path
+    "/kotobase-cf-wasm-production/shadow/iengine/merkle-lsm/v3/backfill/bafyreicuqbxou4isy5z4d5lucus326qtuwpslhpslkb4pazp7deaatsedq.bin",
+    :requests 23}
+   {:path "/resources", :requests 21}
+   {:path "/obsidian", :requests 20}],
+  :status-mix {:ok 5177, :client-error 2863, :server-error 79},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,12 +35,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-04",
- :traffic-quality {:window "24h", :probe-4xx-pct 36, :error-5xx-pct 1},
+ :traffic-quality {:window "24h", :probe-4xx-pct 35, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.engine.candi… 1910 · /xrpc/ai.gftd.apps.kotobase.engine.prima… 1907 · /xrpc/ai.gftd.apps.kotobase.engine.canar… 239 · /xrpc/ai.gftd.apps.kotobase.engine.boots… 36 · /resources 22 | 4xx(probe) 36% · 5xx 1%",
- :funnel {:visitors 2214, :signups 12, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.engine.candi… 1910 · /xrpc/ai.gftd.apps.kotobase.engine.prima… 1907 · /xrpc/ai.gftd.apps.kotobase.engine.canar… 239 · /xrpc/ai.gftd.apps.kotobase.engine.boots… 36 · /__scheduled 29 | 4xx(probe) 35% · 5xx 1%",
+ :funnel {:visitors 2218, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 32804 req/7d・1368 uniques(日次和)・うち4xx probe 36%(24h)、workers 29650 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 33587 req/7d・1374 uniques(日次和)・うち4xx probe 35%(24h)、workers 30394 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 13,
   :submissions 3,
@@ -47,6 +49,6 @@
   :attempt-rate 0.23076923076923078,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 682},
+ {:visitors {:openai-ads 3, :organic 686},
   :signups {:organic 9}, 
   :checkouts {}}}
