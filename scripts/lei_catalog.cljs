@@ -53,8 +53,34 @@
 (defn- raw-url [repo file]
   (str "https://raw.githubusercontent.com/cloud-itonami/" repo "/main/" file))
 
-(defn- fetch-text [url]
-  (-> (js/fetch url)
+(defn- api-url [repo file]
+  (str "https://api.github.com/repos/cloud-itonami/" repo "/contents/" file "?ref=main"))
+
+(def ^:private gh-token
+  "`gh auth token` once, not per request. Only needed on the :fresh? path."
+  (delay (str/trim (execSync "gh auth token" #js {:encoding "utf8" :stdio "pipe"}))))
+
+(defn- fetch-text
+  "`raw.githubusercontent` by default; the Contents API when freshness matters.
+
+  WHY BOTH. raw.githubusercontent is a CDN and serves a stale copy for minutes
+  after a write. That is harmless for a work list -- the worst case is
+  re-visiting a company that was just done -- but it is NOT harmless for the
+  loop's after-measurement, which exists to see what the loop's own action just
+  wrote. Measured 2026-08-04: a cycle reported `found: 1` and scored an
+  IDENTICAL maturity before and after, because the write it had just made was
+  not yet visible through the CDN. A loop that cannot see its own effect is
+  predicting, not measuring -- the exact property this loop is built on.
+
+  The API path costs an authenticated request per repo (~185, twice per cycle,
+  against a 5000/hour budget) and is only used where it is load-bearing."
+  [url & [{:keys [fresh?]}]]
+  (-> (js/fetch url (if fresh?
+                      #js {:headers #js {"authorization" (str "Bearer " @gh-token)
+                                         "accept" "application/vnd.github.raw"
+                                         "user-agent" "cloud-itonami-lei-catalog/1.0"}
+                           :cache "no-store"}
+                      #js {}))
       (.then (fn [^js r]
                (cond
                  (.-ok r) (.text r)
@@ -132,10 +158,12 @@
     (-> (js/Promise.all (clj->js (repeatedly (min n (max 1 (count items))) worker)))
         (.then (fn [_] @out)))))
 
-(defn- fetch-one [repo want-docs?]
-  (-> (js/Promise.all
-       #js [(fetch-text (raw-url repo "blueprint.edn"))
-            (if want-docs? (fetch-text (raw-url repo "80-data/public/tos.journal.edn"))
+(defn- fetch-one [repo want-docs? fresh?]
+  (let [url (fn [f] (if fresh? (api-url repo f) (raw-url repo f)))
+        opts {:fresh? fresh?}]
+   (-> (js/Promise.all
+       #js [(fetch-text (url "blueprint.edn") opts)
+            (if want-docs? (fetch-text (url "80-data/public/tos.journal.edn") opts)
                 (js/Promise.resolve nil))])
       (.then (fn [[bp-text journal]]
                (let [bp (try (edn/read-string bp-text) (catch :default _ nil))]
@@ -145,7 +173,7 @@
                     :company (assoc bp :company/repo repo
                                     :company/country (->country (:company/jurisdiction bp)))
                     :docs (or (journal->docs journal) [])}))))
-      (.catch (fn [e] {:repo repo :ok false :error (.-message e)}))))
+      (.catch (fn [e] {:repo repo :ok false :error (.-message e)})))))
 
 (defn fetch-catalog
   "Every cloud-itonami-lei-* repo's blueprint (and optionally its ToS journal),
@@ -155,9 +183,9 @@
   work list over a partial catalog and does not say so has produced a number
   nobody can check."
   ([] (fetch-catalog {}))
-  ([{:keys [concurrency docs?] :or {concurrency 12 docs? false}}]
+  ([{:keys [concurrency docs? fresh?] :or {concurrency 12 docs? false fresh? false}}]
    (let [repos (list-repos)]
-     (-> (run-bounded repos #(fetch-one % docs?) concurrency)
+     (-> (run-bounded repos #(fetch-one % docs? fresh?) concurrency)
          (.then (fn [rs]
                   {:repos-seen (count repos)
                    :companies (vec (keep :company (filter :ok rs)))

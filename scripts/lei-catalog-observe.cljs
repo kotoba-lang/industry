@@ -15,7 +15,12 @@
 (ns lei-catalog-observe
   (:require [lei-catalog :as cat]))
 
-(-> (cat/fetch-catalog {:docs? true :concurrency 12})
+;; `:fresh? true` -- the Contents API, not the raw CDN. This is the loop's
+;; after-measurement: it exists to see the write the loop's own action just
+;; made, and the CDN serves a stale copy for minutes afterwards. Measured
+;; 2026-08-04: a cycle reported `found: 1` and recorded an identical
+;; maturity before and after. Costs one authenticated request per repo.
+(-> (cat/fetch-catalog {:docs? true :concurrency 12 :fresh? true})
     (.then (fn [c]
              (let [obs (cat/observe c)]
                ;; The unreadable repos go to stderr as well as into the map:
