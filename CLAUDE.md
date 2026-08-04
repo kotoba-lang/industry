@@ -471,6 +471,40 @@ skill `new-project-scaffold` を参照。
   main に着地させたあと、共有 checkout 側は `git fetch` と（内容一致を `shasum`
   で確認した上での）重複ファイルの削除だけで追従させる。
 
+## 「無い」と結論する前に検索する（repo-wide mandatory、2026-08-04）
+
+**「この workspace には X が無い」「X を作る必要がある」と結論する前に、必ず
+`nbb scripts/repo-search.cljs <語> [語...]` を引く。** west.yml は 4,000 repo を
+管理しており、**checkout されていない repo は `ls` にも `find` にも `grep -r` にも
+映らない**。手元に無いことは存在しないことではない。
+
+実測（2026-08-04、この規則が生まれたセッション）: agent が 1 セッションで
+「無い」と 3 回結論し、**3 回とも間違っていた**。
+
+| 結論した内容 | 実際 |
+|---|---|
+| 「semantic-code は kotoba repo にある」 | #429 で `kotoba-lang/codebase` に切り出し済み |
+| 「DHT に announce するには libp2p ノードが要るが無い」 | `io-libp2p-specs-kad-dht`（multi-router quorum 付き delegated routing）と `tech-ipfs-specs-ipns`（実 IPNS record）があり、実ネットワークに publish できた |
+| 「transport が無い」 | multistream/Yamux=`io-libp2p-specs-transport`、Noise XX=`noise`、multiaddr=`io-multiformats`、protobuf=`dev-protobuf` が全部あった |
+
+3 回とも 1 コマンドで見つかった。失敗したのは検索能力ではなく**「結論する前に
+検索する」という手順**で、prose の指示（CLAUDE.md には既に「既存を確認せよ」が
+複数ある）だけでは守られなかった。しかも 3 回目は、2 回目の訂正を受けた直後に
+起きている —— **一度直した種類の誤りが、次の話題で再発する**。
+
+- 検索は**名前と、checkout 済み repo の README 冒頭**の両方に当たる。能力名が
+  repo 名に出ないことがあるため（multistream と Yamux は `io-libp2p-specs-transport`
+  にあり、どちらの語も名前に無い）。
+- **セッション開始時に外部仕様ミラー repo の一覧**（`io-`/`org-`/`tech-`/`dev-`/
+  `capability-` 接頭辞、約 195 件）が SessionStart hook
+  `.claude/hooks/session-start-spec-inventory.cljs` で自動提示される。この接頭辞群は
+  命名規則上「どの外部仕様が実装済みか」の答えそのもので、上記 3 件のうち 2 件は
+  この一覧だけで防げた。
+- **一覧に出ない接頭辞なしの library**（`noise`、`codebase`、`identify`、`mesh`、
+  `p2p` 等）は `repo-search` が拾う。
+- 既存を見つけたら**それを使う**。「見つけたが自分で書き直す」は、既存が accepted
+  ADR で否定されている場合を除き、選択肢に入らない。
+
 ## 並行エージェント運用（worktree-per-agent / stash を積まない）
 
 複数セッション・エージェントが同時に走る前提の標準フロー。stash・branch・worktree の
