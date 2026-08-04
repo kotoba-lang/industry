@@ -1,0 +1,251 @@
+[{:db/id -1
+  :adr/id "adr-2608040100-origin-plane-is-reverse-dns-of-the-real-domain"
+  :adr/title "ADR-2608040100: repo 名を 4 面（origin / role / family / subject）に分け、origin 面は「出所の実ドメインの逆順」と定義して機械検査する"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-04"
+  :adr/last-verified "2026-08-04"
+  :adr/last_verified "2026-08-04"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "repo-naming-four-planes-origin-reverse-dns"
+  :adr/authoritative-for
+  ["repo 名が担う 4 つの面（origin / role / family / subject）と、その適用順序"
+   "origin 面が意味論的分類ではなく「出所の登録可能ドメインのラベル逆順」であること"
+   "com- が「商用法人」を意味せず stripe.com の逆順にすぎないこと"
+   "出所ドメインが登録時点で pin され、authority のドメイン移転で改名しないこと"
+   "capability-* が role 面の宣言済み prefix であること"
+   "product-family 面（kami- / kotoba- / kotobase- / kura- / kotodama-）の宣言"
+   "bare 名が subject 面の残余であり、不透明名には README 名乗り + concept 索引登録が要ること"
+   "面をまたぐ同一主題は許容、同一面の同一主題は禁止であること"
+   "manifest/origin-domains.edn が origin 面のデータ正本であること"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2607299000-repository-rules-workspace-authority"
+   "adr-2607289500-kotoba-refactor-agent-handoff-and-capability-repo-cid"
+   "adr-2607050900-kotoba-lang-naming-audit"
+   "adr-2607102200-kami-render-stack-deps-authority-rename"
+   "adr-2608035000"
+   "adr-2608039980"
+   "manifest/repository-rules.edn"
+   "manifest/origin-domains.edn"
+   "scripts/verify-repository-roles.cljs"]
+
+  :adr/body
+  "# ADR-2608040100: repo 名の 4 面と、origin 面 = 出所ドメインの逆順
+
+**Status**: accepted
+**Date**: 2026-08-04
+**Deciders**: Jun Kawasaki（+ Claude、standing authorization）
+**Scope**: workspace 全体の repo 命名（west 登録 4,078 project）
+
+## Context
+
+オーナーの問い:「今の kotoba-lang の repo 名は capability に基づいた命名に
+なっている?」— 実測すると **1,994 中 56 件（2.8%）だけ**が capability 名で、
+org 全体の原則ではなかった。続く問い:「綺麗にするなら、どう整理するといいか。
+出所ベース、role prefix は残したい」。
+
+実測した分布（`--name-audit`、kotoba-lang 1,995 repo）:
+
+| 面 | 件数 | 当時 authority に宣言されていたか |
+|---|---:|---|
+| origin（`com-`/`org-`/`io-`…） | 1,193 | ❌ |
+| role（`loop-`/`skill-`/`action-`/`app-`/`person-`） | 37 | ✅ |
+| role（`capability-`） | 56 | ❌ |
+| family（`kami-` 96 / `kotoba-` 32 / `kotobase-` 24 / `kura-` 6 / `kotodama-` 5） | 163 | ❌ |
+| subject（bare） | 546 | ✅（`:prefix nil :role :library`） |
+
+**病理は規則の中身ではなく、面が無宣言で混ざっていることだった。** 検査は
+`:checked-repos` 23 件（**全体の 0.6%**）にしか届いていなかった。
+
+### 途中で撤回した誤り（重要）
+
+最初の提案は origin 面を「商用 = `com-`、政府 = `gov-` を新設、国際機関 =
+`int-` を新設」という**意味論的分類**として整理しようとした。オーナーの指摘:
+
+> com- というのは単に出所が com だったから com にしているだけなので、
+> com- というより出所ルールです
+
+これが正しく、提案は間違っていた。`com-` は「商用法人」というカテゴリではなく
+**stripe.com を逆順にした結果**にすぎない。この違いは書き味の問題ではなく、
+**検査可能性そのもの**を変える:
+
+- 意味論的分類なら「IRS は政府機関か国際機関か」という**判断**が要る
+- 出所ドメイン規則なら irs.gov を引くだけで `gov-irs` が**導出される**
+
+つまり誤配置は「判断を誤った」のではなく「**ドメインを引かなかった**」であり、
+機械検査できる。新カテゴリは 1 つも要らなかった — `gov-` も `int-` も
+irs.gov / icao.int を逆順にした結果として自然に現れる。
+
+## Decision
+
+### 1. repo 名は 4 面を持ち、1 名につき 1 面だけを担う
+
+適用順（`manifest/repository-rules.edn` `:plane-order`）:
+
+1. **origin** — 主題が他者の仕様・製品である
+2. **role** — 実行役割が定まっている（loop / app / capability / person / skill / action）
+3. **family** — ここが所有する複数 repo の集合に属する
+4. **subject** — 上のいずれでもない再利用ライブラリ（bare 名）
+
+この workspace が繰り返し発見してきたドリフトは、いつも「誤った規則に従った」
+ではなく「**2 つの規則が使えて、どちらが勝つか誰も書いていなかった**」だった。
+順序を 1 本書くことがこの ADR の中心である。
+
+### 2. origin 面 = 出所の登録可能ドメインのラベル逆順
+
+```
+登録可能ドメイン → www を落とす → '.' で分割 → 逆順 → '-' で連結
+repo 名は「導出 prefix と等しい」か「導出 prefix + '-' + 主題」で始まる
+```
+
+| ドメイン | 導出 prefix | 既存の適合名 |
+|---|---|---|
+| stripe.com | `com-stripe` | `com-stripe` |
+| ietf.org | `org-ietf` | `org-ietf-x509` |
+| libp2p.io | `io-libp2p` | `io-libp2p-specs-kad-dht` |
+| ipfs.tech | `tech-ipfs` | `tech-ipfs-specs-ipns` |
+| berkeley.edu | `edu-berkeley` | `edu-berkeley-spice` |
+| protobuf.dev | `dev-protobuf` | `dev-protobuf` |
+| digital.go.jp | `jp-go-digital` | `jp-go-digital-design-system` |
+
+**右列は願望ではなく既存の repo 名である。** 規則はすでに事実上の慣行として
+動いており、欠けていたのは成文化と検査だけだった。
+
+**導出は一方向（domain → prefix）に限る。** 名前からドメインを逆算しない —
+`com-yang-ming-api` はラベルにハイフンが無くて主題にハイフンが 2 つあるので、
+逆算は一意に決まらない。前向きの導出は全域だが、後ろ向きの解析はそうではない。
+
+**TLD の値域は開いている。** `:vocabulary/observed-tlds` は実測値
+（com 1054 / org 119 / io 13 / tech 2 / jp 2 / net 1 / edu 1 / dev 1）であって
+許可リストではない。未観測 TLD は「未宣言 prefix」として報告され、判断に上がる。
+
+### 3. ドメイン移転では改名しない（登録時点で pin）
+
+**すでに起きている**: IPFS が ipfs.io → ipfs.tech に移り、同一 authority が
+`io-ipfs` / `io-ipld` / `io-multiformats` と `tech-ipfs-specs-*` の
+両方を占めている。**両方とも、それぞれの登録時点で正しい。**
+
+改名しない理由は ADR-2607289500 が既に決めている:
+**repository 名は discovery alias であって identity ではない**（identity は
+semantic definition CID）。marketing ドメインの移転を追って west pin と
+全参照を churn させても、得るものが無い。
+
+### 4. `capability-` を role 面の prefix として宣言する
+
+56 repo が稼働していながら未宣言だった（`app-` が 19 件のドリフト後に
+宣言された経緯と同型で、workspace 最大の未宣言 role family）。
+契約自体は ADR-2607289500 が既に決めている（1 capability = 1 public repo、
+identity は definition CID）— 欠けていたのは name-prefix としての表現だけ。
+
+`:execution :none`（契約であって走るものではない）、
+`:must-not :declare-a-second-capability`（import の immutable identity が
+definition CID である以上、2 つ持つ repo は identity を持てない）。
+
+### 5. product-family 面を宣言する
+
+`kami-` 96 / `kotoba-` 32 / `kotobase-` 24 / `kura-` 6 / `kotodama-` 5。
+**kami-* 単独で、この file の宣言済み role prefix 全部より大きい。**
+
+`:must-not :be-a-family-of-one` — family prefix は集合によってのみ得られる。
+1 件だけの family prefix は、衣装を着た bare 名であり、単一の名前を
+taxonomy に見せかける。
+
+**未決**（3 件未満で family か偶然の共通語か判定できない）:
+`murakumo-` 4、`sdk-` 3（後者は所有者でなく役割に読める）。捏造せず未決と記録。
+
+### 6. subject 面 = 残余。不透明名には第二の経路を義務づける
+
+bare 名は**最後に試す面であって既定ではない**。actor や service なのに
+bare な repo は、role prefix を省略した role 面の repo である。
+
+メタファ名（`kuro` 黒 = terminal model、`kobo` 工房 = workbench）は**許可する** —
+ADR-2606301000 が 7 案から意図して選んだ。許可しないのは**他の入口が無い**
+メタファ: 2026-08-03、両 repo は 34 日存在したのに「terminal は実装されて
+いるか」に「無い」と誤答した。名前が何も言わず、他の何も言わなかったからである。
+対策は改名ではなく第二の経路:
+
+1. README 冒頭が、メタファや経緯より先に、平明に何であるかを述べる
+2. 主題が `manifest/concept-vocabulary.edn` に登録され、
+   `concept-lookup.cljs` が英日どちらでも到達する
+
+### 7. 面をまたぐ同一主題は許容、同一面の同一主題は禁止
+
+`webrtc`（自作 lib）と `org-w3-webrtc-signaling`（仕様）は**両方正しい**。
+ADR-2607050900 が `ipns`/`did` の対を \"exemplary\" と呼んだのと同じ形で、
+条件は **README が最近接 repo との境界を述べること**。
+
+禁止は同一面の重複: `com-ros-robotics` + `com-ros2-nav` vs `org-ros` +
+`org-ros-urdf`、`com-w3c-specs` vs `org-w3-*` 40 件。
+
+## Implementation
+
+- `manifest/repository-rules.edn`（authority、schema は v1 のまま加算的）
+  - `:vocabulary/id :origin` / `:product-family` を追加
+  - `:name-prefix` に `capability-` rule を追加、`:prefix nil` を強化
+  - `:plane-order` / `:cross-plane-collision` / `:same-plane-collision`
+- `manifest/origin-domains.edn`（**新規、データ正本**）— repo → authority
+  ドメインのみ。**導出値は手で持たない**（手書きの導出値は必ず本体とずれる）
+- `scripts/verify-repository-roles.cljs --name-audit` — west 全件を 4 面に
+  分類し、origin 面を CONFORMANT / MISFILED / UNRESOLVABLE / UNVERIFIED に
+  採点。既存 `--prefix-audit` は無改変
+
+## Consequences
+
+### 測定結果（2026-08-04、workspace 4,078 repo）
+
+| | |
+|---|---:|
+| origin 面 | 1,432 |
+| うち conformant | 18 |
+| うち **misfiled** | **77** |
+| うち unresolvable | 4 |
+| うち **unverified** | **1,333** |
+
+**conformant=18 は「1,432 中 18 が正しい」ではない。「18 を検査して通った」
+である。** 77 の誤配置は*見たから*見つかった。同じ率を未検査分に当てれば
+遥かに多いと予測される — これは file を埋める論拠であって、この数を
+スコアとして扱う論拠ではない。
+
+### 検査器が私自身の誤りを捕まえた
+
+`com-bsi-standards` を「英国の標準化団体が com- にあるなら既に正しいはず」と
+思い込んで **anchor（既知の正解）として記録した**。anchor 検査が拒否した:
+BSI のドメインは bsigroup.com なので導出 prefix は `com-bsigroup` であり、
+**TLD は一度も疑わしくなかったのに 2 番目のラベルで誤配置していた**。
+「面は prefix 全体である」ことの実例として `:domains` 側に残してある。
+
+### 改名は主目的ではない
+
+77 件を一括改名しない。名前は discovery alias であり、改名は west pin と
+全参照を churn させる。規則が縛るのは**新規登録**で、既存の逸脱は
+**見えて日付が付いた状態**にする。例外的に改名の価値があるのは、適合済み
+family と正面衝突する 7 件（`com-w3c-specs` → org-w3、`com-ros-*` → org-ros、
+`com-iso-*` → org-iso、`com-openxr` → org-khronos、`com-posix` → org-ieee）。
+
+### 新たに見えたギャップ（捏造せず記録）
+
+- `:origin-domain-unverified` 1,333 — **名前からドメインを自動補完しない**。
+  それは検査対象の答えを仮定することであり、上の 77 件を黙って祝福していた
+- `:capability-declaration-missing` 56 — prefix は宣言されたが、どの契約を
+  主張するかを述べる `resources/repository-rules.edn` を 1 件も持たない
+- `:role-prefix-outside-every-declared-rule` 204 — `cloud-itonami-*` のうち
+  宣言済み role sub-prefix のどれにも当たらないもの（`cloud-itonami-app`、
+  `cloud-itonami-card-issuing`、`cloud-itonami-emi` 等）。fleet actor が
+  subject 面に落ちるのは誤りだが、分類は cloud-itonami 側の判断なので
+  推測せず記録する
+
+## Alternatives considered
+
+- **意味論的カテゴリ（gov- / int- を新設）** — 却下。オーナー指摘のとおり
+  出所規則であって分類ではない。カテゴリ化は判断を要し、検査を不可能にする
+- **77 件を一括改名** — 却下。identity は名前ではない（ADR-2607289500）
+- **名前からドメインを自動補完** — 却下。検査対象の答えを仮定する
+- **`--prefix-audit` を拡張** — 却下。あれは per-repo 宣言を検査する。名前の
+  面分類は宣言を読まないので別サブコマンドにした
+"}]

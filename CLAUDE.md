@@ -72,6 +72,48 @@ short name is taken (e.g. `kami-engine-guest`, `kami-mangaka-scene-author`).
 See ADR-2607102200 addendum 14. Historical GitHub redirects from old `*-clj`
 names remain; new west entries must use the new names only.
 
+## repo 名は 4 面を持ち、1 名につき 1 面だけ（repo-wide mandatory、2026-08-04、ADR-2608040100）
+
+**新しい repo に名前を付ける前に、次の順で「どの面か」を決める。**正本は
+`manifest/repository-rules.edn` の `:plane-order`、検査は
+`nbb --classpath ".:scripts/nbb_compat" scripts/verify-repository-roles.cljs --name-audit`。
+
+| 順 | 面 | 適用条件 | 形 |
+|---|---|---|---|
+| 1 | **origin** | 主題が他者の仕様・製品 | 出所の**登録可能ドメインのラベル逆順** + 主題 |
+| 2 | **role** | 実行役割が定まっている | `loop-` `skill-` `action-` `app-` `person-` `capability-` `cloud-itonami-*-` |
+| 3 | **family** | ここが所有する複数 repo の集合 | `kami-` `kotoba-` `kotobase-` `kura-` `kotodama-` |
+| 4 | **subject** | 上のいずれでもない再利用ライブラリ | bare 名 |
+
+**`com-` は「商用法人」という分類ではない — stripe.com を逆順にした結果**である
+（オーナー指摘 2026-08-04）。だから origin 面の名前を決めるのに判断は要らない:
+**出所の実ドメインを引けば prefix が導出される。**
+
+```
+ietf.org → org-ietf   (org-ietf-x509)      irs.gov  → gov-irs
+libp2p.io → io-libp2p (io-libp2p-specs-*)  icao.int → int-icao
+ipfs.tech → tech-ipfs (tech-ipfs-specs-*)  boj.or.jp → jp-or-boj
+```
+
+- **導出は一方向（domain → prefix）だけ。** 名前からドメインを逆算しない
+  （`com-yang-ming-api` は一意に分解できない）。
+- **TLD の値域は開いている。** 政府機関も条約機関も新カテゴリを要さない —
+  irs.gov / icao.int を逆順にすれば `gov-` / `int-` が自然に出る。
+- **ドメイン移転で改名しない**（登録時点で pin）。名前は discovery alias であって
+  identity ではない（identity は semantic definition CID、ADR-2607289500）。実例:
+  IPFS が ipfs.io → ipfs.tech に移り `io-ipfs` と `tech-ipfs-*` が併存 —**両方正しい**。
+- **面をまたぐ同一主題は可**（`webrtc` と `org-w3-webrtc-signaling`）。条件は
+  README が最近接 repo との境界を述べること。**同一面の同一主題は不可**。
+- **bare 名は最後の面であって既定ではない。** actor / service なのに bare な repo は、
+  role prefix を省略した role 面の repo。メタファ名（`kuro` `kobo` `byoubu`）は
+  許可するが、**README 冒頭の名乗り + `manifest/concept-vocabulary.edn` 登録**が要る
+  （名前が機能を示さない repo の入口を 2 本にする。2026-08-03 の誤答対策）。
+- **出所ドメインのデータ正本は `manifest/origin-domains.edn`**（repo → ドメインのみ。
+  導出値は手で持たない）。**記録が無い = UNVERIFIED であって CONFORMANT ではない** —
+  名前からドメインを補完しない（検査対象の答えを仮定することになる）。
+- 実測 2026-08-04: origin 面 1,432 のうち検査済み 99、うち **77 が誤配置**。一括改名は
+  しない（規則が縛るのは新規登録）。既存の逸脱は `:gaps` に日付付きで記録済み。
+
 ## 標準作業の常時許可（standing authorization）
 
 新規 project の scaffold → 登録フロー（ADR 起票 → 子リポ scaffold → GitHub repo
