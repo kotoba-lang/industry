@@ -3,14 +3,14 @@
   :adr/doc_type "adr"
   :adr/source-format "edn"
   :adr/authoritative true
-  :adr/status "proposed"
+  :adr/status "accepted"
   :adr/date "2026-08-04"
   :adr/last_verified "2026-08-04"
   :adr/deciders ["Jun Kawasaki"]
   :adr/title "ADR-2608040100: murakumo.cloud が日本で税込 30 万円以下で売れる GPU ノードは Arc Pro B60 24GB 1 枚だけ —— B65 は BOM が売価と同額、B70 と Dual B60 は枠に入らない"
   :adr/topic "murakumo-arc-b-series-node-under-300k-jpy"
   :adr/repos ["orgs/com-junkawasaki/root"
-              "orgs/gftdcojp/cloud-murakumo"
+              "orgs/network-awai/cloud-murakumo"
               "orgs/kotoba-lang/murakumo"]
 
   :adr/authoritative_for
@@ -18,7 +18,10 @@
    "Intel Arc Pro B60 / B65 / B70 / MAXSUN B60 Dual 48G の 2026-08-04 時点の国内実勢価格と、¥300,000 枠に対する可否判定"
    "同ティアのプラットフォーム選択（DDR4 を採る理由、Resizable BAR 必須、PCIe レーン要件、電源・筐体の下限）"
    "同ティアで実際に載る推論ワークロードの範囲と、載らないもの（70B 級・waste エンジンの K3 級 container）の明示"
-   "B65 と B70 のどちらが LLM デコード用途で正しいかという問いへの回答"]
+   "B65 と B70 のどちらが LLM デコード用途で正しいかという問いへの回答"
+   "murakumo.cloud の storefront における Node 24 の販売形態（SKU 追加で済ませ mise/kessai へ移さない、¥299,800・fleet 参加型・受注生産全額前払い・日本国内のみ）"
+   "物理出荷 hardware と ownership share hardware を型で分ける決定（:hardware/physical-shipment?）と、それぞれに掛かる義務の違い"
+   "特定商取引法の法定表示が揃うまで物理出荷 SKU の販売をコードで止めるという決定（commercial-disclosure-complete? を purchasable? に AND する）"]
 
   :adr/context
   "オーナーからの問い（2026-08-04）: 今の murakumo.cloud で、日本で 30 万円以下で販売できる GPU の構成を、Intel Arc B60 / B65 / B70 をベースに設計・調査せよ。
@@ -29,7 +32,7 @@
 - 既存 fleet は Mac mini M4 ×10（うち 5 台 down、llama/ollama のテキスト専用）と gad（AMD Strix Halo、comfy-render）。**x86 + 大容量 VRAM のノードが 1 台も無い。**
 - ADR-2608540000 の `:engine :waste`（trunk 常駐 + expert を disk からストリーム）は律速が RAM ではなく disk。ノードの NVMe 容量と seq read がそのままエンジン可否になる。
 - ADR-2607252300 の /gpu-market は 2026-07-25 時点で「新品保証つきの現実解は RTX 5060 Ti 16GB（¥111,000、~¥6,900/GB）、LLM 推論の実用ベストは中古 RTX 3090 24GB」と結論していた。**本 ADR はこの結論を更新する** —— Arc Pro B60 24GB が ¥5,700/GB の新品 2 年保証で買えるようになった。
-- ADR-2607122300 の順序（自家需要を先に固め、公開参加者拡大は後続）は覆さない。本 ADR は製品の設計であって、販売開始の GO ではない。
+- ADR-2607122300 の順序（自家需要を先に固め、公開参加者拡大は後続）は覆さない。本 ADR は当初「製品の設計であって販売開始の GO ではない」としていたが、同日オーナーが販売と Stripe 決済の実装を指示したため §8 まで進めた。**ただし実際の販売はまだ開いていない** —— 特商法の法定表示が揃うまでコードが購入を拒否する（§8）。
 
 ## 市況（この設計の支配的制約）
 
@@ -100,11 +103,9 @@ BIOS 必須設定: **Resizable BAR = Enabled、Above 4G Decoding = Enabled**。A
 
 > **¥300k のハコを売って儲かるのではない。¥300k のハコを原価で置かせてもらい、そこから継続的に取るのが murakumo の事業である。**
 
-したがって Node 24 は 2 つの売り方を持つ:
-- **買い切り ¥299,800** —— 純利 4.6%。ローカル推論が欲しいだけの顧客向け。fleet 参加は任意。
-- **fleet 参加型 ¥249,800**（原価割れ ¥1,051）—— 遊休時に murakumo fleet のリクエストを受ける契約とセット。ハードでは赤だが、ADR-2608039800 が言う「346 秒を秒に変える対価」を**顧客の電気代と設置場所で**供給できるようになる。ADR-2607122300 の Phase B（公開参加者拡大）の実体はこれである。
+**オーナー決定（2026-08-04）: 売価 ¥299,800 の fleet 参加型 1 本。** 検討時に併記した原価割れ ¥249,800 案は採らない —— ハードで赤字を出さずに fleet 容量を得る形になる。
 
-どちらを採るかはオーナー判断であり、本 ADR は両方を成立する構成として提示するに留める。
+ただしこの形の交換条件は明示しておく: **顧客は満額を払ったうえで、自分の電気代と設置場所で fleet に貢献する。** §6B ではこれを対価の無い製品機能として書き（収益分配を約束しない）、参加は任意・いつでも無効化可能・保証やサポートに影響しないとした。**参加を有利にする対価を将来置くなら、それは別契約である。**
 
 ## 4. 上位ティア —— B65 / B70 / Dual 48G の置き場所
 
@@ -144,7 +145,36 @@ B65 は国内流通が **Amazon.co.jp の ASRock 1 SKU のみ**で、価格.com 
 
 **載らない —— ここを曖昧にしない:**
 - **70B 級**。vLLM の公式構成は Llama-70B で 8 GPU、GPT-OSS-120B で 4 GPU（TP=4）。1 枚では扱えない。
-- **waste エンジンの K3 級 container**。ADR-2608540000 の Kimi K3 container は 982GB で、1TB NVMe には入らない。4TB Gen4 は ¥92,980 で ¥300k 枠に入らない。**Node 24 は waste エンジンのノードではない。** waste を回すなら 4TB 以上の SSD が要り、それは上位ティアの構成である。"
+- **waste エンジンの K3 級 container**。ADR-2608540000 の Kimi K3 container は 982GB で、1TB NVMe には入らない。4TB Gen4 は ¥92,980 で ¥300k 枠に入らない。**Node 24 は waste エンジンのノードではない。** waste を回すなら 4TB 以上の SSD が要り、それは上位ティアの構成である。
+
+## 8. murakumo.cloud での販売 —— 既存 storefront に SKU を足す（実装済み）
+
+オーナー決定（2026-08-04）: **売価 ¥299,800・fleet 参加型・受注生産全額前払い・販売事業者は AWAI Network, L.L.C.**
+
+**EC を新規に作らない。** murakumo.cloud には ADR-2607052200 の国別 storefront（`#store/<country>`、Stripe Checkout、`storefront.cljc` が価格の唯一の権威）が既に本番稼働しており、しかも `:kind :hardware` の SKU 系統（did 束縛・規約同意・`purchasable?` ゲート）まで揃っていた。**必要だったのは SKU 1 個の追加と、物販に固有の 4 つの欠落を埋めることだけ。**
+
+`kotoba-lang/mise`（catalog/cart/checkout/order/inventory の pure EC ライブラリ、11 src + 15 test）と `kotoba-lang/kessai`（rail 非依存の決済ポート）は**今回は使わない**。前者は IPaymentPort が mock のみで Stripe adapter が未実装、後者は ISO 8583 カード / ISO 20022 送金の**銀行 rail** 抽象であって、**Stripe Checkout（HTTP API + ホスト型 UI）はどちらの層でもない**。SKU 1 個のために稼働中の経路を捨てて未接続のライブラリへ移すのは、動いているものを壊す方向の変更になる。なお `cloud-itonami/omise` は店舗 EC ではなく actor migration scaffold で、名前が同じだけの別物。
+
+### 埋めた 4 つの欠落（既存 hardware SKU は物販でなかったので存在しなかった）
+
+既存の `:node-mac-mini` / `:node-gpu-l4` は *ownership share* —— 現物は Operator が fleet に置き、**買主には何も届かない**。Node 24 は現物が買主の住所に届くので性質が違う。`:hardware/physical-shipment?` で型として区別した（同じ `:kind :hardware` に混ぜたままだと、**片方にしか無い義務を両方に対して見落とす**）。
+
+1. **配送先を集めていなかった。** Stripe Checkout は `shipping_address_collection` を渡したときだけ住所を訊く。渡し忘れると**代金は取れたが送り先が無い注文**が成立する。物理 SKU にのみ住所 + 電話番号の収集を追加し、引渡時期を `custom_text` で決済ボタン直前にも出す。
+2. **決済されても何も記録されなかった。** `credits-topup-args` は hardware に対して意図的に nil を返す（credits を mint する話ではないので正しい）。結果 hardware の支払いは **webhook 上で完全に無作用**で、注文の存在は Stripe のダッシュボードにしか無かった。ownership share は手動履行なのでそれで成立していたが、物販では**住所が session 内にしか無く、取りに行かないと消える**。`hardware-order-args` を追加（Stripe が 2025 年に `shipping_details` を `collected_information` 配下へ移したので**両方の形を読む** —— 片方しか見ないと決済も webhook も 200 のまま住所だけ nil になる）。住所が取れなければ `:ship-to` は nil のままにし、空文字で埋めない（埋めると梱包直前まで気付けない）。
+3. **規約がこの商品に触れていなかった。** §6A は ownership share の話しかしておらず、送料・引渡時期・返品・輸入者・保証のどれも述べていない。§6B を新設し、terms-version を `2026-08-04` に進めた。§6B は **fleet 参加を対価の無い製品機能として明記**する（収益分配を約束しない）。
+4. **特定商取引法の表示が無かった。** `legal/tokushoho.md` を新設（`npm run prep` が `public/legal/` へ複製する既存規約と同じ経路に乗せた）。
+
+### 販売を止めているもの —— 事業者情報が未確定
+
+**特商法 11 条が要求する所在地・電話番号・代表者が、Operator 自身の `legal/company.md` で『Items requiring counsel/owner completion』として未解決**である。仮の値を置けば法定表示に虚偽を書くことになるので置かない。デラウェア州の登録代理人住所は送達用であって営業所ではないため代用もしない。
+
+代わりに `commercial-disclosure-complete?` を `purchasable?` に AND し、**この 3 項目が埋まるまで Node 24 は購入できない**（一覧に出ず、checkout も 409 で弾く）。plan の履行ゲート（`fulfillment-reachable?`）と同じ形で、**prose の申し送りではなくコードで止める** —— 2026-08-02 の『課金だけされて何も届かない』出荷を止められなかったのは prose だったからである。
+
+md 側の未確定マーカー数と `commercial-disclosure-missing` の件数を突き合わせるテストも置いた。**片方だけ直すと、合法なのに売れない / 売れるのに違法、のどちらかになる。**
+
+### 日本国内向けにのみ売る
+
+`:amounts {:jp 299800}` のみ（`unit-amount-for` が他国で nil を返し checkout が 400）。米国 LLC が国外へ転送販売する形は輸入者・関税・現地保証が未解決なので広げない。副作用として『全 SKU が全 country に価格を持つ』という暗黙の前提が崩れたので、一覧側にも `sold-in?` ガードを追加した —— 価格 nil のまま `format-money` に渡ると zero-decimal でない通貨（usd/eur）で落ち、**US/EU のストアページが SKU 1 個で壊れる**。"
 
   :adr/measurements
   ["GPU 国内実勢（価格.com / OLIOSPEC、観測日 2026-08-04、すべて税込）: SPARKLE Arc Pro B60 24GB Blower SBP60W-24G ¥136,800（PCSHOP Ark、掲載 4 店）/ ASRock Arc Pro B65 Creator 32GB ¥200,293（Amazon.co.jp、掲載 1 店）/ ASRock Arc Pro B70 Creator 32GB ¥233,654（Sofmap、掲載 3 店）/ MAXSUN Arc Pro B60 Dual 48G Turbo ¥298,000（OLIOSPEC 予価、取寄せ）"
