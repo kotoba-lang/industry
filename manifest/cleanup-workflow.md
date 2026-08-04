@@ -17,6 +17,49 @@ merge conflicts in this superproject and its `orgs/` child repos.
 - Keep failed `stash pop` entries. Git keeps the stash on failed pop; inspect it before applying manually.
 - **GitHub push alone is not registration.** Repos under `orgs/` that consumers resolve via `:local/root` (or that are intentional fleet members) must also appear in west (`repos.edn` `:extra-projects` + `gen-west-manifest.cljs --entry`). See skill `new-project-scaffold`.
 
+## west update first — inventory より前に必ず回す
+
+```bash
+git fetch origin && git merge --ff-only origin/main   # superproject を先に同期
+west update --fetch smart                             # 子リポを pin に合わせる（dirty は skip、exit 1）
+```
+
+理由は2つあり、どちらも実測（2026-08-04、オーナー指示でこの節を追加）に基づく。
+
+**1. 判定の前提が古いと結論が全部ずれる。** cleanup の中心的判定である content-containment は
+「branch の追加行が現 `origin/main` に存在するか」を見る。子リポの `origin/main` が fetch されて
+いなければこの判定は成立しない。実測: 6 リポの ahead を **pin 基準**で見ると abi +11 / bitcoin-node
++52 / kotoba +19 / kotobase +3 / kagitaba +1 / shell +5 に見えたが、各リポを fetch して
+**origin/main 基準**で測り直すと bitcoin-node は 0 ahead（pin が遅れていただけ）、残りも大半が
+既に着地済みで、本当に未着地だったのは kotoba の 2 ファイルだけだった。west update を先に
+回していなければ、着地済みの内容を PR にして `main` を巻き戻すところだった。
+
+**2. west update の skip 一覧そのものが cleanup の入力である。** west は dirty な project を
+破壊せず skip して exit 1 を返すので、その skip 集合が「ローカルにしか無い作業を持つ repo」の
+正確な母集団になる。実測（4,022 project、full history、約4時間）: **87 project が skip**、内訳は
+untracked 衝突 83 / tracked のローカル変更 17（13 は両方）。うち **69 project・70 ファイル**は
+incoming と byte-identical な掃き出しファイル（大半が `kotoba-lang/com-*` の
+`schema/<name>.kotoba-schema`）で、`shasum` 一致を確認して削除し再 update すれば解消した。
+残る **18 project** が本物のローカル作業だった。
+
+手順:
+
+1. superproject を `git fetch origin && git merge --ff-only origin/main`
+2. `west update --fetch smart`
+3. skip された project を untracked / localchg に分類。untracked は `git hash-object` と pin 側
+   blob hash の**一致を確認したものだけ**削除して再 update。localchg は触らず温存
+4. 個別リポを触る前に、**そのリポでも** `git fetch origin` して `origin/<default>` を最新化してから判定する
+
+**罠:**
+
+- west checkout は fetch refspec が `refs/west/*` のため `origin/<branch>` の remote-tracking ref
+  が無いことがある。branch の push 済み判定をローカル ref だけで行わず
+  `gh api repos/<slug>/branches/<branch>` で確認する（実測: kotobase の
+  `agent/persist-execution-identities` はローカルに ref が無く未 push に見えたが実際は push 済み）。
+- 巨大リポは長時間かかる。実測 `gftdcojp/apps-gftdcojp` 単体で約1時間（pack 5.4 GiB 受信後に
+  `git index-pack` が CPU 70% で delta 解決）。親の `git fetch` が 0% CPU に見えるので
+  **ハングと誤認しない**こと。
+
 ## UNLANDED inventory — which child repos still hold work that hasn't landed
 
 ```bash
@@ -124,9 +167,11 @@ crm missing from west and often from the local tree → fresh checkout breaks.
 
 ## Standard Cleanup
 
-1. Inventory each relevant repo:
+1. Inventory each relevant repo (**west update を先に回してから** — 上の「west update first」節):
 
    ```bash
+   git fetch origin && git merge --ff-only origin/main
+   west update --fetch smart
    git worktree list --porcelain
    git branch --show-current
    git stash list
