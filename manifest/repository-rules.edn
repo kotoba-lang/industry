@@ -524,17 +524,35 @@
                           "aozora-design-system -> app-aozora-design-system"
                           "aozora-engine -> app-aozora-engine"
                           "aozora-yoro-ui -> app-aozora-yoro-ui"]}
-    {:family "murakumo-" :count 5 :owner nil
+    ;; RENAMED 2026-08-05: the four suffixed members are now cloud-murakumo-*.
+    ;; The stem kotoba-lang/murakumo is NOT renamed -- cloud-murakumo would
+    ;; collide with network-awai/cloud-murakumo, turning the recorded 19
+    ;; cross-org duplicate names into 20.
+    {:family "cloud-murakumo-" :count 4 :owner nil
      :served-domain "murakumo.cloud" :implied-prefix "cloud-murakumo-"
      :hosts 2
-     :note "settles the :vocabulary/undecided entry — murakumo has a domain"}
-    {:family "dougaka-" :count 5 :owner nil
-     :served-domain "dougaka.gftd.ai" :implied-prefix "ai-gftd-dougaka-"
+     :stem-held "kotoba-lang/murakumo"}
+    ;; RENAMED 2026-08-05: all five are now ai-gftd-dougaka*.
+    {:family "ai-gftd-dougaka" :count 5 :owner nil
+     :served-domain "dougaka.gftd.ai" :implied-prefix "ai-gftd-dougaka"
      :hosts 1}
+    ;; CORRECTED 2026-08-05 (ADR-2608040200). --family-audit derived
+    ;; com-etzhayyim-bpmn- from the served host bpmn.etzhayyim.com. Wrong: all
+    ;; three repos implement BPMN 2.0, an OMG standard, and kotoba-lang/org-omg-bpmn
+    ;; already exists beside org-omg-cmmn / -dmn / -sysmlv2 / -uml. :plane-order
+    ;; puts origin ahead of family, so the authority is omg.org.
+    ;;
+    ;; The general lesson: SERVING a host does not make you the AUTHORITY for the
+    ;; subject. bpmn.etzhayyim.com is a deployment of BPMN tooling, not the
+    ;; publisher of the BPMN spec. One level up from ADR-2608040180's
+    ;; "resolving is not owning". --family-audit only sees served hosts, so its
+    ;; derivation must not be adopted where the subject has an external authority.
     {:family "bpmn-" :count 3 :owner nil
-     :served-domain "bpmn.etzhayyim.com" :implied-prefix "com-etzhayyim-bpmn-"
-     :hosts 1
-     :note "previously screened out as multi-org; it is served, so it is real"}
+     :served-host "bpmn.etzhayyim.com"
+     :authority "omg.org" :implied-prefix "org-omg-bpmn-"
+     :blocked-by "bpmn-engine-ts names itself -ts while its README says
+                  'BPMN 2.0 execution engine for Rust' -- resolve that first"
+     :hosts 1}
     {:family "kura-"     :count 6  :owner "kura"}
     {:family "kotodama-" :count 5  :owner "kotodama"}]
    ;; Owner directive 2026-08-05: family = reverse domain + subdomain. A family
@@ -937,6 +955,11 @@
    ;; ADR-2608040170 decided an existing family's form wins over the elision
    ;; rule, and whether that also covers these is the owner's call. The numbers
    ;; are here so it can be decided rather than guessed.
+   ;; 2026-08-05: aozora- (4), murakumo- (4), dougaka- (5) and open-seiyaku (1)
+   ;; are done. open- 9 is NOT a rename -- owner chose ISIC for the duplicates,
+   ;; so those merge and retire. bpmn- 3 is not com-etzhayyim-* at all; its
+   ;; authority is omg.org. What remains as a straight family rename is
+   ;; kotobase- 26, which the owner did not include.
    :gap/was 52
    :gap/families
    [{:family "kotobase-" :members 25 :implied "net-kotobase-"        :serves "kotobase.net"}
