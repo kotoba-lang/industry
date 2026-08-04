@@ -767,3 +767,24 @@
  :remaining ["template の content が別 fragment にならない（2 件、cross-repo な dom 概念が要る）+ 稀な 3 件"
              "vertical-align: top/bottom/middle（完成した行 box が要る）"
              "UA stylesheet の所在（ADR-2800003100、op 数実測済み、オーナー判断待ち）"]}
+
+{:at "2026-08-04"
+ :iteration 44
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 316}
+ :line-structure {:agree 300 :total 304 :pct 99}
+ :geometry {:boxes-agree 1172 :boxes-total 1229 :pct 95 :clean-cases 287}
+ :paint-order {:points-agree 7788 :points-total 7880 :pct 99 :clean-cases 294 :was "7718/7880 (98%), 279"}
+ :computed-style {:values-agree 14984 :values-total 17202 :pct 87}
+ :landed {:cssom "f3bcd13f4822741a68f926dd5ae6dc5e561a55f5 — paint order の矩形判定を半開区間に"}
+ :note "**私が paint order 軸を足したときに入れた欠陥。** 包含判定が遠端を含んでおり、
+        [0,400) の box が x=400 を含むと判定していたため、box の右端・下端にちょうど乗った
+        sample 点が全て不一致になっていた（そこでブラウザは case wrapper = none を返す）。
+        :page/header-nav-main で実測: 5 件の不一致は全て x=400 の列で、幾何は 10/10 一致。
+        **同じ『遠端を含む』誤りを同日に engine-lines の置換 box 判定でも見つけている**
+        （float 作業で hero-with-floated-image が harness の欠陥と判明した件）——
+        これはその複製で、軸を足した本人が入れた。"
+ :residual-now-real ["p -> none 23（overflow するテキストの上でブラウザは p を返すがエンジンは何も返さない）"
+                     "div -> p 9、div -> none 8、b -> p 5、input -> p 5、p -> b 5"]
+ :in-flight ["fieldset/legend + button の atomic inline + media-object（agent 作業中）"
+             "margin: 0 auto / direction: rtl / 負 margin / % 高さ / calc 幅（agent 作業中）"]}
