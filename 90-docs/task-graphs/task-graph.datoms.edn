@@ -105,11 +105,27 @@
   :task/workflow "torihiki-gap-closure"
   :task/title "engi.replica に resume を足し、chain/by-hash/voted/committed/qcs を有界な tail から再開できるようにする"
   :task/kind "consensus"
-  :task/repo "kotoba-lang/engi"
+  :task/repo "kotoba-lang/inga"
   :task/requires ["S1-torihiki-snapshot"]
   :task/external-gate false
+  :task/status :started
+  :task/status-at "2026-08-04"
+  :task/status-note "**対象リポは engi ではなく inga。** loop 1 周目に engi を開いて replica.cljc が無いことで判明した: コンセンサス層は 2026-08-03 に kotoba-lang/inga へ移った（engi 1f83b16「Move the consensus layer to kotoba-lang/inga」/ ADR-2608038000 D1）。engi.{consensus,quorum,pacemaker,replica,sync,wire,net,attest,stake,parity} は inga.* になっている。engi 側の理由は自分の docstring —— どちらかのアプリを import する consensus 層は『ちょうど 1 アプリのための consensus 層』になる。
+
+  実装で決めたこと（次の周はここから）: (a) `commits` は `(count (:committed state))` で既済を数えており chain の truncate と両立しないので、**height 比較に変える**（`three-chain-commits` の結果から `committed-height` 超のものだけ取る）。これは truncate 抜きでも正しい定式化。(b) `:voted` は watermark `:voted-below` を足し、`(voted? state h)` = `(or (<= h below) (contains? voted h))` にする。**多めに『投票済み』とみなす方向は fail-closed で二重投票しない**が、replica.cljc:457 の『同じ height の proposal が再来したら記録済みの vote を再送する』経路は `:votes` の実体に依存するので、watermark 由来で true になったときに安全に劣化することを確かめる。(c) `:chain` / `:by-hash` は末尾 K 件（K>=8、three-chain-commits は 3 件要る）。`ancestor?` は by-hash が切れたら false を返す＝投票を拒否する fail-closed。(d) `:votes` / `:new-views` / `:first-vote` は resume で捨てる（古い height の equivocation 証拠を失うことは明記する）。
+
+  **テストを先に書く**: resume 後に同じ height で二度投票しないこと。境界を 1 つ間違えると、このシステムが唯一 slash する行為を事故で自分に犯す。"}
+
+ {:db/id -15
+  :task/id "S2b-node-engi-to-inga"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "torihiki-node を移動前 engi から inga に載せ替える"
+  :task/kind "dependency"
+  :task/repo "kotoba-lang/torihiki-node"
+  :task/requires ["S2-engi-resume"]
+  :task/external-gate false
   :task/status :pending
-  :task/status-note "machine state だけ snapshot しても engi の畳み込みが O(chain) のまま残る。**:voted（この replica が投票した height の集合）の有界化が投票安全性そのもの** —— watermark の境界を 1 つ間違えると同じ height で二度投票し、このシステムが唯一 slash する行為を事故で自分に犯す。resume 後に二重投票しないことのテストを先に書くこと。"}
+  :task/status-note "loop 1 周目に判明した新しい gap。**deployed validator は engi@d9c531bd（コンセンサス層が inga へ移る前の commit）を pin している。** その sha は main の祖先だが、main にはもう replica.cljc が無い —— つまり本番は『もう存在しない場所のコード』で動いている。S2 の resume は inga に入るので、node がそこへ移らない限り届かない。ns も engi.* から inga.* へ、block の属性名も :engi.block/* から :inga.block/* へ変わる点に注意。"}
 
  {:db/id -9
   :task/id "S3-validator-snapshot-boot"
@@ -117,7 +133,7 @@
   :task/title "validator の boot を snapshot + tail replay にし、checkpoint を定期保存する"
   :task/kind "deployment"
   :task/repo "kotoba-lang/torihiki-node"
-  :task/requires ["S2-engi-resume"]
+  :task/requires ["S2b-node-engi-to-inga"]
   :task/external-gate false
   :task/status :pending
   :task/status-note "ADR-2608040400 の未了節。catchUp のページ分割は障害を遅い起動に変えただけで O(chain) は残っている。deploy 後は /head の code-version で実際に走っているか確認する（Durable Object は deploy を自動では拾わない）。"}
