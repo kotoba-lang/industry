@@ -1032,7 +1032,20 @@
    ;; `:icp/product` は BMC の product id と同形。`:icp/coverage*` を持つ entity を
    ;; 1 件持ち、ICP の述語のうちデータ面が評価**できない**ものを申告する —— target
    ;; list を「ICP 適合企業」と読み違えさせないため、その申告を query 側から読めることが要る。
-   ["gtm-icp" (io/file root "90-docs" "business" "gtm-icp.datoms.edn")]])
+   ["gtm-icp" (io/file root "90-docs" "business" "gtm-icp.datoms.edn")]
+   ;; itonami-maturity — cloud-itonami 全 repo の成熟度スコア + 依存伝播 + leverage
+   ;; 順位 + XMILE 戦略シミュレーション（生成物。ADR-2608052000）。`:repo/path` が
+   ;; repo-taxonomy の `:repo/path` と同形なので join できる。3 種類の entity が
+   ;; 混在する: repo 1 件ごとの行（`:maturity/own-bp` を持つ）/ `:summary/kind
+   ;; "fleet-summary"` 1 件 / `:sim/strategy`・`:sweep/w-substrate` の模型出力。
+   ;;
+   ;; **測定値と模型値を混ぜて読まないこと。** `:maturity/axis-*` は観測から直接、
+   ;; `:maturity/own-bp` は観測 × 重み（重みは判断で、`:model/weights` に載っている）、
+   ;; `:maturity/effective`・`:leverage/*` は依存伝播モデルの出力（`:model/alpha`
+   ;; 依存）、`:sim/*` は XMILE RK4 の軌道（`:model/work-rate` は scenario）。
+   ;; fleet-summary は未 checkout / tombstone repo 数も申告する —— スコアが付いて
+   ;; いないことが「悪い」ではなく「測っていない/対象外」であるため。
+   ["itonami-maturity" (io/file root "90-docs" "system-dynamics" "itonami-maturity.datoms.edn")]])
 
 (defn index-entities [next-tempid!]
   (let [skipped (atom [])
