@@ -206,7 +206,15 @@
   "kotoba-lang/com-pix-brazil"         "bcb.gov.br"
   "kotoba-lang/com-scaleai"            "scale.com"
   "kotoba-lang/com-tensorrt"           "nvidia.com"
-  "kotoba-lang/com-zendesksell"        "zendesk.com"}
+  "kotoba-lang/com-zendesksell"        "zendesk.com"
+
+  ;; 2026-08-04 追加（ADR-2608041500、電柱広告の在庫候補ソース）
+  ;; Mapillary の API host は graph.mapillary.com だが、記録するのは登録可能
+  ;; ドメインなので mapillary.com。Overpass API の公開エンドポイントは
+  ;; overpass-api.de で運用されるが、タグ体系（power=pole / man_made=utility_pole）と
+  ;; データの authority は OSM 側にあるので openstreetmap.org を記録する。
+  "kotoba-lang/com-mapillary-graph-api" "mapillary.com"
+  "kotoba-lang/org-openstreetmap-overpass" "openstreetmap.org"}
 
  ;; ── unresolvable ───────────────────────────────────────────────────────
  ;; Names that carry an origin prefix but have no single authority domain to

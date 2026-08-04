@@ -1147,6 +1147,38 @@
           (assoc e :db/id (next-tempid!) :source/dataset "kakekomi")))
       [])))
 
+;; denchu-inventory (kotoba-lang/loop-denchu-survey) — 電柱広告の在庫候補台帳。
+;; survey が area ごとに `denchu-inventory-<area>.datoms.edn` を、代理店/面種別の
+;; 静的カタログを `denchu-catalog.datoms.edn` を書く（どちらも生成物）。
+;;
+;; 面をまたぐ結合キー:
+;;   :pole/owner (文字列 "tepco-pg") ↔ :agency/sells-poles-of（文字列の vector）
+;;   :agency/id  ↔ denchu.order が組む問い合わせの宛先
+;; datascript.js は :db.type/ref を解決しないので、ここも値一致で join する
+;; （lei-tos / yabai / kakekomi と同型）。
+;;
+;; **この台帳は網羅していない。** survey した area の中しか見ていないので、
+;; `:denchu.coverage/*` entity を必ず一緒に読むこと —— 柱を数えて「日本の N%」と
+;; 読むと誤る。`:pole/ad-eligible` は全件 "unknown" で、幾何情報からは決して
+;; 動かない（所有者/代理店の回答だけが動かせる）。
+
+(defn denchu-inventory-entities [next-tempid!]
+  (let [dir (io/file root "orgs" "kotoba-lang" "loop-denchu-survey" "data")]
+    (if (.exists dir)
+      (let [skipped (atom [])
+            es (->> (file-seq dir)
+                    (filter #(str/ends-with? (str %) ".datoms.edn"))
+                    (sort-by str)
+                    (mapcat (fn [f]
+                              (let [rows (vector-of-maps-entities f)]
+                                (when-not (seq rows) (swap! skipped conj (str f)))
+                                (map #(assoc % :source/file (str f)) (or rows []))))))]
+        (warn-skipped! "denchu-inventory data/*.datoms.edn" @skipped)
+        (when (empty? es) (warn-skipped! "denchu-inventory" [dir]))
+        (for [e es]
+          (assoc e :db/id (next-tempid!) :source/dataset "denchu-inventory")))
+      [])))
+
 ;; ---------- 因縁 dependency record（category N。ADR-2607258500） ----------
 ;; kotoba-lang/loop-innen の corpus/*.edn（+ resources/*-corpus.edn）。
 ;; entity 間の**依存エッジ**を持つ唯一の corpus — この面には従来「entity の台帳」
@@ -1489,6 +1521,7 @@
         patent-tx (toshokan-patents-entities next-tempid!)
         innen-tx (innen-entities next-tempid!)
         awai-tx (awai-yakuwari-entities next-tempid!)
+        denchu-tx (denchu-inventory-entities next-tempid!)
         all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
                                                      biz-tx canvas-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
@@ -1497,7 +1530,7 @@
                                                      working-doc-tx narrative-tx
                                                      company-tx property-tx relationship-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx innen-tx
-                                                     awai-tx kakekomi-tx index-tx)))]
+                                                     awai-tx kakekomi-tx denchu-tx index-tx)))]
     (.transact ds conn all-tx)
     {:conn conn
      :adr-count (count adr-tx)
@@ -1521,6 +1554,7 @@
      :patent-count (count patent-tx)
      :innen-count (count innen-tx)
      :awai-yakuwari-count (count awai-tx)
+     :denchu-inventory-count (count denchu-tx)
      :index-count (count index-tx)}))
 
 ;; ---------- MCP mode（常駐して JSON-RPC で答える） ----------

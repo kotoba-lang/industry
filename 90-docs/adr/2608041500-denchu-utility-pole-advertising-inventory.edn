@@ -1,0 +1,170 @@
+[{:db/id -1
+  :adr/id "2608041500"
+  :adr/date "2026-08-04"
+  :adr/status :accepted
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/title "電柱広告（denchu）— 在庫候補を写真/地図から起こし、窓口・料金・出稿を governed に扱う 4 repo"
+  :adr/related ["2607093500-adnet-first-party-ad-network"
+                "2608040100-origin-plane-is-reverse-dns-of-the-real-domain"
+                "2608039980-concept-index-name-to-function"
+                "2607252000-cross-repo-datom-plane"
+                "2607220100-skill-action-loop-system-dynamics-scaffold"]
+
+  :adr/gap
+  "2026-08-04、オーナー問い『今の cloud-itonami に電柱広告として電柱の一覧、企業、
+問い合わせ先、価格、出稿などは設計実装されているか。edn / DataLad / kotobase
+datomic query 可能な状態としてデータ収集はされているか』。
+
+実測して答えは全部 no だった:
+- workspace 全体 grep `電柱` = 6 件、全て無関係（ghosthacker マンガ本文、UNSPSC 分類表）
+- `orgs/cloud-itonami/` 全体 grep `広告 / 屋外広告 / OOH / out-of-home / utility pole` = 0 件
+- concept 索引にも surface 索引にも該当なし
+- datom 面（manifest/edn-query.cljs）に広告在庫・媒体・料金の dataset は無し
+- `cloud-itonami-lei-*` blueprint 185 件のうち `:company/contact-email` は 5 件、
+  `:company/inquiry-form-url` は 2 件 —— 問い合わせ先は事実上未収集
+
+一方、隣接する実装は厚かった: network-awai/cloud-itonami の adnetwork 群
+（adnetwork.cljc 648行 / adnetwork_providers.cljc 846行 = 49 の**デジタル**媒体
+ネットワーク / onboarding ステートマシン / fail-closed policy / 人口加重
+カバレッジ）、cloud-itonami/adserver + kotoba-lang/adnet（自前配信）、
+cloud-itonami-isic-7310（広告代理店業のコンプライアンス actor）。
+`advertising_facts/ad-channels` には `:real`（offline/physical placements,
+e.g. digital signage）という enum 値が既にあったが、**対応する provider も
+在庫も価格も無く、enum の値が 1 個あるだけ**だった。"
+
+  :adr/decision
+  "電柱広告を、既存のデジタル広告面に混ぜず、4 つの repo として起こす。
+
+1. `kotoba-lang/denchu` — 純 .cljc ドメインライブラリ（subject 面、bare 名）。
+   denchu.pole（観測の束ね・identity・信頼度）/ slot（巻付・袖の面）/
+   media（所有者→指定代理店と問い合わせ先）/ pricing（参考見積）/
+   facts（屋外広告物法・道路占用の管轄別カタログ）/ order（出稿ステートマシン
+   + governor 判定）/ datoms（datom 面への射影）。
+
+2. `kotoba-lang/org-openstreetmap-overpass` — origin 面（openstreetmap.org）。
+   Overpass QL 組み立てと応答正規化。**鍵なしで今日引ける唯一の広域ソース。**
+
+3. `kotoba-lang/com-mapillary-graph-api` — origin 面（mapillary.com）。
+   Graph API v4。写真検出（map_features）から柱を特定する経路。bbox 0.01 度
+   制約に対する決定論的タイル分割、token は env からのみ。
+
+4. `kotoba-lang/loop-denchu-survey` — loop 面（continuous orchestrator）。
+   observe → evaluate → decide → act → record-evidence。domain truth を持たず
+   上記 3 つに委譲する。出力は datom 面に載る *.datoms.edn + 証跡 EDN。
+
+datom 面には `:source/dataset \"denchu-inventory\"` として登録した
+（manifest/edn-query.cljs の `denchu-inventory-entities`）。結合キーは
+`:pole/owner` ↔ `:agency/sells-poles-of`、`:agency/id`。datascript.js は
+:db.type/ref を解決しないので値一致で join する（lei-tos / yabai / kakekomi と同型）。"
+
+  :adr/invariants
+  "この領域は『在庫があるように見せる』誘惑が構造的に強いので、嘘を書けない
+形にした。実装済みの不変条件:
+
+1. **空き在庫数を推定する関数を持たない。** 日本の電柱広告は open inventory では
+   なく、柱は電力/通信会社の設備で、販売は所有者の指定代理店経由でしか行われない。
+   1 本の柱に何面掛かっているかを知っているのは所有者と代理店だけ。
+   `denchu.slot/candidate-slots` は全面 `:availability :unknown` を返し、そこから
+   出る唯一の経路 `apply-agency-answer` は回答元（`:answer/source`）を必須にする。
+2. **`:pole/ad-eligible` は全件 :unknown から始まる。** OSM にも Mapillary にも
+   『この柱に広告を出せるか』は書かれていない。幾何情報から掲出可否を導かない。
+3. **所有者を推測しない。** `operator` 相当のタグに実社名がある時だけ決まる。
+   地域からの補完をしない。
+4. **価格は常に `:quote/confidence :indicative`。** 地域区分が未指定なら
+   `:quote/total nil` と `:quote/unknowns` を返し、平均や中央値で埋めない。
+5. **`:agency-confirmed` より前に実額は存在しない。** 見積を実額として扱う遷移は
+   governor が弾く。
+6. **読めなかった件数を必ず返す**（`:unclassified`）。『柱が無い』と『柱を読め
+   なかった』が区別できなくなるため。
+7. **閾値未満の柱を消さない。** id を evidence に残す（消すと『調べた結果いなかった』
+   に化ける）。
+8. **カバレッジ entity を必ず 1 件出す。** survey した area の外に柱が無いのでは
+   なく、見ていない。"
+
+  :adr/evidence
+  "実データ収集（2026-08-04、OSM Overpass、認証不要）:
+
+| area | 管轄 | 観測 | 柱 | 所有者判明 | 窓口到達可 |
+|---|---|---|---|---|---|
+| chiyoda-marunouchi | JP-13 | 0 | 0 | 0 | 0 |
+| setagaya | JP-13 | 8 | 5 | 0 | 0 |
+| kyoto-nakagyo | JP-26 | 55 | 55 | 0 | 0 |
+| sapporo-chuo | JP-01 | 205 | 201 | 0 | 0 |
+| 計 | | 268 | 261 | 0 | 0 |
+
+datom 面での確認（`manifest/edn-query.cljs q`）:
+- `[?e \"source/dataset\" \"denchu-inventory\"] [?e \"pole/id\" ?p] [?e \"pole/owner\" ?o]`
+  → `[[\"unknown\" 261]]`
+- coverage entity 4 件が area ごとの実数を申告
+- 代理店カタログ 8 社が legal-name + source-url 付きで引ける
+
+**この結果の右 2 列が 0 であることが、この ADR が明らかにした最大のギャップ。**
+OSM に柱はマッピングされていても `operator` タグはほぼ付いていないので所有者が
+決まらず、したがって申込先も決まらない。設計が所有者を推測しない以上、これは
+黙って埋まらず `:pole/owner \"unknown\"` / `:pole/routable false` として台帳に出る。
+丸の内 0 件も実測値であって障害ではない（無電柱化 + 中心部の柱マッピングが薄い）。
+
+テスト: denchu 34 tests / 120 assertions、overpass 8 / 27、mapillary 8 / 32、
+loop 5 / 18。すべて nbb（ClojureScript）で green。JVM は使っていない。
+
+外部事実の出典（すべて 2026-08-04 に実ページで確認）:
+- Mapillary Graph API v4: host graph.mapillary.com、認証必須、bbox < 0.01 度、
+  limit 2000、object_values フィルタ。taxonomy 実文字列
+  `object--support--utility-pole` / `object--support--pole` / `object--street-light` /
+  `object--banner` / `object--sign--advertisement`
+- 東電タウンプランニング（東電PG柱）: 月々2,640円（税込）〜、地域により異なる、
+  TEL 03-6371-8111（月〜金 9:00-17:00）、https://www.ttplan.co.jp/service/ad_pole/
+- テルウェル東日本 東関東支店（NTT東柱・千葉）: 袖広告/巻広告の 2 タイプ、
+  月額 A2,800/B2,600/C2,400/D2,200/E2,000 円（税抜、2025-06-01 改定）、
+  製作費 15,000 円（税抜、取付含む）、https://www.telwel-east.co.jp/denchu-koukoku/fee/
+- 法令: 屋外広告物法 + 各自治体の屋外広告物条例が許可主体、道路上空へ突出する
+  形態は道路法の道路占用許可が別途。多くの条例が電柱への貼り紙・貼り札・広告旗を
+  禁止物件として列挙するが、これは無断の貼付物への規制であり、所有者許諾と条例
+  許可を経た巻付/袖看板とは別扱い —— 『電柱広告は条例で禁止』と要約しない。"
+
+  :adr/alternatives
+  "1. **cloud-itonami の adnetwork_providers に電柱代理店を足す** — 却下。あの
+   カタログは API/MCP で叩ける媒体ネットワークの routing 契約（required-read-tools
+   に campaigns.list / metrics.report を要求する）で、電柱代理店は API を持たず
+   問い合わせ・申込ベース。同じ型に押し込むと『API がある』という嘘になる。
+   代わりに denchu 側で `:execution :inquiry` として別に扱う。
+
+2. **`.kotoba` で書く** — 現時点では不可。柱 → 観測列 → タグ map という入れ子の
+   値が要り、recursive logical values は migration plan の W4 待ち（現在地であって
+   到達目標ではない）。第一 runtime は ClojureScript / nbb とし、JVM は使わない。
+
+3. **Mapillary だけで起こす** — 却下しないが第一手にしない。token が要るうえ、
+   検出は自動抽出なので人手マッピングの OSM より基礎信頼度を低く置いた
+   （0.50 vs 0.60）。2 source 一致に +0.30 を与える設計にして、両方を使ったときに
+   一番強くなるようにした。
+
+4. **在庫の空きを推定する** — 明確に却下。推定した空き数は必ず『在庫がある』と
+   いう嘘になる。この repo 群が持たないと決めた唯一の機能。"
+
+  :adr/next
+  "1. **所有者の解決が最優先**（261 本すべて unknown = 出稿導線がまだ 1 本も通らない）。
+   電力会社の柱には番号札が付くので、Mapillary の /images + detections から
+   柱番号札を読む経路が本命。MAPILLARY_ACCESS_TOKEN の取得が前提。
+2. `--sources both` の実走（2 source 一致で信頼度 +0.30）。
+3. cloud-itonami 側に `denchu_ops` を足し、`advertising_facts/ad-channels` の
+   `:real` チャネルに初めて実体を与える（propose→govern→commit、
+   `:inquiry-sent` は `:external-send` risk として承認キュー経由）。
+4. 代理店窓口のカバレッジ拡大（所有者 12 件中 5 件のみ収録。未収録は
+   東北 / 中国 / 四国 / 九州 / 北海道 / 北陸 / 沖縄）。
+5. area の拡大。現在 4 area のみ。大規模化したら shard を DataLad/B2 へ
+   （skill large-binary-datalad）。"
+
+  :adr/body
+  "詳細は各 repo の README を正本とする:
+- kotoba-lang/denchu — 何を持たないかの一覧と法令構造
+- kotoba-lang/org-openstreetmap-overpass — OSM タグと節度ある利用
+- kotoba-lang/com-mapillary-graph-api — API 制約と taxonomy 実文字列
+- kotoba-lang/loop-denchu-survey — 実走手順と初回実測表
+
+datom 面のクエリ例（datascript.js の節順序に注意 —— 定数値の clause を先頭に
+置くと束縛が効かないことがある。属性 clause から書く）:
+
+  nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+    '[:find ?name ?url :where [?a \"agency/legal-name\" ?name]
+      [?a \"agency/source-url\" ?url] [?a \"source/dataset\" \"denchu-inventory\"]]'"}]
