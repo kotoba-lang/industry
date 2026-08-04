@@ -210,8 +210,19 @@
   :task/repo "kotoba-lang/inga"
   :task/requires []
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "**S2 の bounded resume が持ち込んだ代償。自分で入れた。** `handle-sync-request` は in-memory の `(:chain state)` から答えるが、`resume` はその chain を末尾 resume-tail(8) 件に切り詰める。だから checkpoint から起動した replica は**自分より古いブロックを一切出せない**。
+  :task/status :completed
+  :task/status-at "2026-08-04"
+  :task/status-note "**本番で『提供された』ことを観測して完了。** torihiki-node e383f00（code-version 85、deploy 済み）/ inga 0ca106b。
+
+  証拠: reset した replica の `last-sync-outcome` が `{offered 256, from 1, to 256, ...}` —— **ストレージから 256 ブロックが提供された**。修正前は同じ状況で応答が全部空だった（sync-response を 115 件受けて height 0 のまま）。受信側の seen-types も sync-response 1433 件。
+
+  設計: **I/O は node の仕事**という既存の分離に従い、node が `:sync-request` を `on-message` の手前で捕まえて自分の DO storage の `blk:` キーから答える（`inga.sync` の `:max-batch` で上限。メモリ経路が掛けていたのと同じ cap）。`inga` 側はコードを変えず docstring で罠を明記した —— **空の応答はエラーを出さず無言で網を止める**ので、次に `resume` を使う host が同じ 1 時間を使わないため。
+
+  **診断の途中で自分が間違えた点を記録しておく**: 数周にわたって `/head` の `last-sync` を読んで『応答が処理されていない』と判断していたが、**そのフィールドは存在しない**（本物は `last-sync-outcome`）。無いキーは null を返すので、観測が無効であることに気付けなかった。キーの綴りを確かめる前に結論を出さない。
+
+  **rejoin 自体はまだ成立しない。** 拒否理由は `below-quorum` で、これは別の規則の問題なので S12 として起票した。
+
+  元の起票内容: **S2 の bounded resume が持ち込んだ代償。自分で入れた。** `handle-sync-request` は in-memory の `(:chain state)` から答えるが、`resume` はその chain を末尾 resume-tail(8) 件に切り詰める。だから checkpoint から起動した replica は**自分より古いブロックを一切出せない**。
 
   本番実測（S10 の検証中）: height 0 に /reset した w4 が sync-request を 49 件送り、peer は sync-response を 115〜139 件返しているのに、w4 は height 0 のまま `last-sync` が null —— 応答が空だから何も adopt されない。**要求が届いても、答えられる者がいない。**
 
@@ -220,6 +231,27 @@
   直す方向: replica に『高さ範囲でブロックを取る』seam を注入する（hash-fn / sign-fn / machine と同じ形）。node はそれを storage 読み出しで実装する。**テストは『bounded resume した replica が、自分の chain より古い範囲の sync-request に答えられること』**。
 
   優先度: これが無いと 1 台落ちた network は二度と 4/4 に戻らず、quorum 3 に対し稼働 3 の余裕ゼロで回り続ける（実測でその状態になり、devnet を wipe して 4/4 に戻した）。"}
+
+ {:db/id -19
+  :task/id "S12-sync-refuses-a-segment-that-starts-at-genesis"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "genesis から始まる segment を sync が拒否する — 0 に戻った replica は二度と戻れない"
+  :task/kind "consensus"
+  :task/repo "kotoba-lang/inga"
+  :task/requires []
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "S11 の検証で本番から取れた診断（reset した w4 の `last-sync-outcome`）:
+
+      {offered 256, from 1, to 256, adopted 0, reason :below-quorum,
+       detail {witnesses [\"w2\"], sigs [], qc-view 0, qc-height 0,
+               attest-says \"unsigned\", per-witness {}}}
+
+  ブロックは 256 件ちゃんと届いている（S11 で直った）。拒否しているのは `inga.sync` の規則で、**segment の各ブロックが自分の親への quorum 証明書を持つこと**を要求する。ところが **height 1 のブロックの親は genesis で、genesis には証明書が無い**（qc-height 0 / attest-says unsigned）。segment は部分採用せず**丸ごと**拒否される仕様（『悪い segment の正しい前半を採ると、peer にこちらの履歴がどこで終わるかを選ばせることになる』）なので、`from 1` の要求は原理的に必ず失敗する。
+
+  つまり **height 0 に戻った replica は sync では二度と復帰できない**。/reset の docstring が『peer に足りない分を尋ねて再参加するはず』と書いているのは、この規則と噛み合っていない。
+
+  直す方向: `inga.replica/propose` は既に同じ例外を持っている —— 『genesis には証明書が無いので、height 1 の leader は propose の QC 要件を満たせない。ここが証明書なしにブロックが提案される唯一の場所』。`inga.sync` にも同じ genesis 例外を入れる。**テストは『genesis から始まる segment を採用できること』と『genesis 以外で証明書を欠く segment は依然として丸ごと拒否されること』の両方**。後者を落とすと、この規則が守っているものを失う。"}
 
  {:db/id -16
   :task/id "S9-quadratic-replay"
