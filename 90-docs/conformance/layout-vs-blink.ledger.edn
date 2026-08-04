@@ -525,3 +525,33 @@
              "out-of-flow の静的位置と relative inline の包含ブロック（上記、原因特定済み）"
              "fixed がフローから抜けない、button の nested inline、media-object"
              "cascade の UA stylesheet 所在（構造的）"]}
+
+{:at "2026-08-04"
+ :iteration 39
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 313 :was 299 :added 14 :area "grid"}
+ :line-structure {:agree 289 :total 301 :pct 96 :was "271/287 (94%)"}
+ :geometry {:boxes-agree 1086 :boxes-total 1214 :pct 89 :clean-cases 256 :was "1015/1164 (87%), 234"}
+ :paint-order {:points-agree 7539 :points-total 7805 :pct 97 :clean-cases 265}
+ :computed-style {:values-agree 14782 :values-total 16964 :pct 87}
+ :landed {:cssom "21e2ad01159e38d851d1d136ff5fa7462af1598e — grid の auto トラック / auto-flow: column / gap longhand / justify-items / inline-grid"}
+ :note "grid 群 **37/37（136/136 box）**。per-case 幾何で **22 改善・0 退行**。
+        実装前に Brave で 3 ラウンド・72 形を probe している。"
+ :findings ["**auto トラックの余りは比例配分ではなく均等配分。** 400px で `short` / `a much longer cell` は
+             148.156 / 251.844 = 各トラックの max-content + 213px の余りの半分。比例なら 85/315 で、
+             **どちらも合計 400 になる**ので『コンテナを満たすか』の検査では区別できない。
+             実測しなければ通ってしまう類の誤り。"
+            "**fr があると stretch 段が抑止される。** `auto 1fr` は auto を max-content 41.625 のまま残すが、
+             `auto 100px` は 300 まで伸ばす。"
+            "auto-flow: column は placement 要求を転置して入れ、結果を転置して戻す —— 配置エンジンは 1 つ。"
+            "**row が確定している item が auto 配置カーソルを動かしていた**（CSS Grid §8.5 の step 4 は
+             column 確定または完全 auto の item しか見ない）。:grid/explicit-row-placement の原因。"
+            "inline-grid は layout-grid に shrink-to-fit 枝（トラックの max-content 合計 + gap）を
+             与えてから admit した —— flex agent が『shrink-to-fit が無いから入れない』と留保した
+             理由を解消してから入れており、単に違う挙動にしたのではない。"]
+ :remaining ["justify-content / align-content（コンテナ側）は未実装。node-style が :justify-content を
+              \"flex-start\" 既定にするため、著者の start と既定を区別できず『半分だけ実装』は
+              無実装より悪くなるという判断で見送り —— 実測付きで記録済み。"
+             "row flow での暗黙 column 生成、span する item の intrinsic 寄与、
+              min-content/max-content/fit-content() キーワード、gap と longhand の宣言順"
+             "display 型 + table（agent 作業中）、out-of-flow の静的位置と relative inline（原因特定済み）"]}
