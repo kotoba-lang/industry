@@ -82,6 +82,16 @@ org 全体の原則ではなかった。続く問い:「綺麗にするなら、
 機械検査できる。新カテゴリは 1 つも要らなかった — `gov-` も `int-` も
 irs.gov / icao.int を逆順にした結果として自然に現れる。
 
+> **訂正（2026-08-05、ADR-2608040160）**: 「ドメインを引かなかった」は
+> `com-*` 1,054 件のうち 1,026 件については歴史的に誤り。それらは
+> ADR-2607041500（accepted）の 1 回の機械的移行で生成されており、同 ADR は
+> *\"com- prefix chosen unconditionally ... rather than per-vendor-accurate
+> reverse-DNS TLD, which is out of scope for a 1,027-item mechanical pass\"*
+> と明記している。**引かなかったのではなく、正解を認識した上で scope 外として
+> 明示的に延期された。** したがって誤配置は 94 個の不注意ではなく、
+> **1 個の決定が 1,026 回適用された結果**であり、本 ADR の origin 規則は
+> その延期を解除するものとして位置づく。機械検査可能という結論は変わらない。
+
 ## Decision
 
 ### 1. repo 名は 4 面を持ち、1 名につき 1 面だけを担う
