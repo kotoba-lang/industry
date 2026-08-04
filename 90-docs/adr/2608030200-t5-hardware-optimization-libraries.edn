@@ -1538,4 +1538,54 @@ zero-seek device では floor ではなく **`nil`** を返す——既定 gap �
 **教訓 21: bound に名前を付けたら、その bound を作る。** 「別の天井がある」と書いた
 時点では誠実な注記だったが、作らなければ**注記が新しい空約束になる**。
 
+
+
+## GPU — 実機に到達し、4 回目の設計でようやく測れた（2026-08-04、gpu `c396e79` / `8c2c1f2`）
+
+`kami.gpu.launch` は一度も GPU を見ていなかった。**Deno の WebGPU が wgpu → Metal に
+直接届く**——ブラウザ不要で、CLAUDE.md が警告する focus 奪取のハザードも無い。
+Apple M1 Max: `maxComputeInvocationsPerWorkgroup` 256 / `maxComputeWorkgroupStorageSize` 16384。
+
+### 時計を使わない半分: `workgroup-size`（`c396e79`）
+
+実測限界に対して 4 つ pin した。提案 workgroup が**デバイスの受理範囲を超えない**
+（256 超は保守的助言ではなく**失敗する dispatch**）。shared 予算が device 上限を引き継ぐ点が
+**16384/n が 256 を跨ぐ n=64 ちょうど**。実 32 レーン SIMD group より狭くならず、
+予算超過を `:over-shared-budget?` で明示する。
+
+### 時計が要る半分: `coalescing` は 4 回目で測れた（`8c2c1f2`）
+
+**3 回失敗した。どれも「結果らしい表」を出した。**
+
+1. ループ内 offset が `stride × 1048576 mod N` で **stride ≥ 4 で 0 に潰れ**、該当 arm は
+   1 要素をキャッシュから読み直していた。**モデルと 4% 以内で一致し、報告しかけた。**
+2. 直して 2M 要素の march を入れたら **stride によらず全アクセスが miss** になり、
+   coalescing が対象とする locality 自体を破壊。さらに stride ≥ 32 は wrap して衝突。
+3. 1 スレッド 1 ロードで両方除いたら **dispatch overhead が全部を飲み込んだ**
+   （1 dispatch 16 ms、run 間変動 60%）。
+
+4 回目で切り分けられた交絡が**もう一つ**あった: **スレッド数と負荷を固定したまま stride を
+変えると、触る範囲そのものが変わる**——差が coalescing か span か区別できない。
+解決は置換で、**全 arm が同じアドレス集合を同じ回数読み**、変わるのはスレッド→アドレスの
+対応だけにする: `addr(i) = (i & mask) * s + (i >> shift)`。
+
+さらに 2 点: ロードごとの整数 div/mod で **ALU-bound** になっていた（2 冪なので mask/shift へ）。
+128 MiB の転送が **16 ms の dispatch 固定費より小さく**全 arm がオーバーヘッドを報告していた
+（4.3 GB/dispatch へ引き上げ）。そこで stride 1 が **127 GB/s** = M1 Max として信じられる値。
+
+### 結果: 向きは正しく、大きさは 4 倍悲観的
+
+| stride | 2 | 4 | 8 | 16 | 32 |
+|---|---|---|---|---|---|
+| model | 0.50 | 0.25 | 0.13 | 0.06 | **0.03** |
+| measured | 0.57 | 0.65 | 0.39 | 0.19 | **0.13** |
+
+**式は変えていない。** run 間ばらつきが約 20% あり、**1 回のノイジーな sweep は calibration
+ではない**（今日この判断を何度も間違えた）。誤差は planner にとって安全側でもある。
+docstring に測定値を記録し「**アクセスパターンの順位付けに使え、speedup 予測に使うな**」と明記。
+
+**教訓 22: 交絡は 1 つ潰しても次が出る。** GPU では 4 設計・5 種類の交絡
+（offset 潰れ / locality 破壊 / overhead 支配 / ALU 支配 / span 変動）を経てようやく信号が出た。
+**「結果らしい表」が出たことは、交絡が無いことの証拠にならない。**
+
 "}]
