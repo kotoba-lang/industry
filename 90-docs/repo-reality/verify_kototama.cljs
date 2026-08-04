@@ -130,7 +130,56 @@
               :else
               {:score 0.2 :note (str "confirmed: the two docs still disagree -- README.md says '" readme-level "', docs/maturity.md says '" maturity-level "'. llm-infer's browser column in src/kototama/browser.cljc is "
                                      (if llm-infer-browser-yes? "still :yes (matching maturity.md's higher 14/14, not README's stale 9/9)." "no longer :yes -- re-verify which doc's parity count is actually current.")
-                                     " Scored low on doc-code-drift because the two self-descriptions of the SAME repo's SAME metric, added in the same commit, contradict each other and neither discloses the other's number.")})))}])
+                                     " Scored low on doc-code-drift because the two self-descriptions of the SAME repo's SAME metric, added in the same commit, contradict each other and neither discloses the other's number.")})))}
+
+   ;; ---- 2026-08-03 weekly claim-discovery additions: T8.4 host-parity-live partial status,
+   ;; the T-01 TCB in-progress/unaudited disclosure, and undocumented scheduled-qualification
+   ;; automation. -------------------------------------------------------------------------
+   {:claim :claim/kototama-t84-host-parity-live-partial :axis :axis/functional-completeness :layer :evidence-link
+    :fn (fn []
+          (if (exists? "test/kototama/host_parity_live_test.clj")
+            (let [doc (slurp* "docs/grade-a-host-parity-live-runner.md")
+                  test (slurp* "test/kototama/host_parity_live_test.clj")]
+              (cond
+                (not (has? doc #"Status: partial \(JVM 56 \+ Node 38"))
+                {:score 0.4 :note "docs/grade-a-host-parity-live-runner.md no longer states 'Status: partial (JVM 56 + Node 38 ...)' verbatim -- counts or status may have changed (possible progress toward T8.4 complete); re-verify by hand."}
+                (not (and (has? test #"\(= 56 \(:total r\)\)") (has? test #"\(= 38 \(:total r\)\)")))
+                {:score 0.5 :note "host_parity_live_test.clj no longer hard-asserts (= 56 (:total r)) / (= 38 (:total r)) for the JVM/Node live corpora -- counts may have grown or the assertion shape changed; re-verify whether the doc's cited numbers are still test-backed."}
+                :else
+                {:score 1.0 :note "confirmed: docs/grade-a-host-parity-live-runner.md still declares 'Status: partial (JVM 56 + Node 38 inject/live ...)' with explicit non-claims ('Not claim T8.4 complete'), and host_parity_live_test.clj still hard-asserts 56/38 totals for the JVM/Node live corpora -- the self-reported partial status remains test-backed, not narrative inflation."}))
+            {:score 0.0 :note "test/kototama/host_parity_live_test.clj no longer exists -- claim's cited evidence file is gone; re-verify."}))}
+
+   {:claim :claim/kototama-tcb-t01-in-progress-unaudited :axis :axis/safety-enforcement :layer :lint
+    :fn (fn []
+          (let [doc (slurp* "docs/grade-a-tcb-inventory.md")
+                tcb (slurp* "qualification/tcb-inventory.edn")
+                validate (if (exists? "src/kototama/tcb.clj") (slurp* "src/kototama/tcb.clj") "")]
+            (cond
+              (not (has? doc #"T-01 remains `in-progress`"))
+              {:score 0.4 :note "docs/grade-a-tcb-inventory.md no longer states 'T-01 remains `in-progress`' verbatim -- either the independent audit landed (re-verify, would be real progress) or wording changed; re-verify by hand."}
+              (not (and (has? tcb #"resolver cannot pin validated address") (has? tcb #"not a hardware or process sandbox")))
+              {:score 0.5 :note "qualification/tcb-inventory.edn no longer names the DNS-rebinding or non-sandboxed-isolation risks verbatim under :tcb/native-unsafe -- risk register may have been revised; re-verify by hand."}
+              (not (has? validate #"missing-file"))
+              {:score 0.5 :note "src/kototama/tcb.clj's validate fn no longer has the expected :missing-file check -- automated TCB validation may have been restructured; re-verify."}
+              :else
+              {:score 1.0 :note "confirmed: docs/grade-a-tcb-inventory.md still states T-01 remains in-progress pending independent audit and mutation/adversarial coverage, qualification/tcb-inventory.edn still names the Chicory unsafe-listener/DNS-resolver/JVM-JIT risks verbatim, and src/kototama/tcb.clj's validate fn still implements the automated checks the doc describes -- the automated half is real, the disclosed audit gap remains open and honestly stated."})))}
+
+   {:claim :claim/kototama-scheduled-qualification-workflows-undocumented-in-ci :axis :axis/doc-code-drift :layer :lint
+    :fn (fn []
+          (let [adr (slurp* "docs/adr/0011-linear-resource-recovery-and-browser-surface.md")
+                ci (slurp* ".github/workflows/ci.yml")
+                pkg (if (exists? "package.json") (slurp* "package.json") "")
+                provider (if (exists? "src/kototama/component_provider.cljc")
+                           (slurp* "src/kototama/component_provider.cljc") "")]
+            (cond
+              (not (has? adr #"scheduled Component requalification workflow"))
+              {:score 0.4 :note "ADR 0011 no longer describes a 'scheduled Component requalification workflow' verbatim -- claim text may have been revised; re-verify by hand."}
+              (has? ci #"(?m)^\s*schedule:")
+              {:score 0.8 :note "ci.yml (or another workflow file) now has a 'schedule:' trigger where none existed before -- the previously-undocumented scheduled automation may have actually been built; re-verify which workflow it lives in and whether jco transpilation is really wired before raising this score to 1.0."}
+              (has? pkg #"\"jco\"")
+              {:score 0.6 :note "package.json now lists a jco dependency where none existed before -- partial progress toward the ADR's claimed jco-transpiled-Component-in-Chromium surface; re-verify whether it's actually invoked in CI."}
+              :else
+              {:score 0.2 :note "confirmed: ADR 0011 still describes (in the present tense) a scheduled Component requalification workflow and a jco-transpiled-Component-in-Chromium qualified surface, but .github/workflows/ci.yml still has no 'schedule:' trigger anywhere, package.json still has no jco dependency, and :jco-component in component_provider.cljc is still an inert enum value never dispatched to a real transpile call -- the described recurring automation still does not exist in this repo's CI, and neither doc discloses that."})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]
