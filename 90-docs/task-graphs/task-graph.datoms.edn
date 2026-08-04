@@ -235,23 +235,43 @@
  {:db/id -19
   :task/id "S12-sync-refuses-a-segment-that-starts-at-genesis"
   :task/workflow "torihiki-gap-closure"
-  :task/title "genesis から始まる segment を sync が拒否する — 0 に戻った replica は二度と戻れない"
+  :task/title "below-quorum の診断が誤誘導していた + sync が運ぶ証明書を検証していなかった"
+  :task/kind "consensus"
+  :task/repo "kotoba-lang/inga"
+  :task/requires []
+  :task/external-gate false
+  :task/status :completed
+  :task/status-at "2026-08-04"
+  :task/status-note "**起票時の前提が間違っていた。** `inga.sync` の genesis 免除（`quorum-ok?` の `(zero? (:inga.qc/height qc -1))`）は最初から存在し機能していた。誤らせたのは診断の方で、`below-quorum` の `detail` が **`(first segment)`** を報告していた —— その先頭ブロックこそ免除されている側（justify が genesis 証明書）なので、報告は必ず『通る証明書』を見せ、読む者を存在しない問題へ送り出す。**この loop はそれで 2 周を溶かした。**
+
+  直したもの 2 つ（どちらも main 着地・code-version 86 で deploy 済み）:
+
+  (1) **inga 4d054eb** — `sync/first-uncertified` を足し、`detail` が実際に落ちたブロックと `:at-height` を出すようにした。テストは『planted な未署名証明書のブロックを名指しする』と『genesis 証明書で justify された先頭ブロックは依然として免除される』の両方を固定（後者を落とすと遅れた replica が追いつけなくなる）。285 tests / 1,312 assertions、parity 一致。
+
+  (2) **torihiki-node cfc7930** — `verifyCerts`。validator が inga に渡す verify-fn は**同期でしかありえず**（`validate-segment` は純関数）`.-verified` キャッシュから答えるが、そのキャッシュは vote と new-view の**非同期** WebCrypto 検証でしか埋まらない。**sync で届いたブロックの中の証明書は一度も vote として見ていない**ので全部キャッシュミス＝false だった。`att/pending-checks` の `[witness payload sig]` を先に検証する（`verifyTxs` が transaction に対して既に解いていた問題と同型）。
+
+  **rejoin はまだ成立しない。** 新しい診断が次の原因を出した —— S13 として起票。"}
+
+ {:db/id -20
+  :task/id "S13-sync-responses-are-not-addressed"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "sync 応答が要求者宛てでない — 自分の範囲の答えが他人の答えに埋もれる"
   :task/kind "consensus"
   :task/repo "kotoba-lang/inga"
   :task/requires []
   :task/external-gate false
   :task/status :pending
-  :task/status-note "S11 の検証で本番から取れた診断（reset した w4 の `last-sync-outcome`）:
+  :task/status-note "S12 の新しい診断が出した次の原因。code-version 86 で reset した w4（height 0）の `last-sync-outcome`:
 
-      {offered 256, from 1, to 256, adopted 0, reason :below-quorum,
-       detail {witnesses [\"w2\"], sigs [], qc-view 0, qc-height 0,
-               attest-says \"unsigned\", per-witness {}}}
+      {offered 1, from 1276, to 1276, adopted 0, reason :does-not-attach}
 
-  ブロックは 256 件ちゃんと届いている（S11 で直った）。拒否しているのは `inga.sync` の規則で、**segment の各ブロックが自分の親への quorum 証明書を持つこと**を要求する。ところが **height 1 のブロックの親は genesis で、genesis には証明書が無い**（qc-height 0 / attest-says unsigned）。segment は部分採用せず**丸ごと**拒否される仕様（『悪い segment の正しい前半を採ると、peer にこちらの履歴がどこで終わるかを選ばせることになる』）なので、`from 1` の要求は原理的に必ず失敗する。
+  **1276 は w1 の要求範囲であって w4 のものではない。** w4 は height 0 なので 1 から要らなければならない。
 
-  つまり **height 0 に戻った replica は sync では二度と復帰できない**。/reset の docstring が『peer に足りない分を尋ねて再参加するはず』と書いているのは、この規則と噛み合っていない。
+  原因: `:sync-request` は**送信者を持たない**（`{:type :sync-request :from :to}` だけ）ので、応答は `{:to :all}` でブロードキャストするしかない。結果として、遅れた replica は他の replica 宛ての segment を受け取り `does-not-attach` で捨てる。自分の範囲の答えは、届いていたとしても他人の答えに埋もれて `last-sync-outcome` からは見えない。実測 w4: seen sync-response 5 / sent sync-request 4、それでも height 0。
 
-  直す方向: `inga.replica/propose` は既に同じ例外を持っている —— 『genesis には証明書が無いので、height 1 の leader は propose の QC 要件を満たせない。ここが証明書なしにブロックが提案される唯一の場所』。`inga.sync` にも同じ genesis 例外を入れる。**テストは『genesis から始まる segment を採用できること』と『genesis 以外で証明書を欠く segment は依然として丸ごと拒否されること』の両方**。後者を落とすと、この規則が守っているものを失う。"}
+  直す方向: `:sync-request` に `:witness` を載せ、応答を `{:to <requester>}` で返す。**wire の閉じたメッセージ型に フィールドを足すので、`inga.wire` の encode/decode と `:bad-shape` 判定の両方を更新すること**（古い形の request も当面受け付けるか、両ノードを同時に入れ替えるかを決める）。テストは『遅れた 1 台だけの網が自力で追いつく』——S10 で書いた `a-replica-left-behind-asks-for-what-it-is-missing` の先にある、実際に追いつくところまで。
+
+  **これで sync 経路の欠陥は 4 つ目**（S10 要求が出ない / S11 履歴を出せない / S12 証明書を検証していない / S13 宛先が無い）。1 つ直すごとに次が出ているので、S13 を直したら**遅れた replica が実際に追いつくところまで**を completed の条件にする。"}
 
  {:db/id -16
   :task/id "S9-quadratic-replay"
