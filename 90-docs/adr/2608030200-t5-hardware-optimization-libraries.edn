@@ -1588,4 +1588,44 @@ docstring に測定値を記録し「**アクセスパターンの順位付け�
 （offset 潰れ / locality 破壊 / overhead 支配 / ALU 支配 / span 変動）を経てようやく信号が出た。
 **「結果らしい表」が出たことは、交絡が無いことの証拠にならない。**
 
+
+
+## Closing — 2026-08-04 の到達点と再開点
+
+### 着地したもの（すべて default branch 上、west pin も前進済み）
+
+| repo | pin | この 2 日で入ったもの |
+|---|---|---|
+| `machine` | `e723565` | `:tlb` fact + `translation-penalty`（regime 必須・推測しない）。artifact 由来の定数を訂正 |
+| `layout` | `3339145` | 両モデルが `:model/bounds :layout-only` を名乗る。roofline が cost の compulsory-only を継承 |
+| `traversal` | `792a339` | `pages-touched`、tile-plan の page 報告、byte 規則が厳密になる前提条件を test で pin。`:partially-validated` |
+| `paging` | `9ab25a5` | 実 matmul trace の test、`recorder`（live cache から trace を取り出す口） |
+| `ioplan` | `7cefe9a` | 実 packfile layout の test、floor が lever を名乗る、`bridging-floor` |
+| `perfgate` | `02f5485` | 変更なし（監査の結果 **無実**——`samples-needed` は自分で caveat を書いていた） |
+| `gpu` | `52f7faf` | 実 M1 Max 限界に対する test、coalescing の実測 caveat |
+| `machine-probe` | `9ad1d79` | `:tlb` probe、across-run gate、**composition test**（7 ライブラリを 1 descriptor で貫く） |
+
+**test 実測（2026-08-04、全 8 repo）**: 228 tests / 2595 assertions / **0 failures, 0 errors**。
+
+### 未達（正直に）
+
+1. **qualified な `:tlb` fact は出ていない。** load 6.5 で 1 run 通ったが再現せず、以後 load 9〜84 で
+   拒否され続けた。**基準と計測手法は整っている**（across-run gate、stagger、footprint 一定、
+   sample 長）。**再開点: 機械が静かなときに `cd orgs/kotoba-lang/machine-probe &&
+   clojure -M:tlb 12 3` を、他に何も走らせずに実行する。**
+2. **native stage 2 以降は上流ブロック。** `tender-native` (`f92f390`) の
+   `kototama/native/executor.clj:539` が `(= 512 (:initial fuel))` と `(= 4096 (:capacity heap))` を
+   assert しており、vector-f64 も計測ループも入口で止まる。**自分では直せない。**
+3. **compiler への配線は stage 2 待ち。** native backend に hardware 定数のハードコードは 0 件で、
+   配列もデータ上のループも無いので **T5 が助言できる対象がまだ存在しない**。
+4. **`paging` × `block-cache` の重複**（後者は本番稼働）。`recorder` で前者の bound を後者に
+   届ける seam は作った。統合するかは別判断。
+5. **`coalescing` の式は未較正**（実測は向き正しく大きさ 4 倍悲観的、run 間 20%）。
+
+### この 2 日で最も高くついた誤り
+
+**測定が交絡していたこと**に尽きる。「TLB の罰則 5.6 倍」は大半が L1 set conflict で、
+GPU は 4 設計・5 交絡を経てようやく信号が出た。**どの誤った測定も「結果らしい表」を出し、
+うち 2 つは報告寸前まで行った。** 教訓 18/19/22 はすべてこの一族。
+
 "}]
