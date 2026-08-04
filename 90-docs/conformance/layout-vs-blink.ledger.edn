@@ -788,3 +788,31 @@
                      "div -> p 9、div -> none 8、b -> p 5、input -> p 5、p -> b 5"]
  :in-flight ["fieldset/legend + button の atomic inline + media-object（agent 作業中）"
              "margin: 0 auto / direction: rtl / 負 margin / % 高さ / calc 幅（agent 作業中）"]}
+
+{:at "2026-08-04"
+ :iteration 44
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 327 :was 316 :added 11}
+ :line-structure {:agree 310 :total 314 :pct 99}
+ :geometry {:boxes-agree 1186 :boxes-total 1251 :pct 95 :clean-cases 291 :of 327}
+ :paint-order {:points-agree 8058 :points-total 8159 :pct 99 :clean-cases 302}
+ :computed-style {:no-cascade-attributed-mismatch 321 :of 327}
+ :landed {:cssom "d24899bbb3939e2ef2b8b640aedfa513d88e0c80 — CSS transform に初めて計測を当てる"}
+ :note "**CSS transform はエンジンに存在せず corpus にも 1 件も無かった**（src 中の transform は
+        text-transform という無関係の property だけ）。欠落の大きさが不明だった。
+        transform は getBoundingClientRect の返す箱を変えるので幾何軸で計測できる。
+        **結果: 6/6 の transform case で箱が一致せず、完全な未実装。** oracle が期待値をそのまま与える:
+        translate(30px,10px) → (30,10) ／ scale(2) → (-50,-10,200,40) ／
+        rotate(45deg) → (7.57,-32.43,84.85,84.85) ／ translateX(50%) → 50px。"
+ :findings ["**transform の percentage は要素自身のサイズに対して解決する** —— CSS の他のほぼ全ての
+             percentage と違う。実装時に効くので独立した case にした。"
+            "未被覆だった aspect-ratio と min-height は**既に正しかった**（通った）。"
+            ":overflow/text-overflow-ellipsis-keeps-one-line を :oracle/blind に。
+             **生成コンテンツとは逆向きの盲点**で、ブラウザは DOM に全文を保ち paint 時に省略記号を描くので
+             oracle は全文を読み、エンジンは text op を出す時点で切るしかない。
+             どちらも正しく、比べているのは DOM と描画結果。幾何と paint order は引き続き採点。"]
+ :remaining ["transform の実装（6 case、期待値は実測済み）"
+             "paint order 残差: p → none 23（overflow するテキストの上でエンジンが何も返さない）"
+             "fieldset/legend + button atomic inline（agent 作業中）"
+             "margin auto / rtl / 負 margin / % 高さ / calc 幅（agent 作業中）"
+             "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
