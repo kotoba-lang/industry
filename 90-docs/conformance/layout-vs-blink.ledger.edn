@@ -321,3 +321,29 @@
              "fieldset/legend の out-of-flow、select の control font"
              "cascade の UA stylesheet 所在（構造的 1,400 値）"
              "parser: comment node type（cross-repo）、afe scope marker、omission 3 件（別 agent が作業中）"]}
+
+{:at "2026-08-04"
+ :iteration 36
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 292}
+ :line-structure {:agree 249 :total 280 :pct 89}
+ :geometry {:boxes-agree 952 :boxes-total 1142 :pct 83 :clean-cases 207}
+ :computed-style {:values-agree 13832 :values-total 15942 :pct 87}
+ :paint-order {:points-agree 6978 :points-total 7285 :pct 96 :clean-cases 238 :of 292 :new-axis true}
+ :landed {:cssom "b9c29f87c532ee82ca3788850efa2eeef8edba1a — paint order 軸（第4軸）"}
+ :note "既存 3 軸は全て大きさと位置を測っており、**重なり順**を見るものが無かった。
+        5x5 の点で elementFromPoint と『その点を含む最後の :node draw-op』を比較する。
+        **初回の数値 65% は無意味だったので報告せず原因を潰した**: 両者の case wrapper を
+        互いに採点しており、case 直下テキストに当たる点が全て不一致になっていた
+        （テキストノードは要素でないのでブラウザは wrapper を返す）。2523 件中 2246 件がこれ。
+        修正後 96%。"
+ :new-findings ["**:stacking/negative-z-index は全 box 一致（幾何 12/12）なのに 5 点で不一致。**
+                 全ての矩形が正しくても順序は誤りうる —— この軸を作った理由そのもの。"
+                "幅 360px で corpus 全体を回した: line 248/280・geometry 946/1142（800px では 249/952）。
+                 **エンジンは幅に対してほぼ安定**で、新規に落ちたのは :page/two-column-text の 1 件のみ。
+                 『規模では破綻しない』（doc 系 7 件中 6 件が全一致）と同種の、想定が外れた探索。"]
+ :remaining ["flex（別 agent が作業中）、float（別 agent が作業中）"
+             "grid の flow/gap/alignment、display: table/contents/flow-root、table-layout: fixed"
+             "inline 系の細部（span y +20、label 3/8、button 4/9、option 2/6）"
+             "cascade の UA stylesheet 所在（構造的）"
+             "parser: comment node type（cross-repo）、omission 3 件（別 agent が作業中）"]}
