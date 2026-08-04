@@ -158,7 +158,28 @@ ADR-2608039000 が D1 について定めた操作的基準をそのまま当て�
 | 2 | `kotobase-protocols`: byte 面を block / object 面に移設 | **stage 1 done** — kotoba-lang/kotobase-protocols#15（ctx の `:blocks` port + `:cid-of` 検証。port 無しなら従来どおり = live worker は無変更）。64 tests / 231 assertions、nbb と clj 両方 green。**stage 2（worker が `:blocks` を R2 に束ねる）は未着手** —— これが実際に bytes を chain から降ろす変更で、live worker を触る |
 | 3 | `kotobase`: README の自己記述訂正（D6） | **done** — kotoba-lang/kotobase#31 |
 | 4 | `org-w3-sparql-protocol` / ADR-2607172300: materialize-only を正規経路として記述訂正 | **done** — org-w3-sparql-protocol#6（記述訂正 + `(:spo db)` walk を `bridge/datoms` に置換 + kotobase-query pin 前進）、本 ADR 群の記述訂正は ADR-2607172300 に反映済み |
-| 5 | bridge の incremental 化を ADR-2607166600（IVM）に接続 | **やらない（今は）** — ADR-2608039975。実測したら前提が2つとも崩れていた: bridge を mount する deploy shell が1つも無く（6 surface は未 deploy）、live な SPARQL は別実装（`kotobase.server.sparql`）でしかも Datalog 経由。設計スケッチと trigger は ADR-2608039975 に記録 |
+| 5 | bridge の incremental 化を ADR-2607166600（IVM）に接続 | **やらない（今は）** — ADR-2608039975。設計スケッチと trigger はそちらに記録。2026-08-04 補足: live な SPARQL は materialize を通らなくなった（`pattern-source` が `hot-datoms` を pattern 単位で読む）ので、materialize の full scan が残るのは**未 deploy の HTTP surface 群だけ** |
+
+### D2 の帰結 —— SPARQL は 2026-08-04 に完了した
+
+D2（Datalog を必須 IR にしない）の最初の実適用が終わった。`graph.sparql` は
+`kotoba-lang/org-w3-sparql-protocol` + `kotoba-lang/sparql` の algebra が、`datomic.datoms`
+= filtered index read の上で答える。**SPARQL を Datalog に翻訳していた 233 行の手書き
+subset（`kotobase.server.sparql`）は削除された**（kotobase-server#28）。
+
+| | |
+|---|---|
+| index seam | `datom.source/IPatternSource` 実装が2つ（HTTP: `kotobase.datom-source` / in-process: `kotobase.server.pattern-source`）。**index plan は `kotobase.datom-plan`（`.cljc`）で共有** —— どちらが `[_ p o]` にどのインデックスを使うかがずれたら、同じクエリに違う答えが返る |
+| pushdown | BGP の pattern が index 読みに落ちる。**object 位置だけは押し下げを見送っている** —— `:avet` の value component の意味論が1 datom のコーパスでは「適用された」と「無視された」を区別できず、読み違えると**行が減る**（空の結果に見える誤答）ため。述語レンジ読み + scan 時フィルタで正しさを優先 |
+| 追加した機能 | `kotoba-lang/sparql` の algebra に集約（`:group`）—— 無かった。旧 subset は `COUNT` に答えていたので、包含関係が成立しておらず、そのまま切り替えれば機能が減っていた |
+| 検証 | 旧文法全体（BGP / join / OPTIONAL / UNION / ORDER BY 昇降 / LIMIT / 集約 ± GROUP BY / FILTER）で新旧一致。退役時に **equivalence を snapshot へ変換**（片方が消えると比較は自己参照になるため、旧の答えを削除前に採取） |
+
+**この移行で見つかった欠陥は、1件を除いて全て「エラーではなく静かに違う答え」だった**
+（wire 非互換で述語がワイルドカードに / 依存 pin が engine を差し替え / リテラルの
+二重符号化 / `visible?` の形違いで何もフィルタしない / 外部 IRI が nil = ワイルドカード）。
+**型でもテストでも捕まらない層**で、2実装を同一入力で突き合わせて初めて出た。次に同種の
+差し替えをするときも、この順序（隣に置く → 突き合わせる → 切り替える → snapshot 化）を
+使うこと。
 
 ### 実装して分かったこと（D3 の訂正）
 

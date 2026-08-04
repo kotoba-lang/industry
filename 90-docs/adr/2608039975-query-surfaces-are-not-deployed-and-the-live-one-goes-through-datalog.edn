@@ -1,13 +1,13 @@
 [{:db/id -1
   :adr/id "adr-2608039975-query-surfaces-are-not-deployed-and-the-live-one-goes-through-datalog"
-  :adr/title "ADR-2608039975: kotobase-query の IVM 接続は今やらない —— query surface 6本は未 deploy で、live な SPARQL は別実装かつ Datalog 経由"
+  :adr/title "ADR-2608039975: kotobase-query の IVM 接続は今やらない / SPARQL の 2 実装問題は 2026-08-04 に protocol 実装への差し替えで決着"
   :adr/status "accepted"
   :adr/doc_type "adr"
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-08-03"
-  :adr/last-verified "2026-08-03"
-  :adr/last_verified "2026-08-03"
+  :adr/last-verified "2026-08-04"
+  :adr/last_verified "2026-08-04"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "query-surfaces-not-deployed-live-path-goes-through-datalog"
@@ -25,7 +25,7 @@
    "IVM 接続の設計スケッチと trigger 条件（再導出させないための記録）"
    "2026-08-03 時点の query 経路の現在地 —— どの surface が live で、どれがライブラリ止まりか"
    "live な SPARQL（kotobase.server.sparql）が SPARQL を Datalog に翻訳しているという事実の記録"
-   "SPARQL 実装が2つある状態をどうするかは :not-decided（オーナー判断）であること"]
+   "SPARQL 実装が2つあった状態の決着（2026-08-04、(a) を採用し手書き subset を退役）"]
   :adr/related
   ["adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog"
    "adr-2607166600-kotobase-ipld-materialized-views-ivm"
@@ -78,6 +78,14 @@ ADR-2607172300 は linear materialization を **「real query-volume evidence �
 
 未 deploy の経路を最適化するのは、推測に対して機構を作ることであり、その機構は「どのくらい速くなったか」を測れないまま残る。**ADR-2608039970 が bridge に対して1回やった失敗（実際の利用を見ずに contract を4本と決め、全面 scan が要ることに後から気づいた）を、性能側で繰り返さない。**
 
+**2026-08-04 の補足 —— D1 はまだ有効だが、根拠の半分は移動した。** live な SPARQL は
+protocol 実装になり、その経路は `materialize` を**通らない**（`kotobase.server.pattern-source`
+が `hot-datoms` を pattern 単位で読む）。つまり「full scan の費用を払っている人がいない」は
+今も真だが、理由が変わった: 6 surface が未 deploy だからではなく、**live な経路が
+materialize を使わなくなったから**である。`kotobase-query` の materialize は、まだ deploy
+されていない HTTP surface 群（cypher / graphql / gremlin / datomic-shim / postgres）の
+経路にのみ残る。trigger 条件（下記）はそのまま。
+
 ### D2. 設計スケッチと trigger を残す（再導出させない）
 
 **trigger**: bridge 経路を mount する deploy shell が存在し、その `materialize` scan が実測でレイテンシ予算を超えたとき。「超えそう」ではなく実測で。
@@ -90,7 +98,7 @@ ADR-2607172300 は linear materialization を **「real query-volume evidence �
 
 **どちらでも維持される性質**: `view-rows` は「保存 rows + 未 fold novelty」で常に fresh なので、bridge 側が content address で memo していることと矛盾しない。
 
-### D3. 実際に開いている問題（:not-decided —— オーナー判断）
+### D3. 実際に開いている問題（**2026-08-04 決着済み。以下は経緯**）
 
 **SPARQL 実装2つをどうするか。** 本 ADR は選択肢と推奨だけ置き、決めない。
 
@@ -100,6 +108,32 @@ ADR-2607172300 は linear materialization を **「real query-volume evidence �
 - **(c) 両方あることを受け入れ、役割を明記する。** XRPC = tenant data plane、W3C protocol = 相互運用 surface。**そう決めるなら、2つある理由を両方の README に書く** —— 今は誰もそう書いていないので、読んだ人は片方を見落とす。
 
 **推奨は (a)**。ただし live endpoint の切替はオーナー判断であり、agent が黙って進める範囲を超える。
+
+**→ 2026-08-04、オーナー判断で (a) を採用し、完了した。** ただし実装の形は (a) の文面とは
+1点違う: W3C SPARQL 1.1 Protocol の HTTP surface を新規 deploy したのではなく、**既存の
+`graph.sparql`（XRPC）エンドポイントの中身を protocol 実装に差し替えた**。呼び出し元の
+wire は変わらず、`kotobase.server.sparql`（233行の手書き subset）が削除された。
+
+経緯と、その過程で潰した前提の食い違い:
+
+| | |
+|---|---|
+| org-w3-sparql-protocol#8 | **2面が wire 非互換だった。** 既存呼び出しが書く `<:sp/name>` を、protocol 面は `urn:kotobase:` 前提で**ワイルドカードに落としていた**（エラーではなく誤答）。`<:attr>` を短縮形として受けるよう正規化。同 PR で「外部 IRI が nil = ワイルドカード」になる私の混入バグも修正 |
+| kotobase-client#19, #20 / kotobase-server#23 | `datomic.datoms`（= filtered index read）を `datom.source/IPatternSource` として露出。index plan は `.cljc` で HTTP 経路と in-process 経路が共有 |
+| org-w3-sparql-protocol#7 | SPARQL の BGP が index 読みに落ちる（materialize 全面 scan からの脱却） |
+| kotobase-server#24, #25 | 新経路を**旧の隣に置き**、同一クエリで結果を突き合わせ。ここで **4箇所すべてが最初は誤答**（依存 pin が engine を差し替え / scan pattern の未 coerce / リテラルの文字列化 / 射影の二重引用）。**どれもエラーではなく静かに違う答え**だった |
+| sparql#4 / org-w3#9 | **旧が答えて新が答えられないものがあった**: `kotoba-lang/sparql` の algebra に集約ノードが無く、`COUNT` が表現できなかった。包含関係が成立していなかったので、そのまま切り替えれば機能が減っていた。`:group` ノードと parser を追加 |
+| org-w3#10 / kotobase-server#26, #27 | FILTER。datom 面は「書き込み時に文字列化 → `v_edn` で符号化」の二重表現で、`?v > 25` が7文字の文字列と数値の比較になっていた。source が1段 decode して**格納値**を返すようにし、比較規則を「両辺が数として読めれば数値、でなければ辞書順」に統一 |
+| kotobase-server#28 | **subset 退役。** equivalence スイートは、旧の答えを削除前に採取した **snapshot** に変換した —— 片方が消えると比較は自己参照になり、2つが互いに同意しているだけの状態になるため |
+
+**最終状態**: 旧 subset の文法全体（BGP / join / OPTIONAL / UNION / ORDER BY 昇降 / LIMIT /
+集約 ± GROUP BY / FILTER）で新旧が一致。意図的な差分は1件（OPTIONAL だけの WHERE を
+拒否しなくなった —— 正当な SPARQL なので）、意図的に維持した拒否が1件（未束縛の
+SELECT 変数。仕様上は `[[nil] [nil]]` だが、それは毎回タイプミスなので拒否の方が親切）。
+88 tests / 389 assertions green。
+
+**(b)/(c) は不要になった。** (i)(ii)(iii) の枝分かれ（集約をどう埋めるか）も、(i)（algebra に
+集約を実装）を通したので (ii)(iii) は消滅した。
 
 ## Consequences
 
