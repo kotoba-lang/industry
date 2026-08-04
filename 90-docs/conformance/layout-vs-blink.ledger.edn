@@ -395,3 +395,21 @@
  :process-note "Brave が 1 回 CDP で応答せず Chrome へ fall through した（同一エンジンなので数値は同じ）。
                 原因は並行 agent 実行による Brave プロセスの滞留 8 個。再実行で Brave に戻り 115/122 を再現。
                 harness に CDP の 1 回リトライを入れるのが follow-up。"}
+
+{:at "2026-08-04"
+ :iteration 37
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :parser-tree-shape {:agree 118 :total 122 :pct 97 :was "115/122 (94%)" :comment "4/4"}
+ :line-structure {:agree 249 :total 280 :pct 89}
+ :geometry {:boxes-agree 952 :boxes-total 1142 :pct 83}
+ :paint-order {:points-agree 6968 :points-total 7285 :pct 96}
+ :computed-style {:values-agree 13845 :values-total 15956 :pct 87}
+ :landed {:htmldom "5d6677442d32a0679770b9695f33048b7c61e9b0 — comment を実ノードにする"}
+ :note "dom-gpu の comment node type（同日着地）を配線して cross-repo な gap を閉じた。
+        捨てるのは中立ではなく、前後のテキストが 1 ノードに併合される —— 欠けていたのは
+        ノードだけでなく text 構造。harness は dom/comment-tree（DOM 視点）を読むよう変更。
+        層を跨ぐ確認: cssom の 4 軸すべて不変（comment は layout 視点に現れない）、
+        cascade が comment に style を書かないことも直接確認、browser 752 tests 0 failures。"
+ :remaining ["parser 残り 4 件は稀な挙動のみ（</br>, a-in-a, body in flow, &notit;）"
+             "cssom: flex / float（agent 2 体が作業中）、grid、display: table/contents/flow-root、
+              table-layout: fixed、inline 系の細部、cascade の UA stylesheet 所在"]}
