@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "shinshi.club",
  :zone
- {:requests-7d 18394,
-  :pageviews-7d 14472,
-  :uniques-7d-sum 1776,
+ {:requests-7d 18779,
+  :pageviews-7d 14735,
+  :uniques-7d-sum 1788,
   :zone "shinshi.club"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 15}
+  [{:path "/", :requests 16}
    {:path "/video/actress/tsumugi-amano-idol", :requests 10}
    {:path "/robots.txt", :requests 4}
    {:path "/video/actress/aya-amano-campus", :requests 3}
-   {:path "/video/actress/seraphine-league-of-legends", :requests 3}
    {:path "/video/actress/kotori-amano-campus", :requests 3}
    {:path "/video/actress/lux-league-of-legends", :requests 3}
-   {:path "/chat/lucoa-maid-dragon", :requests 2}],
-  :status-mix {:ok 551, :client-error 3},
+   {:path "/chat/lucoa-maid-dragon", :requests 2}
+   {:path "/video/actress/akali-league-of-legends", :requests 2}],
+  :status-mix {:ok 548, :client-error 60},
   :window "24h"},
  :source "shinshi.d1:pv_daily+chat_event_daily+pay_run",
  :window "7d",
  :as-of "2026-08-04",
- :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 15 · /video/actress/tsumugi-amano-idol 10 · /robots.txt 4 · /video/actress/aya-amano-campus 3 · /video/actress/seraphine-league-of-legen… 3 | 4xx(probe) 1%",
- :funnel {:visitors 1154, :chatters 39, :scenes 0, :paying 0},
+ "上位 page (24h, 2xx/3xx): / 16 · /video/actress/tsumugi-amano-idol 10 · /robots.txt 4 · /video/actress/aya-amano-campus 3 · /video/actress/kotori-amano-campus 3 | 4xx(probe) 10%",
+ :funnel {:visitors 1171, :chatters 39, :scenes 0, :paying 0},
  :signal
- "shinshi.club 実測 18394 req/7d・1776 uniques(日次和)・うち4xx probe 1%(24h)"}
+ "shinshi.club 実測 18779 req/7d・1788 uniques(日次和)・うち4xx probe 10%(24h)"}
