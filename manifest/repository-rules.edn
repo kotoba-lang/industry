@@ -940,12 +940,24 @@
    ;; That is what settled open-network (6110 is literally "Wired
    ;; Telecommunications Network Operations") and open-patent (6910 turned out to
    ;; be "Global Incorporation Actor", not generic legal, so 7490).
+   ;; open-rail resolved 2026-08-05. The owner allowed creating a new target if
+   ;; none fitted; none had to be created. Looking at the ISIC class rather than
+   ;; its title settled it: 5221 "Service activities incidental to land
+   ;; transportation" lists under :includes "operation of railway infrastructure:
+   ;; maintenance of tracks, signals" -- exactly define-line + report-incident +
+   ;; incident-severity. It was never a passenger-vs-freight question, which is
+   ;; why both 4911 and 4912 looked wrong for two rounds.
+   ;;
+   ;; The lesson: the class TITLE is not the class. Reading only nameEn kept the
+   ;; answer hidden behind two obviously-unfitting siblings.
+   :gap/executed-rail {:from "open-rail" :to "cloud-itonami-isic-5221" :files 33
+                       :evidence "ISIC Rev.4 5221 :includes operation of railway infrastructure"
+                       :verification "remote blobs 61 = 28 original + 33 moved, probe fetched, then archived"}
    :gap/still-open
-   [{:repo "open-rail" :why "4911 Passenger vs 4912 Freight -- the repo is
-      'Railway Operations & Network Design' and its BPMN is define-line +
-      report-incident, which is infrastructure, not either service"}
-    {:repo "open-otology-uhl-r" :why "a kotoba AppView for a uhl-right-neural
-      Pregel; 8620 Medical and dental practice is a weak fit for an AppView"}]}
+   [{:repo "open-otology-uhl-r" :why "a kotoba AppView for a uhl-right-neural
+      Pregel; 8620 Medical and dental practice is a weak fit for an AppView.
+      Worth re-checking with the same method that solved open-rail -- read the
+      candidate classes' :includes, not their titles."}]}
 
   {:gap/id :kotodama-retirement
    :gap/measured-at "2026-08-05"
