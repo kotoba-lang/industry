@@ -1,6 +1,15 @@
 #!/usr/bin/env nbb
 ;; gtm-target-list.cljs — 90-docs/business/gtm-icp.datoms.edn の ICP を
-;; cloud-itonami-lei catalog（D1、live）に当てて、実際に出る対象企業を返す。
+;; cloud-itonami-lei catalog に当てて、実際に出る対象企業を返す。
+;;
+;; 読むのは **git の EDN**（各 repo の blueprint.edn、`lei-catalog` 経由）。
+;; 以前は D1 projection に SELECT を投げていたが、オーナー指示 2026-08-04
+;; 「なぜ sql ? edn で datalad 保存では?」で外した —— 誰に連絡するかは判断であって、
+;; 再構築可能なキャッシュから導く対象ではない。実際にずれていた（D1 が到達可能
+;; 78 社と答えた時点で、git には既に 84 社あった）。
+;;
+;; 実行には scripts を classpath に置く:
+;;   nbb --classpath scripts scripts/gtm-target-list.cljs --icp <id>
 ;;
 ;; ## この出力が「何であって、何でないか」
 ;;
@@ -28,51 +37,51 @@
 
 (ns gtm-target-list
   (:require ["fs" :as fs]
-            ["child_process" :refer [execSync]]
             [clojure.string :as str]
-            [cljs.reader :as edn]))
+            [cljs.reader :as edn]
+            [lei-catalog :as cat]))
 
 (def argv (vec (drop 2 (js->clj (.-argv js/process)))))
 (defn- flag [n] (let [i (.indexOf (clj->js argv) n)]
                   (when (and (>= i 0) (< (inc i) (count argv))) (nth argv (inc i)))))
 
 (def icp-file "90-docs/business/gtm-icp.datoms.edn")
-(def db-name "cloud-itonami-lei-catalog")
 
 (defn- load-icps []
   (->> (edn/read-string (fs/readFileSync icp-file "utf8"))
        (filter :icp/id)))
-
-;; ── D1 ──────────────────────────────────────────────────────────────────────
-
-(defn- d1 [sql]
-  (let [out (execSync (str "npx wrangler d1 execute " db-name " --remote -y --json --command "
-                           (pr-str sql))
-                      #js {:encoding "utf8" :maxBuffer (* 40 1024 1024) :stdio "pipe"})
-        i (.indexOf out "[")]
-    (when (neg? i) (throw (js/Error. (str "no JSON in wrangler output: " (subs out 0 200)))))
-    (get-in (first (js->clj (js/JSON.parse (subs out i)) :keywordize-keys true)) [:results])))
-
-(defn- sql-in [xs] (str/join "," (map #(str "'" % "'") xs)))
 
 ;; ── selection ───────────────────────────────────────────────────────────────
 
 (defn- checkable [icp] (edn/read-string (or (:icp/checkable-edn icp) "{}")))
 
 (defn select-targets
-  "Applies ONLY the checkable predicates. Country comes from the ICP's own
-  `:country` set rather than `:icp/countries` so that what ran and what was
-  declared cannot drift apart -- the same reason the loop shells out to the
-  scripts instead of reimplementing them."
-  [icp]
+  "Applies ONLY the checkable predicates, against the catalog's EDN in git.
+
+  This used to be a `SELECT` against the D1 projection. Owner direction
+  2026-08-04 removed SQL from this path: a target list is a decision about who
+  to contact, and a decision should not be derived from a rebuildable cache that
+  can silently lag the source (it did -- D1 reported 78 reachable companies while
+  git already held 84).
+
+  Country comes from the ICP's own `:country` set rather than `:icp/countries`
+  so that what ran and what was declared cannot drift apart. Returns a Promise."
+  [icp companies]
   (let [{:keys [country contact-route]} (checkable icp)]
     (if (empty? country)
       []
-      (d1 (str "SELECT lei, country, legal_name, website, contact_email, inquiry_form_url, repo "
-               "FROM company WHERE country IN (" (sql-in (sort country)) ")"
-               (when (= :required contact-route)
-                 " AND (contact_email IS NOT NULL OR inquiry_form_url IS NOT NULL)")
-               " ORDER BY country, legal_name;")))))
+      (->> companies
+           (filter #(contains? country (:company/country %)))
+           (filter #(or (not= :required contact-route) (cat/reachable? %)))
+           (map (fn [c] {:lei (:company/lei c)
+                         :country (:company/country c)
+                         :legal_name (:company/legal-name c)
+                         :website (:company/website c)
+                         :contact_email (:company/contact-email c)
+                         :inquiry_form_url (:company/inquiry-form-url c)
+                         :repo (str "https://github.com/cloud-itonami/" (:company/repo c))}))
+           (sort-by (juxt :country :legal_name))
+           vec))))
 
 (defn- ir-only?
   "The disqualifier the catalog CAN evaluate: a contact route that is visibly an
@@ -130,34 +139,46 @@
               (println (str "  " why))
               (println "  ICP の status を変えるのは owner の判断。ここでは生成しない。")
               (.exit js/process 3))
-          (let [rows (select-targets icp)
-                {kept false disq true} (group-by ir-only? rows)
-                unevaluated (edn/read-string (or (:icp/unevaluable-edn icp) "[]"))
-                out {:target-list/icp id
-                     :target-list/product (:icp/product icp)
-                     :target-list/as-of (first (str/split (.toISOString (js/Date.)) #"T"))
-                     :target-list/source "cloud-itonami-lei-catalog (D1, live)"
-                     :target-list/checked (checkable icp)
-                     :target-list/unevaluated unevaluated
-                     :target-list/matched-on-checkable-only (count rows)
-                     :target-list/disqualified-ir-only (count disq)
-                     :target-list/targets (vec (map #(select-keys % [:lei :country :legal_name :website
-                                                                     :contact_email :inquiry_form_url :repo])
-                                                    kept))}]
-            (println (str "ICP " id "  (" (:icp/product icp) ")"))
-            (println (str "  checkable  : " (pr-str (checkable icp))))
-            (println (str "  matched    : " (count rows) " 社（評価できた述語にのみ適合）"))
-            (println (str "  disqualified: " (count disq) " 社（IR/privacy/発券窓口しか到達経路が無い）"))
-            (println (str "  → targets  : " (count kept) " 社"))
-            (doseq [r (sort-by (juxt :country :legal_name) kept)]
-              (println (str "     " (:country r) "  " (:legal_name r)
-                            "  " (or (:contact_email r) (:inquiry_form_url r)))))
-            (println)
-            (println (str "  評価できなかった述語（" (count unevaluated) " 件） —— この一覧を落とさないこと:"))
-            (doseq [u unevaluated]
-              (println (str "     " (:predicate u) " : want " (pr-str (:want u)) " — " (:why u))))
-            (when-let [o (flag "--out")]
-              (fs/writeFileSync o (str (pr-str out) "\n"))
-              (println) (println "  wrote" o))))))))
+          (-> (cat/fetch-catalog {:concurrency 12})
+              (.then
+               (fn [c]
+                 (when (seq (:unreadable c))
+                   (println "WARNING" (count (:unreadable c))
+                            "repo(s) unreadable — this list is incomplete:"
+                            (pr-str (mapv :repo (:unreadable c)))))
+                 (let [rows (select-targets icp (:companies c))
+                       {kept false disq true} (group-by ir-only? rows)
+                       unevaluated (edn/read-string (or (:icp/unevaluable-edn icp) "[]"))
+                       out {:target-list/icp id
+                            :target-list/product (:icp/product icp)
+                            :target-list/as-of (first (str/split (.toISOString (js/Date.)) #"T"))
+                            :target-list/source "cloud-itonami-lei-* blueprint.edn (git, live)"
+                            :target-list/repos-seen (:repos-seen c)
+                            :target-list/unreadable-repos (count (:unreadable c))
+                            :target-list/checked (checkable icp)
+                            :target-list/unevaluated unevaluated
+                            :target-list/matched-on-checkable-only (count rows)
+                            :target-list/disqualified-non-buyer-desk (count disq)
+                            :target-list/targets (vec (map #(select-keys % [:lei :country :legal_name :website
+                                                                            :contact_email :inquiry_form_url :repo])
+                                                           kept))}]
+                   (println (str "ICP " id "  (" (:icp/product icp) ")"))
+                   (println (str "  source     : blueprint.edn in git (" (:repos-seen c) " repos read)"))
+                   (println (str "  checkable  : " (pr-str (checkable icp))))
+                   (println (str "  matched    : " (count rows) " 社（評価できた述語にのみ適合）"))
+                   (println (str "  disqualified: " (count disq) " 社（IR/privacy/広報/発券窓口しか到達経路が無い）"))
+                   (println (str "  → targets  : " (count kept) " 社"))
+                   (doseq [r kept]
+                     (println (str "     " (:country r) "  " (:legal_name r)
+                                   "  " (or (:contact_email r) (:inquiry_form_url r)))))
+                   (println)
+                   (println (str "  評価できなかった述語（" (count unevaluated) " 件） —— この一覧を落とさないこと:"))
+                   (doseq [u unevaluated]
+                     (println (str "     " (:predicate u) " : want " (pr-str (:want u)) " — " (:why u))))
+                   (when-let [o (flag "--out")]
+                     (fs/writeFileSync o (str (pr-str out) "\n"))
+                     (println) (println "  wrote" o)))))
+              (.catch (fn [e] (println "FATAL:" (.-message e))
+                        (set! (.-exitCode js/process) 1)))))))))
 
 (-main)

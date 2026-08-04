@@ -17,18 +17,23 @@
 ;; plausible-looking address nobody published is worse than a blank field,
 ;; because a blank field is visibly incomplete while a guess reads as verified.
 ;;
-;; Work list comes from D1 (`SELECT ... WHERE contact_email IS NULL AND
-;; inquiry_form_url IS NULL`), so the catalog itself decides what still needs
-;; doing rather than a hand-maintained list drifting out of sync.
+;; Work list comes from the catalog's SOURCE OF TRUTH -- the blueprint.edn in
+;; each repo, read via `lei-catalog` -- so the catalog itself decides what still
+;; needs doing rather than a hand-maintained list drifting out of sync.
+;;
+;; It used to come from a `SELECT` against the D1 projection. Owner direction
+;; 2026-08-04 (「なぜ sql ? edn で datalad 保存では?」) removed that: deciding what
+;; work to do is not a job for a rebuildable cache. See scripts/lei_catalog.cljs.
 ;;
 ;; Run (from the superproject root):
-;;   nbb scripts/lei-contact-discover.cljs [--limit N] [--dry-run] [--concurrency N]
+;;   nbb --classpath scripts scripts/lei-contact-discover.cljs [--limit N] [--dry-run] [--concurrency N]
 
 (ns lei-contact-discover
   (:require ["fs" :as fs]
             ["child_process" :refer [execSync]]
             [clojure.string :as str]
-            [cljs.reader :as edn]))
+            [cljs.reader :as edn]
+            [lei-catalog :as cat]))
 
 (def argv (vec (drop 2 (js->clj (.-argv js/process)))))
 (defn- flag [n] (let [i (.indexOf (clj->js argv) n)]
@@ -36,7 +41,6 @@
 (def limit (some-> (flag "--limit") js/parseInt))
 (def concurrency (or (some-> (flag "--concurrency") js/parseInt) 6))
 (def dry-run? (boolean (some #{"--dry-run"} argv)))
-(def db-name "cloud-itonami-lei-catalog")
 
 (def ua
   "Identify honestly as an automated collector with a contact route. Pretending
@@ -46,17 +50,27 @@
 
 ;; ── work list ───────────────────────────────────────────────────────────────
 
-(defn work-list []
-  (let [sql (str "SELECT lei, legal_name, jurisdiction, website, repo FROM company "
-                 "WHERE contact_email IS NULL AND inquiry_form_url IS NULL "
-                 "AND website IS NOT NULL ORDER BY lei"
-                 (when limit (str " LIMIT " limit)) ";")
-        out (execSync (str "npx wrangler d1 execute " db-name " --remote -y --json --command "
-                           (pr-str sql))
-                      #js {:encoding "utf8" :maxBuffer (* 40 1024 1024) :stdio "pipe"})
-        ;; wrangler prints a banner before the JSON; take from the first '['.
-        j (js->clj (js/JSON.parse (subs out (.indexOf out "["))) :keywordize-keys true)]
-    (vec (get-in (first j) [:results]))))
+(defn work-list
+  "Companies with a site and no published contact route, from git.
+
+  Returns a Promise -- reading the catalog is 185 concurrent HTTP GETs against
+  raw.githubusercontent, not a single query. `:unreadable` is surfaced rather
+  than swallowed: a work list computed over a partial catalog looks identical to
+  one computed over a complete one."
+  []
+  (-> (cat/fetch-catalog {:concurrency 12})
+      (.then (fn [c]
+               (when (seq (:unreadable c))
+                 (println "WARNING" (count (:unreadable c))
+                          "repo(s) unreadable — this work list is incomplete:"
+                          (pr-str (mapv :repo (:unreadable c)))))
+               (let [ws (cat/needing-contact-route (:companies c))]
+                 (vec (map (fn [x] {:lei (:company/lei x)
+                                    :legal_name (:company/legal-name x)
+                                    :jurisdiction (:company/jurisdiction x)
+                                    :website (:company/website x)
+                                    :repo (:company/repo x)})
+                           (cond->> ws limit (take limit)))))))))
 
 ;; ── fetching ────────────────────────────────────────────────────────────────
 
@@ -331,33 +345,35 @@
              (do (js/console.error "FATAL unhandled rejection:" (or (.-stack e) (str e)))
                  (.exit js/process 1)))))))
 
+(defn- report [results]
+  (let [found (filter #(= :found (:status %)) results)]
+    (doseq [r found]
+      (let [w (update-blueprint! (:repo r) (:found r))]
+        (println "FOUND" (:lei r) (:name r)
+                 "email=" (or (get-in r [:found :email]) "-")
+                 "form=" (or (get-in r [:found :form]) "-")
+                 (if (:dry-run w) "(not written)" "(written)"))))
+    (doseq [[k label] [[:not-found "not-found"] [:blocked "blocked (bot check — skipped, never bypassed)"]
+                       [:unreachable "unreachable"] [:error "error"]]]
+      (let [rs (filter #(= k (:status %)) results)]
+        (when (seq rs)
+          (println (str "--- " label ": " (count rs) " ---"))
+          (doseq [r (take 40 rs)] (println "   " (:lei r) (:name r) (or (:error r) (:http r) ""))))))
+    (println "=== SUMMARY ===")
+    (println "checked:" (count results)
+             " found:" (count found)
+             " not-found:" (count (filter #(= :not-found (:status %)) results))
+             " blocked:" (count (filter #(= :blocked (:status %)) results))
+             " unreachable:" (count (filter #(= :unreachable (:status %)) results))
+             " error:" (count (filter #(= :error (:status %)) results)))))
+
 (defn -main []
-  (let [work (work-list)]
-    (println "companies needing contact info:" (count work) (when dry-run? "(dry-run)"))
-    (-> (run-bounded work discover-one concurrency)
-        (.then
-         (fn [results]
-           (let [found (filter #(= :found (:status %)) results)]
-             (doseq [r found]
-               (let [w (update-blueprint! (:repo r) (:found r))]
-                 (println "FOUND" (:lei r) (:name r)
-                          "email=" (or (get-in r [:found :email]) "-")
-                          "form=" (or (get-in r [:found :form]) "-")
-                          (if (:dry-run w) "(not written)" "(written)"))))
-             (doseq [[k label] [[:not-found "not-found"] [:blocked "blocked (bot check — skipped, never bypassed)"]
-                                [:unreachable "unreachable"] [:error "error"]]]
-               (let [rs (filter #(= k (:status %)) results)]
-                 (when (seq rs)
-                   (println (str "--- " label ": " (count rs) " ---"))
-                   (doseq [r (take 40 rs)] (println "   " (:lei r) (:name r) (or (:error r) (:http r) ""))))))
-             (println "=== SUMMARY ===")
-             (println "checked:" (count results)
-                      " found:" (count found)
-                      " not-found:" (count (filter #(= :not-found (:status %)) results))
-                      " blocked:" (count (filter #(= :blocked (:status %)) results))
-                      " unreachable:" (count (filter #(= :unreachable (:status %)) results))
-                      " error:" (count (filter #(= :error (:status %)) results))))))
-        (.catch (fn [e] (println "FATAL:" (.-message e)) (set! (.-exitCode js/process) 1))))))
+  (-> (work-list)
+      (.then (fn [work]
+               (println "companies needing contact info:" (count work) (when dry-run? "(dry-run)"))
+               (run-bounded work discover-one concurrency)))
+      (.then report)
+      (.catch (fn [e] (println "FATAL:" (.-message e)) (set! (.-exitCode js/process) 1)))))
 
 (install-network-error-guard!)
 (-main)
