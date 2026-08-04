@@ -14,9 +14,15 @@
 ;; so a name-prefix declaration produced the nonsense error
 ;; `declared repository name differs from checkout {:repo "kotoba-lang/"}`.
 ;;
+;; A third vocabulary (:origin) and a fourth (:product-family) were added
+;; 2026-08-04 (ADR-2608040100). They are not per-repo declarations — they
+;; classify a NAME, so they are checked by --name-audit over the whole west
+;; manifest rather than by reading resources/repository-rules.edn.
+;;
 ;; Usage:
 ;;   nbb scripts/verify-repository-roles.cljs <repo-dir>...
 ;;   nbb scripts/verify-repository-roles.cljs --prefix-audit [--west <west.yml>] [--workspace <dir>]
+;;   nbb scripts/verify-repository-roles.cljs --name-audit [--west <west.yml>] [--org <org>]
 
 (require '[clojure.edn :as edn]
          '[clojure.set :as set]
@@ -74,6 +80,52 @@
 
 (def forbidden-suffixes
   (get-in authority [:naming :forbidden-suffixes] []))
+
+;; ------------------------------------------------------------- origin plane
+
+(def origin-vocab (get vocabularies :origin))
+(def family-vocab (get vocabularies :product-family))
+
+(def origin-tlds
+  ;; Deliberately the OBSERVED set, not a copy of the IANA root zone. A repo
+  ;; under a TLD nobody has used here yet is reported as an undeclared prefix,
+  ;; which surfaces it for a decision instead of silently absorbing it.
+  (set (keys (:vocabulary/observed-tlds origin-vocab {}))))
+
+(def family-prefixes
+  (into #{} (map :family) (:vocabulary/rules family-vocab [])))
+
+(defn domain->prefix
+  "Reverse a registrable domain's labels into the origin prefix.
+   ietf.org -> org-ietf ; boj.or.jp -> jp-or-boj ; sel4.systems -> systems-sel4.
+   One-way by design: a name cannot be parsed back into a domain, because a
+   single label may contain no hyphen while the subject contains several."
+  [domain]
+  (->> (str/split (str/replace domain #"^www\." "") #"\.")
+       reverse
+       (str/join "-")))
+
+(defn name-under-prefix? [nm prefix]
+  (or (= nm prefix) (str/starts-with? nm (str prefix "-"))))
+
+(defn- origin-data-file []
+  (.join path (.dirname path (:file authority)) "origin-domains.edn"))
+
+(def origin-data
+  (let [f (origin-data-file)]
+    (when (.existsSync fs f)
+      (let [doc (read-edn f)]
+        (when-not (= "kotoba.origin-domains.v1" (:schema doc))
+          (fail! "unsupported origin-domains schema" {:file f :schema (:schema doc)}))
+        (assoc doc :file f)))))
+
+(def origin-domain-by-repo
+  (merge (:anchors origin-data {}) (:domains origin-data {})))
+
+(def origin-anchors (set (keys (:anchors origin-data {}))))
+
+(def origin-unresolvable
+  (into {} (map (juxt :repo identity)) (:unresolvable origin-data [])))
 
 ;; ------------------------------------------------------------ declarations
 
@@ -305,6 +357,110 @@
                       " — new=" (vec (sort (set/difference observed recorded-decidable)))
                       " resolved=" (vec (sort (set/difference recorded-decidable observed)))))))))
 
+;; -------------------------------------------------------------- name audit
+
+(defn- west-repos
+  "orgs/<org>/<repo> -> {:repo \"<org>/<repo>\" :name \"<repo>\"}"
+  [west-file]
+  (->> (west-paths west-file)
+       (keep (fn [p]
+               (let [nm (.basename path p)
+                     org (.basename path (.dirname path p))]
+                 (when (and (seq nm) (seq org))
+                   {:repo (str org "/" nm) :name nm :org org}))))
+       (sort-by :repo)
+       vec))
+
+(defn- classify-plane
+  "First plane that applies, in the order the authority declares. A name carries
+   exactly one plane; the subject plane is the residue, not the default."
+  [nm]
+  (let [head (first (str/split nm #"-"))]
+    (cond
+      (and (str/includes? nm "-") (contains? origin-tlds head)) :origin
+      (matching-prefix nm) :role
+      (some #(str/starts-with? nm %) family-prefixes) :family
+      :else :subject)))
+
+(defn name-audit! [west-file org-filter]
+  (let [all (west-repos west-file)
+        repos (if org-filter (filterv #(= org-filter (:org %)) all) all)
+        planed (mapv #(assoc % :plane (classify-plane (:name %))) repos)
+        by-plane (group-by :plane planed)
+        in-west (set (map :repo all))
+
+        ;; Origin data that names a repository west does not register is stale
+        ;; and hides a real answer behind a dead key.
+        stale (sort (remove in-west (keys origin-domain-by-repo)))
+
+        origin (get by-plane :origin [])
+        graded (for [{:keys [repo name]} origin]
+                 (let [domain (get origin-domain-by-repo repo)
+                       derived (some-> domain domain->prefix)]
+                   {:repo repo :name name :domain domain :derived derived
+                    :status (cond
+                              (contains? origin-unresolvable repo) :unresolvable
+                              (nil? domain)                        :unverified
+                              (name-under-prefix? name derived)    :conformant
+                              :else                                :misfiled)}))
+        by-status (group-by :status graded)
+        misfiled (sort-by :repo (get by-status :misfiled []))
+        broken-anchors (filter #(and (contains? origin-anchors (:repo %))
+                                     (not= :conformant (:status %)))
+                               graded)
+
+        ;; A hyphenated head token used by three or more subject-plane repos is
+        ;; a family nobody declared — exactly the drift that let kami-* reach 96
+        ;; and app-* reach 19 before either was written down.
+        undeclared (->> (get by-plane :subject [])
+                        (filter #(str/includes? (:name %) "-"))
+                        (group-by #(first (str/split (:name %) #"-")))
+                        (filter (fn [[_ v]] (>= (count v) 3)))
+                        (sort-by (fn [[_ v]] (- (count v)))))]
+
+    (println (str "west manifest: " west-file
+                  (when org-filter (str "  (org=" org-filter ")"))))
+    (println (str "repositories: " (count repos)))
+    (println "")
+    (println "plane distribution (ADR-2608040100 :plane-order)")
+    (doseq [p [:origin :role :family :subject]]
+      (println (str "  " (name p) (apply str (repeat (- 10 (count (name p))) " "))
+                    (count (get by-plane p [])))))
+
+    (println "")
+    (println (str "origin plane — derived from manifest/origin-domains.edn"))
+    (doseq [s [:conformant :misfiled :unresolvable :unverified]]
+      (println (str "  " (name s) (apply str (repeat (- 14 (count (name s))) " "))
+                    (count (get by-status s [])))))
+    (when (seq misfiled)
+      (println "")
+      (println (str "MISFILED (" (count misfiled) ") — recorded gap, not a failure:"))
+      (doseq [{:keys [repo domain derived]} misfiled]
+        (println (str "  " repo "  ->  " derived "-*   (" domain ")"))))
+
+    (when (seq undeclared)
+      (println "")
+      (println (str "undeclared family candidates (subject plane, head token used >=3x):"))
+      (doseq [[head v] undeclared]
+        (println (str "  " head "-  " (count v) "  e.g. "
+                      (str/join ", " (take 3 (map :name v)))))))
+
+    (println "")
+    (println (str "coverage: " (count (get by-status :conformant []))
+                  " conformant / " (count origin) " origin-plane"
+                  "  (" (count (get by-status :unverified [])) " unverified —"
+                  " absence of a recorded domain is NOT a pass)"))
+
+    ;; Hard failures: the derivation must keep matching known-good names, and the
+    ;; data must not point at repositories that are gone.
+    (when (seq broken-anchors)
+      (fail! "origin anchor is no longer conformant — the derivation regressed"
+             {:anchors (mapv #(select-keys % [:repo :domain :derived :status]) broken-anchors)}))
+    (when (seq stale)
+      (fail! "origin-domains.edn records repositories that west does not register"
+             {:stale (vec stale)}))
+    (println (str "name-audit: OK (" (count origin-anchors) " anchors hold, no stale data)"))))
+
 ;; --------------------------------------------------------------------- main
 
 (let [args (vec *command-line-args*)]
@@ -312,7 +468,15 @@
     (empty? args)
     (do (println "Usage: nbb scripts/verify-repository-roles.cljs <repo-dir>...")
         (println "       nbb scripts/verify-repository-roles.cljs --prefix-audit [--west <west.yml>]")
+        (println "       nbb scripts/verify-repository-roles.cljs --name-audit [--west <west.yml>] [--org <org>]")
         (compat/exit 2))
+
+    (some #{"--name-audit"} args)
+    (let [west (or (second (drop-while #(not= "--west" %) args)) "manifest/west.yml")
+          org (second (drop-while #(not= "--org" %) args))]
+      (when-not origin-data
+        (fail! "origin plane data not found" {:expected (origin-data-file)}))
+      (name-audit! west org))
 
     (some #{"--prefix-audit"} args)
     (let [west (or (second (drop-while #(not= "--west" %) args)) "manifest/west.yml")

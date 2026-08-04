@@ -143,6 +143,36 @@
      :unassessed
      ["network-awai/app-aozora" "network-awai/app-aozora-svelte"
       "network-awai/app-hyakka"]}
+    ;; ── capability authorities (owner directive 2026-08-04,
+    ;;    ADR-2608040100) ─────────────────────────────────────────────
+    ;; 56 repositories carried this prefix before it was ever declared here —
+    ;; the same drift as app-, and the largest undeclared role family in the
+    ;; workspace. The contract itself was already decided by ADR-2607289500
+    ;; ("capability を 1 authority = 1 public repository に分離する"); only its
+    ;; name-prefix expression was missing.
+    {:prefix "capability-"
+     :role :capability-authority
+     ;; A capability package is a contract plus its semantic definition. It is
+     ;; imported and compiled against; nothing in it runs on its own. The
+     ;; provider that satisfies it is a separate repo with its own execution.
+     :execution :none
+     :must [:declare-exactly-one-capability
+            :ship-capability-edn
+            :pin-a-semantic-definition-cid]
+     ;; The one-capability-per-repo rule is the whole point of the split: an
+     ;; import's immutable identity is the definition CID, and a repo holding
+     ;; two capabilities cannot have one.
+     :must-not [:declare-a-second-capability
+                :hold-ambient-authority
+                :depend-on-a-provider]
+     :authority "90-docs/adr/2607289500-kotoba-refactor-agent-handoff-and-capability-repo-cid.edn"
+     ;; Recorded because it bears directly on how much the NAME is allowed to
+     ;; mean: ADR-2607289500 decides that a repository name (and a Radicle RID)
+     ;; is a discovery alias only, and that identity is the semantic definition
+     ;; CID. So `capability-http-fetch` is a search affordance, not a contract.
+     :identity :semantic-definition-cid
+     :examples ["capability-http-fetch" "capability-gpu-draw-frame"
+                "capability-identity-sign" "capability-ledger-append"]}
     ;; ── the itonami fleet's two execution classes (owner directive
     ;;    2026-07-30) ──────────────────────────────────────────────────
     ;; The prefix is written out in full because the auditor matches with
@@ -270,8 +300,30 @@
      ;; CLI, no runner, no storage, no clock — every function takes now-ms from
      ;; its caller."
      :execution :none
+     ;; The subject plane. A bare name is the LAST plane tried, not the default
+     ;; one: it is what remains after origin, role and family have all failed to
+     ;; apply (ADR-2608040100 :plane-order). 537 repositories in kotoba-lang
+     ;; carry a bare name, and a bare name that is really an actor or a service
+     ;; is a role-plane repo that skipped its prefix.
      :must [:provide-reusable-contract]
-     :examples ["design-quality" "hinshitsu" "browser-agent" "ao"]}]
+     :must-not [:be-an-actor-or-service-without-a-role-prefix]
+     ;; A metaphor name is allowed — `kuro` (黒, terminal model) and `kobo`
+     ;; (工房, workbench) were deliberately chosen over descriptive names. What
+     ;; is NOT allowed is a metaphor with no other way in: on 2026-08-03 both
+     ;; repos existed for 34 days and "is a terminal implemented?" was still
+     ;; answered "no", because the name said nothing and nothing else did
+     ;; either. The fix is not renaming, it is a second route.
+     :opaque-name-requires
+     [{:route :readme-self-identification
+       :rule "the README's first line states what the repository is, in plain
+              terms, before any metaphor or history"}
+      {:route :concept-index
+       :rule "the subject is registered in manifest/concept-vocabulary.edn so
+              `nbb scripts/concept-lookup.cljs <word>` reaches it — in both
+              English and Japanese"
+       :authority "90-docs/adr/2608039980"}]
+     :examples ["design-quality" "hinshitsu" "browser-agent" "ao"]
+     :opaque-examples ["kuro" "kobo" "byoubu" "sekisho" "madoguchi" "shitsuke"]}]
    :vocabulary/composition
    {:authority "loop-*"
     :adapters ["action-*" "skill-*"]
@@ -281,7 +333,117 @@
     :pull-request-gate true
     :schedule-supported true
     :baseline-promotion :explicit-human-action
-    :missing-evidence :fail-closed}}]
+    :missing-evidence :fail-closed}}
+
+  ;; ── origin plane (owner directive 2026-08-04, ADR-2608040100) ─────────
+  ;; 1,191 repositories carry an origin prefix and none of it was declared.
+  ;;
+  ;; The correction this vocabulary encodes: `com-` is NOT a category meaning
+  ;; "commercial company". It is what stripe.com reverses to. The prefix is a
+  ;; mechanical function of the authority's real domain, which means a
+  ;; misfiling is a lookup that never happened, not a judgement that went the
+  ;; wrong way — and therefore machine-checkable.
+  {:vocabulary/id :origin
+   :vocabulary/authority "90-docs/adr/2608040100-origin-plane-is-reverse-dns-of-the-real-domain.edn"
+   :vocabulary/applies-to "any repo implementing a specification or product that some other party owns"
+   :vocabulary/data "manifest/origin-domains.edn"
+   :vocabulary/discriminator :origin/domain
+   ;; Reverse the registrable domain's labels and join with '-'. The repo name
+   ;; must equal that, or begin with it followed by '-' and a subject.
+   :vocabulary/derivation
+   {:input :registrable-domain
+    :steps [:drop-www :split-on-dot :reverse :join-with-hyphen]
+    :match "name = prefix, or name starts-with (str prefix \"-\")"
+    ;; One-way on purpose. A name cannot be parsed back into a domain because a
+    ;; single label may contain no hyphen while the subject contains several
+    ;; (com-yang-ming-api). Deriving forward is total; parsing backward is not.
+    :direction :domain->prefix-only}
+   ;; Not a fixed value set. Whatever TLD the authority actually uses is the
+   ;; prefix, which is why no new category had to be invented for government or
+   ;; treaty bodies — irs.gov simply reverses to gov-irs.
+   :vocabulary/tld-values :open
+   :vocabulary/observed-tlds
+   {"com" 1054 "org" 119 "io" 13 "tech" 2 "jp" 2 "net" 1 "edu" 1 "dev" 1}
+   ;; Pin the domain as of registration. An authority that moves its domain does
+   ;; NOT trigger a rename: the name is a discovery alias, not identity
+   ;; (ADR-2607289500), and chasing a move would churn west pins and every
+   ;; inbound reference for nothing. Already live: IPFS moved ipfs.io ->
+   ;; ipfs.tech and correctly occupies both io-ipfs and tech-ipfs-*.
+   :vocabulary/on-domain-migration :pin-at-registration-do-not-rename
+   ;; Absence of a recorded domain is UNVERIFIED, never CONFORMANT.
+   :vocabulary/missing-evidence :report-unverified}
+
+  ;; ── product family plane (owner directive 2026-08-04, ADR-2608040100) ──
+  ;; 169 repositories in five families, none declared. kami-* alone is 96 —
+  ;; larger than every declared role prefix in this file combined.
+  {:vocabulary/id :product-family
+   :vocabulary/authority "90-docs/adr/2608040100-origin-plane-is-reverse-dns-of-the-real-domain.edn"
+   :vocabulary/applies-to "repos owned by one authority that ship as a set"
+   :vocabulary/discriminator :family
+   ;; A family prefix is only earned by a set. One repo with a family prefix is
+   ;; a bare-name library wearing a costume, and it makes the prefix look like a
+   ;; taxonomy when it is a single name.
+   :vocabulary/rules
+   [{:family "kami-"     :count 96 :owner "kami-engine"
+     :authority "90-docs/adr/2607102200-kami-render-stack-deps-authority-rename.edn"
+     :note "the 3D stack; CLAUDE.md makes it mandatory for all 3D in the workspace"}
+    {:family "kotoba-"   :count 32 :owner "kotoba"}
+    {:family "kotobase-" :count 24 :owner "kotobase"
+     :note "storage/query providers; kotobase-storage-* is a sub-set keyed by backend"}
+    {:family "kura-"     :count 6  :owner "kura"}
+    {:family "kotodama-" :count 5  :owner "kotodama"}]
+   :vocabulary/must [:share-one-owning-authority :ship-as-a-set]
+   :vocabulary/must-not [:be-a-family-of-one :shadow-a-role-prefix]
+   ;; Measured, not asserted: these carry a family-shaped prefix but have fewer
+   ;; than three members, so whether they are a family or two bare names that
+   ;; happen to share a word is undecided. Named rather than folded in.
+   :vocabulary/undecided
+   [{:family "murakumo-" :count 3 :note "murakumo-generation / -langchain / -studio"}
+    {:family "sdk-"      :count 3 :note "sdk-auth / sdk-mock / sdk-py — reads as a role, not an owner"}]}]
+
+ ;; ── plane order ────────────────────────────────────────────────────────
+ ;; The single rule that makes the four planes a system rather than four
+ ;; overlapping conventions: ONE NAME CARRIES ONE PLANE, and the plane is chosen
+ ;; by the first of these that applies. Written down because the drift this file
+ ;; keeps discovering is never "the wrong rule was followed" — it is "two rules
+ ;; were available and nothing said which won" (ADR-2608040100).
+ :plane-order
+ [{:plane :origin        :when "the subject is someone else's spec or product"
+   :vocabulary :origin}
+  {:plane :role          :when "the repo's execution role is fixed (loop/app/capability/person/skill/action)"
+   :vocabulary :name-prefix}
+  {:plane :family        :when "it belongs to a set owned by one authority here"
+   :vocabulary :product-family}
+  {:plane :subject       :when "none of the above — a reusable library, bare-named"
+   :vocabulary :name-prefix :rule-index :prefix-nil}]
+
+ ;; Two planes may use the same subject word — `webrtc` (our library) and
+ ;; org-w3-webrtc-signaling (the spec) are both correct, and ADR-2607050900
+ ;; already called the ipns/did pair exemplary for exactly this. The condition
+ ;; is that each README states the boundary against its nearest neighbour.
+ ;; What is forbidden is the SAME subject twice on the SAME plane.
+ :cross-plane-collision
+ {:allowed true
+  :requires :readme-states-boundary-against-nearest-neighbour
+  :precedent "90-docs/adr/2607050900-kotoba-lang-naming-audit.edn"
+  :examples [{:subject "webrtc"
+              :subject-plane "kotoba-lang/webrtc"
+              :origin-plane "kotoba-lang/org-w3-webrtc-signaling"}
+             {:subject "dns"
+              :subject-plane "kotoba-lang/dns"
+              :origin-plane "kotoba-lang/org-ietf-dns"}
+             {:subject "arxiv"
+              :subject-plane "kotoba-lang/arxiv"
+              :origin-plane "kotoba-lang/com-arxiv-api"}]}
+ :same-plane-collision
+ {:allowed false
+  :examples [{:subject "ros"
+              :duplicates ["kotoba-lang/com-ros-robotics" "kotoba-lang/com-ros2-nav"
+                           "kotoba-lang/org-ros" "kotoba-lang/org-ros-urdf"]
+              :resolution "ros.org derives org-ros; the two com- entries are misfiled"}
+             {:subject "w3c"
+              :duplicates ["kotoba-lang/com-w3c-specs" "kotoba-lang/org-w3-*"]
+              :resolution "w3.org derives org-w3; com-w3c-specs collides with a 40-strong conformant family"}]}
 
  ;; Naming constraints that hold for every repo in the workspace regardless of
  ;; vocabulary. Lifted from CLAUDE.md "Repo naming" / ADR-2607102200 addendum 14.
@@ -329,6 +491,75 @@
                "kotoba-lang/loop-lei-catalog"
                "kotoba-lang/skill-loop-system-dynamics"]
    :gap/note "prefix-carrying repos with no resources/repository-rules.edn upstream"}
+
+  ;; ── measured 2026-08-04 by --name-audit (ADR-2608040100) ──────────────
+  {:gap/id :origin-domain-unverified
+   :gap/measured-at "2026-08-04"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
+   :gap/count 1333
+   :gap/of 1432
+   :gap/note "origin-plane repos with no domain recorded in manifest/origin-domains.edn.
+              Reported UNVERIFIED, never CONFORMANT. Not auto-populated from the
+              name: deriving the domain from the prefix would assume exactly the
+              answer the check exists to test, and would have silently blessed
+              all 77 misfilings below."}
+
+  {:gap/id :origin-prefix-misfiled
+   :gap/measured-at "2026-08-04"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
+   :gap/count 77
+   :gap/of 99
+   :gap/note "Of the 99 origin-plane repos whose authority domain has been looked
+              up, 77 do not start with the prefix their domain derives. Not a
+              failure and not scheduled for rename: a repository name is a
+              discovery alias, not identity (ADR-2607289500), so 77 renames would
+              churn west pins and inbound references to buy nothing on their own.
+              The rule binds NEW registrations; these are visible and dated.
+              Full list: --name-audit output."
+   :gap/worth-renaming-anyway
+   [{:repo "kotoba-lang/com-w3c-specs" :derives "org-w3"
+     :why "collides head-on with a 40-strong conformant org-w3-* family"}
+    {:repo "kotoba-lang/com-ros-robotics" :derives "org-ros"
+     :why "org-ros and org-ros-urdf already exist — same subject, same plane"}
+    {:repo "kotoba-lang/com-ros2-nav" :derives "org-ros"
+     :why "same"}
+    {:repo "kotoba-lang/com-iso-standards" :derives "org-iso"
+     :why "org-iso-10303 / -16739 / -6983 / -aac / -h264 … already conformant"}
+    {:repo "kotoba-lang/com-iso-8583" :derives "org-iso" :why "same"}
+    {:repo "kotoba-lang/com-openxr" :derives "org-khronos"
+     :why "org-khronos-gltf and org-khronos-glb already exist"}
+    {:repo "kotoba-lang/com-posix" :derives "org-ieee"
+     :why "org-ieee-systemverilog / -verilog / -vhdl / -upf / -tar / -asn1 exist"}]}
+
+  {:gap/id :origin-domain-unresolvable
+   :gap/measured-at "2026-08-04"
+   :gap/count 4
+   :gap/repos ["kotoba-lang/com-rtos" "kotoba-lang/com-can-bus"
+               "kotoba-lang/com-sic-codes" "kotoba-lang/com-gb-standards"]
+   :gap/note "carry an origin prefix but have no single authority domain to derive
+              from — a retired standard, a concept with no publisher, or two
+              competing bodies. Each needs an owner decision (move to the subject
+              plane, or pick an authority). Candidates in origin-domains.edn."}
+
+  {:gap/id :capability-declaration-missing
+   :gap/measured-at "2026-08-04"
+   :gap/count 56
+   :gap/note "capability-* repos now have a declared prefix rule, but none ships
+              resources/repository-rules.edn stating which contract it claims.
+              Same shape as :name-prefix-declaration-missing, at 14x the size."}
+
+  {:gap/id :role-prefix-outside-every-declared-rule
+   :gap/measured-at "2026-08-04"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --name-audit"
+   :gap/count 204
+   :gap/note "cloud-itonami-* repositories that carry the fleet's family prefix but
+              match none of the declared role sub-prefixes (isic-/isco-/iso3166-/
+              municipality-/assoc-/marketplace-/commitment-/cofog-/unspsc-/gtin-/
+              jsic-/crowdfunding-/partners/esim/hygiene-). Examples:
+              cloud-itonami-app, cloud-itonami-card-issuing, cloud-itonami-emi.
+              They fall through to the subject plane, which is wrong for a fleet
+              actor. Classifying them is a cloud-itonami decision, not a naming
+              one, so it is recorded here rather than guessed."}
 
   {:gap/id :forbidden-suffix-still-registered
    :gap/measured-at "2026-07-29"
