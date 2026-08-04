@@ -686,3 +686,43 @@
  :remaining ["foreign content: svg の自己閉じタグ、svg 内 HTML タグの breakout（2 件）"
              "template の content が別 fragment にならない（2 件）"
              "稀な 3 件（</br>, a-in-a, body in flow）"]}
+
+{:at "2026-08-04"
+ :iteration 42
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 316 :was 313 :added 3}
+ :line-structure {:agree 300 :total 304 :pct 99}
+ :geometry {:boxes-agree 1142 :boxes-total 1229 :pct 93 :clean-cases 271 :was "1120/1212 (92%), 267"}
+ :paint-order {:points-agree 7693 :points-total 7880 :pct 98 :clean-cases 273}
+ :computed-style {:values-agree 14984 :values-total 17202 :pct 87}
+ :landed {:cssom "1640cf5e6891fe2eaef902011d7ad2879e58d6ba — intrinsic 幅から out-of-flow を除外 + fixed が viewport に錨を打つ"}
+ :note "**corpus 最大の数値誤差（td +761px / tbody +755px）が消えた。** per-case で 5 件の box が変化、
+        4 改善・0 退行。:position/absolute-inside-table-cell が 1/6 → 6/6。"
+ :findings ["症状 1 つの下に**原因が 2 つ**あった。flex-item-main-width（名前に反して measure-child 経由の
+             **全ての shrink-to-fit 幅** —— flex item / grid item / table cell / inline-block）が
+             :else content-w で終わっていた。(a) out-of-flow の子は intrinsic 幅に寄与しない
+             （Brave: td 30、791 ではない）(b) block コンテナの max-content は**最も広い子**で、
+             隣接する inline 子は 1 つの匿名ブロックにまとめる (c) 子の水平 margin は数える。"
+            "**latent bug が露出**: intrinsic 経路が 2 * content-inset（一様 padding）を足していたのに
+             layout-block は per-side の inset を引いていた。UA の padding-left: 40px を持つ <ul> が
+             21px になり自分の padding の余地が無かった。"
+            "**laid-out-children を共有ヘルパとして抽出**（layout-node から）—— これが無いと <ul> が
+             `• ` マーカー抜きで測られ、マーカー込みで layout され、2 行に折り返していた。"
+            "fixed は**既にフローから抜けていた**。抜けていなかったのは祖先からの脱出。draw-ops が
+             :x/:y/:width + 新しい :height から viewport を組み立て、fixed の offset をそれに対して解決する。
+             Brave 実測（756px viewport）: margin-left:120px の中の left:0 → x=0（120 ではない）、
+             left:50% → 378（viewport の半分）、right:0 → 749。offset 無しは静的位置を保つ。"]
+ :harness-limits ["**fixed box の block 軸はこの harness では計測不能。** case は 1 枚の長い
+                   スクロールページを共有するので、fixed box の y は『その case のページ先頭からの距離の負値』
+                   になる（:position/fixed-leaves-flow で −47.84、同じ case をページ先頭に置けば 0、
+                   上に case を 1 つ挿せば別の値）。当該 case は永久に 1 box ずれたまま残し、
+                   『全 box 一致』という古いコメントをこの実測に差し替えた。inline 軸は unit test で固定。"
+                  "『positioned な祖先を持たない、cell 内 absolute』の case も同じ理由で不正直
+                   （Brave は initial containing block に錨を打ち y=−304 を返す）。代わりに同じ規則を
+                   突く正直な 3 件を入れた。"]
+ :remaining [":table/cell-with-a-list の残り 13.7px は list-style-position: outside 由来
+              （このエンジンは <li> のマーカーを行の内側に描く）。with-implicit-list-markers に
+              scope 外として明記、case にも記録。"
+             "fixed の bottom / % block offset は :height 未指定時に祖先に対して解決する（scope cut、test 済み）"
+             "inline vertical metrics（agent 作業中）"
+             "UA stylesheet の所在（ADR-2800003100、op 数実測済み、オーナー判断待ち）"]}
