@@ -362,3 +362,36 @@
                  内容を回復。以後 commit message はファイルに書いて -F で渡す。"
  :verification {:dom-gpu "126 tests / 272 assertions 0 failures、clj-kondo 0 errors"
                 :browser "752 tests 0 failures"}}
+
+{:at "2026-08-04"
+ :iteration 36
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :parser-tree-shape {:agree 115 :total 122 :pct 94 :was "102/113 (90%)"
+                     :table "25/25" :omission "11/11" :attributes "366/367"}
+ :line-structure {:agree 249 :total 280 :pct 89}
+ :geometry {:boxes-agree 952 :boxes-total 1142 :pct 83}
+ :paint-order {:points-agree 6968 :points-total 7285 :pct 96}
+ :landed {:htmldom "c4f9735e6ef4a655b58a14943fc000b84b4e891f — afe の block 除外 + scope marker"}
+ :note "**引き継いだ診断が両方向に誤っていた**。前 agent（およびそれを中継したオーケストレータ）は
+        『<p> を閉じる block-level 開始タグでは reconstruct-active-formatting を呼ばない』と記述したが、
+        93 タグを 1 つずつ Brave で probe した結果: sibling 58 / nested 25 / token 破棄 10。
+        **広すぎ**（li/dd/dt は別経路、textarea/iframe/noembed/plaintext/rb/rt 等は p を閉じないが
+        再構築もしない）かつ **狭すぎ**（**xmp は p を閉じるが再構築する** —— spec 上 pre/listing の
+        隣に座る直接の反例。button も同型）。『p を閉じる集合』で実装していれば両方壊していた。
+        反例は corpus 化済み（:fmt/xmp-still-reconstructs / :fmt/button-still-reconstructs）。
+        文字 token は再構築するので、過剰抑制は block では見えずテキストで初めて見える —— これも case 化。"
+ :scope-markers "旧 SCOPE CUT は『afe を見ない 4 箇所の pop に marker を通す必要がある』と見積もっていたが、
+                 **marker は要素 id を持ち、その id が stack of open elements にある間だけ生きる**ので、
+                 次回読み取り時の prune として落ちる（foster parenting と同じ手）。
+                 test 1 件が『Brave は bare #text を返す』と自分のコメントに書きながら [:td [:b \"x\"]] を
+                 assert していたので、名指ししていた実測値の側に直した。"
+ :remaining ["parser 残り 7 件 = comment 3 + 稀な 4（</br>, a-in-a, body in flow, &notit;）。
+              comment は dom-gpu 側の node type が今 iteration で着地したので配線可能になった。"
+             "applet/marquee/object/template の marker は **probe で区別できない**（4 つとも挿入前に
+              再構築するため、marker の有無で結果が変わらない）ので prose だけで足さなかった —— 
+              計測されていることが価値の集合に未計測の主張を混ぜない、という判断。"
+             "table/document 構造タグの除外集合は、ブラウザが table 外でその token を**無視**するため
+              『再構築を飛ばした』ではなく『token 破棄』を測ってしまい oracle にならない。"]
+ :process-note "Brave が 1 回 CDP で応答せず Chrome へ fall through した（同一エンジンなので数値は同じ）。
+                原因は並行 agent 実行による Brave プロセスの滞留 8 個。再実行で Brave に戻り 115/122 を再現。
+                harness に CDP の 1 回リトライを入れるのが follow-up。"}
