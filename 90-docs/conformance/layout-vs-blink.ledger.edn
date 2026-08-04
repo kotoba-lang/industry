@@ -134,3 +134,29 @@
              "select の control font 13 vs Chrome 13.3333"
              "htmldom: <p> が block-level 開始タグで自動閉じされない"
              "WebGL/WebGPU host の retained/draw-ops 経路が theme を受け取らない"]}
+
+{:at "2026-08-04"
+ :iteration 31
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 200 :htmldom-parser-cases 108}
+ :line-structure {:agree 185 :total 190 :pct 97}
+ :geometry {:boxes-agree 646 :boxes-total 718 :pct 90 :clean-cases 167}
+ :computed-style {:values-agree 8583 :values-total 10038 :pct 86 :no-cascade-attributed-mismatch 197}
+ :parser-tree-shape {:agree 94 :total 108 :pct 87 :was "88/100"}
+ :landed {:htmldom "a6281a7ac435efa2ff91bea937195e7caf855a72 — 開いた inline を越える tag omission、stray </p>、Brave/CDP oracle、omission corpus 8 件"
+          :cssom "d07db97010426698a30eba132f6a9ac6f207cf05 — corpus ページを run ごとに分離"}
+ :findings ["**harness の corpus ページが固定パスで、並行 run が互いを上書きしていた。** 実測で
+             line 3/190 / geometry 0/750 という壊滅的な数値が出て、box 数がその run が生成した
+             ことのない corpus のものだった。誰が同時に走っているかで数値が変わる harness は
+             何も測っていない。cssom と htmldom の両方を run ごとの一時ディレクトリに変更。"
+            "htmldom の parser harness も --dump-dom を使っており Brave 151 で無反応 → Chrome へ
+             fall through していた。さらに browser-candidates が Chrome 先頭（docstring は Brave と
+             主張）で、fallback ですらなく最初から Chrome を測っていた。"
+            "tag omission の走査境界は scope ではなく special 要素。button scope で実装したら
+             入れ子リストを越えて外側の <li> を閉じた（既存 test が捕捉）。"]
+ :remaining ["omission 群の残り 3 件: block が p を閉じた後の active formatting element 再構築
+              （<em>/<b> が新しい block 内で開き直される）= adoption agency L3、この repo が明示的に先送り"
+             "table foster parenting 3 件、anchor-in-anchor 1 件（parser 既知の scope cut）"
+             "cascade 残り 3 件: <p> の UA margin 1em を両者が食い違う font-size で解決"
+             "fieldset/legend の out-of-flow 配置、select の control font 13 vs 13.3333"
+             "WebGL/WebGPU host の retained/draw-ops 経路が theme を受け取らない"]}
