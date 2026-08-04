@@ -889,3 +889,34 @@
               **::marker は oracle に element box を作らないので、マーカー自体の位置はこの harness では検証できない**。"
              "transform 6 件（agent 作業中）、template 2 件（私が作業中）"
              "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
+
+{:at "2026-08-04"
+ :iteration 46
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 341 :was 337 :added 4}
+ :line-structure {:agree 326 :total 328 :pct 99}
+ :geometry {:boxes-agree 1241 :boxes-total 1283 :pct 97 :clean-cases 318 :was "1224/1272 (96%), 308"}
+ :paint-order {:points-agree 8424 :points-total 8509 :pct 99 :clean-cases 318}
+ :computed-style {:values-agree 15678 :values-total 17949 :pct 87}
+ :landed {:cssom "c287f85 — CSS transform（translate / scale / rotate / skew / matrix / transform-origin）"}
+ :note "**transform 群 10/10。** 実装前に 23 の probe 形を Brave で実測し、engine はその全てを正確に再現する。
+        per-case 差分で変化したのは transform の 10 case のみ・退行 0、既存 case の行軸は byte-identical。"
+ :findings ["**apply-element-transform が layout-node の element dispatch 全体を包み、:draw 半分だけを書き換える。**
+             :box・collapsed margin・:float/escaped・out-of-flow list はそのまま返る —— これにより
+             『transform は paint 時の操作で兄弟を動かさない』が**注意ではなく構造から**出る。
+             dispatch を包むので block / flex / grid / table / form control / atomic inline が同じコードで覆われる。"
+            "**translate の percentage は要素自身の border box に対して解決する** —— このファイルの他の
+             percentage が全て包含ブロックを取るのに対し、transform-length だけが自分の w/h を取る。"
+            "**非置換 inline は除外**（実測: 文中の transformed <span> は matrix を計算するが動かない）。
+             この述語が無ければ、実装はブラウザが動かさない box を動かしていた —— そのための case を追加。"
+            "list の中に扱えない関数が 1 つでもあれば**リストごと捨てる**（部分適用しない）。
+             4 つのうち 3 つだけ適用すると box を自信満々に誤った位置に置くから。test で固定。"]
+ :declined ["matrix3d / perspective / rotate3d / rotateX / rotateY —— 正直な 2D 行列が存在しない。
+             transform-style / backface-visibility は読まない。px/% 以外の長さは digit run を px と読まず nil を返す。"
+            "**stacking context は未モデル化。**"
+            "transformed な static box の abs 子孫の包含ブロックは**動くが理由が別** —— この engine は
+             全ての block box が positioned 祖先の検査なしに out-of-flow 子を錨付けするので、
+             そもそも position 判定に到達しない。広い単純化を直すときに巻き込まれないよう明記。"]
+ :remaining ["inset-side が content-box 要素で border を含まない（fieldset 残差の全部、box model 1 箇所）"
+             "list marker の位置（::marker は oracle に box を作らないので検証不能）"
+             "template 2 件（作業中）、UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
