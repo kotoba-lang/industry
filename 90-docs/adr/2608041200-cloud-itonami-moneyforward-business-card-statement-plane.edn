@@ -302,9 +302,14 @@ missing require）。
 - MF CSV の実列・取引ID列の有無（上記 #1）。
 - MF ビジネスカードの公式 API の有無（公開ドキュメントに記載が確認できない、
   であって「無い」と確認したわけではない）。
-- `orgs/personal/facts/orgs.edn` の `moneyforward` 項目の実値（west 未登録で
-  この checkout に無い）。「ウォレット残高不足が慢性化」は jk-corp 側の
-  引用であって、本 ADR で直接検証していない。
+- `orgs/personal/facts/orgs.edn` の `moneyforward` 項目の実値。**2026-08-04 の
+  closing 時点で `orgs/personal` は superproject に登録されている**（`git ls-files
+  orgs/personal` で 227,701 files）が、**git-annex dataset で content が未取得**の
+  ため中身は読めない（tracked entry は `.git/annex/objects/...` を指す symlink、
+  133 bytes）。したがって「ウォレット残高不足が慢性化」「銀行API連携一時停止」は
+  依然として jk-corp 側の引用であって、本 ADR で直接検証していない。検証するなら
+  B2 credential を用意して当該 1 ファイルだけ `git annex get` する
+  （dataset 全体の annex-get はしない）。
 - 実運用の締め日・引き落とし日（`:billing-cycle` は手入力で、まだ 1 件も
   実データが入っていない）。
 
