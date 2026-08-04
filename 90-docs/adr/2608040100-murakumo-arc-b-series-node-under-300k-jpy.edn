@@ -155,6 +155,8 @@ B65 は国内流通が **Amazon.co.jp の ASRock 1 SKU のみ**で、価格.com 
 
 `kotoba-lang/mise`（catalog/cart/checkout/order/inventory の pure EC ライブラリ、11 src + 15 test）と `kotoba-lang/kessai`（rail 非依存の決済ポート）は**今回は使わない**。前者は IPaymentPort が mock のみで Stripe adapter が未実装、後者は ISO 8583 カード / ISO 20022 送金の**銀行 rail** 抽象であって、**Stripe Checkout（HTTP API + ホスト型 UI）はどちらの層でもない**。SKU 1 個のために稼働中の経路を捨てて未接続のライブラリへ移すのは、動いているものを壊す方向の変更になる。なお `cloud-itonami/omise` は店舗 EC ではなく actor migration scaffold で、名前が同じだけの別物。
 
+> **2026-08-04 追記（ADR-2608040200）**: ここで挙げた『どちらの層でもない』という不足は、その後 `kessai` に第 3 の rail `:redirect` を、`mise` に `mise.redirect` を足して解消した。**したがって『使わない』理由のうち技術的な部分はもう無い。** ただし本 ADR の決定自体は据え置く —— murakumo の storefront は本番稼働中の経路であり、置き換えは動いているものを壊さない順序（並行実装 → webhook を両経路に流して突き合わせ → 切替）で行う必要がある。移行は未着手。
+
 ### 埋めた 4 つの欠落（既存 hardware SKU は物販でなかったので存在しなかった）
 
 既存の `:node-mac-mini` / `:node-gpu-l4` は *ownership share* —— 現物は Operator が fleet に置き、**買主には何も届かない**。Node 24 は現物が買主の住所に届くので性質が違う。`:hardware/physical-shipment?` で型として区別した（同じ `:kind :hardware` に混ぜたままだと、**片方にしか無い義務を両方に対して見落とす**）。
