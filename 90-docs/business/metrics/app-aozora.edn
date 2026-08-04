@@ -1,34 +1,34 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 23011,
-  "app-aozora-appview" 10151,
-  "app-aozora-spa" 6667},
+ {"app-aozora-pds" 23157,
+  "app-aozora-appview" 10222,
+  "app-aozora-spa" 6684},
  :zone
- {:requests-7d 1106625,
-  :pageviews-7d 5814,
-  :uniques-7d-sum 742,
+ {:requests-7d 1114331,
+  :pageviews-7d 5835,
+  :uniques-7d-sum 770,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 920783}
-   {:path "/v1/transact", :requests 4498}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 3233}
-   {:path "/xrpc/com.atproto.server.createSession", :requests 2252}
-   {:path "/federation-pilot/did.json", :requests 146}
+  [{:path "/v1/datoms", :requests 926694}
+   {:path "/v1/transact", :requests 3301}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 2938}
+   {:path "/xrpc/com.atproto.server.createSession", :requests 1651}
+   {:path "/federation-pilot/did.json", :requests 144}
    {:path
     "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
-    :requests 140}
+    :requests 130}
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 134}
-   {:path "/xrpc/com.atproto.sync.getRepo", :requests 77}],
-  :status-mix {:ok 934265, :client-error 24798, :server-error 625},
+    :requests 119}
+   {:path "/api/q", :requests 114}],
+  :status-mix {:ok 937970, :client-error 24221, :server-error 594},
   :window "24h"},
  :as-of "2026-08-04",
  :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 920783 · /v1/transact 4498 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 3233 · /xrpc/com.atproto.server.createSession 2252 · /federation-pilot/did.json 146 | 4xx(probe) 3% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 926694 · /v1/transact 3301 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 2938 · /xrpc/com.atproto.server.createSession 1651 · /federation-pilot/did.json 144 | 4xx(probe) 3% · 5xx 0%",
  :signal
- "aozora.app 実測 1106625 req/7d・742 uniques(日次和)・うち4xx probe 3%(24h)、workers 39829 inv/7d"}
+ "aozora.app 実測 1114331 req/7d・770 uniques(日次和)・うち4xx probe 3%(24h)、workers 40063 inv/7d"}

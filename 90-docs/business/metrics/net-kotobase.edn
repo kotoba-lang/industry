@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 8348, "kotobase-cf-wasm-staging" 8071},
+ {"net-kotobase" 8581, "kotobase-cf-wasm-staging" 8666},
  :zone
- {:requests-7d 23838,
-  :pageviews-7d 1257,
-  :uniques-7d-sum 1337,
+ {:requests-7d 24703,
+  :pageviews-7d 1264,
+  :uniques-7d-sum 1340,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/_health", :requests 2569}
-   {:path "/health", :requests 2554}
-   {:path "/", :requests 127}
+  [{:path "/health", :requests 2494}
+   {:path "/_health", :requests 2480}
+   {:path "/", :requests 123}
    {:path "/api/funnel", :requests 25}
-   {:path "/robots.txt", :requests 25}
+   {:path "/robots.txt", :requests 24}
    {:path "/developers", :requests 23}
-   {:path "/pricing", :requests 23}
+   {:path "/pricing", :requests 22}
    {:path "/why-kotobase", :requests 21}],
-  :status-mix {:client-error 5701, :ok 5523},
+  :status-mix {:client-error 5520, :ok 5357},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
  :as-of "2026-08-04",
  :traffic-quality {:window "24h", :probe-4xx-pct 51, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /_health 2569 · /health 2554 · / 127 · /api/funnel 25 · /robots.txt 25 | 4xx(probe) 51%",
- :funnel {:visitors 2193, :signups 12, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 2494 · /_health 2480 · / 123 · /api/funnel 25 · /robots.txt 24 | 4xx(probe) 51%",
+ :funnel {:visitors 2197, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 23838 req/7d・1337 uniques(日次和)・うち4xx probe 51%(24h)、workers 16419 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 24703 req/7d・1340 uniques(日次和)・うち4xx probe 51%(24h)、workers 17247 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 7,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.42857142857142855,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 661},
+ {:visitors {:openai-ads 3, :organic 665},
   :signups {:organic 9}, 
   :checkouts {}}}
