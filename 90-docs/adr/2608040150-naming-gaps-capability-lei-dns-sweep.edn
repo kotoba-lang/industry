@@ -1,0 +1,173 @@
+[{:db/id -1
+  :adr/id "adr-2608040150-naming-gaps-capability-lei-dns-sweep"
+  :adr/title "ADR-2608040150: 命名 4 面の残ギャップ整理 — capability は capability.edn で宣言済み、cloud-itonami-lei- は role でなく key、origin 面は DNS sweep で worklist を作る"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-05"
+  :adr/last-verified "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "naming-plane-gap-closure"
+  :adr/authoritative-for
+  ["capability-* の宣言ファイルが resources/repository-rules.edn ではなく capability.edn であること"
+   "capability- の repo 名が :capability/id から導出されること（機械検査）"
+   "cloud-itonami-lei- が role prefix ではなく key prefix であり :execution を単一値で持たないこと"
+   ":execution :per-repo-evidence の意味（repo-taxonomy の :repo/kind を読む）"
+   "cloud-itonami- が product-family として宣言されること"
+   "origin 面の未検査分を「名前から自動補完しない」まま狭める方法（DNS sweep の非対称性）"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2608040100-origin-plane-is-reverse-dns-of-the-real-domain"
+   "adr-2607289500-kotoba-refactor-agent-handoff-and-capability-repo-cid"
+   "adr-2607289600-repo-taxonomy-three-planes"
+   "adr-2607299000-repository-rules-workspace-authority"
+   "manifest/repository-rules.edn"
+   "manifest/origin-domains.edn"
+   "manifest/repo-taxonomy.edn"]
+
+  :adr/body
+  "# ADR-2608040150: 命名 4 面の残ギャップ整理
+
+**Status**: accepted
+**Date**: 2026-08-05
+**Deciders**: Jun Kawasaki（+ Claude、standing authorization）
+**Scope**: ADR-2608040100 が記録した 5 つの gap のうち 3 つ
+
+## Context
+
+ADR-2608040100 で 4 面（origin / role / family / subject）を宣言し、5 つの
+gap を日付付きで記録した。オーナー指示「残りの整理を進めて」を受けて 3 つを
+処理した。**3 つのうち 2 つは、記録した内容そのものが間違っていた。**
+
+## Decision
+
+### 1. capability-* の gap は誤診だった（57 件、resolved）
+
+記録は「57 repo が prefix を持つのに `resources/repository-rules.edn` を
+1 件も持たない」。**真だが無意味だった。** 測ったら 57 件すべてが
+`capability.edn` を持っており、汎用ファイルには書けない型付きの形で同じ契約を
+宣言していた（definition CID / hash contract CID / imports / effects /
+default policy / provider status）。
+
+gap を書いたとおりに処理していたら、**既に正本を持つ契約に対して 57 個の冗長な
+ファイルと 2 つ目の source of truth を作っていた。**
+
+正しい修正は、規則を**既にある宣言に向けて**検査すること:
+
+- `:declaration-file "capability.edn"`（schema `kotoba.capability.repository.v1`）
+- **名前は `:capability/id` から導出される**: `capability-` + id の `/` を `-` に。
+  `http/fetch` → `capability-http-fetch`、`secret/use-scram-sha256` →
+  `capability-secret-use-scram-sha256`。**57/57 で成立**するので heuristic
+  ではなく equality として検査する。origin 面に次いで 2 つ目の導出可能な面。
+- `--capability-audit` を追加（local 50 + GitHub 経由 7、違反 0）
+
+名前が導出できることは identity を名前に移すことではない。identity は
+definition CID のまま（ADR-2607289500）で、導出は **discovery alias が
+alias として正しいか**だけを見る。
+
+### 2. `cloud-itonami-lei-` は role prefix ではない（185 件）
+
+未分類 196 件のうち 185 件が `cloud-itonami-lei-<LEI>`。素直な読みは
+「assoc- や isic- と同じ、コード keyed な agent family」——**証拠が拒否した**。
+
+blueprint を並べると別物である:
+
+| | assoc-（宣言済み） | lei- |
+|---|---|---|
+| 鍵 | `:itonami.blueprint/isic` `/iso3166` | `:company/lei` |
+| 役割 | `:itonami.blueprint/domain` + `:governor` | **無し** |
+| 中身 | actor 仕様 | `:company/legal-name` `/jurisdiction` `/website` |
+
+`manifest/repo-taxonomy.edn`（名前 glob ではなく repo 内の証拠から導出、
+ADR-2607289600）が決着させた: **185 件は 154 organisation-record + 31 actor**。
+
+つまりこの prefix は「**何であるか**」ではなく「**何で keyed されているか**」を
+述べている。単一の `:execution` を書けばどちらかの 154 件か 31 件に対して嘘に
+なるので、`:execution :per-repo-evidence` を新設した（値域を拡張し、
+`repo-taxonomy` の `:repo/kind` を読むと明示）。
+
+`:must-not [:hold-a-loop]` は**書かなかった**。記録側にとっては自明に真、
+actor 側にとってもおそらく真だが、これだけ異質な集合に対して各件を測らずに
+主張するのは governance theatre であり、ADR-2607299000 が止めようとしたもの。
+
+あわせて **`cloud-itonami-` を product-family として宣言**した。この org 向けの
+規則はすべて sub-prefix（isic- / assoc- / marketplace- …）を名指ししており、
+**その sub-prefix がぶら下がる family 自体を誰も宣言していなかった** ——
+workspace 最大の family が最後まで未宣言だった。
+
+結果: subject 面 1,181 → 985、role 面 1,300 → 1,485。残り 11 件は sub-prefix を
+共有せず repo-taxonomy 上も 6 lib / 4 actor / 1 不明と割れているので、
+個別判断として `:gap/remaining` に列挙した（cloud-itonami 側の決定）。
+
+### 3. origin 面 1,333 件は batch できない。worklist は作れる
+
+まず**測った**: com-* repo は authority の URL をどこにも持たない（README は
+ベンダ名を散文で書き、github.com 以外にリンクしない）。つまり repo 内から
+抽出できる証拠が無く、1,313 件それぞれが外部 lookup を要する。
+
+代わりに、**何も主張せずに候補を絞る**方法を採った —— 全 1,054 件の com-* に
+ついて、先頭ラベルが `<label>.com` として解決するかを DNS で試す。
+
+**非対称性がこの方法の全部である。**
+
+- **解決しない** = 素直な読みが誤りである証拠（強い）
+- **解決する** = 何の証拠にもならない。`yang.com` は解決するが
+  `com-yang-ming-api` について何も言わない
+
+だから解決した 1,029 件は **UNVERIFIED のまま**にした。黙って conformant に
+すれば、まさにこの検査が存在する理由を無効化する。
+
+結果: 25 件が非解決 → 5 件は記録済み → 20 件を追跡 → **17 件が誤配置、
+3 件が authority 不在（`:unresolvable` へ）、conformant 0 件**。
+
+拾えた例: `com-acorrd-standards`（ACORD、しかも綴りが誤り）/ `com-b-pipe`
+（Bloomberg B-PIPE）/ `com-tensorrt`（NVIDIA）/ `com-pix-brazil`（Banco
+Central do Brasil）/ `com-omop-cdm`（OHDSI）。
+
+**同一面の重複も 1 件出た**: `com-epic-online-services` と
+`com-epiconlineservices` は同じ epicgames.com —— 同じ語を 2 通りに綴った
+重複登録であって 2 つ目の主題ではない。
+
+誤配置 77 → **94**、未検査 1,333 → **1,313**。
+
+## Consequences
+
+| gap | 前 | 後 |
+|---|---|---|
+| `:capability-declaration-missing` | 57 | **0（誤診として resolved）** |
+| `:role-prefix-outside-every-declared-rule` | 196 | **11** |
+| `:origin-prefix-misfiled` | 77 | 94（検査が進んだ結果、増える方が正常） |
+| `:origin-domain-unverified` | 1,333 | 1,313 |
+| `:undeclared-family-candidates` | — | **17（新規記録）** |
+
+**misfiled が増えたのは後退ではない。** 見た分だけ見つかる数であって、
+name-audit の `:honest-reading` はこれを明記している。
+
+### 未着手として残すもの
+
+- **origin 面 1,313 件の lookup** —— 機械化できないことを測って確認した。
+  DNS sweep はもう絞り切っており、残りは 1 件ずつの外部 lookup
+- **誤配置 94 件の改名** —— ADR-2608040100 の方針どおり一括改名しない。
+  適合済み family と正面衝突する 7 件だけが `:gap/worth-renaming-anyway`
+- **`:origin-domain-unresolvable` 7 件** —— 競合する authority のどれを採るか、
+  または subject 面に移すか。オーナー判断
+- **`:undeclared-family-candidates` 17 件** —— kotoba-lang / cloud-itonami 以外の
+  org。`open-` 17 / `ghosthacker-` 13 / `ai-` 10 / `gftd-` 8 等。実在の family か
+  語彙の偶然かは org 単位の判断
+- **`cloud-itonami-*` 残り 11 件** —— 個別に role を決めるか、lib は prefix を
+  外すか
+
+## Alternatives considered
+
+- **57 個の `resources/repository-rules.edn` を書く** —— 却下。gap の記述を
+  疑わずに実行していたら冗長な 2 つ目の正本を作っていた
+- **`cloud-itonami-lei-` に単一 `:execution` を与える** —— 却下。154 件か
+  31 件のどちらかに対して必ず嘘になる
+- **`<label>.com` を全 com-* に自動補完** —— 却下。97.6% が DNS 解決するので
+  ほぼ全件が黙って conformant になり、検査の意味が消える
+"}]

@@ -461,6 +461,72 @@
              {:stale (vec stale)}))
     (println (str "name-audit: OK (" (count origin-anchors) " anchors hold, no stale data)"))))
 
+;; -------------------------------------------------------- capability audit
+
+(def capability-rule
+  (first (filter #(= "capability-" (:prefix %)) prefix-rules)))
+
+(defn- capability-id->name [id]
+  (str "capability-" (str/replace (or id "") "/" "-")))
+
+(defn capability-audit! [west-file workspace]
+  (let [rule (or capability-rule
+                 (fail! "authority declares no capability- prefix rule" {}))
+        schema (:declaration-schema rule)
+        names (->> (west-repos west-file)
+                   (filter #(str/starts-with? (:name %) "capability-"))
+                   (sort-by :name))
+        graded
+        (for [{:keys [repo name]} names
+              :let [dir (.join path workspace "orgs" "kotoba-lang" name)
+                    file (.join path dir (:declaration-file rule))]]
+          (if-not (.existsSync fs file)
+            ;; An absent checkout is "unknown here", not "missing upstream" —
+            ;; the same distinction --prefix-audit already draws.
+            {:repo repo :status (if (.existsSync fs dir) :declaration-missing :checkout-absent)}
+            (let [c (read-edn file)
+                  id (:capability/id c)]
+              {:repo repo :id id
+               :status :present
+               :problems
+               (cond-> []
+                 (not= schema (:schema c))              (conj :wrong-schema)
+                 (nil? id)                              (conj :no-capability-id)
+                 (not= name (capability-id->name id))   (conj :name-does-not-derive-from-id)
+                 (nil? (:capability/definition-cid c))  (conj :no-definition-cid)
+                 (nil? (:capability/hash-contract-cid c)) (conj :no-hash-contract-cid)
+                 (not= repo (:capability/repository c)) (conj :repository-field-mismatch)
+                 (nil? (:authority c))                  (conj :no-authority))})))
+        by-status (group-by :status graded)
+        present (get by-status :present [])
+        bad (filter #(seq (:problems %)) present)]
+
+    (println (str "west manifest: " west-file))
+    (println (str "capability- repositories: " (count names)))
+    (println (str "  checked here   " (count present)))
+    (println (str "  checkout absent " (count (get by-status :checkout-absent []))
+                  "   [declaration unknown locally, not a gap]"))
+    (println (str "  declaration missing " (count (get by-status :declaration-missing []))))
+    (println "")
+    (println (str "contract: " (:declaration-file rule) " (" schema ")"))
+    (println (str "  name derives from :capability/id  "
+                  (count (remove #(some #{:name-does-not-derive-from-id} (:problems %)) present))
+                  "/" (count present)))
+    (println (str "  semantic definition CID pinned    "
+                  (count (remove #(some #{:no-definition-cid} (:problems %)) present))
+                  "/" (count present)))
+    (doseq [{:keys [repo id problems]} bad]
+      (println (str "  BAD " repo " (id=" id ") " (pr-str problems))))
+    (when (seq (get by-status :declaration-missing []))
+      (doseq [{:keys [repo]} (get by-status :declaration-missing [])]
+        (println (str "  GAP " repo " ships no " (:declaration-file rule)))))
+    (if (or (seq bad) (seq (get by-status :declaration-missing [])))
+      (fail! "capability- repositories violate their declared contract"
+             {:bad (mapv :repo bad)
+              :missing (mapv :repo (get by-status :declaration-missing []))})
+      (println (str "capability-audit: OK (" (count present) " checked, "
+                    (count (get by-status :checkout-absent [])) " not checked out here)")))))
+
 ;; --------------------------------------------------------------------- main
 
 (let [args (vec *command-line-args*)]
@@ -470,6 +536,11 @@
         (println "       nbb scripts/verify-repository-roles.cljs --prefix-audit [--west <west.yml>]")
         (println "       nbb scripts/verify-repository-roles.cljs --name-audit [--west <west.yml>] [--org <org>]")
         (compat/exit 2))
+
+    (some #{"--capability-audit"} args)
+    (let [west (or (second (drop-while #(not= "--west" %) args)) "manifest/west.yml")
+          workspace (or (second (drop-while #(not= "--workspace" %) args)) ".")]
+      (capability-audit! west workspace))
 
     (some #{"--name-audit"} args)
     (let [west (or (second (drop-while #(not= "--west" %) args)) "manifest/west.yml")
