@@ -498,3 +498,30 @@
              "absolute 3 件（positioned な祖先が無い / offset 無しの静的位置 / relative な inline が包含ブロック）"
              "fixed がフローから抜けない、button の nested inline、media-object"
              "cascade の UA stylesheet 所在（構造的）"]}
+
+{:at "2026-08-04"
+ :iteration 39
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 299 :was 292 :added 7 :area "stacking"}
+ :line-structure {:agree 271 :total 287 :pct 94}
+ :geometry {:boxes-agree 1015 :boxes-total 1164 :pct 87 :clean-cases 234}
+ :paint-order {:points-agree 7174 :points-total 7455 :pct 96 :clean-cases 250}
+ :computed-style {:values-agree 14120 :values-total 16264 :pct 87}
+ :landed {:cssom "c9fff52ae0be9f4531b332427952ce3cbdb72191 — stacking case 4 → 11"}
+ :note "paint order 軸が着地した時点で stacking case は 4 件しか無く、あの軸は主に
+        **別の主題を持つ case の偶発的な重なり**を測っていた。意図的な 7 件を追加。
+        6 件 pass、**1 件が本物の発散**（:stacking/positioned-covers-later-flow-content:
+        absolute な box が後続の in-flow 内容より前に現れるべきところで後ろに来る。
+        :position/absolute-static-position-no-offsets と同根）。"
+ :investigated-not-landed
+ "out-of-flow の静的位置（absolute な子が『もし in-flow だったら置かれた y』を保つ）を調べたが、
+  layout-children-block / partition-flow への侵襲的な変更が要り、**grid と display 型の agent が
+  同じファイルを編集中**だったため着手しなかった。原因は特定済み:
+  (1) 静的位置が失われコンテナの content 原点に落ちる、
+  (2) inline-level-element? が position: static を要求するため **position: relative な inline が
+      block 化される**（relative の最も一般的な用途である『absolute な子の錨』が壊れる）。
+  次 iteration で専任 agent に渡す。"
+ :remaining ["grid（agent 作業中）、display: table/contents/flow-root + table-layout: fixed（agent 作業中）"
+             "out-of-flow の静的位置と relative inline の包含ブロック（上記、原因特定済み）"
+             "fixed がフローから抜けない、button の nested inline、media-object"
+             "cascade の UA stylesheet 所在（構造的）"]}
