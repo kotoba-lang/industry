@@ -252,3 +252,25 @@
              "既存の gap: absolute × table cell の +761px、fieldset/legend の out-of-flow、
               select の control font、UA stylesheet の所在（cascade 軸の構造的 1,400 値）"
              "parser: comment node type、foster parenting、active formatting 再構築"]}
+
+{:at "2026-08-04"
+ :iteration 34
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 292}
+ :line-structure {:agree 249 :total 280 :pct 89}
+ :geometry {:boxes-agree 948 :boxes-total 1142 :pct 83 :clean-cases 204 :clean-total 292
+            :was "941/1142 (82%), 200/292"}
+ :computed-style {:values-agree 13832 :values-total 15942 :pct 87}
+ :landed {:cssom "336f36f81551671bcda58ca9c94ece6777459fc6 — パーセント長を包含ブロックに対して解決"}
+ :note "拡張 corpus が示した**単一原因として最大**の発散（9 case）。parse-int の先頭数字列抽出で
+        50% が 50px になっていた。これは事故ではなく explicit-length の docstring に
+        『意図的な近似』と明記されていた設計判断で、実測により差し替えた。
+        不定な basis（auto 高さの親）に対するパーセントは実 CSS どおり auto として扱い、
+        生の数値に fallback しない。旧挙動を固定していた test 3 件を理由付きで更新。"
+ :remaining ["flex item / grid item の relative offset はまだ basis 未配線（パーセントは px と誤読せず無視。
+              コードにその旨明記）"
+             "absolute の包含ブロックが content box（正しくは padding box）、left+right / top+bottom による寸法解決"
+             "flex の既定以外 10 プロパティ、grid の flow/gap/alignment、float の clear/margin/包含"
+             "display: table/contents/flow-root、table-layout: fixed、colgroup、border-collapse"
+             "direction: rtl、単位無し line-height、BFC が overflow-x/y を見ない"
+             "parser: comment node type、foster parenting（別 agent が作業中）、active formatting 再構築"]}
