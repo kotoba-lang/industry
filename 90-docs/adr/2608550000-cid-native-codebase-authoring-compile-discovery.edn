@@ -175,15 +175,19 @@
 
    ## 主張してはいけないこと（未実装）
 
-   - **DHT へ announce しない。** libp2p ノードが要る。namespace は**それを host する
-     node で到達可能**であって、公衆ネットワークから見つかるわけではない ——
-     これは「published」より小さい主張である。`pull` は空の provider 集合をそのまま返す。
+   - **自分で DHT へ announce しない。** libp2p ノードが要る。plain HTTP で届くのは
+     **IPFS Pinning Service API** で、pinning service は block を保存し自らを provider と
+     して広告する。service 自身の status は**報告するが信じない**（`queued` は `pinned`
+     ではない）し、`announced?` は **router に訊き直す**（ネットワークが見つけられるかは
+     ネットワークにしか答えられない）。検証は意図的にリトライしない —— 待つと
+     「報告された事実」が「含意された保証」に化ける。**third party に依頼した announce**
+     であって、自分の DHT presence ではない。
    - **name registry も鍵配布も無い。** follower は endpoint と publisher DID を
      何らかの帯域外手段で知っている必要がある。
-   - semantic diff / rebase / 対話的 conflict 解決は無い。
-   - **compiler の正確な revision を cache key に束ねていない**（上述）。
-   - **effect は policy 言語ではない**。capability の委譲・attenuation・
-     policy DSL は無く、allow set と quota と provider 契約だけ。
+   - **対話的な merge UI は無い**（conflict はデータで返るが、選ぶのは呼び出し側）。
+   - **effect は policy DSL ではない**し、**revocation も無い**（grant は減衰できるが、
+     配った後に取り消す機構は無い）。
+   - **hosted registry / 鍵配布は無い**（follower は endpoint と DID を帯域外で知る）。
    - surface 層の `evaluator` は依然 **pure**（capability intrinsic を拒否）。
 
    ## 実装上の判断（再発防止として明記）
