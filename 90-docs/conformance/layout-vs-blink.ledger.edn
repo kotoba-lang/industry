@@ -648,3 +648,19 @@
              "残り 4 case: fixed がフローから抜けない / button の nested inline / media-object /
               上記 stacking の tie（レイアウトではなく計測の限界）"
              "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
+
+{:at "2026-08-04"
+ :iteration 42
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :landed {:root "39e174b9c187f38e483ef9590fc53401ea74eddb — ADR-2800003100 に op 数の実測を反映"}
+ :note "ADR が『着手前に測れ』と名指ししていた唯一の未計測項目を測った。**当初の見積もりが 1 桁外れていた。**
+        Brave で 46 タグの『UA 既定値が initial と異なる property 数』を直接計測:
+        平均 **2.3 個/タグ**（14 ではない）、最大 7（th, button）、**0 個が 5 タグ**（span, label, img, br, a）。
+        a が 0 なのは UA の青色が href を持つ場合に掛かるためで、**UA 規則は tag だけでなく属性にも
+        条件付き**という証拠でもある（実装時に効く）。
+        実ページの op 増加（browser の load-html で実測）: smoke +39% / article +65% / form +67%。
+        全 property を無条件に書けば +255〜400% だが、**initial と異なる値だけを書けば +39〜67%**。
+        よって緩和案（:ua/* 別 namespace）は不要で A をそのまま実装してよい、という見解に更新。
+        大きな文書での実測は未実施と明記。"
+ :in-flight ["inline vertical metrics（agent 作業中、幾何残差最大の ~30 box）"
+             "position: fixed のフロー離脱 + table cell 内 absolute の +761px（agent 作業中）"]}
