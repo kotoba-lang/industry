@@ -98,66 +98,80 @@ dataset を `okugai-inventory`（`:site/*` 面）に置き換えた。`denchu-in
    なく、見ていない。"
 
   :adr/evidence
-  "実データ収集（2026-08-04、OSM Overpass、認証不要、8 area / 全 10 観測媒体）:
+  "実データ収集（2026-08-04、OSM Overpass、認証不要、全 10 観測媒体）。
+JP 8 area + 国外 11 area（うち fr-paris-centre は Overpass 失敗のため shard 無し）:
 
-| area | 管轄 | 地点 | 照会可 |
-|---|---|---|---|
-| chiyoda-marunouchi | JP-13 | 1 | 0 |
-| setagaya | JP-13 | 7 | 5 |
-| kyoto-nakagyo | JP-26 | 67 | 62 |
-| sapporo-chuo | JP-01 | 204 | 202 |
-| tokyo-central | JP-13 | 29 | 23 |
-| osaka-kita | JP-27 | 4 | 1 |
-| nagoya-naka | JP-23 | 0 | 0 |
-| fukuoka-chuo | JP-40 | 0 | 0 |
-| 計 | | 312 | 293 |
+| 法域 | 地点 |
+|---|---|
+| FR-75 (Paris) | 2181 |
+| US-CA (Los Angeles) | 420 |
+| JP-01 (札幌中央) | 204 |
+| DE-BE (Berlin Mitte) | 196 |
+| US-NY (Manhattan) | 77 |
+| IN-DL (Delhi) | 72 |
+| JP-26 (京都中京) | 67 |
+| JP-13 (東京 3 area) | 37 |
+| JP-27 (大阪北) | 4 |
+| AE-DU (Dubai) | 2 |
+| CN-BJ (北京朝陽) | 1 |
+| IN-MH (Mumbai) | 1 |
+| 計 | 3262 |
 
-媒体別（datom 面のクエリ）: utility-pole 283 / board 18 / poster-box 4 /
-billboard 3 / screen 2 / column 1 / sign 1。
-照会状態: candidate-by-area 283（電柱、供給区域から候補）/ operator-known 10
-（観測の operator が照会先の手がかり）/ unresolved 19。
+媒体別: utility-pole 781 / poster-box 731 / billboard 637 / board 483 /
+column 482 / screen 132 / totem 7 / banner 4 / sign 4 / wall 1。
 
-**電柱以外の 29 地点のうち 10 件（34%）は observation だけで照会先の手がかりが
-立った** —— OSM の `operator` タグ（千代田区・商工中金・株式会社アトレ等）。
-電柱の operator 充足率が実質 0% だったのと対照的で、**広告物の方が観測から
-照会先を得やすい**。ただし `operator` は運営者であって媒体社とは限らないので
-`:operator-known` は『手がかりがある』であって『買える』ではない。
+**法域で観測の性格が違うことが実測で出た。** Paris は column（Morris 円柱）322 と
+poster-box 691 が突出し、operator 充足率 33%（725/2181）。Berlin は column 155。
+Los Angeles は utility-pole 416 に対し広告物 4 件だけ。CN/IN/SA/AE は OSM 側の
+マッピングが薄い（Riyadh・Shanghai・Mumbai 南部は 0〜1 件）—— これは『広告が無い』
+ではなく『OSM に無い』。
 
-名古屋・福岡が 0 件なのも実測値であって障害ではない（当該 bbox の OSM 側に
-広告物・電柱のマッピングが無い）。**area の外・要求しなかった媒体に地点が無い
-のではなく、見ていない。**
+法令カタログ: 8 法域 / 17 instrument。すべて一次情報の出典 URL 付き。
+- JPN 屋外広告物条例 / 道路占用（道路法32条）/ 道路使用 / 建築基準法88条（高さ4m超）/
+  64条（防火地域）/ 高速道路沿道
+- USA 自治体 zoning + 州 DOT permit + Highway Beautification Act
+  （23 U.S.C. §131、right-of-way から 660 フィート、州が effective control を
+  維持しないと連邦道路資金の 10% を失う）
+- DEU Baugenehmigung（Werbeanlage は bauliche Anlage、州の Landesbauordnung。
+  **閾値は面積 1 m² 超**で高さではない）
+- FRA Code de l'environnement L581 の déclaration/autorisation préalable
+  （2024-01-01 に police が市長へ分権）
+- CHN 广告法 + 县级以上地方人民政府の户外广告设置规划（設置禁止事項は法律で列挙）
+- IND 市 Municipal Corporation Act + 市の広告政策（BMC 2024: 高さ 100ft 上限、
+  国道 right-of-way 全面禁止、DOOH 23 時消灯）+ structural stability certificate
+- SAU MoMaH/Balady の掲出ライセンス + GAMR の事業者ライセンス
+- ARE Dubai Decree No. (6) of 2020
 
-datom 面での確認（`manifest/edn-query.cljs q`、dataset `okugai-inventory`）:
-- `[?e \"site/medium\" ?m] [?e \"site/id\" ?s]` → 7 媒体 312 地点
-- `[?e \"site/route-status\" ?s]` → candidate-by-area 283 / operator-known 10 / unresolved 19
-- `[?e \"okugai.coverage/areas\" ?a] ...` → area ごとの実数と reachable
-- 媒体カタログ 14 件と規制カタログ 6 件が出典 URL 付きで引ける
+**未収録で人口 1 億超の 9 法域（IDN PAK NGA BRA BGD RUS MEX ETH EGY）を entity
+として出す** —— 『8 法域収録』だけ見せると世界を覆っているように読める。
+**EU レベルの掲出許可制度は存在しない**（DEU/FRA は加盟国法として収録）。
 
-テスト: okugai 29 tests / 155 assertions、denchu 47 / 256、overpass 12 / 42、
-mapillary 8 / 32、loop 8 / 29、cloud-itonami.denchu-ops 13 / 31。
+**実測中に自分の欠陥を 1 件発見して直した**: Overpass のリクエストが失敗した area
+でも 0 件の shard が書かれていた（fr-paris-centre / in-delhi-central の初回）。
+0 件の台帳は『調べて無かった』と読まれるので、全 source が落ちたら shard を書かず
+証跡だけ残して非ゼロ終了し、一部失敗なら coverage に `:source-errors` を刻む。
+
+テスト: okugai 31 tests / 305 assertions、denchu 47 / 256、overpass 12 / 42、
+mapillary 8 / 32、loop 9 / 38、cloud-itonami.denchu-ops 13 / 31。
 すべて nbb（ClojureScript）で green。JVM は使っていない。
 **cloud-itonami のリポジトリ全体 suite は未実行**（別ゲート）。
 
 外部事実の出典（すべて 2026-08-04 に実ページで確認）:
-- Mapillary Graph API v4: host graph.mapillary.com、認証必須、bbox < 0.01 度、
-  limit 2000、object_values フィルタ。taxonomy 実文字列
-  `object--support--utility-pole` / `object--support--pole` / `object--street-light` /
-  `object--banner` / `object--sign--advertisement`
-- OSM `advertising=*` の実分布（都心 bbox 46 件）: board 25 / billboard 9 / screen 7 /
-  poster_box 2 / column 1 / totem 1 / sign 1、うち operator 付き 13 件（28%）
-- 東電タウンプランニング（東電PG柱）: 月々2,640円（税込）〜、TEL 03-6371-8111、
-  https://www.ttplan.co.jp/service/ad_pole/
-- テルウェル東日本 東関東支店（NTT東柱・千葉）: 袖/巻の 2 タイプ、月額
-  A2,800/B2,600/C2,400/D2,200/E2,000 円（税抜、2025-06-01 改定）、製作費 15,000 円
-  （税抜、取付含む）、https://www.telwel-east.co.jp/denchu-koukoku/fee/
-- 建築基準法88条1項（令138条1項3号）: 高さ4m超の広告塔・広告板は工作物確認申請。
-  屋上の広告塔も広告塔部分が4m超なら対象。確認済証前の着工は1年以下の懲役または
-  100万円以下の罰金。https://www.city.ota.tokyo.jp/seikatsu/sumaimachinami/kenchiku/tatemono_tyuuikisei/kousakubutsu.html
-- 建築基準法64条: 防火地域内で建物屋上または高さ3m超は主要部分を不燃材料。
-  https://www.mori-sign.jp/column/sign-building-code-structure
-- 高速道路: 沿道は条例の禁止区域指定・沿道ガイドライン（和歌山県が公開）、
-  区域内・SA/PA は道路管理者系の媒体社（NEXCO 西日本コミュニケーションズ 媒体資料）。
-  https://www.pref.wakayama.lg.jp/prefg/080900/okugaikoukokubutsujyourei/about_okugaikoukokubutsu_d/fil/kousoku_guideline_1.pdf"
+- US: https://www.law.cornell.edu/uscode/text/23/131 /
+  https://www.ecfr.gov/current/title-23/chapter-I/subchapter-H/part-750 /
+  https://www.fhwa.dot.gov/real_estate/oac/oacprog.cfm
+- DE: https://www.service-bw.de/zufi/leistungen/2043
+- FR: https://www.legifrance.gouv.fr/codes/section_lc/LEGITEXT000006074220/LEGISCTA000006159329/ /
+  https://www.ecologie.gouv.fr/politiques-publiques/reglementation-publicite-exterieure-enseignes-preenseignes
+- CN: http://gongbao.court.gov.cn/Details/5e4b747dcdf15e728ae60c3904cdc0.html
+- IN: https://portal.mcgm.gov.in/irj/go/km/docs/documents/HomePage%20Data/Whats%20New/BMC%20Draft%20Policy%20Guidelines%20for%20Display%20of%20Outdoor%20Advertisements%202024.pdf
+- SA: https://balady.gov.sa/en/services/issuing-operational-license-advertising-or-promotional-sign /
+  https://momah.gov.sa/en/node/15049
+- AE: https://dlp.dubai.gov.ae/Legislation%20Reference/2020/Decree%20No.%20(6)%20of%202020%20Regulating%20Advertisements%20in%20the%20Emirate%20of%20Dubai.html
+- JP: 前掲（建築基準法88条/64条、屋外広告物条例、道路占用、高速道路沿道ガイドライン、
+  東電タウンプランニング・テルウェル東日本の公開料金）
+- 人口: World Bank 2024 SP.POP.TOTL https://data.worldbank.org/indicator/SP.POP.TOTL
+- Mapillary Graph API v4 taxonomy / OSM advertising=* の実分布: 前掲"
 
   :adr/alternatives
   "1. **cloud-itonami の adnetwork_providers に電柱代理店を足す** — 却下。あの
