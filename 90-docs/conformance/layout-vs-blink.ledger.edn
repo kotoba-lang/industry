@@ -856,3 +856,36 @@
  :process-note "この agent は cleanup で /tmp/kl/*.txt と *.edn を削除した。/tmp/kl は他 agent と共有の
                 scratch 領域で、worktree や repo 内容は無事だが、直下に scratch ファイルを置いていた場合は
                 失われた可能性がある。以後 agent には repo 外 scratch の共有を明示する。"}
+
+{:at "2026-08-04"
+ :iteration 45
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 337}
+ :line-structure {:agree 322 :total 324 :pct 99 :remaining-2 "fixed-leaves-flow と stacking の tie —— どちらも harness の計測限界として記録済み"}
+ :geometry {:boxes-agree 1224 :boxes-total 1272 :pct 96 :clean-cases 308}
+ :paint-order {:points-agree 8321 :points-total 8409 :pct 99 :clean-cases 312}
+ :computed-style {:values-agree 15535 :values-total 17795 :pct 87}
+ :landed {:cssom "d9fca8112c1c3d0b18019b3c6544e93b7ba45056 — fieldset/legend の band、button のラベル計測、float が子孫の行を狭める"
+          :dom-gpu "28b92ee71b9d9678507059187601da2db4faec29 — button の border-box を反映した golden"}
+ :note "**残る行構造の不一致は 2 件だけで、どちらも engine ではなく harness の限界**として既に記録済み
+        （fixed box の block 軸は 1 枚の長いページを共有する構造上測れない／両語が (0,0) で重なる場合に
+        左右順が存在しない）。per-case 差分で 3 改善・0 退行、6 件が同スコアのまま button 幅を
+        Brave に近づけた。"
+ :findings ["**float が子孫 block の行 box を狭める** —— round 22 で名指しされた scope cut を撤去。
+             :page/media-object は button 修正の下流ではなく**これ**で、wrap 位置ではなく
+             1 ページ分の行構造（3 行が 1 行）を失わせていた。5 形で Brave と一致確認。"
+            "**button の label が markup を数えていなかった** —— atomic-intrinsic-width の control 枝が
+             mixed inline を扱う :else 枝を隠しており、<button>save <b>now</b></button> が `save ` として
+             測られ、**button が自分のラベルを折り返して**自分の box の上に描いていた。"
+            "**button/select/checkbox は border-box**（getComputedStyle から読んだ）。inset-side は
+             border-box の box でしか border を数えないので、button のラベルが border 端に座り
+             自分の box の 3px 上に出て、harness が周囲の行に載せていた —— 行軸を直したのはこれ。"
+            "intrinsic 幅は inset + content で計算され available 幅として返され、同じ inset が引かれる ——
+             **binary float ではそれが content に戻らない**（実測 57.89096472741182 → 57.8909647274118）。
+             1 ulp 足りないだけで control が自分のために測ったラベルを折り返す。content を先に整数に丸めた。"]
+ :remaining ["inset-side が content-box 要素で border を含まない —— :form/fieldset-and-legend の残差 2/3 の**全部**。
+              box model 1 箇所の変更で全ページの bordered box が動くため、fieldset の定数に吸収せず記録。"
+             "list marker: engine は <li> のマーカーを行の内側に描くが browser は 40px padding の外に置く。
+              **::marker は oracle に element box を作らないので、マーカー自体の位置はこの harness では検証できない**。"
+             "transform 6 件（agent 作業中）、template 2 件（私が作業中）"
+             "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
