@@ -274,3 +274,27 @@
              "display: table/contents/flow-root、table-layout: fixed、colgroup、border-collapse"
              "direction: rtl、単位無し line-height、BFC が overflow-x/y を見ない"
              "parser: comment node type、foster parenting（別 agent が作業中）、active formatting 再構築"]}
+
+{:at "2026-08-04"
+ :iteration 34
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :parser-tree-shape {:agree 102 :total 113 :pct 90 :was "94/108 (87%)" :table "20/21 (was 12/16)"}
+ :line-structure {:agree 249 :total 280 :pct 89}
+ :geometry {:boxes-agree 948 :boxes-total 1142 :pct 83 :clean-cases 204}
+ :computed-style {:values-agree 13832 :values-total 15942 :pct 87}
+ :landed {:htmldom "f5bf1de — table foster parenting + 暗黙 <tr>、corpus +5 件"}
+ :note "**挿入モードを増やさずに**実装。§13.2.6.1 の条件は stack of open elements から読める
+        （挿入点が table 構造なのは current node が table/tbody/thead/tfoot/tr のときちょうど）。
+        foster parent は root ではなく **table の親**。
+        prose では分からず実測でのみ出た 2 点: 空白のみの run は table 内に残るが &nbsp; は残らない
+        （U+00A0 は ASCII 空白でないので判定は文字クラスを明示する必要がある）／
+        <input type=hidden> だけは table 内に残る。
+        層を跨ぐ検証: cssom の 3 軸が **byte-identical**（この変更は layout 中立）。
+        オーケストレータが merge 後の main で再現確認済み。"
+ :remaining ["afe の scope marker（table 内の未閉 formatting）—— formatting アルゴリズム側の変更として切り分け、
+              新 case :table/foster-parent-unclosed-formatting で計測を継続"
+             "**omission 残り 3 件は原因が判明**: parse-into-document が全ての開始タグで
+              reconstruct-active-formatting を呼ぶが、WHATWG は <p> を閉じる block-level 開始タグ
+              （ul/table/dd 等）では呼ばない。table 側は今回この除外を持ったので修正の形は既知。
+              条件 1 つで 3 case —— htmldom の次の最有力ターゲット。"
+             "col が colgroup 外にあるとき暗黙 colgroup が作られない、table 外の stray td/tr、template の content"]}
