@@ -97,6 +97,16 @@
 
 **contract が初回実行で捕まえた実欠陥**: sigv4 の `:signed-headers` は canonical な \"content-length;host\" **文字列**（`X-Amz-SignedHeaders` の wire 形式）で、`(set \"content-length;host\")` は**文字の集合**なので `content-length` を含まない。素通しすると全 grant が unbound 判定になる。安全側の誤りではあるが誤りには違いなく、逆向きの誤り（署名していないヘッダを署名したと報告する）が金を失う方である。
 
+**D4（grant endpoint）の判断層は着地した**（2026-08-04、`network-awai/net-kotobase` main `f80cff3a`、`kotobase-api-gateway-cljs/src/kotobase/object_grant.cljc`）。`archive-put` / `b2-write` と同じ純関数／shell 分割で、純関数側だけ。符号化した規則は 3 つで、いずれも**破れても本番で無症状**なので test で固定した:
+
+1. **grant は custody ではない。** upload grant は `:object/state :pending` を記録し、`:holding/*` を**主張しない**。holding は「この tenant がバイトを持っている」という主張で、`CHECKPRESENT` が `git annex drop --from` に答える根拠である。意図の時点で custody を主張すると、URL を渡した直後に client が落ちただけで git-annex は numcopies 充足と信じて**最後のローカルコピーを drop する** — Context 6 の欠陥を 1 層上で再現することになる。custody は `settle` が、object を store で観測した後にだけ主張する。
+2. **未保持の read は 404 であって 403 ではない。** object は CID で global に keyed（dedup は content addressing が既に済ませたこと）なので tenant scope は `:holding/*` にある。403 は「存在するがお前のものではない」と言うことになり、**CID は呼び手が構成できる内容については推測可能**なので、それは store 全体に対する membership oracle になる。
+3. **`:object/verified-by` は必須で推測しない。** サーバが実際に hash した時だけ `:server-digest`、そうでなければ `:stored` + `:client-attested` で止める（D5）。git-lfs も git-annex も読み出し時に再 hash するので、正直な client-attested は何も失わず、嘘の verified が全てを失う。
+
+加えて: presign できない配備は **503** で断る（黙って proxy に落ちると 4 MiB 天井が成功報告付きで戻る）。S3 の単発 5 GiB を超えたら **413 で multipart 不在を名指し**して断る（最後の 1 byte で壊れない）。**route への配線はまだ無い** — shell には presign・pin/holding 面・quota が要る。
+
+**発見（要判断、2026-08-04）**: **`net-kotobase` の west pin `1fd2f4a3` は main から 55 commit 遅れており、その間にレイアウトが作り替えられている**（pin 側: `clj-edge/` `worker/` `kotobase-cf-wasm/` ／ main 側: `kotobase-api-gateway-cljs/`、`worker/` は無い）。帰結が 2 つある: ①**murakumo fleet gate `net-kotobase-hermetic-check.cljs` は放棄されたレイアウトに固定されている** — main tip に対して実行すると `worker/scripts` が無く「refusing to report a pass」で即死する。②org の GitHub Actions は 2026-08-03 以降起動していない（ADR-2608036600）ので、**この repo には今日実際に動く gate が無い**。本セッションでは検査を fleet gate に足すのをやめた（pin 側レイアウトには対象ファイルが存在せず、発火しない check を足すことになるため）。**pin 前進と gate のレイアウト追従はセットで、かつ「CI-gated」の意味に関わるのでオーナー判断に上げる。**
+
 **着地していないもの — G1 の残り。これが無いので 4 MiB はまだ live に残っている**:
 grant endpoint（worker route）/ tenant scoping と CACAO 認証（D9）/ `:object/*` `:holding/*` datom（D3）/ server-side verify の 3 状態と `crypto.DigestStream` のサイズ別実測（D5）/ `kotoba-annex` の backend 差し替え（D7）/ LFS batch API（D6・G2）。
 
