@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 15487, "ai-gftd-chat-shell" 3},
+ {"magatama-sh1n5h1x" 15699, "ai-gftd-chat-shell" 3},
  :zone
- {:requests-7d 614218,
-  :pageviews-7d 2683,
-  :uniques-7d-sum 5359,
+ {:requests-7d 617719,
+  :pageviews-7d 2691,
+  :uniques-7d-sum 5389,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
@@ -20,10 +20,10 @@
     :requests 33}
    {:path "/v1/generation/jobs/0c77db76c3e140f78c952ead14f41a58",
     :requests 29}
-   {:path "/k.php", :requests 28}
    {:path "/v1/generation/jobs/72fd836daf4b40878abde19757bf0454",
-    :requests 27}],
-  :status-mix {:server-error 15485, :ok 1963, :client-error 1091},
+    :requests 27}
+   {:path "/k.php", :requests 27}],
+  :status-mix {:ok 1919, :server-error 15558, :client-error 1138},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -40,5 +40,5 @@
  "上位 page (24h, 2xx/3xx): /v1/generation/jobs/e95b5891a5064a8695a6… 92 · /mgrr.php 45 · /v1/generation/jobs/731ec5e8f8af42089641… 44 · /ms-edit.php 38 · /v1/generation/jobs/e9d3454a0ae84d38b6d2… 33 | 4xx(probe) 6% · 5xx 84%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 614218 req/7d・5359 uniques(日次和)・うち4xx probe 6%(24h)、workers 15490 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 617719 req/7d・5389 uniques(日次和)・うち4xx probe 6%(24h)、workers 15702 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
