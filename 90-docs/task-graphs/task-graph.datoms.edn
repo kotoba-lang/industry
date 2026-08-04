@@ -162,8 +162,36 @@
   :task/repo "kotoba-lang/torihiki-node"
   :task/requires ["S3-validator-snapshot-boot"]
   :task/external-gate false
+  :task/status :completed
+  :task/status-at "2026-08-04"
+  :task/status-note "**本番で tx が着地することを確認して完了**: torihiki-terminal の script/verify.cljs が本番に対して pass —— collateral $0.00→$100,000.00、nonce 1→3、block 76→90、『4 replicas, agreeing』。以前は nonce が 1 のまま動かなかった。
+
+  途中で見つけて直した consensus バグ 2 件（どちらも inga、本番 deploy 済み・code-version 83）:
+
+  (1) **inga 733f279 — 全員が再起動すると誰も tip に投票しない。** replay した replica は自分の tip の証明書を持てない（証明書は次のブロックの :justify で運ばれるので、tip の証明書は『まだ存在しないブロック』の中にある）。そしてその状況のために書かれた vote-on-tip は handle-sync-response の adopted>0 経路からしか呼ばれないので、**全員が同じ tip に座った瞬間に呼ばれなくなる**。propose も助けにならない（proposing は欠けている証明書を要求する）。本番実測 height 282 / view 267 / votes-for-tip 0 / sent-types に vote 無し。on-tick に未証明 tip 用の経路を足して votes-for-tip 0→3、tip-certificate null→True。
+
+  (2) **inga 297c011 — その修正が遅れた replica では送信洪水になっていた（自分で持ち込んだ退行）。** 『未証明』だけを条件にすると、遅れた replica の tip は他の誰も投票しないので条件が永久に解けず毎 tick 再送する。出荷数分後の実測で 3 ブロック遅れた w4 が受信 15 件に対し **vote 1,348 件**。(height, view) ごと 1 回に絞り、40 tick 回しても 2 票以下という回帰テストを追加した。inga 282 tests / 1,305 assertions、parity は JVM と nbb で一致。
+
+  **因果を過大に主張しない。** 最初に観測した『tx が着地しない』は移行前の engi@d9c531bd ビルド上の症状で、その後 inga 移行・checkpoint 起動・上記 2 件・chain の再起動が挟まっている。どれが効いたかは切り分けていない —— 言えるのは『今は着地する、それを本番で見た』まで。
+
+  **検証の過程で devnet を再度 wipe した**（w4 が 3 ブロック遅れたまま同期せず膠着したため）。その膠着自体は S10 として別に起票した。
+
+  元の起票内容: 実測 2026-08-04: faucet も注文も nonce が進まず txs-in-chain 4 のまま resting 0。同じブラウザクライアントで単一シーケンサ torihiki-node には着地する（collateral $100,000、nonce 1→3、実約定も発生）。疑い: 受信 replica の in-memory mempool が eviction で失われ、catch-up 中は /msg に 503 を返すため参加できない窓が長い。S3 が原因側を直す可能性があるので後に置いた —— 直っていたら status-note に「S3 で解消」と書いて completed にする。"}
+
+ {:db/id -17
+  :task/id "S10-lagging-replica-never-syncs"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "遅れた replica が同期を要求しない — 膠着した網では sync-request が一度も出ない"
+  :task/kind "consensus"
+  :task/repo "kotoba-lang/inga"
+  :task/requires []
+  :task/external-gate false
   :task/status :pending
-  :task/status-note "実測 2026-08-04: faucet も注文も nonce が進まず txs-in-chain 4 のまま resting 0。同じブラウザクライアントで単一シーケンサ torihiki-node には着地する（collateral $100,000、nonce 1→3、実約定も発生）。疑い: 受信 replica の in-memory mempool が eviction で失われ、catch-up 中は /msg に 503 を返すため参加できない窓が長い。S3 が原因側を直す可能性があるので後に置いた —— 直っていたら status-note に「S3 で解消」と書いて completed にする。"}
+  :task/status-note "S4 の検証中に本番で観測。w4 が 3 ブロック遅れたまま復帰せず、**4 replica すべてで last-sync-request が null**。/reset で w4 を height 0 に戻しても再参加しなかった —— コードの /reset は『peer に足りない分を尋ねて再参加するはず、それが sync の役目で何もそれを試していなかった』と書いているが、実際に試したら鳴らなかった。
+
+  sync-request が出る経路は 2 つしかない: (a) 親が未知の proposal を受けたとき (b) 自分より高い high-qc を含む new-view を受けたとき。**誰も提案しない膠着では (a) は起きず、(b) も遅れた側が new-view をほとんど受け取らない**（実測 msgs-in 8〜21）ので鳴らない。つまり『遅れると孤立し、孤立すると遅れが直らない』。
+
+  直す方向: 遅れを自分で検出する経路（tick で高さの差を見る / vote を受けたときにその height を見る）を足す。テストは『1 replica だけ遅らせた網が自力で追いつくこと』。"}
 
  {:db/id -16
   :task/id "S9-quadratic-replay"
