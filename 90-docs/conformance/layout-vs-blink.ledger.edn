@@ -88,3 +88,24 @@
              "shorthand 展開が var() 置換より前に走る（同 4 値）"
              "htmldom: <p> が block-level 開始タグで自動閉じされない"
              "WebGL/WebGPU host の retained/draw-ops 経路は theme を受け取らない（ページが暗色 chrome テーマで描かれる）"]}
+
+{:at "2026-08-04"
+ :iteration 30
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 200}
+ :line-structure {:agree 184 :total 190 :pct 97}
+ :geometry {:boxes-agree 638 :boxes-total 719 :pct 89 :clean-cases 166}
+ :computed-style {:values-agree 8501 :values-total 9982 :pct 85 :no-cascade-attributed-mismatch 190}
+ :landed {:cssom "c385b43f9923076d770a754b860884554b28d962 — border-style 無しの border-width は 0px"
+          :browser "b99bd58289e7c649b9026a889843087f5ee4e257 — 対になる fixture 更新"}
+ :note "cross-repo で同時着地。cssom 単独で入れると browser の suite が 0 → 5 failures になるため
+        1 日 landed されていなかった規則。browser 側 fixture は裸の border-width で border rect 4 つを
+        assert しており、どのブラウザも描かないものを要求していた（Chrome 実測:
+        <div style='border-width: 1px'> は border-top-width: 0px を報告）。期待値でなく fixture を
+        実 CSS に直した。downstream 検証: browser 752 tests 0 failures / dom-gpu 122 tests 0 failures
+        （dom-gpu は前回の iteration で確認を落としていた consumer）。"
+ :remaining ["fieldset/legend: legend の out-of-flow 配置（新しい layout 機構）"
+             "select の control font 13 vs Chrome 13.3333（font の平均 advance を出す host hook が無い）"
+             "inline style の margin/padding shorthand 未展開 + var() 置換順（別 agent が作業中）"
+             "htmldom: <p> が block-level 開始タグで自動閉じされない"
+             "WebGL/WebGPU host の retained/draw-ops 経路が theme を受け取らない"]}
