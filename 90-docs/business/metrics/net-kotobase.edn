@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 7540, "kotobase-cf-wasm-staging" 6048},
+ {"net-kotobase" 7770, "kotobase-cf-wasm-staging" 6504},
  :zone
- {:requests-7d 21019,
-  :pageviews-7d 1183,
-  :uniques-7d-sum 1322,
+ {:requests-7d 21716,
+  :pageviews-7d 1229,
+  :uniques-7d-sum 1328,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/_health", :requests 1879}
-   {:path "/health", :requests 1879}
-   {:path "/", :requests 155}
-   {:path "/v1/passkey/login/options", :requests 57}
-   {:path "/cdn-cgi/rum", :requests 33}
-   {:path "/robots.txt", :requests 27}
-   {:path "/v1/passkey/login/verify", :requests 26}
-   {:path "/api/funnel", :requests 24}],
-  :status-mix {:client-error 5298, :server-error 1, :ok 4356},
+  [{:path "/_health", :requests 2061}
+   {:path "/health", :requests 2044}
+   {:path "/", :requests 149}
+   {:path "/cdn-cgi/rum", :requests 30}
+   {:path "/robots.txt", :requests 26}
+   {:path "/sign-in", :requests 26}
+   {:path "/api/funnel", :requests 24}
+   {:path "/developers", :requests 22}],
+  :status-mix {:client-error 5507, :ok 4599},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,12 +30,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-04",
- :traffic-quality {:window "24h", :probe-4xx-pct 55, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 54, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /_health 1879 · /health 1879 · / 155 · /v1/passkey/login/options 57 · /cdn-cgi/rum 33 | 4xx(probe) 55% · 5xx 0%",
- :funnel {:visitors 2179, :signups 12, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /_health 2061 · /health 2044 · / 149 · /cdn-cgi/rum 30 · /robots.txt 26 | 4xx(probe) 54%",
+ :funnel {:visitors 2185, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 21019 req/7d・1322 uniques(日次和)・うち4xx probe 55%(24h)、workers 13588 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 21716 req/7d・1328 uniques(日次和)・うち4xx probe 54%(24h)、workers 14274 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 7,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.42857142857142855,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 647},
+ {:visitors {:openai-ads 3, :organic 653},
   :signups {:organic 9}, 
   :checkouts {}}}
