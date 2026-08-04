@@ -159,9 +159,21 @@
         (contains? country-aliases lower) (get country-aliases lower)
         :else nil))))
 
-(defn company-upsert [bp repo at]
+(defn company-upsert
+  "Projects blueprint.edn into the company row.
+
+  ORGANISATION-level fields only. `:company/phone`, `:company/postal-address`
+  and `:company/registration-number` (ADR-2608043000) identify the company, not
+  a natural person, so they project here like every other public field. A
+  representative's name never appears in blueprint.edn in the first place --
+  `scripts/lei-profile-enrich.cljs` routes person-level facts to the private
+  cloud-itonami-contact-pii dataset -- so there is nothing here to filter out.
+  That is the design: the public projection cannot leak what the public source
+  never held."
+  [bp repo at]
   (str "INSERT INTO company (lei, legal_name, jurisdiction, website, ticker, isic_rev5, "
-       "sector, reg_status, contact_email, contact_email_note, inquiry_form_url, repo, country, ingested_at) VALUES ("
+       "sector, reg_status, contact_email, contact_email_note, inquiry_form_url, "
+       "phone, postal_address, registration_number, repo, country, ingested_at) VALUES ("
        (str/join ", " [(sql-str (:company/lei bp))
                        (sql-str (:company/legal-name bp))
                        (sql-str (:company/jurisdiction bp))
@@ -173,6 +185,9 @@
                        (sql-str (:company/contact-email bp))
                        (sql-str (:company/contact-email-note bp))
                        (sql-str (:company/inquiry-form-url bp))
+                       (sql-str (:company/phone bp))
+                       (sql-str (:company/postal-address bp))
+                       (sql-str (:company/registration-number bp))
                        (sql-str (str "https://github.com/cloud-itonami/" repo))
                        (sql-str (->country (:company/jurisdiction bp)))
                        (sql-str at)])
@@ -183,7 +198,8 @@
        (str/join ", " (map #(str % " = COALESCE(excluded." % ", company." % ")")
                            ["legal_name" "jurisdiction" "website" "ticker" "isic_rev5"
                             "sector" "reg_status" "contact_email" "contact_email_note"
-                            "inquiry_form_url" "repo" "country"]))
+                            "inquiry_form_url" "phone" "postal_address"
+                            "registration_number" "repo" "country"]))
        ", ingested_at = excluded.ingested_at;"))
 
 (defn doc-upsert [lei d at]

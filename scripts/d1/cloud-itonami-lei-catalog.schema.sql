@@ -30,6 +30,18 @@ CREATE TABLE IF NOT EXISTS company (
   contact_email       TEXT,
   contact_email_note  TEXT,
   inquiry_form_url    TEXT,
+  -- ORGANISATION-level contact facts only (ADR-2608043000). A switchboard
+  -- number and a registered address identify the company, not a natural
+  -- person, so they belong in this public projection alongside the role inbox.
+  -- Person-level facts (a representative's name and title) are NOT here and
+  -- must never be added: they live age-encrypted in the private
+  -- cloud-itonami-contact-pii dataset. Adding a `representative` column to this
+  -- table would move personal data into a public, world-rebuildable projection
+  -- in one ALTER.
+  phone               TEXT,                      -- E.164 or as published
+  postal_address      TEXT,                      -- registered/HQ address, as published
+  registration_number TEXT,                      -- commercial register no. (HRB, 法人番号, ...)
+  country             TEXT,                      -- ISO 3166-1 alpha-2, normalised from jurisdiction
   repo                TEXT NOT NULL,             -- github.com/cloud-itonami/<repo>
   blueprint_sha256    TEXT,                      -- of the fetched blueprint.edn
   ingested_at         TEXT NOT NULL              -- ISO-8601 UTC
