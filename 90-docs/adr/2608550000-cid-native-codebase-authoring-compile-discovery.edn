@@ -42,7 +42,34 @@
   :adr/decision
   "4 面すべてを CID ベースにする。境界は次のとおり。
 
-   ## L1 codebase — hash から動く（kotoba-lang/codebase @ 484f1a8）
+   ## L0 identity — 定義 identity は compiler の checked KIR（2026-08-04 後半で収束）
+
+   当初は `semantic-code`（codebase 自前の正規化 IR）だけだった。これは
+   「この定義は何か」に **2 つの答え**がある状態で、片方で保存し片方で
+   compile しても互いに無効化できなかった。`kotoba.codebase.typed-code` は
+   **compiler が出す checked KIR そのもの**を identity にする。
+
+   - identity に入るもの: alpha 正規化した body / typed interface（引数型・結果型・
+     **宣言された effect**、独立ブロック）/ 直接依存の CID リンク。
+   - **入らないもの**: 定義自身の名前、呼んでいる関数の名前。
+   - alpha 正規化は**検証する**（仮定しない）。KIR の binder は 5 種
+     （params / let / result-match-of / variant-match / option-match）で、6 種目が
+     後から増えると source 由来の名前が黙って hash に入る。改名後も生き残った
+     binder があれば **compile を fail-closed** にする。
+   - 実行は `kotoba.codebase.typed-eval` が hydrate した closure を 1 つの KIR
+     module に組み立て、**`kotoba.kir/execute`**（AOT/JIT backend が qualify する
+     oracle）で走らせる。組み立てた module に source 名は 1 つも残らない
+     （全関数が自分の CID で命名される — テストで表明）。
+   - **言語カバレッジは compiler のもの**になった（`defmacro`/`deftype` 等の
+     手作り除外リストと i64/f32/cap/dynamic だけの型語彙は解消）。
+   - **effect は「表現できるが付与されない」**: `typed-cap-call` を宣言・実行でき、
+     dispatcher を注入しない限り denied として trap する。
+
+   接合は `kotoba.codebase-typed`（両方が classpath に載る唯一の場所）で、
+   CLI は `kotoba codebase add --typed`。`run` は**保存ブロックから層を読む**
+   （呼び出し側が覚えておく類のものではないため）。
+
+   ## L1 codebase — hash から動く（kotoba-lang/codebase @ 2b7e823）
 
    - `kotoba.codebase.evaluator`: 定義をそのブロックから評価し、依存は **CID で
      hydrate** する。ファイル・namespace・名前を一切参照しない。source witness は廃止。
@@ -88,6 +115,9 @@
      **canonical encoding であること**も検査する（非 canonical な CBOR で同じ値に
      decode させ、store に「再 encode すると別 CID になるバイト」を置く経路を塞ぐ）。
      嘘をつく gateway を実際に立てたテストが `:codebase/fetched-cid-mismatch` を返す。
+   - **codebase が run するものと compiler が compile するものは同じ定義。**
+     同一ソースについて `codebase run quadruple -- 3` と `kir/execute` が同じ CID
+     から同じ値を返すことをテストが表明する（意図ではなく計測）。
    - **rename は namespace commit を変え、定義 CID を変えない。**
    - **曖昧な短縮ハッシュは拒否する**（先頭一致で最初の候補を選ばない）。
 
@@ -98,8 +128,14 @@
      からである。**discovery が可能であることは、コンテンツがそこにあることと違う。**
      `pull` は空の provider 集合をそのまま返す。
    - browsing UI / semantic diff / rebase / 対話的 conflict 解決は無い。
-   - evaluator は **pure**。capability intrinsic は dispatch せず拒否するので、
-     到達可能性が権限にならない。effectful な実行は従来どおり host 経由。
+     `view` は surface 層のみ（typed 定義のソース射影は未実装）。
+   - **codebase は target artifact を出さない**。oracle を回すだけで compile は
+     しない（同じ KIR を backend に渡せば出せるが、その配線と build cache
+     descriptor への接続はまだ）。
+   - **effect は policy engine ではない**。provider registry・quota・receipt・
+     capability policy の適用は未実装で、`typed-cap-call` の dispatcher を
+     注入するかしないかの二値。
+   - surface 層の `evaluator` は依然 **pure**（capability intrinsic を拒否）。
 
    ## 実装上の判断（再発防止として明記）
 
@@ -108,6 +144,13 @@
      結果ではない（実測で発生した）。深さは **呼び出し時**に数える——再帰グループは
      `fn` ノードを 1 回だけ評価してその 1 つのクロージャに再入するので、生成時に
      捕まえた深さは増えない。
+   - **依存収集の walk を eager にする。** `map` は lazy なので、依存集合を副作用で
+     集めていると **seq が force される前に atom を読んで空集合が返る** —— body の
+     リンクは正しいのに「依存ゼロ」と宣言したブロックが保存され、identity テストは
+     通るのに closure 走査だけが壊れる（実際にそうなった）。
+   - **`ir/substitute-dependencies` は `ir` と `body` の両方を書き換える。**
+     surface 層は `ir`、KIR 層は `body` にリンクを置くので、片方だけだと typed な
+     dependent が古い定義を指したままになる（これも実際にそうなった）。
    - **`cbor/tagged?` を `map?` より先に判定する。** CBOR タグは record なので
      `map?` に真を返し、素朴な再構築はブロック中の全 IPLD リンクを plain map に変えて
      バイトを変えてしまう。
@@ -119,13 +162,14 @@
 
    ## 検証
 
-   - kotoba-lang/codebase: 53 tests / 221 assertions green、lint clean。
+   - kotoba-lang/codebase: 68 tests / 247 assertions green、lint clean
+     （typed-code 追加後）。
    - kotoba-lang/compiler: module-lock 7 tests / 17 assertions green。フルスイートは
      840 tests / 6447 assertions で 4 failures —— すべて既存の **soft performance
      budget**（document_dual_renderer / document_perf_workload、負荷の高いマシンで
      5s budget に対し 25s）で、本変更とは無関係。
-   - kotoba-lang/kotoba: 新規 6 tests / 20 assertions green。フルスイート 467 tests /
-     8371 assertions で 6 failures —— すべて `backend-qualification` の兄弟リポパス
+   - kotoba-lang/kotoba: 新規 10 tests / 31 assertions green。フルスイート 478 tests /
+     8390 assertions で 2 failures —— すべて `backend-qualification` の兄弟リポパス
      （`../kototama`、`../compiler`）の存在チェックで、west レイアウト外の worktree で
      走らせた副作用。兄弟を symlink して当該 namespace を再実行すると 0 failures。
    - global discovery は**実ネットワークで実測**（2026-08-04）: delegated-ipfs.dev が
@@ -136,10 +180,10 @@
 
    | repo | merge | 内容 |
    |---|---|---|
-   | kotoba-lang/codebase | 484f1a8 | evaluator / authoring / render / names / fetch / ir |
+   | kotoba-lang/codebase | 484f1a8 → **2b7e823** | evaluator / authoring / render / names / fetch / ir → **typed-code / typed-eval** |
    | kotoba-lang/compiler | 4fa7e6d（main は a6e7dc4 に前進済み） | module-lock |
-   | kotoba-lang/kotoba | 6e79ab7 | codebase CLI / codebase-routing |
-   | com-junkawasaki/root | 6f36f6d | manifest pin 前進（codebase / kotoba） |
+   | kotoba-lang/kotoba | 6e79ab7 → **f65f1b8** | codebase CLI / codebase-routing → **codebase-typed（--typed）** |
+   | com-junkawasaki/root | 6f36f6d / **13b71bf** | manifest pin 前進（codebase / kotoba） |
 
    `manifest/west.yml` の pin 前進は GitHub API single-entry 経路で行い、サーバ側
    pin 検証を通した。**`gen-west-manifest.cljs --check` は STALE を返すが、これは
