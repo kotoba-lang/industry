@@ -920,3 +920,32 @@
  :remaining ["inset-side が content-box 要素で border を含まない（fieldset 残差の全部、box model 1 箇所）"
              "list marker の位置（::marker は oracle に box を作らないので検証不能）"
              "template 2 件（作業中）、UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
+
+{:at "2026-08-04"
+ :iteration 46
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :parser {:corpus 137 :agree 134 :pct 98 :was "133/137 (97%)" :template "2/2"}
+ :line-structure {:agree 326 :total 328 :pct 99}
+ :geometry {:boxes-agree 1241 :boxes-total 1283 :pct 97}
+ :paint-order {:points-agree 8424 :points-total 8509 :pct 99}
+ :landed {:dom-gpu "7d19aa09febf64a799b67e1398beaa8017b7eba5 — template の content fragment（DOM 層）"
+          :htmldom "aace0c8d1fbd4f9c3eaf5c510c1754c616359eb5 — parser 側の配線 + table 内の 2 barrier"}
+ :note "cross-repo。DOM 層に append-content-child / content-tree を足し（tree・comment-tree・text-content は
+        :content を辿らない —— consumer は :children を『ここに描かれるもの』として読むが template の中身は
+        明示的に描かれない）、parser の insert-node が挿入点 template のとき content に入れる。
+        **foster parenting より先に判定する**（template は table 内に置け、中身は中に留まる）。"
+ :findings ["**配線だけでは足りず barrier が 2 つ要った。どちらも実測で判明。**
+             (1) table の『table context まで戻す』段が template を pop していたため、<td> が届く時点で
+             template は閉じられており、table が tbody/tr/td を **template の兄弟として**組み立てていた。
+             (2) 暗黙の tbody/tr 組み立ても template 内では発火してはならない。
+             Brave: <table><template><td>x</td></template></table> は content が <td> 1 つだけの template。"
+            "**この repo の test 1 件が cssom の変更で既に赤だった**（私の変更とは無関係、stash して確認）。
+             margin: 0 auto は『auto は実レイアウトが要るので展開せず degrade』と固定されていたが、
+             **推測するか展開しないかの二択ではなかった** —— keyword を運ぶ longhand に展開すれば
+             何も失わずレイアウトが解決できる。cssom がそう変えたので理由付きで更新した。
+             なお **htmldom は cssom の downstream 検証リストに入っていなかった** ため、
+             cssom 側の agent はこの赤に気付けなかった。今後の brief に含める。"]
+ :remaining ["parser 残り 3 件: anchor-in-anchor / void 終了タグ / body in flow"
+             "inset-side が content-box 要素で border を含まない（box model 1 箇所）"
+             "list marker の位置（::marker は oracle に box を作らず検証不能）"
+             "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
