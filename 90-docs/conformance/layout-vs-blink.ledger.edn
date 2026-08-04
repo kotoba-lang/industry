@@ -816,3 +816,43 @@
              "fieldset/legend + button atomic inline（agent 作業中）"
              "margin auto / rtl / 負 margin / % 高さ / calc 幅（agent 作業中）"
              "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
+
+{:at "2026-08-04"
+ :iteration 45
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 337 :was 327 :added 10}
+ :line-structure {:agree 320 :total 324 :pct 99}
+ :geometry {:boxes-agree 1215 :boxes-total 1272 :pct 96 :clean-cases 307 :was "1201/1272, 296"}
+ :paint-order {:points-agree 8308 :points-total 8409 :pct 99 :clean-cases 312}
+ :computed-style {:values-agree 15535 :values-total 17795 :pct 87 :cascade-attributed 9 :was 16}
+ :landed {:cssom "a9f46698... — margin auto / rtl block alignment / 負 margin / % 高さ / calc"
+          :browser "352ffea... — 対の fixture 更新（新 cssom に対してのみ正しい）"}
+ :note "**12 case が改善・0 退行**、いずれも全 box 完全一致へ。337 case 全ての box 列を新旧 diff 済み。
+        **途中で 1 件退行させ、着地前に直した**: page/form-row の button が 20→24（oracle 21）になった ——
+        flex が stretch した高さを node に注入し直すため、content-box 修正が二重に box-sizing を適用していた。
+        注入された used height は :kotoba/used-height として運ぶようにした（inline 軸で force-main-width が
+        既に到達していた結論と同じ）。"
+ :findings ["margin: 0 auto は**両層**の問題だった。cssom.core の shorthand 展開が auto token を
+             受け付けず（margin だけ。padding: auto は CSS に無い）、layout は余り幅を配分していなかった。
+             CSS 2.1 §10.3.3 どおり: 両側 auto → 中央、片側 auto → その側が全部取る、
+             over-constrained なら配分しない（Brave は 200px の中の margin: 0 auto な 300px 箱を x=0 に置く。−50 ではない）。
+             `margin: 10px auto` が修正の入れたバグを捕まえた —— margin-side の一様 fallback が
+             縦の値を auto な横側に漏らしていた。"
+            "**宣言された height が border box として使われていた**（% 高さの修正が露出させた第 2 のバグ）。
+             div{height:100px;padding:10px} は Brave で 120。resolve-width が既にしていた content-box 適用を
+             used-block-height にも入れた。"
+            "**percentage が二重解決されていた**: measure-child が % 幅を包含ブロックに対して解決し、
+             その結果を子の avail 幅として渡すので、子がもう一度解決していた（200 の 50% → 100 → 50）。
+             used width を素の長さとして書き戻すようにした。"
+            "負 margin: collapse-margins（最大の正 + 最小の負）が max を置き換えた —— max では負が決して勝たない。"]
+ :declined ["bidi アルゴリズムは無いので rtl は block 整列のみ。text-align の direction 相対 start/end には
+             **意図的に触らなかった** —— その case の行を右寄せすれば <b> は対称性だけで Brave の 2px 以内に
+             入るが、語順は依然として誤りのままだから。"
+            "flex/grid/table は :block/containing-height を落とす（それらの item の包含ブロックは
+             それを設定した block ではない）。flex/grid item 内の % 高さは auto。"
+            "inset-side は content-box 要素で border を含まないまま（position/absolute-containing-block-is-the-padding-box が
+             測っている当のもの）。definite-content-height は**layout が実際に行う同じ引き算**を使い、
+             2 つ目の別の誤り方をする数値を作らない。"]
+ :process-note "この agent は cleanup で /tmp/kl/*.txt と *.edn を削除した。/tmp/kl は他 agent と共有の
+                scratch 領域で、worktree や repo 内容は無事だが、直下に scratch ファイルを置いていた場合は
+                失われた可能性がある。以後 agent には repo 外 scratch の共有を明示する。"}
