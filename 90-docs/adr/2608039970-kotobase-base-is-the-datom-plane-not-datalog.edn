@@ -6,8 +6,8 @@
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-08-03"
-  :adr/last-verified "2026-08-03"
-  :adr/last_verified "2026-08-03"
+  :adr/last-verified "2026-08-04"
+  :adr/last_verified "2026-08-04"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "kotobase-base-is-datom-plane-not-datalog"
@@ -169,10 +169,34 @@ subset（`kotobase.server.sparql`）は削除された**（kotobase-server#28）
 
 | | |
 |---|---|
-| index seam | `datom.source/IPatternSource` 実装が2つ（HTTP: `kotobase.datom-source` / in-process: `kotobase.server.pattern-source`）。**index plan は `kotobase.datom-plan`（`.cljc`）で共有** —— どちらが `[_ p o]` にどのインデックスを使うかがずれたら、同じクエリに違う答えが返る |
-| pushdown | BGP の pattern が index 読みに落ちる。**object 位置だけは押し下げを見送っている** —— `:avet` の value component の意味論が1 datom のコーパスでは「適用された」と「無視された」を区別できず、読み違えると**行が減る**（空の結果に見える誤答）ため。述語レンジ読み + scan 時フィルタで正しさを優先 |
+| index seam | `datom.source/IPatternSource` 実装が2つ（HTTP: `kotobase.datom-source` / in-process: `kotobase.server.pattern-source`）。**index plan は `kotobase.datom-plan`（`.cljc`）で共有**。値表現も 2026-08-04 に揃えた（kotobase-client#21）—— それまで HTTP 側は `v_edn`、in-process 側は格納値を返しており、**同じクエリがどちらのトランスポートで答えたかで違う値**になっていた。conformance の fake が値そのものを返していたため decode 漏れが2 PR ぶん通っていた |
+| pushdown | BGP の pattern が index 読みに落ちる。**object 位置も押し下げ済み**（kotobase-server#29）。一時見送っていたのは、1 datom のコーパスでは `:avet` の value component が「適用された」のか「無視された」のか区別できず、読み違えると**行が減る**（空の結果に見える誤答）ため。同一属性3 datom・うち2つ同値で実測し、`[a raw-value]` が正しく2件（`e1`/`e3`）に絞り、`[a encoded]` が0件になることを確認して解決した |
 | 追加した機能 | `kotoba-lang/sparql` の algebra に集約（`:group`）—— 無かった。旧 subset は `COUNT` に答えていたので、包含関係が成立しておらず、そのまま切り替えれば機能が減っていた |
 | 検証 | 旧文法全体（BGP / join / OPTIONAL / UNION / ORDER BY 昇降 / LIMIT / 集約 ± GROUP BY / FILTER）で新旧一致。退役時に **equivalence を snapshot へ変換**（片方が消えると比較は自己参照になるため、旧の答えを削除前に採取） |
+
+### 2026-08-04 追記 —— Cypher には同じ移行が成立しない
+
+SPARQL の成功をそのまま Cypher に適用できると当初書いたが、**実測して成立しないと分かった**。
+
+`kotobase-server` の `do-cypher` は今も `kotobase.server.cypher/parse` → `run-compiled-graph-query`
+（hot-db 上の Datalog）で、撤回したパターンのまま残っている。**しかし置き換え先の
+`org-opencypher-cypher` 自身が `bridge/q` を呼ぶ**（`cypher.cljc:1027`）—— **Cypher を Datalog に
+翻訳している**。SPARQL には `kotoba-lang/sparql` という独立した algebra があったが、**Cypher に
+対応するものはワークスペースに無い。**
+
+したがって Cypher を差し替えても得られるのは **pushdown（materialize → index 読み）だけ**で、
+意味論の独立は得られない。D2 は「その言語が Datalog に素直に乗るなら Datalog frontend でよい」
+と書いているので、今の subset の範囲では違反ではない —— **可変長パス `[*1..3]` を入れる段に
+なって初めて問題になる**。それまでは「Cypher は Datalog frontend である」と明示的に認めておく
+方が、独立した engine があるかのように扱うより正確である。
+
+D2 の適用可否は言語ごとに違う、というのがこの追記の要点:
+
+| 言語 | 独立 algebra | D2 の意味 |
+|---|---|---|
+| SPARQL | あり（`kotoba-lang/sparql`） | 翻訳をやめる。**完了** |
+| Cypher | **無い** | pushdown のみ。翻訳は当面残る |
+| SQL / GraphQL / Gremlin | 未調査 | 着手前に同じ確認をすること |
 
 **この移行で見つかった欠陥は、1件を除いて全て「エラーではなく静かに違う答え」だった**
 （wire 非互換で述語がワイルドカードに / 依存 pin が engine を差し替え / リテラルの
