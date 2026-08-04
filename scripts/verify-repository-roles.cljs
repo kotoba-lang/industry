@@ -495,6 +495,70 @@
              {:stale (vec stale)}))
     (println (str "name-audit: OK (" (count origin-anchors) " anchors hold, no stale data)"))))
 
+;; ------------------------------------------------------------ family audit
+
+(def family-rules
+  (get-in vocabularies [:product-family :vocabulary/rules] []))
+
+(def family-justification
+  (get-in vocabularies [:product-family :vocabulary/justification] {}))
+
+(defn- surface-hosts
+  "Hosts this workspace actually serves. DNS resolution is NOT usable as the
+   test: gftd.ai answers for every label (measured 2026-08-05 - a wildcard), and
+   oil.cloud / artifact.app resolve because they belong to other people. Serving
+   a host is evidence of operating it; resolving is not."
+  [workspace]
+  (let [f (.join path workspace "90-docs" "surface" "surface.datoms.edn")]
+    (if-not (.existsSync fs f)
+      #{}
+      (into #{}
+            (comp (map second) (remove nil?))
+            (re-seq #":surface/host\s+\"([^\"]+)\"" (compat/slurp f))))))
+
+(defn family-audit! [west-file workspace]
+  (let [hosts (surface-hosts workspace)
+        repos (west-repos west-file)
+        by-name (group-by :name repos)]
+    (when (empty? hosts)
+      (fail! "surface index not found - family justification cannot be checked"
+             {:expected (.join path workspace "90-docs/surface/surface.datoms.edn")}))
+    (println (str "surface index: " (count hosts) " hosts served"))
+    (println (str "declared families: " (count family-rules)))
+    (println "")
+    (doseq [{:keys [family owner]} family-rules
+            :let [stem (str/replace family #"-$" "")
+                  ;; a family is served either as its own label (murakumo.cloud)
+                  ;; or as a shared label prefix (open-banking.etzhayyim.com)
+                  served (filter #(re-find (re-pattern (str "(^|[.])" stem "[-.]")) %) hosts)
+                  members (filter #(str/starts-with? (:name %) family) repos)
+                  kind (if (seq served) :serving :library)]]
+      (println (str "  " family
+                    "  members=" (count members)
+                    "  " (name kind)
+                    (if (seq served)
+                      (str "  hosts=" (count served) "  e.g. " (first (sort served)))
+                      (str "  owner=" (or owner "UNDECLARED")))))
+      ;; A library family with no owning repo has no receipt at all - that is
+      ;; exactly the case this rule exists to catch.
+      (when (and (= :library kind) (not owner))
+        (println (str "    GAP " family " has neither a served host nor a declared owning repo")))
+      ;; The rule's real bite: a serving family's prefix should BE the reversed
+      ;; domain it serves. Report, never fail - renaming these is a decision.
+      (when-let [implied (:implied-prefix (first (filter #(= family (:family %)) family-rules)))]
+        (when (not= implied family)
+          (println (str "    PREFIX " family " serves " (:served-domain
+                                                          (first (filter #(= family (:family %)) family-rules)))
+                        " so the rule implies " implied
+                        "  (" (count (remove #(str/starts-with? (:name %) implied) members))
+                        " of " (count members) " members would move)"))))
+      (when (and (= :library kind) owner (empty? (get by-name owner)))
+        (println (str "    GAP " family " declares owner " owner
+                      " which west does not register"))))
+    (println "")
+    (println (str "justification: serving=" (:serving family-justification)
+                  "  library=" (:library family-justification)))))
+
 ;; -------------------------------------------------------- capability audit
 
 (def capability-rule
@@ -570,6 +634,11 @@
         (println "       nbb scripts/verify-repository-roles.cljs --prefix-audit [--west <west.yml>]")
         (println "       nbb scripts/verify-repository-roles.cljs --name-audit [--west <west.yml>] [--org <org>]")
         (compat/exit 2))
+
+    (some #{"--family-audit"} args)
+    (let [west (or (second (drop-while #(not= "--west" %) args)) "manifest/west.yml")
+          workspace (or (second (drop-while #(not= "--workspace" %) args)) ".")]
+      (family-audit! west workspace))
 
     (some #{"--capability-audit"} args)
     (let [west (or (second (drop-while #(not= "--west" %) args)) "manifest/west.yml")

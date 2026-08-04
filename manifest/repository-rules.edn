@@ -492,8 +492,40 @@
      :authority "90-docs/adr/2607102200-kami-render-stack-deps-authority-rename.edn"
      :note "the 3D stack; CLAUDE.md makes it mandatory for all 3D in the workspace"}
     {:family "kotoba-"   :count 32 :owner "kotoba"}
+    ;; SERVING family: 15 hosts under kotobase.net. Under "family = reverse
+    ;; domain + subdomain" the prefix should BE that domain reversed, so the
+    ;; correct form is net-kotobase-* and the current kotobase-* is missing its
+    ;; TLD. Recorded, not renamed: 25 members (ADR-2608040180).
     {:family "kotobase-" :count 24 :owner "kotobase"
+     :served-domain "kotobase.net" :implied-prefix "net-kotobase-"
      :note "storage/query providers; kotobase-storage-* is a sub-set keyed by backend"}
+    ;; ── families evidenced by the surface index, 2026-08-05 ─────────────
+    ;; Found by matching served hosts, not by DNS: gftd.ai is a wildcard and
+    ;; oil.cloud / artifact.app belong to other people, so resolution proves
+    ;; nothing. Each of these serves real hosts, which under the rule means the
+    ;; prefix should be the reversed domain. None of them is, yet.
+    {:family "open-" :count 12 :owner nil
+     :served-domain "etzhayyim.com" :implied-prefix "com-etzhayyim-open-"
+     :hosts 13
+     :note "open-banking/-gas/-denki/-rail/-ports/-network/-cofog/-airplane
+            .etzhayyim.com are live. The family is a shared LABEL PREFIX across
+            sibling subdomains, not a subdomain of its own."}
+    {:family "aozora-" :count 4 :owner nil
+     :served-domain "aozora.app" :implied-prefix "app-aozora-"
+     :hosts 5
+     :note "app-aozora is already correct; aozora-appview is not, and
+            appview.aozora.app is live. Two forms for one domain."}
+    {:family "murakumo-" :count 5 :owner nil
+     :served-domain "murakumo.cloud" :implied-prefix "cloud-murakumo-"
+     :hosts 2
+     :note "settles the :vocabulary/undecided entry — murakumo has a domain"}
+    {:family "dougaka-" :count 5 :owner nil
+     :served-domain "dougaka.gftd.ai" :implied-prefix "ai-gftd-dougaka-"
+     :hosts 1}
+    {:family "bpmn-" :count 3 :owner nil
+     :served-domain "bpmn.etzhayyim.com" :implied-prefix "com-etzhayyim-bpmn-"
+     :hosts 1
+     :note "previously screened out as multi-org; it is served, so it is real"}
     {:family "kura-"     :count 6  :owner "kura"}
     {:family "kotodama-" :count 5  :owner "kotodama"}]
    ;; Owner directive 2026-08-05: family = reverse domain + subdomain. A family
@@ -521,9 +553,12 @@
    ;; Measured, not asserted: these carry a family-shaped prefix but have fewer
    ;; than three members, so whether they are a family or two bare names that
    ;; happen to share a word is undecided. Named rather than folded in.
+   ;; murakumo- resolved 2026-08-05: it serves murakumo.cloud, so it is a family
+   ;; (declared above). sdk- has no served host and no owning repo, so under the
+   ;; rule it is not a family at all.
    :vocabulary/undecided
-   [{:family "murakumo-" :count 3 :note "murakumo-generation / -langchain / -studio"}
-    {:family "sdk-"      :count 3 :note "sdk-auth / sdk-mock / sdk-py — reads as a role, not an owner"}]}]
+   [{:family "sdk-" :count 3 :note "sdk-auth / sdk-mock / sdk-py — no served host,
+      no owning repo; reads as a role, not an owner. Not a family under the rule."}]}]
 
  ;; ── plane order ────────────────────────────────────────────────────────
  ;; The single rule that makes the four planes a system rather than four
@@ -883,6 +918,41 @@
    :gap/candidates ["e-gov.go.jp" "myna.go.jp" "digital.go.jp"]
    :gap/note "the other five code-system catalogs were renamed to their authority
               names on 2026-08-05; these two were left alone rather than guessed."}
+
+  {:gap/id :serving-family-prefix-lacks-its-tld
+   :gap/measured-at "2026-08-05"
+   :gap/measured-by "nbb scripts/verify-repository-roles.cljs --family-audit"
+   :gap/count 52
+   ;; Six families serve real hosts, and none of their prefixes is the reversed
+   ;; domain they serve -- every one is missing its TLD. Not renamed:
+   ;; ADR-2608040170 decided an existing family's form wins over the elision
+   ;; rule, and whether that also covers these is the owner's call. The numbers
+   ;; are here so it can be decided rather than guessed.
+   :gap/families
+   [{:family "kotobase-" :members 25 :implied "net-kotobase-"        :serves "kotobase.net"}
+    {:family "open-"     :members 12 :implied "com-etzhayyim-open-"  :serves "etzhayyim.com"}
+    {:family "aozora-"   :members 4  :implied "app-aozora-"          :serves "aozora.app"}
+    {:family "murakumo-" :members 4  :implied "cloud-murakumo-"      :serves "murakumo.cloud"}
+    {:family "dougaka-"  :members 4  :implied "ai-gftd-dougaka-"     :serves "dougaka.gftd.ai"}
+    {:family "bpmn-"     :members 3  :implied "com-etzhayyim-bpmn-"  :serves "bpmn.etzhayyim.com"}]
+   :gap/worth-doing-first
+   {:family "aozora-"
+    :why "two forms already coexist for one domain: app-aozora is correct and
+          aozora-appview is not, while appview.aozora.app is live. Consistency
+          inside a single family is a smaller and clearer call than the rest."}}
+
+  {:gap/id :fleet-vcs-not-registered
+   :gap/measured-at "2026-08-05"
+   :gap/count 1
+   :gap/repos ["kotoba-lang/kotoba-fleet-vcs"]
+   ;; CLAUDE.md names bin/fleet.cljs in this repo as the only sanctioned writer
+   ;; for manifest/fleet-db.edn, but west.yml does not register it, so it is
+   ;; never checked out and cannot be driven.
+   :gap/consequence "the 2026-08-05 catalog renames landed in west.yml and
+                     repos.edn but not fleet-db.edn, which still carries
+                     open-isic / open-isco / open-cofog / open-unspsc /
+                     open-apqc. Nothing is broken -- GitHub redirects hold --
+                     but the next fleet reconcile has to pick them up."}
 
   {:gap/id :undeclared-family-candidates
    :gap/measured-at "2026-08-04"
