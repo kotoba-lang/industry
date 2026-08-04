@@ -30,8 +30,10 @@
    "net-kotobase/MIGRATION.md"]
 
   :adr/context
-  "実測 2026-08-04（net-kotobase の default branch tip = 090d44f。**west pin より 66 commit 先**で、
-   pin 側の checkout を読むと古い構成が見える。この ADR は tip を正とする）。
+  "実測 2026-08-04（net-kotobase の default branch tip。この ADR は tip を正とする）。
+   注意: 共有 checkout orgs/network-awai/net-kotobase は west pin より 58 commit、default branch より
+   66 commit 遅れていた（west update が回っていない）。pin 自体は main の 10 commit 手前で、
+   改名後の構成を既に持つ。この ADR の初稿は共有 checkout を読んで改名前の構成を『現状』と書きかけた。
 
    kotobase.net の 12 host を 6 Worker が配信しており、Worker 名・host 名・実際の責任が一致していない。
    **ディレクトリ名は tip で既に capability 名へ改名済み**（worker → kotobase-api-gateway、
@@ -160,9 +162,10 @@
    ["git.kotobase.net を ADR-260718 の delegated-hostname 表に記録する（無記録だった。
      2026-08-04 に記録済み — net-kotobase aa2dccb7ee）"
     "kotobase.gftd.ai を 2 Worker が主張している状態を解消する（本 ADR の削除で解ける）"
-    "net-kotobase の west pin を前進させる。実測 2026-08-04 時点で pin は default branch より
-     66 commit 遅れており、pin 側の checkout を読むと改名前の構成が見える。この ADR の初稿は
-     実際にその古い構成を『現状』と書きかけた — pin の鮮度は読み取りの正しさに直結する"]}
+    "共有 checkout orgs/network-awai/net-kotobase に west update を回す。実測 2026-08-04 時点で
+     pin より 58 commit 遅れており、そこを読むと改名前の構成が見えた。pin 自体は main の 10 commit
+     手前なので前進させるが、より危険なのは pin ではなく『pin にすら追いついていない共有 checkout』
+     の方だった — 手元の tree を現状の証拠として使う前に、pin と remote の両方と突き合わせる"]}
 
   :adr/consequences
   {:positive
