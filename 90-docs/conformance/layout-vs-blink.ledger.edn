@@ -413,3 +413,30 @@
  :remaining ["parser 残り 4 件は稀な挙動のみ（</br>, a-in-a, body in flow, &notit;）"
              "cssom: flex / float（agent 2 体が作業中）、grid、display: table/contents/flow-root、
               table-layout: fixed、inline 系の細部、cascade の UA stylesheet 所在"]}
+
+{:at "2026-08-04"
+ :iteration 37
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 292}
+ :line-structure {:agree 255 :total 280 :pct 91 :was "249/280 (89%)"}
+ :geometry {:boxes-agree 981 :boxes-total 1142 :pct 86 :clean-cases 220 :was "952/1142 (83%), 207/292"}
+ :paint-order {:points-agree 6978 :points-total 7285 :pct 96 :clean-cases 239}
+ :computed-style {:values-agree 13845 :values-total 15956 :pct 87}
+ :landed {:cssom "3cace9bf8d1110049ad551eda2a078a688bd160a — flex の既定以外を実装"}
+ :note "**:flex/* 28 件が両レイアウト軸で全て clean**、幾何残差に flex は 1 件も残っていない。
+        base commit との per-case 差分で 12 改善・0 退行。実装: order（描画順も含めて並べ替え）/
+        align-self（offset と stretch の両方）/ row-reverse・column-reverse（主軸サイズについて反射
+        させることで justify-content も同時に正しくなる）/ wrap-reverse / display: inline-flex /
+        flex shorthand（cssom.core で宣言 parse 時に展開。flex: 1 は 1 1 0% であって flex-grow: 1 ではない）/
+        flex-basis / shrink の実リサイズ / §9.7 の freeze-and-redistribute による min-content 下限 /
+        align-items: baseline / align-content / 主軸の auto margin / column コンテナの寸法決定。
+        いずれも実装前に Brave で probe している（corpus に無い形は cdp_dump 経由の probe ページ）。"
+ :upstream-race "作業中に upstream が動いた（paint order 軸 b9c29f8）。**rebase せず** main を branch に
+                 merge して全検証をやり直し、その後 server-side merge。"
+ :remaining ["flex-basis: content、flex ループ内の max clamp、column の主軸 grow/shrink、
+              inline-grid（layout-grid に shrink-to-fit 枝が無いので入れると文中に全幅 box が出る）、
+              交差軸の auto margin、wrap-reverse 下の last baseline —— いずれも該当関数にコメントで明記"
+             "float（agent 作業中）、grid の flow/gap/alignment、display: table/contents/flow-root、
+              table-layout: fixed、inline 系の細部、cascade の UA stylesheet 所在"
+             "conformance/README.md の『Result — 2026-08-04』は旧数値のまま（並行作業の衝突を避けて
+              意図的に触っていない）。全部着地したら 1 回更新する。"]}
