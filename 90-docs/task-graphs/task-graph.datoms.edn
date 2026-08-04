@@ -66,4 +66,112 @@
   :task/repo "github-linguist/linguist"
   :task/requires ["G-grammar-repo"]
   :task/external-gate true
-  :task/gate-reason "第三者OSSへの公開PR。かつ linguist は複数の独立リポジトでの実利用実績を要求するため、G単体の完了だけでは着手可能にならない（外生条件）。"}]
+  :task/gate-reason "第三者OSSへの公開PR。かつ linguist は複数の独立リポジトでの実利用実績を要求するため、G単体の完了だけでは着手可能にならない（外生条件）。"}
+
+ ;; ── torihiki ⊖ Hyperliquid の gap 解消 ────────────────────────────────────
+ ;;
+ ;; 台帳は ADR-2608040600。順序はそこの「H. 順序についての意見」に従う:
+ ;; 執行層はもう機能被覆が高いのでそこを伸ばしても価値は増えず、
+ ;; snapshot → tx 着地 → candles → bridge → Merkle root の順。
+ ;;
+ ;; **この workflow はローカル loop が読む作業キューでもある。** 次に何を
+ ;; するかを毎回推論し直すのではなく `task-graph-query.cljs ready` が答える
+ ;; ようにしてある —— 優先順位を毎周だけ再導出すると、周ごとに違う答えが
+ ;; 出て、どれも半分ずつ進む。
+ ;;
+ ;; **この下の並び順が優先順位そのもの。** `ready` は catalog をファイル順に
+ ;; 走査して出力するので、loop は「出てきた最初の non-external-gate タスク」を
+ ;; 取ればよい。並べ替えると優先順位が変わる —— 整理のつもりで動かさないこと。
+ {:db/id -6
+  :workflow/id "torihiki-gap-closure"
+  :workflow/title "torihiki を Hyperliquid 相当まで詰める — ADR-2608040600 の分類3・4"
+  :workflow/created "2026-08-04"
+  :workflow/owner "Jun Kawasaki"}
+
+ {:db/id -7
+  :task/id "S1-torihiki-snapshot"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "torihiki に往復可能な snapshot を入れ、free list を bit ladder に替えて order id を復元可能にする"
+  :task/kind "engine"
+  :task/repo "kotoba-lang/torihiki"
+  :task/requires []
+  :task/external-gate false
+  :task/status :completed
+  :task/status-at "2026-08-04"
+  :task/status-note "kotoba-lang/torihiki 4faead84aaf1 — capture/restore が canonical-bytes まで byte 一致で往復。158 tests/461 assertions を JVM と nbb で通過、STATE ROOT 22f75a7f… 不変。同一条件 A/B で 25,314→37,902 ops/sec。west pin 済み（superproject 491b0fa）。"}
+
+ {:db/id -8
+  :task/id "S2-engi-resume"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "engi.replica に resume を足し、chain/by-hash/voted/committed/qcs を有界な tail から再開できるようにする"
+  :task/kind "consensus"
+  :task/repo "kotoba-lang/engi"
+  :task/requires ["S1-torihiki-snapshot"]
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "machine state だけ snapshot しても engi の畳み込みが O(chain) のまま残る。**:voted（この replica が投票した height の集合）の有界化が投票安全性そのもの** —— watermark の境界を 1 つ間違えると同じ height で二度投票し、このシステムが唯一 slash する行為を事故で自分に犯す。resume 後に二重投票しないことのテストを先に書くこと。"}
+
+ {:db/id -9
+  :task/id "S3-validator-snapshot-boot"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "validator の boot を snapshot + tail replay にし、checkpoint を定期保存する"
+  :task/kind "deployment"
+  :task/repo "kotoba-lang/torihiki-node"
+  :task/requires ["S2-engi-resume"]
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "ADR-2608040400 の未了節。catchUp のページ分割は障害を遅い起動に変えただけで O(chain) は残っている。deploy 後は /head の code-version で実際に走っているか確認する（Durable Object は deploy を自動では拾わない）。"}
+
+ {:db/id -10
+  :task/id "S4-validator-tx-landing"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "validator に transaction が着地しない件を解明して直す"
+  :task/kind "bug"
+  :task/repo "kotoba-lang/torihiki-node"
+  :task/requires ["S3-validator-snapshot-boot"]
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "実測 2026-08-04: faucet も注文も nonce が進まず txs-in-chain 4 のまま resting 0。同じブラウザクライアントで単一シーケンサ torihiki-node には着地する（collateral $100,000、nonce 1→3、実約定も発生）。疑い: 受信 replica の in-memory mempool が eviction で失われ、catch-up 中は /msg に 503 を返すため参加できない窓が長い。S3 が原因側を直す可能性があるので後に置いた —— 直っていたら status-note に「S3 で解消」と書いて completed にする。"}
+
+ {:db/id -11
+  :task/id "S5-candles-endpoint"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "node に block 足の OHLC 集計を持たせ、/candles を出す（tape の 200 件 ring buffer を超える履歴）"
+  :task/kind "api"
+  :task/repo "kotoba-lang/torihiki-node"
+  :task/requires []
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "torihiki-chart は既に auto-span と block 足を持つので、消費側の変更は最小。集計は torihiki-chart.candle と同じ規則（絶対バケット・整数のみ・空バケットを作らない）にすること —— 二箇所で違う足を出すと、どちらが本当か言えなくなる。DO storage を無限に太らせないよう保持本数に上限を置き、切ったことを /candles の応答に書く。"}
+
+ {:db/id -12
+  :task/id "S6-bridge"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "担保の裏付け — bridge authority を実際に何かに接続する"
+  :task/kind "asset"
+  :task/repo "kotoba-lang/torihiki"
+  :task/requires []
+  :task/external-gate true
+  :task/gate-reason "**技術ではなく「何に裏付けるか」の決定で、オーナーの判断が要る。** 機構（:bridge-authority）は既にあり devnet は nil のまま＝誰でも自分に入金できる。何を担保にするか（外部チェーンの USDC / 自前の証書 / 何もしない と決める）が決まるまで実装しても意味が定まらない。loop はこのタスクに触らず、他が尽きたら報告して止まること。"}
+
+ {:db/id -13
+  :task/id "S7-merkle-state-root"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "state root を flat digest から認証木にし、1 残高だけを replay 無しで検証できるようにする"
+  :task/kind "engine"
+  :task/repo "kotoba-lang/torihiki"
+  :task/requires []
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "light client を主張するなら必須。**全履歴の root が変わる**ので、canonical-bytes の順序をそのまま木の葉順に写して互換の証明を書けるかを先に決めること。parity fixture の 22f75a7f… も変わる —— 変わってよいことを明示してから変える。"}
+
+ {:db/id -14
+  :task/id "S8-terminal-jp-go-dds-skin"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "torihiki-terminal の design system を kotoba-ui から jp-go-dds に載せ替える（dark 込み）"
+  :task/kind "uiux"
+  :task/repo "kotoba-lang/torihiki-terminal"
+  :task/requires []
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "オーナー指示（2026-08-04）の積み残し。jp-go-dds.dark は実装済みで page に :dark? true を渡すだけ。view.cljc が kotoba-ui の app-shell/nav-bar/panel/grid/stack/->page に依存しており、jp-go-dds 側の対応物は dds-ext-*（container/section/grid/stack/card/hero）だけなので view.cljc 全体の書き換えになる。**チャートは --hig-* 参照なので skin 非依存で、この作業の影響を受けない。** 着地前に script/verify.cljs と script/verify_chart.cljs の両方を本番に対して通すこと。"}]
