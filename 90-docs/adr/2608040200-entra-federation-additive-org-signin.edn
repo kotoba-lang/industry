@@ -153,16 +153,57 @@ transaction は callback で読んだら**検証が落ちても**即座に消す
   PRIMARY edge cljs gate は追加 ns 1つを除き baseline と同一。lint の error 1件は
   `origin/main` と同一（`billing_x402_test.cljc`、本変更と無関係）。
 
-## 未着手（正直に）
+## `cloud-itonami-app` の Microsoft 連携を did:key に結ぶ（2026-08-04 追記）
 
-- **`cloud-itonami-app`（ローカル JVM アプリ）側は未着手。** `:microsoft` は
-  今も『連携アカウント』のままで、アプリへのサインインは Passkey → `did:key`。
-  同じ federation を app に持ち込むかは別途判断が要る（app は loopback bind で
-  脅威モデルが違い、`identity.clj` は Keychain 前提の別実装）。
+オーナー指示「microsoft 連携も passkey, did:key に連携するようにしてね」。
+
+app の `:microsoft` は引き続き**連携アカウント**（サインイン手段ではない）だが、
+**その連携が誰のものかが記録されていなかった**。このアプリの identity は Passkey が
+確立した `did:key` なのに、接続レコードがそれを持っていない。実測した帰結:
+
+| 症状 | 原因 |
+|---|---|
+| 2人目の Microsoft 接続が1人目を**静かに上書き** | 接続 ID が `{org}:{provider}` で組織に provider 1枠しか無い。1人目の Keychain エントリは存在しない接続レコードに属することになる |
+| 同期が**別人の grant** で回る | token 解決が `first`。mail-sync 自身が『machine 上の token を手当たり次第に掴むアプリは、向けられてもいないメールを読むアプリだ』と書いているのに、**app 内部の接続一覧に対して同じことをしていた** |
+| 2人目が自分のアカウントを繋がない | `:connected?` が state のどこかに接続があれば true（**組織すら跨ぐ**）。『接続済み』と出るので繋がず、同期は1人目の grant で回り続ける |
+| 同僚の接続に Disconnect を押せる | `:connections` が organization で絞られていた |
+
+決定:
+
+- **`start-oauth!` は Passkey 未登録なら拒否**し、DID を往復に持ち回る（callback で
+  session を読み直すと『ブラウザが戻ってきた時にサインインしている人』に結ばれる）。
+  callback ではなく**開始時**に拒否するので同意画面自体が出ない。
+- 接続は **DID で keying** し `:user-did` を記録。同じ外部 subject を2つ目の DID に
+  結べない（1つの Microsoft アカウントは1人）。
+- `connection-for` は DID を取り、DID 無しは**一意なときだけ**解決して複数あれば
+  拒否する（誰かを選ばない）。単一利用者の配備ではコストゼロ。
+- token cache は `[provider did]`、公開ビューは本人スコープで**誰の接続かを表示**。
+- **Keychain の account 名は変えない。** DID で keying し直すと既存 token が誰も
+  引かない名前の裏に取り残され、症状は『接続済みと表示されるのに同期が全部失敗』に
+  なる。DID が選ぶのは *どの接続か* で、Keychain は同じ secret を同じ名前で指す。
+- legacy 接続は `ensure-did-links!` が `:user-id` から DID を導出する（必須。
+  `:user-did` の無い接続は DID 単位の検索から漏れ『未接続』として読める）。
+
+実装: `cloud-itonami/cloud-itonami-app` PR #35（`43942c4`）。検証:
+**980 tests / 4204 assertions, 0 failures**、新規 `oauth_did_binding_test.clj`
+11 tests（上表の4症状がテスト名）、clj-kondo は main と同一。
+
+**app へのサインイン自体は従来どおり Passkey → `did:key`** で、Entra federation
+（この ADR の本体）は app には持ち込んでいない —— app は loopback bind で脅威モデルが
+違い、`identity.clj` は Keychain 前提の別実装。持ち込むかは別途判断。
+
+## 未着手（正直に）
 - **live 配備が無い。** `ENTRA_CLIENT_ID` / `ENTRA_CLIENT_SECRET` /
   `ENTRA_REDIRECT_URI` は未設定で、Entra 側のアプリ登録も未実施。実テナントに
   対する end-to-end は一度も走っていない。
 - `:auto-provision? true` を実際に provision する経路が無い（`:provision` は
   outcome として返るが、callback は 401 にする）。
 - UI に『Microsoft でサインイン』のボタンが無い（discover は `\"entra\"` を返すが、
-  `org-signin.cljc` の状態機械はまだこの段を知らない）。"}]
+  `org-signin.cljc` の状態機械はまだこの段を知らない）。
+- **app 側**: `connection-for` の曖昧拒否は**呼び出し元がまだ DID を渡していない**
+  経路で発火しうる。`mail-sync` は背景ループで session を持たないため DID 無しで
+  呼んでおり、同一 provider に2人が接続した配備では
+  `:oauth/ambiguous-connection` で同期が止まる。**黙って他人の grant を使うより
+  正しい**が、複数利用者配備で同期を続けるには『どの DID として同期するか』の
+  設定（`mail-sync` の `:delegated-credential` と同型の明示的な指名）が要る。
+  今日そこまで到達した配備は無い（実測: 接続は各配備1件）。"}]
