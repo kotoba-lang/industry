@@ -298,3 +298,26 @@
               （ul/table/dd 等）では呼ばない。table 側は今回この除外を持ったので修正の形は既知。
               条件 1 つで 3 case —— htmldom の次の最有力ターゲット。"
              "col が colgroup 外にあるとき暗黙 colgroup が作られない、table 外の stray td/tr、template の content"]}
+
+{:at "2026-08-04"
+ :iteration 35
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 292}
+ :line-structure {:agree 249 :total 280 :pct 89}
+ :geometry {:boxes-agree 952 :boxes-total 1142 :pct 83 :clean-cases 207 :clean-total 292
+            :was "948/1142, 204/292"}
+ :computed-style {:values-agree 13832 :values-total 15942 :pct 87}
+ :landed {:cssom "1a35ebafe5e248a91c04d56bb49eca9c801148e5 — absolute の包含ブロックは padding box、left+right / top+bottom が寸法を決める"}
+ :note "**offset を持つ軸だけ**が padding box に対して解決する。offset の無い軸は静的位置に留まる
+        （祖先の content 原点で近似）。両者を混同すると offset の無い absolute/fixed が全て
+        padding 分ずれ、既存 test が実際にそれを捕まえた。test で固定済み。"
+ :known-simplification "位置指定された祖先が無い場合、実ブラウザは initial containing block（viewport）に
+                        対して解決するが、このエンジンは常に最近接の祖先を使う。corpus の :position/* は
+                        全て positioned な祖先を持つので差が出ない —— unit test に明記した。"
+ :remaining ["flex の既定以外 10 プロパティ、grid の flow/gap/alignment"
+             "float の clear / margin / 親の高さへの寄与"
+             "display: table/contents/flow-root、table-layout: fixed、colgroup、border-collapse"
+             "direction: rtl、単位無し line-height、BFC が overflow-x/y を見ない"
+             "fieldset/legend の out-of-flow、select の control font"
+             "cascade の UA stylesheet 所在（構造的 1,400 値）"
+             "parser: comment node type（cross-repo）、afe scope marker、omission 3 件（別 agent が作業中）"]}
