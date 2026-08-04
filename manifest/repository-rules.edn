@@ -916,12 +916,36 @@
     :note2 "open-robo alone is 76 files of cad/ cad-spec/ bom/ firmware/ appview/
             -- a whole hardware product (the Giemon robot kit). Archiving it is
             not sector tidying."}
+   ;; EXECUTED 2026-08-05 in that order, for 7 of the 9.
    :gap/correct-order
    ["move each open-*'s process artifacts under its cloud-itonami-isic-* sibling"
     "verify the move"
     "only then archive open-*"]
-   :gap/note "that move is content work, not a naming operation, so it is
-              recorded rather than executed."}
+   :gap/executed
+   {:date "2026-08-05"
+    :pairs [{:from "open-banking" :to "cloud-itonami-isic-6419" :files 38}
+            {:from "open-denki"   :to "cloud-itonami-isic-3510" :files 27}
+            {:from "open-gas"     :to "cloud-itonami-isic-3520" :files 33}
+            {:from "open-ports"   :to "cloud-itonami-isic-5222" :files 33}
+            {:from "open-network" :to "cloud-itonami-isic-6110" :files 34}
+            {:from "open-patent"  :to "cloud-itonami-isic-7490" :files 34}
+            {:from "open-robo"    :to "cloud-itonami-isic-2829" :files 76}]
+    :verification "remote blob count on each target = its original count + the
+                   moved file count, and a probe file fetched from each target's
+                   main, BEFORE any archive"
+    :archived "the same 7, on GitHub and as groups: [archived] in west.yml"}
+   ;; Resolved from evidence, not from memory: the ISIC titles came from the
+   ;; machine-readable Rev.4 catalog in cloud-itonami/org-un-isic, and the
+   ;; sector match came from each target's blueprint.edn :itonami.blueprint/name.
+   ;; That is what settled open-network (6110 is literally "Wired
+   ;; Telecommunications Network Operations") and open-patent (6910 turned out to
+   ;; be "Global Incorporation Actor", not generic legal, so 7490).
+   :gap/still-open
+   [{:repo "open-rail" :why "4911 Passenger vs 4912 Freight -- the repo is
+      'Railway Operations & Network Design' and its BPMN is define-line +
+      report-incident, which is infrastructure, not either service"}
+    {:repo "open-otology-uhl-r" :why "a kotoba AppView for a uhl-right-neural
+      Pregel; 8620 Medical and dental practice is a weak fit for an AppView"}]}
 
   {:gap/id :kotodama-retirement
    :gap/measured-at "2026-08-05"
