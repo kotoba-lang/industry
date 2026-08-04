@@ -260,18 +260,34 @@
   :task/repo "kotoba-lang/inga"
   :task/requires []
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "S12 の新しい診断が出した次の原因。code-version 86 で reset した w4（height 0）の `last-sync-outcome`:
+  :task/status :completed
+  :task/status-note "**完了。遅れた replica が自力で追いついたところまで観測した**（それが自分で設定した条件だった）。
 
-      {offered 1, from 1276, to 1276, adopted 0, reason :does-not-attach}
+  ## 直したもの 1 — 宛先（inga e7e40eb）
 
-  **1276 は w1 の要求範囲であって w4 のものではない。** w4 は height 0 なので 1 から要らなければならない。
+  `:sync-request` に `:witness` を載せ、`handle-sync-request` が `{:to <requester>}` で返す。wire は `\"w\"` を optional にして encode/decode/`:bad-shape` を更新（deploy 中は新旧が並走するので、witness の無い要求は broadcast に落として答える。echo する値なので長さは検査する）。
 
-  原因: `:sync-request` は**送信者を持たない**（`{:type :sync-request :from :to}` だけ）ので、応答は `{:to :all}` でブロードキャストするしかない。結果として、遅れた replica は他の replica 宛ての segment を受け取り `does-not-attach` で捨てる。自分の範囲の答えは、届いていたとしても他人の答えに埋もれて `last-sync-outcome` からは見えない。実測 w4: seen sync-response 5 / sent sync-request 4、それでも height 0。
+  ## 直したもの 2 — node が `:to` を読んでいなかった（torihiki-node 69b38ad）
 
-  直す方向: `:sync-request` に `:witness` を載せ、応答を `{:to <requester>}` で返す。**wire の閉じたメッセージ型に フィールドを足すので、`inga.wire` の encode/decode と `:bad-shape` 判定の両方を更新すること**（古い形の request も当面受け付けるか、両ノードを同時に入れ替えるかを決める）。テストは『遅れた 1 台だけの網が自力で追いつく』——S10 で書いた `a-replica-left-behind-asks-for-what-it-is-missing` の先にある、実際に追いつくところまで。
+  **inga 側だけでは何も変わらなかった。** `dispatch` は outbox 全体を一度 JSON にして**同じ body を全 peer に**POST していて、`:to` は最初から `inga.replica` が付けていたのに読まれていなかった。vote と proposal は元々 broadcast なので見えず、sync でだけ致命的だった。3 台が同時に訊くと 256 ブロック × 3 が 1 つの body に入って全員に飛んでいたのも同じ原因。
 
-  **これで sync 経路の欠陥は 4 つ目**（S10 要求が出ない / S11 履歴を出せない / S12 証明書を検証していない / S13 宛先が無い）。1 つ直すごとに次が出ているので、S13 を直したら**遅れた replica が実際に追いつくところまで**を completed の条件にする。"}
+  ## 直したもの 3 — 自分の公開鍵を持っていなかった（torihiki-node 0aa94d0）
+
+  宛先を直した直後の実測（v87、w4 を wipe）で**次の欠陥が出た**: 1..256 が**自分宛てで**届くようになったのに `adopted 0 / below-quorum`、高さ 4 で `per-witness {w1 true, w2 true, w4 false}` —— **自分の署名を拒否していた**。鍵マップは peer から埋め、埋める loop は自分を除く（正しい）。その帰結として `verifyCerts` は自分の署名の公開鍵を見つけられず検査を飛ばし、同期 verifier が空のキャッシュから `false` を返していた。replica は自分の履歴のほぼ全ブロックに投票しているので、**自分が証明に加わった chain に復帰できない**。boot で自分の鍵をマップに入れる 1 行。verify-fn から意図的に外した self-trust とは別物（署名は公開鍵で WebCrypto が検証する。鍵が verifier の見る場所に無かっただけ）。
+
+  ## 観測（v88、2026-08-04）
+
+  w4 を `/wipe` で height 0 に落として放置。23:06:19 に 768、23:06:45 に 1056、23:07:12 に 4 台とも 1067。`equivocators []`、`peers-known` は 4（自分の鍵が入った）。**手を触れずに追いついた。**
+
+  ## 前進の代償
+
+  追いついた後も、view が変わるたびに 1 ブロックぶんの `does-not-attach` が出る（`{offered 1, from <tip>, adopted 0}`）—— tip に居る replica が自分の持っている tip を提示されている。1 view あたり 1 ブロックなので flood ではないが、無駄ではある。宛先を分けたぶん body は小さくなった。
+
+  ## テスト
+
+  『遅れた 1 台だけの網が自力で追いつく』（`a-network-with-one-replica-behind-heals-itself`）は**修正前から通っていた** —— in-process では全員が全部受け取るので broadcast でも当たる。**通るテストが証拠にならない例**として残す。本番で当たらないのは、遅れた側が捨てる量が segment 1 本ぶんに埋もれるから。wire の round-trip（新形式・旧形式・長すぎる witness）と宛先の 3 本を追加。JVM 289 tests / 1322 assertions、nbb と parity digest 一致。
+
+  **sync 経路の欠陥はこれで 6 つ**（S10 要求が出ない / S11 履歴を出せない / S12 証明書を検証していない / S13 宛先が無い / node が宛先を読まない / 自分の鍵が無い）。1 つ直すごとに次が出続けたが、**今回は最後まで到達した**。"}
 
  {:db/id -16
   :task/id "S9-quadratic-replay"
