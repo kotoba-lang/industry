@@ -1,27 +1,29 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 9132, "kotobase-cf-wasm-staging" 9708},
+ {"net-kotobase" 9895, "kotobase-cf-wasm-staging" 10718},
  :zone
- {:requests-7d 26077,
-  :pageviews-7d 1271,
-  :uniques-7d-sum 1346,
+ {:requests-7d 27081,
+  :pageviews-7d 1282,
+  :uniques-7d-sum 1354,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 2468}
-   {:path "/xrpc/ai.gftd.apps.kotobase.engine.canaryTransact",
-    :requests 154}
-   {:path "/", :requests 102}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.engine.candidateRead",
+    :requests 246}
    {:path "/xrpc/ai.gftd.apps.kotobase.engine.primaryRead",
-    :requests 26}
-   {:path "/api/funnel", :requests 24}
-   {:path "/xrpc/ai.gftd.apps.kotobase.engine.candidateRead",
-    :requests 23}
-   {:path "/xrpc/ai.gftd.apps.kotobase.engine.bootstrap", :requests 22}
-   {:path "/why-kotobase", :requests 19}],
-  :status-mix {:ok 3775, :client-error 3011, :server-error 242},
+    :requests 242}
+   {:path "/xrpc/ai.gftd.apps.kotobase.engine.canaryTransact",
+    :requests 239}
+   {:path "/xrpc/ai.gftd.apps.kotobase.engine.bootstrap", :requests 35}
+   {:path "/why-kotobase", :requests 19}
+   {:path "/resources", :requests 19}
+   {:path "/obsidian", :requests 16}
+   {:path
+    "/kotobase-cf-wasm-production/blocks/bafyreiazyieskz6xglbp637el7dj6m47xsoe5auq2degwbdj5flll3ttc4/bafyreicsn6yi46qp5abzis5emjajzaxsgjbw32xeoolexckrcl736yhgvi",
+    :requests 16}],
+  :status-mix {:ok 1760, :client-error 2856, :server-error 79},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,12 +35,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-04",
- :traffic-quality {:window "24h", :probe-4xx-pct 43, :error-5xx-pct 3},
+ :traffic-quality {:window "24h", :probe-4xx-pct 61, :error-5xx-pct 2},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 2468 · /xrpc/ai.gftd.apps.kotobase.engine.canar… 154 · / 102 · /xrpc/ai.gftd.apps.kotobase.engine.prima… 26 · /api/funnel 24 | 4xx(probe) 43% · 5xx 3%",
- :funnel {:visitors 2201, :signups 12, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.engine.candi… 246 · /xrpc/ai.gftd.apps.kotobase.engine.prima… 242 · /xrpc/ai.gftd.apps.kotobase.engine.canar… 239 · /xrpc/ai.gftd.apps.kotobase.engine.boots… 35 · /why-kotobase 19 | 4xx(probe) 61% · 5xx 2%",
+ :funnel {:visitors 2205, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 26077 req/7d・1346 uniques(日次和)・うち4xx probe 43%(24h)、workers 18840 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 27081 req/7d・1354 uniques(日次和)・うち4xx probe 61%(24h)、workers 20613 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 7,
   :submissions 3,
@@ -47,6 +49,6 @@
   :attempt-rate 0.42857142857142855,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 669},
+ {:visitors {:openai-ads 3, :organic 673},
   :signups {:organic 9}, 
   :checkouts {}}}
