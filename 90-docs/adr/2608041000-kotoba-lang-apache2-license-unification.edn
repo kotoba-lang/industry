@@ -68,8 +68,39 @@ canonical 本文は GitHub の `/licenses/apache-2.0` が返す 202 行をその
 
 - **GPL-3.0: `comfyui`** — 上流 ComfyUI（GPL-3.0）の派生。relicense する権利が無い。
 - **AGPL-3.0 6 件**: `catalog-maturity` / `crowdfunding` / `kotobase-commoncrawl-actor` / `langchain-store` / `loop-lei-catalog` / `merkle-sum` — 意図的な copyleft 選択とみなし、オーナーの個別判断があるまで触らない。
-- **archived 8 件** — read-only。実測で `kotobase-cljc-worker` への書込が HTTP 403 `Repository was archived so is read-only` で失敗した。
-- **private 4 件** — 外部採用の funnel に無い。
+- **archived 8 件** — read-only。実測で `kotobase-cljc-worker` への書込が HTTP 403 `Repository was archived so is read-only` で失敗した（この 1 件は後にオーナー判断で unarchive し適用済み）。
+- **private 全件 — オープンソースライセンスを付けない。all rights reserved とする**（オーナー方針 2026-08-04）。ライセンスは付与行為なので、既にライセンスを持つ private repo からの剥奪も agent 判断では行わない。
+
+## 3b. 上流 OSS 由来のものは、その上流のライセンスを継承する（オーナー方針 2026-08-04）
+
+**org 既定の Apache-2.0 より、上流の継承が優先する。** 一括適用は「`com-*` / `org-*` は
+仕様の clean-room 実装＝自前コード」という前提に立っていたが、この前提が破れる repo が
+実在した。
+
+- **`jp-go-digital-design-system` は誤って Apache-2.0 にしていた。MIT に戻した。**
+  この repo は `digital-go-jp/design-system-example-components-html` の CSS を
+  `resources/jp_go_dds/dds.css` に vendor しており、上流は MIT / 著作権はデジタル庁。
+  **変更前は `LICENSE` が無く `LICENSE-upstream` だけがあり、GitHub は MIT と判定していた
+  ＝元の状態が正しかった**ものを、一括適用が壊していた。現在は `LICENSE` を canonical MIT
+  （両者の著作権表示）に戻し、vendoring の事実と上流 commit を `NOTICE` に明記、
+  `LICENSE-upstream` は逐語のまま保持している。
+  なお説明文を LICENSE 末尾に足すと licensee が検出できず NOASSERTION になる —
+  **LICENSE は canonical 本文のみに保ち、説明は NOTICE に置く。**
+- **MIT だった 176 repo 全件の変更前著作権表示を機械監査した。第三者著作の消失はゼロ**
+  （139 件が `Jun Kawasaki` / `kotoba-lang` 名義、残りは Apache 本文の語句への誤マッチ）。
+  単一著作権者なので MIT→Apache-2.0 の relicense 自体は有効。
+- **GitHub のコード検索はこの org を当てにできない**（jp-go-dds に実在する
+  `Upstream commit` の検索が total=0）。派生の検出は tree を直接引く
+  （`scratchpad/derivation-scan.cljs`: 第二ライセンスファイル / vendor ディレクトリ /
+  非 kotoba 系ソースの混入を signal にする）。
+- 抜き取り検査（`com-blender` `org-threejs` `com-terraform` `com-kong` `com-agones`
+  `com-quic-http3` `org-w3-rdf`）はいずれも 10〜18 ファイルの `.cljc`/`.cljs`/`.edn`/
+  `.kotoba` のみで上流ソースの混入なし。`com-terraform` は説明に
+  `Clean-room terraform compat actor` と明記。
+- **テストフィクスチャは vendoring と区別する。** `bim` の
+  `test/fixtures/external/revit2011_wall1.ifc` は出典 URL・pin commit・SHA-256 付きで
+  記録された第三者データだが、ライブラリの機能コードではないため repo の
+  Apache-2.0 は維持する。
 
 ## 4. org 既定の community health file を `kotoba-lang/.github` に置く
 
@@ -107,6 +138,32 @@ canonical 本文は GitHub の `/licenses/apache-2.0` が返す 202 行をその
 ## 7. 戦う土俵
 
 point read は Neo4j / Datomic / RisingWave の 3 者すべてに 10x–500x 勝っている実測 receipt がある一方、multi-hop は 1 桁負けている。したがって「速い graph DB」ではなく **「検証可能（CID / incidence merkle）で、エッジで動き、1 つの datom 面に SQL / Cypher / SPARQL / GraphQL が同居する」**で出す。到達可能なコミュニティは IPFS・IPLD / AT Protocol（kotobase.net は PDS）/ Clojure・Datalog 圏（Datomic がクローズドで飢えており、XTDB / Datalevin / Datahike はコミュニティ経由だけで伸びた前例）。
+
+# 実測の最終結果（2026-08-04 完了時）
+
+| ライセンス | 件数 | 説明 |
+|---|---|---|
+| Apache-2.0 | 1987 | org 既定 |
+| AGPL-3.0 | 6 | 意図的な copyleft（据え置き） |
+| MIT | 3 | `jp-go-digital-design-system`（上流継承）+ archived 2 |
+| NONE | 3 | **全て archived**（read-only で書込不可） |
+| GPL-3.0 | 1 | `comfyui`（上流派生） |
+
+**active な public repo は全件がライセンスを持ち、Apache-2.0 以外は全て理由が説明できる。**
+開始時は 1606 件が LICENSE 無し＝全権利留保だった。
+
+適用は 3 波: Wave 1（32、LICENSE+NOTICE）/ Wave 2（1757、LICENSE のみ）/
+Wave 3（7 — インベントリ取得後に作られた repo 6 件 + Wave 2 で失敗した 1 件）。
+
+## 計測そのものの誤り（記録しておく）
+
+**進行中ずっと「失敗 0」と報告していたが誤りだった。** ledger の失敗は
+`{:license 「fail」}` として記録されるのに、集計は旧実装のキー `error` を
+grep していたため、実際の失敗 2 件（Wave 1 の `kotobase-cljc-worker`、Wave 2 の
+`com-optical-compute`）を 0 と報告し続けた。両件とも後に個別処理して解消したが、
+**「gate は緑なのに対象は壊れている」という、本 ADR が site-check について
+指摘したのと同じ形の誤りを、集計側で自分でもやっていた。** 検出器を書いたら
+その検出器が本当に落ちることを一度確かめる（感度測定）以外に防ぎようがない。
 
 # Consequences
 
