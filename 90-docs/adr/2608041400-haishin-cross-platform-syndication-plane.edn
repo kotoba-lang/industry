@@ -145,19 +145,32 @@
    設計なので、これは故障ではなく既定状態である。実際に配信を有効化するには
    下記 R1〜R3 が要る。
 
-   - **R1: `:unverified` な5 target の limit を vendor doc に照合する。**
+   - **R1: `:unverified` な5 target の limit を照合する。**
      `:youtube` のみ `com-youtube` の独立実装と一致していて corroborated。
      Instagram / TikTok / X / Vimeo / LinkedIn は未照合。照合したら
      `haishin.constraints/targets` の該当 entry の `:constraint/provenance` を
      `:vendor-doc` に、`:constraint/checked-at` を照合日に書き換える
      （文書は最新状態のみを表す。履歴は git が持つ）。
      退行検知: `(haishin.core/unverified-targets)` を自分の suite で assert する。
+     **2026-08-04 追記（ADR-2608041800）**: 『workspace 内の既存 lib から裏を取れば
+     よい』は**不可能だと確定した**。org 全 1,999 repo を走査した結果、publish する
+     repo が `com-youtube` しか無く、**publish しない repo は publish の制約を
+     encode する理由が無い**ため。よって R1 は vendor doc に当たるか、下記 R2 の
+     client を実際に叩いて確かめるかのどちらか —— **実質 R2 が R1 を兼ねる。**
 
    - **R2: target ごとの sender を書く。** `:youtube` は `com-youtube` の
      `youtube.videos/insert-video!` への短いアダプタで済む（haishin の
      `:youtube/videos-insert` request body は `youtube.videos/video-metadata` と
-     同形にしてあるので remap 不要）。他5つは新規。**sender は haishin に入れない**
+     同形にしてあるので remap 不要）。**sender は haishin に入れない**
      —— 認証情報がこのライブラリに入らないことが不変条件そのもの。
+     **2026-08-04 更新**: 残り4つの client を新規に書いて公開済み（ADR-2608041800）:
+     `com-instagram` / `com-tiktok` / `com-linkedin` / `com-vimeo-upload`
+     （いずれも依存ゼロ・I/O 注入・27 tests / 58 assertions が nbb と JVM 双方で green）。
+     `:x` だけは publish client がまだ無い —— `com-x` は返信と DM のみで、
+     post 作成と media upload を持たない。**R2 の残りは「4 client を haishin の
+     `:senders` に橋渡しする薄いアダプタ」と「com-x への publish 追加」**であり、
+     プロトコル実装そのものはもう残っていない。
+     capability `social/publish`（wire id 257）も同 ADR で新設済み。
 
    - **R3: `dougaka` engine 側の配線。** `channels #{:aozora :youtube}` の
      `:youtube` は 2026-08-04 時点で enum 値だけで upload 実装が無い。
@@ -182,7 +195,9 @@
 
    R1 に着手するなら `src/haishin/constraints.cljc` の `targets` map だけを触る
    （他の ns は limit の値を知らない）。R2 に着手するなら sender は消費側の repo に
-   置き、`haishin.core/execute!` の `:senders` に渡す。
+   置き、`haishin.core/execute!` の `:senders` に渡す —— 呼ぶ先の client は
+   `kotoba-lang/{com-youtube,com-instagram,com-tiktok,com-linkedin,com-vimeo-upload}`
+   に揃っている（`:x` の publish だけ未実装）。
 
    - receipt は `:source/dataset \"haishin-receipts\"` を持つので、workspace の
      EDN plane にそのまま transact でき、fleet の他の事実と join できる。"
