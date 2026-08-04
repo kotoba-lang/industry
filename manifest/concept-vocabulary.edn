@@ -92,14 +92,27 @@
  ;; 電柱 / denchu / utility pole / OOH と 4 通りに割れる。2026-08-04 に
  ;; 「電柱広告は設計実装されているか」を索引で引いて空振りした（当時は実際に
  ;; 無かったが、作った後に同じ問いが空振りするのを防ぐ）。
+ ;; 屋外広告物（一般）と電柱広告（1 媒体）は別概念として並べる。同じ綴りを
+ ;; 両方に持たせてあるので、どちらで引いても両方出るのが正しい。
+ :outdoor-advertising
+ {:label "屋外広告物 / out-of-home advertising（物理媒体全般）"
+  :spellings ["屋外広告" "屋外広告物" "out-of-home" "ooh" "okugai" "おくがい"
+              "billboard" "ビルボード" "野立看板" "看板" "signage" "digital signage"
+              "デジタルサイネージ" "屋外ビジョン" "壁面広告" "屋上看板" "ポスターボックス"
+              "高速道路 広告" "physical advertising"]
+  :note "kotoba-lang/okugai が一般ドメイン（14 媒体のタクソノミー・屋外広告物法/条例・
+道路占用・建築基準法88条(4m超の工作物確認)/64条・高速道路・地点の束ね・照会・出稿）。
+電柱はその中の 1 媒体で kotoba-lang/denchu が担当。収集は loop-okugai-survey、
+観測ソースは org-openstreetmap-overpass と com-mapillary-graph-api。ADR-2608041500。
+デジタル広告面（cloud-itonami/adserver・kotoba-lang/adnet・adnetwork 群）とは別系統。"}
+
  :utility-pole-advertising
  {:label "電柱広告 / utility-pole advertising"
   :spellings ["電柱広告" "電柱" "denchu" "utility pole" "utility-pole" "power pole"
               "巻付広告" "袖看板" "屋外広告" "out-of-home" "ooh" "屋外広告物"]
-  :note "kotoba-lang/denchu が domain（在庫・窓口・料金・法令・出稿）、
-loop-denchu-survey が収集 orchestrator、org-openstreetmap-overpass と
-com-mapillary-graph-api が観測ソース。ADR-2608041500。デジタル広告面
-（cloud-itonami/adserver・kotoba-lang/adnet・cloud-itonami の adnetwork 群）とは別の repo 群。"}
+  :note "kotoba-lang/denchu が電柱固有の domain（柱の識別・供給区域からの候補所有者・
+電力/通信各社の指定代理店・巻付/袖の面・公開料金表）。法令と出稿の一般則は
+kotoba-lang/okugai が正本。収集は loop-okugai-survey。ADR-2608041500。"}
 
  :street-level-imagery
  {:label "ストリートレベル画像 / 写真からの物体特定"

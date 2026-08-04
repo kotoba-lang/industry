@@ -1147,23 +1147,28 @@
           (assoc e :db/id (next-tempid!) :source/dataset "kakekomi")))
       [])))
 
-;; denchu-inventory (kotoba-lang/loop-denchu-survey) — 電柱広告の在庫候補台帳。
-;; survey が area ごとに `denchu-inventory-<area>.datoms.edn` を、代理店/面種別の
-;; 静的カタログを `denchu-catalog.datoms.edn` を書く（どちらも生成物）。
+;; okugai-inventory (kotoba-lang/loop-okugai-survey) — 屋外広告物（physical / OOH）の
+;; 在庫候補台帳。電柱・ビルボード・広告板・屋外ビジョン・ポスターボックス等を
+;; 同じ面に載せる（電柱だけの denchu-inventory を 2026-08-04 に一般化して置き換えた）。
+;; survey が area ごとに `okugai-inventory-<area>.datoms.edn` を、媒体・規制・電柱
+;; 代理店の静的カタログを `okugai-catalog.datoms.edn` を書く（どちらも生成物）。
 ;;
 ;; 面をまたぐ結合キー:
-;;   :pole/owner (文字列 "tepco-pg") ↔ :agency/sells-poles-of（文字列の vector）
-;;   :agency/id  ↔ denchu.order が組む問い合わせの宛先
-;; datascript.js は :db.type/ref を解決しないので、ここも値一致で join する
+;;   :site/medium (文字列 "billboard")     ↔ :medium/id
+;;   :site/operator                        ↔ 媒体 repo のカタログ（:agency/sells-poles-of 等）
+;;   :medium/regulatory-triggers の各要素  ↔ :regulation/id
+;; datascript.js は :db.type/ref を解決しないので値一致で join する
 ;; （lei-tos / yabai / kakekomi と同型）。
 ;;
-;; **この台帳は網羅していない。** survey した area の中しか見ていないので、
-;; `:denchu.coverage/*` entity を必ず一緒に読むこと —— 柱を数えて「日本の N%」と
-;; 読むと誤る。`:pole/ad-eligible` は全件 "unknown" で、幾何情報からは決して
-;; 動かない（所有者/代理店の回答だけが動かせる）。
+;; **この台帳は網羅していない。** survey した area の中で、要求した媒体しか見て
+;; いない。さらに **屋上看板・SA/PA 内広告・高速道路沿道の後付け分類・シェルター
+;; 広告は観測タグを持たないので survey には決して出ない**（`:medium/observable false`）。
+;; `:okugai.coverage/*` entity を必ず一緒に読むこと —— 地点を数えて「日本の N%」と
+;; 読むと誤る。`:site/ad-eligible` は全件 "unknown"、`:site/height-known` は既定 false
+;; （高さが分からないので建築基準法88条の要否は判定できない）。
 
-(defn denchu-inventory-entities [next-tempid!]
-  (let [dir (io/file root "orgs" "kotoba-lang" "loop-denchu-survey" "data")]
+(defn okugai-inventory-entities [next-tempid!]
+  (let [dir (io/file root "orgs" "kotoba-lang" "loop-okugai-survey" "data")]
     (if (.exists dir)
       (let [skipped (atom [])
             es (->> (file-seq dir)
@@ -1173,10 +1178,10 @@
                               (let [rows (vector-of-maps-entities f)]
                                 (when-not (seq rows) (swap! skipped conj (str f)))
                                 (map #(assoc % :source/file (str f)) (or rows []))))))]
-        (warn-skipped! "denchu-inventory data/*.datoms.edn" @skipped)
-        (when (empty? es) (warn-skipped! "denchu-inventory" [dir]))
+        (warn-skipped! "okugai-inventory data/*.datoms.edn" @skipped)
+        (when (empty? es) (warn-skipped! "okugai-inventory" [dir]))
         (for [e es]
-          (assoc e :db/id (next-tempid!) :source/dataset "denchu-inventory")))
+          (assoc e :db/id (next-tempid!) :source/dataset "okugai-inventory")))
       [])))
 
 ;; ---------- 因縁 dependency record（category N。ADR-2607258500） ----------
@@ -1521,7 +1526,7 @@
         patent-tx (toshokan-patents-entities next-tempid!)
         innen-tx (innen-entities next-tempid!)
         awai-tx (awai-yakuwari-entities next-tempid!)
-        denchu-tx (denchu-inventory-entities next-tempid!)
+        okugai-tx (okugai-inventory-entities next-tempid!)
         all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
                                                      biz-tx canvas-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
@@ -1530,7 +1535,7 @@
                                                      working-doc-tx narrative-tx
                                                      company-tx property-tx relationship-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx innen-tx
-                                                     awai-tx kakekomi-tx denchu-tx index-tx)))]
+                                                     awai-tx kakekomi-tx okugai-tx index-tx)))]
     (.transact ds conn all-tx)
     {:conn conn
      :adr-count (count adr-tx)
@@ -1554,7 +1559,7 @@
      :patent-count (count patent-tx)
      :innen-count (count innen-tx)
      :awai-yakuwari-count (count awai-tx)
-     :denchu-inventory-count (count denchu-tx)
+     :okugai-inventory-count (count okugai-tx)
      :index-count (count index-tx)}))
 
 ;; ---------- MCP mode（常駐して JSON-RPC で答える） ----------
