@@ -1,0 +1,143 @@
+[{:db/id -1
+  :adr/id "adr-2608040190-kagami-rename-and-fleet-db-has-no-rename-path"
+  :adr/title "ADR-2608040190: aozora- を app-aozora-* へ改名。fleet CLI は kagami に改名済みで CLAUDE.md が stale だった。west.yml 先行の改名は fleet-db が FLIP VIOLATION で拒否し、incremental な改名経路が存在しない"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-05"
+  :adr/last-verified "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "aozora-rename-kagami-fleet-db-rename-gap"
+  :adr/authoritative-for
+  ["aozora-* が app-aozora-* に改名されたこと"
+   "fleet-db の CLI が kotoba-lang/kagami であること（kotoba-fleet-vcs は旧名）"
+   "kotoba-lang/kotoba-fleet が別物であること"
+   "west.yml 先行の改名を fleet-db が FLIP VIOLATION で拒否すること"
+   "fleet CLI に entry の追加・削除・改名を行う incremental 操作が無いこと"]
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2608040180-family-justification-is-served-hosts-not-dns"
+   "adr-2608040170-authority-path-is-org-plus-name"
+   "adr-2607160005"
+   "manifest/repository-rules.edn"
+   "manifest/fleet-db.edn"]
+
+  :adr/body
+  "# ADR-2608040190: aozora- 改名、kagami、そして fleet-db に改名経路が無いこと
+
+**Status**: accepted
+**Date**: 2026-08-05
+**Deciders**: Jun Kawasaki（+ Claude、standing authorization）
+
+## 1. aozora- → app-aozora-（実行済み）
+
+ADR-2608040180 が「同一ドメインに 2 つの形が共存している」として最優先に挙げた件。
+`aozora.app` / `appview.aozora.app` / `live.aozora.app` / `pds.aozora.app` が
+稼働しており、規則上の正しい prefix は `app-aozora-`。**4 件を改名**した:
+
+| 旧 | 新 |
+|---|---|
+| `network-awai/aozora-appview` | `app-aozora-appview` |
+| `network-awai/aozora-design-system` | `app-aozora-design-system` |
+| `network-awai/aozora-engine` | `app-aozora-engine` |
+| `network-awai/aozora-yoro-ui` | `app-aozora-yoro-ui` |
+
+`app-aozora` と `app-aozora-svelte` は既に正しい形だったので、これで
+1 ドメイン 1 形式になった。west.yml と repos.edn はサーバ側 API commit で追随。
+
+**残る 48 件**（`kotobase-` 26 / `open-` 12 / `murakumo-` 5 / `dougaka-` 5 /
+`bpmn-` 3）は未実行。「全部動かす」か「新規のみ縛る」かの 1 個の判断である。
+
+### 改名が audit の欠陥を露呈させた
+
+`aozora-` を正しい `app-aozora-` にした直後、`--family-audit` が
+**そのファミリを「裏付けなし」と報告した**。原因は audit が family 名から
+ホストのパターンを導出していたこと —— **名前が間違っている間しか動かない検査**
+だった（逆順の `app-aozora-` は順方向の `aozora.app` に一致しない）。
+
+宣言済みの `:served-domain` を使うよう修正した。**ドメインが事実で、prefix は
+そこから導出される** —— 逆ではない。
+
+## 2. fleet CLI は `kagami` であって `kotoba-fleet-vcs` ではない
+
+ADR-2608040180 に「`kotoba-lang/kotoba-fleet-vcs` が west に未登録」と記録したが、
+**誤診だった**。この repo は **`kotoba-lang/kagami`（鏡）に改名されており**、
+west に登録済み・checkout 済みで、`bin/fleet.cljs` は普通に動く。
+
+誤診の経路が示唆的である:
+
+1. CLAUDE.md が `orgs/kotoba-lang/kotoba-fleet-vcs` という**旧パス**を指していた
+2. GitHub リダイレクトは効くが、**checkout のパスは存在しない**
+3. よって「CLI が無い」と読めた
+
+**説明的な名前（`kotoba-fleet-vcs`）から不透明な名前（`kagami`）への改名が、
+参照を stale にし、ツールを発見不能にした。** 2026-08-03 の `kuro`/`kobo` と
+同じ失敗モードであり、CLAUDE.md 自身の「名前が機能を示さない repo は README
+冒頭で名乗る」規則の実例。CLAUDE.md の 3 箇所を修正した。
+
+なお **`kotoba-lang/kotoba-fleet` は別物**（並列 agent の fleet-coordination
+substrate、ADR-2606302000）で fleet-db とは無関係。名前が紛らわしい。
+
+## 3. west.yml 先行の改名は fleet-db に反映できない
+
+CLI が動いたので、2026-08-05 のカタログ 5 件改名を fleet-db に吸収しようとした。
+`reconcile --check` はドリフトを正しく検出した（`+ org-un-isic` … `- open-isic` …）。
+しかし `--enforce` は拒否した:
+
+```
+FLIP VIOLATION: west.yml written outside the signed fleet-db path
+  in-scope drift: {:changed 0, :added 5, :removed 5}
+  advance in-scope pins with `fleet pin-advance` (signed), not gen --entry
+```
+
+**CLAUDE.md の 2 つの経路が矛盾している:**
+
+- 「west.yml への変更（**登録 / rename** / pin 前進）は GitHub API のサーバ側
+  single-entry commit を**唯一の正経路**にする」
+- fleet-db plane は、まさにその経路で書かれた west.yml を FLIP VIOLATION で拒否する
+
+そして **CLI にはこれを満たす操作が無い**:
+
+| 操作 | できること |
+|---|---|
+| `pin-advance` | **既存** entry の pin 前進のみ（署名付き） |
+| `import` | west.yml **全体**からの db 再構築 |
+| `reconcile` | 検査と、fleet-db 由来の変更の吸収 |
+
+**entry の追加・削除・改名を行う incremental な操作が存在しない。**
+
+### 結果（正直に）
+
+repo 改名は west.yml と repos.edn には届くが **fleet-db には届かない**。
+GitHub リダイレクトが効き `west update` は west.yml を読むので**動作は壊れない**
+が、fleet-db はドリフトする。2026-08-05 時点で fleet-db が保持する stale:
+
+- 本セッション由来: 旧名 9 件（カタログ 5 + aozora 4）
+- 他セッション由来: 未吸収の pin 前進 7 件、未登録 repo 8 件
+
+`--enforce-repos` で自分の 5 件だけに絞って試したので、他セッションの
+pin を巻き込んではいない。
+
+## Decision
+
+- **fleet-db を強制しない。** 署名された plane を迂回して手編集するのは
+  CLAUDE.md が明示的に禁じている
+- **gap として記録する**（`:fleet-db-has-no-rename-path`）。必要なのは
+  kagami の CLI に incremental な add/remove/rename を足すか、
+  「改名は fleet-db 先行」と決めるかのどちらか
+- `:fleet-vcs-not-registered` は **`:resolved-as-misdiagnosed`** として残す。
+  消さないのは、誤診の経路自体が記録に値するため
+
+## Consequences
+
+- `app-aozora-` family は 1 ドメイン 1 形式になった（6 members）
+- `--family-audit` が宣言済みドメインを使うようになり、**正しく命名された
+  family を誤って落とさなくなった**
+- CLAUDE.md の fleet 節が実在するパスを指すようになった
+- fleet-db のドリフトは既知・記録済み。動作影響なし
+"}]

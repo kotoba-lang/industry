@@ -185,19 +185,34 @@ skill `new-project-scaffold` を参照。
   上流の正本になりつつある（Phase 1.5 dual-write 吸収期）。** west.yml は
   fleet-db の projection。pin 前進の推奨経路は署名付き
   `fleet pin-advance` / quorum `fleet govern`（実装:
-  `orgs/kotoba-lang/kotoba-fleet-vcs`、policy は `manifest/fleet-keys.edn`）。
+  **`orgs/kotoba-lang/kagami`**、policy は `manifest/fleet-keys.edn`）。
+  ⚠ **この repo は 2026-08 以前に `kotoba-fleet-vcs` から `kagami`（鏡）に改名されている。**
+  旧名は GitHub リダイレクトで生きているが west には `kagami` として登録されており、
+  旧名のパスでは checkout が存在せず CLI を駆動できない（実測 2026-08-05: この
+  誤りで「fleet CLI が無い」と誤診した）。**名前が機能を示さない repo は README
+  冒頭で名乗る**という規則（下記「無い」と言う前に索引を引く）の実例。
+  なお `kotoba-lang/kotoba-fleet` は**別物**（並列 agent の fleet-coordination
+  substrate、ADR-2606302000）で、fleet-db とは無関係。
   **署名鍵は kagi（compartment `personal`、OS-Keychain unlock）にあり、
   `--kagi fleet-owner-key`（pin）/ `--gov-kagi fleet-gov1,fleet-gov2`
   （govern）/ `--kagi fleet-owner-root`（head）で読む**（PEM ファイル指定は
   `--key`。1Password は使わない — op CLI が interactive auth timeout）。
   `FLEET_ROOT=<superproject root>` を渡すと kagi bin を解決できる。
   従来の `gen-west-manifest.cljs --entry` / API single-entry も引き続き有効。
+  ⚠ **ただし両者は衝突する**（実測 2026-08-05、ADR-2608040190）。west.yml を先に
+  書いてから `fleet reconcile --enforce` すると **`FLIP VIOLATION: west.yml written
+  outside the signed fleet-db path`** で拒否される。そして fleet CLI には
+  **entry の追加・削除・改名を行う incremental な操作が無い**（`pin-advance` は
+  既存 entry の pin 前進のみ、`import` は west.yml 全体からの再構築のみ）。
+  したがって **repo の改名は現状 fleet-db に反映する経路が無い** — west.yml と
+  repos.edn には反映でき、GitHub リダイレクトが効くので動作は壊れないが、
+  fleet-db は旧名を保持したままドリフトする。
   **その書き込みを fleet-db に自動吸収していた CI は無くなった**（2026-07-30、
   ADR-2607300900 で GitHub Actions を撤去。`fleet-projection-verify.yml` は
   murakumo fleet 側に未 port）。当面 `fleet reconcile` は手で回す。**fleet-db / ledger /
   fleet-head.edn を手編集しない**（ledger は追記のみ、head は署名付き）。
-- 並列 sync: `nbb --classpath orgs/kotoba-lang/kotoba-fleet-vcs/src \
-  orgs/kotoba-lang/kotoba-fleet-vcs/bin/fleet.cljs sync --db manifest/fleet-db.edn \
+- 並列 sync: `nbb --classpath orgs/kotoba-lang/kagami/src \
+  orgs/kotoba-lang/kagami/bin/fleet.cljs sync --db manifest/fleet-db.edn \
   --workspace <dir> --names a,b --jobs 8`（pin SHA 直接 fetch、dirty skip）。
 
 ## Git operations

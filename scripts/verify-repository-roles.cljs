@@ -526,12 +526,24 @@
     (println (str "surface index: " (count hosts) " hosts served"))
     (println (str "declared families: " (count family-rules)))
     (println "")
-    (doseq [{:keys [family owner]} family-rules
+    (doseq [{:keys [family owner served-domain]} family-rules
             :let [stem (str/replace family #"-$" "")
-                  ;; a family is served either as its own label (murakumo.cloud)
-                  ;; or as a shared label prefix (open-banking.etzhayyim.com)
-                  served (filter #(re-find (re-pattern (str "(^|[.])" stem "[-.]")) %) hosts)
-                  members (filter #(str/starts-with? (:name %) family) repos)
+                  ;; Prefer the DECLARED domain. Deriving the host pattern from
+                  ;; the family name only works while the name is still wrong:
+                  ;; once aozora- was renamed to the correct app-aozora-, the
+                  ;; reversed prefix no longer matched the forward host
+                  ;; aozora.app and a conformant family read as unjustified.
+                  ;; The domain is the fact; the prefix is derived from it.
+                  served (if served-domain
+                           (filter #(or (= % served-domain)
+                                        (str/ends-with? % (str "." served-domain)))
+                                   hosts)
+                           ;; no declared domain: fall back to the family name,
+                           ;; matching its own label (murakumo.cloud) or a shared
+                           ;; label prefix (open-banking.etzhayyim.com)
+                           (filter #(re-find (re-pattern (str "(^|[.])" stem "[-.]")) %) hosts))
+                  members (filter #(or (= (:name %) stem)
+                                       (str/starts-with? (:name %) family)) repos)
                   kind (if (seq served) :serving :library)]]
       (println (str "  " family
                     "  members=" (count members)
@@ -545,12 +557,12 @@
         (println (str "    GAP " family " has neither a served host nor a declared owning repo")))
       ;; The rule's real bite: a serving family's prefix should BE the reversed
       ;; domain it serves. Report, never fail - renaming these is a decision.
-      (when-let [implied (:implied-prefix (first (filter #(= family (:family %)) family-rules)))]
-        (when (not= implied family)
-          (println (str "    PREFIX " family " serves " (:served-domain
-                                                          (first (filter #(= family (:family %)) family-rules)))
-                        " so the rule implies " implied
-                        "  (" (count (remove #(str/starts-with? (:name %) implied) members))
+      (when-let [rule (first (filter #(= family (:family %)) family-rules))]
+        (when (and (:implied-prefix rule) (not= (:implied-prefix rule) family))
+          (println (str "    PREFIX " family " serves "
+                        (or (:served-domain rule) (:registrable-domain rule) "?")
+                        " so the rule implies " (:implied-prefix rule)
+                        "  (" (count (remove #(str/starts-with? (:name %) (:implied-prefix rule)) members))
                         " of " (count members) " members would move)"))))
       (when (and (= :library kind) owner (empty? (get by-name owner)))
         (println (str "    GAP " family " declares owner " owner
