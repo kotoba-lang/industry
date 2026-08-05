@@ -2876,3 +2876,161 @@
   each with a control beside it that passes on both. FOUR ASSERTIONS THE
   AGENT HAD MISLABELLED `CONTROL` TURNED OUT TO FAIL ON BASE -- relabelled
   as targets, and real controls added where a deftest then had none."}
+
+{:seq 61
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "76171aea4635335ab39a0dd8df9ed4804db85419"
+ :title "where a line is allowed to break: which element's white-space governs, the min-content floor, and block-level generated content"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 581}
+ :measured
+ {:line-structure {:before "547/556" :after "548/556 (99%)"}
+  :geometry {:before "1933/1973" :after "1942/1973 (98%)"
+             :clean-cases {:before "555/581" :after "559/581"}}
+  :paint-order {:before "14462/14514" :after "14490/14514 (100%)"
+                :clean-cases {:before "563/581" :after "569/581"}}
+  :computed-style {:before "27733/27736, 579/581 clean" :after "unchanged"}}
+ :verified-on-merged-main
+ {:cssom-tests "899 tests / 2234 assertions, 0 failures"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "179/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :per-case-deltas
+ "SIX cases in the whole 581-case op dump, no regressions in either
+  direction. :overflow/nowrap-inline-blocks-do-not-wrap (200x40 -> 200x20,
+  second span (0,20) -> (300,0)); :text/nowrap-inline-inside-a-wrapping-
+  paragraph (p 120x60 -> 120x40); :text/overflow-wrap-break-word-keeps-min-
+  content (span 60x40 -> 105x20); :generated/before-display-block-makes-
+  its-own-line (p 300x20 -> 300x40) -- all four exact. Plus
+  :position/sticky-right-in-a-horizontal-scroller stopped wrapping (what
+  remains is sticky in the inline axis, untouched) and
+  :sizing/overflow-hidden-releases-the-flex-floor gave up an overflow hit
+  region it should not have had."
+ :what-the-browser-said
+ [{:topic "overflow-wrap vs word-break min-content -- the whole point of case 3"
+   :measured "a 15-char word in an inline-block inside a 60px block, and
+              the same word at width:min-content in a 200px one:
+              no break property -> 105x20 / 105x20;
+              overflow-wrap: break-word -> 105x20 / 105x20;
+              word-break: break-all -> 60x40 / 7x300;
+              overflow-wrap: anywhere -> 60x40 / 7x300.
+              break-word breaks a word ONCE A WIDTH IS CHOSEN; it does not
+              change what the box ASKS FOR."
+   :engine-gap "the engine had NO min-content floor under shrink-to-fit at
+                all -- atomic-intrinsic-width ended at min(max-content,
+                available) instead of min(max-content, max(min-content,
+                available))."
+   :floor-shape "nine more shapes fixed it: the longest WORD (84 for two
+                 12-char words, 60 for two 7-char ones), surviving
+                 overflow: hidden (105), including padding (115), clamped
+                 by max-width (40), and a box whose content cannot break at
+                 all -- replaced, form control, inline-flex/-grid, or any
+                 white-space forbidding a soft wrap -- is its own floor
+                 (<select> 134, <input size=20> 153, <img width=200> 200 in
+                 a 60px parent)."}
+  {:topic "WHICH element's white-space governs a break -- nine shapes at 120px"
+   :measured "alphaalpha<span nowrap> betabeta</span> -> ONE line; the
+              plain-span version -> two. THE SPACE IS THE SPAN'S.
+              alphaalpha <span normal>betabeta</span> inside a NOWRAP DIV
+              -> ONE line; the normal span does NOT rescue it. With
+              `betabeta gammagamma` it breaks before gammagamma -- that
+              space IS the span's.
+              <span nowrap>xx </span> betabeta -> TWO. One forbids, one
+              permits, they COLLAPSE INTO ONE THAT PERMITS. Mirror likewise.
+              Two adjacent inline-blocks with no whitespace -> TWO lines
+              (an atomic boundary is an opportunity); inside <span nowrap>
+              -> one; with nowrap on the FIRST inline-block only -> two."
+   :rule "a collapsible space is an opportunity when the element CONTAINING
+          it permits one; several collapsing runs are one if ANY does; a
+          boundary with no space is one only at an ATOMIC inline, where the
+          NEAREST COMMON ANCESTOR governs."}
+  {:topic "the corollary, and the ACCIDENT it exposed"
+   :measured "abcdefgh<span>ijkl</span> in a 60px box is ONE line in Brave
+              -- a text/text boundary across an inline edge is NOT an
+              opportunity."
+   :accident "closing that broke :wrap/wbr-is-a-break-opportunity, whose
+              own corpus note says the engine got it right `by treating the
+              unknown element as an inline that splits the text into two
+              runs` -- i.e. BY EXACTLY THAT ACCIDENT. <wbr> now emits its
+              own fragment and is UNCONDITIONAL: aaaaaaa<wbr>bbbbbbb at
+              80px is 40 tall plainly AND under nowrap, where a literal
+              U+200B in the same two places is 40 and 20."}
+  {:topic "clusters, not tokens"
+   :measured "alpha <span nowrap>beta gamma delta epsilon</span> zeta at
+              120px is 60 tall with the span ALONE ON LINE TWO AT 168px,
+              OVERFLOWING -- the browser gives up the line rather than the
+              run."
+   :design "the wrap test now measures the whole unbreakable cluster; a
+            cluster of one reduces to exactly the open-adv + ww + tail-adv
+            the function always tested, so every stream without the
+            property gets the old test BYTE FOR BYTE."}
+  {:topic "block-level ::before -- eight spellings on a 300px <p style='margin:0'>tail</p>"
+   :measured "display:block -> 300x40 with `tail` at y=22; bare -> 300x20;
+              inline-block -> 300x20; FLEX -> 300x40 (so it is inline-
+              LEVEL-ness, not `block`); height:30px -> 300x50; ::after
+              block -> 300x40 with tail at y=2; both -> 300x60;
+              content:\"\" block -> 300x20 (AN EMPTY ONE CONTRIBUTES
+              NOTHING, which is why the rule is applied to the merge in
+              with-generated-content rather than to the layout)."}]
+ :harness-defect-found-and-fixed
+ {:defect "the harness did not track :clip push/pop ops"
+  :why "cssom.layout's own comment at the clip emitter says the engine
+        expresses `a line that overflows a box which CLIPS is not hit
+        outside it` with :clip push/pop ops, `which every hit-tester that
+        reads :node ops already tracks (browser.session/hit-nodes)`. THE
+        HARNESS DID NOT -- it read one half of the engine's answer and
+        charged the engine for the other."
+  :measured "a 300px inline-block in a width:200px; overflow:auto box at
+             x=240 -- `visible` answers the span; auto, hidden, scroll,
+             clip and overflow-x:auto answer NEITHER it nor the box."
+  :proof-it-is-not-a-thumb-on-the-scale
+  "I CHECKED THIS MYSELF: modified harness against the UNMODIFIED engine at
+   the base SHA reproduces the baseline exactly on LINE (547/556), GEOMETRY
+   (1933/1973) and COMPUTED STYLE (27733/27736). Paint moves by +2 points /
+   +1 case -- :overflow/x-auto-reserves-height-only, the one place in the
+   corpus where a clip was already being ignored on its own. So of the +28
+   paint points, 26 are the engine's."
+  :second-half-it-named "the +2 also turned the 10 `none -> span` residuals
+   into `none -> div`, which named a second defect, and THAT one IS the
+   engine's: a :node op is emitted BEFORE its own clip-push, so a clipping
+   box's overflow :hit region survived its own clip. A clipping box now
+   gets none."}
+ :gates
+ "13 new deftests. Every one fails on the unmodified engine at the base SHA
+  EXCEPT the two <wbr> tests, which are the controls that pass on both -- as
+  are the break-all/anywhere rows inside the min-content test and the `two
+  7-char words shrink to the container` row. The tests carry Brave's
+  HORIZONTAL numbers and the engine's own VERTICAL ones; the section header
+  explains why (tm-theme supplies :measure-text but no :font-metrics, so
+  every y is 2px above the browser's and every inline box 1px taller -- the
+  conformance corpus, which feeds real metrics in, compares the absolute
+  numbers)."
+ :scope-cuts
+ [{:what "&shy;" :measured "super&shy;califragilistic at 90px is 40 tall,
+          breaking after `super` with a VISIBLE HYPHEN, second line 105px
+          in a 90px box; without it 20 tall, and 20 under hyphens: none."
+   :why "missing is not the opportunity but the INSERTED GLYPH -- a piece
+         in this file is a SUBSTRING of its token."}
+  {:what "hyphens: auto" :measured "`hyphenation example` at 70px with
+          lang='en' is 60 tall vs 40, Chromium splitting hyphen-ation."
+   :why "needs a dictionary."}
+  {:what "text-wrap: balance" :measured "alpha beta gamma delta epsilon at
+          200px is 40 TALL BOTH WAYS; only the lines differ (alpha beta
+          gamma / delta epsilon vs alpha beta gamma delta / epsilon)."
+   :why "not an opportunity but a different algorithm, and THE GEOMETRY
+         AXIS CANNOT SEE IT."}
+  {:what "white-space: break-spaces" :measured "a 60px box with `aa`, six
+          spaces, `bb` is 60x40 with IDENTICAL word positions under BOTH
+          break-spaces and pre-wrap."
+   :why "never reaches the breaker (nor pre-wrap/pre-line). That content
+         does not discriminate them, and FINDING CONTENT THAT DOES IS STEP
+         ONE."}
+  {:what "the three pre/tab cases" :why "left alone as instructed; the
+          htmldom parse-time-collapsing blocker is restated in the README."}]
+ :tried-and-withdrawn
+ "fixing the min-content floor in flex-item-main-width, which is `every
+  shrink-to-fit width in the file` and squarely the concurrent
+  intrinsic-sizing agent's territory. Scoped to atomic-intrinsic-width (the
+  inline atomic path) instead. THE MERGE CONFIRMED THE CALL: seq 60
+  rewrote flex-item-main-width's text branch and the two never touched the
+  same function."}
