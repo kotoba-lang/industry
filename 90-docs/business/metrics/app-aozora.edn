@@ -1,35 +1,35 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 24456,
-  "app-aozora-appview" 11749,
-  "app-aozora-spa" 5825},
+ {"app-aozora-pds" 24635,
+  "app-aozora-appview" 11825,
+  "app-aozora-spa" 5848},
  :zone
- {:requests-7d 1125356,
-  :pageviews-7d 4653,
-  :uniques-7d-sum 854,
+ {:requests-7d 1132907,
+  :pageviews-7d 4660,
+  :uniques-7d-sum 860,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4771}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4786}
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 214}
+    :requests 216}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
     :requests 106}
-   {:path "/federation-pilot/did.json", :requests 97}
-   {:path "/minidrama-fedtest/did.json", :requests 56}
-   {:path "/hito-federates/did.json", :requests 52}
-   {:path "/hito-diag-fed/did.json", :requests 51}
-   {:path "/hito-verify-clean/did.json", :requests 51}],
-  :status-mix {:ok 7307, :server-error 4984, :client-error 9982},
+   {:path "/federation-pilot/did.json", :requests 98}
+   {:path "/minidrama-fedtest/did.json", :requests 60}
+   {:path "/hito-federates/did.json", :requests 54}
+   {:path "/hito-diag-fed/did.json", :requests 52}
+   {:path "/hito-verify-clean/did.json", :requests 50}],
+  :status-mix {:ok 7465, :server-error 5306, :client-error 9864},
   :window "24h"},
  :as-of "2026-08-05",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 45, :error-5xx-pct 22},
+ {:window "24h", :probe-4xx-pct 44, :error-5xx-pct 23},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4771 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 214 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 106 · /federation-pilot/did.json 97 · /minidrama-fedtest/did.json 56 | 4xx(probe) 45% · 5xx 22%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4786 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 216 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 106 · /federation-pilot/did.json 98 · /minidrama-fedtest/did.json 60 | 4xx(probe) 44% · 5xx 23%",
  :signal
- "aozora.app 実測 1125356 req/7d・854 uniques(日次和)・うち4xx probe 45%(24h)、workers 42030 inv/7d"}
+ "aozora.app 実測 1132907 req/7d・860 uniques(日次和)・うち4xx probe 44%(24h)、workers 42308 inv/7d"}
