@@ -1354,3 +1354,43 @@
              "絶対 font-size キーワード（medium 等）は推測せず未解決のまま
                （Brave は monospace ページで medium を 13px、proportional で 16px と報告するため、
                 表は使用中の family の既定フォントに依存する）"]}
+
+{:at "2026-08-05"
+ :iteration 51
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 370}
+ :line-structure {:agree 356 :total 356 :pct 100}
+ :geometry {:boxes-agree 1335 :boxes-total 1335 :pct 100 :clean-cases 370 :of 370}
+ :paint-order {:points-agree 9202 :points-total 9234 :pct 100 :clean-cases 356}
+ :computed-style {:values-agree 18687 :values-total 18763 :pct 100 :clean-cases 332}
+ :landed {:cssom "9c22821b5320596f8c2b6d5e54db15b5b433be12 — inline box の padding/margin/border（scope cut の撤去）"}
+ :note "**GEOMETRY が 1335/1335 box・370/370 case で完全一致。** 幾何軸に残差ゼロ。"
+ :findings ["**2 原因であって 1 つではなかった。** small/code は疑ったとおり 1 原因
+             —— <small> が ua-font-scale に 0.83 で座っており、それは <h5> と同じ数字だが**同じ規則ではない**。
+             <h5> は 0.83em（Brave 11.62px）だが **<small> は keyword の smaller** で、
+             継承サイズ ÷ 1.2（11.6667）であり**合成する**（14 → 11.6667 → 9.72222 → 8.10185 を
+             3 段の入れ子で実測、20px 段落の中では 16.6667）。0.83 × 14 を long で切り捨てた 11 が
+             3.3125 の全部だった。"
+            "**自分の修正を撤回した。** 並行の em-resolution agent が
+             `small, sub, sup { font-size: smaller }` を UA stylesheet に、合成を resolve-font-size に
+             landing させており、**同じ実測から出た同じ規則が本来あるべき 1 層下**にある。
+             自分の ua-font-smaller-tags・inline-fragments の上書き・重複 test を削除した。"
+            "**span w −40 は inline-owner-ops の documented scope cut が満期を迎えたもの**で、
+             実装がそのまま作業だった。実測した規則: pen は水平の各辺で margin + border + padding だけ進み、
+             box 自身の辺はその進みの margin 1 つ分内側から始まり、垂直の辺は行に触れず box だけを伸ばす。"
+            "**閉じ辺は直前の内容と分割不能**（corpus に無かった実測）。200px 段落で
+             `aaa bbb <span style=padding-left:30px;padding-right:30px>ccc ddd eee fff</span> ggg` は
+             **fff の前**で折り返す —— fff 自身の 191px は収まるが、その後ろの 30px が収まらないから。
+             wrap 判定に 1 token の先読みが要り、pen が到達してから課金すると span が
+             ブラウザの 163 に対し 165px になる。"
+            "**閉じ辺は pen ではなく直前の piece に属する。** 最後の語が行を終えた box は
+             次の token が『閉じた』と告げる時点で既に置き去りにされており、
+             その padding-right を新しい行の pen に足すとその行が字下げされる。"]
+ :declined ["inline box の**辺ごとの border 幅** —— この engine は block も含めどこでも uniform な
+             :border-width 1 つで、inline box は第 2 のモデルを発明する場所ではない。
+             scope cut のコメントは**拡張ではなく置換**し、今はこれだけを名指ししている。"
+            "inline の padding は per-side longhand を :padding/declared 越しに読み、
+             **uniform な :padding は決して読まない** —— そのキーは theme の block 装飾に fallback するので、
+             host の装飾 4px を全ての <b> に課金すると後続の全語が動く。"]
+ :remaining ["paint order 32 点（agent 作業中）"
+             "computed style 76 値: blockified 39 / ua-default 35（未実装の UA 規則）/ cascade 1 / ua-inherited 1"]}
