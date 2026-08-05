@@ -1300,3 +1300,57 @@
                      **意図的に誤ったまま残した** —— この変更は値の出どころを動かすもので値を変えるものではない。
                      ただし 2,303 の『見逃された ua-default』の中に隠れていたものが、
                      今は**帰責されて見えている** —— それが ADR の狙いそのもの。次の tranche で 1 行。"}
+
+{:at "2026-08-05"
+ :iteration 51
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 370}
+ :line-structure {:agree 356 :total 356 :pct 100}
+ :geometry {:boxes-agree 1334 :boxes-total 1335 :pct 100 :clean-cases 369 :of 370}
+ :paint-order {:points-agree 9202 :points-total 9234 :pct 100 :clean-cases 356}
+ :computed-style {:values-agree 18687 :values-total 18763 :pct 100 :clean-cases 332
+                  :was "18149/18761 (97%)、全値一致 180"
+                  :causes {:blockified 39 :ua-default 35 :cascade 1 :ua-inherited 1}
+                  :was-causes {:ua-default 557 :blockified 39 :cascade 13 :ua-inherited 3}}
+ :landed {:cssom "41b35a9694b66ae4211bd8f013fdd5dd2b560f30 — ADR-2800003100 tranche 2（cascade での em 解決）"}
+ :note "**5 軸すべてが 100%（丸め後）に到達。** computed style 97% → 100%、全値一致 case 180 → 332。
+        property 別: font-size 95% → 100%、margin-top 83% → 100%、margin-bottom 82% → 100%。"
+ :design "**cascade の walk 内で font-size を top-down に解決し、親の computed size を引き回す**
+          （base size を一律に適用する案ではない）。Brave 実測 2 点がこれを決めた:
+          (1) em は**合成される**（14px ページで 1.5em を 3 段入れ子にすると 21 / 31.5 / 47.25）
+          (2) **1 要素上の 2 つの em が異なるサイズに対して解決する**
+              （font-size:2em; margin-top:1em → 28px/28px —— font-size の em は**親**、
+               それ以外の em は**要素自身**）。
+          後者はまさに h3 { font-size: 1.17em; margin-block: 1em } が必要とするもので、
+          単一 base の設計では 17% ずれる。
+          apply-cascade は :base-font-size を受けるが**鎖の起点としてのみ**。
+          既定は 14（cssom.core/default-base-font-size、layout の default-theme が
+          再宣言せずこれを読む）。**CSS の 16 を先に試したが**、14px のテキストの周りに
+          16px の margin が出て、この repo 自身の test 42 件が 1 分で否と言った。
+          1em には正直な意味が 1 つしかない —— この engine が実際に描くテキストのサイズ。"
+ :draw-op-diff "**5,229 op 中 82、370 case 中 11 が変化し、全て説明が付く。440 の UA margin は 1 つも box を動かしていない**
+                （layout の parse-int 切り捨てが、削除されたテーブルの計算と厳密に同じ値を再現するため、
+                 margin は出どころだけが変わり幾何は不変）。変わったのは:
+                 radio の x（意図的な margin-left 4→5 修正）／
+                 small・sub・sup の font-size 11 → 11.6667（**smaller = 14/1.2** であり、
+                 engine の 0.83em は通ってはいたが規則ではなかった）——
+                 **これが幾何の全 box 一致を 368 → 369 に上げた**（:inline/small-and-code が一致）／
+                 h3 の font-size 16 → 16.38（Brave の値）／
+                 :text/font-size-em-chain の font-size **1.5 → 31.5**
+                 （入れ子の font-size: 1.5em が **1.5 ピクセル**で描かれていた）。"
+ :bugs-found ["**小数の UA padding が切り捨てられていた** —— fieldset が 64 高（Brave 65.641）。
+               従来は parse-int の**未解析 fallback**として入っていたので露見しなかったが、
+               cascade 経由になったので padding 4 辺を parse-px に変更。"
+              "**整数に解決した長さの型が変わっていた** —— JVM では (= 28 28.0) が false で、
+               下流は全て = で比較する。long に正規化。"]
+ :op-cost "tranche 1 → 現在: table **+0%** / form +7% / article +14% / smoke +15% / 見出しの多いページ **+20%**。
+           **tranche 1 の鏡像** —— あちらは table が最悪（+107%）で見出しには何も足さなかったが、
+           こちらは見出し・段落・リストが全て。"
+ :remaining ["**blockified 39** —— flex item の span が block になる件。cascade 後の別段階で意図的に未着手"
+             "**ua-default 35** —— th/button の text-align: center、caption の -webkit-center、option の padding。
+               **この engine が全く持っていない UA 規則**（移動ではなく新知識で、テキストを動かす）。
+               ここで畳むと本 landing の draw-op diff が帰属不能になるため分離。"
+             "**cascade 1** —— disabled な input の rgb(84,84,84)（:disabled の UA 規則で em ではない）"
+             "絶対 font-size キーワード（medium 等）は推測せず未解決のまま
+               （Brave は monospace ページで medium を 13px、proportional で 16px と報告するため、
+                表は使用中の family の既定フォントに依存する）"]}
