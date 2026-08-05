@@ -139,33 +139,35 @@ Meadows band は `dynamics.core/meadows-bands` をそのまま使う（再発明
 hub の定義は**パーセンタイルではなく「fleet の 1% 以上を推移的に gate している」**
 — 推移的 dependents の 95 パーセンタイルは 1 で、閾値として意味を持たないため。
 
-## 結果（2026-08-04 実測）
+## 結果（現在値: 2026-08-05 実測。改訂の経緯は末尾「改訂履歴」）
 
 ### fleet 全体
 
-- スコア対象 1,797（未 checkout 13 / tombstone 2 は別枠。**「悪い」ではなく「対象外」**）
-- 平均 M_own = **0.3816** / 平均 M_eff = **0.2947**
-- **substrate drag = 0.0869 — fleet が持っている成熟度の 22.8% が、未成熟な substrate に打ち消されている**
-- 層: substrate hub **18** / flagship **9** / cohort **1,770**
+- スコア対象 1,808（tombstone 2 は別枠。**「悪い」ではなく「対象外」**）
+- 平均 M_own = **0.3816** / 平均 M_eff = **0.3070**
+- **substrate drag = 0.0746 — fleet が持っている成熟度の 19.5% が、未成熟な substrate に打ち消されている**
+- 層: substrate hub **17** / flagship **9** / cohort **1,782**
 
-### 上位 3 repo が fleet スコアの 10% を握っている
+### 上位 3 repo が fleet スコアの 6.8% を握っている
 
 | repo | M_own | M_eff | 推移的 dependents | fleet gain | band |
 |---|---|---|---|---|---|
-| `kotoba-lang/langchain-store` | 0.223 | 0.177 | 322 | **21.84** | B |
-| `kotoba-lang/langchain` | 0.587 | 0.587 | 736 | **16.48** | B |
-| `kotoba-lang/langgraph` | 0.545 | 0.432 | 717 | **15.28** | B |
-| `kotoba-lang/robotics` | 0.294 | 0.209 | 101 | 1.41 | B |
-| `kotoba-lang/kotobase-client` | 0.325 | 0.325 | 75 | 1.07 | B |
-| （以下 1,792 repo） | | | | ≤1.0 | 主に E |
+| `kotoba-lang/langgraph` | 0.544 | 0.459 | 719 | **22.31** | B |
+| `kotoba-lang/langchain` | 0.686 | 0.686 | 733 | **9.28** | B |
+| `kotoba-lang/langchain-store` | 0.384 | 0.384 | 323 | **6.06** | B |
+| `kotoba-lang/robotics` | 0.293 | 0.209 | 101 | 2.35 | B |
+| `kotoba-lang/html` | 0.426 | 0.426 | 132 | 0.90 | B |
+| （以下 1,803 repo） | | | | ≤0.9 | 主に E |
 
-上位 3 件の合計 53.6 点は fleet 合計（≈530 点）の **10.1%**。repo 数では 0.17%。
-4 位以下は 1.4 点まで落ち、そこから先はほぼ平坦（leverage ratio ≈ 1.0 = 自分の分だけ）。
-**順位に 30〜40 倍の段差がある。これが答えの中心。**
+上位 3 件の合計 37.7 点は fleet 合計（≈555 点）の **6.8%**。repo 数では 0.17%。
+4 位以下は 2.4 点まで落ち、そこから先はほぼ平坦（leverage ratio ≈ 1.0 = 自分の分だけ）。
+**順位に 10〜20 倍の段差がある。これが答えの中心。**
 
-`langchain-store` が 1 位なのは dependents が最多だからではない（322 で 3 位）。
-**M_own が 0.223 と極端に低いまま 322 repo を gate している**からで、伸びしろ ×
-到達範囲の積が最大になる。
+`langgraph` が 1 位なのは dependents が最多だからではない（719 で 2 位）。
+**M_own 0.544 で 719 repo を gate している**からで、伸びしろ × 到達範囲の積が最大になる。
+初版（2026-08-04）で 1 位だった `langchain-store` は、下記「第 1 反復」の作業で
+M_own が 0.223 → 0.384 に上がり、**leverage を使い切って 3 位に落ちた** — これは
+順位の不安定さではなく、この順位表が意図どおりに機能した証拠である。
 
 ### flagship 9 件は自力では既に上位、しかし 25〜41% を drag で失っている
 
@@ -212,30 +214,35 @@ langgraph に gain 22 を出す一方で動的側が breadth-first を勝たせ�
 
 ### 一番実務的な結果 — substrate 配分の knee は 2〜5%
 
-「土台が先か横展開が先か」は問いの立て方が悪い。substrate 層は 18 repo しかないので、
+「土台が先か横展開が先か」は問いの立て方が悪い。substrate 層は 17 repo しかないので、
 **わずかな配分で飽和する。** 残り全部を cohort に回したときの掃引:
 
 | w_sub | Fleet_Eff t=12 | t=24 | t=60 | Substrate@24 |
 |---|---|---|---|---|
-| **0** | 0.516 | 0.635 | 0.805 | 0.467（動かない） |
-| 0.005 | 0.536 | 0.680 | 0.899 | 0.707 |
-| 0.01 | 0.552 | 0.705 | 0.921 | 0.839 |
-| **0.02** | 0.571 | 0.727 | **0.927** | 0.951 |
-| **0.05** | **0.590** | **0.733** | 0.924 | 0.999 |
-| 0.10 | 0.587 | 0.724 | 0.916 | 1.000 |
+| **0** | 0.523 | 0.645 | 0.816 | 0.513（動かない） |
+| 0.005 | 0.543 | 0.687 | 0.904 | 0.743 |
+| 0.01 | 0.557 | 0.710 | 0.923 | 0.864 |
+| **0.02** | 0.575 | 0.729 | **0.927** | 0.962 |
+| **0.05** | **0.591** | **0.733** | 0.924 | 0.999 |
+| 0.10 | 0.587 | 0.723 | 0.916 | 1.000 |
 | 0.20 | 0.570 | 0.699 | 0.896 | 1.000 |
 
-- w_sub = 0 と 0.05 の差は t=24 で **+15.5%**（0.635 → 0.733）
-- **最適は 2〜5%。10% を超えると過投資で下がる**（18 repo は既に飽和済み）
+- w_sub = 0 と 0.05 の差は t=24 で **+13.8%**（0.645 → 0.733）
+- **最適は 2〜5%。10% を超えると過投資で下がる**（17 repo は既に飽和済み）
 - 「substrate-first フェーズ」は要らない。**要るのは substrate をゼロにしないこと**
+- 第 1 反復後も knee の位置は動いていない（2〜5%）。動いたのは w_sub=0 の底値
+  （0.635 → 0.645）で、substrate が実際に成熟した分だけ「何もしない」場合の
+  出発点が上がった。
 
 ## 決定
 
-1. **`langchain-store` → `langgraph` → `langchain` の 3 件を最優先で成熟させる。**
-   fleet の 10% がここに乗っており、2 位以下との段差が 30〜40 倍ある。
-   `langchain-store` は M_own 0.223 で 322 repo を gate しており、単体で最大の梃子。
+1. **`langgraph` → `langchain` → `langchain-store` の順で substrate を成熟させる。**
+   fleet の 6.8% がここに乗っており、4 位以下との段差が 10〜20 倍ある。
+   `langgraph` は M_own 0.544 で 719 repo を gate しており、現時点で単体最大の梃子。
+   **この順位は作業のたびに変わる**（初版では `langchain-store` が 1 位だった）。
+   固定リストとして扱わず、1 反復ごとに再計測して次を選ぶ。
 2. **substrate への配分を総工数の 2〜5% に固定する。** 専用フェーズを切らず、
-   常時この帯を維持する。ゼロにすると t=24 で 15.5% 失い、10% を超えると過投資になる。
+   常時この帯を維持する。ゼロにすると t=24 で 13.8% 失い、10% を超えると過投資になる。
 3. **残りは breadth（cohort 横展開）に回す。** cohort が fleet の 98.5% を占めるので、
    substrate が飽和している限り breadth が最速。
 4. **flagship への直接投資は 3 番目。** flagship 9 件は M_own では既に上位だが
@@ -296,12 +303,77 @@ fleet-summary は未 checkout / tombstone 件数も申告する — スコアが
     nbb --classpath \"<dynamics/src>:<org-oasis-open-xmile/src>\" \\
       scripts/itonami-maturity-dynamics.cljs --top 30
 
-    # 3) Kotoba カーネルとの完全一致ゲート（全 1,797 repo）
+    # 3) Kotoba カーネルとの完全一致ゲート（全 repo。2026-08-05 実測 1,808/1,808 PASS）
     nbb --classpath \"<kotoba-lang/compiler/src>\" \\
       scripts/itonami-maturity-kernel-parity.cljs --batch 300
 
     # 個別 repo の内訳を見る
     nbb --classpath \"...\" scripts/itonami-maturity-dynamics.cljs --top 0 \\
       --explain orgs/cloud-itonami/cloud-itonami-isic-6310
+
+## 改訂履歴
+
+この ADR は現在値のみを述べる（履歴は git）。ここに残すのは、**数字が変わった理由**が
+読み手の判断を変える場合だけ。
+
+### 2026-08-05 — freshness 軸に実バグ。最も活発な 12 repo を 0 点にしていた
+
+初版は freshness を `sat-bp(180, days)` で計算していた。`sat-bp` は第 2 引数を
+**スケール定数 k** として読み `k < 1` を「尺度が無い ＝ 0」と扱うが、減衰の読みでは
+第 2 引数は**経過日数**で、**0 は「今さっき ＝ 満点」**である。結果、走査当日に
+commit された repo が `days = 0` → 0 点になっていた。実測で 12 repo が該当し、
+そのすべてが fleet で最も活発な repo だった（`langchain`・`kotobase-client`・
+`kotobase`・`kagi`・`liquid-glass-ui`・`cloud-murakumo` 等）。**最も活発な repo を
+最も厳しく罰するという、符号が逆の誤り。**
+
+原因は「同じ式に見える 2 つの読み」を 1 関数に相乗りさせたこと。カーネルに
+`decay-bp` を分けて追加し（`sat-bp` はそのまま）、参照実装とパリティ codegen も
+追随させた。影響: `langchain` の M_own が 0.587 → 0.686、fleet 平均 M_eff が
+0.2947 → 0.2978。
+
+### 2026-08-05 — 第 1 反復（`langchain-store`）
+
+初版の順位表が 1 位に挙げた `kotoba-lang/langchain-store` に実作業を入れた
+（`kotoba-lang/langchain-store` PR #2、repo 内 ADR-0001）。**メトリクスを満たしに
+行くのではなく、メトリクスが測っている実体（consumer 側の重複）を数え直して**
+足りないものを足した:
+
+- 実測: 依存 316 repo のうち **222 が「unique id で EDN blob を 1 件読む」形を手書き**
+  （名前を付けているのは 9 件だけで、残りは query をインライン展開しているため
+  名前ベースの grep にほぼ映らない）。85 repo が `System/currentTimeMillis` の
+  reader conditional を手書き。
+- 追加: `blob-lookup` / `put-blob!` / `now-ms` / `stamp` / `append-record!`。
+  JVM・CLJS 両ランタイムで 13 tests / 40 assertions / 0 failures、clj-kondo 0/0。
+- README が「documented next increment」と書いていた field-spec helper は
+  increment 1 で実装済みだった（28 consumer が使用）。README が古かっただけなので
+  コードでなく README を直した。
+
+測定された効果:
+
+| | 前（08-04） | 後（08-05） |
+|---|---|---|
+| `langchain-store` M_own | 0.223 | **0.384** |
+| `langchain-store` fleet gain | 21.84（1 位） | 6.06（3 位） |
+| fleet 平均 M_eff | 0.2978 | **0.3070** |
+| fleet substrate drag | 0.0847 | **0.0746**（−12%） |
+
+**leverage が消費されて順位が落ちるのが正常な挙動**である。順位表は固定の
+work list ではなく、1 反復ごとに引き直す。
+
+**帰属について正直に**: fleet 平均の差は本作業だけの効果ではない。同じ窓で
+(a) 未 checkout だった 13 repo が checkout され測定対象に入り、(b) 他セッションが
+fleet 各所に commit し、(c) `langchain-store` の `deps.edn` が別 commit（`aeb675c`、
+本作業以前に main 済み）で `:local/root` から git 座標に変わって `langchain` からの
+gate が外れた。**clean な A/B ではない。** 本作業に確実に帰属するのは
+`langchain-store` の M_own 0.223 → 0.384（src/test/README/ADR のバイト数が
+そのまま足したもの）で、M_eff の増分のうち約 0.060 は (c) による。
+
+### 次の反復
+
+再計測後の 1 位は `kotoba-lang/langgraph`（M_own 0.544、推移的 dependents 719、
+fleet gain 22.31）。ただし `langgraph` の損失の主因は自分の欠落ではなく
+`langchain` からの drag（own 0.544 → eff 0.459）であり、全 7 namespace が
+テストで叩かれている。**「何が足りないか」は順位表ではなく consumer 側の実測で
+決めること** — 第 1 反復がそうしたように。
 "
   :source/dataset "root-adr"}]

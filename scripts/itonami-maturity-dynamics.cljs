@@ -97,6 +97,12 @@
 (defn- clamp-bp [x] (if (< x 0) 0 (if (< BP x) BP x)))
 (defn- sat-bp [x k]
   (if (or (nil? k) (< k 1) (nil? x) (< x 1)) 0 (q (* BP x) (+ x k))))
+(defn- decay-bp [half-life elapsed]
+  ;; sat-bp の流用ではない。第 2 引数は経過量で、0 は「今さっき = 満点」。
+  ;; カーネルの decay-bp と同じ（実測バグの再発防止はカーネル側 docstring 参照）。
+  (if (or (nil? half-life) (< half-life 1) (nil? elapsed) (< elapsed 0))
+    0
+    (q (* BP half-life) (+ half-life elapsed))))
 (defn- ratio-bp [num den] (if (or (nil? den) (< den 1)) 0 (clamp-bp (q (* BP num) den))))
 (defn- bool-bp [b] (if b BP 0))
 (defn- axis3-bp [a b c] (q (+ a b c) 3))
@@ -155,7 +161,7 @@
      ;; 双曲減衰 10000*180/(180+d)。exp は kotoba の admitted builtins に無いので
      ;; カーネル側で書けない — 式を言語に合わせた。180 日で 0.5 は同じ、裾は厚い。
      ;; git log が取れなかった repo は nil（0 ではない）。
-     :m/fresh     (when d (sat-bp stale-days (js/Math.floor d)))}))
+     :m/fresh     (when d (decay-bp stale-days (js/Math.floor d)))}))
 
 ;; --- 重み: これは **判断であって測定ではない** ---------------------------------
 ;; repo の kind によって「成熟」の意味が違う。library に governor が無いのは
