@@ -258,10 +258,14 @@ kotobase の `.well-known/x402` は現在、resource 一覧を **route handler �
 - **D3 の前提条件**（ADR-2608047000 follow-up 4）— **解消**。`inga` の証明書が自分の署名者を名乗れていた: `head/verify-cert` の docstring は「既知の validator set の witness」と主張しながら set を知る引数が無く、`attest/verify-certificate` は `witnesses` を証明書自身から採っていた。攻撃者が鍵を quorum 個生成して全部で署名すれば通る（何も偽造せずに）。`admitted?` を `quorum` と同じく**必須**にし、threshold の**前**に適用。`wire/admits` で `wire-id` 正規化（生の set は逆に全ての正当な witness を弾く）。`kotoba-lang/inga@2267102`。
 - **D3 の host 側**（部分）— `inga.propose`。`ref/outcome` の `(nil? winner)` は「敗北」を返すが、これは terminal には正しく **poll には誤り**で、素直に loop を書くと**成功した提案も含めて全部が失敗と報告される**（各呼び出しは文書どおりの値を返しているので、正しく見える）。`step` が `::pending` と決着を分ける。JVM 同期版と cljs 非同期版（Worker は block できないので busy loop は作らない）。`kotoba-lang/inga@78d5494`。
 
+- **D3 の配備**（2026-08-05）— `network-awai/net-kotobase` の `inga-replica`。Worker + 4 Durable Object、testnet 隔離。**実測で証明したのは compare-and-set そのもの**: 同一 `[ref, seq]` を 3 writer が同時に争い、1 つだけが 4 witness の証明書（`committed@67`）付きで勝ち、負けた 2 つは「失敗した」ではなく**どの cid が seq を持っているか**を告げられ、`head-of` も一致した。4 replica は height と committed-height が揃って前進する。
+  - **見えない失敗が 5 つ出た**（どれもネットワークは健康に見えたまま何も commit しない）: ①outbox は envelope（`{:to :all|<w> :msg m}`）でメッセージではない ②`clj->js` が inga の名前空間キーワードと**キーワード値**を壊す（snapshot と message の両方で発生。snapshot 側は最初の snapshot が書かれるまで発現しない）③読めない保存値が replica を恒久的に殺す（load 段の失敗なので再試行が毎回同じ場所に当たる）④await されない subrequest は応答後にキャンセルされる（`waitUntil` が正解）⑤`outcome` は record 全体で勝者を判定するので、決着**前**に cert を付けると全 writer が「自分の cid に負けた」と報告される
+  - **これは Byzantine fault tolerance ではない** —— 1 アカウント・1 operator・4 DO が 1 つの `env` を共有するので**全 validator の seed が 1 つの secret に入る**（越えるべき閾値が存在しない）。ADR-2607110300 の labelling 規則どおり crash fault tolerance と名乗り、`/health` が `fault-model` として返す。
+
 ## やっていないこと（follow-up、優先順）
 
 1. **treasury の分離**（D6-2）。murakumo と kotobase が同一 Safe を指している。新しい Safe の deploy と secret 更新はオーナーの custody 行為で、agent が代行しない。
-2. **inga replica の配備**（D3 の残り）。**実測 2026-08-05: inga の replica はどこにもデプロイされていない**（`wrangler.jsonc` に `inga` の参照が 0 件）。witness1/2 は inga の replica ではなく、同じ worker code を別 bucket・別 seed で動かす**独立した単一 writer pod** である。残作業は ①`inga.replica` をホストする Worker ②3 pod 間のネットワーク ③`head.cljs` に `inga` モードを追加（既存の `off`/`shadow`/`authoritative` の第 4 モードとして）④shadow → authoritative の段階移行。**testnet 環境（別 bucket・別 seed で production と完全隔離）で先に実証する。**
+2. **`head.cljs` に `inga` モードを追加し、shadow → authoritative へ進める**（D3 の残り）。**replica の配備と ref 面の実証は 2026-08-05 に着地した**（下記「着地したもの」）。残るのは production の head 面をこの plane に繋ぐ部分だけで、順序は `off` → `shadow` → `authoritative`（`kotobase.graph-database.head` が D1 で既に確立した形）。ADR-2607142200 の不変条件はその間ずっと成立させる —— 正しさは B2 単独で立ち、この plane が read に**必須**になってはならない。
 3. **x402 challenge の stock 語彙と deal state**（D5 の (1)(2)）。
 4. **kura を `IObjectStore` 面に接続**（D1）。DataLad/annex 経路から。
 5. **暗号 epoch 1 への移行**（D4）。4 binding の provision と legacy block の移行。
