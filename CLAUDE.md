@@ -179,6 +179,59 @@ skill `new-project-scaffold` を参照。
     従来どおり必ず**事前確認**する（force-push / 履歴書き換えの詳細は下記 Git operations
     節。公開リポ化と他者ブランチへの push はここが正本の禁止列挙）。
 
+## CI/CD は murakumo fleet。GitHub Actions を使わない（repo-wide mandatory、2026-08-05、ADR-2607300900）
+
+**オーナー指示（2026-08-05）「github は使わない、murakumo.cloud の cdci, workflow を使う」。**
+このワークスペースの CI/CD の正本は **`scripts/fleet-ci/`（murakumo mac-mini fleet）**であり、
+GitHub Actions ではない。
+
+- **新しい `.github/workflows/*.yml` を書かない。** 検査を足したいなら
+  `scripts/fleet-ci/gates.edn` に 1 行足す（gate 本体は `scripts/fleet-ci/gates/*.cljs`）。
+  「Actions が今は動いているから」は理由にならない — **止まったのは org 単位**で、
+  動いている org も同じ理由で止まりうる。
+- **Actions は repo 単位で無効化してある**（`scripts/github-actions-disable-sweep.cljs`）。
+  workflow ファイル自体は残るが inert。**ファイルの削除には GitHub の `workflow` OAuth scope が
+  要り、このワークスペースの token は持っていない**（push も Contents API も通らず、後者は
+  403 でなく **404** を返すので「repo が無い」と誤読しやすい）。一方 **Actions の無効化は
+  `repo` scope で通る** — 詰まっているのは「workflow ファイルを編集する」経路だけ。
+  org 単位の一括無効化（`PUT /orgs/{org}/actions/permissions`）は `admin:org` が要り、
+  これも持っていない（実測 2026-08-05）。
+- **なぜ「動いていない CI」より「無い CI」の方がよいか。** 2026-07-30、com-junkawasaki と
+  gftdcojp の Actions は課金停止で **job が起動しなくなった**。落ちるのではなく走らないので、
+  **repo は green に見えたまま何も検査されていなかった**。無効化すればチェックマーク自体が
+  出ないので、誤読しようがない。
+
+### fleet gate の書き方（実測した制約つき）
+
+| gate | 要件 | 落とし穴 |
+|---|---|---|
+| `:jvm-test` | `deps.edn` に `:test` alias、出力に `Ran N tests` | **maven 依存は運ばれない** |
+| `:nbb-test` | nbb のテストエントリ | 同上（npm も） |
+| `:nbb-script` | `gates/*.cljs` を配って実行 | ノードに配れる範囲で完結させる |
+
+- **ノードは tailnet だけに繋がっていて外向き HTTPS が無い。** `ship-git-deps!` は
+  **git 依存しかノードへ運ばない**ので、maven 依存を持つ repo の `:jvm-test` は依存解決で落ちる。
+  実例: `global-legislation-datoms` の contract test は Datascript（maven）を要求し、
+  `~/.m2/repository/datascript/` は zebulun にも asher にも無かった（2026-08-05 実測）。
+  **「テストがあるから jvm-test にする」ではなく、先にノードで依存が解決するか確かめる。**
+  解決しないなら Datalog / ライブラリを要する検査は repo 側の local contract に残し、
+  gate はノードで完結する不変条件に絞る。
+- **`:include-ext` で送る tree を絞る**（`max-ship-mb` 200）。`:min-files` は絞り込みが壊れて
+  空 tree を「違反 0 件 = 合格」にしないための床。
+- **手動実行には署名鍵の env が要る**:
+  `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem nbb scripts/fleet-ci/tick.cljs --only <name>`。
+  付けないと `no such item: fleet-agent-murakumo-ci-tip-25mbair` で死ぬ（鍵は kagi の
+  どちらの vault にも無く PEM にだけある。常駐 plist は env を渡している）。
+- **gate は「落ちること」を確かめてから landed とする。** 対象を 1 箇所壊したコピーで
+  exit 1 になり、無改変で exit 0 になることを実際に見る。落ちない gate は劇場。
+
+### 生成物を検査する gate は sha256 を見る（Actions では構造的に不可能だった）
+
+committed な生成物（投影・シャード・索引）を持つ repo では、**manifest に記録された
+sha256 と実ファイルを突き合わせる**。Actions 経路は committed 済みの値を読むだけで
+再生成が走らないので `git diff --exit-code` が無反応になり、**内部整合を保ったまま
+手編集されたファイル**を検出できなかった。fleet gate ならこれを捕まえられる。
+
 ## fleet-db — west 後継 VCS プレーン（ADR-2607160005、2026-07-16）
 
 - **`manifest/fleet-db.edn`（+ append-only `fleet-db.ledger.edn`）が west.yml の

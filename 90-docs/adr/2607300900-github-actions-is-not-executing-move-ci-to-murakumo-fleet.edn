@@ -264,7 +264,42 @@ stating so the next person does not re-raise the same false alarm.
 3. Switch branch-protection required checks to `fleet-ci/murakumo/*`. Until this happens nothing is enforced, whichever plane runs.
 4. Decide codeql and jupyterlite.
 5. Issue the two fine-grained PATs so the LaunchAgent stops skipping (GitHub Web UI, human step) — otherwise ticks only run from an interactive session.
-6. Refresh `scripts/fleet-ci/README.md`, which still lists PR-head verification as not-done."
+6. Refresh `scripts/fleet-ci/README.md`, which still lists PR-head verification as not-done.
+
+## 2026-08-05 — enforced repo-wide, on owner instruction
+
+Owner: 「github は使わない、murakumo.cloud の cdci, workflow を使う」. Until this
+date the decision was a direction with one ported gate; leaving Actions *enabled*
+everywhere meant a repository could still show a green check that stood for
+nothing. It is now enforced by disabling Actions per repository, which is the
+strongest form available with the credentials this workspace has.
+
+What the credentials actually allow (measured, not assumed):
+
+| operation | scope needed | available? |
+|---|---|---|
+| edit/delete `.github/workflows/*` | `workflow` | **no** — push and Contents API both refused; the API answers **404**, not 403, which reads as 「repo missing」 |
+| disable Actions for one repo | `repo` | **yes** |
+| disable Actions for a whole org | `admin:org` | **no** |
+
+So workflow files stay on disk as inert artefacts, and the org-level switch is
+out of reach; the sweep is per-repo. `scripts/github-actions-disable-sweep.cljs`
+does it — resumable via `~/.gftd/gh-actions-sweep-state.edn`, and it leaves a
+400-call rate-limit reserve so fleet-ci's own ticks keep running while it sweeps.
+
+**GitHub code search cannot be used to find the targets.** Asked for
+`org:kotoba-lang path:.github/workflows` it returned **1**, while
+`kotoba-lang/compiler` alone has 4 workflows; `network-awai` returned 0 and
+actually has 11 repos with workflows. The index is too incomplete to scope a
+sweep from, so the script enumerates every repository and asks
+`GET /repos/{o}/{r}/actions/workflows` directly.
+
+The rule now lives in CLAUDE.md (`CI/CD は murakumo fleet。GitHub Actions を
+使わない`), including the fleet-gate constraint that bit hardest in practice:
+nodes reach only the tailnet, `ship-git-deps!` carries git deps but **not maven
+ones**, so a repo whose tests need a maven library cannot use `:jvm-test` — check
+that dependencies resolve on a node before choosing the gate kind, and leave the
+library-dependent assertions in the repo's local contract."
   :adr/verification
   "The ported gate was proved to both pass and fail before registering it:
 
