@@ -138,8 +138,22 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   越しの API トークンではなく、ローカルの wrangler セッションで完結）。
   `CLOUDFLARE_API_TOKEN`（Zone Analytics Read 等の狭いスコープ）は用途別に
   `wrangler secret put` で個別プロジェクトへ投入するもので、これとは別物。
-  DNS 編集用の zone token は keychain `gftd.cf`（DNS read/write 確認済み
-  2026-07-17）。
+  - ⚠ **DNS レコードを書ける資格情報は、2026-08-05 時点でこの環境から到達できない。**
+    以前ここには「DNS 編集用の zone token は keychain `gftd.cf`（DNS read/write
+    確認済み 2026-07-17）」と書いてあったが、**実測でその item は存在しない**
+    （`security find-generic-password -s gftd.cf` → NOT FOUND、kagi の
+    `gftd.cf` / `CLOUDFLARE_DNS_TOKEN` / `CLOUDFLARE_API_TOKEN` も no such item）。
+    - **wrangler の OAuth token では DNS API に読みも書きも通らない。** scope 一覧に
+      `zone (read)` はあるが `dns_records` は含まれず、`GET /zones/{id}/dns_records`
+      も `POST` も **`10000 Authentication error`** を返す（同じ token で
+      `GET /zones?name=` と Pages API は通るので、token 自体は生きている）。
+    - **できること／できないこと**: Pages の **custom domain 追加は `pages (write)`
+      で通る**（`POST /accounts/{acc}/pages/projects/{proj}/domains` が success）。
+      ただし **DNS レコードは自動作成されず** `status: pending` のまま残る。
+      つまり詰まるのは「DNS レコードを 1 本作る」ところだけ。
+    - **オーナー作業**: ダッシュボードで足すか、`Zone.DNS: Edit` を持つ API token を
+      発行して kagi/Keychain に保管し、ここを更新する。実例（ADR-2608057000）:
+      `CNAME cloud-itonami → cloud-itonami.pages.dev (proxied)`。
   - **kotobase-protocols-worker `WRITE_TOKEN`**（s3/atproto/git.kotobase.net の
     write 認可 Bearer、ADR-2607174500）: Worker secret として投入済み。operator
     copy は macOS Keychain `service=cf:kotobase-protocols-worker` /
