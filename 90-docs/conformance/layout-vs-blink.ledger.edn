@@ -2259,3 +2259,142 @@
   -- two other agents' areas). The only stacking-group residual is
   border-radius-shrinks-the-hit-region (4 points), a hit-region SHAPE
   question, not ordering."}
+
+{:seq 56
+ :date "2026-08-06"
+ :repos {"kotoba-lang/cssom" "2b1d95bce3cb956fcdf23037154381c0ddded2cd"
+         "kotoba-lang/htmldom" "7b14d8c3c9c2f6f67935f89a94e61b90c2951344"}
+ :title "logical properties, and percentage margin/padding"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 576}
+ :measured
+ {:line-structure {:before "540/551" :after "540/551"}
+  :geometry {:before "1851/1959 (94%)" :after "1870/1959 (95%)"
+             :clean-cases {:before "510/576" :after "524/576"}}
+  :paint-order {:before "14181/14389" :after "14207/14389"
+                :clean-cases {:before "538/576" :after "542/576"}}
+  :computed-style {:before "27514/27544" :after "27525/27544"
+                   :clean-cases {:before "563/576" :after "570/576"}
+                   :cascade-residual {:before 23 :after 12}
+                   :logical-group-residual {:before 11 :after 0}}}
+ :verified-on-merged-main
+ {:cssom-tests "856 tests / 2024 assertions, 0 failures (828/1918 before)"
+  :browser "754/0 at the pinned revision" :dom-gpu "130/0" :htmldom "178/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly. The agent reported browser
+         752/0 rather than 754/0 -- explained and benign: browser's own
+         main is 2 commits ahead of the pin (a css-test change from the
+         concurrently-running replaced-element agent) and has 752 tests.
+         Both revisions are 0 failures."}
+ :per-case-deltas
+ "14 cases changed, ALL improvements, zero collateral in either direction,
+  diffed with --dump-ops corpus-wide both pre-merge and post-merge. Eleven
+  :logical/ cases and three percentage ones."
+ :what-the-browser-said
+ [{:topic "where the logical->physical rename resolves"
+   :measured "getComputedStyle on <div style='max-inline-size:80px'>
+              reports maxWidth: 80px; margin-inline: 20px 60px reports
+              marginLeft 20px / marginRight 60px. The PHYSICAL LONGHAND
+              HOLDS THE VALUE by the time you can ask -- computed-value
+              time, not layout."}
+  {:topic "which direction"
+   :measured "the element's OWN: <div style='direction:rtl;
+              margin-inline:20px 60px'> lands at x=60, identical to
+              declaring direction:rtl on the parent. Measured side by side,
+              because the two are indistinguishable whenever only the
+              parent declares it."}
+  {:topic "declaration order -- the sharpest test of where the mapping belongs"
+   :measured "margin-left:5px; margin-inline-start:40px -> 40px.
+              margin-inline-start:40px; margin-left:5px -> 5px.
+              margin:1px; margin-inline-start:40px -> 40px.
+              margin-inline-start:40px; margin:1px -> 1px.
+              #a{margin-left:5px} then .a{margin-inline-start:40px} -> 5px.
+              So: SOURCE ORDER at equal specificity; specificity still
+              outranks source order. And under direction:rtl the first pair
+              gives marginLeft 5px / marginRight 40px in BOTH orders --
+              they stop colliding. THE COLLISION IS DECIDED AFTER THE
+              RENAME."}
+  {:topic "percentage margin/padding basis"
+   :measured "the containing block's INLINE size, on all four sides. The
+              row that settles it is a 200-wide x 400-TALL containing
+              block, where padding-top:10% and margin-top:10% are both
+              20px. Also 300-wide with padding:50px -> padding-top:10% is
+              30 (the CONTENT width), and margin-left:-10% is -30."}]
+ :design
+ "the rename is ONE `map` over resolve-style-for's already-sorted
+  declaration list, below the sort and above the group-by. The cascade
+  already sorts by importance/origin/inline/layer/specificity/order and
+  takes the last of each property group; renaming logical->physical IN THAT
+  LIST makes every row of the order table above fall out with NO ORDERING
+  CODE AT ALL. The element's flow {:writing-mode :direction} is threaded
+  down run-cascade-walk like parent-font-size / parent-display already
+  were. Because it happens inside the cascade, margin-inline-start: 2em and
+  margin-inline: var(--gap) 5px needed no new entries anywhere -- they
+  reach resolve-relative-lengths / resolve-style-map already wearing
+  physical names (verified against Brave: 40px and 25px)."
+ :percentages-one-fix-did-not-cover-gaps
+ {:answer "no -- three properties spelled 50%, three bases"
+  :margin-padding "containing block's INLINE size, all four sides. Fixed
+                   here: node-style now carries the raw value beside the
+                   coerced one -- the same thing it already did for
+                   margin's `auto`, for the same reason -- and
+                   resolve-box-percentages rewrites the map once at the
+                   sites that know that size. That fixes all ~56 call sites
+                   of margin-side/inset-side WITHOUT TOUCHING ONE."
+  :inset "top/left/right/bottom resolve against the containing block's size
+          in the value's OWN axis (left:50% of 200x60 is 100, top:50% is
+          30). These ALREADY AGREED -- an earlier round did land them --
+          and are untouched."
+  :row-gap "the container's own content BLOCK size, which for an
+            auto-height container is CYCLIC: measured, a 10% row gap on a
+            40px-tall auto grid is 4px AND THE CONTAINER STAYS 40 TALL --
+            resolved against a height computed without it, content
+            overflowing. That is a two-pass rule and its own round. The two
+            :gap/ cases are unchanged."}
+ :scope-cuts
+ [{:what "writing-mode -- the rename is GATED on horizontal-tb"
+   :measured "under vertical-rl: inline-size:70px; block-size:20px is a box
+              20 WIDE x 70 TALL (engine: 300x20); margin-inline-start:40px
+              is a MARGIN-TOP; padding-block-start:12px is a PADDING-RIGHT;
+              padding-top:10% of a 200-tall parent is 20px (basis = inline
+              size = the height)."
+   :why "adding four rotated rows would make getComputedStyle right while
+         every box stayed horizontal -- unverifiable by either layout axis.
+         A test asserts the gate so it cannot silently half-implement."}
+  {:what "per-side borders -- the ONLY reason 2 of the 15 still diverge,
+          and it is one gap not two"
+   :why ":logical/border-inline-start cascades to border-left-width: 5px
+         CORRECTLY; layout has one uniform :border-width, so the physical
+         border-left: 5px solid #000 renders identically wrong
+         (:box/border-left-width-only records it from that side). And
+         :box/margin-top-percentage-is-of-the-width now resolves its 10% to
+         30px and collapses it out through a parent whose 1px border-top
+         the engine cannot see -- swap it for padding-top: 1px and both
+         sides put the child at y=31 (asserted)."}
+  {:what "abspos margins are not applied at all"
+   :measured "verified with a PX CONTROL: position:absolute; left:0;
+              margin-left:20px is x=0 here, Brave 20 (and 34 for 10%, i.e.
+              10% of the containing block's 340px PADDING box -- the one
+              place the basis is not a content width)."}]
+ :tried-and-withdrawn
+ [{:what "resolving percentages at layout-absolute-children"
+   :why "REVERTED after the px control showed abspos margins are not read
+         at all; it would have produced a correct number nothing consumes.
+         The basis to pass is recorded in the docstring instead."}
+  {:what "threading a basis through node-style (~48 sites) or through
+          margin-side / inset-side (~56)"
+   :why "rejected for the single post-step on the style map."}
+  {:what "a new percentage-pattern that DUPLICATED an existing one 4000
+          lines down"
+   :why "clj-kondo's redefinition warning caught it, and the later def
+         would have SILENTLY SHADOWED the new one at runtime. Merged into
+         one, moved up beside var-ref-pattern."}
+  {:what "deriving the element's flow in style-with-counters from the
+          already-resolved map"
+   :why "withdrawn because direction: revert would diverge from the
+         cascade's own derivation; resolve-style-and-flow returns the flow
+         it actually used."}]
+ :downstream-test-fixed-with-its-reason
+ "htmldom had one stale test -- exactly the failure mode the brief warned
+  about. It asserted that padding: 10% stays unexpanded, on reasoning its
+  own comment had already retired for `auto`. Landed separately in htmldom
+  (7b14d8c)."}
