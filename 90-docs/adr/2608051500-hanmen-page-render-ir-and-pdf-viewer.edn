@@ -277,11 +277,36 @@ parse で request thread を deadlock させる」経路と交換になるので
 合わない、という**判断として**記録した。実際の天井は 8 × `render-limit-bytes` 相当の
 object graph で、上げるならそこを見る。
 
+### 追記: 1 の CID 復号は解消した（`kotoba-lang/com-adobe-cmap`）
+
+**前回の見立ては半分間違っていた。** Identity-H では**コードがそのまま CID** なので、
+CFF charset はテキスト経路に一切関与しない。足りなかったのは collection の
+**CID→Unicode 表だけ**だった。
+
+Adobe が 5 つの character collection について公開している表
+（`adobe-type-tools/mapping-resources-pdf`、BSD-3-Clause）を**バイト単位でそのまま
+vendor** した新 repo `kotoba-lang/com-adobe-cmap`。23,000 件の対応表を書き写せば
+誰にも見つけられない誤りが入る —— 価値は「Adobe の表であること」なので、テストも
+ここで書いた fixture ではなく**公開 collection の値**（CID 1=空白、34=A、843=あ、
+1125=亜）に対して当てている。
+
+**実測: no-tounicode frame 254 → 6、文字数 10,349 → 11,846、影響文書 5 → 3。**
+
+表は `hanmen` に**注入する**（`:cid->unicode`）。1 MB の resource を classpath に
+要求するのは「ファイルを読まない」library の設計に反するので、`:image-href` と
+同じく host が配線する。**`/ToUnicode` を持つフォントではそちらが勝つ** —— producer が
+「こう読め」と言ったことは、collection が言うことに優先する（private に subset された
+フォントでは公開表の方が間違う）。
+
+`bfrange` の読み違いを 2 つともテストしている: destination は**増加する**（1 つの
+文字列の繰り返しではない —— 逆に読むと範囲全体が同じ文字になり「全グリフが同じ
+フォント」に見える）、そして増加するのは**最後の UTF-16 code unit**（`<D842DF9F>`
+はサロゲートペアで、数値として +1 すると上位サロゲートが動く）。
+
 ## まだ無いもの（「実装済み」と読まないこと）
 
-1. **`CIDFontType0C` に `/ToUnicode` が無いと復号できない。** 576 フォント中 25 件。
-   CFF charset パーサと registry CMap リソース（Adobe-Japan1-UCS2 等）の両方が要る
-   —— workspace にどちらも無く、新規 capability としては相応の規模。
+1. **`Adobe-Identity` を名乗るフォントは誰にも復号できない。** 「CID の意味はフォントが
+   決める」という宣言なので公開表が存在しない。実測で残る 6 件はこれ。
 2. **shading・pattern・透明グループは描かない。** `sh` は clip 領域を塗るが clip は
    box としてしか追っていない。pattern fill は直前の色を維持する（平均色を捏造しない）。
 3. **clip は box であって path ではない。** 円形 clip の角が残る（誤差の向きは意図的）。
