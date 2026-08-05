@@ -41,10 +41,21 @@
     :commit-statuses {:v 0 :measured "root と net-kotobase の直近 5 commit を GitHub API で確認、contexts 空"}
     :enforced? {:v false :measured "required status checks 未設定（status が無いので設定すると全 merge が固まる）"}}
    :murakumo-actions
-   {:root-endpoint {:v 200 :measured "GET https://murakumo.cloud/api/actions"}
-    :subroutes {:v 0 :measured "runs/receipts/status/leases/list/health/repos の 7 経路すべて 404 'actions route not found'"}
-    :manifests {:v 1 :measured "find orgs -name actions.edn -path '*/.murakumo/*' → net-kotobase のみ"}
-    :observed-runs {:v 0 :measured "commit status 0 件 + サブ経路 404。実行の観測可能な痕跡なし"}
+   ;; ⚠ 2026-08-05 に**この節の初版を全面的に訂正した**。初版は「サブ経路 7/7 が 404、
+   ;; 実行の痕跡なし」と書いたが、**叩いた 7 経路のうち 6 つは存在しない経路を私が
+   ;; 創作したもの**で、runs は POST 専用だった。実 API は
+   ;; GET /api/actions, POST /api/actions/github, POST /api/actions/runs,
+   ;; GET /api/actions/runs/:id, POST /api/actions/jobs/claim,
+   ;; POST /api/actions/jobs/:id/{complete,approve} の 7 本
+   ;; （cloud_murakumo/actions_http.cljs:285）。存在しない経路の 404 を
+   ;; 「実装されていない証拠」として採点に入れていた。
+   {:root-endpoint {:v 200 :measured "GET https://murakumo.cloud/api/actions → 200。ACTIONS_DB 未設定なら 503 が先に返る実装なので、**D1 は bound**"}
+    :webhook {:v :delivering :measured "net-kotobase の hook 661126468 が https://murakumo.cloud/api/actions/github へ push/pull_request を配送、直近 6 件すべて 202 OK"}
+    :queued-since {:v "2026-08-04T10:01:45Z" :measured "claim で返った最古 job の created-at。**job は 1 日以上溜まっていた**"}
+    :runner-existed? {:v true :measured "scripts/actions-runner.mjs（153 行、action allowlist つき）が repo main に存在"}
+    :runner-was-running? {:v false :measured "どのノードにも常駐が無く、queue が消化されていなかった"}
+    :loop-closed? {:v true :measured "2026-08-05 に手で 1 回実行 → hermetic job を claim → sha で clone → 実テスト（py_compile / unittest 2 tests / metadata checks）→ complete まで通過"}
+    :github-status-token {:v :unset :measured "wrangler secret list --name murakumo-cloud に MURAKUMO_GITHUB_STATUS_TOKEN が無い。github-status! は token 未設定なら no-op なので、**status が 0 件だった理由はこれ**"}
     :declares-enforcement? {:v true :measured ".murakumo/actions.edn :required-statuses 4 本"}}})
 
 ;; ---------------------------------------------------------------------------
@@ -68,15 +79,21 @@
 
    :murakumo-actions
    {:label "B. murakumo.cloud/actions (.murakumo/actions.edn + 中央 control plane)"
-    :cycle-time-days nil                 ;; 一度も発火していない → 測れない
-    :cycle-time-basis {:measured "サブ経路 7/7 が 404、commit status 0 件。ループが回った観測記録が無い"}
+    ;; runner を常駐させた 2026-08-05 以降の cycle time。poll 30 秒。
+    ;; 初版は nil（測定不能）としたが、それは私が存在しない経路を叩いた誤測定に
+    ;; 基づいていた。実際には webhook が 202 で配送し job が queue に積まれており、
+    ;; 欠けていたのは claim するプロセスだけだった。
+    :cycle-time-days (/ 30.0 86400)
+    :cycle-time-basis {:measured "MURAKUMO_ACTIONS_POLL_MS=30000 の常駐 runner（com.gftd.murakumo-actions-runner）。手動 1 回で claim→clone→test→complete を通過済み"}
     :self-funding-coefficient 0.15
     :self-funding-basis {:estimate? true :why "A と同条件で置く（設計が同種のため）"}
-    :instrumentation-completeness 0.0
-    :instrumentation-basis {:measured "観測可能な run・receipt・status がゼロ"}
+    ;; run/job の状態は D1 に、log は content-addressed（log-cid）で記録される。
+    ;; status だけが MURAKUMO_GITHUB_STATUS_TOKEN 未設定で欠けている → 2/3。
+    :instrumentation-completeness 0.67
+    :instrumentation-basis {:measured "run/job 状態は D1、log は sha256 の log-cid で complete 時に送る。commit status のみ token 未設定で no-op"}
     :friction 0.60
     :friction-basis {:estimate? true
-                     :why "対象追加に repo ごとの .murakumo/actions.edn と、control plane 側の action 実装・allowlist 登録が要る（宣言だけでは実行権限を得られないと manifest 自身が書いている）"}}})
+                     :why "対象追加に repo ごとの .murakumo/actions.edn と、runner 側 actionCatalog へのコマンド登録が要る（宣言だけでは実行権限を得られない設計。A の gates.edn 1 行より重い）"}}})
 
 ;; ---------------------------------------------------------------------------
 ;; XMILE モデル。**「検証された commit」ではなく「信頼」を stock に置く**のが要点。
@@ -125,9 +142,9 @@
 
 (def interventions
   [{:id :write-commit-statuses
-    :label "PAT を発行し commit status を書けるようにする"
+    :label "MURAKUMO_GITHUB_STATUS_TOKEN を Worker secret に設定する"
     :band :band/B :tractability 0.5
-    :why "情報フローの構造そのもの（Meadows 6）。検証結果が意思決定点に届いていない状態を解消する。tractability 0.5 は人間の操作（PAT 発行）が要るため"}
+    :why "情報フローの構造そのもの（Meadows 6）。**ローカル PAT ファイルではなく Worker secret 1 本**（B は github-status! を自前で持っており、token が無いときだけ no-op する）。tractability 0.5 は GitHub token の発行に人間の操作が要るため"}
    {:id :fix-chronic-red
     :label "慢性的に赤い gate を直す"
     :band :band/C :tractability 1.0
@@ -138,8 +155,8 @@
     :why "ルール（Meadows 5）。ただし status が書かれるまで実施すると全 merge が固まるので、上の前提が満たされるまで tractability は低い"}
    {:id :adopt-murakumo-actions
     :label "murakumo.cloud/actions を正のプレーンにする"
-    :band :band/A :tractability 0.1
-    :why "パラダイム/目標（Meadows 2-4）: 中央 control plane が lease を発行し GitHub は status の射影に徹する、という設計。理論上いちばん高い band だが、実装が観測できない（サブ経路 7/7 が 404）ので tractability は最低"}
+    :band :band/A :tractability 0.8
+    :why "パラダイム/目標（Meadows 2-4）: 中央 control plane が lease を発行し GitHub は status の射影に徹する設計。**tractability は 0.1 ではなく 0.8** — 初版は実装が無いと誤判定していたが、control plane も runner も allowlist も既にあり、webhook は配送済みで、欠けていたのは runner の常駐だけだった（2026-08-05 に導入して claim→実行→complete を通過）"}
    {:id :register-more-gates
     :label "gates.edn に対象 repo を足す"
     :band :band/E :tractability 0.95
@@ -179,7 +196,7 @@
                 (trust-model {:nm "fleet-ci + statuses" :verify-rate 1.0 :signal-fidelity 1.0
                               :enforcement-gain 1.0 :red-ignored-rate 0.02})
                 :murakumo-actions-today
-                (trust-model {:nm "murakumo actions today" :verify-rate 0.0 :signal-fidelity 0.0
+                (trust-model {:nm "murakumo actions today" :verify-rate 1.0 :signal-fidelity 1.0
                               :enforcement-gain 0.0 :red-ignored-rate 0.02})}
         runs (into {} (map (fn [[k m]] [k (run-trust m)])) models)
         ranked (d/rank-interventions (map d/leverage-score interventions))
