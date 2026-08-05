@@ -1,5 +1,5 @@
 (ns itonami-maturity-kernel
-  (:export [clamp-bp sat-bp ratio-bp bool-bp axis3-bp axis4-bp
+  (:export [clamp-bp sat-bp decay-bp ratio-bp bool-bp axis3-bp axis4-bp
             acc-init acc-step acc-step2 acc-mean]))
 
 ;; cloud-itonami 成熟度スコアの **算術の正本**（ADR-2608052000）。
@@ -49,6 +49,20 @@
   (if (< x 1) 0
       (if (< k 1) 0
           (quot (* 10000 x) (+ x k)))))
+
+;; 双曲減衰。elapsed = 0 で 10000（満点）、elapsed = half-life で 5000。
+;;
+;; **`sat-bp` を流用してはいけない。** 形は同じ 10000·a/(a+b) だが、`sat-bp` は
+;; 第 2 引数をスケール定数 k として読むので `k < 1` を「尺度が無い ＝ 0」と扱う。
+;; 減衰の読みでは第 2 引数は経過量で、**0 は「今さっき ＝ 満点」**であって
+;; 「尺度が無い」ではない。実測 2026-08-04: freshness に `sat-bp` を流用した結果、
+;; 走査当日に commit された 12 repo（langchain・kotobase-client など、fleet で
+;; 最も活発な repo）が elapsed=0 → `k<1` 分岐に落ちて freshness **0** を付けられた。
+;; 同じ式に見える 2 つの読みを 1 関数に相乗りさせたのが原因なので、関数を分ける。
+(defn decay-bp [half-life :i64 elapsed :i64] :i64
+  (if (< half-life 1) 0
+      (if (< elapsed 0) 0
+          (quot (* 10000 half-life) (+ half-life elapsed)))))
 
 ;; 比率を bp に。den<1 なら 0（未測定でなく「分母が無い」）。10000 で頭打ち。
 (defn ratio-bp [num :i64 den :i64] :i64

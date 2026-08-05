@@ -116,7 +116,7 @@
                        " " (b (:surface/has-cron-workflow? e))
                        " " (b (:doc/has-business-model? e))
                        " " (b (:doc/has-pricing? e)) ")")
-     :m/fresh     (when days (str "(sat-bp " (i stale-days) " " (i days) ")"))}))
+     :m/fresh     (when days (str "(decay-bp " (i stale-days) " " (i days) ")"))}))
 
 (defn- fold-expr
   "(値,重み) の列を acc-init/acc-step2/acc-step/acc-mean の入れ子式へ。
@@ -141,7 +141,7 @@
       (str "(defn " nm " [] :i64 " (fold-expr pairs) ")"))))
 
 (def base-exports
-  ["clamp-bp" "sat-bp" "ratio-bp" "bool-bp" "axis3-bp" "axis4-bp"
+  ["clamp-bp" "sat-bp" "decay-bp" "ratio-bp" "bool-bp" "axis3-bp" "axis4-bp"
    "acc-init" "acc-step" "acc-step2" "acc-mean"])
 
 (defn- batch-source
