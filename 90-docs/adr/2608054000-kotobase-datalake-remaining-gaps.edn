@@ -39,14 +39,15 @@
    "adr-2607299700-kotobase-scoped-cacao（互いに代用できる 2 つの capability は 1 つ — P1 で IByteSource に適用した）"]
 
   :adr/decision-summary
-  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :arrow-writer :parquet-writer :group-by :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson}, :write #{:arrow-ipc :parquet}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed}, :refused-by-name #{:lz4-frame :zstd}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :writer-gate :pyarrow-validate-full, :ci-status {:kotoba-lang :actions-disabled-2026-08-05, :network-awai :actions-dead}, :gaps {:p2 #{:schema-evolution :snapshots :compaction :join-cost}, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
+  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :arrow-writer :parquet-writer :group-by :schema-evolution :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson}, :write #{:arrow-ipc :parquet}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed}, :refused-by-name #{:lz4-frame :zstd}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :writer-gate :pyarrow-validate-full, :ci-status {:kotoba-lang :actions-disabled-2026-08-05, :network-awai :actions-dead}, :gaps {:p2 #{:snapshots :compaction :join-cost}, :p2-not-doing #{:rename-needs-field-ids}, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
 
   :adr/verify
-  ["west pin: columnar 16b336b1 / org-apache-arrow 78db9a83 / org-apache-parquet e28a6b3e / kotobase-lake 06d658a0 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
+  ["west pin: columnar 309822ec / org-apache-arrow 78db9a83 / org-apache-parquet e28a6b3e / kotobase-lake 747ad27b / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
    "org-apache-arrow: JVM 39 tests/119 assertions・nbb 34/100・clj-kondo 0 warnings（ローカル実測）。CI は writer commit 6d070313 までは全 step success を実測、それ以降は org の Actions 無効化により未実行"
    "writer の正当性ゲート: clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir>  ; => 6 ケースすべて pyarrow validate(full=True) で受理"
    "org-apache-parquet: JVM 32 tests/143 assertions・nbb 29/131・clj-kondo 0 warnings（ローカル実測）。writer gate = clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir> ; => 7/7 pyarrow 受理・統計も可視。CI は 06df9fdd まで success、e28a6b3e は Actions 無効化により未実行"
-   "columnar: 22 tests/75 assertions・clj-kondo 0 warnings（ローカル実測）。CI は d89813a3 まで success、16b336b1 は Actions 無効化により未実行"
+   "columnar: 36 tests/115 assertions・clj-kondo 0 warnings（ローカル実測）。CI は d89813a3 まで success、以降は Actions 無効化により未実行"
+   "kotobase-lake: 46 tests/192 assertions（JVM / nbb 両方）・clj-kondo 0 warnings（ローカル実測）"
    "nbb scripts/fleet-ci/gates/net-kotobase-hermetic-check.cljs <tree>   ; => E object-grant: Ran 16 tests, rc=0"
    "net-kotobase の GitHub Actions は job を起動しない（ADR-2608036600）。実際に走る gate は murakumo fleet の check A-E のみ"]
 
@@ -159,7 +160,7 @@ validity bitmap + values buffer）なので、seam を曲げる圧力が**別の
 設計すると Parquet の形に引きずられた writer ができるためで、その理由は上記のとおり
 解消した。その上で P2 の最初の項目（writer）を着地させた。
 
-### P2. 書き込み側 — 3 項目着地、残り 3 項目
+### P2. 書き込み側 — 4 項目着地、残り 2 項目
 
 **着地（2026-08-05）: Arrow IPC writer**（`arrow.build` = FlatBuffers builder /
 `arrow.write`）。**「このクエリをテーブルに実体化」ができるようになった** —
@@ -230,8 +231,37 @@ writer は列を手元に持っているので min/max/null_count を書きな�
 - **thrift compact の field id は前フィールドからの delta。** 昇順に出さないと
   **失敗せずに別の field id へ decode される**ので、encoder 側で昇順を強制した。
 
-**残っている 3 項目**:
-- **スキーマ進化**（列の追加 / 改名 / 型変更をファイル間で吸収）
+**着地（2026-08-05）: スキーマ進化**（`columnar.evolve` = 機構 /
+`kotobase.lake.table` の `member/column/*` = manifest 側）。
+
+- **型キーワードは format 固有だった、というのが最大の発見。** Parquet は文字列列を
+  `:byte-array`、Arrow は `:utf8` と呼ぶ。**両 reader とも Clojure 文字列に decode する
+  ので値は既に一致していて、ラベルだけが違う。** 2 形式にまたがる table は型を keyword
+  等価で比べられず、比べようとした consumer がそれぞれ独自の対応表を発明することになる。
+  だから `canonical`（format 名 → 1 つの lattice）は `IColumnSource` の隣に置いた —
+  `columnar.bytes` と同じ理由で、これは**seam が話す語彙**であって片方の format の性質
+  ではない。
+- **拡大方向のみ、それ以外は名指しで拒否。** 同じ class 内では広い方が勝つ
+  （int64 > int32、double > float）。両 reader が既に Clojure 値を作っているので、この
+  拡大は**変換ではなくラベルの張り替え**。class をまたぐ安全な答えは無い（int と float は
+  2^53 以降で違う、string と int は比較できない）ので拒否し、両方の型を名前で出す。
+  `:null` は何とでも unify する（全 null の列は型について何も主張していないので、
+  他のファイルの合意を拒否権で潰してはいけない）。
+- **無い列は全 null で、それは枝刈りが効く。** ある列より前に書かれたファイルは
+  `{:rows n :nulls n}` を返し、`null_count == rows` は `columnar.stats` が bounds 無しで
+  chunk を落とせる唯一の証明。つまり**その列を持たないファイルは読まずに飛ばせる**。
+  「実在する列の統計はそのまま通す」ことと両方 assert してある。
+- **rename はやらない、と明言した。** 名前で解決する以上、rename は drop + add と
+  **区別が付かない**。区別するには rename を越えて安定する列 identity（field ID）が要り、
+  今書いているどのファイルもそれを持たない。できるふりをすると rename が黙って
+  データ損失になる。
+- **partition 列は table schema に入れない**（manifest 側の罠）。ファイルの中に無く
+  path と manifest にあるので、reconcile 対象の schema に入れると **columnar.evolve が
+  全 member でそれを全 null に合成し、manifest が知っている値を無に置き換える**。
+  `table-source` は `partition-datoms` で既に答えているので、2 つの経路が同じ列を
+  主張してはいけない。
+
+**残っている 2 項目**:
 - **テーブルのスナップショット / time travel。** datom 面には有るが**ファイル集合には無い**
   （「時刻 T のテーブル」が言えない）。Iceberg が manifest list で持っている層
 - **コンパクション / small-file 問題**
@@ -366,7 +396,7 @@ Parquet
 ## Consequences
 
 - **『lake を名乗れる』は名乗れる側に来た**が、Iceberg 相当ではない —
-  スナップショット・スキーマ進化・コンパクションが無い（P2 残）
+  スナップショット・コンパクションが無い（P2 残）。**スキーマ進化は入った**
 - **読み書きが両形式で閉じた。** 外から来たオブジェクトを scan し、結果を書いて、
   書いたものをまた scan できる。Arrow と Parquet の両方で。
 - **materialize 先に Parquet を選べば枝刈りが効く。** 「書いた Arrow は自分で枝刈り
