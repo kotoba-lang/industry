@@ -229,4 +229,38 @@
   ;; 「合格」にしないため）。
   {:name "compiler" :id "compiler-jdk-free" :gate :nbb-script
    :script "gates/kotoba-compiler-jdk-free-check.cljs"
-   :include-ext [".edn" ".cljs"] :min-files 60 :cd false}]}
+   :include-ext [".edn" ".cljs"] :min-files 60 :cd false}
+
+  ;; etzhayyim/global-legislation-datoms の corpus 投影（ADR-2608041800）。
+  ;; 世界の法令 95,194 件 + 依存辺 646,468 本を 42 シャードに投影したもので、
+  ;; 全文 3.43GB 自体は 4 つの DataLad dataset 側にあり、ここは sha256 で
+  ;; 名指しするだけ。
+  ;;
+  ;; **:jvm-test ではない理由（実測、推測ではない）**: この repo の contract test は
+  ;; Datascript を要求し、Datascript は maven 依存。fleet のノードは tailnet だけに
+  ;; 繋がっていて外向き HTTPS が無く、`~/.m2/repository/datascript/` は zebulun にも
+  ;; asher にも**存在しない**（2026-08-05 に両ノードで確認）。`clojure -M:test` は
+  ;; 依存解決で必ず落ちる。ship-git-deps! は git 依存しか運ばない。
+  ;; そこで Datalog エンジン抜きで成立する不変条件だけを gate にした。
+  ;;
+  ;; **この gate は Actions 版より強い。** 主眼は「宣言されたシャードの sha256 と
+  ;; バイト数が manifest 通りか」で、これは *内部整合を保ったまま手編集された
+  ;; シャード* を捕まえる — Actions 経路では構造的に不可能だった検査（あちらは
+  ;; committed 済みの値を読むだけで、再生成が走らないので git diff も無反応）。
+  ;; 加えて quality-report の床、JP シャードの identity 一意性 / text address の形 /
+  ;; **辺の向き**（日本国憲法に amends が入っていたら from-to 反転）、
+  ;; corpus→catalog のライセンス join、schema の属性宣言を見る。
+  ;;
+  ;; ここで検査され**ない**もの（不在から推測させない）: EU/UK/US シャードは
+  ;; sha256 + 件数だけで意味検査はしない（646,468 辺を edamame で読むと数分かかる
+  ;; 一方、改竄検出は sha256 で足りる）。また data/corpus/** を locked source から
+  ;; **再導出はしない** — それには 4 dataset の index/ が要る。
+  ;;
+  ;; :include-ext [".edn"] — 検査対象は全部 EDN（tree 71 件、gzip 後 ~40MB で
+  ;; max-ship-mb 200 の内側）。:min-files 50 は絞り込みが壊れて空 tree を
+  ;; 「違反 0 件 = 合格」にしないための床。
+  ;;
+  ;; :cd true — この gate が green なら投影は健全なので west pin を前進させてよい。
+  {:name "global-legislation-datoms" :gate :nbb-script
+   :script "gates/legislation-corpus-check.cljs"
+   :include-ext [".edn"] :min-files 50 :cd true}]}
