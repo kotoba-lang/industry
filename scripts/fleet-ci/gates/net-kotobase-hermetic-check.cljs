@@ -15,7 +15,9 @@
 ;;   B. metadata.yml 全体               bb scripts/check-metadata.cljc
 ;;   C. worker.yml の syntax 半分       bb <script> --syntax-check（root + worker/scripts）
 ;;   D. sdk.yml の python leg           py_compile + unittest test_gremlin.py
-;;   E. 大容量 object grant の判断規則   nbb で kotobase.object-grant-test
+;;   E. 大容量 object grant             nbb で object-grant-test（判断規則）と
+;;                                     object-grant-route-test（shell: 拒否が
+;;                                     presigner にも recorder にも到達しない）
 ;;
 ;; **2026-08-04: レイアウト追従。** 初版は `clj-edge/` `worker/` を前提にしていたが、
 ;; main はその後 `kotobase-api-gateway-cljs/` / `kotobase-api-gateway/` に作り替え
@@ -248,14 +250,21 @@
 ;; 場所である。
 
 (let [gw-dir (path/join root "kotobase-api-gateway-cljs")
-      test-file (path/join gw-dir "test" "kotobase" "object_grant_test.cljc")]
-  (if-not (fs/existsSync test-file)
-    (fail! "object-grant" "object_grant_test.cljc が無い —"
-           "gate が対象を見失っている(レイアウト変更?)")
-    (let [{:keys [rc out]}
+      suites [["object_grant_test.cljc" "kotobase.object-grant-test"]
+              ;; The shell as well as the decision. The route is where the
+              ;; capability is bound to the URL and where a refusal must reach
+              ;; neither the presigner nor the recorder — properties the pure
+              ;; layer cannot have, because it performs nothing.
+              ["object_grant_route_test.cljs" "kotobase.object-grant-route-test"]]
+      missing (remove #(fs/existsSync (path/join gw-dir "test" "kotobase" (first %))) suites)]
+  (if (seq missing)
+    (fail! "object-grant" (str/join ", " (map first missing))
+           "が無い — gate が対象を見失っている(レイアウト変更?)")
+    (let [nss (str/join " " (map #(str "'" (second %)) suites))
+          {:keys [rc out]}
           (run "npx" ["nbb" "--classpath" "src:test" "-e"
-                      (str "(require '[clojure.test :as t] 'kotobase.object-grant-test)"
-                           " (t/run-tests 'kotobase.object-grant-test)")]
+                      (str "(require '[clojure.test :as t] " nss ")"
+                           " (t/run-tests " nss ")")]
                {:cwd gw-dir})
           n (some-> (re-find #"Ran (\d+) tests?" (str out)) second js/parseInt)
           summary (re-find #"(\d+) failures?, (\d+) errors?" (str out))]
