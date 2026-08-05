@@ -1394,3 +1394,49 @@
              host の装飾 4px を全ての <b> に課金すると後続の全語が動く。"]
  :remaining ["paint order 32 点（agent 作業中）"
              "computed style 76 値: blockified 39 / ua-default 35（未実装の UA 規則）/ cascade 1 / ua-inherited 1"]}
+
+{:at "2026-08-05"
+ :iteration 52
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 370}
+ :line-structure {:agree 356 :total 356 :pct 100}
+ :geometry {:boxes-agree 1335 :boxes-total 1335 :pct 100 :clean-cases 370}
+ :paint-order {:points-agree 9227 :points-total 9234 :pct 100 :clean-cases 364 :was "9202/9234, 356"}
+ :computed-style {:values-agree 18687 :values-total 18763 :pct 100 :clean-cases 332}
+ :landed {:cssom "c0a5acef7c058c453c45a506340a93e864b182fa — :node op が hit 領域を運ぶ"
+          :dom-gpu "a1118b3534f58792607b08391b045642f56ea994 — hit-test が hit 領域を読む"
+          :browser "b0425a0440d1e3f58cc548fac47882cf52ce59e0 — node-at が hit 領域を読む"}
+ :note "**:node op の x/y/w/h が 2 つの仕事をしていた** —— ブラウザが**報告する** box と、**クリックされる**領域。
+        Brave 実測でこの 2 つは 3 通りに異なる。:node op が任意の **:hit** 矩形リストを持つようにし、
+        hit テストではそれが box を置き換える（[] = hit 候補でない、省略 = border box なので既存は不変）。
+        **幾何は動いていない —— そこが要点**で、box を広げれば片方の軸をもう片方と引き換えにしていた。"
+ :closed ["**p → b / p → a / union box（8 点）** —— corpus の <b> は client rect が
+           [119,1,33.7,18] と [0,22,46.8,18] なのに bounding rect は [0,1,152.7,39] で、
+           elementFromPoint(80,4) は p を返す。inline-owner-ops が fragment 列を :hit として出し、
+           union は box のまま。旧『honest, documented approximation』のコメントは置換。"
+          "**p → none / pre → none（11 点）** —— ブラウザは溢れた行を box の外でも**行ごとに** hit する
+           （80px の中の `short aaaa... tail` は中央行が x=140 まで、収まる 2 行は x=80 まで）。
+           **祖先は子孫の溢れの上では elementsFromPoint のスタックに入らない**ことも実測し、
+           直接の inline 子からのみ累積する。"
+          "**table → tbody（2 点）** —— 行と行グループは背景の有無に関わらず**決して hit されない**
+           （tbody と両 tr に background を付け border-spacing: 6px でも td か table しか返らない）。:hit []。"
+          "**div → p（5 点）** —— これは hit 領域ではなく**本物の paint order**。CSS 2.1 Appendix E は
+           in-flow block（step 3）を float（step 4）より先に描くが、engine は float を**書かれた位置**で
+           emit していたため後続兄弟の背景が丸ごと覆っていた。"]
+ :left-with-measurement "残り 7 点は全て sub-pixel の境界効果で paint order の誤りではない。
+                         4 点はこの engine が小数位置を floor しているもの（幾何軸の 2px 許容内。
+                         直すと corpus の全 box が動く UA margin 丸めの変更で、それは幾何軸の主題であり
+                         当時 2 体が同じコードにいた）。**3 点は oracle 自身のスロップ** ——
+                         1/64px 刻みで走査した結果、Brave は box の**上端をちょうど 1 CSS px 手前**で、
+                         下端はちょうどで答える（30px の div 2 つは 29.0156 で切り替わる。定数で、
+                         フォント相対でなく、左右にスロップは無い）。**モデル化すれば、あるブラウザの
+                         実装詳細に対して 3 点を得るために、実クリックを全て box の 1px 上に配ることになる**
+                         ので、計測のまま未モデル化。"
+ :bug-caught "**translate-ops / transform-ops が :hit を運んでいなかった** —— 自分で入れて、
+              コードを読んでではなく browser.session/node-at を実際に叩いて捕まえた。
+              2 行の <a> が box は y=30、hit 矩形は y=16 で返っていた。
+              **conformance corpus はこれを見られない**（padding 0 で各 case が 0,0 にあるため）——
+              downstream 検証が効いた実例。"
+ :downstream-fixed "hit テスタ 2 つも :hit を読むようにした。さもないと修正が harness にしか見えず、
+                    **2 行のリンクのぎざぎざの角のクリックが段落でなくリンクを発火し、
+                    テーブルの border-spacing の隙間のクリックが tr を発火していた。**"}
