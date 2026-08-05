@@ -295,11 +295,57 @@ sweep from, so the script enumerates every repository and asks
 `GET /repos/{o}/{r}/actions/workflows` directly.
 
 The rule now lives in CLAUDE.md (`CI/CD は murakumo fleet。GitHub Actions を
-使わない`), including the fleet-gate constraint that bit hardest in practice:
-nodes reach only the tailnet, `ship-git-deps!` carries git deps but **not maven
-ones**, so a repo whose tests need a maven library cannot use `:jvm-test` — check
-that dependencies resolve on a node before choosing the gate kind, and leave the
-library-dependent assertions in the repo's local contract."
+使わない`).
+
+## 2026-08-05 — 既存 workflow をそのまま fleet で実行する
+
+Disabling Actions leaves 2,549 repositories with workflow files and nothing
+running them. Rewriting each as a fleet gate is not realistic, so
+`scripts/fleet-ci/gates/github_workflow_run.cljs` reads
+`.github/workflows/*.yml` and executes it: a YAML subset parser, an admission
+check, bash emission, node-side execution. Measured over the 2,585 workflow
+files in the workspace: **2,452 runnable (95%), 133 unsupported, 0 unparsable**.
+
+`uses:` is highly concentrated — 11,136 of 11,443 occurrences (97.3%) are five
+actions, all of which are already satisfied on the fleet and become no-ops
+(`actions/checkout` because tick ships the tree; `setup-java`/`setup-node`/
+`setup-clojure` because nodes are provisioned; `actions/cache` because `~/.m2`
+persists). **Anything else refuses the whole workflow rather than skipping the
+step** — a skipped step that turns a run green is the exact failure mode this
+ADR exists to prevent.
+
+### The 「no outbound HTTPS」 premise was wrong, and it cost accuracy
+
+This ADR and `tick.cljs` both stated that fleet nodes reach only the tailnet and
+have no outbound HTTPS. That came from **one measurement of one node** (zebulun,
+2026-07-26 — a node that is now unreachable by SSH entirely). On 2026-08-05 all
+ten reachable nodes were measured: `registry.npmjs.org`, `repo1.maven.org` and
+`github.com` all return **200**.
+
+Two decisions had been made on the false premise: a gate was kept off
+`:jvm-test` because 「maven deps cannot resolve」, and the workflow runner
+rejected `npm`/`npx`/`curl`/`cargo` by a hard-coded list, refusing **167
+workflows for a reason that did not hold**. The runner now probes egress on the
+node it is about to run on, rather than believing a constant. The lesson worth
+keeping: a measurement of one node at one time is not a property of the fleet,
+and writing it into a rule makes it outlive the condition it described.
+
+## 2026-08-05 — job placement is computed, not round-robin
+
+`assign` was `(mod i (count slots))`: neither node load nor gate cost entered
+into it. Fleet nodes are not CI-dedicated — they share hardware with inference
+and mining — so a saturated node received the same share as an idle one, and
+since a batch waits for every slot, one slow node set the completion time for
+all of them.
+
+It is now LPT (longest-processing-time-first) list scheduling: node speed from
+`cores` minus **live** `load1` (measured per tick via `sysctl -n vm.loadavg`),
+attenuated when free disk is under 5 GB; gate cost from an EMA of observed
+durations in `~/.gftd/fleet-ci-cost.edn`. First run measured
+`benjamin` at load **100.75** and gave it no work at all, while distributing
+across judah/levi/simeon. Recorded costs are a **batch-level upper bound** (a
+batch's gates run in parallel, so its duration is the slowest one); LPT only
+needs relative magnitude, but the number must not be quoted as a per-gate time."
   :adr/verification
   "The ported gate was proved to both pass and fail before registering it:
 

@@ -185,8 +185,15 @@
    "DeLaGuardo/setup-clojure" "nodes are provisioned; probe.cljs records :clojure"
    "actions/cache" "node ~/.m2 and ~/.gitlibs are persistent across ticks"})
 
-;; ノードは tailnet のみで外向き HTTPS が無い。これらを叩く run: は必ず落ちるので、
-;; 「落ちてから気づく」のでなく受理段階で :needs-network として弾く。
+;; 外向き HTTPS を要する run: の先頭コマンド。**egress が無いノードでだけ**受理段階で弾く。
+;;
+;; ⚠ ここは一度間違えた。fleet-ci の README と tick.cljs のコメントが
+;; 「ノードは tailnet だけに繋がっていて外向きの HTTPS が無い」と書いており
+;; （実測 2026-07-26、zebulun 1 台に対して）、それを全ノードの恒久的な性質だと
+;; 思い込んで定数で弾いていた。2026-08-05 に 10 ノードすべてで実測したところ
+;; **全台が registry.npmjs.org / repo1.maven.org / github.com に 200 を返した**。
+;; 300 本の workflow を、成り立たない前提で拒否していたことになる。
+;; だから今は **実行するノードで実測した値**を analyze に渡す。定数に戻さないこと。
 (def network-commands
   #{"npm" "npx" "pnpm" "yarn" "cargo" "pip" "pip3" "curl" "wget" "brew" "docker"
     "gh" "aws" "wrangler" "mvn" "gradle"})
@@ -278,8 +285,13 @@
         jobs)))
 
 (defn analyze
-  "parse 済み workflow -> {:jobs [...] :verdict :runnable|:unsupported :reasons [...]}"
-  [wf]
+  "parse 済み workflow -> {:jobs [...] :verdict :runnable|:unsupported :reasons [...]}
+
+   opts :egress? — ノードが外向き HTTPS に到達できるか。**実測値を渡すこと。**
+   ここを定数で持っていた時期があり、それが誤りだった（下の network-commands
+   のコメント参照）。"
+  ([wf] (analyze wf {}))
+  ([wf {:keys [egress?] :or {egress? false}}]
   (let [jobs (try (expand-jobs (get wf "jobs"))
                   (catch :default e {:expand-error (.-message e)}))
         reasons (atom [])
@@ -301,10 +313,11 @@
                                " substitution; this runner does not evaluate the GitHub expression language")))
                  (doseq [k kinds :when (= :unsupported-action (:kind k))]
                    (swap! reasons conj (str jid ": action " (:action k) " has no fleet equivalent")))
-                 (doseq [k kinds :when (= :run (:kind k))
-                         t (first-tokens (:script k))
-                         :when (contains? network-commands t)]
-                   (swap! reasons conj (str jid ": `" t "` needs network egress; fleet nodes are tailnet-only")))
+                 (when-not egress?
+                   (doseq [k kinds :when (= :run (:kind k))
+                           t (first-tokens (:script k))
+                           :when (contains? network-commands t)]
+                     (swap! reasons conj (str jid ": `" t "` needs network egress, and this node has none"))))
                  {:id jid
                   :env (get job "env")
                   :steps (mapv (fn [s k] (merge {:name (get s "name")
@@ -315,7 +328,7 @@
     {:name (get wf "name")
      :jobs job-plans
      :reasons (vec (distinct @reasons))
-     :verdict (if (seq @reasons) :unsupported :runnable)}))
+     :verdict (if (seq @reasons) :unsupported :runnable)})))
 
 ;; ---------------------------------------------------------------------------
 ;; ノード実行用の bash 生成
@@ -387,6 +400,18 @@
          :out (str (some-> (.-stdout e) str) (some-> (.-stderr e) str))
          :status (.-status e)}))))
 
+(defn- egress?
+  "このノードが本当に外向き HTTPS に到達できるか、**その場で測る**。
+   定数で持つと環境が変わったときに静かに嘘になる（実際になった）。"
+  []
+  (let [cp (js/require "node:child_process")]
+    (try
+      (= "200" (str/trim (str (.execFileSync cp "curl"
+                                            #js ["-sS" "--max-time" "8" "-o" "/dev/null"
+                                                 "-w" "%{http_code}" "https://repo1.maven.org/maven2/"]
+                                            #js {:encoding "utf8"}))))
+      (catch :default _ false))))
+
 (defn -main [& argv]
   (let [fs (js/require "node:fs")
         path (js/require "node:path")
@@ -398,7 +423,9 @@
       (println (str "FLEET-CI: no .github/workflows in the shipped tree — "
                     "extraction or :include-ext is wrong, refusing to report a pass"))
       (js/process.exit 90))
-    (let [files (->> (.readdirSync fs dir)
+    (let [net? (egress?)
+          _ (println (str "node egress to repo1.maven.org: " (if net? "yes" "no")))
+          files (->> (.readdirSync fs dir)
                      (filter #(or (str/ends-with? % ".yml") (str/ends-with? % ".yaml")))
                      (filter #(or (nil? only) (= only %)))
                      sort vec)]
@@ -411,7 +438,7 @@
                (let [p (.join path dir f)
                      text (str (.readFileSync fs p "utf8"))]
                  (try
-                   (let [plan (analyze (parse-yaml text))]
+                   (let [plan (analyze (parse-yaml text) {:egress? net?})]
                      (if (not= :runnable (:verdict plan))
                        {:file f :ok false :unsupported (:reasons plan)}
                        (let [sh (to-bash plan {:java-home (.-JAVA_HOME js/process.env)})

@@ -19,6 +19,7 @@
 (defn opt [f d] (let [i (.indexOf args f)] (if (neg? i) d (nth args (inc i) d))))
 
 (def root (opt "--root" "orgs"))
+(def assume-egress (some #(= "--egress" %) args))
 (def show-n (js/parseInt (str (opt "--show-unsupported" "25")) 10))
 
 (defn workflow-files [dir]
@@ -47,7 +48,7 @@
                (let [wf (gw/parse-yaml text)]
                  (if-not (get wf "jobs")
                    {:file f :outcome :no-jobs}
-                   (let [plan (gw/analyze wf)]
+                   (let [plan (gw/analyze wf {:egress? assume-egress})]
                      (if (= :runnable (:verdict plan))
                        ;; runnable と言うからには bash まで出せることを確かめる。
                        ;; 出せないなら runnable ではない。
