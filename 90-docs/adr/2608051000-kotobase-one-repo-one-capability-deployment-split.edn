@@ -116,7 +116,32 @@
      kotobase-protocols は 1 compatibility cycle だけ facade として残し、consumer が 0 になったら archive。"
     :naming-note
     "kotobase-protocol-* と単数にする。複数形 kotobase-protocols は『全部入り』を意味してしまい、
-     分割後の 1 capability repo の名前として嘘になる。"}
+     分割後の 1 capability repo の名前として嘘になる。"
+    :namespaces-unchanged
+    "**namespace は kotobase.protocols.* のまま据え置く。** repo 名と namespace は一致しなくてよく、
+     改名すれば全 consumer が壊れる。分割の目的は依存の切り離しであって改名ではない。"
+    :router-is-now-a-registry
+    "分割を可能にした変更はこれ 1 点。旧 router は s3/ipfs/atproto/git を :require しており、
+     **その 1 namespace が 4 surface を compile time で束ねていた**。registry 化して
+     ctx の :surfaces から handler を受け取る形にしたので、core は protocol repo に依存しない。
+     :surfaces に無い surface は /health も含めて serve しない（持っていない capability の
+     readiness を主張しない）。1 host だけ serve する shell は router 自体が不要で、
+     自分の handler を直接呼べばよい。"
+    :classpath-hazard
+    "**facade（kotobase-protocols）と分割 repo を同じ classpath に載せてはいけない。**
+     namespace が同一なので kotobase.protocols.http 等が重複する。consumer はどちらか一方だけを
+     使う。移行期は『既存の protocols-worker は facade、新しい per-host shell は分割 repo』で
+     衝突しない。"
+    :status-2026-08-05
+    {:done "5 repo を作成・push・west 登録（4102 projects）。pin はすべてサーバ側で
+            main 到達性を検証済み。テストは core 10/47・s3 4/20・ipfs 3/11・atproto 4/16・
+            git 5/11 = 26 tests / 105 assertions が全て通過（分割前は 24/87。
+            router の registry 化で absent-surface / prefix-skip / apex-injectable の 3 ケース増）。"
+     :visibility "**5 repo は private で作成した。親の kotobase-protocols は public。**
+                  public 化は一方通行で恒久承認の対象外なのでオーナー判断に残す。
+                  なお facade を archive する時点で後継が private のままだと、
+                  公開ライブラリを実質非公開化することになる — その前に決める必要がある。"
+     :remaining "facade の src 削除は protocols-worker が分割 shell に移ってから（step 5 の後）。"}}
 
    :engine-rename
    {:host-change "backend.kotobase.net → engine.kotobase.net"
