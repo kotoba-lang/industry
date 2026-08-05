@@ -113,6 +113,92 @@
               w (parse-op-set ph "(def write-ops")]
           (when (or r w) (into (or r #{}) (or w #{})))))))
 
+;; ── 3.5) まだ宣言されていない産業の候補 ─────────────────────────────────────
+;;
+;; superproject ADR-2608070000。**「次にどの産業を繋ぐか」を loop の agent に
+;; 毎回考え直させない。** 探索を毎周やり直すと、同じ repo を何度も調べ直し、
+;; しかも周ごとに違う基準で選ぶ。
+;;
+;; 基準は 1 つ: **標準形に適合しているか。** この fleet の governed actor は
+;;
+;;     operation/build（langgraph の StateGraph）/ phase/{read,write}-ops /
+;;     phase/default-phase / store/seed-db / governor
+;;
+;; を共通して持ち、これが揃っていれば `os/adapters/standard` に数行の shim を
+;; 足すだけで OS に繋がる（実測 2026-08-05: 4711 / 4659 / 4920 の 3 本は
+;; まさにこの経路で繋がった）。**揃っていない repo は「駄目」ではなく「この
+;; 経路では繋がらない」** —— 判定は出すが、順位からは外すだけにする。
+
+(def ^:private isic-dir (str root "/orgs/cloud-itonami"))
+
+(defn- own-scores
+  "成熟度スキャンの M_own（ADR-2608052000 の生成物）。無ければ空 —— **無い値を
+  0 で埋めない**（測っていない軸は分母から外す、と同じ規律）。"
+  []
+  (let [p (str root "/90-docs/system-dynamics/itonami-maturity.datoms.edn")]
+    (if-let [s (slurp* p)]
+      (try
+        (into {} (keep (fn [m] (when (and (:repo/path m) (:maturity/own m))
+                                 [(:repo/path m) (:maturity/own m)]))
+                       (edn/read-string s)))
+        (catch :default _ {}))
+      {})))
+
+(defn- conformance
+  "1 repo が標準形かを実測する。返すのは判定と、外れた理由。"
+  [repo]
+  (let [src (str isic-dir "/" repo "/src")
+        nss (try (->> (.readdirSync fs src #js {:withFileTypes true})
+                      (filter #(.isDirectory %))
+                      (mapv #(.-name %)))
+                 (catch :default _ []))]
+    (if (not= 1 (count nss))
+      {:repo repo :conformant? false :why :not-a-single-namespace}
+      (let [ns- (first nss)
+            base (str src "/" ns- "/")
+            phase (slurp* (str base "phase.cljc"))
+            oper (slurp* (str base "operation.cljc"))
+            store (slurp* (str base "store.cljc"))
+            gov? (exists? (str base "governor.cljc"))
+            core-clj (->> (try (vec (.readdirSync fs base)) (catch :default _ []))
+                          (filter #(and (str/ends-with? % ".clj")
+                                        (not= "render_html.clj" %)))
+                          vec)
+            ops (let [r (parse-op-set phase "(def read-ops")
+                      w (parse-op-set phase "(def write-ops")]
+                  (when (or r w) (into (or r #{}) (or w #{}))))
+            why (cond
+                  (nil? ops) :no-phase-op-sets
+                  (not (and phase (str/includes? phase "(def default-phase"))) :no-default-phase
+                  (not (and oper (str/includes? oper "(defn build"))) :no-operation-build
+                  (not (and oper (str/includes? oper "langgraph.graph"))) :not-a-langgraph-actor
+                  (not (and store (str/includes? store "(defn seed-db"))) :no-seed-db
+                  (not gov?) :no-governor
+                  (seq core-clj) :jvm-only-core
+                  :else nil)]
+        (cond-> {:repo repo :ns ns- :conformant? (nil? why) :ops (vec (sort ops))}
+          why (assoc :why why)
+          (seq core-clj) (assoc :jvm-only-core core-clj))))))
+
+(defn- candidates
+  "宣言されていない ISIC repo のうち、標準形に適合しているものを M_own 順で。
+
+  **順位は毎周計算し直す。** 固定リストにすると、繋いだ repo が残り続けたり、
+  新しく標準形になった repo が永久に出てこなくなる。"
+  [declared-repos]
+  (let [scores (own-scores)
+        repos (->> (try (vec (.readdirSync fs isic-dir)) (catch :default _ []))
+                   (filter #(str/starts-with? % "cloud-itonami-isic-"))
+                   (remove declared-repos))
+        rows (->> repos
+                  (map conformance)
+                  (filter :conformant?)
+                  (map (fn [r] (assoc r :own (get scores (str "orgs/cloud-itonami/" (:repo r))))))
+                  (sort-by #(- (or (:own %) 0))))]
+    {:scanned (count repos)
+     :conformant (count rows)
+     :top (mapv #(select-keys % [:repo :ns :own :ops]) (take 5 rows))}))
+
 ;; ── 4) live ──────────────────────────────────────────────────────────────────
 
 (defn- http-status
@@ -185,6 +271,8 @@
         ;; **未認証で 200 が返ったらそれ自体が欠陥**なので、期待値は 401。
         gate (http-status "https://itonami.cloud/api/cloud-itonami/os-verify/os/journal" "POST")
 
+        pool (candidates (set (map :repo vs)))
+
         entry {:at (.toISOString (js/Date.))
                :declared (count rows)
                :bound bound
@@ -194,6 +282,10 @@
                :ops-unknown (mapv :vertical unknown-ops)
                :surfaces surfaces
                :api-gate gate
+               ;; **まだ宣言されていない産業の候補**（ADR-2608070000）。
+               ;; loop はここを読んで次の 1 本を選ぶ。探索を毎周やり直さない。
+               :candidate-pool (select-keys pool [:scanned :conformant])
+               :candidates (:top pool)
                :offline? offline?}]
 
     (log! "── 営み OS 成熟度 tick ──")
@@ -208,6 +300,13 @@
       (log! "⚠ 宣言と actor の op がズレている:" (pr-str (mapv :vertical drift))))
     (when (seq unknown-ops)
       (log! "op 集合が読めなかった（:unknown、ok に丸めない）:" (pr-str (mapv :vertical unknown-ops))))
+    (log! "")
+    (log! "未宣言の ISIC" (:scanned pool) "本のうち、標準形に適合"
+          (:conformant pool) "本 —— shim だけで繋がる")
+    (doseq [c (:top pool)]
+      (log! (str "  · " (:repo c) "  ns=" (:ns c)
+                 "  M_own=" (if (:own c) (.toFixed (:own c) 4) "未測定")
+                 "  ops=" (count (:ops c)))))
     (log! "公開面:" (pr-str surfaces))
     (log! "API gate（未認証 POST で 401 が正）:" gate
           (if (= 401 gate) "" "  ⚠ 401 ではない"))
@@ -223,9 +322,12 @@
           (cond
             (not= 401 gate) "API gate が 401 を返していない。認証境界を先に確認する"
             (seq drift) "宣言と actor の op のズレを先に直す（面が嘘をついている）"
+            (seq drift) "宣言と actor の op のズレを先に直す（面が嘘をついている）"
             (seq connectable) (str (:vertical (first connectable)) " の adapter を書いて接続する")
+            (seq (:top pool)) (str "新しい産業を 1 本繋ぐ: " (:repo (first (:top pool)))
+                                   "（" (:ns (first (:top pool))) "）")
             (pos? (:unbound entry)) "残る未接続は repo 側の .clj を .cljc に割る作業が要る（機械的ではない）"
-            :else "9 本すべて接続済み。次は operator の実データ経路"))
+            :else "宣言された営みはすべて接続済み。次は operator の実データ経路"))
     (js/process.exit 0)))
 
 (-main)
