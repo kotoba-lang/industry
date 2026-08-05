@@ -88,23 +88,4 @@
    {:step 5 :action "D1 継続運転下で graph 1G+ 以上の paging / parity を完了し、次 session の close で production readiness を再判定"}]
 
   :adr/body
-  "# ADR-2608053100: kotobase セッションクローズ（graph/lake/distributed/blockchain、peer、CD/CI）\n\n\
-## 結論\n\n\
-このセッションで確認した設計上の原則は次の通り。\n\n\
-1. **graph/db core を前提に、datastore/lake、distributed/federation、blockchain anchor は同居可能**。\n\
-   ただし、graph core に起因する transaction/query 成否を必須条件にしない能力（capability）は可用化/監査補助扱い。\n\n\
-2. **同居可否は \"層\" と \"責務\" の分離で判定する**。\n\
-   `kotobase-peer` は単一 capability ではないため、新規 capability 名へ即時 rename するのではなく\n\
-   機能抽出→互換 facade（退役期間）→移行完了アーカイブで進める。\n\n\
-3. **CI/CD 実行は GitHub Actions を前提にしない**。\n\
-   network-awai の net-kotobase は murakumo.cloud 側の gate 実行へ寄せ、実行可能な範囲を固定する。\n\
-   npm/node-heavy、live smoke、deploy/DR 系は別経路で引き続き扱う。\n\n\
-4. **このセッションの決定状態は close とする**。\n\
-   - D1 は primary 運転を維持。\n\
-   - s3-backed datomic API は correctness pass だが latency gate fail のため promotion hold。\n\
-   - graph ランタイムは R2-backed production close が完了、ただし大規模 paging/parity と multi-region 系は次セッション。\n\n\
-## 参照（受け渡し）\n\n\
-ADR-2608045000, ADR-2608051000, ADR-2608052800, ADR-2608052900, ADR-2608036600 を読めば、\n\
-`同時成立` の判定根拠と `repo 分離 + CI 移管` の実施境界は一貫している。\n\n\
-## Session close としての扱い\n\n\
-この ADR は実装状態の \"close\" を示す。未完了分は open item として次セッションに引き継ぐ。\n"}]
+  "# ADR-2608053100: kotobase セッションクローズ（graph/lake/distributed/blockchain、peer、CD/CI）\n\n## 結論\n\nこのセッションで確認した設計上の原則は次の通り。\n\n1. **graph/db core を前提に、datastore/lake、distributed/federation、blockchain anchor は同居可能**。\n   ただし、graph core に起因する transaction/query 成否を必須条件にしない能力（capability）は可用化/監査補助扱い。\n\n2. **同居可否は \"層\" と \"責務\" の分離で判定する**。\n   `kotobase-peer` は単一 capability ではないため、新規 capability 名へ即時 rename するのではなく\n   機能抽出→互換 facade（退役期間）→移行完了アーカイブで進める。\n\n3. **CI/CD 実行は GitHub Actions を前提にしない**。\n   network-awai の net-kotobase は murakumo.cloud 側の gate 実行へ寄せ、実行可能な範囲を固定する。\n   npm/node-heavy、live smoke、deploy/DR 系は別経路で引き続き扱う。\n\n4. **このセッションの決定状態は close とする**。\n   - D1 は primary 運転を維持。\n   - s3-backed datomic API は correctness pass だが latency gate fail のため promotion hold。\n   - graph ランタイムは R2-backed production close が完了、ただし大規模 paging/parity と multi-region 系は次セッション。\n\n## 参照（受け渡し）\n\nADR-2608045000, ADR-2608051000, ADR-2608052800, ADR-2608052900, ADR-2608036600 を読めば、\n`同時成立` の判定根拠と `repo 分離 + CI 移管` の実施境界は一貫している。\n\n## Session close としての扱い\n\nこの ADR は実装状態の \"close\" を示す。未完了分は open item として次セッションに引き継ぐ。\n"}]
