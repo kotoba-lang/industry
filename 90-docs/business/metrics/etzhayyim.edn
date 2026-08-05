@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 12745, "etzhayyim-xrpc-proxy" 611},
+ {"etzhayyim-did-web" 12888, "etzhayyim-xrpc-proxy" 613},
  :zone
- {:requests-7d 53795,
-  :pageviews-7d 1227,
-  :uniques-7d-sum 1995,
+ {:requests-7d 54177,
+  :pageviews-7d 1251,
+  :uniques-7d-sum 2012,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 37}
+  [{:path "/robots.txt", :requests 38}
    {:path "/sitemap.xml", :requests 6}
    {:path "/system-dynamics", :requests 4}
-   {:path "/favicon.png", :requests 3}
-   {:path "/murakumo", :requests 3}
-   {:path "/actor/wakai/did.json", :requests 2}
-   {:path "/actor/kazaori/did.json", :requests 2}
-   {:path "/actor/uchiwake/did.json", :requests 2}],
-  :status-mix {:server-error 616, :client-error 756, :ok 157},
+   {:path "/actor/karute/system-dynamics", :requests 3}
+   {:path "/actor/kizashi/system-dynamics", :requests 3}
+   {:path "/actor/kokoro/system-dynamics", :requests 3}
+   {:path "/actor/sarutahiko/system-dynamics", :requests 3}
+   {:path "/actor/tsukuroi/system-dynamics", :requests 3}],
+  :status-mix {:client-error 766, :server-error 611, :ok 182},
   :window "24h"},
  :as-of "2026-08-05",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 49, :error-5xx-pct 40},
+ {:window "24h", :probe-4xx-pct 49, :error-5xx-pct 39},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 37 · /sitemap.xml 6 · /system-dynamics 4 · /favicon.png 3 · /murakumo 3 | 4xx(probe) 49% · 5xx 40%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 38 · /sitemap.xml 6 · /system-dynamics 4 · /actor/karute/system-dynamics 3 · /actor/kizashi/system-dynamics 3 | 4xx(probe) 49% · 5xx 39%",
  :signal
- "etzhayyim.com 実測 53795 req/7d・1995 uniques(日次和)・うち4xx probe 49%(24h)、workers 13356 inv/7d"}
+ "etzhayyim.com 実測 54177 req/7d・2012 uniques(日次和)・うち4xx probe 49%(24h)、workers 13501 inv/7d"}
