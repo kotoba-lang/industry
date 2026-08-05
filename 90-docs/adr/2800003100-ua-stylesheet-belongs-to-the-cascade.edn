@@ -1,11 +1,11 @@
 [{:db/id -1
   :adr/id "2800003100-ua-stylesheet-belongs-to-the-cascade"
   :adr/title "ADR-2800003100: UA stylesheet は cascade が持つ —— cssom.layout の (or (style node :x) <ua default>) 連鎖を移す提案"
-  :adr/status "proposed"
+  :adr/status "accepted"
   :adr/doc_type "adr"
   :adr/topic "cssom-ua-stylesheet-cascade-vs-layout"
   :adr/date "2026-08-04"
-  :adr/last_verified "2026-08-04"
+  :adr/last_verified "2026-08-05"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/authoritative_for
@@ -47,75 +47,70 @@
    層の設計**であり、数値はその設計の帰結を可視化しているにすぎない。"
 
   :adr/decision
-  "**提案（未決定・オーナー判断待ち）: UA stylesheet のデータを cssom.core に置き、
-   cascade の最下位優先度として適用する。** layout は自前の UA 既定連鎖を持たず、
-   cascade が書いた値を読むだけにする。
+  "**決定: option A を採用。2026-08-05 に着地済み**（cssom `64603fdb`、dom-gpu `be1888bf`）。
 
-   選択肢と評価:
+   UA 規則のデータを cssom.core に置き、cascade の最下位優先度として適用する。
+   layout は自前の UA 既定連鎖を持たず、cascade が書いた値を読む。
 
-   A. **cascade が所有する（提案）** —— UA 規則を cssom.core のデータとして定義し、
-      apply-cascade が author 規則より低い優先度で適用する。layout の
-      `(or (style node :x) <ua default>)` は `(style node :x)` になる。
-      利点: 単一の真実。computed-style / devtools / a11y / harness が一斉に正しくなる。
-      実 CSS の層構造（UA < author < inline）と同型。
-      欠点: 全要素に UA 由来の `:style/*` 属性が増える（下記 consequences）。
+   実装は tag→値の map ではなく **CSS テキスト**（`ua-stylesheet-text` → `ua-rules`）で、
+   `resolve-style-for` に `:important?` と `:inline?` の間の実 origin として畳んだ。
+   CSS にしたのは下記 trap 1 のため —— `a[href]` / `input[type=\"checkbox\"]` / `[hidden]` が
+   **自分で自分を表現でき**、specificity が `input[type=…]` を `input` より優先する処理が
+   自動で得られる。
 
-   B. **layout が所有したまま、computed-style だけが UA を後付けする** ——
-      知識が 2 箇所になる。**この repo は同じ形の drift を既に 2 度観測している**
-      （inline style の shorthand 展開が htmldom と cssom.core で食い違った件、
-      border-spacing の 2px が tag 規則か初期値かの取り違え）。採らない。
+   選択肢と評価（当初のまま。B と C は採らなかった）:
 
-   C. **何もしない** —— 87% を『そういうもの』として受け入れる。
-      レイアウトは正しいので実害は限定的だが、devtools / a11y / script 経路は
-      嘘を受け取り続ける。COMPUTED STYLE 軸は永久に 87% 付近で頭打ちになり、
-      **本物の cascade バグ（現在 11 件）が 2,123 件の背景に埋もれ続ける** ——
-      これが測定上の最大の損失。"
+   B. **layout が所有したまま computed-style だけが UA を後付けする** —— 知識が 2 箇所になる。
+      この repo は同じ形の drift を 2 度観測している。採らない。
+   C. **何もしない** —— 本物の cascade バグが背景に埋もれ続ける。採らない。
+
+   結果: COMPUTED STYLE **87% → 97%**、全値一致 case **3 → 180**。
+   property 別: display 17%→97%、padding-* 88-90%→99-100%、color/font-weight/font-style →100%。
+   **layout は byte-identical**（370 case 全ての draw op をフィールド単位で比較し、位置・寸法の差ゼロ）。"
 
   :adr/consequences
-  "A を採る場合の代償:
+  "**着地後の実測（2026-08-05）。**
 
-   1. **DOM op 数の増加 —— 実測済み（2026-08-04）。当初『未計測、着手前に測ること』と
-      していた項目を測った。結論: 代償は当初の見積もりより 1 桁小さい。**
+   1. **op 数の増加 —— 予測は 5 つ中 4 つで当たり、1 つで外れた。**
+      browser/load-html の :browser/ops で実測:
 
-      Brave で 46 タグについて『UA 既定値が initial と異なる property は何個か』を
-      直接測った（bare span を initial の代理とし、td/tr/li 等は正しい親の中に置いて計測）:
+        smoke   要素  6 /  22 →  27 op  **+23%**
+        article 要素 11 /  41 →  52 op  **+27%**
+        page    要素 17 /  64 →  83 op  **+30%**
+        form    要素 10 /  37 →  62 op  **+68%**
+        table   要素 14 /  42 →  87 op  **+107%**
 
-        平均 2.3 個/タグ（14 個ではない）
-        最大 7（th, button）、6（textarea, input）、5（td, h3）
-        0 個: span, label, img, br, a
-        p は 3（display, margin-top, margin-bottom）／div は 1（display のみ）／
-        td は 5（display + padding 四辺）
+      **table ページが予測（+39〜67%）を超えた。** 本 ADR 自身の probe で `td`(5) と `th`(7) が
+      46 タグ中最多の非 initial property を持つと測っていたので整合はするが、
+      **予測はこの最悪ケースを名指ししていなかった** —— 記録として残す。
+      なお `apply-cascade` は `(seq css-rules)` のときだけ走るので、stylesheet の無いページは
+      style op を 1 つも出さない。緩和案（`:ua/*` 別 namespace）は結局不要だった。
 
-      a が 0 なのは UA の青色が href を持つ場合にだけ掛かるためで、
-      UA 規則は tag だけでなく属性にも条件付きだという証拠でもある。
+   2. **性能。** match-and-sort を `node-style` ごとに回すと end-to-end **+80%**（101s → 181s）。
+      sheet が検査する属性を持たない要素向けに per-tag の UA style を事前計算して解消し、
+      base と同等に戻った（89/81/53s vs 91/80/48s）。属性集合は parse 済み規則から読み、
+      **形の仮定を load 時に検査する**ので、将来 `:not([…])` が入っても描画ではなく性能が落ちる。
 
-      実ページでの op 増加（kotoba-lang/browser の load-html を実行して計測）:
+   3. **blockify とは混同していない。** float / absolute / flex item の blockify は cascade 後の
+      別段階のままで、帰責 39 件は着地前後で不変。
 
-        smoke   要素  5 / 現 op 33 / UA 由来 13 → +39%
-        article 要素 17 / 現 op 63 / UA 由来 41 → +65%
-        form    要素  9 / 現 op 39 / UA 由来 26 → +67%
+   4. **残り 557 の ua-default は `em` 相対の半分**（`p { margin: 1em 0 }`、`h1 { font-size: 2em }`、
+      fieldset の `padding: 0.35em`）。`em` は要素自身の computed font-size に対して解決するが、
+      この cascade はそれを計算しない（layout は theme の base size に対して解決しており、
+      theme は cascade からは見えない host 概念）。**次の tranche**であり、font-size 解決の段
+      （または base-size の opt）を cascade に入れるという**別の設計判断**を要する。
+      440 の margin 値を動かすので box も動く。
 
-      全 14 property を無条件に書けば +255〜400% になるが、initial と異なる値だけを
-      書けば +39〜67%。後者が正しい実装であり（initial 値を書くのは冗長）、
-      この範囲なら緩和案（:ua/* 別 namespace）を採らずに A をそのまま実装してよい、
-      というのが実測後の見解。ただし大きな文書での実測は未実施。
+   5. **帰責の正直な増加: cascade 帰責が 9 → 13。** 4 件とも `<input type=radio>` の margin
+      （この engine は checkbox の `3px 3px 3px 4px` を与えるが Brave は `3px 3px 0 5px`）。
+      **意図的に誤ったまま残した** —— この変更は値の出どころを動かすもので値を変えるものではない。
+      2,303 件の『見逃された ua-default』に隠れていたものが今は帰責されて見えている、
+      というのが本 ADR の狙いそのもの。次の tranche で 1 行。
 
-   2. **layout の挙動が変わりうる箇所。** node-style の連鎖は『author 値が無ければ UA』
-      という単純な or ではなく、`ua-control-box` のように tag と type 属性に依存する
-      分岐を含む。cascade 側で表現するには UA 規則をセレクタ（`input[type=checkbox]` 等）
-      として書く必要がある。**移行は property 単位で段階的に行い、各段階で 4 軸すべてを
-      再計測する**（幾何 92% / 行構造 98% / paint order 97% を退行させないこと）。
-
-   3. **`display` の blockify との相互作用。** 現在 38 件が blockified 原因で不一致。
-      float / absolute / flex item は computed-value 時に blockify されるが、これは
-      UA stylesheet ではなく cascade 後の別段階。A を実装する際、UA の display 既定と
-      blockify を混同しない。
-
-   4. 期待値: 成功すれば COMPUTED STYLE は 87% から **約 99.6%**（16,964 中の残り 59）
-      になり、**残った不一致がすべて本物**になる。これが本提案の主目的である。
-
-   決めるべきこと: (a) A を採るか、(b) 1 の緩和案（`:ua/*` namespace）を採るか、
-   (c) C のまま据え置くか。**(a)/(b) を採る場合でも、op 数の実測を先に行う。**"
+   6. **layout に残したもの**（それぞれ理由付きでコードに明記）: control の font-size、
+      `<select>` の 1px block padding（**cascade に書けば box を正しくするために報告値を誤りにする**）、
+      `display: none` の tag 群（layout は display を読む前に tag で抑制しており、実 UA が隠す集合は
+      この engine が描く集合より広い）、`meter`/`progress`、`th`/`button` の `text-align: center`。"
 
   :adr/body
   "## 現在地（2026-08-04 実測、Brave 151 / CDP、corpus 313 case）
