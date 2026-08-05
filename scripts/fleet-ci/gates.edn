@@ -263,4 +263,30 @@
   ;; :cd true — この gate が green なら投影は健全なので west pin を前進させてよい。
   {:name "global-legislation-datoms" :gate :nbb-script
    :script "gates/legislation-corpus-check.cljs"
-   :include-ext [".edn"] :min-files 50 :cd true}]}
+   :include-ext [".edn"] :min-files 50 :cd true}
+
+  ;; ── 既存の GitHub Actions workflow をそのまま fleet で回す ──────────────
+  ;; オーナー指示（2026-08-05）「すでにある workflow をそのままで murakumo で
+  ;; 使えるように設計統合」。gate に書き直すのではなく `.github/workflows/*.yml`
+  ;; を読んで実行する（`gates/github_workflow_run.cljs`）。
+  ;;
+  ;; 実測 2026-08-05、workspace の実在 2,584 本に対して:
+  ;;   runnable 2,284 (88%) / unsupported 300 (12%) / unparsable 0
+  ;; 非対応の内訳は npm 229・npx 51・curl 40・cargo 34（ノードに外向き HTTPS が
+  ;; 無い）と、pages/artifact 系 action・GitHub 式言語。**skip して green には
+  ;; しない** — 受理できない workflow は実行せず理由付きで exit 1。
+  ;;
+  ;; `uses:` は 11,443 回中 11,136 回（97.3%）が 5 つに集中しており、いずれも
+  ;; fleet では前提が既に満たされている（checkout は tick が tree を配る、
+  ;; setup-* はノードが provision 済み、cache は ~/.m2 が永続）ので no-op にする。
+  ;; それ以外の action は no-op にせず workflow ごと拒否する。
+  ;;
+  ;; :include-ext に ".yml" が要る（workflow 本体）。対象 repo の内容次第で
+  ;; テストが読むファイルも要るので、repo ごとに足す。
+  ;;
+  ;; :cd false — workflow が green でも「その repo の CI が通った」以上の意味は
+  ;; 無く、pin を進める根拠には別途 fleet gate を置く方がよい。
+  {:name "cloud-itonami-assoc-0126-idn-gapki" :id "gh-workflow-assoc-gapki"
+   :gate :nbb-script
+   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows"]
+   :include-ext [".yml" ".edn" ".clj" ".cljc"] :min-files 5 :cd false}]}
