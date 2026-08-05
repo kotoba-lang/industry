@@ -969,3 +969,38 @@
           入れ子、adoption agency の複雑形、raw text 要素の端など未被覆の領域は残っている。"
  :in-flight ["inset-side の border（box model 1 箇所、全 bordered box が動く）—— agent 作業中"
              "list marker の位置 + 単位無し line-height の継承 —— agent 作業中"]}
+
+{:at "2026-08-05"
+ :iteration 47
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 341}
+ :line-structure {:agree 326 :total 328 :pct 99}
+ :geometry {:boxes-agree 1244 :boxes-total 1283 :pct 97 :clean-cases 321 :was "1241/1283, 318"}
+ :paint-order {:points-agree 8429 :points-total 8509 :pct 99 :clean-cases 319}
+ :computed-style {:values-agree 15678 :values-total 17949 :pct 87}
+ :landed {:cssom "5e0f263bf9e16118cc72fb8c7c73b80ad58d0150 — inset-side が border を含む（box model）"}
+ :note "**box-sizing は content 端を動かさない** —— 宣言された width/height が何を測るかを決めるだけで、
+        それは resolve-width / used-block-height が declared-inset-side 経由で既に正しく答えていた。
+        inset-side と content-inset が**両モードで** border を足すようになり、
+        二重計上していた (if border-box 0 (* 2 border)) 3 箇所を除去。実測 10 形（plain / border-box /
+        per-side padding / flex / grid / table cell / fieldset）で全て border + padding だけ内側にあり、
+        bordered なものは clientLeft が border と一致。"
+ :caught-regression "**:table/border-collapse が初回で 5/5 → 0/5 に落ちた。** collapsed cell は各罫線の
+                     半分だけを保持するが、列幅は『content + padding、border は決して含まない』自然幅に
+                     内側の半分を足していた。border がその幅に入った途端に二重計上し、Brave が 11 と言う
+                     セルが 15 になった。**外側**の半分を引く（同じ規則を訂正後の入力に対して適用）ことで
+                     5/5 に復帰、baseline と byte-identical。この時点の幾何は 3 case 改善しながら
+                     1241 → **1239** で、**総計だけ見ていれば出荷していた**。"
+ :per-case "4 case 変化・3 改善・0 退行。動いた box は全て oracle の値に着地
+            （fieldset の <p> は Brave (14.5, 38.891, 771) に完全一致、
+             absolute-containing-block は (25, 39, 200) に完全一致）。"
+ :tests-updated "4 test / 16 assertion が答えを変え、全て理由付きで書き直し。**4 つとも誤った値を固定していた** ——
+                 fieldset 系 3 つは自分のコメントに Brave の実値（14.5 / 771 / 6.891）を書きながら
+                 別の数を assert しており、input caret 系 3 つは 2 → 4（border 2 + padding 2。
+                 caret と placeholder が自分の box の border 1 つ外に描かれていた）。"
+ :remaining ["overflow の clip は border box で切っている（ブラウザは padding box）。実測済み・
+              **paint の変更**であり今回の layout 変更とは別物として clip 箇所に明記。corpus に採点対象なし。"
+             "grid コンテナ自身の高さは resolve-height のまま（bordered content-box grid で 60 vs Brave 86）。
+              既存の問題で、items は (13,13) = Brave に着地するようになった。"
+             "content-inset は依然 uniform padding を読む（per-side ではない）—— docstring に明記。"
+             "list marker + 単位無し line-height（agent 作業中）"]}
