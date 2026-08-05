@@ -859,7 +859,17 @@ CertGovernor）。
   `fleet-db`・`fleet-db-remote`・`fleet-ci`（fleet 状態）/ `yabai-passive-dns` /
   `tadori-threat-intel` / `toshokan-patents` / `repo-maturity`・`itonami-fleet-audit` /
   **`repo-taxonomy`**（repo の 3 面分類。ADR-2607289600。`:repo/path` で repo-maturity と、
-  `:company/lei` で market-intel / cloud-itonami-lei と join できる）。
+  `:company/lei` で market-intel / cloud-itonami-lei と join できる）/
+  **`internet-accounts`**（公開アカウント・ディレクトリ。ADR-2608059100。
+  `etzhayyim/global-accounts-datoms`）。
+  ⚠ **`internet-accounts` は catalog(20 directory) + coverage(2) + service(790) だけで、
+  account 行 174,592 件はこの面に載せない** —— account が join できる先は
+  `:account/service-host` → `:service/domain` だけで、その join は service さえ在れば
+  成立する。個人識別子を全 query の作業集合に常駐させない。account を引くなら
+  repo 側の `adapters/read_only.clj`（公開 query のみ）を通す。
+  `:service/domain` は yabai-passive-dns / tadori-threat-intel のドメイン文字列と join できる。
+  **`:service/source` を見ずに service を数えない** —— `:self-reported`（NodeInfo）と
+  `:observed`（PDS をアカウント側から数えたもの）は同じ列に見えて出所が違う。
   ```bash
   # 財務 × 法人実体 × ToS を 1 クエリで
   nbb --classpath ".:scripts/nbb_compat" manifest/edn-query.cljs q \
