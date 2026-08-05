@@ -1152,3 +1152,51 @@
  :in-flight ["UA stylesheet を cascade へ（ADR-2800003100 の option A）—— agent 作業中"
              "font metric hook（平均 advance / x-height）で相殺対を閉じる —— agent 作業中"
              "RTL の inline 配置 —— agent 作業中"]}
+
+{:at "2026-08-05"
+ :iteration 49
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 370 :was 357 :added 13}
+ :line-structure {:agree 356 :total 356 :pct 100}
+ :geometry {:boxes-agree 1328 :boxes-total 1335 :pct 99 :clean-cases 364 :of 370}
+ :paint-order {:points-agree 9196 :points-total 9234 :pct 100 :clean-cases 355}
+ :computed-style {:values-agree 16400 :values-total 18761 :pct 87}
+ :landed {:cssom "ac04cf0 — RTL の行配置と run 並べ替え（UAX #9 の line placement + rule L2、語単位）"}
+ :premise-overturned
+ "**私が brief に書いた水準も、前 agent が境界コメントに書いた理由も、実測で誤りだった。**
+  brief は『RTL コンテナ内の LTR markup を run 単位で右から左に並べる』を提案し、
+  前 agent は『行を右寄せすると <b> は対称性だけで Brave の 2px 以内に入るが**語順が誤ったまま**』
+  として line placement を見送っていた。22 形を実測した結果:
+
+    300px block / `alpha <b>beta</b> gamma`
+      ltr: 0 / 42 / 79.52     rtl: 185.48 / 227.48 / 265
+
+  **順序は同じで、全語が同じ量だけずれている**（その量は行の content 幅の余り）。
+  UAX #9 は strong-L だけの行を RTL 段落の中で『1 本の左→右 run を行の inline-end に置く』と
+  解決するので、**Brave はその行を並べ替えない**。非対称な 2 例目
+  （aa/bbbb/cccccc/d/ee）が『対称性による偶然の一致』でないことも示している。
+  本当に反転するのは RTL 文字自体（שלום עולם אבג は反転、שלום one two אבג は
+  Hebrew だけ反転して one two は順序保持、alpha שלום עולם beta を **ltr** block に置くと
+  Hebrew の対だけ入れ替わる）—— これも全て実測。"
+ :implemented "UAX #9 の**両方**の出力を語単位で: (1) line placement（inline-start/end と
+               direction 相対の text-align: start/end。8 組全て実測。justify は start に degrade =
+               RTL の justify 最終行が右端に来るという実測どおり）(2) rule L2 の run 並べ替え
+               （I1/I2 の level と N1/N2 の中立解決付き）。**片方だけでは偶然になる**ので両方。
+               機構は guard ではなく**構成上** strong RTL 文字が無ければ恒等（ltr 行は max level 0、
+               Latin 語だけの RTL 行は全て level 2 → 2 で反転し 1 で再反転）。"
+ :bug-found "**二重右シフト。** layout-text の box は最も広い行に shrink-wrap するので、
+             裸のテキスト子が layout-children-block の RTL 余白規則から見ると『狭い block』に見え、
+             右へ押されていた —— **正しい答えを誤った機構で得ており**、それが唯一の機構である間は
+             見えなかった。line placement が入った途端に <p direction: rtl>alpha beta</p> が
+             二重にずれて段落の外へ出た。実 CSS はそうした子を匿名 block box で包むので
+             その規則には置くものが無い。**修正しても軸の数値は 1 つも動かなかった**
+             （harness の padding: 0 では両者が偶然一致していた）—— だから scoreboard ではなく
+             draw-op diff を取った、と agent が明記。"
+ :not-implemented "語より下は未実装（文字単位の bidi class、数字の W 規則、明示的な埋め込み/上書き/isolate
+                   制御 U+202A–2069、unicode-bidi）。実測した代償はちょうど 1 形 ——
+                   語の内部で方向が混ざる語（שלוםabc）を Brave は語の中で分割するが、ここでは分割しない。
+                   その case は **pass するが『一致ではない』と case コメントに明記** ——
+                   oracle は複数 rect の語を top でまとめ直すので、ブラウザ側の bidi 分割 2 rect が
+                   1 entry に畳まれ、行軸には分割が見えないため。"
+ :per-case "既存 357 case の draw-op diff で**変化はちょうど 1 件**（:text/rtl-with-inline-elements）、
+            他は byte-identical。新規 13 case は 3 軸すべてで pass。"}
