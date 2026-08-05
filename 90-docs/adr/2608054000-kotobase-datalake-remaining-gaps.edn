@@ -13,6 +13,7 @@
   :adr/repos ["orgs/kotoba-lang/kotobase-lake"
               "orgs/kotoba-lang/columnar"
               "orgs/kotoba-lang/org-apache-parquet"
+              "orgs/kotoba-lang/org-apache-arrow"
               "orgs/kotoba-lang/org-ietf-csv"
               "orgs/kotoba-lang/json"
               "orgs/kotoba-lang/kotobase-storage"
@@ -23,6 +24,7 @@
   ["kotobase の datalake 面の現在地（2026-08-05 時点で何が着地し、何が着地していないか）"
    "残ギャップの優先順位と、それぞれ『なぜ今そこに無いか』の理由"
    "形式対応の現在の集合（:scan / :materialize の別と、拒否される codec / encoding の列挙）"
+   "columnar の seam が format 非依存であることの実測結果（P1 で確定）"
    "このセッションで発見した既存の検証基盤の欠損（本作業由来ではないもの）"]
 
   :adr/supersedes []
@@ -34,15 +36,17 @@
    "adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog（byte を datom 面に載せない境界）"
    "adr-260726-kotobase-query-plane-is-one-ref（join 到達範囲）"
    "adr-2608036600-network-awai-actions-dead-move-net-kotobase-ci-to-murakumo（この repo の CI が動かない件）"
-   "adr-2607299700-kotobase-scoped-cacao（互いに代用できる 2 つの capability は 1 つ）"]
+   "adr-2607299700-kotobase-scoped-cacao（互いに代用できる 2 つの capability は 1 つ — P1 で IByteSource に適用した）"]
 
   :adr/decision-summary
-  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet}, :materialize #{:csv :tsv :ndjson}}, :codecs {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :gaps {:p1 :arrow-ipc, :p2 :write-side, :p3 :transport-retirement, :p4 :verification-infra}, :ceiling-4mib :bypassable-not-removed}"
+  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed}, :refused-by-name #{:lz4-frame :zstd}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :gaps {:p2 :write-side, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
 
   :adr/verify
-  ["west pin: columnar b0862f6d / kotobase-lake 06d658a0 / org-apache-parquet 1d00afc7 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
+  ["west pin: columnar d89813a3 / org-apache-arrow fdce2c3b / org-apache-parquet 06df9fdd / kotobase-lake 06d658a0 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
+   "org-apache-arrow CI 全 step success（JVM 22 tests/71 assertions・nbb 17/52・cljs.main compiled・clj-kondo 0 warnings・fixtures still match the reference writer）"
+   "org-apache-parquet CI 全 step success（17 tests/103 assertions 無変更で通過 = columnar.bytes re-export が透過であることの証拠）"
+   "columnar CI 全 step success（10 tests/52 assertions）"
    "nbb scripts/fleet-ci/gates/net-kotobase-hermetic-check.cljs <tree>   ; => E object-grant: Ran 16 tests, rc=0"
-   "各 repo の CI: kotobase-lake / columnar / org-apache-parquet / org-ietf-csv / json いずれも全 step success"
    "net-kotobase の GitHub Actions は job を起動しない（ADR-2608036600）。実際に走る gate は murakumo fleet の check A-E のみ"]
 
   :adr/body
@@ -62,8 +66,9 @@
 | repo | 内容 |
 |---|---|
 | `kotobase-lake` | catalog（format 非依存の admit / sniff / reader）、tabular（生ファイルへの `IPatternSource`）、acquire（認可ゲート）、**table**（N ファイル = 1 論理テーブル、manifest、partition 枝刈り）、columnar 接合 |
-| `columnar` | ベクトル化実行コア、統計による枝刈り、footer だけで答える集約 |
+| `columnar` | ベクトル化実行コア、統計による枝刈り、footer だけで答える集約、**`columnar.bytes`**（range 読みの seam。P1 で parquet から昇格） |
 | `org-apache-parquet` | thrift compact / footer / **range read** / PLAIN / dictionary / snappy / gzip |
+| `org-apache-arrow` | **FlatBuffers / footer / block / encapsulated message / record batch / 平坦型の buffer 復号**（P1 で着地） |
 | `org-ietf-csv` | RFC 4180（CSV / TSV） |
 | `kotoba-lang/json` | `json.lines`（NDJSON） |
 | `net-kotobase` | **presigned grant endpoints**（`POST /objects/v1/grant/<op>`、`/settle`） |
@@ -90,25 +95,73 @@
    これは答えでは示せない（URL を作った上での拒否も同じステータスを返す）ので、
    記録する fake port で assert している。
 
+## P1 は着地した — seam は曲がらなかった（2026-08-05）
+
+`kotoba-lang/org-apache-arrow` として Arrow IPC reader が着地し、**`columnar` は
+一行も変わらずに 2 つ目の `:scan` 形式を受けた**。これで「seam が Parquet の形を
+していない」は**主張から実測に変わった**。
+
+Arrow IPC を選んだ理由は当初のまま有効だった: メタデータが FlatBuffers（thrift compact
+とは別系統）でありながらデータ層は Parquet より単純（既定で無圧縮・encoding 層なし・
+validity bitmap + values buffer）なので、seam を曲げる圧力が**別の方向から**かかる。
+
+### 分かったこと
+
+1. **Arrow は列統計を持たない。** batch ごとの `length` と field ごとの `null_count`
+   だけで、min/max は記録されない。これは本 reader の欠落ではなく形式の性質である。
+2. **その差は protocol ではなく『報告する内容』に出た。** `columnar.source` は既に
+   「境界を報告しない = 主張しない」と書いており、`columnar.stats` は規則 1 として
+   「統計が無ければ絶対に飛ばさない」と書いていた。**どちらも、それを行使する形式が
+   現れる前に書かれていた。** 結果:
+
+   - `count` / `count-non-null` は `{:from :statistics :read 0}` のまま
+     （Arrow は batch metadata と `FieldNode.null_count` を持つ）
+   - `min` / `max` は scan に落ちる（Parquet なら `:read 0` で返る）
+   - 枝刈りできるのは **all-null chunk だけ**（`null_count == length` は証明）
+
+   **記録の少ない形式は、特別扱いを生やすのではなく、報告を減らすことで刺さる。**
+   この差は隠れずに `:from` / `:read` に出る。
+3. **動いたものが 1 つだけある — `IByteSource`。** range 読みの seam は
+   `parquet.bytes` に住んでいた（当時 Parquet が唯一の利用者だったため）。2 つ目の
+   形式が同一の protocol を要求した時点でそれは private な詳細ではなく**重複**に
+   なったので、`columnar.bytes` へ昇格した（`IColumnSource` の隣 — 同じ seam の
+   もう半分）。根拠は ADR-2607299700『互いに代用できる 2 つの capability は 1 つ』。
+   `parquet.bytes` は re-export として残したので既存の呼び手は無改修で動く
+   （`reify parquet.bytes/IByteSource` を含む）。**証拠は parquet の 17 tests /
+   103 assertions が一行も変えずに通ること**であって、透過だという主張ではない。
+4. **catalog は既に Arrow を分類していた。** `kotobase.lake.sniff` は reader が存在
+   する前から `ARROW1` magic と `application/vnd.apache.arrow.file` を持っていた —
+   admission が parse しないので当然そうなる（背骨 1 の帰結）。欠けていたのは
+   reader だけだった。
+5. **『metadata は復号できない buffer を生き延びる』は Arrow でも成り立つ。** body
+   compression は buffer の性質で metadata には掛からないので、zstd ファイルでも
+   `count` / `count-non-null` / all-null 枝刈りは message header だけで答えられ、
+   `-read-column` は codec を名指しで拒否する。Parquet の『統計は復号できない
+   encoding のファイルでも読める』と同じ性質で、`compressed.arrow` がその唯一の証人。
+
+### 実装上の注意（次に触る人向け）
+
+- **fixture も期待値も pyarrow が書く。** `ground-truth.edn` は fixture を書いたのと
+  同じ script が同じ実行で吐く。手で転記した期待値は、どちらかを再生成した瞬間に
+  ずれる。fixture の表は `org-apache-parquet` と**同一の 9 行 4 列 3 batch**にして
+  あるので、両 reader は互いに依存せずに比較可能。
+- **int64 は『正確か、さもなくば拒否』。** `Math/pow` での積み上げは 64bit 値の上位
+  2 バイトを double 精度の外に出し、**JVM でも**黙って丸めた答えを返す。cljs 側は
+  表現できない大きさを丸めずに投げる。fixture は `2^62+1` と負の int64 を持つ。
+- **FlatBuffers の vtable offset は符号付きで『引く』。** 他の全 offset は符号なしで
+  『足す』。writer が vtable を共有すると soffset が負になり、足す実装はそこで初めて
+  壊れる（それまでの全 buffer では動く）。
+
 ## 残りのギャップ
 
-### P1. Arrow IPC — seam の一般性がまだ証明されていない
-
-`IColumnSource` に差さっている `:scan` 形式は **Parquet ただ 1 つ**。2 つ目が無いので、
-seam が Parquet の形をしていないことは**主張であって証明ではない**。
-
-Arrow IPC が適任なのは、メタデータが FlatBuffers（thrift compact とは別系統）でありながら
-**データ層は Parquet より単純**だから（既定で無圧縮、encoding 無し、validity bitmap +
-values buffer が offset 付きに並ぶだけ）。つまり seam を曲げる圧力が Parquet と違う方向から
-かかる。
-
-**コスト**: FlatBuffers リーダ（vtable ナビゲーション）が本体。fixture は pyarrow の
-`pa.ipc.new_file` で生成できる。
+**次は P2（書き込み側）。** P1 を先にしたのは、seam の一般性が証明されないまま
+書き込み側を設計すると Parquet の形に引きずられた writer ができるためで、その理由は
+上記のとおり解消した。
 
 ### P2. 書き込み側が丸ごと無い
 
-- **writer が無い。** lake は不透明バイトを着地させられるだけで、Parquet を書けない →
-  「このクエリをテーブルに実体化」ができない
+- **writer が無い。** lake は不透明バイトを着地させられるだけで、Parquet も Arrow も
+  書けない →「このクエリをテーブルに実体化」ができない
 - **スキーマ進化**（列の追加 / 改名 / 型変更をファイル間で吸収）
 - **テーブルのスナップショット / time travel。** datom 面には有るが**ファイル集合には無い**
   （「時刻 T のテーブル」が言えない）。Iceberg が manifest list で持っている層
@@ -124,7 +177,8 @@ values buffer が offset 付きに並ぶだけ）。つまり seam を曲げる�
 
 - **旧 `PUT /ipfs/:cid` の 4 MiB 天井はそのまま live**（意図的に無傷にした。public gateway に
   依存しているものを同日に壊さないため）。**畳む判断が別途要る**
-- **`GET /ipfs/:cid` は未認証 public gateway のまま**（ADR-2608012600 Context 4）
+- **`GET /ipfs/:cid` は未認証 public gateway のまま**（ADR-2608012600 Context 4）。
+  **これはセキュリティ課題なので他の優先順位と切り離してよい**
 - **server-side digest verify（D5）が未実測**。`settle` は常に `:client-attested` /
   `:stored` を返し、`:verified` に到達する経路が無い。`crypto.DigestStream` の
   サイズ別実測が合格条件だが、まだ測っていない
@@ -136,25 +190,30 @@ values buffer が offset 付きに並ぶだけ）。つまり seam を曲げる�
 
 ### P4. 検証基盤の既存欠損（本作業由来ではない、しかしこの面を守るもの）
 
-このセッションで発見し、**私の変更より前から存在した**ことを実測で確認したもの:
+**発見時（2026-08-05）に、私の変更より前から存在したことを実測で確認したもの。**
+どれも『直す前に、誰が何を決めるか』が要る — 技術的な難度ではなく決定の所在で
+止まっている:
 
 - **`net-kotobase` の murakumo fleet gate check C が赤**。`runbook-check.cljc` が
   `docs/MURAKUMO-CI.md` に期待するテキストを『Murakumo Cloud Actions への移行』commit が
-  削除している。私の merge 前の `981d1c68` に対して gate を走らせて確認済み。
+  削除している。merge 前の `981d1c68` に対して gate を走らせて確認済み。
   **runbook が今何と書くべきかを決めるのは別の判断**なので直していない
 - **`clojure -M:render-components` が pristine な main で失敗**（`unclassified provider
   source`）。component 成果物を再生成できない
 - **network-awai の GitHub Actions は job を起動しない**（ADR-2608036600）。したがって
-  `api-gateway.yml` に足した step は今日は発火せず、**実際に走る gate は murakumo fleet の
-  check A-E だけ**
+  `api-gateway.yml` に足した step は発火せず、**実際に走る gate は murakumo fleet の
+  check A-E だけ**。⚠ **これは network-awai org の問題であって全 org ではない** —
+  kotoba-lang org の Actions は正常に動く（columnar / org-apache-parquet /
+  org-apache-arrow とも全 step success を実測、2026-08-05）
 - コミット済みの Worker バンドルが main のソースより古かった（同一ソースの 2 回ビルドが
   byte 一致することを確認して、ビルドの非決定性ではないと確定させた上での判定）
 
 ### P5. クエリ到達範囲
 
 - **join 到達範囲は依然 ref 1 本**（ADR-260726）。catalog を跨ぐ分析はその制約下にある
-- lake の catalog datom と Parquet の行が join できるのは、**同じ source に materialize
-  した時だけ**。`kotobase.lake.columnar` がその接合だが、跨ぐ計画は planner が持っていない
+- lake の catalog datom と Parquet / Arrow の行が join できるのは、**同じ source に
+  materialize した時だけ**。`kotobase.lake.columnar` がその接合だが、跨ぐ計画は
+  planner が持っていない
 
 ## 対応形式の現在地
 
@@ -163,8 +222,17 @@ values buffer が offset 付きに並ぶだけ）。つまり seam を曲げる�
   Parquet
     codec:    UNCOMPRESSED / SNAPPY / GZIP
     encoding: PLAIN / PLAIN_DICTIONARY / RLE_DICTIONARY
+    統計:     min / max / null_count / rows（footer）
     拒否（名指し）: zstd / brotli / lz4 / lzo / lz4-raw、
                     delta 系、byte-stream-split、v2 data page、nested(repeated)
+  Arrow IPC
+    型:       int8..int64 / uint8..uint64 / float32 / float64 / bool /
+              utf8 / large_utf8 / binary / large_binary / null
+    統計:     rows（batch）/ null_count（field node）のみ — **min/max は形式が持たない**
+    拒否（名指し）: body compression（lz4_frame / zstd）、dictionary encoding、
+                    nested（list / struct / map / union / fixed_size_list /
+                    run-end-encoded / view 型）、decimal / date / time /
+                    timestamp / interval / duration
 
 :materialize（全読み）
   CSV / TSV（RFC 4180）
@@ -175,29 +243,36 @@ values buffer が offset 付きに並ぶだけ）。つまり seam を曲げる�
 依存（CSV は引用の外、NDJSON は文字列の外でだけ境界）なので、N 番目のレコードへ seek する
 には手前を全部読むしかない。
 
+**Arrow が Parquet より枝刈りできないのも形式の性質**であって欠落ではない。ただし
+こちらは『形式が統計を持たない』という差なので、writer 側（P2）が Arrow を書くように
+なった時に**外部統計を別に持つか**という設計判断として戻ってくる。
+
 ## Decision
 
-**残りは上記 P1-P5 の順で扱う。** ただし順序は硬直させない:
+**残りは P2 → P3 → P4 → P5 の順で扱う。** ただし順序は硬直させない:
 
-- **P1 Arrow IPC** を先にするのは、seam の一般性が証明されないまま P2 の書き込み側を
-  設計すると、Parquet の形に引きずられた writer ができるため
-- **P3 transport** は独立に進められる（形式と無関係）。特に **`GET /ipfs/:cid` の未認証**は
-  セキュリティ課題なので、他の優先順位と切り離してよい
-- **P4 は『直す前に、誰が何を決めるか』が要る**もの（runbook の内容、component catalog の
-  分類規則）なので、技術的な難度ではなく決定の所在で止まっている
+- **P3 の `GET /ipfs/:cid` 未認証**はセキュリティ課題なので、他の優先順位と切り離して
+  よい（形式と無関係に独立して進められる）
+- **P4 は決定の所在で止まっている**もの（runbook の内容、component catalog の分類規則）
+  なので、着手には技術以外の入力が要る
 
 ## Consequences
 
 - **『lake を名乗れる』は名乗れる側に来た**が、Iceberg 相当ではない —
   スナップショット・スキーマ進化・コンパクションが無い（P2）
+- **seam の format 非依存は実測済みになった。** 3 つ目の `:scan` 形式（ORC 等）を足す
+  コストは、その形式の byte 文法だけになる — `columnar` 側の設計余地はもう問われない
+- **`columnar.bytes` が range 読みの正本。** 新しい format library は
+  `parquet.bytes` ではなくこちらを require する（後者は re-export として残るだけ）
 - **4 MiB 天井は『迂回路ができた』であって『撤去した』ではない**。旧経路は live で、
   それを畳むまでは 2 つの書き込み面が並存する
 - **`:verified` 状態は到達不能**。D5 の実測が入るまで、あらゆる object は
   `:stored` + `:client-attested` で止まる。読み手（git-lfs / git-annex）は自分で再 hash
   するので信頼モデルは壊れないが、**`:verified` と書いてあるのに検証していない**状態には
   ならないことが担保の全て
-- **この面を守る gate は murakumo fleet の check E ただ 1 つ**（16 tests）。GitHub Actions
-  側の step は org の Actions が復旧するまで飾りである
+- **net-kotobase 面を守る gate は murakumo fleet の check E ただ 1 つ**（16 tests）。
+  GitHub Actions 側の step は network-awai org の Actions が復旧するまで飾りである
+  （kotoba-lang org 側は正常なので、format library 群は CI に守られている）
 
 ## 付記 — 退避した他セッションの成果物
 
