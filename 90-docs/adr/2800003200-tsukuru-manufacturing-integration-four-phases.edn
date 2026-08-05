@@ -251,7 +251,36 @@ murakumo fleet gate（`scripts/fleet-ci/gates.edn`）に足す場合は、ノー
 
 ## 現在の実装状況（2026-08-05 時点）
 
-**Phase 1 = landed。Phase 2 = コードは landed、live 検証は blocked。Phase 3-4 = 未着手。**
+**Phase 1 = landed。Phase 2 = コードは landed、live 検証は blocked。Phase 3 = landed。Phase 4 = 未着手。**
+
+### Phase 3 — landed（`cloud-itonami/tsukuru-actor` `9d70992`）
+
+`tsukuru.manufacturability` が `cae.solver/solve` と `cae.vv/qualification-gate` を
+**両方**回す。ソルバも相関式も新しい数値も足していない。
+
+- **数字が出ることと、その模型がその問いに適合していることは別。** V&V の 5 カテゴリ
+  （`:analytic-benchmark` `:conservation` `:iterative-convergence` `:grid-convergence`
+  `:traceability`）のどれか 1 つでも証拠が欠ければ `:not-qualified`。証拠は operator
+  input で、この repo は check を捏造せず・既定で passing にせず・証拠の不在を clean と
+  扱わない（`cae-solver` 自身の契約
+  『Missing V&V evidence defaults to not qualified』のとおり）。
+- **gate は片方向にだけ効く。** not-qualified は order を止めて人に聞く根拠になり、
+  qualified は dispatch の根拠にならない。hard check（G1 / G14 / G16）は通過した
+  応力計算に一切影響されない —— `complianceState pending` の order は qualified でも
+  hold のまま、をテストで固定した。
+- **宣言の無い order は「評価していない」であって「落ちた」ではない。** 台帳には
+  `:not-assessed` / `:verified-for-declared-scope` / `:not-qualified` を毎回区別して
+  書く（何も検査していない order が、通った order と同じに読めてはいけない）。
+
+**完了条件を満たした**: 実 case で `:cfd` と `:fem` の両方を回し、**qualified と
+not-qualified の両方が実際に出た**。証拠ブロックを外すと**数値は出たまま**
+not-qualified になる —— それがそのまま「数値は gate ではない」ことの実演になっている。
+45 tests / 682 assertions green（Phase 3 で新規 10）。worker.js は 0 warnings で
+400 KB にビルドされ deploy 済み（Phase 2 と同じく seed 不在のため 503 fail-closed）。
+
+**Phase 3 が今できないこと**（実装ではなく scope の話）: 幾何そのものは触らない。
+CAD ファイルの取り込み・製造性チェック・ツールパス生成は Phase 4 の custody 面
+（DataLad）が無いと成立しないので、ここでは「発注前に物理量で殴れるか」だけを入れた。
 
 ### Phase 2 — 何が landed し、何が止まっているか
 
