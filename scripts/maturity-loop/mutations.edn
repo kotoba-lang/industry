@@ -58,7 +58,14 @@
      :file "src/prolly_tree/core.cljc"
      :find "            \"internal\" (when (some? more)\n                         (recur (descend-cid (get node \"children\") k) more))"
      :replace "            \"internal\" (when (some? more)\n                         (recur (or (some (fn [c]\n                                            (when (= (ipld/cid (first more)) (child-cid c))\n                                              (child-cid c)))\n                                          (get node \"children\"))\n                                    \"no-such-child\")\n                                more))"
-     :must-fail ["a-shadow-path-to-a-second-copy-of-the-key-is-refused"]}]}
+     :must-fail ["a-shadow-path-to-a-second-copy-of-the-key-is-refused"]}
+
+    {:id :prolly/path-ends-at-the-leaf
+     :why "leaf に着いたらパスが終わっていること —— 余分なブロックを黙って無視する verifier は、提出されたものと検証したものが違う"
+     :file "src/prolly_tree/core.cljc"
+     :find "            \"leaf\" (when (nil? more)"
+     :replace "            \"leaf\" (when true"
+     :must-fail ["a-truncated-or-padded-path-is-refused"]}]}
 
   {:repo "orgs/kotoba-lang/inga"
    :label "inga two-root state + metered emission"
