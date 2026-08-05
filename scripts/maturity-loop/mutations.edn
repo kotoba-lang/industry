@@ -100,7 +100,14 @@
      :file "src/inga/state.cljc"
      :find "      (if-not emit-fn\n        state'\n        (update state' :db #(reduce apply-datom-op % (emit-fn o prev next))))"
      :replace "      state'"
-     :must-fail ["emission-is-deterministic-or-replicas-split"]}]}
+     :must-fail ["emission-is-deterministic-or-replicas-split"]}
+
+    {:id :inga/hydrate-returns-both-roots
+     :why "cold reader が CID だけから両方の根を受け取ること —— actor を黙って落とす hydrate は、例外ではなく「actor が 0 件の state」を返すので呼び手から見て正常に見える"
+     :file "src/inga/state.cljc"
+     :find "       #?(:clj {:db (arr/restore get-fn datoms-cid decrypt-fn)\n                :actors actors :prev prev}"
+     :replace "       #?(:clj {:db (arr/restore get-fn datoms-cid decrypt-fn)\n                :actors {} :prev prev}"
+     :must-fail ["a-cold-reader-with-only-the-cid-gets-both-halves"]}]}
 
   {:repo "orgs/kotoba-lang/codebase"
    :label "codebase portable evaluation"
