@@ -441,5 +441,38 @@
   :task/repo "kotoba-lang/torihiki-terminal"
   :task/requires []
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "オーナー指示（2026-08-04）の積み残し。jp-go-dds.dark は実装済みで page に :dark? true を渡すだけ。view.cljc が kotoba-ui の app-shell/nav-bar/panel/grid/stack/->page に依存しており、jp-go-dds 側の対応物は dds-ext-*（container/section/grid/stack/card/hero）だけなので view.cljc 全体の書き換えになる。**チャートは --hig-* 参照なので skin 非依存で、この作業の影響を受けない。** 着地前に script/verify.cljs と script/verify_chart.cljs の両方を本番に対して通すこと。"}]
+  :task/status :completed
+  :task/status-note "**完了。本番 https://torihiki.pages.dev が DADS skin で出ており、verify.cljs / verify_chart.cljs の両方を本番に対して通した。**
+
+  ## 起票時の見立て（view.cljc 全体の書き換え）は採らなかった —— 証拠が反対だった
+
+  `jp-go-dds.tokens/hig->dads` が写すのは**色とフォントだけ**で、spacing も radius も 11 の text size も写さない。これは漏れではなく、DADS 側に写す先の scale が無いため（bridge の規則は「対応は必ず `var(--dads-primitive)`」で、値を書くことを禁じている）。
+
+  つまり **bridge は構造側の契約を既に定義しているページの上に重ねる設計**で、`kotoba-ui.theme` がそれを定義している。page builder ごと差し替えると `--hig-spacing-*` / `--hig-radius-*` が未定義になり、**未定義の custom property は fallback せず宣言ごと無効になる**ので layout が静かに崩れる。
+
+  なので app は `kotoba-ui.core` を require したまま（agent-guide 規則 1）で、載せ替えは skin として実現した: **ページ上の色と書体は全てデジタル庁、幾何は HIG**。accent だけ bridge から除外（`brand-tokens`）—— そのまま当てると端末の teal `#3DD8B6` がデジタル庁の key blue になる。統一が目的の government design system としては正しい既定だが、政府サイトでない製品には正しくない。
+
+  ## dark は forced（jp-go-dds 4324cc7 に `forced-dark-css` を追加）
+
+  `dark-css` は `@media (prefers-color-scheme: dark)` と `[data-theme]` で利用者に選ばせるが、`kotoba-ui.shell/page` は `<html>` に `data-appearance` を張るので **どちらの selector も一度も一致しない** —— light な OS の訪問者に「dark layout の下に DADS light primitive」が出て、エラーはどこにも出ない。第 3 の場合（製品が既に dark と決めている）向けの無条件版を上流に足した。
+
+  ## 3 つの token は今日すでに解決していなかった
+
+  `--hig-label-secondary` / `--hig-color-accent` / `--hig-radius-1` は `shitsuke.hig` が一度も出したことのない名前（正しくは `--hig-color-secondary-label` / `--hig-color-tint` / `--hig-radius-xs`）。**dim なテキストは dim ではなく、有効な flag chip に outline は無く、板の行は角丸でなかった。3 つとも design 上の選択に見えていた。**
+
+  skin を当てるにあたって「どの token が生き延びる必要があるか」を `jp-go-dds.tokens/bridged?` で全部当たった副産物として見つかった —— 載せ替えの調査が既存のバグを 3 件出した。
+
+  ## 次のを build に見つけさせる
+
+  `script/build.clj` の `check-tokens!` が、定義の無い `--hig-*` を fallback 無しで参照していたら build を落とす。既知の上流欠陥（`kotoba-ui/product.cljc` の `--hig-color-accent` / `--hig-radius-large`。この page は該当 class を使わないので無害）は**名前と理由付きで**列挙する —— 一括で無効化されないように。元の 3 token のうち 1 つを戻すと実際に落ちることを確認済み。
+
+  ## 検証
+
+  - design-quality audit（決定論、HIG/WCAG）: **100.00 / min 95 PASS**
+  - `nbb script/verify.cljs`（実ブラウザ、本番）: **pass** —— faucet で collateral $0 → $100,000、post-only chip の `data-tk-on` が立ち、BUY が nonce 3 まで進んだ
+  - `nbb script/verify_chart.cljs`（同）: **pass** —— chart panel が svg を出すか理由を述べ、焼いた hex 色は無し
+  - 本番 HTML 実測: DADS dark primitive あり、3 token とも解決、accent は `#3DD8B6` のまま
+
+  ## 残り
+
+  上流 `kotoba-ui/product.cljc` の 2 token（`--hig-color-accent` / `--hig-radius-large`）は未修正。この page では該当 class を使わないので無害だが、`.kotoba-product__*` を使うページでは metric カードの角丸と accent が落ちているはず。別 repo なのでこの周では触らず、guard の allowlist に名前で残した。"}]
