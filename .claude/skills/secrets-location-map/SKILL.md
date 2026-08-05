@@ -151,9 +151,29 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
       で通る**（`POST /accounts/{acc}/pages/projects/{proj}/domains` が success）。
       ただし **DNS レコードは自動作成されず** `status: pending` のまま残る。
       つまり詰まるのは「DNS レコードを 1 本作る」ところだけ。
-    - **オーナー作業**: ダッシュボードで足すか、`Zone.DNS: Edit` を持つ API token を
-      発行して kagi/Keychain に保管し、ここを更新する。実例（ADR-2608057000）:
-      `CNAME cloud-itonami → cloud-itonami.pages.dev (proxied)`。
+    - ✅ **2026-08-05 解消: オーナーが Global API Key を提供し、kagi に保管した。**
+      下記 `CLOUDFLARE_GLOBAL_API_KEY` で DNS の読み書きができる（実測: この鍵で
+      `CNAME cloud-itonami → cloud-itonami.pages.dev (proxied)` を作成、ADR-2608057000）。
+    - **より良い形（未実施）**: Global Key はアカウント全体・全ゾーンに効き**スコープを
+      絞れない**。`Zone.DNS: Edit` だけの token を発行して差し替えるべき。
+
+- **Cloudflare の実キー（kagi、compartment `personal`、`KAGI_HOME=$HOME/.kagi`）**
+  — 2026-08-05 にオーナーが提供、kagi へ保管（読み戻し・実 API 呼び出しまで検証済み）:
+  - **`CLOUDFLARE_GLOBAL_API_KEY`** — JSON（`email` / `global-api-key` / `account-id`）。
+    **アカウント全体・全ゾーン、スコープを絞れない最強の資格情報。** 使うときは
+    `X-Auth-Email` + `X-Auth-Key` ヘッダ（Bearer ではない）。DNS 編集はこれで通る。
+  - **`CLOUDFLARE_API_TOKEN_AI_GFTD_CDN`** — bucket `ai-gftd-cdn` 用の API token。
+  - **`CLOUDFLARE_R2_ACCESS_KEY`** — JSON（`access-key-id` / `secret-access-key` /
+    `endpoint` / `bucket`）。S3 互換の R2 アクセス。
+  - **`CLOUDFLARE_R2_ACCOUNT_TOKEN`** — R2 Account Token。
+  - **`CLAUDE_API_KEY_GFTDCOJP`** — Anthropic API キー（Cloudflare とは無関係だが
+    同時に提供されたのでここに置いた）。
+  - ⚠ **これら 5 件は 2026-08-05 の会話ログに平文で露出している。ローテーション必須。**
+    ローテーション後はこの項目の値だけ差し替えればよい（item 名は変えない）。
+  - **1Password には未登録** — `op` の CLI 統合がオフで、`op whoami` が
+    `account is not signed in`、`op read` は無応答のままタイムアウトする。
+    1Password アプリの 設定 → 開発者 → 「1Password CLI と連携」を有効にすれば
+    非対話で書けるようになる。有効化したら登録してこの行を更新する。
   - **kotobase-protocols-worker `WRITE_TOKEN`**（s3/atproto/git.kotobase.net の
     write 認可 Bearer、ADR-2607174500）: Worker secret として投入済み。operator
     copy は macOS Keychain `service=cf:kotobase-protocols-worker` /
