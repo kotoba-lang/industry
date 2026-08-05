@@ -2398,3 +2398,121 @@
   about. It asserted that padding: 10% stays unexpanded, on reasoning its
   own comment had already retired for `auto`. Landed separately in htmldom
   (7b14d8c)."}
+
+{:seq 57
+ :date "2026-08-06"
+ :repos {"kotoba-lang/cssom" "f1c0db4147b3c9587af47ac70d87ab0842702475"
+         "kotoba-lang/browser" "dec920be905410493ace75cf923bbf5954e5fbb7"}
+ :title "replaced-element default sizing: intrinsic sizes, atomic inline-ness, and the form-control UA boxes"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 576}
+ :measured
+ {:line-structure {:before "540/551" :after "541/551"}
+  :geometry {:before "1870/1959 (95%)" :after "1892/1959 (97%)"
+             :clean-cases {:before "524/576" :after "535/576"}}
+  :paint-order {:before "14207/14389" :after "14285/14389"
+                :clean-cases {:before "542/576" :after "550/576"}}
+  :computed-style {:before "27525/27544" :after "27539/27544"
+                   :clean-cases {:before "570/576" :after "573/576"}
+                   :residual {:cascade 4 :ua-default 1}}}
+ :verified-on-merged-main
+ {:cssom-tests "865 tests / 2060 assertions, 0 failures (828/1918 at round start)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "178/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :per-case-deltas
+ "12 cases changed, 0 regressions in either direction (--dump-ops
+  corpus-wide). Now exact: replaced/canvas-default-size,
+  canvas-attributes-size-it, canvas-in-a-sentence, iframe-default-size,
+  video-default-size, svg-without-attributes-is-300x150,
+  form/progress-default-box, meter-default-box, input-range-default-box,
+  input-color-default-box, and -- UNPLANNED -- inline/vertical-align-length,
+  a pre-existing failure the length vertical-align closed for free.
+  input-file-default-box improved partially. Nothing else moved a box."
+ :what-the-browser-said
+ [{:topic "300x150 is an INTRINSIC size, not a UA `width` rule"
+   :measured "<canvas style='width:50%'> in a 400px block is 200x100, NOT
+              200x150 -- a stylesheet pair would leave the height. And
+              <canvas style='display:block'> in a 100px block is 300 wide
+              and OVERFLOWS (CSS 2.1 10.3.4 vs 10.3.3), which no stylesheet
+              rule can express. Font-independent at 8/14/28px."}
+  {:topic "<canvas> and <video> are 300x150 FOR DIFFERENT REASONS"
+   :measured "width:200px -> canvas 200x100, video 200x150; height:60px ->
+              120x60 vs 300x60; max-width:100px -> 100x50 vs 100x150. A
+              canvas's BITMAP is its attributes (default 300/150) so it has
+              a RATIO; video/svg/iframe have none and each axis defaults
+              independently."}
+  {:topic "attributes are HINTS on four tags, an INTRINSIC SIZE on the fifth"
+   :measured "width=80 height=40 + CSS width:200px -> 200x40 for
+              img/video/iframe/svg, 200x100 for canvas."}
+  {:topic "atomic inline-ness is separate from size"
+   :measured "`before <canvas w=20 h=10> after` is ONE 20px line, canvas at
+              x=49 y=4 on the baseline; the engine made two lines."}
+  {:topic "iframe's 304x154 is ONE declaration"
+   :measured "border: 2px inset. border:0 gives exactly 300x150, and
+              box-sizing:border-box still gives 304x154 -- so the default
+              is a CONTENT size."}
+  {:topic "<progress>/<meter> are em, not constants"
+   :measured "80x8 / 140x14 / 280x28 and 40x8 / 70x14 / 140x28 at font-size
+              8/14/28 = 10em x 1em and 5em x 1em; the 2.797px below the
+              baseline is vertical-align: -0.2em (5.594 at 28px, unchanged
+              at line-height 10 and 40)."}
+  {:topic "range/color/file are widgets, and their BASELINES are three different rules"
+   :measured "129x16 margin:2px, 50x27 border-box 1px border, ...x27.
+              Separated by overriding the height: range's baseline is its
+              bottom BORDER edge (verified with margin-bottom:20px, which
+              does not move it), color's is 6px up from the bottom and
+              MOVES with the height, file's is 18px from the TOP and does
+              not."}]
+ :scope-line
+ {:what "the intrinsic-RATIO half is genuinely unavailable, and it was
+         VERIFIED rather than assumed"
+  :evidence "cssom.layout emits four ops (:node/:rect/:text/:clip) -- there
+             is no image op -- and dom-gpu has no drawImage path anywhere.
+             No loader, no decoder."
+  :remaining ":replaced/img-width-only-keeps-the-ratio is still 200x0 vs
+              200x100."
+  :what-a-fix-needs "a host (fn [src] {:w .. :h ..}) on the theme, the same
+                     shape as :measure-text; replaced-intrinsic-size is
+                     where it would arrive, and everything below it already
+                     solves both axes from a ratio."
+  :why-this-is-a-RESOURCE-finding
+  "two measurements make it one: with attributes both sides ALREADY AGREE
+   at 200x20, and a bare <img> and a 404ing <img> are BOTH 0x0 in Brave --
+   which is why <img> is excluded from the 300x150 default."}
+ :scope-cuts
+ [{:what "input[type=file]'s width"
+   :measured "Brave 253; shadow button 87.141 + 'No file chosen' 84.484 =
+              171.625, 81 SHORT, plus a reserved filename column -- and
+              both strings are en-US, so a hard-coded 253 WOULD ENCODE THIS
+              MACHINE'S UI LANGUAGE. The height 27 is a rule and IS
+              implemented."}
+  {:what "<object>" :measured "bare it IS 300x150, but <object>fallback
+          </object> renders the fallback -- only replaced WITH a resource."}
+  {:what "<embed> with no src" :measured "NO BOX AT ALL."}
+  {:what "<audio>" :measured "display:none without controls, 300x54 with."}
+  {:what "<svg viewBox>" :measured "ratio without size -- Blink fills the
+          container: 400x200 in a 400px block."}
+  {:what "SVG children" :measured "a browser reports each child's SVG bbox;
+          this engine now reports NONE, which is closer than the CSS block
+          boxes it used to invent."}]
+ :costs-reported-not-buried
+ [{:what "input[type=file] now measures 145 where it measured 153"
+   :note "FURTHER from Brave's 253 -- but 153 was a text field's 20 chars
+          plus padding Brave says isn't there. The div's box now agrees;
+          only the width does not."}
+  {:what ":form/progress-default-box loses exactly 1 paint sample of 14389"
+   :note "engine y=2.8 vs Brave's 2.796875 -- 0.2 x 14 with and without
+          Blink's 1/64 LayoutUnit flooring. Emulating LayoutUnit
+          quantization engine-wide is a much larger change; the geometry
+          axis passes."}]
+ :deliberate-non-admission
+ "vertical-align: <length> deliberately does NOT admit % (which resolves
+  against line-height) -- :inline/vertical-align-percentage stays open. The
+  string form matches `px` WHOLE rather than going through parse-dbl, which
+  would have read an unresolved -0.2em as -0.2px on ClojureScript and nil
+  on the JVM."
+ :downstream-test-fixed-with-its-reason
+ "the one browser-repo failure was a stale test using nil as a proxy for
+  'the author's :required rule did not match' -- true only while nothing
+  ELSE wrote those properties. Fixed to ask the actual question; green
+  against both old and new cssom, landed separately (dec920b)."}
