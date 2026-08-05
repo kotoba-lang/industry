@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-08-05T08:13:57.563Z",
+ :asOf "2026-08-05T09:11:37.506Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,11 +9,11 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 40330,
+ {:requests-7d 40332,
   :pageviews-7d 80,
-  :uniques-7d-sum 207,
+  :uniques-7d-sum 209,
   :zone "itonami.cloud"},
- :agentRuns7d 1100,
+ :agentRuns7d 1046,
  :sources [:cloudflare :health :emitter :itonami-free-path],
  :nextOwnerActions
  [{:freeClaimUrl "/isco-1212/",
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-08-05T08:13:58.185Z",
+  :asOf "2026-08-05T09:11:38.124Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -78,7 +78,7 @@
   {:freeClaimUrl "/isco-1212/",
    :externalTenants 5,
    :freeClaim "/isco-1212/",
-   :agentRuns7d 1100,
+   :agentRuns7d 1046,
    :freeClaimUi "/isco-1212/",
    :docs "/docs/free-path.md",
    :freePathDocs "/docs/free-path.md",
@@ -148,7 +148,7 @@
    {:path "/join/browser", :requests 1}
    {:path "/api/filecoin", :requests 1}
    {:path "/itonami", :requests 1}],
-  :status-mix {:client-error 391, :ok 51},
+  :status-mix {:client-error 392, :ok 51},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
@@ -158,7 +158,7 @@
  {:freeClaimUrl "/isco-1212/",
   :externalTenants 5,
   :freeClaim "/isco-1212/",
-  :agentRuns7d 1100,
+  :agentRuns7d 1046,
   :freeClaimUi "/isco-1212/",
   :docs "/docs/free-path.md",
   :freePathDocs "/docs/free-path.md",
@@ -176,7 +176,7 @@
  {:freeClaimUrl "/isco-1212/",
   :externalTenants 5,
   :freeClaim "/isco-1212/",
-  :agentRuns7d 1100,
+  :agentRuns7d 1046,
   :freeClaimUi "/isco-1212/",
   :docs "/docs/free-path.md",
   :freePathDocs "/docs/free-path.md",
@@ -196,12 +196,12 @@
  :funnel
  {:trials 5,
   :freeClaims 5,
-  :agentRuns7d 1100,
+  :agentRuns7d 1046,
   :externalTenants 5,
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 40330 req/7d・207 uniques(日次和)・うち4xx probe 88%(24h)",
+ "itonami.cloud 実測 40332 req/7d・209 uniques(日次和)・うち4xx probe 88%(24h)",
  :tenants
  {:active 5,
   :external-paid 0,
