@@ -281,6 +281,53 @@
      消さずに放置すると次の deploy でホスト名を奪い返す — git.kotobase.net が失われ
      28 repo が 404 になったのと同じ機構。"}
 
+   :engine-unblocked-by-r2
+   {:owner-directive "2026-08-05『b2 じゃなくて cloudflare r2 を使ってみて』"
+    :why-it-unblocks
+    "engine の改名が止まっていた理由は KOTOBASE_B2_KEY_ID / _APP_KEY を読み戻せないことだった。
+     **R2 は binding であって資格情報ではない**ので、新しい script に『再投入すべきもの』が存在しない。
+     この 2 件が消えると残るのは KOTOBA_SEED（kagi にあり）、KOTOBA_INTERNAL_SECRET
+     （保持者は apex と engine の 2 Worker だけなので旧値を知らずに**ローテートで解決**）、
+     KOTOBASE_MAINTENANCE_OPERATOR_DIDS（**secret ではなく公開 DID**。testnet 分は
+     wrangler 設定に平文で commit 済み。production 分の 1 件だけ確認が要る）。"
+    :why-it-is-also-correct
+    "資格情報の都合だけではない。kotoba-lang/kotobase-storage-s3 が実測して記録しているとおり、
+     **B2 には条件付き PUT が無い** — native / S3 互換のどちらの API でも precondition ヘッダを
+     受理して無視する。エラーにならず書き込みは成功し、並行した書き手の commit だけが消える。
+     つまり B2 に載った ref は :single-writer-ref。R2 は onlyIf を自分で評価するので
+     :linearizable-ref。ref 面の正しさが上がる。"
+    :d1-premise-justification-is-void
+    "ADR-2607299900 が head の CAS に D1 を選んだ理由は『Cloudflare OAuth token に r2 scope が
+     無く R2 の onlyIf.etagMatches が使えなかった』だった。**2026-08-05 実測でこの前提は
+     成立していない**（r2 bucket の list / create / object put / get すべて成功）。
+     ADR-2608039000 の『分散型経路に D1 を前提にしない』を満たす道が実際に開いている。"
+    :implementation
+    {:new-package "net-kotobase/kotobase-object-store-r2 — b2-s3 と同一 surface を R2 binding で実装"
+     :selector "kotobase.graph-database.object-store が実行時に選ぶ。KOTOBASE_R2 binding が
+                あれば R2。フラグは無い（binding は存在するかしないかで、配備コマンドが
+                束ねた binding を出力する）"
+     :not-a-passthrough
+     "list-keys だけは転送にできない。B2 は S3 ListObjectsV2（XML）、R2 は .list（オブジェクト）。
+      **R2 binding から S3 XML を合成して呼び出し側を無変更にする案は却下した** — 自分が
+      名乗っていないプロトコルのふりをする adapter は、失敗を次にデバッグする人に押し付ける。
+      両実装を書き出し、合意する形は {:keys [...] :next-token ...} の 1 つにした。"}
+    :verified-2026-08-05
+    ["compile 通過（173 files / 171 compiled / 0 errors）"
+     "testnet に KOTOBASE_R2 binding を束ねて配備、/_health 200"
+     "R2 bucket への put/get を直接確認"]
+    :not-verified
+    "**配備済み Worker の中で読み書きが実際に R2 を通った証拠は未取得。**
+     それが見える経路（physical-index registry の list）は cron 起動で、testnet は
+     shadow writes が 0 のため回っていない。本番は B2 のまま一切触っていない。"
+    :remaining
+    ["testnet で実行時の R2 経由を確定させる"
+     "本番の B2 → R2 データ移送。**agent は B2 を読めない**ので、鍵を持つ live worker 自身に
+      移送させる設計が要る（新 script に鍵を写すのではなく、既存 script に R2 binding を足して
+      両方読める状態を作る）"
+     "KOTOBA_INTERNAL_SECRET のローテート（apex + engine に新値）"
+     "production の maintenance operator DID を確定"
+     "その後に Worker 名 → net-kotobase-engine、host → engine.kotobase.net"]}
+
    :route-cutover-procedure
    "Cloudflare の custom_domain は 1 host = 1 Worker なので、移設は必ず『外して付ける』になり無防備な
     瞬間が生じる。capability ごとに次の順を守る。逆順にすると host が宙に浮く。
