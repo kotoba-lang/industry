@@ -65,7 +65,14 @@
      :file "src/prolly_tree/core.cljc"
      :find "            \"leaf\" (when (nil? more)"
      :replace "            \"leaf\" (when true"
-     :must-fail ["a-truncated-or-padded-path-is-refused"]}]}
+     :must-fail ["a-truncated-or-padded-path-is-refused"]}
+
+    {:id :prolly/value-is-wrapped
+     :why "「不在」と「値が nil で存在」が区別できること —— 裸で返す verifier はこの 2 つを同じ nil にするので、呼び手は証明が成立しなかったのか値が nil だったのか判別できない"
+     :file "src/prolly_tree/core.cljc"
+     :find "                               {:value (second entry)}))"
+     :replace "                               (second entry)))"
+     :must-fail ["proof-carries-a-nil-value-without-becoming-a-refusal"]}]}
 
   {:repo "orgs/kotoba-lang/inga"
    :label "inga two-root state + metered emission"
