@@ -519,29 +519,32 @@
   :task/workflow "torihiki-gap-closure"
   :task/title "再起動した replica が view で追いつけず、それが leader だと chain が止まる"
   :task/kind "consensus"
-  :task/repo "kotoba-lang/inga"
+  :task/repo "kotoba-lang/torihiki-node"
   :task/requires []
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "**今日 3 回起きた。deploy のたびに起きうる。**
+  :task/status :completed
+  :task/status-note "**根本原因が見つかり、直り、本番で観測した。今日 3 回の停止は全部これ一つだった。**
 
-  形は毎回同じ: deploy → object が再起動 → checkpoint から replay → **replay 中に view が遅れる** → その replica が次の height の leader だと、他の 3 台は `not my turn, w<n> leads` で待ち、**chain が止まる**。
+  `inga.replica/handle-new-view` は new-view が運ぶ `high-qc` を**同期** verify-fn で検証し、通らなければ**メッセージごと捨てる**。node の verify-fn はキャッシュ回答で、キャッシュは票が個別に届いたときに埋まる。つまり**再起動した replica は、その証明書を構成する票を一つも見ていない**ので全部キャッシュミス＝false になり、**新しい new-view を全部捨てる**。drifted な replica を引き戻すために存在する `sync-view`（f+1 で飛ぶ）は、**受理された new-view からしか呼ばれない**。
 
-  実測 2 例:
-  - 2026-08-05 早朝: w1 が view 1458、他は 1578。w1 が leader。1067 で 9 時間停止。
-  - 2026-08-05 夕方: w2 が view 49607、他は 51233。w2 が leader。23784 で停止。w2 だけ checkpoint が古く（22300 対 23700）長い replay をしていた。
+  実測 (v97): w4 が再起動し、new-view を 212 件受け取り、署名を 216 件検証し、**view 16 のまま peer が 92 を通過**。自分の timeout でしか進まず、単独で、永久に。w4 が leader だったので chain は height 2 で停止。
 
-  **height は 4 台とも同じで、遅れているのは view だけ**なので `inga.sync` は効かない（sync は height を運ぶ）。
+  ## 探す場所を 2 回間違えた
 
-  ## 回復手段が devnet 固有
+  最初は「view 同期の機構が無いのでは」と疑って `inga.pacemaker` を読んだ。**機構は在った**。次に「new-view が届いていないのでは」と疑った。**届いていた**。欠陥は**その 2 つの間**、受理の判定にあった。`seen-types` は「届いた」を数え `verified-sigs` は「署名を検証した」を数えるので、**両方増えているのに捨てられている**状態がどの計器にも映らなかった。
 
-  1 台だけ wipe すると**さらに悪化する**（view 0 から、しかも checkpoint も消えるので genesis から replay。実測 3.2 block/秒 = 23,784 ブロックに約 100 分）。実際に効いたのは**4 台まとめて wipe**＝全員の view を同時に 0 に戻すことだけで、これは本番では使えない。
+  ## 直したもの（torihiki-node 6b5ee57）
 
-  ## 先に確かめること
+  S12 で `:sync-response` が運ぶ証明書に同じ修正をしていた。**同じ穴が `:new-view` 側に残っており、そちらの方が影響が大きい** —— sync-response を捨てるのは「追いつけない」で済むが、new-view を捨てるのは「view が同期しない」＝leader なら chain 全体が止まる。`verifyCerts` を両方の到着経路に広げた。
 
-  `inga.pacemaker` が**自分より高い view の new-view / TC を受けたときに前進するか**。遅れた replica は quorum ぶんの new-view を毎 view 受け取っているはずなので、それで TC を組んで飛べるなら実装の問題、飛べない設計なら view 同期そのものが無い。
+  ## 観測（v98、2026-08-05）
 
-  `replay` は `:justify` の QC から view を回復するので、**height で追いつけば view も追いつく**（早朝の件は S9 で replay が速くなったら解けた）。つまり今の設計は「replay が十分速ければ隠れる」だけで、直っていない。"}
+  deploy 直前 `v129/h2 v129/h2 v129/h2 v24/h2`（w4 だけ 105 view 遅れ、height 2 で固着）→ 直後 `v47/h44 v48/h45 v49/h46 v49/h47`。**4 台の view が揃い chain が動き出した。** 以後 height 902 まで同期したまま。
+
+  ## 残り
+
+  1 台だけ wipe すると checkpoint も消えて genesis から replay になる（実測 3.2 block/秒）。回復手段としては依然として悪く、`/reset` が checkpoint を残す形にする余地がある。"}
+
  {:db/id -22
   :task/id "S15-derivable-validator-keys"
   :task/workflow "torihiki-gap-closure"
@@ -550,24 +553,24 @@
   :task/repo "kotoba-lang/torihiki-node"
   :task/requires []
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "**実証済み。** `/head` が公開する chain-id から 4 台全部の鍵を導出し、live の公開鍵と一致することを確認した:
+  :task/status :completed
+  :task/status-note "**直った（torihiki-node 41372ca）。**
 
-      w1 derived pubkey == THE LIVE VALIDATOR'S 5MhNi6oAIUlj
-      w2 derived pubkey == THE LIVE VALIDATOR'S JeAEl5KTnOpa
-      w3 ... w4 ...
+  実証していた欠陥: `/head` が公開する chain-id から 4 台全部の公開鍵を再現でき、つまり誰でも 4 つの**秘密鍵**を計算し、4 票を偽造し、証明書を作れた。**BFT 保証はゼロで、ページは 4 replicas, agreeing と表示していた。**
 
-  誰でも 4 票を偽造して証明書を作れる。**この deployment の BFT 保証はゼロ。** 同じ導出で faucet 鍵も計算でき、担保を無制限に発行できる。
+  - 秘密鍵は Worker secret（`W1_KEY` … `W4_KEY` / `FAUCET_KEY`、32 バイト seed の base64）。導出も表示もしない。
+  - **公開鍵は `validator-keys` として source に焼く。** validator 集合は chain が動き出す前に知っていなければならないもの＝genesis データ。
+  - **trust-on-first-use を廃止。** peer の鍵は `/head` から学んでいた。鍵が導出可能なうちは無害（なりすます相手が居ない）だが、実鍵にした瞬間に**先に答えた者が信じられる**弱点になる。
+  - secret と genesis が食い違ったら **refuse**。そのまま動くと peer が認識しない witness として署名し、全票が did-not-verify で捨てられる。
+  - **`derive-keypair` は削除**（無効化ではない）。chain-id は公開なので、あれは validator 集合の全秘密鍵の public constructor だった。死んだ関数は次の「fallback を復活させる」refactor で生き返る。
 
-  コードは devnet の意図的な妥協として明記している（`derive-keypair` の docstring: 「chain-id と witness 名を知る者はその witness の秘密鍵を計算できる。本物の validator は自分で生成した鍵を genesis で公開する」）。妥協として書かれている以上これは驚きではないが、**この chain について「BFT」「4 replica が合意」と言うときは同時に言わねばならない事実**であり、端末はそれを言っていない（`status: live · block N · 4 replicas, agreeing`）。
+  ## secret 名を間違えて、fail closed が働いた
 
-  ## 直し方
+  `bridge-name` は faucet なので code は `FAUCET_KEY` を探すが、私は `BRIDGE_KEY` で入れた。4 台とも起動を拒否し `no secret for faucet — set FAUCET_KEY` と言った —— **黙って導出に落ちなかった**。fallback を残していたら、この取り違えは「動いているが鍵が公開されている」状態として見えないまま続いた。
 
-  1. 4 つの鍵を生成し、秘密鍵を Worker secret（`W1_KEY` … `W4_KEY`）に置く
-  2. **公開鍵を genesis に焼く** —— 現在の鍵交換は `/head` からの trust-on-first-use で、生成鍵にすると TOFU が弱点になる（先に publish した者が勝つ）。validator 集合は genesis が持つべきもの
-  3. `boot` は secret から読み、`derive-keypair` は削除する（残すと fallback として生き続ける）
+  ## 残り
 
-  S16（oracle publisher）はこの上に乗る —— publisher を validator 集合にしたので、鍵が実物になった時点で oracle の扉も本当に閉まる。"}
+  鍵は Worker secret にあり、Cloudflare account を持つ者は読める。**単一運用者の devnet なのでこれは妥協ではなく事実の記述**で、本物の分散運用は各 validator が別の運用者の下で自分の鍵を持つことを要する。"}
 
  {:db/id -23
   :task/id "S16-cid-plane-is-not-wired"
