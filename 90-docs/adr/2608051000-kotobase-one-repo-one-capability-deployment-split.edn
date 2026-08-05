@@ -258,6 +258,29 @@
      engine（step 2/9）と authn（step 8）はオーナーが secret を kagi に写すまで着手しない。
      **net-kotobase-authn repo は作成済みだが空のまま予約**（削除は破壊的操作なので行わない）。"}
 
+   :first-cutover-2026-08-05
+   {:capability "cypher" :host "cypher.kotobase.net"
+    :repo "orgs/network-awai/net-kotobase-cypher" :worker "net-kotobase-cypher"
+    :shell-size "worker.cljs は約 10 行（surface 選択のみ）。それ以外は kotobase-worker-shell。"
+    :verification
+    ["移設前: workers.dev origin で status / body / security header 5 本すべてが
+      現行 Worker と一致することを 3 回連続で確認"
+     "移設後: host ラベル経路（/health → :surface :cypher）を確認。これは
+      workers.dev では踏めない経路なので、付けた直後にしか検証できない"
+     "他 9 host（s3 / atproto / pinning / sparql / gremlin / graphql / git / smtp / authn）
+      と apex を再確認、いずれも 200 で無傷"]
+    :least-privilege
+    "**WRITE_TOKEN / S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY を投入していない。**
+     この surface は read-only で、shell はこれらを write 認可経路でしか読まない。
+     分割前は『cypher にだけ渡さない』ができなかった — 権限の縮小は分割の副産物ではなく
+     分割によって初めて可能になったもの。"
+    :protocols-worker-not-redeployed
+    "**旧 Worker は rebuild も redeploy もしていない。** 6 つの live surface を配信する
+     script を、route を 1 本消すために作り直すのは割に合わない。wrangler.jsonc から
+     cypher の claim は消したので、次に何かの理由で deploy された時に有効になる。
+     消さずに放置すると次の deploy でホスト名を奪い返す — git.kotobase.net が失われ
+     28 repo が 404 になったのと同じ機構。"}
+
    :route-cutover-procedure
    "Cloudflare の custom_domain は 1 host = 1 Worker なので、移設は必ず『外して付ける』になり無防備な
     瞬間が生じる。capability ごとに次の順を守る。逆順にすると host が宙に浮く。
