@@ -3368,3 +3368,141 @@
           fs/3, fs/5 and the bullet advance)"
    :why "residual under 0.016px, invisible to every axis; noted in the
          docstrings."}]}
+
+{:seq 65
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "5f2cc28d4286b402d64b384a2c116010eb558018"
+ :title "sticky offsets at scroll zero, and visibility: collapse on a table row"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 601}
+ :measured
+ {:line-structure {:before "570/576" :after "572/576"}
+  :geometry {:before "2021/2036" :after "2030/2036 (100%)"
+             :clean-cases {:before "591/601" :after "595/601"}}
+  :paint-order {:before "14987/15009" :after "unchanged"}
+  :computed-style {:before "28615/28618" :after "unchanged"}}
+ :verified-on-merged-main
+ {:cssom-tests "935 / 2372, 0 failures (925/2336 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly. GEOMETRY REACHES 100%."}
+ :per-case-deltas
+ "EXACTLY FOUR cases changed in the whole 601-case op dump -- 18 lines --
+  all four the targets, none in the other direction:
+  :visibility/collapse-removes-a-table-row (5 wrong boxes -> clean, plus
+  its line axis), :position/sticky-bottom-is-stuck-at-scroll-zero,
+  :position/sticky-is-clamped-by-its-containing-block (line axis too),
+  :position/sticky-right-in-a-horizontal-scroller. The geometry residual is
+  now 3 named cases; td/tr/tbody/table and the sticky rows left it entirely."
+ :what-the-browser-said-sticky
+ {:probe "77 shapes over five pages"
+  :headline "THE OFFSET AT SCROLL OFFSET ZERO IS A PURE LAYOUT COMPUTATION,
+             AND IT IS MORE THAN `no scroll model` ALLOWS. Both edges are
+             answerable."
+  :far-inset "bottom/right pulls a box back from the scrollport's END edge
+              -- the corpus's bottom: 0 box at flow y=100 in a 60px
+              scrollport lands at 40."
+  :near-inset "top/left PUSHES a box down/right at scroll zero -- top: 10px
+               on a scroller's first child renders at y=10, NOT 0. The
+               agent had assumed this was a no-op AND THE PROBE DISPROVED
+               IT BEFORE ANY CODE WAS WRITTEN."
+  :three-measurements-that-contradict-the-obvious-reading
+  ["the constraint is on the BORDER box, not the margin box -- bottom: 0
+    with margin-bottom: 8px gives y=40, where a margin-box constraint gives
+    32"
+   "the sticky rectangle is the scroll container's CONTENT box, not its
+    scrollport -- with padding: 10px the pull stops at y=50, not 60"
+   "the clamp uses the containing block's LAYOUT OVERFLOW, not its used
+    size -- top: 500px in a 60px scroller holding 220px of content stops at
+    y=200, not 40"]
+  :what-actually-needs-a-scroll-model
+  "NOT what was skipped. What was scoped out is different: a scrollport
+   that is the VIEWPORT rather than an element -- the position: fixed
+   block-axis problem again. Measured y=0 for a case far down a long page
+   and y=100 for the same case at the top, so NO ENGINE ANSWER CAN AGREE
+   WITH A NUMBER THAT MOVES WHEN AN UNRELATED CASE IS INSERTED. Left at
+   flow position, which is what the corpus's two viewport-scrollport cases
+   measure. Also cut: the BLOCK axis of an INLINE-LEVEL sticky box (its
+   containing block's content height is not known until every line is
+   placed) -- measured y=40, left at flow y=100. What remains genuinely
+   absent is re-layout DURING a scroll."}
+ :what-the-browser-said-collapse
+ {:rule "row height and cell heights -> 0; following rows move up; COLUMN
+         WIDTHS ARE UNTOUCHED (a table whose widest cell is in the
+         collapsed row is 114px wide either way), so the fix is
+         HEIGHT-ONLY and runs after both sizing passes."
+  :spacing "under separate borders the spacing BEFORE the collapsed row
+            goes with it and the one after stays: border-spacing: 10px over
+            three 22px rows puts them at y=10/32/42 in a 54-tall group."
+  :who-collapses "a row is collapsed if its own, its row group's, OR THE
+                  TABLE's computed visibility is `collapse`, and a
+                  descendant's visibility: visible does NOT bring it back
+                  -- all four measured. `visibility` therefore now INHERITS
+                  on the style map, for the same reason caption-side
+                  already did."
+  :controls-hold "collapse on a CELL is hidden (row keeps 22), hidden on
+                  the table keeps 44, and the two existing non-table
+                  controls are byte-identical."}
+ :does-one-mechanism-cover-both-axes
+ {:structurally "YES -- same `zero the track, drop the one gap before it`
+                 rule, and a rowspan/colspan crossing a collapsed track
+                 needs no special case (the spanner just gets
+                 shorter/narrower: 44 not 66)."
+  :but "THE OUTER-SIZE CONSEQUENCE IS OPPOSITE, which is why the column
+        axis was NOT shipped: a collapsed COLUMN shrinks the table's used
+        width against a declared width (300px -> 200), so it must run
+        BEFORE the width is final; the ROW axis is the reverse (a declared
+        table height is divided over every row INCLUDING the collapsed one
+        and only then dropped -- 100px -> 66.67). Written up as a scope cut
+        at layout-table with all those numbers."}
+ :the-three-paint-singles-measured-and-none-is-a-layout-gap
+ [{:cases [":inline/em-strong-code" ":form/input-inside-a-table-cell"]
+   :finding "a hit-region SHAPE question. Both sides' boxes agree EXACTLY.
+             Brave's elementFromPoint answer region is offset ~0.95px up
+             and left from getBoundingClientRect: code's box is
+             x in [75.859, 89.859), y in [3, 18) and the answer region is
+             x in [74.90, 89.05), y in [2.05, 18.00). The harness's sample
+             lands at y=2.1, inside that band."
+   :decision "NEITHER SIDE CHANGED. The harness fix would move the score
+              and so cannot meet the `reproduces the baseline to the value`
+              standard, and growing the engine's :hit rects would ENCODE A
+              CHROMIUM API ARTIFACT into output that dom-gpu and browser
+              use for real pointer hit-testing."}
+  {:case ":form/textarea-with-rows"
+   :finding "not a hit-region question and not this round's. Brave's law is
+             rows x line-height + padding + border, measured 20/34/48/62/76
+             for rows 1-5 and 96 for line-height: 30px. The engine is
+             0.857px tall per box because the harness's :font-metrics hook
+             hands it UNROUNDED metrics -- a choice run.cljs already
+             documents in prose, having measured that rounding them pushed
+             this very case OUT of tolerance."}
+  {:not-shared ":stacking/border-radius-shrinks-the-hit-region does NOT
+                share the cause (its four points are 20/180px inside the
+                box, not on an edge). :page/article-paragraphs,
+                :page/table-of-contents, :page/login-form and
+                :table/empty-cells-hide are all sub-pixel heading-margin /
+                column-width truncation (0.42-0.75px), a separate family."}]
+ :harness
+ "NO harness defect found, and conformance/run.cljs and cases.edn are
+  BYTE-IDENTICAL -- I verified this myself: git diff f28b45c..5f2cc28 lists
+  src/cssom/layout.cljc and test/cssom/layout_test.clj and nothing else.
+  The corpus was deliberately not grown, so the before/after denominators
+  are the same 601."
+ :tried-and-withdrawn
+ ["assuming a `top` inset is a no-op at scroll zero -- the probe disproved
+   it before any code was written"
+  "applying the sticky shift at the child-placement site: the containing
+   block's block-end is not known there. Moved to the end of
+   layout-children-block, where the flow extent is, with the definite
+   content height threaded in as a new argument -- THAT COMBINATION is what
+   makes max(flow extent, declared height) available and is why top: 500px
+   -> 200 and top: 30px in an auto-height parent -> 14 both come out right."
+  "reading collapsed-ness off the paint-time visibility accumulator: IT
+   MULTIPLIES, so it cannot tell collapse from hidden (measured: hidden on
+   a table must keep every row's height)."]
+ :gates
+ "10 tests / 36 assertions. Proved to fail first: 22 assertions fail
+  against the unmodified engine, and every CONTROL assertion beside them
+  passes on both sides. A separate 67-shape checker (every browser
+  measurement taken) reports 67/67 agreement with the engine, re-run after
+  each merge."}
