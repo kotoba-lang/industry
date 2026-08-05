@@ -48,8 +48,16 @@
      :err (if (.-stderr result) (.toString (.-stderr result)) "")
      :error (.-error result)}))
 
+;; maxBuffer は明示する。Node の既定は 1 MiB で、それを超えた `git show` は
+;; ENOBUFS で非ゼロ終了する —— このコードはそれを「declared projection file is
+;; absent from source commit」と報告していた。**存在しているのに存在しないと言う**
+;; 誤診で、実測 2026-08-05 に 1.4 MB の 90-docs/corpus/corpus.datoms.edn で踏んだ。
+;; 併せて失敗時の exit/stderr を fail データに載せ、次に踏んだ人が切り分けられるようにする。
+(def ^:private git-max-buffer (* 256 1024 1024))
+
 (defn git [& args]
-  (run-file "git" args {:cwd root :encoding "utf8" :stdio ["ignore" "pipe" "pipe"]}))
+  (run-file "git" args {:cwd root :encoding "utf8" :maxBuffer git-max-buffer
+                        :stdio ["ignore" "pipe" "pipe"]}))
 
 (defn sha256-bytes [bytes]
   (-> (.createHash crypto "sha256") (.update bytes) (.digest "hex")))
@@ -70,7 +78,8 @@
         result (git "show" (str commit ":" git-path))]
     (when-not (zero? (:exit result))
       (fail! "declared projection file is absent from source commit"
-             {:git/commit commit :path git-path}))
+             {:git/commit commit :path git-path
+              :git/exit (:exit result) :git/stderr (str/trim (or (:err result) ""))}))
     (sha256-bytes (js/Buffer.from (:out result)))))
 
 (defn require-key [m k where]

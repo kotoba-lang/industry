@@ -275,6 +275,19 @@
        (remove #(str/includes? (str %) "/metrics/")) ; metrics は business-metrics で別ロード
        (remove #(str/ends-with? (str %) "canvas-ledger.edn")) ; canvas-ledger で別ロード
        (remove #(str/ends-with? (str %) "design-quality-ledger.edn"))
+       ;; training-corpus は index-sources 側でロードする（下の「索引データ」節）。
+       ;; ここで拾うと **同じ entity が 2 回**入る。実測 2026-08-05: 除外前は
+       ;; `[?e "source/dataset" "training-corpus"]` の tier 別集計が
+       ;; gold 2230 / silver 1532 と、正しい値のちょうど 2 倍になった
+       ;; （この面は entity 自身が `:source/dataset` を持つので、docs 経由の
+       ;; コピーも同じ dataset を名乗ってしまう）。
+       ;;
+       ;; ⚠ surface / concept / engine-parity / gtm-icp / itonami-maturity は
+       ;; **今も両方の経路でロードされている**。あちらは entity 側が
+       ;; `:source/dataset` を持たず index ローダが後から付けるので dataset 別の
+       ;; 集計は二重にならないが、entity 自体は重複している。既存の集計値を
+       ;; 動かさないためここでは触っていない（別途 ADR で扱う）。
+       (remove #(str/ends-with? (str %) "corpus/corpus.datoms.edn"))
        (sort-by str)))
 
 (defn doc-entities-from-file [f]
@@ -1045,7 +1058,24 @@
    ;; 依存）、`:sim/*` は XMILE RK4 の軌道（`:model/work-rate` は scenario）。
    ;; fleet-summary は未 checkout / tombstone repo 数も申告する —— スコアが付いて
    ;; いないことが「悪い」ではなく「測っていない/対象外」であるため。
-   ["itonami-maturity" (io/file root "90-docs" "system-dynamics" "itonami-maturity.datoms.edn")]])
+   ["itonami-maturity" (io/file root "90-docs" "system-dynamics" "itonami-maturity.datoms.edn")]
+   ;; training-corpus — **どの文書が学習素材として何点か**（生成物。ADR-2608056000。
+   ;; `scripts/gen-training-corpus.cljs`、policy は `manifest/corpus-policy.edn`）。
+   ;; 3 種類の entity が混在する:
+   ;;   1 文書 1 件（`:corpus/id` = repo 相対パス、6 軸のスコア + `:corpus/score`
+   ;;     = 重み付き幾何平均 + `:corpus/tier` + `:corpus/hazard`）
+   ;;   shard `:shard/id`（tier ごとに畳んだ bytes の annex key。`:shard/custody`
+   ;;     が `:unverified` の間は「宛先を宣言しただけ」であって保管していない）
+   ;;   `:corpus/coverage true` 1 件（走査数・skip 数・tier 別件数・policy の sha256）
+   ;;
+   ;; join: `:corpus/adr-id` → ADR entity の `"adr/id"`（スコアと決定内容を突き合わせ
+   ;; られる）。`:corpus/repo` は org/repo 表記なので repo-taxonomy の `:repo/path`
+   ;; とは同形ではない。
+   ;;
+   ;; ⚠ `:corpus/tier :excluded` は hazard 検出による除外で、**hazard 検査は既知の形
+   ;; だけを弾く構造検査**。合格は秘密の不在を証明しない（公開先を広げる判断の
+   ;; 根拠にしない）。
+   ["training-corpus" (io/file root "90-docs" "corpus" "corpus.datoms.edn")]])
 
 (defn index-entities [next-tempid!]
   (let [skipped (atom [])
