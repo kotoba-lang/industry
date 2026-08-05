@@ -281,8 +281,8 @@ S1/S2/S4 は `codebase` に、S5 は `compiler` と `kotoba` に landed した�
 
 13 本まとめて上げると **66 errors、うち 65 が `Cannot open <nil> as a Reader`**。
 
-原因は `kotoba-lang@146ffde`（"Separate language semantics from release and IPFS
-adapters"）が `:paths` を `[\"src\" \".\"]` → `[\"src\" \"resources\"]` に変えたこと。
+原因は `kotoba-lang@146ffde`（『Separate language semantics from release and IPFS
+adapters』）が `:paths` を `[\"src\" \".\"]` → `[\"src\" \"resources\"]` に変えたこと。
 同 commit は `repository-rules.edn` を `resources/` に移したが **`lang/` は置いたまま**で、
 **言語 authority 一式が classpath から落ちた**。`launcher/read-cli-contract-resource` は
 `lang/cli.edn` を `io/resource` で読み **fallback を持たない**ので、
