@@ -148,46 +148,72 @@ live（2026-08-05 実測、デプロイ後）:
       古いままで、その後 propagate した。**deploy 直後の 1 回の curl を根拠に
       『反映されていない』と判断しない。**"
 
-  :adr/status_2608051900
-  "## 未完了（次の担当者向け。優先度順）
+  :adr/status_2608052000
+  "## 完了（2026-08-05、live 実測で確認）
 
-### 1. DNS レコードが無い —— org ホストはまだ resolve しない（**オーナー作業**）
+`{org}.itonami.cloud/{repo}/` が動いている。`:status` は `live`。
 
-Pages のカスタムドメイン `cloud-itonami.itonami.cloud` は **`pending` のまま**で、DNS レコードが作られていない。
+    network-awai/cloud-itonami  094e2e3e  shirohan 再ビルド + live 切り替え
+    Cloudflare Pages            c48301b2  Production / branch main
+    DNS  CNAME cloud-itonami -> cloud-itonami.pages.dev (proxied)  id 1a263b2fb15a…
+    Pages custom domain  cloud-itonami.itonami.cloud  status=active
 
-    POST /accounts/{acc}/pages/projects/cloud-itonami/domains  -> success（pages (write) で通る）
-    status: pending / validation: pending / verification: pending
-    dig cloud-itonami.itonami.cloud -> 応答なし
+**org ホスト**
 
-**この環境の Cloudflare OAuth token は `zone (read)` しか持たず、DNS レコードを作れない**（`zone (write)` / `dns_records (edit)` が無い）。Pages は同一アカウントの zone なら自動で CNAME を作ることがあるが、今回は作られなかった。加えて、API で作ろうとした試行はこのセッションの権限分類器にも拒否された。
+    /                            200  org 面（3 サイトを列挙）
+    /inkan/ /shirohan/ /cloud-itonami-rirekisho/   200
+    /inkan                       301 → /inkan/
+    /nope/                       404
+    /marketplace/ /api/health    404   ← cockpit を映さない
+    /inkan/secret.env            404   ← 宣言外ファイル
 
-必要なのは 1 レコード:
+**apex（旧パス形はエイリアスとして 301）**
 
-    CNAME  cloud-itonami  ->  cloud-itonami.pages.dev  (proxied)
+    /cloud-itonami/                     301 → https://cloud-itonami.itonami.cloud/
+    /cloud-itonami/inkan/               301 → …/inkan/
+    /cloud-itonami/shirohan/index.html  301 → …/shirohan/index.html
+    /zzz-nope/qqq                       404
+    / /marketplace/ /api/health /trust/ 200（既存面すべて無傷）
 
-作成後に `status` が `active` になることを確認し、`https://cloud-itonami.itonami.cloud/` が org 面を返すことを実測すること。
+**`/{org}/` が apex SPA を返す経路は消えた** —— これが改訂の主目的だった。
 
-### 2. shirohan の公開物を再ビルドする
+## 解消した blocker（前回の記録からの差分）
 
-上記のとおり source repo が手元で不完全でリモートにも到達できない。**shirohan だけ旧クローム（相対リンク）**なので、org ホストではヘッダーのナビが 404 になる。
+- **DNS**: オーナーが Cloudflare Global API Key を提供し、それで CNAME を作成した。
+  wrangler の OAuth token は DNS API に読み書きとも通らない（scope に `dns_records`
+  が無い）。**secrets-location-map が記していた keychain `gftd.cf` は実在しなかった**
+  ので、実測結果でマップを更新済み（root `1ea863e8`）。
+  ⚠ **使用した Global API Key は会話ログに露出した。ローテーションが要る。**
+  併せて、`Zone.DNS: Edit` だけを持つスコープ付き token を発行して kagi に保管すれば、
+  以後この種の作業に Global Key は不要になる。
+- **shirohan**: source repo は **SSH では fetch できないが HTTPS では取れた**
+  （remote には curve/color/cut.cljc が揃っていた。ローカル checkout が 7468261 で
+  止まっていただけ）。94ffad4 へ FF して再ビルドし、3 サイトすべてが新クロームに
+  なった。**「fetch が失敗した」を「repo が無い」と読まないこと。**
 
-### 3. `:status` を `live` に切り替える
+## 検証
 
-1 と 2 が終わってから `sites.edn` の `:status` を `\"live\"` にし、レジストリを再生成して deploy する。これで apex の `/{org}/{repo}` と `/{org}/` が org ホストへ 301 し、**`/cloud-itonami/` が apex SPA を返す最後の経路が消える**。
+    portable cljs suite   710 tests / 6221 assertions   0 failures 0 errors
+    verify-sites-bundle   26 checks   all passed（:status から期待値を導く形に変更）
+    generate-sites-registry --check   canonical (3 sites, 38 reserved)
+    design-quality        3 サイトとも 100.00 / 12 軸、findings ゼロ
 
-### 4. fleet gate に載っていない
+**`live` に切り替えた瞬間にバンドル検査が 3 件落ちた** —— apex がアセットを返さず
+301 するようになったため。ゲートは正しく捕まえたが、直すべきは検査側だった。
+期待値をレジストリの `:status` から導くようにしたので、次の org を足すときも
+切り替えのたびにゲートが古い意味を見続けることはない。
 
-`scripts/fleet-ci/gates.edn` に cloud-itonami のエントリが無い（`net-kotobase` はある）。`test-sites`（`sites-registry-check` + `sites-bundle-verify`）は standalone で動くので `:nbb-script` gate に載る。**network-awai org の GitHub Actions は 2026-08-03 以降 job が起動しない**ので、今この 2 つの検査はどこでも走っていない。
+## 残っているギャップ
 
-### 5. KRP §4 が未改訂
+1. **fleet gate に載っていない。** `scripts/fleet-ci/gates.edn` に cloud-itonami の
+   エントリが無く、`test-sites` はどこでも自動実行されていない（network-awai org の
+   GitHub Actions は 2026-08-03 以降 job が起動しない）。
+2. **KRP §4 が未改訂。** `/{org}/{repo}` を universal public pattern と定めたまま。
+   他ホストへ広げる前に直すこと。
+3. **cookie jar は分かれていない**（決定 6）。PSL 登録は未着手。
+4. **2 つ目の org はまだ無い。** `:orgs` は複数を受けるが、実際に別 org を載せる
+   までは「1 org でも動く」ことしか確かめられていない。
 
-`90-docs/protocols/kotoba-resource-protocol.edn` は `/{org}/{repo}` を universal public pattern と定めたまま。他ホストへ広げる前に直すこと。
-
-## 次の一手（resume point）
-
-    # DNS を作ったあと
-    dig +short cloud-itonami.itonami.cloud
-    curl -sI https://cloud-itonami.itonami.cloud/ | head -1
-    curl -s https://cloud-itonami.itonami.cloud/inkan/ -o /dev/null -w '%{http_code}\\n'"
+"
 
   :source/dataset "adr"}]
