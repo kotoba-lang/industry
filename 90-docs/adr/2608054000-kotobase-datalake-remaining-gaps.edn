@@ -14,6 +14,7 @@
               "orgs/kotoba-lang/columnar"
               "orgs/kotoba-lang/org-apache-parquet"
               "orgs/kotoba-lang/org-apache-arrow"
+              "orgs/kotoba-lang/org-apache-avro"
               "orgs/kotoba-lang/org-ietf-csv"
               "orgs/kotoba-lang/json"
               "orgs/kotoba-lang/kotobase-storage"
@@ -39,10 +40,10 @@
    "adr-2607299700-kotobase-scoped-cacao（互いに代用できる 2 つの capability は 1 つ — P1 で IByteSource に適用した）"]
 
   :adr/decision-summary
-  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :arrow-writer :parquet-writer :group-by :schema-evolution :snapshots :compaction :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson}, :write #{:arrow-ipc :parquet}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed}, :refused-by-name #{:lz4-frame :zstd}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :writer-gate :pyarrow-validate-full, :ci-status {:kotoba-lang :actions-disabled-2026-08-05, :network-awai :actions-dead}, :gaps {:p2 #{:aggregate-pushdown :join-cost}, :p2-not-doing #{:rename-needs-field-ids}, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
+  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :arrow-writer :parquet-writer :group-by :schema-evolution :snapshots :compaction :zstd :n-triples :avro :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson :n-triples :avro}, :write #{:arrow-ipc :parquet}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip :zstd}, :refused-by-name #{:brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed :zstd}, :refused-by-name #{:lz4-frame}}, :avro {:supported #{:null :deflate :zstandard}, :refused-by-name #{:snappy}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :writer-gate :pyarrow-validate-full, :ci-status {:policy :murakumo-fleet-not-actions, :actions :disabled-by-sweep-on-purpose, :fleet-gates :format-repos-unregistered}, :gaps {:p2 #{:aggregate-pushdown :join-cost}, :p2-not-doing #{:rename-needs-field-ids}, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
 
   :adr/verify
-  ["west pin: columnar 309822ec / org-apache-arrow 78db9a83 / org-apache-parquet e28a6b3e / kotobase-lake 339f0611 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
+  ["west pin: columnar 309822ec / org-apache-arrow 955fa8f3 / org-apache-parquet 09909e19 / kotobase-lake 2746926b / org-apache-avro 9bdeeee8 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
    "org-apache-arrow: JVM 39 tests/119 assertions・nbb 34/100・clj-kondo 0 warnings（ローカル実測）。CI は writer commit 6d070313 までは全 step success を実測、それ以降は org の Actions 無効化により未実行"
    "writer の正当性ゲート: clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir>  ; => 6 ケースすべて pyarrow validate(full=True) で受理"
    "org-apache-parquet: JVM 32 tests/143 assertions・nbb 29/131・clj-kondo 0 warnings（ローカル実測）。writer gate = clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir> ; => 7/7 pyarrow 受理・統計も可視。CI は 06df9fdd まで success、e28a6b3e は Actions 無効化により未実行"
@@ -368,28 +369,46 @@ mutation としてではなく**atomic な新 snapshot として**だけ安全�
 - **network-awai の GitHub Actions は job を起動しない**（ADR-2608036600）。したがって
   `api-gateway.yml` に足した step は発火せず、**実際に走る gate は murakumo fleet の
   check A-E だけ**
-- 🔴 **kotoba-lang org の GitHub Actions も止まった（2026-08-05 セッション中に発生）。**
-  同日 06:08 UTC までは正常に動いていた（columnar `d89813a3` / org-apache-parquet
-  `06df9fdd` / org-apache-arrow `6d070313` はいずれも全 step success を実測）。その後
-  `repos/kotoba-lang/<repo>/actions/permissions` が **`enabled: false`** になり、
-  columnar / org-apache-arrow / org-apache-parquet / kotobase-lake の 4 repo すべてで
-  同じ。push しても branch にも merge commit にも **workflow run が 1 つも作られない**。
-  - **原因は未確定。** org 設定と billing は `admin:org` scope が無く読めない
-    （kotoba-lang は free plan / private repo 13 件）。org 管理者による無効化か、
-    Actions の spending limit 到達かのどちらか
-  - **勝手に `enabled: true` に戻していない。** セッション中に誰かが変えた org 規模の
-    制御であり、意図的な無効化（課金・セキュリティ）だった場合それを黙って覆すことに
-    なるため。**これは報告して判断を仰ぐ側の事象**
-  - **影響（2026-08-05 セッション終了時点）**: 無効化以降に main へ入った
-    **7 個の merge commit が CI 未検証**である。
-    `columnar` `16b336b1`(GROUP BY) / `309822ec`(evolve) ・
-    `org-apache-arrow` `78db9a83`(group 統合) ・
-    `org-apache-parquet` `e28a6b3e`(Parquet writer) ・
-    `kotobase-lake` `747ad27b`(member schema) / `540a20f4`(snapshot) /
-    `23e45897`(compaction)。
-    いずれもローカルで JVM・nbb・clj-kondo・(writer は pyarrow gate も) green を
-    実測しているが、**CI が走ったという主張はできない**。無効化前の 5 commit は
-    CI 実測済み
+- ✅ **kotoba-lang org の Actions が止まったのは「障害」ではなく、このワークスペースの
+  方針だった**（2026-08-05 に訂正）。本 ADR は当初これを原因不明の停止として書いたが、
+  **それは誤りだった**:
+  - CLAUDE.md『CI/CD は murakumo fleet。GitHub Actions を使わない』（repo-wide
+    mandatory、ADR-2607300900、オーナー指示 2026-08-05「github は使わない、
+    murakumo.cloud の cdci, workflow を使う」）
+  - 実行主体は `scripts/github-actions-disable-sweep.cljs` — **workflow を持つ repo の
+    Actions を repo 単位で無効化して回るスクリプト**。同日 06:08 UTC 以降に
+    columnar / org-apache-arrow / org-apache-parquet / kotobase-lake が
+    `enabled: false` になったのはこれ。org 単位の無効化は `admin:org` が要るので
+    repo 単位で回している（だから**新規作成した repo は enabled のまま生まれる** —
+    実測: `org-apache-avro` は作成直後 `true` だった）
+  - **workflow ファイルは意図的に残る。** 削除には `workflow` OAuth scope が要り
+    このワークスペースの token は持たない。ファイルは inert
+  - **私はこの規則に 2 回違反した。** `org-apache-arrow` と `org-apache-avro` に
+    新しい `.github/workflows/ci.yml` を書いた（CLAUDE.md は『新しい
+    `.github/workflows/*.yml` を書かない』と明示している）。`org-apache-avro` の
+    Actions は sweep と同じ操作で無効化済み。**workflow ファイル自体は scope が
+    無く消せないので inert として残る**
+- 🔴 **したがって format library 群には現在 CI が無い**（Actions は方針で停止、
+  fleet gate は未登録）。無効化以降に main へ入った **11 個の merge commit が
+  自動検査を受けていない**:
+  `columnar` `16b336b1`(GROUP BY) / `309822ec`(evolve) ・
+  `org-apache-arrow` `78db9a83`(group 統合) / `955fa8f3`(arrow zstd) ・
+  `org-apache-parquet` `e28a6b3e`(Parquet writer) / `09909e19`(parquet zstd) ・
+  `kotobase-lake` `747ad27b`(member schema) / `540a20f4`(snapshot) /
+  `23e45897`(compaction) / `339f0611`(acquire 境界) / `2746926b`(N-Triples) ・
+  および新規 repo `org-apache-avro` `9bdeeee8`。
+  いずれもローカルで JVM・nbb・clj-kondo（writer は pyarrow gate も）green を実測して
+  いるが、**自動検査が走ったという主張はできない**。
+  - **正しい対応は Actions を戻すことではなく `scripts/fleet-ci/gates.edn` に足すこと。**
+    columnar / org-apache-parquet / org-apache-arrow / org-apache-avro /
+    kotobase-lake はいずれも **gates.edn に未登録**（実測 2026-08-05）
+  - **ただし着地前に確認が要る**: fleet ノードは tailnet のみで外向き HTTPS が無く、
+    `ship-git-deps!` は **git 依存しかノードへ運ばない**。この 5 repo の依存は
+    すべて git（columnar / deflate / zstd / json / nquads / datom-source /
+    cognitect test-runner）だが、`clojure -M:test` 自体が要求する maven 上の
+    Clojure core がノードで解決するかは**未確認**。CLAUDE.md は
+    「テストがあるから jvm-test にする」ではなく先に依存が解決するか確かめよ、と
+    明示している
   - つまり **P4 は network-awai だけの問題ではなくなった**。format library 群も
     今は CI に守られていない
 - コミット済みの Worker バンドルが main のソースより古かった（同一ソースの 2 回ビルドが
