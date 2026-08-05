@@ -76,12 +76,12 @@ Regression: the unmodified disk path produces the same 33 evidence lines and the
 Flash guards exercised against a real internal disk (dry-run, nothing written): refused with \"/dev/disk0 is an INTERNAL disk\"; receipt digest verified as matching."
 
   :adr/gaps
-  "[{:gap :bare-metal-network :state :absent :note \"no NIC driver, no TCP/IP; a node can compute its join plan and cannot post it\"}
+  "[{:gap :bare-metal-network :state :partial :note \"SUPERSEDED IN PART by ADR-2608052200: the LINK layer exists (virtio-net, frame admission in Kotoba, AIUEOS_VIRTIO_NET_OK). A node still cannot post its join plan -- ARP cache + IPv4, TCP, TLS 1.3 and HTTPS all remain.\"}
     {:gap :real-hardware-usb-boot :state :unverified :note \"proved under OVMF/QEMU only; no physical machine has booted the image\"}
     {:gap :join-object-admission :state :blocked :note \"runtime-v2 context pins the smoke app's capability shape; offline RSA signer absent from repo\"}
-    {:gap :upstream-cores-native :state :blocked :note \"kotoba-lang/compiler native typed slice rejects record parameters and entryless libraries\"}
+    {:gap :upstream-cores-native :state :resolved :note \"CLOSED by ADR-2608052000: the native typed slice now admits record parameters, option/result and keyword at a boundary, and native targets carry entryless libraries. murakumo shipped cores compiling natively went 0/33 to 14/33; the remaining 19 are tracked there, not here.\"}
     {:gap :hosted-profile-workload :state :planned :note \"generation serving belongs to ADR-0011 PID-1 profile; not implemented\"}
-    {:gap :shared-uefi-suite-on-qemu-10 :state :environmental :note \"AIUEOS_VIRTIO_INPUT_FAIL on QEMU 10.0.3, pre-existing and transport-independent\"}]"
+    {:gap :shared-uefi-suite-on-qemu-10 :state :corrected :note \"THIS ENTRY WAS TOO BROAD. It said the shared UEFI suite fails on QEMU 10.0.3. Measured 2026-08-05 while building the link layer: the suite PASSES on this same host and QEMU (AIUEOS_UEFI_SMOKE_OK, exit 0) on the default ESP-directory boot path, both with and without a NIC. The AIUEOS_VIRTIO_INPUT_FAIL observed earlier was on the GPT DISK-IMAGE path (AIUEOS_DISK_IMAGE set), which is the only path it was ever measured on. Whether it still fails there is unmeasured -- a re-run was started and abandoned when the host reached load average ~250, where a TCG boot is indistinguishable from a hang. The USB equivalence gate is unaffected either way: it asserts the two transports agree, not that either passes.\"}]"
 
   :adr/authoritative-for ["aiueos-usb-boot" "aiueos-murakumo-node" "murakumo-aiueos-operator-surface"]
   :adr/child-adr "kotoba-lang/aiueos 90-docs/adr/0019-usb-removable-boot-and-murakumo-node-profile.md"
