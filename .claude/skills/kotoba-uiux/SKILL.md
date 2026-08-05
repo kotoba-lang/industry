@@ -1,14 +1,58 @@
 ---
 name: kotoba-uiux
-description: Build refined, Apple-HIG-quality web / local-app UI in cljc using the kotoba-lang design-system stack (shitsuke.hig tokens → liquid-glass-ui material → kotoba-ui single entry → appkit/uikit). Use whenever you are about to write ANY frontend/UI/page/site code in this monorepo — a new site, a new app screen, a redesign, a landing page, an admin console, or when the user says a design is "いまいち/not refined/ダサい". Read this BEFORE writing the first line of HTML/CSS/hiccup. Also use when reviewing UI code for design-system conformance.
+description: Build web / local-app UI in cljc on this workspace's BASE design system, jp-go-dds (デジタル庁デザインシステム), with the shared --hig-* token contract bridged onto it. Also covers the legacy kotoba-ui/liquid-glass stack, which remains only where it has not been migrated. Use whenever you are about to write ANY frontend/UI/page/site code in this monorepo — a new site, a new app screen, a redesign, a landing page, an admin console, or when the user says a design is "いまいち/not refined/ダサい". Read this BEFORE writing the first line of HTML/CSS/hiccup. Also use when reviewing UI code for design-system conformance.
 ---
 
 # kotoba-uiux — the paved road to refined UI
 
-The full recipe lives in `orgs/kotoba-lang/kotoba-ui/docs/agent-guide.md` — **read that
-file next** (fetch the repo with `west update --fetch smart kotoba-ui` if it is not
-checked out). This SKILL.md is the contract summary; the agent-guide is the how-to with
-worked examples.
+## The base is `jp-go-dds` (owner decision, 2026-08-05)
+
+**New UI is built on `kotoba-lang/jp-go-digital-design-system`** — the デジタル庁
+デザインシステム (DADS) mirror — not on liquid-glass. Measured when the decision was
+made: **170 repos already depended on jp-go-dds, 12 on kotoba-ui.** DADS was already the
+workspace's design language; this makes it official and stops new work landing on the
+minority stack.
+
+```clojure
+(require '[jp-go-dds.core :as dds]      ; button / select / table / chip-label / …
+         '[jp-go-dds.page :as page]     ; ->page (charset / viewport / theme-color)
+         '[jp-go-dds.tokens :as tokens]) ; bridge-css — the --hig-* contract on DADS
+```
+
+Three things to know before writing any of it:
+
+1. **The `--hig-*` token contract still holds.** `tokens/bridge-css` redefines every
+   `--hig-*` custom property on top of DADS primitives, so view/SVG/CSS written to the
+   contract follows DADS **unmodified**. That is what made kami-genko / kami-app-daw /
+   kami-app-nle move bases without touching their stylesheets. Keep writing
+   `var(--hig-spacing-4)`, not a DADS primitive, unless you are styling a `dads-*`
+   component itself.
+2. **An app that takes DADS as its base has no `shitsuke.hig` underneath.** An unmapped
+   token resolves to *nothing* — `padding: var(--hig-spacing-4)` collapses, silently. If
+   you need a token the bridge does not carry, add it to `hig->dads` upstream; do not
+   re-derive it in app CSS (the bridge's own docstring: the contract breaks the moment a
+   second app derives its own).
+3. **DADS is light.** `page` takes `:dark? true` for this library's own inversion layer
+   (not upstream's) — right for an editor that grades against a dark surround, and what
+   kami-app-daw / kami-app-nle use.
+
+**What DADS does not have**: an app-shell / editor frame, a segmented control, a list
+with a trailing slot, an accent an app can choose. The first three are app CSS on the
+token contract (see kami-genko); the fourth is the point — DADS ships デジタル庁ブルー
+and an app does not pick its own.
+
+`dds-ext-*` (container / section / grid / stack / row / card) is the library's own
+non-upstream layout layer. Extend it upstream rather than re-deriving layout in app CSS.
+
+## Legacy: kotoba-ui / liquid-glass
+
+Still correct for the ~12 repos that have not moved (`kotoba-lang/app-*`,
+`cloud-itonami/kaisya`, `lawfirm`, `gftdcojp/apex`). Everything below this line describes
+that stack and stays true for them. **Do not start new UI on it.**
+
+The full recipe lives in `orgs/kotoba-lang/kotoba-ui/docs/agent-guide.md` — read that
+file next if you are working in one of those repos. This SKILL.md is the contract
+summary; the agent-guide is the how-to with worked examples.
 
 ## Status: this stack is migrating to `.kotoba` (owner decision 2026-07-27, ADR-2607270100 §10)
 
