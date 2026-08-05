@@ -297,12 +297,34 @@
   :task/repo "kotoba-lang/inga"
   :task/requires []
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "S3 の検証中に wrangler tail で測って判明。**1 invocation で cpuTime 7,257ms / wallTime 9.7s、25 ブロックの畳み込みに 7 秒＝1 ブロック約 280ms。** 原因は `extend-chain` が adopt のたびに `c/three-chain-commits` を chain 全体に対して呼ぶこと —— 畳み込み全体で O(chain²) になる。
+  :task/status :completed
+  :task/status-note "**完了。止まっていた本番 chain が動き出したところまで観測した。**
 
-  **これは今日の障害史の大半を説明する**（height 225 の天井、2033 ブロックが収束しなかったこと、449→124 の後退）。checkpoint はこれを**回避**するが**解消**しない: chain が伸びれば 1 ブロックあたりのコストも伸び続け、いずれ 100 ブロックの tail replay すら 1 invocation に収まらなくなる。
+  ## 見つけ方が変わった —— 起票時の見立ては半分しか当たっていなかった
 
-  直し方の見当: `three-chain-commits` は末尾 3 ブロックしか見ないはずなので、chain 全体ではなく tail を渡す（または commit 済み高さ以降だけを見る incremental 版を持つ）。**inga の既存テストが commit 規則を固定しているので、それを緑のまま保つことが条件。**"}
+  起票時は「checkpoint はこれを回避するが解消しない」と書いた。実際には**回避もできていなかった**。S13 の後、w1 が `503 {\"catching-up\":true, \"at\":324}` を返し続け、chain は 1067 で 9 時間止まった。w1 は leader なので、w1 が復帰できない限り誰も進めない。**一番 catch-up を必要とする replica が、一番 catch-up できない。**
+
+  ## 直したもの（inga 28631ff）
+
+  `commits` は `three-chain-commits` を chain 全体に呼び、返ってきたものを committed 高さで捨てていた。**捨てる分も窓ごとに `hash-fn` を 2 回払っている。** hash がここでは唯一高いものなので、N 個目を adopt する replica が chain 全体を hash し直す。
+
+  `above-height` 引数を足し、呼び手がどのみち捨てる窓を飛ばす。答えは構成上変わらず、変わるのは仕事量だけ。開始位置は binary search（chain 全体を触らないのが目的なので線形走査では意味が無い）。
+
+  実測（1067 ブロックを 1 つずつ adopt する replay の hash 回数）: **1,133,160 → 2,128（532 分の 1）**。
+
+  ## テストは「速い」より先に「同じ」を見る
+
+  全高さ（-1..40）で境界あり/なしの答えが一致すること。そのうえで 400 ブロックの chain を境界付きで走査したとき hash 回数が 20 分の 1 未満であること。前者が無ければ後者はただの手抜きの証明になる。JVM 291 tests / 1365 assertions、nbb と parity digest 一致。
+
+  最初 4 高さで落ちたが、落ちていたのは**テストの方**だった（`()` と `nil` を比べていた）。
+
+  ## 観測（v89、2026-08-05）
+
+  deploy 直後から 1067 → 1853 を 6 分（約 2 block/秒）、4 台とも歩調が揃って前進。`equivocators []`、`peers-known` 4、`last-error` なし。9 時間の停止が deploy で解けた。
+
+  ## まだ残っている懸念（別件として）
+
+  `:chain` と `:committed` はメモリ上で無制限に伸びる。今回の壁は hash だったので消えたが、1,868 ブロックぶんの block map を DO のメモリに載せ続ける形自体は変わっていない。checkpoint + bounded resume がそれを抑える設計なのに、catch-up 経路では効いていない。"}
 
  {:db/id -11
   :task/id "S5-candles-endpoint"
