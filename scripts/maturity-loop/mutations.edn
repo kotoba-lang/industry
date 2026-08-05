@@ -125,4 +125,14 @@
      :replace "(defn- f64-from-bits [payload]\n  (Double/longBitsToDouble (long payload)))"
      ;; cljs suite はテスト名を出さず throw で落ちるので、名前ではなく
      ;; 「緑マーカーが出ないこと」で判定する。:must-fail が空なのはその宣言。
+     :must-fail []}
+
+    {:id :codebase/coerce-refuses-a-path
+     :why "cljs には fallback する先の filesystem が無いこと —— path を黙って通すと、backend seam を作った意味そのものが消える（呼び手が自分の ICodebaseStore を渡さなくても動いたように見えてしまう）"
+     :file "src/kotoba/codebase/backend.cljc"
+     ;; 括弧の釣り合いを保つ形で壊す。プレフィックスだけ差し替えると構文エラーに
+     ;; なり、「コンパイルが通らない」しか証明しない mutation になる（README の
+     ;; 「壊し方は実際に起こりうる退行の形にする」に反する）。
+     :find "  (if (store? root)\n    root\n    #?(:clj (filesystem root)\n       :cljs (throw (ex-info \"codebase: no filesystem backend on this platform — pass an ICodebaseStore value\"\n                             {:problem :codebase/no-default-backend\n                              :given (type root)})))))"
+     :replace "  (if (store? root)\n    root\n    #?(:clj (filesystem root)\n       :cljs root)))"
      :must-fail []}]}]}
