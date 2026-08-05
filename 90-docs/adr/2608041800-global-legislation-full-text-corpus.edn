@@ -182,7 +182,46 @@
      別件として記録する）。
    - maturity/scorecard.edn の `:full-text-corpus` は `:explicitly-out-of-scope` から
      `:met`（4 法域・31,970 文書・3.43 GB、locked dataset に保全）へ書き換え。
-     `:raw-source-integrity` も `:not-applicable` から `:met` へ。"
+     `:raw-source-integrity` も `:not-applicable` から `:met` へ。
+
+   ## 着地点と検証（2026-08-05 時点。ここが現在地）
+
+   default branch に載っているもの（すべて実測・実行済み）:
+
+   | repo | commit | 中身 |
+   |---|---|---|
+   | `etzhayyim/jp.go.e-gov.elaws` | `2e60162` | 全文 9,523 / 1,229,999,063 B。B2 実体 9,524/9,524 |
+   | `etzhayyim/eu.europa.eur-lex` | `eed2847` | 全文 1,114 / 227,301,155 B。B2 1,569/1,569 |
+   | `etzhayyim/uk.gov.legislation` | `c212340` | 全文 3,267 / 1,594,186,594 B。B2 3,493/3,493 |
+   | `etzhayyim/gov.govinfo.bulkdata` | `49da746` | 全文 18,066 / 373,702,595 B。B2 25/25 |
+   | `etzhayyim/global-legislation-datoms` | `c403b6d` | corpus 層 42 シャード |
+   | `com-junkawasaki/root` | `893c70c` | ADR + repos.edn + west 5 entry |
+
+   **CI の現在地（2026-08-05 に狭めた）。** 当初は「CI はカタログのみを検査する」だったが、
+   `test/corpus_contract.clj` は**何も checkout せずに走る**（読むのは committed な
+   `data/corpus/**` と `data/quality-report.edn` だけ）ことに気づき、workflow が既に実行して
+   いる `test/query_contract.clj` の末尾から `load-file` で連結した。実 GitHub Actions run
+   （`c403b6d`、success）のログで確認済み: `:corpus-laws 95194` / `:corpus-relations 646468` /
+   `:text-bytes-addressed 3425189407`。これで shard manifest・カバレッジ下限・全 text address の
+   形・**辺の向き**（`amends` が反転したら落ちる）・corpus から catalog へのライセンス join が
+   CI で守られる。
+
+   **残る 1 点、正確に**: CI は `data/corpus/**` を locked source から**再導出しない**。
+   それには 4 dataset の `index/` を checkout する必要があり、workflow ファイルの編集が要る。
+   内部整合な手編集シャードは通ってしまうし、再生成が走らない以上
+   `git diff --exit-code -- data` も捕まえない。原因は見落としではなく **token に GitHub の
+   workflow scope が無い**こと（workflow ファイルへの push も Contents API も通らない。
+   後者は 403 でなく 404 を返す）。必要な YAML は datoms repo の `docs/ci-design.md` に
+   そのまま載せてある。
+
+   **再開手順**（次の agent はこれだけで続けられる）:
+
+   1. `gh auth refresh -h github.com -s workflow`（人間がブラウザ承認。agent は実行できない）
+   2. `docs/ci-design.md` の YAML を `.github/workflows/contract.yml` に適用
+   3. `test/query_contract.clj` 末尾の `load-file` ブロックを削除
+   4. `sources.lock.edn` の 4 行の `:source/ci-checkout` を `true` に（`verify-ci-lock.cljs`
+      の警告が止まる）
+   5. 法域を足すなら `bin/build-corpus.cljs` の `datasets` に 1 行 + DataLad dataset 1 本"
 
   :adr/alternatives
   "**全文を datoms repo に直接置く。** 却下——`global-energy-datoms` の「出典別 DataLad dataset を
