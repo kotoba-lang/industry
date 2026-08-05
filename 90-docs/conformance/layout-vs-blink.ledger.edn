@@ -1041,3 +1041,41 @@
              ":page/two-column-text と :overflow/x-hidden-y-scroll は marker でも line-height でもなく
               **margin の問題**だった（flex item の margin は collapse しない／overflow コンテナは BFC を作る）"
              "::marker 自体の位置はこの harness では検証不能（oracle は要素ごとに 1 box、::marker は要素でない）"]}
+
+{:at "2026-08-05"
+ :iteration 48
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 357 :was 341 :added 16}
+ :line-structure {:agree 342 :total 344 :pct 99}
+ :geometry {:boxes-agree 1297 :boxes-total 1313 :pct 99 :clean-cases 345 :of 357
+            :on-old-corpus "1261/1277、全 box 一致 329/341（341 case で比較した場合）"}
+ :paint-order {:points-agree 8852 :points-total 8909 :pct 99 :clean-cases 339}
+ :computed-style {:values-agree 16138 :values-total 18453 :pct 87}
+ :landed {:cssom "633d5c4 — figure の UA margin / aspect-ratio / display: contents（harness 側）"}
+ :note "per-case で変化したのは**ちょうど 2 case、どちらも一致へ、退行 0**。"
+ :findings ["**figure は 1em の半分だけ持っていた。** ua-margin-scale に 1em はあったが
+             `figure { margin: 1em 40px }` の 40px はどのテーブルにも無く、宣言 1 つの欠落が 6 つの誤った数値になっていた。
+             Brave の UA sheet を 43 タグ実測して確認（blockquote / dl / dd / fieldset は既に正しかった）。
+             ついでに <menu>/<dir>（list の box を片方も貰えていなかった）と
+             **<hr>（margin 0.5em + 1px border で 2px 高。engine は 0 で描いており hr の下の block が全て 2px 上にいた）**
+             を実装。"
+            "**aspect-ratio は content の下限であって上限ではない**（CSS Sizing 4 の automatic minimum size）——
+             実測: width: 40px; aspect-ratio: 3/1 に 6 行入れると Brave は 144 高であって 13 ではない。
+             12 case 追加（width から / height から / 宣言 height 優先 / auto <ratio> / flex item の両方向 /
+             absolute / box-sizing）で全て pass。"
+            "**display: contents は engine の不一致ではなく harness の欠陥だった。** 要素は box を生成しないが
+             ブラウザは getBoundingClientRect() に **viewport 座標の** 0,0,0,0 を返すので、case root の offset を
+             引くと『その case がページのどこにあるか』だけが残る（full run で −28.03、単独実行で 0）。
+             harness が数値でなく DOM に訊くようにした: getClientRects().length === 0 ——
+             9 形で実測し **display:none と display:contents だけが該当**（空 inline / 空 block / 0x0 block /
+             <br> / visibility:hidden はいずれも 1 rect を返す）。EXCLUDED ブロックで報告、黙って除外しない。"]
+ :declined ["<pre> の margin は**直さなかった**: 1em は正しいが em が誤っている（ブラウザは font-family: monospace と
+             13px の monospace 既定も与えるので 13 vs 16）。font を直さずに margin だけ直すと
+             **正しい数値を誤った理由で得る**ことになる。corpus の 14px 基準では 2px 許容内。"
+            "auto <ratio> が置換要素の**自然な**比率を優先する規則は未モデル化 —— この engine は <img> の寸法を
+             属性から読むだけでリソースを decode しないので、自然比率を持ち得ない。"
+            ":position/fixed-leaves-flow の div y +47.84 は**同じ viewport 原点の artifact だが除外しない** ——
+             fixed box は本当に box を持ち、その case には実際の順序の不一致もあるため、除外すれば本物のバグを隠す。"]
+ :remaining ["margin 2 件（agent 作業中）、control 幅 + vertical-align: top（agent 作業中）"
+             "inline replaced 要素の行 box（aspect-ratio 付き <img> が 46 vs Brave 40）—— control agent の領域として probe を落とした"
+             "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
