@@ -11,7 +11,7 @@
   :adr/authoritative_for
   ["cloud-itonami における製造委託（工場探索・発注・進捗・QC・決済）の統合順序"
    "tsukuru-actor が marketplace 7 actor の kotobase ref に載るかどうか"
-   "工場データ（candidates.edn 2,122 社）が superproject の datom 面に載るかどうか"
+   "工場データ（candidates.edn 2,119 社）が superproject の datom 面に載るかどうか"
    "CAD/CFD/CAE エンジンを production-order の gate として呼ぶ責任境界"
    "製造系バイナリ（CAD / メッシュ / 解析結果）の custody 面をどこに置くか"]
 
@@ -43,9 +43,9 @@ Alibaba の本体である factory-direct の面は、この ref 上に存在し
 
 | ファイル | 件数 | 性質 |
 |---|---|---|
-| `candidates.edn` | **2,122 社（実在企業）** | 公開ディレクトリ由来。全件 `:factory/source-url` 付き。`:factory/sourcing :public-directory`、`:factory/labor-provenance :unknown`。`:factory/did` は `candidate:manufacturer-directory/...` 形で **意図的に did:web ではない**（未 onboard を偽らないため）。ingest 先も別グラフ `com.etzhayyim.tsukuru.candidates` に隔離され、member graph への書き込みを assert で拒否する |
-| `manufacturer-registry-seed.edn` | 101 社 | 実在企業の例示 seed（同じ非-did:web 規律） |
-| `seed.edn` | 3 社 | R0 の worked example |
+| `candidates.edn` | **2,119 社（実在企業 / 106 か国）** | 公開ディレクトリ由来。全件 `:factory/source-url` 付き。`:factory/sourcing :public-directory`、`:factory/labor-provenance :unknown`。`:factory/did` は `candidate:manufacturer-directory/...` 形で **意図的に did:web ではない**（未 onboard を偽らないため）。ingest 先も別グラフ `com.etzhayyim.tsukuru.candidates` に隔離され、member graph への書き込みを assert で拒否する |
+| `manufacturer-registry-seed.edn` | 99 社（21 か国） | 実在企業の例示 seed（同じ非-did:web 規律） |
+| `seed.edn` | 3 社 | R0 の worked example（他に production-order / progress / sbt entity 7 件） |
 | `wire/catalogs/manufacturer-catalog.v1.json` | 465 | 約 90% が合成プレースホルダ、別 consumer 向け read-only。上記とは無関係 |
 
 **この層の誠実さ（同意していない企業を『登録済み』と偽らない）は既に設計に焼き込まれており、
@@ -112,9 +112,12 @@ landed していなくても壊れないが、逆順にすると後段が前段�
 
 `manifest/edn-query.cljs` に `factory-registry-entities` を足し、`all-tx` に載せる。
 
-- 入力は `orgs/cloud-itonami/tsukuru-actor/kotoba/` の `candidates.edn`(2,122) /
-  `manufacturer-registry-seed.edn`(101) / `seed.edn`(3)。`wire/catalogs/*.json` は **読まない**
-  （約 90% が合成プレースホルダ）。
+- 入力は `orgs/cloud-itonami/tsukuru-actor/kotoba/` の `candidates.edn`(2,119) /
+  `manufacturer-registry-seed.edn`(99) / `seed.edn`(3 工場 + 7 entity)。
+  `wire/catalogs/*.json` は **読まない**（約 90% が合成プレースホルダ）。
+  （2026-08-05 訂正: 当初この ADR は 2,122 / 101 と書いていた。grep が
+  **ヘッダのコメント中の `:factory/did` を数え込んだ**もので、実体を parse した
+  正しい数は 2,119 / 99。数え方を間違えた数字を『実測』として書いていた。）
 - **`:source/dataset` を 3 つに分ける**: `\"tsukuru-candidates\"` / `\"tsukuru-registry-seed\"` /
   `\"tsukuru-seed\"`。1 つに畳まない —— 同意していない公開ディレクトリ企業と、例示 seed と、
   デモを 1 つの dataset 名にすると、candidates.edn がヘッダで守っている区別が
@@ -125,9 +128,18 @@ landed していなくても壊れないが、逆順にすると後段が前段�
   自動同定しない。
 - ローダは shape 不一致を nil で握り潰してよいが、**握り潰した件数を stderr に WARNING で
   報告する**（`warn-skipped!` 既存規約）。
-- 完了条件: `edn-query.cljs q` で `[?e \"factory/country\" \"JP\"]` が引けること、
-  `count` に 3 dataset が出ること、`:source/dataset` を指定しないクエリが
-  candidates と seed を **混ぜて返さない**ことをテストで固定すること。
+- 完了条件: `count` に 3 dataset が別々に出ること、能力で工場が引けること、
+  **3 つのタグが partition になっていること**を検査で固定すること。
+
+  （2026-08-05 訂正: 当初ここには「`:source/dataset` を指定しないクエリが candidates と
+  seed を混ぜて返さないことをテストで固定する」と書いていたが、**これは実装できない**。
+  1 つの面に載せる以上、フィルタしないクエリが両方を返すのは設計どおりで、それを
+  禁じたら Phase 1 の目的そのもの（同じ面で join できること）が消える。実際に固定した
+  のは『混ざらないこと』ではなく『**いつでも分離できること**』:
+  ①各 dataset の件数がファイル実体と一致する（行が落ちても混ざっても検出できる）
+  ②3 タグが互いに素 ③`tsukuru-candidates` に `did:web:` が 1 件も無い
+  ④能力検索が 0 件を返さない ⑤factory entity に `:company/lei` が無い。
+  検査は `scripts/verify-tsukuru-factory-plane.cljs`。）
 
 ## Phase 2 — tsukuru を `marketplace` ref に載せる
 
@@ -194,7 +206,7 @@ skill `large-binary-datalad` の経路で `tsukuru-manufacturing-artifacts`（�
   :adr/consequences
   "## 得るもの
 
-- Phase 1 単体で、2,122 社の実在製造業者が `manifest/edn-query.cljs` の datom 面に載り、
+- Phase 1 単体で、2,119 社の実在製造業者が `manifest/edn-query.cljs` の datom 面に載り、
   LEI 実体（`cloud-itonami-lei`）・ToS アーカイブ・SEC 財務（`market-intel`）・特許
   （`toshokan-patents`）・passive DNS（`yabai`）と **同じ面に並ぶ**。join は人間確認付きの
   候補提示から始まるが、面が揃っていること自体が前提条件。
@@ -239,8 +251,32 @@ murakumo fleet gate（`scripts/fleet-ci/gates.edn`）に足す場合は、ノー
 
 ## 現在の実装状況（2026-08-05 時点）
 
-**4 段とも未着手。** この ADR は順序と完了条件を固定するもので、コードは 1 行も landed して
-いない。次の agent はここから Phase 1 に着手してよい。"
+**Phase 1 = landed。Phase 2-4 = 未着手。**
+
+Phase 1 の実測（この面で実際に走らせた値）:
+
+| | 値 |
+|---|---|
+| `tsukuru-candidates` | 2,119 entity（106 か国） |
+| `tsukuru-registry-seed` | 99 entity（21 か国） |
+| `tsukuru-seed` | 10 entity（うち工場 3） |
+| 面の total | 137,875 → **140,106** |
+| ロード時間 | 55 秒 → 62 秒 |
+
+- `manifest/edn-query.cljs` に `tsukuru-factory-entities` を追加し、`ds-schema` に
+  `factory/capabilities` / `factory/fulfillment-modes` の `:db.cardinality/many` を宣言した
+  （宣言しないと datascript が JS array を 1 値として持ち、能力検索が**例外を出さずに
+  0 件を返す**）。`count` は 3 dataset を**別々に**出す。
+- `scripts/verify-tsukuru-factory-plane.cljs` が上記 5 つの不変条件を検査する。
+  **落ちることを確認済み**: ①3 タグを 1 つに畳んだコピー ②cardinality-many 宣言を
+  外したコピー の両方で exit 1 になり、無改変で exit 0 になることを実際に見た。
+- この検査は murakumo fleet gate に**入れていない**。ノードは tailnet だけに繋がっており
+  npm 依存（datascript）が配られないので `:nbb-script` gate では面を組めない。
+  手で回す前提（面を 3 回ロードするので約 3 分）。
+
+**Phase 2 に進む前に読むこと**: Phase 1 は join を**約束していない**。
+`:factory/display-name` × `:company/legal-name` の候補提示までで、LEI による自動同定は
+していない（candidates.edn は LEI を持たないため）。"
 
   :adr/body
   "この ADR の本体は :adr/context / :adr/decision / :adr/consequences にある。

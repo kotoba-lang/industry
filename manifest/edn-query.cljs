@@ -1227,6 +1227,62 @@
           (assoc e :db/id (next-tempid!) :source/dataset "okugai-inventory")))
       [])))
 
+;; ---------- tsukuru factory registry（ADR-2800003200 Phase 1） ----------
+;; cloud-itonami/tsukuru-actor の kotoba/*.edn。製造委託先（工場）を面に載せる。
+;;
+;; **3 つの dataset に分ける。1 つに畳んではならない。** この 3 ファイルは
+;; 「どれだけ本物か」ではなく **その企業がこのプラットフォームに何を同意したか**
+;; で違う。畳むとその区別がクエリ側から消える:
+;;
+;;   tsukuru-candidates    公開ディレクトリ由来の research 参照（2,119 社 / 106 か国）。
+;;                         **同意も onboarding も無い。** :factory/did は
+;;                         "candidate:manufacturer-directory/..." で、did:web ではない。
+;;                         :factory/labor-provenance は全件 :unknown。
+;;   tsukuru-registry-seed 実在企業の例示 seed（99 社）。:sourcing :representative。
+;;                         **これも登録済み関係ではない。**
+;;   tsukuru-seed          R0 の worked example（3 社 + production-order / progress /
+;;                         sbt entity）。デモであって実在の取引ではない。
+;;
+;; `wire/catalogs/manufacturer-catalog.v1.json` は **読まない** —— 約 90% が合成
+;; プレースホルダで、別 consumer 向けの read-only データ。ここに混ぜると
+;; 「実在企業 2,119 社」という数字が嘘になる。
+;;
+;; **:company/lei を合成しない。** candidates.edn は LEI を持たない。持たせれば
+;; 捏造になるので、market-intel / cloud-itonami-lei との join は
+;; :factory/display-name × :company/legal-name の**人間が確認する候補提示**に留める
+;; （自動同定は Phase 1 の scope 外 —— ADR-2800003200 の「Phase 1 は join を約束しない」）。
+;;
+;; 面をまたぐ結合キー:
+;;   :factory/did          ↔ :production-order/factory-did（同一 dataset 内）
+;;   :factory/isic         ↔ cloud-itonami-* の ISIC blueprint repo 名
+;;   :factory/display-name ↔ :company/legal-name（**値一致の候補提示のみ**）
+
+(def ^:private tsukuru-factory-sources
+  ;; [ファイル名 dataset 名] —— 追加するときは dataset 名も必ず新設する。
+  ;; 既存 dataset に相乗りさせると、同意の段階が違うものが同じタグになる。
+  [["candidates.edn"                 "tsukuru-candidates"]
+   ["manufacturer-registry-seed.edn" "tsukuru-registry-seed"]
+   ["seed.edn"                       "tsukuru-seed"]])
+
+(defn tsukuru-factory-entities [next-tempid!]
+  (let [dir (io/file root "orgs" "cloud-itonami" "tsukuru-actor" "kotoba")]
+    (if (.exists dir)
+      (let [skipped (atom [])
+            es (->> tsukuru-factory-sources
+                    (mapcat (fn [[fname dataset]]
+                              (let [f (io/file dir fname)]
+                                (if-not (.exists f)
+                                  (do (swap! skipped conj (str f)) [])
+                                  (let [rows (vector-of-maps-entities f)]
+                                    (when-not (seq rows) (swap! skipped conj (str f)))
+                                    (map #(assoc % :source/file (str f)
+                                                   :source/dataset dataset)
+                                         (or rows []))))))))]
+        (warn-skipped! "tsukuru-actor kotoba/*.edn" @skipped)
+        (for [e es]
+          (assoc e :db/id (next-tempid!))))
+      [])))
+
 ;; ---------- 因縁 dependency record（category N。ADR-2607258500） ----------
 ;; kotoba-lang/loop-innen の corpus/*.edn（+ resources/*-corpus.edn）。
 ;; entity 間の**依存エッジ**を持つ唯一の corpus — この面には従来「entity の台帳」
@@ -1515,6 +1571,14 @@
                "yakuwari.policy/unknown" "yakuwari/capability"
                "yakuwari/runners" "business/roles"]]
       (aset obj a (js-obj ":db/cardinality" ":db.cardinality/many")))
+    ;; tsukuru factory registry (ADR-2800003200 Phase 1): 工場は複数の能力・複数の
+    ;; 受注形態を持つ。cardinality-many を宣言しないと datascript は JS array を
+    ;; 1 つの値として持ち、[?e "factory/capabilities" "cnc-controls"] が
+    ;; **黙って 0 件を返す**（能力で工場を引く、というこの dataset の主目的が
+    ;; 無言で壊れる）。schema.edn は生成物で手編集禁止なので、
+    ;; patent/applicant-norm・yakuwari/* と同じくここに置く。
+    (doseq [a ["factory/capabilities" "factory/fulfillment-modes"]]
+      (aset obj a (js-obj ":db/cardinality" ":db.cardinality/many")))
     obj))
 
 ;; ---------- build + query ----------
@@ -1570,6 +1634,7 @@
         innen-tx (innen-entities next-tempid!)
         awai-tx (awai-yakuwari-entities next-tempid!)
         okugai-tx (okugai-inventory-entities next-tempid!)
+        factory-tx (tsukuru-factory-entities next-tempid!)
         all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
                                                      biz-tx canvas-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
@@ -1578,7 +1643,8 @@
                                                      working-doc-tx narrative-tx
                                                      company-tx property-tx relationship-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx innen-tx
-                                                     awai-tx kakekomi-tx okugai-tx index-tx)))]
+                                                     awai-tx kakekomi-tx okugai-tx factory-tx
+                                                     index-tx)))]
     (.transact ds conn all-tx)
     {:conn conn
      :adr-count (count adr-tx)
@@ -1603,6 +1669,12 @@
      :innen-count (count innen-tx)
      :awai-yakuwari-count (count awai-tx)
      :okugai-inventory-count (count okugai-tx)
+     ;; 3 dataset を合算した 1 個の factory-count にしない —— 同意していない
+     ;; 2,119 社と 3 社のデモが 1 つの数字に溶けると、それを読んだ人が
+     ;; 「登録済み工場 2,221 社」と誤読する（ADR-2800003200）。
+     :tsukuru-candidates-count (count (filter #(= "tsukuru-candidates" (:source/dataset %)) factory-tx))
+     :tsukuru-registry-seed-count (count (filter #(= "tsukuru-registry-seed" (:source/dataset %)) factory-tx))
+     :tsukuru-seed-count (count (filter #(= "tsukuru-seed" (:source/dataset %)) factory-tx))
      :index-count (count index-tx)}))
 
 ;; ---------- MCP mode（常駐して JSON-RPC で答える） ----------
@@ -1634,9 +1706,15 @@
     :description
     (str "Run a Datalog query against the unified EDN plane: "
          "116k entities across 26 datasets — ADRs, business metrics, fleet state, "
-         "SEC EDGAR financials, legal entities, ToS archives, patents, passive DNS. "
+         "SEC EDGAR financials, legal entities, ToS archives, patents, passive DNS, "
+         "manufacturer/factory registries. "
          "Attributes are BARE STRINGS, not keywords (\"company/lei\", not "
-         ":company/lei). Datasets are distinguished by \"source/dataset\". "
+         ":company/lei). Datasets are distinguished by \"source/dataset\" — and for "
+         "the tsukuru factory registries that tag is load-bearing: "
+         "\"tsukuru-candidates\" companies have NOT consented to or been onboarded "
+         "onto the platform (public-directory research only), while "
+         "\"tsukuru-registry-seed\" and \"tsukuru-seed\" are illustrative seeds. "
+         "Never report them as registered suppliers. "
          "Example: [:find ?id :where [?e \"adr/id\" ?id] [?e \"adr/status\" \"accepted\"]]")
     :input-schema {:type "object"
                    :properties {"query" {:type "string"
@@ -1805,24 +1883,28 @@
                 kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                 narrative-count company-count fleet-count yabai-count tadori-count patent-count
-                innen-count awai-yakuwari-count]}
+                innen-count awai-yakuwari-count
+                tsukuru-candidates-count tsukuru-registry-seed-count tsukuru-seed-count]}
         (build-conn)
         total (+ adr-count docs-count manifest-count foreign-adr-count biz-count
                  kj-count rad-count
                  etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                  narrative-count company-count fleet-count yabai-count tadori-count patent-count
-                 innen-count awai-yakuwari-count)]
+                 innen-count awai-yakuwari-count
+                 tsukuru-candidates-count tsukuru-registry-seed-count tsukuru-seed-count)]
     (case mode
       "count"
       (println (format (str "adr=%s docs=%s manifest=%s foreign-adr=%s biz=%s kj=%s rad=%s "
                              "etzhayyim-80-data=%s proc-registry=%s merged-kotoba=%s working-doc=%s "
                              "narrative=%s company=%s fleet=%s yabai=%s tadori=%s patent=%s innen=%s "
-                             "awai-yakuwari=%s total=%s")
+                             "awai-yakuwari=%s tsukuru-candidates=%s tsukuru-registry-seed=%s "
+                             "tsukuru-seed=%s total=%s")
                         adr-count docs-count manifest-count foreign-adr-count biz-count
                         kj-count rad-count
                         etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                         narrative-count company-count fleet-count yabai-count tadori-count patent-count
-                        innen-count awai-yakuwari-count total))
+                        innen-count awai-yakuwari-count
+                        tsukuru-candidates-count tsukuru-registry-seed-count tsukuru-seed-count total))
 
       "q"
       (println (pr-str (js->clj (.q ds query-str (.db ds conn)))))
