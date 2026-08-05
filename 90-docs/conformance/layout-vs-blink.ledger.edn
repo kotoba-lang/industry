@@ -1129,3 +1129,26 @@
              "overflow-x: clip の片軸 clip（clip op が軸を持たない）"
              ":position/fixed-leaves-flow と :stacking の tie（どちらも harness の計測限界）"
              "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
+
+{:at "2026-08-05"
+ :iteration 49
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 357}
+ :line-structure {:agree 343 :total 343 :pct 100 :was "342/344 (99%)"}
+ :geometry {:boxes-agree 1305 :boxes-total 1313 :pct 99 :clean-cases 350}
+ :paint-order {:points-agree 8866 :points-total 8909 :pct 100 :clean-cases 341}
+ :computed-style {:values-agree 16138 :values-total 18453 :pct 87}
+ :landed {:cssom "5e6a160ce392409868ffa60a1c8ebf1ccaaaafa4 — 共有ページで測れない case を単独ページで測る"}
+ :note "**2 ラウンド『harness の限界』として記録していた 1 件は、限界ではなくページ配置の選択だった。**
+        position: fixed の box は viewport に対して配置されるので、全 case を 1 枚に並べたページでは
+        case 相対の y が『その case がページのどこにあるか』でしかない（−47.84、先頭なら 0、
+        上に 1 つ挿せばまた別の値）。:oracle/isolated true の case を自分だけのページで測るようにしたところ、
+        **:position/fixed-leaves-flow は行構造・幾何とも完全一致（4/4 box）** ——
+        engine の欠陥では最初から無く、測り方が答えを壊していた。"
+ :second-case ":stacking/positioned-covers-later-flow-content を :oracle/blind に。2 語が完全に重なり
+               （両方 (0,0)）左右順序が存在しないので、行軸は答えの無い問いを立てている。
+               本題である『どちらが上か』は paint order 軸が、box は幾何軸が採点する。
+               恒久的に赤い case は次の読み手に何も教えないが、印の付いた case は理由を運ぶ。"
+ :in-flight ["UA stylesheet を cascade へ（ADR-2800003100 の option A）—— agent 作業中"
+             "font metric hook（平均 advance / x-height）で相殺対を閉じる —— agent 作業中"
+             "RTL の inline 配置 —— agent 作業中"]}
