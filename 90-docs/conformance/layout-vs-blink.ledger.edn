@@ -1490,3 +1490,44 @@
              inline run として合算されていたからで、規則ではなく偶然。ブラウザ自身の computed 値を
              渡した瞬間に露見する。**次の landing で flex の intrinsic 幅修正とセットにする** ——
              どちらも単独では軸を交換することになる。"}
+
+{:at "2026-08-05"
+ :iteration 53
+ :note "レイアウト被覆 agent（7374e9e、pin 済み）の詳細所見。次反復の入力。"
+ :fixes-found-by-new-cases
+ ["**flex が両軸で単一の :gap を読んでいた** —— row-gap / column-gap / `gap: <r> <c>` の後半が
+    flex box では何もしていなかった（grid は 3 つとも尊重していた）。
+    Brave: row-gap:12 column-gap:8 → 52px 高・2 行目 y=32、engine は 40/y=20。"
+  "distribute-excess が <col> 宣言済みの列を伸ばしていた（300px table で col 200px + auto は
+    Brave 200+94、engine 281+13）。"
+  "**行グループがソース順にレイアウトされていた** —— <tfoot> が <tbody> より前にあると最後に描かれるべきなのに逆。"
+  "UA sheet に template { display:none } と dialog:not([open]) { display:none } が無く、
+    **閉じた <dialog> が自分のテキストをページに描いていた**。"]
+ :new-divergences
+ ["**multi-column は実装が全く無い —— 11 case、corpus 最大のクラスタ**。column-count:2 の 4 ブロックが
+    Brave (0,0)(0,30)(160,0)(160,30) に対し engine は縦一列、テキストも列幅 140 でなく 300 で折り返す。"
+  "sticky の stuck offset が無い（2 case）。bottom:0 は Brave で y=100→40、包含ブロックで clamp されると 100→80。
+    **未 scroll の case は依然一致するので、既存の scope cut は確認され、かつ境界が定まった。**"
+  "**width: min-content|max-content|fit-content が auto 扱い**（3 case）。`alpha beta` は Brave で 35/70/70、
+    engine は 300。**intrinsic 計測は layout.cljc に既にあり（table と flex が使っている）width に繋がっていないだけ**
+    —— 残る中で最も安い。"
+  "flex の min/max clamp が再配分しない（2 case）。200px の flex:1 2 つで一方に min-width:150 を掛けると
+    他方は 50 でなく 100 のまま。"
+  "percentage gap が px として読まれる（2 case）。column-gap:10% は 300px の 30、engine は 10。
+    **Brave の row-gap は cyclic**（grid 自身の 40px の 10% = 4）。"
+  "white-space: nowrap な scroll container の中で inline-block が折り返す（2 case）——
+    **agent が足した control が帰属を変えた**: sticky-right の case は sticky の失敗に見えたが、
+    sticky 抜きの control も折り返す。"
+  "caption-side: bottom（既知の scope cut に数値が付いた）、<dialog open> の UA box（fit-content が先に要る）、
+    **<summary> の無い <details>**（Brave は 20px の summary を合成、engine は空）。"
+  "cssom の所見ではない: htmldom が裸の <col> の周りに暗黙の <colgroup> を合成しない。"]
+ :judgement-calls
+ ["**object-fit / object-position は case を足さなかった** —— 置換 box の**内側**の描画を変えるだけで、
+    box も hit テストも 14 の比較 property も変えない。**採点され得ない case は足さない。**"
+  "closed <details> を :oracle/blind に（Chromium は content-visibility: hidden を使うので
+    oracle はブラウザが描かない y=34 の <p> box を読む —— text-overflow: ellipsis と同じ
+    『DOM と描画結果を比べている』型）。"
+  "**予測が外れたことを正直に記録** —— scrollbar-gutter の case は 15px の差を期待して書いたが、
+    macOS の headless Brave 151 は overlay scrollbar で何も予約しないので一致した。
+    測っている内容に合わせて改名して残した。"
+  "重複 id 検査が既存 corpus との衝突を 2 件検出（1 件は近似重複として削除、1 件は改名）。"]}
