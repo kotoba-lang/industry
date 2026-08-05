@@ -178,11 +178,14 @@
    :script "gates/projection-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
-  ;; 学習コーパス面（ADR-2608056000）。**生成物を再生成して bytes 一致を見る** —
-  ;; committed 済みの値を読むだけの検査では、内部整合を保ったまま手編集された
-  ;; corpus.datoms.edn を検出できない。加えて coverage の申告 vs 実体・
-  ;; hazard⇔:excluded・shard の被覆・annex key の整合という独立な不変条件を見る
-  ;; （生成器自体が壊れて「--check は通るが中身が矛盾する」ケース用）。
+  ;; 学習コーパス面（ADR-2608057000）。**索引に載っている行を再採点して照合する**
+  ;; （`--verify-index`）— committed 済みの値を読むだけの検査では、内部整合を保った
+  ;; まま手編集された corpus.datoms.edn を検出できない。加えて coverage の申告 vs
+  ;; 実体・hazard⇔:excluded・shard の被覆・annex key の整合という独立な不変条件を見る。
+  ;;
+  ;; **全再生成の bytes 一致にしていない**のは、並行セッションが毎日 ADR を足すため
+  ;; —— 新しい文書が 1 件 landed した瞬間に赤になり、以後ずっと赤のままになる。
+  ;; 載っている行の正しさ（改竄検出）と、索引が最新かどうか（運用）は別の問題。
   ;;
   ;; :include-ext に ".md" が要る —— 生成器は 90-docs 配下の .md も採点対象に
   ;; するので、md を送らないと再生成の件数が減って **正しい corpus が STALE と

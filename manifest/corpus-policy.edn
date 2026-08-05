@@ -164,10 +164,17 @@
 
  ;; ---------------------------------------------------------------------------
  ;; bytes plane。**shard は git に入れない**（ADR-2608039700: large EDN shard は annex）。
- ;; ここが宛先の宣言で、実際に custody があるかは `:shard/custody` が別に申告する。
+ ;; ここが宛先の宣言で、実際に custody があるかは**この面が申告しない** ——
+ ;; 証明は `scripts/annex-custody-verify.cljs`（off-machine copy の存在 +
+ ;; remote から読み戻しての checksum）だけが持つ。索引は自分の保管を自称しない。
+ ;;
+ ;; **宛先は com-junkawasaki 自前の dataset**（オーナー判断 2026-08-05）。当初は
+ ;; 既存の `gftdcojp/gftd-llm-dataset` を指していたが、あれは外部コーパス
+ ;; （HF / CommonCrawl / Hume）を license gate 付きで集める **別 org の** dataset で、
+ ;; こちらは com-junkawasaki の `:workspace-internal` な文書。custody は所有に従わせる。
  :bytes-plane
- {:dataset/id "gftdcojp/gftd-llm-dataset"
-  :dataset/path "orgs/gftdcojp/gftd-llm-dataset"
+ {:dataset/id "com-junkawasaki/training-corpus"
+  :dataset/path "orgs/com-junkawasaki/training-corpus"
   :dataset/subdir "corpus/workspace-docs"
   :annex/backend "SHA256"
   :annex/special-remote "b2"
