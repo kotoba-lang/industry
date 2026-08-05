@@ -123,14 +123,38 @@ CLAUDE.md の判定基準（**そのストアを今すぐ削除したとき、�
   「agent-facing な durable source of truth は Git + canonical EDN」とここで一致する ——
   **今日の flat な `blocks/*.cbor` ディレクトリは git object DB の再発明**であり、
   git に載せれば review / fsck / numcopies / 既存の custody 手順がそのまま効く。
-- CID 再検証は `storage/verify` の decorator に降ろす（3 箇所の手検査を消す）。
+- ~~CID 再検証は `storage/verify` の decorator に降ろす（3 箇所の手検査を消す）。~~
+  ❌ **撤回（2026-08-05、実装時の実測）。** `verify/check-blocks` は `(cid-of bytes)` を
+  呼ぶだけで**キーの codec を見られない**（`verify.cljc:106`）。codebase の keyspace は
+  混在している —— 定義ブロックは dag-cbor codec の CID、artifact と pointer は raw codec の
+  CID —— ので、単一の `cid-of` ではどちらかが必ず落ちる。`mf/cidv1-raw` で包むと
+  **全ての意味ブロックが拒否される**。
+  decorator は「呼び出し側が検査を忘れる」問題を解くものだが、codebase の read 経路は 3 本
+  しかなく **3 本とも既に space ごとに正しい検査をしている**（`:block` は canonical CBOR
+  再エンコード、`:artifact` は raw CID）。降ろす先が無いのではなく、**降ろす必要が無い**。
   ⚠ **`fetch.clj` の canonical-encoding 検査は降ろさない。** verify decorator は
   「バイトが要求 CID に一致するか」しか見ておらず、**非 canonical な CBOR で同じ値に
   decode させ、再 encode すると別 CID になるバイトを store に置く**経路は塞がない。
   この 1 点は codebase の方が厳しい。**厳しい側を残す。**
-- head は `signed_head` のレコード形式に載せ替える。ただし
-  **TOFU の publisher DID pin は codebase 側に残す** —— `signed_head` は「誰が issue したか」
-  を検証するが、「どの issuer を信じるか」は決めない。信頼方針は codebase の所有物。
+- ~~head は `signed_head` のレコード形式に載せ替える。~~
+  ❌ **撤回（2026-08-05、両実装を並べて実測）。** 2 つのレコードを項目ごとに比べると、
+  **codebase 側が劣っているのは 1 点だけ**だった:
+
+  | | codebase `kotoba.namespace-head.v1` | kotobase `kotobase.head/v1` |
+  |---|---|---|
+  | ref/namespace 束縛 | ✅ 署名対象に `namespace` | ✅ `addressed-to?` |
+  | monotonic seq / prev link | ✅ | ✅ |
+  | issuer | ✅ **seed から導出**（`sign-record`） | ⚠ 引数で受け取る（`:issuer`） |
+  | TOFU pin | ✅ `following` / `retire!` | `:accept-issuer?` |
+  | **fork 検出** | ❌ **欠落** | ✅ `forked?` |
+
+  issuer の扱いは **codebase の方が強い** —— 「述べた publisher と署名した鍵が食い違う
+  レコード」を構造的に作れない。載せ替えるとその性質を失い、しかも
+  **ADR-2608550000 L5 で実 DHT に publish 済みの wire format を壊す**。
+  欠けていたのは fork 検出 1 点だけなので、**それを codebase 側に足した**
+  （`publication/forked?` + `:publication/forked-head`）。
+  **TOFU の publisher DID pin は引き続き codebase 側が所有する** —— `signed_head` は
+  「誰が issue したか」を検証するが「どの issuer を信じるか」は決めない。
 - artifact は `storage/object`（transfer profile 付き large object 面）に載せる。
   raw bytes を DAG-CBOR block 面に押し込まないという既存判断（`put-artifact!` の docstring）
   は正しく、kotobase 側に**同じ判断が既に別名で存在する**。
@@ -176,12 +200,29 @@ inga の 2f+1 quorum（ADR-2608038000）を ref 面に使う。
 
 | 段 | 内容 | 状態 |
 |---|---|---|
-| **S1** | `codebase.store` に backend seam を入れる（filesystem を 1 実装に降格、public API 不変） | **着手** |
-| S2 | `verify` decorator と `signed_head` へ載せ替え（canonical 検査と TOFU は codebase 側に残す） | 未着手 |
-| S3 | `code-graph` を codebase blocks の projection として配線し、`projection-verify` gate を通す | 未着手 |
-| S4 | `dependents` / `find` / `diff` を projection 経路へ（**fallback 必須**） | 未着手 |
-| S5 | compile 既定を `--module-lock` に反転、`--unpinned` を receipt に記録 | 未着手 |
-| S6 | repo 同期プレーン（ADR-2608040200 Plane A）を同一 ref へ | 未着手 |
+| **S1** | `codebase.store` に backend seam（`backend/ICodebaseStore` + `backend.kotobase`） | **完了** `codebase@9c8c5ed` |
+| **S2** | head 面に fork 検出。block 面は**不要と判明**（上記 D2 の 2 つの撤回） | **完了** `codebase@7392c25` |
+| S3 | `code-graph` を codebase blocks の projection として配線し `projection-verify` gate を通す | **未着手** |
+| **S4** | `dependents` を 1 パス逆向き索引へ。`#`短縮ハッシュの scope 縮退を明示 | **完了** `codebase@7392c25` |
+| **S5** | compile 既定を反転（多モジュールは `--unpinned` 必須）、入力モードを artifact の隣に記録 | **完了**（下記の限界つき） |
+| S6 | repo 同期プレーン（ADR-2608040200 Plane A）を同一 ref へ | **未着手** |
+
+### S5 の実装上の限界（正直に）
+
+`--unpinned` は `<output>.inputs.edn` に記録され、結果行にも出るが、**sealed provenance の
+中には入っていない**。`provenance/verify!` が descriptor の**キー集合の完全一致**を要求する
+ため、キーを 1 つ足すと全 artifact が自分の identity 検査に落ちる。
+正しい終点は `build-metadata` を `compile-project` / `compile-source` / `compile-component`
+に通し、**pinned と unpinned で provenance hash が変わる**ようにすること —— 同じ source でも
+別のビルドだからである。今日の `.inputs.edn` は **record であって seal ではない**。
+
+### S3 / S6 を今日やらなかった理由
+
+- **S3**: `code-graph` は退役予定の legacy `IStore` に載っており（`kotobase.store` /
+  `kotobase.local`）、datom 面への移行は ADR-2607201600 M6 の作業そのもの。codebase 側から
+  配線する前に、その移行が終わっている必要がある。順序を飛ばすと 3 つ目の実装が生える。
+- **S6**: ADR-2608040200 の Plane A/B/C は prolly-tree の diff/merge という**今日存在しない
+  primitive**（同 ADR が自ら名指ししている）を要する。ここで着手すると本 ADR の範囲を超える。
 
 ## 主張してはいけないこと
 
@@ -195,6 +236,20 @@ inga の 2f+1 quorum（ADR-2608038000）を ref 面に使う。
   正確な revision を束ねていない（ADR-2608550000 が明記）問題は別であり、本 ADR は触らない。
 - **`code-graph` の legacy IStore 依存は S3 まで残る。** S3 以前に「datom 面に載った」と
   言わない。
-- **S1 は seam を入れるだけで、まだどの外部 provider も配線していない。** git / IPFS /
-  kura backend が実際に動いたと言えるのは S2 以降である。
+- **S1 は seam を入れただけで、外部 provider を 1 つも配線していない。** 実際に動かした
+  非ファイルシステム backend は `kotobase.storage.memory` だけである。git / IPFS / kura が
+  動いたとは言えない。
+- **kotobase の datom 面はまだ 1 バイトも使っていない。** S4 の索引は codebase 内の
+  1 パス走査であって、datom projection ではない。両者は交換可能に設計してあるが、
+  「kotobase と統合した」と言えるのは S3 以降である。
+- **compiler の 31 件の既存 failure は本 ADR の作業と無関係**（`origin/main` の pristine
+  checkout で同数を実測）。S5 がそれを直したとも壊したとも言わない。
+
+## 改訂履歴
+
+- **2026-08-05（同日）**: D2 の 2 項目を実装時の実測により撤回（`verify` decorator は
+  混在 codec keyspace に適用不能／head レコード形式の載せ替えは issuer 導出の性質を失い
+  publish 済み wire format を壊す）。S1/S2/S4/S5 を完了に更新し、S5 の seal 限界と
+  S3/S6 を今日やらなかった理由を追記。**設計を書いた者と実装した者が同じなので、
+  撤回は「実装が設計に負けた」ではなく「設計が実測に負けた」と記録する。**
 "}]
