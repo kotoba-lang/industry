@@ -148,14 +148,15 @@ live（2026-08-05 実測、デプロイ後）:
       古いままで、その後 propagate した。**deploy 直後の 1 回の curl を根拠に
       『反映されていない』と判断しない。**"
 
-  :adr/status_2608052000
-  "## 完了（2026-08-05、live 実測で確認）
+  :adr/status_2608052200
+  "## 現在地（2026-08-05 closing 時点）—— live。既知のギャップは残っていない
 
-`{org}.itonami.cloud/{repo}/` が動いている。`:status` は `live`。
+`{org}.itonami.cloud/{repo}/` が本番で動いている。`:status` は `live`。
 
-    network-awai/cloud-itonami  094e2e3e  shirohan 再ビルド + live 切り替え
+    network-awai/cloud-itonami  fbf94413
+    com-junkawasaki/root        west pin 59697112 で fbf94413 を指す
     Cloudflare Pages            c48301b2  Production / branch main
-    DNS  CNAME cloud-itonami -> cloud-itonami.pages.dev (proxied)  id 1a263b2fb15a…
+    DNS   CNAME cloud-itonami -> cloud-itonami.pages.dev (proxied)  id 1a263b2fb15a…
     Pages custom domain  cloud-itonami.itonami.cloud  status=active
 
 **org ホスト**
@@ -177,43 +178,105 @@ live（2026-08-05 実測、デプロイ後）:
 
 **`/{org}/` が apex SPA を返す経路は消えた** —— これが改訂の主目的だった。
 
-## 解消した blocker（前回の記録からの差分）
+## 前回の記録から解消したもの
 
-- **DNS**: オーナーが Cloudflare Global API Key を提供し、それで CNAME を作成した。
-  wrangler の OAuth token は DNS API に読み書きとも通らない（scope に `dns_records`
-  が無い）。**secrets-location-map が記していた keychain `gftd.cf` は実在しなかった**
-  ので、実測結果でマップを更新済み（root `1ea863e8`）。
-  ⚠ **使用した Global API Key は会話ログに露出した。ローテーションが要る。**
-  併せて、`Zone.DNS: Edit` だけを持つスコープ付き token を発行して kagi に保管すれば、
-  以後この種の作業に Global Key は不要になる。
-- **shirohan**: source repo は **SSH では fetch できないが HTTPS では取れた**
-  （remote には curve/color/cut.cljc が揃っていた。ローカル checkout が 7468261 で
-  止まっていただけ）。94ffad4 へ FF して再ビルドし、3 サイトすべてが新クロームに
-  なった。**「fetch が失敗した」を「repo が無い」と読まないこと。**
+### DNS（オーナーが Global API Key を提供）
 
-## 検証
+wrangler の OAuth token は DNS API に**読みも書きも通らない**（scope に `dns_records`
+が無い。同じ token で zone 検索と Pages API は通るので token 自体は生きている）。
+secrets-location-map が記していた keychain `gftd.cf` は**実在しなかった**ので、
+実測でマップを訂正した。Keychain / kagi / 1Password の 3 経路とも空振り
+（1Password は CLI 統合オフで到達不能。「無い」ではなく「見えない」）。
 
-    portable cljs suite   710 tests / 6221 assertions   0 failures 0 errors
-    verify-sites-bundle   26 checks   all passed（:status から期待値を導く形に変更）
+オーナー提供の Global API Key で CNAME を作成し、**同じ鍵を kagi に保管した**
+（`CLOUDFLARE_GLOBAL_API_KEY` ほか 4 件、compartment `personal`）。
+⚠ **5 件とも会話ログに平文で露出している。ローテーション必須。**
+Global Key はアカウント全体・全ゾーンでスコープを絞れないので、恒久的には
+`Zone.DNS: Edit` だけの token に差し替えるべき（未実施）。
+
+### shirohan
+
+source repo は **SSH では fetch できないが HTTPS では取れた**（remote には
+curve/color/cut.cljc が揃っていた。ローカル checkout が 7468261 で止まっていた
+だけ）。94ffad4 へ FF して再ビルドし、3 サイトすべてが新クロームになった。
+**「fetch が失敗した」を「repo が無い」と読まないこと。**
+
+### fleet gate（ADR-2607300900 の決定をこの surface にも適用）
+
+`scripts/fleet-ci/gates/cloud-itonami-sites-check.cljs` を作り `gates.edn` に登録。
+3 検査すべて **standalone で動く**（west sibling も source repo も要らない）:
+
+    A registry canonical   sites.edn + 実ファイルの projection であること
+    B built bundle          sites-core.js を実 import（path モード + host モード 27 件）
+    C cookie 回帰ガード      `Domain=` 付き cookie を入れさせない
+
+**3 つとも落ちることを実証した**（2026-08-05）: registry.json を 1 語書き換えると A、
+sites-core.js の org asset root を壊すと（registry 無傷のまま）B、`Domain=` 付き
+cookie を足すと C。無改変で exit 0。
+
+`score-sites` / `build-sites --check` は west レイアウトを要するので**入れていない**
+—— continue-on-error の飾りにしない。
+
+### KRP §4.1
+
+`90-docs/protocols/kotoba-resource-protocol.edn` に host-scoped form を追加した。
+rules 1-8 は不変（第1パスセグメントを `{repo}` と読むだけ）。実装が守るべき制約 5 点
+（宣言されたホストだけが resolve / org ホストは cockpit を映さない /
+`.well-known` は通す / 移行は宣言であって実測からの推測ではない /
+サブドメインは cookie を分けない）。パス形が引き続き baseline。
+
+### cookie —— PSL は解決策ではない（前回の記述を訂正）
+
+コードに cookie を置く行は**1 つも無く**、live 応答にも `Set-Cookie` は 0 件。
+
+**`itonami.cloud` を PSL に載せるのは誤り**である。そうすると apex 自身も cookie を
+置けなくなる —— GitHub が github.com を PSL に載せず Pages を別ドメインへ移したのは
+これが理由。正しい選択肢は「`Domain=` を付けない（今）」と「第三者コンテンツを
+載せる段階で別ドメインへ（将来）」の 2 つ。KRP §4.1 rule 5 に書いた。
+
+### 複数 org
+
+実配備は 1 org だけなので、性質をテストで固定した: ホストが所有権の境界
+（他 org の repo は自分のホストから 404）、org 面はホストごとに別物、
+`:status` は org ごとに独立（片方の live 化が他方を巻き込まない）。
+
+## 検証（closing 時に再実行した実測値）
+
+    portable cljs suite   712 tests / 6235 assertions   0 failures 0 errors
+    fleet gate (A/B/C)    3 checks   OK（registry 3 sites / bundle 27 / cookies 0）
     generate-sites-registry --check   canonical (3 sites, 38 reserved)
     design-quality        3 サイトとも 100.00 / 12 軸、findings ゼロ
 
-**`live` に切り替えた瞬間にバンドル検査が 3 件落ちた** —— apex がアセットを返さず
-301 するようになったため。ゲートは正しく捕まえたが、直すべきは検査側だった。
-期待値をレジストリの `:status` から導くようにしたので、次の org を足すときも
-切り替えのたびにゲートが古い意味を見続けることはない。
+## この作業中に見つけた、本 ADR とは無関係の既存の欠陥
+
+1. **main が deploy 不能だった。** `e2753812`（Entra federation）が
+   `functions/api/auth/entra/start.js` を足したのに `functions/edge/auth-core.js` を
+   再ビルドしていなかった（wrangler が `No matching export` で落ちる）。再ビルドして
+   着地させた（`6ab741f0`）。**deploy workflow は 2026-08-03 以降 job が起動していない**
+   ので誰も気付いていなかった。
+2. **`verify-sites-bundle.cljs` の `call` が `apply` で opts の map を展開していた。**
+   `(apply f p {:host h})` は MapEntry を 1 引数として渡すので `{:keys [host]}` が
+   全部 nil になる。opts を使う検査が無かったので露呈していなかった。
 
 ## 残っているギャップ
 
-1. **fleet gate に載っていない。** `scripts/fleet-ci/gates.edn` に cloud-itonami の
-   エントリが無く、`test-sites` はどこでも自動実行されていない（network-awai org の
-   GitHub Actions は 2026-08-03 以降 job が起動しない）。
-2. **KRP §4 が未改訂。** `/{org}/{repo}` を universal public pattern と定めたまま。
-   他ホストへ広げる前に直すこと。
-3. **cookie jar は分かれていない**（決定 6）。PSL 登録は未着手。
-4. **2 つ目の org はまだ無い。** `:orgs` は複数を受けるが、実際に別 org を載せる
-   までは「1 org でも動く」ことしか確かめられていない。
+1. **Cloudflare の鍵 5 件が会話ログに露出している。ローテーションが要る**（オーナー作業）。
+   併せて Global Key を `Zone.DNS: Edit` スコープの token に差し替えるべき。
+2. **1Password に鍵を登録できていない。** CLI 統合がオフ（`op whoami` が
+   `account is not signed in`、`op read` は無応答）。アプリの 設定 → 開発者 →
+   「1Password CLI と連携」を有効にすれば非対話で書ける。
+3. **2 つ目の org は実配備されていない。** 性質はテストで固定したが、実際に別 org を
+   載せるまでは「1 org でも動く」ことしか live では確かめられない。
+4. **`murakumo.cloud` は path 形のまま**（ADR-2607299300）。KRP §4.1 は書いたが
+   あちらは未実装。
+5. **cookie の恒久対策**（第三者コンテンツを載せる段階で別ドメイン + PSL）は未着手。
+   今日は `Domain=` を使わない規律を gate で守っているだけ。
 
-"
+## resume point
+
+    cd /Users/junkawasaki/github/com-junkawasaki
+    npx nbb scripts/fleet-ci/gates/cloud-itonami-sites-check.cljs orgs/network-awai/cloud-itonami
+    curl -sI https://cloud-itonami.itonami.cloud/ | head -1
+    curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://itonami.cloud/cloud-itonami/"
 
   :source/dataset "adr"}]
