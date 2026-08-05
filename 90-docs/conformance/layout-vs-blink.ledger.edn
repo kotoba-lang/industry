@@ -2105,3 +2105,157 @@
  "four unit tests asserted the old `inherit`-drops behaviour and one
   asserted nil for a disabled input's colour; all five updated carrying the
   measurement that changed them."}
+
+{:seq 55
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "dac22403ec37632d665463e5bb13142f7bcbd54d"
+ :title "CSS 2.1 Appendix E stacking contexts and paint order"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 576}
+ :measured
+ {:paint-order {:before "13971/14389 (97%)" :after "14181/14389 (99%)"
+                :clean-cases {:before "529/576" :after "538/576"}
+                :mismatched-points {:before 418 :after 208}}
+  :line-structure {:before "540/551" :after "540/551" :note "unchanged"}
+  :geometry {:before "1851/1959, 510/576 clean" :after "identical" }
+  :computed-style {:before "27514/27544, 563/576 clean" :after "identical"}
+  :note "geometry, line and computed style are UNCHANGED to the value --
+         which is what says this was a paint change and not a layout one."}
+ :verified-on-merged-main
+ {:cssom-tests "838 tests / 1962 assertions, 0 failures (828/1918 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "178/0"
+  :harness-not-a-thumb-on-the-scale
+  "THE CLAIM I CHECKED MYSELF, because the engine and the harness changed
+   in the same round: I built a tree with src/ at the OLD commit a49f29b
+   and conformance/ at the NEW commit dac2240, and ran it. It reproduced
+   the baseline to the value on every axis -- geometry 1851, paint 13971,
+   computed 27514, line 540. So the entire +210 comes from the engine, not
+   from the harness."}
+ :per-case-deltas
+ {:red-to-green 9 :green-to-red 0
+  :cases ["content-visibility-hidden-is-not-painted 25 -> 0"
+          "filter-lifts-a-box-above-later-flow 25 -> 0"
+          "opacity-lifts-a-box-above-later-flow 25 -> 0"
+          "relative-lifts-a-box-above-later-flow 25 -> 0"
+          "same-tag-opacity-lifts-the-earlier-box 25 -> 0"
+          "transform-lifts-a-box-above-later-flow 25 -> 0"
+          "negative-z-index-stays-above-its-own-context 20 -> 0"
+          "relative-with-z-auto-does-not-confine-a-descendant 20 -> 0"
+          "z-index-on-a-flex-item 20 -> 0"]
+  :dump-ops-diff "25 cases whose op ORDER changed, 1 whose op CONTENT
+                  changed (content-visibility gains hit=[]), and NO case
+                  whose set of boxes moved. The 25 are the 9 above plus
+                  position/relative (3), position/sticky (5),
+                  absolute-inside (2), flex item with an abspos child,
+                  sticky-header (2), transform (2) and two more stacking
+                  cases -- all of which stayed green."}
+ :what-the-browser-said
+ {:probe "two shapes, each in its own overflow:hidden wrapper, sampled with
+          elementFromPoint over CDP: LIFT (does the trigger put the earlier
+          of two boxes pulled together by margin-top:-60px on top, 25
+          points) and CONFINE (does the trigger on a wrapper stop a
+          z-index:5 box beating a z-index:2 sibling of the wrapper, 20
+          points)."
+  :the-whole-rule
+  "the two questions differ for EXACTLY ONE INPUT: a positioned box with
+   z-index: auto LIFTS BUT DOES NOT CONFINE. The engine confined in both
+   shapes -- wrong on one half of the pair, right by accident on the other."
+  :creates-a-context
+  "position: fixed|sticky (with or without offsets); relative|absolute WITH
+   AN INTEGER z-index; a flex/grid ITEM with an integer z-index; opacity<1
+   (0.999999 yes, 1 no); transform/rotate/scale/translate; filter (even
+   opacity(1)); backdrop-filter; clip-path; perspective;
+   transform-style:preserve-3d; isolation:isolate; mix-blend-mode != normal;
+   contain: paint|layout|strict|content; content-visibility: auto|hidden;
+   view-transition-name; will-change naming one of those."
+  :does-not "overflow:hidden; contain:size; contain:style; z-index on a
+             static box."
+  :two-departures-from-a-spec-reading-where-the-browser-won
+  ["container-type creates NO stacking context. css-contain gives a size
+    container `layout` containment, and contain: layout DOES create one
+    here -- yet container-type: inline-size lifted nothing and confined
+    nothing on both probes."
+   "will-change: z-index creates NONE, although a non-initial z-index
+    plainly creates one on a positioned box, which is what css-will-change
+    says. will-change: position does."]
+  :ties "z-index:0 and z-index:auto paint in the SAME step, separated only
+         by tree order. Measured both ways round."}
+ :mechanism
+ "a box in the positioned band paints in its nearest ancestor stacking
+  CONTEXT's op run, which may be many levels up -- so the ops must TRAVEL,
+  not be reordered where produced. They travel as a :stack push/pop span in
+  the op vector, carrying no :x/:y so translate-ops and transform-ops leave
+  them alone; the first ancestor that is a context extracts every span it
+  can see, sorts by level with ties in document order, and splices
+  negatives after its own :node op and the rest at the end. Riding in the
+  op vector rather than a new return key kept this entirely out of
+  layout-flex, layout-grid, layout-table, layout-multicol and
+  layout-inline-run -- each already concatenates its children's :draw.
+  Extraction FLATTENS (a span inside a span becomes its sibling) because a
+  z-index:auto positioned box is not a context; measured through two nested
+  wrappers. layout-absolute-children STOPPED sorting: a local sort by :z
+  cannot be right, since the containing block is not the stacking context."
+ :harness-defects-found-and-fixed
+ [{:defect "engine-boxes took the first :div node op as the #root wrapper,
+            and engine-topmost-at took the first two node ops as the wrappers"
+   :why "a root-context z-index:-1 box is now painted before every other
+         box in the document, so it BECAME the first :div op --
+         :stacking/negative-z-index, whose geometry is exact on both sides,
+         came out with all four boxes shifted by -120px. Both now use
+         wrapper-op-ids, found on the document tree."}
+  {:defect "cluster-lines sorted a line's words by :left and let equal keys
+            fall through to ARRIVAL order"
+   :why "arrival order is document order on the browser side and paint
+         order on the engine side. Six corpus cases put two words at
+         exactly x=0 on the same line on purpose, and the newly-correct
+         paint order read as want [\"a b\"] got [\"b a\"] -- a 6-point
+         line-axis regression on the agent's first full run. Coincident
+         words now sort by their own text: same rule both sides, and it can
+         only reorder words whose positions are identical."}]
+ :scope-cuts
+ [{:what "Appendix E steps 3/4/5 are still one band"
+   :why "a block child's background and its text travel together, so
+         in-flow inline content does not paint above a float. Pre-existing;
+         nothing in the corpus discriminates it."}
+  {:what "positioned INLINE-level boxes are not hoisted"
+   :why "spans are created in layout-node, and an inline box inside an IFC
+         is laid out by inline-fragments, which does not go through it. An
+         inline-block DOES (atomic inline -> real layout-node call), as
+         does every block, flex/grid item, table cell and out-of-flow box."}
+  {:what "a hoisted box escapes an overflow:hidden ancestor's clip"
+   :why "the clip is a clip-push/clip-pop pair in the parent's run and the
+         span is spliced past it. Nothing in the corpus scores a clip edge,
+         so this is a paint change measured by nothing. Recorded, NOT
+         FITTED."}
+  {:what "content-visibility: hidden is :opacity 0 + :hit [] on the
+          subtree's existing ops"
+   :why "real CSS skips the subtree's LAYOUT too (size from
+         contain-intrinsic-size); this engine lays it out and declines to
+         paint it -- right picture, wrong reason, and right numbers here
+         only because Brave reports the real 800x60 inner box for this
+         shape anyway."}
+  {:what "z-index is read as an integer only (no calc())"}]
+ :existing-test-that-was-wrong
+ "negative-z-index-positioned-child-paints-behind-in-flow-content asserted
+  [\"blue\" \"red\" \"green\"] for a position: relative container with NO
+  z-index. That container is not a stacking context, so the -1 child sinks
+  PAST it -- Brave answers the container at all 20 points; add z-index: 0
+  and it answers the child. Renamed to
+  negative-z-index-sinks-past-a-container-that-is-not-a-stacking-context
+  with its pair beside it. Four more tests read boxes out of the op vector
+  by index and now read by node id or :x, with the reason recorded."
+ :new-gates-verified-to-fail-first
+ "nine new deftests (43 assertions) covering lift, the negative list,
+  confinement BOTH halves, flattening through two wrappers, flex-item
+  z-index, negative-z both halves, level/tie ordering and
+  content-visibility. Every new gate was verified to FAIL on the unmodified
+  engine (18 failures) and pass here. Two control tests
+  (document-order-alone-answers-the-later-box, the-triggers-that-do-not-
+  make-a-stacking-context-lift-nothing) pass on BOTH by design -- they
+  guard over-triggering."
+ :remaining-paint-residual
+ "the remaining 208 points are all downstream of GEOMETRY failures
+  (replaced-element default sizes, logical properties, form-control boxes
+  -- two other agents' areas). The only stacking-group residual is
+  border-radius-shrinks-the-hit-region (4 points), a hit-region SHAPE
+  question, not ordering."}
