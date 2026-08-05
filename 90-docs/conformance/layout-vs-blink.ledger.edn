@@ -1247,3 +1247,56 @@
             textarea-in-sentence 167 → **162**（162）、select-with-long-option 156 → **160**（160）など、
             いずれも oracle の値へ。**幾何の worst list からフォーム制御タグが消えた。**
             許容外への退行なし。"}
+
+{:at "2026-08-05"
+ :iteration 50
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 370}
+ :line-structure {:agree 356 :total 356 :pct 100}
+ :geometry {:boxes-agree 1332 :boxes-total 1335 :pct 100 :clean-cases 368}
+ :paint-order {:points-agree 9202 :points-total 9234 :pct 100 :clean-cases 356}
+ :computed-style {:values-agree 18149 :values-total 18761 :pct 97 :was "16400/18761 (87%)"
+                  :clean-cases 180 :was-clean 3
+                  :causes {:ua-default 557 :blockified 39 :cascade 13 :ua-inherited 3}
+                  :was-causes {:ua-default 2303 :blockified 39 :cascade 9 :ua-inherited 10}}
+ :landed {:cssom "64603fdbe88c7801f73bcdc1d0a971ddc93b4983 — ADR-2800003100 option A（UA stylesheet を cascade へ）"
+          :dom-gpu "be1888bf713bf2e323ef480da571bfb964dd7f96 — golden 2 行（:display nil → block / inline-block、座標は不変）"}
+ :note "**ADR-2800003100 の option A が着地。COMPUTED STYLE 87% → 97%、全値一致 case 3 → 180。**
+        property 別: display 17% → 97%、padding-* 88-90% → 99-100%、color / font-weight / font-style → 100%。"
+ :design "UA 規則を **CSS テキスト**として cssom.core に置き（ua-stylesheet-text → ua-rules）、
+          resolve-style-for に :important? と :inline? の間の実 origin として畳んだ。
+          tag→値の map ではなく CSS にしたのは ADR の trap #1 のため —— a[href] / input[type=checkbox] /
+          [hidden] が**自分で自分を表現でき**、specificity が input[type=…] を input より優先する処理が
+          自動で得られる。blockification には触れていない（39 のまま不変）。
+          layout の ua-table-display / ua-padding / ua-box-sides / ua-font-weight / ua-font-style /
+          ua-vertical-align は**削除**。node-style は自分の style アクセサを cssom.core/ua-style-for に
+          fallback するもので shadow する —— **知識の第 2 コピーではなく同じ表**。"
+ :layout-unchanged "**layout は byte-identical。主張ではなく確認済み** —— 370 case 全ての draw op を
+                    両 commit で dump してフィールド単位で比較し、**位置・寸法の差はゼロ**。
+                    op の変化は :display が 1,443 の :node op で埋まったこと（従来 nil）と、
+                    14 case の 30 の :text op が #0000EE になったこと（a[href] の UA 青が初めて届いた）だけ。"
+ :op-cost "実測（browser/load-html の :browser/ops）: smoke +23% / article +27% / page +30% / form +68% /
+           **table +107%**。**5 つ中 4 つは ADR の予測（+39〜67%）以内かそれ以下だが、table ページは超える** ——
+           ADR 自身の probe で td(5) と th(7) が 46 タグ中最多の非 initial property を持つことと整合する。
+           **予測はこの最悪ケースを名指ししていなかった。** なお apply-cascade は (seq css-rules) のときだけ
+           走るので、stylesheet の無いページは style op を 1 つも出さない。"
+ :perf "match-and-sort を node-style ごとに回すと **end-to-end +80%**（101s → 181s）。
+        sheet が検査する属性を持たない要素向けに per-tag の UA style を事前計算して解消
+        （属性集合は parse 済み規則から読み、**形の仮定を load 時に検査**する ——
+        将来 :not([…]) が入っても描画ではなく性能が落ちる）。base と同等（89/81/53s vs 91/80/48s）。"
+ :left-in-layout ["**em 相対の半分**（p の margin: 1em 0、h1 の font-size: 2em、fieldset の padding: 0.35em）——
+                   em は要素自身の computed font-size に対して解決するが、この cascade はそれを計算しない。
+                   **残り 557 の ua-default 残差はこれが全部**で、次の tranche。
+                   font-size 解決の段（または base-size の opt）が要り、それ自体が設計判断。
+                   440 の margin 値を動かすので box も動く。"
+                  "control の font-size（ua-control-font に残置、13 vs 13.3333 は font-hooks agent の領域）"
+                  "<select> の 1px block padding —— ブラウザは padding: 0px を報告する。
+                   この 1px は Chrome の内部 button padding をこの engine が表現したもので、
+                   **cascade に書けば box を正しくするために報告値を誤りにする**ことになる。"
+                  "display: none の tag 群（layout は display を読む前に tag で抑制しており、
+                   実 UA が隠す集合はこの engine が描く集合より広い）"]
+ :honest-regression "**cascade 帰責の残差が 9 → 13 に増えた。** 4 件とも <input type=radio> の margin
+                     （この engine は checkbox の 3px 3px 3px 4px を与えるが Brave は 3px 3px 0 5px）。
+                     **意図的に誤ったまま残した** —— この変更は値の出どころを動かすもので値を変えるものではない。
+                     ただし 2,303 の『見逃された ua-default』の中に隠れていたものが、
+                     今は**帰責されて見えている** —— それが ADR の狙いそのもの。次の tranche で 1 行。"}
