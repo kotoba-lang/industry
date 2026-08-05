@@ -39,11 +39,35 @@
 
 (defn- die [msg] (println msg) (js/process.exit 1))
 
+(defn- lib-usable?
+  "キャッシュが**実際に使えるか**を見る。ディレクトリの存在で判定してはいけない。
+
+  実測 2026-08-05: levi の `/tmp/manifest-reality-0773406` はディレクトリだけ
+  残って中身が消えていた（`src` 配下のファイル数 0、`.git` は
+  `fatal: not a git repository`）。macOS の /tmp 定期パージが中身だけ消し、
+  `existsSync` は true を返し続けるので **二度と再 clone されない**。
+  この gate はそれで 254 回連続して落ちていた —— 永久に赤い gate は
+  signal を運ばない（ADR-2607300400）。
+
+  判定は「この gate が実際に require する名前空間のファイルが在るか」。
+  clone の成否でも sha の一致でもなく、使う物そのものを見る。"
+  [dir]
+  (let [entry (path/join dir "src" "manifest_reality" "checks.cljc")
+        alt (path/join dir "src" "manifest_reality" "checks.cljs")]
+    (or (fs/existsSync entry) (fs/existsSync alt))))
+
 (defn- fetch-lib! []
   (let [dir (path/join (os/tmpdir) (str "manifest-reality-" lib-sha))]
-    (when-not (fs/existsSync dir)
+    (when-not (lib-usable? dir)
+      ;; 壊れたキャッシュは黙って使わず捨てる。
+      (when (fs/existsSync dir)
+        (println (str "cache at " dir " is unusable — removing and re-cloning"))
+        (fs/rmSync dir #js {:recursive true :force true}))
       (cp/execSync (str "git clone --quiet " lib-repo " " dir))
-      (cp/execSync (str "git -C " dir " checkout --quiet " lib-sha)))
+      (cp/execSync (str "git -C " dir " checkout --quiet " lib-sha))
+      (when-not (lib-usable? dir)
+        (die (str "FLEET-CI: cloned " lib-repo " but " dir
+                  "/src/manifest_reality/checks.* is still missing"))))
     (path/join dir "src")))
 
 (defn- slurp* [p]
