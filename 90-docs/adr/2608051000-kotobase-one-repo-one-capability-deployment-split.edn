@@ -175,10 +175,42 @@
        compartment net-kotobase へ写す（`KOTOBASE_B2_KEY_ID` / `KOTOBASE_B2_APP_KEY`）。
        写した時点で engine 以降の分割はすべて非対話で進む。"}}}
    :precondition-for-all-steps
-   "上記 gate は engine 固有ではない。s3 / pinning / atproto / git の各 shell も
-    WRITE_TOKEN・S3_ACCESS_KEY_ID・S3_SECRET_ACCESS_KEY 等を持つので、分割前に同じ確認を行う。
-    secrets-location-map によればこれらは Keychain service cf:kotobase-protocols-worker に
-    operator copy があるので、engine の B2 より条件は良い可能性が高いが、**未確認**。"
+   "上記 gate は engine 固有ではない。**secret 一覧は推測でもソース grep でもなく
+    `wrangler secret list --name <worker>` で取る**（名前だけ返り値は返らない）。
+    2026-08-05 にこれを全 Worker に対して実行した結果が下表。それ以前に
+    『authn は Worker secret を使っていない』と書いたのは誤りで、
+    authn/src が存在せず（生成物 js/authn-worker.js が実体）grep が空振りしたのを
+    不在と読んだもの。**空の grep 結果を不在の証拠にしない。**"
+
+   :secret-inventory-2026-08-05
+   {:method "wrangler secret list --name <worker>（Cloudflare が権威）"
+    :workers
+    [{:worker "kotobase-protocols-worker" :secrets ["S3_ACCESS_KEY_ID" "S3_SECRET_ACCESS_KEY" "WRITE_TOKEN"]
+      :retrievable "全て Keychain service cf:kotobase-protocols-worker に operator copy あり（実測 present）"
+      :status :unblocked}
+     {:worker "kotobase-mail" :secrets [] :status :unblocked}
+     {:worker "kotobase-git" :secrets ["ADMIN_TOKEN"]
+      :retrievable "kagi item KOTOBASE_GIT_ADMIN_TOKEN（実測 present）" :status :unblocked}
+     {:worker "smtp が net-kotobase から持ち出す分" :secrets ["RESEND_API_KEY" "MAIL_INGEST_TOKEN"]
+      :retrievable "1Password gftd.resend + Keychain gftd.resend/API_KEY、Keychain gftd.kotobase/MAIL_INGEST_TOKEN（実測 present）"
+      :status :unblocked}
+     {:worker "kotobase-authn" :secrets ["AUTHN_KEK" "RESEND_API_KEY"]
+      :retrievable "RESEND_API_KEY のみ。**AUTHN_KEK は kagi にも Keychain にも無い**（実測 MISSING）"
+      :status :blocked
+      :severity
+      "engine より代償が重い。AUTHN_KEK は KV AUTHN_CREDENTIALS に入っている passkey 秘密鍵の
+       AES-256-GCM ラップ鍵で、これを失うと**登録済み credential が全て復号不能**になる。
+       加えて Durable Object AUTHN_STORE はスクリプト単位なので、改名すると session と
+       sign-in challenge の storage は引き継がれず作り直しになる（既存 session は無効化）。
+       AUTHN_RP_ID は authn.kotobase.net のままなので WebAuthn credential の orphan は起きない。"}
+     {:worker "kotobase-cf-wasm-staging" :secrets ["KOTOBA_INTERNAL_SECRET" "KOTOBASE_B2_APP_KEY" "KOTOBASE_B2_KEY_ID" "KOTOBA_SEED" "KOTOBASE_MAINTENANCE_OPERATOR_DIDS"]
+      :retrievable "KOTOBA_SEED は kagi KOTOBA_SEED_PRODUCTION。B2 2 件は読み戻し不可（既報）"
+      :status :blocked}]
+    :consequence
+    "着手可能なのは protocols-worker 分割（step 5）・smtp（step 6）・git 移管（step 7）と、
+     deploy を伴わない library 分割（step 4）と gftd.ai 削除（step 3）。
+     engine（step 2/9）と authn（step 8）はオーナーが secret を kagi に写すまで着手しない。
+     **net-kotobase-authn repo は作成済みだが空のまま予約**（削除は破壊的操作なので行わない）。"}
 
    :route-cutover-procedure
    "Cloudflare の custom_domain は 1 host = 1 Worker なので、移設は必ず『外して付ける』になり無防備な
