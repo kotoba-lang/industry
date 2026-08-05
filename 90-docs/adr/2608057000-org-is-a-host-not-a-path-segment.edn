@@ -1,0 +1,193 @@
+[{:db/id -1
+  :adr/id "adr-2608057000-org-is-a-host-not-a-path-segment"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2608057000: 公開面を `{org}.itonami.cloud/{repo}` にする —— org はホスト、repo はパス（GitHub Pages 忠実形）。org 面はホストのルートとして実在させ、旧パス形は :status が live になるまで壊さない"
+  :adr/topic "org-is-a-host-not-a-path-segment"
+  :adr/repos ["orgs/network-awai/cloud-itonami"]
+
+  :adr/authoritative_for
+  ["公開 URL の形: `{org}.itonami.cloud/{repo}/`。org は DNS ラベル、repo は第1パスセグメント"
+   "org 面（ホストのルート）は `public/sites/_org/{org}/index.html` として実在させる。レジストリの projection で、宣言が無ければ 404"
+   "移行スイッチは `sites.edn` の `:status`（`provisioning` | `live`）。`live` のときだけ apex の `/{org}/{repo}` と `/{org}/` が org ホストへ 301"
+   "org ホストは宣言された repo と `/.well-known/` 以外を全部 404 にする（cockpit 本体を映さない）"
+   "クロームの org 名・リンクはレジストリの `:orgs` から引く。リテラルを書かない"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/amends ["90-docs/adr/2607301300-itonami-cloud-org-repo-site-publishing-rule.edn（URL の形だけを差し替える。宣言レジストリ・404・安全境界・共通クローム・DADS の決定はそのまま生きている）"]
+
+  :adr/related
+  ["90-docs/protocols/kotoba-resource-protocol.edn（§4 は `/{org}/{repo}` を universal public pattern と定めている。本 ADR はそこから逸れる。§6.1 が『browser-executable content は subdomain 形が preferred、各々が isolated web origin を得るから』と既に書いており、その論拠を CID から公開 repo サイトへ広げた形）"
+   "manifest/repository-rules.edn の `:org-domain`（7 org すべて DNS 実測済み。cloud-itonami = itonami.cloud で `:org-name-is-reversed true`）"
+   "90-docs/surface/surface.datoms.edn（fleet の 260 ホストは `<label>.<org-domain>` 形。itonami.cloud だけがこの形を持っていなかった）"]
+
+  :adr/problem
+  "オーナーの問い（2026-08-05）は『repo.org.cloud.itonami で公開されるのが github io 的では?』で、指摘は正しかった。
+
+**GitHub Pages の org 単位はホストであってパス接頭辞ではない** —— `{org}.github.io/{repo}/`。ADR-2607301300 は org も repo もパスに入れたので、次の 3 つが構造的に手に入らなかった:
+
+1. **org 面が無い。** 実測 2026-08-05: `/cloud-itonami/`・`/zzz-nope/`・apex の 3 つが**バイト同一**の cockpit SPA を 200 で返していた（SHA `996193614b27…`、123,680 バイト）。ADR-2607301300 が 2 セグメント層で潰した KRP §4 rule 8 違反が、**1 セグメント層にそのまま残っていた**。パス接頭辞としての `/{org}/` は誰も serve しないので、これは実装漏れではなく形の帰結。
+2. **origin が分かれない。** 公開サイトが cockpit SPA・`/api/*`・`/signin/` と同一オリジンで動く。ADR-2607301300 は origin / cookie に**一度も言及していない**（実測: 該当語 0 件）—— 検討されずに決まっていた。
+3. **fleet の既定形から外れている。** surface 索引 260 ホストは etzhayyim.com 890 パス / kotobase.net 680 / murakumo.cloud 204 / gftd.ai 129 と、すべて `<label>.<org-domain>`。itonami.cloud のホストは `hooks.itonami.cloud` の 1 つだけだった。
+
+なお **`repo.org.itonami.cloud` は GitHub より 1 ラベル深く**、apex から 2 段下なので Cloudflare Universal SSL（`itonami.cloud` + `*.itonami.cloud` の 1 段）で覆えない。GitHub が repo をパスに残したのと同じ制約で、オーナーはこれを受けて `{org}.itonami.cloud/{repo}` を選んだ。"
+
+  :adr/decision
+  "### 1. org は DNS ラベル、repo は第1パスセグメント
+
+`{org}.itonami.cloud/{repo}/`。判断は純 `.cljc`（`cloud-itonami.sites/resolve-request`）で、host を受け取って 2 つのモードに分かれる:
+
+- **host モード**（宣言された org ホスト）: `/` = org 面、第1セグメント = repo、`/.well-known/` は pass-through、**それ以外は全部 404**。
+- **path モード**（apex / `*.pages.dev` / localhost）: 旧 `/{org}/{repo}` を従来どおり解決する。
+
+`:orgs` を持たないレジストリを渡すと **改訂前とバイト単位で同じ挙動**になる（既存テストは 1 つも書き換えずに通った）。
+
+### 2. `/.well-known/` だけは org ホストでも通す
+
+証明書の HTTP 検証がここを通る。全部 404 にすると**新しい org ホストの証明書が発行されない** —— 塞いだ結果その org が永久に立ち上がらない、という気付きにくい形をしている。
+
+### 3. org 面はホストのルートに実在させる
+
+`public/sites/_org/{org}/index.html`（`scripts/generate-org-sites.cljs` が生成）。内容は**レジストリの projection** で、その org のサイト一覧。サービス名をここに手で書かない。宣言が無ければ 404 —— サブドメインを掘って誰も居ない状態を黙って作らない。
+
+`_` 始まりなのは `reserved-prefixes` が `public/` 直下の `_` を除くのと同じ理由。
+
+### 4. 移行スイッチは `sites.edn` の `:status` 1 語
+
+`provisioning` の間は apex が従来どおり 200 で配信し続け、`live` にすると apex の `/{org}/{repo}` と `/{org}/` が org ホストへ 301 する。**DNS の実測から自動で決めない** —— レジストリは `sites.edn` と実ファイルだけから決まる projection でなければならず（環境依存の値を混ぜて strict gate を永久に赤くした実測 2026-07-31）、`:status` は「切り替えた」という人間の宣言である。
+
+**現在は `provisioning`。** DNS レコードがまだ無く、shirohan の公開物が再ビルドできていない（下記）。
+
+### 5. クロームのリンクは絶対 URL、org 名はレジストリから
+
+**同じバイトが apex と org ホストの両方から配信される。** `/marketplace/` のような相対リンクは org ホストで 404 になる（org ホストは宣言された repo だけを配信するので）。apex を指すリンクは絶対 URL にする。
+
+`brand` / breadcrumb / footer が持っていたリテラルの `\"cloud-itonami\"` を削り、`:orgs` の宣言から引くようにした。レジストリのキーが `{org}/{repo}` でありながらヘッダーが単一 org 固定だった状態は、他 org を載せた瞬間に嘘になる。
+
+### 6. cookie は分離されない —— それを明記して host-only cookie を要求する
+
+サブドメインで得られるのは **DOM/JS/storage の分離まで**。`itonami.cloud` は Public Suffix List に無いので `Domain=itonami.cloud` の cookie は全ホストで共有される。**GitHub が別ドメイン + PSL 登録まで行ったのはそのため。**
+
+したがって **itonami.cloud のセッション cookie は `Domain=` を付けない host-only にすること。** 実測 2026-08-05 時点で apex も `/signin/` も `Set-Cookie` を返していないので今日の実害は無いが、置いた瞬間に共有される。第三者に任意 JS を公開させる段階になったら、GitHub と同じく別ドメイン + PSL 申請へ進む。
+
+### 7. 二重命名は承知のうえで受け入れる
+
+`cloud-itonami` は `itonami.cloud` の reverse-DNS そのものなので `cloud-itonami.itonami.cloud` は itonami を 2 回言っている。`manifest/repository-rules.edn` の `:org-domain` はこれを `:redundant-but-not-wrong [\"cloud-itonami-*\"]` として既に記録済み。apex を elide 先にすると cockpit 本体のルートと衝突するので、**ラベルを明示する方を採る**（apex は cockpit のまま無傷）。"
+
+  :adr/consequences
+  "**得られたもの**
+
+- `{org}.itonami.cloud/{repo}/` が GitHub Pages と同じ形で使える。org 面がホストのルートとして実在する。
+- org ホストでは cockpit が一切映らない（`/marketplace/`・`/signin/`・`/api/*`・`/css/*` すべて 404）。同じ内容が 2 つの正準 URL を持つのを防ぐ。
+- 公開サイトが cockpit と別オリジンになる（cookie を除く）。
+- レジストリを keywordize して読んでも org を引けるようになった（下記の欠陥 1）。
+
+**代償・限界（正直に）**
+
+- **cookie jar は分かれない**（決定 6）。PSL 登録は今回やっていない。
+- **`/sites/{org}/{repo}/…` と `/sites/_org/{org}/` の生パスでも同じバイトが取れる。** Pages のアセットは deploy dir に居るので構造的。正準 URL は org ホスト形。
+- **KRP §4 から逸れる。** §4 は `/{org}/{repo}` を universal public pattern と定めており、本 ADR は itonami.cloud についてその projection を変えた。KRP 本体は未改訂 —— 他ホストへ広げる前に §4 を直すこと。
+- **`repo.org.itonami.cloud`（2 ラベル）は採らなかった。** Universal SSL が 1 段しか覆わないため（ACM が要る）。GitHub も同じ理由で repo をパスに残している。"
+
+  :adr/evidence
+  "**改訂前の状態（この ADR の出発点、2026-08-05 実測）**
+
+    curl https://itonami.cloud/cloud-itonami/  -> 200 text/html 123,680B
+    curl https://itonami.cloud/zzz-nope/       -> 200 text/html 123,680B
+    curl https://itonami.cloud/                -> 200 text/html 123,680B
+    shasum -> 3件とも 996193614b27e57a66ac077a00b5084fd750eaf9
+
+    dig cloud-itonami.itonami.cloud / www / 任意ラベル -> 全て応答なし（wildcard も無い）
+    grep origin|cookie ADR-2607301300 -> 0 件
+    wrangler whoami -> zone は (read) のみ。r2 は無い（2026-07-30 から変わらず）
+
+**テスト**
+
+    portable cljs suite   710 tests / 6221 assertions   0 failures 0 errors
+      （改訂前の baseline は 707 / 6211 で 2 failures —— その 2 件は
+        service_chrome_test が旧シグネチャを呼んでいたもので、本 ADR で更新した）
+    verify-sites-bundle   26 checks（既存 17 + host モード 9）all passed
+    generate-sites-registry --check   canonical (3 sites, 38 reserved)
+
+**テストが実際に捕まえた欠陥（3件。いずれも例外を出さず黙って壊れる種類）**
+
+1. **レジストリを keywordize して読むと org が引けない。** `registry.json` を `js->clj :keywordize-keys true` で読むと `:orgs` / `:sites` の**キーまで** keyword になり、`(get (:orgs r) \"cloud-itonami\")` が nil を返して **org ホストのリンクが全部旧パス形に落ちる**。生成した org 面のリンクが `/cloud-itonami/inkan/` になっているのを見て気付いた（例外は出ない）。`:sites` のキーは `\"cloud-itonami/inkan\"` なので namespace 付き keyword になり、`name` だけで戻すと org が消える。`chrome/normalize-registry` で一度だけ戻し、テストで固定した。
+2. **バンドル検証が host モードを一度も実行していなかった。** fake context がホストを `itonami.cloud` に固定していたため、org ホストの検査を書いても path モードを見ていた。
+3. **`(apply fake-context pathname opts)` が opts の map を展開していた。** `(apply f p {:host h})` は MapEntry を 1 引数として渡すので `{:keys [host]}` が全部 nil になる。opts を実際に使う検査が今まで無かったので露呈していなかった（host モードを足して初めて出た）。
+
+**この作業中に見つけた、本 ADR とは無関係の既存の欠陥（2件）**
+
+1. **main が deploy 不能だった。** `e2753812`（Entra federation）が `functions/api/auth/entra/start.js` を足したのに `functions/edge/auth-core.js` を再ビルドしておらず、wrangler が `No matching export in \"edge/auth-core.js\" for import \"authEntraStartOnRequestPost\"` で落ちる。`shadow-cljs release auth-api` で再ビルドして着地させた。**GitHub Actions の deploy workflow は 2026-08-03 以降 job が起動していない**（network-awai org の課金停止）ので、誰も気付いていなかった。
+2. **shirohan の公開物が再ビルドできない。** source repo `cloud-itonami/shirohan` の手元 checkout に `curve.cljc` / `color.cljc` / `cut.cljc` が無く、`git fetch origin` も通らない（リモートに到達できない）。生成器は依存順に 1 ファイルずつコピーするので、`geom.cljs` だけ差し替わった**半端な公開物**が残った —— `origin/main` の版に戻してから着地させた。**このため shirohan の公開ページだけ旧クローム（相対リンク）のままで、org ホストではナビが 404 になる。** `:status` を `live` にする前に解消すること。
+
+**着地とデプロイ**
+
+    network-awai/cloud-itonami  b191d981  公開ルール改訂 + org 面 + テスト
+                                6ab741f0  auth-core.js 再ビルド（deploy 不能の解消）
+    wrangler pages deploy       ce358feb  Production / branch main
+
+live（2026-08-05 実測、デプロイ後）:
+
+    /cloud-itonami/inkan/                  200 text/html
+    /cloud-itonami/cloud-itonami-rirekisho/ 200 text/html
+    /cloud-itonami/shirohan/               200 text/html
+    /zzz-nope/qqq                          404 json
+    /api/health                            200 json（回帰なし）
+    /marketplace/                          200 html（既存面すべて無傷）
+    /sites/registry.json                   200 json（`orgs` エントリを含む）
+    /sites/_org/cloud-itonami/             200 html（org ホスト形のリンク 3 件）
+
+    ⚠ 反映直後は edge cache が古い registry を返した。cache-buster でも数分間
+      古いままで、その後 propagate した。**deploy 直後の 1 回の curl を根拠に
+      『反映されていない』と判断しない。**"
+
+  :adr/status_2608051900
+  "## 未完了（次の担当者向け。優先度順）
+
+### 1. DNS レコードが無い —— org ホストはまだ resolve しない（**オーナー作業**）
+
+Pages のカスタムドメイン `cloud-itonami.itonami.cloud` は **`pending` のまま**で、DNS レコードが作られていない。
+
+    POST /accounts/{acc}/pages/projects/cloud-itonami/domains  -> success（pages (write) で通る）
+    status: pending / validation: pending / verification: pending
+    dig cloud-itonami.itonami.cloud -> 応答なし
+
+**この環境の Cloudflare OAuth token は `zone (read)` しか持たず、DNS レコードを作れない**（`zone (write)` / `dns_records (edit)` が無い）。Pages は同一アカウントの zone なら自動で CNAME を作ることがあるが、今回は作られなかった。加えて、API で作ろうとした試行はこのセッションの権限分類器にも拒否された。
+
+必要なのは 1 レコード:
+
+    CNAME  cloud-itonami  ->  cloud-itonami.pages.dev  (proxied)
+
+作成後に `status` が `active` になることを確認し、`https://cloud-itonami.itonami.cloud/` が org 面を返すことを実測すること。
+
+### 2. shirohan の公開物を再ビルドする
+
+上記のとおり source repo が手元で不完全でリモートにも到達できない。**shirohan だけ旧クローム（相対リンク）**なので、org ホストではヘッダーのナビが 404 になる。
+
+### 3. `:status` を `live` に切り替える
+
+1 と 2 が終わってから `sites.edn` の `:status` を `\"live\"` にし、レジストリを再生成して deploy する。これで apex の `/{org}/{repo}` と `/{org}/` が org ホストへ 301 し、**`/cloud-itonami/` が apex SPA を返す最後の経路が消える**。
+
+### 4. fleet gate に載っていない
+
+`scripts/fleet-ci/gates.edn` に cloud-itonami のエントリが無い（`net-kotobase` はある）。`test-sites`（`sites-registry-check` + `sites-bundle-verify`）は standalone で動くので `:nbb-script` gate に載る。**network-awai org の GitHub Actions は 2026-08-03 以降 job が起動しない**ので、今この 2 つの検査はどこでも走っていない。
+
+### 5. KRP §4 が未改訂
+
+`90-docs/protocols/kotoba-resource-protocol.edn` は `/{org}/{repo}` を universal public pattern と定めたまま。他ホストへ広げる前に直すこと。
+
+## 次の一手（resume point）
+
+    # DNS を作ったあと
+    dig +short cloud-itonami.itonami.cloud
+    curl -sI https://cloud-itonami.itonami.cloud/ | head -1
+    curl -s https://cloud-itonami.itonami.cloud/inkan/ -o /dev/null -w '%{http_code}\\n'"
+
+  :source/dataset "adr"}]
