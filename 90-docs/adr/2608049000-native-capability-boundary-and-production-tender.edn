@@ -1,7 +1,7 @@
 [{:db/id -1
   :adr/id "adr-2608049000-native-capability-boundary-and-production-tender"
   :adr/title "native の kit 資格化に要る 3 つ — 境界の形・provider・要求応答チャネル"
-  :adr/status "proposed"
+  :adr/status "accepted"
   :adr/date "2026-08-04"
   :adr/body "## 問い
 
@@ -107,17 +107,33 @@ guest を信用しない前提で書かれている)。sealed runtime identity
 - **loader は記述子に対して値を歩く** — 構造の走査は判断ではなく機構
   (`valid_utf8` と同類) なので decision-free C の範囲に収まる。
 
-**未着手**: ここまでが設計判断で、実装 (記述子の共有・artifact 形式・loader の
-検証・両 backend の marshalling・kir/verifier admission・両 ISA テスト) は
-始めていない。sealed runtime identity を動かす規模なので、疲弊した状態で
-着手しない — 今日 disp8 を 2 度出荷したのがまさにその失敗である。
+### 記述子の移設 — 完了 (2026-08-05)
 
-### 次の具体的な一手
+この ADR が「次の具体的な一手」として名指しし、受け入れ条件まで書いていた移設は
+着地した。**予想どおり記述子面は wasm 非依存だった** — `kotoba.wasm.typed` の
+13-205 行を `kotoba.kir.descriptor` (T0) へ抽出した結果、新 ns の require は
+**ゼロ**になった (`kotoba.kir.cljs-i64` すら要らず、それを使っていたのは残った
+wasm 側だった)。
 
-    # 記述子エンコーダが本当に wasm 非依存か、移動して両者から使えるか
-    git -C orgs/kotoba-lang/kotoba-wasm show origin/main:src/kotoba/wasm/typed.cljc
-    # kotoba-kir へ移し、kotoba-wasm は再エクスポートに落とす案を評価する
-    # (既存 wasm テストが緑のままであることが移動の受け入れ条件)
+- `kotoba-kir` `194623b` — `kotoba.kir.descriptor` 新設 + `kir_descriptor_test.clj`。
+  1 読者のときは wasm custom section 経由で間接的に pin されていたバイト列が、
+  2 読者になった時点で **wire contract** になる。エンコーダと将来のデコーダが
+  互いにしか照合されないなら**同じ誤りに同意できてしまう**ので、独立したテストを
+  付けた (名前が運ばれること・フィールド順が運ばれること・別名がその展開と
+  同一に符号化されること・`clock-v1` の variant/record が特別扱いなしで
+  符号化できること)。
+- `kotoba-wasm` `b0c9837` — 再エクスポートに縮小 (195 行減 / 29 行増)。
+  **テストファイルを 1 つも変えずに 91 tests / 413 assertions が緑** ——
+  この ADR が事前に宣言した受け入れ条件そのもの。
+
+### 残り (段階 1 の残余)
+
+artifact が記述子表を運ぶ / loader が記述子に対して値を歩く (新規の
+decision-free C) / 両 backend の variant・record marshalling /
+`kotoba-kir`・`kotoba-verifier` の `typed-cap-call` admission を現在の 4 形
+(`#{[:i64 :i64] [:string :string] [:option-i64 :option-i64]
+[:result-i64 :result-i64]}`) から拡張 / 両 ISA テスト。
+sealed runtime identity を動かす規模である点は変わらない。
 
 ## 順序
 
@@ -137,6 +153,18 @@ kit descriptor に触れずにきた — 証明した以上を主張する最初
 
 ## 状態
 
-**提案 (proposed)。** 実測部分 (境界 4 形 / provider の所在 / loader が read
-しないこと / 配置は既存 T3) は確定した事実。設計と順序は提案であり、
-TCB 拡大の承認を得るまで実装に着手しない。"}]
+**承認済み (accepted)、段階 1 の第一手のみ着地。**
+
+- **オーナー承認**: 2026-08-04「gap を解消, collection, capability provider を
+  設計実装」。この ADR が明示的に要求していた TCB 拡大の事前承認がこれに当たる。
+- **着地済み**: 段階 1 の記述子移設 (`kotoba-kir` `194623b` / `kotoba-wasm`
+  `b0c9837`)。
+- **未着手**: 段階 1 の残余 (上記)、段階 2 (要求/応答チャネル。承認済みだが
+  未実装)、段階 3 (実 provider の配線)。
+- **kit descriptor は 1 つも触っていない。** 全 9 kit の `:native-aot` は
+  `:pending` のまま — provider の意味論は 1 mm も動いていないので、
+  「証明した以上を主張する最初の 1 本」にならない。
+
+実測部分 (境界 4 形 / provider の所在 / loader が read しないこと / 配置は
+既存 T3) は確定した事実のまま。なお段階 1 に先行して collection 側の gap を
+閉じた記録は ADR-2608049200 (native の vector と context ABI v3)。"}]
