@@ -8,12 +8,12 @@
 {:projection/version 2
  :projection/id "training-corpus"
  :projection/source
- {:git/commit "e94e6590a91c33f00595c5beee33154267347b9d"
+ {:git/commit "fcb1d12daccd9b2a3b6cd2a7f426a7d09f12e7d0"
   :dataset/id "com-junkawasaki/root/training-corpus"}
  :projection/inputs
  [{:input/type :git
    :input/path "90-docs/corpus/corpus.datoms.edn"
-   :input/sha256 "fea59753be445186c6db8817fb014ef0277eb05b4728816de45464ed35225663"}]
+   :input/sha256 "3d243cee06bdb6b9ddae3348422bb002633b0c7d2e17821dd06247afd463bb80"}]
  :projection/identity-attrs [:corpus/entity-id]
  :projection/contracts
  {:schema/path "manifest/projection-schemas/training-corpus.edn"
@@ -24,6 +24,6 @@
  {:loader/id :canonical-edn-v1
   :output/path ".projection-cache/training-corpus.edn"}
  :projection/output
- {:logical-sha256 "bf8be5a7d944ec4b10e70e287f056d262f9df5f2c54b7ae8c82cec40bed8c22c"
-  :physical-sha256 "aeb1c7809d4e128961b4697786af4692ea6a340171ae2d1fa566d0b9b8c2da62"
-  :entity-count 2009}}
+ {:logical-sha256 "ac572ec0a0c926b60ddb056a070729fd1b947814e2e0cba85263eabf0cc3c54f"
+  :physical-sha256 "01aad4c92b20da55372af8317987d85489866714b72c0e709aba7cd84bfc85e6"
+  :entity-count 2016}}
