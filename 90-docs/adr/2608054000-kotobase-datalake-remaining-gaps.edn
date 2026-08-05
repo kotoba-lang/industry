@@ -39,14 +39,14 @@
    "adr-2607299700-kotobase-scoped-cacao（互いに代用できる 2 つの capability は 1 つ — P1 で IByteSource に適用した）"]
 
   :adr/decision-summary
-  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :arrow-writer :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson}, :write #{:arrow-ipc}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed}, :refused-by-name #{:lz4-frame :zstd}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :writer-gate :pyarrow-validate-full, :gaps {:p2 #{:parquet-writer :schema-evolution :snapshots :compaction :group-by :join-cost}, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
+  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :arrow-writer :group-by :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson}, :write #{:arrow-ipc}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed}, :refused-by-name #{:lz4-frame :zstd}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :writer-gate :pyarrow-validate-full, :ci-status {:kotoba-lang :actions-disabled-2026-08-05, :network-awai :actions-dead}, :gaps {:p2 #{:parquet-writer :schema-evolution :snapshots :compaction :join-cost}, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
 
   :adr/verify
-  ["west pin: columnar d89813a3 / org-apache-arrow 6d070313 / org-apache-parquet 06df9fdd / kotobase-lake 06d658a0 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
-   "org-apache-arrow CI 全 step success（JVM 33 tests/105 assertions・nbb 28/86・cljs.main compiled・clj-kondo 0 warnings・fixtures still match the reference writer・files we WROTE are accepted by the reference reader）"
+  ["west pin: columnar 16b336b1 / org-apache-arrow 78db9a83 / org-apache-parquet 06df9fdd / kotobase-lake 06d658a0 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
+   "org-apache-arrow: JVM 39 tests/119 assertions・nbb 34/100・clj-kondo 0 warnings（ローカル実測）。CI は writer commit 6d070313 までは全 step success を実測、それ以降は org の Actions 無効化により未実行"
    "writer の正当性ゲート: clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir>  ; => 6 ケースすべて pyarrow validate(full=True) で受理"
    "org-apache-parquet CI 全 step success（17 tests/103 assertions 無変更で通過 = columnar.bytes re-export が透過であることの証拠）"
-   "columnar CI 全 step success（10 tests/52 assertions）"
+   "columnar: 22 tests/75 assertions・clj-kondo 0 warnings（ローカル実測）。CI は d89813a3 まで success、16b336b1 は Actions 無効化により未実行"
    "nbb scripts/fleet-ci/gates/net-kotobase-hermetic-check.cljs <tree>   ; => E object-grant: Ran 16 tests, rc=0"
    "net-kotobase の GitHub Actions は job を起動しない（ADR-2608036600）。実際に走る gate は murakumo fleet の check A-E のみ"]
 
@@ -159,7 +159,7 @@ validity bitmap + values buffer）なので、seam を曲げる圧力が**別の
 設計すると Parquet の形に引きずられた writer ができるためで、その理由は上記のとおり
 解消した。その上で P2 の最初の項目（writer）を着地させた。
 
-### P2. 書き込み側 — 1 項目着地、残り 5 項目
+### P2. 書き込み側 — 2 項目着地、残り 4 項目
 
 **着地（2026-08-05）: Arrow IPC writer**（`arrow.build` = FlatBuffers builder /
 `arrow.write`）。**「このクエリをテーブルに実体化」ができるようになった** —
@@ -183,7 +183,25 @@ validity bitmap + values buffer）なので、seam を曲げる圧力が**別の
   という最も見つけにくい壊れ方をする。
 - **int64 は読み書き両方向で『正確か、さもなくば拒否』。**
 
-**残っている 5 項目**:
+**着地（2026-08-05）: GROUP BY**（`columnar.group`）。distinct key ごとの集約を、
+predicate が落とせなかった chunk を読みながら畳む。ここでも先に書いておく規律:
+
+- **GROUP BY に metadata の近道は無い。** `columnar.aggregate` が footer から
+  `count` / `min` / `max` を答えられるのは *source 全体*について訊いているから。
+  grouped な答えは distinct key ごとに 1 行あり、**どの key がどの chunk に居るかを
+  記録している形式は無い**。よって生き残った chunk の grouping 列は必ず読む。
+  得られる節約は他と同じ（枝刈りされた chunk と、クエリが言及しない列）で、両方 assert 済み。
+- **null key は「group」であって落とす行ではない。** 落とす方も擁護できる選択だが、
+  そちらは**黙ってデータを失う**方なので、こちらを明文化してテストした。
+- **出力順は hash 順ではなく first-appearance。** hash map の seq 順は未規定で JVM と
+  ClojureScript で同じ key 集合でも異なる。grouped result が runtime 依存になり、
+  その diff が無意味になる。
+- **`count` は行を数え、`count-non-null` は値を数える。** 3 行中 1 行に値があった group は
+  3 と 1 で、混同は「もっともらしく見える誤答」。
+- **`avg` は意図的に無い。** 整数除算か有理数か、全 null group の平均は何か、を決めねば
+  ならず、`sum / count-non-null` を呼び手が書けばその判断が明示される。
+
+**残っている 4 項目**:
 
 - **Parquet writer が無い。** Arrow は書けるが Parquet は書けない。Parquet は統計を
   writer が計算して footer に書く必要があり（Arrow には無い工程）、そこが本質的な差分
@@ -191,8 +209,9 @@ validity bitmap + values buffer）なので、seam を曲げる圧力が**別の
 - **テーブルのスナップショット / time travel。** datom 面には有るが**ファイル集合には無い**
   （「時刻 T のテーブル」が言えない）。Iceberg が manifest list で持っている層
 - **コンパクション / small-file 問題**
-- **GROUP BY が無い**。footer 集約は `count` / `min` / `max` のみで、`sum` は行を
-  materialize してから畳む。形式側への集約 push down も無い
+- **形式側への集約 push down が無い**（Parquet に row group ごとの部分和を求めるような
+  経路）。`IColumnSource` は設計上 chunk と column を露出し arithmetic は露出しないので、
+  ここに手を入れるには seam を変える判断が要る
 - **join 順序のコストモデル**（`selectivity-hint` は「束縛の多い順」だけ）
 
 ### P3. transport — 天井は迂回できるが撤去はしていない
@@ -227,9 +246,25 @@ validity bitmap + values buffer）なので、seam を曲げる圧力が**別の
   source`）。component 成果物を再生成できない
 - **network-awai の GitHub Actions は job を起動しない**（ADR-2608036600）。したがって
   `api-gateway.yml` に足した step は発火せず、**実際に走る gate は murakumo fleet の
-  check A-E だけ**。⚠ **これは network-awai org の問題であって全 org ではない** —
-  kotoba-lang org の Actions は正常に動く（columnar / org-apache-parquet /
-  org-apache-arrow とも全 step success を実測、2026-08-05）
+  check A-E だけ**
+- 🔴 **kotoba-lang org の GitHub Actions も止まった（2026-08-05 セッション中に発生）。**
+  同日 06:08 UTC までは正常に動いていた（columnar `d89813a3` / org-apache-parquet
+  `06df9fdd` / org-apache-arrow `6d070313` はいずれも全 step success を実測）。その後
+  `repos/kotoba-lang/<repo>/actions/permissions` が **`enabled: false`** になり、
+  columnar / org-apache-arrow / org-apache-parquet / kotobase-lake の 4 repo すべてで
+  同じ。push しても branch にも merge commit にも **workflow run が 1 つも作られない**。
+  - **原因は未確定。** org 設定と billing は `admin:org` scope が無く読めない
+    （kotoba-lang は free plan / private repo 13 件）。org 管理者による無効化か、
+    Actions の spending limit 到達かのどちらか
+  - **勝手に `enabled: true` に戻していない。** セッション中に誰かが変えた org 規模の
+    制御であり、意図的な無効化（課金・セキュリティ）だった場合それを黙って覆すことに
+    なるため。**これは報告して判断を仰ぐ側の事象**
+  - **影響**: `columnar` `16b336b1`（GROUP BY）と `org-apache-arrow` `78db9a83`
+    （group 統合テスト）は **CI 未検証のまま main に入っている**。ローカルでは
+    JVM・nbb・clj-kondo すべて green を実測しているが、**CI が走ったという主張は
+    できない**。それ以前の 5 commit は CI 実測済み
+  - つまり **P4 は network-awai だけの問題ではなくなった**。format library 群も
+    今は CI に守られていない
 - コミット済みの Worker バンドルが main のソースより古かった（同一ソースの 2 回ビルドが
   byte 一致することを確認して、ビルドの非決定性ではないと確定させた上での判定）
 
