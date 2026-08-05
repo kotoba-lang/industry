@@ -39,15 +39,15 @@
    "adr-2607299700-kotobase-scoped-cacao（互いに代用できる 2 つの capability は 1 つ — P1 で IByteSource に適用した）"]
 
   :adr/decision-summary
-  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :arrow-writer :parquet-writer :group-by :schema-evolution :snapshots :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson}, :write #{:arrow-ipc :parquet}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed}, :refused-by-name #{:lz4-frame :zstd}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :writer-gate :pyarrow-validate-full, :ci-status {:kotoba-lang :actions-disabled-2026-08-05, :network-awai :actions-dead}, :gaps {:p2 #{:compaction :join-cost}, :p2-not-doing #{:rename-needs-field-ids}, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
+  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :arrow-writer :parquet-writer :group-by :schema-evolution :snapshots :compaction :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson}, :write #{:arrow-ipc :parquet}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed}, :refused-by-name #{:lz4-frame :zstd}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :writer-gate :pyarrow-validate-full, :ci-status {:kotoba-lang :actions-disabled-2026-08-05, :network-awai :actions-dead}, :gaps {:p2 #{:aggregate-pushdown :join-cost}, :p2-not-doing #{:rename-needs-field-ids}, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
 
   :adr/verify
-  ["west pin: columnar 309822ec / org-apache-arrow 78db9a83 / org-apache-parquet e28a6b3e / kotobase-lake 540a20f4 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
+  ["west pin: columnar 309822ec / org-apache-arrow 78db9a83 / org-apache-parquet e28a6b3e / kotobase-lake 23e45897 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
    "org-apache-arrow: JVM 39 tests/119 assertions・nbb 34/100・clj-kondo 0 warnings（ローカル実測）。CI は writer commit 6d070313 までは全 step success を実測、それ以降は org の Actions 無効化により未実行"
    "writer の正当性ゲート: clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir>  ; => 6 ケースすべて pyarrow validate(full=True) で受理"
    "org-apache-parquet: JVM 32 tests/143 assertions・nbb 29/131・clj-kondo 0 warnings（ローカル実測）。writer gate = clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir> ; => 7/7 pyarrow 受理・統計も可視。CI は 06df9fdd まで success、e28a6b3e は Actions 無効化により未実行"
    "columnar: 36 tests/115 assertions・clj-kondo 0 warnings（ローカル実測）。CI は d89813a3 まで success、以降は Actions 無効化により未実行"
-   "kotobase-lake: 53 tests/211 assertions（JVM / nbb 両方）・clj-kondo 0 warnings（ローカル実測）"
+   "kotobase-lake: 67 tests/237 assertions（JVM / nbb 両方）・clj-kondo 0 warnings（ローカル実測）"
    "nbb scripts/fleet-ci/gates/net-kotobase-hermetic-check.cljs <tree>   ; => E object-grant: Ran 16 tests, rc=0"
    "net-kotobase の GitHub Actions は job を起動しない（ADR-2608036600）。実際に走る gate は murakumo fleet の check A-E のみ"]
 
@@ -160,7 +160,7 @@ validity bitmap + values buffer）なので、seam を曲げる圧力が**別の
 設計すると Parquet の形に引きずられた writer ができるためで、その理由は上記のとおり
 解消した。その上で P2 の最初の項目（writer）を着地させた。
 
-### P2. 書き込み側 — 5 項目着地、残り 1 項目
+### P2. 書き込み側 — 6 項目着地。残るは集約 push down のみ
 
 **着地（2026-08-05）: Arrow IPC writer**（`arrow.build` = FlatBuffers builder /
 `arrow.write`）。**「このクエリをテーブルに実体化」ができるようになった** —
@@ -286,8 +286,29 @@ writer は列を手元に持っているので min/max/null_count を書きな�
 **これは compaction の前提でもある** — N ファイルを 1 つに置き換える操作は、
 mutation としてではなく**atomic な新 snapshot として**だけ安全に書けるため。
 
-**残っている 1 項目**:
-- **コンパクション / small-file 問題**（上記 snapshot の上に載る）
+**着地（2026-08-05）: コンパクション**（`kotobase.lake.compact`）。small-file 問題。
+クエリ費用はファイル単位なので、小さいファイル 1000 個は同じ問いに 1 個の 1000 倍かかる。
+
+- **plan と commit だけを持ち、バイトは動かさない。** lake は I/O をしないし、
+  呼び手は既に reader / writer を持っている。よって `plan → 呼び手が書き換え → commit`
+  で、両端がここにあるのは**どちらも「気付かれない形で間違えやすい」部分**だから。
+- **compaction は行を黙って失いうる唯一の操作。** 他は全部うるさく失敗する。行を落とした
+  書き換えは**開けて・parse できて・クエリに答える**ファイルを作る。中身が減っているだけで、
+  下流には判別手段が無い（あるべき内容の記録は、置き換えようとしている側の manifest しか
+  無い）。だから `verify-replacement!` は commit の**中**にある — checker を呼び忘れて
+  loss を着地させる経路が存在しない。置換後は**全行を説明**し、bounds は元の
+  merged bounds を**含む**必要がある。広いのは可（`columnar.stats` 規則 2「統計は境界で
+  あり writer は緩く記録してよい」。広い分は枝刈りが効かないだけ）。**狭いのは、行数が
+  合っていても値が消えたということ。**
+- **partition が違う member は決して同じ group にしない。** partition 値は path にあって
+  data には無いので、跨いで merge すると値を失うか列に変えてしまう。
+- **どれか 1 つの member が報告しなかった bound は落とす**（報告した分から畳んで
+  埋めない）。それは誰も記述していない行についての主張になるため。
+- **commit は mutation ではなく新しい snapshot**。だから snapshot が入るまでこれは
+  書けなかった。テストがそれを通しで確かめている: compact した後も、前の snapshot は
+  元のファイルを名指したままである。
+
+**P2 の書き込み側 6 項目はこれで全部着地した。**
 - **形式側への集約 push down が無い**（Parquet に row group ごとの部分和を求めるような
   経路）。`IColumnSource` は設計上 chunk と column を露出し arithmetic は露出しないので、
   ここに手を入れるには seam を変える判断が要る
@@ -403,7 +424,8 @@ Parquet
 
 ## Decision
 
-**残りは P2 → P3 → P4 → P5 の順で扱う。** ただし順序は硬直させない:
+**P2 の書き込み側は完了。残りは P3 → P4 → P5 と、P2 に残した 2 つ（集約 push down /
+join コストモデル）。** ただし順序は硬直させない:
 
 - **P3 の `GET /ipfs/:cid` 未認証**はセキュリティ課題なので、他の優先順位と切り離して
   よい（形式と無関係に独立して進められる）
@@ -419,7 +441,8 @@ Parquet
 ## Consequences
 
 - **『lake を名乗れる』は名乗れる側に来た**が、Iceberg 相当ではない —
-  コンパクションが無い（P2 残）。**スキーマ進化とスナップショットは入った**
+  **スキーマ進化・スナップショット・コンパクションは入った**。Iceberg 相当に
+  近づいたが、集約 push down と join コストモデルは無い
 - **読み書きが両形式で閉じた。** 外から来たオブジェクトを scan し、結果を書いて、
   書いたものをまた scan できる。Arrow と Parquet の両方で。
 - **materialize 先に Parquet を選べば枝刈りが効く。** 「書いた Arrow は自分で枝刈り
