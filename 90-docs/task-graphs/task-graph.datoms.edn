@@ -387,8 +387,51 @@
   :task/repo "kotoba-lang/torihiki"
   :task/requires []
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "light client を主張するなら必須。**全履歴の root が変わる**ので、canonical-bytes の順序をそのまま木の葉順に写して互換の証明を書けるかを先に決めること。parity fixture の 22f75a7f… も変わる —— 変わってよいことを明示してから変える。"}
+  :task/status :completed
+  :task/status-note "**完了。本番で、state を一切持たない client が 1 残高を検証したところまで観測した。**
+
+  ## fixture が変わってよいことの明示（起票時の条件）
+
+  変えたのは **`state-root` の値だけで、その下のバイト列は変えていない**。`flat-root` が旧 `state-root` の値をそのまま返し、**テストが parity シナリオの公表値 `22f75a7f…` に対してそれを固定する** —— 互換の主張が README の一文からアサーションになった。木は既存 encoding の上に置いた構造であって、新しい encoding ではない。
+
+  `canonical-leaves` が encoding を**既にあった境界**（+ clearing account 1 件ずつ）で**同じ順序**に切り、`canonical-bytes` はその連結として定義し直した（両者が黙って食い違えない）。
+
+  ## merkle-sum を使う（4 つ目の Merkle 木を書かない）
+
+  `kotoba-lang/merkle-sum` は zero-dep portable `.cljc`、inclusion proof 付き、「any actor needing PoR/PoL reuses one audited implementation」のために切り出されたもの。奇数ノードは複製せず持ち上げる（複製は証明偽造の定番の穴）。
+
+  ## sum は全部 0 —— 準備金証明を主張しない
+
+  merkle-sum の root は葉の合計を持つので取引所なら proof of reserves が賞品になるが、**主張しない**: `verify` は負の葉 sum を拒否し、collateral は負になりうる（`liquidation.cljc:204` の shortfall がまさにその場合を計算している）。誰も水面下にいない間だけ正しい合計は、一番必要なときに壊れる。非負が不変条件になってからなら、葉 sum を collateral にするだけで root が準備金証明になる（S6 の担保裏付けと直結する）。
+
+  ## endpoint が無ければ library の性質でしかない
+
+  `/proof?account=N` を sequencer に足した。応答は葉の**バイト列**を載せる（hash だけ渡された verifier は「何らかの preimage が木にある」ことを証明するだけ）。存在しない account は **404 で報告する。証明はしない** —— sorted tree なら非存在も証明できるが、これはそうではない。
+
+  ## 12 桁パディングが live データで 1 時間以内に破れた
+
+  最初の `/proof` が返した leaf id は `04:01:34633027260816` —— `address/derive` の 14 桁 account で、**パディングされていなかった**。長さの違う id は辞書順で比較され、辞書順は長さが違った瞬間に数値順とずれる（`\"99999999999999\"` は `\"100000000000000\"` の後に来るが数値は前）。merkle-sum は id で葉を並べるので、木が flat encoding と違う並びにコミットしうる —— 静かに、どちらも安定した root を出したまま。
+
+  **既存のテストはこれを見逃していた**（parity シナリオの account は 10 と 11 で、2 桁ならどんなパディングでも正しく並ぶ）。16 桁（最大 i53 の幅）に統一し、10^n の両側にまたがる実 id で property を張り直し、**旧パディングでその assertion が実際に落ちることを確認**した。
+
+  ## 代償（deploy 後に測った）
+
+  `state-root` は `root-fn` 経由で `/head` の報告にしか使われず、**block hash にも投票にも入っていない**ので chain は割れない。ただし rolling upgrade 中は新旧の replica が同じ state に別の root を出す —— この数字が検出するために存在する故障とまったく同じ見た目で、故障ではない。
+
+  実測 12:19:47: **height 14382 に 3 台が揃った瞬間、v91 の 2 台は `39860c37` で一致し、v89 の w1 だけ `f00df236`**。全台 v91 後は同一 height の replica（w3/w4 @14477）が同一 root。窓は閉じた。
+
+  ## 本番観測（sequencer v12、2026-08-05）
+
+  state を持たない client が `/head` の root だけを信じ、`/proof?account=34633027260816` の応答（葉 32 バイト + 5 段の兄弟パス）から:
+  - **VERIFIES: true**
+  - 検証したバイト列を decode すると `tag 5 / account 34633027260816 / collateral 4242000` —— 入金額と一致
+  - collateral の 1 バイトを書き換えると **false**
+
+  ## 残り
+
+  **incremental ではない。** root は state 全体ぶんかかる（通常のブロックが触る kB には正しく、数十万の resting order を抱える板には正しくない）。差分で root を更新できる木は別タスク。
+
+  JVM 168 tests / 490 assertions、nbb と両 root + proof 検証が一致。"}
 
  {:db/id -14
   :task/id "S8-terminal-jp-go-dds-skin"
