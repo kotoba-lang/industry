@@ -204,8 +204,23 @@ inga の 2f+1 quorum（ADR-2608038000）を ref 面に使う。
 | **S2** | head 面に fork 検出。block 面は**不要と判明**（上記 D2 の 2 つの撤回） | **完了** `codebase@7392c25` |
 | S3 | `code-graph` を codebase blocks の projection として配線し `projection-verify` gate を通す | **未着手** |
 | **S4** | `dependents` を 1 パス逆向き索引へ。`#`短縮ハッシュの scope 縮退を明示 | **完了** `codebase@7392c25` |
-| **S5** | compile 既定を反転（多モジュールは `--unpinned` 必須）、入力モードを artifact の隣に記録 | **完了**（下記の限界つき） |
+| **S5** | compile 既定を反転（多モジュールは `--unpinned` 必須）、入力モードを記録 | **完了** `compiler@36bedf8` + `kotoba@acd3bb0`（下記の限界つき） |
 | S6 | repo 同期プレーン（ADR-2608040200 Plane A）を同一 ref へ | **未着手** |
+
+### S5 は 2 箇所に要った —— 1 回目の「完了」は嘘だった
+
+`compiler@36bedf8` は **`kotoba.compiler.cli`** に gate を置いた。しかし
+**`kotoba compile` はそこを通らない** —— `launcher/compile-result` が
+`project-files/load-closed-graph` を直接呼び、その後 `compiler/compile-project` を呼ぶ。
+つまり**ユーザーが実際に打つコマンドは gate の横を素通りしていた**。
+`kotoba@acd3bb0` で同じ規則・同じ逃げ道を launcher にも置いて閉じた。
+
+**誰も通らない経路にしか効かない既定は、既定ではない。** これは依存 pin を進めようとして
+初めて気づいた —— つまり **1 回目の報告で「S5 完了」と書いた時点では、ユーザーに面した
+半分は手つかずだった。** 同種の誤りを繰り返さないために、gate を足したら
+「**その gate を通らずに同じことができる経路が他に無いか**」を必ず確認する。
+（`check --project` は manifest のみを受け取り、manifest が自分の source を pin するので
+同等の穴は無い —— これも実際に読んで確認した。）
 
 ### S5 の実装上の限界（正直に）
 
@@ -260,4 +275,8 @@ inga の 2f+1 quorum（ADR-2608038000）を ref 面に使う。
   publish 済み wire format を壊す）。S1/S2/S4/S5 を完了に更新し、S5 の seal 限界と
   S3/S6 を今日やらなかった理由を追記。**設計を書いた者と実装した者が同じなので、
   撤回は「実装が設計に負けた」ではなく「設計が実測に負けた」と記録する。**
+- **2026-08-05（同日、続き）**: S3 の真の前提条件を実測で差し替え（legacy IStore よりも
+  **投影対象の store が workspace 全体で 0 件**である方が決定的）。S5 が `kotoba compile`
+  を覆っていなかったのを発見して `kotoba@acd3bb0` で閉じ、**1 回目の「S5 完了」報告が
+  誤りだった**ことを上記に明記。
 "}]
