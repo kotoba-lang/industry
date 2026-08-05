@@ -264,7 +264,32 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
 
 ## marketplace 共有 identity seed (ADR-2607275000、2026-07-27)
 
-- **`itonami-marketplace-kotobase-seed`（kagi vault、compartment `personal`）** —
+- ⚠ **`itonami-marketplace-kotobase-seed` は 2026-08-05 時点で kagi に存在しない**
+  （`KAGI_HOME=$HOME/.kagi` の live vault・repo-local vault の**両方**で
+  `no such item`、3 回再試行）。**下の記述は実態と乖離している** ——
+  `MURAKUMO_GENERATION_TOKEN_SECRET` / `MURAKUMO_CHAT_TOKEN_SECRET_2` と同じ乖離が
+  3 例目としてここでも起きた（保管されなかったか、後に失われた）。
+  - **実害**: ADR-2800003200 Phase 2（tsukuru を marketplace ref に載せる）が
+    ここで止まっている。**新しい seed を作っても代わりにならない** —— `:apex` は
+    graph scope == issuer DID を要求するので、別 seed は別 DID = 別グラフになり、
+    共有 ref に join できない（それが Phase 2 の目的そのもの）。実測: 使い捨て seed で
+    deploy した `cloud-itonami-tsukuru` は kotobase.net に対して
+    `q 401 Unauthenticated` を返した（未登録 DID）。
+  - **7 worker 側の secret は生きている**（`did:key:z6Mkid37…` で `/health` 200、
+    `/offers` `/orders` が読める）ので、**値は Cloudflare の中にだけ在って
+    読み出せない**状態。復旧には ①オーナーが元の値を持っていれば kagi に入れ直す
+    ②無ければ新 seed を発行して 8 worker 全部に入れ直す（＝既存 ref の DID が
+    変わるので現行データの扱いを決める必要がある）のどちらか。
+  - **`ACTOR_WRITE_TOKEN`（7 actor の write gate）もどこにも記録が無い。**
+    live の cross-actor 検証（onboarding に applicant を作って credential を
+    発行させる）はこれが無いと駆動できない。
+  - **2026-08-05 実測の ref の中身**: `/offers` `/orders` とも `[]`。
+    ADR-2607274000 が記録した live チェーン（merchant.riverside 等）は
+    **現在の ref には残っていない**ので、seed が戻っても正の join を見るには
+    チェーンを引き直す必要がある。
+
+- （以下は復旧時の参照用。**上記のとおり item は現存しない。**）
+  **`itonami-marketplace-kotobase-seed`（kagi vault、compartment `personal`）** —
   cloud-itonami の marketplace 7 actor（order / onboarding / listing / settlement /
   fulfillment / crossborder / returns）が**共有する** Ed25519 seed（base64 32 byte）。
   did は `did:key:z6Mkid37JoU81KWZCA5KbrX3t8Ji9dkH6azjrAKyg63XyvTm`（公開値）、
@@ -277,6 +302,14 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   - **1Password には入れていない。** kagi 側が push で同期し、PQC + 台帳 + 非対話
     読み出しを持つため。**代わりに 1Password に置くべきは kagi の recovery
     passphrase**（単一障害点を分ける）—— これはオーナー手動。
+
+- **`itonami-tsukuru-testgraph-seed` / `itonami-tsukuru-actor-write-token`
+  （kagi、compartment `personal`、2026-08-05 発行）** — 上記が見つからなかったため、
+  ADR-2800003200 Phase 2 の**機構検証用に作った使い捨て**の Ed25519 seed と write token。
+  **共有 ref には繋がらない**（DID が違うので別グラフ。しかも kotobase.net に未登録で
+  `q 401`）。Worker `cloud-itonami-tsukuru` からは検証後に削除済みで、
+  現在この Worker は secret 0 本 = 設計どおり 503 で fail-closed。
+  **共有 seed が復旧したらこの 2 つは用済みなので消してよい。**
 
 ## itonami fleet 共有 identity seed (2026-07-30)
 

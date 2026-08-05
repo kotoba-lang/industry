@@ -251,9 +251,55 @@ murakumo fleet gate（`scripts/fleet-ci/gates.edn`）に足す場合は、ノー
 
 ## 現在の実装状況（2026-08-05 時点）
 
-**Phase 1 = landed。Phase 2-4 = 未着手。**
+**Phase 1 = landed。Phase 2 = コードは landed、live 検証は blocked。Phase 3-4 = 未着手。**
 
-Phase 1 の実測（この面で実際に走らせた値）:
+### Phase 2 — 何が landed し、何が止まっているか
+
+landed（`cloud-itonami/tsukuru-actor` `f206c51`）:
+
+- `tsukuru.store` / `governor` / `advisor` / `phase` / `edge.worker` を追加。host 層は
+  `marketplace.edge` をそのまま使い、この repo には **routes と判断だけ**を置いた。
+- ref は既存の `marketplace` を共有（新 ref を切っていない）。
+- **同意の境界を ref でも強制**: `put-factory!` は `did:web:` 以外を拒否する。
+  Phase 1 で datom 面に載せた 2,119 社の `candidate:manufacturer-directory/...` は
+  この ref に入れない。
+- governor は 9 hard check + 3 escalate。credential は `:seller/id` で引く
+  （factory DID と等しいと仮定すると、実在の seller で永久に満たせない check になる）。
+- production-order は**どの phase でも auto-commit しない**（governor と phase 表の二重）。
+- 検証: 35 tests / 642 assertions green（新規 23）。`shadow-cljs release worker` が
+  0 warnings で 355 KB の worker.js を生成。Worker `cloud-itonami-tsukuru` を
+  Cloudflare に deploy 済み。
+
+**live で確かめられたこと**:
+- Worker は動く。secret 0 本のとき `/health` が 503 と
+  `{ok:false, db:\"marketplace\", did:null}` を返す = **設計どおり fail-closed**。
+- 空文字の secret を入れると 1101（例外）になる。`\"\"` は JS で truthy なので
+  `client-for` が 0 バイト鍵で client を作ろうとする。**secret は「無い」か
+  「正しい」かのどちらかにする**（空で置かない）。
+
+**blocked（この ADR の完了条件に到達していない）**:
+
+1. **共有 seed `itonami-marketplace-kotobase-seed` が kagi に無い。**
+   live vault / repo-local vault の両方で `no such item`（3 回再試行）。
+   secrets-location-map はこれが在ると書いていたが**実態と乖離していた**
+   （murakumo の 2 件に続く 3 例目）。**新しい seed を作っても代わりにならない** ——
+   `:apex` は graph scope == issuer DID を要求するので別 seed は別グラフになり、
+   共有 ref に join できない。実測: 使い捨て seed の Worker は kotobase.net に対し
+   `q 401 Unauthenticated`（未登録 DID）。
+2. **7 actor の `ACTOR_WRITE_TOKEN` もどこにも記録が無い。** onboarding を駆動して
+   credential を発行させる live チェーンは、これが無いと動かせない。
+3. **現在の ref は空**（`/offers` `/orders` とも `[]`、shared DID で読める）。
+   ADR-2607274000 の live チェーンの痕跡は残っていないので、seed が戻っても
+   正の join を見るにはチェーンを引き直す必要がある。
+
+**オーナー作業**: ①元の seed を持っていれば kagi `itonami-marketplace-kotobase-seed`
+に入れ直す（値は 7 worker の Cloudflare secret の中にだけ在り、読み出せない）
+②無ければ新 seed を発行して 8 worker 全部に入れ直す（DID が変わるので既存 ref の
+扱いを決める）。どちらかが済めば、残りは
+`wrangler secret put KOTOBASE_SECRET_KEY` と `ACTOR_WRITE_TOKEN` の 2 本だけで
+completion 条件の検証に進める。
+
+### Phase 1 の実測（この面で実際に走らせた値）:
 
 | | 値 |
 |---|---|
