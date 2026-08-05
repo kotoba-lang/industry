@@ -41,6 +41,7 @@
 (def args (set (vec *command-line-args*)))
 (def check? (contains? args "--check"))
 (def shard? (contains? args "--shard"))
+(def verify-index? (contains? args "--verify-index"))
 
 (def policy-path (path/join root "manifest" "corpus-policy.edn"))
 (def out-path (path/join root "90-docs" "corpus" "corpus.datoms.edn"))
@@ -332,7 +333,65 @@
                 ";; hazard 検査は構造的（既知の形だけ）で、秘密の不在を証明しない。\n"
                 (print-vec numbered))}))
 
-(defn -main []
+;; ---------------------------------------------------------------------------
+;; --verify-index: **索引に載っている行だけ**を再計算して照合する。
+;;
+;; なぜ `--check`（全再生成の bytes 一致）を gate にしないか: この repo は
+;; 並行セッションが毎日 ADR を足す。全再生成一致を gate にすると、**新しい文書が
+;; 1 つ landed した瞬間に赤**になり、以後ずっと赤のままになる。CLAUDE.md が
+;; gen-concept-index について書いているとおり「常に赤い gate は無視され、
+;; 無視される gate は存在しないのと同じ」。
+;;
+;; 代わりに不変条件を 2 つに分ける:
+;;   載っている行は**正確でなければならない**（改竄検出はここが担う。手編集された
+;;     行は、その文書を再採点すれば必ず食い違う）
+;;   載っていない文書があるのは**古いだけで壊れてはいない**（件数を報告して通す）
+(defn- verify-index! []
+  (when-not (fs/existsSync out-path)
+    (println "MISSING: 90-docs/corpus/corpus.datoms.edn") (js/process.exit 1))
+  (let [indexed (->> (edn/read-string {:default (fn [_t v] v)}
+                                      (str (fs/readFileSync out-path "utf8")))
+                     (filter :corpus/id))
+        by-id (into {} (map (juxt :corpus/id identity)) indexed)
+        excluded (set (get-in policy [:scan :exclude-paths]))
+        prefixes (vec (get-in policy [:scan :exclude-prefixes]))
+        on-disk (->> (get-in policy [:scan :roots])
+                     (mapcat (fn [r]
+                               (let [k (:root/kind r)]
+                                 (map (fn [p] [k (rel p)])
+                                      (walk (path/join root (:root/path r)) (:root/ext r))))))
+                     (remove (fn [[_ id]] (or (contains? excluded id)
+                                              (some #(str/starts-with? id %) prefixes))))
+                     (reduce (fn [acc [k id]] (if (contains? acc id) acc (assoc acc id k))) {}))
+        missing (remove #(contains? on-disk %) (keys by-id))
+        unindexed (remove #(contains? by-id %) (keys on-disk))
+        mismatched
+        (->> indexed
+             (keep (fn [e]
+                     (let [id (:corpus/id e)]
+                       (when-let [kind (get on-disk id)]
+                         (let [fresh (-> (entity-of kind (path/join root id))
+                                         (dissoc :db/id))
+                               stored (dissoc e :db/id)]
+                           (when-not (= (into (sorted-map) fresh) (into (sorted-map) stored))
+                             id))))))
+             vec)]
+    (println (str "indexed " (count indexed) " document(s); "
+                  (count unindexed) " on disk not yet indexed; "
+                  (count missing) " indexed but gone from disk"))
+    (if (or (seq mismatched) (seq missing))
+      (do (when (seq mismatched)
+            (println (str "MISMATCH: " (count mismatched)
+                          " indexed row(s) do not match a fresh scoring of the file:"))
+              (doseq [id (take 10 mismatched)] (println (str "  - " id))))
+          (when (seq missing)
+            (println (str "MISSING: " (count missing) " indexed document(s) no longer exist:"))
+            (doseq [id (take 10 missing)] (println (str "  - " id))))
+          (println "  run: nbb scripts/gen-training-corpus.cljs")
+          (js/process.exit 1))
+      (println "OK: every indexed row reproduces exactly"))))
+
+(defn- main-generate! []
   (let [{:keys [text docs shards coverage]} (build)]
     (if check?
       (let [current (when (fs/existsSync out-path) (str (fs/readFileSync out-path "utf8")))]
@@ -362,5 +421,8 @@
                 (fs/writeFileSync p body)
                 (println (str "wrote " (rel p) " — " (:shard/bytes s) " bytes, key "
                               (:shard/annex-key s)))))))))))
+
+(defn -main []
+  (if verify-index? (verify-index!) (main-generate!)))
 
 (-main)
