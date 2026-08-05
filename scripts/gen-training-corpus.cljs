@@ -342,10 +342,24 @@
 ;; gen-concept-index について書いているとおり「常に赤い gate は無視され、
 ;; 無視される gate は存在しないのと同じ」。
 ;;
-;; 代わりに不変条件を 2 つに分ける:
-;;   載っている行は**正確でなければならない**（改竄検出はここが担う。手編集された
-;;     行は、その文書を再採点すれば必ず食い違う）
-;;   載っていない文書があるのは**古いだけで壊れてはいない**（件数を報告して通す）
+;; **索引はスナップショットで、tree は動き続ける。** だから「今の tree で採点し直した
+;; 結果と一致するか」は、どう切り取っても安定な不変条件にならない。実際この設計は
+;; 3 回作り直している（3 回目は closing の監査で見つけた）:
+;;
+;;   1. 全再生成の bytes 一致 → **文書が 1 件 landed した瞬間に赤**
+;;   2. 索引にある行だけ再採点 → **既存の文書が 1 件編集された瞬間に赤**。この repo は
+;;      「文書は最新状態のみを表す。履歴は git に任せる」（ADR-2607257000）なので
+;;      ADR の本文は日常的に書き換わる —— 実測、merge の 23 commit 後に 5 件が該当した
+;;   3. **記録された sha256 と現在の bytes が一致する行だけ**再採点（この実装）
+;;
+;; 3 の理屈: 行が主張しているのは「*この bytes* を採点したらこの点になった」であって
+;; 「この path は今もこの点だ」ではない。だから:
+;;
+;;   file が消えた / sha256 が変わった → **その行は検証できない。stale として報告し通す**
+;;   sha256 が記録どおり            → **完全一致でなければならない**（改竄検出はここ）
+;;
+;; これは tree が動いても壊れない。かつ改竄は依然として捕まる —— スコアだけ手で
+;; 書き換えても file の bytes は変わらないので sha256 は一致し、再採点で必ず食い違う。
 (defn- verify-index! []
   (when-not (fs/existsSync out-path)
     (println "MISSING: 90-docs/corpus/corpus.datoms.edn") (js/process.exit 1))
@@ -363,33 +377,44 @@
                      (remove (fn [[_ id]] (or (contains? excluded id)
                                               (some #(str/starts-with? id %) prefixes))))
                      (reduce (fn [acc [k id]] (if (contains? acc id) acc (assoc acc id k))) {}))
-        missing (remove #(contains? on-disk %) (keys by-id))
         unindexed (remove #(contains? by-id %) (keys on-disk))
-        mismatched
+        classified
         (->> indexed
-             (keep (fn [e]
-                     (let [id (:corpus/id e)]
-                       (when-let [kind (get on-disk id)]
-                         (let [fresh (-> (entity-of kind (path/join root id))
-                                         (dissoc :db/id))
-                               stored (dissoc e :db/id)]
-                           (when-not (= (into (sorted-map) fresh) (into (sorted-map) stored))
-                             id))))))
-             vec)]
-    (println (str "indexed " (count indexed) " document(s); "
-                  (count unindexed) " on disk not yet indexed; "
-                  (count missing) " indexed but gone from disk"))
-    (if (or (seq mismatched) (seq missing))
-      (do (when (seq mismatched)
-            (println (str "MISMATCH: " (count mismatched)
-                          " indexed row(s) do not match a fresh scoring of the file:"))
-              (doseq [id (take 10 mismatched)] (println (str "  - " id))))
-          (when (seq missing)
-            (println (str "MISSING: " (count missing) " indexed document(s) no longer exist:"))
-            (doseq [id (take 10 missing)] (println (str "  - " id))))
+             (map (fn [e]
+                    (let [id (:corpus/id e)
+                          kind (get on-disk id)
+                          buf (when kind (read-buffer (path/join root id)))]
+                      (cond
+                        (nil? kind) [:gone id]
+                        (nil? buf) [:gone id]
+                        ;; bytes が変わっていれば、この行が主張している対象は
+                        ;; もう存在しない。検証不能であって不正ではない。
+                        (not= (sha256 buf) (:corpus/sha256 e)) [:changed id]
+                        :else
+                        (let [fresh (dissoc (entity-of kind (path/join root id)) :db/id)
+                              stored (dissoc e :db/id)]
+                          (if (= (into (sorted-map) fresh) (into (sorted-map) stored))
+                            [:verified id]
+                            [:mismatch id]))))))
+             (group-by first))
+        n (fn [k] (count (get classified k)))
+        mismatched (mapv second (get classified :mismatch))]
+    (println (str "indexed " (count indexed) " row(s): "
+                  (n :verified) " verified against unchanged bytes, "
+                  (n :changed) " stale (document edited since indexing), "
+                  (n :gone) " stale (document removed); "
+                  (count unindexed) " document(s) on disk not yet indexed"))
+    (if (seq mismatched)
+      (do (println (str "MISMATCH: " (count mismatched)
+                        " row(s) whose file is byte-identical to what was indexed"
+                        " do not reproduce — the index was edited by hand:"))
+          (doseq [id (take 10 mismatched)] (println (str "  - " id)))
           (println "  run: nbb scripts/gen-training-corpus.cljs")
           (js/process.exit 1))
-      (println "OK: every indexed row reproduces exactly"))))
+      (println (str "OK: all " (n :verified)
+                    " verifiable row(s) reproduce exactly"
+                    " (stale rows are reported, not failed — the index is a snapshot"
+                    " and the tree moves)")))))
 
 (defn- main-generate! []
   (let [{:keys [text docs shards coverage]} (build)]
