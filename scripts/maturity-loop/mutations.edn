@@ -1,0 +1,114 @@
+;; mutations.edn — 「その拒否は、今も落ちるのか」を繰り返し確かめるための宣言。
+;;
+;; なぜ要るか。CLAUDE.md は fleet gate について
+;; 「**gate は「落ちること」を確かめてから landed とする。落ちない gate は劇場**」
+;; と書いている。原則は書かれているが、それを**時間をまたいで保つ機構**が無かった。
+;; テストは静かに噛まなくなる —— 実装が変わって経路が通らなくなっても、テストは
+;; 緑のままだからである。
+;;
+;; 2026-08-05 の 1 セッションで、これが 2 回起きた:
+;;
+;;   1. prolly-tree の inclusion proof を書いたとき、最初の版は descent 規則を
+;;      壊しても落ちなかった。木が well-formed なら CID 連鎖だけで inclusion は
+;;      健全なので、descent 検査は「本物の拒否」ではなかった。手で木を細工した
+;;      shadow-path テストを足して初めて赤くなった。
+;;   2. codebase を .cljc にしたとき、cljs テストが f32/f64/i64 の decode を一度も
+;;      通っていなかった。`Double/longBitsToDouble` に戻しても cljs は WARNING を
+;;      出すだけで通過した（その経路が実行されないので）。
+;;
+;; どちらも mutation を手で当てて初めて分かった。手でやる限り、次に忘れる。
+;;
+;; ## 各 mutation の意味
+;;
+;;   :find / :replace   その1箇所を壊す最小の編集。**壊し方は「JVM 専用に戻す」
+;;                      「検査を外す」など、実際に起こりうる退行の形にする** ——
+;;                      構文を壊すだけの mutation は「コンパイルが通らない」しか
+;;                      証明しない。
+;;   :must-fail         この mutation で**必ず赤くなるテスト名**。名前まで見るのは、
+;;                      別の理由で赤くなったのを「噛んだ」と誤読しないため。
+;;
+;; ここに載っているのは **2026-08-05 に実際に赤くなるところを見た** ものだけ。
+;; 推測で足さない —— 落ちるのを見ていない mutation を載せると、この仕組み自体が
+;; 劇場になる。
+
+{:policy "maturity-loop/mutation/v1"
+
+ ;; 対象 repo は west の pin から解決し、**使い捨て worktree** に checkout して
+ ;; そこを壊す。共有 checkout は絶対に触らない —— このマシンは多数の agent
+ ;; セッションが並行しており、共有 tree を書き換える定期ジョブは他人の作業を
+ ;; 壊す（実測: 2026-08-05 の 1 日で west.yml の pin 退行が 3 回、別々の
+ ;; セッションから発生している）。
+ :isolation :worktree
+
+ :suites
+ [{:repo "orgs/kotoba-lang/prolly-tree"
+   :label "prolly-tree inclusion proof"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :prolly/cid-chain
+     :why "パスの各ブロックが、直前の段が要求した CID にハッシュすること"
+     :file "src/prolly_tree/core.cljc"
+     :find "      (let [node (try (verified-node expected (first blocks))"
+     :replace "      (let [node (try (ipld/decode (first blocks))"
+     :must-fail ["a-well-formed-block-that-lies-about-the-value-is-refused"]}
+
+    {:id :prolly/descent
+     :why "「木のどこかにある」ではなく「木が k について言っていること」であること"
+     :file "src/prolly_tree/core.cljc"
+     :find "            \"internal\" (when (some? more)\n                         (recur (descend-cid (get node \"children\") k) more))"
+     :replace "            \"internal\" (when (some? more)\n                         (recur (or (some (fn [c]\n                                            (when (= (ipld/cid (first more)) (child-cid c))\n                                              (child-cid c)))\n                                          (get node \"children\"))\n                                    \"no-such-child\")\n                                more))"
+     :must-fail ["a-shadow-path-to-a-second-copy-of-the-key-is-refused"]}]}
+
+  {:repo "orgs/kotoba-lang/inga"
+   :label "inga two-root state + metered emission"
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :inga/actors-in-root
+     :why "actor 木が state root に commit されていること（されていなければ actor 木は作って捨てているだけ）"
+     :file "src/inga/state.cljc"
+     :find "   \"actors\" (some-> actors-cid ipld/link)"
+     :replace "   \"actors\" nil"
+     :must-fail ["actors-are-covered-by-the-root"]}
+
+    {:id :inga/emit-retract
+     :why "投影が現在値であって履歴でないこと（arrangement は quad store なので assert だけだと値が 2 つ生える）"
+     :file "src/inga/state.cljc"
+     :find "  (vec (concat\n        (for [[p k] actor-fields :when (some? (get prev k))]\n          {:op :retract :s address :p p :o (get prev k)})\n        (for [[p k] actor-fields :when (some? (get next k))]"
+     :replace "  (vec (concat\n        (for [[p k] actor-fields :when (some? (get next k))]"
+     :must-fail ["default-emit-projects-the-current-state-not-its-history"
+                 "actor-delete-removes-from-both-roots"]}
+
+    {:id :inga/emission-charged
+     :why "emission が課金されること（無料だと fuel 台帳が実際の仕事量と食い違う）"
+     :file "src/inga/state.cljc"
+     :find "                   :expansion-cost-fn\n                   (fn [s o] (reduce + 0 (map cost-fn (emitted-ops emit-fn s o))))"
+     :replace "                   :expansion-cost-fn (fn [_ _] 0)"
+     :must-fail ["emission-is-charged-not-free"
+                 "an-op-whose-emission-does-not-fit-is-not-applied-at-all"]}
+
+    {:id :inga/emission-applied
+     :why "投影が root に入ること（入らなければ非決定的な emission でも replica は割れない）"
+     :file "src/inga/state.cljc"
+     :find "      (if-not emit-fn\n        state'\n        (update state' :db #(reduce apply-datom-op % (emit-fn o prev next))))"
+     :replace "      state'"
+     :must-fail ["emission-is-deterministic-or-replicas-split"]}]}
+
+  {:repo "orgs/kotoba-lang/codebase"
+   :label "codebase portable evaluation"
+   ;; cljs 側でしか意味が無い mutation なので、JVM ではなく cljs suite を回す。
+   ;; JVM だけ回すと `Double/longBitsToDouble` は当然通ってしまい、この
+   ;; mutation は「噛まない」ではなく「間違ったものを測っている」ことになる。
+   :cmd ["npm" "run" "test:eval-cljs"]
+   :green-marker "ran a definition from its CID alone"
+   :npm-install true
+   :mutations
+   [{:id :codebase/f64-portable
+     :why "評価層が ClojureScript で動くこと（f32/f64/i64 の decode を含めて）"
+     :file "src/kotoba/codebase/typed_eval.cljc"
+     :find "(defn- f64-from-bits [payload]\n  #?(:clj (Double/longBitsToDouble (long payload))\n     :cljs (let [view (js/DataView. (js/ArrayBuffer. 8))]\n             (.setBigInt64 view 0 (js/BigInt payload))\n             (.getFloat64 view 0))))"
+     :replace "(defn- f64-from-bits [payload]\n  (Double/longBitsToDouble (long payload)))"
+     ;; cljs suite はテスト名を出さず throw で落ちるので、名前ではなく
+     ;; 「緑マーカーが出ないこと」で判定する。:must-fail が空なのはその宣言。
+     :must-fail []}]}]}
