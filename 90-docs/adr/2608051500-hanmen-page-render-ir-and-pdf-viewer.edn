@@ -1,0 +1,168 @@
+[{:db/id -1
+  :adr/id "ADR-2608051500"
+  :adr/title "ADR-2608051500: hanmen（版面）— ページを「置かれた印」として持つ共通 lib と、cloud-itonami-app の PDF ビューア統合"
+  :adr/status "accepted"
+  :adr/date "2026-08-05"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/tags "viewer pdf svg cljc kotoba-lang cloud-itonami-app csp app-preview"
+  :adr/body
+  "## Context
+
+`cloud-itonami-app` は 2026-08-05 時点で PDF を**保持できるが表示できなかった**。
+`documents/upload!` は任意バイト列を受け、`previewable-media-types` は
+ラスタ画像 5 種のみなので、PDF は `application/octet-stream` +
+`Content-Disposition: attachment` でしか出ていかない。「何が届いたのか」への答えが
+「ダウンロードして別のアプリで開け」になっていた。
+
+ADR-0007（cloud-itonami-app）は内製 4 種（docs/sheets/forms/slides）について
+「レンダリングされたものが既定のビューである」を決めたが、PDF はその対象外だった。
+理由は正しい: 他人がアップロードしたバイト列をこの origin から inline 配信するのは
+stored XSS であり、PDF はスクリプトを運べる。
+
+### 既存資産（新規に作る前に索引を引いた結果）
+
+| repo | 何を持っているか |
+|---|---|
+| `kotoba-lang/app-preview` | **Apple Preview 相当は既に存在する**。ただし mokuroku カタログ上の**ページ一覧**（label/No./Size/Text/Rotation）であって、ページを描画しない |
+| `kotoba-lang/org-iso-pdf` | COS オブジェクトモデル。`parse`/`pages`/`page-text`/`page-images`。**`extract-text` は BT/ET 間の文字列を集めるだけで位置を持たない** |
+| `kotoba-lang/mokuroku` / `mokuroku-ui` | カタログ kernel と window chrome |
+| `kotoba-lang/canvaskit` | viewport 数学（pan / anchored zoom / fit / hit-test） |
+| `kotoba-lang/kasane` | Adobe/バイナリ形式の decode |
+| `kotoba-lang/tsuzuri` | ブラウザ内 PDF editor（別系統） |
+
+「ページの重さ」（app-preview）と「ページの中身」（org-iso-pdf）の間に、
+**ページが何に見えるかを述べる値**が無かった。だから描くものが無かった。
+
+## Decision
+
+### 1. 共通 lib `kotoba-lang/hanmen`（版面）を起こす
+
+portable `.cljc`、依存は `org-iso-pdf` 1 本、host effect なし。3 名前空間:
+
+- `hanmen.page` — **render-IR**。`{:page/width :page/height :page/rotation :page/items}`、
+  item は `:text` / `:rule` / `:frame` の閉じた 3 種。
+- `hanmen.pdf` — content stream を走らせて IR を埋める。CTM スタック（q/Q/cm）、
+  テキスト行列（Tm/Td/TD/T*/TL）、advance の累積、TJ カーニング、
+  合成フォントの `/ToUnicode`。
+- `hanmen.svg` — 閉じた語彙から SVG を書く。
+
+**`org-iso-pdf` に入れない理由**: content stream は COS オブジェクトモデルの一部では
+なく、小さなスタック言語の**プログラム**である。走らせるにはグラフィクス状態・
+テキスト状態・行列スタックが要り、オブジェクトモデルがそれらを所有する理由は無い。
+`pdf.core` が DCTDecode を不透明バイト列のまま返すのと同じ境界。
+
+### 2. 座標系は「読み手の空間」に一度だけ倒す
+
+PDF は原点左下・y 上向き、SVG / Canvas / ラスタバッファは原点左上・y 下向き。
+反転を各描画側でやると**二重反転**が起き、上下逆のページは人間の目でしか気付けない。
+`/Rotate` も同じ理由でここで適用し、`:page/width` は**見えるとおりの幅**にする
+（app-preview.model が既に「未回転の箱を報告すると thumbnail grid が全部崩れる」と
+学習済み）。
+
+### 3. run の開始位置は厳密、幅は「測れたときだけ」
+
+開始位置は行列から出る算術。幅はフォントの `/Widths` 次第で、文書が積んでいる
+ことも積んでいないこともある。**積んでいなければ推定せず欠落させる** —— 推定値は
+出力上で実測値と区別できず、文書ごとに違う量だけ間違う。欠落は consumer が
+行動できる事実である。測れたときは `textLength` + `lengthAdjust=\"spacingAndGlyphs\"`
+で、読み手のフォントが何であれ run が文書どおりの幅を占める。
+
+### 4. 描けないものは「置いて印を付ける」。飛ばさない
+
+画像 XObject、form XObject、`/ToUnicode` を持たない `/Type0` run —— それぞれ
+`:frame` に label と reason を付ける。黙って落とすと**完成したページと見分けが
+つかない**。`hanmen.svg/emit-item` は未知の kind で throw する（片側だけに
+4 つ目の kind を足せないようにする）。
+
+### 5. SVG は `default-src 'none'` の中で不活性
+
+**アップロードされた SVG を拒否する方針と矛盾しない。** 拒否されるのは
+「ユーザーが書いた任意の要素集合」で、これは「閉じた 3 kind の語彙から
+このコードが生成した markup」である。文書の中身が要素名・属性名になる経路は
+存在せず、エスケープされたテキストノードか属性**値**にしかならない。
+`serialize` が allowlist で二重に強制する（URL を取る要素が 1 つも無い）。
+
+`data:` URI の `<img>` ではなく**ページ内の markup** にしたのは、`data:` は
+*load* であり `default-src 'none'` を広げる必要があるから。markup は load では
+ないので CSP は 1 文字も変えていない。**ADR-0007 の `img-src data:` follow-up は
+開いたまま** —— ページが何を *load* してよいかは独立した決定であって、
+ビューアを足した副作用で決めるものではない。
+
+### 6. 色もフォントも選ばない
+
+すべて `currentColor` + class。ホストの token が見た目を決める。これが 1 つの
+レンダリングが light/dark 両方で正しくなる唯一の方法で、文書の黒は暗いページ上の
+読み手の黒ではない。**インクの濃さは保存する**（60% グレーの罫線は黒より薄いまま、
+`fill-opacity` 経由）—— 濃さは文書の意味であり、絶対色はそうではない。
+モデル側は PDF の `/G`（0=黒）を反転して `:item/ink`（1=最大濃度）で持つ。
+形式中立なモデルに形式の反転規約を持ち込むと、2 番目の producer が全部の罫線を
+ネガで描く。
+
+### 7. cloud-itonami-app への統合
+
+`cloud.itonami.app.pageview` +
+`GET /api/workspace/drive/documents/:id/pages[/:n]`（JSON、`:svg` フィールド）。
+`image/svg+xml` レスポンスにしないのが `/preview` との差 —— SVG *document* を
+この origin から出すのが `previewable-media-types` の避けている hazard そのもの。
+UI は Drive 詳細ペインでページ送り。`app-css` に `hanmen.svg/stylesheet` を連結。
+
+**4 つの拒否**（1 つの失敗ではなく、行き先が違うから）:
+`:pageview/not-viewable` 415 / `:pageview/undecodable` 422 /
+`:pageview/no-pages` 422 / `:pageview/too-large` 413。どの場合も**ファイルは
+今までどおり download できる**。Drive quota は 1 GiB なので「ユーザーが上げた」は
+parse の上限にならない（`render-limit-bytes` 32 MiB）。
+
+## Consequences
+
+- **route は request `cond` の外に置いた。** これは JVM の事実であって好みではない:
+  `cond` は 1 メソッドにコンパイルされ、メソッドは 64 KB で頭打ちで、
+  この 2 route を inline で書いたら実際に超えた（`Method code too large!`）。
+  次に route を足す人も同じ壁に当たる。
+- **`core-test` の docstring guard を `app-css` から `base-css` へ移した。**
+  `app-css` は `str` 呼び出しになったので docstring は docstring であって
+  「黙って切られた stylesheet」ではない。名前ではなく hazard を追った ——
+  `app-css` に残せば pass しながら何も守らない assertion になっていた。
+- **`org-iso-pdf` の phantom page を hanmen 側で落とした。** root が nil のとき
+  `collect-pages` は `:else` で `[{}]` を返す = 空 map 1 個 = 1 ページ。
+  PDF でないファイルが「1 ページの白紙」として描画され、存在しなかった文書の
+  中身を探しに行かせる答えになっていた。consumer 側のテストが見つけた。
+
+## 検証
+
+- `hanmen`: 38 tests / 125 assertions、0 failures。clj-kondo 0 errors 0 warnings。
+  配置の assertion はすべて**テストが書いた PDF に対する座標**であって、
+  誰かが眺めて良さそうだと思ったレンダリングではない。
+- `cloud-itonami-app`: 1088 tests / 4521 assertions、0 failures / 0 errors。
+  clj-kondo 0 errors、warnings 9 はすべて既存で触ったファイルには 1 件も無い。
+  `node --check` 通過。
+- **out of sample**: このマシン上の実 PDF 30 件のうち **29 件が描画**。
+  Word 由来の日本語契約書（株式譲渡契約書等）を含み、CJK は `/ToUnicode` 経由で
+  復号できている。30 件目は `org-ietf-deflate` から
+  `zlib: unsupported compression method` を投げた —— これが
+  `:pageview/undecodable` の存在理由（この app が壊れているのではなく、
+  この形式の decoder が誰にも書かれていない、と言う）。
+
+### テストが名指しした 2 つのバグ
+
+1. **90° 回転行列が反時計回りだった。** flip を畳み込んだ行列は行列式 −1 に
+   なるべきで、+1 の行列は鏡像ページ。最初の版は他のあらゆる面で妥当に見えた。
+2. **PDF のグレー（0=黒）が反転されずに形式中立モデルに届いていた。**
+
+## まだ無いもの（「実装済み」と読まないこと）
+
+1. **ラスタは描かない。** 画像 XObject は `:frame` として置くだけ。描くには
+   `data:` URI が要り、それは ADR-0007 が開けたままにしている CSP の決定。
+2. **読み順は主張しない。** `text-of` は content stream 順 —— 検索には十分近く、
+   引用には全く足りない。2 段組の論文は交互に出る。
+3. **パス・シェーディング・透明グループは無い。** `re … f` だけが罫線になる。
+4. **`/ToUnicode` の無い日本語 LaTeX PDF はほぼ枠になる。** 実測: `main_ja.pdf`
+   の 1 ページ目が text 60 / frame 550。正直な失敗ではあるが、読めはしない。
+5. **ページ送りのたびに再 parse する。** object-ref は PieceCID なので memo は
+   自明に正しいが、上限付きで**意図してやる**変更であってビューア追加の副作用で
+   やることではない。
+6. **`app-preview` 側は未配線。** kotoba-lang の Preview app は今もページ一覧の
+   ままで、hanmen を描画に使っていない。共通 lib の 2 番目の consumer は未着手。
+7. **実ブラウザでの目視確認は未実施。** レンダリングの inert 性・座標・
+   文字数は自動で検証したが、「ページに見えるか」は人の目でしか答えられず、
+   このセッションでは見ていない。"}]

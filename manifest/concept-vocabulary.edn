@@ -45,6 +45,12 @@
               "エディタ" "エディター"]
   :note "kotoba-lang/kobo（model + read-only console）。event 配線は未実装。"}
 
+ :document-viewer
+ {:label "document viewer / ページを見る"
+  :spellings ["viewer" "preview" "document viewer" "pdf viewer" "page render"
+              "版面" "hanmen" "ビューア" "ビューアー" "プレビュー" "閲覧"]
+  :note "kotoba-lang/hanmen が render-IR（置かれた印）+ PDF producer + SVG drawer、app-preview が mokuroku 上のページ一覧、org-iso-pdf が COS モデル、canvaskit が viewport 数学。名前が機能を示さないので登録（ADR-2608051500）。ラスタは描かない — 画像は :frame として置くだけ。"}
+
  :design-system
  {:label "design system / UI kit"
   :spellings ["design system" "ui kit" "component library" "hig"
