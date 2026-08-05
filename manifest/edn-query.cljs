@@ -955,6 +955,62 @@
           [])
       (mapcat (fn [f] (or (corpus-line-entities f next-tempid!) [])) files))))
 
+;; ---------- 公開アカウント・ディレクトリ（category J — global-accounts-datoms、ADR-2608059100） ----------
+;;
+;; **account 行（174,592 件）はこの面に載せない。** 載せるのは 3 種類だけ:
+;;   catalog  `data/datascript-tx.edn`         — どの protocol にどんな公開
+;;              ディレクトリが在るか（20 件、8 protocol）。`:directory/kind :none`
+;;              の 6 件（did:web / WebFinger / Matrix / NIP-05 / OIDC discovery）が
+;;              「そもそも列挙できるものが無い」を述べる —— corpus の欠落は
+;;              この行の隣でしか読めない
+;;   coverage `data/corpus/coverage.edn`       — 分母（2 件）
+;;   services `data/corpus/*/services.edn`     — サーバ（790 件）。
+;;              `:service/domain` が yabai-passive-dns / tadori-threat-intel の
+;;              ドメイン文字列と join できる（DNS 面との唯一の接点）
+;;
+;; account を除いたのは容量の話ではなく到達性の話。account 行が join できる先は
+;; `:account/service-host` → `:service/domain` だけで、その join はこの面に
+;; services さえ在れば成立する。**個人識別子 174,592 件を全 query の作業集合に
+;; 常駐させる理由が無い** —— account を引きたい query は
+;; global-accounts-datoms 側の adapters/read_only.clj（公開 query のみ）を通す。
+;; ADR-2608059100 / 同 repo の connections/actors.edn が正本。
+
+(defn accounts-datoms-files
+  "etzhayyim/global-accounts-datoms の committed projection のうち、この面に
+   載せてよい 3 種類。west が宣言する path 配下を見る（org をパスに焼かない）。"
+  []
+  (when-let [p (west-project-path "global-accounts-datoms")]
+    (let [base (apply io/file root (str/split p #"/"))]
+      (->> [(io/file base "data" "datascript-tx.edn")
+            (io/file base "data" "corpus" "coverage.edn")
+            (io/file base "data" "corpus" "directory.plc" "services.edn")
+            (io/file base "data" "corpus" "nodeinfo" "services.edn")]
+           (filter #(.exists %))))))
+
+(defn internet-accounts-entities
+  "catalog + coverage + services を 1 dataset として load する。
+
+   ⚠ `:service/source` を見ずに service を数えない。`:self-reported` は
+   NodeInfo（サーバが自分について公開した文書）、`:observed` は PDS を
+   アカウント側から数えたもので、**同じ列に見えて出所が違う**。
+   `:service/users-total` は前者だけが持ち、しかも自己申告なので、
+   1.7% 標本の合計を「fediverse の人口」として引用しない。"
+  [next-tempid!]
+  (let [files (accounts-datoms-files)]
+    (if (empty? files)
+      (do (js/console.error
+           (str "edn-query: WARNING internet-accounts: etzhayyim/global-accounts-datoms の "
+                "data/ projection が無い — 公開アカウント・ディレクトリは load されない"
+                "（west update 未実行か、projection 未生成）"))
+          [])
+      (mapcat (fn [f]
+                (for [e (or (vector-of-maps-entities f) [])]
+                  (assoc e
+                         :db/id (next-tempid!)
+                         :source/dataset "internet-accounts"
+                         :source/file (str f))))
+              files))))
+
 ;; ---------- patent bibliographic（category J — toshokan-patents、ADR-2607251552） ----------
 ;; toshokan-patents repo の 80-data/public/*.journal.edn（quads [entity attr value tx op]
 ;; — toshokan と同じ ADR-2607072300 形）。lei-tos と同型でロードする。
@@ -1631,6 +1687,7 @@
         tadori-tx (tadori-threat-intel-entities next-tempid!)
         kakekomi-tx (kakekomi-entities next-tempid!)
         patent-tx (toshokan-patents-entities next-tempid!)
+        accounts-tx (internet-accounts-entities next-tempid!)
         innen-tx (innen-entities next-tempid!)
         awai-tx (awai-yakuwari-entities next-tempid!)
         okugai-tx (okugai-inventory-entities next-tempid!)
@@ -1642,7 +1699,7 @@
                                                      proc-registry-tx merged-kotoba-tx
                                                      working-doc-tx narrative-tx
                                                      company-tx property-tx relationship-tx fleet-tx
-                                                     yabai-tx tadori-tx patent-tx innen-tx
+                                                     yabai-tx tadori-tx patent-tx accounts-tx innen-tx
                                                      awai-tx kakekomi-tx okugai-tx factory-tx
                                                      index-tx)))]
     (.transact ds conn all-tx)
@@ -1666,6 +1723,11 @@
      :yabai-count (count yabai-tx)
      :tadori-count (count tadori-tx)
      :patent-count (count patent-tx)
+     ;; catalog / coverage / service を 1 つの数字にしない。20 の directory と
+     ;; 790 の service が溶けると「810 件のアカウント情報」と読める。
+     :accounts-directory-count (count (filter :directory/id accounts-tx))
+     :accounts-coverage-count (count (filter :coverage/id accounts-tx))
+     :accounts-service-count (count (filter :service/id accounts-tx))
      :innen-count (count innen-tx)
      :awai-yakuwari-count (count awai-tx)
      :okugai-inventory-count (count okugai-tx)
