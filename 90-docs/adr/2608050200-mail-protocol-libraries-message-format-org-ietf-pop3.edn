@@ -1,0 +1,174 @@
+[{:db/id -1
+  :adr/id "adr-2608050200-mail-protocol-libraries-message-format-org-ietf-pop3"
+  :adr/title "ADR-2608050200: メールは account 単位 — プロトコルはバイトを運び org-ietf-mime が読む、org-ietf-pop3 を新設"
+  :adr/status "accepted"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-04"
+  :adr/last-verified "2026-08-05"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "mail-protocol-libraries-message-format-org-ietf-pop3"
+  :adr/repos ["orgs/cloud-itonami/cloud-itonami-app"
+              "orgs/kotoba-lang/org-ietf-mime"
+              "orgs/kotoba-lang/org-ietf-imap"
+              "orgs/kotoba-lang/org-ietf-smtp"
+              "orgs/kotoba-lang/org-ietf-pop3"]
+
+  :adr/related ["adr-2607263000"]
+
+  :adr/authoritative-for
+  ["メールの単位は provider ではなく account（1 mailbox = 1 credential = 1 cursor = 1 error state）"
+   "プロトコルライブラリ（imap/smtp/pop3）はバイトを運ぶだけで、メッセージ書式の解析は org-ietf-mime が唯一担う"
+   "メール系トランスポートの読み取りは latin-1 binary string（1 バイト 1 文字）。UTF-8 デコードしない"
+   "org-ietf-pop3 を kotoba-lang に新設し west に登録"
+   "OAuth scope は書き込みを含む（gmail.modify + gmail.send / Mail.ReadWrite + Mail.Send）"]
+
+  :adr/body
+  "## 背景 — 2 つの受信箱があり、見えていたのは片方だけ
+
+cloud-itonami-app の `mail-sync` は Gmail と Microsoft Graph を毎分
+`[:mail-sync :messages]` に取り込んでいて、それは動いていた。一方 Inbox は
+`workspace/inbox-mailbox`（ディスク上の .eml）だけから組まれていて、そのキーを
+知らなかった。メールは届き、解析され、ラベルが付き、保存され、どの画面にも
+出なかった。Google を接続しても何も起きないように見えたのは、外から見て実際に
+何も起きていなかったから。
+
+さらに単位が provider だった。connection id は `{org}:{did}:{provider}`、
+Keychain も同形、アーカイブは `<provider>/<message-id>.json`。どれも枠が 1 つで:
+(a) 2 つ目の Google アカウントは 1 つ目を上書きし、最初の接続は「接続済み」と
+表示し続けながら別アカウントのメールを返した (b) 2 つのメールボックスの
+メッセージが id で衝突した（Gmail の id はメールボックス内でのみ一意）
+(c) 認可切れは「Google のエラー」としか記録できなかった。
+
+IMAP はどこにも無く、SMTP も無いので送信もできなかった —— 返信ボタンのある
+Inbox の下に、誰かにメールを届けるコードが一行も無かった。
+
+## 決定 1 — 単位は account
+
+`mail-account/accounts` が :gmail / :microsoft / :imap / :pop3 の 4 種を返し、
+上位はどれを持っているか区別せずに回す。OAuth account は identity の connection
+から derive（消えたら消える）、IMAP/POP3 account は宣言（store + Keychain）、
+delegated account は設定で名指しされた他ツールの grant。
+
+connection id と Keychain 名に provider subject を付けた。アドレスではなく
+subject —— アドレスは付け替えられるし、別名は主アドレスの違うメールボックスに
+届く。旧名の grant は読み取り時に一度だけ fallback し、再接続で新名に移る。
+
+`mailbox/merged-box` がアーカイブと同期済み全アカウントを 1 つの `mail.mailbox`
+に畳む。スレッド・ラベル・未読数・本文検索がすべてにまたがる。
+
+## 決定 2 — メッセージ書式は org-ietf-mime のもの（本セッションの誤りの訂正）
+
+最初の実装で `org-ietf-imap` に `split-message`・転送符号化デコーダ・
+quoted-printable デコーダを手書きで足した。`kotoba-lang/org-ietf-mime` が
+RFC 5322 / 2045–2047 / 8601 を既に全部やっていて、ADR-2607263000 D8 から存在して
+いた。**探さなかった。** CLAUDE.md の「無いと結論する前に repo-search を引く」
+規則は、まさにこの失敗のために書かれている。
+
+自前版は multipart を間違えていた（本文を境界線ごと生で返し、それを「制限事項」
+と書いた）。`mime.parse` は正しい —— multipart/alternative は悪い順に並ぶ
+（RFC 2046 §5.1.4）ので最後の text/plain が送信者の書いた本文。
+
+以後 `fetch-message!` / `retrieve!` は `:raw` を返し、解析は mime が行う。
+プロトコルライブラリはバイトを運び、mime が読む。
+
+## 決定 3 — 読み取りは latin-1 binary string
+
+org-ietf-mime は入力契約を README に明記している: latin-1、1 バイト 1 文字。
+imap/pop3 の両トランスポートは読み取りを UTF-8 でデコードしていたので、パーサに
+届く前にバイトが壊れていた。症状は日本語本文が `e1n2WkdDf<U+FFFD>W~Y` —— 原因から
+2 ライブラリ離れた場所の MIME パーサのバグに見える文字化け。
+
+メッセージはバイトで、その各パートは「そのバイトが何を意味するか」で食い違う
+（UTF-8 本文の隣に ISO-2022-JP の件名、その隣に PDF）。全体を UTF-8 でデコード
+すると UTF-8 でなかったパートが全部壊れる —— 静かに、エラーではなく U+FFFD として。
+コマンド側の書き込みは UTF-8 のまま（コマンドは受け取ったバイトではなく
+このライブラリが組んだテキスト）。
+
+## 決定 4 — org-ietf-pop3 を新設
+
+3 つのプロトコルのうち唯一 client が無かった。ISP・レガシーホスティングの
+メールボックスは今も POP3 しか話さないものが多く、それらはこの workspace の
+どこからも開けなかった。RFC 1939 + CAPA(2449) + STLS(2595) + APOP + SASL(5034)。
+
+POP3 が他の 2 つと違い、IMAP の習慣で書くと間違える 3 点を README と docstring に
+明記した: (a) メッセージ番号はセッション限りで削除のたび振り直されるので UIDL が
+唯一の識別子 (b) 読むことは消すことではない（歴史的既定はサーバの唯一のコピーを
+RETR のついでに消すこと。このアプリは DELE を一切送らない）(c) QUIT は儀礼では
+なく maildrop のロックを解放する操作。
+
+## 仕様適合（各ライブラリ）
+
+- org-ietf-mime: RFC 2231 パラメータ継続・charset 付き値（日本語の添付ファイル名、
+  継続で分割された boundary）／生 8bit ヘッダを構造的に UTF-8 なら UTF-8 として読む
+  （valid-utf8? は構造判定。latin-1 の Müller は 0xFC が lead byte でないので素通し）
+- org-ietf-imap: UIDVALIDITY、untagged 応答、AUTH PLAIN/XOAUTH2、STARTTLS、
+  任意フラグの STORE、LIST/STATUS/EXAMINE/APPEND/COPY/MOVE/EXPUNGE、IDLE、
+  1 応答内の複数 literal
+- org-ietf-smtp: 1 メッセージ 1 トランザクション、ESMTP 拡張解析、
+  AUTH PLAIN/XOAUTH2、STARTTLS、RSET/NOOP、RFC 3463 拡張ステータス、:raw
+- org-ietf-pop3: 新規
+
+うち 2 つは機能追加ではなく欠陥の修正:
+
+**SMTP は 1 通につき 1 トランザクション。** send-mail! が単一 :to しか取らな
+かったので、アプリは宛先ごとに送っていた。それは同じメールを 3 回配ることでは
+ない —— 各コピーのヘッダには自分の宛先しか載らないので、誰が一緒に受け取ったか
+誰にも見えず、全員返信が 1 人にしか届かない（RFC 5321 §3.3）。宛先の一部が拒否
+されても送信は中断しない（部分成功は仕様が認めている）。全部拒否は例外。
+
+**UIDVALIDITY。** UID は発行時の UIDVALIDITY と一緒でなければ意味を持たない
+（RFC 3501 §2.3.1.1）。読まない client はサーバが再発行した日に、保存済みの全 UID
+が別のメッセージを指す —— 静かに、プロトコル事象ではなく破損に見える形で。
+
+## 代償
+
+- **再同意が要る。** Google の scope が gmail.readonly → gmail.modify + gmail.send、
+  Microsoft が Mail.ReadBasic → Mail.ReadWrite + Mail.Send。ラベル付けも返信も
+  書き込みで、読み取り専用 grant ではプロバイダ側 403（Mail.ReadBasic は本文すら
+  読めない）。既存接続は再接続するまで旧 grant で動く。mail.google.com（完全
+  アクセス・完全削除）までは取っていない。
+- **POP3 の既読状態はローカルのみ。** サーバ側フラグが無い。
+- **IMAP の multipart 以外の未実装**は各 README に列挙: CONDSTORE/QRESYNC、
+  NAMESPACE、ACL、SORT/THREAD、BODYSTRUCTURE/ENVELOPE 解析、sequence-number
+  コマンド、SASL は PLAIN/XOAUTH2 まで。SMTP は PIPELINING、CHUNKING/BDAT、DSN、
+  SMTPUTF8 が未実装。
+- **UTF-8/ASCII/latin-1 以外の文字コードは host デコーダ注入**（mime は純粋
+  ライブラリ内に ISO-2022-JP を発明しないと明言。JVM のものは既に正しい）。
+
+## 検証
+
+- cloud-itonami-app: 1026 tests / 4329 assertions / 0 failures（着手前 984 / 4232）。
+  clj-kondo 0 errors（残る 7 warning は account_link_sync / agent_control /
+  mailbox_http_test の既存の別件）。
+- org-ietf-mime: 31 tests / 87 assertions、JVM と ClojureScript の両方で green。
+- org-ietf-imap: 40 tests / 101 assertions、lint clean。
+- org-ietf-smtp: 27 tests / 68 assertions、lint clean。
+- org-ietf-pop3: 26 tests / 53 assertions、lint clean。RFC 1939 §7 の worked
+  example で APOP digest の順序を固定。
+
+テストが捕まえた自分の実装バグ 3 件: quoted-printable を 1 エスケープずつ文字に
+していた（日本語全滅）／POP3 の AUTH で +OK も + で始まるのに継続行より先に判定
+していた（認証成功時に資格情報を再送して無限待ち）／APOP digest の引数順。
+
+## 着地
+
+- cloud-itonami-app 13ab40e4b5f7206eb88f3178d236878993046026
+- org-ietf-mime  71c93d49a7b7d53c847afcb2216332e80bcfcc35
+- org-ietf-imap  dd14dc42ad8a1f7e1a1677342e3cb751a6ed9afc
+- org-ietf-smtp  71114b058326bfd7564c828957f990f61c3b42d4
+- org-ietf-pop3  b180ebd1bf1ed4f8c251e3a66e0aaf82468e978c（新規）
+
+west.yml は API single-entry commit で 5 回更新（org-ietf-pop3 の新規登録 1 件、
+pin 前進 4 件。すべて fast-forward、behind=0、merge-base == 旧 pin を事前確認）。
+
+子リポ側 ADR: cloud-itonami-app docs/adr/0016（account が単位）と 0017
+（メッセージ書式はライブラリのもの）。"
+
+  :adr/gaps
+  ["cloud-itonami-app に compose UI が無い。POST /api/mail/send は動くが送信フォームは未実装"
+   "IMAP の Sent への APPEND（mail-imap/append-sent!）は実装済みだが mail-send/send! から呼んでいない。SMTP 送信後に Sent へ複製する配線が残っている"
+   "POP3 account の set-read! 相当が無い（プロトコルにサーバ側既読状態が無いため設計上不可。ローカル mark 層のみ）"
+   "cloud-itonami-app の open PR #28 / #32 / #37 は identity.clj と deps.edn を触っており、今回の merge と衝突する可能性が高い。いずれも本セッションの作業ではない"
+   "org-ietf-mime の charset デコーダはホスト注入のまま。nbb/cljs 側の consumer が現れたら TextDecoder 版を書く必要がある"]}]
