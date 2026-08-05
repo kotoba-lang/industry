@@ -1177,20 +1177,46 @@ ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics に�
     配線待ちで長期 untested、outcome/metric を LLM が捏造することを明示的に禁止する
     固有の不変条件を持つ）には触れないことを明記する。
 
-## UI/UX 標準 — frontend を書く前に skill `kotoba-uiux` を読む（2026-07-12）
+## UI/UX 標準 — 基本 design system は `jp-go-dds`（repo-wide mandatory、2026-08-05）
 
-**このリポジトリ群で web / local app の UI（新規サイト・画面・redesign・landing・
-console）を書く時は、コードを書き始める前に Skill ツールで `kotoba-uiux` を呼ぶ。**
-kotoba-lang の design system スタック（`shitsuke.hig` HIG semantic tokens →
-`liquid-glass-ui` material → `kotoba-ui` 単一エントリ（shell/theme/`->page`）→
-`appkit`/`uikit` platform traits）が正で、正典レシピは
-`orgs/kotoba-lang/kotoba-ui/docs/agent-guide.md`。要点: app は `kotoba-ui.core`
-（+ `appkit.core` | `uikit.core`）だけを require する（`liquid-glass.*`/`shitsuke.*`
-直 require は理由必須の opt-out）、raw hex / ad-hoc font-size を app に書かない
-（token / theme map 経由のみ）、ライブラリ CSS は `@layer kotoba.hig, kotoba.glass`
-内にあるので app CSS は unlayered のままで常に勝つ（compound-selector での上書き
-戦争をしない）、layout は `kotoba-ui.shell` から組む（`.layout`/`.hero` 手書き禁止）。
-詳細は ADR-2607122200。
+**このリポジトリ群で web / local app の UI を書く時は、コードを書き始める前に Skill
+ツールで `kotoba-uiux` を呼ぶ。** そして**新規 UI の基盤は
+`kotoba-lang/jp-go-digital-design-system`（デジタル庁デザインシステム = DADS）で
+あって liquid-glass ではない**（オーナー判断 2026-08-05）。
+
+判断時の実測: **DADS 依存 170 repo / kotoba-ui 依存 12 repo**。DADS は既にこの
+ワークスペースの共通言語で、この決定はそれを追認し、新しい仕事が少数派スタックに
+着地するのを止めるもの。
+
+```clojure
+(require '[jp-go-dds.core :as dds]       ; button / select / table / chip-label / …
+         '[jp-go-dds.page :as page]      ; ->page
+         '[jp-go-dds.tokens :as tokens])  ; bridge-css — --hig-* 契約を DADS の上に
+```
+
+- **`--hig-*` トークン契約はそのまま生きる。** `tokens/bridge-css` が全 `--hig-*`
+  を DADS primitive の上に再定義するので、契約で書かれた view / SVG / CSS は**無改造で**
+  DADS に追従する。実際 kami-genko / kami-app-daw / kami-app-nle は app CSS を 1 行も
+  変えずに基盤を移した。`dads-*` コンポーネント自体を触る時以外は、DADS primitive
+  ではなく `var(--hig-spacing-4)` を書き続けること。
+- **DADS を基盤にした app の下には `shitsuke.hig` が居ない。** 橋渡しに無いトークンは
+  **何にも解決しない**（`padding: var(--hig-spacing-4)` が黙って消える）。足りなければ
+  上流の `hig->dads` に足す —— app CSS で再導出しない（bridge 自身の docstring:
+  「2つ目のアプリが再導出した瞬間に契約は壊れる」）。
+- **DADS は light。** `page` の `:dark? true` はこのライブラリ独自の反転層（上流には
+  dark palette が無い）。暗い環境で色を見る editor 向けで、kami-app-daw / -nle が使う。
+- **DADS に無いもの**: app-shell / editor frame、segmented control、trailing slot 付き
+  list、**app が選べる accent**。前 3 つは token 契約で書く app CSS（実例 kami-genko）、
+  4 つ目は「無い」のが仕様 —— DADS はデジタル庁ブルーを配り、app は自分の色を選ばない。
+- `dds-ext-*`（container / section / grid / stack / row / card）は上流に無い layout 補助。
+  app CSS で layout を再導出せず、ここを上流拡張する。
+
+**legacy（kotoba-ui / liquid-glass）** は未移行の約 12 repo（`kotoba-lang/app-*`、
+`cloud-itonami/kaisya`・`lawfirm`、`gftdcojp/apex`）でのみ引き続き正。**新規 UI を
+これで始めない。** 旧スタックの規約（`kotoba-ui.core` 単一 require、raw hex 禁止、
+`@layer kotoba.hig, kotoba.glass` の外で app CSS が勝つ、layout は `kotoba-ui.shell`
+から）は該当 repo ではそのまま有効。詳細は ADR-2607122200 と
+`orgs/kotoba-lang/kotoba-ui/docs/agent-guide.md`。
 
 ## UI/UX 品質の数値化 — design-quality-score（2026-07-13、ADR-2607132300）
 
