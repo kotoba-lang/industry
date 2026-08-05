@@ -1079,3 +1079,53 @@
  :remaining ["margin 2 件（agent 作業中）、control 幅 + vertical-align: top（agent 作業中）"
              "inline replaced 要素の行 box（aspect-ratio 付き <img> が 46 vs Brave 40）—— control agent の領域として probe を落とした"
              "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
+
+{:at "2026-08-05"
+ :iteration 48
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 357}
+ :line-structure {:agree 342 :total 344 :pct 99}
+ :geometry {:boxes-agree 1304 :boxes-total 1313 :pct 99 :clean-cases 349 :of 357}
+ :paint-order {:points-agree 8866 :points-total 8909 :pct 100 :clean-cases 341}
+ :computed-style {:values-agree 16138 :values-total 18453 :pct 87}
+ :landed {:cssom ["33d71b2 — flex/grid item の margin は予約される + overflow の軸（誰も読んでいなかった）"
+                  "e719bc6 — textarea の cols / scrollbar gutter / bold control face / vertical-align: top"]}
+ :note "**A（margin 2 件）と C（個別 6 項目）を 3 体並行で処理し、全て着地。**
+        A の 2 件はどちらも Brave と完全一致へ。paint order は **100%**（8866/8909）に到達。"
+ :findings-margin ["**flex item の margin は collapse されていたのではなく落とされていた。** layout-flex が
+                    各 item の **border** box を測って詰めていたため margin が消えていた。Brave 実測:
+                    margin-bottom:20 と margin-top:30 の隣接 item は **50px** 離れる（max(20,30) ではない）——
+                    独立 formatting context なので collapse しない。主軸 margin は resolve-flexible-lengths の
+                    **前**に avail-main から引く（margin は予約済み空間で flex-grow が取れるものではない）。
+                    grid も Brave で**同一に**測れたので同じ規則を適用。"
+                   "**overflow の軸を誰も読んでいなかった。** node-style は shorthand しか読まず
+                    overflow-x / overflow-y は layout のどこにも届いていなかった。加えて
+                    **overflow: clip を formatting context として扱っていた**（誤り）。
+                    CSS Overflow 3 の computed-value fixup を実装し、Brave で測った 12 組の
+                    specified→computed を全て再現。clip は何も確立せず、Brave はそこから margin を
+                    collapse させ float を逃がす —— 両方一致。"]
+ :findings-controls ["**textarea は `size` 属性を読んでいた —— HTML は <textarea> に size を定義していない**
+                      （属性は cols、既定 20）。<textarea cols=40> が 20 文字で組まれていた。
+                      加えて**縦スクロールバーの gutter 16px を予約していなかった**（12 サイズ × 6 ファミリで一定と実測。
+                      overlay scrollbar のこのプラットフォームでも **intrinsic 寸法の予約**として存在する）。"
+                     "**button の −3.53 は engine ではなく harness の欠陥だった。** oracle は 4 face を測り、
+                      measure-text が **family を weight より先に**判定していたため、bold な control ラベルに
+                      regular の control metrics を返していた（`now` は regular Arial 13.3333 で 24.45px、
+                      bold で 26.65px）。6 face に増やし weight/style を family より先に解決。"
+                     "**vertical-align: top の blocker は既に消えていた** —— 行 box モデルが書き直され、
+                      整列先の完成した union があるため。edge 整列の box を baseline union から外し、
+                      union を取ってから完成した端に対して :shift として置く（sub/super と同じ経路）。"]
+ :cancelling-pair "**『どちらも直さない』を選び、理由を実測で記録。** textarea の残差 +5 はまさにその対
+                   （0 グリフ代理 7.23/char vs Brave の平均 advance 7.0 × 20 列）。提案されていた
+                   『平均 advance の hook』も**効かない**ことを測って示した: Blink の avgCharWidth は
+                   フォントの OS/2 要約値で**小サイズでは整数ピクセルに hint される**ため、
+                   per-character advance **表**から供給した hook は 13.3333px では 0.3% 以内に追随するが
+                   **26.6666px と 40px では 5.4% ずれる**（corpus が使うまさにそのサイズ）。
+                   閉じるには実フォントの xAvgCharWidth と maxCharWidth が要る。
+                   textarea の真の UA family（monospace と確認）をモデル化すると**逆に悪化する**（−6）ことも実測。"
+ :remaining ["textarea 2 件（上記の対が閉じるまで残る）、RTL の inline 配置（bidi 未実装）"
+             "vertical-align: middle は親フォントの x-height が要る（font-metrics は ascent/descent のみ）——
+              x-height hook が来た日に落ちる test で固定済み"
+             "overflow-x: clip の片軸 clip（clip op が軸を持たない）"
+             ":position/fixed-leaves-flow と :stacking の tie（どちらも harness の計測限界）"
+             "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
