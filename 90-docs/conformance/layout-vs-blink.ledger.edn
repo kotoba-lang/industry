@@ -1875,3 +1875,128 @@
    words on the same lines."
   "overflow: clip is identical to hidden on every axis here."
   "object-fit -- the README already says no axis can see it."]}
+
+{:seq 53
+ :date "2026-08-06"
+ :repos {"kotoba-lang/cssom" "73ca44aa3ad0b158fb42638712b7427727b49552"
+         "kotoba-lang/htmldom" "c8a87edbced67b1dd4633a2e6c646c2ff4f9e073"}
+ :title "table: caption-side, declared cell widths, and the implied <colgroup> (htmldom)"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 576}
+ :measured
+ {:line-structure {:before "540/553" :after "542/553"}
+  :geometry {:before "1823/1959" :after "1844/1959"
+             :clean-cases {:before "502/576" :after "506/576"}}
+  :paint-order {:before "13936/14389" :after "13956/14389"
+                :clean-cases {:before "524/576" :after "527/576"}}
+  :computed-style {:before "27483/27528" :after "27497/27542"
+                   :note "the htmldom fix turned 14 element-count-mismatch
+                          EXCLUDED values into 14 comparable ones that ALL
+                          AGREE -- the denominator grew with the numerator."}
+  :parser-tree-shape {:before "137/137" :after "139/139"}
+  :not-one-table-entry-remains "confirmed independently on the merged tree:
+     no table tag appears in the geometry worst list; td 132/134, tr 72/74,
+     table 42/43, and the residual entries there are from the new
+     corpus-expansion cases (visibility: collapse on a <tr>), not from this
+     cluster."}
+ :verified-on-merged-main
+ {:cssom-tests "799 tests / 1834 assertions, 0 failures"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "178/0"
+  :note "re-ran the harness independently on the merged tree. My numbers
+         come out one box and one clean case ABOVE the agent's report
+         (1844/506 vs 1843/505) because the agent measured cssom alone and
+         this run has the htmldom colgroup landing in it too."}
+ :base-moved-mid-task
+ "cssom main went 501 -> 576 cases under the agent. It merged main in and
+  RE-MEASURED every number on the 576-case corpus by running the unmodified
+  layout.cljc through the same harness -- which reproduced the published
+  baseline exactly. The before/after is honest against the corpus that
+  actually exists, not against a corpus that no longer does."
+ :what-the-browser-said
+ [{:topic "caption-side"
+   :measured "the caption is in the table WRAPPER box -- it spans the
+              table's whole BORDER-BOX width and sits OUTSIDE its border
+              and padding, and the table's height is the same on both
+              sides. width:200px; border:6px; padding:9px + a `Cap`
+              caption is 200x76 EITHER WAY, caption at y=0 (top) or y=56
+              (bottom), rows at y=37 or y=17. caption-side also INHERITS
+              (declared on a wrapping <div> it moves a <table>'s caption),
+              so it is carried down inherited."}
+  {:topic "declared cell widths -- two rules, neither derivable from the other"
+   :measured
+   "A LENGTH SIZES THE CELL: width:100px on a <td> -> 102px column (100 +
+    the UA's 1px padding each side); padding:8px -> 116; border:3px -> 108.
+    A PERCENTAGE SIZES THE COLUMN: width:25% -> 73.5 = 25% of 294 exactly,
+    the content width minus all three 2px border-spacings -- not 25% of
+    300, not 25% of anything plus padding. Moving the spacing moves the
+    basis (border-spacing:10px -> 67.5 = 25% of 270; border-collapse:
+    collapse -> 75 = 25% of 300).
+    The declared width is FLOORED AT THE COLUMN's min-content, not the
+    declaring cell's: width:10px on `averylongword` -> 93; a width:50px
+    cell whose column holds `averylongcellword` in another row -> 121 in
+    both rows.
+    A declared column then holds while the others share the surplus in
+    proportion to demand (3 cells, middle at 100px -> 66.078 / 102 /
+    123.922). <col> vs cell: LARGER WINS, measured both directions (80 vs
+    200 -> 202; 200 vs 80 -> 200). A cell FILLS its column -- the 25% cell
+    reports 73.5 (the column), and width:500px in a 200px table reports 185."}
+  {:topic "empty-cells is UNMEASURABLE by this corpus -- measured, not assumed"
+   :measured "hide and show give byte-identical boxes to three decimals
+              (128.625/59.375 with cell borders; 153.813/34.188 with
+              backgrounds) and elementFromPoint answers td over the empty
+              cell EITHER WAY. It changes which pixels are FILLED, and no
+              axis here compares a fill."}
+  {:topic "the one paint-order point on that case was not empty-cells and not tables"
+   :measured "swept at 0.05px: BRAVE HIT-TESTS EVERY ELEMENT FROM ONE PIXEL
+              ABOVE AND LEFT OF ITS BOX. A td at y=4..26 answers `table` at
+              y=3.00 and `td` from y=3.05, stopping at 26.00 exactly; the
+              same slop appears on a <p> in a padded <div> (box y=36, hit
+              from 35.05) and a bare <span>, in x as well as y."
+   :decision "changed nothing -- this engine's half-open [x, x+w) test is
+              the honest answer to the question the axis asks. Recorded in
+              cases.edn beside the case."}]
+ :withdrawn
+ [{:what "writing the column width back as :style/width cw + box-sizing: border-box"
+   :why "the net geometry score went UP while :table/cell-with-inline-content
+         silently went 6/6 -> 1/6. A column width is routinely fractional
+         (50.5625 for `go <b>now</b>`) and a declared length goes through an
+         integer parse, truncating to 50 and wrapping the content. Replaced
+         with DROPPING the declaration so the cell takes its avail exactly.
+         ONLY THE PER-CASE OP DIFF CAUGHT THIS -- the scoreboard hid it."}
+  {:what "adding conformance cases for the new declared-width rules"
+   :why "declined so the before/after denominators stay unambiguous. The
+         measurements went into 10 unit tests instead, each carrying
+         Brave's numbers."}
+  {:what "Blink treats a <table>'s declared width as its BORDER box"
+   :measured "width:200px; border:6px; padding:9px is 200 wide in Brave
+              with 166 of rows inside; this engine makes it 230 with the
+              same 166 of rows -- every y right, only the outer width (and
+              a caption's) 2x(border+padding) too big."
+   :why "different rule, moves every bordered table at once, and no corpus
+         case has a table with both a declared width and a border."}]
+ :tooling-added
+ "--dump-ops <file> on the cssom harness: every case's :node ops in emitted
+  order, made to be diffed. This is what turned 'the score went up' into
+  '6/6 -> 1/6 on one case' above."
+ :harness-defect-found-and-fixed
+ "htmldom's attribute axis reported a PHANTOM `width` attribute for every
+  :style/width key, because `name` erases the namespace. Attributes
+  404/405 -> 421/422; the remainder is the pre-existing @click spelling."
+ :htmldom-change
+ "two lines in table-clear-targets + maybe-insert-implied-table-structure,
+  predicting all seven measured Brave shapes: consecutive bare <col>s share
+  one group; a <col> after a row/thead/caption pops back to table level and
+  gets a SIBLING group; an explicit empty <colgroup> followed by a bare
+  <col> gives TWO."
+ :scope-cuts
+ ["percentage cell width on an AUTO-WIDTH table (Brave: 42px table, columns
+   9 and 27) -- not modelled, left on the max-content path"
+  "a declared width is NOT capped by other columns' needs (500px in a 200px
+   table is 185 there, 502 here)"
+  "a colspan cell contributes no declared column width (colspan=2 at 50%
+   -> 73/73)"
+  "a percentage beats a length in the same column whichever is larger (20%
+   vs 200px -> 58.797)"
+  "calc() widths fall through to max-content"
+  "distribute-excess hands out whole pixels, so Brave's 220.5 comes out 220
+   at x=78 vs 77.5 -- inside the 2px tolerance and the one place these
+   shapes are not exact"]}
