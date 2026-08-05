@@ -1200,3 +1200,50 @@
                    1 entry に畳まれ、行軸には分割が見えないため。"
  :per-case "既存 357 case の draw-op diff で**変化はちょうど 1 件**（:text/rtl-with-inline-elements）、
             他は byte-identical。新規 13 case は 3 軸すべてで pass。"}
+
+{:at "2026-08-05"
+ :iteration 49
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 370}
+ :line-structure {:agree 356 :total 356 :pct 100}
+ :geometry {:boxes-agree 1332 :boxes-total 1335 :pct 100 :clean-cases 368 :of 370 :was "1328/1335, 364"}
+ :paint-order {:points-agree 9202 :points-total 9234 :pct 100 :clean-cases 356}
+ :computed-style {:values-agree 16400 :values-total 18761 :pct 87}
+ :landed {:cssom "d670314 — font metric hook（avg advance / max advance / x-height）で相殺対を閉じる"
+          :dom-gpu "94936c0 — 同じ hook を production の host にも（必須、下記）"}
+ :note "**相殺する誤差の対が閉じた。** 3 体の agent が『片方だけ直すと悪化する』として保存してきた対
+        （ua-control-font 13px vs Brave 13.3333、と 0 グリフ代理 vs 平均 advance）。
+        **metric が名指しできるだけでなく測定可能だと分かったので両半分が同時に動いた。**"
+ :measurement "Brave を **10 family × 11 サイズ（10〜64px）× 14 列数**で probe（padding/border を 0 にして
+               制御が metric を直接読めるようにした）。2 つの法則が **3,080 観測中 3,080 で厳密一致**:
+                 avg = max(w, round(w))   w = `x` グリフの advance
+                 max = round(フォントの ascent)
+                 textarea content = ceil(avg * cols) + 16
+                 input content    = ceil(avg * n + max(0, max - avg))
+               丸めは half-**UP**（Zapfino 20px の x advance がちょうど 12.5 で、制御は 13 から組まれる）。
+               **前 agent の袋小路も記録**: advance 表の**平均**は 13.3333px で 0.3% 以内に追随するが
+               26.6666/40px で 5.4% ずれる —— metric は平均ではなく **`x` の advance** だった。
+               maxCharWidth も advance 表の max ではなく（Arial の最広 ASCII は 1.015em、metric は 0.9em）
+               **ascent** —— max-char-width を持たないプラットフォームで Blink の
+               SimpleFontData::PlatformInit が落ちる先で、macOS がそれ。
+               さらに **family 名で分岐する第 2 経路**: Blink が metric を信用しない 15 family は
+               0 advance から slack 無しで組まれる。**Arial と Helvetica が証拠** ——
+               canvas metric はビット単位で同一なのに制御幅が 6% 違う。"
+ :honest-oracle "hook は oracle が**既に集めている** advance 表と face ごとの ascent から供給する。
+                 <textarea cols=n> を逆算して engine に渡せば **corpus 自身の答えを渡すことになる**ので、
+                 そうしていない。"
+ :x-height "vertical-align: middle も可能と判明し実装。60 の親子組で法則を実測:
+            raise = x-height/2 + line-height/2 − leading-ascent(a,d,lh) ——
+            フォントの content area ではなく **CSS 2.1 の inline box の中点**
+            （leading-ascent の floor が、14px の子が line-height:10px のとき normal より 0.5px 上に来る理由）。
+            host が x-height を報告することを条件にした（family 間で 0.453em〜0.545em と幅があり、
+            発明できる分数が無いため）。"
+ :incidental "**parse-px**: parse-int の正規表現が小数点で止まるため、**全ての font-size 読み取りが
+              13.3333 を 13 に切り捨てていた。**"
+ :dom-gpu-required "**dom-gpu は任意ではなかった。** サイズが 13.3333 になり fallback が 0 グリフのままだと、
+                    その host は <input size=20> で 152.7 → 157 になり Brave の 153 から離れる ——
+                    **同じ罠が 1 リポジトリ下で再現する**。"
+ :per-case "19 case で engine 出力が変化。input-with-size 44.14 → **48**（oracle 48）、
+            textarea-in-sentence 167 → **162**（162）、select-with-long-option 156 → **160**（160）など、
+            いずれも oracle の値へ。**幾何の worst list からフォーム制御タグが消えた。**
+            許容外への退行なし。"}
