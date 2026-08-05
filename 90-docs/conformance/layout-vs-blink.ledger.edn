@@ -949,3 +949,23 @@
              "inset-side が content-box 要素で border を含まない（box model 1 箇所）"
              "list marker の位置（::marker は oracle に box を作らず検証不能）"
              "UA stylesheet の所在（ADR-2800003100、オーナー判断待ち）"]}
+
+{:at "2026-08-05"
+ :iteration 47
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :parser {:corpus 137 :agree 137 :pct 100 :was "134/137 (98%)"}
+ :line-structure {:agree 326 :total 328 :pct 99}
+ :geometry {:boxes-agree 1241 :boxes-total 1283 :pct 97}
+ :paint-order {:points-agree 8424 :points-total 8509 :pct 99}
+ :landed {:htmldom "600c30ade81582c00645f7232a0247f6f0538de1 — in-body の残り 3 規則"}
+ :note "**parser corpus が 137/137 = 100% になった。** 3 規則とも実装前に Brave で実測（8 形の probe）:
+        (1) <a> の中の <a> は開いている方を閉じる（実測: 兄弟 2 つ、入れ子ではない）
+        (2) </br> は START タグとして扱う（<br> が 2 つ。**br 固有**で </img> は無視される —— 両方 test で固定）
+        (3) fragment では html/head/body タグを落とすが中身は落とさない
+            （head を落として title は残す、を実測）。
+        規則 2・3 は stack に依存しないので tree builder の前段の token 正規化として実装。"
+ :caveat "**corpus が 100% = この corpus はもう欠陥を見つけられない。** 次は case を足す番であり、
+          この数値は parser が完成したという意味ではない。foreign content の深い形、template の
+          入れ子、adoption agency の複雑形、raw text 要素の端など未被覆の領域は残っている。"
+ :in-flight ["inset-side の border（box model 1 箇所、全 bordered box が動く）—— agent 作業中"
+             "list marker の位置 + 単位無し line-height の継承 —— agent 作業中"]}
