@@ -541,4 +541,58 @@
 
   `inga.pacemaker` が**自分より高い view の new-view / TC を受けたときに前進するか**。遅れた replica は quorum ぶんの new-view を毎 view 受け取っているはずなので、それで TC を組んで飛べるなら実装の問題、飛べない設計なら view 同期そのものが無い。
 
-  `replay` は `:justify` の QC から view を回復するので、**height で追いつけば view も追いつく**（早朝の件は S9 で replay が速くなったら解けた）。つまり今の設計は「replay が十分速ければ隠れる」だけで、直っていない。"}]
+  `replay` は `:justify` の QC から view を回復するので、**height で追いつけば view も追いつく**（早朝の件は S9 で replay が速くなったら解けた）。つまり今の設計は「replay が十分速ければ隠れる」だけで、直っていない。"}
+ {:db/id -22
+  :task/id "S15-derivable-validator-keys"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "validator の秘密鍵が公開 chain-id から計算できる — BFT 保証がゼロ"
+  :task/kind "security"
+  :task/repo "kotoba-lang/torihiki-node"
+  :task/requires []
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "**実証済み。** `/head` が公開する chain-id から 4 台全部の鍵を導出し、live の公開鍵と一致することを確認した:
+
+      w1 derived pubkey == THE LIVE VALIDATOR'S 5MhNi6oAIUlj
+      w2 derived pubkey == THE LIVE VALIDATOR'S JeAEl5KTnOpa
+      w3 ... w4 ...
+
+  誰でも 4 票を偽造して証明書を作れる。**この deployment の BFT 保証はゼロ。** 同じ導出で faucet 鍵も計算でき、担保を無制限に発行できる。
+
+  コードは devnet の意図的な妥協として明記している（`derive-keypair` の docstring: 「chain-id と witness 名を知る者はその witness の秘密鍵を計算できる。本物の validator は自分で生成した鍵を genesis で公開する」）。妥協として書かれている以上これは驚きではないが、**この chain について「BFT」「4 replica が合意」と言うときは同時に言わねばならない事実**であり、端末はそれを言っていない（`status: live · block N · 4 replicas, agreeing`）。
+
+  ## 直し方
+
+  1. 4 つの鍵を生成し、秘密鍵を Worker secret（`W1_KEY` … `W4_KEY`）に置く
+  2. **公開鍵を genesis に焼く** —— 現在の鍵交換は `/head` からの trust-on-first-use で、生成鍵にすると TOFU が弱点になる（先に publish した者が勝つ）。validator 集合は genesis が持つべきもの
+  3. `boot` は secret から読み、`derive-keypair` は削除する（残すと fallback として生き続ける）
+
+  S16（oracle publisher）はこの上に乗る —— publisher を validator 集合にしたので、鍵が実物になった時点で oracle の扉も本当に閉まる。"}
+
+ {:db/id -23
+  :task/id "S16-cid-plane-is-not-wired"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "CID 面が実装済みで、動いている chain に一切繋がっていない"
+  :task/kind "architecture"
+  :task/repo "kotoba-lang/inga"
+  :task/requires []
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "**実測**: `inga.replica` が require するのは consensus / pacemaker / quorum / attest / stake / sync / wire だけで、`inga.ref` / `inga.head` / `inga.retrieval` / `inga.state` は一つも入っていない。ブロックの同一性は `:inga.block/parent-hash` ＝ SHA-256 の hex 文字列で、CID ではない。CID コードを持つ `torihiki.log` はどちらの Worker からも require されていない。
+
+  **`inga.ref` は既に「2f+1 の quorum 証明書それ自体が条件付き書き込みである」を実装している** —— CLAUDE.md の ADR-2608038000 が「分散型経路で単一ベンダの条件付き書き込みを前提にするな、inga の ref を使え」と名指ししている当の機構。ところが本番の chain は状態を Durable Object storage に置いており、それはその ADR が**前提にするなと言っているもの**。
+
+  つまり設計は既にここにあり、繋がっていない。書くべきものは新しい設計ではなく配線:
+
+      (storage/compose {:blocks <content-addressed object store> :refs <inga>})
+
+  block 面の provider 候補は全部 checkout 済み: `io-storj`（署名付き S3 / Gateway-MT）、`io-filecoin`（Lotus JSON-RPC）、`io-ipfs`（Kubo）、`io-ipld`（tag-42 CID link 付き DAG-CBOR）。必要な capability は `#{:immutable-blocks :cid-addressed-read}` だけで、**条件付き書き込みは要らない**（それは ref 側＝inga が担う）。
+
+  ## Holochain は当たらない
+
+  `kotodama-holochain` はあるが、Holochain は agent-centric で**全順序を持たない**。CLOB は全順序が要件なので、consensus 面の代替にはならない。agent が自分の鍵を生成し identity ＝ 公開鍵という点は S15 と同じ方向だが、それは Holochain を使わなくても得られる。
+
+  ## 何が解決して、何が解決しないか
+
+  解決する: 履歴の耐久性・内容アドレス化・検証可能な取得・DO storage 前提からの脱却。
+  解決しない: S14（liveness）、S15（鍵）、oracle の権限、withdraw の出口。**これらは保存層の設計問題ではない。**"}]
