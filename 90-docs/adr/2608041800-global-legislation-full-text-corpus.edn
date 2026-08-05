@@ -197,31 +197,46 @@
    | `etzhayyim/global-legislation-datoms` | `c403b6d` | corpus 層 42 シャード |
    | `com-junkawasaki/root` | `893c70c` | ADR + repos.edn + west 5 entry |
 
-   **CI の現在地（2026-08-05 に狭めた）。** 当初は「CI はカタログのみを検査する」だったが、
-   `test/corpus_contract.clj` は**何も checkout せずに走る**（読むのは committed な
-   `data/corpus/**` と `data/quality-report.edn` だけ）ことに気づき、workflow が既に実行して
-   いる `test/query_contract.clj` の末尾から `load-file` で連結した。実 GitHub Actions run
-   （`c403b6d`、success）のログで確認済み: `:corpus-laws 95194` / `:corpus-relations 646468` /
-   `:text-bytes-addressed 3425189407`。これで shard manifest・カバレッジ下限・全 text address の
-   形・**辺の向き**（`amends` が反転したら落ちる）・corpus から catalog へのライセンス join が
-   CI で守られる。
+   **CI は murakumo fleet。GitHub Actions は使わない**（オーナー指示 2026-08-05
+   「github は使わない、murakumo.cloud の cdci, workflow を使う」。ワークスペースの決定は
+   ADR-2607300900 — 3 org の workflow が job を起動しなくなり、**落ちるのではなく走らない**
+   ので repo は green に見えていた）。当該 repo の Actions は Actions API で**無効化済み**
+   （`workflow` scope は不要だった）。`.github/workflows/contract.yml` はディスク上に残るが
+   inert で、ファイルの削除にだけ `workflow` scope が要る。
+
+   gate は `scripts/fleet-ci/gates/legislation-corpus-check.cljs`（`gates.edn` に
+   `:nbb-script` `:cd true` で登録）。tip が動くたびに `.edn` だけの tarball をノードへ送り、
+   署名 receipt を `manifest/fleet-ci.edn` に積み、green なら west pin を前進させる。
+
+   **この gate は Actions 版より強い。** 主眼は「宣言された 42 シャードの sha256・バイト数・
+   entity 件数が manifest 通りか」で、これは**内部整合を保ったまま手編集されたシャード**を
+   捕まえる。Actions 経路では構造的に不可能だった —— あちらは committed 済みの値を読むだけで
+   再生成が走らないので `git diff --exit-code -- data` も無反応。実証済み: UK シャードを
+   1 文字書き換えて exit 1、無改変で exit 0。加えて quality-report の床
+   （`text-bytes-held-here` = 0）、JP シャードの identity 一意性 / text address の形 /
+   本文欠落ちょうど 13 件 / **辺の向き**（日本国憲法に amends が入っていたら from-to 反転）、
+   corpus→catalog のライセンス join、schema の属性宣言を見る。
+
+   **`:jvm-test` gate にしていない理由（実測、推測ではない）**: repo 側の contract test は
+   Datascript を要求し、Datascript は maven 依存。fleet のノードは tailnet だけに繋がっていて
+   外向き HTTPS が無く、`~/.m2/repository/datascript/` は zebulun にも asher にも存在しない
+   （2026-08-05 に両ノードで確認）。`clojure -M:test` は依存解決で必ず落ちる。
+   `ship-git-deps!` は git 依存しか運ばない。したがって Datalog を要する検査は
+   repo 側の local contract（`clojure -M test/query_contract.clj`）に残した。
 
    **残る 1 点、正確に**: CI は `data/corpus/**` を locked source から**再導出しない**。
-   それには 4 dataset の `index/` を checkout する必要があり、workflow ファイルの編集が要る。
-   内部整合な手編集シャードは通ってしまうし、再生成が走らない以上
-   `git diff --exit-code -- data` も捕まえない。原因は見落としではなく **token に GitHub の
-   workflow scope が無い**こと（workflow ファイルへの push も Contents API も通らない。
-   後者は 403 でなく 404 を返す）。必要な YAML は datoms repo の `docs/ci-design.md` に
-   そのまま載せてある。
+   それには 4 dataset の `index/` をノードに置く必要がある。sha256 は改竄を検出可能にするが、
+   導出を再現可能にはしない。EU/UK/US シャードも sha256 + 件数だけで意味検査はしない
+   （646,468 辺の parse に数分かかる一方、改竄検出は sha256 で足りる）。
 
    **再開手順**（次の agent はこれだけで続けられる）:
 
-   1. `gh auth refresh -h github.com -s workflow`（人間がブラウザ承認。agent は実行できない）
-   2. `docs/ci-design.md` の YAML を `.github/workflows/contract.yml` に適用
-   3. `test/query_contract.clj` 末尾の `load-file` ブロックを削除
-   4. `sources.lock.edn` の 4 行の `:source/ci-checkout` を `true` に（`verify-ci-lock.cljs`
-      の警告が止まる）
-   5. 法域を足すなら `bin/build-corpus.cljs` の `datasets` に 1 行 + DataLad dataset 1 本"
+   1. gate を手で回す: `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem
+      nbb scripts/fleet-ci/tick.cljs --only global-legislation-datoms`
+      （env を忘れると `no such item: fleet-agent-murakumo-ci-tip-25mbair` で死ぬ —
+      署名鍵は kagi に無く PEM にだけある。常駐 plist は env を渡している）
+   2. 対象を増やすなら `scripts/fleet-ci/gates.edn` に 1 行
+   3. 法域を足すなら `bin/build-corpus.cljs` の `datasets` に 1 行 + DataLad dataset 1 本"
 
   :adr/alternatives
   "**全文を datoms repo に直接置く。** 却下——`global-energy-datoms` の「出典別 DataLad dataset を
