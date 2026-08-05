@@ -110,7 +110,9 @@
      {:repo "orgs/kotoba-lang/kotobase-protocol-s3" :owns "kotobase.protocols.s3"}
      {:repo "orgs/kotoba-lang/kotobase-protocol-ipfs" :owns "kotobase.protocols.ipfs"}
      {:repo "orgs/kotoba-lang/kotobase-protocol-atproto" :owns "kotobase.protocols.atproto"}
-     {:repo "orgs/kotoba-lang/kotobase-protocol-git" :owns "kotobase.protocols.git"}]
+     {:repo "orgs/kotoba-lang/kotobase-protocol-git" :owns "kotobase.protocols.git"}
+     {:repo "orgs/kotoba-lang/kotobase-protocol-pinning" :owns "kotobase.protocols.ipfs-pinning（pinning.<apex>）"}
+     {:repo "orgs/kotoba-lang/kotobase-protocol-issues" :owns "kotobase.protocols.issue（issues.<apex>）"}]
     :dependency-rule
     "各 protocol repo は kotobase-protocol-core にのみ依存する。protocol repo 同士は import しない。
      kotobase-protocols は 1 compatibility cycle だけ facade として残し、consumer が 0 になったら archive。"
@@ -132,11 +134,30 @@
      namespace が同一なので kotobase.protocols.http 等が重複する。consumer はどちらか一方だけを
      使う。移行期は『既存の protocols-worker は facade、新しい per-host shell は分割 repo』で
      衝突しない。"
+    :split-was-redone-from-tip
+    "**初回の分割は west pin された共有 checkout（38 commit 遅れ）から行っており、やり直した。**
+     判明したこと:
+     - namespace が 3 本まるごと欠落していた（cid / ipfs_pinning / issue）。
+       ipfs_pinning と issue はそれぞれ pinning.<apex> / issues.<apex> という
+       独立 host を持つ surface で、repo も別に立てた（計 7 repo）
+     - コピーした 9 本も 38 commit 古かった
+     - **router を『registry 化した』と称して手で書き直したが、upstream の main には
+       既に :surfaces と :path-surfaces が入っていた。** 手製版は keyword ラベルを使い
+       :path-surfaces を落としていたので facade と ctx 互換ですらなかった。
+       現在の core は upstream の contract（string ラベル・:path-surfaces・
+       injected mount を built-in prefix より先に評価・非 strip）をそのまま保ち、
+       built-in の surface 表だけを外している
+     - テスト規模の差がそのまま見落としの量: stale 基準 26 tests/105 assertions →
+       tip 基準 64 tests/236 assertions
+     これは本 ADR が既に教訓として記録している失敗そのもの
+     （手元の tree を現状の証拠にする前に pin と remote の両方と突き合わせる）で、
+     **その規則を書いた同じセッションで再発した。** 規則を書くことと従うことは別の動作である。"
+
     :status-2026-08-05
-    {:done "5 repo を作成・push・west 登録（4102 projects）。pin はすべてサーバ側で
-            main 到達性を検証済み。テストは core 10/47・s3 4/20・ipfs 3/11・atproto 4/16・
-            git 5/11 = 26 tests / 105 assertions が全て通過（分割前は 24/87。
-            router の registry 化で absent-surface / prefix-skip / apex-injectable の 3 ケース増）。"
+    {:done "**7 repo**（core / s3 / ipfs / atproto / git / pinning / issues）を作成・push・west 登録。
+            分割元は kotobase-protocols の main tip。pin はすべてサーバ側で到達性検証済み。
+            テスト: core 24/97・s3 4/20・ipfs 4/13・atproto 4/16・git 6/24・pinning 9/34・
+            issues 13/32 = **64 tests / 236 assertions** 全通過（push 済み内容で再実行して確認）。"
      :visibility "**5 repo は private で作成した。親の kotobase-protocols は public。**
                   public 化は一方通行で恒久承認の対象外なのでオーナー判断に残す。
                   なお facade を archive する時点で後継が private のままだと、
