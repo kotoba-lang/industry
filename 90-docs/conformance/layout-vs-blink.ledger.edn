@@ -2000,3 +2000,108 @@
   "distribute-excess hands out whole pixels, so Brave's 220.5 comes out 220
    at x=78 vs 77.5 -- inside the 2px tolerance and the one place these
    shapes are not exact"]}
+
+{:seq 54
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "a49f29bc43a584b4a9b1d047bb5db475e586248d"
+ :title "CSS-wide keywords, :disabled control colours, <dialog> UA box, generated quotes, self-collapsing blocks"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 576}
+ :measured
+ {:line-structure {:before "542/553" :after "540/551"
+                   :note "SAME 9 failures; two cases became :oracle/blind,
+                          so both numerator and denominator dropped by 2."}
+  :geometry {:before "1844/1959" :after "1851/1959"
+             :clean-cases {:before "506/576" :after "510/576"}}
+  :paint-order {:before "13956/14389" :after "13971/14389"
+                :clean-cases {:before "527/576" :after "529/576"}}
+  :computed-style {:before "27497/27542" :after "27514/27544"
+                   :clean-cases {:before "556/576" :after "563/576"}
+                   :cascade-residual {:before 30 :after 23}
+                   :ua-default-residual {:before 15 :after 7}}}
+ :verified-on-merged-main
+ {:cssom-tests "828 tests / 1918 assertions, 0 failures"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "178/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly. `q` no longer appears in
+         the paint-order worst list at all. The paint residual is now
+         dominated by the NEW corpus-expansion cases (stacking 210 points,
+         replaced elements 40) rather than by anything this cluster owned."}
+ :what-the-browser-said
+ [{:topic "CSS-wide keywords are three different answers to the same declaration"
+   :measured "one <p> under a styled <div>: `initial` gives display:
+              inline -- NOT the UA `block`; `unset` gives green / inline /
+              0; `revert` gives green / BLOCK / 14px."}
+  {:topic ":disabled colours are THREE rules, not one"
+   :measured "input/textarea rgb(84,84,84); button + input
+              type=button/submit/reset/color rgba(16,16,16,.3); select
+              rgb(128,128,128). Via :disabled, NOT [disabled] -- a
+              <fieldset disabled> greys its children."}
+  {:topic "quote characters, identified by measurement rather than by reading the spec"
+   :measured "`quotes: auto` and `quotes: \"\\201C\" \"\\201D\" \"\\2018\"
+              \"\\2019\"` produce BYTE-IDENTICAL boxes (63px, 91/35
+              nested); the four characters advance 14px where ASCII \"
+              advances 7; a three-deep nest is 147/91/35, so DEPTH 3
+              REUSES DEPTH 2's PAIR."}
+  {:topic "self-collapsing blocks -- 15 shapes measured"
+   :measured "margin-top 5 / bottom 30 draws the empty box at y=25 and
+              resumes flow at y=50 -- TWO DIFFERENT NUMBERS OFF ONE BOX.
+              `height: 0` WITH TEXT does NOT self-collapse (the line box is
+              in-flow content); `overflow: hidden` does not; `padding-left`
+              does."
+   :note "this is the rule I attempted and WITHDREW on 2026-08-04 (seq 48),
+          where 1 case was fixed and 3 broken. The missing condition was
+          the one above: an empty-looking block that still holds a line box
+          is not self-collapsing. Landed correctly here -- the three cases
+          that broke last time now go 88px -> 74px, and Brave says 74."}
+  {:topic ":nth-child(2n+1 of .m)"
+   :measured "on li.m/li/li.m/li/li.m/li.m it bolds the 1st and 5th.
+              Ignoring the `of` clause bolds 1/3/5; treating the whole
+              thing as a compound bolds only the 1st. Three distinguishable
+              behaviours, so the case actually pins the semantics."}]
+ :ua-rule-op-cost
+ "6380 -> 6402 cascade DOM ops over the corpus, +22 (+0.35%): disabled
+  colours +1, dialog +12, quotes +7."
+ :cost-reported-not-buried
+ "<dialog>'s padding LOSES 4 paint points. They agreed before because TWO
+  ERRORS CANCELLED: the oracle's dialog is 54 tall and 48 wide, the
+  engine's was 20 tall and 300 wide, so y=24 fell OUTSIDE the engine's box
+  and hit the parent div -- the same element the oracle hits, for the
+  opposite reason. The box is now exact (300x54 against Brave's 48x54, the
+  width being the fit-content scope cut below)."
+ :hit-region-fix
+ "a 4-point `q -> p` paint residual turned out to be hit-region
+  granularity: an inline box's hit region is now ONE RECT PER LINE rather
+  than one per fragment. Brave answers the outer <q> in the space between
+  the inner one and the following text."
+ :scope-cuts
+ [{:what "the rest of <dialog>'s UA rule (position:absolute; width:fit-content; margin:auto)"
+   :measured "added it and measured: NOT ONE BOX MOVES (fit-content is a
+              scope cut in explicit-width) and it costs 4 computed-style
+              values, 2 of which agree today."
+   :why "intrinsic sizing has to come first."}
+  {:what "absolute font-size keywords"
+   :measured "the whole table is now in resolve-font-size's docstring,
+              measured in monospace / Arial / serif. It is NOT A RATIO --
+              it is keyed on the family's default SIZE (Arial and serif are
+              identical), and `xx-small` reports 10px while its own 1em
+              margin measures 9."
+   :why "needs a font-family model, not a table."}
+  {:what "enabled control colours"
+   :measured "an enabled <input> inside color:#ff0000 reports black in a
+              browser and inherits here."
+   :why "the fix is the system colour `fieldtext`; writing #000000 would
+         HARD-CODE BLACK INTO THE DARK HOST THEME."}
+  {:what "per-side borders"
+   :why "self-collapsing-block? tests the block-axis border twice, the
+         second time against raw declarations, because the box model has
+         one uniform :border-width. Same gap the corpus-expansion round
+         measured at seq 52 rank 6."}]
+ :not-attempted
+ ":interactive/details-with-no-summary (82 paint points) -- the oracle also
+  reports a <p> box the engine cannot emit, so the case cannot go clean on
+  geometry anyway."
+ :tests-updated-with-their-reason
+ "four unit tests asserted the old `inherit`-drops behaviour and one
+  asserted nil for a disabled input's colour; all five updated carrying the
+  measurement that changed them."}
