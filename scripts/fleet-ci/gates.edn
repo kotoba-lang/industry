@@ -219,6 +219,35 @@
    :script "gates/net-kotobase-hermetic-check.cljs"
    :script-args ["--min-surfaces" "8" "--min-syntax" "20"] :cd true}
 
+  ;; network-awai/cloud-itonami の公開サイト面（`{org}.itonami.cloud/{repo}`、
+  ;; ADR-2607301300 → ADR-2608057000）。
+  ;;
+  ;; ADR-2607301300 は STRICT job `sites` を `.github/workflows/ci.yml` に入れて
+  ;; いたが、**この org の Actions は net-kotobase と同じく 2026-08-03 以降 job を
+  ;; 起動していない** —— 落ちるのではなく走らないので、repo は green に見えたまま
+  ;; 何も検査されていなかった。
+  ;;
+  ;; repo 自身の `test-sites`（registry canonical + built bundle を実 import）を
+  ;; そのまま呼ぶ。**どちらも standalone で動く**（west sibling も source repo も
+  ;; 要らない）。`score-sites` / `build-sites --check` は west レイアウトが要るので
+  ;; 入れない —— continue-on-error の飾りにしない。
+  ;;
+  ;; :include-ext を付けないのは、レジストリの `--check` が `public/sites/**` の
+  ;; **実ファイル一覧**と `public/` `functions/` の top-level エントリ名から決まる
+  ;; ため。拡張子で絞ると tree が痩せて file list が変わり、**痩せたことに気付かない
+  ;; まま STALE になる**。full tarball は 27MB（max-ship 200MB）。
+  ;;
+  ;; --min-reserved は「ship された tree が痩せていないか」の床（実測 38）。
+  ;; --min-checks は「host モードの検査が消えていないか」の床（実測 27）。
+  ;; どちらも上限ではなく、0 件で緑になるのを防ぐためのもの。
+  ;;
+  ;; **落ちることを確認済み**（2026-08-05）: registry.json を 1 語書き換えると
+  ;; A が STALE で落ち、sites-core.js の org asset root を壊すと（registry は
+  ;; 無傷のまま）B が `org host root -> org face asset` で落ちる。無改変で exit 0。
+  {:name "cloud-itonami" :org "network-awai" :gate :nbb-script
+   :script "gates/cloud-itonami-sites-check.cljs"
+   :script-args ["--min-checks" "27" "--min-reserved" "30"] :cd true}
+
   ;; kotoba-lang/compiler の JDK-free 経路（compiler ADR-0202）。
   ;;
   ;; **ここに置く理由は 2 つある。** ①ADR-2607300900 の決定（CI は Actions では
