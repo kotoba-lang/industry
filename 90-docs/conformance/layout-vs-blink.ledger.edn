@@ -1596,3 +1596,145 @@
                      『130px の列』と書いていたが、それは padding を含まない width から padding を
                      引いた数。ブラウザは 140 と言う。**比較される数値は常にブラウザ由来**で、
                      誤っていたのは散文だけ。"}
+
+{:seq 50
+ :date "2026-08-05"
+ :repo "kotoba-lang/cssom"
+ :commit "d9be48d00bbd0a1acad3f1a7b21bae2b2e087f29"
+ :title "text metrics: letter-spacing / word-spacing / text-indent / tab-size in a text run's advance"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 501}
+ :measured {:line-structure {:before "464/482" :after "473/482"}
+            :geometry {:before "1682/1766" :after "1702/1766"
+                       :clean-cases {:before "456/501" :after "469/501"}}
+            :paint-order {:before "12401/12514" :after "12421/12514"
+                          :clean-cases {:before "472/501" :after "479/501"}}
+            :computed-style {:before "24758/24816" :after "24758/24816"}}
+ :verified-on-merged-main
+ {:cssom-tests "772 tests / 1765 assertions, 0 failures"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "177/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :blast-radius
+ "exactly 16 of 501 cases change their box list, all 16 in the target set,
+  0 regressions. 9 line-axis flips, all fail->pass."
+ :what-the-browser-said
+ ["letter-spacing is charged after EVERY character including the last --
+   `abcd` at 4px/char is 44, not 40. That is why a shrink-to-fit box gets
+   the full n*spacing and a centred line offsets by half of it. The space
+   between two words takes it like any other character."
+  "word-spacing is charged once per U+0020, NOT once per gap -- a preserved
+   `a  b` is charged twice."
+  "text-indent % resolves against the box whose lines are indented, not its
+   containing block. The shape that separates them is
+   <div style='width:200px;text-indent:50%'><p style='width:100px'>, which
+   indents by 50. `hanging` and `each-line` are two independent inversions
+   of one rule; all four combinations were measured. A soft wrap is not a
+   forced break. The indent is INSIDE the width text-align centres."
+  "tab stops are tab-size advances OF A SPACE, so letter-spacing and
+   word-spacing move them (8*9=72, 8*17=136, 8*19=152). Strictly past the
+   pen (two tabs = two stops), and measured from the line's start, not from
+   the indented pen."]
+ :design
+ "one shared `text-advance`, asked by all four measurement sites
+  (layout-text, inline-line-breaker, inline-max-content-width,
+  flex-item-natural-text-width), so a property added at one site cannot be
+  missing at the others. layout-text's text-shadow map parameter became
+  `text-style` and absorbed the new properties -- the fn is at Clojure's
+  20-positional-parameter limit and its own docstring already prescribed
+  exactly this move."
+ :shared-helper-defect-found
+ "flex-item-natural-text-width merged the element's font properties into
+  the style it measured against but NOT white-space, so every shrink-to-fit
+  box was measured with its runs of spaces collapsed and its tabs gone
+  (<pre style='display:inline-block'>   ind</pre> measured 28 where Brave
+  says 42). Fixed; that also unblocked every tab assertion."
+ :scope-cuts
+ [{:what "three corpus cases stay red; the cause is upstream of cssom"
+   :why "htmldom collapses whitespace at PARSE time on an HTML-structural
+         rule, so <span style='white-space: pre'>   indented</span> arrives
+         at layout as ' indented' -- the characters are gone before cssom
+         can measure them. cssom's own half is implemented and asserted in
+         <pre> form where the characters survive: 63 / 35 / 42, the
+         browser's numbers exactly. Blocker + one-line reproduction written
+         into cases.edn next to the three cases."}
+  {:what "tab-size: <length> reads as a number of spaces"
+   :why "cssom.core collapses 20px and 20 to the same value before layout
+         sees it. Documented at tab-stop-width -- same class as the
+         columns: 3 vs 3px arm added for multicol."}
+  {:what "flex-item-min-content-width / caption width / form-control size
+          sizing are NOT routed through text-advance"
+   :why "they answer min-content and per-character-metric questions, not
+         'how wide is this string', and neither is measured."}]}
+
+{:seq 51
+ :date "2026-08-05"
+ :repo "kotoba-lang/cssom"
+ :commit "7a599ce99cb62a8b289acf15fbdd69fd4e9cbb3a"
+ :title "CSS blockification (Display 3 §2.7), and the flex intrinsic-sizing rule it exposed"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 501}
+ :measured {:line-structure {:before "473/482" :after "473/482"}
+            :geometry {:before "1702/1766" :after "1702/1766"
+                       :clean-cases {:before "469/501" :after "469/501"}}
+            :paint-order {:before "12421/12514" :after "12421/12514"}
+            :computed-style {:before "24758/24816" :after "24797/24816"
+                             :clean-cases {:before "469/501" :after "492/501"}
+                             :display-property {:before "1735/1774" :after "1774/1774"}}}
+ :verified-on-merged-main
+ {:cssom-tests "783 tests / 1804 assertions, 0 failures"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "177/0"
+  :note "re-ran the harness independently on the merged tree; the
+         blockified mismatch cause is now absent from the residual
+         entirely. Remaining computed-style residual: cascade 11,
+         ua-default 8."}
+ :why-one-landing-and-not-two
+ "blockification ALONE regresses geometry: :flex/nested-flex drops from 5/5
+  boxes to 3/5 (1652 -> 1650). The engine had been getting a row flex
+  container's max-content right BY ACCIDENT -- its items carried no
+  `display`, so they looked inline and were summed. Blockifying them makes
+  them look like blocks, and the block rule takes the MAX. The correct rule
+  is that a row flex container's max-content is the SUM of its items plus
+  main-axis gaps (the max only along a column). The counterfactual run is
+  the evidence: sizing fix alone = 0 per-case deltas anywhere; both
+  together = 0 geometry/line/paint deltas and +39 computed style.
+  This is the earlier withdrawal (2026-08-04) landed correctly."
+ :design
+ "flex-item-main-width gained a branch keyed on the box's OWN display,
+  placed before the inline branches -- a flex container's items are
+  blockified whatever they were written as. block-max-content-width's
+  per-child measurement was extracted to a shared
+  `child-outer-max-content-width` so the max rule and the sum rule cannot
+  drift. That is the only shared helper touched."
+ :cost
+ "cascade DOM ops over the whole corpus 20000 -> 20035 (+35 :style/display
+  set-attr ops, +0.18%). The 39 changed values minus 35 new ops = the four
+  elements (button x2, input x2) whose UA inline-block becomes block -- a
+  value change, not an extra op. This is the measured cost the
+  ADR-2800003100 estimate anticipated."
+ :scope-cuts
+ [{:what "grid containers measured for shrink-to-fit still report their
+          widest item, not the sum of their column tracks"
+   :measured "Brave 100 / 42 / 54 where the engine says 7 / 28 / 28"
+   :why "the number it needs is layout-grid's own intrinsic-cw, and sharing
+         it means lifting that whole prelude (template areas,
+         auto-placement, implicit tracks, fr equalisation) out of
+         layout-grid -- a change to grid, not to flex, and not what
+         blockification exposed. A second approximate copy of track sizing
+         is the outcome to avoid. Unchanged by both halves, so genuinely
+         independent."}
+  {:what "width: min-content | max-content | fit-content still behaves as auto"
+   :why "resolve-width takes only [st avail] and cannot see the node or the
+         theme, so resolution belongs at a caller that still holds the
+         node."
+   :measured "fit-content is min(max-content, max(min-content, available))
+              -- 70 at 300px, 40 at 40px. The keyword yields a CONTENT size
+              with padding/border added on top IN BOTH box-sizing MODES (86
+              either way for max-content + 6px padding + 2px border, where
+              a declared length would differ by 16). Left in the docstring
+              so a fix does not re-measure it."}
+  {:what "flex-basis-adjusted max-content contributions (Flexbox §9.9.1)"
+   :why "the item's own max-content is taken instead. Measured identical
+         for every shape probed including `flex: 1`; they part company only
+         for a declared flex-basis length smaller than the content."}
+  {:what "::before / ::after of a flex item are not blockified"
+   :why "the pseudo maps sit under separate keys and never reach the
+         rewrite."}]}
