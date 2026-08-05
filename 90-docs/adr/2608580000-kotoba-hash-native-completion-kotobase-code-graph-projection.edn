@@ -25,7 +25,8 @@
   :adr/body
   "# ADR-2608580000: kotoba を hash-native に完成させ、kotobase を code graph の projection として統合する
 
-**Status**: accepted（設計。実装は S1 のみ着手、S2 以降は未着手）
+**Status**: accepted（**S1 / S2 / S4 / S5 landed、S3 / S6 未着手**。D2 の 2 項目は
+実測により撤回済み —— 下記を参照）
 **Date**: 2026-08-05
 **Deciders**: Jun Kawasaki（指示: 「hash native となるようにして、また kotobase などとの効率的な設計、統合を検討」）
 
@@ -268,6 +269,51 @@ inga の 2f+1 quorum（ADR-2608038000）を ref 面に使う。
 - **compiler の 31 件の既存 failure は本 ADR の作業と無関係**（`origin/main` の pristine
   checkout で同数を実測）。S5 がそれを直したとも壊したとも言わない。
 
+## 依存 pin を進めて分かったこと（2026-08-05、S1〜S5 の後）
+
+S1/S2/S4 は `codebase` に、S5 は `compiler` と `kotoba` に landed したが、
+**`kotoba` の deps.edn が古い pin を指していたので、どれも CLI から届いていなかった。**
+13 本すべてを測ったら**全部 stale**（`kotoba-lang` 111 / `compiler` 45 /
+`kotoba-core-contracts` 25 / `org-chainagnostic-cacao` 20 / `io-multiformats` 13 /
+`io-ipld` 10 / 他 1〜7 commit）。
+
+### kotoba-lang main が主要 consumer を壊していた（修正済み、`kotoba-lang@079e54e`）
+
+13 本まとめて上げると **66 errors、うち 65 が `Cannot open <nil> as a Reader`**。
+
+原因は `kotoba-lang@146ffde`（"Separate language semantics from release and IPFS
+adapters"）が `:paths` を `[\"src\" \".\"]` → `[\"src\" \"resources\"]` に変えたこと。
+同 commit は `repository-rules.edn` を `resources/` に移したが **`lang/` は置いたまま**で、
+**言語 authority 一式が classpath から落ちた**。`launcher/read-cli-contract-resource` は
+`lang/cli.edn` を `io/resource` で読み **fallback を持たない**ので、
+**`kotoba-lang@main` に依存すると `kotoba` CLI は 1 コマンドも dispatch できない**。
+`:paths` の編集はその commit の主題と無関係で、意図的な API 変更ではなく事故である。
+
+**`.` を再び外すなら、同じ変更で `lang/` を `resources/lang/` へ移すこと** ——
+consumer が使う resource path を変えてはならない。
+
+**特定方法として記録に値する**: 12 本だけ上げて `kotoba-lang` を留め置いたら
+consumer の baseline と完全一致した。これが「13 本のうちどれが原因か」を、
+1 本ずつ 13 回試さずに 1 回で決めた手順である。
+
+### 残った 1 件は本物の capability gap（未解決、意図的に pin を留めた）
+
+packaging 修正後、66 → **1**。残るのは `authority-positive-cases-run-on-primary-wasm` で、
+**言語 authority が conformance case を増やし、`kotoba` の wasm emitter / runtime が
+追いついていない**:
+
+`typed-map-new` / first-class closures（invoke・apply）/ `string-from-i64` /
+`vector-count` / `:bytes` destructuring（`runtime.clj:3923`）
+
+**stale な pin がこのギャップを隠していた。** conformance suite は正しく働いている。
+既知の赤を main に入れるのはオーナー判断なので、**`kotoba` の `kotoba-lang` dep は
+`9c76285` に留めた**（理由は `kotoba@efc8c2b` の commit message に記録）。
+上げる判断が出たら、この 5 つの op を実装するのが先。
+
+**なお west pin（`manifest/west.yml`）の `kotoba-lang` は `079e54e` に進めてある** ——
+packaging 修正は誰にとっても正しいため。留めたのは `kotoba/deps.edn` の側だけで、
+2 つは別物である。
+
 ## 改訂履歴
 
 - **2026-08-05（同日）**: D2 の 2 項目を実装時の実測により撤回（`verify` decorator は
@@ -279,4 +325,8 @@ inga の 2f+1 quorum（ADR-2608038000）を ref 面に使う。
   **投影対象の store が workspace 全体で 0 件**である方が決定的）。S5 が `kotoba compile`
   を覆っていなかったのを発見して `kotoba@acd3bb0` で閉じ、**1 回目の「S5 完了」報告が
   誤りだった**ことを上記に明記。
+- **2026-08-05（closing）**: 依存 pin を進める過程で `kotoba-lang` の packaging 回帰を
+  発見・修正（`079e54e`）。`kotoba` の依存 12 本を前進（`efc8c2b`）し、`kotoba-lang` dep
+  だけは conformance の capability gap のため据え置き。上記「依存 pin を進めて分かったこと」
+  節を追加。**S3 / S6 は未着手のまま**で、前提条件は変わっていない。
 "}]
