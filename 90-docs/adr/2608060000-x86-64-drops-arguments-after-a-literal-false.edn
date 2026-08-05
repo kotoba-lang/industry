@@ -1,0 +1,77 @@
+[{:db/id -1
+  :adr/id "2608060000"
+  :adr/title "x86-64 backend はリテラル false 引数以降を emit しない — :bool 境界を開けた瞬間に到達可能になる latent miscompilation"
+  :adr/status "accepted"
+  :adr/date "2026-08-05"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/last-verified "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "native-x86-64-false-argument-defect"
+  :adr/tags ["kotoba" "native" "x86-64" "codegen" "defect" "bool" "evidence"]
+
+  :adr/authoritative-for
+  ["x86-64 backend の引数走査が false を終端と誤認する欠陥の所在と再現条件"
+   ":bool boundary widening を kotoba-verifier に merge しない判断とその解除条件"
+   "murakumo 33 cores の sweep 値を引用するとき、どの kotoba-native に対して測ったかを併記する規則"]
+
+  :adr/related
+  ["2608052000"
+   "adr-2608049000-native-capability-boundary-and-production-tender"
+   "adr-2608049200-native-vector-collections-and-context-abi-v3"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"]
+
+  :adr/context
+  "kotoba-kir 8de6215a が :bool を関数境界に admit したあと、kotoba-verifier 側の同一の 1 行 guard 除去を landing する前に「:bool parameter は machine code として一度も実行されていない」ことを完了条件にした。verify-native-artifact! は emit されたコードではなく KIR interpreter で再実行するので、コンパイル成功は実行の証拠にならないためである。
+
+その実行証明が x86-64 で落ちた。落ちたこと自体がこの ADR の中身であり、widening は書かれ緑になっているが merge していない。"
+
+  :adr/decision
+  "**欠陥**: `kotoba.native.x86-64` の引数走査が `(if-let [arg (first remaining)] …)` で書かれている。引数の KIR form が**リテラル `false` そのもの**のとき `if-let` は else 枝を取る（Clojure の false/nil 混同）。したがってその引数と**それ以降の全引数**が emit されないまま loop が終わる一方、`pops` は `argc` 全部を pop する。スタックが壊れ、SIGILL / SIGSEGV になる。
+
+同じ形が 3 箇所にある（origin/main b65fd0d 時点）: `x86_64.cljc:189` emit-tail-self-call / `:242` emit-call / `:342` typed heap・cap-call。**2 箇所は到達して crash することを確認済み、3 箇所目は未検証。**
+
+aarch64 は `mapcat` で `args` を走査し真偽判定を持たないので無傷。**これは表現の問題ではなく走査の書き方の問題**であり、`:bool` の値表現には何の欠陥もない。
+
+**判断**:
+1. `agent/verifier-bool-boundary-widening` (b5a88cd) は **merge しない**。commit subject に `DO NOT MERGE YET` を残したまま open にしておく。解除条件は x86-64 の修正 + 17 行の再実行。
+2. kotoba-verifier main には**境界を保持する側だけ**を landing した（83f42a4）。admission は 1 つも広げていないので digest も動いていない。
+3. 修正は `(if (seq remaining) (let [arg (first remaining)] …))` 相当。3 箇所すべてを直し、3 箇所目も到達性を測る。"
+
+  :adr/evidence
+  "実行証明は `compiler` の共有 ISA 実行テーブル（test/kotoba/compiler/isa_execution_test.clj）に 17 行を足し、tools/kexe_loader.c 経由で**実プロセス**として走らせた（両 loader をビルドし probe 検証済み。行は compiler に commit していない — 同 repo は scope 外のため、kotoba-verifier の ADR 0001 に逐語で再現）。
+
+**aarch64: 17 行すべて正しい。x86-64: true 行はすべて正しく、bool 引数がリテラル false の行はすべて crash**（SIGILL = loader exit 120、tail self-call 行のみ SIGSEGV）。
+
+バイト証拠: 同一プログラムが true で **167 バイト**、false で **156 バイト**。差の 11 バイトはちょうど `48 b8 <imm64> 50`（movabs rax,imm; push rax）1 個分。
+
+到達性の分離（controls）: :i64 param にリテラル 0 を渡すのは正常 / パラメータを跨がない false リテラルは正常 / **計算された** false や let 束縛された false は正常。**無改変の main では到達不能** — 注釈の無い param は :i64 と型付くので `(f false)` は frontend が `expected i64, got bool {:phase :subset}` で弾く。**:bool 境界を開けることが、この欠陥を到達可能にする。**
+
+falsification: guard を戻すと新 gate は 9 failures を出し、そのすべてが :bool 行、negative 行は 1 つも落ちない。逆向きの falsification も実施。
+
+assertion 数: kotoba-verifier baseline 400d980 = 11 tests / 65 → landed main 83f42a4 = 12 tests / 84 → widening branch = 14 tests / 106、すべて 0 failures。west pin は root dd18b694 で 83f42a4 へ前進（fast-forward 検証済み、ahead=4 / behind=0）。"
+
+  :adr/consequences
+  "**sweep 値は「どの kotoba-native に対して測ったか」を併記しないと矛盾する。** 同じ 33 cores に対して 2026-08-05 中に 14/33 と 16/33 の 2 つの値が出た。矛盾ではない: 16/33 は kotoba-native b65fd0d（record-new の tail placement を含む）を :local/root にした測定、14/33 は compiler が pin している 9b33db5（それを含まない）に対する測定である。verifier agent の残存クラスに `infer_credits` と `infer_rebalance` が並んでいることが裏付けになる — その 2 本はまさに b65fd0d が閉じたものだからである。**以後、N/33 を引用するときは kotoba-native の SHA を併記する。**
+
+widening 単体の効果は、その 14/33 baseline に対して **19/33**（+5: connect / dash_state / infer_waste / overlay_stream / report）。b65fd0d の +2 と重ならないが、**両方を入れた実測値はまだ存在しない** — 21/33 と算術で足さないこと。
+
+**5 本が unblock されたのは運であって性質ではない。** そのどれもリテラル `false` を引数位置に書いていない（すべて if 分岐位置）。x86-64 の欠陥を直さずに widening を入れれば、`(f … false …)` を書いた瞬間に**沈黙して壊れるコードが出る**。これが merge を止めた理由である。"
+
+  :adr/gaps
+  "[{:gap :x86-64-false-argument :state :open :note \"THE BLOCKER. x86_64.cljc の 3 箇所（189 emit-tail-self-call / 242 emit-call / 342 typed heap・cap-call）が (if-let [arg (first remaining)] …) で書かれており、リテラル false 引数以降を emit しない。2 箇所は crash を確認、342 は未検証。修正は seq 判定への置換。kotoba-native repo に別 agent が在席中だったため、発見者は報告のみ行い修正していない。\"}
+    {:gap :verifier-bool-widening-held :state :open :note \"agent/verifier-bool-boundary-widening (b5a88cd) は書かれて緑だが DO NOT MERGE YET で open。解除条件は x86-64 修正 + 17 行の実行再走。landing は merge 1 回で済む。\"}
+    {:gap :isa-rows-not-committed :state :open :note \"17 行の ISA 実行行は compiler repo に commit されていない（scope 外）。kotoba-verifier ADR 0001 に逐語で再現済み。widening が landing する時に compiler へ移す。\"}
+    {:gap :compiler-suite-42-failures-unattributed :state :open :note \"widening branch で compiler suite は 929 tests / 7090 assertions / 42 failures。baseline を走らせていないので、この 42 が pre-existing か widening 由来かは未判定。2026-08-05 の別測定では無改変 origin/main に 30 failures が存在したので pre-existing が大半と推測されるが、推測は証拠ではない。\"}
+    {:gap :bool-untyped-encoding :state :open :note \"ADR-2608052000 から変更なし。:bool のみが typed feature の module は :kotoba.hir/v2 で emit され :param-types を失う。compiler の typed-values? 分類の問題で、閉じると全 target の :kir-sha256 が動く。kotoba-kir に回帰テストで固定済み。\"}]"
+
+  :adr/verify
+  ["cd orgs/kotoba-lang/kotoba-native && git show origin/main:src/kotoba/native/x86_64.cljc | grep -n 'if-let \\[arg (first remaining)\\]'   ; => 189, 242, 342 の 3 箇所"
+   "同 aarch64.cljc は mapcat で args を走査し真偽判定を持たない（215 / 466 行）"
+   "gh api repos/kotoba-lang/kotoba-verifier/branches/agent/verifier-bool-boundary-widening --jq .commit.sha   ; => b5a88cd（open のまま）"]
+
+  :adr/child-adr "kotoba-lang/kotoba-verifier docs/adr/0001"
+  :source/dataset "adr"}]
