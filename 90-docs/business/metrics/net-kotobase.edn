@@ -1,38 +1,36 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 18058, "kotobase-cf-wasm-staging" 28936},
+ {"net-kotobase" 18257, "kotobase-cf-wasm-staging" 29643},
  :zone
- {:requests-7d 49614,
-  :pageviews-7d 1359,
-  :uniques-7d-sum 1396,
+ {:requests-7d 50389,
+  :pageviews-7d 1363,
+  :uniques-7d-sum 1402,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
   [{:path
-    "/kotobase-cf-wasm-production/shadow/iengine/merkle-lsm/v3/backfill/bafyreifhjyl7rn2wf6lblxlmumkuay4rzxxc3jyv7w55kzz6x5wwhkxu7e.bin",
-    :requests 41}
+    "/kotobase-cf-wasm-production/blocks/bafyreic2s4nyoryhrwaytevit3ij7nq5sn2paaphbfzbdxm22tzvddcydy/bafyreifbprolpg3qwy5cavtchedavbs2uw73u7bra63su4ct7wvn2dbt2u",
+    :requests 6}
+   {:path "/obsidian", :requests 6}
    {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreih33cib7wase5noayinc5idjoncj73wxy5bwnxh3vo3g3wrmu5utq",
-    :requests 15}
-   {:path "/sign-in", :requests 12}
+    "/kotobase-cf-wasm-production/blocks/bafyreice4ippgk6yjt2xlxvd4ikds3psmkzpoabsxu6wiz3ks2pesrljci/bafyreifhvpvgdgpj5rq5f4em32d4tlzwutspnbwfmqz2wvrt4o7fchdlfu",
+    :requests 6}
    {:path
-    "/kotobase-cf-wasm-production/shadow/iengine/merkle-lsm/v1/journal/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreidtarqyvhb6yedn4mgmztwru43uzziimrnilomlffmnxjkzrf2sfq.bin",
-    :requests 10}
+    "/kotobase-cf-wasm-production/blocks/bafyreiccc4mj54mv73xc7p7qjwu4rowyszyxm5v5ij3wlekyv7vypn5rxu/bafyreidijvp4m2nwsayo4fn5resotew7xm7jkifttgbmnag33g64lyzc5q",
+    :requests 6}
    {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreiemixtnqnuxyjs5g4sl6kkzzb4wv7gra64ouzsrlpwb5koazrrimu",
-    :requests 10}
+    "/kotobase-cf-wasm-production/blocks/bafyreibueppra5x7paeb5tqmm4ygj3ctc4sbtd5jahcixa45243pxwd2oq/bafyreifqeijnllzv2gs4zm7elghp7635pjmmpj6tqt6uvugpvbyhcstspq",
+    :requests 6}
    {:path
-    "/kotobase-cf-wasm-production/shadow/iengine/merkle-lsm/v1/journal/bafyreifbgustwka5bdarppk24aextwwuoz2nkyiayswh3suuubu5ge6uce/bafyreiavmkfsyhuhqbihhq6tvouh5ssmtmh4qgi3rfnhadrnb3egjlvana.bin",
-    :requests 10}
+    "/kotobase-cf-wasm-production/blocks/bafyreifbgustwka5bdarppk24aextwwuoz2nkyiayswh3suuubu5ge6uce/bafyreidejxmj4oh4fncsoiefpzjwlxxrg6bdib2t3ylx2znu6dvxn7f2xe",
+    :requests 6}
+   {:path "/resources", :requests 6}
    {:path
-    "/kotobase-cf-wasm-production/shadow/iengine/merkle-lsm/v3/backfill/bafyreifaay2ogimjcel4w6bfywa3bwg4yk64pdcvu2bo5daip3wu7mwzkm.bin",
-    :requests 9}
-   {:path
-    "/bafyreico5af7wbpo2obzyv7ti76sbwb5jsjbjd7kaj25m354so4rw3mvz4",
-    :requests 8}],
-  :status-mix {:server-error 146, :ok 981, :client-error 8011},
+    "/kotobase-cf-wasm-production/blocks/bafyreiccc4mj54mv73xc7p7qjwu4rowyszyxm5v5ij3wlekyv7vypn5rxu/bafyreiajknnutwjoxqcfisaaas2ecgcygl2u5xmrvbx7ullpr7asb3pg74",
+    :requests 5}],
+  :status-mix {:client-error 111, :ok 762},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -44,12 +42,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-05",
- :traffic-quality {:window "24h", :probe-4xx-pct 88, :error-5xx-pct 2},
+ :traffic-quality {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/shadow/ieng… 41 · /kotobase-cf-wasm-production/blocks/bafy… 15 · /sign-in 12 · /kotobase-cf-wasm-production/shadow/ieng… 10 · /kotobase-cf-wasm-production/blocks/bafy… 10 | 4xx(probe) 88% · 5xx 2%",
- :funnel {:visitors 2269, :signups 12, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/blocks/bafy… 6 · /obsidian 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 | 4xx(probe) 13%",
+ :funnel {:visitors 2273, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 49614 req/7d・1396 uniques(日次和)・うち4xx probe 88%(24h)、workers 46994 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 50389 req/7d・1402 uniques(日次和)・うち4xx probe 13%(24h)、workers 47900 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -58,6 +56,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 737},
+ {:visitors {:openai-ads 3, :organic 741},
   :signups {:organic 9}, 
   :checkouts {}}}
