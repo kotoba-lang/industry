@@ -3034,3 +3034,131 @@
   inline atomic path) instead. THE MERGE CONFIRMED THE CALL: seq 60
   rewrote flex-item-main-width's text branch and the two never touched the
   same function."}
+
+{:seq 62
+ :date "2026-08-06"
+ :repos {"kotoba-lang/cssom" "f868acd85fbc3c69447fc68b92d4404cec409893"
+         "kotoba-lang/dom-gpu" "ee09f51c71c0ec4a1aba91afe1a5c5663b1ecbce"}
+ :title "multi-column block fragmentation across a column boundary"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 581 :after 597}}
+ :measured
+ {:isolated-effect-on-the-unchanged-581-corpus
+  {:note "like-for-like on the agent's own base eb9dca9"
+   :line-structure {:before "546/556" :after "546/556"}
+   :geometry {:before "1926/1973" :after "1930/1973"
+              :clean-cases {:before "549/581" :after "551/581"}}
+   :paint-order {:before "14450/14514" :after "unchanged"}
+   :computed-style {:before "27735/27740" :after "unchanged"}}
+  :final-on-merged-main-597-cases
+  {:line-structure "564/572 (99%)"
+   :geometry "2005/2032 (99%), 577/597 clean"
+   :paint-order "14885/14909 (100%), 585/597 clean"
+   :computed-style "28559/28562 (100%), 595/597 clean"}}
+ :verified-on-merged-main
+ {:cssom-tests "911 tests / 2264 assertions, 0 failures"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "179/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :per-case-deltas
+ "EXACTLY TWO pre-existing cases changed, both improvements, zero
+  regressions in either direction:
+  :multicol/a-block-splits-across-the-column-boundary and
+  :multicol/break-inside-avoid-moves-the-whole-block, each 2 wrong boxes ->
+  2 right ones. THE BALANCING RULE SURVIVED: no other multicol case moved.
+  Corpus then grown by 16 new measured cases, all clean."
+ :the-harness-needed-no-change-and-that-is-the-result
+ {:why "the geometry axis already compares getBoundingClientRect against
+        the single :node box, and the paint axis already compares
+        elementFromPoint against that op's :hit rects -- the exact pair
+        this engine needed once before, for a wrapped inline box. So the
+        engine emits THE UNION as the box and THE FRAGMENTS as :hit."
+  :verified-by-me "git diff on conformance/run.cljs between the previous
+                   pin and this one is 0 LINES. There is no thumb to
+                   disprove because there is no harness change -- the
+                   base-SHA replay proof applies to a MODIFIED harness and
+                   there isn't one."
+  :and-it-showed-the-two-axes-are-not-redundant
+  "the geometry axis CANNOT SEE the missing box-decoration-break: clone
+   (both unions are [160,0,300,40]); the paint axis sees it at 2 points."}
+ :what-the-browser-said
+ {:probe-count "fifty-nine shapes measured before a line was written; the
+                engine now matches all of them box for box (141/141, then
+                181/183 with the orphans shapes -- the 2 are the <br> quirk
+                below)."
+  :a-fragmented-box-is-two-different-rectangles
+  "getClientRects() -> ONE RECT PER FRAGMENT; getBoundingClientRect() ->
+   THEIR UNION, spanning both columns and covering ground the element does
+   not occupy, inside which elementFromPoint answers the CONTAINER. Corpus
+   case 1: rects [0,0,140,25] + [160,0,140,5], bounding [0,0,300,25]."
+  :decorations-are-sliced-measured-not-assumed
+  "box-decoration-break: slice is the initial value -- a
+   border:5px;padding:3px;height:40px block is 56 tall and cut at 40
+   reports 40 AND 16 (= 56, the ring cut open). `clone` on the same shape
+   reports 40 and 32 (= 72)."
+  :lines-are-unbreakable "verified: a single line in a 10px column reports
+                          two 20px fragments that OVERFLOW, never halves."
+  :break-inside-avoid-taller-than-a-column-is-dropped
+  "a 100px avoid block in a 40px column SKIPS COLUMN ONE, then fragments
+   40/40/20."
+  :two-rules-the-agent-would-not-have-guessed
+  ["`orphans` (initial 2) decides whether a two-line block splits AT ALL,
+    and `widows` IS IGNORED -- orphans:1;widows:2 splits leaving a single
+    widow, orphans:2;widows:1 refuses."
+   "the balanced height is FLOORED AT ceil(total/count): two 30px blocks
+    with a 60px margin fit one per column at height 30 (the margin is
+    dropped at the break) and Brave STILL SAYS 60. This refines seq 49's
+    balancing rule rather than contradicting it."]
+  :corpus-comment-corrected "an existing case comment named the wrong block
+                             as the one that splits."}
+ :scope-cuts
+ [{:what "box-decoration-break: clone" :measured "40/32 vs slice's 40/16"}
+  {:what "an item containing a :clip or :stack push is monolithic"
+   :measured "for :clip that is WHAT BRAVE DOES ANYWAY (a 60px
+              overflow:hidden block moves whole and overflows)."
+   :flagged "for :stack -- a positioned/z-indexed descendant -- THIS IS THE
+             ONE CUT WHOSE BROWSER NUMBER IS NOT MEASURED. First thing to
+             probe next."}
+  {:what "break-before / break-after unread; `widows` DELIBERATELY unread
+          (reading it would DIVERGE); a declared `orphans` on the multicol
+          box's own direct content unread (uses the initial 2)"}
+  {:what "balanced height searched over whole pixels"}
+  {:what "a measured divergence left alone as not-about-fragmentation"
+   :measured "a <br> in the second column reports x=7 in Brave where the
+              engine says 167. Costs 2 boxes on a six-line probe, so that
+              shape is NOT in the corpus."}]
+ :gates
+ "13 new unit tests. EIGHT verified to fail on the unmodified engine at
+  eb9dca9 (12 assertions, run by copying the new test file into a base
+  worktree); 5 are controls that pass on both AND SAY SO IN THEIR COMMENTS.
+  The break-inside: avoid test asserts the with/without pair IN ONE TEST,
+  because on the old engine both halves read identically. The stale test
+  that encoded the cut KEPT ITS NUMBER (60) -- its break-inside: avoid was
+  decoration before and is load-bearing now; its comment records that the
+  same blocks WITHOUT it balance to 50, re-measured."
+ :downstream-golden
+ "dom-gpu's retained_draw_ops.edn golden pins WHOLE OP MAPS, and four
+  additive keys appeared (:break-inside, :orphans, :frag/insets on :node;
+  :line/h on :text). NO x/y/w/h MOVED. Regenerated rather than relaxed; the
+  test comment now says which four and why. THAT GOLDEN WAS THE ONLY THING
+  ANYWHERE THAT NOTICED THE OP VOCABULARY GREW -- worth knowing it works."
+ :tried-and-withdrawn
+ [{:what "op-derived line boxes without new keys"
+   :why "a text op's :y is the LINE TOP on layout-text's path and a
+         BASELINE-DERIVED GLYPH TOP on layout-inline-run's, and nothing
+         said which; inferring line height from op spacing only works for
+         uniform items. Added :line/dy and :line/h as RELATIVE values so
+         they survive every translate-ops -- an absolute second coordinate
+         would have gone stale at the first missed shift site."}
+  {:what "merging decoration bands as ordinary atoms"
+   :why "made padding-top look like a break opportunity (lowered the
+         first-legal-cut floor) and broke three shapes that had been
+         passing. Absorbed into the content atom they touch instead --
+         CONTENT MEETING CONTENT IS A BREAK OPPORTUNITY, CONTENT MEETING
+         ITS OWN PADDING IS NOT."}
+  {:what "orphans as `fuse the first two touching lines`"
+   :why "wrong -- it also fused TWO SIBLING BLOCKS' lines and forbade a cut
+         Brave takes. Lines are grouped by their innermost containing :node
+         box instead."}
+  {:what "chasing the <br> x divergence" :why "not fragmentation,
+          zero-width, dropped with a note."}]}
