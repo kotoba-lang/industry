@@ -1440,3 +1440,53 @@
  :downstream-fixed "hit テスタ 2 つも :hit を読むようにした。さもないと修正が harness にしか見えず、
                     **2 行のリンクのぎざぎざの角のクリックが段落でなくリンクを発火し、
                     テーブルの border-spacing の隙間のクリックが tr を発火していた。**"}
+
+{:at "2026-08-05"
+ :iteration 53
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 502 :was 370 :added 132}
+ :line-structure {:agree 451 :total 482 :pct 94 :was "356/356 (100%) @ 370 case"}
+ :geometry {:boxes-agree 1652 :boxes-total 1766 :pct 94 :clean-cases 445 :of 501
+            :was "1335/1335 (100%), 370/370 @ 370 case"}
+ :paint-order {:points-agree 12396 :points-total 12514 :pct 99 :clean-cases 471}
+ :computed-style {:values-agree 24758 :values-total 24816 :pct 100 :clean-cases 469
+                  :causes {:blockified 39 :cascade 11 :ua-default 8}}
+ :landed {:cssom ["5f25ea9 — テキスト/selector の被覆（370 → 441 case）"
+                  "7374e9e — レイアウト機能の被覆 + 見つけた 4 件の修正（441 → 502 case）"
+                  "f37a8b7 — th/button の text-align、caption、option の padding（ua-default 35 → 8）"]}
+ :note "**loop の方針を『修正』から『被覆の拡大』に切り替えた結果。corpus 370 → 502 case、
+        数値は 100% から 94% へ落ちた —— これは退行ではなく、より正直な計測。**
+        4 軸が 100% だった corpus はもう欠陥を見つけられず、拡大が唯一の学習手段だった。"
+ :method-finding "**被覆 agent が自分の初稿を捨てた** —— テキスト 5 case が『何も測らずに通っていた』。
+                  120px の箱の中の `alpha beta` に letter-spacing: 4px を掛けると 110px、
+                  素で 70px で**どちらも収まる**ので、その case は『両者が適用していない property』について
+                  Brave と一致していた。最終版の幅は全て、両者の答えが必ず食い違う値を
+                  CDP で行 box を読みながら選んでいる。"
+ :new-divergences ["letter-spacing / word-spacing が text run の advance に届かない（6 case、
+                    inherited 集合には既に入っていて使われていない）"
+                   "text-indent が未実装（5 case、property が layout に存在しない）"
+                   "tab が 1 スペース扱いで tab-size を読まない（3 case、Brave 63px vs engine 21px）"
+                   "break opportunity 4 種（soft hyphen / hyphens: auto / text-wrap: balance /
+                    white-space: break-spaces）と、逆に nowrap な inline 子の両側で切りすぎる 1 件"
+                   "break-word と anywhere/break-all が**寸法指定された箱で袂を分かつ**（3 case、
+                    2 つが一致することで 3 つ目が finding になる構成）"
+                   "<q> に引用符が付かない（2 case）"
+                   "**空の block が self-collapsing でない**（:selector/empty-pseudo-class が
+                    横から露出させた。Brave は親 20px・子 2 つとも y=0、engine は 34px）"
+                   "selector: :nth-child の of 節、:has(~ p)、CSS-wide キーワード 3 種
+                    （inherit を非継承 property に、initial、revert）"]
+ :also-measured "**43 の selector case のうち 38 が一致することも計測結果** —— An+B、
+                 :is()/:where() の specificity 差、:not() の引数 specificity、属性演算子 6 種、
+                 inline と !important の順序が『存在する』のではなく『正しい』という初の証拠。
+                 うち 2 つは cssom.core 自身の docstring が古いことを示した（scope 外と書かれた
+                 :is(.wrap section) p と p:not(:first-child) は両方とも動く）。"
+ :my-landing "th/button の text-align: center、caption の -webkit-center、option の padding: 0 2px 1px を
+              UA sheet に追加（実測 14 形）。ua-default 35 → 8。text-align はテキストを動かしうるので
+              幾何・行構造・paint order が不変であることを確認済み。"
+ :withdrawn "**cascade での blockification を試して撤回した。** computed style の残差 39 → 1 まで落ちたが
+             （写像は Brave で 5 形実測済み）、**幾何が 1335 → 1333 に退行**。原因は engine の本物のバグ:
+             **行 flex コンテナの max-content は items の「和」であるべきなのに「最大」を取っている** ——
+             これまで正しかったのは flex item が display 宣言を持たず inline に見えたため
+             inline run として合算されていたからで、規則ではなく偶然。ブラウザ自身の computed 値を
+             渡した瞬間に露見する。**次の landing で flex の intrinsic 幅修正とセットにする** ——
+             どちらも単独では軸を交換することになる。"}
