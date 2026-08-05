@@ -259,6 +259,40 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
     kagi:itonami-org-root ...` で再 mint**)。merge 時は
     `bin/kagi get itonami-<dept>-head-chain > /tmp/chain.edn` で取り出す。
 
+## cloud-itonami 受信メール本文の age 鍵 (ADR-0021、2026-08-05)
+
+- **`itonami-mail-age`（kagi vault、compartment `personal`、`KAGI_HOME=$HOME/.kagi`）
+  — 正本。** 中身は**平文 EDN ではなく kagitaba item**（1Password 互換の item 形）で、
+  `recipient`（公開値）と `identity`（`AGE-SECRET-KEY-1…`、concealed）の 2 フィールドを
+  持つ。取得:
+  `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get itonami-mail-age`。
+  - **何を守っているか**: cloud-itonami-app が project に振り分けたメール本文は、
+    project の Git リポジトリに **age 暗号文**として git-annex で入る
+    （`mail/<yyyy>/<mm>/<id>.eml.age`）。**この identity を失うと、これまでに
+    ファイルした本文を全て失う** —— 暗号文は Git にあり鍵は無い、というのが設計。
+  - **app は identity を読まない。** 書く側は recipient（公開鍵）だけあれば足りるので、
+    アプリは recipient のみ解決する。復号は人が実行する:
+    ```bash
+    KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get itonami-mail-age \
+      | grep -o 'AGE-SECRET-KEY-[A-Z0-9]*' > /tmp/id
+    age -d -i /tmp/id <project>/mail/2026/08/<id>.eml.age && rm /tmp/id
+    ```
+- **Keychain ミラー**（非対話ローカル、GUI プロセスから読める）:
+  service `cloud-itonami-app.mail-age`、account `recipient` / `identity`。
+  **app の解決順は env → recipients file → Keychain → kagi** で、Keychain が先なのは
+  vault unlock を待たずに答えるから（メールをファイルする経路をブロックさせない）。
+- **recipient は公開値なのでここに書いてよい**:
+  `age1erny355hm8nrq5plls0fs2trl6gwrxp0vl8nfqkxkc5clh2gxfwqemlhg9`
+  （これと違う recipient で封緘されていたら、手元の identity では開けない
+  —— `GET /api/mail/projects` の `:sealing` がどの store から解決したかを返す）。
+- ⛔ **1Password には未登録。** `op signin --account my.1password.com --raw` が
+  exit 124（無応答タイムアウト）、`op whoami` は `account is not signed in`。
+  このマシンで CLI 統合がオフのため非対話で書けない（本マップが他の item でも
+  繰り返し記録している症状）。**オーナー作業**: 1Password アプリ →
+  設定 → 開発者 → 「1Password CLI と連携」を有効化 →
+  item `cloud-itonami mail age key`（category: Password、vault `gftdcojp`）を作り、
+  `recipient` / `identity` フィールドに kagi の値を写す。登録したらこの行を更新する。
+
 ## kaigi / Cloudflare RealtimeKit (2026-07-31)
 
 - **`REALTIMEKIT_API_TOKEN`（kagi vault、compartment `personal`、`KAGI_HOME=$HOME/.kagi`）**
