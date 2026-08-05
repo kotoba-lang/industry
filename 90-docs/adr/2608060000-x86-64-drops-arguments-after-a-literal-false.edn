@@ -32,7 +32,25 @@
   :adr/decision
   "**欠陥**: `kotoba.native.x86-64` の引数走査が `(if-let [arg (first remaining)] …)` で書かれている。引数の KIR form が**リテラル `false` そのもの**のとき `if-let` は else 枝を取る（Clojure の false/nil 混同）。したがってその引数と**それ以降の全引数**が emit されないまま loop が終わる一方、`pops` は `argc` 全部を pop する。スタックが壊れ、SIGILL / SIGSEGV になる。
 
-同じ形が 3 箇所にある（origin/main b65fd0d 時点）: `x86_64.cljc:189` emit-tail-self-call / `:242` emit-call / `:342` typed heap・cap-call。**2 箇所は到達して crash することを確認済み、3 箇所目は未検証。**
+同じ形が 3 箇所にある（origin/main b65fd0d 時点）: `x86_64.cljc:189` emit-tail-self-call / `:242` emit-call / `:342` emit-heap-call。
+
+**訂正（2026-08-05、修正時の実測）: 342 は「未検証の潜在」ではなく、無改変の main で
+今日 miscompile していた。** `emit-heap-call` が受け取るのは関数引数ではなく **host callback
+引数**なので、boundary type の gate が一切かからない。`option-some-of` / `result-ok-of` は
+`(pair 1 payload)` に lower され、frontend は payload を宣言された要素型で型付けするため、
+次は**そのままコンパイルが通る**:
+
+```clojure
+(defn main [] (if (option-value-of [:option :bool] (option-some-of [:option :bool] false) true) 6 7))
+```
+
+修正前、これは `true` 形が 170 バイトのところ **159 バイト**を emit し、x86-64 では
+`KEXE_TRAP {:signal :SIGBUS}`、aarch64 では正しく 7 を返した。189/242 だけを修正して
+342 を戻した状態では option/result の 2 行だけが落ち他の 14 行が通る、という形で分離済み。
+したがって**これは出荷済みの miscompilation であって、潜在バグではなかった。**
+（`(pair false 1)` や `(vector-conj v false)` は `same-expression-type?` が厳密なので拒否される —
+host-call slot に boolean を運び込めるのは `[:option :bool]` / `[:result :bool …]` という
+parametric な構築子に限られる。）
 
 aarch64 は `mapcat` で `args` を走査し真偽判定を持たないので無傷。**これは表現の問題ではなく走査の書き方の問題**であり、`:bool` の値表現には何の欠陥もない。
 
@@ -48,7 +66,21 @@ aarch64 は `mapcat` で `args` を走査し真偽判定を持たないので無
 
 バイト証拠: 同一プログラムが true で **167 バイト**、false で **156 バイト**。差の 11 バイトはちょうど `48 b8 <imm64> 50`（movabs rax,imm; push rax）1 個分。
 
-到達性の分離（controls）: :i64 param にリテラル 0 を渡すのは正常 / パラメータを跨がない false リテラルは正常 / **計算された** false や let 束縛された false は正常。**無改変の main では到達不能** — 注釈の無い param は :i64 と型付くので `(f false)` は frontend が `expected i64, got bool {:phase :subset}` で弾く。**:bool 境界を開けることが、この欠陥を到達可能にする。**
+到達性の分離（controls）: :i64 param にリテラル 0 を渡すのは正常 / パラメータを跨がない false リテラルは正常 / **計算された** false や let 束縛された false は正常。**189 と 242 は無改変の main では到達不能** — 注釈の無い param は :i64 と型付くので `(f false)` は frontend が `expected i64, got bool {:phase :subset}` で弾く。この 2 箇所については :bool 境界を開けることが到達可能にする。**342 は違う（上記訂正）— host callback 引数なので gate がかからず、出荷済み main で到達していた。**
+
+**修正（2026-08-05、kotoba-native f6f29e9ff682d227c9d0556f66fd6b274070a746）**: 3 箇所の走査を
+`(seq remaining)` を条件とする単一の `emit-pushed-arguments` に畳んだ。**3 箇所を個別に直すのではなく
+1 つにまとめたのは、走査が 3 部コピーされていたことが 1 つの誤りを 3 つのバグにした原因だから。**
+16 行を両 ISA の実プロセスで実行（x86-64 は Rosetta 2、aarch64 は native、runner が
+`ISAs with a buildable+runnable loader: [\"x86_64\" \"aarch64\"]` を出力 = どちらも skip されていない）:
+**修正後 32/32 通過。修正前は aarch64 16/16 通過・x86-64 10/16 が trap**（emit-call / emit-heap-call 行は
+SIGBUS で loader exit 120、tail-self-call 行は `{:kind :supervisor :reason :unhandled-child-signal}` exit 123 —
+この箇所は生きているパラメータ slot に誤った語を書いてから本体へ戻る）。通っていた 6 行は全部 true のみの行。
+byte 数の同値検査（true 形と false 形が同じバイト数を emit すること）は kotoba-native 側にコミット済み
+（9 行 × 2 ISA）。falsification は 2 通り: pristine な修正前ソースで x86-64 9 行が 11/33/51 バイト不足で落ち、
+helper の条件を `if-let` に戻すと同 9 行に加えて走査テストが `[1 2 3]` / `[false 2 3]` / `[1 false 3]` /
+`[1 2 false]` に対し 33/0/11/22 バイトという打ち切りを直接示して落ちる。
+kotoba-native suite 2,506 → 2,572 assertions、0 failures。
 
 falsification: guard を戻すと新 gate は 9 failures を出し、そのすべてが :bool 行、negative 行は 1 つも落ちない。逆向きの falsification も実施。
 
@@ -62,8 +94,9 @@ widening 単体の効果は、その 14/33 baseline に対して **19/33**（+5:
 **5 本が unblock されたのは運であって性質ではない。** そのどれもリテラル `false` を引数位置に書いていない（すべて if 分岐位置）。x86-64 の欠陥を直さずに widening を入れれば、`(f … false …)` を書いた瞬間に**沈黙して壊れるコードが出る**。これが merge を止めた理由である。"
 
   :adr/gaps
-  "[{:gap :x86-64-false-argument :state :open :note \"THE BLOCKER. x86_64.cljc の 3 箇所（189 emit-tail-self-call / 242 emit-call / 342 typed heap・cap-call）が (if-let [arg (first remaining)] …) で書かれており、リテラル false 引数以降を emit しない。2 箇所は crash を確認、342 は未検証。修正は seq 判定への置換。kotoba-native repo に別 agent が在席中だったため、発見者は報告のみ行い修正していない。\"}
-    {:gap :verifier-bool-widening-held :state :open :note \"agent/verifier-bool-boundary-widening (b5a88cd) は書かれて緑だが DO NOT MERGE YET で open。解除条件は x86-64 修正 + 17 行の実行再走。landing は merge 1 回で済む。\"}
+  "[{:gap :x86-64-false-argument :state :closed :note \"CLOSED 2026-08-05, kotoba-native f6f29e9（west pin c63ccefe）。3 箇所の走査を (seq remaining) 条件の単一 emit-pushed-arguments に畳んだ。16 行 × 2 ISA の実プロセス実行で 32/32 通過（修正前は x86-64 が 10/16 trap）。なお 342 は当初 UNVERIFIED と記録したが、実測の結果 potential ではなく出荷済み main で到達していた miscompilation だった — 本文の訂正節を参照。\"}
+    {:gap :verifier-bool-widening-held :state :in-progress :note \"ブロッカー（x86-64 の false 引数）が f6f29e9 で解消したので agent/verifier-bool-boundary-widening (b5a88cd) は unblocked。ただし held branch は古い main 基点で、その後 string-operations の変更 (a64956a) が同一ファイルの別関数に入っている。rebase せず merge-forward で持ち上げ、17 行を修正済み backend に対して再走させたうえで landing する（実行証明が通らなければ landing しない）。\"}
+    {:gap :compiler-pins-predate-this-work :state :open :note \"OPENED 2026-08-05。compiler/deps.edn が kir a54916bc / verifier 400d980b / native 9b33db54 という一連の作業より前の SHA を pin したままなので、24/33 という測定値は :local/root override 経由でしか再現しない — 出荷された compiler を呼ぶ側からは依然 16/33 に見える。gate 変更に pin 前進を黙って抱き合わせるのは pin 退行の入る経路なので、担当した agent は意図的に手を付けなかった。独立した変更として前進させる必要がある。\"}
     {:gap :isa-rows-not-committed :state :open :note \"17 行の ISA 実行行は compiler repo に commit されていない（scope 外）。kotoba-verifier ADR 0001 に逐語で再現済み。widening が landing する時に compiler へ移す。\"}
     {:gap :compiler-suite-42-failures-unattributed :state :open :note \"widening branch で compiler suite は 929 tests / 7090 assertions / 42 failures。baseline を走らせていないので、この 42 が pre-existing か widening 由来かは未判定。2026-08-05 の別測定では無改変 origin/main に 30 failures が存在したので pre-existing が大半と推測されるが、推測は証拠ではない。\"}
     {:gap :bool-untyped-encoding :state :open :note \"ADR-2608052000 から変更なし。:bool のみが typed feature の module は :kotoba.hir/v2 で emit され :param-types を失う。compiler の typed-values? 分類の問題で、閉じると全 target の :kir-sha256 が動く。kotoba-kir に回帰テストで固定済み。\"}]"
