@@ -42,7 +42,7 @@
   "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :arrow-writer :parquet-writer :group-by :schema-evolution :snapshots :compaction :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson}, :write #{:arrow-ipc :parquet}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed}, :refused-by-name #{:lz4-frame :zstd}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :writer-gate :pyarrow-validate-full, :ci-status {:kotoba-lang :actions-disabled-2026-08-05, :network-awai :actions-dead}, :gaps {:p2 #{:aggregate-pushdown :join-cost}, :p2-not-doing #{:rename-needs-field-ids}, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
 
   :adr/verify
-  ["west pin: columnar 309822ec / org-apache-arrow 78db9a83 / org-apache-parquet e28a6b3e / kotobase-lake 23e45897 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
+  ["west pin: columnar 309822ec / org-apache-arrow 78db9a83 / org-apache-parquet e28a6b3e / kotobase-lake 339f0611 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
    "org-apache-arrow: JVM 39 tests/119 assertions・nbb 34/100・clj-kondo 0 warnings（ローカル実測）。CI は writer commit 6d070313 までは全 step success を実測、それ以降は org の Actions 無効化により未実行"
    "writer の正当性ゲート: clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir>  ; => 6 ケースすべて pyarrow validate(full=True) で受理"
    "org-apache-parquet: JVM 32 tests/143 assertions・nbb 29/131・clj-kondo 0 warnings（ローカル実測）。writer gate = clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir> ; => 7/7 pyarrow 受理・統計も可視。CI は 06df9fdd まで success、e28a6b3e は Actions 無効化により未実行"
@@ -321,8 +321,29 @@ mutation としてではなく**atomic な新 snapshot として**だけ安全�
 
 - **旧 `PUT /ipfs/:cid` の 4 MiB 天井はそのまま live**（意図的に無傷にした。public gateway に
   依存しているものを同日に壊さないため）。**畳む判断が別途要る**
-- **`GET /ipfs/:cid` は未認証 public gateway のまま**（ADR-2608012600 Context 4）。
-  **これはセキュリティ課題なので他の優先順位と切り離してよい**
+- **`GET /ipfs/:cid` は未認証のまま — ただしこれは「脆弱性」ではなく文書化された
+  公開境界である**（2026-08-05 に net-kotobase の正本を読んで訂正）。
+  本 ADR は当初これを「セキュリティ課題」と書いたが、**それは誤りだった**:
+  - `docs/THREAT-MODEL.md` は 401 要件を **write surface に限定**して宣言している
+    （Public **write** surfaces reject unauthenticated callers with 401）
+  - `worker/scripts/public-smoke.cljc` は **live production に対して未認証の
+    `/ipfs/*` 挙動を検証**している（= 公開面として意図的にテストされている）
+  - `docs/DATA-HANDLING.md` は「content-addressed bytes は archive や gateway から
+    **CID を持つ者には取得可能なまま**」と明記している
+  したがって**ここに認証を足すのは修正ではなく、文書化・smoke テスト済みの公開面の
+  破壊**（公開コンテンツ配信・x402 の無料枠との共存が壊れる）。**やってはいけない。**
+- **残る本当の論点は confidentiality の所在**（上記の帰結として 2026-08-05 に整理）。
+  `kotobase.lake.acquire` は membership oracle を避けるために相当な手当て（共有 refused
+  値、2 つの拒否が `=` であることの test）をしており、**読むと「tenant データを秘匿する
+  もの」に見える**。実際は違う:
+  - acquire が守るのは **query path の認可**だけ
+  - **bytes が誰に読めるかは deployment がどこに置いたか次第**で、acquire はそれを
+    知らない（`read-range` は呼び手が渡す）
+  - 現行 deployment では `net-kotobase` が `<prefix>/objects/<cid>`（**tenant scope
+    無しのグローバル**）に置き、未認証 `GET /ipfs/<cid>` で配る
+  → **tenant-confidential なデータは admission 前に暗号化する必要がある。** 呼び手が
+  再構成できる内容の CID はその呼び手に計算できるので、gateway はそれを配る。
+  この境界は `kotobase.lake.acquire` の docstring に書いた（誤解が生まれる場所に置く）
 - **server-side digest verify（D5）が未実測**。`settle` は常に `:client-attested` /
   `:stored` を返し、`:verified` に到達する経路が無い。`crypto.DigestStream` の
   サイズ別実測が合格条件だが、まだ測っていない
@@ -433,8 +454,11 @@ Parquet
 **P2 の書き込み側は完了。残りは P3 → P4 → P5 と、P2 に残した 2 つ（集約 push down /
 join コストモデル）。** ただし順序は硬直させない:
 
-- **P3 の `GET /ipfs/:cid` 未認証**はセキュリティ課題なので、他の優先順位と切り離して
-  よい（形式と無関係に独立して進められる）
+- ~~**P3 の `GET /ipfs/:cid` 未認証はセキュリティ課題**~~ — **これは誤りだった**
+  （2026-08-05 訂正、上記 P3 参照）。文書化・smoke テスト済みの公開境界であり、
+  認証を足すのは修正ではなく破壊。**次に着手する項目として推奨しない。**
+  代わりに残るのは「confidentiality は acquire ではなく暗号化の責任」という設計事実で、
+  これは既に docstring に着地済み
 - **P4 は決定の所在で止まっている**もの（runbook の内容、component catalog の分類規則）
   なので、着手には技術以外の入力が要る
 
