@@ -1,0 +1,157 @@
+[{:db/id -1
+  :adr/id "ADR-2608059100"
+  :adr/title "media-gamers: ゲーム攻略情報を EDN で集め、DataLad で保管し、Datalog で引き、jp-go-dds で公開する"
+  :adr/status "accepted"
+  :adr/date "2026-08-05"
+  :adr/deciders "root@junkawasaki.com"
+  :adr/related "ADR-2608039700 (Git+EDN+DataLad が正本 / DB は projection), ADR-2607141915 (jp-go-dds), ADR-2607132300 (design-quality 決定論 audit), ADR-2608056000 (training-corpus: 収集ポリシーの手書き面), ADR-2607252000 (custody は主張でなく検査)"
+  :adr/last_verified "2026-08-05"
+  :adr/body
+  "## Context
+
+オーナー指示（2026-08-05）「実際にゲーム情報を収集、キャラクター、ステージ、
+アイテムなどの攻略情報を公開, jp-go-dds デザインで, データは全て edn, datalad に
+保存永続化, query できるように」。
+
+受け皿は既存の `cloud-itonami/media-gamers`（PROJECT.jsonld が
+\"Game strategy and walkthrough media project\"）。同一主題で新 repo を起こすと
+命名規則の『同一面の同一主題は不可』に触れるので、既存 repo に `kouryaku/` 面を
+足す形にした。既存の TS/Python 実装（AT Protocol appview / LangGraph）は
+CLAUDE.md 冒頭で DEPRECATED 扱いのまま温存し、触っていない。
+
+## Decision
+
+`cloud-itonami/media-gamers` に 4 本の面を置く。
+
+| ファイル | 役割 |
+|---|---|
+| `kouryaku/sources.edn` | 収集元レジストリ（**手書きの唯一の面**）。ライセンス / robots 実測 / 公開ゲート / 掃き先 |
+| `kouryaku/collect.cljs` | 収集。source → 出典付き正規化 EDN |
+| `kouryaku/query.cljs` | DataScript による問い合わせ + `verify` ゲート |
+| `kouryaku/publish.cljs` | jp-go-dds による静的 HTML 生成 |
+
+正本は Git + canonical EDN、DataScript は projection、生バイトは DataLad
+（ADR-2608039700 の三層をそのまま踏襲）。正規化済み EDN は小さく diff も
+レビューもしたいので**通常の git blob**（180 KB）、生 API 応答は
+`cloud-itonami/media-gamers-corpus`（DataLad + git-annex SHA256E + B2）へ。
+**『EDN だから annex』ではない。**
+
+### データモデル — 価値は rel の側にある
+
+`:game` / `:character` / `:item` / `:stage` の 4 record と、record 間の
+`:kouryaku/rel`。「どのステージに、どのキャラクターが、どのバージョンで、
+どれくらい、何レベルで出るか」は単体の一覧には無く、**これが攻略情報の実体**。
+`query.cljs` は rel を **別 entity に展開してから** DataScript に載せる
+（入れ子のまま 1 属性に押し込むと Datalog から辿れず、この corpus の一番の価値が
+query 面から消える）。
+
+### 出典の追跡可能性
+
+全レコードが `:src/source` `:src/url` `:src/license`、Wikidata 由来は
+`:src/revision`（lastrevid）を持つ。第三者が
+`Special:EntityData/Q42.json?revision=N` を叩いて同一バイトを再取得できる
+＝**数値を後から捏造・改変できない構造**。product-corpus の
+`:src/warc-offset` と同じ役割。`query.cljs verify` が欠落を検出し exit 1。
+
+## なぜ source がこの 2 つだけなのか（実測 2026-08-05）
+
+攻略情報が最も濃いのは game wiki だが、主要どころは軒並み自動アクセスを
+拒否していた。**迂回しない**（安全床④ / product-corpus と同じ判断）。
+
+| 候補 | 実測 | 判定 |
+|---|---|---|
+| `zelda.fandom.com` | robots.txt 自体が Cloudflare managed challenge の裏 | 不可（challenge を解くのは bot 検出回避） |
+| `terraria.wiki.gg` | `ClaudeBot` / `GPTBot` / `CCBot` / `Google-Extended` を名指しで `Disallow: /` | 不可（AI agent への明示的拒否） |
+| `minecraft.wiki` | 全 UA に `Disallow: /*api.php` + 『### AI bots ###』節で `ClaudeBot` | 不可 |
+| `stardewvalley.wiki.gg` | api.php が HTTP 401 | 不可 |
+| **Wikidata** | `/w/` `/api/` は Disallow だが **`/wiki/` は許可** → `Special:EntityData` が使える | 可（CC0） |
+| **PokéAPI** | robots.txt は Cloudflare content-signals の前文のみで **directive も signal も無し** | 可（fair use 遵守） |
+
+⚠ **`query.wikidata.org/robots.txt` の `Disallow: /sparql` は正直に記録する。**
+AI agent を名指ししていない blanket rule で、WDQS 自体は Wikimedia が
+programmatic query 用に提供している endpoint だが、Disallow と書いてあるのは
+事実。したがって **一覧の発見だけを SPARQL に投げ、件数の多い本体取得は
+robots-clean な `Special:EntityData` に回す**設計にした（ラベル解決も
+`VALUES` で 1 クエリに束ねる）。UA 偽装はしない。オーナーが不可と判断するなら
+`:discovery/enabled? false` の 1 箇所で SPARQL は完全に止まる。
+
+## 分担 — Wikidata は深くない（測ってある）
+
+| source | 担当 | 実測 |
+|---|---|---|
+| Wikidata | 作品カタログ + 著名キャラクター | ゲームキャラクター全体では 37,449 件。ただし **1 作品あたりは数十件**（GTA V / BotW 等 4 作品の `P1441` は『コンピュータゲームキャラクター 20 / 架空のラジオ局 20 / 架空の人 19…』程度）で、**アイテムとステージはほぼ無い** |
+| PokéAPI | 攻略の深さ | キャラクター 1,302 / アイテム 2,180 / ステージ 1,533 + 出現関係 |
+
+「Wikidata だけで済ませなかったのはなぜか」を後から再調査させないため数字ごと残す。
+
+## 実装中に実測で見つけた 5 件（すべて修正済み）
+
+1. **本文キーが endpoint ごとに違う。** `pokemon-species` は `flavor_text`、
+   `item` は `text`、`effect_entries` は `effect`/`short_effect`。`flavor_text`
+   しか見ておらず**アイテムの説明が全件空**だった。生 JSON を見て初めて分かった
+   ——『0 件』を source の欠落と誤読しかけたちょうどその形。
+2. **Wikidata の `mul`（多言語共通ラベル）。** 綴りが全言語で同じ名前は各言語に
+   複製されず `mul` 1 本に集約される。Minecraft (Q49740) と Roblox (Q692989) は
+   labels に **en も ja も持たず** mul だけを持ち（labels の言語数は 42 / 28 ある）、
+   公開ページに作品名でなく `Q49740` という QID が出ていた。
+3. **`P31/P279*` の重複。** `DISTINCT` が無く同一 QID が重複行で返り、corpus に
+   同じ id が 2 本入った（`verify` が検出）。SPARQL 側と収集側の二重で畳む。
+4. **`max_chance` は百分率ではない。** エンカウント方式ごとの確率の合計で 100 を
+   超える（Valley Windworks の magikarp が 155）。属性名を `:encounter-score` に
+   変え、`%` を付けて表示しない。
+5. **参照グラフが閉じていなかった。** ステージ 12 件の corpus では出現キャラクターが
+   全件『収集範囲外』（Sinnoh のステージは全国図鑑の後半を参照するので先頭 40 件と
+   1 件も一致しない）。`--close-refs` を追加し、**limit を当てずっぽうに上げるのでは
+   なく実際に参照されているものだけ**を 73 件取得。範囲外 rel 73 種 → 0 種。
+
+## source 側の欠落（バグではない。そう記録する）
+
+- **ステージに日本語名が無い。** `location-area` も親の `location` も言語は
+  de / en / fr のみ。Sinnoh 12 件と Kanto 4 件（pallet-town / kanto-route-1 /
+  celadon-city / viridian-forest）で ja / ja-Hrkt は 1 件も無い。キャラクターと
+  アイテムには ja がある（40/40）ので『PokéAPI に日本語が無い』ではなく
+  **『location 系にだけ無い』**。公開面は英語名を出しつつ『日本語名なし』と明示する
+  （黙って英語を出すと日本語対応済みに見える）。
+
+## 公開ゲート
+
+`:source/publish?` が false の source は publish.cljs が 1 件も出さない。収集できる
+ことと再配布してよいことは別で、判断を各ページに散らすと必ずどこかで漏れる。出した
+source の attribution は全ページのフッタに必ず刷る（`:public-with-attribution` の履行）。
+PokéAPI は CC0 ではない（API は無償だが原データは権利者のもの）ので、出典表示と
+原典リンクを必須にし、全量ミラーの再配布は主張しない。`media-gamers-corpus` を
+**private** にしたのも同じ理由。
+
+## UI
+
+skill `kotoba-uiux`（オーナー判断 2026-08-05）に従い base は jp-go-dds。app が
+require するのは `jp-go-dds.core` / `.page` / `.tokens` のみ、生 hex / px font-size
+無し、layout は `dds-ext-*`、CSS は `css.core` の EDN。
+
+## Verification（2026-08-05 実測）
+
+- corpus **177 件**（character 113 / item 40 / stage 12 / game 12）、rel 207 件
+- `query.cljs verify`: 出典欠落 0 / revision 欠落 0 / id 重複 0 / **範囲外 rel 0 種** → OK
+- 日本語名: character 113/113、item 40/40、game 12/12、stage 0/12（上記 source 欠落）
+- `design-quality` 決定論 audit: index / character 一覧 / character 詳細 /
+  item 詳細 / stage 詳細 とも **100.00 / min 95 → PASS**
+- 実ブラウザ（headless Chrome）でレンダリング確認。stage ページが出現キャラクターを
+  日本語名のリンク付き表で表示することを目視で確認（この目視で上記 2 と 5 を発見）
+- bytes plane: raw 302 ファイル / 16 MB、**302/302 が B2 に存在**
+  （`git annex find raw --in b2`）。正規化 EDN は 180 KB で git
+
+## Consequences
+
+- 収集元を増やすのは `sources.edn` に 1 エントリ足すだけ。ライセンスと robots の
+  判断がその 1 箇所に集まり、公開ゲートが自動で効く
+- **`.raw/` は git に入らない**ので、収集を回しても本体 repo の履歴は太らない
+- custody は**この ADR も README も自称しない**。証明は
+  `scripts/annex-custody-verify.cljs` のみが持つ。現状 off-machine remote は B2 1 本
+  なので `numcopies` を 2 に上げるには 2 本目が要る
+- Wikidata の per-title 深度が浅いのは source の性質なので、攻略の網羅を増やすなら
+  PokéAPI 側の limit を上げるか、**同等にライセンスの明確な別 source を足す**。
+  robots で拒否されている wiki を迂回する経路は選択肢に入らない
+- 未着手: 公開面のホスティング（現状 `site/` を生成するだけでデプロイしていない）、
+  スケジュール収集、`manifest/edn-query.cljs` の datom 面への露出
+  （`:source/dataset \"media-gamers-kouryaku\"` は sources.edn に宣言済みだが
+  ローダ未接続）"}]
