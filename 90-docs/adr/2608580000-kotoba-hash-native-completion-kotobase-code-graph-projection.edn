@@ -218,9 +218,17 @@ inga の 2f+1 quorum（ADR-2608038000）を ref 面に使う。
 
 ### S3 / S6 を今日やらなかった理由
 
-- **S3**: `code-graph` は退役予定の legacy `IStore` に載っており（`kotobase.store` /
-  `kotobase.local`）、datom 面への移行は ADR-2607201600 M6 の作業そのもの。codebase 側から
-  配線する前に、その移行が終わっている必要がある。順序を飛ばすと 3 つ目の実装が生える。
+- **S3**: 理由は 2 つあり、**2 つ目の方が決定的**。
+  ①`code-graph` は退役予定の legacy `IStore` に載っており（`kotobase.store` /
+  `kotobase.local`）、datom 面への移行は ADR-2607201600 M6 の作業そのもの。順序を飛ばすと
+  3 つ目の実装が生える。
+  ②**投影する対象が存在しない。** 2026-08-05 実測: この workspace 全体に
+  `STORE.edn`（codebase store の marker）を持つディレクトリは **0 件**で、`blocks/` も
+  無い。codebase store は今のところテストと CLI 実行が都度作る一時物しかない。
+  **中身の無い索引と、決して落ちない gate を今作るのは劇場である**（この workspace が
+  「gate は落ちることを確かめてから landed とする」と定めているのと同じ理由）。
+  S3 の前提条件は「実際に authoring されている store が 1 つ存在すること」であり、
+  それを現実的にするのが S5（pin された入力）と `kotoba codebase add` の日常使用。
 - **S6**: ADR-2608040200 の Plane A/B/C は prolly-tree の diff/merge という**今日存在しない
   primitive**（同 ADR が自ら名指ししている）を要する。ここで着手すると本 ADR の範囲を超える。
 
