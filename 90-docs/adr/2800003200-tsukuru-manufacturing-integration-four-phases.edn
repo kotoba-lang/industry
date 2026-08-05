@@ -251,7 +251,43 @@ murakumo fleet gate（`scripts/fleet-ci/gates.edn`）に足す場合は、ノー
 
 ## 現在の実装状況（2026-08-05 時点）
 
-**Phase 1 = landed。Phase 2 = コードは landed、live 検証は blocked。Phase 3 = landed。Phase 4 = 未着手。**
+**Phase 1 = landed。Phase 2 = コードは landed、live 検証は blocked。Phase 3 = landed。Phase 4 = landed。**
+
+### Phase 4 — landed（`cloud-itonami/tsukuru-manufacturing-artifacts`、west 登録 `fcd6fb5`）
+
+DataLad dataset を新設し、west に `userdata.datalad: true` / `datalad` グループで登録した
+（既定の `group-filter` が `-datalad` なので通常の `west update` では取得されない）。
+
+- **git 履歴にバイナリを入れない。** `raw/` は annex、`index/` と `README.md` は git 本体
+  （何があるかだけ知りたい消費者に `datalad get` を強いない。legislation 4 dataset と同型）。
+- **datom 面には annex key と metadata だけ**（ADR-2608039970「byte を datom 面に載せない」）。
+  `index/catalog.datoms.edn` がその git 側の半分で、`:artifact/annex-key` で実体に繋がる。
+- 最初のコンテンツは `kami-engine-cae-solver` 42afc0c の `:fem` / `:cfd` 参照出力 2 件。
+  どちらも **`:artifact/qualification :not-qualified` を明記**している —— V&V 証拠が
+  付いていないので `:no-industrial-accuracy-claim` であり、数値の存在を「適合」と
+  読ませない。`:artifact.coverage/*` entity で「**実 production order 由来のものは 0 件**」
+  も申告している（Phase 2 が blocked なので発注自体が無い）。
+
+**完了条件の達成状況**:
+
+| 条件 | 結果 |
+|---|---|
+| `numcopies` ≥ 2 | **達成**（2） |
+| 独立した複数 remote | **部分的**。remote は 2 本（`b2`=`gftdcojp-m365-annex` / `b2-datasets`=`ai-gftd-datasets`）でバケットも鍵も別だが、**どちらも Backblaze B2**。バケット削除や鍵 1 本の侵害には耐え、**プロバイダ障害には耐えない**。別プロバイダは未着手 |
+| `annex-get` / `annex-drop` の往復 | **達成**。local を drop してバイトが解放されたことと、B2 から復元して sha256 が一致することを実測 |
+| `annex-custody-verify.cljs` | **達成**（`ok=1 fail=0`、2 件とも remote から fsck）。**落ちることも確認済み** —— push していない annex ファイルを 1 つ置くと exit 1 で「1 file(s) exist ONLY on this machine」を出す |
+
+**実測で分かったこと（設計に効く）**: off-machine の remote が **1 本だと numcopies 2 の
+dataset は drop できない**。git-annex が「1/2 コピーしか確認できない」と拒否するため、
+手元のバイトを落として clone を軽くするというこの面の目的が成立しない。numcopies を 1 に
+下げれば drop は通るが、それは保証を弱めて通しただけ。**2 本目の remote を足すのが正しい
+解**で、そうして初めて往復が回った。
+
+**この Phase が決めていないこと**: 機密図面の受領。公開/private の別に関わらず、
+git-annex の暗号化は**本文**を隠すが path・size・更新頻度・author は隠さない
+（`raw/cad/<顧客>-<部品>.step` が launch 直前に更新されれば、暗号化されていても
+スケジュールが漏れる）。README にこの警告と暫定運用（顧客名・部品番号・
+プログラム名を path に入れない）を書いた。NDA との突き合わせは別途。
 
 ### Phase 3 — landed（`cloud-itonami/tsukuru-actor` `9d70992`）
 
