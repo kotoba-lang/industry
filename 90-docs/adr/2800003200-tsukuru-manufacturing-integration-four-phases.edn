@@ -398,7 +398,13 @@ landed（`cloud-itonami/tsukuru-actor` `f206c51`）:
 `wrangler.jsonc` に endpoint / operator-did の上書きは無く、コードは同じ
 `marketplace.edge/read-all`。**同じ identity・同じコードで、kind が違うと 401 になる。**
 
-- 5 回連続で叩いて**決定論的**（間欠ではないので CACAO の時刻フォーマット揺れではない）。
+- **訂正（同日 20:39〜20:49 実測）: これは間欠だった。** 上の「5 回連続で決定論的」は
+  その 1 分間については正しいが、一般化としては**誤り**。継続測定 loop
+  （`scripts/tsukuru-maturity-tick.cljs`）を入れた直後、`fulfillment` の `:task` 読みが
+  **10 分間で ok → blocked → ok と 3 回変わった**（こちら側は何も変えていない）。
+  一方 `onboarding` の `:credential` は同じ窓で 3/3 とも 401 のまま。
+  つまり「kind によって決まる恒久的な拒否」ではなく、**時間で揺れる拒否**であり、
+  kind ごとに揺れ方が違う。原因の切り分けは kotobase.net 側の観測が要る。
 - **現ソースから再ビルドして再 deploy しても変わらない**（onboarding version
   `d05f6ded`、deps は listing と同一 sha）。「deploy 済み bundle が古い」仮説は**棄却**。
 - 原因は外から特定できていない。kotobase.net（apex）側が、この identity に対して
@@ -413,8 +419,29 @@ landed（`cloud-itonami/tsukuru-actor` `f206c51`）:
    読めないものを、直らない変更のために捨てることになる。
 
 **正しい順序は「読めない原因を先に潰す → 測り直す → それから seed を判断する」。**
-次の一手は kotobase.net 側の authorization モデルの確認（なぜ `:mp.order/doc` は通り
-`:mp.credential/doc` は 401 か）であって、鍵の再発行ではない。
+次の一手は kotobase.net 側の観測（なぜ同じ identity の読みが時間で揺れるのか）で
+あって、鍵の再発行ではない。
+
+### 残 gap の継続測定（2026-08-05 設置）
+
+`scripts/tsukuru-maturity-tick.cljs` + LaunchAgent `com.gftd.tsukuru-maturity-tick`
+（6h、`tamaki exec` 配下）が、この ADR の残 gap を 11 probe で測り続ける。姉妹の
+`com.gftd.itonami-maturity-tick`（ADR-2607254000）と作法は同じだが **observe-only** ——
+ここに残っているのは決定論的欠陥ではなく、外部サービスの authorization・人間の判断・
+到達できない資格情報なので、無人で埋めてよい種類ではない。
+
+- 監視するもの: seed の在否 / tsukuru worker の fail-closed / 3 worker の ref 到達性 /
+  custody / path-policy / factory-plane / actor tests / remote 暗号化 / 機密材料の許可。
+- **`:unknown` を `:ok` に丸めない。** 機密材料の許可は `:human` 固定で、loop が
+  `:ok` に反転させることは無い（機械は NDA を読めない）。
+- 状態が変わった時だけ `*** STATE CHANGED ***` を出す。
+- 初回のフル tick は 202 秒、`{:blocked 4, :ok 7}`。
+
+**設置初日に 2 つ捕まえた**: ①上記の 401 の間欠性（これが無ければ「決定論的」という
+誤った記述が残った）②`node_modules/` が空になっていて `manifest/edn-query.cljs` が
+`Cannot find module 'datascript'` で落ちていた —— **datom 面が誰にも引けない状態**
+だった（`npm install` で復旧）。後者は loop 自身の欠陥も暴いた: 環境エラーを
+`:regressed` と分類していたので、`:unknown` に直した（6 時間ごとに狼少年になる）。
 
 **この調査で行った live の変更 2 件**（どちらも小さいが記録する）:
 - `cloud-itonami-marketplace-onboarding` に `ACTOR_WRITE_TOKEN` を**新規作成**した

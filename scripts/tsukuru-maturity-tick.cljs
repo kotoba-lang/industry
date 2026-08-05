@@ -142,8 +142,18 @@
   (let [{:keys [code out]} (sh root "nbb" (concat ["--classpath" ".:scripts/nbb_compat" script] extra)
                                {:timeout-ms 900000})]
     {:probe id
+     ;; An ENVIRONMENT failure is :unknown, not :regressed. A missing script, an
+     ;; unresolvable npm module, an absent checkout — none of those are evidence
+     ;; that the guarantee stopped holding, and reporting them as regressions
+     ;; makes the loop cry wolf every six hours until nobody reads it.
+     ;; Measured on the first launchd firing: `node_modules/` at the superproject
+     ;; root had been emptied, so the factory-plane probe could not load
+     ;; datascript and this classified it :regressed. The plane was fine; the
+     ;; machine was not.
      :state (cond (zero? code) :ok
-                  (str/includes? out "no such file") :unknown
+                  (some #(str/includes? out %)
+                        ["no such file" "Cannot find module" "ENOENT"
+                         "not checked out" "command not found"]) :unknown
                   :else :regressed)
      :note (let [t (str/trim out)] (subs t (max 0 (- (count t) 200))))}))
 
