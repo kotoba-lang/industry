@@ -3162,3 +3162,98 @@
          box instead."}
   {:what "chasing the <br> x divergence" :why "not fragmentation,
           zero-width, dropped with a note."}]}
+
+{:seq 63
+ :date "2026-08-06"
+ :repos {"kotoba-lang/htmldom" "d5468007171a87fab3732e6be5afa3b58e0c42bd"
+         "kotoba-lang/cssom" "bbe20e54417877ddb68be4c24688e61eb2254894"}
+ :title "the parser collapses no whitespace at all -- collapsing moves to layout, and the four preserving white-space values become reachable"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 597 :after 601}}
+ :measured
+ {:line-structure {:before "564/572" :after "569/576"}
+  :geometry {:before "2005/2032, 577/597 clean" :after "2013/2036, 585/601 clean"}
+  :paint-order {:before "14885/14909, 585/597 clean" :after "14987/15009, 589/601 clean"}
+  :computed-style {:before "28559/28562, 595/597" :after "28615/28618, 599/601"}
+  :htmldom-tree-shape {:before "139/139" :after "139/139"}
+  :htmldom-attributes {:before "421/422" :after "421/422"}}
+ :verified-on-merged-main
+ {:cssom-tests "916 / 2295, 0 failures (911/2264 before)"
+  :htmldom-tests "180 / 557 (179/553 before)"
+  :browser "754/0" :dom-gpu "130/0"
+  :note "re-ran the harness independently on the merged tree with BOTH
+         checkouts advanced; every axis reproduced the agent's numbers
+         exactly."}
+ :this-blocker-had-been-deferred-three-times
+ "named and left in three separate rounds. It was given its own round
+  precisely because deferring collapsing to layout changes THE TEXT EVERY
+  CORPUS CASE SEES."
+ :per-case-deltas
+ {:changed 4 :regressed 0
+  :detail "white-space-pre-keeps-leading-spaces span 63 -> 77 (browser 77);
+           tab-in-pre-advances-to-the-next-eight-column-stop 21 -> 63 (63);
+           tab-size-four-in-pre 21 -> 35 (35);
+           white-space-break-spaces-keeps-newlines div 200x20 -> 200x40
+           (200x40). Plus 4 cases added."
+  :the-real-evidence
+  "the HTMLDOM CHANGE ALONE, with cssom untouched, accounts for the first
+   three and MOVED NOTHING ELSE in the whole 597-case dump. That
+   intermediate run is what says the blast radius was contained."}
+ :parser-vs-layout-what-the-browser-said
+ {:the-parser-collapses-NOTHING
+  "<div>   a   b   </div> keeps SP SP SP a SP SP SP b SP SP SP; tabs,
+   &nbsp;, inter-block indentation all survive; <table>\\n<tr> keeps its
+   newlines INSIDE the table."
+  :it-drops-exactly-one-thing
+  "the single leading newline after <pre>/<textarea>, and measurably ONE and
+   FIRST: <pre>\\nx -> x, <pre>\\n\\nx -> LF x, <pre> \\nx -> SP LF x."
+  :and-rewrites-line-endings
+  "CR/CRLF -> LF everywhere INCLUDING inside <pre>. The old code turned CR
+   into a SPACE outside <pre> and left a literal U+000D inside one. Both
+   wrong, both fixed."}
+ :the-equivalence-that-made-it-safe
+ {:property "collapse(old_parse(t)) == collapse(t), because layout maps any
+             whitespace RUN to one space and a shortened run is still a run."
+  :asserted "over ten corpus idioms by WHOLE DRAW-OP VECTORS, with an
+             INEQUALITY CONTROL under white-space: pre that fails at base."
+  :the-control-earned-its-keep-immediately
+  "it caught that cssom's deps.edn resolves ../dom-gpu to a dom-gpu whose
+   own ../htmldom was the SHARED UNMODIFIED checkout, so the first suite run
+   was scoring the OLD parser. All ten equalities passed. ONLY THE CONTROL
+   NOTICED."}
+ :pre-wrap-pre-line-break-spaces
+ {:the-discriminating-content
+  "a space run that OVERFLOWS, not one that merely ends a line -- which is
+   why seq 61's six-space shape read 60x40 under both and WAS RIGHT TO SAY
+   SO. In a 60px box: `aa` + 10 spaces is pre-wrap 20 / break-spaces 40;
+   `aa` + 20 spaces + `bb` is 40 / 60; the two six-space shapes are 40/40
+   either way. All four are now corpus cases IN PAIRS."
+  :and-it-exposed-a-bug-that-had-been-unreachable
+  "pre-wrap: the word packer rejoined its spaces (60x20 vs Brave's 60x40).
+   pre-line needed nothing."}
+ :scope-cuts
+ [{:what "line-leading collapsible whitespace is collapsed but not REMOVED"
+   :measured "`   indented` shrink-to-fit under normal/pre-line is 56 in
+              Brave, 63 here. inline-tokens drops it; layout-text does not."
+   :note "pre-existing, verified at base"}
+  {:what "hanging content gets a full-height hit region"
+   :measured "the 1 paint point the new case loses. GENERAL, not
+              pre-wrap-specific (a `pre` control does the same): Brave
+              answers the overflowing div at y=7/13 out to x=75, and the box
+              behind it at y=1/19."
+   :note "pre-existing, verified at base"}]
+ :coordination-hazard-and-what-I-did
+ "cssom main now contains 13 assertions that REQUIRE the new parser, so the
+  old pairing no longer builds. Two other agents were running against the
+  SHARED checkouts under an instruction to leave htmldom alone. I advanced
+  the shared htmldom checkout to d546800 immediately on verifying, and sent
+  both agents the new baseline with an explicit note that it countermands
+  their brief. The pins must advance TOGETHER -- this ledger entry does both."
+ :tried-and-withdrawn
+ "the agent repointed /tmp/kl/htmldom at its own worktree as its brief
+  instructed, then REVERTED IT WITHIN A MINUTE on finding that another
+  agent's live cssom worktree resolves ../htmldom through that same
+  symlink, and moved its whole setup to a private directory. The two trees
+  were identical at that moment, so nothing of the other agent's was
+  affected. My brief was wrong to give that instruction; the agent caught
+  it."}
