@@ -204,20 +204,89 @@ parse の上限にならない（`render-limit-bytes` 32 MiB）。
    最初の版は「幅未計測のテキスト run を幅 0 とみなし」、kerning で原点より左に
    出た `TJ` の後半を削除した。自分のテストが捕まえた。
 
+## 残り 6 件も解消した（2026-08-05 さらに後刻）
+
+オーナー指示の順（6→1→2→3→4→5）。**測ってから直した**ので、1 件は「直さない」が
+答えになった。
+
+### 6. 目視 — 27 件が未確認だった
+
+**contact sheet で 48 文書を一度に見た。** 最初の sample は 48 件中 35 件が
+`IOException: Operation timed out` —— レンダラの失敗ではなく **cloud placeholder で
+バイトがローカルに無い**（0 バイトの businesscard と同じ罠）。実バイトを持つ 927 件に
+絞って再抽出したら 48 件中 47 件が描画した。
+
+**見て初めて分かった欠陥**: producer が **1 グリフ 1 `Tj`** を出す（監査報告書の表紙で
+1 行 52 run）。`text-of` が 1 文字ずつの配列を返しており **検索が壊れていた**し、
+文書のフォントでない字形を各グリフの座標に置くので `Cont r act s` と読めた。
+`coalesce` を追加 —— pen の終端位置は advance から分かるので**等値判定**であって
+近接推測ではない。gap は 3 通り: 無し=1 語 / word space=1 句（空白を戻す）/ それ以上=
+run を切る（2 段組の行が 1 文になるのを防ぐ）。実測 47 文書で run 11,568→5,681、
+1 文字 run 72.4%→38.0%、文字数 20,909→**27,276**（増えたのが空白の復活）。
+
+### 1. ベジエパス
+
+`re … f` しか解釈していなかったので、図・ロゴ・署名が**等しく不可視**だった。構築
+（`m l c v y h re`）と描画（`f F f* B b S s n`）を全部実装。実測 **28,966 path が
+新たに描かれる**。`v`/`y` は制御点 1 つを補う曲線で、直線扱いは「ほぼ動くレンダラ」に
+見える。`n` は描かない（clip 用）。矩形だけの path は `:rule` のまま（`re … f` が
+文書の大半で、box は path より下流に価値がある）。fill と stroke は別 ink（小文字が
+fill、大文字が stroke。同一視すると罫線がセル背景の色になる）。bbox は制御点の凸包
+なので **ink より小さくなることはない** —— 捨てる判断をする値として安全な向き。
+
+### 2. `/ToUnicode` 無しの CID —— **直さないのが答えだった**
+
+素直な fallback は「埋め込みフォント自身の cmap を逆引き」で、そのために
+`opentype.cmap` を書いた（`org-iso-opentype` に着地・9 tests）。**配線する前に測った**:
+160 文書・576 の `/Type0` フォントのうち **549 が `/ToUnicode` を持ち**（既に読めている）、
+**25 が持たず `CIDFontType0C`**、2 が埋め込み無し、そして **SFNT は 0 件** ——
+cmap 経路が効く文書が 1 つも無い。
+
+`CIDFontType0C` は素の CFF で **cmap テーブルを持たない**。復号には CFF charset と
+registry CMap リソース（Adobe-Japan1-UCS2 等）が要り、どちらも workspace に無い。
+**0/576 でしか発火しない経路のために依存を足すのは依存ではない**ので配線を revert し、
+代わりに frame の label が **ordering と埋め込みフォント種別の両方**を名乗るようにした
+（次の人が同じ袋小路に入らないように）。
+
+### 3. encode できない画像形
+
+16bit は**切り捨て**（線形同レンジなので上位バイトが 8bit 値。捨てていると明記 ——
+原本は `/download` が無加工で渡す）、indexed は RGB base の palette 経由、CMYK は
+`hanmen` の fill と同じ素朴変換（画像と罫線が色について一致する）。それ以外は
+**名指しで拒否**（誤 encode した画像は「開ける」）。`hanmen` が `:bits`/`:colorspace`/
+`:palette` を報告するようにした —— バイト数だけでは 16bit gray と 8bit RGB を
+区別できない（同じ bytes/pixel）。**テストが実バグを捕まえた**: samples-per-pixel が
+整数除算で、4px に 5 バイトが「1 sample/px」になり encoder まで届いていた。
+
+### 4. clip path
+
+`W n` を解釈。実測 47 文書で **文書が見せていない 112 の text run** を落とす。
+**box として**追跡し、誤差の向きを選んでいる: 円形 clip の box は角を残すので
+「文書より少し多く見せる」。多いのは文書が何も描かなかった場所に印が出るだけだが、
+少ないのは印の**欠落**で、読み手は欠落と元から無いのを区別できない。clip は graphics
+state なので `q`/`Q` が保存・復元する —— `Q` は merge の前に dissoc する（merge は
+キーを**不在**に戻せないので、pair 内で設定した clip が残ってページの残りを飲む）。
+
+### 5. cache の並行性
+
+上限も thread-safety も**主張であって測定ではなかった**。16 並列 reader × 20 文書
+（cache 容量超）で「各 reader が隣の文書ではなく自分の文書を得る」「map が上限を
+超えない」を assert。`swap!` がしないこと —— 同一文書の同時 parse は両方走って両方
+書く（無駄であって誤りではない）—— も書いた。promise per key にすると「throw する
+parse で request thread を deadlock させる」経路と交換になるので 8 件規模では割に
+合わない、という**判断として**記録した。実際の天井は 8 × `render-limit-bytes` 相当の
+object graph で、上げるならそこを見る。
+
 ## まだ無いもの（「実装済み」と読まないこと）
 
-1. **パス・シェーディング・透明グループは無い。** `re … f` だけが罫線になる。
-   ベジエ曲線を使った図版は描かれない。
-2. **`/ToUnicode` を持たない CID フォントは復号できない。** 30 件中 3 件・553 run
-   （550 は LaTeX-CJK 1 文書）。predefined CMap リソース（Adobe-Japan1-UCS2 等）が
-   要る。枠が「何が要るか」は名乗る。
-3. **`FlateDecode` 以外・8bit 以外・indexed / CMYK の画像は encode できない。**
-   `png.encode` が書ける形（8bit の gray / gray-alpha / rgb / rgba）以外は
-   `:pageview/unsupported-image` で**名指しで拒否**する —— 誤って encode した画像は
-   「開ける」ので気づけない。
-4. **clip path を追わない。** ページ境界の外は落とすが、文書内の clip による
-   切り抜きは無視する（はみ出して描かれうる）。
-5. **並行 session での cache 共有は測っていない。** 上限 8 件・満杯で全捨ての
-   単純な atom で、LRU ではない（理由は実装の docstring）。
-6. **目視は 3 文書のみ。** 実測 30 件のうち 3 件を Chrome で見た。残り 27 件は
-   座標・文字数・inert 性の自動検証だけで、「ページに見えるか」は確認していない。"}]
+1. **`CIDFontType0C` に `/ToUnicode` が無いと復号できない。** 576 フォント中 25 件。
+   CFF charset パーサと registry CMap リソース（Adobe-Japan1-UCS2 等）の両方が要る
+   —— workspace にどちらも無く、新規 capability としては相応の規模。
+2. **shading・pattern・透明グループは描かない。** `sh` は clip 領域を塗るが clip は
+   box としてしか追っていない。pattern fill は直前の色を維持する（平均色を捏造しない）。
+3. **clip は box であって path ではない。** 円形 clip の角が残る（誤差の向きは意図的）。
+4. **目視の後追いができていない。** coalesce 前は 30 文書を Chrome で確認したが、
+   **修正後の再確認は他 session の terminal がデスクトップを占有して撮れていない**
+   （数値では検証済み: run 半減・空白復活）。
+5. **cache は同一文書の同時 parse を重複させる。** 意図的な判断（上記 5）。
+6. **`:frame` が残るのは 286 箇所**（47 文書）。ほぼ全て上記 1 の CFF フォント。"}]
