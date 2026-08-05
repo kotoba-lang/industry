@@ -27,7 +27,21 @@
          '[babashka.process :as p]
          '[clojure.string :as str]
          '[clojure.edn :as edn]
+         '["node:fs" :as fs]
          '[scripts.nbb-compat :as compat])
+
+(defn- target-dir
+  "コマンドが実際に触るリポジトリのディレクトリ。
+
+  hook の cwd から repo を決めてはならない ── cwd はセッションの cwd（この
+  superproject）で固定なので、`cd /tmp/other-repo && git commit` のような
+  **別リポジトリの commit** まで superproject の状態で判定してしまう。
+  コマンド文字列に書かれた `git -C <dir>` と先頭の `cd <dir>` を見る。
+  どちらも無ければ cwd（従来どおり）。"
+  [cmd]
+  (or (second (re-find #"\bgit\s+-C\s+(\S+)" cmd))
+      (second (re-find #"^\s*cd\s+(\S+)\s*&&" cmd))
+      "."))
 
 (defn- sh
   "コマンドを実行し、成功時は stdout を、失敗時は nil を返す。"
@@ -97,8 +111,18 @@
     ;; 対象は git commit / git push だけ。それ以外は即許可。
     (when-not (re-find #"\bgit\b(?:\s+-C\s+\S+)?\s+(?:commit|push)\b" cmd)
       (allow!))
-    (let [top (some-> (sh "." "rev-parse" "--show-toplevel") str/trim)]
+    (let [top (some-> (sh (target-dir cmd) "rev-parse" "--show-toplevel") str/trim)]
       (when (str/blank? top) (allow!))
+      ;; **この superproject の 90-docs を守る gate なので、90-docs を持たない
+      ;; リポジトリの commit は対象外。** これが無いと、hook の cwd（= セッションの
+      ;; cwd = superproject）から repo を解決してしまい、`cd /tmp/other-repo &&
+      ;; git commit` のような**別リポジトリの commit まで**、superproject に
+      ;; 転がっている他セッターの WIP edn が壊れているという理由で止まる。
+      ;; 実際に 2026-08-05、別セッションの staged な ADR 2 件が壊れていたために
+      ;; `kotoba-lang/inga` の commit が deny され、このマシン上の git 全体が
+      ;; 事実上止まった。gate が守っている物を持たない repo を止めるのは、
+      ;; 誤検知ですらなく単に管轄外である。
+      (when-not (.existsSync fs (str top "/90-docs")) (allow!))
       (let [broken
             (->> (changed-edn-files top)
                  (keep (fn [path]
