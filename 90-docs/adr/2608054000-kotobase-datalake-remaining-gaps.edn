@@ -39,13 +39,13 @@
    "adr-2607299700-kotobase-scoped-cacao（互いに代用できる 2 つの capability は 1 つ — P1 で IByteSource に適用した）"]
 
   :adr/decision-summary
-  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :arrow-writer :group-by :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson}, :write #{:arrow-ipc}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed}, :refused-by-name #{:lz4-frame :zstd}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :writer-gate :pyarrow-validate-full, :ci-status {:kotoba-lang :actions-disabled-2026-08-05, :network-awai :actions-dead}, :gaps {:p2 #{:parquet-writer :schema-evolution :snapshots :compaction :join-cost}, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
+  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :arrow-ipc :arrow-writer :parquet-writer :group-by :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet :arrow-ipc}, :materialize #{:csv :tsv :ndjson}, :write #{:arrow-ipc :parquet}}, :codecs {:parquet {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :arrow {:supported #{:uncompressed}, :refused-by-name #{:lz4-frame :zstd}}}, :seam {:verdict :did-not-bend, :moved [:columnar.bytes]}, :writer-gate :pyarrow-validate-full, :ci-status {:kotoba-lang :actions-disabled-2026-08-05, :network-awai :actions-dead}, :gaps {:p2 #{:schema-evolution :snapshots :compaction :join-cost}, :p3 :transport-retirement, :p4 :verification-infra, :p5 :query-reach}, :ceiling-4mib :bypassable-not-removed}"
 
   :adr/verify
-  ["west pin: columnar 16b336b1 / org-apache-arrow 78db9a83 / org-apache-parquet 06df9fdd / kotobase-lake 06d658a0 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
+  ["west pin: columnar 16b336b1 / org-apache-arrow 78db9a83 / org-apache-parquet e28a6b3e / kotobase-lake 06d658a0 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
    "org-apache-arrow: JVM 39 tests/119 assertions・nbb 34/100・clj-kondo 0 warnings（ローカル実測）。CI は writer commit 6d070313 までは全 step success を実測、それ以降は org の Actions 無効化により未実行"
    "writer の正当性ゲート: clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir>  ; => 6 ケースすべて pyarrow validate(full=True) で受理"
-   "org-apache-parquet CI 全 step success（17 tests/103 assertions 無変更で通過 = columnar.bytes re-export が透過であることの証拠）"
+   "org-apache-parquet: JVM 32 tests/143 assertions・nbb 29/131・clj-kondo 0 warnings（ローカル実測）。writer gate = clojure -M:emit <dir> && python test/fixtures/verify_written.py <dir> ; => 7/7 pyarrow 受理・統計も可視。CI は 06df9fdd まで success、e28a6b3e は Actions 無効化により未実行"
    "columnar: 22 tests/75 assertions・clj-kondo 0 warnings（ローカル実測）。CI は d89813a3 まで success、16b336b1 は Actions 無効化により未実行"
    "nbb scripts/fleet-ci/gates/net-kotobase-hermetic-check.cljs <tree>   ; => E object-grant: Ran 16 tests, rc=0"
    "net-kotobase の GitHub Actions は job を起動しない（ADR-2608036600）。実際に走る gate は murakumo fleet の check A-E のみ"]
@@ -159,7 +159,7 @@ validity bitmap + values buffer）なので、seam を曲げる圧力が**別の
 設計すると Parquet の形に引きずられた writer ができるためで、その理由は上記のとおり
 解消した。その上で P2 の最初の項目（writer）を着地させた。
 
-### P2. 書き込み側 — 2 項目着地、残り 4 項目
+### P2. 書き込み側 — 3 項目着地、残り 3 項目
 
 **着地（2026-08-05）: Arrow IPC writer**（`arrow.build` = FlatBuffers builder /
 `arrow.write`）。**「このクエリをテーブルに実体化」ができるようになった** —
@@ -201,10 +201,36 @@ predicate が落とせなかった chunk を読みながら畳む。ここでも
 - **`avg` は意図的に無い。** 整数除算か有理数か、全 null group の平均は何か、を決めねば
   ならず、`sum / count-non-null` を呼び手が書けばその判断が明示される。
 
-**残っている 4 項目**:
+**着地（2026-08-05）: Parquet writer**（`parquet.write` + `parquet.thrift` の
+compact protocol **encoder**）。**同時に「Parquet writer か外部統計か」の未決を
+Parquet 側で決着させた** — 外部統計（sidecar）は記述対象のファイルから drift しうるが、
+Parquet は**他の全ツールが既に読む容器**の中に統計を運ぶ。新しい仕組みを発明するより
+標準を使う。
 
-- **Parquet writer が無い。** Arrow は書けるが Parquet は書けない。Parquet は統計を
-  writer が計算して footer に書く必要があり（Arrow には無い工程）、そこが本質的な差分
+writer は列を手元に持っているので min/max/null_count を書きながら計算して footer に
+入れる。効果は直接 assert してある: **ここで書いたファイルへのクエリは row group を
+1 つ読んで 2 つ飛ばす**。
+
+**この項目で得た、他の writer にも効く知見**:
+
+- **自前テストが「妥当な Parquet である」ことを証明できない、という主張の実証が出た。**
+  Arrow の時は論証だったが、今回は**実際に 2 件の欠陥が in-repo テストを全部通過した**:
+  ① `ColumnChunk.file_offset` の欠落（thrift IDL で `required` だがこちらの reader は
+  読まないので、ローカルでは完璧に round-trip し、pyarrow は footer を deserialize
+  すらできなかった）② `FileMetaData.column_orders` の欠落（**全ファイルが開き、全値が
+  正しく、統計だけが全部 None になった** — sort order 未宣言の `min_value`/`max_value`
+  を信用することを spec が禁じているため）。**②は「sidecar でなく Parquet を選んだ
+  理由そのもの」を無効化する欠陥**で、repo の中からは一切見えなかった。
+- **gate は落ちることを確認してから landed とした。** `column_orders` を外した版で、
+  7 ファイルすべてが open と read で `ok` を出したまま
+  `stats (None, None, 0) != (10, 30, 0)` で gate が落ちることを実測。
+- **varint は unsigned で書く。** zigzag が 2^62 以上で最上位ビットを立てるため、
+  signed long に対して `(< v 0x80)` を見るループは負数を見て「1 バイトに収まる」と
+  判断し 1 バイト出す。実測: 2^62+1 が 1 になって返ってきた。
+- **thrift compact の field id は前フィールドからの delta。** 昇順に出さないと
+  **失敗せずに別の field id へ decode される**ので、encoder 側で昇順を強制した。
+
+**残っている 3 項目**:
 - **スキーマ進化**（列の追加 / 改名 / 型変更をファイル間で吸収）
 - **テーブルのスナップショット / time travel。** datom 面には有るが**ファイル集合には無い**
   （「時刻 T のテーブル」が言えない）。Iceberg が manifest list で持っている層
@@ -341,11 +367,16 @@ Parquet
 
 - **『lake を名乗れる』は名乗れる側に来た**が、Iceberg 相当ではない —
   スナップショット・スキーマ進化・コンパクションが無い（P2 残）
-- **読み書きが閉じた。** 外から来たオブジェクトを scan し、その結果を書いて、書いた
-  ものをまた scan できる。ただし**閉じたのは Arrow だけ**で、Parquet は読み専用のまま
-- **書いた Arrow は自分で枝刈りできない**（Arrow が統計を持たないため）。materialize
-  を繰り返すと、元の Parquet より枝刈りの効かない中間生成物が積み上がる —
-  上記の「Parquet writer か外部統計か」の判断が未了である間はそうなる
+- **読み書きが両形式で閉じた。** 外から来たオブジェクトを scan し、結果を書いて、
+  書いたものをまた scan できる。Arrow と Parquet の両方で。
+- **materialize 先に Parquet を選べば枝刈りが効く。** 「書いた Arrow は自分で枝刈り
+  できない」問題は、**外部統計を発明せず Parquet writer で解いた**（未決だった判断は
+  決着済み）。Arrow は統計を持たないという性質自体は変わらないので、**枝刈りを効かせ
+  たい materialize は Parquet に書く**のが答えになる。`:utf8` → `byte_array` の対応が
+  入っているので arrow→parquet は 2 行。
+- **新しい writer は「参照実装が受理すること」を着地条件にする。** Arrow の時は
+  論証だったが、Parquet で**実際に 2 件の欠陥が in-repo テストを全通過した**ので、
+  これは規約として確定した。
 - **seam の format 非依存は実測済みになった。** 3 つ目の `:scan` 形式（ORC 等）を足す
   コストは、その形式の byte 文法だけになる — `columnar` 側の設計余地はもう問われない
 - **`columnar.bytes` が range 読みの正本。** 新しい format library は
