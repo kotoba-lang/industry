@@ -236,12 +236,15 @@
   ;; 全文 3.43GB 自体は 4 つの DataLad dataset 側にあり、ここは sha256 で
   ;; 名指しするだけ。
   ;;
-  ;; **:jvm-test ではない理由（実測、推測ではない）**: この repo の contract test は
-  ;; Datascript を要求し、Datascript は maven 依存。fleet のノードは tailnet だけに
-  ;; 繋がっていて外向き HTTPS が無く、`~/.m2/repository/datascript/` は zebulun にも
-  ;; asher にも**存在しない**（2026-08-05 に両ノードで確認）。`clojure -M:test` は
-  ;; 依存解決で必ず落ちる。ship-git-deps! は git 依存しか運ばない。
-  ;; そこで Datalog エンジン抜きで成立する不変条件だけを gate にした。
+  ;; **:jvm-test ではなく :nbb-script にしてある。** 当初の理由は「ノードに外向き
+  ;; HTTPS が無いので maven 依存の Datascript を解決できない」だったが、**それは誤り**
+  ;; だった —— 2026-08-05 に到達可能な 10 ノード全部で測ったところ repo1.maven.org は
+  ;; 200 を返す（誤前提の出所は fleet-ci README の、zebulun 1 台に対する 2026-07-26 の
+  ;; 実測）。したがって :jvm-test へ移すことは**可能**。
+  ;; それでもこの gate を残す理由は別にある: sha256 照合・シャード件数・辺の向きは
+  ;; Datascript を起動しなくても検査でき、`clojure -M:test` より速く、
+  ;; **手編集されたシャード**という Actions では捕まえられなかった事象を捕まえる。
+  ;; Datascript に実際に載ることの検査は repo 側の local contract が持っている。
   ;;
   ;; **この gate は Actions 版より強い。** 主眼は「宣言されたシャードの sha256 と
   ;; バイト数が manifest 通りか」で、これは *内部整合を保ったまま手編集された

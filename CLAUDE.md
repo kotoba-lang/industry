@@ -205,25 +205,46 @@ GitHub Actions ではない。
 
 | gate | 要件 | 落とし穴 |
 |---|---|---|
-| `:jvm-test` | `deps.edn` に `:test` alias、出力に `Ran N tests` | **maven 依存は運ばれない** |
-| `:nbb-test` | nbb のテストエントリ | 同上（npm も） |
-| `:nbb-script` | `gates/*.cljs` を配って実行 | ノードに配れる範囲で完結させる |
+| `:jvm-test` | `deps.edn` に `:test` alias、出力に `Ran N tests` | 依存はノード側で解決する |
+| `:nbb-test` | nbb のテストエントリ | 同上 |
+| `:nbb-script` | `gates/*.cljs` を配って実行 | 1 ファイルで完結させる（nbb に `load-file` は無い） |
 
-- **ノードは tailnet だけに繋がっていて外向き HTTPS が無い。** `ship-git-deps!` は
-  **git 依存しかノードへ運ばない**ので、maven 依存を持つ repo の `:jvm-test` は依存解決で落ちる。
-  実例: `global-legislation-datoms` の contract test は Datascript（maven）を要求し、
-  `~/.m2/repository/datascript/` は zebulun にも asher にも無かった（2026-08-05 実測）。
-  **「テストがあるから jvm-test にする」ではなく、先にノードで依存が解決するか確かめる。**
-  解決しないなら Datalog / ライブラリを要する検査は repo 側の local contract に残し、
-  gate はノードで完結する不変条件に絞る。
+- **ノードの外向き HTTPS の有無は「実測して」使う。定数で持たない。**
+  fleet-ci の README と `tick.cljs` のコメントは「ノードは tailnet だけに繋がっていて
+  外向きの HTTPS が無い」と書いているが、これは **2026-07-26 に zebulun 1 台で測った値**で、
+  全ノードの恒久的な性質ではない。**2026-08-05 に到達可能な 10 ノード全部で測ったところ、
+  `registry.npmjs.org` / `repo1.maven.org` / `github.com` すべて 200 だった。**
+  この誤った前提のせいで、gate 種別の判断を誤り（maven 依存があるから `:jvm-test` は無理、
+  と結論した）、workflow 実行では 167 本を不当に拒否していた。
+  必要なら `curl -sS -o /dev/null -w '%{http_code}' https://repo1.maven.org/maven2/` を
+  その場で叩く（`gates/github_workflow_run.cljs` の `egress?` が実例）。
+- **`ship-git-deps!` が運ぶのは git 依存だけ**（maven/npm は運ばない）。egress があれば
+  ノードが自力で取りに行けるので普通は問題にならないが、**egress を切った運用に戻すなら
+  そこが効いてくる**。
 - **`:include-ext` で送る tree を絞る**（`max-ship-mb` 200）。`:min-files` は絞り込みが壊れて
   空 tree を「違反 0 件 = 合格」にしないための床。
-- **手動実行には署名鍵の env が要る**:
-  `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem nbb scripts/fleet-ci/tick.cljs --only <name>`。
-  付けないと `no such item: fleet-agent-murakumo-ci-tip-25mbair` で死ぬ（鍵は kagi の
-  どちらの vault にも無く PEM にだけある。常駐 plist は env を渡している）。
+- **署名鍵**は kagi の `fleet-agent-murakumo-ci-tip-25mbair`（compartment `personal`）と
+  `~/.gftd/fleet-ci-signer-tip.pem` の両方にある（2026-08-05 に kagi 側を PEM から復元）。
+  手動実行で `no such item` が出たら `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem`
+  を付ける。常駐 plist は env を渡している。
 - **gate は「落ちること」を確かめてから landed とする。** 対象を 1 箇所壊したコピーで
   exit 1 になり、無改変で exit 0 になることを実際に見る。落ちない gate は劇場。
+
+### job の配分は自動計算する（round-robin に戻さない）
+
+`tick.cljs` の `assign` は **LPT（重い順に、投入後の完了時刻が最小の slot へ）**で、
+ノードの速度を `cores` / `free-gb` / **live の load1**（`sysctl -n vm.loadavg` を実測）から、
+gate の重さを過去実測の EMA（`~/.gftd/fleet-ci-cost.edn`）から出す。
+
+以前は `(mod i (count slots))` の round-robin で、**空きも重さも見ていなかった**。
+fleet のノードは CI 専用ではなく推論やマイニングと同居しているので、張り付いている
+ノードに暇なノードと同じ本数が飛び、batch は全 slot の完走を待つため遅い 1 台が
+全体の完了時刻を決めていた。**新しいノードを足したり用途を変えたときに手で配分を
+書き換える必要は無い** — 測った値から毎 tick 計算し直す。
+
+記録するコストは **batch 単位の上界**（batch 内の gate は並列に走るので、所要時間は
+最も遅い 1 本で決まる）。LPT は相対的な重さしか使わないのでこれで足りるが、
+**絶対値として引用しない**こと。
 
 ### 生成物を検査する gate は sha256 を見る（Actions では構造的に不可能だった）
 
