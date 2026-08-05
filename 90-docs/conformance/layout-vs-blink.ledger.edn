@@ -2660,3 +2660,121 @@
    baseline, and a wrapping flex container with a definite height already
    stretches its lines (Brave's y=110 falls out whole). Both corrected
    against the browser rather than the other way round."]}
+
+{:seq 59
+ :date "2026-08-06"
+ :repos {"kotoba-lang/cssom" "eb9dca99d4bac4672f39bd571b0c3317ad37b55e"
+         "kotoba-lang/htmldom" "42252d51ae0ec9adc0edd6f4ecdd655e64ae5f49"}
+ :title "per-side border widths, and the <details> band a browser synthesises"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 581}
+ :measured
+ {:line-structure {:before "546/556" :after "546/556"}
+  :geometry {:before "1915/1973 (97%)" :after "1926/1973 (98%)"
+             :clean-cases {:before "545/581" :after "549/581"}}
+  :paint-order {:before "14426/14514 (99%)" :after "14450/14514 (100%)"
+                :clean-cases {:before "558/581" :after "561/581"}}
+  :computed-style {:before "27735/27740" :after "unchanged"}}
+ :verified-on-merged-main
+ {:cssom-tests "879 tests / 2152 assertions, 0 failures"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "179/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly. PAINT ORDER reaches 100%."}
+ :per-case-deltas
+ "exactly FIVE cases changed in the whole 581-case op dump, all in the
+  intended direction, all matching the oracle exactly afterwards
+  (--dump-ops diffed corpus-wide before/after EVERY STEP):
+  :box/border-top-width-only, :box/border-left-width-only,
+  :logical/border-inline-start,
+  :box/margin-top-percentage-is-of-the-width,
+  :interactive/details-with-no-summary. No case moved the other way."
+ :what-the-browser-said
+ [{:topic "borders -- 27 declarations on one probe page"
+   :measured "the two rows nobody would guess: `border-style: solid` with
+              NO WIDTH is 306x22.797 (omitted width = `medium` = 3px), and
+              `border-top: 10px` with NO STYLE is 300x16.797 (omitted style
+              = `none`, which ZEROES it)."
+   :ordering "border-top: 10px solid red; border: 2px solid blue -> 2px on
+              all four sides; the REVERSE order -> 10/2/2/2. That pair is
+              why `border` must write ALL TWELVE per-side longhands."}
+  {:topic "margin collapsing reads BLOCK-AXIS borders only"
+   :measured "border-top: none on an empty box SELF-COLLAPSES (container
+              20, sibling y=0); border-top: 1px solid does NOT (35, y=15);
+              border-bottom behaves like border-top; and border-left: 5px
+              solid DOES NOT STOP COLLAPSING AT ALL (a parent with it still
+              lets a child's 20px top margin escape)."}
+  {:topic "<details>"
+   :measured "the band is ONE LINE BOX in the element's own line-height (40
+              at line-height:40px, still 20 at font-size:30px), INSIDE
+              padding and border (36 with padding:8px, 30 with border:5px).
+              Measured with elementsFromPoint: every interior point reports
+              DETAILS, not SUMMARY -- the generated summary is SHADOW
+              CONTENT."}]
+ :where-the-four-numbers-live
+ "BOTH. The CASCADE holds specified values (four border-<side> shorthands,
+  three 1-to-4 shorthands, border's twelve longhands, thin/medium/thick as
+  keywords) BECAUSE DECLARATION ORDER IS RESOLVED THERE AND NOWHERE ELSE.
+  The BOX RECORD holds four USED widths, resolved by node-style through
+  each side's own style. The uniform :border-width stays, for the readers
+  whose axis has no per-side story yet.
+  One non-obvious thing: author and UA-sheet values are read as TWO
+  SEPARATE ORIGINS in the per-side resolver, not through the shadowed
+  `style` accessor. A single chain let the UA sheet's expanded
+  border-top-width: 2px beat an <iframe>'s own border-width: 0 (304x154
+  with its border explicitly off)."
+ :the-previous-agents-reason-for-declining-details
+ {:verdict "IT HELD UP, AND IT WAS NOT SUFFICIENT."
+  :detail "Brave really does report a 300x20 box for the closed <p> and
+           never paints it (content-visibility: hidden), and an
+           op-emitting engine cannot report a box it does not paint -- so
+           the case still cannot go geometry-clean. But that is ONE box,
+           not four: the case went 0/4 -> 3/4 on geometry and FULLY CLEAN
+           on paint. Same limit :interactive/details-closed-shows-only-the-
+           summary already records."
+  :correction-to-my-brief "I told the agent the case was worth 82 paint
+                           points. It was worth 10 in the full run. It was
+                           still the largest single paint residual."}
+ :regression-caught-and-fixed-rather-than-accepted
+ ":table/border-collapse went 26 -> 28 tall on the first run. The
+  collapsed-border halving rewrites a cell's uniform :style/border-width,
+  and the cascade now ALSO puts longhands on that cell which the halving
+  did not touch. The four longhands are dissoc'd with the rewrite. THE NET
+  SCOREBOARD SHOWED +7 THAT RUN AND WOULD HAVE HIDDEN IT."
+ :scope-cuts
+ [{:what "content-inset (flex/grid/table containers) stays uniform"
+   :why "its other half is the uniform :padding."
+   :measured "Brave puts a 50x20 item at (4,10) in a 300x30
+              border-top:10px;border-left:4px flex OR grid container, and a
+              <td> with those borders is 32 tall; this engine puts all
+              three at (0,0) in 300x20."}
+  {:what "a collapsed table's CELL border stays uniform -- DELIBERATE"
+   :why "which edge a cell contributes to depends on which edge is being
+         resolved, and the half-border written back is uniform too, so
+         splitting one without the other would make a cell PAINT AN EDGE
+         ITS COLUMN WIDTH DID NOT RESERVE. The TABLE's own border is now
+         per side."}
+  {:what "<details>' label is not drawn"
+   :why "localised shadow text the oracle's Range cannot read."}
+  {:what "a LATE <summary> is not reordered"
+   :measured "Chromium renders the first summary in DOM order first
+              wherever it sits (<details><p>A</p><summary>S</summary> ->
+              SUMMARY at y=0). No corpus case has one."}]
+ :gates
+ "all new assertions were run against the unmodified engine at the base
+  SHA: 33 FAILURES, and the controls beside them (border-width:10px;
+  border-style:none, border-top:10px, the <details> with a real summary,
+  `no text is drawn in the band`) pass on BOTH sides. Two stale tests were
+  rewritten with the reason, not just the number --
+  a-logical-border-has-no-per-side-border-to-land-on became
+  ...lands-on-the-physical-side-it-resolved-to, and self-collapsing's `not
+  the browser's 35` assertion NOW ASSERTS 35."
+ :tried-and-withdrawn
+ "emitting a synthesised <summary> ELEMENT for a summary-less <details> --
+  the geometry axis matches by tag, so it would have reported a box the
+  oracle has not got, making the case WORSE. elementsFromPoint is what
+  ruled it out."
+ :ordering-note
+ "htmldom's inline-style tests assert cssom's output shape directly, so
+  htmldom is red against the OLD cssom pin until it is advanced -- the same
+  ordering the 2026-08-05 border-width/border-style change took. Both
+  commit messages say so. Verified green here only after both pins moved
+  together."}
