@@ -252,19 +252,20 @@ kotobase の `.well-known/x402` は現在、resource 一覧を **route handler �
 - chain は持つが token は持たない。**収入は手数料**であり、その 3 本は service ごとの treasury に分離される（D6）。
 - anchor は正しさの前提ではない。止まっても database は動く（D6-3）。
 
-## この transaction で着地させたもの
+## 着地したもの（2026-08-05 更新）
 
-D7 のみ（net-kotobase の `kotobase.x402-offer` + `.well-known/x402` の描画元一本化 + `catalog-agrees?` とテスト）。他の決定は配置と順序の記録であり、実装は下記 follow-up として順序付けた。
+- **D7** — net-kotobase の `kotobase.x402-offer`（`priced-resources` が唯一の正）+ `.well-known/x402` の描画元一本化 + 3 方向の `catalog-agrees?` とテスト。**加えて、作業中に見つけた live の収益欠陥を修正**: `?usd=` が宣言価格を置き換えていたので、買い手が `?usd=0.000001` で 1000 分の 1 で買えた（実測）。宣言価格を floor にし、上げる方向だけ残した。kotobase.net に deploy 済み（version `9628cbda`）。
+- **D3 の前提条件**（ADR-2608047000 follow-up 4）— **解消**。`inga` の証明書が自分の署名者を名乗れていた: `head/verify-cert` の docstring は「既知の validator set の witness」と主張しながら set を知る引数が無く、`attest/verify-certificate` は `witnesses` を証明書自身から採っていた。攻撃者が鍵を quorum 個生成して全部で署名すれば通る（何も偽造せずに）。`admitted?` を `quorum` と同じく**必須**にし、threshold の**前**に適用。`wire/admits` で `wire-id` 正規化（生の set は逆に全ての正当な witness を弾く）。`kotoba-lang/inga@2267102`。
+- **D3 の host 側**（部分）— `inga.propose`。`ref/outcome` の `(nil? winner)` は「敗北」を返すが、これは terminal には正しく **poll には誤り**で、素直に loop を書くと**成功した提案も含めて全部が失敗と報告される**（各呼び出しは文書どおりの値を返しているので、正しく見える）。`step` が `::pending` と決着を分ける。JVM 同期版と cljs 非同期版（Worker は block できないので busy loop は作らない）。`kotoba-lang/inga@78d5494`。
 
 ## やっていないこと（follow-up、優先順）
 
 1. **treasury の分離**（D6-2）。murakumo と kotobase が同一 Safe を指している。新しい Safe の deploy と secret 更新はオーナーの custody 行為で、agent が代行しない。
-2. **inga の validator set membership 検査**（ADR-2608047000 follow-up 4）。D3 の前提条件であり、これを解消するまで inga を production の ref 面に置かない。
-3. **inga ref を production に載せる**（D3）。witness1/2 の replica 化、D1 shim の撤去。
-4. **x402 challenge の stock 語彙と deal state**（D5 の (1)(2)）。
-5. **kura を `IObjectStore` 面に接続**（D1）。DataLad/annex 経路から。
-6. **暗号 epoch 1 への移行**（D4）。4 binding の provision と legacy block の移行。
-7. **base-l2 anchor**（D6-3）と fee 3 本の計上。
+2. **inga replica の配備**（D3 の残り）。**実測 2026-08-05: inga の replica はどこにもデプロイされていない**（`wrangler.jsonc` に `inga` の参照が 0 件）。witness1/2 は inga の replica ではなく、同じ worker code を別 bucket・別 seed で動かす**独立した単一 writer pod** である。残作業は ①`inga.replica` をホストする Worker ②3 pod 間のネットワーク ③`head.cljs` に `inga` モードを追加（既存の `off`/`shadow`/`authoritative` の第 4 モードとして）④shadow → authoritative の段階移行。**testnet 環境（別 bucket・別 seed で production と完全隔離）で先に実証する。**
+3. **x402 challenge の stock 語彙と deal state**（D5 の (1)(2)）。
+4. **kura を `IObjectStore` 面に接続**（D1）。DataLad/annex 経路から。
+5. **暗号 epoch 1 への移行**（D4）。4 binding の provision と legacy block の移行。
+6. **base-l2 anchor**（D6-3）と fee 3 本の計上。
 
 ## 学び —— 陳腐化した警告は陳腐化した安心と同じくらい害がある
 
