@@ -1738,3 +1738,140 @@
   {:what "::before / ::after of a flex item are not blockified"
    :why "the pseudo maps sit under separate keys and never reach the
          rewrite."}]}
+
+{:seq 52
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "09a04a861cda0eac8d3cb6738aa943941df13680"
+ :title "corpus expansion into untouched territory: 75 cases, and a paint-order axis that was asking the wrong question"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 501 :after 576}}
+ :measured
+ {:note "BOTH columns re-run on the merged tree. The scores DROP and that
+         is the intended result -- a corpus at 100% cannot find defects."
+  :line-structure {:before "473/482 (98%)" :after "540/553 (98%)"}
+  :geometry {:before "1702/1766 (96%)" :after "1823/1959 (93%)"
+             :clean-cases {:before "469/501" :after "502/576"}}
+  :paint-order {:before "12421/12514 (99%)" :after "13936/14389 (97%)"
+                :clean-cases {:before "479/501" :after "524/576"}}
+  :computed-style {:before "24797/24816" :after "27483/27528"
+                   :clean-cases {:before "492/501" :after "556/576"}
+                   :cascade-residual {:before 11 :after 30}}}
+ :verified-on-merged-main
+ {:cssom-tests "789 tests / 1817 assertions, 0 failures (783/1804 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "177/0"
+  :note "harness re-run independently on the merged tree; every axis
+         reproduced the agent's numbers exactly. The two hit-tester claims
+         were checked against the source: browser.session/node-at and
+         dom-gpu kotoba.wasm.host.retained do both drop
+         pointer-events:none and visibility:hidden/collapse."}
+ :harness-defects-found-and-fixed
+ [{:defect "engine-topmost-at read neither :pointer-events nor :visibility"
+   :why-it-matters
+   "BOTH of the engine's real hit-testers do -- browser.session/node-at
+    and dom-gpu's retained host each drop an op whose :pointer-events is
+    `none` or whose :visibility is `hidden`/`collapse` before taking the
+    topmost, and style-passthrough's own docstring says the keys exist for
+    exactly that. The harness was asking a question NO CONSUMER of this
+    engine asks, and charged the engine 40 sample points for two
+    behaviours it has right."
+   :effect "two cases changed, both to zero; nothing else moved."}
+  {:defect "the paint-order axis compared TAG NAMES only"
+   :why-it-matters
+   "two overlapping <div>s were indistinguishable however they were
+    stacked -- which is most of what stacking is on a real page. A case
+    built from two divs would have PASSED while measuring nothing. The
+    oracle now reports the author's `class` beside the tag and the engine
+    side returns [tag class] (:class was already on every :node op)."
+   :effect "zero points moved on landing -- it hid nothing, it only made
+            the axis able to see. :stacking/same-tag-opacity-lifts-the-
+            earlier-box (Brave div.lower, engine div.upper) is the case
+            that could not have existed before it."}]
+ :new-cases {:total 75
+             :agreeing-on-first-contact 21
+             :note "the 21 are in as CONTROLS -- a divergence beside an
+                    agreement measures a rule; alone it measures a number."
+             :by-group {:stacking 18 :logical 12 :replaced 11 :box 9
+                        :inline-vertical-align 7 :form 5 :visibility 3
+                        :generated 3 :wrap 2
+                        :list 1 :text 1 :multicol 1 :display 1 :position 1}}
+ :new-divergences-ranked
+ [{:rank 1 :what "logical properties -- 12 cases, all diverging, one cause"
+   :measured "margin-inline: 20px 60px -> x=20 w=220 ltr, x=60 w=220 RTL;
+              padding-inline: 10px 30px -> 340-wide box, <p> at x=10;
+              padding-block: 12px 24px -> h=56, <p> at y=12;
+              inline-size: 120px -> w=120; block-size: 60px -> h=60;
+              border-inline-start: 5px -> 305 wide, <p> at x=5;
+              inset-inline-start: 30px -> x=30. Engine ignores all."
+   :judgement "deep gap -- direction-dependent, so NOT a pure cascade rewrite"}
+  {:rank 2 :what "replaced elements other than <img> -- 8 diverging"
+   :measured "Brave reserves 300x150 for bare <canvas>/<video>/<svg> and
+              304x154 for <iframe> (default + UA border: 2px inset); this
+              engine makes each a 0px-tall block filling its container, and
+              a <canvas> in a sentence BREAKS THE SENTENCE IN TWO. <img>
+              intrinsic ratio: a 40x20 SVG at width:200px is 200x100 vs
+              200x0; at height:60px 120x60 vs 0x60. Control agrees:
+              attribute hints give 200x20 on both sides -- so the gap is
+              the RESOURCE's ratio, not the attributes."
+   :judgement "was a named scope cut with no number on it; now measured"}
+  {:rank 3 :what "stacking contexts -- 10 of 18, every geometry box in all 18 exact"
+   :measured "opacity: 0.99, transform: translateY(0), filter: blur(0) and
+              plain position: relative each lift a box over a later
+              overlapping in-flow sibling -- Brave answers the earlier box
+              at all 25 points, engine the later one. Confinement is a
+              DISCRIMINATING PAIR: z-index: auto parent lets a z-index: 5
+              descendant escape (Brave section, engine article) while
+              z-index: 0 confines it (Brave article, engine AGREES) -- the
+              engine confines in both. Also missed: z-index on a flex item,
+              and Appendix E step-1/step-2."
+   :judgement "deep gap"}
+  {:rank 4 :what "percentage margin/padding -- 4 cases"
+   :measured "padding-bottom: 50% of 300px is 150 vs 50; padding-top: 10%
+              is 30 vs 10; margin-top: 10% y=31 vs 0; margin-left: 10%
+              x=30 vs 10. The unit is dropped on every side."
+   :judgement "same cause seq 32 recorded for percentage gaps; now measured
+               for margin/padding too"}
+  {:rank 5 :what "vertical-align on an atomic inline -- 6 of 7"
+   :measured "`middle` reaches an inline-block EXACTLY (y=31.828125 both
+              sides); top/bottom/text-top/text-bottom/12px/50% -> Brave
+              0/36/28/33/18/20, engine 30 for all six."
+   :judgement "medium gap -- the machinery exists, it does not reach the
+               atomic-inline path"}
+  {:rank 6 :what "per-side border shorthands -- 2"
+   :measured "border-top: 10px solid -> Brave 30-tall box, <p> at y=10
+              w=300; engine 20 tall, y=0 -- not read at all, sharper than
+              seq 26's 'one uniform :border-width'. Control constrains any
+              fix: border-width: 10px; border-style: none computes to zero
+              on both sides."}
+  {:rank 7 :what "visibility: collapse on a <tr>"
+   :measured "Brave 0px row, table 44 tall; engine treats it as `hidden`,
+              66. Two controls agree that collapse IS hidden everywhere else."}
+  {:rank 8 :what "form controls with their own UA box"
+   :measured "<progress> 140x14, <meter> 70x14 (neither tag exists here,
+              both 400x0 blocks); input[type=range|color|file] all come out
+              at the text field's 153x21 against 129x16 at x=2 y=2, 50x27,
+              253x27."}
+  {:rank 9 :what "singles"
+   :measured "display: block ::before (p 40 tall vs 20); list-style-
+              position: inside (a at x=59 vs 53.70625 -- exactly the 5.29px
+              list-style-inside? already records); display: inline-table
+              (28x20 at x=49 vs three 400px blocks); writing-mode:
+              vertical-rl (20x70 vs 300x20, deep); border-radius: 50%
+              shrinking a hit region without changing the box (4 corners)."}]
+ :engine-gap-fixed
+ {:what "the `inset` shorthand"
+  :was "stored under an :inset key nothing reads, so an absolutely
+        positioned box fell back to its static position: Brave x=20 y=10
+        w=260 h=40, engine 0,0,7x20."
+  :now "expanded by the same 1-to-4 rule margin/padding use, into the four
+        bare side names layout-absolute-children already reads. `auto`
+        admitted (its initial value); percentage declined exactly as
+        margin/padding decline one."
+  :blast-radius "one case changed over all 576, 0/2 -> 2/2; no paint-order
+                 point moved. Six new tests."}
+ :measured-and-deliberately-not-added
+ ["shape-outside: circle(30px) moves a word from x=60 to x=58.281 -- 1.7px,
+   inside the geometry tolerance, on a coordinate no axis compares, same
+   words on the same lines."
+  "overflow: clip is identical to hidden on every axis here."
+  "object-fit -- the README already says no axis can see it."]}
