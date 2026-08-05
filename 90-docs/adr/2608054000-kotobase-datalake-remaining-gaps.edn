@@ -1,0 +1,213 @@
+[{:db/id -1
+  :adr/id "adr-2608054000-kotobase-datalake-remaining-gaps"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-datalake-remaining-gaps"
+  :adr/title "ADR-2608054000: kotobase を datalake として名乗れる地点まで来た — 残りのギャップ台帳（形式・書き込み・transport・検証基盤）"
+  :adr/status "accepted"
+  :adr/date "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+
+  :adr/repos ["orgs/kotoba-lang/kotobase-lake"
+              "orgs/kotoba-lang/columnar"
+              "orgs/kotoba-lang/org-apache-parquet"
+              "orgs/kotoba-lang/org-ietf-csv"
+              "orgs/kotoba-lang/json"
+              "orgs/kotoba-lang/kotobase-storage"
+              "orgs/kotoba-lang/kotobase-storage-s3"
+              "orgs/network-awai/net-kotobase"]
+
+  :adr/authoritative_for
+  ["kotobase の datalake 面の現在地（2026-08-05 時点で何が着地し、何が着地していないか）"
+   "残ギャップの優先順位と、それぞれ『なぜ今そこに無いか』の理由"
+   "形式対応の現在の集合（:scan / :materialize の別と、拒否される codec / encoding の列挙）"
+   "このセッションで発見した既存の検証基盤の欠損（本作業由来ではないもの）"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related
+  ["adr-2608042000-kotobase-lake-format-agnostic-object-catalog（catalog の設計）"
+   "adr-2608012600-kotobase-large-object-plane-lfs-and-annex（transport。D4 grant endpoint は本 ADR で着地、D5 verify は未着地）"
+   "adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog（byte を datom 面に載せない境界）"
+   "adr-260726-kotobase-query-plane-is-one-ref（join 到達範囲）"
+   "adr-2608036600-network-awai-actions-dead-move-net-kotobase-ci-to-murakumo（この repo の CI が動かない件）"
+   "adr-2607299700-kotobase-scoped-cacao（互いに代用できる 2 つの capability は 1 つ）"]
+
+  :adr/decision-summary
+  "{:verdict :names-itself-a-lake, :landed [:catalog :in-place-scan :engine :parquet :csv :ndjson :table :grant-endpoints], :formats {:scan #{:parquet}, :materialize #{:csv :tsv :ndjson}}, :codecs {:supported #{:uncompressed :snappy :gzip}, :refused-by-name #{:zstd :brotli :lz4 :lzo :lz4-raw}}, :gaps {:p1 :arrow-ipc, :p2 :write-side, :p3 :transport-retirement, :p4 :verification-infra}, :ceiling-4mib :bypassable-not-removed}"
+
+  :adr/verify
+  ["west pin: columnar b0862f6d / kotobase-lake 06d658a0 / org-apache-parquet 1d00afc7 / org-ietf-csv 95fc7f53 / net-kotobase 5f60dd73"
+   "nbb scripts/fleet-ci/gates/net-kotobase-hermetic-check.cljs <tree>   ; => E object-grant: Ran 16 tests, rc=0"
+   "各 repo の CI: kotobase-lake / columnar / org-apache-parquet / org-ietf-csv / json いずれも全 step success"
+   "net-kotobase の GitHub Actions は job を起動しない（ADR-2608036600）。実際に走る gate は murakumo fleet の check A-E のみ"]
+
+  :adr/body
+  "# ADR-2608054000: datalake 面の現在地と残りのギャップ
+
+**Status**: accepted
+**Date**: 2026-08-05
+
+## Context — どこから来たか
+
+オーナー質問（2026-08-04）「kotobase は datalake としても機能するかな?」に対する回答は
+**「storage 基盤としては既にそう、分析クエリ面としては真ん中が丸ごと無い」**だった。
+続く一連の作業で真ん中を埋めた。本 ADR はその現在地と、**まだ無いもの**の台帳である。
+
+## 着地したもの
+
+| repo | 内容 |
+|---|---|
+| `kotobase-lake` | catalog（format 非依存の admit / sniff / reader）、tabular（生ファイルへの `IPatternSource`）、acquire（認可ゲート）、**table**（N ファイル = 1 論理テーブル、manifest、partition 枝刈り）、columnar 接合 |
+| `columnar` | ベクトル化実行コア、統計による枝刈り、footer だけで答える集約 |
+| `org-apache-parquet` | thrift compact / footer / **range read** / PLAIN / dictionary / snappy / gzip |
+| `org-ietf-csv` | RFC 4180（CSV / TSV） |
+| `kotoba-lang/json` | `json.lines`（NDJSON） |
+| `net-kotobase` | **presigned grant endpoints**（`POST /objects/v1/grant/<op>`、`/settle`） |
+| `kotobase-storage` / `-s3` | 非同期 object contract、presigned object plane |
+
+### 設計上の背骨（作業中に確立し、今後も縛るもの）
+
+1. **format 非依存とは『write path が parse しないこと』**。`admit` の拒否理由は 4 つだけ
+   （cid / size / tenant / ingested-at 欠落）で、format による拒否は存在しない。宣言と
+   magic bytes の矛盾は `:conflict` として**記録して受け入れる** — 拒否は最も調べる価値の
+   あるオブジェクトだけを門前払いする。
+2. **object entity と claim entity を分ける**。`cid`/`size` はバイトだけの関数なので object、
+   宣言 media type と sniff 結果は observer 依存なので claim（`sniffer-version` 付き）。
+   sniff を object に置くと分類器の更新が黙って履歴を書き換える。
+3. **枝刈りはファイルでも row group でも同じ関数**（`columnar.stats/skip?`）。継承される
+   最重要規則は**統計が無ければ絶対に飛ばさない**。
+4. **triple pattern は projection + filter**。列指向ファイルが応えるために作られた形なので、
+   pushdown は後付けでなく pattern が既に持っている。
+5. **grant は custody ではない**。upload grant は `:pending` を記録し `:holding/*` を主張
+   しない。意図の時点で custody を主張すると git-annex が最後のローカルコピーを drop する。
+6. **未保持の read は 404 であって 403 ではない**。CID は構成可能な内容について推測可能なので、
+   区別すると catalog が全 tenant への membership oracle になる。
+7. **拒否はコストゼロ**。未認可の呼び手は presigner にも recorder にも到達しない。
+   これは答えでは示せない（URL を作った上での拒否も同じステータスを返す）ので、
+   記録する fake port で assert している。
+
+## 残りのギャップ
+
+### P1. Arrow IPC — seam の一般性がまだ証明されていない
+
+`IColumnSource` に差さっている `:scan` 形式は **Parquet ただ 1 つ**。2 つ目が無いので、
+seam が Parquet の形をしていないことは**主張であって証明ではない**。
+
+Arrow IPC が適任なのは、メタデータが FlatBuffers（thrift compact とは別系統）でありながら
+**データ層は Parquet より単純**だから（既定で無圧縮、encoding 無し、validity bitmap +
+values buffer が offset 付きに並ぶだけ）。つまり seam を曲げる圧力が Parquet と違う方向から
+かかる。
+
+**コスト**: FlatBuffers リーダ（vtable ナビゲーション）が本体。fixture は pyarrow の
+`pa.ipc.new_file` で生成できる。
+
+### P2. 書き込み側が丸ごと無い
+
+- **writer が無い。** lake は不透明バイトを着地させられるだけで、Parquet を書けない →
+  「このクエリをテーブルに実体化」ができない
+- **スキーマ進化**（列の追加 / 改名 / 型変更をファイル間で吸収）
+- **テーブルのスナップショット / time travel。** datom 面には有るが**ファイル集合には無い**
+  （「時刻 T のテーブル」が言えない）。Iceberg が manifest list で持っている層
+- **コンパクション / small-file 問題**
+- **GROUP BY が無い**。footer 集約は `count` / `min` / `max` のみで、`sum` は行を
+  materialize してから畳む。形式側への集約 push down も無い
+- **join 順序のコストモデル**（`selectivity-hint` は「束縛の多い順」だけ）
+
+### P3. transport — 天井は迂回できるが撤去はしていない
+
+`POST /objects/v1/grant/<op>` が着地したので **GB のオブジェクトが Worker に入らない経路は
+できた**。しかし:
+
+- **旧 `PUT /ipfs/:cid` の 4 MiB 天井はそのまま live**（意図的に無傷にした。public gateway に
+  依存しているものを同日に壊さないため）。**畳む判断が別途要る**
+- **`GET /ipfs/:cid` は未認証 public gateway のまま**（ADR-2608012600 Context 4）
+- **server-side digest verify（D5）が未実測**。`settle` は常に `:client-attested` /
+  `:stored` を返し、`:verified` に到達する経路が無い。`crypto.DigestStream` の
+  サイズ別実測が合格条件だが、まだ測っていない
+- **REMOVE が未配線**（D7）
+- `:object/*` / `:holding/*` datom は ADR-2608012600 D3 の schema ではなく、
+  **既存の archive pin 面**を holding として使っている。tenant scope・quota・
+  CHECKPRESENT の答えが既にそこにあるため（『この tenant が持っているか』の答えが
+  2 つあるのは 1 つ多い）だが、D3 の schema とは一致していない
+
+### P4. 検証基盤の既存欠損（本作業由来ではない、しかしこの面を守るもの）
+
+このセッションで発見し、**私の変更より前から存在した**ことを実測で確認したもの:
+
+- **`net-kotobase` の murakumo fleet gate check C が赤**。`runbook-check.cljc` が
+  `docs/MURAKUMO-CI.md` に期待するテキストを『Murakumo Cloud Actions への移行』commit が
+  削除している。私の merge 前の `981d1c68` に対して gate を走らせて確認済み。
+  **runbook が今何と書くべきかを決めるのは別の判断**なので直していない
+- **`clojure -M:render-components` が pristine な main で失敗**（`unclassified provider
+  source`）。component 成果物を再生成できない
+- **network-awai の GitHub Actions は job を起動しない**（ADR-2608036600）。したがって
+  `api-gateway.yml` に足した step は今日は発火せず、**実際に走る gate は murakumo fleet の
+  check A-E だけ**
+- コミット済みの Worker バンドルが main のソースより古かった（同一ソースの 2 回ビルドが
+  byte 一致することを確認して、ビルドの非決定性ではないと確定させた上での判定）
+
+### P5. クエリ到達範囲
+
+- **join 到達範囲は依然 ref 1 本**（ADR-260726）。catalog を跨ぐ分析はその制約下にある
+- lake の catalog datom と Parquet の行が join できるのは、**同じ source に materialize
+  した時だけ**。`kotobase.lake.columnar` がその接合だが、跨ぐ計画は planner が持っていない
+
+## 対応形式の現在地
+
+```
+:scan（範囲読み・枝刈り可）
+  Parquet
+    codec:    UNCOMPRESSED / SNAPPY / GZIP
+    encoding: PLAIN / PLAIN_DICTIONARY / RLE_DICTIONARY
+    拒否（名指し）: zstd / brotli / lz4 / lzo / lz4-raw、
+                    delta 系、byte-stream-split、v2 data page、nested(repeated)
+
+:materialize（全読み）
+  CSV / TSV（RFC 4180）
+  NDJSON / JSON Lines
+```
+
+**CSV と NDJSON が `:scan` になれないのは形式の性質**であって欠落ではない。区切りが文脈
+依存（CSV は引用の外、NDJSON は文字列の外でだけ境界）なので、N 番目のレコードへ seek する
+には手前を全部読むしかない。
+
+## Decision
+
+**残りは上記 P1-P5 の順で扱う。** ただし順序は硬直させない:
+
+- **P1 Arrow IPC** を先にするのは、seam の一般性が証明されないまま P2 の書き込み側を
+  設計すると、Parquet の形に引きずられた writer ができるため
+- **P3 transport** は独立に進められる（形式と無関係）。特に **`GET /ipfs/:cid` の未認証**は
+  セキュリティ課題なので、他の優先順位と切り離してよい
+- **P4 は『直す前に、誰が何を決めるか』が要る**もの（runbook の内容、component catalog の
+  分類規則）なので、技術的な難度ではなく決定の所在で止まっている
+
+## Consequences
+
+- **『lake を名乗れる』は名乗れる側に来た**が、Iceberg 相当ではない —
+  スナップショット・スキーマ進化・コンパクションが無い（P2）
+- **4 MiB 天井は『迂回路ができた』であって『撤去した』ではない**。旧経路は live で、
+  それを畳むまでは 2 つの書き込み面が並存する
+- **`:verified` 状態は到達不能**。D5 の実測が入るまで、あらゆる object は
+  `:stored` + `:client-attested` で止まる。読み手（git-lfs / git-annex）は自分で再 hash
+  するので信頼モデルは壊れないが、**`:verified` と書いてあるのに検証していない**状態には
+  ならないことが担保の全て
+- **この面を守る gate は murakumo fleet の check E ただ 1 つ**（16 tests）。GitHub Actions
+  側の step は org の Actions が復旧するまで飾りである
+
+## 付記 — 退避した他セッションの成果物
+
+`90-docs/adr/2608053000-cloud-itonami-app-session-close.edn` は EDN として壊れており
+（本文に diff マーカー `+1.` / `\\n+` が混入、Clojure 文字列が対応しない行末 `\\` 継続）、
+docs hook が workspace 全体の push を止めていた。1 時間更新が止まっていたため書いた
+セッションは終了と判断し、**破棄せず退避**した:
+
+- `.git/stash-archive-20260805/2608053000-cloud-itonami-app-session-close.edn`
+- `git stash`（drop していない）
+
+書いたセッションが戻れば `git stash pop` で拾える。**意図を推測して他セッションの ADR を
+書き直すことはしていない。**"}]
