@@ -1531,3 +1531,33 @@
     macOS の headless Brave 151 は overlay scrollbar で何も予約しないので一致した。
     測っている内容に合わせて改名して残した。"
   "重複 id 検査が既存 corpus との衝突を 2 件検出（1 件は近似重複として削除、1 件は改名）。"]}
+
+{:at "2026-08-05"
+ :iteration 54
+ :attempted "空 block の self-collapsing（CSS 2.1 8.3.1）"
+ :outcome "**実装したが着地させず撤回。1 case を直して 3 case を壊した。**"
+ :measured "Brave 151 実測で規則自体は確定していた: margin: 14px 0 の空 div は
+            両方の子を y=0 に置き親は 20px 高（collapsed set が親の上端から逃げる）。
+            **border-top: 1px を付けると止まる**（親 35、次の兄弟 y=15）。
+            **height: 0 では止まらない** —— だから条件は『高さ宣言が無い』ではなく『内容高が 0』。
+            不揃いな margin（20px 0 6px）は他の対と同じく大きい方に畳まれる。"
+ :implementation "gap を置かず carried = collapse(mt*, mb*) を次の兄弟へ運ぶ。
+                  first? かつ collapse-top? のときは carried が親の上端から**逃げる**ので
+                  内側には置かない（さもないと二重に置いて次の兄弟を押し下げる）。
+                  clearance を持つ box は除外（CSS 2.1 8.3.1 の例外であり、
+                  この engine では **clearfix の『空の cleared div』**がまさにその形）。"
+ :why-withdrawn "対象の :block/an-empty-block-collapses-through-itself は **oracle と完全一致**したが、
+                 501 case の draw op を diff した結果、**変化したのはちょうど 4 case**で、
+                 残り 3 つが退行した: :block/nested-block-in-inline /
+                 :inline/anchor-around-block-is-split / :inline/inline-block-containing-a-block。
+                 いずれも **split された <p> の末尾に残る空の <p>** を持ち、
+                 **oracle はそれを y=88 に置くのに、私の規則は 74 に上げる**（ちょうど margin 1 つ分）。
+                 つまり Brave はこの文脈では畳んでいない —— block-in-inline の分割が作る
+                 匿名 block の周りで規則が変わる。**その条件を特定するには、この反復に収まらない
+                 追加の probe が要る。**"
+ :note "**scoreboard は −1 box としか言わない。4 case の draw op を diff して初めて
+        『1 つ直して 3 つ壊した』が見えた。** 総計だけ見ていれば、ほぼ同点だからと
+        着地させていた可能性がある。"
+ :next "次に挑む者への出発点: 空 <p> が split された <p> の末尾にあるとき Brave が畳まない理由を
+        probe する（匿名 block の境界が関与している疑い）。規則そのものは上記のとおり実測済みで、
+        必要なのは**もう 1 つの条件**だけ。"}
