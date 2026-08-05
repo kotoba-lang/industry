@@ -377,6 +377,50 @@ evict して、使うほど遅くなる cache になる）。
 合成フォントの `/W`・`/DW` も読むようにした（`/Type0` に `/Widths` は無いので、
 CJK と subset-CFF は**測定された advance を 1 つも持っていなかった**）。
 
+### 追記: 成熟度を上げ続ける local loop（`kotoba-lang/loop-render-fidelity`）
+
+このセッションで見つけた欠陥は**全て実ファイル由来**で、fixture からは 1 つも出ていない。
+一方で測定は `/tmp` の使い捨てスクリプトで、**私自身が 3 回測り間違えた**
+（fill と stroke を `or` で潰す / advance を gap と誤認 / 空 run が満点 baseline）。
+これを反復可能にする。
+
+```text
+corpus を探す → 描画 → 証人と突き合わせ → ratchet → evidence 追記 → 次の的を名指し
+```
+
+**証人は fixture ではなく第 2 実装。** `pdf.core/extract-text` は行列も状態機械も持たず
+BT/ET 間の文字列を集めるだけ —— **配置には全く使えない**（だから hanmen がある）。
+その使えなさが証人として良い理由で、**interpreter と一切コードを共有しない**ため、
+「どの文字がページにあるか」で両者が一致することは証拠になる。空白を全部落として比較し、
+比較対象は**全フォントが simple なページのみ**（証人は composite font を読めないので、
+そこで一致を要求するのは「証人と同じだけ間違え」と要求すること）。
+
+**文字を落とすのは報告のみ。文字を捏造したら 1 文字で fail**（corpus がどれだけ
+大きくても）。この 2 つは対称ではない —— 復号できないフォントがあるのは正当だが、
+誰も書いていない文字を足すのは決して正当でない。**これがこの loop の存在理由**:
+捏造空白 6,289 個が 45 文書に入っている間、あらゆる rate は健全に見えていた。
+
+**閾値ではなく ratchet。** 「正しい undrawn 数」は存在せず、同じ corpus で
+昨日より多いか少ないかだけが分かる。比較は count でなく **rate**（local corpus は
+動く —— ファイルが同期し placeholder が退避する。それを regression と呼ぶ gate は
+1 週間で切られる）。
+
+**local である理由。** corpus は他人の文書で commit できない。commit するのは
+**metric** の方。`scripts/fleet-ci` の node は tailnet だけで文書を 1 つも持たないので、
+どれだけ gate に見えてもこれは fleet gate になれない。
+
+**loop 自身が自分のバグを 2 つ、走らせることで見つけた**: 空 run が rate 1.0 で
+満点 baseline を記録していた（分母 0）／`unix:blocks` はこの platform に存在せず、
+文書だらけのディレクトリで 0 件を返していた。「バイトがここにある」は今
+**「読み取りが即座である」**と定義している —— それが実際の性質そのものだから。
+
+**初回実行（40 件中 31 件計測）が次の的を出した**: 比較可能 6 ページ中 5 ページ一致
+（1 ページで 1 文字欠落）、undrawn 6 件は全て `:font/no-tounicode`、そして
+**9 文書が計測不能で signature は 3 種**（`/M under radix 16` 系 ×4、
+`zlib: stream ends…Adler-32 trailer` ×2、`/A under radix 16` ×2）。
+1 つの message で 8 文書落ちるなら書くべき decoder があり、8 つの message で
+8 文書なら corpus の問題 —— これは 3 種なので前者に近い。
+
 ## まだ無いもの（「実装済み」と読まないこと）
 
 1. **`Adobe-Identity` を名乗るフォントは誰にも復号できない。** 「CID の意味はフォントが
@@ -385,8 +429,10 @@ CJK と subset-CFF は**測定された advance を 1 つも持っていなか�
    検証できない機能のコードは書かない。
 3. **tiling pattern（34 件）は印を付けるだけで敷き詰めない。** 何回敷くかを決める
    必要があり、2pt のタイルはページに数千枚になる。
-4. **`org-ietf-deflate` が 1 文書で `zlib: stream ends before its Adler-32 trailer`。**
-   上流の decoder 側で、`:pageview/undecodable` として正直に報告される。
+4. **parse が落ちる文書がある**（loop 初回で 40 件中 9 件）。signature は 3 種で、
+   `/M under radix 16` 系 6 件と `zlib: stream ends before its Adler-32 trailer` 2 件。
+   前者は hex parser がコンテンツを hex と誤読しており **未調査の実バグ**。
+   loop が毎回この数を報告する。
 3. **clip は box であって path ではない。** 円形 clip の角が残る（誤差の向きは意図的）。
 4. **目視の後追いができていない。** coalesce 前は 30 文書を Chrome で確認したが、
    **修正後の再確認は他 session の terminal がデスクトップを占有して撮れていない**
