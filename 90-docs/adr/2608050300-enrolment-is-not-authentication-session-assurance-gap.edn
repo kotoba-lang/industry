@@ -173,6 +173,6 @@ cloud-itonami-app: **1073 tests / 4471 assertions / 0 failures**
   :adr/gaps
   ["【解消済 2026-08-05】cloud-itonami-app の retroactive Passkey session の穴は `06239dd` で塞いだ。may-act? が :issued-via :passkey + :authn-level :phishing-resistant + passkey-enrolled? を要求し、markers は passkey-session-options（authn/decide 経由）だけが発行する。finish-passkey-registration! は既存 session を in-place で upgrade する（これが無いと onboarding が自分を締め出す）"
    "cloud-itonami-app: legacy provisional owner の WebAuthn user handle repair path が main に無い（handle が nil のまま）。PR #37 の枝にはある。未着手"
-   "PR #28 (draft) は open のまま。39 commits の embedded Bitcoin consensus の review が要る。known-broken の残り 2 件（account-link-sync / bitcoin-wallet）はこの PR が持っている"
+   "PR #28 (draft) は open のまま。2026-08-05 に conflict 解消を試みて中止した: main が 06239dd まで進み conflict は 6→12 file、そのうち provider.clj は両ブランチで関数の構造が別物で union が構文エラーになり、/mcp はこの PR が HTTP routing をグループ dispatcher に再編しているため main の require-mcp-origin!/require-app-session!/require-mcp-tool-scope! を通る経路と衝突する。これは merge ではなく『どちらの設計を採るか』の決定。推奨は PR 全体の merge ではなく、PR #37 でやったように着地させたい commit だけを現在の main へ replay すること。consensus code 自体は kotoba-lang/bitcoin-node v0.49.0 にあり app 側は adapter なので、Bitcoin 部分と routing 再編は分割できる"
    "cloud-itonami-app の共有 west checkout は他セッションの feat/adr-0013-repository-storage のまま（未追跡 ADR 2 件も残置）。その内容は今回 main に着地したので切り替え可能だが、他セッションの作業なので触っていない"
    "cloud-itonami-app に他セッションの worktree が 6 つ残っており、うち 4 つが prunable。自分のものではないため報告のみ"]}]
