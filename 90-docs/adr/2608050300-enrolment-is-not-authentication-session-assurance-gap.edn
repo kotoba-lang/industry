@@ -1,0 +1,154 @@
+[{:db/id -1
+  :adr/id "adr-2608050300-enrolment-is-not-authentication-session-assurance-gap"
+  :adr/title "ADR-2608050300: enroll は authentication ではない — cloud-itonami-app の session gate に穴があり、塞いでいない"
+  :adr/status "accepted"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-05"
+  :adr/last-verified "2026-08-05"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "session-assurance-gap-and-open-pr-disposition"
+  :adr/repos ["orgs/cloud-itonami/cloud-itonami-app"]
+  :adr/related ["adr-2608050200-mail-protocol-libraries-message-format-org-ietf-pop3"]
+
+  :adr/authoritative-for
+  ["cloud-itonami-app の session gate に既知の穴があり、本セッションでは塞いでいないこと"
+   "open PR の disposition はラベルでなく測定で決めること（cleanup-workflow :preservation-pr-disposition の適用実績）"
+   "superseded な PR を merge しないこと（merge すると壊れることを実測で確認した）"]
+
+  :adr/body
+  "## 見つかった穴 — enroll した瞬間、過去の browser token が遡って通る
+
+`cloud-itonami-app` の `identity/issue-session!` は **既定で `:kind :passkey`**
+を付ける。そして `may-act?` は `:passkey` の場合 `passkey-enrolled?` しか見ない:
+
+    :passkey (passkey-enrolled? candidate)
+
+したがって **Passkey を enroll する前に発行された session token が、その人が
+enroll した瞬間に「Passkey 認証済み」として通るようになる。** token 自体は
+何も証明していない（ブラウザが持っているだけ）。
+
+実測（2026-08-05）: `/api/business` に対し、enroll 前に発行した token を
+`passkey-enrolled? true` にしてから投げると **200** が返る。
+
+## どうやって見つけたか
+
+PR #37 の枝が持っていたテストが、main に対して落ちたため:
+
+    (testing \"enrolling the User does not retroactively turn an unproved
+              browser token into a Passkey-authenticated session\"
+      … (is (= 428 (:status (request :get \"/api/business\" …)))))
+
+期待 428、実際 200。最初は自分の merge 解決が壊したのかと疑ったが、
+`identity.clj` は main と byte-identical であることを確認し、main の
+`issue-session!` の docstring（\"`:kind :passkey` — the shape every caller had
+before agent sessions existed\"）と `may-act?` の実装から、**main の設計上の
+挙動**だと確定した。
+
+PR #37 の枝は `:issued-via` / `:authn-level` を見て区別している（そのテストの
+`passkey-session-options` が `:authn-level :phishing-resistant` を渡している）。
+main はその区別を持たない。
+
+## 決定 — 塞がない。記録して別 review に回す
+
+session-assurance model の移植は **merge conflict の解決ではなく security
+work** である。今回の作業は「open PR を review して conflict を解消し merge
+する」であり、その途中で認証モデルを片手間に書き換えるのは:
+
+- 変更の理由が commit の主題と一致しない（レビューする側が見つけられない）
+- 移植元（PR #37 の枝）は ADR-0013 半分が superseded で、その枝の
+  `identity.clj` 全体を採ると main の新しい実装を巻き戻す
+
+したがって **採用しなかった。** ただし黙って落とすことはしていない:
+
+1. 該当テストを削除した位置に、削除理由と gap の内容をコードコメントで残した
+   (`test/cloud/itonami/app/core_test.clj`)
+2. PR #37 のコメントに測定値付きで記載
+3. 本 ADR（PR は close 済みなのでコメントは失われうる。ここが正本）
+
+同種の gap がもう 1 件: legacy provisional owner の WebAuthn user handle を
+repair する path が PR #37 の枝にあり main に無い（main では handle が nil の
+まま）。こちらは security というより整合性の問題。
+
+## open PR の disposition（測定で決めた）
+
+`manifest/cleanup-workflow.edn` の `:preservation-pr-disposition` に従い、
+overlap → content containment → 人が読む、の順で判定した。
+
+### #32 `cleanup: land email-login session-proof slice` → close-superseded
+
+- `email_login.clj` / `email_login_test.clj` が main と **byte-identical**
+- ADR 0012 は main の方が長い（93 行 vs 73 行）
+- main の `identity.clj` に `start-email-authentication!` /
+  `finish-email-authentication!` / `email-login-configured?` が存在
+
+**merge すると壊れることを実測**: alias が `authentication`/`authorization` と
+main の `authn`/`authz` で衝突し `(def email-login-seconds 600)` が二重定義、
+`server.clj` は `case` に `:email-login/invalid-token` が 2 回入って
+macroexpand で落ちる。同じ機能の古い並行実装だった。
+
+### #37 `ADR-0013 repository storage + ADR-0014 kanban runtime` → 分割
+
+- `a8190b0` (ADR-0013) は **superseded**。main が `6f99f3e` として同じ作業を
+  着地させ、さらに 5 commit 積んでいた（cold recovery drill / derived
+  invariants / secret-safe preflight / actor persistence gaps / OAuth MCP
+  hosting）。触る 12 file 全てが main に存在。
+- `936d16b` (ADR-0014 kanban runtime) は **replay して merge**（`63ccc55`）。
+  rebase を使わず `origin/main` から新しい枝を切って cherry-pick。conflict は
+  19 file → 10 file に減った。
+
+### #28 `Integrate wallet, local agents, consensus and MCP maturity` → needs-review（open のまま）
+
+39 commits の大半が embedded Bitcoin consensus（BIP30/BIP94、compact
+filters、sighash parity、witness validation）で draft。conflict 解消は可能だが
+consensus-critical code の review であり、行単位で監査していない。
+
+`identity.clj` の 1 点だけ解消しておいた: この PR は connection を
+organization だけで絞るが main は user-did でも絞る（1 organization に複数人の
+メールアカウントが載るため、緩めると他人の接続済みアカウントが見える）。
+main 側を残し PR の `:wallet-links` を追加する形にした。
+
+## 副産物 — naive な union が仕込む欠陥
+
+ADR-0014 の replay で、conflict を機械的に「両側採用」した結果 4 件の欠陥が
+出た。いずれもテストか目視で潰したが、記録に値する:
+
+1. `store.clj` が `work-partition-store` の require を落としたまま、それを
+   呼ぶコードを残した（compile 不能）
+2. `server.clj` の `case` に `:email-login/invalid-token` が 2 回（macroexpand
+   で落ちる）
+3. `server.clj` に `/api/email-authenticate/*` が 2 組。main の 2-arg
+   `identity` fn に対して PR の 3-arg 呼び出しが入り、`cond` の順序が変わった
+   日に arity error になる dead code
+4. `server.clj` に `/api/integrations/kotobase/assertion` が 2 箇所
+
+**教訓**: conflict の「両側採用」は additive に見える箇所でも安全ではない。
+`case` の分岐と `cond` の route は、重複しても構文は通り、意味だけが壊れる。
+
+## 検証
+
+cloud-itonami-app: **1073 tests / 4471 assertions / 0 failures**
+（この作業の着手前は 1026 / 4329）。clj-kondo **0 errors**、warning は
+15 → 9（union が作った重複 require 3 件と、replay が引きずってきた dead var
+3 件を除去）。
+
+`store/update-agent-control!` が入ったことで `cloud.itonami.app.agent-control`
+が compile するようになり、`namespaces_test` の `known-broken` から外れた。
+残る known-broken は `account-link-sync`（`identity/wallet-links` 未定義）と
+`bitcoin-wallet`（`cloud.itonami.app.bitcoin` 不在）の 2 件で、どちらも PR #28
+が持っている。
+
+## 着地
+
+- cloud-itonami-app `63ccc558414040c1658115bd2e85886fc4ccad47`
+- west pin 同 SHA（fast-forward、3 ahead / 0 behind、pin-verify hook 通過）
+- archive: `orgs/cloud-itonami/cloud-itonami-app/.git/stash-archive-20260805/`
+  に 3 PR 分の patch + commits + index.txt（close 前に退避。内容は失われていない）"
+
+  :adr/gaps
+  ["【security】cloud-itonami-app: enroll 前に発行された session token が enroll した瞬間に may-act? を通る。main の issue-session! が既定で :kind :passkey を付け、may-act? が passkey-enrolled? しか見ないため。PR #37 の枝が持っていた :issued-via / :authn-level による区別の移植が要る。未着手"
+   "cloud-itonami-app: legacy provisional owner の WebAuthn user handle repair path が main に無い（handle が nil のまま）。PR #37 の枝にはある。未着手"
+   "PR #28 (draft) は open のまま。39 commits の embedded Bitcoin consensus の review が要る。known-broken の残り 2 件（account-link-sync / bitcoin-wallet）はこの PR が持っている"
+   "cloud-itonami-app の共有 west checkout は他セッションの feat/adr-0013-repository-storage のまま（未追跡 ADR 2 件も残置）。その内容は今回 main に着地したので切り替え可能だが、他セッションの作業なので触っていない"
+   "cloud-itonami-app に他セッションの worktree が 6 つ残っており、うち 4 つが prunable。自分のものではないため報告のみ"]}]
