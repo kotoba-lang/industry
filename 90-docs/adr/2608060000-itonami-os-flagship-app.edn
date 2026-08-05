@@ -1,0 +1,191 @@
+[{:db/id -1
+  :adr/id "2608060000"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-os-flagship-app"
+  :adr/title "営み OS — flagship は成熟度 TIER であって app ではなかった。9 本の governed actor を 1 つの営みとして回す面を建て、境界をまたぐ連携は :carry しか書けないようにする"
+  :adr/status :accepted
+  :adr/date "2026-08-05"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["営み OS の層構造（封筒 / 統合台帳 / 連携 / kernel）と、各層が持たない責任"
+   "統合台帳に何が載り何が載らないか（allowlist 射影と PII 最小化契約）"
+   "vertical 連携の宣言形式と、境界をまたぐ規則が :carry しか取れない機械的強制"
+   "vertical の接続状態（:native / :unbound）の宣言と、未接続を隠さない規律"
+   "{org}.itonami.cloud/{repo} 上の営み面の生成規約"]
+  :adr/supersedes []
+  :adr/related ["2607131000" "2607122300" "2607189300" "2607301300" "2608052000" "2608057000"]
+  :adr/repos ["network-awai/cloud-itonami"
+              "cloud-itonami/cloud-itonami-isic-6399"
+              "cloud-itonami/cloud-itonami-isic-7810"]
+  :adr/body
+  "# ADR-2608060000: 営み OS
+
+**Status**: accepted / **Date**: 2026-08-05
+
+## Directive
+
+オーナー指示: 「今の cloud-itonami の flagship に相当する app を設計実装」。
+続けて「itonami は github の考え方に合わせているので {org}.itonami.cloud/{repo}
+で公開、それぞれが内部的に連携、統合」。
+
+## 何が無かったか（実測 2026-08-05）
+
+`flagship` はこの fleet では**成熟度 TIER**であり（ADR-2607189300 の 7 項目
+チェックリスト）、7/7 に達しているのは 9 本 — isic-6310 / 5820 / 6399 / 7810 /
+4921 / 851 / 852 / 853 / 854（ADR-2608052000 の `:maturity/layer :flagship` と
+同一集合）。
+
+**9 本すべての実体は `.cljc` の governed actor + ビルド時生成の静的 demo ページ
+であり、操作できる app はどこにも無かった。** flagship が証明しているのは
+『repo が checklist を満たしている』ことで、『営みが回っている』ことではない。
+
+一方、面の機構は既に在った: `sites.edn` の宣言 → 純 `.cljc` の resolve →
+shadow-cljs `:esm` → Pages Function（ADR-2607301300、2026-08-05 に
+『org はホスト、repo はパス』へ改訂 = ADR-2608057000）。**オーナーが指定した
+URL 形は既に実装済み**だったので、ここでは routing を作らずその上に建てた。
+
+## 決定
+
+### 1. 4 層。どの層も判断を持たない
+
+| 層 | 持つもの | 持たないもの |
+|---|---|---|
+| `os/envelope` | どの actor にも同じ形で渡す封筒、台帳への射影 | 許可判定・verdict |
+| `os/journal` | 本文を持たない統合台帳（hash 連鎖） | 本文・PII |
+| `os/wiring` | 連携の宣言と、その静的検査 | commit する力 |
+| `os/kernel` | **順番だけ**（宣言→実行→台帳→連携） | 判断すべて |
+
+許可は registry（宣言）、判定は各 vertical の governor と phase gate、連携の
+可否は wiring にある。kernel が判断を 1 つでも持てば、『LLM を独立した censor で
+封じる』という actor パターンの前提が OS 側から崩れる。
+
+### 2. 統合台帳は control plane であって data plane ではない
+
+台帳に載るのは `envelope/journal-fields` の allowlist を通ったものだけ
+（処分・effect・違反規則 ID・監査種別）。**本文・payload・advisor の要約は
+構造的に通れない。** `:boundaries` を持つ vertical の主体は生の ID ではなく
+`sha256:` に畳まれる。
+
+これは ADR-2607131000 の『no single store spans the PII boundary』を守るための
+形である。端から端までの物語を読むには各 actor の台帳と両方が要る —— それは
+不足ではなく意図された設計。
+
+digest 関数は注入する。台帳の同一性を決める関数が暗黙に差し替わる事故を防ぐため、
+この層に既定値を置かない。
+
+### 3. 境界をまたぐ連携に `:invoke` は書けない（load 時に throw）
+
+ADR-2607131000 は 6399→7810 について既に決着している: 『ハンドオフは人間が運ぶ
+referral draft であり、actor 間の直接呼び出しではない。共有ストアも、共有
+governor も、両者間の API 呼び出しも無い』。
+
+本 ADR はこれを**散文ではなく型で**持つ。`wiring/compile-rules` は、境界集合が
+異なる 2 つの vertical をつなぐ規則が `:invoke` なら例外を投げる。
+`:carry`（人が運ぶ）だけが書ける。手で書き写す手間が消えるだけで、**行為の
+主体は人のまま**である。
+
+`:invoke` であっても作るのは request であって commit ではない —— 相手の
+governor と phase gate は必ず通る。加えて `:invoke` の部分グラフは非巡回検査を
+受け、連鎖には燃料上限があり、**上限に当たったら黙って止めず仕事を作る**
+（静かな打ち切りは『連携が無かった』と区別できない）。
+
+すべての連携規則は `:wiring/basis`（出典）を要求する。統治領域をまたぐ判断なので、
+誰がいつそう決めたかが規則自身に無いと後から検証できない。
+
+ADR-2607131000 §3 は『live integration が要るなら transport と PII 最小化契約を
+名指しした新しい ADR を要する』と書いた。本 ADR がそれである:
+**transport = operator console 上の carry 作業（人の行為、server-to-server 呼び出しは無い）**、
+**PII 最小化 = 統合台帳の allowlist 射影 + 境界を持つ vertical の主体 digest 化**。
+
+### 4. 宣言された連携は 2 本。求人掲載 → 職業紹介 → 雇用
+
+| id | from | to | mode | basis |
+|---|---|---|---|---|
+| `:refer->intake` | 6399 `:application/refer` | 7810 `:candidacy/intake` | `:carry` | ADR-2607131000 |
+| `:place->employee` | 7810 `:candidacy/place` | 6310 `:employee/upsert` | `:carry` | 本 ADR |
+
+3 本の repo は『Indeed 置換』『紹介事業』『kaonavi 置換』として別々に作られたが、
+実務ではこれは 1 本の流れである。OS はその流れを**見えるようにするだけ**で、
+境界は 1 つも溶かさない（3 つの統治領域はそれぞれ別の免許と法令を持つ）。
+
+### 5. 接続は 2 本。残り 7 本は `:unbound` と宣言し、動くふりをしない
+
+native adapter で実際に回るのは 6399 と 7810。**flagship 9 本のうち中核が完全に
+portable な `.cljc` なのがこの 2 本だけ**だから（実測: 6310 は `talent/facts.clj`、
+5820 は 6 本、4921/851–854 は `render_html.clj` が JVM 専用）。
+
+残り 7 本は `:binding :unbound` + `:unbound-reason`（必須）で宣言し、op を
+投げると**必ず拒否する**。面は未接続の理由をそのまま出す。ADR-2608052000 の
+『測っていない軸は 0 でなく分母から外す』と同じ規律で、未接続は『0 点の営み』
+ではなく『まだ回していない営み』。
+
+`os/runtime` が宣言と adapter を突き合わせ、食い違えば組み立て自体を落とす
+（`:native` なのに adapter が無い / op 集合がズレる）。この食い違いは**面に
+出ない壊れ方**なので、黙って握り潰さない。
+
+### 6. 面は `{org}.itonami.cloud/os` と `/{repo}`
+
+既存の sites 宣言機構と共通クロームに乗る。生成器は 6399/7810 の
+OperationActor を**実際に回し**、その台帳を描く（ADR-2607122300 §1）。
+**拒否が 0 件の生成は生成器自身が exit 1 にする** —— 拒否が本物であることは
+拒否を実演しないと示せない。
+
+UI は DADS（jp-go-dds）。2026-08-05 のベース変更に従う。
+
+## 実測（2026-08-05、live）
+
+生成器の 1 回の実行で 18 op を回した。台帳 16 件、hash 連鎖 `{:ok? true}`、
+運ぶ仕事 2 件。内訳:
+
+- 確定 9 / 承認待ち→確定 6 / **保留 1**（法域評価を飛ばした掲載）
+- **拒否 2**: `op-not-declared`（宣言に無い op）/ `unbound`（未接続の営み）
+
+live: `https://cloud-itonami.itonami.cloud/os/` ほか 9 枚 + 既存 3 サイト、
+全 13 枚 200。未登録は 404（`/zzz-nonexistent/` で確認）。
+design-quality 100.00 / min 95。
+
+JVM 15 tests。suite 全体 1387 tests / 9067 assertions、既存の 7 failures /
+12 errors は本変更前と同一（回帰なし）。
+
+## 途中で分かったこと（設計に効いた実測）
+
+1. **fleet には op 命名が 2 流儀ある。** 6399/7810/6310/5820 は
+   `:posting/publish` のような qualified keyword、4921/851/852/854 は
+   `:log-service-record` のような裸の keyword。封筒が片方を強制すると flagship の
+   半分が入らないので、`keyword?` までしか要求しない —— **fleet が持っていない
+   規則を OS が発明しない。**
+2. **`:disposition :escalate` は 2 つの意味を持つ。** 承認待ちで止まっている run と、
+   承認が済んで決着した run の両方で立つ。承認待ちの判定は langgraph の
+   `:status :interrupted` でしか取れない。disposition だけを見ると、決着済みの
+   run をいつまでも作業待ちとして面に出し続ける。
+3. **`:os/run-id` は必須にした。** langgraph の checkpointer は thread-id で run を
+   同定するので、`(vertical, op, subject)` から導出する既定を置くと、同じ主体への
+   2 度目の op が新しい run ではなく**承認待ちの run の再開**になる。
+4. **DADS の `--hig-*` bridge が運ぶのは 27 トークンで、`--hig-spacing-*` と
+   `--hig-text-*-size` は入っていない。** 無いトークンはエラーにならず `var()` が
+   空に解決するので、`padding: var(--hig-spacing-3)` は黙って 0 に潰れる。
+
+## 正直な限界
+
+1. **面は今日ビルド時生成であり、request 時に op を受け付けない。** 台帳は生成器が
+   回した筋書きのもので、operator が自分の営みを回す経路（CACAO gate + KV 永続化 +
+   `:esm` edge bundle）はまだ無い。カーネルは host 非依存に書いてあるので edge に
+   載せられるが、**載せていない。**
+2. **統合台帳は永続化されていない。** 値として生成器の中で完結しており、
+   run をまたいで積み上がらない。
+3. **接続は 2/9。** 残り 7 本は adapter を書けば繋がる（4 本は `render_html.clj`
+   だけが JVM 専用で中核は portable）。6310 と 5820 は先に repo 側の
+   `.clj` を `.cljc` に割る作業が要る。
+4. **`:invoke` は実装され検査もされているが、宣言された規則には 1 本も無い。**
+   境界を共有する vertical 同士の連携で出典のあるものが今日は無いため。
+5. **7810 の store は `seed-db` のデモデータ。** 実運用のデータ経路は operator 側。
+6. **isic-853 は `governor/allowed-ops` を持たず op が phase/advisor に散っている。**
+   `os.edn` の `:ops` の写しの検査が、他の 8 本と同じ形では効かない。
+
+## 次の 1 手
+
+`os/kernel` を `:esm` edge bundle に載せ、`POST /api/{org}/{repo}/os/ops` を
+既存の CACAO tenant gate の内側に置く。台帳の永続化先は**共有バックエンド**に
+する —— kotobase の join は ref 1 本までなので、営みをまたいで引きたいものは
+同じ ref に置く。D1 を order/CAS の裁定者にはしない（ADR-2608039000）。
+"}]
