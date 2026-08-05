@@ -1203,6 +1203,13 @@ ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics に�
   **何にも解決しない**（`padding: var(--hig-spacing-4)` が黙って消える）。足りなければ
   上流の `hig->dads` に足す —— app CSS で再導出しない（bridge 自身の docstring:
   「2つ目のアプリが再導出した瞬間に契約は壊れる」）。
+  **実測（2026-08-05、ADR-2608060000）: bridge が運ぶのは 27 個で、内訳は
+  `--hig-color-*`(17) / `--hig-palette-*`(4) / `--hig-font-*`(3) / `--hig-hairline`。
+  `--hig-spacing-*` と `--hig-text-*-size` と `--hig-radius-*` は 1 つも入っていない。**
+  DADS 基盤で最も書きたくなる padding / gap / font-size がちょうど全滅する帯で、
+  しかもエラーにならず 0 に潰れるので**見た目が崩れて初めて気付く**。当座は DADS 側の
+  primitive か `em` 相対で書き、恒久的には上流に足す。確認は
+  `grep -o '"--hig-[a-z0-9-]*"' orgs/kotoba-lang/jp-go-digital-design-system/src/jp_go_dds/tokens.cljc | sort -u`。
 - **DADS は light。** `page` の `:dark? true` はこのライブラリ独自の反転層（上流には
   dark palette が無い）。暗い環境で色を見る editor 向けで、kami-app-daw / -nle が使う。
 - **DADS に無いもの**: app-shell / editor frame、segmented control、trailing slot 付き
