@@ -1,26 +1,26 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 25706,
-  "app-aozora-appview" 12156,
-  "app-aozora-spa" 5975},
+ {"app-aozora-pds" 25876,
+  "app-aozora-appview" 12220,
+  "app-aozora-spa" 5976},
  :zone
- {:requests-7d 1169964,
-  :pageviews-7d 4743,
-  :uniques-7d-sum 899,
+ {:requests-7d 1176287,
+  :pageviews-7d 4745,
+  :uniques-7d-sum 900,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 929491}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4847}
+  [{:path "/v1/datoms", :requests 929317}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4863}
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 229}
+    :requests 232}
    {:path
     "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
-    :requests 219}
-   {:path "/federation-pilot/did.json", :requests 108}
+    :requests 225}
+   {:path "/federation-pilot/did.json", :requests 107}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
     :requests 106}
@@ -28,11 +28,11 @@
     "/bafyreidym3yuu45f34m7rewrg5en7osvcskfln5bd2jmcs2ynzixzg4hoq",
     :requests 73}
    {:path "/hito-federates/did.json", :requests 62}],
-  :status-mix {:server-error 5375, :ok 937298, :client-error 10044},
+  :status-mix {:server-error 5394, :ok 937205, :client-error 10076},
   :window "24h"},
  :as-of "2026-08-05",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 929491 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4847 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 229 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 219 · /federation-pilot/did.json 108 | 4xx(probe) 1% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 929317 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4863 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 232 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 225 · /federation-pilot/did.json 107 | 4xx(probe) 1% · 5xx 1%",
  :signal
- "aozora.app 実測 1169964 req/7d・899 uniques(日次和)・うち4xx probe 1%(24h)、workers 43837 inv/7d"}
+ "aozora.app 実測 1176287 req/7d・900 uniques(日次和)・うち4xx probe 1%(24h)、workers 44072 inv/7d"}
