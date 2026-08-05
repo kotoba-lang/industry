@@ -3257,3 +3257,114 @@
   were identical at that moment, so nothing of the other agent's was
   affected. My brief was wrong to give that instruction; the agent caught
   it."}
+
+{:seq 64
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "f28b45c0e004abd84f66af9708d7458ac2dd1121"
+ :title "vertical-align on atomic inlines, inline-table in running text, and the inside bullet's advance"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 601}
+ :measured
+ {:line-structure {:before "569/576" :after "570/576"}
+  :geometry {:before "2013/2036" :after "2021/2036 (99%)"
+             :clean-cases {:before "585/601" :after "591/601"}}
+  :paint-order {:before "14987/15009" :after "unchanged"}
+  :computed-style {:before "28615/28618" :after "unchanged"}}
+ :verified-on-merged-main
+ {:cssom-tests "925 / 2336, 0 failures (916/2295 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly. The agent also re-measured
+         the bbe20e5 baseline itself rather than taking mine, and it
+         matched to the value."}
+ :per-case-deltas
+ {:changed 8 :regressed 0
+  :newly-clean
+  [":display/inline-table-in-a-sentence -- three 400px blocks on three
+     lines -> ONE 20px line, table 28x20 at x=49"
+   ":inline/vertical-align-top-on-an-inline-block 30 -> 0"
+   ":inline/vertical-align-bottom-on-an-inline-block 30 -> 36"
+   ":inline/vertical-align-text-bottom 30 -> 33"
+   ":inline/vertical-align-percentage 30 -> 20"
+   ":list/list-style-position-inside a.x 53.70625 -> 59"]
+  :changed-but-already-clean
+  [":inline/vertical-align-text-top 30 -> 28 -- THIS ONE WAS PASSING WHILE
+     WRONG. 30 against oracle 28 is EXACTLY the 2px tolerance, so it never
+     appeared in the scoreboard; only the per-case dump showed it."
+   ":inline/sub-and-sup moves 0.017px under the new super/sub law"]}
+ :what-the-browser-said
+ {:probe "13 shapes x 14 values, varying line-height and font-size on the
+          container AND on the box INDEPENDENTLY -- that variation is the
+          whole discrimination."
+  :top-bottom "LINE-relative. y=0 and y=36 on a 46px line; both track the
+               line-height (at line-height:40px the line is 56 and `bottom`
+               reads 46)."
+  :text-top-text-bottom
+  "FONT-relative -- baseline - ascent and baseline + descent - h in the
+   PARENT's face. Identical (28/33) at container line-height 10, 20 AND 40;
+   a BOLD parent reads 26/34, a 28px parent 16/35, an 8px parent 33/32,
+   Arial 27/33. A font-size or line-height on the BOX ITSELF moves neither."
+  :percentage "LINE-relative but to the ELEMENT'S OWN line-height. 50%
+               raises 10 normally, 20 when the box declares
+               line-height:40px, and still 10 when the CONTAINER's
+               font-size goes to 28. Same law on a text span."
+  :growth-when-a-top-and-a-bottom-box-ask-at-once
+  "the shape the docstring admitted it approximated. Measured in BOTH
+   document orders: only the LARGER request is served -- top 60 + bottom 50
+   -> 60px line, baseline unmoved; top 60 + bottom 80 -> 80px line,
+   baseline 34 lower. Independent growth gave the second 94. Agrees with
+   the old model whenever one side asks, i.e. every corpus line."
+  :super-sub-are-affine-not-a-fraction
+  "fs/3 + 1 and -(fs/5 + 1), EXACT at 17 sizes from 6 to 40 including
+   fractional, and IDENTICAL in monospace/Arial/Georgia/Verdana -- so it is
+   the SIZE and nothing else, not any font table. The 0.404em/0.271em table
+   was a 14px fit: 0.42px out at 8px, 0.98px at 28px -- BOTH INSIDE THE 2PX
+   TOLERANCE, which is why no case could ever have found it."
+  :inside-bullet-advance
+  "fs + ceil(2*(fs+2)/7), exact at every integer size 6-40 and 5 fractional
+   ones, identical for disc/circle/square and IDENTICAL IN ARIAL AND
+   MONOSPACE WHOSE SPACE ADVANCES DIFFER BY 3PX -- so Blink is not laying
+   out the '. ' string at all. An <ol>'s inside marker IS its string
+   (21/28/35 for `1. ` / `10. ` / `100. `), so two list-style-types keep two
+   rules; THE <ol> IS THE CONTROL."}
+ :second-defect-the-bullet-exposed
+ "the marker was being merged into the item's text run TWICE
+  (with-generated-content and the line breaker's adjacent-piece merge). A
+  merged :text op has ONE x and ONE string, so the first word painted
+  inside the reserved gap and the run measured as the marker alone -- <td>
+  61px where Brave says 82. Held out of both merges now."
+ :gates
+ "9 new tests, each run against the UNMODIFIED engine at the base SHA WITH
+  THE SAME TEST FILE in a separate worktree: 35 failures / 2 errors there,
+  0 here. Each carries a control that passes on both sides -- the baseline
+  default at y=30, the <length> at 18, the <ol> marker's string advance,
+  and a-percentage's 12px row."
+ :no-harness-defect-found
+ "the agent looked (the brief points straight at this area, which has
+  produced harness defects before) and found none: every divergence was the
+  engine's. So there is no thumb-on-the-scale proof to give -- and saying
+  that explicitly is the right report."
+ :scope-cuts
+ [{:what "text-top / text-bottom on a NON-ATOMIC inline box"
+   :measured "four rows at vertical-align-shift: there they align the box's
+              own INLINE box (line-height, leading-ascent above the
+              baseline), not its content area, so even an identical-face
+              child moves DOWN 2px and the line goes 20 -> 22."
+   :why "no corpus case."}
+  {:what "FOUND, MEASURED, DELIBERATELY NOT FIXED: position: relative on an
+          atomic inline is SILENTLY DROPPED"
+   :detail "inline-fragments computes :rel on the fragment and
+            layout-inline-run reads it off the piece, but the piece's
+            select-keys NEVER COPIED IT ACROSS. Brave puts <span
+            style='display:inline-block;position:relative;left:30px;
+            top:10px'> at x=44 y=10 where this engine leaves it at x=14
+            y=0 (same for an <img>)."
+   :why-withdrawn "it is a ONE-KEY fix in the select-keys the agent was
+                   already editing. It put :rel in, then TOOK IT BACK OUT:
+                   outside these four cases, no corpus case, and
+                   591/601-clean was the constraint. It wants its own round
+                   with a case."}
+  {:what "the +1/ceil quantisation Blink applies (LayoutUnit 1/64 floors on
+          fs/3, fs/5 and the bullet advance)"
+   :why "residual under 0.016px, invisible to every axis; noted in the
+         docstrings."}]}
