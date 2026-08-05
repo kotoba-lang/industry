@@ -50,7 +50,31 @@ PR #37 の枝は `:issued-via` / `:authn-level` を見て区別している（�
 `passkey-session-options` が `:authn-level :phishing-resistant` を渡している）。
 main はその区別を持たない。
 
-## 決定 — 塞がない。記録して別 review に回す
+## 決定 — いったん記録し、その後 2026-08-05 に塞いだ
+
+**追記 2026-08-05**: 下記の「塞がない」判断は、同日オーナー指示により覆した。
+`06239dd` で修正済み。移植したのは PR #37 の枝が持っていた 4 点セットで、
+3 点では動かない:
+
+1. `passkey-session-options` — WebAuthn の結果を factor にして `authn/decide`
+   に `:phishing-resistant` に届くか判定させる。level は主張ではなく**決定**
+   なので、unverified な ceremony はここで throw する
+2. `finish-passkey-authentication!` / `finish-enrollment!` が marked session を発行
+3. **`finish-passkey-registration!` が既存 session を in-place で upgrade** —
+   registration 自体が user-verifying ceremony であり、ブラウザは `register!`
+   が発行した token を持ったままなので、これが無いと onboarding 経路
+   （register → credential 作成 → organization 設定）が自分自身を締め出す。
+   最初の試行でこれを落とし、onboarding のテストが見つけた
+4. `may-act?` が markers + `passkey-enrolled?` の両方を要求
+
+既存テスト 4 件が bare session を発行して「行動できる」前提だったので、
+**緩めるのではなく本物の session を発行するよう更新**した。
+
+検証: 1075 tests / 4478 assertions / 0 failures、clj-kondo 0 errors。
+
+以下は修正前に書いた判断の記録（経緯として残す）。
+
+## 当初の判断 — 塞がない。記録して別 review に回す
 
 session-assurance model の移植は **merge conflict の解決ではなく security
 work** である。今回の作業は「open PR を review して conflict を解消し merge
@@ -147,7 +171,7 @@ cloud-itonami-app: **1073 tests / 4471 assertions / 0 failures**
   に 3 PR 分の patch + commits + index.txt（close 前に退避。内容は失われていない）"
 
   :adr/gaps
-  ["【security】cloud-itonami-app: enroll 前に発行された session token が enroll した瞬間に may-act? を通る。main の issue-session! が既定で :kind :passkey を付け、may-act? が passkey-enrolled? しか見ないため。PR #37 の枝が持っていた :issued-via / :authn-level による区別の移植が要る。未着手"
+  ["【解消済 2026-08-05】cloud-itonami-app の retroactive Passkey session の穴は `06239dd` で塞いだ。may-act? が :issued-via :passkey + :authn-level :phishing-resistant + passkey-enrolled? を要求し、markers は passkey-session-options（authn/decide 経由）だけが発行する。finish-passkey-registration! は既存 session を in-place で upgrade する（これが無いと onboarding が自分を締め出す）"
    "cloud-itonami-app: legacy provisional owner の WebAuthn user handle repair path が main に無い（handle が nil のまま）。PR #37 の枝にはある。未着手"
    "PR #28 (draft) は open のまま。39 commits の embedded Bitcoin consensus の review が要る。known-broken の残り 2 件（account-link-sync / bitcoin-wallet）はこの PR が持っている"
    "cloud-itonami-app の共有 west checkout は他セッションの feat/adr-0013-repository-storage のまま（未追跡 ADR 2 件も残置）。その内容は今回 main に着地したので切り替え可能だが、他セッションの作業なので触っていない"
