@@ -2778,3 +2778,101 @@
   ordering the 2026-08-05 border-width/border-style change took. Both
   commit messages say so. Verified green here only after both pins moved
   together."}
+
+{:seq 60
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "782d555968bf1af551584173502c4c1b05a0d187"
+ :title "intrinsic-sizing keywords, the flex clamping loop, and the <dialog> box they unblocked"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 581}
+ :measured
+ {:line-structure {:before "546/556" :after "547/556"}
+  :geometry {:before "1926/1973" :after "1933/1973 (98%)"
+             :clean-cases {:before "549/581" :after "555/581"}}
+  :paint-order {:before "14450/14514" :after "14462/14514 (100%)"
+                :clean-cases {:before "561/581" :after "563/581"}}
+  :computed-style {:before "27735/27740" :after "27733/27736"
+                   :clean-cases {:before "578/581" :after "579/581"}
+                   :note "the DENOMINATOR falls by 4: the dialog's four auto
+                          margins go from scored to non-absolute-length-
+                          EXCLUDED, which is the previous round's own
+                          prediction. Two of them (margin-left/-right, 0 vs
+                          126px) were the last cascade-attributed
+                          mismatches outside :text/font-size-absolute-
+                          keyword; the residual is now 2 values in 1 case."}}
+ :verified-on-merged-main
+ {:cssom-tests "886 tests / 2194 assertions, 0 failures (879/2152 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "179/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :per-case-deltas
+ "SIX cases in the 581-case op dump, no others in either direction:
+  :sizing/min-width-min-content (300x20 -> 35x40, plus the 12 div->none
+  paint points), :sizing/width-max-content (300 -> 70),
+  :sizing/width-fit-content (300 -> 70), :sizing/min-width-on-a-flex-item
+  (sibling x 100 -> 150, w 100 -> 50), :sizing/max-width-on-a-flex-item
+  (150/150 -> 60/240), :interactive/dialog-open-is-a-bordered-block (300x54
+  at x=0 -> 48x54 at x=126, plus 6 div->dialog paint points). All six now
+  match the oracle exactly. `dialog` leaves the geometry worst-tag list."
+ :why-these-three-were-one-landing
+ "the previous round measured <dialog>'s full UA rule (position:absolute;
+  width:fit-content; margin:auto), ADDED IT, and found NOT ONE BOX MOVED --
+  precisely because fit-content was a scope cut. This round supplies
+  fit-content, and the same UA rule now lands the box exactly."
+ :what-the-browser-said
+ [{:topic "fit-content"
+   :measured "min(max-content, max(min-content, available)), confirmed at
+              FIVE container widths (300->70, 60->60, 50->50, 40->40,
+              20->35), with `available` net of the box's own insets."}
+  {:topic "the keyword yields a CONTENT size in both box-sizing modes"
+   :measured "86 either way with padding: 0 6px; border: 2px, where
+              width: 70px is 86 and 70."}
+  {:topic "min-content is a RECURSION, not the longest word in the subtree"
+   :measured "a padded child gives 55, a width:40px child 40, a 40x20 <img>
+              40 -- the word-scan rule gives 35 and nil."}
+  {:topic "<dialog open>"
+   :measured "48x54 at x=126 with margin: 0px 126px, left/right: 0px, and
+              `top` resolved to its own STATIC position -- which is what
+              says only the INLINE insets are in the UA rule."}]
+ :where-the-keyword-resolution-lives
+ "in layout-node, at the one place a box's style map is built for layout --
+  it holds the node, theme, available width, opacity and inherited context
+  at once, and hands the resulting `st` to every sub-layout function.
+  resolve-width cannot answer ([st avail] only). The used value is written
+  back as a plain length, folding insets in for border-box."
+ :the-flex-loop-needed-the-full-frozen-item-iteration
+ {:the-one-shape-that-proves-it
+  "three `flex: 1` in 300px, max-width: 30px and max-width: 110px ->
+   30 / 110 / 160. Clamp-once-and-redistribute predicts 30/110/135 and
+   DROPS 25px, because the second item's maximum is violated only after the
+   first freezes."
+  :method-note "the other ten shapes are all satisfied by the simpler rule
+                -- that one row is the whole evidence, and it was probed
+                BECAUSE the simpler rule predicted the rest. Flexbox
+                §9.7.4's sign-of-total-violation rule and `freeze
+                everything the clamp moved` agree on both discriminating
+                shapes; the simpler one is implemented and says so."}
+ :scope-cuts
+ ["percentage-width child inside an intrinsic box (Brave 70/35, engine
+   150/75 -- pre-existing in measure-child's write-back)"
+  "already-clamped flex base size (20/95/85 vs 17/95/87)"
+  "clamp-width's inset-blind min/max -- untouched, called from every box;
+   force-main-width now neutralises it for resized flex items"
+  "percentage max-width on a flex item (60 vs 12)"
+  "flex: 1 1 0 unitless basis unparsed (100/200 vs 7/7)"
+  "an absolute box's own margin does not offset it (x=20 vs 0)"
+  "min-content of a flex container (70 vs 35)"
+  "text-indent in min-content -- UNMEASURED, so ABSENT rather than guessed"]
+ :tried-and-withdrawn
+ [{:what "subtracting the box's own margins inside resolve-intrinsic-width"
+   :why "it READS like the rule but double-counts, since
+         layout-children-block already hands a block child (- content-w ml
+         mr). Caught by the two margin rows of the 60px probe (35/35
+         instead of 40/45)."}
+  {:what "reusing flex-item-min-content-width for the keyword"
+   :why "it stays untouched and still answers what it always answered."}]
+ :gates
+ "seven new deftests, each verified to FAIL on the unmodified engine and
+  each with a control beside it that passes on both. FOUR ASSERTIONS THE
+  AGENT HAD MISLABELLED `CONTROL` TURNED OUT TO FAIL ON BASE -- relabelled
+  as targets, and real controls added where a deftest then had none."}
