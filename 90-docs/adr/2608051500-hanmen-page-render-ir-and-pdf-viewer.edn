@@ -332,12 +332,61 @@ pattern fill は**そうだと言う**ようにした（`:item/pattern`）。従
 **shading のコードは書いていない。** corpus に 0 件で、実ファイルで検証できない soft mask は
 信用できない —— embedded-cmap fallback と同じ判断を同じ理由で。
 
+### 追記: 残り 5 件も解消（そのうち 1 件は自分が入れた欠陥だった）
+
+**Shift-JIS 系の predefined encoding。** `Identity-H`（コード = CID）は最も多いだけで、
+`90ms-RKSJ-H` は Shift-JIS —— **1 バイトか 2 バイトか**が CMap 自身の
+`codespacerange` に書いてある。固定 2 バイト分割は ASCII 文字を全部半分に割っていた。
+`com-adobe-cmap` に vendor + 合成（code → CID → Unicode、どちらも公開表）。
+**実測: 復号不能 run 1,133 → 14、文字数 50,174 → 52,288。** 日本語の法律文書 2 件が
+全文読めるようになった。残る 14 は `Adobe-Identity`（公開表が存在しない = 答え）。
+
+**clip を path として持つ。** box では円形 clip の角が残る。`:page/clips` + 各 mark の
+`:item/clip`、SVG は `<clipPath>` + `<g clip-path>`。実測 **379 region / 11,549 mark 中
+4,399**。入れ子は**互いを指す** —— 1 つの `clipPath` 内の複数 path は union で、
+2 回 clip した文書の意図の逆。グループ化は clip 単位ではなく **run 単位**（clip は
+mark の間で on/off するので、まとめるとページの描画順が壊れる）。
+
+**cache が single-flight。** entry を `delay` にして、共有されるのが map で
+**guard されるのが parse**。32 MiB の文書で 1 回 parse と 16 回 parse の差。
+`delay` は例外も憶えるので、失敗した entry は throw を通す前に削除する ——
+ただし**まだ失敗した本人である場合だけ**（そうしないと他スレッドが入れた良い parse を
+evict して、使うほど遅くなる cache になる）。
+
+**目視の後追い —— そして自分が入れた欠陥を見つけた。** デスクトップが空いたので
+48 文書の contact sheet を高解像度で確認したところ、監査報告書の表紙が
+`F o r m  a l V e r i f i c a t i o n` と表示されていた。**文字の間に空白が入っていた。**
+
+原因は 2 つで、1 つ目が 2 つ目に隠れていた:
+
+1. **advance を CTM でしか掛けていなかった（text matrix を掛けていない）。**
+   `Tf 1` にして `Tm` で拡大する producer —— 非常に多い —— では幅が**フォントサイズ 1 個分**
+   小さくなる。実測 0.61 に対し実際の送りは 14.90。全ての run が次と離れて見えていた。
+2. **`coalesce` がその隙間を「単語間空白」と解釈して空白を挿入していた。** 当該ページの
+   隙間分布を測ると 0.30〜0.90 em に**切れ目なく連続**していて、letter-spacing と
+   word-space を分ける閾値は存在しない。どの閾値でもどこかで文字を捏造する。
+
+**空白の挿入を廃止**し、advance を両方の行列で掛けるようにした。すると隙間が消えて
+グリフが自然に単語へまとまる —— 閾値は不要だった。**実測: 45 文書で捏造空白 6,289 個を
+削除。** ブラウザで確認: `Formal Verification of OpenZeppelin (May - June 2022)`。
+
+`::end-x` にも同じ scaling bug があり、**`:width` だけ直しても何も変わらなかった**
+（join が読むのは `::end-x`）。同じ量に 2 つの名前があり、どちらの行列が効くかで
+食い違っていた。
+
+合成フォントの `/W`・`/DW` も読むようにした（`/Type0` に `/Widths` は無いので、
+CJK と subset-CFF は**測定された advance を 1 つも持っていなかった**）。
+
 ## まだ無いもの（「実装済み」と読まないこと）
 
 1. **`Adobe-Identity` を名乗るフォントは誰にも復号できない。** 「CID の意味はフォントが
-   決める」という宣言なので公開表が存在しない。実測で残る 6 件はこれ。
+   決める」という宣言なので公開表が存在しない。実測で残る 14 件はこれ。
 2. **shading・soft mask・blend mode は読まない。** 86 文書で**実測 0 件**。
-   検証できない機能のコードは書かない。tiling pattern は印を付けるだけで敷き詰めない。
+   検証できない機能のコードは書かない。
+3. **tiling pattern（34 件）は印を付けるだけで敷き詰めない。** 何回敷くかを決める
+   必要があり、2pt のタイルはページに数千枚になる。
+4. **`org-ietf-deflate` が 1 文書で `zlib: stream ends before its Adler-32 trailer`。**
+   上流の decoder 側で、`:pageview/undecodable` として正直に報告される。
 3. **clip は box であって path ではない。** 円形 clip の角が残る（誤差の向きは意図的）。
 4. **目視の後追いができていない。** coalesce 前は 30 文書を Chrome で確認したが、
    **修正後の再確認は他 session の terminal がデスクトップを占有して撮れていない**
