@@ -1,35 +1,39 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 24019,
-  "app-aozora-appview" 11348,
-  "app-aozora-spa" 7612},
+ {"app-aozora-pds" 24099,
+  "app-aozora-appview" 11567,
+  "app-aozora-spa" 5805},
  :zone
- {:requests-7d 1161235,
-  :pageviews-7d 6268,
-  :uniques-7d-sum 832,
+ {:requests-7d 1107263,
+  :pageviews-7d 4626,
+  :uniques-7d-sum 830,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 3041}
-   {:path "/api/q", :requests 299}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4834}
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 150}
-   {:path "/federation-pilot/did.json", :requests 138}
-   {:path "/xrpc/com.atproto.sync.getRepo", :requests 104}
+    :requests 213}
+   {:path "/federation-pilot/did.json", :requests 92}
+   {:path "/hito-federates/did.json", :requests 55}
+   {:path "/hito-verify-clean/did.json", :requests 53}
    {:path
-    "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
-    :requests 85}
-   {:path "/hito-federates/did.json", :requests 71}
-   {:path "/hito-diag-fed/did.json", :requests 70}],
-  :status-mix {:ok 5808, :client-error 9272, :server-error 2099},
+    "/kotobase-cf-wasm-testnet/blocks/bafyreiep7dgzse3gird5avas2jl6d6vjahtfhsq73n3ssvpapr6wftlspm/bafyreidtl5acpa5rh7dzfliwr424dpynhgfzud3b3qhxbdwoeutqgjm674",
+    :requests 40}
+   {:path
+    "/bafyreiats42u5aln2wvzaamyvglpadtg4tz2sbszcnpxdtltle3n3wm6ne",
+    :requests 34}
+   {:path
+    "/bafyreiai4pcalaz5k4l6fnu2vua5fljgqaezv24nje22jjgr5deec2koku",
+    :requests 31}],
+  :status-mix {:ok 6907, :server-error 5017, :client-error 9671},
   :window "24h"},
- :as-of "2026-08-04",
+ :as-of "2026-08-05",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 54, :error-5xx-pct 12},
+ {:window "24h", :probe-4xx-pct 45, :error-5xx-pct 23},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 3041 · /api/q 299 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 150 · /federation-pilot/did.json 138 · /xrpc/com.atproto.sync.getRepo 104 | 4xx(probe) 54% · 5xx 12%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4834 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 213 · /federation-pilot/did.json 92 · /hito-federates/did.json 55 · /hito-verify-clean/did.json 53 | 4xx(probe) 45% · 5xx 23%",
  :signal
- "aozora.app 実測 1161235 req/7d・832 uniques(日次和)・うち4xx probe 54%(24h)、workers 42979 inv/7d"}
+ "aozora.app 実測 1107263 req/7d・830 uniques(日次和)・うち4xx probe 45%(24h)、workers 41471 inv/7d"}

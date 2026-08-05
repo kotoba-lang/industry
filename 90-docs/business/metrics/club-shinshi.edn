@@ -1,29 +1,31 @@
 {:health-status 200,
  :zone-name "shinshi.club",
  :zone
- {:requests-7d 18982,
-  :pageviews-7d 14926,
-  :uniques-7d-sum 1793,
+ {:requests-7d 15689,
+  :pageviews-7d 11876,
+  :uniques-7d-sum 1613,
   :zone "shinshi.club"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 15}
-   {:path "/video/actress/tsumugi-amano-idol", :requests 10}
-   {:path "/robots.txt", :requests 4}
-   {:path "/video/actress/aya-amano-campus", :requests 3}
-   {:path "/video/actress/kotori-amano-campus", :requests 3}
-   {:path "/video/actress/lux-league-of-legends", :requests 3}
-   {:path "/chat/lucoa-maid-dragon", :requests 2}
-   {:path "/video/actress/akali-league-of-legends", :requests 2}],
-  :status-mix {:ok 548, :client-error 60},
+  [{:path "/", :requests 65}
+   {:path "/i18n/en.json", :requests 39}
+   {:path "/js/app.js", :requests 36}
+   {:path "/wp-admin/install.php", :requests 15}
+   {:path
+    "/b/bafkreifap5rkixkxqp4peq23cozptcob3fgr24vmzyoch3w64exzpfo66e",
+    :requests 3}
+   {:path "/chat/yshtola-final-fantasy-xiv", :requests 3}
+   {:path "/video/actress/makoto-niijima-persona-5", :requests 2}
+   {:path "/chat/toga-himiko-my-hero-academia", :requests 2}],
+  :status-mix {:ok 669},
   :window "24h"},
  :source "shinshi.d1:pv_daily+chat_event_daily+pay_run",
  :window "7d",
- :as-of "2026-08-04",
- :traffic-quality {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 0},
+ :as-of "2026-08-05",
+ :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 15 · /video/actress/tsumugi-amano-idol 10 · /robots.txt 4 · /video/actress/aya-amano-campus 3 · /video/actress/kotori-amano-campus 3 | 4xx(probe) 10%",
- :funnel {:visitors 1173, :chatters 39, :scenes 0, :paying 0},
+ "上位 page (24h, 2xx/3xx): / 65 · /i18n/en.json 39 · /js/app.js 36 · /wp-admin/install.php 15 · /b/bafkreifap5rkixkxqp4peq23cozptcob3fgr… 3 | 4xx(probe) 0%",
+ :funnel {:visitors 1125, :chatters 2, :scenes 0, :paying 0},
  :signal
- "shinshi.club 実測 18982 req/7d・1793 uniques(日次和)・うち4xx probe 10%(24h)"}
+ "shinshi.club 実測 15689 req/7d・1613 uniques(日次和)・うち4xx probe 0%(24h)"}
