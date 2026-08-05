@@ -2516,3 +2516,147 @@
   'the author's :required rule did not match' -- true only while nothing
   ELSE wrote those properties. Fixed to ask the actual question; green
   against both old and new cssom, landed separately (dec920b)."}
+
+{:seq 58
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "499bb7bb740c12a40b86222e05617db477a31fc6"
+ :title "the :image-size host hook, and percentage row-gap/column-gap as the two-pass rule it is"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 576 :after 581}}
+ :measured
+ {:isolated-effect-of-src
+  {:note "measured on the IDENTICAL 576-case corpus, before the 5 new cases"
+   :line-structure {:before "541/551" :after "541/551"}
+   :geometry {:before "1892/1959" :after "1901/1959"
+              :clean-cases {:before "535/576" :after "540/576"}}
+   :paint-order {:before "14285/14389" :after "14301/14389"
+                 :clean-cases {:before "550/576" :after "553/576"}}
+   :computed-style {:before "27539/27544" :after "27539/27544"}}
+  :with-the-5-new-cases-on-581
+  {:line-structure "546/556"
+   :geometry "1915/1973 (97%), 545/581 clean"
+   :paint-order "14426/14514 (99%), 558/581 clean"
+   :computed-style "27735/27740 (100%), 578/581 clean"}}
+ :verified-on-merged-main
+ {:cssom-tests "876 tests / 2120 assertions, 0 failures (865/2060 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "178/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :per-case-deltas
+ "exactly 5 changed cases corpus-wide, ALL improving, nothing else moved
+  (--dump-ops, both directions). :gap/percentage-column-gap-on-a-grid
+  (145/x155 -> 135/x165), :gap/percentage-row-gap-on-a-grid (50 tall y=30
+  -> 40 tall y=24), :replaced/img-intrinsic-size (0x0 -> 40x20),
+  img-width-only-keeps-the-ratio (200x0 -> 200x100),
+  img-height-only-keeps-the-ratio (0x60 -> 120x60). All five now equal
+  Brave exactly."
+ :CORRECTION-to-seq-57
+ {:what "seq 57 recorded, from the replaced-element round: `a bare <img>
+         and a 404ing <img> are BOTH 0x0 in Brave`. THE SECOND HALF IS
+         WRONG."
+  :actually "a 404ing <img> is a 16x16 BROKEN-IMAGE ICON, and with fewer
+             than two definite axes it is sized like non-replaced inline
+             content: width:200px alone -> still 16x16; width+height ->
+             200x50; display:block;width:200px -> 200x16; alt='...' ->
+             142x20."
+  :consequence "none for any score -- every corpus <img> declares both
+                axes. Recorded as a scope cut in replaced-default-size, in
+                the README and in a test, so the wrong claim cannot be
+                picked up again. 0x0 is KEPT as the engine's behaviour."
+  :note "the agent found the same claim in an earlier round as well, so it
+         had been carried forward more than once before being measured."}
+ :target-1-image-size-hook
+ {:api "(fn [src] {:w <px> :h <px>}) on the theme, nil for an unresolved
+        resource. Arrives at replaced-intrinsic-size; everything below it
+        already solved both axes from a ratio."
+  :absence-pinned-by-a-test
+  "replaced-image-without-an-image-size-hook-is-unchanged: NO hook, a hook
+   returning nil, and a hook returning {:w 0 :h 0} are all
+   indistinguishable and leave today's 0x0 exactly as it was. The engine
+   runs on hosts that have no images at all."
+  :what-brave-said
+  "40x20 SVG data URI: bare 40x20 · width:200px -> 200x100 · height:60px ->
+   120x60 · max-width:20px -> 20x10 (CLAMP BEFORE RATIO) · min-width:400px
+   -> 400x200 · width+height -> 200x60 · height='40' attr alone -> 80x40 ·
+   width='80' height='40' + CSS width:200px -> 200x40, NOT 200x100 (the
+   control that proved the missing piece was the RESOURCE, not the box
+   model) · border-box width:200;border:5;padding:3 -> 200x108,
+   content-box -> 216x116."
+  :how-the-harness-learns-image-sizes-honestly
+  "a per-src naturalWidth/naturalHeight table read off the ORACLE'S OWN
+   DECODER (new __images__ probe), beside the per-character advance table
+   already measured there -- the harness's established way of supplying
+   host facts. NOT decoded in nbb, and THE REASON IS MEASURED, NOT
+   AESTHETIC: the R0lGODlhAQABAAAAACw= GIF that ten corpus cases use has a
+   WELL-FORMED HEADER SAYING 1x1 AND NO IMAGE DATA. A header-sniffing
+   decoder reports 1x1; Brave rejects it, reports 0, and paints a 16x16
+   icon. Feeding 1x1 would make a width:200px image 200x200 here against
+   Brave's 16x16 -- a DECODER argument scored as a LAYOUT bug. `complete`
+   is reported per image and the harness prints a WARNING if any image had
+   not loaded, so a load race cannot look like size zero.
+   :replaced/img-intrinsic-size is a TAUTOLOGY under this arrangement (its
+   box IS the fact) and its comment says so; the two ratio cases are where
+   the algorithm is measured."}
+ :target-2-percentage-gaps
+ {:rule "a percentage gap resolves against the container's own CONTENT-BOX
+         size in that axis. Indefinite -> the size is computed with the gap
+         at ZERO, the percentage resolves against that result, and the gap
+         POSITIONS ONLY: the container does not grow, the content
+         overflows."
+  :measured "two 20px grid rows + row-gap:10% -> 40 tall, gap 4,
+             scrollHeight 44 (row-gap:4px -> 44 tall, the px control).
+             THREE rows -> 60/6/72, NOT 7.2, so EXACTLY ONE PASS. Rows of
+             30+50 -> 80/8. row-gap:200% -> gap 80. Inline axis identical
+             wherever the width is indefinite: inline-grid two 60px cols +
+             column-gap:10% -> 120 wide, 12px gap, overflows; inline-flex
+             -> 120 wide, items shrink to 54."
+  :the-surprise
+  "FLEX IS NOT GRID. Blink gives a flex container's BLOCK axis NO SECOND
+   PASS: flex column, auto height, row-gap 10%/50%/200% all -> 0;
+   min-height:100px -> 0 and max-height:30px -> 0, where the same
+   declarations give a grid 10 and 3 (on a grid the clamp is part of the
+   BASIS). Only a definite height resolves it there (height:200px -> 20). A
+   flex container's INLINE axis behaves like a grid's throughout."
+  :implementation
+  "node-style carries :row-gap/raw and :column-gap/raw beside the coerced
+   pair (parse-int \"10%\" is 10 PIXELS -- the same reason :margin/raw
+   exists); gap-for-intrinsic-size and used-gap read them; layout-grid
+   binds each axis's used gap the moment that axis's content size is known;
+   layout-flex hands used-gap its cw for the inline axis and its definite
+   content height, OR NIL, for the block one. multicol-gap-px already
+   resolved percentages and is untouched."}
+ :gates-proved-to-fail-first
+ "the image gates fail 8 assertions on the unmodified engine and pass here;
+  the gap gates fail 26 of 37. The two absence-pins pass on BOTH, which is
+  what they are for."
+ :scope-cuts
+ [{:what "broken-image rendering" :measured "see the CORRECTION above" :decision "0x0 kept"}
+  {:what "a resource with a RATIO and no size"
+   :measured "<svg viewBox='0 0 40 20'> with no width/height reports
+              naturalWidth 300x150 and Brave lays it out at 400x200 in a
+              400px block (200x100 under width:200px)."
+   :why "a {:w :h} hook cannot express `ratio only`."}
+  {:what "<video poster> = 40x20 and <object data> = 40x20, each a
+          different relationship to a resource; <iframe srcdoc> = 304x154
+          regardless. Not wired."}
+  {:what "grid stretches auto rows into spare block space"
+   :measured "min-height:100px over two 20px rows makes them 45 each, so
+              Brave's second row is at y=55 where this engine says 30 (the
+              10px gap is right)."}
+  {:what "OLDER BUG this uncovered and did not fix, recorded at
+          replaced-content-size: a percentage WIDTH on an INLINE-LEVEL
+          replaced box is RESOLVED TWICE"
+   :measured "50% of a 400px block is 100 here against Brave's 200; 25% ->
+              25 vs 100; 10% -> 4 vs 40 -- the error grows with the SQUARE.
+              Identical for canvas/video/svg/iframe, so it is atomic-inline
+              plumbing, not resources; display:block gives Brave's answer
+              today. No corpus case covers it."}]
+ :tried-and-withdrawn
+ ["an independent image decoder inside the harness -- withdrawn for the
+   truncated-GIF reason above."
+  "TWO OF THE AGENT'S OWN TEST EXPECTATIONS WERE WRONG AND THE ENGINE WAS
+   RIGHT: max-width:20px puts the 10px-tall image at y=4 on the 20px line's
+   baseline, and a wrapping flex container with a definite height already
+   stretches its lines (Brave's y=110 falls out whole). Both corrected
+   against the browser rather than the other way round."]}
