@@ -334,8 +334,40 @@
   :task/repo "kotoba-lang/torihiki-node"
   :task/requires []
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "torihiki-chart は既に auto-span と block 足を持つので、消費側の変更は最小。集計は torihiki-chart.candle と同じ規則（絶対バケット・整数のみ・空バケットを作らない）にすること —— 二箇所で違う足を出すと、どちらが本当か言えなくなる。DO storage を無限に太らせないよう保持本数に上限を置き、切ったことを /candles の応答に書く。"}
+  :task/status :completed
+  :task/status-note "**完了。本番の `/candles` を、同じ tape を独立に畳んだ答えと突き合わせて確認した**（5 つの span で不一致 0）。
+
+  ## 畳み込みは 1 つしか存在させない
+
+  node は `torihiki-chart.candle/absorb` を**そのまま呼ぶ**。node 側に同じ畳み込みを書き直すと、チャートと endpoint が食い違ったときにどちらが嘘をついているか言えなくなる。そのために library 側（80ab3d7）に増分用の入口を出した:
+
+  - `absorb`（旧 private `fold-fill`）— 1 件ずつ畳む
+  - `normalize-side` を public に（node の tape の `:side` は整数）
+  - `rebucket` — 1 ブロック粒度で保存した足を、要求された粗い span に畳み直す。`bucket` の境界が絶対（0 起点）なので、どう束ねても tape 直畳みと同じ答えになる。テストは 6 span で実際に突き合わせる。
+
+  node は 1 ブロック粒度で持ち、要求 span へは `rebucket` で畳む。保存時に span を決めないので、あとから別の span で見られる。
+
+  ## 保存しない —— この file 自身の主張との整合
+
+  `worker.cljs` の docstring は exchange について「replaying the log IS the state, so there is no second encoding to keep in sync」と書いている。足は同じ log の fold なので、保存すればまさにその第二の符号化になる（deploy を跨いで log と食い違いうるし、fold を変えるたびに移行が要る）。cold start の replay で作り直す。代償は応答に出す: `retained-from` / `retained-blocks` / `retention` / `truncated`。
+
+  ## 途中で作った不整合と、その修正
+
+  最初の deploy で **`/trades` が空なのに `/candles` に履歴がある**状態を作った（height 57 / candles 8 / trades 0）。tape は `submit` の中だけで作っていて replay では作らず、candles は replay でも作っていたため。**同じ fill を読む 2 つの endpoint が、約定があったかどうかで食い違う。** 両方を `noteFills` から作るように直した。
+
+  もう 1 つ: `truncated` が「データを失った」に読めていた。若い node に広い窓を訊けば必ず true になるが欠損ではない。`truncated-because` を分け、`\"retention\"`（ring が満杯で捨てた）と `\"no-older-blocks\"`（もともと無い）を区別する。
+
+  ## README が案内していた nbb ランナーが実在しなかった
+
+  torihiki-chart の README は `test/run_tests.cljs` を案内していたが**ファイルが無く**、実際には JVM でしか走っていなかった。この repo の README 自身が「JVM だけでは主張の半分」と書いており（`3/10` が JVM 全 green のまま cljs バンドルを壊した実例）、その保険が効いていなかった。書いた。JVM 38 tests / 1,568 assertions、nbb でも同数。
+
+  ## 観測（sequencer v10、2026-08-05）
+
+  `/candles?span=S&n=500` を span 1 / 2 / 5 / 10 / 50 で取り、`/trades` の 9 件を独立に畳んだものと突き合わせ: **全 span で不一致 0、欠損 0**。tape に h=57 / h=51（現 isolate より前）が入っていることで、replay で作り直されていることも確認。
+
+  ## 残り
+
+  `span` の単位は blocks で、応答に `\"unit\":\"blocks\"` と書く。engine は wall clock を持たない（時刻はブロックヘッダから来る）ので、分足は存在しない真実から作ることになる —— 時間足が欲しくなったら、それは endpoint ではなく engine の設計変更。"}
 
  {:db/id -12
   :task/id "S6-bridge"
