@@ -1,0 +1,29 @@
+;; 学習コーパス面の projection contract（ADR-2608057000 / ADR-2608039700）。
+;;
+;; input は Git 常駐の canonical EDN 1 本。**bytes（shard）はここに入らない** ——
+;; あちらは DataLad/git-annex 側で、entity が持つ annex key だけが 2 つの面を結ぶ。
+;;
+;; identity は `:corpus/entity-id`。文書 / shard / coverage の 3 種類が同じ面に載る
+;; ので、全 entity が持つ属性でなければ projection が成立しない。
+{:projection/version 2
+ :projection/id "training-corpus"
+ :projection/source
+ {:git/commit "e94e6590a91c33f00595c5beee33154267347b9d"
+  :dataset/id "com-junkawasaki/root/training-corpus"}
+ :projection/inputs
+ [{:input/type :git
+   :input/path "90-docs/corpus/corpus.datoms.edn"
+   :input/sha256 "fea59753be445186c6db8817fb014ef0277eb05b4728816de45464ed35225663"}]
+ :projection/identity-attrs [:corpus/entity-id]
+ :projection/contracts
+ {:schema/path "manifest/projection-schemas/training-corpus.edn"
+  :schema/sha256 "1a30c87222d95fd5afc7b071cbc9bb8995e94e6dde54c1f84a43f31e2a71af3c"
+  :loader/path "manifest/project-edn.cljs"
+  :loader/sha256 "88fe9455809e8d3e5df69141ae7c6a4055b900cb3629b01281f5c0aae521cd6b"}
+ :projection/rebuild
+ {:loader/id :canonical-edn-v1
+  :output/path ".projection-cache/training-corpus.edn"}
+ :projection/output
+ {:logical-sha256 "bf8be5a7d944ec4b10e70e287f056d262f9df5f2c54b7ae8c82cec40bed8c22c"
+  :physical-sha256 "aeb1c7809d4e128961b4697786af4692ea6a340171ae2d1fa566d0b9b8c2da62"
+  :entity-count 2009}}
