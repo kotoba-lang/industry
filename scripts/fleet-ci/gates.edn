@@ -178,6 +178,20 @@
    :script "gates/projection-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
+  ;; 学習コーパス面（ADR-2608056000）。**生成物を再生成して bytes 一致を見る** —
+  ;; committed 済みの値を読むだけの検査では、内部整合を保ったまま手編集された
+  ;; corpus.datoms.edn を検出できない。加えて coverage の申告 vs 実体・
+  ;; hazard⇔:excluded・shard の被覆・annex key の整合という独立な不変条件を見る
+  ;; （生成器自体が壊れて「--check は通るが中身が矛盾する」ケース用）。
+  ;;
+  ;; :include-ext に ".md" が要る —— 生成器は 90-docs 配下の .md も採点対象に
+  ;; するので、md を送らないと再生成の件数が減って **正しい corpus が STALE と
+  ;; 報告される**（gate が嘘をつく方向の失敗）。
+  {:name "root" :id "root-training-corpus" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/training-corpus-check.cljs"
+   :include-ext [".edn" ".cljs" ".md"] :min-files 1500 :cd false}
+
   ;; net-kotobase（kotobase.net の本体、private）。**network-awai org の GitHub
   ;; Actions は 2026-08-03T01:10Z 以降 1 本も起動していない**（実測: 全 workflow
   ;; failure、job は steps 0 件で 1-10 秒で終了。同 org の cloud-itonami /

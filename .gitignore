@@ -86,6 +86,10 @@ orgs/personal/bin/datomic/.clj-kondo/
 # Rebuildable query projection outputs (ADR-2608039700)
 /.projection-cache/
 
+# Training-corpus shard bytes (ADR-2608057000). Rebuildable from the scored
+# index; the durable copy belongs in DataLad/git-annex, never in a git blob.
+/.corpus-shards/
+
 # Local-only AI tool workspaces (not part of the superproject)
 /.claire/
 /.cursor/

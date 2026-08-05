@@ -1,0 +1,237 @@
+[{:db/id -1
+  :adr/id "adr-2608057000-training-corpus-edn-datalad-scored-documents"
+  :adr/doc_type "adr"
+  :adr/topic "training-corpus-edn-datalad-scored-documents"
+  :adr/title "ADR-2608057000: 学習コーパスは Git + canonical EDN + DataLad、文書はデータとして採点し、kotoba/Datomic Datalog 面から引く（repo-wide mandatory）"
+  :adr/status "accepted"
+  :adr/date "2026-08-05"
+  :adr/last_verified "2026-08-05"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki (root@junkawasaki.com)" "agent"]
+  :adr/authoritative_for
+  ["この workspace における model 学習コーパスの正本形式（Git + canonical EDN、bytes は DataLad/git-annex）"
+   "文書の採点（軸・重み・合成・hazard・consent）とその正本 manifest/corpus-policy.edn"
+   "学習コーパスの query 面への露出規約（:source/dataset と join key の宣言）"
+   "生成物としての 90-docs/corpus/corpus.datoms.edn と、その projection contract / fleet gate"]
+  :adr/related
+  ["adr-2608039700-agent-loop-git-datalad-source-kotobase-query-projection"
+   "adr-2607171600-docs-edn-only-datascript-query"
+   "adr-2608039000-no-d1-premise-in-decentralized-paths"
+   "adr-2608039970-kotobase-base-is-datom-plane-not-datalog"
+   "adr-2607132300-design-quality-score"
+   "adr-2608039980-concept-index"
+   "adr-2607300900-murakumo-fleet-ci-no-github-actions"
+   "tamaki ADR-0002 finite-relational-lineage-and-wellbecoming"]
+  :adr/source-format "edn"
+  :adr/body
+  "# ADR-2608057000: 学習コーパスは Git + canonical EDN + DataLad、文書はデータとして採点し、kotoba/Datomic Datalog 面から引く
+
+- Status: accepted（repo-wide mandatory）
+- Date: 2026-08-05
+- Deciders: owner 指示「adr を起票, また repo wide に edn, datalad として model の学習コーパス, データとして文書を score , kotoba datomic query できるようにして」/ agent 実装
+
+## Context
+
+### 何がきっかけか
+
+同日の先行する問い —— 『今の tamaki について open weight model として murakumo.cloud を
+使って、学習成長を続けていく仕組みは設計されているか』—— への答えは **否**だった。実測:
+
+- tamaki の runner default は subscription CLI だけ（`orgs/etzhayyim/tamaki/src/kotoba/tamaki/runners.clj:18-26`
+  の codex / claude / claude-zai / grok。可用性判定はローカルバイナリの存在確認
+  `cli.clj:1385-1389` なので、HTTP エンドポイント＝ open weight model を runner にする口が無い）
+- tamaki ↔ murakumo の接続は 4 本 —— `infer`/`murakumo` サブコマンドの素通し
+  （`adapters.clj:84-89`）、sealed state の複製（`replication.clj`）、credits の会計
+  （`physiology.clj:110-122`）、lease 内のプロセス再起動。**学習経路はゼロ**
+- tamaki の『学習』は 2 層とも artifact レベル。`active_inference.clj` の belief 更新は
+  7 次元スカラーの EMA、ADR-0002 の三層継承（genome / epigenome / meme）の継承物リストに
+  **重みは無い**。`ao/evolution.cljc` の write-scope は `:none → :commit → :push → :merge`
+  で、自己改変とは『自分のコードを書き換えること』として定義されている
+- murakumo 側には **課金次元だけ**ある（`infer/credits.cljc:119` の
+  `:training-steps :credit/per-training-step`）。`resources/murakumo/prices.edn` に
+  この単位を使うモデル登録はゼロ
+
+### 既にある『学習コーパス』の現在地（実測 2026-08-05）
+
+`gftdcojp/gftd-llm-dataset` は west 登録済みで README は DataLad + git-annex + B2 を謳うが:
+
+- 正本は `corpus/manifest.toml`（190 行の TOML）+ Python ingest スクリプト群
+- **annex symlink は 0 件、git-annex は init すらされていない**（`git annex info` が
+  『First run: git-annex init』を返す）。つまり宣言はあるが中身が無い
+- TOML なので `manifest/edn-query.cljs` の datom 面から引けない。『どの素材が入って
+  いるか』を他の面（ADR・repo-taxonomy・fleet 状態）と join できない
+
+一方この workspace は、同じ問題に対する答えを既に 3 つ持っている: ADR-2608039700
+（agent-facing な durable source of truth は Git + canonical EDN、large immutable object
+だけ DataLad/git-annex、DB は projection）、ADR-2607171600（90-docs は EDN only + DataScript
+query）、そして `:source/dataset` で出自を区別する 26 dataset の datom 面。
+**学習コーパスだけがこの規約の外にあった。**
+
+## Decision
+
+**この workspace のあらゆる model 学習コーパスは、以下の形でしか正本を持たない。**
+
+1. **正本は Git + canonical EDN。** TOML / CSV / JSONL の manifest を corpus の正本に
+   しない。ingest スクリプトの副作用を正本にしない。EDN は Datomic/DataScript に
+   そのまま transact できる tx-data 形（`[{:db/id -1 ...}]`）。
+
+2. **文書はデータとして採点する。採点は決定論。**
+   - 軸・重み・閾値・hazard パターン・consent scope は `manifest/corpus-policy.edn`
+     **だけ**に手で書く。索引・スコア・shard は生成物で、手編集しない
+   - **LLM judge を採点器にしない。** 採点が学習データの選別を決める以上、
+     再現しない採点器は『劇場』ではなく汚染源になる。根拠は ADR-2607132300 の実測 ——
+     3-judge panel が 4 ライブラリを軒並み 4.0–5.0/5 と採点した裏で、tap-target・
+     dvh fallback・safe-area・theme-color の 4 つの具体的欠落を 3 体とも一つも指摘しなかった
+   - **合成は重み付き幾何平均**。弱い次元を他の次元で埋めさせない（tamaki ADR-0002 の
+     lineage vitality と同じ理由。算術平均だと『証拠ゼロだが具体的な数字だけ多い文書』が通る）
+
+3. **bytes は DataLad/git-annex（→ B2）、小さい semantic EDN は Git のまま。**
+   学習に食わせる shard を git blob に入れない。逆に、スコア・索引・policy を
+   『EDN だから』という理由で annex 化しない（diff と review を失う。ADR-2608039700）。
+   entity は annex key（`SHA256-s<bytes>--<sha256>`）を持ち、2 つの面を結ぶ。
+
+4. **すべての corpus は `:source/dataset` を持ち、kotoba/Datomic Datalog 面から引ける。**
+   `manifest/edn-query.cljs` に登録し、join key を宣言する。**join できない corpus は
+   corpus ではなく、ただのファイル。**
+
+5. **coverage を申告する。** 何件走査し、何件を落としたか（oversize / unreadable /
+   parse 失敗）を entity として持つ。索引を引いて出なかったことが『存在しない』の
+   証拠に使われるので、どれだけ見ていないかを query 側から読めることが要る
+   （`:concept/coverage` と同じ規律）。
+
+6. **consent scope を entity に持つ。既定は `:workspace-internal`。**
+   『公開 repo に置いてあるから公開してよい』ではない。公開先を広げるのは別の決定。
+
+7. **hazard で除外した文書は bytes plane に載らない。** これを gate で検査する。
+   ただし **hazard 検査は既知の形だけを弾く構造検査で、秘密の不在を証明しない** ——
+   合格を公開判断の根拠にしない。
+
+8. **projection contract と fleet gate を通す。** ADR-2608039700 の projection-verify
+   contract を持ち、fleet-ci gate は **再生成して bytes 一致を見る**（committed 済みの
+   値を読むだけの検査は、内部整合を保ったまま手編集された生成物を検出できない）。
+
+## 実装（2026-08-05 に着地したもの、実測値付き）
+
+| ファイル | 役割 |
+|---|---|
+| `manifest/corpus-policy.edn` | **手書きの唯一の面**（軸 6 / 重み / 閾値 / hazard 8 / PII / consent / bytes plane 宛先） |
+| `scripts/gen-training-corpus.cljs` | 採点器 兼 生成器（`--check` / `--shard`） |
+| `90-docs/corpus/corpus.datoms.edn` | 生成物。文書 entity + shard entity + coverage entity |
+| `manifest/edn-query.cljs` | `:source/dataset \"training-corpus\"` として datom 面に登録 |
+| `manifest/projection-schemas/training-corpus.edn` | projection contract が固定する属性スキーマ |
+| `manifest/projections/training-corpus.edn` | ADR-2608039700 の projection contract |
+| `scripts/fleet-ci/gates/training-corpus-check.cljs` | fleet gate（再生成 + 4 つの独立不変条件） |
+
+**採点軸**（各 0..1、括弧内は重み）: evidence(3.0) / specificity(2.0) / structure(2.0) /
+provenance(1.5) / currency(1.5) / self-containment(1.0)。
+
+**実測結果**（superproject の `90-docs/adr/*.edn` + `90-docs/**.md` + `manifest/*.edn`）:
+
+- 走査 2,006 文書、skip 0
+- **gold 1,116 / silver 766 / bronze 110 / excluded 14**
+- excluded 14 件は **全て `:pii-email-cluster`** —— メールテンプレート、テナント
+  identity 監査、パートナー計画。既知形の秘密（PEM / sk- / ghp_ / AKIA / AIza / xox / K00 /
+  インライン password）は 1 件も検出されなかった
+- shard は 2 本（`gold-v1` / `silver-v1`）で、合計 27 MB 強。**どちらも
+  `:shard/custody :unverified`** —— 宛先を宣言しただけで、annex に入れて複製し
+  custody 検証を通すまで『保管している』とは言わない
+- 生成器が計算する annex key が **git-annex 自身の導出と一致することを実測**
+  （`git annex calckey --backend=SHA256 .corpus-shards/gold-v1.edn` が
+  entity の `:shard/annex-key` と完全一致）。bytes plane の識別子は絵に描いた餅ではない
+
+**この ADR 自身がコーパスに入っている。** 上の 2,006 件・gold 1,116 件はこの文書を
+含んだ数で、書き足せば数も shard の bytes も変わる。だから **volatile な数値
+（shard の bytes と sha256）は本文に転記しない** —— それらは
+`90-docs/corpus/corpus.datoms.edn` の shard entity を引く（自分の測定値を自分の
+本文に焼き込むと、更新のたびに嘘になる）。
+
+**query の実測**:
+
+```
+nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+  '[:find ?tier (count ?e) :where
+    [?e \"source/dataset\" \"training-corpus\"] [?e \"corpus/tier\" ?tier]]'
+→ [[\"gold\" 1115] [\"silver\" 766] [\"bronze\" 110] [\"excluded\" 14]]
+   （この実測はこの ADR を書く前の状態。現在値は上記のとおり gold が 1 件多い）
+```
+
+`:corpus/adr-id` で ADR entity の `\"adr/id\"` と join できるので、『accepted なのに
+evidence 軸が低い ADR』のような問いが 1 クエリで書ける。
+
+**gate が落ちることを実測した**（落ちない gate は劇場）: スコアを 1 箇所書き換えた
+コピーで exit 1（再生成不一致）、coverage の gold 件数だけを 1 ずらしたコピーでも exit 1
+（申告 vs 実体）、無改変で exit 0。
+
+## この作業で見つかった実問題（3 件、いずれも修正済み）
+
+1. **query 面の二重ロードで集計がちょうど 2 倍になった。** `docs-edn-files` は
+   `90-docs/**.edn` を総なめするので、index 経由でロードするはずの
+   `corpus.datoms.edn` を二度目に拾っていた。この面は entity 自身が
+   `:source/dataset` を持つため、docs 経由のコピーも同じ dataset を名乗り、
+   tier 別集計が gold 2,230 / silver 1,532 になった（正しくは 1,115 / 766）。
+   `docs-edn-files` から除外して修正。
+   **surface / concept / engine-parity / gtm-icp / itonami-maturity は今も両方の経路で
+   ロードされている** —— あちらは entity 側が `:source/dataset` を持たず index ローダが
+   後から付けるので dataset 別の集計は狂わないが、entity 自体は重複している。
+   既存の集計値を動かさないため本 ADR では触っていない（別途扱う gap）。
+
+2. **projection contract を採点対象に入れると固定点が存在しない。** contract は
+   corpus の sha256 を pin するので、『contract を書く → corpus が変わる →
+   contract が stale → contract を直す → corpus が変わる』の循環になる。
+   `:scan :exclude-prefixes [\"manifest/projections/\"]` で除外。
+   **自分の sha256 を含むファイルを採点しない**、が一般則。
+
+3. **markdown を `edn/read-string` に通していた。** 76 件の `.md` のうち 5 件だけが
+   parse 失敗と記録され、残り 71 件は『先頭フォームがたまたま読めた』だけだった。
+   測っていないものを測ったことにしていたので、EDN として読むのは `.edn` だけに変更。
+
+## Consequences
+
+(+) 学習コーパスが初めて **query できる面**に載った。『どの文書が何点で、なぜ除外され、
+どの shard に入り、その bytes はどこにあるか』が 1 つの Datalog 面で辿れる。
+
+(+) 採点が決定論なので、**選別の再現と監査ができる**。誰がいつ走らせても同じ数値になり、
+gate が bytes 一致で守る。
+
+(+) hazard による除外が **bytes plane への到達を構造的に断つ**（shard は tier 単位で
+畳まれ、`:excluded` を覆う shard の存在自体を gate が禁じる）。
+
+(−) **これはコーパス面であって trainer ではない。** 本 ADR は学習を実行しない。
+tamaki の重みレベルの継続学習は依然として未設計であり、着手には別の決定が要る ——
+最低でも (a) ADR-0002 の継承物に重みを入れるか（30 日 lease と人間の再同意の意味が変わる）、
+(b) `ao/evolution.cljc` の write-scope は git 権限しか表現していないので『重み更新権限』
+という新しい scope、(c) event ログを学習コーパスにする際の meme consent scope と
+『資格情報は継承しない』規約を通す redaction 経路。
+
+(−) **custody はまだ無い。宛先そのものが未確定。** shard は `:unverified` のまま。
+policy は暫定的に `gftdcojp/gftd-llm-dataset`（private、B2 バケット
+`ai-gftd-datasets`）を指しているが、**この corpus は com-junkawasaki の
+`:workspace-internal` な文書 2,006 件**であり、置こうとしている先は
+**別 org の、外部コーパス（HF / CommonCrawl / Hume）を license gate 付きで
+集める目的の dataset** である。混ぜると provenance と custody が混ざる。
+実際に annex に入れて B2 へ複製する前に、次のどれかを決める必要がある:
+(a) com-junkawasaki 側に自前の DataLad dataset を起こす、(b) gftd-llm-dataset に
+`corpus/workspace-docs/` として同居させ、その manifest 側にも内部由来である
+ことを記録する、(c) consent を明示的に広げる。**決めるまで push しない。**
+機構自体は検証済み（annex key が git-annex の導出と一致）なので、残っているのは
+配置の判断だけ。
+
+(−) **走査対象は superproject の `90-docs` + `manifest` だけ。** west の 4,114 project の
+README / docs / ADR は未走査で、これが最大のカバレッジ gap（coverage entity は
+『走査したもの』しか数えないので、この gap は entity からは読めない —— ここに書いて残す）。
+
+(−) `gftdcojp/gftd-llm-dataset` の TOML + Python 経路は本 ADR に**未適合**。既存を今すぐ
+書き換えない（規則が縛るのはこれから作る corpus）。ただし『DataLad と謳って annex が
+init すらされていない』状態は、この ADR の観点では corpus ではなく計画である。
+
+## Alternatives considered
+
+| 案 | 判定 | 理由 |
+|---|---|---|
+| LLM judge で採点する | ❌ | ADR-2607132300 の実測どおり、合意の弱い箇所を隠す。採点が学習データの選別を決めるので、再現しない採点器は汚染源になる |
+| 既存の `gftd-llm-dataset` の TOML manifest を拡張する | ❌ | datom 面から引けず、他の 26 dataset と join できない。owner 指示が『edn, datalad として』『kotoba datomic query できるように』である以上、TOML は正本になれない |
+| 文書本文も datom 面に載せる | ❌ | ADR-2608039970 の『byte を datom 面に載せない』に反する。本文は annex 面、datom 面はスコアと参照だけ |
+| shard も git に commit する | ❌ | gold+silver で 27 MB。ADR-2608039700 の『large EDN shard は annex』に反する |
+| 新しい DataLad dataset を作る | ⏸ 保留 | `gftd-llm-dataset` が既に west 登録済みの LLM 学習用 dataset として存在する（『既存を見つけたらそれを使う』）。ただし下記のとおり **org 境界と consent の問題があり、宛先は未確定** |
+| 採点を fleet gate ではなく `--check` の運用に任せる | ❌ | `gen-concept-index.cljs` が gate 化を避けたのは出力が checkout 状態に依存するため。こちらは superproject の追跡済みファイルだけを見るので同じ commit なら誰が走らせても同じ bytes になり、sha256 gate として意味を持つ |
+"}]
