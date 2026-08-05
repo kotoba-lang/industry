@@ -513,4 +513,32 @@
 
   ## 残り
 
-  上流 `kotoba-ui/product.cljc` の 2 token（`--hig-color-accent` / `--hig-radius-large`）は未修正。この page では該当 class を使わないので無害だが、`.kotoba-product__*` を使うページでは metric カードの角丸と accent が落ちているはず。別 repo なのでこの周では触らず、guard の allowlist に名前で残した。"}]
+  上流 `kotoba-ui/product.cljc` の 2 token（`--hig-color-accent` / `--hig-radius-large`）は未修正。この page では該当 class を使わないので無害だが、`.kotoba-product__*` を使うページでは metric カードの角丸と accent が落ちているはず。別 repo なのでこの周では触らず、guard の allowlist に名前で残した。"}
+ {:db/id -21
+  :task/id "S14-view-desync-halts-the-chain"
+  :task/workflow "torihiki-gap-closure"
+  :task/title "再起動した replica が view で追いつけず、それが leader だと chain が止まる"
+  :task/kind "consensus"
+  :task/repo "kotoba-lang/inga"
+  :task/requires []
+  :task/external-gate false
+  :task/status :pending
+  :task/status-note "**今日 3 回起きた。deploy のたびに起きうる。**
+
+  形は毎回同じ: deploy → object が再起動 → checkpoint から replay → **replay 中に view が遅れる** → その replica が次の height の leader だと、他の 3 台は `not my turn, w<n> leads` で待ち、**chain が止まる**。
+
+  実測 2 例:
+  - 2026-08-05 早朝: w1 が view 1458、他は 1578。w1 が leader。1067 で 9 時間停止。
+  - 2026-08-05 夕方: w2 が view 49607、他は 51233。w2 が leader。23784 で停止。w2 だけ checkpoint が古く（22300 対 23700）長い replay をしていた。
+
+  **height は 4 台とも同じで、遅れているのは view だけ**なので `inga.sync` は効かない（sync は height を運ぶ）。
+
+  ## 回復手段が devnet 固有
+
+  1 台だけ wipe すると**さらに悪化する**（view 0 から、しかも checkpoint も消えるので genesis から replay。実測 3.2 block/秒 = 23,784 ブロックに約 100 分）。実際に効いたのは**4 台まとめて wipe**＝全員の view を同時に 0 に戻すことだけで、これは本番では使えない。
+
+  ## 先に確かめること
+
+  `inga.pacemaker` が**自分より高い view の new-view / TC を受けたときに前進するか**。遅れた replica は quorum ぶんの new-view を毎 view 受け取っているはずなので、それで TC を組んで飛べるなら実装の問題、飛べない設計なら view 同期そのものが無い。
+
+  `replay` は `:justify` の QC から view を回復するので、**height で追いつけば view も追いつく**（早朝の件は S9 で replay が速くなったら解けた）。つまり今の設計は「replay が十分速ければ隠れる」だけで、直っていない。"}]
