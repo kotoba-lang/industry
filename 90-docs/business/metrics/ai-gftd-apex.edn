@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 14849, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 14864, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 649263,
-  :pageviews-7d 3314,
-  :uniques-7d-sum 5743,
+ {:requests-7d 651664,
+  :pageviews-7d 3316,
+  :uniques-7d-sum 5763,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/", :requests 1002}
-   {:path "/favicon.ico", :requests 143}
-   {:path "/3PJcpMFsD8B.php", :requests 48}
-   {:path "/mgrr.php", :requests 39}
-   {:path "/ccou.php", :requests 37}
-   {:path "/wp-content/themes/index.php", :requests 31}
-   {:path "/gecko-new.php", :requests 30}
-   {:path "/7.php", :requests 30}],
-  :status-mix {:ok 2198, :client-error 2345, :server-error 15136},
+  [{:path "/wp-admin/index.php", :requests 230}
+   {:path "/wp-temp.php", :requests 46}
+   {:path "/mgrr.php", :requests 38}
+   {:path "/xyn.php", :requests 37}
+   {:path "/ops.php", :requests 30}
+   {:path "/wp-content/themes/index.php", :requests 30}
+   {:path "/4PJcpMFsD8B.php", :requests 30}
+   {:path "/xp.php", :requests 26}],
+  :status-mix {:ok 1321, :client-error 1280, :server-error 15187},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,11 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-05",
- :traffic-quality
- {:window "24h", :probe-4xx-pct 12, :error-5xx-pct 77},
+ :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 85},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 1002 · /favicon.ico 143 · /3PJcpMFsD8B.php 48 · /mgrr.php 39 · /ccou.php 37 | 4xx(probe) 12% · 5xx 77%",
+ "上位 page (24h, 2xx/3xx): /wp-admin/index.php 230 · /wp-temp.php 46 · /mgrr.php 38 · /xyn.php 37 · /ops.php 30 | 4xx(probe) 7% · 5xx 85%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 649263 req/7d・5743 uniques(日次和)・うち4xx probe 12%(24h)、workers 14850 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 651664 req/7d・5763 uniques(日次和)・うち4xx probe 7%(24h)、workers 14865 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
