@@ -359,10 +359,16 @@ mutation としてではなく**atomic な新 snapshot として**だけ安全�
   - **勝手に `enabled: true` に戻していない。** セッション中に誰かが変えた org 規模の
     制御であり、意図的な無効化（課金・セキュリティ）だった場合それを黙って覆すことに
     なるため。**これは報告して判断を仰ぐ側の事象**
-  - **影響**: `columnar` `16b336b1`（GROUP BY）と `org-apache-arrow` `78db9a83`
-    （group 統合テスト）は **CI 未検証のまま main に入っている**。ローカルでは
-    JVM・nbb・clj-kondo すべて green を実測しているが、**CI が走ったという主張は
-    できない**。それ以前の 5 commit は CI 実測済み
+  - **影響（2026-08-05 セッション終了時点）**: 無効化以降に main へ入った
+    **7 個の merge commit が CI 未検証**である。
+    `columnar` `16b336b1`(GROUP BY) / `309822ec`(evolve) ・
+    `org-apache-arrow` `78db9a83`(group 統合) ・
+    `org-apache-parquet` `e28a6b3e`(Parquet writer) ・
+    `kotobase-lake` `747ad27b`(member schema) / `540a20f4`(snapshot) /
+    `23e45897`(compaction)。
+    いずれもローカルで JVM・nbb・clj-kondo・(writer は pyarrow gate も) green を
+    実測しているが、**CI が走ったという主張はできない**。無効化前の 5 commit は
+    CI 実測済み
   - つまり **P4 は network-awai だけの問題ではなくなった**。format library 群も
     今は CI に守られていない
 - コミット済みの Worker バンドルが main のソースより古かった（同一ソースの 2 回ビルドが
