@@ -262,10 +262,21 @@ kotobase の `.well-known/x402` は現在、resource 一覧を **route handler �
   - **見えない失敗が 5 つ出た**（どれもネットワークは健康に見えたまま何も commit しない）: ①outbox は envelope（`{:to :all|<w> :msg m}`）でメッセージではない ②`clj->js` が inga の名前空間キーワードと**キーワード値**を壊す（snapshot と message の両方で発生。snapshot 側は最初の snapshot が書かれるまで発現しない）③読めない保存値が replica を恒久的に殺す（load 段の失敗なので再試行が毎回同じ場所に当たる）④await されない subrequest は応答後にキャンセルされる（`waitUntil` が正解）⑤`outcome` は record 全体で勝者を判定するので、決着**前**に cert を付けると全 writer が「自分の cid に負けた」と報告される
   - **これは Byzantine fault tolerance ではない** —— 1 アカウント・1 operator・4 DO が 1 つの `env` を共有するので**全 validator の seed が 1 つの secret に入る**（越えるべき閾値が存在しない）。ADR-2607110300 の labelling 規則どおり crash fault tolerance と名乗り、`/health` が `fault-model` として返す。
 
+- **D3 の head 面**（2026-08-05）— `kotobase.graph-database.head` に `inga` 面を追加。`inga-mode` は `KOTOBASE_INGA_URL` と `KOTOBASE_HEAD_INGA=shadow` の両方が揃って初めて `:shadow`（D1 面と同じ規則）。**`authoritative` は受理しない** —— 未実装であり、文字列を受け取ると「切り替えたつもりで何も変わっていない」を許す。`->inga-record` が B2↔inga の命名対応（`name`/`value`/`sequence` ↔ `ref`/`cid`/`seq`）を 1 箇所に持つ。inga 面が落ちても書き込みは失敗しない（ADR-2607142200）。testnet で shadow 有効。`npm run test:cljs` 214 tests / 621 assertions。
+  - **テストが実欠陥を捕まえた**: `->inga-record` は `aget` で JS オブジェクトを読むのに clj map を渡しており、`cid` と `seq` が nil で送られていた（`ref` は引数由来なので正常に見える）。
+  - **走らせて初めて出た欠陥が 3 つ**: ①mirror が `write-head!` の 3 分岐のうち 2 つにしか無く、testnet が走る 3 つ目（D1 `authoritative`）では一度も呼ばれなかった —— **mode 検査を 1 箇所にしても呼び出し箇所が 1 箇所でなければ足りない**（`mirror-to-inga!` の docstring がこの形を警告していた直後に踏んだ）②shadow が `/propose` を await するのは誤り（最大 25 秒書き込みを止め、await しなければ応答後にキャンセルされる）→ `/submit` を追加 ③Worker→Worker の `*.workers.dev` fetch は 1042 で塞がれる（この repo が `wrangler.jsonc` に既に記録していたハザード）→ service binding へ
+  - ⚠ **live では未観測**。実 transact 4 回に対し inga log は 0 records。上記 follow-up 2 が再開点。
+
 ## やっていないこと（follow-up、優先順）
 
 1. **treasury の分離**（D6-2）。murakumo と kotobase が同一 Safe を指している。新しい Safe の deploy と secret 更新はオーナーの custody 行為で、agent が代行しない。
-2. **`head.cljs` に `inga` モードを追加し、shadow → authoritative へ進める**（D3 の残り）。**replica の配備と ref 面の実証は 2026-08-05 に着地した**（下記「着地したもの」）。残るのは production の head 面をこの plane に繋ぐ部分だけで、順序は `off` → `shadow` → `authoritative`（`kotobase.graph-database.head` が D1 で既に確立した形）。ADR-2607142200 の不変条件はその間ずっと成立させる —— 正しさは B2 単独で立ち、この plane が read に**必須**になってはならない。
+2. **shadow の実配線を live で観測できるようにする**（D3 の残り、**次セッションの最初の作業**）。`head.cljs` の `inga` 面と testnet の shadow 有効化は着地したが、**実 transact を 4 回成功させても inga の log は 0 records のまま**で、原因は切り分けられていない。
+
+   **再開手順**: `kotobase-graph-database/src/kotobase/graph_database/head.cljs` の `inga-submit!` にある `.catch (fn [_] nil)` を `console.warn` に変え、testnet に deploy して `npx wrangler tail --env testnet` を張りながら transact を 1 本通す。失敗の実体が出れば残りは数行。残る候補は ①service binding（`env.INGA`）の呼び出し形 ②replica 側 `/submit` の経路 ③まだ読んでいない transact 経路。
+
+   **transact の打ち方**（CACAO 自己発行、testnet）: `db_name` を送る（`graph` は `kotobase/db/<did>/<db_name>` としてサーバ側で導出される。直接は受け付けない）／本文フィールドは `tx_edn`／CACAO の resources には**導出後の graph** を入れる。
+
+   **何も mirror しない shadow は、正常に動いている shadow と見分けがつかない** —— だから observation が付くまで shadow を「動いている」と扱わない。その先が `authoritative`（未実装。`inga-mode` は文字列を受理しない）。ADR-2607142200 の不変条件はその間ずっと成立させる —— 正しさは B2 単独で立ち、この plane が read に**必須**になってはならない。
 3. **x402 challenge の stock 語彙と deal state**（D5 の (1)(2)）。
 4. **kura を `IObjectStore` 面に接続**（D1）。DataLad/annex 経路から。
 5. **暗号 epoch 1 への移行**（D4）。4 binding の provision と legacy block の移行。
