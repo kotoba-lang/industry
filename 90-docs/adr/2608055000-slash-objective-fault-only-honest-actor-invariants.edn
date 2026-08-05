@@ -1,7 +1,7 @@
 [{:db/id -1
   :adr/id "adr-2608055000-slash-objective-fault-only-honest-actor-invariants"
   :adr/title "ADR-2608055000: slash は客観的 fault にのみ発火する — 正直者の免疫 5 条と、murakumo / kotobase / kotoba(inga) の役割再配置"
-  :adr/status "accepted (G1..G6 closed 2026-08-05 + 2 self-review follow-ups; I4/I5 closed in inga, only MITIGATED in escrow)"
+  :adr/status "accepted (session closed 2026-08-05. G1..G6 landed on main + 2 self-review follow-ups; I4/I5 closed in inga, MITIGATED-not-closed in escrow; 2 open gaps recorded with resume points)"
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-08-05"
@@ -394,7 +394,86 @@ witness 集合 × 固定 reason 集合で有界にした。`:slashes` はベク�
 同じ fix（on-chain 検証）で同時に解ける。コードでは直せないので**開示した**:
 契約 docstring・`expireSlash` 自身・README・勧誘文書の Risks。
 
-## 9. 付随して直すもの
+## 9. Session close 記録（2026-08-05）
+
+### 着地したもの（すべて default branch 上で確認済み）
+
+| | repo | main commit |
+|---|---|---|
+| G1 | kotoba-lang/witness-quorum | `73fef67a3c6ea7621a96c786fbfd998c12a730d0` |
+| G1 | kotoba-lang/murakumo | `41588c578a8949ef06bda6edb9c836f8cf1db0f5` |
+| G2 (+follow-up) | kotoba-lang/inga | `7b292e968a676c950a8915cfbeb882f2a665c790` |
+| G3+G4 (+follow-up) | kotoba-lang/engi-witness-escrow | `002b03d9b98e54ac687a46467e7352c3fe00adcb` |
+| G5 | network-awai/cloud-murakumo | `8fddb4b0ab11d415c6c8c8838a8457ee2e51f13b` |
+| G6 (+follow-up) | kotoba-lang/engi | `e81fea799ed58cdde79ccb347b7ee1ae5d1db74e` |
+| ADR + west pin ×6 | com-junkawasaki/root | `83ab1ae634156fe7a720bffeb73bb474cb88c06e` |
+
+west pin 6 件は子リポの main tip と**完全一致を実測**（6/6）。`verify-west-pins` は
+変更 4 件をすべて fast-forward と判定。
+
+### 検証（実行したもの・件数）
+
+- witness-quorum `clojure -M:test` 55 tests / 149 assertions, 0 failures。`-M:lint` 0/0
+- inga `clojure -M:test` 309 tests / 1,419 assertions, 0 failures。`-M:lint` 0 errors
+  （warning 9 件はすべて既存、test/ 内）。parity digest `power:2/1/1/1/4` が
+  **JVM と nbb で一致**（適用された slash と拒否された slash の両方を含む）
+- engi-witness-escrow `forge test` 42 tests, 0 failures。`forge build` の
+  unsafe-typecast warning 0
+- cloud-murakumo `clojure -M:test -n …compute-test` 6 tests / 15 assertions, 0 failures
+- murakumo overlay-witness-* 4 ns 15 tests / 46 assertions, 0 failures（1 回目）
+
+### 残 gap 1 — edn-query が落ちるのは corpus の型不整合（未修正・要 owner 判断）
+
+`nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q` に
+`clojure.string/includes?` を含む述語を渡すと `a.indexOf is not a function` で
+**クエリ全体が落ちる**。
+
+**真因（実測で確定）**: `adr/id` の束縛 2,837 件のうち **169 件（約 6%）が文字列で
+なく整数**（例 `2799007316`）。該当 ADR ファイルは **171 件**で、規約の
+`:adr/id \"adr-<id>-<slug>\"` ではなく `:adr/id 2799007316` と裸の整数。
+`includes?` は `.indexOf` にコンパイルされるので整数に当たった瞬間に落ちる。
+
+**誤診を 1 度した記録**: 最初のスタックが `js->clj` を最内フレームに見せたため
+そこを修正したが、パッチ後も同じエラーで落ちて仮説は棄却（パッチは revert 済み）。
+A/B で確定 —— 同じクエリの述語を `=` に変えるだけで通る。
+
+**再現**:
+```bash
+nbb ... manifest/edn-query.cljs q '[:find ?id :where [?e \"adr/id\" ?id] [(clojure.string/includes? ?id \"2607994000\")]]'   # 落ちる
+nbb ... manifest/edn-query.cljs q '[:find ?id :where [?e \"adr/id\" ?id] [(= ?id \"adr-2607994000-…\")]]'   # 通る
+grep -rlE ':adr/id +[0-9]+' 90-docs/adr/*.edn | wc -l   # => 171
+（--classpath は \".:scripts/nbb_compat\"）
+```
+
+**なぜ直さなかったか**: 171 件の `:adr/id` を文字列化するのは **identity 値の変更**で、
+`:adr/related` 等の相互参照を壊しうる corpus migration。slash 設計のセッションで
+巻き込みで実行する範囲を超える。回避策は述語を `=` にすること。
+
+### 残 gap 2 — murakumo の live QUIC テスト 2 件が flaky（未修正・別スコープ）
+
+`overlay_witness_write_test/write-record-with-real-quorum-reaches-witnessed-over-real-quic`
+と `overlay_witness_ledger_test/ledger-quorum-fn-reaches-witnessed-over-real-quic`。
+実 localhost QUIC listener を固定ポートで立て固定 400ms sleep で待つ設計で、
+このマシンは多数の並行セッションが常時 build を回している。
+
+**本変更由来ではないことを実測済み**——無改変の `origin/main` で同一に失敗する
+（ledger 側は行番号まで一致）。修正には `quic-driver/serve-once-rpc!` に readiness
+signal を足す production API 変更が要り、slash 設計とは別の変更。
+
+なお **split-verdict テストの race は直した**（latch で順序固定、3 連続 green）。
+これも baseline で 2 回とも同じ失敗を再現してから着手している。
+
+### 次に着手するなら
+
+**I4/I5 の恒久解 = 証拠自体の on-chain 検証**（Ed25519 precompile もしくは inga の
+quorum 証明書）。ここに到達したら escrow の `arbiter` と `guardian` は**縮小ではなく
+消滅**させる。共謀による証明なし没収も、再提案による出金凍結も、同時に消える。
+
+**owner 判断が要るもの（agent が決めない）**: ①escrow を実ネットワークにデプロイするか
+②`:ordering` bond floor を 0 から動かすか（trigger は `engi.metrics` の
+`:external-counterparties > 0` で既に測定可能）。
+
+## 10. 付随して直すもの
 
 `inga/README.md:558-559` の Not-here-yet 一覧が
 『equivocation evidence is recorded and does not propagate』と書いているが、
