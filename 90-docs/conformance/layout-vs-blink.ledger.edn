@@ -1561,3 +1561,38 @@
  :next "次に挑む者への出発点: 空 <p> が split された <p> の末尾にあるとき Brave が畳まない理由を
         probe する（匿名 block の境界が関与している疑い）。規則そのものは上記のとおり実測済みで、
         必要なのは**もう 1 つの条件**だけ。"}
+
+{:at "2026-08-05"
+ :iteration 54
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 502}
+ :line-structure {:agree 464 :total 482 :pct 96 :was "451/482 (94%)"}
+ :geometry {:boxes-agree 1682 :boxes-total 1766 :pct 95 :clean-cases 456 :was "1652/1766, 445"}
+ :paint-order {:points-agree 12401 :points-total 12514 :pct 99 :clean-cases 472}
+ :computed-style {:values-agree 24758 :values-total 24816 :pct 100}
+ :landed {:cssom "8b3d14b42f5b997cc727a159bb7a41ba1fb41379 — CSS multi-column layout"}
+ :note "**multicol 群 1/12 → 12/12。11 case 改善・0 退行**（baseline と自分の tree で --debug-geometry を
+        再実行し、harness 自身の貪欲タグ照合を再現して per-case 差分を取った —— 再現した総計が
+        1652 と 1682 で harness と一致することも確認済み）。"
+ :balancing-rule "**使用列高は『その内容が使用列数に収まる最小の高さ』** —— 貪欲パックに対する二分探索で求め
+                  （最大連続分割の最小化に対して貪欲は最適で、実現可能性は高さについて単調）、
+                  最後にもう一度パックして**必ず実在する分割位置**に吸着させる。
+                  **意図的に ceil(total / count) ではない** —— 30px ブロック 3 つを 2 列にすると
+                  45 ではなく **60** に balance する。45 は内容を切れる場所ではないから。
+                  corpus 11 形 + 約 30 の追加 probe（割り切れる/割り切れないブロック数と高さ、
+                  break-inside: avoid、空 vs テキスト持ち、箱より高い単一ブロック、
+                  ブロック間 margin、spanner、確定高）で Brave と全て一致。"
+ :scope-cut "**ブロックは列境界で分割されない** —— 丸ごと次の列へ移る（= 全ブロックが実質
+             break-inside: avoid）。ブラウザは分割して断片の和集合を報告する。
+             残る 2 case（a-block-splits-across-the-column-boundary /
+             break-inside-avoid-moves-the-whole-block）は **baseline から不変**で、
+             どちらも元から失敗していた box。**break-inside: avoid は構成上満たされてしまうので
+             何も採点しない**ことをコードに明記。multicol box の直接の inline 内容は
+             行 box 間で分割される。次のサイクルに必要なのは op 単位の分割と union :node box。"
+ :cascade-note "cssom.core の parse-property-value に 1 arm 追加: `columns` を生文字列のまま通す。
+                **line-height と同じ問題が最も鋭い形で出る** —— `columns: 3` と `columns: 3px` は
+                **単位だけがどちらの半分を指定したかを語る**のに、汎用の coercion が両方 3 にしていた。"
+ :corpus-correction "**case のコメントの誤りを 1 件訂正** —— :multicol/padding-is-outside-the-columns が
+                     『130px の列』と書いていたが、それは padding を含まない width から padding を
+                     引いた数。ブラウザは 140 と言う。**比較される数値は常にブラウザ由来**で、
+                     誤っていたのは散文だけ。"}
