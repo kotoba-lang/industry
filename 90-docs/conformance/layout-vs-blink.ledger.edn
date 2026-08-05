@@ -1004,3 +1004,40 @@
               既存の問題で、items は (13,13) = Brave に着地するようになった。"
              "content-inset は依然 uniform padding を読む（per-side ではない）—— docstring に明記。"
              "list marker + 単位無し line-height（agent 作業中）"]}
+
+{:at "2026-08-05"
+ :iteration 47
+ :oracle {:browser "Brave Browser 151.1.93.129" :transport :cdp}
+ :corpus {:cases 341}
+ :line-structure {:agree 326 :total 328 :pct 99}
+ :geometry {:boxes-agree 1256 :boxes-total 1283 :pct 98 :clean-cases 324 :was "1244/1283, 321"}
+ :paint-order {:points-agree 8444 :points-total 8509 :pct 99 :clean-cases 321}
+ :computed-style {:values-agree 15678 :values-total 17949 :pct 87}
+ :landed {:cssom "df21114c23d40f71aa8591ed32f258c46fdba1da — list marker を独自 fragment に + 単位無し line-height の継承"}
+ :note "**13.70625 をどこにも引いていない** —— marker が pen を進めなくなった時点で 1 marker advance として
+        自然に消えた。marker は inline pipeline を独自の fragment 種（:kind :marker）として通り、
+        item の text run に併合されず、空白を collapse せず、pen を進めず、
+        inline-max-content-width に寄与せず、どの owner の inline box にも寄与せず、
+        content 端の直前の負の x に描かれる。"
+ :findings ["**resolve-line-height が parse-dbl を使っていた** —— JVM では Double/parseDouble（単位付きを拒否）、
+             cljs では js/parseFloat（単位を無視）。つまり `line-height: 1.5em` が nbb では 21px、
+             JVM では theme 既定という**ランタイム依存の食い違い**で、`150%` は font-size の **150 倍**だった。
+             明示 parse に変更（rem / viewport 単位は normal に落とす）。"
+            "単位無し line-height は :line-height/factor として係数のまま継承され、
+             各読み手が自分の font-size で再計算する。number / em / % は解決済み長さとして継承。"]
+ :per-case "engine box が変化したのはちょうど 4 case、許容外への退行 0。
+            :table/cell-with-a-list は **corpus に table が入って以来 0/8 だったものが全 box 完全一致**。
+            :page/table-of-contents も全 box 完全一致。
+            **:selector/nth-child の 1px は隠さず報告** —— bold な 2 つ目の <li> が子 2 つ（marker + text）を
+            持つことで inline 経路に入り、2 つの経路が bold な行 box を異なる丸め方をするため
+            li h 20→21。許容内で case は clean のまま。**既存の 2 つの高さモデルの不一致が
+            より多くの要素で露出しただけで、新たに導入したものではない。**"
+ :measured-not-modelled "`inside` の <ul> marker 幅: Brave の <ol> inside advance は marker 文字列幅そのもの
+                         （1. / 10. / 100. で 21/28/35px、engine と完全一致）だが、<ul> の disc box は
+                         **font-size だけの関数**（14px で 19、10px で 14、28px で 37。Arial でも monospace でも
+                         list-style-type: square でも同じなので 6.7px のグリフ幅ではない）。
+                         3 点から推測せず 5.3px を list-style-inside? に記録するに留めた。"
+ :remaining ["<li> の中身が block の場合、outside marker が独立行を得る（Brave は block の 1 行目の脇に置く）"
+             ":page/two-column-text と :overflow/x-hidden-y-scroll は marker でも line-height でもなく
+              **margin の問題**だった（flex item の margin は collapse しない／overflow コンテナは BFC を作る）"
+             "::marker 自体の位置はこの harness では検証不能（oracle は要素ごとに 1 box、::marker は要素でない）"]}
