@@ -144,4 +144,46 @@ validator に transaction が着地しない（ADR-2608040400 の未了節）。
 5. **Merkle state root**（分類 2）—— light client を主張するなら必須
 
 spot / HyperEVM / vault / staking は**別プロダクトの規模**であり、上の 5 つが
-片付く前に着手すると、動かない土台の上に面積を足すことになる。"}]
+片付く前に着手すると、動かない土台の上に面積を足すことになる。
+
+## 改訂 2026-08-05 —— この台帳の多くは古い
+
+同日の作業で **17 件の gap を閉じた**（`90-docs/task-graphs/task-graph.datoms.edn` の `torihiki-gap-closure` が正本、17/17 completed）。この本文のうち以下は**もう現在地ではない**:
+
+| 台帳の記述 | 2026-08-05 の現在地 |
+|---|---|
+| D「snapshot が無い、boot が O(chain)」 | **解消**（S1/S3）。checkpoint boot を本番で観測。さらに S9 で 3-chain 走査を committed 高さで打ち切り、1067 ブロック replay の hash が 1,133,160 → 2,128 |
+| D「state root は flat digest、light client が作れない」 | **解消**（S7）。merkle-sum の認証木。state を持たない client が `/proof` から collateral を検証し、1 バイト改竄で false を確認 |
+| D「consensus: pacemaker / view change / p2p / 署名集約は無い」 | **engi 時代の記述で誤り。** inga には pacemaker・sync・wire・attest が全て在る |
+| D「tx が着地しない（未解明）」 | **解消**（S4） |
+| E「candles / 履歴が無い、tape は 200 件 ring」 | **解消**（S5）。ただし validator に届いたのは同日夕方（それまで sequencer にしか無く、端末は validator を読んでいた） |
+| C「bridge は seam のみ、誰でも自分に入金できる」 | **解消**（S6、オーナー判断で「自前の証書」）。自己 mint は credit 0、bridge が 1 account 1 回だけ発行、4 replica が合意 |
+
+## 同日に**新しく見つけた**もの
+
+- **validator の秘密鍵が公開 chain-id から計算できた**（S15）。実証済み: 導出した公開鍵が 4 台の live の公開鍵と一致した。**BFT 保証はゼロで、端末は `4 replicas, agreeing` と表示していた。** 実鍵 + genesis の validator set + TOFU 廃止で解消。
+- **見知らぬアカウントが oracle を動かせた**（S6 系）。live で 1000→1001、mark が追従。証拠金と清算は mark を読むので全員清算が可能だった。機構は正しく、**publisher が一人も設定されていなかった**。
+- **`/wipe` `/reset` が無認証だった。** 誰でも replica を破壊でき、leader を消せば chain が止まった。
+- **再起動した replica の view が同期せず、それが leader だと chain が止まる**（S14）。今日 3 回起きた。根本原因は「new-view が運ぶ証明書を同期 verify-fn が検証できず、メッセージごと捨てていた」—— S12 で sync-response に対して直した穴が new-view 側に残っていた。
+- **README と公開ページの `3,155,313 ops/sec = HyperCore の 15.8 倍` は再現しない。** 同じベンチで 5,639 / 25,314（負荷のある機械、下限値）。**取り下げた**。
+
+## 性能の現在地（2026-08-05 実測）
+
+| | torihiki（本番 4 replica） | Hyperliquid（公表） |
+|---|---|---|
+| ブロック間隔 | 604 ms（1.66 blocks/sec） | — |
+| 送信 → 反映 | 2,648 ms | 中央値 ~0.07 s |
+
+**エンドツーエンドで約 40 倍遅い。** 実行層の絶対値は現在**主張なし**（静かな環境で測るまで）。
+
+## H「順序についての意見」の 5 件は全て閉じた
+
+snapshot → tx 着地 → candles → bridge → Merkle root。次に効くのは、この台帳が書いていなかったもの:
+
+1. **block store と head ref**（S16 の残り）。ブロックの同一性は CIDv1 dag-cbor になり parent は tag-42 link だが、**CID から bytes を引く先は今も Durable Object storage**。`inga.ref`（quorum 証明書＝条件付き書き込み）と provider（`io-storj` / `io-filecoin` / `io-ipfs`）は未接続
+2. **出金の出口**（残高は減るが払い出し先が無い）
+3. **`:bridge-authority` が state root にコミットされていない**
+4. **準備金証明**（collateral の非負を不変条件にすれば、merkle-sum の葉 sum を collateral にするだけで root が準備金証明になる）
+5. sequencer chain は authority nil のまま
+
+分類 3（単に未実装）は変わらず: TWAP / scale / amend / cancel-all、fee tier / builder / referral、sub-account / agent wallet、WebSocket、user fills 履歴、multi-market、oracle の stake 加重、清算の自動駆動。"}]
