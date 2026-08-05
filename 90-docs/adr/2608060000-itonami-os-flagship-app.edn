@@ -165,27 +165,82 @@ JVM 15 tests。suite 全体 1387 tests / 9067 assertions、既存の 7 failures 
    `--hig-text-*-size` は入っていない。** 無いトークンはエラーにならず `var()` が
    空に解決するので、`padding: var(--hig-spacing-3)` は黙って 0 に潰れる。
 
+## live 実行（2026-08-05、同日追加）
+
+面がビルド時生成だけだった状態は解消した。`POST /api/{org}/{repo}/os/ops` が
+**リクエスト時に kernel を回す**。
+
+- **永続化**: `itonami_os_tenant` 1 tenant = 1 行に、統合台帳と各 vertical の store
+  スナップショットを**同じ行**で持つ。分けると「台帳には commit が載っているのに
+  store は書き変わっていない」半端な状態が作れる。version 楽観 CAS、負けたら 409
+  （**merge しない** —— hash 連鎖は 2 つの枝を後から混ぜられない）。形は
+  `lawfirm_practice`(0004) と同一。
+- **store は protocol を再実装しない**。6399 の Store は 18 メソッド、7810 は 13 あるが、
+  どちらの `MemStore` も状態は atom 1 個の map なので、永続化に要るのは EDN の
+  出し入れだけ。2 実装に分かれると片方だけ直る壊れ方が入る。
+- **承認は 1 リクエストで完結する**。langgraph の checkpointer はプロセス内にあり、
+  承認待ちの run はリクエストをまたいで生き残らない。承認は body の `approval` として
+  運ぶ —— 判断は認証済み admin が下し、request field として届く。checkpointer の
+  永続化を発明するより「承認は op の入力である」と認める方が状態の置き場が 1 つ減る。
+- **D1 を使う根拠**: ADR-2608039000 が縛るのは分散を名乗る経路。この面は分散性を
+  主張していない（tenant の業務記録）。主張し始めたら順序の裁定は inga へ移す。
+
+### 本番での実測（`cloud-itonami/os-verify` テナント）
+
+| 段 | 結果 |
+|---|---|
+| `posting/ingest` | commit（seq 0） |
+| 法域評価を飛ばした `posting/publish` | **hold** `evidence-incomplete`（seq 1） |
+| `jurisdiction/assess` + 承認 | commit（seq 3） |
+| `posting/publish` + 承認 | commit（seq 5） |
+| `application/refer` + 承認 | commit（seq 7）+ **運ぶ仕事 `:refer->intake`** |
+| 宣言に無い op | 422 `op-not-declared`（actor に届かない） |
+| 未接続の営み | 422 `unbound` |
+| 未認証 POST | 401 / capability 無し | 403 |
+
+台帳検証 `{ok? true, length 8}` at version 5。**4 段目が通ったのは 3 段目の評価が
+D1 に残っていたから** —— スナップショット往復が live で効いていることの証拠。
+
+## 成熟度ループ（2026-08-05、同日追加）
+
+`com.gftd.itonami-os-maturity-loop`（launchd、45 分）。指示は
+`scripts/itonami-os-loop-prompt.md`（plist に埋めない —— 埋めると git の外に正本が
+できる）。作業ツリーは `~/.tamaki/itonami-os/…` の専用 clone で、west 管理の共有
+checkout ではない。
+
+- **毎サイクルまず測る**: `scripts/itonami-os-maturity-tick.cljs` が、接続数・
+  `:unbound-reason` がまだ本当か・宣言 `:ops` が actor の allowlist と一致するか・
+  公開面と API gate の生死を実測し、`~/.gftd/itonami-os-maturity-tick.ledger.edn` に
+  追記する。**状態を記憶から再構成させない。**
+- **PR までしか行かない。** merge も deploy もしない —— adapter を足すと公開面の
+  主張が変わる（「この営みは live」）ので、公開する判断は人がする。
+  **動かないものを live と宣言することが、この面が避けようとしている唯一の失敗**なので、
+  そこだけは自動化しない。
+- **`tamaki loop` を使わなかった理由**: cycle が `rad issue list` を要求する
+  （実測: `cycle issue discovery failed`）。この repo の着地経路は GitHub の
+  `gh api merges` で Radicle ではない。**動かない loop を登録したままにしない** ——
+  「登録されているのに 1 度も回っていない」は Actions で既に踏んだ失敗
+  （ADR-2607300900）。登録は取り消した。
+- 初回サイクルの実測: tick が示した「次の 1 手」どおり isic-4921(transitops) の
+  adapter 作成に着手した。
+
 ## 正直な限界
 
-1. **面は今日ビルド時生成であり、request 時に op を受け付けない。** 台帳は生成器が
-   回した筋書きのもので、operator が自分の営みを回す経路（CACAO gate + KV 永続化 +
-   `:esm` edge bundle）はまだ無い。カーネルは host 非依存に書いてあるので edge に
-   載せられるが、**載せていない。**
-2. **統合台帳は永続化されていない。** 値として生成器の中で完結しており、
-   run をまたいで積み上がらない。
-3. **接続は 2/9。** 残り 7 本は adapter を書けば繋がる（4 本は `render_html.clj`
+1. **接続は 2/9。** 残り 7 本は adapter を書けば繋がる（4 本は `render_html.clj`
    だけが JVM 専用で中核は portable）。6310 と 5820 は先に repo 側の
    `.clj` を `.cljc` に割る作業が要る。
-4. **`:invoke` は実装され検査もされているが、宣言された規則には 1 本も無い。**
+2. **統合台帳は tenant の記録の中で線形に伸びる。** 1 op ごとに記録全体を書くので、
+   台帳が伸びれば書き込みも伸びる（`lawfirm_practice` が既に名指ししているコスト）。
+   protocol 境界があるので実体ストアへの置き換えは上の層を変えない。
+3. **`:invoke` は実装され検査もされているが、宣言された規則には 1 本も無い。**
    境界を共有する vertical 同士の連携で出典のあるものが今日は無いため。
-5. **7810 の store は `seed-db` のデモデータ。** 実運用のデータ経路は operator 側。
-6. **isic-853 は `governor/allowed-ops` を持たず op が phase/advisor に散っている。**
+4. **7810 の store は `seed-db` のデモデータ。** 実運用のデータ経路は operator 側。
+5. **isic-853 は `governor/allowed-ops` を持たず op が phase/advisor に散っている。**
    `os.edn` の `:ops` の写しの検査が、他の 8 本と同じ形では効かない。
 
 ## 次の 1 手
 
-`os/kernel` を `:esm` edge bundle に載せ、`POST /api/{org}/{repo}/os/ops` を
-既存の CACAO tenant gate の内側に置く。台帳の永続化先は**共有バックエンド**に
-する —— kotobase の join は ref 1 本までなので、営みをまたいで引きたいものは
-同じ ref に置く。D1 を order/CAS の裁定者にはしない（ADR-2608039000）。
+ループが開ける PR を見て、繋がる営みを 5 本着地させる（4921 / 851 / 852 / 853 / 854）。
+そこから先は 6310 / 5820 の `.clj` を `.cljc` に割る作業で、機械的ではない。
+面から op を出せるようにする（今は API のみ）のもここから。
 "}]
