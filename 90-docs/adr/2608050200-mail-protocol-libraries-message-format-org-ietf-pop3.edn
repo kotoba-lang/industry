@@ -168,7 +168,7 @@ pin 前進 4 件。すべて fast-forward、behind=0、merge-base == 旧 pin を
 （メッセージ書式はライブラリのもの）。"
 
   :adr/gaps
-  ["cloud-itonami-app に compose UI が無い。POST /api/mail/send は動くが送信フォームは未実装"
+  ["【解消済 2026-08-05】compose form と Reply を b59a8c3 で実装。差出人は明示選択（複数メールボックスがあるとき既定は無い）。Reply は account / 宛先 / Re: / In-Reply-To / thread-id を prefill する —— そのために workspace/entry-view が :account-id と :message-id を返すようにした（archive の .eml は両方 nil、返信元となる live account が無いので正しい）"
    "【解消済 2026-08-05】Sent 複製を ea0f964 で配線した。IMAP のみ（Gmail の users.messages.send と Graph の saveToSentItems は自分で控えを作る、POP3 はフォルダが無い）。複製の失敗は送信を失敗させない —— メールは既に出ているので :sent-copy として結果だけ返す。同じ commit で send! の case に :pop3 節が無く No matching clause で落ちていたのも修正した（POP3 アカウントは登録できて送信できなかった）"
    "POP3 account の set-read! 相当が無い（プロトコルにサーバ側既読状態が無いため設計上不可。ローカル mark 層のみ）"
    "【対応済 2026-08-05】open PR 3 件は disposition を付けた: #32 close-superseded、#37 は ADR-0014 半分を replay して close、#28 は構造的分岐のため needs-review で open のまま。詳細は ADR-2608050300"
