@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 14888, "ai-gftd-chat-shell" 1},
+ {"magatama-sh1n5h1x" 14898, "ai-gftd-chat-shell" 1},
  :zone
- {:requests-7d 654640,
-  :pageviews-7d 3335,
-  :uniques-7d-sum 5771,
+ {:requests-7d 657676,
+  :pageviews-7d 3342,
+  :uniques-7d-sum 5796,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/wp-admin/index.php", :requests 230}
-   {:path "/wp-temp.php", :requests 46}
-   {:path "/mgrr.php", :requests 38}
-   {:path "/xyn.php", :requests 37}
-   {:path "/4PJcpMFsD8B.php", :requests 31}
-   {:path "/ops.php", :requests 30}
+  [{:path "/wp-temp.php", :requests 46}
+   {:path "/xyn.php", :requests 40}
+   {:path "/mgrr.php", :requests 40}
+   {:path "/4PJcpMFsD8B.php", :requests 34}
+   {:path "/ops.php", :requests 31}
    {:path "/wp-content/themes/index.php", :requests 30}
-   {:path "/ms-edit.php", :requests 26}],
-  :status-mix {:ok 1368, :client-error 1282, :server-error 15183},
+   {:path "/ms-edit.php", :requests 26}
+   {:path "/ws13.php", :requests 26}],
+  :status-mix {:ok 1129, :client-error 1272, :server-error 15173},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-05",
- :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 85},
+ :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 86},
  :top-paths
- "上位 page (24h, 2xx/3xx): /wp-admin/index.php 230 · /wp-temp.php 46 · /mgrr.php 38 · /xyn.php 37 · /4PJcpMFsD8B.php 31 | 4xx(probe) 7% · 5xx 85%",
+ "上位 page (24h, 2xx/3xx): /wp-temp.php 46 · /xyn.php 40 · /mgrr.php 40 · /4PJcpMFsD8B.php 34 · /ops.php 31 | 4xx(probe) 7% · 5xx 86%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 654640 req/7d・5771 uniques(日次和)・うち4xx probe 7%(24h)、workers 14889 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 657676 req/7d・5796 uniques(日次和)・うち4xx probe 7%(24h)、workers 14899 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
