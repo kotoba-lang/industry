@@ -577,25 +577,46 @@
   :task/workflow "torihiki-gap-closure"
   :task/title "CID 面が実装済みで、動いている chain に一切繋がっていない"
   :task/kind "architecture"
-  :task/repo "kotoba-lang/inga"
+  :task/repo "kotoba-lang/torihiki-node"
   :task/requires []
   :task/external-gate false
-  :task/status :pending
-  :task/status-note "**実測**: `inga.replica` が require するのは consensus / pacemaker / quorum / attest / stake / sync / wire だけで、`inga.ref` / `inga.head` / `inga.retrieval` / `inga.state` は一つも入っていない。ブロックの同一性は `:inga.block/parent-hash` ＝ SHA-256 の hex 文字列で、CID ではない。CID コードを持つ `torihiki.log` はどちらの Worker からも require されていない。
+  :task/status :completed
+  :task/status-note "**最初の配線が入り、独立実装で検証した。ブロックの同一性は CID になった。**
 
-  **`inga.ref` は既に「2f+1 の quorum 証明書それ自体が条件付き書き込みである」を実装している** —— CLAUDE.md の ADR-2608038000 が「分散型経路で単一ベンダの条件付き書き込みを前提にするな、inga の ref を使え」と名指ししている当の機構。ところが本番の chain は状態を Durable Object storage に置いており、それはその ADR が**前提にするなと言っているもの**。
+  ## 順番の理由
 
-  つまり設計は既にここにあり、繋がっていない。書くべきものは新しい設計ではなく配線:
+  `inga.ref` の主旨（**2f+1 の quorum 証明書それ自体が条件付き書き込み**）は ADR-2608038000 が単一ベンダの条件付き書き込みの代替として名指ししているもので、`inga.head` の head record は `cid` を名指す。**この chain にはその `cid` が無かった** —— ブロックは素の SHA-256 hex で識別されていた。**CID で addressing する store は、addressing される側に CID が無い間は無意味**なので、ここから繋いだ。
 
-      (storage/compose {:blocks <content-addressed object store> :refs <inga>})
+  ## 直したもの（torihiki-node 760dbd4）
 
-  block 面の provider 候補は全部 checkout 済み: `io-storj`（署名付き S3 / Gateway-MT）、`io-filecoin`（Lotus JSON-RPC）、`io-ipfs`（Kubo）、`io-ipld`（tag-42 CID link 付き DAG-CBOR）。必要な capability は `#{:immutable-blocks :cid-addressed-read}` だけで、**条件付き書き込みは要らない**（それは ref 側＝inga が担う）。
+  - `block-node` が `inga.consensus/canonical-block` と**同じ場**（height / parent / proposals / proposer / ts。justify QC は含まない —— 親についての主張であってこのブロックについてではない）を DAG-CBOR node に写す。増やすと「ブロックの hash が何を意味するか」が変わる。
+  - **parent は tag-42 の link で文字列ではない。** これが「hash を含む chain」と「IPLD tool が歩ける DAG」の差。genesis は `\"genesis\"` ではなく nil（CID でない sentinel は全ての読み手に特別扱いを強いる）。
+  - `/block?height=N` が `cid` と `dag-cbor`（base64）を返す。client が自分で CID を計算し直せる。
 
-  ## Holochain は当たらない
+  ## 同一性の定義が 2 つあった
 
-  `kotodama-holochain` はあるが、Holochain は agent-centric で**全順序を持たない**。CLOB は全順序が要件なので、consensus 面の代替にはならない。agent が自分の鍵を生成し identity ＝ 公開鍵という点は S15 と同じ方向だが、それは Holochain を使わなくても得られる。
+  `/head` の `:genesis-hash` / `:tip-hash` は `block-hash (canonical-block …)` のままで、replica は `block-cid` で識別していた。**同じファイルに「ブロックとは何か」の定義が 2 つあり、食い違っていた。** 症状は「全 parent link が CID なのに `/head` は hex」。
 
-  ## 何が解決して、何が解決しないか
+  ## 検証（v100、2026-08-05）
 
-  解決する: 履歴の耐久性・内容アドレス化・検証可能な取得・DO storage 前提からの脱却。
-  解決しない: S14（liveness）、S15（鍵）、oracle の権限、withdraw の出口。**これらは保存層の設計問題ではない。**"}]
+  **自分のライブラリを使わず** Python で sha2-256 → multihash → CIDv1 dag-cbor → base32 を組み立てた:
+
+      head height / tip   : 1800 bafyreifzftar7lqitnnq3rczo5i4rm4r5av2k6faewzn3phmd5uzmrbs7m
+      block height / cid  : 1800 （同じ）
+      python recomputes   : （同じ）  → ALL THREE AGREE: True
+
+  生 CBOR から tag-42（`d8 2a`）を取り出して parent CID を読み、**前ブロックの CID と一致**することも確認した。DAG は本物。
+
+  ## まだやっていない（S16 の残り）
+
+  - **block store が無い。** CID はあるが、CID から bytes を引く先は今も Durable Object storage で、`/block` は height で引いている。cid→height の索引はブロックごとに storage 書き込みが 1 回増える。
+  - **head ref が無い。** `inga.ref/project` + `outcome` に host の `propose!`（submit → commit を待つ → outcome）を繋ぐ段。
+  - provider（`io-storj` / `io-filecoin` / `io-ipfs`）は未接続。必要な capability は `#{:immutable-blocks :cid-addressed-read}` だけで条件付き書き込みは要らない（それは ref 側＝inga が担う）。
+
+  ## 副次的に判明
+
+  CID 経路は npm の `@noble/hashes` に依存する（`multiformats` 経由）。この workspace の純 cljc SHA-256（`kotoba.bytes.sha256`、「各 repo が自前で書くのをやめるため」に在る）とは別系統。Worker には npm を足した。
+
+  ## Holochain
+
+  当たらない。agent-centric で全順序を持たないので CLOB の consensus 代替にならない。"}]
