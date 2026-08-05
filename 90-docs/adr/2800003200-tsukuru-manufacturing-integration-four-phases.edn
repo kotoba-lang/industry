@@ -283,6 +283,26 @@ dataset は drop できない**。git-annex が「1/2 コピーしか確認で�
 下げれば drop は通るが、それは保証を弱めて通しただけ。**2 本目の remote を足すのが正しい
 解**で、そうして初めて往復が回った。
 
+**機密材料について実測したこと（2026-08-05 追加）**: **B2 の 2 remote はどちらも
+`encryption: none`**（`scripts/datalad-b2-init.cljs` が明示的にそう設定している）。
+つまり今日この面に置いたバイトは **B2 に平文で載る**し、どちらの bucket も
+この dataset 専用ではない（`gftdcojp-m365-annex` は M365 archive と legislation 4 件、
+`ai-gftd-datasets` は SHIRO & PICO の制作資産と同居）。この事実は dataset の
+`index/policy.edn` の `:policy/storage-facts` に測定値として記録し、README にも書いた。
+
+**path の規律を prose から機械検査に移した**: `index/policy.edn` の
+`:policy/allowed-paths`（正規表現の allowlist）を `scripts/verify-artifact-path-policy.cljs`
+が検査する。allowlist に無い形の path があれば exit 1。`policy.edn` を持たない
+dataset は :skipped（宣言は opt-in、違反は opt-in ではない）。**落ちることも確認済み。**
+「顧客名を path に入れるな」は読む人がいなければ制御にならない —— 暗号化しても
+path・size・更新頻度・author は隠れないので、ここが実際の漏洩面。
+
+**機密材料の受領に何が要るかを checkable な形にした**（`:policy/confidential-material`
+`:blocked-on`、4 件とも今日は false）: ①専用 remote の暗号化（git-annex
+`encryption=shared` は GPG であって age ではない）②他 dataset と同居しない bucket
+（B2 Master Key が要る。1Password が 2026-08-05 に非対話で通らなかった）
+③counterparty を漏らさない path 規約（opaque id）④この保管形態に対する NDA の確認（人間）。
+
 **この Phase が決めていないこと**: 機密図面の受領。公開/private の別に関わらず、
 git-annex の暗号化は**本文**を隠すが path・size・更新頻度・author は隠さない
 （`raw/cad/<顧客>-<部品>.step` が launch 直前に更新されれば、暗号化されていても
@@ -360,9 +380,48 @@ landed（`cloud-itonami/tsukuru-actor` `f206c51`）:
 **オーナー作業**: ①元の seed を持っていれば kagi `itonami-marketplace-kotobase-seed`
 に入れ直す（値は 7 worker の Cloudflare secret の中にだけ在り、読み出せない）
 ②無ければ新 seed を発行して 8 worker 全部に入れ直す（DID が変わるので既存 ref の
-扱いを決める）。どちらかが済めば、残りは
-`wrangler secret put KOTOBASE_SECRET_KEY` と `ACTOR_WRITE_TOKEN` の 2 本だけで
-completion 条件の検証に進める。
+扱いを決める）。
+
+### ⚠ 2026-08-05 追調査 —— seed は「唯一の blocker」ではなかった（この ADR の前の記述を訂正）
+
+上の 1〜3 は「seed さえ戻れば completion 条件の検証に進める」と読めるが、**実測すると
+そうではない**。共有 identity が **ref の一部しか読めない**:
+
+| worker | 経路 | 結果 |
+|---|---|---|
+| `order` | `edge/read-all :order` | **200** `{"orders":[]}` |
+| `onboarding` | `edge/read-all :credential` | **`q 401 Unauthenticated`** |
+| `onboarding` | `POST /applicants`（書き込み） | **`q 401 Unauthenticated`** |
+| `fulfillment` | `edge/read-all :task` | **`q 401 Unauthenticated`** |
+
+7 worker とも `/health` の did は同一（`z6Mkid37…`）、`db` は同一（`marketplace`）、
+`wrangler.jsonc` に endpoint / operator-did の上書きは無く、コードは同じ
+`marketplace.edge/read-all`。**同じ identity・同じコードで、kind が違うと 401 になる。**
+
+- 5 回連続で叩いて**決定論的**（間欠ではないので CACAO の時刻フォーマット揺れではない）。
+- **現ソースから再ビルドして再 deploy しても変わらない**（onboarding version
+  `d05f6ded`、deps は listing と同一 sha）。「deploy 済み bundle が古い」仮説は**棄却**。
+- 原因は外から特定できていない。kotobase.net（apex）側が、この identity に対して
+  ある種のクエリを拒否している、としか言えない。
+
+**したがって今 seed を再発行するのは誤った手**である:
+
+1. **401 は seed の問題ではない。** 同じ seed で `:order` は読めている。再発行しても
+   `:credential` / `:task` が読めるようにはならない。
+2. **失うものがある。** DID が変われば既存 ref の内容が孤児化する。文書 kind は空に
+   見えるが、**台帳（`:mp.event/*`）は読めていない**（`/ledger` も同じ 401）。
+   読めないものを、直らない変更のために捨てることになる。
+
+**正しい順序は「読めない原因を先に潰す → 測り直す → それから seed を判断する」。**
+次の一手は kotobase.net 側の authorization モデルの確認（なぜ `:mp.order/doc` は通り
+`:mp.credential/doc` は 401 か）であって、鍵の再発行ではない。
+
+**この調査で行った live の変更 2 件**（どちらも小さいが記録する）:
+- `cloud-itonami-marketplace-onboarding` に `ACTOR_WRITE_TOKEN` を**新規作成**した
+  （`wrangler` は "Creating" と報告 —— **それまで存在せず、`edge/authorised?` は
+  `want` が nil なら false を返すので、この actor の write route は全部死んでいた**）。
+  値は kagi `itonami-marketplace-actor-write-token`。
+- 同 worker を現ソースから再 deploy（挙動は変わらなかった）。
 
 ### Phase 1 の実測（この面で実際に走らせた値）:
 
