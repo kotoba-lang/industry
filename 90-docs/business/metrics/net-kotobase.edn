@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 17745, "kotobase-cf-wasm-staging" 27985},
+ {"net-kotobase" 18058, "kotobase-cf-wasm-staging" 28936},
  :zone
- {:requests-7d 48330,
-  :pageviews-7d 1354,
-  :uniques-7d-sum 1385,
+ {:requests-7d 49614,
+  :pageviews-7d 1359,
+  :uniques-7d-sum 1396,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -16,9 +16,7 @@
    {:path
     "/kotobase-cf-wasm-production/blocks/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreih33cib7wase5noayinc5idjoncj73wxy5bwnxh3vo3g3wrmu5utq",
     :requests 15}
-   {:path
-    "/kotobase-cf-wasm-production/shadow/iengine/merkle-lsm/v1/journal/bafyreicuqbxou4isy5z4d5lucus326qtuwpslhpslkb4pazp7deaatsedq/bafyreiemrub25yaimpls74dwf4lzhzftabms4fb72e5oszemzfwjnlhykq.bin",
-    :requests 11}
+   {:path "/sign-in", :requests 12}
    {:path
     "/kotobase-cf-wasm-production/shadow/iengine/merkle-lsm/v1/journal/bafyreifq6p445b472n6qbutttfaa3fegq5bbjnnxcmrogi5y6ksw46qwty/bafyreidtarqyvhb6yedn4mgmztwru43uzziimrnilomlffmnxjkzrf2sfq.bin",
     :requests 10}
@@ -34,7 +32,7 @@
    {:path
     "/bafyreico5af7wbpo2obzyv7ti76sbwb5jsjbjd7kaj25m354so4rw3mvz4",
     :requests 8}],
-  :status-mix {:server-error 166, :ok 963, :client-error 4111},
+  :status-mix {:server-error 146, :ok 981, :client-error 8011},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -46,12 +44,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-05",
- :traffic-quality {:window "24h", :probe-4xx-pct 78, :error-5xx-pct 3},
+ :traffic-quality {:window "24h", :probe-4xx-pct 88, :error-5xx-pct 2},
  :top-paths
- "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/shadow/ieng… 41 · /kotobase-cf-wasm-production/blocks/bafy… 15 · /kotobase-cf-wasm-production/shadow/ieng… 11 · /kotobase-cf-wasm-production/shadow/ieng… 10 · /kotobase-cf-wasm-production/blocks/bafy… 10 | 4xx(probe) 78% · 5xx 3%",
- :funnel {:visitors 2266, :signups 12, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/shadow/ieng… 41 · /kotobase-cf-wasm-production/blocks/bafy… 15 · /sign-in 12 · /kotobase-cf-wasm-production/shadow/ieng… 10 · /kotobase-cf-wasm-production/blocks/bafy… 10 | 4xx(probe) 88% · 5xx 2%",
+ :funnel {:visitors 2269, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 48330 req/7d・1385 uniques(日次和)・うち4xx probe 78%(24h)、workers 45730 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 49614 req/7d・1396 uniques(日次和)・うち4xx probe 88%(24h)、workers 46994 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -60,6 +58,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 734},
+ {:visitors {:openai-ads 3, :organic 737},
   :signups {:organic 9}, 
   :checkouts {}}}
