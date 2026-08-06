@@ -84,8 +84,25 @@
           (let [j (str/index-of yml "    - name:" (+ i (count anchor)))]
             (subs yml i (or j (count yml)))))))))
 
-(defn block-revision [block]
-  (second (re-find #"(?m)^      revision: ([0-9a-f]{40})$" block)))
+(defn block-revision
+  "The entry's pin as written.
+
+  Reads an abbreviation as well as a full hash, because the manifest has held
+  one: `cloud-itonami-app` sat at a 12-character revision on 2026-08-06, alone
+  among 4,123 entries. Insisting on 40 here did not keep that out of the file —
+  it only made the entry unadvanceable by this script, which is the tool that
+  would have written a full hash back. Every check downstream is server-side
+  and takes an abbreviation, so reading one costs nothing and repairs the
+  entry on the next advance."
+  [block]
+  (second (re-find #"(?m)^      revision: ([0-9a-f]{7,40})$" block)))
+
+(defn short-sha
+  "The first `n` characters, or the whole thing when it is already shorter.
+  A pin read from the file may be an abbreviation, and truncating it for a
+  progress line must not be what fails the run."
+  [sha n]
+  (subs sha 0 (min n (count sha))))
 
 (defn block-field [block field]
   (second (re-find (re-pattern (str "(?m)^      " field ": (.+)$")) block)))
@@ -98,7 +115,12 @@
     (when (= expected (block-revision block))
       (let [i (str/index-of yml block)]
         (str (subs yml 0 i)
-             (str/replace block expected new-sha)
+             ;; The revision LINE, not the pin as a bare substring: an
+             ;; abbreviated pin is short enough to occur elsewhere in the block
+             ;; by chance, and a substring replace would rewrite that too.
+             (str/replace block
+                          (re-pattern (str "(?m)^      revision: " expected "$"))
+                          (str "      revision: " new-sha))
              (subs yml (+ i (count block))))))))
 
 ;; ---------------------------------------------------------------------------
@@ -129,6 +151,19 @@
        "    - name: kotoba-lang\n      remote: kotoba-lang\n"
        "      revision: " (apply str (repeat 40 "a")) "\n"
        "      path: orgs/kotoba-lang/kotoba-lang\n"
+       "    - name: beta\n      remote: kotoba-lang\n"
+       "      revision: " (apply str (repeat 40 "b")) "\n"
+       "      path: orgs/kotoba-lang/beta\n"))
+
+(def ^:private abbrev-yml
+  "What the manifest actually held on 2026-08-06: one entry pinned to a
+  12-character revision, the only one of 4,123. A reader that demands 40 does
+  not prevent that -- it just refuses to touch the entry, leaving the
+  abbreviation in place for good."
+  (str "manifest:\n  projects:\n"
+       "    - name: alpha\n      remote: cloud-itonami\n"
+       "      revision: c90f782aceff\n"
+       "      path: orgs/cloud-itonami/alpha\n"
        "    - name: beta\n      remote: kotoba-lang\n"
        "      revision: " (apply str (repeat 40 "b")) "\n"
        "      path: orgs/kotoba-lang/beta\n"))
@@ -172,6 +207,21 @@
 
          ["rewrite refuses an unknown entry"
           (rewrite-revision sample-yml "gamma" a40 c40) nil]
+
+         ;; An abbreviated pin: readable, advanceable, and written back full.
+         ["block-revision reads an abbreviated pin"
+          (block-revision (entry-block abbrev-yml "alpha")) "c90f782aceff"]
+         ["rewrite advances an abbreviated pin to a full hash"
+          (block-revision (entry-block (rewrite-revision abbrev-yml "alpha" "c90f782aceff" c40)
+                                       "alpha"))
+          c40]
+         ["advancing an abbreviated pin still changes exactly one line"
+          (count (remove true? (map = (str/split-lines abbrev-yml)
+                                  (str/split-lines (rewrite-revision abbrev-yml "alpha"
+                                                                     "c90f782aceff" c40)))))
+          1]
+         ["short-sha does not truncate past the end"
+          (short-sha "c90f782aceff" 40) "c90f782aceff"]
 
          ;; A project whose name equals a remote name. This was a real defect:
          ;; every kotoba-lang and network-awai pin advance in this repo had to
@@ -289,8 +339,8 @@
                   new-arg)]
 
     (println (str "west-pin-put: " entry " (" repo ")"))
-    (println (str "  tip pin : " (subs old-pin 0 12)))
-    (println (str "  new pin : " (subs new-sha 0 12)))
+    (println (str "  tip pin : " (short-sha old-pin 12)))
+    (println (str "  new pin : " (short-sha new-sha 12)))
 
     (cond
       (= old-pin new-sha)
@@ -308,7 +358,7 @@
                               "--jq" "{status: .status, behind: .behind_by, ahead: .ahead_by}"))
                          :keywordize-keys true)]
         (println (str "  reachable from " default-branch ": " reach))
-        (println (str "  " (subs old-pin 0 8) "..." (subs new-sha 0 8) ": " (:status fwd)
+        (println (str "  " (short-sha old-pin 8) "..." (short-sha new-sha 8) ": " (:status fwd)
                       " ahead=" (:ahead fwd) " behind=" (:behind fwd)))
 
         (when-not (contains? #{"identical" "behind"} reach)
@@ -330,8 +380,8 @@
                     (println "  REFUSED: the entry's pin changed between reading and rewriting.")
                     (io/exit 6))
                 message (or (:message opts)
-                            (str "west: advance " entry " pin to " (subs new-sha 0 8)
-                                 "\n\nSingle line, from " (subs old-pin 0 8)
+                            (str "west: advance " entry " pin to " (short-sha new-sha 8)
+                                 "\n\nSingle line, from " (short-sha old-pin 8)
                                  ". Verified server-side against the pin the tip actually"
                                  " held: reachable from " default-branch
                                  ", ahead by " (:ahead fwd) ", behind 0."))
