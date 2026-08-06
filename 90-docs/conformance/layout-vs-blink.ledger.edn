@@ -4148,3 +4148,115 @@
    :why "far too thin -- it does not name position, float, overflow, ...
          which is what forced the GATED copy of layout's call sites rather
          than a wider guess."}]}
+
+{:seq 71
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "08c8a4ed003be2fcbe09d619a0561dbafe10e5e2"
+ :title "CSS nesting desugared, and three value functions: @property, env(), attr()"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 720 :after 735}}
+ :measured
+ {:line-structure {:before "704/707" :after "704/707 (100%)"}
+  :geometry {:before "2368/2384, 720/735 clean" :after "2376/2384 (100%), 728/735 clean"}
+  :paint-order {:before "18343/18362, 724/735" :after "unchanged"}
+  :computed-style {:before "33465/33487, 722/735" :after "33481/33487 (100%), 731/735"}
+  :cascade-attributed-residual {:before 21 :after 5}}
+ :verified-on-merged-main
+ {:cssom-tests "1018 / 2692, 0 failures (1001/2646 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly. All four axes read 100%."}
+ :scope-chosen
+ "CSS nesting PLUS three of the four value functions (@property, env(),
+  attr()). @scope was measured in full and DELIBERATELY LEFT -- not for
+  time, but because one of its rules is A NEW DIMENSION IN THE CASCADE SORT
+  TUPLE, not a parse or value change."
+ :method-correction-the-agent-made-to-itself
+ "the FIRST measurement was WRONG: sixteen probes on one page, and a bare
+  `p span { color: blue }` written for probe F REACHED THREE OTHERS and
+  read as `a nested rule loses its layer`. One page per probe from then on."
+ :what-the-browser-said
+ [{:topic "the specificity finding -- `&` IS NOT TEXTUAL SUBSTITUTION"
+   :measured "#zz, .c { & span { color: red } } vs div.c span { color:
+              blue } -> RED. #zz MATCHES NOTHING; `.c span` alone is
+              (0,1,1) and would lose to (0,1,2). It wins because `&` is
+              :is(#zz, .c) = (1,0,0) -- THE MAXIMUM OVER THE PARENT LIST,
+              INCLUDING AN ARM THAT MATCHED NOTHING."
+   :control ".c { & span } vs div.c span -> BLUE. Both are in the corpus;
+             NEITHER MEANS ANYTHING ALONE."}
+  {:topic "other nesting forms" :measured "implicit descendant, relative
+           `> b`, declaration-AFTER-nested-rule still applies (#x {
+           color:blue; span{...} color:green } -> GREEN), nested @media
+           applies to the parent's subject."}
+  {:topic "registered-property fallback"
+   :measured "parent --pv: 200px, element --pv: notalength, @property
+              initial 70px -> Brave reports 70px. THE REGISTERED INITIAL,
+              not the inherited 200 and not `unset`. An UNREGISTERED
+              property with the same shape is IACVT and DOES inherit -- two
+              different rules. Also: initial-value: 2em INVALIDATES THE
+              WHOLE AT-RULE (getComputedStyle reports \"\")."}
+  {:topic "env()"
+   :measured "all four safe-area-inset-* are DEFINED and are 0, so the
+              fallback is never used; titlebar-area-width is NOT defined
+              (fallback used). width: 140px; width: env(unknown) -> 800,
+              i.e. IT DOES NOT FALL BACK TO THE EARLIER DECLARATION."}
+  {:topic "attr()"
+   :measured "typed attr(data-w px, 30px) -> 55/30/30; LEGACY attr(data-w)
+              in a `width` is INVALID (800) even with data-w=\"75px\", and
+              works in `content`. Not interchangeable -- so content's
+              existing support is untouched."}]
+ :implementation
+ "TEXT-LEVEL DESUGARING ABOVE EVERY SPLITTER, for two reasons: a nested
+  @media must become top-level BEFORE the at-rule walk (parse-rules would
+  clobber an inner condition, not compose with it), and THE PASS RETURNS
+  ITS INPUT UNCHANGED unless a nested rule is present -- a rewrite that
+  never fires cannot move 727 untouched cases. :is() and its
+  max-of-arguments specificity ALREADY EXISTED, so the desugaring reuses
+  them rather than inventing a specificity concept."
+ :per-case-deltas
+ "EXACTLY 8 cases changed, EVERY ONE TO Brave's number, NONE AWAY; the
+  other 727 byte-identical. THE SIX NESTING CASES APPEAR IN NEITHER OPS
+  DIFF -- their divergence is a COLOUR -- which is why both dumps matter."
+ :self-correction-on-controls
+ "the agent RELABELLED THREE OF ITS OWN NEW CASES AND BOTH SPECIFICITY
+  CASES AS CONTROLS after checking the middle column: they agree on an
+  engine with none of these features (800 reads as `auto` whether you kept
+  a raw string or correctly declined), and the old stray-& handling landed
+  on the same two colours BY COINCIDENCE. The residual arithmetic accounts
+  for zero of their values, and the README says so."
+ :scope-cuts
+ [{:what "`&` with >=2 parents where one is COMPLEX"
+   :measured "matching exact, specificity per-arm instead of the list max.
+              #zz, .a .b { & span } vs div.a .b span is RED in Brave, BLUE
+              here. Closing it means letting :is() hold a complex selector."}
+  {:what "registered-value-valid? checks only <length>/<number>/<integer>"
+   :measured "other syntaxes accept anything. syntax: \"<color>\" with
+              --c: 7 is `red` in Brave, `7` here."}
+  {:what "declaration ordering"
+   :detail "a block's declaration RUNS fold into one rule emitted BEFORE
+            its nested rules -- costs a nested & { ... } competing with a
+            declaration written after it. No corpus case has that shape."}]
+ :withdrawn
+ "a corpus case for an embedded var() in calc(). THE UNIT TEST IS REAL AND
+  FAILS ON BASE (:style/width is the string `calc(3 * 20px)` vs the number
+  60), BUT cssom.layout RE-PARSES a calc string downstream, so the box is
+  60x20 on BOTH sides and `width` is not among the 14 computed-style
+  properties. IT WOULD HAVE PASSED FOR PRECISELY THE WRONG REASON. The fix
+  stays; the case is documented under `measured and deliberately NOT added`."
+ :left-open-with-its-measurement
+ "@scope: the root itself does not match a bare descendant rule; :scope
+  reaches it; the donut hole works and the limit element is OUT; the
+  prelude contributes NO specificity but an explicit :scope contributes a
+  pseudo-class; and -- THE EXPENSIVE ONE -- PROXIMITY BEATS SOURCE ORDER
+  (reversing the source order does not reverse the answer). That needs a
+  SEVENTH KEY in resolve-style-and-flow's sort tuple, computed per (rule,
+  element)."
+ :concurrency
+ "main moved TWICE under this agent (seq 69 all/::first-letter, seq 70
+  at-rules). It merged both, resolved a SUBSTANTIVE conflict in parse-rules
+  onto their new scan-conditional-at-rules walk, DELETED THEIR NOW-FALSE
+  simplification (`an at-rule inside a style rule is not recognised as
+  nested`), and re-ran everything. No pre-merge number is reported anywhere."
+ :gates "34 new assertions fail on the base commit, with controls passing
+         on both sides."}
