@@ -3506,3 +3506,143 @@
   passes on both sides. A separate 67-shape checker (every browser
   measurement taken) reports 67/67 agreement with the engine, re-run after
   each merge."}
+
+{:seq 66
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "85dd2201d569648e8e72582d544aae731746850c"
+ :title "corpus expansion into cascade machinery: at-rules, nesting, math functions -- and the harness's own at-rule handling"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 601 :after 672}}
+ :measured
+ {:note "THREE columns, because corpus growth and engine change must not
+         pay for each other. The middle column is the BASE-COMMIT ENGINE on
+         the FINISHED corpus."
+  :line-structure {:at-601 "572/576" :base-engine-at-672 "642/647" :after "642/647"}
+  :geometry {:at-601 "2030/2036, 595/601 clean"
+             :base-engine-at-672 "2157/2186, 648/672 clean"
+             :after "2168/2186, 656/672 clean"}
+  :paint-order {:at-601 "14987/15009, 589/601"
+                :base-engine-at-672 "16710/16789, 656/672"
+                :after "16732/16789, 658/672"}
+  :computed-style {:at-601 "28615/28618, 599/601"
+                   :base-engine-at-672 "30681/30717, 648/672"
+                   :after "30685/30717, 649/672"}
+  :cascade-attributed-residual {:at-601 2 :base-engine-at-672 35 :after 31}}
+ :verified-on-merged-main
+ {:cssom-tests "940 / 2396, 0 failures (935/2372 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :harness-defects-found-and-fixed
+ {:main "scope-css SPLIT ON `}` THEN `,`. Measured: `@media (min-width:
+         600px) { p { color: red } }` became `#case-0 @media (min-width:
+         600px) { p { color: red }` -- the PRELUDE got the id prefix, the
+         INNER SELECTOR WAS LEFT UNSCOPED (it would have reached every
+         other case on the page), and the closing brace was lost.
+         `@layer a, b;` became `#case-0 @layer a, #case-0 b;`. Now
+         brace-balanced."
+  :two-assumed-numbers-were-wrong
+  "the viewport is 756, NOT 800, and headless Brave 151 answers
+   (prefers-color-scheme: dark) TRUE where the default assumption was
+   `light`. Both are now MEASURED in the oracle and handed to
+   apply-cascade."
+  :proof-it-is-not-a-thumb-on-the-scale
+  "I CHECKED THIS MYSELF: the modified harness (155 lines added) run
+   against the UNMODIFIED engine on the UNMODIFIED 601-case corpus
+   reproduced the baseline TO THE VALUE on every axis -- 572/576 ·
+   2030/2036 (595/601) · 14987/15009 (589/601) · 28615/28618 (599/601)."}
+ :inventory
+ "the corpus had 48 selector/cascade cases and ZERO at-rules -- grep '@'
+  found two email addresses. Already covered: An+B matching,
+  :is/:where/:not/:has, six attribute operators, four specificity shapes,
+  inline-vs-!important, var() fallbacks, the CSS-wide keywords. Untouched:
+  @layer, @supports, @media, @container, CSS nesting, min/max/clamp, `all`,
+  @property, env(), attr() in a length, @scope, ::first-letter. THREE OF
+  THOSE ARE IMPLEMENTED IN cssom.core AND HAD NEVER BEEN DIFFERENTIALLY
+  TESTED."
+ :deliberately-not-added
+ ["::first-line -- measured: Brave reports the IDENTICAL 800x20 paragraph
+   with and without it. No axis can see it."
+  "revert-layer on an UNLAYERED declaration -- both sides give 800px FOR
+   OPPOSITE REASONS. A case that would pass wrongly."]
+ :new-cases
+ {:total 71 :controls 34
+  :by-group {:layer 11 :supports 8 :media 13 :container 10 :nesting 6
+             :math 11 :cascade 10 :selector 2}
+  :why-so-many-controls
+  "on a feature the engine does not evaluate at all, THE CONTROL IS THE
+   MEASUREMENT: `@supports (display: grid)` agreeing proves nothing until
+   `(display: flurb)` disagrees beside it."}
+ :divergences-found {:total 37 :closed 8 :left 29}
+ :ranked-divergences
+ [{:rank 1 :what "@supports is absent in the FAIL-OPEN direction -- every
+    block applies unconditionally"
+   :measured "right on 4/8 shapes, WRONG on 4/8: (display: flurb),
+              (flurb: 1px), not (display: grid), selector(:frobnicate) ->
+              Brave black, engine red."
+   :judgement "deep -- needs a real support oracle for the engine's own grammar"}
+  {:rank 2 :what "CSS nesting is DESTRUCTIVE, not absent"
+   :measured "a block with declarations AND a nested rule loses the
+              declarations: #x { color: blue; span { color: red } } ->
+              Brave blue/red, engine none/red. 5 cases."
+   :judgement "deep -- making the splitter depth-aware without desugaring
+               would trade one wrong answer for another and turn the
+               control red"}
+  {:rank 3 :what "all: initial | unset | revert"
+   :measured "biggest geometry deltas: a <div> becomes a 9.2x16 INLINE box
+              at 16px; `all: revert` gives margin-left 0 vs the engine's 40
+              (the one scorable on computed style). 3 cases."}
+  {:rank 4 :what "@layer -- four divergences"
+   :measured "two anonymous layers collapse into one (Brave blue / engine
+              red); a nested @layer o { @layer i {} } is not recognised as
+              o.i (red/blue); revert-layer stored as a LITERAL STRING
+              (200x20 / 800x20); and the worst: @media INSIDE @layer does
+              not just lose the tag, IT PROMOTES THE RULE TO UNLAYERED --
+              the strongest normal position (blue/red). A RULE WRITTEN TO
+              BE OVERRIDABLE BECOMES UNOVERRIDABLE."
+   :judgement "medium"}
+  {:rank 5 :what "@media grammar"
+   :measured "`not all and (...)` (red/black), range syntax
+              (width >= 5000px) (black/red), (min-width: 60em) = 960px
+              (black/red). The documented `unrecognized features match`
+              default is RIGHT for a real unknown FEATURE (min-resolution
+              is the control) and INVERTS an answer for GRAMMAR."
+   :judgement "medium"}
+  {:rank 6 :what "@property initial-value (60x20 / 800x20), env() (0x20 /
+    800x20), attr(data-w px, 30px) (55x20 / 800x20), @scope (reaches
+    outside its root) -- four separate features" :judgement "deep each"}
+  {:rank 7 :what "::first-letter" :measured "800x29 vs 800x20 -- an earlier
+    round called it unscorable; the pseudo-element has no box BUT ITS
+    EFFECT GROWS THE PARAGRAPH'S." :judgement "medium"}
+  {:rank 8 :what "@container with a percentage-width container"
+   :measured "Brave applies, engine honestly declines. The engine's own
+              documented pipeline cut, NOW MEASURED."
+   :judgement "deep -- needs a re-cascade after layout"}
+  {:rank 9 :what "min(50%,...), max(..., 2em), calc(100% - 20px) -- the
+    same layout-time boundary calc() already documents" :judgement "deep"}]
+ :what-was-fixed
+ [{:what "min() / max() / clamp() over exactly calc()'s constant subset"
+   :design "NOT a new pipeline -- a math function is a PRIMARY in the
+            precedence-climbing grammar already there, so they nest both
+            ways (calc(min(100px,50px)+10px)=60,
+            min(calc(10px+5px),20px)=15) and clamp(lo,v,hi) IS LITERALLY
+            max(lo,min(v,hi)), which is what makes clamp(90px,5px,300px)
+            come out 90 and not 5. Boundary unmoved. math-function-names is
+            the single authority."
+   :result "7 cases green"}
+  {:what "container-type applies LAYOUT CONTAINMENT"
+   :how-found "the eight @container cases failing on GEOMETRY while
+               agreeing on every colour."
+   :detail "it was cascade-only; inline-size/size make the box an
+            INDEPENDENT FORMATTING CONTEXT. Brave: 400x48 with it, 400x20
+            without. It joins flow-root/scroll-container? in all three
+            places that ask the formatting-context question."
+   :result "1 case green, and its 8 siblings now pin margin: 0 so they
+            measure the query alone"}]
+ :gates "12 assertions in core-test and 3 in layout-test FAIL at the base
+         commit and pass after, each with a control that passes on both."
+ :no-regressions
+ "--dump-ops diffed corpus-wide, base engine vs this one, same 672 cases:
+  8 cases' box lists changed, ALL 8 THE INTENDED ONES. Nothing else moved a
+  pixel, either direction."}
