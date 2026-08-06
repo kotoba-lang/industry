@@ -226,11 +226,50 @@
 
   ;; 1. Read the TIP -- both the content and the blob SHA -- in one place, so the
   ;;    thing verified and the thing written are the same thing.
-  (let [blob-sha (gh "api" (str "repos/" superproject "/contents/" west-path) "--jq" ".sha")
+  (let [;; From the DIRECTORY listing, not the file. Asking the contents API for
+        ;; the file returns its whole body base64-encoded — 1.8 MB for this one —
+        ;; to read a 40-character hash, and on a flaky link that is the request
+        ;; that resets. Measured 2026-08-06: every other call succeeded while
+        ;; this one failed with `connection reset by peer` five times running.
+        ;; CLAUDE.md already says to take the SHA from the dir listing; this
+        ;; script was not doing it.
+        ;; From git first. A blob SHA is a deterministic hash of the content,
+        ;; so `git rev-parse origin/HEAD:<path>` answers exactly what the API
+        ;; would — offline, and without asking for a directory listing that this
+        ;; link keeps failing to deliver. Safety is unchanged: if the remote has
+        ;; moved since the fetch, the PUT is refused with 409, which is the
+        ;; protection the precondition exists for.
+        blob-sha (or (do (sh "git" "fetch" "origin" "--quiet")
+                         (let [{:keys [exit out]}
+                               (sh "git" "rev-parse" (str "origin/HEAD:" west-path))]
+                           (when (zero? exit) (str/trim out))))
+                     (gh "api" (str "repos/" superproject "/contents/"
+                                    (subs west-path 0 (str/last-index-of west-path "/")))
+                         "--jq"
+                         (str ".[] | select(.name==\""
+                              (subs west-path (inc (str/last-index-of west-path "/")))
+                              "\") | .sha")))
         ;; gh-raw, not gh: trimming here would drop the file's trailing
         ;; newline and write it back stripped.
-        yml (gh-raw "api" (str "repos/" superproject "/contents/" west-path)
-                    "-H" "Accept: application/vnd.github.raw")
+        ;;
+        ;; Falls back to git when the API cannot deliver it. This file is 1.8 MB
+        ;; and on a degraded link it is the one request that resets while every
+        ;; small one succeeds — measured 2026-08-06, five consecutive failures
+        ;; against a working API. `git show origin/main:` reaches the same tip
+        ;; over SSH, and the blob-SHA precondition still guards the write: if
+        ;; main moved between the two reads the PUT is refused with 409, which
+        ;; is the protection this script was built around.
+        yml (or (try (gh-raw "api" (str "repos/" superproject "/contents/" west-path)
+                             "-H" "Accept: application/vnd.github.raw")
+                     (catch :default _ nil))
+                (do (sh "git" "fetch" "origin" "--quiet")
+                    (let [{:keys [exit out]} (sh "git" "show"
+                                                 (str "origin/HEAD:" west-path))]
+                      (when (zero? exit)
+                        (println "west-pin-put: tip read via git (contents API unavailable)")
+                        out)))
+                (do (println "west-pin-put: tip の west.yml を取得できませんでした。")
+                    (io/exit 4)))
         block (entry-block yml entry)
         _ (when-not block
             (println (str "west-pin-put: entry '" entry "' not found (or not unique) in the tip's "
@@ -307,8 +346,70 @@
                   (sh "gh" "api" "-X" "PUT"
                       (str "repos/" superproject "/contents/" west-path)
                       "--input" tmp "--jq" ".commit.sha")]
-              (if (zero? exit)
+              (cond
+                (zero? exit)
                 (do (println (str "  committed " (str/trim out))) (io/exit 0))
-                (do (println (str "  PUT failed (409 means someone else wrote west.yml "
-                                  "since the read — just run this again): " err))
-                    (io/exit 7))))))))))
+
+                ;; 409 is the precondition doing its job: somebody wrote west.yml
+                ;; between the read and this write. Re-running re-reads.
+                (str/includes? (str err) "409")
+                (do (println (str "  REFUSED (409): west.yml moved since the read. "
+                                  "Run this again."))
+                    (io/exit 7))
+
+                :else
+                ;; The contents API carries the WHOLE file as base64 on every
+                ;; write. west.yml is 1.0 MB, so the request is ~1.4 MB and
+                ;; GitHub answers 400 "malformed request" — measured 2026-08-06,
+                ;; after the same endpoint had already failed to serve the file
+                ;; for reading. The git Data API is what this workspace's own
+                ;; cleanup-land.cljs uses for exactly this reason: a blob may be
+                ;; large, and the tree/commit/ref calls that follow are small.
+                ;;
+                ;; The safety property is preserved differently. The contents
+                ;; API took a blob-SHA precondition; here it is the ref update,
+                ;; which is refused unless the branch still points at the commit
+                ;; this tree was built on — a fast-forward check rather than a
+                ;; blob check, and the same guarantee: a concurrent write is
+                ;; rejected, never clobbered.
+                (do
+                  (println (str "  contents API refused (" (str/trim (str err))
+                                ") — retrying through the git Data API"))
+                  (let [put-json! (fn [endpoint payload jq]
+                                    (let [f (str "/tmp/west-pin-" (hash endpoint) ".json")]
+                                      (spit f (js/JSON.stringify (clj->js payload)))
+                                      (let [{:keys [exit out err]}
+                                            (sh "gh" "api" endpoint "--input" f "--jq" jq)]
+                                        (if (zero? exit)
+                                          (str/trim out)
+                                          (do (println (str "  git Data API failed at "
+                                                            endpoint ": " err))
+                                              (io/exit 8))))))
+                        base-commit (gh "api" (str "repos/" superproject
+                                                   "/git/ref/heads/main")
+                                        "--jq" ".object.sha")
+                        base-tree (gh "api" (str "repos/" superproject
+                                                 "/git/commits/" base-commit)
+                                      "--jq" ".tree.sha")
+                        blob (put-json! (str "repos/" superproject "/git/blobs")
+                                        {:content (.toString (js/Buffer.from next-yml "utf8")
+                                                             "base64")
+                                         :encoding "base64"}
+                                        ".sha")
+                        tree (put-json! (str "repos/" superproject "/git/trees")
+                                        {:base_tree base-tree
+                                         :tree [{:path west-path :mode "100644"
+                                                 :type "blob" :sha blob}]}
+                                        ".sha")
+                        commit (put-json! (str "repos/" superproject "/git/commits")
+                                          {:message message :tree tree
+                                           :parents [base-commit]}
+                                          ".sha")
+                        ;; No force: the ref update is refused if main moved,
+                        ;; which is this path's version of the 409 above.
+                        updated (put-json! (str "repos/" superproject
+                                                "/git/refs/heads/main")
+                                           {:sha commit :force false}
+                                           ".object.sha")]
+                    (println (str "  committed " updated " (git Data API)"))
+                    (io/exit 0)))))))))))
