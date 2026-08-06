@@ -4260,3 +4260,112 @@
   nested`), and re-ran everything. No pre-merge number is reported anywhere."
  :gates "34 new assertions fail on the base commit, with controls passing
          on both sides."}
+
+{:seq 72
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "2a3320973388a31a508d98eaa578eee41419cf90"
+ :title "value grammars: :is() holds a complex selector, @property's full <syntax>, and the @supports colour oracle that was never cross-namespace"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 735 :after 744}}
+ :measured
+ {:line-structure {:before "704/707" :after "713/716"}
+  :geometry {:before "2376/2384, 728/735 clean" :after "2402/2410, 737/744 clean"}
+  :paint-order {:before "18343/18362, 724/735" :after "18573/18592, 733/744"}
+  :computed-style {:before "33481/33487, 731/735" :after "33845/33851, 740/744"}
+  :cascade-attributed-residual {:before 5 :after 5}
+  :note "EVERY MISMATCH COUNT IS UNCHANGED -- 8 boxes, 19 paint points, 6
+         style values, 4 colour values. Nine cases were added and the
+         residual did not grow."}
+ :verified-on-merged-main
+ {:cssom-tests "1030 / 2767, 0 failures (1018/2692 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :per-case-deltas
+ "OPS: ZERO of the 735 pre-existing cases changed a single box, either way;
+  9 new cases added, none removed. COMPUTED STYLE: the harness's ENTIRE
+  TEXT OUTPUT IS BYTE-IDENTICAL outside the 9 new pass lines, the 4 group
+  counts they land in, and the totals. The agent ALSO ran the engine change
+  against the UNMODIFIED 735-case corpus first: all five axes reproduced
+  the base exactly and the ops dump was byte-identical -- `a cascade change
+  that moves nothing is a claim, and that run is its evidence`."
+ :what-the-browser-said
+ [{:topic ":is() with complex arguments -- 11 of 22 shapes diverged, and
+           THE FIRST IS A MATCHING BUG, NOT SPECIFICITY"
+   :measured ":is(.wA .wB) span is RED in Brave on .wA > .wB > span
+              (engine: black) and BLACK on .wA.wB > span (engine: RED).
+              `>` and `+` are real (skipping a level is black).
+              :is(> .wB) is black -- a RELATIVE selector is invalid there,
+              UNLIKE :has(). :is(%%bad, .wA .wB) is red -- forgiving.
+              A complex arm's specificity is the SUM over its compounds
+              ((0,2,1) beats div.wB span's (0,1,2), loses to
+              div.wA .wB span's (0,2,2)); the list still contributes the
+              MAX, including from an arm that matches nothing. :not() takes
+              one too."
+   :and-a-false-claim-in-the-file "the prose claiming :is(.wrap section) p
+     `works` WAS WRONG -- it worked because `section` is not a class, so
+     the argument DEGRADED to :is(.wrap)."}
+  {:topic "@property's <syntax> -- this build honours ALL OF IT"
+   :measured "every one of the 15 spec component types, `|`, literal idents,
+              `+`, `#`, `*`. The two rows that had to be measured: <flurb>
+              and <length>|<flurb> leave an unset element reporting \"\" --
+              AN UNKNOWN COMPONENT NAME INVALIDATES THE WHOLE AT-RULE, and
+              ONE BAD ALTERNATIVE POISONS A GOOD ONE. Read via a THIRD
+              PROBE on an element declaring nothing, which is what
+              separates `unenforced` from `unregistered`."}
+  {:topic "@supports -- 115 conditions"
+   :measured "all 18 colour rows: #zzz / flurb / 7 / 0 black;
+              oklch() / lab() / color-mix() / light-dark() RED. And the
+              control group that stopped further enumeration:
+              (font-family: flurb), (list-style-type: flurb),
+              (will-change: flurb) are ALL RED."}]
+ :what-letting-is-hold-a-complex-selector-cost
+ "four edits, NO NEW CONCEPT. selector-parts (the walk builder) and
+  parts-match? (the walk) factored out and moved above
+  parse-simple-selector / matches-simple?, each TAKING ITS CALLEE AS AN
+  ARGUMENT -- the has-group-matches? shape, since this namespace avoids
+  `declare`. parse-selector is now four lines. THE PART THAT LOOKED
+  EXPENSIVE MEASURED CHEAP: matches-simple? must build parent-index itself,
+  but MATCHES? ALREADY REBUILDS IT ON EVERY CALL, so a complex arm pays
+  what the engine already pays and a stylesheet without one pays nothing.
+  expand-nested-selector LOST a condition -- compound-selector? is gone."
+ :verdict-on-the-cross-namespace-value-grammars
+ {:headline "THE PREMISE WAS WRONG, AND THAT IS THE FINDING."
+  :detail "cssom.layout does NOT parse a colour anywhere -- it threads the
+           string onto the draw-op -- and does not enumerate
+           text-decoration either. The only colour parser is
+           kotoba.wasm.host.color/parse-color, one layer BELOW cssom.core,
+           in the dependency kotoba.wasm.dom already comes from. It needed
+           a `require`: NO MOVE, NO MIRROR, NO GATE, NO CHANGE OF
+           DEPENDENCY DIRECTION."
+  :the-one-real-copy "text-decoration's keywords DO live above, in
+                      dom-gpu's .cljs renderers, so that one is a real copy
+                      and got the layout-read-properties-shaped gate
+                      against BOTH renderers' `case` keys (proved:
+                      shortening the table by one keyword turns it red)."}
+ :scope-cuts
+ [{:what "six @property rows, ONE STRUCTURAL CAUSE"
+   :detail "parse-style-value collapses 200px to the NUMBER 200 before any
+            check runs, so the engine CANNOT TELL 7 FROM 7px at use time.
+            <length>/<number>/<percentage>/<length-percentage>/alternation/
+            <integer>+ still take a bare number. Closing them means keeping
+            a custom property's RAW TEXT -- a parse-declarations change."}
+  {:what "thirty @supports conditions, all fail-open, ALL LISTED BY NAME"}]
+ :tried-and-withdrawn
+ ["a numeric grammar for opacity/z-index/flex-grow/order/column-count -- it
+   LOOKED LIKE ONE RULE until (flex-grow: auto) came back BLACK while
+   (z-index: auto) and (column-count: auto) came back RED."
+  "a keyword vocabulary for text-decoration -- it would have made
+   `underline dotted red` FALSE where Brave says red."
+  "`split-top-level` as a name: ONE ALREADY EXISTS for media queries LATER
+   in the file, so the new one compiled and THE OLD ONE WON AT RUNTIME,
+   slicing <length>+ with a comma-only splitter."]
+ :process-improvement
+ "conformance/probe.cljs is new -- ONE TAB PER PROBE, so the shared-page
+  leak that produced a wrong measurement two rounds ago is STRUCTURALLY
+  IMPOSSIBLE rather than remembered. It also fixes a RACE where
+  /json/new?url= returns before the document parses; a fixed sleep lost
+  ~1 probe in 10 as a null getElementById, WHICH READS AS A WRONG ANSWER.
+  Two measurements were taken from that state before it was found, and
+  both were re-run."}
