@@ -4011,3 +4011,140 @@
   after, each with a control that passes on both sides. THE :index GATE
   CANNOT FAIL ON A BASE THAT HAS NO `all`, so it was proved THE OTHER WAY:
   removing :index from this engine flips the all-first half to `auto`."}
+
+{:seq 70
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "c17735cdf794a6d63135b801e752124cfb8b8e05"
+ :title "at-rules actually evaluate: a three-valued @supports oracle, the @media grammar, and @layer as a tree"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 711 :after 720}}
+ :measured
+ {:isolated-on-the-unchanged-711-corpus
+  {:note "column 1 is the BASE COMMIT'S OWN ENGINE, run by the agent on the
+          unmodified corpus -- it reproduced my published baseline to the
+          value."
+   :geometry {:before "2315/2331, 697/711 clean" :after "2316/2331, 698/711"}
+   :computed-style {:before "32713/32745, 688/711 clean" :after "32724/32745, 699/711"}
+   :cascade-attributed-residual {:before 31 :after 20}}
+  :final-on-merged-main-720-cases
+  {:line-structure "689/692 (100%)"
+   :geometry "2338/2349 (100%), 710/720 clean"
+   :paint-order "17968/17987 (100%), 709/720 clean"
+   :computed-style "32983/32997 (100%), 711/720 clean"
+   :cascade-attributed-residual 13}}
+ :verified-on-merged-main
+ {:cssom-tests "1001 / 2646, 0 failures (981/2537 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly. ALL FOUR AXES NOW READ
+         100%."}
+ :per-case-deltas
+ "--dump-ops diffed corpus-wide THREE TIMES:
+  (1) base engine -> this engine, 711 cases: EXACTLY ONE box list changed,
+      in one direction -- :layer/revert-layer-rolls-back-to-the-previous-
+      layer, 800x20 -> 200x20, Brave's own number. Nothing else moved a
+      pixel. The other ten divergences are COLOURS, which only the
+      computed-style axis sees.
+  (2) +9 new cases: nine new box lists, ZERO changes to the 711 already
+      there. All nine agree with Brave on all four axes.
+  (3) across the merge with seq 69: exactly four cases changed AND ALL FOUR
+      ARE THEIRS. None of this round's moved. The gain in the final column
+      is seq 69's, not this round's, AND THE README SAYS SO."
+ :what-the-browser-said
+ [{:topic "the @supports unparseable question -- 44 rules on one page, read
+           back through document.styleSheets[0].cssRules: 40 SURVIVED"
+   :measured "(grid) / frobnicate(x) -> black: <general-enclosed> is FALSE.
+              not (grid) / not frobnicate(x) -> RED: and `not` inverts it.
+              `garbage` -> black: does not parse, whole at-rule invalid,
+              DROPPED. `not garbage` -> BLACK: `not` CANNOT RESCUE WHAT
+              NEVER EXISTED. `(display: grid) or garbage` -> black: ONE
+              UNPARSEABLE ARM POISONS A TRUE ONE."
+   :design "so the evaluator is THREE-VALUED internally, with the third
+            value PROPAGATING through not/and/or instead of inverting. The
+            two @supports corpus cases added are exactly this pair --
+            NEITHER ALONE MEASURES ANYTHING."}
+  {:topic "how `unknown feature` and `unparsed grammar` got separated in @media"
+   :design "BY WHERE THE FAILURE HAPPENS, not by a flag. The parser now
+            recognises the whole <media-query-list> grammar; a FEATURE NAME
+            IT DOES NOT IMPLEMENT, INSIDE WELL-FORMED PARENS, evaluates
+            true (the kept fail-open default, for which min-resolution:
+            1dppx is the control), while anything that fails to PARSE
+            returns a distinct ::invalid that a query converts to false."
+   :measured "Brave confirmed the top-level shape: @media (min-width:
+              5000px), garbage garbage comes back as (min-width: 5000px),
+              not all WITH THE RULE STANDING -- an unparseable query does
+              NOT invalidate its neighbours. THAT IS THE OPPOSITE OF
+              @supports, and the two evaluators differ in exactly that place."
+   :two-numbers-only-measurement-could-give
+   "on a page declaring html { font-size: 32px }, (min-width: 47.25em)
+    matched EXACTLY at 756px (47.25 x 16) -- a media query's `em` is 16px,
+    NOT the root's. And (min-width: 100) is black where (min-width: 100px)
+    is red -- a unitless non-zero length is INVALID, not px."}
+  {:topic "@layer is a TREE -- four measured shapes forced it"
+   :measured "two anonymous blocks are TWO layers; a nested layer IS its
+              dotted name; and -- THE PAIR A FLAT LIST CANNOT EXPRESS -- A
+              LAYER'S OWN DECLARATIONS BEAT ITS SUBLAYERS REGARDLESS OF
+              SOURCE ORDER. Priority is now a POST-ORDER TRAVERSAL."
+   :revert-layer "became the fifth CSS-wide keyword, resolving to `as if no
+                  declaration in the winner's own LAYER existed`, which is
+                  the phrasing six measured shapes require (including an
+                  UNLAYERED revert-layer rolling back INTO the layers)."}]
+ :where-the-support-oracle-lives
+ "in cssom.core, IN TWO HALVES, because the property and value answers
+  genuinely live in different places.
+  PROPERTY half: a registry assembled from tables the engine ALREADY
+  MAINTAINS FOR ITS OWN REASONS (inherited-properties, initial-values,
+  em-resolvable-properties) plus every property its own UA stylesheet
+  declares, read back out through parse-rules. The one part that IS a copy
+  -- the 137 (style node :k) call sites in cssom.layout, unreachable from
+  here because layout requires core and not the reverse -- is GATED BY A
+  TEST THAT RE-EXTRACTS THEM FROM THE SOURCE.
+  VALUE half: cannot come from that registry (`display` and `flurb` are
+  equally well-formed identifiers). It is a per-property vocabulary for
+  keyword properties, the length grammar for length properties, and FOR A
+  SHORTHAND IT RUNS THE ENGINE'S OWN EXPANDER -- padding: 1px 2px expands
+  to four longhands, padding: flurb expands to nothing. selector() asks
+  parse-selector plus a GATED set of the pseudo-classes matches-pseudo?
+  actually implements."
+ :one-rewrite-covered-four-bugs
+ "the @media-inside-@layer promotion and the other three at-rule nesting
+  orders were ALL ONE SHAPE: three split-*-segments passes chained in a
+  fixed order. ONE RECURSIVE SCANNER replaced them, and made @supports
+  nesting free."
+ :scope-cuts
+ [{:what "the @supports VALUE oracle only speaks for properties whose value
+          space THIS NAMESPACE writes down"
+   :measured "@supports (color: #zzz) and @supports (text-decoration:
+              flurb) are BLACK IN BRAVE AND TRUE HERE -- both grammars live
+              in cssom.layout, which core cannot ask."}
+  {:what "this engine stays TWO-VALUED about unknown media features"
+   :measured "Brave PROPAGATES unknown through and/or, so (min-width:
+              100px) and (flurb: 1) and (min-width: 5000px) or (flurb: 1px)
+              are BLACK there and RED here."
+   :why "that is THE PRICE OF THE FAIL-OPEN DEFAULT, and min-resolution is
+         what it buys. Not fixable without giving up the default."}
+  {:what "@supports selector(:hover) is RED in Brave and FALSE here"
+   :why ":hover is a real pseudo-class this engine does not implement, so
+         THE ORACLE IS TELLING THE TRUTH ABOUT ITSELF."}
+  {:what "nested @container keeps only the innermost condition"}]
+ :gates
+ "20 new deftests / 109 assertions. Run against the base commit: 42
+  ASSERTIONS FAIL ACROSS 17 OF THE 18 BEHAVIOURAL GROUPS. The eighteenth is
+  important-still-reverses-the-layer-order-after-the-tree-rewrite -- A PURE
+  CONTROL that passes on both sides, AND THE ONE THE TREE REWRITE MOST
+  RISKED BREAKING. Every group carries controls that pass on both sides.
+  Two of the twenty are DRIFT GATES that re-extract layout-read-properties
+  and implemented-pseudo-classes from the sources they mirror."
+ :tried-and-withdrawn
+ [{:what "putting the @supports filter in apply-cascade beside the @media one"
+   :why "moved into resolve-style-and-flow instead: @supports depends on
+         NOTHING THE CALLER SUPPLIES, so filtering it where rules are
+         MATCHED means the standalone computed-style path -- which has no
+         viewport and therefore skips @media entirely -- GETS THE RIGHT
+         ANSWER TOO. A test pins that, with @media as the control showing
+         it really is the standalone path."}
+  {:what "deriving the whole property registry at load time from ua-rules alone"
+   :why "far too thin -- it does not name position, float, overflow, ...
+         which is what forced the GATED copy of layout's call sites rather
+         than a wider guess."}]}
