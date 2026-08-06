@@ -1,0 +1,148 @@
+[{:db/id -1
+  :adr/id "2608061800"
+  :adr/doc_type "adr"
+  :adr/topic "mangaka-studio-published-work-as-editable-genko"
+  :adr/title "公開済みの manga を『まだ手を入れられる原稿』として開く — app.itonami.cloud/mangaka/ に kami-genko のスタジオ面を出す。storyboard は復元できないので下絵としてトレースする"
+  :adr/status :accepted
+  :adr/date "2026-08-06"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["app.itonami.cloud/mangaka/ の原稿スタジオの設計と現在地"
+   "公開作品 → 編集可能な genko doc の投影(kami.mangaka.genko-work)"
+   "ai-image が URL 参照の画素を持てるようにした理由と、base64 経路を残した理由"
+   "app.itonami.cloud が何であるか(dispatcher であって Pages でも 404 でもない)"
+   "cloud-itonami sites.edn の app 面についての記述が事実と違うこと"]
+  :adr/supersedes []
+  :adr/body
+  "# Context
+
+オーナー指示(2026-08-06):
+
+> https://mangaka.itonami.cloud/work/gh-arc0-1-v11 を app.itonami.cloud/mangaka/ に配置,
+> また viewer じゃなくて, genko を使ってちゃんと mangaka が manga を作る uiux に.
+
+2 つのことを言っている。**置き場所**(app.itonami.cloud/mangaka/)と、**性質**
+(読む面ではなく作る面にする)。前者は配備、後者は kami-genko に足りないものの話に
+なった。
+
+## まず、app.itonami.cloud を読み違えていた
+
+着手時の見立ては『app.itonami.cloud は local-murakumo の Worker custom domain で
+404 JSON を返す死んだホストなので、cloud-itonami の Pages プロジェクトに付け替える』
+だった。**これは全部間違いで、そのまま実行していたら生きている dispatcher を落として
+いた。**
+
+実際は `itonami-fleet-dispatch`(`cloud-itonami-app/services/`)という**生きた
+Worker** で、`/{repo}/{path}` を dispatch namespace `ai-gftd-repository-dispatch` の
+同名 user Worker に振り、prefix を剥がして渡す。`GET /` は
+`{\"ok\":true,\"service\":\"itonami-fleet-dispatch\",...}` を返す。
+
+誤読の出どころは `network-awai/cloud-itonami` の `sites.edn` のコメントで、そこには
+この host が local-murakumo のもので 404 を返すと書いてある。**その記述は事実と
+違う。** 生きているサービスについて『死んでいる』と書かれた注釈は、消極的な誤りでは
+なく**行動を促す誤り**である —— 読んだ側は撤去してよいと判断する。
+
+したがって `/mangaka` に app を足すとは、**namespace に `mangaka` という名前の
+Worker を上げること**であって、DNS も custom domain も触らない。dispatcher 自身が
+そう書いている: 『adding an app is uploading a Worker into the namespace, not editing
+this file』。
+
+# Decision
+
+## 1. storyboard は復元しない。公開ページを下絵として敷く
+
+`gh-arc0-1-v11` の D1 の行には `blobKey` と `jumpQa` しか無く、**panel の行は 1 件も
+無い**。storyboard は生成時にメモリに在って、公開物には残っていない。
+
+選択肢は 3 つあった: (a) storyboard が publish されるまで待つ (b) 公開ページから
+コマ矩形を推定して storyboard を復元する (c) 公開ページを下絵として敷き、人が上に
+組む。
+
+**(c) を採る。** (b) は**捏造**である —— 推定したコマ矩形は元の作画意図ではないのに、
+storyboard EDN として書き出されれば区別が付かない。(a) は今できることを止める。
+(c) は劣化ではなく、ネーム→下書き→ペン入れという実際の制作順序に一致している。
+
+重要なのは**出口が塞がっていない**こと: 人が組む panel / fukidashi / text / tone は
+ふつうの node なので、`genko-project/doc->page` がそのまま storyboard EDN に戻す。
+下絵は目玉アイコンで隠せる。つまりここで組んだ原稿は mangaka のパイプラインの入力に
+戻る。
+
+## 2. `ai-image` は画素の出どころを 2 経路持つ(置き換えない)
+
+従来 `ai-image` は base64(`:_genImage`)しか受けなかった。公開ページ 1 枚が実測
+2.6 MB、base64 で 3.5 MB で、localStorage の autosave は 2 ページ目で確実に溢れる。
+
+`:imageUrl` を足した。**base64 を置き換えたのではない**: URL 参照は『その URL が
+死んだら絵も消える』を意味し、それは**下絵(参照)には正しく、生成物には正しくない**。
+性質が違うものを 1 つにまとめない。
+
+cache key は node id 単独から `id + 出どころ` にした。base64 は生涯不変だが URL は
+人が差し替えられるので、id だけを key にすると差し替え後も古い texture が返り続ける。
+
+## 3. カタログは絶対 URL で宣言し、proxy を置かない
+
+studio は `app.itonami.cloud`、作品と頁画像は `mangaka.itonami.cloud`。reader の
+`/api/` と `/img/` はどちらも `access-control-allow-origin: *` を返す(実測)ので、
+ブラウザが直接読める。
+
+**これは単純さの問題ではなく正しさの問題**だった: reader が返す `src` は
+`/img/<key>` という **reader の origin での**絶対パスで、そのまま使うと
+`app.itonami.cloud/img/<key>` を指して 404 になる。しかも症状は『placeholder 枠の
+まま止まる』で、**画面には理由が何も出ない**。`genko-work/with-base` が宣言された
+カタログを基準に解決する。
+
+## 4. エディタがスタジオになる条件は meta 1 つ
+
+`<meta name=\"genko-catalog\">` が在るときだけ作品一覧の画面が出る。**探索
+(`api/works` を投げて 404 なら諦める)にはしない** —— それは『カタログが落ちている』
+と『そもそも無い』を区別できず、意図どおり動いている kami-genko 自身の公開ページの
+読み込みごとに警告を出すことになる。
+
+ページ自体は `genko-theme/->page-html` に移した。2 つの repo(kami-genko と
+cloud-itonami/mangaka)が同じページを generator の複製 2 つから描くのは、その 2 面が
+食い違っていく道筋そのもの。
+
+## 5. 所有は cloud-itonami/mangaka、実装は kotoba-lang/kami-genko
+
+dispatcher は path segment = repository 名で振るので、`mangaka` の持ち主は
+`cloud-itonami/mangaka`。ただし `studio/` にあるのは deps.edn / shadow-cljs.edn /
+gen-page.cljs / wrangler.jsonc だけで、**エディタは pin されたライブラリとして食べる**。
+この directory が決めるのは『どこに出すか』であって『何であるか』ではない。
+
+# Consequences
+
+## 動いていること(2026-08-06 実測)
+
+- `https://app.itonami.cloud/mangaka/` — 200。**deploy 済みの面**を実ブラウザで駆動して
+  9/9: 作品一覧が実データで出る / 表紙が reader の origin の絶対 URL に解決する /
+  作品を押すと全ページが開き下絵が locked layer の下の `ai-image` になっている /
+  ページ画像が cross-origin で 200 で取れる / 実際に描かれている。
+- kami-genko: JVM 69 tests / 505 assertions、`shadow-cljs release` 0 warnings、
+  `gen-page --check` clean、実ブラウザ 18/18(画面往復と頁送りの check を追加)。
+
+## 測り方について記録しておくこと
+
+『実際に描かれている』は **pixel 読みではなく目玉アイコンとの A/B**。WebGL の
+drawing buffer は frame を跨いで保存されないので、draw の後の `readPixels` は画面に
+何が出ていても `0,0,0,0` を返す —— この check の最初の版はそれを『描かれていない』と
+誤報した。**測定器が黙っていることと、対象が無いことは違う。**
+
+同じ理由で `GENKO_BROWSER_CHANNEL` を verify-browser に足した。この workstation では
+playwright 自身の chromium が 92 MiB 落とし切ったあと ABOUT と LICENSE しか展開しない
+(4 回試行、毎回 exit 0)。**走れなかった check は何も報告せず、それは通った check と
+見分けが付かない。**
+
+## 残っているギャップ
+
+- **studio 面の browser check は repo に入っていない。** 生きたカタログに依存する
+  ので、commit した harness を外部サービスの可用性に人質に取ることになる。今回は
+  scratchpad の one-off として走らせ、結果をここに記録した。
+- **書き戻しの経路は繋いでいない。** 組んだ原稿は localStorage(作品ごとに鍵を分けた)
+  に在り、storyboard EDN として手で書き出す。パイプラインへの publish は reader の
+  認証付き `POST /api/work/:rkey` で、**誰でも開けるページには意図的に繋いでいない**。
+- **`sites.edn` の誤った注釈を直していない。** app.itonami.cloud を local-murakumo の
+  404 と書いている記述は `network-awai/cloud-itonami` に在り、この作業では触っていない。
+  次に触る人が同じ誤読をする。
+- **`genko-project/doc->page` で書き出した storyboard が mangaka のパイプラインに
+  実際に入ることは、まだ end-to-end で確かめていない。** 型としては入力形だが、
+  それは『通した』ではない。"}]
