@@ -1146,7 +1146,14 @@
                                  ;; JVM gate はノード上で deps.edn を解決する。
                                  ;; ノードに外向き HTTPS が無いので、git 依存は
                                  ;; operator から ~/.gitlibs へ先に置いておく。
-                                 _ (when (= :jvm-test (:gate w))
+                                 _ (when (or (= :jvm-test (:gate w))
+                                              ;; :nbb-script は既定では要らない
+                                              ;; （多くは data を見る gate で
+                                              ;; classpath を持たない）。repo の
+                                              ;; nbb スイートを回す gate だけが
+                                              ;; 同じ ~/.gitlibs から classpath を
+                                              ;; 組むので、gate 側で明示的に要求する。
+                                              (:ship-git-deps w))
                                      (let [m (mirror! (:org-repo w))
                                            dtxt (git-show m (:tip w) "deps.edn")]
                                        (when dtxt

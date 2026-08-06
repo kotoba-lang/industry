@@ -73,6 +73,8 @@
   {:name "org-ietf-cbor" :gate :jvm-test :cd true}
   {:name "io-multiformats" :gate :jvm-test :cd true}
   {:name "io-ipld" :gate :jvm-test :cd true}
+  {:name "org-ietf-deflate" :gate :jvm-test :cd true}
+  {:name "kotobase-block-codec" :gate :jvm-test :cd true}
   {:name "chain" :gate :jvm-test :cd true}
   {:name "org-chainagnostic-cacao" :gate :jvm-test :cd true}
   {:name "tech-ipfs-specs-ipns" :gate :jvm-test :cd true}
@@ -335,6 +337,45 @@
   ;;
   ;; :cd false — workflow が green でも「その repo の CI が通った」以上の意味は
   ;; 無く、pin を進める根拠には別途 fleet gate を置く方がよい。
+  ;; ── 第2ランタイム（nbb）で同じスイートを回す ──────────────────────────
+  ;; ADR-2608060500。kotobase の block 圧縮を作る過程で欠陥が 4 件出て、
+  ;; **うち 3 件は JVM では原理的に見えなかった**:
+  ;;   - org-ietf-deflate が cljs と JVM で違う（どちらも valid な）DEFLATE を
+  ;;     吐いていた。同順位の Huffman ノードが hash-map の列挙順で決まって
+  ;;     いたため。round-trip テストは両方とも通る。圧縮バイトを
+  ;;     content-address した瞬間に致命傷になる。
+  ;;   - `(count uint8-array)` は cljs で ICounted を投げる（byte[] は通る）。
+  ;;   - `ipld.link/link-cid` が deftype のフィールドを直読みしており、nbb では
+  ;;     nil を返す = link を含むノードを 1 つも encode できない。
+  ;; JVM スイートは 3 件とも green のままだった。fleet-ci に第2ランタイムを
+  ;; 回すものが無かったので、次の 1 件も同じように見逃す。
+  ;;
+  ;; :gate :nbb-test ではなく script なのは classpath の解決のため。:nbb-test は
+  ;; gates.edn に literal な `--classpath` を書くので、git 依存を持つ repo では
+  ;; `~/.gitlibs/libs/<lib>/<sha>/src` を手で並べることになり、pin が動くたびに
+  ;; 黙って古い依存に対してスイートが走る状態に腐る。script は repo の deps.edn
+  ;; から推移閉包を組み直す。
+  ;;
+  ;; :ship-git-deps true — その classpath の実体を operator が ~/.gitlibs に置く
+  ;; （既定では :jvm-test にしか付かない）。
+  ;;
+  ;; nbb のバージョンは script 側で固定してある。実測 2026-08-06、同一ソースで
+  ;; 1.4.210 は通り 1.4.208 は "Protocol not found: IEquiv" で死ぬ（deftype 内の
+  ;; カスタムプロトコルが動かない）ので、固定しないと言語側の失敗をコードの
+  ;; 失敗として報告する、しかもマシンによって結果が変わる。
+  ;;
+  ;; :include-ext に ".json" が要る（package.json — io-multiformats の CID
+  ;; ハッシュに @noble/hashes が要り、無いと ipld.core の require が load 時に死ぬ）。
+  {:name "org-ietf-deflate" :id "nbb-cross-runtime-deflate" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+  {:name "io-ipld" :id "nbb-cross-runtime-io-ipld" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+  {:name "kotobase-block-codec" :id "nbb-cross-runtime-block-codec" :gate :nbb-script
+   :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
+   :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
+
   {:name "cloud-itonami-assoc-0126-idn-gapki" :id "gh-workflow-assoc-gapki"
    :gate :nbb-script
    :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows"]
