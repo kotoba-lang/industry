@@ -11,7 +11,10 @@
   :adr/doc_type "adr"
   :adr/repo ["orgs/kotoba-lang/kotobase-block-codec"
              "orgs/kotoba-lang/kotobase-peer"
-             "orgs/kotoba-lang/org-ietf-deflate"]
+             "orgs/kotoba-lang/org-ietf-deflate"
+             "orgs/kotoba-lang/io-ipld"
+             "orgs/kotoba-lang/kotobase-engine-lsm"
+             "orgs/kotoba-lang/merkle-lsm"]
 
   :adr/context
   "Prompted by the question 'is kura/kotobase data compressed, how much storage does that save, and is the CID over the compressed or uncompressed bytes?' The audit answered: no, none, and the question did not apply — there was no compression anywhere in either system.
@@ -45,7 +48,17 @@ Measured, 2026-08-06:
 
 8. **`measure` reports a real sample, not a constant**, for the same reason `kotobase-storage-kura/effective-multiplier` does: quoting 0.10 to a consumer whose payloads are ciphertext would be a lie about what they are buying.
 
-9. **A defect in `org-ietf-deflate` had to be fixed first** (merged as `e755803`). `huffman-depths` sorted its initial node list on frequency alone; `sort-by` is stable, so equal frequencies kept the seq order of a **hash map**, whose iteration order differs between Clojure and ClojureScript. The two runtimes built different (equally optimal) Huffman trees and emitted different, equally valid DEFLATE streams for byte-identical input. Sorting on `[frequency symbol]` makes the order total."
+9. **Merkle-LSM run blocks get a second, different seam: `kotobase.blockcodec.node`.** That path has no `encrypt-fn` at all — `merkle-lsm.core/encoded` runs `ipld/encode` and stores the result — so there is no opaque byte string to hide compression inside, and two further constraints appear.
+
+   **(a) The block must stay valid DAG-CBOR.** `ipld/cid` is `cidv1-dag-cbor`; a zlib stream stored under it is a CID lying about its own codec, and anything trusting the multicodec chokes. So the compressed bytes go inside a node — `{"kbc" 1 "z" <framed>}`, versioned, two keys so an envelope is distinguishable from data a caller wrote on purpose.
+
+   **(b) Links must stay visible to a walker that does not decompress.** `ipld/links` is, by io-ipld's own description, "the one generic walk hydrate loops and GC need"; a link inside a compressed payload is a child GC may delete while its parent still points at it. There is no clever fix, so the rule is a precondition: **only link-free nodes are ever compressed**, checked by `encode-node` and stated as the runnable predicate `links-preserved?`. Manifests and range directories are nearly all links and keep their exact current bytes; run blocks are keys and values and do not.
+
+   The payoff of (b) is that **link walkers need no change at all** — `lsm/linked-cids` over a compressed block correctly yields nothing, because the node it wraps had none. Nine such call sites in `kotobase-peer/object_store/worker.cljs` were left untouched for this reason.
+
+10. **This one ships in two phases, and the ordering is not a preference.** merkle-lsm and its readers are separate artifacts on separate deploy cycles, unlike the tx block whose producer and consumer are one library. Measured: with the decoder reverted, `kotobase-engine-lsm` reads **zero rows** out of a compressed store **and reports success**. Not an error — silent, total row loss. So: every reader first, everywhere, then the writer.
+
+11. **A defect in `org-ietf-deflate` had to be fixed first** (merged as `e755803`). `huffman-depths` sorted its initial node list on frequency alone; `sort-by` is stable, so equal frequencies kept the seq order of a **hash map**, whose iteration order differs between Clojure and ClojureScript. The two runtimes built different (equally optimal) Huffman trees and emitted different, equally valid DEFLATE streams for byte-identical input. Sorting on `[frequency symbol]` makes the order total."
 
   :adr/consequences
   "**Measured savings, end to end.** A 300-quad transaction over 20 subjects and 5 predicates: **25,152 bytes stored -> 1,364 bytes**, across the same 3 blocks. Payload ratios by batch size: 5 quads 0.368, 20 quads 0.168, 60 quads 0.121, 200 quads 0.104, 800 quads 0.104.
@@ -63,29 +76,43 @@ Measured, 2026-08-06:
 **CPU is now on the write path.** Warmed, level 1 runs about 270 KB/s under nbb. A small transaction costs single-digit milliseconds; a 200 KB one costs most of a second. `min-payload-bytes` (128) exists to not spend it on payloads too small to repay it."
 
   :adr/gaps
-  "1. **Only the tx-block seam is wired.** The larger cold-data volume is in `merkle_lsm` run blocks and `materialized_view` blocks, which are also batched and therefore also compressible. Neither is framed yet; both should be measured before being wired, since the CPU is paid per write.
+  "1. **The Merkle-LSM writer has not flipped, and must not until every reader is deployed.** Done: `kotobase-engine-lsm` (both the JVM engine and `provider.cljs`). Not done: the content-reading sites in `kotobase-peer/object_store/worker.cljs` (lines 3677, 4693, 4780, 4908 — the nine `lsm/linked-cids` sites need nothing) and `kotobase-projection` line 532. Only then does `merkle-lsm.core/encoded` switch to `bcn/encode-node`.
 
-2. **The prolly leaf key path is 2x larger than it needs to be, and compression is the wrong fix.** `arrangement.core/index-root` stores a leaf key as `(pr-str [blinded-a blinded-b blinded-o])`, and `blind-fn` returns a *string* — so 32 bytes of HMAC are stored as ~64 characters. A leaf-shaped block measured at ratio 0.700 under DEFLATE, which is most of that hex expansion being recovered after the fact. Encoding the blind index as a CBOR byte string instead would be cheaper than compressing it, but it changes every key, every CID and the prefix-seek ordering semantics, so it is a separate decision and not a follow-up to this one.
+   **That flip will force an argument this ADR did not settle.** `merkle-lsm/deps.edn` says, deliberately: "ONE dependency, on purpose... If a change here needs a second dependency, that is a signal the boundary is being crossed, not a missing coordinate." Compressing on write needs `kotobase-block-codec` there. The reader phase respected the boundary because readers are hosts; the writer phase cannot. Either the comment is amended with a reason, or `encoded` grows an injected encoder — decide it explicitly rather than by editing deps.edn quietly.
 
-3. **Content dedup still does not apply to tx blocks**, and this ADR does not change that: ADR-2607051000 chose a random AEAD nonce, so two identical transactions produce two ciphertexts and two CIDs. Anyone reasoning about kotobase's storage footprint should account for compression, not dedup.
+2. **`kotobase-projection`'s own blocks are unmeasured.** They are the materialized-view/columnar path, batched and plausibly compressible, and they are NOT merkle-lsm blocks — a separate producer, so a separate measurement and a separate decision.
 
-4. **`min-payload-bytes` and the level were chosen from measurements taken under nbb on one machine.** They are format constants now, so revisiting them means a new codec tag, which is the intended cost.
+3. **The prolly leaf key path is 2x larger than it needs to be, and compression is the wrong fix.** `arrangement.core/index-root` stores a leaf key as `(pr-str [blinded-a blinded-b blinded-o])`, and `blind-fn` returns a *string* — so 32 bytes of HMAC are stored as ~64 characters. A leaf-shaped block measured at ratio 0.700 under DEFLATE, which is most of that hex expansion being recovered after the fact. Encoding the blind index as a CBOR byte string instead would be cheaper than compressing it, but it changes every key, every CID and the prefix-seek ordering semantics, so it is a separate decision and not a follow-up to this one.
 
-5. **No fleet-ci gate yet.** The golden tests run in each repo's own suite (`clojure -M:test`, `nbb run-tests.cljs`); a `scripts/fleet-ci/gates.edn` entry that runs both repos' suites on a murakumo node would close the loop."
+4. **Content dedup still does not apply to tx blocks**, and this ADR does not change that: ADR-2607051000 chose a random AEAD nonce, so two identical transactions produce two ciphertexts and two CIDs. Anyone reasoning about kotobase's storage footprint should account for compression, not dedup.
+
+5. **`min-payload-bytes` and the level were chosen from measurements taken under nbb on one machine.** They are format constants now, so revisiting them means a new codec tag, which is the intended cost.
+
+6. **No fleet-ci gate yet.** The golden tests run in each repo's own suite (`clojure -M:test`, `nbb run-tests.cljs`); a `scripts/fleet-ci/gates.edn` entry that runs both repos' suites on a murakumo node would close the loop."
 
   :adr/evidence
   "**org-ietf-deflate** `e7558036709b673e22673fc2bbd12f3a24144e98` (main): total Huffman tie-break. JVM 34 tests / 488 assertions, nbb 23 / 202, clj-kondo 0/0. `huffman-tie-break-is-total` verified to FAIL on ClojureScript with the fix reverted; the `:structured` sample's CRC-32 differs between runtimes without it (308af9a9 / 0cd62fd7) and is 1638761810 on both with it.
 
 **kotobase-block-codec** `a551e27f91aee2be5dd74a8a77165c92c6fb335f` (main, new repo): JVM 11 tests / 44 assertions, nbb 11 / 44, clj-kondo 0/0. `golden_test` pins the 277 framed bytes of a 1,737-byte payload and passes identically on both runtimes.
 
+**io-ipld** `5d8de535ebc2c10bb90a671ea6019783ecbd2137` (main): `ipld.link/link-cid` and both equality implementations read the deftype field directly — the exact thing `ipld.core`'s docstring forbids. Under nbb `link-cid` returned nil, so `link->tag` threw and **no node containing a link could be encoded at all**, and two links to one CID compared unequal while hashing equal (a set of links kept duplicates; a map keyed by link missed lookups). shadow-cljs compiles deftype fields to real properties and this repo tests under shadow-cljs, so nothing there could fail on it. Now an `ILink` protocol, plus an nbb runner so the check happens on the runtime where it broke: 0 failures with the fix, 6 failures / 3 errors without.
+
+**kotobase-block-codec** `f03bcef355975067060af55e23e9c8bbfb0bc362` (main): adds `kotobase.blockcodec.node` and `bc/byte-length`. JVM 19 tests / 79 assertions, nbb 19 / 79, clj-kondo 0/0.
+
+**kotobase-engine-lsm** `37948d7cae150082c541c26ec6a770510d6a7cb2` (main): six decode sites routed through `decode-node`; no behaviour change today. JVM 7 tests / 29 assertions. `reads-blocks-stored-in-the-compressed-representation` verified to FAIL — returning `[]` rows — with the decoder reverted.
+
+Merkle-LSM run-block ratios (`bcn/measure`, real `canonical-key` shapes): 128 rows / 512 rows -> plaintext values **0.108 / 0.080**, ciphertext values **0.412 / 0.406**, keys alone **0.080 / 0.054**. Even an all-ciphertext workload compresses here, unlike the arrangement leaf, because the canonical keys are half the block.
+
 **kotobase-peer** `f576393c24fd489fc80342a1a5bea6fb022fa5c8` (main): JVM 229 tests / 680 assertions, clj-kondo at the pre-existing 43 warnings / 0 errors. `tx-block-payload-is-compression-framed` verified to FAIL with the framing removed (1 failure / 229 tests). `legacy-tx-blocks-still-read` writes legacy blocks through the public API using an `encrypt-fn` that unframes first — byte-for-byte what the old writer sent — and reads them back, including a chain that holds one legacy and one framed transaction.
 
 Ratio table (`bc/measure`, JVM): quads 5/20/60/200/800 -> 0.368/0.168/0.121/0.104/0.104; 60 KB ciphertext -> 1.000; 20/80 mix -> 0.617. End-to-end `commit!`: 25,152 -> 1,364 bytes."
 
   :adr/resume-point
-  "Next, in order:
+  "Phase 1 (readers) is partly landed. Next, in order:
 
-1. Measure `merkle_lsm` run blocks and `materialized_view` blocks with `bc/measure` on real data before wiring either. Run blocks are the larger prize and the larger CPU bill.
-2. Add a `scripts/fleet-ci/gates.edn` entry running kotobase-block-codec's and org-ietf-deflate's suites on both runtimes, so the golden pins are checked by something other than a human remembering to.
-3. Decide the leaf-key encoding question (gap 2) on its own terms — it is a bigger win than compressing that block, and a bigger migration.
-4. If a second codec is ever wanted, it is tag `0x02` and a new constant, never an edit to `zlib-1-tag`."}]
+1. **Finish the reader rollout** — the four content-decoding sites in `kotobase-peer/object_store/worker.cljs` (3677, 4693, 4780, 4908) and `kotobase-projection` line 532. The `lsm/linked-cids` sites need nothing; do not change them, and say why in the commit so the next reader does not `wonder`.
+2. **Deploy those readers**, then and only then flip `merkle-lsm.core/encoded` to `bcn/encode-node` — settling the one-dependency question in that repo's deps.edn explicitly first.
+3. Add a `scripts/fleet-ci/gates.edn` entry running kotobase-block-codec's, org-ietf-deflate's and io-ipld's suites **on both runtimes**. Three of the four defects this work surfaced were visible only on the second runtime, and nothing currently runs them there automatically.
+4. Measure `kotobase-projection`'s own blocks before assuming they behave like run blocks.
+5. Decide the leaf-key encoding question (gap 3) on its own terms — a bigger win than compressing that block, and a bigger migration.
+6. If a second codec is ever wanted, it is tag `0x02` and a new constant, never an edit to `zlib-1-tag`."}]
