@@ -76,7 +76,56 @@ Per child repo, a **landing ladder** — left is more dangerous because git prot
 | `dirty=N` | tracked, uncommitted | Survives branch switches only by accident. |
 | `unpushed=B:N` | branch `B` is N ahead of `origin/B` (or `no-remote`) | Exists only on this machine. |
 | `nopr=B` | pushed, unreachable from default branch, no open PR | Not on any review path; rots silently. |
-| `nopr=?(N branches…)` | PR lookup capped at 20 branches | Branch farms (webgpu ≈80, slides ≈90) need one API round-trip each. Reported, never silently dropped. |
+| `nopr=?(N branches…)` | 予算切れで PR 照会を打切り | 報告する。黙って落とさない。 |
+| `nopr=!(N branches…)` | gh 照会が失敗（再試行3回後） | **「PR が無い」ではなく「見られなかった」。** 混同すると偽陽性になる。 |
+
+### PR 照会は repo あたり 1 往復（2026-08-06）
+
+`gh pr list --repo <slug> --state open --json number,headRefName` は open PR を
+**まとめて**返すので、branch ごとに `--head` で引く必要はない。取得した map と
+手元の branch を突き合わせれば同じ答えが 1 往復で出る。
+
+同一 fleet での実測:
+
+| | 往復 | 解決した branch | 打切り |
+|---|---|---|---|
+| 旧（branch ごと） | 199/200 | 約 181 | **18** |
+| 新（repo ごと） | **149/200** | **242** | **0** |
+
+branch farm（webgpu ≈80、slides ≈90）が実質無料になり、20 branch の cap は不要に
+なったので撤去した。
+
+**gh の失敗を `nopr` にしない。** 旧実装は gh 失敗時に nil を返し、呼び手の `remove`
+がそれを「PR が見つからなかった」と読んでいた——つまり**ネットワークの瞬断が黙って
+偽の「push 済みだが PR 無し」を作っていた**。`net/http: TLS handshake timeout` は
+実測で無負荷時 1/40、survey が数千の git を spawn している最中は 137/137 で起きた。
+3 回・2s/4s バックオフで再試行し、それでも駄目なら `nopr=!` として**別に**数える。
+
+### `unpushed` は実測する（ローカル ref から推測しない）
+
+west checkout の fetch refspec は `refs/west/*` なので `refs/remotes/origin/<branch>`
+が無いことがあり、**push 済みの branch が「このマシンにしか無い」と誤報される**。
+ladder の rank 3 は本来「消えたら戻らない」を意味するので、偽陽性は本物を埋もれさせる。
+
+実測 2026-08-06: `:no-remote` は 57 repo / 96 branch あり、**28 が偽**だった。例:
+
+```
+旧: orgs/cloud-itonami/cloud-itonami-isco-0110  UNLANDED; unpushed=uiux/banner:no-remote
+新: orgs/cloud-itonami/cloud-itonami-isco-0110  UNLANDED; nopr=uiux/banner
+remote: b4141de64ae94ededac13cd87407ae914734daa9  refs/heads/uiux/banner
+```
+
+`git ls-remote` は **git protocol なので REST の rate limit を消費しない**（同一 repo・
+同一の問い: `gh api .../branches/main` 2173ms・1 branch・課金、`git ls-remote` 1627ms・
+全 ref・無課金）。`:no-remote` を持つ repo だけに当てるので fleet 全体で 29 往復。
+
+`clojure.java.shell/sh` に timeout は無いので、退役した remote で認証プロンプトに
+ぶつかると survey ごと止まる。`GIT_TERMINAL_PROMPT=0` と ssh の
+`BatchMode=yes`/`ConnectTimeout=10` で塞ぐ（実測: 死んだ remote が 800ms で exit 128）。
+
+集計は row ではなく atom に持つ——覆した repo はしばしば UNLANDED でなくなって
+行ごと filter から落ち、row に持たせた集計値も一緒に消える（初回は実際に
+recovered=0 と表示された）。
 
 Incident reference (2026-07-25): `orgs/gftdcojp/cloud-itonami` held the entire Workspace
 suite (Directory/Mail/Drive/backup/domain-proof/projection-outbox, ~4,000 lines with tests

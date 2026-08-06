@@ -137,15 +137,52 @@
     (some-> (gitc dir "rev-list" "--count" (str "origin/" branch ".." branch))
             str/trim parse-long)))
 
-(defn- open-pr-for
-  "その branch を head に持つ open PR の番号。無ければ nil。
-  slug が取れない/gh が失敗した場合も nil（fail-open — survey を落とさない）。"
-  [slug branch]
+(def ^:private pr-list-limit
+  "1 repo あたり取得する open PR の上限。到達したら truncated として必ず報告する
+  （黙って切らない）。実測 2026-08-06 の fleet 最大は 1 repo 33 件。"
+  200)
+
+(defn- open-prs-for-repo
+  "その repo の open PR を **1 往復** で引き、headRefName→number の map で返す。
+
+  以前は `gh pr list --head <branch>` を **branch ごと**に叩いていた。PR の有無は
+  GitHub 固有の概念なので API でしか答えられないが、*branch ごとに引く必要は無い*
+  ——repo 単位で全 open PR を取って手元で突き合わせれば同じ答えが 1 往復で出る。
+
+  実測 2026-08-06: この fold で branch farm が実質無料になった。kotoba-lang/webgpu
+  は 67 branch = 67 往復かかっていたのが 1 往復、slides は 90+ が 1 往復。前回の
+  survey が `nopr=?(18 branch は照会を打切り)` と報告していた truncation は、
+  この 18 branch が 4 repo に収まっていたため丸ごと消える。
+
+  返り値 {:prs {branch number} :truncated? bool}。全試行が失敗したら nil。
+
+  **再試行する理由**（2026-08-06 実測）: `gh` は輻輳時に
+  `net/http: TLS handshake timeout` で落ちる。実測で 40 repo 中 1 件、survey 本体が
+  数千の git を spawn している最中は更に高い（137 candidate 全滅を観測した）。
+  1 回の瞬断で repo 丸ごと「照会不能」にすると survey の意味が消えるので、
+  指数バックオフで 3 回試す。
+
+  **旧実装のバグも併せて潰している**: 旧 `open-pr-for` は gh 失敗時に nil を返し、
+  呼び手の `remove` がそれを「PR が見つからなかった」と解釈していた。つまり
+  **ネットワークの瞬断が黙って `nopr`（= PR 無し）という偽陽性になっていた**。
+  ここでは失敗を nil として区別し、呼び手が :nopr-failed として報告する。"
+  [slug]
   (when slug
-    (let [{:keys [out exit]} (sh "gh" "pr" "list" "--repo" slug "--state" "open"
-                                 "--head" branch "--json" "number" "--limit" "1")]
-      (when (zero? exit)
-        (some-> (json/parse-string out true) first :number)))))
+    (loop [attempt 1]
+      (let [{:keys [out exit]} (sh "gh" "pr" "list" "--repo" slug "--state" "open"
+                                   "--json" "number,headRefName"
+                                   "--limit" (str pr-list-limit))]
+        (cond
+          (zero? exit)
+          (let [prs (json/parse-string out true)]
+            {:prs (into {} (map (juxt :headRefName :number) prs))
+             :truncated? (>= (count prs) pr-list-limit)})
+
+          (< attempt 3)
+          (do (sh "sleep" (str (* attempt 2))) ; 2s, 4s
+              (recur (inc attempt)))
+
+          :else nil)))))
 
 (defn- merged-into-default?
   "branch の tip が既に default branch から到達可能か（= 着地済み）。"
@@ -184,11 +221,19 @@
 ;;      annex は untracked/dirty が既定状態なので、そもそも数える必要がない。
 
 (def ^:private pr-budget
-  "phase 2 で許す `gh pr list` の総往復数。超えたら打ち切って件数を報告する。"
+  "phase 2 で許す `gh pr list` の総往復数。超えたら打ち切って件数を報告する。
+
+  2026-08-06 に単位が **branch あたり → repo あたり** に変わった（open-prs-for-repo
+  の fold）。同じ 200 でも、以前は 200 branch までしか見られなかったのが 200 repo
+  ——branch 数に関係なく——見られる。実測の母集団（pushed-but-unlanded branch を
+  持つ repo）はこの範囲に収まるので、実質的に打切りが起きなくなる。"
   200)
 
 (def ^:private pr-spent (atom 0))
 (def ^:private pr-truncated (atom 0))
+;; gh の失敗（再試行後）。予算切れの打切りとは別物なので混ぜない——混ぜると
+;; 「fleet に未 PR branch が大量にある」のか「照会できなかった」のか区別が付かない。
+(def ^:private pr-failed (atom 0))
 
 (defn- eprogress [s] (.error js/console s))
 
@@ -260,6 +305,8 @@
      :junk-untracked junk-untracked
      :branch-analysis-skipped branch-analysis-skipped
      :locals locals :unpushed unpushed :pushed-live pushed-live
+     ;; refine-push-state が :no-remote を実測で覆すために生の判定を残す。
+     :aheads aheads :default default
      :annex? annex :slug (repo-slug dir)
      ;; phase 1 の時点で確定する未着地。nopr は phase 2 で足す。
      :local-unlanded? (boolean (if annex
@@ -267,24 +314,128 @@
                                  (or (pos? untracked) (pos? dirty) (seq unpushed)
                                      branch-analysis-skipped)))}))
 
+(def ^:private remote-heads-spent (atom 0))
+;; 偽陽性を覆した branch 数。row に持たせると、覆った結果その repo が UNLANDED で
+;; なくなり `--unlanded` の filter から落ちて、集計値ごと消える（実測 2026-08-06:
+;; 29 往復して recovered=0 と表示された。実際は覆せていたのに行が消えていた）。
+(def ^:private push-state-recovered (atom 0))
+
+(defn- remote-heads
+  "リモートの branch を **1 往復** で {branch sha} として取る。REST ではなく git
+  protocol の `ls-remote` なので **rate limit を消費しない**。
+
+  実測 2026-08-06（同一 repo・同一質問）:
+    gh api .../branches/main      2173 ms  1 branch のみ・rate limit 消費
+    git ls-remote <url>           1627 ms  全 ref・rate limit なし"
+  [dir]
+  (when-let [url (some-> (gitc dir "remote" "get-url" "origin") str/trim not-empty)]
+    (swap! remote-heads-spent inc)
+    ;; `sh` (clojure.java.shell) には timeout が無い。退役した remote に当たると
+    ;; git が認証を対話で訊きに行き、survey ごと止まる。両経路を塞ぐ:
+    ;;   GIT_TERMINAL_PROMPT=0  … https の資格情報プロンプトを出さず即座に失敗する
+    ;;   BatchMode=yes          … ssh の passphrase/known-hosts 対話を出さない
+    ;;   ConnectTimeout=10      … 到達しない host で無限に待たない
+    ;; 失敗すれば exit≠0 → nil → 呼び手は row を据え置く（fail-open）。
+    (let [{:keys [out exit]} (sh "env" "GIT_TERMINAL_PROMPT=0"
+                                 "GIT_SSH_COMMAND=ssh -o BatchMode=yes -o ConnectTimeout=10"
+                                 "git" "ls-remote" "--heads" url)]
+      (when (zero? exit)
+        (into {} (for [l (str/split-lines (or out ""))
+                       :let [[sha ref] (str/split (str/trim l) #"\s+")]
+                       :when (and sha ref (str/starts-with? ref "refs/heads/"))]
+                   [(subs ref (count "refs/heads/")) sha]))))))
+
+(defn- refine-push-state
+  "`:no-remote` と判定された branch を **リモートに実際に問い合わせて**覆す。
+
+  なぜ要るか: west checkout の fetch refspec は `refs/west/*` なので
+  `refs/remotes/origin/<branch>` が存在しないことがある。ahead-of-remote は
+  それを見て `:no-remote`（= 未 push、このマシンにしか無い）と報告するが、
+  実際には push 済みのことがある。runbook 自身がこの罠を記録している
+  （kotobase の agent/persist-execution-identities）。
+
+  実害: `unpushed` は ladder で 3 番目に危険なマーカーなので、偽陽性は
+  「消えたら困る作業」の一覧を水増しし、本物を埋もれさせる。
+
+  実測 2026-08-06: `:no-remote` は 57 repo / 96 branch あり、無作為 3 件のうち
+  **2 件が push 済み**だった（cloud-itonami-isco-0110 `uiux/banner` = b4141de、
+  cloud-itonami-isic-1512 `preserve/stray-detached-bce0813` = bce0813）。
+
+  `:no-remote` を 1 つも持たない repo は往復しない（大半の repo はここで抜ける）。"
+  [{:keys [dir aheads default] :as row}]
+  (if-not (some #(= :no-remote %) (vals aheads))
+    row
+    (if-let [heads (remote-heads dir)]
+      (let [aheads' (into {} (for [[b n] aheads]
+                               [b (if (and (= n :no-remote) (contains? heads b))
+                                    ;; リモートに在った。手元に其の commit があれば
+                                    ;; 先行数を数え、無ければ 0（= push 済み）扱い。
+                                    (or (some-> (gitc dir "rev-list" "--count"
+                                                      (str (get heads b) ".." b))
+                                                str/trim parse-long)
+                                        0)
+                                    n)]))
+            recovered (count (for [[b n] aheads
+                                   :when (and (= n :no-remote)
+                                              (not= :no-remote (get aheads' b)))]
+                               b))
+            unpushed' (vec (for [[b n] aheads'
+                                 :when (or (= n :no-remote) (and (number? n) (pos? n)))]
+                             (str b ":" (if (= n :no-remote) "no-remote" n))))]
+        (swap! push-state-recovered + recovered)
+        (assoc row
+               :aheads aheads'
+               :push-state-recovered recovered
+               :unpushed unpushed'
+               :pushed-live (vec (for [[b n] aheads' :when (and (number? n) (zero? n))] b))
+               ;; :local-unlanded? は phase 1 の unpushed で決まっていた。覆した後は
+               ;; 再計算しないと、既に push 済みと分かった repo を未着地のまま報告する。
+               :local-unlanded? (boolean (if (:annex? row)
+                                           (seq unpushed')
+                                           (or (pos? (:untracked row 0))
+                                               (pos? (:dirty row 0))
+                                               (seq unpushed')
+                                               (:branch-analysis-skipped row))))))
+      row)))
+
 (defn- survey-prs
-  "phase 2: push 済み未着地 branch にだけ `gh pr list` を当てる。予算超過は打切り、
-  件数は :nopr-skipped として必ず報告する（黙って切らない）。"
+  "phase 2: push 済み未着地 branch を持つ repo に `gh pr list` を **repo あたり 1 回**
+  当てる。予算超過は打切り、件数は :nopr-skipped として必ず報告する（黙って切らない）。
+
+  予算の単位が branch から **repo** に変わった点に注意。同じ pr-budget で覆える
+  範囲が桁で広がる代わり、1 repo が予算 1 を使い切る形になる。branch 数による
+  打切り（旧 pr-cap 20）は不要になったので撤去した——1 往復に何 branch 乗っても
+  コストは変わらない。"
   [{:keys [pushed-live slug] :as row}]
-  (let [pr-cap 20
-        over-cap? (> (count pushed-live) pr-cap)
-        budget-left (- pr-budget @pr-spent)
-        skip? (or over-cap? (nil? slug) (< budget-left (count pushed-live)))]
-    (if skip?
-      (do (when (seq pushed-live) (swap! pr-truncated + (count pushed-live)))
-          (assoc row :nopr [] :nopr-skipped (when (seq pushed-live) (count pushed-live))))
-      (let [nopr (vec (remove #(do (swap! pr-spent inc) (open-pr-for slug %)) pushed-live))]
-        (assoc row :nopr nopr :nopr-skipped nil)))))
+  (cond
+    (or (empty? pushed-live) (nil? slug))
+    (assoc row :nopr [] :nopr-skipped nil)
+
+    ;; 予算切れ。何 branch を見送ったかを必ず数える。
+    (< (- pr-budget @pr-spent) 1)
+    (do (swap! pr-truncated + (count pushed-live))
+        (assoc row :nopr [] :nopr-skipped (count pushed-live)))
+
+    :else
+    (do (swap! pr-spent inc)
+        (if-let [{:keys [prs truncated?]} (open-prs-for-repo slug)]
+          (assoc row
+                 :nopr (vec (remove #(contains? prs %) pushed-live))
+                 ;; --limit に当たった repo は「PR が無い」と言い切れない。
+                 :nopr-skipped (when truncated? (count pushed-live))
+                 :pr-list-truncated? truncated?)
+          ;; 再試行しても gh が失敗した。**「PR 無し」とは絶対に書かない**
+          ;; （旧実装はここで偽陽性を作っていた）。予算切れとも別の状態として数える。
+          (do (swap! pr-failed + (count pushed-live))
+              (assoc row :nopr [] :nopr-failed (count pushed-live)))))))
 
 (defn- finalize [row]
   (assoc row :unlanded? (boolean (or (:local-unlanded? row)
                                      (seq (:nopr row))
-                                     (:nopr-skipped row)))))
+                                     (:nopr-skipped row)
+                                     ;; 照会できなかった repo も「未着地でない」と
+                                     ;; 断定はできない。判定不能は安全側に倒す。
+                                     (:nopr-failed row)))))
 
 (def js-fs (js/require "node:fs"))
 
@@ -374,6 +525,12 @@
                                                           (:branch-analysis-skipped row)))))])))
                       untracked-repos)
         local-rows (mapv #(get refined (:dir %) %) local-rows)
+        ;; phase 1.5: `:no-remote` を ls-remote で実測して覆す。git protocol なので
+        ;; rate limit は消費しない。往復するのは :no-remote を持つ repo だけ。
+        need-remote (count (filter #(some #{:no-remote} (vals (:aheads % {}))) local-rows))
+        _ (eprogress (str "phase 1.5 (ls-remote push-state): " need-remote
+                          " repos have :no-remote branches to verify"))
+        local-rows (mapv refine-push-state local-rows)
         candidates (filter #(seq (:pushed-live %)) local-rows)
         _ (eprogress (str "phase 2 (gh pr lookup): " (count candidates)
                           " repos have pushed-but-unlanded branches"))
@@ -401,6 +558,7 @@
                     (seq unpushed)                      (conj (str "unpushed=" (str/join "," unpushed)))
                     (seq nopr)                          (conj (str "nopr=" (str/join "," nopr)))
                     nopr-skipped                        (conj (str "nopr=?(" nopr-skipped " branches, PR照会を打切り)"))
+                    (:nopr-failed row)                  (conj (str "nopr=!(" (:nopr-failed row) " branches, gh 照会失敗——PR の有無は不明)"))
                     (:branch-analysis-skipped row)       (conj (str "branches=?(" (:branch-analysis-skipped row) " 本, branch解析を打切り)"))
                     (pos? (:junk-untracked row 0))       (conj (str "junk-untracked=" (:junk-untracked row) "(ビルド副産物・着地対象外)"))
                     (pos? (:untracked-upstream row 0))   (conj (str "untracked-but-upstream=" (:untracked-upstream row) "(内容は既に main にある・着地不要)"))
@@ -415,11 +573,20 @@
                      (count (filter :annex? rows))))
     ;; 打切りは必ず報告する。「完走したように見える不完全な survey」は
     ;; 遅い survey より悪い（runbook :unlanded :caps）。
-    (println (format "PR 照会: %d/%d 往復を使用%s"
+    (println (format "PR 照会: %d/%d 往復を使用（repo あたり 1 往復・%d branch を解決）%s"
                      @pr-spent pr-budget
-                     (if (pos? @pr-truncated)
-                       (format " / ⚠ %d branch は照会を打切り（nopr=? として上に表示）" @pr-truncated)
-                       "（打切りなし）")))
+                     (reduce + 0 (map #(count (:pushed-live % [])) rows))
+                     (str (if (pos? @pr-truncated)
+                            (format " / ⚠ %d branch は予算切れで打切り（nopr=?）" @pr-truncated)
+                            "（打切りなし）")
+                          (when (pos? @pr-failed)
+                            (format " / ⚠ %d branch は gh 照会が失敗（nopr=!・再試行3回後）" @pr-failed)))))
+    (println (format "push 状態の実測: ls-remote %d 往復（rate limit 非消費）%s"
+                     @remote-heads-spent
+                     (if (pos? @push-state-recovered)
+                       (format " / %d branch は `unpushed` の偽陽性だった（実際は push 済み・この行から消えている）"
+                               @push-state-recovered)
+                       "（偽陽性なし）")))
     (println "※ このセクションは完走した（この行が出ていれば途中 kill されていない）。")
     (when (some #(and (pos? (:untracked %)) (not (:annex? %))) rows)
       (println)
