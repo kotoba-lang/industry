@@ -113,8 +113,8 @@ content addressing でなくなる。
 
 | block 母集団 | 平均サイズ | overhead % | encrypt | decrypt |
 |---|---|---|---|---|
-| index block | 12,225 B | **0.23%** | 0.25 ms | 0.07 ms |
-| 定義 block | 1,638 B | **1.71%** | 0.04 ms | 0.03 ms |
+| index block | 12,225 B | **0.23%** | 0.21 ms | 0.03 ms |
+| 定義 block | 1,638 B | **1.71%** | 0.02 ms | 0.02 ms |
 
 → **暗号化は細粒度チャンクを不利にする**（全ノード CID なら 14.9 block/定義 × 28 B =
 417 B/定義 対 定義単位 28 B）。D5 の粒度決定を補強する。
@@ -128,7 +128,7 @@ content addressing でなくなる。
 | 不透明な属性レンジ | 14 | 4,000 |
 | **倍率** | **2.8×** | **8.06×** |
 
-cipher は 0.07 ms/block、不透明性は 8 倍の byte。
+cipher は 0.03 ms/block、不透明性は 8 倍の byte。
 
 ### D4. 定義 identity は checked KIR の CID（S 式 CID では足りない）
 
@@ -179,10 +179,10 @@ leaf 20 件なら 20 件（40 block）。別 graph engine を立てるとクエ�
 
 | | requests | 走査 rows | skip した chunk | ms |
 |---|---|---|---|---|
-| **columnar + zone map** | **2** | **512** | 8 中 7 | **6.2** |
-| AVET Prolly index | 16 | 4,000 | — | 154 |
+| **columnar + zone map** | **2** | **512** | 8 中 7 | **5.2** |
+| AVET Prolly index | 16 | 4,000 | — | 108 |
 
-**request 8 倍減 / rows 7.8 倍減 / 25 倍速。** footer の min/max で 8 中 7 chunk を読む前に
+**request 8 倍減 / rows 7.8 倍減 / 21 倍速。** footer の min/max で 8 中 7 chunk を読む前に
 捨てられる。構築は 46 PUT / 404 KB。
 
 → **columnar projection は削除・再構築可能な派生物として持つ**（ADR-2608580000 が code graph に
@@ -193,13 +193,13 @@ latency ではない。
 
 | | 実測 |
 |---|---|
-| 1 block の sha256 | 0.04 ms |
-| CID 組み立て込み（multibase 含む） | **0.71 ms** |
+| 1 block の sha256 | 0.02 ms |
+| CID 組み立て込み（multibase 含む） | **0.45 ms** |
 | 1 byte 改竄の検出 | 検出（CID 不一致） |
 | convergent 暗号下の tenant 間 equality 漏洩 | tenant A の **35.12%** の block |
 | plaintext-addressed の住所漏洩 | 100%（住所が平文 hash そのもの） |
 
-**検証コストの 18 倍は暗号ではない** —— pure cljs の base32 multibase 実装。content 検証が
+**検証コストの約 22 倍は暗号ではない** —— pure cljs の base32 multibase 実装。content 検証が
 高いのではなく、この CID 文字列の組み立てが高い。**最適化対象であって、検証をやめる理由ではない。**"
 
   :adr/consequences
