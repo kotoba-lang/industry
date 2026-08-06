@@ -103,9 +103,33 @@ repo 名は**接頭辞一致**でよい（後ろに主題が続く: `com-example
 唯一の門**。だから registry 生成器（`scripts/generate-sites-registry.cljs`）も同じ
 `org-id/admit` を通す（`check-org-admission!`）。
 
-検証: `{:org \"toyota\" …}` を注入して exit 1 と
+検証: `{:org \"toyota\" …}` を注入して
 `org \"toyota\" は受理できない（missing-domain）` を実際に見た。**落ちることを
 確かめてから landed とする**（fleet gate の規則と同じ）。
+
+## closing で見つけた自分の誤り（2026-08-06、修正済み）
+
+**門は landed 直後から起動していなかった。** `org-id` が
+`nameserver.domain-verification`（`kotoba-lang/org-ietf-dns` にある）を require して
+いたが、**門は bare nbb（`:paths [\"src\" \"test\" \"mobile/scripts\"]`）で走る**ので
+その ns を解決できず、`Could not find namespace` で即死していた。セッション中の検証は
+classpath の通る経路で行っており、**門が実際に走る経路で確かめていなかった**。
+
+判定は TXT レコードの綴りを知る必要がない —— 知る必要があるのは申請者に見せる指示
+だけ。`challenge-instructions` を `cloud-itonami.org-id-challenge` へ分け、`admit` の
+`:dns-unverified` から `:challenge`（レコード名）を落とした。契約の正本は引き続き
+`nameserver.domain-verification` 側の 1 箇所。
+
+**さらに、受理規則のテストはどちらの runner にも登録されておらず、suite では一度も
+走っていなかった。** ファイルは在り、個別実行の記録だけが ADR に残っていた —— これは
+`test_runner.cljc` 自身が別の ADR のコメントで名指ししている失敗の形（走らないテストは
+緑と区別が付かない）と同型。両 runner に登録した結果 **1437 → 1445 tests /
+9442 → 9487 assertions**。failure 数は pristine な pin と同じ 5/12 のままで、これらは
+xrpc / doctor / ops-identity の既存 failure（`cloud-itonami.org-id` を参照するのは
+自分の 3 ファイルだけ、と実測で確認）。
+
+依存の向きは guard test で固定した。`org-id` に require を戻すと実際に落ちることを
+確認済み。散文での言及は許す（require 形だけを見る）。
 
 ## 同時に着地したもの（同じ公開面の話）
 
@@ -161,14 +185,22 @@ deploy** し、さらに `edge/sites.cljs` の projection が `:moved-to` を落
     :gap/detail \"PSL が無いので co.jp 等の多段 suffix を厳密判定できない。形の検査までで、判定できないものは推測せず断る（fail-closed）\"}]"
 
   :adr/verification
-  "[{:check \"cloud_itonami/org_id_test — derive/admit/challenge\" :result \"7 tests\"}
-   {:check \"cloud-itonami 全体テスト\" :result \"20 tests / 153 assertions / 0 failures\"}
+  "[{:check \"門が bare nbb で起動するか（nbb scripts/generate-sites-registry.cljs --check）\"
+     :result \"OK: 22 sites / 38 reserved prefixes。**landed 直後は起動していなかった** —— 2026-08-06 の closing で発見し修正\"}
+   {:check \"門が実際に落ちるか（未検証の org \\\"toyota\\\" を注入）\"
+     :result \"受理規則が発火して落ちる: org \\\"toyota\\\" は受理できない（missing-domain）。先に dir / chrome の検査が発火するので、それらを満たした上で確認した\"}
+   {:check \"cloud-itonami 全体テスト（clojure -M:test）\"
+     :result \"1445 tests / 9487 assertions / 5 failures / 12 errors。failure は pristine な pin と同一（xrpc / doctor / ops-identity の既存 failure）で本件由来ではない\"}
+   {:check \"受理規則のテストが suite で走るか\"
+     :result \"両 runner に登録した（登録前は一度も走っていなかった）。1437 → 1445 tests / 9442 → 9487 assertions\"}
+   {:check \"依存の向きの guard\" :result \"org-id に DNS 実装の require を戻すと実際に落ちることを確認\"}
    {:check \"registry canonical\" :result \"22 sites / 38 reserved prefixes\"}
-   {:check \"門が実際に落ちるか（org \\\"toyota\\\" を注入）\" :result \"exit 1 + 理由 missing-domain。落ちることを確認済み\"}
    {:check \"移動した旧 URL（cloud-itonami.itonami.cloud/inkan/）\" :result \"301 で新 URL へ（一時 404 を修復後に再確認）\"}]"
 
   :adr/landed
   "[{:repo \"orgs/network-awai/cloud-itonami\" :commit \"da622271a66f\" :what \"org-id: tenant org id は reverse domain、DNS で証明する\"}
+   {:repo \"orgs/network-awai/cloud-itonami\" :commit \"0338d6f7d9fc\" :what \"org-id: 判定を DNS 実装から切り離し（門が bare nbb で起動しなかった）、受理規則のテストを両 runner に登録\"}
+   {:repo \"com-junkawasaki/root\" :commit \"823aae8eba28\" :what \"west pin を 0338d6f7 へ前進\"}
    {:repo \"orgs/network-awai/cloud-itonami\" :commit \"8e30149846f8\" :what \"edge: registry projection が :moved-to を落としていた\"}
    {:repo \"orgs/network-awai/cloud-itonami\" :commit \"b3362938ed74\" :what \"sites: app org、org 予約、旧 URL を生かす移動\"}
    {:repo \"orgs/cloud-itonami/animeka\" :commit \"38aeec98ac7e\" :what \"animeka を service プレーンへ（ad-hoc サブドメイン撤去）\"}
@@ -179,8 +211,9 @@ deploy** し、さらに `edge/sites.cljs` の projection が `:moved-to` を落
   :adr/resume-point
   "次の agent が最初に打つコマンド:
 
-  # 1) 受理規則が生きているか（宣言の門）
+  # 1) 受理規則が生きているか（宣言の門）。**bare nbb で起動すること自体が検査対象**
   cd orgs/network-awai/cloud-itonami && nbb scripts/generate-sites-registry.cljs --check
+  #    期待: OK: sites registry is canonical (22 site(s), 38 reserved prefixes)
 
   # 2) provisioning の 2 org を live にできるか（token 次第。今は不可）
   gh api ... / wrangler pages domain add   # zone(read) しか無いので現状 Authentication error
