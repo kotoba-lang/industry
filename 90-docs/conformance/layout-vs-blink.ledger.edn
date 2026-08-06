@@ -3780,3 +3780,122 @@
    with the reason written into the case."]
  :gates "every new gate verified to FAIL on the base engine (15 assertions)
          with a control beside each that passes on both sides."}
+
+{:seq 68
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "aa18babddc4a99261dc4a9ee3e2f9b8b64df8e54"
+ :title "writing-mode: the horizontal algorithm in a rotated basis, all four modes"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 688 :after 711}}
+ :measured
+ {:line-structure {:before "656/660" :after "679/683"}
+  :geometry {:before "2251/2267, 674/688 clean" :after "2315/2331, 697/711 clean"}
+  :paint-order {:before "17138/17187, 676/688" :after "17713/17762, 699/711"}
+  :computed-style {:before "31819/31851" :after "32713/32745"}
+  :read-the-disagreeing-halves
+  "geometry 16 -> 16 boxes, paint 49 -> 49 points, computed style 32 -> 32
+   values, line 4 -> 4 cases. EVERY COUNT IDENTICAL -- 23 cases were added
+   and the residual did not grow."}
+ :verified-on-merged-main
+ {:cssom-tests "966 / 2475, 0 failures (952/2419 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :per-case-deltas
+ {:fixed ":text/writing-mode-vertical-rl -- geometry div w +280 and div h
+          -20 both gone (300x20 -> 20x70, Brave's number exactly); line
+          axis [\"alpha beta\"] -> [\"alpha\"][\"beta\"]."
+  :new-failures-both-deliberate-and-documented-in-the-case
+  [":writing-mode/aspect-ratio-is-not-rotated -- div w -90. Brave 120x60,
+    engine 30x60 (ratio inverted)."
+   ":writing-mode/a-horizontal-box-inside-a-vertical-one-turns-back -- LINE
+    axis only; every box, paint sample and computed value exact."]
+  :nothing-in-the-horizontal-tb-corpus-moved
+  "--dump-ops against main: 688 case blocks diffed, 23 added, EXACTLY ONE
+   pre-existing case changed -- the one above. The agent ran this diff
+   THREE TIMES against three successive merge bases; same single line each
+   time. And it is STRUCTURAL, NOT LUCK: horizontal-tb is the IDENTITY in
+   all three tables and both style rewrites return their argument object
+   unchanged for it."}
+ :what-the-browser-said
+ {:headline "the vertical modes are the horizontal algorithm IN A ROTATED
+             BASIS -- every measured number is the transpose. Box 20x70 in
+             a 120-tall parent, STILL 20x70 in a 400-tall one, 40x60 (two
+             lines) in a 60-tall one."
+  :which-modes-share-a-mechanism
+  "vertical-lr and sideways-rl share one mechanism with vertical-rl;
+   SIDEWAYS-LR DOES NOT QUITE. sideways-rl is BYTE-IDENTICAL to vertical-rl
+   in every box measured. vertical-lr differs only in BLOCK direction
+   (children at x=0/x=30 vs x=50/x=0). sideways-lr's INLINE AXIS RUNS UP
+   THE PAGE -- inline-size: 70px puts its word at y=63 where the other
+   three put it at y=0. So: ONE SIGNED-PERMUTATION MATRIX PER MODE, not a
+   rotation count."
+  :direction-is-not-a-third-bit
+  "it swaps inline-start/end on BOTH sides of the physical<->canonical
+   mapping and CANCELS OUT."
+  :text-orientation
+  "changes WHAT A CHARACTER ADVANCES, not what a line is. `alpha` inside
+   vertical-rl: mixed 35px, sideways 35px, UPRIGHT 70px (5 x the em, space
+   included). Japanese `あいう えお`: 77px under mixed, 84 under upright."}
+ :scope-line
+ {:in "the basis change (sizes, block stacking, line wrapping, per-side
+       padding/border, margins, insets, floats, text-align, percentage
+       bases), ALL FOUR MODES, both boundary directions, and
+       text-orientation: upright."
+  :why-upright-and-not-mixed "upright's rule is EXACT WITHOUT A UNICODE
+                              TABLE; mixed for CJK needs per-character
+                              script classification."
+  :three-rules-that-are-NOT-the-axis-swap-and-were-measured-separately
+  ["an orthogonal flow's inline-size: auto is FIT-CONTENT"
+   "it establishes a BFC (45-wide box for a contained margin-right: 25px;
+    40x30 for a contained float)"
+   "its MARGINS ARE READ BY WHOEVER PLACES IT, IN THAT BOX'S FRAME --
+    which is why the ambient mode rides on `theme`, since node-style is
+    called by a box's PARENT as often as by itself."]}
+ :scope-cuts
+ [{:what "glyphs are not rotated"
+   :repaired-half "a rotated run is one op per word, re-anchored to the
+                   top-left of its transformed em box (without which a
+                   sideways-lr op reports y=40 for ink starting at y=5)."
+   :unrepaired-half "a page MIXING orientations cannot be line-scored -- a
+                     rotated word's ink is 15x7 in Brave, 7x15 here."}
+  {:what "aspect-ratio" :measured "Brave 120x60, engine 30x60"}
+  {:what "overflow-x/y, scroll-left/top" :why "PHYSICAL in the DOM;
+          rotating in without rotating out is worse."}
+  {:what "indefinite available inline size"
+   :measured "Brave falls back to the nearest scrollport: 150 inside
+              overflow:auto;height:150px, 419 otherwise (= window.
+              innerHeight, read back in the same probe). draw-ops has no
+              viewport block size, so an unconstrained orthogonal flow
+              resolves fit-content to max-content."}
+  {:what "CSS transform applies INSIDE the rotation"
+   :measured "translateX(10px) moves content DOWN, not right."}
+  {:what "an orthogonal child's intrinsic-size contribution"
+   :measured "width:max-content around a vertical child is 20 in Brave (the
+              child's BLOCK size)."}
+  {:what "writing-mode on a non-atomic inline" :measured "Brave computes
+          display: inline-block."}]
+ :tried-and-withdrawn
+ [{:what "a branch in glyph-advance for `upright`"
+   :why "sized the box right and NEVER REACHED THE LINE BREAKER
+         (layout-text, the flex base size, the caption's intrinsic width
+         and the caret all read (:measure-text theme) DIRECTLY). Replaced
+         by SUBSTITUTING THE THEME'S MEASURER."}
+  {:what "applying the style rotation in layout-node"
+   :why "left every intrinsic-size reader measuring a vertical box against
+         its UNROTATED width (two width:30px/50px children gave their
+         parent a canonical width of 50 where Brave says 21). Moved into
+         node-style."}
+  {:what "reading the available inline size AFTER the percentage-base swap"
+   :why "handed the box its parent's INLINE size; the case stopped wrapping
+         at a 60-tall parent."}]
+ :gates
+ "fifteen new/rewritten unit tests; FOURTEEN CONFIRMED FAILING against the
+  base commit's src/ (42 assertions) BEFORE THE SOURCE WAS WRITTEN. The
+  fifteenth is the control whose only job is to pass on both sides --
+  nothing-outside-a-vertical-subtree-is-rotated, three horizontal shapes
+  covering the four property families the rotation touches. The old gate
+  test a-vertical-writing-mode-leaves-logical-properties-unmapped is now
+  a-vertical-writing-mode-rotates-the-logical-mapping, carrying THE REASON
+  THE GATE EXISTED AND THE REASON IT WAS OPENED."}
