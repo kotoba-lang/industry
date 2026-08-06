@@ -71,11 +71,21 @@
 (defn -main []
   (let [started (.toISOString (js/Date.))]
 
+    ;; 同期の確認。**共有 checkout を書き換えない。**
+    ;;
+    ;; 以前は `git merge --ff-only origin/main` していたが、これは superproject の
+    ;; 共有 checkout を書き換えるので、他セッションの未コミットが 1 個あるだけで
+    ;; 止まり、手で作業している人と index.lock を奪い合う。姉妹の
+    ;; `itonami-os-connect-loop` で実測した障害と同じ（2026-08-05 に 9 時間
+    ;; 1 周も回らなかった／2026-08-06 に実作業と複数回衝突した）。
+    ;;
+    ;; 知りたいのは「この checkout が origin/main から分岐していないか」だけで、
+    ;; tick は読むだけ、実装側は自分の worktree を切る。非破壊で判定する。
     (sh "git" ["fetch" "origin" "--quiet"] {})
-    (let [{:keys [code err]} (sh "git" ["merge" "--ff-only" "origin/main"] {})]
+    (let [{:keys [code]} (sh "git" ["merge-base" "--is-ancestor" "HEAD" "origin/main"] {})]
       (when (not= 0 code)
-        (log! "origin/main に FF できない。この周は何もしない:" (str/trim (or err "")))
-        (append-ledger! {:at started :outcome :skipped :why :not-fast-forwardable})
+        (log! "この checkout は origin/main から分岐している。この周は何もしない。")
+        (append-ledger! {:at started :outcome :skipped :why :diverged-from-main})
         (js/process.exit 0)))
 
     (let [{:keys [out]} (sh "nbb" ["--classpath" ".:scripts/nbb_compat"
