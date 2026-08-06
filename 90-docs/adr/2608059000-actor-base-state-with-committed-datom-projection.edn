@@ -31,11 +31,13 @@
    "emission の .kotoba 化は不可能 — count/nth on vector に admitted lowering が無い（実測 2026-08-05、:phase :subset）"
    ":prev はどこも前進させない（この変更前から nil）"
    "west pin 未前進 — 別セッションの kami-app-daw / kami-app-nle の pin 退行が verify-west-pins をブロックしている（2026-08-05）"
-   "ADR-2608038000 の『inga は agent chain head を順序づける』は設計意図であり未配線 — inga.consensus の proposals は不透明 id で engi.core は inga に存在しない"
+   "ADR-2608038000 の『inga は agent chain head を順序づける』の**合意層側は配線済み**（2026-08-06、inga@9bc81ae — inga.chain + :actor-advance）。残るのは**生産側**: engi は advance を作らない（chain は datom と hash 文字列で、entry は CID 化されていない）／proposal を解決する deployment がまだ無い／warrant は記録されるが伝播しない"
    "apply-fn の .kotoba 化が未完（ADR-2608038000 の表が自認: wasm 化されたのは fuel の算術のみ、op 適用は cljc）"
    "index の inclusion proof が無い（ADR-2608058000 が担当）"]
   :adr/evidence
-  ["着地: inga@b270ab1 — :authority と :invoke-fn。JVM 339 tests / 1485 assertions、cljs 344 tests / 1733 assertions、clj-kondo 0 errors"
+  ["着地: inga@9bc81ae — inga.chain（proposal → advance → committed head）と :actor-advance。JVM 350 tests / 1512 assertions、cljs 355 / 1760。mutation: fork 検査を外すと 1 件赤、seq 検査で 2 件赤、resolver 検査で 2 件赤"
+   "mutation で発見した偽陽性: unresolvable proposal のテストが `thrown?` だけを見ており、nil advance が 1 段先の missing-address throw に当たって緑になっていた。ex-data の :type と :proposal を見るよう締めた"
+   "着地: inga@b270ab1 — :authority と :invoke-fn。JVM 339 tests / 1485 assertions、cljs 344 tests / 1733 assertions、clj-kondo 0 errors"
    "着地: codebase@bc85d8d — kotoba.codebase.actor/invoke-fn。JVM 110 tests / 339 assertions、cljs portable suite に actor round-trip を追加"
    "mutation 確認（inga）: self-write 検査を落とすと 5 件が赤、refusal を db に畳まないと 8 件が赤、transition* の memo を外すと once-only が赤"
    "mutation 確認（codebase）: refusal-by-problem を 1 理由に潰すと 3 件が赤、cljs 側の期待値を 1→99 にすると check! が噛む"
