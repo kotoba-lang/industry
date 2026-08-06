@@ -41,7 +41,46 @@
  :isolation :worktree
 
  :suites
- [{:repo "orgs/kotoba-lang/prolly-tree"
+ [{:repo "orgs/kotoba-lang/langgraph"
+   :label "langgraph operator-quickstart claims"
+   ;; docs/operator-quickstart.md tells a host author four runtime facts
+   ;; that are not visible from the API. Prose rots silently, so each
+   ;; claim has an assertion — and each assertion is here, because an
+   ;; assertion that never bites rots just as silently as the prose.
+   ;; 全て 2026-08-06 に実際に赤くなるところを見た。
+   :cmd ["clojure" "-M:test"]
+   :green-marker "0 failures, 0 errors"
+   :mutations
+   [{:id :langgraph/tick-not-resume-to-completion
+     :why "§5.1 `run*` が :done thread で新しい tick を始めること —— 「終わった thread は no-op」に変えると、supervisor が終了するようになった代わりに long-lived agent の次のターンが回らなくなる（実際に起こりうる「冪等にしました」型の退行）"
+     :file "src/langgraph/graph.cljc"
+     :find "        resume? (and latest\n                     (= :interrupted (:status latest))"
+     :replace "        resume? (and latest\n                     (contains? #{:interrupted :done} (:status latest))"
+     :must-fail ["run*-is-one-tick-not-resume-to-completion"]}
+
+    {:id :langgraph/claim-table
+     :why "§5.2 の表（今 claim するのは mem-checkpointer だけ）が実装と一致していること。backend が protocol を得たら表を直せ、という向きの mutation —— 退行ではなく改良で doc が古くなる方を捕まえる"
+     :file "src/langgraph/checkpoint.cljc"
+     :find "     (reify Checkpointer\n       (-put! [_ tid {:keys [step state frontier status] :as ckpt}]"
+     :replace "     (reify\n       ClaimableCheckpointer\n       (-claim-resume! [_ _ _] true)\n       Checkpointer\n       (-put! [_ tid {:keys [step state frontier status] :as ckpt}]"
+     :must-fail ["which-checkpointers-claim"]}
+
+    {:id :langgraph/recursion-limit-throws
+     :why "§5.3 再帰上限が throw であって :status ではないこと —— status に「改善」すると、:status しか見ない supervisor は park せず黙って進む"
+     :file "src/langgraph/graph.cljc"
+     :find "        (> step recursion-limit)\n        (throw (ex-info \"Recursion limit reached\"\n                        {:limit recursion-limit :state state :frontier frontier}))"
+     :replace "        (> step recursion-limit)\n        {:state state :events events :status :limit :frontier frontier}"
+     :must-fail ["recursion-limit-throws-and-is-not-a-status" "recursion-limit"]}
+
+    {:id :langgraph/history-ascending
+     :why "§4 list-checkpoints が :step 昇順であること。この mutation は最初の版のテストを赤くしなかった —— 1 tick しか回しておらず checkpoint が 1 件だったので、順序の assertion が空虚に真だった。full cycle を回すよう直して初めて噛んだ"
+     :file "src/langgraph/checkpoint.cljc"
+     :find "                (map #(->ckpt (pull dbv '[*] %)))\n                (sort-by :step)\n                vec)"
+     :replace "                (map #(->ckpt (pull dbv '[*] %)))\n                reverse\n                vec)"
+     :must-fail ["checkpoint-history-is-readable-without-running-the-graph"
+                 "interrupt-and-resume-datomic"]}]}
+
+  {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
    :cmd ["clojure" "-M:test"]
    :green-marker "0 failures, 0 errors"
