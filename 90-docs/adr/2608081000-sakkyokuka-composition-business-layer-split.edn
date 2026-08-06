@@ -182,7 +182,10 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:what \"lint\" :cmd \"clojure -M:lint（ongaku / sakkyokuka / isco-2652）\" :result \"errors 0。warning は既存分のみ（ongaku catalog.cljc の未使用 require、isco-2652 advisor.cljc の未使用 require）\"}
    {:what \"west pin 4 件がすべて fast-forward か\" :cmd \"gen-west-manifest.cljs --entry ongaku,sakkyokuka,cloud-itonami-isco-2652,ongakuka\" :result \"verify-west-pins: 4 件の pin 変更をすべて検証 OK。diff は revision 4 行のみ、project 数 4127 で不変\"}
    {:what \"gates.edn が parse でき 3 件増えたか\" :cmd \"nbb で read-string して :repos を数える\" :result \"30 -> 33、3 repo とも deps.edn に :test alias あり\"}
-   {:what \"blueprint.edn が壊れていないか\" :cmd \"nbb で read-string して keys を出す\" :result \"12 keys、parse 成功\"}]"
+   {:what \"blueprint.edn が壊れていないか\" :cmd \"nbb で read-string して keys を出す\" :result \"12 keys、parse 成功\"}
+   {:what \"fleet-db 吸収前の全 pin fast-forward 検証\" :cmd \"drift 63 件を gh api compare で 1 件ずつ（うち 3 件は :repo-path 付きで正規表現から漏れたため個別に）\" :result \"63/63 が status=ahead / behind_by=0。1 件でも behind なら中止する予定だったが無かった\"}
+   {:what \"ledger が追記のみか\" :cmd \"新 ledger の先頭 N バイト（N = origin/main の ledger サイズ 1,486,288）を shasum して比較\" :result \"ff8f1f5a8501 で一致。既存行は 1 バイトも書き換わっていない\"}
+   {:what \"west pin 前進が他セッションの pin を巻き戻していないか\" :cmd \"landing 後に origin/main の west.yml で net-kotobase / cloud-itonami-yotei を確認\" :result \"e17ca7a600bc / 4fc3b7168b84 のまま（別セッションが進めた新しい値）。project 数 4127 で不変\"}]"
 
 :adr/landed
   "[{:repo \"orgs/kotoba-lang/ongaku\" :commit \"cb88622101057\" :what \"rights/work/commission — 受注で渡す側を gate する（技芸層）\"}
@@ -190,11 +193,12 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:repo \"orgs/cloud-itonami/cloud-itonami-isco-2652\" :commit \"ead84682f107\" :what \"craft-libraries に作曲の両経路、business-layers 宣言、governor に受注 gate\"}
    {:repo \"orgs/cloud-itonami/ongakuka\" :commit \"7982787cb516\" :what \"README に sakkyokuka との境界\"}
    {:repo \"com-junkawasaki/root\" :commit \"57d3ca6a5cc8\" :what \"ADR + repos.edn + west.yml への sakkyokuka 登録\"}
-   {:repo \"com-junkawasaki/root\" :what \"fleet-ci gates.edn に 3 層の :jvm-test、west pin 4 件前進、この ADR の訂正\"}]"
+   {:repo \"com-junkawasaki/root\" :what \"fleet-ci gates.edn に 3 層の :jvm-test、この ADR の訂正\"}
+   {:repo \"com-junkawasaki/root\" :commit \"e427dcfb0685\" :what \"west pin 4 件前進（API single-entry。枝に west.yml を載せると別セッションの pin を巻き戻すため）\"}
+   {:repo \"com-junkawasaki/root\" :commit \"8328c999df3\" :what \"fleet-db に west.yml(origin/main) を吸収 — changed 64 / added 18 / removed 0、ledger に 82 event\"}]"
 
 :adr/gaps
   "[{:gap \"`gftd-audio-actor`（persona リツ）と `ai.gftd.ongakuka.compose` は受注 gate を通っていない。生成は従来どおり動くが、権利と納品の検査は isco-2652 の actor 経由で受注を出したときだけ効く\" :since \"2026-08-06\"}
    {:gap \"受注 gate は store の track レコードに :work/held-rights / :work/provenance が入っていることを前提にする。既存の track はこれらを持たないので、provenance は :authored に、保有権利は空に既定される（= 何も譲渡できない）。既存カタログへの backfill は未着手\" :since \"2026-08-06\"}
    {:gap \"sakkyokuka の台帳 works.edn は seed 3 件のみで、実際の受注も実際の作品も入っていない\" :since \"2026-08-06\"}
-   {:gap \"fleet-ci に足した 3 gate はまだ 1 度も実行されていない（次の tick 待ち）。落ちることは手元の mutation で確かめたが、fleet 上で green を見てはいない\" :since \"2026-08-06\"}
-   {:gap \"fleet-db への reconcile は未実施。west.yml が先行している\" :since \"2026-08-06\"}]"}]
+   {:gap \"fleet-ci に足した 3 gate はまだ 1 度も実行されていない（次の tick 待ち）。落ちることは手元の mutation で確かめたが、fleet 上で green を見てはいない\" :since \"2026-08-06\"}]"}]
