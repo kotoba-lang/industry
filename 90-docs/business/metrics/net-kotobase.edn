@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 19715, "kotobase-cf-wasm-staging" 33872},
+ {"net-kotobase" 19053, "kotobase-cf-wasm-staging" 33783},
  :zone
- {:requests-7d 55953,
-  :pageviews-7d 1377,
-  :uniques-7d-sum 1438,
+ {:requests-7d 54123,
+  :pageviews-7d 1187,
+  :uniques-7d-sum 1196,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -34,7 +34,7 @@
    {:path
     "/kotobase-cf-wasm-production/blocks/bafyreiccc4mj54mv73xc7p7qjwu4rowyszyxm5v5ij3wlekyv7vypn5rxu/bafyreifwggo4lvruhttoam2ozf7jhdpf6ttqkh6onfcukdp6n344vx2jgm",
     :requests 4}],
-  :status-mix {:client-error 134, :ok 755},
+  :status-mix {:client-error 136, :ok 752},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -45,13 +45,13 @@
   :murakumo-paid-amount-minor 0,
   :charges-total 90,
   :last-charge-epoch 1604224274},
- :as-of "2026-08-05",
+ :as-of "2026-08-06",
  :traffic-quality {:window "24h", :probe-4xx-pct 15, :error-5xx-pct 0},
  :top-paths
  "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 | 4xx(probe) 15%",
- :funnel {:visitors 2285, :signups 12, :checkouts 0},
+ :funnel {:visitors 2286, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 55953 req/7d・1438 uniques(日次和)・うち4xx probe 15%(24h)、workers 53587 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 54123 req/7d・1196 uniques(日次和)・うち4xx probe 15%(24h)、workers 52836 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -60,6 +60,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 753},
+ {:visitors {:openai-ads 3, :organic 754},
   :signups {:organic 9}, 
   :checkouts {}}}
