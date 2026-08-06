@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 19172, "kotobase-cf-wasm-staging" 34095},
+ {"net-kotobase" 19225, "kotobase-cf-wasm-staging" 34264},
  :zone
- {:requests-7d 54551,
-  :pageviews-7d 1198,
-  :uniques-7d-sum 1200,
+ {:requests-7d 54777,
+  :pageviews-7d 1204,
+  :uniques-7d-sum 1210,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -31,10 +31,8 @@
    {:path
     "/kotobase-cf-wasm-production/blocks/bafyreic2s4nyoryhrwaytevit3ij7nq5sn2paaphbfzbdxm22tzvddcydy/bafyreifvwbkn666n3exg4xnamipnnpnejdfffzoeab6eycnoctgge53cn4",
     :requests 5}
-   {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreiccc4mj54mv73xc7p7qjwu4rowyszyxm5v5ij3wlekyv7vypn5rxu/bafyreifwggo4lvruhttoam2ozf7jhdpf6ttqkh6onfcukdp6n344vx2jgm",
-    :requests 4}],
-  :status-mix {:client-error 145, :ok 752},
+   {:path "/why-kotobase", :requests 5}],
+  :status-mix {:client-error 145, :ok 753},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -49,9 +47,9 @@
  :traffic-quality {:window "24h", :probe-4xx-pct 16, :error-5xx-pct 0},
  :top-paths
  "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 | 4xx(probe) 16%",
- :funnel {:visitors 2288, :signups 12, :checkouts 0},
+ :funnel {:visitors 2292, :signups 12, :checkouts 0},
  :signal
- "kotobase.net 実測 54551 req/7d・1200 uniques(日次和)・うち4xx probe 16%(24h)、workers 53267 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 54777 req/7d・1210 uniques(日次和)・うち4xx probe 16%(24h)、workers 53489 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -60,6 +58,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 756},
+ {:visitors {:openai-ads 3, :organic 760},
   :signups {:organic 9}, 
   :checkouts {}}}

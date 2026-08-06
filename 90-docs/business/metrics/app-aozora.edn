@@ -1,40 +1,40 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 23836,
-  "app-aozora-appview" 11150,
-  "app-aozora-spa" 4983},
+ {"app-aozora-pds" 23916,
+  "app-aozora-appview" 11201,
+  "app-aozora-spa" 4989},
  :zone
- {:requests-7d 1034855,
-  :pageviews-7d 3795,
-  :uniques-7d-sum 853,
+ {:requests-7d 1040885,
+  :pageviews-7d 3800,
+  :uniques-7d-sum 858,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 929488}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4310}
+  [{:path "/v1/datoms", :requests 931177}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4172}
    {:path
     "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
-    :requests 235}
+    :requests 233}
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 223}
+    :requests 217}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
     :requests 125}
-   {:path "/federation-pilot/did.json", :requests 110}
+   {:path "/federation-pilot/did.json", :requests 109}
    {:path
     "/bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4eq3q5k2optwu446juce4",
     :requests 100}
    {:path
     "/bafyreif3nwiklvjnpdntx2n2h4ltice2fx4tpqt7hvbkpcbbytxjrmzs7q",
     :requests 68}],
-  :status-mix {:ok 937044, :client-error 22914, :server-error 5911},
+  :status-mix {:ok 938657, :client-error 22660, :server-error 5830},
   :window "24h"},
  :as-of "2026-08-06",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 929488 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4310 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 235 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 223 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 125 | 4xx(probe) 2% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 931177 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4172 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 233 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 217 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 125 | 4xx(probe) 2% · 5xx 1%",
  :signal
- "aozora.app 実測 1034855 req/7d・853 uniques(日次和)・うち4xx probe 2%(24h)、workers 39969 inv/7d"}
+ "aozora.app 実測 1040885 req/7d・858 uniques(日次和)・うち4xx probe 2%(24h)、workers 40106 inv/7d"}
