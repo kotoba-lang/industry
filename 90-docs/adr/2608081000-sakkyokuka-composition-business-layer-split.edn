@@ -185,7 +185,13 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:what \"blueprint.edn が壊れていないか\" :cmd \"nbb で read-string して keys を出す\" :result \"12 keys、parse 成功\"}
    {:what \"fleet-db 吸収前の全 pin fast-forward 検証\" :cmd \"drift 63 件を gh api compare で 1 件ずつ（うち 3 件は :repo-path 付きで正規表現から漏れたため個別に）\" :result \"63/63 が status=ahead / behind_by=0。1 件でも behind なら中止する予定だったが無かった\"}
    {:what \"ledger が追記のみか\" :cmd \"新 ledger の先頭 N バイト（N = origin/main の ledger サイズ 1,486,288）を shasum して比較\" :result \"ff8f1f5a8501 で一致。既存行は 1 バイトも書き換わっていない\"}
-   {:what \"west pin 前進が他セッションの pin を巻き戻していないか\" :cmd \"landing 後に origin/main の west.yml で net-kotobase / cloud-itonami-yotei を確認\" :result \"e17ca7a600bc / 4fc3b7168b84 のまま（別セッションが進めた新しい値）。project 数 4127 で不変\"}]"
+   {:what \"west pin 前進が他セッションの pin を巻き戻していないか\" :cmd \"landing 後に origin/main の west.yml で net-kotobase / cloud-itonami-yotei を確認\" :result \"e17ca7a600bc / 4fc3b7168b84 のまま（別セッションが進めた新しい値）。project 数 4127 で不変\"}
+   {:what \"ongaku holdings — JVM\" :cmd \"clojure -M:test\" :result \"28 tests / 90 assertions, 0 failures\"}
+   {:what \"holdings の fail-closed が劇場でないことの確認\" :cmd \"未知ライセンスの既定 [] を独占原盤に潰す / DOVA の表に原盤権を足す\" :result \"それぞれ 2 failures / 3 failures。復元して 0\"}
+   {:what \"isco-2652 カタログ登録 — JVM\" :cmd \"clojure -M:test\" :result \"23 tests / 90 assertions, 0 failures\"}
+   {:what \":licensed 既定が劇場でないことの確認\" :cmd \"register-catalog-track! の :licensed 既定を :authored に潰す\" :result \"3 failures。復元して 0\"}
+   {:what \"2 回目の fleet-db 吸収前の全 pin 検証\" :cmd \"reconcile が変更した 10 件を gh api compare\" :result \"10/10 が status=ahead / behind_by=0。追加 3 件は新規で退行の余地なし\"}
+   {:what \"west.yml の revision が全件 40 桁か\" :cmd \"revision 行の文字数を数える\" :result \"修正前: 40 桁 4122 件 + 12 桁 1 件。修正後: 40 桁 4123 件。この 1 件は正規表現ベースの pin 検証から黙って漏れていた\"}]"
 
 :adr/landed
   "[{:repo \"orgs/kotoba-lang/ongaku\" :commit \"cb88622101057\" :what \"rights/work/commission — 受注で渡す側を gate する（技芸層）\"}
@@ -195,10 +201,15 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:repo \"com-junkawasaki/root\" :commit \"57d3ca6a5cc8\" :what \"ADR + repos.edn + west.yml への sakkyokuka 登録\"}
    {:repo \"com-junkawasaki/root\" :what \"fleet-ci gates.edn に 3 層の :jvm-test、この ADR の訂正\"}
    {:repo \"com-junkawasaki/root\" :commit \"e427dcfb0685\" :what \"west pin 4 件前進（API single-entry。枝に west.yml を載せると別セッションの pin を巻き戻すため）\"}
-   {:repo \"com-junkawasaki/root\" :commit \"8328c999df3\" :what \"fleet-db に west.yml(origin/main) を吸収 — changed 64 / added 18 / removed 0、ledger に 82 event\"}]"
+   {:repo \"com-junkawasaki/root\" :commit \"8328c999df3\" :what \"fleet-db に west.yml(origin/main) を吸収 — changed 64 / added 18 / removed 0、ledger に 82 event\"}
+   {:repo \"orgs/kotoba-lang/ongaku\" :commit \"b027912fb06c\" :what \"ongaku.holdings（ライセンス別に第三者へ渡せる権利）+ provenance :licensed\"}
+   {:repo \"orgs/cloud-itonami/cloud-itonami-isco-2652\" :commit \"b6792fe02d30\" :what \"store/register-catalog-track! — 登録時に渡せる権利と実在する成果物を確定させる\"}
+   {:repo \"com-junkawasaki/root\" :commit \"b7e12ebb3660\" :what \"ongaku / isco-2652 の pin 前進（API single-entry）\"}
+   {:repo \"com-junkawasaki/root\" :commit \"5002d8f94fdc\" :what \"west.yml の短縮 revision を 40 桁に直す（cloud-itonami-app。4123 件中 1 件だけ 12 桁だった）\"}]"
 
 :adr/gaps
   "[{:gap \"`gftd-audio-actor`（persona リツ）と `ai.gftd.ongakuka.compose` は受注 gate を通っていない。生成は従来どおり動くが、権利と納品の検査は isco-2652 の actor 経由で受注を出したときだけ効く\" :since \"2026-08-06\"}
-   {:gap \"受注 gate は store の track レコードに :work/held-rights / :work/provenance が入っていることを前提にする。既存の track はこれらを持たないので、provenance は :authored に、保有権利は空に既定される（= 何も譲渡できない）。既存カタログへの backfill は未着手\" :since \"2026-08-06\"}
+   {:gap \"`register-catalog-track!` を通さず `register-track!` で直接入れた track は今も :work/held-rights を持たない（= 何も譲渡できない fail-closed）。既に seed 済みの store は登録し直しが要る\" :since \"2026-08-06\"}
+   {:gap \"license-holdings に載っているのは DOVA-SYNDROME と CC BY 4.0 の 2 件だけ（ongakuka の実カタログ 30 件がこの 2 種のため）。3 種目のライセンスを引いた資産を足すときは、本文を読んで根拠つきで表に足すまで何も渡せない\" :since \"2026-08-06\"}
    {:gap \"sakkyokuka の台帳 works.edn は seed 3 件のみで、実際の受注も実際の作品も入っていない\" :since \"2026-08-06\"}
    {:gap \"fleet-ci に足した 3 gate はまだ 1 度も実行されていない（次の tick 待ち）。落ちることは手元の mutation で確かめたが、fleet 上で green を見てはいない\" :since \"2026-08-06\"}]"}]
