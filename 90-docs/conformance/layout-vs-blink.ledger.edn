@@ -3899,3 +3899,115 @@
   test a-vertical-writing-mode-leaves-logical-properties-unmapped is now
   a-vertical-writing-mode-rotates-the-logical-mapping, carrying THE REASON
   THE GATE EXISTED AND THE REASON IT WAS OPENED."}
+
+{:seq 69
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "37709347da305cf196c89889075271a2cd8bf06c"
+ :title "the `all` shorthand is a declaration, not a phase -- and ::first-letter needed no new layout machinery"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 711}
+ :measured
+ {:line-structure {:before "679/683" :after "680/683 (100%)"}
+  :geometry {:before "2315/2331, 697/711 clean" :after "2319/2331, 700/711 clean"}
+  :paint-order {:before "17713/17762, 699/711" :after "17743/17762, 700/711"}
+  :computed-style {:before "32713/32745" :after "32720/32745"
+                   :cascade-attributed-residual {:before 31 :after 24}}}
+ :verified-on-merged-main
+ {:cssom-tests "981 / 2537, 0 failures (966/2475 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly. LINE STRUCTURE REACHES 100%."}
+ :per-case-deltas
+ "EXACTLY FOUR cases changed corpus-wide, all four the targets -- the three
+  :cascade/all-* and :selector/first-letter-changes-the-line-box. Nothing
+  else in 711 moved a pixel in either direction. Three of the four are now
+  fully clean on every axis."
+ :what-the-browser-said
+ [{:topic "`all` is NOT a phase, it is a DECLARATION"
+   :measured "div#a { width: 120px } #a { all: initial } is 120px wide -- A
+              HIGHER-SPECIFICITY LONGHAND BEATS `all` EVEN THOUGH IT IS
+              WRITTEN FIRST."
+   :design "so `all` expands into one clone per property SPLICED INTO THE
+            ALREADY-SORTED cascade entry list AT THE `all` ENTRY'S OWN
+            POSITION; all six measured shapes (both declaration orders,
+            both rule orders, both !important directions) then FALL OUT OF
+            THE EXISTING group-by WITH NO CODE OF THEIR OWN."}
+  {:topic "what `all` does NOT reset -- measured, not read"
+   :measured "direction (rtl survives), unicode-bidi, and CUSTOM PROPERTIES
+              (--mycustom: 42px survives), while the other 44 properties on
+              the same element reset. writing-mode is NOT exempt and had to
+              be measured separately: horizontal-tb under all: initial
+              inside a vertical-rl parent, vertical-rl under unset and
+              revert."}
+  {:topic "`medium` is answerable under `all` and NOWHERE ELSE"
+   :measured "font-size: initial = 13px on the monospace page;
+              font-size: initial; font-family: initial = 16px;
+              all: initial = 16px, INCLUDING under a 30px parent."
+   :why "`all` resets the family IN THE SAME OPERATION, so the family-keyed
+         keyword has exactly one value there -- which is why the number
+         lives in the `all` expansion and not in initial-values."}
+  {:topic "a guarantee the engine had ONLY BY ACCIDENT"
+   :detail "width: 120px; all: initial and its reverse are two answers in
+            one block, so WITHIN-BLOCK DECLARATION ORDER became
+            load-bearing -- and was INEXPRESSIBLE: a Clojure map is an
+            array-map to 8 entries and a HASH-MAP BEYOND, and every
+            declaration of a rule shares that rule's :rule/order. ONE
+            `border` PLUS ONE `margin` ALREADY REACHES NINE. Each
+            declaration now carries an :index."}
+  {:topic "::first-letter needed NO NEW LAYOUT MACHINERY"
+   :measured "paragraph height at font-size 10/none/20/28/40/60 is
+              21/20/22/25/29/36 -- the ORDINARY inline line-box model on a
+              one-character box whose INHERITED line-height: 20px gives a
+              NEGATIVE half-leading past ~20px. That is why the 40px letter
+              OVERFLOWS: Brave puts its rect at y=37..79 against a
+              paragraph box of 48..77."}
+  {:topic "which properties apply to ::first-letter"
+   :measured "font-size, font-weight, font-style, line-height,
+              vertical-align, margin, padding, border, letter-spacing,
+              color, background, text-decoration, text-transform,
+              visibility -- and FLOAT, which changes the model.
+              display, position, width/height DO NOT (all three leave
+              800x20 with the letter at 7x15)."}
+  {:topic "what `the first letter` IS -- 51 leading characters measured one at a time"
+   :measured "Ps/Pe/Pi/Pf/Po JOIN the letter; Pd (ALL THREE DASHES), Pc and
+              the maths/currency/modifier symbols DO NOT -- A \\p{P} REGEX
+              WOULD HAVE BEEN WRONG ON EVERY DASH. Trailing punctuation
+              joins too (A\"lpha -> A\"), exactly one typographic unit is
+              taken (`123 Alpha` -> `1`), and punctuation with NO LETTER
+              AFTER IT is NO FIRST LETTER AT ALL (`((( Alpha` stays 800x20)."}]
+ :where-the-pseudo-elements-effect-lives
+ "the split is applied in laid-out-children and NOWHERE ELSE -- and that IS
+  the block-container gate. An inline <span>'s children are walked by
+  inline-fragments and never come through it, WHICH MATCHES BRAVE (a
+  <span>'s ::first-letter does nothing). Descending from the block's own
+  children also composes for free: <span><b>Alpha</b></span> gives 40px AND
+  bold, because the box is left where it was found."
+ :scope-cuts
+ [{:what "font-family in the cascade -- the WHOLE of the remaining
+          all-initial residual"
+   :measured "and it is NOT the font size (both sides say 16). line-height:
+              normal at 16px is 24 in the initial family and 17 in
+              monospace, so the case reports 800x21 against Brave's 800x24,
+              letter at y=1.3 against y=4."}
+  {:what "float on a first letter is carried and IGNORED"
+   :measured "Brave gives 800x20 floated against 800x29 not, so a floated
+              first letter leaves the paragraph 9px too tall."}
+  {:what "a ::before's generated content (Brave 800x29); a block whose
+          first child is another block; inline style=\"...\" past 8
+          declarations (the :index fix belongs upstream in htmldom)"}]
+ :tried-and-withdrawn
+ [{:what "a display-based block-level predicate on with-first-letter"
+   :why "it let a <span> take a first letter, BECAUSE THIS CASCADE WRITES
+         NO :style/display FOR A <span> AT ALL. Replaced by the call-site
+         placement."}
+  {:what "asserting the layout gates through gen-boxes"
+   :why "without a host :font-metrics hook this file keeps its documented
+         approximation (line box = tallest line-HEIGHT), under which
+         ::first-letter has NO OBSERVABLE EFFECT -- gen-boxes reported
+         800x20 at every font size. The tests carry a metrics-bearing theme
+         and say why."}]
+ :gates
+ "38 assertions across 14 deftests, each failing on aa18bab and passing
+  after, each with a control that passes on both sides. THE :index GATE
+  CANNOT FAIL ON A BASE THAT HAS NO `all`, so it was proved THE OTHER WAY:
+  removing :index from this engine flips the all-first half to `auto`."}
