@@ -1,11 +1,11 @@
 {:as-of "2026-08-06",
  :sources [:cloudflare :health :emitter],
- :workers-invocations-7d {"nexus-x402" 1537},
+ :workers-invocations-7d {"nexus-x402" 1556},
  :health-status 200,
  :catalog
  {:x402Version 1,
   :service "nexus-x402",
-  :count 4,
+  :count 5,
   :items
   [{:seller "murakumo",
     :method "POST",
@@ -40,6 +40,18 @@
      :network "base",
      :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
     :description nil}
+   {:seller "kekkai",
+    :method "POST",
+    :path-prefix "/kekkai/x402/",
+    :gateway "https://x402.nexus/gateway/kekkai/kekkai/x402/…",
+    :price
+    {:usd "0.001",
+     :micros "1000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :description
+    "one deny-by-default kekkai edge decision, organisation boundary first"}
    {:seller "shinshi",
     :method "GET",
     :path-prefix "/x402/premium/",
@@ -56,4 +68,4 @@
    :usd-total 0,
    :agent-hint {:agent 0, :human 0, :unknown 0},
    :sources {}}}, 
- :signal "workers 1537 inv/7d"}
+ :signal "workers 1556 inv/7d"}
