@@ -199,6 +199,66 @@
      :conformant (count rows)
      :top (mapv #(select-keys % [:repo :ns :own :ops]) (take 5 rows))}))
 
+
+;; ── 2b) 標準形か（shim だけで繋がるか）────────────────────────────────────
+;;
+;; **`.clj` の有無では判定できない。** 実測（2026-08-06）: isic-853 / 854 は
+;; JVM 専用が `render_html.clj` 1 本だけで、旧判定は「繋げられる」と言い続けたが、
+;; 両者とも `operation/build` を持たず langgraph StateGraph 自体が無い
+;; （`all-operations` + `execute-proposal!` という別アーキテクチャ）。
+;; `adapters/standard` は駆動できず、繋ぐには adapter に判定を足すことになる ——
+;; それは禁じている変更なので、書けば捨てることになる。実際にループが 1 周
+;; まるごと使って同じ結論に達した。
+;;
+;; だから **`standard/vertical` が実際に要求するもの**を見る:
+;;   - `operation/build`         … StateGraph を組む入口
+;;   - `phase/{read,write}-ops`  … op の allowlist（`ops` の出所）
+;;   - `store/seed-db`           … store の入口
+;; どれか 1 つでも欠ければ shim では繋がらない。
+
+(defn- standard-shape [v]
+  (let [base (str root "/orgs/" (:org v) "/" (:repo v) "/src/" (:ns v))
+        op (slurp* (str base "/operation.cljc"))
+        ph (slurp* (str base "/phase.cljc"))
+        st (slurp* (str base "/store.cljc"))]
+    (cond
+      (not (and op ph st)) {:standard? :unknown :missing [:source-unreadable]}
+      :else
+      (let [missing (cond-> []
+                      (not (str/includes? op "(defn build")) (conj :operation/build)
+                      (not (str/includes? ph "(def read-ops")) (conj :phase/read-ops)
+                      (not (str/includes? ph "(def write-ops")) (conj :phase/write-ops)
+                      (not (str/includes? st "(defn seed-db")) (conj :store/seed-db))]
+        {:standard? (empty? missing) :missing missing}))))
+
+
+;; ── 2c) 既に PR で待っている営み ─────────────────────────────────────────
+;;
+;; **tick は main しか読まない。** そのままだと、open PR で review 待ちの営みを
+;; 毎周「次の 1 手」として出し続け、ループが同じものを作り直す。実測
+;; （2026-08-05）: isic-4921 が #506 と #507 で 2 回実装され、3 本目も作られ
+;; かけた（作った側が「#507 と同じもの」と気づいて破棄した）。1 反復まるごとの
+;; 損失。
+;;
+;; `gh` が無い / 落ちた場合は **:unknown** にして、候補から外さない ——
+;; 「PR があるかもしれない」で作業を止める方が、二重実装より悪い。
+
+(defn- queued-repos
+  "open PR の branch 名から、既に着手済みの repo を拾う。"
+  []
+  (if offline?
+    {:status :skipped :repos #{}}
+    (let [{:keys [code out]} (sh "gh" ["pr" "list" "--repo" "network-awai/cloud-itonami"
+                                       "--state" "open" "--limit" "50"
+                                       "--json" "headRefName" "--jq" ".[].headRefName"])]
+      (if (not= 0 code)
+        {:status :unknown :repos #{}}
+        {:status :ok
+         :repos (into #{}
+                      (keep (fn [b]
+                              (second (re-find #"(cloud-itonami-isic-[0-9]+)" (str b)))))
+                      (str/split-lines out))}))))
+
 ;; ── 4) live ──────────────────────────────────────────────────────────────────
 
 (defn- http-status
@@ -234,17 +294,28 @@
         (for [v vs]
           (let [k (tenant-key v)
                 {:keys [checkout files]} (jvm-only-files v)
+                shape (standard-shape v)
                 declared (:ops v)
                 actual (actor-ops v)]
             {:vertical k
              :binding (:binding v)
              :checkout checkout
              :jvm-only files
-             ;; **繋げられるか**の一次判定。中核が portable（.clj が
-             ;; render_html だけ、または 0 本）なら adapter を書くだけで繋がる。
+             ;; **繋げられるか**の判定は `standard/vertical` が実際に要求する
+             ;; ものを見る（`.clj` の有無ではない —— 上の standard-shape 参照）。
+             :standard? (:standard? shape)
+             :standard-missing (:missing shape)
+             ;; **2 条件の AND。**片方だけでは足りない:
+             ;;   - 標準形だけ見ると 6310/5820 が候補に出る。あちらは
+             ;;     `facts.clj` / store・http・llm など **JVM 専用の中核**を持ち、
+             ;;     cljs の edge bundle に載らない。
+             ;;   - `.clj` だけ見ると 853/854 が候補に出る。あちらは JVM 専用が
+             ;;     `render_html.clj` 1 本でも StateGraph 自体が無い。
+             ;; 実測でどちらの誤りも 1 反復ずつ無駄にした（2026-08-05／06）。
              :mechanically-connectable?
              (and (= :unbound (:binding v))
                   (= :present checkout)
+                  (true? (:standard? shape))
                   (vector? files)
                   (every? #{"render_html.clj"} files))
              :ops-declared (count declared)
@@ -257,7 +328,15 @@
                            :actor-only (vec (sort (remove (set declared) actual)))})}))
         rows (vec rows)
         bound (count (filter #(= :native (:binding %)) rows))
-        connectable (filterv :mechanically-connectable? rows)
+        queued (queued-repos)
+        ;; 既に PR が open な営みは候補から外す（ただし理由を残す）
+        connectable-all (filterv :mechanically-connectable? rows)
+        connectable (filterv #(not (contains? (:repos queued)
+                                              (last (str/split (:vertical %) #"/"))))
+                             connectable-all)
+        queued-out (filterv #(contains? (:repos queued)
+                                        (last (str/split (:vertical %) #"/")))
+                            connectable-all)
         drift (filterv #(= :drift (:ops-match %)) rows)
         unknown-ops (filterv #(= :unknown (:ops-match %)) rows)
 
@@ -278,6 +357,8 @@
                :bound bound
                :unbound (- (count rows) bound)
                :mechanically-connectable (mapv :vertical connectable)
+               :queued-in-pr (mapv :vertical queued-out)
+               :pr-lookup (:status queued)
                :ops-drift (mapv #(select-keys % [:vertical :ops-drift]) drift)
                :ops-unknown (mapv :vertical unknown-ops)
                :surfaces surfaces
@@ -293,6 +374,10 @@
     (doseq [r rows]
       (log! (format-str r)))
     (log! "")
+    (when (seq queued-out)
+      (log! "既に PR で待っている（候補から外した）:" (str/join ", " (map :vertical queued-out))))
+    (when (= :unknown (:status queued))
+      (log! "⚠ open PR を引けなかった（gh 不在/失敗）。候補は PR 重複を含みうる。"))
     (log! "機械的に繋げられる営み:" (if (seq connectable)
                                      (str/join ", " (map :vertical connectable))
                                      "なし"))
@@ -320,7 +405,12 @@
     (log! "")
     (log! "次の 1 手:"
           (cond
-            (not= 401 gate) "API gate が 401 を返していない。認証境界を先に確認する"
+            ;; `--offline` のとき gate は :skipped であって「401 でない」ではない。
+            ;; 測っていないものを異常として報告すると、次の 1 手が毎回
+            ;; 『認証境界を確認しろ』になり、本当の次の 1 手が隠れる
+            ;; （実測 2026-08-06）。**測っていない = 分母から外す。**
+            (and (not offline?) (not= 401 gate))
+            "API gate が 401 を返していない。認証境界を先に確認する"
             (seq drift) "宣言と actor の op のズレを先に直す（面が嘘をついている）"
             (seq drift) "宣言と actor の op のズレを先に直す（面が嘘をついている）"
             (seq connectable) (str (:vertical (first connectable)) " の adapter を書いて接続する")
