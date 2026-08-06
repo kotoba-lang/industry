@@ -487,6 +487,44 @@ join コストモデル）。** ただし順序は硬直させない:
 『参照実装が受理すること』を CI ゲートに持つこと** — pyarrow の `validate(full=True)`
 に相当する、metadata を信用せず構造を歩く検証を外部実装にやらせる。
 
+## Resume point（2026-08-06 セッション終了時点）
+
+**次の 1 手は 2 つのうちどちらか。順序は下の理由で fleet gate を先にする。**
+
+### A. fleet gate 登録（先にやる方）
+
+format library 群には**現在いかなる自動検査も無い**（Actions は方針で停止、
+fleet gate は未登録）。作業を積むほど未検査 commit が増えるので、これが先。
+
+1. まず「ノードで依存が解決するか」を確かめる（CLAUDE.md の明示要件）。
+   ノードは tailnet のみ・外向き HTTPS 無し・`ship-git-deps!` は git 依存しか運ばない。
+   この 5 repo の依存は全部 git だが、`clojure -M:test` 自体が要る maven 上の
+   Clojure core がノードにあるかは**未確認**。
+
+       FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem nbb scripts/fleet-ci/tick.cljs --only columnar
+
+2. 通ったら `scripts/fleet-ci/gates.edn` に `:jvm-test` を 1 行ずつ足す
+   （columnar / org-apache-parquet / org-apache-arrow / org-apache-avro / kotobase-lake）。
+3. **落ちることを確かめてから landed とする**（1 箇所壊したコピーで exit 1 になり、
+   無改変で exit 0 になることを実際に見る。落ちない gate は劇場）。
+
+### B. ORC reader（`org-apache-orc`、新規 repo）
+
+catalog は `:orc` を既に sniff するのに reader が無い唯一の columnar 形式。
+
+**スコープは footer + statistics のみ、column read は全て名指しで拒否**にすること。
+ORC の整数エンコーディングは RLE v2（SHORT_REPEAT / DIRECT / PATCHED_BASE /
+DELTA の 4 サブエンコーディング）で、**半端な実装は「静かに誤デコードする reader」
+になり、このワークスペースの『誤デコードするより名指しで拒否する』基準に反する。**
+footer だけでも file 枝刈り・`count`・`min`/`max` が `:read 0` で答えられ、
+これは org-apache-parquet が「部分実装の reader が価値を持つ理由」として
+文書化している性質そのもの。
+
+- footer は **protobuf**（`dev-protobuf` が workspace にある）
+- 末尾 1 byte = PostScript 長 → PostScript（compression / footerLength）→ FileFooter
+- 参照実装 oracle: pyarrow の `pyarrow.orc` で fixture を書く
+- codec は ZLIB / SNAPPY / ZSTD。`org-ietf-deflate` と `org-ietf-zstd` が既にある
+
 ## Consequences
 
 - **『lake を名乗れる』は名乗れる側に来た**が、Iceberg 相当ではない —
