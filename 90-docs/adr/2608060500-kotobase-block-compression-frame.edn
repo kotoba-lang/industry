@@ -126,7 +126,9 @@ Ratio table (`bc/measure`, JVM): quads 5/20/60/200/800 -> 0.368/0.168/0.121/0.10
   :adr/resume-point
   "Phase 1 (readers) is complete in code. Next, in order:
 
-1. **Deploy the readers** — `kotobase-engine-lsm` and the `kotobase-peer` object-store worker — and confirm no older version is still serving. Only then flip `merkle-lsm.core/encoded` to `bcn/encode-node`. The failure mode of getting this wrong is zero rows reported as success, so 'probably deployed' is not good enough.
+1. **Deploy the readers, then flip the writer.** Readers landed: `kotobase-engine-lsm` (JVM engine + `provider.cljs`), `kotobase-peer/object_store/worker.cljs` (`get-node!`), `kotobase-projection` (`decode-range`). Only after those are deployed does `merkle-lsm.core/encoded` switch to `bcn/encode-node`. The failure mode of getting it wrong is zero rows reported as success, so 'probably deployed' is not good enough.
+
+   **And it cannot be answered from the manifest.** `network-awai/local-murakumo`, which builds the object-store worker into a deployed Worker, consumes `kotobase-peer` through `:local/root` rather than a `:git/sha`. There is no pin to inspect, so what a deployed artifact contains is only knowable by rebuilding and redeploying it. Whoever does the flip should redeploy that Worker deliberately rather than reason about whether it is current.
 
 2. **Settle the one-dependency question in `merkle-lsm/deps.edn` before that flip**, not during it. Its comment says: 'ONE dependency, on purpose... If a change here needs a second dependency, that is a signal the boundary is being crossed, not a missing coordinate.' Compressing on write needs `kotobase-block-codec` there. Either amend the comment with a reason, or give `encoded` an injected encoder. Do not edit deps.edn quietly.
 
