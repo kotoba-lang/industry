@@ -4475,3 +4475,118 @@
    input[type=number] is 153 wide here against Brave's 42."]
  :gates "18 new deftests, 11 failing on the base commit (21 assertions),
          7 pure controls passing both sides."}
+
+{:seq 74
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "ecbc8a77cd456d61b75c1ec438a4eb44e60efc79"
+ :title "@scope, both halves: the matching and the seventh cascade sort key"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 817 :after 835}}
+ :measured
+ {:note "the control column is MAIN AS MERGED on the merged 835-case
+         corpus, through this branch's harness. Nothing pre-merge is
+         reported."
+  :line-structure {:main "800/805" :after "800/805"}
+  :geometry {:main "2676/2714, 812/835 clean" :after "identical"}
+  :paint-order {:main "20767/20837, 816/834" :after "identical"}
+  :computed-style {:main "38143/38191, 805/835 clean"
+                   :after "38166/38191, 817/835 clean"}
+  :cascade-attributed-residual {:main 42 :after 20}}
+ :verified-on-merged-main
+ {:cssom-tests "1069 / 2880, 0 failures (1048/2808 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :per-case-deltas
+ "--dump-ops: ZERO of 835 cases changed, BYTE-IDENTICAL.
+  --dump-style (ADDED THIS ROUND, because the ops dump cannot see a colour
+  -- seq 71 said so and did not build it): EXACTLY 12 cases changed, every
+  one toward the browser, none away, and NO CASE'S COMPARED TOTAL CHANGED.
+  No @scope value is left in the residual; the 20 that remain are other
+  rounds' named gaps."
+ :what-the-browser-said-where-proximity-sits
+ {:probe ".far > .near > p throughout, EVERY PAIR RUN IN BOTH SOURCE ORDERS"
+  :rows [{:probe "two scopes, equal specificity"
+          :brave "RED (nearer) -- and RED reversed"
+          :conclusion "proximity beats ORDER"}
+         {:probe "farther scope carries `div p`"
+          :brave "BLUE -- and BLUE reversed"
+          :conclusion "SPECIFICITY beats proximity"}
+         {:probe "farther scope in the later @layer"
+          :brave "BLUE; both in one layer -> RED"
+          :conclusion "LAYER beats proximity"}
+         {:probe "both !important" :brave "RED both orders"
+          :conclusion "importance does NOT reverse proximity"}
+         {:probe "<p style=\"color:blue\">" :brave "BLUE"
+          :conclusion "element-attached beats it"}]
+  :order "importance -> origin -> inline -> layer -> specificity ->
+          PROXIMITY -> order"
+  :why-the-pair-matters
+  "`between specificity and order` was the standing phrasing and IS NOT THE
+   SAME CLAIM as `below specificity` -- the third row is what separates
+   them, and the equal-specificity control beside it is what makes the pair
+   evidence."
+  :also-measured-not-assumed
+  "AN UNSCOPED DECLARATION IS AT INFINITE PROXIMITY (a scoped rule beats a
+   LATER unscoped one of equal specificity in the same layer; controls in
+   both directions). Proximity counts HOPS FROM THE ELEMENT, not root
+   depth, to the NEAREST MATCHING root."}
+ :what-the-seventh-key-cost
+ "BELOW THE BENCHMARK'S NOISE FLOOR. Three alternating JVMs per engine,
+  min-of-six within each: THE SPREAD OF ONE ENGINE AGAINST ITSELF on one
+  stylesheet (54.6-67.2 ms) IS WIDER THAN ANY GAP BETWEEN THE TWO, and the
+  distributions overlap. Structurally it is one :proximity lookup per
+  declaration per comparison, one :rule/scope lookup per rule per element,
+  and one unforced `delay` per element -- every unscoped declaration
+  carries the same ##-Inf, so THE KEY IS A PURE TIE, WHICH IS WHY THE OPS
+  DUMP IS BYTE-IDENTICAL. A second comparator for the no-@scope case was
+  considered and NOT written: provably-zero cost is not worth two sort
+  tuples kept in step by hand."
+ :scope-cuts
+ [{:what "prelude-less @scope { ... } applies to nothing here"
+   :why "it scopes to the <style> element's PARENT and parse-rules gets
+         text with no owner."
+   :measured "five shapes: a <style> in a div -> Brave RED / here black;
+              the <p> outside -> black/black; in <head> -> black/black;
+              with a limit -> RED/black; two <style>s -> each its own
+              colour / both black. IT FAILS CLOSED; two of five are already
+              right. Closing it is a SIGNATURE CHANGE to every caller of
+              parse-rules."}
+  {:what "nested-@scope proximity is counted from the innermost"
+   :why "no probe discriminates the outer ones, AND NOTHING IS CLAIMED."}
+  {:what "names-scope? reads raw selector text, so [data-x=\":scope\"]
+          would fool it"}]
+ :tried-and-withdrawn
+ [{:what "a corpus case for `unscoped is at infinite proximity`"
+   :why "IT PASSED ON THE BASE COMMIT -- which is how it was caught.
+         cascaded-document gives the ENGINE the raw :css and the BROWSER
+         the scope-css'd one, so an unscoped selector carries ONE MORE ID
+         IN THE BROWSER ONLY. Equal specificity on one side is unequal on
+         the other, BY CONSTRUCTION; there is no rewrite. Removed,
+         documented in cases.edn, and KEPT AS A UNIT TEST (which has one
+         CSS text)."}
+  {:what "a SEQUENTIAL benchmark"
+   :why "it reported the SLOWER configuration as 27% FASTER, because it
+         inherited the first one's JIT warm-up. Both are now timed
+         ALTERNATELY in one JVM."}
+  {:what "a probe with no `div` below the scope root"
+   :why "it made `div p` unmatchable and produced a WRONG SPECIFICITY
+         READING. Caught, fixed, re-measured."}]
+ :two-things-found-on-the-way
+ [{:what "THE HARNESS COULD NOT EXPRESS A SCOPED RULE"
+   :detail "scope-css prefixed every selector with the case container's id,
+            and the container is an ANCESTOR of a scope root -- so the rule
+            reaching the browser was `:scope #case-N .x`, MATCHING NOTHING.
+            Measured three ways; a rooted @scope body is now left
+            unprefixed (its prelude already confines it)."
+   :consequence "THE CASE THAT EXISTED BEFORE THIS ROUND WAS THEREFORE
+                 MEASURING SOMETHING OTHER THAN WHAT ITS COMMENT SAID --
+                 Brave read BOTH its paragraphs as black."}
+  {:what ":scope outside any @scope is :root"
+   :measured ":scope { outline-color: red } lands on <html> and nothing
+              else. It returned FALSE everywhere before, and the namespace
+              docstring listed it as out of scope."}]
+ :gates "33 of 72 new assertions, in 18 of 21 new tests, fail on main's
+         src/ and pass after -- THE SAME 33 fail on the round's original
+         base commit."}
