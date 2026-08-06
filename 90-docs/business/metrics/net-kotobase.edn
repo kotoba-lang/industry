@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 19555, "kotobase-cf-wasm-staging" 34950},
+ {"net-kotobase" 19595, "kotobase-cf-wasm-staging" 35031},
  :zone
- {:requests-7d 55788,
-  :pageviews-7d 1224,
-  :uniques-7d-sum 1216,
+ {:requests-7d 55935,
+  :pageviews-7d 1228,
+  :uniques-7d-sum 1221,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -32,7 +32,7 @@
    {:path
     "/kotobase-cf-wasm-production/blocks/bafyreic2s4nyoryhrwaytevit3ij7nq5sn2paaphbfzbdxm22tzvddcydy/bafyreifvwbkn666n3exg4xnamipnnpnejdfffzoeab6eycnoctgge53cn4",
     :requests 5}],
-  :status-mix {:client-error 157, :ok 745},
+  :status-mix {:client-error 160, :ok 739},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -44,12 +44,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-06",
- :traffic-quality {:window "24h", :probe-4xx-pct 17, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 18, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /why-kotobase 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 | 4xx(probe) 17%",
- :funnel {:visitors 2296, :signups 13, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /why-kotobase 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 | 4xx(probe) 18%",
+ :funnel {:visitors 2298, :signups 13, :checkouts 0},
  :signal
- "kotobase.net 実測 55788 req/7d・1216 uniques(日次和)・うち4xx probe 17%(24h)、workers 54505 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 55935 req/7d・1221 uniques(日次和)・うち4xx probe 18%(24h)、workers 54626 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -58,6 +58,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 764},
+ {:visitors {:openai-ads 3, :organic 766},
   :signups {:organic 10}, 
   :checkouts {}}}
