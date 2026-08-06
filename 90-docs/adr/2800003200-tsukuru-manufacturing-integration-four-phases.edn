@@ -249,6 +249,45 @@ murakumo fleet gate（`scripts/fleet-ci/gates.edn`）に足す場合は、ノー
 先に確かめる。解決しないなら repo 側の local contract に残し、gate はノードで完結する
 不変条件に絞る。GitHub Actions は使わない（ADR-2607300900）。
 
+## 再開点（2026-08-05 セッション終了時点）—— 次の agent はここから読む
+
+**着地済み（すべて default branch 上、PR は残っていない）**
+
+| repo | commit | 内容 |
+|---|---|---|
+| `cloud-itonami/tsukuru-actor` | `9d70992` | Phase 2 actor（store/governor/advisor/phase/edge.worker）+ Phase 3 CAE gate |
+| `cloud-itonami/tsukuru-manufacturing-artifacts` | `69b398f` | Phase 4 custody 面（DataLad、B2 remote 2 本） |
+| `com-junkawasaki/root` | `ecc588c` `a71b041` `2e1f8b8` `63a67de` `cd66c91` `a1494ca` | ADR / Phase 1 loader / 検査 3 本 / skill 訂正 / 継続測定 loop |
+
+west pin は両子リポの tip と一致（`9d70992` / `69b398f`）。Cloudflare Worker
+`cloud-itonami-tsukuru` は deploy 済みで **503 fail-closed**（seed 不在の正しい状態）。
+
+**検証の実測値**（この面で実際に走らせた数字）
+
+| 検査 | 結果 |
+|---|---|
+| `tsukuru-actor` `clojure -M:test` | 45 tests / 681–682 assertions、0 failures。assertion 数が揺れるのは repository-contract test が**ディスク上のファイル数に比例**して assert するため（`dist/` の有無で変わる）。テスト数 45 は不変 |
+| `verify-tsukuru-factory-plane.cljs` | PASS。3 タグを畳んだコピーと cardinality-many を外したコピーで **exit 1 を確認済み** |
+| `annex-custody-verify.cljs` | OK（2 件とも remote から fsck）。未 push ファイルで **exit 1 を確認済み** |
+| `verify-artifact-path-policy.cljs` | OK。`raw/cad/AcmeCorp-PART-4471-Rev-C.step` で **exit 1 を確認済み** |
+| Worker build | `shadow-cljs release worker` 0 warnings / 400 KB |
+
+**次の具体的な一手（優先順）**
+
+1. **kotobase.net の読みが揺れる理由を観測する。** 同一 identity の read が
+   10 分で ok→blocked→ok と変わる（kind ごとに揺れ方が違う）。**seed の再発行より先。**
+   再現コマンド:
+   `for i in 1 2 3 4 5; do curl -sS https://cloud-itonami-marketplace-fulfillment.04-feasts-minded.workers.dev/tasks; done`
+   継続観測は `~/.gftd/tsukuru-maturity-tick.ledger.edn`（6h ごと、`:tick/changed` を見る）。
+2. **seed（オーナー作業）。** ①元の値を kagi `itonami-marketplace-kotobase-seed` に戻す
+   ②無ければ再発行して 8 worker に投入（DID が変わるので既存 ref の扱いの判断が要る）。
+   **1 を先に潰さないと、再発行しても chain は通らない。**
+3. **機密材料（オーナー判断）。** `index/policy.edn` の
+   `:policy/confidential-material :blocked-on` 4 件が今日は全部 false。
+4. **`ACTOR_WRITE_TOKEN` が 6 actor で未設定の疑い。** onboarding は**存在しなかった**
+   （＝write route が全部死んでいた）。他 6 台も確認する価値がある:
+   `npx wrangler secret list --name cloud-itonami-marketplace-<actor>`
+
 ## 現在の実装状況（2026-08-05 時点）
 
 **Phase 1 = landed。Phase 2 = コードは landed、live 検証は blocked。Phase 3 = landed。Phase 4 = landed。**
