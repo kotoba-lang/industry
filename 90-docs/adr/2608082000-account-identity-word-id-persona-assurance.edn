@@ -1,0 +1,189 @@
+[{:db/id -1
+  :adr/id "2608082000"
+  :adr/doc_type "adr"
+  :adr/topic "account-identity-word-id-persona-assurance"
+  :adr/title "口座の面を 3 つに割る — 覚えられる ID（word-id）・相手ごとの顔（persona）・確かめられたことの段階（sekisho.assurance）。メールは身元の根ではなく session の証明にとどめ、その配信の口を建てる"
+  :adr/status "accepted"
+  :adr/date "2026-08-06"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["語ベース ID の符号化（語彙サイズが素数であることの要件と checksum の保証範囲）"
+   "alias / persona の所有関係と、本体の識別子が投影に出ない構造"
+   "口座の信頼の段階と、それが解放する上限（persona 本数・送信数・支払い上限）"
+   "メールでのサインインが認可しないことと、それを担保しているのが scope だけであること"
+   "cloud-itonami-app の email ログイン配信の口（itonami.cloud 上）"]
+  :adr/supersedes []
+  :adr/related ["2608039950" "2608052000" "2608060000"]
+  :adr/repos ["kotoba-lang/word-id"
+              "kotoba-lang/persona"
+              "kotoba-lang/sekisho"
+              "network-awai/cloud-itonami"
+              "cloud-itonami/cloud-itonami-app"]
+  :adr/body
+  "## 何を聞かれたか
+
+オーナーからの 4 つ（2026-08-06）。
+
+1. cloud-itonami / cloud-itonami-app にメールアドレスでもログインできるように
+2. what3words のような覚えやすい ID を発行する機能はあるか
+3. Private Relay のようにメインの ID を隠して複数のアカウント / メールを作る機能はあるか
+4. メール認証・顔認証・ID チェックで信頼性スコアを評価し、制限を解放する機能はあるか
+
+## 調べた結果（実測、2026-08-06）
+
+| 問い | 現状 |
+|---|---|
+| email ログイン | **app には在った。ただし到達不能だった** |
+| 覚えやすい ID | 無い |
+| alias / persona | **client だけ在って provider が無い** |
+| 信頼スコア | 部品は在るが、合成するものが無い |
+
+`cloud-itonami-app` の email ログインは ADR-0012 で設計され、
+`identity/start-email-authentication!` から UI まで揃っていた。動かなかった理由は
+`:enabled? false` と、**配信の口が fleet のどこにも存在しなかったこと**。ADR-0012 は
+配信を『配備が用意する HTTPS の口』に委ねており、その口を誰も建てていなかった。
+完成しているのに誰も辿り着けない機能が 3 日間そこに在った。
+
+`cloud.itonami.app.relay` は外部 provider の `/v1/aliases/reserve` を叩く client
+だが、`rg 'v1/aliases'` の結果は client 2 本だけで、endpoint の実装は無い。
+しかも accountId 1 つに alias 1 本で、複数ペルソナの構造ではない。
+
+## 決めたこと
+
+### 1. メールは身元の根ではない（ADR-0012 の線を守る）
+
+オーナー判断で 3 択のうち『ADR-0012 の線を守る』を採った。email 単独での
+アカウント作成（＝ADR-0012 の反転）は採らない。
+
+- **app 側**: 配信の口を `itonami.cloud` に建て（`/api/auth/magic-link/deliver`、
+  既存の Resend 経路）、`profiles/itonami.edn` がそこを指す。既定は無効のまま ——
+  テナント中立の配布物が他人の送信レピュテーションでメールを出すのは、運用者の
+  代わりに選択することになる。
+- **edge 側**: `/api/auth/email` と `/api/auth/email/verify` を足した。リンクを
+  踏んだ人が受け取るのは本物の CACAO だが、その `resources` は
+  `kotoba://itonami/{org}/{repo}/session/email` で、`auth/require-actor!` が求める
+  `kotoba://itonami/{org}/{repo}` を**覆わない**（`cacao/covers?` は完全一致か
+  末尾 `*` のみ）。誰であるかを暗号的に証明し、何も認可しない。
+
+**この経路は暗号的に止まっていない。** 署名鍵を開けるのは KEK（サーバの secret）
+であって passkey の assertion ではない —— assertion は unwrap を許可するだけで、
+実行はしない。だから `login-mint-cacao!` は元から assertion 無しで呼べた。
+止めているのは scope だけである。この事実を
+`webauthn/mint-session-cacao!` と `edge.email-login` の docstring の両方に書き、
+scope を親に広げると 3 件落ちるテストを置いた。**見えない guard は、次に触る人が
+消す。**
+
+パスキー登録済みの口座にしか送らない（`account/email-login-outcome`）。まだ
+引き換えていない人に送ると、初期パスワードの引換券と二重の入口ができる。
+
+### 2. 覚えやすい ID は `kotoba-lang/word-id`
+
+`sponge-pumpkin-cellar-nestle` ⇄ 888,888,888 の全単射。payload 3 語 + check 1 語。
+
+**語彙サイズは素数でなければならない。** checksum は桁の重み付き和を語彙サイズで
+割った余りなので、1024 語だと重み 2 の桁を 512 ずらす誤りが余りを変えない ——
+検出できない誤りが構造的に残る。1021（1024 に最も近い素数）を採り、
+`vocabulary/problems` は合成数を警告でなく**拒否**する。
+
+素数体なので **1 語の置換と 2 語の入れ替えは必ず検出する**。5 語 × 2 桁の語彙で
+全 ID × 全位置 × 全置換を尽くして確認した。**位置は特定しない** —— どの位置の
+誤りでも同じずれを説明できるので、`repairs` が返す 4 つは訂正結果ではなく
+『どれも等しく正当な候補』である。ここを『訂正できる』と書くと嘘になる。
+
+語彙は生成物。候補は手で書くが採否は生成器が決め（`/usr/share/dict/web2` に実在・
+4-7 文字・先頭 4 文字が一意・編集距離 2 以上）、最後に library 自身の `problems` に
+通す。生き残りが足りなければ**落ちる** —— web2 から自動で埋めると口に出せない語が
+混ざり、この語彙の唯一の存在理由が消える。
+
+### 3. alias / persona は `kotoba-lang/persona`
+
+Apple の Hide My Email と同じ形。相手ごとに別アドレスを配り、相手は本体を知らない。
+
+**本体は persona のフィールドではなく directory の鍵にした。** persona の値が本体を
+持たないので、どんな投影をしても漏れない。『投影関数で落とす』設計にしなかったのは、
+投影関数は増えるからで、増えたどれか 1 つが落とし忘れれば終わるため。テストは
+persona / owner-view / outward / inventory を再帰走査して本体文字列が出ないことを見る
+（同じ走査が directory では陽性になることも確認して、検出器が働いていることを示す）。
+
+`issue` は相手（party）を必須の引数にする。省略できる引数は必ず省略され、
+省略された瞬間にこの library の存在理由が消える。
+
+**返信が一番よく壊れる** —— 1 通を本体から返せば全部無効になり、相手には普通に
+届くので誰も気づかない。`relay/outbound` は `:allow` のとき From を必ず返し、
+`:refuse` のときは From が無いので組み立てようがない。
+
+相手を記録しているので、想定外の差出人を『漏れたか売られた』信号として返せる。
+alias をどの相手に渡したかを持たない実装（Apple を含む）にはできない判定。遮断はしない。
+
+alias の local part は word-id の 4 語なので**電話で読み上げられる**。
+
+### 4. 信頼は段階であってスコアではない（`sekisho.assurance`）
+
+    :anonymous → :contactable → :rooted → :attested → :identified
+
+**単一のスコアにしない。** 『信頼性スコア 72 点』は書きやすいが、72 点で断られた人に
+次の一手が無い。返すのは順序付きの段階と、次の段階に足りていないものの**名前**
+（`:sekisho.assurance/shortfall`）。段階は比較できるが足し算はできない ——
+メール検証 2 回は身分証 1 回にならないので、加算できる量に見せない。
+これは `credential-assurance/policy-issues` が真偽値でなく理由の列を返すのと同じ規律。
+
+**段階は飛び級できない。** 身分証と顔だけあってパスキーが無い口座は `:contactable`
+止まり。飛び級を許すと、鍵を持たない口座が身分証だけで支払い上限を得る。
+
+**証拠には期限がある**（liveness は 180 日）。期限切れは『やっていない』ではなく
+『切れた』として報告する —— UI が『本人確認を』と『更新を』を出し分けられるように。
+自己申告は held に入るが段階を上げない。未知の floor は満たせない（設定の綴り
+間違いが門を静かに無効化しないよう両方向に fail closed）。
+
+**解放するのは上限であって行為そのものではない。** `:identified` が支払い上限を
+上げても、その 1 回には依然として新しい WebAuthn の署名が要る（app の ADR-0006 /
+ADR-0012）。段階は『いくらまで』を決め、`authority` が『この 1 件を本人が今承認したか』
+を決める。
+
+パスキーの 4 段階は `sekisho.assurance` の語彙にしない。呼び出し側が
+`:evidence/passkey-hardware` / `:evidence/passkey-enrolled` に翻訳して渡すので、
+段階の判定が集合演算だけで書ける。persona の上限も整数 1 つで渡す ——
+`persona` も `sekisho` も相手の内部を知らない。
+
+## 検証
+
+| 対象 | JVM | ClojureScript |
+|---|---|---|
+| `word-id` | 25 tests / 1258 assertions | 同じ 25 / 1258 |
+| `persona` | 24 / 70 | 同じ 24 / 70 |
+| `sekisho`（assurance 追加後） | 42 / 126 | 28 / 77（`.cljc` のみ） |
+| `cloud-itonami` edge | — | 468 / 1304（+ email-login-test） |
+| `cloud-itonami` JVM | 1452 / 9631 | — |
+| `cloud-itonami-app` | 1199 / 4882 | — |
+
+**gate が落ちることを確かめた**（劇場でないこと）:
+
+| 壊した箇所 | 落ちた件数 |
+|---|---|
+| word-id: check 桁の重みを payload と衝突させる | 26 |
+| persona: `within?` のドット境界を外す | 1 |
+| sekisho: 段階の単調性（飛び級を許す） | 3 |
+| cloud-itonami: email の scope を親に広げる | 3 |
+| cloud-itonami: `:initial` にもリンクを送る | 1 |
+| app: `profiles/itonami.edn` を無効に戻す | 4 |
+
+`cloud-itonami` の JVM 側には 7 failures / 12 errors が**元から在る**
+（`runtime` / `doctor` / `product-party` / `company` / `ops-keys`）。clean な
+origin/main で 1449 tests / 9622 assertions / 7 failures / 12 errors を実測し、
+この変更の後も同じ 7 / 12 のまま（テストは +3、assertion は +9）。**自分の変更で
+増えていないことを測った上で、既存の赤を隠さずここに書く。**
+
+## やっていないこと
+
+- **email 単独でのアカウント作成**。オーナーが ADR-0012 の線を選んだ。やるなら
+  身元の根（did:key）と電子署名の扱いを設計し直す必要があり、別の決定になる。
+- **alias provider の稼働**。`persona` は判断層で、`/v1/aliases/*` を
+  `mail.itonami.cloud` の Email Routing の上に建てるのは次の一歩。受信の土台
+  （ADR-0004 の mail-inbound worker）は既に在る。
+- **顔認証と身分証の実検証**。`sekisho.assurance` は証拠を受け取る側で、liveness と
+  document VP を実際に取る経路（OID4VP Verifier は app の
+  `presentation_request.clj` に半分在る）は繋いでいない。段階は今日
+  `:attested` までしか実際には到達できない。**これは『対象外』ではなく
+  『カバレッジ未達』である。**
+- **word-id / persona を app と edge に配線すること**。library は着地したが、
+  account-id 発行と alias 一覧の UI はまだ繋いでいない。"}]
