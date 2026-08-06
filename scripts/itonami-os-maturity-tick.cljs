@@ -180,6 +180,18 @@
           why (assoc :why why)
           (seq core-clj) (assoc :jvm-only-core core-clj))))))
 
+(defn- dep-classpath
+  "この vertical を nbb で load するのに要る classpath。repo 自身と、
+  `deps.edn` の `:local/root` が指す sibling の `src` を並べる（推移依存は
+  1 段だけ —— これで足りなければ load は失敗し、それは正しい答えになる）。"
+  [v]
+  (let [self (str root "/orgs/" (:org v) "/" (:repo v))
+        deps (or (slurp* (str self "/deps.edn")) "")
+        sibs (->> (re-seq #"\"\.\./\.\./([a-z0-9-]+)/([a-z0-9.-]+)\"" deps)
+                  (map (fn [[_ o r]] (str root "/orgs/" o "/" r "/src")))
+                  distinct)]
+    (str/join ":" (cons (str self "/src") sibs))))
+
 (defn- candidates
   "宣言されていない ISIC repo のうち、標準形に適合しているものを M_own 順で。
 
@@ -194,10 +206,29 @@
                   (map conformance)
                   (filter :conformant?)
                   (map (fn [r] (assoc r :own (get scores (str "orgs/cloud-itonami/" (:repo r))))))
-                  (sort-by #(- (or (:own %) 0))))]
+                  (sort-by #(- (or (:own %) 0))))
+        ;; **提案する分だけ nbb で実際に require してみる。** 形が揃っていても
+        ;; 面を作る nbb で load できなければ繋がらない（isic-6910 の js-mod が
+        ;; その実例）。222 本全部を probe すると tick が遅くなるので、
+        ;; **順位上位だけ**を確かめて、落ちたものは順に次へ送る。
+        ;; 落ちた理由も残す —— 「候補から消えた」だけだと理由が失われる。
+        probed (loop [cs rows acc [] rejected []]
+                 (cond
+                   (>= (count acc) 5) {:top acc :rejected rejected}
+                   (empty? cs) {:top acc :rejected rejected}
+                   :else
+                   (let [c (first cs)
+                         v {:org "cloud-itonami" :repo (:repo c) :ns (:ns c)}
+                         {:keys [code]} (sh "nbb" ["--classpath" (dep-classpath v)
+                                                   "-e" (str "(require '[" (:ns c) ".operation])")])]
+                     (if (= 0 code)
+                       (recur (rest cs) (conj acc c) rejected)
+                       (recur (rest cs) acc
+                              (conj rejected {:repo (:repo c) :why :not-loadable-under-nbb}))))))]
     {:scanned (count repos)
      :conformant (count rows)
-     :top (mapv #(select-keys % [:repo :ns :own :ops]) (take 5 rows))}))
+     :nbb-rejected (:rejected probed)
+     :top (mapv #(select-keys % [:repo :ns :own :ops]) (:top probed))}))
 
 
 ;; ── 2b) 標準形か（shim だけで繋がるか）────────────────────────────────────
@@ -229,7 +260,23 @@
                       (not (str/includes? ph "(def read-ops")) (conj :phase/read-ops)
                       (not (str/includes? ph "(def write-ops")) (conj :phase/write-ops)
                       (not (str/includes? st "(defn seed-db")) (conj :store/seed-db))]
-        {:standard? (empty? missing) :missing missing}))))
+        (if (seq missing)
+          {:standard? false :missing missing}
+          ;; **形が揃っていても、面を作る nbb で load できなければ繋がらない。**
+          ;; 実測（2026-08-06）: isic-6910 は標準 4 点を全部持ち JVM でも動くが、
+          ;; `formation/registry.cljc` の ISO 7064 検査数字が `js-mod` を使って
+          ;; おり（LEI の 18-20 桁は 53-bit double を溢れるので BigInt 演算が
+          ;; 要る）、nbb の cljs.core にこの関数が無い。面は nbb の生成器が
+          ;; **実物の actor を回して**描くので、これは繋がらないことを意味する。
+          ;;
+          ;; 形だけを見ていた版はこの repo を毎周「次の 1 手」に出し続け、
+          ;; ループが 1 反復まるごと使って同じ結論に達するところだった。
+          ;; **実際に require してみるのが唯一の確かめ方**なので、そうする。
+          (let [{:keys [code]} (sh "nbb" ["--classpath" (str (dep-classpath v))
+                                          "-e" (str "(require '[" (:ns v) ".operation])")])]
+            (if (= 0 code)
+              {:standard? true :missing []}
+              {:standard? false :missing [:not-loadable-under-nbb]}))))))) 
 
 
 ;; ── 2c) 既に PR で待っている営み ─────────────────────────────────────────
@@ -387,7 +434,11 @@
       (log! "op 集合が読めなかった（:unknown、ok に丸めない）:" (pr-str (mapv :vertical unknown-ops))))
     (log! "")
     (log! "未宣言の ISIC" (:scanned pool) "本のうち、標準形に適合"
-          (:conformant pool) "本 —— shim だけで繋がる")
+          (:conformant pool) "本 —— ただし「適合」は静的な形の話で、面を作る
+                              nbb で load できるかは別（上位だけ実際に require して確かめる）")
+    (when (seq (:nbb-rejected pool))
+      (log! "  nbb で load できず候補から外した:"
+            (str/join ", " (map #(str (:repo %) "(" (name (:why %)) ")") (:nbb-rejected pool)))))
     (doseq [c (:top pool)]
       (log! (str "  · " (:repo c) "  ns=" (:ns c)
                  "  M_own=" (if (:own c) (.toFixed (:own c) 4) "未測定")
