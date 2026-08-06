@@ -25,6 +25,9 @@
                                                     — OT (Sinkhorn) 予算配分表示（ADR-2607194500）
      allocate md                                   — portfolio-allocation.edn 再生成
      allocate write                                — 配分結果を governor 経由で ledger へ記録（任意）
+     allocate pools [--epsilon E] [--iters K] [--score-key bmc|yc]
+                                                    — released tranche だけを配分（ADR-2608062300）
+     allocate pools md                             — capital-pools.edn 再生成
      ledger show [--tail N]
      (ADR-2607180400: default advisor=auto → murakumo LLM + gate; ledger dual-writes to kotobase)"
   (:require [clojure.string :as str]
@@ -100,7 +103,10 @@
    {:cmd "allocate" :usage ["allocate [--budget N] [--epsilon E] [--iters K] [--score-key bmc|yc]"
                             "                                              — OT (Sinkhorn) 予算配分表示（ADR-2607194500）"
                             "allocate md                                   — portfolio-allocation.edn 再生成"
-                            "allocate write                                — 配分結果を governor 経由で ledger へ記録（任意）"]}
+                            "allocate write                                — 配分結果を governor 経由で ledger へ記録（任意）"
+                            "allocate pools [--epsilon E] [--iters K] [--score-key bmc|yc]"
+                            "                                              — released tranche だけを配分（ADR-2608062300）"
+                            "allocate pools md                             — capital-pools.edn 再生成"]}
    {:cmd "ledger"   :usage ["ledger show [--tail N]  (local SSoT; dual-write → kotobase unless --no-kotobase)"]}])
 
 (defn find-command-help [cmd]
@@ -411,6 +417,26 @@
                                                        :floors floors :caps caps})]
          {:result result :budget-supply budget-supply :score-key score-key}))
 
+     (defn pools-inputs
+       "budget-supply.edn の :supply/pools（owner が ADR で決めた実額のみ）+ demand
+        → {:result :budget-supply :score-key}。
+
+        `allocate-inputs` と違い :supply/total-amount を**読まない** — あれは owner
+        未確認の placeholder であって pool ではない（ADR-2608062200 決定 4）。
+        `--budget` での上書きも受けない: pool の総額は正本 ADR が決めるもので
+        あって CLI flag が決めるものではない。"
+       [ps idx flags]
+       (let [facts (edn/read-string (slurp (:facts ps)))
+             scores (score/score-all idx facts (cli-products :gftd idx))
+             budget-supply (edn/read-string (slurp (:budget-supply ps)))
+             score-key (keyword (or (:score-key flags) "yc"))
+             epsilon (if (:epsilon flags) (parse-double (str (:epsilon flags))) 0.05)
+             max-iters (if (:iters flags) (parse-long (str (:iters flags))) 200)
+             demand (into {} (for [[p s] scores] [p (get-in s [score-key :score])]))
+             pools (vec (:supply/pools budget-supply))
+             result (allocate/allocate-pools pools demand {:epsilon epsilon :max-iters max-iters})]
+         {:result result :budget-supply budget-supply :score-key score-key}))
+
      (defn -main-for
        "Entry point shared by the 7 wrappers. `--help` / `help` (グローバルまたは
         `<cmd> --help` / `help <cmd>`) は repo root 解決や datoms 読込より前に
@@ -509,6 +535,21 @@
              ["allocate" nil]
              (let [{:keys [result]} (allocate-inputs ps idx flags)]
                (print (allocate/render-table result)))
+             ["allocate" "pools"]
+             (let [{:keys [result budget-supply score-key]} (pools-inputs ps idx flags)]
+               (if (= "md" c3)
+                 (let [f (java.io.File. (str (:md-out ps) "/capital-pools.edn"))
+                       body (allocate/render-pools-md result budget-supply score-key)
+                       tx [{:db/id -1
+                            :doc/id "capital-pools"
+                            :doc/doc_type "capital-pools-projection"
+                            :doc/title "Capital pools — released tranche allocation"
+                            :doc/path "90-docs/business/capital-pools.edn"
+                            :doc/body body
+                            :doc/source "gftd allocate pools md (ADR-2608062300); SSoT = budget-supply.edn :supply/pools + maturity-scores.edn"}]]
+                   (spit f (pr-str tx))
+                   (println "wrote" (.getPath f)))
+                 (print (allocate/render-pools-table result))))
              ["allocate" "md"]
              (let [{:keys [result budget-supply score-key]} (allocate-inputs ps idx flags)
                    f (java.io.File. (str (:md-out ps) "/portfolio-allocation.edn"))
@@ -819,6 +860,26 @@
                                                        :floors floors :caps caps})]
          {:result result :budget-supply budget-supply :score-key score-key}))
 
+     (defn pools-inputs
+       "budget-supply.edn の :supply/pools（owner が ADR で決めた実額のみ）+ demand
+        → {:result :budget-supply :score-key}。
+
+        `allocate-inputs` と違い :supply/total-amount を**読まない** — あれは owner
+        未確認の placeholder であって pool ではない（ADR-2608062200 決定 4）。
+        `--budget` での上書きも受けない: pool の総額は正本 ADR が決めるもので
+        あって CLI flag が決めるものではない。"
+       [ps idx flags]
+       (let [facts (edn/read-string (nc/slurp (:facts ps)))
+             scores (score/score-all idx facts (cli-products :gftd idx))
+             budget-supply (edn/read-string (nc/slurp (:budget-supply ps)))
+             score-key (keyword (or (:score-key flags) "yc"))
+             epsilon (if (:epsilon flags) (parse-double (str (:epsilon flags))) 0.05)
+             max-iters (if (:iters flags) (parse-long (str (:iters flags))) 200)
+             demand (into {} (for [[p s] scores] [p (get-in s [score-key :score])]))
+             pools (vec (:supply/pools budget-supply))
+             result (allocate/allocate-pools pools demand {:epsilon epsilon :max-iters max-iters})]
+         {:result result :budget-supply budget-supply :score-key score-key}))
+
      (defn -main-for
        "Entry point shared by the 7 wrappers. `--help` / `help` (グローバルまたは
         `<cmd> --help` / `help <cmd>`) は repo root 解決や datoms 読込より前に
@@ -917,6 +978,21 @@
              ["allocate" nil]
              (let [{:keys [result]} (allocate-inputs ps idx flags)]
                (print (allocate/render-table result)))
+             ["allocate" "pools"]
+             (let [{:keys [result budget-supply score-key]} (pools-inputs ps idx flags)]
+               (if (= "md" c3)
+                 (let [f (str (:md-out ps) "/capital-pools.edn")
+                       body (allocate/render-pools-md result budget-supply score-key)
+                       tx [{:db/id -1
+                            :doc/id "capital-pools"
+                            :doc/doc_type "capital-pools-projection"
+                            :doc/title "Capital pools — released tranche allocation"
+                            :doc/path "90-docs/business/capital-pools.edn"
+                            :doc/body body
+                            :doc/source "gftd allocate pools md (ADR-2608062300); SSoT = budget-supply.edn :supply/pools + maturity-scores.edn"}]]
+                   (nc/spit f (pr-str tx))
+                   (println "wrote" f))
+                 (print (allocate/render-pools-table result))))
              ["allocate" "md"]
              (let [{:keys [result budget-supply score-key]} (allocate-inputs ps idx flags)
                    f (str (:md-out ps) "/portfolio-allocation.edn")
