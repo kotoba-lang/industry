@@ -1,40 +1,38 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 24113,
-  "app-aozora-appview" 11396,
-  "app-aozora-spa" 5034},
+ {"app-aozora-pds" 24181,
+  "app-aozora-appview" 11454,
+  "app-aozora-spa" 5037},
  :zone
- {:requests-7d 1059453,
-  :pageviews-7d 3843,
-  :uniques-7d-sum 873,
+ {:requests-7d 1065701,
+  :pageviews-7d 3847,
+  :uniques-7d-sum 876,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 933213}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 3654}
+  [{:path "/v1/datoms", :requests 934307}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 3478}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 2034}
    {:path
     "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
-    :requests 219}
+    :requests 209}
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 197}
+    :requests 183}
    {:path
     "/bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3lpa5tyrmwjvzojccf77ya",
-    :requests 170}
+    :requests 156}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
     :requests 125}
-   {:path "/federation-pilot/did.json", :requests 108}
-   {:path
-    "/bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4eq3q5k2optwu446juce4",
-    :requests 100}],
-  :status-mix {:ok 940526, :client-error 25760, :server-error 5906},
+   {:path "/federation-pilot/did.json", :requests 109}],
+  :status-mix {:ok 943597, :client-error 25909, :server-error 5748},
   :window "24h"},
  :as-of "2026-08-06",
  :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 933213 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 3654 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 219 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 197 · /bafyreiezivwicf3zbw3diuaxngntk4o2kwrw3l… 170 | 4xx(probe) 3% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 934307 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 3478 · /xrpc/com.atproto.sync.subscribeRepos 2034 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 209 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 183 | 4xx(probe) 3% · 5xx 1%",
  :signal
- "aozora.app 実測 1059453 req/7d・873 uniques(日次和)・うち4xx probe 3%(24h)、workers 40543 inv/7d"}
+ "aozora.app 実測 1065701 req/7d・876 uniques(日次和)・うち4xx probe 3%(24h)、workers 40672 inv/7d"}
