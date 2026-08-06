@@ -1115,6 +1115,28 @@
    ;; fleet-summary は未 checkout / tombstone repo 数も申告する —— スコアが付いて
    ;; いないことが「悪い」ではなく「測っていない/対象外」であるため。
    ["itonami-maturity" (io/file root "90-docs" "system-dynamics" "itonami-maturity.datoms.edn")]
+   ;; permits — cloud-itonami の governed actor が各自の `facts.cljc` に持っている
+   ;; **法規制カタログ**の射影（生成物。`scripts/gen-permit-index.cljs`、ADR-2608080000）。
+   ;; 「採掘許可が要る法域はどこか」「配電の所管庁は誰か」を横断で引けるようにする。
+   ;; **正本は各 actor の facts.cljc のまま** —— ここは射影で、規制の正本ではない。
+   ;;
+   ;; join: `:permit/repo` → repo-taxonomy / itonami-maturity の `:repo/path`（同形）。
+   ;;       `:permit/jurisdiction` → `cloud-itonami-iso3166-<iso3>` repo。
+   ;;       `:permit/kyoninka-procedure` → kotoba-lang/kyoninka の `:procedure/id`。
+   ;;
+   ;; **読み違えを防ぐために data 側が申告しているもの**（`:join/*` entity と
+   ;; `:permit/coverage` entity を必ず見ること）:
+   ;;   1. `:permit/legal-basis` と `:permit/authority` は**結合キーにできない**。
+   ;;      同じ法律・同じ当局が repo ごとに違う表記で書かれており、手続き側との
+   ;;      交差は実測ゼロ（`:join/status :unusable` として載っている）。
+   ;;   2. `:permit/source-shape` が `:jurisdictions-map` の行は**法的引用を持たない**
+   ;;      （法令名が `:name` の散文に入っているだけ）。引用付きだけを数えるなら絞る。
+   ;;   3. **法域別の行数は制度の数ではない。** iso3166 の marketentry catalog が
+   ;;      各国 repo に USA/DEU/GBR の比較行を再掲するため（`:coverage/caveat`）。
+   ;;   4. `:permit/jurisdiction` は**観測済みの ISO3 のときだけ**出る。第 1 階層の
+   ;;      キーが自治体 slug・団体 slug・制度 keyword のことがあり、[A-Z]{3} を国と
+   ;;      決めると偽の国コードを鋳造する（"EUR" "IEC" は 3 文字だが国ではない）。
+   ["permits" (io/file root "90-docs" "regulatory" "permits.datoms.edn")]
    ;; training-corpus — **どの文書が学習素材として何点か**（生成物。ADR-2608056000。
    ;; `scripts/gen-training-corpus.cljs`、policy は `manifest/corpus-policy.edn`）。
    ;; 3 種類の entity が混在する:
