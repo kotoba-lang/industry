@@ -320,7 +320,12 @@
     (log! "")
     (log! "次の 1 手:"
           (cond
-            (not= 401 gate) "API gate が 401 を返していない。認証境界を先に確認する"
+            ;; `--offline` のとき gate は :skipped であって「401 でない」ではない。
+            ;; 測っていないものを異常として報告すると、次の 1 手が毎回
+            ;; 『認証境界を確認しろ』になり、本当の次の 1 手が隠れる
+            ;; （実測 2026-08-06）。**測っていない = 分母から外す。**
+            (and (not offline?) (not= 401 gate))
+            "API gate が 401 を返していない。認証境界を先に確認する"
             (seq drift) "宣言と actor の op のズレを先に直す（面が嘘をついている）"
             (seq drift) "宣言と actor の op のズレを先に直す（面が嘘をついている）"
             (seq connectable) (str (:vertical (first connectable)) " の adapter を書いて接続する")
