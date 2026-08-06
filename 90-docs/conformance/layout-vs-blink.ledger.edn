@@ -3646,3 +3646,137 @@
  "--dump-ops diffed corpus-wide, base engine vs this one, same 672 cases:
   8 cases' box lists changed, ALL 8 THE INTENDED ONES. Nothing else moved a
   pixel, either direction."}
+
+{:seq 67
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "b76d5d3fdd03a14db6aef26567877a59febd57e3"
+ :title "four named leftovers: relative on an atomic inline, the soft hyphen's inserted glyph, the file input's real width rule, and column collapse"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 672 :after 688}}
+ :measured
+ {:post-merge
+  {:line-structure {:before "642/647" :after "656/660"}
+   :geometry {:before "2168/2186, 656/672 clean" :after "2251/2267, 674/688 clean"}
+   :paint-order {:before "16732/16789, 658/672" :after "17138/17187, 676/688"}
+   :computed-style {:before "30685/30717, 649/672" :after "31819/31851, 665/688"}
+   :note "mismatch counts fell by EXACTLY 2 boxes and 8 paint points;
+          nothing else moved."}
+  :against-the-assigned-base-5f2cc28-corpus-601-to-617
+  {:geometry "2030/2036, 595/601 clean -> 2113/2117, 613/617 clean"
+   :paint-order "14987/15009, 589/601 -> 15395/15409, 607/617"}}
+ :verified-on-merged-main
+ {:cssom-tests "952 / 2419, 0 failures (940/2396 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :per-case-deltas
+ "EXACTLY TWO pre-existing cases changed, both intended, both before AND
+  after the merge: :text/soft-hyphen-is-a-break-opportunity div 20 -> 40
+  tall, :form/input-file-default-box input 145 -> 253 wide. Zero
+  regressions in either direction, 16 cases added."
+ :what-the-browser-said
+ [{:topic "1. position: relative on an atomic inline"
+   :measured "left:30px; top:10px puts the inline-block at x=44 y=10 (14,0
+              without); an <img> lands identically. The one-key select-keys
+              fix WAS correct, and the three interactions it could not have
+              covered all worked once the key was there: the box is a
+              containing block and its abs child follows the shift (49,3
+              from a parent at 44,0); z-index:0 on it confines a z-index:5
+              descendant (Brave answers lime) while z-index:auto does not
+              (red), with hoisted ops keeping the shift; and the shift
+              changes NEITHER the line height NOR the following block.
+              Also measured: offsets ACCUMULATE through a relative inline
+              box (10+20 -> x=51), and top: 50% on an atomic inline in an
+              auto-height container resolves to 0."}
+  {:topic "2. the soft hyphen's inserted glyph"
+   :measured "it is U+2010 HYPHEN, NOT U+002D: in this monospace face `-`
+              is 7px and U+2010 is 14, and BOTH of Chromium's hyphenating
+              paths report 14."
+   :design "it lives APPENDED TO THE TEXT OF THE LAST PIECE ON THE LINE
+            BEING CLOSED -- not a piece of its own, because a second op is
+            a second WORD to anything reading the ops, and Brave reports it
+            as part of the first line's own run (35 then 14 at x=35). The
+            U+00AD character STAYS in the text, so a word that never breaks
+            is BYTE-IDENTICAL to before. Two packers learned it
+            (soft-hyphen-lines for a lone text child, inline-line-breaker
+            for a run), sharing soft-hyphen-parts."}
+  {:topic "3. input[type=file] -- VERDICT: there IS a rule, and the earlier
+           round's reason for leaving it was MEASURING THE WRONG STRINGS"
+   :measured "piercing the UA shadow tree over CDP, THIS MACHINE'S BROWSER
+              UI IS JAPANESE: the button is `ファイルを選択` at 108.656,
+              the label `選択されていません` at 119.313, gap 4 -- 231.97,
+              not the assumed en-US 171.625. Blink's width is
+              ceil(max(34 x advance(\"0\"), button + 4 + label)) and THE
+              FIRST TERM WINS: 34 nominal `0` glyphs of the UA control face
+              is 252.063 -> ceil 253, verified across eight font/size
+              pairs."
+   :why-it-is-honest "that term is a property of the FONT, not the UI
+                      language, so it is implemented and the case passes
+                      FOR THE RIGHT REASON -- not :oracle/blind, not a
+                      constant. My brief had said hard-coding 253 was not
+                      acceptable; the agent found the rule instead."}
+  {:topic "4. column collapse -- the ordering worked, and it was the EASY
+           way round"
+   :measured "the collapsed column is sized EXACTLY AS A VISIBLE ONE,
+              surplus and all, and only then is its width plus one
+              border-spacing taken off the table: surviving columns keep
+              the control's numbers TO TWO DECIMALS in both the
+              declared-width form (300 -> 200.66) and the auto form
+              (300 -> 194.42). So it runs AFTER the widths are final, like
+              the row half."
+   :and-it-found-a-bug-in-the-landed-row-axis
+   "asking the same question sideways found that a collapsed track takes
+    ONE ADJACENT GAP, the one BEFORE it -- EXCEPT TRACK 0, where the
+    leading border-spacing belongs to the TABLE, so the gap AFTER goes. A
+    table whose FIRST row collapsed was 88 tall against Brave's 82. Both
+    axes now share collapsed-track-offsets."}]
+ :scope-cuts
+ [{:what "a hyphenated line must FIT"
+   :measured "`alpha bravo&shy;charlie` at 91px breaks at the shy (77+14);
+              at 88px Brave FALLS BACK TO THE SPACE (`alpha` /
+              `bravocharlie`, 84 unhyphenated) where this engine still
+              breaks and overflows to 91. Needs the ability to REJECT an
+              opportunity and re-pack."
+   :why-no-case "NO CORPUS CASE CARRIES IT ON PURPOSE -- both answers are
+                 40px tall, so it would PASS GEOMETRY WHILE BEING WRONG."}
+  {:what "trailing soft hyphen"
+   :measured "`alphabetagam&shy; delta` at 90px: Brave breaks at the space
+              and draws a 14px hyphen HANGING past the edge. Same line
+              structure here, different paint."}
+  {:what "hyphens: auto" :measured "`hyphenation example` at 70px is 60
+          tall vs 40, `hyphen-ation` (42+14, then 35). Documented, not
+          implemented."}
+  {:what "file input's LOCALIZED term" :measured "at monospace 14px Brave
+          is 244 against this branch's 238."}
+  {:what "file input height with padding" :measured "Brave 53, engine 27 --
+          pre-existing, unrelated, asserted as width-only with the reason."}]
+ :harness
+ {:three-cases-are-oracle-blind-for-a-MEASURED-artifact
+  "Chromium attributes the inserted hyphen's rect to the character AFTER
+   the break -- the range over `c` reports getClientRects() =
+   [[35,2,14,15],[0,22,7,15]] and getBoundingClientRect() (what the harness
+   reads) is their UNION [0,2,49,35], whose midpoint MERGES THE TWO LINES
+   INTO ONE."
+  :deliberately-left "fixable (last-rect-per-character, plus folding both
+                      hyphen characters in normalize) and LEFT: changing
+                      what the oracle says rewrites the `want` side of
+                      every case, and four engine changes were already in
+                      flight. The measurement is in the README."
+  :one-harness-change "an ADDITION rather than a rewrite: U+2010 joined the
+                       measured advance table, because the engine now emits
+                       it."}
+ :tried-and-withdrawn
+ ["stripping U+00AD from token text -- withdrawn: keeping it makes
+   non-breaking words byte-identical and matches the oracle's own word text."
+  "corpus cases with an EMPTY baseline-aligned inline-block -- withdrawn:
+   Brave makes that line box 26 tall and this engine 20, an unrelated
+   pre-existing divergence that would have CONTAMINATED EVERY NEW CASE. All
+   four use vertical-align: top instead."
+  ":position/absolute-child-of-a-relative-inline-block first shipped with
+   left:30px alone and failed the LINE axis (want [\"ab cd\"] got [\"ab\"])
+   -- the shifted box covered the following text's origin and the harness's
+   GEOMETRIC inside-atomic? proxy discarded it. Reworked with top: 24px,
+   with the reason written into the case."]
+ :gates "every new gate verified to FAIL on the base engine (15 assertions)
+         with a control beside each that passes on both sides."}
