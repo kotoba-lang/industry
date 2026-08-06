@@ -1,34 +1,30 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 19796, "kotobase-cf-wasm-staging" 35467},
+ {"net-kotobase" 19978, "kotobase-cf-wasm-staging" 35916},
  :zone
- {:requests-7d 56495,
-  :pageviews-7d 1234,
-  :uniques-7d-sum 1235,
+ {:requests-7d 57226,
+  :pageviews-7d 1280,
+  :uniques-7d-sum 1247,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/mcp", :requests 10}
+  [{:path "/obsidian", :requests 11}
+   {:path "/mcp", :requests 10}
+   {:path "/why-kotobase", :requests 9}
+   {:path "/resources", :requests 8}
+   {:path "/admin", :requests 7}
    {:path
     "/kotobase-cf-wasm-production/blocks/bafyreic2s4nyoryhrwaytevit3ij7nq5sn2paaphbfzbdxm22tzvddcydy/bafyreifbprolpg3qwy5cavtchedavbs2uw73u7bra63su4ct7wvn2dbt2u",
     :requests 6}
-   {:path "/obsidian", :requests 6}
    {:path
     "/kotobase-cf-wasm-production/blocks/bafyreice4ippgk6yjt2xlxvd4ikds3psmkzpoabsxu6wiz3ks2pesrljci/bafyreifhvpvgdgpj5rq5f4em32d4tlzwutspnbwfmqz2wvrt4o7fchdlfu",
     :requests 6}
-   {:path "/why-kotobase", :requests 6}
    {:path
     "/kotobase-cf-wasm-production/blocks/bafyreiccc4mj54mv73xc7p7qjwu4rowyszyxm5v5ij3wlekyv7vypn5rxu/bafyreidijvp4m2nwsayo4fn5resotew7xm7jkifttgbmnag33g64lyzc5q",
-    :requests 6}
-   {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreibueppra5x7paeb5tqmm4ygj3ctc4sbtd5jahcixa45243pxwd2oq/bafyreifqeijnllzv2gs4zm7elghp7635pjmmpj6tqt6uvugpvbyhcstspq",
-    :requests 6}
-   {:path
-    "/kotobase-cf-wasm-production/blocks/bafyreifbgustwka5bdarppk24aextwwuoz2nkyiayswh3suuubu5ge6uce/bafyreidejxmj4oh4fncsoiefpzjwlxxrg6bdib2t3ylx2znu6dvxn7f2xe",
     :requests 6}],
-  :status-mix {:ok 754, :client-error 162},
+  :status-mix {:ok 770, :client-error 171},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -42,10 +38,10 @@
  :as-of "2026-08-06",
  :traffic-quality {:window "24h", :probe-4xx-pct 18, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /mcp 10 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /obsidian 6 · /kotobase-cf-wasm-production/blocks/bafy… 6 · /why-kotobase 6 | 4xx(probe) 18%",
- :funnel {:visitors 2300, :signups 13, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /obsidian 11 · /mcp 10 · /why-kotobase 9 · /resources 8 · /admin 7 | 4xx(probe) 18%",
+ :funnel {:visitors 2302, :signups 13, :checkouts 0},
  :signal
- "kotobase.net 実測 56495 req/7d・1235 uniques(日次和)・うち4xx probe 18%(24h)、workers 55263 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 57226 req/7d・1247 uniques(日次和)・うち4xx probe 18%(24h)、workers 55894 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -54,6 +50,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 768},
+ {:visitors {:openai-ads 3, :organic 770},
   :signups {:organic 10}, 
   :checkouts {}}}
