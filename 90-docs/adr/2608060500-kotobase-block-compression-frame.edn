@@ -82,7 +82,11 @@ Measured, 2026-08-06:
 
    **That flip will force an argument this ADR did not settle.** `merkle-lsm/deps.edn` says, deliberately: \"ONE dependency, on purpose... If a change here needs a second dependency, that is a signal the boundary is being crossed, not a missing coordinate.\" Compressing on write needs `kotobase-block-codec` there. The reader phase respected the boundary because readers are hosts; the writer phase cannot. Either the comment is amended with a reason, or `encoded` grows an injected encoder — decide it explicitly rather than by editing deps.edn quietly.
 
-2. **`kotobase-projection`'s own blocks are unmeasured.** They are the materialized-view/columnar path, batched and plausibly compressible, and they are NOT merkle-lsm blocks — a separate producer, so a separate measurement and a separate decision.
+2. **`kotobase-projection` is measured and its reader has landed; its writer has not.** Measured on real view-block shapes (`bcn/measure`): plaintext values 0.105 / 0.098 at 128 / 512 rows, ciphertext values 0.439 / 0.433, keys alone 0.081 / 0.067 — the same profile as the Merkle-LSM run blocks and for the same reason, canonical keys being half the block. `decode-range` now decodes through `bcn/decode-node`; it is the single decode point for view blocks, and `kotobase-peer`'s `materialized-view` namespace re-exports it rather than duplicating it, so one line covered both repos.
+
+   Its writer has two paths — plain bytes, or `encrypt-block-fn` with `:cid` still over the plaintext — and `bcn/encode-node` serves both, since the envelope is just bytes to an AEAD. Same deployment precondition as merkle-lsm.
+
+   Registering it in `manifest/west.yml` was part of this: it was a **true west orphan**, which the completion gate in `new-project-scaffold` forbids. Eight other orphans remain (`kotobase-federation`, `kotobase-maintenance`, `user-test`, `net-kotobase/sdk`, three etzhayyim/gftdcojp actors, `network-awai/aozora-engine`) — pre-existing, out of this ADR's scope, and named here so the count is not mistaken for zero.
 
 3. **The prolly leaf key path is 2x larger than it needs to be, and compression is the wrong fix.** `arrangement.core/index-root` stores a leaf key as `(pr-str [blinded-a blinded-b blinded-o])`, and `blind-fn` returns a *string* — so 32 bytes of HMAC are stored as ~64 characters. A leaf-shaped block measured at ratio 0.700 under DEFLATE, which is most of that hex expansion being recovered after the fact. Encoding the blind index as a CBOR byte string instead would be cheaper than compressing it, but it changes every key, every CID and the prefix-seek ordering semantics, so it is a separate decision and not a follow-up to this one.
 
@@ -111,6 +115,8 @@ Merkle-LSM run-block ratios (`bcn/measure`, real `canonical-key` shapes): 128 ro
 
 **kotobase-peer** `530f2d1f360cc7115e4d69c657b5150fdeb0fbcb` (main): adds the worker's one-line `get-node!` change. JVM 229 tests / 680 assertions, shadow-cljs 231 / 929. `get-node-reads-a-compressed-block` verified to FAIL with it reverted.
 
+**kotobase-projection** `d528c43fde605b678576236b2735200cf988d1ce` (main, newly west-registered): JVM 48 tests / 195 assertions, clj-kondo clean. `decode-range-reads-a-compressed-block` verified to FAIL with the decoder reverted — it returns the raw envelope map instead of the node.
+
 **fleet-ci gate** verified both directions before landing, as the fleet-ci README requires: exit 0 on `org-ietf-deflate` / `io-ipld` / `kotobase-block-codec` as they stand (23/202, 4/12, 19/79 assertions on nbb), and exit 1 on a copy of `org-ietf-deflate` with the Huffman tie-break reverted (3 failures).
 
 **kotobase-peer** at the earlier `f576393c24fd489fc80342a1a5bea6fb022fa5c8`: JVM 229 tests / 680 assertions, clj-kondo at the pre-existing 43 warnings / 0 errors. `tx-block-payload-is-compression-framed` verified to FAIL with the framing removed (1 failure / 229 tests). `legacy-tx-blocks-still-read` writes legacy blocks through the public API using an `encrypt-fn` that unframes first — byte-for-byte what the old writer sent — and reads them back, including a chain that holds one legacy and one framed transaction.
@@ -124,8 +130,6 @@ Ratio table (`bc/measure`, JVM): quads 5/20/60/200/800 -> 0.368/0.168/0.121/0.10
 
 2. **Settle the one-dependency question in `merkle-lsm/deps.edn` before that flip**, not during it. Its comment says: 'ONE dependency, on purpose... If a change here needs a second dependency, that is a signal the boundary is being crossed, not a missing coordinate.' Compressing on write needs `kotobase-block-codec` there. Either amend the comment with a reason, or give `encoded` an injected encoder. Do not edit deps.edn quietly.
 
-3. **Measure `kotobase-projection`'s own blocks** with `bcn/measure` before assuming they behave like run blocks. Different producer, different shape, separate decision.
+3. **Decide the leaf-key encoding question** (gap 3) on its own terms — a CBOR byte string beats compressing hex, and it is a bigger migration.
 
-4. **Decide the leaf-key encoding question** (gap 3) on its own terms — a CBOR byte string beats compressing hex, and it is a bigger migration.
-
-5. If a second codec is ever wanted, it is tag `0x02` and a new constant, never an edit to `zlib-1-tag`."}]
+4. If a second codec is ever wanted, it is tag `0x02` and a new constant, never an edit to `zlib-1-tag`."}]
