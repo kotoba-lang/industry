@@ -227,6 +227,206 @@
              :cap (get caps p)
              :bound (get bound p)}))}))
 
+;; ---- pool-aware allocation (multi supply node) -------------------------------
+;;
+;; ADR-2608062200（資本 pool は id を持ち、正本 ADR をちょうど 1 つ持つ）/
+;; ADR-2608062300（budget-supply.edn の tranche 化）。
+;;
+;; `allocate` との違いは「supply node が 1 個か n 個か」だけではない。**配れない
+;; 金を配れる金と同じ数値に潰さない**ことがこの経路の目的で、そのために tranche を
+;; 4 クラスに分け、sinkhorn へ渡すのは :allocating だけにする。残り 3 つを質量ゼロの
+;; supply node として渡さないのは意味論と数値の両方の理由による — 質量 0 の行は
+;; log(0) - logsumexp(全マスク行) = -Inf - (-Inf) = NaN を作る（`logsumexp` が
+;; 全マスクを ##-Inf で返すのは列マスクを安全にするためで、行の質量 0 を救わない）。
+
+(defn- tranche-mass
+  "その tranche から**今**配れる額。released でなければ 0。released なら
+   max - committed - spent（ADR-2607246100 §2『JPY 3,000,000 is a maximum
+   envelope』— :tranche/max は上限であって支出目標ではないので、既に commit /
+   spend した分は引く）。"
+  [t]
+  (if (= :released (:tranche/state t))
+    (max 0.0 (- (double (or (:tranche/max t) 0))
+                (double (or (:tranche/committed t) 0))
+                (double (or (:tranche/spent t) 0))))
+    0.0))
+
+(defn- tranche-eligible
+  "その tranche が資金を出せる product 集合。:undetermined と未記載は**空集合**
+   にする — ADR に書かれていない eligibility をコードで推測しない
+   （ADR-2608062200 決定 1）。「書いていない = 全 product に出せる」と読み替えると、
+   ADR が決めていない配分を allocator が勝手に決めることになる。"
+  [t]
+  (let [e (:tranche/eligible-products t)]
+    (if (or (nil? e) (= e :undetermined)) #{} (set e))))
+
+(defn pool-nodes
+  "pools（budget-supply.edn の :supply/pools）→ 全 tranche を 1 行に展開し 4 クラス
+   に分類する。**ここで行を落とさない。**
+
+     :allocating  released・質量 > 0・demand に居る eligible product が 1 つ以上
+     :stranded    released・質量 > 0 だが行き先が宣言されていない（:undetermined、
+                  または宣言された product が demand に居ない）
+     :exhausted   released だが max - committed - spent ≤ 0
+     :held        まだ release されていない"
+  [pools demand]
+  (let [product-set (set (keys demand))]
+    (vec (for [p pools t (:pool/tranches p)
+               :let [mass (tranche-mass t)
+                     declared (tranche-eligible t)
+                     eligible (into (sorted-set) (filter product-set declared))
+                     released? (= :released (:tranche/state t))]]
+           {:pool-id (:pool/id p)
+            :pool-authority (:pool/authority p)
+            :tranche-id (:tranche/id t)
+            :state (:tranche/state t)
+            :max (double (or (:tranche/max t) 0))
+            :mass mass
+            :eligible eligible
+            :eligible-declared declared
+            :release-condition (:tranche/release-condition t)
+            :purpose (:tranche/purpose t)
+            :class (cond
+                     (not released?) :held
+                     (not (pos? mass)) :exhausted
+                     (empty? eligible) :stranded
+                     :else :allocating)}))))
+
+(defn- components
+  "supply node × column の二部グラフを連結成分に分ける（不動点まで閉じるだけの
+   素朴な実装。tranche 数は 1 桁なので十分）。
+
+   成分をまたいで資金は動かせないので、需要比例の正規化は**成分ごとに**行う。
+   全体比例にすると、ある成分の供給質量が別の成分の需要に引っぱられて transport
+   自体が実行不能になる（例: T1 が cloud-itonami にしか出せないのに、nu を全
+   product の需要比で決めると T1 の 300,000 を受け取れる列質量が足りない）。
+
+   → [{:supply-idx [i...] :column-idx [j...]} ...]"
+  [supply columns]
+  (let [n (count supply)
+        col-idx (into {} (map-indexed (fn [j p] [p j]) columns))
+        adj (mapv (fn [nd] (into #{} (keep col-idx) (:eligible nd))) supply)]
+    (loop [remaining (set (range n)) out []]
+      (if (empty? remaining)
+        out
+        (let [seed (apply min remaining)
+              [ss cs] (loop [ss #{seed} cs (nth adj seed)]
+                        (let [ss' (into ss (filter (fn [i] (some cs (nth adj i))) remaining))
+                              cs' (into cs (mapcat #(nth adj %) ss'))]
+                          (if (and (= ss ss') (= cs cs'))
+                            [ss cs]
+                            (recur ss' cs'))))]
+          (recur (reduce disj remaining ss)
+                 (conj out {:supply-idx (vec (sort ss)) :column-idx (vec (sort cs))})))))))
+
+(defn- solve-component
+  "1 連結成分の masked OT。cost は eligible なら -demand、そうでなければ ##Inf
+   （= M_ij が ##-Inf になり `logsumexp` の全マスク処理に乗る）。"
+  [supply columns demand {:keys [supply-idx column-idx]} {:keys [epsilon max-iters]}]
+  (let [rows (mapv #(nth supply %) supply-idx)
+        cols (mapv #(nth columns %) column-idx)
+        mu (mapv :mass rows)
+        mass (reduce + 0.0 mu)
+        ds (mapv #(max 0.0 (double (get demand % 0.0))) cols)
+        td (reduce + 0.0 ds)
+        nu (if (pos? td)
+             (mapv #(* mass (/ % td)) ds)
+             (vec (repeat (count cols) (/ mass (count cols)))))
+        cost (mapv (fn [nd]
+                     (mapv (fn [p] (if (contains? (:eligible nd) p)
+                                     (- (double (get demand p 0.0)))
+                                     ##Inf))
+                           cols))
+                   rows)]
+    {:rows rows :cols cols :mass mass
+     :result (sinkhorn cost mu nu {:epsilon epsilon :max-iters max-iters})}))
+
+(defn allocate-pools
+  "pools（budget-supply.edn の :supply/pools）× demand（{product demand-score}）
+   → tranche を supply node とした n×m 配分。
+
+   `allocate` が答えるのは「予算を需要比でどう割るか」だが、こちらが答えるのは
+   **「今いくら配れて、それはどこへ出せるのか」**である。配れない金（held /
+   exhausted / 行き先未宣言）は総額から静かに引かず、別の列として残す。
+
+   → {:allocatable-total n :held-total n :stranded-total n :declared-total n
+       :tranche-classes {:allocating [...] :stranded [...] :held [...] :exhausted [...]}
+       :product-classes {:eligible [...] :not-eligible [...]}
+       :nodes [...]                 ; pool-nodes の全行（4 クラス込み）
+       :allocations [{:product :demand-score :allocated-amount :share-pct :by-tranche}]
+       :contested [{:pool-id :authority :contested-by}]
+       :components n :converged? bool :feasible? bool
+       :marginal-error e :epsilon e}
+
+   :feasible? が false になるのは、宣言された eligibility では需要比例の目標を
+   満たせない場合（連結成分内でも Gale–Hoffman 条件は自動では満たされない）。
+   その場合も数値を捏造せず、marginal-error をそのまま報告する。"
+  [pools demand {:keys [epsilon max-iters] :or {epsilon 0.05 max-iters 200}}]
+  (let [nodes (pool-nodes pools demand)
+        by-class (group-by :class nodes)
+        supply (vec (get by-class :allocating []))
+        columns (vec (into (sorted-set) (mapcat :eligible supply)))
+        comps (components supply columns)
+        solved (mapv #(solve-component supply columns demand % {:epsilon epsilon :max-iters max-iters})
+                     comps)
+        ;; product → 総額 / product → {[pool tranche] 額}
+        [by-product by-tranche]
+        (reduce (fn [[bp bt] {:keys [rows cols result]}]
+                  (reduce (fn [[bp bt] [ri row]]
+                            (let [nd (nth rows ri)
+                                  k [(:pool-id nd) (:tranche-id nd)]]
+                              (reduce (fn [[bp bt] [ci amt]]
+                                        (let [p (nth cols ci)]
+                                          [(update bp p (fnil + 0.0) amt)
+                                           (if (> amt 1e-9)
+                                             (assoc-in bt [p k] amt)
+                                             bt)]))
+                                      [bp bt] (map-indexed vector row))))
+                          [bp bt] (map-indexed vector (:plan result))))
+                [{} {}] solved)
+        allocatable (reduce + 0.0 (map :mass supply))
+        held-total (reduce + 0.0 (map :max (get by-class :held [])))
+        stranded-total (reduce + 0.0 (map :mass (get by-class :stranded [])))
+        declared-total (reduce + 0.0 (map (comp double #(or % 0) :pool/total-amount) pools))
+        converged? (every? (comp :converged? :result) solved)
+        marg-err (reduce max 0.0
+                         (mapcat (fn [{:keys [result]}]
+                                   [(:row-marginal-error result) (:col-marginal-error result)])
+                                 solved))
+        products (vec (sort (keys demand)))
+        col-set (set columns)
+        ids (fn [ns] (vec (sort-by (juxt (comp str :pool-id) (comp str :tranche-id))
+                                   (map (fn [n] [(:pool-id n) (:tranche-id n)]) ns))))]
+    {:allocatable-total allocatable
+     :held-total held-total
+     :stranded-total stranded-total
+     :declared-total declared-total
+     :tranche-classes {:allocating (ids (get by-class :allocating []))
+                       :stranded (ids (get by-class :stranded []))
+                       :held (ids (get by-class :held []))
+                       :exhausted (ids (get by-class :exhausted []))}
+     :product-classes {:eligible (vec (filter col-set products))
+                       :not-eligible (vec (remove col-set products))}
+     :nodes nodes
+     :components (count comps)
+     :converged? converged?
+     :feasible? (and converged? (<= marg-err (* 1e-6 (max 1.0 allocatable))))
+     :marginal-error marg-err
+     :epsilon epsilon
+     :contested (vec (for [p pools :when (:pool/contested-by p)]
+                       {:pool-id (:pool/id p)
+                        :authority (:pool/authority p)
+                        :contested-by (:pool/contested-by p)}))
+     :allocations
+     (vec (for [p products]
+            {:product p
+             :demand-score (double (get demand p 0.0))
+             :allocated-amount (get by-product p 0.0)
+             :share-pct (if (pos? allocatable)
+                          (* 100.0 (/ (get by-product p 0.0) allocatable))
+                          0.0)
+             :by-tranche (get by-tranche p {})}))}))
+
 ;; ---- governed-write proposals (optional ledger visibility) -------------------
 
 (defn- block-id [product suffix] (keyword (str (name product) "." suffix)))
@@ -272,6 +472,16 @@
        "     入力 = maturity-scores.edn (:score-key " score-key ") + budget-supply.edn。手編集禁止。 -->\n\n"
        "**As-of (budget)**: " (:as-of budget-supply) "  \n"
        "**Currency**: " (:supply/currency budget-supply) "  \n"
+       (when (:supply/placeholder? budget-supply)
+         (str "\n> ⚠ **この表の総額は owner 未確認の placeholder であって pool ではない**"
+              "（ADR-2608062200 決定 4）。budget-supply.edn の `:supply/total-amount` は"
+              "『実額が決まるまでの仮置き』と自ファイルに明記されており、これを配分した結果は"
+              "**「owner が決めた予算を配分した結果」ではない**。owner が ADR で実際に決めた額は"
+              "`:supply/pools`（現在 1 本、JPY 3,000,000 / ADR-2607246100）にあり、そのうち"
+              "今配れるのは released tranche だけ — それは `capital-pools.edn`"
+              "（`gftd allocate pools md`）が計算する。\n>\n"
+              "> 数字の桁が違うだけでなく**答えている問いが違う**: この表は「予算があるとしたら"
+              "需要比でどう割るか」、`capital-pools.edn` は「今いくら配れて、それはどこへ出せるか」。\n\n"))
        "**手法**: log-domain stabilized Sinkhorn（entropic OT）。現行は単一 supply node"
        "（予算プール1個）× N product（demand node）の退化ケース — 実行可能解が一意"
        "（列制約だけで plan=nu に決まる）なので、実質「需要比例配分」に還元される。"
@@ -282,4 +492,79 @@
        "opportunity size の直接計測ではなく、現状手に入る中で最良の数値プロキシ — "
        "de-risked-ness（検証の進み具合）と opportunity size を混同しうる注意点がある。\n\n"
        (render-table result)
+       "\n"))
+
+;; ---- pool render -------------------------------------------------------------
+
+(defn- pair-str [[pool tranche]] (str (name pool) "/" (name tranche)))
+
+(defn render-pools-table
+  "terminal / md 共用。**4 クラスすべてを印字する** — :allocating だけを出すと
+   『配れる額 = 予算』に見えるので、held / stranded / exhausted を同じ表に残す。"
+  [{:keys [nodes allocations allocatable-total held-total stranded-total declared-total
+           tranche-classes product-classes components converged? feasible? marginal-error
+           epsilon contested]}]
+  (str "| pool/tranche | state | class | max | 配分可能 | eligible |\n"
+       "|---|---|---|---|---|---|\n"
+       (apply str
+              (for [n (sort-by (juxt (comp str :pool-id) (comp str :tranche-id)) nodes)]
+                (str "| " (pair-str [(:pool-id n) (:tranche-id n)])
+                     " | " (name (:state n))
+                     " | " (name (:class n))
+                     " | " (fmt0 (:max n))
+                     " | " (if (= :allocating (:class n)) (fmt0 (:mass n)) "—")
+                     " | " (if (seq (:eligible n))
+                             (str/join ", " (map name (:eligible n)))
+                             (if (empty? (:eligible-declared n)) "(未宣言)" "(demand 外)"))
+                     " |\n")))
+       "\n| product | demand-score | 配分額 | share% | 出所 |\n"
+       "|---|---|---|---|---|\n"
+       (apply str
+              (for [{:keys [product demand-score allocated-amount share-pct by-tranche]}
+                    (sort-by (juxt (comp - :allocated-amount) (comp str :product)) allocations)]
+                (str "| " (name product) " | " (fmt1 demand-score)
+                     " | " (fmt0 allocated-amount) " | " (fmt1 share-pct)
+                     " | " (if (seq by-tranche)
+                             (str/join ", " (map pair-str (sort-by (comp str first) (keys by-tranche))))
+                             "—")
+                     " |\n")))
+       "\n配分可能 (released): " (fmt0 allocatable-total)
+       " | held: " (fmt0 held-total)
+       " | 行き先未宣言 (stranded): " (fmt0 stranded-total)
+       " | 宣言済 pool 総額: " (fmt0 declared-total) "\n"
+       "tranche クラス: allocating=" (count (:allocating tranche-classes))
+       " stranded=" (count (:stranded tranche-classes))
+       " held=" (count (:held tranche-classes))
+       " exhausted=" (count (:exhausted tranche-classes)) "\n"
+       "product: eligible=" (count (:eligible product-classes))
+       " (" (str/join ", " (map name (:eligible product-classes))) ")"
+       " / not-eligible=" (count (:not-eligible product-classes)) "\n"
+       "components=" components " converged=" converged? " feasible=" feasible?
+       " marginal-error=" marginal-error " epsilon=" epsilon "\n"
+       (when (seq contested)
+         (apply str "\n⚠ 係争中の pool:\n"
+                (for [c contested]
+                  (str "  " (name (:pool-id c)) " — 正本 " (:authority c)
+                       " に対し " (:adr (:contested-by c)) " (" (:status (:contested-by c)) ") が "
+                       (fmt0 (:claim (:contested-by c))) " を主張\n"))))))
+
+(defn render-pools-md
+  [result budget-supply score-key]
+  (str "# capital pools — released tranche だけを配分する (ADR-2608062300)\n\n"
+       "<!-- generated by gftd cli `allocate pools md` (70-tools/bmc).\n"
+       "     入力 = maturity-scores.edn (:score-key " score-key ") + budget-supply.edn の\n"
+       "     :supply/pools。手編集禁止。 -->\n\n"
+       "**As-of (budget)**: " (:as-of budget-supply) "  \n"
+       "**Currency**: " (:supply/currency budget-supply) "  \n\n"
+       "この表が答えるのは「予算を需要比でどう割るか」ではなく、**「今いくら配れて、"
+       "それはどこへ出せるのか」**である。`gftd allocate`（`portfolio-allocation.edn`）"
+       "との違いは supply node の数だけではない — あちらの入力 `:supply/total-amount` は "
+       "owner 未確認の placeholder であり pool ではない（ADR-2608062200 決定 4）。"
+       "こちらは owner が ADR で決めた実額だけを読む。\n\n"
+       "配れない金は総額から静かに引かず、別クラスとして残す:\n\n"
+       "- `:held` — release 条件未達。**未割当ではなく意図された hold**。\n"
+       "- `:stranded` — released だが行き先 product が ADR に書かれていない"
+       "（`:undetermined`）。書かれていない eligibility をコードで推測しない。\n"
+       "- `:exhausted` — max - committed - spent ≤ 0。\n\n"
+       (render-pools-table result)
        "\n"))

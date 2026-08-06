@@ -3,24 +3,108 @@
 ;; demand 側（90-docs/business/maturity-scores.edn、gftd score md の生成物）と
 ;; 合わせて `gftd allocate` / `gftd allocate md` の入力になる。
 ;;
-;; 単一 supply node（:supply/total-amount 1 個）— 現行の gftd.allocate はこれを
-;; entropic OT (Sinkhorn) の退化ケース（供給側ノードが 1 個）として扱い、需要
-;; 比例配分に還元する（詳細は src/gftd/allocate.cljc の ns docstring、
-;; ADR-2607194500）。将来、予算を tranche（例: growth/infra/runway）に分けて
-;; 複数 supply node にしたくなったら、ここに :supply/tranches のような形で
-;; 追加する拡張点はあるが、2026-07-19 時点では未実装（意図的な v1 スコープ外
-;; — 中途半端な多 tranche 対応はしない、README/ADR 参照）。
+;; ---------------------------------------------------------------------------
+;; 2026-08-06 改訂（ADR-2608062200 / ADR-2608062300）
 ;;
-;; フィールド:
+;; **:supply/total-amount と :supply/pools は別のものを表す。混ぜて読まない。**
+;;
+;;   :supply/total-amount  owner 未確認の placeholder。2026-07-19 から 18 日間、
+;;                         この数値が 12 product へ按分され portfolio-allocation.edn
+;;                         を生成し続けていた。ADR-2608062200 決定 4 により、
+;;                         これは **pool ではない**。既存の `gftd allocate` 経路は
+;;                         互換のため残すが、生成物は「owner が決めた予算を配分した
+;;                         結果」ではない。
+;;
+;;   :supply/pools         **owner が ADR で決めた実額のみ**。各 pool は id と正本
+;;                         ADR をちょうど 1 つ持つ（ADR-2608062200 決定 1）。
+;;                         `gftd allocate pools` はここだけを読む。
+;;
+;; 配分できるのは **released な tranche だけ**。held の tranche は質量 0 で
+;; supply node に入る（存在は見えるが配れない）。「予算がある」ことと「配れる」
+;; ことを 1 つの数値に潰さないための構造で、これが tranche 化の本体。
+;; ---------------------------------------------------------------------------
+;;
+;; フィールド（placeholder 経路、従来どおり）:
 ;;   :as-of              予算の as-of 日付
 ;;   :supply/currency     通貨コード（表示用。換算はしない）
 ;;   :supply/total-amount 単一予算プールの総額（1 期間分。期間の解釈は :supply/note で明記）
 ;;   :supply/floors       {product amount} — product ごとの最低配分額（任意、空 map 可）
 ;;   :supply/caps         {product amount} — product ごとの最大配分額（任意、空 map 可）
 ;;   :supply/note         注記。捏造ゼロの原則どおり、実額が未確定なら placeholder と明記する
-{:as-of "2026-07-19"
+;;
+;; フィールド（pool 経路）:
+;;   :pool/id             pool の識別子。配分を書く ADR はこれを名指しする
+;;   :pool/authority      正本 ADR。この ADR だけが総額と release 規則を定める
+;;   :pool/total-amount   pool の総額（= tranche の :tranche/max の総和）
+;;   :pool/tranches       release 単位。:tranche/state は :released | :held
+;;   :tranche/eligible-products
+;;                        その tranche が資金を出せる product。**ADR 本文から引く**
+;;                        — 書かれていなければ :undetermined とし、コードで推測しない
+;;   :pool/use-envelope   用途別の内訳（tranche 軸とは直交する第 2 の分解。
+;;                        ADR-2607246100 §3。合計は :pool/total-amount と一致する）
+{:as-of "2026-08-06"
  :supply/currency "JPY"
+
+ ;; ---- placeholder 経路（owner 未確認。pool ではない）------------------------
  :supply/total-amount 10000000
  :supply/floors {}
  :supply/caps {}
- :supply/note "placeholder — owner should replace with real portfolio budget figures. 2026-07-19 時点: 実際の予算プール額・期間（月次/四半期）ともオーナー未確定のため、10,000,000 JPY を仮の月次予算として置いている。floors/caps も未設定（空 map = 全 product が需要比例のみで配分される）。"}
+ :supply/placeholder? true
+ :supply/note "placeholder — owner should replace with real portfolio budget figures. 2026-07-19 時点: 実際の予算プール額・期間（月次/四半期）ともオーナー未確定のため、10,000,000 JPY を仮の月次予算として置いている。floors/caps も未設定（空 map = 全 product が需要比例のみで配分される）。2026-08-06 追記（ADR-2608062200）: この数値は依然 owner 未確認であり pool ではない。owner が実際に決めた唯一の額は :supply/pools の growth-2026H2（JPY 3,000,000、ADR-2607246100）である。"
+
+ ;; ---- pool 経路（owner が ADR で決めた実額のみ）-----------------------------
+ :supply/pools
+ [{:pool/id :growth-2026H2
+   :pool/authority "adr-2607246100-revenue-agent-loop-capital-allocation-governor"
+   :pool/currency "JPY"
+   :pool/total-amount 3000000
+   :pool/as-of "2026-07-24"
+   :pool/note "ADR-2607246100 §2。『JPY 3,000,000 is a maximum envelope. Unreleased capital remains a reserve.』— 総額ではなく上限であり、release は ceiling であって支出目標ではない。2026-07-24 の Run 0020 時点で T1 が ceiling として release され、committed/spent はともに 0。以後 revenue-agent-loop の run は追加されていない（最新 run = 0020）。"
+   :pool/contested-by
+   {:adr "adr-2607269000-murakumo-mk1-minimax-capital-allocation"
+    :status "proposed"
+    :claim 3000000
+    :note "ADR-2607269000（proposed、2026-07-26）が同額 JPY 3,000,000 を叢雲 MK-1 の戦略 F に配分しており、両 ADR は互いを参照していない。同一 pool なのか別 pool なのかは owner しか知らない事実なので、ここでは衝突の記録に留める（ADR-2608062200 決定 2）。別 pool と判明したら :pool/id :murakumo-mk1 として 2 本目をここに足す。"}
+   :pool/tranches
+   [{:tranche/id :T1
+     :tranche/max 300000
+     :tranche/state :released
+     :tranche/committed 0
+     :tranche/spent 0
+     :tranche/release-condition "this ADR accepted"
+     :tranche/released-on "2026-07-24"
+     :tranche/eligible-products [:cloud-itonami]
+     :tranche/eligibility-source "ADR-2607246100 Consequences: 'cloud-itonami becomes the delivery and measurement substrate for a result-oriented service; its product breadth is not itself the sale.' および Run 0020: 'The initial commercial hypothesis is: … cloud-itonami as delivery and measurement substrate.' — ADR 本文からの引用であって推測ではない。"
+     :tranche/purpose "one segment, 100 named accounts, up to 200 personalized contacts, five qualified discoveries, three proposals, one verified paid implementation or diagnostic with an agreed implementation next step"}
+    {:tranche/id :T2
+     :tranche/max 700000
+     :tranche/state :held
+     :tranche/release-condition "first verified non-owner payment and successful fulfillment"
+     :tranche/eligible-products :undetermined
+     :tranche/eligibility-source "ADR-2607246100 は T2 の対象 product を書いていない。書かれていないものを埋めない（ADR-2608062200 決定 1）。"
+     :tranche/purpose "produce a case study, close customers two and three through substantially the same buyer/problem/offer path, measure actual delivery cost"}
+    {:tranche/id :T3
+     :tranche/max 1000000
+     :tranche/state :held
+     :tranche/release-condition "at least two customers and evidence that the close is repeatable"
+     :tranche/eligible-products :undetermined
+     :tranche/eligibility-source "同上"
+     :tranche/purpose "add sales/delivery capacity and run small paid-channel tests using only the manually proven message"}
+    {:tranche/id :T4
+     :tranche/max 1000000
+     :tranche/state :held
+     :tranche/release-condition "observed acquisition payback no longer than three months and positive contribution after delivery cost"
+     :tranche/eligible-products :undetermined
+     :tranche/eligibility-source "同上"
+     :tranche/purpose "scale the winning channel and preserve working-capital coverage"}]
+   :pool/use-envelope
+   {:founder-led-sales 900000
+    :fulfillment-and-cs 600000
+    :proof-assets 400000
+    :paid-channel-experiments 300000
+    :crm-and-measurement 300000
+    :legal-registration-tax 200000
+    :reserve 300000}
+   :pool/use-envelope-note "ADR-2607246100 §3。tranche 軸（release 順）とは直交する第 2 の分解で、合計は 3,000,000 に一致する。:paid-channel-experiments 300,000 は **T3 まで実行できない** — 同 ADR は『paid acquisition is prohibited until the offer has produced verified non-owner payment through founder-led sales』を authoritative_for に持つ。したがって現在の marketing 実行予算は構造的に 0 であり、これは未割当ではなく意図された hold である。"}]
+
+ :supply/pools-note "2026-08-06 時点で released な tranche は growth-2026H2/T1（JPY 300,000）のみ。配分可能総額は 300,000 で、その eligible product は cloud-itonami 1 件。残り 2,700,000 は held。`gftd allocate pools` はこれを計算して報告する。"}

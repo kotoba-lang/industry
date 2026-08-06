@@ -1,0 +1,148 @@
+[{:db/id -1
+  :adr/id "adr-2608062400-money-loop-blocked-on-a-measured-price-and-an-observed-cac"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "money-loop-blocked-on-a-measured-price-and-an-observed-cac"
+  :adr/title "ADR-2608062400: 手数料 → 再投資 → 獲得 の R ループは「まだやっていない」のではなく T3 まで構造的に計算できない — 測定された価格と観測された CAC を release 条件として明記する"
+  :adr/status "accepted"
+  :adr/date "2026-08-06"
+  :adr/last_verified "2026-08-06"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/repos ["com-junkawasaki/root" "kotoba-lang/dynamics" "kotoba-lang/loop-system-dynamics"]
+
+  :adr/authoritative_for
+  ["手数料収益 → 再投資 → 獲得 の自己強化ループを XMILE でモデル化することは、測定された価格と観測された CAC が揃うまで blocked である（未着手ではない）"
+   "gftd.allocate の demand を成熟度スコアから CAC×payback 由来の経済指標へ差し替えることは、観測された CAC が出るまで blocked である"
+   "この 2 件の release 条件は ADR-2607246100 の T1 exit（価格）と T3 release（獲得ゲイン）であり、どちらも agent の作業量では解けない"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2608062300-budget-supply-tranche-and-released-only-allocation"
+   "adr-2608062200-capital-pool-identity-and-the-double-allocated-three-million"
+   "adr-2607246100-revenue-agent-loop-capital-allocation-governor"
+   "adr-2607194500-bmc-portfolio-ot-allocation"
+   "adr-2607203000-system-dynamics-all-entities-kotoba-lang-dynamics"
+   "kotoba-lang/dynamics src/dynamics/xmile.cljc"
+   "kotoba-lang/loop-system-dynamics src/loop_system_dynamics/token_economy_comparison.cljs"]
+
+  :adr/context
+  "オーナーの問い（2026-08-06）『手数料モデルの資金をどう持続的成長に繋げるか、system dynamics は計算・設計統合されているか』に対する調査で、**計算できないものが 2 つ**残った。どちらも設計不足でも実装漏れでもなく、**入力が世界にまだ存在しない**ことによる。
+
+この 2 件を「follow-up」や「TODO」として書くと、着手すれば片付く作業に見える。実際には agent がいくら作業しても解けない — 解けるのは非オーナーが金を払ったときだけである。だから本 ADR は release 条件を持つ blocked item として明示的に記録する。
+
+### 現在地（2026-08-06 実測）
+
+3 プロダクトとも収益ゼロである。
+
+| プロダクト | 収益 | 実測値 |
+|---|---|---|
+| nexus-x402 | 0 | challenges 14 / submissions 3 / rejections 3 / **settlements 0**（seller は 4 登録済み） |
+| net-kotobase | 0 | visitors 2,292 / signups 12 / **checkouts 0** / paid-workspaces 0 |
+| cloud-itonami | 0 | external-tenants 5 / trials 5 / **paying-orgs 0**（agent-runs 1,012/7d） |
+
+（出典は `kotoba-lang/dynamics` の `loop-archetypes` に 2026-08-06 に instantiate した 3 archetype の `:source` フィールド。3 つのゼロは原因が違う — x402 は wiring、net-kotobase は stage、cloud-itonami と etzhayyim は demand。詳細は `dynamics` README の該当節。）
+
+### blocked item 1 — 収益 → 再投資 → 獲得 の R ループ
+
+system dynamics の道具立ては揃っている。`kotoba-lang/dynamics` には `xmile.cljc`（実 XMILE モデル構築）・`sysml.cljc`・`core.cljc`（stock/flow/loop primitives、Meadows leverage bands）があり、`loop-system-dynamics` には 6 本の実 XMILE モデルが動いている。
+
+**足りないのは道具ではなく係数である。** `dynamics.xmile/acquisition-model` の docstring は既にこう書いている:
+
+> This is deliberately NOT a network-effect/feedback model (the stock does not feed back into the inflow rate) -- adding a self-reinforcing term would require a real measured coefficient this catalog has never observed ... and fabricating one would violate this whole workspace's 'never fabricate' discipline.
+
+つまり**ライブラリは既に正しく拒否している**。問題は、この拒否が docstring の設計注記としてしか存在せず、**release 条件を持つ追跡対象になっていない**ことである。価格が測れた日に誰かが戻ってくる仕組みが無い。
+
+自己強化項に必要なのは 2 つの実測値であり、どちらも今は存在しない:
+
+- **価格**（手数料率 × 決済額、あるいはサブスク単価）— 決済が 1 件も起きていないので未観測
+- **獲得ゲイン**（1 円の再投資が何件の獲得を生むか）— 有償チャネル支出が 1 円も無いので未観測
+
+### blocked item 2 — allocate の demand を CAC×payback にする
+
+`gftd.allocate` の demand ベクトルは `gftd.score` の成熟度スコア（`:yc` / `:bmc`）である。ns docstring 自身が『現状手に入る中で最良の数値プロキシであって opportunity size の直接計測ではない』『YC bench スコアは de-risked-ness と opportunity size を混同しうる』と書いている。
+
+予算配分器の demand として正しいのは「1 円あたりの期待リターン」であり、それは CAC・payback 期間・貢献利益から出る。**CAC は全プロダクトで未観測**である — 有償・無償を問わず、どのチャネル経由でも顧客獲得が 1 件も起きていない。payback は収益がゼロの間は定義されない。"
+
+  :adr/decision
+  "### 1. 2 件を blocked item として記録する（follow-up ではない）
+
+`:adr/blocked-items` に構造化して持つ。それぞれ `:blocked-on`（何が無いか）・`:release-condition`（何が起きたら解けるか）・`:gate`（その条件を支配する既存 ADR のゲート）・`:interim`（それまでどうするか）を持つ。
+
+### 2. release 条件は ADR-2607246100 のゲートに固定する
+
+新しいゲートを作らない。ADR-2607246100 が既に持っているゲートをそのまま使う:
+
+| blocked item | 必要な実測値 | release するゲート |
+|---|---|---|
+| R ループの価格項 | 価格（手数料率または単価） | **T1 exit** — 『one verified paid implementation or diagnostic』 |
+| R ループの獲得ゲイン項 | 1 円あたりの獲得件数 | **T3 release** — 『small paid-channel tests using only the manually proven message』 |
+| allocate の demand | CAC | **T3 release**（同上） |
+
+**したがって R ループの完全なモデルは T3 より前には作れない。** これは順序の問題であって優先度の問題ではない。T1 exit で価格の半分が解けるが、獲得ゲインが無いままではループは閉じない。
+
+### 3. それまでの暫定を明示する
+
+- **R ループ**: `acquisition-model`（フィードバック無し、外生的な inflow）を使い続ける。自己強化項を入れたシナリオを作りたい場合は、`scenario` と明示的にラベルし、既定として出荷しない（`acquisition-model` docstring が既に定めている作法をそのまま踏襲する）。
+- **allocate の demand**: `--score-key` の成熟度スコアを使い続ける。差し替え可能な設計（demand は呼び出し側が渡す map）は既にあるので、CAC が出た日に allocator 側の変更は要らない。
+
+### 4. demand プロキシの弱さは、実際に金を配る経路では現在**無効**である
+
+ADR-2608062300 の `allocate pools` では、**demand は「どこへ配るか」を決めていない** — それを決めるのは ADR が宣言した eligibility である。demand が効くのは連結成分の中での按分だけで、2026-08-06 時点で eligible な product は cloud-itonami の 1 件しかない。**成分内に 1 列しか無いので、demand の値が何であっても配分結果は変わらない。**
+
+つまり blocked item 2 は、`portfolio-allocation.edn`（placeholder 経路）の精度には効くが、`capital-pools.edn`（実額経路）には今のところ一切効かない。T2 以降が release されて eligible product が 2 件以上になった時点で初めて効き始める。**この非対称性を記録しておかないと、CAC が無いことが実際より深刻に見える。**"
+
+  :adr/blocked-items
+  "[{:id :money-loop-reinforcing-edge
+     :what \"手数料収益 stock → 再投資 flow → 獲得 inflow-rate への自己強化エッジを持つ XMILE モデル\"
+     :where \"kotoba-lang/dynamics src/dynamics/xmile.cljc（acquisition-model は意図的にフィードバック無し）/ kotoba-lang/loop-system-dynamics\"
+     :blocked-on [{:missing :price
+                   :why \"決済が 1 件も起きていない。nexus-x402 settlements 0 / net-kotobase checkouts 0 / cloud-itonami paying-orgs 0（2026-08-06 実測）\"
+                   :release-condition \"非オーナーによる検証済み実決済が 1 件\"
+                   :gate \"adr-2607246100 T1 exit: one verified paid implementation or diagnostic\"}
+                  {:missing :acquisition-gain-per-yen
+                   :why \"有償チャネル支出が 0 円なので、1 円の再投資が何件の獲得を生むかが未観測\"
+                   :release-condition \"支出に帰属可能な獲得が観測されること\"
+                   :gate \"adr-2607246100 T3 release: small paid-channel tests using only the manually proven message\"}]
+     :interim \"acquisition-model（外生 inflow、フィードバック無し）を使い続ける。自己強化項を入れる場合は scenario と明示ラベルし既定として出荷しない\"
+     :not-blocked-on [\"実装工数\" \"XMILE ライブラリの機能\" \"モデリング設計\"]}
+    {:id :allocate-demand-from-cac
+     :what \"gftd.allocate の demand を成熟度スコア（:yc/:bmc プロキシ）から CAC×payback 由来の経済指標へ差し替える\"
+     :where \"70-tools/bmc/src/gftd/allocate.cljc（demand は呼び出し側が渡す map なので差し替え点は既にある）\"
+     :blocked-on [{:missing :cac
+                   :why \"有償・無償を問わず、どのチャネル経由でも顧客獲得が 1 件も起きていない\"
+                   :release-condition \"少なくとも 1 product で支出に帰属可能な獲得が観測されること\"
+                   :gate \"adr-2607246100 T3 release\"}
+                  {:missing :payback-period
+                   :why \"収益がゼロの間は定義されない\"
+                   :release-condition \"adr-2607246100 T4 の観測条件（acquisition payback no longer than three months）が測定可能になること\"
+                   :gate \"adr-2607246100 T4 release\"}]
+     :interim \"--score-key の成熟度スコアを使い続ける。CAC が出た日に allocator 側の変更は不要\"
+     :currently-inert-on \"capital-pools.edn（実額経路）— eligible product が 1 件しかないため demand の値は配分結果を変えない。T2 以降が release されて eligible が 2 件以上になった時点で効き始める\"
+     :not-blocked-on [\"実装工数\" \"allocator の設計\"]}]"
+
+  :adr/consequences
+  "- **『まだやっていない』と『今は計算できない』が区別される。** この 2 件はレビューで『なぜ SD モデルが無いのか』と問われたときに、着手漏れではなく入力欠如だと即答できる。
+- **release 条件が既存ゲートに固定されているので、新しい追跡対象が増えない。** T1 exit / T3 release / T4 release は ADR-2607246100 が既に持っているゲートで、revenue-agent-loop の run がそれを判定する。この ADR はそこにぶら下がるだけ。
+- **R ループのモデルは T3 より前には作れない。** 順序の問題であって優先度の問題ではない。T1 exit（価格）だけでは半分しか解けず、獲得ゲインが無いままループは閉じない。
+- **CAC が無いことは、実額経路では今のところ無害である。** `capital-pools.edn` では eligibility が配分先を決め、demand は成分内の按分にしか効かない。eligible が 1 件の今、demand の値は結果を変えない。これを書いておかないと欠測が実際より深刻に見える。
+- **`dynamics.xmile/acquisition-model` の docstring は変えない。** あそこに書かれた拒否は正しく、本 ADR はそれを追跡対象に格上げしただけである。ライブラリの振る舞いは 1 バイトも変わらない。
+- **捏造の誘惑が具体的に名指しされる。** 自己強化係数と CAC は、それらしい数値を置けばモデルが動いてしまう種類の欠測である。動くことと正しいことが一致しないので、blocked のまま置く。"
+
+  :adr/verification
+  "**item 1 の根拠**（`kotoba-lang/dynamics` を直接読んだ）:
+- `src/dynamics/xmile.cljc` に `acquisition-model` / `percentage-rate-model` / `bass-diffusion-model` / `crossing-year` / `project` が存在する。XMILE の道具は揃っている。
+- `acquisition-model` の docstring が『This is deliberately NOT a network-effect/feedback model ... adding a self-reinforcing term would require a real measured coefficient this catalog has never observed』と明記している。**ライブラリは既に拒否している。**
+- `kotoba-lang/loop-system-dynamics` の XMILE モデルを全て確認した（`cloud_itonami_xmile` / `etzhayyim_actors_xmile` / `etzhayyim_xmile_sysml` / `kotoba_lang_xmile` / `fleet_registration_xmile` / `nation_state_military_xmile`）。**収益 stock から獲得 inflow へ戻るエッジを持つものは 1 つも無い。**
+- `money_loop_analysis.cljs` は存在するが、これは World Bank 指標による各国の貨幣創造ループの分析であって、本 ADR の 3 プロダクトの手数料ループとは無関係。
+
+**item 2 の根拠**:
+- `70-tools/bmc/src/gftd/allocate.cljc` の ns docstring が demand について『現状手に入る中で最良の数値プロキシであって opportunity size の直接計測ではない』『YC bench スコアは de-risked-ness と opportunity size を混同しうる』と自ら書いている。
+- `gftd/cli.cljc` の `allocate-inputs` / `pools-inputs` はどちらも `(get-in s [score-key :score])` を demand にしている。CAC を読む経路は存在しない。
+- 決定 4 の非対称性を実測で確認した: `gftd allocate pools` の出力は `product: eligible=1 (cloud-itonami) / not-eligible=11`、`components=1`。成分内に列が 1 本しか無いので demand の値は配分結果を変えない。
+
+**収益ゼロの根拠**: `kotoba-lang/dynamics` の `loop-archetypes` に 2026-08-06 に instantiate した 3 archetype の `:source` フィールド（`90-docs/business/metrics/nexus-x402.edn`、net-kotobase の funnel/stripe 実測、cloud-itonami の 2026-08-06T01:12:10Z funnel）。
+
+**この ADR が検証していないこと**: T1 exit がいつ来るか。ADR-2607246100 の最新 run は 0020（2026-07-24）で、以後 run は追加されていない。つまり T1 の作業自体が 13 日間進んでいないが、それは本 ADR の対象外である（この ADR は『進んだとして何が解けるか』だけを定める）。"}]

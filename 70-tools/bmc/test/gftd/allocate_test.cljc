@@ -137,6 +137,176 @@
     (is (thrown? #?(:clj Exception :cljs :default)
                  (allocate/allocate {:a 10.0} 1000 {:floors {:a 500.0} :caps {:a 100.0}})))))
 
+;; ---- pool-aware allocation (ADR-2608062300) --------------------------------
+;;
+;; ここで守りたい不変条件は「合計が合う」ではなく **「配れない金を配れる金と
+;; 同じ数値に潰さない」**。だから合計より先に、4 クラスの分割が全 tranche を
+;; ちょうど覆っていること（重複なし・取りこぼしなし）を検査する。
+
+(def ^:private live-pools
+  "budget-supply.edn の :supply/pools と同型（growth-2026H2、ADR-2607246100 §2）。
+   実ファイルを読まずに同じ形をここに置くのは、test が I/O に依存しないため
+   （実ファイル側の値が変わっても test は構造を検査し続ける）。"
+  [{:pool/id :growth-2026H2
+    :pool/authority "adr-2607246100-revenue-agent-loop-capital-allocation-governor"
+    :pool/total-amount 3000000
+    :pool/contested-by {:adr "adr-2607269000-murakumo-mk1-minimax-capital-allocation"
+                        :status "proposed" :claim 3000000}
+    :pool/tranches
+    [{:tranche/id :T1 :tranche/max 300000 :tranche/state :released
+      :tranche/committed 0 :tranche/spent 0
+      :tranche/eligible-products [:cloud-itonami]}
+     {:tranche/id :T2 :tranche/max 700000 :tranche/state :held
+      :tranche/eligible-products :undetermined}
+     {:tranche/id :T3 :tranche/max 1000000 :tranche/state :held
+      :tranche/eligible-products :undetermined}
+     {:tranche/id :T4 :tranche/max 1000000 :tranche/state :held
+      :tranche/eligible-products :undetermined}]}])
+
+(deftest pool-classes-partition-every-tranche
+  (testing "4 クラスは全 tranche をちょうど 1 回ずつ覆う（silent drop なし）"
+    (let [demand {:cloud-itonami 78.0 :net-kotobase 82.0 :cloud-murakumo 60.0}
+          r (allocate/allocate-pools live-pools demand {})
+          {:keys [allocating stranded held exhausted]} (:tranche-classes r)
+          all (concat allocating stranded held exhausted)
+          declared (for [p live-pools t (:pool/tranches p)] [(:pool/id p) (:tranche/id t)])]
+      (is (= 4 (count declared)))
+      (is (= (count declared) (count all)) "分類の総数が tranche 総数と一致する")
+      (is (= (set declared) (set all)) "どの tranche も落ちていない")
+      (is (= (count all) (count (set all))) "同じ tranche が 2 クラスに入っていない")
+      (is (= [[:growth-2026H2 :T1]] allocating))
+      (is (= 3 (count held))))))
+
+(deftest pool-products-partition-every-demand-key
+  (testing "eligible / not-eligible は demand の全 product をちょうど覆う"
+    (let [demand {:cloud-itonami 78.0 :net-kotobase 82.0 :cloud-murakumo 60.0}
+          r (allocate/allocate-pools live-pools demand {})
+          {:keys [eligible not-eligible]} (:product-classes r)]
+      (is (= (set (keys demand)) (set (concat eligible not-eligible))))
+      (is (empty? (filter (set eligible) not-eligible)))
+      ;; T1 が名指ししているのは cloud-itonami だけ。demand が高い net-kotobase も
+      ;; 「配れない」— 需要ではなく ADR の eligibility が決める。
+      (is (= [:cloud-itonami] eligible))
+      (is (= #{:net-kotobase :cloud-murakumo} (set not-eligible))))))
+
+(deftest pool-allocatable-is-released-only
+  (testing "配分されるのは released tranche の質量だけ。held は総額に混ぜない"
+    (let [demand {:cloud-itonami 78.0 :net-kotobase 82.0 :cloud-murakumo 60.0}
+          r (allocate/allocate-pools live-pools demand {})
+          by (into {} (for [a (:allocations r)] [(:product a) (:allocated-amount a)]))]
+      (is (close? (:allocatable-total r) 300000.0 1e-6))
+      (is (close? (:held-total r) 2700000.0 1e-6))
+      (is (close? (:declared-total r) 3000000.0 1e-6))
+      (is (:feasible? r))
+      ;; 300,000 全額が唯一の eligible product へ行く
+      (is (close? (:cloud-itonami by) 300000.0 1.0))
+      (is (close? (:net-kotobase by) 0.0 1e-6))
+      (is (close? (:cloud-murakumo by) 0.0 1e-6))
+      ;; 出所が pool/tranche まで辿れる
+      (is (= #{[:growth-2026H2 :T1]}
+             (set (keys (:by-tranche (first (filter #(= :cloud-itonami (:product %))
+                                                    (:allocations r)))))))))))
+
+(deftest pool-undetermined-eligibility-is-not-guessed
+  (testing ":undetermined を released にしても、行き先を推測せず :stranded にする
+            （『書いていない = 全 product に出せる』と読み替えない）"
+    (let [pools [{:pool/id :p :pool/total-amount 500000
+                  :pool/tranches [{:tranche/id :X :tranche/max 500000
+                                   :tranche/state :released
+                                   :tranche/eligible-products :undetermined}]}]
+          r (allocate/allocate-pools pools {:a 10.0 :b 10.0} {})]
+      (is (= [[:p :X]] (:stranded (:tranche-classes r))))
+      (is (empty? (:allocating (:tranche-classes r))))
+      (is (close? (:allocatable-total r) 0.0 1e-6))
+      (is (close? (:stranded-total r) 500000.0 1e-6))
+      (is (every? #(close? (:allocated-amount %) 0.0 1e-9) (:allocations r))))))
+
+(deftest pool-committed-and-spent-reduce-available-mass
+  (testing ":tranche/max は上限であって支出目標ではない — committed/spent を引く"
+    (let [pools [{:pool/id :p :pool/total-amount 300000
+                  :pool/tranches [{:tranche/id :X :tranche/max 300000
+                                   :tranche/state :released
+                                   :tranche/committed 100000 :tranche/spent 50000
+                                   :tranche/eligible-products [:a]}]}]
+          r (allocate/allocate-pools pools {:a 10.0} {})]
+      (is (close? (:allocatable-total r) 150000.0 1e-6))
+      (is (close? (:allocated-amount (first (:allocations r))) 150000.0 1.0))))
+
+  (testing "使い切った released tranche は :exhausted であって :allocating ではない"
+    (let [pools [{:pool/id :p :pool/total-amount 300000
+                  :pool/tranches [{:tranche/id :X :tranche/max 300000
+                                   :tranche/state :released
+                                   :tranche/spent 300000
+                                   :tranche/eligible-products [:a]}]}]
+          r (allocate/allocate-pools pools {:a 10.0} {})]
+      (is (= [[:p :X]] (:exhausted (:tranche-classes r))))
+      (is (close? (:allocatable-total r) 0.0 1e-6)))))
+
+(deftest pool-disjoint-eligibility-keeps-money-in-its-component
+  (testing "eligibility が分断されていたら成分ごとに解く — 需要比例を全体で取ると
+            transport が実行不能になり、質量がどこかへ消える"
+    (let [pools [{:pool/id :p :pool/total-amount 300000
+                  :pool/tranches
+                  [{:tranche/id :A :tranche/max 100000 :tranche/state :released
+                    :tranche/eligible-products [:x]}
+                   {:tranche/id :B :tranche/max 200000 :tranche/state :released
+                    :tranche/eligible-products [:y :z]}]}]
+          ;; x の需要は小さいが、A は x にしか出せないので 100,000 全額が x へ行く
+          demand {:x 1.0 :y 30.0 :z 10.0}
+          r (allocate/allocate-pools pools demand {})
+          by (into {} (for [a (:allocations r)] [(:product a) (:allocated-amount a)]))]
+      (is (= 2 (:components r)))
+      (is (:feasible? r))
+      (is (close? (:x by) 100000.0 1.0))
+      ;; B の 200,000 は y:z = 30:10 で分かれる
+      (is (close? (:y by) 150000.0 1.0))
+      (is (close? (:z by) 50000.0 1.0))
+      (is (close? (reduce + (map :allocated-amount (:allocations r))) 300000.0 1.0)))))
+
+(deftest pool-contested-is-surfaced-not-resolved
+  (testing "係争中の pool は報告されるだけ。額を勝手に半分にしたりしない"
+    (let [r (allocate/allocate-pools live-pools {:cloud-itonami 78.0} {})
+          c (first (:contested r))]
+      (is (= 1 (count (:contested r))))
+      (is (= :growth-2026H2 (:pool-id c)))
+      (is (= "proposed" (:status (:contested-by c))))
+      ;; 争われていても declared-total は 3,000,000 のまま（6,000,000 でも
+      ;; 1,500,000 でもない）— 実額の判断は owner の入力を要する
+      (is (close? (:declared-total r) 3000000.0 1e-6)))))
+
+(deftest pool-empty-input-is-not-a-crash
+  (testing "pool が 1 つも無くても NaN も例外も出さない"
+    (let [r (allocate/allocate-pools [] {:a 10.0 :b 20.0} {})]
+      (is (close? (:allocatable-total r) 0.0 1e-9))
+      (is (= 0 (:components r)))
+      (is (:feasible? r))
+      (is (= [:a :b] (:not-eligible (:product-classes r))))
+      (is (every? #(= (:allocated-amount %) (:allocated-amount %)) (:allocations r))))))
+
+(deftest pool-render-shows-held-not-only-allocatable
+  (testing "render は 4 クラス全部を印字する — :allocating だけ出すと
+            『配れる額 = 予算』に見える"
+    (let [r (allocate/allocate-pools live-pools {:cloud-itonami 78.0 :net-kotobase 82.0} {})
+          s (allocate/render-pools-table r)]
+      (is (re-find #"growth-2026H2/T1" s))
+      (is (re-find #"growth-2026H2/T4" s) "held な tranche も表に出る")
+      (is (re-find #"held" s))
+      (is (re-find #"2700000" s) "held 合計が数値として見える")
+      (is (re-find #"係争中の pool" s)))))
+
+(deftest placeholder-budget-is-disclosed-in-the-generated-doc
+  (testing ":supply/placeholder? true なら render-md が『これは pool ではない』と書く
+            — 生成物が『owner が決めた予算を配分した結果』に見えてはならない
+            （ADR-2608062200 決定 4）"
+    (let [r (allocate/allocate {:a 10.0 :b 20.0} 10000000 {})
+          with (allocate/render-md r {:as-of "2026-08-06" :supply/currency "JPY"
+                                      :supply/placeholder? true} :yc)
+          without (allocate/render-md r {:as-of "2026-08-06" :supply/currency "JPY"} :yc)]
+      (is (re-find #"placeholder であって pool ではない" with))
+      (is (re-find #"capital-pools\.edn" with))
+      (is (nil? (re-find #"placeholder であって pool ではない" without))
+          "placeholder でない予算にこの警告を出すと、本物の予算まで疑わしく見える"))))
+
 ;; ---- governed-write proposals (optional ledger visibility) ------------------
 
 (deftest allocate-proposals-are-governor-clean

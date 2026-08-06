@@ -159,8 +159,8 @@ optimal transport としては**退化ケース**（supply node が 1 個）— 
 実装してあり（n=1 専用のハックではない）、floor/cap 制約は
 water-filling（制約に触れた product を fix → 残りを再配分…を収束するまで
 繰り返す）で解く。将来、予算を tranche（growth/infra/runway 等）に分けて複数
-supply node にすれば非自明な輸送構造にそのまま拡張できるが、2026-07-19 時点では
-**未実装**（意図的な v1 スコープ外 — 中途半端な多 tranche 対応はしない）。
+supply node にすれば非自明な輸送構造にそのまま拡張できる — **2026-08-06 に
+`gftd allocate pools` として実装した**（下記、ADR-2608062300）。
 
 demand 側の入力（`--score-key`）は `gftd.score` の成熟度スコアを流用している —
 これは「現状手に入る中で最良の数値プロキシ」であって opportunity size（市場機会の
@@ -180,3 +180,54 @@ opportunity size を混同しうる注意点があり、より良い需要指標
 スナップショット方式と同じ dedup 挙動で `<product>.metrics` block へ
 `:canvas/add-item` として記録する（governor 側の変更は不要 — `:canvas/add-item`
 は既に allowed-actions に含まれている）。
+
+## capital pools — released tranche だけを配分する (ADR-2608062300)
+
+```bash
+70-tools/bmc/bin/gftd allocate pools                     # 端末表示
+70-tools/bmc/bin/gftd allocate pools md                  # capital-pools.edn 再生成
+```
+
+**`allocate` と `allocate pools` は答えている問いが違う。**
+
+| | `gftd allocate` | `gftd allocate pools` |
+|---|---|---|
+| 問い | 予算があるとしたら需要比でどう割るか | **今いくら配れて、それはどこへ出せるか** |
+| 入力 | `:supply/total-amount`（owner 未確認の placeholder） | `:supply/pools`（owner が ADR で決めた実額のみ） |
+| supply node | 1 個（退化ケース） | tranche ごと（masked n×m） |
+| 割り先 | 全 product、需要比 | ADR が名指しした eligible product だけ |
+| 2026-08-06 実測 | 10,000,000 を 12 product へ | **300,000 を 1 product へ**（残り 2,700,000 は held） |
+
+`--budget` は受け付けない。pool の総額は正本 ADR が決めるもので、CLI flag が
+決めるものではない（ADR-2608062200 決定 1）。
+
+**配れない金を配れる金と同じ数値に潰さない**のがこの経路の目的で、tranche を
+4 クラスに分けて全部印字する:
+
+| class | 意味 |
+|---|---|
+| `:allocating` | released・残額 > 0・行き先が宣言されている |
+| `:stranded` | released・残額 > 0 だが行き先が ADR に書かれていない（`:undetermined`） |
+| `:exhausted` | released だが `max - committed - spent ≤ 0` |
+| `:held` | release 条件未達。**未割当ではなく意図された hold** |
+
+`:undetermined` を「全 product に出せる」と読み替えない — そう読むと、ADR が
+決めていない配分を allocator が勝手に決めることになる。
+
+sinkhorn に渡すのは `:allocating` だけ。残りを質量ゼロの supply node として
+渡さないのは意味論と数値の両方の理由による — 質量 0 の行は
+`log(0) - logsumexp(全マスク行)` = `-Inf - (-Inf)` = **NaN** を作る
+（`allocate_test.cljc` の BREAK 3 相当の検査で実際に NaN が出ることを確認済み）。
+
+eligibility が分断されている場合（T1 は cloud-itonami にしか出せない、T2 は
+別の product にしか出せない等）、需要比例の正規化は**連結成分ごと**に行う。
+全体比例にすると transport 自体が実行不能になり、質量が消える（テスト
+`pool-disjoint-eligibility-keeps-money-in-its-component` が、成分分割を外すと
+100,000 が 7,317 に化けることを実測している）。
+
+正本:
+```
+90-docs/business/budget-supply.edn の :supply/pools   (owner 手編集。各 pool は
+                                                       id と正本 ADR を 1 つずつ持つ)
+生成物: 90-docs/business/capital-pools.edn            (gftd allocate pools md; 手編集禁止)
+```
