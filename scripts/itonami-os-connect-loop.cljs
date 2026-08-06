@@ -79,12 +79,26 @@
 (defn -main []
   (let [started (.toISOString (js/Date.))]
 
-    ;; 1) 同期。FF できなければ**何もしない**（古い base の上に積まない）
+    ;; 1) 同期の確認。**共有 checkout を書き換えない。**
+    ;;
+    ;; 以前はここで `git merge --ff-only origin/main` していたが、これは
+    ;; superproject の**共有 checkout を書き換える**ので、
+    ;;   (a) 他セッションの未コミットが 1 個あるだけで FF が失敗し、この loop が
+    ;;       止まる（実測 2026-08-05T18:38 以降 9 時間、`:not-fast-forwardable`
+    ;;       で 1 周も回らなかった。原因は無関係な `scripts/maturity-loop/
+    ;;       mutations.edn` と受信メールファイル）
+    ;;   (b) 手で作業している人の tree と index.lock を奪い合う（実測 2026-08-06、
+    ;;       同じ repo で作業中の別セッションと衝突した）
+    ;;
+    ;; そもそも**書き換える必要が無い**: tick は現在のファイルを読むだけで、
+    ;; 実装側（skill）は `origin/main` から自分の worktree を切る。この loop が
+    ;; 知りたいのは「この checkout が origin/main から分岐していないか」だけ。
+    ;; 分岐していなければ、遅れていても skill 側は origin/main から始まる。
     (sh "git" ["fetch" "origin" "--quiet"] {})
-    (let [{:keys [code err]} (sh "git" ["merge" "--ff-only" "origin/main"] {})]
+    (let [{:keys [code]} (sh "git" ["merge-base" "--is-ancestor" "HEAD" "origin/main"] {})]
       (when (not= 0 code)
-        (log! "origin/main に FF できない。この周は何もしない:" (str/trim (or err "")))
-        (append-ledger! {:at started :outcome :skipped :why :not-fast-forwardable})
+        (log! "この checkout は origin/main から分岐している。この周は何もしない。")
+        (append-ledger! {:at started :outcome :skipped :why :diverged-from-main})
         (js/process.exit 0)))
 
     ;; 2) 測る（決定論。ここにモデルは居ない）
