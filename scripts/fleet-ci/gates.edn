@@ -123,6 +123,25 @@
    :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs/adr" "--min" "1400"]
    :include-ext [".edn"] :min-files 1500 :cd false}
 
+  ;; superproject の parity 台帳 gate。**:id が必要**（:name は org / tip 解決に使う
+  ;; repo 名のままにする必要があるため）。
+  ;;
+  ;; 検証内容: engine parity 台帳の軸が「不在」を主張するとき、その probe が主張を
+  ;; 支える範囲を探しているか。2026-08-04〜06 に台帳は 5 回「無い」と書いて 5 回とも
+  ;; 誤った（profiler / navigation ×2 / prefab / steam-distribution）—— 毎回手で訂正し、
+  ;; 訂正の次の反復で同じ種類の誤りが再発した。CLAUDE.md には既に「結論する前に検索
+  ;; せよ」が 2 箇所あるので、**足りないのは規則ではなく機械検査**。
+  ;;
+  ;; :include-ext に **.cljs が要る** — この gate は検証ロジックを複製せず
+  ;; scripts/verify-parity-probes.cljs をノード上で呼ぶので、それが tree に無いと
+  ;; 動かない（gate 側が存在を確認して FAIL する）。
+  ;; :min-files は「絞り込みが壊れて 0 件 → trivially pass」を防ぐ床で、gate に渡す
+  ;; --min（probe を持つ軸の下限）と二重に掛ける。
+  {:id "root-parity-probe-policy"
+   :name "root" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/parity-probe-check.cljs" :script-args ["--min" "30"]
+   :include-ext [".edn" ".cljs"] :min-files 200 :cd false}
+
   ;; superproject の 2 本目の gate。**:id が必要**（:name は org / tip 解決に使う
   ;; repo 名のままにしないといけないので、識別子を分ける。無いと state の
   ;; [:repos "root"] と gate-name を上の entry と奪い合う）。
