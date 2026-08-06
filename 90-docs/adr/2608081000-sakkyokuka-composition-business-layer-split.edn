@@ -42,7 +42,7 @@
 
 ## 実測した現在地（2026-08-06）
 
-**1. `ongakuka` の商売は作曲ではない。** `kotoba-lang/ongaku` の関数は
+**1. `ongakuka` の craft は選曲であって作曲ではない。** `kotoba-lang/ongaku` の関数は
 `ongaku.compose/compose` という名前だが、返るのは `{:asset/id :asset/path :credit/text
 :policy/render-only? ...}` ——既製アセットへのポインタである。README も
 \"BGM **selection** and license-policy gating\" と書いており、`cloud-itonami/ongakuka` の
@@ -94,26 +94,62 @@ NSID は wire identity なので改名しない（CLAUDE.md「ドメイン移転
 権利の譲渡側と納品の約束側で行う。これが -ka を分ける実利であり、単なる名前の整理では
 ないことの根拠でもある。
 
-1. **持っていない権利は売れない**（`sakkyokuka.rights/validate-grant`）。ongakuka の
+1. **持っていない権利は売れない**（`ongaku.rights/validate-grant`）。ongakuka の
    カタログ資産について studio が持つのは非独占の使用許諾であって原盤権ではないので、
    それを素材にした受注で `:master` を独占譲渡することは成立しない。非独占しか持たない
    権利の独占譲渡、保有地域の外への譲渡、保有期間を超える譲渡、既発の独占譲渡と地域・
    期間が重なる二重譲渡も同じく拒否する。
-2. **作れない物は約束できない**（`sakkyokuka.work/validate-deliverables`）。生成
+2. **作れない物は約束できない**（`ongaku.work/validate-deliverables`）。生成
    パイプラインの出力は音源と stems だけで、譜面も MIDI も DAW セッションも**そもそも
    存在しない**。`:generated` の作品に「譜面つき」を売ることは守れない約束なので受注時に
    落ちる。`producible-kinds` は `:authored` → 5 種、`:generated` → 2 種。
 3. **AI が関与した作品は model-id と開示文を持たずに納品できない**
-   （`sakkyokuka.work/validate-work`）。`ai.gftd.ongakuka.track` の `modelId` と同じ要求。
+   （`ongaku.work/validate-work`）。`ai.gftd.ongakuka.track` の `modelId` と同じ要求。
 
-## なぜ最初の分析が2回外れたか
+## 層を間違えていた（2026-08-06、着地後に訂正）
+
+最初は `rights` / `work` / `commission` を `sakkyokuka`（商売層）に置いた。
+**これは層が逆だった。** 職能側の governor が依存できるのは技芸層だけで
+（`isco-2652` は `ongaku` に、`jsic-3914` は `game-production` に依存する）、
+再利用される判定を -ka に置くと職能 → 商売 の逆向き依存になり、governor から
+呼べない。判定は `kotoba-lang/ongaku` へ移し（`ongaku.rights` / `.work` /
+`.commission`）、`sakkyokuka` には craft library が原理的に知らないもの
+——**この studio がどの作品を持ち、それぞれについて何の権利を実際に保有し、
+既にどこへ何を渡してあるか**（`resources/works.edn`）——だけを残した。
+`ongaku.catalog` に対して `ongakuka/resources/catalog.edn` が立つのと同じ関係。
+
+判定の置き場所を決める規準はこれ: **その関数が特定の studio の事業データを
+必要とするか。** 必要としないなら技芸。`validate-grant` は保有権利を引数で
+受け取るので技芸、「この studio は w-0003 について何を持っているか」は商売。
+
+## `ongakuka` の位置づけも粗かった（同日訂正）
+
+「ongakuka = 他人の既製音源、原盤権は持たない」と書いたが不正確。ongakuka の
+README（origin/main）には **path B: AI generation coscientist**
+（MusicGen / murakumo fleet、ADR-2607171900）があり、ongakuka も自前で音を作る。
+
+正しい軸は音源の出所ではなく**商売の単位** —— 作った音を自分のカタログに積むのか、
+依頼主に権利ごと渡すのか。そして**保有権利は repo 単位ではなく資産・作品単位の
+事実**（path A の調達物は使用許諾のみ、path B の自前生成は原盤を保有）なので、
+台帳がそれを資産ごとに持つ。コードは元から作品単位で持っていたので変更は無く、
+直したのは説明（`sakkyokuka` README / `works.edn` の note / isco-2652 blueprint
+の `:business-layers`）だけ。
+
+## なぜ分析が4回外れたか
 
 一度目——「作曲の craft は無い」と考えかけた。`repo-search` が `kami-ongaku-*` を返して
 訂正された。二度目——「作曲の商売は存在しない」と書いた。ADR-2607121400 の
 `:adr/related` に `adr-2607031510-kotoba-lang-composer` があり、そこから
 `kotoba-lang/composer` → `ai.gftd.ongakuka.*` lexicon 9本に辿り着いて訂正された。
 
-どちらも索引と ADR の相互参照が拾った。**「手元の checkout に無い」と「存在しない」を
+三度目は層（上記）、四度目は ongakuka の位置づけ（上記）。三度目は「既存の
+実装がどちらの向きに依存しているか」を実際に読めば防げた（`isco-2652/deps.edn`
+が答えを持っていた）。四度目は**手元の checkout が pin で止まっていて、
+origin/main の README を読んでいなかった**ことによる —— これは
+「checkout に無い ≠ 存在しない」の変種で、*古い checkout に書いてあること ≠
+今書いてあること*。
+
+最初の2つは索引と ADR の相互参照が拾った。**「手元の checkout に無い」と「存在しない」を
 分けること、および ADR の `:adr/related` を辿ること**が、この種の誤りに対する実際に
 効いた対策だった。名前も一因で、`ongaku.compose/compose` と `ai.gftd.ongakuka.compose` は
 どちらも \"compose\" を名乗るが、前者は選曲、後者は生成である。
@@ -121,26 +157,44 @@ NSID は wire identity なので改名しない（CLAUDE.md「ドメイン移転
 ## 帰結
 
 - 作曲の技芸5本＋生成契約1本が職能に接続され、孤児でなくなった。
-- 「AI 生成の曲に譜面をつけて売る」が受注前に落ちるようになった。以前はどこにも
-  検査が無かった。
+- 「AI 生成の曲に譜面をつけて売る」「持っていない原盤権を売る」が受注前に落ちる
+  ようになった。以前はどこにも検査が無かった。governor は前者を承認待ち
+  （採譜を手配すれば解ける）、後者を hold（署名しても覆らない）に振り分ける。
+- **保有権利と provenance は request ではなく store の track レコードから採る。**
+  呼び出し側が「この作品の原盤権を持っている」と自己申告できてしまうと権利保存の
+  invariant が空文になる。`held-rights-come-from-the-store-not-the-request` が
+  実際に自己申告を送りつけて無視されることを確かめる。
+- ISCO-08 2652 の3層に fleet-ci gate が付いた（`ongaku` / `sakkyokuka` /
+  `cloud-itonami-isco-2652` の `:jvm-test`）。それまでこの職能を検査するものは
+  1本も無かった。
 - `:business-layers` は複数形の新しい key。`jsic-3914` の単数 `:business-layer` は
   そのまま。2026-08-06 時点で 1391 blueprint 中 `business-layer` を持つのは1件のみ、
   code consumer は0件なので、shape の食い違いは実害を持たない。将来 blueprint を
   機械で読むものを書くときは両方を見ること。"
 
   :adr/verification
-  "[{:what \"sakkyokuka suite — nbb (ClojureScript on Node)\" :cmd \"nbb --classpath 'src:test' run-tests.cljs\" :result \"13 tests / 37 assertions, 0 failures 0 errors, exit 0\"}
-   {:what \"sakkyokuka suite — JVM\" :cmd \"clojure -M:test\" :result \"13 tests / 37 assertions, 0 failures 0 errors\"}
-   {:what \"gate が実際に落ちるか（劇場でないことの確認）\" :cmd \"rights.cljc の保有権利チェック (not-any? #(covers? % requested) held) を false に潰したコピーで再実行\" :result \"6 failures / exit 1。復元して 0 failures / exit 0\"}
-   {:what \"blueprint.edn が壊れていないか\" :cmd \"nbb で read-string して keys を出す\" :result \"12 keys、:business-layers を含めて parse 成功\"}
-   {:what \"blueprint key の consumer 有無\" :cmd \"grep -rn 'itonami.blueprint/business-layer|craft-libraries' --include='*.clj*' orgs/ scripts/ manifest/\" :result \"0 件（データ宣言であって実行時契約ではない）\"}]"
+  "[{:what \"ongaku suite（rights/work/commission を含む全体）— JVM\" :cmd \"clojure -M:test\" :result \"18 tests / 52 assertions, 0 failures\"}
+   {:what \"ongaku の新規分 — nbb (ClojureScript on Node)\" :cmd \"nbb --classpath 'src:test' <runner>\" :result \"13 tests / 37 assertions, 0 failures\"}
+   {:what \"sakkyokuka 台帳突き合わせ — nbb と JVM の両方\" :cmd \"nbb --classpath 'src:test:../../kotoba-lang/ongaku/src' run-tests.cljs / clojure -M:test\" :result \"6 tests / 15 assertions, 0 failures（両ランタイム）\"}
+   {:what \"isco-2652 actor + 受注 gate — JVM\" :cmd \"clojure -M:test\" :result \"16 tests / 70 assertions, 0 failures\"}
+   {:what \"受注 gate が劇場でないことの確認\" :cmd \"governor の (when-let [c (:commission request)]) を nil に潰したコピーで再実行\" :result \"18 failures。復元して 0 failures\"}
+   {:what \"権利 gate が劇場でないことの確認\" :cmd \"rights の (not-any? #(covers? % requested) held) を false に潰したコピーで再実行\" :result \"6 failures / exit 1。復元して 0 failures / exit 0\"}
+   {:what \"lint\" :cmd \"clojure -M:lint（ongaku / sakkyokuka / isco-2652）\" :result \"errors 0。warning は既存分のみ（ongaku catalog.cljc の未使用 require、isco-2652 advisor.cljc の未使用 require）\"}
+   {:what \"west pin 4 件がすべて fast-forward か\" :cmd \"gen-west-manifest.cljs --entry ongaku,sakkyokuka,cloud-itonami-isco-2652,ongakuka\" :result \"verify-west-pins: 4 件の pin 変更をすべて検証 OK。diff は revision 4 行のみ、project 数 4127 で不変\"}
+   {:what \"gates.edn が parse でき 3 件増えたか\" :cmd \"nbb で read-string して :repos を数える\" :result \"30 -> 33、3 repo とも deps.edn に :test alias あり\"}
+   {:what \"blueprint.edn が壊れていないか\" :cmd \"nbb で read-string して keys を出す\" :result \"12 keys、parse 成功\"}]"
 
-  :adr/landed
-  "[{:repo \"orgs/cloud-itonami/sakkyokuka\" :commit \"dece243\" :what \"受注・権利・納品の商売層 + 両ランタイムの test\" :url \"https://github.com/cloud-itonami/sakkyokuka\"}
-   {:repo \"orgs/cloud-itonami/cloud-itonami-isco-2652\" :commit \"5416495a96c2\" :what \"craft-libraries に作曲の両経路を追加、business-layers を宣言\"}]"
+:adr/landed
+  "[{:repo \"orgs/kotoba-lang/ongaku\" :commit \"cb88622101057\" :what \"rights/work/commission — 受注で渡す側を gate する（技芸層）\"}
+   {:repo \"orgs/cloud-itonami/sakkyokuka\" :commit \"8260f57b77ce\" :what \"新規。作品台帳（works.edn）と受注の突き合わせ\" :url \"https://github.com/cloud-itonami/sakkyokuka\"}
+   {:repo \"orgs/cloud-itonami/cloud-itonami-isco-2652\" :commit \"ead84682f107\" :what \"craft-libraries に作曲の両経路、business-layers 宣言、governor に受注 gate\"}
+   {:repo \"orgs/cloud-itonami/ongakuka\" :commit \"7982787cb516\" :what \"README に sakkyokuka との境界\"}
+   {:repo \"com-junkawasaki/root\" :commit \"57d3ca6a5cc8\" :what \"ADR + repos.edn + west.yml への sakkyokuka 登録\"}
+   {:repo \"com-junkawasaki/root\" :what \"fleet-ci gates.edn に 3 層の :jvm-test、west pin 4 件前進、この ADR の訂正\"}]"
 
-  :adr/gaps
-  "[{:gap \"sakkyokuka はまだ actor ではない — langgraph StateGraph も governor も ledger も持たない純粋なデータモデル。isco-2652 は :maturity :implemented の reference actor なので、受注 gate をその governor に載せるのが次\" :since \"2026-08-06\"}
-   {:gap \"`gftd-audio-actor`（persona リツ）と `ai.gftd.ongakuka.compose` は sakkyokuka の受注 gate を通っていない。生成は従来どおり動くが、権利と納品の検査は現状 sakkyokuka を明示的に呼んだときだけ効く\" :since \"2026-08-06\"}
-   {:gap \"craft library へのコード依存が無い（deps.edn は :deps {}）。SMF から尺を測る等、実体を読む機能を足す時点で kami-ongaku-sequencer への git dep が要る\" :since \"2026-08-06\"}
-   {:gap \"`ongakuka` 側の README はまだ sakkyokuka との境界を書いていない（isco-2652 の README には入れた）\" :since \"2026-08-06\"}]"}]
+:adr/gaps
+  "[{:gap \"`gftd-audio-actor`（persona リツ）と `ai.gftd.ongakuka.compose` は受注 gate を通っていない。生成は従来どおり動くが、権利と納品の検査は isco-2652 の actor 経由で受注を出したときだけ効く\" :since \"2026-08-06\"}
+   {:gap \"受注 gate は store の track レコードに :work/held-rights / :work/provenance が入っていることを前提にする。既存の track はこれらを持たないので、provenance は :authored に、保有権利は空に既定される（= 何も譲渡できない）。既存カタログへの backfill は未着手\" :since \"2026-08-06\"}
+   {:gap \"sakkyokuka の台帳 works.edn は seed 3 件のみで、実際の受注も実際の作品も入っていない\" :since \"2026-08-06\"}
+   {:gap \"fleet-ci に足した 3 gate はまだ 1 度も実行されていない（次の tick 待ち）。落ちることは手元の mutation で確かめたが、fleet 上で green を見てはいない\" :since \"2026-08-06\"}
+   {:gap \"fleet-db への reconcile は未実施。west.yml が先行している\" :since \"2026-08-06\"}]"}]

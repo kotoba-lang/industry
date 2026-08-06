@@ -79,6 +79,20 @@
   {:name "org-chainagnostic-cacao" :gate :jvm-test :cd true}
   {:name "tech-ipfs-specs-ipns" :gate :jvm-test :cd true}
   {:name "kotoba-delta" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd true}
+
+  ;; ISCO-08 2652（Musicians, Singers *and Composers*）の3層。ADR-2608081000 で
+  ;; 作曲の商売層を分けたときに、この職能を検査するものが1本も無いことに気づいた。
+  ;;
+  ;; 3 本とも :jvm-test。sakkyokuka と isco-2652 は ongaku を git dep で引くので、
+  ;; :nbb-test（classpath はノードへ送った repo tree の中だけ）では sibling repo の
+  ;; ソースに届かない。deps.edn 経由ならノードの egress で解決される
+  ;; （2026-08-05 に到達可能な 10 ノード全部で repo1.maven.org / github.com が 200）。
+  ;; ongaku と sakkyokuka は nbb でも走るが、両ランタイムを CI で二重に回すのは
+  ;; まだ要らない（両方 green であることは landing 時に手で確かめている）。
+  {:name "ongaku" :gate :jvm-test :cd true}
+  {:name "sakkyokuka" :gate :jvm-test :cd true}
+  {:name "cloud-itonami-isco-2652" :gate :jvm-test :cd true}
+
   ;; :include-ext = ノードへ送る tree を必要な path だけに絞る（trees+blobs API 経由）。
   ;; この repo の full tarball は 1.6GB（assets/動画・画像）で、EDN を parse するだけの
   ;; gate に毎回転送するのは論外。:min-files は「絞り込みが壊れて 0 件 → trivially pass」を
