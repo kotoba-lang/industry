@@ -1,0 +1,146 @@
+[{:db/id -1
+  :adr/id "adr-2608081000-sakkyokuka-composition-business-layer-split"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-06"
+  :adr/last_verified "2026-08-06"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/title "ADR-2608081000: 作曲は「無かった」のではなく3箇所に散っていた。ISCO-08 2652 は割らず、-ka（商売層）だけを `ongakuka`（選曲とライセンス運用）と `sakkyokuka`（受注制作）に割る"
+  :adr/topic "sakkyokuka-composition-business-layer-split"
+  :adr/repos ["orgs/cloud-itonami/sakkyokuka"
+              "orgs/cloud-itonami/cloud-itonami-isco-2652"
+              "orgs/cloud-itonami/ongakuka"
+              "orgs/kotoba-lang/kami-ongaku-notation"
+              "orgs/kotoba-lang/kami-ongaku-sequencer"
+              "orgs/kotoba-lang/kami-ongaku-project"
+              "orgs/kotoba-lang/composer"
+              "com-junkawasaki/root (manifest/west.yml)"]
+
+  :adr/authoritative_for
+  ["作曲（composition）の商売層は `cloud-itonami/sakkyokuka`。既製 BGM カタログの選定とライセンス運用の商売層は `cloud-itonami/ongakuka`。この2つを混ぜない"
+   "職能（ISCO-08 2652 Musicians, Singers and Composers）は割らない。-ka が ISCO より細かいのは既存の形（isco-2651 に対する mangaka）"
+   "`cloud-itonami-isco-2652` の `:craft-libraries` は作曲の両経路（人が書く kami-ongaku-* / 生成する composer）を含む"
+   "`ai.gftd.ongakuka.*` の lexicon NSID は改名しない。名前は discovery alias であって identity ではない"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2607023000-ka-creative-craft-libs-isco-decomposition"
+                "adr-2607121400-kami-ongaku-eizo-commercial-grade-cljs-stack"
+                "adr-2607031510-kotoba-lang-composer"
+                "adr-2607123000-gftd-per-modality-asset-actors"
+                "adr-2607221000-animeka-classification-collision"]
+
+  :adr/body
+  "## 問い
+
+「今の cloud-itonami に sakkyokuka はある?」——無い。では作れ、で終わる話に見えたが、
+作る前に索引を引いた結果、**作曲は「無い」のではなく3箇所に散っていた**ことが分かった。
+これは CLAUDE.md の「『無い』と結論する前に検索する」が想定しているとおりの事例で、
+最初の設計案（作曲の技芸は孤児、商売は存在しない）は2回訂正されている。
+
+## 実測した現在地（2026-08-06）
+
+**1. `ongakuka` の商売は作曲ではない。** `kotoba-lang/ongaku` の関数は
+`ongaku.compose/compose` という名前だが、返るのは `{:asset/id :asset/path :credit/text
+:policy/render-only? ...}` ——既製アセットへのポインタである。README も
+\"BGM **selection** and license-policy gating\" と書いており、`cloud-itonami/ongakuka` の
+実体も `resources/catalog.edn`（DOVA-SYNDROME / Incompetech 由来の他人の音源の台帳）
+だけ。つまり商売は**選曲とライセンス運用**。
+
+**2. 作曲の技芸は在るが、職能に接続されていなかった。** ADR-2607121400 で 2026-07-12 に
+landed した `kami-ongaku-notation`（譜面 IR + MusicXML）/ `-sequencer`（MIDI 相当 +
+SMF）/ `-project`（DAW セッション）/ `-plugin-host` / `-sampler` が実在する。しかし
+`cloud-itonami-isco-2652/blueprint.edn` の `:craft-libraries` は
+`[\"kotoba-lang/ongaku\"]` の1本だけで、「Musicians, Singers **and Composers**」を
+名乗る職能が選曲ライブラリしか宣言していなかった。
+
+**3. 生成経路の作曲は既に稼働している。** `ai.gftd.ongakuka.compose` の XRPC surface が
+`gftdcojp/apps-gftdcojp/00-contracts/lexicons/ai/gftd/ongakuka/` に9本あり
+（compose / regenerate / track / stem / style / generation / getTrack / listTracks /
+health）、パイプラインは lyricist→composer→vocalist‖arranger→mixer→critic、
+model は `diffrhythm-1.2-ja` 系、出力は master audio と stems。
+`etzhayyim/com-etzhayyim-app-ongakuka` に同型の port がある。この契約を模した craft lib が
+`kotoba-lang/composer`（ADR-2607031510）。さらに `cloud-itonami/gftd-audio-actor` が
+persona「リツ、作曲家」として network-isekai 向けの BGM/SFX 生成 actor をやっている。
+
+## 決定
+
+**職能は割らず、商売層だけを割る。**
+
+ISCO-08 2652 が Musicians, Singers and Composers を1職業として束ねているのは正しい。
+一方で商売の力学は別物である:
+
+| | ongakuka | sakkyokuka |
+|---|---|---|
+| 原資 | 他人の既製音源 | 自分が作る |
+| 権利 | 第三者ライセンスの遵守 | 原盤権・著作権・出版権を自分が持つ |
+| 収益 | 使用許諾 / render 同梱 | 受注 + 二次利用 |
+| 納品物 | asset path + credit text | master / stems / MIDI / 譜面 / セッション |
+| craft | `kotoba-lang/ongaku` | `kami-ongaku-*` + `composer` |
+
+-ka が ISCO より細かいのは既存の形である——`isco-2651` は painters / sculptors /
+cartoonists を束ねているのに、-ka 側は `mangaka` だけが立っている。
+
+**`sakkyokuka` は greenfield ではなく集約である。** 既存の生成経路
+（`ai.gftd.ongakuka.*` / `gftd-audio-actor`）はそのまま残し、置き換えない。lexicon の
+NSID は wire identity なので改名しない（CLAUDE.md「ドメイン移転で改名しない」と同型）。
+新しく1箇所に集めるのは**商売としての受注・権利・納品**であって、生成の実装ではない。
+
+## sakkyokuka が構造的に拒否すること
+
+`kotoba-lang/ongaku` が license policy 違反の利用を構造的に拒否するのと同じことを、
+権利の譲渡側と納品の約束側で行う。これが -ka を分ける実利であり、単なる名前の整理では
+ないことの根拠でもある。
+
+1. **持っていない権利は売れない**（`sakkyokuka.rights/validate-grant`）。ongakuka の
+   カタログ資産について studio が持つのは非独占の使用許諾であって原盤権ではないので、
+   それを素材にした受注で `:master` を独占譲渡することは成立しない。非独占しか持たない
+   権利の独占譲渡、保有地域の外への譲渡、保有期間を超える譲渡、既発の独占譲渡と地域・
+   期間が重なる二重譲渡も同じく拒否する。
+2. **作れない物は約束できない**（`sakkyokuka.work/validate-deliverables`）。生成
+   パイプラインの出力は音源と stems だけで、譜面も MIDI も DAW セッションも**そもそも
+   存在しない**。`:generated` の作品に「譜面つき」を売ることは守れない約束なので受注時に
+   落ちる。`producible-kinds` は `:authored` → 5 種、`:generated` → 2 種。
+3. **AI が関与した作品は model-id と開示文を持たずに納品できない**
+   （`sakkyokuka.work/validate-work`）。`ai.gftd.ongakuka.track` の `modelId` と同じ要求。
+
+## なぜ最初の分析が2回外れたか
+
+一度目——「作曲の craft は無い」と考えかけた。`repo-search` が `kami-ongaku-*` を返して
+訂正された。二度目——「作曲の商売は存在しない」と書いた。ADR-2607121400 の
+`:adr/related` に `adr-2607031510-kotoba-lang-composer` があり、そこから
+`kotoba-lang/composer` → `ai.gftd.ongakuka.*` lexicon 9本に辿り着いて訂正された。
+
+どちらも索引と ADR の相互参照が拾った。**「手元の checkout に無い」と「存在しない」を
+分けること、および ADR の `:adr/related` を辿ること**が、この種の誤りに対する実際に
+効いた対策だった。名前も一因で、`ongaku.compose/compose` と `ai.gftd.ongakuka.compose` は
+どちらも \"compose\" を名乗るが、前者は選曲、後者は生成である。
+
+## 帰結
+
+- 作曲の技芸5本＋生成契約1本が職能に接続され、孤児でなくなった。
+- 「AI 生成の曲に譜面をつけて売る」が受注前に落ちるようになった。以前はどこにも
+  検査が無かった。
+- `:business-layers` は複数形の新しい key。`jsic-3914` の単数 `:business-layer` は
+  そのまま。2026-08-06 時点で 1391 blueprint 中 `business-layer` を持つのは1件のみ、
+  code consumer は0件なので、shape の食い違いは実害を持たない。将来 blueprint を
+  機械で読むものを書くときは両方を見ること。"
+
+  :adr/verification
+  "[{:what \"sakkyokuka suite — nbb (ClojureScript on Node)\" :cmd \"nbb --classpath 'src:test' run-tests.cljs\" :result \"13 tests / 37 assertions, 0 failures 0 errors, exit 0\"}
+   {:what \"sakkyokuka suite — JVM\" :cmd \"clojure -M:test\" :result \"13 tests / 37 assertions, 0 failures 0 errors\"}
+   {:what \"gate が実際に落ちるか（劇場でないことの確認）\" :cmd \"rights.cljc の保有権利チェック (not-any? #(covers? % requested) held) を false に潰したコピーで再実行\" :result \"6 failures / exit 1。復元して 0 failures / exit 0\"}
+   {:what \"blueprint.edn が壊れていないか\" :cmd \"nbb で read-string して keys を出す\" :result \"12 keys、:business-layers を含めて parse 成功\"}
+   {:what \"blueprint key の consumer 有無\" :cmd \"grep -rn 'itonami.blueprint/business-layer|craft-libraries' --include='*.clj*' orgs/ scripts/ manifest/\" :result \"0 件（データ宣言であって実行時契約ではない）\"}]"
+
+  :adr/landed
+  "[{:repo \"orgs/cloud-itonami/sakkyokuka\" :commit \"dece243\" :what \"受注・権利・納品の商売層 + 両ランタイムの test\" :url \"https://github.com/cloud-itonami/sakkyokuka\"}
+   {:repo \"orgs/cloud-itonami/cloud-itonami-isco-2652\" :commit \"5416495a96c2\" :what \"craft-libraries に作曲の両経路を追加、business-layers を宣言\"}]"
+
+  :adr/gaps
+  "[{:gap \"sakkyokuka はまだ actor ではない — langgraph StateGraph も governor も ledger も持たない純粋なデータモデル。isco-2652 は :maturity :implemented の reference actor なので、受注 gate をその governor に載せるのが次\" :since \"2026-08-06\"}
+   {:gap \"`gftd-audio-actor`（persona リツ）と `ai.gftd.ongakuka.compose` は sakkyokuka の受注 gate を通っていない。生成は従来どおり動くが、権利と納品の検査は現状 sakkyokuka を明示的に呼んだときだけ効く\" :since \"2026-08-06\"}
+   {:gap \"craft library へのコード依存が無い（deps.edn は :deps {}）。SMF から尺を測る等、実体を読む機能を足す時点で kami-ongaku-sequencer への git dep が要る\" :since \"2026-08-06\"}
+   {:gap \"`ongakuka` 側の README はまだ sakkyokuka との境界を書いていない（isco-2652 の README には入れた）\" :since \"2026-08-06\"}]"}]
