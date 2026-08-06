@@ -203,6 +203,15 @@
    :script "gates/west-pin-policy-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
+  ;; 法規制の datom 射影（ADR-2608080000）。正本は各 actor の facts.cljc で、
+  ;; 90-docs/regulatory/permits.datoms.edn はその射影。actor 側が法令・所管庁を
+  ;; 直したのに射影を作り直していないと、datom 面が古い規制を返し続ける ——
+  ;; 古い値も「それらしい」ので読み手には見分けが付かない。
+  ;; :include-ext に .cljc が要るのは、生成器が actor の facts.cljc を読むため。
+  {:name "root" :id "root-permit-index" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/permit-index-check.cljs"
+   :include-ext [".edn" ".cljs" ".cljc"] :min-files 1500 :cd false}
+
   ;; Projection contracts are rebuilt from the exact Git-tip snapshot shipped
   ;; by the fleet operator. The archive has no .git directory, so this gate
   ;; uses snapshot mode: current input/schema/loader hashes plus logical and

@@ -1,0 +1,152 @@
+[{:db/id -1
+  :adr/id "2608080000"
+  :adr/doc_type "adr"
+  :adr/topic "permit-index-datom-plane"
+  :adr/title "各国の法規制（許認可の要件）を datom 面に載せて query できるようにする — 結合できない鍵を「使えない」とデータ自身に申告させる"
+  :adr/status :accepted
+  :adr/date "2026-08-06"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["法規制カタログ（各 actor の facts.cljc）の datom 面への射影規則"
+   "法域 id を「導出」ではなく「観測」で決める規律"
+   "要件側と手続き側（kyoninka）の結合可否と、その申告方法"]
+  :adr/related ["2608060000" "2608052000" "2607141620" "2607122400"]
+  :adr/repos ["com-junkawasaki/root"
+              "kotoba-lang/kyoninka"
+              "cloud-itonami/cloud-itonami-licensed-operator"]
+  :adr/body
+  "# ADR-2608080000: 許認可の要件を datom 面に載せる
+
+**Status**: accepted / **Date**: 2026-08-06
+
+## Directive
+
+オーナー指示: 「採掘許可、配電などの許認可が必要なものは 各国の法規制の edn と
+datomic query で query できるように。また許認可手続き系の repo と連携」。
+
+## 何が無かったか（実測 2026-08-06）
+
+答えは**既に実在していた**。cloud-itonami の governed actor は各自
+`src/<ns>/facts.cljc` の `catalog` に、根拠法・所管庁・国内基準・必要証跡・公式 URL を
+持っている。**無かったのは横断で引く手段**で、それが 373 repo の `.cljc` に散っていた。
+
+手続き側も既に 2 本ある: `kotoba-lang/kyoninka`（日本の許認可を procedure-as-data で
+持つ、Datomic 互換 schema + 8 状態機械）と
+`cloud-itonami/cloud-itonami-licensed-operator`（名義人になれるかの判定 commons）。
+
+## 決定
+
+### 1. 射影であって正本ではない
+
+`scripts/gen-permit-index.cljs` が `90-docs/regulatory/permits.datoms.edn` を生成し、
+`:source/dataset \"permits\"` として index 面に載せる。**正本は各 actor の
+`facts.cljc` のまま。** actor 側を直せば次の生成で反映される。
+
+### 2. 法域 id は導出せず観測する
+
+`:permit/jurisdiction` は **`cloud-itonami-iso3166-<iso3>` repo が実在する ISO3 の
+ときだけ**出す。生キーは常に `:permit/subject-key` に残す。
+
+`[A-Z]{3}` を国だと決めると偽の国コードを鋳造する —— 実測で `\"EUR\"` と `\"IEC\"`
+（標準化団体）が 3 文字で混ざっており、881 個の map catalog のうち **187 は
+自治体 slug（\"paris\"）・団体 slug・制度 keyword（`:davis-bacon-act`）・
+製品セグメント（\"AUTOMOTIVE\"）で keyed** されている。
+
+これは `cloud-itonami-isic-3811` が既に採っている規律と同じ —— あちらは
+`{:jpn \"JPN\" …}` という**閉じた map** で写しており、`(str/upper-case (name k))` で
+導出しない理由を「誰も調べていない id を作らないため」と書いている。
+
+### 3. `catalog` という var 名は 3 種類の別物に使われている。値の形で分岐する
+
+| 形 | 規模 | 扱い |
+|---|---|---|
+| requirement map | 1,455 行 / 373 repo | **これが対象**（`:permit/source-shape :requirement-map`） |
+| record vector（`:statute/*` `:ordinance/*`） | 2,663 行 / 291 repo | 対象外（形も意味も別） |
+| source allowlist | 16 repo | 対象外（governor の引用元 allowlist） |
+| `(def jurisdictions)` | 31 repo | 別 tier（`:jurisdictions-map`、**法的引用を持たない**） |
+
+第 4 の形は `{:jp/maff {:id :name :required-evidence}}` で、法令名が `:name` の散文に
+入っているだけ。**同じ tier に混ぜると『引用付きの要件』の件数が水増しされる**ので
+`:permit/source-shape` で分け、coverage が両方の件数を申告する。
+
+### 4. 第 2 の引用系統はハードコードしない
+
+`<prefix>-<suffix>` の族が **194 種類**ある（`:corporate-number-*` 166 repo、
+`:rep-*` 113、`:blast-*` 2、残り約 180 は 1 repo ずつ）。接尾辞
+（`owner-authority` / `legal-basis` / `provenance` / …）で束ね、接頭辞をトピックにして
+`:permit/citations` に畳む。ハードコードすると構造上 8 属性 × N トピックで済むものが
+**692 属性**になる。
+
+### 5. 結合できない鍵を「使えない」とデータ自身に申告させる
+
+生成物は `:join/*` entity を持ち、結合の可否を**測定値つきで**載せる:
+
+| 結合 | 状態 | 根拠（実測） |
+|---|---|---|
+| `:permit/repo` → `:repo/path` | **works** | 同形。成熟度・分類と突き合わせられる |
+| `:permit/jurisdiction` → iso3166 repo | **works** | 観測済み ISO3 のみ |
+| `:permit/kyoninka-procedure` → `:procedure/id` | **works** | キーワード厳密一致。実測 2 本（片方向） |
+| `:permit/legal-basis` → `:procedure/law` | **unusable** | 1,355 スロットに 1,018 個の異なる文字列。手続き側との交差は**空集合** |
+| `:permit/authority` → `:procedure/authority` | **unusable** | 4 例中 1 例のみ一致。粒度も違う（「都道府県公安委員会」vs「東京都公安委員会」） |
+
+**使えない結合を query の書き手が自分で発見しなくて済むようにする**のが目的。
+散文の注意書きではなく entity にしたのは、query が読める形でないと読まれないため。
+
+### 6. 法域別の行数は制度の数ではない（coverage が申告する）
+
+iso3166 の marketentry catalog が各国 repo に USA/DEU/GBR の比較行を**再掲**するので、
+USA が 304 行に見えても実体は少数の制度の再掲（実測: 545 行中、自国行は 185）。
+国ごとの制度を数えるには `:permit/repo` で絞る必要がある。
+
+## 実測（2026-08-06）
+
+- **1,530 行 / 188 法域 / 395 ファイル**。うち引用あり 1,406 / 引用なし（jurisdictions 形）90 /
+  手続きへの橋（licensed-operator）27
+- 対象外: record vector 等 517 ファイル / `catalog` も `jurisdictions` も無い 41 /
+  map でない 17
+- 生成は冪等（`--check` 一致）
+
+動く query の例:
+
+    ;; 採掘（0810）の法域別 所管庁・根拠法
+    [:find ?j ?auth ?law :where
+     [?e \"source/dataset\" \"permits\"] [?e \"permit/isic\" \"0810\"]
+     [?e \"permit/jurisdiction\" ?j] [?e \"permit/authority\" ?auth]
+     [?e \"permit/legal-basis\" ?law]]
+    ;; → JPN 鉱山保安法/METI, USA Mine Act/MSHA, GBR Quarries Regulations 1999/HSE,
+    ;;   DEU Bundesberggesetz/Landesbergämter
+
+    ;; 許認可 → 手続き（窓口・手数料まで降りる）
+    [:find ?j ?lic ?law ?win ?fee ?proc :where
+     [?e \"source/dataset\" \"permits\"] [?e \"permit/kyoninka-procedure\" ?proc]
+     [?e \"permit/jurisdiction\" ?j] [?e \"permit/licence-name\" ?lic]
+     [?e \"permit/legal-basis\" ?law] [?e \"permit/window\" ?win] [?e \"permit/fee-jpy\" ?fee]]
+    ;; → JPN 古物商許可 / 古物営業法第3条 / 管轄警察署（防犯係）/ 19000 / kobutsu-marunouchi
+
+## 正直な限界
+
+1. **手続き側は日本の 2 本しか無い。** `kotoba-lang/kyoninka` の収録は
+   産廃収集運搬業許可と古物商許可のみ。橋は 27 行中 2 行しか渡っていない。
+2. **`kotoba-lang/kyoninka` は多法域を表現できない。** schema に法域属性が 1 つも
+   無く、`:procedure/fee-jpy` で通貨が型に焼かれている。さらに schema と実データが
+   3 点で不整合（`fee-jpy` 未使用 / `standard-period-days` は long 宣言なのに実データは
+   map / documents 等 6 属性が未宣言）で、**このままでは datom 面に載らない**。
+   手続き側を面に載せるには、まずあちらの schema を実データに合わせ、法域軸を
+   足す必要がある —— 別の決定なのでこの ADR では触っていない。
+3. **`regulatory-tracker` と `isco-3354` は規制データ 0 件・消費者 0 件。**
+   実装はあるがデータが無いので、繋ぐものが無い。
+4. **状態機械の語彙が 2 系統ある。** kyoninka（`:preparing :granted`）と
+   regulatory-tracker（`:draft :approved`）は `:submitted :rejected :withdrawn` の
+   3 語だけ一致する**危険な半一致**で、素朴に見ると同じ状態機械に読める。
+   片方の遷移表でもう片方を検証すると通らない。統合するなら先にどちらかへ寄せる。
+5. **`:required-evidence` は自由記述**（4,796 件、統制語彙なし）。キーにできない。
+6. **抽出器の重複。** `scripts/lib/cljc_literal.cljs` と
+   `scripts/gen-market-entry-registry.cljs` に同じ括弧バランス走査がある。
+   後者を移していないのは、出力が変わらないことを確かめる手段がこの周に無かったため。
+
+## 次の 1 手
+
+`kotoba-lang/kyoninka` の schema を実データに合わせ、法域軸（`:procedure/jurisdiction`）と
+通貨中立な手数料（`:procedure/fee` + `:procedure/fee-currency`）を足す。そこまで行けば
+手続き側も同じ datom 面に載り、`(iso3, sector)` で要件と手続きが両方向に引ける。
+"}]
