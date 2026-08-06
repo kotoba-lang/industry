@@ -238,6 +238,42 @@ re-frame の global `:after` interceptor が、どのイベント経由でも ro
 検証: `track_api_test.cljs` **12 checks / 0 failures**、whitelist を外すと
 **4 failures**（gate が実際に落ちることを確認）。
 
+## 読む面（同日追加）
+
+計測しただけで読めないカウンタは劇場である —— 収集コストは同じまま何も買わず、
+さらに「その問いは見張られている」という誤った印象だけを与える。両サイトに
+secret-gated な read surface を足した。
+
+| | エンドポイント | 認証 |
+|---|---|---|
+| shinshi.club | `GET /_metrics/audience?window_days=&end_day=` | `x-internal-trust`（`/_metrics/revenue` と同じ gate、`metrics/authorized` に切り出して共有） |
+| babiniku.net | `GET /api/telemetry-report?window_days=&end_day=` | `Bearer`（`reaction-moderation.js` と同じ規約） |
+
+**集計値でも public にしない。** オーディエンス規模と funnel の形は business data である。
+
+**未設定のとき閉じる順序が本体。** 「間違った secret を弾く」より危険なのは、
+**secret が未設定のまま起動し、`authorization` を undefined と比較して誰にでも
+配ってしまう**経路である。shinshi は 500、babiniku は 503 を返す分岐を認証比較の
+*前* に置き、両方をテストで固定した。
+
+**各セクションが `collected-since` を持つ。** dwell / transition のテーブルは
+2026-08-06 に作ったので、それ以前まで遡る window は 0 行を返す。それを
+「誰も滞在していない」と読むのは正反対で、**行が無いのは NOT MEASURED**。
+呼び出し側が両者を区別できるよう境界を渡す。
+
+**window は両端 inclusive**（7 日 = 07-31〜08-06）。ここを 1 日ずらすと、人間が
+「今週」として読む数字が全部ずれる。90 日で clamp し、負値・非数でも範囲が
+反転しないことをテストで固定した。**1 本のクエリが失敗しても、そのセクションが
+空になるだけでレポート全体は返る。**
+
+検証: shinshi `122 tests / 3170 assertions, 0 failures`（403 分岐を外すと 4 failures）、
+babiniku `12 checks / 0 failures`（401 分岐を外すと 2 failures）。
+live: `shinshi.club/_metrics/audience` は secret 無し・誤 secret とも **403**、
+POST は 405、サイト本体は 200。
+
+⚠ deploy 直後は Cloudflare の伝播中に古い版が応答する。実際に一度
+「403 になっていない」と誤診した —— **deploy 直後の 1 回の probe を結論にしない。**
+
 # Consequences
 
 - 両サイトで『どの route がどれだけ読まれ、次にどこへ行くか』が初めて測れる。
@@ -267,6 +303,14 @@ re-frame の global `:after` interceptor が、どのイベント経由でも ro
   RUM scope が無い（403）。dashboard での 1 手作業
 - **`kotoba-lang/senden` は consumer ゼロのまま。** 今回 2 つのサイトが独自に
   funnel 語彙を持ったので、3 つ目の前に寄せるかを決める
-- **どちらのサイトも計測結果を読む面が無い。** テーブルはあるが、集計を見る
-  ダッシュボードも、fleet の EDN 面（`:source/dataset`）への取り込み経路も無い。
-  次に効くのはここ"}]
+- **読む面は API までで、ダッシュボードは無い。** `/_metrics/audience` と
+  `/api/telemetry-report` は JSON を返すが、それを人が見る画面は無い。次に効くのは
+  `70-tools/bmc` の collector からこの 2 本を叩き、`90-docs/business/metrics/*.edn`
+  に綴じ込むこと（shinshi の `/_metrics/revenue` が既にその形を持っている）
+- **fleet の EDN 面（`:source/dataset`）への取り込み経路が無い。** 2 サイトの
+  スキーマを揃えたので、`repo-taxonomy` / `market-intel` と join できる形で
+  載せられるはずだが、まだ載っていない
+- **babiniku の `TELEMETRY_REPORT_SECRET` は provisioning 済み**（Pages production
+  secret）。値は macOS login keychain の service
+  `net-babiniku TELEMETRY_REPORT_SECRET` にある。shinshi 側は既存の
+  `DISPATCHER_INTERNAL_SECRET` / `GROWTH_ACTOR_READONLY_SECRET` をそのまま使う"}]
