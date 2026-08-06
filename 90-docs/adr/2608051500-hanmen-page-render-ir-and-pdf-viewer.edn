@@ -421,6 +421,55 @@ BT/ET 間の文字列を集めるだけ —— **配置には全く使えない*
 1 つの message で 8 文書落ちるなら書くべき decoder があり、8 つの message で
 8 文書なら corpus の問題 —— これは 3 種なので前者に近い。
 
+## セッション終了時の状態（2026-08-06 closing）
+
+**全て default branch に着地済み。** 未 merge の branch も worktree も残していない。
+
+| repo | main | 検証 |
+|---|---|---|
+| `kotoba-lang/hanmen` | `cffae2d` | 73 tests / 253 assertions・lint 0/0 |
+| `kotoba-lang/com-adobe-cmap` | `e02ad46` | 13 / 44・lint 0/0 |
+| `kotoba-lang/loop-render-fidelity` | `3b0a1b0` | 9 / 19・lint 0/0 |
+| `kotoba-lang/org-iso-opentype` | `8604a2c` | 9 / 21・lint 0/0 |
+| `kotoba-lang/org-w3-png` | `8948070` | 11 / 36・lint 0/0 |
+| `kotoba-lang/mokuroku-ui` | `f950a4b` | 10 / 44・design-quality 100.0 |
+| `kotoba-lang/app-preview` | `c80d546` | 13 / 36・design-quality 100.0 |
+| `cloud-itonami/cloud-itonami-app` | closing 時 main | **1176 tests / 4803 assertions**・lint 0 errors |
+
+いずれも closing 時に default branch tip で再実行し **0 failures / 0 errors** を確認した
+（app は他 session が main を先に進めているため、`e49f783` 時点の数値と closing 時の
+再実行の両方を記録）。
+
+### 次の反復の入口（loop が出した的）
+
+```sh
+cd orgs/kotoba-lang/loop-render-fidelity
+bin/run-fidelity-loop <実文書のあるディレクトリ> 40 ./evidence
+```
+
+初回実行の結果がそのまま優先順位:
+
+1. **`/M under radix 16` 系で 6 文書が parse 不能** —— hex parser が content を hex と
+   誤読している。40 件中 9 件の parse 失敗のうち最大の signature で、**未調査の実バグ**。
+2. `zlib: stream ends before its Adler-32 trailer` 2 件（`org-ietf-deflate` 上流）
+3. 比較可能 6 ページ中 1 ページで**文字が 1 つ落ちる**（証人との不一致）
+4. `:font/no-tounicode` 6 件（`Adobe-Identity` = 原理的に復号不能）
+
+### このセッションで自分がやった間違い（再発防止のため残す）
+
+- **lint の `errors: 1` を読む前に merge した（2 回）。** `:clj` だけの `:require` と
+  `.cljc` の `format`。**どちらもテストは全部緑**で、まだ ClojureScript で走らせて
+  いないから —— linter があって suite に無い理由そのもの。
+- **ADR の本文に生の二重引用符を入れて EDN を壊した（3 回目はこの一文自体だった）。** 1 回目は repo の edn gate が止め、2 回目と
+  3 回目は自分の parse 検証で気付いた —— **3 回目は「生の引用符を入れるな」と
+  書いている行の中で起きた。****自分の検証は「有効な EDN・短い body」を
+  見て何も言わなかった** —— 壊れ方が「切り詰め」なので、パースが通ることは検証にならない。
+- **測定を 3 回間違えた。** fill と stroke を `or` で潰した / advance を gap と誤認した /
+  空 run が満点 baseline を作った。`loop-render-fidelity` はこの 3 つを code にして
+  test を付けたもの。
+- **セッション再起動で未 commit の app 作業を 1 度失った**（scratchpad が消えた）。
+  以降は各ステップで commit してから次へ進んだ。
+
 ## まだ無いもの（「実装済み」と読まないこと）
 
 1. **`Adobe-Identity` を名乗るフォントは誰にも復号できない。** 「CID の意味はフォントが
