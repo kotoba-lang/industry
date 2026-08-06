@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 12392, "etzhayyim-xrpc-proxy" 586},
+ {"etzhayyim-did-web" 12717, "etzhayyim-xrpc-proxy" 586},
  :zone
- {:requests-7d 51735,
-  :pageviews-7d 1279,
-  :uniques-7d-sum 1865,
+ {:requests-7d 52304,
+  :pageviews-7d 1386,
+  :uniques-7d-sum 1881,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 16}
+  [{:path "/robots.txt", :requests 19}
+   {:path "/actor/nusa/system-dynamics", :requests 4}
+   {:path "/actor/infra-utility-connect/system-dynamics", :requests 4}
+   {:path "/actor/sarutahiko/system-dynamics", :requests 4}
+   {:path "/actor/watatsuna/system-dynamics", :requests 3}
    {:path "/", :requests 3}
-   {:path "/actor/nusa/system-dynamics", :requests 3}
-   {:path "/actor/tomoshibi/did.json", :requests 3}
-   {:path "/actor/makura/did.json", :requests 3}
-   {:path "/actor/jinushi/did.json", :requests 3}
-   {:path "/actor/tsuzuri/did.json", :requests 3}
-   {:path "/.well-known/did.json", :requests 3}],
-  :status-mix {:client-error 754, :ok 200, :server-error 723},
+   {:path "/actor/pinner/system-dynamics", :requests 3}
+   {:path "/sitemap.xml", :requests 3}],
+  :status-mix {:client-error 840, :ok 260, :server-error 769},
   :window "24h"},
  :as-of "2026-08-06",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 45, :error-5xx-pct 43},
+ {:window "24h", :probe-4xx-pct 45, :error-5xx-pct 41},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 16 · / 3 · /actor/nusa/system-dynamics 3 · /actor/tomoshibi/did.json 3 · /actor/makura/did.json 3 | 4xx(probe) 45% · 5xx 43%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 19 · /actor/nusa/system-dynamics 4 · /actor/infra-utility-connect/system-dyna… 4 · /actor/sarutahiko/system-dynamics 4 · /actor/watatsuna/system-dynamics 3 | 4xx(probe) 45% · 5xx 41%",
  :signal
- "etzhayyim.com 実測 51735 req/7d・1865 uniques(日次和)・うち4xx probe 45%(24h)、workers 12978 inv/7d"}
+ "etzhayyim.com 実測 52304 req/7d・1881 uniques(日次和)・うち4xx probe 45%(24h)、workers 13303 inv/7d"}
