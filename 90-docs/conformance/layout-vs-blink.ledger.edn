@@ -4369,3 +4369,109 @@
   ~1 probe in 10 as a null getElementById, WHICH READS AS A WRONG ANSWER.
   Two measurements were taken from that state before it was found, and
   both were re-run."}
+
+{:seq 73
+ :date "2026-08-06"
+ :repo "kotoba-lang/cssom"
+ :commit "44402203906370d8f003a68342f0d942f331f7cc"
+ :title "corpus expansion into selector state, pseudo-elements and box alignment -- and two harness scoping defects"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 744 :after 817}}
+ :measured
+ {:note "THREE columns. The middle is the base-commit engine on the
+         FINISHED corpus, so coverage and engine change do not pay for
+         each other."
+  :geometry {:at-744 "2402/2410, 737/744 clean"
+             :base-engine-at-817 "2583/2631, 787/817 clean"
+             :after "2593/2631, 794/817 clean"}
+  :computed-style {:at-744 "33845/33851, 740/744 clean"
+                   :base-engine-at-817 "36994/37029, 792/817"
+                   :after "37002/37029, 798/817"
+                   :cascade-residual {:base-at-817 30 :after 22}}
+  :paint-order {:at-744 "18573/18592, 733/744" :after "20322/20392, 798/816"}
+  :line-structure {:at-744 "713/716" :after "782/787"}
+  :the-honest-drop "geometry 100% -> 98% and the cascade residual 6 -> 30
+                    ON COVERAGE ALONE. Of the 22 left, SIX ARE PRE-EXISTING
+                    AND ARE THE SAME SIX WITH THE SAME CAUSES -- nothing
+                    regressed."}
+ :verified-on-merged-main
+ {:cssom-tests "1048 / 2808, 0 failures (1030/2767 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly. --dump-ops names exactly
+         7 changed cases, ALL TO the browser's number, 810 byte-identical."}
+ :inventory-and-why-this-area
+ "matches-pseudo? implements THIRTEEN form-state pseudo-classes -- and
+  grep ':checked' cases.edn found ZERO cases. So did :root, :lang,
+  :only-of-type, :only-child alone, ::marker, and place-items.
+  IMPLEMENTED-AND-NEVER-DIFFERENTIALLY-TESTED is exactly where @layer was
+  before seq 66, and it is where the defects were."
+ :new-cases {:total 73 :controls 33
+             :by-group {:form-state 27 :structural-logical 23
+                        :pseudo-elements 4 :box-alignment 19}}
+ :skipped-measured-and-said-so
+ ["::placeholder -- a 40px font-size leaves the input at 153x21, identical"
+  "::selection -- nothing is selected"
+  "::backdrop -- a <dialog open> is not modal; box 41x54 either way"
+  ":root -- UNREACHABLE: #case-N :root matches nothing, measured black"
+  ":target -- location.hash is \"\""]
+ :harness-defects-found-and-fixed
+ [{:defect "scope-css split selector lists on commas INSIDE PARENTHESES"
+   :measured "div:has(b, i) became #case-N div:has(b, #case-N i) -- VALID
+              CSS ANSWERING A DIFFERENT QUESTION."}
+  {:defect "only the BROWSER's CSS was scoped"
+   :detail "the engine got RAW CSS against its own <div id=\"root\">, so a
+            selector could match the wrapper ON ONE SIDE ONLY. Four of the
+            new cases hit it and ALL FOUR LOOKED LIKE ENGINE BUGS."
+   :agent-disclosure "the agent reported that this fix COSTS one
+                      computed-style value (residual 5 -> 6) -- disclosing
+                      a result in the direction against itself."}]
+ :my-independent-check-of-the-harness
+ "I built a tree with src/ AND cases.edn at the base commit and run.cljs at
+  this one, and ran it. IT REPRODUCED MY PUBLISHED 744-CASE BASELINE
+  EXACTLY ON ALL FIVE AXES, INCLUDING THE RESIDUAL CAUSE BREAKDOWN
+  (cascade 5, ua-default 1). So the disclosed -1 applies to the agent's own
+  base column, which it measured at 735 cases -- i.e. BEFORE seq 72
+  landed -- and seq 72's :is() complex-argument work had already closed the
+  case that fix 2 would otherwise have exposed. THE PROOF IS THEREFORE
+  STRONGER THAN THE AGENT CLAIMED, and the disclosure was still the right
+  thing to make."
+ :fixed
+ [":checked reads the state of ITS control (`selected` on an <option>) --
+   BOTH option cases were EXACTLY INVERTED"
+  ":enabled / :disabled are complements over what CAN be disabled (a bare
+   <option> was NEITHER)"
+  ":only-of-type" ":link / :any-link"
+  "place-items / place-content / place-self expand ALIGN THEN JUSTIFY
+   (measured: `end start` -> (0,40); the other reading -> (113,0))"]
+ :written-measured-then-REVERTED
+ {:what ":read-only is (not :read-write), and :required / :optional decide
+         on the attribute alone -- ONE PREDICATE makes eleven measured rows
+         fall out, AND IT WORKED."
+  :why-reverted "kotoba-lang/browser's query-selector suite asserts today's
+                 answers in THREE assertions that ENCODE A BROWSER
+                 BEHAVIOUR WHICH DOES NOT EXIST, and browser was outside
+                 this round's scope. Keeping the fix would have meant
+                 reporting browser 751/3."
+  :what-was-left-instead "the eleven-row table and the three assertion
+                          names at matches-pseudo?, and four corpus cases
+                          carry it red. THIS IS THE ONE PIECE OF WORK
+                          WAITING ON A CROSS-REPO ROUND."}
+ :left-with-browser-numbers
+ [":empty counts comments as children"
+  ":placeholder-shown / :default / :indeterminate unimplemented"
+  ":dir() -- AND IT READS THE ATTRIBUTE, NOT direction: rtl (measured blue)"
+  ":not() / :has() with complex arguments over-match"
+  ":has() inside :has() is INVALID CSS and the engine matches"
+  "grid justify-content / align-content / dense / order"
+  "::marker font-size (800x29 vs 20) and content (56 vs 40)"
+  "::file-selector-button (261x65 vs 253x27)"
+  "justify-self on a PLAIN BLOCK CHILD -- x=120. BOX ALIGNMENT IS NOT
+   GRID-ONLY, which a spec reading gets wrong."]
+ :two-notes
+ [":lang(fr, de) is the FIRST case where THE ENGINE IS AHEAD OF THE ORACLE
+   -- Blink 151 drops the rule."
+  "the :in-range cases surfaced an unrelated pre-existing gap:
+   input[type=number] is 153 wide here against Brave's 42."]
+ :gates "18 new deftests, 11 failing on the base commit (21 assertions),
+         7 pure controls passing both sides."}
