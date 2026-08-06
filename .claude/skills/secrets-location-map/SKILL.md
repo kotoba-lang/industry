@@ -234,8 +234,50 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
   動く（passphrase はKeychainが使えない場合の recovery 経路として残っている
   のみ）。`bin/kagi ls` で一覧、`bin/kagi get <name>` で取得。1Password から
   個別 item を持ち込みたい時は `bin/kagi import onepassword <file.1pux>`。
-  既存 item 例: `net-kotobase` compartment に `KOTOBA_SEED_PRODUCTION`/
-  `KOTOBA_SEED_TESTNET`/`KOTOBASE_B2_*` 等。
+  ⚠ **2026-08-06 実測: `KOTOBA_SEED_PRODUCTION` / `KOTOBA_SEED_TESTNET` /
+  `KOTOBASE_B2_KEY_ID` / `KOTOBASE_B2_APP_KEY` は 4 件とも存在しない** —
+  live vault（`KAGI_HOME=$HOME/.kagi`）と repo-local vault
+  （`orgs/kotoba-lang/kagi/.kagi`）の**両方**で。ここにはかつて「既存 item 例:
+  `net-kotobase` compartment に `KOTOBA_SEED_PRODUCTION`/`KOTOBA_SEED_TESTNET`/
+  `KOTOBASE_B2_*` 等」と書いてあったが、**その記述を信じて計画を立てると詰まる**。
+  `MURAKUMO_GENERATION_TOKEN_SECRET` / `MURAKUMO_CHAT_TOKEN_SECRET_2` /
+  `itonami-marketplace-kotobase-seed` と同じ乖離の 4 例目。
+
+  詳細は「kotobase-graph-database の secret は Cloudflare の中にしか無い」節（下）。
+## kotobase-graph-database の secret は Cloudflare の中にしか無い（2026-08-06 実測）
+
+**Worker script `kotobase-cf-wasm-staging`（= 本番 `graph-database.kotobase.net` /
+`backend.kotobase.net` を配信）が持つ 3 つの secret は、どこからも読み戻せない。**
+
+| secret | 役割 | 可読な複製 |
+|---|---|---|
+| `KOTOBA_SEED` | 本番 operator Ed25519 seed。**IPNS head に署名する** | **無し** |
+| `KOTOBASE_B2_KEY_ID` | B2 bucket 스코프鍵 | **無し** |
+| `KOTOBASE_B2_APP_KEY` | 同上 | **無し** |
+
+`env.testnet`（`kotobase-cf-wasm-testnet`）も同様に 4 件（上記 3 + `KOTOBASE_PROLLY_STANDALONE_CRYPTO_SEED`）
+を持ち、`KOTOBA_SEED_TESTNET` も vault に無い。
+
+**これが何を塞いでいるか。** Cloudflare の Worker secret は **per-script かつ
+write-only** で、script 名を変えると別 script が生まれ secret はコピーされない。
+つまり **`kotobase-cf-wasm-staging` を capability 名に改名できない**（runtime 名 +
+間違った環境名で本番を配信し続ける）。`kotobase-graph-database/wrangler.jsonc` の
+`env.testnet` R2 セクションが「That is what blocked kotobase-cf-wasm-staging from
+becoming net-kotobase-engine」と書いているのはこの制約のこと。
+
+**`KOTOBA_SEED` は単なる資格情報ではない。** これが変わると operator DID が変わり、
+content-addressed graph の名前空間ごと変わる — 障害ではなく**データ面の同一性の変更**。
+「動かなくなったら再発行すればいい」で済む種類のものではない。
+
+**解除するには（agent 単独ではできない、安全床①）**:
+1. オーナーが 3 値を供給して kagi（compartment `net-kotobase`）に保管する、または
+2. B2 → **R2 binding** 移行を先に完了させる（binding は資格情報を要さないので B2 の
+   2 件が消える。`env.testnet` は既に `KOTOBASE_R2` binding を持っている）。`KOTOBA_SEED`
+   は残るので、これだけでは足りない。
+
+**agent は seed を推測・再生成して代替しないこと。** 新しい seed は別 DID = 別グラフで、
+既存の head チェーンから切り離される。
+
 - **`gftd.kotobase/CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`（1Password
   `gftdcojp` vault）+ kagi `CLOUD_ITONAMI_LEI_INGEST_IDENTITY_SEED`
   （compartment `net-kotobase`）— 両方に保管済み** — ADR-2607113500
