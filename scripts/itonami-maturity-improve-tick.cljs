@@ -1,0 +1,295 @@
+#!/usr/bin/env nbb
+;; scripts/itonami-maturity-improve-tick.cljs — 成熟度を**上げる** loop の入力を測る
+;; （superproject ADR-2608080000）。observe-only。
+;;
+;; ## 姉妹との住み分け
+;;
+;;   com.gftd.itonami-maturity-tick   決定論的欠陥クラス（Tier 1）を無人で直す。
+;;                                    モデルは居ない。**2026-08-05 時点で枯れており**
+;;                                    1,398 repo を 6h ごとに走査して findings 0。
+;;   com.gftd.itonami-os-connect      まだ繋がっていない産業を OS に 1 本繋ぐ（横）。
+;;   com.gftd.itonami-maturity-improve  ← これ。**軸そのものを上げる**（縦）。
+;;
+;; ADR-2608052000 は「どこに工数を積むと fleet 合計が最大に伸びるか」を
+;; 計算したが、**それを定期的に実行するものが無かった**。この tick はその
+;; 計算結果を毎周読み直し、次の 1 手の対象と軸を名指しする。
+;;
+;; ## 何を出すか
+;;
+;;   1. lane —— substrate か breadth か（ADR-2608052000 決定 2 の 2〜5% 帯を
+;;      **ledger の実績から**維持する。固定スケジュールにしない）
+;;   2. 対象 repo と、その**一番弱い軸**（何をすればよいかまで降ろす）
+;;   3. 計測値の鮮度（古ければ、まず測り直すのが次の 1 手）
+;;
+;; ## 不変条件
+;;
+;;   - **何も書かない・deploy しない・git を触らない。** 測って言うだけ。
+;;   - 捏造ゼロ。読めなければ :unknown。0 に丸めない。
+;;   - 順位は毎周読み直す。ADR-2608052000 決定 1 が明示的に
+;;     「この順位は作業のたびに変わる。固定リストとして扱わない」と書いている。
+;;
+;; 使い方:
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-improve-tick.cljs
+;;
+;; exit 0 常に（監視であって gate ではない）。
+
+(ns itonami-maturity-improve-tick
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str]))
+
+(def fs (js/require "fs"))
+(def os (js/require "os"))
+(def cp (js/require "child_process"))
+
+(def home (.homedir os))
+(def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
+              (str home "/github/com-junkawasaki")))
+(def datoms-file (str root "/90-docs/system-dynamics/itonami-maturity.datoms.edn"))
+(def ledger-file (str home "/.gftd/itonami-maturity-improve.ledger.edn"))
+
+;; 計測値がこれより古ければ、次の 1 手は「作業」ではなく「測り直し」。
+;; 古い順位に従って работать のは、測っていないものを測ったことにするのと同じ。
+(def stale-after-days 7)
+
+;; ADR-2608052000 決定 2。専用フェーズを切らず、この帯を常時維持する。
+;; ゼロにすると t=24 で 13.8% 失い、10% を超えると過投資（17 repo は飽和済み）。
+(def substrate-share-floor 0.02)
+
+(defn log! [& xs] (println (str/join " " (map str xs))))
+(defn- slurp* [p] (try (str (.readFileSync fs p "utf8")) (catch :default _ nil)))
+
+(defn- sh [cmd args]
+  (try (let [r (.spawnSync cp cmd (clj->js args)
+                           #js {:encoding "utf8" :cwd root :timeout 60000})]
+         {:code (aget r "status") :out (str (aget r "stdout"))})
+       (catch :default e {:code nil :out (str e)})))
+
+;; ── 計測値 ───────────────────────────────────────────────────────────────────
+
+(def datoms
+  (when-let [s (slurp* datoms-file)]
+    (try (edn/read-string s) (catch :default _ nil))))
+
+(defn- days-since-generated
+  "datoms が最後に commit された日からの経過日数。**ファイルの mtime では
+  ない** —— checkout し直しただけで新しく見えてしまう。"
+  []
+  (let [{:keys [code out]} (sh "git" ["log" "-1" "--format=%ct" "--"
+                                      "90-docs/system-dynamics/itonami-maturity.datoms.edn"])]
+    (if (and (= 0 code) (seq (str/trim out)))
+      (let [t (* 1000 (js/parseInt (str/trim out) 10))]
+        (/ (- (.now js/Date) t) 86400000.0))
+      :unknown)))
+
+(def axes [:maturity/axis-substrate :maturity/axis-test :maturity/axis-governed
+           :maturity/axis-ingest :maturity/axis-docs :maturity/axis-surface
+           :maturity/axis-fresh])
+
+;; ── 軸の重みは kind ごとに違う。**0 の軸は欠陥ではなく category mismatch** ──
+;;
+;; ADR-2608052000 が明示している: 「library に governor が無いのは欠陥ではなく
+;; category mismatch」。実際 `lib` の重みは governed=0 / surface=0 である。
+;;
+;; **素の値が小さい軸を『弱い軸』として出すと、この loop は library に governor を
+;; 生やしに行く。** 実測 2026-08-06: 重み補正前の版は langgraph（kind=lib）の
+;; 次の 1 手として axis-governed（値 0.000、重み 0）を名指しした —— スコアは
+;; 1 bp も動かず、ライブラリには不要なものが増える。**害のある助言**だった。
+;;
+;; だから並べ替えは値ではなく **重み × 伸びしろ**（= その軸を満点にしたときに
+;; 実際に増える basis point）で行う。重み 0 の軸は候補にすら入らない。
+
+;; ── 目標にしてよい軸 / いけない軸 ────────────────────────────────────────────
+;;
+;; **これがこの tick で一番重要な表。** 軸はすべて観測量（バイト数・ファイルの
+;; 有無・経過日数）なので、「この軸を上げろ」とモデルに言うと、素直に
+;; **観測量を直接動かしに行く** —— src にバイトを足し、README を膨らませ、
+;; 意味の無い commit で freshness を戻す。スコアは上がり、fleet は悪くなる。
+;;
+;; だから軸を 2 つに分ける:
+;;
+;;   目標にしてよい = **その軸が上がったことを、軸とは独立に検証する手段がある**
+;;   目標にしてはいけない = 検証手段が無く、直接動かすと必ず水増しになる
+;;
+;; 水増し不可の軸は「上げるな」ではない。**良い仕事の副産物として上がる**もので
+;; あって、狙う対象ではない、という区別である。
+
+(def axis-policy
+  {:axis-test      {:targetable? true
+                    :gate "nbb scripts/maturity-loop/run.cljs --only <repo>"
+                    :why "テストを足すだけならバイト数は増える。**壊して赤くなることを確かめる**のが gate（『落ちない gate は劇場』）。"}
+   :axis-ingest    {:targetable? true
+                    :gate "引用した URL を実際に取得して 2xx を確認する"
+                    :why "引用は捏造できるが、取得できるかは独立に検査できる。"}
+   :axis-governed  {:targetable? true
+                    :gate "拒否を実演する（生成器が拒否 0 件なら exit 1）"
+                    :why "7 部品を置くだけならファイルは増える。門が本当に閉まることは実演でしか示せない。"}
+   :axis-surface   {:targetable? true
+                    :gate "demo 生成器を実際に回し、生成物が実 actor 由来であること"
+                    :why "手書きのモックアップを置けば軸は上がる（ADR-2607122300 §1 が名指しで禁じた形）。"}
+   :axis-docs      {:targetable? true
+                    :gate "operator-quickstart の手順を実際に踏んで動くこと"
+                    :why "README を膨らませれば軸は上がる。踏めるかどうかは独立に検査できる。"}
+   :axis-substrate {:targetable? false
+                    :why "`src/**` の実バイト数。**狙うと『コードを増やす』になる。** 実装が育った結果として上がる軸であって、目標にする軸ではない。"}
+   :axis-fresh     {:targetable? false
+                    :why "最終 commit からの経過日数。**狙うと『無意味な commit を打つ』になる。** 仕事をした結果として上がる。"}})
+
+(defn- targetable? [axis] (get-in axis-policy [axis :targetable?] false))
+
+(def ^:private weights
+  "summary entity の `:model/weights`（pr-str された blob）。**自分で重みを
+  持たない** —— 持った瞬間に、スコアを計算する側と助言する側で別の重みになる。"
+  (delay
+    (let [summary (first (filter :model/weights datoms))]
+      (when-let [s (:model/weights summary)]
+        (try (edn/read-string s) (catch :default _ nil))))))
+
+(defn- weights-for [kind]
+  (let [w @weights]
+    (or (get w kind) (get w :default) (get w "default"))))
+
+(defn- weakest-axes
+  "重み × 伸びしろが大きい順に 3 つ。
+
+  **測っていない軸（nil）は候補から外す** —— 0 ではない（ADR-2607203000）。
+  **重み 0 の軸も外す** —— その kind にとって意味の無い軸なので。"
+  [e]
+  (let [w (weights-for (:repo/kind e))]
+    (->> axes
+         (keep (fn [a]
+                 (let [v (get e a)
+                       ;; blob は `#:m{...}` で書かれているので鍵は `:m/substrate`。
+                       ;; `:substrate` で引くと全部 0 になり、weakest が空になる
+                       ;; （実測 2026-08-06: それで出力が落ちた）。
+                       wt (get w (keyword "m" (str/replace (name a) "axis-" "")) 0)]
+                   (when (and (some? v) (pos? wt))
+                     {:axis (keyword (name a))
+                      :targetable? (targetable? (keyword (name a)))
+                      :value v
+                      :weight wt
+                      ;; **軸も重みも basis point（10000 = 1.0）**。ADR-2608052000 が
+                      ;; 整数 bp にしたのは、丸めが実行環境依存にならないようにする
+                      ;; ため。[0,1] と混ぜると桁がずれる（実測 2026-08-06: (- 1 v)
+                      ;; と書いて headroom が -12,515,000bp になった）。
+                      ;; 満点にしたら repo の own が実際に何 bp 増えるか:
+                      :headroom-bp (js/Math.round (/ (* wt (- 10000 v)) 10000))}))))
+         (sort-by #(- (:headroom-bp %)))
+         (take 4)
+         vec)))
+
+(defn- row [e]
+  {:repo (:repo/path e)
+   :kind (:repo/kind e)
+   :layer (:maturity/layer e)
+   :own (:maturity/own e)
+   :effective (:maturity/effective e)
+   :fleet-gain (:leverage/fleet-gain e)
+   :band (:leverage/band e)
+   :weakest (weakest-axes e)})
+
+;; ── lane（substrate か breadth か）───────────────────────────────────────────
+
+(defn- ledger-lines []
+  (if-let [s (slurp* ledger-file)]
+    (->> (str/split-lines s)
+         (remove str/blank?)
+         (keep #(try (edn/read-string %) (catch :default _ nil)))
+         vec)
+    []))
+
+(defn- lane
+  "ADR-2608052000 決定 2 を**実績から**維持する。固定スケジュール
+  （『5 周に 1 回 substrate』等）にしないのは、周が飛んだり skip されたりすると
+  帯からずれるため —— 実際に積んだ比率を見て、床を下回ったら substrate。"
+  [entries]
+  (let [worked (filterv #(contains? #{:landed :ran} (:outcome %)) entries)
+        n (count worked)
+        subs (count (filter #(= :substrate (:lane %)) worked))
+        share (if (zero? n) 0.0 (/ subs n))]
+    {:lane (if (< share substrate-share-floor) :substrate :breadth)
+     :observed-substrate-share share
+     :iterations n}))
+
+;; ── 走る ─────────────────────────────────────────────────────────────────────
+
+(defn -main []
+  (when-not datoms
+    (log! "計測値が読めない（" datoms-file "）— 次の 1 手は測り直し")
+    (js/process.exit 0))
+
+  (let [rows (->> datoms (filter :repo/path) (mapv row))
+        age (days-since-generated)
+        stale? (and (number? age) (> age stale-after-days))
+        {:keys [lane observed-substrate-share iterations]} (lane (ledger-lines))
+        in-lane (filterv #(= lane (:layer %)) rows)
+        ;; substrate 層は 17 本しかなく leverage に 10〜20 倍の段差がある。
+        ;; cohort は 1,700 本超で ratio ≈ 1.0 の平坦地 —— **同じ順位付けでも
+        ;; 意味の強さが違う**ので、それを出力に明記する。
+        ranked (->> in-lane (sort-by #(- (or (:fleet-gain %) 0))) (take 5))
+        flat? (and (= :breadth lane)
+                   (let [gs (keep :fleet-gain ranked)]
+                     (and (seq gs) (< (- (apply max gs) (apply min gs)) 0.5))))
+        summary (first (filter :summary/layer-flagship datoms))
+
+        entry {:at (.toISOString (js/Date.))
+               :datoms-age-days (if (number? age) (js/Math.round age) age)
+               :datoms-stale? stale?
+               :lane lane
+               :observed-substrate-share observed-substrate-share
+               :iterations iterations
+               :fleet {:mean-own (:summary/mean-own summary)
+                       :mean-effective (:summary/mean-effective summary)
+                       :substrate-drag (:summary/substrate-drag summary)}
+               :ranked (mapv #(select-keys % [:repo :kind :layer :own :effective
+                                              :fleet-gain :band :weakest])
+                             ranked)
+               :ranking-is-flat? flat?}]
+
+    (log! "── 成熟度向上 tick ──")
+    (log! "計測値の鮮度:" (:datoms-age-days entry) "日" (if stale? "（STALE）" ""))
+    (log! "fleet: 平均 M_own=" (:mean-own (:fleet entry))
+          " M_eff=" (:mean-effective (:fleet entry))
+          " substrate drag=" (:substrate-drag (:fleet entry)))
+    (log! "lane:" (name lane)
+          "（これまでの substrate 比率" (.toFixed (* 100 observed-substrate-share) 1)
+          "% / 床" (* 100 substrate-share-floor) "% / 実績" iterations "周）")
+    (doseq [r ranked]
+      (log! (str "  · " (:repo r) " [" (:kind r) "]"
+                 "  own=" (some-> (:own r) (.toFixed 3))
+                 " eff=" (some-> (:effective r) (.toFixed 3))
+                 " gain=" (some-> (:fleet-gain r) (.toFixed 2))
+                 " band=" (:band r)))
+      (log! (str "      伸びしろ: "
+                 (str/join " / " (map #(str (name (:axis %)) "="
+                                            (js/Math.round (:value %)) "bp"
+                                            " → +" (:headroom-bp %) "bp"
+                                            (when-not (:targetable? %) "（狙わない）"))
+                                      (:weakest r))))))
+    (when flat?
+      (log! "⚠ この lane の leverage は平坦（上位 5 本の差 < 0.5）。順位は弱い信号なので、"
+            "順位より『弱い軸を 1 つ確実に埋める』を優先する"))
+
+    (try (.appendFileSync fs ledger-file (str (pr-str (assoc entry :outcome :measured)) "\n"))
+         (log! "ledger:" ledger-file)
+         (catch :default e (log! "ledger 追記に失敗（測定自体は有効）:" (str e))))
+
+    (log! "")
+    (log! "次の 1 手:"
+          (cond
+            stale? (str "計測値が " (:datoms-age-days entry)
+                        " 日前。まず itonami-maturity-scan → dynamics を回し直して着地させる")
+            (empty? ranked) (str lane " lane に対象が無い。lane の判定か計測値を疑う")
+            ;; 重みのある軸が 1 つも無い = その kind にとって上げる意味のある軸が
+            ;; 無い。**作らない。** 重みテーブルか kind 分類を疑う。
+            (empty? (filter :targetable? (:weakest (first ranked))))
+            (str (:repo (first ranked)) "（kind=" (:kind (first ranked)) "）は"
+                 "上位 3 軸がすべて『狙わない軸』。**水増しに行かせない** —— "
+                 "この repo は飛ばして次を採るか、軸の外側の仕事（実装そのもの）を選ぶ")
+
+            :else (let [r (first ranked) a (first (filter :targetable? (:weakest r)))]
+                    (str (:repo r) "（kind=" (:kind r) "）の "
+                         (name (:axis a)) " 軸（現在 " (js/Math.round (:value a))
+                         "bp、満点で +" (:headroom-bp a) "bp）を上げる"))))
+    (js/process.exit 0)))
+
+(-main)
