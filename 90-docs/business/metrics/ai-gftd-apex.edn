@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 11584, "ai-gftd-chat-shell" 2},
+ {"magatama-sh1n5h1x" 11607, "ai-gftd-chat-shell" 2},
  :zone
- {:requests-7d 636459,
-  :pageviews-7d 3312,
-  :uniques-7d-sum 5755,
+ {:requests-7d 640210,
+  :pageviews-7d 3317,
+  :uniques-7d-sum 5788,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
   [{:path "/wp-admin/index.php", :requests 234}
-   {:path "/puc.php", :requests 38}
+   {:path "/puc.php", :requests 43}
    {:path "/ops.php", :requests 36}
-   {:path "/edit.php", :requests 33}
-   {:path "/mgrr.php", :requests 33}
-   {:path "/4PJcpMFsD8B.php", :requests 32}
-   {:path "/1xmomo.php", :requests 28}
-   {:path "/ms-edit.php", :requests 27}],
-  :status-mix {:server-error 14252, :client-error 1836, :ok 1363},
+   {:path "/mgrr.php", :requests 36}
+   {:path "/edit.php", :requests 32}
+   {:path "/4PJcpMFsD8B.php", :requests 31}
+   {:path "/1xmomo.php", :requests 29}
+   {:path "//wp-admin/js/index.php", :requests 27}],
+  :status-mix {:server-error 14230, :client-error 1835, :ok 1352},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,8 +33,8 @@
  :traffic-quality
  {:window "24h", :probe-4xx-pct 11, :error-5xx-pct 82},
  :top-paths
- "上位 page (24h, 2xx/3xx): /wp-admin/index.php 234 · /puc.php 38 · /ops.php 36 · /edit.php 33 · /mgrr.php 33 | 4xx(probe) 11% · 5xx 82%",
+ "上位 page (24h, 2xx/3xx): /wp-admin/index.php 234 · /puc.php 43 · /ops.php 36 · /mgrr.php 36 · /edit.php 32 | 4xx(probe) 11% · 5xx 82%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 636459 req/7d・5755 uniques(日次和)・うち4xx probe 11%(24h)、workers 11586 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 640210 req/7d・5788 uniques(日次和)・うち4xx probe 11%(24h)、workers 11609 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
