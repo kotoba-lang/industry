@@ -239,6 +239,26 @@
    :script "gates/training-corpus-check.cljs"
    :include-ext [".edn" ".cljs" ".md"] :min-files 1500 :cd false}
 
+  ;; 資本 pool 面（ADR-2608062300）。`capital-pools.edn` が `budget-supply.edn` の
+  ;; `:supply/pools` から**今も**導かれることを再導出して照合する。
+  ;;
+  ;; **projection contract（`:canonical-edn-v1`）で代替しない。** あれが捕まえるのは
+  ;; 生成物の手編集だけで、budget-supply.edn だけが動いた場合を捕まえない ——
+  ;; T2 を release する編集は budget-supply.edn 側にしか現れないので、実運用で最初に
+  ;; 起きるドリフトがちょうど死角に入る。加えて budget-supply.edn は tx-data では
+  ;; ない（entity の vector でなく 1 個の map）ので project-edn の入力になれない。
+  ;;
+  ;; **全再生成の bytes 一致にしていない**のは root-training-corpus と同じ理由 ——
+  ;; `gftd allocate pools md` の demand は canvas index からの live scoring で、
+  ;; canvas ledger は毎日動く。bytes 一致にすると翌日に赤くなる。demand に依存しない
+  ;; 不変条件だけを再導出するのは妥協ではなく、capital-pools.edn が答えている問い
+  ;; （今いくら配れて、それはどこへ出せるか）が構造的に demand に依存しないため
+  ;; （配分先を決めるのは ADR が宣言した eligibility であって需要ではない）。
+  {:name "root" :id "root-capital-pools" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/capital-pools-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+
   ;; net-kotobase（kotobase.net の本体、private）。**network-awai org の GitHub
   ;; Actions は 2026-08-03T01:10Z 以降 1 本も起動していない**（実測: 全 workflow
   ;; failure、job は steps 0 件で 1-10 秒で終了。同 org の cloud-itonami /

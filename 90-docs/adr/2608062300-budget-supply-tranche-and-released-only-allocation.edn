@@ -100,6 +100,7 @@ supply node × product の二部グラフを連結成分に分け、需要比例
 - **`portfolio-allocation.edn` の 10,000,000 が消えるわけではない。** ADR-2607194500 の経路は互換のため残す。ただし生成物自身が placeholder であることを名乗る。2 つの生成物が並ぶことになるが、**答えている問いが違う**ので統合しない。
 - **T2 を release するとき、対象 product を ADR に書かなければ `:stranded` として出る。** これは意図した摩擦で、release と eligibility の宣言を同時に要求する。
 - **marketing 予算は構造的に 0 のまま。** `:pool/use-envelope` の `:paid-channel-experiments 300,000` は T3 まで実行できない（ADR-2607246100 が『非オーナー実決済が出るまで有償広告禁止』を authoritative_for に持つ）。これは未割当ではなく意図された hold であり、budget-supply.edn の `:pool/use-envelope-note` に明記した。
+- **生成物には gate が付いた（2026-08-07 追記）。** 導入当初、`capital-pools.edn` を検査するものは 1 つも無かった —— `manifest/projections/` の contract は 2 件（agent-source-query / training-corpus）だけで business 系は 0 件、`scripts/fleet-ci/gates.edn` にも budget-supply / capital-pools を見る entry が無かった。現在は `root-capital-pools` gate（正本 `scripts/verify-capital-pools.cljs`、fleet adapter `scripts/fleet-ci/gates/capital-pools-check.cljs`）が `budget-supply.edn` から pool 算術を**再導出して** `capital-pools.edn` の本文と照合する。projection contract（`:canonical-edn-v1`）を使わないのは、あれが捕まえるのが生成物の手編集だけで、**budget-supply.edn だけが動いた場合を捕まえない**ため —— T2 を release する編集は budget-supply.edn 側にしか現れないので、実運用で最初に起きるドリフトがちょうど死角に入る。
 - **本 ADR も 3,000,000 が 1 つなのか 2 つなのかを決めていない。** ADR-2608062200 と同じく、係争は `:pool/contested-by` として記録され、`allocate pools` が毎回警告として印字するだけである。額を勝手に半分にも 2 倍にもしない。"
 
   :adr/verification
