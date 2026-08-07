@@ -218,10 +218,9 @@ JPY 1）にした。
 
 ## 正直な限界
 
-1. **橋は 27 行中 2 行のまま。** 手続きは 5 本になったが、licensed-operator 側に
-   `:licence/kyoninka-procedure` を足していないので、新しい 3 本は
-   `:procedure/*` として面には載っているが要件側からは辿れない。
-   （辿れる 2 本は JPN のまま。）
+1. **橋は 27 行中 5 行。** 3 法域（JPN / GBR / DEU）で要件から手続きに辿れる。
+   残る 22 行に橋が無いのは手抜きではなく、対応する手続きを書いていないから
+   —— 橋だけ先に張ることはできない（結合先が無い）。
 3. **`regulatory-tracker` と `isco-3354` は規制データ 0 件・消費者 0 件。**
    実装はあるがデータが無いので、繋ぐものが無い。
 4. **状態機械の語彙が 2 系統ある。** kyoninka（`:preparing :granted`）と
@@ -233,10 +232,46 @@ JPY 1）にした。
    `scripts/gen-market-entry-registry.cljs` に同じ括弧バランス走査がある。
    後者を移していないのは、出力が変わらないことを確かめる手段がこの周に無かったため。
 
+## 非日本 3 本に橋を渡した（2026-08-07 追記）
+
+`:coverage/procedures-reachable` は **5/5**、`:coverage/kyoninka-linked-rows` は 5。
+3 法域を跨いで「要件 → 手続き → 所管当局」が 1 クエリで引ける。
+
+**sector 一致では繋がなかった。** 両側の法令と所管当局を突き合わせ、同一の免許を
+指していることを確かめてから 3 本とも書いた:
+
+    COPA(A) 1989 s.1    / Environment Agency (England)   -> :gbr-waste-carrier
+    SMDA 2013 s.1       / 地方自治体 licensing authority  -> :gbr-scrap-metal
+    KrWG §53(1)/§54(1)  / Land 当局                       -> :deu-abfall-transport
+
+sector だけで繋ぐと、同一 sector に複数の免許がある法域（DEU の 届出/許可 二段）で
+黙って違う手続きを指す。この確認は今回 3 本とも一致したので**書き換えは起きて
+いない** —— つまりこの手間は今回の成果物には現れず、次に不一致が出たときに初めて
+効く種類の作業である。
+
+## 属性一覧を面自身に載せた（2026-08-07 追記）
+
+`:coverage/attributes` が **出力に実在する属性を件数付きで**申告する（39 種）。
+
+**射影の属性名は元データの語彙と一致しない。** licensed-operator の `:licence/law`
+はこの面では `:permit/legal-basis`、`:licence/*` は全て `:permit/*` になる（3 つの
+source-shape を 1 つの名前空間に集めるため）。実測 2026-08-07: **自分で書いた射影に
+対してさえ属性名を 2 回続けて外し、どちらも空リストが返るだけだった** —— Datalog は
+存在しない属性を「該当なし」と同じ形で返すので、綴りの誤りと「本当にデータが無い」が
+読み手には区別できない。
+
+件数を付けたのは意図的で、1,540 行のうち 5 行にしかない属性
+（`:permit/kyoninka-procedure`）を「この面が持っているもの」として設計に使わせない
+ため。上位は `:permit/ns` `:permit/repo` `:permit/source-shape` `:permit/subject-key`
+が各 1,535、`:permit/legal-basis` 1,404、`:permit/jurisdiction` 1,367。
+
+初版は `(concat rows (:rows procs))` と書いて 5 本の手続きを 10 と数えた —— **一覧を
+足した直後に、その一覧が自分の誤りを見せた**（`rows` は既に手続きを含んでいた）。
+
 ## 次の 1 手
 
-licensed-operator の GBR / DEU エントリに `:licence/kyoninka-procedure` を足し、
-新しい 3 本にも橋を渡す。属性は既にあり、値を 3 つ書くだけ。
-そのあと `:procedure/fee` の額が単一でない制度（範囲・窓口依存）を data として
-表せるようにする —— 3 者が独立に要求した中で最も繰り返し出てきた要件。
+`:procedure/fee` の額が単一でない制度（範囲・窓口依存）を data として表せるように
+する —— 3 者が独立に要求した中で最も繰り返し出てきた要件。GBR scrap metal の
+£181〜£804.78（4.4 倍）は現在 amount を持たず、`:procedure/fee-kind` だけで
+「自治体が決める」と伝えている。伝わってはいるが計算には使えない。
 "}]

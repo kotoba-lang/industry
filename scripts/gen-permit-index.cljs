@@ -382,7 +382,33 @@
          ;; 橋が両側に渡っているか。片側だけなら結合は宣言だけで辿れない。
          :coverage/procedures-reachable
          (let [ids (into #{} (map :procedure/id) (:rows procs))]
-           (count (filter #(contains? ids (:permit/kyoninka-procedure %)) rows)))}
+           (count (filter #(contains? ids (:permit/kyoninka-procedure %)) rows)))
+         ;; ## 属性名を当て推量させない
+         ;;
+         ;; **この面の属性名は元データの語彙と一致しない。** 射影が付け替えている:
+         ;; licensed-operator の `:licence/law` はここでは `:permit/legal-basis`、
+         ;; `:licence/*` は全て `:permit/*` になる（3 つの source-shape を 1 つの
+         ;; 名前空間に集めるため）。実測 2026-08-07: 自分で書いた射影に対してさえ
+         ;; `licence/kyoninka-procedure` → `permit/law` と 2 回続けて外し、
+         ;; **どちらも空リストが返るだけで理由は何も出なかった** —— Datalog は
+         ;; 存在しない属性を「該当なし」と同じ形で返すので、綴りの誤りと
+         ;; 「本当にデータが無い」が読み手には区別できない。
+         ;;
+         ;; そこで実際に出力に現れた属性を数える。手で並べた語彙ではなく
+         ;; 行から数えた値なので、射影を変えれば自動で追従する。
+         ;; **件数付きなのは意図的** —— 1,540 行のうち 5 行にしかない属性を
+         ;; 「この面が持っているもの」として設計に使わせないため。
+         ;; `rows` は既に手続き行を含む（上の `(into (:rows procs))`）。
+         ;; 初版で `(concat rows (:rows procs))` と書いて 5 本の手続きを 10 と
+         ;; 数えた —— **一覧を足した直後に、その一覧が自分の誤りを見せた**。
+         ;; 数える対象は組み立て直したものではなく、出力に入る `rows` そのもの。
+         :coverage/attributes
+         (->> rows
+              (mapcat keys)
+              (remove #(= "source" (namespace %)))
+              frequencies
+              (sort-by (juxt (comp - val) (comp str key)))
+              (mapv (fn [[k n]] [(str k) n])))}
         ;; 結合の可否そのものをデータにする（ADR-2608080000）
         joins
         [{:join/id "permit->kyoninka-procedure"
