@@ -192,16 +192,66 @@
                   distinct)]
     (str/join ":" (cons (str self "/src") sibs))))
 
+(defn- norm
+  "照合用の正規化 —— 英数字だけに落とす。**branch 名は repo 名と綴りが揃わない**
+  （実測 2026-08-07: repo `cloud-itonami-cofog-03.2` に対して branch は
+  `agent/itonami-os-cofog-032`。ドットが落ち prefix も無い）。"
+  [x]
+  (str/replace (str/lower-case (str x)) #"[^a-z0-9]" ""))
+
+(defn- in-flight?
+  "`branches` の中に、この repo を触っている枝があるか。
+
+  **後ろが数字なら別 repo。** `isic-851` の正規化 `isic851` は `isic8510` の
+  部分文字列なので、境界を見ないと 8510 の枝が 851 を永久に隠す。"
+  [branches repo]
+  (let [t (norm (str/replace repo #"^cloud-itonami-" ""))]
+    (boolean
+     (some (fn [b]
+             (let [nb (norm b)]
+               (when-let [i (str/index-of nb t)]
+                 (let [after (get nb (+ i (count t)))]
+                   (not (and after (re-matches #"[0-9]" (str after))))))))
+           branches))))
+
+(def ^:private candidate-family-re
+  "候補に出す repo の族。**分類に紐づく営みだけ**（産業 / 職業 / 政府機能 / 品目）。
+
+  2026-08-07 まではここが `cloud-itonami-isic-` 前綴じで、**ISIC 以外は候補集合に
+  一度も入っていなかった**。COFOG 03.2（消防）は実装済み・nbb で load 可・標準形
+  なのに毎周見えず、繋がったのは人が名指しで選んだからである（ADR-2608091000 D8）。
+
+  族を広げるとき entity 面（`lei-` 法人実体 / `iso3166-` 国・官庁 / `assoc-` 業界団体 /
+  `municipality-` 自治体）は入れない —— **あれは営みの分類ではなく実体の名簿**で、
+  『次に繋ぐ 1 本』として提案する対象ではない。ただし黙って落とすのではなく、
+  適合している件数を別枠で報告する（人が判断できるように）。"
+  #"^cloud-itonami-(isic|isco|cofog|jsic|nace|naics|unspsc)-")
+
 (defn- candidates
-  "宣言されていない ISIC repo のうち、標準形に適合しているものを M_own 順で。
+  "宣言されていない**分類ファミリ**の repo のうち、標準形に適合しているものを
+  M_own 順で。
 
   **順位は毎周計算し直す。** 固定リストにすると、繋いだ repo が残り続けたり、
   新しく標準形になった repo が永久に出てこなくなる。"
-  [declared-repos]
+  [declared-repos in-flight-branches]
   (let [scores (own-scores)
-        repos (->> (try (vec (.readdirSync fs isic-dir)) (catch :default _ []))
-                   (filter #(str/starts-with? % "cloud-itonami-isic-"))
-                   (remove declared-repos))
+        all-dirs (->> (try (vec (.readdirSync fs isic-dir)) (catch :default _ []))
+                      (filter #(str/starts-with? % "cloud-itonami-"))
+                      (remove declared-repos))
+        family (filterv #(re-find candidate-family-re %) all-dirs)
+        ;; **着手中の枝がある repo は候補から外す。** ここを見ていなかったのが
+        ;; 2026-08-07 まで残っていた穴 —— `in-flight?` は宣言済み vertical にしか
+        ;; 掛かっておらず、**二重実装が起きるのは候補側**である（ADR-2608070000 が
+        ;; 記録した isic-4921 の 2 回実装はまさにこれ）。実測 2026-08-07: 別セッションが
+        ;; `agent/itonami-os-isic-6492` で作業中なのに、tick は isic-6492 を
+        ;; 「次の 1 手」に出し続けていた。
+        in-flight-skipped (filterv #(in-flight? in-flight-branches %) family)
+        repos (filterv #(not (in-flight? in-flight-branches %)) family)
+        ;; 分類に紐づかない適合 repo（entity 面など）。**候補には出さないが数える。**
+        outside (->> (remove #(re-find candidate-family-re %) all-dirs)
+                     (map conformance)
+                     (filter :conformant?)
+                     (mapv :repo))
         rows (->> repos
                   (map conformance)
                   (filter :conformant?)
@@ -228,6 +278,21 @@
     {:scanned (count repos)
      :conformant (count rows)
      :nbb-rejected (:rejected probed)
+     ;; **1 行直せば候補になる族を見えるようにする。** 実測 2026-08-07:
+     ;; COFOG は 5 本中 4 本が `:no-seed-db` だけで落ちている —— cofog-03.2 に
+     ;; 足したのと同じ 1 行で候補になる。族ごとに『落ちた理由の最頻値』を出す。
+     :near-miss (into (sorted-map)
+                      (for [[fam rs] (group-by #(second (re-find candidate-family-re %))
+                                               family)
+                            :let [cs (map conformance rs)
+                                  fails (remove :conformant? cs)]
+                            :when (seq fails)]
+                        [fam {:n (count rs)
+                              :conformant (count (filter :conformant? cs))
+                              :why (into (sorted-map) (frequencies (map :why fails)))}]))
+     :outside-families {:conformant (count outside)
+                        :sample (vec (take 3 outside))}
+     :in-flight-skipped in-flight-skipped
      :top (mapv #(select-keys % [:repo :ns :own :ops]) (:top probed))}))
 
 
@@ -291,20 +356,37 @@
 ;; 「PR があるかもしれない」で作業を止める方が、二重実装より悪い。
 
 (defn- queued-repos
-  "open PR の branch 名から、既に着手済みの repo を拾う。"
+  "既に着手済みの営みを拾う。**PR だけでは足りない。**
+
+  実測 2026-08-07: この repo の open PR は **0 件**だが、`agent/itonami-os-isic-6492`
+  という接続作業中の枝が remote に在った。接続フロー（skill `itonami-os-connect`）は
+  PR を作らず `gh api .../merges` でサーバ側マージするので、**PR を見ている限り
+  進行中の作業は 1 件も見えない**。旧実装はさらに branch 名から
+  `cloud-itonami-isic-NNNN` を抜こうとしていたが、実際の枝名は
+  `agent/itonami-os-isic-6492` で prefix が無く、**1 件も抽出できていなかった**
+  （二重実装を防ぐはずの仕掛けが、静かに何も防いでいなかった）。
+
+  見るのは接続フローが作る名前（`itonami-os` / `os-connect`）の枝だけ。無関係な
+  枝まで見ると、たまたま似た綴りの枝が候補を隠す。`gh` が落ちたら `:unknown` に
+  して候補から外さない（従来どおり fail-open）。"
   []
   (if offline?
-    {:status :skipped :repos #{}}
-    (let [{:keys [code out]} (sh "gh" ["pr" "list" "--repo" "network-awai/cloud-itonami"
-                                       "--state" "open" "--limit" "50"
-                                       "--json" "headRefName" "--jq" ".[].headRefName"])]
-      (if (not= 0 code)
-        {:status :unknown :repos #{}}
-        {:status :ok
-         :repos (into #{}
-                      (keep (fn [b]
-                              (second (re-find #"(cloud-itonami-isic-[0-9]+)" (str b)))))
-                      (str/split-lines out))}))))
+    {:status :skipped :branches []}
+    (let [pr (sh "gh" ["pr" "list" "--repo" "network-awai/cloud-itonami"
+                       "--state" "open" "--limit" "50"
+                       "--json" "headRefName" "--jq" ".[].headRefName"])
+          br (sh "gh" ["api" "repos/network-awai/cloud-itonami/branches"
+                       "--paginate" "--jq" ".[].name"])]
+      (if (and (not= 0 (:code pr)) (not= 0 (:code br)))
+        {:status :unknown :branches []}
+        {:status (if (and (= 0 (:code pr)) (= 0 (:code br))) :ok :partial)
+         :branches (->> (concat (str/split-lines (or (:out pr) ""))
+                                (str/split-lines (or (:out br) "")))
+                        (map str/trim)
+                        (remove str/blank?)
+                        (filter #(or (str/includes? % "itonami-os") (str/includes? % "os-connect")))
+                        distinct
+                        vec)}))))
 
 ;; ── 4) live ──────────────────────────────────────────────────────────────────
 
@@ -378,12 +460,9 @@
         queued (queued-repos)
         ;; 既に PR が open な営みは候補から外す（ただし理由を残す）
         connectable-all (filterv :mechanically-connectable? rows)
-        connectable (filterv #(not (contains? (:repos queued)
-                                              (last (str/split (:vertical %) #"/"))))
-                             connectable-all)
-        queued-out (filterv #(contains? (:repos queued)
-                                        (last (str/split (:vertical %) #"/")))
-                            connectable-all)
+        in-flight (fn [v] (in-flight? (:branches queued) (last (str/split (:vertical v) #"/"))))
+        connectable (filterv (complement in-flight) connectable-all)
+        queued-out (filterv in-flight connectable-all)
         drift (filterv #(= :drift (:ops-match %)) rows)
         unknown-ops (filterv #(= :unknown (:ops-match %)) rows)
 
@@ -397,7 +476,7 @@
         ;; **未認証で 200 が返ったらそれ自体が欠陥**なので、期待値は 401。
         gate (http-status "https://itonami.cloud/api/cloud-itonami/os-verify/os/journal" "POST")
 
-        pool (candidates (set (map :repo vs)))
+        pool (candidates (set (map :repo vs)) (:branches queued))
 
         entry {:at (.toISOString (js/Date.))
                :declared (count rows)
@@ -406,13 +485,14 @@
                :mechanically-connectable (mapv :vertical connectable)
                :queued-in-pr (mapv :vertical queued-out)
                :pr-lookup (:status queued)
+               :in-flight-branches (:branches queued)
                :ops-drift (mapv #(select-keys % [:vertical :ops-drift]) drift)
                :ops-unknown (mapv :vertical unknown-ops)
                :surfaces surfaces
                :api-gate gate
                ;; **まだ宣言されていない産業の候補**（ADR-2608070000）。
                ;; loop はここを読んで次の 1 本を選ぶ。探索を毎周やり直さない。
-               :candidate-pool (select-keys pool [:scanned :conformant])
+               :candidate-pool (select-keys pool [:scanned :conformant :near-miss :outside-families])
                :candidates (:top pool)
                :offline? offline?}]
 
@@ -422,9 +502,11 @@
       (log! (format-str r)))
     (log! "")
     (when (seq queued-out)
-      (log! "既に PR で待っている（候補から外した）:" (str/join ", " (map :vertical queued-out))))
+      (log! "既に別の枝が触っている（候補から外した）:" (str/join ", " (map :vertical queued-out))))
     (when (= :unknown (:status queued))
-      (log! "⚠ open PR を引けなかった（gh 不在/失敗）。候補は PR 重複を含みうる。"))
+      (log! "⚠ open PR も branch 一覧も引けなかった（gh 不在/失敗）。候補は二重着手を含みうる。"))
+    (when (= :partial (:status queued))
+      (log! "⚠ PR / branch のどちらかしか引けなかった。二重着手の検出は不完全。"))
     (log! "機械的に繋げられる営み:" (if (seq connectable)
                                      (str/join ", " (map :vertical connectable))
                                      "なし"))
@@ -433,9 +515,21 @@
     (when (seq unknown-ops)
       (log! "op 集合が読めなかった（:unknown、ok に丸めない）:" (pr-str (mapv :vertical unknown-ops))))
     (log! "")
-    (log! "未宣言の ISIC" (:scanned pool) "本のうち、標準形に適合"
-          (:conformant pool) "本 —— ただし「適合」は静的な形の話で、面を作る
+    (log! "未宣言の分類ファミリ（isic/isco/cofog/jsic/nace/naics/unspsc）" (:scanned pool)
+          "本のうち、標準形に適合" (:conformant pool)
+          "本 —— ただし「適合」は静的な形の話で、面を作る
                               nbb で load できるかは別（上位だけ実際に require して確かめる）")
+    (log! "  族ごとの落ちた理由（1 行直せば候補になる族が見える）:")
+    (doseq [[fam m] (:near-miss pool)]
+      (log! (str "    " fam ": " (:n m) " 本中 適合 " (:conformant m)
+                 " / " (pr-str (:why m)))))
+    (when (seq (:in-flight-skipped pool))
+      (log! (str "  別の枝が着手中なので候補から外した: "
+                 (str/join ", " (:in-flight-skipped pool)))))
+    (let [o (:outside-families pool)]
+      (log! (str "  分類に紐づかない族（lei / iso3166 / assoc / municipality 等）で適合しているもの: "
+                 (:conformant o) " 本 —— **候補には出さない**（営みの分類ではなく実体の名簿）。例: "
+                 (str/join ", " (:sample o)))))
     (when (seq (:nbb-rejected pool))
       (log! "  nbb で load できず候補から外した:"
             (str/join ", " (map #(str (:repo %) "(" (name (:why %)) ")") (:nbb-rejected pool)))))
