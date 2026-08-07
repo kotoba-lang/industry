@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-08-07T12:47:24.873Z",
+ :asOf "2026-08-07T14:19:21.028Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,9 +9,9 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 9616,
-  :pageviews-7d 2081,
-  :uniques-7d-sum 412,
+ {:requests-7d 9628,
+  :pageviews-7d 2088,
+  :uniques-7d-sum 421,
   :zone "itonami.cloud"},
  :agentRuns7d 458,
  :sources [:cloudflare :health :emitter :itonami-free-path],
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-08-07T12:47:25.918Z",
+  :asOf "2026-08-07T14:19:21.798Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -140,15 +140,15 @@
  :freePathDocs "/docs/free-path.md",
  :paths
  {:ok
-  [{:path "/cdn-cgi/rum", :requests 122}
-   {:path "/", :requests 104}
+  [{:path "/cdn-cgi/rum", :requests 120}
+   {:path "/", :requests 102}
    {:path "/yotei/c/jun", :requests 85}
    {:path "/yotei/c/jun-review", :requests 41}
    {:path "/img/yamainu-2-p01", :requests 38}
    {:path "/os/", :requests 37}
    {:path "/img/yamainu-8-p01", :requests 32}
    {:path "/img/zankyo-7-p01", :requests 31}],
-  :status-mix {:server-error 297, :ok 1533, :client-error 289},
+  :status-mix {:server-error 280, :ok 1528, :client-error 273},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
@@ -190,9 +190,9 @@
   :freePathApiAlias "/api/free-path"},
  :ok true,
  :traffic-quality
- {:window "24h", :probe-4xx-pct 14, :error-5xx-pct 14},
+ {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 13},
  :top-paths
- "上位 page (24h, 2xx/3xx): /cdn-cgi/rum 122 · / 104 · /yotei/c/jun 85 · /yotei/c/jun-review 41 · /img/yamainu-2-p01 38 | 4xx(probe) 14% · 5xx 14%",
+ "上位 page (24h, 2xx/3xx): /cdn-cgi/rum 120 · / 102 · /yotei/c/jun 85 · /yotei/c/jun-review 41 · /img/yamainu-2-p01 38 | 4xx(probe) 13% · 5xx 13%",
  :freeClaimDocs "/docs/free-path.md",
  :funnel
  {:trials 5,
@@ -202,7 +202,7 @@
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 9616 req/7d・412 uniques(日次和)・うち4xx probe 14%(24h)",
+ "itonami.cloud 実測 9628 req/7d・421 uniques(日次和)・うち4xx probe 13%(24h)",
  :tenants
  {:active 5,
   :external-paid 0,
