@@ -10,6 +10,8 @@
   ["app.itonami.cloud/mangaka/ の原稿スタジオの設計と現在地"
    "公開作品 → 編集可能な genko doc の投影(kami.mangaka.genko-work)"
    "ai-image が URL 参照の画素を持てるようにした理由と、base64 経路を残した理由"
+   "プロンプトから絵を作る経路(生成)と、それを proxy しない理由"
+   "murakumo 画像ゲートウェイが止まっていた 3 層の原因と復旧内容"
    "app.itonami.cloud が何であるか(dispatcher であって Pages でも 404 でもない)"
    "cloud-itonami sites.edn の app 面についての記述が事実と違うこと"]
   :adr/supersedes []
@@ -132,6 +134,68 @@ playwright 自身の chromium が 92 MiB 落とし切ったあと ABOUT と LICE
 (4 回試行、毎回 exit 0)。**走れなかった check は何も報告せず、それは通った check と
 見分けが付かない。**
 
+# 生成 — 2026-08-07 追記
+
+初版は『編集はできるが生成はできない』で終わっていた。オーナーの問い
+「実際に生成、編集できるようになっている?」で測り直した結果を追記する。
+
+## 編集はできていた（実ドラッグで確認）
+
+コマ / ふきだし / トーン / ペンがそれぞれ node を増やし、undo・redo が効き、
+コマ割りプリセットが +4、**reload しても残り**、JSON と storyboard EDN の両方が
+実際に書き出せる。
+
+## 生成は 3 層で止まっていた。studio の中の問題は 1 つだけだった
+
+| 層 | 状態 | 直した内容 |
+|---|---|---|
+| studio の UI | 生成の入口が無い | `genko-image-api` を宣言した面に生成の面を出す |
+| `local-murakumo` の `GATEWAY_URL` | 未設定 → 503 | `gateway.murakumo.cloud` を新設して設定 |
+| gateway 本体 | プロセス停止 + 2 つの実装欠陥 | 起動 + HTTP/1.1 の対 + model 名の翻訳 |
+
+**これは studio の問題ではなかった。** 同じ穴で `awai.network` の画像生成も
+止まっており、同時に直った。
+
+## 私が出した選択肢の前提が間違っていた
+
+「生成を繋ぐと誰でも GPU を回せるので認証を付けるか」と問うたが、
+`api.murakumo.cloud/v1/images/generations` は**元から認証なし・CORS 全開**で、
+ページを認証で囲っても露出は減らない。守る場所があるとすれば gate 側。
+
+さらに **proxy は技術的に成立しない**: レンダーは同期作業で、Cloudflare は
+非ストリーミングの Worker subrequest を 100 秒で切って HTML 524 を返す。
+`network-awai-apex` が画像だけ proxy から外しているのはこの実測による。
+オーナーは「認証を付けて繋ぐ」を選んだが、その前提を私が誤って提示していた
+ので、直接経路（apex と同じ）で実装し、事実を訂正して報告した。
+
+## gateway の 3 つの欠陥（どれも「不安定な GPU 箱」に見えた）
+
+1. **HTTP/1.0 のまま cloudflared の後ろに居た。** 応答ごとに接続を閉じるので、
+   接続をプールする connector が閉じ済みの接続を再利用し、edge が約 1 秒で
+   `error code: 502`。再試行すると通るので間欠障害に見える。
+2. **`protocol_version` だけ足すと恒常的な 502 になった。** HTTP/1.1 のスレッドは
+   次の要求を待って永久にブロックし、listen backlog 5 に溜まる。`timeout` が対。
+3. **model 名を翻訳していなかった。** OpenAI の `model` は素の id、ComfyUI が要るのは
+   ファイル名。その翻訳が bridge の存在理由そのものなのにしていなかった ——
+   **ファイルは呼び手があと一歩で言い当てた名前でそこに在った**。既知の呼び手 2 つは
+   docstring に「gate が拡張子を付ける」と書いており、**両方とも契約を記述していて
+   コードの実際とは逆**だった。
+
+## 記録しておくべき隣接事実
+
+**呼び手が出すモデル一覧は、フリート全体の走査ではなく gateway が届くホストの
+ものでなければならない。** `/infer/model-map` は Mac mini 群を走査するが、
+gateway は gad にしか届かない。zebulun にある checkpoint を選ぶと ComfyUI の
+検証に落ちる。現在の studio はフリート全体の一覧を出しており、**gad に無い
+モデルを選べてしまう**（下記ギャップ）。
+
+## 生成の検証（2026-08-07、実 GPU）
+
+`api.murakumo.cloud` に model 指定つきで 200 / 21〜23 秒 / 実 PNG 3MB を 2 回連続。
+**deploy 済みの studio** から生成して 30 秒以内に原稿へ `ai-image` node が入ることを
+実ブラウザで確認（node 2→3、`ai-image` が 2 つ）。失敗経路も別途確認済みで、
+gate の言い分（`no GATEWAY_URL configured`）が潰されずに画面へ出る。
+
 ## 残っているギャップ
 
 - **studio 面の browser check は repo に入っていない。** 生きたカタログに依存する
@@ -145,4 +209,17 @@ playwright 自身の chromium が 92 MiB 落とし切ったあと ABOUT と LICE
   次に触る人が同じ誤読をする。
 - **`genko-project/doc->page` で書き出した storyboard が mangaka のパイプラインに
   実際に入ることは、まだ end-to-end で確かめていない。** 型としては入力形だが、
-  それは『通した』ではない。"}]
+  それは『通した』ではない。
+- **モデル一覧が gateway の実体とずれている。** studio はフリート全体の
+  `/infer/model-map` を出すが、gateway が届くのは gad だけ。gad に無いモデルを
+  選ぶと 502（`value_not_in_list`）になる。正しくは bridge に自分の checkpoint を
+  申告させ、それを一覧にする。
+- **生成した絵は base64 で doc に入るので localStorage を圧迫する。** 溢れたときは
+  autosave が正直に諦めて編集は続く(例外で止めない)が、**閉じると失われる**。
+  恒久策は生成物を content-addressed 面に置いて CID 参照にすること。
+- **bridge は手で起動した nohup プロセスのまま。** LaunchAgent/systemd に載って
+  いないので、gad が再起動すればまた止まる。README の follow-up が 2026-07-10 から
+  残っている。
+- **プロンプトの効きは未調整。** animagine-xl-4.0 に『ペン画・モノクロ』を渡しても
+  カラーのイラストが返る。配線の問題ではないが、原稿の下絵として使うには
+  negative/style の詰めが要る。"}]
