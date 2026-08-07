@@ -27,7 +27,14 @@
 ;; 概念を 1 つに畳むとどれかが消える。**別概念として並べ、同じ綴りを両方に
 ;; 持たせる** —— `console` で引いた人には両方出るのが正しい。
 
-{:terminal
+{:visit-telemetry
+ {:label "回遊 / アクセス解析（訪問者を特定せずに動線を測る）"
+  :spellings ["回遊" "kaiyu" "visit telemetry" "access analytics" "アクセス解析"
+              "dwell" "滞在時間" "route transition" "遷移" "動線" "pageview"
+              "acquisition" "流入" "audience"]
+  :note "kotoba-lang/kaiyu が語彙（dwell バケット / route whitelist / acquisition / window / collected-since）。consumer は club-shinshi-app・net-babiniku・net-kotobase。observability の trace/span は kotoba-lang/log で別物、campaign と attribution は kotoba-lang/senden。heatmap は非目標（ADR-2608060900 D3）。"}
+
+ :terminal
  {:label "対話端末 / terminal"
   :spellings ["terminal" "tty" "pty" "shell session" "command line"
               "端末" "ターミナル" "コンソール" "console"]
