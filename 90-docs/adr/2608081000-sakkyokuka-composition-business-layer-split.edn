@@ -194,7 +194,9 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:what \"west.yml の revision が全件 40 桁か\" :cmd \"revision 行の文字数を数える\" :result \"修正前: 40 桁 4122 件 + 12 桁 1 件。修正後: 40 桁 4123 件。この 1 件は正規表現ベースの pin 検証から黙って漏れていた\"}
    {:what \"fleet-ci gate が murakumo fleet 上で実際に走ったか（gap 5 の解消証跡）\" :cmd \"manifest/fleet-ci.edn の receipt から :gate/test-{ongaku,sakkyokuka,cloud-itonami-isco-2652}-* を抽出\" :result \"5 run すべて :outcome :pass。simeon/asher/benjamin の 3 ノードで、件数はローカル実行と一致（isco-2652 16->23, ongaku 18->28, sakkyokuka 6）\"}
    {:what \":rights-not-determined — 未確定と確定済みゼロの区別\" :cmd \"clojure -M:test（isco-2652）\" :result \"26 tests / 101 assertions, 0 failures。区別を潰すと 2 failures\"}
-   {:what \"3 回目の fleet-db 吸収前の全 pin 検証\" :cmd \"reconcile が変更した 13 件を gh api compare\" :result \"13/13 が status=ahead / behind_by=0。追加 1 件（cloud-itonami-kekkai）は新規\"}]"
+   {:what \"3 回目の fleet-db 吸収前の全 pin 検証\" :cmd \"reconcile が変更した 13 件を gh api compare\" :result \"13/13 が status=ahead / behind_by=0。追加 1 件（cloud-itonami-kekkai）は新規\"}
+   {:what \"ongaku CC0/public-domain holdings — JVM\" :cmd \"clojure -M:test\" :result \"30 tests / 111 assertions, 0 failures\"}
+   {:what \"gftd-audio-actor の構造化 provenance\" :cmd \"最小 classpath（clojure + src/test のみ）で audio.datalad-test\" :result \"4 tests / 13 assertions, 0 failures。:work/provenance を潰すと 1 failure。**repo 全体の suite は無改変の main でも classpath を組めないため実行できていない**（ed25519 の二重座標。gap に起票）\"}]"
 
 :adr/landed
   "[{:repo \"orgs/kotoba-lang/ongaku\" :commit \"cb88622101057\" :what \"rights/work/commission — 受注で渡す側を gate する（技芸層）\"}
@@ -210,10 +212,16 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:repo \"com-junkawasaki/root\" :commit \"b7e12ebb3660\" :what \"ongaku / isco-2652 の pin 前進（API single-entry）\"}
    {:repo \"com-junkawasaki/root\" :commit \"5002d8f94fdc\" :what \"west.yml の短縮 revision を 40 桁に直す（cloud-itonami-app。4123 件中 1 件だけ 12 桁だった）\"}
    {:repo \"orgs/cloud-itonami/cloud-itonami-isco-2652\" :commit \"b4815e812d29\" :what \"governor に :rights-not-determined — 『まだ決めていない』を『決めた結果ゼロ』に化けさせない\"}
-   {:repo \"com-junkawasaki/root\" :commit \"dd622f36c86b\" :what \"isco-2652 pin 前進（API single-entry）\"}]"
+   {:repo \"com-junkawasaki/root\" :commit \"dd622f36c86b\" :what \"isco-2652 pin 前進（API single-entry）\"}
+   {:repo \"orgs/kotoba-lang/ongaku\" :commit \"5b51e60c0031\" :what \"holdings に :license/cc0 と :license/public-domain（生成物に貼られる公衆ライセンス）\"}
+   {:repo \"orgs/cloud-itonami/gftd-audio-actor\" :commit \"5cbf7a43d399\" :what \"isekai manifest に :work/provenance :generated + :work/generator（機械可読な provenance）\"}
+   {:repo \"com-junkawasaki/root\" :commit \"b595b1e6cd81\" :what \"ongaku / gftd-audio-actor の pin 前進\"}]"
 
 :adr/gaps
-  "[{:gap \"`gftd-audio-actor`（persona リツ）と `ai.gftd.ongakuka.compose` は受注 gate を通っていない。生成は従来どおり動くが、権利と納品の検査は isco-2652 の actor 経由で受注を出したときだけ効く\" :since \"2026-08-06\"}
+  "[{:gap \"`gftd-audio-actor` は資産に機械可読な provenance（:work/provenance :generated + :work/generator）を載せるようになったが、**その資産を実際に track として登録する経路はまだ無い**。`ai.gftd.ongakuka.compose` 側は手つかず\" :since \"2026-08-06\"}
+   {:gap \"**`gftd-audio-actor` の :cc0 主張に根拠が無い。** persona が :persona/license :cc0 を宣言し governor が #{:cc0 :cc-by :public-domain} を強制しているが、governor が見ているのは値が許可集合に入っていることだけで、murakumo 生成モデルの出力条項が CC0 献呈を許すかは**どこにも記録されていない**。ongaku.holdings は『CC0 として出ている資産から何を渡せるか』には答えるが『CC0 で出してよかったか』には答えない\" :since \"2026-08-07\"}
+   {:gap \"**`gftd-audio-actor` の suite は無改変の main でも classpath を組めない** — io.github.kotoba-lang/ed25519 の git-sha 依存と org-ietf-ed25519 の local/root 依存が同じ lib を指していて解決不能。この actor には現状 CI gate が無い（fleet-ci にも未登録）。今回の変更は audio.datalad-test だけを最小 classpath で実行して検証した\" :since \"2026-08-07\"}
+   {:gap \"`gftd-audio-actor` は :work/model-id を立てられない。murakumo の function entry は :fn/id / :fn/engine / :fn/kind / :fn/modality しか持たず、実際のモデルはエンジン側が選ぶため観測できない。下流は :missing-model-id を出し続ける（それが正しい状態）が、納品するには murakumo 側がモデルを job 結果に載せる必要がある\" :since \"2026-08-07\"}
    {:gap \"既に seed 済みの store は `register-catalog-track!` で登録し直しが要る。gate は :rights-not-determined で止めて理由を出すので黙って通ることは無いが、登録し直すまでその track で受注は取れない\" :since \"2026-08-06\"}
    {:gap \"license-holdings に載っているのは DOVA-SYNDROME と CC BY 4.0 の 2 件だけ（ongakuka の実カタログ 30 件がこの 2 種のため）。3 種目のライセンスを引いた資産を足すときは、本文を読んで根拠つきで表に足すまで何も渡せない\" :since \"2026-08-06\"}
    {:gap \"sakkyokuka の台帳 works.edn は seed 3 件のみで、実際の受注も実際の作品も入っていない\" :since \"2026-08-06\"}]"}]
