@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 22220, "kotobase-cf-wasm-staging" 42809},
+ {"net-kotobase" 22255, "kotobase-cf-wasm-staging" 42938},
  :zone
- {:requests-7d 62788,
+ {:requests-7d 62971,
   :pageviews-7d 1426,
-  :uniques-7d-sum 1259,
+  :uniques-7d-sum 1260,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 1504}
-   {:path "/_health", :requests 1472}
-   {:path "/", :requests 84}
+  [{:path "/health", :requests 1535}
+   {:path "/_health", :requests 1511}
+   {:path "/", :requests 83}
    {:path "/api/funnel", :requests 28}
    {:path "/robots.txt", :requests 18}
    {:path "/pricing", :requests 7}
    {:path "/llms.txt", :requests 6}
    {:path "/sign-in", :requests 5}],
-  :status-mix {:client-error 3326, :ok 3163},
+  :status-mix {:client-error 3396, :ok 3231},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
  :as-of "2026-08-07",
  :traffic-quality {:window "24h", :probe-4xx-pct 51, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 1504 · /_health 1472 · / 84 · /api/funnel 28 · /robots.txt 18 | 4xx(probe) 51%",
+ "上位 page (24h, 2xx/3xx): /health 1535 · /_health 1511 · / 83 · /api/funnel 28 · /robots.txt 18 | 4xx(probe) 51%",
  :funnel {:visitors 2420, :signups 13, :checkouts 0},
  :signal
- "kotobase.net 実測 62788 req/7d・1259 uniques(日次和)・うち4xx probe 51%(24h)、workers 65029 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 62971 req/7d・1260 uniques(日次和)・うち4xx probe 51%(24h)、workers 65193 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
