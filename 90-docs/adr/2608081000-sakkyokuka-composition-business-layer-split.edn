@@ -198,7 +198,11 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:what \"ongaku CC0/public-domain holdings — JVM\" :cmd \"clojure -M:test\" :result \"30 tests / 111 assertions, 0 failures\"}
    {:what \"gftd-audio-actor の構造化 provenance（暫定・最小 classpath）\" :cmd \"clojure + src/test のみで audio.datalad-test\" :result \"4 tests / 13 assertions, 0 failures。この時点では repo 全体の suite が組めず代用だった\"}
    {:what \"gftd-audio-actor の suite 本体（classpath 修正後、初回）\" :cmd \"clojure -M:test\" :result \"30 tests / 59 assertions, 0 failures。lint 0 errors 0 warnings。:work/provenance を潰すと 1 failure —— 今度は**本物の suite で**確認\"}
-   {:what \"classpath 修正が正しい層か\" :cmd \"cloud-murakumo 単体で clojure -Spath\" :result \"exit 0。単体では top-level 宣言が深さ 1 で勝つので通り、1 レベル上の consumer でだけ壊れる。修正は cloud-murakumo 自身と同じ形（top-level :local/root）を consumer に置く\"}]"
+   {:what \"classpath 修正が正しい層か\" :cmd \"cloud-murakumo 単体で clojure -Spath\" :result \"exit 0。単体では top-level 宣言が深さ 1 で勝つので通り、1 レベル上の consumer でだけ壊れる。修正は cloud-murakumo 自身と同じ形（top-level :local/root）を consumer に置く\"}
+   {:what \"座標二重化の横断調査（静的スキャン）\" :cmd \"checkout 済み 3,397 件の deps.edn を走査し、:local/root 経由で推移グラフを辿って『同じ lib が git と local の両形式で、かつ top-level に無い』repo を抽出\" :result \"11 repo。171 lib が両形式で宣言されていたが、実際に壊れるのはこの 11 件\"}
+   {:what \"横断調査の実証（推測でなく実行）\" :cmd \"11 repo それぞれで clojure -A:test -Spath\" :result \"11/11 が実際に失敗。静的解析に false positive は無かった\"}
+   {:what \"6 actor の suite（修正後、初回）\" :cmd \"clojure -M:test\" :result \"avatar 29/46, illust 24/38, motion 24/38, rig 28/45, sculpt 24/38, voice 27/51 —— 計 156 tests すべて 0 failures。修正前はいずれも classpath が組めず 1 度も走っていなかった\"}
+   {:what \"消してしまった 3 repo の復元\" :cmd \"west pin の revision で clone + checkout し、pin と HEAD の一致を確認\" :result \"router d7369db / kami-gen-ml3d a1ff3b0 / cloud-murakumo-market-analyst 5d83039 —— 3 件とも pin 一致・dirty 0。ただし削除前の未コミット変更があれば失われている（削除前に dirty を確認していない）\"}]"
 
 :adr/landed
   "[{:repo \"orgs/kotoba-lang/ongaku\" :commit \"cb88622101057\" :what \"rights/work/commission — 受注で渡す側を gate する（技芸層）\"}
@@ -219,12 +223,21 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:repo \"orgs/cloud-itonami/gftd-audio-actor\" :commit \"5cbf7a43d399\" :what \"isekai manifest に :work/provenance :generated + :work/generator（機械可読な provenance）\"}
    {:repo \"com-junkawasaki/root\" :commit \"b595b1e6cd81\" :what \"ongaku / gftd-audio-actor の pin 前進\"}
    {:repo \"orgs/cloud-itonami/gftd-audio-actor\" :commit \"50caaa0ea77d\" :what \"ed25519 を top-level に置いて classpath を組めるようにする — この repo の suite が初めて走った\"}
-   {:repo \"com-junkawasaki/root\" :what \"fleet-ci gates.edn に cloud-itonami-gftd-audio-actor の :jvm-test\"}]"
+   {:repo \"com-junkawasaki/root\" :what \"fleet-ci gates.edn に cloud-itonami-gftd-audio-actor の :jvm-test\"}
+   {:repo \"orgs/cloud-itonami/gftd-avatar-actor\" :commit \"906f540708a4\" :what \"座標二重化の解消 — suite が初めて走った（29 tests）\"}
+   {:repo \"orgs/cloud-itonami/gftd-illust-actor\" :commit \"d5b248fabfac\" :what \"同上（24 tests）\"}
+   {:repo \"orgs/cloud-itonami/gftd-motion-actor\" :commit \"1003720c7cd9\" :what \"同上（24 tests）\"}
+   {:repo \"orgs/cloud-itonami/gftd-rig-actor\" :commit \"ad7b6b2402a5\" :what \"同上（28 tests）\"}
+   {:repo \"orgs/cloud-itonami/gftd-sculpt-actor\" :commit \"eec673a62778\" :what \"同上（24 tests）\"}
+   {:repo \"orgs/cloud-itonami/gftd-voice-actor\" :commit \"d08205ed625a\" :what \"同上（27 tests）\"}
+   {:repo \"com-junkawasaki/root\" :commit \"5fd9a66f7698\" :what \"6 actor の pin 前進（全件 fast-forward 検証済み）\"}
+   {:repo \"com-junkawasaki/root\" :what \"fleet-ci gates.edn に残り 6 actor の :jvm-test（7 modality 全部が gate 下に入った）\"}]"
 
 :adr/gaps
   "[{:gap \"`gftd-audio-actor` は資産に機械可読な provenance（:work/provenance :generated + :work/generator）を載せるようになったが、**その資産を実際に track として登録する経路はまだ無い**。`ai.gftd.ongakuka.compose` 側は手つかず\" :since \"2026-08-06\"}
    {:gap \"**`gftd-audio-actor` の :cc0 主張に根拠が無い。** persona が :persona/license :cc0 を宣言し governor が #{:cc0 :cc-by :public-domain} を強制しているが、governor が見ているのは値が許可集合に入っていることだけで、murakumo 生成モデルの出力条項が CC0 献呈を許すかは**どこにも記録されていない**。ongaku.holdings は『CC0 として出ている資産から何を渡せるか』には答えるが『CC0 で出してよかったか』には答えない\" :since \"2026-08-07\"}
-   {:gap \"座標二重化は gftd-audio-actor では直したが、**同型の壊れ方が他の consumer にも在りうる** —— `io.github.kotoba-lang/ed25519` を :git/sha で宣言する repo は 10 件以上あり、そのどれかを :local/root 側と同じ graph で consume すると同じ症状が出る。横断調査は未実施\" :since \"2026-08-07\"}
+   {:gap \"横断調査で見つけた 11 repo のうち `cloud-itonami-isic-649`（kotoba-lang/identity）と `cloud-itonami-isic-6493`（html/css）は **deps.edn の修正を書いたが検証できず未着地**。sandbox に sibling checkout が足りず classpath を組めなかった。未検証のものは出していない\" :since \"2026-08-07\"}
+   {:gap \"横断調査のスキャンは **checkout 済み repo の deps.edn しか見ていない**（3,397 件）。west 全体は 4,100 件超あり、未 checkout の repo と、git dep の pin 時点の deps.edn（ローカルの現在状態で代用した）は調べられていない。したがって『11 件で全部』とは言えない\" :since \"2026-08-07\"}
    {:gap \"`gftd-audio-actor` は :work/model-id を立てられない。murakumo の function entry は :fn/id / :fn/engine / :fn/kind / :fn/modality しか持たず、実際のモデルはエンジン側が選ぶため観測できない。下流は :missing-model-id を出し続ける（それが正しい状態）が、納品するには murakumo 側がモデルを job 結果に載せる必要がある\" :since \"2026-08-07\"}
    {:gap \"既に seed 済みの store は `register-catalog-track!` で登録し直しが要る。gate は :rights-not-determined で止めて理由を出すので黙って通ることは無いが、登録し直すまでその track で受注は取れない\" :since \"2026-08-06\"}
    {:gap \"license-holdings に載っているのは DOVA-SYNDROME と CC BY 4.0 の 2 件だけ（ongakuka の実カタログ 30 件がこの 2 種のため）。3 種目のライセンスを引いた資産を足すときは、本文を読んで根拠つきで表に足すまで何も渡せない\" :since \"2026-08-06\"}

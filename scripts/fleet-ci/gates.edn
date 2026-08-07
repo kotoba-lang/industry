@@ -98,6 +98,17 @@
   ;; tools.deps が classpath を組めず、しかも gate が無いので誰も気付かなかった。
   ;; 直したので、二度と黙って腐らないようここに載せる。
   {:name "cloud-itonami-gftd-audio-actor" :gate :jvm-test :cd true}
+  ;; 残る 6 つの asset actor（ADR-2607123000 の 7 modality）。横断調査の結果、
+  ;; **7 本すべてが同じ座標二重化で classpath を組めず、suite が 1 度も走って
+  ;; いなかった**。修正して初めて計 156 tests が動いた（avatar 29 / illust 24 /
+  ;; motion 24 / rig 28 / sculpt 24 / voice 27、audio は別途 30）。
+  ;; 直しただけでは再発を防げないので 7 本とも gate に載せる。
+  {:name "cloud-itonami-gftd-avatar-actor" :gate :jvm-test :cd true}
+  {:name "cloud-itonami-gftd-illust-actor" :gate :jvm-test :cd true}
+  {:name "cloud-itonami-gftd-motion-actor" :gate :jvm-test :cd true}
+  {:name "cloud-itonami-gftd-rig-actor" :gate :jvm-test :cd true}
+  {:name "cloud-itonami-gftd-sculpt-actor" :gate :jvm-test :cd true}
+  {:name "cloud-itonami-gftd-voice-actor" :gate :jvm-test :cd true}
 
   ;; :include-ext = ノードへ送る tree を必要な path だけに絞る（trees+blobs API 経由）。
   ;; この repo の full tarball は 1.6GB（assets/動画・画像）で、EDN を parse するだけの
