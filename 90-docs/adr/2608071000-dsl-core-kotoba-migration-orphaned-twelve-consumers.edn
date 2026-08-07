@@ -14,7 +14,19 @@
   :adr/authoritative_for
   ["実測の記録: kotoba.dsl.problem は 2026-07-21 以降どの runtime でも load できず、checkout 済み 12 repo が壊れている"
    ".kotoba 移行は、消費側が load できる経路を持ってから src/ の .cljc を外す（消費側より先に外さない）"
-   "この修理方法の選択は本 ADR では行わない。dsl-core の accepted ADR とその実施テストを覆す決定であり、オーナー入力を要する"]
+   "kotoba は kotoba-native + tender-native で走らせることを優先する。ホスト言語で書き直した第 2 の実装を loadable surface として置かない（オーナー指示 2026-08-07）"
+   "実測の記録: kotoba-native は :vector / :set / :map / :document を 1 つも運ばない。problem.kotoba の native 実行は移行計画 W4（recursive logical values）待ちである"]
+
+  :adr/blocked-items
+  "[{:id :problem-kotoba-native-execution
+     :what \"kotoba.dsl.problem を kotoba-native + tender-native で実行し、消費側がそこを経由して呼ぶ\"
+     :where \"kotoba-lang/kotoba-native（backend）/ kotoba-lang/tender-native（capability gate 下の executor）/ kotoba-lang/dsl-core\"
+     :blocked-on [{:missing :collection-value-type
+                   :why \"native backend が運ぶのは :i64 :bool :string :keyword :record :option :result のみ。:vector / :set / :map / :list / :variant / :document は x86_64.cljc / aarch64.cljc に 0 回しか現れない（実測 2026-08-07）。problem/problem-field は :document を返し、errors/warnings は problem の集合を返すので、:record で 1 件を表現し直しても書けない\"
+                   :release-condition \"kotoba-native が collection / document 値を運べるようになること\"
+                   :gate \"adr-2607279200 W4: Define recursive logical values with explicit node/depth/byte budgets\"}]
+     :interim \"未決。W4 までの間 12+ repo と loop-system-dynamics の XMILE 実行経路 6 本が壊れたまま残る。巻き戻すか否かはオーナー入力を要する（決定 5）\"
+     :not-blocked-on [\"実装工数\" \"tender-native の capability gate\" \"消費側の書き換え\"]}]"
 
   :adr/supersedes []
   :adr/superseded_by []
@@ -96,28 +108,67 @@ checkout 済み全 repo で `(problem/…)` の呼び出しを数えた結果:
 
 これは CLAUDE.md が design system 移行について既に定めている『移行途中のリポジトリを app から直接 require しない』の裏返しで、**移行する側の義務**として書く。
 
-### 2. 修理方法は本 ADR では決めない
+### 2. 方向はオーナーが決めた —— native 経路を優先する（2026-08-07）
 
-dsl-core の accepted ADR-0001 とその実施テスト（`production-source-authority`）を覆す決定であり、agent が単独で行ってよい種類のものではない。ADR-2608062200 で JPY 3,000,000 の衝突を記録だけして解消しなかったのと同じ扱いにする —— **事実を固定し、判断はオーナーに残す。**
+**オーナー指示: 「kotoba は kotoba-native を使って安全に動かすことを優先」。**
 
-選択肢は 3 つあり、コストと誠実さのトレードオフが異なる:
+したがって **`src/` に手書きの `.cljc` を戻す案（旧 A）は採らない。** 消費側は `kotoba-native`（KIR → x86_64/aarch64 機械語 + ELF64）が出した artifact を `tender-native`（`kototama.native.executor`、capability gate 下で loader を measure して実行）経由で呼ぶ。ホスト言語で書き直した第 2 の実装を置くのではなく、**authority である `.kotoba` そのものを走らせる。**
 
-| | 何をするか | 代償 |
+これは dsl-core の ADR-0001（『sole production language source』）とその実施テスト `production-source-authority` を**撤回せずに済む**方向でもある。
+
+### 3. ただし `problem.kotoba` は今日 native で走らない —— 型が無い
+
+方向が決まったので実現可能性を測った。**`problem.kotoba` は現在の kotoba-native では compile できない。**
+
+native backend（`kotoba.native.x86-64` / `aarch64`）が運ぶ値型（src の実測 2026-08-07）:
+
+| 型 | x86_64.cljc の出現 | 判定 |
 |---|---|---|
-| **A. `src/` に `.cljc` を戻す** | 削除された 45 行を復元し、`.kotoba` を authority、`.cljc` を loadable surface とする。parity テストで 4 関数の一致を強制（既存 `problem_test.clj` が既に `.kotoba` を JVM で駆動しているので実装可能）。`production-source-authority` テストは削除する | ADR-0001 の『sole production language source』を明示的に撤回することになる。1 repo で済み、12 repo が即座に回復する |
-| **B. 生成物として emit する** | `problem.kotoba` から loadable な artifact を生成し、`src/` は `.kotoba` のみのまま保つ | ADR-0001 を撤回せずに済むが、`:js-kotoba-v1` が出すのは restricted ESM であって Clojure の namespace ではない。Clojure requireable な emitter は現状無く、作る必要がある |
-| **C. 消費側 12+ repo を移行する** | 各 repo が `kotoba.dsl.problem` への依存をやめる（inline するか、ESM 境界を経由する） | 最も原則に忠実だが 12+ repo に触る。共有していた検証規約が repo ごとに分岐する（dsl-core の存在理由が消える） |
+| `:record` | 25 | あり |
+| `:string` | 10 | あり |
+| `:i64` | 5 | あり |
+| `:bool` | 4 | あり |
+| `:keyword` | 1 | **値としてのみ**（printed text の 1 word handle。`keyword-name` 等の演算は無い） |
+| `:option` / `:result` | 1 / 2 | あり |
+| `:vector` `:set` `:map` `:list` `:variant` `:document` | **0** | **無い** |
 
-**A が最短で、css の先例と一致する。** ただしそれは dsl-core の ADR-0001 を撤回する決定であって、本 ADR の権限ではない。
+`problem.kotoba` が使う 10 演算子のうち native backend にあるのは 2 つだけ:
 
-### 3. 検出の欠如は別の gap として残る
+    keyword-from-string   5      string-concat        12
+    document-map          0      document-vector       0
+    document-keyword      0      document-count        0
+    document-contains     0      document-vector-conj  0
+    required-at           0      required-document     0
+
+`problem`/`problem-field` は `:document` を返し、`errors`/`warnings` は problem の**集合**を返す。集合型が 1 つも lower されない以上、`:record` で problem 1 件を表現し直しても `errors` は書けない。
+
+これは既知の言語側の限界と同じ根である —— CLAUDE.md「再帰的な値型は『まだ』無い」、移行計画 ADR-2607279200 の **W4「Define recursive logical values with explicit node/depth/byte budgets」**。`problem.kotoba` は W4 を待つ側の program である。
+
+### 4. release 条件
+
+> **kotoba-native が collection / document 値（W4 の recursive logical value）を運べるようになること。**
+
+それまで `kotoba.dsl.problem` を native で走らせることはできない。この 1 行が本 ADR の blocked item であり、`:adr/blocked-items` に構造化して持つ。
+
+### 5. 未決のまま残る問い（オーナー入力を要する）
+
+native 経路が W4 待ちである以上、**W4 までの間、12+ repo と loop-system-dynamics の XMILE 実行経路 6 本をどう扱うか**が残る。本 ADR は決めない。ただし決定 1（移行の順序）から導かれる読みは記録しておく:
+
+> `problem.kotoba` が native で走れないなら、それは **`.cljc` を外してよい段階に達していなかった**ということになる。この読みに従えば、修理は「恒久的な shim を足す」ではなく **「時期尚早だった移行を W4 まで巻き戻す」** になる。これは旧 A（恒久 shim）とは別物だが、`src/` に `.cljc` が戻る点は同じなので、やはり dsl-core の ADR-0001 に触れる。
+
+**agent は巻き戻しを実行しない。** 事実（native が W4 待ちであること、消費側が壊れていること）を固定するのが本 ADR の役割である。
+
+### 6. 検出の欠如は別の gap として残る
 
 この破損を捕まえる仕組みはワークスペースに無い。dsl-core の CI は自 repo だけを見て、消費側には CI が無い。**「require が解決するか」を横断で見る gate**が要るが、本 ADR では設計しない（修理方法が決まると必要な形も変わるため）。"
 
   :adr/consequences
   "- **17 日間、緑の CI の裏で 12 repo が壊れていた事実が記録された。** ADR-2607300900 が『動いていない CI より無い CI の方がよい』と書いたのと同じ構図が、別の形で出た —— ここでは CI は動いていて緑で、**見る範囲が自 repo に閉じていた**。
 - **loop-system-dynamics の XMILE 経路 6 本が現在動かない。** これは test ではなく `src/` の実行経路である。ADR-2608062400 が『SD の道具立ては揃っている』と書いたのは `dynamics` の XMILE ライブラリについてであり正しいが、**それを使う orchestrator 側は今 load できない**。同 ADR の verification に書いた「6 本の XMILE モデルを確認した」はファイルを読んだという意味であって、実行したという意味ではない。
-- **修理は未決のまま残る。** 意図的な非決定であり、オーナーの入力を要する。
+- **方向は決まり、実行は W4 待ちになった（2026-08-07）。** オーナーが native 経路を優先すると決めたので、手書き `.cljc` を loadable surface として置く案は消えた。同時に、その native 経路が `problem.kotoba` を今日運べないことも測って分かった —— **決まったのは方向であって、期日ではない。**
+- **「道具は揃っている」と「今それが使える」は違う、が別の場所でもう一度出た。** ADR-2608062400 は SD について同じ形の誤りを避けたが（価格が無いのでループが閉じない）、ここでは native backend が『在る』ことと『この program を運べる』ことが別だった。**在ることの確認は、動くことの確認ではない。**
+- **W4 の優先度が上がる。** これまで W4（recursive logical values）は言語計画の一項目だったが、いま 12+ repo と 1 本の実行経路がそこに直接ぶら下がっている。
+- **W4 までの扱いは未決のまま残る。** 意図的な非決定であり、オーナーの入力を要する（決定 5）。
 - **`.kotoba` 移行の順序規則ができた。** 次の移行（design system は css → html → shitsuke → liquid-glass-ui → kotoba-ui の順が決まっている）でこの形の事故を繰り返さないための床になる。"
 
   :adr/verification
@@ -132,4 +183,13 @@ dsl-core の accepted ADR-0001 とその実施テスト（`production-source-aut
 - 復元の代償: dsl-core の worktree で `src/kotoba/dsl/problem.cljc` を復元し `clojure -M:test` を実行 → `production-source-authority` が `(not (= [\"src/kotoba/dsl/problem.kotoba\"] [\"src/kotoba/dsl/problem.cljc\" \"src/kotoba/dsl/problem.kotoba\"]))` で落ちることを確認。**この worktree は landing せずに撤去した。**
 - css の先例: `kotoba-lang/css` に `src/css/core.cljc` / `src/css/utility.cljc` / `src/kotoba/css.cljc` が現存し、`.kotoba` は `css/kotoba/css_core.kotoba` / `css_document.kotoba` に分離、`deps.edn` に『kotoba-lang/compiler is a TEST-ONLY dependency, for the parity gate』とある。
 
-**この ADR が検証していないこと**: checkout されていない west project の中に何 repo の消費者が居るか。12 は下限であって総数ではない。また選択肢 B の実現可能性（Clojure requireable な emitter を作るコスト）は見積もっていない。"}]
+### native 経路の実現可能性（2026-08-07 追記、オーナーが方向を決めた後に測った）
+
+- `nbb scripts/repo-search.cljs kotoba-native native` → `kotoba-lang/kotoba-native`（backend）と `kotoba-lang/tender-native`（`kototama.native.executor`）。どちらも checkout 済みで実在する。ADR-2607266000 で core repo から分割されたもの。
+- `tender-native/src/kototama/native/executor.clj` の `execute` は署名済み artifact を検証し、admission policy を通し、measure した loader で実行する。**capability gate は実在する。**
+- 型の実測は `grep -c` を `src/kotoba/native/x86_64.cljc` に当てて数えた: `:record` 25 / `:string` 10 / `:i64` 5 / `:bool` 4 / `:keyword` 1 / `:option` 1 / `:result` 2、**`:vector` `:set` `:map` `:list` `:variant` `:document` はいずれも 0**。
+- 演算子の実測は `problem.kotoba` が使う 10 個を backend src に当てた: `keyword-from-string` 5 / `string-concat` 12、**残り 8 個（`document-map` `document-vector` `document-keyword` `document-count` `document-contains` `document-vector-conj` `required-at` `required-document`）はすべて 0**。
+- `:keyword` は x86_64.cljc:1175 のコメントどおり**値としてのみ**運ばれる（printed text の 1 word handle）。同コメントは『This admits keyword VALUES, not keyword OPERATIONS』と明記している。
+- `executor/execute` は `(every? integer? args)` かつ `(<= (count args) 5)` を要求する。document を渡す経路は引数側にも無い。
+
+**この ADR が検証していないこと**: checkout されていない west project の中に何 repo の消費者が居るか（12 は下限であって総数ではない）。W4 の実装コスト。`problem.kotoba` を実際に native ターゲットで compile して失敗するところ（型の不在から演繹しており、compile を走らせてはいない）。"}]
