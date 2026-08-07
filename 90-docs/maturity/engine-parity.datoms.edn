@@ -232,10 +232,10 @@
   :parity/label "ネットコード（権威サーバ / 状態同期 / 予測・補間 / relay）"
   :parity/status :partial :parity/score 0.50
   :parity/repos "[\"network-awai/network-isekai\"]"
-  :parity/evidence "network-isekai に authoritative_transport.cljc が実在。matchmak* が 6 件ヒット。ただし kami-engine 家そのものには netcode 層が無く、network-isekai 側の実装に依存している。"
+  :parity/evidence "network-isekai に authoritative_transport.cljc が実在。matchmak* が 6 件ヒット。ただし kami-engine 家そのものには netcode 層が無く、network-isekai 側の実装に依存している。**第 33 反復（2026-08-07）訂正**: 「予測・巻き戻し・lag compensation の実測が無い」のうち **予測と reconcile は実装済み**（`kotoba-lang/netsync` の `pred-record` / `pred-reconcile` / `remote-interp`）。同反復で `kami.relevancy` を足したので **relevancy も在る**。未だに無いのは **lag compensation**（サーバが撃った瞬間へ巻き戻して当たり判定する経路）と、**game への配線**（netsync に在るが tick が全 entity を送っている）。"
   :parity/probe "ls orgs/network-awai/network-isekai/src/isekai/authoritative_transport.cljc"
   :parity/gap "engine 家に汎用 netcode が無い（game 側実装）。予測・巻き戻し・lag compensation の実測が無い。"
-  :parity/measured-at "2026-08-04"}
+  :parity/measured-at "2026-08-07"}
 
  ;; ───────────── network-isekai vs Roblox / Fortnite / Steam ─────────────
  {:parity/id :parity/roblox-ugc-authoring
@@ -308,12 +308,12 @@
   :parity/target "fortnite" :parity/subject "network-isekai"
   :parity/axis "large-scale-netcode"
   :parity/label "大規模同時接続ネットコード（100 人規模 BR / relevancy / lag compensation）"
-  :parity/status :partial :parity/score 0.35
+  :parity/status :partial :parity/score 0.45
   :parity/repos "[\"network-awai/network-isekai\"]"
-  :parity/evidence "royale ゲームが実在し authoritative_transport.cljc + world_streaming.cljc がある。matchmak* 6 件。ADR-2607121800 Phase 1 で kotoba.level の zone（storm 相当）を royale に配線済み。"
-  :parity/probe "ls orgs/network-awai/network-isekai/public/games/gftd/royale/"
-  :parity/gap "同時接続数の実測が無い。relevancy（見えている相手だけ同期）・lag compensation・予測巻き戻しが未実装。sekaiju MMO 設計（ADR-260726）は kotobase ref 1 本制約に当たって shard 案が却下された経緯があり、その後継設計が未着地。"
-  :parity/measured-at "2026-08-04"}
+  :parity/evidence "royale ゲームが実在し authoritative_transport.cljc + world_streaming.cljc がある。matchmak* 6 件。ADR-2607121800 Phase 1 で kotoba.level の zone（storm 相当）を royale に配線済み。**第 33 反復（2026-08-07）で relevancy を実装し、同時にこの軸の gap 記述の誤りを 1 つ訂正した**（netsync 29be81c9）。「relevancy・lag compensation・予測巻き戻しが未実装」のうち、**予測と巻き戻しは実装済みだった** —— `kotoba-lang/netsync` の `kami.netsync` に `pred-record` / `pred-reconcile` / `remote-interp` が在り、`:predict` と `:prediction` を schema に持っている。未実装だったのは **relevancy だけ**（relevancy / interest management / area-of-interest は workspace 全体で名前も内容も 0 件だった）。足したもの: `kami.relevancy` —— relevant set + **hysteresis**（境界で毎 tick 出入りさせない。flicker は 1 往復ごとに spawn と despawn を要するのでどちらの状態よりも高い）+ **delta**（wire が欲しいのは :entered / :left）。実装は **exit 半径を cell 幅にした uniform spatial hash** で、observer は 3x3x3 近傍だけを見る。**正しさは brute force との完全一致で担保**: 素直な全 observer × 全 entity 実装を `brute-force-relevant` として残し、grid がそれと一致することを cold（:enter が効く）と warm（:exit が効く）の両方で assert する。**コストは測る**: `examined-count` が実際に距離計算した数を返し、2,000 entity / 半径 400 の世界で最悪近傍が全体の 1/10 未満であることを assert（これが無いと最適化が no-op でも他の test は通る）。この test は最初 radius-40 の disc に 2,000 個を詰めて **796/2000** を examine して落ちた —— 数字は正しく、**世界が小さすぎて grid が要らない領域を測っていた**ので regime を直した。新規 7 test / 122 assertion、repo 全体 9/127 緑、lint 0。**mutation 5 通りのうち 1 つが生き残り、hysteresis が 2 箇所に実装されていて片方しか効いていないと判明**したので retention に一本化した（このセッション 3 例目の同じ形 —— probe の axis-weights、BVH の NaN guard に続く）。"
+  :parity/probe "nbb scripts/repo-search.cljs relevancy interest aoi  # => relevancy と area-of-interest は 4127 project の名前で 0 件; network-isekai 全体に /relevanc|interest.manage|AOI|lag.?compensat/i を当てて relevancy 系 0 件（rollback 11 件は netsync の予測経路）; cd orgs/kotoba-lang/netsync && clojure -M:test  # => Ran 9 tests containing 127 assertions, 0 failures"
+  :parity/gap "**relevancy は在る（第 33 反復）。予測・巻き戻しも在った。残るのは規模の実測と lag compensation。** ①**同時接続数の実測が無い** —— relevancy は帯域の天井を構造的に外したが、実際に何人繋がるかは測っていない。`examined-count` は grid の仕事量を測るだけで、transport も tick 予算も測らない ②**lag compensation が無い** —— 予測と reconcile は在るが、サーバが「撃った瞬間の相手の位置」に巻き戻して当たり判定する経路は無い（`pred-reconcile` は自分の位置の補正であって他者の過去位置の再構成ではない）③**relevancy が game に配線されていない** —— `kami.relevancy` は netsync に在るが、sekaiju / network-isekai の tick はまだ全 entity を送っている。**繋ぐまで帯域は減らない** ④sekaiju MMO 設計は kotobase の「ref 1 本」制約に当たって shard 案が却下された経緯があり、その後継設計が未着地（ADR-260726）⑤relevancy は距離のみ。視線遮蔽・chunk 単位の購読・優先度付き劣化送信は無い。"
+  :parity/measured-at "2026-08-07"}
 
  {:parity/id :parity/fortnite-liveops
   :parity/target "fortnite" :parity/subject "network-isekai"
