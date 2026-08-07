@@ -37,7 +37,7 @@ git を起動する。** 全体を回すのは初回 clone と、pin が大量�
 
 | やりたいこと | 使うもの |
 |---|---|
-| **local を pin に合わせる（差分だけ）** | `fleet sync --db manifest/fleet-db.edn`（kagami）。pin と一致する repo は **`:noop` で git を起動しない**、dirty は skip、pin SHA を名指しで fetch、`--jobs` で並列。⚠ **先に `fleet reconcile` を通すこと**（下記） |
+| **local を pin に合わせる（差分だけ）** | `kagami sync --db manifest/fleet-db.edn`（kagami）。pin と一致する repo は **`:noop` で git を起動しない**、dirty は skip、pin SHA を名指しで fetch、`--jobs` で並列。⚠ **先に `kagami reconcile` を通すこと**（下記） |
 | **どの pin が remote より遅れているか** | `west update` は**答えない**（pin に合わせるだけ）。`gh api repos/<org>/<repo>/compare/<pin>...main` の `ahead_by` |
 | **pin を前進させる** | `nbb scripts/advance-pins.cljs <org> <list-file> --execute`（entry の revision 行だけ書換）→ `nbb scripts/verify-west-pins.cljs` |
 | **GitHub / local / west.yml の三点ずれ** | `nbb scripts/west-triple-sync.cljs plan --scope managed`（既定 dry-run。`--scope blocking` は fresh-checkout を壊している分だけ） |
@@ -58,17 +58,17 @@ printf '%s\n' <name> <name> | xargs west update --fetch smart           # ← xa
 pin へ checkout を合わせるだけで、GitHub 側の新しい commit は見ない（この誤解は
 下の「Git operations」節にも書いてある）。
 
-**`fleet sync` を使う前に `fleet reconcile` を通す。** fleet-db は west.yml の
+**`kagami sync` を使う前に `kagami reconcile` を通す。** fleet-db は west.yml の
 **上流の正本**だが、west.yml 側の pin 書き込みを fleet-db へ運ぶのは reconcile だけで、
 それを回していた CI は 2026-07-30 に撤去された（ADR-2607300900）。**遅れた fleet-db に
-対して `fleet sync` すると checkout が pin より「後ろ」へ動く。** 実測 2026-08-07:
+対して `kagami sync` すると checkout が pin より「後ろ」へ動く。** 実測 2026-08-07:
 reconcile が未実行のまま 24 pin ぶん遅れており、dry-run が既に west pin と一致している
 repo に `:advance` を出した。
 
 ```bash
 # 吸収前に必ず: 入力 west.yml は origin/main のもの、変更される pin は全て fast-forward か
 git show origin/main:manifest/west.yml > /tmp/west-main.yml
-nbb --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/fleet.cljs \
+nbb --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/kagami.cljs \
   reconcile --db manifest/fleet-db.edn --west /tmp/west-main.yml
 ```
 
@@ -307,7 +307,7 @@ sha256 と実ファイルを突き合わせる**。Actions 経路は committed �
 - **`manifest/fleet-db.edn`（+ append-only `fleet-db.ledger.edn`）が west.yml の
   上流の正本になりつつある（Phase 1.5 dual-write 吸収期）。** west.yml は
   fleet-db の projection。pin 前進の推奨経路は署名付き
-  `fleet pin-advance` / quorum `fleet govern`（実装:
+  `kagami pin-advance` / quorum `kagami govern`（実装:
   **`orgs/kotoba-lang/kagami`**、policy は `manifest/fleet-keys.edn`）。
   ⚠ **この repo は 2026-08 以前に `kotoba-fleet-vcs` から `kagami`（鏡）に改名されている。**
   旧名は GitHub リダイレクトで生きているが west には `kagami` として登録されており、
@@ -322,14 +322,14 @@ sha256 と実ファイルを突き合わせる**。Actions 経路は committed �
   `--key`。1Password は使わない — op CLI が interactive auth timeout）。
   `FLEET_ROOT=<superproject root>` を渡すと kagi bin を解決できる。
   従来の `gen-west-manifest.cljs --entry` / API single-entry も引き続き有効。
-  **API single-entry で west.yml に書いたあと、フラグ無しの `fleet reconcile` で
+  **API single-entry で west.yml に書いたあと、フラグ無しの `kagami reconcile` で
   fleet-db に吸収する**のが Phase 1.5 の正規手順:
 
   ```bash
   # 吸収（書き込む）。--check は検査のみ、--enforce* は「拒否」スイッチで書き込み
   # スコープではない（実測 2026-08-05: --enforce-repos に自分の変更を渡して
   # FLIP VIOLATION を食らった。scope 外の drift はどのみち吸収される）
-  nbb --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/fleet.cljs \
+  nbb --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/kagami.cljs \
     reconcile --db manifest/fleet-db.edn --west manifest/west.yml
   ```
 
@@ -342,10 +342,10 @@ sha256 と実ファイルを突き合わせる**。Actions 経路は committed �
   fast-forward か `gh api compare` で確認する**（53 件を確認した実績）。
   **その書き込みを fleet-db に自動吸収していた CI は無くなった**（2026-07-30、
   ADR-2607300900 で GitHub Actions を撤去。`fleet-projection-verify.yml` は
-  murakumo fleet 側に未 port）。当面 `fleet reconcile` は手で回す。**fleet-db / ledger /
+  murakumo fleet 側に未 port）。当面 `kagami reconcile` は手で回す。**fleet-db / ledger /
   fleet-head.edn を手編集しない**（ledger は追記のみ、head は署名付き）。
 - 並列 sync: `nbb --classpath orgs/kotoba-lang/kagami/src \
-  orgs/kotoba-lang/kagami/bin/fleet.cljs sync --db manifest/fleet-db.edn \
+  orgs/kotoba-lang/kagami/bin/kagami.cljs sync --db manifest/fleet-db.edn \
   --workspace <dir> --names a,b --jobs 8`（pin SHA 直接 fetch、dirty skip）。
 
 ## Git operations
