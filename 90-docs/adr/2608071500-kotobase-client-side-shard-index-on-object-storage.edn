@@ -36,7 +36,7 @@
    "adr-2607192200-net-kotobase-commoncrawl-web-search-integration"]
 
   :adr/artifacts
-  "{:code \"70-tools/kotobase-shard-index/\", :tests \"70-tools/kotobase-shard-index/test/run_tests.cljs (26 assertions)\", :receipt \"70-tools/kotobase-shard-index/bench/results/2026-08-07-get-scaling.edn\", :budget \"70-tools/kotobase-shard-index/bench/budget.edn\", :gate \"scripts/fleet-ci/gates/shard-index-check.cljs + gates.edn root-shard-index\"}"
+  "{:code \"70-tools/kotobase-shard-index/\", :tests \"70-tools/kotobase-shard-index/test/run_tests.cljs (32 assertions)\", :receipt \"70-tools/kotobase-shard-index/bench/results/2026-08-07-get-scaling.edn\", :budget \"70-tools/kotobase-shard-index/bench/budget.edn\", :gate \"scripts/fleet-ci/gates/shard-index-check.cljs + gates.edn root-shard-index\"}"
 
   :adr/body
   "# Context
@@ -337,9 +337,14 @@ prefetch=2` の exactness）。無改変では 32/32 合格。
 
 # 次にやること（優先順）
 
-1. **novelty queue の bounded segment 化** — 本 ADR とは独立に、**現行の本番経路**の
-   2.3 秒を削る唯一の特定済みの打ち手（ADR-2608021000 が名指し、未実装）。
-   `append-novelty-index!` の 16 entry/segment を `push-novelty!` にも適用すれば 64 hops → 4 hops。
+1. ~~novelty queue の bounded segment 化~~ — **完了・実測済み（2026-08-07 更新）**。
+   実装は kotobase-peer `c8e4f96`（2026-08-02、west pin `530f2d1` に含まれる）で、
+   本 ADR 執筆時点では landed を確認できていなかった。同日に変更後の receipt を取った:
+   fold 閾値 64 で **novelty 逐次 hops 64 → 4（16 倍）、hydrate の async round trip
+   66 → 6（11 倍）、novelty の占有率 96.9% → 66.7%**。
+   receipt `90-docs/kotobase-performance/2026-08-07-novelty-segmentation-dag-shape.edn`、
+   詳細は ADR-2608021000 §3。**ただし deployed worker（`network-awai/net-kotobase`、
+   private）が持っているかは未確認**で、2,282ms の実測値は変更前のもの。
 2. **incremental segment merge** — 全再構築を外す。これが無いとクロールに追随できない。
 3. **実コーパスでの再測定** — `product-corpus` か `kotobase-commoncrawl-actor` の実データで。
 4. **`kotoba-lang` への切り出しと west 登録**。
