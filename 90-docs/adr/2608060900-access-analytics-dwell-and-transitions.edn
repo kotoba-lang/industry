@@ -288,6 +288,80 @@ POST は 405、サイト本体は 200。
   consumer ゼロなので、実際に使われる形が 2 つ揃ってから寄せる方が安全）
 
 
+# 訪問者数は audience ではなかった（2026-08-07 実測）
+
+前日に landed した計測を「実トラフィックが乗ったか」確認しに行ったところ、
+**pv_daily は 88 views を記録しているのに dwell_daily / route_transition_daily は
+0 行**だった。ADR に自分で書いた注意（`collected-since` が null なら beacon が
+動いていない可能性も疑う）に従って切り分けた。
+
+## 決定的だった signature
+
+```
+day        new_visitors  returning_visits  d7_returns
+2026-08-03      119            0               0
+2026-08-04       68            0               0
+2026-08-05       59            0               0
+2026-08-06       80            0               0
+```
+
+**5 日で約 400 の「訪問者」が居て、後日戻ってきた者が 1 人も居ない。**
+`returning_visits` は `sv_first` / `sv_seen` cookie で駆動していて、実ブラウザなら
+必ず送り返す。この長さの完全な 0 は「静かな週」ではなく
+**cookie を保持しない母集団**を意味する。
+
+## 推測で終わらせず、Cloudflare GraphQL で実測した
+
+（wrangler の OAuth token がそのまま通る —— ADR-2607282000 の知見）
+
+23 時間の上位クライアント:
+
+| requests | client |
+|---|---|
+| 118 | ClaudeBot |
+| 77 / 55 / 18 / 8 / 6 | ブラウザ形の UA（Mac / Win / Android / iPhone） |
+| 53 | SemrushBot |
+| **50** | **`gftd-bmc-collect/1.0`** ← このワークスペース自身の収集器 |
+| 41 | curl |
+| 18 | Go-http-client |
+| 17 | AhrefsBot |
+| 13 | wp-admin スキャナ |
+
+## 見つかった 2 つの欠陥（どちらも修正済み）
+
+**① 自己参照。** `skip-prefixes` に `/_metrics` が無かった。portfolio collector が
+`/_metrics/revenue` を定期的に叩き、**その polling が pageview かつ新規訪問者として
+数えられ、同じ collector がその膨らんだ訪問者数を business metric として読み戻して
+いた。** zone で 5 番目に多いクライアントが自分たちの収集器だった。
+
+**② bot 判定の穴。** `bot-re` は \"bot\" を含む UA しか弾かない。`Go-http-client/1.1`
+も `gftd-bmc-collect/1.0` も含まないので**人間の訪問者として計上されていた**。
+どちらも JavaScript を実行できない。
+
+## 0017 — JS 実行を証明する discriminator
+
+根本問題は「general tier に *ブラウザが我々のコードを実行した* ことを示す信号が
+1 つも無かった」こと。だから静かな週と空の週を区別できず、audience の数字を
+どちらの向きにも信じられなかった。
+
+`visit_daily`（0017）はページロードごとに 1 行、**JS を実行した場合のみ**。
+`/_metrics/audience` は両方と**その比 `js-execution-rate` を返す** —— 呼び出し側に
+計算させない。単独で読むと誤解を招くのは `pageviews` の方だからである。
+
+net-babiniku の 0020 と同じ列構成にしたので 2 プロダクトを比較できる。なお
+**babiniku の数字は最初から膨らんでいない** —— 唯一のカウンタが client-side beacon
+なので、構造的に bot が入れない。
+
+## これまでの pv_daily をどう読むか
+
+**過去の `pv_daily` / `visitor_daily` を audience として引用しない。** それらは
+HTTP リクエスト数であり、実測した内訳ではクローラと自前ツールが支配的だった。
+ブラウザ形の UA も存在するが、**JS 実行の証明なしには実在の人間と偽装した
+スクレイパを区別できない** —— まさにそれが 0017 の存在理由である。
+
+BMC の metrics に綴じ込む前にこれを直したのは意図的で、順序を逆にしていたら
+bot の数を business decision に流し込んでいた。
+
 # 着地点と再開点（2026-08-06 closing）
 
 ## default branch に存在することを確認済み
