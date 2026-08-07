@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-08-07T10:11:43.010Z",
+ :asOf "2026-08-07T11:25:30.017Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,9 +9,9 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 9469,
-  :pageviews-7d 1994,
-  :uniques-7d-sum 410,
+ {:requests-7d 9492,
+  :pageviews-7d 2015,
+  :uniques-7d-sum 412,
   :zone "itonami.cloud"},
  :agentRuns7d 458,
  :sources [:cloudflare :health :emitter :itonami-free-path],
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-08-07T10:11:43.749Z",
+  :asOf "2026-08-07T11:25:30.879Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -141,14 +141,14 @@
  :paths
  {:ok
   [{:path "/cdn-cgi/rum", :requests 122}
-   {:path "/", :requests 112}
+   {:path "/", :requests 101}
    {:path "/yotei/c/jun", :requests 85}
    {:path "/yotei/c/jun-review", :requests 41}
    {:path "/img/yamainu-2-p01", :requests 38}
+   {:path "/os/", :requests 33}
    {:path "/img/yamainu-8-p01", :requests 32}
-   {:path "/os/", :requests 31}
    {:path "/img/zankyo-7-p01", :requests 31}],
-  :status-mix {:server-error 239, :ok 1437, :client-error 484},
+  :status-mix {:server-error 280, :ok 1467, :client-error 278},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
@@ -190,9 +190,9 @@
   :freePathApiAlias "/api/free-path"},
  :ok true,
  :traffic-quality
- {:window "24h", :probe-4xx-pct 22, :error-5xx-pct 11},
+ {:window "24h", :probe-4xx-pct 14, :error-5xx-pct 14},
  :top-paths
- "上位 page (24h, 2xx/3xx): /cdn-cgi/rum 122 · / 112 · /yotei/c/jun 85 · /yotei/c/jun-review 41 · /img/yamainu-2-p01 38 | 4xx(probe) 22% · 5xx 11%",
+ "上位 page (24h, 2xx/3xx): /cdn-cgi/rum 122 · / 101 · /yotei/c/jun 85 · /yotei/c/jun-review 41 · /img/yamainu-2-p01 38 | 4xx(probe) 14% · 5xx 14%",
  :freeClaimDocs "/docs/free-path.md",
  :funnel
  {:trials 5,
@@ -202,7 +202,7 @@
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 9469 req/7d・410 uniques(日次和)・うち4xx probe 22%(24h)",
+ "itonami.cloud 実測 9492 req/7d・412 uniques(日次和)・うち4xx probe 14%(24h)",
  :tenants
  {:active 5,
   :external-paid 0,
