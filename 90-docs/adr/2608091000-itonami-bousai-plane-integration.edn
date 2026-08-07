@@ -231,16 +231,45 @@ COFOG / ISCO / 名前付き actor も候補に入れる。
    例外が『防災だから』を理由に増殖しやすい —— 増やすなら 1 本ごとに
    同じ強さの理由を書く
 
-## 実行手順（この設計を面に載せるとき）
+## 着地（2026-08-07。設計と同じ日に接続まで済んだ）
 
-1. cofog-03.2 に `phase/read-ops`（空集合でよい）と `store/seed-db` を足す
-   → upstream PR。既存の `mem-store` + `sample-data!` を包むだけ
-2. `os/adapters/firerisk.cljc` を 4 行で書く（construction.cljc と同型）
-3. os.edn に vertical 1 件（`:ns \"firerisk\"`、`:ops` は 4 op、
-   `:boundaries #{:hazard/public-safety}`、`:subject-private? false`）と
-   wiring 1 件（D4）を足す。境界名の逸脱理由をコメントに書く
-4. 実際に回す —— `:escalate-hazard` が承認でも解除できない hold になることを
-   実演してから landed とする（『落ちない gate は劇場』）
+D3 と D4 は**面に載った**。手順ではなく結果を書く。
+
+| | commit |
+|---|---|
+| upstream 標準形化（`phase/read-ops` + `store/seed-db`） | `cloud-itonami/cloud-itonami-cofog-03.2` `f878dd86` |
+| OS 接続（shim / os.edn / hydrate / endpoints / 生成器 / deps / sites / test） | `network-awai/cloud-itonami` `bc605964` |
+| west pin 前進 2 件 | `com-junkawasaki/root` `08d76404` |
+
+**実際に回した結果**（生成器が実物の actor を実行。`OS_SITE_AT=2026-08-07T12:00:00Z`）:
+
+    台帳 65  :log-inspection      insp-1  確定    （phase 3 の :auto はこれだけ）
+    台帳 66  :escalate-hazard     hz-1    承認待ち（どの phase の :auto にも無い）
+    台帳 67  :escalate-hazard     hz-1    確定    （人の承認後）
+    台帳 68  :fire-hazard-survey  fh-1    保留    （未検証 site を台帳から独立に判定）
+    台帳 69  :log-inspection      insp-2  保留    （:effect :propose の宣言なし）
+
+公開面: https://cloud-itonami.itonami.cloud/cloud-itonami-cofog-03.2/ （200）。
+宣言は 20 → **21 本、接続済み 15 → 16 本**。
+
+**検証**: `clojure -M:test` = 1476 tests / 9855 assertions。失敗集合は
+`origin/main` の baseline（1473 / 9810）と **1 行も違わない**（既知 19 件:
+doctor / kotoba-xrpc / ops-keys / product-party / company 系）。上流側は
+`clojure -M:test` 81 tests / 210 assertions / 0 failures、`clojure -M:lint`
+0 errors 0 warnings —— **README の自己申告だった 81/210 を実際に走らせて確認した**。
+
+### 設計になかった発見: `:effect :propose` を誰が宣言するか
+
+この actor の governor は**最初の検査**で request 自身が `:effect :propose` を
+宣言していることを要求する（接続済み 15 本にこの要求は無い）。shim が黙って
+足せば全 op が通るが、その瞬間この検査は **OS 経由の全トラフィックで空振り**に
+なる —— OS が呼び出し側の宣言を代筆することになる。
+
+**代筆しない**方を選んだ。宣言は呼び出し側に残り、宣言し忘れた呼び出しは
+`:not-propose-effect` で HOLD される（面の台帳 69 とテスト
+`the-os-does-not-forge-the-propose-declaration` がこれを固定する）。代償は
+API 呼び出し側もこの field を送る必要があること —— 不適合として ledger に
+記録済みで、恒久的には actor 側が兄弟に寄せる番。
 
 ## 帰結
 
@@ -253,11 +282,9 @@ COFOG / ISCO / 名前付き actor も候補に入れる。
 "
 
   :adr/gaps
-  ["cofog-03.2 の read-ops / seed-db 追加（upstream PR）が未着手"
-   "os/adapters/firerisk.cljc と os.edn 宣言が未着手（D3/D4 は設計であって接続ではない）"
-   "cofog-03.2 のテストを実際に走らせていない（81/210 は README の自己申告）"
-   "OS の面生成器の classpath に langgraph + langchain が入っているか未確認"
-   "isco-5411 の標準形化（phase.cljc / operation.cljc 新設）が未着手"
-   "tick の走査範囲拡張（D8）は判定の検証が先。別反復として未起票"
-   "etzhayyim 三幅対（sonae / kazaori / shidemori）は R0 のまま。cell は import 時 RuntimeError"
-   "concept-vocabulary.edn に『防災 / disaster / bousai』が無く、concept-lookup で引けない"]}]
+  ["tick の走査範囲拡張（D8）が未着手 —— `itonami-os-maturity-tick.cljs:203` は今も `cloud-itonami-isic-` 前綴じだけを見る。COFOG / ISCO / 名前付き actor は候補集合に入らないままで、cofog-03.2 が繋がったのは人が名指しで選んだから。判定（標準形適合）が非 ISIC でも成り立つかの検証が先"
+   "isco-5411 の標準形化（phase.cljc / operation.cljc 新設）が未着手。pre-standard 形なので shim に判断を書かないと繋がらない"
+   "cofog-03.2 だけ request に `:effect :propose` 宣言を要求する不適合が残る（shim は代筆しない選択）。API 呼び出し側もこれを送る必要がある。恒久的には actor 側が兄弟に寄せる番"
+   "etzhayyim 三幅対（sonae / kazaori / shidemori）は R0 のまま。cell は import 時 RuntimeError。D6 のとおり面には載せていない"
+   "防災面に載っているのは before の断片 1 本だけ。during / after は面に無い（載せない判断であって、埋まった穴ではない）"
+   "共有 checkout `orgs/network-awai/cloud-itonami` が別セッションの未コミット WIP で dirty のため ff できず、deploy は隔離 worktree から行った。共有 checkout は main より遅れたまま"]}]
