@@ -19,15 +19,64 @@
 ```bash
 # 初回
 west init -l manifest
-# 取得/同期（full history がデフォルト。shallow は使わない — ADR-2607211600。
-# zsh は変数を単語分割しないので複数指定は xargs）
-west update --fetch smart
-west list -f '{name}' | grep -v '^manifest$' | xargs west update --fetch smart
+# 取得/同期（full history がデフォルト。shallow は使わない — ADR-2607211600）
+# ⚠ 引数なしの `west update` は 4,100 project 全部を歩く。既定にしない（下記）
+west update --fetch smart <name> [<name> ...]
 # DataLad の実体だけ別途（B2 creds は環境変数）
 west update --group-filter +datalad m365-archive && nbb manifest/west_annex.cljs annex-get
 # pin を進めたら manifest 再生成（手書き禁止 / CI は --check）
 nbb scripts/gen-west-manifest.cljs
 ```
+
+### 同期は「動いたものだけ」。引数なしの `west update` を既定にしない（2026-08-07）
+
+**`west update` は 4,124 project を歩き、既に pin と一致している checkout でも
+git を起動する。** 全体を回すのは初回 clone と、pin が大量に動いた後だけ。
+`manifest/west-triple-sync-workflow.edn`（ADR-2607173200）は `:never` に
+**「clone all west projects by default」**を挙げており、これはその文の運用面。
+
+| やりたいこと | 使うもの |
+|---|---|
+| **local を pin に合わせる（差分だけ）** | `fleet sync --db manifest/fleet-db.edn`（kagami）。pin と一致する repo は **`:noop` で git を起動しない**、dirty は skip、pin SHA を名指しで fetch、`--jobs` で並列。⚠ **先に `fleet reconcile` を通すこと**（下記） |
+| **どの pin が remote より遅れているか** | `west update` は**答えない**（pin に合わせるだけ）。`gh api repos/<org>/<repo>/compare/<pin>...main` の `ahead_by` |
+| **pin を前進させる** | `nbb scripts/advance-pins.cljs <org> <list-file> --execute`（entry の revision 行だけ書換）→ `nbb scripts/verify-west-pins.cljs` |
+| **GitHub / local / west.yml の三点ずれ** | `nbb scripts/west-triple-sync.cljs plan --scope managed`（既定 dry-run。`--scope blocking` は fresh-checkout を壊している分だけ） |
+| **ずれの定期検出** | `nbb scripts/fleet-sync-tick.cljs check`（検出のみ。書かない） |
+
+```bash
+# 例: 遅れている pin だけを見つけて、その分だけ同期する
+gh api repos/kotoba-lang/<repo>/compare/<pin>...main --jq '.ahead_by'   # 0 なら触らない
+printf '%s\n' <name> <name> | xargs west update --fetch smart           # ← xargs 必須
+```
+
+**`xargs` は必須。zsh は変数もパイプも単語分割しないので、`west update $NAMES` は
+全体を 1 個の project 名として渡し `unknown project name` になり、
+`printf ... | west update` は**引数ゼロ = 全 project 更新**になる（実測 2026-08-06、
+10 分でタイムアウトするまで気付かなかった）。
+
+**pin と remote の鮮度は別の問い**である。`west update` は west.yml に**既に書かれた**
+pin へ checkout を合わせるだけで、GitHub 側の新しい commit は見ない（この誤解は
+下の「Git operations」節にも書いてある）。
+
+**`fleet sync` を使う前に `fleet reconcile` を通す。** fleet-db は west.yml の
+**上流の正本**だが、west.yml 側の pin 書き込みを fleet-db へ運ぶのは reconcile だけで、
+それを回していた CI は 2026-07-30 に撤去された（ADR-2607300900）。**遅れた fleet-db に
+対して `fleet sync` すると checkout が pin より「後ろ」へ動く。** 実測 2026-08-07:
+reconcile が未実行のまま 24 pin ぶん遅れており、dry-run が既に west pin と一致している
+repo に `:advance` を出した。
+
+```bash
+# 吸収前に必ず: 入力 west.yml は origin/main のもの、変更される pin は全て fast-forward か
+git show origin/main:manifest/west.yml > /tmp/west-main.yml
+nbb --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/fleet.cljs \
+  reconcile --db manifest/fleet-db.edn --west /tmp/west-main.yml
+```
+
+**reconcile / sync のような manifest 書き込みは共有 checkout でやらない。** superproject
+本体は「統合・閲覧専用」（下記「並行エージェント運用」）で、実測 2026-08-07 には
+共有 checkout で走らせた reconcile の出力を、別セッションが 2 分後に巻き戻した
+（同時刻に別セッションが `manifest/repos.edn` へ新規 project を登録中だった）。
+worktree で走らせて branch で着地させる。
 
 ### agent 専用 worktree で west を動かすときの topdir 固定（重要）
 
