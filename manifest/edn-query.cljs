@@ -904,11 +904,76 @@
                              (str/ends-with? n ".datoms.edn"))))
              (sort-by str))))))
 
+;; ---------- GLEIF の tier（ADR-2608071000） ----------
+;;
+;; **projection のサイズは、誰が撃つどのクエリにも一律にかかる税**である。
+;; この面は毎回まるごと DataScript に load されるので、大きい tier を既定に
+;; すると「LEI を 1 件も見ないクエリ」まで同じ代金を払う。
+;;
+;; 実測（M4 mac mini、2026-08-07）:
+;;   200,000 entity → 3.88M datom / 2.4 GB / 27 秒
+;;   500,000 entity → 9.77M datom / 3.6 GB / 72 秒
+;; 1,000,000 entity → 19.66M datom / 5.6 GB / 156 秒
+;; ≒ 1M あたり 5.6 GB・156 秒。node の既定 old-space は 4.2 GB なので、
+;; 既定のままなら 70 万 entity 付近で落ちる。
+;;
+;; したがって tier で分ける（既定 = joined のみ）:
+;;   joined     plane が既に参照している LEI とそれに触れる edge（約 42k）
+;;   closure    joined から所有 edge を辿って到達できる全社（約 276k）
+;;   universe   3,396,479 社。**約 22 GB。CLI の 1 クエリでは載らない**ので
+;;              git にも置かない（node の ~/.cache/gleif にある）
+;;
+;; **これは「別ストアに分ける」ではない。** 同じ 1 つの面に、同じ属性で、
+;; 追加ロードするだけなので join 到達性は失われない —— 失うのは「黙って
+;; 全部載っている」という思い込みだけで、そのために count が tier を表示する。
+(def gleif-default-tiers #{"joined"})
+
+(defn gleif-tiers
+  "load する tier。`--tier closure` / `--tier closure,universe`、または
+   `EDN_QUERY_GLEIF_TIERS=closure`。joined は常に入る（面の既定の姿）。"
+  []
+  (let [argv (vec (js->clj (or (.-argv js/process) #js [])))
+        flag (second (drop-while #(not= "--tier" %) argv))
+        raw (or flag (.. js/process -env -EDN_QUERY_GLEIF_TIERS))]
+    (into gleif-default-tiers
+          (remove str/blank?)
+          (map str/trim (str/split (or raw "") #",")))))
+
+(defn- file-tier
+  "`gleif-lei-closure-2.datoms.edn` → \"closure\"。prefix の直後から次の `-` か
+   `.` まで。shard 番号は tier ではない。"
+  [f prefix]
+  (let [n (last (str/split (str f) #"/"))]
+    (first (str/split (subs n (count prefix)) #"[-.]"))))
+
+(defn gleif-projection-files
+  "GLEIF projection の正本は **`com-junkawasaki/org-gleif-projections` だけ**
+   （murakumo fleet ノードの gleif-cell が毎日ここへ push する）。
+
+   `kotoba-lang/property` の data/ を**併読しない**のは、同じ LEI が二重に
+   entity 化されるため —— 両方読んだ実測で `company` が 18,930 でなく 37,860 に
+   なり、しかも数字としては正しく見える。property 側の gleif-* は本 ADR で
+   削除した（property が持ち続けるのは collector/projector とその test、および
+   別 dataset の property-ownership）。"
+  [prefix]
+  (->> ["org-gleif-projections"]
+       (keep west-project-path)
+       (mapcat (fn [p]
+                 (let [dir (apply io/file root (concat (str/split p #"/") ["data"]))]
+                   (when (.exists dir)
+                     (->> (seq (.listFiles dir))
+                          (filter #(let [n (last (str/split (str %) #"/"))]
+                                     (and (str/starts-with? n prefix)
+                                          (str/ends-with? n ".datoms.edn")))))))))
+       (filter #(contains? (gleif-tiers) (file-tier % prefix)))
+       (sort-by str)))
+
 (defn gleif-lei-entities
-  "GLEIF LEI projection（`data/gleif-lei-*.datoms.edn`）。複数ファイルを読むので、
-   jurisdiction 別 projection を足すのは data/ にファイルを 1 つ置くだけで済む。"
+  "GLEIF LEI projection（`data/gleif-lei-<tier>*.datoms.edn`）。複数ファイルを
+   読むので、jurisdiction 別 projection を足すのは data/ にファイルを 1 つ置く
+   だけで済む。"
   [next-tempid!]
-  (let [files (property-data-files "gleif-lei-")]
+  (let [files (gleif-projection-files "gleif-lei-")]
     (if (empty? files)
       (do (js/console.error
            (str "edn-query: WARNING gleif-lei: kotoba-lang/property の "
@@ -932,7 +997,7 @@
    （20260803 publish で 483,263 本中 139,111 本）。**自己申告の edge を検証済み
    として提示しない** — legalsupport の `:legal/verification` 降格と同じ規律。"
   [next-tempid!]
-  (let [files (property-data-files "gleif-relationship-")]
+  (let [files (gleif-projection-files "gleif-relationship-")]
     (if (empty? files)
       (do (js/console.error
            (str "edn-query: WARNING gleif-relationship: kotoba-lang/property の "
@@ -1724,8 +1789,19 @@
                                                      yabai-tx tadori-tx patent-tx accounts-tx innen-tx
                                                      awai-tx kakekomi-tx okugai-tx factory-tx
                                                      index-tx)))]
-    (.transact ds conn all-tx)
+    ;; 1 本の巨大 transact でなく 50k ずつ流す。実測（2026-08-07）: 20 万 entity を
+    ;; 1 本で流すとピーク 2.4 GB、50 万 entity を 50k ずつなら 3.4 GB —— 分割の方が
+    ;; entity あたりのピークが小さい。単一 transact は「全 entity の JS 表現」と
+    ;; 「db」を同時に生かすため、tier を 1 つ足しただけで既定 heap（4.2 GB）を
+    ;; 割りやすい。分割してもトランザクション境界の意味は変わらない（この面は
+    ;; 読み取り専用で、構築中に誰も query しない）。
+    (let [n (.-length all-tx)]
+      (loop [i 0]
+        (when (< i n)
+          (.transact ds conn (.slice all-tx i (min n (+ i 50000))))
+          (recur (+ i 50000)))))
     {:conn conn
+     :gleif-tiers (sort (gleif-tiers))
      :adr-count (count adr-tx)
      :docs-count (count docs-tx)
      :manifest-count (count manifest-tx)
@@ -1967,7 +2043,7 @@
                 kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                 narrative-count company-count fleet-count yabai-count tadori-count patent-count
-                innen-count awai-yakuwari-count
+                innen-count awai-yakuwari-count gleif-tiers
                 tsukuru-candidates-count tsukuru-registry-seed-count tsukuru-seed-count]}
         (build-conn)
         total (+ adr-count docs-count manifest-count foreign-adr-count biz-count
@@ -1982,13 +2058,14 @@
                              "etzhayyim-80-data=%s proc-registry=%s merged-kotoba=%s working-doc=%s "
                              "narrative=%s company=%s fleet=%s yabai=%s tadori=%s patent=%s innen=%s "
                              "awai-yakuwari=%s tsukuru-candidates=%s tsukuru-registry-seed=%s "
-                             "tsukuru-seed=%s total=%s")
+                             "tsukuru-seed=%s total=%s gleif-tiers=%s")
                         adr-count docs-count manifest-count foreign-adr-count biz-count
                         kj-count rad-count
                         etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
                         narrative-count company-count fleet-count yabai-count tadori-count patent-count
                         innen-count awai-yakuwari-count
-                        tsukuru-candidates-count tsukuru-registry-seed-count tsukuru-seed-count total))
+                        tsukuru-candidates-count tsukuru-registry-seed-count tsukuru-seed-count total
+                        (str/join "," gleif-tiers)))
 
       "q"
       (println (pr-str (js->clj (.q ds query-str (.db ds conn)))))
