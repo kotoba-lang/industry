@@ -33,7 +33,17 @@
               "west 全 2900 project の無差別 clone"
               "未 push ローカル HEAD の pin 化"]
   :adr/cli "nbb scripts/west-triple-sync.cljs plan|apply|verify [--scope blocking|managed|names] [--names a,b] [--no-pin-advance]\nnbb scripts/west-orphan-audit.cljs [--blocking|--all|--edn]"
-  :adr/fleet "Phase 1.5 dual-write: west.yml への --entry 書き込みは CI fleet-projection-verify が fleet-db に reconcile 吸収する。本 workflow は fleet-db を手編集しない。"
+  :adr/fleet "Phase 1.5 dual-write: west.yml への --entry 書き込みは fleet-db に reconcile で吸収する。本 workflow は fleet-db を手編集しない。**2026-08-07 訂正: これを自動でやっていた CI fleet-projection-verify は 2026-07-30 に撤去済み（ADR-2607300900、GitHub Actions 廃止）。murakumo fleet 側に未 port なので reconcile は手で回すしかなく、実測で 24 pin ぶん遅れていた。** 遅れた fleet-db に `fleet sync` すると checkout が pin より後ろへ動くので、sync の前に必ず `fleet reconcile --west <origin/main の west.yml>` を通す。"
+  :adr/gaps
+  ["**scope 規則を強制するものが無い（2026-08-07 の resume point）。** 本 ADR と workflow edn は `:never` に「clone all west projects by default」を挙げ、CLAUDE.md にも 2026-08-07 に運用 rule を書いたが、いずれも散文であって機構ではない。実際 2026-08-06 に引数なし `west update` が走り 4,124 project を歩いて 10 分でタイムアウトした。次の一手は PreToolUse hook（`.claude/hooks/` の既存 6 本と同じ形、pure policy + `scripts/*-policy-test.cljs` は `west_pin_guard_policy.cljs` が先例）で ①引数なし `west update` ②stale な fleet-db への `fleet sync` ③共有 checkout での reconcile/sync を deny すること"
+   "**fleet-db ⇄ west.yml の drift を吸収するものが無い。** 検出は `scripts/fleet-sync-tick.cljs check` があるが、その docstring 自身が「書かない」と宣言している（無人 writer を main に置かない判断 + launchd 下で push credential が無い）。結果、drift は誰かが手で reconcile するまで積む。2026-08-07 の reconcile 直後にも別セッションの pin 前進で 1 件（kekkai-node）復活した"
+   "west.yml に 12 桁の短縮 revision が 1 件ある（cloud-itonami-app、2026-08-07 実測。他 4,122 件は 40 桁）。`verify-west-pins` は通っており実害は出ていないが、短縮 pin は照合スクリプトが `[0-9a-f]{40}` で書かれていると黙って取りこぼす（実際この drift 検出で 1 件見落とした）"]
+  :adr/evidence-2608070000
+  ["CLAUDE.md に「同期は動いたものだけ」節を追加（b4cdbe4）。scope 表 + zsh が変数もパイプも単語分割しないため xargs 必須 + reconcile 前置 + 共有 checkout で走らせない、を明記"
+   "kagami@8f04c56 — `fleet.sync/plan` の shallow 既定を撤去。`fetch --depth 1` を既定にし CLAUDE.md を根拠として引用していたが、その既定は 2026-07-21 に ADR-2607211600 が撤回済みで、EDN 駆動 sync が graft を 1 repo ずつ戻す経路になっていた。19 tests / 121 assertions、mutation 3 本すべて赤"
+   "fleet-db reconcile 24 件（480dc48）。入力は origin/main の west.yml、24 件すべて `status ahead / behind_by 0 / merge_base == 旧 pin` を gh api で確認してから吸収"
+   "効率の実測（reconcile 後、6 repo の dry-run）: {:noop 4, :advance 1, :skip-dirty 1} —— pin と一致する 4 repo では git を 1 回も起動しない"
+   "共有 checkout で走らせた最初の reconcile は 2 分後に別セッションに巻き戻された（同時刻に別セッションが manifest/repos.edn へ新規 project を登録中）。worktree で再実行して着地"]
   :adr/execution
   {:closed "2026-07-17"
    :baseline {:local-root-broken 19 :true-orphan-git 62 :path-override-leftovers 24}
