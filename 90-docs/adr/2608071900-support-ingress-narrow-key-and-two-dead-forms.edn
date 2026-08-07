@@ -1,0 +1,138 @@
+[{:db/id -1
+  :adr/id "2608071900"
+  :adr/doc_type "adr"
+  :adr/topic "support-ingress-narrow-key-and-two-dead-forms"
+  :adr/title "エンドユーザーのサポート受付は「1 テナントに case を 1 件立てる」だけの狭い鍵で入る — babiniku と shinshi の窓口が両方とも死んでいたのを直した"
+  :adr/status :accepted
+  :adr/date "2026-08-07"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["公開サイトから cloud-itonami の customer-service-hub へ case を立てる経路の設計"
+   "その経路が使う資格情報の種類（テナント資格情報を配らない理由）"
+   "net-babiniku / club-shinshi の問い合わせ・通報フォームの現在地"]
+  :adr/supersedes []
+  :adr/body
+  "# Context
+
+「net-kotobase, cloud-murakumo, cloud-itonami に club-shinshi, net-babiniku の
+ようなアクセス分析・カスタマーサポートは統合設計されているか」という問いから
+始まった。カスタマーサポートについての最初の答えは
+**『cloud-itonami が hub 本体で、babiniku だけが繋がっている』**だったが、
+**これは間違いだった。**
+
+## 実測（2026-08-06〜07、live）
+
+`net-babiniku/functions/api/support.js` は shipped 以来
+`POST {itonami}/api/{org}/{repo}/effects` を
+`Authorization: Bearer ITONAMI_OPERATOR_TOKEN` で叩いていた。
+
+- **その route は存在しない。** cloud-itonami にあるのは
+  `effects/{id}/{action}`（approve/reject）だけ。認証なしの POST を打つと
+  `functions/_middleware.js` の api-route-html-leak ガードが 502 を返す
+- **その認証方式も存在しない。** テナント書き込みは
+  `Authorization: CACAO <b64>` + capability（`edge/tenant-auth`）であり、
+  `ITONAMI_OPERATOR_TOKEN` は ADR-2607022300 が明示的に採用しないと決めたもの
+
+つまり訪問者のサポート要求は 1 件も case になっていなかった。受付番号が
+表示されていたのは、**client 側が勝手に採番していた**から。
+
+さらに `club-shinshi` 側を見ると、`/api/compliance/report`（通報・削除依頼、
+権利侵害の申し立て）が **405 を返していた** —— `worker/api/handle` が GET 以外を
+全部 405 にするため。18+ プラットフォームの info ページが「受付番号を発行」と
+案内している法的に重い窓口が、一度も何も受け付けていなかった。こちらの方が重い。
+
+`/contact` は メールアドレスの表示だけ。`/support` は **応援（tipping）**ページで、
+名前が紛らわしいが別物。
+
+# Decision
+
+## D1. 一般の propose endpoint（POST .../effects）を作らない
+
+それを作ると、公開サイトの Pages Function が「任意の effect kind を任意の risk で
+テナントのキューに提案できる」資格情報を持つことになる。漏れたらキューが乗っ取られる。
+
+代わりに `POST /api/{org}/{repo}/support`（`cloud_itonami.edge.support-ingress`）を
+新設し、次のように**狭く**した:
+
+- 作れる effect は `:support/open-case` ただ 1 種、risk は
+  `cloud-itonami.support/effect-risk` が与える `:financial` 固定。**どちらも
+  リクエストからは読まない**
+- provenance class は bridge が `:customer-inbound-message` を打つ。呼び出し側は
+  選べないし、詐称もできない
+- case id はサーバが発行する。body からは受け取らない（`open-case-ground` は既存
+  case-id を拒否するので、pin を許すと訪問者向けエラーになる）
+- 資格情報は **per-tenant の ingress key**。KV には SHA-256 の digest だけを置く
+  （`support:{org}/{repo}:ingress-key-sha256`）。KV を読んでも使える鍵は手に入らない
+- 未設定 = 未 provision = **503 で明示的に断る**。読まれない要求を黙って受けるのは、
+  断るより悪い（訪問者は「届いた」と思う）
+- IP レートリミットは既存の `edge/ratelimit` を共有
+
+## D2. 受付番号はサーバのものを読み返す
+
+client 側の自前採番をやめた。**訪問者に見せる番号と台帳の番号が同じ**でなければ、
+番号は無い方がましである。2xx なのに caseId が無ければ 502 にする
+（中身の無い『受け付けました』を出さない）。
+
+## D3. shinshi の通報フォームも同じ受付に通す
+
+`shinshi.worker.support` を新設し、`POST /api/support` と
+`POST /api/compliance/report` を `/api/` prefix の**前**に置いた（api/handle の
+GET-only 405 がまさに今回の原因）。report は既存のフィールド契約
+（report_type / reporter_* / rights_holder_name / target_url / description /
+evidence_urls / honeypot `website`）をそのまま受け、ラベル付きの 1 メッセージに
+畳んで case にする。`rid` は itonami の case id。
+
+honeypot に引っかかった投稿は **偽の受領証を返さず 400** にする。受領証を出して
+捨てるのは、この ADR が直している失敗そのものだから。
+
+## D4. 読み手ごとに別の secret（`/_metrics/*`）
+
+collector を繋ぐために `BMC_COLLECTOR_READONLY_SECRET` を 3 つ目として受ける形に
+した。`GROWTH_ACTOR_READONLY_SECRET` を回して流用しなかったのは、**片方の失効が
+もう片方を黙って壊す**から。詳細は ADR-2608060900 D5。
+
+# 実装済み（着地・live 確認済み）
+
+| repo | commit | 内容 |
+|---|---|---|
+| `network-awai/cloud-itonami` | `963ef05f` | `edge/support_ingress.cljc` + route + edge-api 再生成 |
+| `network-awai/net-babiniku` | `a0397be9` | client を実在する endpoint に繋ぎ直す |
+| `network-awai/club-shinshi-app` | `85ca0785` | `/api/support` + `/api/compliance/report` + collector secret |
+| `com-junkawasaki/root` | `153a16c6` | collector 配線 + ADR-2608060900 更新 |
+
+live 検証:
+
+- 未 provision テナントへの POST → **503**、誤鍵 → **401**、`toStatus` 同梱 → **400**
+- 使い捨てテナント（`network-awai/support-probe`）で 202 → KV の store blob に
+  `:support/open-case` / `:proposed` / `:financial` / `:inbox` と本文が入ることを確認 →
+  **鍵と blob を削除して原状復帰**
+- `babiniku.net/api/support` → 202 + caseId、そのまま
+  `store:network-awai/net-babiniku` に case が入ることを確認（配線検証と明記した
+  1 件が承認待ちで残っている。operator が reject してよい）
+- `shinshi.club/api/support` → 202 + caseId、`/api/compliance/report` の不備は
+  フィールド別 400
+
+# Consequences
+
+- 公開サイトからのサポート要求が、初めて**人間が承認するキューに載る**。
+  何も自動では答えない（answer / LLM / commit は一切しない）
+- 鍵が漏れても、できるのは「そのテナントにサポート case を立てる」ことだけ
+- **レートリミットは Worker 単位の 1 バケットを共有する。** ingress は client IP で
+  絞るが、product サイトからの要求は 1 つの Worker から来るため。現在のトラフィック
+  では余裕があるが、効いてきたら「向こうのバケットを広げる」のではなく
+  「こちら側に per-visitor の limiter を置く」のが正しい直し方
+- shinshi の `/report` が本当に受け付けるようになったので、**権利侵害の申し立てに
+  対する運用（誰がいつ見るか）が必要になった。** これは技術ではなく運用の宿題
+
+# Gaps
+
+- **`/support` という名前が shinshi では応援（tipping）を指したまま。** 問い合わせは
+  `/contact`。紛らわしいが、既存 URL の変更は別の判断
+- **通報フォームの到着通知が無い。** case は積まれるが、operator に push されない
+  （cockpit を見に行く必要がある）
+- **`itonami.cloud/api/*` は存在しないパスにも 200 `{ok:true}` を返す catch-all を
+  持つ。** `/api/zzz-nonexistent-path` で確認。endpoint の存在を live probe で
+  判定できず、typo が成功に見える
+- **`app-aozora` の engagement emitter が 500**（`datoms 401: Unauthorized`）。
+  collector は非 200 を silent no-op にするので、gate は「データが無い」と読める。
+  本 ADR の対象外だが同じクラスの壊れ方"}]
