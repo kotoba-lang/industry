@@ -1,0 +1,263 @@
+[{:db/id -1
+  :adr/id "2608091000"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-bousai-plane-integration"
+  :adr/title "防災は 1 本の産業ではなくフェーズで割った面 —— 散っていた実装 3 本と R0 の三幅対を 1 つの設計に統合し、『権威を持たない』を散文から境界名へ移す"
+  :adr/status :accepted
+  :adr/date "2026-08-07"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["営み OS における防災面の構成（before/during/after の分担と、産業側の災害スライスの位置づけ）"
+   "境界名 :hazard/public-safety の意味と、それが強制する連携モード"
+   "cloud-itonami-cofog-03.2 を防災面の最初の vertical とする決定と、その適合差分の埋め方"
+   "etzhayyim の三幅対（sonae / kazaori / shidemori）を OS の面に載せない決定とその理由"
+   "日本の防災官庁 leaf（気象庁 / 消防庁 / 内閣府防災）を作らない決定"
+   "次の 1 本を選ぶ tick の走査範囲が ISIC 前綴じに閉じている問題の扱い"]
+  :adr/supersedes []
+  :adr/related ["2608070000" "2608060000" "2608052000" "2607082700" "2607131000"
+                "2606091200" "2605263200" "2800002100"]
+  :adr/repos ["network-awai/cloud-itonami"
+              "cloud-itonami/cloud-itonami-cofog-03.2"
+              "cloud-itonami/cloud-itonami-isic-4211"
+              "cloud-itonami/cloud-itonami-isco-5411"
+              "etzhayyim/com-etzhayyim-sonae"
+              "etzhayyim/com-etzhayyim-kazaori"
+              "etzhayyim/com-etzhayyim-shidemori"]
+
+  :adr/body
+  "# ADR-2608091000: 防災面の統合設計
+
+## 問い
+
+『今の cloud-itonami に防災関係の営みは設計実装されているか』。答えは
+**『無い』でも『ある』でもなく『散っている』**だった。散り方が悪く、
+どの索引を引いても全体が出ない。この ADR はその散らばりを 1 つの面に
+統合する設計を決める。
+
+## 現在地（実測 2026-08-07。README の自己申告と実測を区別して書く）
+
+### 実装があるもの（すべて cloud-itonami org）
+
+| repo | 中身 | 実測した形 |
+|---|---|---|
+| `cloud-itonami-cofog-03.2` | COFOG 03.2 消防サービス。火災リスク点検ロボット（熱・煙センシング + 植生密度スキャン）を InspectionAdvisor ⊣ Fire-Risk Governor が gate | `src/firerisk/*.cljc` 7 本、**`.clj` は 1 本も無い**。`governor/allowed-ops` = `#{:log-inspection :fire-hazard-survey :escalate-hazard :schedule-reinspection}`。phase 3 の `:auto` は `#{:log-inspection}` のみ。**nbb で load 可**（langgraph + langchain を classpath に置いた場合） |
+| `cloud-itonami-isic-4211` Slice 1 | 台風時の法域別作業中止判定 → 全作業員へ mail+phone で警報 dispatch、地震・暴風後の義務点検が作業再開を gate（ADR-2607082700） | **既に OS に宣言済み・`:binding :native`**。`phase.cljc:79` で phase 3 の `:auto` に `:actuation/dispatch-alert` が入っている |
+| `cloud-itonami-isco-5411` | 消防署の装備 readiness・シフト・補給の事務調整。突入・トリアージ・現場指揮は `scope-excluded-ops` として名指しで除外 | `src/firestation/*.cljc` 4 本。**`phase.cljc` も `operation.cljc` も無い** —— `actor.cljc` が直接 `build-graph` を持つ pre-standard 形 |
+
+### 設計だけあるもの（すべて etzhayyim org、R0）
+
+`sonae`（備え・before、ADR-2606091200）→ `kazaori`（風折・during、ADR-2605263200）
+→ `shidemori`（死出守・after）の三幅対。**cell は import 時 RuntimeError で
+非実行**。実在するのは registry と invariant test だけ:
+
+- sonae — `registry/warning-sources.edn` に権威ある警報発信元の allowlist
+  **20 件 / 16 法域**、fail-closed invariant test 20 件
+- kazaori — `registry/agencies.seed.json`（民間災害対策機関ディレクトリ、
+  全件 `verificationStatus=\"unverified-seed\"`）、`methods/emergency.cljc`
+  189 行の純関数エンジン、charter-gate test
+
+### 無いもの
+
+- 営み OS（`orgs/network-awai/cloud-itonami/os.edn`）に**防災系 vertical は 0 本**。
+  宣言済み 20 本のうち防災に触れるのは 4211 の災害スライスだけ
+- 気象庁 / 消防庁 / 内閣府防災の個別 blueprint（`jpn-cao` / `jpn-mic` /
+  `jpn-mlit` の README にも防災の記述なし。`jpn-reconstruction`＝復興庁だけある）
+
+## 問題は 3 つあり、どれも『やる気』ではなく『構造』だった
+
+### 1. 散り方が org 境界と分類体系の両方をまたぐ
+
+本命の三幅対は **etzhayyim** org、実装は **cloud-itonami** org。しかも
+cloud-itonami 側は COFOG（機能分類）・ISCO（職業分類）・ISIC（産業分類）に
+1 本ずつ散っている。`nbb scripts/concept-lookup.cljs 防災` は**『語彙に無い』**
+と答え、`repo-search 防災 disaster` は 6 件しか出さず、そのうち本命 sonae は
+etzhayyim にある —— どちらの索引でも全体像は出ない。
+
+### 2. 次の 1 本を選ぶ機械が、防災を候補にすら入れていなかった
+
+`scripts/itonami-os-maturity-tick.cljs:203` の candidate 走査は
+
+    (filter #(str/starts-with? % \"cloud-itonami-isic-\"))
+
+**ISIC 前綴じだけ**を見る。つまり cofog-03.2 は —— 実装済みで、nbb で load でき、
+`.clj` を 1 本も持たないのに —— **却下されたのではなく、一度も候補集合に
+入っていない**。tick が『未宣言の ISIC 441 本のうち標準形適合 219 本』と
+報告するとき、COFOG も ISCO も名前付き actor もその 441 に含まれていない。
+
+### 3. 同じ不変条件を 3 つの repo が別々の散文で持っている
+
+- sonae: G8『NO false authority — 公式 地震/津波 警報を発出しない』
+- kazaori: 『OBSERVATIONAL directory — 自前の alert 発信なし・response 指揮なし』
+- isco-5411: `scope-excluded-ops` に `:issue-tactical-command`
+  `:authorize-structure-entry` `:perform-triage` …
+- cofog-03.2: `high-stakes` に `:coordination/hazard-escalation`（確度に関係なく人）
+
+**同じことを 4 回、別々の言葉で書いている。**散文なので機械は検査できず、
+5 本目を足す人はどれも読まない可能性がある。
+
+## 決定
+
+### D1. 防災を 1 本の vertical として作らない。フェーズで割る
+
+防災は産業ではなく**時間の相**である。すでに sonae/kazaori/shidemori が
+before/during/after で割っており、この分割を統合設計の骨格として採用する。
+
+    before（予防・減災・備え・早期警戒）   sonae ⟶ [実装は cofog-03.2 が一部を担う]
+    during（対応）                        kazaori
+    after（復旧・検証）                    shidemori ／ 4211 :inspection/screen
+
+**産業側の災害スライス（4211 Slice 1、cofog-03.2）は『before の実装断片』で
+あって防災 actor ではない。**この位置づけを固定することが統合の中身であり、
+新しい repo を起こすことではない。
+
+### D2. 『権威を持たない』を境界名にする —— `:hazard/public-safety`
+
+os.edn は既に**境界集合が異なる 2 vertical をつなぐ規則は `:carry` しか
+書けず、`:invoke` を書くと load 時に throw する**という機械の規則を持つ
+（`wiring/compile-rules`）。この仕掛けを再利用する。
+
+防災面の vertical に境界 `:hazard/public-safety` を宣言する。意味は
+**『この面の出力は公衆の安全に直接触れるが、この面は公式警報・避難指示・
+緊急事態宣言・現場指揮のいずれの権威も持たない』**。
+
+帰結: この境界を持つ vertical と持たない産業 vertical をつなぐ辺は、
+既存規則によって**構造的に `:carry`（人が運ぶ）に強制される**。
+4 つの repo が別々に書いていた散文の不変条件が、1 つの境界名として
+機械の側に移る。
+
+**境界名は『どの法域のどの主体のデータか』を表すという既存の用法から
+少し外れる**（これは主体ではなく権威の不在を表す）。それでも同じ列に置くのは、
+強制したい規則が同一だから —— 別の機構を足すより、既にある機構が
+同じ答えを出すならそちらを使う。この逸脱は意図的であり、os.edn の
+コメントに明記する。
+
+### D3. 防災面の最初の vertical は cofog-03.2
+
+実測根拠（すべてこの ADR の執筆時に確かめた）:
+
+- `src/` 全 7 本が `.cljc`、`.clj` は 0
+- **nbb で load できた** —— `orgs/kotoba-lang/langgraph/src` と
+  `orgs/kotoba-lang/langchain/src` を classpath に足した状態で
+  `firerisk.{operation,phase,governor,store,registry}` が全て解決した
+- `operation/build` は store を第 1 引数に取る（標準 shim の
+  `(standard/vertical ops (op/build db))` にそのまま合う）
+- phase 3 の `:auto` は `:log-inspection` のみ。`:fire-hazard-survey` と
+  `:schedule-reinspection` は『`write-ops` だが**どの phase の `:auto` にも
+  入れるな**』と phase.cljc 自身が注記している
+
+**標準形との差分は 2 つだけ**: `phase/read-ops` が無い（`write-ops` のみ）、
+`store/seed-db` が無い（`mem-store` + `sample-data!` の 2 段）。
+
+**この 2 つは shim ではなく repo 側に足す。** shim で
+`(doto (store/mem-store) (store/sample-data!))` と書けば動くが、それは
+147 本が共有する形から 1 本だけ外れるということで、
+『shim が育ち始めたら OS 側に判断が漏れている合図』（standard.cljc の
+docstring）に該当する。shim は 4 行に保つ。
+
+### D4. 連携は 1 本だけ宣言する（`:carry`）
+
+    cofog-03.2 :escalate-hazard (commit) ⟶ 4211 :inspection/screen   mode :carry
+
+火災リスク点検が『即時の消防 dispatch を要する活動中ハザード』を確定したら、
+同じ建物の施工現場は作業を止めて点検し直すべきである。
+
+**`:invoke` にできない理由が 2 つあり、どちらも単独で十分**:
+
+1. 境界が違う（cofog-03.2 は `:hazard/public-safety`、4211 は `#{}`）ので
+   D2 の規則が `:carry` を強制する
+2. **強制が無くても `:invoke` は死んだ辺になる。** 4211 の
+   `:inspection/screen` の主体は 4211 自身の台帳に登録された site であり、
+   上流にその登録を作る権限は無い。`:mint-from-rule` で作った主体は必ず
+   落ちる —— `custody-transfer->forwarding-record`（ADR-2800002100）で
+   実測済みの同型である
+
+なお `:inspection/screen` は 4211 のどの phase の `:auto` にも入っていない
+（phase.cljc:79 の phase-3 `:auto` は `#{:site/intake :actuation/dispatch-alert}`）
+ので、運ばれた先で必ず人か governor が動く。
+
+### D5. isco-5411 は今回繋がない
+
+標準形に未適合。`phase.cljc` / `operation.cljc` が無く、`actor.cljc` が
+直接 `build-graph` / `run-request!` / `approve!` を持つ pre-standard 形なので、
+shim に翻訳以上の判断を書かないと繋がらない。**repo 側を標準形に寄せてから
+繋ぐ**（`closed-op-allowlist` の 4 op はそのまま `write-ops` になる）。
+
+### D6. etzhayyim の三幅対は OS の面に載せない
+
+`:binding :unbound` として載せることは技術的に可能だが、**載せない**。
+
+理由は R0 だからではない（`:unbound-reason` を書けば済む）。
+**kazaori の緊急事態宣言は Council Lv6+ の 7 人中 4 人以上が所有しており、
+sonae は『imminence signal を出して handoff するだけ』と自分で決めている。**
+これを cloud-itonami の営み面に並べると『cloud-itonami が防災を回している』
+と読める —— それ自体が D2 で禁じた false authority の一種である。
+
+参照はこの ADR が持つ。三幅対が R1 に上がり、統治の所在が面の上で
+誤読されない形（別 org 面、または明示的な権威表示）が決まったら再考する。
+
+### D7. 気象庁 / 消防庁 / 内閣府防災の leaf を作らない
+
+sonae の `registry/warning-sources.edn` が既に**権威ある警報発信元の
+allowlist を 20 件 / 16 法域**持っている。官庁 blueprint を起こすと
+**2 つ目の権威の名簿**ができ、どちらが relay 元の正本か決められなくなる。
+relay 元の正本は 1 つに保つ。
+
+### D8. tick の走査範囲は広げる。ただし判定の検証が先
+
+`scripts/itonami-os-maturity-tick.cljs:203` の ISIC 前綴じフィルタを外し、
+COFOG / ISCO / 名前付き actor も候補に入れる。
+
+**ただし 1 行変える前に、『標準形適合』の判定が ISIC 以外でも成り立つかを
+確かめる。** cofog-03.2 で `read-ops` と `seed-db` が欠けていたように、
+非 ISIC repo は形が微妙に違う。判定を変えずに走査だけ広げると、
+**適合していないものを『適合』と報告する**ようになり、tick の出力が
+静かに信用できなくなる。これは別の反復として起票する。
+
+## この設計が嘘になりうる場所（次の反復が最初に確かめること）
+
+1. **cofog-03.2 の nbb load は、langgraph + langchain を明示的に classpath に
+   置いた状態での結果。** 営み OS の面を作る生成器の classpath にこの 2 本が
+   入っているかは未確認。入っていなければ `:binding` は `:native` にならない
+2. **`81 tests / 210 assertions green` は README の自己申告であって、
+   この ADR の執筆時に実行していない。**接続する反復は必ず実際に走らせる
+3. **D4 の連携は『同じ建物』を前提にしている。**cofog-03.2 の site と 4211 の
+   site が実務で同一物を指すかは、両者の store を並べて確かめていない。
+   `:carry` なので運ぶ人が同定するが、同定できない場合この辺は無意味になる
+4. **`:actuation/dispatch-alert` が phase 3 で auto commit される**のは実測
+   （4211 phase.cljc:79）。理由は README:154 の『災害警報の dispatch は
+   速さそのものが安全である』。宣言済み 20 本の phase-3 `:auto` を数えた
+   ところ、他はほぼ intake 形（記録の受理）で、**外向きの通信を自動で出す
+   op をこの理由で置いているのは 4211 だけ**。防災面を広げるとき、この
+   例外が『防災だから』を理由に増殖しやすい —— 増やすなら 1 本ごとに
+   同じ強さの理由を書く
+
+## 実行手順（この設計を面に載せるとき）
+
+1. cofog-03.2 に `phase/read-ops`（空集合でよい）と `store/seed-db` を足す
+   → upstream PR。既存の `mem-store` + `sample-data!` を包むだけ
+2. `os/adapters/firerisk.cljc` を 4 行で書く（construction.cljc と同型）
+3. os.edn に vertical 1 件（`:ns \"firerisk\"`、`:ops` は 4 op、
+   `:boundaries #{:hazard/public-safety}`、`:subject-private? false`）と
+   wiring 1 件（D4）を足す。境界名の逸脱理由をコメントに書く
+4. 実際に回す —— `:escalate-hazard` が承認でも解除できない hold になることを
+   実演してから landed とする（『落ちない gate は劇場』）
+
+## 帰結
+
+- 防災は『無い』から『**before の一部が実装済み・OS 未接続、during と after は
+  R0 で別 org**』という位置づけの明示に変わる。読み手が現在地を 1 回で読める
+- 4 つの repo に散っていた『権威を持たない』が 1 つの境界名になり、
+  5 本目を足す人が散文を読まなくても機械が同じ答えを出す
+- **tick が防災を候補にできない**という構造的な見落としが記録される。
+  これは防災に限らず、COFOG / ISCO / 名前付き actor の全部に効いている
+"
+
+  :adr/gaps
+  ["cofog-03.2 の read-ops / seed-db 追加（upstream PR）が未着手"
+   "os/adapters/firerisk.cljc と os.edn 宣言が未着手（D3/D4 は設計であって接続ではない）"
+   "cofog-03.2 のテストを実際に走らせていない（81/210 は README の自己申告）"
+   "OS の面生成器の classpath に langgraph + langchain が入っているか未確認"
+   "isco-5411 の標準形化（phase.cljc / operation.cljc 新設）が未着手"
+   "tick の走査範囲拡張（D8）は判定の検証が先。別反復として未起票"
+   "etzhayyim 三幅対（sonae / kazaori / shidemori）は R0 のまま。cell は import 時 RuntimeError"
+   "concept-vocabulary.edn に『防災 / disaster / bousai』が無く、concept-lookup で引けない"]}]
