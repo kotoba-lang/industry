@@ -1,16 +1,16 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 10374, "etzhayyim-xrpc-proxy" 588},
+ {"etzhayyim-did-web" 10435, "etzhayyim-xrpc-proxy" 588},
  :zone
- {:requests-7d 46981,
-  :pageviews-7d 1359,
-  :uniques-7d-sum 1901,
+ {:requests-7d 47281,
+  :pageviews-7d 1362,
+  :uniques-7d-sum 1903,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 22}
+  [{:path "/robots.txt", :requests 21}
    {:path "/_shell/home-feed.js", :requests 14}
    {:path "/organism/health.json", :requests 13}
    {:path "/organism/pulse.json", :requests 11}
@@ -18,12 +18,11 @@
    {:path "/_shell/liquid-glass.css", :requests 7}
    {:path "/system-dynamics", :requests 6}
    {:path "/gov", :requests 5}],
-  :status-mix {:client-error 745, :server-error 6608, :ok 404},
+  :status-mix {:server-error 6583, :client-error 680, :ok 405},
   :window "24h"},
  :as-of "2026-08-07",
- :traffic-quality
- {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 85},
+ :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 86},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 22 · /_shell/home-feed.js 14 · /organism/health.json 13 · /organism/pulse.json 11 · /_shell/shell.css 8 | 4xx(probe) 10% · 5xx 85%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 21 · /_shell/home-feed.js 14 · /organism/health.json 13 · /organism/pulse.json 11 · /_shell/shell.css 8 | 4xx(probe) 9% · 5xx 86%",
  :signal
- "etzhayyim.com 実測 46981 req/7d・1901 uniques(日次和)・うち4xx probe 10%(24h)、workers 10962 inv/7d"}
+ "etzhayyim.com 実測 47281 req/7d・1903 uniques(日次和)・うち4xx probe 9%(24h)、workers 11023 inv/7d"}
