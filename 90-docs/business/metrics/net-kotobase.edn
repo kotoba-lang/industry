@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 22286, "kotobase-cf-wasm-staging" 43038},
+ {"net-kotobase" 22319, "kotobase-cf-wasm-staging" 43130},
  :zone
- {:requests-7d 63058,
-  :pageviews-7d 1432,
-  :uniques-7d-sum 1270,
+ {:requests-7d 63191,
+  :pageviews-7d 1434,
+  :uniques-7d-sum 1277,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 1548}
-   {:path "/_health", :requests 1526}
-   {:path "/", :requests 83}
+  [{:path "/health", :requests 1577}
+   {:path "/_health", :requests 1551}
+   {:path "/", :requests 84}
    {:path "/api/funnel", :requests 27}
-   {:path "/robots.txt", :requests 19}
-   {:path "/llms.txt", :requests 6}
+   {:path "/robots.txt", :requests 20}
+   {:path "/llms.txt", :requests 7}
    {:path "/sign-in", :requests 5}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 4}],
-  :status-mix {:client-error 3416, :ok 3244},
+  :status-mix {:client-error 3454, :ok 3301},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
  :as-of "2026-08-07",
  :traffic-quality {:window "24h", :probe-4xx-pct 51, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 1548 · /_health 1526 · / 83 · /api/funnel 27 · /robots.txt 19 | 4xx(probe) 51%",
- :funnel {:visitors 2426, :signups 13, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 1577 · /_health 1551 · / 84 · /api/funnel 27 · /robots.txt 20 | 4xx(probe) 51%",
+ :funnel {:visitors 2428, :signups 13, :checkouts 0},
  :signal
- "kotobase.net 実測 63058 req/7d・1270 uniques(日次和)・うち4xx probe 51%(24h)、workers 65324 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 63191 req/7d・1277 uniques(日次和)・うち4xx probe 51%(24h)、workers 65449 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 895},
+ {:visitors {:openai-ads 3, :organic 897},
   :signups {:organic 10}, 
   :checkouts {}}}
