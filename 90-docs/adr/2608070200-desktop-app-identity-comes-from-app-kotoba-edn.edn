@@ -139,7 +139,15 @@ library 側が CLI 側の受け付ける manifest を拒否する。
 - **`release build --target macos`** は依然として `--app-bundle` を呼び出し側から
   受け取る。今回作った `ensure-macos-bundle!` は起動用であって配布用ではない
   （署名も notarization も通っていない）。
-- **west.yml の他の省略形 pin**: 現時点で 0 件。generator 側で 40 桁を強制する
-  検査は入れていない（入れるなら `verify-west-pins` 側）。
+- **省略形 pin は再発する。** 2026-08-07 11:29 の `fa13fefdfe4`
+  「manifest: advance cloud-itonami-app pin」が、40 桁の
+  `d8cb86c71aca...` を **12 桁の `62d2ae39fe66` に書き換えた** —— 同じ entry が、
+  同じ日に、また短くなっている。出所は `west-pin-put.cljs` ではなく
+  **手で書いた manifest 編集**。読めるようにしたので前進は止まらないが、
+  **書く側は塞いでいない**。塞ぐなら `verify-west-pins` / fleet gate 側で
+  40 桁を強制する（この ADR ではやっていない）。
+- **同じ commit のまま 40 桁へ修復する経路が無い。** `west-pin-put` は
+  fast-forward を要求するので、pin が指す commit を変えずに桁だけ直すことは
+  できない（`identical` で refuse される）。修復は次の実際の前進でしか起きない。
 "
    :adr/last_verified "2026-08-06"}]
