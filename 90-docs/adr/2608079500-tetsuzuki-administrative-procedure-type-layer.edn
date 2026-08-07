@@ -1,0 +1,166 @@
+[{:db/id -1
+  :adr/id "2608079500"
+  :adr/title "行政手続きの型を先に置く（tetsuzuki）— 期限が誰を縛り、徒過したら何が起きるか"
+  :adr/status "accepted"
+  :adr/date "2026-08-07"
+  :adr/tags ["tetsuzuki" "senkyo" "ooyake" "cloud-itonami" "isic-8411"
+             "administrative-procedure" "kotoba-lang"]
+  :adr/supersedes ""
+  :adr/body
+  "## 前提 — 順序が逆だった
+
+オーナー指摘（2026-08-07）「先に各国の法的手続きに基づいて、各省庁、自治体、
+行政機関の itonami の設計実装は」。ADR-2608079400 で選挙分野を先に実装したが、
+その下にあるべき**一般行政手続きの型**が無かった。実測すると:
+
+| 層 | 実測 |
+|---|---|
+| 機能類型 actor（ISIC 84xx） | **8 本**（8411/8411-electoral/8412/8413/8421/8422/8423/8430）。公共行政グループはほぼ埋まっている |
+| 組織の地図（`ooyake`） | `:gov.unit` **7,135** / `:gov.address` **7,088**、~193 法域 |
+| 国別 blueprint | `cloud-itonami-iso3166-*` **225 本**（plain-country 188 / agency-suffixed 37 = jpn 19・usa 15・chn 2・ind 1） |
+
+**穴は手続き層だった。** ooyake の `:gov.procedure` は **158 件・全件
+`:unverified-seed`**、`:gov.form` 6・`:gov.window` 4・`:gov.bpmn` 4 で、
+unit 数に対して 3 桁遅れている。さらに seed が持つ 12 属性には**期限も徒過効果も
+形式審査項目も無い**ので、seed だけでは「遅れているか、遅れたら何が起きるか」に
+答えられない。ISIC 84xx の 8 actor は**手続きを持たない行政 actor**として立って
+いた。
+
+（測定上の訂正: 当初 `:gov.unit/procedure` のような**属性**を grep して「実出現数
+0」と報告したが、ooyake はこれらを**別 entity**（`:gov.address/unit` で join）
+として持つ。住所は 7,088 で unit とほぼ 1:1 に揃っており、薄いのは窓口・書式・
+手続き・BPMN のほうである。ooyake の README もこの実態に合わせて修正した。）
+
+## 決定
+
+### D1. `kotoba-lang/tetsuzuki` を型の層として置く
+
+純 `.cljc` / 依存ゼロ。閉じた語彙・期限の算法・形式審査・適合検査・5 法域の
+一般行政手続きカタログ（18 手続き）・ooyake seed のアダプタを持つ。
+**分野固有の手続きはこの形に載る側**であって、この repo の中身ではない。
+
+### D2. 期限には『誰を縛るか』が要る
+
+選挙の手続きは**全部が提出側**を縛る期限だった。一般行政は逆で、実測
+`{:authority 13, :filer 4}`。標準処理期間（行政手続法 §6）・FOIA・
+Genehmigungsfiktion はすべて行政庁を縛る。同じ列に入れると「誰が遅れたのか」が
+読めなくなる。
+
+### D3. 期限には『徒過したら何が起きるか』が要る
+
+**これが型を分けた最大の理由。** 同じ「行政庁が期限内に応答しなかった」に、
+法域は正反対の効果を与える:
+
+| 徒過効果 | 実例 |
+|---|---|
+| `:deemed-granted` | DEU VwVfG §42a — **許可されたものとみなす** |
+| `:deemed-refused` | CAN ATIA s.10(3) — **拒否したものとみなす** |
+| `:exhausts-remedy` | USA FOIA §552(a)(6)(C) / GBR FOIA s.50 — 出訴適格を得る |
+| `:none` | JPN 行政手続法 §6 — 自動的な法的効果は**無い** |
+| `:forfeits-right` | 各法域の不服申立期間 — 争えなくなる |
+| `:sanction` | 報告義務の徒過 — 罰則・当選無効の対象になる |
+
+効果を持たない期限モデルでは、この 6 つが同じ「期限を過ぎた」に潰れ、
+**許可を拒否と、拒否を許可と取り違える**。
+
+### D4. 日の単位を型に入れ、営業日を暦日で近似しない
+
+米 FOIA は 20 **business days**、英 FOIA は 20 **working days**、独英日の不服
+申立ては**月**。暦日 20 日で計算すると実際より約 8 日早い日を返し、**遅れて
+いない行政庁を遅れていると判定する**。休日カレンダーが無ければ
+`:needs-business-calendar` を返して止まり、月は `:needs-calendar-date` を返す
+（1 か月を 30 日で近似しない）。
+
+### D5. 解けない理由を 1 つに畳まない
+
+`resolve-deadline` の戻り値は 6 種類で、それぞれ**別の打つ手**を持つ:
+整数 / `:no-deadline`（調べた結果、定めが無い）/ `:authority-published`
+（数値は各庁が定めて公表する）/ `:unknown-anchor` / `:needs-business-calendar`
+/ `:no-basis`。`:authority-published` を `:no-deadline` に丸めると、
+「各庁が公表しているはずの数値を持っていない」が「期限が無い」に化ける。
+
+### D6. 届出は申請ではない
+
+行政手続法 §37 は届出が到達したときに手続上の義務が履行されたものと定め、
+行政庁に諾否の余地を残していない。申請と同じ受領モデルで扱うと、行政庁が審査
+できるかのように書けてしまうので、`:not-reviewable` を別の結果として持つ。
+
+### D7. `senkyo` を実際にこの型へ載せ替える
+
+「型を先に置くべきだった」の実装上の帰結として、既に着地していた `senkyo` を
+retrofit した。`senkyo.procedure/due-epoch-day` は `tetsuzuki.deadline` へ委譲し、
+14 entry を共有形へ載せ替え、適合検査（`senkyo.conformance-test`）を置いた。
+
+**適合検査を書いた結果、両側に穴が見つかった。型は 1 つの分野だけでは検証
+されない:**
+
+tetsuzuki 側に足りなかったもの:
+1. `:sanction` — 収支報告の徒過は権利を失うのではなく**罰則の対象**になる。
+   `:forfeits-right` に丸めると刑事罰があることが消える。
+2. `:before-or-on` — 供託は公示日「まで」であり当日ちょうどではない。
+3. **基準点の分野拡張** — `:poll-day` は一般行政に無く `:disposition-known` は
+   選挙に出てこない。単一の閉集合にすると、分野を足すたび他分野と無関係な値が
+   混ざるか、分野が適合できなくなる。適合検査は `:anchors` オプションで分野の
+   集合を受け取る形にした。
+
+senkyo 側に足りなかったもの:
+- **14 手続き全部が `:proc/source-urls` と `:proc/verified` を持っていなかった。**
+  根拠法を書きながら出典 URL も確認日も無く、検証できない状態だった。
+
+### D8. `ooyake` の seed は写すが昇格させない
+
+`tetsuzuki.ooyake` は seed を写し、検証状態を落とさずに運び、**`core` 適合検査に
+通らないままにする**。「取り込んだから使える」という嘘をつかないためで、昇格の
+唯一の経路は条文を確認して `tetsuzuki.catalog` へ書くこと（`promotable?` は
+検証済みかつ根拠法判明の両方を要求する）。
+
+### D9. `cloud-itonami-isic-8411` を消費側にする
+
+`:case/decide` に HARD check を 3 本足した:
+
+- `:decision-precluded-by-lapse` — **みなし処分が既に効力を生じている案件を、
+  行政庁が今から『決定』することはできない**（擬制と矛盾する処分を重ねられない）。
+  出訴適格（米英 FOIA）と効果なし（日本の標準処理期間）は決定を妨げない。
+- `:procedure-deadline-unresolved` — 未解決の理由をすべて止める（fail-closed）。
+  自分が法定期間の内にいるか言えない行政庁に決定させない。
+- `:procedure-formal-review-incomplete`
+
+`:procedure-id` を宣言していない案件は素通りする —— コミュニティ行政の案件
+すべてが一般カタログに載るわけではなく、**載っていないことを違反にしない**。
+宣言した以上はその手続きの法定期限に従う。
+
+## 帰結
+
+- ISIC 84xx の行政 actor が**初めて法定期限を扱える**ようになった。ただし
+  消費側として配線したのは 8411 の 1 本だけで、8412/8413/8421/8422/8423/8430 は
+  未配線。
+- カバレッジは **5 法域 / 18 手続き**。~194 法域のうち 5 であり、ooyake の
+  158 seed のうち昇格したものは 0 件（昇格には条文確認が要る）。
+- 期限の fail-closed により、基準日を渡し忘れた運用は全部 HOLD になる。
+  **煩わしいが、静かに処分するより良い。**
+- `senkyo` は依存ゼロでなくなった（tetsuzuki 1 本に依存。tetsuzuki 自身は依存
+  ゼロ）。分野が独自の期限算法を持たないことのほうが重要と判断した。
+
+## 検証
+
+| 対象 | 結果 |
+|---|---|
+| `kotoba-lang/tetsuzuki` | 34 tests / 198 assertions green（nbb）。営業日を暦日で近似する退行と徒過効果を潰す退行で **3 件**落ちる |
+| `kotoba-lang/senkyo` | 43 tests / 453 assertions green（うち conformance 8）。適合検査が実際に senkyo の出典欠落を捕まえた |
+| `cloud-itonami-isic-8411` | 50 tests / 211 assertions green、clj-kondo 0 errors。みなし処分の集合を空にし未解決理由を減らすと **6 件**落ちる。既存 44 テストは無変更で通る |
+| `kotoba-lang/ooyake` | README のみ変更（データ無変更） |
+
+## follow-up（実施していないことを名指しで残す）
+
+1. **残り 6 本の ISIC 84xx actor を配線する**（8412/8413/8421/8422/8423/8430）。
+2. **ooyake の 158 seed の昇格。** 1 件ずつ条文を確認して `tetsuzuki.catalog`
+   へ書く。写すだけでは適合しない設計にしてある。
+3. **自治体階層。** ooyake の subdivision 3,580 は ADM1 で、その下は
+   prefecture 1・ward 1 のみ。市区町村と窓口は未収録。
+4. **省庁 itonami の法域拡大。** agency-suffixed blueprint は 4 か国 37 機関
+   （jpn 19 / usa 15 / chn 2 / ind 1）。
+5. **法域の追加。** 未収録の大人口法域 12（IND / CHN / IDN / PAK / NGA / BRA /
+   BGD / RUS / MEX / ETH / PHL / EGY）。
+6. **fleet-ci gate。** tetsuzuki / senkyo の nbb test と 8411 系の JVM test を
+   `scripts/fleet-ci/gates.edn` に登録する（GitHub Actions は使わない、
+   ADR-2607300900）。"}]
