@@ -101,7 +101,7 @@
    :gaps
    [\"AWAI Network, L.L.C. の LEI が未記録 (fleet.edn は Delaware file no. のみ)。このため :company/lei での market-intel / cloud-itonami-lei との join はできない — 初稿はできると書いていたが誤り。LEI を捏造しない\"
     \"fleet.edn の :capability-ceiling は現在どの役割も narrow していない (全役割が ceiling 以内で書かれている)。正しく配線され test もあるが実データ上まだ load-bearing ではない\"
-    \"dispatcher が未配線。:spawn effect が agent.run にならないので全 31 役割が :starved に射影される (正しいラベルであってバグではない)\"
+    \"dispatcher は配線済み (2026-08-07)。:spawn effect は tamaki の AgentRun になり、隔離 worktree・detached start・runs.edn・status 更新・worktree 返却まで実 tamaki と実 repo で検証済み。ただし :local mode の executor (kotoba-code) がこのマシンに存在しないので dispatch は submit 前の readiness 検査で拒否し、31 役割は :starved のまま (正しいラベル)\"
     \"journal rollover の閾値は未決定 (journal が小さいうちは決める必要がない)\"
     \"person-* の mailbox は Cloudflare Email Routing の zone token を要する owner action\"
     \"marketer を inward に分類したが、対外発信を伴うので publish 帰属 (app-aozora への署名) は別途整理が要る\"]}",
@@ -316,9 +316,19 @@ phase 6 / 7 の最短経路:
 
 ### 残っている gap の優先順位
 
-1. **dispatcher が無い** — `:spawn` effect を `agent.run` にする実装が無く、
-   31 役割すべてが `:starved` に射影される（正しいラベルであってバグではない）。
-   これが無い限り loop は「決める」までしかしない。
+1. **executor がこのマシンに無い**（dispatcher は 2026-08-07 に配線済み） —
+   `src/awai/dispatch.cljc` + `awai dispatch` が `:spawn` effect を実際の tamaki
+   AgentRun にする。`tamaki doctor` が `:kotoba-code {:ok? false}` を返すため
+   `:local` mode に executor が無く、`dispatch --apply` はそのパスを名指しして
+   **submit する前に**拒否する。拒否は設計であって回避策ではない —— 起動されない
+   run は `:queued` のまま slot を占め、`stale-run?` は `:leased` しか刈らないので
+   永久に詰まる。31 役割は executor ができるまで `:starved` のまま。
+   測定値で設計が変わった 2 点: `tamaki status` 全件は 5.2 MB / 20,804 行 / 3m04s で
+   この loop 自身の 300 秒 tick より長いので `refresh` は run 単位で問い合わせる
+   (1 KB / 1m26s、`:global-wip` で有界、live 0 件なら呼び出しゼロ)。tamaki の
+   `:local` mode は `--project` 直下で agent を走らせ worktree を作らないので、
+   dispatch は業務 repo の fetch 済み default branch から自前の worktree を切り、
+   `AWAI_WORKTREE_ROOT` 未設定なら拒否する（fallback は共有 west checkout になる）。
 2. **常駐が install されていない** — `deploy/install.cljs` は dry-run 検証済みだが
    LaunchAgent は未 install。install すれば 300 秒ごとに tick が回り journal が
    伸び始める。

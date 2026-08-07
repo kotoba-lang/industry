@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-08-07T03:09:38.115Z",
+ :asOf "2026-08-07T04:11:58.947Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,11 +9,11 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 8495,
-  :pageviews-7d 1723,
-  :uniques-7d-sum 393,
+ {:requests-7d 9155,
+  :pageviews-7d 1846,
+  :uniques-7d-sum 398,
   :zone "itonami.cloud"},
- :agentRuns7d 418,
+ :agentRuns7d 458,
  :sources [:cloudflare :health :emitter :itonami-free-path],
  :nextOwnerActions
  [{:freeClaimUrl "/isco-1212/",
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-08-07T03:09:38.537Z",
+  :asOf "2026-08-07T04:11:59.981Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -78,7 +78,7 @@
   {:freeClaimUrl "/isco-1212/",
    :externalTenants 5,
    :freeClaim "/isco-1212/",
-   :agentRuns7d 418,
+   :agentRuns7d 458,
    :freeClaimUi "/isco-1212/",
    :docs "/docs/free-path.md",
    :freePathDocs "/docs/free-path.md",
@@ -140,15 +140,15 @@
  :freePathDocs "/docs/free-path.md",
  :paths
  {:ok
-  [{:path "/cdn-cgi/rum", :requests 209}
-   {:path "/", :requests 111}
-   {:path "/yotei/c/jun", :requests 104}
-   {:path "/yotei/c/jun-15min", :requests 101}
-   {:path "/yotei/c/jun-review", :requests 56}
-   {:path "/os/", :requests 27}
-   {:path "/img/yamainu-9-p01", :requests 22}
-   {:path "/img/halfgram-6-p01", :requests 21}],
-  :status-mix {:server-error 253, :ok 1387, :client-error 595},
+  [{:path "/cdn-cgi/rum", :requests 255}
+   {:path "/yotei/c/jun", :requests 116}
+   {:path "/", :requests 114}
+   {:path "/yotei/c/jun-15min", :requests 109}
+   {:path "/yotei/c/jun-review", :requests 66}
+   {:path "/img/yamainu-2-p01", :requests 42}
+   {:path "/img/yamainu-8-p01", :requests 35}
+   {:path "/img/zankyo-7-p01", :requests 34}],
+  :status-mix {:server-error 305, :ok 1885, :client-error 564},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
@@ -158,7 +158,7 @@
  {:freeClaimUrl "/isco-1212/",
   :externalTenants 5,
   :freeClaim "/isco-1212/",
-  :agentRuns7d 418,
+  :agentRuns7d 458,
   :freeClaimUi "/isco-1212/",
   :docs "/docs/free-path.md",
   :freePathDocs "/docs/free-path.md",
@@ -176,7 +176,7 @@
  {:freeClaimUrl "/isco-1212/",
   :externalTenants 5,
   :freeClaim "/isco-1212/",
-  :agentRuns7d 418,
+  :agentRuns7d 458,
   :freeClaimUi "/isco-1212/",
   :docs "/docs/free-path.md",
   :freePathDocs "/docs/free-path.md",
@@ -190,19 +190,19 @@
   :freePathApiAlias "/api/free-path"},
  :ok true,
  :traffic-quality
- {:window "24h", :probe-4xx-pct 27, :error-5xx-pct 11},
+ {:window "24h", :probe-4xx-pct 20, :error-5xx-pct 11},
  :top-paths
- "上位 page (24h, 2xx/3xx): /cdn-cgi/rum 209 · / 111 · /yotei/c/jun 104 · /yotei/c/jun-15min 101 · /yotei/c/jun-review 56 | 4xx(probe) 27% · 5xx 11%",
+ "上位 page (24h, 2xx/3xx): /cdn-cgi/rum 255 · /yotei/c/jun 116 · / 114 · /yotei/c/jun-15min 109 · /yotei/c/jun-review 66 | 4xx(probe) 20% · 5xx 11%",
  :freeClaimDocs "/docs/free-path.md",
  :funnel
  {:trials 5,
   :freeClaims 5,
-  :agentRuns7d 418,
+  :agentRuns7d 458,
   :externalTenants 5,
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 8495 req/7d・393 uniques(日次和)・うち4xx probe 27%(24h)",
+ "itonami.cloud 実測 9155 req/7d・398 uniques(日次和)・うち4xx probe 20%(24h)",
  :tenants
  {:active 5,
   :external-paid 0,

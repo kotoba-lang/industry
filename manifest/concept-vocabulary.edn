@@ -159,4 +159,37 @@ pre-standard 形）。どれも公式警報・避難指示・緊急事態宣言�
 ロボット ⊣ Fire-Risk Governor、:implemented、nbb で load 可）と
 cloud-itonami-isco-5411（ISCO 5411、ns=firestation。装備 readiness とシフトの事務のみ。
 突入・トリアージ・現場指揮は scope-excluded-ops で名指し除外）。
-災害対応そのものは :disaster-management を引く。"}}
+災害対応そのものは :disaster-management を引く。"}
+
+;; ── fleet は 4 つの別物を指していた（2026-08-07 の改名で 3 つに減った） ──
+ :agent-coordination
+ {:label "並列 agent の協調基盤 / 座 (za)"
+  :spellings ["agent coordination" "parallel agents" "coordination substrate"
+              "fleet" "fleet coordinator" "worktree lease" "座" "za"
+              "並列エージェント" "協調基盤"]
+  :note "kotoba-lang/kotoba-fleet が substrate（ns kotoba.fleet.*、改名せず — 衝突せず
+依存 56 箇所）、cloud-itonami/za-actor がその封じ込め済み実体（旧 cloud-itonami/fleet、
+2026-08-07 rename）。座＝中世の職人・商人の自治結社、座法に従い座衆が縄張りを侵さず働く。"}
+
+ :tender-placement
+ {:label "tender の配置と貸借 / 差配 (sahai)"
+  :spellings ["placement" "lease" "multi-tenant" "budget" "checkpoint"
+              "epoch fencing" "fleet" "差配" "sahai" "配置" "貸借"]
+  :note "kotoba-lang/sahai（旧 kotoba-lang/fleet、2026-08-07 rename）。durable T6 placement —
+どの tender をどこに、どれだけの予算で、いつまで置くか。差配人＝借家の割り当てを取り仕切る人。
+実行そのものは kototama の tender。永続 EDN の :kototama.fleet/* キーは互換のため据え置き。"}
+
+ :vcs-plane
+ {:label "repo の pin と統治 / 鏡 (kagami)"
+  :spellings ["vcs plane" "pin" "west" "manifest" "fleet-db" "reconcile"
+              "fleet" "鏡" "kagami" "台帳"]
+  :note "kotoba-lang/kagami（ns は 2026-08-07 に fleet.* → kagami.*）。manifest/fleet-db.edn を
+west.yml に映す鏡。機械でも agent でもなく repo の登録簿なので、fleet を名乗る根拠が最も薄かった。
+データ側の :fleet/repos キーは 4,124 entity の on-disk フォーマットなので据え置き。"}
+
+ :machine-fleet
+ {:label "物理マシン群 / 叢雲 (murakumo)"
+  :spellings ["fleet" "mac mini" "node" "cluster" "murakumo" "叢雲"
+              "マシン" "ノード" "マイニング" "推論"]
+  :note "murakumo の mac-mini 10 台（scripts/fleet-ci、manifest/fleet-ci.edn、fleet-sandbox.edn）。
+**4 つの意味の中で唯一「群れ」が実体と合う**ので fleet の語をここに残した。"}}

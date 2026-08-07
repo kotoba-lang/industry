@@ -223,7 +223,7 @@ manifest:
         rad-rid: rad:zCJJKo7FEwJMwGMWk4kQYVzeChTd
     - name: cloud-itonami-app
       remote: cloud-itonami
-      revision: 8b71d4c452640055781f51b820c1d0598851da6c
+      revision: 073651492dfe8047a3c1ae1da3691dcfd5d822c7
       path: orgs/cloud-itonami/cloud-itonami-app
       groups: [cloud-itonami]
     - name: cloud-itonami-assoc-0126-idn-gapki
@@ -796,7 +796,7 @@ manifest:
         rad-rid: rad:z37geSJmbGEcVUPFatM6WvG6C4fm7
     - name: cloud-itonami-cofog-03.2
       remote: cloud-itonami
-      revision: a46fe8021575fde58691e182a5c4fd26ebad59ad
+      revision: f878dd86b0050b804ccf0760a1260c317f4de3c5
       path: orgs/cloud-itonami/cloud-itonami-cofog-03.2
       groups: [cloud-itonami]
       userdata:
@@ -5966,6 +5966,11 @@ manifest:
       groups: [cloud-itonami]
       userdata:
         rad-rid: rad:zdfcoRsXRZr52cebbb2Ku2jBA15Z
+    - name: cloud-itonami-isic-8411-electoral
+      remote: cloud-itonami
+      revision: 7505fdc2924b4fb052b8e43286882b6cd397426d
+      path: orgs/cloud-itonami/cloud-itonami-isic-8411-electoral
+      groups: [cloud-itonami]
     - name: cloud-itonami-isic-8412
       remote: cloud-itonami
       revision: d5a6e92a82081ea346a4a278bbdb7bf4aaa25db7
@@ -6381,7 +6386,7 @@ manifest:
         rad-rid: rad:z3jxnuSUiwC8T56VM2JWA3tQx62jR
     - name: cloud-itonami-isic-9492
       remote: cloud-itonami
-      revision: f30299e17fb34634af07e2cdf364de249a4007a3
+      revision: 2918126847f1672565cad1dbafed3cbde16d28f6
       path: orgs/cloud-itonami/cloud-itonami-isic-9492
       groups: [cloud-itonami]
       userdata:
@@ -10291,11 +10296,10 @@ manifest:
       groups: [cloud-itonami]
       userdata:
         rad-rid: rad:z4QjVUQL6Tpy2wHJgreDLRmL9e3x8
-    - name: cloud-itonami-fleet
+    - name: za-actor
       remote: cloud-itonami
-      repo-path: fleet
-      revision: ce0c12e5954a34d59b7535f0e76be9c5b220029f
-      path: orgs/cloud-itonami/fleet
+      revision: 614340970799a0ef5de27f83565a3ffe21202173
+      path: orgs/cloud-itonami/za-actor
       groups: [cloud-itonami]
       userdata:
         rad-rid: rad:z4CFz4gj9babaTo8iAnLEjyB4q9jf
@@ -11049,6 +11053,11 @@ manifest:
       revision: 85058e50d252fbdfcd9df4428bd9daa6174598eb
       path: orgs/kotoba-lang/kaigi
       groups: [kotoba-lang]
+    - name: kekkai-cli
+      remote: kotoba-lang
+      revision: dd3f658b235e02d50c08df23bced7f2e834013a6
+      path: orgs/kotoba-lang/kekkai-cli
+      groups: [kotoba-lang]
     - name: kotobase-anchor-fevm
       remote: kotoba-lang
       revision: 14b155f92f4fda8eb510f67631be7d142d26f8e2
@@ -11178,6 +11187,11 @@ manifest:
       remote: kotoba-lang
       revision: 93e2455075c66a1c60b1b3951553ca8d6a130bd0
       path: orgs/kotoba-lang/sekisho
+      groups: [kotoba-lang]
+    - name: senkyo
+      remote: kotoba-lang
+      revision: f812d5b7669169305424d2589a11a20c7981060f
+      path: orgs/kotoba-lang/senkyo
       groups: [kotoba-lang]
     - name: shift
       remote: kotoba-lang
@@ -12332,7 +12346,7 @@ manifest:
     - name: cloud-itonami-yotei
       remote: cloud-itonami
       repo-path: yotei
-      revision: f641446b8c250e6e2c01ca417b9067e1f7359485
+      revision: d849d3c09d47fd07953afda227e90505bd4121a1
       path: orgs/cloud-itonami/yotei
       groups: [cloud-itonami]
       userdata:
@@ -23491,11 +23505,10 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:zUDKP6e7ngb4TgLDNyqWWWkaGphT
-    - name: kotoba-lang-fleet
+    - name: sahai
       remote: kotoba-lang
-      repo-path: fleet
-      revision: 220290038102f274370ab562a82396513689b75c
-      path: orgs/kotoba-lang/fleet
+      revision: a282b8f1de6718e9f9c4a8d5741681b27269789a
+      path: orgs/kotoba-lang/sahai
       groups: [kotoba-lang]
     - name: floorplan-lab
       remote: kotoba-lang
@@ -23975,7 +23988,7 @@ manifest:
         rad-rid: rad:zk24SQytaBHvxCaEdkuigUa1TWfQ
     - name: kagami
       remote: kotoba-lang
-      revision: 8f04c56b321bd747d0da2c0c834a02b207316576
+      revision: a7d025945fd7add5ec5c9c17b27f1ab38aaa8f44
       path: orgs/kotoba-lang/kagami
       groups: [kotoba-lang]
       userdata:
@@ -24554,7 +24567,7 @@ manifest:
         rad-rid: rad:z4SgXkr4nTueookRPgnW6WyMh3b48
     - name: kami-nv-compat
       remote: kotoba-lang
-      revision: e4ed98d251b87f497f363cd07fe30a38534b91fb
+      revision: bc38b205cefca4f61bff5d631717eaa5653e2169
       path: orgs/kotoba-lang/kami-nv-compat
       groups: [kotoba-lang]
       userdata:
@@ -25299,7 +25312,7 @@ manifest:
     - name: kotoba-lang-kyoninka
       remote: kotoba-lang
       repo-path: kyoninka
-      revision: be342c471315ca68a0c5d1b5c547bf0e03d63d96
+      revision: fe7cbc80cd202f58efc3f195d8367e06e0fa009e
       path: orgs/kotoba-lang/kyoninka
       groups: [kotoba-lang]
       userdata:
@@ -26941,7 +26954,7 @@ manifest:
       groups: [kotoba-lang]
     - name: render
       remote: kotoba-lang
-      revision: 1c8972c52683e022ffe9c57069b9b43ac4a40f31
+      revision: 8d5948ca2cfaaf00e1778cb566e90fe0a6ea6870
       path: orgs/kotoba-lang/render
       groups: [kotoba-lang]
       userdata:
@@ -27171,7 +27184,7 @@ manifest:
         rad-rid: rad:z3j9x9ohJGTzzZyq9jyspeNY6YRBn
     - name: shell
       remote: kotoba-lang
-      revision: ea5b4fb0f6ef9812a00373c7654d915ad4d0bc89
+      revision: 7261caa965ad8f607a43bb058367b7d32f4d589b
       path: orgs/kotoba-lang/shell
       groups: [kotoba-lang]
       userdata:
@@ -27946,7 +27959,7 @@ manifest:
       groups: [network-awai]
     - name: cloud-itonami
       remote: network-awai
-      revision: 963ef05f05bb545b303990dea240f580a812818a
+      revision: b678eff8f9f0346a271f950bc9a084f94d68a2f4
       path: orgs/network-awai/cloud-itonami
       groups: [network-awai]
     - name: cloud-manimani
@@ -27956,7 +27969,7 @@ manifest:
       groups: [network-awai]
     - name: cloud-murakumo
       remote: network-awai
-      revision: 8fddb4b0ab11d415c6c8c8838a8457ee2e51f13b
+      revision: 5ad9e25dce1113c56a19f0cbbf662a13fb74d43e
       path: orgs/network-awai/cloud-murakumo
       groups: [network-awai]
     - name: cloud-murakumo-market-analyst
@@ -28011,7 +28024,7 @@ manifest:
       groups: [network-awai]
     - name: loop-yakuwari
       remote: network-awai
-      revision: a7e1bd3d8b31ffbe25902ed7e227f565411adde7
+      revision: 31b67a9465577489679d438fd9d72918342543f0
       path: orgs/network-awai/loop-yakuwari
       groups: [network-awai]
     - name: manimani

@@ -1180,6 +1180,22 @@
    ;; fleet-summary は未 checkout / tombstone repo 数も申告する —— スコアが付いて
    ;; いないことが「悪い」ではなく「測っていない/対象外」であるため。
    ["itonami-maturity" (io/file root "90-docs" "system-dynamics" "itonami-maturity.datoms.edn")]
+   ;; itonami-industry-scorecard — 上の repo 単位スコアを **産業（ISIC）軸**に畳んだ
+   ;; 生成物（`scripts/gen-itonami-industry-scorecard.cljs`、`--check` あり）。
+   ;; itonami.cloud の /industries/ が読んでいるのと同じ数。3 種類の entity:
+   ;;   `:scorecard/kind "summary"` 1 件（出典・caveat・fleet 全体の数）
+   ;;   `:scorecard/kind "section"` 21 件（A–U。coverage と 7 軸の平均）
+   ;;   `:scorecard/kind "industry"` 651 件（registry の 1 行 = ISIC コード 1 つ）
+   ;;
+   ;; join: `:industry/repo-name` → itonami-maturity の `:repo/name`（同形）。
+   ;;       `:industry/id` → permits の ISIC コード、marketplace.json の :id。
+   ;;
+   ;; ⚠ **coverage の分母は UN ISIC Rev.4 の 428 class**（org-un-isic）。registry 側は
+   ;; 改訂番号を宣言していないので、突き合わない id は `:summary/off-classification`
+   ;; に件数で出し、分子からも除いてある。`:section/unmeasured` は「スコア 0」では
+   ;; なく「maturity scan にその repo が無い」——平均の分母から外してある。
+   ["itonami-industry-scorecard"
+    (io/file root "90-docs" "system-dynamics" "itonami-industry-scorecard.edn")]
    ;; permits — cloud-itonami の governed actor が各自の `facts.cljc` に持っている
    ;; **法規制カタログ**の射影（生成物。`scripts/gen-permit-index.cljs`、ADR-2608080000）。
    ;; 「採掘許可が要る法域はどこか」「配電の所管庁は誰か」を横断で引けるようにする。

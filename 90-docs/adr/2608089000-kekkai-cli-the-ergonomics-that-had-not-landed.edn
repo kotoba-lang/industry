@@ -1,0 +1,108 @@
+[{:db/id -1
+  :adr/id "2608089000"
+  :adr/title "kekkai-cli: the capability had landed and the ergonomics had not"
+  :adr/status "accepted"
+  :adr/date "2026-08-07"
+  :adr/tags ["kekkai" "kekkai-cli" "kekkai-node" "cli" "ssh" "fleet"]
+  :adr/supersedes ""
+  :adr/body
+  "## 出発点
+
+ADR-2608069000 で netmap publisher を、ADR-2608079000 で reliable stream を
+着地させ、実フリートで ssh を通した。そのあとオーナーに「kekkai cli も作った?」と
+聞かれて確認したところ、答えは **No** で、しかも状況は思っていたより悪かった:
+
+- **`kekkai.netmap/publish` と `kekkai.envelope/seal` には entry point が無かった。**
+  昨日書いたばかりの署名 netmap 発行器が、REPL とテストからしか呼べなかった。
+  シェルから netmap を発行する手段が存在しない。
+- **ssh を通した実行そのものが再現不能だった。** 実際に使った 3 本
+  （`fleet-ssh-driver.cljs` と、judah に置いた `service.cljs` / `relay.cljs`）は
+  全部 scratchpad の使い捨てで、commit していないし judah からも消した。
+  commit されていたのはライブラリと E2E だけ。
+
+**capability は着地していて ergonomics は着地していなかった。**
+
+## 決定 1 — 第三の repo にする
+
+`kekkai`（制御面）は netmap を**発行**し、`kekkai-node`（データ面）は**消費**する。
+`netmap publish` を node 側に入れると**署名鍵がデータ面に入り、node が自分の
+到達性を自分で書けるようになる** —— charter の関係が反転する。だから CLI は
+両方に依存する第三の repo であり、どちらも CLI に依存しない。
+
+`kotoba-lang/kekkai-cli`。family 面の命名（`kekkai` / `kekkai-node` /
+`kekkai-cli`）。
+
+## 決定 2 — nbb だけで動かす（JVM サブプロセスを挟まない）
+
+`kekkai.envelope` は `java.security` を使う JVM 専用なので、素直に作ると
+**一番大事なコマンドのためだけに JVM を起動する**ことになる。
+
+書く前に測った: `kekkai.netmap` は pure `.cljc` で、その出力は Clojure と
+ClojureScript で**バイト一致**する。Ed25519 は決定的なので、payload が同一なら
+署名も同一。よって `kekkai.cli.sign`（node:crypto）は JVM publisher のバイト列を
+そのまま再現できる。
+
+**ただしこれは言語の性質ではなくこのデータの性質**: 8 キー以下の map は両ランタイムで
+array-map になり挿入順に印字される。9 キーの map が生えた瞬間に hash 順になり、
+2 つのランタイムは黙って食い違う。だから**仮定せず、kekkai の committed fixture に
+対するテストとして固定した** —— 壊れるなら CI で壊れる。
+
+これで 1 つの形式に対して **署名 2 実装（JVM / cljs）・検証 3 実装（JVM / node /
+WebCrypto）** になったが、全部が同じ 1 つの fixture のバイト列に固定されている。
+
+## コマンド
+
+`keygen` / `netmap publish` / `netmap verify` / `relay` / `up` / `status` / `ssh`。
+
+- **`netmap publish` は tailnet 全体を 1 ファイルで受ける。** netmap は射影であって、
+  ノードごとに別ファイルから射影するのは「2 つのノードが tailnet の構成について
+  食い違う」ための最短経路。
+- **`netmap verify --authority` は必須で、envelope からは絶対に読まない。**
+  署名者の鍵の唯一の複製を持つ envelope は自分自身を認証してしまう。
+- **`ssh` は ssh を再実装しない。** stdio 継承で本物の `ssh` を spawn するので、
+  鍵・agent・`~/.ssh/config`・`-J`・`-L`・対話プロンプトが全部いつもどおり動く。
+- **拒否は何も起動する前に、足りない grant を名指しで返す。** exit code は
+  sysexits（78 policy / 69 connectivity / 64 usage）でスクリプトから分岐できる。
+
+## 走らせて初めて見つかった 2 つのバグ
+
+1. **ssh は位置引数**（`ssh [options] destination [command]`）なのに、最初の版は
+   宛先を**末尾に**足していた。結果 `kekkai ssh judah … 'echo hi; hostname'` が
+   `hostname contains invalid characters` で落ちる —— ssh がリモートコマンドを
+   ホスト名として読んだ。**しかもユニットテストが同じ間違いを書いていた**ので緑だった。
+   値を取るオプションの閉集合を持って、オプション群の直後・コマンドの直前という
+   ただ 1 箇所に挿すよう直した。
+2. **relay に node の config を渡すと relay と node が同一 identity になる。**
+   セッションが確立してしばらくして止まる、という症状が出た。**そして何も
+   ログが無かったので原因が見えなかった** —— これが `up --verbose` と relay の
+   登録ログを足した理由。**セッションが黙って死ぬ CLI は運用ツールではない。**
+
+## 運用上の知見（README にも書いた）
+
+**relay は peer から到達できる側に置く。** 実測: UDP は workstation → fleet node は
+通るが逆は通らない。両 peer が relay を dial する設計なので、到達可能な側に置けばよく、
+それが本来の配備形でもある（workstation は relay ではない）。
+
+## 実測（2026-08-07）
+
+CLI だけで端から端まで駆動した: `keygen authority` → `keygen --node-id` ×2 →
+`netmap publish`（2 nodes 署名）→ `netmap verify`（正authority で ok、誤 authority で
+`netmap signer is not the configured authority`）→ judah で `relay` と `up` →
+`kekkai ssh judah --user judah 'echo …; hostname; uname -sm'` が
+`KEKKAI-CLI-OK / judahnoMac-mini.local / Darwin arm64` を返した。
+拒否経路も実測: 未知ノード→78、grant の無いポート→78、誤 authority→70、未知コマンド→64。
+
+8 tests / 23 assertions。
+
+## 残っていること
+
+- **常駐化していない。** `kekkai install`（LaunchDaemon）は未実装で、
+  `kekkai.node.launchd` は plist を生成できるのに CLI から呼べない。
+  今回も judah では手で `nohup` した。
+- **`kekkai up` は netmap のホットリロードをしない。** netmap を再発行したら
+  再起動が要る。version が prologue に束縛されている以上、ロールアウトは
+  どのみち協調的な操作だが、それを CLI が助けてはいない。
+- **`--verbose` 以外の観測手段が無い。** `status` は別 agent を起動して 3 秒待つ
+  という粗い作り（常駐 agent に問い合わせる経路が無い）。
+- 署名 2 実装のバイト一致は 8 キー以下の map に依存している。テストで固定してあるが、
+  **恒久的には canonical encoding にすべき**（そうすれば依存が消える）。"}]
