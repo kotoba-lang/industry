@@ -55,7 +55,7 @@ for o in cloud-itonami gftdcojp kotoba-lang; do ln -sfn ~/github/com-junkawasaki
 cd /tmp/itonami-os-<repo>/orgs/network-awai/cloud-itonami && npm install
 ```
 
-触るのはこの 6 箇所だけ。**`os/adapters/standard.cljc` は触らない**（147 本以上が
+触るのはこの 7 箇所だけ。**`os/adapters/standard.cljc` は触らない**（147 本以上が
 共有する形なので、1 本のために変えたらそこが最初のズレになる）。
 
 | ファイル | 足すもの |
@@ -64,14 +64,28 @@ cd /tmp/itonami-os-<repo>/orgs/network-awai/cloud-itonami && npm install
 | `os.edn` | vertical 宣言（`:binding :native`）。連携があれば `:wiring` |
 | `src/cloud_itonami/os/hydrate.cljc` | `hydrate` の case に 1 節（edge が使う） |
 | `src/cloud_itonami/edge/os_endpoints.cljc` | `native-adapter` の case に 1 節 |
+| **`scripts/generate-os-site.cljs`** | **`natives` map に 1 行 + require + `<x>-repo` / `<x>-operator` + シナリオ本体** |
 | `deps.edn` / `sites.edn` | `:local/root` と classpath・site entry |
-| `test/cloud_itonami/os_test.cljc` | 宣言一致・coverage の数・その産業固有の性質 |
+| `test/cloud_itonami/os_test.cljc` | 宣言一致・coverage の数・その産業固有の性質。**`ctx` の natives map にも足す**（2 箇所） |
 
-宣言を変えたら**必ず**射影を作り直す:
+生成器の `natives` map は 2026-08-06 まで表から漏れていた。落ちるので気付けるが
+（`os runtime: 宣言と adapter が食い違う`）、**表を信じて 6 箇所で終えると必ず踏む**。
+
+宣言を変えたら**必ず**射影を作り直す。**2 つある** —— 片方だけだと面が 404 になる:
 
 ```bash
+# ① OS registry（宣言 → kernel が読む射影）
 nbb scripts/generate-os-registry.cljs && nbb scripts/generate-os-registry.cljs --check
+# ② sites registry（生成した面 → edge の routing 表）
+nbb scripts/generate-sites-registry.cljs && nbb scripts/run-task.cljs sites-registry-check
 ```
+
+**②を忘れると、面の HTML は commit されているのに誰もそこへ行けない**（実測
+2026-08-06: isic-5210 を接続して site を生成・merge したが sites registry を
+再生成せず、`/{repo}/` が 404 のまま一晩残った）。さらに悪いことに、sites
+registry が STALE だと `test-sites` は**検査を始める前に中断する** —— つまり
+STALE は「404 になる」だけでなく「検査が走らなくなる」。実際この中断が既存の
+4 失敗を隠していた。`sites-registry-check` が OK を返すまでを接続作業に含めること。
 
 ### 3. 実際に回す（ここを飛ばさない）
 
@@ -114,6 +128,26 @@ gh api repos/network-awai/cloud-itonami/merges -f base=main -f head=agent/itonam
 
 superproject 側は `manifest/west.yml` の pin を **当該 entry だけ**前進させる
 （`nbb scripts/gen-west-manifest.cljs --entry cloud-itonami`。wholesale な再生成は禁止）。
+
+⚠ **`--entry` でも生成器が他の差分を巻き込むことがある。** `repos.edn` に別セッションが
+足した未登録 repo があると、その entry も一緒に書かれる（実測 2026-08-06:
+`cloud-itonami-kekkai` が混入し diff が 7 行になった）。**diff を必ず目で見て**、当該
+1 行だけでないなら GitHub API の single-entry commit で該当行だけを書く。
+
+### 5b. デプロイまでが完了条件（面は git に入っただけでは 404）
+
+```bash
+# checkout が origin/main を含むこと（deploy guard が要求する）
+git fetch origin && git merge --ff-only origin/main
+npx wrangler pages deploy public --project-name=cloud-itonami --branch=main --commit-dirty=true
+curl -o /dev/null -w '%{http_code}\n' https://cloud-itonami.itonami.cloud/<repo>/   # 200 を確認
+```
+
+**`:local/root` 依存が west pin とズレていると deploy guard が止める。** その依存が
+**clean かつ pin の後ろ**なら `west update --fetch smart <name>` で足りるが、**dirty か
+diverged なら触らない** —— pin の clean な worktree を作り、兄弟 org を symlink した
+隔離レイアウトからデプロイする（実測 2026-08-07: `kyoninka` が diverged だったので
+この経路を使った）。
 
 後片付けまでが完了条件: worktree 削除 → ローカル branch 削除 → remote branch 削除。
 
