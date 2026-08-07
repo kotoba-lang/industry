@@ -298,7 +298,18 @@
                   (:procedure/authority p) (assoc :procedure/authority (:procedure/authority p))
                   (:procedure/window p) (assoc :procedure/window (:procedure/window p))
                   (:procedure/jurisdiction p) (assoc :procedure/jurisdiction (:procedure/jurisdiction p))
+                  ;; **法の適用範囲。** 法域コードより狭いことがある（SMDA 2013 は
+                  ;; England and Wales のみ）。省略は法域全域だが、確認したなら
+                  ;; 書く —— 省略は『確認した』と『考えていない』を区別できない。
+                  (:procedure/extent p) (assoc :procedure/extent (:procedure/extent p))
+                  ;; 出所を data として持つ（docstring だと query から引けない）。
+                  (seq (:procedure/source-urls p))
+                  (assoc :procedure/source-urls (vec (:procedure/source-urls p)))
+                  ;; **額は最小単位の整数**（£191.02 → 19102 pence）。額を持たない
+                  ;; 手続きが実在する —— 英スクラップ金属は council が、独は州が
+                  ;; 決めるので、額はここでは決まらない（`:verify` がそれを言う）。
                   (:amount fee) (assoc :procedure/fee-amount (:amount fee))
+                  (:minor-unit fee) (assoc :procedure/fee-minor-unit (:minor-unit fee))
                   (:currency fee) (assoc :procedure/fee-currency (:currency fee))
                   (:kind fee) (assoc :procedure/fee-kind (str (:kind fee)))
                   (verify-str fee) (assoc :procedure/fee-verify (verify-str fee))
