@@ -94,6 +94,19 @@ CLI だけで端から端まで駆動した: `keygen authority` → `keygen --no
 
 8 tests / 23 assertions。
 
+## 着地（2026-08-07）
+
+- `kotoba-lang/kekkai-cli` main `dd3f658b` — 新規 repo、8 tests / 23 assertions。
+- superproject: west 登録 + 本 ADR を `9f65d9e4` で main へ。west pin は
+  `dd3f658b` で repo の main と一致。
+- **judah は掃除済み**（プロセス・`~/kekkai-ws` とも削除）。今回の実測は手で起動した
+  agent によるもので、常駐は入れていない。
+
+同日に着地した関連 ADR: ADR-2608069000（署名 netmap publisher）、
+ADR-2608079000（reliable stream と実 ssh）。3 つで
+「制御面が署名して発行する → node が検証して消費する → CLI から駆動できる」
+が一続きになった。
+
 ## 残っていること
 
 - **常駐化していない。** `kekkai install`（LaunchDaemon）は未実装で、
