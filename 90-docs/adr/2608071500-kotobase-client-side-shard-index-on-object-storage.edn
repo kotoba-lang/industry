@@ -1,0 +1,347 @@
+[{:db/id -1
+  :adr/id "adr-2608071500-kotobase-client-side-shard-index-on-object-storage"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/title "ADR-2608071500: Google 級の検索は hydrate 経路ではなく object store 上の client-side shard index で作る — ref 1 本の制約の正しい読み方と、実装・実測"
+  :adr/topic "kotobase-client-side-shard-index"
+  :adr/status "accepted"
+  :adr/date "2026-08-07"
+  :adr/last-verified "2026-08-07"
+  :adr/last_verified "2026-08-07"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+
+  :adr/authoritative-for
+  ["『query plane は ref 1 本』（ADR-260726）が何を禁じ、何を禁じていないかの解釈"
+   "1 manifest の下に shard を並べる構造が同規約に反しないこと、およびその理由"
+   "検索の posting list が datom 面ではなく block 面に住むこと"
+   "client-side descent の停止条件が保証する範囲（score について厳密／同点は未規定）"
+   "この経路のコスト指標は GET 回数と waves であって wall-clock ではないこと"
+   "70-tools/kotobase-shard-index の実装スコープと未達項目"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-260726-kotobase-query-plane-is-one-ref"
+   "adr-2607310900-query-plane-cache-index-materialized-view"
+   "adr-2608021000-namidb-comparison-and-the-read-path-trampoline"
+   "adr-2608011400-kotobase-query-plane-as-composable-sources"
+   "adr-2608039000-no-d1-premise-on-decentralized-paths"
+   "adr-2608039970-kotobase-base-is-datom-plane"
+   "adr-2608070400-kotobase-client-held-security-and-searchable-encryption-tiers"
+   "adr-2607250100-kotobase-maturity-bar-vs-production-databases"
+   "adr-2607072430-net-kotobase-web-geo-datalog-search"
+   "adr-2607192200-net-kotobase-commoncrawl-web-search-integration"]
+
+  :adr/artifacts
+  "{:code \"70-tools/kotobase-shard-index/\", :tests \"70-tools/kotobase-shard-index/test/run_tests.cljs (26 assertions)\", :receipt \"70-tools/kotobase-shard-index/bench/results/2026-08-07-get-scaling.edn\", :budget \"70-tools/kotobase-shard-index/bench/budget.edn\", :gate \"scripts/fleet-ci/gates/shard-index-check.cljs + gates.edn root-shard-index\"}"
+
+  :adr/body
+  "# Context
+
+オーナー指示（2026-08-07）: 「Google 級に耐えれるようにするには」「いまの CID・分散・
+S3 backed で実現したい」「storage は S3 前提、client 側で query、サーバーを使わない設計に。
+cache や index は storage を使う」「query plane は ref 1 本の制約はなぜ？複数ではダメな理由は？」
+
+## 出発点の実測（すべて既存 ADR の receipt）
+
+- kotobase.net の p50 は 2,491ms で、内訳は network+worker 起動 104ms / **hydration 2,282ms（92%）** /
+  クエリ本体 105ms（4%）。ADR-2607310900 訂正3。
+- hydration の逐次 round trip の **97% は未 fold novelty の cons chain**（幅 1・深さ = 未 fold tx 数・
+  後続 CID は前任を decode するまで存在しないので原理的に prefetch 不能）。prolly-tree の方は
+  幅広で浅く、60,000 datom でも async 3 waves。ADR-2608021000。
+- `arrangement` の hydrate は **結果サイズではなくデータベースのサイズに比例**する
+  （2k facts で 57ms / 50 block reads、32k で 678ms / 640）。ADR-2608011400。
+- 有界リソースの主張可能域は **10M datoms @8GB heap**。ADR-2607250100 軸 2。
+
+つまり現行の遅さと上限は、どちらも「クエリの前にデータベースを組み立てる」という
+一点から出ている。**そこを外せる読み経路を作れるか**、が本 ADR の問い。
+
+# Decision
+
+## D1 — 『query plane は ref 1 本』は原子性の規約であって、容量の規約ではない
+
+ADR-260726 の制約は 3 つの層に分かれており、破れる条件がそれぞれ違う。切り分けずに
+「だから分散検索は無理」と読まない。
+
+| 層 | 内容 | 現在地 |
+|---|---|---|
+| 実装 | `kotobase.core/open` が `:ref-name` を 1 つしか取らない | ADR-2608011400 の `datom-source` seam と `merged` combinator で **合成は可能**になった |
+| 性能 | 複数 source をクエリ経路で merge するのは高い（k=200 で 9,697ms、畳んでから引けば **0ms**） | 「merge が高い」のではなく「クエリ経路で merge するのが高い」。答えは background compaction |
+| **原理** | **ref は原子性とスナップショットの単位**。2 本の ref は独立に前進するので、両方を読むクエリには単一の basis が無い | **これは破れない** |
+
+原理の層だけが本物である。ref A の 10:00 と ref B の 10:03 を join した結果は、
+**どの瞬間にも存在しなかった世界**でありうる。「一緒に join したいものは同じ ref に」の
+本当の意味はここで、性能の話ではない。
+
+**そして ref が指せるのは manifest（root object）であって、blob 1 個ではない。**
+1 本の ref の下に数千の shard pack の CID を pin することは、この規約に一切反しない。
+
+    ref（署名付き head、1 本）
+     └─ manifest CID
+         ├─ shard-000: dict-root / posting packs / meta packs
+         ├─ shard-001: ...
+         └─ shard-N  : ...
+
+- 読み手はどの時点でも **1 つの manifest CID = 全 shard の整合したスナップショット**を見る（原理の層を満たす）
+- 書き手は shard ごとに独立に segment を作り、**直列化されるのは manifest の publish 1 回だけ**
+- したがって ADR-260726 が指摘した「クエリ到達範囲と書き込み並列度は同じ ref で決まるため常に対立する」
+  というトレードオフは、**この構造では対立しない**。直列化されるのが write ごとの head CAS ではなく
+  publish ごとの pointer swap になるため。
+
+これは Iceberg / Delta の snapshot pointer、Lucene の `segments_N` と同じ形である。
+ADR-2608011400 が「ClickHouse の MergeTree は我々の partitioned root + compaction と同じ設計」
+と確認したのと同じ収束。
+
+**規約が禁じているのは黙ったシャーディング**（sekaiju の事故: `/char` を 64 分割して
+ランキング・ギルド名簿・経済監査が全部書けなくなった）であって、分割そのものではない。
+本 ADR が名指しする代償は D2 に書く。
+
+## D2 — posting list は block 面に住む。datom 面には載せない
+
+転置索引の posting list は bytes であり、ADR-2608039970 の「byte を datom 面に載せない」が
+そのまま当たる。`kotobase-storage` の `IBlockStore`(CID) がそのまま使える。
+
+**これによって失われる横断クエリを名指しする（ADR-260726 の要求）**: posting list そのものを
+Datalog で join することはできなくなる。これは元々やりたくない操作である —— shard が返すのは
+`(doc-id, score)` の top-k だけで、join が要るのは merge 後の top-k の metadata 引き当てだけ。
+それは ref 1 本の datom 面で足りる。
+
+したがって `IPatternSource` adapter は**意図的に作らない**。`datom-source` seam の正しい
+適用先は manifest / metadata 面であって、posting 面ではない。
+
+## D3 — server は不変 byte の置き場でしかない
+
+ADR-2608070400 D1（同日 accepted、「server は暗号文と CID の置き場でしかない」）を
+検索面に延長する。client は manifest CID を 1 GET し、あとは自分で木を降りる。
+
+- **cache = storage**。CID 命名の object は不変なので `Cache-Control: immutable` が無条件に正しく、
+  無効化という概念自体が無い（変われば別 CID）。専用の cache 層も cache サーバも要らない。
+  ADR-2607310900 の「revision counter でなく CID を鍵に」を HTTP cache 層まで延長したもの。
+- **untrusted store で成立する**。読み手が bytes から address を再導出できる（`block/verify-block`）。
+- **D1 は premise にならない**（ADR-2608039000）。この経路に条件付き書き込みは 1 箇所も無い。
+  ref 面の quorum は `inga` の担当で、本 ADR のスコープ外。
+
+## D4 — impact 順 posting + 証明付き early termination。ただし『厳密』の範囲を明示する
+
+posting を impact 降順に並べ、chunk ごとの max-impact を head block に持つ。読んだ prefix に
+現れない doc は、その term の未読先頭 chunk の max-impact を超えられない。よって全候補に
+lower bound（積算済み）と upper bound（＋未見 term の threshold）が付き、未見 doc には
+shard の threshold 和が上界になる。**その区間が分離した時点で停止する。**
+
+**厳密なのは score について。同点の扱いは未規定。** k 個の score は上位 k 個であり、
+返る score は各 doc の完全な score である。ただし score が同じ doc のうち**どれが**返るか、
+どの順かは決まらない。境界は score を見るので doc-id の tie-break を見ることができず、
+そこまで決めさせると「k 番目の score と同じ max-impact を持つ chunk を全部読む」ことに
+なり、同点の多いコーパスでは索引全体になる。
+
+**この限界を書いているのは、最初の実装が黙ってそれ以上を主張し、oracle テストが捕まえたから**
+である（下記「作って分かったこと」①）。
+
+## D5 — コスト指標は GET 回数と waves。CI で gate する
+
+client は 1 GET = 1 round trip を払うので、**GET 回数がそのままコストモデル**である。
+wall-clock ではなく回数を測る（`kotobase-peer` の dag-shape bench が確立した規律、
+ADR-2608021000 —— 並行 agent が多数走るマシンの wall-clock はマシンを測る）。
+
+`waves` は逐次依存の深さで、latency が実際に追随するのはこちら。同一 wave 内の GET は
+独立なので実クライアントは並列に投げる。**posting head が全 chunk の CID と max-impact を
+前もって持っている**ので、ここには追いかけるべきポインタが無い —— hydrate 経路の
+novelty cons-chain がまさにそれを持っていて、だから並列化できなかった。
+
+**そして gate に入れる。** ADR-2607250100 軸 1 は「kotobase-peer の CI は unit test しか
+走らせない。**性能が退行しても検出する仕組みが無い。**これが今この軸で一番大きい穴で、
+数値そのものより優先度が高い」と書いている。コストモデルが主張の全部である設計は、
+コストモデルを CI に置かなければ主張を維持できない。
+
+# 実装と実測
+
+`70-tools/kotobase-shard-index/`（nbb / portable `.cljc`、依存ゼロ）。
+
+## 構造
+
+    manifest（唯一の可変ポインタ）
+     └─ shard[i]
+         ├─ dict-root ─> dict-internal ─> dict-leaf     term -> posting head、fanout 32
+         ├─ posting-head ─> posting-chunk...            impact 降順、128 posting/chunk
+         └─ meta-dir     ─> meta-chunk...               表示用の url/title
+
+- content address = canonical EDN の sha-256。**multiformats CIDv1 ではない**（`io-multiformats` への
+  移行は名前を付けた follow-up であって、済んだことにしない）。
+- canonical 化は必須: Clojure の map は 8 entry 超で挿入順を保たなくなるため、素の `pr-str` では
+  同じ論理ブロックが 2 つの address を持つ。float も排除した（整数値 double の `pr-str` が
+  JVM で `10.0` / JS で `10` になり、runtime 間で address が割れる）。
+- BM25 の idf は **全 shard 横断で計算**する。shard ごとの idf にすると 2 つの shard が
+  「珍しい語」について別のことを言い、cross-shard の merge が意味の違う数を比べることになる。
+
+## 実測（2026-08-07、in-memory store、GET 回数）
+
+`bench/budget.edn`（4,000 doc / 4 shard / 20,000 語彙 / 索引 21,054 block、k=10）:
+
+| クエリ | GET | waves | hits |
+|---|---|---|---|
+| 超高頻度語 1 語 | 37 | 8 | 10 |
+| 高頻度語 1 語 | 33 | 8 | 10 |
+| 中頻度語 1 語 | 33 | 8 | 10 |
+| 2 語（頻度混在） | 53 | 8 | 10 |
+| 3 語 | 65 | 8 | 10 |
+
+**索引 21,054 block に対して 1 クエリ 33–65 GET（0.16–0.31%）、waves は 8 で一定。**
+
+### スケーリング — shard 化はタダではない。それが上限を決める
+
+receipt: `bench/results/2026-08-07-get-scaling.edn`。コーパスを **64 倍**（1,000 →
+64,000 doc）にして、shard 数の扱いだけが違う 2 つの regime を測った。**片方だけ出すのは
+売り込みなので両方測る。**
+
+| regime | shard 数 | 索引 block | 平均 GET/query | waves |
+|---|---|---|---|---|
+| **`:fixed-shards`** | 8 で固定 | 39,310 → 59,990 (1.53x) | **77.4 → 76.0（0.98x = 横ばい）** | 9 → 11 |
+| **`:scaled-shards`** | 1 → 32 (32x) | 7,268 → 175,116 (24.1x) | **19.8 → 240.8（12.2x）** | 8 → 15 |
+
+**shard あたりのコストはコーパスサイズに対して横ばい**（64 倍にして GET は 0.98 倍）。
+**増分はすべて fan-out 項**である —— 全 shard に全クエリを投げるので、GET は
+shard 数に比例する（32 倍の shard で 12.2 倍）。
+
+したがって:
+
+- **shard 数はコーパスサイズから決めない。** write 並列度と object サイズから決める。
+  コーパスが増えたぶんは shard を大きくして吸収する（per-shard は対数）。
+- **client からの fan-out がこの設計の真の上限**であり、それは 10⁹〜10¹⁰ ページという
+  射程の根拠でもある（下記「到達しないところ」）。これは議論ではなく測った値になった。
+
+waves に実測 RTT を掛けたものが latency の見積もりになる（R2 range GET の既存実測
+p50 21ms、waves 9–11 なら ~190–230ms）。**この receipt から latency を直接読まないこと**
+—— store は in-memory で、ネットワークも並行性も CDN も測っていない。
+
+なお `:fixed-shards` の索引 block が 1,000 doc の時点で 39,310 と大きいのは合成コーパスの
+性質で、20,000 語彙を 8 shard に割ると 1 文書あたりの posting より **term ごとの固定費**が
+支配するため。実コーパスでも長い裾は同じ形をとるが、比率は違う。
+
+## 作って分かったこと（設計より重要な 3 件。すべて検査が捕まえた）
+
+### ① 同点が停止条件に入っていなかった
+
+最初の実装は top-k の**順序まで厳密**だと主張していた。oracle テスト（bounded scan を
+同じ索引の full scan と突き合わせる）が、全 score が同点のコーパスで **doc-id 600-609 を
+返すべきところ 0-9 を返した**ケースを検出。境界は score について正しかったが、同点を
+分ける doc-id を見ていなかった。**主張を実態に合わせて狭めた**（D4）—— 境界を強くする
+方向は、同点の多いコーパスで索引全体を読むことになるので採らない。
+
+### ② ベンチのコーパスが tokenizer に割られていた
+
+合成語彙が `alpha-one` のようなハイフン付きで、analyzer はハイフンで割る。結果、
+**全クエリが「コーパス中で最も頻出の 2 語の OR」**になっていた —— 選択的な lookup を
+示すはずのベンチが、最も非選択的なクエリを測っていた（3,705 block の索引に対し 1,399 GET）。
+
+これは「実装が遅い」ではなく「測っているものが違う」で、**数字を見て設計を疑う前に
+測定器を疑う**という ADR-2607250100 の教訓（85x/97.5x の公表値が計測器バグで取り下げ）
+と同じ形。コーパス生成器を `src/` に移し（コピーがドリフトしたのが原因）、
+`analyze: a hyphen splits, it does not join` をテストに固定した。
+
+あわせて 2 つ直した: **chunk-size を 16 → 128**（小さい chunk は「早く止まる」ように
+見えて、1 個ごとに round trip を払う）、**1 wave で最も有望な chunk を prefetch 個
+まとめて読む**（chunk は list 内で impact 降順なので、全 list 横断の上位 N は自動的に
+各 list の prefix になり、境界の妥当性が保たれる）。
+
+### ③ exactness テストが、境界条件を一度も検査していなかった
+
+①②を直したあと、**変異テストで検査そのものを検査した**。`threshold` を 4 分の 1 に
+過少申告する変異と、未見 doc の上界 `(>= kth-lb u)` を落とす変異 —— **どちらも
+26 assertions を素通りした。**
+
+原因: テストのコーパスが 200–2,000 doc、chunk 128 posting だったので、**prefetch 1 波で
+posting list が尽きていた**。全クエリが `:proof :exhausted` で終わり、境界は一度も
+参照されていなかった。exactness テストは全走査を全走査と比べていたことになる。
+
+直したのは 2 つ。**境界が実際に効く構成**（chunk 8–16、shard 少、prefetch 2–4）を
+テスト行列に足し、**`:proof :bounded` が出ていることを assert** した（出ていなければ
+検査は何もしていない）。加えて **prefetch を 1/2/8/64 と変えて結果が一致すること**を
+検査に足した —— 読む順序が答えを変えるなら、単一構成のテストでは見えない形で境界が
+壊れている。
+
+同じ 2 変異を強化後の suite にかけると**どちらも落ちる**（`n=800 shards=4 chunk=8
+prefetch=2` の exactness）。無改変では 32/32 合格。
+
+**教訓は CLAUDE.md が既に書いていること**（「gate は『落ちること』を確かめてから landed
+とする。落ちない gate は劇場」）が、**gate だけでなくテストにも当たる**ということ。
+テストが緑であることと、テストが何かを検査していることは別である。
+
+## 検証
+
+- `test/run_tests.cljs` — **32 assertions / 0 failures**。canonical 化、analyzer
+  （ハイフン分割の固定を含む）、build 決定性（2 回 build して manifest CID 一致）、
+  全 block の再ハッシュ検証、関連性、**exactness（4 構成 × 5 クエリ、うち 3 構成は
+  境界が効くよう設定し `:bounded` が出ることを assert）**、同点契約、
+  **prefetch 1/2/8/64 での結果一致**、early termination の節約、dict 高さの対数性、
+  GET の劣線形性、fs store の round-trip。
+- **落ちることを実測済み**: 上記 2 変異でそれぞれ 31/1。予算 gate も
+  `:total-gets` を 50 に改竄して exit 1 を確認（「total GETs 221 > budget 56」）。
+- `bench/check_budget.cljs` — GET 予算。**両方向に落ちる**（索引が縮んでも、hits が 0 でも fail）。
+- fleet gate `root-shard-index`（`gates/shard-index-check.cljs`）。判定は tool 側の 2 本に委ね、
+  gate は展開済み tree に対して呼ぶだけ（判定を gate に複製すると fleet と repo で
+  別実装になる）。**GitHub Actions は使わない**（ADR-2607300900）。
+
+# この設計が到達しないところ（正直に）
+
+- **fan-out がスケールの真の上限（実測済み。上表 `:scaled-shards`）。** doc-shard 型は
+  全 shard に聞くので、GET は shard 数に比例する（32 倍の shard で 12.2 倍）。client からの
+  fan-out は実用 ~10² shard。10¹¹ ページ級には 10³〜10⁴ shard が要り、client 単独では
+  tail latency とリクエスト数が破綻する。**この設計の正直な射程は 10⁹〜10¹⁰ ページ**で、
+  それ以上には client の手前に集約 tier が要る —— それはサーバーの再導入である。
+- **visibility を server で強制できない。** client が読める block は全部読める。公開ウェブ /
+  地図コーパスなら問題にならない（ADR-2608070400 の段 P）。private を混ぜるなら段 C
+  （opaque index、実測 request 2.8x / row 8.06x の増幅）に載せる。
+- **incremental build が無い。** `build!` はコーパス全体から作り直す。segment merge
+  （新 segment を足して manifest だけ書き換える）が次に書くもの。
+- **publish の単一 writer は前提であって強制ではない。** ここに ref 面は無い。
+  `build!` は manifest CID を返すだけで、その publish の直列化には何も言わない。
+  それが `inga` の境界。
+- **range GET は実装済みだが query 経路が使っていない。** block は丸ごと取る。
+  sub-block range は bytes を減らすが round trip を減らさず、この設計を縛るのは
+  round trip の方 —— 意図的な順序であって見落としではない。
+- **コーパス取得の制約は 1mm も動かない。** Common Crawl の Index API は URL キー引きのみ、
+  カバレッジ上限は robots.txt（ADR-2607192200 / 2607252100）。検索面が速くなっても
+  **入るページの範囲を決めるのは crawl 政策**である。
+- **合成コーパスでの測定**。実テキストは裾がずっと長く、dict は深くなる（対数）が
+  中頻度語はより選択的になる。実コーパスでの再測定は未実施。
+
+# 却下した選択肢
+
+| 案 | 判定 | 理由 |
+|---|---|---|
+| hydrate 経路を最適化して Google 級にする | 却下 | L1 memo / L2 永続 index / L3 差分はすべて**クエリ時間の 4%** を争っている（ADR-2607310900 訂正3）。92% は hydration で、その 97% は原理的に prefetch 不能な cons-chain |
+| shard ごとに ref を分ける | 却下 | 原子性が無くなる（D1）。どの瞬間にも存在しなかったスナップショットを返しうる |
+| posting list を datom 面に載せて Datalog で引く | 却下 | byte を datom 面に載せない（ADR-2608039970）。`[_ _ o]` はどの実装でも O(DB)（ADR-2608011400） |
+| term-shard（語ごとに分割） | 却下 | tail latency が構造的に悪い。doc-shard なら各 shard が独立に top-k を出せる |
+| block DAG の並列 prefetch を再挑戦 | 却下 | 既に測って 24% 悪化・revert 済み（ADR-2607310900 訂正4）。木は既に 2-3 waves |
+| クエリ時に BM25 を計算する | 却下 | 全候補の term frequency と大域統計を運ぶことになる。impact を焼いておけば posting は `[doc-id impact]` だけ |
+| chunk を小さく保って早く止める | 却下（実測） | 16 posting/chunk は選択的なクエリを数百 GET にした。round trip が支配項 |
+
+# Consequences
+
+- **(+) 『ref 1 本だから分散検索は無理』という誤読が正本として否定される。** 制約は原子性の
+  規約であり、1 manifest の下の shard 化はそれを満たす。
+- **(+) hydrate 経路と独立に測れる読み経路ができた。** 速さの主張は materialized view 系の
+  数字で出す（ADR-2608021000 §4）という既存の作法に、実装と gate が付いた。
+- **(+) コスト gate が最初から在る。** ADR-2607250100 軸 1 の穴（退行を検出する仕組みが無い）を
+  このサブシステムでは繰り返さない。
+- **(-) 本番経路ではない。** kotobase.net は今も hydrate 経路。本 ADR は代替経路の存在と
+  そのコストを実測しただけで、移行は決めていない。
+- **(-) staging 先が正しくない。** このセッションの GitHub scope が `com-junkawasaki/root` だけ
+  だったため `70-tools/` に置いた。`kotobase-` family の subject repo として `kotoba-lang` に
+  切り出し、`manifest/repos.edn` + `gen-west-manifest.cljs --entry` で west 登録するのが
+  正しい置き場。名前を付けた follow-up であって、暗黙に済ませない。
+
+# 次にやること（優先順）
+
+1. **novelty queue の bounded segment 化** — 本 ADR とは独立に、**現行の本番経路**の
+   2.3 秒を削る唯一の特定済みの打ち手（ADR-2608021000 が名指し、未実装）。
+   `append-novelty-index!` の 16 entry/segment を `push-novelty!` にも適用すれば 64 hops → 4 hops。
+2. **incremental segment merge** — 全再構築を外す。これが無いとクロールに追随できない。
+3. **実コーパスでの再測定** — `product-corpus` か `kotobase-commoncrawl-actor` の実データで。
+4. **`kotoba-lang` への切り出しと west 登録**。
+5. **R2/B2 に対する実 GET での waves × RTT の実測** —— in-memory の回数を latency に翻訳する。
+"}]

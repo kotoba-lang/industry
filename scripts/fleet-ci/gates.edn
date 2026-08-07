@@ -276,6 +276,25 @@
    :script "gates/capital-pools-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
+  ;; kotobase-shard-index（ADR-2608071500）。client が object store から直接
+  ;; 読む検索索引。2 つを守る:
+  ;;
+  ;; ①**正しさ** — early termination が答えを変えないこと。「停止条件は証明で
+  ;;   あって近似ではない」がこの設計の主張なので、その検査が落ちたら主張が嘘に
+  ;;   なる。実際これは開発中に 2 回とも本物の欠陥を捕まえている（同点時の順位が
+  ;;   境界条件に入っていなかった／ベンチのコーパスが tokenizer に割られていた）。
+  ;;
+  ;; ②**コスト** — 1 クエリの GET 数と waves。ADR-2607250100 軸 1 が
+  ;;   「kotobase-peer の CI は unit test しか走らせないので、性能が退行しても
+  ;;   検出できない。これが今この軸で一番大きい穴で、数値そのものより優先度が
+  ;;   高い」と書いている、その穴をこのサブシステムでは最初から塞いでおく。
+  ;;
+  ;; :include-ext に .cljc が要るのは src が portable だから。
+  {:name "root" :id "root-shard-index" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/shard-index-check.cljs"
+   :include-ext [".edn" ".cljs" ".cljc"] :min-files 1500 :cd false}
+
   ;; net-kotobase（kotobase.net の本体、private）。**network-awai org の GitHub
   ;; Actions は 2026-08-03T01:10Z 以降 1 本も起動していない**（実測: 全 workflow
   ;; failure、job は steps 0 件で 1-10 秒で終了。同 org の cloud-itonami /
