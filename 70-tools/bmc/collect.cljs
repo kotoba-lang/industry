@@ -63,7 +63,14 @@
    ;; Worker のため zone 無し (app-aozora-yoro と同型) — workers invocation +
    ;; health のみ。seller/agent-demand 実測は gate-emitters (:catalog) 経由。
    :nexus-x402      {:workers #{"nexus-x402"}
-                      :health "https://x402.nexus/health"}})
+                      :health "https://x402.nexus/health"}
+   ;; 2026-08-07 追加: 一次計測（dwell / route transition, ADR-2608060900）が
+   ;; 入ったのに products に居らず、metrics ファイル自体が存在しなかった。
+   ;; zone は付けない — babiniku.net の zone id をこの作業機から検証できず
+   ;; （CF_API_TOKEN も Keychain "gftd.cf" も無い）、確かめていない id を
+   ;; 書くくらいなら無い方がよい。zone を足すときは API で実在を確認してから。
+   ;; 実データは :emitter（/api/telemetry-report）が運ぶ。
+   :net-babiniku    {:health "https://babiniku.net/"}})
 
 (defn keychain [service]
   (let [{:keys [exit out]} (sh "security" "find-generic-password" "-s" service "-w")]
@@ -334,7 +341,24 @@
    ;; chatters/scenes/paying}} from shinshi D1 (pv_daily + chat_event_daily).
    ;; chatters = 1:1 companion chat messages = the validation signal the live
    ;; chat (murakumo fleet) now produces.
-   :club-shinshi   {:url "https://shinshi.club/api/funnel"            :fmt :json :merge true}
+   ;; 2026-08-07: 1 product に複数 emitter を許す形にした（値が map なら 1 本、
+   ;; vector なら順に merge）。shinshi は funnel(公開) と audience(secret-gated)
+   ;; の 2 本を持つ。
+   :club-shinshi   [{:url "https://shinshi.club/api/funnel"            :fmt :json :merge true}
+                    ;; 滞在時間バケット + 遷移エッジ（ADR-2608060900、0016）。
+                    ;; business data なので x-internal-trust ゲート付き。
+                    ;; `collected-since` を必ず一緒に綴じ込むこと — 行が無いのは
+                    ;; 「誰も滞在していない」ではなく NOT MEASURED。
+                    {:url "https://shinshi.club/_metrics/audience?window_days=7"
+                     :fmt :json :key :audience :timeout 15
+                     :secret-service "club-shinshi BMC_COLLECTOR_READONLY_SECRET"
+                     :auth-header :internal-trust}]
+   ;; babiniku の一次計測（ADR-2608060900、0020）。shinshi と schema を揃えて
+   ;; あるので、2 プロダクトの回遊を同じ形で比較できる。
+   :net-babiniku   {:url "https://babiniku.net/api/telemetry-report?window_days=7"
+                    :fmt :json :key :audience :timeout 15
+                    :secret-service "net-babiniku TELEMETRY_REPORT_SECRET"
+                    :auth-header :bearer}
    ;; app-aozora organism-engagement (2026-07-16, ADR-2607151900): appview.aozora.app
    ;; /api/engagement が {:engagement {:organism-engagement-ratio r|nil ...集計}} を返す。
    ;; :merge true で top-level に載せ gate :hyp/aozora-organism-content が読む。
@@ -353,28 +377,57 @@
    ;; feeds :hyp/nexus-x402-agent-demand (added when nexus-x402 shipped /stats).
    :nexus-x402     {:url "https://x402.nexus/stats"                   :fmt :json :key :catalog}})
 
+(defn- auth-args
+  "curl args for an emitter that needs a credential. `:secret-service` names a
+  macOS Keychain item (ONE targeted lookup — never an enumeration), and
+  `:auth-header` says how to present it. Returns nil when the secret is absent,
+  and the caller then skips the fetch entirely rather than sending an empty
+  credential: an unauthenticated request to a gated endpoint is a 403 that
+  reads, in the metrics file, exactly like 'no data'."
+  [{:keys [secret-service auth-header]}]
+  (when secret-service
+    (when-let [secret (keychain secret-service)]
+      (case auth-header
+        :bearer         ["-H" (str "authorization: Bearer " secret)]
+        :internal-trust ["-H" (str "x-internal-trust: " secret)]
+        nil))))
+
 (defn fetch-emitter
-  "→ parsed emitter map, or nil if unreachable/unparseable (no-op)."
-  [{:keys [url fmt timeout]}]
+  "→ parsed emitter map, or nil if unreachable/unparseable (no-op).
+
+  A gated emitter whose secret is not on this machine is skipped, not fetched
+  anonymously — see auth-args."
+  [{:keys [url fmt timeout secret-service] :as cfg}]
   (try
-    (let [r (curl/get url {:throw false
-                           :raw-args ["--max-time" (str (or timeout 8)) "-A" collect-ua]})]
-      (when (= 200 (:status r))
-        (case fmt
-          :edn  (clojure.edn/read-string (:body r))
-          :json (json/parse-string (:body r) true))))
+    (let [auth (auth-args cfg)]
+      (when-not (and secret-service (nil? auth))
+        (let [r (curl/get url {:throw false
+                               :raw-args (into ["--max-time" (str (or timeout 8)) "-A" collect-ua]
+                                               (or auth []))})]
+          (when (= 200 (:status r))
+            (case fmt
+              :edn  (clojure.edn/read-string (:body r))
+              :json (json/parse-string (:body r) true))))))
     (catch :default _ nil)))
+
+(defn- merge-one-emitter
+  [m {:keys [key merge] :as cfg}]
+  (if-let [em (fetch-emitter cfg)]
+    (cond-> (if merge (clojure.core/merge m em) (assoc m key em))
+      true (update :sources (fnil conj []) :emitter))
+    m))
 
 (defn merge-emitter
   "Merge a product's live gate-metric emitter output into its metrics map m.
-   :key → nest under that key; :merge → shallow-merge top-level."
+   :key → nest under that key; :merge → shallow-merge top-level.
+
+   A product may declare either one emitter (map) or several (vector), applied
+   in order. Several because a product can have both a public funnel and a
+   gated audience surface, and folding them into one endpoint would mean
+   publishing the gated half."
   [m product]
-  (if-let [{:keys [key merge] :as cfg} (get gate-emitters product)]
-    (if-let [em (fetch-emitter cfg)]
-      (cond-> (if merge (clojure.core/merge m em) (assoc m key em))
-        true (update :sources (fnil conj []) :emitter))
-      m)
-    m))
+  (let [cfg (get gate-emitters product)]
+    (reduce merge-one-emitter m (cond (map? cfg) [cfg] (sequential? cfg) cfg :else []))))
 
 (defn traffic-quality
   "24h の status-mix から probe(4xx)/5xx 率を % で。zone の uniques/requests を

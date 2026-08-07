@@ -375,19 +375,43 @@ bot の数を business decision に流し込んでいた。
 open PR ゼロ、自分の branch / worktree はすべて削除済み。本番デプロイ済み
 （`magatama-sh1n5h1x` version `fc8c05e8` / net-babiniku Pages）。
 
-## 検証していないこと（正直に）
+## 2026-08-07 追記: 読む面は shipped した日から一度も動いていなかった
 
-- **shinshi の `/_metrics/audience` は 200 経路を live で検証していない。**
-  `DISPATCHER_INTERNAL_SECRET` / `GROWTH_ACTOR_READONLY_SECRET` の値を読んで
-  いないため。403（secret 無し・誤 secret）と 405（POST）までは live 確認済みで、
-  200 経路は unit test（122 tests）でのみ確認している。babiniku 側は secret を
-  自分で発行したので 200 経路まで live 確認済み。
+前節が「200 経路を live で検証していない」と書いた、まさにその穴に本物のバグが
+入っていた。翌日 collector を繋ぐために secret を発行して初めて 200 を叩き、
+**全セクションが 0 / `collected-since` null** を返すことが分かった —— 同じ
+window の `pv_daily` には 595 views が入っているのに。
+
+原因は `telemetry/rows` の `(apply (.-bind (.prepare db sql)) binds)`。cljs の
+`apply` は statement から切り離したメソッドを呼ぶので workerd の D1 が throw し、
+直後の `.catch` が `[]` に変えていた。**`collected-since null` は NOT MEASURED の
+つもりで置いたのに、実際には NOT READ を意味していた** —— 正直な空に見える分だけ
+質が悪い。修正後の本番確認: pageviews 595 / new_visitors 486 /
+`collected-since 2026-06-11`（`club-shinshi-app` `2792b6c4`）。
+
+教訓を 2 つ、この ADR の他の項目より重く記録する:
+
+1. **「200 経路は unit test で確認済み」は検証ではない。** 実際 122 tests は
+   全部緑のまま、本番は 1 行も読めていなかった。secret が手元に無いことを理由に
+   live 検証を飛ばしたが、その secret は自分で発行できた（下記 D5）。
+2. **この bug は unit test では再現できない。** cljs の fn は detached な呼び出しを
+   受け入れるので、stub をどれだけ厳しくしても cljs.test 上では throw しない。
+   stub の docstring に「再現しない」と明記した —— 再現できるつもりの trap を
+   置く方が危ない。gate として効くのは「行がレスポンスまで届く」ことを見る test。
+
+## D5. 読み手ごとに別の secret を持たせる（2026-08-07 追加）
+
+`/_metrics/*` の gate は 3 つ目の secret `BMC_COLLECTOR_READONLY_SECRET` を受ける。
+collector に `GROWTH_ACTOR_READONLY_SECRET` を流用する（= 回して両方に配る）案を
+採らなかったのは、**片方の失効がもう片方を黙って壊す**から。判定は「設定済みの
+ものだけを候補にして一致を見る」形に整理し、空の presented 値が未設定 secret に
+一致しないことをテストで固定した。
 - **実トラフィックによる書き込みをまだ見ていない。** 検証用の行は削除して両サイトとも
   0 行から開始したので、最初の実データが入るのはこれから。次に読むとき
   `collected-since` が null なら「まだ誰も来ていない」だけでなく
   「beacon が動いていない」可能性も疑うこと。
 
-## 次にやる最初のこと
+## 次にやる最初のこと（2026-08-06 時点。08-07 に下記のとおり実施済み）
 
 実トラフィックが乗ったかの確認。babiniku の secret は macOS login keychain の
 service `net-babiniku TELEMETRY_REPORT_SECRET`（`security find-generic-password`
@@ -404,6 +428,26 @@ GET https://shinshi.club/_metrics/audience?window_days=7
 その次に効く作業は **`70-tools/bmc` の collector からこの 2 本を叩き、
 `90-docs/business/metrics/*.edn` に綴じ込むこと** —— shinshi の
 `/_metrics/revenue` が既にその形を持っているので、`collect.cljs` に 1 本足す形で入る。
+
+**2026-08-07 に実施した**（`com-junkawasaki/root`）:
+
+- `gate-emitters` が **1 product に複数 emitter** を持てるようにした（map なら 1 本、
+  vector なら順に merge）。shinshi は公開の `/api/funnel` と secret-gated な
+  `/_metrics/audience` の 2 本を持つ。
+- gated emitter は Keychain の 1 件を**狙い撃ちで**引く（`:secret-service` +
+  `:auth-header :bearer|:internal-trust`）。**secret が無いときは匿名で叩かず
+  skip する** —— gated endpoint への無認証リクエストは 403 で、metrics ファイル上
+  「データが無い」と見分けが付かなくなる。
+- `net-babiniku` を `products` に追加（一次計測が入ったのに product 自体が無く、
+  metrics ファイルが存在しなかった）。**zone は付けていない** —— この作業機に
+  CF token が無く zone id を実在確認できないため。確かめていない id を書くより
+  無い方がよい。
+- live 確認: shinshi `/_metrics/audience` → 200（collector secret）/ 403（無し）、
+  babiniku `/api/telemetry-report` → 200。babiniku 側は `collected-since` が
+  まだ null（= 実トラフィックの beacon 書き込みがまだ 0 件）。
+- ⚠ **collector 自体はこの作業機で走らせていない**（`CF_API_TOKEN` も Keychain
+  `gftd.cf` も無く、`-main` が token 無しで throw する）。emitter 2 本の応答は
+  curl で個別に確認したが、`metrics/*.edn` の再生成は未実施。
 
 # Gaps
 
