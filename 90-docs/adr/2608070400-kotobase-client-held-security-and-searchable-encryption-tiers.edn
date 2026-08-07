@@ -1,0 +1,203 @@
+[{:db/id -1
+  :adr/id "adr-2608070400-kotobase-client-held-security-and-searchable-encryption-tiers"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-confidentiality"
+  :adr/title "ADR-2608070400: kotobase の機密性は client が持ち、server は安全性の責務を持たない — 検索可能暗号の段と実測トレードオフ"
+  :adr/status "accepted"
+  :adr/date "2026-08-07"
+  :adr/last_verified "2026-08-07"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["kotobase の server は安全性の責務を持たない（暗号文と CID の置き場に限る）という決定"
+   "封筒面 / 射影面の二面分割を kotobase.net の既定構造とする決定"
+   "検索可能暗号の 5 段（P/B/S/C/F）と、各段で server が学習するものの定義"
+   "columnar lake projection は射影面にのみ載るという制約"
+   "convergent 暗号を使わない決定（tenant 間 35.12% の等価漏洩が実測されたため）"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2606131600-kotobase-e2e-pq-and-universal-read-audit"
+                "adr-2608039970-kotobase-base-is-datom-plane"
+                "adr-2608039000-no-d1-premise-on-decentralized-paths"
+                "adr-2608071000-dsl-core-kotoba-migration-orphaned-twelve-consumers"]
+  :adr/artifacts "{:model-hndl \"90-docs/models/crypto-tradeoff-xmile.cljs\", :model-client-burden \"90-docs/models/client-burden-xmile.cljs\", :bench \"kotoba-lang/kotobase/capability-bench/results/{storage,latest}.edn (2026-08-06)\", :pq-suite \"kotoba-lang/pqh (pqh-v1)\", :client-pq \"kotoba-lang/kagi kagi.crypto.noble\", :prior-art \"cloud-itonami-rirekisho / kagi / com-etzhayyim-talent\"}"
+  :adr/body
+"# ADR-2608070400: kotobase の機密性は client が持ち、server は安全性の責務を持たない
+
+**Status**: accepted
+**Date**: 2026-08-07
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー指示（2026-08-07）: 「安全は client 側の負担に寄せて、server は安全性の
+責務を持たないように」「検索可能暗号までを想定」。
+
+これは同日の先行案（server 可読を既定 Tier とし、機密 graph だけ client-held に
+する二層案）を**否定する訂正**である。server が鍵を持つ限り server は安全性の
+責務を負い、侵害・法的要求・運用ミスの矢面に立つ。責務をゼロにするとは、
+**server が持っていないものは漏らせない**という状態にすることを指す。
+
+### 先行資産 — 新規実装は要らない
+
+| 資産 | 中身 | 状態 |
+|---|---|---|
+| `kotoba-lang/pqh` | suite `pqh-v1`: X25519+ML-KEM-768 (FIPS 203) KEM combiner / Ed25519+ML-DSA-65 (FIPS 204) 二重署名 / XChaCha20-Poly1305 (nonce 24 + tag 16) / Argon2id | 実装済み |
+| `kotoba-lang/kagi` `kagi.crypto.noble` | **ブラウザ**側の実 ML-KEM-768（`@noble/post-quantum`）。JVM 側は JDK 24 標準。双方向の相互運用テストあり | 実装済み |
+| `kotoba-lang/crypto` | `hmac` / `hkdf` | 実装済み |
+| `cloud-itonami-rirekisho` / `kagi` / `com-etzhayyim-talent` | 「運営者に読ませない」二面分割 | **3 実装** |
+| net-kotobase `ADR-2606131600` | 同方針の起草（status: proposed） | 未 ratify |
+
+**client 側 PQ は想定ではなく実在する。** この ADR が足すのは方針の確定と、
+検索可能暗号の段の定義だけである。
+
+### 実測（`kotobase/capability-bench`, 2026-08-06）
+
+- AEAD overhead 28 B/block（index block 平均 12,225.47 B に対し 0.23%）
+- AEAD throughput 56.23 MB/s、index block 復号 0.03 ms
+- opaque index 増幅: **request 2.8x / row 8.06x**
+- convergent 暗号の等価漏洩: **tenant A の 35.12% の block が tenant B と byte 同一**
+- index heights: eavt 2 / avet 2、GET/op point 2.04 / find 3.6 / range 16
+- columnar lake vs avet index: 2 GET・512 行・5.23ms ↔ 16 GET・4,000 行・108.12ms（**20.7x**）
+- padding bucket `[1024 4096 16384 65536]`: index block **+34.0%**、definition block **+150.0%**
+
+## Decision
+
+### D1 — server は暗号文と CID の置き場でしかない
+
+server が持ってよいのは、暗号文ブロック・CID・ref・アクセス台帳だけとする。
+**平文の鍵を server に置かない。** `SealedBlockStore` のような server 保持鍵の
+封緘は「at-rest 保護」であって責務の除去ではないので、これを機密性の根拠に
+しない。
+
+### D2 — 二面分割（封筒面 / 射影面）を既定構造とする
+
+| 面 | 中身 | server から見えるか |
+|---|---|---|
+| **封筒面** | 本体の datom。`pqh-v1` で client が封緘 | 見えない |
+| **射影面** | 何をクエリしたいかを先に決めて、それだけを**非識別**な形で平文投影 | 見える（設計上 PII ゼロ） |
+
+**暗号文は join できない。** したがって「server に読ませない」と「Datalog で
+クエリする」は同じ datom に同時には成立しない。どちらかを諦めるのではなく、
+**クエリしたいものを射影面へ先に決めて出す**。これは新案ではなく、上記 3 実装が
+既に採っている形の 4 つ目である。
+
+射影面の内容は client が決める。server は射影面が非識別であることを**保証しない**
+（保証すると責務が戻る）。非識別性の責任は射影を定義した client 側にある。
+
+### D3 — 検索可能暗号は 5 段。既定は P、機密は C
+
+`90-docs/models/client-burden-xmile.cljs` の実行結果（実測パラメータ、
+1M ops/月・RTT 50ms 想定）:
+
+| 段 | 構成 | server が答えられるもの | GET 増幅 | hops | 復号 ms/op | server が学習するもの | 状態 |
+|---|---|---|---|---|---|---|---|
+| **P** | 射影面（平文・PII ゼロ） | full Datalog | 1.0x | 2 | 0 | 射影の中身のみ | **実装済み（3 例）** |
+| **B** | blind index（HMAC 決定的トークン） | 等価のみ | 1.0x | 2 | 0.944 | 検索パターン + アクセスパターン + **等価/頻度** | 今日作れる |
+| **S** | SSE（暗号化転置索引） | 等価 + 論理積 | 1.0x | 3 | 0.944 | 検索パターン + アクセスパターン | **未実装** |
+| **C** | opaque index + client 側 tree 降下 | 無し（blob 取得のみ） | **2.8x** | 3 | 2.643 | アクセスパターン + サイズ | 今日作れる |
+| **F** | 全 client（corpus 丸ごと） | 無し | 1.0x | 1 | **23,462** | サイズのみ | corpus が小さい間だけ |
+
+**採用**: 既定は **P**、機密 graph は **C**。**B は要件が出てから**（等価/頻度
+漏洩は convergent の 35.12% と同種で、既定にするには漏れすぎる）。**S は未実装**
+なので、S を前提にした設計を今書かない。**F は 1 op あたり 23 秒**で、corpus が
+成長すると成立しない。
+
+### D4 — client 側暗号の実コストは暗号ではなく hops
+
+段 B/S/C の client 復号は 1 op あたり 0.94〜2.64 ms で、RTT 100〜150ms に対し
+**0.63〜1.73%**。つまり **client に寄せても CPU 的にはほぼ無料**。効くのは
+往復回数で、server が index を読めなくなると tree 降下が client に移り
+**hops が 2 → 3（+50ms @ RTT 50ms）**、GET が 2.8 倍になる。
+
+設計はここを最適化する: 段 C を採る graph では **client 側に index ノードを
+キャッシュ**して降下の往復を潰す（実測: cache=1000 で point-read の GET が
+2.04 → 0.74）。
+
+### D5 — suite は pqh-v1。convergent 暗号は使わない
+
+`pqh-v1`（X25519+ML-KEM-768 / Ed25519+ML-DSA-65）を封筒面の suite とする。
+**convergent 暗号は採らない** — 実測で tenant 間 35.12% の block が byte 同一に
+なり、server が重複を学習する。これは D1 の「持っていないものは漏らせない」に
+反する。per-tenant 鍵とし、**重複排除は捨てる**。
+
+### D6 — block sizing を pad bucket 直下に揃える
+
+長さ秘匿（padding）が実コストの主項で、AEAD の 0.23% に対し index block +34.0% /
+definition block +150.0%。**block target を 16,384 B 直下に揃えれば padding 比は
+ほぼ消える。** pad bucket の上限は 65,536 B で、それを超える block は
+`ciphertextBlob` 送りになり inline padding の経路を外れる。したがって
+**block sizing は 64 KiB を超えない**。
+
+### D7 — 移行は今日始める。遅延が支配項
+
+`90-docs/models/crypto-tradeoff-xmile.cljs`（露出 = classical のまま保持された
+量の時間積分）:
+
+| シナリオ | 露出@120mo | 何もしない比 |
+|---|---|---|
+| 何もしない | 158.31k MB·mo | 1.0000 |
+| 新規のみ PQ、legacy 放置 | 14.61k | 0.0923 |
+| **新規 PQ + legacy 再暗号化** | **67.14** | **0.0004** |
+| 24ヶ月後に着手（中身は同一） | 9.94k | 0.0628 |
+
+**やることが同一でも 24 ヶ月遅らせると露出は 148 倍。** 再暗号化は 56.23 MB/s
+なので現 corpus では数秒で終わり、**crypto は律速ではない**。高いのは着手を
+遅らせる判断そのもの。
+
+### D8 — columnar lake は射影面にのみ載る
+
+chunk の min/max 枝刈りに平文が要るので、**封筒面には原理的に作れない**。
+射影面に載せれば実測 20.7 倍（2 GET・512 行・5.23ms ↔ 16 GET・4,000 行・108.12ms、
+8 chunk 中 7 skip）。build は 46 PUT / 404,142 B / 281.82ms。
+projection として足すので `manifest/projection-verify.cljs verify` を gate に通す。
+
+## Consequences
+
+- (+) server 侵害の影響が「暗号文とアクセスパターンの露出」に閉じる。鍵が無い。
+- (+) 既存資産だけで組める。新規の暗号実装はゼロ。
+- (+) client 側 PQ は CPU 的にほぼ無料（RTT の 1% 未満）と実測で確定した。
+- (−) **封筒面には server 側 Datalog も columnar lake も無い。** クエリしたい
+  ものは射影面に出す設計判断が、graph ごとに毎回必要になる。
+- (−) 段 C は GET 2.8 倍・hops +1。client キャッシュで緩和するが消えない。
+- (−) 重複排除を捨てる（D5）。同一内容を複数 tenant が持てば複数回保管される。
+- (−) 射影面の非識別性は client の責任であり、server は検査しない。**射影の
+  設計を誤れば、暗号は無傷のまま PII が平文で出る。** これは構造上 server 側
+  では防げない。
+- (−) net-kotobase 本番は現在 server 可読（`SealedBlockStore` 系）で動いており、
+  この ADR は**現状の記述ではなく到達目標**である。移行は未着手。
+
+## 測っていないもの（この ADR の数字を読むときの限界）
+
+- **敵対者の harvest レートは実測が無いので掛けていない。** D7 の露出は
+  harvest レート非依存の積分（MB·月）で、実 harvest バイト = 露出 × 任意レート。
+  CRQC の到来時期もモデルに入れていない（日付非依存）。
+- **仮定であって実測でないもの**: 新規書込 20 MB/月、クエリ 1M ops/月、
+  mix 70/20/10、RTT 50ms。corpus 初期値は本番の *object 数* 8,601 が実測で、
+  バイト数は bench 平均 14,848 B/block からの**推定**（本番の実バイト数は未計測）。
+- **段 S（SSE）の hops 3 と増幅 1.0x は published shape からの見積もりで、
+  実装も実測も無い。** S を採るなら測り直すこと。
+- **ms は nbb/SCI インタプリタ上の値。**
+- **XMILE モデルの構造検証（`xmile.validate`）を走らせていない** — dsl-core が
+  `.kotoba` へ移行して `kotoba.dsl.problem` がどの runtime でも load できない
+  ため（ADR-2608071000、既知・accepted）。`xmile.execute` は通っている。
+
+## Follow-up
+
+1. net-kotobase `ADR-2606131600`（proposed）を本 ADR に合わせて accepted へ更新するか、
+   本 ADR を指す形に整理する。
+2. 射影面の第一実装を 1 つ選んで landed にする（`rirekisho` の cohort 面が最も近い）。
+3. columnar lake を射影面の projection として実装し `projection-verify` gate に通す。
+4. block sizing を 16 KiB 直下へ（D6）。64 KiB 超を禁じる検査を fleet gate に足す。
+5. 段 C の client 側 index キャッシュを実装して hops の実測を取り直す。
+
+## One-line summary
+
+**server は暗号文と CID の置き場でしかなく、機密性は client の鍵と計算で担保する。
+クエリは「封筒面（読めない）」と「射影面（何をクエリしたいか先に決めて非識別に
+平文投影）」の二面に分け、検索可能暗号は P/B/S/C/F の 5 段のうち既定 P・機密 C を
+採る（S は未実装なので前提にしない）。client 側暗号は 1 op あたり 1ms 弱で
+RTT の 1% 未満なので実コストは暗号ではなく往復回数であり、移行を 24 ヶ月遅らせる
+判断だけが露出を 148 倍にする。**
+"}]
