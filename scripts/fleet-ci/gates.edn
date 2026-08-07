@@ -447,4 +447,27 @@
   {:name "cloud-itonami-assoc-0126-idn-gapki" :id "gh-workflow-assoc-gapki"
    :gate :nbb-script
    :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc"] :min-files 5 :cd false}]}
+   :include-ext [".yml" ".edn" ".clj" ".cljc"] :min-files 5 :cd false}
+
+  ;; kotoba-lang/shell の in-app provider bridge。scaffold された .ipa/.apk が
+  ;; 自前で持つ provider 実装（Swift / Java）と、Clojure 側の宣言
+  ;; `bridge-provider-commands` の3者が一致していることを検査する。
+  ;;
+  ;; 片側だけ足す/消すと silent に壊れる: 宣言にあって実装が無い command は
+  ;; その platform でだけ `unknown-command` になり（policy 上は許可されている
+  ;; ので「許可されているのに動かない」）、実装があって宣言に無い command は
+  ;; policy asset の capabilities に載らず capability 単位の allow が効かなく
+  ;; なる。どちらもコードを読む限り自然に見える変更なので機械で押さえる。
+  ;;
+  ;; この repo の GitHub Actions（ci.yml）は 2026-08-04 を最後に無効化されて
+  ;; おり、それ以降の commit は gate を通っていない。実 xcodebuild/gradle と
+  ;; 実機起動までは fleet ノードに Xcode/Android SDK が要るのでまだ移せて
+  ;; いない —— ここが埋めているのは「両 native 半分の対称性」だけで、ビルドの
+  ;; 再現ではない。
+  ;;
+  ;; 落ちることを実測済み（2026-08-07）: Java 側の `case "notify/show"` を1つ
+  ;; 潰したコピーで exit 1 + 差分の名指し、空 tree でも exit 1（絞り込みミスを
+  ;; 「0対0で一致」と報告しない）、無改変で exit 0。
+  {:name "shell" :id "shell-native-bridge-parity" :gate :nbb-script
+   :script "gates/shell-native-bridge-parity.cljs"
+   :include-ext [".clj" ".swift" ".java"] :min-files 5 :cd true}]}
