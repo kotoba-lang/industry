@@ -96,24 +96,53 @@ server が持ってよいのは、暗号文ブロック・CID・ref・アクセ�
 | **P** | 射影面（平文・PII ゼロ） | full Datalog | 1.0x | 2 | 0 | 射影の中身のみ | **実装済み（3 例）** |
 | **B** | blind index（HMAC 決定的トークン） | 等価のみ | 1.0x | 2 | 0.944 | 検索パターン + アクセスパターン + **等価/頻度** | 今日作れる |
 | **S** | SSE（暗号化転置索引） | 等価 + 論理積 | 1.0x | 3 | 0.944 | 検索パターン + アクセスパターン | **未実装** |
-| **C** | opaque index + client 側 tree 降下 | 無し（blob 取得のみ） | **2.8x** | 3 | 2.643 | アクセスパターン + サイズ | 今日作れる |
+| **C** | opaque index + client 側 tree 降下 | 無し（blob 取得のみ） | **2.8x** | **2.04→0.70 実測** | 2.643 | アクセスパターン + サイズ | 今日作れる |
 | **F** | 全 client（corpus 丸ごと） | 無し | 1.0x | 1 | **23,462** | サイズのみ | corpus が小さい間だけ |
+
+**hops 列の出所**: 段 C だけが実測（`capability-bench/run-descent.cljs`、cache 0 → 100）。
+**段 P/B/S の hops は宣言値**で、まだ数えていない（D4 の訂正を参照 — 段 C も当初は
+宣言値 3 で、実測したら誤りだった）。段 S を採るならまず数えること。
 
 **採用**: 既定は **P**、機密 graph は **C**。**B は要件が出てから**（等価/頻度
 漏洩は convergent の 35.12% と同種で、既定にするには漏れすぎる）。**S は未実装**
 なので、S を前提にした設計を今書かない。**F は 1 op あたり 23 秒**で、corpus が
 成長すると成立しない。
 
-### D4 — client 側暗号の実コストは暗号ではなく hops
+### D4 — client 側暗号の実コストは暗号ではなく hops。ただし cache で hops は消える
 
 段 B/S/C の client 復号は 1 op あたり 0.94〜2.64 ms で、RTT 100〜150ms に対し
-**0.63〜1.73%**。つまり **client に寄せても CPU 的にはほぼ無料**。効くのは
-往復回数で、server が index を読めなくなると tree 降下が client に移り
-**hops が 2 → 3（+50ms @ RTT 50ms）**、GET が 2.8 倍になる。
+**0.63〜1.73%**。つまり **client に寄せても CPU 的にはほぼ無料**。効くのは往復回数。
 
-設計はここを最適化する: 段 C を採る graph では **client 側に index ノードを
-キャッシュ**して降下の往復を潰す（実測: cache=1000 で point-read の GET が
-2.04 → 0.74）。
+> **2026-08-07 訂正 — この節の当初の主張は実測で否定された。**
+>
+> 当初ここには「server が index を読めなくなると hops が 2 → 3（+50ms）」と書いた。
+> **これは宣言値であって実測ではなく、2 点とも誤りだった。**
+> `kotoba-lang/kotobase` の `capability-bench/run-descent.cljs`（`npm run bench:descent`）
+> が、依存往復を「降下パス上の cache miss」として**実際に数えた**結果:
+>
+> | client cache | hops/op（実測） | hit率 | cache=0 比 | @RTT 50ms |
+> |---|---|---|---|---|
+> | 0 | **2.04** | 0% | 1x | 102ms |
+> | 10 | 1.04 | 49.0% | 0.51x | 52ms |
+> | **100** | **0.70** | 65.7% | **0.34x** | **35ms** |
+> | 1,000 / 10,000 | 0.70 | 65.7% | 0.34x | 35ms |
+>
+> 1. **無キャッシュの降下は 3 ではなく 2.04。** height+1 という見積もりが誤り。
+> 2. **0.70 は 1 を下回る。** 完全に cache に載った降下は**ネットワークを 1 度も
+>    使わない**ので、opaque index を client が降下する方が、index を読める server に
+>    問い合わせる構成（必ず 1 往復かかる）より **latency 下限が低くなりうる**。
+>    「index を server から隠すと必ず 1 hop 増える」という直観は、この cache 量では
+>    成り立たない。
+> 3. **cache は約 100 block で飽和する**（1,000 でも 10,000 でも同一）。hit するのは
+>    クエリ間で共有される上位ノードで、数が少ない。**それ以上大きくしても何も買わない。**
+>
+> したがって段 C の設計指針は「hops 増を緩和する」ではなく **「100 block 程度の
+> client 側 index cache を必須要件にする」**。GET 増幅 2.8x（D3 の表）は
+> opaque index が range/prefix を attribute-range 走査に落とすことによるもので、
+> こちらは cache とは別要因なので残る。
+>
+> ネットワークは介在していない（hops × 自分の RTT で読むこと）。cache は LRU では
+> なく FIFO で、実際の client の hit 率はこれより高くなる。
 
 ### D5 — suite は pqh-v1。convergent 暗号は使わない
 
@@ -190,7 +219,10 @@ projection として足すので `manifest/projection-verify.cljs verify` を ga
 2. 射影面の第一実装を 1 つ選んで landed にする（`rirekisho` の cohort 面が最も近い）。
 3. columnar lake を射影面の projection として実装し `projection-verify` gate に通す。
 4. block sizing を 16 KiB 直下へ（D6）。64 KiB 超を禁じる検査を fleet gate に足す。
-5. 段 C の client 側 index キャッシュを実装して hops の実測を取り直す。
+5. ~~段 C の client 側 index キャッシュを実装して hops の実測を取り直す。~~
+   **✅ 完了 2026-08-07** — `capability-bench/run-descent.cljs`（`npm run bench:descent`）。
+   結果は D4 の訂正のとおり。**当初の hops=3 は誤りで、実測 2.04（無キャッシュ）→
+   0.70（cache 100 で飽和）**。残件: 段 P/B/S の hops はまだ宣言値のまま。
 
 ## One-line summary
 
