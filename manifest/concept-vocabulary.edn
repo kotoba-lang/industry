@@ -125,4 +125,38 @@ kotoba-lang/okugai が正本。収集は loop-okugai-survey。ADR-2608041500。"
   :spellings ["mapillary" "street level imagery" "streetview" "street view"
               "object detection" "map features" "ストリートビュー" "写真データ"]
   :note "kotoba-lang/com-mapillary-graph-api（Graph API v4、map_features の
-三角測量済み地物と detections）。OSM 側の地物は org-openstreetmap-overpass。"}}
+三角測量済み地物と detections）。OSM 側の地物は org-openstreetmap-overpass。"}
+
+ ;; 2026-08-07 追加。「今の cloud-itonami に防災関係の営みは設計実装されている?」に
+ ;; 索引が答えられなかった（`concept-lookup 防災` は『語彙に無い』、`repo-search` は
+ ;; 6 件しか出さず本命は別 org）。**4 本とも名前が機能を一文字も示さない** ——
+ ;; 備え(sonae) / 風折(kazaori) / 死出守(shidemori) / firerisk(COFOG 03.2)。
+ ;; しかも org（cloud-itonami / etzhayyim）と分類体系（COFOG / ISCO / ISIC）の
+ ;; 両方に散っている。統合設計は ADR-2608091000。
+ :disaster-management
+ {:label "防災 / disaster risk reduction・response（before / during / after）"
+  :spellings ["防災" "災害" "減災" "被災" "罹災" "避難" "避難所" "警報" "早期警戒"
+              "災害対策" "危機管理" "備え" "sonae" "kazaori" "shidemori" "bousai"
+              "disaster" "disaster management" "disaster risk reduction" "drr"
+              "preparedness" "early warning" "evacuation" "emergency"
+              "resilience" "hazard" "earthquake" "tsunami" "typhoon" "flood"
+              "wildfire" "地震" "津波" "台風" "洪水" "山火事"]
+  :note "フェーズで割れている。before=etzhayyim/com-etzhayyim-sonae（備え。警報発信元
+allowlist 20件/16法域を持つが cell は R0 で非実行）、during=com-etzhayyim-kazaori（風折。
+observational directory、宣言権は Council Lv6+）、after=com-etzhayyim-shidemori。
+実装があるのは cloud-itonami 側の断片: cloud-itonami-cofog-03.2（消防・火災リスク点検、
+ns=firerisk、:implemented）/ cloud-itonami-isic-4211 Slice 1（台風の作業中止判定と
+警報 dispatch、営み OS に接続済み）/ cloud-itonami-isco-5411（消防署の装備事務、
+pre-standard 形）。どれも公式警報・避難指示・緊急事態宣言・現場指揮の権威を持たない。
+統合設計は superproject ADR-2608091000。"}
+
+ :fire-protection
+ {:label "消防 / fire protection（火災リスク点検・消防署運営）"
+  :spellings ["消防" "消防署" "消防士" "火災" "火災予防" "延焼" "fire" "firefighter"
+              "fire protection" "fire brigade" "fire risk" "fire safety"
+              "firerisk" "firestation" "inspection"]
+  :note "cloud-itonami-cofog-03.2（COFOG 03.2、ns=firerisk。建物/植生の火災リスク点検
+ロボット ⊣ Fire-Risk Governor、:implemented、nbb で load 可）と
+cloud-itonami-isco-5411（ISCO 5411、ns=firestation。装備 readiness とシフトの事務のみ。
+突入・トリアージ・現場指揮は scope-excluded-ops で名指し除外）。
+災害対応そのものは :disaster-management を引く。"}}
