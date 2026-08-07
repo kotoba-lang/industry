@@ -1,0 +1,130 @@
+[{:db/id -1
+  :adr/id "2608090000"
+  :adr/doc_type "adr"
+  :adr/topic "shared-libs-between-the-two-itonami-surfaces"
+  :adr/title "cloud-itonami と cloud-itonami-app が独立に同じ判断を実装していた — 判断は kotoba-lang の責任単位 repo へ、機構は各面に残す"
+  :adr/status "accepted"
+  :adr/date "2026-08-07"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["2 つの itonami 面のあいだで何を共有し、何を各面に残すかの線引き"
+   "共有ライブラリを kotoba-lang のどの命名面に置くか（capability-* を使わない理由）"
+   "一度きりのリンクの寿命の判断の所在（kotoba-lang/one-time-link）"
+   "WebAuthn credential の assurance 判定の所在（kotoba-lang/webauthn）"]
+  :adr/supersedes []
+  :adr/related ["2608082000" "2608084000" "2607302145" "2608062000"]
+  :adr/repos ["kotoba-lang/one-time-link"
+              "kotoba-lang/webauthn"
+              "network-awai/cloud-itonami"
+              "cloud-itonami/cloud-itonami-app"]
+  :adr/body
+  "## オーナー指示（2026-08-07）
+
+『cloud-itonami-app と cloud-itonami で同じ lib を使えるように。共通 lib, uiux は
+kotoba-lang org 側に capability ごとに repo に分けて、責任ごとに分離、統合 import。』
+
+## `capability-*` は使えない
+
+先に名前の面を確定した。`kotoba-lang/capability-*`（約 50 repo）は**Kotoba の
+effect authority package** 族で、中身は `Atomic authority package for
+'http/fetch'` + semantic definition CID + hash contract CID + provider status。
+`manifest/repository-rules.edn` の `:name-prefix` taxonomy が機械検査している。
+
+汎用の共有ライブラリをここに入れると、意味の違う 2 つの族が 1 つの接頭辞に混ざる。
+共有ライブラリは **subject 面の bare 名**（`persona` / `word-id` / `sekisho` /
+`identity` / `authentication` と同じ）に置く。
+
+## 何が実際に重複していたか（実測、2026-08-07）
+
+推測でなく突き合わせた。
+
+### 一度きりのリンク — **二重実装**
+
+| | cloud-itonami-app（JVM） | cloud-itonami（Worker / CLJS） |
+|---|---|---|
+| 有効期限 | `email-login-seconds 600` | `email-login-ttl-ms (* 10 60 1000)` |
+| 冷却 | `email-login-cooldown-seconds 60` | `email-login-cooldown-ms (* 60 1000)` |
+| トークン | 32 byte CSPRNG | 32 byte CSPRNG |
+| 保存 | SHA-256 digest（平文は保存しない） | SHA-256 digest（同上） |
+| 応答 | 常に同じ（列挙耐性） | 常に同じ（列挙耐性） |
+
+**別々に書かれて、同じ結論に達していた。** 同じ結論なら 1 箇所にある方がよい ——
+別々である限り、片方だけ直る事故が構造的に起こりうる。
+
+### credential assurance — **片方にしか無い**
+
+app に `cloud.itonami.app.credential-assurance`（197 行、4 ns が利用）。
+edge には等価物が無く、`backup-eligible?`/`backup-state?` から復旧姿勢は出すが、
+**鍵が何を証明しているか**を言う仕組みが無かった。同じプロダクトの 2 つの面が
+パスキーの強さについて別々のことを言う状態。
+
+### UI/UX — **既に共有されていた**
+
+`jp-go-dds` は `jp-go-digital-design-system` の**別名**（`:local/root` が同じ
+repo を指している）で、2 つ目の DDS repo ではない。両面とも同じ基盤の上に居る。
+
+残っている差は共有ライブラリの不在ではなく **cloud-itonami が legacy スタック
+（`kotoba-ui` / `liquid-glass-ui` / `appkit` / `shitsuke`）をまだ retire して
+いないこと**で、これは移行であって抽出ではない（ADR-2608062000 が DDS を基盤と
+定めている）。**新しい UI repo は作らなかった** —— 作れば 3 つ目の UI 基盤に
+なるだけである。
+
+## 決めたこと
+
+| 置き場所 | 責任 | 動かしたもの |
+|---|---|---|
+| **`kotoba-lang/one-time-link`**（新規） | 一度きりのリンクの寿命の判断 | 両面から抽出 |
+| **`kotoba-lang/webauthn`** の `webauthn.assurance` | passkey が実際に何を証明しているか | app から移設（新規 repo を作らない） |
+
+**判断は共有面へ、機構は各面に残す。** `one-time-link` は乱数もハッシュも KV も
+メール送信も持たない。edge には `js/crypto` + KV が、app には `SecureRandom` +
+`state.edn` が残る。**この線引きは移植性のためではなく検査可能性のため** ——
+判断だけなら鍵も KV も無しに全経路を試せる。
+
+`webauthn.assurance` を新規 repo にしなかったのは、『WebAuthn credential が何を
+証明するか』が `webauthn` repo の主題そのものだから。repo を増やすことと責任を
+分けることは同じではない。
+
+### 共有ライブラリが消費側の形を知らないこと
+
+`policy-for` は configuration を掘るのをやめ、overrides を直接受け取るように
+変えた。共有ライブラリが『あるアプリが policy をどこに置くか』を知っていると、
+他のアプリも同じ場所に置かされ、**最初に違う置き方をしたものが自分の floor では
+なく既定値を静かに受け取る**。config の形は app 側に残した。
+
+## 実際に踏んだバグ（この分離が捕まえた）
+
+`one-time-link` の定数時間 digest 比較の初版は
+
+    (bit-xor (int (nth a i)) (int (nth b i)))
+
+で、JVM では正しい。**ClojureScript では `nth` が 1 文字の文字列を返し
+`(int \"a\")` が NaN になるため `bit-xor` が常に 0 になり、長さの同じ digest が
+全て一致した。** ブラウザと Worker でだけ壊れる。
+
+**初回の cljs 実行が捕まえた。** 共有ライブラリを両ホストでテストする規律が、
+最初の 1 コミットで元を取った形になる。もし edge 側に手書きで同じ比較を足して
+いたら、同じバグが誰にも見えないまま入っていた。
+
+## 残っている抽出候補（測ったもの、憶測ではない）
+
+- **account 状態機械**（`:initial` → `:enrolled` → `:disabled`、引換券の単回性、
+  ロックアウト）: edge の `cloud-itonami.account` に在り、app は同等物を
+  `identity.clj`（1,833 行）に埋め込んでいる。抽出には app 側の解体が要る。
+- **紐付いた連絡経路**（ADR-2608084000）: edge に在り、app は `:email` と
+  `:contact-email` の 2 フィールド。
+- **サインイン画面**: cloud-itonami に `site/signin.cljc` があり、app は
+  `web.clj`（2,258 行）の一部。`yakuwari-view` の形（表示モデル + クラス語彙の
+  hiccup、スタイルは消費側）が正しい雛形。**今回は作っていない** —— app 側の
+  取り分が小さく、共有化は de-duplication ではなく app の UI 再設計になる。
+
+## 検証
+
+| 対象 | 結果 |
+|---|---|
+| `one-time-link` | JVM 11 tests / 41 assertions、cljs 同数 |
+| `webauthn`（assurance 追加後） | JVM 24 / 62、cljs 18 / 53 |
+| `cloud-itonami-app`（ローカルのコピーを削除し共有面へ） | 本文の『検証』節を参照 |
+| `cloud-itonami`（発行経路を委譲） | 同上 |
+
+gate が落ちることも確認: `one-time-link` の期限境界を inclusive に倒すと 1 件落ちる。"}]
