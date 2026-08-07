@@ -1,0 +1,184 @@
+[{:db/id -1
+  :adr/id "adr-2608070100-kotobase-admin-console-repair-and-graph-database-naming"
+  :adr/topic "kotobase-admin-console-repair-and-graph-database-naming"
+  :adr/title "ADR-2608070100: /admin の 404 は退役名前空間への proxy だった、認証済みに login を促さない、query を配線し直す、graph database を capability で名指す(script 名は secret が読めず不可)"
+  :adr/status "accepted"
+  :adr/date "2026-08-06"
+  :adr/deciders ["Jun Kawasaki (+ Claude)"]
+  :adr/authoritative true
+  :adr/source-format "edn-only (ADR-2607171600)"
+  :adr/repos ["com-junkawasaki/root" "network-awai/net-kotobase"]
+  :adr/related ["adr-2608011200-kotobase-tenant-audit-log-and-admin-console"
+                "adr-2608011300-kotobase-enterprise-sso-oidc"
+                "adr-260726-kotobase-query-plane-is-one-ref"
+                "adr-2607260940-d1-storage-mode-proxy-bridge"]
+  :adr/verification "kotobase-api-gateway-cljs: clojure -M:test 99 tests / 598 assertions / 0 failures(clean な origin/main では 4 failures —— 同じ 4 test 名。本 ADR の catalog 修正で解消)。clojure -M:site-test 37 tests / 280 assertions / 0 failures。kotobase-graph-database: npm run test:cljs 234 tests / 679 assertions / 0 failures。npx shadow-cljs release worker(両 repo) 0 warnings。新規 site test 5 本は未修正/未配線の origin/main に対して先に走らせ、chrome 系 6 assertion・query 系 7 assertion が落ちることを確認してから landed とした。live 実測 2026-08-06: graph-database.kotobase.net /_health 200 / backend.kotobase.net /_health 200 /kotobase.net /health 200 / /admin 401(未認証) / xrpc datomic.q,datomic.datoms,kg.ingest すべて 401(auth に到達 = proxy 成立、5xx ではない)。未検証: 認証済みの実画面(Chrome 拡張が未接続でオーナー確認待ち)。"
+  :adr/known-gaps ["認証済み /admin の実画面は未確認。ブラウザ拡張が未接続だったため未認証の probe までしか到達していない。オーナーが /admin を再読み込みして、実数が出ること・Sign out が効くこと・query が走ることを確認する必要がある。"
+                        "Worker script 名 kotobase-cf-wasm-staging は改名できないまま。KOTOBA_SEED / KOTOBASE_B2_KEY_ID / KOTOBASE_B2_APP_KEY が Cloudflare の中にしか無く、kagi の両 vault に不在。解除は (1) オーナーが 3 値を kagi に保管、または (2) B2 -> R2 binding 移行(binding は資格情報を要さないので B2 の 2 件が消える。KOTOBA_SEED は残るのでこれだけでは足りない)。"
+                        "query workbench が deprecated な XRPC datomic.q に載っている。Sunset は 2026-11-01。恒久解は session が CACAO を提示できる経路を作り POST /api/q へ移すこと。未着手。"
+                        "org 面が admin console に無い。tenant -> org membership を答える経路が存在しないため、配線ではなく新規設計が要る。cloud-itonami の federation subject を org member として enroll する設計判断を含む。"
+                        "accountCreate は依然として退役名前空間へ proxy し 404 する。書き込みなのでローカルで答えるのは誤りと判断し本 ADR では触っていない。実利用者がいるかは未調査。"
+                        "backend.kotobase.net を叩いている 5 repo(kotobase-client / kotobase-commoncrawl-actor / toshokan / toshokan-patents / apps-gftdcojp)は未移行。alias はそれらが移るまで外せない。"
+                        "graph.sparql / graph.query / kg.query は宣言だけで実装が無い。console では意図的に出していない。"
+                        "clj-edge/ と worker/ に 5a6a55b の rename が置き去りにした tracked file が残っている(:legacy-pre-rename として catalog 済み、17 ファイル)。撤去は未着手。"]
+  :adr/primary-sources ["live 実測 2026-08-06: kotobase-graph-database/src の NSID grep が ai.gftd.apps.kotobase.datomic と .kg の 2 族のみを返す(404 の直接証拠)"
+                        "live 実測 2026-08-06: deployed /pricing が origin/main のビルド成果物と sha256 一致(5585ced24c389266) —— 本番 = main = west pin であることの確認"
+                        "live 実測 2026-08-06: wrangler secret list が production script に KOTOBA_SEED / KOTOBASE_B2_KEY_ID / KOTOBASE_B2_APP_KEY の 3 件を報告"
+                        "live 実測 2026-08-06: kagi get(live vault + repo-local vault) が KOTOBA_SEED_PRODUCTION / KOTOBA_SEED_TESTNET / KOTOBASE_B2_KEY_ID / KOTOBASE_B2_APP_KEY の 4 件すべてに no such item"
+                        "live 実測 2026-08-06: /org/cloud-itonami/members が {members: [], events: 0} を返す"
+                        "net-kotobase eb9af579(404 + chrome) / 63df259c(query workbench) / 098ae0d2(capability hostname)"
+                        "com-junkawasaki/root 3950b76(secrets-location-map の乖離訂正)"
+                        "Cloudflare Worker versions: net-kotobase 676048e9 -> 94451d1f -> 3ef307cf, kotobase-cf-wasm-staging e9ca90af"]
+  :adr/session-closed "2026-08-06"
+  :adr/body "## Context
+
+オーナーの報告(2026-08-06): 「https://kotobase.net/admin に passkey でアクセスしても
+`Could not load tenant data (HTTP 404). The values below are NOT zero — they are unknown.`
+と表示される。login 済みなのに login button が表示される。また datomic, sparql, cypher, sql
+などの viewer, query などが存在しない? kotobase の管理画面を neo4j や supabase のような
+管理機能と成熟度を比較。org 機能などは? cloud-itonami の org などと連携できている?」
+
+続けて「backend.kotobase.net が責任が分かりずらいので, capability に基づいた名称に refactor」
+「haisen(配線)」「kotobase-cf-wasm-staging も修正」。
+
+ADR-2608011200 が /admin をセッションの裏に入れて実データで埋めた回で、本 ADR はその直後に
+表面化した 2 つの欠陥の修正と、そこから派生した命名・配線・ブロッカーの記録である。
+
+## 実測で確定した 2 つの根本原因
+
+### 1. HTTP 404 — tenant データが無いのではなく、存在しない名前空間への proxy
+
+`worker/route-account-usage` は `KOTOBASE_STORAGE_MODE != b2` のとき(本番は `backend`)
+accountStatus/usageGet を `KOTOBA_BACKEND_URL` へ転送する。`core/to-backend-nsid` は
+`datomic.*` と `kg.*` 以外を `com.etzhayyim.apps.kotobase.*` へ書き換える —— 2026-06-24 に
+退役した Kubernetes kotoba pod の名前空間である。現 backend(kotobase-graph-database)が
+実装している NSID 族は 2 つだけ:
+
+    $ grep -rho '\\\"ai\\\\.gftd\\\\.apps\\\\.kotobase[^\\\"]*\\\"' kotobase-graph-database/src
+    \\\"ai.gftd.apps.kotobase.datomic\\\"
+    \\\"ai.gftd.apps.kotobase.kg\\\"
+
+つまり誰も答える予定の無いルートに投げ、`upstream-json-response` が upstream の 404 を
+そのまま透過していた。`to-backend-nsid` の docstring 自身が「この書き換えは無条件に 404 する」
+と既に書いており、`datomic.`/`kg.` だけ直して account/usage が取り残されていた。
+
+**決定: edge で答える。** plan/quota/subscription は本番に bound 済みの TENANT_STATE KV に
+あるので実値。pin/byte は Worker-B2 モード以外では読めないので **0 ではなく省略**し
+`counts_available: false` を明示する。console の `num`/`bytes` は欠損を `—` に描画済み。
+読めなかった値を 0 と描く console は「0 が実測」と教えてしまい、quota アラームが最も
+誤ってはいけない読みになる。`overlay-tenant-state!` も欠損 count から metrics を導出しない。
+`accountCreate` は書き込みなので proxy のまま(ローカルで答えると起きていない provisioning
+side effect を報告することになる)。
+
+### 2. login button — ビルド時生成のページは cookie を読めない
+
+`site-chrome/links` が `Log in` / `Get started free` を無条件描画し、誰も切り替えていなかった。
+ただし `/admin` は `route-admin` が viewer を解決した後にしか配信されない(未認証は 401、
+実測済み)ので、**そのページに限れば認証済みは経路の事実**である。
+
+**決定: 状態を request 単位ではなく document 単位で持つ。** `header`/`footer` に `:authed?`
+を追加し、Worker が session の裏に置くページだけが渡す。gate の無いページは signed-out の
+まま —— それらにとって正直な答えは「不明」だから。authed 版は `Console` + 実際に効く
+`Sign out`(authn の `POST /v1/logout` でサーバ側失効してから離脱。client-side redirect だけでは
+共有端末に生きた session が残る)。origin は /signup と同じ `{{AUTHN_URL}}` slot 経由なので
+document は hostname を持たない。
+
+## Query workbench の配線 — なぜ deprecated な面に繋いだか
+
+`datomic.q` はずっと生きていた。console が呼ぶのをやめていた(2026-08-01 の DDS 書き直しで
+kotoba-ui 版にあった workbench が落ちた)。
+
+**決定: XRPC `datomic.q`。official Client API の `POST /api/q` ではない。**
+`client-api/handle` は viewer を解決せず caller の `Authorization` を D1 Worker へ透過する
+= CACAO 認証。ブラウザは `gftd_session` cookie しか持たない。XRPC は `proxy/resolve-viewer`
+を通り(accountStatus/usageGet と同じ経路)、`viewer-permitted?` が session viewer に
+`data:read` を与える。**XRPC が優れているのではなく、この document が認証できる唯一の面。**
+Deprecation/Sunset(2026-11-01)は card に明記した —— レスポンスヘッダで気付かせない。
+
+**SPARQL / Cypher は意図的に置かない。** `graph.sparql` / `graph.query` は edge の READ 集合に
+居るが、`to-backend-nsid` が `graph.*` を退役 pod の名前空間へ書き換え、実装が存在しない。
+ボックスを置けば必ず 404 するボタンになる。card で名前を挙げて「使えない」と書いた ——
+空の console からは「ここに SPARQL は無い」と「SPARQL を忘れた」が同じに見えるため。
+
+## capability による命名 — hostname は加算的に、script は不可
+
+`backend` は *他の何かに対する関係* を言っていて、それ自体が何かを言っていない。しかも
+「1 つある」ように読めるが、edge は 3 つに proxy する(ここの graph database、
+`KOTOBASE_D1_URL` の Client API、`inga-replica` の head plane)。component の他の部分は
+2026-08-02 の 5a6a55b で既に capability 名になっており(ディレクトリ・R2 バケット・バンドル)、
+**hostname だけが旧名のまま残り、しかもそれが他 repo から見える唯一の部分**だった。
+
+**決定: `graph-database.kotobase.net` を canonical、`backend.kotobase.net` を deprecated alias
+として両方 serve する。** 旧名は repo の外で load-bearing(kotobase-client /
+kotobase-commoncrawl-actor / toshokan / toshokan-patents / apps-gftdcojp の 5 つ)。切り替えれば
+DNS レコード 1 本を節約するために 5 consumer を黙って壊す。env は
+`KOTOBASE_GRAPH_DATABASE_URL` を canonical とし `KOTOBA_BACKEND_URL` を fallback に残す ——
+礼儀ではなく、**どちらも無いと `kotoba-backend-base-url` は `http://localhost:8080` を返す**ので
+deploy を 1 つ取りこぼした改名が失敗せず tenant トラフィックを静かに虚無へ流すため。
+throw される文字列は `KOTOBA_BACKEND_URL` のまま残した(security/supply-check と
+auth_fallback_test が逐語で assert している。値の改名と契約の改名は別の変更)。
+
+**deploy 順序は graph-database → gateway。** 逆順はまだ存在しない hostname に edge を向ける。
+
+## Worker script 名の改名は不可能 — secret が Cloudflare の中にしか無い
+
+`kotobase-cf-wasm-staging` は runtime 名 + 間違った環境名で本番を配信している。しかし
+Cloudflare の Worker secret は **per-script かつ write-only** で、script 名を変えると別 script が
+生まれ secret は移らない。この script が持つ 3 件(実測): `KOTOBA_SEED`(本番 operator Ed25519
+seed、IPNS head に署名) / `KOTOBASE_B2_KEY_ID` / `KOTOBASE_B2_APP_KEY`。
+
+`secrets-location-map` は `KOTOBA_SEED_PRODUCTION` / `KOTOBA_SEED_TESTNET` / `KOTOBASE_B2_*` が
+kagi の `net-kotobase` compartment にあると書いていたが、**4 件とも live vault
+(`KAGI_HOME=$HOME/.kagi`)と repo-local vault の両方で `no such item`**(識別子を狙い撃ちで
+確認、列挙はしていない —— 安全床(7))。`MURAKUMO_GENERATION_TOKEN_SECRET` /
+`MURAKUMO_CHAT_TOKEN_SECRET_2` / `itonami-marketplace-kotobase-seed` に続く 4 例目の乖離。
+
+**`KOTOBA_SEED` は資格情報であると同時に identity である。** 別の seed は別の operator DID で、
+content-addressed graph の名前空間ごと変わる —— 障害ではなくデータ面の同一性の変更であり、
+「壊れたら再発行」で済む種類ではない。agent が推測・再生成して代替してはならない。
+
+**決定: 改名しない。** testnet での予行演習も却下した —— testnet の seed も同様に不在で、
+壊せば testnet の operator identity と graph 名前空間、SLO の `:testnet-read-reference` を失う。
+不可逆性は同じで、本番が進められない以上得るものがない。`kotobase-graph-database/wrangler.jsonc`
+の R2 セクションが「That is what blocked kotobase-cf-wasm-staging from becoming
+net-kotobase-engine」と既に書いており、過去にも同じ壁で止まっている。DEPLOY.md と
+secrets-location-map に制約と解除経路を記録した。
+
+## 副産物 — component catalog の gate が動いていなかった
+
+`clojure -M:render-components` が例外で落ち、digest 台帳を再生成できず、clean な
+`origin/main` で `component_test` が 4 failure だった(ADR-2608011200 の verification が
+「既存 3 failure」と記録していたものの後継)。原因は `inga-replica` と
+`kotobase-index-prolly-standalone` が分類器に無く、さらに 5a6a55b の capability rename が
+`clj-edge/` と `worker/` に tracked file を置き去りにしていたこと。後者は
+`:legacy-pre-rename` として **数えられる形**で残した —— 置き換えた component に畳み込むと
+取り残しが見えなくなる。
+
+## 成熟度 — Neo4j Browser / Supabase Studio との比較(オーナーの問いへの回答)
+
+課金・監査・content-addressed 履歴では対等以上、「データベースを触る」中核操作で未達だった。
+本 ADR の配線で query は入った。残る差は org/seats/roles(下記 gap)と SSO/SCIM(未実装、
+console 自身が『Not here yet』で申告済み)、schema 閲覧、結果の graph ビュー。
+
+## org と cloud-itonami 連携の現在地
+
+org 面は実在し live(`/org/<org>/did.json` と `/org/<org>/members` が 200、registry に
+cloud-itonami 含む 7 org)。ただし `capabilityInvocation: []` / `events: 0` で **誰も enroll
+されておらず**、admin console に org 面が無い。console に出すには「この viewer はどの org に
+属するか」を答える経路が要るが存在しない(member は did:key の配列、registry は静的、
+tenant は別 DID で、両者を結ぶ索引が無い)。全 tenant に 7 org を並べるのは誤り。
+
+cloud-itonami 側の federation は実在する(`kotobase_federation.clj` が `authn.kotobase.net` を
+audience に CACAO assertion を発行。WebAuthn P-256 は Ed25519 CACAO を署名できないので
+ローカル passkey session 後に短命 assertion を署名する設計)。**繋がっていないのは kotobase 側の
+org member 面** —— federation で来た subject が org member として現れる経路が無い。
+これは配線ではなく新規の membership lookup で、設計判断を伴うため本セッションでは着手していない。
+
+## Consequences
+
+- /admin は tenant の実数を表示し、認証済みに login を促さなくなり、query を実行できる。
+- 外から見える名前はすべて capability 名になった。旧名は alias として生き続ける。
+- XRPC datomic の Sunset(2026-11-01)が console のカウントダウンになった。session が CACAO を
+  提示できる経路が無いと、その日に workbench は動かなくなる。
+- component catalog の gate が再び走るようになった(生成物の手編集を捕まえられる)。
+"}]
