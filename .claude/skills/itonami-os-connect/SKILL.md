@@ -172,6 +172,22 @@ diverged なら触らない** —— pin の clean な worktree を作り、兄�
   収まらないなら**接続しない**で、tick の `:candidates` から次を採る。
 - **境界を跨ぐ連携に `:invoke` を書かない。** 書くと `wiring/compile-rules` が
   load 時に throw する（ADR-2607131000 の機械化）。落ちたら宣言が間違っている。
+- **境界が空でも `:invoke` を書けるとは限らない。** `compile-rules` を通ることと
+  実際に動くことは別。受け手の governor が『対象が**自分の台帳で**独立に登録・
+  検証済みであること』を要求するなら、`:mint-from-rule` が作る新しい主体は
+  受け手の store に存在しないので**必ず hold する** —— 面には「繋がっているのに
+  何も通らない」という一番わかりにくい形で出る。実測 2026-08-07: 5210→5229 を
+  `:invoke` で書いたら、mint された `custody-transfer->forwarding-record:tank-1`
+  が 5229 の台帳に無く `:shipment-unverified` で落ち続けた。**受け手が intake 系の
+  op（自分で record を作る op）を持っていなければ `:carry`** にする。判断材料は
+  「受け手はこの主体を自分で作れるか」の 1 点。
+- **繋ぐ前に、その actor が `:subject` を使っているか確かめる。** `standard/->request`
+  が作るのは `{:op op :subject subject}` で、接続済みの vertical はすべてこの形。
+  `:target-id` など別の名前で主体を受け取る actor をそのまま繋ぐと、キーが nil の
+  まま governor の第 1 検査に入り、**登録・検証済みの対象でも全 op が hold する**
+  （実測 2026-08-07: isic-5229）。`grep ':keys \[op ' <repo>/src/*/governor.clj*`
+  で 1 秒で分かる。翻訳を shim に書くのは可（判断は書かない）だが、**不適合として
+  ledger と shim の docstring に必ず残す** —— 恒久的には actor 側が寄せる番。
 - **`:invoke` を書くなら `:wiring/subject :mint-from-rule` を必ず添える。**
   無いと load 時に落ちる（実行時に必ず `:malformed-request` で拒否されるものを
   宣言できてしまわないため）。
