@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 22265, "kotobase-cf-wasm-staging" 42952},
+ {"net-kotobase" 22282, "kotobase-cf-wasm-staging" 43027},
  :zone
- {:requests-7d 62985,
-  :pageviews-7d 1429,
-  :uniques-7d-sum 1266,
+ {:requests-7d 63050,
+  :pageviews-7d 1430,
+  :uniques-7d-sum 1269,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 1533}
-   {:path "/_health", :requests 1511}
+  [{:path "/health", :requests 1547}
+   {:path "/_health", :requests 1526}
    {:path "/", :requests 82}
    {:path "/api/funnel", :requests 26}
-   {:path "/robots.txt", :requests 19}
+   {:path "/robots.txt", :requests 17}
    {:path "/llms.txt", :requests 6}
-   {:path "/pricing", :requests 6}
-   {:path "/sign-in", :requests 5}],
-  :status-mix {:client-error 3386, :ok 3217},
+   {:path "/sign-in", :requests 5}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 4}],
+  :status-mix {:client-error 3415, :ok 3239},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
  :as-of "2026-08-07",
  :traffic-quality {:window "24h", :probe-4xx-pct 51, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 1533 · /_health 1511 · / 82 · /api/funnel 26 · /robots.txt 19 | 4xx(probe) 51%",
- :funnel {:visitors 2423, :signups 13, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 1547 · /_health 1526 · / 82 · /api/funnel 26 · /robots.txt 17 | 4xx(probe) 51%",
+ :funnel {:visitors 2424, :signups 13, :checkouts 0},
  :signal
- "kotobase.net 実測 62985 req/7d・1266 uniques(日次和)・うち4xx probe 51%(24h)、workers 65217 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 63050 req/7d・1269 uniques(日次和)・うち4xx probe 51%(24h)、workers 65309 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 892},
+ {:visitors {:openai-ads 3, :organic 893},
   :signups {:organic 10}, 
   :checkouts {}}}
