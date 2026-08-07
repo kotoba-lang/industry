@@ -262,6 +262,61 @@
                       (:licence/kyoninka-procedure lic)
                       (assoc :permit/kyoninka-procedure (name (:licence/kyoninka-procedure lic))))))})))
 
+
+;; ── 手続きそのもの（kotoba-lang/kyoninka）────────────────────────────────────
+;;
+;; ADR-2608080000 の「次の 1 手」。あちらの schema を実データに合わせ、法域軸と
+;; 通貨中立な手数料を足したので（kyoninka be342c4）、手続き側も同じ面に載る。
+;;
+;; **要件側とは別の entity。** 要件（何が要るか）と手続き（どう取るか）は別の
+;; 事実で、混ぜると「引用付きの要件」の件数に手続きが紛れ込む。
+;; `:procedure/id` で `:permit/kyoninka-procedure` と結合する。
+;;
+;; 複合値（`:procedure/fee` / `:procedure/standard-period-days`）は**スカラに割って
+;; 載せる** —— map のまま 1 属性にすると「¥19,000 の手続きを探す」が書けない。
+;; `:verify` は落とさず `*-verify` に残す（改定されうる標準値だと分かるように）。
+
+(defn- kyoninka-procedures []
+  (let [dir (str root "/orgs/kotoba-lang/kyoninka/src/kyoninka")]
+    (if-not (.existsSync fs dir)
+      {:found false :rows []}
+      {:found true
+       :rows
+       (vec (for [f (ls dir)
+                  :when (str/ends-with? f ".cljc")
+                  :let [src (slurp* (str dir "/" f))
+                        p (when src (lit/read-def-literal src "procedure"))]
+                  :when (and (map? p) (not (lit/error? p)) (:procedure/id p))]
+              (let [fee (:procedure/fee p)
+                    per (:procedure/standard-period-days p)
+                    verify-str (fn [m] (when-let [v (:verify m)] (:how v)))]
+                (cond-> {:procedure/id (name (:procedure/id p))
+                         :procedure/source-repo "orgs/kotoba-lang/kyoninka"
+                         :source/dataset "permits"}
+                  (:procedure/name p) (assoc :procedure/name (:procedure/name p))
+                  (:procedure/law p) (assoc :procedure/law (:procedure/law p))
+                  (:procedure/authority p) (assoc :procedure/authority (:procedure/authority p))
+                  (:procedure/window p) (assoc :procedure/window (:procedure/window p))
+                  (:procedure/jurisdiction p) (assoc :procedure/jurisdiction (:procedure/jurisdiction p))
+                  (:amount fee) (assoc :procedure/fee-amount (:amount fee))
+                  (:currency fee) (assoc :procedure/fee-currency (:currency fee))
+                  (:kind fee) (assoc :procedure/fee-kind (str (:kind fee)))
+                  (verify-str fee) (assoc :procedure/fee-verify (verify-str fee))
+                  (:value per) (assoc :procedure/standard-period-days (:value per))
+                  (verify-str per) (assoc :procedure/standard-period-verify (verify-str per))
+                  (:procedure/valid-years p) (assoc :procedure/valid-years (:procedure/valid-years p))
+                  (seq (:procedure/steps p)) (assoc :procedure/step-count (count (:procedure/steps p)))
+                  (seq (:procedure/documents p)) (assoc :procedure/document-count (count (:procedure/documents p)))
+                  ;; **人が動く step の数。** この library は提案するだけで実行しない、
+                  ;; という性質を query から見えるようにする。
+                  (seq (:procedure/steps p))
+                  (assoc :procedure/human-step-count
+                         (count (filter :step/requires-human (:procedure/steps p))))
+                  (seq (:procedure/legal-questions p))
+                  (assoc :procedure/open-legal-questions
+                         (count (remove #(= :settled (:question/status %))
+                                        (:procedure/legal-questions p))))))))})))
+
 ;; ── 走る ────────────────────────────────────────────────────────────────────
 
 (defn -main []
@@ -269,7 +324,10 @@
         results (mapcat scan-repo repos)
         by (group-by :outcome results)
         lo (licensed-operator-rows)
-        rows (into (vec (mapcat :rows (:rows by))) (:rows lo))
+        procs (kyoninka-procedures)
+        rows (-> (vec (mapcat :rows (:rows by)))
+                 (into (:rows lo))
+                 (into (:rows procs)))
         links (kyoninka-links)
         juris (->> rows (keep :permit/jurisdiction) distinct sort vec)
         non-juris (->> rows (remove :permit/jurisdiction) (map :permit/subject-key) distinct count)
@@ -308,7 +366,12 @@
          :coverage/known-iso3 (count known-iso3)
          :coverage/licensed-operator-rows (count (:rows lo))
          :coverage/kyoninka-linked-rows
-         (count (filter :permit/kyoninka-procedure rows))}
+         (count (filter :permit/kyoninka-procedure rows))
+         :coverage/procedures (count (:rows procs))
+         ;; 橋が両側に渡っているか。片側だけなら結合は宣言だけで辿れない。
+         :coverage/procedures-reachable
+         (let [ids (into #{} (map :procedure/id) (:rows procs))]
+           (count (filter #(contains? ids (:permit/kyoninka-procedure %)) rows)))}
         ;; 結合の可否そのものをデータにする（ADR-2608080000）
         joins
         [{:join/id "permit->kyoninka-procedure"
@@ -378,6 +441,10 @@
           (println "  対象外:" (:coverage/excluded coverage))
           (println "  licensed-operator（手続きへの橋）:" (count (:rows lo)) "行、"
                    "うち kyoninka 手続きを指すもの"
-                   (count (filter :permit/kyoninka-procedure rows)) "行")))))
+                   (count (filter :permit/kyoninka-procedure rows)) "行")
+          (println "  kyoninka の手続き:" (count (:rows procs)) "本、"
+                   "橋が両側に渡っているもの"
+                   (let [ids (into #{} (map :procedure/id) (:rows procs))]
+                     (count (filter #(contains? ids (:permit/kyoninka-procedure %)) rows))) "本")))))
 
 (-main)

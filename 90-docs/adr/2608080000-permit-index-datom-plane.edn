@@ -123,16 +123,49 @@ USA が 304 行に見えても実体は少数の制度の再掲（実測: 545 �
      [?e \"permit/legal-basis\" ?law] [?e \"permit/window\" ?win] [?e \"permit/fee-jpy\" ?fee]]
     ;; → JPN 古物商許可 / 古物営業法第3条 / 管轄警察署（防犯係）/ 19000 / kobutsu-marunouchi
 
+## 手続き側も同じ面に載せた（2026-08-07 追記）
+
+当初この ADR は『kyoninka は多法域を表現できないので手続き側は載せない』と書いた。
+その前提を潰してから載せた。
+
+**kyoninka 側で直したこと**（kyoninka `be342c4`）:
+
+- `:procedure/jurisdiction`（ISO3）を宣言し、両手続きに JPN を入れた。
+  国より細かい単位（都道府県）は `:procedure/window` が持つ —— **窓口は法域ではない**。
+- `:procedure/fee-jpy` を `:procedure/fee-{amount,currency,kind,verify}` に割った。
+  通貨を属性名に焼くと、日本以外を収録した瞬間に嘘になる。
+- 未宣言だった 4 族（`:document/* :requirement/* :step/* :question/*`）と 6 属性を宣言した。
+
+**なぜずれていたか**: `schema/schema` は src からも test からも**一度も参照されて
+いなかった**。実装が動いていても宣言だけが古くなり、しかも外からは
+『Datomic 互換 schema がある』と読める。直すだけでは同じことが起きるので、
+双方向の一致検査（`schema_test.cljc`、23 tests）を足した。片方向だと使われなく
+なった宣言が残り続ける —— それがまさに `:procedure/fee-jpy` の状態だった。
+
+**その検査は書いた直後に写し間違いを 3 件捕まえた**（実データは
+`:requirement/blocking?` で `blocking` ではない、kobutsu は `:procedure/categories`
+で sanpai は `:procedure/waste-categories`）。gate が落ちることも確認した
+（属性を 1 個改名すると双方向とも FAIL、戻すと green）。
+
+**射影の側**: `:procedure/*` entity として同じ dataset に載せる（要件とは別 entity。
+混ぜると『引用付きの要件』の件数に手続きが紛れ込む）。複合値はスカラに割り、
+`:verify` は `*-verify` に残す。人が動く step 数（`:procedure/human-step-count`）と
+未決の法的論点数（`:procedure/open-legal-questions`）も出す —— この library が
+『提案するだけで実行しない』性質を query から見えるようにするため。
+
+要件から手続きまで 1 クエリで降りられる（実測 2026-08-07）:
+
+    古物商許可 / 古物営業法 第3条 / 丸の内警察署 生活安全課 防犯係 / 19000 JPY / 40 日 / 人が動く step 5
+    産業廃棄物収集運搬業許可 / 廃棄物処理法 第14条第1項 / 東京都環境局 / 81000 JPY / 60 日 / 5
+
+`:coverage/procedures-reachable` が**橋が両側に渡っている本数**を申告する ——
+片側だけなら結合は宣言だけで辿れない。実測 2/2。
+
 ## 正直な限界
 
 1. **手続き側は日本の 2 本しか無い。** `kotoba-lang/kyoninka` の収録は
    産廃収集運搬業許可と古物商許可のみ。橋は 27 行中 2 行しか渡っていない。
-2. **`kotoba-lang/kyoninka` は多法域を表現できない。** schema に法域属性が 1 つも
-   無く、`:procedure/fee-jpy` で通貨が型に焼かれている。さらに schema と実データが
-   3 点で不整合（`fee-jpy` 未使用 / `standard-period-days` は long 宣言なのに実データは
-   map / documents 等 6 属性が未宣言）で、**このままでは datom 面に載らない**。
-   手続き側を面に載せるには、まずあちらの schema を実データに合わせ、法域軸を
-   足す必要がある —— 別の決定なのでこの ADR では触っていない。
+   法域軸は入ったので、日本以外を収録する準備はできた（収録そのものは別作業）。
 3. **`regulatory-tracker` と `isco-3354` は規制データ 0 件・消費者 0 件。**
    実装はあるがデータが無いので、繋ぐものが無い。
 4. **状態機械の語彙が 2 系統ある。** kyoninka（`:preparing :granted`）と
@@ -146,7 +179,7 @@ USA が 304 行に見えても実体は少数の制度の再掲（実測: 545 �
 
 ## 次の 1 手
 
-`kotoba-lang/kyoninka` の schema を実データに合わせ、法域軸（`:procedure/jurisdiction`）と
-通貨中立な手数料（`:procedure/fee` + `:procedure/fee-currency`）を足す。そこまで行けば
-手続き側も同じ datom 面に載り、`(iso3, sector)` で要件と手続きが両方向に引ける。
+手続きの収録を日本の 2 本から増やす。法域軸と通貨中立な手数料は入ったので、
+2 本目以降は data を足すだけで面に載る。優先は要件側の行数が多い法域と、
+既に橋のある sector。
 "}]
