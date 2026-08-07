@@ -124,7 +124,25 @@ repo を指している）で、2 つ目の DDS repo ではない。両面とも
 |---|---|
 | `one-time-link` | JVM 11 tests / 41 assertions、cljs 同数 |
 | `webauthn`（assurance 追加後） | JVM 24 / 62、cljs 18 / 53 |
-| `cloud-itonami-app`（ローカルのコピーを削除し共有面へ） | 本文の『検証』節を参照 |
-| `cloud-itonami`（発行経路を委譲） | 同上 |
+| `cloud-itonami-app`（ローカルのコピーを削除し共有面へ） | 1,201 tests / 4,895 assertions、0 failures / 0 errors |
+| `cloud-itonami`（発行経路を委譲、edge cljs） | 478 / 1,326、0 / 0 |
 
-gate が落ちることも確認: `one-time-link` の期限境界を inclusive に倒すと 1 件落ちる。"}]
+gate が落ちることも確認: `one-time-link` の期限境界を inclusive に倒すと 1 件落ちる。
+
+## 着地（2026-08-07 closing 時点）
+
+| repo | main に含まれる commit | 何が入ったか |
+|---|---|---|
+| `kotoba-lang/one-time-link` | `0580376` | 新規 repo |
+| `kotoba-lang/webauthn` | `15b2610` | `webauthn.assurance` |
+| `network-awai/cloud-itonami` | `abd68b0` | 発行経路を委譲 |
+| `cloud-itonami/cloud-itonami-app` | `aa0b1b3` | ローカルのコピーを削除 |
+| `com-junkawasaki/root` | `0ebd007` | この ADR + west 登録 + pin |
+
+west 登録済み（`manifest/repos.edn` の `:extra-projects` と `west.yml` の
+`one-time-link` entry）。`west-orphan-audit --blocking` は
+`local-root-broken (blocking): 0` で exit 0。
+
+**この時点で検証されていないこと。** どちらの共有ライブラリも**本番で実行された
+記録が無い**。テストは両ホストで通っているが、`itonami.cloud` に deploy して
+リンクを 1 本通した証拠はまだ無い。次の一手はそれ。"}]
