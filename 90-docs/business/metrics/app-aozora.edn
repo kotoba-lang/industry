@@ -1,34 +1,34 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 23599,
-  "app-aozora-appview" 12661,
-  "app-aozora-spa" 5814},
+ {"app-aozora-pds" 23670,
+  "app-aozora-appview" 12720,
+  "app-aozora-spa" 5818},
  :zone
- {:requests-7d 1016240,
-  :pageviews-7d 4643,
-  :uniques-7d-sum 891,
+ {:requests-7d 1022580,
+  :pageviews-7d 4647,
+  :uniques-7d-sum 895,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 937718}
+  [{:path "/v1/datoms", :requests 937473}
    {:path "/federation-pilot/did.json", :requests 112}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
     :requests 66}
-   {:path "/hito-diag-fed/did.json", :requests 61}
-   {:path "/hito-federates/did.json", :requests 55}
+   {:path "/hito-diag-fed/did.json", :requests 58}
+   {:path "/hito-federates/did.json", :requests 56}
    {:path "/minidrama-fedtest/did.json", :requests 54}
    {:path "/hito-verify-clean/did.json", :requests 48}
    {:path
     "/bafyreigzmueqzvsysrubevz2d3cgfigfx5eu3gdpqvclbafgd6amtxn7me",
     :requests 46}],
-  :status-mix {:client-error 16655, :ok 939671, :server-error 4242},
+  :status-mix {:client-error 16613, :ok 939420, :server-error 4308},
   :window "24h"},
  :as-of "2026-08-07",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 937718 · /federation-pilot/did.json 112 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 66 · /hito-diag-fed/did.json 61 · /hito-federates/did.json 55 | 4xx(probe) 2% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 937473 · /federation-pilot/did.json 112 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 66 · /hito-diag-fed/did.json 58 · /hito-federates/did.json 56 | 4xx(probe) 2% · 5xx 0%",
  :signal
- "aozora.app 実測 1016240 req/7d・891 uniques(日次和)・うち4xx probe 2%(24h)、workers 42074 inv/7d"}
+ "aozora.app 実測 1022580 req/7d・895 uniques(日次和)・うち4xx probe 2%(24h)、workers 42208 inv/7d"}

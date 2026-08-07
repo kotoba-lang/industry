@@ -1,0 +1,139 @@
+[{:db/id -1
+  :adr/id "2608071000"
+  :adr/title "ADR-2608071000: GLEIF の取り込みを murakumo fleet ノードの常駐 cell に移し、LEI universe を実測したコストで tier に分ける"
+  :adr/status "accepted"
+  :adr/decided "2026-08-07"
+  :adr/deciders ["Jun Kawasaki (オーナー指示「murakumo.cloud のセルに載せ替えて、projection を 339 万社側」)"]
+  :adr/tags ["gleif" "murakumo" "cell" "query-plane" "lei" "projection" "datascript"]
+  :adr/links ["adr-2608012000" "adr-2608031900" "adr-2608044000" "adr-2608042000"
+              "adr-2607252000" "adr-2608039700" "adr-260726-kotobase-query-plane-is-one-ref"]
+  :adr/body "## 背景
+
+オーナー指示（2026-08-07）「murakumo.cloud のセルに載せ替えて、projection を
+339 万社側」。直前の実測で分かっていたこと:
+
+- LEI catalog loop はラップトップの LaunchAgent で回っており、**6h 間隔なのに
+  2026-08-06T10:33Z から 17 時間発火していなかった**（sleep）。
+- ADR-2607182400 が計画した murakumo cell は `:cell/id` として fleet-db に
+  1 件も登録されておらず、**実行されていなかった**。
+- ADR-2608012000 が作ったはずの 3.4M 社 corpus は `~/.cache/gleif` ごと
+  **消えていた**。面に載っていた GLEIF 法人は 2,756 社（ADR-2608031900 が
+  同じことを別の角度で指摘している）。
+
+## 決定
+
+### D1. GLEIF の取り込みは murakumo fleet ノードに常駐する cell が行う
+
+`com-junkawasaki/org-gleif-projections` の `deploy/gleif-cell.cljs`。judah
+（10 core / 16 GB / 76 GB 空き）で日次に走り、当日 publish の Golden Copy を
+取り込んで projection を push する。
+
+**なぜノードか。** 入力が大きく（LEI2 zip 475 MB・corpus 1.2 GB）、重く
+（3,396,479 行の CSV→EDN は単一プロセスで約 68 分、8 shard 並列で約 3 分・実測）、
+そして**毎日**来る。ラップトップに置いた同じ仕事は、実際には保たなかった。
+
+**常駐機構は LaunchAgent でも cron でもなく LaunchDaemon。** judah は
+console user が root の headless ノードで Aqua セッションが無く、
+`launchctl bootstrap gui/$(id -u)` は `Domain does not support specified action`、
+`user/$(id -u)` も失敗する。cron は macOS の TCC が SSH 経由の crontab 書き込みを
+拒否する（`sudo` でも同じ — sshd に Full Disk Access が無い）。system domain の
+LaunchDaemon（`UserName judah`）は root で bootstrap でき、GUI ログインに
+依存しない。**headless な fleet ノードに常駐を置くときはこれが既定**。
+
+### D2. 権限は 1 repo の deploy key。ノードに広い token を置かない
+
+judah で ed25519 鍵を生成し（**秘密鍵はノードから出ない**）、
+`com-junkawasaki/org-gleif-projections` の write deploy key として登録した。
+GitHub API token は渡していない —— このセルが触れる範囲は 1 repo に固定される。
+
+**成果物が `kotoba-lang/property` でなく別 repo にあるのはこのため。**
+`kotoba-lang` org は deploy key を org 設定で無効にしており（実測: property と
+loop-lei-catalog の両方で `Deploy keys are disabled for this repository`）、
+有効化には `admin:org` が要る（このワークスペースの token は持たない —
+GitHub Actions の org 一括無効化と同じ壁）。選択肢は「広い token をノードに置く」
+か「deploy key が使える org に成果物 repo を作る」で、後者を選んだ。
+
+property が持ち続けるのは collector / projector とその test、および別 dataset の
+property-ownership。**projection の重複を避けるため、property の
+`data/gleif-*.datoms.edn` は削除した** —— 面は見つけた `gleif-*.datoms.edn` を
+全部読むので、両方あると同じ LEI が 2 entity になり、しかも
+`company=37,860` という**もっともらしい数字**になって気付けない。
+
+### D3. LEI universe は tier に分ける。既定は joined のみ
+
+**projection のサイズは、誰が撃つどのクエリにも一律にかかる税**である。面は
+毎回まるごと DataScript に load されるので、大きい tier を既定にすると
+「LEI を 1 件も見ないクエリ」まで同じ代金を払う。実測（M4 mac mini、
+`bench_load.cljs`、2026-08-07）:
+
+| entity | datom | ピーク heap | 時間 |
+|---:|---:|---:|---:|
+| 200,000 | 3.88M | 2.4 GB | 27 秒 |
+| 500,000 | 9.77M | 3.6 GB | 72 秒 |
+| 1,000,000 | 19.66M | 5.6 GB | 156 秒 |
+
+≒ **1M あたり 5.6 GB・156 秒**。node の既定 old-space は 4.2 GB なので、
+既定のままなら 70 万 entity 付近で落ちる。
+
+| tier | 中身 | entity | git | load |
+|---|---|---:|---|---|
+| `joined` | 面が既に参照している LEI と、それに触れる edge | 18,930 + 47,315 | あり | 既定 |
+| `closure` | joined から所有 edge を辿って到達できる全社 | 107,797 + 168,182 | あり（45 MB で shard） | `--tier closure` |
+| `ownership` | RR edge に現れる全 LEI | 353,127 + 483,822 | なし | ノード cache |
+| `universe` | 全 LEI | 3,396,479 + 483,822 | なし | **約 22 GB。CLI では載らない** |
+
+**339 万社を Datalog で join することは、この面の substrate では今日できない。**
+DataScript.js に 3.4M entity ≒ 67M datom を持たせると約 22 GB・10 分弱で、
+これは 1 クエリが払える値段ではない。**「シャーディングして別ストアに逃がす」
+ことはしていない** —— tier は同じ 1 つの面に同じ属性で*追加ロード*するだけなので、
+join 到達性は失われない。失われるのは「黙って全部載っている」という思い込みで、
+そのために `count` は `gleif-tiers=` を必ず表示する。
+
+面を本当に 339 万社へ広げたいなら、必要なのは projection の切り方ではなく
+**永続 index を持つ store**（kotobase / arrangement の spo・pso・pos・ocp）で、
+それは別の作業。ADR-2608039700 の「projection は消して再構築できるもの」に
+照らせば、tier 境界を動かすのはいつでも安全である。
+
+### D4. closure を選んだ理由
+
+`joined`（18,930）から 1 hop で 36,524、所有グラフの推移閉包で **107,797**。
+所有グラフ全体は 353,127 なので、closure は universe の 3% でありながら
+「この会社を誰が所有しているか／この会社は何を所有しているか」を**名前で**
+解決できる。実証: JP の子会社 → 最終親会社を `:corporate-relation/validation`
+付きで 1 クエリで引ける（ソフトバンク株式会社 → ソフトバンクグループ株式会社
+`FULLY_CORROBORATED`、合同会社ユー・エス・ジェイ → COMCAST CORPORATION
+`ENTITY_SUPPLIED_ONLY`）。**自己申告 edge を検証済みとして出さない**規律は
+ADR-2608031900 のまま。
+
+## 実測でわかったこと（再発防止として残す）
+
+**RR collector は `--skip` も `--no-manifest` も持たない。** LEI2 collector に
+あるので同じつもりで 4 shard 並列にしたところ、4 本すべてが同じ先頭 121,000 行を
+書き、連結すると 484,004 行（正解 483,822 行）になった。**行数は「それらしく」
+合っていた** —— 気付けたのは各 shard の 2 行目を見比べたからで、行数だけを見て
+いたら重複した corpus から projection を切っていた。cell はこの経路を単一
+プロセスに固定し、コメントで理由を残している。
+
+**corpus の件数は publish の `record_count` と突き合わせる。** cell は不一致なら
+projection を作らずに落ちる。短い corpus から作った projection は、正しい
+projection と見分けがつかない（ADR-2608044000 の「不完全な読み取りは報告する」の
+同型）。
+
+**judah の `~/.ssh/config` は先頭 4 行が pg 接続断片で壊れていた**（`[host` /
+`user=user@rw` …）。ssh 設定全体が読めない状態だったので、断片を
+`~/.ssh/misplaced-pg-service-fragment.txt` に退避して config を有効にした
+（削除はしていない）。
+
+## 帰結
+
+- `manifest/edn-query.cljs`: tier 選択（`--tier` / `EDN_QUERY_GLEIF_TIERS`）、
+  読み先を `org-gleif-projections` に一本化、**transact を 50k ずつに分割**
+  （単一 transact は「全 entity の JS 表現」と「db」を同時に生かすので、tier を
+  1 つ足しただけで既定 heap を割る。実測: 20 万を 1 本 = 2.4 GB に対し、
+  50 万を 50k 刻み = 3.4 GB）。
+- 既定 `count` は `gleif-tiers=joined`、`--tier closure` で company が
+  18,930 → 126,727（+87 秒）。
+- **ラップトップの LEI catalog loop（`com.kotoba-lang.lei-catalog-tick`）は
+  そのまま**。あれは連絡先発見（185 repo への Contents API 書き込み）で、
+  1 repo の deploy key では足りない。**この ADR が移したのは GLEIF の取り込み
+  だけで、loop 全体ではない。**"}]
