@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-08-07T17:09:48.476Z",
+ :asOf "2026-08-07T18:11:12.942Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,9 +9,9 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 9683,
+ {:requests-7d 9691,
   :pageviews-7d 2094,
-  :uniques-7d-sum 426,
+  :uniques-7d-sum 428,
   :zone "itonami.cloud"},
  :agentRuns7d 414,
  :sources [:cloudflare :health :emitter :itonami-free-path],
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-08-07T17:09:49.426Z",
+  :asOf "2026-08-07T18:11:13.798Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -141,14 +141,14 @@
  :paths
  {:ok
   [{:path "/cdn-cgi/rum", :requests 118}
-   {:path "/", :requests 92}
+   {:path "/", :requests 91}
    {:path "/yotei/c/jun", :requests 85}
    {:path "/yotei/c/jun-review", :requests 41}
    {:path "/img/yamainu-2-p01", :requests 39}
    {:path "/os/", :requests 37}
    {:path "/img/yamainu-8-p01", :requests 32}
    {:path "/img/zankyo-7-p01", :requests 31}],
-  :status-mix {:server-error 293, :ok 1486, :client-error 256},
+  :status-mix {:server-error 293, :ok 1484, :client-error 262},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
@@ -192,7 +192,7 @@
  :traffic-quality
  {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 14},
  :top-paths
- "上位 page (24h, 2xx/3xx): /cdn-cgi/rum 118 · / 92 · /yotei/c/jun 85 · /yotei/c/jun-review 41 · /img/yamainu-2-p01 39 | 4xx(probe) 13% · 5xx 14%",
+ "上位 page (24h, 2xx/3xx): /cdn-cgi/rum 118 · / 91 · /yotei/c/jun 85 · /yotei/c/jun-review 41 · /img/yamainu-2-p01 39 | 4xx(probe) 13% · 5xx 14%",
  :freeClaimDocs "/docs/free-path.md",
  :funnel
  {:trials 5,
@@ -202,7 +202,7 @@
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 9683 req/7d・426 uniques(日次和)・うち4xx probe 13%(24h)",
+ "itonami.cloud 実測 9691 req/7d・428 uniques(日次和)・うち4xx probe 13%(24h)",
  :tenants
  {:active 5,
   :external-paid 0,
