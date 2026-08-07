@@ -1,34 +1,34 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 23875,
-  "app-aozora-appview" 12893,
-  "app-aozora-spa" 6215},
+ {"app-aozora-pds" 23966,
+  "app-aozora-appview" 12947,
+  "app-aozora-spa" 6339},
  :zone
- {:requests-7d 1041718,
-  :pageviews-7d 5014,
-  :uniques-7d-sum 909,
+ {:requests-7d 1047972,
+  :pageviews-7d 5141,
+  :uniques-7d-sum 915,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 939478}
-   {:path "/federation-pilot/did.json", :requests 118}
-   {:path "/minidrama-fedtest/did.json", :requests 59}
-   {:path "/hito-federates/did.json", :requests 59}
-   {:path "/hito-diag-fed/did.json", :requests 58}
-   {:path "/hito-verify-clean/did.json", :requests 48}
+  [{:path "/v1/datoms", :requests 941427}
+   {:path "/federation-pilot/did.json", :requests 119}
+   {:path "/minidrama-fedtest/did.json", :requests 62}
+   {:path "/hito-diag-fed/did.json", :requests 57}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
-    :requests 41}
+    :requests 57}
+   {:path "/hito-federates/did.json", :requests 57}
    {:path
     "/bafyreif4afcpz5latrazxff3kyap2rt7hgbcywzu75hglzxd6ddui4f2hy",
-    :requests 34}],
-  :status-mix {:client-error 24409, :ok 941156, :server-error 4011},
+    :requests 56}
+   {:path "/hito-verify-clean/did.json", :requests 47}],
+  :status-mix {:server-error 4700, :client-error 16767, :ok 943365},
   :window "24h"},
  :as-of "2026-08-07",
- :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 939478 · /federation-pilot/did.json 118 · /minidrama-fedtest/did.json 59 · /hito-federates/did.json 59 · /hito-diag-fed/did.json 58 | 4xx(probe) 3% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 941427 · /federation-pilot/did.json 119 · /minidrama-fedtest/did.json 62 · /hito-diag-fed/did.json 57 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 57 | 4xx(probe) 2% · 5xx 0%",
  :signal
- "aozora.app 実測 1041718 req/7d・909 uniques(日次和)・うち4xx probe 3%(24h)、workers 42983 inv/7d"}
+ "aozora.app 実測 1047972 req/7d・915 uniques(日次和)・うち4xx probe 2%(24h)、workers 43252 inv/7d"}
