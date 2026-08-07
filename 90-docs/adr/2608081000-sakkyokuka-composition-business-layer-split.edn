@@ -191,7 +191,10 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:what \"isco-2652 カタログ登録 — JVM\" :cmd \"clojure -M:test\" :result \"23 tests / 90 assertions, 0 failures\"}
    {:what \":licensed 既定が劇場でないことの確認\" :cmd \"register-catalog-track! の :licensed 既定を :authored に潰す\" :result \"3 failures。復元して 0\"}
    {:what \"2 回目の fleet-db 吸収前の全 pin 検証\" :cmd \"reconcile が変更した 10 件を gh api compare\" :result \"10/10 が status=ahead / behind_by=0。追加 3 件は新規で退行の余地なし\"}
-   {:what \"west.yml の revision が全件 40 桁か\" :cmd \"revision 行の文字数を数える\" :result \"修正前: 40 桁 4122 件 + 12 桁 1 件。修正後: 40 桁 4123 件。この 1 件は正規表現ベースの pin 検証から黙って漏れていた\"}]"
+   {:what \"west.yml の revision が全件 40 桁か\" :cmd \"revision 行の文字数を数える\" :result \"修正前: 40 桁 4122 件 + 12 桁 1 件。修正後: 40 桁 4123 件。この 1 件は正規表現ベースの pin 検証から黙って漏れていた\"}
+   {:what \"fleet-ci gate が murakumo fleet 上で実際に走ったか（gap 5 の解消証跡）\" :cmd \"manifest/fleet-ci.edn の receipt から :gate/test-{ongaku,sakkyokuka,cloud-itonami-isco-2652}-* を抽出\" :result \"5 run すべて :outcome :pass。simeon/asher/benjamin の 3 ノードで、件数はローカル実行と一致（isco-2652 16->23, ongaku 18->28, sakkyokuka 6）\"}
+   {:what \":rights-not-determined — 未確定と確定済みゼロの区別\" :cmd \"clojure -M:test（isco-2652）\" :result \"26 tests / 101 assertions, 0 failures。区別を潰すと 2 failures\"}
+   {:what \"3 回目の fleet-db 吸収前の全 pin 検証\" :cmd \"reconcile が変更した 13 件を gh api compare\" :result \"13/13 が status=ahead / behind_by=0。追加 1 件（cloud-itonami-kekkai）は新規\"}]"
 
 :adr/landed
   "[{:repo \"orgs/kotoba-lang/ongaku\" :commit \"cb88622101057\" :what \"rights/work/commission — 受注で渡す側を gate する（技芸層）\"}
@@ -205,11 +208,12 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:repo \"orgs/kotoba-lang/ongaku\" :commit \"b027912fb06c\" :what \"ongaku.holdings（ライセンス別に第三者へ渡せる権利）+ provenance :licensed\"}
    {:repo \"orgs/cloud-itonami/cloud-itonami-isco-2652\" :commit \"b6792fe02d30\" :what \"store/register-catalog-track! — 登録時に渡せる権利と実在する成果物を確定させる\"}
    {:repo \"com-junkawasaki/root\" :commit \"b7e12ebb3660\" :what \"ongaku / isco-2652 の pin 前進（API single-entry）\"}
-   {:repo \"com-junkawasaki/root\" :commit \"5002d8f94fdc\" :what \"west.yml の短縮 revision を 40 桁に直す（cloud-itonami-app。4123 件中 1 件だけ 12 桁だった）\"}]"
+   {:repo \"com-junkawasaki/root\" :commit \"5002d8f94fdc\" :what \"west.yml の短縮 revision を 40 桁に直す（cloud-itonami-app。4123 件中 1 件だけ 12 桁だった）\"}
+   {:repo \"orgs/cloud-itonami/cloud-itonami-isco-2652\" :commit \"b4815e812d29\" :what \"governor に :rights-not-determined — 『まだ決めていない』を『決めた結果ゼロ』に化けさせない\"}
+   {:repo \"com-junkawasaki/root\" :commit \"dd622f36c86b\" :what \"isco-2652 pin 前進（API single-entry）\"}]"
 
 :adr/gaps
   "[{:gap \"`gftd-audio-actor`（persona リツ）と `ai.gftd.ongakuka.compose` は受注 gate を通っていない。生成は従来どおり動くが、権利と納品の検査は isco-2652 の actor 経由で受注を出したときだけ効く\" :since \"2026-08-06\"}
-   {:gap \"`register-catalog-track!` を通さず `register-track!` で直接入れた track は今も :work/held-rights を持たない（= 何も譲渡できない fail-closed）。既に seed 済みの store は登録し直しが要る\" :since \"2026-08-06\"}
+   {:gap \"既に seed 済みの store は `register-catalog-track!` で登録し直しが要る。gate は :rights-not-determined で止めて理由を出すので黙って通ることは無いが、登録し直すまでその track で受注は取れない\" :since \"2026-08-06\"}
    {:gap \"license-holdings に載っているのは DOVA-SYNDROME と CC BY 4.0 の 2 件だけ（ongakuka の実カタログ 30 件がこの 2 種のため）。3 種目のライセンスを引いた資産を足すときは、本文を読んで根拠つきで表に足すまで何も渡せない\" :since \"2026-08-06\"}
-   {:gap \"sakkyokuka の台帳 works.edn は seed 3 件のみで、実際の受注も実際の作品も入っていない\" :since \"2026-08-06\"}
-   {:gap \"fleet-ci に足した 3 gate はまだ 1 度も実行されていない（次の tick 待ち）。落ちることは手元の mutation で確かめたが、fleet 上で green を見てはいない\" :since \"2026-08-06\"}]"}]
+   {:gap \"sakkyokuka の台帳 works.edn は seed 3 件のみで、実際の受注も実際の作品も入っていない\" :since \"2026-08-06\"}]"}]
