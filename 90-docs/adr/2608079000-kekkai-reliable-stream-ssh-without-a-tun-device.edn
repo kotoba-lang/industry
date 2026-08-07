@@ -1,0 +1,122 @@
+[{:db/id -1
+  :adr/id "2608079000"
+  :adr/title "kekkai: ssh over the overlay, by writing the reliability layer a userspace forwarder cannot borrow"
+  :adr/status "accepted"
+  :adr/date "2026-08-07"
+  :adr/tags ["kekkai" "kekkai-node" "transport" "ssh" "zero-trust" "fleet"]
+  :adr/supersedes ""
+  :adr/body
+  "## 前提
+
+ADR-2608069000 は「kekkai で fleet に ssh できるか」に **No** と答え、理由を 2 つ
+挙げた: ①kekkai-node は L3/TUN 面を持たない（macOS の全トンネル経路は Apple 署名の
+Network Extension）②オーバレイに再送層が無いので TUN を迂回する userspace 転送も
+書けない。そして「順序としては reliable-stream 層の方が Apple 署名より手前」と
+書いた。これはそれを実装した記録で、**ssh は通った**。
+
+## 実測（2026-08-07、実フリート）
+
+judah（tailnet 上の Mac mini）に relay と service agent を置き、ワークステーションに
+forwarder を置いた:
+
+```
+$ ssh -p 2222 judah@127.0.0.1 'echo KEKKAI-SSH-OK; hostname; uname -sm'
+KEKKAI-SSH-OK
+judahnoMac-mini.local
+Darwin arm64
+```
+
+2 回目は far side で `/dev/urandom` 200 KB を hash させた（実データ量が通る）。
+**そのうえで judah の kekkai service を kill すると同じコマンドが
+`Connection timed out during banner exchange` で落ちた** —— この対照実験が無いと
+1 つ目の結果は何も意味しない。素の Tailscale SSH はどちらの状態でも通るからで、
+「kekkai を経由した」と「同じホストに ssh できた」を区別するものがそれしかない。
+
+## なぜ再送層を*書く*しかなかったか
+
+`peer.cljc` が持つのは handshake の retry だけで、データフレームには sequence
+number も ack も再送も無い。**パケットオーバレイとしてはそれが正しい** —— WireGuard
+相当は datagram を IP スタックに渡し、内側の TCP が回復する。しかし
+**userspace の転送には内側の TCP が無い**。順序・欠損回復・フロー制御・half-close は
+この層の仕事か、誰の仕事でもないかのどちらか。
+
+`kekkai.node.application` は代わりにならない: あれは*メッセージ*を再組立てするもので、
+1 chunk 落ちればそのメッセージは永久に完成しない。
+
+## 実装
+
+- **`kekkai.node.stream`（`.cljc`、socket に触れない）** — 16 byte の固定 binary
+  header、**byte offset** の sequence（cumulative ack が「これ未満は全部届いた」を
+  意味し、送信側の分割の仕方に依存しない）、範囲付き out-of-order バッファ、
+  3 dup-ack の fast retransmit、フロー制御、half-close、理由付き reset。
+- **`kekkai.node.stream-edge`（`.cljs`）** — TCP socket への結線。
+
+### 決定として書き留めること
+
+- **out-of-order は捨てずに buffer する。** go-back-N の方が単純だが、relay 経由で
+  1 datagram 落ちるたびに後続を全部捨てることになり、対話セッションは損失のたびに
+  RTO 分固まる。バッファは有界（`max-reorder-bytes`）で、超えた分は落とす ——
+  1 segment を送らない peer にメモリを無限に押さえられないため。
+- **再送タイマは適応的にしない。** `disco` の固定 burst は*両側が一致する必要がある*
+  から固定なのであって、その理由はここには当たらない。それでも RTT 推定器は
+  「間違え得る 2 本目の制御ループ」で、この repo の実測は datagram あたり 6–9 ms の
+  marshalling —— 律速はタイマではない。固定 base + 指数 backoff + 天井を超えたら reset。
+- **offset は wrap しない。** 2^32 で `:stream-exhausted` として reset する。黙って
+  wrap すると配信バイト列の順序が壊れ、しかもそれが見えないままどれだけ続くかに
+  上限が無い。
+- **認可は両端で確認する。** forwarder 側は stream を開く前に、service 側は loopback に
+  繋ぐ前に `netmap/permitted?` を引く。**境界として効いているのは service 側**で、
+  それが無いと peer と loopback の間にあるのは「peer 自身が何を許されていると思って
+  いるか」だけになる —— `kekkai.node.netmap` の docstring が `fleet.edn` について
+  警告しているのと同じ形。forwarder 側は拒否を速く・読めるようにするためのもの。
+
+## テストが見つけた 3 つのバグ（種類が全部違う）
+
+1. **OPEN-OK が `:opening` 中に queue された bytes を flush していなかった。**
+   forwarder の client は接続直後に書くので、**毎回の初回接続が自分の最初の bytes を
+   取り残していた** —— stream は綺麗に開いて何も転送しない。**socket E2E が見つけた**。
+   既に開いた pair から駆動する state machine テストでは構造的に到達できない場所。
+2. **FIN は sequence number N を占めるのに、`ack == N` で再送キューから外していた。**
+   つまり**最後のデータバイトの ack が FIN を捨てていた**。飛行中に落ちた FIN は
+   二度と再送されず、peer は来ない終端を待ち続ける。**JVM で suite を回して初めて出た**。
+3. **なぜ nbb では出なかったか** —— テストハーネスの LCG が glibc の乗数
+   （1103515245）を使っており、積が 2^53 を超える。**JVM の long では厳密、
+   ClojureScript の double では精度が落ちる。** 両方とも決定論的なテストを走らせ、
+   *違う*決定論的テストを走らせていた。Park–Miller（48271）に替えて両方一致させた。
+
+**3 は 2 より重要かもしれない。** 「決定論的な harness」は決定論的であるだけでは
+足りず、**プラットフォーム間で同一**でなければ、緑が 2 つと真実が 1 つになる。
+
+## もう 1 つの修正 — 例外が agent を落としていた
+
+`emit!` は throw ではなく失敗を返すようにした。`agent/send-to` は session が未確立の
+とき throw するが、それはここでは**普通の状態**（client は handshake 完了前に接続できる）。
+throw を逃がすと、拒否されるべき接続が unhandled rejection になって agent ごと落ちる ——
+**実フリートの初回実行でまさにそれが起きた**。
+
+## 運用上わかったこと
+
+**relay はフリートノード側に置く必要があった。** 実測: UDP は workstation → judah
+は通るが逆は通らない（ローカル firewall は無効なので原因は別）。両 peer が relay を
+dial する設計なので、到達可能な側に置けば済む —— そして workstation は relay ではない
+のだから、そちらが本来の配備形でもある。
+
+## 残っていること
+
+- **TUN 面は依然として必要**（転送可能な TCP サービス以外のすべて）。Apple 署名の
+  Network Extension は未着手で、この ADR はそれを不要にしていない —— **ssh を
+  そこから外しただけ**。
+- **常駐化していない。** 今回の実行は手で起動した agent で、LaunchDaemon 配備
+  （`kekkai.node.launchd` は plist を生成できる）も、署名 netmap の実配布も
+  していない。フリート常設にするならそこから。
+- **NAT 越えの実測は無い。** 今回の経路は relay 固定。direct への upgrade は
+  E2E が loopback で証明しているだけで、実 NAT 対の punch 成否は別問題
+  （`disco/path-report` が計器）。
+- 実測スループットは相変わらず bulk 向きではない（README の 100–600 datagram/s）。
+  ssh のような対話・RPC 形状のための transport。
+
+## 着地
+
+`kotoba-lang/kekkai-node` main `008ac17`、west pin 前進済み。
+cljs 82 tests / 251 assertions（58/187 から）、JVM 71 / 213（47/149 から）、
+lint clean、既存 E2E も stream E2E も green。"}]
