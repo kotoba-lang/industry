@@ -351,19 +351,45 @@ ADR-2607031000 が `public/games/itonami/<slug>/` と記しているので、
 現在の network-isekai の実態かは、repo access が取れるまでどちらの
 セッションも検証できていない。)
 
-**着地した**: `com-junkawasaki/root` の `60-apps/network-isekai/public/games/itonami/isic-9601/` に、規則・
-テスト・自己完結 HTML プレビュー (~41 KB、外部取得ゼロ) 一式。
+**着地した** (2026-08-08 時点):
 
-**着地していない**: network-isekai への移植。`network-awai/network-isekai` は
-private で本セッションの repo scope に無く、`add_repo` が承認待ちで通らなかった。
-したがって:
+- **8 district すべてが遊べる。** `district.cljc` が `world.cljc` の 1 行を board に
+  変える —— op 列が station 連鎖に、`:never-auto` が人手必須の station に、
+  `:auto-at-3` が phase 3 で無人稼働する集合になる。`logic.cljc` は spec を受け取って
+  event を畳むだけで、クリーニング固有の名詞を持たない。**主張が 8 回独立に確認できる
+  ものになった** —— それまでは 1 店舗で見せて残り 7 件は README が言うだけだった。
+  ただし phase 1/2 の staging は 9601 以外**創作**で、`:phase-source :game-staging`
+  として district ごとに記録してある（端点 phase 0/3 は repo 由来）。
+- **3D の街がページの中にある。** タップで店に入り、監査クローズで隣が開く。
+  `preview/gl.cljs` が唯一の WebGL 2.0 配線で、`bin/render.cljs` はそれを bundle して
+  使う（以前は同じ手順を JS 文字列として手で写した 2 つ目を持っていた）。
+- **squint の誤コンパイルを見つけて、2 種類の検査を置いた。** `(- (+ a b))` が
+  `-(a) + (b)` に compile される —— 警告もエラーも痕跡も無く、違う数を返す。
+  Clojure と ClojureScript は正しいので、**JVM のテストも nbb の CLI も通ったまま
+  ブラウザだけが静かに歪む**。実際に 2 箇所で生きていた（環状道路の yaw と、engine の
+  orthographic projection）。`npm run parity` が JVM engine と squint bundle の
+  全 float を比較して見つけ、`npm run lint:squint` が source を形で読む。両方 fleet
+  gate 登録済み（`root-squint-unary-minus`）。engine 側の変更は upstream の欠陥では
+  なく squint が壊さない書き方への修正で、`sdk-patches/0004`・`0005` に staged。
 
-- **`scene.edn` を書いていない。** 既存 8 本の実スキーマを読めない状態で
-  推測で書くと、動かないものを「できた」と言うことになる。
-- `game.edn` は ADR-2607091830 が記述する 8 キーで書き、staging 情報は
-  `:staging` キーに隔離した (移植時に落とす)。
+**着地していない**:
 
-**次にやること**: repo access を得る → 既存 8 本の `scene.edn`/`logic.cljc` の
+- **network-isekai への移植。** `network-awai/network-isekai` は private で本セッションの
+  repo scope に無い。`add_repo` は承認待ちではなく**構造的に通らない** —— session の
+  owner が `com-junkawasaki` なので cross-tier add が v1 で未対応。権限付与では
+  解決せず、`kotoba-lang`/`network-awai` を根とする別セッションが要る。
+  したがって `scene.edn` を書いていない（既存 8 本の実スキーマを読めない状態で推測で
+  書くと、動かないものを「できた」と言うことになる）。
+- **WebGPU の pixels。** 経路は adapter → device → wgsl-compiled → pipeline →
+  submitted まで通り、`createRenderPipeline` が engine の packer layout に対して
+  shader の binding と 8 つの vertex/instance location を検証している。この container
+  では Dawn が submit 直後に instance を落とす（6 通りの flag 組合せ、3 行の
+  clear-to-red shader でも同じ）。frame ではなく環境。
+- **shadow pass。** 両 backend とも 1×1 の lit depth texture を bind している。
+- **Pages smoke test。**
+- **SDK patch 5 本が push できない**（同じ cross-tier 制約）。
+
+**次にやること**: `kotoba-lang`/`network-awai` を根とするセッションを起こす → 既存 8 本の `scene.edn`/`logic.cljc` の
 実スキーマを読む → `public/games/itonami/isic-9601/` へ移植 → `feed-index` に
 載ることを確認 → `?embed=1` と Work Actor の生成 (`gen-game-actors.cljs`
 再実行) → 公開。
