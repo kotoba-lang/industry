@@ -1,8 +1,8 @@
 #!/usr/bin/env nbb
 ;; Level set report and gate.
 ;;
-;;     npx nbb --classpath src levels.cljs                # report
-;;     npx nbb --classpath src levels.cljs --gate         # non-zero on a bad level
+;;     npx nbb --classpath src:../common/src levels.cljs                # report
+;;     npx nbb --classpath src:../common/src levels.cljs --gate         # non-zero on a bad level
 ;;
 ;; For each level: does it validate, can a greedy player finish it, how many
 ;; moves that took, and how much slack the move budget leaves. The gate fails

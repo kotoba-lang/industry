@@ -28,7 +28,7 @@
             [isekai.games.kingdom-cascade.gravity :as gravity]
             [isekai.games.kingdom-cascade.level :as level]
             [isekai.games.kingdom-cascade.matcher :as matcher]
-            [isekai.games.kingdom-cascade.rng :as rng]))
+            [isekai.games.common.rng :as rng]))
 
 (def piece-score 60)
 

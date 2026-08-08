@@ -3,6 +3,7 @@
             [isekai.games.kingdom-cascade.board :as b]
             [isekai.games.kingdom-cascade.core :as g]
             [isekai.games.kingdom-cascade.matcher :as m]
+            [isekai.games.kingdom-cascade.solver :as solver]
             [isekai.games.kingdom-cascade.support :as sup]))
 
 (def level
@@ -157,6 +158,32 @@
         h (g/hud s)]
     (is (= 20 (:moves-left h)))
     (is (= [4] (mapv :goal/remaining (:goals h))))))
+
+(def golden-level
+  "Frozen on purpose. Defined here rather than read from `resources/levels/`
+  so that tuning a shipped level does not break the golden digests below —
+  only a change in *behaviour* should."
+  {:level/id "kc-golden"
+   :level/moves 15
+   :level/seed 20260808
+   :level/colors [:coin :gem :clover :goblet]
+   :level/goals [{:goal/kind :block :goal/block :crate :goal/count 4}]
+   :level/grid ["........" "........" "..cccc.." "........" "........" "........"]})
+
+(deftest golden-digests-are-unchanged
+  (testing "the numbers a browser build and a packaged app have to reproduce.
+
+            These are also what makes a refactor of the RNG or the cascade
+            loop provably behaviour-preserving instead of merely test-passing:
+            any drift moves them, including drift that every other assertion
+            here would accept."
+    (is (= 690555956 (g/digest (g/new-game golden-level)))
+        "opening deal")
+    (let [{:keys [state moves]} (solver/autoplay (g/new-game golden-level))]
+      (is (= 869549719 (g/digest state)) "greedy playthrough")
+      (is (= 1 moves))
+      (is (= 20820 (:score state)))
+      (is (= :won (:status state))))))
 
 (deftest replaying-the-same-moves-gives-the-same-digest
   (testing "this is the check the browser and the mobile shell are held to"

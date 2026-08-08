@@ -3,7 +3,7 @@
             [isekai.games.kingdom-cascade.board :as b]
             [isekai.games.kingdom-cascade.level :as level]
             [isekai.games.kingdom-cascade.matcher :as m]
-            [isekai.games.kingdom-cascade.rng :as rng]))
+            [isekai.games.common.rng :as rng]))
 
 (def colors [:coin :gem :clover :goblet])
 

@@ -16,9 +16,9 @@ artwork, level, string or specific rule is taken from any commercial game.
 ## Run it
 
 ```bash
-npx nbb --classpath src:test run-tests.cljs          # 88 tests, 2202 assertions
-npx nbb --classpath src play.cljs resources/levels/kc-001.edn
-npx nbb --classpath src levels.cljs --gate           # solvability over the set
+npx nbb --classpath src:test:../common/src run-tests.cljs   # 89 tests, 2207 assertions
+npx nbb --classpath src:../common/src play.cljs resources/levels/kc-001.edn
+npx nbb --classpath src:../common/src levels.cljs --gate           # solvability over the set
 ```
 
 `play.cljs` prints the board after every move, so the cascade rules are
@@ -44,8 +44,9 @@ blocker stops each one.
 ## Layout
 
 ```
+../common/src/isekai/games/common/
+  rng.cljc        Park-Miller PRNG, shared by every game here
 src/isekai/games/kingdom_cascade/
-  rng.cljc        Lehmer PRNG, identical on the JVM and in ClojureScript
   board.cljc      sparse grid — only playable cells exist
   matcher.cljc    runs, merged into L/T groups, promoted to specials
   clear.cljc      what a clear does to pieces, covers and blocks

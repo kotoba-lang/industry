@@ -1,5 +1,10 @@
-(ns isekai.games.kingdom-cascade.rng
-  "Deterministic, portable pseudo-random source for Kingdom Cascade.
+(ns isekai.games.common.rng
+  "Deterministic, portable pseudo-random source, shared by every game here.
+
+  Shared rather than copied per game on purpose: determinism is the one thing
+  two independent copies of a generator cannot be allowed to drift on, and a
+  drifted copy fails silently — the replays keep working, they just stop
+  agreeing with the other build.
 
   Lehmer / Park-Miller: `s' = (s * 48271) mod (2^31 - 1)`.
 

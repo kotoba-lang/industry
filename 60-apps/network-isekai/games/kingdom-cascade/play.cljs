@@ -2,8 +2,8 @@
 ;; Headless play. Runs a level to a terminal state and prints the board after
 ;; every move, so the cascade rules can be reviewed without a GPU.
 ;;
-;;     npx nbb --classpath src play.cljs resources/levels/kc-001.edn
-;;     npx nbb --classpath src play.cljs resources/levels/kc-001.edn --quiet
+;;     npx nbb --classpath src:../common/src play.cljs resources/levels/kc-001.edn
+;;     npx nbb --classpath src:../common/src play.cljs resources/levels/kc-001.edn --quiet
 ;;
 ;; `--quiet` prints only the outcome line and the replay digest, which is the
 ;; form the CI gate and the browser/shell parity check both consume.

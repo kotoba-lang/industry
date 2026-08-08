@@ -1,7 +1,7 @@
 #!/usr/bin/env nbb
 ;; Test entry point for the murakumo fleet `:nbb-test` gate.
 ;;
-;;     npx nbb --classpath src:test run-tests.cljs
+;;     npx nbb --classpath src:test:../common/src run-tests.cljs
 ;;
 ;; nbb only, per the workspace script-host rule — no bb, no bare .mjs, no .sh.
 (ns run-tests

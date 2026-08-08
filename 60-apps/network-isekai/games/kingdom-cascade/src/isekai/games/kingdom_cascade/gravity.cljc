@@ -8,7 +8,7 @@
   ice — so on a plain rectangular board the behaviour is exactly straight
   fall and nothing looks jittery."
   (:require [isekai.games.kingdom-cascade.board :as b]
-            [isekai.games.kingdom-cascade.rng :as rng]))
+            [isekai.games.common.rng :as rng]))
 
 (defn- donor
   "The cell whose piece may drop into the vacant `pos`, or nil.

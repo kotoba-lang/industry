@@ -16,7 +16,7 @@
   Grid glyphs: `.` ground, `*` explicit spawner, `c` crate, `s` stone,
   `i` ice, `f` frost, `#` or space outside the play area."
   (:require [isekai.games.kingdom-cascade.board :as b]
-            [isekai.games.kingdom-cascade.rng :as rng]))
+            [isekai.games.common.rng :as rng]))
 
 (defn- would-match?
   "True if placing `color` at `pos` completes a run of three with cells that

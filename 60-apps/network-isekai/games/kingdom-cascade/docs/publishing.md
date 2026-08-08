@@ -13,7 +13,7 @@ Being precise about this matters more than the runbook itself.
 
 | Step | State |
 |---|---|
-| Game logic, levels, solver | **done** — 79 tests / 2183 assertions green under nbb |
+| Game logic, levels, solver | **done** — 89 tests / 2207 assertions green under nbb |
 | Level set gate | **done** — 3/3 levels won by the greedy solver inside budget |
 | Render-IR emitter | **written, not compiled against the real renderer** |
 | shadow-cljs web build | **not run** — needs the KAMI stack dependency coordinates |
@@ -137,7 +137,7 @@ three surfaces. `digest` is a polynomial rolling hash, deliberately not
 `clojure.core/hash`, because that is free to differ between Clojure and
 ClojureScript — which would make the check silently vacuous.
 
-    npx nbb --classpath src play.cljs resources/levels/kc-001.edn --quiet
+    npx nbb --classpath src:../common/src play.cljs resources/levels/kc-001.edn --quiet
 
 Take the digest that prints and compare it with what the browser build and
 the packaged app produce for the same greedy playthrough. As of this writing
