@@ -181,4 +181,65 @@
      ;; 「壊し方は実際に起こりうる退行の形にする」に反する）。
      :find "  (if (store? root)\n    root\n    #?(:clj (filesystem root)\n       :cljs (throw (ex-info \"codebase: no filesystem backend on this platform — pass an ICodebaseStore value\"\n                             {:problem :codebase/no-default-backend\n                              :given (type root)})))))"
      :replace "  (if (store? root)\n    root\n    #?(:clj (filesystem root)\n       :cljs root)))"
-     :must-fail []}]}]}
+     :must-fail []}]}
+
+  {:repo "orgs/kotoba-lang/social-publication"
+   :label "social-publication の 4 不変条件"
+   ;; `run_tests.cljs` は同じ suite を nbb と JVM の両方で走らせ、**両方**緑の
+   ;; ときだけ緑マーカーを出す。実装は .cljc なので、片方でしか走らせないと
+   ;; 「移植性」は主張のままになる —— codebase の f64 と同じ穴で、実際に
+   ;; :portable-not-jvm-only はその穴だけを撃つ mutation である。
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "social-publication: both runtimes green (nbb + JVM)"
+   ;; 全て 2026-08-08 に実際に赤くなるところを見た。同時に**元の suite では
+   ;; 6 件すべてが緑のまま**だったことも確認している（7 件目が撃つコードは
+   ;; 元には存在しなかった —— それがこの回に直した欠陥そのもの）。
+   :mutations
+   [{:id :social-pub/non-adjudication-notice
+     :why "非断定の断りが**読者に届く本文**に載ること。:post/non-adjudicating-notice true は宣言であって本文ではないので、フラグを立てたまま前置きだけ短縮できてしまう（prose を整理する、という形で起こる退行）"
+     :file "src/etzhayyim/social/publication.cljc"
+     :find "(def disclaimer-prefix\n  \"【観測ミラー / accountability map — NOT a verdict, NOT advice, 非断定】\")"
+     :replace "(def disclaimer-prefix\n  \"【観測ミラー】\")"
+     :must-fail ["every-body-opens-with-a-non-verdict-notice"]}
+
+    {:id :social-pub/blank-citations
+     :why "空白だけの出典が頭数に入らないこと。「nil だけ落とせば十分」に緩めると出典 1 件の投稿が『出典 2 件』と名乗る —— 数が合っているように見えるぶん、外から気づけない"
+     :file "src/etzhayyim/social/publication.cljc"
+     :find "  (let [citations (vec (filter #(seq (str/trim (str %))) (or sources [])))]"
+     :replace "  (let [citations (vec (remove nil? (or sources [])))]"
+     :must-fail ["blank-citations-are-not-provenance"]}
+
+    {:id :social-pub/wire-shaped-server-key
+     :why "wire 形（文字列）で届いた server key も鍵とみなすこと。state はキーが全部文字列なので値も文字列で届く —— 「型をきちんとした」という形の退行で `\"true\"` が素通りする"
+     :file "src/etzhayyim/social/publication.cljc"
+     :find "  [value]\n  (boolean value))"
+     :replace "  [value]\n  (true? value))"
+     :must-fail ["a-wire-shaped-server-key-flag-is-still-a-server-key"]}
+
+    {:id :social-pub/status-normalization
+     :why "library が自分で出した \":dry-run\" を読み戻せること。正規化を外すと妥当な投稿が**黙って** refused に落ちる（拒否は安全側に見えるので、壊れていることに気づくのが遅れる）"
+     :file "src/etzhayyim/social/publication.cljc"
+     :find "(defn- without-leading-colon [value]\n  (str/replace (str value) #\"^:+\" \"\"))"
+     :replace "(defn- without-leading-colon [value]\n  (str value))"
+     :must-fail ["the-status-the-library-emits-is-a-status-it-accepts"]}
+
+    {:id :social-pub/refusal-carries-no-draft
+     :why "拒否が前回の下書きを持ち越さないこと。2026-08-08 に実在した欠陥そのもの —— cell_state は呼び手が持ち回すので、成功のあと server key を立てて再投入すると、拒否したのに payload に下書きが残っていた"
+     :file "src/etzhayyim/social/publication.cljc"
+     :find "                         \"refusal\" message\n                         \"payload\" {}\n                         \"phase\" phase-refused)})]"
+     :replace "                         \"refusal\" message\n                         \"phase\" phase-refused)})]"
+     :must-fail ["a-refusal-carries-no-draft"]}
+
+    {:id :social-pub/attribution-required
+     :why "名乗りの無い観測ミラーが作れないこと。display-name 検査を落とすと、誰の観測か言わない投稿が作れる —— accountability map を名乗る以上そこが要"
+     :file "src/etzhayyim/social/publication.cljc"
+     :find "  (when (str/blank? (str display-name))\n    (throw (ex-info \"social publication config requires :display-name\" {:config config})))\n"
+     :replace ""
+     :must-fail ["an-unattributed-mirror-post-is-not-producible"]}
+
+    {:id :social-pub/portable-not-jvm-only
+     :why "実装が両 runtime で動くこと。JVM 専用 interop に戻すと **JVM だけ緑**になる（実測: nbb=red jvm=green）—— cljs 側を走らせていなければ永久に気づけない。codebase の f64 と同じ穴を、同じ形で撃っている"
+     :file "src/etzhayyim/social/publication.cljc"
+     :find "  (str/replace (str value) #\"^:+\" \"\"))"
+     :replace "  (.replaceFirst (str value) \"^:+\" \"\"))"
+     :must-fail ["the-status-the-library-emits-is-a-status-it-accepts"]}]}]}
