@@ -1,6 +1,6 @@
 {:schema "aiueos-aarch64-boot-evidence/v1"
  :recorded-on "2026-08-08"
- :adr "2608080300"
+ :adr "2608080600"
  :question "Does aiueos boot as a Mac virtual machine with a desktop UI/UX today?"
  :answer :no
  :measured-by "70-tools/aiueos-aarch64-spike/smoke-qemu-aarch64-uefi.cljs"
@@ -32,6 +32,20 @@
   {:invocation "--expect-fail (FAT32 ESP with no EFI/BOOT/BOOTAA64.EFI)"
    :result "all 6 required markers absent; gate rejects"
    :note "The gate was watched failing before being recorded as landed."}
+  :kernel-handoff
+  {:status :loads-and-enters
+   :kernel "KERNEL.ELF, ELF64 ET_EXEC AArch64, 83536 bytes, entry 0x42000000"
+   :admission "bounded ET_EXEC/EM_AARCH64 PT_LOAD placement into a reserved
+               2 MiB window at 0x42000000 (AllocateAddress, so a collision is
+               loud); 3 segments admitted"
+   :boot-info "field-for-field identical to the x86_64 struct aiueos_boot_info;
+               magic and version validated by the kernel before use"
+   :markers ["AIUEOS_KERNEL_FILE_OK bytes=83536"
+             "AIUEOS_KERNEL_ELF_OK segments=3 entry=0x0000000042000000"
+             "AIUEOS_KERNEL_HANDOFF entry=0x0000000042000000"
+             "AIUEOS_KERNEL_ENTRY"
+             "AIUEOS_BOOTINFO_OK entries=39"]}
+
   :findings
   [{:finding :calling-convention
     :detail "AArch64 UEFI uses the platform AAPCS64 default, so EFIAPI is empty.
@@ -47,7 +61,70 @@
    {:finding :exception-level
     :detail "AAVMF hands control at EL1 on machine virt (CurrentEL >> 2 = 1),
              not EL2. A kernel wanting EL2 must be entered before firmware or
-             re-enter deliberately."}]}
+             re-enter deliberately."}
+   {:finding :vector-slot-size
+    :detail "An AArch64 exception vector slot is exactly 0x80 bytes (32
+             instructions). A register-save sequence inlined into every slot
+             overflows it; the slots must hold a branch to one shared save."}
+   {:finding :table-cache-maintenance
+    :detail "The page tables are written under the firmware's mapping and then
+             walked under ours. They are cleaned by VA (dc cvac) before the
+             TTBR0/SCTLR switch so the walk cannot observe a stale line."}]}
+
+ ;; --- (a2) AArch64 kernel: own translation tables, W^X actually enforced ----
+ :aarch64-kernel-mmu-wx
+ {:status :mmu-enabled-and-wx-proven
+  :counterpart "x86_64 Phase-1/2: kernel replaces the firmware CR3 with its own
+                four-level identity map, maps text RX / rodata R+NX / writable
+                RW+NX, then writes to text and executes a byte in rodata and
+                requires both to raise vector 14."
+  :translation-regime
+  {:granule "4 KiB"
+   :t0sz 25
+   :va-bits 39
+   :start-level 1
+   :mair {0 :Device-nGnRnE 1 :Normal-write-back}
+   :map ["L1[0] 0..1 GiB Device, PXN+UXN (PL011, GIC, virt MMIO)"
+         "L1[1] 1..2 GiB table -> L2 (RAM; lets the kernel's own 2 MiB split)"
+         "L1[2..3] 1 GiB Normal blocks, PXN+UXN"
+         "L2[16] table -> L3 (the kernel image at 0x42000000)"
+         "L3 4 KiB pages: text AP=RO+exec, rodata AP=RO+PXN+UXN, rest AP=RW+PXN+UXN"]}
+  :sctlr "0x0000000030d0198d"
+  :sctlr-bits {:M true :C true :I true}
+  :ttbr0 "0x0000000042005000"
+  :wx-probes
+  [{:probe "store into .text"
+    :esr-ec "0x25"
+    :esr-ec-meaning "data abort taken without a change in exception level"
+    :fsc :permission-fault-level-3
+    :far "0x0000000042000000"
+    :outcome :faulted-as-required}
+   {:probe "execute a byte in .rodata"
+    :esr-ec "0x21"
+    :esr-ec-meaning "instruction abort taken without a change in exception level"
+    :fsc :permission-fault-level-3
+    :far "0x00000000420031dc"
+    :outcome :faulted-as-required
+    :note "The rodata byte is a valid `ret` (0xd65f03c0), so a PXN failure
+           returns cleanly and is reported as NO_FAULT instead of hanging."}]
+  :termination "PSCI SYSTEM_OFF via HVC #0; qemu exit 0"}
+
+ ;; --- The gate judges substance, and was watched refusing both controls -----
+ :gate-negative-controls
+ [{:control :no-loader
+   :setup "FAT32 ESP with no EFI/BOOT/BOOTAA64.EFI"
+   :rejected? true
+   :unmet-requirements 5
+   :note "Trivial case: nothing boots, every marker absent."}
+  {:control :wx-not-enforced
+   :setup "kernel built with -DAIUEOS_BREAK_WX: every kernel page mapped
+           writable AND privileged-executable"
+   :rejected? true
+   :unmet-requirements 2
+   :note "The sharp control. This build boots the whole chain and still prints
+          AIUEOS_MMU_OK and AIUEOS_AARCH64_KERNEL_OK, so a marker-presence gate
+          would pass it. It is refused on the two W^X substance checks alone —
+          which is what distinguishes this gate from theatre."}]
 
  ;; --- The load-bearing display finding: this is what couples (a) and (c) ----
  :aarch64-gop-display-matrix
@@ -101,10 +178,14 @@
 
  ;; --- What this evidence does NOT show -------------------------------------
  :not-demonstrated
- ["A kernel. The spike is a UEFI loader; it does not yet hand off to an
-   aarch64 KERNEL.ELF, so nothing below ExitBootServices is exercised."
-  "Any desktop. No compositor, no widget tree, no input path; the GOP numbers
-   are a capability probe, not a rendered surface."
+ ["Any desktop. No compositor, no widget tree, no input path, no virtio-gpu 2D
+   resource path; the GOP numbers are a capability probe, not a rendered
+   surface. ramfb is probed but never driven."
+  "Anything above the MMU. No physical page allocator, no dynamic paging, no
+   GIC, no generic timer, no scheduler, no ring 3, no userspace. The kernel
+   maps a static identity map and stops."
+  "Kotoba decision objects. The 59 .kotoba objects are untouched; the arch
+   split described in ADR-2608080300 track a3 has not started."
   "Anything on macOS. No Mac host in this session, so HVF, the
    com.apple.security.hypervisor entitlement, and Apple Silicon virtio-gpu
    behaviour are all unmeasured."

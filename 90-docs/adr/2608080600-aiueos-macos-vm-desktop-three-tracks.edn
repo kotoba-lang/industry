@@ -1,5 +1,5 @@
 [{:db/id -1
-  :adr/id "2608080300"
+  :adr/id "2608080600"
   :adr/doc_type "adr"
   :adr/topic "aiueos-macos-vm-desktop-three-tracks"
   :adr/title "aiueos を Mac の desktop VM にする三線（aarch64 bare-metal / HVF tender / compositor+browser shell）— 実測した display 面の断絶が (a) と (c) を結合する"
@@ -73,7 +73,7 @@ QEMU を exit 0 で落とすところまで通った。
 `AIUEOS_MEMMAP_OK entries=32 descsize=48` / `AIUEOS_EXIT_BOOT_SERVICES_OK` /
 `AIUEOS_CURRENT_EL 1` / `AIUEOS_AARCH64_UEFI_OK`。
 
-port の実費として出た差分は 4 点:
+port の実費として出た差分は 6 点:
 
 1. **UEFI は AArch64 では AAPCS64。** x86_64 loader が全 protocol function pointer に
    付けている `__attribute__((ms_abi))` が丸ごと不要になる（`EFIAPI` が空）。
@@ -84,6 +84,49 @@ port の実費として出た差分は 4 点:
    （`0x84000008` / `HVC #0`）。
 4. **AAVMF は EL1 で制御を渡す**（EL2 ではない）。EL2 が要るなら firmware より前に
    入るか、意図的に入り直す設計が要る。
+5. **exception vector slot は 0x80 バイト（32 命令）ちょうど。** register save を
+   16 slot 全部に inline すると溢れる。slot には branch だけ置き、save は 1 箇所。
+6. **page table は firmware の mapping 下で書き、自分の mapping で walk される。**
+   切り替え前に VA で clean（`dc cvac`）しないと walk が stale line を見うる。
+
+### (a2) kernel は自前の TTBR0 で MMU を有効化し、W^X が効くことを証明する
+
+loader が ESP から `\\EFI\\AIUEOS\\KERNEL.ELF` を読み、**bounded な ET_EXEC /
+EM_AARCH64 の PT_LOAD だけ**を 0x42000000 の予約済み 2 MiB 窓に配置する
+（`AllocateAddress` なので衝突は loud）。boot-info は **x86_64 の
+`struct aiueos_boot_info` と field 単位で同一** —— handoff ABI は port のうち
+本当に arch 中立な部分で、埋める機構だけが違う。
+
+kernel は magic/version を検証してから stage-1 EL1 の変換表を自分で組み
+（4 KiB granule、T0SZ=25、39-bit VA、L1 から walk）、`TTBR0_EL1` を firmware の
+ものと差し替える。**text は AP=RO+exec、rodata は RO+PXN+UXN、残りは RW+PXN+UXN。**
+
+そのうえで **W^X を両方向に破って fault することを実測**した:
+
+| probe | ESR EC | 意味 | FSC | 結果 |
+|---|---|---|---|---|
+| `.text` へ store | `0x25` | data abort, 同一 EL | permission fault L3 | 期待どおり fault |
+| `.rodata` を実行 | `0x21` | instruction abort, 同一 EL | permission fault L3 | 期待どおり fault |
+
+`SCTLR_EL1 = 0x30d0198d`（M/C/I が立っている）、`TTBR0_EL1 = 0x42005000`、
+終了は PSCI SYSTEM_OFF で qemu exit 0。**これは x86_64 の Phase-1/2 が
+「text に書き、rodata を実行し、どちらも vector 14 を上げること」で証明したのと
+同じ粒度**であり、機構だけが完全に異なる（CR3/CR0/EFER → TTBR0/TCR/MAIR/SCTLR、
+error code → ESR_EL1、port I/O は存在しない）。
+
+### gate は marker の有無ではなく中身を判定する
+
+`--expect-fail` は negative control を **2 つ**走らせ、両方が拒否されることを要求する:
+
+- **no-loader** —— loader を置かない ESP。何も起動せず marker が全て無い（自明な方）。
+- **wx-not-enforced** —— `-DAIUEOS_BREAK_WX` で kernel の全 page を writable かつ
+  privileged-executable に map したビルド。**これは chain を最後まで起動し、
+  `AIUEOS_MMU_OK` も `AIUEOS_AARCH64_KERNEL_OK` も印字する。** marker の有無だけを
+  見る gate は通してしまう。この gate は W^X の 2 つの実質検査だけで拒否する。
+
+gate は `SCTLR_EL1` を parse して bit 0 が実際に立っていることを確かめ、各 W^X
+probe に**厳密な ESR exception class と level-3 permission fault** を要求する。
+**両 control が拒否されるのを見てから landed とした。**
 
 ### display 面の断絶 —— これが (a) と (c) を結合する
 
@@ -126,9 +169,12 @@ ADR-0014 が避けた「測定前の commit」を繰り返すため。
 
 ## 依存順
 
-1. **a1 — aarch64 UEFI loader**（本 ADR で spike 済み・証拠あり）→ `kotoba-lang/aiueos`
-   の `os/aiueos/aarch64/` へ移設する
-2. **a2 — aarch64 kernel** entry / MMU(TTBR0_EL1,TTBR1_EL1) / GIC / generic timer / PSCI。
+1. **a1 — aarch64 UEFI loader** ✅ **landed**（ELF load + bounded admission +
+   boot-info handoff まで込み。証拠あり）→ `kotoba-lang/aiueos` の
+   `os/aiueos/aarch64/` へ移設する
+2. **a2 — aarch64 kernel: entry / vectors / MMU(TTBR0_EL1) / W^X** ✅ **landed**
+   （negative control 2 本つき）。**残り**: physical page allocator、dynamic paging、
+   GIC、generic timer、SMP/PSCI CPU_ON、exception 分類の本体。
    x86_64 側の GDT・IDT・CR3・PIC・APIC・multiboot に相当する mechanism を置き換える。
    C mechanism は現在 6,591 行で、その多くが x86 固有（paging.c 429 / entry.S 372 /
    ap_trampoline.S 62 / apic.c 48 / ioapic.c 41 / acpi.c 234 / vtd.c 177 / multiboot 455）
@@ -144,9 +190,14 @@ ADR-0014 が避けた「測定前の commit」を繰り返すため。
 
 ## 正直な限界
 
-- **kernel はまだ無い。** spike は loader であって、aarch64 `KERNEL.ELF` への handoff は
-  していない。`ExitBootServices` より下は一切動いていない。
-- **desktop は一切無い。** GOP の数値は capability probe であって描画ではない。
+- **MMU より上は何も無い。** physical page allocator も dynamic paging も GIC も
+  generic timer も scheduler も ring 3 も userspace も無い。kernel は静的な
+  identity map を張って止まる。
+- **desktop は一切無い。** compositor も widget tree も input path も virtio-gpu 2D
+  resource path も無い。GOP の数値は capability probe であって描画ではない。
+  `ramfb` は probe しただけで駆動していない。
+- **Kotoba decision object に手を付けていない。** 59 個は未着手で、track a3 の
+  arch 仕分けは始まっていない。
 - **macOS では何も測っていない。** 本セッションに Mac が無く、HVF・entitlement・
   Apple Silicon の virtio-gpu 挙動は全て未測定。
 - **実機でも測っていない。** `ramfb` の aperture も 800x600 も QEMU の産物で、
@@ -158,7 +209,14 @@ ADR-0014 が避けた「測定前の commit」を繰り返すため。
 
 ## 次の一手
 
-**a2 の最小 gate を一本にする**: aarch64 `KERNEL.ELF` を loader から load し、
-MMU を自前の TTBR で有効化し、PL011 に marker を出して PSCI で落ちるところまで。
-x86_64 の Phase-1 が `ud2` → vector 6 handler で証明したのと同じ粒度を、
-`--expect-fail` 付きで aarch64 に作る。"}]
+a1/a2 が landed したので、次は **physical page allocator と dynamic paging**
+（ADR-0013 が x86_64 側で「immediate next gate」に置いているのと同じ場所）。
+UEFI memory map を歩いて usable な page-aligned conventional memory だけを admit し
+（loader/kernel/boot-info の範囲は除外）、page を確保・zero し、枯渇と overlap を
+拒否し、その page で新しい変換表を組んで有効化する。**その admission judgement は
+C ではなく Kotoba object として書く**（ADR-2607241100 D6 の境界。今回の spike の
+C は全て機構であって判断ではない）。
+
+その次の分岐点が **c1（virtio-gpu 2D resource path）** で、上の display 実測により
+これは「desktop を作りたくなったら」ではなく「aarch64 で desktop を出すなら必ず」
+必要になる。"}]
