@@ -139,12 +139,50 @@ fan-out を起こした）に従い、**2 本まとめない**。順は次で固
 
 ### 3. 洗車・カーペット・ペットのクリーニングは「未実装」であって「対象外」ではない
 
-**2026-08-08 追記: 適合済み 7 本が全部繋がった今も、この 3 つは無いままである。**
-初版が新規作成を止めた理由（『actor はあるが面に出ていない』状態を増やさない）は
-**消えた** —— その状態はもう無い。次に作るなら止める理由は無く、`new-project-scaffold`
-の標準フローで起こせる。ただし 8121/8129 を繋いだ実測から、**カーペットは
-既存の清掃 2 本の scope 外**（carpet/rug/upholstery の語が README にも ops にも
-無い）ことが確定したので、3 つとも新規 actor が要る。
+**2026-08-08 追記 その 1: 適合済み 7 本が全部繋がり、新規作成を止める理由が消えた。**
+初版が止めた理由（『actor はあるが面に出ていない』状態を増やさない）は、その状態が
+無くなった時点で失効した。
+
+**2026-08-08 追記 その 2: ISIC の帰属を仕様ミラーで実測した**
+（`cloud-itonami/org-un-isic` の `data/classes/*.json`。記憶で決めていない）:
+
+| 業種 | ミラーが言っていること | 帰結 |
+|---|---|---|
+| **洗車** | **4520 の `includes` に \"washing, polishing\" が明記** | satellite `cloud-itonami-isic-4520-carwash` として起こす |
+| **ペットのクリーニング** | **9609 の `includes` に \"pet care services (grooming, boarding, training)\" が明記** | satellite `cloud-itonami-isic-9609-petcare` |
+| **カーペット** | **どのクラスにも carpet cleaning が列挙されていない。** 8121（interior / window / chimney / industrial machinery）・8129（disinfecting / pool / steam-blast / ice / tankers）・9601（laundry / dry-clean / dyeing / **coin-operated** / rental）のどの `includes` にも無く、carpet を含むのは 1391-1393（製造）と 4753（小売）だけ | **帰属を捏造しない。** 9601 の `description`（\"washing, cleaning, dyeing, and pressing of **textile products**\"）が根拠になる読みと、8121 の interior cleaning に含める読みの両方が成り立つ。scope を actor 自身に宣言させ、分類の権威を主張させない |
+
+**追記 その 3: コインランドリーは 4 つ目の穴だった。** 9601 の `includes` に
+**\"coin-operated laundry activities\" が明記されている**のに、既存の 9601 actor は
+有人取次型（`:garment/intake` → `:careplan/verify` → …）で、無人機・課金・巡回補充の
+op を 1 つも持たない。オーナーの最初の質問はコインランドリーを名指ししていたので、
+これは**質問に対する未回答が 1 件残っている**ということである。
+
+### 3b. 洗車 actor は landed（2026-08-08、`109007e`）
+
+`cloud-itonami/cloud-itonami-isic-4520-carwash` を起こした。**satellite 形**
+（`-facade`/8129・`-cryptoexchange`/6611 と同じ）で、親 4520 は整備工場の運営調整の
+まま。親を広げなかったのは、親の governor が roadworthiness 認定の恒久ブロックを
+抱えており、排水規制を同じ governor に足すと**無関係な 2 つの規制体系が 1 つの
+censor の裏に並ぶ**ため。
+
+| 検査 | 実測値 |
+|---|---|
+| `clojure -M:dev:test` | 31 tests / 91 assertions、0 failures |
+| `clojure -M:dev:run` | 確定 5 件 + **構造的に別々の governor hold 6 件** |
+| 標準形適合 | 単一 ns / `phase/{read,write}-ops` / `operation/build`（langgraph）/ `store/seed-db` / `governor` / 全 `.cljc` — tick と同じ判定で適合 |
+| west 登録 | `repos.edn :extra-projects` + `--entry` の最小 diff（5 行）。`verify-west-pins` OK |
+
+**この actor が意図的に既存の負債を繰り返さなかった点 2 つ**:
+
+1. **`high-stakes` は op 名の集合**（`:stake` 自己申告ではない）。恒久的な不変条件を
+   検閲される側の自己申告に依存させない。テストが `:stake` を外した actuation 提案でも
+   escalate することを直接固定している。
+2. **request の主体キーは `:subject`**。5229/4759/8121/8129 の shim 翻訳を要する負債を
+   増やさない。将来の OS adapter は素の 3 行 shim で済む。
+
+**まだ os.edn に宣言していない。** fork 可能であることと共有面に載っていることは
+別の主張で、この repo は前者だけを主張する。
 
 ADR-2607203000 の規則（**いかなる entity も categorical に除外しない。今日数値を
 持たない entity は『カバレッジが未達』であって『対象外』ではない**）をここにも
