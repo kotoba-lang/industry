@@ -1,10 +1,15 @@
 # Commercial Go / No-Go
 
-**Observed:** 2026-08-08（前回 2026-07-24 から更新。数値は `90-docs/business/metrics/*.edn` の as-of 2026-08-08 実測）
+**Observed:** 2026-08-08（gate は run 0021 で再実測、ポートフォリオ数値は `90-docs/business/metrics/*.edn` の as-of 2026-08-08 実測）
 **Purpose:** 技術的に決済可能であることと、正当に販売可能であることを分離する。
 
 `green` の証拠が揃うまで、agent は外部顧客への有料勧誘、live checkoutの公開、
 実決済の受領を行わない。draft、推測、実装済みコードは承認の代用にならない。
+
+**この表は現在値である。** 前版（2026-07-24）は cloud-itonami の 6 gate を red と
+していたが、うち 4 つは run 0018/0019 と ADR-2607242600 で同日〜翌日に閉じており、
+15 日間 red のまま放置されていた。停まっていたのは商流ではなく**この表**である。
+その結果 SCORECARD の全 action が存在しない red を根拠に `blocked` を維持していた。
 
 ## Portfolio revenue state（2026-08-08 実測）
 
@@ -21,19 +26,19 @@
 = **最後の課金が 2020-11-01**。以後の実入金なし。account-wide active subs 2 は
 この 4 product のいずれにも紐づかない（apex / kotobase / murakumo いずれも 0）。
 
-## Portfolio gate
+## Portfolio gate — cloud-itonami（2026-08-08 実測）
 
-| Gate | Required evidence | Current evidence | Status | Owner / next action |
+| Gate | Required evidence | Measured evidence (2026-08-08) | Status | Owner / next action |
 |---|---|---|---|---|
-| 契約主体 | 法人名、住所、連絡先、商品ごとのoperatorが公開文書で一致 | cloud-itonamiはAWAI Network。住所と専用連絡先が未確定 | yellow | owner: principal addressと正式contactを確定 |
-| Merchant / collection | 契約主体自身のPSP口座、または有効な収納代行契約 | StripeはGftd Japan、AWAIとの収納代行契約は署名なしdraft | **red** | 両社authorized signatory: PSPを移すか契約へ署名 |
-| 日本での法人・税務 | 外国会社登記、PE、源泉・消費税の専門家判断 | 要検討と記載されているが、専門家結論なし | **red** | 日本の弁護士・税理士: written advice |
-| Terms / Privacy | placeholderなし、公開版、発効日、operator承認証跡 | cloud-itonamiはDRAFT、税・APPI等が未確認。net-kotobaseはprivacy未確定 | **red** | counsel + owner: final review and approval |
-| DPA / subprocessors | 実際のdata flowと一致するDPA・一覧 | termsは「executed後に提供」。公開済み証拠なし | **red** | product owner: data map、counsel: DPA確定 |
-| 価格・税・返金 | 通貨、税込/税別、周期、解約時点、返金条件 | **net-kotobase Standard は 2026-08-08 に owner が ¥2,980/月 で確定**（下記「価格の確定」）。税込/税別・解約時点・返金条件は未確定。他商品は未確定 | **red** | owner: 税区分・解約時点・返金条件を決定 |
-| Fulfillment | 署名検証済みpaymentからentitlementまでE2E証拠 | net-kotobase billing 4 tests/16 assertions、site 20/110、bundle route 6 tests pass。本物のStripe/KV E2Eは未検証 | yellow | product owner: nonowner本番前のtest-mode E2E証跡 |
-| Support / complaints | support窓口、応答方針、苦情・返金処理者 | 一部で共通mailのみ | yellow | operator: accountable ownerを指名 |
-| Product safety | 年齢、content、privacy等のproduct固有gate | club-shinshi / net-babinikuは未解決 | **red** | product owner + specialist counsel |
+| 契約主体 | 法人名、住所、連絡先、商品ごとのoperatorが公開文書で一致 | Terms §15 が live: AWAI Network, L.L.C.（Delaware file 10704996）が operator、Gftd Japan K.K. が infra supplier、contact `hello@gftd.co.jp`。`GET /legal/terms/` → 200 / 15,322 B, effective 2026-07-24 | **green** | — |
+| Merchant / collection | 契約主体自身のPSP口座、または有効な収納代行契約 | ADR-2607242600 accepted (2026-07-24)。Terms §6.3 が Gftd Japan を**開示された限定 collection agent**、AWAI を supplier として公開明記。署名 counterpart は設計上 git 外（同 ADR §6） | **green**（governance level） | — |
+| 日本での法人・税務 | 外国会社登記、PE、源泉・消費税の専門家判断 | Terms §6.4 は税抜 + reverse-charge の**立場**を公開しているが、`Customer is responsible for confirming its own filing position` と自認。ADR-2607242600 §7 が「foreign-company registration と counsel review は別 gate」と明示。**written advice は存在しない** | **red** | 日本の弁護士・税理士: written advice。AWAI の外国会社登記 |
+| Terms / Privacy | placeholderなし、公開版、発効日、operator承認証跡 | owner 承認済み（run 0018、2026-07-24）。`/legal/terms/` 200 / 15,322 B、`/legal/privacy/` 200 / 16,902 B、いずれも effective 2026-07-24、DRAFT 表記なし。**これは owner 承認であって counsel review ではない**（この gate が要求するのは operator 承認証跡なので green は正しい。counsel review は下の Unblock proof が別途追跡しており未充足） | **green** | — |
+| DPA / subprocessors | 実際のdata flowと一致するDPA・一覧 | `/legal/dpa/` 200 / 10,047 B。Terms §7.1 が incorporation by reference。Privacy §5 が subprocessor を実名列挙（Cloudflare, Inc. / net-kotobase ほか）、§6 に international transfer | **green** | — |
+| 価格・税・返金 | 通貨、税込/税別、周期、解約時点、返金条件 | 通貨・周期 green（§6.1 JPY・月次後払い）。税 green（§6.4 税抜 + reverse charge）。**解約時点・返金条件は ADR-2608080300 で決定済み**（2026-08-08、run 0023）— ただし Terms 本文への適用は未実施（`refund`/`cancel` は依然 Terms に無い）。価格は**単価 2 件のみ未確定**、他 4 項目は同 ADR 決定 4 で確定 | **yellow** | ①owner: Stripe Price の `unit_amount` 2 件を読んで転記（agent は live key を扱えない）②repo access を持つセッション: ADR-2608080300 の 1・2 を `legal/terms.md` へ追補、pricing ページ生成 |
+| Fulfillment | 署名検証済みpaymentからentitlementまでE2E証拠 | `GET /api/billing/status`: `mode:"live"`, `stripeConfigured:true`, `webhookReady:true`, `readyForLiveCheckout:true`, `readyForEntitlement:true`, `missing:[]`。**構成要素としてのレールは欠落ゼロ**。ただし ①checkout が一度も走っていないため signed-webhook → entitlement は本番未実証 ②test-mode 証跡は `sk_test_…` 不在で取得不能（run 0016） ③**24h で 5xx 28%**。**構成が揃っていることは、有料導線に載せてよい品質であることを意味しない** | **yellow** | owner: Stripe dashboard で `sk_test_…` を発行 → test-mode E2E。並行して 5xx を潰す |
+| Support / complaints | support窓口、応答方針、苦情・返金処理者 | **ADR-2608080300 決定 3 で確定**（2026-08-08）: 窓口 `hello@gftd.co.jp`、一次受付と返金**実行**は Gftd Japan K.K.、返金**承認**と苦情の最終責任は AWAI Network, L.L.C.、受領応答は 1 営業日目標（SLA ではない）、10 営業日で operator へエスカレーション。公開文言への反映は未実施 | **yellow** | repo access を持つセッション: support ページへ反映 |
+| Product safety | 年齢、content、privacy等のproduct固有gate | cloud-itonami は adult / age-assurance 対象外 | n/a | — |
 
 ## 価格の確定（2026-08-08）
 
@@ -61,15 +66,55 @@ ratify 記録は net-kotobase repo 側にあり未検証（下記「Session cons
 
 | Product | Contracting boundary | Product-specific boundary | Decision |
 |---|---|---|---|
-| cloud-itonami | AWAI / Gftd Japan collection関係、登記・税務が赤 | terms/privacy/DPAがdraft | **no-go** |
-| club-shinshi | operator・決済条件の確定が必要 | adult specialist review、age assurance、refund/tax/payoutが赤 | **no-go** |
-| net-babiniku | PSP/crypto railの契約証跡なし | monetization proposal自体がhard hold | **no-go** |
-| net-kotobase | Gftd Japanがoperatorで主体は明示済み | **価格は確定（¥2,980/月）**。privacy未確定、counsel/E2E未完了 | **no-go** |
+| cloud-itonami | AWAI/Gftd Japan の収納代行は ADR + 公開 Terms で確定。**登記・税務のみ赤** | terms/privacy/DPA は承認済み・公開済み。ただし 24h で 5xx 28%（有料導線に載せる品質ではない） | **conditional**（red 1 + yellow 3 + 品質。前版 no-go から前進） |
+| net-kotobase | Gftd Japan K.K.（Corporate Number 1011101086505、国内法人）が operator。**外国会社登記の論点は構造的に無い** | **価格は owner 確定（¥2,980/月、2026-08-08）だが未公開。** run 0022 の実測: `terms.md` は**依然 DRAFT**（1 行目に「counsel review required before publication」）かつ製品ドメインに無く GitHub blob リンクのみ（`kotobase.net/legal/terms/` は実 404）。**privacy.md / dpa.md はどちらも 404 = 存在しない**。`/pricing` は live だが**価格が 1 つも書かれていない**（¥表記ゼロ）。`[CONFIRM: …]` が 5 件未解決（最低年齢・価格・請求周期・税・**返金**）。`/api/billing/status` 無し | **no-go** |
+| club-shinshi | operator・決済条件の確定が必要 | adult specialist review、age assurance、refund/tax/payoutが赤 | **no-go**（SPA のため legal surface は HTTP で再実測不能 — run 0022） |
+| net-babiniku | PSP/crypto railの契約証跡なし | monetization proposal自体がhard hold | **no-go**（未再実測） |
 
 ## Smallest path to one green product
 
-`net-kotobase Standard` を最小候補にする。AWAIの法人間・外国会社論点を持たず、
-Gftd Japanをoperatorとして既に特定しているためである。ただし次の全項目が必要。
+**前版の推奨（net-kotobase Standard）を撤回する。** 当時 net-kotobase を選んだ理由は
+「AWAI の法人間・外国会社論点を持たない」ことで、**それ自体は今も正しい**（operator は
+国内法人 Gftd Japan K.K.）。しかし 2026-08-08 に実測したところ（run 0022）、net-kotobase は
+**Terms が依然 DRAFT で、privacy と DPA は存在せず、価格も未公開**だった。cloud-itonami の
+red 1 件を回避する代わりに、「公開前に counsel review が要る」と自ら宣言している DRAFT と、
+ゼロから書く privacy・DPA を引き受けることになる。**両方とも counsel は要る。文書が
+完成・公開済みなのは cloud-itonami だけ。**
+
+現行の最小経路は **cloud-itonami**。残りは 2 red/yellow + 1 需要である。
+
+1. **owner**: 日本の弁護士・税理士から written advice を取り、AWAI の外国会社登記の
+   要否を確定する（唯一の red）。
+2. **owner**: Stripe dashboard で `sk_test_…` を発行する。run 0016 が金庫を確認済みで、
+   test secret は存在しない。**live key の流用は禁止**（同 run の決定）。発行後の
+   test-mode E2E 証跡取得は機械的作業として agent が実行できる。
+3. ~~**owner**: 返金・解約条件を決め、公開 pricing ページを立てる。~~ → **決定は完了**
+   （ADR-2608080300、2026-08-08）。残るのは (a) owner が Stripe Price の `unit_amount`
+   2 件を読んで転記する 1 手 — **agent は live secret key を扱えないので代行しない** —
+   と (b) 決定済み文言の Terms / pricing / support ページへの適用（判断は残っていない
+   機械的作業。`gftdcojp/cloud-itonami` への access が要る）。
+4. ~~**owner**: support / 苦情の accountable owner を指名する。~~ → **決定は完了**
+   （同 ADR 決定 3）。既存の決定（ADR-2607242600 の代理人境界）から導出したもので、
+   新しい人の割当ては発生していない。
+5. **需要**: 非 owner の実決済 1 件。これは 1–4 が全て green になっても**誰も代行できない**
+   （下記）。
+
+## この gate が閉じても残るもの
+
+commercial gate は「売ってよいか」を決めるだけで、「売れたか」は決めない。
+ADR-2607246100 の T1 exit は **非 owner による検証済み実決済 1 件**であり、
+2026-08-08 実測で `externalTotal:5 / externalPaid:0 / activeSubscriptions:0`。
+itonami.cloud 自身が `bottleneck: "run Stripe checkout via /isco-1212/"` と申告している。
+
+**agent はこれを代行してはならない。** owner の payment method で checkout を通すと
+externalPaid は 1 になるが、それは owner 決済であって T1 が要求する非 owner 決済ではない。
+release 条件を満たさないまま満たしたように見える数値を作る行為であり、
+ADR-2608062400 が防いでいる捏造そのものである。
+
+## 並行トラック — net-kotobase（価格は確定、公開が未了）
+
+cloud-itonami が最小経路だが、net-kotobase は**価格だけ先に確定した**ので手順を残す。
+下記「Session constraint」はこのトラックの項目 2・3・4・6 を指す。
 
 1. ~~ownerが月額を決定する。~~ **完了 2026-08-08: ¥2,980/月。**
    税込/税別、billing cycle、解約時点、返金方針は**未決定**。
@@ -111,8 +156,8 @@ but session already has repos from owner(s) [com-junkawasaki]
 
 green判定は次の参照が一つのrunに揃った時だけ行う。
 
-- 最終版Terms / Privacy / DPAのcommit
-- counsel reviewの日時・対象version（助言内容そのものは機密でよい）
-- ratified price、Stripe Product/Priceとの照合結果
-- test-mode E2E event IDsを秘匿化した検証記録
-- ownerのlive販売承認、support/refund担当
+- 最終版Terms / Privacy / DPAのcommit — **充足**（run 0018/0019、live 200 で確認）
+- counsel reviewの日時・対象version（助言内容そのものは機密でよい）— **未充足**
+- ratified price、Stripe Product/Priceとの照合結果 — **未充足**（公開 pricing ページ無し）
+- test-mode E2E event IDsを秘匿化した検証記録 — **未充足**（`sk_test_…` 不在）
+- ownerのlive販売承認、support/refund担当 — **未充足**
