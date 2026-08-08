@@ -124,20 +124,31 @@
     :gross-margin 0.88             ; 原価モデル（execution plan）
     :retention-months 12}})        ; 仮定。実測ではない
 
-(def owned-inventory-pv-7d
-  "自社 zone の実測 pageviews/7d（90-docs/business/metrics/<product>.edn の :zone）。
-   ad rail の inventory はこれ。RPM は未計測なので掛けて収益を作らない。"
-  {:club-shinshi 8302 :app-aozora 5527 :network-isekai 4650 :ai-gftd-apex 4566
-   :cloud-itonami 3043 :cloud-murakumo 2633 :etzhayyim 1574 :net-kotobase 1197
-   :cloud-manimani 333})
+(defn owned-inventory-pv-7d
+  "自社 zone の実測 pageviews/7d を metrics ディレクトリから読む。
+   ad rail の inventory はこれ。RPM は未計測なので掛けて収益を作らない。
+
+   **値をここに焼かない。** SSoT は 90-docs/business/metrics/<product>.edn であり、
+   焼くと advisor loop が metrics を更新するたびに黙って古くなる — 本モデルが
+   まさに扱っている『記録が計測から乖離する』欠陥をモデル自身が持つことになる。"
+  []
+  (into {}
+        (for [f (.readdirSync fs "90-docs/business/metrics")
+              :let [d (edn/read-string
+                        (fs/readFileSync (str "90-docs/business/metrics/" f) "utf8"))
+                    pv (get-in d [:zone :pageviews-7d])]
+              :when pv]
+          [(keyword (subs f 0 (- (count f) 4))) pv])))
 
 (defn ad-rail-inventory
   "収益は出さない。出すのは『月間 PV』と『目標収益に必要な RPM』だけ。
    RPM を仮定して収益を作るのは捏造なので、逆に解いて必要 RPM を返す。"
   [target-monthly-jpy]
-  (let [pv-7d (reduce + (vals owned-inventory-pv-7d))
+  (let [inv (owned-inventory-pv-7d)
+        pv-7d (reduce + (vals inv))
         pv-month (* pv-7d (/ 30.0 7.0))]
-    {:owned-pv-7d pv-7d
+    {:owned-inventory inv
+     :owned-pv-7d pv-7d
      :owned-pv-month (int pv-month)
      :target-monthly-jpy target-monthly-jpy
      :required-rpm-jpy (/ target-monthly-jpy (/ pv-month 1000.0))
