@@ -154,6 +154,21 @@ origin/main の README を読んでいなかった**ことによる —— こ�
 効いた対策だった。名前も一因で、`ongaku.compose/compose` と `ai.gftd.ongakuka.compose` は
 どちらも \"compose\" を名乗るが、前者は選曲、後者は生成である。
 
+## pin は push ガードを通らない経路でも巻き戻る（2026-08-07 実測）
+
+6 actor の pin を入れた commit `5fd9a66f7698` が、別セッションの
+`agent/gleif-universe-murakumo-cell` の**サーバ側 merge**（`63213a486bd`）で古い値に
+戻っていた。その branch の west.yml が私の commit より前の状態だったため。
+
+**`west-pin-verify-guard` はこれを止められない** —— ガードが見るのは push であって、
+stale な west.yml を含む branch の merge ではない。全 pin を突き合わせたところ 19 件が
+差分で、うち**巻き戻ったのは私の 6 件だけ**（残り 13 件は他セッションの正常な前進）
+だったので、fast-forward を再確認して入れ直した（`240d01061aee`）。
+
+対策は既に本文で述べているのと同じ: **west.yml に触る変更を枝に載せず、API
+single-entry で tip に直接載せる。** 枝に載せなければ、その枝が古くなっても
+west.yml を巻き戻しようがない。
+
 ## 帰結
 
 - 作曲の技芸5本＋生成契約1本が職能に接続され、孤児でなくなった。
@@ -202,6 +217,8 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:what \"座標二重化の横断調査（静的スキャン）\" :cmd \"checkout 済み 3,397 件の deps.edn を走査し、:local/root 経由で推移グラフを辿って『同じ lib が git と local の両形式で、かつ top-level に無い』repo を抽出\" :result \"11 repo。171 lib が両形式で宣言されていたが、実際に壊れるのはこの 11 件\"}
    {:what \"横断調査の実証（推測でなく実行）\" :cmd \"11 repo それぞれで clojure -A:test -Spath\" :result \"11/11 が実際に失敗。静的解析に false positive は無かった\"}
    {:what \"6 actor の suite（修正後、初回）\" :cmd \"clojure -M:test\" :result \"avatar 29/46, illust 24/38, motion 24/38, rig 28/45, sculpt 24/38, voice 27/51 —— 計 156 tests すべて 0 failures。修正前はいずれも classpath が組めず 1 度も走っていなかった\"}
+   {:what \"isic-649 / isic-6493 の suite（実 checkout で apply→検証→復元）\" :cmd \"clojure -A:test -Spath && clojure -M:test、その後 deps.edn を復元\" :result \"649: 38 tests / 90 assertions、6493: 82 tests / 336 assertions、ともに 0 failures。両 checkout とも dirty 0 に復元済み。sandbox に sibling が足りず検証できなかったので実 checkout を使った\"}
+   {:what \"9 repo すべての 3 面一致（closing 監査）\" :cmd \"pin == default tip == fleet-db を突き合わせ\" :result \"9/9 で pin == tip。fleet-db は closing の reconcile で追随\"}
    {:what \"消してしまった 3 repo の復元\" :cmd \"west pin の revision で clone + checkout し、pin と HEAD の一致を確認\" :result \"router d7369db / kami-gen-ml3d a1ff3b0 / cloud-murakumo-market-analyst 5d83039 —— 3 件とも pin 一致・dirty 0。ただし削除前の未コミット変更があれば失われている（削除前に dirty を確認していない）\"}]"
 
 :adr/landed
@@ -231,12 +248,16 @@ origin/main の README を読んでいなかった**ことによる —— こ�
    {:repo \"orgs/cloud-itonami/gftd-sculpt-actor\" :commit \"eec673a62778\" :what \"同上（24 tests）\"}
    {:repo \"orgs/cloud-itonami/gftd-voice-actor\" :commit \"d08205ed625a\" :what \"同上（27 tests）\"}
    {:repo \"com-junkawasaki/root\" :commit \"5fd9a66f7698\" :what \"6 actor の pin 前進（全件 fast-forward 検証済み）\"}
-   {:repo \"com-junkawasaki/root\" :what \"fleet-ci gates.edn に残り 6 actor の :jvm-test（7 modality 全部が gate 下に入った）\"}]"
+   {:repo \"com-junkawasaki/root\" :what \"fleet-ci gates.edn に残り 6 actor の :jvm-test（7 modality 全部が gate 下に入った）\"}
+   {:repo \"orgs/cloud-itonami/cloud-itonami-isic-649\" :commit \"b12f36907e19\" :what \"座標二重化の解消（kotoba-lang/identity）— suite が初めて走った（38 tests）\"}
+   {:repo \"orgs/cloud-itonami/cloud-itonami-isic-6493\" :commit \"5476a8f0bd9f\" :what \"同（html/css）— 82 tests / 336 assertions\"}
+   {:repo \"com-junkawasaki/root\" :commit \"cd39ad98b0d3\" :what \"isic 2 件の pin 前進\"}
+   {:repo \"com-junkawasaki/root\" :commit \"240d01061aee\" :what \"6 actor の pin を再前進（別セッションの merge で巻き戻っていた分）\"}]"
 
 :adr/gaps
   "[{:gap \"`gftd-audio-actor` は資産に機械可読な provenance（:work/provenance :generated + :work/generator）を載せるようになったが、**その資産を実際に track として登録する経路はまだ無い**。`ai.gftd.ongakuka.compose` 側は手つかず\" :since \"2026-08-06\"}
    {:gap \"**`gftd-audio-actor` の :cc0 主張に根拠が無い。** persona が :persona/license :cc0 を宣言し governor が #{:cc0 :cc-by :public-domain} を強制しているが、governor が見ているのは値が許可集合に入っていることだけで、murakumo 生成モデルの出力条項が CC0 献呈を許すかは**どこにも記録されていない**。ongaku.holdings は『CC0 として出ている資産から何を渡せるか』には答えるが『CC0 で出してよかったか』には答えない\" :since \"2026-08-07\"}
-   {:gap \"横断調査で見つけた 11 repo のうち `cloud-itonami-isic-649`（kotoba-lang/identity）と `cloud-itonami-isic-6493`（html/css）は **deps.edn の修正を書いたが検証できず未着地**。sandbox に sibling checkout が足りず classpath を組めなかった。未検証のものは出していない\" :since \"2026-08-07\"}
+   {:gap \"asset actor 7 本 + isic 2 本の fleet-ci gate は **まだ 1 度も実行されていない**。gates.edn には載ったが、fleet-ci.edn の最新 receipt（2026-08-07T03:47）は gate 追加より前。ローカルでは全 306 tests green を確認済みだが、fleet 上の green は見ていない\" :since \"2026-08-08\"}
    {:gap \"横断調査のスキャンは **checkout 済み repo の deps.edn しか見ていない**（3,397 件）。west 全体は 4,100 件超あり、未 checkout の repo と、git dep の pin 時点の deps.edn（ローカルの現在状態で代用した）は調べられていない。したがって『11 件で全部』とは言えない\" :since \"2026-08-07\"}
    {:gap \"`gftd-audio-actor` は :work/model-id を立てられない。murakumo の function entry は :fn/id / :fn/engine / :fn/kind / :fn/modality しか持たず、実際のモデルはエンジン側が選ぶため観測できない。下流は :missing-model-id を出し続ける（それが正しい状態）が、納品するには murakumo 側がモデルを job 結果に載せる必要がある\" :since \"2026-08-07\"}
    {:gap \"既に seed 済みの store は `register-catalog-track!` で登録し直しが要る。gate は :rights-not-determined で止めて理由を出すので黙って通ることは無いが、登録し直すまでその track で受注は取れない\" :since \"2026-08-06\"}
