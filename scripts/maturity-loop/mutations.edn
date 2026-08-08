@@ -554,7 +554,10 @@
      :file "docs/identity-claims.edn"
      :find " {:cell-count               9"
      :replace " {:cell-count               8"
-     :must-fail ["the-pinned-gate-census-matches-the-substrate"]}
+     :must-fail ["the-pinned-gate-census-matches-the-substrate"
+                 ;; README が引用する「9 cell」も census から導いているので同時に落ちる。
+                 ;; 名指ししておかないと「別の理由で赤くなったのを噛んだと読む」ことになる。
+                 "the-readme-quotes-the-gate-and-cell-counts-that-the-substrate-has"]}
 
     {:id :m365-ingest/census-pin-goes-stale
      :why "兄弟 repo cargo に置かれていた actor-manifest.test.ts は toHaveLength(8) と書いたまま一度も走らず、実際の pipeline は 10 本に増えていた。count を pin して**両方向に**落とすのがこの節の要"
@@ -568,7 +571,9 @@
      :file "docs/identity-claims.edn"
      :find "  :shared-collection-count   0"
      :replace "  :shared-collection-count   3"
-     :must-fail ["the-substrate-and-the-manifest-share-no-collection-at-all"]}
+     :must-fail ["the-substrate-and-the-manifest-share-no-collection-at-all"
+                 ;; README が「交差 0」と述べているので、pin が動けば散文も同時に古くなる。
+                 "the-readme-states-that-the-lexicons-do-not-overlap"]}
 
     {:id :m365-ingest/did-service-id-goes-foreign
      :why "service id が別の DID を指したまま残るのは、改名を半分だけやった形そのもの。document 全体は妥当に見えるので、id を突き合わせない限り通る。しかもここで足す DID は substrate と manifest が名乗っている方なので、単体では『整合させた』ようにすら見える"
@@ -599,4 +604,73 @@
      :replace "  \"@id\": \"did:web:etzhayyim.com:actor:m365-ingest\","
      :must-fail ["every-identity-claim-names-the-value-its-source-file-actually-holds"
                  "the-substrate-and-the-manifest-agree-on-the-actor-did"
-                 "the-did-document-names-a-different-did-than-the-manifest"]}]}]}
+                 "the-did-document-names-a-different-did-than-the-manifest"]}
+
+    ;; ── 散文（README / quickstart / ADR）を撃つ ─────────────────────────────
+    ;; 2026-08-08 追加。この repo は README を持たず、唯一の長文である CLAUDE.md が
+    ;; **ここに無い T1 実行系**を詳細に書いていた。README / quickstart / ADR を
+    ;; 足したので、それらが黙って古くなる経路も塞ぐ（test/m365_ingest/docs_test.cljs）。
+    ;;
+    ;; **散文検査には固有の弱点がある。** `includes?` は「その語がどこかに在る」しか
+    ;; 言わないので、検査したい主張が短い語だと無関係な出現に守られて死ぬ ——
+    ;; 実際 remote 名の注意は `cloud-itonami` の出現を見ており、clone の URL に
+    ;; 必ず現れるせいで注意書きを消しても緑だった（mutation が噛まないことで気づき、
+    ;; 文言そのものを見るように直した）。だから散文の mutation は
+    ;; **anchor が一意であること**に加えて、**その 1 箇所を消せば主張が本当に
+    ;; 消えること**まで見て採用している。
+    {:id :m365-ingest/quickstart-names-a-script-that-does-not-exist
+     :why "**『踏めない手順は書かない』の番人。** 存在しない script を指す quickstart は、読んだ人が実行して初めて壊れていることが分かる —— 文書としては最後までもっともらしく読めるので、レビューでも落ちない"
+     :file "docs/operator-quickstart.md"
+     :find "nbb scripts/maturity-loop/run.cljs --only m365-ingest"
+     :replace "nbb scripts/maturity-loop/runner.cljs --only m365-ingest"
+     :must-fail ["every-script-the-quickstart-names-either-exists-or-is-declared-external"]}
+
+    {:id :m365-ingest/quickstart-classpath-points-at-a-missing-dir
+     :why "script が実在しても classpath が違えば step は踏めない。`--classpath src` を別名にすると require が解決せず、しかも quickstart 上は正しく見える"
+     :file "docs/operator-quickstart.md"
+     :find "--classpath src -e"
+     :replace "--classpath lib -e"
+     :must-fail ["every-classpath-directory-the-quickstart-names-exists"]}
+
+    {:id :m365-ingest/quickstart-test-count-goes-stale
+     :why "**両方向に落ちる pin の散文版。** test を足しても消しても『期待される出力』が古くなる。cargo の toHaveLength(8) が 10 になったまま誰も気づかなかった事故は、`.ts` の中でも `.md` の中でも同じ形で起きる"
+     :file "docs/operator-quickstart.md"
+     :find "Ran 48 tests containing 231 assertions."
+     :replace "Ran 41 tests containing 231 assertions."
+     :must-fail ["the-quickstart-quotes-the-number-of-tests-that-actually-exist"]}
+
+    {:id :m365-ingest/quickstart-loses-the-do-not-do-section
+     :why "『やらないこと』はこの repo では飾りではない —— CLAUDE.md の手順を実行する / did.json を編集して直ったことにする、はどちらも実際に起こる誤りである。節ごと消えても本文は自然に読めるので、消えたことに気づけない"
+     :file "docs/operator-quickstart.md"
+     :find "## やらないこと"
+     :replace "## 補足"
+     :must-fail ["the-quickstart-keeps-a-do-not-do-section"]}
+
+    {:id :m365-ingest/quickstart-drops-which-side-is-the-authority
+     :why "**向き違いを止める注意そのものを撃つ。** substrate を manifest に合わせると割れが解消したように見えて権威から遠ざかる（:substrate-lexicon-aligned-to-the-manifest が撃つ誤り）。その注意が quickstart から消えると、誤りを止める手前の防波堤が無くなる"
+     :file "docs/operator-quickstart.md"
+     :find "_meta.primaryLexicon"
+     :replace "メタ情報"
+     :must-fail ["the-quickstart-keeps-a-do-not-do-section"]}
+
+    {:id :m365-ingest/quickstart-drops-the-remote-is-not-origin-warning
+     :why "west 経由の checkout は remote 名が `cloud-itonami` で、`git fetch origin` は通らない。step 1 で止まる種類の誤りなので、注意が消えると quickstart 全体が踏めなくなる"
+     :file "docs/operator-quickstart.md"
+     :find "`origin` ではなく `cloud-itonami`"
+     :replace "`origin`"
+     :must-fail ["the-quickstart-warns-that-the-remote-is-not-called-origin"]}
+
+    {:id :m365-ingest/adr-slips-back-to-proposed
+     :why "ADR-0001 は『この repo は descriptor と gate であって executor ではない』という境界の決定。status が proposed に戻ると、README の断り書きが根拠を失う"
+     :file "docs/adr/0001-descriptor-and-gate-not-an-executor.md"
+     :find "- **status**: accepted"
+     :replace "- **status**: proposed"
+     :must-fail ["the-adr-is-accepted-and-the-readme-points-at-it"]}
+
+    {:id :m365-ingest/the-actor-did-changes-without-the-readme
+     :why "**散文が実体から離れる典型。** actor-did を動かすと claims と割れる（既存の deftest が捕まえる）が、それに加えて README が古い DID を名乗ったまま残る。identity のような『README の主張の中核』が黙って嘘になる経路をここで塞ぐ"
+     :file "src/m365_ingest/murakumo.cljc"
+     :find "  \"did:web:m365-ingest.etzhayyim.com\")"
+     :replace "  \"did:web:m365-ingest.cloud-itonami.example\")"
+     :must-fail ["the-readme-names-both-dids-and-says-which-one-resolves"
+                 "every-identity-claim-names-the-value-its-source-file-actually-holds"]}]}]}
