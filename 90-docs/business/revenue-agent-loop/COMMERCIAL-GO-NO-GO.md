@@ -26,8 +26,6 @@
 = **最後の課金が 2020-11-01**。以後の実入金なし。account-wide active subs 2 は
 この 4 product のいずれにも紐づかない（apex / kotobase / murakumo いずれも 0）。
 
-## Portfolio gate
-
 ## Portfolio gate — cloud-itonami（2026-08-08 実測）
 
 | Gate | Required evidence | Measured evidence (2026-08-08) | Status | Owner / next action |
@@ -38,7 +36,7 @@
 | Terms / Privacy | placeholderなし、公開版、発効日、operator承認証跡 | owner 承認済み（run 0018、2026-07-24）。`/legal/terms/` 200 / 15,322 B、`/legal/privacy/` 200 / 16,902 B、いずれも effective 2026-07-24、DRAFT 表記なし。**これは owner 承認であって counsel review ではない**（この gate が要求するのは operator 承認証跡なので green は正しい。counsel review は下の Unblock proof が別途追跡しており未充足） | **green** | — |
 | DPA / subprocessors | 実際のdata flowと一致するDPA・一覧 | `/legal/dpa/` 200 / 10,047 B。Terms §7.1 が incorporation by reference。Privacy §5 が subprocessor を実名列挙（Cloudflare, Inc. / net-kotobase ほか）、§6 に international transfer | **green** | — |
 | 価格・税・返金 | 通貨、税込/税別、周期、解約時点、返金条件 | 通貨・周期 green（§6.1 JPY・月次後払い）。税 green（§6.4 税抜 + reverse charge）。**解約時点・返金条件は ADR-2608080300 で決定済み**（2026-08-08、run 0023）— ただし Terms 本文への適用は未実施（`refund`/`cancel` は依然 Terms に無い）。価格は**単価 2 件のみ未確定**、他 4 項目は同 ADR 決定 4 で確定 | **yellow** | ①owner: Stripe Price の `unit_amount` 2 件を読んで転記（agent は live key を扱えない）②repo access を持つセッション: ADR-2608080300 の 1・2 を `legal/terms.md` へ追補、pricing ページ生成 |
-| Fulfillment | 署名検証済みpaymentからentitlementまでE2E証拠 | `GET /api/billing/status`: `mode:"live"`, `stripeConfigured:true`, `webhookReady:true`, `readyForLiveCheckout:true`, `readyForEntitlement:true`, `missing:[]`。**レールは 100% 完成**。ただし checkout が一度も走っていないため signed-webhook → entitlement は本番未実証。test-mode 証跡は `sk_test_…` 不在で取得不能（run 0016） | **yellow** | owner: Stripe dashboard で `sk_test_…` を発行 → test-mode E2E |
+| Fulfillment | 署名検証済みpaymentからentitlementまでE2E証拠 | `GET /api/billing/status`: `mode:"live"`, `stripeConfigured:true`, `webhookReady:true`, `readyForLiveCheckout:true`, `readyForEntitlement:true`, `missing:[]`。**構成要素としてのレールは欠落ゼロ**。ただし ①checkout が一度も走っていないため signed-webhook → entitlement は本番未実証 ②test-mode 証跡は `sk_test_…` 不在で取得不能（run 0016） ③**24h で 5xx 28%**。**構成が揃っていることは、有料導線に載せてよい品質であることを意味しない** | **yellow** | owner: Stripe dashboard で `sk_test_…` を発行 → test-mode E2E。並行して 5xx を潰す |
 | Support / complaints | support窓口、応答方針、苦情・返金処理者 | **ADR-2608080300 決定 3 で確定**（2026-08-08）: 窓口 `hello@gftd.co.jp`、一次受付と返金**実行**は Gftd Japan K.K.、返金**承認**と苦情の最終責任は AWAI Network, L.L.C.、受領応答は 1 営業日目標（SLA ではない）、10 営業日で operator へエスカレーション。公開文言への反映は未実施 | **yellow** | repo access を持つセッション: support ページへ反映 |
 | Product safety | 年齢、content、privacy等のproduct固有gate | cloud-itonami は adult / age-assurance 対象外 | n/a | — |
 
