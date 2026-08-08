@@ -127,9 +127,15 @@ iPhone ミラーリング（macOS 15+）はその channel である: 実機の�
 
 **教訓は『権限のある経路で到達できたことは、権限の無い経路でも到達できることの証拠にならない』**であり、これは索引の規則（『手元に無いことは存在しないことではない』）の裏返しの形をしている —— 到達できたことも、誰にとって到達できたのかを言わなければ意味を持たない。
 
-したがって cross-tier の着地は**このセッションからは実行できない**。実行できるのは次のいずれか:
+**着地した経路（2 度目）**: `kotoba-lang/computer-use` を initial source とするセッションに、patch ではなく**ファイルの内容を prompt で直接渡して**着地させた。公開 repo への転送用 branch push（byte-exact だが無関係な公開 repo を汚す）と、使い捨て転送 repo の作成（`manifest/repository-rules.edn` の命名規則違反）は、どちらも採らなかった。
 
-1. **owner のローカル checkout**（`orgs/kotoba-lang/computer-use` が west 管理下にある）で patch を当てて push する。
-2. `kotoba-lang/computer-use` を initial source とする**新しいセッションを owner が起こす**（そのセッションからは root が見えないので、patch の内容は別途渡す必要がある）。
+結果: **`kotoba-lang/computer-use` PR #10**（draft、head `4956af5`）。
 
-**着地後、この patch ファイルを削除し、superproject の west pin を前進させる。**"}]
+**転写ずれは起きていない。実測で確認した:**
+
+- push された tree を clone し、手元の検証済み commit と `git diff --stat` → **空**（tree 完全一致）。
+- 4 ファイルの sha256 が全て一致（`8726d4a2…` / `ad8d69b2…` / `ab07618c…` / `8c26325d…`）。**これは test が届かない `#?(:clj)` 内の shell-out 約 150 行も含めて保証する** —— test だけでは、あの領域の転写ずれは捕まらなかった。
+- push された tree に対して**こちらで独立に** `clojure -M:test` を回し、30 tests / 121 assertions / 0 failures を再現（子セッションの自己申告ではない）。
+- upstream PR #10 の本文が『shell-out は 1 度も実行していない・実機ゲーム未プレイ・inset 26pt と model-width 480 は当て推量』を保持していることを確認。
+
+**残る follow-up は 1 件**: upstream PR #10 が main に merge されるまで **west pin は前進させられない**（pin に許されるのは upstream default branch から到達可能な commit だけ、ADR-2607022900）。merge 後に `computer-use` の pin を進める。この patch ファイル自体は upstream branch + PR #10 が commit を保持しているため削除した（同じコードを 2 箇所に置かない）。"}]
