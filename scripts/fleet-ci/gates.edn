@@ -310,6 +310,58 @@
    :script "gates/permit-index-check.cljs"
    :include-ext [".edn" ".cljs" ".cljc"] :min-files 1500 :cd false}
 
+  ;; 「クリーニング営み」(ISIC 9601 idle tycoon) の主張の機械検査。
+  ;;
+  ;; ゲームの主張は 1 行に尽きる —— cloud-itonami の governed actor はどれも、どの
+  ;; phase の `:auto` 集合にも入れない操作を最低 1 つ永久に持つ。数字は 8 つの別 repo
+  ;; の `phase.cljc` / `governor.cljc` から転写したもので、転写元と転写先は別 repo・
+  ;; 別 owner。`:auto-at-3` に 1 語足しても `:never-auto` を空にしても **ゲームは
+  ;; 普通に動き続ける** —— 壊れるのは主張だけなので、遊んでも気づけない。
+  ;;
+  ;; repo 側のテストは同じ不変条件を見ているが誰も回していない（Actions は
+  ;; ADR-2607300900 で撤去済み）。ここに載って初めて毎 tip で走る。
+  ;;
+  ;; 2026-08-08 に「落ちること」を確認済み: phase 3 の :auto に :clean を足す /
+  ;; ある district の :never-auto を空にする、の 2 通りでいずれも exit 1。
+  ;;
+  ;; :min-files 20 —— root が tracked で持つ .cljc は 38 件（2026-08-08 実測）。
+  ;; 60 に置いたら**正しい tree で落ちた**ので、実数を見て決め直した。床は
+  ;; 「絞り込みが壊れて空 tree を合格にしない」ためのもので、大きいほど良いのでは
+  ;; ない —— 対象より大きい床は gate ではなく誤報。
+  {:name "root" :id "root-itonami-game-never-auto" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/itonami-game-never-auto-check.cljs"
+   :include-ext [".cljc"] :min-files 20 :cd false}
+
+  ;; squint-cljs 0.8.147 compiles `(- (+ a b))` to `-(a) + (b)` — it splices the inner
+  ;; operands out of a unary negation. It compiles, it runs, and it returns `b - a`.
+  ;;
+  ;; The preview page is squint-compiled, so this reaches shipped pixels while every other
+  ;; execution of the same source is correct: Clojure and ClojureScript group it properly, so
+  ;; the JVM suites pass and the nbb CLI renderer draws the right picture. Found 2026-08-08 by
+  ;; the game's parity test, in two places at once — a road ring yawed to `π/2 − a`, and the
+  ;; engine's orthographic projection returning `l − r` in the shadow matrix.
+  ;;
+  ;; Arity is what decides, so the check reads the form: `(- a (+ b c))` and `(- (- q) r)` are
+  ;; binary and correct, and `(- (* a b))` survives because negation distributes. A regex over
+  ;; `(- (` reports all of those as bugs — it did, on its first run.
+  ;;
+  ;; 2026-08-08 に「落ちること」を確認済み: `(- (+ a b))` / `(- (- a b))` /
+  ;; `(- (+ a (* b c)))` の 3 通りで exit 1、`(- (* a b))` `(- (/ a b))` `(- a (+ b c))`
+  ;; `(- (- q) b)` `(- a)` `(-> a (+ b))` と、文字列・コメント内の同形は素通し。
+  ;;
+  ;; **この tree で実際に検査されるのはゲーム側の source だけ。** engine
+  ;; (`orgs/kotoba-lang/{webgpu,render}`) は west checkout で root の tracked tree には
+  ;; 入らないので、fleet に送られる snapshot にも存在しない —— bug が実際に見つかった
+  ;; コードは、ここでは走査対象外である。gate は不在を ABSENT として件数と共に出すので
+  ;; 黙って通ることはないが、**exit 0 で通る**。engine 側まで塞ぐには gate を
+  ;; kotoba-lang の repo entry として別に登録する必要がある（cross-tier のため
+  ;; このセッションからは登録できない）。
+  {:name "root" :id "root-squint-unary-minus" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/squint-unary-minus-check.cljs"
+   :include-ext [".cljc" ".cljs" ".clj"] :min-files 20 :cd false}
+
   ;; Projection contracts are rebuilt from the exact Git-tip snapshot shipped
   ;; by the fleet operator. The archive has no .git directory, so this gate
   ;; uses snapshot mode: current input/schema/loader hashes plus logical and
