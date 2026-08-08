@@ -1,36 +1,36 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 22813,
-  "app-aozora-appview" 12691,
-  "app-aozora-spa" 6920},
+ {"app-aozora-pds" 22894,
+  "app-aozora-appview" 12761,
+  "app-aozora-spa" 7057},
  :zone
- {:requests-7d 985099,
-  :pageviews-7d 5426,
-  :uniques-7d-sum 909,
+ {:requests-7d 991525,
+  :pageviews-7d 5512,
+  :uniques-7d-sum 911,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 943788}
-   {:path "/federation-pilot/did.json", :requests 112}
+  [{:path "/v1/datoms", :requests 944870}
+   {:path "/federation-pilot/did.json", :requests 111}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
     :requests 81}
    {:path
     "/bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4eq3q5k2optwu446juce4",
     :requests 63}
-   {:path "/minidrama-fedtest/did.json", :requests 60}
-   {:path "/hito-diag-fed/did.json", :requests 54}
-   {:path "/hito-verify-clean/did.json", :requests 49}
+   {:path "/minidrama-fedtest/did.json", :requests 62}
+   {:path "/hito-diag-fed/did.json", :requests 53}
+   {:path "/hito-verify-clean/did.json", :requests 51}
    {:path
     "/bafyreicwof6vg3l7aopynnj7nh67pgaugg5h6rhjlhuwc6ebtpjotepnb4",
     :requests 45}],
-  :status-mix {:client-error 11894, :server-error 5654, :ok 946039},
+  :status-mix {:client-error 15795, :server-error 5401, :ok 947040},
   :window "24h"},
  :as-of "2026-08-08",
- :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 1},
+ :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 943788 · /federation-pilot/did.json 112 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 81 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 63 · /minidrama-fedtest/did.json 60 | 4xx(probe) 1% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 944870 · /federation-pilot/did.json 111 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 81 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 63 · /minidrama-fedtest/did.json 62 | 4xx(probe) 2% · 5xx 1%",
  :signal
- "aozora.app 実測 985099 req/7d・909 uniques(日次和)・うち4xx probe 1%(24h)、workers 42424 inv/7d"}
+ "aozora.app 実測 991525 req/7d・911 uniques(日次和)・うち4xx probe 2%(24h)、workers 42712 inv/7d"}
