@@ -1,5 +1,5 @@
 [{:db/id -1
-  :adr/id "2608094000"
+  :adr/id "2608097000"
   :adr/doc_type "adr"
   :adr/topic "connector-plane-one-repo-per-connector"
   :adr/title "connector は 1 つにつき 1 repo（origin 面）。scope は tool ごとに宣言し、同意は OAuth client ごとに 1 回"
@@ -23,7 +23,7 @@
               "kotoba-lang/com-microsoft-graph"
               "com-junkawasaki/root"]
   :adr/body
-  "# ADR-2608094000: connector 面 —— 1 connector = 1 repo
+  "# ADR-2608097000: connector 面 —— 1 connector = 1 repo
 
 **Status**: accepted / **Date**: 2026-08-08
 
@@ -181,21 +181,69 @@ credential 抜きの request を返し、これが connector repo のテスト�
   1 件なら動き、複数なら省略する（先頭だけ黙って送らない）。
 - **`connector.edn` を手で直すと落ちる。** 生成し直す手順が README にある。
 
-## 実測で見つかった別件（この ADR の範囲外）
+## 実測で見つかった別件（この ADR の範囲外。すべて追跡済み）
 
-- **`.mcp.json` の `cloud-itonami-license` が存在しないパスを指している** ——
-  `orgs/gftdcojp/cloud-itonami/...` だが west 上の実体は
-  `orgs/network-awai/cloud-itonami`。この MCP server は現状起動できない。
-- **west.yml に 3 件の pin 退行がある**（`cloud-itonami` / `cloud-itonami-yotei` /
-  `loop-game-autoplay`）。PreToolUse hook が push を止めて教えてくれた。
-  本 ADR の作業とは無関係の既存 drift。
-- **hosted MCP の OAuth は稼働していない** —— `auth.itonami.cloud` は DNS 解決せず、
-  `app.itonami.cloud/.well-known/oauth-protected-resource/mcp` は別物の actor
-  router が 400 を返す。動いているのは stdio 経路のみ。"
+### ① `.mcp.json` の `cloud-itonami-license` —— 誤りは 2 つあった（修正済み）
+
+`orgs/gftdcojp/cloud-itonami/...` を指していたが west 上の実体は
+`orgs/network-awai/cloud-itonami`。**path が存在しないので server が起動すらせず、
+11 tools が設定上あって 1 つも届いていなかった。**
+
+**path を直しただけでは動かない。** `cloud_itonami.mcp` は推移的に `mail.inbound` を
+要るが classpath に `mail` が無く `Could not find namespace` で落ちる。
+当該 repo 自身の docstring も同じ 3 要素 classpath を書いているので、
+**それに従っても失敗する**（repo 側 docstring は未修正）。
+
+修正後の実測: `initialize` 応答 / `tools/list` が 11 tools / `license.list_procedures`
+が実データ。main `72273d9fe3d`。
+
+### ② 「pin 退行 4 件」は誤報だった（訂正）
+
+作業中に PreToolUse guard が 4 件（`cloud-itonami` / `cloud-itonami-yotei` /
+`loop-game-autoplay` / `cloud-itonami-app`）の pin 退行を報告したが、**本物の退行では
+なかった。** guard は `origin/main` の west.yml（baseline）とローカル HEAD の
+west.yml（candidate）を比べるので、**ローカル checkout が origin/main より遅れて
+いると、origin/main 側で既に前進済みの pin が古い HEAD 由来の退行として見える。**
+2 回とも私の base が遅れていたのが原因。
+
+`gh api compare` で測り直した結果: **4 件中 3 件は upstream default branch と
+`identical`**。実在した遅れは `cloud-itonami-app` の 2 commit のみで、
+`57c89cb9c753 → 4af1ce4dfc23`（fast-forward）へ前進済み。
+
+**教訓**: guard の出力を「west.yml の drift」と読まない。まず自分の base が
+origin/main と一致しているか確かめる。
+
+### ③ hosted MCP の OAuth は稼働していない（未修正）
+
+`auth.itonami.cloud` は DNS 解決せず、
+`app.itonami.cloud/.well-known/oauth-protected-resource/mcp` は別物の actor router が
+400 を返す。`:introspection-endpoint` の既定も nil。動いているのは stdio 経路のみ。
+
+### ④ ADR 番号 `2608094000` の衝突（本 ADR を移動して解消）
+
+同日 09:17Z に `2608094000-portfolio-revenue-zero-kotobase-green-path-blocked` が
+main に着地しており、本 ADR は 09:46Z に**同じ番号で 2 件目**として着地した。
+さらに PR #1735 が 3 件目を要求していた。`:adr/id` 文字列自体は衝突していない
+（相手は full slug 形式）が、**ファイル名の数値 prefix と散文の「ADR-2608094000」が
+2 つの決定を指す**状態だった。
+
+**後から着地した側（本 ADR）が 2608097000 へ移動**した。子 repo 4 件の
+`connector.edn` `:authority` / emit script / test も追随し、pin を前進させてある。
+
+## Resume point（次の agent 向け）
+
+| | |
+|---|---|
+| superproject main | ADR 本体 + west 5 entry + origin-domains + repos.edn |
+| kernel | `kotoba-lang/connector` |
+| connectors | `com-google-calendar` / `-drive` / `-gmail` / `com-microsoft-graph` |
+| 次の 1 手 | `cloud-itonami-app` の `identity/provider-catalog`（`identity.clj:73`）を `connector.registry` に置き換える。`connector.consent/groups` が Google 3 connector を 1 grant に束ねるので、`identity.clj:1678` 付近の PKCE 生成はそのまま使える |
+| その次 | `com-github` / `com-slack` / `com-notion` / `com-google-chat` に connector を載せる（新規 repo は作らない） |
+| テスト再実行 | 各 repo で `nbb --classpath \"src:test:../connector/src\" run-tests.cljs`（kernel は `../org-anthropic-mcp/src`） |"
   :adr/consequences
   "cloud-itonami-app はまだ配線されていない。registry は「使える形で在る」だけで「使われている」ではない。
 tool 名は全 connector で一意。registry が load 時に拒否する。
 既存 origin 面 repo（com-github / com-slack / com-notion / com-google-chat）への connector 追加は未実施。
 Gmail の labelIds は複数指定不可（query map が単値）。1 件なら動き、複数なら省略する。
 connector.edn を手編集するとテストが落ちる。生成し直す。
-別件: .mcp.json の cloud-itonami-license が存在しないパスを指す / west.yml に 3 件の pin 退行 / hosted MCP の OAuth AS は未稼働。"}]
+別件（追跡済み）: .mcp.json は path と classpath の 2 つの誤りを修正済み（main 72273d9fe3d）。「pin 退行 4 件」は誤報で、実在した遅れは cloud-itonami-app の 2 commit のみ（前進済み）。hosted MCP の OAuth AS は未稼働のまま。ADR 番号 2608094000 は先着があったため本 ADR を 2608097000 へ移動した。"}]

@@ -20,7 +20,8 @@
   :adr/superseded_by []
 
   :adr/related
-  ["adr-2608062300-budget-supply-tranche-and-released-only-allocation"
+  ["adr-2608080200-revenue-blocker-chain-remeasured-gate-doc-was-the-constraint"
+   "adr-2608062300-budget-supply-tranche-and-released-only-allocation"
    "adr-2608062200-capital-pool-identity-and-the-double-allocated-three-million"
    "adr-2607246100-revenue-agent-loop-capital-allocation-governor"
    "adr-2607194500-bmc-portfolio-ot-allocation"
@@ -145,4 +146,14 @@ ADR-2608062300 の `allocate pools` では、**demand は「どこへ配るか�
 
 **収益ゼロの根拠**: `kotoba-lang/dynamics` の `loop-archetypes` に 2026-08-06 に instantiate した 3 archetype の `:source` フィールド（`90-docs/business/metrics/nexus-x402.edn`、net-kotobase の funnel/stripe 実測、cloud-itonami の 2026-08-06T01:12:10Z funnel）。
 
-**この ADR が検証していないこと**: T1 exit がいつ来るか。ADR-2607246100 の最新 run は 0020（2026-07-24）で、以後 run は追加されていない。つまり T1 の作業自体が 13 日間進んでいないが、それは本 ADR の対象外である（この ADR は『進んだとして何が解けるか』だけを定める）。"}]
+**この ADR が検証していないこと**: T1 exit がいつ来るか。この ADR は『進んだとして何が解けるか』だけを定める。
+
+## 2026-08-08 の再実測（ADR-2608080200）
+
+**blocked-items は 1 件も解けていない。** 価格も CAC も依然として未観測であり、この ADR の decision と blocked-items は全て有効である。変わったのは **release までの距離の見え方**であって、release ではない。
+
+- **技術レールは 100% 完成していることが確定した。** `GET /api/billing/status` → `mode:live` / `stripeConfigured:true` / `webhookReady:true` / `readyForLiveCheckout:true` / `readyForEntitlement:true` / `missing:[]`。欠けている構成要素はゼロ。
+- **commercial gate の 6 red のうち 4 は既に閉じていた**（terms / privacy / DPA / 収納代行 / 契約主体）。`COMMERCIAL-GO-NO-GO.md` が 15 日間更新されておらず、SCORECARD が存在しない red を根拠に全 action を blocked にしていた。詳細と実測値は ADR-2608080200 / run 0021。
+- **残る hard blocker は日本の法人・税務 counsel written advice 1 件**（+ yellow 3）。**そのどれも agent の作業では動かない。**
+- 収益ゼロは不変: 2026-08-08 実測で cloud-itonami `externalTotal:5 / externalPaid:0 / activeSubscriptions:0`、`agentRuns7d:306`（08-06 の 1,012 から継続減）。
+- **非 owner 決済の代行は禁止**（ADR-2608080200 決定 4）。owner の payment method で checkout を通すと `externalPaid` は 1 になるが、それは T1 exit が要求する非 owner 決済ではなく、release 条件を満たさないまま満たしたように見える数値を作る行為である — この ADR が防いでいる捏造そのものに当たる。"}]

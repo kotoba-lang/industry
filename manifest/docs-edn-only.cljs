@@ -647,7 +647,20 @@
   ;; MONTH-3-GRACEFUL-RUST-DRAIN.edn left on 2026-08-08: seven unclosed sub-maps
   ;; closed and one run of unkeyed sibling maps wrapped in a vector. Structure
   ;; only -- no content character added or removed.
-  ["90-docs/migration/M5-M6-checkpoint-procedures.edn"])
+  ;;
+  ;; M5-M6-checkpoint-procedures.edn left on 2026-08-08, emptying this list. A
+  ;; single `}` was missing at the end of :procedures/gate-decision-process: the
+  ;; `}]` on line 132 closed :gate-procedure, leaving the enclosing
+  ;; {:gate-type "major-gate"} map open, so the `]` had nothing to close and the
+  ;; reader reported `Unmatched delimiter ]` -- pointing at the delimiter that was
+  ;; present rather than the brace that was not, which is why appending closers at
+  ;; EOF never fixed it. The repair is one character. All nine top-level keys, the
+  ;; four gate steps and all ten :checkpoint-type entries survive unchanged.
+  ;;
+  ;; The list being empty is the intended terminal state, not a disabled check:
+  ;; `known` is then the empty set, so any file that stops parsing is reported as
+  ;; a NEW PARSE ERROR. Do not add to this list -- repair the document instead.
+  [])
 
 (defn verify!
   "EDN が 90-docs の唯一の正本であることを機械検証する。

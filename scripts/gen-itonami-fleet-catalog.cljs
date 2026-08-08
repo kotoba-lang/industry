@@ -72,7 +72,11 @@
    ;; NOT carried — that is the mirror this file refuses to be, and a caller
    ;; needing routes should read the blueprint.
    :itonami.blueprint/mount
-   :itonami.blueprint/org])
+   :itonami.blueprint/org
+   ;; ADR-2608093000 D4. What the app asks of a tenant, so the Fleet view can
+   ;; show it **before** a grant exists. A consent screen that only learns the
+   ;; scopes when the app requests them cannot warn anybody in advance.
+   :itonami.blueprint/requests])
 
 (defn- short-key [k] (keyword (name k)))
 
