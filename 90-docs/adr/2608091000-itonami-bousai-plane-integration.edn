@@ -214,13 +214,36 @@ relay 元の正本は 1 つに保つ。
 |---|---|---|---|
 | isic | 442 | 220 | phase op 集合なし 103 / seed-db なし 79 / JVM 専用 21 / governor なし 17 |
 | **isco** | 340 | **0** | **phase op 集合なし 337** —— 職業 blueprint は構造的に別の形 |
-| **cofog** | 5 | 1 | **`:no-seed-db` だけで 4 本** —— cofog-03.2 に足したのと同じ 1 行で候補になる |
+| **cofog** | 5 | 1 → **5** | `:no-seed-db` だけで 4 本 —— **2026-08-07 に 4 本とも直した（下記）**|
 | unspsc | 5 | 1 | 同じく `:no-seed-db` 4 |
 | jsic | 3 | 0 | phase op 集合なし 3 |
 
 判定は非 ISIC でも壊れない（理由が族ごとに一貫している）。**広げて今すぐ増える
 候補は unspsc-27 の 1 本だけ**だが、cofog / unspsc の 8 本が「1 行の距離」に
 あることが**初めて面に出た** —— これは走査を広げなければ永久に見えなかった。
+
+#### 実際に詰めた: COFOG 族は 5 本とも標準形になった（2026-08-07）
+
+見えた 4 本に、cofog-03.2 と同じ 2 つ（`phase/read-ops` = `#{}` と
+`store/seed-db` = `(-> (mem-store) (sample-data!))`）を足した。4 本とも
+`write-ops` が `governor/allowed-ops` と一致しており（実測）、`read-ops` を
+空集合と書くのは嘘ではない。振る舞いは変えていない。
+
+| repo | ns | 主題 | test | merge |
+|---|---|---|---|---|
+| cofog-04.5 | `infrainsp` | 運輸（道路構造物点検） | 93 tests / 243 assertions | `e008349f` |
+| cofog-05.1 | `wastecollect` | 廃棄物管理（収集・選別） | 64 / 185 | `eeb08e3f` |
+| cofog-06.3 | `leaksurvey` | 上水道（漏水調査） | 74 / 202 | `a29d4386` |
+| cofog-07.4 | `vectorsurvey` | 公衆衛生（媒介生物調査） | 76 / 209 | `cc6c582f` |
+
+4 本とも 0 failures / 0 errors、`clojure -M:lint` 0 errors 0 warnings、
+nbb で load 可・`(op/build (seed-db))` が graph を返すことを実測。west pin
+4 件前進（`16bf3759`、diff は `+4 -4`）。
+
+**測って確かめた**: 適合数 222 → **226**（ちょうど +4）。族の表から cofog 行が
+消えた（落ちる repo が 0 になった）。4 本の M_own は 0.505–0.535 で、ISIC 上位
+（0.72–0.75）の下に並ぶ —— 順位が付いているので、上位が繋がれば自然に上がってくる。
+**残るのは UNSPSC 4 本**で、こちらも `:no-seed-db` だけ。
 
 **entity 面（`lei-` 法人実体 / `iso3166-` 国・官庁 / `assoc-` 業界団体 /
 `municipality-` 自治体）は候補に入れない。** 適合しているものが 57 本あるが、
@@ -326,7 +349,8 @@ API 呼び出し側もこの field を送る必要があること —— 不適�
 "
 
   :adr/gaps
-  ["COFOG 残り 4 本 / UNSPSC 残り 4 本は `store/seed-db` の 1 行だけで候補になる（D8 の実測）。upstream に足す作業は未着手"
+  ["UNSPSC 残り 4 本は `store/seed-db` の 1 行だけで候補になる（COFOG 4 本は 2026-08-07 に済ませた）。未着手"
+   "標準形になった COFOG 4 本はまだ OS に接続していない（候補プールに入っただけ）。M_own 0.505-0.535 で ISIC 上位の下に並ぶ"
    "ISCO 340 本は 337 本が phase op 集合を持たない別構造。標準形へ寄せる道筋は未検討"
    "分類に紐づかない適合 57 本（crowdfunding-* / marketplace-* 等の営みらしきものを含む）を OS に載せるかは未決。今は毎周報告するだけ"
    "tick が読む os.edn は共有 checkout のものなので、その checkout が main より遅れていると宣言数を過少に報告する（2026-08-07 実測: 21/16 が 20/15 に見える）"
