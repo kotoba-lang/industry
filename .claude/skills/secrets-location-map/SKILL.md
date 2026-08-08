@@ -42,7 +42,7 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
       （prefix `ghosthacker-shiropico/`: ep01-07 フルエピソード×11言語、
       ep08-12 ja、ep-scenes 178枚、bgm、panels、ep01 motion comic）。
       在庫と drift 検証は
-      `orgs/gftdcojp/ai-gftd-ghosthacker-shiropico/tools/b2_catalog.py`
+      `orgs/com-junkawasaki/ghosthacker-shiropico/tools/b2_catalog.py`
       （`--verify` は kagi/Keychain/env のどれからでも鍵を解決できる）。
       同じ実体は annex 化されて `gftdcojp-m365-annex` にも trusted copy がある
       （ADR-2607252000 ledger seq 86）。
@@ -292,7 +292,7 @@ content-addressed graph の名前空間ごと変わる — 障害ではなく**�
 - **cloud-itonami ops-repo の鍵(ADR-2607141700、kagi vault
   `orgs/kotoba-lang/kagi/.kagi/`、compartment `personal`、2026-07-14 mint)**:
   - `itonami-org-root` — org root Ed25519 seed(64 hex)。公開 did は
-    `orgs/gftdcojp/cloud-itonami/resources/ops-identity.edn` にコミット済み。
+    `orgs/network-awai/cloud-itonami/resources/ops-identity.edn` にコミット済み。
   - `itonami-sales-head` / `itonami-billing-head` / `itonami-keiei-head` —
     部門長 seed(同形式)。
   - `itonami-sales-head-chain` / `itonami-billing-head-chain` /
@@ -473,7 +473,7 @@ user Worker には届かない。`.dev.vars` も dispatch-namespace deploy で�
   Keychain service `manimani:user-junkawasaki-token`
 - **owner DID**(非機密・公開値だが参照用): Keychain service `gftdcojp:owner-did`
   = `did:key:z6MkmCrDjqsUiHM4bK6zVyzuYGitMGjCVRb1eTrF122mxrNU`
-- **owner Ed25519 秘密鍵(seed)**: `orgs/gftdcojp/cloud-itonami/.junkawasaki/identity.edn`
+- **owner Ed25519 秘密鍵(seed)**: `orgs/network-awai/cloud-itonami/.junkawasaki/identity.edn`
   (gitignored。cloud-itonami.identity/load-or-create-identity! が正)
   - `itonami-runner-bot` — **execute-only** runner bot Ed25519 seed
     (did `did:key:z6MkvmMJxqz4iA3R2wuJ7mFQfJ9qh4HCe2o7vvjeXoxvFWmq`)。
@@ -626,7 +626,7 @@ KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get <ITEM>
   （cloud-murakumo GitHub main `5bba489`）、agent が mint できる第2系統として
   この kagi item を追加した。既存 primary 署名 token は無効化されない（rotation
   ではなく追加）。chat-scope token の mint:
-  `cd orgs/gftdcojp/cloud-murakumo && MURAKUMO_TOKEN_SECRET=$(kagi get
+  `cd orgs/network-awai/cloud-murakumo && MURAKUMO_TOKEN_SECRET=$(kagi get
   MURAKUMO_CHAT_TOKEN_SECRET_2) clojure -M:token issue <sub> chat <ttl>`。
   Worker secret `MURAKUMO_TOKEN_SECRET_2` は wrangler で投入済み（worker
   `murakumo-cloud`、redeploy を跨いで永続）。
