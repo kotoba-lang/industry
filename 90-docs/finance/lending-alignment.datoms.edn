@@ -1,0 +1,844 @@
+;; 貸付の三体制カタログ —— 整合 / 直交 / 逆行
+;;
+;; ADR-2608082200。ADR-2608082100（金くささ = 収益 × 逆行度）の一般モデルを、
+;; **貸付**という 1 つの契約族に絞って実在組織に当てたもの。
+;; manifest/edn-query.cljs の索引ローダが `:source/dataset "lending-alignment"`
+;; として読む（vector-of-maps -> 1 record 1 entity）。
+;;
+;; ── 分類しているのは組織ではなく「契約機序」である ──────────────────
+;;
+;; **同じ組織が 3 体制を同時に走らせる。**大手銀行は事業融資（直交）を出しながら、
+;; 同じ顧客に遅延損害金とリボ（逆行）を課し、イスラム窓口（名目上は整合）も持つ。
+;; だから `:lending/subject` は「組織」ではなく **組織 × 商品**であり、
+;; ある行が逆行であることは、その組織の全事業が逆行だという主張では**ない**。
+;;
+;; **同じ形式がどの体制にもなりうる。**ISA も RBF もイスラム金融も、形式は整合だが
+;; 運用で逆行になりうる（BloomTech の CFPB 同意命令がその実例として入っている）。
+;; **形式から体制を導出してはならない。**導出できるのは「取り分の決まり方」からだけ。
+;;
+;; ── :lending/confidence の意味（読み違え防止）────────────────────────
+;;
+;;   :documented  規制当局の処分・裁判所の判断・法令・一次統計に基づく。URL 付き。
+;;   :reported    複数の二次報道に基づく。本パスで一次資料まで当たっていない。
+;;   :structural  公開された商品説明・契約形式から機序を読んだもの。
+;;                **個別の契約文書を観測していない。**ADR-2608082100 が損保約款で
+;;                やった定型句検出のような実測は、この dataset ではまだ行っていない。
+;;
+;; **:structural は「観測した」ではない。**この区別を潰して集計すると、
+;; 「世界の貸付を観測した」という嘘になる。:lending/coverage entity を必ず読むこと。
+;;
+;; ── 申し立てと認定を混ぜない ────────────────────────────────────────
+;;
+;; 逆行に分類した行のうち、和解で終わったもの（責任の自認を伴わない）は
+;; `:lending/adjudication :settled-no-admission`、当局が訴訟から撤退したものは
+;; `:withdrawn` と書いてある。**処分額の大きさを違法性の強さとして読まないこと。**
+;; Amigo の £72.9m は「科していれば」の額で、実際には免除されている。
+;;
+;; LEI は 1 件も入れていない。market-intel / cloud-itonami-lei と join したいが、
+;; **推測した LEI は join 面を静かに壊す**ので、確認できるまで入れない
+;; （:coverage/no-lei-join に申告してある）。
+
+[
+ ;; ══════════════════════════════════════════════════════════════════
+ ;; 体制の定義 —— 判定は「借手の成果が動いたとき、貸手の取り分がどう動くか」
+ ;; ══════════════════════════════════════════════════════════════════
+
+ {:regime/id :aligned
+  :regime/label-ja "整合"
+  :regime/label-en "aligned"
+  :regime/sign "+1"
+  :regime/take-rule "貸手の取り分が借手の成果の単調増加関数。成果が下がれば取り分も下がる"
+  :regime/downside "借手が失敗したとき貸手も損を被る（損失が貸手のバランスシートに乗る）"
+  :regime/examples "ムダーラバ / ムシャーラカ、エクイティ、レベニューシェア、ISA、GDP 連動債"
+  :regime/note
+  "整合の本質は利率ではなく**損失を誰が食べるか**。上振れの共有だけを入れて
+   下振れの共有を入れない契約（固定倍率の RBF、上向き GDP ワラント）は
+   :partially-aligned であって整合ではない —— このカタログでは分けてある。"
+  :source/dataset-hint "lending-alignment"}
+
+ {:regime/id :orthogonal
+  :regime/label-ja "直交"
+  :regime/label-en "orthogonal"
+  :regime/sign "0"
+  :regime/take-rule "貸手の取り分が借手の成果と無関係（固定利息・固定手数料）"
+  :regime/downside "貸手は担保・優先弁済・保証で下振れを回避しようとする"
+  :regime/examples "通常の事業ローン、住宅ローン、社債、公的融資"
+  :regime/note
+  "**直交は中立ではない。**世界の貸付の圧倒的多数がここに入るが、直交契約は
+   デフォルトを引き金に**逆行モードへ相転移する**（遅延損害金・期限の利益喪失・
+   担保実行）。したがって『直交 → 逆行』の境界は 2 つの組織の間ではなく、
+   **1 つの契約の中の状態遷移**として引かれる。これが本カタログの中心的発見であり、
+   各法域の規制が利率ではなく**取り分の総額**を縛る理由でもある（:remedy/* 参照）。"
+  :source/dataset-hint "lending-alignment"}
+
+ {:regime/id :regressive
+  :regime/label-ja "逆行"
+  :regime/label-en "regressive"
+  :regime/sign "-1"
+  :regime/take-rule "借手が困窮するほど貸手の取り分が増える（成果の単調減少関数）"
+  :regime/downside "借手の失敗が貸手の**利益源**。回収不能そのものが商品設計に織り込まれる"
+  :regime/examples "遅延損害金の累積、リボ払い、ロールオーバー型ペイデイ、担保差押えでの剰余取得、不良債権の買取訴訟"
+  :regime/note
+  "ADR-2608082100 の中心的な式がここに効く ——
+   Exit_Rate = exit_base·(1 − a_lockin)·(1 − n_Legitimacy)。
+   **貸付では債務そのものがロックインである。**正統性がどれだけ落ちても借手は
+   離れられない（離れる = 法的強制執行）。8 機序のうちロックインだけが顧客を
+   増やし、200/200 のランダム重みで顧客が増えた —— 貸付は、そのロックインが
+   **契約の定義そのもの**である稀な業種。だから逆行が構造的に強い。"
+  :source/dataset-hint "lending-alignment"}
+
+ ;; 判定手続き —— 3 問。形式ではなく取り分の決まり方だけを見る。
+ {:test/id :lending-regime-decision-procedure
+  :test/q1 "借手の成果が悪化したとき、貸手の名目請求権は増えるか？ → YES なら逆行"
+  :test/q2 "借手の成果が良化したとき、貸手の取り分は増えるか？ → YES なら整合"
+  :test/q3 "どちらも NO → 直交"
+  :test/q4-downside "整合を主張する行には追加で問う: 借手が失敗したとき貸手は損を被るか？ NO なら :partially-aligned"
+  :test/anti-pattern
+  "形式（イスラム金融 / RBF / ISA / 協同組合）から体制を導出しないこと。
+   BloomTech は ISA（整合の形式）を逆行として運用して CFPB の同意命令を受けた。
+   逆に Al Rajhi は世界最大のイスラム銀行だが、融資の大半はムラーバハ（実質固定マークアップ）
+   であり substance は直交。**形式は体制を決めない。**"
+  :test/ownership-caveat
+  "所有構造からも導出しないこと。この workspace は ADR-2608082100 で
+   『組合員所有の非営利だから契約も穏やか』という仮説を共済の約款で検定し、
+   **支持されなかった**（6 機序中 5 つで株式会社より制約が濃かった）。
+   信用組合を整合に入れていないのはこの前例による。"
+  :source/dataset-hint "lending-alignment"}
+
+ ;; ══════════════════════════════════════════════════════════════════
+ ;; 整合 —— 取り分が借手の成果に比例する
+ ;; ══════════════════════════════════════════════════════════════════
+
+ ;; ── A. イスラム金融の損益分担（PLS）──────────────────────────────
+ ;; **この節が本カタログで最も注意を要する。**イスラム金融 3.2 兆ドルの大半は
+ ;; 整合ではない。整合なのは PLS 部分だけで、それは数 % しかない。
+
+ {:lending/id :isdb
+  :lending/regime :aligned
+  :lending/org "Islamic Development Bank (IsDB)"
+  :lending/org-ja "イスラム開発銀行"
+  :lending/jurisdiction "SAU (Jeddah) / 57 member states"
+  :lending/instrument "ムダーラバ・ムシャーラカ・イスティスナー・イジャーラの混成"
+  :lending/take-rule "PLS 部分は事業成果に比例。多国間開発金融機関"
+  :lending/confidence :structural
+  :lending/note "多国間開発銀行としての性格上、譲許的条件が併存する。PLS 比率は非公表"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :al-rajhi
+  :lending/regime :orthogonal
+  :lending/regime-nominal :aligned
+  :lending/org "Al Rajhi Bank"
+  :lending/jurisdiction "SAU"
+  :lending/instrument "ムラーバハ / タワッルク中心、PLS は少数"
+  :lending/take-rule "コストプラス固定マークアップ = 実質的に成果非依存"
+  :lending/scale "総資産 2,780 億 USD、純利益 66 億 USD（2024 年末、世界最大のイスラム金融機関）"
+  :lending/evidence "TABInsights: 上位 100 イスラム銀行の総資産 1.6 兆 USD"
+  :lending/source "https://tabinsights.com/ab100/largest-islamic-banks"
+  :lending/confidence :documented
+  :lending/note
+  "**名目整合 / 実質直交の代表例。**シャリーア適合ではあるが、ムラーバハの
+   取り分は借手の事業成果に反応しない。この乖離はイスラム金融の内部でも
+   長年批判されている（『シャリーア適合であってシャリーア準拠ではない』）"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :islamic-pls-share
+  :lending/regime :aligned
+  :lending/org "イスラム銀行業界全体の PLS 部分"
+  :lending/jurisdiction "global"
+  :lending/instrument "ムダーラバ + ムシャーラカ"
+  :lending/take-rule "事業損益の分担。損失も貸手が負う（真の整合）"
+  :lending/scale
+  "**イスラム金融資産は 2024 年末で 3.2 兆 USD 超。うち PLS は数 %。**
+   実証研究ではムダーラバが総融資の平均約 5%、ムシャーラカが 3% 未満、
+   合計で 4% 未満という測定がある。ある市場ではムラーバハが 61.7% に対し
+   ムダーラバは 6.6%。銀行が PLS を高リスク商品に分類して避けるため"
+  :lending/source "https://ideas.repec.org/a/eee/riibaf/v49y2019icp166-175.html"
+  :lending/confidence :documented
+  :lending/note
+  "**この 1 行が『イスラム金融 = 整合』という読み方を止める。**整合体制の
+   実在規模は 3.2 兆ドルではなく、その数 %。残りは直交である。
+   ⚠ 出典の 4% / 5% / 3% はサンプル市場の値で、業界全体の確定統計ではない"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :islamic-banks-major
+  :lending/regime :orthogonal
+  :lending/regime-nominal :aligned
+  :lending/org "Kuwait Finance House / Abu Dhabi Islamic Bank / Dubai Islamic Bank / Maybank Islamic / Bank Syariah Indonesia / Meezan Bank / Kuveyt Türk"
+  :lending/jurisdiction "KWT ARE MYS IDN PAK TUR"
+  :lending/instrument "ムラーバハ / タワッルク中心"
+  :lending/take-rule "上の Al Rajhi と同じ構造。名目整合・実質直交"
+  :lending/scale "上位 100 行の地域分布: アジア 47 / 中東 39 / 欧州 9 / アフリカ 5"
+  :lending/source "https://tabinsights.com/article/top-100-islamic-banks-hold-1-6-trillion-in-assets-with-saudi-arabian-banks-strongest-financially"
+  :lending/confidence :documented
+  :lending/note "Dubai Islamic Bank は 1975 年設立の世界初の近代イスラム商業銀行"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :guidance-residential
+  :lending/regime :aligned
+  :lending/org "Guidance Residential"
+  :lending/jurisdiction "USA"
+  :lending/instrument "逓減ムシャーラカ（diminishing musharaka）住宅金融"
+  :lending/take-rule "共同所有の持分を借手が買い増す。売却損も持分比で分担すると説明されている"
+  :lending/source "https://www.guidanceresidential.com/resources/faith-based-financing/the-three-islamic-home-finance-models-musharaka-murabaha-ijara/"
+  :lending/confidence :structural
+  :lending/note "商品説明からの読み。実契約書は未観測"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ── B. レベニューシェア型（RBF）──────────────────────────────────
+ ;; **大半は :partially-aligned。**返済の「タイミング」は売上に連動するが、
+ ;; 「総額」は固定倍率なので、事業が失敗しても取り分は減らない。
+
+ {:lending/id :rbf-platforms
+  :lending/regime :partially-aligned
+  :lending/org "Wayflyer / Clearco / Capchase / Pipe / Uncapped / Liberis / Silvr / GetVantage / re:cap / Choco Up / Karmen / Decathlon Capital / Novel Capital / Ritmo / Arc"
+  :lending/jurisdiction "IRL CAN USA GBR FRA DEU IND HKG SGP ESP"
+  :lending/instrument "レベニューベースファイナンス（売上連動返済）"
+  :lending/take-rule
+  "返済額 = 月次売上 × 一定率。売上が落ちれば返済も落ちる（タイミングは整合）。
+   しかし総返済額は固定倍率（factor rate）で決まり、事業が失敗しても減らない
+   （**総額は直交**）。したがって :partially-aligned"
+  :lending/downside "貸手は下振れの**時期**を共有するが**金額**を共有しない"
+  :lending/scale
+  "Wayflyer は 5,000 超のブランドに 50 億 USD 超を供給。Clearco は累計 6.98 億 USD 超、
+   調達 7.75 億 USD。RBF 市場全体は 2025 年に 80 億 USD 超"
+  :lending/source "https://thecfoclub.com/strategic-growth-investments/revenue-based-financing-companies/"
+  :lending/confidence :reported
+  :lending/note
+  "**この節を『整合』として数えないこと。**固定倍率の RBF は、真の整合と
+   マーチャント・キャッシュ・アドバンス（逆行になりうる）の**間**にある。
+   同じ形式が両側に振れるので、体制の判定は個別契約の倍率条項を見ないと確定しない"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :lighter-capital
+  :lending/regime :aligned
+  :lending/org "Lighter Capital"
+  :lending/jurisdiction "USA"
+  :lending/instrument "ロイヤルティ型レベニューファイナンス（SaaS 向け）"
+  :lending/take-rule "売上に対する率で回収。持分希薄化なし"
+  :lending/confidence :structural
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :platform-merchant-capital
+  :lending/regime :partially-aligned
+  :lending/org "Shopify Capital / Stripe Capital / Amazon Lending / PayPal Working Capital"
+  :lending/jurisdiction "global (platform-embedded)"
+  :lending/instrument "プラットフォーム内蔵の売上連動前払い"
+  :lending/take-rule "返済は流通額の一定率で自動控除。総額は固定手数料"
+  :lending/downside "プラットフォームが決済を握っているため回収リスクが構造的に低い"
+  :lending/confidence :structural
+  :lending/note
+  "**貸手が借手の売上フローを技術的に支配している**という点で、他の RBF と
+   リスク構造が違う。整合に見えるが、貸手側の下振れがほぼ無い"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ── C. 所得分配契約（ISA）────────────────────────────────────────
+
+ {:lending/id :chancen-international
+  :lending/regime :aligned
+  :lending/org "CHANCEN International"
+  :lending/jurisdiction "RWA KEN ZAF GHA (非営利)"
+  :lending/instrument "Income Share Agreement（所得下限あり）"
+  :lending/take-rule "卒業後所得の一定率を一定期間。所得が下限を下回れば支払いゼロ"
+  :lending/downside "**貸手が下振れを完全に負う**（所得が出なければ回収なし）—— 真の整合"
+  :lending/scale "60,000 人規模への拡大を表明。ドイツで 20 年運用されたモデルを 2018 年に東アフリカへ"
+  :lending/source "https://chancen.international/"
+  :lending/confidence :reported
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :purdue-back-a-boiler
+  :lending/regime :aligned
+  :lending/org "Purdue University — Back a Boiler"
+  :lending/jurisdiction "USA"
+  :lending/instrument "大学運営の ISA"
+  :lending/take-rule "卒業後所得の一定率"
+  :lending/status :discontinued
+  :lending/evidence "2022 年秋に新規契約の発行を停止（サービサー Vemo の市場撤退に伴う）。既存契約の管理は継続"
+  :lending/source "https://www.insidehighered.com/news/2022/06/23/purdue-pauses-new-income-share-agreement-enrollments"
+  :lending/confidence :documented
+  :lending/note "ISA のパイオニア群は多くが終了した。**整合体制は市場で自然に拡大していない**という観測点"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :bloomtech
+  :lending/regime :regressive
+  :lending/regime-nominal :aligned
+  :lending/org "BloomTech, Inc.（旧 Lambda School）/ Austen Allred"
+  :lending/jurisdiction "USA"
+  :lending/instrument "ISA（形式は整合）"
+  :lending/take-rule "所得連動を名乗りながら、費用と就職率を偽って表示した"
+  :lending/evidence
+  "CFPB 同意命令（2024-04-17）。ISA の性質と費用について学生を誤認させ、
+   卒業生の就職率について虚偽の主張を行ったと認定。TILA / UDAAP / FTC Holder Rule 違反。
+   BloomTech と Allred は消費者向け貸付から**恒久的に排除**、Allred は学生向け貸付から 10 年排除。
+   制裁金は会社 64,235 USD、Allred 個人 100,000 USD"
+  :lending/adjudication :consent-order
+  :lending/source "https://www.consumerfinance.gov/enforcement/actions/bloomtech-inc-and-austen-allred/"
+  :lending/confidence :documented
+  :lending/note
+  "**本カタログで最も重要な 1 行。**整合の形式（ISA）が逆行として運用された実例であり、
+   『形式から体制を導出してはならない』という判定規則の根拠。
+   ⚠ この 1 件を ISA 一般の性質として読まないこと（Chancen は同じ形式で整合側に在る）"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :isa-others
+  :lending/regime :partially-aligned
+  :lending/org "Stride Funding / Better Future Forward / Avenify"
+  :lending/jurisdiction "USA"
+  :lending/instrument "ISA"
+  :lending/confidence :structural
+  :lending/note "所得下限・支払上限・期間上限の設定次第で整合度が大きく変わる。個別条項未観測"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ── D. 住宅持分投資 ─────────────────────────────────────────────
+
+ {:lending/id :home-equity-investment
+  :lending/regime :aligned
+  :lending/org "Point / Hometap / Unison"
+  :lending/jurisdiction "USA"
+  :lending/instrument "Home Equity Investment（住宅持分投資）"
+  :lending/take-rule "住宅価格の値上がり分の一定率。**値下がり時は投資家も損を被る設計が多い**"
+  :lending/downside "下落局面で貸手が損を負うなら整合。負わない（元本保証型）なら直交"
+  :lending/confidence :structural
+  :lending/note "下落分担条項の有無が体制を決める。各社契約は未観測"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :uk-help-to-buy
+  :lending/regime :aligned
+  :lending/org "UK Government — Help to Buy equity loan"
+  :lending/jurisdiction "GBR"
+  :lending/instrument "政府によるエクイティローン"
+  :lending/take-rule "返済額は売却時の住宅価値に対する持分比。**値下がりすれば政府の回収額も減る**"
+  :lending/downside "政府が下振れを負う。**政府が整合側の貸手になっている例**"
+  :lending/confidence :structural
+  :lending/note "本カタログには政府が逆行側にいる行（Hennepin County）もある。政府は体制を決めない"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ── E. 国家債務の状態連動証券（SCDI）────────────────────────────
+
+ {:lending/id :argentina-gdp-warrants
+  :lending/regime :partially-aligned
+  :lending/org "アルゼンチン共和国 GDP 連動ワラント（2005 / 2010 再編）"
+  :lending/jurisdiction "ARG"
+  :lending/instrument "GDP-linked warrant（上向きのみ）"
+  :lending/take-rule "実質 GDP 成長が閾値を超えた年に債権者へ支払い"
+  :lending/downside
+  "**上振れのみ共有。下振れは共有しない**ので :partially-aligned。
+   不況時に支払いが減るのではなく、好況時に支払いが増えるだけ"
+  :lending/source "https://cepr.org/voxeu/columns/what-history-tells-us-about-state-contingent-debt-instruments"
+  :lending/confidence :documented
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :ukraine-gdp-warrants
+  :lending/regime :partially-aligned
+  :lending/org "ウクライナ GDP 連動ワラント（2015 再編）"
+  :lending/jurisdiction "UKR"
+  :lending/instrument "GDP-linked warrant"
+  :lending/take-rule
+  "名目 GDP が 1,254 億 USD に達し、かつ実質成長が 3% 超の場合に支払い。
+   2021–2025 は GDP の 1% を上限とするキャップ付き"
+  :lending/evidence "3 つの主要再編（アルゼンチン 2005/2010、ギリシャ 2012、ウクライナ 2015）すべてに上向き GDP ワラントが付いた"
+  :lending/source "https://findevlab.org/wp-content/uploads/2024/09/FDL-_Policy-Note-17_The-Pitfalls-of-Value-Recovery-Instruments-in-Sovereign-Debt-Restructuring_-Sept24_Ugo-Panizza_Final.pdf"
+  :lending/confidence :documented
+  :lending/note
+  "**整合形式が債務国の負担に転じた実例。**FDL の政策ノートは value recovery
+   instrument の陥穽を論じている。整合形式であっても、閾値設計を誤れば
+   債務国側にとって不利になる"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :greece-gdp-linked
+  :lending/regime :partially-aligned
+  :lending/org "ギリシャ共和国 GDP 連動債（2012 再編）"
+  :lending/jurisdiction "GRC"
+  :lending/instrument "GDP-linked bond（上向き）"
+  :lending/confidence :documented
+  :lending/source "https://cepr.org/voxeu/columns/what-history-tells-us-about-state-contingent-debt-instruments"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :climate-resilient-debt-clauses
+  :lending/regime :aligned
+  :lending/org "気候レジリエント債務条項（CRDC）を採用する公的貸手群"
+  :lending/jurisdiction "multilateral / bilateral"
+  :lending/instrument "Climate-Resilient Debt Clause"
+  :lending/take-rule
+  "自然災害等の事前合意された条件が発生したとき、**債務返済が一時凍結され
+   返済スケジュールが後ろ倒しになる**。借手の状態悪化に対して請求権が減る方向に動く"
+  :lending/downside "貸手がタイミングリスクを負う（元本の減免ではないので部分的）"
+  :lending/evidence
+  "FiCS 向け CRDC 入門（2025-02）。2025 年セビリアの第 4 回開発資金国際会議（FfD4）で
+   状態連動債務条項の標準化・主流化が優先課題とされた"
+  :lending/source "https://financeincommon.org/sites/default/files/2025-03/Climate-Resilient-Debt-Clauses-Primer.pdf"
+  :lending/confidence :documented
+  :lending/note
+  "**逆行の正反対を明示的に契約に書いた稀な例** —— 借手が最も弱ったときに
+   請求権が縮む。バルバドスの自然災害条項が先行例として知られる"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :scdi-adoption-limit
+  :lending/regime :aligned
+  :lending/org "状態連動債務証券（SCDI）全般 —— 普及の実測"
+  :lending/jurisdiction "global"
+  :lending/instrument "SCDI"
+  :lending/scale
+  "**理論的利点にもかかわらず実務での利用は限定的**（BIS / CEPR）。
+   債権者は状態連動性に対してプレミアムを要求する（BIS WP 988）"
+  :lending/source "https://www.bis.org/publ/work988.htm"
+  :lending/confidence :documented
+  :lending/note
+  "整合体制は『良いから普及する』わけではない。**整合はプレミアムを要求される** ——
+   これは ADR-2608082100 の『逆行が勝つのは強いからではなく負けが計上されないから』の
+   債券市場版で、整合側にはコストが計上されるのに逆行側には計上されない"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ══════════════════════════════════════════════════════════════════
+ ;; 直交 —— 取り分が成果と無関係。世界の貸付の圧倒的多数がここ
+ ;; ══════════════════════════════════════════════════════════════════
+
+ {:lending/id :gsib-commercial-lending
+  :lending/regime :orthogonal
+  :lending/org "G-SIB 群の通常事業融資: JPMorgan Chase / Bank of America / Citigroup / Wells Fargo / HSBC / BNP Paribas / Santander / Barclays / Deutsche Bank / UBS / 三菱UFJ / 三井住友 / みずほ / 工商銀行 / 建設銀行 / 農業銀行 / 中国銀行 / RBC / TD / Commonwealth Bank / SBI / HDFC"
+  :lending/jurisdiction "global"
+  :lending/instrument "固定金利・変動金利の事業融資、住宅ローン"
+  :lending/take-rule "契約金利。借手の事業成果が上振れしても貸手の取り分は増えない"
+  :lending/downside "担保・保証・優先弁済で下振れを回避する設計"
+  :lending/confidence :structural
+  :lending/note
+  "**同一組織が逆行商品も持つ。**遅延損害金・リボルビング・当座貸越手数料は
+   同じ銀行の別商品であり、下の逆行節に該当する。この行は事業融資という
+   **商品面**の分類であって、組織の全体評価ではない"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :public-policy-lenders
+  :lending/regime :orthogonal
+  :lending/org "日本政策金融公庫 / KfW / BNDES / 韓国産業銀行 / 世界銀行(IBRD) / IMF / ADB / AfDB / EIB / JICA・JBIC"
+  :lending/jurisdiction "JPN DEU BRA KOR multilateral"
+  :lending/instrument "政策金融・譲許的融資"
+  :lending/take-rule "金利は譲許的でありうるが、借手の成果には連動しない"
+  :lending/confidence :structural
+  :lending/note "『金利が低い = 整合』ではない。低い直交である。CRDC を入れて初めて整合側へ動く"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :mortgage-plumbing
+  :lending/regime :orthogonal
+  :lending/org "Fannie Mae / Freddie Mac / 住宅金融支援機構（フラット35）"
+  :lending/jurisdiction "USA JPN"
+  :lending/instrument "住宅ローン証券化・買取"
+  :lending/take-rule "固定金利。住宅価格が上がっても貸手の取り分は増えない"
+  :lending/confidence :structural
+  :lending/note "上の UK Help to Buy と対比すると、同じ住宅金融が直交と整合に分かれる"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :government-student-loans
+  :lending/regime :orthogonal
+  :lending/org "米国教育省 Federal Direct Loan / 日本学生支援機構（JASSO）第二種"
+  :lending/jurisdiction "USA JPN"
+  :lending/instrument "政府学生ローン（固定利息）"
+  :lending/take-rule "利息は卒業後所得と無関係"
+  :lending/confidence :structural
+  :lending/note
+  "**ISA との対比が体制の違いを最もよく示す。**同じ『教育への資金供給』が、
+   ISA なら整合、固定利息なら直交、延滞金が積み上がれば逆行になる。
+   所得連動返済（IDR / 所得連動返還型）を入れた制度は整合側へ部分的に移動する"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :credit-unions-cooperative
+  :lending/regime :orthogonal
+  :lending/regime-nominal :aligned
+  :lending/org "世界の信用組合・協同組合金融: Desjardins / Rabobank / Crédit Mutuel / Raiffeisen / Nationwide Building Society ほか"
+  :lending/jurisdiction "101 countries"
+  :lending/instrument "組合員向け融資（固定利息）+ 剰余の組合員還元"
+  :lending/take-rule
+  "**契約面は固定利息 = 直交。**整合性は取り分の決まり方ではなく
+   **所有構造**（剰余が借手＝組合員に戻る）から来る"
+  :lending/scale
+  "2024-12-31 時点で 101 か国 67,137 組合、組合員 412,681,905 人、総資産 3.8 兆 USD 超。
+   組合数は前年比 10% 減（1 年で 7 万を割り込んだ）"
+  :lending/source "https://www.woccu.org/newsroom/releases/WOCCU_Releases_Most_Comprehensive_Statistical_Report_to_Date"
+  :lending/confidence :documented
+  :lending/note
+  "**整合に入れていない理由を明記する。**この workspace は ADR-2608082100 で
+   『組合員所有だから契約も穏やか』という仮説を共済の約款で検定し、支持されなかった。
+   保険で反証された仮説を、貸付で検定せずに採用することはしない。
+   **貸付版の約款検定は未実施**（:coverage/untested-ownership-hypothesis）"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :grameen-microfinance
+  :lending/regime :orthogonal
+  :lending/org "Grameen Bank ほか古典的マイクロファイナンス"
+  :lending/jurisdiction "BGD ほか"
+  :lending/instrument "グループ連帯保証付き小口融資"
+  :lending/take-rule "逓減残高方式の固定利息。借手の事業成果には連動しない"
+  :lending/confidence :structural
+  :lending/note
+  "**マイクロファイナンスは整合ではない。**貧困層への供給という目的は整合的でも、
+   取り分の決まり方は直交。しかも下の :india-microfinance-crisis のとおり、
+   同じ形式が逆行へ転じた実例がある"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ══════════════════════════════════════════════════════════════════
+ ;; 逆行 —— 借手が困窮するほど取り分が増える
+ ;; ══════════════════════════════════════════════════════════════════
+
+ ;; ── A. 遅延損害金・手数料の累積（最も普遍的な逆行機序）──────────
+
+ {:lending/id :default-interest-universal
+  :lending/regime :regressive
+  :lending/org "遅延損害金・期限の利益喪失・手数料累積（貸手横断の機序）"
+  :lending/jurisdiction "global"
+  :lending/instrument "標準的な貸付契約のデフォルト条項"
+  :lending/take-rule
+  "借手が支払えないほど請求額が増える。**返済能力の低下が請求権の増加を生む**
+   という、逆行の定義そのもの"
+  :lending/downside "借手の困窮が貸手の名目資産を増やす"
+  :lending/confidence :structural
+  :lending/note
+  "**これは特定の悪質業者の話ではなく、直交契約に標準で埋め込まれた逆行モードである。**
+   だから世界の主要法域が、利率ではなく**取り分の総額**を縛る規制へ収束した
+   （:remedy/* を参照）。逆行の中心は周縁の高利貸しではなく、**契約の状態遷移**"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ── B. ペイデイ / 高コスト短期・ロールオーバー依存 ──────────────
+
+ {:lending/id :wonga
+  :lending/regime :regressive
+  :lending/org "Wonga"
+  :lending/jurisdiction "GBR"
+  :lending/instrument "ペイデイローン"
+  :lending/take-rule "短期高利。ロールオーバーで返済能力の低い借手ほど累積収益が増える"
+  :lending/evidence
+  "FCA との協議を受けて 2014 年に貸付可能性審査を大幅変更し、貸すべきでなかった
+   33 万件の債務を帳消し。2018 年 8 月に管財手続入り。約 358,000 人の請求者が
+   最終配当 約 2,300 万ポンド（承認債権に対し 1 ポンドあたり約 4.3 ペンス）を分け合った"
+  :lending/adjudication :insolvency
+  :lending/source "https://www.fca.org.uk/news/press-releases/wonga-make-major-changes-affordability-criteria-following-discussions-fca"
+  :lending/confidence :documented
+  :lending/note
+  "**逆行が是正されたときに何が起きるかの実測。**是正費用を払えず事業が消滅し、
+   被害者の回収は 1 ポンドあたり 4.3 ペンス。**逆行の是正は遅れると被害者に戻らない**"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :provident-home-credit
+  :lending/regime :regressive
+  :lending/org "Provident Financial — 訪問集金型消費者信用（home credit）"
+  :lending/jurisdiction "GBR"
+  :lending/instrument "ドアステップ・レンディング"
+  :lending/evidence
+  "2021 年 5 月に新規貸付を停止。2021 年 8 月に Scheme of Arrangement が承認され、
+   被害者への配当は 1 ポンドあたり 5〜10 ペンス。FCA 規制後の営業利益率では
+   救済債務の増加を吸収できなかった"
+  :lending/adjudication :scheme-of-arrangement
+  :lending/confidence :documented
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :amigo-loans
+  :lending/regime :regressive
+  :lending/org "Amigo Loans Ltd"
+  :lending/jurisdiction "GBR"
+  :lending/instrument "保証人付きローン（guarantor loan）"
+  :lending/take-rule "借手と保証人**双方**の返済能力審査を怠り、返済不能を保証人へ転嫁"
+  :lending/evidence
+  "FCA が 2023 年 2 月に公開譴責。借手・保証人の状況評価の不備を認定し、
+   **7,290 万ポンドの制裁金を科すとしたうえで、重大な財務的困難を理由に免除**。
+   2023 年 3 月に新規貸付を停止し、貸付子会社は秩序ある清算へ。
+   被害者の回収見込みは 1 ポンドあたり約 17 ペンス"
+  :lending/adjudication :public-censure-fine-waived
+  :lending/source "https://en.wikipedia.org/wiki/Amigo_Holdings"
+  :lending/confidence :documented
+  :lending/note "**£72.9m を『処分額』として集計に使わないこと** —— 実際には徴収されていない"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :us-payday-lenders
+  :lending/regime :regressive
+  :lending/org "CURO Group（Speedy Cash）/ Enova International（CashNetUSA・NetCredit）/ Advance America / Elevate Credit"
+  :lending/jurisdiction "USA"
+  :lending/instrument "ペイデイ・高コスト分割・タイトルローン"
+  :lending/take-rule "ロールオーバーと再借入に収益が依存する構造"
+  :lending/confidence :reported
+  :lending/note "各社の個別処分は本パスで一次資料まで当たっていない"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :kenya-digital-lenders
+  :lending/regime :regressive
+  :lending/org "ケニアのデジタル信用提供者（DCP / NDTCP）群"
+  :lending/jurisdiction "KEN"
+  :lending/instrument "アプリ型小口高利貸付、モバイルマネー当座貸越"
+  :lending/take-rule "高金利・隠れ手数料・連絡先を使った取立て"
+  :lending/evidence
+  "ケニア中央銀行（CBK）が非預金取扱信用提供者（NDTCP）を全件ライセンス制へ。
+   デジタルローンに金利上限を導入し、**不良債権からの回収額を、未払元本＋同額の
+   利息＋合理的回収費用までに制限**。完全遵守期限は 2025-06-28"
+  :lending/adjudication :regulatory-framework
+  :lending/source "https://www.cliffedekkerhofmeyr.com/en/news/publications/2025/Practice/Corporate-Commercial/corporate-and-commercial-alert-1-october-The-Central-Bank-of-Kenyas-expanded-net-over-non-deposit-taking-credit-providers"
+  :lending/confidence :documented
+  :lending/note "**この救済手段が南アの in duplum 則と同型**（:remedy/in-duplum-convergence）"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ── C. リボルビング信用 ────────────────────────────────────────
+
+ {:lending/id :brazil-rotativo
+  :lending/regime :regressive
+  :lending/org "ブラジルのクレジットカード回転信用（rotativo）—— 発行体横断"
+  :lending/jurisdiction "BRA"
+  :lending/instrument "リボルビング信用"
+  :lending/take-rule "最低支払額のみ払う借手ほど残高が雪だるま式に増える"
+  :lending/evidence
+  "規制前の平均金利は年約 450%。法律 14.690/23（Desenrola 法）が 2024-01-03 に発効し、
+   **回転信用の利息および手数料が元本を超えてはならない**（元債務の 100% を上限）と定めた。
+   ⚠ この法は**総額**を縛るのであって、そこに至る**利率**は縛っていない"
+  :lending/adjudication :statutory-cap
+  :lending/source "https://www.brazilcounsel.com/blog/brazil-caps-credit-card-interest-rates"
+  :lending/confidence :documented
+  :lending/observed-at "2026-08-08"}
+
+ ;; ── D. 担保実行・剰余取得（loan-to-own）────────────────────────
+
+ {:lending/id :credit-acceptance
+  :lending/regime :regressive
+  :lending/org "Credit Acceptance Corporation"
+  :lending/jurisdiction "USA"
+  :lending/instrument "サブプライム自動車ローン（間接貸付・サービシング）"
+  :lending/take-rule "返済不能を前提に設計された融資と、回収・再販から利益を得る構造だと申し立てられた"
+  :lending/evidence
+  "CFPB とニューヨーク州司法長官が 2023-01-04 に共同提訴。消費者金融保護法上の
+   欺瞞的・濫用的行為があり、借手を返済不能に陥らせる設計だったと**申し立てた**。
+   **CFPB は 2025-04-24 に原告からの離脱を申し立て、2025-04-29 に認められた。**
+   別途マサチューセッツ州との間で 2,700 万 USD の和解が公表されている"
+  :lending/adjudication :withdrawn
+  :lending/source "https://www.consumerfinance.gov/enforcement/actions/credit-acceptance-corporation/"
+  :lending/confidence :documented
+  :lending/note
+  "**申し立てであって認定ではない。**さらに 2025 年に連邦当局が訴訟から撤退した ——
+   本カタログの検出可能性が**執行体制の変動に依存している**ことを示す行であり、
+   :coverage/enforcement-plane-shift の根拠"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :hennepin-county-equity-theft
+  :lending/regime :regressive
+  :lending/org "Hennepin County, Minnesota（および同種制度を持っていた約 12 州と DC）"
+  :lending/jurisdiction "USA"
+  :lending/instrument "固定資産税滞納による差押えと剰余の保持"
+  :lending/take-rule
+  "**滞納税額を超える売却代金を政府が保持する。**税債務が小さくても住宅の
+   全価値を取れるので、借手の困窮が政府の取り分を最大化する"
+  :lending/evidence
+  "Geraldine Tyler の約 15,000 USD の滞納に対し、郡はコンドミニアムを差押えて
+   40,000 USD で売却し、差額 25,000 USD を保持した。連邦最高裁は 2023-05-25、
+   Tyler v. Hennepin County, 598 U.S. ___ で**全員一致**により、これが合衆国憲法
+   修正 5 条の収用条項に違反すると判断。当時この制度を認めていた約 12 州と DC は
+   以後これを行えない"
+  :lending/adjudication :supreme-court-unanimous
+  :lending/source "https://www.supremecourt.gov/opinions/22pdf/22-166_8n59.pdf"
+  :lending/confidence :documented
+  :lending/note
+  "**政府が逆行側の主体である実例。**ADR-2607203000 の
+   『いかなる entity も categorical に除外しない』規則の適用点 ——
+   逆行は民間高利貸しの属性ではなく、**取り分の決まり方の属性**である。
+   同じカタログに整合側の政府（UK Help to Buy）も在る"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :title-rent-to-own
+  :lending/regime :regressive
+  :lending/org "タイトルローン・レントトゥオウン業態（TitleMax/TMX Finance、Rent-A-Center/Upbound ほか）"
+  :lending/jurisdiction "USA"
+  :lending/instrument "自動車権原担保貸付、レントトゥオウン"
+  :lending/take-rule
+  "担保物の価値が債務を大きく上回るため、**差押え・再販の反復そのものが収益源**になる。
+   借手が完済できないほうが貸手の期待収益が高い"
+  :lending/confidence :structural
+  :lending/note "機序の分類のみ。個別企業の処分内容は本パスで未検証（金額を書いていないのはそのため）"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ── E. 不良債権の買取と訴訟 ────────────────────────────────────
+
+ {:lending/id :debt-buyers
+  :lending/regime :regressive
+  :lending/org "Encore Capital Group（Midland Funding / Midland Credit Management / Asset Acceptance）/ PRA Group"
+  :lending/jurisdiction "USA"
+  :lending/instrument "償却済み債権の買取と回収訴訟"
+  :lending/take-rule
+  "額面を大幅に下回る価格で償却債権を買い、額面で回収を図る。
+   **債務者が争えないほど利益率が上がる**（欠席判決が最も効率的な回収経路）"
+  :lending/evidence
+  "米国最大の債権回収・買取業者群。2015 年に CFPA / FDCPA / FCRA 違反の認定に基づく
+   同意命令。CFPB は 2020-09-08 に同意命令違反で再提訴し、和解により消費者への
+   救済 79,308.81 USD と民事制裁金 1,500 万 USD の支払いを求めた。
+   PRA Group とも同種の同意命令"
+  :lending/adjudication :consent-order
+  :lending/source "https://www.consumerfinance.gov/administrative-adjudication-proceedings/administrative-adjudication-docket/encore/"
+  :lending/confidence :documented
+  :lending/note
+  "**救済 79,308.81 USD と制裁金 1,500 万 USD の比に注目。**被害者に戻った額より
+   国庫に入った額が 189 倍大きい。逆行の是正が被害者の原状回復にならない構造"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :sovereign-holdout-funds
+  :lending/regime :regressive
+  :lending/org "Elliott Management / NML Capital（対アルゼンチン）ほかホールドアウト債権者"
+  :lending/jurisdiction "USA GBR / 対 ARG"
+  :lending/instrument "デフォルト済み国債の買取と全額請求訴訟"
+  :lending/take-rule
+  "**債務国が破綻しているほど安く買え、全額請求で得られる倍率が上がる。**
+   再編に応じないことが収益の源泉"
+  :lending/evidence
+  "アルゼンチンは 2001 年に約 800 億 USD の公的債務をデフォルト。2005 年と 2010 年の
+   再編に債権者の 91% が応じたが、Elliott らは応じず全額請求を追求し、2006 年に米国で
+   判決を取得。NML Capital の請求は約 3 億 USD。2012-10-11、ガーナのアクラ商事裁判所は
+   NML Capital の申立てにより Tema 港で拘留されていたアルゼンチン海軍練習帆船
+   ARA Libertad の解放申立てを却下した。2012-10-26、米国第 2 巡回区控訴裁判所は
+   pari passu 条項に基づき、再編債権者への支払いを行うならホールドアウトにも
+   比例的支払いを行うよう命じる差止めを支持した"
+  :lending/adjudication :court-judgment
+  :lending/source "https://www.hsfkramer.com/notes/arbitration/2012-10/nml-capital-and-argentina-ghanaian-court-rejects-argentinas-sovereign-immunity-challenge-and-nml-capital-targets-second-vessel-in-south-africa"
+  :lending/confidence :documented
+  :lending/note
+  "**逆行の最も純粋な形。**取り分は債務国の窮状に対する単調増加関数であり、
+   しかも法制度がそれを執行する。上の :argentina-gdp-warrants（整合形式）と
+   **同じ債務国・同じ再編**から両体制が生じている点が重要 ——
+   体制は国でも業種でもなく、**契約ごとに決まる**"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ── F. 整合形式が逆行に転じた歴史的事例 ────────────────────────
+
+ {:lending/id :india-microfinance-crisis
+  :lending/regime :regressive
+  :lending/regime-nominal :aligned
+  :lending/org "アーンドラ・プラデーシュ州のマイクロファイナンス機関群（2010）/ その後のアプリ型貸付"
+  :lending/jurisdiction "IND"
+  :lending/instrument "小口融資、後にデジタル小口融資"
+  :lending/take-rule "多重債務と攻撃的取立てにより、返済困難な借手ほど回収圧力が増した"
+  :lending/evidence "RBI は 2022 年にデジタル貸付ガイドラインを導入した"
+  :lending/confidence :reported
+  :lending/note "本パスで一次資料まで当たっていない。数値を書いていないのはそのため"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :japan-grey-zone
+  :lending/regime :regressive
+  :lending/org "武富士ほか日本の消費者金融（グレーゾーン金利期）"
+  :lending/jurisdiction "JPN"
+  :lending/instrument "グレーゾーン金利の消費者信用"
+  :lending/take-rule "出資法と利息制限法の間の金利帯で貸し、借換えで累積させた"
+  :lending/evidence
+  "2006 年の最高裁判断以降、過払金返還請求が急増。武富士は約 200 万人・
+   総額約 2.4 兆円の過払いがあったと推計され、2010-09-28 に会社更生手続開始を申立て、
+   負債約 52 億 USD で日本の消費者金融として最大の破綻となった。
+   2006 年の貸金業法改正で上限金利 20%、および年収の 3 分の 1 を超える貸付の禁止
+   （総量規制）が導入された"
+  :lending/adjudication :statutory-cap-and-restitution
+  :lending/source "https://en.wikipedia.org/wiki/Takefuji"
+  :lending/confidence :documented
+  :lending/note
+  "**逆行を遡及的に是正した数少ない実例。**過払金返還は『取り過ぎた分を返す』
+   という総額規制の事後版であり、:remedy/in-duplum-convergence と同じ論理"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ══════════════════════════════════════════════════════════════════
+ ;; 救済手段の法域横断的な収束 —— 利率ではなく「取り分の総額」を縛る
+ ;; ══════════════════════════════════════════════════════════════════
+
+ {:remedy/id :in-duplum-convergence
+  :remedy/finding
+  "互いに参照していない 4 つの法域が、逆行に対して**同一の形の救済**に到達した ——
+   利率の上限ではなく、**取り分の総額を元本に対して縛る**"
+  :remedy/instances
+  "ZAF: in duplum 則（ローマ・オランダ法起源の慣習法）。国民信用法 103 条 5 項で
+     成文化され、債務不履行中に発生する利息・手数料の合計が、不履行時点の
+     未払元本残高を超えてはならないと定める（利息だけでなく全 charge に拡張）
+   BRA: 法律 14.690/23（Desenrola 法）、2024-01-03 発効。回転信用の利息・手数料の
+     合計が元債務の 100% を超えてはならない
+   KEN: CBK の NDTCP 枠組み。不良債権からの回収額を未払元本＋同額＋合理的回収費用に制限
+   JPN: 2006 年貸金業法改正の上限金利 20% と総量規制（年収の 3 分の 1）、
+     および過払金返還による事後的な総額是正"
+  :remedy/why-this-shape
+  "**逆行の定義的特徴は取り分の無限増殖である**（借手が払えないほど請求権が増える）。
+   利率上限はその増殖の**速度**を縛るだけで、時間さえかければ総額は発散する。
+   総額上限は**発散そのもの**を止める。だから独立に到達された。
+   ⚠ ブラジル法は総額を縛るが利率は縛っていない —— この 2 つを混同しないこと"
+  :remedy/source "https://www.jutajournals.co.za/in-duplum-and-the-lump-sum-loan-the-common-law-and-section-1035-of-the-national-credit-act/"
+  :remedy/confidence :documented
+  :remedy/note
+  "**これは本カタログの主要な分析的発見**であり、事前に想定していたものではない。
+   4 法域を別々に調べた結果、同じ形が出た。反証可能な形にしておく ——
+   総額上限を持たない法域で逆行の被害が同程度に抑えられていれば、この主張は弱まる"}
+
+ {:remedy/id :form-does-not-determine-regime
+  :remedy/finding
+  "整合の形式（ISA / RBF / イスラム金融 / 協同組合）は体制を保証しない。
+   BloomTech は ISA を、AP 州の MFI はマイクロファイナンスを、イスラム銀行は
+   PLS の看板をそれぞれ掲げたまま、直交または逆行として運用した"
+  :remedy/implication
+  "**したがって『整合的な組織を認定する』方式の制度設計は機能しない。**
+   認定できるのは契約条項であり、しかもそれは運用で覆る。
+   検査すべきは形式でも所有構造でもなく、
+   『借手の成果が悪化したとき請求権がどう動いたか』という**実績データ**"
+  :remedy/confidence :documented}
+
+ ;; ══════════════════════════════════════════════════════════════════
+ ;; カバレッジ申告 —— 何を測っていないか
+ ;; ══════════════════════════════════════════════════════════════════
+
+ {:lending/coverage true
+  :coverage/observed-at "2026-08-08"
+  :coverage/entity-total 46
+  :coverage/lending-rows 39
+  :coverage/regime-breakdown
+  ":regressive 15 / :aligned 10 / :orthogonal 8 / :partially-aligned 6"
+  :coverage/confidence-breakdown
+  ":documented 21 / :structural 14 / :reported 4"
+  :coverage/regime-nominal-mismatch-rows 5
+  :coverage/counts-are-measured
+  "上記はファイルを読んで数えた実測値（2026-08-08）であって手書きの概数ではない。
+   行を足したらこの 6 つの数も更新すること —— カバレッジ申告が実態とずれたら、
+   この dataset は自分自身の :confidence 規則に違反する"
+
+  :coverage/regime-breakdown-is-not-a-population-estimate
+  "**逆行 15 行 > 整合 10 行 を『世界では逆行のほうが多い』と読まないこと。**
+   これは選定の結果である —— 逆行は執行記録という探しやすい索引を持ち、整合は
+   持たない。実際の**量**では直交が圧倒的多数で、8 行という数字と何の関係もない
+   （信用組合 1 行が 67,137 組合を代表している）。**行数は量ではない。**"
+
+  :coverage/not-a-census
+  "**これは世界の貸付の国勢調査ではない。**世界には数十万の与信主体があり
+   （信用組合だけで 67,137、それ以外に銀行・ノンバンク・公的機関・国家・
+   非公式金融がある）、本カタログはそのうち **39 行**しか持たない。
+   『世界中で分類特定した』という要求に対して、**カバレッジは達成していない**。
+   達成しているのは、分類**規則**と、各体制の**代表例の実証**まで"
+
+  :coverage/selection-bias
+  "**逆行の行は執行記録から選ばれている。**規制当局が動いた事案しか見えないので、
+   規制が弱い法域・非公式金融（ヤミ金、非公式高利貸し、質屋、雇用主貸付、
+   契約農業の前貸し）は**構造的に欠落**している。件数の地域分布を
+   『逆行の地理的分布』として読むと、実際には**執行能力の地理的分布**を読むことになる"
+
+  :coverage/enforcement-plane-shift
+  "検出可能性は時間的にも一定でない。CFPB は 2025-04-29 に Credit Acceptance 訴訟から
+   離脱した。同じ機序が同じ規模で続いていても、2026 年の記録には残らなくなる。
+   **本カタログの逆行件数を時系列で比較してはならない**"
+
+  :coverage/no-contract-text-observed
+  "ADR-2608082100 が損保・共済の約款で行った**定型句の実測**（負:正 = 24.62:1 等）に
+   相当する作業を、この dataset では**まだ行っていない**。:structural の 11 行は
+   商品説明と契約形式からの読みであって、契約文の観測ではない。
+   次に取るべきデータは、貸付約款に対する同型の中立化済み検出器 ——
+   ただし共済の事例が示すとおり、**語彙を中立化しないと業態間比較が壊れる**"
+
+  :coverage/untested-ownership-hypothesis
+  "『組合員所有なら契約が穏やか』という仮説は、保険では検定され支持されなかったが、
+   **貸付では未検定**。信用組合 67,137 組合を直交に置いたのはこの未検定を理由とする
+   保守的な扱いであり、整合でないことの証明ではない"
+
+  :coverage/no-lei-join
+  "LEI を 1 件も付けていないので、market-intel（SEC EDGAR 財務）や
+   cloud-itonami-lei（法人実体）と **join できない**。推測した LEI は join 面を
+   静かに壊すため、確認できるまで入れない。これが本 dataset の最大の構造的制約"
+
+  :coverage/quantification-gap
+  "ADR-2608082100 の 8 機序（取り分・情報非対称・退出コスト・外部化・非同意・
+   目的収益ずれ・商品化・訴求可視量）に対応する **aᵢ の数値を、この dataset は
+   1 行も持たない**。したがって Alignment = 1 − 2·Misalignment を計算できず、
+   money-stink モデルへ入力できない。現状は**符号の分類**までで、**度合いの測定**には
+   達していない。捏造した aᵢ を埋めないこと"
+
+  :coverage/next-measurement
+  "1. 貸付約款に対する中立化済み定型句検出器（業態間で語彙を揃える）
+   2. 信用組合 vs 株式会社銀行の**同一商品**での約款比較（保険で交絡した商品種別を揃える）
+   3. 各行への LEI 付与（GLEIF 突合。推測しない）
+   4. aᵢ の実測値付与 → money-stink モデルへの接続"}
+]

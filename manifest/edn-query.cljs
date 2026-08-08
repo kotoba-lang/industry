@@ -1254,7 +1254,30 @@
    ;;    .gitignore に入っている charter 上のローカル台帳で、**走らせたマシンにしか
    ;;    存在しない**。ここに載っているのは観測サマリであって中身ではない。
    ;; ⚠ `:coverage/unmeasured` は「対象外」ではなく「まだ測っていない」。
-   ["observatory" (io/file root "90-docs" "observatory" "observatory.datoms.edn")]])
+   ["observatory" (io/file root "90-docs" "observatory" "observatory.datoms.edn")]
+   ;; lending-alignment — 貸付を整合 / 直交 / 逆行の 3 体制に分類した実在組織カタログ
+   ;; （手書きの「現在値」文書。ADR-2608082200。ADR-2608082100 の一般モデルを貸付に絞ったもの）。
+   ;; 4 種類の entity が混在する:
+   ;;   `:regime/id` 3 件（体制の定義と判定規則）
+   ;;   `:test/id` 1 件（3 問 + 下振れ問の判定手続き）
+   ;;   `:lending/id` 行（組織 × 商品 1 つごと）
+   ;;   `:remedy/id` 2 件 / `:lending/coverage true` 1 件
+   ;;
+   ;; ⚠ **分類の単位は組織ではなく「組織 × 商品」。** 同じ銀行が事業融資（直交）と
+   ;;    遅延損害金・リボ（逆行）とイスラム窓口（名目整合）を同時に持つ。ある行が
+   ;;    逆行であることは、その組織の全事業が逆行だという主張ではない。
+   ;; ⚠ **`:lending/confidence` を見ずに集計しない。** `:structural` は商品説明と契約
+   ;;    形式からの読みで、**契約文を観測していない**（ADR-2608082100 が約款でやった
+   ;;    定型句の実測に相当する作業は未実施）。`:documented` だけが一次資料に基づく。
+   ;; ⚠ **`:lending/regime-nominal` を持つ行は名目と実質が食い違う。** イスラム金融の
+   ;;    大半（名目整合・実質直交）と BloomTech（名目整合・実質逆行）がこれ。
+   ;;    形式から体制を導出しないこと。
+   ;; ⚠ **逆行の件数を時系列比較しない。** 行は執行記録から選ばれており、規制が弱い
+   ;;    法域と非公式金融は構造的に欠落する。CFPB は 2025-04-29 に Credit Acceptance
+   ;;    訴訟から離脱しており、検出可能性そのものが年によって動く。
+   ;; ⚠ **LEI を 1 件も持たないので market-intel / cloud-itonami-lei と join できない。**
+   ;;    推測した LEI が join 面を静かに壊すのを避けたため（`:coverage/no-lei-join`）。
+   ["lending-alignment" (io/file root "90-docs" "finance" "lending-alignment.datoms.edn")]])
 
 (defn index-entities [next-tempid!]
   (let [skipped (atom [])
