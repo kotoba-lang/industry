@@ -1,0 +1,17 @@
+{
+  "name": "itonami-isic-9601-game",
+  "private": true,
+  "version": "0.1.0",
+  "description": "クリーニング営み — the cloud-itonami ISIC 9601 garment-care actor as an idle tycoon. Build tooling only; the game itself is the cljc in src/.",
+  "scripts": {
+    "test": "nbb --classpath src test/logic_test.cljs",
+    "balance": "nbb --classpath src test/balance.cljs",
+    "build": "nbb preview/build.cljs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.0",
+    "nbb": "1.3.201",
+    "playwright": "1.49.0",
+    "squint-cljs": "0.8.147"
+  }
+}

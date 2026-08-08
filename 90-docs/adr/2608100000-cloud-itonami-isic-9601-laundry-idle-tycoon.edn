@@ -1,0 +1,218 @@
+[{:db/id -1
+  :adr/id "adr-2608100000-cloud-itonami-isic-9601-laundry-idle-tycoon"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "cloud-itonami-isic-9601-laundry-idle-tycoon"
+  :adr/title "ADR-2608100000: ISIC 9601 クリーニング業の governed actor を放置系タイクーンにして isekai.network へ出す"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["90-docs/adr/2607031000-cloud-itonami-network-isekai-job-simulators.edn"
+                "90-docs/adr/2607091830-network-isekai-game-work-actors-app-aozora.edn"
+                "90-docs/adr/2607031400-itonami-games-atproto-actors-app-aozora.edn"
+                "90-docs/adr/2606271700-cloud-itonami-business-os.edn"
+                "games/itonami/isic-9601/"
+                "https://github.com/cloud-itonami/cloud-itonami-isic-9601"]
+
+  :adr/authoritative_for
+  ["cloud-itonami の 9 本目の network-isekai ゲームは `cloud-itonami-isic-9601`
+    (ISIC Rev.5 9601 洗濯・ドライクリーニング業、LaundryOps-LLM ⊣ Garment Care
+    Governor) を題材にし、canonical な置き場所は
+    network-awai/network-isekai:public/games/itonami/isic-9601/ とする"
+   "ジャンルは既存 8 本の depot loop ではなく放置系タイクーン (オーナー判断
+    2026-08-08)。理由は機構の好みではなく、9601 の不変条件がこのジャンルでだけ
+    遊びとして成立するため —— 放置ゲーは「全部自動化する」ゲームであり、この店は
+    最後の 2 工程を構造的に自動化できない"
+   "ゲームの規則は考案しない。`laundry.phase/write-ops` が 5 工程、
+    `laundry.phase/phases` が段階の梯子、各 phase の `:auto` 集合が
+    「無人で回る工程」、`laundry.governor` の 6 HARD チェックが HOLD、
+    `laundry.governor/confidence-floor` (0.6) が承認への escalate、
+    `laundry.registry/cleaning-process-forbidden-by-care-label?` が
+    洗濯表示チェック。転写であって着想ではない"
+   "`:actuation/apply-cleaning-process` と `:actuation/return-garment` は
+    どの phase の `:auto` にも入らない (phase 3 の `:auto` は
+    `#{:garment/intake}` 1 つきり)。承認者を雇っても、店をいくら大きくしても、
+    この 2 つはプレイヤーのタップでしか進まない。
+    `test/logic_test.cljs` の actuation-never-auto-at-any-phase と
+    hired-approver-never-clears-actuation がこれを固定する"
+   "ゲーム本体は pure `.cljc` の `state + event -> state` reducer 1 本
+    (`games/itonami/isic-9601/logic.cljc`)。nbb のテスト、squint 経由の
+    ブラウザプレビュー、将来の network-isekai guest が同じファイルを読む。
+    UI は `summary` しか見ず、規則を一切持たない"
+   "本セッションで着地したのは superproject 側の staging まで。
+    network-awai/network-isekai は private でセッションの repo scope に無く、
+    `add_repo` が承認待ちで通らなかったため、`scene.edn` は書いていない
+    —— 既存 8 本の実スキーマを読めない状態で推測で書かない"]
+
+  :adr/consequences
+  "{:positive
+    [\"9601 が 9 本目として既存レール (feed-index 自動発見、?embed=1、
+      <org>-<slug>.games.aozora.app の Work Actor) にそのまま乗る\"
+     \"actor の不変条件が遊びの手触りとして伝わる —— プレイヤーは「洗浄と返却だけ
+      自動化できない」ことを説明ではなく操作で知る\"
+     \"規則が 1 ファイルの純関数なので、テスト・プレビュー・guest の 3 経路で
+      挙動が割れない\"
+     \"ADR-2607031400 (keyed CACAO actor + Governor gated publish) は未着手のまま
+      温存されており、この ADR はそれを消費しない\"]
+    :negative
+    [\"scene.edn が無いので今は network-isekai に置いても描画されない。
+      移植は既存 8 本のスキーマ確認から始まる\"
+     \"game.edn に schema 外の :staging キーを載せている。移植時に落とす前提で、
+      落とし忘れると schema が汚れる\"
+     \"logic.cljc が flat と src/itonami/isic_9601/ の 2 箇所に同じ内容で存在する
+      (guest は flat file、loader は namespace path)。同期は今は手作業で、
+      一致検査は fleet gate に入れるべき未了作業\"
+     \"preview/style.css が --hig-* トークンをローカル定義している。移植時に
+      jp-go-dds.tokens/bridge-css へ差し替える必要があり、bridge が
+      --hig-spacing-* / --hig-radius-* / --hig-text-*-size を運んでいない
+      既知ギャップ (ADR-2608060000) にそのままぶつかる\"
+     \"バランスは 4 seed の probe で見ただけ。人間のプレイテストはしていない\"]}"
+
+  :adr/body
+  "# ADR-2608100000: ISIC 9601 クリーニング業の governed actor を放置系タイクーンにする
+
+**Status**: accepted (staging landed / port blocked on repo access)
+**Date**: 2026-08-08
+**Deciders**: Jun Kawasaki
+
+## Context
+
+オーナーから、放置系クリーニング店タイクーン (Laundry Store 系) のスクリーン
+ショット 2 枚とともに「こういう感じのゲームを isekai network で cloud-itonami の
+活動をそのままゲーム化して、公開」「クリーニング屋は cloud-itonami の repo に
+あるかな？」という依頼。
+
+**ある。** `cloud-itonami/cloud-itonami-isic-9601` —— ISIC Rev.5 9601
+「Washing and (dry-)cleaning of textile and fur products」。他の itonami actor と
+同じ形 (langgraph-clj StateGraph + 独立 Governor + append-only 監査台帳) で、
+**LaundryOps-LLM ⊣ Garment Care Governor**。
+
+先行研究も既にある:
+
+- **ADR-2607031000** —— cloud-itonami の 8 blueprint が既に
+  `network-isekai:public/games/itonami/<slug>/` に job simulator として
+  存在する (`game.edn` + `scene.edn` + `logic.cljc`、kami-clj guest subset、
+  `isekai.feed-index` が自動発見)。機構は intake→propose→approve→execute→audit
+  を写した「depot loop」。
+- **ADR-2607091830** —— 31 games 全件に Work Actor
+  (`<org>-<slug>.games.aozora.app`) と `?embed=1` 埋め込み URL が付いている。
+
+つまり 9601 は **9 本目として同じレールに乗る**。
+
+## Decision
+
+### 1. ジャンルは放置系タイクーン。既存の depot loop ではない
+
+オーナー判断。ただし決め手は機構の好みではない。**放置ゲーは「全部自動化する」
+ゲームであり、この店は最後の 2 工程を構造的に自動化できない。** そのねじれが
+そのまま遊びになる。
+
+`laundry.phase` を読むと、phase 3 (supervised-auto) の `:auto` 集合は
+`#{:garment/intake}` の **1 つきり**で、`:actuation/apply-cleaning-process` と
+`:actuation/return-garment` はどの phase の `:auto` にも入っていない。
+`laundry.governor/high-stakes` が同じ不変条件を独立に守っている (2 層)。
+店をいくら大きくしても、承認者を何人雇っても、**洗浄と返却はプレイヤーの指に
+残り続ける**。放置ゲーの文法でこれをやると、プレイヤーは説明ではなく操作で
+それを知る。
+
+### 2. 規則は転写する。考案しない
+
+| ゲーム | actor |
+|---|---|
+| 5 工程 (受付/取扱方法/資格照合/洗浄/返却) | `laundry.phase/write-ops` |
+| 店の段階 0–3 | `laundry.phase/phases` |
+| 無人で回る工程 | 各 phase の `:auto` |
+| 6 種の HOLD | `laundry.governor` の 6 HARD チェック |
+| 確度 60% 未満で承認待ち | `laundry.governor/confidence-floor` |
+| 洗濯表示との衝突 | `laundry.registry/cleaning-process-forbidden-by-care-label?` |
+| 差し戻す | 承認ワークフローの `{:approval {:status :rejected}}` |
+| 監査台帳 | actor の append-only ledger |
+
+**ゲームが教える技能は 3 番目のチェック。** advisor が処理方法を提案し、
+garment 自身の洗濯表示が ground truth。衝突した計画を取扱方法で承認しても
+**安全ではある** —— governor が洗浄で HOLD し、衣類は絶対に傷まない —— が、
+顧客の信頼を失う。表示を読んで差し戻せば時間しか失わない。
+
+### 3. 遊べるようにするために足した 3 つ、その根拠
+
+転写だけでは遊びが成立しない箇所が 3 つあり、いずれも actor の意味論の側から
+埋めた。**バランス調整のための後付けではない。**
+
+1. **工程ごとの入金** (`station-payout`)。返却だけが払うと phase 1/2 は収入ゼロで
+   段階を上げられない。実際のクリーニング屋は預かり時に前受金を取る。
+2. **phase 未対応工程の「手作業で処理」** (`sweep-off-system`)。phase-disabled は
+   失敗ではなく「actor がまだその工程を覆っていない」という意味なので、
+   garment は手作業で流れて半額を払う。これが無いと phase 1 でフロアが詰まって
+   デッドロックする。
+3. **`:clean` の必要書類は 4 でなく 3**。4 件目の洗濯処理記録は洗浄自身が生む。
+   前提として要求すると洗浄に永久に到達できない。`:return` は 4 件全部を要求し、
+   それが「洗っていない衣類は返せない」を自動的に表現する。
+
+また **資格失効 (`:certification-not-current`) はライフを減らさず店を止める。**
+governor はこのチェックを無条件に評価するので全工程が HOLD になる —— これは
+「正しく止まっている」状態であって、garment ごとに罰を積むと 1 回の失効が
+即死になる。
+
+### 4. 1 ファイルの純関数 reducer にする
+
+`games/itonami/isic-9601/logic.cljc` が全規則。I/O・atom・interop・
+`Math/random` なし。RNG は `:seed` から状態に織り込んだ MINSTD。
+nbb のテストも、squint 経由のブラウザプレビューも、将来の kami-clj guest も
+**同じファイルを読む**ので挙動が割れない。UI は `summary` しか見ず規則を持たない。
+
+実装中に踏んだ 2 つの罠を記録しておく (どちらも「3 経路で同じファイル」を
+成立させるための制約):
+
+- **`(mapv :key xs)` は squint で落ちる。** squint はキーワードを素の文字列に
+  コンパイルするので関数位置に置けない。この ns 全体でキーワードの関数適用を
+  避けている。
+- **LCG の乗数は 16807 (MINSTD)。** よく使う 1103515245 は 2^31 剰余に対して
+  積が 2.4e18 になり float64 の仮数部を溢れる。nbb とブラウザで乱数列が
+  静かにずれ、`:seed` が再現しなくなる。
+
+### 5. 検証
+
+- **単体 63 チェック** (nbb, `test/logic_test.cljs`)。核は
+  `actuation-never-auto-at-any-phase` /
+  `clean-and-return-escalate-even-when-perfectly-clean` /
+  `hired-approver-never-clears-actuation` の 3 本 —— 将来の編集がこの店を
+  actor より自動化しやすくしたら落ちる。
+- **`careless-play-loses-to-the-care-label`** が教材性の両面を固定する:
+  表示を読まずに承認すると負ける、かつ**負ける過程でも禁止処理は 1 件も
+  適用されない**。
+- **ブラウザ 7 チェック** (headless Chromium, `preview/smoke.cljs`) ——
+  実ページで 40/40 返却まで到達することを確認。dead board はここで落ちる。
+- **balance probe** (`test/balance.cljs`) —— seed 3/7/11/99 すべてで
+  丁寧なプレイが t≈700 で victory、ライフ 3 維持。雑なプレイは t≈300 で gameover。
+
+## 現在地 —— 何が着地して、何が着地していないか
+
+**着地した**: `com-junkawasaki/root` の `games/itonami/isic-9601/` に、規則・
+テスト・自己完結 HTML プレビュー (~41 KB、外部取得ゼロ) 一式。
+
+**着地していない**: network-isekai への移植。`network-awai/network-isekai` は
+private で本セッションの repo scope に無く、`add_repo` が承認待ちで通らなかった。
+したがって:
+
+- **`scene.edn` を書いていない。** 既存 8 本の実スキーマを読めない状態で
+  推測で書くと、動かないものを「できた」と言うことになる。
+- `game.edn` は ADR-2607091830 が記述する 8 キーで書き、staging 情報は
+  `:staging` キーに隔離した (移植時に落とす)。
+
+**次にやること**: repo access を得る → 既存 8 本の `scene.edn`/`logic.cljc` の
+実スキーマを読む → `public/games/itonami/isic-9601/` へ移植 → `feed-index` に
+載ることを確認 → `?embed=1` と Work Actor の生成 (`gen-game-actors.cljs`
+再実行) → 公開。
+
+## Alternatives
+
+- **既存の depot loop をそのまま使う。** 実装リスクは最小で feed-index/Work
+  Actor 統合も確実だが、スクショの手触りと違う。オーナーは放置系を選んだ。
+- **depot loop の上に放置系を重ねる。** 作業量が最大で、2 つの機構の接合部が
+  どちらの意味論でもない場所になる。採らない。
+- **プレビューを手書き JS で書く。** CLAUDE.md (2026-07-14) が新規 `.mjs` を
+  禁じており、かつ規則が 2 実装に割れる。squint で同じ `.cljc` を通した。"}]
