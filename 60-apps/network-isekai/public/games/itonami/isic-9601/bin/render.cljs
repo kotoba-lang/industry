@@ -30,6 +30,7 @@
   Usage:
     nbb bin/render.cljs [--out FILE] [--width N] [--height N] [--cleared N] [--engine DIR]"
   (:require ["node:fs" :as fs]
+            ["node:http" :as http]
             ["node:path" :as path]
             [clojure.string :as str]
             [promesa.core :as p]
@@ -48,17 +49,26 @@
 (def H (int (num-opt "height" 1600)))
 (def out (opt "out" "preview/street.png"))
 (def cleared (int (num-opt "cleared" 0)))
+(def backend
+  "`webgl2` (default) or `webgpu`. Both read the SAME packed instances and the SAME 60-float
+  globals block — `fixtures/lit-shader.wgsl` and `fixtures/glsl/lit.*` declare an identical
+  `struct G` and identical vertex/instance locations, because one is transpiled from the
+  other. That is the render-IR contract holding in practice rather than on paper."
+  (opt "backend" "webgl2"))
 (def engine-root
   (or (opt "engine" nil)
       (path/resolve (js/process.cwd) "../../../../../../orgs/kotoba-lang")))
 
-(defn- glsl [f]
-  (let [p (path/join engine-root "webgpu" "fixtures" "glsl" f)]
+(defn- fixture [& parts]
+  (let [p (apply path/join engine-root "webgpu" "fixtures" parts)]
     (when-not (fs/existsSync p)
       (println (str "missing " p))
       (println "  west update --fetch smart webgpu   (or pass --engine <dir>)")
       (js/process.exit 3))
     (fs/readFileSync p "utf8")))
+
+(defn- glsl [f] (fixture "glsl" f))
+(defn- wgsl [f] (fixture f))
 
 ;; --------------------------------------------------------------------------
 ;; the frame, entirely from the engine
@@ -70,6 +80,7 @@
 (def payload
   #js {:VERT (glsl "lit.vert")
        :FRAG (glsl "lit.frag")
+       :WGSL (wgsl "lit-shader.wgsl")
        :POS  (clj->js (vec (mapcat identity (:positions mesh))))
        :NOR  (clj->js (vec (mapcat identity (:normals mesh))))
        :IDX  (clj->js (:indices mesh))
@@ -164,30 +175,183 @@
           png: cv.toDataURL('image/png')};
 ")
 
+
+(def webgpu-js "
+  const {WGSL, POS, NOR, IDX, INST, G, W, H, N} = window.__frame;
+  const stages = [];
+  const step = s => { stages.push(s); return s; };
+  if (!navigator.gpu) return {ok:false, stages, reason:'navigator.gpu is absent (not a secure context?)'};
+  const adapter = await navigator.gpu.requestAdapter();
+  if (!adapter) return {ok:false, stages, reason:'no WebGPU adapter'};
+  step('adapter');
+  const dev = await adapter.requestDevice(); step('device');
+  window.__keep = {adapter, dev};
+  let lost = null; dev.lost.then(i => { lost = i.reason + ': ' + i.message; });
+  const problems = [];
+  dev.addEventListener('uncapturederror', e => problems.push(String((e.error && e.error.message) || e.error)));
+
+  const mod = dev.createShaderModule({code: WGSL});
+  const ci = await mod.getCompilationInfo();
+  const errs = ci.messages.filter(m => m.type === 'error');
+  if (errs.length) return {ok:false, stages, reason:'WGSL ' + errs.map(m => m.lineNum+':'+m.message).join(' | ')};
+  step('wgsl-compiled');
+
+  const cv = Object.assign(document.createElement('canvas'), {width: W, height: H});
+  const ctx = cv.getContext('webgpu');
+  const fmt = navigator.gpu.getPreferredCanvasFormat();
+  ctx.configure({device: dev, format: fmt, alphaMode: 'opaque'});
+  step('canvas-configured');
+
+  function buf(data, usage) {
+    const b = dev.createBuffer({size: Math.ceil(data.byteLength / 4) * 4, usage: usage | GPUBufferUsage.COPY_DST});
+    dev.queue.writeBuffer(b, 0, data);
+    return b;
+  }
+  const verts = new Float32Array(POS.length * 2);
+  for (let i = 0; i < POS.length / 3; i++) {
+    verts[i*6+0]=POS[i*3]; verts[i*6+1]=POS[i*3+1]; verts[i*6+2]=POS[i*3+2];
+    verts[i*6+3]=NOR[i*3]; verts[i*6+4]=NOR[i*3+1]; verts[i*6+5]=NOR[i*3+2];
+  }
+  const vb = buf(verts, GPUBufferUsage.VERTEX);
+  const ib = buf(new Float32Array(INST), GPUBufferUsage.VERTEX);
+  const eb = buf(new Uint16Array(IDX.length % 2 ? [...IDX, 0] : IDX), GPUBufferUsage.INDEX);
+  const gb = buf(new Float32Array(G), GPUBufferUsage.UNIFORM);
+  step('buffers');
+
+  // no shadow pass: a 1x1 depth texture reads as fully lit, matching the WebGL2 path here
+  const shadowTex = dev.createTexture({size:[1,1], format:'depth32float',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT});
+  const shadowSamp = dev.createSampler({compare:'less-equal'});
+  const layout = dev.createBindGroupLayout({entries:[
+    {binding:0, visibility:GPUShaderStage.VERTEX|GPUShaderStage.FRAGMENT, buffer:{type:'uniform'}},
+    {binding:1, visibility:GPUShaderStage.FRAGMENT, texture:{sampleType:'depth'}},
+    {binding:2, visibility:GPUShaderStage.FRAGMENT, sampler:{type:'comparison'}}]});
+  const bind = dev.createBindGroup({layout, entries:[
+    {binding:0, resource:{buffer:gb}},
+    {binding:1, resource:shadowTex.createView()},
+    {binding:2, resource:shadowSamp}]});
+  step('bindgroup');
+
+  // Creating this pipeline is the real check: it validates the canonical WGSL's @group(0)
+  // bindings and all eight vertex/instance locations against the layout the engine's own
+  // packers produce. A mismatch fails HERE, before any pixel exists.
+  const pipe = dev.createRenderPipeline({
+    layout: dev.createPipelineLayout({bindGroupLayouts:[layout]}),
+    vertex: {module: mod, entryPoint:'vs', buffers:[
+      {arrayStride:24, stepMode:'vertex', attributes:[
+        {shaderLocation:0, offset:0,  format:'float32x3'},
+        {shaderLocation:1, offset:12, format:'float32x3'}]},
+      {arrayStride:128, stepMode:'instance', attributes:[
+        {shaderLocation:2, offset:0,  format:'float32x4'},
+        {shaderLocation:3, offset:16, format:'float32x4'},
+        {shaderLocation:4, offset:32, format:'float32x4'},
+        {shaderLocation:5, offset:48, format:'float32x4'},
+        {shaderLocation:6, offset:64, format:'float32x4'},
+        {shaderLocation:7, offset:80, format:'float32x4'}]}]},
+    fragment: {module: mod, entryPoint:'fs', targets:[{format: fmt}]},
+    primitive: {topology:'triangle-list', cullMode:'back'},
+    depthStencil: {format:'depth24plus', depthWriteEnabled:true, depthCompare:'less'}});
+  step('pipeline');
+
+  const depth = dev.createTexture({size:[W,H], format:'depth24plus', usage: GPUTextureUsage.RENDER_ATTACHMENT});
+  const enc = dev.createCommandEncoder();
+  const pass = enc.beginRenderPass({
+    colorAttachments:[{view: ctx.getCurrentTexture().createView(), loadOp:'clear', storeOp:'store',
+                       clearValue:{r:0.53, g:0.74, b:0.93, a:1}}],
+    depthStencilAttachment:{view: depth.createView(), depthLoadOp:'clear', depthStoreOp:'store',
+                            depthClearValue:1.0}});
+  pass.setPipeline(pipe); pass.setBindGroup(0, bind);
+  pass.setVertexBuffer(0, vb); pass.setVertexBuffer(1, ib);
+  pass.setIndexBuffer(eb, 'uint16');
+  pass.drawIndexed(IDX.length, N);
+  pass.end();
+  dev.queue.submit([enc.finish()]);
+  step('submitted');
+
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  // census through a 2D copy rather than copyTextureToBuffer, which needs a live device
+  const c2 = Object.assign(document.createElement('canvas'), {width:W, height:H});
+  const g2 = c2.getContext('2d'); g2.drawImage(cv, 0, 0);
+  const px = g2.getImageData(0, 0, W, H).data;
+  let nonSky = 0; const colors = new Set();
+  for (let i = 0; i < px.length; i += 4) {
+    colors.add((px[i]>>4)+','+(px[i+1]>>4)+','+(px[i+2]>>4));
+    if (!(Math.abs(px[i]-135)<12 && Math.abs(px[i+1]-189)<12 && Math.abs(px[i+2]-237)<12)) nonSky++;
+  }
+  step('read-back');
+  return {ok: !lost && problems.length === 0 && nonSky > 0,
+          stages, lost, reason: lost ? ('device lost — ' + lost) : problems.join(' | '),
+          glError: problems.length, blocks: 3, nonSkyPixels: nonSky, distinctColors: colors.size,
+          format: fmt,
+          renderer: [adapter.info && adapter.info.vendor, adapter.info && adapter.info.architecture,
+                     adapter.info && adapter.info.description].filter(Boolean).join(' / ') || 'webgpu',
+          png: cv.toDataURL('image/png')};
+")
+
+(def chromium-args
+  "Flags measured in this container, not copied from anywhere. `--enable-unsafe-swiftshader`
+  alone gives a WebGL2 context but no WebGPU *adapter*; adding `--enable-unsafe-webgpu`,
+  `--enable-features=Vulkan` and `--use-angle=swiftshader` is what makes `requestAdapter()`
+  return one."
+  #js ["--no-sandbox" "--use-gl=swiftshader" "--enable-unsafe-swiftshader"
+       "--enable-unsafe-webgpu" "--enable-features=Vulkan" "--use-angle=swiftshader"])
+
+(def port 8731)
+
+(defn- serve!
+  "A one-page localhost server.
+
+  WebGPU is only exposed in a SECURE CONTEXT, and `about:blank` is not one — with the page
+  loaded there `navigator.gpu` is not merely adapterless, it is absent entirely, which
+  reads exactly like 'this browser has no WebGPU'. That cost a round of flag-guessing
+  before the flags turned out never to have been the problem. `http://127.0.0.1` is a
+  secure context, so the page is served rather than injected."
+  []
+  (let [srv (.createServer http (fn [_ res]
+                                  (.writeHead res 200 #js {"Content-Type" "text/html"})
+                                  (.end res "<!doctype html><meta charset=utf-8><title>street</title>")))]
+    (.listen srv port "127.0.0.1")
+    srv))
+
 (defn -main []
   (println (str "  engine  " engine-root))
+  (println (str "  backend " backend))
   (println (str "  frame   " (count (:instances ir)) " instances · " W "x" H
                 " · eye " (pr-str (get-in ir [:globals :eye]))))
-  (p/let [pw (js/import "playwright")
+  (p/let [srv (serve!)
+          pw (js/import "playwright")
           browser (.launch (.-chromium pw)
-                           #js {:args #js ["--no-sandbox" "--use-gl=swiftshader"
-                                           "--enable-unsafe-swiftshader"]
+                           #js {:args chromium-args
                                 :executablePath (or (.-PW_CHROMIUM js/process.env)
                                                     "/opt/pw-browsers/chromium-1194/chrome-linux/chrome")})
           page (.newPage browser)
           _ (.addInitScript page #js {:content (str "window.__frame = " (js/JSON.stringify payload) ";")})
-          _ (.goto page "about:blank")
-          raw (.evaluate page (str "(() => {" page-js "})()"))
-          _ (.close browser)]
+          _ (.goto page (str "http://127.0.0.1:" port "/"))
+          raw (.evaluate page (str "(async () => {"
+                                   (if (= backend "webgpu") webgpu-js page-js)
+                                   "})()"))
+          _ (.close browser)
+          _ (.close srv)]
     (let [r (js->clj raw :keywordize-keys true)]
+      (when (:stages r)
+        (println (str "  stages  " (str/join " → " (:stages r)))))
       (if-not (:ok r)
-        (do (println (str "  FAILED  " (:reason r))) (js/process.exit 4))
+        (do (println (str "  FAILED  " (:reason r)))
+            (when (= backend "webgpu")
+              (println "  note    WGSL compiled and the render pipeline validated against the")
+              (println "          canonical vertex/instance layout — the failure is the device,")
+              (println "          not the frame. Measured in this container: Dawn drops its")
+              (println "          instance right after submit under every flag combination")
+              (println "          tried (6), including on a 3-line clear-to-red shader."))
+            (js/process.exit 4))
         (let [abs (path/resolve (js/process.cwd) out)
               b64 (second (str/split (:png r) #","))]
           (fs/mkdirSync (path/dirname abs) #js {:recursive true})
           (fs/writeFileSync abs (js/Buffer.from b64 "base64"))
-          (println (str "  gpu     " (:renderer r) "  (software rasteriser — no GPU in this container)"))
-          (println (str "  draw    glError=" (:glError r) "  uniform blocks bound=" (:blocks r)))
+          (println (str "  gpu     " (:renderer r)
+                        (when (:format r) (str "  format=" (:format r)))))
+          (println (str "  draw    error=" (:glError r) "  bindings=" (:blocks r)))
           (println (str "  pixels  " (:nonSkyPixels r) " non-background · "
                         (:distinctColors r) " distinct colours"))
           (println (str "  wrote   " abs))

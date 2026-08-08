@@ -104,10 +104,9 @@ demands that shop back, so any layout where one hides another fails the suite.
 since `bin/render.cljs` — the frame actually drawing in real WebGL 2.0, through the
 engine's own GLSL, with pixels read back (`preview/street.png`).
 
-**Still outstanding**, and part of CLAUDE.md's completion criteria for 3D: the **WebGPU**
-path has never run (the executor needs a shadow-cljs build over the full dependency tree),
-the **shadow pass** is not exercised by the CLI renderer, and there is no **Pages smoke
-test**.
+**Still outstanding**, and part of CLAUDE.md's completion criteria for 3D: **WebGPU pixels**
+(the path runs and validates, but the device is lost before anything is drawn — see above),
+the **shadow pass**, and a **Pages smoke test**.
 
 ## KAMI SDK — what was missing
 
@@ -182,7 +181,8 @@ npm run play                           # 1500 turns of the reference strategy
 npm run play -- --script "tick*30 verify screen clean return"   # scripted
 npm run play -- --seed 7 --turns 800
 
-npm run render                         # the 3D street → preview/street.png
+npm run render                         # WebGL 2.0 → preview/street.png
+npm run render -- --backend webgpu     # the WebGPU path
 npm run render -- --width 1280 --height 720 --cleared 3
 ```
 
@@ -202,6 +202,36 @@ Two limits, printed on every run: the **shadow pass is not run** (a 1×1 fully-l
 texture is bound instead, so the image is the lit pass without shadowing), and the GPU is
 **SwiftShader** because this container has no hardware one — which still exercises the real
 GLSL compiler and the real GL state machine.
+
+### The WebGPU path
+
+`--backend webgpu` runs the same frame through `fixtures/lit-shader.wgsl`. The two shaders
+declare an **identical `struct G` and identical vertex/instance locations** — one is
+transpiled from the other — so `pack-globals` and `pack-instances` feed both unchanged.
+That is the render-IR contract holding in practice rather than on paper.
+
+How far it gets here, printed as stages:
+
+```
+adapter → device → wgsl-compiled → canvas-configured → buffers → bindgroup → pipeline → submitted → read-back
+FAILED  device lost — unknown: A valid external Instance reference no longer exists.
+```
+
+**Everything except the pixels is verified.** The canonical WGSL compiles with no messages,
+and — the part worth having — `createRenderPipeline` validates the shader's `@group(0)`
+bindings and all eight vertex/instance locations against the layout the engine's packers
+produce. A mismatch would fail there, before any pixel exists.
+
+**The pixels are not obtainable in this container.** Dawn drops its instance immediately
+after `submit`, under every flag combination tried (`--use-angle=swiftshader`,
+`--use-webgpu-adapter=swiftshader`, `VulkanFromANGLE`, `--in-process-gpu`,
+`--single-process`, `--disable-gpu-sandbox`) — including on a three-line clear-to-red
+shader with `layout: 'auto'`. It is the environment, not the frame.
+
+One thing worth writing down because it cost a detour: **WebGPU is only exposed in a secure
+context.** Loaded from `about:blank`, `navigator.gpu` is not adapterless — it is *absent*,
+which reads exactly like a browser without WebGPU support. The renderer serves its page from
+`http://127.0.0.1` for that reason alone.
 
 ### What running it from a terminal found
 

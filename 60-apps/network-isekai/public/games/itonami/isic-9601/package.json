@@ -9,7 +9,8 @@
     "render": "nbb --classpath src:../../../../../../orgs/kotoba-lang/webgpu/src:../../../../../../orgs/kotoba-lang/render/src bin/render.cljs",
     "test": "nbb --classpath src test/logic_test.cljs",
     "balance": "nbb --classpath src test/balance.cljs",
-    "build": "nbb preview/build.cljs"
+    "build": "nbb preview/build.cljs",
+    "render:webgpu": "nbb --classpath src:../../../../../../orgs/kotoba-lang/webgpu/src:../../../../../../orgs/kotoba-lang/render/src bin/render.cljs -- --backend webgpu"
   },
   "devDependencies": {
     "esbuild": "0.25.0",

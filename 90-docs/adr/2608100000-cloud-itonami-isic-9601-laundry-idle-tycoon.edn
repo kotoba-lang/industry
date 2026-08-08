@@ -104,6 +104,26 @@
     `webgpu/fixtures/glsl/lit.*` を通して描き、画素を読み戻して PNG にする。
     **第2レンダラではない** —— geometry・行列・照明・shading を一切書かず、
     context 作成 / buffer bind / draw / readback という plumbing だけを持つ"
+   "**WebGPU 経路は実装し、pixel 以外はすべて検証した**(`--backend webgpu`)。
+    canonical な `fixtures/lit-shader.wgsl` は GLSL 版と**同一の `struct G` と
+    同一の vertex/instance location** を宣言している(片方が他方の transpile
+    なので)ため、`pack-globals` / `pack-instances` が無改造で両方に効く ——
+    render-IR の契約が紙の上ではなく実際に成立していることの確認。
+    到達段階: adapter → device → wgsl-compiled → canvas-configured → buffers
+    → bindgroup → **pipeline** → submitted → read-back。とくに
+    `createRenderPipeline` が shader の `@group(0)` binding と 8 本の
+    vertex/instance location を engine の packer が出す layout に対して
+    検証する —— 不一致ならここで、pixel が存在する前に落ちる"
+   "**WebGPU の pixel はこのコンテナでは取得できない。** Dawn が submit 直後に
+    instance を落とす(`A valid external Instance reference no longer exists`)。
+    6 通りのフラグ組み合わせ(`--use-angle=swiftshader` /
+    `--use-webgpu-adapter=swiftshader` / `VulkanFromANGLE` / `--in-process-gpu` /
+    `--single-process` / `--disable-gpu-sandbox`)すべてで同一に失敗し、
+    3 行の clear-to-red shader + `layout:'auto'` でも同じ。frame ではなく環境。
+    実測で判明した別件: **WebGPU は secure context にしか露出しない** ——
+    `about:blank` では `navigator.gpu` が adapter 無しではなく *存在しない* ので、
+    「この browser は WebGPU 非対応」と読める。renderer が `http://127.0.0.1` を
+    立てて配信しているのはこの一点のため"
    "**WebGL 2.0 の E2E は達成した** —— 実 WebGL2 (SwiftShader) で
     glError=0、1,013,400 画素、92 色、`preview/street.png`。
     ただし **WebGPU 経路は未実行**(executor に shadow-cljs ビルドが要る)、
@@ -284,8 +304,12 @@ nbb のテストも、squint 経由のブラウザプレビューも、将来の
 - **WebGL 2.0 E2E 達成** (`bin/render.cljs`) —— 実 WebGL2 (SwiftShader) で
   glError=0、1,013,400 画素が背景以外、92 色、`preview/street.png` を出力。
   engine 自身の GLSL / packer / geometry を通しており、第2レンダラではない。
-- **未実施**: WebGPU 経路 (executor の shadow-cljs ビルドが要る)、
-  shadow pass (1x1 の全面 lit depth texture を bind している)、Pages smoke。
+- **WebGPU 経路**: pipeline 検証まで到達 (canonical WGSL が compile し、
+  `@group(0)` binding と 8 本の vertex/instance location が engine の packer の
+  layout に対して validate される)。**pixel は未取得** —— Dawn が submit 直後に
+  instance を落とす。6 通りのフラグで同一に失敗、3 行の shader でも同じ。
+- **未実施**: shadow pass (1x1 の全面 lit depth texture を bind している)、
+  Pages smoke。
 - **マップ 17 テスト / 102 assertion** (JVM, `test/world_ir_test.clj`) ——
   `world.cljc` が出す render-IR を**実物の `kotoba.sprite2d.layout`** に通し、
   8 district 全部が任意の viewport (360x640 / 1280x720 / 900x1600) に収まること、
