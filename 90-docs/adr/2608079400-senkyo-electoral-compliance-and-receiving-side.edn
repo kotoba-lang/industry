@@ -43,7 +43,7 @@
 
 ### D1. `kotoba-lang/senkyo` を共有ライブラリとして起こす
 
-純 `.cljc` / 依存ゼロ。`okugai.facts` と同型で **普遍カテゴリ × 法域別 instrument** に
+純 `.cljc`。**当初は依存ゼロだったが、2026-08-07 に ADR-2608079500 で 期限の算法を `kotoba-lang/tetsuzuki`（一般行政手続きの型）へ委譲し、tetsuzuki 1 本に依存する形へ載せ替えた**（tetsuzuki 自身は依存ゼロ）。分野が独自の期限算法を持たないことのほうが重要と判断したため。`okugai.facts` と同型で **普遍カテゴリ × 法域別 instrument** に
 層を分ける（`:attribution` `:quantity-limit` `:placement-authority` `:period-window`
 `:contact-conduct` `:spend-report` の 6 カテゴリ × 8 手段）。
 
@@ -158,6 +158,15 @@
 | `cloud-itonami-isic-8411-electoral` | 33 tests / 160 assertions green、clj-kondo 0 errors / 0 warnings。`clojure -M:dev:run` で clean 3 件 + HARD hold 5 件。期限判定を `#{:past}` に縮め台帳登載を auto にすると **7 件**落ちる |
 
 3 つとも「落ちることを確かめてから landed とする」を通している。
+
+## 後続 ADR
+
+ADR-2608079500（2026-08-07）が**この ADR の下の層**を置いた。オーナー指摘
+「先に各国の法的手続きに基づいて各省庁・自治体・行政機関の itonami は」の
+とおり順序が逆で、選挙分野を先に実装したあとで一般行政手続きの型
+（`kotoba-lang/tetsuzuki`）を切り出し、`senkyo` をそこへ retrofit した。
+本 ADR の設計判断（D1–D7）は有効だが、`senkyo.procedure` の期限の算法と
+entry の形は tetsuzuki の共有形に置き換わっている。
 
 ## follow-up（実施していないことを名指しで残す）
 
