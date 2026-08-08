@@ -100,14 +100,66 @@ O 0.80 の 4 section だけ。
   `:focus-visible`・phone media query を入れた結果で、加点のためではない
   （素の `input`/`select` は theme.css の focus ring に当たらない）。
 - 実ブラウザ（headless Chrome）で 21 section と 651 行のテーブルを目視。
+- 内訳（下記）は **実際に `button.click()` を発火させて** delegated listener
+  経由で DOM に入ること・`aria-expanded` が true になること・未計測の行
+  （0162）が内訳でなく注記を出すことを `--dump-dom` で確認した。描画だけを
+  見ると配線の切れた UI を『動いている』と読み違える。
+
+## 行の内訳（2026-08-07 追加、`a870fd35`）
+
+section 平均だけでは「どの軸が足りないのか」に答えられない。データは最初から
+scorecard の industry entity に在り、JSON に載せていなかっただけだった。
+
+ISIC コードを押すと 7 軸が開く。**3 つの層を混ぜずに出す** ——
+ADR-2608052000 の「測定値と模型値を混ぜて読まないこと」をそのまま表示に移した:
+
+| 層 | 何 | 4210 の例 |
+|---|---|---|
+| 観測から直接 | 7 軸（実装量 / テスト / governor 部品 / 出典引用 / 文書 / 公開面 / 更新の新しさ） | 75 / 68 / 86 / 50 / 56 / 75 / 95 % |
+| 観測 × 重み（重みは判断） | 成熟度 | 0.7194 |
+| モデルの出力（`:model/alpha` 依存） | 依存伝播後・band | 0.4979 / D |
+
+- **未計測の行を開いても 7 軸が 0% で並ばない。** 内訳の代わりに「スコア 0
+  ではなく未計測」と出し、平均の分母から外してあることも書く。
+- **逆に実測 0 は 0% の bar として描く。** 出典引用が 0 の repo は実在する
+  （未計測とは別物なので、破線ではなく空の track で出る）。
+- 開閉は `button` + `aria-expanded`/`aria-controls`。行全体を clickable に
+  すると Tab で辿れない。listener は tbody への委譲 1 個で 651 行に張らない。
+  絞り込みを変えると開いた行は閉じる（状態を DOM 1 箇所に閉じ込める方を採った）。
+
+## 現在地（2026-08-08）
+
+すべて default branch に着地し、本番に出ている。
+
+| もの | commit | 状態 |
+|---|---|---|
+| 生成器 + scorecard + datom 面登録 + 本 ADR | `ec96b83e`（com-junkawasaki/root main） | landed |
+| `/industries/` 初版 | `0d7f29c0`（network-awai/cloud-itonami main） | landed |
+| 行の内訳 | `a870fd35`（同上） | landed |
+| west pin 前進 | `87ccb370` → `f0bb181e`（pin = `28ce9ee8`） | landed |
+| Cloudflare Pages Production | `65eac7f3`（source `a870fd3`） | live |
+
+live 検証（2026-08-08）: `/industries/` 200・`/industries.json` 200（651 行 /
+うち軸つき 407）・`/`・`/marketplace/` から nav リンクが張れている。
+
+**theme.css の drift は別セッションが着地させた**（`liquid-glass-focus-ring-*`
+等が live に入っている）。本 ADR が「別途、見た目を確認した上で」と書いた
+確認は済ませてある —— `/industries/` が使う 13 個のトークンが再生成後の
+theme.css にすべて残っていることを確認し、live を再撮影して崩れていない
+ことを見た。
 
 ## 残っているもの
 
-- **`/industries/` は itonami-maturity の 7 軸のうち section 平均しか出して
-  いない。** 産業 1 件を開いたときの軸別内訳と leverage band は
-  `/industries.json` には在るが UI に無い。
-- **`public/css/theme.css` は再生成すると上流 liquid-glass-ui の drift
-  （focus-ring / status トークン追加）が乗る。** 11 ページの見た目に影響する
-  ので本 ADR の変更には含めていない。別途、見た目を確認した上で更新する。
+- **`src/cloud_itonami/site/shell.cljc` で並行セッションと衝突している。**
+  main の nav は旧形式（25 項目 + `/industries/`）だが、共有 checkout には
+  別セッションの作り直し WIP（25 項目 → 5 つの問い、`/evidence/` `/apps/`
+  `/open-business/` を新設）が居る。**その WIP は既に `/industries/` を含んで
+  いる**ので、あちらが着地するときは theirs を採れば解決する。こちらからは
+  触っていない。あちらが着地したら **全 12 ルートの HTML を再生成する必要が
+  ある**（nav は各ページに焼き込まれている）。
 - **scorecard は maturity scan の日付（2026-08-05）に固定される。** scan を
-  回し直すまで数は動かない。`--check` を fleet gate に入れるかは未決。"}]
+  回し直すまで数は動かない。`--check` を fleet gate に入れるかは未決 ——
+  入れるなら scan の再実行も一緒に回す設計が要る（gate だけ足すと、古い scan の
+  canonical 一致を『最新』と読み違える）。
+- **`/industries.json` の section 別 7 軸平均は UI に出していない。** 行の
+  内訳は出したが、section カードは coverage と成熟度の 2 本のまま。"}]
