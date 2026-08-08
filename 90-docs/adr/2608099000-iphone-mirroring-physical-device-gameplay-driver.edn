@@ -26,7 +26,8 @@
    "kotoba-lang/computer-use"
    "kotoba-lang/loop-game-autoplay"
    "kotoba-lang/shell"
-   "kotoba-lang/hinshitsu"]
+   "kotoba-lang/hinshitsu"
+   "adr-2608108000-agent-visual-game-loop-cli-mcp"]
 
   :adr/context
   "オーナー指示（2026-08-08）「iPhone ミラーリング越しに実機のネイティブゲームを」。前段の問い（「iphone ミラーリングを操作する repo はある? 遺伝的学習の train はある? 画面を見てゲームをクリアさせる LLM を作りたい」）に対する在庫調査で、次の 3 点が実測で確定していた。
@@ -81,6 +82,8 @@ iPhone ミラーリング（macOS 15+）はその channel である: 実機の�
 | `loop-game-autoplay` | game state 12 数値 | 進化する線形写像 | web ゲーム（改変せず driver 注入） |
 | 本 driver + `computeruse.agent` | 実機の画面 pixel | LLM | **App Store のネイティブゲーム** |
 | `kotoba-lang/shell` + `hinshitsu` | screenshot | （人間 / QA gate） | simulator 上の WKWebView |
+
+同日の ADR-2608108000（proposed、agent-visual-game-loop）とは**対象が違う**ので統合しない。あちらは**この workspace が作っている web ゲーム**の状態・描画・比較を CLI / MCP から扱えるようにして開発と debug を目で行う話で、観測対象は自前のゲームの内部状態である。本 ADR は**他者が作った App Store のネイティブゲーム**を実機の画面越しに遊ぶ話で、内部状態には触れられない。『agent がゲームを見る』という語が同じだけで、機構も対象も交わらない。
 
 **進化と LLM を接続する経路は、本 ADR では作っていない。** `shinka` の genome は double のベクタで、LLM policy の探索単位（prompt / 戦略記述）はそこに載らない。接続するなら別 ADR とする。"
 
