@@ -242,4 +242,222 @@
      :file "src/etzhayyim/social/publication.cljc"
      :find "  (str/replace (str value) #\"^:+\" \"\"))"
      :replace "  (.replaceFirst (str value) \"^:+\" \"\"))"
-     :must-fail ["the-status-the-library-emits-is-a-status-it-accepts"]}]}]}
+     :must-fail ["the-status-the-library-emits-is-a-status-it-accepts"]}]}
+
+  {:repo "orgs/cloud-itonami/cargo"
+   :label "cargo descriptor —— 規則・固定値・descriptor 本体"
+   ;; この repo には 2026-05 から `actor-manifest.test.ts`（vitest）が置かれていたが、
+   ;; package.json も vitest 依存も無く **一度も実行できなかった**。走らないまま
+   ;; manifest の pipeline は 8 → 10 に増え、`@id` と did.json の `id` は別の DID に
+   ;; 割れたが、test file はどちらも報告していない。走らないテストは、自分が古く
+   ;; なったことも報告しない —— この loop がまさに測っている性質そのものである。
+   ;;
+   ;; 撃つ先が 3 種類あるのは、この suite が 3 種類のものを守っているから:
+   ;;   1. 規則のコード（src/…/descriptor.cljc）
+   ;;   2. 固定した測定値（docs/identity-claims.edn）
+   ;;   3. descriptor 本体のデータ（actor-manifest.jsonld / .well-known/did.json）
+   ;; データを撃つ mutation が噛まないなら、この suite は「自分自身のテスト」で
+   ;; あって「descriptor のテスト」ではない。
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "cargo descriptor: all green"
+   ;; 全て 2026-08-08 に実際に赤くなるところを見た。
+   :mutations
+   [{:id :cargo/did-web-always-well-known
+     :why "did:web の解決規則の唯一の非対称（path 成分があるときは /.well-known/ を挟まない）。ここを間違えると identity-claims.edn の :resolves-to が全部ズレ、network 検査は『存在しない URL を測って 404 だと報告する』まま緑になる —— 測定が動いて見えるぶん、間違いに気づく手がかりが無い"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "          (if (seq path)\n            (str \"https://\" host \"/\" (str/join \"/\" path) \"/did.json\")\n            (str \"https://\" host \"/.well-known/did.json\")))))))"
+     :replace "          (str \"https://\" host \"/.well-known/did.json\"))))))"
+     :must-fail ["did-web-resolution-follows-the-well-known-rule"
+                 "the-claims-file-derives-each-resolution-url-from-its-own-did"]}
+
+    {:id :cargo/percent-decode-drops-broken-escapes
+     :why "壊れた `%` を捨てる実装にすると、壊れた入力が**正しく見える host** に化ける。落ちずに別の URL を測るので、捨てる側は永久に気づけない"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "          (if (and h l)\n            (recur (drop 3 cs) (conj out (char (+ (* 16 h) l))))\n            (recur (rest cs) (conj out c))))"
+     :replace "          (if (and h l)\n            (recur (drop 3 cs) (conj out (char (+ (* 16 h) l))))\n            (recur (drop 3 cs) out)))"
+     :must-fail ["percent-decoding-leaves-broken-escapes-alone"]}
+
+    {:id :cargo/undeclared-capability-allowed
+     :why "step が capability 宣言を通らない fn を呼べると、deny-by-default が descriptor の面で成立しない。実装側が宣言を読んで権限を絞る前提なので、ここが素通りすると『宣言にない権限で動く actor』が作れる"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "            :when (and f (not (caps f)))]\n        (v :capability/undeclared"
+     :replace "            :when (and f false (not (caps f)))]\n        (v :capability/undeclared"
+     :must-fail ["a-step-that-calls-an-undeclared-capability-is-a-violation"]}
+
+    {:id :cargo/custom-escape-hatch-allowed
+     :why "fn \"custom\" は任意コードへの逃げ道。撤去した vitest が見ていた唯一の capability 規則で、引き継いだもの。1 つ通ると『この descriptor は宣言だけで閉じている』という主張がそこで終わる"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "            :when (= \"custom\" (get s \"fn\"))]"
+     :replace "            :when (= \"custom-disabled\" (get s \"fn\"))]"
+     :must-fail ["the-custom-escape-hatch-is-a-violation"]}
+
+    {:id :cargo/duplicate-nsid-allowed
+     :why "同じ nsid が 2 本あると後勝ちになり、片方が黙って到達不能になる。pipeline は消えていないので一覧を見ても気づけない"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "      (for [[nsid n] (frequencies nsids) :when (> n 1)]"
+     :replace "      (for [[nsid n] (frequencies nsids) :when (> n 99)]"
+     :must-fail ["a-duplicate-xrpc-nsid-is-a-violation"]}
+
+    {:id :cargo/foreign-service-id-allowed
+     :why "service id が別の DID を指したまま残るのは、改名を半分だけやった形そのもの（この repo が 90b15e4 → ec7015f で実際にやったこと）。document 全体は妥当に見えるので、id を突き合わせない限り通る"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "            :when (not (str/starts-with? (str sid) (str id \"#\")))]"
+     :replace "            :when (not (str/starts-with? (str sid) \"did:\"))]"
+     :must-fail ["a-did-document-service-id-must-be-a-fragment-of-its-own-did"]}
+
+    ;; ── ここから下は「規則」ではなく **固定値と descriptor 本体** を撃つ ──────
+
+    {:id :cargo/census-pin-goes-stale
+     :why "この repo が実際に見逃した drift そのもの。撤去した vitest は toHaveLength(8) と書いていたが manifest は 10 本ある。count を pin して**両方向に**落とすのがこの suite の要で、pin が古くなったら赤くなることをここで確かめる"
+     :file "docs/identity-claims.edn"
+     :find " {:pipeline-count 10"
+     :replace " {:pipeline-count 8"
+     :must-fail ["the-pinned-census-matches-the-manifest"]}
+
+    {:id :cargo/manifest-grows-a-custom-step
+     :why "**descriptor 本体**を撃つ。規則を守っているのが『fixture だけ』なら、実ファイルが壊れても緑のままになる —— 実際その状態が 2026-05 から 2026-08 まで続いていた"
+     :file "actor-manifest.jsonld"
+     :find "          \"fn\": \"agent.chat\","
+     :replace "          \"fn\": \"custom\","
+     :must-fail ["the-committed-descriptor-has-no-structural-violations"]}
+
+    {:id :cargo/manifest-id-drifts-from-claims
+     :why "manifest の @id だけを直して identity-claims.edn を直し忘れる（あるいは逆）を止める。この repo の identity は 4 つに割れており、片側だけ動かすのが一番起こりやすい壊れ方"
+     :file "actor-manifest.jsonld"
+     :find "  \"@id\": \"did:web:cargo.etzhayyim.com\","
+     :replace "  \"@id\": \"did:web:etzhayyim.com:actor:cargo\","
+     :must-fail ["every-identity-claim-names-the-did-its-source-file-actually-says"]}
+
+    {:id :cargo/descriptor-starts-naming-the-live-did
+     :why "『唯一解決する DID を、descriptor 側のどのファイルも名乗っていない』という現在地の記録。直った側でも赤くなることをここで確かめる —— 赤の意味は『戻せ』ではなく『測り直して claims と README を更新しろ』"
+     :file ".well-known/did.json"
+     :find "\"alsoKnownAs\" : [ \"at://cargo.etzhayyim.com\""
+     :replace "\"alsoKnownAs\" : [ \"did:web:etzhayyim.com:actor:cargo\", \"at://cargo.etzhayyim.com\""
+     :must-fail ["the-only-did-that-resolves-is-named-by-no-descriptor-file"]}]}
+
+  {:repo "orgs/cloud-itonami/jp-ashiba-actor"
+   :label "jp-ashiba actor —— deny-by-default gate・固定値・descriptor 本体"
+   ;; この repo は 2026-06 の snapshot 以来テストを 1 本も持っていなかった。
+   ;; 2026-07-18 の rescue commit で入った src/jp_ashiba/murakumo.cljc は
+   ;; 「required-gates が全て attest されなければ effect を 1 つも出さない」という
+   ;; **判断**を持つのに、それが緩んでも誰も気づかない状態が既定だった。
+   ;;
+   ;; cargo の suite が descriptor（宣言）を守るのに対し、ここは **gate（判断）** を
+   ;; 守る。だから撃つ先の重心が違う: 緩む方向の mutation（明示 false を attest と
+   ;; みなす / AND を OR にする / blocked なのに records を持つ / 未知 cell を
+   ;; 黙って ready にする）が主で、固定値と descriptor 本体はその周辺にある。
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "jp-ashiba actor: all green"
+   ;; 全て 2026-08-08 に実際に赤くなるところを見た。
+   :mutations
+   [{:id :jp-ashiba/gate-value-checks-presence-not-value
+     :why "**この suite で一番静かな壊れ方。** `contains?` で実装すると `{:no-probing-baseline false}` が『attest 済み』になる —— false は『測ったうえで満たしていない』という最も強い否定なのに、キーがあるというだけで通る。map を渡す呼び出し側からは gate が消えたように見えない"
+     :file "src/jp_ashiba/murakumo.cljc"
+     :find "  (or (get attestations gate)\n      (get attestations (name gate))"
+     :replace "  (or (contains? attestations gate)\n      (get attestations (name gate))"
+     :must-fail ["an-attestation-that-is-explicitly-false-does-not-count-as-attested"]}
+
+    {:id :jp-ashiba/required-gates-become-or-instead-of-and
+     :why "7 本の gate は AND。`every?` と `some` の取り違えで OR になると、1 本でも attest されていれば全部通る。無 attest では依然 blocked なので、素朴な『空 attestation で試す』検査は緑のまま素通りする"
+     :file "src/jp_ashiba/murakumo.cljc"
+     :find "       (remove #(boolean (gate-value attestations %)))\n       vec))"
+     :replace "       (remove (fn [_] (some #(boolean (gate-value attestations %)) (:required-gates spec))))\n       vec))"
+     :must-fail ["removing-any-single-required-gate-blocks-the-plan"]}
+
+    {:id :jp-ashiba/blocked-plans-still-carry-records
+     :why "『plan は作るが実行しない』形にすると、blocked でも計算済みの record が手前に置かれる。:effects だけ見て安心した呼び出し側が :records を拾って書ける —— gate を通っていない書き込みが、gate の出力から作れてしまう"
+     :file "src/jp_ashiba/murakumo.cljc"
+     :find "         {:status :blocked\n          :effects []}"
+     :replace "         {:status :blocked\n          :effects []\n          :records (vec (records-for spec input))}"
+     :must-fail ["a-blocked-plan-carries-no-records-at-all"]}
+
+    {:id :jp-ashiba/unknown-cell-plans-silently
+     :why "打ち間違えた cell 名が nil spec のまま進むと、required-gates が nil ＝ missing 無し ＝ **:ready** になる。effect は 0 件なので実害は出ないが、status だけ見る呼び出し側には『gate を通った』と見える。throw を外すだけでその状態になる"
+     :file "src/jp_ashiba/murakumo.cljc"
+     :find "    (when-not spec\n      (throw (ex-info \"unknown cell\" {:cell cell-key})))"
+     :replace "    (when-not spec nil)"
+     :must-fail ["an-unknown-cell-throws-instead-of-planning-nothing"]}
+
+    {:id :jp-ashiba/safe-rkey-keeps-path-separators
+     :why "rkey は record のアドレスになる。`/` を安全文字集合に入れると rkey が階層を作り、AT Protocol の rkey 構文からも外れる。安全文字を『足す』変更は、既存の入力では何も変わらないので気づきにくい"
+     :file "src/jp_ashiba/murakumo.cljc"
+     :find "(str/replace #\"[^A-Za-z0-9._~-]\" \"-\")"
+     :replace "(str/replace #\"[^A-Za-z0-9._~/-]\" \"-\")"
+     :must-fail ["safe-rkey-strips-the-did-prefix-and-replaces-unsafe-characters"]}
+
+    {:id :jp-ashiba/safe-rkey-can-return-blank
+     :why "空 rkey は『rkey を指定しなかった』と区別が付かない。blank fallback を外しても、普通の入力では一切挙動が変わらない —— nil / 空文字 / 潰して空になる入力を明示的に撃たない限り緑のまま"
+     :file "src/jp_ashiba/murakumo.cljc"
+     :find "    (if (str/blank? clean) \"unknown\" clean)))"
+     :replace "    clean))"
+     :must-fail ["safe-rkey-never-returns-blank"]}
+
+    {:id :jp-ashiba/effects-stop-being-attributed-to-this-actor
+     :why "effect の :actor が actor-did 以外になりうると、この gate を通した書き込みが別 actor の repo に入る。rkey 混じりの『それらしい』DID にすると、目視では気づけない"
+     :file "src/jp_ashiba/murakumo.cljc"
+     :find "  {:op :mst/put-record\n   :actor actor-did"
+     :replace "  {:op :mst/put-record\n   :actor (str actor-did \"#\" rkey)"
+     :must-fail ["every-emitted-effect-is-attributed-to-this-actor"]}
+
+    {:id :jp-ashiba/substrate-lexicon-aligned-to-the-manifest
+     :why "**『直す』方向の mutation。** substrate の collection prefix を manifest（com.etzhayyim.apps.jpAshiba.）に合わせると、一見 3 つ割れが解消したように見えるが、live DID document の _meta.primaryLexicon は com.etzhayyim.jp-ashiba なので**権威から離れる**。揃える先を間違えたことに気づけるか"
+     :file "src/jp_ashiba/murakumo.cljc"
+     :find "  (str \"com.etzhayyim.jp-ashiba.\" name))"
+     :replace "  (str \"com.etzhayyim.apps.jpAshiba.\" name))"
+     :must-fail ["the-substrate-prefix-is-the-one-the-live-authority-declares"]}
+
+    ;; ── ここから下は「規則」ではなく **固定値と descriptor 本体** を撃つ ──────
+    ;; 規則を守っているのが fixture だけなら、実ファイルが壊れても緑のままになる。
+    ;; cargo では実際にその状態が 2026-05 から 2026-08 まで続いていた。
+
+    {:id :jp-ashiba/census-pin-goes-stale
+     :why "兄弟 repo cargo に置かれていた actor-manifest.test.ts は toHaveLength(8) と書いたまま一度も走らず、実際の pipeline は 10 本に増えていた。count を pin して**両方向に**落とすのがこの節の要で、pin が古くなったら赤くなることをここで確かめる"
+     :file "docs/identity-claims.edn"
+     :find " {:pipeline-count 8"
+     :replace " {:pipeline-count 10"
+     :must-fail ["the-pinned-census-matches-the-manifest"]}
+
+    {:id :jp-ashiba/gate-census-pin-goes-stale
+     :why "cell や baseline gate の数が動いたら測り直させる。とくに :common-gate-count が**減る**のは gate が緩む方向の変更なので、気づかずに通ってはいけない"
+     :file "docs/identity-claims.edn"
+     :find " {:cell-count 13"
+     :replace " {:cell-count 12"
+     :must-fail ["the-pinned-gate-census-matches-the-substrate"]}
+
+    {:id :jp-ashiba/lexicon-overlap-pin-goes-stale
+     :why "『gate が書く先を descriptor 側の誰も購読していない（交差 0）』がこの repo で最も重い測定。pin を動かしたら赤くなること —— 直った側でも赤くなり、その意味は『戻せ』ではなく『測り直して claims を更新しろ』"
+     :file "docs/identity-claims.edn"
+     :find "  :shared-collection-count 0}"
+     :replace "  :shared-collection-count 5}"
+     :must-fail ["the-substrate-and-the-manifest-share-no-collection-at-all"]}
+
+    {:id :jp-ashiba/did-service-id-goes-foreign
+     :why "service id が別の DID を指したまま残るのは、改名を半分だけやった形そのもの。document 全体は妥当に見えるので、id を突き合わせない限り通る。しかもここで足す DID は manifest が名乗っている方なので、単体では『整合させた』ようにすら見える"
+     :file ".well-known/did.json"
+     :find "\"id\" : \"did:web:etzhayyim.com:actor:jp-ashiba#atproto_pds\""
+     :replace "\"id\" : \"did:web:jp-ashiba.etzhayyim.com#atproto_pds\""
+     :must-fail ["every-did-document-service-id-is-a-fragment-of-its-own-did"]}
+
+    {:id :jp-ashiba/cron-loses-a-field
+     :why "3 / 4 / 6 フィールドの cron は、host によって黙って別の時刻に走る（秒付き 6 フィールドと取り違える）。落ちずにズレるので、動いているように見えたまま日報が別の時刻に出る"
+     :file "actor-manifest.jsonld"
+     :find "\"cron\": \"0 6 * * *\""
+     :replace "\"cron\": \"0 6 * *\""
+     :must-fail ["every-cron-trigger-has-five-fields"]}
+
+    {:id :jp-ashiba/a-capability-is-revoked-but-still-called
+     :why "capabilities から 1 つ落としても、それを呼ぶ step は残る。deny-by-default の workspace で『宣言にない権限で動く actor』が作れる形。census も同時に赤くなるべきで、両方名指しして『別の理由で赤くなったのを噛んだと読む』のを防ぐ"
+     :file "actor-manifest.jsonld"
+     :find "    \"graph.query\",\n    \"graph.write\",\n    \"agent.chat\","
+     :replace "    \"graph.query\",\n    \"agent.chat\","
+     :must-fail ["every-step-declares-a-capability-the-manifest-grants"
+                 "the-pinned-census-matches-the-manifest"]}
+
+    {:id :jp-ashiba/manifest-id-drifts-from-claims
+     :why "manifest の @id だけを直して identity-claims.edn を直し忘れる（あるいは逆）を止める。この repo の identity は 3 つに割れており、片側だけ動かすのが一番起こりやすい壊れ方。ここで足す値は『解決する DID』なので、単体では改善に見える"
+     :file "actor-manifest.jsonld"
+     :find "  \"@id\": \"did:web:jp-ashiba.etzhayyim.com\","
+     :replace "  \"@id\": \"did:web:etzhayyim.com:actor:jp-ashiba\","
+     :must-fail ["every-identity-claim-names-the-value-its-source-file-actually-holds"
+                 "the-substrate-and-the-manifest-agree-on-the-actor-did"
+                 "the-did-document-names-a-different-did-than-the-manifest"]}]}]}
