@@ -54,6 +54,53 @@
                :text (str/join " " (repeatedly len
                                                #(term (zipf-rank r vocab-size))))}))))))
 
+(defn clustered-corpus
+  "`n` documents in `clusters` topical groups, emitted group by group.
+
+  `corpus` above is homogeneous: every document draws from the same Zipf
+  vocabulary, so contiguous doc-id shards are statistically identical and no
+  shard can be distinguished from another by an upper bound. That is a real
+  property and the routing measurement pins it — but it is not what a crawl
+  looks like. `build!` assigns doc-ids by position, so a caller that groups a
+  crawl by host (which is what `build!`'s docstring says the caller does) gets
+  shards whose vocabularies differ.
+
+  Modelled here as a shared head plus one disjoint tail per cluster: every
+  document draws common words from the head, and its topical words from its
+  own slice. Head fraction `head-frac` is what stops this from being C
+  unrelated corpora — real hosts share stopwords, and a query term that
+  appears everywhere is exactly the case where pruning must NOT fire."
+  ([n seed clusters] (clustered-corpus n seed clusters 20000 0.3))
+  ([n seed clusters vocab-size head-frac]
+   (let [r (lcg seed)
+         head (max 1 (int (* head-frac vocab-size)))
+         tail (max 1 (quot (- vocab-size head) clusters))
+         per (max 1 (quot (+ n clusters -1) clusters))
+         pick (fn [c]
+                (if (< (unit r) 0.4)
+                  (term (min (dec head) (int (Math/pow head (unit r)))))
+                  (term (+ head (* c tail) (mod (nxt! r) tail)))))]
+     (vec (for [i (range n)
+                :let [c (min (dec clusters) (quot i per))
+                      len (+ 20 (mod (nxt! r) 120))]]
+            {:url (str "https://host" c ".test/" i)
+             :title (str/join " " (repeatedly (inc (mod (nxt! r) 3)) #(pick c)))
+             :text (str/join " " (repeatedly len #(pick c)))})))))
+
+(defn cluster-queries
+  "Terms drawn from specific clusters' tails, so a query is topical rather
+  than uniform. This is the shape shard pruning exists for; `probe-queries`
+  is the shape that proves it must not fire when it cannot."
+  [clusters vocab-size head-frac]
+  (let [head (max 1 (int (* head-frac vocab-size)))
+        tail (max 1 (quot (- vocab-size head) clusters))
+        t (fn [c frac] (term (+ head (* c tail) (int (* frac tail)))))]
+    [(t 0 0.05)
+     (t 1 0.10)
+     (t (dec clusters) 0.05)
+     (str (t 0 0.05) " " (t 0 0.30))
+     (str (t 1 0.10) " " (t 2 0.10))]))
+
 (defn probe-queries
   "Query terms spanning the frequency range, so a measurement is not secretly
   all-common or all-rare. Ranks are fixed, not sampled: a benchmark whose

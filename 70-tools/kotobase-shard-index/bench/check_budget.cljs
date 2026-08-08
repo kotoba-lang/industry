@@ -21,6 +21,7 @@
             [kotobase-shard-index.codec :as codec]
             [kotobase-shard-index.node :as node]
             [kotobase-shard-index.query :as query]
+            [kotobase-shard-index.route :as route]
             [kotobase-shard-index.synth :as synth]))
 
 (def fs (js/require "node:fs"))
@@ -53,7 +54,17 @@
                             {:q q :gets (:gets @tally)
                              :waves (get-in r [:stats :waves])
                              :hits (count (:hits r))}))
-                        queries)]
+                        queries)
+        ;; The routing read path is budgeted too. It is the one that is
+        ;; supposed to be cheaper, and an optimisation with no regression gate
+        ;; is the hole ADR-2607250100 軸 1 describes — just relocated.
+        route-per-query (mapv (fn [q]
+                                (block/reset-tally! tally)
+                                (let [r (route/search counted manifest-cid q {:k k})]
+                                  {:q q :gets (:gets @tally)
+                                   :waves (get-in r [:stats :waves])
+                                   :hits (count (:hits r))}))
+                              queries)]
     {:corpus-size corpus-size
      :shard-count shard-count
      :vocab-size vocab-size
@@ -63,12 +74,32 @@
      :per-query per-query
      :total-gets (reduce + 0 (map :gets per-query))
      :max-gets (apply max (map :gets per-query))
-     :max-waves (apply max (map :waves per-query))}))
+     :max-waves (apply max (map :waves per-query))
+     :route-per-query route-per-query
+     :route-total-gets (reduce + 0 (map :gets route-per-query))
+     :route-max-gets (apply max (map :gets route-per-query))
+     :route-max-waves (apply max (map :waves route-per-query))}))
+
+;; `test/mutations.cljs` edits `src/` in place while it runs. A measurement
+;; taken in that window measures MUTATED code, and the direction it errs in is
+;; the dangerous one: a broken stop condition stops EARLY, so the numbers look
+;; BETTER. Measured 2026-08-08 — 29 GETs against the true 149, a 5x
+;; "improvement" produced by code that returns wrong answers. Committed as a
+;; budget it would then have failed every correct run afterwards.
+;;
+;; This is the reason a cost gate is not a substitute for a correctness gate,
+;; and the reason this lock exists rather than a note in a README.
+(def mutation-lock "70-tools/kotobase-shard-index/.mutating")
 
 (defn -main [& args]
+  (when (.existsSync fs mutation-lock)
+    (println (str "FAIL: " mutation-lock " exists — test/mutations.cljs is rewriting src/ "
+                  "right now. Any measurement taken here would be of mutated code."))
+    (js/process.exit 1))
   (let [now (measure)
         write? (some #{"--write"} args)]
     (println "measured:" (pr-str (select-keys now [:total-gets :max-gets :max-waves :index-blocks])))
+    (println "  routing:" (pr-str (select-keys now [:route-total-gets :route-max-gets :route-max-waves])))
     (doseq [{:keys [q gets waves hits]} (:per-query now)]
       (println (str "  " gets " gets / " waves " waves / " hits " hits   " q)))
     (cond
@@ -97,6 +128,20 @@
               (conj (str "worst-query GETs " (:max-gets now) " > budget " limit-max))
               (> (:max-waves now) limit-waves)
               (conj (str "worst-query waves " (:max-waves now) " > budget " limit-waves))
+              (> (:route-total-gets now)
+                 (Math/ceil (* (:route-total-gets budget) (+ 1 tolerance))))
+              (conj (str "routing total GETs " (:route-total-gets now) " > budget "
+                         (Math/ceil (* (:route-total-gets budget) (+ 1 tolerance)))))
+              (> (:route-max-waves now)
+                 (Math/ceil (* (:route-max-waves budget) (+ 1 tolerance))))
+              (conj (str "routing worst-query waves " (:route-max-waves now) " > budget "
+                         (Math/ceil (* (:route-max-waves budget) (+ 1 tolerance)))))
+              ;; The routing path exists to be cheaper. If it stops being
+              ;; cheaper the optimisation has been undone, and every other
+              ;; check here would still pass.
+              (> (:route-total-gets now) (:total-gets now))
+              (conj (str "the routing path is no longer cheaper than v1: "
+                         (:route-total-gets now) " vs " (:total-gets now) " GETs"))
               (< (:index-blocks now) floor)
               (conj (str "index shrank to " (:index-blocks now) " blocks (< " floor
                          ") — the corpus or the builder is broken, not the query"))

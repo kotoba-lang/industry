@@ -13,6 +13,7 @@
             [kotobase-shard-index.codec :as codec]
             [kotobase-shard-index.node :as node]
             [kotobase-shard-index.query :as query]
+            [kotobase-shard-index.route :as route]
             [kotobase-shard-index.synth :as synth]))
 
 (def failures (atom []))
@@ -130,6 +131,159 @@
     (check! (str "exactness: the bound is actually exercised, n=" n " chunk=" chunk
                  " " (pr-str (frequencies proofs)))
             (some #{:bounded} proofs) proofs)))
+
+;; ── 5d. the routing read path ───────────────────────────────────────
+;; `route/search` skips shards whose bound cannot reach the k-th score. That
+;; is a second early-termination argument stacked on the first, so it gets the
+;; same treatment: checked against the full scan, and checked that the thing
+;; being tested actually happens.
+;;
+;; The multi-shard configurations are the point. With one shard there is
+;; nothing to prune and the test would pass while exercising none of the code
+;; the namespace exists for — the exact failure mode mutation testing found in
+;; §5a.
+
+;; `sb` (shard-batch) is part of the configuration because it decides whether
+;; pruning can happen at all: a batch at least as large as the shard count
+;; opens everything in one wave and there is nothing left to skip. That is the
+;; GETs-versus-waves dial working as intended, and both ends of it are pinned
+;; below rather than left to whichever default happens to be set.
+(doseq [[n seed shards chunk pf sb] [[800 23 4 8 2 2]
+                                     [2000 31 8 16 4 2]
+                                     [4000 41 16 128 8 4]
+                                     [2000 31 1 16 4 8]
+                                     [2000 31 8 16 4 8]]]
+  (let [{:keys [store manifest-cid]} (build-mem (synth/corpus n seed vocab-size)
+                                                {:shard-count shards :chunk-size chunk})
+        runs (mapv (fn [q]
+                     {:q q
+                      :routed (route/search store manifest-cid q
+                                            {:k 10 :prefetch pf :shard-batch sb})
+                      :v1 (query/search store manifest-cid q {:k 10 :prefetch pf})
+                      :oracle (query/top-k-exhaustive store manifest-cid q {:k 10})})
+                   queries)
+        vs-oracle (vec (for [{:keys [q routed oracle]} runs
+                             :let [scores-ok? (= (mapv :score (:hits routed))
+                                                 (mapv :score (:hits oracle)))
+                                   complete? (every? (fn [h] (= (:score h)
+                                                                (get (:scores oracle) (:doc-id h))))
+                                                     (:hits routed))]
+                             :when (not (and scores-ok? complete?))]
+                         {:q q
+                          :routed (mapv (juxt :doc-id :score) (:hits routed))
+                          :oracle (mapv (juxt :doc-id :score) (:hits oracle))}))
+        vs-v1 (vec (for [{:keys [q routed v1]} runs
+                         :when (not= (mapv :score (:hits routed)) (mapv :score (:hits v1)))]
+                     {:q q
+                      :routed (mapv :score (:hits routed))
+                      :v1 (mapv :score (:hits v1))}))
+        pruned (mapv #(get-in % [:routed :stats :shards-pruned]) runs)]
+    (check! (str "route: scores == full scan, n=" n " shards=" shards
+                 " chunk=" chunk " prefetch=" pf " batch=" sb)
+            (empty? vs-oracle) (first vs-oracle))
+    (check! (str "route: agrees with the v1 read path, n=" n " shards=" shards
+                 " batch=" sb)
+            (empty? vs-v1) (first vs-v1))
+    ;; Bound pruning has to actually happen somewhere or it is dead code that
+    ;; every assertion above passes over — the failure mode §5a was written
+    ;; against. It bites on a HOMOGENEOUS corpus with many shards: the shards
+    ;; are small, so which query terms each one holds and how strongly varies,
+    ;; and the weakest bounds fall under the k-th score. (The first version of
+    ;; this test asserted the OPPOSITE, on the theory that uniform shards are
+    ;; indistinguishable. Measurement said otherwise: the variance grows as
+    ;; shards shrink, so pruning gets better in the regime where fan-out hurts
+    ;; most. §5e covers the other corpus shape.)
+    (when (and (>= shards 8) (< sb shards))
+      (check! (str "route: bound pruning fires, n=" n " shards=" shards " batch=" sb
+                   " pruned=" (pr-str (frequencies pruned)))
+              (some pos? pruned) pruned))
+    ;; The other end of the dial: a batch that covers every shard opens them
+    ;; all in one wave, so nothing can be pruned. Pinned so that a future
+    ;; change to the default cannot silently turn pruning off everywhere
+    ;; while the assertion above still passes on some other configuration.
+    (when (>= sb shards)
+      (check! (str "route: a batch >= shard count prunes nothing, shards=" shards
+                   " batch=" sb " " (pr-str (frequencies pruned)))
+              (every? zero? pruned) pruned))))
+
+;; ── 5e. the other half of the fan-out: shards that hold no query term ──
+;; `build!` assigns doc-ids by position, so a crawl grouped by host produces
+;; shards with different vocabularies. On such a corpus a topical query is not
+;; pruned by a bound at all — the routing entry never lists the shards that do
+;; not contain the term, so they are never candidates. That is a bigger and
+;; cheaper reduction than pruning, and it is invisible in `:shards-pruned`,
+;; which is why the stats report both. Measured, not assumed: the first
+;; version of this block asserted pruning here and got zero.
+
+(let [clusters 8
+      head-frac 0.3
+      docs (synth/clustered-corpus 4000 91 clusters vocab-size head-frac)
+      cqs (synth/cluster-queries clusters vocab-size head-frac)
+      {:keys [store manifest-cid]} (build-mem docs {:shard-count clusters :chunk-size 16})
+      runs (mapv (fn [q]
+                   {:q q
+                    :routed (route/search store manifest-cid q {:k 10 :prefetch 4})
+                    :oracle (query/top-k-exhaustive store manifest-cid q {:k 10})})
+                 cqs)
+      absent (mapv #(get-in % [:routed :stats :shards-absent]) runs)
+      opened (mapv #(get-in % [:routed :stats :shards-opened]) runs)
+      mismatches (vec (for [{:keys [q routed oracle]} runs
+                            :when (not= (mapv :score (:hits routed))
+                                        (mapv :score (:hits oracle)))]
+                        {:q q
+                         :routed (mapv (juxt :doc-id :score) (:hits routed))
+                         :oracle (mapv (juxt :doc-id :score) (:hits oracle))}))]
+  (check! (str "route/clustered: a topical query never considers most shards, absent="
+               (pr-str (frequencies absent)) " of " clusters)
+          (every? pos? absent) absent)
+  (check! (str "route/clustered: it opens far fewer than it would fan out to, opened="
+               (pr-str (frequencies opened)))
+          (every? #(< % clusters) opened) opened)
+  ;; Skipping that changed an answer is not skipping. This is the assertion
+  ;; the whole optimisation rests on.
+  (check! "route/clustered: scores == full scan even where shards were skipped"
+          (empty? mismatches) (first mismatches)))
+
+;; The routing path must not depend on read order either.
+(let [{:keys [store manifest-cid]} (build-mem (synth/corpus 3000 71 vocab-size)
+                                              {:shard-count 8 :chunk-size 8})
+      disagreements
+      (vec (for [q queries
+                 :let [runs (mapv (fn [pf]
+                                    [pf (mapv :score (:hits (route/search store manifest-cid q
+                                                                          {:k 10 :prefetch pf})))])
+                                  [1 2 8 64])]
+                 :when (not (apply = (map second runs)))]
+             {:q q :runs runs}))]
+  (check! "route: scores are identical for prefetch 1 / 2 / 8 / 64"
+          (empty? disagreements) (first disagreements)))
+
+;; `shard-batch` trades GETs for waves: a bigger batch opens shards that a
+;; risen k-th score would have excluded. It must not move the ANSWER — if it
+;; does, the bound is being applied to shards it has not actually accounted
+;; for. Same argument as the prefetch check above, one level up.
+(let [{:keys [store manifest-cid]} (build-mem (synth/corpus 4000 71 vocab-size)
+                                              {:shard-count 16 :chunk-size 16})
+      disagreements
+      (vec (for [q queries
+                 :let [runs (mapv (fn [sb]
+                                    [sb (mapv :score (:hits (route/search store manifest-cid q
+                                                                          {:k 10 :shard-batch sb})))])
+                                  [1 2 8 64])]
+                 :when (not (apply = (map second runs)))]
+             {:q q :runs runs}))]
+  (check! "route: scores are identical for shard-batch 1 / 2 / 8 / 64"
+          (empty? disagreements) (first disagreements)))
+
+;; An index built without the routing dictionary must say so rather than
+;; silently fall back to reading everything — a fallback here would be a
+;; performance cliff with no signal.
+(let [{:keys [store manifest-cid]} (build-mem (synth/corpus 200 13 vocab-size)
+                                              {:shard-count 2 :route? false})]
+  (check! "route: an index without a routing dictionary is refused loudly"
+          (try (route/search store manifest-cid (first queries) {:k 5}) false
+               (catch :default _ true))
+          nil))
 
 ;; ── 5c. the read ORDER must not change the answer ───────────────────
 ;; `prefetch` changes which chunks are fetched in which wave. If any result
