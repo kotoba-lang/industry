@@ -121,4 +121,15 @@ iPhone ミラーリング（macOS 15+）はその channel である: 実機の�
 - **実機のゲームを 1 本もプレイしていない。** `examples/iphone_game_agent.clj` は配線であって receipt ではない。ADR-2608082500 が『繋いだら 3 つの実バグが出た』と記録しているとおり、**繋いでいないものは動いていない**。
 - **`loop-game-autoplay` の evidence を再現していない。** 引用した 904.7 秒 / 35,719 frames は当該 repo の evidence を読んだものであり、本セッションが走らせたものではない。
 
-**着地の経路**: 本セッションは `com-junkawasaki` を source とするため、`kotoba-lang/computer-use` へは push できない（git proxy が 403 で credential を注入しない。`add_repo` も cross-tier add を拒否）。driver の commit はこの branch の `.handoff/computer-use-ios-mirroring.patch` に patch として置き、`kotoba-lang/computer-use` を source とする別セッションで着地させる。**着地後、この patch ファイルは削除し、superproject の west pin を前進させる。**"}]
+**着地の経路と、その設計を 1 度間違えたこと**: 本セッションは `com-junkawasaki` を source とするため `kotoba-lang/computer-use` へ push できない（git proxy が 403 で credential を注入しない。`add_repo` も cross-tier add を拒否）。driver の commit はこの branch の `.handoff/computer-use-ios-mirroring.patch` に置いてある。
+
+当初、これを `kotoba-lang/computer-use` を source とする子セッションから匿名 clone させて着地させる計画を立て、実行した。**この計画は誤りで、子セッションは着地できずに停止した。** 誤りの原因は測り方にある: このコンテナから `git clone https://github.com/com-junkawasaki/root` が成功したことを『root は public』の証拠として採ったが、**成功したのは root が本セッションの authorized set に入っており proxy が credential を注入したから**であって、public だからではない。GitHub API で確認すると `\"private\": true` / `\"visibility\": \"private\"`。`raw.githubusercontent.com` は `main/README.md` すら 404 を返す。
+
+**教訓は『権限のある経路で到達できたことは、権限の無い経路でも到達できることの証拠にならない』**であり、これは索引の規則（『手元に無いことは存在しないことではない』）の裏返しの形をしている —— 到達できたことも、誰にとって到達できたのかを言わなければ意味を持たない。
+
+したがって cross-tier の着地は**このセッションからは実行できない**。実行できるのは次のいずれか:
+
+1. **owner のローカル checkout**（`orgs/kotoba-lang/computer-use` が west 管理下にある）で patch を当てて push する。
+2. `kotoba-lang/computer-use` を initial source とする**新しいセッションを owner が起こす**（そのセッションからは root が見えないので、patch の内容は別途渡す必要がある）。
+
+**着地後、この patch ファイルを削除し、superproject の west pin を前進させる。**"}]
