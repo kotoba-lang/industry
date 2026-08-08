@@ -1,0 +1,183 @@
+[{:db/id -1
+  :adr/id "adr-2608081800-money-power-reputation-sacred-status-dynamics"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/topic "money-power-reputation-sacred-status-dynamics"
+  :adr/title "ADR-2608081800: 金は移転でき、評判は移転できず、神聖性は買えない —— この三層をこの workspace がどこまで実装しているかの実測と、14 次元 power vector の stock-flow モデル"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/repos ["com-junkawasaki/root" "etzhayyim/root" "gftdcojp/engi"
+              "kotoba-lang/org-oasis-open-xmile" "kotoba-lang/dynamics"]
+
+  :adr/authoritative_for
+  ["三層命題（money 移転可 / reputation 獲得可・移転不可 / sacred status 購入不可）が etzhayyim と engi にどこまで実装されているかの実測結果"
+   "money / power vector / reputation / sacred status の system dynamics モデルの正本は 90-docs/system-dynamics/money-power-sacred.cljs であること"
+   "そのモデルの数値のうち引用してよいのは構造的結論だけで、水準の絶対値は引用してはならないこと（キャリブレーション用の実データが 1 件も無いため）"]
+
+  :adr/body
+  "## 何を問われたか
+
+『Money は移転可能。Reputation は獲得可能だが移転不可。Sacred status は原則として
+金銭・reputation のどちらからも購入不可』—— この三層が etzhayyim・engi などに
+設計・ルール化されているか。そして、それを system dynamics として実際に走らせられるか。
+
+## 実測 1 —— 三層のうち 2 つは実装され、1 つは実装されていない
+
+### money 移転可 —— gftdcojp/engi がこれ「だけ」をやる
+
+engi は Murakumo の metering と Nexus-x402 の settlement の間に立つ value-accounting /
+countersignature 境界である。Murakumo の Ed25519 receipt を検証し、正準な CIDv1/raw/sha2-256
+の transfer ID を導出し、それを一度だけ記録して replay を封じ、Engi 独立鍵で副署して
+Base USDC の決済文脈へ渡す。reputation も status も一切持たない。移転そのものが唯一の関心事。
+
+### reputation 獲得可・移転不可 —— 要求より強い形で実装されている
+
+etzhayyim は『移転を禁じる』のではなく『数値として鋳造すること自体』を禁じている。
+しかもテストで強制されている:
+
+- 20-actors/ake の G9 —— proposals throttle; they never mint a permanent reputation number。
+  methods/contributor.cljc の docstring が『no permanent ban, no minted reputation number,
+  no ranking of contributors against each other』と書き、methods/test_contributor.cljc:81 が
+  API 表面から rank / leaderboard / compare / score / reputation / best / worst / top を排除する。
+  throttle は回復可能（次の accepted edit で自動解除）なので『獲得可』の側も保たれている。
+- 20-actors/shomei の G8 —— identity-assurance NOT social-credit。
+  methods/test_charter_invariants.cljc:60 / test_aggregate.cljc:50 / test_lexicons.cljc:57 が
+  score / rank / reputation / trustScore / worth / socialCredit フィールドの存在を禁止する。
+
+移転不可は構造的に自明である。claim は subject 自身の DID 鍵で署名され（G1/G7 が
+serverSig / operatorSig を型で拒否）、G2 の own-identity-only により第三者について
+主張する field を持てない。他人に渡せる表現が存在しない。
+
+精度のための但し書き: 禁止は『人』に対してだけである。20-actors/kakaku は
+merchant/reputation-score を持ち、20-actors/credits は HC reputation gate
+（approval_rate < 50% は earn 拒否）を持つ。取引相手の評価は禁じていない。
+
+### sacred status 購入不可 —— 人の地位としては設計されていない
+
+sacred という語の出現は LANDS.md の土地権利型（stewardship / occupancy / use / access /
+cultivation / water / conservation / sacred / easement と並ぶ claim type）と、比喩
+（kamado = 竈 = sacred hearth、asobi = sacred free-play）だけである。金でも評判でも
+買えない『地位』という層は存在しない。
+
+ただし構造的に最も近いものはある。Charter Compliance Rider の Tier-0 priority は
+『The Tier-0 priorities themselves are not amendable by any Council vote (changing them is
+founding a different association -- a chain fork)』と定め、Section 2 の改正ですら
+Council Lv7+ 全会一致 + priority-conformance attestation を要求する。経済面は
+non-profit-only / donation-only inflow / no-equity / ad-exclusion。
+つまり購入不可にしてあるのは『地位』ではなく『優先順位』であり、Charter 自身の言葉では
+『固定するのは掟でなく priority』（ADR-2606062100）。三層命題の第 3 層は、人ではなく
+憲章に対して実装されている。
+
+## 実測 2 —— 14 次元 power vector の stock-flow モデル
+
+power を 1 変数に潰すのは粗すぎるという指摘を受けて組み直した。正本は
+90-docs/system-dynamics/money-power-sacred.cljs。新規実装はゼロで、
+kotoba-lang/org-oasis-open-xmile（XMILE 1.0 の model / expr / validate / execute / xml、
+Euler・RK4 シミュレータ付き）と kotoba-lang/dynamics（Meadows leverage band）だけを使う。
+
+構成: 17 stocks（Money / Attention / Reputation / Network / Institutional / Political /
+Media / Narrative / Cultural / Technological / Data / Coordination / Moral_Authority /
+Legitimacy + Sacred を elite / mass / institutional の 3 チャネルに分割）、34 flows、
+126 aux（うち 87 がパラメータ）、合計 177 変数。XMILE 1.0 として well-formed で、
+Stella / Vensim / Insight Maker にそのまま読める
+（90-docs/system-dynamics/money-power-reputation-sacred.xmile、18,542 bytes）。
+
+Coercive / Reward / Expert / Platform / Gatekeeping / Information / Followers は stock では
+なく Cobb-Douglas の auxiliary にした。『資源そのもの ≠ power』という区別を型で表すため
+である（例: Political_Influence = FinCap^0.4 · Network^0.3 · Rep^0.2 · Inst^0.1）。
+
+半飽和定数 K は当て推量ではない。dX/dt = g·n̄ − δX、n_X = X/(K+X) の閉ループ不動点
+X* = g/δ − K から n* = 1 − Kδ/g なので、K = 0.45·g/δ と置けば全 stock が n*≈0.55 の
+感度帯に入る。初版はここを外していて全 stock が n≈0.05 の不感帯に潰れていた。
+
+## 結果（構造的な結論のみ。水準の絶対値は引用しないこと）
+
+1. 構造不変条件は機械検査に通る。sacred_elite_gain / sacred_mass_gain / sacred_inst_gain の
+   式に Money・Financial_Capacity・Manipulation は一文字も現れない。一方 sacred_*_loss は
+   Scandal・Commercialization・Contradiction を参照する。**金で買う辺は無いが、金で失わせる
+   辺はある**という非対称が構造として出ている。
+
+2. 換金後に『必ず通る関門』は 1 つも無い。|V| 回の到達可能性判定（全単純経路の列挙は
+   組合せ爆発するので使わない）で、Financial_Capacity 以降に単独で切れば分離できる節点は
+   ゼロだった。『1 点を規制すれば金と神聖性を切り離せる』は偽である。最短経路は
+   elite 6 hop（→ political_power_in → Political_Power）、inst 7 hop（→ technological_power_in
+   → Technological_Power → Genuine_Contribution）、mass 9 hop（→ Manipulation → Scandal →
+   reputation_out → Reputation → Recognition）。大衆への最短路が負の経路を通る。
+
+3. **初期資本は到達点を買わない。**t=600 まで回すと、M0 が 1 でも 100000 でも、
+   非-money stock を 0.01 から出発させても 30 から出発させても、Sacred_Total は
+   完全に同一値（差 0.00000）に収束する。単一の大域アトラクタである。
+   ただし過渡は実在する: ∫ΔS dt は M0=1000 で +52.81、M0=1 で −218.13。
+   **初期資本が買うのは速さであって高さ。**
+
+4. 一方で『金の定常的な豊富さ』は到達点を確実に下げる。富の複利の飽和パラメータ
+   money_cap_k を 0（無限に複利）から 0.01（すぐ頭打ち）まで振ると Sacred_Total は
+   9.41 → 12.82 と単調に上がる。どの値でも M0 依存はゼロのまま。金が積み上がるほど
+   Manipulation と Commercialization が増え、mass と institutional のチャネルが削られる。
+
+5. dynamic power multiplier（平衡の +10% ショックに対する ∫ΔS dt。系が単一アトラクタ
+   なので T→∞ で収束する well-defined な impulse response）の順位は
+   Institutional > Political > Coordination > Cultural > Narrative > Network > Legitimacy >
+   Attention > Media > Reputation > Technological > Moral_Authority > **Money** > Data。
+   Money は 14 中 13 位。予想外だったのは Moral_Authority が下から 3 番目であること。
+   Contradiction = n_Moral_Authority × Coercion_Visibility が自分自身の負のフィードバック
+   になるためで、強制が可視な状態では道徳的権威は自分の神聖性を削る。
+   絶対ショック +10 で並べると Reputation が 4 位に跳ね上がるので、絶対ショックの順位は
+   stock ごとの単位スケールに依存する量として扱うこと。
+
+6. policy lever の効きは Meadows の band 順と一致した。psi（商業化の罰、band C）が最強で
+   −41%、theta（power→sacred 防火壁、band E）は −14% にとどまる。phi（money→power 摩擦）は
+   非単調で、しかもチャネルごとに最適点が違う: S_elite は phi=0 で最大、S_mass は phi=0.6 で
+   最大、S_total は phi=0.4 で最大。Sacred を 3 チャネルに割ったから見えた結果である。
+
+## 途中で自分が間違えたこと（同じ誤りを繰り返さないために記録する）
+
+- **t=80 を平衡だと思い込んで M0 依存を報告した。**t=600 まで伸ばすと消えた。
+  収束を確かめずに『平衡値』と呼ばない。今回は cold start と hot start を突き合わせる
+  アトラクタ一意性プローブで初めて気付いた。
+- **xmile.execute/parsed-eqn が評価のたびに式を再パースすると説明した。これは誤り。**
+  execute/run は先頭の desugar-delays で全式を一度だけ木に落とす。実測（メモ化の有無で
+  62.1s 対 63.1s）で効果ゼロと分かった。本当の無駄は定数 aux を RK4 の substep ごとに
+  評価し直すことだった。
+- **スクリプトが節 4b に印字した結論行が間違っていた。**『飽和しない世界でのみ初期資本が
+  到達点を決める』と書いたが、正しくは『飽和しない世界では初期資本の差は消えたまま、
+  到達点そのものが下がる』。上の 4 が正しい読み。
+- **新しいテストの期待値を間違えた。**t=20 は時定数 1 個ぶんで S=200(1−e^−1)=126.424 が
+  正解であり、実装は最初から正しかった。閉形式解に対する各ステップ検証に直した。
+- **90-docs/system-dynamics/ を新規ディレクトリだと思って作ろうとした。**既に
+  business.cljs / leverage.cljs / pricing.cljs / regret.cljs / token-price.cljs /
+  itonami-maturity.datoms.edn がある。自分で書いた『無いと結論する前に索引を引く』規則を
+  踏みかけた。
+
+## 上流に返した変更
+
+kotoba-lang/org-oasis-open-xmile#2（merge commit 9a70300）—— XMILE では全パラメータを
+literal 方程式の aux として宣言するのが普通（Stella / Vensim のスライダーがそれ）なので、
+中規模モデルは大半が定数になる。それを RK4 の substep ごとに評価し直していた。
+run が topo-order を一度だけ分割し、値が run 中変わらない変数を 1 回だけ評価して
+既存の extra-env 経由で流す。public arity は追加のみ。
+
+このモデルで 160 non-stock 変数中 88（55.0%）が定数と判定され、1 run あたりの変数評価が
+480,160 → 216,160（−55.0%）になった。出力は全 stock で小数 12 桁まで一致。
+**速度向上は主張していない。**畳んだ変数はどれも :num 葉で最も安い評価であり、消えるのは
+substep ごとの lookup と assoc であって木の走査ではない。開発機での交互実行は
+before 12.6〜35.2s / after 13.9〜14.4s と before の範囲が after を跨いでおり、壁時計は
+機械負荷に支配されていて何も支持しない。評価回数の削減は決定的で再現するが、壁時計はしない。
+
+TIME/DT が通常の :ref であること（free-vars は結果から除くが評価器は env から解決する）と、
+sec 3.5.4 の PULSE/STEP/RAMP が TIME を引数に取らず env から読むことの 2 点により、
+:ref を持つ木と :call を持つ木は畳めない。どちらもテストで固定した。
+
+## 限界（これを外して引用しないこと）
+
+- **キャリブレーション用の実データは 1 件も無い。**パラメータは全て仮説であり、上の順位も
+  重み付けの仮説に条件付きである。dynamics の『computed always means instantiated against
+  real facts』に照らせば、これは measured ではない。
+- したがって引用してよいのは構造的結論（どの経路が存在するか / 到達点が初期値に依存するか /
+  順位はどうか）だけで、Sacred_Total = 12.58 のような水準の絶対値ではない。
+- XMILE の配列・conveyor・queue は使っていない（org-oasis-open-xmile v1 が未実装）。
+- etzhayyim の実測は checkout 済みのファイルに対するものである。west は必要になるまで
+  取得しないので、未 checkout の repo に別の実装がある可能性は排除していない。"}]
