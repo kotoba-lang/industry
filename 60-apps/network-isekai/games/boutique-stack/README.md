@@ -16,7 +16,7 @@ declares it, `world` refuses to route an agent into a locked zone, and
 ## Run it
 
 ```bash
-npx nbb --classpath src:test:../common/src run-tests.cljs   # 56 tests, 149 assertions
+npx nbb --classpath src:test:../common/src run-tests.cljs   # 57 tests, 153 assertions
 npx nbb --classpath src:../common/src shift.cljs            # balance report
 npx nbb --classpath src:../common/src shift.cljs --gate     # non-zero on a broken shop
 ```
@@ -104,7 +104,7 @@ draw a nicer path over the same timing.
 - offers a hire nobody would ever buy.
 
 All four ship a shop that *runs* — no exception, no visible error — and is
-broken anyway. It has already earned its place three times:
+broken anyway. It has already earned its place four times:
 
 1. The manager only ever acted on the worst leak, so it hired stockers to the
    cap and stopped. **The cashier role was unbuyable content** on every shop
@@ -112,7 +112,10 @@ broken anyway. It has already earned its place three times:
 2. At the first costs tried, outerwear and shoes opened **one minute apart**
    and the shop was finished by minute 9 of a 20-minute session. The current
    costs are picked from a sweep, not from feel.
-3. A one-till shop still never hires a cashier — the player alone covers a
+3. `validate` used to **throw** on a shop it could not build, so the one
+   input the gate exists to catch crashed the run and hid every other shop in
+   it. It now reports the offending fixture and zone.
+4. A one-till shop still never hires a cashier — the player alone covers a
    single till at every traffic level measured. That is now a written-down
    fact about the layout rather than a mystery, and the test that checks
    "every role is worth hiring" uses a two-till shop and says why.

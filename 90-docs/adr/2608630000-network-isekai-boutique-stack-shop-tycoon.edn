@@ -3,7 +3,7 @@
   :adr/doc-type "adr"
   :adr/doc_type "adr"
   :adr/topic "network-isekai-boutique-stack"
-  :adr/title "ADR-2608630000: network-isekai の shop tycoon「Boutique Stack」— 服屋の department chain（tops → outerwear → shoes）、balance gate が設計欠陥を 3 件検出"
+  :adr/title "ADR-2608630000: network-isekai の shop tycoon「Boutique Stack」— 服屋の department chain（tops → outerwear → shoes）、balance gate が設計欠陥を 4 件検出"
   :adr/status "accepted"
   :adr/date "2026-08-08"
   :adr/last-verified "2026-08-08"
@@ -87,7 +87,7 @@ deliveries → staff → player → customers → tills → spawns。
 一致しなくなるだけ。移設が挙動を変えていないことは、先に打った golden digest
 （`690555956` / `869549719`）が動かないことで証明した。
 
-## balance gate が実際に検出した設計欠陥 3 件
+## balance gate が実際に検出した設計欠陥 4 件
 
 `shift.cljs`（Kingdom Cascade の `levels.cljs` に相当）は、**動くが壊れている shop**
 を落とす: validate 不通過 / 有能な manager が最終 department に到達できない /
@@ -105,6 +105,14 @@ served より lost が多い / **誰も買わない hire がある**。
    捌けきる。これは謎ではなく**レイアウトについての書かれた事実**にし、
    「全 role が買われる」テストは 2 レジ shop で行い理由を書いた。
 
+4. **`world/validate` 自身が throw していた**（PR #1736 のレビューで発見）。
+   `build` は typo した zone / item で throw する — これは「これから走らせる」
+   呼び出し側には正しいが、**`validate` の仕事は報告することなので、そこで throw
+   すると gate 実行全体が落ち、同じ run の他の shop が全部隠れる**。
+   **gate が存在する理由そのものの入力で gate が死んでいた。** `try-build` で捕らえ
+   `{:problem :malformed-shop :fixture ... :zone ...}` として報告する。
+   Kingdom Cascade の `level/validate` にも同型の欠陥があり同時に修正した。
+
 ## 実行中に見つけた実バグ 1 件
 
 **接客中の客が patience 切れで退店し、レジ側に stale な service entry が残った。**
@@ -117,8 +125,8 @@ service entry を消す / `complete-sale` は客が居なければ売上を計�
 
 | 対象 | 実測 |
 |---|---|
-| テスト | **56 tests / 149 assertions / 0 failures**（boutique-stack） |
-| | **89 tests / 2207 assertions / 0 failures**（kingdom-cascade、RNG 移設後も golden digest 不変） |
+| テスト | **57 tests / 153 assertions / 0 failures**（boutique-stack） |
+| | **91 tests / 2211 assertions / 0 failures**（kingdom-cascade、RNG 移設後も golden digest 不変） |
 | balance gate | `shift.cljs --gate` → 1/1 shops playable |
 | 20 分シフト | served 677 / lost 25（3%、内訳 empty 15 / queue 10）/ revenue 67,052 |
 | 進行 | outerwear 10 分、**shoes 15 分**、全 department 開放 |
@@ -186,8 +194,8 @@ service entry を消す / `complete-sale` は客が居なければ売上を計�
 
   :adr/verification
   {:command "npx nbb --classpath src:test:../common/src run-tests.cljs"
-   :result "56 tests, 149 assertions, 0 failures, 0 errors"
+   :result "57 tests, 153 assertions, 0 failures, 0 errors"
    :balance-gate "npx nbb --classpath src:../common/src shift.cljs --gate -> 1/1 shops playable"
-   :sibling-suite "kingdom-cascade: 89 tests, 2207 assertions, 0 failures (golden digests unchanged after the rng move)"
+   :sibling-suite "kingdom-cascade: 91 tests, 2211 assertions, 0 failures (golden digests unchanged after the rng move)"
    :measured-shift "677 served / 25 lost (3%) / revenue 67052 / outerwear at minute 10 / shoes at minute 15"
    :date "2026-08-08"}}]

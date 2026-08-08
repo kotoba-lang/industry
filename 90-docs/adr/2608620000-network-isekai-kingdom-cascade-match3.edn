@@ -82,7 +82,7 @@ capability policy は **deny-by-default で `storage/*` と `clock/now` のみ�
 
 | 対象 | 実測 |
 |---|---|
-| テスト | **88 tests / 2202 assertions / 0 failures**（`npx nbb --classpath src:test run-tests.cljs`） |
+| テスト | **91 tests / 2211 assertions / 0 failures**（`npx nbb --classpath src:test:../common/src run-tests.cljs`） |
 | レベル集合 | **3/3 が greedy solver で budget 内に勝てる**（`levels.cljs --gate`） |
 | headless 実行 | kc-001 6/12 手・kc-002 14/26 手・kc-003 21/30 手で勝利、盤面を毎手表示 |
 | 決定性 | 同 seed の再実行で digest 一致 |
@@ -95,7 +95,7 @@ Linux で Xcode も Android SDK も持たないことによる。** なお ADR-2
 「実際のアップロードは未検証」と記録しており、**このワークスペースで store 送信を
 通した実績はまだ 1 件も無い**。
 
-## gate が実際に捕まえた 3 件（劇場ではない証拠）
+## gate が実際に捕まえた 4 件（劇場ではない証拠）
 
 1. **`level/validate` が自分の書いたレベルを落とした** — kc-001 が crate 8 個を
    要求したが grid には 4 個しか無かった。
@@ -103,7 +103,16 @@ Linux で Xcode も Android SDK も持たないことによる。** なお ADR-2
    `board/vacant?`（cover があると false）で埋めていたため、**ice の下に piece が
    置かれず、ice を含む match が原理的に成立しなかった**。cover goal は永久に
    0 のまま、しかも例外は出ない。`board/pieceless?` を分けて修正。
-3. **`matcher/longest-contiguous` の off-by-one** — `loop` の binding が `let` と
+3. **`level/validate` 自身が throw していた**（PR #1736 のレビューで発見、2026-08-08）。
+   `parse-grid` は未知の glyph で throw する — これは「これから遊ぶ」呼び出し側には
+   正しい。しかし **`validate` の仕事は不正なレベルを*報告する*ことなので、そこで
+   throw すると gate 実行全体が落ち、同じ run の他のレベルが全部隠れる**。
+   **gate が存在する理由そのものの入力で gate が死んでいた。** `try-parse` で捕らえ、
+   `{:problem :malformed-grid :glyph ... :pos ...}` として報告するよう修正。
+   検証: 壊した glyph 入りの level set で、不正な kc-001 を報告しつつ健全な kc-002 も
+   引き続き報告し、exit code 1 を維持することを実測。
+
+4. **`matcher/longest-contiguous` の off-by-one** — `loop` の binding が `let` と
    同じく**逐次**であることを忘れ、`(loop [vs (rest vs), prev (first vs) ...])` の
    `prev` が既に rebind された `vs` を読んでいた。結果、4-in-a-row が
    `:arrow-v`、L/T が `:bomb` でなく `:prism` を返していた。nbb の不具合ではなく
@@ -149,7 +158,7 @@ Linux で Xcode も Android SDK も持たないことによる。** なお ADR-2
    {:decision/id :d2
     :decision/what "ルール層は pure .cljc（atom なし、I/O なし）。browser / mobile shell / headless nbb の共通 authority。"
     :decision/status :landed
-    :decision/evidence "88 tests / 2202 assertions green"}
+    :decision/evidence "91 tests / 2211 assertions green"}
    {:decision/id :d3
     :decision/what "描画は render_ir.cljc 1 ファイルに閉じた EDN render-IR。KAMI sprite2d 経路（kotoba.sprite2d over kotoba.webgpu、fallback kotoba.webgl）が消費する。"
     :decision/status :written-unverified
@@ -185,7 +194,7 @@ Linux で Xcode も Android SDK も持たないことによる。** なお ADR-2
 
   :adr/verification
   {:command "npx nbb --classpath src:test run-tests.cljs"
-   :result "88 tests, 2202 assertions, 0 failures, 0 errors"
+   :result "91 tests, 2211 assertions, 0 failures, 0 errors"
    :level-gate "npx nbb --classpath src levels.cljs --gate -> 3/3 playable"
    :headless "npx nbb --classpath src play.cljs resources/levels/kc-00{1,2,3}.edn -> won"
    :date "2026-08-08"}}]

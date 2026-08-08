@@ -16,7 +16,7 @@ artwork, level, string or specific rule is taken from any commercial game.
 ## Run it
 
 ```bash
-npx nbb --classpath src:test:../common/src run-tests.cljs   # 89 tests, 2207 assertions
+npx nbb --classpath src:test:../common/src run-tests.cljs   # 91 tests, 2211 assertions
 npx nbb --classpath src:../common/src play.cljs resources/levels/kc-001.edn
 npx nbb --classpath src:../common/src levels.cljs --gate           # solvability over the set
 ```
@@ -124,9 +124,12 @@ greedy solver needs against its budget:
   kc-003  win   greedy 21/30  slack 9   score 45720
 ```
 
-It has already earned its place twice: it caught a goal asking for eight
-crates on a grid holding four, and it caught covered cells never being dealt
-a piece — which made every cover goal unreachable without anything erroring.
+It has already earned its place three times: it caught a goal asking for
+eight crates on a grid holding four; it caught covered cells never being
+dealt a piece, which made every cover goal unreachable without anything
+erroring; and it caught itself — `validate` used to *throw* on an unknown
+glyph, so the one input the gate exists to catch took the whole run down and
+hid every other level in it. It now reports the glyph and its position.
 
 ## The renderer seam
 

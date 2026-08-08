@@ -13,7 +13,7 @@ Being precise about this matters more than the runbook itself.
 
 | Step | State |
 |---|---|
-| Game logic, levels, solver | **done** — 89 tests / 2207 assertions green under nbb |
+| Game logic, levels, solver | **done** — 91 tests / 2211 assertions green under nbb |
 | Level set gate | **done** — 3/3 levels won by the greedy solver inside budget |
 | Render-IR emitter | **written, not compiled against the real renderer** |
 | shadow-cljs web build | **not run** — needs the KAMI stack dependency coordinates |

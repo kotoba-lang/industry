@@ -82,6 +82,25 @@
     (is (= [:unreachable-goal] (mapv :problem problems)))
     (is (= 1 (:available (first problems))))))
 
+(deftest validation-reports-a-malformed-grid-instead-of-throwing
+  (testing "the validator's whole job is to report bad levels, so throwing on
+            one takes down the run and hides every other level in it — which
+            is exactly the input it exists to catch"
+    (let [problems (level/validate {:level/moves 10
+                                    :level/colors colors
+                                    :level/grid ["..Z.."]
+                                    :level/goals [{:goal/kind :block
+                                                   :goal/block :crate
+                                                   :goal/count 1}]})]
+      (is (= [:malformed-grid] (mapv :problem problems)))
+      (is (= \Z (:glyph (first problems))) "and says which glyph")
+      (is (string? (:detail (first problems)))))))
+
+(deftest parsing-still-throws-for-callers-that-are-about-to-play
+  (testing "only `validate` swallows it — a level being loaded for play must
+            fail loudly rather than silently shrink"
+    (is (thrown? #?(:clj Exception :cljs js/Error) (b/parse-grid ["..Z.."])))))
+
 (deftest a-well-formed-level-validates-clean
   (is (empty? (level/validate {:level/moves 10
                                :level/colors colors

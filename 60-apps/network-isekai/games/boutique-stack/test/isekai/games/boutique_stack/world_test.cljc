@@ -78,6 +78,25 @@
                         :zone/requires #{:dept-nonexistent} :zone/entry [0 0]})]
     (is (some #{:zone-requires-unknown-zone} (map :problem (world/validate broken))))))
 
+(deftest validation-reports-a-malformed-shop-instead-of-throwing
+  (testing "the validator's whole job is to report bad shops, so throwing on
+            one takes down the run and hides every other shop in it — which is
+            exactly the input it exists to catch"
+    (let [broken (update sup/tiny :shop/fixtures conj
+                         {:fixture/id :orphan :fixture/kind :rack
+                          :fixture/zone :nowhere :fixture/pos [0 0]
+                          :fixture/item :tee :fixture/capacity 1})
+          problems (world/validate broken)]
+      (is (= [:malformed-shop] (mapv :problem problems)))
+      (is (= :nowhere (:zone (first problems))) "and says which zone")
+      (is (string? (:detail (first problems)))))
+    (testing "an unknown item too"
+      (let [broken (update sup/tiny :shop/fixtures conj
+                           {:fixture/id :odd :fixture/kind :rack
+                            :fixture/zone :front :fixture/pos [0 0]
+                            :fixture/item :sombrero :fixture/capacity 1})]
+        (is (= [:malformed-shop] (mapv :problem (world/validate broken))))))))
+
 (deftest validation-catches-a-shop-with-no-till
   (let [broken (update sup/tiny :shop/fixtures
                        (fn [fs] (vec (remove #(= :checkout (:fixture/kind %)) fs))))]

@@ -152,11 +152,23 @@
 
 ;; ------------------------------------------------------------------ validation
 
-(defn validate
-  "Problems with a shop definition. Empty means usable.
+(defn- try-build
+  "Builds a world, turning a construction failure into a reportable problem.
 
-  Every check here is for a mistake that produces a shop which *runs* — no
-  exception, no visible error — and simply cannot make money."
+  `build` throws on a typo'd zone or item, which is right for a caller that
+  is about to run the shop. It is wrong for `validate`, whose entire job is
+  to *report* malformed shops: an exception there takes down the whole
+  validation run and hides every other shop in it."
+  [shop]
+  (try
+    {:world (build shop)}
+    (catch #?(:clj Exception :cljs :default) e
+      {:problem (merge {:problem :malformed-shop :detail (ex-message e)}
+                       (ex-data e))})))
+
+(defn- validate-buildable
+  "The checks that need a built world. Only reachable once `try-build`
+  has confirmed there is one."
   [shop]
   (let [world (build shop)
         unlocked (set (map :zone/id (:shop/zones shop)))
@@ -195,3 +207,13 @@
                     (when-not (pos? (:fixture/capacity r 0))
                       {:problem :rack-with-no-capacity :fixture (:fixture/id r)}))
                   racks)))))
+
+(defn validate
+  "Problems with a shop definition. Empty means usable.
+
+  Never throws: a shop too malformed to build comes back as a problem like
+  any other, so one bad file cannot take down a whole validation run."
+  [shop]
+  (if-let [fatal (:problem (try-build shop))]
+    [fatal]
+    (validate-buildable shop)))

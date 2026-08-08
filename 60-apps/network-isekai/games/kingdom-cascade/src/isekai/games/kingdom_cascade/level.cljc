@@ -93,12 +93,23 @@
 
 ;; ---------------------------------------------------------------- validation
 
-(defn validate
-  "Returns a vector of problems with a level definition. Empty means usable.
+(defn- try-parse
+  "Parses a grid, turning a parse failure into a reportable problem.
 
-  Cheap to run and worth running: a level whose goal asks for more crates than
-  the grid contains is unwinnable, and that is far easier to catch here than
-  from a player report."
+  `parse-grid` throws on an unknown glyph, which is right for a caller about
+  to play the level. It is wrong for `validate`, whose job is to *report*
+  malformed levels: an exception there takes down the whole validation run
+  and hides every other level in it."
+  [grid]
+  (try
+    {:board (b/parse-grid grid)}
+    (catch #?(:clj Exception :cljs :default) e
+      {:problem (merge {:problem :malformed-grid :detail (ex-message e)}
+                       (ex-data e))})))
+
+(defn- validate-parsed
+  "The checks that need a parsed board. Only reachable once `try-parse` has
+  confirmed there is one."
   [level]
   (let [board (b/parse-grid (:level/grid level))
         blocks (frequencies (keep #(:kind (b/block-at board %)) (b/positions board)))
@@ -130,3 +141,17 @@
                                 :available (get covers (:goal/cover goal) 0)})
                       nil))
                   (:level/goals level))))))
+
+(defn validate
+  "Returns a vector of problems with a level definition. Empty means usable.
+
+  Cheap to run and worth running: a level whose goal asks for more crates than
+  the grid contains is unwinnable, and that is far easier to catch here than
+  from a player report.
+
+  Never throws: a grid too malformed to parse comes back as a problem like any
+  other, so one bad file cannot take down a whole validation run."
+  [level]
+  (if-let [fatal (:problem (try-parse (:level/grid level)))]
+    [fatal]
+    (validate-parsed level)))
