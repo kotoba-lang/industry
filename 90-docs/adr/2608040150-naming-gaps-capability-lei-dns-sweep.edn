@@ -59,7 +59,7 @@ gap を書いたとおりに処理していたら、**既に正本を持つ契�
 
 正しい修正は、規則を**既にある宣言に向けて**検査すること:
 
-- `:declaration-file "capability.edn"`（schema `kotoba.capability.repository.v1`）
+- `:declaration-file \"capability.edn\"`（schema `kotoba.capability.repository.v1`）
 - **名前は `:capability/id` から導出される**: `capability-` + id の `/` を `-` に。
   `http/fetch` → `capability-http-fetch`、`secret/use-scram-sha256` →
   `capability-secret-use-scram-sha256`。**57/57 で成立**するので heuristic

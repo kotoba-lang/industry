@@ -513,9 +513,25 @@
   seventy, nothing could report that a SEVENTY-FIRST had appeared, which is the only
   question a gate can usefully answer about a migration in progress. Same reasoning as
   known-parse-errors, and asserted in the same two directions: a file here that no longer
-  exists must be removed from the list."
+  exists must be removed from the list.
+
+  **Regenerate this list only from a FULL checkout.** Six files were missing from the
+  original capture and reported as NEW for a week (2026-07-31 → 2026-08-08), which is
+  the one thing this list exists to prevent. All six were already committed when the
+  baseline was written -- verified with `git cat-file -e <baseline-commit>:<path>` --
+  so they were not new; they were never seen. The likely cause is a sparse worktree,
+  and the same trap was hit again on 2026-08-08 while investigating this: the very
+  same command reported md=34 from a sparse worktree and md=76 from the full checkout.
+  A partial view does not report that it is partial, so a baseline taken from one
+  silently converts pre-existing files into permanent false alarms."
   [
    "90-docs/business/cloud-itonami-5820-crm-go-to-market.md"
+   "90-docs/kura/README.md"
+   "90-docs/religious-community/README.md"
+   "90-docs/religious-community/queries/guide.md"
+   "90-docs/security-gates/evidence/EVIDENCE-SUMMARY.md"
+   "90-docs/security-gates/evidence/INDEX.md"
+   "90-docs/security/kagi-external-crypto-review-package-20260718.md"
    "90-docs/business/cloud-itonami-5820-dogfood-execution.md"
    "90-docs/business/cloud-itonami-5820-validation-sprint-order-form.md"
    "90-docs/business/cloud-itonami-6399-6310-acquisition-audit.md"

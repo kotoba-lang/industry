@@ -428,7 +428,7 @@ landed（`cloud-itonami/tsukuru-actor` `f206c51`）:
 
 | worker | 経路 | 結果 |
 |---|---|---|
-| `order` | `edge/read-all :order` | **200** `{"orders":[]}` |
+| `order` | `edge/read-all :order` | **200** `{\"orders\":[]}` |
 | `onboarding` | `edge/read-all :credential` | **`q 401 Unauthenticated`** |
 | `onboarding` | `POST /applicants`（書き込み） | **`q 401 Unauthenticated`** |
 | `fulfillment` | `edge/read-all :task` | **`q 401 Unauthenticated`** |
@@ -484,7 +484,7 @@ landed（`cloud-itonami/tsukuru-actor` `f206c51`）:
 
 **この調査で行った live の変更 2 件**（どちらも小さいが記録する）:
 - `cloud-itonami-marketplace-onboarding` に `ACTOR_WRITE_TOKEN` を**新規作成**した
-  （`wrangler` は "Creating" と報告 —— **それまで存在せず、`edge/authorised?` は
+  （`wrangler` は \"Creating\" と報告 —— **それまで存在せず、`edge/authorised?` は
   `want` が nil なら false を返すので、この actor の write route は全部死んでいた**）。
   値は kagi `itonami-marketplace-actor-write-token`。
 - 同 worker を現ソースから再 deploy（挙動は変わらなかった）。
