@@ -20,9 +20,9 @@
 | 日本での法人・税務 | 外国会社登記、PE、源泉・消費税の専門家判断 | Terms §6.4 は税抜 + reverse-charge の**立場**を公開しているが、`Customer is responsible for confirming its own filing position` と自認。ADR-2607242600 §7 が「foreign-company registration と counsel review は別 gate」と明示。**written advice は存在しない** | **red** | 日本の弁護士・税理士: written advice。AWAI の外国会社登記 |
 | Terms / Privacy | placeholderなし、公開版、発効日、operator承認証跡 | owner 承認済み（run 0018、2026-07-24）。`/legal/terms/` 200 / 15,322 B、`/legal/privacy/` 200 / 16,902 B、いずれも effective 2026-07-24、DRAFT 表記なし。**これは owner 承認であって counsel review ではない**（この gate が要求するのは operator 承認証跡なので green は正しい。counsel review は下の Unblock proof が別途追跡しており未充足） | **green** | — |
 | DPA / subprocessors | 実際のdata flowと一致するDPA・一覧 | `/legal/dpa/` 200 / 10,047 B。Terms §7.1 が incorporation by reference。Privacy §5 が subprocessor を実名列挙（Cloudflare, Inc. / net-kotobase ほか）、§6 に international transfer | **green** | — |
-| 価格・税・返金 | 通貨、税込/税別、周期、解約時点、返金条件 | 通貨・周期 green（§6.1 JPY・月次後払い）。税 green（§6.4 税抜 + reverse charge）。**返金・解約条項が Terms に存在しない**（`refund` / `cancel` が全文に無い）。§6.1 が参照する "in-product pricing page" も**公開されていない**（`/pricing` は 35,552 B の cockpit fallback = 実ページ無し） | **yellow** | owner: 返金・解約条件を決定 → Terms へ追補 / 公開 pricing ページを立てる |
+| 価格・税・返金 | 通貨、税込/税別、周期、解約時点、返金条件 | 通貨・周期 green（§6.1 JPY・月次後払い）。税 green（§6.4 税抜 + reverse charge）。**解約時点・返金条件は ADR-2608080300 で決定済み**（2026-08-08、run 0023）— ただし Terms 本文への適用は未実施（`refund`/`cancel` は依然 Terms に無い）。価格は**単価 2 件のみ未確定**、他 4 項目は同 ADR 決定 4 で確定 | **yellow** | ①owner: Stripe Price の `unit_amount` 2 件を読んで転記（agent は live key を扱えない）②repo access を持つセッション: ADR-2608080300 の 1・2 を `legal/terms.md` へ追補、pricing ページ生成 |
 | Fulfillment | 署名検証済みpaymentからentitlementまでE2E証拠 | `GET /api/billing/status`: `mode:"live"`, `stripeConfigured:true`, `webhookReady:true`, `readyForLiveCheckout:true`, `readyForEntitlement:true`, `missing:[]`。**レールは 100% 完成**。ただし checkout が一度も走っていないため signed-webhook → entitlement は本番未実証。test-mode 証跡は `sk_test_…` 不在で取得不能（run 0016） | **yellow** | owner: Stripe dashboard で `sk_test_…` を発行 → test-mode E2E |
-| Support / complaints | support窓口、応答方針、苦情・返金処理者 | `hello@gftd.co.jp` のみ。accountable owner 未指名 | yellow | operator: accountable ownerを指名 |
+| Support / complaints | support窓口、応答方針、苦情・返金処理者 | **ADR-2608080300 決定 3 で確定**（2026-08-08）: 窓口 `hello@gftd.co.jp`、一次受付と返金**実行**は Gftd Japan K.K.、返金**承認**と苦情の最終責任は AWAI Network, L.L.C.、受領応答は 1 営業日目標（SLA ではない）、10 営業日で operator へエスカレーション。公開文言への反映は未実施 | **yellow** | repo access を持つセッション: support ページへ反映 |
 | Product safety | 年齢、content、privacy等のproduct固有gate | cloud-itonami は adult / age-assurance 対象外 | n/a | — |
 
 ## Product decisions
@@ -51,8 +51,14 @@ red 1 件を回避する代わりに、「公開前に counsel review が要る�
 2. **owner**: Stripe dashboard で `sk_test_…` を発行する。run 0016 が金庫を確認済みで、
    test secret は存在しない。**live key の流用は禁止**（同 run の決定）。発行後の
    test-mode E2E 証跡取得は機械的作業として agent が実行できる。
-3. **owner**: 返金・解約条件を決め、公開 pricing ページを立てる（yellow、小）。
-4. **owner**: support / 苦情の accountable owner を指名する（yellow、小）。
+3. ~~**owner**: 返金・解約条件を決め、公開 pricing ページを立てる。~~ → **決定は完了**
+   （ADR-2608080300、2026-08-08）。残るのは (a) owner が Stripe Price の `unit_amount`
+   2 件を読んで転記する 1 手 — **agent は live secret key を扱えないので代行しない** —
+   と (b) 決定済み文言の Terms / pricing / support ページへの適用（判断は残っていない
+   機械的作業。`gftdcojp/cloud-itonami` への access が要る）。
+4. ~~**owner**: support / 苦情の accountable owner を指名する。~~ → **決定は完了**
+   （同 ADR 決定 3）。既存の決定（ADR-2607242600 の代理人境界）から導出したもので、
+   新しい人の割当ては発生していない。
 5. **需要**: 非 owner の実決済 1 件。これは 1–4 が全て green になっても**誰も代行できない**
    （下記）。
 
