@@ -3,8 +3,8 @@
 ;; superproject ADR-2608071500。
 ;;
 ;; **判定ロジックはここに複製しない。** 正本は tool 側の 2 本
-;;   70-tools/kotobase-shard-index/test/run_tests.cljs      （正しさ）
-;;   70-tools/kotobase-shard-index/bench/check_budget.cljs  （コスト）
+;;   test/run_tests.cljs      （正しさ）
+;;   bench/check_budget.cljs  （コスト）
 ;; で、この gate は展開済み tree に対してそれを呼ぶだけ。gate に判定を書くと
 ;; fleet と repo で別実装になり、片方だけ通る状態が黙って生まれる
 ;; （permit-index-check.cljs / west-pin-policy-check.cljs と同じ理由）。
@@ -46,7 +46,10 @@
                   argv))]
     (or (when i (get argv (inc i))) ".")))
 
-(def tool "70-tools/kotobase-shard-index")
+;; `:cd true` puts us inside the shipped repo, so paths are repo-relative.
+;; They were "70-tools/kotobase-shard-index/…" while the subsystem was staged
+;; in the superproject (ADR-2608087000 moved it out).
+(def tool ".")
 
 (defn- run [label script extra]
   (let [r (.spawnSync cp "npx"

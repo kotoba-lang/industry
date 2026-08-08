@@ -306,10 +306,16 @@
   ;;   高い」と書いている、その穴をこのサブシステムでは最初から塞いでおく。
   ;;
   ;; :include-ext に .cljc が要るのは src が portable だから。
-  {:name "root" :id "root-shard-index" :org "com-junkawasaki"
+  ;; **2026-08-08: root から kotoba-lang/kotobase-shard-index へ移した**
+  ;; （ADR-2608087000）。3 つの ADR が繰り返し follow-up に挙げていた切り出しで、
+  ;; gate も一緒に動かす必要がある —— west project は superproject の git tree に
+  ;; 入らないので、`:name "root"` のまま置くと fleet に配られる tree に対象が
+  ;; 含まれず、**検査対象 0 件のまま合格する**。`:min-files` はその床だが、
+  ;; 床が守るのは「絞り込みが壊れたとき」であって「repo を間違えたとき」ではない。
+  {:name "kotobase-shard-index" :id "root-shard-index" :org "kotoba-lang"
    :gate :nbb-script
    :script "gates/shard-index-check.cljs"
-   :include-ext [".edn" ".cljs" ".cljc"] :min-files 1500 :cd false}
+   :include-ext [".edn" ".cljs" ".cljc"] :min-files 10 :cd true}
 
   ;; net-kotobase（kotobase.net の本体、private）。**network-awai org の GitHub
   ;; Actions は 2026-08-03T01:10Z 以降 1 本も起動していない**（実測: 全 workflow
