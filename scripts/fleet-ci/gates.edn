@@ -196,6 +196,31 @@
    :script "gates/repository-roles-check.cljs" :script-args ["--min" "20"]
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
+  ;; cloud-itonami の org id **受付**（`POST /api/onboarding/challenge`）が、
+  ;; ADR-2608062100 の逆順規則と一致しているか。
+  ;;
+  ;; あの ADR は門を「intake と generate-sites-registry の 2 箇所」に置くと決めた。
+  ;; registry 側は `cloud-itonami-sites-check` が repo 自身の `--check`（= org-id/admit）
+  ;; を呼ぶので覆われているが、**intake 側を見るものは 1 本も無かった** —— そして
+  ;; 実測 2026-08-08、intake は 6 org すべてで逆順ではなく順方向を返していた
+  ;; （`awai.network -> awai-network`。規則は `network-awai` で、これは west.yml の
+  ;; remote 名そのもの）。宣言と受付が食い違ったまま誰も落ちなかった。
+  ;;
+  ;; **規則を再実装しない。** 期待値は `manifest/repository-rules.edn` の
+  ;; `:org-domain` vocabulary が持つ `:domain` -> `:reversed` をそのまま使う。
+  ;; gate が 3 つ目の導出を書くと、導出が 2 つある問題を 3 つある問題にする。
+  ;;
+  ;; **両方向を確認済み**（2026-08-08）: live の itonami.cloud に対して 6 件の
+  ;; 不一致で exit 1、規則どおりに導出する stub に対して 0 件で exit 0。
+  ;; 予約ドメイン（itonami.cloud）は `reserved-domain` で拒否されるのが正しいので
+  ;; 検査済みとして数える。
+  ;;
+  ;; :cd false — この gate は superproject の pin の根拠にならない（見ているのは
+  ;; 別 repo の live surface であって、この tree の内容ではない）。
+  {:name "root" :id "root-itonami-org-id" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/itonami-org-id-check.cljs" :script-args ["--min" "7"]
+   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+
   ;; superproject の 3 本目。manifest が宣言することと GitHub の実態の乖離を見る。
   ;; 検査ロジックは kotoba-lang/manifest-reality（純 .cljc、IO なし）が正本で、
   ;; gate は west.yml / repos.edn を渡して呼ぶだけ — repository-roles gate と
