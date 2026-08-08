@@ -16,7 +16,7 @@
 
  :deployment-readiness/checklist
  {:infrastructure-readiness
-  {:monitoring-cluster-capacity
+  [{:monitoring-cluster-capacity
    {:target ">= 50 GB free storage"
     :status "✅ VERIFIED"
     :evidence "Prometheus retention policy configured for 30d + 1y aggregated"}}
@@ -28,10 +28,10 @@
    {:target "All required tokens available (CI, Jira, CloudFlare, PagerDuty, Slack)"
     :status "✅ READY"
     :evidence "GitHub Actions secrets template configured"
-    :action-required "Populate actual token values in GitHub UI (done by ops team during phase 2)"}}}
+    :action-required "Populate actual token values in GitHub UI (done by ops team during phase 2)"}}]}
 
  :artifact-readiness
- {:prometheus-configuration
+ [{:prometheus-configuration
   {:file "deploy/prometheus.yml"
    :status "✅ PRODUCTION_READY"
    :checks
@@ -125,7 +125,7 @@
    :status "✅ ARMED"
    :sla-definitions "4h alert response, 2h critical blocker response"
    :channels ["Slack #prod-gates-wave5" "Email gates-escalation@gftd.group" "PagerDuty prod-gates service"]
-   :notes "Ready for deployment, team contacts need final verification"}}
+   :notes "Ready for deployment, team contacts need final verification"}}]
 
  :team-readiness
  {:roles-assigned
@@ -209,7 +209,7 @@
   :confidence-level "✅ VERY_HIGH (95%+)"}
 
  :deployment-timeline
- {:phase-1-prometheus
+ [{:phase-1-prometheus
   {:date "2026-08-08"
    :duration "3 hours (12:00–15:00 UTC)"
    :owner "Metrics Lead + Infra Lead"
@@ -238,7 +238,7 @@
    :time "09:00 JST"
    :duration "60 minutes"
    :attendees ["team-lead-m5" "team-lead-m6" "platform-owner" "metrics-lead" "escalation-lead"]
-   :description "Execution kickoff meeting, metrics pipeline live and operational"}}
+   :description "Execution kickoff meeting, metrics pipeline live and operational"}}]
 
  :success-metrics
  {:deployment-success-criteria
@@ -265,7 +265,7 @@
 
  :go-live-prerequisites
  {:deployment-checklist
-  {:phase-1-complete "[ ] Sign-off from Metrics Lead + Infra Lead"
+  [{:phase-1-complete "[ ] Sign-off from Metrics Lead + Infra Lead"
    :phase-2-complete "[ ] Sign-off from CI Lead + Metrics Lead"
    :phase-3-complete "[ ] Sign-off from Metrics Lead + Escalation Lead + Platform Lead"
    :pre-kickoff-complete "[ ] Sign-off from Metrics Lead + Escalation Lead + Platform Lead"}
@@ -273,7 +273,7 @@
    :team-trained "[ ] All team-leads trained on dashboard and escalation"
    :metrics-live "[ ] All 5 metrics confirmed live in Prometheus + Grafana"
    :alert-routing-tested "[ ] All 3 alert channels (Slack, PagerDuty, email) tested"
-   :rollback-ready "[ ] Rollback procedure documented and tested"}
+   :rollback-ready "[ ] Rollback procedure documented and tested"}]
   :final-approval
   {:decision-maker "Platform Lead"
    :decision-deadline "2026-08-17 15:00 JST"
