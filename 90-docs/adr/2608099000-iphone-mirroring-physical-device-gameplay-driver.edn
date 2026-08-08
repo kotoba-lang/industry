@@ -138,4 +138,15 @@ iPhone ミラーリング（macOS 15+）はその channel である: 実機の�
 - push された tree に対して**こちらで独立に** `clojure -M:test` を回し、30 tests / 121 assertions / 0 failures を再現（子セッションの自己申告ではない）。
 - upstream PR #10 の本文が『shell-out は 1 度も実行していない・実機ゲーム未プレイ・inset 26pt と model-width 480 は当て推量』を保持していることを確認。
 
-**残る follow-up は 1 件**: upstream PR #10 が main に merge されるまで **west pin は前進させられない**（pin に許されるのは upstream default branch から到達可能な commit だけ、ADR-2607022900）。merge 後に `computer-use` の pin を進める。この patch ファイル自体は upstream branch + PR #10 が commit を保持しているため削除した（同じコードを 2 箇所に置かない）。"}]
+**upstream は merge 済み**（PR #10 → `kotoba-lang/computer-use` main の `172f57a`、squash）。merge 後の main の tree が手元の検証済み commit と byte 一致することを確認し（4 ファイルの sha256 全一致 + `git diff --stat` 空）、merge 後の main に対して独立に `clojure -M:test` を回して 31 tests / 124 assertions / 0 failures を再現した。west pin も `2d66086` → `172f57a` に前進済み。
+
+## review で自分のコードに見つけた 2 件（merge 前に直した）
+
+**どちらもテストを落とさない。読んで見つけるしかない種類のものだった。**
+
+1. **`sips -Z` は幅ではなく長辺を縛る。** `-Z` は `--resampleHeightWidthMax` で、デスクトップは横長だから `computeruse.macos` では長辺＝幅で一致する。その idiom をそのまま持ってきたが**電話は縦長**なので、400×874 の crop に `-Z 480` を掛けると 480 になるのは**高さ**で、幅は約 220px になっていた。scale は実測 dims から導くので**座標は壊れず、何も失敗しない** —— ただ『画面を見て遊ぶ』ための driver がモデルに**サムネイルを渡していた**。決定的だったのはテスト側で、fixture の `(def model [480 1049])` は 400×874 に対して**幅 480** を仮定しており、コメントは `; as if sips -Z 480` ——**意図はテストに書かれていて実装がそれと違い、間違いはコメントに書き残されていた**。`--resampleWidth` に変更。
+2. **観測前の scale が `[1.0 1.0]` に fallback していた。** スクリーンショット前に操作すると model 座標を point としてそのまま扱い、**タップがもっともらしい別の場所に落ちる** —— この namespace が存在する理由そのものの失敗である。しかも同じファイルの `mirroring-window-rect` は「既定値を返さず throw する」と明記して逆をやっていた。拒否するように変更し、あわせて**座標解決を focus より前**に移した（呼び出し側のミスが窓を前面に引き出す前に表面化する。副産物として Mac 無しで検査可能になり、実際に test を足した）。新 gate は変異で落ちることを確認済み（`[1.0 1.0]` を戻すと 3 操作が error）。
+
+**教訓**: 1 は「隣の driver で正しい idiom を、前提が違う場所へ運んだ」誤りで、2 は「同じファイルの中で自分の原則と逆をやった」誤り。どちらも test 緑・lint 緑のまま通っていた。
+
+**pin 検証について正直に**: `scripts/verify-west-pins.cljs` は `gh` CLI を要求するがこのコンテナに無く、**実行できていない**。代わりに同じ 3 条件を個別に確認した ——(1) 存在: `git ls-remote` で `172f57a` が実在、(2) default branch 到達性: `172f57a` が `refs/heads/main` **そのもの**（server 確認）、(3) 前進: full 履歴を取得した上で `git merge-base --is-ancestor 2d66086 172f57a` が真、4 commit 先行。shallow 由来の誤判定（CLAUDE.md の警告）は unshallow 済みなので該当しない。"}]
