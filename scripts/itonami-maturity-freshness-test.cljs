@@ -153,6 +153,71 @@
                 {:at "2026-08-08T17:00:00Z" :axis :axis-docs :merged "2" :target "b"}]
                measured-at)))
 
+;; ── ledger の `:at` より merge commit の実時刻を優先する ─────────────────────
+;;
+;; 実測（2026-08-09、この case が生まれた周）: m365-ingest の行は
+;; `:at "2026-08-09T00:30:00Z"` と書いてあったが、merge commit c70a7114 の実時刻は
+;; 2026-08-08T15:14:18Z —— JST の壁時計に Z を付けた 9 時間先の値だった。測り直しを
+;; main に着地させた**直後**の tick がまだ STALE と答え、loop は測り直しから
+;; 出られなかった（測る → stale → また測る）。
+;;
+;; `landing-instant` の `:landed-at-ms` 優先を外すと、この case は赤くなる。
+
+(def m365-row
+  {:at "2026-08-09T00:30:00Z"                 ; 周が自分で書いた値（JST に Z）
+   :landed-at-ms (ms "2026-08-08T15:14:18Z")  ; git が持つ事実
+   :outcome :landed :lane :breadth :axis :axis-docs
+   :target "orgs/cloud-itonami/m365-ingest"
+   :merged "c70a7114c4cb618191a3cf17b071d73dcfef3cb7"})
+
+(let [r (f/freshness {:generated-at (ms "2026-08-08T18:18:32Z")  ; 測り直しの着地時刻
+                      :now (ms "2026-08-08T18:30:00Z")
+                      :entries [m365-row] :stale-after-days 7})]
+  (check! "commit-time-beats-at: 測り直した後は fresh（:at は 9 時間先を指していた）"
+          {:stale? false :reason :fresh}
+          (select-keys r [:stale? :reason])))
+
+(check! "commit-time-beats-at: 出所が :commit だと分かる"
+        {:ms (ms "2026-08-08T15:14:18Z") :source :commit}
+        (f/landing-instant m365-row))
+
+(check! "landing-instant: commit を解決できなければ :at に落ちる"
+        {:ms (ms "2026-08-08T17:14:19.000Z") :source :at}
+        (f/landing-instant {:at "2026-08-08T17:14:19.000Z" :merged "676c81f8"}))
+
+;; 優先順位を入れただけで検出そのものを弱めていないこと。
+(let [r (f/freshness {:generated-at (ms "2026-08-08T15:00:00Z")
+                      :now (ms "2026-08-08T18:30:00Z")
+                      :entries [m365-row] :stale-after-days 7})]
+  (check! "commit-time-beats-at: 実時刻が計測より後なら今までどおり STALE"
+          {:stale? true :reason :blind-to-own-work}
+          (select-keys r [:stale? :reason])))
+
+;; ── 未来の時刻は見落としの証拠にならない ─────────────────────────────────────
+;;
+;; commit を解決できなかった行が壊れた `:at`（未来）を持っていると、それだけで
+;; loop は永久に測り直しへ送り返される。未来判定を外すと 2 件とも赤くなる。
+
+(def future-row
+  {:at "2026-08-09T00:30:00Z" :outcome :landed :lane :breadth :axis :axis-docs
+   :target "orgs/cloud-itonami/m365-ingest" :merged "deadbeef"})  ; 解決できない SHA
+
+(let [r (f/freshness {:generated-at (ms "2026-08-08T18:18:32Z")
+                      :now (ms "2026-08-08T18:30:00Z")
+                      :entries [future-row] :stale-after-days 7})]
+  (check! "future-at-is-not-evidence: 未来の :at では STALE にしない"
+          {:stale? false :reason :fresh}
+          (select-keys r [:stale? :reason]))
+  (check! "future-at-is-not-evidence: 黙って捨てず :suspect で報告する"
+          ["orgs/cloud-itonami/m365-ingest"]
+          (mapv :target (:suspect r))))
+
+;; 未来判定は `now` を渡したときだけ。判定材料が無いのに『未来ではない』と
+;; 決めつけない。
+(check! "future 判定は now が無ければ掛けない"
+        ["orgs/cloud-itonami/m365-ingest"]
+        (mapv :target (f/unseen-landings [future-row] (ms "2026-08-08T18:18:32Z"))))
+
 ;; ── 読めない値を捏造しない ───────────────────────────────────────────────────
 
 (check! "parse-instant: 読めない文字列は nil（0 に丸めない）"
