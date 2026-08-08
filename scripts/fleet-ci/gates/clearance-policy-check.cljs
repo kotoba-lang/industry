@@ -171,6 +171,79 @@
                (:blocking r))
       (v! ":ratification: 席が埋まっているのに :blocking が残っている"))))
 
+;; ── 11: 実装プロトコル（ADR-2608084000）──────────────────────────
+;;
+;; **仕様名を挙げただけの設計を『設計済み』と読ませない。** 引用する repo が
+;; west.yml に実在することを機械で確かめる。実装の有無まではここでは見ないが、
+;; 「名前だけ在って repo が無い」は落とす。
+(def west-names
+  (if (exists? (p "manifest" "west.yml"))
+    (into #{} (map second) (re-seq #"(?m)^    - name: (\S+)$" (rd (p "manifest" "west.yml"))))
+    #{}))
+
+(defn- collect-repos [x]
+  (cond (map? x) (concat (when (vector? (:repo x)) (:repo x)) (mapcat collect-repos (vals x)))
+        (sequential? x) (mapcat collect-repos x)
+        :else nil))
+
+(when-let [pr* (:protocols pol)]
+  ;; 参照する repo が west に実在するか
+  (when (seq west-names)
+    (doseq [r (distinct (collect-repos pr*))]
+      (when-not (contains? west-names r)
+        (v! ":protocols が west.yml に無い repo " (pr-str r) " を引用している"
+            " — 実装の在るものだけを protocol として書く"))))
+
+  ;; :repo は必ずベクタ（文字列だと 1 文字ずつに散る。実測 2026-08-08）
+  (letfn [(scan [x path]
+            (when (map? x)
+              (when (and (contains? x :repo) (not (vector? (:repo x))))
+                (v! (str path " の :repo がベクタでない: " (pr-str (:repo x)))))
+              (doseq [[k v*] x] (scan v* (str path "/" k)))
+              (doseq [v* (filter sequential? (vals x))
+                      e v* :when (map? e)] (scan e path))))]
+    (scan pr* ":protocols"))
+
+  ;; 権限更新は 4 事象すべてに別々の機構が要る
+  (let [au (:authority-update pr*)
+        evs (into #{} (map :event) au)]
+    (doseq [e [:grant :suspend :revoke :expiry]]
+      (when-not (contains? evs e)
+        (v! ":authority-update に事象 " e " が無い"
+            " — 授与/停止/剥奪/失効 は別々の機構を持つ。混ぜると停止が高価になり"
+            "運用が停止をためらう")))
+    (doseq [a au]
+      (doseq [k [:mechanism :cost :repo]]
+        (when (nil? (get a k))
+          (v! ":authority-update " (:event a) " に " k " が無い"))))
+    ;; 停止が再鍵を伴うと、安く可逆であるという設計意図が壊れる
+    (when-let [s (first (filter #(= :suspend (:event %)) au))]
+      (when-not (= "O(1)" (:cost s))
+        (v! ":authority-update :suspend の :cost が O(1) でない"
+            " — 停止が高価だと運用が停止をためらう。安いことが安全側に効く"))))
+
+  ;; 閲覧履歴: 順序と保存とギャップの申告
+  (let [al (:access-log pr*)]
+    (when-not (= :log-then-serve (:ordering al))
+      (v! ":access-log の :ordering が :log-then-serve でない"
+          " — 平文を配ってから書くと、途中で落ちたときに記録だけが消えて"
+          "相互性の条件が黙って破れる"))
+    (when (nil? (:retention al))
+      (v! ":access-log に :retention が無い"))
+    (when (and (= :none (:inclusion-proof al)) (nil? (:anchor al)))
+      (v! ":access-log は :inclusion-proof :none なのに :anchor が無い"
+          " — 出せない証明の代わりに何をするかを書かずに『できない』とだけ書かない"))
+    (when (and (= :permanent (:retention al)) (nil? (:long-term-integrity al)))
+      (v! ":access-log は :retention :permanent なのに :long-term-integrity が無い"
+          " — 永久保存はハッシュが先に老いる。RFC 4998 相当の更新計画が要る")))
+
+  ;; 穴は影響と深刻度つきで名指す
+  (doseq [m (:missing pr*)]
+    (doseq [k [:what :impact :severity]]
+      (when (nil? (get m k))
+        (v! ":missing " (pr-str (:what m)) " に " k " が無い"
+            " — 穴を穴として名指すには、何がどう効くかまで書く")))))
+
 ;; ── 結果 ────────────────────────────────────────────────────────────
 (let [vs @violations]
   (println (str "clearance-policy-check: 級 " (count grades)

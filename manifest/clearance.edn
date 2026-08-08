@@ -324,6 +324,178 @@
   "fleet-db" "fleet-ci" "market-intel" "cloud-itonami-lei" "concept" "surface"]
 
  ;; ── 開いている問い（設計の穴を穴として残す）─────────────────────────
+ ;; ══════════════════════════════════════════════════════════════════════
+ ;; 実装プロトコル（ADR-2608084000、2026-08-08 追加）
+ ;; ══════════════════════════════════════════════════════════════════════
+ ;;
+ ;; 上の政策は「誰が何を読めるか」を決めるだけで、**どう封緘し、変更時に何を
+ ;; 動かし、閲覧をどう残すか**を決めていなかった。ここがそれ。
+ ;;
+ ;; ⚠ **ここに書く protocol は、このワークスペースに実装が在るものだけ。**
+ ;;    仕様名を挙げて実装が無い状態を「設計済み」と読ませない。gate が
+ ;;    :repo を west.yml と突き合わせて、存在しない repo の引用を落とす。
+ :protocols
+ {;; ── 1. 封緘（情報設計と暗号化）──────────────────────────────────
+  :sealing
+  {:layers
+   [{:layer :content-key :scope "object の version ごと"
+     :note "本文はこれで 1 回だけ暗号化する。読者の数だけ暗号化しない"}
+    {:layer :compartment-key :scope "区画の epoch ごと"
+     :note "content key を包む。**この中間層が無いと、会員が 1 人増減する
+            たびに全 object を包み直すことになる**"}
+    {:layer :delivery :scope "会員ごと"
+     :repo ["org-signal"]
+     :note "compartment key を sender-keys group ratchet で配る。少人数なら
+            X3DH の pairwise。**実装済み**（X3DH + Double Ratchet + group）"}]
+
+   ;; **隠さない非対称。** ここを曖昧にした設計は、除名を『無かったこと』に
+   ;; できると読ませてしまう。
+   :irreversibility
+   {:removal-is :forward-only
+    :note "除名しても、その者が既に復号した平文は取り戻せない。旧 epoch の
+           鍵も消せない（憲章に消去権が無い以上、消したふりもしない）。
+           **『再鍵した』は『過去も守られた』ではない。**"
+    :to-protect-past :re-seal
+    :re-seal-cost "O(objects)。C5/C6 の区画だけに適用する"
+    :join-is :forward-only
+    :join-note "**加入も前方のみが既定。** 新しく入った者に過去を開かない ——
+                sender-key は現在の chain から配るので自然にそうなる。
+                『昇級したら過去も読める』にしない"}
+
+   ;; C5 鍵 は封緘の対象ではない（政策の :declassify :never-rotate-instead）。
+   :capability-grade-exception
+   {:c 5 :handling :rotate-not-decrypt
+    :note "鍵は復号して読ませるものではなく、失効させて回すもの"}}
+
+  ;; ── 2. クリアランスが変わったときに何が動くか ────────────────────
+  ;;
+  ;; **4 つの事象に 4 つの別々の機構を割り当てる。混ぜてはならない。**
+  ;;
+  ;; 停止で再鍵すると停止が高価になり、運用が停止をためらう =「疑わしいが
+  ;; 高いので放置」になる。逆に剥奪を停止で済ませると、鍵を持ったままの者が
+  ;; 残る。**status list が revocation と suspension を別の statusPurpose として
+  ;; 持っているのは、この 2 つが別物だからである。**
+  :authority-update
+  [{:event :grant :ja "授与"
+    :mechanism "級の VC を発行し、区画の epoch を進めて新しい compartment key を配る"
+    :cost "O(現メンバー数)"
+    :repo ["org-w3-vc" "org-w3-vc-data-integrity" "org-signal"]
+    :note "新規加入者は過去 epoch を読めない（前方のみ）"}
+
+   {:event :suspend :ja "停止"
+    :mechanism "status list の suspension bit を立てる。**再鍵しない**"
+    :cost "O(1)"
+    :repo ["org-w3-vc-bitstring-status-list"]
+    :note "政策の :on-expiry :suspend-not-revoke はこれ。安く可逆だから、
+           疑わしい時にためらわずに使える —— それが安全側に効く"}
+
+   {:event :revoke :ja "剥奪"
+    :mechanism "revocation bit を立て、epoch を進めて残る者に再鍵する"
+    :cost "O(残るメンバー数)"
+    :repo ["org-w3-vc-bitstring-status-list" "org-signal"]
+    :note "前方のみ。過去を守るなら別途 re-seal が要る"}
+
+   {:event :expiry :ja "失効"
+    :mechanism "CACAO の exp が切れる。誰も何もしない"
+    :cost "O(0)"
+    :repo ["org-chainagnostic-cacao"]
+    :note "**要求ごとのトークンを session ではなく短命 CACAO にする理由がこれ。**
+           失効に調整が要らない設計だけが zero trust で回る"}]
+
+  ;; 要求ごとのトークン。:decision の 7 条件を満たした結果として発行する。
+  :per-request-token
+  {:format :cacao
+   :repo ["org-chainagnostic-cacao"]
+   :fields "iss/aud/iat/exp/nonce/resources（実装済み）。resources に区画・
+            epoch・宣言した目的・級を入れて attenuate する"
+   :ttl-minutes 10
+   :no-session true
+   :note "session を持たない = 前回通ったことが今回の根拠にならない"}
+
+  ;; 級の提示。**級の VC 全体を見せずに『この区画の C4 を持つ』だけを示す。**
+  :selective-disclosure
+  {:repo ["org-ietf-sd-jwt"]
+   :spec "RFC 9901"
+   :note "salted-hash 方式。保持者が開示する claim を選べる。**実装済み**"}
+
+  ;; ── 3. 閲覧履歴 ─────────────────────────────────────────────────
+  :access-log
+  {:store :append-only-hash-chain
+   :repo ["com-etzhayyim-kotoba-datom"]
+   :structure "tx/cid = sha256(canonical-json {prev, datoms})。1 アクセス 1 tx"
+
+   ;; **順序が protocol の一部である。**
+   :ordering :log-then-serve
+   :ordering-note "記録を書いてから平文を配る。逆順だと、読んだ直後に落ちた
+                   場合に記録だけが消え、**相互性の条件が黙って破れる**。
+                   :decision の 7 番目（記録を公開できないなら拒否）は、
+                   この順序と組でなければ意味を持たない"
+
+   :fields ["要求者の did" "区画と epoch" "宣言した目的" "級" "判定" "時刻"
+            "対象の識別子（**salted digest**）"]
+
+   ;; 再帰する問題への答え。
+   :subject-privacy
+   {:problem "「X が Y のデータを読んだ」という記録自体が Y についての個人データ。
+              相互性は公開を要求するが、公開すると誰を読んだかが漏れる"
+    :answer "対象の識別子を salted digest にする。**本人は salt を持つので
+             自分の行を検証でき、公衆には『区画 X へのアクセスが 1 件あった』
+             までしか見えない**"
+    :repo ["org-ietf-sd-jwt"]}
+
+   ;; 何ができて何ができないかを分ける。
+   :tamper-evidence :hash-chain
+   :inclusion-proof :none
+   :inclusion-note "**kotoba-datom は hash chain であって Merkle tree ではない。**
+                    改竄は検知できるが、第三者に『あなたの記録がこの log に在り、
+                    log が書き換えられていない』を示す包含証明は出せない。
+                    代わりに **head を定期公開して錨を打つ**"
+   :anchor {:mechanism :publish-head
+            :repo ["tech-ipfs-specs-ipns"]
+            :note "『時刻 T の log の head は H だった』を第三者が持てる状態にする"}
+
+   ;; 憲章に消去権が無い = 保存は永久 = ハッシュが先に老いる。
+   :retention :permanent
+   :long-term-integrity
+   {:repo ["org-ietf-ers" "org-ietf-rfc3161"]
+    :spec "RFC 4998 Evidence Record Syntax"
+    :note "**永久記憶は SHA-256 より長く生きる。** ERS は自分の暗号が老いる前に
+           hash tree を更新し続けるための仕様で、build-tree / reduced-path /
+           archive-time-stamp / timestamp-renewal-digest / hash-renewal-digest /
+           verify が実装済み。保存が永久だからこそ、これが要る"}}
+
+  ;; ── 4. 無いもの（設計の穴を穴として名指す）─────────────────────
+  ;;
+  ;; **これらは「設計が悪い」のではなく「まだ書かれていない」。**
+  :missing
+  [{:what "MLS (RFC 9420)" :in-west false
+    :impact "群の再鍵が sender-keys の O(n) のまま。MLS なら O(log n)"
+    :severity :low
+    :why-low "会員 1 名の現状では効かない。**ただし規模を理由に後回しにする
+              判断と、下の membership 層が無い問題を混同しないこと**"}
+
+   {:what "kotoba-signal の group membership management（add/remove）"
+    :in-west true :implemented false
+    :impact "**この設計が要求する層がまさに欠けている。** org-signal の README が
+             自ら『the sender-keys chain ratchet itself is implemented,
+             membership bookkeeping is not』『Key revocation / rotation policy
+             … a scheduler/policy for *when* does not [exist]』と書いている。
+             primitive は在るが、epoch を進めて誰に配り直すかを決める層が無い"
+    :severity :blocking
+    :first-implementation-decision true}
+
+   {:what "HPKE / JWE / COSE" :in-west false
+    :impact "封緘の envelope を kotoba-signal の primitive の上に自作することになる"
+    :severity :medium}
+
+   {:what "Certificate Transparency 相当の Merkle log" :in-west false
+    :impact "包含証明が出せない。錨打ちで代替する（上記 :anchor）"
+    :severity :medium}
+
+   {:what "age" :in-west false
+    :impact "CLAUDE.md が annex 暗号化で age に触れているが、west に無い"
+    :severity :low}]}
+
  :open-questions
  [{:q "アクセス記録の公開先はどこか（PDS / on-chain / git）"
    :note "相互性の条項が実装可能かはここに懸かる。未決のまま施行しない"}
