@@ -92,6 +92,37 @@ shard is asked every query. So shard count should follow write parallelism and
 object size, not corpus size; and client-side fan-out, not index size, is what
 bounds this design.
 
+## The routing dictionary — `route.cljc`
+
+The fan-out above is what put the honest reach at 10⁹–10¹⁰ pages. One
+dictionary for the whole index removes most of it
+(`bench/results/2026-08-08-route-scaling.edn`, ADR-2608085000):
+
+    term -> [{:shard :max-impact :df :postings} ...]
+
+Locating a term costs one descent instead of one per shard, and a shard whose
+per-term maxima cannot reach the k-th score is skipped without being opened.
+Same corpus, same queries, both read paths on one index:
+
+| corpus | docs / shards | v1 GETs | route GETs | |
+|---|---|---|---|---|
+| uniform | 64,000 / 32 | 240.8 | **77.6** | fan-out growth 12.2x → **3.9x** |
+| uniform | 16,000 / 8 | 72.8 | **39.2** | descent only — nothing was pruned |
+| clustered | 64,000 / 32 | 150.6 | **20.4** | 30.8 of 32 shards never became candidates |
+
+Two mechanisms, and the stats report both because a corpus picks between them:
+`total → considered` drops shards that hold no query term (free — the routing
+entry does not list them), `considered → opened` drops shards whose bound
+cannot win (pruning). A topical corpus collapses at the first step, a uniform
+one at the second.
+
+`:shard-batch` is the GETs-versus-waves dial. Opening one shard per wave is
+GET-optimal and depth-pessimal — 70.6 GETs in 70 waves at 64k/32, against 77.6
+in 18 at the default of 8. Answers are identical at every setting, which the
+suite checks.
+
+Index cost: blocks ×1.00–1.02, bytes ×1.18–1.32.
+
 ## Run
 
 ```bash

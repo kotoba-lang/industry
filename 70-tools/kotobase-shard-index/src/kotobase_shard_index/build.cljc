@@ -38,7 +38,11 @@
    :title-weight 3
    :k1-x100 120        ; BM25 k1 = 1.20
    :b-x100 75          ; BM25 b  = 0.75
-   :impact-scale 1000})
+   :impact-scale 1000
+   ;; Write the routing dictionary. Costs blocks at build time and removes the
+   ;; per-shard fan-out at query time; `false` reproduces the v1 index exactly,
+   ;; which is what the A/B in `bench/route_scaling.cljs` compares against.
+   :route? true})
 
 (defn- round-int [x]
   #?(:clj (long (Math/round (double x))) :cljs (js/Math.round x)))
@@ -97,7 +101,11 @@
 
   Sorted by impact descending, ties broken by doc-id ascending so a rebuild
   produces byte-identical blocks. The head block carries each chunk's
-  max-impact, which is what lets a client stop reading."
+  max-impact, which is what lets a client stop reading.
+
+  Returns `{:cid :df :max-impact}`. The `:max-impact` is the first chunk's,
+  i.e. the largest contribution this term can make to any document in this
+  shard — the quantity the routing dictionary is built out of."
   [sink hash-fn chunk-size term postings]
   (let [ordered (vec (sort-by (juxt (comp - second) first) postings))
         chunks (mapv (fn [grp]
@@ -107,11 +115,13 @@
                           :max-impact (second (first grp))
                           :count (count grp)}))
                      (partition-all chunk-size ordered))]
-    (block/put-block! sink hash-fn
-                      {:kind :posting-head
-                       :term term
-                       :df (count ordered)
-                       :chunks chunks})))
+    {:cid (block/put-block! sink hash-fn
+                            {:kind :posting-head
+                             :term term
+                             :df (count ordered)
+                             :chunks chunks})
+     :df (count ordered)
+     :max-impact (if (seq chunks) (:max-impact (first chunks)) 0)}))
 
 ;; ── metadata ────────────────────────────────────────────────────────
 
@@ -148,7 +158,7 @@
   the caller groups them, which is what makes host-scoped queries cheap."
   ([sink hash-fn docs] (build! sink hash-fn docs {}))
   ([sink hash-fn docs opts]
-   (let [{:keys [shard-count dict-fanout chunk-size meta-chunk-size title-weight]
+   (let [{:keys [shard-count dict-fanout chunk-size meta-chunk-size title-weight route?]
           :as opts} (merge default-opts opts)
          docs (vec (map-indexed (fn [i d] (assoc d :id i)) docs))
          n (count docs)
@@ -159,7 +169,7 @@
                     {} tfs)
          idfs (reduce-kv (fn [m t d] (assoc m t (idf n d))) {} df)
          ranges (if (zero? n) [] (shard-ranges n shard-count))
-         shards
+         built-shards
          (vec (map-indexed
                (fn [sid [start end]]
                  (let [local (subvec docs start end)
@@ -175,29 +185,57 @@
                                             a)))
                                       acc tf)))
                                  {} (range start end))
-                       entries (mapv (fn [t]
-                                       [t {:df (count (get postings t))
-                                           :postings (build-postings sink hash-fn chunk-size
-                                                                     t (get postings t))}])
-                                     (sort (keys postings)))
+                       built (mapv (fn [t]
+                                     [t (build-postings sink hash-fn chunk-size
+                                                        t (get postings t))])
+                                   (sort (keys postings)))
+                       entries (mapv (fn [[t b]]
+                                       [t {:df (:df b) :postings (:cid b)}])
+                                     built)
                        {:keys [root height]} (build-dict-tree sink hash-fn dict-fanout entries)]
-                   {:id sid
-                    :doc-base start
-                    :doc-count (- end start)
-                    :dict-root root
-                    :dict-height height
-                    :term-count (count entries)
-                    :meta-dir (build-meta sink hash-fn meta-chunk-size start local)}))
+                   {:shard {:id sid
+                            :doc-base start
+                            :doc-count (- end start)
+                            :dict-root root
+                            :dict-height height
+                            :term-count (count entries)
+                            :meta-dir (build-meta sink hash-fn meta-chunk-size start local)}
+                    ;; What the routing dictionary is assembled from. Emitted
+                    ;; here because the max-impact is known exactly once, while
+                    ;; this shard's postings are in hand.
+                    :route (mapv (fn [[t b]]
+                                   [t {:shard sid :max-impact (:max-impact b)
+                                       :df (:df b) :postings (:cid b)}])
+                                 built)}))
                ranges))
-         manifest {:kind :manifest
-                   :version 1
-                   :analyzer {:form :ascii+cjk-bigram :title-weight title-weight}
-                   :scorer (select-keys opts [:k1-x100 :b-x100 :impact-scale])
-                   :layout (select-keys opts [:dict-fanout :chunk-size :meta-chunk-size])
-                   :stats {:doc-count n
-                           :term-count (count df)
-                           :avgdl-x1000 (round-int (* 1000 avgdl))
-                           :shard-count (count shards)}
-                   :shards shards}]
+         shards (mapv :shard built-shards)
+         ;; ── routing dictionary ──────────────────────────────────────
+         ;; term -> every shard that holds it, with that shard's largest
+         ;; possible contribution for the term. One tree for the whole index,
+         ;; so locating a term costs log(global vocabulary) round trips ONCE
+         ;; instead of once per shard. See `route.cljc` for why that is the
+         ;; fan-out term and why pruning on these bounds stays exact.
+         route-entries (when route?
+                         (->> (mapcat :route built-shards)
+                              (group-by first)
+                              (map (fn [[t es]]
+                                     [t (vec (sort-by :shard (map second es)))]))
+                              (sort-by first)
+                              vec))
+         route-tree (when route?
+                      (build-dict-tree sink hash-fn dict-fanout route-entries))
+         manifest (cond->
+                   {:kind :manifest
+                    :version 1
+                    :analyzer {:form :ascii+cjk-bigram :title-weight title-weight}
+                    :scorer (select-keys opts [:k1-x100 :b-x100 :impact-scale])
+                    :layout (select-keys opts [:dict-fanout :chunk-size :meta-chunk-size])
+                    :stats {:doc-count n
+                            :term-count (count df)
+                            :avgdl-x1000 (round-int (* 1000 avgdl))
+                            :shard-count (count shards)}
+                    :shards shards}
+                    route? (assoc :route-root (:root route-tree)
+                                  :route-height (:height route-tree)))]
      {:manifest-cid (block/put-block! sink hash-fn manifest)
       :stats (:stats manifest)})))
