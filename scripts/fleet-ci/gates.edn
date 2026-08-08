@@ -136,6 +136,22 @@
   ;; 90-docs/ 直下ほか 4 — Unmatched delimiter / 奇数個の map form など、2026-08
   ;; 付けの計画文書群）。これらは規約成立前の遺物で、gate をそこまで広げると
   ;; 「最初から赤で誰も直さない」になる。範囲を明示して、直ったら広げる。
+  ;; club-shinshi-app は kotoba-lang/kaiyu を **vendor** している（deps では
+  ;; なく写し。理由は ADR-2607078100 と同じ: この repo の CI と本番 deploy は
+  ;; repo 単体を checkout するので、west sibling も :git/sha も解決しない）。
+  ;;
+  ;; 誰も検査しない vendor は、名前が紛らわしいだけの fork でしかない。しかも
+  ;; 壊れ方が静かで、library が dwell の境界を変えて babiniku と kotobase が
+  ;; 追従し、shinshi だけ古いまま —— **3 サイトの分布が比較できなくなるのに、
+  ;; どの suite も緑のまま**。共有語彙が防ぐはずだったものそのもの。
+  ;;
+  ;; gate は header に書かれた sha を GitHub から引いて突き合わせる（隣の
+  ;; checkout ではなく「header が主張する版」と比べるのが要点）。
+  ;; :include-ext は .cljc だけ送る。この repo は動画/画像込みで巨大。
+  {:name "club-shinshi-app" :gate :nbb-script
+   :script "gates/vendored-kaiyu-parity.cljs" :script-args []
+   :include-ext [".cljc"] :min-files 2 :cd true}
+
   {:name "root" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs/adr" "--min" "1400"]
    :include-ext [".edn"] :min-files 1500 :cd false}
