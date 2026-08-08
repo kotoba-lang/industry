@@ -1,0 +1,28 @@
+;; Kingdom Cascade — level 3, "Frostworks".
+;;
+;; Covers, not blocks. Iced pieces cannot be dragged and nothing falls past
+;; them, so the board is stiff until the ice comes off — the player has to
+;; work from the loose edges inward rather than from the top down.
+;;
+;; Frost takes two hits and sits behind the ice band, which is what makes the
+;; ordering matter instead of being a formality.
+{:level/id "kc-003"
+ :level/name "Frostworks"
+ :level/chapter 1
+ :level/preset :throne-hall
+ :level/moves 30
+ :level/seed 20260810
+ :level/colors [:coin :gem :clover :goblet :crown :rune]
+ :level/goals [{:goal/kind :cover :goal/cover :ice :goal/count 10}
+               {:goal/kind :cover :goal/cover :frost :goal/count 4}
+               {:goal/kind :block :goal/block :crate :goal/count 4}]
+ :level/grid [".........."
+              "..iiiiii.."
+              "..i.ff.i.."
+              "..i.ff.i.."
+              "..iiiiii.."
+              ".c......c."
+              ".........."
+              ".c......c."
+              ".........."
+              ".........."]}
