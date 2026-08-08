@@ -23,8 +23,15 @@
 ;;     サイトが健全な周に issue を出す loop は noise を出す
 ;;   - **secret が無い / 到達できないサイトは候補にしない。** 読めなかったことを
 ;;     「問題が無い」とも「問題がある」とも書かない
-;;   - **同じ issue id が既に開いていれば ingress が 200 already-open を返す。**
-;;     loop 側で重複を防ごうとしない（状態を 2 箇所で持つことになる）
+;;   - **書き込みの重複は ingress が防ぐ**（同じ issue id なら 200 already-open）。
+;;     loop 側で「既に開いているか」を持たない —— それは queue の状態で、写しを
+;;     持てば必ずずれる
+;;   - **起こしたかどうかは loop 自身の状態**なので ledger が持つ。これは別の問い
+;;     で、答えないと **答えの出た問いのために 6 時間ごとにモデルを起こし続ける**。
+;;     実測（2026-08-08）: shinshi の transitions の issue は実ブラウザ実験で答えが
+;;     出て ledger に :answered まで書いたのに、tick は同じ finding を出し続ける
+;;     （行が 0 なのは事実なので当然）。ingress は 200 already-open を返すから
+;;     queue は汚れないが、**モデルは毎周起きる**
 ;;   - ledger は追記のみ。起こさなかった周は :skipped と理由を書く
 ;;   - **成否をここで判定しない。** 次周の tick が測り直す
 ;;   - exit 0 常に（監視 loop であって gate ではない）
@@ -33,7 +40,8 @@
 ;;   nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
 ;;       scripts/kaiyu-kaizen-loop.cljs [--dry-run]
 
-(require '[clojure.string :as str])
+(require '[clojure.edn :as edn]
+         '[clojure.string :as str])
 
 (def fs (js/require "node:fs"))
 (def cp (js/require "node:child_process"))
@@ -67,6 +75,27 @@
       (js/console.error "kaiyu-kaizen-loop: tick failed" (str e))
       nil)))
 
+(defn- handled-issue-ids
+  "Issue ids this loop has already woken for (or recorded an answer to).
+
+  Reads its OWN ledger, not the queue: 「まだ開いているか」は queue の問いで
+  ingress が答える（200 already-open）。ここが答えるのは「もう起こしたか」で、
+  別の問いである。両方を queue に訊くと、答えの出た問いのためにモデルを起こし
+  続けることになる。
+
+  Parses the whole file as one vector of forms rather than line by line —
+  entries written by hand span several lines, and a per-line reader silently
+  yields the first keyword it finds instead of the map, which reads as『まだ
+  起こしていない』for every entry. Found by the dry-run still saying it would
+  wake for an issue the ledger already recorded as answered."
+  []
+  (try
+    (let [content (str (.readFileSync fs ledger "utf8"))]
+      (->> (edn/read-string (str "[" content "]"))
+           (keep :issue-id)
+           set))
+    (catch :default _ #{})))
+
 (defn- wake-model! [candidate]
   (let [prompt (str "/kaiyu-kaizen " (js/JSON.stringify (clj->js candidate)))]
     (try
@@ -89,16 +118,26 @@
                      :sites (mapv #(select-keys % [:site :status :finding-count]) (:results tick))})
 
     :else
-    (let [candidate (first (:candidates tick))]
-      (if dry-run?
-        (println (str "would wake: " (get-in candidate [:issue :id])))
-        (let [result (wake-model! candidate)]
-          (append-ledger! (merge {:status :woke
-                                  :window (:window tick)
-                                  :site (:site candidate)
-                                  :issue-id (get-in candidate [:issue :id])
-                                  :severity (get-in candidate [:top :severity])
-                                  :candidates (count (:candidates tick))}
-                                 (select-keys result [:error]))))))))
+    (let [handled (handled-issue-ids)
+          fresh (remove #(contains? handled (get-in % [:issue :id])) (:candidates tick))]
+      (if (empty? fresh)
+        ;; Every candidate is one this loop already took to the model. Recorded
+        ;; rather than silent, so 「何も無い」 and 「同じものばかり」 stay
+        ;; distinguishable — they need different fixes.
+        (append-ledger! {:status :skipped :reason :all-candidates-already-woken
+                         :window (:window tick)
+                         :issue-ids (mapv #(get-in % [:issue :id]) (:candidates tick))})
+        (let [candidate (first fresh)]
+          (if dry-run?
+            (println (str "would wake: " (get-in candidate [:issue :id])))
+            (let [result (wake-model! candidate)]
+              (append-ledger! (merge {:status :woke
+                                      :window (:window tick)
+                                      :site (:site candidate)
+                                      :issue-id (get-in candidate [:issue :id])
+                                      :severity (get-in candidate [:top :severity])
+                                      :candidates (count (:candidates tick))
+                                      :fresh (count fresh)}
+                                     (select-keys result [:error]))))))))))
 
 (js/process.exit 0)
