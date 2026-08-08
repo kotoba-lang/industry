@@ -282,6 +282,32 @@ base のままということなので、PR の `-N` 行は**いま main にあ�
 | 0 | `:merge`（何も書き換えない） |
 | 1 行でも有 | `:needs-review`（他人の未完成の編集を main に適用することになる） |
 
+### `close` は、ローカル WIP が残っている限り終端ではない
+
+`:close-superseded` / `:close-stale-revert-risk` として PR を閉じても、**その PR の元になった
+共有 checkout の未コミット変更は消えない**（cleanup-land が「ローカルの WIP は一切削除しない」
+のは非交渉の安全床なので、これは正しい挙動）。したがって次に `cleanup-land --apply` を回すと、
+**同じ内容の preservation PR が作り直される。**
+
+実測 2026-08-08: `etzhayyim/com-etzhayyim-kawaraban#28` を `:close-stale-revert-risk` として
+archive → close した約 1 時間後、同じ 54 ファイルが `:review` として再び plan に載った
+（この時は `--names` から外して回避した）。
+
+disposition が `:close-*` の repo は、次のどれかまでやって初めて片付く:
+
+| | 対処 |
+|---|---|
+| (a) | その working tree の変更を owner が commit するか捨てる |
+| (b) | 意図的に残すなら `.gitignore` / `.git/info/exclude` に入れて cleanup-land の視界から外す |
+| (c) | 現 `main` から切り直した正しい PR を landed させ、working tree を `main` と一致させる |
+
+どれもできないなら、**「close したが再生成される」ことを報告に明記する**。黙って閉じると、
+次の周で復活したものを別の agent が新規 backlog として数え直す。
+
+なお **PR の重複そのもの**（日付違いの同一内容）は tool 側のバグで、com-junkawasaki/root#1765 で
+修正済み。修正後は既存の open な preservation PR があればその branch を再利用するので、
+repo あたり常に 1 本になる。
+
 **Never**: `DO-NOT-MERGE` を理由に中身を見ずに放置する（この節ができた理由）/ draft の
 まま放置して「GitHub が merge を防ぐから安全」で終わらせる（防いでいるのは事故だけで、
 判断は誰もしていない）/ archive せずに close する（`:retirement :archive` と同じ

@@ -138,15 +138,39 @@
 
 (def max-bytes (* 2 1024 1024))
 
+(def ^:private workflow-policy-re
+  "GitHub Actions の workflow ファイル。**着地させない。**
+
+  理由は 2 つあり、順序が大事（policy が先、token は結果論）:
+
+  1. **repo-wide mandatory な禁止事項である。** CLAUDE.md 「CI/CD は murakumo fleet。
+     GitHub Actions を使わない」（ADR-2607300900、オーナー指示 2026-08-05）は
+     『新しい `.github/workflows/*.yml` を書かない』と明示している。検査を足したいなら
+     `scripts/fleet-ci/gates.edn` に足す。cleanup が共有 checkout に落ちていた
+     workflow ファイルを拾って main に載せるのは、この規則を裏口から破ることになる。
+  2. そもそも **token に `workflow` OAuth scope が無いので書き込めない**。
+
+  2 だけに任せると失敗の見え方が最悪になる: GitHub は workflow ファイルへの書き込みを
+  **403 ではなく 404** で拒否するので、`gh failed: gh: Not Found (HTTP 404)` としか出ず、
+  **repo が存在しないと誤読する**（CLAUDE.md がこの誤読を名指しで警告している）。
+
+  実測 2026-08-08: `kotoba-lang/user-test` の untracked は `.github/workflows/ci.yml`
+  1 件だけで、これが 404 になり `:additive commit に失敗` として報告された。repo は
+  実在し archived でもなく default=main で健在——原因は scope だった。着地しなかったこと
+  自体は正しい（policy が禁じている）が、**理由が伝わらないまま失敗していた**ので、
+  policy 側で先に落として名前の付いた skip クラスとして報告する。"
+  #"(^|/)\.github/workflows/")
+
 (defn- classify-file [dir path]
   (let [f (io/file dir path)
         size (try (.-size (.statSync node-fs (.getPath f))) (catch :default _ 0))]
     (cond
-      (re-find credential-re path) :skip-credential
-      (re-find junk-re path)       :skip-junk
-      (> size max-bytes)           :skip-large
-      (secret-content? f)          :skip-credential
-      :else                        :take)))
+      (re-find credential-re path)      :skip-credential
+      (re-find workflow-policy-re path) :skip-workflow-policy
+      (re-find junk-re path)            :skip-junk
+      (> size max-bytes)                :skip-large
+      (secret-content? f)               :skip-credential
+      :else                             :take)))
 
 (defn- annex? [dir]
   (or (.exists (io/file dir ".git" "annex")) (.exists (io/file dir ".datalad"))))
