@@ -91,22 +91,53 @@ git worktree add -b agent/maturity-<repo> /tmp/maturity-<repo> origin/main   # �
 
 ### 5. 測り直しの反復（`:datoms-stale?` が true のとき）
 
+**scan は `orgs/` の実 checkout を読む。** worktree の `orgs/` は west の checkout では
+ないので（gitignore されている）、**`--data-root` で本体を指す**。指し忘れると 1,729 repo
+すべてを「未 checkout」と測る。同じ理由で dynamics の classpath も本体の絶対パスにする。
+
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-scan.cljs
-nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/dynamics/src:orgs/kotoba-lang/org-oasis-open-xmile/src" \
+R=$HOME/github/com-junkawasaki                      # 本体（orgs/ が populate されている）
+nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-scan.cljs \
+  --data-root "$R" --out manifest/itonami-maturity-evidence.edn
+nbb --classpath ".:scripts/nbb_compat:$R/orgs/kotoba-lang/dynamics/src:$R/orgs/kotoba-lang/org-oasis-open-xmile/src" \
   scripts/itonami-maturity-dynamics.cljs \
   --evidence manifest/itonami-maturity-evidence.edn \
   --taxonomy manifest/repo-taxonomy.edn \
   --out 90-docs/system-dynamics/itonami-maturity.datoms.edn
 ```
 
-**パリティゲートも通す**（スコア算術の正本は Kotoba カーネル、ADR-2608052000）:
+**scan の前に checkout と pin のずれを見る。** pin より**遅れた** checkout は、
+既に着地している仕事を「無い」と測る（実測: 過去周が 6 件でこれを踏んだ）。
+**ahead は直さない** —— 自動 commit を打ち続ける actor（`yabai-actor` の ct-watch 等）は
+pin より前に居るのが正常で、HEAD こそ実態である。
+
+**パリティゲートも通す**（スコア算術の正本は Kotoba カーネル、ADR-2608052000）。
+**`.:scripts/nbb_compat` だけでは起動しない** —— compiler の依存閉包 12 repo が要る。
+これを省いた例が長く載っていたため、gate は `Could not find namespace:
+kotoba.artifact.core` で*走らないまま*何周も landed し続けた（落ちるより悪い。
+検査されていないことが緑と区別できない）:
 
 ```bash
-nbb --classpath ".:scripts/nbb_compat" scripts/itonami-maturity-kernel-parity.cljs
+R=$HOME/github/com-junkawasaki
+CP=".:scripts/nbb_compat:$R/orgs/kotoba-lang/compiler/src:$R/orgs/kotoba-lang/compiler/resources"
+for r in abi artifact io-ipld io-multiformats kotoba-component kotoba-kir \
+         kotoba-native kotoba-script kotoba-verifier kotoba-wasm provider tender-native; do
+  CP="$CP:$R/orgs/kotoba-lang/$r/src"
+  [ -d "$R/orgs/kotoba-lang/$r/resources" ] && CP="$CP:$R/orgs/kotoba-lang/$r/resources"
+done
+nbb --classpath "$CP" scripts/itonami-maturity-kernel-parity.cljs \
+  --evidence manifest/itonami-maturity-evidence.edn \
+  --datoms 90-docs/system-dynamics/itonami-maturity.datoms.edn
 ```
 
+**緑を採用する前に落とす。** datoms のコピーで 1 repo の `:maturity/own-bp` を
+**1bp だけ**ずらし、`FAIL` + exit 1 になることを見る（無改変で exit 0）。
+起動しない gate と全一致する gate は、出力が同じ「異常なし」なので区別できない。
+
 生成物を着地させて終わり。この周は lane を消費しない（軸を上げていないので）。
+ledger の行は `:outcome :remeasured` / **`:axis :none-remeasure`** にする ——
+`axis-` で始まる軸を書くと freshness 判定がそれを「軸上げ」と数え、
+loop は測り直しから二度と出られない（`scripts/itonami_maturity_freshness.cljs`）。
 
 ### 6. 着地（rebase も force-push もしない）
 
