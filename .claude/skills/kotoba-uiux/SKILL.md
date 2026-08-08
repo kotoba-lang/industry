@@ -41,6 +41,47 @@ with a trailing slot, an accent an app can choose. The first three are app CSS o
 token contract (see kami-genko); the fourth is the point — DADS ships デジタル庁ブルー
 and an app does not pick its own.
 
+## Build it as a single page (owner decision, 2026-08-08, ADR-2608080100)
+
+**kotoba-lang UI is single-page apps: one document, one bundle, one mount.** Moving
+between screens changes state, not location. If you are about to add a second HTML
+file to an app, it is a **view**, not a document.
+
+Measured on the two apps this rule came from: they had a second document for their
+user-test dashboard, which meant React, cljs core and the whole design system were
+**compiled and shipped twice** — 3.6 MB across the pair, 2.1 MB as one page. The
+difference was not features. And with two app shells, only one of them followed the
+DADS migration: the other went on serving a `<link>` to the `liquid-glass.css` that
+migration had deleted, unstyled, for three days.
+
+1. **Views are data; the nav is generated from them.** A view added to the dispatch
+   and forgotten in the nav is dead code that looks live. Generating removes the
+   possibility. The nav is `dds/button` with `:href` — real links that are still
+   design-system controls, and **no app CSS for any of it**.
+2. **Address views with the fragment, not a path.** On a static host (Pages, the
+   cloud-itonami sites plane) `pushState` to `/user-test` gives a URL that works
+   until someone reloads it and then 404s. Use `pushState` only where a server
+   rewrite actually exists (a Worker's `not_found_handling: single-page-application`)
+   — check, don't assume.
+3. **Ship a `404.html`, and do not rewrite every unknown path to `./`** — `/x/y`
+   would go to `/x/`, also missing, and the fallback redirects to itself forever.
+   Send only the addresses that really moved; redirect relative (`./`) so one
+   artifact is correct at any mount point.
+4. **Assert that crossing a view does not load a document.** This is invisible in
+   the source — the code reads the same whether the nav routes or navigates. Leave a
+   value on `window`, cross, and check it survived. Wait on an element that exists
+   *only* in the target view (waiting on something both views have returns before the
+   crossing renders). Assert app state survives too; without that, the single page
+   bought nothing.
+
+**Exception**: pages that need SSR/OG for crawlers (ADR-2606290000). Don't bind an app
+and a marketing surface with one rule.
+
+**No shared router yet.** Two apps each hold a ~60-line `route.cljc` (view table +
+`fragment->view` + `nav` pure, listener behind `#?(:cljs)`); `.cljc` so addressability
+is testable without a browser. **The extraction trigger is the third app** — and not
+into `jp-go-dds`, since routing is neither markup nor CSS. Read those two first.
+
 `dds-ext-*` (container / section / grid / stack / row / card) is the library's own
 non-upstream layout layer. Extend it upstream rather than re-deriving layout in app CSS.
 

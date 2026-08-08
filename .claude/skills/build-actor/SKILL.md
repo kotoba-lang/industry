@@ -48,11 +48,17 @@ PolicyGovernor）/ **cloud-itonami**（ops-LLM ⊣ CertGovernor）。
   - deps に `io.github.kotoba-lang/langchain-store {:local/root
     "../../kotoba-lang/langchain-store"}` を足す。既存の hand-rolled store は
     「触るついでに漸進移行」（一括書き換えはしない）。
-- **deps / lint / test。** `io.github.com-junkawasaki/langgraph-clj
-  {:local/root "../../com-junkawasaki/langgraph-clj"}` ＋ `:dev` で langchain-clj を
-  override（3 actor 同形の deps.edn）。`clojure -M:lint`（clj-kondo・errors fail）/
+- **deps / lint / test。** `io.github.kotoba-lang/langgraph
+  {:local/root "../../kotoba-lang/langgraph"}` ＋ `:dev` で langchain を
+  override（手本 `gftdcojp/gftd-talent-actor/deps.edn`）。`clojure -M:lint`（clj-kondo・errors fail）/
   `clojure -M:dev:test`。`.cljc` は `edn`/`Exception` を `#?(:clj/:cljs)` 条件化して
   JVM/cljs/WASM 可搬に保つ。
+  - ⚠ **`cloud-itonami/deps.edn` に残る `io.github.com-junkawasaki/langgraph-clj`
+    （旧 artifact ID・`:local/root` は新パス）を「古いから」と消さない。** 依存の一部が
+    その ID で宣言しており、tools.deps は同一 lib を別 ID・別 coordinate 種別で
+    掴むと全 alias の classpath 構築に失敗する。旧 ID は shallowest 宣言として
+    意図的に残してある（同 deps.edn の madoguchi 節のコメントが理由）。
+    **新しい actor は旧 ID を持ち込まない**が、既存の旧 ID を掃除もしない。
 - **west / RAD 登録。** 新 actor workflow は `20-actors/{name}` に実装を置くだけで完了
   しない。actor 単位 repo `etzhayyim/com-etzhayyim-{name}` を作り、
   `orgs/etzhayyim/com-etzhayyim-{name}` として west に登録し、RAD identity 台帳にも

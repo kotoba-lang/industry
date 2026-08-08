@@ -1,0 +1,147 @@
+[{:db/id -1
+  :adr/id "2608620000-kaisya-email-entrance-and-mcp-edge-scope"
+  :adr/title "ADR-2608620000: kaisya のメール入口（着地はパスキー）と、mcp.itonami.cloud を MCP の 2 経路に絞ったこと"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-identity-surface"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for ["network-awai/cloud-itonami の kaisya サインイン面"
+                          "cloud-itonami/cloud-itonami-app の公開面（mcp-edge）"]
+  :adr/related ["2607270100" "2607279200"]
+
+  :adr/context
+  "問いは 2 つだけだった —— 『app.itonami.cloud/kaisya は deploy 済みか』『passkey 以外に
+email でもログインできるか』。答えは『済み』『できない』で、その調査から 3 つの事実が出た。
+
+1. **server 側の email 経路は全部あって、呼ぶ人が居なかった。** `cloud-itonami.edge.email-login`
+   は `/api/auth/email`（常に同じ 200）・`/verify`（session / 引換券 / 確認の 3 種）・
+   `/attach` `/detach` を実装済みで本番で応答していたのに、`git grep 'api/auth/email' origin/main`
+   の唯一のヒットが実装ファイル自身だった。画面から見れば存在しないのと同じ。
+
+2. **送られたリンクは着地できない場所を指していた。** `magic-link` は
+   `https://itonami.cloud/#email-login=<token>` を組み立てていたが、root は営み OS の玄関で、
+   その fragment を読むコードは無い。
+
+3. **`app.itonami.cloud/kaisya` には `/signin` が無い**（404、実測）。にもかかわらず kaisya の
+   起動処理は無条件で `navigator.credentials.get` を叩き、失敗文言は `/signin` を案内していた。
+
+同じ日に『cloud-itonami-app の web 版はどこに公開されているか』を追ったところ、独立した web 版は
+無く（local-first、`http://localhost:1338`、rp-id `localhost`）、しかし `services/mcp-edge` の
+Worker が **14 行の無条件リバースプロキシ**で、`mcp.itonami.cloud` に**ローカルアプリ全体**を
+出していた。外から実測: `GET /` は 200 でチャット UI 全文（651 KB）、`GET /api/state` は
+**直近のアシスタント応答の本文**・session 数・モデル設定を無認証で返した。"
+
+  :adr/decision
+  "**D1. kaisya にメールの入口を置く。文言は『メールでログイン』にしない。**
+入口がメールでも着地はパスキーである（根が無い人には引換券、ある人には何も認可しない session）。
+`workspace-view/sign-in-gate` が 5 段（choose / sent / enroll / enrolled / identified）を持ち、
+`workspace-app` が `#email-login=` を消費して `credentials.create` → `/api/auth/enroll-passkey`
+まで完結させる。**メールの session CACAO は保存しない** —— server が `:authorizes []` を明示的に
+返しているものを Authorization に載せると全 plane が 403 になり、『入れたのに何もできない』という
+読めない状態になる。
+
+**D2. magic link の宛先を `/kaisya/` にする。** 引き換えの儀式を実装しているのは kaisya の書類
+だけ。ホストは rp-id（itonami.cloud）のまま —— `app.itonami.cloud` を指すと認証の儀式そのものが
+cross-origin になる。
+
+**D3. 起動時にパスキーのダイアログを出さない。** 3 分岐（リンクで来た / session がある / それ以外）
+にし、それ以外は入口を出して人の操作を待つ。
+
+**D4. `mcp-edge` は MCP の 2 経路だけを通す明示表にする。** `/mcp`(POST,GET,DELETE) と
+`/.well-known/oauth-protected-resource/mcp`(GET) のみ。prefix 判定にしない（`/mcp` の前方一致は
+`/mcpanything` も通す）。未知パスと既知パスへの誤 method は**同じ 404** —— 405 を返すとどのパスが
+在るかを走査で数えられる。
+
+**D5. `/api/state` は session 必須。** 検査は route 表ではなく関数側（`runtime-state!`）に置く。
+handler の `cond` は JVM の 64KB メソッド上限の数フォーム手前に居て、分岐を `do` で包むと
+名前空間ごと『Method code too large!』で落ちる（実測: main は :ok、main + その `do` は失敗）。
+
+**D6. 遠隔アクセスは origin を変えない経路（tailnet 経由の port-forward）を採る。**
+公開ホスト化（rp-id 変更）は採らない —— 根拠は下記 4 点で、実行すると締め出される。"
+
+  :adr/consequences
+  "- **公開面は MCP の 2 経路のみ**になった。`/`・`/api/*`・`/health` は 404（実測）。
+- アプリ本体でも `/api/state` が 401 になったので、エッジとアプリの**二重**で塞がっている。
+  片方が将来緩んでも会話本文は出ない。
+- **遠隔から UI を使う経路は未達**。唯一の残りは macOS の Remote Login が off であること
+  （`RunSSH: True` なのに port 22 は connection refused、`sshHostKeys` absent —— macOS の
+  tailscaled では SSH サーバが実際には出ていない）。sudo と GUI が要るのでオーナーの手。
+- **iPhone / iPad からは port-forward が現実的でない。** スマホから使う要求が出た時にだけ、
+  ts.net ホスト化 + 引換券方式を作る価値がある（インターネット公開ではなく tailnet 内）。
+- **gap（未修正）: アプリに『別 origin / 2 台目の端末で passkey を足す』経路が無い。**
+  `register!` は `:identity/already-registered` で拒否、`resume-owner-onboarding!` は
+  `(empty? (:passkeys state))` が条件、enrollment code は `add-user!`（他人を招く経路）でしか
+  発行されない。iCloud 同期されたパスキーが在る限り実害は出ないが、同期の効かない
+  authenticator を使う日には効いてくる。
+- kaisya の静的 HTML が最初に出すものが『空のチャット + Connecting…』から門に変わった。
+  design-quality の採点対象がこの面になる。"
+
+  :adr/body
+  "## 着地した commit
+
+| 内容 | repo | commit |
+|---|---|---|
+| kaisya のメール入口（D1–D3） | network-awai/cloud-itonami | `702e0bc5`（main に含有） |
+| mcp-edge を 2 経路に限定（D4） | cloud-itonami/cloud-itonami-app | `2cecbd60`（同） |
+| `/api/state` に session（D5） | cloud-itonami/cloud-itonami-app | `0d945e33`（同） |
+| west pin 前進 ×3 | com-junkawasaki/root | `382c4aed` `a54b5a1c` `fb8e1ae5`（各 +1 −1） |
+
+## 検証（すべて実行済み・実測）
+
+- portable cljs **745 tests / 6372 assertions / 0 failures**
+- edge cljs **493 tests / 1390 assertions / 0 failures**
+- JVM **1208 tests / 4936 assertions / 0 failures**
+- **新しい gate は落ちることを確かめた**: `magic-link` を `/` に戻すと edge が 1 件、
+  `console` から gate を外すと portable が 4 件落ちる。
+- shadow-cljs `:workspace-app` release ビルド通過（`:infer-warning` は既存コードにも出る同種）。
+- 本番 deploy 後の実測:
+  `itonami.cloud/kaisya/` と `app.itonami.cloud/kaisya` の両方で門と新バンドル、
+  `mcp.itonami.cloud` は `/mcp` 401（`www-authenticate` に resource_metadata）・
+  metadata 200・`/` `/api/state` `/health` `/chat` `/mcpanything` `PUT /mcp` すべて 404、
+  loopback の `/api/state` は 401。
+- **未検証**: 実際のメール送信（Resend 経由）。`/api/auth/email` は仕様どおり常に同じ 200 を
+  返すため、外からは送信の成否が見えない。登録済みアドレスを 1 つ指定すれば端まで通せる。
+
+## 遠隔アクセスを公開ホスト化しない根拠（実測）
+
+1. 既存 passkey は rp-id `localhost` に束縛。`https://mcp.itonami.cloud` では提示できない。
+2. `register!` は既存ユーザがいると `:identity/already-registered` で拒否。
+3. `resume-owner-onboarding!` は `(empty? (:passkeys state))` が条件 —— 古い記録が残る限り不可。
+4. `require-origin!` は public-origin **1 個**と厳密比較 —— 公開ホストに向けると localhost からの
+   書き込みが全部落ちる。
+
+つまり rp-id を変えた瞬間、新しい credential を作る手段が無いまま古い credential が使えなくなる
+（config を戻せば復旧はする）。対して port-forward は origin も rp-id も変えないので、
+アプリ改修ゼロ・公開面の追加ゼロで済み、失敗モードも『繋がらない』であって
+『二度と認証できない』ではない。
+
+## resume point（次の agent が会話履歴なしで再開できる粒度）
+
+1. **遠隔アクセスを完成させる**: オーナーが Remote Login を on にしたら、tailnet 上の別 Mac から
+   `ssh -N -L 1338:127.0.0.1:1338 25mbair.tail110d8b.ts.net` → `http://localhost:1338`。
+   tailnet 以外の interface を落とす要求があればファイアウォールで絞る。
+2. **メール配信の端まで検証**: オーナーが登録済みアドレスを 1 つ挙げたら、
+   `POST https://itonami.cloud/api/auth/email` → 受信 → `/kaisya/#email-login=` →
+   引換券 → パスキー作成、を実際に通す。
+3. **`/signin/` にメールの口が無いまま**（magic link は kaisya に着地するので機能はする）。
+   揃えるかはオーナー判断待ち。
+4. **superproject のローカル checkout が `origin/main` から 25 commit 遅れ**、その west.yml は
+   7 件の pin を退行させる内容。同期は `.git/index.lock` を別セッション（本 closing 時点では
+   git-annex PID 29984）が保持しており未実施。空いたら
+   `git merge --ff-only origin/main`。**それまでこの checkout から `git push` しない**
+   （pin guard が止めるが、理由を知らないと skip したくなる）。
+
+## 運用上の学び（次に効くもの）
+
+- **west.yml を GitHub API で読むときは `contents?ref=main` の raw ではなく
+  `git/blobs/<sha>` を使う。** raw エンドポイントは古い内容を返すことがあり、それを土台に
+  wholesale で書くと**他人の pin を静かに巻き戻す**。実際に 1 回、6 件を巻き戻す payload を
+  作りかけ、`west-pin-verify-guard` が止めた。blob は content-addressed なので古くなり得ない。
+- **`git push` を含む複合コマンドは、pin guard がローカルの west.yml を検査する。**
+  子リポの branch 削除が superproject の staleness で deny される。API
+  (`gh api -X DELETE .../git/refs/heads/<branch>`) なら通る。
+- **`git worktree remove` が Permission denied で失敗したら git-annex の object**。
+  `chmod -R u+w` してから消す。"}]

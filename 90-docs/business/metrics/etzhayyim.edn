@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 11204, "etzhayyim-xrpc-proxy" 573},
+ {"etzhayyim-did-web" 11729, "etzhayyim-xrpc-proxy" 573},
  :zone
- {:requests-7d 49066,
-  :pageviews-7d 1553,
-  :uniques-7d-sum 1977,
+ {:requests-7d 50068,
+  :pageviews-7d 1574,
+  :uniques-7d-sum 1998,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 32}
-   {:path "/sitemap.xml", :requests 13}
+  [{:path "/robots.txt", :requests 29}
+   {:path "/system-dynamics", :requests 27}
+   {:path "/sitemap.xml", :requests 12}
+   {:path "/api/state", :requests 5}
+   {:path "/.well-known/oauth-protected-resource/mcp", :requests 5}
+   {:path "/actor/tazuna/system-dynamics", :requests 4}
    {:path "/actor/tate/system-dynamics", :requests 4}
-   {:path "/actor/com-google-ads/did.json", :requests 4}
-   {:path "/actor/tazuna/system-dynamics", :requests 3}
-   {:path "/actor/aburi/system-dynamics", :requests 3}
-   {:path "/actor/funamori/system-dynamics", :requests 3}
-   {:path "/actor/suji/system-dynamics", :requests 3}],
-  :status-mix {:server-error 6600, :client-error 869, :ok 437},
+   {:path "/actor/com-google-ads/did.json", :requests 4}],
+  :status-mix {:server-error 6854, :client-error 1059, :ok 442},
   :window "24h"},
  :as-of "2026-08-08",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 11, :error-5xx-pct 83},
+ {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 82},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 32 · /sitemap.xml 13 · /actor/tate/system-dynamics 4 · /actor/com-google-ads/did.json 4 · /actor/tazuna/system-dynamics 3 | 4xx(probe) 11% · 5xx 83%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 29 · /system-dynamics 27 · /sitemap.xml 12 · /api/state 5 · /.well-known/oauth-protected-resource/mc… 5 | 4xx(probe) 13% · 5xx 82%",
  :signal
- "etzhayyim.com 実測 49066 req/7d・1977 uniques(日次和)・うち4xx probe 11%(24h)、workers 11777 inv/7d"}
+ "etzhayyim.com 実測 50068 req/7d・1998 uniques(日次和)・うち4xx probe 13%(24h)、workers 12302 inv/7d"}

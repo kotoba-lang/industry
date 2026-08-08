@@ -62,8 +62,66 @@
 
 ;; ── 1) 宣言を読む ────────────────────────────────────────────────────────────
 
+(defn- git-out
+  "`git -C app ...` の stdout。落ちたら nil —— 宣言が読めないことと
+  『読めたが古い』ことは別の失敗なので、ここで握り潰さずに呼び出し側へ返す。"
+  [args]
+  (let [{:keys [code out]} (sh "git" (into ["-C" app] args))]
+    (when (= 0 code) out)))
+
+(def declaration-source
+  "宣言をどこから読んだか。`:remote` / `:worktree` / nil。
+
+  **working tree の os.edn を読むと、この tick は嘘の候補を出す。** 共有
+  checkout は west の pin に留まり、しかも他セッションの WIP で dirty のまま
+  置かれるので、main で既に接続済みの vertical を『未宣言』と判定する。
+  実測 2026-08-07 と 2026-08-08 の 2 回、tick 1 位（4630）が**両方とも既に
+  接続済み**で、os-connect loop 自身が『次の反復も同じ罠を踏む』と ledger に
+  書いて終わっていた。
+
+  したがって既定は **origin/main を実際に取りに行って読む**。`--offline` の
+  ときと fetch が失敗したときだけ working tree に落ちる —— そのときは何を
+  読んだかを必ず表示する（黙って古い方を読むのが、この 2 回の失敗そのもの）。"
+  (atom nil))
+
+(defn- gh-file
+  "GitHub の main にあるファイルを HTTPS + token で読む。
+
+  `git fetch` を使わないのは、この tick が launchd から走るときに **SSH agent
+  が無い**ため（実測 2026-08-08: spawnSync 下の fetch が
+  `could not read IPC response` で落ち、FETCH_HEAD が古いまま残って黙って
+  worktree に落ちていた）。`gh` は token 認証なので agent を要らない。"
+  [repo path]
+  (let [{:keys [code out]} (sh "gh" ["api" (str "repos/" repo "/contents/" path "?ref=main")
+                                     "--jq" ".content"])]
+    (when (and (= 0 code) (not (str/blank? out)))
+      (try (.toString (js/Buffer.from (str/replace out #"\s" "") "base64") "utf8")
+           (catch :default _ nil)))))
+
 (def declaration
-  (some-> (slurp* (str app "/os.edn")) edn/read-string))
+  (let [remote (when-not offline?
+                 (or (gh-file "network-awai/cloud-itonami" "os.edn")
+                     ;; 二次: 直近の fetch が残した remote-tracking ref。
+                     ;; worktree より新しいことは多いが、誰かが fetch して
+                     ;; いなければ古い —— だから一次にはしない。
+                     (git-out ["show" "origin/main:os.edn"])))
+        local (slurp* (str app "/os.edn"))]
+    (if (some? remote)
+      (do (reset! declaration-source :remote)
+          (edn/read-string remote))
+      (do (when (some? local) (reset! declaration-source :worktree))
+          (some-> local edn/read-string)))))
+
+(defn- declaration-drift
+  "working tree の宣言が origin/main とどれだけズレているか。
+
+  数えるだけで直さない —— 共有 checkout を tick が書き換えてよい理由は無い。
+  ズレていること自体が『この checkout から生成器を回すな』の合図になる。"
+  []
+  (let [local (some-> (slurp* (str app "/os.edn")) edn/read-string)
+        n #(count (:verticals %))]
+    (when (and local declaration (not= (n local) (n declaration)))
+      {:worktree (n local) :remote (n declaration)})))
 
 (defn- tenant-key [v] (str (:org v) "/" (:repo v)))
 
@@ -367,8 +425,29 @@
   （二重実装を防ぐはずの仕掛けが、静かに何も防いでいなかった）。
 
   見るのは接続フローが作る名前（`itonami-os` / `os-connect`）の枝だけ。無関係な
-  枝まで見ると、たまたま似た綴りの枝が候補を隠す。`gh` が落ちたら `:unknown` に
-  して候補から外さない（従来どおり fail-open）。"
+  枝まで見ると、たまたま似た綴りの枝が候補を隠す。
+
+  **情報源は 3 つで、gh の 2 本はどちらも落ちうる。** 実測 2026-08-08: 同じ tick を
+  2 回続けて回したら、1 回目は 6492 を「別の枝が着手中」として外し、2 回目は
+  「次の 1 手」として出した —— gh がこけたときに fail-open するため。二重実装を
+  防ぐ仕掛けが**気まぐれに効かなくなるのは、効かないより悪い**（効いていると
+  思って進むので）。ADR-2608070000 が記録した isic-4921 の 2 回実装は、まさに
+  この検出漏れが起こした事故だった。
+
+  3 つ目は git の remote-tracking ref。**ネットワークも gh も要らない**ので、
+  launchd 下で SSH agent が無い（この tick が origin/main を fetch ではなく
+  remote-tracking ref から読んでいるのと同じ制約）状況でも効く。
+
+  ただし **gh が答えたときは gh が正で、git ref は使わない**。remote-tracking ref
+  は prune されるまで消えた枝を持ち続けるからで、しかもこの repo は同じ GitHub repo に
+  remote が 2 本（gftdcojp / origin）刺さっているので、片方を prune しても他方が
+  残る。実測 2026-08-08: 枝を GitHub から消した後も
+  `refs/remotes/origin/agent/itonami-os-isic-6492` が残り、**6492 が候補から
+  永久に外れた**。
+
+  向きが違うので両方まずいが、まずさの質が違う: 検出漏れは二重実装（やり直せる）、
+  過剰検出は**候補が永久に出てこない**（loop が静かに何もしなくなる）。だから
+  git ref は gh が黙ったときの保険に留める。"
   []
   (if offline?
     {:status :skipped :branches []}
@@ -376,12 +455,20 @@
                        "--state" "open" "--limit" "50"
                        "--json" "headRefName" "--jq" ".[].headRefName"])
           br (sh "gh" ["api" "repos/network-awai/cloud-itonami/branches"
-                       "--paginate" "--jq" ".[].name"])]
-      (if (and (not= 0 (:code pr)) (not= 0 (:code br)))
+                       "--paginate" "--jq" ".[].name"])
+          gh-answered? (or (= 0 (:code pr)) (= 0 (:code br)))
+          ;; gh が黙ったときだけ git ref に落ちる（union しない — 上の docstring）
+          refs (when-not gh-answered?
+                 (sh "git" ["-C" app "for-each-ref" "--format=%(refname:short)" "refs/remotes"]))
+          refs-ok? (and refs (= 0 (:code refs)))]
+      (if (and (not gh-answered?) (not refs-ok?))
         {:status :unknown :branches []}
         {:status (if (and (= 0 (:code pr)) (= 0 (:code br))) :ok :partial)
          :branches (->> (concat (str/split-lines (or (:out pr) ""))
-                                (str/split-lines (or (:out br) "")))
+                                (str/split-lines (or (:out br) ""))
+                                ;; remote 名を剥がす（gftdcojp/agent/x → agent/x）
+                                (map #(str/replace % #"^[^/]+/" "")
+                                     (str/split-lines (or (:out refs) ""))))
                         (map str/trim)
                         (remove str/blank?)
                         (filter #(or (str/includes? % "itonami-os") (str/includes? % "os-connect")))
@@ -417,6 +504,16 @@
   (when-not declaration
     (log! "itonami-os tick: os.edn が読めない（" app "）— 何も測らずに終了")
     (js/process.exit 0))
+
+  ;; 何を読んだかを先に言う。working tree に落ちた tick の候補は信用できない
+  ;; ので、それを画面に出さずに候補だけ出すのは、この 2 回の失敗の再演になる。
+  (log! (case @declaration-source
+          :remote   "宣言: origin/main の os.edn"
+          :worktree "宣言: ⚠ working tree の os.edn — origin/main を取れなかった。候補が既に接続済みの可能性がある"
+          "宣言: 出所不明"))
+  (when-let [d (declaration-drift)]
+    (log! "  ⚠ 共有 checkout の宣言は" (:worktree d) "本、origin/main は" (:remote d)
+          "本 —— この checkout から生成器を回すと古い面を焼く"))
 
   (let [vs (:verticals declaration)
         rows
