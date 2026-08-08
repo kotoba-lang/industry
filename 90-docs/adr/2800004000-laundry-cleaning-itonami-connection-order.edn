@@ -158,9 +158,58 @@ fan-out を起こした）に従い、**2 本まとめない**。順は次で固
 op を 1 つも持たない。オーナーの最初の質問はコインランドリーを名指ししていたので、
 これは**質問に対する未回答が 1 件残っている**ということである。
 
-### 3b. 洗車 actor は landed（2026-08-08、`109007e`）
+### 3b. 3 業種すべて landed（2026-08-08）
 
-`cloud-itonami/cloud-itonami-isic-4520-carwash` を起こした。**satellite 形**
+| repo | ISIC 根拠 | commit | 検証 |
+|---|---|---|---|
+| `cloud-itonami-isic-4520-carwash` | 4520 の includes に \"washing, polishing\" | `109007e` | 31 tests / 91 assertions、確定 5 + hold 6 |
+| `cloud-itonami-isic-9609-petcare` | 9609 の includes に \"pet care services\" | `e3e0e62` | 33 tests / 93 assertions、確定 5 + hold 6 |
+| `cloud-itonami-isic-9601-carpet` | **どのクラスにも無い**（下記） | `5da80e0` | 31 tests / 91 assertions、確定 5 + hold 6 |
+
+**3 本とも標準形**（単一 ns / `phase/{read,write}-ops` / `operation/build`（langgraph
+StateGraph）/ `store/seed-db` / `governor` / 全 `.cljc`）なので、営み OS へ繋ぐときは
+3 行の shim で済む。**ただし 3 本とも `os.edn` に未宣言** —— fork 可能であることと
+共有面に載っていることは別の主張である。
+
+### 3c. カーペットは「帰属を宣言する」形で解いた
+
+仕様ミラーがどのクラスにも carpet cleaning を列挙していない以上、**どちらの読みも
+主張できない**。repo は**主張を広げるのではなく自分のモデルを絞って**解決した:
+
+- 実装したのは**引き取り型**（off-premises intake、収集 → 洗浄 → 返却）で、これは
+  9601 の description \"washing, cleaning, dyeing, and pressing of textile products\"
+  に素直に収まる。オーナー判断（2026-08-08）で 9601 satellite
+- **客先施工型（in-situ）は対象外**と明記した。8121 の interior cleaning で読む案は
+  ADR に残してあり、そちらは別 actor になる
+- **actor が自分の読みを昇格させられないようにした**: `:actuation/declare-isic-class`
+  を allowed-ops から外し、\"classified under isic\" を scope-excluded-terms に入れた。
+  分類を決めるのは統計当局であってこの actor ではない
+
+### 3d. 預り品の形が 4 回反復され、5 本目は別の形になる
+
+9601(衣類) → 9522(家電) → 9523(靴) → **9601-carpet(カーペット)** と、
+受理 → 検証 → 審査 → 実動作 → 返却・実動作 2 つ・`:auto` は受理だけ、という形が
+4 回とも無改造で通った。`4520-carwash` も同型（預かった車）。
+
+**次に起こすコインランドリーはこの形にならない。** 無人のセルフサービスでは
+**operator は顧客の洗濯物を占有しない** —— 預り品が存在しないので、実動作も
+返却も無い。唯一 operator が他人の物を占有するのは**残置物**で、そこだけが
+別の（遺失物法的な）扱いを要する。形をコピーしないこと。
+
+### 3e. 新規 3 本が既存の負債を繰り返さなかった点
+
+superproject が記録した 2 つの負債を、新規 repo では最初から避けた:
+
+1. **`high-stakes` は op 名の集合**（助言者の `:stake` 自己申告ではない）。9601 と
+   同じ側で、9521/9512/9522/9523 の側ではない。**恒久的な不変条件を検閲される側の
+   自己申告に依存させない** —— テストが `:stake` を外した actuation 提案でも
+   escalate することを直接固定している
+2. **request の主体キーは `:subject`**。5229 `:target-id` / 4759 `:store-id` /
+   8121・8129 `:site-id` のような shim 翻訳を要する形にしない
+
+### 3f. 洗車 actor の設計判断（satellite にした理由）
+
+**satellite 形**
 （`-facade`/8129・`-cryptoexchange`/6611 と同じ）で、親 4520 は整備工場の運営調整の
 まま。親を広げなかったのは、親の governor が roadworthiness 認定の恒久ブロックを
 抱えており、排水規制を同じ governor に足すと**無関係な 2 つの規制体系が 1 つの
