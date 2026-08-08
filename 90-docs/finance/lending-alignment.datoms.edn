@@ -729,6 +729,146 @@
    という総額規制の事後版であり、:remedy/in-duplum-convergence と同じ論理"
   :lending/observed-at "2026-08-08"}
 
+ ;; ── G. 遅延損害金・手数料で稼ぐ主体（2026-08-08 深掘り）────────────
+ ;; 上の :default-interest-universal は機序だけを書いていた。ここは**その機序で
+ ;; 実際に稼いでいた主体**を、規制当局の処分記録から特定したもの。
+
+ {:lending/id :overdraft-fee-operators
+  :lending/regime :regressive
+  :lending/org "Wells Fargo / Regions Bank / Bank of America（当座貸越・残高不足手数料）"
+  :lending/jurisdiction "USA"
+  :lending/instrument "オーバードラフト手数料、NSF（残高不足）手数料"
+  :lending/take-rule
+  "**手数料は顧客の残高が足りないときにだけ発生する。**すなわち取り分は顧客の
+   財務状態の悪化に対する単調増加関数であり、逆行の定義を満たす"
+  :lending/evidence
+  "Wells Fargo: 2022 年、CFPB が 37 億 USD の支払いを命令（消費者への救済 20 億 USD 超 +
+     民事制裁金 17 億 USD）。取引時点で残高が足りていた顧客にも不意打ちの
+     オーバードラフト手数料を課していた
+   Regions Bank: 2022 年、不意打ちのオーバードラフト手数料で 1 億 9,100 万 USD。
+     **同種の違法行為で 2015 年にも 5,600 万 USD 超を命じられている（再犯）**
+   Bank of America: NSF 手数料の二重取り（double-dipping）等で 9,000 万 USD"
+  :lending/adjudication :consent-order
+  :lending/source "https://www.consumerfinance.gov/about-us/newsroom/cfpb-orders-regions-bank-pay-191-million-for-illegal-surprise-overdraft-fees/"
+  :lending/confidence :documented
+  :lending/note
+  "**Regions の再犯が示すもの。**2015 年の処分は行動を変えなかった。
+   ADR-2608082100 の『ロックインが高いと正統性が落ちても顧客は離れない』が
+   当座預金でも成り立つ（口座の移し替えコストがロックイン）"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :navient
+  :lending/regime :regressive
+  :lending/org "Navient Corporation"
+  :lending/jurisdiction "USA"
+  :lending/instrument "学生ローンのサービシング"
+  :lending/take-rule
+  "**借手を forbearance（返済猶予）へ誘導した。**猶予中も利息は発生し元本に組み入れ
+   られるので、借手の問題を**解決しないほど**債権が育つ。請求権が困窮の長期化に
+   比例して増える"
+  :lending/evidence
+  "CFPB は 2024 年 9 月、Navient を**連邦学生ローンのサービシングから恒久的に排除**。
+   借手への救済 1 億 USD + 民事制裁金 2,000 万 USD。認定された行為は、高コストな
+   forbearance への誘導、請求額の誤算定、信用情報の毀損"
+  :lending/adjudication :consent-order
+  :lending/source "https://www.washingtonpost.com/education/2024/09/12/navient-student-loans-settlement/"
+  :lending/confidence :documented
+  :lending/note
+  "**サービサー型逆行の最も明快な形。**貸手ではなく**回収代行**が、債務の解決ではなく
+   延命から収益を得る。上の :government-student-loans（直交）と同じ債権に付いた
+   サービシング層が逆行になっている —— **1 本の債務の中で層ごとに体制が違う**"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :mortgage-servicers
+  :lending/regime :regressive
+  :lending/org "Nationstar Mortgage / Mr. Cooper"
+  :lending/jurisdiction "USA"
+  :lending/instrument "住宅ローンのサービシング"
+  :lending/take-rule "延滞・差押え手続き中に発生する手数料が収益源になる構造"
+  :lending/evidence
+  "CFPB と全米の州当局による 2020-12-08 の同意判決。40,000 人超の被害者への救済
+   約 7,300 万 USD + 民事制裁金 150 万 USD、総額 9,100 万 USD 超。
+   別途、電話・IVR 経由の支払いに課した『便宜手数料』をめぐる集団訴訟が
+   3,587,254 USD で和解し、2024-04-25 に最終判決が出ている"
+  :lending/adjudication :consent-order
+  :lending/source "https://www.consumerfinance.gov/archive/newsroom/consumer-financial-protection-bureau-multiple-states-enter-settlement-nationstar-mortgage-llc-unlawful-servicing-practices/"
+  :lending/confidence :documented
+  :lending/note "『支払う手段に手数料を課す』は、払おうとする借手ほど取られる点で逆行"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :japan-default-interest-statutory
+  :lending/regime :orthogonal
+  :lending/org "日本の遅延損害金 —— 法定上限（貸手横断の枠）"
+  :lending/jurisdiction "JPN"
+  :lending/instrument "遅延損害金（賠償額の予定）"
+  :lending/take-rule
+  "利息制限法 4 条: 賠償額の予定は同法 1 条の制限利率の **1.46 倍**まで。
+   元本 10 万円未満 年 29.2% / 10〜100 万円 年 26.28% / 100 万円以上 年 21.9%。
+   同法 7 条: **営業的金銭消費貸借の遅延損害金は年 20%** が上限"
+  :lending/evidence "消費者契約法 9 条も、消費者が支払う損害賠償額の予定条項を制限する"
+  :lending/adjudication :statutory-cap
+  :lending/source "https://houtori.com/rigenhou/risokugeigenhou/"
+  :lending/confidence :documented
+  :lending/note
+  "**逆行を『禁止』せず『天井付き』にした形。**日本は逆行機序そのものを認めたうえで
+   倍率（1.46）で縛る。ゼロにはしないが発散もさせない —— 総額上限（in duplum）とも
+   比率検出（FCA）とも違う第 3 の形（:remedy/three-remedy-shapes）"
+  :lending/observed-at "2026-08-08"}
+
+ ;; ── H. リボルビング信用の主体（2026-08-08 深掘り）──────────────────
+
+ {:lending/id :japan-revolving
+  :lending/regime :regressive
+  :lending/org "日本のリボ払い（カード発行体横断: 楽天カード / PayPay カード ほか大手）"
+  :lending/jurisdiction "JPN"
+  :lending/instrument "リボルビング払い"
+  :lending/take-rule
+  "毎月の支払額を低く固定するため、残高の減りが遅く手数料が長期に発生する。
+   手数料 = 利用金額 × 実質年率 ÷ 365 × 利用日数"
+  :lending/scale
+  "大手カード会社の手数料は**実質年率 年 15.0% が相場**（楽天カードは 15.00%）。
+   PayPay カードは **18.0%** と発行体によって異なる"
+  :lending/source "https://www.daylight-law.jp/debt/qa/ribobaraikinri/"
+  :lending/confidence :reported
+  :lending/note
+  "**上の :japan-default-interest-statutory と読み合わせること。**日本は遅延損害金を
+   20%（営業的貸付）で縛っているが、リボの 15〜18% は**延滞していない借手**に課される。
+   逆行の主要経路が延滞ではなく『延滞しないまま減らない』側に移っている可能性 ——
+   これは仮説であって観測ではない（残高推移の実データ未取得）"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :korea-revolving
+  :lending/regime :regressive
+  :lending/org "韓国のカード・リボルビング（리볼빙、カード会社 8 社）"
+  :lending/jurisdiction "KOR"
+  :lending/instrument "リボルビング（일부결제금액이월약정）"
+  :lending/take-rule "期日に払えなかった残高が高金利で繰り越される"
+  :lending/scale
+  "リボ残高は **7.5 兆ウォン**で過去最高水準。利用者の **35.6% が年 18〜20%** の
+   金利を負担（10 月時点）。上限は 20% 程度。
+   1 か月超延滞のカード債務は **約 1.5 兆ウォン**で統計開始以来最高。
+   延滞カードローン残高は過去 4 年で 2 倍超（2021 年末 7,180 億ウォン）"
+  :lending/source "https://www.koreajoongangdaily.com/korea/overdue-credit-card-loans-reaches-record-high-nearing-1-billion/12287128"
+  :lending/confidence :reported
+  :lending/note
+  "**逆行の需要側が観測できている稀な例。**利用者の 3 分の 1 超が上限近傍の金利を
+   払っており、同時に延滞が過去最高。『高金利を払える人が使っている』のではなく
+   『払えない人が使っている』ことを、2 つの独立した系列が同時に示している"
+  :lending/observed-at "2026-08-08"}
+
+ {:lending/id :us-revolving-issuers
+  :lending/regime :regressive
+  :lending/org "米国のサブプライム寄りカード発行体（Capital One / Synchrony / Credit One / Bread Financial ほか）"
+  :lending/jurisdiction "USA"
+  :lending/instrument "リボルビング信用 + 遅延手数料"
+  :lending/take-rule "最低支払額の設計と遅延手数料により、返済能力の低い層ほど収益が出る"
+  :lending/confidence :structural
+  :lending/note
+  "**個別の処分を裏取りしていないので :structural。**下の
+   :remedy/enforcement-retreat-2025 のとおり、2025 年に遅延手数料規制が撤回された
+   ため、この層の逆行度を測る公的記録は今後さらに得にくくなる"
+  :lending/observed-at "2026-08-08"}
+
  ;; ══════════════════════════════════════════════════════════════════
  ;; 救済手段の法域横断的な収束 —— 利率ではなく「取り分の総額」を縛る
  ;; ══════════════════════════════════════════════════════════════════
@@ -756,7 +896,75 @@
   :remedy/note
   "**これは本カタログの主要な分析的発見**であり、事前に想定していたものではない。
    4 法域を別々に調べた結果、同じ形が出た。反証可能な形にしておく ——
-   総額上限を持たない法域で逆行の被害が同程度に抑えられていれば、この主張は弱まる"}
+   総額上限を持たない法域で逆行の被害が同程度に抑えられていれば、この主張は弱まる"
+  :remedy/scope-correction-2026-08-08
+  "**当初この節は『規制はこの形に収束する』と読める書き方だった。それは広すぎた。**
+   2026-08-08 の深掘りで英国 FCA の persistent debt 規則（比率検出）と日本の
+   利息制限法 4 条（倍率上限）を見つけ、**形は 1 つではなく 3 つ**あると分かった
+   （:remedy/three-remedy-shapes）。当初 4 法域が同じ形に収束したこと自体は事実だが、
+   それは**総額上限という形を探して総額上限を見つけた**結果でもある。
+   収束の主張は『総額上限を採った法域は独立に採った』までで、
+   『規制一般がこの形へ向かう』ではない"}
+
+ {:remedy/id :three-remedy-shapes
+  :remedy/finding
+  "逆行に対して実際に機能した規制は、**3 つの異なる形**を取る。当初は 1 つしか
+   見ていなかった（総額上限）"
+  :remedy/shape-1-total-cap
+  "**総額上限** —— 取り分の累計を元本に対して縛る。ZAF の in duplum（国民信用法
+   103 条 5 項）/ BRA の法律 14.690/23（元債務の 100%）/ KEN の CBK 枠組み
+   （未払元本＋同額＋合理的回収費用）。**発散そのものを止める**"
+  :remedy/shape-2-ratio-test
+  "**比率検出** —— 取り分が元本の減りを上回っているかを見る。英国 FCA の
+   persistent debt 規則（PS18/4、2018-03-01 施行）は、**18 か月にわたり
+   利息・手数料・課金の支払いが元本の返済を上回っている**状態を『持続的債務』と
+   定義し、18 / 27 / 36 か月で介入を義務づける。36 か月時点で妥当な期間内に
+   完済する方法を提示できなければ **forbearance（利息・手数料の減額・免除・取消）**
+   を求める。**借手が前に進んでいるかを直接測る**"
+  :remedy/shape-3-rate-multiple-cap
+  "**倍率上限** —— 逆行機序を認めたうえで通常利率に対する倍率で縛る。日本の
+   利息制限法 4 条（制限利率の 1.46 倍）と 7 条（営業的貸付は年 20%）。
+   **ゼロにはしないが青天井にもしない**"
+  :remedy/why-shape-2-matters
+  "**FCA の定義は、本カタログの判定手続き第 1 問の運用版である。**
+   『借手の成果が悪化したとき貸手の請求権は増えるか』を、規制当局が
+   『利息・手数料が元本の減りを上回っているか』という**測定可能な述語**に
+   落としている。しかも延滞を条件にしていないので、**一度も延滞せずに
+   逆行している借手**を捕まえられる —— 総額上限も倍率上限も、これは捕まえない。
+   :japan-revolving で立てた仮説（逆行の主経路が延滞側から『減らない』側へ
+   移っている可能性）を検定するなら、この述語が道具になる"
+  :remedy/source "https://www.fca.org.uk/publication/policy/ps18-04.pdf"
+  :remedy/confidence :documented}
+
+ {:remedy/id :enforcement-retreat-2025
+  :remedy/finding
+  "**2025 年、米国で逆行機序に対する規制が約 1 か月の間に 3 つ撤回された。**
+   個別の事案ではなく、検出面そのものの縮小である"
+  :remedy/instances
+  "2025-04-15 **クレジットカード遅延手数料規則が無効化**。CARD Act のセーフハーバーを
+     32 USD から 8 USD へ下げる規則（業界試算で年 100 億 USD の影響）について、
+     テキサス北部地区連邦地裁の Pittman 判事が無効判決。**CFPB 自身が原告側と
+     共同で同意判決を申し立て、自らの規則が CARD Act と APA に違反していたと認めた**
+   2025-04-29 **CFPB が Credit Acceptance 訴訟から離脱**（:credit-acceptance の行）
+   2025-05-09 **オーバードラフト規則が議会審査法（CRA）で撤回**。大手（資産 100 億 USD 超）の
+     当座貸越を TILA/Reg Z の対象とし手数料を 5 USD 等に制限する 2024 年 12 月の規則を、
+     S.J.Res.18 が覆し大統領が署名（P.L. 119-10）。上院 2025-03-27、下院 2025-04-09"
+  :remedy/why-cra-is-different
+  "**CRA による撤回は単なる巻き戻しではない。**CRA で覆された規則は、新たな立法が
+   ない限り**実質的に同様の規則を再び定めることが禁じられる**。遅延手数料規則の
+   無効判決は将来の規則制定を直接には塞がないが、オーバードラフト規則の CRA 撤回は
+   **その形の規制を恒久的に塞ぐ**"
+  :remedy/consequence-for-this-catalog
+  "本カタログの逆行の行は執行記録から選ばれている。したがって
+   **2025 年以降の米国の記録の薄さは、逆行の減少ではなく観測装置の縮小を映す。**
+   `:coverage/enforcement-plane-shift` は当初 Credit Acceptance 1 件を根拠にしていたが、
+   実際には 3 件の同時進行だった。**米国の年次比較は行ってはならない**"
+  :remedy/source "https://www.congress.gov/crs-product/IN12513"
+  :remedy/confidence :documented
+  :remedy/note
+  "⚠ **これを『規制緩和は悪い』という主張として読まないこと。**ここで言えるのは
+   検出可能性が下がったことだけで、逆行の実量が増えたか減ったかは本カタログの
+   データでは分からない。実量を測るには契約文の直接観測（:coverage/next-measurement）が要る"}
 
  {:remedy/id :form-does-not-determine-regime
   :remedy/finding
@@ -776,13 +984,18 @@
 
  {:lending/coverage true
   :coverage/observed-at "2026-08-08"
-  :coverage/entity-total 46
-  :coverage/lending-rows 39
+  :coverage/entity-total 55
+  :coverage/lending-rows 46
   :coverage/regime-breakdown
-  ":regressive 15 / :aligned 10 / :orthogonal 8 / :partially-aligned 6"
+  ":regressive 21 / :aligned 10 / :orthogonal 9 / :partially-aligned 6"
   :coverage/confidence-breakdown
-  ":documented 21 / :structural 14 / :reported 4"
+  ":documented 25 / :structural 15 / :reported 6"
   :coverage/regime-nominal-mismatch-rows 5
+  :coverage/expansion-2026-08-08
+  "遅延損害金・リボの主体を深掘りして 7 行を追加（貸付 39 → 46）。逆行が 15 → 21 に
+   増えたが、**これは世界の逆行が増えたのではなく、1 つの機序を掘ったから**である。
+   同じ深さで整合側（PLS 実施行・SCDI 発行体）を掘れば整合側も増える。
+   **深掘りの対象を選んだのはこちらであって、比は選定を映す**"
   :coverage/counts-are-measured
   "上記はファイルを読んで数えた実測値（2026-08-08）であって手書きの概数ではない。
    行を足したらこの 6 つの数も更新すること —— カバレッジ申告が実態とずれたら、
@@ -797,7 +1010,7 @@
   :coverage/not-a-census
   "**これは世界の貸付の国勢調査ではない。**世界には数十万の与信主体があり
    （信用組合だけで 67,137、それ以外に銀行・ノンバンク・公的機関・国家・
-   非公式金融がある）、本カタログはそのうち **39 行**しか持たない。
+   非公式金融がある）、本カタログはそのうち **46 行**しか持たない。
    『世界中で分類特定した』という要求に対して、**カバレッジは達成していない**。
    達成しているのは、分類**規則**と、各体制の**代表例の実証**まで"
 
@@ -808,13 +1021,18 @@
    『逆行の地理的分布』として読むと、実際には**執行能力の地理的分布**を読むことになる"
 
   :coverage/enforcement-plane-shift
-  "検出可能性は時間的にも一定でない。CFPB は 2025-04-29 に Credit Acceptance 訴訟から
-   離脱した。同じ機序が同じ規模で続いていても、2026 年の記録には残らなくなる。
-   **本カタログの逆行件数を時系列で比較してはならない**"
+  "検出可能性は時間的にも一定でない。**2026-08-08 の深掘りで、これが当初の想定より
+   はるかに大きいことが分かった**（:remedy/enforcement-retreat-2025）——
+   2025 年 4〜5 月の約 1 か月間に、米国で遅延手数料規則の無効化（04-15、CFPB 自身が
+   自らの規則の違法を認める同意判決）・Credit Acceptance 訴訟からの離脱（04-29）・
+   オーバードラフト規則の CRA 撤回（05-09、P.L. 119-10）が起きている。
+   CRA 撤回は**実質的に同様の規則を将来も禁じる**ので、巻き戻しではなく恒久的な閉塞。
+   同じ機序が同じ規模で続いていても記録には残らない。
+   **本カタログの逆行件数を時系列で比較してはならない（特に米国）**"
 
   :coverage/no-contract-text-observed
   "ADR-2608082100 が損保・共済の約款で行った**定型句の実測**（負:正 = 24.62:1 等）に
-   相当する作業を、この dataset では**まだ行っていない**。:structural の 11 行は
+   相当する作業を、この dataset では**まだ行っていない**。:structural の 15 行は
    商品説明と契約形式からの読みであって、契約文の観測ではない。
    次に取るべきデータは、貸付約款に対する同型の中立化済み検出器 ——
    ただし共済の事例が示すとおり、**語彙を中立化しないと業態間比較が壊れる**"
