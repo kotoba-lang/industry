@@ -1,0 +1,141 @@
+[{:db/id -1
+  :adr/id "2608082300"
+  :adr/doc_type "adr"
+  :adr/topic "kaiyu-kaizen-loop-worker-actor-job-role"
+  :adr/title "回遊 → 改善: 測る・判定する・governance に載せる・回す を 4 つの場所に分け、cloud-itonami と local-first app にも語彙を通す"
+  :adr/status :accepted
+  :adr/date "2026-08-08"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["アクセス解析から改善 issue までの経路と、その 4 分割の責任境界"
+   "kaizen issue が「問い」であって「修正案」でない理由と、それを守る仕組み"
+   "cloud-itonami / cloud-itonami-app の回遊統合の形（公開サイトとの違いを含む）"
+   "com.gftd.kaiyu-kaizen loop の起動条件と、健全な周に何もしないという規約"]
+  :adr/supersedes []
+  :adr/body
+  "# Context
+
+ADR-2608072100 で 3 サイトが同じ語彙で測れるようになった。次の問いは
+「測ったものをどう使うか」で、答えを 1 つの loop に押し込むと必ず壊れる形が
+ある —— **fetch と判定と提案と承認が同じ場所にあると、規則が I/O の中に散り、
+周ごとに基準が揺れ、最後の incident が規則になる。**
+
+そこで 4 つに分けた。オーナー指示の「worker, actor, job, role」はこの 4 分割に
+そのまま対応する。
+
+# Decision
+
+## D1. 4 分割（どこに何を置くか）
+
+| 役 | 実体 | 持つもの |
+|---|---|---|
+| **worker**（測る） | 各サイトの read face + `kotoba-lang/kaiyu` | 何を記録してよいか（閉じた語彙）。判定はしない |
+| **actor**（判定して提案する） | `kaiyu.diagnose` + `cloud-itonami.kaizen` + `/api/{org}/{repo}/kaizen` | 何が問いか、それを誰が承認するか。修正はしない |
+| **job**（回す） | `scripts/kaiyu-kaizen-tick.cljs` / `-loop.cljs` + LaunchAgent `com.gftd.kaiyu-kaizen`（6h） | いつ測るか、いつモデルを起こすか。判定はしない |
+| **role**（誰の仕事か） | `network-awai/loop-yakuwari` の `:kaizen-analyst`（3 事業） | 何を単独でしてよいか。`:issue.create` は autonomous、`:patch.create` は承認必須 |
+
+**judgment を library に置いた理由**（`kaiyu.diagnose`）: taxonomy 上 `loop-*` は
+orchestrator で、domain の判定は library が持つ（ADR-2607203000 が dynamics で
+確立した形）。ここでも同じにしたので、規則は 31 tests で固定でき、loop 側は
+「候補があるか」しか見ない。
+
+## D2. 所見は問いであって、修正案ではない
+
+回遊の計測は counts と dates だけで訪問者を識別しない。**どこで注意が止まり、
+どこに届いていないかは分かるが、なぜは分からない。** だから
+`kaiyu.diagnose/->issue` は本文に「この issue が言っていないこと」を必ず書き、
+原因も対策も書かない。書けば、推測を推論に見せかけることになる。
+
+`:kaizen/open-issue` の risk が `:read-only` なのも同じ理由 —— 承認は
+「この問いは答える価値がある」という合意であって、作業の指示ではない。
+
+## D3. 計測が疑わしい周は、サイトの所見を 1 件も出さない
+
+`kaiyu.diagnose` は `:not-measured` な section が 1 つでもあれば
+site 所見を**含めない**（下位に並べるのでもなく）。両方出すと「動きやすい方」から
+手を付けることになり、それはちょうど artefact かもしれない側だから。
+
+根拠は実測: 2026-08-07 に `/_metrics/audience` が 595 pv を抱えたまま 200 で
+0 を返していた。あの日この loop が動いていたら、『誰も来ていない』issue を
+出していて、全部が壊れた read の話だった。
+
+## D4. 1 周 1 件、健全な周は何も出さない
+
+issue は「答えるべき問い」であって作業指示ではない。まとめて 5 件積むと
+どれも読まれない —— **queue を読まれなくすることが、計測から得られるものを
+全部無駄にする唯一の方法**である。`top-finding` が nil を返す周は、
+`:skipped :no-candidates` を ledger に書いて終わる（「何も無かった」と
+「loop が動いていない」を区別するため）。
+
+## D5. id は計測から導出し、ingress は caller の id を受ける
+
+`kaizen:<site>:<finding>:<window>`。support ingress は公開ブラウザが caller なので
+id の pin を拒むが、kaizen の caller は自前の鍵付き loop で、id は測定値から
+決まる。**受けることが再実行を no-op にする唯一の仕組み**で、受けなければ 7 日
+window を 6 時間ごとに回す loop が同じ issue を 28 件/週 開く。既存 id は
+**200 `already-open`**（error ではなく、いちばん多い正常な経路）。
+
+## D6. cloud-itonami-app（local-first）は語彙だけ共有し、送信しない
+
+公開サイトの回遊は「訪問者」を測って事業の問いに答える。local-first workspace の
+「訪問者」は**そのマシンの持ち主だけ**なので、2 点を構造で担保した:
+
+- **何も送信しない** —— counter は app 自身の state file にだけ載り、network
+  writer が存在しない。test は docstring ではなく ns の `:require` を検査する
+- **持ち主のための機能であって、持ち主についての指標ではない** —— 粗いバケット、
+  UTC 日より細かい時刻なし、session を復元できる順序なし（「順序が表現できない」
+  ことを test で固定）
+
+共有するのは語彙だけ。目的は workspace と web サイトを比較することではなく、
+両方を読む人が「10 秒未満」の意味を 2 つ抱えなくて済むこと。
+
+# 実装済み（着地・live 確認済み）
+
+| repo | commit | 何 |
+|---|---|---|
+| `kotoba-lang/kaiyu` | `1a5cfb2` | `kaiyu.diagnose`（31 tests / 140 assertions） |
+| `network-awai/cloud-itonami` | `2a847f3` | `kaizen.cljc` + `edge/kaizen_ingress.cljc` + route + handler 登録（745 tests / 6376 assertions） |
+| `cloud-itonami/cloud-itonami-app` | `10de606` | `kaiyu_local.clj` + `send-html!` 配線（1213 tests / 4958 assertions） |
+| `network-awai/loop-yakuwari` | `21fbfcf` | `:kaizen-analyst` role × 3 事業（check OK / 42 tests） |
+| `com-junkawasaki/root` | `9ee35f5` | tick / loop / skill `kaiyu-kaizen` / LaunchAgent |
+
+## 初回の実測（2026-08-08）
+
+| site | 結果 |
+|---|---|
+| shinshi.club | `:blocked` — transitions が測れていない |
+| babiniku.net | 所見 0（計測開始が window 内なので blocked にしない） |
+| kotobase.net | `:medium` — 到達の 98% が direct |
+
+shinshi の 1 件を実際に承認キューへ着地させた（`202 proposed`）。再送は
+`200 already-open`。skill の手順どおり D1 を直接見て確認した結果、より狭い
+問いになった: **beacon は動いている**（`dwell_daily` 1 行 / `visit_daily` 1 行）が
+`route_transition_daily` だけ 0。残る読みは「1 面だけ見て帰っている」か
+「nav beacon の経路だけ届いていない」かの 2 つで、それを issue 本文に書いた。
+
+# Consequences
+
+- 測定 → 判定 → 提案 → 承認 が別々の場所にあるので、どれか 1 つを直しても
+  他が壊れない。判定規則の変更は library の test で落ちる
+- **loop は承認できない。** narrow ingress key は提案しか作れず、approve は
+  cockpit の仕事。role の `:patch.create` も承認必須 —— 同じ役が問いと修正の
+  両方をやると、原因の推測がそのまま patch になる
+- itonami.cloud 自身の回遊はまだ測っていない（下記 Gaps）
+
+# Gaps
+
+- **itonami.cloud 自身の回遊が未計測。** tick の対象は 3 サイトで、itonami は
+  read face を持たない。持たせるなら kotobase と同じ server 側 2 信号
+  （acquisition / 同一 origin referer からの遷移）が最短
+- **cloud-itonami-app の reader surface が無い。** `report` は関数として在るが、
+  loopback の route も CLI コマンドも生えていない（`handler` の dispatch が
+  JVM の 64KB method 上限に達しており、branch を足すと compile が落ちる）。
+  読めない counter は counter ではないので、次に効くのはここ
+  — 小さい sub-dispatch か CLI コマンドに置く
+- **shinshi の transitions が 0 のまま。** 今回の issue that this loop filed。
+  2 面を実際に踏んで行が増えるかを見れば決着する
+- **kotobase は kaiyu 初版 `69012a9` を pin したまま**（session を使っていないので
+  影響は無いが、fleet に 3 版が同時に居る: kotobase `69012a9` / app `1a5cfb2` /
+  shinshi vendored `d0b8e8c`）
+- **loop はまだ 1 度も自動起動していない**（LaunchAgent は load 済み、次回は
+  6 時間以内）。手で 1 周回した結果が上記の実測"}]
