@@ -242,4 +242,95 @@
      :file "src/etzhayyim/social/publication.cljc"
      :find "  (str/replace (str value) #\"^:+\" \"\"))"
      :replace "  (.replaceFirst (str value) \"^:+\" \"\"))"
-     :must-fail ["the-status-the-library-emits-is-a-status-it-accepts"]}]}]}
+     :must-fail ["the-status-the-library-emits-is-a-status-it-accepts"]}]}
+
+  {:repo "orgs/cloud-itonami/cargo"
+   :label "cargo descriptor —— 規則・固定値・descriptor 本体"
+   ;; この repo には 2026-05 から `actor-manifest.test.ts`（vitest）が置かれていたが、
+   ;; package.json も vitest 依存も無く **一度も実行できなかった**。走らないまま
+   ;; manifest の pipeline は 8 → 10 に増え、`@id` と did.json の `id` は別の DID に
+   ;; 割れたが、test file はどちらも報告していない。走らないテストは、自分が古く
+   ;; なったことも報告しない —— この loop がまさに測っている性質そのものである。
+   ;;
+   ;; 撃つ先が 3 種類あるのは、この suite が 3 種類のものを守っているから:
+   ;;   1. 規則のコード（src/…/descriptor.cljc）
+   ;;   2. 固定した測定値（docs/identity-claims.edn）
+   ;;   3. descriptor 本体のデータ（actor-manifest.jsonld / .well-known/did.json）
+   ;; データを撃つ mutation が噛まないなら、この suite は「自分自身のテスト」で
+   ;; あって「descriptor のテスト」ではない。
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "cargo descriptor: all green"
+   ;; 全て 2026-08-08 に実際に赤くなるところを見た。
+   :mutations
+   [{:id :cargo/did-web-always-well-known
+     :why "did:web の解決規則の唯一の非対称（path 成分があるときは /.well-known/ を挟まない）。ここを間違えると identity-claims.edn の :resolves-to が全部ズレ、network 検査は『存在しない URL を測って 404 だと報告する』まま緑になる —— 測定が動いて見えるぶん、間違いに気づく手がかりが無い"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "          (if (seq path)\n            (str \"https://\" host \"/\" (str/join \"/\" path) \"/did.json\")\n            (str \"https://\" host \"/.well-known/did.json\")))))))"
+     :replace "          (str \"https://\" host \"/.well-known/did.json\"))))))"
+     :must-fail ["did-web-resolution-follows-the-well-known-rule"
+                 "the-claims-file-derives-each-resolution-url-from-its-own-did"]}
+
+    {:id :cargo/percent-decode-drops-broken-escapes
+     :why "壊れた `%` を捨てる実装にすると、壊れた入力が**正しく見える host** に化ける。落ちずに別の URL を測るので、捨てる側は永久に気づけない"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "          (if (and h l)\n            (recur (drop 3 cs) (conj out (char (+ (* 16 h) l))))\n            (recur (rest cs) (conj out c))))"
+     :replace "          (if (and h l)\n            (recur (drop 3 cs) (conj out (char (+ (* 16 h) l))))\n            (recur (drop 3 cs) out)))"
+     :must-fail ["percent-decoding-leaves-broken-escapes-alone"]}
+
+    {:id :cargo/undeclared-capability-allowed
+     :why "step が capability 宣言を通らない fn を呼べると、deny-by-default が descriptor の面で成立しない。実装側が宣言を読んで権限を絞る前提なので、ここが素通りすると『宣言にない権限で動く actor』が作れる"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "            :when (and f (not (caps f)))]\n        (v :capability/undeclared"
+     :replace "            :when (and f false (not (caps f)))]\n        (v :capability/undeclared"
+     :must-fail ["a-step-that-calls-an-undeclared-capability-is-a-violation"]}
+
+    {:id :cargo/custom-escape-hatch-allowed
+     :why "fn \"custom\" は任意コードへの逃げ道。撤去した vitest が見ていた唯一の capability 規則で、引き継いだもの。1 つ通ると『この descriptor は宣言だけで閉じている』という主張がそこで終わる"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "            :when (= \"custom\" (get s \"fn\"))]"
+     :replace "            :when (= \"custom-disabled\" (get s \"fn\"))]"
+     :must-fail ["the-custom-escape-hatch-is-a-violation"]}
+
+    {:id :cargo/duplicate-nsid-allowed
+     :why "同じ nsid が 2 本あると後勝ちになり、片方が黙って到達不能になる。pipeline は消えていないので一覧を見ても気づけない"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "      (for [[nsid n] (frequencies nsids) :when (> n 1)]"
+     :replace "      (for [[nsid n] (frequencies nsids) :when (> n 99)]"
+     :must-fail ["a-duplicate-xrpc-nsid-is-a-violation"]}
+
+    {:id :cargo/foreign-service-id-allowed
+     :why "service id が別の DID を指したまま残るのは、改名を半分だけやった形そのもの（この repo が 90b15e4 → ec7015f で実際にやったこと）。document 全体は妥当に見えるので、id を突き合わせない限り通る"
+     :file "src/etzhayyim/cargo/descriptor.cljc"
+     :find "            :when (not (str/starts-with? (str sid) (str id \"#\")))]"
+     :replace "            :when (not (str/starts-with? (str sid) \"did:\"))]"
+     :must-fail ["a-did-document-service-id-must-be-a-fragment-of-its-own-did"]}
+
+    ;; ── ここから下は「規則」ではなく **固定値と descriptor 本体** を撃つ ──────
+
+    {:id :cargo/census-pin-goes-stale
+     :why "この repo が実際に見逃した drift そのもの。撤去した vitest は toHaveLength(8) と書いていたが manifest は 10 本ある。count を pin して**両方向に**落とすのがこの suite の要で、pin が古くなったら赤くなることをここで確かめる"
+     :file "docs/identity-claims.edn"
+     :find " {:pipeline-count 10"
+     :replace " {:pipeline-count 8"
+     :must-fail ["the-pinned-census-matches-the-manifest"]}
+
+    {:id :cargo/manifest-grows-a-custom-step
+     :why "**descriptor 本体**を撃つ。規則を守っているのが『fixture だけ』なら、実ファイルが壊れても緑のままになる —— 実際その状態が 2026-05 から 2026-08 まで続いていた"
+     :file "actor-manifest.jsonld"
+     :find "          \"fn\": \"agent.chat\","
+     :replace "          \"fn\": \"custom\","
+     :must-fail ["the-committed-descriptor-has-no-structural-violations"]}
+
+    {:id :cargo/manifest-id-drifts-from-claims
+     :why "manifest の @id だけを直して identity-claims.edn を直し忘れる（あるいは逆）を止める。この repo の identity は 4 つに割れており、片側だけ動かすのが一番起こりやすい壊れ方"
+     :file "actor-manifest.jsonld"
+     :find "  \"@id\": \"did:web:cargo.etzhayyim.com\","
+     :replace "  \"@id\": \"did:web:etzhayyim.com:actor:cargo\","
+     :must-fail ["every-identity-claim-names-the-did-its-source-file-actually-says"]}
+
+    {:id :cargo/descriptor-starts-naming-the-live-did
+     :why "『唯一解決する DID を、descriptor 側のどのファイルも名乗っていない』という現在地の記録。直った側でも赤くなることをここで確かめる —— 赤の意味は『戻せ』ではなく『測り直して claims と README を更新しろ』"
+     :file ".well-known/did.json"
+     :find "\"alsoKnownAs\" : [ \"at://cargo.etzhayyim.com\""
+     :replace "\"alsoKnownAs\" : [ \"did:web:etzhayyim.com:actor:cargo\", \"at://cargo.etzhayyim.com\""
+     :must-fail ["the-only-did-that-resolves-is-named-by-no-descriptor-file"]}]}]}
