@@ -10,4 +10,12 @@
   {:extra-paths ["test"]
    :extra-deps {kotoba-lang/sprite2d {:local/root "../../../../../../orgs/kotoba-lang/sprite2d"}
                 io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
-   :main-opts ["-m" "cognitect.test-runner"]}}}
+   :main-opts ["-m" "cognitect.test-runner" "-n" "world-ir-test"]}
+
+  ;; The authoritative 3D view: the canonical render-IR both GPU backends consume.
+  ;;   west update --fetch smart webgpu
+  :gpu-test
+  {:extra-paths ["test"]
+   :extra-deps {io.github.kotoba-lang/webgpu {:local/root "../../../../../../orgs/kotoba-lang/webgpu"}
+                io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+   :main-opts ["-m" "cognitect.test-runner" "-n" "world3d-test"]}}}

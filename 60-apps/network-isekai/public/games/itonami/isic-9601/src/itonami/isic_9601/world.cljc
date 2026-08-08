@@ -44,14 +44,25 @@
 ;; --------------------------------------------------------------------------
 
 (def districts
-  "The street, in unlock order. `:at` is the world position the map draws it at
-  (world units, +y is north/up, matching `kami.sprite2d.layout`).
+  "The street, in unlock order. `:at` is the position both views draw it at
+  (+y is north; `world3d/district->world` maps north to -z for the engine).
+
+  The layout is two rows of four facing the camera, the far row offset by half a column.
+  That is a requirement rather than a style. The 3D street is seen from one fixed high
+  angle, so two shops on the same view ray put one entirely behind the other, and a
+  building you cannot see is a building you cannot tap. Spreading across the frame rather
+  than away from it keeps every shop its own screen space; the half-column offset stops
+  the two rows lining up.
+
+  `world3d-test`'s `tapping-a-shop-resolves-to-that-district` is what holds this: it taps
+  each shop at its own projected centre and demands that shop back, so any layout where
+  one hides another fails.
 
   `:never-auto` is the op (or ops) that repo's own phase table keeps out of every `:auto`
   set. `:subject` is what that business actually cleans — the thing the widening is about."
   [{:id "isic-9601" :repo "cloud-itonami-isic-9601" :isic "9601"
     :label "クリーニング" :subject "衣類" :en "Washing and dry-cleaning"
-    :at [-600 300] :unlock-at 0 :hue [0.36 0.55 0.95]
+    :at [-933 -400] :unlock-at 0 :hue [0.36 0.55 0.95]
     :ops [:garment/intake :careplan/verify :certification/screen
           :actuation/apply-cleaning-process :actuation/return-garment]
     :auto-at-3 [:garment/intake]
@@ -60,7 +71,7 @@
 
    {:id "isic-4520" :repo "cloud-itonami-isic-4520" :isic "4520"
     :label "洗車・整備" :subject "自動車" :en "Maintenance and repair of motor vehicles"
-    :at [0 420] :unlock-at 1 :hue [0.30 0.68 0.52]
+    :at [-311 -400] :unlock-at 1 :hue [0.30 0.68 0.52]
     :ops [:log-service-record :schedule-service-operation :coordinate-parts-order
           :flag-safety-concern]
     :auto-at-3 [:log-service-record :schedule-service-operation :coordinate-parts-order]
@@ -69,7 +80,7 @@
 
    {:id "isic-9609" :repo "cloud-itonami-isic-9609" :isic "9609"
     :label "ペットケア" :subject "動物" :en "Other personal service activities n.e.c."
-    :at [640 330] :unlock-at 2 :hue [0.92 0.62 0.42]
+    :at [311 -400] :unlock-at 2 :hue [0.92 0.62 0.42]
     :ops [:client/intake :serviceplan/verify :background-check/screen
           :actuation/finalize-referral]
     :auto-at-3 [:client/intake]
@@ -78,7 +89,7 @@
 
    {:id "isic-8121" :repo "cloud-itonami-isic-8121" :isic "8121"
     :label "建物清掃" :subject "建物" :en "Community building cleaning operations"
-    :at [-700 -180] :unlock-at 3 :hue [0.45 0.72 0.86]
+    :at [933 -400] :unlock-at 3 :hue [0.45 0.72 0.86]
     :ops [:log-service-record :schedule-cleaning-operation :coordinate-supply-order
           :flag-safety-concern]
     :auto-at-3 [:log-service-record :schedule-cleaning-operation :coordinate-supply-order]
@@ -87,7 +98,7 @@
 
    {:id "isic-8129" :repo "cloud-itonami-isic-8129" :isic "8129"
     :label "産業清掃" :subject "プラント" :en "Other building and industrial cleaning"
-    :at [-60 -260] :unlock-at 4 :hue [0.86 0.72 0.30]
+    :at [-1244 356] :unlock-at 4 :hue [0.86 0.72 0.30]
     :ops [:log-service-record :schedule-service-operation :coordinate-supply-order
           :flag-safety-concern]
     :auto-at-3 [:log-service-record :schedule-service-operation :coordinate-supply-order]
@@ -96,7 +107,7 @@
 
    {:id "isic-3700" :repo "cloud-itonami-isic-3700" :isic "3700"
     :label "下水" :subject "排水" :en "Sewerage operations coordination"
-    :at [600 -220] :unlock-at 5 :hue [0.40 0.50 0.62]
+    :at [-622 356] :unlock-at 5 :hue [0.40 0.50 0.62]
     :ops [:log-system-record :schedule-maintenance :order-supplies :flag-safety-concern]
     :auto-at-3 [:log-system-record :schedule-maintenance :order-supplies]
     :never-auto [:flag-safety-concern]
@@ -104,7 +115,7 @@
 
    {:id "isic-3811" :repo "cloud-itonami-isic-3811" :isic "3811"
     :label "廃棄物収集" :subject "ごみ" :en "Collection of non-hazardous waste"
-    :at [-380 -620] :unlock-at 6 :hue [0.55 0.66 0.38]
+    :at [0 356] :unlock-at 6 :hue [0.55 0.66 0.38]
     :ops [:pickup/schedule :manifest/record :dispute/request]
     :auto-at-3 [:pickup/schedule :manifest/record]
     :never-auto [:dispute/request]
@@ -112,7 +123,7 @@
 
    {:id "isic-3900" :repo "cloud-itonami-isic-3900" :isic "3900"
     :label "汚染浄化" :subject "土壌" :en "Remediation activities"
-    :at [320 -640] :unlock-at 7 :hue [0.72 0.45 0.72]
+    :at [622 356] :unlock-at 7 :hue [0.72 0.45 0.72]
     :ops [:log-remediation-record :schedule-remediation-operation :coordinate-disposal
           :flag-contamination-concern]
     :auto-at-3 [:log-remediation-record :schedule-remediation-operation :coordinate-disposal]

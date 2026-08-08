@@ -75,6 +75,31 @@
     実装されていなかった / `kotoba.sprite2d.layout` は facade ではなく
     `kami` 版の完全なコピーで、layout テストは painter が使わない方を
     検査していた"
+   "**3D が authoritative view** (オーナー指示 2026-08-08、スクショどおり)。
+    `world3d.cljc` が canonical な `kami.webgpu` render-IR を出し、WebGPU と
+    WebGL 2.0 の両 backend が同じ EDN を食う (CLAUDE.md の 3D 規則: WebGPU
+    first / WebGL 2.0 fallback / 第2エンジン禁止 / 3D viewport を Canvas2D で
+    代替しない)。参照画は平坦色の箱の集合で、これは IR の単位そのもの
+    (`ir/instance` = 接地点 + サイズ + 色) なので mesh を要さない。
+    2D の `world.cljc` は fallback view として残り、自分のテストを通り続ける"
+   "街の配置は「カメラ正面に 4 列 × 2 行、後列は半列ずらす」。これは様式では
+    なく要件 —— 固定の高い視点では同一視線上の 2 店は片方が完全に隠れ、
+    見えない建物はタップできない。`world3d-test` の
+    tapping-a-shop-resolves-to-that-district が各店の投影中心をタップして
+    その店が返ることを要求するので、隠れる配置は落ちる"
+   "KAMI 3D SDK (`kotoba-lang/webgpu`) に無かった 2 つを実装した:
+    `kami.webgpu.pick` (render-IR は world→screen を持つのに逆が無い。
+    タップ解決にはアプリが camera 変換を再導出するしかなく、しかも
+    **instance の `:pos` は接地点で箱は半高さ上**という非自明な事実を
+    含むので、画面と少しずつ違う答えになる) と
+    `ir/fit-distance` / `ir/fit-rig` (rig の `:distance` は定数で、水平画角は
+    垂直画角を aspect で広げたもの。16:9 で合わせた構図は縦画面で左右に
+    はみ出し、しかも何も報告されない)。push 権限が無いため commit は
+    `sdk-patches/0002-*.patch` に退避"
+   "**ブラウザでは一度も描画していない。** WebGPU E2E・WebGL 2.0 fallback
+    E2E・Pages smoke test は CLAUDE.md の 3D 完了条件だが、いずれも未実施
+    —— executor を動かすには全依存ツリーに対する shadow-cljs ビルドが要り、
+    本セッションでは立てていない。JVM の緑を「描画できている」と読まない"
    "本セッションで着地したのは superproject 側の staging まで。
     network-awai/network-isekai は private でセッションの repo scope に無く、
     `add_repo` が承認待ちで通らなかったため、`scene.edn` は書いていない
@@ -218,6 +243,20 @@ nbb のテストも、squint 経由のブラウザプレビューも、将来の
   適用されない**。
 - **ブラウザ 7 チェック** (headless Chromium, `preview/smoke.cljs`) ——
   実ページで 40/40 返却まで到達することを確認。dead board はここで落ちる。
+- **3D 街 16 テスト / 530 assertion** (JVM, `test/world3d_test.clj`) ——
+  `world3d.cljc` の render-IR を**実物の `kami.webgpu.ir` / `kami.webgpu.pick`**
+  に通し、`ir/valid?` を満たすこと、8 店すべてが 390x844 / 900x1600 /
+  1280x720 / 1920x1080 のどれでもカメラ前方かつ画面内に入ること、各店の
+  投影中心をタップするとその店が返ること (= どの店も他店に隠れていない)、
+  地面・道路・木・プレイヤーは filter で除外されること、施錠中の店も
+  タップできることを確認。
+- **SDK 23 テスト / 108 assertion** (JVM, `kami.webgpu.pick-test`) —— 要は
+  `pick-agrees-with-projection`。executor と同じ行列で各 instance の中心を
+  投影し、その画素で pick して同一 instance が返ることを要求する。
+  up ベクトル・深度規約・半高さの持ち上げのどれを間違えても picker は
+  「それらしい」答えを返し続けるので、これが無いと誤りは縁でしか出ない。
+- **未実施**: ブラウザ描画 (WebGPU E2E / WebGL 2.0 fallback E2E / Pages
+  smoke)。CLAUDE.md の 3D 完了条件のうちこの 3 つは満たしていない。
 - **マップ 17 テスト / 102 assertion** (JVM, `test/world_ir_test.clj`) ——
   `world.cljc` が出す render-IR を**実物の `kotoba.sprite2d.layout`** に通し、
   8 district 全部が任意の viewport (360x640 / 1280x720 / 900x1600) に収まること、

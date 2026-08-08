@@ -78,12 +78,54 @@ confirmations of the same argument.
 Only 9601 has a playable board today (`:playable?` in `world/status`). The other seven are
 map entities with their real op tables attached.
 
-## KAMI 2D SDK — what was missing
+## 3D is the authoritative view
+
+`world3d.cljc` emits the **canonical `kami.webgpu` render-IR** — the EDN both GPU backends
+consume. CLAUDE.md's 3D rule is repo-wide and mandatory: WebGPU + WGSL first, WebGL 2.0 +
+GLSL ES 3.00 fallback, one render-IR, no second engine and no Canvas2D standing in for a 3D
+viewport. `kami.webgl/pick-backend` chooses the runtime; there is one scene description.
+
+The reference art is chunky flat-coloured boxes, which is exactly the IR's unit:
+`ir/instance` takes a ground position, a size and a colour and the executor instances
+cuboids. A shopfront is a body, an awning, a sign board and a roof block; a padlock is a
+body and a shackle. No meshes, no textures.
+
+The street is laid out as two rows of four facing the camera, far row offset half a column.
+That is a requirement, not a style — from one fixed high angle two shops on the same view
+ray put one entirely behind the other, and a building you cannot see is one you cannot tap.
+`tapping-a-shop-resolves-to-that-district` taps each shop at its own projected centre and
+demands that shop back, so any layout where one hides another fails the suite.
+
+`world.cljc` (2D sprite IR) remains as the fallback view and still passes its own tests.
+
+### What is NOT verified yet
+
+The IR is verified against the real engine's own camera and picking math on the JVM. It has
+**not** been rendered in a browser — no WebGPU E2E, no WebGL 2.0 fallback E2E, no Pages
+smoke test. Those are three of CLAUDE.md's completion criteria for 3D work and they are
+outstanding: the executor needs a shadow-cljs build over the full dependency tree, which
+this session did not stand up. Do not read the green suites below as "it renders".
+
+## KAMI SDK — what was missing
 
 The map renders through `kotoba-lang/sprite2d`, and three things a board game cannot work
 without were not in the package. They are implemented and tested upstream; the commit is
 staged here as `sdk-patches/0001-sprite2d-board-support.patch` because pushing to
 `kotoba-lang/sprite2d` needs repo access this session did not have.
+
+**`kotoba-lang/webgpu`** — `sdk-patches/0002-webgpu-pick-and-camera-fit.patch`
+
+| gap | why a tap-driven 3D scene needs it |
+|---|---|
+| `kami.webgpu.pick` | the render-IR mapped world→screen and nothing mapped back. Resolving a tap meant the app re-deriving the camera transform — including the non-obvious fact that an instance's `:pos` is its **ground** point while its box sits half a height above — so every app got a slightly different answer from the screen, and the error reads as a UI bug rather than as duplicated math. Pure `.cljc`, so both backends get the same picking. |
+| `ir/fit-distance` / `ir/fit-rig` | a rig's `:distance` is a constant, and the horizontal field of view is the vertical one widened by the aspect. A framing tuned on 16:9 puts half the street off both sides of a portrait phone **and reports nothing** — the shops are simply not on screen. |
+
+The load-bearing test is `pick-agrees-with-projection`: it projects each instance's own
+centre with the same matrices the executor builds and requires the pick at that pixel to
+return that instance. A picker with the wrong up vector, the wrong depth convention, or no
+half-height lift still returns plausible hits — just the wrong ones, near the frame edges.
+
+**`kotoba-lang/sprite2d`** — `sdk-patches/0001-sprite2d-board-support.patch`
 
 | gap | why a board needs it |
 |---|---|
@@ -112,7 +154,9 @@ it does not compile.
 | `preview/ui.cljs` | browser shell, compiled by squint; holds no rules, draws only `summary` |
 | `preview/build.cljs` | squint → esbuild → one self-contained `preview/index.html` |
 | `preview/smoke.cljs` | headless-Chromium check that the built page actually plays |
-| `world.cljc` | the street: district registry, unlock ladder, and the sprite2d render-IR |
+| `world.cljc` | the street: district registry, unlock ladder, and the 2D sprite render-IR |
+| `world3d.cljc` | the authoritative view: the canonical `kami.webgpu` render-IR |
+| `test/world3d_test.clj` | 16 tests / 530 assertions, JVM, against the real `kami.webgpu.ir` + `pick` |
 | `test/world_ir_test.clj` | 17 tests / 102 assertions, JVM, against the real `kotoba.sprite2d.layout` |
 | `sdk-patches/` | the upstream `sprite2d` commit, staged until it can be pushed |
 | `game.edn` | network-isekai game metadata |
@@ -134,7 +178,11 @@ npm run build                     # -> preview/index.html (self-contained, ~41 K
 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
   npx nbb --classpath node_modules preview/smoke.cljs   # real-browser gate
 
-# the map, against the real KAMI 2D stack (needs sprite2d checked out)
+# the 3D street, against the real canonical stack (needs webgpu checked out)
+west update --fetch smart webgpu
+clojure -M:gpu-test
+
+# the 2D fallback map (needs sprite2d checked out)
 west update --fetch smart sprite2d
 clojure -M:ir-test
 ```
