@@ -132,6 +132,63 @@
       (v! (or (:target n) "<next>") ": :next の " k " が無い"
           " — 何を直すかが書かれていない行は次の反復の入力にならない"))))
 
+;; ── 10: 頻度の入力（ADR-2608082600）────────────────────────────────────
+;; 走る actor には λ と importance が要る。**「無いから毎周走らせる」を既定に
+;; しない** —— 既定が「速い方」だと、測っていない actor ほど頻繁に叩かれる。
+(def basis-vocab #{:measured :prior :lower-bound :upper-bound})
+(doseq [o obs
+        :when (not= :known-broken (:expect o))]
+  (let [n (or (:name o) "<no-name>") cr (:change-rate o)]
+    (cond
+      (nil? cr)
+      (v! n ": 走る actor なのに :change-rate が無い"
+          " — λ [1/day] を宣言するか、測れないなら :uncomputable-until-measured と書くこと")
+
+      (= :uncomputable-until-measured cr)
+      (when (str/blank? (str (:change-rate-source o)))
+        (v! n ": :change-rate が :uncomputable-until-measured なのに理由が無い"))
+
+      (number? cr)
+      (do
+        (when-not (pos? cr) (v! n ": :change-rate は正の数であること（" cr "）"))
+        (when-not (basis-vocab (:change-rate-basis o))
+          (v! n ": :change-rate-basis " (pr-str (:change-rate-basis o)) " は語彙外 "
+              (pr-str basis-vocab)
+              " — **prior を測定値として提示させない**ための必須キー"))
+        (when (str/blank? (str (:change-rate-source o)))
+          (v! n ": :change-rate-source が無い — その数がどこから来たかを書くこと"))
+        (when-not (and (number? (:importance o)) (pos? (:importance o)))
+          (v! n ": :importance が無いか正でない"
+              " — 単位は [sec·day]（陳腐化 1 単位を避けるのに払ってよい計算秒数）")))
+
+      :else (v! n ": :change-rate " (pr-str cr) " は数でも :uncomputable-until-measured でもない"))))
+
+;; ── 11: plist が XML として妥当か ──────────────────────────────────────
+;; **壊れた plist は落ちるのではなく、launchd に読まれないだけ。**「設定したのに
+;; 一度も走っていない」という最も気付きにくい壊れ方をする。実測 2026-08-08、
+;; 初版の observatory-run.plist は XML コメント中に 2 連ハイフン（フラグ名）を
+;; 含んでいて不正だった。ここで機械に見せる。
+(let [plist-dir (p "scripts" "fleet-ci")]
+  (when (exists? plist-dir)
+    (doseq [f (vec (.readdirSync fs plist-dir))
+            :when (str/ends-with? f ".plist")]
+      (let [txt (rd ((.-join path) plist-dir f))]
+        ;; **`(?s)` を使わない。** JS の正規表現はインラインの dotall 修飾子を
+        ;; 解釈しないので、`(?s).*?` は改行をまたげず**黙って 1 件も一致しない**
+        ;; （実測 2026-08-08: この検査が無反応で、壊した plist を素通りさせた）。
+        ;; 明示的な `[\s\S]` で書く。
+        ;; ⚠ 捕獲グループの無い正規表現の `re-seq` は**文字列**を返す（ベクタでは
+        ;; ない）。`[whole]` で分配束縛すると先頭 1 文字を掴み、検査が常に無反応に
+        ;; なる（実測 2026-08-08、この 1 行で 2 度目の空振りをした）。
+        (doseq [whole (re-seq #"<!--[\s\S]*?-->" txt)]
+          ;; コメント本体（開始 4 文字と終了 3 文字を除く）に "--" が在ってはならない
+          (let [body (subs whole 4 (- (count whole) 3))]
+            (when (str/includes? body "--")
+              (v! f ": XML コメントに 2 連ハイフンが入っている（XML 仕様違反）"
+                  " — plist は落ちずに『読まれない』ので、走っていないことに気付けない"))))
+        (when-not (str/includes? txt "<plist")
+          (v! f ": <plist> 要素が無い"))))))
+
 ;; ── 6: 台帳が登録を落としていないか ──────────────────────────────────────
 (def ledger-file (p (or (:ledger reg) "90-docs/observatory/observatory.datoms.edn")))
 (if-not (exists? ledger-file)
