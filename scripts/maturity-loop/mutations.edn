@@ -460,4 +460,143 @@
      :replace "  \"@id\": \"did:web:etzhayyim.com:actor:jp-ashiba\","
      :must-fail ["every-identity-claim-names-the-value-its-source-file-actually-holds"
                  "the-substrate-and-the-manifest-agree-on-the-actor-did"
+                 "the-did-document-names-a-different-did-than-the-manifest"]}]}
+
+  {:repo "orgs/cloud-itonami/m365-ingest"
+   :label "m365-ingest actor —— deny-by-default gate・固定値・descriptor 本体"
+   ;; 4 兄弟目。jp-ashiba と同じく 2026-07-18 の rescue commit で murakumo gate が
+   ;; 入り、テストが 1 本も無いまま放置されていた。**さらに west の pin が
+   ;; その rescue commit の 2 つ手前で止まっており、成熟度 scan が測る tree には
+   ;; src/ が存在しなかった** —— axis-substrate=0 は「コードが無い」ではなく
+   ;; 「pin が古くて見えていない」の意味だった。同じ pin 遅れが jp-ashiba でも
+   ;; 起きている。**この 2 例は scan の測定値そのものを疑う理由になる。**
+   ;;
+   ;; 撃つ先の重心は jp-ashiba と同じ（gate が緩む方向が主）だが、この repo 固有の
+   ;; 形が 2 つある:
+   ;;   - substrate と manifest が **一致** しており、その一致先が DNS に無い。
+   ;;     片側だけ直す修正が「揃える」ように見えるので、そこを撃つ。
+   ;;   - record 本体の :actorDid を呼び出し側が上書きできる（既知の gap）。
+   ;;     **gap が塞がったときに赤くなる** mutation を置いて、gap 記録が
+   ;;     飾りにならないようにしてある。
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "m365-ingest actor: all green"
+   ;; 全て 2026-08-08 に実際に赤くなるところを見た。
+   :mutations
+   [{:id :m365-ingest/gate-value-checks-presence-not-value
+     :why "**この suite で一番静かな壊れ方。** `contains?` で実装すると `{:no-probing-baseline false}` が『attest 済み』になる —— false は『測ったうえで満たしていない』という最も強い否定なのに、キーがあるというだけで通る"
+     :file "src/m365_ingest/murakumo.cljc"
+     :find "  (or (get attestations gate)\n      (get attestations (name gate))"
+     :replace "  (or (contains? attestations gate)\n      (get attestations (name gate))"
+     :must-fail ["an-attestation-that-is-explicitly-false-does-not-count-as-attested"]}
+
+    {:id :m365-ingest/required-gates-become-or-instead-of-and
+     :why "7 本の gate は AND。`every?` と `some` の取り違えで OR になると、1 本でも attest されていれば全部通る。無 attest では依然 blocked なので、素朴な『空 attestation で試す』検査は緑のまま素通りする"
+     :file "src/m365_ingest/murakumo.cljc"
+     :find "       (remove #(boolean (gate-value attestations %)))\n       vec))"
+     :replace "       (remove (fn [_] (some #(boolean (gate-value attestations %)) (:required-gates spec))))\n       vec))"
+     :must-fail ["removing-any-single-required-gate-blocks-the-plan"]}
+
+    {:id :m365-ingest/blocked-plans-still-carry-records
+     :why "『plan は作るが実行しない』形にすると、blocked でも計算済みの record が手前に置かれる。:effects だけ見て安心した呼び出し側が :records を拾って書ける —— gate を通っていない書き込みが、gate の出力から作れてしまう"
+     :file "src/m365_ingest/murakumo.cljc"
+     :find "         {:status :blocked\n          :effects []}"
+     :replace "         {:status :blocked\n          :effects []\n          :records (vec (records-for spec input))}"
+     :must-fail ["a-blocked-plan-carries-no-records-at-all"]}
+
+    {:id :m365-ingest/unknown-cell-plans-silently
+     :why "打ち間違えた cell 名が nil spec のまま進むと、required-gates が nil ＝ missing 無し ＝ **:ready** になる。effect は 0 件なので実害は出ないが、status だけ見る呼び出し側には『gate を通った』と見える"
+     :file "src/m365_ingest/murakumo.cljc"
+     :find "    (when-not spec\n      (throw (ex-info \"unknown cell\" {:cell cell-key})))"
+     :replace "    (when-not spec nil)"
+     :must-fail ["an-unknown-cell-throws-instead-of-planning-nothing"]}
+
+    {:id :m365-ingest/safe-rkey-keeps-path-separators
+     :why "rkey は record のアドレスになる。`/` を安全文字集合に入れると rkey が階層を作り、AT Protocol の rkey 構文からも外れる。安全文字を『足す』変更は、既存の入力では何も変わらないので気づきにくい"
+     :file "src/m365_ingest/murakumo.cljc"
+     :find "(str/replace #\"[^A-Za-z0-9._~-]\" \"-\")"
+     :replace "(str/replace #\"[^A-Za-z0-9._~/-]\" \"-\")"
+     :must-fail ["safe-rkey-strips-the-did-prefix-and-replaces-unsafe-characters"]}
+
+    {:id :m365-ingest/safe-rkey-can-return-blank
+     :why "空 rkey は『rkey を指定しなかった』と区別が付かない。blank fallback を外しても、普通の入力では一切挙動が変わらない —— nil / 空文字 / 潰して空になる入力を明示的に撃たない限り緑のまま"
+     :file "src/m365_ingest/murakumo.cljc"
+     :find "    (if (str/blank? clean) \"unknown\" clean)))"
+     :replace "    clean))"
+     :must-fail ["safe-rkey-never-returns-blank"]}
+
+    {:id :m365-ingest/effects-stop-being-attributed-to-this-actor
+     :why "effect の :actor が actor-did 以外になりうると、この gate を通した書き込みが別 actor の repo に入る。rkey 混じりの『それらしい』DID にすると、目視では気づけない"
+     :file "src/m365_ingest/murakumo.cljc"
+     :find "  {:op :mst/put-record\n   :actor actor-did"
+     :replace "  {:op :mst/put-record\n   :actor (str actor-did \"#\" rkey)"
+     :must-fail ["every-emitted-effect-is-attributed-to-this-actor"]}
+
+    {:id :m365-ingest/substrate-lexicon-aligned-to-the-manifest
+     :why "**『直す』方向の mutation。** substrate の collection prefix を manifest（com.etzhayyim.apps.m365Ingest.）に合わせると、一見 割れが解消したように見えるが、live DID document の _meta.primaryLexicon は com.etzhayyim.m365-ingest なので**権威から離れる**。揃える先を間違えたことに気づけるか"
+     :file "src/m365_ingest/murakumo.cljc"
+     :find "  (str \"com.etzhayyim.m365-ingest.\" name))"
+     :replace "  (str \"com.etzhayyim.apps.m365Ingest.\" name))"
+     :must-fail ["the-substrate-prefix-is-the-one-the-live-authority-declares"]}
+
+    {:id :m365-ingest/caller-can-no-longer-forge-the-record-actor-did
+     :why "**gap が塞がったときに赤くなる mutation。** base map を入力より後に merge すると、呼び出し側は record の :actorDid を上書きできなくなる —— これは**改善**だが、docs/identity-claims.edn の :gaps は穴が開いたままだと記録している。塞いだのに記録が残る状態を止める（赤の意味は『戻せ』ではなく『:gaps を更新しろ』）"
+     :file "src/m365_ingest/murakumo.cljc"
+     :find "       (let [record* (merge {:$type coll}\n                            base\n                            (or (get input-records coll)\n                                (get input-records idx)\n                                {}))"
+     :replace "       (let [record* (merge {:$type coll}\n                            (or (get input-records coll)\n                                (get input-records idx)\n                                {})\n                            base)"
+     :must-fail ["the-pinned-gaps-still-describe-the-code"]}
+
+    ;; ── ここから下は「規則」ではなく **固定値と descriptor 本体** を撃つ ──────
+    ;; 規則を守っているのが fixture だけなら、実ファイルが壊れても緑のままになる。
+    ;; cargo では実際にその状態が 2026-05 から 2026-08 まで続いていた。
+
+    {:id :m365-ingest/gate-census-pin-goes-stale
+     :why "cell や baseline gate の数が動いたら測り直させる。とくに :common-gate-count が**減る**のは gate が緩む方向の変更なので、気づかずに通ってはいけない"
+     :file "docs/identity-claims.edn"
+     :find " {:cell-count               9"
+     :replace " {:cell-count               8"
+     :must-fail ["the-pinned-gate-census-matches-the-substrate"]}
+
+    {:id :m365-ingest/census-pin-goes-stale
+     :why "兄弟 repo cargo に置かれていた actor-manifest.test.ts は toHaveLength(8) と書いたまま一度も走らず、実際の pipeline は 10 本に増えていた。count を pin して**両方向に**落とすのがこの節の要"
+     :file "docs/identity-claims.edn"
+     :find "  :pipeline-count           3"
+     :replace "  :pipeline-count           4"
+     :must-fail ["the-pinned-census-matches-the-manifest"]}
+
+    {:id :m365-ingest/lexicon-overlap-pin-goes-stale
+     :why "『gate が書く先を descriptor 側の誰も宣言していない（交差 0）』がこの repo で最も重い測定。pin を動かしたら赤くなること —— 直った側でも赤くなり、その意味は『戻せ』ではなく『測り直して claims を更新しろ』"
+     :file "docs/identity-claims.edn"
+     :find "  :shared-collection-count   0"
+     :replace "  :shared-collection-count   3"
+     :must-fail ["the-substrate-and-the-manifest-share-no-collection-at-all"]}
+
+    {:id :m365-ingest/did-service-id-goes-foreign
+     :why "service id が別の DID を指したまま残るのは、改名を半分だけやった形そのもの。document 全体は妥当に見えるので、id を突き合わせない限り通る。しかもここで足す DID は substrate と manifest が名乗っている方なので、単体では『整合させた』ようにすら見える"
+     :file ".well-known/did.json"
+     :find "\"id\" : \"did:web:etzhayyim.com:actor:m365-ingest#atproto_pds\""
+     :replace "\"id\" : \"did:web:m365-ingest.etzhayyim.com#atproto_pds\""
+     :must-fail ["every-did-document-service-id-is-a-fragment-of-its-own-did"]}
+
+    {:id :m365-ingest/cron-loses-a-field
+     :why "3 / 4 / 6 フィールドの cron は、host によって黙って別の時刻に走る（秒付き 6 フィールドと取り違える）。落ちずにズレるので、動いているように見えたまま別の時刻に走る"
+     :file "actor-manifest.jsonld"
+     :find "\"cron\": \"0 3 * * *\""
+     :replace "\"cron\": \"0 3 * *\""
+     :must-fail ["every-cron-trigger-has-five-fields"]}
+
+    {:id :m365-ingest/a-capability-is-revoked-but-still-called
+     :why "capabilities から 1 つ落としても、それを呼ぶ step は残る。deny-by-default の workspace で『宣言にない権限で動く actor』が作れる形。census も同時に赤くなるべきで、両方名指しして『別の理由で赤くなったのを噛んだと読む』のを防ぐ"
+     :file "actor-manifest.jsonld"
+     :find "    \"graph.query\",\n    \"graph.write\",\n    \"host.m365.acquireAppToken\","
+     :replace "    \"graph.query\",\n    \"host.m365.acquireAppToken\","
+     :must-fail ["every-step-declares-a-capability-the-manifest-grants"
+                 "the-pinned-census-matches-the-manifest"]}
+
+    {:id :m365-ingest/manifest-id-drifts-from-claims
+     :why "**この repo 固有の形。** substrate と manifest は一致しており、その一致先が DNS に無い。manifest の @id だけを『解決する DID』に直すと、単体では改善に見えるのに identity が三つに割れる。片側だけ動かす修正をここで止める"
+     :file "actor-manifest.jsonld"
+     :find "  \"@id\": \"did:web:m365-ingest.etzhayyim.com\","
+     :replace "  \"@id\": \"did:web:etzhayyim.com:actor:m365-ingest\","
+     :must-fail ["every-identity-claim-names-the-value-its-source-file-actually-holds"
+                 "the-substrate-and-the-manifest-agree-on-the-actor-did"
                  "the-did-document-names-a-different-did-than-the-manifest"]}]}]}
