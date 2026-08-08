@@ -221,7 +221,24 @@
         age (days-since-generated)
         stale? (and (number? age) (> age stale-after-days))
         {:keys [lane observed-substrate-share iterations]} (lane (ledger-lines))
-        in-lane (filterv #(= lane (:layer %)) rows)
+        ;; **lane 名と layer 値は別の語彙。** `:substrate` はたまたま両方に
+        ;; 存在するが、`:breadth` という layer は無い —— 実データの
+        ;; `:maturity/layer` は `:cohort` 1,782 / `:flagship` 9 /
+        ;; `:substrate` 17 だけ（実測 2026-08-08）。
+        ;;
+        ;; 素朴に `(= lane (:layer %))` と書くと breadth 周は必ず 0 件になり、
+        ;; loop は `:no-targetable-axis` で毎回 skip する。しかも substrate の
+        ;; 実績比率が床（2%）を超えた時点で lane は breadth に固定されるので、
+        ;; **一度 substrate を 1 周でも回すと二度と何も選ばなくなる**。実際
+        ;; 2026-08-06 に substrate を 1 周回した翌日から、この loop は
+        ;; `ranked []` を出し続けて停止していた。
+        ;;
+        ;; breadth は層の名前ではなく『substrate 以外すべて』の意味なので、
+        ;; そう書く。
+        in-lane (filterv (if (= :substrate lane)
+                           #(= :substrate (:layer %))
+                           #(not= :substrate (:layer %)))
+                         rows)
         ;; substrate 層は 17 本しかなく leverage に 10〜20 倍の段差がある。
         ;; cohort は 1,700 本超で ratio ≈ 1.0 の平坦地 —— **同じ順位付けでも
         ;; 意味の強さが違う**ので、それを出力に明記する。
