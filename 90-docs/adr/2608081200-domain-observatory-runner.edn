@@ -108,10 +108,16 @@ query 面の 13 dataset にも 1 つも載っていなかった。**
    **他の dataset と性質が違う** —— ほかは actor が産んだ *データ* の射影だが、
    ここは actor が *動いたかどうか* の観測である。
 
-6. **日次実行は launchd**（`com.gftd.observatory-run.plist`、6:11）。既存の
+6. **実行は launchd**（`com.gftd.observatory-run.plist`）。既存の
    fleet-ci-sweep / newsfeed-ingest と同じ面に置く。**live ingest（kouhou の
    `:live-alias`）は既定で起動しない** —— 外向きの fetch/publish を無人の
-   日次 run に黙って混ぜない。
+   run に黙って混ぜない。
+
+   ⚠ **頻度は 2026-08-08 に日次から『毎時 :11 に起きて期限の来たものだけ』へ
+   変更した（ADR-2608082600）。** 1 つの頻度が全 actor に正しいことはない ——
+   日次は kawaraban（実測 1,436 記事/day）には遅すぎ、冪等な inochi / rasen には
+   速すぎた。間隔は actor ごとに T* = sqrt(2·cost / (importance·λ)) で計算する。
+   **この ADR の『なぜ 1 日 1 回か』という当初の理由付けは撤回された。**
 
 7. **fleet-ci gate `root-observatory-registry`** が登録簿の腐敗を止める
    （必須キー / :expect 語彙 / :blocked-by の有無 / `${REPO}` 起点 /

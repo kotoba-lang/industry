@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 22621, "kotobase-cf-wasm-staging" 45979},
+ {"net-kotobase" 22796, "kotobase-cf-wasm-staging" 46503},
  :zone
- {:requests-7d 65636,
-  :pageviews-7d 1231,
-  :uniques-7d-sum 1083,
+ {:requests-7d 66275,
+  :pageviews-7d 1235,
+  :uniques-7d-sum 1095,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 1199}
-   {:path "/_health", :requests 1026}
-   {:path "/", :requests 96}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 26}
+  [{:path "/health", :requests 1349}
+   {:path "/_health", :requests 1164}
+   {:path "/", :requests 98}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 31}
+   {:path "/robots.txt", :requests 27}
    {:path "/api/funnel", :requests 26}
-   {:path "/robots.txt", :requests 23}
    {:path "/sign-in", :requests 12}
    {:path "/cdn-cgi/rum", :requests 10}],
-  :status-mix {:client-error 2675, :ok 2470},
+  :status-mix {:client-error 2996, :ok 2769},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
  :as-of "2026-08-08",
  :traffic-quality {:window "24h", :probe-4xx-pct 52, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 1199 · /_health 1026 · / 96 · /xrpc/ai.gftd.apps.kotobase.datomic.q 26 · /api/funnel 26 | 4xx(probe) 52%",
- :funnel {:visitors 2471, :signups 13, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 1349 · /_health 1164 · / 98 · /xrpc/ai.gftd.apps.kotobase.datomic.q 31 · /robots.txt 27 | 4xx(probe) 52%",
+ :funnel {:visitors 2474, :signups 13, :checkouts 0},
  :signal
- "kotobase.net 実測 65636 req/7d・1083 uniques(日次和)・うち4xx probe 52%(24h)、workers 68600 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 66275 req/7d・1095 uniques(日次和)・うち4xx probe 52%(24h)、workers 69299 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 941},
+ {:visitors {:openai-ads 3, :organic 944},
   :signups {:organic 10}, 
   :checkouts {}}}

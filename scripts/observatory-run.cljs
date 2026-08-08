@@ -28,9 +28,24 @@
 ;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs --only watari,sukashi
 ;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs --check
 ;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs --live kouhou
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs --due
 ;;
 ;;   --check  走らせない。登録簿の整合（west.yml に在るか / checkout が在るか）だけ見る
 ;;   --live   :live-alias を持つ actor を実 fetch/publish モードで走らせる（明示 opt-in）
+;;   --due    **各 actor 固有の間隔**を過ぎたものだけ走らせる（ADR-2608082600）。
+;;            毎時これを叩けば、kawaraban は毎時・inochi は 4.8 日ごとに回る。
+;;            間隔は 90-docs/system-dynamics/observatory-cadence.datoms.edn（生成物）
+;;            から読む。**登録簿には書き戻さない** —— 計算値を手書きの正本に混ぜない。
+;;
+;; ## なぜ「最後にいつ走ったか」に別の台帳が要るか
+;;
+;; observatory.datoms.edn は**スナップショット**（毎回まるごと書き換わる）なので、
+;; run のたびに前回の時刻が消える。--due は「前回いつ走ったか」を必要とするので、
+;; append-only の `observatory-runs.ledger.edn` を別に持つ。CLAUDE.md が
+;; 「文書は最新状態のみ / 測定・イベント列は append-only」と分けているとおり、
+;; 前者はスナップショット、後者はイベント列である。
+;; **この台帳は λ の実測にも使う** —— 変化したかどうかの列が伸びれば、
+;; 宣言した prior を実測値に置き換えられる（現在 λ 実測は 13 本中 1 本だけ）。
 
 (require '[scripts.nbb-compat :as compat :refer [slurp spit sh]]
          '[clojure.edn :as edn]
@@ -53,8 +68,45 @@
 (defn- opt [f] (let [i (.indexOf (clj->js argv) f)] (when (>= i 0) (nth argv (inc i) nil))))
 
 (def check-only? (flag? "--check"))
+(def due-only? (flag? "--due"))
 (def only (when-let [v (opt "--only")] (set (str/split v #","))))
 (def live (when-let [v (opt "--live")] (set (str/split v #","))))
+
+;; ── 間隔（生成物）と run 履歴（append-only）────────────────────────────────
+(def cadence-path (abs "90-docs" "system-dynamics" "observatory-cadence.datoms.edn"))
+(def run-ledger-path (abs "90-docs" "observatory" "observatory-runs.ledger.edn"))
+
+(def intervals
+  (if (exists? cadence-path)
+    (into {} (for [e (edn/read-string (slurp cadence-path))
+                   :when (:cadence/observatory e)]
+               [(:cadence/observatory e) (:cadence/interval-hours e)]))
+    {}))
+
+(defn- read-run-ledger []
+  (if (exists? run-ledger-path)
+    (->> (str/split-lines (slurp run-ledger-path))
+         (remove #(or (str/blank? %) (str/starts-with? (str/trim %) ";;")))
+         (keep #(try (edn/read-string %) (catch :default _ nil)))
+         vec)
+    []))
+
+;; 名前 → 最後に走った時刻(ms)。**「1 度も走っていない」と「古い」を区別する** ——
+;; 前者は必ず due、後者は間隔と比べる。
+(def last-run
+  (reduce (fn [acc r]
+            (let [t (.getTime (js/Date. (:run/at r)))]
+              (if (> t (get acc (:run/observatory r) 0)) (assoc acc (:run/observatory r) t) acc)))
+          {} (read-run-ledger)))
+
+(defn- due? [o]
+  (let [h (get intervals (:name o))]
+    (cond
+      ;; 間隔が計算されていない actor（known-broken / λ 未定義）は --due で走らせない。
+      ;; **既定を「走らせる」にしない** —— 起動しないものを毎時叩いても意味が無い。
+      (nil? h) false
+      (nil? (get last-run (:name o))) true
+      :else (>= (- (.now js/Date) (get last-run (:name o))) (* h 3600 1000)))))
 
 ;; --registry は gate の自己検査用（『この gate は落ちるのか』を別の登録簿で
 ;; 確かめるため）。運用では既定の manifest/observatories.edn を使う。
@@ -178,8 +230,13 @@
       ;; append-only 台帳: 伸びたか
       (> (:bytes after 0) (:bytes before 0))
       (if (= :file (:kind after)) :produces-datoms :produces-files)
-      ;; 上書き型: この run で書き直されたか
-      (and fresh? (pos? (:bytes after 0))) :produces-files
+      ;; 上書き型（ディレクトリ出力）: この run で書き直されたか。
+      ;; **mtime の鮮度を見るのはディレクトリ出力だけにする。** ファイル出力は
+      ;; append-only 台帳なので、判定は「伸びたか」であって「触られたか」ではない
+      ;; —— 実測 2026-08-08、checkout を `cp -r` した直後に走らせると台帳の mtime が
+      ;; 新しく、伸びていないのに :produces-files と判定されて冪等 actor が
+      ;; 下振れ FAIL した。**他人が触った時刻を自分の産出と数えない。**
+      (and (= :dir (:kind after)) fresh? (pos? (:bytes after 0))) :produces-files
       ;; 冪等な append-only 台帳: seed から導いた datom 集合が前回と同じなら
       ;; **何も足さないのが正常**（actor 自身が appended=false (no-change) と印字する）。
       ;; 実測 2026-08-08: inochi / rasen / busshi は 2 周目で伸びない。これを
@@ -191,6 +248,7 @@
       ;; （実測: seed を壊すと exit 1 → :known-broken → 下振れで FAIL）。
       (and (= :file (:kind after)) (pos? (:bytes after 0)))
       :produces-datoms-idempotent
+      ;; ディレクトリ出力が古いまま = 前回の遺物が残っているだけ。産出ではない。
       :else :runs-empty)))
 
 ;; 下位互換の梯子。observed の rank が expect の rank 以上なら合格。
@@ -226,6 +284,15 @@
          check-only?
          (do (println (str "  · " (:name o) " — 登録 OK / checkout 有り"))
              (assoc base :observed :not-run))
+
+         (and due-only? (not (due? o)))
+         (do (println (str "  · " (:name o) " — まだ間隔内（"
+                           (get intervals (:name o)) "h ごと、前回 "
+                           (if-let [t (get last-run (:name o))]
+                             (str (Math/round (/ (- (.now js/Date) t) 3600000.0)) "h 前")
+                             "未実行")
+                           "）"))
+             (assoc base :observed :not-due))
 
          :else
          (let [before (measure dir (:produces o))
@@ -279,7 +346,7 @@
     (:blocked-by r) (assoc :observatory/blocked-by (str/replace (:blocked-by r) #"\s+" " "))
     (seq (:headline r)) (assoc :observatory/headline (:headline r))))
 
-(def ran (remove #(#{:not-run :absent :unregistered} (:observed %)) results))
+(def ran (remove #(#{:not-run :absent :unregistered :not-due} (:observed %)) results))
 (def failing (remove :ok ran))
 
 (def coverage
@@ -310,26 +377,90 @@
 (when (and partial-run? (not check-only?))
   (println "\n  （--only / --registry の部分実行なので台帳は書かない）"))
 
+;; ── run 履歴（append-only）───────────────────────────────────────────────
+;; **実際に走らせた actor だけ**を 1 行ずつ追記する。--check や not-due は
+;; イベントではないので書かない（「走らせた」の意味を薄めない）。
+(when (and (not check-only?) (seq ran))
+  (let [lines (for [r ran]
+                (pr-str (cond-> {:run/observatory (:name r)
+                                 :run/at now
+                                 :run/observed (:observed r)
+                                 :run/exit (:exit r)
+                                 :run/duration-ms (:ms r)
+                                 ;; λ の実測はこの 1 列から育つ。
+                                 ;; 「変化したか」を run ごとに残す。
+                                 :run/changed (> (- (:bytes-after r 0) (:bytes-before r 0)) 0)}
+                          (contains? r :bytes-after)
+                          (assoc :run/delta-bytes (- (:bytes-after r) (:bytes-before r 0))))))
+        header (when-not (exists? run-ledger-path)
+                 (str ";; observatory-runs.ledger.edn — **append-only のイベント列**。手編集禁止。\n"
+                      ";; observatory-run が実際に起動した actor を 1 行 1 run で追記する。\n"
+                      ";; スナップショット（observatory.datoms.edn）と役割が違う ——\n"
+                      ";; あちらは「今どうなっているか」、ここは「いつ何が起きたか」。\n"
+                      ";;\n"
+                      ";; :run/changed の列が伸びると λ（更新頻度）が実測できるようになる。\n"
+                      ";; 現在 λ が実測なのは 13 本中 1 本だけで、残りは宣言した prior。\n"
+                      ";; 設計: ADR-2608082600\n\n"))]
+    (.appendFileSync fs run-ledger-path (str header (str/join "\n" lines) "\n"))
+    (println (str "  → " (:ledger registry) " / observatory-runs.ledger.edn（+"
+                  (count lines) " run）"))))
+
+;; **書き込みは常にマージ。置き換えない。**
+;;
+;; 以前は full run が台帳をまるごと書き換えていた。checkout が 1 本も無い環境で
+;; 全体 run をすると、22 行の実測が **:absent 22 行に置き換わって消えた** ——
+;; 「走らせていない」が「走らせたが何も無かった」に化ける。これは運用の注意書きで
+;; 防ぐ種類の間違いではないので、構造で塞ぐ:
+;;
+;;   **実際に走った actor の行だけを差し替え、それ以外は前回の観測を持ち越す。**
+;;
+;; 各行が自分の :observatory/as-of を持つので、いつ観測した値かは行ごとに読める。
+;; --only / --registry だけは今までどおり一切書かない（1 件の結果を fleet 全体の
+;; 観測に化けさせないため）。
 (when (and (not check-only?) (not partial-run?))
-  (spit ledger-path
-        (str ";; 90-docs/observatory/observatory.datoms.edn — **生成物**。手編集禁止。\n"
-             ";; 再生成: nbb --classpath \".:scripts/nbb_compat\" scripts/observatory-run.cljs\n"
-             ";; 登録簿（正本・手書き）: manifest/observatories.edn   設計: ADR-2608081200\n"
-             ";;\n"
-             ";; 領域別 observatory を**実際に起動した**結果。README や MATURITY.md の\n"
-             ";; 主張ではなく、その時刻に走らせて観測した値だけが入る。\n"
-             ";;\n"
-             ";; query: :source/dataset \"observatory\"\n"
-             ";; join:  :observatory/repo → repo-taxonomy / itonami-maturity の :repo/path\n"
-             ";;\n"
-             ";; ⚠ :observatory/output-gitignored true の actor は、出力が各 repo の\n"
-             ";;   .gitignore に入っている（charter 上のローカル台帳）。**走らせた者の\n"
-             ";;   マシンにしか存在しない。** 面に載っているのはここの観測サマリだけ。\n"
-             ";;\n"
-             ";; ⚠ :observatory/observed :runs-empty は「正常終了したが 0 件」。\n"
-             ";;   exit 0 だが成功ではない。:observatory/blocked-by を読むこと。\n\n"
-             "[" (str/join "\n " (map pr-str (concat (map-indexed datom results) [coverage]))) "]\n"))
-  (println (str "\n  → " (:ledger registry))))
+  (let [prev (if (exists? ledger-path)
+               (into {} (for [e (try (edn/read-string (slurp ledger-path)) (catch :default _ []))
+                              :when (:observatory/name e)]
+                          [(:observatory/name e) e]))
+               {})
+        replaced (into #{} (map :name) ran)
+        registered (into #{} (keep :name) obs)
+        carried (vec (for [nm (sort registered)
+                           :when (and (not (replaced nm)) (contains? prev nm))]
+                       (prev nm)))
+        ;; 前回にも今回にも観測が無い actor（初回の :absent など）は、observed を
+        ;; そのまま残す —— 「一度も走っていない」ことも面に載せる。
+        never (vec (for [r results
+                         :when (and (not (replaced (:name r)))
+                                    (not (contains? prev (:name r))))]
+                     r))]
+    (spit ledger-path
+          (str ";; 90-docs/observatory/observatory.datoms.edn — **生成物**。手編集禁止。\n"
+               ";; 再生成: nbb --classpath \".:scripts/nbb_compat\" scripts/observatory-run.cljs\n"
+               ";; 登録簿（正本・手書き）: manifest/observatories.edn   設計: ADR-2608081200\n"
+               ";; 間隔の計算: ADR-2608082600（observatory-cadence.datoms.edn）\n"
+               ";;\n"
+               ";; 領域別 observatory を**実際に起動した**結果。README や MATURITY.md の\n"
+               ";; 主張ではなく、その時刻に走らせて観測した値だけが入る。\n"
+               ";;\n"
+               ";; ⚠ **全行が同じ時刻の観測とは限らない。** actor ごとに間隔が違う\n"
+               ";;   （--due）ので、走らなかった actor の行は前回の観測を保持している。\n"
+               ";;   いつの値かは行ごとの :observatory/as-of を見ること。\n"
+               ";;\n"
+               ";; query: :source/dataset \"observatory\"\n"
+               ";; join:  :observatory/repo → repo-taxonomy / itonami-maturity の :repo/path\n"
+               ";;\n"
+               ";; ⚠ :observatory/output-gitignored true の actor は、出力が各 repo の\n"
+               ";;   .gitignore に入っている（charter 上のローカル台帳）。**走らせた者の\n"
+               ";;   マシンにしか存在しない。** 面に載っているのはここの観測サマリだけ。\n"
+               ";;\n"
+               ";; ⚠ :observatory/observed :runs-empty は「正常終了したが 0 件」。\n"
+               ";;   exit 0 だが成功ではない。:observatory/blocked-by を読むこと。\n\n"
+               "[" (str/join "\n " (map pr-str (concat (map-indexed datom (concat ran never))
+                                                       carried [coverage]))) "]\n"))
+    (println (str "\n  → " (:ledger registry)
+                  "（更新 " (count ran) " / 前回の観測を保持 " (count carried)
+                  (when (seq never) (str " / 未観測 " (count never))) "）"))))
 
 ;; ── まとめ ──────────────────────────────────────────────────────────────
 (println (str "\n  登録 " (count obs)

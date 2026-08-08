@@ -150,22 +150,42 @@ actor には 2 種類ある:
   混ぜない
 - 着地したら `:next` からその行を消す。新しく分かった手当ては `:next` に足す
 
-### 5. 台帳を再生成する（⚠ checkout が揃っている時だけ）
+### 5. 台帳を再生成する
 
 ```bash
 nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs
 ```
 
-**checkout が無い actor は `:absent` として記録される。** 22 本のうち 1 本しか
-clone していない状態で全体 run をすると、**台帳の実測値 21 本分が `:absent` で
-上書きされる**。台帳は「最後に回した 1 回のスナップショット」なので、これは
-情報の消失になる。
+**書き込みは常にマージで、実際に走った actor の行だけが差し替わる**（2026-08-08
+に構造を変えた。ADR-2608082600）。以前は全体 run が台帳をまるごと書き換えたので、
+checkout の無い環境で回すと 22 行の実測が `:absent` に化けて消えた。今は消えない
+—— 各行が自分の `:observatory/as-of` を持つので、いつの観測かは行ごとに読める。
 
-したがって:
+`--only <name>` は今までどおり**一切書かない**（1 件の結果を fleet 全体の観測に
+化けさせないため）。確認だけならこちら。
 
-- **全部 clone してから回す**（初回で約 25 repo、数分。disk は 1 GB 未満）か、
-- **`--only <name>` で確かめるだけにする**（部分実行は台帳を書かない。これは
-  保護であって不具合ではない）
+### 5b. 頻度を触るとき（ADR-2608082600）
+
+観測の頻度は actor ごとに **T\* = sqrt(2·cost / (importance·λ))** で計算する。
+入力は登録簿の `:change-rate`（λ [1/day]）と `:importance` [sec·day]、cost は
+台帳の実測。計算は:
+
+```bash
+nbb --classpath "90-docs/system-dynamics/nbb-shim:orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dynamics/src" \
+  90-docs/system-dynamics/observatory-cadence.cljs
+```
+
+- **λ の 12/13 は宣言した prior であって測定値ではない。** `:change-rate-basis` を
+  見ずに間隔を引用しない。実測に置き換える材料は
+  `90-docs/observatory/observatory-runs.ledger.edn`（append-only、1 行 1 run）の
+  `:run/changed` 列。**この列を読んで λ を prior から実測へ動かすのは、この skill の
+  仕事に含まれる**（数十 run 貯まってから）。
+- **新しい actor を登録したら `:change-rate` / `:change-rate-basis` /
+  `:change-rate-source` / `:importance` も付ける。** gate が欠落を落とす。
+  測れないものは `:uncomputable-until-measured` と書く —— **0 を入れない**
+  （0 は「毎周走らせる」になり、測っていない actor ほど頻繁に叩かれる）。
+- importance を細かく詰めない。**T\* ∝ 1/sqrt(w) なので 16 倍間違えても 4 倍しか
+  ずれない。** 桁で足りる（現在 5 / 10 / 20 の 3 段）。
 
 ### 6. gate を通す
 
