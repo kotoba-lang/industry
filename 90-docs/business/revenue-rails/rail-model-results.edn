@@ -1,23 +1,5 @@
-{:as-of "2026-08-08",
- :observed
- {:kotobase
-  {:visitors 2453,
-   :signups 13,
-   :paid 0,
-   :x402-submissions 3,
-   :x402-settlements 0,
-   :as-of "2026-08-08"},
-  :shinshi {:visitors 645, :paid 0, :as-of "2026-08-08"},
-  :itonami {:tenants 5, :paid 0, :as-of "2026-08-08"},
-  :murakumo {:demand-apps 0, :as-of "2026-08-08"}},
- :conversion-upper-bounds
- {:kotobase-visitor->paid 0.0012205070302881982,
-  :kotobase-signup->paid 0.20581666518655062,
-  :kotobase-x402-submission->settlement 0.6315968501359612,
-  :shinshi-visitor->paid 0.004633776935202616,
-  :itonami-tenant->paid 0.4507197283469411},
- :note-bounds
- "successes=0 の Bernoulli 上界（95%）。点推定ではない。trials が小さいほど上界は緩む — itonami の tenant→paid は 5 trials しかないので上界が大きく出るが、それは有望さではなく情報が無いことを意味する。",
+{:note-pool-tap
+ "buy-traffic-web は :pool-size を持つが conversion-rate を渡していないため :expected-yield は :uncomputable-until-measured になる。大きな pool に未計測の転換率を掛けて期待値を作らないための規律。",
  :web-subscription-economics
  {:ltv-jpy 31468.800000000003,
   :conversion-upper-bound 0.0012205070302881982,
@@ -32,13 +14,21 @@
     "日本の登記・税務に専門家結論なし"
     "Terms/Privacy が DRAFT"],
    :open? false},
-  :ad-network
+  :ad-network-thirdparty
   {:needs #{:contracting-entity :payout-account :jp-tax :traffic},
    :blocking
-   ["ad network は法人の payout 口座と税務書類へ支払う — web-subscription と同じ gate"
+   ["ExoClick / AdSense 等は法人の payout 口座と税務書類へ fiat で支払う — web-subscription と同じ gate"
     "実測: ExoClick は 7d 再構成 USD 0 / imp 0（2026-07-09）"
-    "human traffic が小さい（kotobase の / は 24h で 99 req）"],
+    "fill 率・payout ポリシー・支払サイクルが他社に従属する"],
    :open? false},
+  :ad-network-firstparty
+  {:needs #{:wallet :publisher-inventory :advertiser},
+   :blocking
+   ["USDC で入札する広告主が 0"
+    "adnet が publisher（shinshi / isekai / media-gamers 等）へ未配線"],
+   :note
+   "kotoba-lang/adnet は広告主が USDC で入札し x402 rail で決済する設計。\n           したがって fiat payout の gate を通さない — usdc-x402 と同じ開いたレール。\n           2026-08-08 訂正: 当初 ad-network を一括で CLOSED としたのは\n           third-party と first-party の混同だった。",
+   :open? true},
   :mobile-iap
   {:needs
    #{:contracting-entity :payout-account :jp-tax :store-account
@@ -55,12 +45,50 @@
    :note
    "PSP 関係を必要としない唯一のレール。nexus-x402 facilitator は live、\n           seller 3 件登録済み、kotobase の x402 challenge も発火している。",
    :open? true}},
+ :as-of "2026-08-08",
+ :conversion-upper-bounds
+ {:kotobase-visitor->paid 0.0012205070302881982,
+  :kotobase-signup->paid 0.20581666518655062,
+  :kotobase-x402-submission->settlement 0.6315968501359612,
+  :shinshi-visitor->paid 0.004633776935202616,
+  :itonami-tenant->paid 0.4507197283469411},
+ :note-bounds
+ "successes=0 の Bernoulli 上界（95%）。点推定ではない。trials が小さいほど上界は緩む — itonami の tenant→paid は 5 trials しかないので上界が大きく出るが、それは有望さではなく情報が無いことを意味する。",
+ :observed
+ {:kotobase
+  {:visitors 2453,
+   :signups 13,
+   :paid 0,
+   :x402-submissions 3,
+   :x402-settlements 0,
+   :as-of "2026-08-08"},
+  :shinshi {:visitors 645, :paid 0, :as-of "2026-08-08"},
+  :itonami {:tenants 5, :paid 0, :as-of "2026-08-08"},
+  :murakumo {:demand-apps 0, :as-of "2026-08-08"}},
  :ranked-interventions
  ({:id :close-x402-settlement,
    :label "x402 の settlement を 0 → 1 にする（非 owner の実決済を 1 件観測）",
    :band :band/C,
    :tractability 0.8,
    :base-score 4,
+   :kind :structural}
+  {:id :wire-adnet-to-publishers,
+   :label "adnet を自社 publisher へ配線し、USDC 建て在庫を立てる",
+   :band :band/D,
+   :tractability 0.7,
+   :base-score 2.0999999999999996,
+   :kind :structural}
+  {:id :land-first-usdc-advertiser,
+   :label "USDC で入札する広告主を 1 件獲得する",
+   :band :band/C,
+   :tractability 0.4,
+   :base-score 2,
+   :kind :structural}
+  {:id :grow-owned-inventory,
+   :label "media-gamers/kouryaku・gameya 等で自社 PV 在庫を増やす（SEO/コンテンツ）",
+   :band :band/D,
+   :tractability 0.6,
+   :base-score 1.7999999999999998,
    :kind :structural}
   {:id :open-psp-gate,
    :label "収納主体と PSP を一致させ、登記・税務の結論を得る",
@@ -77,8 +105,8 @@
    :id :buy-traffic-web,
    :kind :pool-tap,
    :base-score 0.9}
-  {:id :expand-ad-network,
-   :label "adnet / 第三者 ad network へ展開",
+  {:id :expand-ad-network-thirdparty,
+   :label "ExoClick 等の第三者 ad network へ展開",
    :band :band/E,
    :tractability 0.4,
    :base-score 0.4,
@@ -89,5 +117,10 @@
    :tractability 0.1,
    :base-score 0.30000000000000004,
    :kind :structural}),
- :note-pool-tap
- "buy-traffic-web は :pool-size を持つが conversion-rate を渡していないため :expected-yield は :uncomputable-until-measured になる。大きな pool に未計測の転換率を掛けて期待値を作らないための規律。"}
+ :ad-rail
+ {:owned-pv-7d 31825,
+  :owned-pv-month 136392,
+  :target-monthly-jpy 300000,
+  :required-rpm-jpy 2199.528672427337,
+  :note
+  "RPM は未計測。measured な唯一の第三者 ad 実績は ExoClick の USD 0 / imp 0 で、これは RPM ではなく fill の失敗。first-party adnet の RPM は広告主が 1 件も居ないため未定義。"}}

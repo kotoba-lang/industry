@@ -69,12 +69,22 @@
                "Terms/Privacy が DRAFT"]
     :open? false}
 
-   :ad-network
+   :ad-network-thirdparty
    {:needs #{:contracting-entity :payout-account :jp-tax :traffic}
-    :blocking ["ad network は法人の payout 口座と税務書類へ支払う — web-subscription と同じ gate"
+    :blocking ["ExoClick / AdSense 等は法人の payout 口座と税務書類へ fiat で支払う — web-subscription と同じ gate"
                "実測: ExoClick は 7d 再構成 USD 0 / imp 0（2026-07-09）"
-               "human traffic が小さい（kotobase の / は 24h で 99 req）"]
+               "fill 率・payout ポリシー・支払サイクルが他社に従属する"]
     :open? false}
+
+   :ad-network-firstparty
+   {:needs #{:wallet :publisher-inventory :advertiser}
+    :blocking ["USDC で入札する広告主が 0"
+               "adnet が publisher（shinshi / isekai / media-gamers 等）へ未配線"]
+    :note "kotoba-lang/adnet は広告主が USDC で入札し x402 rail で決済する設計。
+           したがって fiat payout の gate を通さない — usdc-x402 と同じ開いたレール。
+           2026-08-08 訂正: 当初 ad-network を一括で CLOSED としたのは
+           third-party と first-party の混同だった。"
+    :open? true}
 
    :mobile-iap
    {:needs #{:contracting-entity :payout-account :jp-tax :store-account :store-review}
@@ -114,6 +124,27 @@
     :gross-margin 0.88             ; 原価モデル（execution plan）
     :retention-months 12}})        ; 仮定。実測ではない
 
+(def owned-inventory-pv-7d
+  "自社 zone の実測 pageviews/7d（90-docs/business/metrics/<product>.edn の :zone）。
+   ad rail の inventory はこれ。RPM は未計測なので掛けて収益を作らない。"
+  {:club-shinshi 8302 :app-aozora 5527 :network-isekai 4650 :ai-gftd-apex 4566
+   :cloud-itonami 3043 :cloud-murakumo 2633 :etzhayyim 1574 :net-kotobase 1197
+   :cloud-manimani 333})
+
+(defn ad-rail-inventory
+  "収益は出さない。出すのは『月間 PV』と『目標収益に必要な RPM』だけ。
+   RPM を仮定して収益を作るのは捏造なので、逆に解いて必要 RPM を返す。"
+  [target-monthly-jpy]
+  (let [pv-7d (reduce + (vals owned-inventory-pv-7d))
+        pv-month (* pv-7d (/ 30.0 7.0))]
+    {:owned-pv-7d pv-7d
+     :owned-pv-month (int pv-month)
+     :target-monthly-jpy target-monthly-jpy
+     :required-rpm-jpy (/ target-monthly-jpy (/ pv-month 1000.0))
+     :note (str "RPM は未計測。measured な唯一の第三者 ad 実績は ExoClick の "
+                "USD 0 / imp 0 で、これは RPM ではなく fill の失敗。"
+                "first-party adnet の RPM は広告主が 1 件も居ないため未定義。")}))
+
 (defn breakeven-cpc
   "転換率の上界 r、LTV から、marketing の 1 訪問あたり許容単価を出す。
    これは『上界』なので、実際に払ってよい額ではなく
@@ -151,9 +182,24 @@
     :band :band/D                  ; stock-flow structure — 新しい経路を足す
     :tractability 0.1}             ; entity + store account + 審査 + 実装ゼロから
 
-   {:id :expand-ad-network
-    :label "adnet / 第三者 ad network へ展開"
+   {:id :expand-ad-network-thirdparty
+    :label "ExoClick 等の第三者 ad network へ展開"
     :band :band/E
+    :tractability 0.4}
+
+   {:id :wire-adnet-to-publishers
+    :label "adnet を自社 publisher へ配線し、USDC 建て在庫を立てる"
+    :band :band/D                  ; stock-flow structure — 既存在庫に収益経路を接続する
+    :tractability 0.7}             ; adnet は実装済み、publisher も実在、配線が残っている
+
+   {:id :grow-owned-inventory
+    :label "media-gamers/kouryaku・gameya 等で自社 PV 在庫を増やす（SEO/コンテンツ）"
+    :band :band/D
+    :tractability 0.6}             ; pipeline 実装済み、corpus 収集済み、公開と継続運用が残る
+
+   {:id :land-first-usdc-advertiser
+    :label "USDC で入札する広告主を 1 件獲得する"
+    :band :band/C                  ; feedback loop gain — 広告ループの gain を 0 から立ち上げる
     :tractability 0.4}])
 
 ;; ---------------------------------------------------------------------------
@@ -187,6 +233,7 @@
               "trials が小さいほど上界は緩む — itonami の tenant→paid は 5 trials しかないので"
               "上界が大きく出るが、それは有望さではなく情報が無いことを意味する。")
          :web-subscription-economics econ
+         :ad-rail (ad-rail-inventory 300000)
          :gates gates
          :ranked-interventions ranked
          :note-pool-tap
@@ -209,6 +256,13 @@
                         (.toFixed (:breakeven-cpc-jpy-upper-bound econ) 2)
                         "  <- 上界ですらこれ以上払うと赤字")))
       (println "  uncomputable"))
+    (println)
+    (println "=== ad rail (owned inventory) ===")
+    (let [a (ad-rail-inventory 300000)]
+      (println (str "  owned PV/7d = " (:owned-pv-7d a)
+                    "  -> PV/month = " (:owned-pv-month a)))
+      (println (str "  月次 ¥" (int (:target-monthly-jpy a)) " を出すのに必要な RPM = ¥"
+                    (.toFixed (:required-rpm-jpy a) 0) " / 1000PV")))
     (println)
     (println "=== gates ===")
     (doseq [[rail g] gates]
