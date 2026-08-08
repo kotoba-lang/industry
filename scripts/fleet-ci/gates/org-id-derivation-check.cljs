@@ -6,7 +6,7 @@
 ;; `verify-repository-roles.cljs` の `domain->prefix`、そして cloud-itonami の
 ;; org id 受付。実測 2026-08-08、受付は 6 org すべてで**逆向き**を返しており
 ;; （`awai.network -> awai-network`、規則は `network-awai` = west.yml の remote 名）、
-;; どの検査もそれを見ていなかった（ADR-2608094000）。
+;; どの検査もそれを見ていなかった（ADR-2608098000）。
 ;;
 ;; **この gate は規則を実装しない。** 3 箇所を 4 箇所にするだけなので。
 ;; 代わりに、既に在る 3 つの表現を互いに突き合わせる:
@@ -175,7 +175,7 @@
                                        (count @failures) " failing"))
                          (when (seq @failures)
                            (println "")
-                           (println "ADR-2608094000: 導出の正本は manifest/org-id.kotoba。")
+                           (println "ADR-2608098000: 導出の正本は manifest/org-id.kotoba。")
                            (println "cljs 側は scripts/org_id_derivation.cljs の 1 箇所だけ。")
                            (set! (.-exitCode js/process) 1))))
                 (.catch (fn [e]

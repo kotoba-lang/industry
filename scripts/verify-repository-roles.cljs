@@ -98,7 +98,7 @@
 
 ;; The derivation itself moved to `scripts/org_id_derivation.cljs` so that this
 ;; file and the org-id intake stop being two implementations of one rule
-;; (ADR-2608094000). The canonical form is `manifest/org-id.kotoba`; the fleet
+;; (ADR-2608098000). The canonical form is `manifest/org-id.kotoba`; the fleet
 ;; gate `root-org-id-derivation` holds the two in agreement.
 (def domain->prefix org-id/domain->prefix)
 

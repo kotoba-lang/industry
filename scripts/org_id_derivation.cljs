@@ -4,7 +4,7 @@
 ;; `domain->prefix`（origin 面）と cloud-itonami の `org-id`（org id 受付）に
 ;; それぞれ書かれていた。実測 2026-08-08、受付側は**逆向き**を返しており
 ;; （`awai.network -> awai-network`、規則は `network-awai`）、宣言と受付が
-;; 食い違ったまま誰も落ちなかった（ADR-2608094000）。
+;; 食い違ったまま誰も落ちなかった（ADR-2608098000）。
 ;;
 ;; 規則の**正本は `manifest/org-id.kotoba`**（`kotoba/pure`、capability 0）。
 ;; ここはその cljs 側の相方で、両者が一致することを fleet gate

@@ -222,7 +222,7 @@
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
   ;; 同じ規則の **workspace 内側**。上の gate が受付の drift を見るのに対し、
-  ;; こちらは「導出が 1 つであること」自体を押さえる（ADR-2608094000）。
+  ;; こちらは「導出が 1 つであること」自体を押さえる（ADR-2608098000）。
   ;;
   ;; 逆順導出は 3 箇所に在った: `:org-domain` の手書き `:reversed` 列、
   ;; `verify-repository-roles.cljs` の `domain->prefix`、cloud-itonami の受付。
