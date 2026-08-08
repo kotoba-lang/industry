@@ -212,13 +212,93 @@ projection として足すので `manifest/projection-verify.cljs verify` を ga
   `.kotoba` へ移行して `kotoba.dsl.problem` がどの runtime でも load できない
   ため（ADR-2608071000、既知・accepted）。`xmile.execute` は通っている。
 
+## 2026-08-08 実装棚卸し — 両面とも「作る」ではなく「既にある」
+
+Follow-up 2/3 に着手する前に索引を引いた結果、**この ADR が新規実装だと想定していた
+ものは大半が既に存在した。** 次に触る人が 4 つ目を書かないよう、現在地を記す。
+
+### 封筒面は実在する。欠けているのは PQ であって存在ではない
+
+**`kotoba-lang/envelope`** が kotobase.net の Drive/Mail の本番封筒
+（ADR-2607263000 D3–D5）。1 オブジェクト = 1 content key、鍵は保存せず受信者ごとに
+wrap のみ。共有は re-wrap であって再暗号化ではない。`envelope.model`（portable、
+crypto 不要の判断）と `envelope.seal`（cljs、bytes）に分かれ、20 tests / 61
+assertions が実 Web Crypto・実 X25519 に対して通っている。否定ケース（鍵違い・
+ビット反転・chunk 入れ替え・切り詰め・chunk 移動・wrap 貼り替え）が主眼。
+
+**D5 に対する差分は 1 点だけ: PQ ではない。** wrap は X25519 ECIES + HKDF-SHA256 +
+AES-256-GCM で、`pqh-v1`（X25519+ML-KEM-768 / XChaCha20-Poly1305）ではない。
+つまり **harvest-now-decrypt-later に対して D7 の S1（何もしない）と同じ位置**に
+本番の Drive/Mail がいる。
+
+一方 **D5 の「convergent 暗号を使わない」は既に満たしている** ——
+ADR-2607263000 D4 が object ごとに fresh content key を選んでおり、同一平文が
+重複排除されないことにテストがある。
+
+**PQ 化は crypto だけの変更ではない。** hybrid wrap には受信者が X25519 に加えて
+ML-KEM-768 公開鍵を持つ必要があり、DID document・鍵バックアップ・デバイス連携
+（`kotoba-lang/org-signal` + ADR-2607022330）に及ぶ。crypto を差し替えるより
+identity/鍵配布の方が大きい。
+
+**そして材料は既に書かれている（未着地）**: `kotoba-lang/pqh` の
+`src/kotoba/lang/pqh/pq_noble.cljs` —— @noble ベースのブラウザ IPq host
+（x25519 / ml_kem768 / ml_dsa65 / hkdf）が **2026-07-20 から 18 日間 uncommitted
+のまま**共有 checkout に置かれている（`pq.cljc` / `util.cljc` の未コミット変更を
+伴う）。pqh の README が「future」と書いている当のものが、書かれて着地していない。
+**別人の作業なので破棄せず、着地の可否は所有者が決めること。**
+
+### 射影面は「汎用ライブラリが無い」のであって、実装が無いのではない
+
+`cloud-itonami-rirekisho`（封筒 `rirekisho.envelope` / cohort `rirekisho.cohort`）、
+`kotoba-lang/kagi`（index/ACL は graph、secret は SealedBlockStore）、
+`etzhayyim/com-etzhayyim-talent`（cohort は graph、PII は ciphertext）の 3 実装が
+既にある。rirekisho 自身が「これが 3 つ目」と書いている。
+
+**4 つ目のドメイン実装を書いても何も増えない。** 共通化できるのは cohort の中身
+（ドメインごとに違う）ではなく、rirekisho が talent より改善した 1 点 ——
+`persistable?` を「プレフィックスが付いているか」ではなく「**この値が seal の出力
+そのものか**」で判定する契約だけ。未知の鍵があっても通さない。ここを取り出すなら
+それが commons であって、cohort スキーマは commons ではない。
+
+⚠ **`kotoba-lang/kotobase-projection` は名前が似ているが別物** ——
+materialized query bundle と atomic publication（`kotobase-peer` から抽出）で、
+この ADR の「射影面」ではない。名前で取り違えないこと。
+
+### D8 の lake は gate の allowlist を広げなくてよい
+
+`manifest/projection-verify.cljs` は loader を `:canonical-edn-v1` 1 種に絞って
+おり、これは意図的な制限。columnar lake は CBOR ブロックを産むので一見合わないが、
+**射影すべきは lake の manifest（root CID・column footer CID・chunk の zone map）
+であって chunk の bytes ではない。** manifest は小さな canonical EDN なので既存
+loader でそのまま通る。
+
+これは ADR-2608039970 の「byte を datom 面に載せない。メタデータは datom 面で
+よい —— 分けるのは bytes」と同じ判断で、**loader を足す理由にならない。**
+
+**ただし現状 lake は `capability-bench` の中にしか無く、ベンチマークである。**
+「verified projection」にするには先に射影対象の実データが要る（superproject の
+datom 面には market-intel / repo-taxonomy / corpus 等がある）。gate の形は
+決まったが、対象が未定というのが正確な現在地。
+
 ## Follow-up
 
 1. net-kotobase `ADR-2606131600`（proposed）を本 ADR に合わせて accepted へ更新するか、
    本 ADR を指す形に整理する。
-2. 射影面の第一実装を 1 つ選んで landed にする（`rirekisho` の cohort 面が最も近い）。
-3. columnar lake を射影面の projection として実装し `projection-verify` gate に通す。
-4. block sizing を 16 KiB 直下へ（D6）。64 KiB 超を禁じる検査を fleet gate に足す。
+2. ~~射影面の第一実装を 1 つ選んで landed にする~~ → **再定義（2026-08-08 の棚卸し）**。
+   3 実装が既にあるので 4 つ目のドメイン実装は書かない。残るのは 2 択:
+   (a) `envelope` の PQ 化（identity/鍵配布を含む大仕事。前提として
+   `pqh/pq_noble.cljs` の 18 日放置を所有者が解決すること）、
+   (b) `persistable?` 契約（seal の出力そのものかを見る）だけを commons 化する。
+3. ~~columnar lake を projection として実装し gate に通す~~ → **loader 追加は不要**と
+   判明（manifest を canonical EDN として射影する。bytes はブロック面に残す）。
+   残る前提は「射影対象の実データを決めること」——今の lake は
+   `capability-bench` の中のベンチマークで、射影すべき本番データがまだ無い。
+4. ~~block sizing を 16 KiB 直下へ。64 KiB 超を禁じる検査を fleet gate に足す。~~
+   **✅ 完了 2026-08-08**（案 B）。`kotoba-lang/pqh` 86c453f が PAD-BUCKETS を
+   7 段へ、`kotoba-lang/kotobase-peer` 587e3f9 が size-classes を bucket 直下
+   （17 バイト下げる）へ。overhead は +300%/+100%/経路外/経路外 → 全 0.0-0.1%。
+   fleet gate `kotobase-peer-block-sizing-pad` を配線済み（落ちることを 3 方向で
+   実測してから配線した）。両 repo のテストは通過（pqh 20/147、peer 229/680）。
 5. ~~段 C の client 側 index キャッシュを実装して hops の実測を取り直す。~~
    **✅ 完了 2026-08-07** — `capability-bench/run-descent.cljs`（`npm run bench:descent`）。
    結果は D4 の訂正のとおり。**当初の hops=3 は誤りで、実測 2.04（無キャッシュ）→
