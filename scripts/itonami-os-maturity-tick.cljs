@@ -425,8 +425,20 @@
   （二重実装を防ぐはずの仕掛けが、静かに何も防いでいなかった）。
 
   見るのは接続フローが作る名前（`itonami-os` / `os-connect`）の枝だけ。無関係な
-  枝まで見ると、たまたま似た綴りの枝が候補を隠す。`gh` が落ちたら `:unknown` に
-  して候補から外さない（従来どおり fail-open）。"
+  枝まで見ると、たまたま似た綴りの枝が候補を隠す。
+
+  **情報源は 3 つで、gh の 2 本はどちらも落ちうる。** 実測 2026-08-08: 同じ tick を
+  2 回続けて回したら、1 回目は 6492 を「別の枝が着手中」として外し、2 回目は
+  「次の 1 手」として出した —— gh がこけたときに fail-open するため。二重実装を
+  防ぐ仕掛けが**気まぐれに効かなくなるのは、効かないより悪い**（効いていると
+  思って進むので）。ADR-2608070000 が記録した isic-4921 の 2 回実装は、まさに
+  この検出漏れが起こした事故だった。
+
+  3 つ目は git の remote-tracking ref。**ネットワークも gh も要らない**ので、
+  launchd 下で SSH agent が無い（この tick が origin/main を fetch ではなく
+  remote-tracking ref から読んでいるのと同じ制約）状況でも効く。既に誰かが
+  fetch した時点の枝しか見えないが、**見えた枝は本物**なので、候補から外す
+  方向にしか働かない。3 本とも駄目なときだけ従来どおり :unknown で fail-open。"
   []
   (if offline?
     {:status :skipped :branches []}
@@ -434,12 +446,17 @@
                        "--state" "open" "--limit" "50"
                        "--json" "headRefName" "--jq" ".[].headRefName"])
           br (sh "gh" ["api" "repos/network-awai/cloud-itonami/branches"
-                       "--paginate" "--jq" ".[].name"])]
-      (if (and (not= 0 (:code pr)) (not= 0 (:code br)))
+                       "--paginate" "--jq" ".[].name"])
+          refs (sh "git" ["-C" app "for-each-ref" "--format=%(refname:short)" "refs/remotes"])
+          refs-ok? (= 0 (:code refs))]
+      (if (and (not= 0 (:code pr)) (not= 0 (:code br)) (not refs-ok?))
         {:status :unknown :branches []}
-        {:status (if (and (= 0 (:code pr)) (= 0 (:code br))) :ok :partial)
+        {:status (if (and (= 0 (:code pr)) (= 0 (:code br)) refs-ok?) :ok :partial)
          :branches (->> (concat (str/split-lines (or (:out pr) ""))
-                                (str/split-lines (or (:out br) "")))
+                                (str/split-lines (or (:out br) ""))
+                                ;; remote 名を剥がす（gftdcojp/agent/x → agent/x）
+                                (map #(str/replace % #"^[^/]+/" "")
+                                     (str/split-lines (or (:out refs) ""))))
                         (map str/trim)
                         (remove str/blank?)
                         (filter #(or (str/includes? % "itonami-os") (str/includes? % "os-connect")))
