@@ -261,8 +261,69 @@ censor の裏に並ぶ**ため。
 2. **request の主体キーは `:subject`**。5229/4759/8121/8129 の shim 翻訳を要する負債を
    増やさない。将来の OS adapter は素の 3 行 shim で済む。
 
-**まだ os.edn に宣言していない。** fork 可能であることと共有面に載っていることは
-別の主張で、この repo は前者だけを主張する。
+### 3h. 4 本とも営み OS に接続した（2026-08-08）
+
+scaffold した 4 本は全部 `os.edn` に宣言され、面が live になった。
+
+| repo | merge | 内訳（確定/承認待ち/保留/拒否） | 面 |
+|---|---|---|---|
+| 4520-carwash | `71f6203` | 5 / 4 / 4 / 1 | 200 |
+| 9609-petcare | `cd25433` | 5 / 4 / 3 / 1 | 200 |
+| 9601-carpet | `2b185cd` | 5 / 4 / 3 / 1 | 200 |
+| 9601-coinlaundry | `49d9d30` | 5 / 4 / 4 / 1 | 200 |
+
+最終状態: os-registry **39 verticals・10 wiring** / sites-registry **49 site** /
+`clojure -M:test` **1,535 tests / 11,335 assertions**（失敗集合は origin/main と
+完全一致、既知 17 件のみ）。**4 本とも標準形だったので repo 側の改修はゼロ**、
+shim は 3 行ずつで済んだ（主体キーが `:subject` だから）。
+
+### 3i. 接続で自分が作った欠陥と、その再発防止
+
+**4520-carwash の接続 commit に `os_endpoints.cljc` の `require` が欠けていた。**
+`native-adapter` の case 節だけ足して require を忘れており、
+`cloud-itonami.edge.os-endpoints` の load が
+`Unable to resolve symbol: carwashops/vertical` で落ちる。require を外す/戻すの
+両方を実行して実証し、petcare の commit（`cd25433`）で修理した。
+
+**`clojure -M:test` はこれを捕まえない。** `os_endpoints.cljc` は cljs ビルド
+（`:os-api`）でしか compile されないので、JVM のテスト実行は一度も読まない。
+しかも接続作業は必ずこのファイルを触る（毎回 require が 1 本増える）ので、
+**この穴は毎反復で開く**。1,532 tests すべて green のまま main に merge された。
+
+skill `itonami-os-connect` に §4b として検査を足した（`da49839`）—— 本命は
+`resource-guard.mjs run build -- npx shadow-cljs release os-api`、guard が
+他セッションで埋まっているとき（exit 2）の代替は nbb での load。carpet と
+coinlaundry はこの検査を着地前に通してある。
+
+（`shadow-cljs release worker` ではない —— **`:worker` という build id は存在せず**、
+`no build with id` を「ビルドが壊れている」と誤読しやすい。これも実測で踏んだ。）
+
+### 3j. 面に出て初めて言えるようになったこと
+
+**預り品の形は 6 回反復し、7 本目だけが違う。** 面の側のテスト
+`the-coin-laundry-is-the-only-non-bailment-vertical-on-this-surface` が、
+預り品 6 本（衣類/家電/靴/カーペット/車/生き物）に返却 op が在り、
+コインランドリー 1 本に無いことを**同時に** assert する。repo 側の
+`this-is-not-the-bailment-shape` と合わせて 2 層で守っている。
+
+**カーペットは面の側でも分類の権威を主張しない。**
+`the-carpet-actor-cannot-promote-its-own-isic-reading` が
+`:actuation/declare-isic-class` の不在を宣言の側から固定する。
+
+**ペットケアは 9609 の否定に対する肯定側。**
+`pet-care-is-the-answer-to-the-denial-9609-carries` が、親 9609 に今もペットの
+op が無いことと、petcare にそれが全部あることを同時に assert する。
+
+### 3k. 4 本とも連携 0 本のまま
+
+親（4520 / 9609 / 9601）との間にも、兄弟どうしの間にも `:wiring` は書いていない。
+**親子であることも、形が似ていることも、繋がっている理由にならない。** 4 本とも
+テストで固定してある。
+
+---
+
+**（旧文、scaffold 直後の状態）** まだ os.edn に宣言していない。fork 可能である
+ことと共有面に載っていることは別の主張で、この repo は前者だけを主張する。
 
 ADR-2607203000 の規則（**いかなる entity も categorical に除外しない。今日数値を
 持たない entity は『カバレッジが未達』であって『対象外』ではない**）をここにも
