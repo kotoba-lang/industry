@@ -136,4 +136,38 @@ projection と見分けがつかない（ADR-2608044000 の「不完全な読み
 - **ラップトップの LEI catalog loop（`com.kotoba-lang.lei-catalog-tick`）は
   そのまま**。あれは連絡先発見（185 repo への Contents API 書き込み）で、
   1 repo の deploy key では足りない。**この ADR が移したのは GLEIF の取り込み
-  だけで、loop 全体ではない。**"}]
+  だけで、loop 全体ではない。**
+
+## 着地と、無人で 1 周回ったことの確認（2026-08-08）
+
+| 何が | どこに |
+|---|---|
+| ADR・tier ローダ・west 登録 2 件 | `com-junkawasaki/root` main `63213a48` |
+| projection の削除（重複解消） | `kotoba-lang/property` main `a1148081` |
+| 初回 projection（publish 20260807-0000） | `com-junkawasaki/org-gleif-projections` main `16fd9b4` |
+
+**cell は 2026-08-08 01:30 UTC（10:30 JST）に誰も見ていない状態で発火し、完走した。**
+これが本 ADR の主張（「ラップトップに置いた同じ仕事は保たなかった」）の唯一の
+実証であり、手で kickstart した 1 回目は実証ではない。
+
+- 当日の publish は `20260807-0000` ではなく **`20260807-1600`**（GLEIF は日に
+  複数回 publish する）。cell は publish id で冪等性を判断しているので、
+  「同じ日だから skip」ではなく**新しい publish だから取り込む**を正しく選んだ。
+- 3,397,167 社 / 483,866 edge。前日から +688 社 / +44 edge。
+- corpus 件数は publish の record_count と一致。closure は 18,930 → **107,803**。
+- 所要 32 分（download 2 分 + corpus 12 分 + projection 19 分）、exit 0、
+  `com-junkawasaki/org-gleif-projections` main `ca4528d3` へ push 済み。
+
+## 残っている gap
+
+**west pin が毎日ずれる。** cell は日次で `org-gleif-projections` に push するので、
+superproject の pin はその都度遅れる。遅れたまま `west update` すると、**ローカルの
+checkout が cell の最新 projection より前に戻る**（面が古い universe を見る）。
+今回は closing で手で `--entry org-gleif-projections` を進めた（`ca4528d3`）。
+
+これは「生成物 repo を west に載せた」ことの構造的な帰結で、選択肢は 3 つ:
+①pin 前進を fleet-ci の CD 段に足す ②この repo だけ pin を追わず常に main を
+見る（west の意味論から外れる）③projection の取得を west でなく別経路にする。
+**今日の運用は「pin が遅れていても、ローカル checkout を触らなければ面は新しい
+まま」**なので実害は west update のタイミングに限られるが、放置すると
+「`west update` したら company が減る」という気付きにくい形で出る。"}]
