@@ -83,7 +83,19 @@
  ;; each prefix and reports CONFORMANT or MISFILED. No status is stored here —
  ;; storing a derived value by hand is how the two drift apart.
  :domains
- {;; United States federal
+ {;; connector plane (ADR-2608094000). One connector, one repository, named
+  ;; from the authority's registrable domain. Gmail is recorded under
+  ;; google.com rather than gmail.com because the API's authority is
+  ;; developers.google.com — and because recording the same domain for Drive,
+  ;; Gmail and Calendar is what lets connector.consent group all three into one
+  ;; grant. graph.microsoft.com is a host under microsoft.com, so the
+  ;; registrable domain is what is recorded.
+  "kotoba-lang/com-google-calendar" "google.com"
+  "kotoba-lang/com-google-drive"    "google.com"
+  "kotoba-lang/com-google-gmail"    "google.com"
+  "kotoba-lang/com-microsoft-graph" "microsoft.com"
+
+  ;; United States federal
   "kotoba-lang/com-irs"            "irs.gov"
   "kotoba-lang/com-fda"            "fda.gov"
   "kotoba-lang/com-epa"            "epa.gov"

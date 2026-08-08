@@ -74,6 +74,29 @@ MURAKUMO_CLAUDE_TOKEN=$(kagi get MURAKUMO_CRITIC_TOKEN) \
 （ADR-0060 が明記）。劣化したまま「vision で評価した」と報告しない。取れないなら
 その反復では visual は m6 gate だけにして、劣化した旨を残す。
 
+### 2.5 「実際に遊ばせる」なら既存の autoplay を先に見る
+
+`kotoba-lang/loop-game-autoplay` は **実ゲームをプレイする policy を進化させ、
+champion を実機 iPhone Simulator で検証してフレームを記録する** loop である。
+ゲームは改変せず、出荷済みページに driver を注入し、ゲームが既に持っている状態を読み、
+ゲームが既に polling している key map を書く。
+
+```bash
+nbb --classpath src:../shinka/src -m loop-game-autoplay.train \
+    --game <path-or-url> --generations 12 --population 24 --episode-ms 60000 --seeds 3
+nbb --classpath src:../shinka/src:../hinshitsu/src -m loop-game-autoplay.qualify \
+    --champion target/run-champion.edn --seed 1
+```
+
+この skill の gate は **20〜240 tick の決定的な短い窓**で「動くか / 相手が居るか」を訊く。
+autoplay は **60 秒級のエピソードを何世代も回して「遊べるか」**を訊く。役割が違うので
+どちらも要るが、**後者を新しく書かないこと。**
+
+この項は 2026-08-08 の追記である。初版はこの repo の存在を確認せずに書かれた ——
+「無いと結論する前に検索する」を skill の著者自身が守れていなかった。
+`nbb scripts/repo-search.cljs <語>` は 4,140 repo を引く。**手元に無いことは存在しない
+ことではない。**
+
 ### 3. 欠陥を 1 件選んで直す
 
 優先順（上ほど先）:
