@@ -1,4 +1,39 @@
-(ns scripts.west-pin-guard-policy)
+(ns scripts.west-pin-guard-policy
+  (:require [clojure.string :as str]))
+
+(defn- push-tail
+  "The arguments of the `git push`, up to the next shell separator.
+
+  Everything this predicate looks for is an ARGUMENT of the push, so anything
+  before `push` or after `&&` must not be able to trigger it."
+  [cmd]
+  (some-> (re-find #"git\s+(?:-C\s+\S+\s+)?push\b([\s\S]*)$" cmd)
+          second
+          (str/split #"&&|;|\|")
+          first))
+
+(defn deletion-push?
+  "True when this `git push` only DELETES refs, so it carries no content.
+
+  A deletion has nothing to verify — there is no candidate `west.yml` in it —
+  but the guard used to run the ordinary HEAD-vs-origin/main comparison anyway,
+  against whatever the current checkout happened to be. Measured 2026-08-08:
+  deleting a merged feature branch from a checkout that was behind `origin/main`
+  reported SEVEN pins as regressions and denied the deletion. None of them had
+  anything to do with the command; the checkout was simply stale.
+
+  Two spellings, both of which mean deletion:
+  - the `--delete` / `-d` flag
+  - a refspec with an empty SOURCE side, `:branch` or `:refs/heads/branch`
+
+  A colon INSIDE a refspec (`HEAD:main`, `src:dst`) is an ordinary push and has
+  no whitespace before the colon, so it does not match."
+  [cmd]
+  (if-let [tail (push-tail cmd)]
+    (boolean (or (re-find #"(?:^|\s)--delete(?:\s|=|$)" tail)
+                 (re-find #"(?:^|\s)-d(?:\s|$)" tail)
+                 (re-find #"\s:[^\s:]+" tail)))
+    false))
 
 (defn requires-verification?
   "Only a superproject push that changes manifest/west.yml needs pin
