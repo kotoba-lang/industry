@@ -85,7 +85,7 @@
     App team (Slack): 'We found bug in session cache lock. Fix ready, deploy in 12 min.'
     Owner: '[OVERRIDE] Delaying rollback 15 min. App team: deploy fix. Monitoring: watch p99 post-deploy. If not recovered by 14:15 → automatic rollback executes.'
     (12 min later) App team: 'Fix deployed. Restarting nodes.'
-    (2 min later) Monitoring-lead: 'p99 recovered to 96ms. Fix successful. Override rescinded. Proceeding with Stage 2 ramp.'"
+    (2 min later) Monitoring-lead: 'p99 recovered to 96ms. Fix successful. Override rescinded. Proceeding with Stage 2 ramp.'"}
 
   :decision-tree/scenario-3-false-alert-investigation
   {:scenario "Alert fires: 5xx rate = 1.5% (auto-trigger threshold)"
@@ -101,7 +101,7 @@
    :learning "This is why fire-drill includes false positive scenarios. Alerts may need tuning based on canary experience."
 
    :key-insight "Manual override does NOT apply to automatic triggers that have already fired.
-                 Manual decision is for **preventing** automatic trigger fire, not **undoing** it."
+                 Manual decision is for **preventing** automatic trigger fire, not **undoing** it."}
 
   :decision-tree/scenario-4-business-priority-override
   {:scenario "Latency p99 = 98ms (below trigger), but business priority: 'Must reach 100% traffic for marketing launch'"
@@ -126,7 +126,7 @@
       :action "Owner communicates to business: 'We must complete Stage 2 validation. Cannot accelerate without SLO risk.'"
       :timeline "Proceed with normal timeline (4h per stage)"}]
 
-   :principle "Business priority influences **when** to proceed (decision velocity), never **whether** to override technical constraints."
+   :principle "Business priority influences **when** to proceed (decision velocity), never **whether** to override technical constraints."}
 
   :decision-tree/scenario-5-team-readiness-gap
   {:scenario "Stage 2 SLOs are green, but on-call engineer was unavailable overnight. Team confidence is low."
@@ -148,7 +148,7 @@
        "Allow on-call engineer to rest and return confident"
        "Escalation-lead logs: '[STAGE HOLD] Team readiness: deferred Stage 3 cutover 2 hours. No technical SLO issue. Proceeding when team ready.'"]}]
 
-   :principle "Manual decisions can defer **based on team confidence**, not just technical SLOs. Fatigue-driven errors are production risk."
+   :principle "Manual decisions can defer **based on team confidence**, not just technical SLOs. Fatigue-driven errors are production risk."}
 
   :decision-tree/scenario-6-unresolvable-issue
   {:scenario "Memory leak detected in cljc code. Automatic rollback triggered (heap > 512MB). App team says: 'Root cause unknown. Cannot fix in < 1 hour.'"
@@ -173,7 +173,7 @@
        "Escalation-lead logs: '[RETURN TO PHASE 2] Memory leak unresolved. Investigation: 1 week. Retry canary: 2026-09-18.'"]
       :timeline "1 week investigation + re-validation"}]
 
-   :principle "If unresolvable issue → better to pause than to loop. Incident + retry cycles waste time and risk production stability."
+   :principle "If unresolvable issue → better to pause than to loop. Incident + retry cycles waste time and risk production stability."}
 
   :decision-tree/escalation-path
   {:stage-1-concern

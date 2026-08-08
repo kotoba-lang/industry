@@ -650,7 +650,6 @@
   ;; is a hard failure rather than a note: the list has to be pruned when a file
   ;; is repaired, in the same commit.
   ["90-docs/deployment/MONTH-3-GRACEFUL-RUST-DRAIN.edn"
-   "90-docs/deployment/MONTH-3-MANUAL-ROLLBACK-DECISION-TREE.edn"
    "90-docs/migration/M5-M6-checkpoint-procedures.edn"])
 
 (defn verify!
