@@ -481,4 +481,30 @@
   ;; 「0対0で一致」と報告しない）、無改変で exit 0。
   {:name "shell" :id "shell-native-bridge-parity" :gate :nbb-script
    :script "gates/shell-native-bridge-parity.cljs"
-   :include-ext [".clj" ".swift" ".java"] :min-files 5 :cd true}]}
+   :include-ext [".clj" ".swift" ".java"] :min-files 5 :cd true}
+
+  ;; kotobase-peer の Merkle block size class が、client 封緘の padding bucket に
+  ;; 実際に載るかを検査する（ADR-2608070400 D6）。
+  ;;
+  ;; 2 つの定数は別 repo・別 owner が別の理由で決めている: size class は sync 粒度
+  ;; （kotobase-peer）、bucket は長さ秘匿（kotoba-lang/pqh の ISO/IEC 7816-4）。
+  ;; **両者の整合を見るものが無かった。** 実測 2026-08-07 で 4 class すべてが
+  ;; 病的だった —— class が 2 冪の上にちょうど乗ると、pick-bucket が要求する
+  ;; len+1+16 が 17 バイト超過して次の bucket へ落ちる:
+  ;;   16384 -> 65536 (+300%) / 32768 -> 65536 (+100%) / 65536, 131072 -> bucket 無し
+  ;; 両 repo を直して（pqh 86c453f = 階段を 7 段へ、kotobase-peer 587e3f9 =
+  ;; class を 17 下げる）今は 0.0-0.1%。
+  ;;
+  ;; **bucket 階段を :script-args に置くのは意図的。** 正本は pqh 側だが、この
+  ;; gate は kotobase-peer の tree に対して走るので別 repo の定数を tree から
+  ;; 読めない。script に埋めると pqh が動いたときに誰も気づかないので、値を
+  ;; review 対象として gates.edn に置く（pqh 側の変更が diff に出る）。
+  ;;
+  ;; 落ちることを実測済み（2026-08-07）: 修正前の実 tree で exit 1（4/4 を名指し）、
+  ;; bucket 直下に揃えた tree で exit 0、size-classes 定数が読めない tree で
+  ;; exit 1（読めなかったことを pass にしない）。
+  {:name "kotobase-peer" :id "kotobase-peer-block-sizing-pad" :gate :nbb-script
+   :script "gates/block-sizing-pad-alignment-check.cljs"
+   :script-args ["--buckets" "1024,4096,16384,32768,65536,131072,262144"
+                 "--max-overhead" "25"]
+   :include-ext [".cljc"] :min-files 20 :cd false}]}
