@@ -128,4 +128,13 @@
 
 **分類の機械可読出力**: `nbb scripts/diagnose-unreadable-edn.cljs --edn <壊れたファイル> <正常なファイル>` → `[{:status :needs-reconstruction :reason \"Map literal contains duplicate keys: …\"} {:status :already-readable}]`。
 
-**この ADR が検証していないこと**: モデルを実際に起こした 1 反復。loop を install した後の初回で確かめる。また、どの生成器がこれらの文書を壊したかは特定できていない —— 7 件は `90-docs/deployment` `gates` `migration` に散っており、共通の生成器が居るのか、同じ手癖の別々の生成なのかは分かっていない。"}]
+### install と launchd 経由の実起動（2026-08-08 追記）
+
+- `~/Library/LaunchAgents/com.gftd.docs-edn-repair.plist` に配置し `launchctl bootstrap` 済み。`launchctl list` に出る。
+- **auth を先に潰した。** 姉妹 loop の plist が「HOME/USER/LOGNAME が無いと `Not logged in` になり、失敗が『静かに毎周 :failed』という形になる」と警告しているので、plist と同じ env（`env -i` + PATH/HOME/USER/LOGNAME/SHELL）で `claude -p` を叩いて `AUTH_OK` を確認した。
+- `launchctl kickstart` で launchd 経由の実起動を確認。stdout log に tick の出力（7 候補）が出て、`claude -p /docs-edn-repair --allow-dangerously-skip-permissions` が実プロセスとして起動した。**shell から回すのと launchd から回すのは env と cwd が違う**ので、ここは別に確かめる必要があった。
+
+**この ADR が検証していないこと（更新）**:
+
+- **1 反復の結果。** 初回反復は 2026-08-08T07:26 頃に起動し、closing 時点でまだ走っている。直ったかどうかは**次周の tick が測る**（この loop の設計どおり、自己申告の green を信用しない）。確認は `nbb --classpath \".:scripts/nbb_compat\" scripts/docs-edn-repair-tick.cljs` の `読めない N` が 7 → 6 になるか。
+- **どの生成器がこれらの文書を壊したか。** 7 件は `90-docs/deployment` `gates` `migration` に散っており、共通の生成器が居るのか、同じ手癖の別々の生成なのかは分かっていない。loop はこれを直さない —— 破損した文書を拾うだけで、破損源は残る。"}]
