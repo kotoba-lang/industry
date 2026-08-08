@@ -1,0 +1,173 @@
+[{:db/id -1
+  :adr/id "2608095000"
+  :adr/doc_type "adr"
+  :adr/topic "cloud-itonami-app-first-run-and-assistant-import"
+  :adr/title "cloud-itonami-app の初期起動は 5 段の first run にし、Passkey ceremony をその 3 段目に置く — ChatGPT/Claude Code/Codex からの import は「不活性なデータは着地させ、権限は着地させない」"
+  :adr/status :accepted
+  :adr/date "2026-08-08"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["cloud-itonami-app の初期起動 / 利用登録の画面構成（welcome → role → passkey → import → starter）"
+   "first run の段の順序が装飾ではなく権限境界であること（gate の前後で server が要求する認証が変わる）"
+   "他アシスタント（Claude Code / Codex CLI / ChatGPT）からの import で何を取り込み何を取り込まないか"
+   "import における credential の伏せ字化と、MCP server を無効状態で控える規約"
+   "読めない取り込み元を「0 件」ではなく理由付きで示す規約"]
+  :adr/supersedes []
+  :adr/related ["2608080100" "2607122200" "2607132300" "2608040100"]
+  :adr/repos ["com-junkawasaki/root" "cloud-itonami/cloud-itonami-app"]
+  :adr/body
+  "## Context
+
+`cloud-itonami-app` の新規インストールは Settings 画面で開き、nav は全項目が
+disabled、赤い注記で「Passkey 登録が必須です」と出ていた。どれも事実だが、
+それが第一印象の全部だった —— アプリが自分について最初に言うことが
+「ロックされている」で、二番目が入力フォームだった。
+
+参照として示されたのは ChatGPT デスクトップの first run（中央 1 カラム、挨拶、
+一度に一つの質問、starter card の列、primary button が一つ）と、その import 画面
+（他アシスタントの ツールと設定 / プロジェクト / チャットセッション を 3 つの
+チェックボックスと インポート ボタン一つで出す）。
+
+**形は正しい。そのまま写すのは正しくない** —— import が実際に何を読むかを見ると
+二つの理由が出てくる。
+
+## Decision
+
+### 1. first run は 5 段、Passkey ceremony はその 3 段目
+
+```
+welcome  →  role  →  passkey  →  import  →  starter
+╰── 権限不要 ──╯       │       ╰── session 必須 ──╯
+                       ╰── the gate
+```
+
+素直な並べ替え（welcome 画面 → 既存の gate）は first run を 2 つ作る ——
+迎える方と拒む方 —— しかも利用者は**迎えられた後に拒まれる**。ceremony を列に
+畳み込めば first run は一つで、ロックはその中の一段になる。
+
+**この分割は表示上のものではない。** `role` は短い enum を書くだけなので未認証で
+serve できる。`import` は `~/.claude` を読み `state.edn` に書くので実権限であり、
+だから gate の後に置く。ChatGPT 型のフローは import を先に置く（そこが気前の
+良い段だから）が、ここでそれをやると**このアプリの持ち主だと証明していない
+呼び出し元のために、別アプリの設定を読む**ことになる。
+
+`onboarding/before-gate?` がその分割の唯一の記述で、server は書き込みを serve
+する前に、client は button を出す前にそれを引く。`onboarding-test` は gate より
+上の段が `:local` を超える権限を宣言していないことを assert するので、
+ディスクを触る段が上に動かされたら**security model が黙って変わるのではなく
+suite が落ちる**。
+
+### 2. 不活性なデータは着地させ、権限は着地させない
+
+`~/.claude/settings.json` と `~/.codex/config.toml` にあるのは設定だけではない。
+`ANTHROPIC_API_KEY`、設定済み MCP server 全部の `env` block、そして別の
+アシスタントが起動を許されている実行ファイルの一覧が入っている。
+「ツールと設定」を一押しで import するのは、**インポート としか書かれていない
+ボタンで、無人のまま credential store と実行面をコピーする**ことになる。
+
+| 素材 | 行き先 | 理由 |
+|---|---|---|
+| chat transcript | 実際の `:sessions` | ただのテキスト。利用者が見たいと言ったもの |
+| project directory | candidate | project を作ると git repository ができる |
+| instructions | 添付、非活性 | standing orders は権限 |
+| MCP server | proposal、無効、伏せ字 | command line は権限 |
+
+credential 形の値は store に到達しない。`redact` は永続化の**前**に走り、
+key 名（`key|token|secret|password|…`）と値の形（`sk-…` / `ghp_…` / JWT）の
+両方で判定するので、`MY_THING` という名前の env entry も捕まる。テストは
+fixture の秘密が**scan 結果の serialise 全体**に現れないことを assert する ——
+期待するフィールドだけを見ても意味がなく、**問題になるのは誰も考えなかった
+フィールド経由の漏洩**だから。
+
+伏せ字は silent ではなく visible にする（値は `[redacted]`、MCP 行は
+`:env-keys` を保持）—— 利用者はその変数が在ったことを知らないと、繋ぎ直すか
+どうかを判断できない。
+
+### 3. 読めない取り込み元は理由を言う
+
+ChatGPT デスクトップがこれを強制した。**その履歴はディスクに無い** —— macOS
+アプリは `~/Library/Containers/com.openai.chat/` に sandbox され、会話は OpenAI
+のサーバ側にある。ここに「チャットセッション」のチェックボックスを出すのは
+**動きようのないものを提示する**ことで、インポート を押した後にそれを知るのは
+最初から言われるより悪い。
+
+だから `:available? false` と理由を返し、行は grey で count の代わりに理由を出す。
+`:server-side` と `:not-found` は別の答えにする —— 「入っているが読めない」と
+「入っていない」は利用者を別の場所へ送るから。ChatGPT 履歴の対応経路は
+data export で、それは実際に読む。
+
+これは `route-scan` が `missing` と `unresolvable` の間に引いている線、
+readiness matrix が 不可 と わからない の間に引いている線と同じ。
+**0 と 不在 はチェックボックス上で見分けがつかず、測定値なのは片方だけ。**
+
+### 4. ボタンの数字は測定値
+
+`scan` は木を歩いて見つけたものを報告し、UI はその数字を出す。推定も定数も無い。
+scanner は全て root を引数で取るので suite は fixture を指せる ——
+`$HOME` は ambient input で、それを読む関数は動いているマシンでしか test できない。
+環境を見るのは `default-roots` だけ。
+
+`apply!` はデータではなく id を取ってディスクから読み直すので、
+**取り込まれるものが client の作り話になりえない**。session は
+`import:<source-id>` で keying するので二度目は複製ではなく置換になる ——
+インポート を押して接続が切れた人が期待するのはそれ。
+
+この namespace は socket を開かない。import はローカルの read とローカルの
+write で、それは平文で言えることに価値がある性質。
+
+## Consequences
+
+- `handler` の reify method は既に JVM の 64 KB per-method 上限まで数百バイトしか
+  無かった（`project-route?` 自身がそう書いている）。routes を inline に足すと
+  **namespace 全体がコンパイルを拒否される**ので、`onboarding-route!` に置き、
+  既存の単一 delegation clause（`delegated-route?` / `handle-delegated!` に拡張）
+  経由で `handler` に届ける。`handler` の bytecode は増えていない。同じ上限が
+  理由で、sub-handler は自分の validation error を自分で答える —— `handler` の
+  inline error map は reify method の中にあり、**そこに 2 行足しただけで
+  build が壊れた**（実測）。
+- `route-scan` はこのファイルをテキストで読むので、新しい routes は
+  `resources/cloud-itonami-app.commands.edn` に現れ CLI がそのまま得る
+  （再生成: 249 routes から 180 commands）。
+- instructions と MCP server は非活性で着地するので、**import したことは
+  まだ使えることを意味しない**。proposal の採用は別の明示的な操作で、ここでは
+  実装していない。意図的な線引き —— import 画面の仕事は素材を境界の向こうへ
+  運ぶことで、権限を与える判断はそれだけを決める画面に属する。
+- overlay は `/api/onboarding` が答えてから現れるので、新規インストールは
+  loopback 1 往復ぶん先に workspace を見る。代案（overlay を既定で表示）は
+  既存の全インストールで毎回それを一瞬見せることになり、そちらが悪い取引。
+
+## Alternatives considered
+
+**import を Passkey 段より前に置く。** 参照フローに一致し、より気前が良い。
+却下 —— 未認証の呼び出し元のために別アプリの設定を読むことになり、しかも
+loopback port はこのマシンの全プロセスから届く。
+
+**MCP server を env ごと有効で import する。** 摩擦が無く、機能として完成して
+見える。却下 —— チェックボックス経由の任意コード実行と credential 移送。
+
+**読めない取り込み元を隠す。** 見た目は整う。却下 —— 利用者は
+「探したが無かった」と「探していない」を区別できず、無いチェックボックスを
+探しに行く。
+
+**first run を別 HTML 文書にする。** ADR-2608080100 が却下している
+（1 文書・1 バンドル・1 mount）。overlay は同一ページ内で `.workspace` の兄弟。
+
+## Verification
+
+このセッションで実測したもの:
+
+- clj-kondo: errors 0 / warnings 10（upstream の baseline と同一）
+- `core-test` + `commands-test` + 新規 2 suite: 65 tests / 397 assertions /
+  0 errors。唯一の failure（`core-test` の `workspace-adapters-…`）は
+  **無改変の upstream tree でもこのコンテナで同一に再現**する charset 由来の
+  環境要因で、この変更とは無関係であることを確認済み。
+- `dev/gen_commands.cljs --check`: commands.edn は current。
+- `node --check` で interaction.js の syntax。
+- app-css が jp-go-dds に存在しない token を参照していないこと（`core-test` の
+  該当 assertion を単体で実行して missing 0 を確認）。
+
+**このコンテナで検証できていないもの（正直に）**: full suite は動かない ——
+`kotoba-lang/org-ietf-pop3` が private で clone できず、`mail-projects-test` は
+不在の外部バイナリを exec する。`mail-pop3` はローカル stub に対して compile
+したので、その test はここでは無意味であり実行していない。ブラウザでの
+first run の実挙動（WebAuthn ceremony を含む）も未実測 —— macOS の実機が要る。"}]
