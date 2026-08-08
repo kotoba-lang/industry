@@ -1234,7 +1234,27 @@
    ;; ⚠ `:corpus/tier :excluded` は hazard 検出による除外で、**hazard 検査は既知の形
    ;; だけを弾く構造検査**。合格は秘密の不在を証明しない（公開先を広げる判断の
    ;; 根拠にしない）。
-   ["training-corpus" (io/file root "90-docs" "corpus" "corpus.datoms.edn")]])
+   ["training-corpus" (io/file root "90-docs" "corpus" "corpus.datoms.edn")]
+   ;; observatory — 領域別 observatory を**実際に起動した**結果（生成物。
+   ;; ADR-2608081200。`scripts/observatory-run.cljs`、登録簿は
+   ;; `manifest/observatories.edn`）。2 種類の entity:
+   ;;   actor 1 件ごとの行（`:observatory/name`、`:observatory/expect` と
+   ;;     `:observatory/observed`、exit code、出力 bytes の差分、chain 検証）
+   ;;   `:observatory/coverage true` 1 件（登録数・実行数・下振れ数・未測定数）
+   ;;
+   ;; join: `:observatory/repo` → repo-taxonomy / itonami-maturity の `:repo/path`（同形）。
+   ;;
+   ;; **他の dataset と性質が違う。** ほかは actor が産んだ *データ* の射影だが、
+   ;; ここは actor が *動いたかどうか* の観測。「収集層が生きているか」を
+   ;; query 面から引けるようにするために在る。
+   ;;
+   ;; ⚠ `:observatory/observed :runs-empty` は **exit 0 だが 0 件**。成功ではない
+   ;;    （`:observatory/blocked-by` に理由がある）。exit code だけで数えないこと。
+   ;; ⚠ `:observatory/output-gitignored true` の actor は、出力が各 repo の
+   ;;    .gitignore に入っている charter 上のローカル台帳で、**走らせたマシンにしか
+   ;;    存在しない**。ここに載っているのは観測サマリであって中身ではない。
+   ;; ⚠ `:coverage/unmeasured` は「対象外」ではなく「まだ測っていない」。
+   ["observatory" (io/file root "90-docs" "observatory" "observatory.datoms.edn")]])
 
 (defn index-entities [next-tempid!]
   (let [skipped (atom [])

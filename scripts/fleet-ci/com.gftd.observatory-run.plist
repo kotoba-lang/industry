@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  com.gftd.observatory-run.plist — 領域別 observatory の日次 heartbeat（ADR-2608081200）。
+
+  なぜ launchd か: この workspace の定期実行は既に launchd に寄っている
+  （com.gftd.fleet-ci-tip-tick / com.gftd.fleet-ci-sweep / com.gftd.newsfeed-ingest）。
+  別の scheduler を持ち込むと「どこで何が回っているか」が 2 箇所に割れる。
+
+  なぜ operator マシンで回すか（fleet ノードでなく）: newsfeed-ingest と同じ理由。
+  fleet-ci の不変条件は「ノードにはテストだけを配り、秘密情報を配らない」。
+  observatory は west checkout 一式（sibling の :local/root 依存を含む）と、
+  将来的には live ingest の credential を要るので operator 側に置く。
+
+  なぜ 1 日 1 回か: 現状 3 actor が append-only の datom log を伸ばすだけで、
+  seed が動かない限り毎 cycle の内容は同じ。回数を増やしても台帳が太るだけで
+  新しい観測は出ない。live ingest を有効にした actor が増えたら頻度を見直す。
+
+  6:11 は fleet-ci-sweep (4:17) と newsfeed-ingest (5:23) の後ろにずらしてある
+  —— 同時刻に走らせるとどちらの負荷か切り分けられない。
+
+  ⚠ **live ingest はここでは走らない。** kouhou の :live-alias は
+  `--live kouhou` を明示したときだけ起動する。外向きの fetch/publish を
+  無人の日次 run に黙って混ぜない（混ぜるなら別 plist にして、その旨を書く）。
+
+  前提: clojure CLI（各 actor の deps.edn 解決）と nbb が PATH に居ること。
+        west checkout が materialize されていること —— sibling の
+        :local/root 依存（langgraph / ie-flow / …）が無いと actor は起動しない。
+
+  導入:
+    cp scripts/fleet-ci/com.gftd.observatory-run.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.observatory-run.plist
+    launchctl kickstart -p gui/$(id -u)/com.gftd.observatory-run   ; 1 回だけ試す
+  停止:
+    launchctl bootout gui/$(id -u)/com.gftd.observatory-run
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.gftd.observatory-run</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <!-- 実体は scripts/observatory-run.cljs。plist にロジックを書かない
+         （launchctl は編集のたびに bootout/bootstrap が要り、直せなくなる）。
+         cwd が superproject root である必要がある — 入力パスを
+         git rev-parse --show-toplevel から解決しているため。 -->
+    <string>cd /Users/junkawasaki/github/com-junkawasaki &amp;&amp; exec /opt/homebrew/bin/nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>6</integer>
+    <key>Minute</key><integer>11</integer>
+  </dict>
+
+  <!-- bootstrap 直後に走らせない。意図しない一斉実行を避ける（fleet-ci と同じ）。 -->
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/observatory-run.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/observatory-run.err</string>
+</dict>
+</plist>
