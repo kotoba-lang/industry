@@ -1,0 +1,11 @@
+{:status :answered
+ :at "2026-08-08"
+ :issue-id "kaizen:shinshi.club:transitions-not-measured:2026-08-02_2026-08-08"
+ :question "beacon が動いていないのか、誰も遷移していないのか"
+ :answer :nobody-navigated
+ :method "本番の shinshi.club を実ブラウザで開き、home → /video → /actresses と 2 回 SPA 遷移した"
+ :evidence {:synthetic-beacon "POST /_track {t:nav} → 204、route_transition_daily が 0→1（worker→D1 経路は生きている）"
+            :browser-navigation "video→actresses が 1 行。合成では送っていない辺なので、client 側も生きている"}
+ :conclusion "書き込み側も client 側も動作する。行が 0 だったのは、実訪問者が 1 面だけ見て帰っているため。計測の欠陥ではなく回遊の事実"
+ :cleanup "検証で作った行のうち確実に自分のものだけ削除（transitions 全 2 行 — 表は検証前 0 だった / dwell の video 30_59 — 合成 beacon と完全一致）。他の dwell 行は断定できないので残した"
+ :note "issue の close は cockpit の人の操作。narrow ingress key は提案しか作れない（設計どおり）"}
