@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmile version="1.0" xmlns="http://docs.oasis-open.org/xmile/ns/XMILE/v1.0">
+  <header>
+    <vendor>kotoba-lang/org-oasis-open-xmile</vendor>
+    <product version="1.0">observatory-cadence</product>
+    <name>Observatory cadence — staleness / adaptive estimate / fleet capacity</name>
+  </header>
+  <sim_specs method="rk4" time_units="day">
+    <start>0</start>
+    <stop>60</stop>
+    <dt>0.00706</dt>
+  </sim_specs>
+  <model name="staleness_tradeoff">
+    <sim_specs method="rk4" time_units="day">
+      <start>0</start>
+      <stop>60</stop>
+      <dt>0.00706</dt>
+    </sim_specs>
+    <variables>
+      <aux name="total_cost">
+        <eqn>staleness_cost + run_cost</eqn>
+      </aux>
+      <stock name="Unobserved_Change">
+        <eqn>0</eqn>
+        <inflow>world_change</inflow>
+        <outflow>capture</outflow>
+      </stock>
+      <aux name="staleness_cost">
+        <eqn>importance * Unobserved_Change</eqn>
+      </aux>
+      <aux name="interval_days">
+        <eqn>0.07056321043338849</eqn>
+      </aux>
+      <aux name="run_cost">
+        <eqn>run_cost_seconds / interval_days</eqn>
+      </aux>
+      <flow name="world_change">
+        <eqn>lambda</eqn>
+      </flow>
+      <aux name="run_cost_seconds">
+        <eqn>1.195</eqn>
+      </aux>
+      <flow name="capture">
+        <eqn>Unobserved_Change / interval_days</eqn>
+      </flow>
+      <aux name="lambda">
+        <eqn>24</eqn>
+      </aux>
+      <aux name="importance">
+        <eqn>20</eqn>
+      </aux>
+    </variables>
+  </model>
+  <model name="adaptive_cadence">
+    <sim_specs method="rk4" time_units="day">
+      <start>0</start>
+      <stop>120</stop>
+      <dt>0.25</dt>
+    </sim_specs>
+    <variables>
+      <flow name="forget">
+        <eqn>gain * Lambda_Hat</eqn>
+      </flow>
+      <flow name="learn">
+        <eqn>gain * true_lambda</eqn>
+      </flow>
+      <aux name="tracking_error">
+        <eqn>ABS(Lambda_Hat - true_lambda) / true_lambda</eqn>
+      </aux>
+      <aux name="interval_days">
+        <eqn>SQRT(2 * run_cost_seconds / (importance * MAX(Lambda_Hat, 0.001)))</eqn>
+      </aux>
+      <aux name="run_cost_seconds">
+        <eqn>1.195</eqn>
+      </aux>
+      <aux name="true_lambda">
+        <eqn>1 + 9 * STEP(1, 30)</eqn>
+      </aux>
+      <stock name="Lambda_Hat">
+        <eqn>1</eqn>
+        <inflow>learn</inflow>
+        <outflow>forget</outflow>
+      </stock>
+      <aux name="importance">
+        <eqn>20</eqn>
+      </aux>
+      <aux name="gain">
+        <eqn>0.1</eqn>
+      </aux>
+    </variables>
+  </model>
+  <model name="fleet_capacity">
+    <sim_specs method="rk4" time_units="day">
+      <start>0</start>
+      <stop>30</stop>
+      <dt>0.25</dt>
+    </sim_specs>
+    <variables>
+      <aux name="demand_sec_per_day">
+        <eqn>286.9632862813441</eqn>
+      </aux>
+      <aux name="capacity_sec_per_day">
+        <eqn>300</eqn>
+      </aux>
+      <stock name="Backlog_sec">
+        <eqn>0</eqn>
+        <inflow>arrivals</inflow>
+        <outflow>service</outflow>
+      </stock>
+      <flow name="arrivals">
+        <eqn>demand_sec_per_day</eqn>
+      </flow>
+      <flow name="service">
+        <eqn>MIN(capacity_sec_per_day, demand_sec_per_day + Backlog_sec)</eqn>
+      </flow>
+      <aux name="utilization">
+        <eqn>demand_sec_per_day / capacity_sec_per_day</eqn>
+      </aux>
+    </variables>
+  </model>
+</xmile>

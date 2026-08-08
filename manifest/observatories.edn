@@ -95,6 +95,11 @@
  [;; ── 走って datom を産む（実測で確認済み）────────────────────────────────
   {:name "watari" :org "cloud-itonami"
    :domain "船舶 AIS + 航空 ADS-B の実位置（sea-lane / chokepoint 集中）"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 24.0          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "AIS/ADS-B は連続的に動く。chokepoint 集中が意味的に変わるのは時間オーダーという判断。**下界は実測**（観測した全 run で +498 datoms 追記された = λ ≥ 1/run-gap）"
+   :importance 20           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :main "watari.methods.autorun"
    :args ["--cycles" "1" "--log" "${REPO}/data/watari.datoms.kotoba.edn"]
    :produces "data/watari.datoms.kotoba.edn"
@@ -104,6 +109,11 @@
 
   {:name "sukashi" :org "cloud-itonami"
    :domain "広告サプライチェーン + 配信インフラ + 不正ネットワーク"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 2.0          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "ads.txt / sellers.json は日次オーダーで更新されるという判断。未実測"
+   :importance 20           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :main "sukashi.methods.autorun"
    :args []
    :produces "data/sukashi.datoms.kotoba.edn"
@@ -113,6 +123,11 @@
 
   {:name "meyasu" :org "cloud-itonami"
    :domain "価格スプレッド + 供給レジリエンスの統合（kakaku × mitooshi）"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 4.0          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "kakaku × mitooshi の合成なので上流のうち速い方に従うという判断。未実測"
+   :importance 20           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :main "meyasu.methods.autorun"
    ;; --log を明示しないと cwd 相対で `meyasu/data/…` という入れ子を掘る（実測）。
    :args ["--cycles" "1" "--log" "${REPO}/data/meyasu.datoms.kotoba.edn"]
@@ -127,6 +142,11 @@
   ;; exit 0）。watari 系と混ぜて登録しないこと —— 混ぜると片方が必ず嘘になる。
   {:name "com-etzhayyim-inochi" :org "etzhayyim"
    :domain "生物圏（種・生息域・生態系サービス）"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 0.02          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "生物圏の種・生息域。四半期オーダーという判断。**上界は実測**（5 回連続で追記せず）だが露出が数分なので弱い"
+   :importance 5           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :main "inochi.methods.autorun"
    :args []
    :produces "data/persisted/inochi.biosphere.kotoba.edn"
@@ -137,6 +157,11 @@
 
   {:name "com-etzhayyim-rasen" :org "etzhayyim"
    :domain "遺伝（ゲノム・変異・形質）"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 0.03          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "ClinVar / gnomAD は月次リリース。同上、上界は実測だが弱い"
+   :importance 5           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :main "rasen.methods.autorun"
    :args []
    :produces "data/persisted/rasen.genome.kotoba.edn"
@@ -147,6 +172,11 @@
 
   {:name "com-etzhayyim-busshi" :org "etzhayyim"
    :domain "商品・原材料（コモディティと供給クラス）"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 2.0          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "コモディティ価格は日次という判断。上界は実測だが弱い"
+   :importance 10           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :main "busshi.methods.autorun"
    ;; -main は seed を第 1 引数、log を第 2 引数で受ける。既定の log path だけが
    ;; `*file*` 相対で NPE になるので、**両方**明示する（片方だけでは足りない）。
@@ -165,6 +195,11 @@
   ;; ── 引数を明示すれば走る（既定のパス解決が *file* 相対で壊れている）──────
   {:name "shionome" :org "cloud-itonami"
    :domain "資産クラス横断の資本フロー（潮目）"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 2.0          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "市場は営業日ごとに動くという判断。未実測"
+   :importance 10           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :main "shionome.methods.analyze"
    :args ["${REPO}/data/seed-capital-flow-graph.kotoba.edn" "--out" "${REPO}/out"]
    :produces "out"
@@ -174,6 +209,11 @@
 
   {:name "mitooshi" :org "cloud-itonami"
    :domain "確率予測（proper scoring / reliability）"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 1.0          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "予測の更新は日次オーダーという判断。未実測"
+   :importance 10           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :main "mitooshi.methods.analyze"
    :args ["${REPO}/data/seed-forecast-graph.kotoba.edn" "--out" "${REPO}/out"]
    :produces "out"
@@ -183,6 +223,11 @@
 
   {:name "com-etzhayyim-masago" :org "etzhayyim"
    :domain "材料科学（結晶構造・物性・発見優先度）"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 0.03          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "結晶構造・物性の KG。月オーダーでしか変わらないという判断。未実測"
+   :importance 5           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :main "masago.methods.analyze"
    ;; **deps.edn が無い**（bb.edn だけ）。外部依存がゼロなので素の
    ;; `clojure -M -m` で通る —— tadori / kaname のような bb 退役の巻き添えには
@@ -201,6 +246,11 @@
   ;; ── 走るが、ディスクに書かないのが正常 ────────────────────────────────
   {:name "kouhou" :org "cloud-itonami"
    :domain "公共・公益情報のキュレーションと配信"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 4.0          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "官公庁の press は 1 日数回という判断。未実測"
+   :importance 10           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :aliases ["dev" "run"] :main nil
    :args []
    :produces nil
@@ -214,6 +264,11 @@
 
   {:name "tashikame" :org "cloud-itonami"
    :domain "ファクトチェック判定の発行"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 1.0          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "ファクトチェック判定の発行は日次オーダーという判断。未実測"
+   :importance 10           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :aliases ["dev" "run"] :main nil
    :args []
    :produces nil
@@ -222,6 +277,11 @@
 
   {:name "com-etzhayyim-mikurabe" :org "etzhayyim"
    :domain "言説比較（同一事象に対する報じ方の差）"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 24.0          ; λ [1/day]
+   :change-rate-basis :prior
+   :change-rate-source "kawaraban の下流なので上流の到着に従う。kawaraban が実測 1,436/日でも、比較対象クラスタが変わるのは時間オーダーという判断"
+   :importance 10           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :aliases ["dev" "run"] :main nil
    :args []
    :produces nil
@@ -236,6 +296,11 @@
 
   {:name "com-etzhayyim-kawaraban" :org "etzhayyim"
    :domain "ニュースミラー（多国・多媒体のアーカイブ）"
+   ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
+   :change-rate 1436.0          ; λ [1/day]
+   :change-rate-basis :measured
+   :change-rate-source "data/articles/*.edn の日付ファイルを実測（2026-08-08）。直近 20 日（当日除く）の平均 1,436 記事/日、中央値 1,703。立ち上げ期（7/19-7/25）を含むので保守側に振れている"
+   :importance 20           ; [sec·day] 陳腐化 1 単位を避けるのに払ってよい計算秒数
    :runtime :clojure :aliases ["query"] :main nil
    :args []
    :produces nil
@@ -254,6 +319,8 @@
    :args []
    :produces "data/meisai.datoms.kotoba.edn"
    :output-gitignored true
+   :change-rate :uncomputable-until-measured
+   :change-rate-source "source が 0 件なので変化率を定義できない。source 登録は owner 判断（:next 参照）"
    :expect :runs-empty
    :blocked-by "source が 1 件も設定されていない（cycle 1: +0 tx / 0 datoms）。
                 個人の明細を扱うので source 登録は owner の判断であり、
