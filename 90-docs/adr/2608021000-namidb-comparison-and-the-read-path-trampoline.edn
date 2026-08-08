@@ -110,7 +110,56 @@ novelty の **tx-block 読み** を `read-tx-block-async` へ回すが、
 **novelty chain の数え上げ `(novelty-cids get-fn state)` は sync get-fn の
 まま** — ここが残った理由。
 
-### 3. 次にやること (この ADR は打ち手を1つに絞る)
+### 3. 打った手と、その実測 (2026-08-07 更新)
+
+**この節は当初「次にやること」だった。landed し、測った。**
+
+- **実装**: kotobase-peer `c8e4f96`（2026-08-02）「Batch the novelty queue 16 entries
+  to a block, so enumerating it stops being linear」。`novelty-segment-size` = 16、
+  `push-novelty!` は bounded な head segment に追記し、`node-entries` が旧
+  単一エントリ節と新 segment の**両方**を読むので、既存 chain は書き換えずに
+  segment を上に伸ばす（移行ステップ無し）。west pin `530f2d1` に入っている。
+  テスト: `clojure -M:test` 229 tests / 680 assertions / 0 failures
+  （`kotobase-peer.novelty-segments-test` を含む）。
+
+- **実測（2026-08-07、この ADR が求めた検証）**: landed から 5 日、**変更後の
+  receipt が無かった** —— 「64 hops → 4 hops」は予測のままだった。同じ
+  `dag_shape_bench` を west pin で回し直した:
+
+  | 未 fold tx | novelty 逐次 hops | hydrate async round trips | novelty の占有率 |
+  |---|---|---|---|
+  | 0 | 0 → 0 | 2 → 2 | 0% → 0% |
+  | 20 | 20 → **2** | 22 → **4** | 90.9% → **50.0%** |
+  | 64（fold 閾値） | 64 → **4** | 66 → **6** | 96.9% → **66.7%** |
+
+  **novelty 半分は 16 倍（= segment size そのもの）、hydrate 全体は 11 倍。**
+  16 倍でなく 11 倍なのは snapshot 半分（2 waves）が変わらないからで、**それが要点**
+  —— novelty は支配項ではなくなった。receipt:
+  `90-docs/kotobase-performance/2026-08-07-novelty-segmentation-dag-shape.edn`
+  （7 セル全部。本 ADR の前身が完走できなかった (20000, 64) を含む）。
+
+- **帰属を分けた**: 5000 doc のセルは snapshot 側の prolly-tree が別事情で
+  height 3 → 2 に変わっているので**統制されていない**。1000 と 20000 は木の形が
+  完全一致（height/widths/nodes とも）なので、そちらから帰属する。receipt の
+  `:snapshot-half-controlled?` がセルごとに記録している。
+
+- **測定器の欠陥を 1 件直した**: `novelty-shape` は subject directory の \"entries\"
+  キーしか知らず、queue の \"es\" segment を **1 tx として数えていた**（64 tx の
+  backlog が `:txs 4` と出る。hops は正しいが tx 数が嘘で、**自分と矛盾する receipt**
+  は誤読を招く）。今回の数値はこの修正を当てて取った。patch は receipt の
+  `:follow-ups` に入れてあるが、**upstream には未反映**（このセッションに
+  kotoba-lang への write 権限が無い）。
+
+- **本番に届いたかは未確認**。ライブラリ経路は届いている（`kotobase-protocols-worker`
+  は `shadow-cljs.edn` で \"../kotobase-peer/src\" を**相対パス**参照するので、
+  west pin の kotobase-peer をそのままコンパイルする）。しかし実際に kotobase.net を
+  配信しているのは `network-awai/net-kotobase` の protocols-worker で、**private で
+  このセッションからは読めない**。本 ADR §2 が記録したとおり、この 2 つは以前も乖離
+  していた（library 側が sync に見えて deployed 側は既に async だった）ので、
+  **ライブラリが持っていることは deployment が持っていることの証拠にならない。**
+  2,282ms という hydration の実測値も変更前のものである。
+
+当初の記述（残す）:
 
 **novelty queue を、subject directory と同じ手法で bounded segment 化する。**
 `append-novelty-index!` は既に 16 entry/segment のチェインを作っている
