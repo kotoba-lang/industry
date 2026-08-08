@@ -148,19 +148,50 @@ descriptor から生成し、**commit 済みファイルが descriptor とずれ
 テストが落ちる**。実際に `com-google-calendar/connector.edn` の 1 語を書き換えて
 赤くなること、戻して緑になることを確認した（落ちない gate は劇場）。
 
-## 実装状況
+## 実装状況（2026-08-08 時点、すべて main 着地済み）
 
 | | |
 |---|---|
-| `kotoba-lang/connector` kernel | ✅ 22 tests / 59 assertions |
-| `com-google-calendar` | ✅ 12 tests / 43 assertions |
-| `com-google-drive` | ✅ 10 tests / 34 assertions |
-| `com-google-gmail` | ✅ 11 tests / 43 assertions |
-| `com-microsoft-graph` | ✅ 12 tests / 44 assertions |
-| west 登録（5 件） | ✅ |
-| GitHub / Slack / Notion / Google Chat を既存 repo に載せる | ❌ |
-| `cloud-itonami-app` の配線（`identity/provider-catalog` → registry） | ❌ |
-| Fleet 画面の「接続」 | ❌（ADR-2608093000 D4） |
+| `kotoba-lang/connector` kernel | ✅ 27 tests / 77 assertions |
+| `com-google-calendar` | ✅ 12 / 43 |
+| `com-google-drive` | ✅ 10 / 34 |
+| `com-google-gmail` | ✅ 11 / 43 |
+| `com-microsoft-graph` | ✅ 12 / 44 |
+| **`com-github`**（既存 repo に追加） | ✅ 13 / 50 |
+| **`com-slack`**（既存 repo に追加） | ✅ 12 / 34 |
+| **`com-notion`**（既存 repo に追加） | ✅ 12 / 36 |
+| **`com-google-chat`**（既存 repo に追加） | ✅ 8 / 19 |
+| west 登録・pin | ✅ 9 repo |
+| **`cloud-itonami-app` の配線** | ✅ 1,231 tests / 5,158 assertions（app 全体） |
+| Fleet 画面の「接続」 | ✅ **別セッションが実装**（下記） |
+
+### D8. 配線の安全性は「広がらないこと」で示す（2026-08-08 追記）
+
+`identity/provider-catalog` を registry 由来にするとき、**導出結果が従来より広い
+scope を要求したら、次回 reconnect で全員が「誰も決めていない権限」の承認画面を
+見る** —— しかも通常の再接続に見えるので承認されてしまう。
+
+そこで既定の有効 tool 集合を**計算する**: *その tool が要る scope が、registry 以前の
+grant に全て含まれていたときだけ既定 ON*。`connectors/historical-grant` はそのためだけに
+旧 literal を保持し、`scope-implications` は「片方が他方を含む」3 例（`gmail.modify` ⊃
+read / `Mail.ReadWrite` ⊃ `Mail.Read`。**`Calendars.Read` は `Calendars.ReadBasic` を
+含まないので Microsoft の calendar は既定 OFF**）を記録する。
+`connectors-test` が部分集合であることを表明する。
+
+既定 OFF になったもの（すべて名前を挙げてテスト済み）: Drive の**本文**、calendar の
+書き込み、GitHub の `repo` 全体、Microsoft の calendar、そして
+Slack / Notion / Google Chat（この app が一度も到達していなかった provider）。
+`catalog-rows` で OFF のものも見え、`widened-scopes` が「ONにすると何の承認になるか」を
+返す。
+
+旧 shape で表現できなかった絞り込みが実際に効く: `gmail_search_messages` だけ有効に
+すると `gmail.readonly` を要求し、`gmail.modify` も `gmail.send` も要求しない。
+
+### 実装中に見つけた kernel の実バグ（修正済み）
+
+`connector.registry/select` が **nil と空集合を同一視**しており、「全 tool を無効化した
+deployment に全 tool が渡る」状態だった。**絞り込む関数の中に silent widening があった。**
+app 側の「明示的に空の設定は何も返さないこと」というテストが捕まえた（`019f6f6`）。
 
 **テストはネットワークを使わない。** request が map なので、assertion は値の比較で
 足りる —— fake server も cassette も無い。`connector.invoke/request-for` は
@@ -213,7 +244,7 @@ west.yml（candidate）を比べるので、**ローカル checkout が origin/m
 **教訓**: guard の出力を「west.yml の drift」と読まない。まず自分の base が
 origin/main と一致しているか確かめる。
 
-### ③ hosted MCP の OAuth は稼働していない（未修正）
+### ③ hosted MCP の OAuth は稼働していない（**未着手。この ADR で唯一残っている穴**）
 
 `auth.itonami.cloud` は DNS 解決せず、
 `app.itonami.cloud/.well-known/oauth-protected-resource/mcp` は別物の actor router が
@@ -237,8 +268,10 @@ main に着地しており、本 ADR は 09:46Z に**同じ番号で 2 件目**�
 | superproject main | ADR 本体 + west 5 entry + origin-domains + repos.edn |
 | kernel | `kotoba-lang/connector` |
 | connectors | `com-google-calendar` / `-drive` / `-gmail` / `com-microsoft-graph` |
-| 次の 1 手 | `cloud-itonami-app` の `identity/provider-catalog`（`identity.clj:73`）を `connector.registry` に置き換える。`connector.consent/groups` が Google 3 connector を 1 grant に束ねるので、`identity.clj:1678` 付近の PKCE 生成はそのまま使える |
-| その次 | `com-github` / `com-slack` / `com-notion` / `com-google-chat` に connector を載せる（新規 repo は作らない） |
+| 次の 1 手 | **hosted MCP の OAuth authorization server**（下記 ③）。これがこの ADR で唯一残っている未着手項目 |
+| 部品 | `kotoba-lang/oauth`（client 側 flow substrate）/ `org-ietf-oauth2`（RFC 6749 + PKCE as data）/ `org-openid-oidc` / `authentication.identity-service`（Clerk 形）。**issuer 側は無い** —— `/authorize` + 同意 / `/token` / `/introspect`（RFC 7662）/ `.well-known/oauth-authorization-server`（RFC 8414）と DNS が要る |
+| 既に在るもの | `cloud-itonami-app/src/cloud/itonami/app/oauth_resource.clj` は**完成した resource server**。introspection 先が nil なだけ |
+| 済んだ経路 | 記述子 → registry → consent → invoke → MCP、および Fleet 画面の catalog → tenant_connection → passkey |
 | テスト再実行 | 各 repo で `nbb --classpath \"src:test:../connector/src\" run-tests.cljs`（kernel は `../org-anthropic-mcp/src`） |"
   :adr/consequences
   "cloud-itonami-app はまだ配線されていない。registry は「使える形で在る」だけで「使われている」ではない。
