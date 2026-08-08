@@ -35,7 +35,8 @@
 
 (ns itonami-maturity-improve-tick
   (:require [clojure.edn :as edn]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [scripts.itonami-maturity-freshness :as fresh]))
 
 (def fs (js/require "fs"))
 (def os (js/require "os"))
@@ -48,7 +49,13 @@
 (def ledger-file (str home "/.gftd/itonami-maturity-improve.ledger.edn"))
 
 ;; 計測値がこれより古ければ、次の 1 手は「作業」ではなく「測り直し」。
-;; 古い順位に従って работать のは、測っていないものを測ったことにするのと同じ。
+;; 古い順位に従って働くのは、測っていないものを測ったことにするのと同じ。
+;;
+;; **これは床であって、唯一の判定ではない。** 日数だけを見ていた版は、同じ日に
+;; 着地した仕事を構造的に見落とした（`scripts/itonami_maturity_freshness.cljs`
+;; の ns docstring に実測を書いた）。本当の問いは「計測はどれだけ古いか」では
+;; なく「計測は **この loop 自身が直前に着地させた仕事** を見ているか」で、
+;; それは時計ではなく ledger にしか書いていない。
 (def stale-after-days 7)
 
 ;; ADR-2608052000 決定 2。専用フェーズを切らず、この帯を常時維持する。
@@ -70,15 +77,17 @@
   (when-let [s (slurp* datoms-file)]
     (try (edn/read-string s) (catch :default _ nil))))
 
-(defn- days-since-generated
-  "datoms が最後に commit された日からの経過日数。**ファイルの mtime では
-  ない** —— checkout し直しただけで新しく見えてしまう。"
+(defn- generated-at
+  "datoms が最後に commit された時刻（epoch ms）。**ファイルの mtime では
+  ない** —— checkout し直しただけで新しく見えてしまう。
+
+  読めなければ `:unknown` を返す。`freshness` はそれを stale とも fresh とも
+  言わずに上げてくる。"
   []
   (let [{:keys [code out]} (sh "git" ["log" "-1" "--format=%ct" "--"
                                       "90-docs/system-dynamics/itonami-maturity.datoms.edn"])]
     (if (and (= 0 code) (seq (str/trim out)))
-      (let [t (* 1000 (js/parseInt (str/trim out) 10))]
-        (/ (- (.now js/Date) t) 86400000.0))
+      (* 1000 (js/parseInt (str/trim out) 10))
       :unknown)))
 
 (def axes [:maturity/axis-substrate :maturity/axis-test :maturity/axis-governed
@@ -218,9 +227,14 @@
     (js/process.exit 0))
 
   (let [rows (->> datoms (filter :repo/path) (mapv row))
-        age (days-since-generated)
-        stale? (and (number? age) (> age stale-after-days))
-        {:keys [lane observed-substrate-share iterations]} (lane (ledger-lines))
+        entries (ledger-lines)
+        freshness (fresh/freshness {:generated-at (generated-at)
+                                    :now (.now js/Date)
+                                    :entries entries
+                                    :stale-after-days stale-after-days})
+        {:keys [stale? unseen]} freshness
+        age (:age-days freshness)
+        {:keys [lane observed-substrate-share iterations]} (lane entries)
         ;; **lane 名と layer 値は別の語彙。** `:substrate` はたまたま両方に
         ;; 存在するが、`:breadth` という layer は無い —— 実データの
         ;; `:maturity/layer` は `:cohort` 1,782 / `:flagship` 9 /
@@ -249,8 +263,13 @@
         summary (first (filter :summary/layer-flagship datoms))
 
         entry {:at (.toISOString (js/Date.))
-               :datoms-age-days (if (number? age) (js/Math.round age) age)
+               :datoms-age-days (if (number? age) (js/Math.round age) :unknown)
                :datoms-stale? stale?
+               :datoms-stale-reason (:reason freshness)
+               ;; 見落とした着地を **名指しで** 残す。次周が ledger を読んだとき
+               ;; 「なぜ測り直しになったか」を自分で再構成できるようにする。
+               :datoms-unseen-landings (mapv #(select-keys % [:at :target :axis :merged])
+                                             unseen)
                :lane lane
                :observed-substrate-share observed-substrate-share
                :iterations iterations
@@ -263,7 +282,11 @@
                :ranking-is-flat? flat?}]
 
     (log! "── 成熟度向上 tick ──")
-    (log! "計測値の鮮度:" (:datoms-age-days entry) "日" (if stale? "（STALE）" ""))
+    (log! (fresh/explain freshness))
+    (doseq [u unseen]
+      (log! (str "    ↳ 計測が見ていない着地: " (:at u) " " (:target u)
+                 " " (name (or (:axis u) :?))
+                 " (" (subs (str (:merged u)) 0 (min 8 (count (str (:merged u))))) ")")))
     (log! "fleet: 平均 M_own=" (:mean-own (:fleet entry))
           " M_eff=" (:mean-effective (:fleet entry))
           " substrate drag=" (:substrate-drag (:fleet entry)))
@@ -293,8 +316,18 @@
     (log! "")
     (log! "次の 1 手:"
           (cond
-            stale? (str "計測値が " (:datoms-age-days entry)
-                        " 日前。まず itonami-maturity-scan → dynamics を回し直して着地させる")
+            stale?
+            (str (case (:reason freshness)
+                   :blind-to-own-work
+                   (str "**上の順位を信用しない。** 計測(" (:datoms-age-days entry)
+                        " 日前)より後に、この loop 自身が " (count unseen)
+                        " 周ぶん着地させている（" (str/join ", " (map :target unseen))
+                        "）。順位はその仕事を見ていないので、既に上げた軸を"
+                        "『0bp』と読んで同じ場所へ送り返す —— 従うと水増しになる。")
+                   :too-old (str "計測値が " (:datoms-age-days entry) " 日前。")
+                   "")
+                 " まず itonami-maturity-scan → dynamics を回し直して着地させる"
+                 "（skill の §5。この周は lane を消費しない）")
             (empty? ranked) (str lane " lane に対象が無い。lane の判定か計測値を疑う")
             ;; 重みのある軸が 1 つも無い = その kind にとって上げる意味のある軸が
             ;; 無い。**作らない。** 重みテーブルか kind 分類を疑う。
