@@ -1,19 +1,19 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 22541,
-  "app-aozora-appview" 12441,
-  "app-aozora-spa" 6736},
+ {"app-aozora-pds" 22593,
+  "app-aozora-appview" 12498,
+  "app-aozora-spa" 6738},
  :zone
- {:requests-7d 960437,
-  :pageviews-7d 5309,
-  :uniques-7d-sum 884,
+ {:requests-7d 966171,
+  :pageviews-7d 5312,
+  :uniques-7d-sum 889,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 941349}
-   {:path "/federation-pilot/did.json", :requests 115}
+  [{:path "/v1/datoms", :requests 940613}
+   {:path "/federation-pilot/did.json", :requests 113}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
     :requests 99}
@@ -23,16 +23,16 @@
    {:path
     "/bafyreif4afcpz5latrazxff3kyap2rt7hgbcywzu75hglzxd6ddui4f2hy",
     :requests 60}
-   {:path "/minidrama-fedtest/did.json", :requests 57}
+   {:path "/minidrama-fedtest/did.json", :requests 58}
    {:path
     "/bafyreicwof6vg3l7aopynnj7nh67pgaugg5h6rhjlhuwc6ebtpjotepnb4",
     :requests 55}
    {:path "/hito-diag-fed/did.json", :requests 52}],
-  :status-mix {:client-error 16334, :server-error 6235, :ok 943703},
+  :status-mix {:client-error 16419, :server-error 6344, :ok 942931},
   :window "24h"},
  :as-of "2026-08-08",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 941349 · /federation-pilot/did.json 115 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 99 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 71 · /bafyreif4afcpz5latrazxff3kyap2rt7hgbcyw… 60 | 4xx(probe) 2% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 940613 · /federation-pilot/did.json 113 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 99 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 71 · /bafyreif4afcpz5latrazxff3kyap2rt7hgbcyw… 60 | 4xx(probe) 2% · 5xx 1%",
  :signal
- "aozora.app 実測 960437 req/7d・884 uniques(日次和)・うち4xx probe 2%(24h)、workers 41718 inv/7d"}
+ "aozora.app 実測 966171 req/7d・889 uniques(日次和)・うち4xx probe 2%(24h)、workers 41829 inv/7d"}
