@@ -65,22 +65,67 @@
                 (keyword? axis)
                 (str/starts-with? (name axis) "axis-"))))
 
+(defn landing-instant
+  "この行が main に着地した瞬間（epoch ms）と、その出所。
+
+  **`:at` は最後の手段。** `:at` は周が自分で書く文字列であって観測ではない。
+  実測（2026-08-09）: `m365-ingest` の行は `\"2026-08-09T00:30:00Z\"` と
+  書いてあったが、その merge commit `c70a7114` の実時刻は
+  `2026-08-08T15:14:18Z` —— JST の壁時計に `Z` を付けた 9 時間先の値だった。
+  9 時間先の『着地』はどんな計測よりも新しいので、**測り直しても永久に
+  『計測が自分の仕事を見ていない』と言われ続ける**（実際にこの周、測り直しを
+  main に着地させた直後の tick がまだ STALE と答えた）。
+
+  merge commit の時刻は git が持つ事実なので、呼び出し側が解決できたなら
+  （`:landed-at-ms`）そちらを使う。これは `generated-at` が file の mtime を
+  拒んで `git log -1 --format=%ct` を使うのと **同じ原則を着地側に当てた**
+  だけで、新しい判断ではない。"
+  [{:keys [landed-at-ms at]}]
+  (if (number? landed-at-ms)
+    {:ms landed-at-ms :source :commit}
+    (when-let [t (parse-instant at)]
+      {:ms t :source :at})))
+
+(defn classify-landings
+  "軸上げの行を『計測が見ていない』と『時刻が使えない』に分ける。
+
+  **未来の時刻は見落としの証拠にならない** —— 着地は未来には起きない。commit を
+  解決できずに `:at` へ落ちた行が壊れた時刻を持っていると、それだけで loop は
+  測り直しから出られなくなるので、`now` より後の行は `:unseen` に数えない。
+
+  ただし **黙って捨てない**。`:suspect` として返し、tick に出させる —— 隠すと、
+  次に同じ壊れ方をしたとき誰も気づかない（この欠陥が 1 周まるごと溶かしたのは、
+  ledger の時刻が静かに嘘をついていたからである）。
+
+  `now` が数でなければ未来判定はできないので、その篩は掛けない（`nil` を
+  『未来ではない』とみなすのではなく、判定しない）。"
+  [entries generated-at now]
+  (if-not (number? generated-at)
+    {:unseen [] :suspect []}
+    (let [rows (->> entries
+                    (filter axis-raise?)
+                    (keep (fn [e]
+                            (when-let [{:keys [ms source]} (landing-instant e)]
+                              (assoc e :at-ms ms :at-source source))))
+                    vec)
+          future? (fn [e] (and (number? now) (> (:at-ms e) now)))]
+      {:unseen (->> rows
+                    (remove future?)
+                    (filter #(> (:at-ms %) generated-at))
+                    (sort-by :at-ms)
+                    vec)
+       :suspect (->> rows (filter future?) (sort-by :at-ms) vec)})))
+
 (defn unseen-landings
   "計測値が commit された後に着地した軸上げを、古い順に返す。
 
   `generated-at` が数でなければ比較の基準が無いので空 —— 『無かった』ではなく
-  『判定できなかった』であり、それは `freshness` が別の理由として扱う。"
-  [entries generated-at]
-  (if-not (number? generated-at)
-    []
-    (->> entries
-         (filter axis-raise?)
-         (keep (fn [e]
-                 (when-let [t (parse-instant (:at e))]
-                   (when (> t generated-at)
-                     (assoc e :at-ms t)))))
-         (sort-by :at-ms)
-         vec)))
+  『判定できなかった』であり、それは `freshness` が別の理由として扱う。
+
+  `now` を渡さない 2 引数版は未来判定をしない（`classify-landings` を見よ）。"
+  ([entries generated-at] (unseen-landings entries generated-at nil))
+  ([entries generated-at now]
+   (:unseen (classify-landings entries generated-at now))))
 
 (defn freshness
   "計測値を信用してよいか。
@@ -91,7 +136,11 @@
     {:stale? bool
      :reason :fresh | :blind-to-own-work | :too-old | :unknown-generation
      :age-days num-or-nil
-     :unseen [ledger 行 …]}
+     :unseen  [ledger 行 …]
+     :suspect [ledger 行 …]}   ; 時刻が未来で使えなかった行
+
+  `:suspect` は判定には使わないが **必ず返す**。呼び出し側に出させることで、
+  ledger の時刻が壊れていることが黙って埋もれないようにする。
 
   `:unknown-generation`（git log が答えなかった等）は **stale とも fresh とも
   言わない**。stale にすると計測を直しても抜けられない永久ループになり、fresh に
@@ -100,21 +149,21 @@
   [{:keys [generated-at now entries stale-after-days]}]
   (let [age (when (and (number? generated-at) (number? now))
               (/ (- now generated-at) 86400000.0))
-        unseen (unseen-landings entries generated-at)]
+        {:keys [unseen suspect]} (classify-landings entries generated-at now)]
     (cond
       (not (number? generated-at))
-      {:stale? false :reason :unknown-generation :age-days nil :unseen []}
+      {:stale? false :reason :unknown-generation :age-days nil :unseen [] :suspect suspect}
 
       ;; 日数の床より先に見る。こちらの方が具体的で、次の 1 手も強い
       ;; （『何日か経った』ではなく『この commit を見ていない』と言える）。
       (seq unseen)
-      {:stale? true :reason :blind-to-own-work :age-days age :unseen unseen}
+      {:stale? true :reason :blind-to-own-work :age-days age :unseen unseen :suspect suspect}
 
       (and (number? stale-after-days) (number? age) (> age stale-after-days))
-      {:stale? true :reason :too-old :age-days age :unseen []}
+      {:stale? true :reason :too-old :age-days age :unseen [] :suspect suspect}
 
       :else
-      {:stale? false :reason :fresh :age-days age :unseen []})))
+      {:stale? false :reason :fresh :age-days age :unseen [] :suspect suspect})))
 
 (defn explain
   "`freshness` の結果を、tick の 1 行表示にする。"

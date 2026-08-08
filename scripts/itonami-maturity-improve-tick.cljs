@@ -206,6 +206,35 @@
          vec)
     []))
 
+(defn- commit-time-ms
+  "ledger 行の `:merged` が指す commit の実時刻（epoch ms）。解決できなければ nil。
+
+  **ledger の `:at` を信用しないため。** `:at` は周が自分で書く文字列で、実測
+  （2026-08-09）では JST の壁時計に `Z` を付けた行があった —— `m365-ingest` の
+  `\"2026-08-09T00:30:00Z\"` に対し merge commit `c70a7114` の実時刻は
+  `2026-08-08T15:14:18Z` で、9 時間先を指していた。commit の時刻は git が持つ
+  事実なので、そちらを聞く。
+
+  nil を返すことに意味がある（0 や now に丸めない）—— 解決できなかった行は
+  `freshness` 側で `:at` に落ち、それが未来なら `:suspect` として表に出る。"
+  [{:keys [merged target]}]
+  (when (and (string? merged) (string? target) (str/starts-with? target "orgs/"))
+    (let [{:keys [code out]} (sh "git" ["-C" target "log" "-1" "--format=%ct" merged])]
+      (when (and (= 0 code) (seq (str/trim out)))
+        (let [n (js/parseInt (str/trim out) 10)]
+          (when-not (js/isNaN n) (* 1000 n)))))))
+
+(defn- with-landing-times
+  "軸上げの行に、merge commit から測った実時刻を添える。
+
+  問い合わせるのは `axis-raise?` の行だけ（ledger 全体を git に聞かない）。"
+  [entries]
+  (mapv (fn [e]
+          (if (fresh/axis-raise? e)
+            (if-let [ms (commit-time-ms e)] (assoc e :landed-at-ms ms) e)
+            e))
+        entries))
+
 (defn- lane
   "ADR-2608052000 決定 2 を**実績から**維持する。固定スケジュール
   （『5 周に 1 回 substrate』等）にしないのは、周が飛んだり skip されたりすると
@@ -230,9 +259,10 @@
         entries (ledger-lines)
         freshness (fresh/freshness {:generated-at (generated-at)
                                     :now (.now js/Date)
-                                    :entries entries
+                                    ;; `:at` ではなく merge commit の実時刻で測る
+                                    :entries (with-landing-times entries)
                                     :stale-after-days stale-after-days})
-        {:keys [stale? unseen]} freshness
+        {:keys [stale? unseen suspect]} freshness
         age (:age-days freshness)
         {:keys [lane observed-substrate-share iterations]} (lane entries)
         ;; **lane 名と layer 値は別の語彙。** `:substrate` はたまたま両方に
@@ -287,6 +317,11 @@
       (log! (str "    ↳ 計測が見ていない着地: " (:at u) " " (:target u)
                  " " (name (or (:axis u) :?))
                  " (" (subs (str (:merged u)) 0 (min 8 (count (str (:merged u))))) ")")))
+    ;; 時刻が壊れた行は判定から外したが、**外したことを黙らない**。
+    (doseq [s suspect]
+      (log! (str "    ⚠ ledger の時刻が未来（判定に使わない）: " (:at s) " " (:target s)
+                 " — merge commit が解決できず :at に落ちた。"
+                 "JST を Z と書いていないか確かめる")))
     (log! "fleet: 平均 M_own=" (:mean-own (:fleet entry))
           " M_eff=" (:mean-effective (:fleet entry))
           " substrate drag=" (:substrate-drag (:fleet entry)))
