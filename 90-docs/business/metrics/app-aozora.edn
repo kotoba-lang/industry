@@ -1,36 +1,36 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 22894,
-  "app-aozora-appview" 12761,
-  "app-aozora-spa" 7057},
+ {"app-aozora-pds" 22963,
+  "app-aozora-appview" 12825,
+  "app-aozora-spa" 7188},
  :zone
- {:requests-7d 991525,
-  :pageviews-7d 5512,
-  :uniques-7d-sum 911,
+ {:requests-7d 997492,
+  :pageviews-7d 5526,
+  :uniques-7d-sum 912,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 944870}
-   {:path "/federation-pilot/did.json", :requests 111}
+  [{:path "/v1/datoms", :requests 945496}
+   {:path "/federation-pilot/did.json", :requests 107}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
     :requests 81}
    {:path
     "/bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4eq3q5k2optwu446juce4",
     :requests 63}
-   {:path "/minidrama-fedtest/did.json", :requests 62}
-   {:path "/hito-diag-fed/did.json", :requests 53}
-   {:path "/hito-verify-clean/did.json", :requests 51}
+   {:path "/minidrama-fedtest/did.json", :requests 61}
+   {:path "/hito-diag-fed/did.json", :requests 51}
+   {:path "/hito-verify-clean/did.json", :requests 47}
    {:path
     "/bafyreicwof6vg3l7aopynnj7nh67pgaugg5h6rhjlhuwc6ebtpjotepnb4",
     :requests 45}],
-  :status-mix {:client-error 15795, :server-error 5401, :ok 947040},
+  :status-mix {:client-error 15646, :server-error 5071, :ok 947664},
   :window "24h"},
  :as-of "2026-08-08",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 944870 · /federation-pilot/did.json 111 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 81 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 63 · /minidrama-fedtest/did.json 62 | 4xx(probe) 2% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 945496 · /federation-pilot/did.json 107 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 81 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 63 · /minidrama-fedtest/did.json 61 | 4xx(probe) 2% · 5xx 1%",
  :signal
- "aozora.app 実測 991525 req/7d・911 uniques(日次和)・うち4xx probe 2%(24h)、workers 42712 inv/7d"}
+ "aozora.app 実測 997492 req/7d・912 uniques(日次和)・うち4xx probe 2%(24h)、workers 42976 inv/7d"}
