@@ -1,0 +1,270 @@
+[{:db/id -1
+  :adr/id "2608650000"
+  :adr/doc_type "adr"
+  :adr/topic "kotoba-cannot-write-has-two-kinds-decision-core"
+  :adr/title "kotoba で「書けない」は 2 種類ある — 恒久の安全設計と native backend の未達を分けて扱い、移行の単位を決定核（decision core）にする"
+  :adr/status :accepted
+  :adr/date "2026-08-08"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["`.kotoba` に書けない理由を「恒久の安全設計」と「backend 未達」に必ず分類する規約と、その分類の正本"
+   "恒久として引き受ける制約は 2 つだけ（exceptions→Result / bool は型）という決定"
+   "map・set・closure・異種ベクタ・再帰値・bare bool パラメータを native 追随前提の一時制約として扱う決定"
+   "cljc → .kotoba の移行単位を決定核（decision core）とし、コレクション組み立てを cljc に残す規約"
+   "決定核に parity test を必須とする規約"
+   "正規表現に依存する設計・`.cljc` のままの依存を持つ面を移行対象にしない規約"
+   "kotoba-native の成熟度の 2026-08-08 時点の実測値と、その測り方"]
+  :adr/supersedes []
+  :adr/related ["2607279200" "2607289500" "2607270100" "2608039700" "2608052000" "2607198300" "2607241100" "2607173000"]
+  :adr/repos ["com-junkawasaki/root"
+              "cloud-itonami/cloud-itonami-app"
+              "kotoba-lang/kotoba-lang"
+              "kotoba-lang/compiler"
+              "kotoba-lang/kotoba-kir"
+              "kotoba-lang/kotoba-native"
+              "kotoba-lang/kotoba-verifier"
+              "kotoba-lang/murakumo"]
+  :adr/body
+  "# kotoba で「書けない」は 2 種類ある
+
+## Context
+
+発端はオーナーの問い（2026-08-08）:「いまの cloud-itonami-app での cljc はもう
+kotoba-native として .kotoba に全て refactor 可能? kotoba native 側の実装の
+成熟度は?」
+
+最初の調査は「使ってよい / 使わない」の 1 枚の表を出した。オーナーはそこで
+止めて、決定的な問いを返した ——「これは kotoba の安全設計によるもの? それとも
+kotoba-native の実装の成熟度不足によるもの?」
+
+**表は 2 種類の制約を混ぜていた。** これは書き手の不注意ではなく、**混ぜたまま
+でも表として成立してしまう**ことが問題である。恒久の設計制約と一時の実装ギャップ
+は、どちらも「使えない」として同じ形で現れる。分類を書かなければ、読み手は全部を
+恒久だと読み、**backend が追いついた後もその自己制限を守り続ける**。
+
+## kotoba 自身がこの区別を持っている
+
+分類は推測する必要がない。言語側が仕様として持っている。
+
+- `kotoba-lang/kotoba-lang` の `lang/surface-status.edn` は全項目に
+  `:disposition` を付ける。値域は 4 つ:
+  `:intentional-security-constraint`（安全不変条件を守るための除外。広げるには
+  ADR と fail-closed 強制が要る）/ `:intentional-semantic-simplification`
+  （決定性・可搬性・検証可能性のため Clojure より意図的に狭い）/
+  `:implemented-partial`（少なくとも 1 backend で使える。限界は記録済み）/
+  `:not-yet-implemented`（**安全上の禁止ではない**。表現・境界意味論・conformance・
+  backend parity が未完）。
+- `kotoba-lang/compiler` の `resources/kotoba/lang/application-language.edn` の
+  `:backend-qualification :rule` が、その線を一文で引いている:
+
+  > An unavailable backend is an implementation gap, not a reason to remove a
+  > specified safe language feature.
+
+**したがって「native に無い」は、それ自体では言語の設計判断の証拠にならない。**
+
+## Decision
+
+### 1. 分類を引いてから書く
+
+`.kotoba` で何かが書けないと結論する前に、`lang/surface-status.edn` の
+`:disposition` を引く。分類を書かずに「使えない」と記録しない。**これは
+「無い」と結論する前に索引を引く（CLAUDE.md、2026-08-04）の同型の規則**で、
+違いは対象が repo の存在ではなく制約の性質であること。
+
+### 2. 恒久として引き受けるのは 2 つだけ
+
+| 制約 | disposition | 扱い |
+|---|---|---|
+| `throw` / `try` / `catch` → `[:result T E]` | `:intentional-security-constraint`（`:invariants :explicit-errors`） | **恒久。設計変更として一度きちんとやる** |
+| bool は数ではなく型 | `:intentional-semantic-simplification`（`:invariants :bool-is-a-type-not-a-number`） | **恒久** |
+
+exceptions の除外理由は言語側が書いている ——
+`Component/provider effects use explicit result/error values rather than hidden
+exception paths`。effect を隠す経路を作らないための不変条件であって、実装が
+追いついていないのではない。**これは native の話ではなく、wasm/cljs でも同じく
+禁止**である。移行のときに `ex-info` を Result へ移すのは後戻りしない変更なので、
+決定核を切り出す機会に正面からやる。
+
+### 3. それ以外は native 追随を前提とした一時制約として書く
+
+| 制約 | disposition | 実装済みの backend |
+|---|---|---|
+| map / set リテラル、永続コレクション | `:implemented-partial`、`:missing []` | `#{:compiler :kotoba-wasm :kotoba-cljs}` |
+| closure / HOF（`fn` `map` `filter` `reduce` コールバック） | `:implemented-partial` | 同上 |
+| 異種ベクタ・再帰値（W4） | `:implemented-partial` | 同上 |
+| bare `:bool` パラメータ | 実装ギャップ、解消途中 | — |
+| `str/*`・正規表現 | 未実装（**`:forbidden-heads` に無い**） | — |
+
+`:regex` が `lang/value-codec.edn` の `:rejected-closed` に在るのは
+**正規表現を値として転送できない**という正準エンコーディングの決定であって、
+正規表現演算の禁止ではない。`:forbidden-heads` にも `surface-status.edn` にも
+regex への言及は無い。
+
+bare `:bool` パラメータは compiler ADR 0219 が自ら
+`That is a real gap, but it is in the INTERPRETER, not in either backend`
+と書いており、`kotoba-kir` 側の admission gate は既に開いていて
+`kotoba.verifier/native-boundary-type?` の追随が follow-on として名指しされて
+いる。**withhold の理由は安全ではなく、oracle がまだ 1 本も実行していなかった
+という認識論的なもの**だった。
+
+**一時制約に沿って書いたコードは、その旨をモジュールのヘッダに書く。** 何が
+一時で、何が landed したら外せるのかを書く。書かなければ、後から読む者はそれを
+恒久の様式として模倣する。
+
+### 4. 移行の単位は決定核（decision core）
+
+**リポジトリ全体を `.kotoba` に移そうとしない。** スカラ + 文字列 + record で
+表せる判断だけを切り出し、コレクションの組み立てと effect は `.cljc` / `.clj` に
+残す。
+
+先例は `kotoba-lang/murakumo` の 33 本の `kotoba/*_core.kotoba`。
+`infer_join_core.kotoba`（87 行）は冒頭コメントで自分の境界を宣言している:
+
+> partition-work / enrollment map assembly stay cljc (vectors/maps).
+
+**33/33 が native に載ったのは murakumo を移植したからではなく、決定核を切り出した
+から**である（compiler ADR 0219 → 0220 → 0221 で 0/33 → 14/33 → 30/33 → 33/33）。
+
+この方式は upstream への依頼を 1 つも必要としない。
+
+### 5. 決定核には parity test を必須にする
+
+`.kotoba` 側と既存実装が同じ入力で同じ答えを出すことを、実際に走らせて確かめる。
+雛形は `murakumo/test/murakumo/infer_join_kotoba_parity_test.clj`
+（`compiler/compile-source` → `ir/execute` で `.kotoba` を回し、cljc の関数と
+突き合わせる）。
+
+**mirror を作らない。** 同じ判断を 2 実装が別々に持ち、片方だけ直る状態を作らない
+（実測: `cloud-itonami-app` の `policy.cljc` は docstring で自分を
+`The host-side mirror of policy.kotoba` と名乗っている。13 行の `.kotoba` と
+22 行の cljc が同じ判断を二重に持っている）。
+
+### 6. 正規表現に依存する設計は、移行ではなく設計変更を先にやる
+
+正規表現でコードやテキストを走査して構造を得る設計は、`.kotoba` へ移す対象に
+しない。**先に「走査をやめて宣言データにする」**。実測: `cloud-itonami-app` の
+`route_scan.cljc`（309 行）は `server.clj` の `cond` を `re-seq` / `re-find` で
+読んでルート表を導出している。正規表現が入るのを待つのではなく、ルートを宣言
+データにする方が正しい。
+
+### 7. 依存が `.cljc` のままの面は移行しない
+
+ADR-2607270100 の「移行途中のリポジトリを app から直接 require しない」を、
+依存側から見た形で再掲する。実測: `jp-go-dds`（6 ファイルすべて `.cljc`）と
+`yakuwari`（4 ファイルすべて `.cljc`）に `.kotoba` 版は無い。これらに依存する
+`view.cljc` / `work_governance.cljc` は依存が移るまで待つ。
+
+## kotoba-native の成熟度（2026-08-08 実測）
+
+### できるようになったこと
+
+- compiler ADR 0221（2026-08-06）: murakumo の 33 本の pure planner core が
+  **両 ISA（x86-64 / aarch64）で機械語まで通った**。`infer_join_core` は
+  2,041 バイト、8 export 全部。
+- ADR 0219: record が**パラメータ境界を越えられる**ようになった（それまでは
+  結果としてしか越えられず、これが「0/33」の唯一の原因だった）。
+- ADR 0219: entryless library（`main` を持たず `:export` だけのモジュール）が
+  native ターゲットで通る。決定核はちょうどこの形になる。
+
+### 天井
+
+admission gate は `kotoba-lang/kotoba-kir` の `src/kotoba/kir.cljc:285`
+`only-native-word-typed-features?`。名前のとおり **1 ワードで表せる値しか
+通さない**:
+
+| 通る | 通らない |
+|---|---|
+| i64 / i32 / f64 / bool | map（永続マップ） |
+| string・keyword（pair handle） | set |
+| sealed scalar record / variant | closure / HOF |
+| `[:option word]` / `[:result word]` | 異種ベクタ・hiccup・再帰値 |
+| 同種 `vector-i64` / `vector-f64` | lazy seq、protocol dispatch |
+| `typed-cap-call`（`[:i64 :i64]` `[:string :string]` `[:option-i64]` `[:result-i64]` の 4 組だけ） | それ以外の capability 境界 |
+| 文字列は `string=?` `string-concat` `string-substring` `string-code-point-at` `string-contains?` `string-replace-all` `string-length` | `str/*` 全般、正規表現 |
+
+- **capability kit 8 本（clock / http / http-ingress / llm / log / state /
+  storage / ui）はすべて `:native-aot :pending`**
+  （`compiler/resources/kotoba/lang/capability-kits/*.edn`）。effect を持つ
+  コードで native に qualified なものは 1 本も無い。
+- **`lang/guest-grammar.edn` の `:backends` 74 箇所すべてに native が無い。**
+  値域は `#{:compiler :kotoba-wasm :kotoba-cljs}` 系のみ。言語表面の成熟と
+  native backend の成熟は、今は別々に進んでいる。
+- 可搬 stdlib（`lang/stdlib/core.kotoba`、113 行、release 0.1.0、
+  `compile --prelude` で明示取り込み、`:missing []`）も
+  `:backends #{:compiler :kotoba-wasm :kotoba-cljs}` で native を含まない。
+  収録: `option-*` `ok` `err` `unwrap-*` `some` `every?` `find` `concat`
+  `reverse` `range` `range-step` `zipmap` `merge` `select-keys` `update`
+  `group-by` `comp2` `partial1`。**未収録**: `get-in` `sort-by` `juxt` `mapv`
+  `keep` `remove` `for` と `str/*` 全般。
+
+### 文書の危険
+
+**`compiler/docs/native-aot-baseline.md` は ADR 0063 で更新が止まっている**
+（ADR 系列は 0221 まで進んでいる）。この文書は
+`there is still no native provider/capability mechanism at all` と書いており、
+現在は `typed-cap-call` の i64 / UTF-8 文字列境界が qualified になっているので
+**native を実際より低く見せる**。superproject の CLAUDE.md はこの文書を根拠に
+native backend を引用していた。
+
+同時に、`:native-aot :pending` が 8 kit すべてに立っているのは事実なので、
+**「capability 機構が無い」は誤りだが「capability kit が使える」も誤り**。
+両方を正しく言うには kit の qualification 行を直接引く。
+
+## cloud-itonami-app の現在地（2026-08-08、`76ed52e`）
+
+| | 本数 | 行数 |
+|---|---|---|
+| `.clj`（src のみ） | 110 | 41,940 |
+| `.cljc` | 6 | 1,035 |
+| `.kotoba` | 1 | 13 |
+
+`.cljc` 6 本の処遇:
+
+| ファイル | 行 | 判定 |
+|---|---|---|
+| `policy.cljc` | 22 | 決定核は既に `policy.kotoba` に在る。足りないのは parity test と mirror の解消 |
+| `fleet_core.cljc` | 97 | `callable?` / `probeable?` 等の述語を record ベースで抽出可。`filter` / `sort-by` / `juxt` は cljc に残す |
+| `organism_worker.cljc` | 105 | validation の判定を抽出可。`throw` ×5 は cljc 側の薄いラッパへ |
+| `work_governance.cljc` | 395 | メンバシップ判定と `case` 分岐のみ抽出可。`for` ×13 / `mapv` ×11 は cljc。依存 `yakuwari` が `.cljc` |
+| `route_scan.cljc` | 309 | 正規表現依存。決定 6 により設計変更が先 |
+| `edge/view.cljc` | 107 | 依存 `jp-go-dds` が `.cljc`。決定 7 により待ち |
+
+## Consequences
+
+- **native 追随を前提に進める**（オーナー判断 2026-08-08）。決定核は word 型に
+  閉じて書くが、それは安全のためではなく backend が追いつくまでの自己制限で
+  あることを各モジュールに明記する。map / closure が native に載ったら、その
+  制限だけを外す。
+- 恒久の設計変更は `throw` → Result の 1 つ。これは移行の副産物ではなく、
+  移行が要求する本体の変更として扱う。
+- 決定核方式は upstream を 1 つも待たない。逆に「6 本全部を移す」は、正規表現・
+  jp-go-dds・yakuwari という自分で解けない依存を 3 つ抱える。
+- `native-aot-baseline.md` を引用しない。native の現在地は ADR 系列（0219 /
+  0220 / 0221）と `kir.cljc` の gate と kit の `:qualification` 行から読む。
+
+## 実測（この ADR を書いた作業）
+
+- `only-native-word-typed-features?` を全文読み、通る op 族を列挙した
+  （kotoba-kir `da24cae`）。
+- capability kit 9 ファイルの `:qualification` 行を全部引いた
+  （8 本が `:native-aot :pending`、`stream-object-v1` のみ別形）。
+- `guest-grammar.edn` の `:backends` 出現 74 箇所を集計し、native が 0 件で
+  あることを確認した。
+- `lang/surface-status.edn` の `:disposition` を全項目 dump し、
+  `:intentional-*` が付くのが `:invariants` の 9 項目だけであること、
+  `:collections` と `:other-gaps` は全部 `:implemented-partial` であることを
+  確認した。
+- 前段の回答で「`select-keys` / `merge` / `update` / `group-by` / `every?` /
+  `some` / `concat` は無い」と述べたのは誤りで、`lang/stdlib/core.kotoba` に
+  在る。訂正済み。**stdlib の存在を確認せずに「無い」と言った** —— これは
+  CLAUDE.md が既に持っている規則（索引を引いてから「無い」と言う）の違反で、
+  同じ規則が言語の stdlib にも当たることが分かった。
+- west pin のずれを検出: `kotoba-native` は pin `ef2df693` に対しローカルが
+  `22c1569c`。ADR 0221 の 33/33 を手元で再現するには先に
+  `west update --fetch smart kotoba-native` が要る。
+
+## 次
+
+`policy` を最初のスライスにする（決定核が既に在り、22 行で、依存が無い）。
+parity test → mirror 解消 → `kotoba compile --target x86_64-kotoba-v1` の実測。
+通れば `fleet_core` / `organism_worker` が同じ型紙で続く。"}]

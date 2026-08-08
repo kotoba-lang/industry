@@ -1511,23 +1511,27 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   export し、grant が `requiredCapabilities` と厳密一致しなければ
   `capability-grant-mismatch` で instantiate 自体が落ちる（実行時も fail closed）。
 
-### 再帰的な値型は「まだ」無い — flat/handle 設計を恒久前提にしない
+### 再帰的な値型は landed（W4）— flat/handle 設計を恒久前提にしない
 
-現在地: `docs/architecture.md`「not a recursive value」/ `docs/component-model-baseline.md`
-「General recursive Kotoba schemas are rejected by Component v1」。`[:set T]` は最大 32 要素。
-今日は hiccup のような任意深度の入れ子を Kotoba の値として表現できない。
+**この節は 2026-08-08 に書き換えた。** 旧文は「今日は hiccup のような任意深度の入れ子を
+Kotoba の値として表現できない」と書いていたが、W4 は 2026-07-27 に 6 スライスまで landed
+している（migration plan の W4 節が各スライスを記録）。第 5 スライス
+（`recursive_tree_value_test`、compiler#343 + kotoba-kir#10 + kotoba-script#71）が
+**sealed schema-checked tree としての recursive logical value** を、第 1〜4 スライスが
+`:document` 値（構築・walk・digest・`document-sha256`・DOM reconcile）を入れている。
+**backend は `#{:compiler :kotoba-wasm :kotoba-cljs}`。native には無い**（下記の新しい規則の
+とおり、これは backend 未達であって言語の天井ではない）。
 
-**しかしこれは到達目標ではない。** migration plan の W4 は
-「Define **recursive logical values** with explicit node/depth/byte budgets」を計画しており、
-さらに **「Implementations may use arenas and handles, but *handles are not the application
-programming model*」** と明記している。したがって:
+migration plan は **「Implementations may use arenas and handles, but *handles are not the
+application programming model*」** と明記している。したがって:
 
 - **flat node 集合 / parent ポインタ / handle を「Kotoba ではこう書くもの」として文書化しない。**
   それは実装戦略であって application の書き方ではない、と計画側が名指しで否定している。
-- 今日どうしても書く必要があるなら暫定として次の 2 形を使ってよいが、**暫定と明記する**:
-  **形 A** component を `:string` を返す純関数にし `string-concat` で合成（木は呼び出しグラフ
-  としてのみ存在、capability 不要）／**形 B** ui-v1 kit の `:declarative-flat-tree`。
-- 新しく永続的な API を設計するなら、W4 の recursive logical value を待つ方が正しい。
+- **native 向けに word 型へ閉じて書く場合も同じ** — その制限は「native がまだ持っていない
+  から」であって様式ではない。モジュールのヘッダにそう書く。
+- 形 A（component を `:string` を返す純関数にし `string-concat` で合成）は、capability 不要で
+  native にも載る書き方として引き続き有効。ただし**string-only SSR を最終 API にしない**
+  （ADR-2607279200 Delivery #6）。
 
 ### 今日の既知ブロッカー（回避策を知らずに時間を溶かさないこと）
 
@@ -1539,11 +1543,96 @@ programming model*」** と明記している。したがって:
    引き続き拒否（同名 schema の衝突規則が未決定）。
 2. **全 8 capability kit（clock/http/llm/log/state/storage/stream-object/ui）は
    `:reference :implemented` だが `:wasm-aot`/`:native-aot`/`:jit` は `pending`**。
-3. **ingress（Request→Response）capability はどちらの面にも無い** — Cloudflare Worker の
-   エントリは cljs のままにする（ADR-2606290000 と整合）。
+3. **ingress capability は在る**（`capability-kits/http-ingress-v1.edn`、host-injects /
+   guest-polls の accept-then-reply、queue 深さ 8、body 64 KiB）。**ただし
+   `:native-aot` / `:wasm-aot` は他 kit と同じく `pending`** なので、Cloudflare Worker の
+   エントリは当面 cljs のままにする（ADR-2606290000 と整合）。2026-08-08 訂正: 旧文は
+   「どちらの面にも無い」と書いていた。
 4. **fs/process/exec capability も Kotoba script host（`kbb`）も無い** — build スクリプトは
    nbb 据え置き。`kotoba-lang/kotoba-script` は restricted-ESM emitter であって script runner
    ではない（名前で誤解しないこと）。
+
+## `.kotoba` で「書けない」は 2 種類ある — 恒久と一時を混ぜない（repo-wide mandatory、2026-08-08、ADR-2608650000）
+
+**`.kotoba` で何かが書けないと結論する前に、それが「恒久の安全設計」なのか
+「backend がまだ追いついていない」だけなのかを、必ず分類してから書く。** 両者は
+どちらも「使えない」として同じ形で現れるので、分類を書かなければ読み手は全部を恒久だと
+読み、**backend が追いついた後もその自己制限を守り続ける**。
+
+分類は推測しない。言語側が仕様として持っている:
+
+- **`kotoba-lang/kotoba-lang` の `lang/surface-status.edn` の `:disposition`** —
+  `:intentional-security-constraint`（安全不変条件。広げるには ADR と fail-closed 強制）/
+  `:intentional-semantic-simplification`（決定性・可搬性のため意図的に狭い）/
+  `:implemented-partial`（1 つ以上の backend で使える）/ `:not-yet-implemented`
+  （**安全上の禁止ではない**）。
+- **`kotoba-lang/compiler` の `resources/kotoba/lang/application-language.edn` の
+  `:backend-qualification :rule`** — *An unavailable backend is an implementation gap,
+  not a reason to remove a specified safe language feature.*
+
+**したがって「native に無い」は、それ自体では言語の設計判断の証拠にならない。**
+
+### 恒久として引き受けるのは 2 つだけ
+
+| 制約 | 出典 |
+|---|---|
+| `throw` / `try` / `catch` を使わず `[:result T E]` を返す | `:invariants :explicit-errors` = `:intentional-security-constraint`。**native の話ではなく wasm/cljs でも禁止** |
+| bool は数ではなく型 | `:invariants :bool-is-a-type-not-a-number` = `:intentional-semantic-simplification` |
+
+`ex-info` → Result は後戻りしない設計変更なので、移行の副産物にせず正面からやる。
+
+### それ以外は native 追随を前提とした一時制約として書く
+
+map / set / 永続コレクション・closure / HOF・異種ベクタ・再帰値はすべて
+`:implemented-partial` で `#{:compiler :kotoba-wasm :kotoba-cljs}` に実装済み。
+native に無いだけ。bare `:bool` パラメータは compiler ADR 0219 が自ら
+*a real gap … in the INTERPRETER, not in either backend* と書いており解消途中。
+**正規表現は `:forbidden-heads` に無い**（`value-codec.edn` の `:rejected-closed :regex` は
+「正規表現を値として転送できない」という正準エンコーディングの話で、演算の禁止ではない）。
+
+**一時制約に沿って書いたコードは、その旨と撤去条件をモジュールのヘッダに書く。**
+書かなければ、後から読む者はそれを恒久の様式として模倣する。
+
+### 移行の単位は決定核（decision core）— repo 全体を移そうとしない
+
+スカラ + 文字列 + record で表せる**判断**だけを `.kotoba` に切り出し、コレクションの
+組み立てと effect は `.cljc` / `.clj` に残す。先例は `kotoba-lang/murakumo` の 33 本の
+`kotoba/*_core.kotoba` — **33/33 が native に載ったのは murakumo を移植したからではなく、
+決定核を切り出したから**（compiler ADR 0219 → 0220 → 0221 で 0/33 → 14/33 → 30/33 → 33/33）。
+`infer_join_core.kotoba` は冒頭で自分の境界を宣言している:
+`partition-work / enrollment map assembly stay cljc (vectors/maps).`
+
+- **parity test を必須にする。** 雛形は
+  `murakumo/test/murakumo/infer_join_kotoba_parity_test.clj`
+  （`compiler/compile-source` → `ir/execute` で `.kotoba` を回し既存実装と突き合わせる）。
+- **mirror を作らない。** 同じ判断を 2 実装が別々に持ち片方だけ直る状態にしない
+  （実測: `cloud-itonami-app` の `policy.cljc` は自分を
+  `The host-side mirror of policy.kotoba` と名乗っている）。
+- **正規表現でテキストを走査して構造を得る設計は、移行ではなく設計変更を先にやる**
+  （走査をやめて宣言データにする）。
+- **依存が `.cljc` のままの面は移行しない**（ADR-2607270100 を依存側から見た形）。
+
+### native の現在地の読み方
+
+**`compiler/docs/native-aot-baseline.md` を引用しない** — ADR 0063 で更新が止まっており
+（ADR 系列は 0221 まで）、*there is still no native provider/capability mechanism at all* と
+書いていて native を実際より低く見せる。現在地は次の 3 つから読む:
+
+1. **admission gate** `kotoba-lang/kotoba-kir` の `src/kotoba/kir.cljc` の
+   `only-native-word-typed-features?` — 名前のとおり 1 ワードで表せる値しか通さない
+   （i64/i32/f64/bool、string・keyword は pair handle、sealed scalar record/variant、
+   `[:option word]`/`[:result word]`、同種 `vector-i64`/`vector-f64`、
+   `typed-cap-call` は `[:i64 :i64]` `[:string :string]` `[:option-i64]` `[:result-i64]` の 4 組のみ）
+2. **kit の `:qualification` 行** `compiler/resources/kotoba/lang/capability-kits/*.edn`
+   — 8 kit すべて `:native-aot :pending`。effect を持つコードで native に qualified な
+   ものは 1 本も無い
+3. **ADR 系列** compiler の 0219 / 0220 / 0221
+
+可搬 stdlib は `kotoba-lang/lang/stdlib/core.kotoba`（`compile --prelude` で明示取り込み）。
+`select-keys` `merge` `update` `group-by` `every?` `some` `concat` `comp2` `partial1` 等は
+**在る**。無いのは `get-in` `sort-by` `juxt` `mapv` `keep` `remove` `for` と `str/*` 全般。
+**「stdlib に無い」と言う前にこのファイルを引く**（索引を引いてから「無い」と言う規則が、
+repo だけでなく言語の stdlib にも当たる）。
 
 ## design system（css / html / shitsuke / liquid-glass-ui / kotoba-ui）は `.kotoba` 移行対象（オーナー判断 2026-07-27、ADR-2607270100 §10）
 
