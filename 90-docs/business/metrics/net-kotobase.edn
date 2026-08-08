@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 23839, "kotobase-cf-wasm-staging" 49390},
+ {"net-kotobase" 24038, "kotobase-cf-wasm-staging" 49892},
  :zone
- {:requests-7d 70316,
-  :pageviews-7d 1262,
-  :uniques-7d-sum 1116,
+ {:requests-7d 70994,
+  :pageviews-7d 1283,
+  :uniques-7d-sum 1131,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 2250}
-   {:path "/_health", :requests 2101}
-   {:path "/", :requests 88}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 63}
+  [{:path "/health", :requests 2371}
+   {:path "/_health", :requests 2238}
+   {:path "/", :requests 105}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 69}
    {:path "/robots.txt", :requests 28}
    {:path "/api/funnel", :requests 27}
-   {:path "/sign-in", :requests 16}
-   {:path "/contact", :requests 13}],
-  :status-mix {:client-error 4800, :ok 4664},
+   {:path "/sign-in", :requests 18}
+   {:path "/contact", :requests 14}],
+  :status-mix {:client-error 5050, :ok 4964},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,12 +30,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-08",
- :traffic-quality {:window "24h", :probe-4xx-pct 51, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 50, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 2250 · /_health 2101 · / 88 · /xrpc/ai.gftd.apps.kotobase.datomic.q 63 · /robots.txt 28 | 4xx(probe) 51%",
- :funnel {:visitors 2479, :signups 13, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 2371 · /_health 2238 · / 105 · /xrpc/ai.gftd.apps.kotobase.datomic.q 69 · /robots.txt 28 | 4xx(probe) 50%",
+ :funnel {:visitors 2486, :signups 13, :checkouts 0},
  :signal
- "kotobase.net 実測 70316 req/7d・1116 uniques(日次和)・うち4xx probe 51%(24h)、workers 73229 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 70994 req/7d・1131 uniques(日次和)・うち4xx probe 50%(24h)、workers 73930 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 949},
+ {:visitors {:openai-ads 3, :organic 956},
   :signups {:organic 10}, 
   :checkouts {}}}
