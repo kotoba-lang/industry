@@ -1,19 +1,19 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 24297,
-  "app-aozora-appview" 14264,
-  "app-aozora-spa" 7531},
+ {"app-aozora-pds" 24448,
+  "app-aozora-appview" 14333,
+  "app-aozora-spa" 7535},
  :zone
- {:requests-7d 1079162,
-  :pageviews-7d 5872,
+ {:requests-7d 1085733,
+  :pageviews-7d 5876,
   :uniques-7d-sum 969,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 957875}
-   {:path "/federation-pilot/did.json", :requests 134}
+  [{:path "/v1/datoms", :requests 959250}
+   {:path "/federation-pilot/did.json", :requests 131}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
     :requests 94}
@@ -26,13 +26,13 @@
    {:path
     "/bafyreicjm25j5og3mu6ewquuupkwisronspkrv7v3xdczmzlknhqpf7vc4",
     :requests 84}
-   {:path "/minidrama-fedtest/did.json", :requests 67}
-   {:path "/hito-postfix-fed/did.json", :requests 64}],
-  :status-mix {:ok 960617, :client-error 25303, :server-error 6983},
+   {:path "/hito-postfix-fed/did.json", :requests 65}
+   {:path "/minidrama-fedtest/did.json", :requests 65}],
+  :status-mix {:ok 962001, :client-error 25460, :server-error 7305},
   :window "24h"},
  :as-of "2026-08-08",
  :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 957875 · /federation-pilot/did.json 134 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 94 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 92 · /bafyreigknzqpup4wv566lfcmxtb5sjegwv74mp… 85 | 4xx(probe) 3% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 959250 · /federation-pilot/did.json 131 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 94 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 92 · /bafyreigknzqpup4wv566lfcmxtb5sjegwv74mp… 85 | 4xx(probe) 3% · 5xx 1%",
  :signal
- "aozora.app 実測 1079162 req/7d・969 uniques(日次和)・うち4xx probe 3%(24h)、workers 46092 inv/7d"}
+ "aozora.app 実測 1085733 req/7d・969 uniques(日次和)・うち4xx probe 3%(24h)、workers 46316 inv/7d"}
