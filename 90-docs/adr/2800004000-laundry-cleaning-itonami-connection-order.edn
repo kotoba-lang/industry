@@ -1,0 +1,226 @@
+[{:db/id -1
+  :adr/id "2800004000"
+  :adr/doc_type "adr"
+  :adr/topic "laundry-cleaning-itonami-connection-order"
+  :adr/title "洗濯・クリーニングの営みは actor が全部あって面に 1 本も出ていなかった —— 接続順を固定し、9601 を暮らしの営みの 1 本目として繋ぐ"
+  :adr/status :accepted
+  :adr/date "2026-08-08"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["洗濯・クリーニング系 vertical（9601/9522/4759/2750/9523/8121/8129/4520/9609）の営み OS 接続順"
+   "この群で `:pii/laundry-customer` 境界を新設する根拠と、5820 の `:pii/customer` と同一視しない理由"
+   "洗車 / カーペットクリーニング / ペットのクリーニングが「未実装」であって「対象外」ではないという判定"
+   "tsukuru の 3D CAD 入口と SBOM を、この接続と同じ反復で繋がない理由"]
+  :adr/supersedes []
+  :adr/related ["2608070000" "2608060000" "2608052000" "2800003200" "2607131000"
+                "2607189300" "2607203000" "2607301300"]
+  :adr/repos ["network-awai/cloud-itonami"
+              "cloud-itonami/cloud-itonami-isic-9601"
+              "cloud-itonami/cloud-itonami-isic-2750"
+              "cloud-itonami/cloud-itonami-isic-4759"
+              "cloud-itonami/cloud-itonami-isic-9522"
+              "cloud-itonami/tsukuru-actor"]
+  :adr/body
+  "# ADR-2800004000: 洗濯・クリーニングの営み —— 接続順を固定し、1 本目を繋ぐ
+
+**Status**: accepted / **Date**: 2026-08-08
+
+## Directive
+
+オーナー質問（2026-08-08）「今の cloud-itonami に 洗濯機、乾燥機、コインランドリー
+などの tsukuru, 3d cad, sbom や 服のクリーニング, 靴のクリーニング、カーペットの
+クリーニング、車のクリーニング、ペットのクリーニングは設計統合されている?」
+に続いて「では設計実装」。
+
+## 実測した現在地（2026-08-08、この ADR の起点）
+
+**actor はほぼ全部あった。面に 1 本も出ていなかった。** west 4,138 project を
+`repo-search` と `concept-lookup` で引き、checkout を実際に読んだ結果:
+
+| 問い | repo | 標準形適合 | 営み OS 宣言（当時） |
+|---|---|---|---|
+| 洗濯機・乾燥機の製造 | `cloud-itonami-isic-2750`(domappl) | **不適合**（`read-ops` と `seed-db` が無い） | 未宣言 |
+| 家電小売 | `isic-4759`(applianceops) | 適合 | 未宣言 |
+| 家電修理 | `isic-9522`(applianceshop) | 適合 | 未宣言 |
+| 服のクリーニング | `isic-9601`(laundry) | **適合** | 未宣言 |
+| 靴 | `isic-9523`(leathergoods) | 適合 | 未宣言 |
+| カーペット | 専用 repo 無し。`isic-8121`/`8129` は適合だが carpet/rug/upholstery の語が README にも ops にも無い | 適合 | 未宣言 |
+| 車 | `isic-4520`(autorepair) は整備・修理で、**洗車は scope 外** | **不適合**（phase の op 集合が無い） | 未宣言 |
+| ペット | `isco-5164`(Pet Groomers) は職業 blueprint。ISIC 側は `9609` の汎用のみ | 適合(9609) | 未宣言 |
+
+`os.edn` の宣言は 26 本で、この群は 1 本も入っていなかった。os.edn 冒頭が自分で
+書いているとおり **『checkout があること・west に登録があること・成熟度が高い
+ことは、いずれも OS から回せることを意味しない』**。
+
+## tsukuru / 3D CAD / SBOM の現在地
+
+ADR-2800003200 の 4 段は Phase 1/3/4 landed、Phase 2 はコード landed・live 検証
+blocked（kotobase seed 不在で Worker が 503 fail-closed）。そのうえで:
+
+- **3D CAD の入口は実装されていない。** `manufacturingCell/designCell` lexicon
+  （\"Design a 3D manufacturing cell using kami-engine-sdk\"）は contracts / wire
+  の両方に契約として在るが、実装は **deprecated な TS 版
+  `orgs/cloud-itonami/tsukuru/kotoba/src/planning.ts` にしか無く**、後継の cljc
+  `tsukuru-actor` に移植されていない。ADR-2800003200 自身が「CAD 幾何そのもの
+  （kami-engine-cad / cnc-toolpath / STEP・G-code）は Phase 3 の scope 外」と書いている。
+- **custody 面は在るが空に近い。** `tsukuru-manufacturing-artifacts` の `raw/` に
+  今あるのは CAE 参照 2 件（cfd/fem）だけで、**STEP / メッシュは 0 件**。
+- **SBOM は tsukuru に無い。** `createProductionOrder` の `productSpec` は
+  `{\"type\":\"object\"}` の free-form で、説明文に \"CAD CIDs, BOM, quantities\" と
+  書いてあるだけ ——**型が無いので検査できない**。実在する SBOM 実装は別系統の
+  `cloud-itonami/open-robo`（giemon）で、hardware BOM（`bom/parts.edn`）+ software
+  SBOM（`firmware/software-sbom.edn`、purl → OSV 突合、CycloneDX 出力）を持つ。
+  これは tsukuru とも 2750 とも配線されていない。
+
+## Decision
+
+### 1. 接続順を固定する（1 反復 = 1 vertical）
+
+ADR-2607189300 のガードレール（大きいバッチと自己申告の green が 61% 欠陥の
+fan-out を起こした）に従い、**2 本まとめない**。順は次で固定する:
+
+1. **`isic-9601` クリーニング業** — この ADR で landed。標準形に完全適合しており、
+   demo store が「正規の道 1 本 + 構造的に別々の拒否 3 本」を最初から持っている。
+2. **`isic-9522` 家電修理** — 適合済み。9601 と同じ『預り品を預かって返す』形で、
+   境界を共有できるか（`:pii/laundry-customer` を分けるか）をそこで決める。
+3. **`isic-4759` 家電小売** — 適合済み。既に繋がっている `isic-4711`（総合小売）と
+   op の形が同じはずで、`:reorder/commit → 卸` の連鎖に載る可能性がある。
+4. **`isic-2750` 家電製造** — **先に repo 側の作業が要る**（`phase/read-ops` と
+   `store/seed-db` を足して標準形に揃える）。shim では繋がらない。
+5. **`isic-9523` 靴・革製品** / **`isic-8121`/`8129` 清掃** / **`isic-9609`** — 適合済み。
+   上の 4 本が着地してから順に。
+
+### 2. `:pii/laundry-customer` を新設する（`:pii/customer` と同一視しない）
+
+9601 の `:subject` は garment id で自然人の識別子ではない。**それでも境界は空に
+できない** —— demo store の 4 件のうち 2 件が `鈴木花子のシルクブラウス` /
+`田中一郎のコート` で、衣類の記述そのものが顧客の氏名を運んでいる（実測）。
+
+名前を 5820 CRM の `:pii/customer` と同じにしないのは、os.edn 冒頭の
+『同じ PII でも求職者・従業員・生徒は別の統治領域なので同一視しない』に従った
+ため。クリーニング業の顧客は**預り品（bailment）の寄託者**で、商談相手とは別の
+統治領域にいる。3510 が `:pii/utility-customer` を使うのと同じ形。
+
+同一視しないことには機械的な効果がある: **境界が違えば `:invoke` を書けない**
+（`wiring/compile-rules` が load 時に throw する）。畳んだ瞬間に、CRM から
+クリーニングの預り品へ自動で request を起こせるようになってしまう。
+
+### 3. 洗車・カーペット・ペットのクリーニングは「未実装」であって「対象外」ではない
+
+ADR-2607203000 の規則（**いかなる entity も categorical に除外しない。今日数値を
+持たない entity は『カバレッジが未達』であって『対象外』ではない**）をここにも
+当てる。3 つとも、既存 repo の scope 外に落ちているだけである:
+
+- **洗車** — `isic-4520` は整備・修理で、README にも ops にも wash/clean が無い。
+- **カーペット** — `isic-8121`/`8129` は建物・産業清掃で、carpet/rug/upholstery が
+  1 語も無い。
+- **ペットのクリーニング** — `isco-5164` は**職業** blueprint（グルーミング支援
+  ロボ前提）で、ISIC 側の事業 actor が無い。`isic-9609` は汎用の personal service。
+
+**この ADR ではこの 3 本を新規に起こさない。** 上の接続順 5 段が着地する前に
+新しい repo を足すと、『actor はあるが面に出ていない』という今日の状態を
+3 本ぶん増やすだけになる —— それがまさにこの ADR が直そうとしている状態である。
+
+### 4. tsukuru の 3D CAD / SBOM は、この反復では繋がない
+
+理由は 3 つとも実測に基づく:
+
+- **Phase 2 の live 検証が blocked のまま**（kotobase seed 不在、Worker 503）。
+  ADR-2800003200 の再開点が『**seed の再発行より先に、kotobase.net の読みが揺れる
+  理由を観測する**』と名指ししている。その手前で CAD 入口を足しても検証できない。
+- **`designCell` の実装は deprecated な TS 側にしかない。** 移植は shim 1 本では
+  終わらず、1 反復に収まらない。
+- **SBOM の正本をどこに置くかがまだ決まっていない。** `open-robo` の
+  `bom/parts.edn` + `firmware/software-sbom.edn`（purl/OSV/CycloneDX）が唯一の
+  実装で、これを `productSpec` の型にするのか、別の custody 面に置くのかは
+  ADR-2608039970『byte を datom 面に載せない』との兼ね合いで別途決める。
+
+**代わりにこの ADR が固定するのは境界だけ**: `productSpec` を free-form の
+まま『CAD と BOM を運べる』と説明する文言を、UI にも README にも新しく書かない。
+型が無いものを運べると書くのは、ADR-2607203000 が禁じた『未計測の変換率を掛けた
+期待値の捏造』と同じクラスの誤り。
+
+## この反復で実際に landed したもの（9601）
+
+`network-awai/cloud-itonami` の 7 箇所 + site entry 1 個。**`os/adapters/standard.cljc`
+は触っていない**（147 本以上が共有する形なので）。
+
+| 検査 | 実測値 |
+|---|---|
+| 生成器（実物の actor を回す） | 139 op / 132 台帳エントリ / 台帳検証 `{:ok? true, :length 132}` |
+| 9601 の内訳 | 確定 5 / 承認待ち 4 / **保留 3** / 拒否 1 |
+| 射影 2 つ | os-registry 27 verticals・9 wiring（一致）/ sites-registry 37 site（canonical） |
+| `clojure -M:test` | 1,512 tests / 10,257 assertions。**失敗集合が origin/main と完全一致**（既知 17 件: doctor / kotoba-xrpc / ops-keys。新規失敗ゼロ） |
+| 公開面 | https://cloud-itonami.itonami.cloud/cloud-itonami-isic-9601/ → 200 |
+
+**保留 3 本は構造的に別々の理由**で、これが『拒否を実演した』と言える根拠:
+
+1. **洗濯表示が禁じる処理**（garment-3: 提案処理 `:bleach` がその衣類自身の禁止
+   リストに入っている）。governor は提案の自己申告を読まず、衣類に元から載って
+   いる ground truth 2 フィールドから独立に再計算する。
+2. **溶剤取扱資格の失効**（garment-4）。審査 op 自身が自分の発見で HARD hold する。
+3. **法域の取扱基準が台帳に無い**（garment-2 は \"ATL\"）。助言者が spec-basis の
+   不在を正直に申告して cites を空にし、governor の第 1 検査が落とす。
+
+加えて宣言に無い op（`:garment/dispose`）が governor に届く前に拒否される。
+
+**面で subject が digest に畳まれていることを確認した** —— `:subject-private? true`
+の宣言が飾りでないことは、面に `garment-1` ではなく
+`sha256:b3e568eb…` が出ることでしか示せない。
+
+## 連携（`:wiring`）は 1 本も宣言していない
+
+上流（2750 製造 / 4759 小売）も下流（9522 修理）もまだ OS に繋がっていないので、
+今日繋げる相手が居ない。**繋がっていないものを繋がっているように宣言しない**
+ことを、`laundry-declares-a-person-boundary-of-its-own-and-no-wiring` で機械的に
+固定した（3600 上水道の先例と同じ形）。
+
+## Consequences
+
+### 得るもの
+
+- 営み OS に**暮らしの営み**という列が 1 本できた。これまでの 26 本は事業者
+  どうしの営みか公共インフラで、**個人が自分の持ち物を業者に預けて返して
+  もらう**という形は 1 本も無かった。
+- `:pii/laundry-customer` という境界名が、寄託者を商談相手から機械的に分けた。
+- 「actor はあるのに面に出ていない」群のうち、最も適合度の高い 1 本が消えた。
+  残りの接続順が ledger と ADR の両方に書かれている。
+
+### 払う代償（黙らせない）
+
+- **9601 は繋がったが、この群の営みの流れはまだ 1 本も繋がっていない。**
+  製造 → 小売 → 修理 → クリーニング という連鎖は、4 本とも接続されるまで
+  面に出ない。今日出たのは『1 本の vertical が単体で回る』ところまで。
+- **2750 と 4520 は shim では繋がらない。** repo 側に `read-ops` / `seed-db` /
+  phase の op 集合を足す作業が先で、これは 1 反復に収まらない可能性が高い。
+- **洗車・カーペット・ペットのクリーニングは今日も無い。** 新規に起こさないと
+  決めたので、この 3 つは次の ADR まで空欄のまま残る。
+- **tsukuru の CAD/SBOM は今日も繋がっていない。** ADR-2800003200 の再開点
+  （kotobase.net の読みの揺れの観測）が先。
+- **sites.edn の 28 ブロックに同じ classpath 行が増えた。** 1 本繋ぐたびに全
+  ブロックへ波及するのは構造上の負債で、恒久対応は宣言を導出にすること
+  （skill `itonami-os-connect` が既に記録している。この ADR では直さない）。
+
+## 次の具体的な一手
+
+1. **`isic-9522`（家電修理）を繋ぐ。** 標準形適合済み。9601 と同じ『預り品』の形
+   なので、境界名を共有するか分けるかをそこで決める。
+2. **`isic-4759`（家電小売）を繋ぎ、4711 との op の形の一致を固定する。**
+   一致していれば `:reorder/commit → 卸` の既存連鎖に載る。
+3. **`isic-2750` を標準形に揃える**（repo 側: `phase/read-ops` + `store/seed-db`）。
+   ここまで来て初めて『製造 → 小売 → 修理 → クリーニング』が面に出る。
+4. tsukuru は ADR-2800003200 の再開点から。**この ADR は tsukuru の順序を
+   変更しない。**"
+
+  :adr/consequences
+  "上の `## Consequences` を参照。要点だけ再掲する:
+
+- 9601 は landed（面 200、拒否 3 本を実演、テストの失敗集合は main と一致）。
+- **この群の営みの流れ（製造 → 小売 → 修理 → クリーニング）はまだ 1 本も
+  繋がっていない。** 連携 0 本であることをテストで固定してある。
+- 2750 / 4520 は標準形不適合で shim では繋がらない。
+- 洗車・カーペット・ペットのクリーニングは新規に起こさないと決めた（未実装で
+  あって対象外ではない）。
+- tsukuru の 3D CAD 入口（`designCell`）と SBOM は繋いでいない。理由は
+  Phase 2 の live 検証 blocked / 実装が deprecated な TS 側のみ / SBOM の正本の
+  置き場が未決定。"}]
