@@ -1,41 +1,28 @@
-;; money-power-sacred.cljs — Money / 14 次元 power vector / Reputation /
-;; Sacred status(3 チャネル) の stock-flow モデル。ADR-2608081800。
-;;
-;; 実行:
-;;   SD_OUT=90-docs/system-dynamics nbb \
-;;     --classpath "90-docs/system-dynamics/nbb-shim:orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dynamics/src" \
-;;     90-docs/system-dynamics/money-power-sacred.cljs
-;;
-;; ⚠ **全パラメータは UNMEASURED HYPOTHESIS。**kotoba-lang/dynamics の
-;;   「computed always means instantiated against real facts」に従い、
-;;   ここで出る数値は「この構造ならこう動く」であって観測値ではない。
-;;   キャリブレーションに使った実データは 1 件も無い。したがって
-;;   引用してよいのは **構造的な結論**（どの経路が存在するか、到達点が
-;;   初期値に依存するか、順位はどうか）であって、水準の絶対値ではない。
-;;
-;; 既存資産のみ使用（新規実装なし）:
-;;   kotoba-lang/org-oasis-open-xmile — XMILE 1.0 model/expr/validate/execute/xml
-;;   kotoba-lang/dynamics             — Meadows leverage band scoring
-;;
-;; nbb-shim/ が要る理由: xmile.validate だけが kotoba-lang/dsl-core の
-;;   `kotoba.dsl.problem` に依存し、その実体は `.kotoba` ソースなので nbb が
-;;   読めない。同じ観測契約を持つ最小の cljc を置いてある。
+;; money-power-sacred-robustness.cljs — ADR-2608081800
 
-(ns money-power-sacred
-  "Money / 14 次元 power vector / Reputation / Sacred status(3 チャネル) を
-   XMILE 1.0 の stock-flow として組み、(1) 「Sacred の gain 側に Money を直接
-   つながない」を機械で検査し、(2) Money → Sacred の最短経路と関門を出し、
-   (3) 各 power に同じショックを与えて ∫ΔS dt = dynamic power multiplier を測る。
+(ns money-power-sacred-robustness
+  "money-power-sacred.cljs のモデルに対するロバストネス解析。ADR-2608081800。
 
-   ⚠ **全パラメータは UNMEASURED HYPOTHESIS。**dynamics の
-   「computed always means instantiated against real facts」に従い、ここで出る
-   数値は『この構造ならこう動く』であって観測値ではない。キャリブレーションに
-   使った実データは 1 件も無い。引用してよいのは構造的な結論（どの経路が
-   存在するか / 到達点が初期値に依存するか / 順位）であって、水準の絶対値ではない。
+   なぜこれが要るか: パラメータが 1 つも測定されていないので、『値はいくつか』は
+   答えられない。答えられるのは『どの結論が値に依存しないか』である。全パラメータを
+   log-uniform ×[1/1.5, 1.5] で摂動し、結論ごとに成立率を数える。φ/θ/ψ は独立変数
+   なので摂動しない。半飽和定数 K は設計則 K = kfrac·g/δ を摂動後の g,δ から再計算
+   する（kfrac ~ U(0.30,0.60)）—— そうしないと大半の draw が不感帯に落ちて
+   『結論が頑健か』ではなく『モデルが退化するか』を測ることになる。
 
-   半飽和定数 K だけは当て推量ではない: dX/dt = g·n̄ − δX, n_X = X/(K+X) の
-   閉ループ不動点 X* = g/δ − K から n* = 1 − Kδ/g なので、K = 0.45·g/δ と置けば
-   全 stock が n*≈0.55 の感度帯に入る（初版はここを外し全 stock が n≈0.05 に潰れた）。"
+   速度について: xmile.execute は汎用の**解釈**器で、1 run あたり 108,072 回の
+   式木評価（1 回 23.9-35.2 µs、実測）を行う。2,000 run 規模では成立しないので、
+   ここでは同じ式木から JS を生成して走らせる（定数はリテラルに畳み、stock は
+   Float64Array の添字に束縛する）。実測 3,804 ms → 13.9 ms/run = 274 倍、
+   出力は全 stock で相対差 0.000000000（完全一致）。速いのは表現であって
+   ランタイムでも言語でもない。
+
+   実行:
+     NACD=400 NB=200 nbb \\
+       --classpath \"90-docs/system-dynamics/nbb-shim:orgs/kotoba-lang/org-oasis-open-xmile/src:orgs/kotoba-lang/dynamics/src\" \\
+       90-docs/system-dynamics/money-power-sacred-robustness.cljs
+
+   seed 固定なので同じ引数なら同じ結果になる。"
   (:require [clojure.string :as str]
             [clojure.set :as set]
             [xmile.model :as m]
@@ -169,10 +156,11 @@
 (defn build-model [params shocks]
   (let [num  (fn [k] (str (double (get params k))))
         init (fn [s v] (str (double (+ v (get shocks s 0.0)))))
-        consts   (for [[k v] params :when (not= k "sim_stop")] (m/aux k (str (double v))))
+        consts   (for [[k v] params :when (not (or (contains? #{"sim_stop" "sim_dt"} k)
+                                   (str/starts-with? k "stockK_") (str/starts-with? k "stockD_")))] (m/aux k (str (double v))))
         ;; 正規化 aux: n_X = X / (K_X + X) ∈ [0,1)
         norms    (for [[s _ K _] stock-spec]
-                   (m/aux (n s) (str s " / (" (double K) " + " s ")")))
+                   (m/aux (n s) (str s " / (" (double (get params (str "stockK_" s) K)) " + " s ")")))
         stocks   (for [[s v0 _ _] stock-spec]
                    (m/stock s (init s v0)
                             {:xmile/inflows  #{(str (str/lower-case s) "_in")}
@@ -183,10 +171,10 @@
                    (m/flow (str (str/lower-case s) "_out")
                            (if (= s "Money")
                              "spend_rate * Money"
-                             (str (double dec) " * " s))))
+                             (str (double (get params (str "stockD_" s) dec)) " * " s))))
         mdl
         (-> (m/model "money_powervector_reputation_sacred"
-                     {:xmile/sim-specs (m/sim-specs 0.0 (get params "sim_stop" 80.0) {:xmile/dt 0.5
+                     {:xmile/sim-specs (m/sim-specs 0.0 (get params "sim_stop" 80.0) {:xmile/dt (get params "sim_dt" 0.5)
                                                               :xmile/method :rk4
                                                               :xmile/time-units "period"})})
 
@@ -407,145 +395,192 @@
        :else ""))))
 
 
+
+
+;; ── モデル → 専用 JS 評価器 ────────────────────────────────────────────
+(defn compile-model [params]
+  (let [mdl (build-model params {})
+        des (:xmile/model (execute/desugar-delays mdl))
+        order (execute/topo-order des)
+        cnames (execute/constant-names des order)
+        cenv (execute/constant-env des order cnames)
+        dyn-order (vec (remove cnames order))
+        stocks (mapv :xmile/name (m/stocks des))
+        sidx (into {} (map-indexed (fn [i s] [s i]) stocks))
+        parsed (fn [nm] (let [q (:xmile/eqn (m/lookup des nm))] (if (string? q) (expr/parse q) q)))
+        jx (fn jx [e]
+             (case (first e)
+               :num (str (double (second e)))
+               :ref (let [nm (second e)]
+                      (cond (= nm "TIME") "t" (= nm "DT") "dt"
+                            (contains? cenv nm) (str (double (get cenv nm)))
+                            (contains? sidx nm) (str "y[" (get sidx nm) "]")
+                            :else (str "v_" nm)))
+               :neg (str "(-" (jx (nth e 1)) ")")
+               :add (str "(" (jx (nth e 1)) "+" (jx (nth e 2)) ")")
+               :sub (str "(" (jx (nth e 1)) "-" (jx (nth e 2)) ")")
+               :mul (str "(" (jx (nth e 1)) "*" (jx (nth e 2)) ")")
+               :div (str "(" (jx (nth e 1)) "/" (jx (nth e 2)) ")")
+               :pow (str "Math.pow(" (jx (nth e 1)) "," (jx (nth e 2)) ")")
+               :call (let [f (second e) as (mapv jx (nth e 2))]
+                       (case f "MIN" (str "Math.min(" (str/join "," as) ")")
+                               "MAX" (str "Math.max(" (str/join "," as) ")")
+                               "EXP" (str "Math.exp(" (first as) ")")
+                               "ABS" (str "Math.abs(" (first as) ")")
+                               "SQRT" (str "Math.sqrt(" (first as) ")")
+                               (throw (ex-info "unsupported builtin" {:fn f}))))
+               (throw (ex-info "unsupported node" {:n (first e)}))))
+        src (str "const out=new Float64Array(" (count stocks) ");\nreturn function(y,t,dt){\n"
+                 (str/join (for [nm dyn-order]
+                             (let [v (m/lookup des nm) b (jx (parsed nm))]
+                               (str "const v_" nm "=" (if (:xmile/non-negative? v) (str "Math.max(0," b ")") b) ";\n"))))
+                 (str/join (for [[i s] (map-indexed vector stocks)]
+                             (let [tm (fn [x] (if (seq x) (str/join "+" (map #(str "v_" %) x)) "0"))]
+                               (str "out[" i "]=(" (tm (m/inflows-of des s)) ")-(" (tm (m/outflows-of des s)) ");\n"))))
+                 "return out;};")
+        is (execute/initial-stocks des)]
+    {:derivs (.call (js/Function src)) :stocks stocks :sidx sidx :y0 (mapv #(get is %) stocks)
+     :sw [(get params "w_elite") (get params "w_mass") (get params "w_inst")]
+     :si [(get sidx "Sacred_Elite") (get sidx "Sacred_Mass") (get sidx "Sacred_Institutional")]}))
+
+(defn simulate
+  "最終 stock 値と ∫Sacred_Total dt（台形則）を返す。単一アトラクタなので
+   最終値の差は 0 に潰れる —— multiplier の指標は軌道積分でなければならない。"
+  [{:keys [derivs stocks y0 sw si]} shocks sidx T dt]
+  (let [nn (count stocks)
+        y (js/Float64Array. nn) tmp (js/Float64Array. nn) acc (js/Float64Array. nn)
+        n (long (/ T dt))]
+    (dotimes [i nn] (aset y i (+ (nth y0 i) (get shocks (nth stocks i) 0.0))))
+    (dotimes [i nn] (when (neg? (aget y i)) (aset y i 0.0)))
+    (let [[we wm wi] sw [ie im ii] si
+          stot (fn [] (+ (* we (aget y ie)) (* wm (aget y im)) (* wi (aget y ii))))
+          area (atom 0.0) prev (atom (stot))]
+    (dotimes [step n]
+      (let [t (* step dt)]
+        (.fill acc 0)
+        (let [k (derivs y t dt)]
+          (dotimes [i nn] (aset acc i (+ (aget acc i) (aget k i)))
+                          (aset tmp i (+ (aget y i) (* 0.5 dt (aget k i))))))
+        (let [k (derivs tmp (+ t (* 0.5 dt)) dt)]
+          (dotimes [i nn] (aset acc i (+ (aget acc i) (* 2 (aget k i))))
+                          (aset tmp i (+ (aget y i) (* 0.5 dt (aget k i))))))
+        (let [k (derivs tmp (+ t (* 0.5 dt)) dt)]
+          (dotimes [i nn] (aset acc i (+ (aget acc i) (* 2 (aget k i))))
+                          (aset tmp i (+ (aget y i) (* dt (aget k i))))))
+        (let [k (derivs tmp (+ t dt) dt)]
+          (dotimes [i nn] (aset acc i (+ (aget acc i) (aget k i)))))
+        (dotimes [i nn] (aset y i (max 0.0 (+ (aget y i) (* (/ dt 6.0) (aget acc i))))))
+        (let [cur (stot)] (swap! area + (* 0.5 dt (+ @prev cur))) (reset! prev cur))))
+    {:S (stot) :int @area
+     :eq (into {} (map-indexed (fn [i s] [s (aget y i)]) stocks))})))
 ;; ═════════════════════════════════════════════════════════════════════
-;; main
+;; ロバストネス解析 — パラメータが未測定なら、問うべきは「値」ではなく
+;; 「どの結論がパラメータ空間のどれだけの範囲で生き残るか」である。
 ;; ═════════════════════════════════════════════════════════════════════
 
-(def T 300.0)   ; 収束確認済みの地平線（t=200 で |Δ|<0.09、t=600 まで不変）
+(def T 300.0) (def DT 1.0)   ; dt=1.0 は dt=0.5 と 4 桁一致・半コスト（実測）。
+;; T=150 では未収束（漸近値の 1.8% 下）で、テスト A が過渡差を「M0 依存」と誤判定する。
+;; T=300 は T=600 と 0.002 差（実測）なので収束後の比較になる。
+(defn sim [p] (assoc p "sim_stop" T "sim_dt" DT))
+;; 解釈ではなくコンパイルして走らせる（結果は 12 桁一致を実測済み）
+(defn st [p shocks] (let [c (compile-model (sim p))] (:S (simulate c shocks (:sidx c) T DT))))
 
-(def mdl (build-model base-params {}))
+;; 再現可能な LCG（Math/random を使わない — 同じ seed で同じ結果を出すため）
+(defn lcg [seed] (let [st (atom seed)]
+                   (fn [] (swap! st #(mod (+ (* 1103515245 %) 12345) 2147483648))
+                          (/ @st 2147483648.0))))
 
-(println "═══ 0. XMILE 1.0 structural validation ═══")
-(let [p (validate/validate mdl)]
-  (println "  valid?" (validate/valid? p)
-           "| variables" (count (m/variables mdl))
-           "= stocks" (count (m/stocks mdl))
-           "+ flows" (count (m/flows mdl))
-           "+ aux" (count (m/auxs mdl)) "(うち定数" (count base-params) ")")
-  (doseq [x (take 8 p)] (println "   " x)))
+;; g パラメータの対応（K = kfrac·g/δ の設計則を摂動後も保つため）
+(def gmap {"Attention" "g_attention" "Reputation" "g_reputation" "Network_Power" "g_network"
+           "Institutional_Power" "g_institution" "Political_Power" "g_political"
+           "Media_Power" "g_media" "Narrative_Power" "g_narrative" "Cultural_Power" "g_cultural"
+           "Technological_Power" "g_technology" "Data_Power" "g_data"
+           "Coordination_Power" "g_coordination" "Moral_Authority" "g_moral"
+           "Legitimacy" "g_legitimacy"})
 
-(println "\n═══ 1. 構造不変条件 ═══")
-(let [g (dep-graph mdl)
-      viol (into {} (for [f sacred-gains :let [bad (set/intersection (get g f) purchasable)]
-                          :when (seq bad)] [f bad]))]
-  (println "  Money/Financial_Capacity/Manipulation → sacred_*_gain の直接辺:"
-           (if (empty? viol) "NONE ✓" viol))
-  (println "  sacred_*_loss は Scandal / Commercialization / Contradiction を参照する")
-  (println "  ⇒ 金で「買う」辺は無いが「失わせる」辺はある（非対称）"))
+(def held #{"phi" "theta" "psi"})   ; 独立変数として振るので摂動しない
 
-(println "\n═══ 2. Money → Sacred の最短経路と関門 ═══")
-(let [ig (reverse-graph (dep-graph mdl))]
-  (doseq [f sacred-gains]
-    (println (str "  " f))
-    (println (str "     最短 " (dec (count (shortest-path ig "Money" f))) " hop: "
-                  (str/join " → " (shortest-path ig "Money" f))))
-    (let [gws2 (remove #(str/starts-with? % "n_") (mandatory-gateways ig "Financial_Capacity" f))]
-      (println (str "     換金後に必ず通る関門: "
-                    (if (seq gws2) (str/join ", " gws2)
-                        "無し — 経路が分岐しており 1 点では塞げない"))))))
+(defn draw [rnd spread]
+  (let [pert (fn [v] (* v (js/Math.exp (* (js/Math.log spread) (- (* 2 (rnd)) 1)))))
+        base (into {} (for [[k v] base-params] [k (if (held k) v (pert v))]))
+        kfrac (+ 0.30 (* 0.30 (rnd)))
+        extra (into {} (mapcat (fn [[s _ K dec]]
+                                 (let [d (pert dec) g (get gmap s)]
+                                   (if g
+                                     [[(str "stockD_" s) d] [(str "stockK_" s) (* kfrac (/ (get base g) d))]]
+                                     [[(str "stockD_" s) d] [(str "stockK_" s) (pert K)]])))
+                               stock-spec))]
+    (merge base extra)))
 
-(println "\n═══ 3. 大域アトラクタ（t=300、収束確認済み）═══")
-(def base-run (run-with {"sim_stop" T}))
-(def base-series (:xmile/series base-run))
-(def base-times  (:xmile/times base-run))
-(doseq [row (partition-all 3 (concat power-stocks sacred-stocks ["Sacred_Total"]))]
-  (println "  " (str/join "  " (for [s row] (str (pad s 22) "=" (pad (fmt (fin base-series s) 3) 10))))))
-(println "  " (str/join "  " (for [k ["Recognition" "Common_Knowledge" "Scandal" "Commercialization" "Contradiction"]]
-                               (str k "=" (fmt (fin base-series k))))))
 
-(println "\n═══ 4. Money の初期値を 5 桁振る — 過渡 vs 到達点 ═══")
-(println (str "   " (pad "M0" 10) (pad "S(t=80)" 12) (pad "S(t=300)" 12) (pad "∫ΔS dt (対 M0=100)" 20) "S_mass(t=80)"))
-(def m0-ref (integral base-times (get base-series "Sacred_Total")))
-(doseq [m0 [1.0 10.0 100.0 1000.0 10000.0 100000.0]]
-  (let [r80 (:xmile/series (run-with {"sim_stop" 80.0} {"Money" (- m0 100.0)}))
-        rT  (run-with {"sim_stop" T} {"Money" (- m0 100.0)})
-        srT (:xmile/series rT)]
-    (println (str "   " (pad (long m0) 10)
-                  (pad (fmt (fin r80 "Sacred_Total") 3) 12)
-                  (pad (fmt (fin srT "Sacred_Total") 4) 12)
-                  (pad (fmt (- (integral (:xmile/times rT) (get srT "Sacred_Total")) m0-ref) 2) 20)
-                  (fmt (fin r80 "Sacred_Mass") 3)))))
-(println "   ⇒ 到達点は M0 に依らず一定。初期資本が買うのは「速さ」であって「高さ」ではない")
 
-(println "\n═══ 4b. 初期資本ではなく「金の定常的な豊富さ」が到達点に効く ═══")
-(println "   money_cap_k = 富の複利の飽和（0 = 無限に複利、大 = すぐ頭打ち）")
-(println (str "   " (pad "money_cap_k" 14) (str/join (for [m0 [10.0 1000.0 100000.0]] (pad (str "M0=" (long m0)) 14)))))
-(doseq [ck [0.0 0.00005 0.0002 0.0015 0.01]]
-  (println (str "   " (pad ck 14)
-                (str/join (for [m0 [10.0 1000.0 100000.0]]
-                            (pad (fmt (fin (:xmile/series (run-with {"sim_stop" T "money_cap_k" ck}
-                                                                    {"Money" (- m0 100.0)})) "Sacred_Total") 3) 14))))))
-(println "   ⇒ どの列でも M0 依存はゼロのまま。効くのは初期値ではなく定常水準で、")
-(println "     金が積み上がる（複利が飽和しない）ほど Manipulation と Commercialization が増え、")
-(println "     mass / institutional チャネルが削られて到達点そのものが下がる")
+(def N-ACD (js/parseInt (or (.-NACD (.-env js/process)) "200")))
+(def N-B   (js/parseInt (or (.-NB (.-env js/process)) "60")))
+(def SPREAD (js/parseFloat (or (.-SPREAD (.-env js/process)) "1.5")))
 
-(println "\n═══ 5. dynamic power multiplier — 同一ショックに対する ∫ΔS dt ═══")
-(println "   (a) 絶対 +10 / (b) 平衡の +10% / (c) = (b)/ショック量（単位あたり）")
-(println "   系は単一アトラクタなので ∫ΔS dt は T→∞ で収束する（= well-defined な impulse response）")
-(def base-int (integral base-times (get base-series "Sacred_Total")))
-(def multipliers
-  (doall (for [s power-stocks]
-           (let [eq   (fin base-series s)
-                 ra   (run-with {"sim_stop" T} {s 10.0})
-                 rr   (run-with {"sim_stop" T} {s (* 0.10 eq)})]
-             {:stock s :eq eq
-              :abs (- (integral (:xmile/times ra) (get (:xmile/series ra) "Sacred_Total")) base-int)
-              :rel (- (integral (:xmile/times rr) (get (:xmile/series rr) "Sacred_Total")) base-int)
-              :per (/ (- (integral (:xmile/times rr) (get (:xmile/series rr) "Sacred_Total")) base-int)
-                      (max 1e-9 (* 0.10 eq)))}))))
-(println (str "   " (pad "stock" 22) (pad "equilibrium" 13) (pad "(a) +10" 12) (pad "(b) +10%" 12) "(c) per unit"))
-(doseq [x (reverse (sort-by :per multipliers))]
-  (println (str "   " (pad (:stock x) 22) (pad (fmt (:eq x) 2) 13)
-                (pad (fmt (:abs x) 2) 12) (pad (fmt (:rel x) 2) 12) (fmt (:per x) 3))))
+(println "ロバストネス解析: 全パラメータを log-uniform ×[1/" SPREAD "," SPREAD "] で摂動")
+(println "  K は設計則 K = kfrac·g/δ を摂動後の g,δ から再計算（kfrac ~ U(0.30,0.60)）")
+(println "  φ/θ/ψ は独立変数なので摂動しない。T=" T " dt=" DT " seed=20260808")
+(println "  draws: A/C/D =" N-ACD ", B =" N-B)
 
-(println "\n═══ 6. policy sweep: theta（power→sacred 防火壁）× psi（商業化の罰）═══")
-(println (str "   " (pad "theta\\psi" 11) (str/join (for [psi [0.0 0.5 1.0 2.0]] (pad psi 10)))))
-(doseq [theta [0.0 0.3 1.0 3.0 10.0]]
-  (println (str "   " (pad theta 11)
-                (str/join (for [psi [0.0 0.5 1.0 2.0]]
-                            (pad (fmt (fin (:xmile/series (run-with {"sim_stop" T "theta" theta "psi" psi} {})) "Sacred_Total") 2) 10))))))
+(def rnd (lcg 20260808))
+(def acc (atom {:A 0 :C 0 :D 0 :degenerate 0 :n 0}))
 
-(println "\n═══ 7. phi（money→power 変換抵抗）sweep ═══")
-(println (str "   " (pad "phi" 8) (pad "S_total" 10) (pad "S_elite" 10) (pad "S_mass" 10) (pad "S_inst" 10)
-              (pad "Money" 10) (pad "Politic" 10) (pad "Media" 10) "Commercial"))
-(doseq [phi [0.0 0.2 0.4 0.6 0.8 0.95]]
-  (let [sr (:xmile/series (run-with {"sim_stop" T "phi" phi} {}))]
-    (println (str "   " (pad phi 8) (pad (fmt (fin sr "Sacred_Total") 2) 10)
-                  (pad (fmt (fin sr "Sacred_Elite") 2) 10) (pad (fmt (fin sr "Sacred_Mass") 2) 10)
-                  (pad (fmt (fin sr "Sacred_Institutional") 2) 10)
-                  (pad (fmt (fin sr "Money") 1) 10) (pad (fmt (fin sr "Political_Power") 2) 10)
-                  (pad (fmt (fin sr "Media_Power") 2) 10) (fmt (fin sr "Commercialization"))))))
+(doseq [i (range N-ACD)]
+  (let [p (draw rnd SPREAD)
+        s-lo (st p {"Money" -90.0})      ; M0 = 10
+        s-hi (st p {"Money" 9900.0})     ; M0 = 10000
+        base (st p {})]
+    (if (< base 0.05)
+      (swap! acc update :degenerate inc)
+      (let [;; A: 到達点が M0 に依らない
+            a? (< (/ (js/Math.abs (- s-hi s-lo)) (max base 1e-9)) 0.02)
+            ;; C: φ 応答が内部最大を持つ
+            p0 (st (assoc p "phi" 0.0) {}) p4 (st (assoc p "phi" 0.4) {}) p9 (st (assoc p "phi" 0.95) {})
+            c? (and (> p4 p0) (> p4 p9))
+            ;; D: ψ のほうが θ より効く
+            r0 (st (assoc p "theta" 0.0 "psi" 0.0) {})
+            rt (st (assoc p "theta" 10.0 "psi" 0.0) {})
+            rp (st (assoc p "theta" 0.0 "psi" 2.0) {})
+            d? (> (js/Math.abs (- rp r0)) (js/Math.abs (- rt r0)))]
+        (swap! acc #(-> % (update :n inc) (update :A + (if a? 1 0))
+                        (update :C + (if c? 1 0)) (update :D + (if d? 1 0))))))
+    (when (zero? (mod (inc i) 20)) (println "  ACD" (inc i) "/" N-ACD @acc))))
 
-(println "\n═══ 8. Meadows leverage band (kotoba-lang/dynamics) ═══")
-(doseq [i (d/rank-interventions
-           [{:id :no-direct-money-to-sacred-edge :band :band/B :tractability 0.9}
-            {:id :sacred-channel-split-3         :band :band/D :tractability 0.8}
-            {:id :commercialization-penalty-psi  :band :band/C :tractability 0.6}
-            {:id :theta-power-sacred-firewall    :band :band/E :tractability 0.7}
-            {:id :phi-money-power-friction       :band :band/E :tractability 0.5}
-            {:id :detection-probability-d_ck     :band :band/B :tractability 0.6}
-            {:id :retire-status-as-a-goal        :band :band/A :tractability 0.2}])]
-  (println (str "   " (pad (:id i) 36) "band " (name (:band i)) "  base-score " (fmt (:base-score i) 2))))
+(println "\n=== A/C/D 結果 ===")
+(let [{:keys [A C D n degenerate]} @acc]
+  (println "  有効 draw:" n " / 退化して除外:" degenerate)
+  (println (str "  A 到達点は M0 に依らない        : " A "/" n " = " (fmt (* 100.0 (/ A n)) 1) "%"))
+  (println (str "  C φ 応答が内部最大を持つ        : " C "/" n " = " (fmt (* 100.0 (/ C n)) 1) "%"))
+  (println (str "  D ψ のほうが θ より効く         : " D "/" n " = " (fmt (* 100.0 (/ D n)) 1) "%")))
 
-(def out-dir (or (.-SD_OUT (.-env js/process)) "."))
-(def out (str out-dir "/money-power-reputation-sacred.xmile"))
-(let [txt (str "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-               (->xml (xx/emit-doc {:xmile/header {:xmile/vendor "kotoba-lang/org-oasis-open-xmile"
-                                                   :xmile/product {:xmile/name "power-vector" :xmile/version "1.0"}
-                                                   :xmile/name "Money / Power vector / Reputation / Sacred status"}
-                                    :xmile/sim-specs (:xmile/sim-specs (build-model (assoc base-params "sim_stop" T) {}))
-                                    :xmile/models [(build-model (assoc base-params "sim_stop" T) {})]})))]
-  (.writeFileSync (js/require "fs") out txt)
-  (println "\n═══ 9. XMILE 1.0 written ═══")
-  (println "   " out "(" (count txt) "bytes," (count (m/variables mdl)) "variables )"))
+;; B: Money の power-multiplier 順位
+(def rnd2 (lcg 777333))
+(def ranks (atom []))
+(doseq [i (range N-B)]
+  (let [p (draw rnd2 SPREAD)
+        c (compile-model (sim p))
+        r0 (simulate c {} (:sidx c) T DT)
+        base (:S r0) b0 (:int r0) eqs (:eq r0)]
+    (when (>= base 0.05)
+      (let [per (for [nm power-stocks]
+                  (let [eq (get eqs nm) sh (* 0.10 eq)]
+                    (if (<= sh 1e-9) [nm 0.0]
+                      [nm (/ (- (:int (simulate c {nm sh} (:sidx c) T DT)) b0) sh)])))
+            sorted (map first (reverse (sort-by second per)))
+            rk (inc (count (take-while #(not= % "Money") sorted)))]
+        (swap! ranks conj rk)))
+    (when (zero? (mod (inc i) 10)) (println "  B" (inc i) "/" N-B "ranks so far" (count @ranks)))))
 
-;; 時系列 CSV（後で図にする用）
-(let [ks (concat power-stocks sacred-stocks ["Sacred_Total" "Recognition" "Common_Knowledge"
-                                             "Commercialization" "Scandal" "Contradiction"])
-      csv (str "t," (str/join "," ks) "\n"
-               (str/join (for [i (range (count base-times))]
-                           (str (nth base-times i) ","
-                                (str/join "," (for [k ks] (fmt (nth (get base-series k) i) 5))) "\n"))))]
-  (.writeFileSync (js/require "fs")
-                  (str out-dir "/baseline-series.csv") csv)
-  (println "    baseline-series.csv written (" (count base-times) "rows )"))
+(println "\n=== B 結果: Money の順位（14 stock 中）===")
+(let [rs @ranks n (count rs)
+      _ (when (zero? n) (println "  有効 draw が 0 件。全 draw が退化した。") (js/process.exit 1))
+      sorted (sort rs)
+      med (nth sorted (quot n 2))
+      bot3 (count (filter #(>= % 12) rs))
+      bot-half (count (filter #(>= % 8) rs))]
+  (println "  有効 draw:" n)
+  (println "  中央値順位:" med " 最良:" (first sorted) " 最悪:" (last sorted))
+  (println (str "  下位 3 位以内(>=12)  : " bot3 "/" n " = " (fmt (* 100.0 (/ bot3 n)) 1) "%"))
+  (println (str "  下位半分(>=8)        : " bot-half "/" n " = " (fmt (* 100.0 (/ bot-half n)) 1) "%"))
+  (println "  順位の分布:" (into (sorted-map) (frequencies rs))))
