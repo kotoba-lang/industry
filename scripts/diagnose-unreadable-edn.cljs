@@ -142,9 +142,44 @@
             (println (str "  " (if write? "FIXED" "OK(dry-run)") " " path
                           " — " (count after) " キーを保って読めるようになった"))))))))
 
+(defn classify-file
+  "1 ファイルの状態を **機械可読** で返す。`docs-edn-repair-tick` が消費する。
+   人間向けの印字と同じ判定を 2 箇所に書かないため、判定はここだけに置く。
+
+   :already-readable      reader を通る（修復不要）
+   :closers-only          閉じ括弧を足すだけで読め、キー集合も保たれる
+   :needs-reconstruction  括弧を閉じてもまだ読めない（第 2 のバグがある）
+   :key-set-changed       読めるようになったがキー集合が変わった（危険。書かない）"
+  [path]
+  (let [raw (.readFileSync fs path "utf8")
+        lines (vec (str/split-lines raw))]
+    (if (entity-keys raw)
+      {:path path :status :already-readable}
+      (let [intended (set (outer-keys lines))
+            fixed (str/join "\n" (close-tail (repair-lines lines)))
+            after (entity-keys fixed)]
+        (cond
+          (nil? after)
+          {:path path :status :needs-reconstruction
+           :reason (try (do (cljs.reader/read-string fixed) "?")
+                        (catch :default e (ex-message e)))
+           :intended-keys (count intended)}
+
+          (not= intended after)
+          {:path path :status :key-set-changed
+           :missing (vec (sort (remove after intended)))
+           :extra (vec (sort (remove intended after)))}
+
+          :else
+          {:path path :status :closers-only :keys (count after)})))))
+
 (defn -main [& args]
   (let [write? (boolean (some #{"--write"} args))
+        edn-out? (boolean (some #{"--edn"} args))
         paths (remove #(str/starts-with? % "--") args)]
+    (when edn-out?
+      (println (pr-str (mapv classify-file paths)))
+      (js/process.exit 0))
     (when (empty? paths)
       (println "usage: nbb scripts/diagnose-unreadable-edn.cljs <file>... [--write]")
       (js/process.exit 2))
