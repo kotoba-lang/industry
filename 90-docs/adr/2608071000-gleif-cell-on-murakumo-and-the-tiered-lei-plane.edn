@@ -158,6 +158,12 @@ projection と見分けがつかない（ADR-2608044000 の「不完全な読み
 - 所要 32 分（download 2 分 + corpus 12 分 + projection 19 分）、exit 0、
   `com-junkawasaki/org-gleif-projections` main `ca4528d3` へ push 済み。
 
+**cell のディスクは 1 publish 分に収まる。** corpus 名に publish id が入るので
+放置すると 1 publish ごとに約 1.43 GB 積む（GLEIF は日に複数回 publish するので
+日次より速い）。cycle が成功した回だけ、今回以外の corpus を捨てる —— 途中で
+落ちた回の corpus は、次の tick が作り直しを省ける唯一の材料なので消さない。
+実測 2026-08-08: 2 cycle で 4.4 GB まで積んでいたのを 1.8 GB に戻した。
+
 ## 残っている gap
 
 **west pin が毎日ずれる。** cell は日次で `org-gleif-projections` に push するので、
