@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 21521, "kotobase-cf-wasm-staging" 43422},
+ {"net-kotobase" 21527, "kotobase-cf-wasm-staging" 43434},
  :zone
- {:requests-7d 61845,
-  :pageviews-7d 1187,
-  :uniques-7d-sum 1027,
+ {:requests-7d 61852,
+  :pageviews-7d 1189,
+  :uniques-7d-sum 1029,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/health", :requests 1540}
-   {:path "/_health", :requests 1503}
+  [{:path "/health", :requests 1391}
+   {:path "/_health", :requests 1352}
    {:path "/", :requests 94}
    {:path "/api/funnel", :requests 26}
-   {:path "/robots.txt", :requests 20}
-   {:path "/sign-in", :requests 11}
+   {:path "/robots.txt", :requests 21}
+   {:path "/sign-in", :requests 10}
    {:path "/llms.txt", :requests 6}
    {:path "/v1/email/verify", :requests 5}],
-  :status-mix {:client-error 3617, :ok 3233},
+  :status-mix {:client-error 3283, :ok 2934},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
  :as-of "2026-08-08",
  :traffic-quality {:window "24h", :probe-4xx-pct 53, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /health 1540 · /_health 1503 · / 94 · /api/funnel 26 · /robots.txt 20 | 4xx(probe) 53%",
- :funnel {:visitors 2447, :signups 13, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /health 1391 · /_health 1352 · / 94 · /api/funnel 26 · /robots.txt 21 | 4xx(probe) 53%",
+ :funnel {:visitors 2448, :signups 13, :checkouts 0},
  :signal
- "kotobase.net 実測 61845 req/7d・1027 uniques(日次和)・うち4xx probe 53%(24h)、workers 64943 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 61852 req/7d・1029 uniques(日次和)・うち4xx probe 53%(24h)、workers 64961 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 916},
+ {:visitors {:openai-ads 3, :organic 917},
   :signups {:organic 10}, 
   :checkouts {}}}
