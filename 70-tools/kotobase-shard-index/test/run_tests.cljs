@@ -8,6 +8,7 @@
   full scan of the same index over synthetic corpora and queries. The stopping
   bound is an argument; this is the check on it."
   (:require [kotobase-shard-index.analyze :as analyze]
+            [kotobase-shard-index.append :as append]
             [kotobase-shard-index.block :as block]
             [kotobase-shard-index.build :as build]
             [kotobase-shard-index.codec :as codec]
@@ -361,6 +362,96 @@
   (check! (str "GETs grow far slower than the corpus " (pr-str results))
           (< growth (/ corpus-growth 2))
           {:results results :get-growth growth :corpus-growth corpus-growth}))
+
+;; ── 8b. incremental append ──────────────────────────────────────────
+;; An index that can only be produced from the whole corpus at once cannot
+;; follow a crawl. What has to hold after an append:
+;;
+;;   (a) the appended documents are findable;
+;;   (b) the index is INTERNALLY consistent — the bounded scan still agrees
+;;       with a full scan of the same index. This must hold no matter how far
+;;       the scoring basis has drifted, because drift changes what the right
+;;       answer is, not whether the early termination proof holds;
+;;   (c) existing shards' blocks are not rewritten;
+;;   (d) two appends against one manifest are refused rather than silently
+;;       producing two segments that claim the same doc-ids.
+
+(let [head (synth/corpus 1500 51 vocab-size)
+      tail (mapv (fn [d] (update d :url str "-t")) (synth/corpus 500 52 vocab-size))
+      store (block/memory-store)
+      {:keys [manifest-cid]} (build/build! store node/sha256-hex head {:shard-count 4})
+      blocks-before (block/block-count store)
+      shard-cids (fn [mc] (set (mapcat (juxt :dict-root :meta-dir)
+                                       (:shards (block/get-block store mc)))))
+      before-cids (shard-cids manifest-cid)
+      appended (append/append! store store node/sha256-hex manifest-cid tail)
+      mc2 (:manifest-cid appended)
+      m2 (block/get-block store mc2)]
+
+  (is= "append: document count grows by the batch"
+       2000 (get-in m2 [:stats :doc-count]))
+  (is= "append: one new segment" 5 (count (:shards m2)))
+  (check! "append: the scoring basis is preserved, and the generation counts up"
+          (and (= 1500 (get-in m2 [:scoring-basis :doc-count]))
+               (= 1 (get-in m2 [:scoring-basis :generation])))
+          (:scoring-basis m2))
+
+  ;; (c) — the existing shards' roots are byte-identical, so the append wrote
+  ;; nothing on their behalf. Content addressing makes this checkable rather
+  ;; than a claim about which code paths ran.
+  (check! "append: existing shards' blocks are untouched"
+          (every? (set (shard-cids mc2)) before-cids)
+          {:before (count before-cids) :still-present (count (filter (set (shard-cids mc2)) before-cids))})
+  (check! (str "append: writes far fewer blocks than the index already had ("
+               (- (block/block-count store) blocks-before) " vs " blocks-before ")")
+          (< (- (block/block-count store) blocks-before) blocks-before)
+          {:written (- (block/block-count store) blocks-before) :existing blocks-before})
+
+  ;; (b) — the load-bearing one.
+  (let [inconsistent
+        (vec (for [q queries
+                   :let [fast (route/search store mc2 q {:k 10})
+                         slow (query/top-k-exhaustive store mc2 q {:k 10})]
+                   :when (not= (mapv :score (:hits fast)) (mapv :score (:hits slow)))]
+               {:q q :fast (mapv (juxt :doc-id :score) (:hits fast))
+                :slow (mapv (juxt :doc-id :score) (:hits slow))}))]
+    (check! "append: the bounded scan still agrees with a full scan of the appended index"
+            (empty? inconsistent) (first inconsistent)))
+
+  ;; (a) — without this the rest could pass on an index that appended nothing
+  ;; queryable. Search for a term and require at least one appended doc-id.
+  (let [hits (mapcat #(:hits (route/search store mc2 % {:k 50})) queries)]
+    (check! "append: appended documents are reachable (doc-id >= 1500)"
+            (some #(>= (:doc-id %) 1500) hits)
+            {:max-id (reduce max -1 (map :doc-id hits))}))
+
+  ;; (d) — `append!` is a pure function of (manifest, docs). This is what is
+  ;; actually guaranteed, and it is worth more than the guard that was here
+  ;; first: that one tried to REFUSE a second append against the same parent
+  ;; manifest, which cannot be detected from the parent (it has no record of
+  ;; the child). Divergence is a ref-plane concern — `inga`'s — and a check
+  ;; here would have passed while two writers raced. Purity gives the thing
+  ;; the guard was reaching for: a retry is free, and a duplicate is
+  ;; detectable by comparing addresses.
+  (let [again (append/append! store store node/sha256-hex manifest-cid tail)]
+    (is= "append: appending the same batch to the same manifest is idempotent"
+         mc2 (:manifest-cid again)))
+  (check! "append: appending nothing is refused rather than writing an empty segment"
+          (try (append/append! store store node/sha256-hex mc2 []) false
+               (catch :default _ true))
+          nil))
+
+;; An index built without a routing dictionary cannot be appended to — the
+;; merge has nothing to merge into. Refused loudly, for the same reason
+;; `route/search` refuses it: a silent fallback here would rebuild the world.
+(let [{:keys [store manifest-cid]} (build-mem (synth/corpus 200 13 vocab-size)
+                                              {:shard-count 2 :route? false})]
+  (check! "append: an index without a routing dictionary is refused loudly"
+          (try (append/append! store store node/sha256-hex manifest-cid
+                               (synth/corpus 50 14 vocab-size))
+               false
+               (catch :default _ true))
+          nil))
 
 ;; ── 9. filesystem (S3-shaped) store round-trips ─────────────────────
 

@@ -1,0 +1,147 @@
+[{:db/id -1
+  :adr/id "adr-2608094000-portfolio-revenue-zero-kotobase-green-path-blocked"
+  :adr/doc_type "adr"
+  :adr/topic "portfolio-revenue-zero-kotobase-green-path-blocked"
+  :adr/title "ADR-2608094000: 4 主力ドメインの実収益はゼロ、kotobase の green 化は repo 到達不能で停止"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+  :adr/authoritative_for
+  ["kotobase.net / murakumo.cloud / shinshi.club / itonami.cloud の 2026-08-08 実収益実測"
+   "net-kotobase Standard の確定価格 (¥2,980/月) と ¥980 の supersede"
+   "net-kotobase green 化の残作業と、session 境界による停止点・引き継ぎ入力"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends []
+  :adr/related
+  ["90-docs/business/revenue-agent-loop/COMMERCIAL-GO-NO-GO.md"
+   "90-docs/business/revenue-agent-loop/SCORECARD.md"
+   "90-docs/business/net-kotobase-graphdb-baas-execution-plan-2026-07-24.md"
+   "90-docs/business/maturity-facts.edn"]
+  :adr/evidence
+  ["90-docs/business/metrics/net-kotobase.edn (as-of 2026-08-08)"
+   "90-docs/business/metrics/cloud-murakumo.edn (as-of 2026-08-08)"
+   "90-docs/business/metrics/club-shinshi.edn (as-of 2026-08-08)"
+   "90-docs/business/metrics/cloud-itonami.edn (as-of 2026-08-08)"
+   "90-docs/business/canvas-ledger.edn (ExoClick 2026-07-09 実測)"]
+  :adr/body "# ADR-2608094000: 4 主力ドメインの実収益はゼロ、kotobase の green 化は repo 到達不能で停止
+
+## Context
+
+オーナーからの問い: 「いまの kotobase.net, murakumo.cloud, shinshi.club,
+itonami.cloud で収益を稼げる状態になっている?」
+
+`90-docs/business/metrics/*.edn`（as-of 2026-08-08、advisor loop が当日更新）を
+実測として確認した。
+
+| Product | 外部実入金 | 実測ファネル | 決済状態 |
+|---|---|---|---|
+| net-kotobase (kotobase.net) | 0 | 訪問 2,453 → 登録 13 → checkout 0 | Stripe active subs 0 / x402 settlement 0 |
+| cloud-murakumo (murakumo.cloud) | 0 | federation active-demand-apps 0 | Stripe active subs 0、murakumo-paid-charges 0 |
+| club-shinshi (shinshi.club) | 0 | 訪問 645 → chatter 1 → scene 0 → 課金 0 | creator GMV 0、ExoClick も直近窓 USD 0 |
+| cloud-itonami (itonami.cloud) | 0 | 外部 tenant 5（全 free path）→ externalPaid 0 | live Payment Link あり・readyForLiveCheckout true |
+
+ポートフォリオ全体の Stripe は charges-total 90 / last-charge-epoch 1604224274
+= 最後の課金が 2020-11-01。account-wide active subs 2 はこの 4 product の
+いずれにも紐づかない。
+
+各 product の「稼げない理由」は共通ではない。
+
+- **murakumo**: 原価優位は実在する（フリート ¥21.7/Mtok vs spot ¥40.55/Mtok）。
+  しかし x402 出品 $0.01/req は 1req≒270tok 換算で約 $37/1M tok = GPT-4o-mini の
+  約 100 倍。さらに推論は head 1 台で日 40M tok が天井のため、市場価格で完売しても
+  理論上の収益天井は月約 $360。売値の問題であって告知の問題ではない。
+- **shinshi**: creator 課金は PSP 制約と成人向け固有ゲート（age assurance /
+  refund / payout）で hard red。
+- **itonami**: billing 配線は live で E2E も email step まで到達済み。塞いでいるのは
+  収納主体（AWAI operator に対し Stripe は Gftd Japan、収納代行契約が未署名 draft）と
+  日本の登記・税務。加えて 24h で 5xx 28%。
+- **kotobase**: COMMERCIAL-GO-NO-GO が指名する「最短で green にできる 1 本」。
+
+## 監査で検出した 2 つの記録上の欠陥
+
+### 1. Standard 価格が同一日付の 2 文書で矛盾していた
+
+| 文書 | 記載 |
+|---|---|
+| revenue-agent-loop/SCORECARD.md（2026-07-24） | ¥980/mo、pricing ADR は proposed（未 ratify） |
+| net-kotobase-graphdb-baas-execution-plan-2026-07-24.md | Developer Standard ¥2,980/mo |
+
+同時に COMMERCIAL-GO-NO-GO の「Smallest path」項目 1-2 は取り消し線で完了扱い
+だった。3 つは同時に真になり得ず、Unblock proof の要件「ratified price」は
+実際には満たされていなかった。この repo の ADR を grep しても ¥980 / ¥2,980 は
+どちらも存在しない（ratified pricing ADR があるとすれば net-kotobase repo 側）。
+
+### 2. ExoClick を現在形で「唯一の live 収益」と書いていた
+
+maturity-facts.edn / maturity-scores.edn の club-shinshi note は ExoClick ad を
+「gftd 唯一の :live 収益」と現在形で記載し、revenue 3 の根拠にしていた。しかし
+canvas-ledger の 2026-07-09 実測は 7d 再構成 USD 0・imp 0（原因は
+atproto.gftd.ai 全 522 による全画像死。PR #12 で cdn.gftd.ai 直配信に切替えたが
+imp 回復は未確認）。2026-08-08 実測も課金 0・creator GMV 0。first $ は史実だが
+現在は産出していない。ポートフォリオ最高の revenue スコアが現在値を表さない
+記述に支えられていた。
+
+## Decision
+
+1. **net-kotobase Standard = ¥2,980/月**（owner 判断 2026-08-08）。execution plan の
+   Developer Standard を正とし、¥980 は superseded。base target（39 顧客・月次 GP
+   約 ¥314,600）は ¥2,980 前提で組まれており、こちらが整合する。
+2. COMMERCIAL-GO-NO-GO.md / SCORECARD.md を 2026-07-24 → 2026-08-08 の実測へ更新し、
+   価格矛盾の検出と解消経緯を「価格の確定」節に記録する。
+3. maturity-facts.edn の club-shinshi note を訂正し（現在形の誤りを除去、
+   ledger 実測と原因を明記）、`gftd score md` で maturity-scores.edn を再生成する。
+   **revenue 3 の数値自体は据置とし、rubric の 0-5 anchor に照らした再採点は
+   owner 判断事項として未実施であることを note に明示する** — agent が独断で
+   ポートフォリオのスコアを動かさない。
+4. green 化の残り作業を、会話履歴なしで再開できる形で固定する（下記）。
+
+## Session constraint（この ADR が停止点である理由）
+
+`network-awai/net-kotobase` は com-junkawasaki スコープの session に attach できない。
+`add_repo` が構造的に拒否する。
+
+    cross-tier adds are not supported in v1: requested \"network-awai/net-kotobase\"
+    but session already has repos from owner(s) [com-junkawasaki]
+
+green 化 7 項目のうち:
+
+- 項目 2（pricing ADR ratify + Stripe Product/Price 照合）、3（terms 確定）、
+  4（privacy 確定）、6（Stripe test-mode E2E）は net-kotobase repo の実装事実を要し、
+  **本 session から実行不能**。
+- 項目 5（counsel 承認）、7（live 切替の owner 承認 + support/refund 担当指名）は
+  irreducibly owner / counsel の行為であり、**agent が代行してはならない**。
+
+したがって本 session で閉じられたのは項目 1（価格決定）のみ。
+
+## 次 session への引き継ぎ
+
+`network-awai/net-kotobase` を initial source にした新規 session を開くこと。
+
+- 確定入力: Standard ¥2,980/月（¥980 は superseded）
+- 検証対象: Stripe Product/Price が ¥2,980 と一致するか、landing 表示と一致するか、
+  pricing ADR が ratified か
+- 未決定のまま渡す項目: 税込/税別、billing cycle、解約時点、返金条件
+- E2E 要件: checkout → signed webhook → tenant entitlement → cancellation/downgrade、
+  test mode、event ID は秘匿化して記録
+- 禁止: live 切替、外部顧客への勧誘、owner 承認の代行
+
+## Consequences
+
+(+) 「収益ゼロ」が推定ではなく当日実測として固定され、4 product の停止理由が
+    別々であることが記録された。
+
+(+) green の前提条件だった価格が確定し、最も安いゲートが 1 つ閉じた。
+
+(+) ポートフォリオのスコアを支えていた現在形の誤記が訂正され、生成物も再生成された。
+
+(-) 実収益は 1 円も動いていない。本 ADR は記録の整備であって売上ではない。
+
+(-) kotobase の green 化は session 境界で停止しており、再開には新規 session が要る。
+
+(?) club-shinshi の revenue 3 は現在値と乖離したまま据置。rubric に照らした再採点を
+    owner が行うまで、ポートフォリオ集計は実態より高く出る。
+"}]
