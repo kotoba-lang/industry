@@ -1,0 +1,200 @@
+[{:db/id -1
+  :adr/id "adr-2608620000-network-isekai-kingdom-cascade-match3"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/topic "network-isekai-kingdom-cascade"
+  :adr/title "ADR-2608620000: network-isekai の match-3「Kingdom Cascade」— ルール層は完成・検証済み、renderer と mobile packaging は未実行（repo scope により superproject に staging）"
+  :adr/status "accepted"
+  :adr/date "2026-08-08"
+  :adr/last-verified "2026-08-08"
+  :adr/last_verified "2026-08-08"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+
+  :adr/authoritative-for
+  ["network-isekai 向け match-3 ゲーム Kingdom Cascade の設計と現在地の正本"
+   "そのコードが superproject の 60-apps/ に staging された理由（session の repo scope）の正本"
+   "renderer 境界（render_ir.cljc）が唯一の adapter seam であるという設計判断の正本"]
+
+  :adr/related
+  ["adr-2607140900-kami-engine-genre-benchmark-sample-suite"
+   "adr-2607120100-kami-engine-cljs-direct-webgpu-rendering-standard"
+   "adr-2608072000-kotoba-shell-mobile-signing-packaging-in-app-bridge"
+   "adr-2607031800-kami-genre-base-systems"
+   "260726-isekai-sekaiju-2d-sidescroll-mmo"]
+
+  :adr/body
+  "# ADR-2608620000: Kingdom Cascade
+
+**Status**: accepted / **Date**: 2026-08-08
+
+## 依頼
+
+オーナー指示（2026-08-08、スクリーンショット添付）: **「Network-isekai でこれと
+同じゲームをつくって公開。iOS, android にも公開できるように。kami engine を使って」**。
+添付は商用 match-3（swap-and-match + 障害物破壊 + 不整形盤面）の App Store 広告。
+
+**参照したのはジャンルだけで、タイトル・キャラクター・アート・レベル・文言・固有
+ルールは一切複製していない**（ADR-2607140900 が genre benchmark に課している線と
+同じ）。成果物は `Kingdom Cascade` という独自 IP。
+
+## 決定
+
+`network-awai/network-isekai` の `games/kingdom-cascade/` として、ルール層を
+**pure `.cljc`**、描画を **KAMI sprite2d 経路への EDN render-IR** として実装する。
+
+### 置き場所 — superproject の `60-apps/` に staging した（これは妥協である）
+
+**このセッションの GitHub access は `com-junkawasaki/root` だけにスコープされていた。**
+`network-awai/network-isekai` / `kotoba-lang/kami-engine` / `kotoba-lang/shell` は
+いずれも到達不能で、`add_repo` は cross-tier add を拒否した（`git clone` も
+`mcp__github__get_file_contents` も同じ理由で失敗）。
+
+したがってコードは
+`60-apps/network-isekai/games/kingdom-cascade/` に置き、**そのまま移設できる形**に
+した（`src/isekai/games/kingdom_cascade/**` が network-isekai 既存の `src/isekai/`
+ツリーにそのまま合流する）。これは正しい最終位置ではない。移設は次のセッションの
+最初の仕事。
+
+### 描画境界は 1 ファイルに閉じる
+
+`render_ir.cljc` だけが renderer の存在を知る。ゲームの他のどのファイルも
+sprite・atlas・座標を知らない。**上流の key 名が違っていたら直す場所はここ 1 箇所**。
+
+これは設計の趣味ではなく、上流を読めなかったことへの構造的な対処である。
+`kotoba.sprite2d` / `isekai/render_ir.cljc` を実際に読めていないので、key 名は
+ADR-2607120100 と kami-webgpu split ledger が記す形（`:render/sprite2d` component、
+`:art/preset` を base layer にして scene 側が override）に**従っているが、実物に
+対してコンパイルしていない**。この不確かさを 1 ファイルに閉じ込めた。
+
+### mobile は kotoba-shell 経路（新しい packaging を作らない）
+
+ADR-2608072000 が iOS/Android の配布経路の正本。`shell/app.edn` を書き、
+`app scaffold` → `app build`（開発ループ）→ `app package`（配布、署名必須）→
+`store request` / `release submit` の runbook を `docs/publishing.md` に置いた。
+
+capability policy は **deny-by-default で `storage/*` と `clock/now` のみ許可**。
+`http/fetch` を含む残りは*名指しで* deny に書いた（後から「analytics のために」足す
+には誰かが行を消す必要がある）。
+
+## 実測したこと（file-presence ではなく実行結果）
+
+| 対象 | 実測 |
+|---|---|
+| テスト | **91 tests / 2211 assertions / 0 failures**（`npx nbb --classpath src:test:../common/src run-tests.cljs`） |
+| レベル集合 | **3/3 が greedy solver で budget 内に勝てる**（`levels.cljs --gate`） |
+| headless 実行 | kc-001 6/12 手・kc-002 14/26 手・kc-003 21/30 手で勝利、盤面を毎手表示 |
+| 決定性 | 同 seed の再実行で digest 一致 |
+| web build | **未実行** |
+| `.ipa` / `.aab` | **未生成** |
+| ストア送信 | **未着手** |
+
+**未実行の 3 つは設計の欠落ではなく、上記の repo scope と、この container が
+Linux で Xcode も Android SDK も持たないことによる。** なお ADR-2608072000 自身が
+「実際のアップロードは未検証」と記録しており、**このワークスペースで store 送信を
+通した実績はまだ 1 件も無い**。
+
+## gate が実際に捕まえた 4 件（劇場ではない証拠）
+
+1. **`level/validate` が自分の書いたレベルを落とした** — kc-001 が crate 8 個を
+   要求したが grid には 4 個しか無かった。
+2. **`levels.cljs` が cover goal の到達不能を暴いた** — `level/deal` が
+   `board/vacant?`（cover があると false）で埋めていたため、**ice の下に piece が
+   置かれず、ice を含む match が原理的に成立しなかった**。cover goal は永久に
+   0 のまま、しかも例外は出ない。`board/pieceless?` を分けて修正。
+3. **`level/validate` 自身が throw していた**（PR #1736 のレビューで発見、2026-08-08）。
+   `parse-grid` は未知の glyph で throw する — これは「これから遊ぶ」呼び出し側には
+   正しい。しかし **`validate` の仕事は不正なレベルを*報告する*ことなので、そこで
+   throw すると gate 実行全体が落ち、同じ run の他のレベルが全部隠れる**。
+   **gate が存在する理由そのものの入力で gate が死んでいた。** `try-parse` で捕らえ、
+   `{:problem :malformed-grid :glyph ... :pos ...}` として報告するよう修正。
+   検証: 壊した glyph 入りの level set で、不正な kc-001 を報告しつつ健全な kc-002 も
+   引き続き報告し、exit code 1 を維持することを実測。
+
+4. **`matcher/longest-contiguous` の off-by-one** — `loop` の binding が `let` と
+   同じく**逐次**であることを忘れ、`(loop [vs (rest vs), prev (first vs) ...])` の
+   `prev` が既に rebind された `vs` を読んでいた。結果、4-in-a-row が
+   `:arrow-v`、L/T が `:bomb` でなく `:prism` を返していた。nbb の不具合ではなく
+   Clojure の仕様どおりの挙動で、**テストが無ければ気付けなかった**。
+
+## ルール（要点だけ）
+
+- 隣接 swap。**match が開くか、special が絡むときだけ合法**。
+- 4 直線 → arrow（行/列）、5+ 直線 → prism（1 色全消し）、L/T → bomb（3×3）。
+  special は**色を持たない**ので色 run に参加しない。tap で発火、special 同士の
+  swap で combo（arrow+arrow=十字、bomb+bomb=半径2、bomb+arrow=3幅ビーム、
+  prism+X=1 色変換、prism+prism=全消し）。
+- **crate/stone** はセルを占有し piece を持たない。**隣接**の match で壊れる。
+  **ice/frost** は piece に被さる。piece は動かせず落下も塞ぐが、**match には
+  参加でき**、clear は piece でなく cover を削る。
+- 落下は直下優先、直上が solid なら斜め。**斜め落下が無いと張り出しの下の
+  ポケットが永久に埋まらず deadlock する**。
+- 手詰まりは loose piece だけ reshuffle。障害物は動かさない。
+
+## 決定性の作り方（両 runtime で同値であることが要件）
+
+- RNG は Park-Miller（`s' = s * 48271 mod (2^31-1)`）。**乗算の中間値が 2^53 未満**
+  に収まる multiplier を選んであるので JVM の long と cljs の double が食い違わない。
+- `core/digest` は多項式 rolling hash。**`clojure.core/hash` は使わない** —
+  clj と cljs で違ってよい値なので、まさにこの比較には使えない。
+- 盤面走査は固定の reading order。
+
+## 次の一手（順序つき）
+
+1. `60-apps/network-isekai/games/kingdom-cascade/` を network-isekai へ移設。
+2. network-isekai 自身の `deps.edn` から KAMI stack の座標を取り、
+   shadow-cljs release を通す（**座標をここで推測して焼かない** — 間違った pin は
+   build 時でなく実行時に落ちる）。
+3. `render_ir.cljc` を実物の `kotoba.sprite2d` に当て、key 名の drift を潰す。
+4. browser / packaged app / nbb の 3 者で `core/digest` を突き合わせる。
+5. `apple/team-id` と Android keystore を credential ツールから入れ、
+   `app package` を通す。"
+
+  :adr/decisions
+  [{:decision/id :d1
+    :decision/what "network-isekai に match-3 ゲーム Kingdom Cascade を作る。ジャンルのみ参照、独自 IP。"
+    :decision/status :landed}
+   {:decision/id :d2
+    :decision/what "ルール層は pure .cljc（atom なし、I/O なし）。browser / mobile shell / headless nbb の共通 authority。"
+    :decision/status :landed
+    :decision/evidence "91 tests / 2211 assertions green"}
+   {:decision/id :d3
+    :decision/what "描画は render_ir.cljc 1 ファイルに閉じた EDN render-IR。KAMI sprite2d 経路（kotoba.sprite2d over kotoba.webgpu、fallback kotoba.webgl）が消費する。"
+    :decision/status :written-unverified
+    :decision/gap "上流 repo が session scope 外で、実物に対してコンパイルしていない。"}
+   {:decision/id :d4
+    :decision/what "iOS/Android は kotoba-shell の app scaffold / package 経路（ADR-2608072000）。新しい packaging を作らない。capability policy は deny-by-default。"
+    :decision/status :configured-unrun
+    :decision/gap "shell repo が scope 外、container に Xcode / Android SDK 無し。"}
+   {:decision/id :d5
+    :decision/what "コードは superproject の 60-apps/network-isekai/games/kingdom-cascade/ に staging。移設可能な形を保つ。"
+    :decision/status :landed
+    :decision/gap "正しい最終位置ではない。移設が次セッションの最初の仕事。"}]
+
+  :adr/gaps
+  [{:gap/id :renderer-uncompiled
+    :gap/what "render_ir.cljc が上流 kotoba.sprite2d / isekai/render_ir.cljc に対してコンパイルされていない。"
+    :gap/blocked-by "session の GitHub scope が com-junkawasaki/root のみ"
+    :gap/date "2026-08-08"}
+   {:gap/id :web-build-unrun
+    :gap/what "shadow-cljs release 未実行。KAMI stack の依存座標は意図的に書いていない（推測した pin は実行時にしか落ちない）。"
+    :gap/blocked-by "network-isekai の deps.edn が読めない"
+    :gap/date "2026-08-08"}
+   {:gap/id :mobile-unbuilt
+    :gap/what "app scaffold / package 未実行。.ipa / .aab 未生成。ストア送信未着手。"
+    :gap/blocked-by "shell repo が scope 外 / Linux container に Xcode・Android SDK 無し"
+    :gap/date "2026-08-08"}
+   {:gap/id :no-store-precedent
+    :gap/what "このワークスペース全体で App Store / Play への実アップロード実績が 0 件（ADR-2608072000 自身の記録）。最初の送信は最初の送信になる。"
+    :gap/date "2026-08-08"}
+   {:gap/id :no-art
+    :gap/what "atlas 画像が未制作。art/atlas は renderer が期待する配置を記述しているだけ。"
+    :gap/date "2026-08-08"}]
+
+  :adr/verification
+  {:command "npx nbb --classpath src:test run-tests.cljs"
+   :result "91 tests, 2211 assertions, 0 failures, 0 errors"
+   :level-gate "npx nbb --classpath src levels.cljs --gate -> 3/3 playable"
+   :headless "npx nbb --classpath src play.cljs resources/levels/kc-00{1,2,3}.edn -> won"
+   :date "2026-08-08"}}]
