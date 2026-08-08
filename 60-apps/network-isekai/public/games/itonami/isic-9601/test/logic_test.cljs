@@ -1,7 +1,7 @@
 (ns logic-test
   "nbb test suite for the ISIC 9601 idle tycoon.
 
-  Run: npx nbb --classpath games/itonami/isic-9601 games/itonami/isic-9601/test/logic_test.cljs
+  Run: npx nbb --classpath 60-apps/network-isekai/public/games/itonami/isic-9601 60-apps/network-isekai/public/games/itonami/isic-9601/test/logic_test.cljs
 
   The first three tests are the ones that matter: they are the game's copy of
   `cloud-itonami-isic-9601`'s own invariants, and they fail if a future edit

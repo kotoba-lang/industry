@@ -3,7 +3,7 @@
   shop in a browser.
 
   Run from the repo root:
-    npx nbb games/itonami/isic-9601/preview/build.cljs
+    npx nbb 60-apps/network-isekai/public/games/itonami/isic-9601/preview/build.cljs
 
   Pipeline: squint compiles `logic.cljc` and `ui.cljs` to ESM, esbuild bundles
   them with squint's core into one dependency-free script, and that script is
@@ -17,7 +17,7 @@
             ["node:path" :as path]
             ["node:child_process" :as cp]))
 
-(def here (path/join (js/process.cwd) "games/itonami/isic-9601"))
+(def here (path/join (js/process.cwd) "60-apps/network-isekai/public/games/itonami/isic-9601"))
 (def out (path/join here "preview/index.html"))
 
 (defn sh [cmd]

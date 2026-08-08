@@ -15,7 +15,8 @@
                 "90-docs/adr/2607091830-network-isekai-game-work-actors-app-aozora.edn"
                 "90-docs/adr/2607031400-itonami-games-atproto-actors-app-aozora.edn"
                 "90-docs/adr/2606271700-cloud-itonami-business-os.edn"
-                "games/itonami/isic-9601/"
+                "90-docs/adr/2608620000-network-isekai-kingdom-cascade-match3.edn"
+                "60-apps/network-isekai/public/games/itonami/isic-9601/"
                 "https://github.com/cloud-itonami/cloud-itonami-isic-9601"]
 
   :adr/authoritative_for
@@ -40,9 +41,16 @@
     `test/logic_test.cljs` の actuation-never-auto-at-any-phase と
     hired-approver-never-clears-actuation がこれを固定する"
    "ゲーム本体は pure `.cljc` の `state + event -> state` reducer 1 本
-    (`games/itonami/isic-9601/logic.cljc`)。nbb のテスト、squint 経由の
+    (`60-apps/network-isekai/public/games/itonami/isic-9601/logic.cljc`)。nbb のテスト、squint 経由の
     ブラウザプレビュー、将来の network-isekai guest が同じファイルを読む。
     UI は `summary` しか見ず、規則を一切持たない"
+   "staging の置き場所は `60-apps/network-isekai/<repo 内と同じ相対パス>/`。
+    同日に並行セッションが同じ blocker (network-isekai が private) に当たり
+    Kingdom Cascade を `60-apps/network-isekai/games/kingdom-cascade/` に
+    置いた (ADR-2608620000) ので、staging の根を揃えた。根の下は移植先の
+    相対パスをそのまま写す —— itonami の game は ADR-2607031000 が記す
+    `public/games/itonami/<slug>/` なので、ここも `public/games/itonami/`
+    が付く"
    "本セッションで着地したのは superproject 側の staging まで。
     network-awai/network-isekai は private でセッションの repo scope に無く、
     `add_repo` が承認待ちで通らなかったため、`scene.edn` は書いていない
@@ -159,7 +167,7 @@ governor はこのチェックを無条件に評価するので全工程が HOLD
 
 ### 4. 1 ファイルの純関数 reducer にする
 
-`games/itonami/isic-9601/logic.cljc` が全規則。I/O・atom・interop・
+`60-apps/network-isekai/public/games/itonami/isic-9601/logic.cljc` が全規則。I/O・atom・interop・
 `Math/random` なし。RNG は `:seed` から状態に織り込んだ MINSTD。
 nbb のテストも、squint 経由のブラウザプレビューも、将来の kami-clj guest も
 **同じファイルを読む**ので挙動が割れない。UI は `summary` しか見ず規則を持たない。
@@ -191,7 +199,19 @@ nbb のテストも、squint 経由のブラウザプレビューも、将来の
 
 ## 現在地 —— 何が着地して、何が着地していないか
 
-**着地した**: `com-junkawasaki/root` の `games/itonami/isic-9601/` に、規則・
+**staging の根について**: 同日、別のセッションが同じ blocker に当たって
+Kingdom Cascade (match-3) を `60-apps/network-isekai/games/kingdom-cascade/`
+に置いた (ADR-2608620000)。`60-apps/` は origin/main にまだ無い新設だが、
+`70-tools` / `80-data` / `90-docs` の数字付きエリア規約に沿っており、
+staging の根を 2 つ作るより揃える方がよいのでこちらも同じ根に置いた。
+根の下は**移植先の相対パスをそのまま写す** —— itonami の game は
+ADR-2607031000 が `public/games/itonami/<slug>/` と記しているので、
+`60-apps/network-isekai/public/games/itonami/isic-9601/` になる。
+(Kingdom Cascade 側は `games/<slug>/` を写している。どちらの相対パスが
+現在の network-isekai の実態かは、repo access が取れるまでどちらの
+セッションも検証できていない。)
+
+**着地した**: `com-junkawasaki/root` の `60-apps/network-isekai/public/games/itonami/isic-9601/` に、規則・
 テスト・自己完結 HTML プレビュー (~41 KB、外部取得ゼロ) 一式。
 
 **着地していない**: network-isekai への移植。`network-awai/network-isekai` は

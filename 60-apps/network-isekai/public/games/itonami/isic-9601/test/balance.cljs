@@ -2,7 +2,7 @@
   "Balance probe -- plays the shop the way a competent player would and reports
   what actually killed the run. Not a test; a tuning instrument.
 
-  Run: npx nbb --classpath games/itonami/isic-9601/src games/itonami/isic-9601/test/balance.cljs"
+  Run: npx nbb --classpath 60-apps/network-isekai/public/games/itonami/isic-9601/src 60-apps/network-isekai/public/games/itonami/isic-9601/test/balance.cljs"
   (:require [itonami.isic-9601.logic :as l]))
 
 (defn- station-of [s k]

@@ -3,8 +3,8 @@
 
   Run from the repo root, after `preview/build.cljs`:
     PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \\
-      npx nbb --classpath games/itonami/isic-9601/node_modules \\
-      games/itonami/isic-9601/preview/smoke.cljs
+      npx nbb --classpath 60-apps/network-isekai/public/games/itonami/isic-9601/node_modules \\
+      60-apps/network-isekai/public/games/itonami/isic-9601/preview/smoke.cljs
 
   It opens the built page in headless Chromium, lets the shop run, drives the
   same approve/reject/upgrade buttons a player would, and asserts the page
@@ -15,7 +15,7 @@
             [promesa.core :as p]))
 
 (def page-url
-  (str "file://" (path/join (js/process.cwd) "games/itonami/isic-9601/preview/index.html")))
+  (str "file://" (path/join (js/process.cwd) "60-apps/network-isekai/public/games/itonami/isic-9601/preview/index.html")))
 
 (def failures (atom 0))
 
@@ -74,7 +74,7 @@
           _ (is! (and returned (pos? (js/parseInt returned 10)))
                  (str "garments were returned (" returned "/40)"))
 
-          _ (.screenshot page #js {:path "games/itonami/isic-9601/preview/screenshot.png"
+          _ (.screenshot page #js {:path "60-apps/network-isekai/public/games/itonami/isic-9601/preview/screenshot.png"
                                    :fullPage true})
           _ (println "  screenshot written")]
     true))
