@@ -31,6 +31,13 @@ nbb --classpath ".:scripts/nbb_compat" scripts/itonami-os-maturity-tick.cljs
 ```
 
 tick が出す `:candidates` が**次の 1 本の候補**（M_own 降順、標準形適合のみ）。
+
+tick は宣言を **origin/main から**読む（2026-08-08 以降）。出力 1 行目が
+`宣言: origin/main の os.edn` であることを確認すること —— `⚠ working tree の
+os.edn` と出ていたら **その候補は信用できない**（共有 checkout は west の pin に
+留まり他セッターの WIP で dirty なので、main で既に接続済みの vertical を
+「未宣言」と判定する。実測 2026-08-07 / 08 の 2 回、1 位の 4630 が両方とも既に
+接続済みで、loop 自身が『次の反復も同じ罠を踏む』と ledger に書いて終わった）。
 `~/.gftd/itonami-os-maturity-tick.ledger.edn` の末尾数行も読む。
 
 **tick が `:ops-drift` を出していたら、接続より先にそれを直す。** 宣言と actor の
@@ -86,6 +93,25 @@ nbb scripts/generate-sites-registry.cljs && nbb scripts/run-task.cljs sites-regi
 registry が STALE だと `test-sites` は**検査を始める前に中断する** —— つまり
 STALE は「404 になる」だけでなく「検査が走らなくなる」。実際この中断が既存の
 4 失敗を隠していた。`sites-registry-check` が OK を返すまでを接続作業に含めること。
+
+**`sites.edn` の classpath は 1 ブロックではなく、生成対象の全ブロックに足す。**
+`:generator "scripts/generate-os-site.cljs"` を持つ site 宣言は 27 個あり、その
+どれもが**繋いだ vertical 全部**を解決できないといけない（生成器は 1 回の実行で
+全面を描くため）。`declared-classpath-can-actually-run-the-generator` がこれを
+検査する。
+
+⚠ **並行して別の反復が着地すると、両方向に穴が空く。** 実測 2026-08-08:
+7320 と 3600 が同じ日に着地し、**7320 のブロックに 3600 が無く、3600 のブロックに
+7320 が無い**状態になった（互いの patch が相手の追加より前に作られていたため）。
+片方向だけ直しても落ち続ける。両方向を揃えること:
+
+```bash
+grep -c 'isic-<自分>/src' sites.edn   # 27 になるまで
+grep -c 'isic-<相手>/src' sites.edn   # こちらも 27
+```
+
+1 本繋ぐたびに 27 ブロックへ波及するのは構造上の負債で、**恒久対応は宣言を
+導出にすること**（この skill の範囲では直さない。踏んだら ledger に残す）。
 
 ### 3. 実際に回す（ここを飛ばさない）
 

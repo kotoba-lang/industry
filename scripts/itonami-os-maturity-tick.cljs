@@ -62,8 +62,66 @@
 
 ;; ── 1) 宣言を読む ────────────────────────────────────────────────────────────
 
+(defn- git-out
+  "`git -C app ...` の stdout。落ちたら nil —— 宣言が読めないことと
+  『読めたが古い』ことは別の失敗なので、ここで握り潰さずに呼び出し側へ返す。"
+  [args]
+  (let [{:keys [code out]} (sh "git" (into ["-C" app] args))]
+    (when (= 0 code) out)))
+
+(def declaration-source
+  "宣言をどこから読んだか。`:remote` / `:worktree` / nil。
+
+  **working tree の os.edn を読むと、この tick は嘘の候補を出す。** 共有
+  checkout は west の pin に留まり、しかも他セッションの WIP で dirty のまま
+  置かれるので、main で既に接続済みの vertical を『未宣言』と判定する。
+  実測 2026-08-07 と 2026-08-08 の 2 回、tick 1 位（4630）が**両方とも既に
+  接続済み**で、os-connect loop 自身が『次の反復も同じ罠を踏む』と ledger に
+  書いて終わっていた。
+
+  したがって既定は **origin/main を実際に取りに行って読む**。`--offline` の
+  ときと fetch が失敗したときだけ working tree に落ちる —— そのときは何を
+  読んだかを必ず表示する（黙って古い方を読むのが、この 2 回の失敗そのもの）。"
+  (atom nil))
+
+(defn- gh-file
+  "GitHub の main にあるファイルを HTTPS + token で読む。
+
+  `git fetch` を使わないのは、この tick が launchd から走るときに **SSH agent
+  が無い**ため（実測 2026-08-08: spawnSync 下の fetch が
+  `could not read IPC response` で落ち、FETCH_HEAD が古いまま残って黙って
+  worktree に落ちていた）。`gh` は token 認証なので agent を要らない。"
+  [repo path]
+  (let [{:keys [code out]} (sh "gh" ["api" (str "repos/" repo "/contents/" path "?ref=main")
+                                     "--jq" ".content"])]
+    (when (and (= 0 code) (not (str/blank? out)))
+      (try (.toString (js/Buffer.from (str/replace out #"\s" "") "base64") "utf8")
+           (catch :default _ nil)))))
+
 (def declaration
-  (some-> (slurp* (str app "/os.edn")) edn/read-string))
+  (let [remote (when-not offline?
+                 (or (gh-file "network-awai/cloud-itonami" "os.edn")
+                     ;; 二次: 直近の fetch が残した remote-tracking ref。
+                     ;; worktree より新しいことは多いが、誰かが fetch して
+                     ;; いなければ古い —— だから一次にはしない。
+                     (git-out ["show" "origin/main:os.edn"])))
+        local (slurp* (str app "/os.edn"))]
+    (if (some? remote)
+      (do (reset! declaration-source :remote)
+          (edn/read-string remote))
+      (do (when (some? local) (reset! declaration-source :worktree))
+          (some-> local edn/read-string)))))
+
+(defn- declaration-drift
+  "working tree の宣言が origin/main とどれだけズレているか。
+
+  数えるだけで直さない —— 共有 checkout を tick が書き換えてよい理由は無い。
+  ズレていること自体が『この checkout から生成器を回すな』の合図になる。"
+  []
+  (let [local (some-> (slurp* (str app "/os.edn")) edn/read-string)
+        n #(count (:verticals %))]
+    (when (and local declaration (not= (n local) (n declaration)))
+      {:worktree (n local) :remote (n declaration)})))
 
 (defn- tenant-key [v] (str (:org v) "/" (:repo v)))
 
@@ -417,6 +475,16 @@
   (when-not declaration
     (log! "itonami-os tick: os.edn が読めない（" app "）— 何も測らずに終了")
     (js/process.exit 0))
+
+  ;; 何を読んだかを先に言う。working tree に落ちた tick の候補は信用できない
+  ;; ので、それを画面に出さずに候補だけ出すのは、この 2 回の失敗の再演になる。
+  (log! (case @declaration-source
+          :remote   "宣言: origin/main の os.edn"
+          :worktree "宣言: ⚠ working tree の os.edn — origin/main を取れなかった。候補が既に接続済みの可能性がある"
+          "宣言: 出所不明"))
+  (when-let [d (declaration-drift)]
+    (log! "  ⚠ 共有 checkout の宣言は" (:worktree d) "本、origin/main は" (:remote d)
+          "本 —— この checkout から生成器を回すと古い面を焼く"))
 
   (let [vs (:verticals declaration)
         rows
