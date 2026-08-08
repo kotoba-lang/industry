@@ -136,28 +136,63 @@ passkey は**署名はできるが復号はできない**。したがって承�
 - **passkey に寄せると web console で連絡先が読めない。** これは制約ではなく設計:
   復号鍵をブラウザに置かない理由が消えるわけではない。
 
-## 未実装（この ADR は方向を決めるだけで、実装していない）
+## 実装状況（2026-08-08 closing 時点。すべて default branch に着地済み）
+
+| | | 着地 |
+|---|---|---|
+| D1 `:app/*` → `:itonami.blueprint/*` の吸収 | ✅ | yotei `bdb3e56` / gen `72f13ff` |
+| D2 外向き capability + 文言の構造的強制 | ✅ | app `57c89cb` |
+| D3 同意 = `passkey/start-authorization!` | ✅ 既存を使用 | — |
+| D4 Fleet 画面の「接続」 | ✅ | app `0cf364ab` / yotei `a921f18` |
+| yotei の `blueprint.edn` | ✅ | `fe1af24` |
+| **カタログ再生成（下記）** | ✅ | app `80ad7bbc` / gen `f28b493` |
+
+## itonami-fleet-catalog.edn —— 解決済み。partition の assertion が正しかった
+
+**当初この ADR は「再生成すると fleet_test が 2 本落ちるので範囲外」と書いていた。
+調べたら片方は本物のバグを捕まえていたので、直した。**
+
+### `:per-repo-evidence` は実行モデルではなく「指示」だった
+
+4 つ目の bucket を足すのが素直に見えたが、それはバグを埋めることだった。
+`manifest/repository-rules.edn` はこれを**値ではなく指示**として定義している ——
+「prefix が ROLE ではなく KEY の場合ひとつの execution 値を持てない。`:repo/kind` を
+証拠由来の taxonomy から読み、名前から推論するな」。
+
+**generator はその sentinel をそのままカタログに書いていた**（185 行）。分割
+assertion はそれを捕まえていた。修正は rule 自身の `:execution-source`
+（file / attribute / mapping）を経由する —— ここに写しを置かない
+（ADR-2607299000 が語彙を superproject に移した理由と同じ）。
+
+authority の予告どおりの数字が出た:
 
 | | |
 |---|---|
-| `:app/*` → `:itonami.blueprint/*` の吸収 | ❌ |
-| `tenant_connection` の外向き capability | ❌ |
-| Fleet 画面の「接続」 | ❌ |
-| yotei の `blueprint.edn` | ✅ `fe1af24` |
+| organisation-record → `:none`（除外） | **154** |
+| actor → `:on-demand` | 31 |
+| actors | 1,448 → **1,294**（ちょうど 154 減） |
+| callable | **79 のまま**（到達可能なものは失われていない） |
+| partition | `1294 == 1269 + 13 + 12` ✅ |
 
-## itonami-fleet-catalog.edn を再生成していない理由
+### `:resident` 10 → 13 は benign
 
-**`--check` はこの ADR の変更前から STALE**（232 件遅れ）。再生成すると
-`fleet_test` が 2 本落ちる:
+`loop-*` 11 + `person-*` 2。同じテストが assert する role と一致しており、
+コメントが「8 → 9 は tripwire が仕事をしている姿」と言うとおりに発火していた。
+母集団を名指しして上げた。「unclassified は今は空」というコメントも直した（12 件ある）。
 
-- **185 件が `:execution :per-repo-evidence`** —— `fleet_test` の分割 assertion
-  （`total == on-demand + resident + unclassified`）が知らない実行モデル
-- **49 件が blueprint フィールドを持たない裸のレコード**（`mokuroku` 等、
-  `:repo-name` / `:remote` / `:revision` / `:path` のみ）
+**`--check` は OK。** yotei の行は `:mount` `:org` `:requests` `:endpoint` を持ち、
+D4 の接続 UI が描画するものが揃っている。
 
-yotei と無関係な既存の drift。267 行の他 repo のエントリと赤いテスト 2 本を
-この作業のコミットで署名するのは誤りなので戻した。**直して再生成した瞬間に
-yotei は Fleet 画面に出る。** 直す責任はこの ADR の範囲外。
+## 残っている gap（優先順）
+
+1. **記述子の統合は yotei 1 repo だけ。** `kotodama.jsonld` + `APP_*` wrangler vars を
+   使う etzhayyim appview 群は未着手。移行対象は少数派の側であって、1,393 の
+   blueprint 側ではない
+2. **接続 UI は未検証。** サーバ・カタログ・capability は実測したが、
+   Fleet 詳細から実際にクリックして grant まで通す往復は動かしていない
+   （tenant が要る）
+3. **`oteint` の blueprint が 1 件 skip され続けている**（actor blueprint でも
+   company record でもない）
 
 ## 参考: この判断が生まれた経緯
 
@@ -166,7 +201,8 @@ yotei（`cloud-itonami/yotei`）を Calendly 相当として実装する過程�
 free/busy ingest まで通した。その後「他の app と同じように扱えるか」を確認したところ、
 **カタログに存在しないことが分かった**。"
   :adr/consequences
-  "記述子統合の移行対象は :app/* を持つ側（1 repo）であって 1,393 の blueprint 側ではない。
+  "D1-D4 すべて default branch に着地済み（2026-08-08）。カタログも再生成され --check は OK。
+記述子統合の移行対象は :app/* を持つ側（1 repo）であって 1,393 の blueprint 側ではない。
 capability を増やすときは grant 画面に出す人間可読の文言を同時に決める。
 passkey に寄せた結果、web console からは暗号化された連絡先を読めない —— これは設計であって不足ではない。
 itonami-fleet-catalog.edn は再生成すると fleet_test が 2 本落ちる状態のままで、yotei は直るまで Fleet 画面に出ない。"}]
