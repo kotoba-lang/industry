@@ -28,89 +28,30 @@ west update --group-filter +datalad m365-archive && nbb manifest/west_annex.cljs
 nbb scripts/gen-west-manifest.cljs
 ```
 
-### 同期は「動いたものだけ」。引数なしの `west update` を既定にしない（2026-08-07）
+### pin を動かす・同期する・worktree で west を回す → skill `west-pin-advance`
 
-**`west update` は 4,124 project を歩き、既に pin と一致している checkout でも
-git を起動する。** 全体を回すのは初回 clone と、pin が大量に動いた後だけ。
-`manifest/west-triple-sync-workflow.edn`（ADR-2607173200）は `:never` に
-**「clone all west projects by default」**を挙げており、これはその文の運用面。
+**pin の前進、repo の登録/改名、local を pin に合わせる同期、三点ずれの解消、
+west を動かす worktree の作り方は、Skill ツールで `west-pin-advance` を呼ぶ。**
+手順・使うスクリプト・実測済みの罠はそこが正本。
 
-| やりたいこと | 使うもの |
-|---|---|
-| **local を pin に合わせる（差分だけ）** | `kagami sync --db manifest/fleet-db.edn`（kagami）。pin と一致する repo は **`:noop` で git を起動しない**、dirty は skip、pin SHA を名指しで fetch、`--jobs` で並列。⚠ **先に `kagami reconcile` を通すこと**（下記） |
-| **どの pin が remote より遅れているか** | `west update` は**答えない**（pin に合わせるだけ）。`gh api repos/<org>/<repo>/compare/<pin>...main` の `ahead_by` |
-| **pin を前進させる** | `nbb scripts/advance-pins.cljs <org> <list-file> --execute`（entry の revision 行だけ書換）→ `nbb scripts/verify-west-pins.cljs` |
-| **GitHub / local / west.yml の三点ずれ** | `nbb scripts/west-triple-sync.cljs plan --scope managed`（既定 dry-run。`--scope blocking` は fresh-checkout を壊している分だけ） |
-| **ずれの定期検出** | `nbb scripts/fleet-sync-tick.cljs check`（検出のみ。書かない） |
+ここで守るべき規則だけ再掲する（skill を読まなくても効く）:
 
-```bash
-# 例: 遅れている pin だけを見つけて、その分だけ同期する
-gh api repos/kotoba-lang/<repo>/compare/<pin>...main --jq '.ahead_by'   # 0 なら触らない
-printf '%s\n' <name> <name> | xargs west update --fetch smart           # ← xargs 必須
-```
-
-**`xargs` は必須。zsh は変数もパイプも単語分割しないので、`west update $NAMES` は
-全体を 1 個の project 名として渡し `unknown project name` になり、
-`printf ... | west update` は**引数ゼロ = 全 project 更新**になる（実測 2026-08-06、
-10 分でタイムアウトするまで気付かなかった）。
-
-**pin と remote の鮮度は別の問い**である。`west update` は west.yml に**既に書かれた**
-pin へ checkout を合わせるだけで、GitHub 側の新しい commit は見ない（この誤解は
-下の「Git operations」節にも書いてある）。
-
-**`kagami sync` を使う前に `kagami reconcile` を通す。** fleet-db は west.yml の
-**上流の正本**だが、west.yml 側の pin 書き込みを fleet-db へ運ぶのは reconcile だけで、
-それを回していた CI は 2026-07-30 に撤去された（ADR-2607300900）。**遅れた fleet-db に
-対して `kagami sync` すると checkout が pin より「後ろ」へ動く。** 実測 2026-08-07:
-reconcile が未実行のまま 24 pin ぶん遅れており、dry-run が既に west pin と一致している
-repo に `:advance` を出した。
-
-```bash
-# 吸収前に必ず: 入力 west.yml は origin/main のもの、変更される pin は全て fast-forward か
-git show origin/main:manifest/west.yml > /tmp/west-main.yml
-nbb --classpath orgs/kotoba-lang/kagami/src orgs/kotoba-lang/kagami/bin/kagami.cljs \
-  reconcile --db manifest/fleet-db.edn --west /tmp/west-main.yml
-```
-
-**reconcile / sync のような manifest 書き込みは共有 checkout でやらない。** superproject
-本体は「統合・閲覧専用」（下記「並行エージェント運用」）で、実測 2026-08-07 には
-共有 checkout で走らせた reconcile の出力を、別セッションが 2 分後に巻き戻した
-（同時刻に別セッションが `manifest/repos.edn` へ新規 project を登録中だった）。
-worktree で走らせて branch で着地させる。
-
-### agent 専用 worktree で west を動かすときの topdir 固定（重要）
-
-**agent ごとの git worktree で `west update` を動かすときは、worktree を
-superproject ルートの *外*（sibling path）に作り、worktree 内で `west init -l manifest`
-をやり直して topdir をその worktree に固定せよ。** これをしないと west は
-子リポジトリを agent の worktree でなく **superproject 本体の `orgs/` に展開**してしまい、
-他 agent の WIP と衝突する・`west update` が dirty で skip される。
-
-理由: west は cwd から上方向に `.west/` を探して topdir を決める。`git worktree add`
-を superproject *配下*（既定の `.claude/worktrees/<name>` 等）で作ると、その path は
-superproject のサブディレクトリなので上方向の探索が superproject 本体の `.west/`
-に当たり、topdir = superproject 本体と誤認される。`WEST_TOPDIR` 環境変数での上書きも
-効かない（`.west/` 発見が優先される）。superproject ルートの *外* に worktree を作れば
-`.west/` に当たらず、`west init -l manifest` でその worktree 専用の `.west/` が生成され
-topdir が固定される。実測検証: ADR-2607011300。
-
-```bash
-# ✅ 正: superproject の外に worktree を作り、topdir を固定
-git worktree add -b <agent-branch> /tmp/root-<agent-name> origin/main
-cd /tmp/root-<agent-name>
-west init -l manifest                       # ← この worktree 専用の .west/ を生成
-west update --fetch smart <必要な repo>     # ← worktree 内 orgs/ に独立 checkout
-# ❌ 誤: .claude/worktrees/<name> 配下の worktree で west を動かす
-#        （superproject 本体を topdir と誤認し、本体の orgs/ を書き換える）
-```
-
-注意:
-- これでも防げないのは **上流の force-push 系**（`origin/main` の force-rewrite /
-  子 repo remote の force-rewrite による pin 退行）。worktree 分離は作業 tree の
-  WIP 衝突しか防ぐ。force-push は上流の運用で撲滅するしかない。
-- 大容量 repo は worktree ごとに重複取得される（full history 既定のため軽減策は
-  無い。恒久対応は DataLad/B2 経路への移行、`nbb manifest/west_annex.cljs
-  annex-get`）。
+- **引数なしの `west update` を既定にしない。** 4,124 project を歩き、pin と
+  一致している checkout でも git を起動する。全体を回すのは初回 clone と、
+  pin が大量に動いた後だけ。**複数 project を渡すときは `xargs` が必須**
+  （zsh は単語分割しないので `west update $NAMES` は 1 個の project 名になり、
+  `printf ... | west update` は**引数ゼロ = 全 project 更新**になる）。
+- **`west update` は pin 鮮度を答えない。** west.yml に既に書かれた pin へ
+  checkout を合わせるだけで、GitHub 側の新しい commit は見ない。
+- **`kagami sync` の前に `kagami reconcile` を通す。** 遅れた fleet-db に対して
+  sync すると checkout が pin より**後ろへ**動く。reconcile の入力 west.yml は
+  必ず `origin/main` のものにする。
+- **manifest の書き込み（reconcile / sync / pin 前進）を共有 checkout でやらない。**
+  worktree で走らせて branch で着地させる。
+- **west を動かす worktree は superproject ルートの *外* に作り、その中で
+  `west init -l manifest` をやり直して topdir を固定する。** superproject 配下に
+  作ると west が本体の `.west/` を見つけて topdir を誤認し、**本体の `orgs/` を
+  書き換える**（`WEST_TOPDIR` でも直らない）。
 
 
 ## Repo naming — no `-clj` suffix (2026-07-10)
@@ -408,63 +349,26 @@ sha256 と実ファイルを突き合わせる**。Actions 経路は committed �
 
 - **`manifest/west.yml` への変更（登録 / rename / pin 前進）は GitHub API の
   サーバ側 single-entry commit を「唯一の正経路」にする。** west.yml は生成物
-  （`repos.edn` ＋ 各子repo HEAD → `gen-west-manifest.cljs`、手書き禁止 / `--check`）
-  なので、行指向 pin を textual 3-way merge するのはアンチパターンで、conflict
-  marker の手編集は **pin を静かに壊す**。代わりに: tip の west.yml と blob SHA を
-  取得（dir listing から SHA を採ると巨大 base64 を避けられる）→ **当該 entry の
-  行だけ**編集 → blob SHA 一致で PUT（`branch=` `sha=`）。**tip がずれれば 409**
-  で弾かれる（取得し直してリトライ）ので **conflict が構造的に発生しない**。
-  commit 前に **pin == 子repo HEAD を検証**。API 手編集は生成器を通らないので、
-  落ち着いたら `nbb scripts/gen-west-manifest.cljs --check` で canonical 一致を確認。
-  やむを得ずローカル merge する場合のみ、west.yml の衝突は **marker 手編集でなく
-  再生成で解決**: superset 側採用 → `west update` で子を目的 pin に揃える
-  （⚠ 再生成はローカル working HEAD で pin するので、子が遅れていると黙って
-  ロールバックする＝pin 退行の罠）→ `gen-west-manifest.cljs` → `--check`。子repo
-  自体は普通の git（branch/PR/push）。詳細は ADR-2606272237 / `repos.edn`
-  `:manifest-workflow`。実例: PR #61/#62/#86、kenchi-actor→kenchi-clj rename
-  （`34988dd`、diff は当該 entry のみ）。
+  （手書き禁止）なので、行指向 pin の textual 3-way merge はアンチパターンで、
+  conflict marker の手編集は **pin を静かに壊す**。**登録・rename・pin 前進は
+  `--entry <name>` で当該 entry のみの最小 diff を生成する — wholesale 再生成
+  commit は禁止**（1 件の登録のつもりが未 push HEAD 由来の壊れた pin を 44 件
+  main に流した実事故 `90852b86` の再発防止）。
 
-- **west.yml の pin 変更はサーバ側 pin 検証を必ず通す（`scripts/verify-west-pins.cljs`、
-  ADR-2607022900）。** pin に許されるのは「上流 repo の default branch から到達可能な
-  commit」だけ: ①存在（= push 済み。未 push のローカル HEAD の pin 化は禁止）、
-  ②default branch 到達性（rewrite されうる未 merge branch 上の commit は不可）、
-  ③旧 pin からの前進（behind = 静かな pin 退行 / diverged を弾く）。判定はすべて
-  GitHub API（サーバ側 full 履歴）で行い、**ローカルの ancestry 判定だけに頼らない**。
-  `gen-west-manifest.cljs` は生成時に自動でこの検証を行い、失敗したら west.yml を
-  書かない（緊急スキップ: `--no-verify-remote` / `WEST_PIN_VERIFY_SKIP=1`。使ったら
-  理由を commit message に残す）。**登録・rename・pin 前進は `--entry <name>` で当該
-  entry のみの最小 diff を生成する — wholesale 再生成 commit は禁止**（1件の登録の
-  つもりが未 push HEAD 由来の壊れた pin を 44 件 main に流した実事故 `90852b86` の
-  再発防止）。強制するのは PreToolUse hook
-  （`.claude/hooks/west-pin-verify-guard.cljs`。`git push` と `gh api PUT` の両経路）と、
-  murakumo fleet の `root-west-pin-policy` gate（policy 層）+ tick.cljs の CD 前
-  `verify-west-pins`（server-side 到達性）。**GitHub Actions の
-  `west-pin-verify.yml` は撤去済み**（2026-07-30、ADR-2607300900 — 16 workflow
-  すべてが job 起動せず赤のままだった）。
+- **west.yml の pin 変更はサーバ側 pin 検証を必ず通す**（`scripts/verify-west-pins.cljs`、
+  ADR-2607022900）。pin に許されるのは「上流 repo の default branch から到達可能な
+  commit」だけ — ①存在（未 push のローカル HEAD の pin 化は禁止）②default branch
+  到達性 ③旧 pin からの前進（behind = 静かな pin 退行）。判定は GitHub API で行い、
+  **ローカルの ancestry 判定だけに頼らない**。強制するのは PreToolUse hook
+  `.claude/hooks/west-pin-verify-guard.cljs` と murakumo fleet の
+  `root-west-pin-policy` gate。
 
 - **`git push` / `git pull` / `west update` の前に、manifest の pin が upstream
   GitHub の最新から取り残されていないか（pin 鮮度）を必ず確認する。** `west update`
-  は west.yml に**既に書かれている** pin へ checkout を合わせるだけで、GitHub 側の
-  新しいコミットを pin に反映するコマンドではない（pin 自体の前進は別操作。
-  「`west update` すれば GitHub 最新に追従する」と誤解しないこと）。実測
-  （2026-07-03）: `nbb scripts/gen-west-manifest.cljs`（引数なし dry-run）で kotoba-lang
-  org 配下の character / comfyui / kami-engine / kotoba / kotobase / murakumo 等
-  多数の project で、ローカル checkout が **既存 pin より遅れている**状態を検出
-  （気付かず push すると stale checkout や古い pin が他 clone / CI に伝播する）。
-  対象 project を触る git 操作の前に:
+  は pin へ checkout を合わせるだけで、GitHub 側の新しいコミットを pin に反映する
+  コマンドではない。
 
-  ```bash
-  # 1) 対象 project の pin 鮮度を GitHub API で確認（ahead_by > 0 なら upstream が先行）
-  gh api "repos/<org>/<repo>/compare/<pinned-sha>...<default-branch>" \
-    --jq '{ahead_by, behind_by}'
-  # 2) 先行していたら該当 project の checkout を最新化
-  cd orgs/<org>/<repo> && git fetch origin && git merge --ff-only origin/<default-branch>
-  # 3) manifest の pin を前進（当該 entry のみ最小 diff。wholesale 再生成は禁止）
-  nbb scripts/gen-west-manifest.cljs --entry <repo-name>
-  nbb scripts/gen-west-manifest.cljs --check
-  ```
-
-  これを終えてから本来の `git push` / `git pull` / `west update` を実行する。
+  **上記 3 点の手順・コマンド・実測済みの罠は skill `west-pin-advance`。**
 
 - **常に `main` と同期し、乖離を作らない（最優先）。** 何らかの git 操作
   （pull / checkout / commit / branch 作業の開始など）を行う前に、上流 `main`
