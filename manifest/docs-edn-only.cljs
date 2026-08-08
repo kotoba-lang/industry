@@ -617,29 +617,24 @@
   forms -- the signature of a literal that ended early, which is the same failure an
   unescaped quote produces.
 
-  That last sentence is a hypothesis, and for the seven still listed below it is
+  That last sentence is a hypothesis, and for the ones still listed below it is
   WRONG. Measured 2026-08-04 by scanning every string literal in each file: the
   longest is ~400 characters and none runs away, so no quote is swallowing
-  structure. The actual defect is collections that are opened and never closed
-  (in MONTH-3-GRACEFUL-RUST-DRAIN.edn a `{` at line 217 and another at 253), plus
-  maps appearing in key position because a sibling map follows a keyed value with
-  no key of its own.
+  structure. The actual defect is collections that are opened and never closed,
+  plus maps appearing in key position because a sibling map follows a keyed value
+  with no key of its own.
 
-  They are not mechanically repairable, and the reason is worth stating so the
-  next reader does not rediscover it: once the delimiters are gone, indentation is
-  the only remaining signal for where a map ends, and in these files it is not
-  consistent -- `:next-step` sits at three spaces immediately after a `}` that
-  closed at four, so it reads as either the inner map's last key or the outer
-  map's next one. Choosing a parent for each key is authoring, not repair.
-
-  Two repairs that ARE unambiguous were tried and then reverted, so they are not
-  retried: wrapping a run of unkeyed sibling maps in a vector, and closing a map
-  where the following line's indentation marks the boundary. Both applied cleanly
-  to the first two sites in MONTH-3-GRACEFUL-RUST-DRAIN.edn and then stalled, and
-  a file that is still unparseable after two edits is worse than an untouched one
-  -- it adds noise to the owning agent's history for no gain. What would actually
-  fix these is the agent that owns these runbooks regenerating them, or an owner
-  deciding they are historical planning documents and retiring them."
+  This list also carried a claim that these are NOT mechanically repairable,
+  because once the delimiters are gone indentation is the only signal for where a
+  map ends and it is inconsistent. That claim was disproved on 2026-08-08 by
+  repairing MONTH-3-GRACEFUL-RUST-DRAIN.edn: indentation is not the only signal.
+  In that file every outer key is namespaced (`:doc/*`, `:drain/*`, `:adr/*`) and
+  every inner key is bare, so a bare `:next-step` belongs to the inner map no
+  matter what column it sits in -- the two signals agree at all seven sites. Its
+  bracket census (16 `{` against 9 `}`) named the count before any edit, and
+  stripping `{}[]` from both revisions showed the repair to be byte-identical in
+  content. Try that census and the namespacing test before concluding a file here
+  needs its owning agent to regenerate it."
   ;; Two ADRs left this list on 2026-07-31: both were a pr-str'd map inside a string
   ;; where some quotes were escaped and the rest were not, and both are repaired.
   ;;
@@ -649,8 +644,10 @@
   ;; uninformatively as the unconditional FAIL it replaced, which is why `fixed`
   ;; is a hard failure rather than a note: the list has to be pruned when a file
   ;; is repaired, in the same commit.
-  ["90-docs/deployment/MONTH-3-GRACEFUL-RUST-DRAIN.edn"
-   "90-docs/migration/M5-M6-checkpoint-procedures.edn"])
+  ;; MONTH-3-GRACEFUL-RUST-DRAIN.edn left on 2026-08-08: seven unclosed sub-maps
+  ;; closed and one run of unkeyed sibling maps wrapped in a vector. Structure
+  ;; only -- no content character added or removed.
+  ["90-docs/migration/M5-M6-checkpoint-procedures.edn"])
 
 (defn verify!
   "EDN が 90-docs の唯一の正本であることを機械検証する。

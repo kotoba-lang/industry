@@ -43,7 +43,7 @@
     "✓ Load balancer verified to not route new requests"
     "✓ Existing connections remain alive (no forced closure)"]
 
-   :next-step "Proceed to Phase 2 (drain in-flight requests)"
+   :next-step "Proceed to Phase 2 (drain in-flight requests)"}
 
   :drain/phase-2-drain-in-flight-requests
   {:seq 2
@@ -112,7 +112,7 @@
     "✓ Drain completed within 60-second grace period"
     "✓ All connection details logged for audit"]
 
-   :next-step "Proceed to Phase 3 (verify session migration)"
+   :next-step "Proceed to Phase 3 (verify session migration)"}
 
   :drain/phase-3-verify-session-migration
   {:seq 3
@@ -168,7 +168,7 @@
 
    :success-message "Session migration verification PASS. Ready to deactivate Rust pool."
 
-   :next-step "Proceed to Phase 4 (deactivate Rust pool)"
+   :next-step "Proceed to Phase 4 (deactivate Rust pool)"}
 
   :drain/phase-4-deactivate-rust-pool
   {:seq 4
@@ -211,7 +211,7 @@
     "✓ Team notified"
     "✓ Standby SLA documented (7 days)"]
 
-   :success-message "Rust pool deactivated. cljc fleet now 100% production traffic. Standby: 7 days."
+   :success-message "Rust pool deactivated. cljc fleet now 100% production traffic. Standby: 7 days."}
 
   :drain/post-drain-validation
   {:seq 5
@@ -247,7 +247,7 @@
      "⚠ DECLARE WITH CAVEATS: minor issues found but acceptable (document SLA)"
      "✗ DECLARE RESTORE RUST: critical issue requires rollback within grace period"]}
 
-   :next-step "If SUCCESSFUL → decommission Rust pool after 7-day standby (2026-09-20)"
+   :next-step "If SUCCESSFUL → decommission Rust pool after 7-day standby (2026-09-20)"}
 
   :drain/emergency-restore-procedure
   {:scenario "After Rust pool deactivated, cljc fleet encounters catastrophic failure (e.g., all nodes crash)"
@@ -272,12 +272,12 @@
     Incident declared resolved (T+3 min from detection)"
 
    :restore-vs-retry-decision
-   {:restore-scenario "cljc failure is transient (e.g., node reboot, temporary resource exhaustion)"
+   [{:restore-scenario "cljc failure is transient (e.g., node reboot, temporary resource exhaustion)"
     :decision "Restore Rust, investigate cljc issue, retry canary after fix"
     :decision-timeline "Restore now, retry decision after 24h investigation"}
     {:abort-scenario "cljc failure is structural (e.g., semantic bug, data corruption)"
     :decision "Keep Rust on 100%, abort Month 3 canary, extend investigation to next month"
-    :decision-timeline "Return to Phase 2 investigation, plan retry for Month 4"}
+    :decision-timeline "Return to Phase 2 investigation, plan retry for Month 4"}]}
 
   :drain/standby-to-decommission
   {:standby-end-date "2026-09-20 16:15 JST (7 days after drain completion)"
@@ -285,7 +285,7 @@
    ["✓ 48h post-drain validation: PASS (no issues observed)"
     "✓ 7-day stability window: no rollbacks or incidents"
     "✓ cljc fleet healthy and performant"
-    "✓ No customer impact or data loss"]}
+    "✓ No customer impact or data loss"]
 
    :decommission-procedure
    ["1. Escalation-lead: '[DECOMMISSION SCHEDULED] Rust pool decommissioning 2026-09-20 16:15 JST.'"
@@ -298,7 +298,7 @@
    :decommission-success
    "Rust fleet successfully retired. cljc kotoba-server is now sole production fleet.
     Month 3 canary complete. Fleet migration from Rust to cljc finished.
-    All metrics stable. No outstanding issues. Ready for post-incident review."
+    All metrics stable. No outstanding issues. Ready for post-incident review."}
 
   :drain/rollback-from-drain
   {:scenario "During graceful drain (Phase 2), monitoring detects cljc fleet issue. Owner decides to rollback."
@@ -315,7 +315,7 @@
     "7. Next decision: return to Phase 2 investigation (50% / 50%), or abort Month 3?"]
 
    :estimated-rollback-time "< 2 minutes to restore Rust traffic"
-   :data-safety "Session data: cljc fleet still has 100% (no data loss). Can roll back to Rust anytime during drain."
+   :data-safety "Session data: cljc fleet still has 100% (no data loss). Can roll back to Rust anytime during drain."}
 
   :adr/related ["2607072100-kotoba-server-fleet-deployment-strangler-fig.edn"
                 "2607072400-kaisha-pod-murakumo-fleet-deployment.edn"]}]
