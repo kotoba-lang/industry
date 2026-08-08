@@ -3,7 +3,7 @@
   :adr/doc_type "adr"
   :adr/source-format "edn"
   :adr/topic "game-autoplay-ios-sim-capture-evolution-inventory"
-  :adr/title "ADR-2608081500: iPhone sim でゲームを自動プレイし、記録し、配信し、進化的に学習する経路 — 4 面とも実在し、繋ぐ層と入力注入・録画だけが無い"
+  :adr/title "ADR-2608081500: iPhone sim でゲームを自動プレイし、記録し、配信し、進化的に学習する経路の在庫 — 4 面とも実在した（ADR-2608082500 で実装済み）"
   :adr/status "accepted"
   :adr/date "2026-08-08"
   :adr/last_verified "2026-08-08"
@@ -12,7 +12,7 @@
   :adr/repos ["com-junkawasaki/root"]
 
   :adr/authoritative_for
-  ["「iPhone Simulator でゲームを自動プレイ → 記録 → 動画配信 → 遺伝的学習」を 1 本で担う repo / actor は 2026-08-08 時点で存在しない。新規に起こす前にこの ADR の在庫表を見る"
+  ["この経路は **ADR-2608082500 で実装済み**（`kotoba-lang/shinka` + `kotoba-lang/loop-game-autoplay`）。本 ADR が authority なのは『4 面の正本がどこにあるか』であって、欠落の一覧ではない —— 在庫表は 2026-08-08 の実測の記録である"
    "iOS Simulator の駆動面の正本は `kotoba-lang/shell`（`bin/kotoba-shell-host-ios`、`xcrun simctl spawn booted`）であり、新しい simulator bridge を各 app に生やさない"
    "simulator の画面検査の正本は `kotoba-lang/hinshitsu`（`hinshitsu.mokushi` + `bin/hinshitsu-ios-visual-qa`、`hinshitsu.ios-visual.v0` receipt）であり、app 側には bundle ID と path を渡す薄い wrapper だけを置く"
    "映像の合成・多重化の正本は `kotoba-lang/utsushi` + `org-iso-isobmff` / `org-iso-h264` / `org-iso-aac` / `org-ietf-opus`、完成物の各プラットフォームへの送出は `kotoba-lang/haishin`。ライブ配信（RTMP/WHIP）はどちらでもない"
@@ -23,7 +23,8 @@
   :adr/superseded_by []
 
   :adr/related
-  ["adr-2608081200-ios-publishing-capability-measured-state"
+  ["adr-2608082500-game-autoplay-evolution-implementation"
+   "adr-2608081200-ios-publishing-capability-measured-state"
    "adr-2608072000-kotoba-shell-mobile-signing-packaging-in-app-bridge"
    "adr-2607091830-network-isekai-game-work-actors-app-aozora"
    "adr-2607023000-ka-creative-craft-libs-isco-decomposition"
@@ -53,7 +54,23 @@
 つまりこの問いは、既存の索引 3 本（repo-search / concept-lookup / surface）**どれ単独でも解けなかった**。"
 
   :adr/decision
-  "## 決定
+  "## 現在地（2026-08-08 更新）— この在庫は実装済みである
+
+**同日 ADR-2608082500 でこの経路を実装した。** 下の在庫表と欠落 5 点は**当時の実測**であって現在地ではない。読む順は ADR-2608082500 が先である。
+
+| 欠落 | 現在地 |
+|---|---|
+| ① 入力注入 | **要件でなくなった** — agent channel をページ内に置き、ゲームが既に polling している key map に書く（`kotoba-lang/loop-game-autoplay` の `resources/autoplay-driver.js`）。Appium / WDA / XCUITest は導入していない |
+| ② 録画 | **閉じた** — 実機で 904.7 秒 / 318 MB / 35,719 frames、hinshitsu gate `:passed` |
+| ③ crossover を持つ GA | **閉じた** — `kotoba-lang/shinka` |
+| ④ 画面 → observation | **閉じない**（設計判断。observation は game state の 12 数値） |
+| ⑤ ライブ配信 | **閉じない**（範囲外と明示。成果物は mp4 で `haishin` に載せる） |
+
+**この ADR は「4 面の正本がどこにあるか」の authority としては引き続き有効**（shell / hinshitsu / utsushi+haishin / com-nvidia-isaac-lab+sha256d.evolve）。無効になったのは欠落の一覧だけである。
+
+なお本 ADR の consequences が挙げた懸念のうち 1 つは**実際に起きた**: 「どの構成要素も実際に繋いで動かしていない」——繋いだ結果、3 つの実バグ（Playwright の string page function が式評価される / パリティゲート自身の真空パス / 実機経路への引数形違い）が出た。詳細は ADR-2608082500 の verification。
+
+## 当時の決定（2026-08-08 の在庫時点）
 
 **1 本の repo / actor を新設しない。** 4 面はそれぞれ既存の正本を持っており、足りないのは面と面の間だけである。以下を在庫の正本とし、この経路に着手するときはここから始める。
 

@@ -39,6 +39,12 @@
    :k1-x100 120        ; BM25 k1 = 1.20
    :b-x100 75          ; BM25 b  = 0.75
    :impact-scale 1000
+   ;; `:content` decides block boundaries by hashing the key at that position;
+   ;; `:fixed` uses a running count. Fixed is kept ONLY so the A/B in
+   ;; bench/incremental.cljs can measure what it costs — it makes an append
+   ;; rewrite the dictionary from the insertion point onward, so it is never
+   ;; the right choice for an index that will be appended to.
+   :chunking :content
    ;; Write the routing dictionary. Costs blocks at build time and removes the
    ;; per-shard fan-out at query time; `false` reproduces the v1 index exactly,
    ;; which is what the A/B in `bench/route_scaling.cljs` compares against.
@@ -52,11 +58,18 @@
 
 ;; ── scoring ─────────────────────────────────────────────────────────
 
-(defn- idf
+(defn idf-value
   "BM25 probabilistic idf with the +1 that keeps it non-negative for terms
-  present in more than half the corpus."
+  present in more than half the corpus.
+
+  Public because `append/append!` must compute idf the same way for a new
+  segment as the original build did for the existing ones. Two spellings of
+  idf is two scales of impact, and the cross-shard top-k compares them
+  directly."
   [n df]
   (ln (+ 1.0 (/ (+ (- n df) 0.5) (+ df 0.5)))))
+
+(def ^:private idf idf-value)
 
 (defn- impact
   "The finished per-(term,doc) contribution, quantised to an integer."
@@ -68,31 +81,98 @@
 
 ;; ── dictionary tree ─────────────────────────────────────────────────
 
+;; ── content-defined chunking ────────────────────────────────────────
+;;
+;; Where a block ends is decided by the CONTENT at that point, not by a
+;; running count. This is the property that makes the tree incrementally
+;; cheap, and it was added because the first version was not: with
+;; `partition-all fanout`, inserting one term shifts every following leaf's
+;; contents by one position, so a one-document append rewrote 3,863 blocks of
+;; a 490,130-block index — nearly the whole dictionary, to add one document.
+;; Measured on the real corpus, `bench/results/2026-08-08-incremental-*`.
+;;
+;; With a content-defined boundary, a term inserted between two boundaries
+;; changes exactly one leaf and the path above it. Same idea as
+;; `kotoba-lang/prolly-tree` and as every Merkle-structured store in this
+;; workspace; reimplemented in fifteen lines here rather than taken as a
+;; dependency, because this subsystem's zero-dependency property is what lets
+;; a browser client run it.
+
+(defn- key-hash
+  "A cheap, stable, portable hash of a boundary key. FNV-1a over UTF-16 code
+  units — not a cryptographic hash and not the block address; it only has to
+  be deterministic across runtimes, and `hash` in Clojure is not (it differs
+  between JVM and JS, which would give two runtimes different tree shapes for
+  the same corpus and therefore different manifest CIDs)."
+  [^String s]
+  (loop [i 0 h 2166136261]
+    (if (>= i (count s))
+      (bit-and h 0x7FFFFFFF)
+      (recur (inc i)
+             (bit-and (* (bit-xor h #?(:clj (int (.charAt s i))
+                                       :cljs (.charCodeAt s i)))
+                         16777619)
+                      0xFFFFFFFF)))))
+
+(defn- content-chunks
+  "Split `xs` where `key-of` hashes to a boundary, targeting `avg` per chunk.
+
+  `min-size` and `max-size` bound the damage a pathological key distribution
+  can do: without a floor the tree degenerates into one entry per block (a
+  round trip per term), and without a ceiling one unlucky run makes a block
+  the client must download whole."
+  [key-of avg xs]
+  (let [avg (max 2 avg)
+        min-size (max 1 (quot avg 4))
+        max-size (* avg 4)
+        mask (dec avg)]                     ; avg is a power of two in practice
+    (loop [out [] cur [] xs (seq xs)]
+      (if-not xs
+        (if (seq cur) (conj out cur) out)
+        (let [x (first xs)
+              cur (conj cur x)
+              n (count cur)
+              boundary? (or (>= n max-size)
+                            (and (>= n min-size)
+                                 (zero? (bit-and (key-hash (key-of x)) mask))))]
+          (if boundary?
+            (recur (conj out cur) [] (next xs))
+            (recur out cur (next xs))))))))
+
 (defn- build-dict-tree
-  "Sorted `[term entry]` pairs -> a fanout-B search tree of blocks.
+  "Sorted `[term entry]` pairs -> a content-addressed search tree of blocks.
 
   Height is logarithmic in the term count, and height is exactly the number of
   round trips a client spends to locate one term. That is the whole reason the
-  dictionary is a tree and not one sorted object."
-  [sink hash-fn fanout entries]
-  (if (empty? entries)
-    {:root (block/put-block! sink hash-fn {:kind :dict-leaf :entries []}) :height 1}
-    (let [leaves (mapv (fn [grp]
-                         {:cid (block/put-block! sink hash-fn
-                                                 {:kind :dict-leaf :entries (vec grp)})
-                          :first-term (ffirst grp)})
-                       (partition-all fanout entries))]
-      (loop [level leaves height 1]
-        (if (<= (count level) 1)
-          {:root (:cid (first level)) :height height}
-          (recur (mapv (fn [grp]
-                         {:cid (block/put-block!
-                                sink hash-fn
-                                {:kind :dict-internal
-                                 :entries (mapv (juxt :first-term :cid) grp)})
-                          :first-term (:first-term (first grp))})
-                       (partition-all fanout level))
-                 (inc height)))))))
+  dictionary is a tree and not one sorted object.
+
+  Block boundaries are content-defined (see above), so the tree is also cheap
+  to update: an append rewrites the leaves it actually lands in, not every
+  leaf after the insertion point."
+  ([sink hash-fn fanout entries]
+   (build-dict-tree sink hash-fn fanout entries :content))
+  ([sink hash-fn fanout entries chunking]
+   (let [chunk (if (= :fixed chunking)
+                 (fn [_key-of n xs] (partition-all n xs))
+                 content-chunks)]
+     (if (empty? entries)
+       {:root (block/put-block! sink hash-fn {:kind :dict-leaf :entries []}) :height 1}
+       (let [leaves (mapv (fn [grp]
+                            {:cid (block/put-block! sink hash-fn
+                                                    {:kind :dict-leaf :entries (vec grp)})
+                             :first-term (ffirst grp)})
+                          (chunk first fanout entries))]
+         (loop [level leaves height 1]
+           (if (<= (count level) 1)
+             {:root (:cid (first level)) :height height}
+             (recur (mapv (fn [grp]
+                            {:cid (block/put-block!
+                                   sink hash-fn
+                                   {:kind :dict-internal
+                                    :entries (mapv (juxt :first-term :cid) grp)})
+                             :first-term (:first-term (first grp))})
+                          (chunk :first-term fanout level))
+                    (inc height)))))))))
 
 ;; ── postings ────────────────────────────────────────────────────────
 
@@ -150,6 +230,77 @@
     (->> (range 0 n per)
          (mapv (fn [start] [start (min n (+ start per))])))))
 
+(defn build-shard!
+  "One shard's blocks from `docs` (already carrying `:id`), scored by `idf-of`.
+
+  Split out of `build!` so that `append/append!` builds a segment the same way
+  a full build does. Two builders that produce shards independently is how the
+  scores in one stop meaning the same thing as the scores in another."
+  [sink hash-fn opts sid docs idf-of avgdl]
+  (let [{:keys [dict-fanout chunk-size meta-chunk-size title-weight chunking]} opts
+        base (:id (first docs))
+        tfs (mapv #(analyze/doc-terms % title-weight) docs)
+        dls (mapv #(reduce + 0 (vals %)) tfs)
+        postings (reduce
+                  (fn [acc i]
+                    (let [tf (nth tfs i) dl (nth dls i) id (:id (nth docs i))]
+                      (reduce-kv
+                       (fn [a t f]
+                         (let [imp (impact opts (idf-of t) f dl avgdl)]
+                           (if (pos? imp) (update a t (fnil conj []) [id imp]) a)))
+                       acc tf)))
+                  {} (range (count docs)))
+        built (mapv (fn [t]
+                      [t (build-postings sink hash-fn chunk-size t (get postings t))])
+                    (sort (keys postings)))
+        entries (mapv (fn [[t b]] [t {:df (:df b) :postings (:cid b)}]) built)
+        {:keys [root height]} (build-dict-tree sink hash-fn dict-fanout entries
+                                              (or chunking :content))]
+    {:shard {:id sid
+             :doc-base base
+             :doc-count (count docs)
+             :dict-root root
+             :dict-height height
+             :term-count (count entries)
+             :meta-dir (build-meta sink hash-fn meta-chunk-size base docs)}
+     ;; `[term [entry]]` — a one-element VECTOR, not a bare entry. One shape
+     ;; everywhere, because `merge-route-entries` folds these into entries read
+     ;; back out of an existing tree, where a term already has several. Two
+     ;; shapes here meant `mapcat` walked a map and produced MapEntry pairs
+     ;; whose `:postings` was nil, and the failure surfaced three layers away
+     ;; as "block not found" on a cid nobody had written.
+     :route (mapv (fn [[t b]]
+                    [t [{:shard sid :max-impact (:max-impact b)
+                         :df (:df b) :postings (:cid b)}]])
+                  built)
+     :local-df (reduce (fn [m [t b]] (assoc m t (:df b))) {} built)
+     :doc-lengths dls}))
+
+(defn build-route-dict!
+  "`[[term [{:shard :max-impact :df :postings} ...]] ...]` -> a dict tree.
+
+  Public because `append/append!` has to rebuild this tree after merging one
+  segment's entries into it, and rebuilding it a second way would let the two
+  drift."
+  ([sink hash-fn dict-fanout route-entries]
+   (build-route-dict! sink hash-fn dict-fanout route-entries :content))
+  ([sink hash-fn dict-fanout route-entries chunking]
+   (build-dict-tree sink hash-fn dict-fanout route-entries chunking)))
+
+(defn merge-route-entries
+  "Fold `new-entries` into `existing`, both sorted `[term [entry ...]]`.
+
+  A term already present gains the new shard's entry; a new term is inserted
+  in order. Kept here next to the builder because the sort order IS the tree's
+  search order — a merge that produced a differently-ordered list would build
+  a tree that descends to the wrong leaf without ever failing."
+  [existing new-entries]
+  (->> (concat existing new-entries)
+       (group-by first)
+       (map (fn [[t es]] [t (vec (sort-by :shard (mapcat second es)))]))
+       (sort-by first)
+       vec))
+
 (defn build!
   "`docs` : seq of `{:url :title :text}`. Returns `{:manifest-cid :stats}`.
 
@@ -158,7 +309,8 @@
   the caller groups them, which is what makes host-scoped queries cheap."
   ([sink hash-fn docs] (build! sink hash-fn docs {}))
   ([sink hash-fn docs opts]
-   (let [{:keys [shard-count dict-fanout chunk-size meta-chunk-size title-weight route?]
+   (let [{:keys [shard-count dict-fanout chunk-size meta-chunk-size title-weight route?
+                 chunking]
           :as opts} (merge default-opts opts)
          docs (vec (map-indexed (fn [i d] (assoc d :id i)) docs))
          n (count docs)
@@ -169,44 +321,11 @@
                     {} tfs)
          idfs (reduce-kv (fn [m t d] (assoc m t (idf n d))) {} df)
          ranges (if (zero? n) [] (shard-ranges n shard-count))
+         idf-of (fn [t] (get idfs t 0.0))
          built-shards
          (vec (map-indexed
                (fn [sid [start end]]
-                 (let [local (subvec docs start end)
-                       ;; term -> [[doc-id impact] ...] for this shard only
-                       postings (reduce
-                                 (fn [acc i]
-                                   (let [tf (nth tfs i) dl (nth dls i)]
-                                     (reduce-kv
-                                      (fn [a t f]
-                                        (let [imp (impact opts (get idfs t) f dl avgdl)]
-                                          (if (pos? imp)
-                                            (update a t (fnil conj []) [i imp])
-                                            a)))
-                                      acc tf)))
-                                 {} (range start end))
-                       built (mapv (fn [t]
-                                     [t (build-postings sink hash-fn chunk-size
-                                                        t (get postings t))])
-                                   (sort (keys postings)))
-                       entries (mapv (fn [[t b]]
-                                       [t {:df (:df b) :postings (:cid b)}])
-                                     built)
-                       {:keys [root height]} (build-dict-tree sink hash-fn dict-fanout entries)]
-                   {:shard {:id sid
-                            :doc-base start
-                            :doc-count (- end start)
-                            :dict-root root
-                            :dict-height height
-                            :term-count (count entries)
-                            :meta-dir (build-meta sink hash-fn meta-chunk-size start local)}
-                    ;; What the routing dictionary is assembled from. Emitted
-                    ;; here because the max-impact is known exactly once, while
-                    ;; this shard's postings are in hand.
-                    :route (mapv (fn [[t b]]
-                                   [t {:shard sid :max-impact (:max-impact b)
-                                       :df (:df b) :postings (:cid b)}])
-                                 built)}))
+                 (build-shard! sink hash-fn opts sid (subvec docs start end) idf-of avgdl))
                ranges))
          shards (mapv :shard built-shards)
          ;; ── routing dictionary ──────────────────────────────────────
@@ -219,17 +338,33 @@
                          (->> (mapcat :route built-shards)
                               (group-by first)
                               (map (fn [[t es]]
-                                     [t (vec (sort-by :shard (map second es)))]))
+                                     [t (vec (sort-by :shard (mapcat second es)))]))
                               (sort-by first)
                               vec))
          route-tree (when route?
-                      (build-dict-tree sink hash-fn dict-fanout route-entries))
+                      (build-dict-tree sink hash-fn dict-fanout route-entries chunking))
          manifest (cond->
                    {:kind :manifest
                     :version 1
+                    ;; ── the scoring basis ────────────────────────────────
+                    ;; Impacts are baked, and BM25's idf is a function of the
+                    ;; WHOLE corpus. So an impact is only comparable to
+                    ;; another impact computed against the same N and avgdl.
+                    ;;
+                    ;; Recording them makes that an explicit part of the
+                    ;; index's identity rather than an accident of when a
+                    ;; shard happened to be built: `append/append!` scores a
+                    ;; new segment against this basis, so its numbers are on
+                    ;; the same scale as every existing shard's. The basis
+                    ;; goes stale as the corpus grows, which is what a
+                    ;; rebuild is for, and the drift is measured rather than
+                    ;; assumed (`bench/incremental.cljs`).
+                    :scoring-basis {:doc-count n
+                                    :avgdl-x1000 (round-int (* 1000 avgdl))
+                                    :generation 0}
                     :analyzer {:form :ascii+cjk-bigram :title-weight title-weight}
                     :scorer (select-keys opts [:k1-x100 :b-x100 :impact-scale])
-                    :layout (select-keys opts [:dict-fanout :chunk-size :meta-chunk-size])
+                    :layout (select-keys opts [:dict-fanout :chunk-size :meta-chunk-size :chunking])
                     :stats {:doc-count n
                             :term-count (count df)
                             :avgdl-x1000 (round-int (* 1000 avgdl))
