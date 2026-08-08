@@ -1,0 +1,55 @@
+;; kotoba-shell application manifest for Boutique Stack.
+;;
+;; Consumed by `kotoba-shell app scaffold / build / package`
+;; (kotoba-lang/shell, pin fae4ee4 — see ADR-2608072000). The runbook is
+;; ../../kingdom-cascade/docs/publishing.md; the path is identical.
+;;
+;; STATUS: written, never executed.
+{:app/id "network.isekai.boutique-stack"
+ :app/name "Boutique Stack"
+ :app/version "0.1.0"
+ :app/build 1
+ :app/description "Run the shop. Stock the racks. Open the shoe department."
+
+ :app/web-root "../web/dist"
+ :app/entry "index.html"
+
+ :ios
+ {:ios/product-name "BoutiqueStack"
+  :ios/bundle-id "network.isekai.boutique-stack"
+  ;; Both, always. Unset, Info.plist falls back to $(PRODUCT_NAME), which in a
+  ;; scaffolded app means the shell's own default — the app shows its real
+  ;; name inside itself while the home screen says "KotobaShell".
+  :ios/bundle-name "Boutique Stack"
+  :ios/display-name "Boutique Stack"
+  :ios/deployment-target "16.0"
+  :ios/orientations [:portrait]
+  :ios/status-bar :dark-content
+  ;; `app package` refuses with `team-id-required` until this is real.
+  :apple/team-id nil}
+
+ :android
+ {:android/application-id "network.isekai.boutique_stack"
+  :android/label "Boutique Stack"
+  :android/min-sdk 26
+  :android/target-sdk 34
+  :android/orientations [:portrait]
+  :android/keystore nil
+  :android/keystore-alias nil}
+
+ ;; Deny-by-default. A shop tycoon needs to remember your shop and read the
+ ;; clock; everything else is named in the deny list rather than merely
+ ;; absent, so adding one later means deleting a line somebody chose.
+ :policy
+ {:allow #{[:storage/get] [:storage/set] [:storage/delete]
+           [:clock/now]}
+  :deny #{[:http/fetch]
+          [:fs/read] [:fs/write] [:fs/list]
+          [:keychain/get] [:keychain/set]
+          [:notify/show]
+          [:clipboard/read] [:clipboard/write]
+          [:contacts/list] [:calendar/list] [:webauthn/assert]}}
+
+ :notes
+ {:macos-only-commands [:contacts :calendar :webauthn]
+  :bridge-commands 10}}
