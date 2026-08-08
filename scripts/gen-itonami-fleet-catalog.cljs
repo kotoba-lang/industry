@@ -65,7 +65,14 @@
    :itonami.blueprint/orchestrator
    :itonami.blueprint/endpoint
    :itonami.blueprint/endpoint-kind
-   :itonami.blueprint/health-path])
+   :itonami.blueprint/health-path
+   ;; ADR-2608093000 D1. A "connect this app" surface needs two things the
+   ;; catalog did not carry: where the app lives under the shared host, and
+   ;; which organization owns it. :surface (the route list) is deliberately
+   ;; NOT carried — that is the mirror this file refuses to be, and a caller
+   ;; needing routes should read the blueprint.
+   :itonami.blueprint/mount
+   :itonami.blueprint/org])
 
 (defn- short-key [k] (keyword (name k)))
 
