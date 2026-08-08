@@ -114,15 +114,70 @@ kernel は magic/version を検証してから stage-1 EL1 の変換表を自分
 同じ粒度**であり、機構だけが完全に異なる（CR3/CR0/EFER → TTBR0/TCR/MAIR/SCTLR、
 error code → ESR_EL1、port I/O は存在しない）。
 
+### (a2b) physical page allocator と、判断を Kotoba に置けない理由
+
+ADR-0013 が x86_64 側で「immediate next gate」に置いているのと同じ場所を実装した。
+UEFI memory map を **firmware の `descriptor_size`（48）で stride して**歩き
+（`sizeof(struct)` で歩くのが典型的な事故）、usable な conventional memory だけを
+admit する。kernel 窓 / boot-info page / memory map 自身は reserved として除外。
+
+実測: **12 region / 121,036 page = 472 MiB**（512 MiB 中）。self-test は 3 本 ——
+reserved と重ならないこと、32 連続 alloc が相異なり 4 KiB 整列で admitted region に
+属し zero 済みであること、budget 超過が **0 を返す清潔な拒否**であること。
+**translation table は静的配列をやめてこの allocator の page から作る**
+（`ttbr0` が `.bss` の 0x42005000 から allocator の 0x40024000 へ移った）。
+gate は `from=allocator` を要求するので、**allocator が在るのに使われていない**状態は落ちる。
+
+**判断（`page_range_admissible`）は C のままである。** ADR-2607241100 D6 は
+「C は機構、判断は compiler-emit の Kotoba object」と定めており、これは判断なので
+本来 Kotoba に置くべきだが、**aarch64 では置けない**:
+
+- `kotoba.native.elf64/package-kernel-object` は **「a linkable x86-64 ET_REL object」**
+  で、`:x86_64-aiueos-kernel-v1` 以外の target を hard reject する（`kernel-target`、
+  elf64.clj:4 と :226 の guard）。
+- aarch64 は `package-kernel-aarch64` にしか到達せず、これは**まるごと standalone の
+  ET_EXEC image** を出す。compiler core.clj も aarch64 target には `:binary` だけを
+  assoc し `:object` を持たない。
+
+つまり **aarch64 には linkable object emitter が無い**ので、x86_64 の構え
+（C 機構 kernel が `kotoba/kernel-probe.o` を link する）を再現できない。
+今日の aarch64 は「全部 Kotoba の standalone image」か「全部 C」かの二択で、
+**decision/mechanism 分離が表現できない。** 対策として
+`page_range_admissible` は `(descriptor, reserved ranges) -> admitted sub-range`
+の**純関数**として書き、global も I/O も触らせていない —— emitter ができた時点で
+機械的に差し替えられるようにするため。この状態を崩さないこと。
+
+（compiler 4c9650ee と kotoba-native の**ソース調査**による。compiler は実行して
+いない —— 依存閉包が kotoba-lang の git repo 約 10 本 + maven で、ここに clojure CLI が無い。）
+
 ### gate は marker の有無ではなく中身を判定する
 
-`--expect-fail` は negative control を **2 つ**走らせ、両方が拒否されることを要求する:
+`--expect-fail` は negative control を **3 つ**走らせ、全部が拒否されることを要求する:
 
-- **no-loader** —— loader を置かない ESP。何も起動せず marker が全て無い（自明な方）。
+- **no-loader** —— loader を置かない ESP。何も起動せず marker が全て無い（自明な方、23 件不足）。
 - **wx-not-enforced** —— `-DAIUEOS_BREAK_WX` で kernel の全 page を writable かつ
   privileged-executable に map したビルド。**これは chain を最後まで起動し、
   `AIUEOS_MMU_OK` も `AIUEOS_AARCH64_KERNEL_OK` も印字する。** marker の有無だけを
   見る gate は通してしまう。この gate は W^X の 2 つの実質検査だけで拒否する。
+- **pmm-admission-trusts-map** —— `-DAIUEOS_BREAK_PMM` で admission judgement が
+  firmware map を信用するビルド（10 件不足、page table を組む前に停止）。
+
+### 「正しく見えて何も証明していない control」を 1 本踏んだ
+
+pmm の control は最初 **reserved-range 除外だけ**を無効化していた。結果は
+**正しいビルドと byte 単位で同一の出力**で、`AIUEOS_PMM_RESERVED_OK` は通ってしまい、
+**control として何も証明していなかった。**
+
+原因: AAVMF では reserved range（kernel 窓・boot-info page・memory map）が全て
+**`EfiLoaderData` であって `EfiConventionalMemory` ではない**。type filter だけで既に
+除外されており、**reserved-range trimming は dead code だった**。type filter も
+落として初めて control が実物になった（12 region → 14 region、
+`PMM_RESERVED_VIOLATED` が発火）。
+
+したがって **reserved-range 除外は今日は defence-in-depth であって load-bearing では
+ない。** `ExitBootServices` 後に `EfiBootServicesCode/Data` を回収し始めた時、
+あるいは firmware が誤報した時に効いてくる。**break switch の diff を読んでも
+これは分からない** —— 実際に走らせて transcript を比べて初めて分かった。
 
 gate は `SCTLR_EL1` を parse して bit 0 が実際に立っていることを確かめ、各 W^X
 probe に**厳密な ESR exception class と level-3 permission fault** を要求する。
@@ -172,17 +227,23 @@ ADR-0014 が避けた「測定前の commit」を繰り返すため。
 1. **a1 — aarch64 UEFI loader** ✅ **landed**（ELF load + bounded admission +
    boot-info handoff まで込み。証拠あり）→ `kotoba-lang/aiueos` の
    `os/aiueos/aarch64/` へ移設する
-2. **a2 — aarch64 kernel: entry / vectors / MMU(TTBR0_EL1) / W^X** ✅ **landed**
-   （negative control 2 本つき）。**残り**: physical page allocator、dynamic paging、
-   GIC、generic timer、SMP/PSCI CPU_ON、exception 分類の本体。
+2. **a2 — aarch64 kernel: entry / vectors / MMU(TTBR0_EL1) / W^X / physical page
+   allocator** ✅ **landed**（negative control 3 本つき。table は allocator の page
+   から作る）。**残り**: runtime の map/unmap（dynamic paging 本体）、GIC、
+   generic timer、SMP/PSCI CPU_ON、exception 分類の本体。
    x86_64 側の GDT・IDT・CR3・PIC・APIC・multiboot に相当する mechanism を置き換える。
    C mechanism は現在 6,591 行で、その多くが x86 固有（paging.c 429 / entry.S 372 /
    ap_trampoline.S 62 / apic.c 48 / ioapic.c 41 / acpi.c 234 / vtd.c 177 / multiboot 455）
-3. **a3 — Kotoba decision objects の仕分け。** 59 個の `.kotoba` object のうち
-   arch 中立なもの（SHA-256、RSA、ELF admission、capability plan、journal）はそのまま
-   再利用し、arch 固有（`idt-gate-build` `cpu-apic-id` `cpu-feature-nx`
+3. **a3 — Kotoba decision objects の仕分け。⛔ compiler 側が blocker。**
+   **先に `kotoba-lang/compiler` + `kotoba-native` に aarch64 の ET_REL
+   emitter（`package-kernel-object` の aarch64 版）が要る。** それが無い限り
+   aarch64 では「判断は Kotoba、機構は C」（ADR-2607241100 D6）が**表現できない**
+   ——「全部 Kotoba の standalone image」か「全部 C」の二択になる。
+   emitter ができたら: 59 個の `.kotoba` object のうち arch 中立なもの
+   （SHA-256、RSA、ELF admission、capability plan、journal）はそのまま再利用し、
+   arch 固有（`idt-gate-build` `cpu-apic-id` `cpu-feature-nx`
    `cpu-feature-syscall` `pic-*`）にだけ aarch64 の対応物を書く。
-   **判断は Kotoba、機構は C** の境界（ADR-2607241100 D6）は動かさない
+   最初の移送先は本 ADR で C に置いた `page_range_admissible`（純関数のまま維持）
 4. **c1 — virtio-gpu 2D resource path**（上の実測により a と同時に必要）
 5. **c2 — compositor + input**（virtio-input / HID、IME は browser 側の権威のまま）
 6. **c3 — browser shell as desktop UI**（ADR-0013 Phase 6 本体）
@@ -209,14 +270,19 @@ ADR-0014 が避けた「測定前の commit」を繰り返すため。
 
 ## 次の一手
 
-a1/a2 が landed したので、次は **physical page allocator と dynamic paging**
-（ADR-0013 が x86_64 側で「immediate next gate」に置いているのと同じ場所）。
-UEFI memory map を歩いて usable な page-aligned conventional memory だけを admit し
-（loader/kernel/boot-info の範囲は除外）、page を確保・zero し、枯渇と overlap を
-拒否し、その page で新しい変換表を組んで有効化する。**その admission judgement は
-C ではなく Kotoba object として書く**（ADR-2607241100 D6 の境界。今回の spike の
-C は全て機構であって判断ではない）。
+**選択肢が 2 つあり、どちらを先にするかは「何を証明したいか」で決まる。**
 
-その次の分岐点が **c1（virtio-gpu 2D resource path）** で、上の display 実測により
+**(i) compiler に aarch64 ET_REL emitter を足す。** これを先にすると a3 が解けて、
+以後の判断（memory admission、ELF admission、capability plan）を最初から Kotoba に
+置ける。**C に判断を書き溜めてから移す方が高くつく**ので、順序としてはこちらが正しい。
+ただし作業は `kotoba-lang/compiler` + `kotoba-native` 側で、本セッションは
+cross-tier の `add_repo` ができないため着手できない。
+
+**(ii) runtime の map/unmap（dynamic paging 本体）を足す。** allocator は在るが
+今は起動時に静的 identity map を張るだけ。x86_64 の ADR-0013 exit gate に合わせ、
+map / unmap / `invlpg` 相当（`tlbi vae1`）/ W^X 違反の拒否 / 枯渇の決定的失敗を
+実証する。aarch64 内で完結するので**ここで続けられる**のはこちら。
+
+その先の分岐点が **c1（virtio-gpu 2D resource path）** で、上の display 実測により
 これは「desktop を作りたくなったら」ではなく「aarch64 で desktop を出すなら必ず」
 必要になる。"}]

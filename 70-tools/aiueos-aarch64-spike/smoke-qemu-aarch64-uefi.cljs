@@ -1,5 +1,5 @@
 #!/usr/bin/env nbb
-;; aiueos AArch64 UEFI + kernel boot evidence gate (ADR-2608080300 tracks a1/a2).
+;; aiueos AArch64 UEFI + kernel boot evidence gate (ADR-2608080600 tracks a1/a2).
 ;;
 ;; The x86_64 counterpart is `os/aiueos/scripts/smoke-qemu-uefi.sh`. This one is
 ;; nbb per the 2026-07-14 owner rule (new harnesses are `.cljs`, never `.sh`).
@@ -9,15 +9,17 @@
 ;; appear on PL011 serial.
 ;;
 ;; The gate judges SUBSTANCE, not marker presence: it parses SCTLR_EL1 to confirm
-;; the MMU bit is actually set, and requires both W^X probes to report the exact
+;; the MMU bit is actually set, requires the translation tables to have come from
+;; the physical page allocator, and requires both W^X probes to report the exact
 ;; ESR exception class and a level-3 permission fault. A kernel that enables the
 ;; MMU but maps everything RWX still prints `AIUEOS_MMU_OK` and
-;; `AIUEOS_AARCH64_KERNEL_OK` — `--expect-fail` builds exactly that kernel and
-;; requires this gate to reject it.
+;; `AIUEOS_AARCH64_KERNEL_OK` — `--expect-fail` builds exactly that kernel, plus
+;; one whose memory-admission judgement trusts the firmware map, and requires
+;; this gate to reject both.
 ;;
 ;;   nbb smoke-qemu-aarch64-uefi.cljs                  # boot evidence gate
 ;;   nbb smoke-qemu-aarch64-uefi.cljs --display-matrix  # GOP probe across devices
-;;   nbb smoke-qemu-aarch64-uefi.cljs --expect-fail     # both negative controls
+;;   nbb smoke-qemu-aarch64-uefi.cljs --expect-fail     # three negative controls
 
 (ns smoke-qemu-aarch64-uefi
   (:require ["node:child_process" :as cp]
@@ -49,6 +51,10 @@
    "AIUEOS_KERNEL_ENTRY"
    "AIUEOS_BOOTINFO_OK"
    "AIUEOS_KERNEL_IMAGE"
+   "AIUEOS_PMM_OK"
+   "AIUEOS_PMM_RESERVED_OK"
+   "AIUEOS_PMM_DISTINCT_OK"
+   "AIUEOS_PMM_EXHAUSTION_OK"
    "AIUEOS_PAGETABLES_BUILT"
    "AIUEOS_MMU_OK"
    "AIUEOS_AARCH64_KERNEL_OK"])
@@ -74,12 +80,33 @@
          (str/includes? l "expected-ec")
          (not (str/includes? l "NO_FAULT")))))
 
+(defn- tables-from-allocator?
+  "The translation tables must come from the physical page allocator, not from
+   .bss. Without this the allocator could exist and be entirely unused."
+  [serial]
+  (when-let [l (line-for serial "AIUEOS_PAGETABLES_BUILT")]
+    (str/includes? l "from=allocator")))
+
+(defn- pmm-found-memory?
+  "A plausible amount of usable memory. Zero regions would still print
+   AIUEOS_PMM_OK-shaped output in a broken allocator."
+  [serial]
+  (when-let [l (line-for serial "AIUEOS_PMM_OK")]
+    (and (not (str/includes? l "TRUNCATED"))
+         (when-let [m (re-find #"regions=(\d+) pages=(\d+)" l)]
+           (and (pos? (js/parseInt (nth m 1) 10))
+                (pos? (js/parseInt (nth m 2) 10)))))))
+
 (defn evidence-failures
   "Every unmet requirement, as human-readable strings. Empty means the gate passes."
   [serial]
   (concat
    (map #(str "missing marker: " %) (remove #(str/includes? serial %) required-markers))
    (when-not (mmu-enabled? serial) ["SCTLR_EL1.M not set (MMU not actually enabled)"])
+   (when-not (pmm-found-memory? serial)
+     ["physical allocator reported no usable regions/pages (or truncated the map)"])
+   (when-not (tables-from-allocator? serial)
+     ["translation tables did not come from the physical page allocator"])
    (when-not (wx-probe-ok? serial "AIUEOS_WX_WRITE_TEXT" 0x25)
      ["W^X probe 1 (store into .text) did not take a level-3 permission data abort"])
    (when-not (wx-probe-ok? serial "AIUEOS_WX_EXEC_RODATA" 0x21)
@@ -120,16 +147,20 @@
     efi))
 
 (defn build-kernel!
-  "Compile + link the freestanding AArch64 kernel ELF. `break-wx?` builds the
-   negative control that maps every kernel page writable AND executable."
-  [out-dir break-wx?]
-  (let [kobj (path/join out-dir (if break-wx? "kernel_bad.o" "kernel.o"))
+  "Compile + link the freestanding AArch64 kernel ELF. `break` selects a
+   negative control: :wx maps every kernel page writable AND executable, :pmm
+   makes the physical-memory admission judgement trust the firmware map."
+  [out-dir break]
+  (let [kobj (path/join out-dir (str "kernel" (when break (str "_" (name break))) ".o"))
         eobj (path/join out-dir "kentry.o")
         elf (path/join out-dir "KERNEL.ELF")]
     (must! "clang" (concat ["--target=aarch64-unknown-none-elf" "-ffreestanding"
                             "-fno-stack-protector" "-mgeneral-regs-only" "-O1"
                             "-I" here]
-                           (when break-wx? ["-DAIUEOS_BREAK_WX"])
+                           (case break
+                             :wx ["-DAIUEOS_BREAK_WX"]
+                             :pmm ["-DAIUEOS_BREAK_PMM"]
+                             nil)
                            ["-c" "-o" kobj (path/join here "kernel.c")]))
     (must! "clang" ["--target=aarch64-unknown-none-elf" "-ffreestanding"
                     "-I" here "-c" "-o" eobj (path/join here "kentry.S")])
@@ -218,7 +249,7 @@
 
     (let [out-dir (fs/mkdtempSync "/tmp/aiueos-aa64-")
           efi (build-efi! out-dir)
-          elf (build-kernel! out-dir false)
+          elf (build-kernel! out-dir nil)
           esp (build-esp! out-dir efi elf)]
       (println (str "built " (path/basename efi) " (" (.-size (fs/statSync efi)) " bytes), "
                     (path/basename elf) " (" (.-size (fs/statSync elf)) " bytes)"))
@@ -228,16 +259,19 @@
         (display-matrix! out-dir esp)
 
         (contains? args "--expect-fail")
-        ;; Two independent ways the gate must refuse: nothing to boot at all,
-        ;; and a kernel that boots and enables the MMU but does not enforce W^X.
+        ;; Three independent ways the gate must refuse: nothing to boot at all;
+        ;; a kernel that boots and enables the MMU but does not enforce W^X; and
+        ;; a physical-memory admission judgement that trusts the firmware map.
         (let [empty-esp (build-esp! (fs/mkdtempSync "/tmp/aiueos-aa64-empty-") nil nil)
-              bad-dir (fs/mkdtempSync "/tmp/aiueos-aa64-badwx-")
-              bad-elf (build-kernel! bad-dir true)
-              bad-esp (build-esp! bad-dir efi bad-elf)
-              a (negative-control! out-dir "no-loader" empty-esp)
-              b (negative-control! bad-dir "wx-not-enforced" bad-esp)]
-          (if (and a b)
-            (do (println "\nPASS: gate rejected both negative controls") (js/process.exit 0))
+              wx-dir (fs/mkdtempSync "/tmp/aiueos-aa64-badwx-")
+              wx-esp (build-esp! wx-dir efi (build-kernel! wx-dir :wx))
+              pmm-dir (fs/mkdtempSync "/tmp/aiueos-aa64-badpmm-")
+              pmm-esp (build-esp! pmm-dir efi (build-kernel! pmm-dir :pmm))
+              results [(negative-control! out-dir "no-loader" empty-esp)
+                       (negative-control! wx-dir "wx-not-enforced" wx-esp)
+                       (negative-control! pmm-dir "pmm-admission-trusts-map" pmm-esp)]]
+          (if (every? true? results)
+            (do (println "\nPASS: gate rejected all three negative controls") (js/process.exit 0))
             (do (println "\nFAIL: a negative control was not rejected") (js/process.exit 1))))
 
         :else

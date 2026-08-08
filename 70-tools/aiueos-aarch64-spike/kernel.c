@@ -54,14 +54,174 @@ extern char __rodata_start[], __rodata_end[];
 extern char __end[];
 
 /* --------------------------------------------------------------------------
+ * UEFI memory map, as handed over in boot-info. Descriptors are strided by the
+ * firmware's `descriptor_size`, which is NOT sizeof(struct) — walking with the
+ * struct size is the classic way to read a corrupt map.
+ */
+struct efi_memory_descriptor {
+  uint32_t type;
+  uint32_t pad;
+  uint64_t physical_start;
+  uint64_t virtual_start;
+  uint64_t number_of_pages;
+  uint64_t attribute;
+};
+#define EFI_CONVENTIONAL_MEMORY 7
+
+struct reserved_range { uint64_t base, size; };
+
+/* --------------------------------------------------------------------------
+ * THE DECISION.
+ *
+ * ADR-2607241100 D6 draws the line: C owns mechanism, every judgement is a
+ * compiler-emitted Kotoba object. This function is a judgement — which physical
+ * memory may be handed out — and so belongs in Kotoba, not here.
+ *
+ * It is not in Kotoba today because there is no way to put it there on AArch64.
+ * `kotoba.native.elf64/package-kernel-object` emits "a linkable x86-64 ET_REL
+ * object" and hard-rejects any target other than `:x86_64-aiueos-kernel-v1`;
+ * the aarch64 target only reaches `package-kernel-aarch64`, which emits a whole
+ * standalone ET_EXEC image. There is no aarch64 ET_REL emitter, so a Kotoba
+ * decision object cannot be linked into a C-mechanism kernel at all.
+ *
+ * So it is written here as a PURE function of (descriptor, reserved ranges) ->
+ * admitted sub-range, touching no global state and doing no I/O, precisely so
+ * it is a drop-in replacement once that emitter exists. Keep it that way: the
+ * moment it reads a global or allocates, the swap stops being mechanical.
+ */
+static int page_range_admissible(const struct efi_memory_descriptor *d,
+                                 const struct reserved_range *reserved, int reserved_count,
+                                 uint64_t *out_base, uint64_t *out_pages) {
+#ifdef AIUEOS_BREAK_PMM
+  /* Negative control for the gate (never a build option for real use): a
+     judgement that trusts the firmware map. It drops BOTH the type filter and
+     the reserved-range exclusion below, so the allocator may hand out the
+     kernel image, the boot-info page or the memory map itself.
+     Dropping only the reserved-range exclusion is NOT a usable control: under
+     AAVMF every reserved range is EfiLoaderData, so the type filter alone
+     already excludes them and the control comes out byte-identical to a
+     correct build. Measured 2026-08-08 — the first attempt at this control was
+     vacuous for exactly that reason. */
+  if (d->type != EFI_CONVENTIONAL_MEMORY && d->type != 2 /* EfiLoaderData */) return 0;
+#else
+  if (d->type != EFI_CONVENTIONAL_MEMORY) return 0;
+#endif
+  if (d->number_of_pages == 0) return 0;
+  if (d->physical_start & 0xFFFULL) return 0;           /* must be page aligned */
+
+  uint64_t base = d->physical_start;
+  uint64_t end = base + d->number_of_pages * 4096ULL;
+  if (end <= base) return 0;                            /* overflow */
+
+  /* Trim against every reserved range. A descriptor that a reserved range cuts
+     in half is refused outright rather than split — refusing is safe, and
+     splitting would need an allocator policy this judgement must not own. */
+#ifdef AIUEOS_BREAK_PMM
+  /* Negative control for the gate (never a build option for real use): skip the
+     reserved-range exclusion entirely, so the allocator may hand out the kernel
+     image, the boot-info page or the memory map. A gate that actually checks
+     the judgement must reject this build. */
+  (void)reserved; (void)reserved_count;
+  goto skip_reserved;
+#endif
+  for (int i = 0; i < reserved_count; i++) {
+    uint64_t r0 = reserved[i].base;
+    uint64_t r1 = reserved[i].base + reserved[i].size;
+    if (r1 <= base || r0 >= end) continue;              /* disjoint */
+    if (r0 <= base && r1 >= end) return 0;              /* fully covered */
+    if (r0 <= base) { base = r1; continue; }            /* overlaps the front */
+    if (r1 >= end) { end = r0; continue; }              /* overlaps the tail */
+    return 0;                                           /* splits it: refuse */
+  }
+#ifdef AIUEOS_BREAK_PMM
+skip_reserved:
+#endif
+
+  base = (base + 0xFFFULL) & ~0xFFFULL;
+  end &= ~0xFFFULL;
+  if (end <= base) return 0;
+
+  *out_base = base;
+  *out_pages = (end - base) / 4096ULL;
+  return 1;
+}
+
+/* --------------------------------------------------------------------------
+ * Physical page allocator. Mechanism only: it hands out pages from the ranges
+ * the judgement above admitted, and never decides what is admissible.
+ */
+#define PMM_MAX_REGIONS 64
+
+struct pmm {
+  struct { uint64_t base, pages; } region[PMM_MAX_REGIONS];
+  int region_count;
+  uint64_t total_pages;
+  uint64_t allocated;
+  int cursor_region;
+  uint64_t cursor_page;
+  uint64_t limit;              /* 0 = unlimited; a test-only cap */
+  int truncated;               /* map had more admissible regions than we hold */
+};
+static struct pmm pmm;
+
+static void pmm_init(const struct aiueos_boot_info *info,
+                     const struct reserved_range *reserved, int reserved_count) {
+  pmm.region_count = 0; pmm.total_pages = 0; pmm.allocated = 0;
+  pmm.cursor_region = 0; pmm.cursor_page = 0; pmm.limit = 0; pmm.truncated = 0;
+
+  const unsigned char *p = (const unsigned char *)info->memory_map;
+  uint64_t stride = info->descriptor_size;
+  uint64_t count = stride ? info->memory_map_size / stride : 0;
+
+  for (uint64_t i = 0; i < count; i++) {
+    const struct efi_memory_descriptor *d =
+      (const struct efi_memory_descriptor *)(p + i * stride);
+    uint64_t base = 0, pages = 0;
+    if (!page_range_admissible(d, reserved, reserved_count, &base, &pages)) continue;
+    if (pmm.region_count == PMM_MAX_REGIONS) { pmm.truncated = 1; break; }
+    pmm.region[pmm.region_count].base = base;
+    pmm.region[pmm.region_count].pages = pages;
+    pmm.region_count++;
+    pmm.total_pages += pages;
+  }
+}
+
+/* Returns 0 on exhaustion — a clean refusal, never a wild pointer. */
+static uint64_t pmm_alloc_page(void) {
+  if (pmm.limit && pmm.allocated >= pmm.limit) return 0;
+  while (pmm.cursor_region < pmm.region_count) {
+    if (pmm.cursor_page < pmm.region[pmm.cursor_region].pages) {
+      uint64_t addr = pmm.region[pmm.cursor_region].base + pmm.cursor_page * 4096ULL;
+      pmm.cursor_page++;
+      pmm.allocated++;
+      for (uint64_t *q = (uint64_t *)addr; q < (uint64_t *)(addr + 4096ULL); q++) *q = 0;
+      return addr;
+    }
+    pmm.cursor_region++;
+    pmm.cursor_page = 0;
+  }
+  return 0;
+}
+
+static int pmm_owns(uint64_t addr) {
+  for (int i = 0; i < pmm.region_count; i++) {
+    uint64_t b = pmm.region[i].base;
+    uint64_t e = b + pmm.region[i].pages * 4096ULL;
+    if (addr >= b && addr < e) return 1;
+  }
+  return 0;
+}
+
+/* --------------------------------------------------------------------------
  * Stage-1 EL1 translation tables. 4 KiB granule, T0SZ=25 (39-bit VA), so the
- * walk starts at level 1 with 1 GiB entries.
+ * walk starts at level 1 with 1 GiB entries. The tables now come from the
+ * allocator above rather than from .bss.
  */
 #define PT_ENTRIES 512
 
-static uint64_t l1_table[PT_ENTRIES] __attribute__((aligned(4096)));
-static uint64_t l2_table[PT_ENTRIES] __attribute__((aligned(4096)));
-static uint64_t l3_table[PT_ENTRIES] __attribute__((aligned(4096)));
+static uint64_t *l1_table;
+static uint64_t *l2_table;
+static uint64_t *l3_table;
 
 #define DESC_TABLE 0x3ULL   /* table descriptor at L1/L2 */
 #define DESC_BLOCK 0x1ULL   /* block descriptor at L1/L2 */
@@ -108,8 +268,14 @@ static void clean_dcache_range(const void *base, uint64_t size) {
   __asm__ volatile("dsb ish" ::: "memory");
 }
 
-static void build_page_tables(void) {
-  for (int i = 0; i < PT_ENTRIES; i++) { l1_table[i] = 0; l2_table[i] = 0; l3_table[i] = 0; }
+/* Returns 0 if the allocator could not supply all three table pages. */
+static int build_page_tables(void) {
+  l1_table = (uint64_t *)pmm_alloc_page();
+  l2_table = (uint64_t *)pmm_alloc_page();
+  l3_table = (uint64_t *)pmm_alloc_page();
+  if (!l1_table || !l2_table || !l3_table) return 0;
+
+  /* pmm_alloc_page zeroes each page, so the tables start clean. */
 
   /* L1[0]: 0..1 GiB as Device memory. PL011, the GIC and the rest of the
      QEMU virt MMIO live here. Never executable. */
@@ -157,9 +323,12 @@ static void build_page_tables(void) {
     l3_table[i] = DESC_PAGE | va | attrs;
   }
 
-  clean_dcache_range(l1_table, sizeof l1_table);
-  clean_dcache_range(l2_table, sizeof l2_table);
-  clean_dcache_range(l3_table, sizeof l3_table);
+  /* 4096, not `sizeof l1_table` — these are pointers into allocator pages now,
+     so sizeof would clean 8 bytes and silently leave the rest stale. */
+  clean_dcache_range(l1_table, 4096);
+  clean_dcache_range(l2_table, 4096);
+  clean_dcache_range(l3_table, 4096);
+  return 1;
 }
 
 static void mmu_enable(void) {
@@ -275,10 +444,91 @@ void kernel_main(struct aiueos_boot_info *info) {
   serial_puthex((uint64_t)__end);
   serial_puts("\n");
 
-  build_page_tables();
+  /* --- physical memory admission + allocator ---------------------------- */
+  {
+    /* Ranges the allocator must never hand out, even if the firmware were to
+       describe them as conventional memory. */
+    struct reserved_range reserved[3] = {
+      {AIUEOS_KERNEL_LOAD_BASE, 0x200000ULL},                  /* kernel window */
+      {(uint64_t)info & ~0xFFFULL, 4096ULL},                   /* boot-info page */
+      {(uint64_t)info->memory_map & ~0xFFFULL,
+       (info->memory_map_size + 0xFFFULL) & ~0xFFFULL}         /* the map itself */
+    };
+    pmm_init(info, reserved, 3);
+
+    serial_puts("AIUEOS_PMM_OK regions=");
+    serial_putdec((uint64_t)pmm.region_count);
+    serial_puts(" pages=");
+    serial_putdec(pmm.total_pages);
+    serial_puts(" mib=");
+    serial_putdec(pmm.total_pages * 4096ULL / (1024ULL * 1024ULL));
+    serial_puts(pmm.truncated ? " TRUNCATED\n" : "\n");
+
+    if (pmm.region_count == 0 || pmm.total_pages == 0) {
+      serial_puts("AIUEOS_PMM_NO_USABLE_MEMORY\n");
+      goto done;
+    }
+
+    /* Self-test 0: the judgement held — no admitted region overlaps anything
+       reserved. This is the check that catches an allocator willing to hand
+       out the kernel image, the boot-info page or the memory map itself. */
+    {
+      int ok = 1;
+      for (int i = 0; i < pmm.region_count && ok; i++) {
+        uint64_t b = pmm.region[i].base;
+        uint64_t e = b + pmm.region[i].pages * 4096ULL;
+        for (int j = 0; j < 3; j++) {
+          uint64_t r0 = reserved[j].base, r1 = reserved[j].base + reserved[j].size;
+          if (b < r1 && r0 < e) { ok = 0; break; }
+        }
+      }
+      serial_puts(ok ? "AIUEOS_PMM_RESERVED_OK\n"
+                     : "AIUEOS_PMM_RESERVED_VIOLATED — allocator may hand out reserved memory\n");
+      if (!ok) goto done;
+    }
+
+    /* Self-test 1: distinctness, alignment and ownership over a run of pages.
+       A double-allocation is the failure this must catch. */
+    {
+      uint64_t seen[32];
+      int n = 32, ok = 1;
+      for (int i = 0; i < n; i++) {
+        uint64_t p = pmm_alloc_page();
+        if (!p || (p & 0xFFFULL) || !pmm_owns(p)) { ok = 0; break; }
+        for (int j = 0; j < i; j++) if (seen[j] == p) { ok = 0; break; }
+        if (!ok) break;
+        /* pmm_alloc_page must hand back a zeroed page. */
+        for (int w = 0; w < 512; w++) if (((uint64_t *)p)[w] != 0) { ok = 0; break; }
+        if (!ok) break;
+        seen[i] = p;
+      }
+      serial_puts(ok ? "AIUEOS_PMM_DISTINCT_OK n=32\n"
+                     : "AIUEOS_PMM_DISTINCT_FAIL\n");
+      if (!ok) goto done;
+    }
+
+    /* Self-test 2: exhaustion is a clean refusal, not a wild pointer. Capped
+       with a test-only budget so this does not have to drain real RAM. */
+    {
+      uint64_t saved_limit = pmm.limit;
+      pmm.limit = pmm.allocated + 4;
+      int drained = 0, clean = 0;
+      for (int i = 0; i < 4; i++) if (pmm_alloc_page()) drained++;
+      clean = (pmm_alloc_page() == 0);
+      pmm.limit = saved_limit;
+      serial_puts((drained == 4 && clean) ? "AIUEOS_PMM_EXHAUSTION_OK\n"
+                                          : "AIUEOS_PMM_EXHAUSTION_FAIL\n");
+      if (!(drained == 4 && clean)) goto done;
+    }
+  }
+
+  if (!build_page_tables()) {
+    serial_puts("AIUEOS_PAGETABLES_ALLOC_FAIL\n");
+    goto done;
+  }
   serial_puts("AIUEOS_PAGETABLES_BUILT ttbr0=");
   serial_puthex((uint64_t)l1_table);
-  serial_puts("\n");
+  serial_puts(pmm_owns((uint64_t)l1_table) ? " from=allocator\n" : " from=UNKNOWN\n");
 
   mmu_enable();
 

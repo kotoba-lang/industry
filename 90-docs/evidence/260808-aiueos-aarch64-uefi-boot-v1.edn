@@ -109,6 +109,40 @@
            returns cleanly and is reported as NO_FAULT instead of hanging."}]
   :termination "PSCI SYSTEM_OFF via HVC #0; qemu exit 0"}
 
+ ;; --- (a2b) physical page allocator + dynamic paging ------------------------
+ :aarch64-physical-memory
+ {:status :allocator-backs-the-translation-tables
+  :counterpart "ADR-0013's 'immediate next gate' for x86_64: parse the UEFI
+                memory map, admit only usable page-aligned conventional memory
+                excluding loader/kernel/boot-info, allocate and zero pages,
+                reject exhaustion and overlap, and build the translation tables
+                from those pages."
+  :admitted {:regions 12 :pages 121036 :mib 472 :of-ram-mib 512 :truncated? false}
+  :reserved-ranges ["kernel window 0x42000000 +2 MiB"
+                    "boot-info page"
+                    "the UEFI memory map buffer itself"]
+  :map-walk "strided by the firmware's descriptor_size (48), not sizeof(struct)"
+  :self-tests
+  [{:test :reserved-exclusion
+    :marker "AIUEOS_PMM_RESERVED_OK"
+    :checks "no admitted region overlaps any reserved range"}
+   {:test :distinctness
+    :marker "AIUEOS_PMM_DISTINCT_OK n=32"
+    :checks "32 consecutive allocations are pairwise distinct, 4 KiB aligned,
+             owned by an admitted region, and returned zeroed"}
+   {:test :exhaustion
+    :marker "AIUEOS_PMM_EXHAUSTION_OK"
+    :checks "with a test-only budget, the allocation past the budget returns 0
+             — a clean refusal, never a wild pointer"}]
+  :tables-now-allocated
+  {:ttbr0 "0x0000000040024000"
+   :previously "0x0000000042005000 (static arrays in .bss)"
+   :marker "AIUEOS_PAGETABLES_BUILT ttbr0=0x0000000040024000 from=allocator"
+   :note "The gate requires from=allocator, so an allocator that exists but is
+          never used fails."}
+  :wx-still-enforced "both probes still fault with EC 0x25 / 0x21 and a level-3
+                      permission fault, now on dynamically allocated tables"}
+
  ;; --- The gate judges substance, and was watched refusing both controls -----
  :gate-negative-controls
  [{:control :no-loader
@@ -124,7 +158,60 @@
    :note "The sharp control. This build boots the whole chain and still prints
           AIUEOS_MMU_OK and AIUEOS_AARCH64_KERNEL_OK, so a marker-presence gate
           would pass it. It is refused on the two W^X substance checks alone —
-          which is what distinguishes this gate from theatre."}]
+          which is what distinguishes this gate from theatre."}
+  {:control :pmm-admission-trusts-map
+   :setup "kernel built with -DAIUEOS_BREAK_PMM: the physical-memory admission
+           judgement drops both the EfiConventionalMemory type filter and the
+           reserved-range exclusion"
+   :rejected? true
+   :unmet-requirements 10
+   :note "Halts at AIUEOS_PMM_RESERVED_VIOLATED before building page tables.
+          Admits 14 regions / 121,605 pages instead of 12 / 121,036."}]
+
+ ;; --- A control that looked right and proved nothing ------------------------
+ :vacuous-control-finding
+ {:what "The first attempt at the :pmm-admission-trusts-map control disabled
+         ONLY the reserved-range exclusion, leaving the type filter in place."
+  :result "Byte-identical output to a correct build — AIUEOS_PMM_RESERVED_OK
+           still passed, so the control proved nothing."
+  :why "Under AAVMF every reserved range (kernel window, boot-info page, memory
+        map) is EfiLoaderData, never EfiConventionalMemory. The type filter
+        alone already excluded them, so the reserved-range trimming was dead
+        code and disabling it changed nothing."
+  :consequence "The reserved-range exclusion is defence-in-depth today, not the
+                load-bearing check. It becomes load-bearing when the kernel
+                starts reclaiming EfiBootServicesCode/Data after
+                ExitBootServices, or if firmware misreports a range."
+  :lesson "A negative control that passes is not a control. This one was caught
+           only by running it and comparing transcripts — reading the diff of
+           the break switch would not have revealed it."}
+
+ ;; --- What blocks moving the judgement into Kotoba (ADR track a3) -----------
+ :kotoba-object-gap
+ {:blocks "Writing the physical-memory admission judgement as a Kotoba object,
+           per ADR-2607241100 D6 (C owns mechanism, judgements are
+           compiler-emitted Kotoba)."
+  :measured-on "kotoba-lang/compiler 4c9650ee1a3ebaefb9a5a449e1b6ad37b009d2bf,
+                kotoba-lang/kotoba-native (elf64.clj)"
+  :finding "There is no AArch64 linkable-object emitter. kotoba.native.elf64
+            has package-kernel-object — 'a linkable x86-64 ET_REL object' —
+            which hard-rejects any target other than :x86_64-aiueos-kernel-v1
+            (kernel-target, elf64.clj:4 and its guard at :226). The aarch64
+            path reaches only package-kernel-aarch64, which emits a whole
+            standalone ET_EXEC image, and compiler core.clj assoc's :binary
+            for that target with no :object."
+  :consequence "The x86_64 arrangement — a C-mechanism kernel linking
+                kotoba/kernel-probe.o — cannot be reproduced on aarch64 at all.
+                Until an aarch64 ET_REL emitter exists, aarch64 must choose
+                between an all-Kotoba standalone image and an all-C kernel; the
+                decision/mechanism split is not expressible."
+  :mitigation "page_range_admissible() in kernel.c is written as a pure
+               function of (descriptor, reserved ranges) -> admitted sub-range,
+               touching no global state and doing no I/O, so it is a mechanical
+               drop-in once the emitter exists."
+  :not-attempted "The compiler was not run — its dependency closure is ~10
+                  kotoba-lang git repos plus maven, and no clojure CLI is
+                  present here. This finding is from source, not execution."}
 
  ;; --- The load-bearing display finding: this is what couples (a) and (c) ----
  :aarch64-gop-display-matrix

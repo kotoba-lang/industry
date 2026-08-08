@@ -19,9 +19,11 @@ Measured evidence: `90-docs/evidence/260808-aiueos-aarch64-uefi-boot-v1.edn`
 calls `ExitBootServices`, and hands a boot-info struct to the kernel.
 
 **`kernel.c` / `kentry.S` / `kernel.ld`** — the freestanding AArch64 kernel.
-Validates the boot-info handoff, builds its own stage-1 EL1 translation tables
-(4 KiB granule, `T0SZ=25`), replaces the firmware's mapping via `TTBR0_EL1`, and
-then **proves W^X is enforced** by violating it in both directions.
+Validates the boot-info handoff, walks the UEFI memory map to admit usable
+physical memory, allocates pages from it, builds its own stage-1 EL1 translation
+tables **out of those pages** (4 KiB granule, `T0SZ=25`), replaces the
+firmware's mapping via `TTBR0_EL1`, and then **proves W^X is enforced** by
+violating it in both directions.
 
 **`bootinfo.h`** — the handoff ABI, field-for-field identical to the x86_64
 `struct aiueos_boot_info`. The ABI is one of the genuinely arch-neutral pieces
@@ -56,14 +58,33 @@ It parses `SCTLR_EL1` to confirm bit 0 is actually set, and requires each W^X
 probe to report the exact ESR exception class (`0x25` data abort / `0x21`
 instruction abort at the current EL) with a level-3 permission fault.
 
-That matters because of the second negative control. `--expect-fail` builds a
-kernel with `-DAIUEOS_BREAK_WX`, which maps every kernel page writable *and*
-executable. It boots all the way through and still prints `AIUEOS_MMU_OK` and
-`AIUEOS_AARCH64_KERNEL_OK` — a marker-presence gate would pass it. This gate
-refuses it on the two W^X checks alone. The first control (an ESP with no
-loader) covers the trivial case.
+It also requires the translation tables to have come from the page allocator
+(`from=allocator`), so an allocator that exists but is never used fails.
 
-Both controls were watched being rejected before this was recorded as landed.
+`--expect-fail` runs three controls, all watched being rejected:
+
+| control | what it breaks | why it is refused |
+|---|---|---|
+| `no-loader` | ESP with no `BOOTAA64.EFI` | nothing boots; 23 unmet |
+| `wx-not-enforced` | `-DAIUEOS_BREAK_WX`: every page writable *and* executable | boots fully, prints `MMU_OK` **and** `KERNEL_OK`; refused on the 2 W^X checks alone |
+| `pmm-admission-trusts-map` | `-DAIUEOS_BREAK_PMM`: admission drops the type filter and reserved-range exclusion | halts at `PMM_RESERVED_VIOLATED`; 10 unmet |
+
+### One of these controls was vacuous at first — worth knowing why
+
+The `pmm` control originally disabled *only* the reserved-range exclusion. It
+produced **byte-identical output to a correct build**: `AIUEOS_PMM_RESERVED_OK`
+still passed, so it proved nothing.
+
+The reason is that under AAVMF every reserved range (kernel window, boot-info
+page, memory map) is `EfiLoaderData`, never `EfiConventionalMemory` — the type
+filter alone already excluded them, making the reserved-range trimming dead
+code. The control only became real once it dropped the type filter too.
+
+So: **the reserved-range exclusion is defence-in-depth today, not the
+load-bearing check.** It becomes load-bearing when the kernel starts reclaiming
+`EfiBootServicesCode`/`Data` after `ExitBootServices`, or if firmware
+misreports. Reading the break switch's diff would not have revealed this —
+only running it and comparing transcripts did.
 
 ## Three findings worth reading before continuing the port
 
@@ -82,9 +103,35 @@ it — the slots hold a branch and the save lives once. And the page tables are
 built under the firmware's mapping but walked under ours, so they are cleaned by
 VA (`dc cvac`) before the switch.
 
+## Why the memory-admission judgement is still in C
+
+ADR-2607241100 D6 says C owns mechanism and every judgement is a
+compiler-emitted Kotoba object. `page_range_admissible()` **is** a judgement and
+belongs in Kotoba. It is not there because it cannot be, on aarch64:
+
+`kotoba.native.elf64/package-kernel-object` emits *"a linkable x86-64 ET_REL
+object"* and hard-rejects any target but `:x86_64-aiueos-kernel-v1`. The aarch64
+path reaches only `package-kernel-aarch64`, which emits a whole standalone
+`ET_EXEC` image, and the compiler assoc's `:binary` for that target with no
+`:object`. **There is no aarch64 linkable-object emitter**, so the x86_64
+arrangement — a C-mechanism kernel linking `kotoba/kernel-probe.o` — cannot be
+reproduced. aarch64 today must pick all-Kotoba-standalone or all-C.
+
+Mitigation: `page_range_admissible()` is written as a pure function of
+`(descriptor, reserved ranges) -> admitted sub-range`, touching no global state
+and doing no I/O, so it is a mechanical swap once the emitter exists. Keep it
+that way — the moment it reads a global or allocates, the swap stops being
+mechanical.
+
+(From source inspection of compiler `4c9650ee` and `kotoba-native`, not from
+running the compiler: its closure is ~10 kotoba-lang git repos plus maven, and
+there is no clojure CLI here.)
+
 ## Deliberately not done
 
-No compositor, no input path, no virtio-gpu 2D resource path, no scheduler, no
-userspace. `ramfb` is probed but not driven. Nothing measured on macOS or on
-real Apple Silicon — the entire HVF track is unmeasured. See
+No dynamic paging beyond the initial static identity map (the allocator backs
+the tables, but nothing maps or unmaps at runtime yet), no GIC, no generic
+timer, no scheduler, no ring 3, no userspace. No compositor, no input path, no
+virtio-gpu 2D resource path; `ramfb` is probed but not driven. Nothing measured
+on macOS or on real Apple Silicon — the entire HVF track is unmeasured. See
 `:not-demonstrated` in the evidence EDN.
