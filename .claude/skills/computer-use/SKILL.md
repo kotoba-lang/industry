@@ -75,18 +75,28 @@ macOS alert.
 
 ```bash
 cd orgs/kotoba-lang/computer-use
-clojure -M:examples -m <example-ns>       # NOT :dev:examples
+clojure -M:dev:examples -m <example-ns>   # local checkouts, no network
+clojure -M:examples -m <example-ns>       # :git/sha coordinates, needs network
 ```
 
-`:dev` overrides `langgraph-clj`/`langchain-clj` to `../langgraph-clj` /
-`../langchain-clj` local roots — those sibling paths do not resolve under
-`orgs/kotoba-lang/` (the actual checkouts live at
-`orgs/com-junkawasaki/langgraph-clj` and `orgs/com-junkawasaki/langchain-clj`),
-so `:dev:examples` fails classpath resolution from this cwd. Plain `:examples`
-uses the `deps.edn` git-tag/sha coordinates (`io.github.com-junkawasaki/…`)
-resolved over the network, and works. (To develop against the local checkouts,
-point the `:dev` `:local/root`s at `../../com-junkawasaki/<repo>` instead —
-do not re-clone.)
+`:dev` overrides `io.github.kotoba-lang/langgraph` and `…/langchain` to
+`../langgraph` / `../langchain` — sibling paths under `orgs/kotoba-lang/`,
+where both checkouts actually live, so `:dev:examples` resolves offline.
+Verified 2026-08-08: `clojure -Spath -A:dev:examples` puts
+`orgs/kotoba-lang/langgraph/src` and `…/langchain/src` on the classpath.
+
+Without `:dev`, `:examples` resolves langgraph by `:git/sha` over the network.
+That pin is deliberate and **not** a stale tag — see the `deps.edn` header
+comment: `:git/tag "v0.2.0"` predates langgraph's org rename and drags in the
+old `io.github.com-junkawasaki/langchain-clj`, which shadows
+`io.github.kotoba-lang/langchain`'s `langchain.model` namespace and drops
+`openai-model`. Every example then dies with `No such var: model/openai-model`.
+Do not "upgrade" that `:git/sha` to a tag until a tag exists past the rename.
+
+> Until 2026-08-08 this section said to use plain `:examples` and *avoid*
+> `:dev:examples`, because the local roots used to point at
+> `orgs/com-junkawasaki/langgraph-clj`. That org/name is gone (the `-clj`
+> suffix ban, 2026-07-10) and `deps.edn` was rewritten; the warning inverted.
 
 ## Building a new guardrailed task
 

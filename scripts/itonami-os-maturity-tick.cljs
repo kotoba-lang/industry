@@ -425,8 +425,29 @@
   （二重実装を防ぐはずの仕掛けが、静かに何も防いでいなかった）。
 
   見るのは接続フローが作る名前（`itonami-os` / `os-connect`）の枝だけ。無関係な
-  枝まで見ると、たまたま似た綴りの枝が候補を隠す。`gh` が落ちたら `:unknown` に
-  して候補から外さない（従来どおり fail-open）。"
+  枝まで見ると、たまたま似た綴りの枝が候補を隠す。
+
+  **情報源は 3 つで、gh の 2 本はどちらも落ちうる。** 実測 2026-08-08: 同じ tick を
+  2 回続けて回したら、1 回目は 6492 を「別の枝が着手中」として外し、2 回目は
+  「次の 1 手」として出した —— gh がこけたときに fail-open するため。二重実装を
+  防ぐ仕掛けが**気まぐれに効かなくなるのは、効かないより悪い**（効いていると
+  思って進むので）。ADR-2608070000 が記録した isic-4921 の 2 回実装は、まさに
+  この検出漏れが起こした事故だった。
+
+  3 つ目は git の remote-tracking ref。**ネットワークも gh も要らない**ので、
+  launchd 下で SSH agent が無い（この tick が origin/main を fetch ではなく
+  remote-tracking ref から読んでいるのと同じ制約）状況でも効く。
+
+  ただし **gh が答えたときは gh が正で、git ref は使わない**。remote-tracking ref
+  は prune されるまで消えた枝を持ち続けるからで、しかもこの repo は同じ GitHub repo に
+  remote が 2 本（gftdcojp / origin）刺さっているので、片方を prune しても他方が
+  残る。実測 2026-08-08: 枝を GitHub から消した後も
+  `refs/remotes/origin/agent/itonami-os-isic-6492` が残り、**6492 が候補から
+  永久に外れた**。
+
+  向きが違うので両方まずいが、まずさの質が違う: 検出漏れは二重実装（やり直せる）、
+  過剰検出は**候補が永久に出てこない**（loop が静かに何もしなくなる）。だから
+  git ref は gh が黙ったときの保険に留める。"
   []
   (if offline?
     {:status :skipped :branches []}
@@ -434,12 +455,20 @@
                        "--state" "open" "--limit" "50"
                        "--json" "headRefName" "--jq" ".[].headRefName"])
           br (sh "gh" ["api" "repos/network-awai/cloud-itonami/branches"
-                       "--paginate" "--jq" ".[].name"])]
-      (if (and (not= 0 (:code pr)) (not= 0 (:code br)))
+                       "--paginate" "--jq" ".[].name"])
+          gh-answered? (or (= 0 (:code pr)) (= 0 (:code br)))
+          ;; gh が黙ったときだけ git ref に落ちる（union しない — 上の docstring）
+          refs (when-not gh-answered?
+                 (sh "git" ["-C" app "for-each-ref" "--format=%(refname:short)" "refs/remotes"]))
+          refs-ok? (and refs (= 0 (:code refs)))]
+      (if (and (not gh-answered?) (not refs-ok?))
         {:status :unknown :branches []}
         {:status (if (and (= 0 (:code pr)) (= 0 (:code br))) :ok :partial)
          :branches (->> (concat (str/split-lines (or (:out pr) ""))
-                                (str/split-lines (or (:out br) "")))
+                                (str/split-lines (or (:out br) ""))
+                                ;; remote 名を剥がす（gftdcojp/agent/x → agent/x）
+                                (map #(str/replace % #"^[^/]+/" "")
+                                     (str/split-lines (or (:out refs) ""))))
                         (map str/trim)
                         (remove str/blank?)
                         (filter #(or (str/includes? % "itonami-os") (str/includes? % "os-connect")))

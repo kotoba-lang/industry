@@ -163,10 +163,10 @@ fetch しようとして、端末上にそのサーバが無い。**local-first 
 
 ## 残っている gap（優先順）
 
-1. **local-first アプリのサーバ配置**が未決定。cloud-itonami-app と
+1. ~~**local-first アプリのサーバ配置**が未決定。~~ **cloud-itonami-app については 2026-08-08 に決着**: サーバは Cloudflare Workers 上の ClojureScript へ移す（ADR-2608081500）。local-manimani は未決のまま。以下は決着前の記述: cloud-itonami-app と
    local-manimani が同じ壁に当たっている（上記）。ここが決まらないと、
    「モバイルで動く」は「UI が描画される」止まりになる。
-2. **実アップロード未実施**（App Store Connect / Play の審査 track を通していない）。
+2. **実アップロード未実施 —— この経路では**（App Store Connect / Play の審査 track を通していない）。⚠ **ワークスペース全体としては誤読しないこと**: 別経路（Capacitor + fastlane）では 2026-02 に build 2 本を ASC へアップロード済みで、`Spirit in Physics` 1.0 は審査に到達して REJECTED になっている。Apple の有料アカウント・DISTRIBUTION 証明書・ASC API キーはすべて稼働中。実測は ADR-2608081200。
 3. **local-manimani の実バンドルは Android 未検証** —— bridge 自体は fixture で
    Android 実機検証済みだが、実 UI の描画確認は iOS のみ。
 4. **iOS の `notify/show` の authorized 経路が headless で検証できない** —

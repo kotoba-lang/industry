@@ -217,7 +217,38 @@ projection として足すので `manifest/projection-verify.cljs verify` を ga
 Follow-up 2/3 に着手する前に索引を引いた結果、**この ADR が新規実装だと想定していた
 ものは大半が既に存在した。** 次に触る人が 4 つ目を書かないよう、現在地を記す。
 
-### 封筒面は実在する。欠けているのは PQ であって存在ではない
+### 封筒面は実在する。PQ の欠落は 2026-08-08 に解消した
+
+> **この節は 2026-08-08 の棚卸し時点の記述で、その後 D5 の gap は塞がれた。**
+> `kotoba-lang/envelope` に `envelope.kem`（`:x25519+ml-kem-768`）が着地し、
+> 39 tests / 110 assertions が実 ML-KEM-768・実 X25519 に対して通っている。
+>
+> **置き換えではなく結合。** HKDF を `x25519_shared || mlkem_shared` にかけるので、
+> どちらか一方が秘密なら鍵は秘密のまま —— hybrid は元の構成より弱くなりようがない。
+>
+> **ダウングレード耐性を AAD に入れた。** `wrap-aad` は object と recipient しか
+> 束縛しておらず、classical と hybrid の AAD がバイト同一だった（AEAD から見て
+> 交換可能）。hybrid だけ KEM を AAD に足し、classical の文字列は**凍結**した
+> （既存 wrap の AAD を変えると開かなくなる）。`unwrap-with` は construction を
+> entry から読み、**fallback しない** —— fallback こそがダウングレードそのもの。
+>
+> 本当に hybrid であることは退行で確認済み: combiner から `pq_shared` を落とすと
+> 1 件落ち、AAD の KEM 束縛を外すと 1 件落ちる。否定ケース（X25519 半分が誤り /
+> ML-KEM 半分が誤り / encapsulation 差し替え）はそれぞれ単独で失敗する。
+>
+> **残る gap はライブラリの外にある**: recipient が ML-KEM 公開鍵を公開する経路
+> （DID document / 鍵バックアップ / デバイス連携）は未着手。ライブラリは hybrid
+> recipient を受け取れるが、誰もまだ `pq-pub` を配っていない。加算的な変更なので
+> classical の recipient はそのまま動き続ける。**つまり本番 Drive/Mail は今も
+> D7 の S1 の位置にいる** —— 塞いだのは「作れない」ことであって「配ってある」
+> ことではない。
+>
+> `pqh/pq_noble.cljs` の 18 日放置は**依然として未解決**（下記）。envelope は
+> それに乗らず `@noble/post-quantum` を自前で薄く束ねた（他人の未着地の working
+> tree に乗るのは依存ではなく偶然なので）。結果として workspace の ML-KEM 束ねは
+> 3 つになった —— 統合の機会として `envelope.kem` の docstring に記録してある。
+
+以下は棚卸し時点の記述:
 
 **`kotoba-lang/envelope`** が kotobase.net の Drive/Mail の本番封筒
 （ADR-2607263000 D3–D5）。1 オブジェクト = 1 content key、鍵は保存せず受信者ごとに
@@ -284,11 +315,15 @@ datom 面には market-intel / repo-taxonomy / corpus 等がある）。gate の
 
 1. net-kotobase `ADR-2606131600`（proposed）を本 ADR に合わせて accepted へ更新するか、
    本 ADR を指す形に整理する。
-2. ~~射影面の第一実装を 1 つ選んで landed にする~~ → **再定義（2026-08-08 の棚卸し）**。
-   3 実装が既にあるので 4 つ目のドメイン実装は書かない。残るのは 2 択:
-   (a) `envelope` の PQ 化（identity/鍵配布を含む大仕事。前提として
-   `pqh/pq_noble.cljs` の 18 日放置を所有者が解決すること）、
-   (b) `persistable?` 契約（seal の出力そのものかを見る）だけを commons 化する。
+2. ~~射影面の第一実装を 1 つ選んで landed にする~~ → **完了 2026-08-08、ただし
+   当初の想定とは別物として**。3 実装が既にあったので 4 つ目のドメイン実装は
+   書かず、代わりに 2 つとも landed:
+   (a) **`envelope.projection`** —— `persistable?` / `leaks` / `sealed?` の契約を
+   commons 化（`kotoba-lang/envelope`、新規 repo は作らず）。prefix ではなく形を
+   見る（talent の穴）、任意の深さを歩く（rirekisho の穴）。28→39 tests。
+   (b) **`envelope.kem`** —— hybrid X25519+ML-KEM-768（D5 の gap）。
+   **残るのは鍵配布**: recipient が `pq-pub` を公開する経路が無いので、本番は
+   まだ classical のまま。ライブラリ側は塞がった。
 3. ~~columnar lake を projection として実装し gate に通す~~ → **loader 追加は不要**と
    判明（manifest を canonical EDN として射影する。bytes はブロック面に残す）。
    残る前提は「射影対象の実データを決めること」——今の lake は

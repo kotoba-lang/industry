@@ -1,0 +1,113 @@
+[{:db/id -1
+  :adr/id "2608080200"
+  :adr/doc_type "adr"
+  :adr/topic "github-pages-publish-without-actions"
+  :adr/title "止まった CI は赤くならない — GitHub Pages は gh-pages branch へ push して配信する。kami-app-nle / kami-app-daw の github.io は DADS 移行後 3 日間、移行前の artifact を配信し続けていた"
+  :adr/status :accepted
+  :adr/date "2026-08-08"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["GitHub Actions を撤去した repo で GitHub Pages をどう配信するか（gh-pages branch + build_type legacy）"
+   "publish script が満たすべき条件（origin/main を包含した checkout からのみ、生成物の存在検査）"
+   "`build_type: workflow` + Actions 無効 という組み合わせが「静かに古い artifact を配信し続ける」ことの記録"
+   "同型の危険を持つ repo の見分け方"]
+  :adr/supersedes []
+  :adr/related ["2607300900" "2608080100" "2608060000" "2607252000"]
+  :adr/repos ["com-junkawasaki/root"
+              "kotoba-lang/kami-app-nle"
+              "kotoba-lang/kami-app-daw"]
+  :adr/body
+  "## Context
+
+`https://kotoba-lang.github.io/kami-app-nle/` と `.../kami-app-daw/` は、
+2026-08-08 の時点で **DADS 移行前の liquid-glass ページを配信していた**。
+両 repo の `main` は 2026-08-05 に jp-go-dds へ移っており（`--hig-*` bridge の
+上に app CSS を無改造で載せる形）、`public/index.html` は生成済みで正しかった。
+それでも live は古かった。
+
+理由は「失敗した」ではなく「**走らなかった**」:
+
+| 事実 | 時刻 |
+|---|---|
+| Pages workflow の最後の成功 | 2026-08-04 02:46Z |
+| GitHub Actions を repo 単位で無効化（ADR-2607300900） | 2026-08-04〜 |
+| DADS 移行が main に着地 | 2026-08-05 |
+
+`actions/permissions` は `{\"enabled\": false}`、Pages の設定は
+`{\"build_type\": \"workflow\", \"status\": null}`。**workflow が起動しないので
+job は赤くならず、Pages は最後に成功した artifact をそのまま配信し続ける。**
+ADR-2607300900 は「動いていない CI より無い CI の方がよい」と書いているが、
+そのとき撤去したのは *検査* の経路だった —— **配信の経路も同じ穴を持っていた**。
+
+同時に見つかった付随の欠陥（同じ原因の別の面）: `public/user-test-dashboard.html`
+は DADS 移行から取り残され、移行が削除した `liquid-glass.css` を `<link>` した
+ままだった（= スタイルシート 404、無スタイルで配信）。さらに `dashboard.cljs` の
+`init!` が `head.innerHTML` を代入しており、DADS ページは CSS を**インライン**で
+持つので、たとえ link が解決しても **mount 時に design system を消していた**。
+`<noscript>` は JavaScript で挿入されていた —— それを読む唯一の読者には届かない。
+
+## Decision
+
+### 1. Pages は branch から配信する（runner を経路から外す）
+
+各 repo に **`scripts/publish-pages.cljs`（nbb）** を置く。build 済み `public/` を
+`refs/heads/gh-pages` の **root tree** として commit し push する。Pages 側は
+`build_type: legacy` / `source: {branch: gh-pages, path: /}`。**runner が経路に
+居ないので、runner が止まっても配信が古くならない。**
+
+- commit は throwaway index に対する plumbing（`add -f` → `write-tree` →
+  `commit-tree`）で組む。作業 tree に触るのは `public/.nojekyll` だけ。
+- `.nojekyll` は必須（branch source は既定で Jekyll を通し、認識できない
+  ファイルを落とす）。
+
+### 2. publish は `origin/main` を包含した checkout からしか通さない
+
+**deploy には fast-forward 検査が無い —— 最後に実行した人が勝つ。** 古い
+checkout から出荷すると、その間に着地した変更を黙って巻き戻す（kotobase.net、
+2026-07-25: signup funnel の修正が 11 分後に古い checkout から巻き戻され、
+誰も気付かなかった）。script は `merge-base --is-ancestor origin/main HEAD` を
+検査し、通らなければ **書かずに exit 非 0**。
+
+生成物の存在も検査する（`index.html` / `404.html` / `js/main.js`）—— 空の
+`public/` を「合格」として配信しないため。
+
+### 3. workflow ファイルは残す（消せない）
+
+`.github/workflows/pages.yml` は tree に残り inert。**削除には `workflow`
+OAuth scope が要り、このワークスペースの token は持っていない**（push も
+Contents API も通らず、後者は 403 でなく **404** を返すので「repo が無い」と
+誤読しやすい。ADR-2607300900 に既出）。
+
+### 4. Pages の設定変更は script がやらない（報告する）
+
+`publish-pages.cljs` は Pages の設定を読んで、`legacy gh-pages` でなければ
+**必要な 1 回きりのコマンドを表示する**。live な公開インフラの設定を script が
+黙って書き換えない。
+
+## Consequences
+
+- **同型の危険を持つ repo は他にもある。** 見分け方:
+  `gh api repos/<org>/<repo>/pages --jq .build_type` が `workflow` で、かつ
+  `gh api repos/<org>/<repo>/actions/permissions --jq .enabled` が `false` の
+  repo は、**live が main と一致している保証が無い**。この 2 本の組み合わせが
+  そのまま検出条件になる（本 ADR の副産物）。
+- Pages の `status` は `null` のまま（legacy build の記録が
+  `pages/builds/latest` に現れないことがある）。**live の HTML を実際に fetch
+  して確かめる**のが唯一の確認方法。この作業では両 site を fetch し、さらに
+  browser harness を live URL に対して実行した（24/24）。
+- 検査は fleet gate（`scripts/fleet-ci/gates.edn`）へ寄せる余地がある。今回は
+  publish 経路だけを直した。
+
+## 実測
+
+- 修復前の live: `<link rel=\"stylesheet\" href=\"liquid-glass.css\">` を持つ
+  646 バイトの文書。修復後: DADS を inline で持つ 121 KB の文書。
+- 併せて直した欠陥: dashboard の 3 点（deleted stylesheet / `head.innerHTML` /
+  JS で挿入される `<noscript>`）、session 集計が常に 0/0/0 だった件
+  （`(= :task-result (:kind ev))` を JSON 由来の文字列に当てていた）、
+  両文書の favicon 404（DADS 移行で accent が消え、`jp-go-dds.page` は icon を
+  出さない。色は `dark/resolve-dark` で vendored palette から解決し、literal を
+  書かない）。
+- 検証: nle 47 tests / 249 assertions、daw 46 / 230、browser harness 17/17
+  （local と live の両方）、design-quality 100.00 × 4 文書。
+  その後 ADR-2608080100（single-page app 化）で harness は 24/24 に増えた。"}]
