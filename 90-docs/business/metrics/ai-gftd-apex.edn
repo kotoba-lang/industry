@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 9867, "ai-gftd-chat-shell" 5},
+ {"magatama-sh1n5h1x" 9883, "ai-gftd-chat-shell" 5},
  :zone
- {:requests-7d 612155,
-  :pageviews-7d 4241,
-  :uniques-7d-sum 5268,
+ {:requests-7d 615913,
+  :pageviews-7d 4563,
+  :uniques-7d-sum 5289,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/my", :requests 27}
-   {:path "/1xmomo.php", :requests 26}
-   {:path "/mgrr.php", :requests 26}
-   {:path "/public/.env", :requests 21}
-   {:path "/wp-content/themes/index.php", :requests 20}
-   {:path "/dejavu.php", :requests 19}
-   {:path "/.ssh/id_ecdsa", :requests 19}
-   {:path "/edit.php", :requests 18}],
-  :status-mix {:server-error 14061, :client-error 1385, :ok 734},
+  [{:path "/mgrr.php", :requests 28}
+   {:path "/my", :requests 27}
+   {:path "/1xmomo.php", :requests 25}
+   {:path "/application.yml", :requests 24}
+   {:path "/dejavu.php", :requests 22}
+   {:path "/sa.json", :requests 22}
+   {:path "/.well-known/jwks.json", :requests 21}
+   {:path "/public/.env", :requests 21}],
+  :status-mix {:server-error 14058, :client-error 1432, :ok 804},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-08",
- :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 87},
+ :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 86},
  :top-paths
- "上位 page (24h, 2xx/3xx): /my 27 · /1xmomo.php 26 · /mgrr.php 26 · /public/.env 21 · /wp-content/themes/index.php 20 | 4xx(probe) 9% · 5xx 87%",
+ "上位 page (24h, 2xx/3xx): /mgrr.php 28 · /my 27 · /1xmomo.php 25 · /application.yml 24 · /dejavu.php 22 | 4xx(probe) 9% · 5xx 86%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 612155 req/7d・5268 uniques(日次和)・うち4xx probe 9%(24h)、workers 9872 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 615913 req/7d・5289 uniques(日次和)・うち4xx probe 9%(24h)、workers 9888 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
