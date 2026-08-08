@@ -22,8 +22,8 @@
 ;; ## 検査する不変条件
 ;;
 ;;   1. 必須キー（:name :org :domain :runtime :expect）が揃っている
-;;   2. :expect が語彙内（produces-datoms / produces-files / runs-ok /
-;;      runs-empty / known-broken）
+;;   2. :expect が語彙内（produces-datoms / produces-datoms-idempotent /
+;;      produces-files / runs-ok / runs-empty / known-broken）
 ;;   3. **:known-broken と :runs-empty は :blocked-by を持つ。**
 ;;      壊れているものを「壊れている」と登録するだけで理由を書かないと、
 ;;      それは記録ではなく黙認になる
@@ -79,7 +79,8 @@
     (into #{} (map second) (re-seq #"(?m)^    - name: (\S+)$" (rd (p "manifest" "west.yml"))))
     #{}))
 
-(def expect-vocab #{:produces-datoms :produces-files :runs-ok :runs-empty :known-broken})
+(def expect-vocab #{:produces-datoms :produces-datoms-idempotent
+                    :produces-files :runs-ok :runs-empty :known-broken})
 
 ;; ── 1–5: 登録簿そのもの ─────────────────────────────────────────────────
 (doseq [o obs]
@@ -114,6 +115,22 @@
   (when (str/blank? (str (:note u)))
     (v! (or (:name u) "<unmeasured>") ": :unmeasured なのに :note が無い"
         " — 『対象外』と読まれないよう、なぜ未測定かを書くこと")))
+
+;; 8. :unmeasured が空なら :inventory-note が要る。
+;;    **空の :unmeasured は「全部見た」と読める** —— 実際には 4,148 project から
+;;    手で拾った 22 件でしかない。網羅を証明していないことを登録簿自身に言わせる。
+(when (and (empty? (:unmeasured reg)) (str/blank? (str (:inventory-note reg))))
+  (v! ":unmeasured が空なのに :inventory-note が無い"
+      " — 空の未測定リストは『網羅した』と読まれる。どう作った候補かを書くこと"))
+
+;; 9. :next（次にやると効くこと）は :target と :fix を持つ。
+;;    skill `observatory-collect` の毎周の入力なので、目標だけ書いて手当てが
+;;    書かれていない行は、次の反復が読んでも何も決まらない。
+(doseq [n (:next reg)]
+  (doseq [k [:target :fix]]
+    (when (str/blank? (str (get n k)))
+      (v! (or (:target n) "<next>") ": :next の " k " が無い"
+          " — 何を直すかが書かれていない行は次の反復の入力にならない"))))
 
 ;; ── 6: 台帳が登録を落としていないか ──────────────────────────────────────
 (def ledger-file (p (or (:ledger reg) "90-docs/observatory/observatory.datoms.edn")))

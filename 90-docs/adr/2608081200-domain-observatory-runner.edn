@@ -18,19 +18,23 @@ shionome=資本フロー、mitooshi=確率予測、kakaku/meyasu=価格と供給
 meisai=明細、kouhou=公共情報、tashikame=ファクトチェック、hakoniwa=前方
 シミュレーション、tadori/yabai=CTI、kaname=律速点、narashi=格差）。
 
-## 実測（2026-08-08、13 actor を実際に起動した）
+## 実測（2026-08-08、22 actor を実際に起動した）
 
 **壊れていたのではない。誰も一度も走らせていなかった。**
 
+初回に cloud-itonami の 13 本、同日の第 2 巡で etzhayyim の 6 本・
+kotoba-lang/chie・runner を持たない 2 本を測り、**22 本すべてを実測した**。
+
 | 分類 | actor | 実測 |
 |---|---|---|
-| 走って datom を産む | watari / sukashi / meyasu | +498 / +962 / +42 datoms per cycle、chain OK |
-| 引数を明示すれば走る | shionome / mitooshi | 21 buckets・11 flows / 15 forecast・4 model |
-| 走る（出力無しが正常） | kouhou / tashikame | Governor が実際に hold している |
+| 毎周 datom が伸びる | watari / sukashi / meyasu | +498 / +962 / +42 datoms per cycle、chain OK |
+| 変化した時だけ伸びる | busshi / inochi / rasen | 305 / 380 / 583 datoms、chain OK、2 周目は no-change |
+| ファイル群を書く | shionome / mitooshi / masago | 21 buckets・11 flows / 15 forecast・4 model / 60 nodes・75 edges |
+| 走る（出力無しが正常） | kouhou / tashikame / mikurabe / kawaraban | Governor が実際に hold する / 154 outlet・30,025 article を読む |
 | 走るが 0 件 | meisai | exit 0 だが log length 0（source 未設定） |
-| 起動しない | kakaku / hakoniwa / tadori / kaname / narashi | 原因は 5 件とも別物 |
+| 起動しない | kakaku / hakoniwa / tadori / kaname / narashi / chie / yabai / collector | 原因は 8 件とも別物 |
 
-起動しない 5 件の原因は、**どれも実行して初めて分かった**。README も
+起動しない 8 件の原因は、**どれも実行して初めて分かった**。README も
 MATURITY.md も manifest.edn も、これらが動くと書いていた。
 
 1. **kakaku** — seed が repo に無い（`kakaku/kotoba/seed.edn` FileNotFound）
@@ -42,8 +46,20 @@ MATURITY.md も manifest.edn も、これらが動くと書いていた。
 4. **kaname** — deps.edn が babashka/http-client を宣言していない（同じ
    bb 退役の巻き添え）
 5. **narashi** — clojure entry が無く、nbb 側の task 名も宣言されていない
+6. **chie** — hakoniwa と同じ形。`here` を `*file*` から 4 段 getParentFile して
+   導き null で NPE。argv は `--cycles` しか受けないので**引数では回避できない**
+7. **yabai** — 入力を `projects/etzhayyim-project-yabai/content/…` に探す。
+   west 移行前のモノレポのパスで、実体は `content/source/watchlist.jsonld`。
+   加えて出力先が live の remote XRPC で、ローカル台帳を作る actor ではない
+8. **collector** — 観測を回す入口が無い。TS のリファレンス実装
+   （typecheck / vitest のみ）であって runner ではない
 
-さらに 3 つの構造的な事実が分かった:
+さらに 4 つの構造的な事実が分かった:
+
+- **append-only の台帳には 2 種類ある。** 毎周伸びるもの（watari は
+  +498 datoms/cycle）と、**内容が変わらなければ何も足さないもの**
+  （busshi / inochi / rasen は 2 周目で `appended=false (no-change)`）。
+  1 周目だけ見ると区別できず、混ぜて登録すると必ず片方が嘘になる。
 
 - **sibling 依存が materialize されていないと起動しない。** kouhou / tashikame /
   kaname は `:local/root \"../../kotoba-lang/langgraph\"` 等に依存する。west
@@ -79,6 +95,13 @@ query 面の 13 dataset にも 1 つも載っていなかった。**
 4. **`:expect :known-broken` / `:runs-empty` は `:blocked-by` を必須にする。**
    壊れていると登録するだけで理由を書かないのは、記録ではなく黙認である。
 
+4b. **`:produces-datoms-idempotent` を `:produces-datoms` と別の語彙にする。**
+   冪等な actor を `:produces-datoms` として登録すると、正常な 2 周目が毎回
+   下振れになり **gate が常時赤くなる —— 常時赤い gate は無視されるので、
+   gate が無いのと同じになる**。逆に毎周伸びるものを idempotent にすると、
+   伸びなくなっても気付けない。rank は `:produces-datoms` の**下**に置く
+   （watari が伸びなくなれば落ちる）。台帳が実在して中身があることは要求する。
+
 5. **`90-docs/observatory/observatory.datoms.edn`（生成物）** を query 面に
    `:source/dataset \"observatory\"` として載せる。`:observatory/repo` は
    repo-taxonomy / itonami-maturity の `:repo/path` と join できる。
@@ -97,20 +120,36 @@ query 面の 13 dataset にも 1 つも載っていなかった。**
    要り、ノードには配れない。したがって**この gate が green でも actor が動く
    証拠にはならない**。この境界を曖昧にしない。
 
+8. **残りの収集は 1 反復 1 actor の loop で進める。** 手順は skill
+   `observatory-collect`（fresh context から読める runbook）、起動は毎時の
+   routine `observatory-collect-hourly`（trig_0171PwSvajr4Ey4iPXi3R9jw、
+   fresh session per fire）。**まとめて直そうとしない** —— 失敗の原因が毎回
+   別物なので、まとめると『どれがどう直ったか』が分離できなくなる。
+   次に何をやると効くかは登録簿の `:next`（`:target` / `:fix` / `:needs`）に
+   持ち、gate がその 2 キーの存在を検査する。着地できる仕事が無い周は
+   **何も作らずに終わる**ことを skill の完了条件に含める。
+
 ## Consequences
 
 - 領域別の収集層が『生きているか』を query 面から引けるようになった。
   今までは README の主張しか無かった。
-- **13 actor のうち実際に観測を産むのは 5 本**（datom 3 + files 2）という数字が
-  台帳に載る。これは低いが、正しい数である。
-- 起動しない 5 本は名前と理由付きで記録された。**直すのは各 repo 側の作業**で、
+- **22 actor のうち実際に観測を産むのは 9 本**（datom 3 + datom-idempotent 3 +
+  files 3）、走るが出力を持たないのが 4 本、0 件が 1 本、起動しないのが 8 本。
+  低いが、正しい数である。
+- 起動しない 8 本は名前と理由付きで記録された。**直すのは各 repo 側の作業**で、
   このセッションからは push できない（`add_repo` が cross-owner push を拒否:
   \"cross-tier adds are not supported in v1\"）。必要な修正は登録簿の
-  `:blocked-by` に具体的に書いてある。
-- **未測定 9 件を `:unmeasured` として申告している。** etzhayyim 側の
-  busshi / masago / rasen / inochi / kawaraban / mikurabe、kotoba-lang/chie、
-  cloud-itonami の yabai / collector。『対象外』ではなく『まだ測っていない』。
-  索引に無いことを不在の証拠に使わない（ADR-2608039980 と同じ立場）。
+  `:blocked-by` と `:next` に具体的に書いてある。
+- **`:unmeasured` は空になったが、それは『全部見た』ことを意味しない。**
+  22 件は west.yml 4,148 project から**手で**拾った候補であって、網羅の証明では
+  ない。登録簿は `:inventory-note` でそれを自分から申告し、gate は
+  「`:unmeasured` が空なら `:inventory-note` が要る」を検査する。索引に無いことを
+  不在の証拠に使わない（ADR-2608039980 と同じ立場）。新規候補は
+  `repo-search` / `concept-lookup` を引いてから足す。
+- **exit 127 は actor の失敗ではない。** yabai / collector は `:runtime :node` で、
+  observatory-run がまだ起動方法を持っていない。この差を `:blocked-by` に
+  明示した —— 書かなければ、repo 側を直しても 127 のままで『まだ壊れている』と
+  読み違える。
 
 ## Alternatives considered
 
@@ -125,16 +164,18 @@ query 面の 13 dataset にも 1 つも載っていなかった。**
 - **起動しない actor を登録簿から外す** — 却下。外すと『無い』ように見える。
   名前と理由を残すことがこの ADR の主眼である。
 
-## 次の一手（このセッションの範囲外）
+## 次の一手
 
-各 repo 側で（push 権が要る）:
-- `tadori` / `kaname`: deps.edn を足し、bb 同梱に頼っていた cheshire /
-  babashka.http-client を宣言する
-- `hakoniwa`: `-main` の `*file*` 相対のパス解決を引数優先に直す
-- `kakaku`: seed を repo に入れるか、seed パスを引数で受ける
-- `narashi`: 観測 heartbeat に当たる task 名を宣言する
-- `meisai`: source を登録する（個人の明細なので owner の判断）
+**正本は登録簿の `:next`**（`:target` / `:fix` / `:needs` の 9 行）。ここに
+重複して書くと片方だけが古くなるので、以下は分類だけを示す。
 
-superproject 側で:
-- `:unmeasured` 9 件を測って登録簿に移す
-- live ingest を有効にする actor を決める（kouhou は `:live-alias` を持っている）"}]
+- `:needs :push-to-<org>`（6 件: chie / hakoniwa / tadori / kaname / kakaku /
+  yabai）— **この superproject のセッションからは着地できない。** 対象 org の
+  セッションを別に立てる必要がある
+- `:needs :owner-decision`（2 件: narashi の task 名 / meisai の source 登録）
+- `:needs :investigation`（1 件: collector に入口があるのか、移行途中なのか）
+
+superproject 側の残件:
+- live ingest を有効にする actor を決める（kouhou と kawaraban が `:live-alias`
+  を持つ。**無人の毎時 run に外向きの副作用を混ぜない**という既定は維持する）
+- `:runtime :node` の起動経路（yabai の repo 側ブロッカーが解けてから）"}]
