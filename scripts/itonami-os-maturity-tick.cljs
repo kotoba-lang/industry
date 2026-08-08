@@ -436,9 +436,18 @@
 
   3 つ目は git の remote-tracking ref。**ネットワークも gh も要らない**ので、
   launchd 下で SSH agent が無い（この tick が origin/main を fetch ではなく
-  remote-tracking ref から読んでいるのと同じ制約）状況でも効く。既に誰かが
-  fetch した時点の枝しか見えないが、**見えた枝は本物**なので、候補から外す
-  方向にしか働かない。3 本とも駄目なときだけ従来どおり :unknown で fail-open。"
+  remote-tracking ref から読んでいるのと同じ制約）状況でも効く。
+
+  ただし **gh が答えたときは gh が正で、git ref は使わない**。remote-tracking ref
+  は prune されるまで消えた枝を持ち続けるからで、しかもこの repo は同じ GitHub repo に
+  remote が 2 本（gftdcojp / origin）刺さっているので、片方を prune しても他方が
+  残る。実測 2026-08-08: 枝を GitHub から消した後も
+  `refs/remotes/origin/agent/itonami-os-isic-6492` が残り、**6492 が候補から
+  永久に外れた**。
+
+  向きが違うので両方まずいが、まずさの質が違う: 検出漏れは二重実装（やり直せる）、
+  過剰検出は**候補が永久に出てこない**（loop が静かに何もしなくなる）。だから
+  git ref は gh が黙ったときの保険に留める。"
   []
   (if offline?
     {:status :skipped :branches []}
@@ -447,11 +456,14 @@
                        "--json" "headRefName" "--jq" ".[].headRefName"])
           br (sh "gh" ["api" "repos/network-awai/cloud-itonami/branches"
                        "--paginate" "--jq" ".[].name"])
-          refs (sh "git" ["-C" app "for-each-ref" "--format=%(refname:short)" "refs/remotes"])
-          refs-ok? (= 0 (:code refs))]
-      (if (and (not= 0 (:code pr)) (not= 0 (:code br)) (not refs-ok?))
+          gh-answered? (or (= 0 (:code pr)) (= 0 (:code br)))
+          ;; gh が黙ったときだけ git ref に落ちる（union しない — 上の docstring）
+          refs (when-not gh-answered?
+                 (sh "git" ["-C" app "for-each-ref" "--format=%(refname:short)" "refs/remotes"]))
+          refs-ok? (and refs (= 0 (:code refs)))]
+      (if (and (not gh-answered?) (not refs-ok?))
         {:status :unknown :branches []}
-        {:status (if (and (= 0 (:code pr)) (= 0 (:code br)) refs-ok?) :ok :partial)
+        {:status (if (and (= 0 (:code pr)) (= 0 (:code br))) :ok :partial)
          :branches (->> (concat (str/split-lines (or (:out pr) ""))
                                 (str/split-lines (or (:out br) ""))
                                 ;; remote 名を剥がす（gftdcojp/agent/x → agent/x）
