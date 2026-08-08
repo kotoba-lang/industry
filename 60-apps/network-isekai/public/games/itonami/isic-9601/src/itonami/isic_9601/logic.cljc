@@ -32,7 +32,8 @@
   no `defrecord`/`defprotocol`/`atom`/multimethod, no `Math/random` (the RNG
   is an LCG threaded through state, so every run is reproducible from
   `:seed`). That intersection is what both squint (browser preview) and the
-  network-isekai kami-clj guest subset accept.")
+  network-isekai kami-clj guest subset accept."
+  (:require [itonami.isic-9601.district :as district]))
 
 ;; --------------------------------------------------------------------------
 ;; deterministic RNG -- state carries its own seed, nothing reads a clock
@@ -59,33 +60,51 @@
 ;; the actor's tables, transcribed
 ;; --------------------------------------------------------------------------
 
+(def default-spec
+  "The laundry. Kept as the default so every existing caller — the tests, the preview, the
+  guest — keeps working unchanged, and so the module-level tables below stay meaningful."
+  (district/spec "isic-9601"))
+
+(defn first-station
+  "The station a job enters at — the district's first operation."
+  [spec] (first (:station-keys spec)))
+
+(defn assess-stations
+  "The stations a hired human approver may clear: everything that is not the entry point
+  and not one the governor keeps for a human permanently. For the laundry that is
+  取扱方法 and 資格照合, which is what it always was."
+  [spec]
+  (set (keep (fn [st] (when (and (not= (:key st) (first (:station-keys spec)))
+                                 (not (:hard-human? st)))
+                        (:key st)))
+             (:stations spec))))
+
+(defn spec-of
+  "The board this shop is running. State carries it, because the rules ARE the district:
+  which operations exist, which of them never automates, what the subject is."
+  [st]
+  (or (:spec st) default-spec))
+
 (def stations
   "`laundry.phase/write-ops` in operating order. `:op` is the actor's own
   keyword; `:hard-human?` marks the two ops `laundry.governor/high-stakes`
   never lets commit without a human."
-  [{:key :intake  :op :garment/intake                      :label "受付"     :hard-human? false}
-   {:key :verify  :op :careplan/verify                     :label "取扱方法" :hard-human? false}
-   {:key :screen  :op :certification/screen                :label "資格照合" :hard-human? false}
-   {:key :clean   :op :actuation/apply-cleaning-process    :label "洗浄"     :hard-human? true}
-   {:key :return  :op :actuation/return-garment            :label "返却"     :hard-human? true}])
+  (:stations default-spec))
 
 ;; NOTE: `(mapv :key stations)` would be idiomatic Clojure, but a keyword is
 ;; not callable in every runtime this file has to work in -- squint compiles
 ;; `:key` to the string "key", which throws in function position. Keyword-as-
 ;; function is avoided throughout this namespace for that reason.
-(def station-keys (mapv (fn [s] (:key s)) stations))
+(def station-keys (:station-keys default-spec))
 
-(defn station [k]
-  (first (filter (fn [s] (= (:key s) k)) stations)))
+(defn station
+  ([k] (station default-spec k))
+  ([spec k] (first (filter (fn [s] (= (:key s) k)) (:stations spec)))))
 
 (def phase-table
   "`laundry.phase/phases`. `:writes` is which stations exist at all at this
   tier; `:auto` is which may commit with no human in the loop."
-  {0 {:label "read-only"       :writes #{}                                 :auto #{}}
-   1 {:label "assisted-intake" :writes #{:intake}                          :auto #{}}
-   2 {:label "assisted-verify" :writes #{:intake :verify :screen}          :auto #{}}
-   3 {:label "supervised-auto" :writes #{:intake :verify :screen :clean :return}
-                               :auto   #{:intake}}})
+  (:phase-table default-spec))
 
 (def max-phase 3)
 
@@ -95,27 +114,26 @@
   0.6)
 
 (defn auto-ops
-  "Stations that may run with no human at `phase`. The invariant this game is
-  built on: `:clean`/`:return` are never members, at any phase."
-  [phase]
-  (:auto (get phase-table phase (get phase-table max-phase))))
+  "Stations that may run with no human at `phase`. The invariant this game is built on:
+  the district's never-auto op is never a member, at any phase."
+  ([phase] (auto-ops default-spec phase))
+  ([spec phase]
+   (let [t (:phase-table spec)]
+     (:auto (get t phase (get t max-phase))))))
 
-(defn writes-at [phase]
-  (:writes (get phase-table phase (get phase-table max-phase))))
+(defn writes-at
+  ([phase] (writes-at default-spec phase))
+  ([spec phase]
+   (let [t (:phase-table spec)]
+     (:writes (get t phase (get t max-phase))))))
 
 ;; --------------------------------------------------------------------------
 ;; garment ground truth
 ;; --------------------------------------------------------------------------
 
-(def processes ["dry-clean" "wet-clean" "tumble-dry" "bleach" "press"])
+(def processes (:processes default-spec))
 
-(def garment-kinds
-  [{:desc "ウールのジャケット"   :forbidden ["bleach" "tumble-dry"]}
-   {:desc "シルクのブラウス"     :forbidden ["bleach" "tumble-dry"]}
-   {:desc "綿のシャツ"           :forbidden []}
-   {:desc "ダウンコート"         :forbidden ["dry-clean"]}
-   {:desc "カシミヤのセーター"   :forbidden ["tumble-dry" "wet-clean"]}
-   {:desc "リネンのワンピース"   :forbidden ["bleach"]}])
+(def garment-kinds (:kinds default-spec))
 
 (def evidence-required
   "`laundry.facts/required-evidence-satisfied?` -- the records the
@@ -130,11 +148,20 @@
   which the cleaning itself produces -- demanding it beforehand would make the
   station unreachable. `:return` needs all four, which is exactly what makes
   `:return` unreachable until the garment has actually been cleaned."
-  [station-key]
-  (cond
-    (= station-key :clean)  (dec (count evidence-required))
-    (= station-key :return) (count evidence-required)
-    :else 0))
+  ([station-key] (evidence-needed-for default-spec station-key))
+  ([spec station-key]
+   (let [ks (:station-keys spec)
+         n (count ks)
+         i (.indexOf (into-array (map str ks)) (str station-key))]
+     ;; Every station EXCEPT the last one files a record, so the checklist is one shorter
+     ;; than the station list — for the laundry, five stations and four records. Using the
+     ;; station count instead makes the settling act demand a record nothing produces, and
+     ;; the shop stalls one step from the end with no rule to blame.
+     (let [checklist (dec n)]
+       (cond
+         (= i (dec n)) checklist         ; settling needs the whole checklist
+         (= i (- n 2)) (dec checklist)   ; the act before it produces the last record
+         :else 0)))))
 
 ;; --------------------------------------------------------------------------
 ;; the six HARD checks -- `laundry.governor`
@@ -152,37 +179,47 @@
   garment `g` in shop `st`. Returns a violation map or nil. All six are HARD:
   a human approver cannot override any of them."
   [st station-key g]
-  (let [actuation? (or (= station-key :clean) (= station-key :return))]
+  (let [spec (spec-of st)
+        ks (:station-keys spec)
+        n (count ks)
+        i (.indexOf (into-array (map str ks)) (str station-key))
+        ;; "actuation" generalises to the last two stations: the act and its settlement.
+        ;; For 9601 that is :clean and :return exactly.
+        actuation? (>= i (- n 2))
+        act? (= i (- n 2))
+        settle? (= i (dec n))
+        verify-station (nth ks (min 1 (dec n)))]
     (cond
       ;; 1. spec-basis -- the advisor cited no official source
-      (and (or actuation? (= station-key :verify)) (not (:cited? g)))
+      (and (or actuation? (= station-key verify-station)) (not (:cited? g)))
       {:rule :no-spec-basis
        :detail "公式spec-basisの引用が無い提案はクリーニング業運営基準として扱えない"}
 
       ;; 2. evidence incomplete -- the jurisdiction's checklist is not satisfied
-      (and actuation? (< (:evidence g) (evidence-needed-for station-key)))
+      (and actuation? (< (:evidence g) (evidence-needed-for spec station-key)))
       {:rule :evidence-incomplete
-       :detail (str "必要書類が " (:evidence g) "/" (evidence-needed-for station-key)
+       :detail (str "必要書類が " (:evidence g) "/" (evidence-needed-for spec station-key)
                     " しか揃っていない")}
 
       ;; 3. the care label itself forbids the proposed process
-      (and (= station-key :clean) (forbidden-by-care-label? g))
+      (and act? (forbidden-by-care-label? g))
       {:rule :cleaning-process-forbidden-by-care-label
-       :detail (str (:desc g) " の洗濯表示が「" (:proposed-process g) "」を禁止している")}
+       :detail (str (:desc g) " の" (:conflict-label spec) "が「" (:proposed-process g)
+                    "」を禁止している")}
 
       ;; 4. solvent-handling certification not current -- evaluated
       ;;    unconditionally, exactly as the governor does
       (not (:cert-current? st))
       {:rule :certification-not-current
-       :detail "溶剤取扱資格が最新でない状態では提案を進められない"}
+       :detail (str (:cert-label spec) "が最新でない状態では提案を進められない")}
 
       ;; 5. double application
-      (and (= station-key :clean) (:cleaning-applied? g))
-      {:rule :already-cleaned :detail (str (:id g) " は既に洗濯処理済み")}
+      (and act? (:cleaning-applied? g))
+      {:rule :already-cleaned :detail (str (:id g) " は既に処理済み")}
 
       ;; 6. double return
-      (and (= station-key :return) (:garment-returned? g))
-      {:rule :already-returned :detail (str (:id g) " は既に返却済み")}
+      (and settle? (:garment-returned? g))
+      {:rule :already-returned :detail (str (:id g) " は既に完了済み")}
 
       :else nil)))
 
@@ -194,13 +231,14 @@
   either the player's tap or a hired approver. `:commit` means it may run
   with nobody in the loop, which only ever happens for `:intake` at phase 3."
   [st station-key g]
-  (let [phase (:phase st)]
+  (let [phase (:phase st)
+        spec (spec-of st)]
     (cond
-      (hard-violation st station-key g)              :hold
-      (not (contains? (writes-at phase) station-key)) :hold
-      (:hard-human? (station station-key))            :escalate
+      (hard-violation st station-key g)                    :hold
+      (not (contains? (writes-at spec phase) station-key)) :hold
+      (:hard-human? (station spec station-key))            :escalate
       (< (:confidence g) confidence-floor)            :escalate
-      (contains? (auto-ops phase) station-key)        :commit
+      (contains? (auto-ops spec phase) station-key)        :commit
       :else                                           :escalate)))
 
 ;; --------------------------------------------------------------------------
@@ -217,7 +255,7 @@
 
 (defn upgrade-cost [st k]
   (let [lvl (get-in st [:levels k] 0)
-        base (get upgrade-base k 100)]
+        base (get (:upgrade (spec-of st)) k (get upgrade-base k 100))]
     ;; 1.6^lvl by repeated multiplication -- no `Math/pow` interop, so the
     ;; guest subset and squint both accept it
     (int (reduce (fn [acc _] (* acc 1.6)) base (range lvl)))))
@@ -229,7 +267,10 @@
     (max 1 (int (/ 24 (+ 2 lvl))))))
 
 (def station-payout
-  "Cash each committed station act earns, before the tier multiplier.
+  "The laundry's per-station payouts, kept for reference. A running shop reads
+  `(:payout (spec-of st))`, which is the same numbers for 9601.
+
+  Cash each committed station act earns, before the tier multiplier.
 
   A real クリーニング屋 is paid at drop-off and settles the balance at
   collection, so intake/verify/screen carry income too. That is not
@@ -248,23 +289,30 @@
   40)
 
 (defn init
-  "A fresh shop. `seed` makes the whole run reproducible."
-  [seed]
-  {:seed seed
-   :t 0
-   :phase 1
-   :cash 0
-   :lives 3
-   :next-id 1
-   :queue []
-   :garments []
-   :ledger []
-   :returned 0
-   :commits 0
-   :levels {:intake 1 :verify 1 :screen 1 :clean 1 :return 1 :approver 0}
-   :cert-current? true
-   :cert-ticks 1200
-   :flow :playing})
+  "A fresh shop. `seed` makes the whole run reproducible; `district-id` chooses which
+  business you are running (default the laundry). An unknown or unlabelled district falls
+  back to the laundry rather than starting a shop with no stations."
+  ([seed] (init seed "isic-9601"))
+  ([seed district-id]
+   (let [spec (or (district/spec district-id) default-spec)]
+    {:spec spec
+     :district (:id spec)
+     :seed seed
+     :t 0
+     :phase 1
+     :cash 0
+     :lives 3
+     :next-id 1
+     :queue []
+     :garments []
+     :ledger []
+     :returned 0
+     :commits 0
+     ;; one level per station this district actually has, plus the approver
+     :levels (assoc (into {} (map (fn [k] [k 1]) (:station-keys spec))) :approver 0)
+     :cert-current? true
+     :cert-ticks 1200
+     :flow :playing})))
 
 ;; --------------------------------------------------------------------------
 ;; audit ledger -- the actor writes a fact for every disposition
@@ -286,8 +334,9 @@
 
 (defn- spawn-garment [st]
   (let [seed (:seed st)
-        [s1 kind] (pick seed garment-kinds)
-        [s2 proc] (pick s1 processes)
+        spec (spec-of st)
+        [s1 kind] (pick seed (:kinds spec))
+        [s2 proc] (pick s1 (:processes spec))
         [s3 conf-r] (rand-int* s2 100)
         [s4 cite-r] (rand-int* s3 100)
         id (str "garment-" (:next-id st))]
@@ -304,15 +353,15 @@
                  ;; ~1 in 12 proposals arrives with a fabricated spec-basis
                  :cited? (>= cite-r 8)
                  :evidence 0
-                 :stage :intake
+                 :stage (first-station (spec-of st))
                  :work 0
                  :cleaning-applied? false
                  :garment-returned? false
                  :blocked? false}))))
 
 (defn- arrival-interval [st]
-  ;; busier as the shop grows; floor of 6 ticks
-  (max 3 (- 10 (get-in st [:levels :intake] 1))))
+  ;; busier as the shop grows; floor of 3 ticks
+  (max 3 (- 10 (get-in st [:levels (first-station (spec-of st))] 1))))
 
 ;; --------------------------------------------------------------------------
 ;; acting on a garment
@@ -322,31 +371,39 @@
   "Explicit successor table -- no `.indexOf` interop."
   {:intake :verify :verify :screen :screen :clean :clean :return :return :done})
 
-(defn- next-stage [k] (get stage-after k :done))
+(defn- next-stage
+  ([k] (next-stage default-spec k))
+  ([spec k] (get (:stage-after spec) k :done)))
 
 (defn- advance-garment
   "Move `g` one station on and file the evidence record that station produces."
-  [g]
-  (let [k (:stage g)]
+  [spec g]
+  (let [k (:stage g)
+        ks (:station-keys spec)
+        n (count ks)
+        i (.indexOf (into-array (map str ks)) (str k))]
     (-> g
         (assoc :work 0 :blocked? false :awaiting? false)
         ;; each station files one more evidence record; `:clean` files the
         ;; fourth (the 洗濯処理記録), which is what unlocks `:return`
-        (update :evidence (fn [e] (min (count evidence-required) (inc (or e 0)))))
-        (assoc :cleaning-applied? (or (:cleaning-applied? g) (= k :clean)))
-        (assoc :garment-returned? (or (:garment-returned? g) (= k :return)))
-        (assoc :stage (next-stage k)))))
+        (update :evidence (fn [e] (min (dec n) (inc (or e 0)))))
+        (assoc :cleaning-applied? (or (:cleaning-applied? g) (= i (- n 2))))
+        (assoc :garment-returned? (or (:garment-returned? g) (= i (dec n))))
+        (assoc :stage (next-stage spec k)))))
 
 (defn- apply-commit
   "Shop-level effects of a committed station act: pay, count, audit."
   [st g]
-  (let [k (:stage g)
-        paid (* (get station-payout k 0) (:phase st))]
+  (let [spec (spec-of st)
+        k (:stage g)
+        last-k (last (:station-keys spec))
+        paid (* (get (:payout spec) k 0) (:phase st))]
     (-> st
         (update :cash + paid)
         (update :commits inc)
-        (update :returned (fn [n] (if (= k :return) (inc n) n)))
-        (log {:t* :committed :op (:op (station k)) :subject (:id g) :disposition :commit}))))
+        (update :returned (fn [n] (if (= k last-k) (inc n) n)))
+        (log {:t* :committed :op (:op (station spec k)) :subject (:id g)
+              :disposition :commit}))))
 
 (defn- apply-hold
   "A governor HARD violation -- `laundry.governor/hold-fact`. The garment
@@ -360,7 +417,7 @@
   [st g v]
   (-> st
       (update :lives (fn [n] (if (= (:rule v) :certification-not-current) n (dec n))))
-      (log {:t* :governor-hold :op (:op (station (:stage g))) :subject (:id g)
+      (log {:t* :governor-hold :op (:op (station (spec-of st) (:stage g))) :subject (:id g)
             :disposition :hold :basis (:rule v) :detail (:detail v)})))
 
 (defn- replace-garment [st g']
@@ -398,7 +455,7 @@
 
       :else
       (let [st' (apply-commit st g)
-            g'  (advance-garment g)]
+            g'  (advance-garment (spec-of st) g)]
         (if (= (:stage g') :done)
           (drop-garment st' (:id g'))
           (replace-garment st' g'))))))
@@ -429,9 +486,9 @@
 
 (defn- compliant-process
   "The first process the garment's own care label does not forbid."
-  [g]
+  [spec g]
   (or (first (filter (fn [p] (not (forbidden-by-care-label? (assoc g :proposed-process p))))
-                     processes))
+                     (:processes spec)))
       (:proposed-process g)))
 
 (defn reject
@@ -453,9 +510,9 @@
         st
         (let [g (first waiting)]
           (-> st
-              (replace-garment (assoc g :proposed-process (compliant-process g)
+              (replace-garment (assoc g :proposed-process (compliant-process (spec-of st) g)
                                         :cited? true :work 0 :awaiting? false))
-              (log {:t* :approval :op (:op (station station-key)) :subject (:id g)
+              (log {:t* :approval :op (:op (station (spec-of st) station-key)) :subject (:id g)
                     :disposition :rejected
                     :detail "取扱方法を洗濯表示に合わせて差し戻した"})))))))
 
@@ -466,16 +523,17 @@
     (cond
       (not= (:flow st) :playing) st
       (empty? q) st
-      (>= (count (:garments st)) (* 3 (get-in st [:levels :intake] 1))) st
+      (>= (count (:garments st)) (* 3 (get-in st [:levels (first-station (spec-of st))] 1))) st
       :else
       (let [g (first q)
-            d (disposition st :intake g)]
+            entry (first-station (spec-of st))
+            d (disposition st entry g)]
         (cond
           ;; a governor HARD violation at the counter -- the customer is
           ;; turned away and the shop takes the hit
-          (and (= d :hold) (hard-violation st :intake g))
+          (and (= d :hold) (hard-violation st entry g))
           (-> st (assoc :queue (vec (rest q)))
-              (apply-hold (assoc g :stage :intake) (hard-violation st :intake g)))
+              (apply-hold (assoc g :stage entry) (hard-violation st entry g)))
 
           ;; phase 0: the counter is not open. The queue simply waits.
           (= d :hold) st
@@ -485,10 +543,12 @@
           :else
           (-> st
               (assoc :queue (vec (rest q)))
-              (update :garments conj (assoc g :stage :verify :evidence 1 :work 0))
-              (update :cash + (* (get station-payout :intake 0) (:phase st)))
+              (update :garments conj (assoc g :stage (next-stage (spec-of st) entry)
+                                              :evidence 1 :work 0))
+              (update :cash + (* (get (:payout (spec-of st)) entry 0) (:phase st)))
               (update :commits inc)
-              (log {:t* :committed :op :garment/intake :subject (:id g) :disposition :commit})))))))
+              (log {:t* :committed :op (:op (station (spec-of st) entry)) :subject (:id g)
+                    :disposition :commit})))))))
 
 (defn buy
   "Spend cash on a station level, or on hiring a human approver."
@@ -542,7 +602,7 @@
           (update :phase inc)
           (log {:t* :phase :op :rollout :disposition :commit
                 :detail (str "phase " p " -> " (inc p) " "
-                             (:label (get phase-table (inc p))))})))))
+                             (:label (get (:phase-table (spec-of st)) (inc p))))})))))
 
 (defn- approver-pass
   "A hired human approver clears escalations on the three assessment stations.
@@ -556,16 +616,18 @@
        (fn [acc g]
          (let [g' (first (filter (fn [x] (= (:id x) (:id g))) (:garments acc)))]
            (cond
-             (not (and g' (contains? #{:verify :screen} (:stage g')) (ready? acc g'))) acc
+             (not (and g' (contains? (assess-stations (spec-of acc)) (:stage g'))
+                       (ready? acc g'))) acc
              ;; a hired approver reads the care label too -- otherwise
              ;; automating the assessment stations would be strictly worse
              ;; than doing them by hand
-             (and (= (:stage g') :verify)
+             (and (= (:stage g') (second (:station-keys (spec-of acc))))
                   (or (forbidden-by-care-label? g') (not (:cited? g'))))
-             (reject acc :verify)
+             (reject acc (second (:station-keys (spec-of acc))))
              :else (settle acc g' true))))
        st
-       (take n (filter (fn [g] (contains? #{:verify :screen} (:stage g))) (:garments st)))))))
+       (take n (filter (fn [g] (contains? (assess-stations (spec-of st)) (:stage g)))
+                       (:garments st)))))))
 
 (defn- sweep-off-system
   "A garment sitting at a station this tier has not opened yet is not stuck --
@@ -579,14 +641,14 @@
   [st]
   (reduce
    (fn [acc g]
-     (if (and (not (contains? (writes-at (:phase acc)) (:stage g)))
+     (if (and (not (contains? (writes-at (spec-of acc) (:phase acc)) (:stage g)))
               (ready? acc g))
        (-> acc
-           (update :cash + (int (/ (* (get station-payout (:stage g) 0) (:phase acc)) 2)))
+           (update :cash + (int (/ (* (get (:payout (spec-of acc)) (:stage g) 0) (:phase acc)) 2)))
            (drop-garment (:id g))
-           (log {:t* :off-system :op (:op (station (:stage g))) :subject (:id g)
+           (log {:t* :off-system :op (:op (station (spec-of acc) (:stage g))) :subject (:id g)
                  :disposition :manual
-                 :detail (str (:label (station (:stage g))) " は phase " (:phase acc)
+                 :detail (str (:label (station (spec-of acc) (:stage g))) " は phase " (:phase acc)
                               " では未対応 — 手作業で処理した")}))
        acc))
    st
@@ -618,7 +680,9 @@
           st (if (:cert-current? st)
                (let [st (if (zero? (mod (:t st) (arrival-interval st))) (spawn-garment st) st)
                      ;; intake auto-commits only where the phase table allows it
-                     st (if (contains? (auto-ops (:phase st)) :intake) (take-in st false) st)
+                     st (if (contains? (auto-ops (spec-of st) (:phase st))
+                            (first-station (spec-of st)))
+               (take-in st false) st)
                      st (accrue-work st)
                      st (sweep-off-system st)]
                  (approver-pass st))
@@ -655,28 +719,31 @@
   so neither one needs to know the internal state shape."
   [st]
   {:t (:t st)
-   :phase (:phase st)
-   :phase-label (:label (get phase-table (:phase st)))
+     :phase (:phase st)
+   :phase-label (:label (get (:phase-table (spec-of st)) (:phase st)))
    :next-phase (when (< (:phase st) max-phase) (phase-requirement st))
-   :cash (:cash st)
-   :lives (:lives st)
-   :queue (count (:queue st))
-   :commits (:commits st)
-   :returned (:returned st)
+     :cash (:cash st)
+     :lives (:lives st)
+     :queue (count (:queue st))
+     :commits (:commits st)
+     :returned (:returned st)
    :target victory-target
    :cert-current? (:cert-current? st)
    :cert-ticks (:cert-ticks st)
-   :levels (:levels st)
+     :levels (:levels st)
    :costs (into {} (map (fn [k] [k (upgrade-cost st k)]) (keys upgrade-base)))
    :flow (:flow st)
-   :ledger (:ledger st)
+     :ledger (:ledger st)
+   :district (:district st)
+   :district-label (:label (spec-of st))
+   :subject (:subject (spec-of st))
    :stations (mapv (fn [s]
                      (let [k (:key s)
                            here (filter (fn [g] (= (:stage g) k)) (:garments st))]
                        {:key k
                         :label (:label s)
-                        :open? (contains? (writes-at (:phase st)) k)
-                        :auto? (contains? (auto-ops (:phase st)) k)
+                        :open? (contains? (writes-at (spec-of st) (:phase st)) k)
+                        :auto? (contains? (auto-ops (spec-of st) (:phase st)) k)
                         :hard-human? (:hard-human? s)
                         :level (get-in st [:levels k] 1)
                         :count (count here)
@@ -701,4 +768,4 @@
                                            ;; visible from `:verify` onward
                                            :label-conflict? (forbidden-by-care-label? g)})
                                         here)}))
-                   stations)})
+                   (:stations (spec-of st)))})

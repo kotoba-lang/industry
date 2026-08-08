@@ -24,14 +24,37 @@
 ;;
 ;; ## 検査する不変条件
 ;;
-;;   1. `logic.cljc` の `phase-table` の**どの** phase の `:auto` にも
-;;      `:clean` / `:return` が入っていない
-;;   2. phase 3 の `:auto` はちょうど `#{:intake}`
+;;   1. `district.cljc` の phase 3 の `:auto` は `:auto-at-3` から導出されており、
+;;      never-auto の op はそこに入らない（`:hard-human?` は `:never-auto` から導出）
+;;   2. `district.cljc` が `:auto` を推測していない —— `:auto-at-3` 以外から作らない
 ;;   3. `world.cljc` の各 district の `:never-auto` が空でない
-;;   4. 各 district の `:never-auto` の op が、その district 自身の
-;;      `:auto-at-3` に入っていない
+;;   4. 各 district の `:never-auto` の op が、その district 自身の `:auto-at-3` に無い
 ;;   5. district 数と、街全体の never-auto op 総数が申告どおり
 ;;   6. 各 district が実在の repo 名 (`cloud-itonami-isic-<code>`) を名乗る
+;;
+;; 2026-08-08 の kaizen で board が district 駆動になり、phase table は
+;; `logic.cljc` のリテラルから `district.cljc` の導出へ移った。**gate は不変条件を
+;; 追いかける** —— 元の場所を見続ければ「見つからない」で落ちるか、もっと悪いことに
+;; 「見つかったものが空だから合格」になる。ここは前者で落ちた（expected 4 phases,
+;; found 0）ので気づけた。
+;;
+;; ## 落ちることの確認（2026-08-08、移設後に取り直し）
+;;
+;; 無改変の tree で exit 0、以下 7 通りでいずれも exit 1:
+;;
+;;   A `:auto auto-keys` → `:auto (set keys')`      phase 3 が writes 集合をそのまま自動化
+;;   B `:hard-human?` を `false` 固定               人手必須の工程が消える
+;;   C `auto3` を `:auto-at-3` でなく `:ops` から   自動化範囲をゲームが発明する
+;;   D `never` を `#{}` 固定                        never-auto の導出そのものを切る
+;;   E ある district の `:never-auto` を空に         (isic-3900)
+;;   F never-auto の op を同じ district の `:auto-at-3` にも書く  (isic-4520)
+;;   G district が実在しない repo 名を名乗る        (isic-3811)
+;;
+;; **この確認をするときは、壊す置換が実際に当たったことを先に見ること。**
+;; A と F は最初 exit 0 で「gate に穴がある」ように見えたが、実際は sed/perl が
+;; 一致していなかっただけで、ファイルは無改変のまま合格していた。**当たらなかった
+;; break と、素通しの gate は、出力が完全に同じ。** 置換後の grep で差分を確認して
+;; から gate を回す。
 ;;
 ;; ネットワーク: 不要。tree だけを読む。
 ;;
@@ -79,21 +102,22 @@
                           (re-seq #":[a-z0-9-]+" (nth m 1)))))
         (re-seq #":auto\s+#\{([^}]*)\}" phase-text)))
 
-(when-let [logic (slurp* "logic.cljc")]
-  (let [pt (section logic "(def phase-table" "(def max-phase")]
-    (if-not pt
-      (fail! "logic.cljc: phase-table not found — the gate cannot see the invariant")
-      (let [sets (auto-sets pt)]
-        (when (< (count sets) 4)
-          (fail! "logic.cljc: expected 4 phases, found" (count sets)))
-        (doseq [[i s] (map-indexed vector sets)]
-          (doseq [op ["clean" "return"]]
-            (when (contains? s op)
-              (fail! "logic.cljc: phase" i "auto-commits" (str ":" op)
-                     "— the two actuation ops must never be automatable, at any phase"))))
-        (when (and (= 4 (count sets)) (not= #{"intake"} (nth sets 3)))
-          (fail! "logic.cljc: phase 3 :auto is" (pr-str (nth sets 3))
-                 "but must be exactly #{:intake}"))))))
+(when-let [d (slurp* "district.cljc")]
+  ;; The board's phase table is built in `spec`. Two things must hold in that source:
+  ;; `:auto` comes from `auto-keys`, and `auto-keys` comes from `:auto-at-3`. Anything
+  ;; else — a literal set, a union, the writes set — would widen what runs unattended.
+  (let [spec-text (or (section d "(defn spec" "(def playable") d)]
+    (when-not (str/includes? spec-text ":auto auto-keys")
+      (fail! "district.cljc: phase 3 ':auto' is not `auto-keys` — the one set that decides"
+             "what runs with nobody watching must not be built any other way"))
+    (when-not (str/includes? spec-text "auto3 (set (map (fn [o] (str o)) (:auto-at-3 d)))")
+      (fail! "district.cljc: `auto3` is no longer read from :auto-at-3 — the phase-3 auto"
+             "set would then be the game's invention rather than the repo's"))
+    (when-not (str/includes? spec-text ":hard-human? (contains? never (str op))")
+      (fail! "district.cljc: ':hard-human?' is no longer derived from :never-auto — a"
+             "station could then be automatable while the repo says it is not"))
+    (when-not (str/includes? spec-text "never (set (map (fn [o] (str o)) (:never-auto d)))")
+      (fail! "district.cljc: `never` is no longer read from :never-auto"))))
 
 ;; --------------------------------------------------------------------------
 

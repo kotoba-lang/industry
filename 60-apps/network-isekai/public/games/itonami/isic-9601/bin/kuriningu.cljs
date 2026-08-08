@@ -30,7 +30,8 @@
             ["node:path" :as path]
             [clojure.string :as str]
             [itonami.isic-9601.logic :as l]
-            [itonami.isic-9601.world :as world]))
+            [itonami.isic-9601.world :as world]
+            [itonami.isic-9601.district :as district]))
 
 ;; --------------------------------------------------------------------------
 ;; argv
@@ -93,7 +94,7 @@
 (defn print-shop! [st]
   (let [sm (l/summary st)]
     (println)
-    (println (bold (str "  クリーニング営み  "))
+    (println (bold (str "  " (:district-label sm) "  "))
              (str "t=" (:t sm)
                   "  ¥" (:cash sm)
                   "  信頼 " (.repeat "●" (max 0 (:lives sm)))
@@ -119,7 +120,7 @@
     (when (not= (:flow sm) :playing)
       (println)
       (println "  " (if (= (:flow sm) :victory)
-                      (green "監査クローズ — 規程どおり返却しました")
+                      (green "監査クローズ — 規程どおり完了しました")
                       (red "信頼を失いました"))))
     sm))
 
@@ -153,6 +154,10 @@
         g (first (filter (fn [g] (:ready? g)) (:garments st)))]
     (boolean (and g (or (:risk g) (:label-conflict? g) (not (:cited? g)))))))
 
+(defn- station-order
+  "The stations to work, after the entry point."
+  [sm] (mapv (fn [s] (:key s)) (:stations sm)))
+
 (defn- auto-turn
   "One turn of the reference strategy: read the care label before approving, keep the
   certification current, climb when you can.
@@ -171,19 +176,28 @@
   (let [st (-> st (l/reduce-event [:tick]) (l/reduce-event [:take-in]))
         sm (l/summary st)]
     (-> st
-        (l/reduce-event (if (first-ready-risky? sm :verify)
-                          [:reject :verify] [:tap :verify]))
-        (l/reduce-event [:tap :screen])
-        (l/reduce-event [:tap :clean])
-        (l/reduce-event [:tap :return])
+        (as-> st'
+              (let [ks (station-order sm)
+                    second-k (second ks)]
+                (reduce (fn [a k]
+                          (if (= k second-k)
+                            (l/reduce-event a (if (first-ready-risky? sm second-k)
+                                                [:reject second-k] [:tap second-k]))
+                            (l/reduce-event a [:tap k])))
+                        st' (rest ks))))
         (l/reduce-event [:renew])
         (l/reduce-event [:phase]))))
 
 (defn cmd-play []
   (let [seed (int (num-opt "seed" 20260808))
+        district-id (opt "district" "isic-9601")
         script (opt "script")
         turns (int (num-opt "turns" (if script 0 1500)))
-        st0 (l/init seed)
+        _ (when-not (district/spec district-id)
+            (println (red (str "unknown district: " district-id)))
+            (println (dimmed (str "  playable: " (str/join " " district/playable))))
+            (js/process.exit 2))
+        st0 (l/init seed district-id)
         st (cond
              script
              (reduce (fn [st token]
@@ -200,7 +214,7 @@
              (reduce (fn [st _] (auto-turn st)) st0 (range turns)))
         sm (print-shop! st)]
     (println)
-    (println (dimmed (str "  seed " seed
+    (println (dimmed (str "  " district-id "  seed " seed
                           (if script (str "  script: " script) (str "  auto ×" turns))
                           " — 同じ seed と同じ入力は同じ試合になります")))
     (js/process.exit (if (= (:flow sm) :gameover) 1 0))))
@@ -222,7 +236,7 @@
                (.padEnd (:label d) 12)
                (dimmed (.padEnd (str "ISIC " (:isic d)) 11))
                (.padEnd (str (:subject d) " を洗う") 14)
-               (if (:playable? d) (green "遊べる") (dimmed "マップのみ"))))
+               (if (district/spec (:id d)) (green "遊べる") (dimmed "マップのみ"))))
     (println)
     (println (dimmed "  どの店にも、どの段階でも自動化されない工程が必ずある:"))
     (doseq [d (:districts s)]
@@ -248,6 +262,7 @@
   (println "    street  [--cleared N]                             営みの街を見る")
   (println "    render                                            → bin/render.cljs を案内")
   (println)
+  (println (dimmed (str "  遊べる district: " (str/join " " district/playable))))
   (println (dimmed (str "  play の script 語彙: " (str/join " " (sort (keys commands))))))
   (println (dimmed "  tick*40 のように *N で繰り返せます"))
   (println))

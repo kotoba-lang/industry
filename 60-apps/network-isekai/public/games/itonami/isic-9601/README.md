@@ -75,8 +75,29 @@ player meets that boundary once in the laundry and then finds it again in every 
 they unlock. The map is not eight variations on a theme; it is eight independent
 confirmations of the same argument.
 
-Only 9601 has a playable board today (`:playable?` in `world/status`). The other seven are
-map entities with their real op tables attached.
+**All eight are playable** (2026-08-08). `district.cljc` turns a `world.cljc` row into a
+board: the op list becomes the station chain, `:never-auto` becomes the station that always
+needs a person, `:auto-at-3` becomes what phase 3 will run unattended. `logic.cljc` holds no
+laundry nouns any more — it takes a spec and reduces events against it.
+
+What is *derived* and what is *authored* is marked in that file, because the distinction is
+the whole point:
+
+| | source |
+|---|---|
+| station chain, hard-human station, phase-3 auto set | derived from `world.cljc`, transcribed from the eight repos |
+| Japanese labels, subject nouns, process vocabulary | authored here — the repos carry no player-facing copy |
+| which ops open at phases 1 and 2 | **authored here** (`:phase-source :game-staging`), except 9601 which is `:transcribed` |
+
+That last row matters. Only 9601's phase ladder was read out of a real `phase.cljc`. The
+other seven have real endpoints — phase 0 and phase 3 come from the repo — and an invented
+middle. `district/spec` carries which it is, per district, so nobody quotes the game back as
+evidence about a repo it never read.
+
+```
+nbb --classpath src bin/kuriningu.cljs play --district isic-3900
+nbb --classpath src bin/kuriningu.cljs street          # all eight, with their never-auto op
+```
 
 ## 3D is the authoritative view
 
@@ -150,8 +171,10 @@ it does not compile.
 
 | file | what it is |
 |---|---|
-| `src/itonami/isic_9601/logic.cljc` | the whole rule set: a pure `state + event -> state` reducer. No I/O, no atoms, no interop. |
-| `test/logic_test.cljs` | 63 checks (nbb) |
+| `src/itonami/isic_9601/logic.cljc` | the whole rule set: a pure `state + event -> state` reducer. No I/O, no atoms, no interop. Holds no district nouns — it reduces against a spec. |
+| `src/itonami/isic_9601/district.cljc` | `world.cljc` row → playable board. Marks what it derives and what it invents. |
+| `test/logic_test.cljs` | 68 checks (nbb) |
+| `test/district_test.cljs` | 103 checks (nbb) — all eight boards reachable, and the never-auto op absent from `:auto` at every phase in every one |
 | `test/balance.cljs` | tuning probe — plays four seeds and reports what killed each run |
 | `preview/ui.cljs` | browser shell, compiled by squint; holds no rules, draws only `summary` |
 | `preview/build.cljs` | squint → esbuild → one self-contained `preview/index.html` |

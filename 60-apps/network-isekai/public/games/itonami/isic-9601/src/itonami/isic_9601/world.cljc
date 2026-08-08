@@ -200,7 +200,10 @@
                       {:id (:id d) :label (:label d) :subject (:subject d)
                        :isic (:isic d) :repo (:repo d)
                        :unlocked? (unlocked? d (:cleared w))
-                       :playable? (= (:id d) "isic-9601")
+                       ;; whether a district has a BOARD is `district/spec`'s answer, and
+                       ;; that namespace requires this one — so it is not answered here.
+                       ;; It used to be hardcoded to the laundry, which was true only for
+                       ;; as long as the laundry was the only board.
                        :best (get (:best w) (:id d) 0)
                        :ops (count (:ops d))
                        :never-auto (mapv (fn [o] (str o)) (:never-auto d))
