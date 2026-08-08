@@ -362,6 +362,20 @@
    :script "gates/squint-unary-minus-check.cljs"
    :include-ext [".cljc" ".cljs" ".clj"] :min-files 20 :cd false}
 
+  ;; 領域別 observatory の登録簿（ADR-2608081200）。2026-08-08 の実測で、13 actor の
+  ;; うち 5 本が起動しなかった —— にもかかわらず README も MATURITY.md も
+  ;; manifest.edn も動くと書いていた。差を埋めるのが observatory-run で、この gate は
+  ;; **その登録簿が腐るのを止める**（壊れた actor に理由が書かれているか、:args が
+  ;; ${REPO} 起点か、west.yml に実在するか、台帳が登録を落としていないか）。
+  ;;
+  ;; ⚠ **observatory-run 自体はここでは走らない。** 実行には west checkout 一式
+  ;;    （sibling の :local/root 依存）が要り、ノードには配れない。実際に動くかは
+  ;;    operator 側の日次 run（com.gftd.observatory-run.plist）が測る。
+  ;;    **この gate が green でも actor が動く証拠にはならない。**
+  {:name "root" :id "root-observatory-registry" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/observatory-registry-check.cljs" :script-args ["--min" "10"]
+   :include-ext [".edn" ".yml" ".cljs"] :min-files 1500 :cd false}
+
   ;; Projection contracts are rebuilt from the exact Git-tip snapshot shipped
   ;; by the fleet operator. The archive has no .git directory, so this gate
   ;; uses snapshot mode: current input/schema/loader hashes plus logical and

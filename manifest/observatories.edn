@@ -1,0 +1,233 @@
+;; manifest/observatories.edn — 領域別 observatory（産業・領域ごとの観測 actor）を
+;; **実際に走らせる**ための登録簿。手書き（正本）。ADR-2608081200。
+;;
+;; ## なぜこれが要るか
+;;
+;; 2026-08-08 に「領域別の収集はちゃんと動いているか」を実測した。答えは **ほぼ全部
+;; 動いていなかった**。ただし壊れていたのではない —— **誰も一度も走らせていなかった**。
+;;
+;; 13 actor を実行して分かった内訳:
+;;
+;;   走って datom を産む         watari / sukashi / meyasu          (3)
+;;   走るが引数を明示しないと死ぬ  shionome / mitooshi                (2)
+;;   走るが出力が無い（正常系）    kouhou / tashikame                 (2)
+;;   走るが 0 件（source 未設定）  meisai                             (1)
+;;   走らない                    kakaku / hakoniwa / tadori / kaname (4)
+;;   clojure entry が無い         narashi                            (1)
+;;
+;; 「走らない」4 件の原因は全部別物で、しかも **どれも実行して初めて分かった**。
+;; README も MATURITY.md も manifest.edn も、これらが動くと書いてある。
+;;
+;; ## この登録簿が持つのは「どう起動するか」だけ
+;;
+;; 各 actor の **正本はその repo 自身**（charter / gate / schema）。ここが持つのは
+;; superproject 側の運用知識だけ —— どの runtime で、どの main を、どの引数で叩けば
+;; 実際に動くか。newsfeed（ADR-2608031900）が `scripts/newsfeed-ingest.cljs` に
+;; 運用を置いたのと同じ境界。
+;;
+;; **:args に絶対パスを明示するのが要点。** shionome / mitooshi は既定のパス解決が
+;; `*file*` 相対で、`clojure -M -m` からは解決できない（実測: shionome は
+;; `../data/seed-…` を探して落ち、mitooshi は `here` が null で NPE）。しかしどちらも
+;; 第 1 引数で seed を、`--out` で出力先を受け取れる。**引数を明示すれば、repo に
+;; 一切触らずに動く。** 直せない側（hakoniwa）は引数に関係なく `-main` の let 束縛で
+;; 落ちるので `:expect :known-broken` として名前で記録する。
+;;
+;; ## ${REPO} 展開
+;;
+;; :args の中の `${REPO}` は、その actor の checkout の**絶対パス**に展開される。
+;; 相対パスを書かないこと —— cwd 依存の既定値を避けるためにこの登録簿が在るのに、
+;; ここで相対パスを書いたら同じ罠を踏み直す。
+;;
+;; ## :expect は「落ちる gate」のための宣言
+;;
+;; observatory-run は :expect と実測を突き合わせ、**下振れしたら exit 1** する。
+;; :known-broken が動き出した場合も報告する（登録簿を直すため）。exit 0 を成功の
+;; 証拠にしない、という fleet-ci 全体の規律をここでも守る。
+;;
+;;   :produces-datoms  実行のたびに append-only の datom log が伸びる
+;;   :produces-files   出力ファイル群を書く（datom log ではない）
+;;   :runs-ok          正常終了する。ディスクに何も書かないのが正常
+;;   :runs-empty       正常終了するが 0 件。**設定不足であって成功ではない**
+;;   :known-broken     現時点で起動しない。:blocked-by に理由を名前で書く
+;;
+;; ## :output-gitignored
+;;
+;; watari / sukashi / meyasu の datom log は **各 repo の .gitignore に入っている**。
+;; つまり走らせても出力はそのマシンから出ない。これは charter 上の設計（ローカル
+;; 台帳）であって不具合ではないが、**「走らせた」と「面に載った」は別**という意味
+;; なので、query 面には全文ではなく観測サマリだけを載せる（observatory-run が
+;; 90-docs/observatory/observatory.datoms.edn を生成する）。
+;;
+;; ## 実行
+;;
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs --only watari
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/observatory-run.cljs --check   ; 走らせない
+
+{:policy "observatory-run/v1"
+ :adr "ADR-2608081200"
+ :measured "2026-08-08"
+
+ ;; 1 actor あたりの実行時間の上限。clojure の初回 maven / git 依存解決を含む。
+ :timeout-ms 600000
+
+ ;; 生成物の行き先（superproject 相対）。
+ :ledger "90-docs/observatory/observatory.datoms.edn"
+
+ :observatories
+ [;; ── 走って datom を産む（実測で確認済み）────────────────────────────────
+  {:name "watari" :org "cloud-itonami"
+   :domain "船舶 AIS + 航空 ADS-B の実位置（sea-lane / chokepoint 集中）"
+   :runtime :clojure :main "watari.methods.autorun"
+   :args ["--cycles" "1" "--log" "${REPO}/data/watari.datoms.kotoba.edn"]
+   :produces "data/watari.datoms.kotoba.edn"
+   :output-gitignored true
+   :expect :produces-datoms
+   :evidence "2026-08-08 実測: 13 craft / 26 fixes / 9 lanes、+498 datoms/cycle、chain OK"}
+
+  {:name "sukashi" :org "cloud-itonami"
+   :domain "広告サプライチェーン + 配信インフラ + 不正ネットワーク"
+   :runtime :clojure :main "sukashi.methods.autorun"
+   :args []
+   :produces "data/sukashi.datoms.kotoba.edn"
+   :output-gitignored true
+   :expect :produces-datoms
+   :evidence "2026-08-08 実測: 74 adtech / 28 auth-edges / 12 fraud-sig、+962 datoms/cycle、chain OK"}
+
+  {:name "meyasu" :org "cloud-itonami"
+   :domain "価格スプレッド + 供給レジリエンスの統合（kakaku × mitooshi）"
+   :runtime :clojure :main "meyasu.methods.autorun"
+   ;; --log を明示しないと cwd 相対で `meyasu/data/…` という入れ子を掘る（実測）。
+   :args ["--cycles" "1" "--log" "${REPO}/data/meyasu.datoms.kotoba.edn"]
+   :produces "data/meyasu.datoms.kotoba.edn"
+   :output-gitignored true
+   :expect :produces-datoms
+   :evidence "2026-08-08 実測: 3 cards / 0 refused、+42 datoms/cycle、chain OK"}
+
+  ;; ── 引数を明示すれば走る（既定のパス解決が *file* 相対で壊れている）──────
+  {:name "shionome" :org "cloud-itonami"
+   :domain "資産クラス横断の資本フロー（潮目）"
+   :runtime :clojure :main "shionome.methods.analyze"
+   :args ["${REPO}/data/seed-capital-flow-graph.kotoba.edn" "--out" "${REPO}/out"]
+   :produces "out"
+   :expect :produces-files
+   :evidence "2026-08-08 実測: buckets=21 flows=11 snapshots=13。引数無しでは
+              `../data/seed-capital-flow-graph.kotoba.edn` を探して FileNotFound"}
+
+  {:name "mitooshi" :org "cloud-itonami"
+   :domain "確率予測（proper scoring / reliability）"
+   :runtime :clojure :main "mitooshi.methods.analyze"
+   :args ["${REPO}/data/seed-forecast-graph.kotoba.edn" "--out" "${REPO}/out"]
+   :produces "out"
+   :expect :produces-files
+   :evidence "2026-08-08 実測: 15 forecast / 4 model、全 model skilled=True。
+              引数無しでは -main の `here` が null で NPE"}
+
+  ;; ── 走るが、ディスクに書かないのが正常 ────────────────────────────────
+  {:name "kouhou" :org "cloud-itonami"
+   :domain "公共・公益情報のキュレーションと配信"
+   :runtime :clojure :aliases ["dev" "run"] :main nil
+   :args []
+   :produces nil
+   :expect :runs-ok
+   ;; 実 fetch + 実 publish は別 alias（KOUHOU_ALLOW_LIVE_INGEST=1 clojure -M:live-ingest）。
+   ;; **既定では起動しない** —— 外向き publish を毎時の無人 run に混ぜない。
+   :live-alias "live-ingest"
+   :live-env {"KOUHOU_ALLOW_LIVE_INGEST" "1"}
+   :evidence "2026-08-08 実測: gov-jp-press は commit、anon-blog は Governor が
+              :source-not-in-registry で hold。gate が実際に効いている"}
+
+  {:name "tashikame" :org "cloud-itonami"
+   :domain "ファクトチェック判定の発行"
+   :runtime :clojure :aliases ["dev" "run"] :main nil
+   :args []
+   :produces nil
+   :expect :runs-ok
+   :evidence "2026-08-08 実測: c1 supported / c2 unverifiable、低信頼度に warning"}
+
+  ;; ── 走るが 0 件。設定不足であって成功ではない ──────────────────────────
+  {:name "meisai" :org "cloud-itonami"
+   :domain "カード利用明細の取り込み"
+   :runtime :clojure :main "meisai.methods.autorun"
+   :args []
+   :produces "data/meisai.datoms.kotoba.edn"
+   :output-gitignored true
+   :expect :runs-empty
+   :blocked-by "source が 1 件も設定されていない（cycle 1: +0 tx / 0 datoms）。
+                個人の明細を扱うので source 登録は owner の判断であり、
+                自動で埋めるものではない"
+   :evidence "2026-08-08 実測: exit 0、log length 0"}
+
+  ;; ── 起動しない。原因を名前で記録する ─────────────────────────────────
+  {:name "kakaku" :org "cloud-itonami"
+   :domain "価格観測"
+   :runtime :clojure :main "kakaku.methods.autorun"
+   :args []
+   :produces "data/kakaku.datoms.kotoba.edn"
+   :expect :known-broken
+   :blocked-by "seed が repo に無い: kakaku/kotoba/seed.edn (FileNotFoundException)。
+                repo 側に seed を追加するか、-main が seed パスを引数で受ける必要がある"
+   :evidence "2026-08-08 実測"}
+
+  {:name "hakoniwa" :org "cloud-itonami"
+   :domain "前方シミュレーション（分布としての未来）"
+   :runtime :clojure :main "hakoniwa.methods.simulate"
+   :args ["${REPO}/data/seed-scenario.kotoba.edn"]
+   :produces nil
+   :expect :known-broken
+   :blocked-by "-main の let 束縛 `(-> *file* io/file .getParentFile .getParentFile)` が
+                null を返して NPE (simulate.cljc:237)。argv より先に評価されるので
+                **引数では回避できない** —— repo 側の修正が要る。
+                なお deps.edn が tools.deps の形式ではなくプロジェクト記述子で、
+                :cells が今も methods/*.py を指している"
+   :evidence "2026-08-08 実測。charter は :status R1-live-operation-authorized"}
+
+  {:name "tadori" :org "cloud-itonami"
+   :domain "証拠アンカー付きの追跡（CTI）"
+   :runtime :clojure :main "tadori.methods.autorun"
+   :args []
+   :produces "data/tadori.datoms.kotoba.edn"
+   :expect :known-broken
+   :blocked-by "deps.edn が無い。runner は bb.edn だけで、cheshire を bb の同梱に
+                頼っていた。bb は ADR-2607173000 で退役したので現在**起動経路が無い**。
+                deps.edn を足して cheshire を宣言すれば動く見込み"
+   :evidence "2026-08-08 実測: cheshire/core が classpath に無い"}
+
+  {:name "kaname" :org "cloud-itonami"
+   :domain "領域横断の律速点（leverage point）合成"
+   :runtime :clojure :main "kaname.autorun"
+   :args []
+   :produces "data/kaname.datoms.kotoba.edn"
+   :expect :known-broken
+   :blocked-by "deps.edn が babashka/http-client を宣言していない（tadori と同じ
+                bb 退役の巻き添え）。sibling の :local/root 依存
+                （langgraph / ie-flow / social-publication / kotoba-datom）は
+                west checkout があれば解決する"
+   :evidence "2026-08-08 実測: babashka/http_client が classpath に無い"}
+
+  ;; ── clojure entry が無い ───────────────────────────────────────────────
+  {:name "narashi" :org "cloud-itonami"
+   :domain "世界的な格差の観測"
+   :runtime :nbb :main "scripts/run-task.cljs" :args []
+   :produces nil
+   :expect :known-broken
+   :blocked-by "deps.edn も clojure の -main も無い。nbb 側の scripts/run-task.cljs +
+                tasks.edn が入口だが、どの task が観測 heartbeat かが宣言されていない。
+                repo 側で task 名を決めてからここに書く（当て推量で叩かない）"
+   :evidence "2026-08-08 実測: src は 3 ファイル、data ディレクトリ自体が無い"}]
+
+ ;; 登録していないが、同じ層に属すると分かっているもの。**「まだ測っていない」で
+ ;; あって「対象外」ではない**（system dynamics の規則と同じ立場）。
+ :unmeasured
+ [{:name "yabai" :org "cloud-itonami"
+   :note "passive-DNS / CTI。runner が無い（deps.edn も bb.edn も無い）。
+          ただし出力は既に query 面に載っている（:source/dataset yabai-passive-dns）"}
+  {:name "collector" :org "cloud-itonami"
+   :note "runner が無い。README.edn と appview / kotoba / config のみ"}
+  {:name "com-etzhayyim-busshi" :org "etzhayyim" :note "商品・原材料。未測定"}
+  {:name "com-etzhayyim-masago" :org "etzhayyim" :note "材料科学 KG。未測定"}
+  {:name "com-etzhayyim-rasen" :org "etzhayyim" :note "遺伝。未測定"}
+  {:name "com-etzhayyim-inochi" :org "etzhayyim" :note "生物圏。未測定"}
+  {:name "com-etzhayyim-kawaraban" :org "etzhayyim" :note "ニュースミラー。未測定"}
+  {:name "com-etzhayyim-mikurabe" :org "etzhayyim" :note "言説比較。未測定"}
+  {:name "chie" :org "kotoba-lang" :note "AI エコシステム KG。未測定"}]}

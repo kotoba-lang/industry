@@ -1,0 +1,224 @@
+[{:db/id -1
+  :adr/id "2608089500"
+  :adr/doc_type "adr"
+  :adr/topic "itonami-flagship-cited-scope-exclusions"
+  :adr/title "flagship の範囲除外は「引用付きの権限カタログ」でなければ監査できない — isic-853 で実装し、HTTP status では引用を検証できないことを実測した"
+  :adr/status :accepted
+  :adr/date "2026-08-08"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["cloud-itonami flagship 9 repo の scope exclusion が、除外クラス・代替の決定権者・法令引用を持つべきこと"
+   "引用の検証を HTTP status ではなく法令本文で行う理由（e-Gov / eCFR は存在しないパスに 200 を返す）"
+   "除外カタログが空/壊れたときに governor が fail closed する規約"
+   "hold の台帳 fact が :excluded-classes / :decided-by / :citations を運ぶこと"
+   "この変更が com-junkawasaki/root の外（cloud-itonami org）に着地していない理由と、その受け渡し方"]
+  :adr/supersedes []
+  :adr/related ["2608052000" "2607122300" "2607189300" "2607011000" "2607189200"]
+  :adr/repos ["com-junkawasaki/root" "cloud-itonami/cloud-itonami-isic-853"]
+  :adr/body
+  "## Context
+
+`itonami-maturity` の実測（2026-08-07 scan、`90-docs/system-dynamics/itonami-maturity.datoms.edn`）で
+flagship 9 repo は 2 群に割れている:
+
+| repo | own | docs | test | ingest | governed |
+|---|---|---|---|---|---|
+| isic-853 | 0.5104 | 4521 | 5137 | **0** | 7142 |
+| isic-854 | 0.5155 | 5095 | 4256 | **0** | 7142 |
+| isic-852 | 0.5420 | 4570 | 5820 | **0** | 7142 |
+| isic-851 | 0.5441 | 4710 | 5815 | **0** | 7142 |
+| isic-4921 | 0.5805 | 5757 | 6860 | **0** | 7142 |
+| isic-7810 | 0.7342 | 9268 | 6046 | 5200 | 8571 |
+| isic-6399 | 0.7675 | 9344 | 7551 | 5000 | 8571 |
+| isic-5820 | 0.7703 | 8999 | 8297 | 0 | 8571 |
+| isic-6310 | 0.7977 | 9165 | 7096 | 8333 | 8571 |
+
+遅れている 5 本（教育 4 本 + 航空 1 本）は **ingest が揃って 0**、governed が
+5/7 で頭打ち。`itonami-maturity-scan.cljs` の測り方に照らすと、これは
+`facts`/`catalog` 相当のファイルが無く、実 URL の引用が 1 件も無いことを意味する。
+
+fleet-gain 最上位は **isic-853（0.3571）**。ここを最初の 1 本にした。
+
+## 何が実際に壊れていたか（スコアではなく）
+
+`highereds.governor/scope-exclusion-violations` は英語 regex 断片 12 個を
+インラインで持っていた: `\"grading\" \"assessment\" \"academic.?standing\"
+\"probation\" \"expulsion\" \"admissions?.*decision\" \"degree.*conferral\"
+\"disciplin\" \"safety.*authority.*override\" \"law.?enforcement\" \"CPS\"
+\"mandatory.*report.*override\"`。監査で回復できない失敗が 2 つある:
+
+1. **hold の記録が `\"Scope exclusion: grading\"` だけ。** append-only 台帳を
+   1 年後に読む運用者は、それが法的に必要な hold なのか、誰かが思いついた
+   キーワードなのかを区別できない。governor の存在理由は「拒否が説明できる」
+   ことなので、これは中心的な欠陥である。
+2. **pattern を静かに消せた。** `\"expulsion\"` を消すと actor の学生に対する
+   権限が広がるが、**集合を検査するテストが 1 つも無い**ので全部緑のまま通る。
+
+これは ingest 軸が 0 であることと同じ根であって、別の問題ではない。除外の
+根拠になる外部の実定法を 1 件も引いていないから、引用も持てないし検査もできない。
+
+## Decision
+
+除外を宣言データにし、各クラスに **代わりに誰がその決定を持つのか** と
+**それを定める法令** を持たせる。
+
+- `highereds.facts`（新規）— 6 つの除外決定クラス。日本の実定法 5 本・12 引用:
+  学校教育法（322AC0000000026）/ 学校教育法施行規則（322M40000080011）/
+  大学設置基準（331M50000080028）/ 学位規則（328M50000080009）/
+  個人情報の保護に関する法律（415AC0000000057）。
+  例: 懲戒（退学・停学・訓告）は **学校教育法施行規則 第二十六条第2項**により
+  校長（大学にあつては、学長の委任を受けた学部長を含む。）が行う ——
+  だから coordination actor はそこに触れない。
+- `highereds.governor` — pattern をカタログから導出し、hold に構造化された
+  `:findings` と `:citation-refs` を載せる。違反文字列は歴史的な
+  `Scope exclusion: <pattern>` 接頭辞を保つ（既存の読み手を壊さない）。
+- **fail closed** — カタログが空/壊れていたら**全件 hold**。「何も除外されて
+  いない」と読まれる方が危険だから。safety-concern の carve-out もこの時は効かない。
+- `highereds.operation` — hold の台帳 fact に `:excluded-classes` `:decided-by`
+  `:citations` を書く。
+- `highereds.verify-citations`（`-M:verify-citations`）— 各引用を e-Gov 法令検索
+  API に当てる。
+
+## HTTP status では引用を検証できない（実測 2026-08-08）
+
+素直な実装（`:citation/url` を GET して 2xx なら OK）は**動かないのに動いて
+いるように見える**。`laws.e-gov.go.jp` は SPA で、存在しない law id でも 200 を
+返す:
+
+```
+200  https://laws.e-gov.go.jp/law/999AC9999999999      ← 架空の法令
+200  https://www.ecfr.gov/current/title-34/part-99999  ← 架空の CFR part
+```
+
+status だけを見る link checker は、**捏造した引用に対して緑になる** —— それこそが
+検査したかった唯一の失敗である。なので verifier は API から本文を取り、
+①`<Code>0</Code>`（law id が解決する）②`<LawTitle>` がカタログの記載と一致する
+③引用した `<ArticleTitle>` が実際にその法令にある、を検査する。
+
+引用文（`:citation/note`）はすべて 2026-08-08 に API の本文から読んだ。記憶から
+書いていない。**条文が今も同じことを言っているか**は検査していない（法令は改正
+される）—— gate が保証するのは条の実在までで、そこは verifier の docstring に
+明記した。
+
+この経路上、`--offline` はカタログの形だけを見る。`clojure -M:test` は
+ネットワークに触れない（決定的であることを壊さない）。
+
+## gate が噛むことを確かめた（7/7）
+
+**落ちない gate は劇場**（CLAUDE.md / `scripts/maturity-loop`）。7 つの mutation を
+実際に当てて赤くなるのを見た:
+
+| 壊し方 | 検知 |
+|---|---|
+| 実在する法令に架空の条番号 | `verify-citations` exit 1 |
+| 架空の law id | `verify-citations` exit 1 |
+| law id を別の実在法令に付け替え | `verify-citations` exit 1 |
+| 除外 pattern を 1 つ削除（expulsion） | `-M:test` 11 failures |
+| クラスから引用を消す | `-M:test` 41 failures |
+| fail-closed を無効化 | `-M:test` 6 failures |
+| hold が引用を台帳に書かなくなる | `-M:test` 1 failure |
+
+**うち 2 つは最初 *噛まなかった*。**
+
+1. 「law id の付け替え」— verifier が law 単位で法令名を**集合照合**していた。
+   学位規則の id を学校教育法の id に付け替えると 2 つの引用群が併合し、
+   集合に学校教育法が含まれているので緑になった。引用単位の照合に直した。
+2. 「台帳が引用を運ばなくなる」— **台帳の中身を読むテストが 1 つも無かった。**
+   governor の戻り値だけを見ていて、store への書き込みを誰も見ていない。
+   `execute-proposal!` を通して台帳 fact を読むテストを足した。
+
+どちらも mutation を当てて初めて分かった。**推測で「テストがある」と言っていたら
+両方見逃していた。**
+
+## 検証
+
+`cloud-itonami/cloud-itonami-isic-853` の main（`11e38206`）に対して:
+
+- `clojure -M:test` — 変更前 49 tests / 165 assertions / 0 failures、
+  変更後 **63 tests / 339 assertions / 0 failures**
+- `clojure -M:verify-citations` — 12 引用すべてが実法令の本文に存在
+- `clojure -M:lint` — errors 0（warnings 3 は `sim.cljc` の既存分）
+
+副産物として README が**存在しないテストファイル 2 つ**
+（`governor_contract_test.clj` / `store_contract_test.clj`）を案内していたので
+実在の一覧に直した。docs の腐りは docs 軸が 4521bp である理由の一部である。
+
+## この変更がまだ cloud-itonami に着地していない
+
+このセッションの GitHub 資格情報は **`com-junkawasaki/root` にしか push できない**
+（`add_repo` は cross-tier add を拒否し、`git push --dry-run` は
+`access denied by the git proxy … not in this session's authorized repository set`
+で 403、GitHub API も `Access denied: repository \"cloud-itonami/…\" is not
+configured for this session`）。cloud-itonami は匿名 clone で**読める**ので実装と
+検証はすべて実リポジトリに対して行えたが、着地だけができない。
+
+そこで変更は `git format-patch` として
+
+    90-docs/evidence/itonami-flagship-maturity/2608089500-isic-853-cited-scope-exclusions.patch
+    sha256 d1629e23a2a79e687c33c0bd2349c2441ada9895b687d909d8e9ea95c6c9e6d2
+    base 11e38206df20c3d65104ac44f78fd4a26b2d5e25
+
+に置いた。着地させる手順:
+
+```bash
+git clone https://github.com/cloud-itonami/cloud-itonami-isic-853
+cd cloud-itonami-isic-853
+git checkout -b agent/maturity-isic-853-cited-scope-exclusions 11e38206
+git am < .../2608089500-isic-853-cited-scope-exclusions.patch
+clojure -M:test && clojure -M:verify-citations
+```
+
+**この patch を「landed」として扱わない。** 上流の main に入るまでは、
+maturity 軸は 1bp も動いていない。2026-08-08 時点で
+`cloud-itonami/cloud-itonami-isic-853` の ref は `main` 1 本
+（`11e38206`）だけで、着地していないことを `git ls-remote` で確認済み。
+
+### 子セッションでの着地を試みて失敗した（transport、2026-08-08）
+
+オーナー承認のもと、`cloud-itonami-isic-853` を source にした sibling session
+（`session_01X9NJw6vkU1jvtUeGa15prK`、push 権あり）を起こし、patch を
+**gzip + base64（22,464 文字を 1 行）で prompt に埋めて**渡した。結果は失敗:
+
+> base64 patch corrupted in transit (~76% desynced); unrecoverable
+
+**設計どおりに止まった。** prompt には「`sha256` が
+`d1629e23…` と一致しなければ適用せず報告せよ」と書いてあり、子セッションは
+壊れた patch を適用せず、どこで壊れたかまで報告して停止した。**破損した
+patch が黙って適用されるより、この失敗の方がよい**——検査を先に書いた分の
+配当である。
+
+再送はできなかった: **このビルドの CCR MCP には remote session への
+`send_message` が無い**（`create_session` の説明文は fan-out 用に
+send_message を挙げているが、ツール自体が surface に無く、`ListAgents` にも
+remote session は出ない）。idle な子セッションに追加入力を渡す経路が無いので、
+やり直すには新しいセッションを起こして同じ 22 KB を再送するしかなく、
+同じ破損を繰り返す可能性が高い。子セッションは archive した。
+
+**教訓（次に同型の受け渡しをする者へ）**: 数十 KB の payload を prompt に
+1 行で埋めない。実際に効く順に:
+
+1. **そもそも patch を運ばない。** 対象 repo を source にしたセッションを
+   *最初から* 立てて、そこで実装・検証・push まで完結させる。今回は
+   「実装が先、着地の権限が後」という順序が transport を発生させた。
+2. どうしても運ぶなら **1 チャンク 3〜4 KB に分割し、チャンクごとに
+   sha256 を添える**（子セッション自身の提案でもある）。全体の sha256 だけだと
+   「どこが壊れたか」が分からず再送のしようがない。
+3. 受け手側の検査（sha256 gate）は**必ず先に書く**。今回それだけが機能した。
+
+## Consequences
+
+- **`scripts/maturity-loop/mutations.edn` に flagship の suite はまだ足していない。**
+  現在 8 suite（langgraph / prolly-tree / inga / codebase / social-publication /
+  cargo / jp-ashiba-actor / m365-ingest）あるが、**flagship 9 本は 1 本も無い**。
+  上の 7 mutation は isic-853 の *変更後* の tree に対して赤くなるもので、west pin が
+  指している現在の main には `facts.cljc` が存在しないため、今足すと `:find` が
+  0 回ヒットで `BUG` 報告になる。patch が着地したら同じ 7 件をそのまま suite にする
+  —— **落ちるのを既に見ているので、推測で足すことにはならない。**
+- 残り 4 本の遅れた flagship（851 / 852 / 854 / 4921）は同型の欠陥を持つ。
+  ただし**引用は repo ごとに引き直す**: 851（初等教育）と 852（中等教育）は
+  学校教育法の別の条（懲戒の主体が校長、退学の制限が学齢児童生徒に及ぶ）に当たり、
+  4921（旅客陸運）は道路運送法・運輸安全マネジメントの系統で、
+  853 の 12 引用をコピーすると**間違った法令を引くことになる**。
+- ingest 軸を「URL を並べる」ことで上げる経路は、この ADR をもって塞がったと
+  みなす —— 実 URL であっても検証されない引用は捏造と区別がつかない。
+  今後 ingest を主張する repo は、引用を機械で確かめる entry point を持つこと。"}]

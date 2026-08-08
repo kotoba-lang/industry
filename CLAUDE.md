@@ -1166,13 +1166,23 @@ ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics に�
   **何にも解決しない**（`padding: var(--hig-spacing-4)` が黙って消える）。足りなければ
   上流の `hig->dads` に足す —— app CSS で再導出しない（bridge 自身の docstring:
   「2つ目のアプリが再導出した瞬間に契約は壊れる」）。
-  **実測（2026-08-05、ADR-2608060000）: bridge が運ぶのは 27 個で、内訳は
-  `--hig-color-*`(17) / `--hig-palette-*`(4) / `--hig-font-*`(3) / `--hig-hairline`。
-  `--hig-spacing-*` と `--hig-text-*-size` と `--hig-radius-*` は 1 つも入っていない。**
-  DADS 基盤で最も書きたくなる padding / gap / font-size がちょうど全滅する帯で、
-  しかもエラーにならず 0 に潰れるので**見た目が崩れて初めて気付く**。当座は DADS 側の
-  primitive か `em` 相対で書き、恒久的には上流に足す。確認は
-  `grep -o '"--hig-[a-z0-9-]*"' orgs/kotoba-lang/jp-go-digital-design-system/src/jp_go_dds/tokens.cljc | sort -u`。
+  **再実測（2026-08-08）: bridge は 71 個を運ぶ —— `--hig-color-*`(18) /
+  `--hig-text-*`(22) / `--hig-spacing-*`(11) / `--hig-palette-*`(9) /
+  `--hig-radius-*`(7) / `--hig-font-*`(3) / `--hig-hairline`。**
+  2026-08-05 版のこの節は「27 個で spacing / text-size / radius は 1 つも無い」と
+  書いていたが、その後 upstream の `e671277`「bridge the rest of the `--hig-*`
+  contract」が入って解消している。**したがって `padding: var(--hig-spacing-4)` も
+  `font-size: var(--hig-text-footnote-font-size)` も `--hig-radius-xs` も、
+  DADS 基盤でそのまま書いてよい** —— 旧記述に従って `em` 相対や DADS primitive を
+  直接書くと、いま在る契約から不要に外れる。
+  **残っている本物の穴は `--hig-palette-*` の 6 色**（teal / mint / indigo / brown /
+  gray2-6）。DADS に対応する色相が無いので意図的に載せていない。bridge の docstring は
+  「載せなければ `shitsuke.hig` の既定値が効く」と書いているが、**DADS 基盤の app の
+  下に `shitsuke.hig` は居ない**（`jp-go-dds.page` は bridge も HIG も自動では入れず、
+  app が `:app-css` で `tokens/bridge-css` を渡す）ので、そこでは**何にも解決しない**。
+  カテゴリ色にこの 6 つを使っている view は移行前に確認する。
+  確認コマンド（`grep` は行内 1 件しか数えないので使わない）:
+  `clojure -M -e "(require '[jp-go-dds.tokens :as t]) (println (count t/hig->dads))"`。
 - **DADS は light。** `page` の `:dark? true` はこのライブラリ独自の反転層（上流には
   dark palette が無い）。暗い環境で色を見る editor 向けで、kami-app-daw / -nle が使う。
 - **DADS に無いもの**: app-shell / editor frame、segmented control、trailing slot 付き

@@ -424,6 +424,38 @@
                    "--json" "url" "--limit" "1")
           first :url))
 
+(defn- prior-cleanup-pr
+  "この tool が過去に開いた **未 close の** PR を、branch 名の *接頭辞* で探す。
+  -> {:url ... :headRefName ...} / nil
+
+  **なぜ接頭辞なのか（2026-08-08 の実測バグ）。** 呼び出し側は branch を
+  `agent/cleanup-review-<stamp>` と日付入りで組み立てるのに、重複防止は
+  `existing-pr slug br`（= その日の branch と完全一致）で行っていた。**stamp は
+  今日の日付なので、この照合は同日中しか一致しえない。** 日をまたぐと必ず外れ、
+  毎回 branch も PR も新規に作られる —— 重複防止の意図で置かれたガードが、
+  構造的に発火できない位置にあった。
+
+  実測: `agent/cleanup-review-*` は 20260803 / 20260805 / 20260806 / 20260808 の
+  4 世代・22 PR を fleet に積んでいた。`etzhayyim/root#3376`(0803) と `#3392`(0808)
+  は **file/line 集合が完全に一致**（+59008/-8421・36 files）で、5 日空けて同じ内容を
+  2 度開いていた。`com-etzhayyim-kawaraban#27/#28` も同型。これらは人手で
+  :close-superseded にするまで滞留し続ける —— backlog は放置の結果ではなく、
+  **この関数が無いことによって毎日生成されていた**。
+
+  接頭辞で拾えば、日付入り branch のまま過去世代（別 stamp）も掴める。掴んだら
+  呼び出し側はその branch へ commit し直し、PR は開き直さず更新する（server-commit!
+  は既存 ref を force 更新できる）。結果として repo あたり preservation PR は常に 1 本、
+  中身は最新になる。
+
+  :additive にも同じガードを効かせる。通常 :additive は開いた直後に merge される
+  ので重複は残らないが、**merge が落ちた回**（CI 不通・conflict・権限）に PR が
+  open のまま残り、翌日そこに 2 本目が積まれる経路は :review と同一である。"
+  [slug prefix]
+  (->> (gh-json "pr" "list" "--repo" slug "--state" "open"
+                "--json" "url,headRefName" "--limit" "100")
+       (filter #(str/starts-with? (str (:headRefName %)) prefix))
+       first))
+
 ;; gh-input! を使うので、ref 更新は PATCH ではなく POST/PATCH を gh が endpoint から
 ;; 判別する。既存 ref への POST は 422 になるため existing? で分岐している。
 
@@ -577,7 +609,9 @@
           (println "  → 全て着地済み。新規 PR なし。"))
         ;; :additive — untracked のみ。main のどの行も書き換えないので merge する。
         (when (seq additive)
-          (let [br (str "agent/cleanup-land-" stamp)
+          ;; merge が落ちた回に open のまま残った PR を再利用する（:review と同じ経路）。
+          (let [prior (prior-cleanup-pr slug "agent/cleanup-land-")
+                br (or (:headRefName prior) (str "agent/cleanup-land-" stamp))
                 msg (str "cleanup: land untracked WIP (" (count additive) " files)\n\n"
                          "These files existed only in the shared west checkout — on no branch,\n"
                          "on no remote. A single `git checkout` there would have destroyed them.\n"
@@ -587,7 +621,8 @@
                          ".git/stash-archive-" stamp "/ in the operator's checkout.\n\n"
                          "Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>")]
             (if-let [{:keys [files]} (server-commit! slug dir base additive br msg)]
-              (let [url (or (existing-pr slug br)
+              (let [url (or (:url prior)
+                            (existing-pr slug br)
                             (open-pr! slug base br
                                       (str "cleanup: land untracked WIP (" files " files)")
                                       (str "Untracked files rescued from the shared west checkout — on no branch, on no remote.\n\n"
@@ -599,14 +634,18 @@
               (println "  :additive commit に失敗（報告のみ、ローカルは無傷）"))))
         ;; :review — tracked 変更。base が古いと main を巻き戻すので merge しない。
         (when (seq tracked)
-          (let [br (str "agent/cleanup-review-" stamp)
+          ;; 過去世代の preservation PR があればその branch を再利用する。無いときだけ
+          ;; 日付入りの新しい branch を切る（prior-cleanup-pr の docstring 参照）。
+          (let [prior (prior-cleanup-pr slug "agent/cleanup-review-")
+                br (or (:headRefName prior) (str "agent/cleanup-review-" stamp))
                 msg (str "cleanup: preserve uncommitted tracked changes (" (count tracked) " files)\n\n"
                          "NOT auto-merged. These rewrite files that already exist on " base ",\n"
                          "and the working tree they came from may be far behind it.\n\n"
                          "Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>")]
             ;; tracked は必ず 3-way で載せる（three-way-blob! の docstring 参照）。
             (if-let [{:keys [files]} (server-commit! slug dir base tracked br msg true)]
-              (let [url (or (existing-pr slug br)
+              (let [url (or (:url prior)
+                            (existing-pr slug br)
                             (open-pr! slug base br
                                       (str "DO-NOT-MERGE cleanup: preserve uncommitted tracked changes ("
                                            files " files)")
