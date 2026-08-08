@@ -329,6 +329,27 @@
    :script "gates/itonami-game-never-auto-check.cljs"
    :include-ext [".cljc"] :min-files 20 :cd false}
 
+  ;; squint-cljs 0.8.147 compiles `(- (+ a b))` to `-(a) + (b)` — it splices the inner
+  ;; operands out of a unary negation. It compiles, it runs, and it returns `b - a`.
+  ;;
+  ;; The preview page is squint-compiled, so this reaches shipped pixels while every other
+  ;; execution of the same source is correct: Clojure and ClojureScript group it properly, so
+  ;; the JVM suites pass and the nbb CLI renderer draws the right picture. Found 2026-08-08 by
+  ;; the game's parity test, in two places at once — a road ring yawed to `π/2 − a`, and the
+  ;; engine's orthographic projection returning `l − r` in the shadow matrix.
+  ;;
+  ;; Arity is what decides, so the check reads the form: `(- a (+ b c))` and `(- (- q) r)` are
+  ;; binary and correct, and `(- (* a b))` survives because negation distributes. A regex over
+  ;; `(- (` reports all of those as bugs — it did, on its first run.
+  ;;
+  ;; 2026-08-08 に「落ちること」を確認済み: `(- (+ a b))` / `(- (- a b))` /
+  ;; `(- (+ a (* b c)))` の 3 通りで exit 1、`(- (* a b))` `(- (/ a b))` `(- a (+ b c))`
+  ;; `(- (- q) b)` `(- a)` `(-> a (+ b))` と、文字列・コメント内の同形は素通し。
+  {:name "root" :id "root-squint-unary-minus" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/squint-unary-minus-check.cljs"
+   :include-ext [".cljc" ".cljs" ".clj"] :min-files 20 :cd false}
+
   {:name "root" :id "root-permit-index" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/permit-index-check.cljs"
    :include-ext [".edn" ".cljs" ".cljc"] :min-files 1500 :cd false}

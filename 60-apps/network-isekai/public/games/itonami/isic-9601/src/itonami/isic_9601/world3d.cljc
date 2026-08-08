@@ -125,8 +125,14 @@
         (let [a (* two-pi (/ (double i) segments))
               cx (* r (Math/cos a))
               cz (* r (Math/sin a))
-              ;; tangent direction; a box's length runs along x, so yaw by the tangent
-              yaw (- (+ a (/ Math/PI 2.0)))
+              ;; tangent direction; a box's length runs along x, so yaw by the tangent.
+              ;; Written `(* -1.0 (+ …))` rather than the obvious `(- (+ …))` because squint
+              ;; miscompiles unary minus over a nested sum: `(- (+ a b))` becomes
+              ;; `-(a) + (b)`, which is `b - a`. It compiles, it runs, and the road tilts the
+              ;; wrong way in the browser while the JVM and nbb are right. See
+              ;; `scripts/…/squint-unary-minus-check` — the same bug is in the engine's
+              ;; orthographic projection.
+              yaw (* -1.0 (+ a (/ Math/PI 2.0)))
               seg-len (+ 2.0 (/ (* two-pi r) segments))]
           [(inst :road [cx 0.02 cz] road-color [seg-len 0.12 5.4] {:yaw yaw})
            (inst :road-line [cx 0.10 cz] road-line [(* seg-len 0.42) 0.06 0.28] {:yaw yaw})]))

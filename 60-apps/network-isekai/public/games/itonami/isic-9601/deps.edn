@@ -18,4 +18,18 @@
   {:extra-paths ["test"]
    :extra-deps {io.github.kotoba-lang/webgpu {:local/root "../../../../../../orgs/kotoba-lang/webgpu"}
                 io.github.cognitect-labs/test-runner {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
-   :main-opts ["-m" "cognitect.test-runner" "-n" "world3d-test"]}}}
+   :main-opts ["-m" "cognitect.test-runner" "-n" "world3d-test"]}
+
+  ;; Dumps the JVM engine's floats so the squint-compiled browser build can be compared
+  ;; against them (`npm run parity`). Same engine, different compiler — the numbers decide.
+  ;; Clojure 1.12, not the 1.11.1 the other aliases use. `kami.webgpu.submission` writes
+  ;; `#?(:clj Math/sin)` in value position, which 1.11 rejects outright — the namespace does
+  ;; not load there at all. Nothing had noticed: `world3d_test.clj` exercises `ir` and
+  ;; `pick`, and the only other consumer of the packers is `bin/render.cljs`, which runs on
+  ;; nbb. This alias is the first JVM code to require it.
+  :parity-dump
+  {:extra-paths ["test"]
+   :override-deps {org.clojure/clojure {:mvn/version "1.12.0"}}
+   :extra-deps {io.github.kotoba-lang/webgpu {:local/root "../../../../../../orgs/kotoba-lang/webgpu"}
+                org.clojure/data.json {:mvn/version "2.5.0"}}
+   :main-opts ["-m" "parity-dump"]}}}

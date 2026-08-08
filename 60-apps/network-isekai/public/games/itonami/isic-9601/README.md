@@ -149,6 +149,13 @@ centre with the same matrices the executor builds and requires the pick at that 
 return that instance. A picker with the wrong up vector, the wrong depth convention, or no
 half-height lift still returns plausible hits — just the wrong ones, near the frame edges.
 
+**`kotoba-lang/webgpu` + `kotoba-lang/render`** —
+`sdk-patches/0004-…` and `sdk-patches/0005-avoid-squint-miscompiled-unary-minus.patch`
+
+These two are not gaps in the SDK. The engine source is correct Clojure; **squint-cljs
+0.8.147 compiles it wrongly**, and the patches write the same arithmetic in a form squint
+does not mangle. See “A compiler that is wrong quietly” below.
+
 **`kotoba-lang/sprite2d`** — `sdk-patches/0001-sprite2d-board-support.patch`
 
 | gap | why a board needs it |
@@ -185,7 +192,10 @@ it does not compile.
 | `bin/render.cljs` | CLI — the 3D street through real WebGL 2.0, to a PNG |
 | `test/world3d_test.clj` | 16 tests / 530 assertions, JVM, against the real `kami.webgpu.ir` + `pick` |
 | `test/world_ir_test.clj` | 17 tests / 102 assertions, JVM, against the real `kotoba.sprite2d.layout` |
-| `sdk-patches/` | the upstream `sprite2d` commit, staged until it can be pushed |
+| `test/parity.cljs` + `test/parity_probe.cljs` + `test/parity_dump.clj` | 14,244 floats, JVM engine vs squint engine, three frames |
+| `test/squint_unary_minus.cljs` | reads the sources for the arithmetic squint miscompiles |
+| `preview/squint_shim.mjs` | the two core functions squint does not implement |
+| `sdk-patches/` | five upstream commits, staged until they can be pushed |
 | `game.edn` | network-isekai game metadata |
 
 Sources live once, under `src/`. They used to exist twice — a flat copy for a
@@ -293,6 +303,54 @@ One thing worth writing down because it cost a detour: **WebGPU is only exposed 
 context.** Loaded from `about:blank`, `navigator.gpu` is not adapterless — it is *absent*,
 which reads exactly like a browser without WebGPU support. The renderer serves its page from
 `http://127.0.0.1` for that reason alone.
+
+## A compiler that is wrong quietly
+
+The preview page is compiled by **squint**, and squint miscompiles a common arithmetic form:
+
+```clojure
+(- (+ a b))     ;; squint emits:  -(a) + (b)      → b - a
+(- (- a b))     ;; squint emits:  -(a) - (b)      → -a - b
+```
+
+It splices the inner operands out of the negation. There is no warning, no error, and no
+artefact to find — the expression compiles, runs, and returns a different number. `*` and `/`
+survive because negation distributes over them, and binary minus is fine, so it is not a
+general breakage: it is a specific shape that is silently wrong.
+
+**Only the browser is affected.** Clojure and ClojureScript group the form correctly, so the
+JVM suites pass, `bin/render.cljs` (nbb) draws the right picture, and the page is quietly
+askew. That asymmetry is what makes it dangerous: every check that existed said the code was
+fine, and every one of them was right about the execution it was checking.
+
+It was live in two places at once:
+
+| | written | squint computed |
+|---|---|---|
+| `world3d/road-ring` | `-(a + π/2)` | `π/2 - a` — the ring road's segments yawed off-tangent |
+| `submission/ortho-rh`, `camera/orthographic-rh` | `-(r + l)` | `l - r` — the shadow matrix's translation lane |
+
+Two checks now stand against it, and they are different in kind:
+
+- **`npm run parity`** runs the real street through the JVM engine and through the squint
+  bundle and compares **every float** — 14,244 of them across three frames. This is what
+  found the bug. It is semantic: it does not care what the source looks like, only whether
+  two executions of one engine agree. It also happens to be the thing that keeps three
+  executions from becoming three engines, which is what CLAUDE.md's 3D rule forbids.
+- **`npm run lint:squint`** reads the sources for the shape. Cheap, no JVM, names the line.
+  It reads the *form*, because arity decides: a regex over `(- (` flags `(- a (+ b c))` and
+  `(- (- q) r)`, which squint compiles correctly. It did exactly that on its first run, and
+  the false positive nearly got correct engine code "fixed".
+
+Both are registered in fleet-CI (`root-squint-unary-minus`). The engine changes are staged as
+`sdk-patches/0004` and `0005`; squint itself is an external npm package, not a repo in this
+workspace, so the accommodation has to live on our side.
+
+Two smaller squint gaps turned up on the way, in `preview/squint_shim.mjs`: `pos-int?` and
+`double` are not implemented, and squint compiles an unresolved symbol to a bare identifier —
+so a missing core function is a `ReferenceError` at first execution, or a wrong number on a
+branch nothing exercises. The parity test is what makes the shims trustworthy rather than
+merely quiet.
 
 ### What running it from a terminal found
 

@@ -10,7 +10,9 @@
     "test": "nbb --classpath src test/logic_test.cljs",
     "balance": "nbb --classpath src test/balance.cljs",
     "build": "nbb preview/build.cljs",
-    "render:webgpu": "nbb --classpath src:../../../../../../orgs/kotoba-lang/webgpu/src:../../../../../../orgs/kotoba-lang/render/src bin/render.cljs -- --backend webgpu"
+    "render:webgpu": "nbb --classpath src:../../../../../../orgs/kotoba-lang/webgpu/src:../../../../../../orgs/kotoba-lang/render/src bin/render.cljs -- --backend webgpu",
+    "parity": "nbb test/parity.cljs",
+    "lint:squint": "nbb test/squint_unary_minus.cljs"
   },
   "devDependencies": {
     "esbuild": "0.25.0",
