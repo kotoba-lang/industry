@@ -112,4 +112,22 @@ Terms 本文から直接確認した条項: §6.1（JPY・月次後払い・Orde
 
 **Terms 全文に refund / cancel の文字列が存在しないことを確認した**（返金・解約条項の不在は推測ではない）。
 
-**この ADR が検証していないこと**: net-kotobase / club-shinshi / net-babiniku の gate は再実測していない。product decision 表のそれらの行は 2026-07-24 の値をそのまま持ち越しており、cloud-itonami と同種の陳腐化を含んでいる可能性がある。"}]
+## net-kotobase の再実測（2026-08-08、run 0022）
+
+上の『検証していないこと』のうち net-kotobase を実測した。**仮説（国内法人 operator なので cloud-itonami より近いはず）は反証された。**
+
+外国会社登記の論点が無いのは事実である（operator は Gftd Japan 株式会社、Corporate Number 1011101086505）。しかし文書面では cloud-itonami より**全項目で後ろ**だった:
+
+- `kotobase-docs/terms.md` は**依然 DRAFT**（1 行目に `DRAFT — Review by qualified counsel is required before publication`）。しかも製品ドメインに無く、`kotobase.net/legal/terms/` は実 404 で、root からは GitHub blob リンクのみ
+- `privacy.md` / `dpa.md` はどちらも **404 = 存在しない**
+- `/pricing` は live だが**価格が 1 つも書かれていない**（`¥` 表記ゼロ。SCORECARD の ¥980/mo は未公開の提案値）
+- `[CONFIRM: …]` が 5 件未解決（最低年齢・価格・請求周期・税・返金）
+- `/api/billing/status` が存在しない
+
+**cloud-itonami の red 1 件を回避する代わりに、公開前 counsel review が必要な DRAFT と、ゼロから書く privacy・DPA を引き受けることになる。両方とも counsel は要る。** したがって決定 2（最小経路を cloud-itonami へ）は推論ではなく実測で確認された。
+
+## この ADR が依然として検証していないこと
+
+club-shinshi（`shinshi.club`）と net-babiniku（`babiniku.net`）は、`/legal/terms/` を含む全パスに対してバイト単位で同一の app shell を返す client-rendered SPA（2,035 B / 1,918 B）であり、**HTTP だけでは legal surface を判定できない**。実ブラウザが要る。
+
+ただし優先度は見た目ほど高くない: 両者の red は **product-safety**（adult content / age assurance / creator billing の payout・返金条件）であり、**commit が黙って閉じる種類の gate ではない**。run 0021 が見つけた陳腐化は、文書 gate に特有の現象である。"}]

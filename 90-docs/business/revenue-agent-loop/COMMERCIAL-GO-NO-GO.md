@@ -18,7 +18,7 @@
 | 契約主体 | 法人名、住所、連絡先、商品ごとのoperatorが公開文書で一致 | Terms §15 が live: AWAI Network, L.L.C.（Delaware file 10704996）が operator、Gftd Japan K.K. が infra supplier、contact `hello@gftd.co.jp`。`GET /legal/terms/` → 200 / 15,322 B, effective 2026-07-24 | **green** | — |
 | Merchant / collection | 契約主体自身のPSP口座、または有効な収納代行契約 | ADR-2607242600 accepted (2026-07-24)。Terms §6.3 が Gftd Japan を**開示された限定 collection agent**、AWAI を supplier として公開明記。署名 counterpart は設計上 git 外（同 ADR §6） | **green**（governance level） | — |
 | 日本での法人・税務 | 外国会社登記、PE、源泉・消費税の専門家判断 | Terms §6.4 は税抜 + reverse-charge の**立場**を公開しているが、`Customer is responsible for confirming its own filing position` と自認。ADR-2607242600 §7 が「foreign-company registration と counsel review は別 gate」と明示。**written advice は存在しない** | **red** | 日本の弁護士・税理士: written advice。AWAI の外国会社登記 |
-| Terms / Privacy | placeholderなし、公開版、発効日、operator承認証跡 | owner 承認済み（run 0018、2026-07-24）。`/legal/terms/` 200 / 15,322 B、`/legal/privacy/` 200 / 16,902 B、いずれも effective 2026-07-24、DRAFT 表記なし | **green** | — |
+| Terms / Privacy | placeholderなし、公開版、発効日、operator承認証跡 | owner 承認済み（run 0018、2026-07-24）。`/legal/terms/` 200 / 15,322 B、`/legal/privacy/` 200 / 16,902 B、いずれも effective 2026-07-24、DRAFT 表記なし。**これは owner 承認であって counsel review ではない**（この gate が要求するのは operator 承認証跡なので green は正しい。counsel review は下の Unblock proof が別途追跡しており未充足） | **green** | — |
 | DPA / subprocessors | 実際のdata flowと一致するDPA・一覧 | `/legal/dpa/` 200 / 10,047 B。Terms §7.1 が incorporation by reference。Privacy §5 が subprocessor を実名列挙（Cloudflare, Inc. / net-kotobase ほか）、§6 に international transfer | **green** | — |
 | 価格・税・返金 | 通貨、税込/税別、周期、解約時点、返金条件 | 通貨・周期 green（§6.1 JPY・月次後払い）。税 green（§6.4 税抜 + reverse charge）。**返金・解約条項が Terms に存在しない**（`refund` / `cancel` が全文に無い）。§6.1 が参照する "in-product pricing page" も**公開されていない**（`/pricing` は 35,552 B の cockpit fallback = 実ページ無し） | **yellow** | owner: 返金・解約条件を決定 → Terms へ追補 / 公開 pricing ページを立てる |
 | Fulfillment | 署名検証済みpaymentからentitlementまでE2E証拠 | `GET /api/billing/status`: `mode:"live"`, `stripeConfigured:true`, `webhookReady:true`, `readyForLiveCheckout:true`, `readyForEntitlement:true`, `missing:[]`。**レールは 100% 完成**。ただし checkout が一度も走っていないため signed-webhook → entitlement は本番未実証。test-mode 証跡は `sk_test_…` 不在で取得不能（run 0016） | **yellow** | owner: Stripe dashboard で `sk_test_…` を発行 → test-mode E2E |
@@ -30,16 +30,19 @@
 | Product | Contracting boundary | Product-specific boundary | Decision |
 |---|---|---|---|
 | cloud-itonami | AWAI/Gftd Japan の収納代行は ADR + 公開 Terms で確定。**登記・税務のみ赤** | terms/privacy/DPA は承認済み・公開済み | **conditional**（red 1 + yellow 3。前版 no-go から前進） |
-| club-shinshi | operator・決済条件の確定が必要 | adult specialist review、age assurance、refund/tax/payoutが赤 | **no-go** |
-| net-babiniku | PSP/crypto railの契約証跡なし | monetization proposal自体がhard hold | **no-go** |
-| net-kotobase | Gftd Japanがoperatorで主体は明示済み | Standard価格・解約・返金等はowner決定済み。privacy未確定、counsel/E2E未完了 | **no-go**（2026-07-24 時点。未再実測） |
+| net-kotobase | Gftd Japan K.K.（Corporate Number 1011101086505、国内法人）が operator。**外国会社登記の論点は構造的に無い** | **2026-08-08 実測（run 0022）**: `terms.md` は**依然 DRAFT**（1 行目に「counsel review required before publication」）かつ製品ドメインに無く GitHub blob リンクのみ（`kotobase.net/legal/terms/` は実 404）。**privacy.md / dpa.md はどちらも 404 = 存在しない**。`/pricing` は live だが**価格が 1 つも書かれていない**（¥表記ゼロ。¥980/mo は未公開の提案値）。`[CONFIRM: …]` が 5 件未解決（最低年齢・価格・請求周期・税・**返金**）。`/api/billing/status` 無し | **no-go** |
+| club-shinshi | operator・決済条件の確定が必要 | adult specialist review、age assurance、refund/tax/payoutが赤 | **no-go**（2026-07-24 値。SPA のため HTTP では再実測不能 — run 0022） |
+| net-babiniku | PSP/crypto railの契約証跡なし | monetization proposal自体がhard hold | **no-go**（同上、未再実測） |
 
 ## Smallest path to one green product
 
 **前版の推奨（net-kotobase Standard）を撤回する。** 当時 net-kotobase を選んだ理由は
-「AWAI の法人間・外国会社論点を持たない」ことだったが、その論点のうち収納代行の側は
-cloud-itonami で既に閉じており、terms/privacy/DPA も cloud-itonami だけが承認・公開済みに
-なった。net-kotobase は 2026-07-24 以降再実測されていない。
+「AWAI の法人間・外国会社論点を持たない」ことで、**それ自体は今も正しい**（operator は
+国内法人 Gftd Japan K.K.）。しかし 2026-08-08 に実測したところ（run 0022）、net-kotobase は
+**Terms が依然 DRAFT で、privacy と DPA は存在せず、価格も未公開**だった。cloud-itonami の
+red 1 件を回避する代わりに、「公開前に counsel review が要る」と自ら宣言している DRAFT と、
+ゼロから書く privacy・DPA を引き受けることになる。**両方とも counsel は要る。文書が
+完成・公開済みなのは cloud-itonami だけ。**
 
 現行の最小経路は **cloud-itonami**。残りは 2 red/yellow + 1 需要である。
 
