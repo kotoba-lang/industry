@@ -1,0 +1,112 @@
+{:schema "aiueos-aarch64-boot-evidence/v1"
+ :recorded-on "2026-08-08"
+ :adr "2608080300"
+ :question "Does aiueos boot as a Mac virtual machine with a desktop UI/UX today?"
+ :answer :no
+ :measured-by "70-tools/aiueos-aarch64-spike/smoke-qemu-aarch64-uefi.cljs"
+ :aiueos-pin "fd371d71c2ab593c2191727eef1031d0bc00f182"
+
+ :host
+ {:note "Linux x86_64 container; QEMU TCG only. No macOS host and no KVM here,
+         so every HVF/Apple-Silicon claim in the ADR is design-only, not measured."
+  :qemu "QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.18)"
+  :firmware "AAVMF 2024.02-2ubuntu0.9 (edk2 aarch64), /usr/share/AAVMF/AAVMF_CODE.fd"
+  :toolchain "Ubuntu clang 18.1.3 + lld-link 18 (PE32+ AArch64), no new Rust/C"}
+
+ ;; --- (a) AArch64 UEFI loader spike -----------------------------------------
+ :aarch64-uefi-loader
+ {:status :boots-under-real-uefi
+  :artifact "BOOTAA64.EFI, PE32+ executable (EFI application) Aarch64, 4608 bytes"
+  :build ["clang --target=aarch64-unknown-windows -ffreestanding -fshort-wchar -fno-stack-protector -O1 -c"
+          "lld-link -subsystem:efi_application -entry:efi_main -nodefaultlib"]
+  :qemu-exit 0
+  :serial-markers
+  ["AIUEOS_AARCH64_UEFI_ENTRY"
+   "AIUEOS_UEFI_REVISION 0x0000000000020046"
+   "AIUEOS_GOP_OK base=0x0000000000000000 size=0 w=1280 h=800 stride=1280 format=3"
+   "AIUEOS_MEMMAP_OK entries=32 descsize=48"
+   "AIUEOS_EXIT_BOOT_SERVICES_OK"
+   "AIUEOS_CURRENT_EL 1"
+   "AIUEOS_AARCH64_UEFI_OK"]
+  :negative-control
+  {:invocation "--expect-fail (FAT32 ESP with no EFI/BOOT/BOOTAA64.EFI)"
+   :result "all 6 required markers absent; gate rejects"
+   :note "The gate was watched failing before being recorded as landed."}
+  :findings
+  [{:finding :calling-convention
+    :detail "AArch64 UEFI uses the platform AAPCS64 default, so EFIAPI is empty.
+             The x86_64 loader's __attribute__((ms_abi)) on every protocol
+             function pointer is the single largest source-level difference."}
+   {:finding :no-port-io
+    :detail "AArch64 has no port I/O at all. The x86_64 evidence path (COM1 at
+             0x3f8) becomes PL011 MMIO at 0x09000000 on QEMU virt."}
+   {:finding :termination
+    :detail "isa-debug-exit (x86_64, iobase 0xf4) has no AArch64 counterpart.
+             PSCI SYSTEM_OFF (0x84000008 via HVC #0) terminates QEMU with exit 0
+             and is the deterministic replacement."}
+   {:finding :exception-level
+    :detail "AAVMF hands control at EL1 on machine virt (CurrentEL >> 2 = 1),
+             not EL2. A kernel wanting EL2 must be entered before firmware or
+             re-enter deliberately."}]}
+
+ ;; --- The load-bearing display finding: this is what couples (a) and (c) ----
+ :aarch64-gop-display-matrix
+ {:machine "qemu-system-aarch64 -machine virt, AAVMF"
+  :why "The x86_64 desktop-surface bootstrap takes the GOP LINEAR APERTURE
+        (framebuffer_base/size), maps it RW+NX uncached, and presents a
+        retained-rectangle test frame with a readback hash. That bootstrap only
+        ports to a device that actually exposes an aperture."
+  :efi-pixel-format {0 :PixelRedGreenBlueReserved8BitPerColor
+                     1 :PixelBlueGreenRedReserved8BitPerColor
+                     2 :PixelBitMask
+                     3 :PixelBltOnly}
+  :devices
+  [{:device "virtio-gpu-pci"
+    :gop :present
+    :pixel-format 3
+    :pixel-format-name :PixelBltOnly
+    :framebuffer-base "0x0000000000000000"
+    :framebuffer-size 0
+    :resolution [1280 800]
+    :linear-aperture? false
+    :note "The idiomatic AArch64 display device gives Blt-only GOP with NO
+           aperture. The x86_64 desktop-surface bootstrap does not port to it."}
+   {:device "ramfb"
+    :gop :present
+    :pixel-format 1
+    :pixel-format-name :PixelBlueGreenRedReserved8BitPerColor
+    :framebuffer-base "0x000000005c7a0000"
+    :framebuffer-size 3145728
+    :resolution [800 600]
+    :stride 800
+    :linear-aperture? true
+    :note "The only probed AArch64 device exposing a real linear aperture."}
+   {:device "VGA"           :gop :absent :linear-aperture? false
+    :note "AAVMF binds no GOP; there is no CSM/VGA BIOS execution on ARM.
+           vgabios-stdvga.bin was present, so this is not a missing-rom artifact."}
+   {:device "bochs-display" :gop :absent :linear-aperture? false
+    :note "Same as VGA: rom present, no GOP bound."}
+   {:device "virtio-vga"    :gop :not-applicable :linear-aperture? false
+    :note "'virtio-vga' is not a valid device model name on aarch64 — it is
+           x86-only because it bundles VGA compatibility. This is exactly the
+           device os/aiueos/scripts/smoke-qemu-uefi.sh uses on x86_64, so the
+           existing smoke gate's display device does not exist on AArch64."}]
+  :consequence
+  "AArch64 desktop parity requires either (i) ramfb for the early surface, or
+   (ii) the virtio-gpu 2D resource path (create resource, attach backing,
+   transfer, flush) that os/aiueos/README.md currently lists as intentionally
+   excluded. Therefore virtio-gpu 2D moves from 'Phase 6, later' to 'required
+   for AArch64 desktop', and tracks (a) and (c) are coupled rather than
+   independent."}
+
+ ;; --- What this evidence does NOT show -------------------------------------
+ :not-demonstrated
+ ["A kernel. The spike is a UEFI loader; it does not yet hand off to an
+   aarch64 KERNEL.ELF, so nothing below ExitBootServices is exercised."
+  "Any desktop. No compositor, no widget tree, no input path; the GOP numbers
+   are a capability probe, not a rendered surface."
+  "Anything on macOS. No Mac host in this session, so HVF, the
+   com.apple.security.hypervisor entitlement, and Apple Silicon virtio-gpu
+   behaviour are all unmeasured."
+  "Real hardware. ramfb's aperture and its 800x600 mode are QEMU artifacts;
+   Apple Silicon exposes neither ramfb nor this GOP shape."]}
