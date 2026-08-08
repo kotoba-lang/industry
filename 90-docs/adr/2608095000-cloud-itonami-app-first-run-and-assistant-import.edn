@@ -11,7 +11,8 @@
    "first run の段の順序が装飾ではなく権限境界であること（gate の前後で server が要求する認証が変わる）"
    "他アシスタント（Claude Code / Codex CLI / ChatGPT）からの import で何を取り込み何を取り込まないか"
    "import における credential の伏せ字化と、MCP server を無効状態で控える規約"
-   "読めない取り込み元を「0 件」ではなく理由付きで示す規約"]
+   "読めない取り込み元を「0 件」ではなく理由付きで示す規約"
+   "この機能の実装を JVM ではなく portable .cljc + kotoba native に置く判断（runtime 優先順位の適用）"]
   :adr/supersedes []
   :adr/related ["2608080100" "2607122200" "2607132300" "2608040100"]
   :adr/repos ["com-junkawasaki/root" "cloud-itonami/cloud-itonami-app"]
@@ -107,13 +108,49 @@ scanner は全て root を引数で取るので suite は fixture を指せる �
 `$HOME` は ambient input で、それを読む関数は動いているマシンでしか test できない。
 環境を見るのは `default-roots` だけ。
 
-`apply!` はデータではなく id を取ってディスクから読み直すので、
+`plan!` はデータではなく id を取ってディスクから読み直すので、
 **取り込まれるものが client の作り話になりえない**。session は
 `import:<source-id>` で keying するので二度目は複製ではなく置換になる ——
 インポート を押して接続が切れた人が期待するのはそれ。
 
 この namespace は socket を開かない。import はローカルの read とローカルの
 write で、それは平文で言えることに価値がある性質。
+
+### 5. 実装は JVM ではなく portable `.cljc` + kotoba native
+
+**オーナー指示（2026-08-08）「jvm ではなく clojure script と kotoba native のみで ok」。**
+
+ワークスペースの runtime 優先順位は kotoba wasm > clojurewasm > ClojureScript >
+nbb で、JVM は互換層に降格している。この app は全体が JVM だが、**新しく書く
+コードをその最下段に置く理由は無い** —— 初版は `.clj` で
+`cloud.itonami.app.store` を require しており、`store` が `java.nio.file` を
+掴むので、`assoc` を数回するためだけに新規 namespace が JVM に固定されていた。
+
+そこで両 namespace は世界を読まない。`onboarding` は保存済み record を受けて
+新しい record を返すだけ。`assistant-import` は host 関数を十数個
+（`read-text-file` / `list-names` / `sha256-hex` 等、runtime ごとに 1 実装）に
+閉じ込め、残り（redaction・TOML subset・scan 結果の整形・plan）は portable。
+`plan!` は書き込みを**データとして返し**、`server.clj` が transact する ——
+store を知ることは JVM の store に縛られることだから。パスを
+`java.io.File` ではなく文字列にしたのが seam が小さく済んだ主因。
+
+これは `route-scan` が自分について書いていること（*text in, data out。読み書きは
+呼び出し側の仕事*）そのものであり、`policy.cljc` / `policy.kotoba` が既に取って
+いる形でもある。`onboarding.kotoba` は同じ対で、gate を**添字**として native に
+述べる（emitter の subset が整数と算術であり、境界が依存するのは step の名前
+ではなく gate に対する位置だから）。
+
+**`.kotoba` はこの repo の build ではコンパイルされない**（emitter が載っていない）。
+そこで suite は黙って腐りうる部分だけを検査する —— 2 つの定数と step 表の一致。
+gate より前に step を挿して `gate-index` を放置すると、native 側は
+「権限を持つ step が未認証で書ける」と答えてしまう。この assertion は
+**定数をわざとずらして落ちることを確認してから**着地させた。
+
+suite は `.cljc` で両 runtime を走る。ClojureScript 側の入口は
+`dev/nbb_test.cljs`。exit code を `run-tests` の戻り値ではなく
+`:end-run-tests` report hook から取っているのは、**nbb では `run-tests` が nil を
+返す**ため —— JVM の書き方をした runner は FAIL を印字して exit 0 した（実測）。
+runner が無いより悪い。
 
 ## Consequences
 
@@ -156,11 +193,15 @@ loopback port はこのマシンの全プロセスから届く。
 
 このセッションで実測したもの:
 
-- clj-kondo: errors 0 / warnings 10（upstream の baseline と同一）
-- `core-test` + `commands-test` + 新規 2 suite: 65 tests / 397 assertions /
-  0 errors。唯一の failure（`core-test` の `workspace-adapters-…`）は
-  **無改変の upstream tree でもこのコンテナで同一に再現**する charset 由来の
-  環境要因で、この変更とは無関係であることを確認済み。
+- **nbb（ClojureScript、第一 runtime）**: `nbb --classpath src:test dev/nbb_test.cljs`
+  で 25 tests / 106 assertions / 0 failures。exit code が green で 0・red で 1 に
+  なることを、assertion をわざと壊して確認済み。
+- **JVM（互換）**: 同じ 2 suite + `core-test` + `commands-test` で
+  71 tests / 421 assertions / 0 errors。唯一の failure（`core-test` の
+  `workspace-adapters-…`）は**無改変の upstream tree でもこのコンテナで同一に
+  再現**する charset 由来の環境要因で、この変更とは無関係。
+- clj-kondo: errors 0 / warnings 10（upstream の baseline と同一、新規ファイルに
+  警告なし）。
 - `dev/gen_commands.cljs --check`: commands.edn は current。
 - `node --check` で interaction.js の syntax。
 - app-css が jp-go-dds に存在しない token を参照していないこと（`core-test` の
@@ -169,5 +210,6 @@ loopback port はこのマシンの全プロセスから届く。
 **このコンテナで検証できていないもの（正直に）**: full suite は動かない ——
 `kotoba-lang/org-ietf-pop3` が private で clone できず、`mail-projects-test` は
 不在の外部バイナリを exec する。`mail-pop3` はローカル stub に対して compile
-したので、その test はここでは無意味であり実行していない。ブラウザでの
-first run の実挙動（WebAuthn ceremony を含む）も未実測 —— macOS の実機が要る。"}]
+したので、その test はここでは無意味であり実行していない。**`onboarding.kotoba` は
+コンパイルしていない**（emitter が載っていない）。ブラウザでの first run の実挙動
+（WebAuthn ceremony を含む）も未実測 —— macOS の実機が要る。"}]
