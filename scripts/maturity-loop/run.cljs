@@ -125,12 +125,26 @@
     (guarded ["npm" "install" "--silent"] dir))
   (guarded (vec cmd) dir))
 
+(defn- green?*
+  "suite が緑か。**終了コードが第一の根拠**で、マーカーはその裏取り。
+
+   マーカーの文字列一致だけで判定すると、**失敗メッセージが README や quickstart を
+   丸ごと吐き、その本文が緑マーカーを引用している**場合に、赤い実行を緑と読む。
+   実測（2026-08-09、marine-insurance）: 20 mutation のうち 3 つがこれで
+   『噛まない』と誤報された —— どれも `(is (str/includes? readme ...))` 形の
+   assertion で、README が手順として `... actor: all green` を引用していた。
+
+   **『不変条件を誰も守っていない』という最も行動を促す報告が偽陽性になる**ので、
+   ここは出力の見た目ではなくプロセスの終了コードを信じる。"
+  [out code green-marker]
+  (and (zero? code) (str/includes? out green-marker)))
+
 (defn- bites?
-  "mutation が本当に噛んだか。緑マーカーが消えたことに加え、`:must-fail` に
+  "mutation が本当に噛んだか。緑でなくなったことに加え、`:must-fail` に
   挙げたテスト名が実際に出力に現れることまで見る —— 別の理由で赤くなったのを
   「噛んだ」と読むのが、この種の道具の一番ありがちな嘘だから。"
-  [out green-marker must-fail]
-  (let [green? (str/includes? out green-marker)
+  [out code green-marker must-fail]
+  (let [green? (green?* out code green-marker)
         named (remove #(str/includes? out %) must-fail)]
     {:bit? (and (not green?) (empty? named))
      :still-green? green?
@@ -160,7 +174,7 @@
                 {:errors 1})
             (try
               (let [base (run-suite dir suite)]
-                (if-not (str/includes? (:out base) green-marker)
+                (if-not (green?* (:out base) (:code base) green-marker)
                   (do (println (str "   FAIL: pin " (subs sha 0 8) " で suite が緑にならない"))
                       (println (str "         " (last (remove str/blank? (str/split-lines (:out base))))))
                       {:errors 1})
@@ -173,7 +187,7 @@
                            (do (println (str "   BUG  " id " — " (:reason applied)))
                                (update acc :errors inc))
                            (let [r (run-suite dir suite)
-                                 v (bites? (:out r) green-marker must-fail)]
+                                 v (bites? (:out r) (:code r) green-marker must-fail)]
                              (fs/writeFileSync (:path applied) (:original applied))
                              (if (:bit? v)
                                (do (println (str "   噛む " id))

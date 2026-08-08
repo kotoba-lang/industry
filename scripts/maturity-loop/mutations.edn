@@ -673,4 +673,162 @@
      :find "  \"did:web:m365-ingest.etzhayyim.com\")"
      :replace "  \"did:web:m365-ingest.cloud-itonami.example\")"
      :must-fail ["the-readme-names-both-dids-and-says-which-one-resolves"
-                 "every-identity-claim-names-the-value-its-source-file-actually-holds"]}]}]}
+                 "every-identity-claim-names-the-value-its-source-file-actually-holds"]}]}
+
+  {:repo "orgs/cloud-itonami/marine-insurance"
+   :label "marine-insurance actor —— deny-by-default gate・descriptor 本体・文書の腐り"
+   ;; 5 兄弟目。m365-ingest / jp-ashiba と同型の descriptor snapshot で、
+   ;; **west の pin が rescue commit の 2 つ手前で止まっていたのも同じ** ——
+   ;; これで 3 例目。axis-substrate=0 は「コードが無い」ではなく「pin が古い」だった。
+   ;;
+   ;; この repo 固有の形が 2 つある:
+   ;;   - **走らないテストが嘘をついていた。** `actor-manifest.test.ts` は pipeline を
+   ;;     8 と主張していたが実体は 10。package.json も vitest も無いので一度も
+   ;;     走っていない。消さずに数だけ直し、**走る側（nbb）から数を縛った**ので、
+   ;;     その縛りが外れたら赤くなることを撃って確かめる。
+   ;;   - **文書 guard の最初の版は 3 つ素通りした。** bare な数の一致・`includes?`
+   ;;     の部分一致・DID の接頭辞一致。いずれも「正しい記述が別の行に残っていると
+   ;;     壊れた行を見逃す」形。強化後の版を撃ち続けるために全部ここに載せる。
+   :cmd ["nbb" "--classpath" "src:test" "run_tests.cljs"]
+   :green-marker "marine-insurance actor: all green"
+   ;; 全て 2026-08-09 に実際に赤くなるところを見た（20/20）。
+   :mutations
+   [{:id :marine-insurance/gate-value-checks-presence-not-value
+     :why "`contains?` で実装すると `{:no-probing-baseline false}` が『attest 済み』になる。false は『測ったうえで満たしていない』という最も強い否定なのに、キーが在るだけで通る"
+     :file "src/marine_insurance/murakumo.cljc"
+     :find "  (or (get attestations gate)\n      (get attestations (name gate))"
+     :replace "  (or (contains? attestations gate)\n      (get attestations (name gate))"
+     :must-fail ["an-attestation-that-is-explicitly-false-does-not-count-as-attested"]}
+
+    {:id :marine-insurance/required-gates-become-or-instead-of-and
+     :why "7 本の gate は AND。`every?`/`some` の取り違えで OR になると 1 本でも attest されていれば全部通る。無 attest では依然 blocked なので、素朴な検査は緑のまま素通りする"
+     :file "src/marine_insurance/murakumo.cljc"
+     :find "       (remove #(boolean (gate-value attestations %)))\n       vec))"
+     :replace "       (remove (fn [_] (some #(boolean (gate-value attestations %)) (:required-gates spec))))\n       vec))"
+     :must-fail ["removing-any-single-required-gate-blocks-the-plan"]}
+
+    {:id :marine-insurance/blocked-plans-still-carry-records
+     :why "『plan は作るが実行しない』形にすると blocked でも計算済み record が手前に置かれる。:effects だけ見て安心した呼び出し側が :records を拾って書ける —— gate を通っていない書き込みが gate の出力から作れてしまう"
+     :file "src/marine_insurance/murakumo.cljc"
+     :find "         {:status :blocked\n          :effects []}"
+     :replace "         {:status :blocked\n          :records (vec (records-for spec input))\n          :effects []}"
+     :must-fail ["blocked-plans-do-not-carry-records"]}
+
+    {:id :marine-insurance/effects-stop-being-attributed-to-this-actor
+     :why "effect の :actor が他人になると、この gate を通った書き込みが別 actor の名前で台帳に載る"
+     :file "src/marine_insurance/murakumo.cljc"
+     :find "   :actor actor-did\n   :collection collection"
+     :replace "   :actor \"did:web:someone-else.example\"\n   :collection collection"
+     :must-fail ["effects-are-attributed-to-this-actor"]}
+
+    {:id :marine-insurance/unknown-cell-plans-silently
+     :why "未知の cell が throw をやめて静かに nil を返すと、typo した cell 名が『何も書かなかった』ではなく『書いたつもりで書いていない』になる"
+     :file "src/marine_insurance/murakumo.cljc"
+     :find "    (when-not spec\n      (throw (ex-info \"unknown cell\" {:cell cell-key})))"
+     :replace "    (when-not spec\n      nil)"
+     :must-fail ["unknown-cells-throw-rather-than-plan-nothing"]}
+
+    {:id :marine-insurance/safe-rkey-keeps-path-separators
+     :why "rkey に `/` や `:` が残ると、record の宛先が別 collection へ逸れうる"
+     :file "src/marine_insurance/murakumo.cljc"
+     :find "                  (str/replace #\"[^A-Za-z0-9._~-]\" \"-\"))"
+     :replace "                  (str/replace #\"[^A-Za-z0-9._~/:-]\" \"-\"))"
+     :must-fail ["safe-rkey-does-not-emit-path-separators-or-blanks"]}
+
+    {:id :marine-insurance/substrate-lexicon-aligned-to-the-manifest
+     :why "**『直す』方向の mutation。** substrate の prefix を manifest（com.etzhayyim.apps.marineInsurance.）に合わせると割れが解消したように見えるが、配信されている DID document の _meta.primaryLexicon は com.etzhayyim.marine-insurance なので**権威から離れる**。揃える先を間違えたことに気づけるか"
+     :file "src/marine_insurance/murakumo.cljc"
+     :find "  (str \"com.etzhayyim.marine-insurance.\" name))"
+     :replace "  (str \"com.etzhayyim.apps.marineInsurance.\" name))"
+     :must-fail ["the-lexicon-split-is-still-total"]}
+
+    {:id :marine-insurance/actor-did-quietly-fixed-to-the-resolving-one
+     :why "**これも『直す』方向。** substrate だけ解決する DID に替えると、manifest と .ts は古いまま残り、割れが『半分だけ直った』状態になる。割れの記録が飾りになっていないかを撃つ"
+     :file "src/marine_insurance/murakumo.cljc"
+     :find "(def actor-did\n  \"did:web:marine-insurance.etzhayyim.com\")"
+     :replace "(def actor-did\n  \"did:web:etzhayyim.com:actor:marine-insurance\")"
+     :must-fail ["the-substrate-names-the-did-that-does-not-resolve"]}
+
+    {:id :marine-insurance/readme-number-goes-stale
+     :why "**最初の版はここが素通りした。** README の別の行に正しい『pipeline 10』が残っていると、bare な `\\b10\\b` 検索が当たってしまい、書き換えられた 8 を隠す。隣接する数の**集合**を突き合わせる形に強化してある"
+     :file "README.md"
+     :find "10 pipeline（cron 2 / subscribeRepos 1 / xrpc 7）"
+     :replace "8 pipeline（cron 2 / subscribeRepos 1 / xrpc 5）"
+     :must-fail ["the-numbers-in-the-readme-match-the-census"]}
+
+    {:id :marine-insurance/quickstart-tells-you-to-run-vitest
+     :why "`actor-manifest.test.ts` は package.json も vitest も無いので走らない。走らせろと書いた瞬間、それは**踏めない手順**になる"
+     :file "docs/operator-quickstart.md"
+     :find "## 5. gate を手で撃ってみる（任意・5 秒）"
+     :replace "## 4.5 まず npx vitest run で manifest を検査する\n\n## 5. gate を手で撃ってみる（任意・5 秒）"
+     :must-fail ["the-docs-do-not-tell-the-operator-to-run-something-that-cannot-run"]}
+
+    {:id :marine-insurance/quickstart-classpath-drifts
+     :why "**これも最初の版が素通りした。** step 2 の classpath を `src:tests` に壊しても、step 3 に正しい行が残っているので `includes?` は真のまま。出てくる**すべての** classpath の実在を見る形に強化した"
+     :file "docs/operator-quickstart.md"
+     :find "nbb --classpath src:test run_tests.cljs\n```\n\n最後の 3 行がこうなれば緑:"
+     :replace "nbb --classpath src:tests run_tests.cljs\n```\n\n最後の 3 行がこうなれば緑:"
+     :must-fail ["every-nbb-classpath-in-the-docs-points-at-real-directories"]}
+
+    {:id :marine-insurance/readme-swaps-a-did-for-a-lookalike
+     :why "**3 つ目の素通り。** DID を `…marine-insurance-x` に替えても `str/includes?` は接頭辞に当たって緑のまま。語境界で切る形に強化した"
+     :file "README.md"
+     :find "`did:web:etzhayyim.com:actor:marine-insurance`（解決する方"
+     :replace "`did:web:etzhayyim.com:actor:marine-insurance-x`（解決する方"
+     :must-fail ["the-readme-carries-both-dids-and-says-which-one-resolves"]}
+
+    {:id :marine-insurance/readme-link-goes-dead
+     :why "死んだリンクは『踏めない手順』の一番よくある形"
+     :file "README.md"
+     :find "[docs/operator-quickstart.md](docs/operator-quickstart.md)"
+     :replace "[docs/operator-quickstart.md](docs/operator-quickstart-v2.md)"
+     :must-fail ["every-relative-link-in-the-docs-resolves"]}
+
+    {:id :marine-insurance/green-marker-drifts-from-the-docs
+     :why "「これが出れば緑」と書いた文字列が runner の出す文字列と違うと、operator は緑を確認できない"
+     :file "run_tests.cljs"
+     :find "  \"marine-insurance actor: all green\")"
+     :replace "  \"marine-insurance actor: ALL GREEN\")"
+     :must-fail ["the-green-marker-in-the-docs-is-the-runner-s-marker"]}
+
+    {:id :marine-insurance/readme-stops-naming-what-it-is
+     :why "名前が機能を示さない repo は README 冒頭で名乗る（superproject CLAUDE.md）。『海上保険 actor』とだけ書くと、実装なのか宣言だけなのかが再び読めなくなる"
+     :file "README.md"
+     :find "**海上保険 actor の *descriptor* と、その書き込みを止める *deny-by-default gate*。\n保険の引受・査定・支払いそのものは、ここには無い。実装ではない。**"
+     :replace "**海上保険 actor。**"
+     :must-fail ["readme-names-what-this-repo-is-in-its-opening"]}
+
+    {:id :marine-insurance/the-unrunnable-vitest-drifts-again
+     :why "**この repo の元の事故そのもの。** 走らない .ts の数が実体から離れても誰も気づかなかった。走る側から縛った、その縛りが効いているかを撃つ"
+     :file "actor-manifest.test.ts"
+     :find "expect(m.pipelines).toHaveLength(10)"
+     :replace "expect(m.pipelines).toHaveLength(8)"
+     :must-fail ["the-checked-in-vitest-no-longer-asserts-a-falsehood"]}
+
+    {:id :marine-insurance/pipeline-census-pin-goes-stale
+     :why "census は**両方向に**落ちること。pipeline が増えても減っても赤"
+     :file "docs/identity-claims.edn"
+     :find "{:pipelines 10"
+     :replace "{:pipelines 9"
+     :must-fail ["pipeline-census-matches-the-manifest"]}
+
+    {:id :marine-insurance/over-grant-pin-goes-stale
+     :why "capability は宣言 5 / 使用 4 で、agent.invoke が過剰付与。この gap 記録が飾りにならないよう、数が動いたら赤くする"
+     :file "docs/identity-claims.edn"
+     :find "  :capabilities-used 4"
+     :replace "  :capabilities-used 5"
+     :must-fail ["steps-never-call-an-undeclared-capability"]}
+
+    {:id :marine-insurance/migration-todo-filled-in-without-doing-the-work
+     :why "codemod 6 項目は全部未着手。**作業せずにチェックを埋めると赤くなる** —— 埋めたなら測り直すのが筋"
+     :file "MIGRATION-TODO.md"
+     :find "- [ ] Remove 3rd-party ad / GA4 / Meta Pixel."
+     :replace "- [x] Remove 3rd-party ad / GA4 / Meta Pixel."
+     :must-fail ["migration-todo-is-still-untouched"]}
+
+    {:id :marine-insurance/adr-link-target-removed
+     :why "ADR-0001 は『descriptor であって executor ではない』という境界の決定。README から参照が消えると、断り書きが根拠を失う"
+     :file "README.md"
+     :find "[docs/adr/0001-descriptor-snapshot-not-an-executor.md](docs/adr/0001-descriptor-snapshot-not-an-executor.md)"
+     :replace "docs/adr/0001-gone.md"
+     :must-fail ["the-adr-exists-and-is-linked"]}]}]}
