@@ -143,6 +143,35 @@ clojure -M:test 2>&1 | grep -E "^(FAIL|ERROR) in" | sort > /tmp/after.txt
 diff /tmp/base.txt /tmp/after.txt   # base は origin/main の worktree で同じものを取る
 ```
 
+### 4b. **`clojure -M:test` は edge Worker 側を compile しない**（2026-08-08 実測）
+
+`src/cloud_itonami/edge/os_endpoints.cljc` は cljs ビルド（`:os-api`）でしか
+compile されないので、**そこに書いた require の抜けはテストが green のまま通る。**
+
+実測 2026-08-08: 4520-carwash を接続したとき `native-adapter` の case 節だけ足して
+`require` を忘れた。`clojure -M:test` は 1,532 tests すべて green で、
+**欠陥は main に merge された**。`cloud-itonami.edge.os-endpoints` を load すると
+`Unable to resolve symbol: carwashops/vertical` で落ちる。
+
+**だから接続のたびに、テストとは別にこれを回す:**
+
+```bash
+# 本命: os-api の cljs ビルド（resource-guard 経由が repo-wide の規約）
+node ~/github/com-junkawasaki/scripts/resource-guard.mjs run build -- \
+  npx shadow-cljs release os-api
+
+# guard が他セッションで埋まっているとき（exit 2）の代替。これでも require 抜けは捕まる
+nbb --classpath "<sites.edn のこの vertical の classpath>" \
+  -e '(require (quote [cloud-itonami.edge.os-endpoints])) (println "LOAD OK")'
+```
+
+`shadow-cljs release worker` ではない —— **`:worker` という build id は存在しない**
+（`shadow-cljs.edn` の build は `:os-api` `:edge-api` `:sites-api` 等）。存在しない
+id を指定すると `no build with id` で落ち、それを「ビルドが壊れている」と誤読しやすい。
+
+**この検査を飛ばしてよい反復は無い。** 接続作業は必ず `os_endpoints.cljc` を触るので、
+毎回 require が 1 本増える。
+
 ### 5. 着地（rebase も force-push もしない）
 
 ```bash

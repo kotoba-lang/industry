@@ -130,6 +130,12 @@
     ;; --- 経路1: git push で west.yml が origin/main と異なる ------------------
     (when (re-find (re-pattern (str "git\\s+(?:-C\\s+(?:" path-tok-src ")\\s+)?push\\b")) cmd)
       (when (str/includes? cmd "--dry-run") (allow!))
+      ;; ref の削除は内容を運ばないので検証する candidate が無い。ここを除外
+      ;; しないと、下の HEAD vs origin/main 比較が「今の checkout がたまたま
+      ;; どうなっているか」を測ってしまう。実測 2026-08-08: merge 済み branch を
+      ;; origin/main より遅れた checkout から削除しようとして、コマンドと何の
+      ;; 関係も無い pin 7 件を退行として報告し deny した。
+      (when (policy/deletion-push? cmd) (allow!))
       (let [cdir (some-> (re-find (re-pattern (str "git\\s+-C\\s+(" path-tok-src ")")) cmd)
                          second strip-quotes)
             cd   (some-> (re-find (re-pattern (str "cd\\s+(" path-tok-src ")")) cmd)

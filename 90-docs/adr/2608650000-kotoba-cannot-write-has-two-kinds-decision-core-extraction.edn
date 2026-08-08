@@ -263,8 +263,109 @@ native backend を引用していた。
   `22c1569c`。ADR 0221 の 33/33 を手元で再現するには先に
   `west update --fetch smart kotoba-native` が要る。
 
-## 次
+## 実施結果（2026-08-08、この ADR と同日に着地）
 
-`policy` を最初のスライスにする（決定核が既に在り、22 行で、依存が無い）。
-parity test → mirror 解消 → `kotoba compile --target x86_64-kotoba-v1` の実測。
-通れば `fleet_core` / `organism_worker` が同じ型紙で続く。"}]
+決定核 3 本を `cloud-itonami/cloud-itonami-app` の main に着地させた
+（merge `c5cec975`、west pin も同 SHA へ前進 = superproject `e10d13e4`）。
+
+| スライス | 決定核 | parity の網 |
+|---|---|---|
+| `policy.kotoba` | `loopback-host?` / `provider-allowed?` | 4 boolean 全 16 通り + host 9 種 |
+| `fleet_core.kotoba` | `catalog-schema-ok?` / `callable?` / `probeable?` / `isic-of` | ISIC 3 フィールド全 8 通り + address 4 通り |
+| `organism_worker.kotoba` | `required-value-present?` / `rejection-reason` | 拒否理由 16 シナリオ |
+
+3 本とも **wasm32 / js / x86_64 / aarch64 の 4 ターゲットで compile する**。
+`[:option :string]` の record フィールドと結果、`:keyword` 結果、record パラメータを
+含む。app suite は **1256 tests / 5347 assertions、0 failures 0 errors**
+（着地前の origin/main は 1220 / 5078）。parity 3 namespace は 20 tests / 95 assertions。
+
+`throw` は 3 本とも cljc 側に残した。**したがって「`ex-info` → Result」への恒久移行は
+まだ起きていない** —— 核が例外を持たないだけで、アプリの error contract は無変更。
+それが必要になるのは cljc を核で「置き換える」段階で、成果物経路が無い今は到達できない。
+
+## 実施して分かったこと（この ADR の決定を実際に使った結果）
+
+### gate は「落ちること」を確かめないと本当に theatre になる
+
+**organism-worker の parity gate は最初 theatre だった。** cljc の `cond` で期限切れ
+判定を capability 判定より前に実際に動かしたのに、**20 tests / 93 assertions が
+0 failures で通った**。シナリオ表に「capability 拒否と期限切れが同時に成立する行」が
+無く、その順序対だけ無検査だった。
+
+一般化: **N 段の `cond` の順序を縛るには、隣接する順序対それぞれに 1 行が要る。**
+足りない対は静かに無検査になり、しかもテスト件数は増えているので気付けない。
+CLAUDE.md の「gate は落ちることを確かめてから landed とする」が、prose ではなく
+手順として要る理由の実例。
+
+### 測っていない自己制限を書いてしまう
+
+最初の `policy.kotoba` は `and`/`or` を「native では使えない」と決めつけて 4 段の
+`if` 入れ子で書いていた。**測ったら両 ISA で通った。** ヘッダに「自己制限を足す前に
+`:x86_64-kotoba-v1` で compile しろ」と書いた。
+
+ただし **`and`/`or` は `:bool` ではなく `:i64` を返す**ので、`:bool` 宣言の関数では
+`(if … true false)` で畳む必要がある（`expression type mismatch: expected bool, got
+i64`）。これは CLAUDE.md が `kotoba-lang/css` 移植で既に記録していた罠と同じもので、
+**記録されている罠でも、読んでいなければもう一度踏む。**
+
+### compiler pin を上げると共有 dep が黙って降格する
+
+app の `:test` alias で compiler を west pin（`4c9650ee`）へ上げたところ、compiler が
+連れてくる古い `io-multiformats`（`b3b157e6`）が app 自身の `dc520032` を置き換え、
+`mf/sha384` が消えて `org-w3-rdf-canon` が **load 不能**になり、**suite 全体が
+1 assertion も走らずに死んだ**。`:override-deps` で app 自身の pin に固定して塞いだ。
+
+**これは予行演習でしかない** —— app の `src` が `.kotoba` を使うようになれば main deps
+でも compiler を上げる必要があり、同じ降格が本番側で再現する。
+
+### app が transitive に持っていた compiler は profile-4 世代だった
+
+`kotoba` v0.6.29 が連れてくる compiler は `94f29b24` で、`:schemas` を ns 節で拒否し
+（`only a bounded :export vector is admitted`）、entryless library を kotoba-script
+web target 以外で拒否し、`string=?` が i64 を返すため `:bool` 結果が型不一致になる。
+**決定核はこの pin では 1 本も表現できない。** murakumo と同じく test-only で上げた。
+
+## 副次的に直したもの
+
+`.claude/hooks/west-pin-verify-guard.cljs` が **ref の削除でも pin 検証を走らせていた**。
+`git push origin --delete <branch>` には candidate の west.yml が無いので、guard は
+「今の checkout がたまたまどうなっているか」を測り、コマンドと無関係な pin 7 件を
+退行として報告して deny した。`deletion-push?` を policy 側に足して除外
+（policy テスト 6 → 19 cases、superproject main `f4f3ffa4`）。
+
+## 残る gap（優先順）
+
+1. **成果物経路が無い（最優先）。** `.kotoba` は parity test がメモリ上で compile する
+   だけで、artifact を作る経路も配る経路も無い。「native-ready」であって「native で
+   動いている」ではない。**決定核を 4 本目 5 本目と増やしても、増えるのは parity test
+   だけ** —— ここを開けるまで横に広げる価値は薄い。
+2. **capability kit 8 本すべて `:native-aot :pending`。** effect を持つコードは native に
+   1 行も載らない。これが最大の天井で、上流の仕事。
+3. **bare `:bool` パラメータ**（`kotoba-verifier` の追随待ち）。閉じれば
+   `provider-allowed?` の record は要らなくなる。
+4. **残る cljc 3 本は自分で解けない依存を持つ** —— `work_governance`（`yakuwari` が
+   `.cljc`）/ `route_scan`（正規表現、設計変更が先）/ `view`（`jp-go-dds` が `.cljc`）。
+5. **`compiler/docs/native-aot-baseline.md` は ADR 0063 で停止したまま**（未修正）。
+   この ADR は「引用するな」と書いたが、upstream の文書自体は直していない。
+6. **`io-multiformats` の降格は `:test` alias でしか塞いでいない**（上記）。
+7. `organism-worker` の parity test は map → 述語の導出を**テスト側に書いている**。
+   cljc と突き合わせているので誤った導出は失敗として出るが、アプリが同じ導出をする
+   保証ではない。アプリが核を呼ぶようになったら、その呼び出し側が導出を持つべき。
+
+## resume point
+
+次の具体的な一手は **gap 1**。決定核 3 本を build 時に compile して成果物を置き、
+その存在と digest を gate する。capability kit の `:native-aot :pending` を待たずにできる。
+
+```bash
+# 現在地の確認（決定核が 4 ターゲットで通ることの再現）
+cd orgs/cloud-itonami/cloud-itonami-app
+clojure -A:test -Spath > /tmp/cp.txt
+java -cp \"$(cat /tmp/cp.txt)\" clojure.main -e \\
+  \"(require '[kotoba.compiler.core :as c]) \\
+   (doseq [f [\\\"src/cloud/itonami/app/policy.kotoba\\\" \\
+              \\\"src/cloud/itonami/app/fleet_core.kotoba\\\" \\
+              \\\"src/cloud/itonami/app/organism_worker.kotoba\\\"] \\
+           t [:wasm32-kotoba-v1 :x86_64-kotoba-v1 :aarch64-kotoba-v1]] \\
+     (println f t (some? (:kir (c/compile-source (slurp f) t {})))))\"
+```"}]
