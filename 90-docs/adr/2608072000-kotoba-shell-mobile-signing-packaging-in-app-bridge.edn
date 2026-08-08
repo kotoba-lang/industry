@@ -6,8 +6,8 @@
   :adr/title "ADR-2608072000: kotoba-shell に署名・release packaging・アプリ内 provider bridge を入れ、iOS/Android を「ビルドできる」から「配れる」へ動かした"
   :adr/status "accepted"
   :adr/date "2026-08-07"
-  :adr/last-verified "2026-08-07"
-  :adr/last_verified "2026-08-07"
+  :adr/last-verified "2026-08-08"
+  :adr/last_verified "2026-08-08"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/source-format "edn"
@@ -22,7 +22,8 @@
   :adr/body "
 # ADR-2608072000: shell の mobile 配布経路
 
-**Status**: accepted / **Date**: 2026-08-07 / **pin**: kotoba-lang/shell `7261caa`
+**Status**: accepted / **Date**: 2026-08-07 / **last verified**: 2026-08-08
+**pin**: kotoba-lang/shell `fae4ee4`（west.yml、superproject main 上で一致確認済み）
 
 ## 出発点（実測した現在地）
 
@@ -70,8 +71,8 @@ bridge を入れると policy 評価器が CLI と native の2つになる。**�
 読めなければ**全拒否**（packaging 事故は fail closed）。
 
 一致は信用でなくテストで押さえる（全 command について3者の判定を突き合わせ）。
-superproject 側には fleet-ci gate
-`shell-native-bridge-parity` を置いた（gates.edn、`:nbb-script`）。
+superproject 側には fleet-ci gate `shell-native-bridge-parity` を置いた
+（`scripts/fleet-ci/gates.edn`、`:nbb-script`）。
 
 ### bridge に載せるのは portable な 10 command だけ
 
@@ -89,12 +90,13 @@ superproject 側には fleet-ci gate
 | iOS packaging | device `.ipa`、`iOS Team Provisioning Profile` 埋め込み |
 | Android packaging | `.aab` を `jarsigner -verify` が verified と報告 |
 | 拒否経路 | `team-id-required` / `keystore-required`、step 実行数 0 |
-| suite | 71 tests / 536 assertions、clj-kondo 0 |
+| **実プロダクト**（`local-manimani` の `web/dist`、shadow-cljs 出力） | **iOS Simulator で実 UI が描画**（ヘッダー・マスコット・project カード・CALENDAR・7 タブのタブバー、日本語込み） |
+| suite | 72 tests / 541 assertions、clj-kondo 0 |
 
 **未検証: 実際のアップロード。** App Store Connect の審査も Play track も通して
 いない。`store request` / `release submit` は実行可能だが実績が無い。
 
-## 途中で見つかった既存バグ（2件とも landed）
+## 途中で見つかった既存バグ（3件とも landed）
 
 - **`policy-decision` が `http/fetch` と `notify/show` で例外を投げていた。**
   token を `#{command capability \"*\"}` という set literal で作っており、
@@ -106,15 +108,33 @@ superproject 側には fleet-ci gate
   人間のタップ待ちでブロックし、結果がタップの速さに依存**していた。起動時に1回
   だけ要求し、provider は結果を読むだけにした（Android の MainActivity が同じ
   理由で startup に要求しているのと揃えた）。
+- **scaffold したアプリが自分の名前を名乗らなかった**（2026-08-08、`fae4ee4`）。
+  Info.plist が `CFBundleName` を設定せず `$(PRODUCT_NAME)` にフォールバックする
+  ため、`:ios/product-name` 未設定の consumer では shell 自身の既定
+  `KotobaShell` になる。実測: local-manimani の実バンドルはアプリ内では
+  「manimani」と表示しながら、**ホーム画面と権限シートでは「KotobaShell」と
+  名乗っていた**。`app run` は直前の 2 commit で macOS の Dock / メニューバー
+  向けにこれを直していたが、**scaffold 経路は直っていなかった**（Android は
+  `android:label` が最初から `:app/name` を使っていて正しかった）。
+  `CFBundleName` / `CFBundleDisplayName` を `:app/name` から設定する。
+  - **既知の観測上の注意**: 同一デバイスで先に古い名前で認可要求を出していると、
+    **権限シートの表示名は `usernotificationd` のデバイス単位キャッシュのまま**
+    変わらない。plist 側の問題ではない。ホーム画面ラベルは即座に反映される
+    （そちらで確認した）。
 
-## 訂正した README の記述
+## 訂正した記述
 
-**「Android の WebView は WebChromeClient 無しで JS console を logcat に出す、
-WKWebView より観測性が良い」は誤り。** WebView 113.0.5672.136 で測り直したところ
-`[INFO:CONSOLE]` は1行も出ず、bridge の smoke をデバッグする1パスを消費した。
-scaffold は `WebChromeClient` を入れて tag `kotoba-shell` に転送するように
-した（**debuggable ビルドのみ** — release アプリがページの console 出力を
-他アプリから読めるログに書くべきではない）。
+- **「Android の WebView は WebChromeClient 無しで JS console を logcat に出す、
+  WKWebView より観測性が良い」は誤り**（shell README）。WebView 113.0.5672.136 で
+  測り直したところ `[INFO:CONSOLE]` は1行も出ず、bridge の smoke をデバッグする
+  1パスを消費した。scaffold は `WebChromeClient` を入れて tag `kotoba-shell` に
+  転送する（**debuggable ビルドのみ** — release アプリがページの console 出力を
+  他アプリから読めるログに書くべきではない）。
+- **shell README が local-manimani 側の未解決バグとして名指ししていた
+  `Could not find namespace kotoba-ui.theme.` は、現在のツリーに参照が1件も無い**
+  （2026-08-08 実測）。バンドルが scittle（`cljs/public`、CDN 読み込み）から
+  shadow-cljs（`web/dist`、`js/main.js`）へ移っており、README の記述は当時の
+  もの。**直すべきバグは存在しなかった** —— README 側は未訂正（follow-up）。
 
 ## Android の origin を変えた
 
@@ -134,15 +154,43 @@ loopback server（`clojure -M:server`、port 1338、ADR-2607313000 の常駐 ins
 `kotoba.shell.client` から native capability に届く。cloud-itonami-app を載せたい
 なら、server 側を別ランタイムへ移すか、リモートに寄せるかの決定が別途要る。
 
-## 残っている gap
+**同じ形の問題を local-manimani で実測した**（2026-08-08）: iOS で実 UI は
+描画されたが、画面に `TypeError: Load failed` が出る —— アプリがローカル API を
+fetch しようとして、端末上にそのサーバが無い。**local-first なアプリを端末に
+載せると、バンドルは載るがサーバは載らない**という構図がそのまま現れている。
+これは local-manimani 側の設計判断（サーバをどこに置くか）であり、ここでは
+触っていない。
 
-- **実アップロード未実施**（審査 track を通していない）。
-- **iOS の `notify/show` の authorized 経路が headless で検証できない** —
-  `xcrun simctl privacy` に notifications service が無い。Android では
-  `pm grant` で検証済み。
-- **Windows は scaffold のみ**（従来どおり）。
-- **fleet gate が見ているのは対称性だけ** — 実 xcodebuild/gradle と実機起動を
-  fleet に移すには node に Xcode と Android SDK が要る。
-- **shell の GitHub Actions は 2026-08-04 以降 inert**（ADR-2607300900）。
-  それ以降の commit は手で検証している。
+## 残っている gap（優先順）
+
+1. **local-first アプリのサーバ配置**が未決定。cloud-itonami-app と
+   local-manimani が同じ壁に当たっている（上記）。ここが決まらないと、
+   「モバイルで動く」は「UI が描画される」止まりになる。
+2. **実アップロード未実施**（App Store Connect / Play の審査 track を通していない）。
+3. **local-manimani の実バンドルは Android 未検証** —— bridge 自体は fixture で
+   Android 実機検証済みだが、実 UI の描画確認は iOS のみ。
+4. **iOS の `notify/show` の authorized 経路が headless で検証できない** —
+   `xcrun simctl privacy` に notifications service が無い。Android では
+   `pm grant` で検証済み。
+5. **fleet gate が見ているのは対称性だけ** — 実 xcodebuild/gradle と実機起動を
+   fleet に移すには node に Xcode と Android SDK が要る。
+6. **Windows は scaffold のみ**（従来どおり）。
+7. **shell README の local-manimani バグ記述が古い**（上記「訂正した記述」）。
+8. **shell の GitHub Actions は 2026-08-04 以降 inert**（ADR-2607300900）。
+   それ以降の commit は手で検証している。
+
+## 次に着手するときの起点
+
+```bash
+# shell CLI を superproject 外の worktree に出す（共有 checkout は別セッションが使う）
+git -C orgs/kotoba-lang/shell worktree add --detach /tmp/shell-cli origin/main
+# test alias は ../../etzhayyim/tamaki を :local/root で引くので west と同じ相対配置が要る
+#   <X>/orgs/kotoba-lang/shell と <X>/orgs/etzhayyim/tamaki（dom-gpu / browser / aiueos /
+#   kototama / kotobase / hil も symlink すれば ui check / e2e stack まで通る）
+clojure -M:test    # 72 tests / 541 assertions
+# bridge の実機 smoke
+./bin/kotoba-shell app scaffold --target ios --web-dist-dir test/web/bridge-smoke ...
+# Android は JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home が要る
+#   （AGP 8.5.0 は JDK 24 だと androidJdkImage 変換で落ちる）
+```
 "}]
