@@ -1,0 +1,34 @@
+;; columnar lake manifest の projection contract（ADR-2608070400 D8 / ADR-2608039700）。
+;;
+;; **loader は :canonical-edn-v1 のまま** —— allowlist を広げていない。射影するのは
+;; lake の manifest（列と chunk のメタデータ + zone map）で、chunk の値ではないため。
+;; 値は 90-docs/lake/itonami-maturity/ に EDN として置き、manifest から
+;; :lake/sha256 で参照する（ADR-2608039970「分けるのは bytes」）。
+;;
+;; manifest 自体の再生成:
+;;   nbb --classpath ".:scripts/nbb_compat" scripts/gen-lake-manifest.cljs \
+;;     --input 90-docs/system-dynamics/itonami-maturity.datoms.edn \
+;;     --dataset itonami-maturity
+;; --check で canonical 一致を検査できる（決定的: 時刻も乱数も使わない）。
+{:projection/version 2
+ :projection/id "itonami-maturity-lake"
+ :projection/source
+ {:git/commit "1c03179738ac87abcd19fbdf510fa998b79d1a63"
+  :dataset/id "com-junkawasaki/root/itonami-maturity-lake"}
+ :projection/inputs
+ [{:input/type :git
+   :input/path "90-docs/lake/itonami-maturity-lake.datoms.edn"
+   :input/sha256 "555fca9b48b7ef7d83d84d4dda7ffa7b4ba3e76b207cfe4cc77acf83041794d2"}]
+ :projection/identity-attrs [:lake/entity-id]
+ :projection/contracts
+ {:schema/path "manifest/projection-schemas/itonami-maturity-lake.edn"
+  :schema/sha256 "3b7bc55c726600a825acdb4b66c44a8704a9e747ef7e1460902016798c8e9a18"
+  :loader/path "manifest/project-edn.cljs"
+  :loader/sha256 "88fe9455809e8d3e5df69141ae7c6a4055b900cb3629b01281f5c0aae521cd6b"}
+ :projection/rebuild
+ {:loader/id :canonical-edn-v1
+  :output/path ".projection-cache/itonami-maturity-lake.edn"}
+ :projection/output
+ {:logical-sha256 "15b1684617559f7559640c1ecdd2e4b898f6f1e14c1a929fbd8fa8bd5417fd4f"
+  :physical-sha256 "da34b3629ede534226099baa1b5806f3ba1915d23c0e704e2c99ef660816665e"
+  :entity-count 95}}
