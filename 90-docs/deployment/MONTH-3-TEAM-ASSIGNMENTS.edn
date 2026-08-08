@@ -103,7 +103,7 @@
       "Execute: Full rollback to Phase 2 (50% Rust / 50% cljc)"
       "Verify: Rust pool resumes, traffic stable within < 2 min"]
      :duration-minutes 20
-     :pass-criteria "Full rollback executes successfully"
+     :pass-criteria "Full rollback executes successfully"}
     {:item "Graceful Shutdown Test (Staging)"
      :owner "ops-lead"
      :target-team "Traffic Controller, On-Call Engineer"
@@ -114,7 +114,7 @@
       "Verify: all connections closed within 60s grace period"
       "Confirm: no cascading failure, cljc pool stable at 100%"]
      :duration-minutes 60
-     :pass-criteria "Graceful shutdown completes within SLA"
+     :pass-criteria "Graceful shutdown completes within SLA"}
     {:item "PagerDuty Escalation Policy Test"
      :owner "escalation-lead"
      :target-team "Escalation Lead, On-Call Engineer"
@@ -125,7 +125,7 @@
       "Verify: phone call placed (if enabled)"
       "Measure: time from trigger to human acknowledgement"]
      :duration-minutes 20
-     :pass-criteria "Alert routing works, ack time < 5 min"
+     :pass-criteria "Alert routing works, ack time < 5 min"}
     {:item "Team Briefing & Q&A"
      :owner "canary-lead"
      :target-team "All core roles"
@@ -230,7 +230,7 @@
     ["Execute: set Rust pool drain flag (no new connections)"
      "Duration: 30 seconds"
      "Verify: load balancer stops routing new requests to Rust pool"
-     "Monitor: Rust connection count should begin decreasing"]}
+     "Monitor: Rust connection count should begin decreasing"]
     :step-2-drain-in-flight
     ["Wait: let existing connections complete (grace period: 60 seconds)"
      "Monitor: Rust active connection count → 0"
@@ -276,30 +276,30 @@
      "Trigger: sustained > 5 min → automatic rollback"
      "Monitoring tool: Prometheus drama_profile_http_latency_p99"
      "Frequency: check every 1 minute (or continuous dashboard watch)"
-     "Escalation: if trending toward 110ms+ → alert canary-lead immediately"]}
+     "Escalation: if trending toward 110ms+ → alert canary-lead immediately"]
     :latency-p95
     ["Target: ≤ 95ms"
      "Status: monitored but not automatic trigger (soft SLO)"
-     "Escalation: if > 100ms, discuss with canary-lead (may indicate system stress)"]}
+     "Escalation: if > 100ms, discuss with canary-lead (may indicate system stress)"]
     :parity-failure-rate
     ["Target: < 0.01% (< 10 divergence per 1M requests)"
     "Trigger: > 1% sustained > 1 min → automatic FULL ROLLBACK"
      "Monitoring tool: murakumo/parity-checker metrics"
      "Frequency: check every 30 seconds (parity checker sensitive)"
      "Escalation: if trending toward 0.02% → alert canary-lead (may need to slow ramp)"
-     "Critical: any parity divergence at 100% cljc (post-cutover) is data consistency issue → immediate investigation"]}
+     "Critical: any parity divergence at 100% cljc (post-cutover) is data consistency issue → immediate investigation"]
     :http-5xx-rate
     ["Target: ≤ 0.01% (< 1 error per 10K requests)"
      "Trigger: > 1% sustained > 2 min → automatic rollback"
      "Monitoring tool: Prometheus murakumo_errors_total (5xx bucket)"
      "Frequency: check every 1 minute"
-     "Escalation: any spike → investigate root cause (GC pause, pool exhaustion, app bug)"]}
+     "Escalation: any spike → investigate root cause (GC pause, pool exhaustion, app bug)"]
     :memory-per-instance
     ["Target: ≤ 256MB post-GC (at traffic load)"
      "Trigger: > 512MB peak → automatic rollback + investigate"
      "Monitoring tool: JVM metrics jvm_memory_heap_used"
      "Frequency: check every 5 minutes"
-     "Watch: GC collection frequency (< 2 per minute expected)"]}
+     "Watch: GC collection frequency (< 2 per minute expected)"]
     :gc-pause-p99
     ["Target: ≤ 30ms"
      "Status: monitored for regression (soft SLO)"
@@ -312,16 +312,16 @@
      "Confirm: parity failure < 0.01% over stage window"
      "Confirm: 5xx rate ≤ 0.01%"
      "Confirm: memory stable < 256MB"
-     "Decision: 'Stage 1 PASS' (sign-off for gate)"]}
+     "Decision: 'Stage 1 PASS' (sign-off for gate)"]
     :gate-2-stage-2-success
     ["Same verification as Stage 1, but at 90% traffic load"
      "Extra focus: confirm Rust pool still healthy at 10% traffic"
-     "Decision: 'Stage 2 PASS' (sign-off for gate)"]}
+     "Decision: 'Stage 2 PASS' (sign-off for gate)"]
     :gate-3-stage-3a-success
     ["Verify: 90% → 99% traffic ramp completed"
      "Confirm: all SLOs stable at 99% cljc / 1% Rust"
      "Watch: 1% Rust traffic for edge-case failures"
-     "Decision: 'Stage 3a PASS' (sign-off for gate)"]}
+     "Decision: 'Stage 3a PASS' (sign-off for gate)"]
     :gate-4-stage-3b-success
     ["Verify: 99% → 100% cutover executed"
      "Confirm: no immediate spike (latency p99 < 110ms post-cutover)"
@@ -509,7 +509,7 @@
     "escalation-lead: confirm 24/7 availability"
     "on-call rotation (4 engineers x 4 shifts): confirm shifts assigned"]
    :confirmation-method "Slack message in #prod-gates-wave5: 'I confirm availability for Month 3 canary [ROLE] 2026-09-11 to 2026-09-14'"
-   :escalation-if-unavailable "Platform-lead identifies backup within 48 hours"}}
+   :escalation-if-unavailable "Platform-lead identifies backup within 48 hours"}
 
   :adr/related ["2607072100-kotoba-server-fleet-deployment-strangler-fig.edn"
                 "2607072400-kaisha-pod-murakumo-fleet-deployment.edn"]}]
