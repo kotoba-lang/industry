@@ -1,36 +1,36 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 24548,
-  "app-aozora-appview" 14403,
-  "app-aozora-spa" 7538},
+ {"app-aozora-pds" 24696,
+  "app-aozora-appview" 14463,
+  "app-aozora-spa" 7746},
  :zone
- {:requests-7d 1091643,
-  :pageviews-7d 5879,
-  :uniques-7d-sum 972,
+ {:requests-7d 1098289,
+  :pageviews-7d 6075,
+  :uniques-7d-sum 975,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 960789}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1239}
-   {:path "/federation-pilot/did.json", :requests 130}
+  [{:path "/v1/datoms", :requests 962426}
+   {:path "/federation-pilot/did.json", :requests 137}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
-    :requests 75}
+    :requests 95}
    {:path
     "/bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4eq3q5k2optwu446juce4",
-    :requests 73}
-   {:path "/hito-verify-clean/did.json", :requests 63}
-   {:path "/hito-postfix-fed/did.json", :requests 62}
+    :requests 93}
    {:path
-    "/bafyreicjm25j5og3mu6ewquuupkwisronspkrv7v3xdczmzlknhqpf7vc4",
-    :requests 61}],
-  :status-mix {:ok 964462, :client-error 27660, :server-error 6933},
+    "/bafyreigknzqpup4wv566lfcmxtb5sjegwv74mpbhw4euqym3puw7qr6ssm",
+    :requests 71}
+   {:path "/hito-verify-clean/did.json", :requests 65}
+   {:path "/hito-postfix-fed/did.json", :requests 64}
+   {:path "/hito-diag-fed/did.json", :requests 63}],
+  :status-mix {:ok 965355, :client-error 25974, :server-error 7768},
   :window "24h"},
  :as-of "2026-08-08",
  :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 960789 · /xrpc/com.atproto.sync.subscribeRepos 1239 · /federation-pilot/did.json 130 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 75 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 73 | 4xx(probe) 3% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 962426 · /federation-pilot/did.json 137 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 95 · /bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4… 93 · /bafyreigknzqpup4wv566lfcmxtb5sjegwv74mp… 71 | 4xx(probe) 3% · 5xx 1%",
  :signal
- "aozora.app 実測 1091643 req/7d・972 uniques(日次和)・うち4xx probe 3%(24h)、workers 46489 inv/7d"}
+ "aozora.app 実測 1098289 req/7d・975 uniques(日次和)・うち4xx probe 3%(24h)、workers 46905 inv/7d"}

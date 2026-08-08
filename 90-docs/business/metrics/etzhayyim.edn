@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 12418, "etzhayyim-xrpc-proxy" 578},
+ {"etzhayyim-did-web" 12526, "etzhayyim-xrpc-proxy" 578},
  :zone
- {:requests-7d 54366,
-  :pageviews-7d 1817,
-  :uniques-7d-sum 2253,
+ {:requests-7d 54843,
+  :pageviews-7d 1848,
+  :uniques-7d-sum 2332,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 36}
+  [{:path "/", :requests 80}
    {:path "/settings", :requests 30}
-   {:path "/system-dynamics", :requests 29}
+   {:path "/robots.txt", :requests 29}
+   {:path "/actor/oil-refining/did.json", :requests 28}
+   {:path "/system-dynamics", :requests 27}
    {:path "/actor/handotai/did.json", :requests 20}
-   {:path "/sitemap.xml", :requests 12}
-   {:path "/actor/marine-insurance/did.json", :requests 8}
-   {:path "/actor/oil-refining/did.json", :requests 7}
-   {:path "/.well-known/oauth-protected-resource/mcp", :requests 7}],
-  :status-mix {:ok 641, :server-error 6846, :client-error 1056},
+   {:path "/actor/oil-midstream/did.json", :requests 14}
+   {:path "/actor/oil-coverage/did.json", :requests 14}],
+  :status-mix {:ok 825, :server-error 6682, :client-error 955},
   :window "24h"},
  :as-of "2026-08-08",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 12, :error-5xx-pct 80},
+ {:window "24h", :probe-4xx-pct 11, :error-5xx-pct 79},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 36 · /settings 30 · /system-dynamics 29 · /actor/handotai/did.json 20 · /sitemap.xml 12 | 4xx(probe) 12% · 5xx 80%",
+ "上位 page (24h, 2xx/3xx): / 80 · /settings 30 · /robots.txt 29 · /actor/oil-refining/did.json 28 · /system-dynamics 27 | 4xx(probe) 11% · 5xx 79%",
  :signal
- "etzhayyim.com 実測 54366 req/7d・2253 uniques(日次和)・うち4xx probe 12%(24h)、workers 12996 inv/7d"}
+ "etzhayyim.com 実測 54843 req/7d・2332 uniques(日次和)・うち4xx probe 11%(24h)、workers 13104 inv/7d"}
