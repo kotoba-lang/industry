@@ -254,7 +254,16 @@
                       (:licence/law lic) (assoc :permit/legal-basis (:licence/law lic))
                       (:licence/authority lic) (assoc :permit/authority (:licence/authority lic))
                       (:licence/window lic) (assoc :permit/window (:licence/window lic))
-                      (:licence/fee-jpy lic) (assoc :permit/fee-jpy (:licence/fee-jpy lic))
+                      ;; **手数料の属性名は 2 つの dataset で揃える。** 面の上で
+                      ;; `:permit/fee-jpy` と `:procedure/fee-amount` が混在していると
+                      ;; 「手数料を持つものを全部引く」が書けない —— しかも前者は
+                      ;; 通貨を名前に焼いており、188 法域を持つ catalog で JPY 前提だった。
+                      (:licence/fee-amount lic)
+                      (assoc :permit/fee-amount (:licence/fee-amount lic))
+                      (:licence/fee-currency lic)
+                      (assoc :permit/fee-currency (:licence/fee-currency lic))
+                      (:licence/fee-minor-unit lic)
+                      (assoc :permit/fee-minor-unit (:licence/fee-minor-unit lic))
                       (:licence/valid-years lic) (assoc :permit/valid-years (:licence/valid-years lic))
                       (some? (:licence/obtainable-by-company? lic))
                       (assoc :permit/obtainable-by-company? (:licence/obtainable-by-company? lic))
@@ -276,17 +285,25 @@
 ;; 載せる** —— map のまま 1 属性にすると「¥19,000 の手続きを探す」が書けない。
 ;; `:verify` は落とさず `*-verify` に残す（改定されうる標準値だと分かるように）。
 
-(defn- kyoninka-procedures []
+(defn- parsed-procedures
+  "kyoninka の各 `.cljc` から `procedure` を 1 回だけ読む。**行と観測の両方が
+  ここから出る** —— 別々に読むと、片方だけが古い parse を見る状態が作れてしまう。"
+  []
   (let [dir (str root "/orgs/kotoba-lang/kyoninka/src/kyoninka")]
-    (if-not (.existsSync fs dir)
+    (when (.existsSync fs dir)
+      (vec (for [f (ls dir)
+                 :when (str/ends-with? f ".cljc")
+                 :let [src (slurp* (str dir "/" f))
+                       p (when src (lit/read-def-literal src "procedure"))]
+                 :when (and (map? p) (not (lit/error? p)) (:procedure/id p))]
+             p)))))
+
+(defn- kyoninka-procedures [parsed]
+  (if-not parsed
       {:found false :rows []}
       {:found true
        :rows
-       (vec (for [f (ls dir)
-                  :when (str/ends-with? f ".cljc")
-                  :let [src (slurp* (str dir "/" f))
-                        p (when src (lit/read-def-literal src "procedure"))]
-                  :when (and (map? p) (not (lit/error? p)) (:procedure/id p))]
+       (vec (for [p parsed]
               (let [fee (:procedure/fee p)
                     per (:procedure/standard-period-days p)
                     verify-str (fn [m] (when-let [v (:verify m)] (:how v)))]
@@ -309,6 +326,18 @@
                   ;; 手続きが実在する —— 英スクラップ金属は council が、独は州が
                   ;; 決めるので、額はここでは決まらない（`:verify` がそれを言う）。
                   (:amount fee) (assoc :procedure/fee-amount (:amount fee))
+                  ;; **額を決めるのは誰か。** これが無いと、額が無い手続きについて
+                  ;; 「調べていない」のか「そもそも全国値が存在しない」のかを
+                  ;; 読み手が区別できない。
+                  (get-in fee [:set-by :level])
+                  (assoc :procedure/fee-set-by-level (name (get-in fee [:set-by :level])))
+                  (get-in fee [:set-by :body])
+                  (assoc :procedure/fee-set-by-body (get-in fee [:set-by :body]))
+                  (get-in fee [:set-by :basis])
+                  (assoc :procedure/fee-set-by-basis (get-in fee [:set-by :basis]))
+                  (seq (:procedure/fee-observations p))
+                  (assoc :procedure/fee-observation-count
+                         (count (:procedure/fee-observations p)))
                   (:minor-unit fee) (assoc :procedure/fee-minor-unit (:minor-unit fee))
                   (:currency fee) (assoc :procedure/fee-currency (:currency fee))
                   (:kind fee) (assoc :procedure/fee-kind (str (:kind fee)))
@@ -326,7 +355,74 @@
                   (seq (:procedure/legal-questions p))
                   (assoc :procedure/open-legal-questions
                          (count (remove #(= :settled (:question/status %))
-                                        (:procedure/legal-questions p))))))))})))
+                                        (:procedure/legal-questions p))))))))}))
+
+;; ── 手数料の観測 ────────────────────────────────────────────────────────────
+;;
+;; 額が単一でない制度（英スクラップ金属は council が、独は州が決める）で実際に
+;; 引いた額。**行として出すのは、散文に閉じ込めると引けないから** —— 直前まで
+;; 観測値は `:verify` 文字列と ns docstring の中にあり、読めるが計算に使えなかった。
+;;
+;; **この行集合の min/max を制度の幅として使わないこと。** Cheshire East £235 と
+;; Newham £1,089 は「£235〜£1,089 が法定の幅」ではなく「見た 14 council が
+;; その範囲だった」でしかない。法定の幅は observation 自身が
+;; `:fee-observation/range-min|max` で持ち、その場合だけ `:basis` が付く。
+;; この 2 つを取り違えないために、**集約値はこの生成器では一切作らない。**
+
+(defn- fee-observation-rows [parsed]
+  (vec (for [p (or parsed [])
+             o (:procedure/fee-observations p)
+             ;; 通貨と最小単位は観測ごとに書かない（手続き 1 本の中で通貨が
+             ;; 変わることは無い）。**行に載せるのは、行だけを見た人が額を
+             ;; 誤読しないため** —— 19102 が pence なのか pound なのかは
+             ;; minor-unit が無いと決まらない。
+             :let [fee (:procedure/fee p)]]
+         (cond-> {:source/dataset "permits"
+                  :fee-observation/id (:fee-observation/id o)
+                  :fee-observation/procedure (name (:fee-observation/procedure o))
+                  :fee-observation/authority (:fee-observation/authority o)
+                  :fee-observation/currency (:currency fee)
+                  :fee-observation/minor-unit (:minor-unit fee)
+                  :fee-observation/source-repo "orgs/kotoba-lang/kyoninka"}
+           (:fee-observation/licence-type o)
+           (assoc :fee-observation/licence-type (name (:fee-observation/licence-type o)))
+           ;; **額の「形」。** 幅を既定にしない —— 実測 DEU 16 州は
+           ;; 幅 11 / 下限のみ 2 / 上限のみ 1 / 定額 1 / **額の定めなし 1**。
+           ;; `:no-amount-set` は「調べていない」ではなく「額という形の答えが無い」。
+           (:fee-observation/rule-form o)
+           (assoc :fee-observation/rule-form (name (:fee-observation/rule-form o)))
+           ;; 提出経路で額が変わる制度がある（DEU 4 州）。
+           (:fee-observation/channel o)
+           (assoc :fee-observation/channel (name (:fee-observation/channel o)))
+           ;; **「規則がそう定めている」と「所管庁がそう言っている」は同格でない。**
+           (:fee-observation/source-kind o)
+           (assoc :fee-observation/source-kind (name (:fee-observation/source-kind o)))
+           (:fee-observation/stage o)
+           (assoc :fee-observation/stage (name (:fee-observation/stage o)))
+           (:fee-observation/amount o)
+           (assoc :fee-observation/amount (:fee-observation/amount o))
+           ;; 幅は**その当局の規則自身が幅で定めている**場合だけ。
+           ;; **両端は独立に出す。** 初版は range-min の有無だけを見て両方を
+           ;; assoc しており、下限のみの観測（NI ≥160 € / HH ≥371 €）に
+           ;; `:range-max nil` を書き込み、**上限のみの観測（MV ≤5.500 €）を
+           ;; 丸ごと落としていた** —— どちらも「幅は両端で来る」という
+           ;; 思い込みの残り。属性の件数を数えていなければ気付かなかった。
+           (:fee-observation/range-min o)
+           (assoc :fee-observation/range-min (:fee-observation/range-min o))
+           (:fee-observation/range-max o)
+           (assoc :fee-observation/range-max (:fee-observation/range-max o))
+           (:fee-observation/approximate? o)
+           (assoc :fee-observation/approximate? true)
+           (:fee-observation/fee-year o)
+           (assoc :fee-observation/fee-year (:fee-observation/fee-year o))
+           (:fee-observation/as-of o)
+           (assoc :fee-observation/as-of (:fee-observation/as-of o))
+           (:fee-observation/source-url o)
+           (assoc :fee-observation/source-url (:fee-observation/source-url o))
+           (:fee-observation/basis o)
+           (assoc :fee-observation/basis (:fee-observation/basis o))
+           (:fee-observation/note o)
+           (assoc :fee-observation/note (:fee-observation/note o))))))
 
 ;; ── 走る ────────────────────────────────────────────────────────────────────
 
@@ -335,10 +431,13 @@
         results (mapcat scan-repo repos)
         by (group-by :outcome results)
         lo (licensed-operator-rows)
-        procs (kyoninka-procedures)
+        parsed (parsed-procedures)
+        procs (kyoninka-procedures parsed)
+        fee-obs (fee-observation-rows parsed)
         rows (-> (vec (mapcat :rows (:rows by)))
                  (into (:rows lo))
-                 (into (:rows procs)))
+                 (into (:rows procs))
+                 (into fee-obs))
         links (kyoninka-links)
         juris (->> rows (keep :permit/jurisdiction) distinct sort vec)
         non-juris (->> rows (remove :permit/jurisdiction) (map :permit/subject-key) distinct count)
@@ -379,6 +478,15 @@
          :coverage/kyoninka-linked-rows
          (count (filter :permit/kyoninka-procedure rows))
          :coverage/procedures (count (:rows procs))
+         :coverage/fee-observations (count fee-obs)
+         ;; **集約値をこの生成器は作らない。** 作った瞬間、それが法定の幅なのか
+         ;; 標本の端なのかを読み手が区別できなくなる。数えるのは件数だけ。
+         :coverage/fee-observation-caveat
+         (str "手数料の観測は標本であって幅ではない。min/max を制度の幅として引用しない。"
+              "比較するときは :fee-observation/licence-type と :stage を揃えること —— "
+              "揃えないと『新規と明記された額』と『段階を書いていない額』が混ざる。"
+              "また :fee-observation/fee-year を持つ行はごく一部で、"
+              "残りは年度不明であって今年度ではない。")
          ;; 橋が両側に渡っているか。片側だけなら結合は宣言だけで辿れない。
          :coverage/procedures-reachable
          (let [ids (into #{} (map :procedure/id) (:rows procs))]
@@ -411,7 +519,20 @@
               (mapv (fn [[k n]] [(str k) n])))}
         ;; 結合の可否そのものをデータにする（ADR-2608080000）
         joins
-        [{:join/id "permit->kyoninka-procedure"
+        [{:join/id "fee-observation->procedure"
+          :source/dataset "permits"
+          :join/from ":fee-observation/procedure"
+          :join/to ":procedure/id"
+          :join/status (if (seq fee-obs) :works :absent)
+          :join/evidence
+          (str "手数料の観測 " (count fee-obs) " 行。**この集合の min/max を制度の幅として"
+               "使わないこと** —— 法定の幅は観測自身が :fee-observation/range-min|max で持ち、"
+               "その場合だけ :fee-observation/basis に定めている条文が付く。"
+               "さらに :licence-type と :stage を揃えずに額を並べると段階の違う額が混ざる: "
+               "実測 gbr-scrap-metal は素朴には £235〜£1,089（4.6 倍）に見えるが、"
+               "site かつ新規と明記された行だけに絞ると 5 件・£371〜£804.78（2.2 倍）で、"
+               "最安と最高はどちらも council が段階を書いていない行だった。")}
+         {:join/id "permit->kyoninka-procedure"
           :source/dataset "permits"
           :join/from ":permit/kyoninka-procedure"
           :join/to ":procedure/id (kotoba-lang/kyoninka)"
