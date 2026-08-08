@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "description": "クリーニング営み — the cloud-itonami ISIC 9601 garment-care actor as an idle tycoon. Build tooling only; the game itself is the cljc in src/.",
   "scripts": {
+    "play": "nbb --classpath src bin/kuriningu.cljs play",
+    "street": "nbb --classpath src bin/kuriningu.cljs street",
+    "render": "nbb --classpath src:../../../../../../orgs/kotoba-lang/webgpu/src:../../../../../../orgs/kotoba-lang/render/src bin/render.cljs",
     "test": "nbb --classpath src test/logic_test.cljs",
     "balance": "nbb --classpath src test/balance.cljs",
     "build": "nbb preview/build.cljs"

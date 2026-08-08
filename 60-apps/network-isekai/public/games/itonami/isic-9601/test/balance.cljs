@@ -9,8 +9,10 @@
   (first (filter (fn [x] (= (:key x) k)) (:stations (l/summary s)))))
 
 (defn- risky? [s k]
-  (some (fn [g] (and (:ready? g) (or (:risk g) (:label-conflict? g) (not (:cited? g)))))
-        (:garments (station-of s k))))
+  (let [g (first (filter (fn [g] (:ready? g)) (:garments (station-of s k))))]
+    ;; the garment `tap`/`reject` will actually act on — asking whether ANY ready
+    ;; garment is risky rejects the wrong one when two are waiting
+    (boolean (and g (or (:risk g) (:label-conflict? g) (not (:cited? g)))))))
 
 (defn play [seed ticks]
   (reduce

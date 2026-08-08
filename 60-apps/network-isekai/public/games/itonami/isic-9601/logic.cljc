@@ -502,11 +502,18 @@
           (log {:t* :upgrade :op k :disposition :commit})))))
 
 (defn renew-certification
-  "Renew the solvent-handling certification. While it is lapsed, check 4 HARD
-  holds every op in the shop -- the governor evaluates it unconditionally."
+  "Renew the solvent-handling certification. While it is lapsed, check 4 HARD holds every
+  op in the shop -- the governor evaluates it unconditionally.
+
+  Renewing one that is still current is a NO-OP, not a purchase. It used to charge the fee
+  and reset the timer, which meant a player who tapped the button twice, or any script
+  that called it every turn, quietly paid ¥90 a tick and never climbed a tier. Found by
+  running the reference strategy from the CLI, where the shop sat at phase 1 with ¥80
+  forever; the browser preview hid it because the button only invites a press while the
+  certification is lapsed."
   [st]
   (let [cost 90]
-    (if (< (:cash st) cost)
+    (if (or (:cert-current? st) (< (:cash st) cost))
       st
       (-> st
           (update :cash - cost)

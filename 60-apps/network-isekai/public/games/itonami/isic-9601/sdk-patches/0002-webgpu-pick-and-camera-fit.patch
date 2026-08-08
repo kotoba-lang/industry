@@ -1,9 +1,9 @@
 From a144d3a8e1ca0b741bace269c2ccb8a62ef15b91 Mon Sep 17 00:00:00 2001
 From: Jun Kawasaki <jun784@gmail.com>
 Date: Sat, 8 Aug 2026 09:27:27 +0000
-Subject: [PATCH] =?UTF-8?q?feat(webgpu):=20kami.webgpu.pick=20=E2=80=94=20?=
- =?UTF-8?q?screen=E2=86=92instance=E3=80=81=E3=81=8A=E3=82=88=E3=81=B3=20i?=
- =?UTF-8?q?r/fit-rig?=
+Subject: [PATCH 1/2] =?UTF-8?q?feat(webgpu):=20kami.webgpu.pick=20?=
+ =?UTF-8?q?=E2=80=94=20screen=E2=86=92instance=E3=80=81=E3=81=8A=E3=82=88?=
+ =?UTF-8?q?=E3=81=B3=20ir/fit-rig?=
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
@@ -460,6 +460,221 @@ index 0000000..57532e6
 +    (is (= 1.15 (:azimuth fitted)))
 +    (is (= 3.0 (:look-height fitted)))
 +    (is (number? (:distance fitted)) "only :distance is solved")))
+-- 
+2.43.0
+
+
+From b714050905dc7dcdd7aebdadb24bf05c963607a6 Mon Sep 17 00:00:00 2001
+From: Jun Kawasaki <jun784@gmail.com>
+Date: Sat, 8 Aug 2026 09:50:33 +0000
+Subject: [PATCH 2/2] =?UTF-8?q?feat(webgpu):=20submission/pack-globals=20?=
+ =?UTF-8?q?=E2=80=94=2060=20f32=20=E3=81=AE=20G=20block=20=E3=82=92=20port?=
+ =?UTF-8?q?able=20data=20=E3=81=AB?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+`kami.webgl` は自分のソースで layout を明記した上でこう書いている:
+
+  "The matrix math (camera→vp, sun→light_vp) is shared with WebGPU and
+   computed by the CALLER, who hands us the packed G uniform
+   (60 f32: vp[16] sun_dir[4] sun_col[4] sky[4] light_vp[16] light_a..d[16])"
+
+そして **engine の中にそれを計算するものが無い**。lit 経路を使う側は毎回
+60 個の float を正しい順で組み直すしかなく、その中には
+**camera 位置が sun_dir / sun_col / sky の .w レーンに紛れ込んでいる**
+という、どの shader ソースにも書かれていない事実が含まれる。1 レーン
+間違えてもフレームは描画され、ただ照明が狂うだけなので、原因の特定が
+最も難しい種類の誤りになる。
+
+- `pack-globals` — render-IR + viewport → 60 f32
+- `light-view-projection` — `[:globals :shadow]` から太陽の view-projection
+- `globals-floats` — 60 (WebGPU 側は cascade 4 本 + splits + wind の 116)
+
+検証: 9 tests / 23 assertions。vp が picker の射影と同一行列であること
+(照明と当たり判定が別のカメラを見ているフレームは直せない)、.w レーン、
+lighting の既定値と上書き、shadow frustum の可変性、viewport を変えても
+vp 以外は動かないこと。
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0156d6SPQCfLvucUL3mTNAkX
+---
+ src/kami/webgpu/submission.cljc   | 75 +++++++++++++++++++++++++++++++
+ test/kami/webgpu/globals_test.clj | 72 +++++++++++++++++++++++++++++
+ 2 files changed, 147 insertions(+)
+ create mode 100644 test/kami/webgpu/globals_test.clj
+
+diff --git a/src/kami/webgpu/submission.cljc b/src/kami/webgpu/submission.cljc
+index 0c5ecc0..64b56c0 100644
+--- a/src/kami/webgpu/submission.cljc
++++ b/src/kami/webgpu/submission.cljc
+@@ -6,6 +6,7 @@
+    material aliasing while still batching differently coloured instances."
+   (:require [kotoba.render.foliage :as foliage]
+             [kotoba.render.instance :as render-instance]
++            [kotoba.render.camera :as cam]
+             [kami.webgpu.ir :as ir]))
+ 
+ (def schema :kotoba.webgpu/submission-packets-v1)
+@@ -57,6 +58,80 @@
+   [instances]
+   (vec (mapcat model-and-instance-data instances)))
+ 
++;; --- the globals uniform block, as portable data -----------------------------
++;;
++;; `kami.webgl`'s own comment states the contract and then leaves it unmet:
++;;
++;;   "The matrix math (camera→vp, sun→light_vp) is shared with WebGPU and computed by
++;;    the CALLER, who hands us the packed G uniform (60 f32: vp[16] sun_dir[4]
++;;    sun_col[4] sky[4] light_vp[16] light_a..d[16])"
++;;
++;; Nothing in these repos computed it. Every consumer of the lit path had to rebuild
++;; sixty floats in exactly the right order — including the three places the eye is
++;; smuggled into the .w lanes of sun_dir/sun_col/sky, which no shader source states.
++;; Get one lane wrong and the frame still renders, just lit wrongly, which is the
++;; hardest kind of error to attribute.
++
++(def globals-floats
++  "Size of the WebGL2 G block. The WebGPU executor packs a wider variant (116 f32: four
++   cascade light_vps plus splits and wind); this is the single-cascade layout the GLSL
++   fixtures declare."
++  60)
++
++(defn- ortho-rh [l r b t near far]
++  [(/ 2.0 (- r l)) 0.0 0.0 0.0
++   0.0 (/ 2.0 (- t b)) 0.0 0.0
++   0.0 0.0 (/ -1.0 (- far near)) 0.0
++   (/ (- (+ r l)) (- r l)) (/ (- (+ t b)) (- t b)) (/ (- near) (- far near)) 1.0])
++
++(defn light-view-projection
++  "The directional light's view-projection for the shadow pass, from `[:globals :shadow]`
++   (defaults reproduce the executor's original frustum) and the sun direction."
++  [sun-dir center shadow-map]
++  (let [{:keys [extent near far distance]} (ir/shadow shadow-map)
++        d (cam/v3-normalize sun-dir)
++        eye (cam/v3-sub center (cam/v3-scale d distance))]
++    (cam/mat4-mul (ortho-rh (- extent) extent (- extent) extent near far)
++                  (cam/look-at-rh eye center [0.0 1.0 0.0]))))
++
++(defn pack-globals
++  "The 60-float G uniform block for a render-IR frame at viewport `[w h]`, as portable
++   data — the same values the executor writes, in the same order, so a JVM or nbb caller
++   can drive the WebGL2 lit path without re-deriving any of it.
++
++   Note the packing the shader sources do not document: the camera position rides in the
++   unused `.w` lane of `sun_dir`, `sun_col` and `sky` (x, y and z respectively)."
++  ([ir-map w h] (pack-globals ir-map w h nil))
++  ([ir-map w h {:keys [shadow-texel]}]
++   (let [g (:globals ir-map)
++         sky (:sky g)
++         eye (or (:eye g) [0.0 0.0 0.0])
++         target (or (:target g) [0.0 0.0 0.0])
++         fov (double (or (:fov g) 60.0))
++         near (double (or (:near g) 0.5))
++         far (double (or (:far g) 4000.0))
++         aspect (/ (double w) (double (max 1 h)))
++         vp (cam/mat4-mul (cam/perspective-rh (cam/deg->rad fov) aspect near far)
++                          (cam/look-at-rh eye target [0.0 1.0 0.0]))
++         sd (or (:sun-dir sky) [0.3 -1.0 0.2])
++         sun (or (:sun sky) [1.0 1.0 1.0])
++         horizon (or (:horizon sky) [0.5 0.7 0.9])
++         lvp (light-view-projection sd target (:shadow g))
++         lt (ir/lighting (:lighting g))
++         amb (:ambient lt)]
++     (vec
++      (concat vp
++              [(nth sd 0) (nth sd 1) (nth sd 2) (nth eye 0)]
++              [(nth sun 0) (nth sun 1) (nth sun 2) (nth eye 1)]
++              [(nth horizon 0) (nth horizon 1) (nth horizon 2) (nth eye 2)]
++              lvp
++              [(nth amb 0) (nth amb 1) (nth amb 2) (:ambient-sky lt)]
++              [(:spec-min lt) (:spec-max lt) (:rim lt) (:rim-power lt)]
++              [(:shininess-min lt) (:shininess-max lt) (:sun-diffuse lt)
++               (:metallic-diffuse-cut lt)]
++              [(:gamma lt) (:shadow-bias-slope lt) (:shadow-bias-min lt)
++               (or shadow-texel (:shadow-texel lt))])))))
++
+ (defn- stable-key [key]
+   ;; compatibility-key is a fixed vector of scalar values, so `pr-str` is stable
+   ;; across CLJ/CLJS and does not depend on map iteration order.
+diff --git a/test/kami/webgpu/globals_test.clj b/test/kami/webgpu/globals_test.clj
+new file mode 100644
+index 0000000..964cc21
+--- /dev/null
++++ b/test/kami/webgpu/globals_test.clj
+@@ -0,0 +1,72 @@
++(ns kami.webgpu.globals-test
++  "Tests for `pack-globals` — the 60-float G uniform block.
++
++  `kami.webgl`'s own source states the layout and then says the CALLER computes it, and
++  nothing here did. These pin the order, and in particular the three lanes no shader
++  source mentions: the camera position rides in the .w of sun_dir/sun_col/sky."
++  (:require [clojure.test :refer [deftest is]]
++            [kami.webgpu.ir :as ir]
++            [kami.webgpu.submission :as sub]
++            [kotoba.render.camera :as cam]))
++
++(def frame
++  (-> (ir/render-ir (ir/sky [0.5 0.7 0.9] [0.3 -1.0 0.2] [1.0 0.97 0.9])
++                    [(ir/instance [0 0 0] [1 0 0] [4 4 4])]
++                    [10 20 30] [0 2 0])
++      (assoc-in [:globals :fov] 46.0)))
++
++(def G (sub/pack-globals frame 800 600))
++
++(deftest block-is-sixty-floats
++  (is (= sub/globals-floats 60))
++  (is (= 60 (count G)))
++  (is (every? number? G)))
++
++(deftest vp-is-the-same-matrix-the-picker-projects-with
++  (let [vp (cam/mat4-mul (cam/perspective-rh (cam/deg->rad 46.0) (/ 800.0 600.0) 0.5 4000.0)
++                         (cam/look-at-rh [10 20 30] [0 2 0] [0.0 1.0 0.0]))]
++    (is (= vp (subvec G 0 16))
++        "a frame whose picking and whose lighting disagree about the camera is unfixable")))
++
++(deftest the-eye-rides-in-the-w-lanes
++  ;; undocumented in every shader source, and silently wrong if you miss it
++  (is (= 10 (nth G 19)) "sun_dir.w = eye.x")
++  (is (= 20 (nth G 23)) "sun_col.w = eye.y")
++  (is (= 30 (nth G 27)) "sky.w = eye.z"))
++
++(deftest sun-and-sky-are-where-the-shader-reads-them
++  (is (= [0.3 -1.0 0.2] (subvec G 16 19)))
++  (is (= [1.0 0.97 0.9] (subvec G 20 23)))
++  (is (= [0.5 0.7 0.9] (subvec G 24 27))))
++
++(deftest lighting-defaults-round-trip
++  (let [lt ir/default-lighting]
++    (is (= (vec (concat (:ambient lt) [(:ambient-sky lt)])) (subvec G 44 48)) "light_a")
++    (is (= [(:spec-min lt) (:spec-max lt) (:rim lt) (:rim-power lt)] (subvec G 48 52)) "light_b")
++    (is (= [(:shininess-min lt) (:shininess-max lt) (:sun-diffuse lt) (:metallic-diffuse-cut lt)]
++           (subvec G 52 56)) "light_c")
++    (is (= [(:gamma lt) (:shadow-bias-slope lt) (:shadow-bias-min lt) (:shadow-texel lt)]
++           (subvec G 56 60)) "light_d")))
++
++(deftest a-frame-can-override-the-lighting
++  (let [G2 (sub/pack-globals (assoc-in frame [:globals :lighting] {:gamma 1.0 :rim 0.9}) 800 600)]
++    (is (= 1.0 (nth G2 56)) "gamma overridden")
++    (is (= 0.9 (nth G2 50)) "rim overridden")
++    (is (= (nth G 48) (nth G2 48)) "everything else keeps the default")))
++
++(deftest the-light-matrix-looks-down-the-sun
++  (let [lvp (subvec G 28 44)]
++    (is (= 16 (count lvp)))
++    (is (some (fn [x] (not (zero? x))) lvp) "it is not left as zeros"))
++  ;; moving the sun must move the shadow matrix
++  (let [G2 (sub/pack-globals (assoc-in frame [:globals :sky :sun-dir] [-0.8 -0.5 0.1]) 800 600)]
++    (is (not= (subvec G 28 44) (subvec G2 28 44)))))
++
++(deftest a-wider-viewport-changes-only-the-projection
++  (let [G2 (sub/pack-globals frame 1600 600)]
++    (is (not= (subvec G 0 16) (subvec G2 0 16)) "vp tracks the aspect")
++    (is (= (subvec G 16 60) (subvec G2 16 60)) "nothing else does")))
++
++(deftest shadow-frustum-is-authorable
++  (let [G2 (sub/pack-globals (assoc-in frame [:globals :shadow] {:extent 400.0}) 800 600)]
++    (is (not= (subvec G 28 44) (subvec G2 28 44)) "a wider light frustum is a different matrix")))
 -- 
 2.43.0
 

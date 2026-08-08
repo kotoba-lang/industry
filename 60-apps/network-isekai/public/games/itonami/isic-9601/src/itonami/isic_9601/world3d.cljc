@@ -115,7 +115,9 @@
   "A ring road threading past every shopfront. Segments are boxes laid flat and yawed to
   the tangent — the winding grey ribbon in the reference, without needing a mesh."
   [segments]
-  (let [r (* street-radius 0.72)
+  ;; outside everything: a ring drawn at a fraction of the street radius runs straight
+  ;; through the shopfronts, which the first CLI render made obvious at a glance
+  (let [r (+ street-radius 16.0)
         two-pi (* 2.0 Math/PI)]
     (vec
      (mapcat
@@ -150,7 +152,11 @@
         (recur (inc i) s2 (into acc (tree x z)))))))
 
 (defn ground []
-  [(inst :ground [0.0 -0.5 0.0] ground-color
+  ;; `:pos` is the point a box STANDS on and it extends UP by its height, so a 1-unit slab
+  ;; whose top must be y=0 stands at y=-1. Standing it at -0.5 puts its top at +0.5 and
+  ;; swallows the road, which sits at 0.02 — the first CLI render showed a street with no
+  ;; road on it and no error anywhere.
+  [(inst :ground [0.0 -1.0 0.0] ground-color
          [(* street-radius 4.0) 1.0 (* street-radius 4.0)] {})])
 
 (defn player
@@ -170,6 +176,12 @@
   executor, `kami.webgpu.pick`, and the camera fit below."
   46.0)
 
+(def pitch-deg
+  "How far down the camera looks. The reference framing is steep — a near-overhead 3/4 —
+  and steepness is not only a look: a shallow camera turns a wide, flat street into a thin
+  band across the middle of a portrait frame, with sky above and below doing nothing."
+  52.0)
+
 (def camera-rig
   "A high, near-overhead 3/4 view — the reference's framing, which is essentially
   axis-aligned with a steep pitch rather than rotated off it. `:azimuth` is π/2 (the eye on
@@ -180,8 +192,7 @@
   horizontal field of view is the vertical one widened by the aspect. A constant distance
   tuned on a desktop puts half this street off both sides of a portrait phone, and nothing
   reports it — the shops are simply not on screen."
-  {:height (* street-radius 1.35)
-   :azimuth (/ Math/PI 2.0)
+  {:azimuth (/ Math/PI 2.0)
    :look-height 2.0})
 
 (def fit-radius
@@ -189,12 +200,21 @@
   (+ street-radius 9.0))
 
 (defn camera
-  "eye/target for the street at this viewport aspect (width/height). Delegates the framing
-  math to `kami.webgpu.ir` rather than re-deriving it here — the same reason picking lives
-  in the engine and not in the app."
+  "eye/target for the street at this viewport aspect (width/height).
+
+  `ir/fit-distance` gives the RANGE at which the street fits — the straight-line distance
+  from the target. A rig states its ground distance and its height separately, so the range
+  is split between them by `pitch-deg`; handing the range straight to `:distance` and
+  picking a height independently is how you end up with a camera that is both too far away
+  and too low, which is what the first CLI render looked like."
   ([] (camera (/ 9.0 16.0)))
   ([aspect]
-   (ir/rig->camera (ir/fit-rig camera-rig fit-radius fov-deg aspect) [0.0 0.0])))
+   (let [range (ir/fit-distance fit-radius fov-deg aspect)
+         th (* pitch-deg (/ Math/PI 180.0))]
+     (ir/rig->camera (assoc camera-rig
+                            :distance (* range (Math/cos th))
+                            :height (* range (Math/sin th)))
+                     [0.0 0.0]))))
 
 (defn instances
   "Every box in the street, scenery first so shopfronts sort later in the vector (order is

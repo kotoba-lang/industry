@@ -98,13 +98,16 @@ demands that shop back, so any layout where one hides another fails the suite.
 
 `world.cljc` (2D sprite IR) remains as the fallback view and still passes its own tests.
 
-### What is NOT verified yet
+### What is and is not verified
 
-The IR is verified against the real engine's own camera and picking math on the JVM. It has
-**not** been rendered in a browser — no WebGPU E2E, no WebGL 2.0 fallback E2E, no Pages
-smoke test. Those are three of CLAUDE.md's completion criteria for 3D work and they are
-outstanding: the executor needs a shadow-cljs build over the full dependency tree, which
-this session did not stand up. Do not read the green suites below as "it renders".
+**Verified:** the IR against the real engine's camera and picking math on the JVM, and —
+since `bin/render.cljs` — the frame actually drawing in real WebGL 2.0, through the
+engine's own GLSL, with pixels read back (`preview/street.png`).
+
+**Still outstanding**, and part of CLAUDE.md's completion criteria for 3D: the **WebGPU**
+path has never run (the executor needs a shadow-cljs build over the full dependency tree),
+the **shadow pass** is not exercised by the CLI renderer, and there is no **Pages smoke
+test**.
 
 ## KAMI SDK — what was missing
 
@@ -119,6 +122,7 @@ staged here as `sdk-patches/0001-sprite2d-board-support.patch` because pushing t
 |---|---|
 | `kami.webgpu.pick` | the render-IR mapped world→screen and nothing mapped back. Resolving a tap meant the app re-deriving the camera transform — including the non-obvious fact that an instance's `:pos` is its **ground** point while its box sits half a height above — so every app got a slightly different answer from the screen, and the error reads as a UI bug rather than as duplicated math. Pure `.cljc`, so both backends get the same picking. |
 | `ir/fit-distance` / `ir/fit-rig` | a rig's `:distance` is a constant, and the horizontal field of view is the vertical one widened by the aspect. A framing tuned on 16:9 puts half the street off both sides of a portrait phone **and reports nothing** — the shops are simply not on screen. |
+| `submission/pack-globals` | `kami.webgl`'s own source states the 60-float G block layout and says "computed by the CALLER" — and nothing in the engine computed it. Every consumer had to rebuild sixty floats in the right order, including the three places the camera position is smuggled into the `.w` lanes of `sun_dir`/`sun_col`/`sky`, which no shader source mentions. Get one lane wrong and the frame still renders, just lit wrongly. |
 
 The load-bearing test is `pick-agrees-with-projection`: it projects each instance's own
 centre with the same matrices the executor builds and requires the pick at that pixel to
@@ -156,6 +160,8 @@ it does not compile.
 | `preview/smoke.cljs` | headless-Chromium check that the built page actually plays |
 | `world.cljc` | the street: district registry, unlock ladder, and the 2D sprite render-IR |
 | `world3d.cljc` | the authoritative view: the canonical `kami.webgpu` render-IR |
+| `bin/kuriningu.cljs` | CLI — `play` / `street` (pure game, no engine needed) |
+| `bin/render.cljs` | CLI — the 3D street through real WebGL 2.0, to a PNG |
 | `test/world3d_test.clj` | 16 tests / 530 assertions, JVM, against the real `kami.webgpu.ir` + `pick` |
 | `test/world_ir_test.clj` | 17 tests / 102 assertions, JVM, against the real `kotoba.sprite2d.layout` |
 | `sdk-patches/` | the upstream `sprite2d` commit, staged until it can be pushed |
@@ -166,7 +172,53 @@ it does not compile.
 the path a namespace loader needs. **Edit the flat one and copy**; a check that they match
 belongs in the fleet-CI gate when this lands.
 
-## Run it
+## From the command line
+
+Both halves run in a terminal, and neither is a separate implementation of anything.
+
+```bash
+npm run street                         # the eight districts and what never automates
+npm run play                           # 1500 turns of the reference strategy
+npm run play -- --script "tick*30 verify screen clean return"   # scripted
+npm run play -- --seed 7 --turns 800
+
+npm run render                         # the 3D street → preview/street.png
+npm run render -- --width 1280 --height 720 --cleared 3
+```
+
+`play` drives `logic/reduce-event`, the same reducer the browser preview and the future
+guest run, so a scripted run is an executable description of a real game rather than a
+simulation of one. `--script` accepts `tick intake verify screen clean return reject renew
+phase buy-*`, with `tick*40` for repeats.
+
+`render` builds the canonical render-IR, packs it with the engine's own
+`submission/pack-instances` and `pack-globals`, and draws it in headless Chromium through
+`webgpu/fixtures/glsl/lit.{vert,frag}` — the GLSL the WebGL 2.0 backend actually uses.
+**This is the WebGL 2.0 end-to-end check** CLAUDE.md's 3D rule asks for, in a form that
+runs without a screen. It is not a second renderer: no geometry, matrices, lighting or
+shading are authored in `bin/render.cljs`, only GL plumbing.
+
+Two limits, printed on every run: the **shadow pass is not run** (a 1×1 fully-lit depth
+texture is bound instead, so the image is the lit pass without shadowing), and the GPU is
+**SwiftShader** because this container has no hardware one — which still exercises the real
+GLSL compiler and the real GL state machine.
+
+### What running it from a terminal found
+
+Three defects that the browser preview could not show, because a person looking at a board
+always reads the board that is in front of them:
+
+- **Renewing a valid certification charged ¥90.** The button only invites a press while
+  the certification is lapsed, so nobody ever pressed it early — but a script that calls it
+  every turn paid the fee every turn and the shop never climbed past phase 1. Now a no-op.
+- **The reference strategy decided on stale state.** It inspected the board *before* the
+  tick and acted *after* it, so it approved the plan it meant to reject, one turn late.
+- **The road was buried in the ground.** An instance's `:pos` is the point it stands on and
+  the box extends *up*, so a 1-unit ground slab standing at y=-0.5 has its top at +0.5 and
+  swallows a road at 0.02. The first render showed a street with no road on it, and
+  nothing anywhere reported an error.
+
+## Run the tests
 
 ```bash
 npm install                       # esbuild / nbb / squint / playwright

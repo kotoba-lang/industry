@@ -157,6 +157,20 @@
     (let [st (assoc (l/init 1) :phase 3 :cash 99999 :commits 9999)]
       (is! (= (:phase (l/advance-phase st)) 3) "phase 3 is the top of the ladder"))))
 
+(testing! "renewing-a-current-certification-is-free-and-does-nothing"
+  (fn []
+    ;; a button pressed twice must not charge twice
+    (let [st (assoc (l/init 1) :cash 500 :cert-current? true :cert-ticks 700)
+          after (l/renew-certification st)]
+      (is! (= 500 (:cash after)) "no fee while the certification is current")
+      (is! (= 700 (:cert-ticks after)) "and the clock is not reset")
+      (is! (= (:ledger st) (:ledger after)) "nothing is written to the audit ledger"))
+    ;; and it still works when it has actually lapsed
+    (let [st (assoc (l/init 1) :cash 500 :cert-current? false :cert-ticks 0)
+          after (l/renew-certification st)]
+      (is! (= 410 (:cash after)) "the fee is charged once, on a real renewal")
+      (is! (true? (:cert-current? after)) "and the shop reopens"))))
+
 (testing! "upgrade-costs-rise"
   (fn []
     (let [st (l/init 1)
@@ -198,9 +212,11 @@
     ;; drive the shop the way a player would: tap the two actuation stations
     ;; every few ticks, buy what you can afford.
     (let [risky? (fn [s k]
-                   (some (fn [g] (and (:ready? g) (or (:risk g) (:label-conflict? g) (not (:cited? g)))))
-                         (:garments (first (filter (fn [x] (= (:key x) k))
-                                                   (:stations (l/summary s)))))))
+                   ;; the garment `tap`/`reject` will actually act on
+                   (let [g (first (filter (fn [g] (:ready? g))
+                                          (:garments (first (filter (fn [x] (= (:key x) k))
+                                                                    (:stations (l/summary s)))))))]
+                     (boolean (and g (or (:risk g) (:label-conflict? g) (not (:cited? g)))))))
           final (reduce (fn [s i]
                           (let [s (l/tick s)
                                 s (l/take-in s true)
