@@ -31,8 +31,24 @@ west update --fetch smart                             # 子リポを pin に合�
 いなければこの判定は成立しない。実測: 6 リポの ahead を **pin 基準**で見ると abi +11 / bitcoin-node
 +52 / kotoba +19 / kotobase +3 / kagitaba +1 / shell +5 に見えたが、各リポを fetch して
 **origin/main 基準**で測り直すと bitcoin-node は 0 ahead（pin が遅れていただけ）、残りも大半が
-既に着地済みで、本当に未着地だったのは kotoba の 2 ファイルだけだった。west update を先に
-回していなければ、着地済みの内容を PR にして `main` を巻き戻すところだった。
+既に着地済みで、本当に未着地だったのは kotoba の 2 ファイルだけだった。
+
+> ⚠️ **訂正（2026-08-08）: この鮮度は `west update` では得られない。**
+> `west update --fetch smart` は **remote-tracking ref を一切更新しない**。`--fetch smart` は
+> pin の SHA に到達するのに必要な分しか fetch せず、pin 自体が upstream より遅れているので、
+> west が保証するのは「checkout が pin に一致すること」だけで「upstream が最新であること」
+> ではない。対照実験（`kotoba-lang/css`）:
+>
+> | | `refs/remotes/kotoba-lang/main` |
+> |---|---|
+> | before | `6eda5ee` |
+> | GitHub の `main` | `82aa184` |
+> | `west update --fetch smart css` 直後 | `6eda5ee` ← **動かない** |
+> | `git fetch kotoba-lang` 直後 | `82aa184` ← 正しい |
+>
+> したがって鮮度は下の手順 **(d) で別途取る**のが唯一の方法であり、(d) は補助ではなく
+> 本体である。west update を先に回す価値は理由 **(2)**（skip 集合 = ローカルにしか無い
+> 作業の母集団）にある。
 
 **2. west update の skip 一覧そのものが cleanup の入力である。** west は dirty な project を
 破壊せず skip して exit 1 を返すので、その skip 集合が「ローカルにしか無い作業を持つ repo」の
@@ -48,9 +64,31 @@ incoming と byte-identical な掃き出しファイル（大半が `kotoba-lang
 2. `west update --fetch smart`
 3. skip された project を untracked / localchg に分類。untracked は `git hash-object` と pin 側
    blob hash の**一致を確認したものだけ**削除して再 update。localchg は触らず温存
-4. 個別リポを触る前に、**そのリポでも** `git fetch origin` して `origin/<default>` を最新化してから判定する
+4. 個別リポを触る前に、**そのリポでも**明示的に fetch して `<remote>/<default>` を最新化して
+   から判定する（上の訂正のとおり、**ここが鮮度を得る唯一の手段**）。
+   **`git fetch origin` と書いてはならない** — 下記のとおり 72% の repo に `origin` は無い。
+
+   ```bash
+   REM=$(git -C "$R" remote | grep -qx origin && echo origin || git -C "$R" remote | head -1)
+   git -C "$R" fetch "$REM" --quiet
+   ```
 
 **罠:**
+
+- **remote は `origin` とは限らない。むしろ少数派。** west は remote を manifest の remote 名
+  (`kotoba-lang` / `cloud-itonami` / …) で作る。実測 2026-08-08、`orgs/` 配下 273 repo の
+  サンプルで **197 (72%) に `origin` が無い**。`origin/` 決め打ちは ref が解決せず、
+  `merge-base --is-ancestor` が fatal になって **判定が静かに UNLANDED 側へ倒れる**。
+  `scripts/cleanup.cljs` は実際にこれで 5 箇所誤答しており（`repo-slug` が nil に落ちて PR
+  照会が飛ぶ / 全 branch が未着地に見える / 既に upstream にある untracked が最上位に来る）、
+  `primary-remote` を port して修正した。観測した verdict の反転は**全て「偽の未着地 → 着地済み」**
+  の向きだった。
+
+- **`error: could not read IPC response` は fetch の失敗ではない。** `core.fsmonitor` の IPC
+  である（`~/.gitconfig` で `true`、実測 983 個の `fsmonitor--daemon` が常駐）。素の
+  `git status` でも出て、`-c core.fsmonitor=false` を付けると消える。west のログでは直後に
+  `HEAD is now at …` が続くので「fetch が落ちている」と読み違えやすい（2026-08-08 に実際に
+  誤診した）。west update の出力からこの行を根拠に fetch 失敗を結論しないこと。
 
 - west checkout は fetch refspec が `refs/west/*` のため `origin/<branch>` の remote-tracking ref
   が無いことがある。branch の push 済み判定をローカル ref だけで行わず

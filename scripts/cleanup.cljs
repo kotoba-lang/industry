@@ -113,29 +113,94 @@
 ;;
 ;; 「UNLANDED」= その子リポの成果が default branch に到達していない状態。
 ;; untracked > unpushed > nopr > dirty の順に危険（左ほど git が守ってくれない）。
+(def ^:private remote-tracking-refs-are-not-refreshed-by-west
+  "**`west update --fetch smart` は子リポの remote-tracking ref を更新しない。**
+
+  runbook（manifest/cleanup-workflow.edn の :west-update）は「content-containment は
+  各子リポの *現在の* origin/main に対して判定するので、先に west update を回せ」と
+  書いているが、**west update はその前提を作らない**。`--fetch smart` は pin の SHA に
+  到達するのに必要な分しか fetch せず、pin 自体が upstream より遅れているので、
+  remote-tracking ref は古いままになる。
+
+  対照実験（2026-08-08、kotoba-lang/css）:
+
+    before                      refs/remotes/kotoba-lang/main = 6eda5ee
+    GitHub main                                               = 82aa184
+    west update --fetch smart css の直後                       = 6eda5ee  ← 動かない
+    git fetch kotoba-lang の直後                               = 82aa184  ← 正しい
+
+  したがって **判定の直前に、その repo で明示的に fetch する**のが唯一の正しい前提。
+  west update が保証するのは『checkout が pin に一致すること』だけで、
+  『upstream が最新であること』ではない。
+
+  併せて（誤診しないために）: west 実行中に大量に出る `error: could not read IPC
+  response` は **fetch でも認証でもなく core.fsmonitor の IPC** である。
+  ~/.gitconfig に core.fsmonitor=true があり、実測 983 個の fsmonitor--daemon が
+  常駐している。素の `git status` でも同じ行が出て、`-c core.fsmonitor=false` を
+  付けると消える。west のログではこの行の直後に `HEAD is now at …` が続くため
+  『fetch が失敗している』と読み違えやすいが、無関係。"
+  :documentation-only)
+
+(def primary-remote
+  "この repo の upstream remote 名。**`origin` 決め打ちにしてはいけない。**
+
+  west は remote を manifest の remote 名（`kotoba-lang` / `cloud-itonami` /
+  `gftdcojp` …）で作るので、west 管理下の repo には `origin` が **無い方が多い**。
+  実測 2026-08-08（orgs/ 配下 273 repo をサンプル）: **197 repo (72%) に `origin`
+  が無い**。
+
+  この関数が無かったせいで survey は 3 箇所で静かに誤答していた:
+
+  1. `repo-slug` が nil に落ちる → PR 照会が丸ごと行われず、`nopr` 判定が付かない
+  2. `merged-into-default?` の `origin/<default>` が解決しない → `merge-base
+     --is-ancestor` が fatal になり `landed?` が **常に false** → **その repo の
+     全 branch が未着地として報告される**
+  3. `already-upstream?` の `origin/<default>:path` が解決しない → 内容が既に
+     upstream にある untracked を「未着地の WIP」として最上位に押し上げる
+
+  どれも「エラー」ではなく **UNLANDED 方向への過剰報告**として出るので、
+  survey が賑やかになるほど正しく見えるという最悪の壊れ方をしていた。
+
+  同じ関数と同じ docstring が `scripts/cleanup-land.cljs` には既にある
+  （そちらは 2026-07-30 に同じ罠を踏んで直した）。survey 側へ port されていな
+  かった。
+
+  `origin` があればそれを優先し、無ければ最初の remote を使う。remote が1つも
+  無ければ \"origin\" を返す（呼び出し側の ref 解決が従来どおり失敗するだけで、
+  新しい失敗モードを増やさない）。"
+  (memoize
+   (fn [dir]
+     (let [rs (->> (str/split-lines (or (gitc dir "remote") ""))
+                   (map str/trim) (remove str/blank?) vec)]
+       (cond (some #{"origin"} rs) "origin"
+             (seq rs)              (first rs)
+             :else                 "origin")))))
+
 (defn- repo-slug
   "子リポの GitHub slug。remote URL から採る（gh repo view はネットワーク往復が
   重いので使わない）。取れなければ nil。"
   [dir]
-  (some-> (gitc dir "remote" "get-url" "origin")
+  (some-> (gitc dir "remote" "get-url" (primary-remote dir))
           str/trim
           (as-> u (or (second (re-find #"github\.com[:/](.+?)(?:\.git)?$" u)) nil))))
 
 (defn- default-branch
-  "origin/HEAD が指す既定ブランチ。未設定なら main を仮定する。"
+  "<remote>/HEAD が指す既定ブランチ。未設定なら main を仮定する。"
   [dir]
-  (or (some-> (gitc dir "symbolic-ref" "--quiet" "refs/remotes/origin/HEAD")
-              str/trim (str/replace #"^refs/remotes/origin/" "") not-empty)
-      "main"))
+  (let [rem (primary-remote dir)]
+    (or (some-> (gitc dir "symbolic-ref" "--quiet" (str "refs/remotes/" rem "/HEAD"))
+                str/trim (str/replace (re-pattern (str "^refs/remotes/" rem "/")) "") not-empty)
+        "main")))
 
 (defn- ahead-of-remote
-  "ローカル branch が origin/<branch> より何 commit 先行しているか。
+  "ローカル branch が <remote>/<branch> より何 commit 先行しているか。
   upstream が無ければ :no-remote。"
   [dir branch]
-  (if-not (gitc dir "rev-parse" "--verify" "--quiet" (str "refs/remotes/origin/" branch))
-    :no-remote
-    (some-> (gitc dir "rev-list" "--count" (str "origin/" branch ".." branch))
-            str/trim parse-long)))
+  (let [rem (primary-remote dir)]
+    (if-not (gitc dir "rev-parse" "--verify" "--quiet" (str "refs/remotes/" rem "/" branch))
+      :no-remote
+      (some-> (gitc dir "rev-list" "--count" (str rem "/" branch ".." branch))
+              str/trim parse-long))))
 
 (def ^:private pr-list-limit
   "1 repo あたり取得する open PR の上限。到達したら truncated として必ず報告する
@@ -185,9 +250,13 @@
           :else nil)))))
 
 (defn- merged-into-default?
-  "branch の tip が既に default branch から到達可能か（= 着地済み）。"
+  "branch の tip が既に default branch から到達可能か（= 着地済み）。
+
+  remote 名は primary-remote で解決する。`origin/` 決め打ちだと 72% の repo で
+  ref が解決せず gitc が nil を返し、**全 branch が「未着地」になる**。"
   [dir branch default]
-  (boolean (gitc dir "merge-base" "--is-ancestor" branch (str "origin/" default))))
+  (boolean (gitc dir "merge-base" "--is-ancestor" branch
+                  (str (primary-remote dir) "/" default))))
 
 (defn- annex?
   "git-annex / DataLad dataset か。実測: orgs/gftdcojp/m365-archive は untracked=15945
@@ -256,11 +325,14 @@
   cleanup-land にかけたところ **全件が内容一致で既に main にあった**。つまり
   untracked= は runbook が最も危険と位置づけるマーカーなのに、実際には安全な
   ケースを大量に上位に押し上げていた。ビルド副産物(junk-path?)とは別クラスの
-  誤検知なので、別に潰す。判定はローカルのみ（origin/<default> は fetch 済み前提）。"
+  誤検知なので、別に潰す。判定はローカルのみ（<remote>/<default> は fetch 済み前提
+  —— **その前提は `west update --fetch smart` では満たされない**。下の
+  remote-tracking-refs-are-not-refreshed-by-west 参照）。"
   [dir default path]
   ;; gitc は `git -C dir` なので path は dir 相対でよい。
   (let [local-sha (some-> (gitc dir "hash-object" path) str/trim)
-        upstream-sha (some-> (gitc dir "rev-parse" (str "origin/" default ":" path)) str/trim)]
+        upstream-sha (some-> (gitc dir "rev-parse"
+                                   (str (primary-remote dir) "/" default ":" path)) str/trim)]
     (and local-sha upstream-sha (= local-sha upstream-sha))))
 
 (def ^:private branch-cap
