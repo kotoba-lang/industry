@@ -157,13 +157,20 @@
             z (* r (Math/sin a))]
         (recur (inc i) s2 (into acc (tree x z)))))))
 
-(defn ground []
+(defn ground
+  "The ground slab.
+
+  Sized from the camera's `far` plane rather than from the street, because it is scenery
+  and not a place: a slab sized to the street is a slab a wide viewport can see the edge
+  of, and sky appearing past the corners of the world reads as a rendering fault. There is
+  no skybox behind it — the clear colour is the horizon — so the slab has to cover
+  everything the camera can reach."
+  []
   ;; `:pos` is the point a box STANDS on and it extends UP by its height, so a 1-unit slab
   ;; whose top must be y=0 stands at y=-1. Standing it at -0.5 puts its top at +0.5 and
   ;; swallows the road, which sits at 0.02 — the first CLI render showed a street with no
   ;; road on it and no error anywhere.
-  [(inst :ground [0.0 -1.0 0.0] ground-color
-         [(* street-radius 4.0) 1.0 (* street-radius 4.0)] {})])
+  [(inst :ground [0.0 -1.0 0.0] ground-color [8000.0 1.0 8000.0] {})])
 
 (defn player
   "The little figure from the reference, standing outside the shop that is open."

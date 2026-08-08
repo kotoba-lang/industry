@@ -117,13 +117,32 @@ ray put one entirely behind the other, and a building you cannot see is one you 
 `tapping-a-shop-resolves-to-that-district` taps each shop at its own projected centre and
 demands that shop back, so any layout where one hides another fails the suite.
 
+**The page opens on the street.** `preview/street.cljs` draws the 3D map in the browser
+through the same `world3d/render-ir`, and tapping a shopfront opens that district's board —
+`preview/gl.cljs` binds the buffers, `kami.webgpu.pick` resolves the tap. Closing an audit
+unlocks the next business, so the street is the game's spine rather than an illustration of
+it. Until 2026-08-08 the 3D street existed only as a PNG the CLI produced while the page
+showed a 2D board of one shop, and this section claimed otherwise.
+
+The engine runs in the browser under **squint**, which is a different compiler from the one
+the JVM tests and the nbb CLI use. `npm run parity` is what keeps that from being a second
+engine: see “A compiler that is wrong quietly”.
+
 `world.cljc` (2D sprite IR) remains as the fallback view and still passes its own tests.
 
 ### What is and is not verified
 
-**Verified:** the IR against the real engine's camera and picking math on the JVM, and —
-since `bin/render.cljs` — the frame actually drawing in real WebGL 2.0, through the
-engine's own GLSL, with pixels read back (`preview/street.png`).
+**Verified:** the IR against the real engine's camera and picking math on the JVM; the frame
+actually drawing in real WebGL 2.0 through the engine's own GLSL, with pixels read back
+(`preview/street.png`); and the same drawing happening **in the page**, with the browser smoke
+test reading the canvas back and requiring more than one distinct colour — a blank canvas has
+exactly one, and `non-background > 0` passes it, which is how the first version of this check
+reported success on nothing.
+
+`bin/render.cljs` and the page share one implementation: the CLI bundles
+`preview/render_entry.cljs`, which calls the same `preview/gl.cljs` the page calls. It used to
+inject a hand-written JavaScript transcription of the same procedure. Two copies of one
+sequence agree until one is edited, and nothing announces that day.
 
 **Still outstanding**, and part of CLAUDE.md's completion criteria for 3D: **WebGPU pixels**
 (the path runs and validates, but the device is lost before anything is drawn — see above),
@@ -184,6 +203,9 @@ it does not compile.
 | `test/district_test.cljs` | 103 checks (nbb) — all eight boards reachable, and the never-auto op absent from `:auto` at every phase in every one |
 | `test/balance.cljs` | tuning probe — plays four seeds and reports what killed each run |
 | `preview/ui.cljs` | browser shell, compiled by squint; holds no rules, draws only `summary` |
+| `preview/gl.cljs` | the only WebGL 2.0 plumbing — context, buffers, draw, pick. No geometry, no matrices, no shading. |
+| `preview/street.cljs` | the 3D street in the page: draw the map, turn a tap into a district |
+| `preview/render_entry.cljs` | the CLI's page-side entry, so `bin/render.cljs` runs the page's own code |
 | `preview/build.cljs` | squint → esbuild → one self-contained `preview/index.html` |
 | `preview/smoke.cljs` | headless-Chromium check that the built page actually plays |
 | `src/itonami/isic_9601/world.cljc` | the street: district registry, unlock ladder, and the 2D sprite render-IR |

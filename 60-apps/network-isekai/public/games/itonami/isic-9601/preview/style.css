@@ -296,3 +296,26 @@ code {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* --- the 3D street ------------------------------------------------------- */
+/* The canvas is sized in CSS and its backing store in JS; `street/size` reads this box.
+   `display:block` matters — an inline canvas gets a text baseline gap underneath it. */
+#street-wrap { margin: 0 0 1rem; }
+#street-canvas {
+  display: block; width: 100%; height: min(58vh, 30rem);
+  border-radius: 14px; background: #87bdec; cursor: pointer;
+}
+.street__hud { display: flex; gap: 1.5rem; margin: .5rem 0 .75rem; }
+.street__list { list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .5rem; }
+.dist { display: grid; grid-template-columns: auto 1fr; gap: .1rem .5rem;
+  padding: .5rem .7rem; border-radius: 10px; cursor: pointer;
+  background: color-mix(in srgb, currentColor 6%, transparent); }
+.dist--locked { opacity: .45; cursor: default; }
+.dist__lock { grid-row: 1 / 3; align-self: center; }
+.dist__label { font-weight: 600; }
+.dist__isic, .dist__subject { font-size: .78rem; opacity: .7; }
+.dist__subject { grid-column: 2; }
+.shop__back { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
+.shop__which { font-weight: 600; }
+.shop__isic { font-size: .78rem; opacity: .6; }

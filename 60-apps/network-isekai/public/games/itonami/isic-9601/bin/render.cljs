@@ -31,6 +31,7 @@
     nbb bin/render.cljs [--out FILE] [--width N] [--height N] [--cleared N] [--engine DIR]"
   (:require ["node:fs" :as fs]
             ["node:http" :as http]
+            ["node:child_process" :as cp]
             ["node:path" :as path]
             [clojure.string :as str]
             [promesa.core :as p]
@@ -98,89 +99,22 @@
 ;; plumbing
 ;; --------------------------------------------------------------------------
 
-(def page-js "
-  const {VERT, FRAG, POS, NOR, IDX, INST, G, W, H, N} = window.__frame;
-  const cv = Object.assign(document.createElement('canvas'), {width: W, height: H});
-  const gl = cv.getContext('webgl2', {antialias: true, preserveDrawingBuffer: true});
-  if (!gl) return {ok: false, reason: 'no webgl2 context'};
+(def webgl-bundle
+  "The WebGL 2.0 path, compiled from `preview/render_entry.cljs`.
 
-  function sh(type, src) {
-    const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) return gl.getShaderInfoLog(s);
-    return s;
-  }
-  const vs = sh(gl.VERTEX_SHADER, VERT); if (typeof vs === 'string') return {ok:false, reason:'VS '+vs};
-  const fs = sh(gl.FRAGMENT_SHADER, FRAG); if (typeof fs === 'string') return {ok:false, reason:'FS '+fs};
-  const p = gl.createProgram(); gl.attachShader(p, vs); gl.attachShader(p, fs); gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) return {ok:false, reason:'link '+gl.getProgramInfoLog(p)};
-
-  const verts = new Float32Array(POS.length * 2);
-  for (let i = 0; i < POS.length / 3; i++) {
-    verts[i*6+0]=POS[i*3]; verts[i*6+1]=POS[i*3+1]; verts[i*6+2]=POS[i*3+2];
-    verts[i*6+3]=NOR[i*3]; verts[i*6+4]=NOR[i*3+1]; verts[i*6+5]=NOR[i*3+2];
-  }
-  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
-  const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb);
-  gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 24, 0);
-  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 24, 12);
-
-  // instance attrs read out of the canonical 32-float stride (128 bytes); the lit shader
-  // wants the first 24 floats — model rows, colour, material
-  const ib = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ib);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(INST), gl.STATIC_DRAW);
-  [[2,0],[3,16],[4,32],[5,48],[6,64],[7,80]].forEach(([loc, off]) => {
-    gl.enableVertexAttribArray(loc);
-    gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, 128, off);
-    gl.vertexAttribDivisor(loc, 1);
-  });
-
-  const eb = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, eb);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(IDX), gl.STATIC_DRAW);
-
-  const gb = gl.createBuffer(); gl.bindBuffer(gl.UNIFORM_BUFFER, gb);
-  gl.bufferData(gl.UNIFORM_BUFFER, new Float32Array(G), gl.STATIC_DRAW);
-  let bound = 0;
-  ['G_block_0Vertex','G_block_0Fragment'].forEach(n => {
-    const i = gl.getUniformBlockIndex(p, n);
-    if (i !== gl.INVALID_INDEX) { gl.uniformBlockBinding(p, i, 0); bound++; }
-  });
-  gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, gb);
-
-  gl.useProgram(p);
-  // no shadow pass here: bind a 1x1 fully-lit depth texture so the PCF taps read 'unshadowed'
-  const st = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, st);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT24, 1, 1, 0,
-                gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, new Uint32Array([0xffffffff]));
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  // the shader declares `sampler2DShadow`, so the texture must be in compare mode or the
-  // draw is INVALID_OPERATION with nothing else to say about it
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_MODE, gl.COMPARE_REF_TO_TEXTURE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_COMPARE_FUNC, gl.LEQUAL);
-  const sloc = gl.getUniformLocation(p, '_group_0_binding_1_fs');
-  if (sloc) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, st); gl.uniform1i(sloc, 0); }
-
-  gl.viewport(0, 0, W, H);
-  gl.enable(gl.DEPTH_TEST);
-  gl.clearColor(0.53, 0.74, 0.93, 1.0);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-  gl.drawElementsInstanced(gl.TRIANGLES, IDX.length, gl.UNSIGNED_SHORT, 0, N);
-
-  const err = gl.getError();
-  const px = new Uint8Array(W * H * 4);
-  gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px);
-  let nonSky = 0; const colors = new Set();
-  for (let i = 0; i < px.length; i += 4) {
-    colors.add((px[i]>>4)+','+(px[i+1]>>4)+','+(px[i+2]>>4));
-    if (!(Math.abs(px[i]-135)<12 && Math.abs(px[i+1]-189)<12 && Math.abs(px[i+2]-237)<12)) nonSky++;
-  }
-  return {ok:true, glError:err, blocks:bound, nonSkyPixels:nonSky, distinctColors:colors.size,
-          renderer:(gl.getExtension('WEBGL_debug_renderer_info') ?
-                    gl.getParameter(gl.getExtension('WEBGL_debug_renderer_info').UNMASKED_RENDERER_WEBGL) : 'n/a'),
-          png: cv.toDataURL('image/png')};
-")
-
+  It used to be a JavaScript string in this file — the same create-context/bind/draw/read-back
+  sequence the preview page performs, transcribed by hand a second time. Two transcriptions of
+  one procedure agree until one of them is edited, and nothing reports the day that happens.
+  Building the page's own module here means the picture this CLI verifies is drawn by the code
+  the page runs, which is the only reason a headless render is evidence about the product."
+  (let [entry (path/join here ".build/render_entry.mjs")
+        out (path/join here ".build/render_entry.js")]
+    (cp/execSync "npx --yes squint-cljs@0.8.147 compile"
+                 #js {:cwd here :stdio "ignore"})
+    (cp/execSync (str "npx --yes esbuild@0.25.0 " entry " --bundle --format=iife "
+                      "--target=es2020 --inject:preview/squint_shim.mjs --outfile=" out)
+                 #js {:cwd here :stdio "ignore"})
+    (fs/readFileSync out "utf8")))
 
 (def webgpu-js "
   const {WGSL, POS, NOR, IDX, INST, G, W, H, N} = window.__frame;
@@ -364,7 +298,12 @@
                 (println (str "           got as far as " (str/join " → " (:stages gpu-r))))))
           raw (if (= used "webgpu")
                 gpu-raw
-                (.evaluate page (str "(async () => {" page-js "})()")))
+                (.evaluate page
+                           (str webgl-bundle
+                                ";window.__render(" (js/JSON.stringify
+                                                     #js {:width W :height H :cleared cleared
+                                                          :vert (glsl "lit.vert")
+                                                          :frag (glsl "lit.frag")}) ")")))
           _ (.close browser)
           _ (.close srv)]
     (let [r (js->clj raw :keywordize-keys true)]

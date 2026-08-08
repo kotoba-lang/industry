@@ -5,10 +5,23 @@
   Run from the repo root:
     npx nbb 60-apps/network-isekai/public/games/itonami/isic-9601/preview/build.cljs
 
-  Pipeline: squint compiles `logic.cljc` and `ui.cljs` to ESM, esbuild bundles
+  Pipeline: squint compiles the game and the engine to ESM, esbuild bundles
   them with squint's core into one dependency-free script, and that script is
-  inlined into the page together with the stylesheet. Nothing is fetched at
-  runtime, so the page works offline and inside a strict CSP.
+  inlined into the page together with the stylesheet and the engine's GLSL.
+  Nothing is fetched at runtime, so the page works offline and inside a strict
+  CSP.
+
+  Two details are load-bearing:
+
+  `--inject:preview/squint_shim.mjs` supplies the two core functions squint does
+  not implement. Without it the page dies at first paint with a `ReferenceError`
+  naming a Clojure function, from inside minified engine code.
+
+  The GLSL is read from the engine's own `fixtures/glsl/` and inlined as
+  `window.__GLSL`. It is generated from the one EDN shader the WGSL also comes
+  from, so the page and the WebGPU path are shading the same scene description
+  — copying the shader source here instead would be a second renderer wearing
+  the first one's numbers.
 
   The page is deliberately fragment-shaped (no <!doctype>/<html>/<body>): it
   renders standalone in a browser and can also be published verbatim as an
@@ -38,9 +51,21 @@
 
 (println "[2/3] esbuild bundle")
 (sh (str "npx --yes esbuild@0.25.0 .build/ui.mjs --bundle --format=iife "
-         "--minify --target=es2020 --outfile=.build/bundle.js"))
+         "--minify --target=es2020 --inject:preview/squint_shim.mjs "
+         "--outfile=.build/bundle.js"))
 
 (println "[3/3] assemble")
+
+(def engine-root
+  (path/resolve here "../../../../../../orgs/kotoba-lang/webgpu"))
+
+(defn- glsl [f]
+  (let [p (path/join engine-root "fixtures" "glsl" f)]
+    (when-not (fs/existsSync p)
+      (println (str "  missing " p))
+      (println "  west update --fetch smart webgpu")
+      (js/process.exit 3))
+    (fs/readFileSync p "utf8")))
 
 (def style (fs/readFileSync (path/join here "preview/style.css") "utf8"))
 (def script (fs/readFileSync (path/join here "preview/../.build/bundle.js") "utf8"))
@@ -52,21 +77,26 @@
    "<main class='wrap'>\n"
    "  <header class='top'>\n"
    "    <h1 class='hig-title'>クリーニング営み</h1>\n"
-   "    <p class='hig-subhead'>ISIC Rev.5 9601 — 洗濯・ドライクリーニング業の governed actor を、そのまま放置系タイクーンにしたもの。</p>\n"
-   "    <p class='lede'>ルールは考案したものではなく <code>cloud-itonami/cloud-itonami-isic-9601</code> からの転写です。"
-   "5つの工程は <code>laundry.phase/write-ops</code>、段階の梯子は <code>laundry.phase/phases</code>、"
-   "6つの HOLD は <code>laundry.governor</code> の HARD チェック。"
-   "<b>洗浄</b> と <b>返却</b> だけは、どれだけ店が大きくなっても自動化されません — "
-   "phase 3 の <code>:auto</code> 集合が <code>#{:garment/intake}</code> 1つきりだからです。</p>\n"
+   "    <p class='hig-subhead'>cloud-itonami の governed actor 8 つを、そのまま放置系タイクーンにしたもの。</p>\n"
+   "    <p class='lede'>ルールは考案したものではなく、8 つの repo "
+   "(<code>cloud-itonami-isic-{9601,4520,9609,8121,8129,3700,3811,3900}</code>) の "
+   "<code>phase.cljc</code> と <code>governor.cljc</code> からの転写です。"
+   "<b>どの店にも、どの段階でも自動化されない工程が必ずあります</b> — 街全体で 9 件。"
+   "放置ゲーは全部を自動化するゲームなので、その 1 件が自動化されないことが、そのまま遊びになっています。</p>\n"
+   "    <p class='fine'>街をタップして店に入ります。3D は <code>kami.webgpu</code> の "
+   "canonical render-IR を WebGL 2.0 で描いたもので、CLI の PNG と同じ数値です。</p>\n"
    "  </header>\n"
+   "  <div id='street-wrap'><canvas id='street-canvas'></canvas></div>\n"
    "  <div id='shop'></div>\n"
    "  <footer class='foot'>\n"
-   "    <p>遊び方: 工程が満ちたら <b>承認</b>。<b>取扱方法</b> で洗濯表示と提案処理が食い違っていたら <b>差し戻す</b> — "
-   "そのまま通すと <b>洗浄</b> で governor が HOLD し、顧客の信頼を失います。"
-   "資格が切れたら全工程が止まるので更新を。40点returnで監査クローズ。</p>\n"
+   "    <p>遊び方: 工程が満ちたら <b>承認</b>。2 番目の工程で提示された根拠と提案が食い違っていたら <b>差し戻す</b> — "
+   "そのまま通すと後段で governor が HOLD し、顧客の信頼を失います。"
+   "資格が切れたら全工程が止まるので更新を。40 件で監査クローズ、隣の営みが開きます。</p>\n"
    "    <p class='fine'>プレビュー実装。乱数は <code>:seed</code> から決定的に回るので、同じ種は同じ試合になります。</p>\n"
    "  </footer>\n"
    "</main>\n"
+   "<script>window.__GLSL=" (js/JSON.stringify #js {:vert (glsl "lit.vert")
+                                                     :frag (glsl "lit.frag")}) ";</script>\n"
    "<script>" script "</script>\n"))
 
 (fs/writeFileSync out markup)
