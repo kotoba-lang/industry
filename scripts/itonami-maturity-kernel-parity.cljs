@@ -2,8 +2,17 @@
 ;; scripts/itonami-maturity-kernel-parity.cljs — Kotoba カーネルと cljs 参照実装の
 ;; **完全一致**ゲート。ADR-2608052000。
 ;;
-;;   nbb --classpath "<kotoba-lang/compiler/src>" \
-;;     scripts/itonami-maturity-kernel-parity.cljs \
+;; compiler の **依存閉包ごと** classpath に載せる。compiler/src だけでは
+;; `Could not find namespace: kotoba.artifact.core` で起動しない（実測 2026-08-08）。
+;; 閉包は compiler/deps.edn の io.github.kotoba-lang/* から引く:
+;;
+;;   CP=".:scripts/nbb_compat:orgs/kotoba-lang/compiler/src:orgs/kotoba-lang/compiler/resources"
+;;   for r in abi artifact io-ipld io-multiformats kotoba-component kotoba-kir \
+;;            kotoba-native kotoba-script kotoba-verifier kotoba-wasm provider tender-native; do
+;;     CP="$CP:orgs/kotoba-lang/$r/src"
+;;     [ -d "orgs/kotoba-lang/$r/resources" ] && CP="$CP:orgs/kotoba-lang/$r/resources"
+;;   done
+;;   nbb --classpath "$CP" scripts/itonami-maturity-kernel-parity.cljs \
 ;;     [--evidence manifest/itonami-maturity-evidence.edn] \
 ;;     [--datoms 90-docs/system-dynamics/itonami-maturity.datoms.edn] \
 ;;     [--kernel 90-docs/system-dynamics/kotoba/itonami_maturity_kernel.kotoba] \
@@ -33,11 +42,20 @@
 ;; **生成済み datom 面の fleet-summary から読む。** ここで再計算すると
 ;; 「検査対象の答えを検査側が仮定する」ことになる。
 
+;; ## KIR は compiler ではなく kotoba-kir にある（2026-08-08 修正）
+;;
+;; この gate は当初 `kotoba.compiler.ir` を require していたが、
+;; **ADR-2607266000 Phase B がその名前空間を compiler から撤去した**
+;; （「compiler は frontend -> KIR だけを所有し、残りは consume する」）。
+;; 以来この gate は `Could not find namespace` で **一度も起動できていなかった** ——
+;; 落ちたのではなく走らなかったので、「スコア算術はカーネルと一致している」が
+;; 誰にも検査されないまま計測が landed し続けていた。
+;; `lower` / `execute` は名前も引数も同じまま移っただけなので require の差し替えで足りる。
 (ns itonami-maturity-kernel-parity
   (:require [clojure.string :as str]
             [clojure.edn :as edn]
             [kotoba.compiler.frontend :as frontend]
-            [kotoba.compiler.ir :as ir]
+            [kotoba.kir :as ir]
             ["fs" :as fs]
             ["path" :as npath]))
 
