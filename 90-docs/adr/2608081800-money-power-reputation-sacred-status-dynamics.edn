@@ -15,7 +15,9 @@
   :adr/authoritative_for
   ["三層命題（money 移転可 / reputation 獲得可・移転不可 / sacred status 購入不可）が etzhayyim と engi にどこまで実装されているかの実測結果"
    "money / power vector / reputation / sacred status の system dynamics モデルの正本は 90-docs/system-dynamics/money-power-sacred.cljs であること"
-   "そのモデルの数値のうち引用してよいのは構造的結論だけで、水準の絶対値は引用してはならないこと（キャリブレーション用の実データが 1 件も無いため）"]
+   "そのモデルの数値のうち引用してよいのは構造的結論だけで、水準の絶対値は引用してはならないこと（キャリブレーション用の実データが 1 件も無いため）"
+   "4 つの結論のうちどれがパラメータ空間で頑健かの実測（B 100% / D 97.5% / A 90.8% / C 36.8%）"
+   "C（φ 応答の内部最大）は基準パラメータの性質であって構造の性質ではないこと"]
 
   :adr/body
   "## 何を問われたか
@@ -180,4 +182,112 @@ sec 3.5.4 の PULSE/STEP/RAMP が TIME を引数に取らず env から読むこ
   順位はどうか）だけで、Sacred_Total = 12.58 のような水準の絶対値ではない。
 - XMILE の配列・conveyor・queue は使っていない（org-oasis-open-xmile v1 が未実装）。
 - etzhayyim の実測は checkout 済みのファイルに対するものである。west は必要になるまで
-  取得しないので、未 checkout の repo に別の実装がある可能性は排除していない。"}]
+  取得しないので、未 checkout の repo に別の実装がある可能性は排除していない。
+
+## ロバストネス解析 —— 較正できないなら「値」ではなく「値への依存」を測る（2026-08-08 追記）
+
+較正用の実データはこの workspace に無い。`kotoba-lang/dynamics` の `loop-archetypes` は
+52 件あるが cycle-time の実測は 0 件（ライブラリ自身が推測値を返さず nil を返す設計）、
+`market-intel` や `internet-accounts` は実データだが神聖性に対応する観測量を持たない。
+そこで較正の代わりに、**どの結論がパラメータ値に依存しないか**を測った。
+
+方法: 全パラメータを log-uniform ×[1/1.5, 1.5] で摂動。φ/θ/ψ は独立変数なので摂動しない。
+半飽和定数 K は設計則 K = kfrac·g/δ を摂動後の g,δ から再計算する（kfrac ~ U(0.30,0.60)）
+—— これをしないと大半の draw が不感帯に落ち、『結論が頑健か』ではなく『モデルが退化するか』
+を測ることになる。T=300 / dt=1.0 / seed 固定。退化して除外された draw は 0 件。
+
+| 結論 | 成立率 | 判定 |
+|---|---|---|
+| B Money は power multiplier の下位半分 | **200/200 = 100%** | 完全に構造的 |
+| D ψ（商業化の罰）のほうが θ（防火壁）より効く | **390/400 = 97.5%** | 構造的 |
+| A 到達点は初期資本 M0 に依らない | **363/400 = 90.8%** | ほぼ構造的 |
+| C φ 応答が内部最大を持つ（非単調） | **147/400 = 36.8%** | **構造的ではない** |
+
+Money の順位分布は 11 位:14 / 12 位:42 / 13 位:94 / 14 位:50。400 通りの重み付けで
+**一度も上位半分に入らなかった**。中央値 13 位、最良でも 11 位。
+
+**C の扱いを改める。**φ 応答の非単調性（S_elite は φ=0 で最大、S_mass は φ=0.6 で最大、
+S_total は φ=0.4 で最大）は基準パラメータでは実測どおり成り立つが、±50% 摂動すると
+6 割の draw で消える。したがって『金と力の摩擦には最適点がある』は**この重み付けの性質
+であって、この構造の性質ではない**。本 ADR の結果節 6 と artifact の該当箇所はこの但し書き
+つきで読むこと。
+
+A が落ちる 9.2% も記録しておく。そこでは初期資本が到達点を変えており、最初の議論で
+仮説として出た『ある閾値以上の money で分岐する』現象がパラメータ空間の一部に実在する
+ことを意味する。基準点には無い。
+
+実装は `90-docs/system-dynamics/money-power-sacred-robustness.cljs`、
+生の出力は `90-docs/system-dynamics/robustness-2608081800.log`。
+
+## 解釈から生成へ —— 274 倍（2026-08-08 追記）
+
+上のロバストネス解析は当初 `xmile.execute`（解釈）で回して 35 分で 60 draw しか進まず、
+完走に数時間かかる見込みだった。分解して測った結果:
+
+- マシン負荷の寄与は約 26%（`8.42 real / 6.20 user` = CPU 効率 74%、load average 75–94）。支配的ではない
+- **支配的なのは解釈そのもの**。1 run = 動的な非-stock 変数 72 × 評価 1,501 回 = **108,072 回**
+  の式木評価で、1 回あたり **23.9〜35.2 µs**。変数ごとに `m/lookup`（入れ子 map）→ 式木の
+  再帰走査（`:ref` ごとに約 170 キーの PersistentHashMap へ `contains?` + `get`）→ `assoc` で
+  環境を作り直している
+
+同じ式木から JS を生成し（定数はリテラルに畳み込み、stock は Float64Array の添字に束縛）、
+直線的な浮動小数コードにした:
+
+| | |
+|---|---|
+| 解釈（xmile.execute） | 3,804.3 ms/run — 1 変数評価 35.2 µs |
+| 生成 JS | **13.87 ms/run** — 1 変数評価 0.128 µs |
+| 倍率 | **274×** |
+| 出力の一致 | 全 stock で相対差 0.000000000 |
+| 生成コード | 177 変数で 6,425 bytes |
+
+**速いのは表現であって、ランタイムでも言語でもない。**これは
+`kotoba-lang/org-oasis-open-xmile` の欠陥ではない —— 40 ステップの bathtub では解釈コストは
+見えず、2,000 run × 108k 評価で初めて効く。上流に `xmile.compile`（モデル → クロージャ）を
+任意経路として足すのが自然な follow-up で、大きいモデルを回す誰にでも効く。
+
+## kotoba-native へコンパイルできるか（2026-08-08 追記、実測）
+
+**backend の場所について CLAUDE.md の記述が古い。**「`compiler/src/kotoba/compiler/backend/
+x86_64.cljc`」は存在せず、そこには `cljs.clj` しかない（pin は upstream main と identical
+なので checkout が古いのではない）。native backend は ADR-2607266000 で
+**`kotoba-lang/kotoba-native`** に切り出されている（`kotoba.native.x86-64` /
+`kotoba.native.aarch64` / `kotoba.native.elf64` を所有）。索引（`repo-search`）を引いて判明した。
+
+native の f64 演算表は x86_64 と aarch64 で**完全に一致**する:
+`f64-abs add div eq ge gt le lt max min mul neg sqrt sub unordered`。
+`exp` / `log` / `sin` / `cos` は無い。整数ビット演算も `bit-not` だけ（and/or/shift 無し）
+なので、指数部をビットで抜く常套手段は使えない。f64 は整数レジスタに IEEE-754 の
+ビット列として置かれ、`f64-from-bits` / `f64-to-bits` は何も emit しない。
+
+**それでも backend 変更なしでコンパイルできる。**native が既に emit できる演算だけで
+exp / log / pow を書いて精度を実測した:
+
+| | 最大相対誤差 | 対 libm 速度 |
+|---|---|---|
+| exp（モデルの範囲 x∈[-6,0]） | 2.44e-14 | 5.3× 遅い |
+| log（x∈(0,1]） | 2.37e-15 | 9.2× 遅い |
+| pow（一般指数） | 1.47e-12 | — |
+| `^0.5` → `f64-sqrt` に特殊化 | 厳密 | **0.92×（libm の pow より速い）** |
+
+RK4 の打ち切り誤差は dt=1 で ~1e-4 なので、数値的には 10 桁の余裕がある。
+アルゴリズムは exp = 1/256 に縮小 → 7 項 Horner → 8 回二乗（逆数を定数畳み込みして
+除算を消すと 17.4× → 5.3×）、log = `f64-sqrt` 反復縮小 → atanh 級数、pow = exp∘log。
+
+`vector-f64-*` は両 backend で汎用 vector と同じ表にエイリアスされているので、RK4 の
+state 配列（17 要素）もそのまま通る。再帰的値（W4 待ち）も `[:set T]` の 32 要素上限も
+このモデルには無関係。
+
+手順: ① `f64-math.kotoba`（exp/log/pow、backend 変更なし）② XMILE → `.kotoba` emitter
+（JS 用の式木ウォークを流用。**定数指数の特殊化を入れること** —— 冪 18 箇所のうち 10 箇所が
+`^0.5`＝`f64-sqrt` 一命令、2 箇所が `^3`＝乗算 2 回になり、一般 pow は 6 箇所に減る）
+③ RK4 driver を `[:vector :f64]` 上の末尾自己再帰で ④ 結果は `kgraph-assert` か capability で
+取り出す ⑤ `lang_native_conformance.clj` + `backend_qualification.clj` を通し、
+12 桁一致の JS 版を参照解として突き合わせる。
+
+**ただし native が JS より速いとは限らない。**このモデルは超越関数が重く（derivs 1 回あたり
+一般 pow 6 + exp 1 が残る）、ソフトウェア実装の 5〜9 倍のペナルティと、native 側の利得
+（boxing なし・JIT 無関係・境界検査なし）が正面からぶつかる。どちらが勝つかは測らないと
+分からない。native を明確に勝たせたいなら入れる価値がある backend 変更は 1 つだけ —
+**`f64-exp` と `f64-log`**。上で 1e-14 の精度が出る命令列を実測したので、backend はその列を
+そのまま inline で吐けばよい。"}]
