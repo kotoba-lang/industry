@@ -652,7 +652,6 @@
   ["90-docs/deployment/MONTH-3-GRACEFUL-RUST-DRAIN.edn"
    "90-docs/deployment/MONTH-3-MANUAL-ROLLBACK-DECISION-TREE.edn"
    "90-docs/deployment/MONTH-3-TEAM-ASSIGNMENTS.edn"
-   "90-docs/gates/METRICS-DEPLOYMENT-READINESS-2026-08-08.edn"
    "90-docs/gates/weekly-checkpoint-structure.edn"
    "90-docs/migration/M5-M6-checkpoint-procedures.edn"])
 
