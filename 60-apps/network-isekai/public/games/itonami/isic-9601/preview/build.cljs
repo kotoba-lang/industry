@@ -17,7 +17,14 @@
             ["node:path" :as path]
             ["node:child_process" :as cp]))
 
-(def here (path/join (js/process.cwd) "60-apps/network-isekai/public/games/itonami/isic-9601"))
+(def here
+  "This package's directory, resolved from the script's own path rather than the working
+  directory. It used to be `(path/join (js/process.cwd) \"<the whole path>\")`, which meant
+  the build only worked when run from the repo root and failed from anywhere else with
+  `spawnSync /bin/sh ENOENT` — the cwd handed to the subprocess did not exist, and the
+  error names the shell rather than the directory. `npm run build` from this package hit
+  exactly that."
+  (path/resolve (path/dirname *file*) ".."))
 (def out (path/join here "preview/index.html"))
 
 (defn sh [cmd]

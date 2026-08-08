@@ -150,15 +150,14 @@ it does not compile.
 
 | file | what it is |
 |---|---|
-| `logic.cljc` | the whole rule set: a pure `state + event -> state` reducer. No I/O, no atoms, no interop. |
-| `src/itonami/isic_9601/logic.cljc` | the same file on a namespace-shaped path, so nbb and squint can require it |
+| `src/itonami/isic_9601/logic.cljc` | the whole rule set: a pure `state + event -> state` reducer. No I/O, no atoms, no interop. |
 | `test/logic_test.cljs` | 63 checks (nbb) |
 | `test/balance.cljs` | tuning probe — plays four seeds and reports what killed each run |
 | `preview/ui.cljs` | browser shell, compiled by squint; holds no rules, draws only `summary` |
 | `preview/build.cljs` | squint → esbuild → one self-contained `preview/index.html` |
 | `preview/smoke.cljs` | headless-Chromium check that the built page actually plays |
-| `world.cljc` | the street: district registry, unlock ladder, and the 2D sprite render-IR |
-| `world3d.cljc` | the authoritative view: the canonical `kami.webgpu` render-IR |
+| `src/itonami/isic_9601/world.cljc` | the street: district registry, unlock ladder, and the 2D sprite render-IR |
+| `src/itonami/isic_9601/world3d.cljc` | the authoritative view: the canonical `kami.webgpu` render-IR |
 | `bin/kuriningu.cljs` | CLI — `play` / `street` (pure game, no engine needed) |
 | `bin/render.cljs` | CLI — the 3D street through real WebGL 2.0, to a PNG |
 | `test/world3d_test.clj` | 16 tests / 530 assertions, JVM, against the real `kami.webgpu.ir` + `pick` |
@@ -166,10 +165,11 @@ it does not compile.
 | `sdk-patches/` | the upstream `sprite2d` commit, staged until it can be pushed |
 | `game.edn` | network-isekai game metadata |
 
-`logic.cljc` exists twice on purpose: the flat copy is what ports into network-isekai
-(whose guests are flat files), and `src/itonami/isic_9601/logic.cljc` is the same bytes on
-the path a namespace loader needs. **Edit the flat one and copy**; a check that they match
-belongs in the fleet-CI gate when this lands.
+Sources live once, under `src/`. They used to exist twice — a flat copy for a
+network-isekai guest that the port was assumed to want, plus the namespace-shaped path nbb
+and squint need — kept in sync by hand. That assumption is unverified (network-isekai is
+private and its loader has not been read), and carrying a hand-synced duplicate to satisfy
+a guess is worse than flattening at port time, when the loader is actually known.
 
 ## From the command line
 
@@ -205,6 +205,17 @@ texture is bound instead, so the image is the lit pass without shadowing), and t
 GLSL compiler and the real GL state machine.
 
 ### Falling back
+
+**What counts as "it drew something" is the whole check.** The first version asked for
+*more than zero non-background pixels*, and a blank WebGPU frame passed it — a blank canvas
+is black or transparent, not the sky colour, so every pixel of an empty frame counts as
+drawn. `auto` duly reported `used webgpu · 1440000 non-background · 1 distinct colours`.
+The test is now *more than one colour*: a scene of 149 coloured boxes cannot be one colour.
+
+`device.lost` alone is not enough either — it resolves asynchronously, so reading it right
+after submit sometimes sees the loss and sometimes does not. The pixels are the reliable
+evidence, which is the argument for verifying rather than asking, and it applies to the
+verifier too.
 
 The default is `--backend auto`, and it means what it says: **try WebGPU, and fall back on
 the evidence.** In this container that produces

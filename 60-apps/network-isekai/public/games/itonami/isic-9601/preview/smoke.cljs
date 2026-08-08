@@ -14,8 +14,11 @@
             ["playwright" :refer [chromium]]
             [promesa.core :as p]))
 
+(def here (path/resolve (path/dirname *file*) ".."))
+
 (def page-url
-  (str "file://" (path/join (js/process.cwd) "60-apps/network-isekai/public/games/itonami/isic-9601/preview/index.html")))
+  ;; resolved from this script, not from the working directory — see preview/build.cljs
+  (str "file://" (path/join here "preview/index.html")))
 
 (def failures (atom 0))
 
@@ -74,7 +77,7 @@
           _ (is! (and returned (pos? (js/parseInt returned 10)))
                  (str "garments were returned (" returned "/40)"))
 
-          _ (.screenshot page #js {:path "60-apps/network-isekai/public/games/itonami/isic-9601/preview/screenshot.png"
+          _ (.screenshot page #js {:path (path/join here "preview/screenshot.png")
                                    :fullPage true})
           _ (println "  screenshot written")]
     true))

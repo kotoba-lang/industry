@@ -241,6 +241,29 @@
   ;; 直したのに射影を作り直していないと、datom 面が古い規制を返し続ける ——
   ;; 古い値も「それらしい」ので読み手には見分けが付かない。
   ;; :include-ext に .cljc が要るのは、生成器が actor の facts.cljc を読むため。
+  ;; 「クリーニング営み」(ISIC 9601 idle tycoon) の主張の機械検査。
+  ;;
+  ;; ゲームの主張は 1 行に尽きる —— cloud-itonami の governed actor はどれも、どの
+  ;; phase の `:auto` 集合にも入れない操作を最低 1 つ永久に持つ。数字は 8 つの別 repo
+  ;; の `phase.cljc` / `governor.cljc` から転写したもので、転写元と転写先は別 repo・
+  ;; 別 owner。`:auto-at-3` に 1 語足しても `:never-auto` を空にしても **ゲームは
+  ;; 普通に動き続ける** —— 壊れるのは主張だけなので、遊んでも気づけない。
+  ;;
+  ;; repo 側のテストは同じ不変条件を見ているが誰も回していない（Actions は
+  ;; ADR-2607300900 で撤去済み）。ここに載って初めて毎 tip で走る。
+  ;;
+  ;; 2026-08-08 に「落ちること」を確認済み: phase 3 の :auto に :clean を足す /
+  ;; ある district の :never-auto を空にする、の 2 通りでいずれも exit 1。
+  ;;
+  ;; :min-files 20 —— root が tracked で持つ .cljc は 38 件（2026-08-08 実測）。
+  ;; 60 に置いたら**正しい tree で落ちた**ので、実数を見て決め直した。床は
+  ;; 「絞り込みが壊れて空 tree を合格にしない」ためのもので、大きいほど良いのでは
+  ;; ない —— 対象より大きい床は gate ではなく誤報。
+  {:name "root" :id "root-itonami-game-never-auto" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/itonami-game-never-auto-check.cljs"
+   :include-ext [".cljc"] :min-files 20 :cd false}
+
   {:name "root" :id "root-permit-index" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/permit-index-check.cljs"
    :include-ext [".edn" ".cljs" ".cljc"] :min-files 1500 :cd false}

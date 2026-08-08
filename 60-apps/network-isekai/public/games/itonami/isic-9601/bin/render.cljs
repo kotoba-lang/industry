@@ -45,9 +45,14 @@
     (if (neg? i) default (nth argv (inc i) default))))
 (defn num-opt [k d] (js/parseFloat (opt k (str d))))
 
+(def here
+  "This package's directory, resolved from the script's own path rather than the working
+  directory — see `preview/build.cljs` for what assuming a cwd cost."
+  (path/resolve (path/dirname *file*) ".."))
+
 (def W (int (num-opt "width" 900)))
 (def H (int (num-opt "height" 1600)))
-(def out (opt "out" "preview/street.png"))
+(def out (opt "out" (path/join here "preview/street.png")))
 (def cleared (int (num-opt "cleared" 0)))
 (def backend
   "`auto` (default), `webgpu`, or `webgl2`. Both read the SAME packed instances and the SAME 60-float
@@ -56,8 +61,9 @@
   other. That is the render-IR contract holding in practice rather than on paper."
   (opt "backend" "auto"))
 (def engine-root
+  ;; resolved from this script, not from the working directory — see preview/build.cljs
   (or (opt "engine" nil)
-      (path/resolve (js/process.cwd) "../../../../../../orgs/kotoba-lang")))
+      (path/resolve here "../../../../../../orgs/kotoba-lang")))
 
 (defn- fixture [& parts]
   (let [p (apply path/join engine-root "webgpu" "fixtures" parts)]
@@ -280,7 +286,19 @@
     if (!(Math.abs(px[i]-135)<12 && Math.abs(px[i+1]-189)<12 && Math.abs(px[i+2]-237)<12)) nonSky++;
   }
   step('read-back');
-  return {ok: !lost && problems.length === 0 && nonSky > 0,
+  // 'drew something' must be MORE THAN ONE COLOUR, not 'more than zero non-background
+  // pixels'. A blank canvas is not the sky colour — it is black or transparent — so the
+  // background test counts every pixel of an empty frame as drawn. That is not a hypothetical:
+  // this check passed a completely blank WebGPU frame once, and `auto` reported
+  // 'used webgpu · 1440000 non-background · 1 distinct colours'. A scene of 149 coloured
+  // boxes cannot be one colour.
+  //
+  // Nor is `device.lost` enough on its own: it resolves asynchronously, so reading it
+  // immediately after submit sometimes sees the loss and sometimes does not. The pixels
+  // are the reliable evidence, which is the whole argument for verifying rather than
+  // asking.
+  const drew = colors.size > 1;
+  return {ok: !lost && problems.length === 0 && drew,
           stages, lost, reason: lost ? ('device lost — ' + lost) : problems.join(' | '),
           glError: problems.length, blocks: 3, nonSkyPixels: nonSky, distinctColors: colors.size,
           format: fmt,
@@ -362,7 +380,7 @@
               (println "          instance right after submit under every flag combination")
               (println "          tried (6), including on a 3-line clear-to-red shader."))
             (js/process.exit 4))
-        (let [abs (path/resolve (js/process.cwd) out)
+        (let [abs (path/resolve here out)
               b64 (second (str/split (:png r) #","))]
           (fs/mkdirSync (path/dirname abs) #js {:recursive true})
           (fs/writeFileSync abs (js/Buffer.from b64 "base64"))
