@@ -51,6 +51,30 @@
     相対パスをそのまま写す —— itonami の game は ADR-2607031000 が記す
     `public/games/itonami/<slug>/` なので、ここも `public/games/itonami/`
     が付く"
+   "ワールドマップ (`world.cljc`) の 8 district はすべて実在の cloud-itonami
+    actor repo で、`:ops` / `:auto-at-3` / `:never-auto` は各 repo の
+    `phase.cljc` / `governor.cljc` から 2026-08-08 に読んだ実測値
+    (`world/district-evidence` に出所を記録)。9601 衣類 / 4520 自動車 /
+    9609 動物 / 8121 建物 / 8129 プラント / 3700 排水 / 3811 ごみ /
+    3900 土壌 —— 「クリーニング」を衣服以外へ広げるのは題材の追加ではなく、
+    ISIC の清掃系クラスと cloud-itonami の repo 集合をそのまま辿った結果"
+   "8 つの兄弟 actor を並べて読むと、単店では主張しかできなかったことが事実に
+    なる: **どの actor も、どの phase の `:auto` にも入れない op を最低 1 つ
+    永久に持っている** (街全体で 9 個、それぞれ別の理由で)。マップは 8 通りの
+    変奏ではなく、同じ境界の 8 つの独立した確認"
+   "KAMI 2D SDK (`kotoba-lang/sprite2d`) には盤面ゲームに必要な 3 つが無かった
+    ので実装した: `:text` primitive (文字は player 中心の一瞬の fx layer にしか
+    無く、建物に属して一緒に動く名前が書けない) / camera `:mode :fixed` `:fit`
+    (既定 camera は `\"player\"` entity を探し、無ければ黙って原点に寄る) /
+    `layout/pick` + `sprite-bounds` (world→screen はあるが逆が無く、tap 駆動の
+    ゲームは camera 変換を当て推量で再導出するしかなかった)。
+    push 権限が無いため commit は `sdk-patches/` に退避"
+   "同じ作業中に見つけた sprite2d の既存欠陥 3 件も同じ patch で直した:
+    `clojure -M:test` が 1 assertion も走らずに落ちていた (README が案内する
+    コマンド) / `test/sprite2d_test.clj` が assert している JVM スタブが
+    実装されていなかった / `kotoba.sprite2d.layout` は facade ではなく
+    `kami` 版の完全なコピーで、layout テストは painter が使わない方を
+    検査していた"
    "本セッションで着地したのは superproject 側の staging まで。
     network-awai/network-isekai は private でセッションの repo scope に無く、
     `add_repo` が承認待ちで通らなかったため、`scene.edn` は書いていない
@@ -194,6 +218,15 @@ nbb のテストも、squint 経由のブラウザプレビューも、将来の
   適用されない**。
 - **ブラウザ 7 チェック** (headless Chromium, `preview/smoke.cljs`) ——
   実ページで 40/40 返却まで到達することを確認。dead board はここで落ちる。
+- **マップ 17 テスト / 102 assertion** (JVM, `test/world_ir_test.clj`) ——
+  `world.cljc` が出す render-IR を**実物の `kotoba.sprite2d.layout`** に通し、
+  8 district 全部が任意の viewport (360x640 / 1280x720 / 900x1600) に収まること、
+  描画位置を tap すると当該 district が返ること、施錠中の店も tap できること、
+  看板の `:text` が hit box を広げることを確認。SDK の追加を revert すると
+  **コンパイルすら通らない** (`layout/pick` が無い) ので、このテストは
+  SDK 側の退行ゲートでもある。
+- **sprite2d 49 テスト / 125 assertion** (JVM, `clojure -M:test`) ——
+  変更前は 0 assertion (suite が起動しなかった)。
 - **balance probe** (`test/balance.cljs`) —— seed 3/7/11/99 すべてで
   丁寧なプレイが t≈700 で victory、ライフ 3 維持。雑なプレイは t≈300 で gameover。
 

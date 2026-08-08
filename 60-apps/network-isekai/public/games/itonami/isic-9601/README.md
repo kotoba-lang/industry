@@ -46,6 +46,61 @@ the customer's trust. Reading the label and rejecting the plan costs only time.
 `careless-play-loses-to-the-care-label` pins both halves of that: blind approval loses the
 run, and not one forbidden process is ever applied even while losing.
 
+## The street — 「営みの街」
+
+`world.cljc` is the map the shop stands on: eight districts, **each of them a real
+`cloud-itonami` governed actor**, locked until the business next door has closed its
+audit. It is what makes this a game about *cleaning* rather than about laundry — the
+subject widens from clothes to cars, animals, buildings, industrial plant, sewers, waste
+and contaminated ground.
+
+| ISIC | district | subject | the op that never automates | why |
+|---|---|---|---|---|
+| 9601 | クリーニング | 衣類 | `apply-cleaning-process` / `return-garment` | 実際に衣類を処理し、客に返す |
+| 4520 | 洗車・整備 | 自動車 | `flag-safety-concern` | roadworthiness の判断に触れる |
+| 9609 | ペットケア | 動物 | `actuation/finalize-referral` | 実在の人物を引き合わせる |
+| 8121 | 建物清掃 | 建物 | `flag-safety-concern` | 作業員の身体に関わる |
+| 8129 | 産業清掃 | プラント | `flag-safety-concern` | hazmat / 密閉空間 |
+| 3700 | 下水 | 排水 | `flag-safety-concern` | 公衆衛生 |
+| 3811 | 廃棄物収集 | ごみ | `dispute/request` | 相手のある紛争行為 |
+| 3900 | 汚染浄化 | 土壌 | `flag-contamination-concern` | 土地と住民に関わる |
+
+Every row was read out of that repo's own `phase.cljc` and `governor.cljc` on 2026-08-08;
+`world/district-evidence` records where, so a reader can check rather than trust.
+
+**Reading eight sibling actors side by side turns up the thing the single-shop game could
+only assert: every one of them keeps at least one operation out of every phase's `:auto`
+set, permanently — nine such operations across the street, each for its own reason.** The
+player meets that boundary once in the laundry and then finds it again in every business
+they unlock. The map is not eight variations on a theme; it is eight independent
+confirmations of the same argument.
+
+Only 9601 has a playable board today (`:playable?` in `world/status`). The other seven are
+map entities with their real op tables attached.
+
+## KAMI 2D SDK — what was missing
+
+The map renders through `kotoba-lang/sprite2d`, and three things a board game cannot work
+without were not in the package. They are implemented and tested upstream; the commit is
+staged here as `sdk-patches/0001-sprite2d-board-support.patch` because pushing to
+`kotoba-lang/sprite2d` needs repo access this session did not have.
+
+| gap | why a board needs it |
+|---|---|
+| `:text` primitive | text existed only in the transient screen-space fx layer. A building's name and ISIC code belong to the building and move with it. |
+| camera `:fixed` / `:fit` | the default camera follows a `"player"` entity, and silently anchors at world origin when there is none — indistinguishable from a correctly centred board until the board isn't at the origin. `:fit` also re-solves the scale per viewport. |
+| `layout/pick` (+ `sprite-bounds`) | `draw-list` mapped world→screen and nothing mapped back, so every tap-driven game had to re-derive the camera transform, as a guess, since sprite extents were not exposed. |
+
+Three further defects surfaced while doing it and are fixed in the same patch: `clojure
+-M:test` did not start at all (an unconditional `:cljs`-only require took the suite down
+before any assertion ran), the JVM stubs that `test/sprite2d_test.clj` has always asserted
+about were never written, and `kotoba.sprite2d.layout` was a verbatim **fork** of
+`kami.sprite2d.layout` rather than the facade the README claims — so the layout tests
+exercised the copy while the painter used the original.
+
+`test/world_ir_test.clj` runs this game's map IR against the real SDK. Revert the patch and
+it does not compile.
+
 ## Files
 
 | file | what it is |
@@ -57,6 +112,9 @@ run, and not one forbidden process is ever applied even while losing.
 | `preview/ui.cljs` | browser shell, compiled by squint; holds no rules, draws only `summary` |
 | `preview/build.cljs` | squint → esbuild → one self-contained `preview/index.html` |
 | `preview/smoke.cljs` | headless-Chromium check that the built page actually plays |
+| `world.cljc` | the street: district registry, unlock ladder, and the sprite2d render-IR |
+| `test/world_ir_test.clj` | 17 tests / 102 assertions, JVM, against the real `kotoba.sprite2d.layout` |
+| `sdk-patches/` | the upstream `sprite2d` commit, staged until it can be pushed |
 | `game.edn` | network-isekai game metadata |
 
 `logic.cljc` exists twice on purpose: the flat copy is what ports into network-isekai
@@ -75,6 +133,10 @@ npm run build                     # -> preview/index.html (self-contained, ~41 K
 
 PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers \
   npx nbb --classpath node_modules preview/smoke.cljs   # real-browser gate
+
+# the map, against the real KAMI 2D stack (needs sprite2d checked out)
+west update --fetch smart sprite2d
+clojure -M:ir-test
 ```
 
 Open `preview/index.html` in a browser to play. Nothing is fetched at runtime.
