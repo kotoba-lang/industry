@@ -45,7 +45,10 @@
 (defn- abs [& parts] (apply (.-join path-mod) (clj->js (cons root parts))))
 (defn- exists? [p] (.existsSync fs p))
 
-(def argv (vec (drop 2 (js->clj (.-argv js/process)))))
+;; nbb の process.argv には `--classpath` とその値、script 自身のパスも入る
+;; （実測: drop 2 で ["--classpath" ".:scripts/nbb_compat" "…/observatory-run.cljs" …]）。
+;; 手で drop すると位置引数を誤読するので、gate 側と同じく *command-line-args* を使う。
+(def argv (vec *command-line-args*))
 (defn- flag? [f] (some #{f} argv))
 (defn- opt [f] (let [i (.indexOf (clj->js argv) f)] (when (>= i 0) (nth argv (inc i) nil))))
 
@@ -113,10 +116,10 @@
         (case (:runtime o)
           :clojure
           (let [a (cond
+                    ;; live 実行は通常の alias に :live-alias を足して起動する
                     live-alias [(str "-M:" (str/join ":" (concat aliases [live-alias])))]
                     (seq aliases) [(str "-M:" (str/join ":" aliases))]
-                    :else (into ["-M" "-m" (:main o)] []))
-                a (if (or live-alias (seq aliases)) a a)]
+                    :else ["-M" "-m" (:main o)])]
             ["clojure" (into a (map #(expand % dir) (:args o)))])
           :nbb ["nbb" (into [(:main o)] (map #(expand % dir) (:args o)))]
           [nil nil])]
@@ -151,7 +154,11 @@
    古い out/ が残っているだけの actor を『動いた』にしない。append-only の
    datom log は bytes が伸びること、上書き型の出力は mtime が新しいことを見る。"
   [{:keys [exit]} before after produces t0]
-  (let [fresh? (>= (:mtime after 0) t0)]
+  ;; mtime の粒度が 1 秒のファイルシステムがあるので 2 秒の余裕を持たせる。
+  ;; **偽の FAIL の方が偽の PASS より悪い** —— flaky な gate は無視されるようになり、
+  ;; そうなれば gate が無いのと同じ。実運用で actor は数秒かかるので、この余裕で
+  ;; 前回の出力を「新しい」と誤認することはない。
+  (let [fresh? (>= (:mtime after 0) (- t0 2000))]
     (cond
       (not (zero? exit)) :known-broken
       (nil? produces) :runs-ok
