@@ -50,11 +50,11 @@
 (def out (opt "out" "preview/street.png"))
 (def cleared (int (num-opt "cleared" 0)))
 (def backend
-  "`webgl2` (default) or `webgpu`. Both read the SAME packed instances and the SAME 60-float
+  "`auto` (default), `webgpu`, or `webgl2`. Both read the SAME packed instances and the SAME 60-float
   globals block — `fixtures/lit-shader.wgsl` and `fixtures/glsl/lit.*` declare an identical
   `struct G` and identical vertex/instance locations, because one is transpiled from the
   other. That is the render-IR contract holding in practice rather than on paper."
-  (opt "backend" "webgl2"))
+  (opt "backend" "auto"))
 (def engine-root
   (or (opt "engine" nil)
       (path/resolve (js/process.cwd) "../../../../../../orgs/kotoba-lang")))
@@ -316,7 +316,7 @@
 
 (defn -main []
   (println (str "  engine  " engine-root))
-  (println (str "  backend " backend))
+  (println (str "  backend " backend (when (= backend "auto") "  (WebGPU first, WebGL 2.0 fallback)")))
   (println (str "  frame   " (count (:instances ir)) " instances · " W "x" H
                 " · eye " (pr-str (get-in ir [:globals :eye]))))
   (p/let [srv (serve!)
@@ -328,12 +328,29 @@
           page (.newPage browser)
           _ (.addInitScript page #js {:content (str "window.__frame = " (js/JSON.stringify payload) ";")})
           _ (.goto page (str "http://127.0.0.1:" port "/"))
-          raw (.evaluate page (str "(async () => {"
-                                   (if (= backend "webgpu") webgpu-js page-js)
-                                   "})()"))
+          ;; `auto` is the point of having two backends. `kami.webgl/pick-backend` answers
+          ;; "does this browser know the word WebGPU", which is not the same question as
+          ;; "can it draw" — here it says :webgpu and the device dies on submit. So auto
+          ;; TRIES WebGPU and falls back on the evidence, the policy being
+          ;; `kami.webgl/backend-from-probe`.
+          gpu-raw (when (not= backend "webgl2")
+                    (.evaluate page (str "(async () => {" webgpu-js "})()")))
+          gpu-r (when gpu-raw (js->clj gpu-raw :keywordize-keys true))
+          used (cond (= backend "webgl2") "webgl2"
+                     (:ok gpu-r) "webgpu"
+                     (= backend "webgpu") "webgpu"     ; asked for it explicitly: report the failure
+                     :else "webgl2")
+          _ (when (and (= used "webgl2") (not= backend "webgl2"))
+              (println (str "  fallback WebGPU → WebGL 2.0: " (:reason gpu-r)))
+              (when (:stages gpu-r)
+                (println (str "           got as far as " (str/join " → " (:stages gpu-r))))))
+          raw (if (= used "webgpu")
+                gpu-raw
+                (.evaluate page (str "(async () => {" page-js "})()")))
           _ (.close browser)
           _ (.close srv)]
     (let [r (js->clj raw :keywordize-keys true)]
+      (println (str "  used    " used))
       (when (:stages r)
         (println (str "  stages  " (str/join " → " (:stages r)))))
       (if-not (:ok r)

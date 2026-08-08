@@ -114,6 +114,18 @@
     `createRenderPipeline` が shader の `@group(0)` binding と 8 本の
     vertex/instance location を engine の packer が出す layout に対して
     検証する —— 不一致ならここで、pixel が存在する前に落ちる"
+   "**fallback は SDK 側で壊れていた。** `kami.webgl/pick-backend` は
+    `navigator.gpu` というプロパティの有無しか見ておらず、それが答えるのは
+    「この browser は WebGPU という語を知っているか」で「描けるか」ではない。
+    このコンテナは両者が分かれるまさにその場合 —— property はあり、
+    requestAdapter も requestDevice も成功し、submit で device が死ぬ。
+    `pick-backend` に従う呼び出し側は真っ白な canvas を得て **fallback しない**
+    (何も描けたか誰も尋ねないから)。`sdk-patches/0003` で
+    `backend-from-probe` (pure、GPU 無しで policy をテストでき、理由がログに
+    残る) と `select-backend!` (async、adapter/device を実際に取り、任意で
+    trivial frame を submit してから答える) を足した。`pick-backend` は
+    「hint であって決定ではない」と docstring に明記して残す —— sync な関数は
+    adapter を await できないのでその場では直せない"
    "**WebGPU の pixel はこのコンテナでは取得できない。** Dawn が submit 直後に
     instance を落とす(`A valid external Instance reference no longer exists`)。
     6 通りのフラグ組み合わせ(`--use-angle=swiftshader` /
@@ -304,6 +316,9 @@ nbb のテストも、squint 経由のブラウザプレビューも、将来の
 - **WebGL 2.0 E2E 達成** (`bin/render.cljs`) —— 実 WebGL2 (SwiftShader) で
   glError=0、1,013,400 画素が背景以外、92 色、`preview/street.png` を出力。
   engine 自身の GLSL / packer / geometry を通しており、第2レンダラではない。
+- **fallback**: CLI の既定は `--backend auto` で、WebGPU を試して証拠に基づいて
+  WebGL 2.0 へ退く。SDK の fallback policy は 9 tests / 15 assertions
+  (`backend-from-probe`)、webgl repo 全体 14 tests / 34 assertions。
 - **WebGPU 経路**: pipeline 検証まで到達 (canonical WGSL が compile し、
   `@group(0)` binding と 8 本の vertex/instance location が engine の packer の
   layout に対して validate される)。**pixel は未取得** —— Dawn が submit 直後に

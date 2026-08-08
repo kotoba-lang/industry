@@ -181,8 +181,9 @@ npm run play                           # 1500 turns of the reference strategy
 npm run play -- --script "tick*30 verify screen clean return"   # scripted
 npm run play -- --seed 7 --turns 800
 
-npm run render                         # WebGL 2.0 → preview/street.png
-npm run render -- --backend webgpu     # the WebGPU path
+npm run render                         # WebGPU first, WebGL 2.0 fallback
+npm run render -- --backend webgpu     # WebGPU only, report the failure
+npm run render -- --backend webgl2     # WebGL 2.0 only
 npm run render -- --width 1280 --height 720 --cleared 3
 ```
 
@@ -202,6 +203,32 @@ Two limits, printed on every run: the **shadow pass is not run** (a 1×1 fully-l
 texture is bound instead, so the image is the lit pass without shadowing), and the GPU is
 **SwiftShader** because this container has no hardware one — which still exercises the real
 GLSL compiler and the real GL state machine.
+
+### Falling back
+
+The default is `--backend auto`, and it means what it says: **try WebGPU, and fall back on
+the evidence.** In this container that produces
+
+```
+fallback WebGPU → WebGL 2.0: device lost — unknown: A valid external Instance reference no longer exists.
+         got as far as adapter → device → wgsl-compiled → canvas-configured → buffers → bindgroup → pipeline → submitted → read-back
+used    webgl2
+pixels  1013400 non-background · 92 distinct colours
+```
+
+The engine's own `kami.webgl/pick-backend` would **not** have fallen back here. It tests
+whether `navigator.gpu` exists, which is a different question from whether the browser can
+draw — and this container is exactly the case that separates them: the property is present,
+`requestAdapter()` succeeds, `requestDevice()` succeeds, and the device dies on submit. A
+caller routed by `pick-backend` gets a blank canvas and never retreats, because nothing
+asked whether anything was drawn.
+
+`sdk-patches/0003-webgl-honest-backend-selection.patch` adds the missing question:
+`backend-from-probe` (pure, so the policy is testable without a GPU, and so the *reason*
+survives into logs) and `select-backend!` (async — it acquires an adapter and a device, and
+optionally submits a trivial frame, before answering). `pick-backend` stays, documented as
+a hint rather than a decision; a synchronous function cannot await an adapter, so it cannot
+be fixed in place.
 
 ### The WebGPU path
 

@@ -1,0 +1,207 @@
+From 76784f5ce62f4dae3e2576ca25134248a55e0df9 Mon Sep 17 00:00:00 2001
+From: Jun Kawasaki <jun784@gmail.com>
+Date: Sat, 8 Aug 2026 11:41:16 +0000
+Subject: [PATCH] =?UTF-8?q?feat(webgl):=20backend-from-probe=20/=20select-?=
+ =?UTF-8?q?backend!=20=E2=80=94=20=E5=AE=9F=E9=9A=9B=E3=81=AB=E8=A9=A6?=
+ =?UTF-8?q?=E3=81=97=E3=81=A6=E3=81=8B=E3=82=89=E6=B1=BA=E3=82=81=E3=82=8B?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+`pick-backend` は `navigator.gpu` というプロパティの有無しか見ていない。
+それが答えるのは「この browser は WebGPU という語を知っているか」で、
+「この browser は描けるか」ではない。両者の差は仮定の話ではない:
+
+実測 2026-08-08、headless Chromium コンテナで
+  navigator.gpu    ある
+  requestAdapter() 成功
+  requestDevice()  成功
+  そして submit した瞬間に device が失われる
+これが 6 通りのフラグ組み合わせすべてで起きる。`pick-backend` はその
+すべてで :webgpu を返す。呼び出し側は WebGPU へ経路を取り、真っ白な
+canvas を得て、**fallback しない** —— 何も描けたか誰も尋ねないから。
+
+- `backend-from-probe` (pure, .cljc) — probe の結果から backend と理由を
+  決める。GPU 無しでテストでき、理由がログに残る。「fallback した」は
+  「device が失われたから」が付かないと役に立たない
+- `select-backend!` (cljs, async) — adapter と device を実際に取ってから
+  答える。`verify!` を渡せば trivial な frame を submit して読み戻す所まで
+  やる (lost-after-submit が現実にある環境ではこれが要る)
+- `pick-backend` は残すが、docstring で「これは hint であって決定ではない」
+  と明記した。sync な関数は adapter を await できないので、その場では直せない
+
+検証: backend-selection 9 tests / 15 assertions、repo 全体 14 tests /
+34 assertions すべて green。
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_0156d6SPQCfLvucUL3mTNAkX
+---
+ src/kami/webgl.cljc             | 64 +++++++++++++++++++++++++++++-
+ test/backend_selection_test.clj | 70 +++++++++++++++++++++++++++++++++
+ 2 files changed, 132 insertions(+), 2 deletions(-)
+ create mode 100644 test/backend_selection_test.clj
+
+diff --git a/src/kami/webgl.cljc b/src/kami/webgl.cljc
+index 8c23f47..ed23358 100644
+--- a/src/kami/webgl.cljc
++++ b/src/kami/webgl.cljc
+@@ -59,6 +59,21 @@
+ ;; that transitively pulls it in) no longer throws an opaque "js/navigator is unbound" — the
+ ;; capability-query fns (`webgpu-available?`, `pick-backend`, `caps`) return real, useful JVM
+ ;; answers, and the browser-only executors fail fast with a clear `ex-info` instead.
++(defn backend-from-probe
++  "Pure decision from what a probe actually found. Returns
++   `{:backend :webgpu|:webgl2 :reason kw}`.
++
++   Separated from the probing so the policy is testable without a GPU, and so the reason
++   survives into logs — 'we fell back' is not useful without 'because the device was lost'."
++  [{:keys [gpu-present? adapter? device? device-lost? drew?]}]
++  (cond
++    (not gpu-present?) {:backend :webgl2 :reason :no-webgpu-api}
++    (not adapter?)     {:backend :webgl2 :reason :no-adapter}
++    (not device?)      {:backend :webgl2 :reason :no-device}
++    device-lost?       {:backend :webgl2 :reason :device-lost}
++    (false? drew?)     {:backend :webgl2 :reason :drew-nothing}
++    :else              {:backend :webgpu :reason :ok}))
++
+ #?(:cljs
+    (do
+ 
+@@ -80,11 +95,56 @@
+   (.getContext canvas "webgl2" #js {:antialias true :premultipliedAlpha true :preserveDrawingBuffer true}))
+ 
+ (defn pick-backend
+-  "The best available GPU backend for this browser: :webgpu if WebGPU is present, else :webgl2.
+-   Both consume the same render-IR; the caller routes to kami.webgpu or kami.webgl accordingly."
++  "The best available GPU backend *as far as a synchronous check can tell*: :webgpu if the
++   `navigator.gpu` property exists, else :webgl2.
++
++   **This is a hint, not a decision.** It answers 'does this browser know the word WebGPU',
++   which is not the same question as 'can this browser draw'. `navigator.gpu` can be
++   present, `requestAdapter()` can succeed and `requestDevice()` can succeed, and the
++   device can still be lost the moment work is submitted — a software rasteriser, a
++   blocklisted driver, a GPU-process crash. The caller then routes to WebGPU, gets a blank
++   canvas, and never falls back, because nothing asked whether anything was drawn.
++
++   Measured 2026-08-08 in a headless Chromium container with SwiftShader: every step
++   succeeded and the device was lost immediately after `submit`, under six different flag
++   combinations. `pick-backend` chose :webgpu for all of them.
++
++   The check cannot be fixed in place: acquiring an adapter is asynchronous and this fn is
++   not. Use `select-backend!` when the answer has to be right."
+   []
+   (if (webgpu-available?) :webgpu :webgl2))
+ 
++(defn select-backend!
++  "Which backend to actually use, decided by trying. Returns a promise of
++   `{:backend :reason (:adapter) (:device)}`.
++
++   Unlike `pick-backend` this acquires an adapter and a device before answering, so a
++   browser that advertises WebGPU and cannot use it falls back instead of rendering
++   nothing. `verify!` is an optional fn of the device returning a promise of a boolean —
++   pass one that submits a trivial frame and reads it back when a lost-after-submit device
++   is a real possibility (it is, in software rasterisers and headless containers)."
++  ([] (select-backend! nil))
++  ([verify!]
++   (let [decide (fn [m] (merge (backend-from-probe m) (select-keys m [:adapter :device])))
++         with-device
++         (fn [adapter device]
++           (let [lost (atom false)]
++             (.then (.-lost device) (fn [_] (reset! lost true)))
++             (.then (if verify! (verify! device) (js/Promise.resolve nil))
++                    (fn [drew]
++                      (decide {:gpu-present? true :adapter? true :device? true
++                               :device-lost? @lost :drew? drew
++                               :adapter adapter :device device})))))
++         with-adapter
++         (fn [adapter]
++           (if-not adapter
++             (js/Promise.resolve (decide {:gpu-present? true :adapter? false}))
++             (.then (.requestDevice adapter) (fn [device] (with-device adapter device)))))]
++     (if-not (webgpu-available?)
++       (js/Promise.resolve (decide {:gpu-present? false}))
++       (.catch (.then (.requestAdapter (.-gpu js/navigator)) with-adapter)
++               (fn [_] (decide {:gpu-present? true :adapter? false})))))))
++
+ (defn caps
+   "The kami.gpu capability tier for a running WebGL2 context (no compute / no storage, instancing
+    via ANGLE_instanced_arrays core in WebGL2)."
+diff --git a/test/backend_selection_test.clj b/test/backend_selection_test.clj
+new file mode 100644
+index 0000000..641b3dd
+--- /dev/null
++++ b/test/backend_selection_test.clj
+@@ -0,0 +1,70 @@
++(ns backend-selection-test
++  "The policy behind falling back from WebGPU to WebGL 2.0.
++
++  `pick-backend` asks whether the browser knows the word WebGPU. That is not the same
++  question as whether it can draw, and the gap between them is not hypothetical: measured
++  2026-08-08 in a headless Chromium container, `navigator.gpu` was present,
++  `requestAdapter()` succeeded, `requestDevice()` succeeded, and the device was lost the
++  instant work was submitted — under six different flag combinations. A caller routed by
++  `pick-backend` gets a blank canvas and never falls back, because nothing asked whether
++  anything was drawn.
++
++  `backend-from-probe` is that missing question, as a pure function so the policy is
++  testable without a GPU."
++  (:require [clojure.test :refer [deftest is]]
++            [kami.webgl :as webgl]))
++
++(deftest no-webgpu-api-falls-back
++  (is (= {:backend :webgl2 :reason :no-webgpu-api}
++         (webgl/backend-from-probe {:gpu-present? false}))))
++
++(deftest advertised-but-no-adapter-falls-back
++  (is (= {:backend :webgl2 :reason :no-adapter}
++         (webgl/backend-from-probe {:gpu-present? true :adapter? false}))))
++
++(deftest adapter-but-no-device-falls-back
++  (is (= {:backend :webgl2 :reason :no-device}
++         (webgl/backend-from-probe {:gpu-present? true :adapter? true :device? false}))))
++
++(deftest a-device-that-is-lost-falls-back
++  ;; the case `pick-backend` cannot see, and the one this container actually hits
++  (is (= {:backend :webgl2 :reason :device-lost}
++         (webgl/backend-from-probe {:gpu-present? true :adapter? true :device? true
++                                    :device-lost? true}))))
++
++(deftest a-device-that-draws-nothing-falls-back
++  ;; a device can survive and still produce an empty frame; verifying the pixels is the
++  ;; only check that catches it
++  (is (= {:backend :webgl2 :reason :drew-nothing}
++         (webgl/backend-from-probe {:gpu-present? true :adapter? true :device? true
++                                    :device-lost? false :drew? false}))))
++
++(deftest a-working-device-is-used
++  (is (= {:backend :webgpu :reason :ok}
++         (webgl/backend-from-probe {:gpu-present? true :adapter? true :device? true
++                                    :device-lost? false :drew? true}))))
++
++(deftest an-unverified-device-is-used
++  ;; `:drew?` nil means nobody checked — that is not evidence of failure, and demanding a
++  ;; verification step would make the selector unusable where one is too expensive
++  (is (= {:backend :webgpu :reason :ok}
++         (webgl/backend-from-probe {:gpu-present? true :adapter? true :device? true
++                                    :device-lost? false}))))
++
++(deftest every-fallback-says-why
++  ;; "we fell back" is not useful without "because"; a reason that is not one of these is a
++  ;; reason nobody wrote down
++  (let [reasons #{:no-webgpu-api :no-adapter :no-device :device-lost :drew-nothing :ok}]
++    (doseq [probe [{:gpu-present? false}
++                   {:gpu-present? true :adapter? false}
++                   {:gpu-present? true :adapter? true :device? false}
++                   {:gpu-present? true :adapter? true :device? true :device-lost? true}
++                   {:gpu-present? true :adapter? true :device? true :drew? false}
++                   {:gpu-present? true :adapter? true :device? true :drew? true}]]
++      (is (contains? reasons (:reason (webgl/backend-from-probe probe)))
++          (str "probe " (pr-str probe))))))
++
++(deftest the-jvm-still-answers-webgl2
++  ;; there is no browser here; the sync hint must not claim otherwise
++  (is (= :webgl2 (webgl/pick-backend)))
++  (is (false? (webgl/webgpu-available?))))
+-- 
+2.43.0
+
