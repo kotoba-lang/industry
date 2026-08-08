@@ -306,6 +306,10 @@
   ;; 直したのに射影を作り直していないと、datom 面が古い規制を返し続ける ——
   ;; 古い値も「それらしい」ので読み手には見分けが付かない。
   ;; :include-ext に .cljc が要るのは、生成器が actor の facts.cljc を読むため。
+  {:name "root" :id "root-permit-index" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/permit-index-check.cljs"
+   :include-ext [".edn" ".cljs" ".cljc"] :min-files 1500 :cd false}
+
   ;; 「クリーニング営み」(ISIC 9601 idle tycoon) の主張の機械検査。
   ;;
   ;; ゲームの主張は 1 行に尽きる —— cloud-itonami の governed actor はどれも、どの
@@ -345,14 +349,18 @@
   ;; 2026-08-08 に「落ちること」を確認済み: `(- (+ a b))` / `(- (- a b))` /
   ;; `(- (+ a (* b c)))` の 3 通りで exit 1、`(- (* a b))` `(- (/ a b))` `(- a (+ b c))`
   ;; `(- (- q) b)` `(- a)` `(-> a (+ b))` と、文字列・コメント内の同形は素通し。
+  ;;
+  ;; **この tree で実際に検査されるのはゲーム側の source だけ。** engine
+  ;; (`orgs/kotoba-lang/{webgpu,render}`) は west checkout で root の tracked tree には
+  ;; 入らないので、fleet に送られる snapshot にも存在しない —— bug が実際に見つかった
+  ;; コードは、ここでは走査対象外である。gate は不在を ABSENT として件数と共に出すので
+  ;; 黙って通ることはないが、**exit 0 で通る**。engine 側まで塞ぐには gate を
+  ;; kotoba-lang の repo entry として別に登録する必要がある（cross-tier のため
+  ;; このセッションからは登録できない）。
   {:name "root" :id "root-squint-unary-minus" :org "com-junkawasaki"
    :gate :nbb-script
    :script "gates/squint-unary-minus-check.cljs"
    :include-ext [".cljc" ".cljs" ".clj"] :min-files 20 :cd false}
-
-  {:name "root" :id "root-permit-index" :org "com-junkawasaki" :gate :nbb-script
-   :script "gates/permit-index-check.cljs"
-   :include-ext [".edn" ".cljs" ".cljc"] :min-files 1500 :cd false}
 
   ;; Projection contracts are rebuilt from the exact Git-tip snapshot shipped
   ;; by the fleet operator. The archive has no .git directory, so this gate

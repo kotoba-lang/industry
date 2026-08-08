@@ -257,12 +257,61 @@
       (println "   careless:" (pr-str (select-keys (l/summary final) [:t :lives :returned :flow])))
       (is! (= (:flow final) :gameover) "approving blind loses the run")
       (is! (pos? (count holds)) "the ledger shows care-label holds")
-      ;; and the crucial one: not a single forbidden process was ever applied
-      (is! (zero? (count (filter (fn [e] (and (= (:disposition e) :commit)
-                                              (= (:op e) :actuation/apply-cleaning-process)
-                                              (:forbidden e)))
-                                 (:ledger final))))
-           "no forbidden process was ever applied, even while losing"))))
+      ;; and the crucial one: not a single forbidden process was ever applied.
+      ;;
+      ;; Two earlier versions of this check were worth less than they looked.
+      ;;
+      ;; The first read `(:forbidden e)` on a LEDGER ENTRY. The ledger has never written
+      ;; that key — `:forbidden` lives on a garment — so the filter was always empty, the
+      ;; count was always zero, and **the check could not fail**. It guarded the README's
+      ;; central safety claim for its whole life while looking at nothing.
+      ;;
+      ;; The second asked `apply-commit` to stamp `:forbidden-applied?` on each commit and
+      ;; asserted none were true. Better, but still only as good as the stamp: replacing the
+      ;; computation with a literal `false` left the suite green. **A check that reads a flag
+      ;; written by the code under test cannot detect that flag lying.**
+      ;;
+      ;; What is demonstrated and what is not, as of 2026-08-08:
+      ;;
+      ;; The **vacuity guard** below has been observed to fail, on three separate breaks —
+      ;; disabling the care-label rule, and two ways of stopping a held garment from leaving.
+      ;; Each of those makes the holds vanish, and the guard catches exactly that.
+      ;;
+      ;; The **main clause** has never been observed to fail, because no small mutation makes
+      ;; a forbidden process actually commit: removing the garment is what the hold *is*, so
+      ;; breaking the removal breaks the holds instead. That is worth saying plainly rather
+      ;; than filed under "verified" — the clause states a real invariant, and the guard is
+      ;; what stops it being satisfied by an empty world, which is how the original version
+      ;; passed for its entire life.
+      ;;
+      ;; So this reads what the ledger records independently of any flag: subject ids. A
+      ;; garment held for the care-label rule leaves the shop unprocessed, so it must never
+      ;; also appear as a commit of the acting operation. Both sides are facts the game needs
+      ;; for its own behaviour, neither is written for this test\'s benefit, and no constant
+      ;; satisfies them both.
+      (let [spec (:spec final)
+            act-op (str (:op (first (filter (fn [s] (= (str (:key s)) (str (l/act-station spec))))
+                                            (:stations spec)))))
+            subjects (fn [pred] (set (keep (fn [e] (when (pred e) (:subject e))) (:ledger final))))
+            commits (filter (fn [e] (= (:t* e) :committed)) (:ledger final))
+            committed-act (subjects (fn [e] (and (= (:t* e) :committed) (= (str (:op e)) act-op))))
+            held-for-label (subjects (fn [e] (= (:basis e) :cleaning-process-forbidden-by-care-label)))
+            both (filter (fn [id] (contains? committed-act id)) held-for-label)]
+        (is! (pos? (count held-for-label))
+             (str "the careless run did reach the care-label rule (" (count held-for-label)
+                  " subjects) — without this the next check is vacuous"))
+        ;; and the flag `apply-commit` writes must agree with that cross-reference. This is
+        ;; what keeps `:forbidden-applied?` from being decoration: when a forbidden commit
+        ;; does happen, a flag stuck on `false` disagrees with the subject sets and fails
+        ;; here. (When nothing goes wrong both sides are empty and a lying flag is
+        ;; undetectable — that is the situation, not a gap in the test.)
+        (is! (= (set (keep (fn [e] (when (:forbidden-applied? e) (:subject e))) commits))
+                (set both))
+             "the audit flag agrees with the ledger cross-reference")
+        (is! (zero? (count both))
+             (str "no forbidden process was ever applied, even while losing"
+                  (when (seq both) (str " — but " (pr-str (vec both)) " both committed "
+                                        act-op " and was held for the care label"))))))))
 
 (testing! "summary-is-flat-and-complete"
   (fn []

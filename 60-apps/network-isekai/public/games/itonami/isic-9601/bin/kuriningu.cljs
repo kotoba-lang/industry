@@ -124,16 +124,38 @@
                       (red "信頼を失いました"))))
     sm))
 
-(def commands
-  "The scripted vocabulary. Every one is a `logic/reduce-event`, so a script cannot reach
-  anything the browser cannot."
-  {"tick" [:tick] "intake" [:take-in]
-   "verify" [:tap :verify] "screen" [:tap :screen]
-   "clean" [:tap :clean] "return" [:tap :return]
-   "reject" [:reject :verify]
-   "renew" [:renew] "phase" [:phase]
-   "buy-intake" [:buy :intake] "buy-clean" [:buy :clean]
-   "buy-return" [:buy :return] "buy-approver" [:buy :approver]})
+(defn commands
+  "The scripted vocabulary for a district. Every one is a `logic/reduce-event`, so a script
+  cannot reach anything the browser cannot.
+
+  Built from the spec rather than written out. It used to be a literal map of the laundry's
+  five station keys, which meant `--script \"clean return\"` under `--district isic-3900`
+  dispatched `[:tap :clean]` at a shop that has no `:clean` station: the reducer found
+  nothing to act on, did nothing, and the run exited 0. **A script that does nothing and a
+  script that works both print a board and return success**, so the only signal was the
+  numbers not moving — and a scripted run is usually short enough that they would not have
+  moved much anyway.
+
+  Station keys are also offered under their position (`s1`…`sN`) so a script can be written
+  once and replayed against any district."
+  [spec]
+  (let [ks (:station-keys spec)
+        ;; nbb keeps keywords, so `(str :flag)` is ":flag" and a script would have to be
+        ;; written with the colon. squint turns a keyword into its bare name, where the same
+        ;; call gives "flag". Strip the colon so a script reads the same either way.
+        nm (fn [k] (let [t (str k)] (if (= ":" (subs t 0 1)) (subs t 1) t)))
+        by-name (into {} (mapcat (fn [k] [[(nm k) [:tap k]]
+                                          [(str "buy-" (nm k)) [:buy k]]])
+                                 ks))
+        by-index (into {} (mapcat (fn [i] (let [k (nth ks i)]
+                                            [[(str "s" (inc i)) [:tap k]]
+                                             [(str "buy-s" (inc i)) [:buy k]]]))
+                                  (range (count ks))))]
+    (merge by-name by-index
+           {"tick" [:tick] "intake" [:take-in]
+            "reject" [:reject (l/verify-station spec)]
+            "renew" [:renew] "phase" [:phase]
+            "buy-approver" [:buy :approver]})))
 
 (defn- expand
   "`tick*40` means forty ticks. Anything else is a single command."
@@ -200,15 +222,17 @@
         st0 (l/init seed district-id)
         st (cond
              script
-             (reduce (fn [st token]
-                       (let [ev (get commands token)]
-                         (when-not ev
-                           (println (red (str "unknown command: " token
-                                              "  (known: " (str/join " " (sort (keys commands))) ")")))
-                           (js/process.exit 2))
-                         (l/reduce-event st ev)))
-                     st0
-                     (mapcat expand (str/split (str/trim script) #"\s+")))
+             (let [vocab (commands (district/spec district-id))]
+               (reduce (fn [st token]
+                         (let [ev (get vocab token)]
+                           (when-not ev
+                             (println (red (str "unknown command: " token)))
+                             (println (dimmed (str "  " district-id " knows: "
+                                                   (str/join " " (sort (keys vocab))))))
+                             (js/process.exit 2))
+                           (l/reduce-event st ev)))
+                       st0
+                       (mapcat expand (str/split (str/trim script) #"\s+"))))
 
              :else
              (reduce (fn [st _] (auto-turn st)) st0 (range turns)))
@@ -263,7 +287,9 @@
   (println "    render                                            → bin/render.cljs を案内")
   (println)
   (println (dimmed (str "  遊べる district: " (str/join " " district/playable))))
-  (println (dimmed (str "  play の script 語彙: " (str/join " " (sort (keys commands))))))
+  (println (dimmed (str "  play の script 語彙 (isic-9601): "
+                        (str/join " " (sort (keys (commands (district/spec "isic-9601"))))))))
+  (println (dimmed "  station は名前でも位置 (s1..sN) でも書けます — 位置なら district を跨げます"))
   (println (dimmed "  tick*40 のように *N で繰り返せます"))
   (println))
 

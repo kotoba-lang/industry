@@ -32,3 +32,15 @@ export function pos_int_QMARK_(x) {
 export function double$(x) {
   return Number(x);
 }
+
+// (keyword s) — squint has no `keyword` at all. It does not need one internally: a keyword
+// in squint IS its name string, so `:isic-9601` compiles to `"isic-9601"` and a map keyed by
+// `(keyword id)` must be keyed by `id`. That equivalence is the whole shim.
+//
+// It cannot simply be deleted from the source instead. `world.cljc` is .cljc, and on the JVM
+// and under nbb a keyword is not a string: `kotoba.sprite2d` and `test/world_ir_test.clj`
+// both look these sprites up as `:isic-9601`. Removing the call was tried and broke that
+// suite in eleven places.
+export function keyword(a, b) {
+  return b === undefined ? String(a) : String(a) + "/" + String(b);
+}

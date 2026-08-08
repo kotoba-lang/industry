@@ -69,6 +69,38 @@
   "The station a job enters at — the district's first operation."
   [spec] (first (:station-keys spec)))
 
+;; The three stations the rules single out, by name rather than by position.
+;;
+;; They used to be recomputed by index at each use site — `(nth ks (- n 2))` here,
+;; `(min 1 (dec n))` there — and every consumer outside this file had to either repeat that
+;; arithmetic or guess. Both guessed the laundry: `preview/ui.cljs` emitted the 差し戻す
+;; button only for a station literally named `"verify"`, and `bin/kuriningu.cljs`'s script
+;; vocabulary was five hardcoded laundry keys. Five of the eight districts therefore had no
+;; reject button at all in the browser, and `--script` silently did nothing and exited 0.
+;;
+;; A district's chain is `intake → verify → … → act → settle`.
+
+(defn verify-station
+  "Where the care label is read and a bad plan can still be rejected cheaply."
+  [spec] (nth (:station-keys spec) (min 1 (dec (count (:station-keys spec))))))
+
+(defn act-station
+  "The irreversible one — the process is actually applied to the subject here."
+  [spec] (nth (:station-keys spec) (- (count (:station-keys spec)) 2)))
+
+(defn settle-station
+  "Handing the subject back. Completing this is what counts toward the target."
+  [spec] (last (:station-keys spec)))
+
+(defn- station-index
+  "Position of `k` in the chain, or -1.
+
+  `keep-indexed` rather than `.indexOf` on an `into-array`: the latter is JS-only, and this
+  is a `.cljc` whose entire premise is that the rules run wherever they are read. Compared
+  as strings because squint turns a keyword into its name and nbb does not."
+  [ks k]
+  (or (first (keep-indexed (fn [i x] (when (= (str x) (str k)) i)) ks)) -1))
+
 (defn assess-stations
   "The stations a hired human approver may clear: everything that is not the entry point
   and not one the governor keeps for a human permanently. For the laundry that is
@@ -152,7 +184,7 @@
   ([spec station-key]
    (let [ks (:station-keys spec)
          n (count ks)
-         i (.indexOf (into-array (map str ks)) (str station-key))]
+         i (station-index ks station-key)]
      ;; Every station EXCEPT the last one files a record, so the checklist is one shorter
      ;; than the station list — for the laundry, five stations and four records. Using the
      ;; station count instead makes the settling act demand a record nothing produces, and
@@ -180,15 +212,15 @@
   a human approver cannot override any of them."
   [st station-key g]
   (let [spec (spec-of st)
-        ks (:station-keys spec)
-        n (count ks)
-        i (.indexOf (into-array (map str ks)) (str station-key))
-        ;; "actuation" generalises to the last two stations: the act and its settlement.
-        ;; For 9601 that is :clean and :return exactly.
-        actuation? (>= i (- n 2))
-        act? (= i (- n 2))
-        settle? (= i (dec n))
-        verify-station (nth ks (min 1 (dec n)))]
+        ;; compared by name, not by index. The index form used `.indexOf` on an
+        ;; `into-array`, which is JS-only — in a `.cljc` file whose whole point is that the
+        ;; rules run anywhere.
+        act? (= (str station-key) (str (act-station spec)))
+        settle? (= (str station-key) (str (settle-station spec)))
+        ;; "actuation" is the act and its settlement: the last two stations. For 9601 that
+        ;; is :clean and :return exactly.
+        actuation? (or act? settle?)
+        verify-station (verify-station spec)]
     (cond
       ;; 1. spec-basis -- the advisor cited no official source
       (and (or actuation? (= station-key verify-station)) (not (:cited? g)))
@@ -368,7 +400,7 @@
 ;; --------------------------------------------------------------------------
 
 (def ^:private stage-after
-  "Explicit successor table -- no `.indexOf` interop."
+  "Explicit successor table for the laundry — the fallback when a spec carries none."
   {:intake :verify :verify :screen :screen :clean :clean :return :return :done})
 
 (defn- next-stage
@@ -381,7 +413,7 @@
   (let [k (:stage g)
         ks (:station-keys spec)
         n (count ks)
-        i (.indexOf (into-array (map str ks)) (str k))]
+        i (station-index ks k)]
     (-> g
         (assoc :work 0 :blocked? false :awaiting? false)
         ;; each station files one more evidence record; `:clean` files the
@@ -402,8 +434,17 @@
         (update :cash + paid)
         (update :commits inc)
         (update :returned (fn [n] (if (= k last-k) (inc n) n)))
+        ;; `:forbidden-applied?` is written on every commit, not only the bad ones. An
+        ;; audit line that appears only when something went wrong cannot be used to prove
+        ;; that nothing went wrong — `(filter :forbidden-applied? ledger)` would be empty
+        ;; both when the invariant holds and when the key was never written at all, and
+        ;; `logic_test`'s "no forbidden process was ever applied" spent its whole life
+        ;; asserting the second case. Recording false explicitly is what makes the absence
+        ;; of true mean something.
         (log {:t* :committed :op (:op (station spec k)) :subject (:id g)
-              :disposition :commit}))))
+              :disposition :commit
+              :forbidden-applied? (boolean (and (= k (act-station spec))
+                                                (forbidden-by-care-label? g)))}))))
 
 (defn- apply-hold
   "A governor HARD violation -- `laundry.governor/hold-fact`. The garment
@@ -548,7 +589,12 @@
               (update :cash + (* (get (:payout (spec-of st)) entry 0) (:phase st)))
               (update :commits inc)
               (log {:t* :committed :op (:op (station (spec-of st) entry)) :subject (:id g)
-                    :disposition :commit})))))))
+                    :disposition :commit
+                    ;; the approver only ever clears the intake station, which is never the
+                    ;; acting station — but the key is written here too, because a ledger
+                    ;; where some commits carry the flag and some omit it is one where
+                    ;; "no entry has it set" is again ambiguous
+                    :forbidden-applied? false})))))))
 
 (defn buy
   "Spend cash on a station level, or on hiring a human approver."
@@ -578,7 +624,14 @@
       (-> st
           (update :cash - cost)
           (assoc :cert-current? true :cert-ticks 1200)
-          (log {:t* :committed :op :certification/screen :disposition :commit
+          ;; the district's own screening op, not the laundry's. `:certification/screen`
+          ;; is a real op in 9601 and in none of the other seven, so the audit ledger was
+          ;; naming an operation the actor does not have.
+          (log {:t* :committed :op (:op (station (spec-of st) (verify-station (spec-of st))))
+                :disposition :commit
+                ;; renewal is a `:committed` line too, so it carries the flag. Every entry
+                ;; of a kind must answer the question or "none answered true" means nothing.
+                :forbidden-applied? false
                 :detail "溶剤取扱資格を更新した"})))))
 
 (defn phase-requirement
@@ -710,7 +763,9 @@
         (= kind :buy)     (buy st arg)
         (= kind :renew)   (renew-certification st)
         (= kind :phase)   (advance-phase st)
-        (= kind :reset)   (init (or arg (:seed st)))
+        ;; same district. The 1-arity `init` defaults to the laundry, so a reset in 洗車 or
+        ;; 汚染浄化 quietly handed the player a different business.
+        (= kind :reset)   (init (or arg (:seed st)) (:district st))
         :else st))))
 
 (defn summary
@@ -731,7 +786,14 @@
    :cert-current? (:cert-current? st)
    :cert-ticks (:cert-ticks st)
      :levels (:levels st)
-   :costs (into {} (map (fn [k] [k (upgrade-cost st k)]) (keys upgrade-base)))
+   ;; keyed from THIS district's upgrade table, not the laundry's. It used to read
+   ;; `(keys upgrade-base)` — the five laundry stations plus :approver — so in the other
+   ;; seven districts `station-card` looked its own key up in a map that did not have it and
+   ;; rendered "強化 ¥" with no number. The fallback in `upgrade-cost` meant the button still
+   ;; worked when pressed; only the price was missing, which is the kind of breakage that
+   ;; survives a play-through.
+   :costs (into {} (map (fn [k] [k (upgrade-cost st k)])
+                        (keys (:upgrade (spec-of st)))))
    :flow (:flow st)
      :ledger (:ledger st)
    :district (:district st)
@@ -742,6 +804,14 @@
                            here (filter (fn [g] (= (:stage g) k)) (:garments st))]
                        {:key k
                         :label (:label s)
+                        ;; the view must not work out which station takes a rejection by
+                        ;; matching a name. `preview/ui.cljs` matched the literal string
+                        ;; "verify" and so drew no 差し戻す button in the five districts whose
+                        ;; second station is called something else — reading the care label
+                        ;; is the whole skill of the game, and in those five it was
+                        ;; unreachable, which makes a careful run lose exactly like a
+                        ;; careless one.
+                        :rejectable? (= (str k) (str (verify-station (spec-of st))))
                         :open? (contains? (writes-at (spec-of st) (:phase st)) k)
                         :auto? (contains? (auto-ops (spec-of st) (:phase st)) k)
                         :hard-human? (:hard-human? s)

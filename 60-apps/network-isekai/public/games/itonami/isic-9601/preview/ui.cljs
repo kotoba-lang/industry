@@ -104,8 +104,8 @@
          "<div class='acts'>"
          "<button class='btn btn--go' data-act='tap' data-arg='" (nm k) "'"
          (when-not (:open? s) " disabled") ">承認</button>"
-         (when (= (nm k) "verify")
-           (str "<button class='btn' data-act='reject' data-arg='verify'"
+         (when (:rejectable? s)
+           (str "<button class='btn' data-act='reject' data-arg='" (nm k) "'"
                 (when-not (:open? s) " disabled") ">差し戻す</button>"))
          "<button class='btn btn--buy' data-act='buy' data-arg='" (nm k) "'>強化 ¥"
          (get costs (nm k)) "</button>"

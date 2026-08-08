@@ -262,6 +262,16 @@
    :render/sprite2d {:camera {:mode :fit :rect world-rect :pad 0.05}
                      ;; a street is not a forest
                      :tree-count 0}
+   ;; `keyword` is real here and shimmed for squint (`preview/squint_shim.mjs`). squint has
+   ;; no `keyword` and compiles the unresolved symbol to a bare identifier, so the shipped
+   ;; bundle carried a call that throws `ReferenceError` the first time it is reached —
+   ;; nothing reaches it today, the page draws the 3D street rather than this 2D IR, which is
+   ;; exactly why it would have sat there.
+   ;;
+   ;; The first attempt at this keyed the map by the id STRING instead, which broke the JVM
+   ;; `world_ir_test` in eleven places: it looks sprites up as `:isic-9601`, and so does
+   ;; `kotoba.sprite2d`. Under squint a keyword already *is* its name string, so the shim is
+   ;; the coercion this needs and the two worlds stay consistent with themselves.
    :sprites (reduce (fn [acc d]
                       (assoc acc (keyword (:id d))
                              (shop-sprite d (unlocked? d (:cleared w)))))
