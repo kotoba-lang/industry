@@ -372,9 +372,21 @@
   ;;    （sibling の :local/root 依存）が要り、ノードには配れない。実際に動くかは
   ;;    operator 側の日次 run（com.gftd.observatory-run.plist）が測る。
   ;;    **この gate が green でも actor が動く証拠にはならない。**
+  ;; ⚠ :include-ext に ".plist" が要る。この gate は launchd の plist が XML として
+  ;;    妥当か（コメント中の 2 連ハイフン）も見るが、**ノードに配られない拡張子は
+  ;;    検査対象が 0 件になり、黙って合格する**。検査を足したら配る tree も広げる。
   {:name "root" :id "root-observatory-registry" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/observatory-registry-check.cljs" :script-args ["--min" "10"]
-   :include-ext [".edn" ".yml" ".cljs"] :min-files 1500 :cd false}
+   :include-ext [".edn" ".yml" ".cljs" ".plist"] :min-files 1500 :cd false}
+
+  ;; クリアランス政策（ADR-2608083000）。**政策が腐る 2 方向を語彙で塞ぐ** ——
+  ;; 秘匿の根拠が第三者の危害から組織の都合へ滑ること、位（役職・年功）が級を
+  ;; 連れてくること。どちらも人間のレビューではその場で筋が通って見えるので、
+  ;; 機械に見せる。**政策は :proposed（Council Lv7+ 未批准）で、この gate は
+  ;; 施行の証拠ではなく、草案が自分の不変条件を破っていないことの検査である。**
+  {:name "root" :id "root-clearance-policy" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/clearance-policy-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
   ;; Projection contracts are rebuilt from the exact Git-tip snapshot shipped
   ;; by the fleet operator. The archive has no .git directory, so this gate
