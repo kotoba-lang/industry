@@ -113,6 +113,24 @@ provider が `fs/browse` / `fs/app-data` 級の authority を使う。**1 つの
 **読むだけの経路も含める** —— 他所のページから GET できる形にすると、この repo の中身を
 外へ流す口になる。
 
+## レビューで見つけて直した 1 件 — fragment が本文を運ぶようになった
+
+SSE の live 更新は `#kobo-root` の中身を丸ごと差し替える。editor pane を入れた
+ことで、**その中身に開いているファイルの全文が入った**。実測: buffer が空なら
+4 KB、84 KB のファイルを開くと 89 KB。そして `on-chunk` は pipe の chunk ごとに
+呼ばれるので、饒舌なコマンドを走らせながら大きいファイルを開いていると、
+**全文が chunk の数だけ再直列化されて流れる**（読み取り上限は 1 MiB）。
+
+`broadcast!` を 80 ms に 1 回へまとめた。**末尾の 1 回は必ず送る** —— 窓の中の
+呼び出しを捨てるだけの間引きだと、最後の変化が窓に落ちたときそれが永久に届かず、
+画面が 1 手前で止まる。止まった画面は遅い画面より悪い（読み手はそれを現在だと思う）。
+
+**この gate は「落ちること」を先に確かめた。** 最初に書いたテストは throttle を
+無効にしても緑のままだった —— `(repeat n (POST ...))` が**同じ Promise を n 個
+並べていて**、要求が 1 本しか出ていなかった。`repeatedly` に直したら、無効時は
+「6 件の重なった変更で 6 回送信」で落ち、有効時に通る。**数えるテストは、数える
+対象が実際に起きていることを先に確かめないと劇場になる。**
+
 ## 実測で見つけた 2 件（どちらも効く場所に書いた）
 
 ### `kotoba.lang.lsp/text-document` は最終行を落とす
@@ -143,7 +161,7 @@ build 経路を 1 つの変更に混ぜないためであって、「まだ小�
 ## 検証
 
 - `clojure -M:test` — **63 tests / 189 assertions, 0 failures**（変更前は 18 / 55）
-- `npm run test:host`（nbb, 実ファイルシステム・実 HTTP）— **43 tests / 121 assertions, 0 failures**
+- `npm run test:host`（nbb, 実ファイルシステム・実 HTTP）— **44 tests / 124 assertions, 0 failures**
 - `clojure -M:lint` — 0 errors / 0 warnings
 - design-quality gate（ADR-2607132300）— 木のみ / 編集中の両方で **>= 95**
 - console を端から端まで駆動: `--mode terminal-build` で起動 → `/toggle src` →
