@@ -169,7 +169,41 @@ clojure -M:test && clojure -M:verify-citations
 ```
 
 **この patch を「landed」として扱わない。** 上流の main に入るまでは、
-maturity 軸は 1bp も動いていない。
+maturity 軸は 1bp も動いていない。2026-08-08 時点で
+`cloud-itonami/cloud-itonami-isic-853` の ref は `main` 1 本
+（`11e38206`）だけで、着地していないことを `git ls-remote` で確認済み。
+
+### 子セッションでの着地を試みて失敗した（transport、2026-08-08）
+
+オーナー承認のもと、`cloud-itonami-isic-853` を source にした sibling session
+（`session_01X9NJw6vkU1jvtUeGa15prK`、push 権あり）を起こし、patch を
+**gzip + base64（22,464 文字を 1 行）で prompt に埋めて**渡した。結果は失敗:
+
+> base64 patch corrupted in transit (~76% desynced); unrecoverable
+
+**設計どおりに止まった。** prompt には「`sha256` が
+`d1629e23…` と一致しなければ適用せず報告せよ」と書いてあり、子セッションは
+壊れた patch を適用せず、どこで壊れたかまで報告して停止した。**破損した
+patch が黙って適用されるより、この失敗の方がよい**——検査を先に書いた分の
+配当である。
+
+再送はできなかった: **このビルドの CCR MCP には remote session への
+`send_message` が無い**（`create_session` の説明文は fan-out 用に
+send_message を挙げているが、ツール自体が surface に無く、`ListAgents` にも
+remote session は出ない）。idle な子セッションに追加入力を渡す経路が無いので、
+やり直すには新しいセッションを起こして同じ 22 KB を再送するしかなく、
+同じ破損を繰り返す可能性が高い。子セッションは archive した。
+
+**教訓（次に同型の受け渡しをする者へ）**: 数十 KB の payload を prompt に
+1 行で埋めない。実際に効く順に:
+
+1. **そもそも patch を運ばない。** 対象 repo を source にしたセッションを
+   *最初から* 立てて、そこで実装・検証・push まで完結させる。今回は
+   「実装が先、着地の権限が後」という順序が transport を発生させた。
+2. どうしても運ぶなら **1 チャンク 3〜4 KB に分割し、チャンクごとに
+   sha256 を添える**（子セッション自身の提案でもある）。全体の sha256 だけだと
+   「どこが壊れたか」が分からず再送のしようがない。
+3. 受け手側の検査（sha256 gate）は**必ず先に書く**。今回それだけが機能した。
 
 ## Consequences
 
