@@ -84,14 +84,39 @@
 ;; 観測: live intake に domain を出して、返ってくる org を読む。
 
 (defn- challenge! [domain]
+  ;; **HTTP status を見る。ただし 4xx を一律 unreachable にしない。**
+  ;;
+  ;; status を見ないと 429/502 の JSON ボディが「org id が違う」として報告され、
+  ;; 落ちている intake を規則違反と誤診する。だが **intake は正しい拒否も 4xx で
+  ;; 返す** —— `itonami.cloud` の `reserved-domain` は HTTP 403（実測 2026-08-08。
+  ;; status を見始めた最初の版がこれを「到達不能」に落として、設計どおりの拒否を
+  ;; 見失った）。
+  ;;
+  ;; だから分けるのは status ではなく **ボディが判断を持っているか**:
+  ;;   本文に `error`/`org` がある      -> intake の判断。status は問わない
+  ;;   本文が無い / 判断が無い          -> transport の失敗。INCONCLUSIVE
+  ;;   5xx                              -> 常に INCONCLUSIVE（本文があっても）
   (-> (js/fetch (str base "/api/onboarding/challenge")
                 #js {:method "POST"
                      :headers #js {"content-type" "application/json"}
                      :body (js/JSON.stringify #js {:domain domain})})
-      (.then (fn [r] (.json r)))
-      (.then (fn [j] {:ok true
-                      :org (some-> (aget j "org") str)
-                      :refusal (some-> (aget j "error") str)}))
+      (.then (fn [r]
+               (let [status (.-status r)]
+                 (-> (.json r)
+                     (.catch (fn [_] nil))
+                     (.then (fn [j]
+                              (let [org     (some-> j (aget "org") str not-empty)
+                                    refusal (some-> j (aget "error") str not-empty)]
+                                (cond
+                                  (>= status 500)
+                                  {:ok false :error (str "HTTP " status)}
+
+                                  (or org refusal)
+                                  {:ok true :org org :refusal refusal :status status}
+
+                                  :else
+                                  {:ok false :error (str "HTTP " status
+                                                         " with no verdict in the body")}))))))))
       (.catch (fn [e] {:ok false :error (.-message e)}))))
 
 (defn- check-one! [{:keys [org domain reversed]}]
@@ -122,6 +147,13 @@
 
 (defn- main! []
   (let [rules (org-domain-rules)]
+    ;; **床は `when (seq rules)` の外。** 0 件こそが床の存在理由なので、0 件の
+    ;; ときだけ床を飛ばす形にすると、検査が消えた状態が緑で通る。
+    ;; `:org-domain` vocabulary が改名されれば rules は静かに [] になる。
+    (when (< (count rules) min-pairs)
+      (fail! "only" (count rules) "org/domain rules found, floor is" min-pairs
+             "— nothing would be checked")
+      (set! (.-exitCode js/process) 1))
     (when (seq rules)
       (println "org-domain rules:" (count rules) "· intake:" base)
       (-> (js/Promise.all (clj->js (map check-one! rules)))
@@ -129,9 +161,6 @@
            (fn [outcomes]
              (let [outcomes (vec outcomes)
                    checked (count outcomes)]
-               ;; 絞り込みが壊れて 0 件を「合格」にしない床。上限ではない。
-               (when (< checked min-pairs)
-                 (fail! "only" checked "org/domain pairs checked, floor is" min-pairs))
                (println (str "checked " checked " pairs, " (count @failures) " failing"))
                (when (seq @failures)
                  (println "")

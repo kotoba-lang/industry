@@ -1,15 +1,49 @@
-;; cloud-itonami の org id 導出 —— ADR-2608062100 の規則を 1 箇所で持つ。
+;; cloud-itonami の org id 導出 —— ADR-2608098000 の規則を 1 箇所で持つ。
 ;;
 ;; 規則: 予約語以外の org id は registrable domain のラベル逆順。
 ;;   awai.network     -> network-awai
 ;;   gftd.co.jp       -> jp-co-gftd
 ;;   junkawasaki.com  -> com-junkawasaki
 ;;
-;; 導出は一方向（domain -> id）だけ。id からドメインを逆算しない。
+;; 導出は一方向（domain -> prefix）だけ。id からドメインを逆算しない。
+;;
+;; **正規化の順序が契約である。** `scripts/org_id_derivation.cljs` は同じ順序を
+;; 同じ入力に対して行い、fleet gate `root-org-id-derivation` が両者の一致を
+;; **記録済みドメイン + 敵対的な入力列**に対して見る。順序を変えるなら両方同時に。
+;;
+;;   1. 長さ（バイト）が 253 を超えたら不正   —— DNS の上限
+;;   2. case fold                              —— ドメインは大小を区別しない
+;;   3. 先頭の `www.` を落とす
+;;   4. 非 ASCII バイトが 1 つでもあれば不正   —— punycode 前の IDN は受けない
+;;   5. ラベルが 2 未満、または空ラベルがあれば不正
+;;
+;; 4 は ADR-2608062100 が既に決めていること（`:not-a-registrable-domain`）を
+;; 実装しているだけで、新しい制限ではない。**受けないものは trap ではなく
+;; 「不正」として返す** —— 受付が拒否できず fault するのは、拒否とは違う。
 (ns cloud-itonami.org-id)
 
-;; '.' の code point。`.kotoba` に文字リテラルは無いので数で持つ。
+;; `.kotoba` に文字リテラルは無いので数で持つ。
 (defn dot-code-point [] :i64 46)
+(defn ascii-ceiling [] :i64 128)
+(defn max-domain-bytes [] :i64 253)
+
+;; 先頭の `www.` を落とした走査開始位置。落とすものが無ければ 0。
+;;
+;; `string-substring domain 0 4` で比べない —— 4 バイト目が多バイト文字の途中に
+;; 当たると、非 ASCII を弾く前に `string-substring-code-point-boundary` で trap する
+;; （`日本.jp` で実測）。code point を 1 つずつ、**短絡する形で**比べる:
+;; 先頭が `w` でなければ 2 バイト目以降を読まないので、継続バイトに触れない。
+;; `and` ではなく入れ子の `if` なのは短絡を型ではなく構文で保証するため。
+(defn scan-start [domain :string] :i64
+  (if (< (string-length domain) 4)
+    0
+    (if (= (string-code-point-at domain 0) 119)
+      (if (= (string-code-point-at domain 1) 119)
+        (if (= (string-code-point-at domain 2) 119)
+          (if (= (string-code-point-at domain 3) (dot-code-point)) 4 0)
+          0)
+        0)
+      0)))
 
 ;; ラベル 1 本を先頭へ足す。acc が空なら区切りを入れない。
 (defn prepend-label [label :string acc :string] :string
@@ -19,6 +53,9 @@
 
 ;; 左から走査し、区切りを見つけるたびに acc の**前**へ積む。
 ;; 前へ積むこと自体が逆順なので、別に反転する工程が要らない。
+;;
+;; 前提: `registrable-shape` が 1 を返す入力であること。非 ASCII を渡すと
+;; `string-code-point-at` が継続バイトの上で trap する —— だから shape を先に通す。
 (defn scan [domain :string i :i64 start :i64 acc :string] :string
   (if (< i (string-length domain))
     (if (= (string-code-point-at domain i) (dot-code-point))
@@ -27,32 +64,38 @@
       (scan domain (+ i 1) start acc))
     (prepend-label (string-substring domain start i) acc)))
 
-;; 空ラベル（先頭・末尾・連続する区切り）が 1 つでもあれば 0 を返す。
-(defn labels-nonempty [domain :string i :i64 start :i64] :i64
+;; **1 パスで** 非 ASCII と空ラベルを弾き、ラベル数を返す。不正なら 0。
+;;
+;; 2 パス（空ラベル判定とラベル数え上げを別々に）にすると 253 バイトの合法な
+;; ドメインで fuel が尽きた —— 拒否すべきでない入力の上で trap するので、
+;; 「長いドメインは受け付けない」ですらなく「長いドメインで壊れる」になる。
+;;
+;; 非 ASCII は**先頭バイトの上で**弾く。code point を読めるのは境界だけなので、
+;; 1 バイトずつ進む前に返す必要がある（進むと継続バイトの上で trap する）。
+(defn label-scan [domain :string i :i64 start :i64 seen :i64] :i64
   (if (< i (string-length domain))
-    (if (= (string-code-point-at domain i) (dot-code-point))
-      (if (= start i) 0 (labels-nonempty domain (+ i 1) (+ i 1)))
-      (labels-nonempty domain (+ i 1) start))
-    (if (= start i) 0 1)))
-
-(defn label-count [domain :string i :i64 seen :i64] :i64
-  (if (< i (string-length domain))
-    (if (= (string-code-point-at domain i) (dot-code-point))
-      (label-count domain (+ i 1) (+ seen 1))
-      (label-count domain (+ i 1) seen))
-    (+ seen 1)))
+    (if (>= (string-code-point-at domain i) (ascii-ceiling))
+      0
+      (if (= (string-code-point-at domain i) (dot-code-point))
+        (if (= start i)
+          0
+          (label-scan domain (+ i 1) (+ i 1) (+ seen 1)))
+        (label-scan domain (+ i 1) start seen)))
+    (if (= start i) 0 (+ seen 1))))
 
 ;; registrable domain の**形**をしているか。PSL は持たないので `co.jp` のような
-;; 多段 suffix は判定できない —— だから「その形をしていないもの」（単一ラベル・
-;; 空ラベル）を落とすだけにする。推測で通さない。
+;; 多段 suffix は判定できない —— だから「その形をしていないもの」だけを断る
+;; （通してから取り消すのは、断るより高い）。
 (defn registrable-shape [domain :string] :i64
-  (if (= (labels-nonempty domain 0 0) 0)
+  (if (> (string-length domain) (max-domain-bytes))
     0
-    (if (< (label-count domain 0 0) 2) 0 1)))
+    (let [d (string-fold-case domain)]
+      (if (< (label-scan d (scan-start d) (scan-start d) 0) 2) 0 1))))
 
 ;; 唯一の導出。呼ぶ前に `registrable-shape` が 1 であることを確かめること。
 (defn derive-org-id [domain :string] :string
-  (scan (string-fold-case domain) 0 0 ""))
+  (let [d (string-fold-case domain)]
+    (scan d (scan-start d) (scan-start d) "")))
 
 (defn main [] :string
   (derive-org-id "awai.network"))

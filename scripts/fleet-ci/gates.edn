@@ -238,11 +238,27 @@
   ;; **:include-ext に .mjs が要る** —— コンパイル済み成果物をノードへ送らないと
   ;; import できない。`.kotoba` も同様（sha256 の突き合わせ対象）。
   ;;
-  ;; **3 通りの壊し方で落ちることを確認済み**（2026-08-08）: ソースを触って
-  ;; 再コンパイルしないと ① で 1 件、`:reversed` を 1 つ逆にすると ④ で 2 件、
-  ;; cljs から `reverse` を抜くと ③ で 95 件。無改変で exit 0。
+  ;; **記録済みドメインだけでは足りない**（2026-08-08 のレビューで判明）。最初の版は
+  ;; 95 件の corpus だけを突き合わせて緑だったが、2 実装は実際には**等価ではなかった**
+  ;; —— kotoba だけが case fold し、cljs だけが `www.` を落とし、非 ASCII と 253 バイトで
+  ;; kotoba が trap していた。corpus が全て bare・小文字・ASCII・短いものだったので、
+  ;; 4 つの分岐すべてが検査範囲の外に隠れていた。**偶然そろっていたことを一致と
+  ;; 読んでいた。** 固定の敵対的入力列（18 件）を足して 4 段すべてを踏む。
+  ;;
+  ;; **落ちることを確認済み**（2026-08-08、無改変で exit 0）。正規化 4 段はどれも
+  ;; 単独で load-bearing で、1 つ外すと名指しで落ちる:
+  ;;   case fold を外す      -> 3 件（IETF.ORG / Awai.Network / WWW.IETF.ORG）
+  ;;   `www.` 除去を外す     -> 3 件（www.com の shape 不一致を含む）
+  ;;   ASCII 判定を外す      -> 2 件（日本.jp / ＷＷＷ.jp）
+  ;;   長さ上限を外す        -> 1 件（254 バイト）
+  ;; 加えて: ソースを触って再コンパイルしないと ① で 1 件、`:reversed` を 1 つ逆に
+  ;; すると ④ で 2 件、cljs から `reverse` を抜くと 95 件。
+  ;;
+  ;; --min-rules は check ④ の床。vocabulary が改名されると rules が静かに [] になり、
+  ;; 「手書きの :reversed と導出の一致」が 0 回の反復に縮む。
   {:name "root" :id "root-org-id-derivation" :org "com-junkawasaki" :gate :nbb-script
-   :script "gates/org-id-derivation-check.cljs" :script-args ["--min" "90"]
+   :script "gates/org-id-derivation-check.cljs"
+   :script-args ["--min" "90" "--min-rules" "7"]
    :include-ext [".edn" ".cljs" ".kotoba" ".mjs"] :min-files 1500 :cd false}
 
   ;; superproject の 3 本目。manifest が宣言することと GitHub の実態の乖離を見る。
