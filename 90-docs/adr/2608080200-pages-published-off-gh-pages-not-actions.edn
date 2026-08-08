@@ -90,7 +90,7 @@ Contents API も通らず、後者は 403 でなく **404** を返すので「re
   `gh api repos/<org>/<repo>/pages --jq .build_type` が `workflow` で、かつ
   `gh api repos/<org>/<repo>/actions/permissions --jq .enabled` が `false` の
   repo は、**live が main と一致している保証が無い**。この 2 本の組み合わせが
-  そのまま検出条件になる（本 ADR の副産物）。
+  そのまま検出条件になる（本 ADR の副産物）。**測った結果は下記「fleet の実測」。**
 - Pages の `status` は `null` のまま（legacy build の記録が
   `pages/builds/latest` に現れないことがある）。**live の HTML を実際に fetch
   して確かめる**のが唯一の確認方法。この作業では両 site を fetch し、さらに
@@ -110,4 +110,83 @@ Contents API も通らず、後者は 403 でなく **404** を返すので「re
   書かない）。
 - 検証: nle 47 tests / 249 assertions、daw 46 / 230、browser harness 17/17
   （local と live の両方）、design-quality 100.00 × 4 文書。
-  その後 ADR-2608080100（single-page app 化）で harness は 24/24 に増えた。"}]
+  その後 ADR-2608080100（single-page app 化）で harness は 24/24 に増えた。
+
+## fleet の実測（2026-08-08、closing 時に測った）
+
+上の検出条件を、**checkout 済みで Pages workflow を持つ 45 repo**に当てた
+（`find orgs -maxdepth 6 -path '*/.github/workflows/*.yml' | xargs grep -l
+'deploy-pages\\|upload-pages-artifact'`）。
+
+| | 件数 |
+|---|---|
+| Pages workflow を持つ（checkout 済み） | 45 |
+| Pages 未設定（= 危険なし） | 9 |
+| `legacy`（= branch 配信。既に安全） | 13 |
+| **`workflow` + Actions 無効（構造的に脆い）** | **23** |
+| **うち live が実際に main より遅れている** | **3** |
+
+**「脆い」と「遅れている」は別**である。23 のうち 20 は、最後の成功 run が
+main tip 以降なので **live は今のところ main と一致している** —— 次の commit が
+配信されないだけ。実際に遅れているのは 3 件だけだった:
+
+| repo | 遅れ | 最後の成功 run |
+|---|---|---|
+| `kotoba-lang/kotoba` | **7 commit** | 2026-08-04T17:49Z |
+| `kotoba-lang/kotoba-lang` | **2 commit** | 2026-08-05T04:20Z |
+| `com-junkawasaki/webmaster` | **1 commit** | 2026-08-02T00:54Z |
+
+kami-app-nle / kami-app-daw が目に見えたのは、遅れが 3 日 + design system 移行
+という**内容の大きな差**だったから。1〜7 commit の遅れは同じ仕組みで起きていても
+気付かれない。
+
+**この 3 件は直していない**（このセッションの依頼は nle / daw の 2 面）。次に
+やるなら: 各 repo に `scripts/publish-pages.cljs` を置き（nle/daw のものが雛形）、
+`gh api -X PUT repos/<slug>/pages -f build_type=legacy -f 'source[branch]=gh-pages'
+-f 'source[path]=/'` で 1 回切り替え、`npm run publish:pages`。
+
+再測定:
+
+```bash
+find orgs -maxdepth 6 -path '*/.github/workflows/*.yml' -print0 |
+  xargs -0 grep -l 'deploy-pages\\|upload-pages-artifact' |
+  sed 's|/.github/workflows/.*||' | sed 's|^orgs/||' | sort -u |
+  while read -r s; do
+      bt=$(gh api \"repos/$s/pages\" --jq .build_type 2>/dev/null) || continue
+      en=$(gh api \"repos/$s/actions/permissions\" --jq .enabled)
+      [ \"$bt\" = workflow ] && [ \"$en\" = false ] && echo \"$s\"
+    done
+```
+
+**カバレッジの限界**: 検出対象は **checkout 済みの repo だけ**。west.yml は
+4,138 project を管理しており、未 checkout の repo はこの `find` に映らない
+（CLAUDE.md「無い」と結論する前に検索する、と同じ穴）。全 fleet を測るには
+GitHub 側から列挙する必要がある —— していない。
+
+## 着地（closing、2026-08-08）
+
+| 面 | commit | 状態 |
+|---|---|---|
+| `kotoba-lang/kami-app-nle` main | `8b20e8e` | merged |
+| `kotoba-lang/kami-app-daw` main | `6d189b8` | merged |
+| `kami-app-nle` gh-pages | `07f20d0`（source `8b20e8e`） | live・24/24 |
+| `kami-app-daw` gh-pages | `277243d`（source `6d189b8`） | live・24/24 |
+| `com-junkawasaki/root`（規則 + 本 ADR） | `d45bd4b` → main | merged |
+| west pin 前進 | `963e1ef` / `34f34eb` → 更に SPA 分 | merged |
+
+**この closing 節を書くときに踏んだ罠**（EDN 文書面の話なので残す）: shell の
+行継続 `\\` を `:adr/body` の中に書くと、EDN reader が
+`Unsupported escape character: \\` で落ち、**ファイルごと load されなくなる**。
+そして `edn-query` はそのとき当該ファイルを名指しせず、単に結果が空になる
+（`docs-edn-only.cljs verify` は unparseable を数えるが、query 側は黙る）。
+`:adr/body` にシェルを載せるときは行末 `\\` を使わず、`|` で改行する
+（shell はパイプ末尾でも継続する）。**書いたあと必ず read-string を通すこと。**
+
+**gh-pages は 2 回 push している。** 1 回目（`0d818e1` / `e547111`）は
+source commit を **SPA 化前の main**（`f2dc809` / `e17c85c`）と記録していた ——
+publish を commit より先にやったため。内容は正しかった（live で 24/24 を確認済み）
+が、**provenance が嘘になる**（main は SPA、gh-pages は「SPA 前の commit から
+作った」と書いてある）。closing で main から再 build して push し直し、
+`pages: publish 8b20e8e` / `6d189b8` になっている。**publish は commit と merge の
+後にやること** —— publish script は `origin/main` の包含は検査するが、
+「今の HEAD が push 済みか」は検査しない（そこは穴として残っている）。"}]
