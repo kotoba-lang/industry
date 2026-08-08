@@ -1277,6 +1277,45 @@ ai-gftd-yukkuri・club-shinshi）も base datoms / canvas-ledger / metrics に�
 - `dds-ext-*`（container / section / grid / stack / row / card）は上流に無い layout 補助。
   app CSS で layout を再導出せず、ここを上流拡張する。
 
+### UI は single-page app で建てる（repo-wide mandatory、2026-08-08、ADR-2608080100）
+
+**オーナー指示（2026-08-08）「daw, nle どちらも single page app となるようにして、
+これは kotoba-lang の repo wide に single page app を前提にした デザインルールに」。**
+kotoba-lang の web / local app UI は **1 文書・1 バンドル・1 mount** を既定とする。
+画面の移動は state の変更であって location の変更ではない。
+
+- **2 つ目の HTML を作りたくなったら、それは view であって document ではない。**
+  実測（ADR-2608080100）: kami-app-nle / kami-app-daw は「エディタ」と「ユーザテスト
+  集計」で 2 文書 2 バンドルを持ち、**React・cljs core・design system を 2 回
+  コンパイルして 2 回配っていた**（3.6 MB → 1 文書にして 2.1 MB）。差は機能ではない。
+  さらに app shell が 2 箇所にあったので、**片方だけが DADS 移行に追従して、もう
+  片方は削除済みの `liquid-glass.css` を link したまま無スタイルで配信されていた。**
+- **view は data として持ち、nav をそこから生成する。** dispatch に足して nav に
+  足し忘れた view は「live に見える dead code」になる。表から生成すれば構造的に
+  起きない。nav は `dds/button` に `:href`（= 実際のリンクでありながら DADS の
+  control）。**この規則のために app CSS を足さない。**
+- **addressability は fragment（hash）で与える。pushState を既定にしない** ——
+  静的ホスト（Pages / cloud-itonami sites plane）では `/user-test` は **reload
+  されるまで動く URL** で、reload した瞬間に 404 になる。server rewrite を持つ
+  経路（Worker の `not_found_handling: single-page-application`）では pushState を
+  選んでよいが、**その rewrite が実在することを確かめてから**。
+- **静的ホストには `404.html` を置く。ただし未知のパス全部を `./` へ rewrite
+  しない** —— `/x/y` は `/x/` へ飛び、そこも無いので **fallback が自分自身へ
+  無限にリダイレクトする**。移動した実アドレスだけを対応 view へ送る。
+  redirect 先は相対 `./`（同じ artifact が任意の mount point で正しくなる）。
+- **「document を読み込んでいない」ことは機械で確かめる。ソースからは観測
+  できない** —— nav が router link でも素の href でもコードは同じに読める。
+  `window` に値を置き、view をまたぎ、まだそこにあることを確認する。
+  待つ対象は**その view にしか無い要素**にする（両 view にある `main h1` を待つと
+  crossing の描画前に返る。実測で踏んだ）。app 固有 state が crossing を越える
+  ことも確かめる（これが無いと single page にした利益が無い）。
+- **例外は SSR/OG が必要な公開ページ**（ADR-2606290000）。app と marketing
+  surface を同じ規則で縛らない。分けるなら理由を書く。
+- **router はまだ共有ライブラリに無い。** 2 app が同型の `route.cljc`（約 60 行、
+  view 表 + `fragment->view` + `nav` を pure に持ち、listener だけ `#?(:cljs)`）を
+  各自持っている。**抽出の trigger は 3 つ目の app** —— routing は markup でも CSS
+  でもないので `jp-go-dds` には置かない。3 つ目を書くときは先にここを見ること。
+
 **legacy（kotoba-ui / liquid-glass）** は未移行の約 12 repo（`kotoba-lang/app-*`、
 `cloud-itonami/kaisya`・`lawfirm`、`gftdcojp/apex`）でのみ引き続き正。**新規 UI を
 これで始めない。** 旧スタックの規約（`kotoba-ui.core` 単一 require、raw hex 禁止、
