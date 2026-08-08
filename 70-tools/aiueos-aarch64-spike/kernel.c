@@ -448,11 +448,18 @@ void kernel_main(struct aiueos_boot_info *info) {
   {
     /* Ranges the allocator must never hand out, even if the firmware were to
        describe them as conventional memory. */
+    /* Round each range OUT to whole pages. The base is masked down, so the
+       masked-off offset has to be added back to the size before rounding up —
+       otherwise a base that is not page aligned under-covers its own tail by
+       up to 4095 bytes. */
+    uint64_t map_off = (uint64_t)info->memory_map & 0xFFFULL;
+    uint64_t info_off = (uint64_t)info & 0xFFFULL;
     struct reserved_range reserved[3] = {
       {AIUEOS_KERNEL_LOAD_BASE, 0x200000ULL},                  /* kernel window */
-      {(uint64_t)info & ~0xFFFULL, 4096ULL},                   /* boot-info page */
+      {(uint64_t)info & ~0xFFFULL,
+       (info_off + sizeof *info + 0xFFFULL) & ~0xFFFULL},      /* boot-info page */
       {(uint64_t)info->memory_map & ~0xFFFULL,
-       (info->memory_map_size + 0xFFFULL) & ~0xFFFULL}         /* the map itself */
+       (map_off + info->memory_map_size + 0xFFFULL) & ~0xFFFULL} /* the map itself */
     };
     pmm_init(info, reserved, 3);
 
