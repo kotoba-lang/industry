@@ -93,6 +93,59 @@
         (throw (ex-info "no :name-prefix vocabulary in the authority" {:file @rules-file})))
       (vec (:vocabulary/rules np)))))
 
+(def ^:private taxonomy-index
+  "repo name → :repo/kind, from whatever file a rule's :execution-source names.
+
+  Loaded lazily and once: the taxonomy is ~1.6 MB and most runs never need it,
+  because only prefixes declared :per-repo-evidence consult it."
+  (memoize
+   (fn [file attribute]
+     (let [rows (reader/read-string (fs/readFileSync file "utf8"))]
+       (reduce (fn [acc row]
+                 (if-let [n (get row :repo/name)]
+                   (assoc acc n (get row attribute))
+                   acc))
+               {}
+               (if (map? rows) [rows] rows))))))
+
+(defn- resolve-execution
+  "Turn the :per-repo-evidence sentinel into a real execution value.
+
+  `:per-repo-evidence` is an INSTRUCTION, not a value —
+  `manifest/repository-rules.edn` says so where it defines it: a prefix that is
+  a KEY rather than a ROLE cannot carry one execution value, so read
+  :repo/kind from the evidence-derived taxonomy and do not infer it from the
+  name. cloud-itonami-lei-* is the case: 154 of its 185 members are inert
+  organisation records and 31 are actors, and declaring either value for all
+  of them would have been false for the rest.
+
+  The generator was emitting the sentinel verbatim into the catalog, so 185
+  rows carried an execution model that is not one — which is what
+  `fleet_test`'s partition assertion (`total == on-demand + resident +
+  unclassified`) was failing on. The assertion was right; this is the bug it
+  found.
+
+  The mapping is taken from the rule's own :execution-source, not hardcoded
+  here: the authority declares both which file to read and how to translate
+  what it finds, and a second copy of that in this file is a second thing to
+  keep in step."
+  [rule dir]
+  (let [{:keys [execution execution-source]} rule]
+    (if-not (= :per-repo-evidence execution)
+      execution
+      (let [{:keys [file attribute mapping]} execution-source]
+        (if-not (and file attribute mapping)
+          ;; A rule that says "read the evidence" without saying where is not
+          ;; usable, and guessing would reintroduce exactly the fabricated
+          ;; single value the sentinel exists to avoid.
+          (throw (ex-info (str ":per-repo-evidence without a usable :execution-source: " dir)
+                          {:rule rule}))
+          (let [kind (get (taxonomy-index file attribute) dir)]
+            ;; An unmapped kind stays nil rather than defaulting. nil means
+            ;; "the vocabulary does not cover this", which is the honest
+            ;; signal the rest of this file already relies on.
+            (get mapping kind)))))))
+
 (defn- role+execution
   "Match a repository name against the authority's prefix rules.
 
@@ -103,12 +156,13 @@
   confident-looking answer — the absence is the honest signal that the
   vocabulary does not cover them."
   [dir]
-  (some (fn [{:keys [prefix role execution authority-library]}]
+  (some (fn [{:keys [prefix role execution authority-library] :as rule}]
           (when (and prefix (str/starts-with? dir prefix))
-            (cond-> {}
-              role (assoc :role role)
-              execution (assoc :execution execution)
-              authority-library (assoc :authority-library authority-library))))
+            (let [execution (resolve-execution rule dir)]
+              (cond-> {}
+                role (assoc :role role)
+                execution (assoc :execution execution)
+                authority-library (assoc :authority-library authority-library)))))
         @prefix-rules))
 
 (def ^:private deploy-configs
