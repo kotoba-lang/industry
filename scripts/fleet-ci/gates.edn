@@ -301,6 +301,20 @@
    :script "gates/west-pin-policy-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
+  ;; 成熟度向上 loop の鮮度判定（ADR-2608052000 / ADR-2608080000 の loop）。
+  ;;
+  ;; 壊しても loop は普通に動き続ける —— tick は毎周 exit 0 で順位を出し、ranked も
+  ;; lane も正しく見える。壊れるのは「その順位が今の tree を見ているか」だけで、
+  ;; 出力を読んでも分からない。実測 2026-08-09: 鮮度が日単位だったせいで 78 分前に
+  ;; 着地した仕事が `0 日 = 新鮮` と読まれ、README も quickstart も ADR も既に在る
+  ;; repo を「axis-docs 0bp」と名指しした。直近 3 周が同じ穴に落ちている。
+  ;;
+  ;; :include-ext ".cljs" — policy ns / test 本体と scripts/nbb_compat shim を送るため。
+  {:name "root" :id "root-itonami-maturity-freshness" :org "com-junkawasaki"
+   :gate :nbb-script
+   :script "gates/itonami-maturity-freshness-check.cljs"
+   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+
   ;; 法規制の datom 射影（ADR-2608080000）。正本は各 actor の facts.cljc で、
   ;; 90-docs/regulatory/permits.datoms.edn はその射影。actor 側が法令・所管庁を
   ;; 直したのに射影を作り直していないと、datom 面が古い規制を返し続ける ——
