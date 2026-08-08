@@ -221,6 +221,30 @@
    :script "gates/itonami-org-id-check.cljs" :script-args ["--min" "7"]
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
+  ;; 同じ規則の **workspace 内側**。上の gate が受付の drift を見るのに対し、
+  ;; こちらは「導出が 1 つであること」自体を押さえる（ADR-2608094000）。
+  ;;
+  ;; 逆順導出は 3 箇所に在った: `:org-domain` の手書き `:reversed` 列、
+  ;; `verify-repository-roles.cljs` の `domain->prefix`、cloud-itonami の受付。
+  ;; 2 つ目は `scripts/org_id_derivation.cljs` に括り出し、正本を
+  ;; `manifest/org-id.kotoba`（`kotoba/pure`、capability 0）に置いた。
+  ;;
+  ;; gate は規則を実装しない（3 箇所を 4 箇所にするだけなので）。突き合わせるのは:
+  ;; ①`org-id.mjs` の `sourceDigest` == `org-id.kotoba` の sha256（ノードに
+  ;; kotoba ツールチェーンが要らない） ②`requiredCapabilities` が空のまま
+  ;; ③記録された 94 ドメインで kotoba == cljs（対象を子プロセスで起動して呼ぶ）
+  ;; ④手書きの `:reversed` 7 件 == 導出 ⑤形の判定の一致。
+  ;;
+  ;; **:include-ext に .mjs が要る** —— コンパイル済み成果物をノードへ送らないと
+  ;; import できない。`.kotoba` も同様（sha256 の突き合わせ対象）。
+  ;;
+  ;; **3 通りの壊し方で落ちることを確認済み**（2026-08-08）: ソースを触って
+  ;; 再コンパイルしないと ① で 1 件、`:reversed` を 1 つ逆にすると ④ で 2 件、
+  ;; cljs から `reverse` を抜くと ③ で 95 件。無改変で exit 0。
+  {:name "root" :id "root-org-id-derivation" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/org-id-derivation-check.cljs" :script-args ["--min" "90"]
+   :include-ext [".edn" ".cljs" ".kotoba" ".mjs"] :min-files 1500 :cd false}
+
   ;; superproject の 3 本目。manifest が宣言することと GitHub の実態の乖離を見る。
   ;; 検査ロジックは kotoba-lang/manifest-reality（純 .cljc、IO なし）が正本で、
   ;; gate は west.yml / repos.edn を渡して呼ぶだけ — repository-roles gate と

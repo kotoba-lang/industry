@@ -120,12 +120,59 @@ ADR-2608062100 の「推測で通さない」をそのまま実装している�
 **`kotoba check` を万能の網と扱わない。** 消せるのは「同じ規則が 2 箇所に在る」形の
 穴だけで、UI の欠落も DNS の drift も型は見ない。
 
+## 決定 3 —— workspace 内側の導出も 1 つに畳んだ（着地済み）
+
+同じ規則は cloud-itonami の外、**この superproject の中でも 2 つあった**:
+
+- `manifest/repository-rules.edn` の `:org-domain` が持つ**手書きの `:reversed` 列**
+- `scripts/verify-repository-roles.cljs` の `domain->prefix`（origin 面の検査に使う）
+
+7 org 分しかないので `:reversed` は手で合っていたが、**合っている理由が「たまたま」**
+だった —— 一致を見るものが無かった。
+
+着地したもの:
+
+| 何 | どこ |
+|---|---|
+| 導出の正本 | `manifest/org-id.kotoba`（`kotoba/pure`、capability 0） |
+| コンパイル済み成果物 | `manifest/org-id.mjs`（+ provenance / manifest） |
+| cljs 側の唯一の実装 | `scripts/org_id_derivation.cljs` |
+| 検査 | fleet gate `root-org-id-derivation` |
+
+`verify-repository-roles.cljs` は `domain->prefix` の本体を持たなくなり、
+`scripts.org-id-derivation` を require する。**`--name-audit` の出力は移動の前後で
+byte 一致**（1,452 origin-plane / 18 anchors、差分ゼロ）。
+
+`:reversed` 列は**残した**。手書きが残っているのは一致が検査できるからで、導出に
+置き換えると突き合わせる相手がいなくなる。
+
+gate は規則を実装しない（3 箇所を 4 箇所にするだけなので）。突き合わせるのは
+①`org-id.mjs` の `sourceDigest` == `org-id.kotoba` の sha256 —— `kotoba -M compile` が
+sha256 をそのまま焼くので、**ノードに kotoba ツールチェーンが無くても** source <->
+artifact の束縛を確かめられる ②`requiredCapabilities` が空のまま ③記録された 94
+ドメインで kotoba == cljs（cljs は子プロセスで**実際に呼ぶ**。gate は単一ファイルで
+配られ classpath を持たないので、`cloud-itonami-sites-check` と同じ形）
+④手書きの `:reversed` 7 件 == 導出 ⑤形の判定の一致。
+
+**3 通りの壊し方で落ちることを確認済み**（2026-08-08）:
+
+```
+ソースを触って再コンパイルしない  -> (1) で 1 件、exit 1
+:reversed を 1 つ逆にする         -> (4) で 2 件、exit 1
+cljs から reverse を抜く          -> (3) で 95 件、exit 1
+無改変                            -> 0 件、exit 0
+```
+
 ## やっていないこと
 
-- **`network-awai/cloud-itonami` 側に着地していない。** このセッションの repo scope は
-  `com-junkawasaki` に固定されており、`add_repo` は cross-tier を拒否、west remote は
-  SSH。モジュールと gate はここに在るが、intake を直す commit はあちらへのアクセスを
-  持つセッションが要る。
+- **cloud-itonami 側に着地していない。** このセッションの repo scope は
+  `com-junkawasaki` に固定されており、`add_repo` は cross-tier を拒否する。ソースは
+  `network-awai/cloud-itonami` と `gftdcojp/cloud-itonami`（サイトが AGPL source として
+  指す先）の両方とも private で、HTTPS clone も通らない。**正本モジュールと 2 本の
+  gate はここに在るが、intake を直す commit はあの repo を初期ソースにしたセッションが
+  要る。** そこでやることは `manifest/org-id.kotoba` を持って行って
+  `cloud-itonami.org-id` の導出をそれに差し替え、受付が同じモジュールを通るように
+  するだけ。
 - **`itonami.cloud` の live intake は今も順方向を返す。** gate は赤で着地する ——
   実在する不一致を報告しているので、それが正しい状態である。
 - **`kotoba-lang/compiler` の `deps-lock.edn` が main で stale**（別件、下記）。
@@ -142,7 +189,7 @@ deps.edn 自身のコメントが「同じ commit で再生成しろ」「stale 
 実際 `bin/kotoba` はその通りに fallback した（JDK が無ければそこで死ぬ）。
 fleet gate `compiler-jdk-free` はこれを見るので、走っていれば赤のはず。
 
-## モジュール（`cloud-itonami/org_id.kotoba`、検証済み）
+## モジュール（`manifest/org-id.kotoba`、着地済み）
 
 ```clojure
 ;; cloud-itonami の org id 導出 —— ADR-2608062100 の規則を 1 箇所で持つ。

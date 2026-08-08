@@ -27,7 +27,8 @@
 (require '[clojure.edn :as edn]
          '[clojure.set :as set]
          '[clojure.string :as str]
-         '[scripts.nbb-compat :as compat])
+         '[scripts.nbb-compat :as compat]
+         '[scripts.org-id-derivation :as org-id])
 
 (def fs (js/require "node:fs"))
 (def path (js/require "node:path"))
@@ -95,15 +96,11 @@
 (def family-prefixes
   (into #{} (map :family) (:vocabulary/rules family-vocab [])))
 
-(defn domain->prefix
-  "Reverse a registrable domain's labels into the origin prefix.
-   ietf.org -> org-ietf ; boj.or.jp -> jp-or-boj ; sel4.systems -> systems-sel4.
-   One-way by design: a name cannot be parsed back into a domain, because a
-   single label may contain no hyphen while the subject contains several."
-  [domain]
-  (->> (str/split (str/replace domain #"^www\." "") #"\.")
-       reverse
-       (str/join "-")))
+;; The derivation itself moved to `scripts/org_id_derivation.cljs` so that this
+;; file and the org-id intake stop being two implementations of one rule
+;; (ADR-2608094000). The canonical form is `manifest/org-id.kotoba`; the fleet
+;; gate `root-org-id-derivation` holds the two in agreement.
+(def domain->prefix org-id/domain->prefix)
 
 (defn name-under-prefix? [nm prefix]
   (or (= nm prefix) (str/starts-with? nm (str prefix "-"))))

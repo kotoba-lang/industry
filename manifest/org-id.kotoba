@@ -1,0 +1,58 @@
+;; cloud-itonami の org id 導出 —— ADR-2608062100 の規則を 1 箇所で持つ。
+;;
+;; 規則: 予約語以外の org id は registrable domain のラベル逆順。
+;;   awai.network     -> network-awai
+;;   gftd.co.jp       -> jp-co-gftd
+;;   junkawasaki.com  -> com-junkawasaki
+;;
+;; 導出は一方向（domain -> id）だけ。id からドメインを逆算しない。
+(ns cloud-itonami.org-id)
+
+;; '.' の code point。`.kotoba` に文字リテラルは無いので数で持つ。
+(defn dot-code-point [] :i64 46)
+
+;; ラベル 1 本を先頭へ足す。acc が空なら区切りを入れない。
+(defn prepend-label [label :string acc :string] :string
+  (if (string=? acc "")
+    label
+    (string-concat (string-concat label "-") acc)))
+
+;; 左から走査し、区切りを見つけるたびに acc の**前**へ積む。
+;; 前へ積むこと自体が逆順なので、別に反転する工程が要らない。
+(defn scan [domain :string i :i64 start :i64 acc :string] :string
+  (if (< i (string-length domain))
+    (if (= (string-code-point-at domain i) (dot-code-point))
+      (scan domain (+ i 1) (+ i 1)
+            (prepend-label (string-substring domain start i) acc))
+      (scan domain (+ i 1) start acc))
+    (prepend-label (string-substring domain start i) acc)))
+
+;; 空ラベル（先頭・末尾・連続する区切り）が 1 つでもあれば 0 を返す。
+(defn labels-nonempty [domain :string i :i64 start :i64] :i64
+  (if (< i (string-length domain))
+    (if (= (string-code-point-at domain i) (dot-code-point))
+      (if (= start i) 0 (labels-nonempty domain (+ i 1) (+ i 1)))
+      (labels-nonempty domain (+ i 1) start))
+    (if (= start i) 0 1)))
+
+(defn label-count [domain :string i :i64 seen :i64] :i64
+  (if (< i (string-length domain))
+    (if (= (string-code-point-at domain i) (dot-code-point))
+      (label-count domain (+ i 1) (+ seen 1))
+      (label-count domain (+ i 1) seen))
+    (+ seen 1)))
+
+;; registrable domain の**形**をしているか。PSL は持たないので `co.jp` のような
+;; 多段 suffix は判定できない —— だから「その形をしていないもの」（単一ラベル・
+;; 空ラベル）を落とすだけにする。推測で通さない。
+(defn registrable-shape [domain :string] :i64
+  (if (= (labels-nonempty domain 0 0) 0)
+    0
+    (if (< (label-count domain 0 0) 2) 0 1)))
+
+;; 唯一の導出。呼ぶ前に `registrable-shape` が 1 であることを確かめること。
+(defn derive-org-id [domain :string] :string
+  (scan (string-fold-case domain) 0 0 ""))
+
+(defn main [] :string
+  (derive-org-id "awai.network"))
