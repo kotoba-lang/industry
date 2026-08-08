@@ -122,9 +122,16 @@
                     :else ["-M" "-m" (:main o)])]
             ["clojure" (into a (map #(expand % dir) (:args o)))])
           :nbb ["nbb" (into [(:main o)] (map #(expand % dir) (:args o)))]
+          ;; :node（yabai / collector）は未実装。**exit 127 は「その actor が
+          ;; 落ちた」ではなく「こちらが起動方法を持っていない」という意味**なので、
+          ;; 登録簿の :blocked-by でその差を明示すること。実装するのは repo 側の
+          ;; ブロッカーが解けてから —— 起動できないものに runner を先回りで足しても
+          ;; 検証できない。
           [nil nil])]
     (if (nil? cmd)
-      {:exit 127 :out "" :err (str "unknown runtime " (:runtime o))}
+      {:exit 127 :out ""
+       :err (str "unknown runtime " (:runtime o)
+                 " — observatory-run が起動方法を持っていない（actor 側の失敗ではない）")}
       ;; process.env はプレーンな JS object ではないので js->clj では変換できない
       ;; （nbb-compat の getenv-all がそのために在る）。
       (let [env (merge (compat/getenv-all)
@@ -140,11 +147,17 @@
 
 (defn- chain-ok?
   "actor が chain 検証を印字していれば拾う。印字しない actor では nil
-   （『検証していない』を『壊れている』と混同しない）。"
+   （『検証していない』を『壊れている』と混同しない）。
+
+   ⚠ **偽を先に見る。** actor によって印字が `chain OK` だったり
+   `chain={:ok true, :length 1, :broken-at -1}` だったりする（実測 2026-08-08:
+   inochi / rasen / busshi は後者）。真のパターンを先に当てると
+   `{:ok false, :broken-at 3}` の `:broken-at` に引っかかる余地を残すので、
+   **壊れている側を先に判定する**。"
   [out]
   (cond
-    (re-find #"chain OK|chain ok=true|ok=true" out) true
-    (re-find #"BROKEN|ok=false" out) false
+    (re-find #"BROKEN|ok=false|:ok false" out) false
+    (re-find #"chain OK|chain ok=true|ok=true|:ok true" out) true
     :else nil))
 
 (defn- classify
@@ -167,9 +180,24 @@
       (if (= :file (:kind after)) :produces-datoms :produces-files)
       ;; 上書き型: この run で書き直されたか
       (and fresh? (pos? (:bytes after 0))) :produces-files
+      ;; 冪等な append-only 台帳: seed から導いた datom 集合が前回と同じなら
+      ;; **何も足さないのが正常**（actor 自身が appended=false (no-change) と印字する）。
+      ;; 実測 2026-08-08: inochi / rasen / busshi は 2 周目で伸びない。これを
+      ;; :runs-empty（＝ 0 件・設定不足）と同じ扱いにすると、正常な 2 周目が毎回
+      ;; 下振れ扱いになり、gate が常時赤 = 無視される gate になる。
+      ;; run のあとに台帳が実在して中身があることは要求する。ただし**台帳を消しても
+      ;; seed から作り直す**ので、それだけでは落ちない（実測: 消すと Δbytes>0 で
+      ;; :produces-datoms になり合格）。落ちるのは actor が実際に失敗した時
+      ;; （実測: seed を壊すと exit 1 → :known-broken → 下振れで FAIL）。
+      (and (= :file (:kind after)) (pos? (:bytes after 0)))
+      :produces-datoms-idempotent
       :else :runs-empty)))
 
-(def rank {:known-broken 0 :runs-empty 1 :runs-ok 2 :produces-files 3 :produces-datoms 4})
+;; 下位互換の梯子。observed の rank が expect の rank 以上なら合格。
+;; :produces-datoms-idempotent を :produces-datoms の**下**に置くのが要点 ——
+;; 毎周伸びるはずの watari が伸びなくなったら、それは下振れとして落ちる。
+(def rank {:known-broken 0 :runs-empty 1 :runs-ok 2 :produces-files 3
+           :produces-datoms-idempotent 4 :produces-datoms 5})
 
 ;; ── main ────────────────────────────────────────────────────────────────
 (println (str "observatory-run " (.toISOString (js/Date.))
