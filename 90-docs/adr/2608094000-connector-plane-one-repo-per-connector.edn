@@ -1,0 +1,201 @@
+[{:db/id -1
+  :adr/id "2608094000"
+  :adr/doc_type "adr"
+  :adr/topic "connector-plane-one-repo-per-connector"
+  :adr/title "connector は 1 つにつき 1 repo（origin 面）。scope は tool ごとに宣言し、同意は OAuth client ごとに 1 回"
+  :adr/status :accepted
+  :adr/date "2026-08-08"
+  :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
+  :adr/authoritative_for
+  ["connector（Claude / Codex の connector に相当するもの）の契約は kotoba-lang/connector が正本"
+   "connector 1 つにつき repo 1 つ。名前は origin 面（相手先の登録可能ドメインの逆順 + 主題）"
+   "既に origin 面 repo が在る service は、その repo に connector を載せる（新規作成しない）"
+   "scope は provider 単位ではなく tool 単位で宣言する"
+   "同意は OAuth client 単位に 1 回（connector 単位ではない）"
+   "connector repo は credential を取得する手段を持たない"
+   "connector.edn は生成物。手で維持しない"]
+  :adr/supersedes []
+  :adr/related ["2608093000" "2608040100" "2607289500" "2606272204" "2607171600"]
+  :adr/repos ["kotoba-lang/connector"
+              "kotoba-lang/com-google-calendar"
+              "kotoba-lang/com-google-drive"
+              "kotoba-lang/com-google-gmail"
+              "kotoba-lang/com-microsoft-graph"
+              "com-junkawasaki/root"]
+  :adr/body
+  "# ADR-2608094000: connector 面 —— 1 connector = 1 repo
+
+**Status**: accepted / **Date**: 2026-08-08
+
+## Directive
+
+オーナー質問（2026-08-08）「いまの cloud-itonami, cloud-itonami-app, kotoba-lang に
+connector は設計されている? claude, codex のような」→ 実測の報告を受けて
+「では設計実装, また connector ごとに repo を作って, 公開, kotoba-lang org でok」。
+
+## 実測した現在地（2026-08-08）
+
+**部品は全部あって、connector という面だけが無かった。**
+
+| 在る | 無い |
+|---|---|
+| MCP **server**（stdio + Streamable HTTP `/mcp`、OAuth 2.1、RFC 9728、scope 4 種） | 外部 service を**登録する**口 |
+| Google / Microsoft / GitHub への OAuth（`identity.clj` 2,174 行にハードコード） | 4 つ目の provider を app を編集せずに足す方法 |
+| `tenant_connection`（capability lease、TTL、request→approve→revoke） | **外向き**の capability |
+| 1,215 件の app カタログ | 「入れる」操作（ADR-2608093000） |
+
+`agent_control.clj:397` の `available-tools` は `done` / `local-query` /
+`browser` / `computer` の 4 本を `cond->` で足すだけで、**registry ではない**。
+統合を 1 つ足すことは application を編集することだった。
+
+**この点は 3 度確認した。** 1 度目の grep は west.yml のインデントを誤指定して
+`com-google-chat` すら見落とし「既存 0 件」と読み違えた（CLAUDE.md「『無い』と
+結論する前に検索する」の実例をまた作った）。取り直して初めて `com-github` /
+`com-slack` / `com-notion` が既に在ることが分かり、設計が変わった（下記 D3）。
+
+## Decision
+
+### D1. connector の契約は `kotoba-lang/connector`（新規）
+
+portable `.cljc`、依存は sibling kernel `org-anthropic-mcp` 1 本のみ
+（`connector.mcp` だけが使う）。I/O は無く、すべて URL / request map / result を
+返す。
+
+| ns | |
+|---|---|
+| `connector.model` | descriptor（EDN）、builder、tool 単位の scope 演算、`read-only` |
+| `connector.validate` | 構造検査 + origin 面の名前検査 |
+| `connector.auth` | OAuth 2.0 authorization-code + PKCE を URL / request map として |
+| `connector.uri` | RFC 3986 percent-encoding（両 host で同一出力） |
+| `connector.provider` | descriptor + `request`/`normalize`、load 時に検証 |
+| `connector.registry` | 複数 connector を 1 面に。`select` で「有効なもの」に絞る |
+| `connector.consent` | OAuth client 単位の grant、`grant-summary` |
+| `connector.invoke` | build → authorize → send → normalize |
+| `connector.ports` | `IHttp` / `ITokens`（host 注入） |
+| `connector.declare` | `connector.edn` の生成 |
+| `connector.mcp` | `mcp.model` manifest + `mcp.ports/ITool` への射影 |
+
+### D2. connector 1 つにつき repo 1 つ、origin 面
+
+名前は **相手先の登録可能ドメインの逆順 + 主題**（ADR-2608040100）。
+`google.com` → `com-google` → `com-google-calendar`。
+`connector.validate/name-conformant?` が検査し、**ドメイン記録が無いときは
+`false` ではなく `nil` を返す**（UNVERIFIED は合格ではない）。
+
+今回起こした 4 件（すべて public、kotoba-lang）:
+
+| repo | tools | 特記 |
+|---|---|---|
+| `com-google-calendar` | 5 | `google_calendar_freebusy` が ADR-2608093000 D2 の外向き capability |
+| `com-google-drive` | 4 | metadata と text のみ。**binary download tool を持たない** |
+| `com-google-gmail` | 5 | read / modify / send を**別 scope**に分けた |
+| `com-microsoft-graph` | 6 | Graph は 1 API で多 service なので API 名で 1 connector |
+
+### D3. 既に origin 面 repo が在る service は、その repo に載せる
+
+**同一面の同一主題は不可**（ADR-2608040100）。実測で `kotoba-lang/com-github` が
+既に在り、しかも `github.workflow`（HTTP と認証を注入する portable client、
+read/write capability を分離済み）を持っていた。**GitHub connector を新規 repo に
+起こすのは規則違反であり、既存の実装の再発明でもある。** 同様に `com-slack` /
+`com-notion` / `com-google-chat`（送信専用 webhook client）も既存。
+
+→ GitHub / Slack / Notion / Google Chat の connector は**それぞれの既存 repo に
+`connector.edn` + connector ns を足す**。本 ADR ではまだ実施していない（未実装、
+下記）。
+
+### D4. scope は provider 単位ではなく tool 単位
+
+これが「部品を組み替えただけ」ではない一点。`identity.clj` の provider は 1 entry =
+1 scope 列なので、**mailbox を検索したいだけの deployment も `gmail.modify` を
+握る**（`modify` が read を含むため）。tool 単位なら:
+
+- 検索と閲覧だけ有効 → `gmail.readonly` だけを要求
+- 送信を有効化 → `gmail.send` が**別の行として**同意画面に現れ、人が個別に断れる
+- `connector.model/read-only` は write tool を落とし、**その scope も一緒に落ちる**
+  （別リストを同期する必要が無い）
+
+Drive も同じで、一覧・監査だけなら `drive.metadata.readonly` のみ。本文を読む
+`export` の瞬間に `drive.readonly` が別 scope として見える。
+
+### D5. 同意は OAuth client 単位に 1 回
+
+Drive / Gmail / Calendar は **3 connector・1 Google client**。3 回同意させるのは
+無意味を超えて有害で、2 回目以降は「読まずに押す」を教える。
+`connector.consent/groups` は `(authorization endpoint, token endpoint,
+client-id env)` で束ね、**有効な tool の scope の和集合**を 1 回だけ要求する。
+
+provider 名でなく **client** で束ねるのは意図的 —— 同じ service を別 OAuth client で
+使う 2 deployment が grant を共有してはならず、名前ではそれを見分けられない。
+
+client id が未設定の group は**落とさずに `:unconfigured true` を付けて返す**。
+黙って落とすと「誰も要求していない connector」に見え、operator には
+「接続を提案してこない connector」として現れる。
+
+### D6. connector repo は credential を取得する手段を持たない
+
+`request` が受け取るのは tool 名と引数だけ。token も keychain も環境変数も、
+それらに到達する方法も渡さない。Authorization header は `connector.invoke` が
+付ける。**したがって connector repo の review に「credential を漏らしていないか」
+という項目は要らない —— 手段が無い。**
+
+### D7. `connector.edn` は生成物
+
+`capability-` family の `capability.edn` と同じ役割（ADR-2607289500）: repo 直下に
+契約を宣言し、**Clojure を読み込まずに**読める。4,100 repo のカタログ生成に
+JVM を repo ごとに起こす必要が無い。
+
+descriptor から生成し、**commit 済みファイルが descriptor とずれたら各 repo の
+テストが落ちる**。実際に `com-google-calendar/connector.edn` の 1 語を書き換えて
+赤くなること、戻して緑になることを確認した（落ちない gate は劇場）。
+
+## 実装状況
+
+| | |
+|---|---|
+| `kotoba-lang/connector` kernel | ✅ 22 tests / 59 assertions |
+| `com-google-calendar` | ✅ 12 tests / 43 assertions |
+| `com-google-drive` | ✅ 10 tests / 34 assertions |
+| `com-google-gmail` | ✅ 11 tests / 43 assertions |
+| `com-microsoft-graph` | ✅ 12 tests / 44 assertions |
+| west 登録（5 件） | ✅ |
+| GitHub / Slack / Notion / Google Chat を既存 repo に載せる | ❌ |
+| `cloud-itonami-app` の配線（`identity/provider-catalog` → registry） | ❌ |
+| Fleet 画面の「接続」 | ❌（ADR-2608093000 D4） |
+
+**テストはネットワークを使わない。** request が map なので、assertion は値の比較で
+足りる —— fake server も cassette も無い。`connector.invoke/request-for` は
+credential 抜きの request を返し、これが connector repo のテストの主対象。
+
+## Consequences
+
+- **`cloud-itonami-app` はまだ 1 行も変わっていない。** この ADR が用意したのは
+  `identity.clj` の `provider-catalog` を置き換えられる形の registry であって、
+  置き換えそのものではない。配線するまで、この面は「使える形で在る」だけで
+  「使われている」ではない。
+- **tool 名は全 connector で一意でなければならない**（`connector.registry` が
+  load 時に拒否する）。model が見るのは tool 名なので、deployment によって
+  意味が変わる名前は load 失敗より悪い。
+- **既存の origin 面 repo に connector を載せる作業は、その repo の主題と混ざる。**
+  `com-github` は clean-room actor でもあるので、README が境界を述べる必要がある。
+- **Gmail の `labelIds` は複数指定できない** —— Graph の query map が単値のため。
+  1 件なら動き、複数なら省略する（先頭だけ黙って送らない）。
+- **`connector.edn` を手で直すと落ちる。** 生成し直す手順が README にある。
+
+## 実測で見つかった別件（この ADR の範囲外）
+
+- **`.mcp.json` の `cloud-itonami-license` が存在しないパスを指している** ——
+  `orgs/gftdcojp/cloud-itonami/...` だが west 上の実体は
+  `orgs/network-awai/cloud-itonami`。この MCP server は現状起動できない。
+- **west.yml に 3 件の pin 退行がある**（`cloud-itonami` / `cloud-itonami-yotei` /
+  `loop-game-autoplay`）。PreToolUse hook が push を止めて教えてくれた。
+  本 ADR の作業とは無関係の既存 drift。
+- **hosted MCP の OAuth は稼働していない** —— `auth.itonami.cloud` は DNS 解決せず、
+  `app.itonami.cloud/.well-known/oauth-protected-resource/mcp` は別物の actor
+  router が 400 を返す。動いているのは stdio 経路のみ。"
+  :adr/consequences
+  "cloud-itonami-app はまだ配線されていない。registry は「使える形で在る」だけで「使われている」ではない。
+tool 名は全 connector で一意。registry が load 時に拒否する。
+既存 origin 面 repo（com-github / com-slack / com-notion / com-google-chat）への connector 追加は未実施。
+Gmail の labelIds は複数指定不可（query map が単値）。1 件なら動き、複数なら省略する。
+connector.edn を手編集するとテストが落ちる。生成し直す。
+別件: .mcp.json の cloud-itonami-license が存在しないパスを指す / west.yml に 3 件の pin 退行 / hosted MCP の OAuth AS は未稼働。"}]

@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 10305,
-  :pageviews-7d 4650,
-  :uniques-7d-sum 536,
+ {:requests-7d 11198,
+  :pageviews-7d 4791,
+  :uniques-7d-sum 546,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 87}
-   {:path "/preview", :requests 31}
-   {:path "/preview.html", :requests 31}
-   {:path "/feed/fork-stats.edn", :requests 26}
-   {:path "/robots.txt", :requests 10}
-   {:path "/favicon.ico", :requests 5}
-   {:path "/feed/index.edn", :requests 4}
-   {:path "/js/app.js", :requests 4}],
-  :status-mix {:ok 1102, :server-error 97, :client-error 8},
+  [{:path "/", :requests 91}
+   {:path "/favicon.ico", :requests 74}
+   {:path "/js/app.js", :requests 70}
+   {:path "/kototama/kototama_bg.wasm", :requests 67}
+   {:path "/kototama/kototama.js", :requests 64}
+   {:path "/api/liveops", :requests 63}
+   {:path "/api/analytics", :requests 63}
+   {:path "/preview", :requests 31}],
+  :status-mix {:ok 1975, :server-error 257, :client-error 12},
   :channel-mix
-  {:channel 270, :probe 683, :unclassified 149, :ok-total 1102},
+  {:channel 775, :probe 683, :unclassified 517, :ok-total 1975},
   :window "24h"},
  :as-of "2026-08-08",
- :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 8},
+ :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 11},
  :top-paths
- "上位 page (24h, 2xx/3xx・channel-allowlist済): / 87 · /preview 31 · /preview.html 31 · /feed/fork-stats.edn 26 · /robots.txt 10 | 4xx(probe) 1% · 5xx 8% · probe(200-fallback) 62% · unclassified 14%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): / 91 · /favicon.ico 74 · /js/app.js 70 · /kototama/kototama_bg.wasm 67 · /kototama/kototama.js 64 | 4xx(probe) 1% · 5xx 11% · probe(200-fallback) 35% · unclassified 26%",
  :signal
- "isekai.network 実測 10305 req/7d・536 uniques(日次和)・うち4xx probe 1%(24h)",
+ "isekai.network 実測 11198 req/7d・546 uniques(日次和)・うち4xx probe 1%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}

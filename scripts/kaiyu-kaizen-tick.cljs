@@ -49,9 +49,9 @@
 (def json-out? (some? (some #{"--json"} argv)))
 
 (def sites
-  "The three sites with a 回遊 read face. itonami.cloud is deliberately absent
-  until its own measurement lands — listing it here with no endpoint would make
-  every round report a permanently broken instrument."
+  "The four sites with a 回遊 read face. itonami.cloud joined 2026-08-08 —
+  until then the loop could read every site except the one it files into,
+  which is the shape of a tool that stops being true first."
   [{:site "shinshi.club"
     :tenant {:org "network-awai" :repo "club-shinshi"}
     :url (str "https://shinshi.club/_metrics/audience?window_days=" window-days)
@@ -72,6 +72,15 @@
     :keychain "net-kotobase KAIYU_REPORT_SECRET"
     :header "authorization-bearer"
     :live-since "2026-08-07"
+    :shape :kotobase}
+   {:site "itonami.cloud"
+    :tenant {:org "network-awai" :repo "cloud-itonami"}
+    :url (str "https://itonami.cloud/api/kaiyu?window_days=" window-days)
+    :keychain "cloud-itonami KAIYU_REPORT_SECRET"
+    :header "authorization-bearer"
+    ;; 2026-08-08, the day its own measurement landed. Earlier windows report
+    ;; :not-measured rather than :blocked, which is the honest reading.
+    :live-since "2026-08-08"
     :shape :kotobase}])
 
 (defn- keychain
