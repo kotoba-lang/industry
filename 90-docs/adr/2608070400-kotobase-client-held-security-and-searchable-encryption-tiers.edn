@@ -243,10 +243,20 @@ Follow-up 2/3 に着手する前に索引を引いた結果、**この ADR が�
 > D7 の S1 の位置にいる** —— 塞いだのは「作れない」ことであって「配ってある」
 > ことではない。
 >
-> `pqh/pq_noble.cljs` の 18 日放置は**依然として未解決**（下記）。envelope は
-> それに乗らず `@noble/post-quantum` を自前で薄く束ねた（他人の未着地の working
-> tree に乗るのは依存ではなく偶然なので）。結果として workspace の ML-KEM 束ねは
-> 3 つになった —— 統合の機会として `envelope.kem` の docstring に記録してある。
+> **訂正（2026-08-08 closing）**: 下の「18 日間 uncommitted」は**誤りだった**。
+> `pq_noble.cljs` は **2026-07-27 に `f57c175` で landed** しており（`pq.cljc` /
+> `util.cljc` は 2026-08-01 の `72fa921`）、放置されてなどいなかった。誤認の原因は
+> **こちらのローカル checkout が 12 commit 遅れていた**こと —— 遅れた checkout では
+> 着地済みのファイルが untracked / modified に見える。同じ誤りを cleanup survey の
+> 全体でも踏んでおり、dirty と報告された 66 ファイルのうち **42 が main とバイト
+> 同一**（偽陽性）だった。**「ローカルが dirty」を「未着地」と読まないこと。**
+> 判定は必ず fetch 後の `origin/main` に対する content-containment で行う。
+>
+> envelope が `@noble/post-quantum` を自前で束ねた判断自体は変わらない。ただし
+> 理由は「他人の未着地 WIP に乗れないから」ではなく、**pqh のものは `IPq` seam の
+> 背後にある別 consumer 向けの provider 実装だから**である。結果として workspace の
+> ML-KEM 束ねは 3 つ —— 統合の機会として `envelope.kem` の docstring に記録してある
+> （そちらの docstring にも同じ誤りが残っているので、次に触る人が直すこと）。
 
 以下は棚卸し時点の記述:
 
@@ -271,12 +281,14 @@ ML-KEM-768 公開鍵を持つ必要があり、DID document・鍵バックアッ
 （`kotoba-lang/org-signal` + ADR-2607022330）に及ぶ。crypto を差し替えるより
 identity/鍵配布の方が大きい。
 
-**そして材料は既に書かれている（未着地）**: `kotoba-lang/pqh` の
+**そして材料は既にある**: `kotoba-lang/pqh` の
 `src/kotoba/lang/pqh/pq_noble.cljs` —— @noble ベースのブラウザ IPq host
-（x25519 / ml_kem768 / ml_dsa65 / hkdf）が **2026-07-20 から 18 日間 uncommitted
-のまま**共有 checkout に置かれている（`pq.cljc` / `util.cljc` の未コミット変更を
-伴う）。pqh の README が「future」と書いている当のものが、書かれて着地していない。
-**別人の作業なので破棄せず、着地の可否は所有者が決めること。**
+（x25519 / ml_kem768 / ml_dsa65 / hkdf）。pqh の README が「future」と書いている
+当のものが、実は **2026-07-27 に `f57c175` で landed 済み**である。
+
+> ⚠ この節は当初「2026-07-20 から 18 日間 uncommitted のまま」と書いていた。
+> **誤り**で、原因はこちらのローカル checkout が 12 commit 遅れていたこと。
+> 上のブロックの訂正を参照。
 
 ### 射影面は「汎用ライブラリが無い」のであって、実装が無いのではない
 
@@ -310,6 +322,48 @@ loader でそのまま通る。
 「verified projection」にするには先に射影対象の実データが要る（superproject の
 datom 面には market-intel / repo-taxonomy / corpus 等がある）。gate の形は
 決まったが、対象が未定というのが正確な現在地。
+
+## 2026-08-08 closing — fleet 全体の uncommitted 調査と、そこで判明した測定上の罠
+
+`nbb scripts/cleanup.cljs --unlanded` を fleet 全体（**走査 4,158 repo**）で回した。
+
+**素朴なスキャンは 826 repo が「uncommitted」だと言うが、その大半は偽陽性である。**
+origin/main ref を持つ 16 repo をサンプルして dirty ファイルを 1 件ずつ照合した結果:
+
+| dirty ファイルの実態 | 件数 |
+|---|---|
+| **main とバイト同一（偽陽性）** | **42** |
+| 本当にローカル変更 | 24 |
+| ローカルで削除済み（`D`） | 53 |
+
+原因は **checkout が pin/main より遅れていると、内容が同一でも dirty に見える**こと。
+`git status` はローカル HEAD との差を出すのであって、`origin/main` との差ではない。
+**この罠は同じ日に 2 回踏んだ** —— pqh を「18 日放置」と誤認したのも同じ機序で、
+そちらは上のブロックで訂正した。
+
+**判定は必ず fetch 後の `origin/main` に対する content-containment で行うこと。**
+`git status` の dirty/untracked を「未着地」と読んではならない。
+
+`scripts/cleanup-land.cljs` はこの絞り込みを実装済みで、826 → **着地対象 34 repo**
+まで落ちた（偽陽性・削除・ビルドゴミを除外）。実行結果:
+
+- **merge した（`:additive` = 未追跡のみ、既存行を書き換えない）**:
+  `network-awai/cloud-itonami` #510（4 files）、`network-awai/net-kotobase` #362（1 file）
+- **PR のみ・merge しない（`:review` = 追跡ファイルの変更）**: 5 件（slides #13 /
+  cloud-itonami #511 / loop-consumability #2 / net-babiniku #183 / nexus-x402 #8）
+- 内容一致で着地不要と判定: 56 ファイル / 6 repo
+- 手動解決が要る conflict: 18 件（cloud-itonami 15 / nexus-x402 3）
+
+**`:review` を auto-merge しない規則は測定に基づく。** `DO-NOT-MERGE` ラベル付きの
+preservation PR が過去に実際に merge されている（`kotoba-lang/slides` #12、
+`network-awai/loop-consumability` #1、`network-awai/nexus-x402` #7）。
+`cleanup-workflow.edn` の `:preservation-pr-disposition` が記録する 2026-07-26/27 の
+事故（main から約 913 行が消えた）と同型で、**ラベルは merge を止めない**。
+
+**1 件の「失敗」は正しい拒否だった。** `kotoba-lang/user-test` の未追跡ファイルは
+`.github/workflows/ci.yml` で、HTTP 404 は repo 不在ではなく **`workflow` OAuth
+scope の不足**（403 でなく 404 が返るので誤読しやすい）。そもそも CLAUDE.md が
+新しい Actions workflow を禁じているので、着地させないのが正しい。
 
 ## Follow-up
 
