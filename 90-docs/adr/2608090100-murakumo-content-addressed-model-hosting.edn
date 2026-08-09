@@ -1,0 +1,92 @@
+[{:db/id -1
+  :adr/id "2608090100"
+  :adr/doc_type "adr"
+  :adr/topic "murakumo-content-addressed-model-hosting"
+  :adr/title "murakumo.cloud に content-addressed model hosting を統合し、配布面と実行面を分離する"
+  :adr/status :accepted
+  :adr/date "2026-08-09"
+  :adr/deciders ["Jun Kawasaki" "OpenAI Codex"]
+  :adr/authoritative_for
+  ["murakumo.cloud の公開 model hosting における blob、metadata、identity の責務分離"
+   "model repository、immutable revision、logical file、raw CID block の公開 API"
+   "model hosting と既存の executable generation catalog の境界"
+   "phase 1 の制限と、private/gated hosting 等を後続に送る判断"]
+  :adr/supersedes []
+  :adr/related ["2608052900"]
+  :adr/repos ["com-junkawasaki/root" "network-awai/cloud-murakumo"]
+  :adr/body
+  "# ADR-2608090100: murakumo.cloud content-addressed model hosting
+
+**Status**: accepted / **Date**: 2026-08-09
+
+## Context
+
+murakumo.cloud には公開 generation catalog と Hugging Face consumer があったが、
+Civitai / Hugging Face Hub のように、利用者が model artifact と model card を
+repository/revision 単位で登録し、content-addressed に取得する hosting plane は
+設計・実装されていなかった。
+
+既存 generation catalog は「どの model を fleet が実行できるか」を表す実行面であり、
+任意の model bytes を保管・配布する hosting plane とは authority が異なる。
+両者を一つの table や lifecycle に押し込まない。
+
+## Decision 1 — immutable bytes は R2、検索 projection は専用 D1
+
+raw block と DAG-CBOR repository/revision node は CIDv1（raw / dag-cbor、sha2-256）で
+識別し、R2 `murakumo-model-blocks` を authoritative store とする。key は
+`blocks/<cid>` と `ipld/<cid>`。upload 時に payload の SHA-256 と CID を照合し、
+同一 CID の再送は idempotent とする。
+
+D1 `murakumo-model-registry` は repository/revision/file/block の検索・一覧 projection
+だけを持つ。bytes の authority にはせず、R2 の immutable graph から再構築可能にする。
+既存 Actions DB や generation catalog の table も blob authority にしない。
+
+## Decision 2 — identity と公開 API
+
+write は既存 DID-bound bearer token の `model-hosting` scope を必須とし、repository owner
+と token subject を一致させる。repository 作成、raw block upload、revision publish は
+owner のみ。read は public とし、repository/revision metadata、raw CID block、logical
+file を GET/HEAD で取得できる。logical file は複数 block をまたぐ HTTP byte range に
+対応する。
+
+API root は `/api/v1/model-hosting`。repository は model card、license、tags、task、
+framework、base model provenance を持ち、revision は parent CID、file path、file SHA-256、
+ordered block manifest を持つ。repository metadata と immutable revision manifest を分ける。
+
+## Decision 3 — bounded ingestion
+
+phase 1 は 1 block 95 MiB 以下、1 revision 900 blocks 以下、128 files 以下に制限する。
+path traversal、重複 path、宣言 size/SHA/CID の不一致、未 upload block、他 owner の parent
+revision を拒否する。CORS と capability discovery に model-hosting を明示する。
+
+## Decision 4 — hosting と execution を自動接続しない
+
+hosting された model は、既存 executable generation catalog に自動登録しない。
+実行可能性、runner compatibility、安全性、license policy は別 gate であり、bytes が
+存在するだけでは fleet execution の承認にならない。
+
+## Landed evidence
+
+- child repo PR `network-awai/cloud-murakumo#46`、merge commit
+  `036e59df5e82242ca27a06e4b1bf2e8b1cd4d016`
+- Cloudflare Worker version `f26ce290-5392-4fb8-b1d3-7ea8748be077` を production deploy
+- D1 `murakumo-model-registry`（`1ac7c030-b487-48ce-92a9-b144ad95055d`）を APAC に作成し、
+  `model_repositories` / `model_revisions` projection migration を remote 適用
+- R2 `murakumo-model-blocks` を APAC に作成
+- JVM 12 tests / 58 assertions、compiled Worker model-hosting 4 tests、既存 generation
+  catalog regression 10 tests、app/worker/mobile/mobile-sw production build 0 warnings
+- Miniflare 実統合で repository 作成 → raw CID block upload → DAG-CBOR revision publish →
+  search → logical Range `bytes=6-10`（`model`）→ raw HEAD/Range を確認
+- production で capability、空 repository list、unauthorized write=401、API discovery、
+  `/models/` hosting guide を確認
+
+## Phase 1 boundary / follow-up
+
+private/gated repository、moderation、likes/comments、browser uploader、Hugging Face mirror、
+orphan block garbage collection、hosting から fleet execution への governed promotion は未実装。
+必要性と policy を別 ADR で決めてから追加する。
+
+## Manifest
+
+root の `cloud-murakumo` pin を merge commit
+`036e59df5e82242ca27a06e4b1bf2e8b1cd4d016` に fast-forward する。"}]
