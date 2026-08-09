@@ -4590,3 +4590,107 @@
  :gates "33 of 72 new assertions, in 18 of 21 new tests, fail on main's
          src/ and pass after -- THE SAME 33 fail on the round's original
          base commit."}
+
+{:seq 75
+ :date "2026-08-09"
+ :repos {"kotoba-lang/cssom" "b41a93ccef6974573b9f08266975d2e5ae2017c2"
+         "kotoba-lang/browser" "4b234d0c020bbf7cc9b9a006405a954102b9c783"}
+ :title "form controls, cross-repo: the reverted :read-only predicate landed, and the browser assertions that encoded a behaviour the browser does not have"
+ :oracle {:browser "Brave 151.1.93.129" :corpus-cases 835}
+ :pins-must-advance-together
+ "browser's suite is RED against the previous cssom. This ledger entry
+  moves both."
+ :measured
+ {:line-structure {:before "800/805" :after "800/805"}
+  :geometry {:before "2676/2714, 812/835 clean" :after "2688/2714, 818/835 clean"}
+  :paint-order {:before "20767/20837, 816/834" :after "20780/20837, 818/834"}
+  :computed-style {:before "38166/38191, 817/835" :after "38175/38191, 825/835"}}
+ :verified-on-merged-main
+ {:cssom-tests "1082 / 2952, 0 failures (1069/2880 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"
+  :note "re-ran the harness independently on the merged tree; every axis
+         reproduced the agent's numbers exactly."}
+ :per-case-deltas
+ "EXACTLY 6 cases moved on --dump-ops and 8 on --dump-style, EVERY ONE
+  TOWARD BRAVE, none the other way."
+ :this-round-existed-because-an-earlier-one-reverted-correct-work
+ "seq 73 wrote the :read-only / :required predicate, measured it, PROVED IT
+  WORKED, and then REVERTED IT because kotoba-lang/browser's suite asserted
+  the old answers and browser was out of that round's scope. It left the
+  eleven-row table and the three assertion names in the code. This round is
+  that cross-repo follow-up."
+ :what-the-browser-said
+ [{:topic "the eleven :read-only / :required rows re-measured -- AND ONE WAS WRONG"
+   :measured "seq 73's table called <button>/<select>/a checkbox `same`.
+              <button> and <select> were; A CHECKBOX WAS NOT -- Brave says
+              input[type=checkbox] is :read-only, the engine said
+              :read-write, because editable-form-control? was every <input>
+              bar hidden/file. MEASURING NINETEEN TYPES ONE AT A TIME gives
+              exactly HTML's `readonly applies to` list (12 types). The
+              other ten rows confirmed."
+   :extra "the contenteditable walk stops at the NEAREST ancestor (a <p>
+           inside a contenteditable=\"false\" inside an editable div is
+           :read-only), and a control's OWN state WINS over an editable
+           ancestor."}
+  {:topic ":required / :optional were not `the attribute alone` either"
+   :measured "THE ATTRIBUTE MUST APPLY: 15 input types plus select/textarea
+              take it; 7 types AND EVERY <button> are :optional instead.
+              `file` in, `hidden` out. disabled/readonly are irrelevant to
+              both."}
+  {:topic ":indeterminate -- which shapes are reachable from static markup: TWO OF THREE"
+   :measured "a CHECKBOX's is NOT -- `indeterminate` is IDL-only, and
+              neither <input type=checkbox indeterminate> nor =\"true\"
+              matches. THAT IS ASSERTED AS A GATE. <progress> is
+              indeterminate iff it has no `value` ATTRIBUTE (value=\"\" and
+              value=\"abc\" are both determinate). A radio's is a property
+              of its GROUP."}
+  {:topic "input[type=number] -- the real rule is the control's own"
+   :measured "BOTH min and max required, `size` NEVER applies, width is n
+              characters of the longest bound plus a flat 15px spin widget
+              (CONSTANT across 7 font/size pairs -- a platform widget, not
+              an em multiple), where the fraction comes from the widest of
+              the step's / min's / max's WRITTEN LITERALS (step=1.0 widens
+              min=0 max=100 from 3 chars to 5). UNBOUNDED type=number is
+              153, exactly a text field -- SO THE ENGINE'S 153 WAS RIGHT in
+              an-unbounded-number-is-in-neither-range and wrong only where
+              bounds exist."}]
+ :what-the-browser-assertions-actually-encoded
+ "THERE WERE SEVEN answers in three deftests, not three -- the landed fix
+  reaches further than seq 73 could see. input:read-write returning
+  `checked` asserted A CHECKBOX IS READ-WRITE; input:read-only /
+  input:optional returning `readonly`/`checked` asserted a disabled input
+  is NEITHER; #file-required:required -> nil and css_test's padding
+  assertion asserted a required file input is not :required -- the latter
+  WITH THE REASON `a file input with a value is :valid`, WHICH CONFLATES
+  TWO PSEUDO-CLASSES. Each corrected with its Brave measurement inline; the
+  quickjs vector gained a 28th query (#readonly:read-only) that answers the
+  same on both sides."
+ :scope-cuts
+ [{:what "::file-selector-button -- MEASURED IN FULL (12 declarations,
+          control box and button box each), DELIBERATELY NOT IMPLEMENTED"
+   :measured "both dimensions come from the shadow button:
+              width = max(ceil(34 x advance(\"0\")), ceil(button border
+              box) + 4 + ceil(label)), height = max(button MARGIN box, the
+              label's 21px line). A margin on the button counts toward
+              HEIGHT and not WIDTH; an explicit width on it does not reach
+              the control's intrinsic width at all."
+   :why "the height half is derivable; THE WIDTH HALF IS
+         ceil(92.656+pad+border) + 4 + ceil(119.313) -- THIS MACHINE'S
+         JAPANESE UA STRINGS, exactly what seq 57 refused. Half would leave
+         the case red on `input w` anyway. Case stays 253x27 vs 261x65."}
+  {:what "scientific notation in min/max -- INTRODUCED, not closed"
+   :measured "min=0 max=1e3 is 35 in Brave, 153 here (same cut parse-number
+              documents). min=\" 1 \" and max=+50 are 153 on both sides --
+              controls."}
+  {:what "<input type=file required> is :invalid in Brave, still :valid
+          here -- needs a file input's value"}
+  {:what "maxlength dirty-value flag (pre-existing, recorded)"
+   :measured "<input value=12345 maxlength=3> is :valid in Brave, invalid
+              here."}]
+ :stale-test-corrected-with-its-reason
+ "length-constraints-do-not-apply-to-non-text-like-controls asserted
+  maxlength against <textarea value=\"12345\">, WHOSE .value IS \"\" --
+  HTML gives a textarea no `value` attribute, so the string it constrained
+  WAS NEVER IN THE CONTROL."
+ :gates "14 new deftests, 12 fail on base (36 assertions), 2 pure controls.
+         Lint 23 -> 22 warnings (control-value's unused binding went)."}
