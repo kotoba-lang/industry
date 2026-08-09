@@ -1,2 +1,17 @@
 ;; industry-stack-ledger.edn — append-only, one EDN map per line.
 ;; Wave program: ADR-2608090800. Do not hand-edit past lines.
+{:event/type :industry-stack/wave, :event/wave 0, :event/at "2026-08-09T01:10:00Z", :event/lanes {:A 6 :B 2 :C 2}, :event/parallel 10, :event/success 10, :event/fail 0, :event/failure-rate 0.0, :event/verify "spot: isic-3512 HTML has HARD holds; isic-1313 clojure -M:test 98/288 green with shirohan sibling", :event/merged
+ [{:repo "cloud-itonami-isic-0127" :sha "8af65d9408e58aa6fbef49e134407fa12866bf76" :lane :A}
+  {:repo "cloud-itonami-isic-3512" :sha "c5e7a09cb038bdb5db2d370684fa64097101acb3" :lane :A}
+  {:repo "cloud-itonami-isic-4721" :sha "9d526e2ad6eac2ffbfd5d23c579aa0cce1a061cc" :lane :A}
+  {:repo "cloud-itonami-isic-4923" :sha "aaef176b16ec2b62611349d5914368168734a1e7" :lane :A}
+  {:repo "cloud-itonami-isic-5011" :sha "c101366b7dba13c76cf7d5a685190ba2fdcbba48" :lane :A}
+  {:repo "cloud-itonami-isic-5110" :sha "a623e79a6998673267f7c4dc505a3ba04d5e5b63" :lane :A}
+  {:repo "cloud-itonami-isic-1313" :sha "9c3e0ab66f6067c2d1f0fa3860c6dd4e7475b31e" :lane :B :craft "shirohan"}
+  {:repo "cloud-itonami-isic-6910" :sha "5aa714a65272f7fe35da8744e9bd988f6ee01d01" :lane :B :craft "inkan"}
+  {:repo "seihan" :sha "b022bd26c398e148187bd0ba8f9944b65afa081f" :lane :C}
+  {:repo "cloud-itonami-isic-1410" :sha "0d4b760e0fad593f019ea1298e61d9b3f87ca2df" :lane :C}]
+ :event/not-done ["west pin advance for 9 isic + seihan registration" "industry registry :demo for A6" "seihan site SPA" "1410 pattern craft" "OS connect for 1313"]
+ :event/superproject-adr "2608090800"
+ :event/note "Wave 0 full parallel 10 subagents; all :landed; server-side merges; failure rate 0%"}
+
