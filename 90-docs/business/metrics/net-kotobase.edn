@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 25035, "kotobase-cf-wasm-staging" 54213},
+ {"net-kotobase" 25247, "kotobase-cf-wasm-staging" 54723},
  :zone
- {:requests-7d 75209,
-  :pageviews-7d 1131,
-  :uniques-7d-sum 1020,
+ {:requests-7d 75927,
+  :pageviews-7d 1135,
+  :uniques-7d-sum 1032,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/_health", :requests 2573}
-   {:path "/health", :requests 2508}
-   {:path "/", :requests 144}
+  [{:path "/_health", :requests 2560}
+   {:path "/health", :requests 2524}
+   {:path "/", :requests 151}
    {:path "/xrpc/ai.gftd.apps.kotobase.datomic.q", :requests 78}
-   {:path "/robots.txt", :requests 32}
-   {:path "/api/funnel", :requests 27}
+   {:path "/robots.txt", :requests 31}
+   {:path "/api/funnel", :requests 28}
    {:path "/contact", :requests 15}
    {:path "/sign-in", :requests 13}],
-  :status-mix {:client-error 5429, :ok 5465},
+  :status-mix {:client-error 5489, :ok 5474},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,10 +32,10 @@
  :as-of "2026-08-09",
  :traffic-quality {:window "24h", :probe-4xx-pct 50, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /_health 2573 · /health 2508 · / 144 · /xrpc/ai.gftd.apps.kotobase.datomic.q 78 · /robots.txt 32 | 4xx(probe) 50%",
- :funnel {:visitors 2535, :signups 13, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /_health 2560 · /health 2524 · / 151 · /xrpc/ai.gftd.apps.kotobase.datomic.q 78 · /robots.txt 31 | 4xx(probe) 50%",
+ :funnel {:visitors 2539, :signups 13, :checkouts 0},
  :signal
- "kotobase.net 実測 75209 req/7d・1020 uniques(日次和)・うち4xx probe 50%(24h)、workers 79248 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 75927 req/7d・1032 uniques(日次和)・うち4xx probe 50%(24h)、workers 79970 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -44,6 +44,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 1006},
+ {:visitors {:openai-ads 3, :organic 1010},
   :signups {:organic 10}, 
   :checkouts {}}}
