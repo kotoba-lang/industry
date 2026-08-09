@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "ADR-2608059100"
-  :adr/title "media-gamers: ゲーム攻略情報を EDN で集め、DataLad で保管し、Datalog で引き、jp-go-dds で公開する"
+  :adr/title "cloud-itonami/media: ゲーム攻略情報を EDN で集め、DataLad で保管し、Datalog で引き、jp-go-dds で公開する（旧 media-gamers）"
   :adr/status "accepted"
   :adr/date "2026-08-05"
   :adr/deciders "root@junkawasaki.com"
@@ -153,7 +153,9 @@ annex-custody-verify: projects=1 ok=1 fail=0 skipped=0 (sample=1/repo)
 ```
 
 off-machine コピーの無い annex ファイルは 0 件、標本 1 件を b2 から読み戻して
-fsck 済み。**ただし remote は B2 1 本のまま**なので、bucket 削除・鍵 1 本の侵害・
+fsck 済み。**同日の `media-corpus` への改名後にも同じ検査を回して OK**
+（302 annexed / 全件 off-machine / 標本 fsck）—— 改名で annex の custody が
+壊れていないことを名前が変わった側で確かめている。**ただし remote は B2 1 本のまま**なので、bucket 削除・鍵 1 本の侵害・
 プロバイダ障害には耐えない。`numcopies` を 2 に上げるなら 2 本目の remote が要る
 （1 本のままだと `datalad drop` が『1 out of 2 necessary copies』で拒否され、
 手元を軽くするというこの経路の目的が成立しない）。
@@ -170,6 +172,53 @@ fsck 済み。**ただし remote は B2 1 本のまま**なので、bucket 削�
   PokéAPI 側の limit を上げるか、**同等にライセンスの明確な別 source を足す**。
   robots で拒否されている wiki を迂回する経路は選択肢に入らない
 
+## 2026-08-09: media 主題を cloud-itonami に集約（オーナー指示）
+
+配置が変わった。**この ADR の設計判断は変わらない**（source 選定・出典追跡・
+公開ゲート・bytes plane の分け方はそのまま）が、住所が全部動いたので更新する。
+
+| | 前 | 後 |
+|---|---|---|
+| コード/コーパス | `cloud-itonami/media-gamers` の `kouryaku/` | **`cloud-itonami/media` の `kouryaku/`** |
+| bytes plane | `cloud-itonami/media-gamers-corpus` | **`cloud-itonami/media-corpus`** |
+| 公開面 | 未デプロイ | **https://kouryaku.itonami.cloud**（Workers static assets、169 ページ） |
+| link medium の route | `media.gftd.ai` | `media.itonami.cloud`（⚠ 下記のとおり未デプロイ） |
+| `cloud-itonami/media-gamers` | 稼働 | **archive**（RETIRED.md が後継を指す。west 登録解除） |
+| `etzhayyim/com-etzhayyim-media-gamers` | stub | **archive** |
+
+動機は「**所有 org は cloud-itonami なのに配信ゾーンが gftd.ai / etzhayyim.com に
+乗っている**」という食い違いの解消。実測 2026-08-09 時点で cloud-itonami に紐づく
+配信面のうち itonami.cloud だったのは `hooks.itonami.cloud` だけだった。
+
+### retire 前に確認したこと
+
+- `a7m8oocs.etzhayyim.com`（media-gamers の worker route）は **DNS が解決しない** ——
+  実際には何も serve していなかった。
+- `media.gftd.ai` は **522**（Cloudflare は応答するが origin に到達不能）。
+- etzhayyim stub の `.well-known/did.json` は **どこからも serve されていない**
+  （Pages 未有効化、ドメイン未解決）。DID を止める副作用は無い。
+- したがってこの移行で**落ちた live トラフィックは無い**。cut over ではなく、
+  存在しなかった面を立ち上げた。
+
+### 今回の変更が原因ではない既存の壊れ 2 件（直さず記録）
+
+1. **link medium の worker はデプロイできない。** `wrangler.jsonc` の `main` が指す
+   `src/app.cljc` が存在しない（実体は `src/app.ts` と `clj/src/media/*.cljc`）。
+   `media.gftd.ai` の 522 はこれが原因で、route を itonami.cloud に付け替えても
+   直らない —— entrypoint を決める作業が別途要る。**blind deploy はしていない。**
+2. **ルートの `package.json` は `npm install` が通らない**
+   （`@gftd/magatama-host-sdk` が `workspace:*` のまま。gftdcojp モノレポからの
+   切り出し残骸）。他人の依存を消さずに済むよう、kouryaku 面は自前の
+   `kouryaku/package.json` を持つ（node は require 元から上方向に探すので
+   `kouryaku/node_modules` が先に当たる）。
+
+### repo 名についての留保
+
+`media` は family の傘ではなく **A→B link medium という主題 repo** で、そこに攻略を
+同居させると名前が主題を 1 つしか示さなくなる。オーナー判断で集約したので、
+`CLAUDE.md` 冒頭に 2 面を名乗る表を置いて補った（「名前が機能を示さない repo は
+README 冒頭で名乗る」）。
+
 ## Resume point（2026-08-09 現在）
 
 着地済みで、追加作業なしに動く状態。再開する人はここから:
@@ -184,7 +233,7 @@ nbb --classpath . kouryaku/query.cljs verify           # 範囲外 rel 0 を確�
 ```
 
 生応答を bytes plane に送る手順（`.raw/` → dataset）は
-`west update --group-filter +datalad media-gamers-corpus` のあと
+`west update --group-filter +datalad media-corpus` のあと
 `git annex unlock raw` → コピー → `datalad save` → `git annex copy --to b2 raw`。
 ⚠ **annex はコンテンツを read-only にするので `unlock` を挟まないと `cp` が
 Permission denied で落ちる**（実測 2026-08-05）。また **superproject 配下の cwd から
