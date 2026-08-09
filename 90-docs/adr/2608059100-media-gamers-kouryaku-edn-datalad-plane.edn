@@ -5,7 +5,7 @@
   :adr/date "2026-08-05"
   :adr/deciders "root@junkawasaki.com"
   :adr/related "ADR-2608039700 (Git+EDN+DataLad が正本 / DB は projection), ADR-2607141915 (jp-go-dds), ADR-2607132300 (design-quality 決定論 audit), ADR-2608056000 (training-corpus: 収集ポリシーの手書き面), ADR-2607252000 (custody は主張でなく検査)"
-  :adr/last_verified "2026-08-05"
+  :adr/last_verified "2026-08-09"
   :adr/body
   "## Context
 
@@ -137,8 +137,26 @@ require するのは `jp-go-dds.core` / `.page` / `.tokens` のみ、生 hex / p
   item 詳細 / stage 詳細 とも **100.00 / min 95 → PASS**
 - 実ブラウザ（headless Chrome）でレンダリング確認。stage ページが出現キャラクターを
   日本語名のリンク付き表で表示することを目視で確認（この目視で上記 2 と 5 を発見）
-- bytes plane: raw 302 ファイル / 16 MB、**302/302 が B2 に存在**
-  （`git annex find raw --in b2`）。正規化 EDN は 180 KB で git
+- bytes plane: raw 302 ファイル / 16 MB、正規化 EDN は 180 KB で git
+
+### custody（2026-08-09 再検査）
+
+初版は `git annex find raw --in b2` で 302/302 と書いていたが、**あれはローカルの
+annex 台帳が『b2 にあるはず』と思っている件数**であって remote を読んでいない。
+このワークスペースの custody の証明は検査器だけが持つ（ADR-2607252000）ので、
+着地から 4 日後に実際に回した:
+
+```
+annex-custody-verify: projects=1 ok=1 fail=0 skipped=0 (sample=1/repo)
+  - media-gamers-corpus: OK — 302 annexed, all with off-machine copies;
+    verified from b2: raw/pokeapi-character/aipom-species.json
+```
+
+off-machine コピーの無い annex ファイルは 0 件、標本 1 件を b2 から読み戻して
+fsck 済み。**ただし remote は B2 1 本のまま**なので、bucket 削除・鍵 1 本の侵害・
+プロバイダ障害には耐えない。`numcopies` を 2 に上げるなら 2 本目の remote が要る
+（1 本のままだと `datalad drop` が『1 out of 2 necessary copies』で拒否され、
+手元を軽くするというこの経路の目的が成立しない）。
 
 ## Consequences
 
@@ -151,7 +169,45 @@ require するのは `jp-go-dds.core` / `.page` / `.tokens` のみ、生 hex / p
 - Wikidata の per-title 深度が浅いのは source の性質なので、攻略の網羅を増やすなら
   PokéAPI 側の limit を上げるか、**同等にライセンスの明確な別 source を足す**。
   robots で拒否されている wiki を迂回する経路は選択肢に入らない
-- 未着手: 公開面のホスティング（現状 `site/` を生成するだけでデプロイしていない）、
-  スケジュール収集、`manifest/edn-query.cljs` の datom 面への露出
-  （`:source/dataset \"media-gamers-kouryaku\"` は sources.edn に宣言済みだが
-  ローダ未接続）"}]
+
+## Resume point（2026-08-09 現在）
+
+着地済みで、追加作業なしに動く状態。再開する人はここから:
+
+```bash
+west update --fetch smart media-gamers
+cd orgs/cloud-itonami/media-gamers && npm install
+nbb --classpath . kouryaku/query.cljs stats     # 177 件が読めれば健全
+nbb --classpath . kouryaku/collect.cljs --all --limit 200
+nbb --classpath . kouryaku/collect.cljs --close-refs   # 参照グラフを閉じる（必須）
+nbb --classpath . kouryaku/query.cljs verify           # 範囲外 rel 0 を確認してから publish
+```
+
+生応答を bytes plane に送る手順（`.raw/` → dataset）は
+`west update --group-filter +datalad media-gamers-corpus` のあと
+`git annex unlock raw` → コピー → `datalad save` → `git annex copy --to b2 raw`。
+⚠ **annex はコンテンツを read-only にするので `unlock` を挟まないと `cp` が
+Permission denied で落ちる**（実測 2026-08-05）。また **superproject 配下の cwd から
+`git push` すると west pin ガードが無関係な pin 退行で deny することがある** ——
+`git -C <dataset> push` を superproject の外の cwd から実行する。
+
+残っているギャップ（優先度順）:
+
+1. **公開面のホスティング未定。** `publish.cljs` は `site/` を生成するだけで
+   デプロイ先が決まっていない。`media-gamers.etzhayyim.com` の既存 Worker は
+   DEPRECATED 扱いの TS 実装なので、そこに載せるのか別ホストにするのかは判断待ち。
+2. **`manifest/edn-query.cljs` の datom 面に未接続。** `sources.edn` に
+   `:source/dataset \"media-gamers-kouryaku\"` は宣言済みだがローダが無いので、
+   ワークスペース横断クエリからはまだ引けない（repo ローカルの `query.cljs` のみ）。
+3. **スケジュール収集が無い。** 現状は手で `collect.cljs` を回す。
+4. **stage の日本語名**は source 側に無いので、別 source を足さない限り埋まらない。
+5. **B2 remote が 1 本**（上記 custody 節）。
+
+## 未解決のまま残した判断（オーナー確認待ち）
+
+`query.wikidata.org/robots.txt` の `Disallow: /sparql` を「AI agent を名指ししない
+blanket rule であり、WDQS は programmatic query 用の endpoint である」と解釈して
+discovery のみに使う設計にしたが、これはこちらの判断であってオーナーの明示的な
+承認は得ていない。不可と判断するなら `sources.edn` の
+`:discovery/enabled? false` 1 箇所で SPARQL は完全に止まる（hydration は
+`Special:EntityData` なので生き残り、既存 corpus も無効化されない）。"}]
