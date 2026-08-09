@@ -130,7 +130,10 @@ require するのは `jp-go-dds.core` / `.page` / `.tokens` のみ、生 hex / p
 
 ## Verification（2026-08-05 実測）
 
-- corpus **177 件**（character 113 / item 40 / stage 12 / game 12）、rel 207 件
+- corpus **177 件**（character 113 / item 40 / stage 12 / game 12）、rel **404 件**
+  （2026-08-09 の closing で訂正。初版は rel 207 と書いていたが、あれは corpus が
+  104 件・stage 8 件だった時点の値を、`--close-refs` 後の 177 件に貼り違えたもの。
+  着地した checkout で数え直した値が 404）
 - `query.cljs verify`: 出典欠落 0 / revision 欠落 0 / id 重複 0 / **範囲外 rel 0 種** → OK
 - 日本語名: character 113/113、item 40/40、game 12/12、stage 0/12（上記 source 欠落）
 - `design-quality` 決定論 audit: index / character 一覧 / character 詳細 /
