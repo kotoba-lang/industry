@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 12308, "etzhayyim-xrpc-proxy" 595},
+ {"etzhayyim-did-web" 12556, "etzhayyim-xrpc-proxy" 595},
  :zone
- {:requests-7d 54400,
-  :pageviews-7d 2029,
-  :uniques-7d-sum 2328,
+ {:requests-7d 54882,
+  :pageviews-7d 2040,
+  :uniques-7d-sum 2348,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 33}
-   {:path "/actor/oil-refining/did.json", :requests 21}
-   {:path "/system-dynamics", :requests 12}
+  [{:path "/robots.txt", :requests 32}
+   {:path "/system-dynamics", :requests 14}
    {:path "/sitemap.xml", :requests 11}
-   {:path "/actor/oil-shipping/did.json", :requests 9}
-   {:path "/actor/kamado/did.json", :requests 8}
-   {:path "/actor/oil-distribution/did.json", :requests 7}
-   {:path "/actor/oil-trading/did.json", :requests 7}],
-  :status-mix {:ok 567, :server-error 6411, :client-error 772},
+   {:path "/organism/pulse.json", :requests 8}
+   {:path "/organism/health.json", :requests 6}
+   {:path "/actor/tomoshibi/system-dynamics", :requests 5}
+   {:path "/.well-known/did.json", :requests 5}
+   {:path "/actor/rare-earth-coverage/did.json", :requests 4}],
+  :status-mix {:ok 416, :server-error 6548, :client-error 899},
   :window "24h"},
  :as-of "2026-08-09",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 83},
+ {:window "24h", :probe-4xx-pct 11, :error-5xx-pct 83},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 33 · /actor/oil-refining/did.json 21 · /system-dynamics 12 · /sitemap.xml 11 · /actor/oil-shipping/did.json 9 | 4xx(probe) 10% · 5xx 83%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 32 · /system-dynamics 14 · /sitemap.xml 11 · /organism/pulse.json 8 · /organism/health.json 6 | 4xx(probe) 11% · 5xx 83%",
  :signal
- "etzhayyim.com 実測 54400 req/7d・2328 uniques(日次和)・うち4xx probe 10%(24h)、workers 12903 inv/7d"}
+ "etzhayyim.com 実測 54882 req/7d・2348 uniques(日次和)・うち4xx probe 11%(24h)、workers 13151 inv/7d"}
