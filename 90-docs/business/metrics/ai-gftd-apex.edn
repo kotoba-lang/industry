@@ -1,24 +1,25 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 10538, "ai-gftd-chat-shell" 5},
+ {"magatama-sh1n5h1x" 10550, "ai-gftd-chat-shell" 5},
  :zone
- {:requests-7d 454328,
-  :pageviews-7d 4440,
-  :uniques-7d-sum 4931,
+ {:requests-7d 457132,
+  :pageviews-7d 4453,
+  :uniques-7d-sum 4958,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/fpwch.php", :requests 47}
-   {:path "/xyn.php", :requests 45}
-   {:path "/k.php", :requests 36}
-   {:path "/1xmomo.php", :requests 34}
-   {:path "/wp-content/admin.php", :requests 33}
-   {:path "/hypo.php", :requests 31}
-   {:path "/mgrr.php", :requests 29}
-   {:path "/4PJcpMFsD8B.php", :requests 28}],
-  :status-mix {:server-error 14691, :client-error 1293, :ok 1293},
+  [{:path "/", :requests 874}
+   {:path "/favicon.ico", :requests 134}
+   {:path "/v1/generation/jobs/5dc4b934375b45c9aa4c1f2993561d4e",
+    :requests 40}
+   {:path "/222.php", :requests 35}
+   {:path "/8.php", :requests 34}
+   {:path "/ajax.php", :requests 33}
+   {:path "/blurbs.php", :requests 30}
+   {:path "/.gitconfig", :requests 30}],
+  :status-mix {:ok 2394, :server-error 14858, :client-error 1769},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +31,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-09",
- :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 85},
+ :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 78},
  :top-paths
- "上位 page (24h, 2xx/3xx): /fpwch.php 47 · /xyn.php 45 · /k.php 36 · /1xmomo.php 34 · /wp-content/admin.php 33 | 4xx(probe) 7% · 5xx 85%",
+ "上位 page (24h, 2xx/3xx): / 874 · /favicon.ico 134 · /v1/generation/jobs/5dc4b934375b45c9aa4c… 40 · /222.php 35 · /8.php 34 | 4xx(probe) 9% · 5xx 78%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 454328 req/7d・4931 uniques(日次和)・うち4xx probe 7%(24h)、workers 10543 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 457132 req/7d・4958 uniques(日次和)・うち4xx probe 9%(24h)、workers 10555 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
