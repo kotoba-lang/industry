@@ -5,7 +5,7 @@
   :adr/authoritative true
   :adr/status "accepted"
   :adr/date "2026-08-08"
-  :adr/last_verified "2026-08-08"
+  :adr/last_verified "2026-08-09"
   :adr/deciders ["Jun Kawasaki" "Claude Opus 5 (Claude Code)"]
   :adr/title "ADR-2608098000: cloud-itonami の org id 受付が逆順規則と食い違っていた —— 検出は fleet gate、恒久の解は導出を `.kotoba` の 1 モジュールに畳むこと"
   :adr/topic "itonami-org-id-intake-drift-and-the-kotoba-single-derivation"
@@ -226,16 +226,34 @@ code point の短絡比較に変えた（多バイト文字の途中を切ると
 
 ## やっていないこと
 
-- **cloud-itonami 側に着地していない。** このセッションの repo scope は
-  `com-junkawasaki` に固定されており、`add_repo` は cross-tier を拒否する。ソースは
-  `network-awai/cloud-itonami` と `gftdcojp/cloud-itonami`（サイトが AGPL source として
-  指す先）の両方とも private で、HTTPS clone も通らない。**正本モジュールと 2 本の
-  gate はここに在るが、intake を直す commit はあの repo を初期ソースにしたセッションが
-  要る。** そこでやることは `manifest/org-id.kotoba` を持って行って
-  `cloud-itonami.org-id` の導出をそれに差し替え、受付が同じモジュールを通るように
-  するだけ。
-- **`itonami.cloud` の live intake は今も順方向を返す。** gate は赤で着地する ——
-  実在する不一致を報告しているので、それが正しい状態である。
+- **cloud-itonami 側に着地していない。ブロッカーは session の形ではなく GitHub App の
+  認可である**（2026-08-09 に修正。初版はここを取り違えていた）。当初は「repo scope が
+  `com-junkawasaki` に固定されていて `add_repo` が cross-tier を拒否する」と書き、
+  **「あの repo を初期ソースにしたセッションを起こせばよい」を remedy として示していたが、
+  2026-08-09 にそれを実際に試したところ通らない**:
+
+  | 経路 | 結果 |
+  |---|---|
+  | `add_repo` | `cross-tier adds are not supported in v1` |
+  | GitHub MCP | `repository ... is not configured for this session` |
+  | HTTPS clone | `could not read Username` — private、proxy が credential を注入しない |
+  | **当該 repo を `source_url` にした `create_session`**（= 初版の remedy） | **`github_repo_access_denied`** |
+
+  4 つ目が決定的で、**GitHub App が `network-awai/cloud-itonami` へのアクセスを
+  持っていない。** セッションをどう起こしても同じ壁に当たる。**先に必要なのは
+  GitHub 設定でこの repo へのアクセスを許可すること**で、それが済むまで着地経路は
+  1 本も無い。`gftdcojp/cloud-itonami`（サイトが AGPL source として指す先）も同様に private。
+
+  アクセスが通った後にやることは変わらない: `manifest/org-id.kotoba` を持って行って
+  `cloud-itonami.org-id` の導出をそれに差し替え、**受付が同じモジュールを通るようにする**。
+  intake がインラインで持っているコピーを消すところまでやらないと、導出が 2 つある状態に
+  戻る。
+- **`itonami.cloud` の live intake は今も順方向を返す**（2026-08-09 に再実測、7 件中 6 件
+  不一致で `root-itonami-org-id` は exit 1。`itonami.cloud` の `reserved-domain` 403 だけが
+  設計どおり）。gate は赤で着地する —— 実在する不一致を報告しているので、それが正しい
+  状態である。同日 `root-org-id-derivation` は exit 0（記録済み 98 件 + 敵対的入力 18 件で
+  kotoba ⇔ cljs 一致、artifact↔source bound、capabilities none）—— **workspace 内側は
+  畳めており、残っているのは向こう側だけ**、という現在地は変わっていない。
 - **`kotoba-lang/compiler` の `deps-lock.edn` が main で stale**（別件、下記）。
 
 ## 副次的に見つけた別件 —— compiler の lock が main で stale
