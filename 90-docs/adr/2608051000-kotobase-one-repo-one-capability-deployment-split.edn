@@ -328,6 +328,52 @@
      "production の maintenance operator DID を確定"
      "その後に Worker 名 → net-kotobase-engine、host → engine.kotobase.net"]}
 
+   :sweep-completed-2026-08-09
+   {:result "**done: true / copied: 8601.** R2 bucket kotobase-graph-database-production は
+             8,853 objects / 588 MB。内訳は sweep が写した 8,601 + 先行して lazy backfill と
+             最初の 201 件 + cursor。B2 の全ページを歩き切った（continuation token が尽きた）
+             ことが done の根拠。"
+    :what-unblocks
+    "step 4（`:r2` へ切替）の前提が揃った。R2 は lazy fill ではなく**全走査で埋まっている**ので、
+     B2 binding を外しても『読まれたことのない cold データが 404 になる』事故は起きない。"
+    :two-independent-bugs-found
+    ["**cursor が前進しない**: `whole-page? (<= (count keys) slice-size)` — page 1000 / slice 25 では
+      永久に false なので token が動かず、毎ティック同じ先頭ページを list して全件 skip していた。
+      修正は page-size == slice-size（コピーする分だけ list する）。条件分岐そのものを消した。"
+     "**cursor が読み戻せない**: `read-state*` が parsed JSON を `(.-token v)` で読んでいた。
+      本番は `shadow-cljs release`（Closure :advanced）なので**このアクセスだけが rename され**、
+      JSON のキーは rename されないため undefined になる。報告値（token nil → \"start\"、
+      copied nil → 0）と完全に一致。修正は parsed JSON の読み取りを全て `aget` に。"]
+    :the-second-bug-is-a-class-not-an-incident
+    "**テストビルドは最適化なし、本番は :advanced。したがってこのクラスのバグはスイートでは
+     原理的に検出できない。** 234 tests が緑のまま本番で動かない状態が二度続いたのはそのためで、
+     唯一の誠実な検証は本番そのものだった。同じ形（parsed JSON への `.-prop`）は他の Worker にも
+     あるはずで、`aget` への統一は横展開する価値がある。**これは未着手の follow-up。**"
+    :how-it-was-actually-found
+    "sweep について仮説を 4 つ立てて 3 つ外した（tick の時間切れ / write 失敗 / cursor 前進条件 /
+     read の rename）。当てられたのは**観測を足した時だけ**である。決め手は 2 つ:
+     ① `/_migration/run` で tick の返り値を直接返すようにしたこと（`cursor-written: true` が
+     読めて初めて write 説が消えた）② `wrangler r2 object put` で cursor を手で置き、
+     **wrangler では読めるのに worker には見えない**ことを示したこと（read 側だと確定した）。
+     推測を重ねるより、観測を 1 つ足す方が速かった。"
+    :measurement-trap
+    "**`wrangler r2 bucket info` の object_count は進捗指標に使えない。** Cloudflare 側の集計が
+     大きく遅延し、実際に 350 件コピー済みの時点でも 201 のままだった。進捗の正本は cursor の
+     `copied`。一度これを根拠に『止まっている』と誤診しかけた。"}
+
+   :remaining-after-2026-08-09
+   ["step 4: B2 binding を外して `:r2` へ。前提は揃っている"
+    "step 5: `KOTOBA_INTERNAL_SECRET` をローテート（保持者は apex と engine の 2 Worker のみ、
+     旧値不要）+ production の maintenance operator DID を確定 → Worker 名 `net-kotobase-engine`、
+     host `engine.kotobase.net`"
+    "step 5 の残り 6 surface（s3 / atproto / pinning / sparql / gremlin / graphql）。cypher で型は確立済み"
+    "step 8: authn。**`AUTHN_KEK` が読み戻せない限りブロック**（失うと passkey credential が全滅）"
+    "`.-prop` → `aget` の横展開（上記のバグクラス）"
+    "git の block 面が専用 R2 バケットに分かれている件・D1 が premise になっている件・
+     git-worker が 482 行の .mjs である件。repo 分割とは独立した storage 面の話なので別 ADR 推奨"
+    "`/_migration/run` は migration 用の一時エンドポイント。`KOTOBASE_R2_BACKFILL` に gate して
+     あるので flag を落とせば消えるが、step 4 の後に flag ごと撤去すること"]
+
    :route-cutover-procedure
    "Cloudflare の custom_domain は 1 host = 1 Worker なので、移設は必ず『外して付ける』になり無防備な
     瞬間が生じる。capability ごとに次の順を守る。逆順にすると host が宙に浮く。
