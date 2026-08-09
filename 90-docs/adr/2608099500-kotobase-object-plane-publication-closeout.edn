@@ -30,7 +30,7 @@
 しかし当時の publication は feature branch push 後に GitHub merge API で直接 default branch へ入れたため、ready PR の review / mergeability / checks を 1 箇所に束ねた証跡が無い。これは現在の `AGENTS.md` `closing` 規則（明示 stage → commit → push → ready PR → review/check確認 → merge → default branch確認）を満たさない。実装を再着地させたり履歴を書き換えたりはせず、現在の default branch を review 対象として publication evidence を追加する。"
 
   :adr/decision
-  "本 closeout は ready PR `PENDING_PR_URL` を唯一の review 証跡とする。
+  "本 closeout は ready PR `https://github.com/com-junkawasaki/root/pull/1808` を唯一の review 証跡とする。
 
 PR は既に着地済みの実装を再適用しない。代わりに次を review scope とする:
 
@@ -57,8 +57,21 @@ review で blocker が見つかった場合は本 PR を merge せず修正す�
 - multipart upload / range GET は未実装。
 - Monero fleet は 9/10 node を durable-disable 済みだが、SSH 到達不能の `zebulun` は復帰時に mining を再開する。SupportXMR の 0.049107 XMR は payout threshold 未満で、回収は owner action。"
 
-  :publication/pr "PENDING_PR_URL"
-  :publication/review_status "pending"
+  :publication/pr "https://github.com/com-junkawasaki/root/pull/1808"
+  :publication/review_status "self-reviewed-no-blockers"
+  :publication/review_evidence
+  {:reviewed_at "2026-08-09"
+   :pr_ready true
+   :mergeable "MERGEABLE"
+   :merge_state "CLEAN"
+   :github_checks 0
+   :github_checks_note "GitHub Actions は無効。CI/CD 正本は murakumo fleet。PR 自身は docs-only EDN なので targeted parse と diff check を実施"
+   :targeted_edn_parse "pass"
+   :diff_check "pass"
+   :changed_files ["90-docs/adr/2608099500-kotobase-object-plane-publication-closeout.edn"]
+   :implementation_reachability "all implementation/evidence commits reachable from each repository main"
+   :live_health {:s3_diag 200 :s3_anonymous_get 401 :atproto_health 200 :pinning_health 200}
+   :findings []}
   :publication/default_branch "main"
   :publication/implementation_commits
   ["network-awai/net-kotobase@31f8f8745ea3063e73ea34ef1bee56216668ddcb"
