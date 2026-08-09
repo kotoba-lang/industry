@@ -244,6 +244,60 @@
         (v! ":missing " (pr-str (:what m)) " に " k " が無い"
             " — 穴を穴として名指すには、何がどう効くかまで書く")))))
 
+;; ── 12: 限度の無い権限を作れないこと ────────────────────────────────
+;;
+;; **時間の上限だけでは足りない。** 期限内に何回でも読めるなら、正当な 1 件の
+;; 閲覧と区画の丸ごと持ち出しが同じ権限で通る。両方を必須にする。
+(let [lim (:limits pol)]
+  (when (nil? lim) (v! ":limits が無い — 限度の無い権限を作れる状態になっている"))
+  (when (and lim (not= :no-unbounded-authority (:principle lim)))
+    (v! ":limits の :principle が :no-unbounded-authority でない"))
+  (when (and lim (not (false? (:auto-renew lim))))
+    (v! ":limits の :auto-renew が false でない"
+        " — 自動で延びる権限は、誰も見直さない権限になる"))
+  (when (and lim (not= :deny-and-trigger-review (:on-quota-exceeded lim)))
+    (v! ":limits の :on-quota-exceeded が :deny-and-trigger-review でない"
+        " — throttle で済ませると、異常な閲覧量という信号が『遅いが通った』に化ける")))
+
+(doseq [g grades :when (pos? (:c g))]
+  (let [n (str "C" (:c g) " " (:ja g))]
+    (doseq [k [:max-ttl-days :quota-reads-per-day]]
+      (let [x (get g k)]
+        (cond
+          (nil? x) (v! n ": " k " が無い（nil）"
+                       " — 限度の無い権限を作れてしまう。C0 以外は必ず有限")
+          (not (and (number? x) (pos? x)))
+          (v! n ": " k " " (pr-str x) " が正の数でない"))))
+    ;; 級が重いほど限度はきつく。逆転していたら設計意図が壊れている。
+    (let [prev (first (filter #(= (dec (:c g)) (:c %)) grades))]
+      (when (and prev (pos? (:c prev))
+                 (number? (:max-ttl-days g)) (number? (:max-ttl-days prev))
+                 (> (:max-ttl-days g) (:max-ttl-days prev)))
+        (v! n ": :max-ttl-days が 1 つ下の級より長い"
+            " — 危害が大きい級ほど寿命は短くする"))
+      (when (and prev (pos? (:c prev))
+                 (number? (:quota-reads-per-day g)) (number? (:quota-reads-per-day prev))
+                 (> (:quota-reads-per-day g) (:quota-reads-per-day prev)))
+        (v! n ": :quota-reads-per-day が 1 つ下の級より多い")))))
+
+;; ── 13: 封緘は一律。分類が『暗号化されているか』から読めないこと ────
+;;
+;; 選択的に暗号化すると、**暗号化されている事実そのものが分類を漏らす**。
+(when-let [se (get-in pol [:protocols :sealing])]
+  (when-not (true? (:uniform se))
+    (v! ":protocols :sealing の :uniform が true でない"
+        " — 選択的に封緘すると、どれが封緘されているかを見るだけで機微の在処が分かる"))
+  (when-not (= :content-key-published (:c0-is se))
+    (v! ":protocols :sealing の :c0-is が :content-key-published でない"
+        " — 一律封緘なら C0 は『暗号化されていない』ではなく『鍵が公開されている』"))
+  (let [pr* (:plane-rule se)]
+    (when (nil? pr*)
+      (v! ":protocols :sealing に :plane-rule が無い"
+          " — git plane は diff を要求するので平文のまま。境界を書かないと C1 以上が
+             git に漏れる"))
+    (when (and pr* (str/blank? (str (:invariant pr*))))
+      (v! ":plane-rule に :invariant（C1 以上を git plane に置かない）が無い"))))
+
 ;; ── 結果 ────────────────────────────────────────────────────────────
 (let [vs @violations]
   (println (str "clearance-policy-check: 級 " (count grades)
