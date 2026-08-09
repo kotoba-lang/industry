@@ -4694,3 +4694,63 @@
   WAS NEVER IN THE CONTROL."
  :gates "14 new deftests, 12 fail on base (36 assertions), 2 pure controls.
          Lint 23 -> 22 warnings (control-value's unused binding went)."}
+
+{:seq 76
+ :date "2026-08-09"
+ :repo "kotoba-lang/cssom"
+ :commit "7cc00c47fa36c9913f500d718acd3ff36e02b535"
+ :title "grid content distribution, dense packing and order -- recovered and verified after its author terminated mid-round"
+ :oracle {:browser "Brave 151.1.93.129"
+          :corpus-cases {:before 835 :after 854}}
+ :provenance
+ "THE AUTHORING AGENT TERMINATED ON AN API ERROR (the organisation
+  disabled Claude Code subscription access) WITH THE WORK COMMITTED BUT
+  NEVER MEASURED. Its own last words were the downstream suites: browser
+  754/0, dom-gpu 130/0, htmldom 180/0. It never reported a conformance
+  number and never merged. THIS ENTRY IS THE ORCHESTRATOR'S OWN
+  MEASUREMENT, taken after merging main into its branch."
+ :measured
+ {:line-structure {:main-at-835 "800/805" :after-at-854 "821/824 (100%)"}
+  :geometry {:main-at-835 "2688/2714, 818/835 clean"
+             :after-at-854 "2760/2779, 841/854 clean"
+             :mismatch-boxes {:before 26 :after 19}}
+  :paint-order {:main-at-835 "20780/20837, 818/834"
+                :after-at-854 "21245/21302, 837/853"
+                :mismatch-points {:before 57 :after 57}}
+  :computed-style {:main-at-835 "38175/38191, 825/835"
+                   :after-at-854 "39085/39101, 844/854"
+                   :mismatch-values {:before 16 :after 16}}
+  :reading "SEVEN geometry boxes closed WHILE ADDING 19 CASES, and the
+            paint and computed-style mismatch counts did not move at all.
+            The corpus got harder in one axis only, which is where the work
+            was."}
+ :verified-on-merged-main
+ {:cssom-tests "1094 / 3035, 0 failures (1082/2952 before)"
+  :browser "754/0" :dom-gpu "130/0" :htmldom "180/0"}
+ :what-was-not-verified
+ "I DID NOT SEE THE AGENT'S PER-CASE --dump-ops / --dump-style DIFF, and I
+  did not reconstruct one: the branch was already committed when I picked
+  it up, so there is no before-tree of its own authorship to diff against
+  beyond the merge base. What I CAN state is the aggregate above and that
+  every suite is green. A future round touching grid track positioning
+  should re-run the per-case dump rather than trusting this entry to have
+  covered it."
+ :incident-that-blocked-the-first-attempt
+ "the first verification run died with `oracle unusable: no measurement
+  block over CDP` on BOTH Brave and Chrome. Cause: THE TWO TERMINATED
+  AGENTS LEAKED FIFTY HEADLESS HARNESS BROWSERS, which exhausted whatever
+  the harness needs to attach. Killed only processes matching BOTH
+  --headless AND --remote-debugging (the user's ordinary Brave was left
+  alone); the rerun succeeded. Worth knowing: an agent killed mid-run does
+  not clean up its oracle, and the next run's failure mode is `the browser
+  produced no measurement block`, which reads like a harness bug."
+ :tooling-note
+ "the pin script had been removed from /tmp by a cleanup between sessions
+  and was rewritten with the same two guards, BOTH SMOKE-TESTED BEFORE USE:
+  (1) a pins-less run does not touch west.yml -- reusing the script for a
+  ledger-only append once produced an empty commit on main; (2) every SHA
+  is verified to exist on its own remote before any is written -- confirmed
+  by feeding it the fabricated SHA f5bf1de1b3... that was actually written
+  to main on 2026-08-04, which it refused. The superproject's PreToolUse
+  pin guard cannot catch that case: it matches on the Bash COMMAND STRING,
+  and a script that shells out to gh from inside nbb never produces it."}
