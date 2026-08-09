@@ -145,6 +145,8 @@
    :floor-lv 5 :compartment-required false :two-person-rule false
    :access-record :published
    :review-interval-days 365
+   :max-ttl-days 365          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 1000
    :declassify "文脈が文書化された時点で C0"
    :examples ["未成熟な設計" "測定途中の値" "prior にすぎない推定"]}
 
@@ -155,6 +157,8 @@
    :floor-lv 5 :compartment-required true :two-person-rule false
    :access-record :published
    :review-interval-days 180
+   :max-ttl-days 180          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 500
    :declassify "その構成が退役した時点で C0"
    :examples ["インフラ構成" "運用手順" "fleet の内部状態"]}
 
@@ -165,6 +169,8 @@
    :floor-lv 5 :compartment-required true :two-person-rule false
    :access-record :published-and-notifiable
    :review-interval-days 90
+   :max-ttl-days 90          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 100
    :declassify "本人が公開に同意した / 集計されて個人に戻せなくなった時点"
    :examples ["internet-accounts の account 行" "meisai の明細" "abuse 報告の連絡先"]}
 
@@ -175,6 +181,8 @@
    :floor-lv 5 :compartment-required true :two-person-rule false
    :access-record :published-and-notifiable
    :review-interval-days 90
+   :max-ttl-days 90          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 50
    :declassify "危害の源が消滅したことを区画の custodian が確認した時点"
    :examples ["abuse 報告の被害者" "追跡対象と被対象者の結び付き" "所在に関わる情報"]}
 
@@ -185,6 +193,8 @@
    :floor-lv 5 :compartment-required true :two-person-rule true
    :access-record :published
    :review-interval-days 30
+   :max-ttl-days 30          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 10
    :declassify :never-rotate-instead
    :note "**復号ではなく回転で扱う。** 期限切れの鍵を公開しても意味は無いので
           declassify は存在しない —— 出口は失効と回転だけ"
@@ -197,6 +207,8 @@
    :floor-lv 5 :compartment-required true :two-person-rule true
    :access-record :published
    :review-interval-days 30
+   :max-ttl-days 30          ; **付与そのものの寿命。** 自動更新しない
+   :quota-reads-per-day 5
    :declassify "危険が消滅したことを Council が attest した時点"
    :examples ["法域リスクに関わる会員の身元" "身体安全に関わる所在"]}]
 
@@ -226,6 +238,32 @@
  ;; ではなく「まだ必要が立っていない」として記録する** —— 必要の無い区画を
  ;; 先に作ると、そこに物が集まる。
  :compartments []
+
+ ;; ── 限度（すべての権限に必ず 2 つの上限が付く）─────────────────────
+ ;;
+ ;; オーナーの確認（2026-08-08）:「権限は limit が常に設けられている?」
+ ;; **時間の上限だけでは足りない。** 期限内に何回でも読めるなら、正当な 1 件の
+ ;; 閲覧と、区画を丸ごと持ち出す行為が同じ権限で通ってしまう。
+ ;;
+ ;;   時間の上限 :max-ttl-days        付与そのものが切れる（更新は再授与）
+ ;;   量の上限   :quota-reads-per-day 1 日に読める件数
+ ;;
+ ;; **どちらも nil にできない**（C0 を除く。C0 は権限ではない）。gate が落とす。
+ ;;
+ ;; 量の超過を「絞る」で済ませない —— **異常な閲覧量それ自体が信号**なので、
+ ;; 拒否したうえで照会を起こす。throttle は信号を握り潰す。
+ :limits
+ {:principle :no-unbounded-authority
+  :every-grant-has #{:max-ttl-days :quota-reads-per-day}
+  :auto-renew false
+  :auto-renew-note "**自動更新しない。** 更新は再授与であり、再授与は照会を伴う。
+                    自動で延びる権限は、誰も見直さない権限になる"
+  :on-quota-exceeded :deny-and-trigger-review
+  :on-quota-note "throttle しない。絞るだけだと、異常な閲覧量という**信号**が
+                  『遅いが通った』に化けて誰にも届かない"
+  :token-ttl-minutes 10
+  :token-note "要求ごとの CACAO。付与（日単位）とトークン（分単位）は別の上限で、
+               短い方が常に効く"}
 
  ;; ── zero trust の判定 ───────────────────────────────────────────────
  ;;
@@ -337,7 +375,26 @@
  :protocols
  {;; ── 1. 封緘（情報設計と暗号化）──────────────────────────────────
   :sealing
-  {:layers
+  {;; ── 一律封緘（オーナーの確認 2026-08-08「情報は基本的に暗号化されており」）
+   ;;
+   ;; **object plane では C0 も含めて全部を封緘する。分類は『暗号化されているか』
+   ;; ではなく『content key が公開されているか』で表す。**
+   ;;
+   ;; 選択的に暗号化すると、**暗号化されているという事実そのものが分類を漏らす** ——
+   ;; どの object が封緘されているかを見るだけで、どこに機微があるか分かる。
+   ;; 一律にすればその信号が消える。加えて封緘の分岐が無くなるので、
+   ;; 「封緘し忘れ」という種類の事故が構造的に起きない。
+   ;;
+   ;; ⚠ **git plane は平文のまま。** ADR・コード・manifest は review が diff を
+   ;;    要求するので暗号化できない（CLAUDE.md が EDN を annex 化しない理由と同じ）。
+   ;;    したがって不変条件は 1 つ: **C1 以上を git plane に置いてはならない。**
+   ;;    置けないものは object plane へ行く。gate はこの規則の存在を要求する。
+   :uniform true
+   :c0-is :content-key-published
+   :plane-rule {:git :c0-plaintext-only
+                :object :always-sealed
+                :invariant "C1 以上を git plane に置かない"}
+   :layers
    [{:layer :content-key :scope "object の version ごと"
      :note "本文はこれで 1 回だけ暗号化する。読者の数だけ暗号化しない"}
     {:layer :compartment-key :scope "区画の epoch ごと"
@@ -464,6 +521,38 @@
            archive-time-stamp / timestamp-renewal-digest / hash-renewal-digest /
            verify が実装済み。保存が永久だからこそ、これが要る"}}
 
+  ;; ── 3b. membership 層（オーナー指示 2026-08-08「org-signal に membership を
+  ;;        足す方向で」）──────────────────────────────────────────────
+  ;;
+  ;; MLS を持ってくるのではなく、org-signal に足す方を採った。**設計・実装・
+  ;; テストは済んでいるが、まだ org-signal には入っていない**（この session は
+  ;; kotoba-lang への push 権を持たない。cross-tier add が拒否される）。
+  :membership-layer
+  {:home "kotoba-lang/org-signal"
+   :ns "kotoba.signal.membership"
+   :handoff ".handoff/org-signal-membership/"
+   :status :implemented-and-tested-awaiting-port
+   :purity :no-keys-no-crypto
+   :purity-note "**鍵も暗号も持たない純粋な `.cljc` の決定核。** epoch 数と member
+                 集合の上の値→値の関数で、どの create-sender-key と
+                 distribution-message を呼ぶかを返すだけ。group.clj と group.cljs は
+                 別 backend なので、primitive に触れない bookkeeping を 1 本の
+                 .cljc にしておけば **2 つの host が『誰が group に居るか』で
+                 食い違えない**"
+   :invariants
+   ["epoch は単調増加。巻き戻さない"
+    "**member 変更は必ず epoch を進める。** 1 つの epoch は生涯 1 つの member 集合"
+    "**加入は前方のみ。** epoch n で入った者は n 未満を復号できない"
+    "**除名は前方のみ。** epoch n で出た者は [joined, n-1] を保持し続ける"
+    "log は append-only。誰がいつ入って出たかは消えない（相互監視は member 自身にも及ぶ）"]
+   :honesty
+   "remove-member は **:still-readable-by と :re-seal-required を返す** ——
+    除名が守れなかった epoch 範囲を呼び出し側に返す。**除名を完了として報告しない。**
+    そう思わせる membership 層は、無いより悪い"
+   :verified "9 tests / 29 assertions が nbb で通る。4 通りの壊し方
+              （join が epoch を進めない / 除名が漏れを報告しない / 再加入が過去を開く /
+              members-at が left を無視する）で 1〜9 件の失敗になることを確認済み"}
+
   ;; ── 4. 無いもの（設計の穴を穴として名指す）─────────────────────
   ;;
   ;; **これらは「設計が悪い」のではなく「まだ書かれていない」。**
@@ -476,13 +565,16 @@
 
    {:what "kotoba-signal の group membership management（add/remove）"
     :in-west true :implemented false
-    :impact "**この設計が要求する層がまさに欠けている。** org-signal の README が
-             自ら『the sender-keys chain ratchet itself is implemented,
-             membership bookkeeping is not』『Key revocation / rotation policy
-             … a scheduler/policy for *when* does not [exist]』と書いている。
-             primitive は在るが、epoch を進めて誰に配り直すかを決める層が無い"
-    :severity :blocking
-    :first-implementation-decision true}
+    :impact "**upstream には今も無い。** org-signal の README が自ら『the sender-keys
+             chain ratchet itself is implemented, membership bookkeeping is not』
+             『Key revocation / rotation policy … a scheduler/policy for *when*
+             does not [exist]』と書いている。
+             2026-08-08 に設計・実装・テストまで済ませたが、**port していないので
+             org-signal から使えるようにはなっていない**（:membership-layer 参照）"
+    :severity :awaiting-port
+    :handoff ".handoff/org-signal-membership/"
+    :blocked-by "kotoba-lang への push 権。この session の add_repo が
+                 cross-tier add を拒否する"}
 
    {:what "HPKE / JWE / COSE" :in-west false
     :impact "封緘の envelope を kotoba-signal の primitive の上に自作することになる"
