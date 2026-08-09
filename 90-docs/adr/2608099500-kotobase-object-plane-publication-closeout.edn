@@ -68,10 +68,16 @@ review で blocker が見つかった場合は本 PR を merge せず修正す�
    :github_checks_note "GitHub Actions は無効。CI/CD 正本は murakumo fleet。PR 自身は docs-only EDN なので targeted parse と diff check を実施"
    :targeted_edn_parse "pass"
    :diff_check "pass"
+   :full_docs_gate
+   {:command "nbb --classpath .:scripts/nbb_compat manifest/docs-edn-only.cljs verify"
+    :status "fail-pre-existing-baseline"
+    :summary "今回ADRを含む EDN 2023件は parse-errors=0。非zeroの理由は既存 known-md-files baseline が削除済み .md を保持、既存 path-md-refs 11件、既存 non-tx EDN 7件"
+    :change_attribution "none of the reported paths is this PR's new ADR; targeted parse and diff check pass"}
    :changed_files ["90-docs/adr/2608099500-kotobase-object-plane-publication-closeout.edn"]
    :implementation_reachability "all implementation/evidence commits reachable from each repository main"
    :live_health {:s3_diag 200 :s3_anonymous_get 401 :atproto_health 200 :pinning_health 200}
-   :findings []}
+   :findings []
+   :nonblocking_findings ["full docs gate baseline is stale; repair is outside this docs-only closeout PR"]}
   :publication/default_branch "main"
   :publication/implementation_commits
   ["network-awai/net-kotobase@31f8f8745ea3063e73ea34ef1bee56216668ddcb"
