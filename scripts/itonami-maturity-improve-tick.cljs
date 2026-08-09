@@ -251,8 +251,17 @@
 ;; ── 走る ─────────────────────────────────────────────────────────────────────
 
 (defn -main []
+  ;; **「計測値が無い」と「root を間違えている」を区別する。**
+  ;; 実測 2026-08-09: 別マシン（superproject が ~/github/com-junkawasaki に無い）で
+  ;; 走らせたところ、tick は「測り直し」を指示した。datoms は健在で、間違って
+  ;; いたのは root だけ。測り直しは 1,700 repo を歩く重い反復なので、環境の
+  ;; 設定ミスでそこへ送り込むと、その周がまるごと無駄になる。
+  ;; **root が存在しないなら、それは計測の問題ではないと言う。**
   (when-not datoms
-    (log! "計測値が読めない（" datoms-file "）— 次の 1 手は測り直し")
+    (if (.existsSync fs root)
+      (log! "計測値が読めない（" datoms-file "）— 次の 1 手は測り直し")
+      (log! "root が存在しない（" root "）— 計測の問題ではない。"
+            "superproject の場所を COM_JUNKAWASAKI_ROOT で指すこと"))
     (js/process.exit 0))
 
   (let [rows (->> datoms (filter :repo/path) (mapv row))
