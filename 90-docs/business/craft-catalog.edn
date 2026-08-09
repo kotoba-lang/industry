@@ -1,6 +1,5 @@
 ;; craft-catalog.edn — craft engine index (hand-maintained catalog, not generated)
-;; Maps pure craft libs to industry actors and surfaces.
-{:catalog/version 2
+{:catalog/version 3
  :catalog/as-of "2026-08-09"
  :catalog/crafts
  [{:craft/id "shirohan"
@@ -23,7 +22,7 @@
    :craft/path "orgs/cloud-itonami/seihan"
    :craft/domain :print/prepress-paper
    :craft/api [:plan :findings]
-   :craft/wired-to []
+   :craft/wired-to ["cloud-itonami-isic-1811" "cloud-itonami-isic-1812"]
    :craft/intended-isic ["1811" "1812"]
    :craft/surface nil
    :craft/status :live
