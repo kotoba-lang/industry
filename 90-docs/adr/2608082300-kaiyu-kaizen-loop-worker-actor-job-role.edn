@@ -184,6 +184,16 @@ vendor gate は新しい sha で再実行して OK。
   self-kaiyu は**新 ns だけを対象にした runner**で検証した（5 tests / 60 assertions）。
   直すなら「宣言を足す」か「edge グラフから envelope を外す」かで、後者が本筋に見える
 - **itonami.cloud の counters は edge cache の分だけ過小**（上記 1）
+- **itonami.cloud は測れるが、自分の tenant へ提案を書けない**（2026-08-08 実測）:
+  `POST /api/network-awai/cloud-itonami/kaizen` が **503 `kaizen intake is not
+  provisioned for this tenant`**。KV に
+  `kaizen:network-awai/cloud-itonami:ingress-key-sha256` が無く、`--prefix kaizen:`
+  は club-shinshi / net-babiniku / net-kotobase の 3 件しか返さない。`guard-key!` の
+  設計どおりの fail closed であって障害ではない（**同じ鍵は net-kotobase に対して
+  200 already-open を返すので鍵は生きている**）。self-kaiyu が landed した当日に、
+  **読める面と書ける面がずれたまま残った** —— `kaiyu-kaizen-tick.cljs` の docstring が
+  「the loop could read every site except the one it files into」と名指ししている形
+  そのもの。digest 1 件を KV に入れれば開く
 - **loop はまだ 1 度も自動起動していない**（LaunchAgent は load 済み）
 - **`git stash push` を他セッションの stash がある repo で使って事故りかけた**
   （2026-08-08）。pathspec 付き push が失敗し、続く `pop` が **index 0 の別セッションの
