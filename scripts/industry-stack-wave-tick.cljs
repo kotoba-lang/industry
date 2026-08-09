@@ -32,20 +32,55 @@
 
 (def done-file (str home "/.gftd/industry-stack-wave-done.edn"))
 
+(defn- done-from-project-ledger
+  "project ledger の構造化行だけから着地 repo を拾う。
+  free-text scrape はしない（dry-run の :next 候補や note の名前で
+  未着地 repo が done 扱いになりプールが偽縮みするのを防ぐ）。"
+  []
+  (try
+    (let [lines (->> (str (.readFileSync fs project-ledger "utf8"))
+                     str/split-lines
+                     (remove str/blank?)
+                     (remove #(str/starts-with? (str/trim %) ";")))]
+      (reduce
+       (fn [acc line]
+         (try
+           (let [m (edn/read-string line)
+                 t (:event/type m)]
+             (cond
+               (= t :industry-stack/wave)
+               (into acc
+                     (keep (fn [x]
+                             (let [r (if (map? x) (:repo x) x)]
+                               (when (and (string? r)
+                                          (str/starts-with? r "cloud-itonami-isic-"))
+                                 r)))
+                           (concat (:event/merged m)
+                                   (:event/merged-new m)
+                                   ;; 一部 wave は :event/merged 無しで note だけ
+                                   ;; その場合は pins 行側を信じる
+                                   )))
+               (= t :industry-stack/pins)
+               (into acc
+                     (filter #(and (string? %)
+                                   (str/starts-with? % "cloud-itonami-isic-"))
+                             (:event/pins m)))
+               :else acc))
+           (catch :default _ acc)))
+       #{}
+       lines))
+    (catch :default _ #{})))
+
 (defn- done-repos
   "既 wave で着地した repo 名集合。local checkout が pin より遅れていても
   再ピックしないための床（skill 側は origin/main を見るが、slot を浪費しない）。
   正本は ~/.gftd/industry-stack-wave-done.edn（wave 着地時に skill が conj）。
-  ledger 文字列からも拾う（seed 漏れの保険）。"
+  保険は project ledger の :event/merged / :event/pins だけ — loop/tick
+  ledger の free-text や dry-run 候補は見ない。"
   []
-  (let [from-file (try (edn/read-string (str (.readFileSync fs done-file "utf8")))
-                       (catch :default _ #{}))
-        texts (for [p [project-ledger wave-ledger ledger-file]]
-                (try (str (.readFileSync fs p "utf8")) (catch :default _ "")))
-        from-ledger (->> (str/join "\n" texts)
-                         (re-seq #"cloud-itonami-isic-[\w.-]+")
-                         set)]
-    (into (set from-file) from-ledger)))
+  (let [from-file (try (set (edn/read-string (str (.readFileSync fs done-file "utf8"))))
+                       (catch :default _ #{}))]
+    (into from-file (done-from-project-ledger))))
 
 (defn- log! [& xs]
   (println (str (.toISOString (js/Date.)) " " (str/join " " (map str xs)))))
