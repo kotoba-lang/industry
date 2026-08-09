@@ -4,11 +4,18 @@
 ;;
 ;; compiler の **依存閉包ごと** classpath に載せる。compiler/src だけでは
 ;; `Could not find namespace: kotoba.artifact.core` で起動しない（実測 2026-08-08）。
-;; 閉包は compiler/deps.edn の io.github.kotoba-lang/* から引く:
+;; 閉包は **そのつど compiler/deps.edn から引く。列を貼らない** —— 貼った列は
+;; compiler が名前空間を別 repo へ出すたびに腐り、gate は落ちるのではなく
+;; *走らなくなる*（実測 2026-08-09: `kotoba.compiler.frontend` が #545 で
+;; compiler → kotoba-sema へ移り、貼ってあった 12 repo の列がそれを含まず
+;; `Could not find namespace: kotoba.compiler.frontend` で起動しなかった。
+;; ここには「deps.edn から引く」と書いてあったのに、その下に引いた結果の
+;; スナップショットが貼ってあったため、読む側は貼られた列の方を使った）:
 ;;
 ;;   CP=".:scripts/nbb_compat:orgs/kotoba-lang/compiler/src:orgs/kotoba-lang/compiler/resources"
-;;   for r in abi artifact io-ipld io-multiformats kotoba-component kotoba-kir \
-;;            kotoba-native kotoba-script kotoba-verifier kotoba-wasm provider tender-native; do
+;;   for r in $(grep -oE 'io\.github\.kotoba-lang/[a-z0-9-]+' orgs/kotoba-lang/compiler/deps.edn \
+;;              | sed 's|.*/||' | sort -u); do
+;;     [ -d "orgs/kotoba-lang/$r/src" ] || echo "MISSING checkout: $r"   # west update で取る
 ;;     CP="$CP:orgs/kotoba-lang/$r/src"
 ;;     [ -d "orgs/kotoba-lang/$r/resources" ] && CP="$CP:orgs/kotoba-lang/$r/resources"
 ;;   done

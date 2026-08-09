@@ -112,23 +112,37 @@ nbb --classpath ".:scripts/nbb_compat:$R/orgs/kotoba-lang/dynamics/src:$R/orgs/k
 pin より前に居るのが正常で、HEAD こそ実態である。
 
 **パリティゲートも通す**（スコア算術の正本は Kotoba カーネル、ADR-2608052000）。
-**`.:scripts/nbb_compat` だけでは起動しない** —— compiler の依存閉包 12 repo が要る。
-これを省いた例が長く載っていたため、gate は `Could not find namespace:
-kotoba.artifact.core` で*走らないまま*何周も landed し続けた（落ちるより悪い。
-検査されていないことが緑と区別できない）:
+**`.:scripts/nbb_compat` だけでは起動しない** —— compiler の依存閉包が要る。
+**閉包を手で書いた列にしない** —— compiler は名前空間を別 repo へ出し続けており、
+**列を書いた瞬間からそれは腐り始める**。実際 2 回とも同じ形で壊れた:
+
+| 起動しなかった理由 | 移動先 | 実測 |
+|---|---|---|
+| `Could not find namespace: kotoba.artifact.core` | 閉包を 1 つも書いていなかった | 2026-08-08 |
+| `Could not find namespace: kotoba.compiler.frontend` | compiler → **`kotoba-sema`**（#545 "Consume semantic analysis from kotoba-sema"。ns 名は不変で repo だけ動いた） | 2026-08-09 |
+
+どちらも**落ちたのではなく走らなかった**ので、「スコア算術はカーネルと一致している」が
+誰にも検査されないまま計測が landed し続けた（落ちるより悪い。検査されていないことが
+緑と区別できない）。だから閉包は**そのつど `compiler/deps.edn` から引く**:
 
 ```bash
 R=$HOME/github/com-junkawasaki
 CP=".:scripts/nbb_compat:$R/orgs/kotoba-lang/compiler/src:$R/orgs/kotoba-lang/compiler/resources"
-for r in abi artifact io-ipld io-multiformats kotoba-component kotoba-kir \
-         kotoba-native kotoba-script kotoba-verifier kotoba-wasm provider tender-native; do
-  CP="$CP:$R/orgs/kotoba-lang/$r/src"
+for r in $(grep -oE 'io\.github\.kotoba-lang/[a-z0-9-]+' "$R/orgs/kotoba-lang/compiler/deps.edn" \
+           | sed 's|.*/||' | sort -u); do
+  if [ -d "$R/orgs/kotoba-lang/$r/src" ]; then CP="$CP:$R/orgs/kotoba-lang/$r/src"
+  else echo "MISSING checkout: $r"; fi          # ← west update --fetch smart <name> で取る
   [ -d "$R/orgs/kotoba-lang/$r/resources" ] && CP="$CP:$R/orgs/kotoba-lang/$r/resources"
 done
 nbb --classpath "$CP" scripts/itonami-maturity-kernel-parity.cljs \
   --evidence manifest/itonami-maturity-evidence.edn \
   --datoms 90-docs/system-dynamics/itonami-maturity.datoms.edn
 ```
+
+**`MISSING checkout:` が出たら先にそれを取る。** 閉包の repo は west に登録されていても
+checkout されていないことがある（実測 2026-08-09: `kotoba-sema` が未 checkout で、
+`orgs/` を見ただけでは「そんな repo は無い」と読めた）。**手元に無いことは
+存在しないことではない** —— west.yml を引く。
 
 **緑を採用する前に落とす。** datoms のコピーで 1 repo の `:maturity/own-bp` を
 **1bp だけ**ずらし、`FAIL` + exit 1 になることを見る（無改変で exit 0）。
