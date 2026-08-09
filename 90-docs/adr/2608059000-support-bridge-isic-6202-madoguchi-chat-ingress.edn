@@ -4,7 +4,7 @@
   :adr/topic "support-bridge-isic-6202-madoguchi-chat-ingress"
   :adr/status "accepted"
   :adr/date "2026-08-05"
-  :adr/last_verified "2026-08-05"
+  :adr/last_verified "2026-08-09"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/authoritative_for ["cloud-itonami :support/* effect kinds"
@@ -160,6 +160,28 @@ load しないことも実測で確認した。
   `:support/*` 4 件すべて存在）。**edge 側は未配線のまま残る** — cljs build で
   vertical actor が解決するかの検証が別途要るため、本 ADR のスコープ外。
 
+## 着地の確認（2026-08-09 再監査）
+
+全 4 repo の default branch に**存続を実測確認**した（4 日後の再監査。他セッションが
+同じ木を活発に触っているので、「merge した」と「今 main にある」は別物として確かめた）:
+
+| repo | 実測 |
+|---|---|
+| `network-awai/cloud-itonami` | support.cljc / support_view.cljc / 両 test が main に存在。`runtime_handlers` と `edge/effects_endpoints` の両方に `support/handlers` が結線済み。crm-test も runner に登録済み。**edge artifact に `support/open-case` が3箇所**（Worker に本当に載っている） |
+| `network-awai/net-babiniku` | `functions/api/support.js` / ingress test / 7 locale catalog すべて main。`chat.js` の `MODEL_ALIAS` 5 箇所、views の `support-panel-view` 2 箇所 |
+| `network-awai/club-shinshi-app` | `murakumo-main` が default-model として main に存在 |
+| `com-junkawasaki/root` | 本 ADR が main に存在 |
+
+**murakumo の実測値も再測定して不変**（本 ADR の主張が陳腐化していないことの確認）:
+alias は `qwen3.6-35b-a3b` / `endpoint https://infer.murakumo.cloud/v1/chat/completions`
+/ `status serving` / `vision true`。両 chat 経路とも **HTTP 401**（502 ではない）。
+つまり **access token の mint はまだ行われておらず、chat は依然として通らない**。
+
+**west pin の現況（2026-08-09）**: cloud-itonami は pin == main（identical）。
+net-babiniku は pin が main より 10 commits、club-shinshi-app は 1 commit 遅れて
+いるが、**いずれも本作業より後の他セッションの成果**であり、検証していない変更を
+pin に載せるのは越権なので進めていない（fast-forward であることだけ確認済み）。
+
 ## Consequences
 
 - cloud-itonami の JVM 実行経路（`approval-drain` / `tick-loop`）で
@@ -168,7 +190,15 @@ load しないことも実測で確認した。
   「受け付けた・審査待ち」であって回答ではない（回答を捏造しない）。
 - madoguchi が孤立解消。SLA breach / escalation / customer-360 が
   cloud-itonami 側から引ける。
-- **残るギャップ（正直に）**: ①edge approve 経路への配線 ②club-shinshi 側の
-  ingress endpoint と UI ③isic-6209 / 8220 の bridge ④murakumo access token の
-  mint（chat が 401 で通らない運用課題）。
+- **残るギャップ（2026-08-09 時点、優先順）**:
+  1. **murakumo access token の mint** — 唯一「今ユーザーに見えている壊れ」。両 chat
+     経路が 401 のままで、babiniku の character chat も shinshi の 1:1 chat も動かない。
+     コード変更ではなく運用作業（`nbb scripts/run-task.cljs token issue --scope chat`
+     を kotoba-lang/murakumo で実行し、各 Worker の secret に bind）。
+  2. **club-shinshi 側の ingress endpoint と UI** — babiniku には入れたが shinshi には
+     未着手。babiniku の `functions/api/support.js` と `support-panel-view` がそのまま
+     雛形になる（cljs Worker なので endpoint は cljs で書く）。
+  3. **isic-6209（helpdesk ticket routing）/ 8220（call centre）の bridge** —
+     `support.cljc` と同型で書ける。6209 は access-tier / IR 認証、8220 は一次 triage。
+  4. ~~edge approve 経路への配線~~ — **本 ADR で完了**（当初は未着手として記録していた）。
 "}]
