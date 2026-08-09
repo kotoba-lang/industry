@@ -9,3 +9,46 @@
  :conclusion "書き込み側も client 側も動作する。行が 0 だったのは、実訪問者が 1 面だけ見て帰っているため。計測の欠陥ではなく回遊の事実"
  :cleanup "検証で作った行のうち確実に自分のものだけ削除（transitions 全 2 行 — 表は検証前 0 だった / dwell の video 30_59 — 合成 beacon と完全一致）。他の dwell 行は断定できないので残した"
  :note "issue の close は cockpit の人の操作。narrow ingress key は提案しか作れない（設計どおり）"}
+{:status :proposed
+ :at "2026-08-08"
+ :issue-id "kaizen:kotobase.net:single-channel-direct:2026-08-02_2026-08-08"
+ :site "kotobase.net"
+ :tenant {:org "network-awai" :repo "net-kotobase"}
+ :severity :medium
+ :verification "候補の数字を kotobase.net の read face（GET /api/kaiyu?window_days=7）に当てて確認。visits.rows = [{direct 88} {search 1}]、window 2026-08-02〜2026-08-08 — tick の evidence {:source \"direct\" :visits 88 :total 89} と一致"
+ :ingress {:response 202 :status "proposed"}
+ :caveat "visits は state=partial（collected-since 2026-08-07、window の途中から）。tick が :ok を返したのは site-live-since が window より後だからで、正しい判定。ただしこの 89 件は実質 2 日分であり、比率の所見として読むこと（絶対量の所見ではない）"
+ :note "承認は cockpit の人の操作。この loop は提案までしかできない"}
+{:status :woke, :window {:days 7, :from "2026-08-02", :to "2026-08-08"}, :site "kotobase.net", :issue-id "kaizen:kotobase.net:single-channel-direct:2026-08-02_2026-08-08", :severity "medium", :candidates 3, :fresh 2, :at "2026-08-08T14:01:32.105Z"}
+{:status :blocked-at-ingress
+ :at "2026-08-08"
+ :issue-id "kaizen:itonami.cloud:single-channel-direct:2026-08-02_2026-08-08"
+ :site "itonami.cloud"
+ :tenant {:org "network-awai" :repo "cloud-itonami"}
+ :severity :medium
+ :verification "候補の数字を itonami.cloud の read face（GET /api/kaiyu?window_days=7）に当てて確認。visits.rows = [{direct 647} {referral 1}]、window 2026-08-02〜2026-08-08 — tick の evidence {:source \"direct\" :visits 647 :total 648} と一致。所見そのものは本物"
+ :ingress {:response 503 :error "kaizen intake is not provisioned for this tenant"}
+ :cause "KV `kaizen:network-awai/cloud-itonami:ingress-key-sha256` が存在しない。`wrangler kv key list --prefix kaizen:` は club-shinshi / net-babiniku / net-kotobase の 3 件だけを返す。kaizen-ingress の guard-key! は digest が空の tenant を 503 で fail closed する設計どおりの動作であって、鍵の失効でも障害でもない"
+ :key-is-valid "同じ鍵で net-kotobase の tenant に POST すると 200 already-open（id 既存のため書き込みは発生しない）。つまり鍵は生きており、欠けているのは cloud-itonami tenant の provisioning だけ"
+ :not-done "provisioning（KV への digest 書き込み）は permission classifier に拒否されたため実行していない。この issue は **提案されていない** —— 未着地として扱うこと"
+ :caveat "visits は state=partial（collected-since 2026-08-08、= 計測が landed した当日）。tick が :ok を返したのは site-live-since が window 内だからで正しい判定。ただしこの 648 件は実質 1 日分であり、比率の所見として読むこと（絶対量の所見ではない）"
+ :gap "itonami.cloud は 2026-08-08 に自分の回遊を測り始めたが、**自分の tenant への filing 経路が無い**。tick の docstring が名指ししている『読める面と書ける面がずれる』形そのもので、ADR-2608082300 の Gaps には未記載"
+ :observation "1 本の ingress key が全 tenant の digest に登録されている（loop の Keychain 参照が単一 service 名で固定されているため）。tenant ごとに鍵を分ければ漏洩時の影響範囲が 1 tenant で止まるが、loop 側の鍵解決の変更を伴うのでこの反復では触っていない"
+ :next "owner が次を 1 回実行すれば経路が開く: printf '%s' \"$(security find-generic-password -a cloud-itonami -s 'cloud-itonami KAIZEN_INGRESS_KEY' -w)\" | shasum -a 256 | awk '{print $1}' | tr -d '\\n' > /tmp/d.txt && npx wrangler kv key put 'kaizen:network-awai/cloud-itonami:ingress-key-sha256' --path /tmp/d.txt --namespace-id e9857fe8617440e59f9720293dc53afd --remote && rm -f /tmp/d.txt"}
+{:status :woke, :window {:days 7, :from "2026-08-02", :to "2026-08-08"}, :site "itonami.cloud", :issue-id "kaizen:itonami.cloud:single-channel-direct:2026-08-02_2026-08-08", :severity "medium", :candidates 3, :fresh 1, :at "2026-08-08T20:14:27.888Z"}
+{:status :proposed-but-already-answered
+ :at "2026-08-09"
+ :issue-id "kaizen:shinshi.club:transitions-not-measured:2026-08-03_2026-08-09"
+ :site "shinshi.club"
+ :tenant {:org "network-awai" :repo "club-shinshi"}
+ :severity :blocked
+ :ingress {:response 202 :status "proposed"}
+ :verification "候補の数字を read face（GET /_metrics/audience?window_days=7、x-internal-trust）に当てて確認。transitions {:top-edges [] :collected-since nil}、window 2026-08-03〜2026-08-09 — tick の evidence と完全一致。所見そのものは本物"
+ :but "**この問いは 2026-08-08 に実ブラウザで answered 済み**（本 ledger 1 件目、:answer :nobody-navigated）。同じ問いを 1 日後に再提出した"
+ :why-it-refired "昨日の検証は home→video→actresses を実際に踏んで route_transition_daily に 2 行書き、cleanup でその 2 行を削除した（『表は検証前 0 だった』）。MIN(day) が NULL に戻り、collected-since も null に戻る。diagnose の :blocked は collected-since == nil だけで決まるので、**判定は検証前の状態に完全に巻き戻った**"
+ :structural "この issue は毎日再発火する —— 実訪問者が初めて 1 本 transition を踏むまで、window が 1 日ずれるたびに新しい id が生成され、dedup（id 単位）はこれを止められない。1 反復 1 issue の queue を、答えの出ている問いで毎日埋める"
+ :independent-check "beacon→transport→worker→table を今回コードで追い直し、昨日の実測と同じ結論に至った: router が page! を route 変更(router.cljs:52)と popstate(:91)の両方で呼び、advance! が :vocabulary routes/segments を注入（36 語彙、dwell 行が \"comic\"/\"actresses\" と実名で出ていることが語彙の生存証明）、track-nav! が /_track へ sendBeacon、worker track.cljs の nav 分岐は t=\"nav\" だけで無条件に INSERT。経路に欠陥は無い"
+ :root-cause-of-the-blocked-state "collected-since が `SELECT MIN(day) FROM route_transition_daily` —— **表自身のデータから導出**される。telemetry/read-audience の docstring は『Absent rows mean NOT MEASURED. The caller is given the boundary so it can tell the two apart instead of guessing』と書いているが、行が 0 の表は開始日を答えられないので、約束したその区別をちょうど必要な場面で提供できない。0016 の作成日 2026-08-06 は docstring に散文としてはあるが query には無い"
+ :not-done "read face の修正は提案していない（この skill は問いで終わる。修正の採否は人が決める）。issue の close も cockpit の操作"
+ :note "検証は読み取りのみ。昨日のような実ブラウザ遷移は行っていない（行を書けば collected-since が埋まり判定が変わるが、それは計測対象の捏造になる）"}
+{:site "shinshi.club", :candidates 3, :window {:days 7, :from "2026-08-03", :to "2026-08-09"}, :status :woke, :at "2026-08-09T11:32:32.888Z", :severity "blocked", :error "Error: spawnSync claude ETIMEDOUT", :issue-id "kaizen:shinshi.club:transitions-not-measured:2026-08-03_2026-08-09", :fresh 3}
