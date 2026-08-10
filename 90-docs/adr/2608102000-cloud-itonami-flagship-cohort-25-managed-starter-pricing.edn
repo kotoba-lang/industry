@@ -293,6 +293,46 @@ green に見えたまま何も検査しない」の実例で、今回はさら�
 `workflow` OAuth scope を持たない**（CLAUDE.md に既出の制約）。scope が得られ次第
 checkout 行を足して登録する。
 
+### 追記（同日）— workflow を読む方式をやめ、murakumo native にした
+
+オーナー指示（2026-08-10）「workflow は github は使わずに, murakumo を使うようにして」。
+`gates/github_workflow_run.cljs` 経由をやめ、**`.github/workflows/` を一切読まない**
+`gates/itonami-regenerate.cljs` に置き換えた。25 本すべてをこれで登録している。
+
+**なぜこれが上の『8 本は直せない』を解くのか。** 8 本が落ちていた理由は fleet ではなく
+**workflow が `deps.edn` の `:local/root` を書き写し損ねていた**ことだった。つまり
+「checkout 一覧を人が workflow に書き写す」工程そのものが故障点で、6910 はその工程が
+2026-08-09 に破れたまま誰にも報告されなかった。**依存の正本は deps.edn であって
+workflow ではない** —— そこから推移的に辿れば書き忘れは構造的に起きない。
+
+実測: **8/8 が workflow を 1 行も触らずに PASS**。isic-6910 は workflow が宣言して
+いなかった `inkan` と `jp-go-dds` を含む 5 本、isic-6420 は推移依存 18 本を解決した。
+`workflow` OAuth scope が無いという制約は、**迂回したのではなく無関係になった**。
+
+gate は使い捨て workspace に `orgs/<org>/<repo>` の形で tree を置き（`:local/root` が
+`../../<org>/<x>` と `../<x>` の 2 形なので深さ 2 が要る）、deps.edn を推移的に辿って
+足りない依存を clone し、`clojure -M:dev:render-html` を回し、実行前後の sha256 を
+突き合わせる。
+
+**実装中に踏んだ罠 2 つ（どちらも「相対パスを、それが書かれている場所から解決する」
+という 1 つの原則の違反）**:
+
+1. `../<name>` を「検査対象 repo と同じ org」と決め打ちした。しかし `../<name>` は
+   **推移依存の中**にも現れる —— isic-6420 → kototama（kotoba-lang）→ `../kotoba`。
+   kototama から見れば `kotoba-lang/kotoba` なのに `cloud-itonami/kotoba` を clone
+   しようとして落ちた（6420/6612/6622 の 3 本）。org は解決後の絶対パスから採る。
+2. lib 座標（`io.github.<org>/<name>`）から org を導こうとした。isic-6910 は
+   `io.github.com-junkawasaki/langchain-clj` が `../../kotoba-lang/langchain` を指す ——
+   改名前の座標が残っており座標と実 repo が一致しない。**パスの方が正しい。**
+
+### gate が見つけた 2 つ目の本物の欠陥 — 公開中の demo が古かった
+
+**isic-5210 の公開 demo は tank-7/8/9 の 3 基が抜けていた。** 夜間再生成が止まって
+いた 08-04 以降に actor の出力へ入ったデータで、`operator-console.html` だけが
+古いまま公開され続けていた。sha256 の drift として検出し、再生成して着地させた
+（`c23fd22`）。**committed 済みの値を読むだけの経路では原理的に検出できない種類の
+ずれ**で、これがこの gate を作った理由そのものである。
+
 ### まだ確かめていないこと（正直に）
 
 - **実ノードでの 1 周は回していない。** 検証はすべてこの macOS 上で、gate を
