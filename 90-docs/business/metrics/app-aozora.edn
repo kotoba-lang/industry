@@ -1,30 +1,30 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 16355,
-  "app-aozora-appview" 13952,
-  "app-aozora-spa" 7001},
+ {"app-aozora-pds" 16459,
+  "app-aozora-appview" 14012,
+  "app-aozora-spa" 7108},
  :zone
- {:requests-7d 922578,
-  :pageviews-7d 5482,
-  :uniques-7d-sum 879,
+ {:requests-7d 928732,
+  :pageviews-7d 5565,
+  :uniques-7d-sum 881,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 961077}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1648}
-   {:path "/federation-pilot/did.json", :requests 155}
-   {:path "/hito-federates/did.json", :requests 87}
-   {:path "/hito-postfix-fed/did.json", :requests 79}
-   {:path "/hito-verify-clean/did.json", :requests 76}
-   {:path "/hito-final-verify/did.json", :requests 76}
-   {:path "/hito-diag-fed/did.json", :requests 75}],
-  :status-mix {:ok 965617, :client-error 140493, :server-error 7936},
+  [{:path "/v1/datoms", :requests 962166}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1651}
+   {:path "/federation-pilot/did.json", :requests 151}
+   {:path "/hito-federates/did.json", :requests 90}
+   {:path "/hito-diag-fed/did.json", :requests 80}
+   {:path "/hito-postfix-fed/did.json", :requests 78}
+   {:path "/", :requests 75}
+   {:path "/hito-verify-clean/did.json", :requests 74}],
+  :status-mix {:ok 966739, :server-error 8214, :client-error 28372},
   :window "24h"},
  :as-of "2026-08-10",
- :traffic-quality {:window "24h", :probe-4xx-pct 13, :error-5xx-pct 1},
+ :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 961077 · /xrpc/com.atproto.sync.subscribeRepos 1648 · /federation-pilot/did.json 155 · /hito-federates/did.json 87 · /hito-postfix-fed/did.json 79 | 4xx(probe) 13% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 962166 · /xrpc/com.atproto.sync.subscribeRepos 1651 · /federation-pilot/did.json 151 · /hito-federates/did.json 90 · /hito-diag-fed/did.json 80 | 4xx(probe) 3% · 5xx 1%",
  :signal
- "aozora.app 実測 922578 req/7d・879 uniques(日次和)・うち4xx probe 13%(24h)、workers 37308 inv/7d"}
+ "aozora.app 実測 928732 req/7d・881 uniques(日次和)・うち4xx probe 3%(24h)、workers 37579 inv/7d"}
