@@ -75,14 +75,37 @@
      使える種類のもの。lock / admission / 再現性の主張に CLI 出力の
      `sourceDigest` / `kirDigest` を使わないこと（DefCID が封じている
      effect row・desugar contract version を含まないため）。
-   - identity payload が要求する 6 要素（typed KIR / profile-version /
-     desugar-contract-version / effect-row / interface / 直接依存）は compiler が
-     既に全部持っている。**配線の問題であって設計の問題ではない。**"
+   - **【2026-08-10 訂正】初版はここに『identity payload が要求する 6 要素は
+     compiler が既に全部持っている。配線の問題であって設計の問題ではない』と
+     書いた。それは誤りだった。** 実際に配線しようとして 2 つが取れないことが
+     分かった:
+
+     | 封印される入力 | 実態 |
+     |---|---|
+     | typed KIR | 取れる（`compile-source` の `:kir` の `:functions`） |
+     | effect-row | 取れる（関数の `:effects`） |
+     | interface | 取れる（HIR の `:param-types` / `:result`） |
+     | 直接依存 | 閉じたモジュールなので KIR body から辿れる |
+     | **desugar-contract-version** | **fleet 全体に生成側が無い。** kotoba-lang の テスト・ベクタ・conformance・fixture generator にしか現れず、compiler は desugar のバージョンをどの名前でも追跡していない |
+     | **profile-version** | **出典が食い違う。** compiler の `guest-grammar.edn` は 6、kotoba-lang の `version-policy.edn` の `:release/language-profile` は 5、凍結ベクタは 4 と 5 を使う。identity 用に compiler が読む単一の権威が無い |
+
+     **この 2 つを埋めるには値を発明するしかなく、その 2 つこそ『発明された
+     同一性』を防ぐために存在する。** `desugar-contract-version` の docstring は
+     『a definition CID must never claim semantic equivalence across a desugar
+     change』と書いている。適当な値を入れた `kotoba -M defcid` は、無いより悪い
+     —— 出てくる CID が canonical に見えて何も封印していない。
+
+     したがって **`defcid` は配線ではなく、先に 2 つの authority を作る作業**。
+     ①compiler が desugar contract のバージョンを持ち、desugar が変わったら上げる
+     ②identity 用の profile-version の出典を 1 つに決める。どちらもオーナー判断を
+     要する設計であって、agent が既定値で埋めてよいものではない。"
 
   :adr/next
-  "- `kotoba -M defcid <file>`（または `inspect` の出力に `:definition-cid` を
-     足す）。identity payload の 6 要素は既に揃っているので新しい計算は要らない。
-   - `:test-definition-cid` を `:test-kir-sha256` 等へ改名する（名前が嘘をついている）。
+  "- `kotoba -M defcid <file>` は **上の 2 つの authority が決まるまで着手しない**。
+     ①compiler が desugar contract version を持つ ②identity 用 profile-version の
+     出典を 1 つに決める。どちらもオーナー判断。
+   - ~~`:test-definition-cid` を改名する~~ **完了**（amu `3b45ae1`、
+     `:test-kir-sha256`。テストは旧キーが不在であることも assert する）。
    - CLI が DefCID を出せるようになったら、`lang/code-identity-conformance` の
      positive/negative を CLI 経由でも回して cross-implementation を CLI 面まで
      広げる。"
