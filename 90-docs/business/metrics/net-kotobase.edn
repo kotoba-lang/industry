@@ -1,26 +1,24 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 25217, "kotobase-cf-wasm-staging" 57848},
+ {"net-kotobase" 25485, "kotobase-cf-wasm-staging" 58389},
  :zone
- {:requests-7d 96041,
-  :pageviews-7d 973,
-  :uniques-7d-sum 905,
+ {:requests-7d 99587,
+  :pageviews-7d 976,
+  :uniques-7d-sum 909,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
   [{:path
     "/bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7ozvqjidfdwsj3ht6cxjaqe",
-    :requests 10}
+    :requests 15}
    {:path
     "/etzhayyim-xyz-farcaster-fnames/SHA256E-s43336--1fbf35eb1b428d06f58fbfd68cbdd6e391d83117dcc09107ac17a83cbb58bddb.json",
     :requests 9}
    {:path
     "/etzhayyim-xyz-farcaster-fnames/SHA256E-s43142--75346b7d89a0a3832c375647309adb1a1658d7da92e486b552e410a3b495a598.json",
     :requests 8}
-   {:path "/_diag/health", :requests 7}
-   {:path "/passkey.js", :requests 7}
    {:path
     "/kura-phase0-b2/s3-kotobase/blocks/bafkreie5cj5tj2vomz53no5ti46ef62djziroqmhnzmgpadkave74ksayu",
     :requests 6}
@@ -28,9 +26,15 @@
     "/etzhayyim-xyz-farcaster-fnames/SHA256E-s43763--43093c1b72f74395401beaeddc9ae5728e42b5166a17544a9aee646accd0b2a8.json",
     :requests 6}
    {:path
-    "/kura-phase0-b2/s3-kotobase/blocks/bafkreifhber2nul3nfwznlaocfg7mjjsu35lr3zfkb2l4bkfhgk6r7lblm",
-    :requests 5}],
-  :status-mix {:client-error 417, :ok 439, :server-error 65},
+    "/kura-phase0-b2/s3-kotobase/blocks/bafkreicsaujlhvlixz4hwwqiqm4rz7fmec7feuwl3r5p3trfsalat7trsa",
+    :requests 5}
+   {:path
+    "/kura-phase0-b2/s3-kotobase/blocks/bafkreielpedeq43674eo6jjdmerg2fxkwmroogkz5n5jxurxnbrygy52aq",
+    :requests 5}
+   {:path
+    "/kura-phase0-b2/s3-kotobase/blocks/bafkreidioxr6a27jzr2jkleq2qhg233msed5fxw7jgcyondx6g4vao7zzu",
+    :requests 4}],
+  :status-mix {:client-error 384, :ok 395, :server-error 51},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -42,12 +46,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-10",
- :traffic-quality {:window "24h", :probe-4xx-pct 45, :error-5xx-pct 7},
+ :traffic-quality {:window "24h", :probe-4xx-pct 46, :error-5xx-pct 6},
  :top-paths
- "上位 page (24h, 2xx/3xx): /bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7oz… 10 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 9 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 8 · /_diag/health 7 · /passkey.js 7 | 4xx(probe) 45% · 5xx 7%",
- :funnel {:visitors 2588, :signups 20, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7oz… 15 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 9 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 8 · /kura-phase0-b2/s3-kotobase/blocks/bafkr… 6 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 6 | 4xx(probe) 46% · 5xx 6%",
+ :funnel {:visitors 2592, :signups 20, :checkouts 0},
  :signal
- "kotobase.net 実測 96041 req/7d・905 uniques(日次和)・うち4xx probe 45%(24h)、workers 83065 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 99587 req/7d・909 uniques(日次和)・うち4xx probe 46%(24h)、workers 83874 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -56,6 +60,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 1059},
+ {:visitors {:openai-ads 3, :organic 1063},
   :signups {:organic 17}, 
   :checkouts {}}}
