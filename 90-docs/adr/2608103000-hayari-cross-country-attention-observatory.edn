@@ -209,7 +209,7 @@ search page だけで、meta フィルタ後に 0 行になっていた —— *
   普通の記事に見えるので、Wikidata にしか見えない。
 - **kinds 表を 21 → 44 種。** 未分類を生んだ P31 を頻度順に数えて選んだ（推測ではない）。
   label は全件 live API で確認し、**1 件は推測が外れていた**（Q35252665 は
-  "Wikimedia" ではなく "MediaWiki" non-main namespace）。
+  「Wikimedia」ではなく「MediaWiki」non-main namespace）。
 - **日付は P577 → P571 → P1191 → P580 の順に落とす。プールしない** ——
   プールすると 2024 年の作品が 1963 年の franchise の日付になる。どれが答えたかを
   `:hayari/dated-via` に残す。
@@ -270,6 +270,73 @@ CLAUDE.md が警告する pin 退行の実例で、**wholesale な west.yml comm
 改めて示している。同 commit は hirameki / hirameki-patents の pin も動かしており、
 その 2 件は `gh api compare` が 404 を返す（base commit が remote に無い）が、
 別セッションの進行中の作業なので触っていない。
+
+## 第 3 波（2026-08-10、pin a7a66460）— 分類の深さ
+
+オーナー指示「さらに成熟度を向上して、例えば、ドラマ、アニメ、人物、化学なども」。
+
+### P31 はドラマとアニメを区別できない（実測）
+
+深めに行く前に、既存の軸で足りるかを確かめた。**足りなかった。**
+
+```
+進撃の巨人   P31: manga series        P136: adventure anime and manga, dark fantasy anime and manga
+鬼滅の刃     P31: manga series        P136: dark fantasy, adventure anime and manga
+ひよっこ     P31: television series   P136: drama television series
+半沢直樹     P31: television series   P136: drama television series
+愛の不時着   P31: television series   P136: romantic comedy, drama
+新世紀エヴァ P31: anime television series  P136: drama anime, mecha, science fantasy
+```
+
+**P31 が言うのは「どういう形式で世に出たか」だけ**で、ドラマとアニメを分けているのは
+**P136（genre）**である。同じ理由で**人物の P31 は必ず `Q5`** なので、俳優と政治家と
+アスリートを分けるのは **P106（occupation）**だけ。人物は毎日いちばん多い階級だった。
+
+したがって `:hayari/genres` と `:hayari/occupations` を出す。**ラベルは収集時に引く** ——
+職業は数千種あり、手入力の対応表は必ず、しかも気付かれずに陳腐化する。
+`data/kinds.edn` が手書きでいられるのは頭が短くて実測されているからで、この 2 つは
+そうではない。
+
+### kinds 表 44 → 91 種。ただし出所を 2 つに分けて明記した
+
+`[MEASURED]` は実際の未分類の尾を頻度順に数えて選んだもの。`[BREADTH]` は
+**まだ観測されていない**語彙（化学・医学・天文・生物）で、オーナーが名指しした
+「化学」を含む。**lookup 行を足すことは観測を捏造することではない**が、
+**表の大きさが「何を見たか」の証拠として読まれてはならない**ので、
+`data/kinds.edn` の中で 2 つを分けてある。
+
+### 領域 roll-up と、領域単位の XMILE
+
+`data/domains.edn`（culture / person / science / sport / event / organisation /
+place）で 90 種余りの kind を畳む。`simulate --by domain` は同じ stock モデルを
+領域の集約に当てる —— 問いが「この映画はどれだけ速く忘れられたか」ではなく
+「この国の注目は、文化と出来事とで違う速さで抜けるのか」になる。
+
+実測（2026-08-08）: `person λ=0.1947 half-life=3.56d r²=0.897`、
+`culture λ=-0.0595 growing`。**領域が付かなかった行は `unmapped` として集約に残す** ——
+表が取りこぼした分を黙って除くと、合計が実際より小さいのに全体を表しているように読める。
+
+### 途中で見つけた欠陥 2 件
+
+- **`domain-of` が `namespace` だけを使っていた。** 名前空間なしのキーワード
+  （`:person` `:manga` `:event`）では nil になり、**いちばん大きい階級である
+  `:person` が丸ごと軸から落ちていた**。周りの名前空間つき kind は正常に見えていた。
+- **Wikimedia 内部項目が 3 種、まだ subject として生き残っていた**
+  （`Wikimedia internal item` / `Wikimedia artist discography` /
+  `MediaWiki main namespace page`）。第 2 波の ns 判定でも P31 判定でも漏れており、
+  未分類の尾を数えて初めて見えた。
+
+### 効果（同一日 2026-08-08、全 249 国での前後比較）
+
+| | 前 | 後 |
+|---|---|---|
+| kind 未分類 | 141 | **85** |
+| 分類率 | 81.3% | **88.2%** |
+| domain 集約 | — | **638（unmapped 0）** |
+| genre 付与 | — | **226** |
+| occupation 付与 | — | **369** |
+
+テストは 26 件 / 110 assertion（決定核 21/92 + XMILE 結合 5/18）。
 
 ## 登録済み runner での実測（これが landed の根拠）
 
