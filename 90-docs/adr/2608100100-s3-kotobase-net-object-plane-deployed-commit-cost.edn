@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "ADR-2608100100"
-  :adr/title "s3.kotobase.net: object plane を deploy し、書き込み経路を同期 trampoline から外した（40.6s/1102 → 4.4s/200）"
+  :adr/title "s3.kotobase.net が使えるようになるまでの 3 段（40.6s/1102 → 0.89s/200、annex 2.6 → 229 obj/min）"
   :adr/status "accepted"
   :adr/date "2026-08-10"
   :adr/last_verified "2026-08-10"
@@ -136,26 +136,57 @@
    **『対照を走らせた』と『対照が成立した』は別**で、前者だけで gate を
    有効と報告しかけた。
 
-   ## 残る天井: 1 graph の head CAS
+   ## 第 3 段: bucket ごとに chain を分けた
 
-   jobs を 4 → 8 に倍にしても 8.4 → 9.6 obj/min にしかならない。**並列度で伸びない
-   ＝律速は 1 リクエストの往復ではなく、単一 graph の head CAS の直列化。**
-   14,495 objects なら約 25 時間（resume 可能なので実務上は許容範囲）。
+   write path を直したあとも、**1 dataset の copy を回している間、無関係な
+   別 bucket への PUT が `503 state write conflict, retry` で落ちた。**
+   しかもそれは**サイズ上限のように見えた** —— 64KB 失敗 / 256KB 失敗 /
+   512KB 失敗 / 768KB 成功。単調でないことに気づいてレスポンスボディを読むまで、
+   「1MB 級の directory.plc は載らない」と結論しかけた。**サイズには何の問題も
+   無く、writer が居る必要のない競争に巻き込まれていただけ。**
 
-   次に効くのは **s3 を共有 admin graph から bucket 単位 graph へ分けること**
-   （`graph/for-request` は s3 を shared graph に送っている。atproto の per-DID
-   graph という前例がある）。ただし**これは dataset 間の競合を消すだけで、
-   1 bucket 内の並列度は上げない** —— そこを上げたいなら metadata 書き込みを
-   CAS 経路から外す設計が要る。どちらも着手前に測る。
+   これでこのセッション 3 回目 —— *live surface を測るとき、自分が唯一の client か
+   を先に確かめる*。3 回とも同じ根で、3 回目は**自分でその教訓を ADR に書いた後**に
+   踏んでいる。書くことと使うことは別。
+
+   書き込みは自分の graph を hydrate → commit → **head 1 本を CAS** する。同じ
+   graph に書く 2 者は必ず直列化する。bucket が自然な境界なのは、client が
+   addressing に使う単位そのもので、R2 の `objects/*` が名前に使う単位でもあり、
+   **datom 面で bucket を跨いで join するものが無い**から（listing は 1 bucket に
+   閉じ、bytes はどのみち block 面）。
+
+   | | 第 1 段（object plane） | 第 2 段（async reader） | 第 3 段（per-bucket） |
+   |---|---|---|---|
+   | PUT 24 バイト | 40s / 1102 | 5.0s / 200 | **0.89s / 200** |
+   | GET | — | 5.7s | **0.94s** |
+   | DELETE | 40s / 1102 | 8.6s | **0.65s** |
+   | annex copy | 2.6 obj/min | 16.5 obj/min | **229 obj/min**（3 dataset 並列） |
+
+   0.89s になったのは chain が小さいから（novelty 2 対 共有 graph の 63）。
+   45,000 objects 全部で約 3.3 時間 —— 最初の見積り 4 日から二桁縮んだ。
+
+   **bucket 内の並列度は上がっていない。** そこは今も head 1 本・writer 1 人で、
+   jobs=4 なら約 10% が CAS 競合で retry になる（データ損失ではなく再実行で回収）。
+   上げるには metadata 書き込みを CAS 経路から外す設計が要る —— **今回はやって
+   いない**し、必要になるまでやらない。
+
+   ### 移行の代償を隠さない
+
+   既存 object は共有 graph に居るので新しい chain からは見えない。format 追加では
+   なく**切り替え**なので、annex 側は presence を測り直す必要がある:
+   `git annex fsck --from kotobase --fast`。fnames で実施して **527 → 7 に訂正**され、
+   再 copy した。**annex が「ある」と記録していることと、実際にあることは別** ——
+   fsck を省いていたら、custody を主張しながら実体の無い 520 件が残っていた。
 
    ## 残しているもの
 
-   - live は version 9c8711b5、net-kotobase main `641b080` と一致。
-   - `xyz.farcaster.fnames` の annex copy を background で継続中
-     （jobs=6、log は scratchpad の `annex-copy-kotobase.log`）。完了後に
+   - live は version 7a6726ad、net-kotobase main `a609e31` と一致。
+   - 3 dataset すべてに kotobase remote を登録し、copy を並列実行中
+     （`requeststyle=path` が要る —— 無いと git-annex は
+     `<bucket>.s3.kotobase.net` を引いて DNS で落ちる）。log は scratchpad の
+     `copy-<dataset>.log`。完了後に
      `annex-custody-verify.cljs --names xyz.farcaster.fnames` を回すこと ——
      **1 ファイルの whereis を custody の証拠にしない**（ADR-2608059100）。
-   - directory.plc / software.diaspora.nodeinfo への kotobase remote 追加は未着手。
    - engine 側に書いた object seam の実装は破棄（main の設計が優先）。写しは
      scratchpad の `superseded-seam/`。"
 
