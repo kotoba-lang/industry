@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  com.gftd.hirameki-mirror.plist — 特許 corpus の第 2 の耐久コピーを B2 に置き、
+  置いた直後に復元して確かめる。ADR-2608100400 の custody 穴。
+
+  ⚠ このファイルのコメントに 2 連ハイフンを書かないこと。XML のコメントは
+  それを含められないので、書いた瞬間 plist が壊れる。壊れた plist は
+  エラーを出して落ちるのではなく launchd が読み込まないだけなので、
+  「設定したのに一度も走っていない」という一番気付きにくい壊れ方をする。
+
+  なぜ日次か（収集は 4h ごとなのに）:
+  bundle は履歴を丸ごと含む 1 ファイルなので、毎回まるごと作り直す。corpus は
+  1 日 120 件ほど伸びるので、日次で 1 世代あれば失う上限は 1 日分である。
+  4h ごとに回すと同じものを 1 日 6 回書くことになり、得るものは「失う上限が
+  4 時間分」だけで、B2 側の世代数と転送が 6 倍になる。
+
+  なぜ harvest と別 plist か:
+  収集と保管は別の失敗をする。収集が止まっても保管は続くべきだし、B2 が落ちても
+  収集は続くべきである。1 つの plist に入れると、どちらが落ちても両方止まる。
+
+  なぜ bundle で annex ではないか:
+  corpus は 780 KB の EDN で git が最も得意な領域であり、annex 化すると正本に
+  対する git diff と git blame を失って何も得ない。足りないのは
+  content-addressed store ではなく 2 人目の custodian なので、履歴を丸ごと含む
+  1 ファイルを object store に置く。bundle は annex より強い性質を 1 つ持つ:
+  GitHub が消えても bundle 1 つから repo 全体が復元できる。
+
+  秘密情報は plist に書かない（world-readable）。鍵は scripts/b2-creds.cljs が
+  kagi / Keychain から解決する。launchd 下では kagi が Keychain unlock prompt を
+  出せないので、Keychain ミラー（service b2:gftdcojp-m365-annex）が使われる。
+
+  導入:
+    cp scripts/fleet-ci/com.gftd.hirameki-mirror.plist ~/Library/LaunchAgents/
+    plutil -lint ~/Library/LaunchAgents/com.gftd.hirameki-mirror.plist
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.hirameki-mirror.plist
+  動いているかを見る:
+    tail 90-docs/observatory/hirameki-mirror.ledger.edn
+    mirror/restored が false の行は「置いたが復元できていない」であって、
+    それはバックアップではなくバックアップの主張である。
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.gftd.hirameki-mirror</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd /Users/junkawasaki/github/com-junkawasaki &amp;&amp; exec /opt/homebrew/bin/nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/secret-resolve/src" scripts/hirameki-mirror.cljs</string>
+  </array>
+
+  <!-- 03:53。fleet-ci-sweep (4:17) / newsfeed-ingest (5:23) / observatory-run (:11)
+       / hirameki-harvest (:37) のどれとも衝突させない。同時刻に走らせると
+       どちらの負荷か切り分けられない。 -->
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>3</integer>
+    <key>Minute</key><integer>53</integer>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/hirameki-mirror.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/hirameki-mirror.err</string>
+</dict>
+</plist>
