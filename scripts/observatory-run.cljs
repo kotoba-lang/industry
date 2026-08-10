@@ -125,6 +125,36 @@
 
       :else false)))
 
+(defn- feeder-age-hours
+  "Hours since the newest SUCCESSFUL run in an observatory's feeder ledger,
+  or nil when there is no ledger file.
+
+  ## なぜこれが要るか
+
+  観測 actor の gate は「beat が datom を出したか」しか見ない。だが多くの actor は
+  **自分では取得しない** —— 別の常駐（外向き fetch を持つ側）が corpus を伸ばし、
+  観測はそれを読むだけである。取得が止まっても観測 beat は正常に走り、内容が
+  変わらないので冪等に no-op し、**gate は緑のまま**になる。
+
+  これは仮説ではない: hirameki の元になった収集は 2026-07-28 に止まり、13 日間
+  誰も気づかなかった。可視化はしたが、見張りは無かった。
+
+  そこで registry の `:feeder` が「この actor の入力を誰が、どれくらいの間隔で
+  養っているか」を宣言し、**その台帳が古ければ actor 自身が健康でも失敗させる**。"
+  [o]
+  (when-let [{:keys [ledger]} (:feeder o)]
+    (let [p (abs ledger)]
+      (when (exists? p)
+        (let [newest (->> (str/split-lines (slurp p))
+                          (remove #(or (str/blank? %) (str/starts-with? (str/trim %) ";;")))
+                          (keep #(try (edn/read-string %) (catch :default _ nil)))
+                          (filter :run/ok)
+                          (keep :run/at)
+                          (map #(.getTime (js/Date. %)))
+                          (reduce max 0))]
+          (when (pos? newest)
+            (/ (- (.now js/Date) newest) 3600000.0)))))))
+
 ;; --registry は gate の自己検査用（『この gate は落ちるのか』を別の登録簿で
 ;; 確かめるため）。運用では既定の manifest/observatories.edn を使う。
 (def registry
@@ -271,7 +301,7 @@
 ;; 下位互換の梯子。observed の rank が expect の rank 以上なら合格。
 ;; :produces-datoms-idempotent を :produces-datoms の**下**に置くのが要点 ——
 ;; 毎周伸びるはずの watari が伸びなくなったら、それは下振れとして落ちる。
-(def rank {:known-broken 0 :runs-empty 1 :runs-ok 2 :produces-files 3
+(def rank {:feeder-stale 0 :known-broken 0 :runs-empty 1 :runs-ok 2 :produces-files 3
            :produces-datoms-idempotent 4 :produces-datoms 5})
 
 ;; ── main ────────────────────────────────────────────────────────────────
@@ -299,8 +329,25 @@
              (assoc base :observed :absent))
 
          check-only?
-         (do (println (str "  · " (:name o) " — 登録 OK / checkout 有り"))
+         (do (println (str "  · " (:name o) " — 登録 OK / checkout 有り"
+                           (when-let [f (:feeder o)]
+                             (let [h (feeder-age-hours o)]
+                               (str " / feeder " (if h (str (Math/round h) "h 前")
+                                                     "台帳なし")
+                                    "（上限 " (:max-age-hours f) "h）")))))
              (assoc base :observed :not-run))
+
+         ;; 入力を養っている常駐が止まっていれば、actor 自身が健康でも失敗。
+         ;; **台帳が無い場合は失敗させない** —— observatory-run は daemon が
+         ;; 走っていないマシンでも実行されうるので、不在は「止まった」ではなく
+         ;; 「ここでは走っていない」を意味しうる。古いことだけが証拠になる。
+         (let [f (:feeder o) h (and f (feeder-age-hours o))]
+           (and h (> h (:max-age-hours f))))
+         (let [h (feeder-age-hours o)]
+           (println (str "  ✗ " (:name o) " — feeder が " (Math/round h)
+                         "h 止まっている（上限 " (get-in o [:feeder :max-age-hours])
+                         "h）: " (get-in o [:feeder :ledger])))
+           (assoc base :observed :feeder-stale))
 
          (and due-only? (not (due? o)))
          (do (println (str "  · " (:name o) " — まだ間隔内（"
