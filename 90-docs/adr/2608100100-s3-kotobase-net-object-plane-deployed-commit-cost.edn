@@ -250,9 +250,64 @@
    独立性の主張に使わないこと。**どの bucket かは未確認**（`BLOB_BUCKET` は secret で
    読み戻せない）。独立性が要るなら 3 本目を別プロバイダに置く。
 
+   ## 安定化: 見えなかった 2 つを検査にした（2026-08-10）
+
+   このセッションの障害は 2 つとも「壊れていたこと」より「**壊れているのが
+   見えなかったこと**」が高くついた。どちらも検査は安い。
+
+   **(1) 空の annex credential**（`scripts/annex-custody-verify.cljs`）。
+   `.git/annex/creds/<uuid>` が 2 フィールド未満なら fail する。**空の資格情報で
+   署名した 403 は、HTTP 層では失効した鍵と区別が付かない** —— だから推論では
+   出ず、見るしかない。値は読まない（`--report` はディスクに落ちる）。
+   `--self-test` が空と正常の fixture を実際に作り、前者を落とし後者を通すことを
+   確かめる ——**これが無いと「常に何も出力しない行」と区別が付かない。**
+
+   **(2) engine scan の async reader**（`scripts/fleet-ci/gates/net-kotobase-hermetic-check.cljs`
+   の check F）。ソースを走査して `eng/hot-datoms` / `eng/fold!` を
+   `async-get-fn` 無しで呼ぶ call site があれば fail する。同じ実行で検出器が
+   対照（引数を欠いた合成呼び出し）を検出できることも確かめる。
+   **repo 側の `npm test` にも同じ検査があるが、この org の Actions は死んでおり
+   ノードは npm を回せないので、実際に走る唯一の場所が fleet gate である。**
+   ソースを読むだけなので、gate 冒頭の「protocols-worker は持ってこられない」
+   （npm/shadow-cljs が要る）制約には当たらない。
+
+   ### この gate は現在、上記とは無関係に赤い
+
+   check B（metadata）が **GitHub Actions の action pin drift** と `ruby` で落ちる。
+   **退役させた CI システムの検査が gate 全体を赤くしており、他の 5 検査の信号が
+   見えない** —— ADR-2607300900 の「動いていない CI より無い CI」と同じ構図が、
+   今度は gate の内側で起きている。直すなら Actions 由来のサブ検査を fleet 文脈で
+   非致命にするか、check-metadata から外すかだが、**検査を弱める判断なので
+   勝手にやらない**。fleet receipt から「いつから赤いか」は確認できていない。
+
+   ## kotobase 経由は B2 直の 1/81（測って初めて分かった）
+
+   custody を進めるために両経路を同時に走らせて実測した:
+
+   | 経路 | スループット | 失敗 |
+   |---|---|---|
+   | `git annex copy --to b2`（S3 PUT 直） | **3,172 obj/min** | 0 |
+   | `git annex copy --to kotobase` | **39 obj/min** | 0 |
+
+   ⚠ **この 2 つは同時に測っており、独立ではない** —— kotobase の blob 書き込みも
+   B2 に行くので、両者は同じ backend と同じ回線を奪い合っている（kotobase 単独では
+   124 obj/min だった）。それでも桁は動かない。
+
+   意味するところ: **支配的なコストは bytes ではなく datom 面の記帳である。**
+   object 1 件ごとに bucket の chain を hydrate → commit → CAS する（bucket 内は
+   直列、約 0.9s）のに対し、B2 直は PUT 1 本。**bulk custody が目的なら B2 に
+   直接置くのが正しく、kotobase 面の価値はスループットではなく索引・監査・
+   query 可能性にある。** 両方に置くのは冗長ではなく、役割が違う。
+
    ## 残しているもの
 
    - live は version c037771f、net-kotobase main `4388dd0` と一致。
+   - custody の現在地（2026-08-10 時点、copy は継続中）:
+     fnames 917/14,495(kotobase) · 6,787/14,495(b2) /
+     directory.plc 1,098/4,000 · **4,000/4,000(b2 完了)** /
+     nodeinfo 1,287/26,470 · 12,084/26,470。
+     **b2 側が先に揃う**（上の 81 倍差）ので、off-machine コピーの確保は
+     b2 経路が先に達成する見込み。
    - 3 dataset すべてに kotobase remote を登録し、copy を並列実行中
      （`requeststyle=path` が要る —— 無いと git-annex は
      `<bucket>.s3.kotobase.net` を引いて DNS で落ちる）。log は scratchpad の
