@@ -27,7 +27,7 @@
     (when-not (exists? p) (fail! "legacy inventory path is missing" {:id id :path p}))))
 
 (let [allowed (set (map :dependency-file (:cutover/legacy-inventory contract)))
-      dependency-files ["orgs/kotoba-lang/compiler/deps.edn"
+      dependency-files ["orgs/kotoba-lang/amu/deps.edn"
                         "orgs/kotoba-lang/kototama/deps.edn"
                         "orgs/kotoba-lang/aiueos/deps.edn"
                         "orgs/kotoba-lang/kotoba/deps.edn"]]
