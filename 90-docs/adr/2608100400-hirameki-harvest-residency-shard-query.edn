@@ -196,16 +196,64 @@ journal で直したのと同じ形が actor 側に残っていた。
     seeds.edn  206,269 B / 2 行    → 128,255 B / 1,134 行（1 seed 1 行）
 
 移行は queue から 688 件を除去した。旧 daemon の `:exhausted` は seed id ではなく
-`"source|seed|p1"` の pair key だったので、id 照合だけでは**取得済みの seed が 688 件
+`\"source|seed|p1\"` の pair key だったので、id 照合だけでは**取得済みの seed が 688 件
 queue に残り**、1 件ずつ tick と request を消費して `already-known` を学ぶだけだった。
 corpus に対して dedup することが修復であり、同時に規則でもある。
 
+## どこで安定化させるか — cloud-itonami か murakumo か（2026-08-10 実測）
+
+### murakumo.cloud はスケジューラではない
+
+fleet の駆動元 `com.gftd.fleet-ci-tip-tick` は **operator マシンの launchctl に居る**。
+10 台の mac-mini は operator の tick が配ったものを実行する**実行ファブリック**で、
+独立した時計を持たない。**つまり murakumo に移しても単一障害点は消えず、継承する。**
+加えて fleet の不変条件「ノードにはテストだけを配り、秘密情報を配らない」があるので、
+corpus への push credential はノードに置けない。収集の移送先としては構造的に不適合。
+
+### cloud-itonami には独立した時計がある
+
+実測: このアカウントに **Worker が 116 本デプロイ済み**、うち cloud-itonami 系が 18 本。
+そして **cloud-itonami-domain-reverify に稼働中の Cron Trigger がある**
+（17 3 * * *、2026-07-26 作成）。Cloudflare Cron Triggers は Cloudflare 側で走るので、
+**このマシンが落ちていても動く** —— 今まさに欠けている性質そのもの。
+
+harvest の仕事は Worker に載る: fetch · parse（パーサは .cljc で nbb 実証済み、
+同じ runtime 系）· corpus への commit（**GitHub API**。JVM も git バイナリも不要）。
+
+### 決定 — 3 つに割る（均等ではない）
+
+| レグ | どこ | 理由 |
+|---|---|---|
+| **収集** | cloud-itonami の Worker + Cron | 止まってはいけないのはこれ。Worker に載る唯一のレグ |
+| **検査** | murakumo fleet（jvm-test gate） | fleet の本来の形。**書き手と検証者が別になる** |
+| **ミラー・観測 beat** | operator マシン | git bundle と JVM が要る。止まって失うのはバックアップの鮮度であってデータではない |
+
+この順序は深刻さの順でもある。実際に一度起きた失敗は「収集が止まる」だった。
+
+### 検査を fleet に出した（実装済み）
+
+gates.edn に hirameki-patents を jvm-test gate として登録した。corpus 側の検査ロジックを
+src/hirameki_patents/checks.clj に切り出し、CLI 2 本は薄いラッパに、:test alias が
+両方を clojure.test として回す（実装は 1 つ。2 つに分裂させない）。
+
+**なぜこれが冗長性以上の意味を持つか。** これまで corpus を書いたマシンが唯一の検証者
+だった。ノードは git tree しか持たないので、書き手と検証者がようやく別の主体になる。
+
+**:cd false** —— この repo の pin を fleet に自動前進させない。corpus は daemon が
+1 日 6 回 push するので、自動追従させると west.yml が 1 日 6 回動く。
+**pin は引用であって鏡ではない。**
+
+gate は 3 種の破損で落ちることを確認した（corpus shard に 1 バイト追記 → CID 不一致 /
+datoms shard を 1 つ削除 → 件数不一致 / inventor 属性を混入 → G6）。健全時は通る。
+空の corpus で通らないよう下限も入れた（100 特許超・1000 datom 超）——
+空で満足する gate は削除された corpus でも満足する。
+
 ## 残っている穴
 
-1. **単一マシン依存。** すべて operator マシン常駐で、フェイルオーバーは無い。
-   fleet ノードに配らない判断（並列化は礼儀違反 / 書き込みに鍵が要る）は維持するが、
-   **そのマシンが落ちれば収集は止まる**。`:feeder` は止まったことを検出するが、
-   検出結果を読む者が居るかは別問題（observatory-run の出力を誰が見るか）。
+1. **収集がまだ operator マシンに居る。** 移送先は上の決定のとおり cloud-itonami の
+   Worker + Cron で、前提（Workers 面が稼働している）は実測で確認したが、**移植そのものは
+   未着手** —— tick loop を local git から GitHub API に書き直す必要がある。検査は fleet に出した。
+   **`:feeder` の検出を読む者が居ない**のも未解決（observatory-run の出力を誰が見るか）。
 2. **LaunchAgent の再起動生存は未検証**（plist は所定の場所にあり bootstrap 済み）。
 3. **CPC が無い**（USPTO ODP key が operator ステップ）。
 4. **content remote 未設定**（annex に入れるものが無いため）。

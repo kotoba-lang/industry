@@ -80,6 +80,20 @@
   {:name "tech-ipfs-specs-ipns" :gate :jvm-test :cd true}
   {:name "kotoba-delta" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd true}
 
+  ;; hirameki-patents は**コードではなくデータ**の repo。gate が検査するのは
+  ;; 「テストが通るか」ではなく「公開した corpus がバイトと問いの両方で健全か」——
+  ;; shard の CIDv1 と件数合計（verify）、datom として transact して答えられるか、
+  ;; G1/G2/G6 が公開物の側で成立するか（query-check）。
+  ;;
+  ;; **なぜ fleet に出すのか。** これまで corpus を書いたマシンが唯一の検証者だった。
+  ;; ノードは git tree しか持たないので、書き手と検証者がようやく別になる。
+  ;; 4 時間ごとに corpus が書き換わるので、gate が回る頻度もそれに追従する。
+  ;;
+  ;; :cd false —— この repo の pin を fleet に自動前進させない。corpus は daemon が
+  ;; 1 日 6 回 push するので、pin を自動追従させると west.yml が 1 日 6 回動く。
+  ;; pin は引用であって鏡である（ADR-2608100400）。
+  {:name "hirameki-patents" :gate :jvm-test :cd false}
+
   ;; ISCO-08 2652（Musicians, Singers *and Composers*）の3層。ADR-2608081000 で
   ;; 作曲の商売層を分けたときに、この職能を検査するものが1本も無いことに気づいた。
   ;;
