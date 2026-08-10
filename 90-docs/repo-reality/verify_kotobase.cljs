@@ -139,7 +139,37 @@
               (if (and checks-present? retention-present?)
                 {:score 1.0 :note "confirmed: transparency_log.clj's verify-checkpoint still checks :transparency/key-epoch, :transparency/checkpoint-chain, :transparency/witness-threshold, and :transparency/rollback, and retention-decision still consults legal-holds -- the doc's description of fail-closed checkpoint verification and class-based retention with legal-hold override is genuinely wired, not aspirational."}
                 {:score 0.4 :note (str "transparency_log.clj no longer has the expected checkpoint-verification checks (found=" checks-present? ") and/or retention-decision/legal-holds wiring (found=" retention-present? ") -- module may have been refactored; re-verify by hand whether the doc's claims still hold.")}))
-            {:score 0.0 :note "src/kotobase/transparency_log.clj no longer exists -- claim's cited source file is gone; re-verify."}))}])
+            {:score 0.0 :note "src/kotobase/transparency_log.clj no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   ;; ---- added 2026-08-10, weekly claim-discovery pass ----
+   {:claim :claim/kotobase-cid-multi-page-scheduler-not-implemented :axis :axis/functional-completeness :layer :lint
+    :fn (fn []
+          (if (exists? "docs/adr/2608090000-rust-free-cid-canonical-route.md")
+            (let [adr (slurp* "docs/adr/2608090000-rust-free-cid-canonical-route.md")
+                  replay-exists? (exists? "kotoba/cid_external_transaction_replay.kotoba")
+                  test-exists? (exists? "qualification/kotobase/cid_crypto_qualification_test.clj")]
+              (cond
+                (not (has? adr #"multi-page scheduler remains an open gate"))
+                {:score 0.4 :note "ADR-2608090000 no longer states the global multi-page scheduler qualification remains an open gate verbatim -- either the scheduler landed (real progress -- re-verify) or the ADR text changed; re-verify by hand."}
+                (not replay-exists?)
+                {:score 0.3 :note "kotoba/cid_external_transaction_replay.kotoba no longer exists -- claim's cited source file is gone; re-verify."}
+                (not test-exists?)
+                {:score 0.3 :note "qualification/kotobase/cid_crypto_qualification_test.clj no longer exists -- claim's cited qualification test is gone; re-verify."}
+                :else
+                {:score 1.0 :note "confirmed: ADR-2608090000 still discloses the global multi-page scheduler as an open gate, and kotoba/cid_external_transaction_replay.kotoba plus its qualification test still exist implementing only the bounded single-page replay described -- the disclosed gap remains current."}))
+            {:score 0.0 :note "docs/adr/2608090000-rust-free-cid-canonical-route.md no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   {:claim :claim/kotobase-cid-multi-page-scheduler-not-implemented :axis :axis/doc-code-drift :layer :evidence-link
+    :fn (fn []
+          (if (exists? "kotoba")
+            (let [kotoba-files (->> (.readdirSync fs (str root "kotoba"))
+                                     (filter #(str/ends-with? % ".kotoba")))
+                  scheduler-hits (filter (fn [f] (has? (slurp* (str "kotoba/" f)) #"(?i)multi-page.scheduler|page-dag.scheduling"))
+                                          kotoba-files)]
+              (if (empty? scheduler-hits)
+                {:score 1.0 :note (str "confirmed: none of the " (count kotoba-files) " .kotoba guest files under kotoba/ reference a multi-page scheduler or page-DAG scheduling implementation -- the ADR's disclosed gap (bounded single-page replay only, no global scheduler) matches the code, not an overclaim.")}
+                {:score 0.5 :note (str "found a possible multi-page-scheduler reference in: " (str/join ", " scheduler-hits) " -- re-verify by hand whether this is a real implementation (would close the disclosed gap) or just a comment/TODO.")}))
+            {:score 0.0 :note "kotoba/ directory no longer exists in this repo -- claim's cited source location is gone; re-verify."}))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]

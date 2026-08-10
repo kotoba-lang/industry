@@ -276,7 +276,36 @@
               (seq producers)
               {:score 0.7 :note (str "found :key-checkpoint-storage referenced in " (str/join ", " producers) " beyond the check-site/test-fixture -- a real producer for this evidence field may now exist; re-verify whether it actually persists a checkpoint into sealed storage before raising this score to 1.0.")}
               :else
-              {:score 0.2 :note "confirmed: :key-checkpoint-storage still appears only at the deployment_profile.cljc check site and in test fixtures -- no code in key_lifecycle.clj, launcher.cljc, sealed_state.clj, or sealed_audit.clj actually produces/persists this evidence field into sealed monotonic storage. docs/key-lifecycle.md's 'enforced regulated baseline' status makes no exception for this gap, unlike ADR-0017's disclosed SBOM gap -- a silent placeholder, not a disclosed one."})))}])
+              {:score 0.2 :note "confirmed: :key-checkpoint-storage still appears only at the deployment_profile.cljc check site and in test fixtures -- no code in key_lifecycle.clj, launcher.cljc, sealed_state.clj, or sealed_audit.clj actually produces/persists this evidence field into sealed monotonic storage. docs/key-lifecycle.md's 'enforced regulated baseline' status makes no exception for this gap, unlike ADR-0017's disclosed SBOM gap -- a silent placeholder, not a disclosed one."})))}
+
+   ;; ---- added 2026-08-10, weekly claim-discovery pass ----
+   {:claim :claim/aiueos-kotoba-object-rebuild-does-not-boot :axis :axis/doc-code-drift :layer :lint
+    :fn (fn []
+          (if (exists? "os/aiueos/90-docs/adr/0035-the-rebuild-does-not-boot.md")
+            (let [adr (slurp* "os/aiueos/90-docs/adr/0035-the-rebuild-does-not-boot.md")
+                  script-exists? (exists? "os/aiueos/scripts/reproduce-kotoba-kernel-object.sh")
+                  script (when script-exists? (slurp* "os/aiueos/scripts/reproduce-kotoba-kernel-object.sh"))]
+              (cond
+                (not (has? adr #"Do not land the rebuild"))
+                {:score 0.4 :note "ADR-0035 no longer states 'Do not land the rebuild' verbatim -- the boot-blocking rebuild may since have been fixed and landed (re-verify: does main now build/boot with rebuilt objects?), or wording changed; re-verify by hand before trusting this claim as still current."}
+                (not (has? adr #"stays at .fd371d7"))
+                {:score 0.5 :note "ADR-0035 no longer cites 'origin/main stays at fd371d7' verbatim -- the pinned commit reference may have moved since; re-verify whether main has advanced past the broken-rebuild concern."}
+                (not script-exists?)
+                {:score 0.3 :note "os/aiueos/scripts/reproduce-kotoba-kernel-object.sh no longer exists -- claim's cited pin-verification script is gone; re-verify."}
+                (not (has? script #"0b16d9b6"))
+                {:score 0.5 :note "reproduce-kotoba-kernel-object.sh no longer pins compiler 0b16d9b6 -- the pin may have advanced (would be real progress toward closing ADR-0032's open item, IF the boot failure was actually fixed first); re-verify whether the ADR-0035 boot regression was resolved before raising this score."}
+                :else
+                {:score 1.0 :note "confirmed: ADR-0035 still states 'Do not land the rebuild' and 'origin/main stays at fd371d7 (ADR-0034), which boots', and reproduce-kotoba-kernel-object.sh is still pinned to compiler 0b16d9b6 exactly as ADR-0032 left it -- the disclosed boot-blocking regression is still open and is still correctly kept off main."}))
+            {:score 0.0 :note "os/aiueos/90-docs/adr/0035-the-rebuild-does-not-boot.md no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   {:claim :claim/aiueos-kotoba-object-rebuild-does-not-boot :axis :axis/production-readiness :layer :lint
+    :fn (fn []
+          (if (exists? "os/aiueos/90-docs/adr/0035-the-rebuild-does-not-boot.md")
+            (let [adr (slurp* "os/aiueos/90-docs/adr/0035-the-rebuild-does-not-boot.md")]
+              (if (has? adr #"36 of 57 objects")
+                {:score 0.5 :note "confirmed: ADR-0035 still cites reproduce-kotoba-kernel-object.sh's coverage as '36 of 57 objects', unchanged from ADR-0032/0034, and still names this 'the open item' -- reproducibility production-readiness is disclosed-blocked, not silently stalled, but has made zero forward progress since the 2026-08-03 pass (score reflects an honestly-disclosed, still-open gap, not a regression)."}
+                {:score 0.4 :note "ADR-0035's '36 of 57 objects' coverage figure is no longer present verbatim in the ADR -- the reproducibility coverage numbers may have been revised since; re-verify current object coverage by hand."}))
+            {:score 0.0 :note "os/aiueos/90-docs/adr/0035-the-rebuild-does-not-boot.md no longer exists -- claim's cited source file is gone; re-verify."}))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]
