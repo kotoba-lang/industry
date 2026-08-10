@@ -1,0 +1,143 @@
+[{:db/id -1
+  :adr/id "ADR-2608100100"
+  :adr/title "s3.kotobase.net: object plane を初めて deploy した。書き込みは依然 CPU 上限を超える — 原因は本文ではなく commit"
+  :adr/status "accepted"
+  :adr/date "2026-08-10"
+  :adr/last_verified "2026-08-10"
+  :adr/supersedes ""
+  :adr/context
+  "オーナー指示（2026-08-10）「s3.kotobase.net を使えるように net-kotobase,
+   kotoba-lang/kotobase を更新」。目的は etzhayyim の 3 つの DataLad dataset
+   （directory.plc / software.diaspora.nodeinfo / xyz.farcaster.fnames）の annex
+   実体を、403 で止まっている B2 の代わりに s3.kotobase.net へ預けること。
+
+   ## まず、作ろうとしたものは既に landed していた
+
+   engine 側に object seam（バイトを datom 面から外す層）を実装し、テストまで
+   通してから `origin/main` を見た。**同じ設計が別セッションによって既に main に
+   あった** —— `kotoba-lang/kotobase-protocols` の `d908d00`（agent/s3-listing-size）
+   と `network-awai/net-kotobase` の `45bb662`（ADR-2608061200、objects.cljc +
+   blobs.cljs + x402）。手元の checkout が 40 / 60 commit 遅れていたため見えて
+   いなかった。実装は破棄し、main の設計を採った。
+
+   CLAUDE.md の「『無い』と結論する前に索引を引く」は repo の不在について書かれて
+   いるが、**同じ失敗は『自分の checkout が遅れている』でも起きる**。分岐前の同期
+   （CLAUDE.md「分岐を作る前に、必ず local を remote に同期する」）は、他人の作業と
+   衝突しないためだけでなく、**既に解かれた問題をもう一度解かないため**でもある。
+   コストは engine 実装 1 本分。
+
+   ## 手元の workspace は lock 通りにビルドできない
+
+   `protocols-worker` は `upstream-lock.json` で 25 の upstream revision を固定して
+   いるが、共有 west checkout はそのうち **17 が lock と不一致**（3 つは dirty、
+   2 つは lock の revision を含まないブランチ上）。他セッションの checkout を
+   動かさずにビルドするため、`/private/tmp/kotobase-deploy` に lock の revision で
+   worktree を 25 本張った隔離 root を作り、そこでビルドした（`shadow-cljs.edn` の
+   source-path が `../../../kotoba-lang/<repo>/src` という相対パスなので、
+   `KOTOBASE_PROTOCOLS_UPSTREAM_ROOT` だけでは足りず、ディレクトリ構造ごと再現する
+   必要がある）。"
+
+  :adr/decision
+  "**main を deploy した。これが object plane の初回 deploy である。**
+
+   実測: 直前の code deployment は **2026-08-02**（version 047b3afa）で、08-05 と
+   08-06 の 2 件は Secret Change による同一コードの再配備。ADR-2608061200 の
+   object plane は 08-06 に git へ landed していたが、**一度も deploy されて
+   いなかった** —— repo が正しいことと live が正しいことは別、という
+   CLAUDE.md の deploy 節が言うとおりの状態が 4 日続いていた。
+
+   deploy 前に隔離 root で `npm test`（84 tests / 299 assertions、0 failure。
+   objects-test / blobs-test / s3-e2e-test を含む）と release build を通した。
+   version a7cf453e。B2 の `BLOB_*` secret は未設定なので blob backend は
+   `blobs/config` の fallback（R2 `STATE_BUCKET` の `objects/` prefix）で動く。"
+
+  :adr/consequences
+  "## それでも s3.kotobase.net は annex remote として使えない
+
+   **deploy 後も PUT は Cloudflare 1102（Worker exceeded resource limits）で落ちる。**
+   これは object plane の失敗ではなく、object plane が解いていなかった別の問題:
+
+   | 操作 | 実測 |
+   |---|---|
+   | `GET /health`（router がストアを触らずに答える） | **3.0s** |
+   | `GET /<bucket>?list-type=2` | 3.3–4.4s |
+   | `PUT` 24 バイト（既存 bucket） | **40s → 503 / 1102** |
+   | `PUT` 2 バイト（**新規 bucket、競合トラフィック無し**） | **40.6s → 503 / 1102** |
+
+   2 バイトを新しい bucket に書いても 40 秒かかる。**コストは本文にも bucket にも
+   依存しない。** `/health` すら 3s かかるのは、この shell が `/health` も
+   `run-once` の中の `router/handle` で答えるため hydrate を通るから。つまり
+   **hydrate ≈ 3s、commit ≈ 37s** で、上限を超えているのは commit 側である。
+
+   object plane はバイトを datom 面から外したが、**メタデータ 1 件の書き込みでも
+   共有 chain（`kotobase-protocols-v2`）を丸ごと hydrate → diff → commit →
+   head CAS する構造は変わっていない。** ADR-2608039970 の『バイトを datom 面に
+   載せない』は満たされたが、**書き込み 1 回のコストが状態全体に比例する**という
+   別の性質が残っている。
+
+   ## 途中で 3 回、観測を誤読しかけた（3 回とも測って訂正した）
+
+   1. **『データが消えている』** —— LIST の KeyCount が 24 → 7 → 9 → 19 と揺れた。
+      新 code の read 側が legacy record を落としていると疑い、旧 version へ
+      rollback して比較した（7 対 9）。
+   2. **『read が head を進めている』** —— head CID が読むたびに変わった。read が
+      commit していると結論しかけたが、**リクエストを一切送らない 45 秒でも head は
+      動いた** —— 対照実験で否定された。
+   3. **真因** —— `wrangler tail` に自分のリクエストでない PUT/HEAD が流れていた。
+      **このセッションが 45 分前に起動した `git annex copy --to kotobase --jobs 2`
+      が生きていた。** KeyCount の揺れは、進行中の書き込みと colo ごとに異なる head
+      読みの合成。プロセスを止めてから測り直したのが上の表。
+
+   **外形からの推論を 2 回とも対照実験が否定した。** どちらも『それらしい』
+   仮説で、片方は data loss という重い結論だった。live surface を測るときは
+   『自分が唯一の client か』を最初に確かめる（`wrangler tail` は 1 回で答える）。
+
+   ## annex copy の実績
+
+   停止時点で **14,495 中 123 objects**（47 分、約 2.6 objects/分）。この速度なら
+   全量に 4 日かかる。**s3.kotobase.net は今日の状態では bulk custody に使えない。**
+   3 dataset の off-machine copy は依然 B2 の 403 に依存したままで、
+   `annex-custody-verify.cljs` は fnames について 7,704 files single-copy を報告する
+   （ADR-2608059100）。
+
+   ## 共有 head を 3 つの Worker が持っている
+
+   `kotobase-protocols-state` を binding する wrangler 設定は 3 つある:
+   `kotoba-lang/kotobase-protocols-worker`（routes 無し）/
+   `network-awai/net-kotobase-cypher`（cypher.kotobase.net、2026-08-05 に分離）/
+   本 Worker。**同じ graph の同じ head key を CAS する。** 今回の測定では
+   cypher 側のトラフィックは観測されなかったので原因ではないが、
+   1 件の書き込みが 37 秒 CPU を使う状態でこれを共有しているのは、
+   将来の contention として記録しておく。"
+
+  :adr/next
+  "**次の一手は『commit を状態全体に比例させない』こと。** 具体的な候補を、
+   安いものから:
+
+   1. **s3 を共有 admin graph から外し、bucket 単位の graph にする**
+      （`kotobase-protocols-worker.graph/for-request` は現在 s3 を shared graph に
+      送っている。atproto は既に per-DID graph を持つので、機構は在る）。
+      1 bucket の書き込みが他 surface の状態を hydrate しなくなる。
+   2. **legacy な inline `:bytes` record を chain から掃く。** objects.cljc は
+      『format addition であって migration ではない』と書いており正しいが、
+      掃かない限り古い bytes は毎回の hydrate に乗り続ける。
+   3. **fold**（`/_diag/health` は `should_fold false` / `novelty 18–46` と報告する）。
+      novelty は小さいので、重いのは base 側 —— fold は効かない見込み。
+
+   いずれも計測してから選ぶ。**37 秒がどこで使われているかを、まだ内訳で見て
+   いない** —— hydrate が 3s と分かっているだけで、commit の内訳（block 書き込み /
+   prolly 再ハッシュ / CAS retry）は未測定。ADR-2607178500 と同じ轍を踏まないよう、
+   次は推測ではなく `/_diag` を 1 本足すところから始める。
+
+   ## 残しているもの
+
+   - live は version a7cf453e（main の object plane）。**live と main は一致している。**
+   - 隔離ビルド root `/private/tmp/kotobase-deploy` は worktree 25 本。片付けは
+     `git worktree remove`（superproject の外なので west には影響しない）。
+   - engine 側に書いた object seam の実装は破棄した（main の設計が優先）。
+     写しは scratchpad の `superseded-seam/` に残してある。"
+
+  :adr/references
+  "ADR-2608061200 (net-kotobase, object plane) / ADR-2608039970 (bytes は datom 面に載せない) /
+   ADR-2608059100 (account directories corpus, custody) / ADR-2607177500 (real datom-plane backend) /
+   ADR-2607178500 (unfolded novelty の診断) / ADR-2607263000 (s3 は tenant object storage)"}]
