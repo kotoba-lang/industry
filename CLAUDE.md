@@ -243,6 +243,43 @@ sha256 と実ファイルを突き合わせる**。Actions 経路は committed �
 再生成が走らないので `git diff --exit-code` が無反応になり、**内部整合を保ったまま
 手編集されたファイル**を検出できなかった。fleet gate ならこれを捕まえられる。
 
+### 赤い gate を直す前に 3 つ確かめる（repo-wide mandatory、2026-08-10、ADR-2608102000）
+
+**`manifest/fleet-ci.edn` の fail を見て、いきなり直しにいかない。** 実測 2026-08-10、
+赤い 8 種のうち **2 種は既に上流で直っており**、**2 種は私の手元の環境が原因**で、
+本当に直す必要があったのは残りだけだった。順に:
+
+1. **receipt の sha を現 tip と比べる。** gate 名は
+   `test-<gate>-<sha7>-murakumo-<node>` で、**その sha 時点の判定**でしかない。
+   実測: `test-amu-jdk-free-2644eb9` は赤だったが、現 tip `3b45ae11` では
+   `LOCK-FRESH`。`net-kotobase` も現 tip では gate 全体が OK
+   （別セッションが `93d176d` で直していた）。**古い赤を『いま壊れている』と読まない。**
+2. **ローカルで gate を回すときは `<dir>` を引数の**先頭**に置く。** 多くの gate が
+   `(first (remove #(str/starts-with? % "--") argv))` で tree を決めるので、
+   `gate.cljs --min 10 .` と書くと **`"10"` が tree のパスになる**。
+   fleet は `<dir>` を先に渡すので production では起きない。実測 2026-08-10、
+   この順序ミスで 3 つの gate を「壊れている」と誤診しかけた。
+3. **`npx --yes <pkg> --flag` はこのマシンでは壊れているが、ノードでは動く。**
+   実測 2026-08-10: 手元 npm 11.12.1 では npx が `--classpath` を自分のフラグと
+   誤解してヘルプを吐く。judah（npm 11.17.0）と simeon（10.9.8）では正常。
+   **「ローカルで赤」は「fleet で赤」ではない。** 切り分けは `nbb` を直接呼ぶか、
+   `ssh <node> 'npx --yes nbb …'` で実ノードに当てる。
+
+**直したら pin も前進させる。** 子リポの main を直しても、west pin が手前にあると
+gate は古い tip を見続ける（実測: `amu` / `cloud-itonami` とも修正 commit の手前で
+pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-pins.cljs` までが 1 組。
+
+### gate が要求する入力が repo に無いことがある
+
+**その gate が読む正本が、配られる tree に入っているかを確かめる。** fleet が配るのは
+**その repo の tree だけ**で、`orgs/` 配下の子リポは入らない。実測 2026-08-10:
+`root-permit-index` の生成器 `gen-permit-index.cljs` は `<root>/orgs/cloud-itonami` を
+読むが、`git ls-files orgs/cloud-itonami` は **0 件**（west 管理で repo 外）。
+つまりこの gate は **root repo をどう直しても fleet 上では緑にならない**。
+射影を検査したいなら `manifest/projection-verify.cljs` の contract（入力 hash を
+固定する）に寄せるか、`orgs/` が実在する場所で回す。**入力が無い gate は、
+落ちているのではなく問いを立てられていない。**
+
 ## fleet-db — west 後継 VCS プレーン（ADR-2607160005、2026-07-16）
 
 - **`manifest/fleet-db.edn`（+ append-only `fleet-db.ledger.edn`）が west.yml の

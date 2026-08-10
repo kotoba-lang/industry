@@ -394,6 +394,36 @@ receipt `0a7f4749d323` 署名済み。
 `levi` 等で検証を再開し、署名付き receipt を書き始めた。**`--dry-run` での
 1 回きりの確認ではなく、本番の常駐経路が動いている。**
 
+### 復活した CI が出した赤の内訳（2026-08-10、closing 後の追記）
+
+CI を直した直後、`manifest/fleet-ci.edn` の fail は 08-07 の **3 種**から 08-10 の
+**8 種**に増えた。当初これを「盲目だった 3 日間に積まれた 4 件の退行」と読んだが、
+**1 件ずつ当たったら内訳は違った**:
+
+| gate | 実体 |
+|---|---|
+| `net-kotobase` | **既に上流で直っていた**。現 tip `93d176d`（別セッションの「the DO test went with its subject; gate is green again」）で gate 全体が OK |
+| `amu-jdk-free` | **既に上流で直っていた**。赤は sha `2644eb9` の判定で、現 tip `3b45ae11` では `LOCK-FRESH` |
+| `root-repository-roles` | **現 tip でも本当に赤**。`amu` の `:depends-on` が 8 本なのに実 production 依存は 13 本 —— #1835 の IR 抽出で入った `kotoba-hir`/`kotoba-object`/`kotoba-sema` と、以前から漏れていた `io-ipld`/`io-multiformats`。**修正して着地**（`kotoba-lang/amu` `c2ff8799`、`verify-repository-roles: OK deps=13`）+ pin 前進（`bbddac0`） |
+| `root-itonami-org-id` | **本当に赤**。intake が `(str/replace "." "-")` で順方向導出していた。**修正して着地**（`network-awai/cloud-itonami` `d8888896`）+ pin 前進（`e39ff47`）。ただし gate は **live** を見るので**デプロイするまで赤のまま** |
+| `root-permit-index` | 射影が正本とずれていた。**再生成して着地**（`e7748f5`）。ただし下記のとおり fleet では緑にならない |
+| `root-observatory-registry` | 本当に赤。hayari の登録が `${REPO}` 起点でない `/tmp/…` を指し、台帳から hayari・hirameki が落ちている（`--only` の部分実行で全体を上書きした疑い）。observatory loop の持ち主の領域なので未着手 |
+| `test-cloud-itonami` | sites bundle 4 checks。pin を前進させたので次の tick で再評価される |
+
+**したがって「3 日間で 4 件退行した」は正しくない。** 正しくは
+「**3 日ぶんの判定が止まっていたので、古い赤と新しい赤と直った赤が同じ画面に並んだ**」。
+receipt の sha を見ずに直しにいくと、既に直っているものを直そうとする。
+この教訓は CLAUDE.md「赤い gate を直す前に 3 つ確かめる」に規則として書いた。
+
+### `root-permit-index` は fleet では構造的に緑にならない
+
+`gen-permit-index.cljs` は `<root>/orgs/cloud-itonami` を読むが、
+`git ls-files orgs/cloud-itonami` は **0 件**（west 管理で root repo の外）。fleet が
+配るのは root repo の tree だけなので、**射影をどう直しても再生成側が空を見る**。
+射影自体は正しくなった（本体で `permit-index-check: OK`、1657 行 / 188 法域）が、
+gate を緑にするには `manifest/projection-verify.cljs` の contract 方式へ寄せるか、
+`orgs/` が実在する場所で回す設計変更が要る。**未着手。**
+
 ### 次の agent への resume point
 
 1. **本番 tick を `--dry-run` 無しで通す**（landing / commit status / CD が未検証）。
