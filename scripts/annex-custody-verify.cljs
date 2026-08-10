@@ -155,6 +155,40 @@
    {:ok [] :failed []}
    files))
 
+(defn creds-health
+  "Every git-annex special remote whose credentials are stored LOCALLY, and
+  whether that stored value is usable.
+
+  Added 2026-08-10 after `xyz.farcaster.fnames` spent days unable to reach B2.
+  The B2 key was fine — valid, correctly scoped, and working from every other
+  dataset. What was broken was `.git/annex/creds/<uuid>`: **2 bytes, zero
+  fields.** git-annex signed with nothing and B2 answered 403 to reads and
+  writes alike, which was recorded as `B2 は account 全体で 403` — a diagnosis
+  about the account, from evidence that was entirely local.
+
+  An empty credential is indistinguishable from a revoked key at the HTTP
+  layer, so this cannot be inferred from the failure; it has to be looked at.
+  The file is two whitespace-separated fields, so `< 2 fields` is the whole
+  test — and it is worth having precisely because it is that cheap next to the
+  days the wrong diagnosis cost.
+
+  Never reads the VALUES, only their shape: a custody report is not a place to
+  put a secret, and this one is written to disk with --report."
+  [dir]
+  (let [{:keys [out]} (sh "git" "config" "--get-regexp" "^remote\\..*\\.annex-uuid" {:cwd dir})]
+    (->> (str/split-lines (or out ""))
+         (remove str/blank?)
+         (keep (fn [line]
+                 (let [[k uuid] (str/split (str/trim line) #"\s+")
+                       rname (second (re-find #"^remote\.(.+)\.annex-uuid$" (or k "")))
+                       f (str dir "/.git/annex/creds/" uuid)]
+                   (when (and rname uuid (.existsSync fs f))
+                     (let [fields (->> (str/split (str (.readFileSync fs f "utf8")) #"\s+")
+                                       (remove str/blank?)
+                                       count)]
+                       {:remote rname :fields fields :usable? (>= fields 2)})))))
+         vec)))
+
 (defn audit-project [{:keys [name path remote]} env sample-n]
   (let [dir (str root "/" path)]
     (if-not (.existsSync fs dir)
@@ -164,6 +198,8 @@
           {:name name :status :skipped :reason "not a git-annex repo (no annex.uuid)"}
           (let [entries (whereis dir)
                 total (count entries)
+                creds (creds-health dir)
+                broken-creds (filterv #(not (:usable? %)) creds)
                 at-risk (filter #(and (zero? (:copies %)) (zero? (:untrusted %))) entries)
                 only-untrusted (filter #(and (zero? (:copies %)) (pos? (:untrusted %))) entries)
                 ;; Only fsck files the *configured* remote actually claims —
@@ -178,8 +214,11 @@
                        (fsck-sample! dir remote sampled env)
                        {:ok [] :failed []})]
             {:name name :path path :remote remote
-             :status (if (or (seq at-risk) (seq only-untrusted) (seq (:failed fsck))) :fail :ok)
+             :status (if (or (seq at-risk) (seq only-untrusted) (seq (:failed fsck))
+                             (seq broken-creds))
+                       :fail :ok)
              :annexed total
+             :broken-creds broken-creds
              :at-risk (mapv :file at-risk)
              :only-untrusted (mapv :file only-untrusted)
              :sampled sampled
@@ -204,6 +243,33 @@
   ;; `--list-projects` keeps CI from having to re-implement the west.yml scan as
   ;; an inline one-liner (quoting that inside YAML is a reliable way to ship a
   ;; broken workflow).
+  ;; `--self-test` proves the credential detector can FAIL. Without it the
+  ;; check is a line that always prints nothing, which is the shape a decorative
+  ;; gate has: it passed on the day the credential was empty too, because it did
+  ;; not exist yet, and it would go on passing if the field-count logic were
+  ;; inverted. The fixture is built here rather than mocked so it exercises the
+  ;; same `git config` parse the real path uses.
+  (when (some #{"--self-test"} argv)
+    (let [dir (str (or (.-TMPDIR (.-env js/process)) "/tmp") "/annex-creds-selftest")]
+      (sh "rm" "-rf" dir {})
+      (.mkdirSync fs (str dir "/.git/annex/creds") #js {:recursive true})
+      (sh "git" "init" "-q" dir {})
+      (sh "git" "config" "remote.emptycreds.annex-uuid" "aaaa-empty" {:cwd dir})
+      (sh "git" "config" "remote.goodcreds.annex-uuid" "bbbb-good" {:cwd dir})
+      (.writeFileSync fs (str dir "/.git/annex/creds/aaaa-empty") "\n")
+      (.writeFileSync fs (str dir "/.git/annex/creds/bbbb-good") "KEYID SECRETVALUE\n")
+      (let [health (creds-health dir)
+            by-name (into {} (map (juxt :remote identity)) health)
+            empty-flagged? (false? (:usable? (get by-name "emptycreds")))
+            good-passed? (true? (:usable? (get by-name "goodcreds")))]
+        (sh "rm" "-rf" dir {})
+        (println (str "self-test: remotes=" (count health)
+                      " empty-flagged=" empty-flagged?
+                      " good-passed=" good-passed?))
+        (when-not (and empty-flagged? good-passed? (= 2 (count health)))
+          (fail "self-test 失敗: creds-health が空の credential を検出できていません。"))
+        (println "self-test ok")
+        (exit 0))))
   (when (some #{"--list-projects"} argv)
     (doseq [{:keys [name path]} targets] (println (str name " " path)))
     (exit 0))
@@ -225,6 +291,16 @@
                             (str "; verified from " (:remote r) ": " (str/join ", " (:sampled r))))))
         :fail (do
                 (println (str "  - " (:name r) ": FAIL — " (:annexed r) " annexed"))
+                (when (seq (:broken-creds r))
+                  (println (str "      " (count (:broken-creds r))
+                                " remote(s) have an UNUSABLE stored credential — git-annex will"
+                                " sign with nothing and the remote will answer 403/401, which"
+                                " reads as a revoked key rather than a local file problem:"))
+                  (doseq [c (:broken-creds r)]
+                    (println (str "        remote " (:remote c) ": .git/annex/creds/<uuid> has "
+                                  (:fields c) " field(s), expected 2")))
+                  (println (str "      直し方: AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY を与えて"
+                                " `git annex enableremote <remote>`")))
                 (when (seq (:at-risk r))
                   (println (str "      " (count (:at-risk r))
                                 " file(s) exist ONLY on this machine (no off-machine copy at all):"))

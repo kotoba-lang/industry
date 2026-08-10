@@ -283,9 +283,65 @@
         (not (zero? rc)) (do (println (tail out 15))
                              (fail! "object-grant" "nbb exited" rc))))))
 
+
+;; ---------------------------------------------------------------------------
+;; F. engine scan は必ず async reader を渡す（ADR-2608100100）
+;;
+;; hermetic: ソースを読むだけ。npm も shadow-cljs も要らないので、gate の冒頭が
+;; 「protocols-worker は持ってこられない」と書いている制約に当たらない —— 持って
+;; これないのは *ビルド* であって、この不変条件はテキストの性質である。
+;;
+;; **なぜテキストで見るか。** `eng/hot-datoms` / `eng/fold!` には async-get-fn を
+;; 省いた arity がある。省くとコンパイルは通り、返る行も正しく、ただ同期
+;; `with-blocks` retry trampoline に載る —— 触れる block 数に対して O(N^2)。
+;; この省略は 2 度起きた: `fold!`（kotobase-protocols-worker#1）と、write path の
+;; `doc-point-query`（2026-08-10、2 バイトの PUT が 40.6s かけて Cloudflare 1102 で
+;; 落ちていた原因）。**どちらも見て気づく類ではない**ので、レビューではなく検査に
+;; する。repo 側の npm test にも同じ検査があるが、この org の Actions は死んでおり
+;; ノードは npm を回せないので、**実際に走る唯一の場所がここ**である。
+
+(let [target (path/join root "protocols-worker" "src" "kotobase_protocols_worker"
+                        "kotobase_store.cljs")
+      heads ["(eng/hot-datoms" "(eng/fold!"]
+      arglist (fn [src start]
+                (loop [i start depth 0]
+                  (if (>= i (count src))
+                    (subs src start)
+                    (let [c (nth src i)
+                          depth (case c \( (inc depth) \) (dec depth) depth)]
+                      (if (and (= c \)) (zero? depth))
+                        (subs src start (inc i))
+                        (recur (inc i) depth))))))
+      offenders (fn [src]
+                  (vec (for [h heads
+                             idx (loop [from 0 acc []]
+                                   (if-let [i (str/index-of src h from)]
+                                     (recur (inc i) (conj acc i))
+                                     acc))
+                             :let [call (arglist src idx)]
+                             :when (not (str/includes? call "async-get-fn"))]
+                         (str h " @" idx))))]
+  (if-not (fs/existsSync target)
+    (fail! "async-reader" "kotobase_store.cljs が無い — gate が対象を見失っている(レイアウト変更?)")
+    (let [src (fs/readFileSync target "utf8")
+          found (offenders src)
+          ;; 検出器が壊れていないことを同じ実行で確かめる。壊れた検出器は
+          ;; 「違反 0 件」を返すので、上の結果だけでは合格と区別が付かない。
+          control (offenders "(eng/hot-datoms get-fn cid opts vis blind decrypt)")]
+      (cond
+        (not (some #(str/includes? src %) heads))
+        (fail! "async-reader" "engine scan の呼び出しが 1 件も無い — 対象を見失っている")
+        (empty? control)
+        (fail! "async-reader" "検出器が対照(async-get-fn 無しの呼び出し)を検出できない")
+        (seq found)
+        (fail! "async-reader" (count found) "件の engine scan が async-get-fn 無しで呼ばれている:"
+               (str/join ", " found))
+        :else (println "F async-reader: すべての engine scan が async reader を渡している")))))
+
 ;; ---------------------------------------------------------------------------
 
 (if (seq @failures)
-  (die! 1 (count @failures) "of 5 hermetic checks failed:" (str/join ", " @failures))
+  (die! 1 (count @failures) "of 6 hermetic checks failed:" (str/join ", " @failures))
   (println "OK — tenant-isolation + metadata +" (count syntax-targets)
-           "syntax checks + python sdk conformance + object-grant decisions"))
+           "syntax checks + python sdk conformance + object-grant decisions"
+           "+ engine async-reader"))
