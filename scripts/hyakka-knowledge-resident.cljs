@@ -57,10 +57,21 @@
     e))
 
 (defn changed-receipts []
-  (->> (str/split-lines (checked ["git" "status" "--porcelain" "--" "knowledge/receipts"]
+  (->> (str/split-lines (checked ["git" "status" "--porcelain" "--untracked-files=all"
+                                  "--" "knowledge/receipts"]
                                  {:dir worktree}))
        (keep #(when (>= (count %) 4) (subs % 3)))
        vec))
+
+(defn unpublished-ledgers []
+  (let [published-path (.join path worktree ".resident" "published.edn")
+        published (if (.existsSync fs published-path)
+                    (set (edn/read-string (.readFileSync fs published-path "utf8")))
+                    #{})]
+    (->> (str/split-lines (checked ["git" "ls-files" "knowledge/ledger"] {:dir worktree}))
+         (filter #(str/ends-with? % ".datoms.edn"))
+         (remove published)
+         sort vec)))
 
 (defn upload-raw! [env receipt-path]
   (let [receipt (edn/read-string (.readFileSync fs (.join path worktree receipt-path) "utf8"))
@@ -116,9 +127,7 @@
         (if-let [seed (kotobase-seed env)]
           (let [e (js/Object.assign #js {} env)]
             (aset e "HYAKKA_SEED" seed)
-            (doseq [p receipts
-                    :let [receipt (edn/read-string (.readFileSync fs (.join path worktree p) "utf8"))
-                          ledger (:run/ledger receipt)]]
+            (doseq [ledger (unpublished-ledgers)]
               (let [r (run ["npm" "run" "publish" "--" "--path" ledger "--batch" "100"]
                            {:dir worktree :env e})]
                 (when (pos? (:exit r))
