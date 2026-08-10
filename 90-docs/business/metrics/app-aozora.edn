@@ -1,30 +1,30 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 16171,
-  "app-aozora-appview" 13132,
-  "app-aozora-spa" 6972},
+ {"app-aozora-pds" 16267,
+  "app-aozora-appview" 13888,
+  "app-aozora-spa" 7000},
  :zone
- {:requests-7d 909599,
-  :pageviews-7d 5474,
-  :uniques-7d-sum 871,
+ {:requests-7d 916718,
+  :pageviews-7d 5478,
+  :uniques-7d-sum 875,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 960762}
-   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1679}
-   {:path "/federation-pilot/did.json", :requests 162}
-   {:path "/hito-federates/did.json", :requests 88}
-   {:path "/hito-postfix-fed/did.json", :requests 81}
-   {:path "/hito-final-verify/did.json", :requests 80}
-   {:path "/hito-verify-clean/did.json", :requests 79}
-   {:path "/minidrama-fedtest/did.json", :requests 77}],
-  :status-mix {:ok 965192, :client-error 27793, :server-error 7575},
+  [{:path "/v1/datoms", :requests 960912}
+   {:path "/xrpc/com.atproto.sync.subscribeRepos", :requests 1665}
+   {:path "/federation-pilot/did.json", :requests 156}
+   {:path "/hito-federates/did.json", :requests 86}
+   {:path "/hito-postfix-fed/did.json", :requests 80}
+   {:path "/hito-verify-clean/did.json", :requests 78}
+   {:path "/hito-final-verify/did.json", :requests 78}
+   {:path "/", :requests 75}],
+  :status-mix {:ok 965500, :server-error 7638, :client-error 28120},
   :window "24h"},
  :as-of "2026-08-10",
  :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 960762 · /xrpc/com.atproto.sync.subscribeRepos 1679 · /federation-pilot/did.json 162 · /hito-federates/did.json 88 · /hito-postfix-fed/did.json 81 | 4xx(probe) 3% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 960912 · /xrpc/com.atproto.sync.subscribeRepos 1665 · /federation-pilot/did.json 156 · /hito-federates/did.json 86 · /hito-postfix-fed/did.json 80 | 4xx(probe) 3% · 5xx 1%",
  :signal
- "aozora.app 実測 909599 req/7d・871 uniques(日次和)・うち4xx probe 3%(24h)、workers 36275 inv/7d"}
+ "aozora.app 実測 916718 req/7d・875 uniques(日次和)・うち4xx probe 3%(24h)、workers 37155 inv/7d"}
