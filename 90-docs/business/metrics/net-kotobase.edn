@@ -1,18 +1,18 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 26860, "kotobase-cf-wasm-staging" 62143},
+ {"net-kotobase" 27061, "kotobase-cf-wasm-staging" 62659},
  :zone
- {:requests-7d 104447,
-  :pageviews-7d 1024,
-  :uniques-7d-sum 959,
+ {:requests-7d 105155,
+  :pageviews-7d 1033,
+  :uniques-7d-sum 967,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
   [{:path
     "/bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7ozvqjidfdwsj3ht6cxjaqe",
-    :requests 46}
+    :requests 50}
    {:path
     "/etzhayyim-xyz-farcaster-fnames/SHA256E-s43336--1fbf35eb1b428d06f58fbfd68cbdd6e391d83117dcc09107ac17a83cbb58bddb.json",
     :requests 9}
@@ -34,7 +34,7 @@
    {:path
     "/kura-phase0-b2/s3-kotobase/blocks/bafkreidioxr6a27jzr2jkleq2qhg233msed5fxw7jgcyondx6g4vao7zzu",
     :requests 4}],
-  :status-mix {:client-error 382, :ok 425, :server-error 51},
+  :status-mix {:client-error 382, :ok 429, :server-error 51},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -46,12 +46,12 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-10",
- :traffic-quality {:window "24h", :probe-4xx-pct 45, :error-5xx-pct 6},
+ :traffic-quality {:window "24h", :probe-4xx-pct 44, :error-5xx-pct 6},
  :top-paths
- "上位 page (24h, 2xx/3xx): /bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7oz… 46 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 9 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 8 · /kura-phase0-b2/s3-kotobase/blocks/bafkr… 6 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 6 | 4xx(probe) 45% · 5xx 6%",
- :funnel {:visitors 2620, :signups 20, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7oz… 50 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 9 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 8 · /kura-phase0-b2/s3-kotobase/blocks/bafkr… 6 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 6 | 4xx(probe) 44% · 5xx 6%",
+ :funnel {:visitors 2626, :signups 20, :checkouts 0},
  :signal
- "kotobase.net 実測 104447 req/7d・959 uniques(日次和)・うち4xx probe 45%(24h)、workers 89003 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 105155 req/7d・967 uniques(日次和)・うち4xx probe 44%(24h)、workers 89720 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -60,6 +60,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 1091},
+ {:visitors {:openai-ads 3, :organic 1097},
   :signups {:organic 17}, 
   :checkouts {}}}
