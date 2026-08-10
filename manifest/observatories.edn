@@ -509,6 +509,22 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
               XMILE: 注目の減衰を org-oasis-open-xmile（RK4, dt 0.25）で回す
               （実測: λ=0.5745 half-life=1.21d r²=0.968 MAPE=9.9% n=4）。
               **3 点未満は当てはめを拒否する**（2 点なら r²=1 が必ず出る）。
+
+              2026-08-10 の第 3 波（分類の深さ、pin a7a66460）:
+              **P31 はドラマとアニメを区別できない**（実測: 進撃の巨人と鬼滅の刃は
+              どちらも manga series、ひよっこ / 半沢直樹 / 愛の不時着は全部
+              television series）。分けているのは P136(genre)。**人物の P31 は必ず Q5**
+              なので俳優と政治家を分けるのは P106(occupation) だけ。両方を収集時に
+              ラベル解決して出す（職業は数千種あり手入力表は必ず陳腐化する）。
+              kinds 表 44→91 種、[MEASURED]（実測の尾）と [BREADTH]（未観測の語彙:
+              化学 / 医学 / 天文 / 生物）を**表の中で分けて明記**——表の大きさが
+              「何を見たか」の証拠として読まれないように。
+              領域 roll-up（culture/person/science/sport/event/organisation/place）と
+              `simulate --by domain` を追加（実測: person λ=0.1947 half-life 3.56d
+              r²=0.897 / culture は同じ窓で増加）。
+              効果（同一日 249 国）: 未分類 141→85、分類率 81.3%→88.2%、
+              domain 638（unmapped 0）、genre 226、occupation 369。
+              テスト 26 件 / 110 assertion。
               視聴者の世代は :uncomputable-until-measured（source が持たない）"}]
 
  ;; 登録していないが、同じ層に属すると分かっているもの。**「まだ測っていない」で
