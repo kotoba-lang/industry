@@ -251,7 +251,33 @@ view は進み（13 分で 155→160）、**height は動かず、votes と new-
 deployment 固有の条件（DO 間のレイテンシ、1 分 cron、`block-interval`）の
 どれかに絞られる。
 
-### 次の一手
+### deploy しても Durable Object は入れ替わらない（2026-08-11 実測）
+
+**D4 5 段目が進まない直接の原因はこれで、correctness の問題ではない。**
+
+new-view の拒否理由を出す計器を inga と inga-replica の両方に入れて deploy
+したが、**15 分待っても `/health` に出てこない**。判別は付く: その間に view は
+進んでおり（167 → 168）、view が進むのは timeout したからで、timeout すれば
+`handle-new-view` が自分の new-view を畳む。**コードにその項目があれば値が
+入るはず**で、入らないなら DO は古いコードで動いている。
+
+同じことが今日 2 回起きた。1 回目は約 10 分後に入れ替わったが、そのときは
+手動 tick と deploy を連打していた。**cron が毎分叩き続ける plane では DO が
+warm のままで、新しいコードをいつまでも拾わない。**
+
+運用上の帰結:
+
+- **DO 側のコード変更（と DO 側の計器）は、deploy した瞬間には効かない。**
+  Worker 側のルーティングや var は即時に効くので、**半分だけ新しい状態**が
+  生まれる —— chain-id を替えたときに network が割れたのは、まさにこれ
+- 強制的に入れ替えるには **DO の名前を変える**しかない（`inga-replica.names`
+  が chain-id を名前に入れているのはこのため）。ただし state を捨てる
+- したがって **DO で動く consensus は、計器を足して読むまでの往復が長い**。
+  `inga-node`（プロセス）は再起動が即時なので、同じ問いに数秒で答えられる。
+  ADR-2608670000 の判断（witness は DO ではなくプロセス）を、可搬性とは別の
+  角度から補強する事実である
+
+### 次の一手### 次の一手
 
 `handle-new-view` は拒否しても**何も記録しない** —— `note-proposal` が
 proposal についてやっていることを new-view についてはやっていない。
