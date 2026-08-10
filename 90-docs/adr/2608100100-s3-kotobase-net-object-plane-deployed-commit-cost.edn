@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "ADR-2608100100"
-  :adr/title "s3.kotobase.net が使えるようになるまでの 3 段（40.6s/1102 → 0.89s/200、annex 2.6 → 229 obj/min）"
+  :adr/title "s3.kotobase.net が使えるようになるまで（40.6s/1102 → 0.89s/200）と、3 dataset の custody 完了"
   :adr/status "accepted"
   :adr/date "2026-08-10"
   :adr/last_verified "2026-08-10"
@@ -299,23 +299,71 @@
    直接置くのが正しく、kotobase 面の価値はスループットではなく索引・監査・
    query 可能性にある。** 両方に置くのは冗長ではなく、役割が違う。
 
-   ## 残しているもの
+   ## 決着（2026-08-10 closing）
 
-   - live は version c037771f、net-kotobase main `4388dd0` と一致。
-   - custody の現在地（2026-08-10 時点、copy は継続中）:
-     fnames 917/14,495(kotobase) · 6,787/14,495(b2) /
-     directory.plc 1,098/4,000 · **4,000/4,000(b2 完了)** /
-     nodeinfo 1,287/26,470 · 12,084/26,470。
-     **b2 側が先に揃う**（上の 81 倍差）ので、off-machine コピーの確保は
-     b2 経路が先に達成する見込み。
-   - 3 dataset すべてに kotobase remote を登録し、copy を並列実行中
-     （`requeststyle=path` が要る —— 無いと git-annex は
-     `<bucket>.s3.kotobase.net` を引いて DNS で落ちる）。log は scratchpad の
-     `j1-<dataset>.log`（jobs=1）。完了後に
-     `annex-custody-verify.cljs --names xyz.farcaster.fnames` を回すこと ——
-     **1 ファイルの whereis を custody の証拠にしない**（ADR-2608059100）。
-   - engine 側に書いた object seam の実装は破棄（main の設計が優先）。写しは
-     scratchpad の `superseded-seam/`。"
+   ### custody は 3 dataset とも完了した。検査で示してある
+
+   ```
+   annex-custody-verify: projects=3 ok=3 fail=0 skipped=0 (sample=1/repo)
+     - directory.plc:              4,000 annexed, all with off-machine copies
+     - software.diaspora.nodeinfo: 26,470 annexed, all with off-machine copies
+     - xyz.farcaster.fnames:       14,495 annexed, all with off-machine copies
+   ```
+
+   **44,965 ファイル全部が off-machine コピーを持ち**、各 dataset から 1 件ずつ
+   b2 から実際にダウンロードして checksum が合うことまで確認済み。
+   ADR-2607252000 の「バックアップがあると書いてあったのに実体が無かった」に
+   対する答えを、主張ではなく実行で出した形。
+
+   ### fleet gate は 6/6 で緑
+
+   `tenant-isolation / metadata / 21 syntax / python sdk / object-grant /
+   engine async-reader`。**最後の 1 つは今日足したもので、緑になるまで
+   2 段の赤に埋もれていた**:
+
+   1. GitHub Actions の action pin drift（`d335360` で検査ごと撤去。走らない CI の
+      整合性を保つ作業は何も守らない。オーナー指示「github じゃなくて
+      murakumo.cloud」）
+   2. test allowlist が「無い 1 件」を期待していた（`93d176d`。
+      `durable_object_test.cljc` は同日 `3feb376` でその主題 `durable_objects.cljc`
+      (177 行) ごと削除されていた）
+
+   2 について、最初「allowlist に無いものが 11 本」と報告したのは**誤読**だった ——
+   失敗メッセージは実際の一覧を全部印字する（違反分だけではない）。差は 1 件で、
+   しかも方向が逆（余分ではなく不足）だった。**検査は仕事をしていた**ので、
+   緑にするために実態へ同期したのではなく、消えた理由を確認してから外している。
+
+   ### kotobase 側の copy は途中で止めてある（意図的）
+
+   custody は b2 で達成済みなので、kotobase 経由の copy は索引・監査・query の
+   ためであって custody のためではない。到達点:
+   fnames 1,814/14,495 · directory.plc 1,761/4,000 · nodeinfo 2,009/26,470。
+   **resume 可能**なので、続けるなら各 dataset で:
+
+   ```
+   git annex copy --to kotobase --jobs 1     # bucket あたり 1 が最速で失敗 0
+   ```
+
+   残り約 39,000 件、124 obj/min で約 5 時間。**jobs を増やさないこと**（bucket
+   ごとに head 1 本なので直列化され、増えるのは捨てる仕事だけ —— 実測 4→8 jobs で
+   8.4→9.6 obj/min、失敗率 13.8%）。
+
+   ## 次に手を付けるべきもの（優先順）
+
+   1. **プロバイダ独立性**。`b2` と `kotobase` の bytes は同じ B2 アカウントに
+      落ちる。2 コピーは bucket 削除と鍵 1 本の侵害には耐えるが、**プロバイダ障害
+      には耐えない**。3 本目を別プロバイダに置くかはオーナー判断。
+   2. **bucket 内の書き込み並列度は 1 のまま**。上げるには metadata 書き込みを
+      CAS 経路から外す設計が要る。運用上 jobs=1 が最速なので実害は小さい。
+   3. **`.github/workflows/graph-database.yml` が今日新規追加された**
+      （`3feb376`）。superproject CLAUDE.md の「新しい workflow を書かない」に
+      反する。**削除には GitHub の `workflow` scope が要り、このワークスペースの
+      token は持っていない**ので記録のみ。同種の追加が続けば、今日撤去したのと
+      同じ「死んだ CI の検査が生きた検査を隠す」状態が戻る。
+   4. 共有 graph に残る per-bucket 化前の s3 record（annex 側は fsck 済みなので
+      実害なし、掃除していない）。
+   5. 1MB 級 object の単体再測（`directory.plc` の ~950KB は 1,761 件通っている
+      ので実質確認済みだが、per-bucket + backoff 後に単体で測り直していない）。"
 
   :adr/references
   "ADR-2608061200 (net-kotobase, object plane) / ADR-2608039970 (bytes は datom 面に載せない) /
