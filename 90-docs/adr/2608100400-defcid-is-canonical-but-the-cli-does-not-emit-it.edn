@@ -86,24 +86,49 @@
      | effect-row | 取れる（関数の `:effects`） |
      | interface | 取れる（HIR の `:param-types` / `:result`） |
      | 直接依存 | 閉じたモジュールなので KIR body から辿れる |
-     | **desugar-contract-version** | **fleet 全体に生成側が無い。** kotoba-lang の テスト・ベクタ・conformance・fixture generator にしか現れず、compiler は desugar のバージョンをどの名前でも追跡していない |
-     | **profile-version** | **出典が食い違う。** compiler の `guest-grammar.edn` は 6、kotoba-lang の `version-policy.edn` の `:release/language-profile` は 5、凍結ベクタは 4 と 5 を使う。identity 用に compiler が読む単一の権威が無い |
+     | **desugar-contract-version** | 【**再訂正 2026-08-10**】**存在する。** `kotoba-lang/lang/elaboration-pipeline.edn` の `:contract-versions` に `:desugar-contract 1` として、しかも『Contract versions sealed into definition identity』という注釈付きで宣言されている。私の grep は `desugar-contract-version` という**綴りだけ**を見ており、`:contract-versions` の中のキー名 `:desugar-contract` を見落とした |
+     | **profile-version** | 【**再訂正**】**同じ場所に `:language-profile` として存在する。** 出典が無いのではなく、**3 つに食い違っていた**（elaboration-pipeline 4 / version-policy 5 / surface-status 6）。しかも identity に封印される 4 が最も古かった |
 
-     **この 2 つを埋めるには値を発明するしかなく、その 2 つこそ『発明された
-     同一性』を防ぐために存在する。** `desugar-contract-version` の docstring は
-     『a definition CID must never claim semantic equivalence across a desugar
-     change』と書いている。適当な値を入れた `kotoba -M defcid` は、無いより悪い
-     —— 出てくる CID が canonical に見えて何も封印していない。
+     **したがって当初の『配線の問題』という結論は、遠回りして正しかった —— ただし
+     理由が違う。** 6 要素はすべて存在し、authority も 1 箇所
+     （`elaboration-pipeline.edn` の `:contract-versions`）にある。欠けていたのは
+     **その authority が、自分が写している数字と一致しているかを誰も検査して
+     いなかった**こと。
 
-     したがって **`defcid` は配線ではなく、先に 2 つの authority を作る作業**。
-     ①compiler が desugar contract のバージョンを持ち、desugar が変わったら上げる
-     ②identity 用の profile-version の出典を 1 つに決める。どちらもオーナー判断を
-     要する設計であって、agent が既定値で埋めてよいものではない。"
+     ## この誤診を 2 回した経緯（同じ種類の誤り）
+
+     1 回目: 『6 要素は全部持っている、配線の問題』→ 綴り検索で 2 つ見つからず。
+     2 回目: 『生成側が fleet に無い』→ **`:contract-versions` の中を見ていなかった。**
+
+     どちらも **`grep <正確な綴り>` の結果を不在の証拠として使った**。CLAUDE.md の
+     「『無い』と結論する前に索引を引く」は repo の不在について書かれているが、
+     **同じ誤りがフィールド名でも起きる**。宣言は `:desugar-contract-version` では
+     なく `:contract-versions {:desugar-contract 1}` と書かれていた。
+
+     ## 実際にやった安全化（kotoba-lang `5b69f51`）
+
+     `grammar-authority` に `:pipeline/contract-version-drift` を追加。
+     **他のファイルが宣言している数字を写している entry は、その宣言と一致する
+     ことを検査する**（language-profile / guest-grammar / surface-status /
+     elaboration-pipeline）。`:desugar-contract` `:typed-kir` `:semantic-cid`
+     `:portable-effect` はここが**一次宣言**で比較対象が無いので、その旨と
+     「desugar の形が変わったら上げる」を注釈に明記した。
+
+     `:language-profile` を 4 → **6**（authority と一致）。4 に戻すと 4 failures が
+     6 になる。
+
+     `version-policy` の `:release/language-profile 5` は**変えずに drift を明示**。
+     これを上げることは『profile 6 を released と宣言し `:supported` に加える』
+     ことであり、**写し間違いの修正ではなく出荷内容の宣言**なのでオーナー判断。
+     identity 軸は強制、release 軸は開示、という分け方にした。"
 
   :adr/next
-  "- `kotoba -M defcid <file>` は **上の 2 つの authority が決まるまで着手しない**。
-     ①compiler が desugar contract version を持つ ②identity 用 profile-version の
-     出典を 1 つに決める。どちらもオーナー判断。
+  "- `kotoba -M defcid <file>` は **authority が揃ったので着手できる**。compiler が
+     `elaboration-pipeline.edn` の `:contract-versions` を読み、`:language-profile`
+     と `:desugar-contract` を identity payload に渡す。**compiler 側にこの値を
+     再宣言しない** —— それが今回直した drift の作り方そのもの。
+   - `version-policy :release/language-profile` を 6 へ上げるか（= profile 6 を
+     released と宣言し `:supported` に加える）はオーナー判断。
    - ~~`:test-definition-cid` を改名する~~ **完了**（amu `3b45ae1`、
      `:test-kir-sha256`。テストは旧キーが不在であることも assert する）。
    - CLI が DefCID を出せるようになったら、`lang/code-identity-conformance` の
