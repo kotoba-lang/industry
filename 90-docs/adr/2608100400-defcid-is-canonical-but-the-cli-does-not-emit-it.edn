@@ -1,0 +1,96 @@
+[{:db/id -1
+  :adr/id "ADR-2608100400"
+  :adr/title "DefCID は canonical に計算できているが、kotoba CLI はそれを出さない（出るのは全部 sha256）"
+  :adr/status "accepted"
+  :adr/date "2026-08-10"
+  :adr/last_verified "2026-08-10"
+  :adr/supersedes ""
+  :adr/context
+  "オーナー質問（2026-08-10）「今の kotoba ではちゃんと kotoba cli で defcid などで
+   ちゃんと canonical cid になっている?」。実測して答えた記録。
+
+   計測対象: compiler `875e388` / kotoba-kir `9a70bf1` / kotoba-lang `a5f52b5`。"
+
+  :adr/decision
+  "## 結論は 2 つに分かれる
+
+   **① DefCID のアルゴリズムとエンコーディングは canonical で正しい。**
+   **② CLI 面には一切出ていない。**
+
+   ### ① 中身は正しい
+
+   authority は **2026-08-10 に `kotoba-kir` へ移った**（kotoba-kir #50
+   『Own golden-preserving DefCID』/ #51、kotoba-lang `e0ea505`『Delegate DefCID
+   authority to KIR』）。ADR 0222（compiler）が『明示的な golden-preserving 抽出まで
+   kotoba-lang が唯一の DefCID authority』と書いていた、その抽出が完了した形。
+   `kotoba.lang.code-identity` は互換 facade になった。
+
+   凍結ベクタ `lang/code-identity-vectors.edn` の `:pure-const` を再計算した実測:
+
+   | 項目 | 値 |
+   |---|---|
+   | payload-version | 2 |
+   | 再計算 CID | `bafyreiarrzdga4uwvk6miw6rdndih4z56xgtd4qz25tb3gxld7toolyaiu` |
+   | 凍結 CID | 同一 |
+   | canonical hex（dag-cbor） | 一致 |
+   | `cid?` 検証 | true |
+   | effect row の封印 | 同一 KIR で pure と `#{:host/http}` が別 CID |
+
+   `bafyrei…` は **CIDv1 / dag-cbor / sha2-256**。凍結ベクタ 11 本 +
+   `lang/code-identity-conformance/{manifest,positive,negative}`（CI6
+   cross-implementation）付き。
+
+   payload v1 の 2 欠陥も authority に明記され v2 で両方直っている ——
+   ①effect row が封じられておらず pure と effectful が同じ CID を持った
+   ②**`pr-str` の出力を dag-cbor と称してアドレスしていた**（実装間で byte 一致しない）。
+
+   ### ② CLI からは出ない
+
+   | CLI 経路 | 出るもの |
+   |---|---|
+   | `kotoba -M inspect a.kotoba` | interface EDN + `:sha256`（interface のダイジェスト） |
+   | `kotoba -M compile --target js` | artifact に `sourceDigest` / `kirDigest` = **裸の sha256 hex** |
+   | provenance EDN | `hir-sha256` / `policy-sha256` / … 全部 sha256 |
+
+   compile が生成した全ファイルに `grep 'bafy'` をかけて **0 件**。usage 一覧にも
+   `defcid` / `cid` サブコマンドは無い。**DefCID を得る経路は library API
+   （`kotoba.kir.definition-identity/definition-cid`）だけ。**
+
+   ### ③ 1 箇所、名前だけ CID の sha256 がある
+
+   `compiler/src/kotoba/compiler/test_profile.clj:140`:
+
+       :test-definition-cid (artifact/sha256
+                             (select-keys kir [:format :exports :signature
+                                               :effects :functions]))
+
+   **`definition-cid` を名乗る sha256。** authority が payload v1 の欠陥として
+   名指しした *codec-mislabelled* と同じ形。test report のフィールドで admission に
+   使われていないので実害は限定的だが、**名前が実体と食い違っている。**"
+
+  :adr/consequences
+  "- 『DefCID は canonical か』への答えは **yes（中身）/ no（CLI 面）** であり、
+     どちらか一方だけを引用すると誤解になる。
+   - 現状 CLI が出す digest はすべて sha256 で、**identity ではなく完全性検査**に
+     使える種類のもの。lock / admission / 再現性の主張に CLI 出力の
+     `sourceDigest` / `kirDigest` を使わないこと（DefCID が封じている
+     effect row・desugar contract version を含まないため）。
+   - identity payload が要求する 6 要素（typed KIR / profile-version /
+     desugar-contract-version / effect-row / interface / 直接依存）は compiler が
+     既に全部持っている。**配線の問題であって設計の問題ではない。**"
+
+  :adr/next
+  "- `kotoba -M defcid <file>`（または `inspect` の出力に `:definition-cid` を
+     足す）。identity payload の 6 要素は既に揃っているので新しい計算は要らない。
+   - `:test-definition-cid` を `:test-kir-sha256` 等へ改名する（名前が嘘をついている）。
+   - CLI が DefCID を出せるようになったら、`lang/code-identity-conformance` の
+     positive/negative を CLI 経由でも回して cross-implementation を CLI 面まで
+     広げる。"
+
+  :adr/references
+  "compiler ADR 0222 (sema と IR の repository 境界、DefCID authority の移管条件) /
+   kotoba-kir #50 #51 (golden-preserving DefCID の移管) /
+   kotoba-lang e0ea505 (Delegate DefCID authority to KIR) /
+   kotoba-lang lang/code-identity.edn (identity の正本) /
+   kotoba-lang lang/code-identity-vectors.edn (凍結ベクタ 11 本) /
+   ADR-2608100300 (この計測が出た session)"}]
