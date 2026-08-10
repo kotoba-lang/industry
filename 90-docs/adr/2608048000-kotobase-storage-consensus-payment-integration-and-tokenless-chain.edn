@@ -293,7 +293,9 @@ kotobase の `.well-known/x402` は現在、resource 一覧を **route handler �
    - **修正**（`network-awai/net-kotobase@80de6a0`）: view budget を tick 間隔から導出する（`budget = 2 × tick`、`INGA_TICK_MS` で明示、既定 60000）。1 倍では「その budget を使うはずの tick で期限が切れる」＝同じ失敗の数字違いになる。
    - **検証 1（修正前に詰まっていたものが流れた）**: 19:07:50 に submit して 12 分間 pending [1,1,1,1] だった record が、修正 deploy 後 **手動 tick なしで** commit された —— 19:19:09 `records 3 / height 251 / pending [1,1,1,1]` → 19:19:55 **`records 4 / height 255 / pending [0,0,0,0]`**。
    - **検証 2（新しい書き込みの latency を測った）**: 19:23:11 に新規 submit → **19:24:42 に commit、91 秒**。手動 tick なし、cron のみ。`records 4 → 5`、`pending [0,0,0,0]`、`?ref=probe/cron-only` の head が投入した record と一致。**1 分 clock に対して 1〜2 tick** という期待どおりの値。修正前の同じ操作は 5.5 分観測して pending のままだった。
-   - **chain は free-running ではなく event-driven である**（誤読しないこと）。pending が空なら height も view も止まる —— 実測で 19:20:40 → 19:22:44 の 2 分間 `height [262,262,262,263]` / `view 7867` で完全に静止した。**これは飢餓ではなく idle** で、空ブロックを刻まない設計の帰結。飢餓と idle を見分ける指標は `pending`: **仕事があるのに height が動かない**のが飢餓で、修正前に見ていたのはそれ。
+   - **idle 時の前進は不定期である。「止まる」と書かない。** 実測: 19:20:40 → 19:22:56 は pending 空のまま `height [262,262,262,263]` / `view 7867` で **2 分以上完全に静止**したが、同じく pending 空の 19:25:12 → 19:25:57 では **45 秒で height +7 / view +6** 進んだ。したがって「pending が空なら止まる」は誤りで、正しくは**バースト的に進む**。
+   - **飢餓と idle を見分ける指標は height ではなく `pending`。** 仕事が無くて height が動かないのが idle、**仕事があるのに（`pending` が非ゼロのまま tick をまたいで）height が動かない**のが飢餓で、修正前に見ていたのは後者。height の静止そのものは、どちらでも起こるので判定に使えない —— この 1 点を書き落とすと、正常な静止を障害と読み違えるか、その逆をやる。
+   - 高さの乖離も収束する: 修正直後は `[262,262,262,263]`（leader が 1 つ先）、その後 `[268,268,268,268]` / `[275,275,275,275]` と一致した。`network_test` が spread ≤ 1 を不変条件にしているのはこのため。
 
 2c. **`inga-replica` にテストを入れた（`network-awai/net-kotobase@7eaeb8f`、16 tests / 38 assertions）。**
 
