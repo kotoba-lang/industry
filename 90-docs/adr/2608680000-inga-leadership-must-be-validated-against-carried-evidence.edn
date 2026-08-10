@@ -1,0 +1,142 @@
+[{:db/id -1
+  :adr/id "adr-2608680000-inga-leadership-must-be-validated-against-carried-evidence"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/topic "inga-leadership-must-be-validated-against-carried-evidence"
+  :adr/title "ADR-2608680000: inga の leadership は「自分の state から計算する」のをやめ、提案が運ぶ証拠に対して検証する — 離脱で chain が止まる欠陥の設計"
+  :adr/status "accepted"
+  :adr/date "2026-08-10"
+  :adr/last_verified "2026-08-10"
+  :adr/last-verified "2026-08-10"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["witness が離脱すると chain が恒久停止する欠陥の原因と、修正の形"
+   "leadership を決める round が満たすべき条件（exactly-agreed であること）"
+   "block へ round を載せることの互換影響と、testnet chain をどう扱うか"
+   "実装前に通すべき検証の順序"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related
+  ["adr-2608670000-inga-witnesses-are-processes-not-durable-objects"
+   "adr-2608048000-kotobase-storage-consensus-payment-integration-and-tokenless-chain"
+   "adr-2608038000-inga-consensus-holochain-write-plane-filecoin-state-plane"]
+  :adr/repos ["orgs/kotoba-lang/inga" "orgs/kotoba-lang/inga-node"
+              "orgs/network-awai/net-kotobase"]
+  :adr/evidence
+  ["orgs/kotoba-lang/inga/test/inga/departure_test.cljc（離脱の再現、characterisation）"
+   "orgs/kotoba-lang/inga/src/inga/replica.cljc の my-turn? docstring（2 実験の記録）"
+   "orgs/kotoba-lang/inga-node/script/devnet.cljs（7 プロセス、1 台 kill）"]
+
+  :adr/body
+  "# ADR-2608680000: leadership は運ばれた証拠に対して検証する
+
+**Status**: accepted（2026-08-10）
+
+## Context
+
+witness が 1 台離脱すると chain が恒久停止する（quorum に余裕があっても）。
+再現は `inga-node` の devnet と `inga` の `departure-test`。原因は
+`my-turn?` が **height 鍵**で leadership を決めていることで、`my-turn?` 自身の
+docstring が *a dead leader holds its turn forever* と書いている。
+
+**この ADR は 2 つの否定的実験の後に書いている。** どちらも 30 分で否定でき、
+どちらも docstring に記録済み:
+
+| 実験 | 結果 |
+|---|---|
+| leadership を view 鍵にする（`pm/leader-for-view`） | **44 failures / 1 error**。chain が height 1 に到達しない |
+| leadership を `(+ height view)` の round 鍵にする | **21 failures / 1 error**。同上 |
+
+## 両実験が見つけた制約
+
+**leadership は「厳密に合意されている状態」からしか計算してはならない。**
+
+- **height は厳密に合意される** —— 全 replica が同じ prefix を持つ committed
+  chain から読む
+- **view はいずれ合意される** —— `sync-view` が f+1 の証拠で引き上げ、
+  `on-progress` が QC 到着で押し上げる。**その間、正しい replica 同士が正当な
+  理由で異なる view を持つ**
+
+eventually-agreed な量から leadership を計算すると、**誰が提案してよいかで
+replica が食い違う**。誰も提案しないか 2 人が提案するかで、どちらも直そうと
+していた stall と外から見分けが付かない。
+
+⚠ **「view 同期が無いから」ではない。** `sync-view` は在り、収束する
+（devnet 実測: 離脱後に生存 6 台が同じ view に揃う）。`my-turn?` docstring の
+「収束する view 同期は書かれていない」という一文は誤りで、訂正済み。
+
+## 現在地（2026-08-10 実測）
+
+**round に使える certified な量は既に 2 つある。**
+
+| 量 | 出所 | certified か |
+|---|---|---|
+| `:inga.qc/view` | `consensus/qc` が設定。`wire.cljc` が encode し、`attest` の署名 payload にも入る | **はい**（quorum が署名した QC の一部） |
+| `:inga.tc/view` | `pacemaker/timeout-certificate`（quorum 個の new-view から） | **はい** |
+| `:inga.block/round` | **無い**。`canonical-block` は height / parent-hash / proposals / proposer / ts のみ | — |
+
+**QC の view だけでは足りない。** 失敗した view は QC を生まないので、tip の
+QC view は成功時にしか進まない —— つまり dead leader の下では動かず、同じ
+stall になる。TC はその穴を埋めるが、**ある瞬間に TC を持っている replica と
+持っていない replica が居る**ので、局所 state から読む限り上の制約に戻る。
+
+## Decision
+
+### D1. leadership は「計算する」のではなく「検証する」
+
+提案が **自分の round と、その round を正当化する証拠**（前 round の QC、
+あるいは view 変更の TC）を運ぶ。follower は自分の pacemaker を見ず、
+**運ばれてきた証拠に対して** `leader-for(round) == proposer` を検証する。
+
+これで制約を満たす: 検証に使う入力が提案そのものに入っているので、証拠を
+受け取った replica は全員同じ答えを出す。局所 view の差は関係しなくなる。
+
+### D2. block に `:inga.block/round` を載せる
+
+`canonical-block` に round を足す。**これは hash を変える** —— 全 block の
+hash が変わるので、既存 chain とは互換でない。
+
+### D3. 既存 testnet chain は捨てる（migrate しない）
+
+`inga-replica-testnet` は約 800 block 持っているが、**捨ててよい**:
+
+- shadow であり、正しさは B2 単独で立っている（ADR-2607142200 の不変条件）
+- **耐久成果物である committed log は `committed/<ref>/<seq>` で keyed されて
+  おり、block hash に依存しない**。chain を作り直しても log は残る
+- chain-id を替えれば新旧が互いを無視する（`chain-id` は署名 payload に
+  入っているので、古い replica の投票は新しい chain で検証に落ちる）
+
+migration を書くコストは、testnet の shadow 履歴の価値より高い。
+
+### D4. 検証の順序（これを飛ばさない）
+
+1. `inga` の 362 tests
+2. `inga` の socket harness（`script/network.cljs`、Byzantine validator 込み）
+3. **`departure-test` の `stalls-when-the-height-leader-departs` が落ちること**
+   —— これは characterisation なので、**落ちたら直った合図**であり、その時点で
+   削除するのが正しい（test 自身にそう書いてある）
+4. `inga-node` の devnet（7 プロセス、1 台 kill）が既定で PASS すること
+5. testnet に deploy し、witness を 1 つ止めて chain が進み続けることを実測
+
+**5 を飛ばさない。** 今日の教訓は、書かれていて効いていない保護が 3 つ
+見つかったこと（`route-submit` の fan-out、`evict!` の eviction、
+`ensure-loaded!` の brick guard）で、3 つとも「実際に壊して観測する」以外の
+方法では見つからなかった。
+
+## Consequences
+
+- `wire.cljc` / `attest.cljc` / `resume` が round を運ぶ必要がある。
+  `resume` は snapshot から round を復元する（局所 view ではなく）
+- `inga-replica`（Cloudflare）と `inga-node`（プロセス）は同じ `inga` を
+  使うので、両方が同時に新しい block 形式になる。**testnet の両者を同じ
+  タイミングで入れ替える**
+- ADR-2608670000 の「DO 撤去は保留」はこの ADR が landed し 5 を通るまで継続
+
+## 学び
+
+**否定的な実験 2 つが、設計 1 つより価値があった。** 最初に ADR を書いていたら
+「view 鍵にする」と書いていただろうし、それは 44 failures だった。30 分 × 2 で
+選択肢を 2 つ閉じ、残ったものが上の形になった。**設計の前に、安い選択肢を
+実際に潰す。**"}]
