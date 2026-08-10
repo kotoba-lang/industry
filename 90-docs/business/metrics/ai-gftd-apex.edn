@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6287, "ai-gftd-chat-shell" 6},
+ {"magatama-sh1n5h1x" 6296, "ai-gftd-chat-shell" 6},
  :zone
- {:requests-7d 470226,
-  :pageviews-7d 9215,
-  :uniques-7d-sum 4884,
+ {:requests-7d 473816,
+  :pageviews-7d 9615,
+  :uniques-7d-sum 4904,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
@@ -13,12 +13,12 @@
   [{:path "/.env.production.bak", :requests 74}
    {:path "/health", :requests 63}
    {:path "/@fs/proc/self/environ", :requests 56}
+   {:path "/config.env", :requests 51}
+   {:path "/gc-service.json", :requests 50}
    {:path "/.ssh/id_dsa", :requests 48}
-   {:path "/_profiler/latest", :requests 48}
-   {:path "/gc-service.json", :requests 48}
    {:path "/.bash_profile", :requests 48}
    {:path "/.well-known/jwks.json", :requests 47}],
-  :status-mix {:ok 2126, :client-error 1851, :server-error 15477},
+  :status-mix {:ok 2158, :client-error 1905, :server-error 15548},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -31,10 +31,10 @@
   :last-charge-epoch 1604224274},
  :as-of "2026-08-10",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 80},
+ {:window "24h", :probe-4xx-pct 10, :error-5xx-pct 79},
  :top-paths
- "上位 page (24h, 2xx/3xx): /.env.production.bak 74 · /health 63 · /@fs/proc/self/environ 56 · /.ssh/id_dsa 48 · /_profiler/latest 48 | 4xx(probe) 10% · 5xx 80%",
+ "上位 page (24h, 2xx/3xx): /.env.production.bak 74 · /health 63 · /@fs/proc/self/environ 56 · /config.env 51 · /gc-service.json 50 | 4xx(probe) 10% · 5xx 79%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 470226 req/7d・4884 uniques(日次和)・うち4xx probe 10%(24h)、workers 6293 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 473816 req/7d・4904 uniques(日次和)・うち4xx probe 10%(24h)、workers 6302 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
