@@ -443,7 +443,12 @@
                 実装していないという意味で、collector が落ちた結果ではない）"
    :evidence "2026-08-08 実測: deps.edn / bb.edn / ルート package.json いずれも無く、
               -main を持つファイルも無い"}
-  {:args ["--cycles" "1" "--log" "${REPO}/data/hirameki.datoms.kotoba.edn" "--dataset" "${REPO}/../hirameki-patents"], :expect :produces-datoms, :name "hirameki", :produces "data/hirameki.datoms.kotoba.edn", :evidence "2026-08-10 実測: 625 特許（harvest 618 + curated 7）/ 引用エッジ 2,448 / 未取得フロンティア 1,331、259 datoms、chain OK。3 cycle 回して 1 tx 追記 + 2 no-op（内容で冪等）", :change-rate-source "**corpus が伸びたときだけ datom が伸びる。**beat は内容で冪等なので、収集が止まっていれば何周回しても 0 件。change-rate は「harvest tick を回す頻度」であって観測対象の変化率ではない —— 上界も下界も実測していない", :output-gitignored true, :org "cloud-itonami", :change-rate-basis :prior, :change-rate 24, :runtime :clojure, :domain "世界の公開特許（解放クロック・出願人集中・引用フロンティア）", :main "hirameki.methods.autorun", :importance 18, :dataset-repo "cloud-itonami/hirameki-patents", :note "収集は別コマンド: `clojure -M -m hirameki.methods.harvest --ticks N --dataset ../hirameki-patents`。autorun は観測のみで取得しない —— 1 tick 1 外部リクエストを観測ループに埋めない"}
+  {:args ["--cycles" "1" "--log" "${REPO}/data/hirameki.datoms.kotoba.edn" "--dataset" "${REPO}/../hirameki-patents"], :expect :produces-datoms-idempotent, :name "hirameki", :produces "data/hirameki.datoms.kotoba.edn", :evidence "2026-08-10 実測: 668 特許（harvest 661 + curated 7）/ 引用エッジ 2,448 / 未取得フロンティア 1,331、259 datoms、chain OK。3 cycle 回して 1 tx 追記 + 2 no-op（内容で冪等）。
+:expect は **:produces-datoms-idempotent** —— beat は内容で冪等で、収集（4h ごと）より
+観測（毎時）が速いので **4 回に 3 回は corpus が伸びておらず no-change になる**。
+:produces-datoms を期待すると gate が常時赤になり、常時赤い gate は無視されるので
+gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振れ 1 を出した）。
+**ただしこれは「収集が止まったこと」を検出しない** —— それは別の見張りが要る（ADR-2608100400 の穴 1）", :change-rate-source "**corpus が伸びたときだけ datom が伸びる。**beat は内容で冪等なので、収集が止まっていれば何周回しても 0 件。change-rate は「harvest tick を回す頻度」であって観測対象の変化率ではない —— 上界も下界も実測していない", :output-gitignored true, :org "cloud-itonami", :change-rate-basis :prior, :change-rate 24, :runtime :clojure, :domain "世界の公開特許（解放クロック・出願人集中・引用フロンティア）", :main "hirameki.methods.autorun", :importance 18, :dataset-repo "cloud-itonami/hirameki-patents", :note "収集は別コマンド: `clojure -M -m hirameki.methods.harvest --ticks N --dataset ../hirameki-patents`。autorun は観測のみで取得しない —— 1 tick 1 外部リクエストを観測ループに埋めない"}
   ;; ── 2026-08-10 追加 ───────────────────────────────────────────────────
   {:name "hayari" :org "cloud-itonami"
    :domain "国・地域ごとの公衆の注目と、その作品の原産国・年代（文化／メディア消費）"

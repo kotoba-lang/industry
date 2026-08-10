@@ -4268,3 +4268,9 @@ orgs/personal/bin/datomic/.clj-kondo/
 # audit venv (local scientific stack for independent reconstruction; not source)
 orgs/personal/research/genomics/high-iq-japanese-gwas/.venv-audit/
 70-tools/kotobase-shard-index/.mutating
+
+# observatory / harvest の run 台帳は operator マシンのローカル測定列。
+# tracked にすると daemon が走るたびに superproject の作業ツリーが dirty になり、
+# 他セッションの `git merge --ff-only` を塞ぐ（2026-08-10 に実際にそうなった）。
+# observatory.datoms.edn（スナップショット）は従来どおり tracked。
+90-docs/observatory/*.ledger.edn
