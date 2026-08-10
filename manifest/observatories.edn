@@ -572,6 +572,25 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
               commit を着地させた人の値で、cadence は未決。tracked file が在ることを
               鮮度と読み違えないこと。
               テスト 31 件 / 143 assertion。
+
+              2026-08-10 の第 7 波（cadence、tick）: `bin/tick.cljs` +
+              `deploy/com.gftd.hayari-tick.plist`（StartInterval 900）。
+              **1 tick = まだ持っていない 1 日 = 1 commit**、要約が変わった時だけ commit
+              （空 commit は log に嘘をつく）。新しい日から古い方へ歩き **2021-01-01 で
+              止まる** —— Wikimedia の per-country データはそこから始まる（実測:
+              2020-12-31 は 404、2021-01-01 は 200）。約 2,000 日 = 15 分毎で約 3 週間の
+              **有限の仕事であって daemon ではない**。共有 west checkout ではなく自前の
+              clone（~/.gftd/hayari-tick）で動く。
+              ⚠ **raw に恒久的な置き場所は要らないと判明**: 2021 以降の全日はいつでも
+              再取得できるので観測本体は公開 API の cache。恒久物は commit 済み要約。
+              ⚠ **この波で自分の欠陥を 1 件出して直した**: tick は raw を持たない clone で
+              動くのに collect が要約を raw から作り直しており、commit 済み 5 日
+              122 country-day を 1 日 61 に置き換えて push した。要約は既存要約と union
+              するよう修正し、年軸も要約だけから再構築するようにした（数える量が変わった
+              ので :country-days-by-year に改名）。ローカルに残っていた raw から
+              183 country-day / 6 日に復元済み。回帰テスト 2 本。
+              実測（launchd 経由）: 8 日 / 302 country-days / 年 82 populated / 最古 1901。
+              テスト 28 件 / 134 assertion（決定核）。
               視聴者の世代は :uncomputable-until-measured（source が持たない）"}]
 
  ;; 登録していないが、同じ層に属すると分かっているもの。**「まだ測っていない」で
