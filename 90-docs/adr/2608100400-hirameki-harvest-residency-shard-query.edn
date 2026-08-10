@@ -1,8 +1,9 @@
 [{:db/id -1
-  :adr/id "2608100200"
+  :adr/id "2608100400"
   :adr/title "特許収集を常駐化する — journal を shard 化し、query 面を検査に変える"
   :adr/status "accepted"
   :adr/date "2026-08-10"
+  :adr/renumbered-from "2608100200 — 並行セッションが同じ番号で ADR を先に着地させていた（13:08 対 17:21）。ADR id は edn-query の面で entity を引く鍵なので、重複は 2 つの決定を 1 つの id に畳む。後から着地した方（これ）が動く。"
   :adr/related "2608100100 2608081200 2608082600 2607072300 2608039700 2607173000 2605241500"
   :adr/body
   "## 決定
