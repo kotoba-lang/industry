@@ -1,0 +1,141 @@
+[{:db/id -1
+  :adr/id "ADR-2608100300"
+  :adr/title "jp-go-dds の --hig-* bridge を Kotoba の決定核にした。bridge は 1 つの document 値に入らない"
+  :adr/status "accepted"
+  :adr/date "2026-08-10"
+  :adr/last_verified "2026-08-10"
+  :adr/supersedes ""
+  :adr/context
+  "オーナー指示（2026-08-10）「cljc, cljs から .kotoba への refactor を進め」。
+
+   ## どこを切るかを、索引を引いて決めた
+
+   `lang/w6-migration-inventory.edn` を読むと、design-system cohort は
+   Delivery-6 が 5/5 complete（css → html → shitsuke → liquid-glass-ui →
+   kotoba-ui）で、`next-product-verticals` は murakumo / com-cloudflare /
+   kotoba-script の 3 つとも `:blocked-by-provider` か `:blocked-by-language`
+   だった。capability kit 9 本が全て `:wasm-aot :pending` / `:native-aot
+   :pending` なので、effect を持つ経路は今日は動かせない。
+
+   一方 **`jp-go-digital-design-system` は inventory に載っていない**。2026-08-05 に
+   このワークスペースの BASE design system になった（DADS 依存 170 repo /
+   kotoba-ui 依存 12 repo という実測に基づくオーナー判断）のに、cohort が
+   組まれたのは 2026-07-28 で、その時点では legacy 側が base だった。**live path
+   にあって pure で、`.kotoba` の権威が 1 行も無い**のはここだけだった。
+
+   ## bridge が何を持っているか
+
+   `jp-go-dds.tokens` は `--hig-*` token 契約を DADS primitive の上に再定義する
+   71 件の対応表を持つ。この repo の docstring 自身が存在理由を書いている:
+   『それを2つ目のアプリが再導出した瞬間に token 契約は壊れる』。つまり
+   **1 箇所であることが機能そのもの**であり、それを機械で確かめる手段が無かった。
+
+   持っている判断は 4 つ:
+
+   1. token 正規化（`:color-tint` / `\"color-tint\"` / `\"--hig-color-tint\"` が
+      1 つの custom property に落ちる）。実測バグの記録がある —— keyword を素の
+      `str` に通して `--hig-:color-tint`、すなわち決して解決しない `var()` 参照を
+      作っていた。
+   2. breakout guard（`{` `}` `;` `/*` を含む値を弾く。css.core と同じ 4 系列）。
+   3. 除外（brand accent は上書きではなく**出さない**ことで守る。出さなければ
+      `shitsuke.hig` の既定が答えるので、未定義参照にはならない）。
+   4. identity（この契約そのものの content identity）。"
+
+  :adr/decision
+  "`kotoba-lang/jp-go-digital-design-system` に `kotoba/bridge_document.kotoba`
+   を置き、上記 4 つを **logical `:document` 値**として Kotoba に持たせた。
+   `jp-go-dds.tokens` はその oracle であり、**consumer API は一切変えていない**
+   （170 repo は今までどおり `jp-go-dds.tokens/skin-css` を require する。
+   `kotoba-lang/compiler` は `:test` alias のテスト専用依存）。
+
+   移行計画 W6 の per-slice 手順（ADR-2607279200 / ADR-2607270100 §10）に従い、
+   form-A の string-only SSR を最終 API にしない方針どおり、**最初から
+   Delivery-6 の document 層**で書いた（W4 は 2026-07-27 に 6 スライスまで
+   landed 済みなので、form-A を経由する理由がもう無い）。
+
+   gate は `test/jp_go_dds/kotoba_document_parity_test.clj`:
+
+   - 71 件の bridge 全体が `tokens/bridge-css` と**バイト一致**
+   - `brand-tokens` 除外が `tokens/bridge-css-except` と一致
+   - 3 つの綴りが 1 つの custom property に落ちる（`--hig-:color-tint` 再発防止）
+   - 不正値が **fail closed**。Kotoba に `throw` は無い（`surface-status.edn` の
+     `:intentional-security-constraint`、backend の欠落ではない）ので guest は
+     失敗を `[:result :string :string]` の値として返す
+   - `document-sha256` が token 契約の content identity になる
+
+   **gate が落ちることを確かめてから landed とした**（CLAUDE.md の規則）:
+   `name: value` を `name:value` に変えると 0 failures が 4 failures になる。
+   無改変では JVM 56 tests / 1,498 assertions、nbb 46 tests / 1,460 assertions が green。
+
+   west pin を `cc8f4849` → `38b8a8e4` へ前進（superproject `c7f64e7`、
+   `scripts/west-pin-put.cljs` の single-entry commit、ahead=2 / behind=0 を検証済み）。"
+
+  :adr/consequences
+  "## 実測した 2 つの制約。どちらも恒久の設計ではない
+
+   ### 1. bridge は 1 つの document 値に入らない
+
+   `document-container-item-limit` は **32**、`document-node-limit` は **256**
+   （`kotoba-lang/kotoba-kir` の `src/kotoba/kir/value.cljc`。depth limit は 8）。
+   bridge は 71 件で、1 件が 3 node の map なので entry だけで約 215 node ——
+   **両方の上限を超える**。実際 `(document-vector …)` に 71 件渡すと elaboration
+   で `document sequence exceeds item limit` で弾かれる。
+
+   したがって単位は**最大 32 件の chunk** で、sheet は複数から組む
+   （`render-body` が 1 chunk の宣言を出し、`join-decls` が繋ぎ、`wrap` が
+   selector と括弧を 1 回だけ付ける）。これは `tokens_document.kotoba` が
+   shitsuke で既に持っている形と同じで、あちらは chunk がたまたま意味的な group
+   （colors / spacing / breakpoints、いずれも 8 件以下）だっただけ。**8 件の
+   group では上限に当たらないので、この制約は今回初めて表面化した。**
+
+   chunk 分割は mechanism であって policy ではないので、**別の chunk 幅で同じ
+   バイト列になること**を gate が別途 assert する（32 と 16 の 2 通り）。
+
+   ### 2. bool 述語の型が合わない箇所がある
+
+   compiler `875e388` で実測: `if` の片枝が `false` リテラル・もう片枝が
+   `string=?` 呼び出しだと `if branches must have the same value type` で落ちる。
+   リテラル同士なら通る。追加で測った 5 形の結果:
+
+   | 形 | 結果 |
+   |---|---|
+   | `false` vs `(string=? …)` | REJECT |
+   | `false` vs 入れ子 if（リテラル同士） | OK |
+   | `(string=? …)` vs `(string=? …)` | REJECT: expected bool, got i64 |
+   | bool を返す再帰 | OK |
+   | i64 を返す再帰 | OK |
+
+   `double-dash-prefixed?` は入れ子 `if` で書き、**TEMPORARY と撤去条件を
+   モジュールに明記**した。compiler ADR 0219 がこれを『backend ではなく
+   interpreter の gap』と呼び、ADR 0191 が解消を breaking / opt-in と測っている。
+
+   ## この slice が示したこと
+
+   - **pure な判断層は今日 refactor できる。** 待つ理由は無い。
+   - **待つべきは effect を持つ層だけ。** capability kit 9 本の
+     `:wasm-aot` / `:native-aot` が pending である限り、Worker / browser の
+     entry は cljs のまま。
+   - **inventory は古くなる。** w6-migration-inventory は 2026-07-28 の base
+     design system 観に基づいており、2026-08-05 のオーナー判断（DADS が base）を
+     知らない。cohort を引くときは inventory と現在の依存実測の両方を見る。"
+
+  :adr/next
+  "- `lang/w6-migration-inventory.edn` の design-system cohort に jp-go-dds を
+     足す（`:default-class :portable-pure` / `:status :document-layer-migrated`）。
+     これは kotoba-lang 側の変更なので別 PR。
+   - `jp-go-dds.tokens/root-css` はまだ `.cljc`。`str/index-of` + `subs` +
+     `ex-info` で書かれており、`[:result T E]` へ移すのが次の自然な 1 スライス。
+   - `jp_go_dds/core.cljc`（364 行、opts → hiccup）は W4 の recursive value と
+     `html_document.kotoba` の上に載る候補だが、component 単位で切ること。
+   - chunk 上限 32 は design-system 規模の payload に対して低い。kotoba-kir へ
+     『bridge のような flat な token 表が 1 値に入らない』を実例として報告する
+     価値がある（上限を上げる要求ではなく、実測の 1 件として）。"
+
+  :adr/references
+  "ADR-2607279200 (Kotoba-centered migration の方向、正本) /
+   ADR-2607270100 §10 (design system は .kotoba 移行対象、依存順) /
+   ADR-2608650000 (「書けない」には恒久と一時の 2 種類がある) /
+   compiler ADR 0219 (native record parameters / bool は interpreter の gap) /
+   compiler ADR 0191 (bool-typed predicates は breaking / opt-in) /
+   compiler ADR 0222 (sema と IR の repository 境界) /
+   ADR-2607141915 (jp-go-dds の起点) / ADR-2607122200 (--hig-* token 契約の発行元)"}]
