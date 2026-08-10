@@ -598,6 +598,19 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
               183 country-day / 6 日に復元済み。回帰テスト 2 本。
               実測（launchd 経由）: 8 日 / 302 country-days / 年 82 populated / 最古 1901。
               テスト 28 件 / 134 assertion（決定核）。
+
+              2026-08-10 の第 8 波（corpus の cadence）: tick が collect の直後に
+              `corpus.cljs --only top-entities` を走らせ、要約が名指しする作品の
+              Wikidata レコードを**同じ commit に**載せる（別 commit だと要約が一瞬
+              「面が解決できない QID」を指す）。**commit するのは entity だけで抽出は
+              しない** —— Wikidata は CC0、Wikipedia 散文は CC BY-SA で、抽出を commit
+              すると repo を読む全員に share-alike 義務を負わせる。規模は実測で決めた:
+              618 country-day が名指しする作品は 209 種・約 110 KB。
+              edn-query に loader を足し、QID が名前と説明に解決することを確認
+              （JP 及川光博=Japanese actor / TW 我的荒糖戀愛=2026 South Korea drama series）。
+              ⚠ この波で **gate が west checkout を dirty にしていた**（要約を tracked に
+              した副作用。dirty だと west update が skip し面が静かに固まる）ため、
+              gate の `--summary-out` を checkout の外へ逃がした。上の :args がそれ。
               視聴者の世代は :uncomputable-until-measured（source が持たない）"}]
 
  ;; 登録していないが、同じ層に属すると分かっているもの。**「まだ測っていない」で

@@ -560,6 +560,60 @@ commit 済み全日由来の country-days）、同じ語で印字していた。
 その測定は自動的に進む**。答えが出た時点で MATURITY.md に書く —— 持ち上がらなければ
 「この source では太平洋は見えない」が正しい結論で、第 2 の source が要る。
 
+## 第 8 波（2026-08-10）— corpus に cadence を与え、QID を名前にする
+
+オーナー指示「do it」（corpus の cadence）。
+
+### 何を commit するかは、大きさとライセンスの 2 つで決めた
+
+要約は各 country-day の最多閲覧作品を**裸の QID** で名指ししていた。面はその数字を
+読めても、それが何なのかを言えなかった。
+
+commit する範囲は実測で決めた: **618 country-day が名指しする作品は 209 種しかない**
+（多くの国が同じ日に同じものを見るため）。1 entity 約 550 バイトで **約 110 KB** ——
+tracked にして問題ない大きさで、増え方も遅い。
+
+そして **entity だけを commit し、抽出は commit しない**。Wikidata は CC0、
+Wikipedia の散文は CC BY-SA（継承）で、**抽出をここに commit すると、この repo を
+読む全員に、頼んでもいない share-alike 義務を負わせる**ことになる。抽出は
+corpus の full run が今も取得しており、tracked な面からは意図的に外してある。
+
+### tick に組み込み、同じ commit に載せる
+
+`corpus.cljs --only top-entities` を tick が collect の直後・commit 判定の前に走らせる。
+**その日を導入した commit と同じ commit に entity index が載る** —— 別 commit に
+すると、要約が一瞬だけ「面が解決できない QID」を指す状態ができる。
+
+新しい日で増える entity は少ない（実測: 225 named のうち 209 は既知、16 件だけ取得）。
+
+### 実測: QID が名前と説明に解決する
+
+```
+JP  及川光博                      Mitsuhiro Oikawa  · Japanese actor
+TW  我的荒糖戀愛                   Our Sticky Love   · 2026 South Korea drama series
+ES  La_Odisea_(película_de_2026)  The Odyssey       · 2026 film directed by Christopher Nolan
+GB  Paul_Heaton                   Paul Heaton       · English singer-songwriter
+```
+
+### この波で見つけた自分の欠陥 2 件
+
+- **registry gate が west checkout を dirty にしていた。** 要約を tracked にした副作用で、
+  dirty な project は `west update` が skip する —— **query 面が静かに固まる**ところだった。
+  gate の `--summary-out` を checkout の外へ逃がした（gate の仕事は「collector が動くか」
+  であってデータを所有することではない）。
+- **pin は進むのに checkout が進まなかった。** `west-pin-put` は GitHub 側に commit する
+  ので**ローカルの west.yml は古いまま**で、その古い manifest で `west update` していた。
+  **「成功」と報告しながら面は 3 日遅れ**（11 保持に対し 8 可視）。fetch + `--ff-only` を
+  挟んで解消し、両分岐（batch する / 進める）を実際に見てから landed にした。
+- 加えて、entity index を最初 `/tmp` に書いていて **commit にファイルが入っていなかった**
+  （code path だけが landed していた）。repo 内で生成し直して commit。
+
+### tick の現在地（launchd 実測）
+
+```
+14 日保持 / 690 country-days / 年 104 populated / 最古 1900 / entity 225 種
+```
+
 ## 登録済み runner での実測（これが landed の根拠）
 
 standalone で動くことは landed の根拠にしない —— 欠陥 4 と 5 はどちらも
