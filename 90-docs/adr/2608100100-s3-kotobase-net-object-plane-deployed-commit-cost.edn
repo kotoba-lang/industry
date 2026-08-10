@@ -199,9 +199,60 @@
    待つのは wall time であって CPU ではなく、ここで効いている予算は CPU 側
    （1102 は CPU 上限）なので、眠るのは cycle を回し直すより安い。
 
+   ## B2 の 403 は鍵ではなく、空の credential ファイルだった
+
+   ADR-2608059100 は B2 が「アカウント全体で 403（read も write も、2 dataset・
+   2 prefix）」と記録していた。**鍵は正常だった。**
+
+   - `b2_authorize_account`（**v4**。v1/v2/v3 は `bad_request` を返す）で鍵を検証:
+     capabilities `readFiles,listBuckets,listFiles,deleteFiles,writeFiles`、
+     許可 bucket `gftdcojp-m365-annex`、endpoint `s3.us-west-004.backblazeb2.com`。
+   - 同じ鍵で S3 API を直接叩くと LIST 200 / PUT 200。
+   - `directory.plc` の `git annex copy --to b2` も **ok**。
+
+   壊れていたのは **`xyz.farcaster.fnames` の `.git/annex/creds/<b2-uuid>` が
+   2 バイト・フィールド 0（空）**だったこと（2026-08-09 22:34 に書かれている）。
+   git-annex は空の資格情報で署名し、B2 は当然 403 を返す。他の 2 dataset の
+   同ファイルは 58 バイト・2 フィールドで正常だった。
+   `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` を与えて
+   `git annex enableremote b2` で復元し、copy が通ることを確認した。
+
+   **「アカウント全体」という診断が誤りだった** —— 観測は 1 dataset に閉じており、
+   そこから account 全体を推論していた。**鍵を疑う前に、鍵が読まれる場所を見る。**
+
+   ## R2 は何に使われているか（推測をやめて deployment に言わせた）
+
+   `/_diag/health` が `blob_backend` / `blob_endpoint` を返すようにした。実測:
+
+   ```
+   {\"blob_backend\":\"s3\",\"blob_endpoint\":\"s3.us-west-004.backblazeb2.com\"}
+   ```
+
+   つまり ADR-2608061200 の設計どおりの分担が実際に効いている:
+
+   | 面 | 置き場 | 理由 |
+   |---|---|---|
+   | head（ref、CAS） | **R2** | `onlyIf.etagMatches` を実際に評価する。B2 は `If-Match` を受け取って**無視して成功を返す** |
+   | block（datom 面） | **R2** | 32,328 objects / 1.12 GB。1 annex object あたり約 12 block、平均 17 KB |
+   | object の bytes | **B2** | immutable・CID 名なので CAS が要らない。安い方に置ける |
+
+   これを推測でなく設定として答えられるようにしたのは、**R2 の `bucket_info` が
+   定期スナップショットで、150 秒の窓では 1 バイトも動かない**ため（成長率から
+   推論する経路が塞がっている）。B2 側も S3 listing を recency で絞れない。
+
+   ### custody の独立性はまだ無い（重要）
+
+   `kotobase` remote の bytes は B2 の `s3.us-west-004` に落ちる。`b2` remote と
+   **同一エンドポイント（＝ほぼ確実に同一アカウント）**なので、
+   **`b2` + `kotobase` の 2 コピーはプロバイダ障害に耐えない。**
+   `large-binary-datalad` skill が「同一プロバイダでも bucket 削除と鍵 1 本の侵害には
+   耐えるが、プロバイダ障害には耐えない」と書いているとおりで、numcopies=2 を
+   独立性の主張に使わないこと。**どの bucket かは未確認**（`BLOB_BUCKET` は secret で
+   読み戻せない）。独立性が要るなら 3 本目を別プロバイダに置く。
+
    ## 残しているもの
 
-   - live は version 86f180a5、net-kotobase main `70763b0` と一致。
+   - live は version c037771f、net-kotobase main `4388dd0` と一致。
    - 3 dataset すべてに kotobase remote を登録し、copy を並列実行中
      （`requeststyle=path` が要る —— 無いと git-annex は
      `<bucket>.s3.kotobase.net` を引いて DNS で落ちる）。log は scratchpad の
