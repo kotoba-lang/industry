@@ -369,9 +369,21 @@
 ;; ---------------------------------------------------------------- flagship
 
 (def flagship-paths
-  "flagship は ADR-2607122300 / ADR-2607189300 が名指ししている repo。
-   スコアから導かず、決定文書から引く（flagship は測定結果ではなく指定）。"
-  #{"orgs/cloud-itonami/cloud-itonami-isic-6399"
+  "flagship は ADR-2607122300 / ADR-2607189300 / ADR-2608102000 が名指ししている repo。
+   スコアから導かず、決定文書から引く（flagship は測定結果ではなく指定）。
+
+   2026-08-10（ADR-2608102000）に 9 → 34 本。増えた 25 本は 7 項目チェックリストの
+   1〜6 を既に満たしており、欠けていたのは item 7（Managed Starter の有償 tier）
+   だけだった —— そしてその item 7 の実体は「Payment Link を貼る」ことではなく
+   **vertical ごとに価格を決める**ことだった。24 本は実競合ベンチマークから
+   価格を導出し（公開/非公開の別と出典 URL を各 business-model.md に記録）、
+   Stripe Payment Link を Gftd Japan 口座に作成した。
+
+   ⚠ **この集合に repo を足すのは指定であって測定ではない。** 6/7 を満たす repo は
+   2026-08-10 時点で他に 49 本あるが、item 7 の価格策定が済んでいないので入れて
+   いない。スコアが高いことを理由にここへ足さないこと。"
+  #{;; ADR-2607122300 / ADR-2607189300（2026-07-12〜07-18）
+    "orgs/cloud-itonami/cloud-itonami-isic-6399"
     "orgs/cloud-itonami/cloud-itonami-isic-6310"
     "orgs/cloud-itonami/cloud-itonami-isic-7810"
     "orgs/cloud-itonami/cloud-itonami-isic-5820"
@@ -379,7 +391,33 @@
     "orgs/cloud-itonami/cloud-itonami-isic-852"
     "orgs/cloud-itonami/cloud-itonami-isic-853"
     "orgs/cloud-itonami/cloud-itonami-isic-854"
-    "orgs/cloud-itonami/cloud-itonami-isic-4921"})
+    "orgs/cloud-itonami/cloud-itonami-isic-4921"
+    ;; ADR-2608102000（2026-08-10）
+    "orgs/cloud-itonami/cloud-itonami-isic-0610"
+    "orgs/cloud-itonami/cloud-itonami-isic-2620"
+    "orgs/cloud-itonami/cloud-itonami-isic-2910"
+    "orgs/cloud-itonami/cloud-itonami-isic-3600"
+    "orgs/cloud-itonami/cloud-itonami-isic-4210"
+    "orgs/cloud-itonami/cloud-itonami-isic-4630"
+    "orgs/cloud-itonami/cloud-itonami-isic-5210"
+    "orgs/cloud-itonami/cloud-itonami-isic-5320"
+    "orgs/cloud-itonami/cloud-itonami-isic-6201"
+    "orgs/cloud-itonami/cloud-itonami-isic-6202"
+    "orgs/cloud-itonami/cloud-itonami-isic-6311"
+    "orgs/cloud-itonami/cloud-itonami-isic-6312"
+    "orgs/cloud-itonami/cloud-itonami-isic-6420"
+    "orgs/cloud-itonami/cloud-itonami-isic-6512"
+    "orgs/cloud-itonami/cloud-itonami-isic-6612"
+    "orgs/cloud-itonami/cloud-itonami-isic-6622"
+    "orgs/cloud-itonami/cloud-itonami-isic-6810"
+    "orgs/cloud-itonami/cloud-itonami-isic-6910"
+    "orgs/cloud-itonami/cloud-itonami-isic-6920"
+    "orgs/cloud-itonami/cloud-itonami-isic-7310"
+    "orgs/cloud-itonami/cloud-itonami-isic-7820"
+    "orgs/cloud-itonami/cloud-itonami-isic-8299"
+    "orgs/cloud-itonami/cloud-itonami-isic-9200"
+    "orgs/cloud-itonami/cloud-itonami-isic-9411"
+    "orgs/cloud-itonami/cloud-itonami-isic-9522"})
 
 (defn- layer-of [i]
   (let [p (nth nodes i)]
