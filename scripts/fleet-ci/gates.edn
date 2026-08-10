@@ -659,107 +659,135 @@
    :include-ext [".yml" ".edn" ".clj" ".cljc"] :min-files 5 :cd false}
 
   ;; ---------------------------------------------------------------------
-  ;; flagship の item 4（夜間再生成）を GitHub Actions から fleet へ移す
-  ;; （ADR-2608102000 / ADR-2607300900）。
+  ;; flagship の item 4（夜間再生成）— murakumo で回す（ADR-2608102000）。
   ;;
-  ;; **これは「動いていた CI の移設」ではない。移設先が無いまま止まっていた。**
-  ;; 実測 2026-08-10: `regenerate-console` / `regenerate-board` の最終実行は
-  ;; **2026-08-04** —— Actions を fleet 全体で無効化した日。それ以降、
-  ;; flagship の demo は誰にも再生成されておらず、壊れても誰も気づかない状態だった。
+  ;; オーナー指示（2026-08-10）「workflow は github は使わずに, murakumo を使うように
+  ;; して」。**この gate は `.github/workflows/` を一切読まない。** 必要な情報は
+  ;; すべて repo 自身の `deps.edn` から導く（gates/itonami-regenerate.cljs 冒頭）。
   ;;
-  ;; gate が実際にやること（`gates/github_workflow_run.cljs`）:
-  ;;   1. 使い捨て workspace を組み、配られた tree を workflow が要求する位置
-  ;;      （`path: orgs/cloud-itonami/<repo>`）へ置く
-  ;;   2. `uses: actions/checkout` + `repository:` を **実 clone** に翻訳する
-  ;;      （2026-08-10 まで無条件 no-op だった＝classpath が消えたまま
-  ;;      「実行した」ことになっていた。25 本中 23 本がこの形）
-  ;;   3. 実 actor を走らせて demo を再生成する
-  ;;   4. `git push` を含む step は**実行しない**（gate は検証であって公開ではない）
-  ;;   5. 実行前後の sha256 を突き合わせ、**committed 済みの生成物が動いたら落とす**
+  ;; ## 直前まで workflow を翻訳していて、それをやめた理由（実測 2026-08-10）
   ;;
-  ;; 5 が Actions 経路には構造的に無かった検査。実測で確かめてある（2026-08-10、
-  ;; isic-9522）: 無改変 exit 0 / committed な operator-console.html を 1 セルだけ
-  ;; 手編集した copy は exit 1（**workflow 自身の grep と行数検査は 3 つとも
-  ;; 通ったまま**）/ 依存が欠けた isic-6910 は exit 1。
+  ;; `gates/github_workflow_run.cljs` で regenerate.yml を走らせると **25 本中 8 本が
+  ;; 落ちた**。落ちた理由は fleet ではなく workflow 側で、`regenerate.yml` が
+  ;; `deps.edn` の `:local/root` を**全部 checkout していなかった**。isic-6910 は
+  ;; `inkan` 依存が入った 08-09 から壊れており、Actions は 08-04 に止まっていたので
+  ;; **誰にも報告されなかった**。「checkout 一覧を人が workflow に書き写す」工程
+  ;; そのものが故障点だった。
   ;;
-  ;; ⚠ **ここに載っているのは 25 本中 17 本だけ。** 残り 8 本は
-  ;; `regenerate.yml` が `deps.edn` の `:local/root` を全部 checkout しておらず、
-  ;; **今日の時点で本当に壊れている**（gate がそれを見つけた）:
-  ;;   6910←inkan / 6311←org-ethereum-jsonrpc / 6312←isic-6311 /
-  ;;   7310←langchain-store / 6420←kototama,langchain-store /
-  ;;   2910←isic-0710,isic-2410,isic-2930 / 6612←kototama / 6622←kototama
-  ;; 直すには workflow ファイルの編集が要るが、**このワークスペースの token は
-  ;; `workflow` OAuth scope を持たない**（CLAUDE.md）。scope が得られ次第、
-  ;; checkout 行を足してここへ移す。**「落ちるから外した」ではなく
-  ;; 「壊れているのが分かったから名指しで残した」**。
-  {:name "cloud-itonami-isic-0610" :id "gh-workflow-regenerate-0610" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  ;; **依存の正本は deps.edn であって workflow ではない。** deps.edn から推移的に
+  ;; 辿るこの gate では、その 8 本が workflow を 1 行も触らずに通る（実測: 8/8 PASS。
+  ;; isic-6910 は workflow が宣言していなかった `inkan` と `jp-go-dds` を含む 5 本、
+  ;; isic-6420 は推移依存 18 本を解決した）。このワークスペースの token は
+  ;; `workflow` OAuth scope を持たないので、そもそも workflow は直せない。
+  ;;
+  ;; ## 落ちることを確かめた（実測 2026-08-10）
+  ;;
+  ;;   isic-9522 無改変                     -> exit 0（no drift, 30 files）
+  ;;   isic-9522 の committed な生成物を
+  ;;     1 セルだけ手編集した copy          -> exit 1（drift を名指し）
+  ;;   isic-6910（旧経路で落ちていた）      -> exit 0（deps.edn から 5 本解決）
+  ;;
+  ;; 2 番目が要点。committed 済みの値を読むだけの経路では、**内部整合を保ったまま
+  ;; 手編集された生成物**を検出できない。
+  {:name "cloud-itonami-isic-0610" :id "itonami-regenerate-0610" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-2620" :id "gh-workflow-regenerate-2620" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-2620" :id "itonami-regenerate-2620" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-3600" :id "gh-workflow-regenerate-3600" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-2910" :id "itonami-regenerate-2910" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-4210" :id "gh-workflow-regenerate-4210" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-3600" :id "itonami-regenerate-3600" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-4630" :id "gh-workflow-regenerate-4630" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-4210" :id "itonami-regenerate-4210" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-5210" :id "gh-workflow-regenerate-5210" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-4630" :id "itonami-regenerate-4630" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-5320" :id "gh-workflow-regenerate-5320" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-5210" :id "itonami-regenerate-5210" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6201" :id "gh-workflow-regenerate-6201" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-5320" :id "itonami-regenerate-5320" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6202" :id "gh-workflow-regenerate-6202" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-6201" :id "itonami-regenerate-6201" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6512" :id "gh-workflow-regenerate-6512" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-6202" :id "itonami-regenerate-6202" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6810" :id "gh-workflow-regenerate-6810" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-6311" :id "itonami-regenerate-6311" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-6920" :id "gh-workflow-regenerate-6920" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-6312" :id "itonami-regenerate-6312" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-7820" :id "gh-workflow-regenerate-7820" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-6420" :id "itonami-regenerate-6420" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-8299" :id "gh-workflow-regenerate-8299" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-6512" :id "itonami-regenerate-6512" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-9200" :id "gh-workflow-regenerate-9200" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-6612" :id "itonami-regenerate-6612" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  {:name "cloud-itonami-isic-9411" :id "gh-workflow-regenerate-9411" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-6622" :id "itonami-regenerate-6622" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
-  ;; 実測済みの参照実装（無改変 exit 0 / 手編集 exit 1 を実際に見た repo）
-  {:name "cloud-itonami-isic-9522" :id "gh-workflow-regenerate-9522" :gate :nbb-script
-   :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows" "--workflow" "regenerate.yml"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+  {:name "cloud-itonami-isic-6810" :id "itonami-regenerate-6810" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-6910" :id "itonami-regenerate-6910" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-6920" :id "itonami-regenerate-6920" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-7310" :id "itonami-regenerate-7310" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-7820" :id "itonami-regenerate-7820" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-8299" :id "itonami-regenerate-8299" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-9200" :id "itonami-regenerate-9200" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-9411" :id "itonami-regenerate-9411" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-9522" :id "itonami-regenerate-9522" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
 
   ;; kotoba-lang/shell の in-app provider bridge。scaffold された .ipa/.apk が
