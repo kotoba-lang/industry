@@ -378,6 +378,41 @@ receipt `0a7f4749d323` 署名済み。
   live データを取るので、出力は世の中が変われば正当に変わる。つまり *publisher* であって
   *verifier* ではなく、drift 契約と噛み合わない（載せれば求人が 1 件動くたびに赤くなる）。
 
+### 本番で復旧したことの証拠（closing 時に実測、2026-08-10）
+
+`manifest/fleet-ci.edn` の receipt を日付で数えると、停止と復旧が数字で出る:
+
+| 日付 | receipt |
+|---|---|
+| 2026-08-07 | 31 件（kagami 改名の**前**） |
+| 2026-08-08 | **0 件** |
+| 2026-08-09 | **0 件** |
+| 2026-08-10 | 10 件（修正の**後**） |
+
+しかも 08-10 の receipt が記録している tip は `b5096f414a4d…` ——
+**tick を直したその commit そのもの**である。常駐 tick が修正を拾い、
+`levi` 等で検証を再開し、署名付き receipt を書き始めた。**`--dry-run` での
+1 回きりの確認ではなく、本番の常駐経路が動いている。**
+
+### 次の agent への resume point
+
+1. **本番 tick を `--dry-run` 無しで通す**（landing / commit status / CD が未検証）。
+   `FLEET_CI_SIGNER_PEM=$HOME/.gftd/fleet-ci-signer-tip.pem nbb scripts/fleet-ci/tick.cljs --only cloud-itonami-isic-9522`
+2. **31 本を同時に回したときの負荷を測る**（maven 解決の初回が重いはず）。
+   `nbb scripts/fleet-ci/tick.cljs --all --dry-run`
+3. **6399 / 6310 / 7810 の publisher 経路**。live データを取る再生成なので drift gate
+   では表現できず、「実行して commit する」仕組みが要る。この 3 本の夜間更新は
+   2026-08-04 から止まったままである。
+4. **gate を 1 本でも足したら、必ず「壊して赤くなる」ことを見てから landed とする。**
+   無改変で `nbb scripts/fleet-ci/gates/itonami-regenerate.cljs orgs/cloud-itonami/cloud-itonami-isic-9522 --org cloud-itonami` が exit 0、
+   committed な生成物を 1 セル手編集した copy に対して exit 1 になることを実際に見る。
+
+**この作業では、壊れていることが 3 回とも「実行するまで見えなかった」。**
+gate をローカルで 25/25 通しても実ノードの `JAVA_HOME` 差は出ず、fleet CI が 3 日
+死んでいたことも実ノードで 1 周回すまで誰も気づかず、pricing-intelligence が
+DataScript に載らなくなっていたことも `query.clj` を実際に回して初めて出た。
+**「書いた」と「動く」の間を、毎回実行で埋めること。**
+
 ### まだ確かめていないこと（正直に）
 
 - ~~実ノードでの 1 周は回していない~~ → **回した**（上の「その2」）。ただし通したのは
