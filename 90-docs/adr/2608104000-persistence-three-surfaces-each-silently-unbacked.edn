@@ -111,6 +111,38 @@ commit 先に関わらず `main` を push するので non-fast-forward で弾�
 (b) スクリプトを「いま居るブランチを push する」形に変える —— 安全だが
 **他者ブランチ上のファイルの編集**になる。
 
+### 翌朝の実測（2026-08-11 02:00、closing 時に確認）
+
+plist の修正は効いた —— 夜間は `run-backup.cljc` を正しく選び、`gpg-unlock` まで
+成功して**以前より先へ進んだ**。しかし完走はしていない。**落ちた場所は予告した
+`git push … main` ではなく、その手前の ingest だった**:
+
+```
+== bb ./bin/gpg-unlock.cljc        （成功）
+== ./bin/ingest-mail.cljc          Cannot run program: Exec failed, error: 13 (Permission denied)
+```
+
+原因は実行ビット。`bin/gpg-unlock.cljc` は `-rwxr-xr-x` だが
+`bin/ingest-mail.cljc` は `-rw-r--r--` で、`run-backup.cljc` はこの 2 つを
+**違う呼び方**で起動している:
+
+```
+(run bb ./bin/gpg-unlock.cljc)     ← bb 経由。実行ビット不要
+(run ./bin/ingest-mail.cljc)       ← 直接 exec。実行ビットが要る
+```
+
+`.py` だった頃は実行ビットが付いていた。`py → cljc` の改名で落ちたまま、
+呼び出し側は直接 exec のままになっている。**私の追いつき実行が成功したのは
+`save` モード（ingest を飛ばす）だったからで、`full` モードは通っていなかった。**
+
+直し方は 2 つ（どちらも他者ブランチ上のファイルに触るので未着手）:
+(a) `chmod +x bin/*.cljc` （最小）
+(b) `run-backup.cljc` の呼び出しを全部 `bb` 経由に揃える（`gpg-unlock` と
+    `ingest-drive` は既にそうなっており、**一貫していないのが今回の穴**）
+
+**したがって m365 の夜間は今も完走しない。** ただし今日の追いつきで
+committed 分は B2 と GitHub の両方に載っており、失われているデータは無い。
+
 ### 規則違反を 1 件記録する
 
 追いつき save で生まれた commit を保全するため `py-to-cljc-migration` へ push した。
