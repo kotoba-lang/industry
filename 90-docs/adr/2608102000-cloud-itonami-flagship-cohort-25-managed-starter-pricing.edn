@@ -191,7 +191,12 @@ force-push / rebase 無し。
 
 ## 残る gap（正直に）
 
-1. **item 4（nightly 再生成）は全 repo で死んでいる。** 既存 flagship 9 本を含め、
+1. ~~**item 4（nightly 再生成）は全 repo で死んでいる。**~~ → **2026-08-10 に 17/25 を
+   fleet へ移した（同日追記）。** 下の「item 4 の fleet 移行（2026-08-10 実施）」節を見ること。
+   残り 8 本は `regenerate.yml` 自体が壊れていることが gate で判明し、修正には
+   `workflow` OAuth scope が要るため未着手。以下は移行前に測った内容で、そのまま残す:
+
+   既存 flagship 9 本を含め、
    最後に走ったのは 2026-08-04 —— GitHub Actions を fleet 全体で無効化した日
    （ADR-2607300900）と一致する。`gh api .../actions/runs` で実測。
    **したがって item 4 は現在すべての flagship で名目だけである。**
@@ -225,6 +230,78 @@ force-push / rebase 無し。
    catalog に無い場合に面全体を壊すリスクを避けた。catalog 側の vertical 追加と
    セットで行う。
 5. **5210 / 3600 の価格は確度 low。** 実見積が 1 件でも観測できたら改定する。
+
+## item 4 の fleet 移行（2026-08-10 実施）
+
+`scripts/fleet-ci/gates/github_workflow_run.cljs` を直し、`gates.edn` に 17 本を登録した。
+
+### 直した穴 2 つ（どちらも「黙って嘘をつく」形だった）
+
+1. **`actions/checkout` が `noop-actions` に入っていた。** `with: {repository: ...}`、
+   つまり**別の repo** を持ってくる checkout まで no-op になり、classpath が消えたまま
+   `:runnable` と判定されていた。25 本中 **23 本**がこの形（兄弟 repo 2〜7 個）。
+   checkout は `checkout-kind` が中身を見て `:checkout-self` / `:checkout-repo` に分ける。
+2. **YAML パーサが flow map を文字列のまま返していた。** ファイル冒頭は
+   「複雑なフロー map は読めたら例外にする、黙って無視しない」と書いていたのに、
+   実際は黙って無視していた。`with: {repository: kotoba-lang/langchain, path: ...}` が
+   丸ごと 1 個の文字列になり `(get with \"repository\")` が nil を返す ——
+   **これが 1 の穴を見えなくしていた本体。** `flow-map` を足した。
+
+### gate がやること
+
+使い捨て workspace を組み、配られた tree を workflow が要求する位置
+（`path: orgs/cloud-itonami/<repo>`）へ置く → `repository:` 付き checkout を実 clone に
+翻訳 → 実 actor で demo を再生成 → **`git push` を含む step は実行しない**（gate は検証で
+あって公開ではない）→ **実行前後の sha256 を突き合わせ、committed 済みの生成物が
+動いたら落とす**。
+
+**workspace は self-path の有無に関わらず必ず作る。** 6201/6202 は `run:` の中で
+`git clone … ../../kotoba-lang/crm` と checkout の外へ書くので、in-place で走らせると
+手元では **west 管理の共有 checkout を汚す**（実測して気づいた）。
+
+drift 判定を workflow 自身の `git diff --quiet` に任せないのは、配られる tree が
+tar 展開で `.git` を持たず、`git diff` が「差分なし」ではなく *not a git repository* で
+落ちるため。実行前から在ったファイルだけを比較するので `npm install` の生成物は
+drift に数えない。
+
+### 落ちることを確かめた（実測 2026-08-10）
+
+| 対象 | 期待 | 実測 |
+|---|---|---|
+| isic-9522 無改変 | pass | **exit 0**（`no drift — 28 committed file(s)`） |
+| isic-9522 の committed な `operator-console.html` を 1 セルだけ手編集した copy | fail | **exit 1**（`drift docs/samples/operator-console.html`）。**workflow 自身の grep 2 本と行数検査は 3 つとも通ったまま** —— Actions 経路では構造的に検出できなかった形 |
+| isic-6910（依存欠落） | fail | **exit 1**（`Local lib io.github.cloud-itonami/inkan not found`） |
+| isic-9522 を `:include-ext` 相当（30→28 file）に絞った tree | pass | **exit 0** |
+| isic-6910 を egress 無しで analyze | unsupported | **`checking out 3 other repo(s) needs network egress`** |
+
+### gate が見つけた本物の欠陥
+
+**6910 の夜間再生成は 2026-08-09 から壊れていた。** `inkan` 依存が deps.edn に入った
+のが 08-09（commit 5aa714a）で、`regenerate.yml` は今も checkout していない。
+Actions の最終成功は 08-04 —— **依存が入った時点で CI は既に止まっていたので、
+壊れたことを誰にも報告されなかった。** これは ADR-2607300900 が言う「動いていない CI は
+green に見えたまま何も検査しない」の実例で、今回はさらに **workflow ファイルが残って
+いるせいで『検査されている』という誤った印象**まで与えていた。
+
+同じ検査を 25 本に当てると、**8 本の `regenerate.yml` が `deps.edn` の `:local/root` を
+全部 checkout していない**: 6910←inkan / 6311←org-ethereum-jsonrpc /
+6312←isic-6311 / 7310←langchain-store / 6420←kototama,langchain-store /
+2910←isic-0710,isic-2410,isic-2930 / 6612←kototama / 6622←kototama。
+
+**この 8 本は gates.edn に載せず、理由と共に名指しで残した。**「落ちるから外した」の
+ではない —— 直すには workflow ファイルの編集が要り、**このワークスペースの token は
+`workflow` OAuth scope を持たない**（CLAUDE.md に既出の制約）。scope が得られ次第
+checkout 行を足して登録する。
+
+### まだ確かめていないこと（正直に）
+
+- **実ノードでの 1 周は回していない。** 検証はすべてこの macOS 上で、gate を
+  直接呼んで行った。`tick.cljs` が配る tree の中身（`:include-ext` の効き）は
+  同じ拡張子集合で絞った copy を作って再現したが、ship 経路そのものは通していない。
+- **17 本ぶんの maven 解決がノードに乗る負荷**は測っていない。LPT スケジューラが
+  配分するが、初回は `~/.m2` が温まるまで重いはず。
+- **既存 flagship 9 本は未登録。** 6399 系は `npm install` + nbb 経路で形が違い、
+  同じ翻訳で通るか確かめていない。
 
 ## 手順上の実測（再発防止）
 
