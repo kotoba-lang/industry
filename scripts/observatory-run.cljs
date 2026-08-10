@@ -102,11 +102,28 @@
 (defn- due? [o]
   (let [h (get intervals (:name o))]
     (cond
-      ;; 間隔が計算されていない actor（known-broken / λ 未定義）は --due で走らせない。
-      ;; **既定を「走らせる」にしない** —— 起動しないものを毎時叩いても意味が無い。
-      (nil? h) false
-      (nil? (get last-run (:name o))) true
-      :else (>= (- (.now js/Date) (get last-run (:name o))) (* h 3600 1000)))))
+      ;; 間隔があるなら、それに従う。
+      (some? h)
+      (or (nil? (get last-run (:name o)))
+          (>= (- (.now js/Date) (get last-run (:name o))) (* h 3600 1000)))
+
+      ;; 間隔が無く、**一度も走っていない**なら 1 回だけ走らせる（bootstrap）。
+      ;;
+      ;; ここは 2026-08-10 に直した。旧実装は「間隔が無い = 走らせない」で一律
+      ;; false を返していたが、それは**新しく登録した actor が永久に走れない
+      ;; デッドロック**になっていた: 間隔は observatory-cadence が実測コストから
+      ;; 計算し、実測コストは run 台帳から読み、台帳は run しないと伸びない。
+      ;; 実際 hirameki を登録した直後、`--check` は「登録 OK」と言うのに
+      ;; `--due` は永久に素通りした。
+      ;;
+      ;; 旧コメントの意図（起動しないものを毎時叩かない）は保つ:
+      ;; **`:known-broken` は除く**、そして bootstrap は 1 回だけ —— 走れば台帳が
+      ;; 伸びて次から間隔が付き、走らなければ :known-broken に落ちて以後除外される。
+      (and (nil? (get last-run (:name o)))
+           (not= :known-broken (:expect o)))
+      true
+
+      :else false)))
 
 ;; --registry は gate の自己検査用（『この gate は落ちるのか』を別の登録簿で
 ;; 確かめるため）。運用では既定の manifest/observatories.edn を使う。

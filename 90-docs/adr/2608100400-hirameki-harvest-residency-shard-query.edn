@@ -121,12 +121,37 @@ kotobase ref を切るときは、その ref を跨げなくなる分析を名�
 - query-check: 8 項目すべて ok、改竄 2 種で exit 1
 - 観測 beat: 626 特許を shard から読み、frontier 1,323、chain OK、2 周目は no-change
 
+## west pin は「引用」であって「鏡」ではない
+
+corpus repo は 4 時間ごとに push される。`manifest/west.yml` の pin はそのたびに
+遅れる —— **これは不具合ではなく、常駐するデータ repo の pin の性質である。**
+pin は「この日にこの内容だった」という引用であって、live な鏡ではない。
+`west update` した checkout が最新でないことを後から「壊れている」と誤読しないよう
+ここに書いておく。live が要るなら repo を直接読む。
+
+pin を daemon に前進させることは**しない**: manifest への自動書き込みは
+CLAUDE.md が共有 checkout で禁じている経路であり、4 時間ごとに west.yml を
+書き換えると他セッションの manifest 作業と恒常的に競合する。
+
+## 検証（すべて実測。launchd 下での無人実行を含む）
+
+- toshokan-patents lib: 7 tests / 42 assertions、JVM と nbb 両方 green
+- hirameki actor: 60 tests / 261 assertions、0 failures
+- **launchd 無人実行: 20 tick → +20 特許（648 → 668）→ 再 publish → verify OK →
+  両 repo push 成功。** SSH push が launchd 下で通ることはこれで確かめた
+  （`secrets-location-map` が警告する Keychain 問題は、この経路では起きなかった）
+- query-check: 8 項目 ok、改竄 2 種（属性改名 / inventor 混入）で exit 1
+- 観測 beat: observatory-run 経由で `:produces-datoms`、Δbytes 18,680、1h 間隔で登録
+
+**常駐は「設定した」ではなく「無人で 1 周完走して台帳が伸びた」ことで確認した。**
+最初の無人実行は log が「20 ticks · 20 new patents」と言いながら台帳が
+`patents 0, published false, actor :push-failed` と言っており、3 つの実バグ
+（旧パス計測 / remote 名 / git の非 0 exit を捨てていた）を暴いた。**ログではなく
+台帳を見ること。**
+
 ## 残っている穴
 
-1. **LaunchAgent の push が launchd 下で通るかは未検証。** `secrets-location-map` は
-   「launchd 下では kagi が使えない（Keychain unlock prompt を出せない）」と記している。
-   harvest は取得に鍵を要さないが **push には SSH 鍵が要る**。bootstrap して
-   `hirameki-harvest.ledger.edn` が伸びるかで確かめる —— ログではなく台帳を見る。
-2. **CPC が無い**（USPTO ODP key が operator ステップ）。
-3. **content remote 未設定**（入れるものが無いため。3 節のとおり）。
-4. **コンソール未 deploy。**"}]
+1. **CPC が無い**（USPTO ODP key が operator ステップ。field 面の分析は curated 7 件のみ）
+2. **content remote 未設定**（annex に入れるものが無いため。上記 3 節のとおり）
+3. **コンソール未 deploy**（build も監査も通るが sites plane に出していない）
+4. **kotobase の ref を切っていない**（consumer が無いうちは切らない。上記のとおり）"}]

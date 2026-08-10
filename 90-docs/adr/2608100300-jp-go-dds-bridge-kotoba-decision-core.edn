@@ -91,23 +91,59 @@
    chunk 分割は mechanism であって policy ではないので、**別の chunk 幅で同じ
    バイト列になること**を gate が別途 assert する（32 と 16 の 2 通り）。
 
-   ### 2. bool 述語の型が合わない箇所がある
+   ### 2. string 述語が `:bool` ではなく `:i64` を返す
 
-   compiler `875e388` で実測: `if` の片枝が `false` リテラル・もう片枝が
-   `string=?` 呼び出しだと `if branches must have the same value type` で落ちる。
-   リテラル同士なら通る。追加で測った 5 形の結果:
+   **この節は 2026-08-10 に書き直した。初版の診断は誤りだった。**
+   初版は「`if` の片枝が `false` リテラル・もう片枝が呼び出しだと型が合わない
+   （リテラル同士なら通る）」と書いたが、追加で測ると
+   `(defn f [a :i64] :bool (if (< a 2) false (= a 3)))` は **通る** ——
+   `=` も呼び出しである。リテラルと呼び出しの対立ではなく、**述語自身の型**が
+   すべてだった。
+
+   真因: **`string=?` と `string-contains?` は今も `:i64` を返す。**
+   compiler ADR 0191（profile 5、2026-07-30）が
+   `= < > <= >= not not= zero? pos? neg? empty? some?` を `:bool` へ移したとき、
+   string 述語 2 つが取り残された。同じ `kotoba-sema` frontend.cljc の中で、
+   後から入った `string-index-contains` は `:bool` を返している。
+
+   compiler `875e388` / kotoba-sema `6568fb7` に対して測った 8 形:
 
    | 形 | 結果 |
    |---|---|
-   | `false` vs `(string=? …)` | REJECT |
-   | `false` vs 入れ子 if（リテラル同士） | OK |
-   | `(string=? …)` vs `(string=? …)` | REJECT: expected bool, got i64 |
-   | bool を返す再帰 | OK |
-   | i64 を返す再帰 | OK |
+   | `:bool` 宣言で `(string=? a b)` | REJECT: expected bool, got i64 |
+   | `:bool` 宣言で `(string-contains? a \"x\")` | REJECT: expected bool, got i64 |
+   | `:i64` 宣言で `(string-contains? a \"x\")` | OK |
+   | `:bool` 宣言で `(= a b)` | OK |
+   | `(not (string=? a b))` を `:bool` で | OK |
+   | `(and (string=? …) (string=? …))` | REJECT: expected bool, got i64 |
+   | `(if (string=? a \"x\") 1 0)` | OK（if の test は i64 も受ける） |
+   | `(if (< a 2) false (= a 3))` を `:bool` で | OK |
 
-   `double-dash-prefixed?` は入れ子 `if` で書き、**TEMPORARY と撤去条件を
-   モジュールに明記**した。compiler ADR 0219 がこれを『backend ではなく
-   interpreter の gap』と呼び、ADR 0191 が解消を breaking / opt-in と測っている。
+   ### これは安全設計か、成熟度不足か（オーナー質問 2026-08-10）
+
+   **成熟度不足。** `lang/surface-status.edn` の `:classification-rule` は、
+   安全制約（`:intentional-security-constraint`）を名乗るのに
+   **named invariant + fail-closed 強制 + ADR** の 3 点を要求し、既定は
+   `:not-yet-implemented`＝*\"Not a safety prohibition\"*。string 述語の型付けは
+   3 点のどれも持たない。さらに profile 5 の意図は**逆向き**で、
+   `:bool-is-a-type-not-a-number` は「述語が `and`/`or`/`not` で合成できる
+   ように」存在する。したがってこれは Kotoba の安全設計の帰結ではなく、
+   **profile 5 移行の取り残し**である。
+
+   ただし**閉じるのは breaking**で、その理由も設計ではなくデータの側にある:
+   `compiler/resources/kotoba/lang-conformance/values/string_contains_kit.kotoba`
+   が `(+ (string-contains? …) (string-contains? …))` と書いて i64 の和を
+   assert している。conformance vector の移行が要るので、
+   **勝手に言語を変えず記録に留めた** —— ADR 0191 自身が profile 4→5 の break を
+   『Owner decision』として記録しているのと同じ種類の判断だから。
+
+   上流に `lang/surface-status.edn` の
+   `:other-gaps :string-predicate-typing` として 8 形の実測とともに登録した
+   （kotoba-lang `a5f52b5`）。
+
+   `double-dash-prefixed?` は `(if p true false)` 相当の入れ子 `if` で書き、
+   **TEMPORARY と撤去条件をモジュールに明記**した。これは ADR 0191 が
+   『機械的』と呼ぶ `(if p 1 0)` 移行の逆方向にすぎない。
 
    ## この slice が示したこと
 
@@ -120,16 +156,36 @@
      知らない。cohort を引くときは inventory と現在の依存実測の両方を見る。"
 
   :adr/next
-  "- `lang/w6-migration-inventory.edn` の design-system cohort に jp-go-dds を
-     足す（`:default-class :portable-pure` / `:status :document-layer-migrated`）。
-     これは kotoba-lang 側の変更なので別 PR。
-   - `jp-go-dds.tokens/root-css` はまだ `.cljc`。`str/index-of` + `subs` +
-     `ex-info` で書かれており、`[:result T E]` へ移すのが次の自然な 1 スライス。
-   - `jp_go_dds/core.cljc`（364 行、opts → hiccup）は W4 の recursive value と
-     `html_document.kotoba` の上に載る候補だが、component 単位で切ること。
-   - chunk 上限 32 は design-system 規模の payload に対して低い。kotoba-kir へ
-     『bridge のような flat な token 表が 1 値に入らない』を実例として報告する
-     価値がある（上限を上げる要求ではなく、実測の 1 件として）。"
+  "## 2026-08-10 に片付いた分
+
+   - **slice 2 = dark ramp の鏡映**（jp-go-dds `d59e60e`）。`jp-go-dds.dark` が
+     docstring で宣言する唯一の規則 `ramp の i 番目 → (n-1-i) 番目` を
+     `kotoba/dark_mirror.kotoba` が持つ。gate は vendored `dds.css` に実在する
+     **12 本の ramp 全部**（各 12〜13 段）と **156 件の literal 全件**。
+     `mirror-index` を `(- n i)` に壊すと 0 → 15 failures。
+   - **inventory 登録**（kotoba-lang `a5f52b5`）。W6 design-system cohort に
+     jp-go-dds を追加し、実測 bound を併記。
+   - **string 述語 gap の上流登録**（同上）。
+
+   ## `root-css` は次のスライスに「できない」（測って分かった）
+
+   `jp-go-dds.tokens/root-css` を `[:result T E]` 化する案は成立しない。入力の
+   `dds.css` が **72,114 バイト**で `string-value-byte-limit` **65,536** を
+   超えるため、guest 関数がその文字列を受け取れない。ただし `:root` ブロック
+   だけなら **8,617 バイト**で収まるので、**入力を sheet 全体で取るのをやめれば**
+   道は開く。**サイズではなく「正規表現でテキストを走査する」ことが本当の障害**
+   （`light-literals` / `ramps` / `opacity-inverted` も同じ理由で `.cljc` 据え置き）。
+
+   ## 次
+
+   - `jp_go_dds/core.cljc`（364 行、opts → hiccup）を **component 単位**で。
+     W4 の recursive value と `html_document.kotoba` の上に載る。
+   - 走査をやめて宣言データにする設計変更（`dds.css` の parse 結果を vendor 時に
+     EDN として書き出す）。これが入れば dark の残り半分も移せる。
+   - chunk 上限 32 は design-system 規模の flat な表に対して低い。実測の 1 件と
+     して kotoba-kir に報告する価値がある（上限を上げる要求としてではなく）。
+   - string 述語 gap を実際に閉じるかはオーナー判断。閉じるなら conformance
+     vector（`string_contains_kit.kotoba`）の移行が同時に要る。"
 
   :adr/references
   "ADR-2607279200 (Kotoba-centered migration の方向、正本) /
