@@ -272,8 +272,15 @@ kotobase の `.well-known/x402` は現在、resource 一覧を **route handler �
 ## やっていないこと（follow-up、優先順）
 
 1. **treasury の分離**（D6-2）。murakumo と kotobase が同一 Safe を指している。新しい Safe の deploy と secret 更新はオーナーの custody 行為で、agent が代行しない。
-2. **shadow の log を突き合わせ可能にする**（D3 の残り。旧 follow-up 2「実配線を live で観測」は 2026-08-10 に解消済み）。`/committed` は**耐久的な log ではなく直近のブロックに対する projection** で、実測で 0 → 4 → 0、0 → 2 と増減する（`blocks-known` は 8 のまま）。commit 自体は起きているが古いものは落ちるので、**docstring が shadow の存在理由として挙げている「あとで 2 つの log を突き合わせる」が今日はできない。**
-   もう 1 つ: fan-out は同じ proposal を 4 replica 全部の pending に入れ、各 leader が自分の pending から提案するので、**1 件の submit が複数回 commit される**（head 解決は正しいが件数は水増しになる）。どちらも「届いていない」ではなく「届いた後の形」の問題で、authoritative へ進む前に解く。
+2. ~~shadow の log を突き合わせ可能にする~~ **解消（2026-08-10、`network-awai/net-kotobase@9ad3ef4`）。**
+   2 つの穴を 1 つの機構で閉じた —— **committed head record を共有 object store に `committed/<ref>/<seq>` で落とす**（R2 binding `INGA_LOG`、bucket `inga-replica-testnet-log`）。
+   - **穴 A: `/committed` が耐久 log ではなかった。** `replica_do` の header 自身が「blocks と head records は共有 object store に live する」と書いていたのに、**それを書くコードが無かった**。唯一の実体は replica のメモリ上の `:committed` で、`inga.replica/snapshot` は `(take-last 1 :committed)` しか保持しない（bounded snapshot は `resume` の存在理由そのものなので、これ自体は正しい）。DO の eviction のたびに log が切り詰められ、実測で 0 → 4 → 0、0 → 2 と増減していた。**commit は本物で、log が本物ではなかった。**
+   - **穴 B: 1 件の submit が複数回 commit される。** fan-out が同じ proposal を 4 replica 全部の pending に入れ、各 leader が自分の pending から提案するため。head 解決は正しいが件数が水増しになる。
+   - **key が dedup そのもの** —— `(ref, seq)` は ref plane が調停している identity で、同じ record の 4 回の commit は 1 つの key への 4 回の書き込みになる。書き込みは `If-None-Match: *` の first-write-wins（異なる record が同じ `(ref, seq)` を争うのは quorum が決める話で、勝者は log の順序）。
+   - **sink は `advance!` に置く**（3 つの call site ではなく）。`mirror-to-inga!` が二度踏んだ「決定を 1 箇所にしても call site が複数なら足りない」を繰り返さないため。`state.waitUntil` —— await でも fire-and-forget でもなく。
+   - **これは ADR-2608039000 の premise ではない。** bucket を消しても ref plane は不変で、失われるのは*観測できること*だけ。projection であって premise ではない。`/committed` は `source`（`object-store` / `replica-memory`）を返し、どちらが答えたかを黙らない。
+   - live 実測: 同一 record を 3 回 submit + 別 seq 1 回 → `records 2`（旧コードは同条件で 16 を報告）。実 transact 1 本 → 2 → 3（以前は同じ transact が 2 件を作った）。`?ref=<graph>` の head の `cid` が transact の返した `commit` と一致 —— **B2 の head と inga の head を突き合わせられるようになった**（shadow の存在理由）。
+   - 残り: authoritative へ進むには `->inga-record` の `prev` が nil であること（seq 0 からの backfill が無い）を解く必要がある。`inga.ref/head-of` は 0 から連続で歩くので、途中から mirror し始めた既存 graph は inga 面で head を解決できない。
 3. **x402 challenge の stock 語彙と deal state**（D5 の (1)(2)）。
 4. **kura を `IObjectStore` 面に接続**（D1）。DataLad/annex 経路から。
 5. **暗号 epoch 1 への移行**（D4）。4 binding の provision と legacy block の移行。
