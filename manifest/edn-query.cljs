@@ -1076,15 +1076,34 @@
                          :source/file (str f))))
               files))))
 
-;; ---------- patent bibliographic（category J — toshokan-patents、ADR-2607251552） ----------
-;; toshokan-patents repo の 80-data/public/*.journal.edn（quads [entity attr value tx op]
-;; — toshokan と同じ ADR-2607072300 形）。lei-tos と同型でロードする。
+;; ---------- patent bibliographic（category J — hirameki-patents、ADR-2608100100） ----------
+;; cloud-itonami/hirameki-patents の 80-data/public/*.journal.edn（quads
+;; [entity attr value tx op] — toshokan と同じ ADR-2607072300 形）。lei-tos と同型。
 ;; :patent/applicant-lei が埋まっていれば :company/lei と join（財務×法人×特許）。
+;;
+;; ⚠ 2026-08-10 に corpus が kotoba-lang/toshokan-patents から移った
+;; （ADR-2608100100: kotoba-lang は lib だけを持つ）。**この loader は移動の翌日まで
+;; 消えた dir を読んでいて、面の特許は 0 件になっていた** —— しかも旧実装は dir が
+;; 無いと黙って [] を返すので、count は「読み込めなかった」ではなく「特許が無い」に
+;; 見えた。CLAUDE.md「握り潰した分は必ず stderr で報告する」に従い、
+;; **corpus repo が checkout されていないことを警告する**。
 
-(defn toshokan-patents-entities [next-tempid!]
-  (let [dir (io/file root "orgs" "kotoba-lang" "toshokan-patents" "80-data" "public")]
+(defn hirameki-patents-entities [next-tempid!]
+  (let [dir (io/file root "orgs" "cloud-itonami" "hirameki-patents" "80-data" "public")
+        legacy (io/file root "orgs" "kotoba-lang" "toshokan-patents" "80-data" "public")]
+    (when (.exists legacy)
+      (binding [*out* *err*]
+        (println (str "edn-query: WARNING hirameki-patents: 旧パス "
+                      "orgs/kotoba-lang/toshokan-patents/80-data/public が残っている。"
+                      "corpus は cloud-itonami/hirameki-patents へ移った（ADR-2608100100）。"
+                      "旧パスは読まない。"))))
     (if-not (.exists dir)
-      []
+      (do (binding [*out* *err*]
+            (println (str "edn-query: WARNING hirameki-patents: "
+                          "orgs/cloud-itonami/hirameki-patents/80-data/public が無い — "
+                          "特許は load されない（west update 未実行）。"
+                          "count 0 は「特許が無い」ではなく「読めていない」。")))
+          [])
       (let [files (->> (.listFiles dir) (filter #(.endsWith (.getName %) ".journal.edn")) (sort-by #(.getName %)))
             skipped (atom [])
             out (mapcat
@@ -1100,10 +1119,10 @@
                                 :db/id (next-tempid!)
                                 :patent/entity-id (str eid)
                                 :patent/applicant-norm (vec (keep normalize-name applicants))
-                                :source/dataset "toshokan-patents"
+                                :source/dataset "hirameki-patents"
                                 :source/file (str f))))))
                  files)]
-        (warn-skipped! "toshokan-patents journal" @skipped)
+        (warn-skipped! "hirameki-patents journal" @skipped)
         out))))
 
 ;; ---------- fleet 状態データ（category K） ----------
@@ -1832,7 +1851,7 @@
         yabai-tx (yabai-passive-dns-entities next-tempid!)
         tadori-tx (tadori-threat-intel-entities next-tempid!)
         kakekomi-tx (kakekomi-entities next-tempid!)
-        patent-tx (toshokan-patents-entities next-tempid!)
+        patent-tx (hirameki-patents-entities next-tempid!)
         accounts-tx (internet-accounts-entities next-tempid!)
         innen-tx (innen-entities next-tempid!)
         awai-tx (awai-yakuwari-entities next-tempid!)

@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  com.gftd.hirameki-harvest.plist — 公開特許 corpus の収集 heartbeat。ADR-2608100200。
+
+  ⚠ このファイルのコメントに 2 連ハイフンを書かないこと。XML のコメントは
+  それを含められないので、書いた瞬間 plist が壊れる。壊れた plist は
+  エラーを出して落ちるのではなく launchd が読み込まないだけなので、
+  「設定したのに一度も走っていない」という一番気付きにくい壊れ方をする。
+  （com.gftd.observatory-run.plist が 2026-08-08 に実際に踏んだ）
+
+  なぜ observatory-run と別の plist なのか:
+  observatory-run.plist は自分でこう定めている ．．． 外向きの fetch/publish を
+  無人の毎時 run に黙って混ぜない、混ぜるなら別 plist にしてその旨を書く。
+  hirameki の autorun は観測だけでネットワークに触らないので observatory-run に
+  乗る。harvest は 1 tick 1 外部リクエストなので、その規約どおりここに分けた。
+  同じプロセスに入れると「観測を毎時回す」判断が「Google Patents を毎時叩く」
+  判断を暗黙に含んでしまう。
+
+  なぜ fleet ノード（mac-mini 10 台）に配らないのか:
+  ノードは外向き HTTPS を持っている（CLAUDE.md、2026-08-05 に全ノード実測）。
+  それでも配らない理由が 2 つある。
+
+    1. 並列化はこの仕事では劣化である。この source の規約は
+       「識別可能な User-Agent・逐次・低レート」。10 ノードから並列に叩けば
+       速くはなるが、それは守ると決めた礼儀を破ることでしか得られない速さで、
+       要件ではない。
+    2. 書き込みに credential が要る。fleet-ci の不変条件は
+       「ノードにはテストだけを配り、秘密情報を配らない」。取得は鍵不要だが
+       corpus への push は鍵が要るので、ノードに置くなら
+       「取得だけノード / commit は operator」に割ることになり、1 の理由で
+       得るものが無い。
+
+  したがって newsfeed-ingest / observatory-run と同じ operator 常駐。
+
+  間隔（4 時間ごと・1 回 20 tick = 1 日 120 リクエスト）の根拠:
+  観測 2026-08-10 時点で未取得フロンティアは 1,331 件。ただし 1 件取るごとに
+  平均 3.96 件を引用しており、そのうち約 68 パーセントは未取得なので、
+  フロンティアは取っても縮まない（増える）。つまりこれは有限のキューではなく
+  発見過程であり、間隔が決めるのは「いつ終わるか」ではなく「corpus がどれだけの
+  速さで伸びるか」である。1 日 120 件 = 年 4 万件強、journal で年 48 MB 程度。
+  レートは source に対して十分低い（平均 12 分に 1 リクエスト）。
+
+  :37 分に起きるのは fleet-ci-sweep (4:17) / newsfeed-ingest (5:23) /
+  observatory-run (:11) と衝突させないため。同時刻に走らせるとどちらの負荷か
+  切り分けられない。
+
+  前提: clojure CLI と nbb が PATH に居ること。west checkout に
+        orgs/cloud-itonami/hirameki と orgs/cloud-itonami/hirameki-patents が
+        materialize されていること（無ければ script が clone せずに報告して落ちる）。
+
+  導入:
+    cp scripts/fleet-ci/com.gftd.hirameki-harvest.plist ~/Library/LaunchAgents/
+    plutil -lint ~/Library/LaunchAgents/com.gftd.hirameki-harvest.plist
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.hirameki-harvest.plist
+    launchctl kickstart -p gui/$(id -u)/com.gftd.hirameki-harvest
+  停止:
+    launchctl bootout gui/$(id -u)/com.gftd.hirameki-harvest
+  動いているかを見る:
+    tail 90-docs/observatory/hirameki-harvest.ledger.edn
+    （台帳が伸びていなければ走っていない。ログではなく台帳を見ること）
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.gftd.hirameki-harvest</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <!-- 実体は scripts/hirameki-harvest.cljs。plist にロジックを書かない
+         （launchctl は編集のたびに bootout/bootstrap が要り、直せなくなる）。
+         cwd が superproject root である必要がある（入力パスを git rev-parse で
+         解決しているため）。 -->
+    <string>cd /Users/junkawasaki/github/com-junkawasaki &amp;&amp; exec /opt/homebrew/bin/nbb --classpath ".:scripts/nbb_compat" scripts/hirameki-harvest.cljs --ticks 20</string>
+  </array>
+
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>1</integer><key>Minute</key><integer>37</integer></dict>
+    <dict><key>Hour</key><integer>5</integer><key>Minute</key><integer>37</integer></dict>
+    <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>37</integer></dict>
+    <dict><key>Hour</key><integer>13</integer><key>Minute</key><integer>37</integer></dict>
+    <dict><key>Hour</key><integer>17</integer><key>Minute</key><integer>37</integer></dict>
+    <dict><key>Hour</key><integer>21</integer><key>Minute</key><integer>37</integer></dict>
+  </array>
+
+  <!-- bootstrap 直後に走らせない（fleet-ci / observatory-run と同じ）。 -->
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/hirameki-harvest.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/hirameki-harvest.err</string>
+</dict>
+</plist>

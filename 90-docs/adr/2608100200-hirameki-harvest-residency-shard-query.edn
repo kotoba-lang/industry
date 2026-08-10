@@ -1,0 +1,131 @@
+[{:db/id -1
+  :adr/id "2608100200"
+  :adr/title "特許収集を常駐化する — journal を shard 化し、query 面を検査に変える"
+  :adr/status "accepted"
+  :adr/date "2026-08-10"
+  :adr/related "2608100100 2608081200 2608082600 2607072300 2608039700 2607173000 2605241500"
+  :adr/body
+  "## 決定
+
+オーナー指示（2026-08-10）「収集を安定して murakumo fleet で常駐化して、データは
+datalad, edn で保存, datomic, kotoba query ができるように」。4 つに分けて実装した。
+
+## 1. 常駐化 — observatory-run とは別 plist にする
+
+`com.gftd.observatory-run.plist` は自分でこう定めている: **外向きの fetch/publish を
+無人の毎時 run に黙って混ぜない。混ぜるなら別 plist にして、その旨を書く。**
+
+hirameki の **autorun は観測だけ**（ネットワークに触らない）なので既存の
+observatory-run（毎時 :11、`--due`）に乗る。**harvest は 1 tick 1 外部リクエスト**
+なので `com.gftd.hirameki-harvest.plist`（4 時間ごと、1 回 20 tick）に分けた。
+同じプロセスに入れると「観測を毎時回す」判断が「Google Patents を毎時叩く」判断を
+暗黙に含んでしまう。
+
+**fleet ノード（mac-mini 10 台）には配らない。** ノードは外向き HTTPS を持っている
+（2026-08-05 に全ノード実測）が、配らない理由が 2 つある:
+
+1. **並列化はこの仕事では劣化である。** この source の規約は「識別可能な
+   User-Agent・逐次・低レート」。10 ノードから並列に叩けば速いが、それは守ると
+   決めた礼儀を破ることでしか得られない速さで、要件ではない。
+2. **書き込みに credential が要る。** fleet-ci の不変条件は「ノードにはテストだけを
+   配り、秘密情報を配らない」。取得は鍵不要でも corpus への push は鍵が要るので、
+   ノードに置いても 1 の理由で得るものが無い。
+
+したがって newsfeed-ingest / observatory-run と同じ operator 常駐。
+運用側は `scripts/hirameki-harvest.cljs` が持ち、observatory-run から
+4 つの不変条件を継承する: exit 0 を成功の証拠にしない / FF できなければ何もしない /
+自分のファイルだけ commit する / 落ちたら台帳に理由付きで残す。
+
+## 2. journal の shard 化 — 常駐を安全にするための前提
+
+**これが無いと常駐させてはいけなかった。** journal は 1 ファイルで、しかも中身は
+**691 KB の 1 行**（`(pr-str (vec quads))`）だった。両方とも 618 特許では見えず、
+4 万特許で致命的になる:
+
+- git は commit ごとに journal 全体の新しい blob を保存する。20 tick × 6 run/day で
+  44 MB の journal に対しては、1 日 8 KB の新事実を記録するために**1 日 5 GB の
+  git object** を書くことになる。
+- 1 行のファイルは delta 圧縮を無効化し、`git diff` / `git blame` を
+  **ADR-2607072300 が正本と定めたまさにその artifact に対して**無意味にする。
+
+`toshokan-patents.quad` に `render-journal`（1 quad 1 行、ただし top-level は
+1 つの EDN vector のまま = 既存の全 reader が無改造で動く）と `append-sharded!`
+（1 MiB で封をして次へ）を入れた。**封をした shard は二度と変わらない**ので git は
+1 度だけ保存し、annex も後から取れる。書き換わるのは有界な active shard だけ。
+
+shard は subdirectory ではなく同じ dir に `<source>.NNNN.journal.edn` として置いた。
+`*.journal.edn` を glob する consumer（query 面 / corpus fold / verify）が無改造で
+動くため。移行は目視でなく**等値で検証**した: 10,614 quads が同じ順序の 10,614
+quads として読み戻り、691,043 バイト 1 行が 10,616 行になった。
+
+## 3. DataLad — annex に入れないことを「決定」として書く
+
+corpus repo は 2026-08-10 に本物の DataLad dataset になった（`datalad create`、
+annex 初期化済み、uuid 321b04b1）。**そして何も annex に入れていない。**
+
+これは未着手ではなく決定である。1 MiB の封済み shard は git が 1 度だけ保存するので
+成長は「事実に対して線形」であり「commit に対して二次」ではない。そのサイズで annex 化
+すると、正本に対する `git diff` / `git blame` を失って何も得ない。
+
+**annex は git が本当に苦手なもののためにある** —— USPTO ODP / EPO OPS が吐く
+数 GB の単一ファイル（`*.tsv` / `*.raw.edn`、行構造が無い）。**その最初の 1 本が
+着地したとき content remote が要る**（B2 か IPFS、`large-binary-datalad` の規約）。
+今設定しないのは入れるものが無いからで、そもそも GitHub は annex content を配れない
+（`git-annex-shell` が無い）。
+
+## 4. Datomic / kotoba query — 主張ではなく検査にする
+
+**`verify.clj` が証明するのは「バイトが manifest と一致する」であって
+「この corpus に問いを立てられる」ではない。** shard 群は完璧にハッシュが合ったまま、
+transact できない形や、join したい属性が存在しない形になりうる。
+
+そこで `query-check.clj` を足した: `datoms/*.kotoba.edn` を全部 DataScript に
+transact し、実際のクエリを走らせる —— 保有者別の件数（299 組織）、管轄の roll-up
+（10）、`:kansai-paint` とその 41 件の join、解放クロックの数値比較（589 件が期限超過）。
+さらに **G1/G2/G6 が「書いたコード」ではなく「公開された artifact」の側で成立する**
+ことを検査する。
+
+**両方向で落ちることを確認した**: 全 shard で assignee 属性を改名 → exit 1、
+inventor 属性を混入 → exit 1。最初の試行は 3 shard のうち 1 つだけ改名しており
+gate は緑のままだったが、これは正しい（他の shard がまだ答えられた）——
+**gate が生き延びた改竄は gate が弱い証拠ではなく、改竄が弱い証拠である。**
+
+superproject 側の datom 面（`manifest/edn-query.cljs`）も直した。ADR-2608100100 で
+corpus を移した翌日まで**消えた dir を読んでいて特許 0 件**になっており、しかも旧実装は
+dir が無いと黙って `[]` を返すので count は「読めなかった」ではなく「特許が無い」に
+見えていた。新パスへ向け直し、**corpus が checkout されていないことを stderr で警告する**
+ようにした。
+
+実測できた join（3 dataset 横断）:
+
+    特許 → 正規化出願人 → LEI → SEC 財務
+    [\"Pfizer Inc.\" 62579000000 \"Biotin intermediates\"]
+
+一致は 1 件だけである。corpus が小さく、Google Patents の出願人表記が LEI の
+legal-name と揃うことが稀なため。**これは join が届く証明であって、被覆の証明ではない。**
+
+## kotobase の ref をまだ切らない
+
+kotobase の Datalog join は ref ちょうど 1 本しか届かない（ADR-260726）。特許を
+どの ref に置くかは「何と join できなくなるか」を決める不可逆な選択なので、
+**consumer が無いうちに切らない。** 現在 join したい相手（法人実体・財務）は
+`edn-query.cljs` の datom 面に既に同居しており、そこで join できている。
+kotobase ref を切るときは、その ref を跨げなくなる分析を名指しで書くこと。
+
+## 実測
+
+- toshokan-patents lib: 7 tests / 42 assertions、JVM と nbb の両方で green
+- hirameki actor: 60 tests / 261 assertions、0 failures
+- harvest 実走: 8 tick → +8 特許（618 → 626）→ 再 publish → verify OK → commit
+- query-check: 8 項目すべて ok、改竄 2 種で exit 1
+- 観測 beat: 626 特許を shard から読み、frontier 1,323、chain OK、2 周目は no-change
+
+## 残っている穴
+
+1. **LaunchAgent の push が launchd 下で通るかは未検証。** `secrets-location-map` は
+   「launchd 下では kagi が使えない（Keychain unlock prompt を出せない）」と記している。
+   harvest は取得に鍵を要さないが **push には SSH 鍵が要る**。bootstrap して
+   `hirameki-harvest.ledger.edn` が伸びるかで確かめる —— ログではなく台帳を見る。
+2. **CPC が無い**（USPTO ODP key が operator ステップ）。
+3. **content remote 未設定**（入れるものが無いため。3 節のとおり）。
+4. **コンソール未 deploy。**"}]
