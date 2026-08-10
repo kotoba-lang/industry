@@ -156,7 +156,47 @@
      知らない。cohort を引くときは inventory と現在の依存実測の両方を見る。"
 
   :adr/next
-  "## 2026-08-10 に片付いた分
+  "## slice 3 — palette を宣言データにし、dark の判断を載せた（jp-go-dds `bf9d067`）
+
+   slice 2 が『走査は Kotoba へ移せない、移行ではなく設計変更が先』と記録した。
+   その設計変更をやった:
+
+   - **`scripts/palette.cljs`** が vendor 時に走査を 1 回だけ走らせ、
+     `resources/jp_go_dds/palette.edn`（literals 156 / ramps 12 / all 177 と
+     source の sha256）を書く。**走査の実装は 1 箇所のまま** ——
+     このスクリプトは自前の parser を持たず `jp-go-dds.dark` の公開関数を
+     呼んで直列化するだけ。`scripts/vendor.cljs` が最後に必ず呼ぶ
+     （再 vendor して EDN を作り忘れると dark が前の上流の palette を描き続ける）。
+   - **`kotoba/dark_declarations.kotoba`** が dark / light / snapshot の 3 セット、
+     white/black の例外、scrim 反転を持つ。退避が要るのは反転が対合だから ——
+     ramp の両半分を同じ要素に向け合わせると CSS custom property の循環になり
+     両方無効になるので、両側とも `--dds-light-*` の複製だけを参照する。
+   - gate: 12 ramp × 3 セットで `jp-go-dds.dark` と一致。`mirror-index` を壊すと
+     0 → **11 failures**、`palette.edn` の 1 値を書き換えると 0 → **1 failure**。
+   - **移植の前提を実データに対して assert した** —— scrim 12 件が
+     `rgba(0, 0, 0, ` で始まること（再 vendor で空白が変わると暗い地に黒い
+     scrim が残る）、white が ramp base でないこと。
+
+   ## slice 4 — 最初の component（jp-go-dds `16a86aa`）
+
+   component が決めているのは markup（1 要素 + テキスト 1 つ）ではなく**属性**:
+   ①既定値（`solid-fill` / `md`）②要素の選択（`:href` があれば `<a>`、
+   無ければ `type` と `disabled` を取りうる `<button>`）③**優先順位**
+   （`class` / `data-type` / `data-size` は `:attrs` の後に当たり上書き不可 ——
+   これが component の同一性で、上書きできると consumer は selectable hook を
+   得るために DADS の CSS を app へ複製することになる）。
+
+   `kotoba/button.kotoba` がこの 3 つを持ち、16 通りの opts 行列
+   （両要素・全オプション・owned 3 つを全部奪おうとする passthrough を含む）で
+   `jp-go-dds.core/button` と突き合わせる。実測: `owned?` から `class` を
+   落とすと 0 → **2 failures**、既定 size を `\"lg\"` にすると 0 → **17 failures**。
+
+   属性は **sort ではなく固定順**で出す（document entry の比較子が要る割に
+   得るものが無く、順序があるから比較が成立する）。optional は
+   `[:option :string]` ではなく `\"\"` を不在とする `:string`
+   （native word-typed admission gate の内側に収まる）。
+
+   ## 2026-08-10 に片付いた分
 
    - **slice 2 = dark ramp の鏡映**（jp-go-dds `d59e60e`）。`jp-go-dds.dark` が
      docstring で宣言する唯一の規則 `ramp の i 番目 → (n-1-i) 番目` を
@@ -178,14 +218,29 @@
 
    ## 次
 
-   - `jp_go_dds/core.cljc`（364 行、opts → hiccup）を **component 単位**で。
-     W4 の recursive value と `html_document.kotoba` の上に載る。
-   - 走査をやめて宣言データにする設計変更（`dds.css` の parse 結果を vendor 時に
-     EDN として書き出す）。これが入れば dark の残り半分も移せる。
+   - **残りの component**（heading / accordion / input-text / textarea /
+     checkbox / radio / form-field / select / table / chip-label / divider /
+     notification-banner）。button と同じ形で、判断は属性に集中している。
+     `select` と `notification-banner` は分岐が多いので単独で 1 スライス。
+   - **`resolve-dark`** は走査結果の上での**グラフ探索**（別名を literal まで
+     辿る）で、これまでの 4 スライスと形が違う。`dark_test` がコントラスト比を
+     測るのに使っているので、移すなら測定側も一緒に見る。
    - chunk 上限 32 は design-system 規模の flat な表に対して低い。実測の 1 件と
      して kotoba-kir に報告する価値がある（上限を上げる要求としてではなく）。
    - string 述語 gap を実際に閉じるかはオーナー判断。閉じるなら conformance
-     vector（`string_contains_kit.kotoba`）の移行が同時に要る。"
+     vector（`string_contains_kit.kotoba`）の移行が同時に要る。
+
+   ## この 4 スライスで分かった、進め方の形
+
+   1. **判断だけ切る。** markup でも走査でも rendering でもなく、既定値・
+      分岐・優先順位・規則。切る単位が『判断』のとき parity gate が自然に書ける。
+   2. **走査（テキスト → 構造）は移さず、先に宣言データにする。** 移してから
+      考えると正規表現を Kotoba で書き直すことになる。
+   3. **前提は実データに対して assert する。** scrim の綴り・white が ramp base
+      でないこと・ramp が 32 に収まること —— 全部『たぶんそう』で済ませられた
+      ところで、済ませていたら再 vendor で静かに壊れる。
+   4. **gate は壊して落ちることを見てから landed とする。** 4 スライスすべてで
+      実施（4 → 15 / 11 / 2・17 failures）。"
 
   :adr/references
   "ADR-2607279200 (Kotoba-centered migration の方向、正本) /
