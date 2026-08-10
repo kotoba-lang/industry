@@ -1,34 +1,34 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 17087,
-  "app-aozora-appview" 14383,
-  "app-aozora-spa" 7263},
+ {"app-aozora-pds" 17182,
+  "app-aozora-appview" 14450,
+  "app-aozora-spa" 7394},
  :zone
- {:requests-7d 966270,
-  :pageviews-7d 5758,
-  :uniques-7d-sum 909,
+ {:requests-7d 972985,
+  :pageviews-7d 5869,
+  :uniques-7d-sum 912,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 958579}
+  [{:path "/v1/datoms", :requests 956694}
    {:path "/federation-pilot/did.json", :requests 170}
-   {:path "/hito-federates/did.json", :requests 82}
-   {:path "/hito-diag-fed/did.json", :requests 78}
+   {:path "/hito-federates/did.json", :requests 80}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
     :requests 77}
-   {:path "/minidrama-fedtest/did.json", :requests 75}
+   {:path "/hito-diag-fed/did.json", :requests 76}
+   {:path "/minidrama-fedtest/did.json", :requests 74}
    {:path "/hito-verify-clean/did.json", :requests 72}
    {:path
     "/bafyreigknzqpup4wv566lfcmxtb5sjegwv74mpbhw4euqym3puw7qr6ssm",
     :requests 69}],
-  :status-mix {:ok 961426, :server-error 9763, :client-error 26712},
+  :status-mix {:ok 959446, :server-error 10058, :client-error 27054},
   :window "24h"},
  :as-of "2026-08-10",
  :traffic-quality {:window "24h", :probe-4xx-pct 3, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 958579 · /federation-pilot/did.json 170 · /hito-federates/did.json 82 · /hito-diag-fed/did.json 78 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 77 | 4xx(probe) 3% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 956694 · /federation-pilot/did.json 170 · /hito-federates/did.json 80 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 77 · /hito-diag-fed/did.json 76 | 4xx(probe) 3% · 5xx 1%",
  :signal
- "aozora.app 実測 966270 req/7d・909 uniques(日次和)・うち4xx probe 3%(24h)、workers 38733 inv/7d"}
+ "aozora.app 実測 972985 req/7d・912 uniques(日次和)・うち4xx probe 3%(24h)、workers 39026 inv/7d"}
