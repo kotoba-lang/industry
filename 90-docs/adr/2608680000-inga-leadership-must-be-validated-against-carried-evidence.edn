@@ -217,6 +217,51 @@ D4 の 1〜4 段目を通過した。
 
 **動くはずのものが動かないとき、対象と同じくらい計測器を疑う。**
 
+## D4 5 段目 —— 未達（2026-08-11、現在地を正直に）
+
+**1〜4 段は通った。5 段目（testnet で実際に witness を止めて観測）は未達。**
+
+testnet の chain は height 145 で止まっている。計器を足して一読で分かったこと:
+
+    w1 h 145 ch 143 view 160 pend 1 votes 0 nv 0
+    w2 h 145 ch 143 view 160 pend 0 votes 0 nv 0
+
+view は進み（13 分で 155→160）、**height は動かず、votes と new-views が
+どちらも 0**。つまり提案が起きておらず、new-view も保持されていない。
+
+### 否定した仮説（推測を残さないために記録する）
+
+| 仮説 | 反証 |
+|---|---|
+| 指数バックオフの底に居る | バックオフなら view が止まる。view は進んでいる |
+| edge cache で古い値を見ている | `cache-control: no-store` を入れた後も同じ |
+| warm な DO が旧 chain-id で署名し検証に落ちる | DO は再起動済み（新しい計器の項目が出るようになった）。それでも `nv 0` |
+| n=4 は quorum 3 で余裕ゼロだから | **オフラインの devnet は n=4 でも kill 込みで PASS する**（`votes=61`） |
+
+### 差はここ
+
+同じコード・同じ n・同じ kill 条件で:
+
+| | offline devnet (n=4) | Cloudflare testnet (n=4) |
+|---|---|---|
+| `votes` | **61** | **0** |
+| 結果 | 1 台 kill しても commit 継続 | height 145 で凍結 |
+
+**`votes 0` が testnet だけの症状。** 提案が一切起きていないので、原因は
+deployment 固有の条件（DO 間のレイテンシ、1 分 cron、`block-interval`）の
+どれかに絞られる。
+
+### 次の一手
+
+`handle-new-view` は拒否しても**何も記録しない** —— `note-proposal` が
+proposal についてやっていることを new-view についてはやっていない。
+**不在が記録されない**のはこの repo が繰り返し踏んでいる形なので、
+まずそこに理由を残す計器を足す。それが 1 読で答えを出す。
+
+**ADR-2608670000 の DO 撤去解除はこの段に依存しない** —— あちらは
+「実プロセスで離脱に耐える」ことが条件で、それは n=4 と n=7 の両方で
+実測済み。ここで未達なのは Cloudflare deployment の側の話である。
+
 ## Consequences
 
 - `wire.cljc` / `attest.cljc` / `resume` が round を運ぶ必要がある。
