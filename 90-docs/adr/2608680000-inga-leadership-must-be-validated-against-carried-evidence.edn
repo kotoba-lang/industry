@@ -277,7 +277,43 @@ warm のままで、新しいコードをいつまでも拾わない。**
   ADR-2608670000 の判断（witness は DO ではなくプロセス）を、可搬性とは別の
   角度から補強する事実である
 
-### 次の一手### 次の一手
+### 新しい chain でも同じ止まり方をする（2026-08-11）
+
+chain を作り直して DO を現行コードに載せ替えた（`inga-testnet-3`）。**同じ
+止まり方をする。** したがって chain 固有の状態ではない。
+
+    07:02:42  h [9,9,9,9]  view [14,14,14,14]  blocks [8,8,8,8]  last-new-view nil
+    07:03:57  h [9,9,9,9]  view [15,15,15,15]  blocks [8,8,8,8]  last-new-view nil
+
+**この 2 つは両立しないはずである。** view が進むのは `on-tick` が timeout した
+からで、timeout 経路は new-view を作って `handle-new-view` に渡す。渡していれば
+`:last-new-view` が受理か拒否理由のどちらかで埋まる。**view は進み、
+`:last-new-view` は空のまま。** 次に測るのはここ一点。
+
+**offline との差は依然として決定的**: 同じコード・同じ n=4・同じ kill 条件で
+`inga-node` の devnet は PASS し `votes=61` を持つ。testnet は `votes 0`。
+
+### 観測についての規律（2 度 stale を掴んだので）
+
+`cache-control: no-store` を入れた後も、**plain read が古い値を返した**
+（chain 作り直しの直後、plain が h 145、cache-bust した read が h 8）。
+入れる前にキャッシュされたエントリが残っていたためで、no-store 自体は効いて
+いる。しかし 2 度掴んだ事実は変わらない。
+
+**答えが判断を変える読みは、必ず一意なクエリを付けて取る。**
+
+### west pin guard は本体 checkout の west.yml を読む（運用メモ）
+
+ADR を 1 本足すだけの push が pin 退行として 3 回弾かれた。原因は私の変更でも
+worktree の base でもなく、**本体 checkout が origin/main より 5 commits
+遅れていた**こと —— guard はそちらの `manifest/west.yml` を読むので、古い pin を
+「これから書き込む値」と解釈する。worktree を最新から切り直しても直らない。
+
+**worktree で作業していても、本体 checkout の同期が push の前提になる。**
+（このときは他セッションの未コミット 1 ファイルが同期を塞いでいたので、
+破棄せず stash に退避した。）
+
+### 次の一手### 次の一手### 次の一手
 
 `handle-new-view` は拒否しても**何も記録しない** —— `note-proposal` が
 proposal についてやっていることを new-view についてはやっていない。
