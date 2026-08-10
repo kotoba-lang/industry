@@ -790,6 +790,41 @@
    :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
    :min-files 10 :cd false}
 
+  ;; 既存 flagship 9 本のうち **6 本**（ADR-2607122300 / ADR-2607189300 系）。
+  ;; deps.edn に :render-html を持ち、再生成が決定的なので同じ gate に載る。
+  ;; 実測 2026-08-10: 6/6 PASS。
+  ;;
+  ;; ⚠ **残り 3 本（6399 / 6310 / 7810）は意図的に載せていない。** これらの再生成は
+  ;; `web/collect.cljs` が **実在の求人ボード API から live データを取ってくる**もので、
+  ;; 出力は世の中が変われば正当に変わる。つまりあの 3 本の夜間実行は *publisher* で
+  ;; あって *verifier* ではなく、drift（committed 済み生成物が動いたら落とす）という
+  ;; この gate の契約と噛み合わない —— 載せれば求人が 1 件動くたびに赤くなる。
+  ;; publisher 側の murakumo 移行は別の仕組みが要る（実行して commit する経路）。
+  {:name "cloud-itonami-isic-851" :id "itonami-regenerate-851" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-852" :id "itonami-regenerate-852" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-853" :id "itonami-regenerate-853" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-854" :id "itonami-regenerate-854" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-4921" :id "itonami-regenerate-4921" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+  {:name "cloud-itonami-isic-5820" :id "itonami-regenerate-5820" :gate :nbb-script
+   :script "gates/itonami-regenerate.cljs" :script-args ["--org" "cloud-itonami"]
+   :include-ext [".edn" ".clj" ".cljc" ".cljs" ".html" ".json" ".md" ".css" ".svg"]
+   :min-files 10 :cd false}
+
   ;; kotoba-lang/shell の in-app provider bridge。scaffold された .ipa/.apk が
   ;; 自前で持つ provider 実装（Swift / Java）と、Clojure 側の宣言
   ;; `bridge-provider-commands` の3者が一致していることを検査する。

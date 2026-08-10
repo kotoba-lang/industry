@@ -333,15 +333,62 @@ gate は使い捨て workspace に `orgs/<org>/<repo>` の形で tree を置き�
 （`c23fd22`）。**committed 済みの値を読むだけの経路では原理的に検出できない種類の
 ずれ**で、これがこの gate を作った理由そのものである。
 
+### 追記（同日、その2）— 実ノードで回して、CI 自体が死んでいたのを見つけた
+
+**gate をローカルで 25/25 通した後、実ノードで 1 周回したら 2 つ壊れていた。**
+
+1. **fleet CI 全体が 2026-08-07 から動いていなかった。** `tick.cljs` が kagami の
+   `bin/fleet.cljs` を決め打ちで探していたが、kagami は同日 `bc7cdce`
+   「this repo is kagami, so its namespaces are kagami.*」で `bin/kagami.cljs` へ
+   改名しており、tick は毎回 `FATAL kagami tree missing bin/fleet.cljs` で
+   **gate を 1 本も実行せずに即死**していた。`manifest/fleet-ci.edn` の最終 receipt が
+   `2026-08-07T03:47Z` で止まっているのが証拠。
+   **GitHub Actions を撤去した後の唯一の CI がこれなので、この 3 日間このワークスペース
+   には動く CI が 1 つも無かった。** しかも誰にも報告されなかった —— ADR-2607300900 が
+   「動いていない CI は green に見えたまま何も検査しない」と書いたその失敗を、
+   移行先の側で繰り返していた。両方の名前を試すようにした。
+2. **gate が実ノードでだけ落ちた。** `itonami-regenerate.cljs` が `JAVA_HOME` を
+   敷いておらず、ノードの非対話 ssh は JDK が見えない（`/usr/bin/java` は stub）ので
+   `clojure` が即死した。**手元の macOS では JDK が既定で引けるのでこの差は出ない** ——
+   ローカル 25/25 通過後に実ノードで初めて出た。`github_workflow_run.cljs` は同じ理由で
+   最初からこれを export していた。
+
+**実測（実ノード、`tick --only cloud-itonami-isic-9522 --dry-run`）**: 修正前 exit 1
+（gate 未実行）→ 修正後 **exit 0**、`benjamin` 上で gate 実行、`no drift — 27 files`、
+receipt `0a7f4749d323` 署名済み。
+
+### 追記（同日、その3）— 残りの gap を閉じた
+
+- **無根拠な `¥50k–150k/月` 帯を 153 repo から除去した。** 文言は完全に一様
+  （`packages are the revenue, in the same ¥50k–150k/月 band the sibling flagships
+  anchor against real competitor SaaS`）で、GitHub Contents API で 153/153 を
+  置換（fail 0 / skip 0）。**残る 5 本は触っていない** —— 6399/6310/7810/5820 は
+  その帯が HR/採用/CRM で実際に根拠づけられた元 flagship、4210 は自分の訂正注記。
+  置換後の文は価格を主張せず、「この vertical はまだ値付けされていない。24 vertical を
+  実測したら全部 ¥15,000–60,000 に落ちた。自分の競合を測れ」と書いてある。
+- **pricing-intelligence に 25 件を追記し、08-08 から壊れていた面を直した。**
+  `query.clj`（EDN が本当に transactable であることの runnable proof）が
+  `entid-strict` で落ちていた —— 08-08 の追記が catalog に無い
+  `:vertical/isco-1212` と `:product/{jinjer,smarthr,kaonavi,hrbrain,cloudflare-r2}` を
+  参照していたため。**origin/main の内容だけで再現する**ので、追記時に proof が
+  回されていなかったということ。6 entity を足して解消し、catalog 179 / ledger 182 が
+  実 DataScript に載ることを実測した。band に通貨記号を前置していた表示バグも直した。
+- **既存 flagship 9 本のうち 6 本を gate に載せた**（851/852/853/854/4921/5820、6/6 PASS）。
+  **6399/6310/7810 は意図的に載せていない** —— あの 3 本の再生成は実在の求人ボード API から
+  live データを取るので、出力は世の中が変われば正当に変わる。つまり *publisher* であって
+  *verifier* ではなく、drift 契約と噛み合わない（載せれば求人が 1 件動くたびに赤くなる）。
+
 ### まだ確かめていないこと（正直に）
 
-- **実ノードでの 1 周は回していない。** 検証はすべてこの macOS 上で、gate を
-  直接呼んで行った。`tick.cljs` が配る tree の中身（`:include-ext` の効き）は
-  同じ拡張子集合で絞った copy を作って再現したが、ship 経路そのものは通していない。
-- **17 本ぶんの maven 解決がノードに乗る負荷**は測っていない。LPT スケジューラが
+- ~~実ノードでの 1 周は回していない~~ → **回した**（上の「その2」）。ただし通したのは
+  **1 repo（9522）だけ**で、31 本ぶんを同時に回したときの挙動は見ていない。
+- **31 本ぶんの maven 解決がノードに乗る負荷**は測っていない。LPT スケジューラが
   配分するが、初回は `~/.m2` が温まるまで重いはず。
-- **既存 flagship 9 本は未登録。** 6399 系は `npm install` + nbb 経路で形が違い、
-  同じ翻訳で通るか確かめていない。
+- **6399 / 6310 / 7810 の publisher 経路は未着手。** live データを取る再生成なので
+  drift gate では表現できず、「実行して commit する」別の仕組みが要る。
+  この 3 本の夜間更新は 2026-08-04 から止まったままである。
+- **今日の gate は 1 回も本番 tick（`--dry-run` 無し）を通っていない。** landing /
+  commit status / CD 経路は未検証。
 
 ## 手順上の実測（再発防止）
 
