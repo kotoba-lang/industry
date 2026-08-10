@@ -178,13 +178,34 @@
    再 copy した。**annex が「ある」と記録していることと、実際にあることは別** ——
    fsck を省いていたら、custody を主張しながら実体の無い 520 件が残っていた。
 
+   ## 第 4 段: 競合の答えは server ではなく client 側にあった
+
+   bucket ごとに head 1 本なので、**1 bucket に 2 人以上の writer を向けても
+   直列化されるだけ**で、増えるのは捨てる仕事だけ。実測（同一 workload）:
+
+   | client 設定 | スループット | 失敗 |
+   |---|---|---|
+   | jobs=4 × 3 dataset（即時再試行） | 89.5 obj/min | 13.8% |
+   | jobs=4 × 3 dataset（jitter backoff） | 89.5 obj/min | 9.5% |
+   | **jobs=1 × 3 dataset** | **124 obj/min** | **0 件** |
+
+   **並列度を下げた方が速く、しかも損失が無い。** server 側の backoff
+   （full jitter、0 から指数的に広がる窓、上限 800ms、試行 3 → 4）は
+   13.8% → 9.5% にしか効かず、これは緩和であって解決ではない。
+   運用としては **bucket あたり jobs=1** を既定にする。
+
+   backoff 自体は残す —— 他の client が並列度を上げてきた時に、即時再試行
+   （負けた全員が同時に目を覚まして同じ順で再衝突する）よりは厳密に良い。
+   待つのは wall time であって CPU ではなく、ここで効いている予算は CPU 側
+   （1102 は CPU 上限）なので、眠るのは cycle を回し直すより安い。
+
    ## 残しているもの
 
-   - live は version 7a6726ad、net-kotobase main `a609e31` と一致。
+   - live は version 86f180a5、net-kotobase main `70763b0` と一致。
    - 3 dataset すべてに kotobase remote を登録し、copy を並列実行中
      （`requeststyle=path` が要る —— 無いと git-annex は
      `<bucket>.s3.kotobase.net` を引いて DNS で落ちる）。log は scratchpad の
-     `copy-<dataset>.log`。完了後に
+     `j1-<dataset>.log`（jobs=1）。完了後に
      `annex-custody-verify.cljs --names xyz.farcaster.fnames` を回すこと ——
      **1 ファイルの whereis を custody の証拠にしない**（ADR-2608059100）。
    - engine 側に書いた object seam の実装は破棄（main の設計が優先）。写しは
