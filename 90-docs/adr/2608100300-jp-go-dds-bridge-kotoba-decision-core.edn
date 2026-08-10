@@ -216,12 +216,74 @@
    道は開く。**サイズではなく「正規表現でテキストを走査する」ことが本当の障害**
    （`light-literals` / `ramps` / `opacity-inverted` も同じ理由で `.cljc` 据え置き）。
 
+   ## slice 5 — 残りの component の属性決定（jp-go-dds `5fc7fa2`）
+
+   heading / chip-label / input-text / textarea / checkbox / radio /
+   form-field の 7 判断。heading の size は**表であって式ではない**ので表として
+   書き、1..6 の外は `\"20\"`（h7 を要求するページは型サイズではなく文書構造に
+   バグがある）。input-text の `:size` は `data-size` に消費して属性としては
+   出さない（`size=\"md\"` は HTML では文字幅ヒント）。
+
+   **form-field だけは既定値ではない。** 必須/任意マーカーは `data-required` を
+   持つ `__requirement` で、`__status` は「入力済み」等のグレーの塗りバッジ。
+   `.cljc` の docstring が「実測でこれをやっていた」と記録している ——
+   **一度実際に間違えた判断は、テストが届く場所に置く。**
+
+   実測: heading の表を 1 段変えると 0 → 1 failure、`__requirement` を
+   `__status` にすり替えると 0 → 2 failures。
+
+   初回で落ちた 22 件は**どちらもテスト側の誤り**だった（hiccup の index 演算で
+   属性マップを子として読んでいた / `data-size=\"lg\"` が `size=\"lg\"` を部分
+   文字列として含むのに部分一致で検査していた）。guest の出力は最初から正しい。
+
+   ## slice 6 — select の option 状態と banner の icon 表（jp-go-dds `e526073`）
+
+   **どの option に `selected` が付くか**は、この library で唯一**実害を出した
+   判断**。①値が空なら placeholder（disabled かつ selected）②現在値に一致する
+   ものが selected —— **テキストとして比較**（options は数値も持つので `18` は
+   `\"18\"` に一致しなければならない）③**現在値が無ければ何も selected に
+   ならず、ブラウザが先頭を表示する**。
+
+   3 番目が刺さった: 実測 2026-07-30、`cloud-itonami/inkan` が 18.0mm のつもりで
+   **12.0mm** の印影を描画。valid な HTML、正常な見た目、違う値。既定値を
+   呼び出し側の代わりに作ることはできないが、規則をテストが届く形にはできる。
+
+   banner の icon 表は未知の type を **info に fallback**（icon の無い banner は
+   メッセージを運ぶが、throw する banner は何も運ばない）。
+
+   ### 発見: select と button で passthrough の向きが逆（実測 2026-08-10）
+
+   `button` は `:attrs` を先に merge して自分の class を後に置くのでライブラリが
+   勝つ。`select` は逆で、`(select {:attrs {:class \"MINE\"}} …)` は
+   `class=\"MINE\"` を出し **DADS のスタイルが丸ごと外れる**。button の docstring が
+   「component の同一性を壊させないため」と書いている、その規則の反対。
+
+   **移植は出荷されている挙動をそのまま再現した。** あるべき挙動を encode した
+   parity gate は実際の挙動について何も証明しない。食い違いは gate で明示的に
+   assert してあるので失われない。**どちらが正しいかを決めるのは migration では
+   なく shipped API の変更**なので、ここではしていない —— オーナー判断。
+
+   ### 実測した恒久制約: 関数の引数は 5 個まで
+
+   `select-attrs` は 7 値を要し `:abi-bound {:max-arity 5}` に当たった。これは
+   `:intentional-security-constraint`（**恒久であって埋まる gap ではない**）なので、
+   guest record への畳み込みは workaround ではなく**idiom**。他モジュールが
+   既に使っている T5.2 の形と同じ。
+
+   ### mutation が自分のコードの重複を見つけた
+
+   placeholder の mutation が 1 failure しか出さず、調べると `option-attrs` の
+   placeholder 分岐が `selected?` を経由せず `selected` を直書きしていた
+   （両者がずれても片方しか落ちない）。1 箇所に直したら同じ mutation が
+   **8 failures** を出すようになった。**弱い mutation 結果は gate の弱さでは
+   なく実装の重複の兆候**でありうる。
+
    ## 次
 
-   - **残りの component**（heading / accordion / input-text / textarea /
-     checkbox / radio / form-field / select / table / chip-label / divider /
-     notification-banner）。button と同じ形で、判断は属性に集中している。
-     `select` と `notification-banner` は分岐が多いので単独で 1 スライス。
+   - `resolve-dark`（走査結果の上でのグラフ探索。`dark_test` がコントラスト比の
+     測定に使っているので、移すなら測定側も一緒に見る）
+   - `skin.cljc`（145 行）/ `css.cljc`（81 行、`css-for` の合成）/ `table`
+   - **select と button の passthrough の向きを揃えるか** —— オーナー判断
    - **`resolve-dark`** は走査結果の上での**グラフ探索**（別名を literal まで
      辿る）で、これまでの 4 スライスと形が違う。`dark_test` がコントラスト比を
      測るのに使っているので、移すなら測定側も一緒に見る。
