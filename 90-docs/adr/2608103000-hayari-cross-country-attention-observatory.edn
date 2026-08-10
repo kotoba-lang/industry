@@ -163,6 +163,38 @@ era:       113 dated / 822 undated（大半は :person で P577 を持たない�
 data/kinds.edn が :person と :event を意図的に含めているのは、それも『何が注目を
 集めたか』の実際の答えであり、observatory が事前にどちらが重要かを決めないため。
 
+### 6. `:countries/with-data` が実態より良く読めた（オーナーの問いで露出）
+
+2026-08-10、オーナーの「全世界の主要地域、年代ごとに全て集まっている?」に答えるため
+実際に datom を数えたところ、**coverage が 101 と言っている一方で、観測行を持つ国は
+66 しか無かった。** 差の 35 国は 200 を返したが、閾値を超えた記事が main page /
+search page だけで、meta フィルタ後に 0 行になっていた —— **feed には居るが findings
+には居ない**国を、1 つの数が両方として数えていた。
+
+`:countries/responded`（応答した）と `:countries/with-rows`（観測を産んだ）に分けた。
+これは欠陥 1（失敗バッチが「Wikidata 項目が無い」と区別できなかった）と同じ形で、
+**この repo が持つ「正直さの機構」自体に同じ誤りが入っていた**ことになる。
+
+同時に `:hayari/work-year` を出すようにした。`publication-year` は P577 から既に
+年を計算していたのに、保存前に 10 年単位へ丸めており、**source が無料でくれていた
+精度を捨てていた** —— 1 年粒度が欲しい consumer は、もう年を持たないデータから
+再導出できない。
+
+## 到達していないもの（現在地。2026-08-10 実測）
+
+「全部集まっているか」への答えは **No**。誠実に書く:
+
+| | 現在地 |
+|---|---|
+| 大地域 | 5 region すべてに観測はある。ただし国カバレッジは Europe 26/51・Asia 16/50・Africa 12/60・Americas 9/57・**Oceania 2/29** |
+| 小地域 | **Melanesia 0/5・Micronesia 0/8・Polynesia 0/10** —— 太平洋島嶼は 1 国も観測できていない |
+| 作品年代 | era を持つ row は **121/886 のみ**（残りは :person 等で P577 を持たない）。うち 101 が 2020 年代で、1990 年代以前は合計 13 |
+| 時系列 | **単日スナップショットのみ。** 出力は毎回上書きで .gitignore 済み（登録簿の `:output-gitignored true`）—— **年ごとの履歴は蓄積していない** |
+
+いずれも「対象外」ではなく**カバレッジ**であり、上 3 つは coverage entity に、
+4 つ目は登録簿と本 ADR に記録する。歴史の蓄積は別の決定（どこに置くか）が要るので
+本 ADR では決めない。
+
 ## 登録済み runner での実測（これが landed の根拠）
 
 standalone で動くことは landed の根拠にしない —— 欠陥 4 と 5 はどちらも
@@ -171,7 +203,7 @@ standalone では出ず、runner 経由で初めて出た。
 ```
 observatory-run --only hayari
   ✓ hayari — produces-datoms (expect produces-datoms) exit=0 Δbytes=447531 units=891 63s
-  観測日 2026-08-08 / 249 国要求 / 101 国からデータ / 887 datoms /
+  観測日 2026-08-08 / 249 国要求 / 101 国が応答 / 66 国が観測行を産んだ / 887 datoms /
   QID 730 解決 / kind 520 分類 / era 121 判定 / :enrichment/degraded? false
 ```
 
