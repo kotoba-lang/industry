@@ -464,10 +464,19 @@
    ;; enrichment だけが欠けて他のカウントは健全に見える（実測 2026-08-10:
    ;; QID 解決が 48/50 → 1/874 に落ちたのに他は正常に見えた）。判定は行数ではなく
    ;; coverage entity の :enrichment/degraded? を見ること。
-   :evidence "2026-08-10 実測（観測日 2026-08-07、249 国 top 25）: 105 国からデータ、
-              935 rows、QID 580/935 解決、失敗バッチ 0、kind 527 分類、
-              era 113 判定。最大到達は The Odyssey (2026 film) の 34 か国。
-              決定核は 9 test / 37 assertion。
+   ;; 自前の wall-clock 予算 480s を持つ（registry の 600s より内側）。**これは
+   ;; 性能調整ではなく出力の意味の問題** —— 最初の稼働 run は 600s で kill され、
+   ;; exit=124 / Δbytes=0 という「一度も動いたことのない actor」と同じ行を出した。
+   ;; 予算超過時は残りを飛ばし、飛ばした分を coverage に申告して**必ず書く**。
+   :budget-ms 480000
+   :evidence "2026-08-10、observatory-run 経由の実測（この行の数字は standalone 実行では
+              なく登録済み runner の出力）: ✓ produces-datoms exit=0 Δbytes=447531
+              units=891 63s。観測日 2026-08-08、249 国要求 / 101 国からデータ、
+              887 datoms、QID 730 解決、kind 520 分類、era 121 判定、
+              :enrichment/degraded? false。
+              予算切り上げ経路も強制して確認済み（--budget-ms 3000 で 215 国 /
+              47 title を飛ばし、DEGRADED を申告して 55 datoms を書いて exit 0）。
+              決定核は 10 test / 41 assertion。
               視聴者の世代は :uncomputable-until-measured（source が持たない）"}]
 
  ;; 登録していないが、同じ層に属すると分かっているもの。**「まだ測っていない」で

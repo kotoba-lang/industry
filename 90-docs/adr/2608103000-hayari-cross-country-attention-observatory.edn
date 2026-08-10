@@ -116,7 +116,35 @@ collector は永久に待つ（実際に 1 回ハングした）。`AbortSignal.
 同時に、1 つの国の中で複数言語版が上位に入る場合を国単位で畳んだ。
 `:observed-in` は国を数えるべきで、記事を数えるべきではない。
 
-## 実測（2026-08-07 の観測、249 国 top 25）
+### 4. runner 経由で起動できなかった（`Could not find namespace: hayari.core`）
+
+登録簿の runner はコマンドを `[\"nbb\" main & args]` の形で組む。nbb は
+`--classpath` を**スクリプト名より前**に要求するので、**`:args` に何を書いても
+直せない**。直すべきは repo 側で、`nbb.classpath/add-classpath` に `*file*` から
+導いた `src` を渡すようにした。既定の出力先も `\".\"` ではなく `*file*` から導く
+（登録簿の前文が shionome / mitooshi の同じ罠を既に警告していた）。
+
+**`--check` は「登録 OK / checkout 有り」と答えた。**起動できるかは答えていない。
+ADR-2608081200 が記録した「README も MATURITY.md も動くと書いてある」と同じ距離が、
+`--check` と実行の間にもある。
+
+### 5. 最初に稼働した runner 実行は 600s で kill された（exit=124 / Δbytes=0）
+
+同じ 249 国の掃引が 1m35s → 3m47s → 10 分超と振れた。**振れているのは
+Wikimedia のスロットルであって作業量ではない**ので、roster をその幅に合わせて
+固定することはできない。
+
+問題は遅さそのものではなく、**出力の意味**である。exit=124 / Δbytes=0 という行は、
+「一度も動いたことのない actor」の行と**区別がつかない** —— 登録簿がまさにその
+誤読を潰すために作られたのに、同じ誤読を再生産する。
+
+そこで期限を runner から取り戻した: 480s の自前予算を持ち、超過したら残りの国と
+enrichment バッチを**試みずに飛ばし**、飛ばした分を数えて部分結果を書く。
+`:countries/skipped-budget` は `:countries/no-data` と**別の列**にする ——
+前者は「こちらが時間切れになった」、後者は「API の閾値を超える記事が無かった」で、
+同じ数に混ぜると**自分のスケジューリングを世界についての事実に変えてしまう**。
+
+## 実測（2026-08-07 の観測、249 国 top 25、standalone 実行）
 
 ```
 countries: 249 requested / 105 with data / 144 no-data（名前で記録）
@@ -134,6 +162,22 @@ era:       113 dated / 822 undated（大半は :person で P577 を持たない�
 **`:person` が最多である点は隠さない。** 国別ランキング上位は作品より人物が多い。
 data/kinds.edn が :person と :event を意図的に含めているのは、それも『何が注目を
 集めたか』の実際の答えであり、observatory が事前にどちらが重要かを決めないため。
+
+## 登録済み runner での実測（これが landed の根拠）
+
+standalone で動くことは landed の根拠にしない —— 欠陥 4 と 5 はどちらも
+standalone では出ず、runner 経由で初めて出た。
+
+```
+observatory-run --only hayari
+  ✓ hayari — produces-datoms (expect produces-datoms) exit=0 Δbytes=447531 units=891 63s
+  観測日 2026-08-08 / 249 国要求 / 101 国からデータ / 887 datoms /
+  QID 730 解決 / kind 520 分類 / era 121 判定 / :enrichment/degraded? false
+```
+
+予算切り上げ経路も**落ちることを確かめてから**採用した（`--budget-ms 3000` を
+強制すると 215 国・47 title を飛ばし、DEGRADED を申告して 55 datoms を書いて
+exit 0）。決定核は 10 test / 41 assertion。
 
 ## Consequences
 
