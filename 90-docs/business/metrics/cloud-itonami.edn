@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-08-09T23:13:08.034Z",
+ :asOf "2026-08-10T00:14:57.012Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,9 +9,9 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 12989,
-  :pageviews-7d 8002,
-  :uniques-7d-sum 494,
+ {:requests-7d 13047,
+  :pageviews-7d 8174,
+  :uniques-7d-sum 451,
   :zone "itonami.cloud"},
  :agentRuns7d 148,
  :sources [:cloudflare :health :emitter :itonami-free-path],
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-08-09T23:13:08.863Z",
+  :asOf "2026-08-10T00:14:57.374Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -140,20 +140,20 @@
  :freePathDocs "/docs/free-path.md",
  :paths
  {:ok
-  [{:path "/", :requests 79}
-   {:path "/cloud-itonami-isic-9101/", :requests 52}
+  [{:path "/", :requests 83}
+   {:path "/cloud-itonami-isic-9101/", :requests 56}
    {:path "/cloud-itonami-isic-7110/", :requests 51}
-   {:path "/cloud-itonami-isic-851/", :requests 51}
    {:path "/os/", :requests 51}
    {:path "/cloud-itonami-isic-5229/", :requests 51}
    {:path "/cloud-itonami-isic-0162/", :requests 51}
-   {:path "/cloud-itonami-isic-4210/", :requests 51}],
-  :status-mix {:server-error 2500, :ok 3331, :client-error 243},
+   {:path "/cloud-itonami-isic-4210/", :requests 51}
+   {:path "/cloud-itonami-isic-6920/", :requests 50}],
+  :status-mix {:server-error 2505, :ok 3346, :client-error 270},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
  "PII-free aggregates only. freePath is live without Stripe; paid stays 0 until checkout + webhook (hyp/itonami-smb-pay).",
- :as-of "2026-08-09",
+ :as-of "2026-08-10",
  :freePath
  {:freeClaimUrl "/isco-1212/",
   :externalTenants 5,
@@ -191,7 +191,7 @@
  :ok true,
  :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 41},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 79 · /cloud-itonami-isic-9101/ 52 · /cloud-itonami-isic-7110/ 51 · /cloud-itonami-isic-851/ 51 · /os/ 51 | 4xx(probe) 4% · 5xx 41%",
+ "上位 page (24h, 2xx/3xx): / 83 · /cloud-itonami-isic-9101/ 56 · /cloud-itonami-isic-7110/ 51 · /os/ 51 · /cloud-itonami-isic-5229/ 51 | 4xx(probe) 4% · 5xx 41%",
  :freeClaimDocs "/docs/free-path.md",
  :funnel
  {:trials 5,
@@ -201,7 +201,7 @@
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 12989 req/7d・494 uniques(日次和)・うち4xx probe 4%(24h)",
+ "itonami.cloud 実測 13047 req/7d・451 uniques(日次和)・うち4xx probe 4%(24h)",
  :tenants
  {:active 5,
   :external-paid 0,
