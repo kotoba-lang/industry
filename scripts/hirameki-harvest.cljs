@@ -66,8 +66,23 @@
 
 (def actor-dir (abs "orgs" "cloud-itonami" "hirameki"))
 (def corpus-dir (abs "orgs" "cloud-itonami" "hirameki-patents"))
-(def journal (str ((.-join path-mod) corpus-dir "80-data" "public" "google-patents.journal.edn")))
+(def journal-dir (str ((.-join path-mod) corpus-dir "80-data" "public")))
 (def ledger-path (abs "90-docs" "observatory" "hirameki-harvest.ledger.edn"))
+
+(defn- remote-name
+  "The remote of a west checkout is named after the MANIFEST remote
+  (`cloud-itonami`, `kotoba-lang`), not `origin`.
+
+  Assuming `origin` is not a harmless guess: `git fetch origin` fails, and then
+  `git rev-list origin/main...HEAD` fails too and prints nothing, so a
+  fetch-then-parse guard sails straight through with NaN and reports that the
+  checkout is in sync. Measured 2026-08-10 under launchd: the FF guard was doing
+  nothing at all, silently."
+  [dir]
+  (let [r (.spawnSync cp "git" (clj->js ["remote"])
+                      (clj->js {:cwd dir :encoding "utf8"}))
+        names (->> (str/split-lines (or (.-stdout r) "")) (remove str/blank?) vec)]
+    (or (some #{"origin"} names) (first names))))
 
 (defn- git [dir & args]
   (let [r (.spawnSync cp "git" (clj->js args)
@@ -84,12 +99,30 @@
     {:exit (if (nil? (.-status r)) 124 (.-status r))
      :out (or (.-stdout r) "") :err (or (.-stderr r) "")}))
 
-(defn- size [p] (if (exists? p) (.-size (.statSync fs p)) 0))
+(defn- journal-shards
+  "Every shard of the harvest journal, in index order.
+
+  The journal was ONE file until 2026-08-10 and is now
+  `google-patents.NNNN.journal.edn` (sealed at 1 MiB). This wrapper kept reading
+  the old single path after the split, so it measured **0 patents / 0 bytes**,
+  which made `gained` always 0 — and `gained` guards the re-publish, so the
+  artifacts would silently never have been rebuilt. Found by running under
+  launchd rather than by reading the code.
+
+  A legacy single file is still read if present: it holds the oldest facts."
+  []
+  (if-not (exists? journal-dir)
+    []
+    (->> (vec (.readdirSync fs journal-dir))
+         (filter #(re-find #"^google-patents(\.\d{4})?\.journal\.edn$" %))
+         sort
+         (mapv #((.-join path-mod) journal-dir %)))))
+
+(defn- size []
+  (reduce + 0 (map #(.-size (.statSync fs %)) (journal-shards))))
 
 (defn- patents-in-journal []
-  (if-not (exists? journal)
-    0
-    (count (into #{} (map first) (edn/read-string (slurp journal))))))
+  (count (into #{} (mapcat #(map first (edn/read-string (slurp %)))) (journal-shards))))
 
 (defn- append-ledger! [m]
   (let [line (str (pr-str (assoc m :run/at (.toISOString (js/Date.)))) "\n")]
@@ -117,23 +150,44 @@
          :run/observatory "hirameki" :run/stage :precondition}))
 
 ;; 不変条件 2 — FF できないなら何もしない。
+;;
+;; **git の exit code を毎回見る。** 不変条件 1 が「exit 0 を成功の証拠にしない」
+;; なら、その裏は「非 0 を黙って捨てない」である。fetch が落ちたのに続行すると、
+;; 次の rev-list も落ち、出力が空になり、parseInt が NaN を返し、(pos? NaN) が
+;; false になって「同期済み」と報告される —— 実測 2026-08-10、まさにこれが起きた。
+(def remotes
+  (into {} (for [[label dir] [["corpus" corpus-dir] ["actor" actor-dir]]]
+             [label (or (remote-name dir)
+                        (die! {:run/reason (str label " に remote が無い: " dir)
+                               :run/observatory "hirameki" :run/stage :sync}))])))
+
 (doseq [[label dir] [["corpus" corpus-dir] ["actor" actor-dir]]]
-  (git dir "fetch" "origin" "--quiet")
-  (let [{:keys [out]} (git dir "rev-list" "--left-right" "--count" "origin/main...HEAD")
-        [behind ahead] (map #(js/parseInt % 10) (str/split out #"\s+"))]
-    (when (and (pos? behind) (pos? ahead))
-      (die! {:run/reason (str label " が origin/main と乖離している（behind " behind
-                              " / ahead " ahead "）— rebase も force もしないので手で解く")
+  (let [rem (get remotes label)
+        f (git dir "fetch" rem "--quiet")]
+    (when-not (zero? (:exit f))
+      (die! {:run/reason (str label " の fetch が失敗（remote " rem "）: " (:err f))
              :run/observatory "hirameki" :run/stage :sync}))
-    (when (pos? behind)
-      (let [{:keys [exit err]} (git dir "merge" "--ff-only" "origin/main")]
-        (when-not (zero? exit)
-          (die! {:run/reason (str label " の fast-forward に失敗: " err)
+    (let [rv (git dir "rev-list" "--left-right" "--count" (str rem "/main...HEAD"))]
+      (when-not (zero? (:exit rv))
+        (die! {:run/reason (str label " の rev-list が失敗: " (:err rv))
+               :run/observatory "hirameki" :run/stage :sync}))
+      (let [[behind ahead] (map #(js/parseInt % 10) (str/split (:out rv) #"\s+"))]
+        (when (or (js/isNaN behind) (js/isNaN ahead))
+          (die! {:run/reason (str label " の ahead/behind が読めない: " (pr-str (:out rv)))
                  :run/observatory "hirameki" :run/stage :sync}))
-        (println (str "  · " label " を origin/main へ " behind " commit 前進"))))))
+        (when (and (pos? behind) (pos? ahead))
+          (die! {:run/reason (str label " が " rem "/main と乖離している（behind " behind
+                                  " / ahead " ahead "）— rebase も force もしないので手で解く")
+                 :run/observatory "hirameki" :run/stage :sync}))
+        (when (pos? behind)
+          (let [m (git dir "merge" "--ff-only" (str rem "/main"))]
+            (when-not (zero? (:exit m))
+              (die! {:run/reason (str label " の fast-forward に失敗: " (:err m))
+                     :run/observatory "hirameki" :run/stage :sync}))
+            (println (str "  · " label " を " rem "/main へ " behind " commit 前進"))))))))
 
 ;; ── 収集 ────────────────────────────────────────────────────────────────────
-(def before-bytes (size journal))
+(def before-bytes (size))
 (def before-patents (patents-in-journal))
 (println (str "  · 開始時: " before-patents " 特許 / " before-bytes " bytes"))
 
@@ -149,7 +203,7 @@
 (when-not (zero? (:exit harvest))
   (println (:err harvest)))
 
-(def after-bytes (size journal))
+(def after-bytes (size))
 (def after-patents (patents-in-journal))
 (def gained (- after-patents before-patents))
 
@@ -192,7 +246,7 @@
 ;; ── 着地（自分のファイルだけ）──────────────────────────────────────────────
 ;; 不変条件 3 — 他の path は stage しない。共有 checkout に他セッションの WIP が
 ;; あっても巻き込まない。
-(defn- commit-and-push! [dir paths msg label]
+(defn- commit-and-push! [dir rem paths msg label]
   (apply git dir "add" "--" paths)
   (let [staged (git dir "diff" "--cached" "--quiet")]
     (if (zero? (:exit staged))
@@ -203,20 +257,19 @@
           (do (println (str "  ✗ " label " commit 失敗: " (:err c))) :failed)
           (if-not push?
             (do (println (str "  · " label ": commit 済み（--no-push）")) :committed)
-            (let [p (git dir "push" "origin" "HEAD:main")]
+            (let [p (git dir "push" rem "HEAD:main")]
               (if (zero? (:exit p))
                 (do (println (str "  · " label ": push 済み")) :pushed)
                 (do (println (str "  ✗ " label " push 失敗: " (:err p))) :push-failed)))))))))
 
 (def corpus-landed
-  (commit-and-push! corpus-dir
-                    ["80-data/public/google-patents.journal.edn"
-                     "corpus" "datoms" "publish-manifest.edn"]
+  (commit-and-push! corpus-dir (get remotes "corpus")
+                    ["80-data/public" "corpus" "datoms" "publish-manifest.edn"]
                     (str "harvest: +" gained " patents (" after-patents " total)")
                     "corpus"))
 
 (def actor-landed
-  (commit-and-push! actor-dir ["seeds.edn" "state.edn"]
+  (commit-and-push! actor-dir (get remotes "actor") ["seeds.edn" "state.edn"]
                     (str "harvest state: " ticks " ticks, +" gained " patents")
                     "actor state"))
 
