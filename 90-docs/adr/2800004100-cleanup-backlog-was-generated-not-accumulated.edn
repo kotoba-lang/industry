@@ -127,22 +127,76 @@ nopr 153 / dirty 778。**895 の大半は rank-2 の dirty** で、実際に危�
 だけだった。PR 照会 153 往復・246 branch を打切りなしで解決。`ls-remote` で 28 branch の
 `unpushed` 偽陽性を訂正。
 
+## 現在地の更新（2026-08-09 の再測定）
+
+修正後の survey をもう一度回した（同じ `cleanup.cljs`、`--unlanded`）:
+
+    UNLANDED 987 repo / 走査 4,129
+    untracked 16 / unpushed 13 / nopr 162 / dirty 827 / stash 保持 11 repo (21 stash)
+    branch 解析の打切り 20 repo（件数は報告されており、黙って捨てられてはいない）
+
+**この 987 も過大である。ただし今度は工具の欠陥ではなく、`dirty` という段の意味が粗い
+ことによる。** dirty のみの 827 repo から 60 件を抽出して中身を分類したところ:
+
+    build-cache の削除のみ  52 件 (87%)   ← .cpcache/ .shadow-cljs/ の commit 済み成果物が
+                                            ローカルで消えている ` D` エントリ
+    実体のある変更           8 件 (13%)
+
+` D` は runbook が「絶対に適用しない」と定めるクラス（古い working tree の削除を default
+branch に replay すると他人の追加を消す）。**したがって 987 のうち本物の未着地は概ね
+100〜150 repo 規模**と読むのが正しい（抽出からの推定であって実測値ではない）。
+
+**untracked 16 の内訳も、上位 1 件が全体を歪めている:** 5,704 file のうち **5,563 は
+`kotoba-lang/kototama` の `native/` 一箇所**。残り 15 repo で 141 file。
+
+**誤診しかけた実例（rank-1 に見えて実は 0 だったもの）:** `gftdcojp/ai-gftd-mangaka` は
+`rescue/wip-20260718` 上で dirty 157（うち ` D` 147）という、ADR-2607252000 が記録した
+cloud-itonami 事故と**同じ見た目**をしていた。しかし実測すると branch は `origin/main` に
+対し **0 ahead / 34 behind**、修正済み 10 file の `git diff origin/main` は**空**だった。
+147 の削除は 34 commit 遅れた HEAD の副作用にすぎない。**`rescue/wip-*` という branch 名と
+大きな dirty 数は、それ自体では未着地の証拠にならない。**
+
 **stash:** superproject の 1 件を archive 後 drop（`itonami-os-maturity-tick` の remote 宣言。
 `d63a6d4a485` が同じ問題を `gh api` 経路で解決済みで、この stash は**その commit message が
 名指しで却下した最初の実装**だった —— launchd 下で fetch が落ち古い FETCH_HEAD を掴む）。
 
-## 残 gap（優先順）
+## 残 gap（優先順。状態は 2026-08-09 に再確認）
+
+**新規・最優先。2026-08-09 の cleanup で判明した、owner 判断を要する 3 件:**
+
+0a. **`etzhayyim/global-accounts-datoms` の未 push 10 commit** — corpus を 2.29M → 4.68M
+    account へ育てた実体のある作業だが、**1,191 blob / 10.5 GB（非圧縮）**を伴う。
+    ADR-2608059100 はこの corpus を `annex → B2` と定めており、repo に annex 設定は無い。
+    **そのまま push すると 10.5 GB の不可逆な方針違反**になるので push しなかった。
+    annex/B2 へ移すか、現状のまま push するかの判断が要る。
+    `.git/stash-archive-20260809/child-repos/` に commit log と status を退避済み。
+0b. **`network-awai/cloud-murakumo`** — pin に対し tracked 18 file・**+219 行**の未着地。
+    これがある限り west が checkout を拒否し（破壊を避けて正しく skip する）、**この repo
+    だけ pin から取り残され続ける**。未追跡 11 件のうち 9 件は pin と byte 一致の掃き出し、
+    2 件は `.env.*.example` で credential クラスなので着地対象外。
+0c. **`network-awai/net-kotobase`** — untracked 18 / dirty 2。他サービスが依存する live
+    worker なので優先度が高い（うち 2 件は「内容は既に main にある」と survey が判定済み）。
+
+**08-08 から引き継いだ gap:**
 
 1. **`kotoba-lang/user-test` の `.github/workflows/ci.yml`** — 削除するか
-   `scripts/fleet-ci/gates.edn` の gate に移すか。放置すると恒久的な untracked ノイズ。
-2. **Dependabot PR 約 25 件が CI 無しで滞留** — GitHub Actions は fleet 全体で無効なので
-   検査が 1 つも走らない。fleet-ci gate を用意するか Dependabot を止めるかの判断が要る。
-   **無検査の依存 bump を一括 merge しない。**
-3. **archived repo の PR 31 件**（`gftdcojp/241001-lifescience-web` 29 + `kotoba-lang/kotoba-v2025` 2）
-   — read-only なので close すらできない。owner が unarchive しない限り動かせない。
-4. **`com-etzhayyim-kawaraban`** — 54 files が未解決のままなので、欠陥 3 のとおり次回
-   `cleanup-land --apply` で preservation PR が再生成される。
+   `scripts/fleet-ci/gates.edn` の gate に移すか。**2026-08-09 時点では検証不能**（この repo は
+   ローカルに checkout されておらず、survey の走査対象に入らない）。解消したのではなく
+   測れていないだけなので、gap として残す。
+2. **Dependabot PR は 25 → 56 件に増えた**（2026-08-09 実測、6 org 横断）。GitHub Actions は
+   fleet 全体で無効なので依然として検査が 1 つも走らない。**無検査の依存 bump を一括
+   merge しない。** —— ただし 2026-08-09 の cleanup で `com-junkawasaki/root#1770`
+   （playwright 1.49.0 → 1.55.1、devDependency 1 行、MERGEABLE/CLEAN）を **1 件だけ merge した**。
+   一括ではないが、無検査であることに変わりはないので記録しておく。
+3. **archived repo の PR 31 件**（`gftdcojp/241001-lifescience-web` 29 +
+   `kotoba-lang/kotoba-v2025` 2）— read-only なので close すらできない。owner が unarchive
+   しない限り動かせない。**未処理として数え続けない。**
+4. **`com-etzhayyim-kawaraban`** — **解消した**（2026-08-09 実測で working tree は clean、
+   54 files は残っていない）。欠陥 3 の再生成ループには入っていない。
 5. **`:review` PR 17 件** — 測定値と「何を確認すれば決まるか」は各 PR に記載済み。判断は著者。
+
+**fleet open PR は 84 → 94 に増えた**（6 org 横断、2026-08-09 実測）。増分の主因は 2 の
+Dependabot。
 
 ## resume point
 
@@ -150,8 +204,10 @@ nopr 153 / dirty 778。**895 の大半は rank-2 の dirty** で、実際に危�
     git fetch origin && git merge --ff-only origin/main
     nbb --classpath \".:scripts/nbb_compat\" scripts/cleanup.cljs --unlanded
 
-次に着手するなら残 gap 1（1 ファイルの判断で終わる）か 2（判断が要る）。
+次に着手するなら **gap 0a**（owner の一言で決まる。10.5 GB の押し先を決めるだけ）か
+**0b**（+219 行を着地させれば cloud-murakumo が pin 同期に復帰する）。
 survey を回す前に、判定対象 repo で**明示 fetch**すること（west update では鮮度が付かない）。
+`.git` の肥大に手を付けるなら先に ADR-2800004200 を読むこと（archive を一律に消さない）。
 
 ## 教訓（この 4 件に共通する形）
 
