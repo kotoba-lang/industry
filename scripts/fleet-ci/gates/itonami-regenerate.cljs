@@ -138,8 +138,21 @@
 
 ;; ---------------------------------------------------------------------------
 
+;; ノードの非対話 ssh には JDK が見えない。**明示的に環境を敷く。**
+;;
+;; ⚠ 実測 2026-08-10、実ノード asher: `clojure` は PATH に在る（/opt/homebrew/bin）が
+;; `JAVA_HOME` は未設定で、`/usr/bin/java` は JDK 未導入時の stub なので
+;; `clojure -M:...` が **The operation couldn't be completed. Unable to locate a
+;; Java Runtime.** で即死する。手元の macOS では JDK が既定で引けるので**この差は
+;; ローカル検証では出ない** —— gate をローカルで 25/25 通してから実ノードで落ちた。
+;; `gates/github_workflow_run.cljs` は同じ理由で最初からこれを export していた。
+(def env-prelude
+  (str "export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH\n"
+       "export JAVA_HOME=\"${JAVA_HOME:-/opt/homebrew/opt/openjdk}\"\n"
+       "export PATH=\"$JAVA_HOME/bin:$PATH\"\n"))
+
 (defn- sh [cmd cwd]
-  (try {:ok true :out (str (.execFileSync cp "bash" #js ["-c" cmd]
+  (try {:ok true :out (str (.execFileSync cp "bash" #js ["-c" (str env-prelude cmd)]
                                           #js {:encoding "utf8" :maxBuffer 67108864
                                                :stdio "pipe" :cwd cwd}))}
        (catch :default e

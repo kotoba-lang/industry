@@ -1126,13 +1126,35 @@
       (let [kagami-org (str (org-of west "kagami") "/kagami")
             kagami-sha (gh-tip kagami-org)
             kagami-dir (ensure-tree! kagami-org kagami-sha)
-            fleet-bin (path/join kagami-dir "bin" "fleet.cljs")
-            _ (when-not (fs/existsSync fleet-bin) (die "kagami tree missing bin/fleet.cljs"))
+            ;; CLI の入口名は repo の改名で動いた。**両方を試す。**
+            ;;
+            ;; ⚠ 実測 2026-08-10: ここが `bin/fleet.cljs` 決め打ちで、**fleet CI 全体が
+            ;; 2026-08-07 から 3 日間まったく動いていなかった**。kagami は同日
+            ;; `refactor: this repo is kagami, so its namespaces are kagami.*`（bc7cdce）で
+            ;; `bin/fleet.cljs` を `bin/kagami.cljs` に改名しており、tick は毎回
+            ;; `FATAL kagami tree missing bin/fleet.cljs` で **gate を 1 本も実行せずに
+            ;; 死んでいた**。`manifest/fleet-ci.edn` の最終 receipt が
+            ;; 2026-08-07T03:47Z で止まっているのがその証拠。
+            ;;
+            ;; GitHub Actions を撤去した（ADR-2607300900）後の唯一の CI がこれなので、
+            ;; **この 3 日間このワークスペースには動く CI が 1 つも無かった**。しかも
+            ;; 誰にも報告されなかった —— ADR-2607300900 自身が「動いていない CI は
+            ;; green に見えたまま何も検査しない」と書いた失敗を、移行先の側で繰り返した。
+            ;;
+            ;; 名前を 1 つに決め打ちしない。tip の kagami を使う設計なので、**上流の
+            ;; 改名は「起こりうること」であって例外ではない。**
+            fleet-bin (or (->> ["kagami.cljs" "fleet.cljs"]
+                               (map #(path/join kagami-dir "bin" %))
+                               (filter #(fs/existsSync %))
+                               first)
+                          (die (str "kagami tree has neither bin/kagami.cljs nor bin/fleet.cljs"
+                                    " (looked in " kagami-dir "/bin) — the CLI entrypoint was"
+                                    " renamed again; add the new name here")))
             tmp (fs/mkdtempSync (path/join (os/tmpdir) "fleet-ci-tick-"))
             db-file (path/join tmp "fleet-db.edn")
             _ (fs/writeFileSync db-file (gh-raw (:repo landing) (:branch landing) (:db landing)))
             results (atom [])]
-        (log "fleet CLI: kagami@" (sha12 kagami-sha))
+        (log "fleet CLI: kagami@" (sha12 kagami-sha) (path/basename fleet-bin))
         (doseq [[bi batch] (map-indexed vector batches)]
           (let [unassigned (filter :unassigned batch)
                 batch (remove :unassigned batch)]
