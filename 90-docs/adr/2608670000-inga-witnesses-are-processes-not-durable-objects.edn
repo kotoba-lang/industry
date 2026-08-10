@@ -99,7 +99,52 @@ host）。peer URL は tailscale IP か MagicDNS 名にする。
 witness を止めて観測すること**。`inga-replica` の inga pin は今日の変更より
 前（`451a276b`）なので、pin 前進 + chain 作り直し（D3）が要る。
 
-以下は保留していた当時の記録:
+### fleet で走っている（2026-08-11 実測）
+
+judah / benjamin / simeon / joseph に 1 台 1 witness。各自の Ed25519 鍵は
+各自のディスクにあり、**一度も送信されていない**（`script/fleet.cljs` が
+ノード上で生成し公開鍵だけ返す。再実行は冪等、seed は `-rw-------`）。
+
+    judah    h 566 ch 564 out 3 in 3 fault byzantine-capable (one key per host)
+    benjamin h 566 ch 564 out 3 in 3
+    joseph   h 566 ch 564 out 3 in 3
+
+submit した record が各ノードの耐久 log に届く（`fleet/first → bafyfleet1` x3）。
+
+**全ノードを落として戻したら、同じ高さから再開した。** height 566 /
+committed 564。snapshot の永続化が実地で効いている —— DO が担っていた 3 つ目を
+ファイルで置き換えた主張の、live での確認である。
+
+### 未解決 1 —— catch-up: block を持っているのに採用しない
+
+simeon（cold start から参加）は接続もし、メッセージも受け、**block を 516 個
+持ち、投票を 515 集めている**。それでも `height 0` / `committed-height -1`。
+
+    judah  h 546 ch 544 blocks 538 nv 190 votes 530 recv 19184
+    simeon h   0 ch  -1 blocks 516 nv 185 votes 515 recv 21668
+
+**受け取って覚えているのに、一度も chain に採用していない。** 途中から参加した
+replica が追いつく経路（`inga.sync`）が、この状況で働いていない。ADR-2608680000
+の `validate-segment` を触った際に一度直したのと同じクラスで、規模が違う
+（0 → 546）。次に測るのはここ。
+
+### 未解決 2 —— 常駐化: launchd は ssh から入らない
+
+いまは `nohup` で走っており、**再起動でも logout でも消える**。plist は書いて
+配って `plutil -lint` も通ったが、`launchctl load` も
+`launchctl bootstrap user/$UID` も ssh セッションからは失敗する
+（*Try re-running the command as root for richer errors*）。LaunchAgent の
+ドメインは GUI セッションを要求する。
+
+**この workspace の fleet-ci の plist は operator マシンに置かれている**ので、
+ノード側 launchd の確立した手順は無い。選択肢は LaunchDaemon（root、sudo が
+要る）か、別の supervisor か、operator 側からの定期再起動。**未決定。**
+
+⚠ この検証中に一度 fleet を落とした（plist を入れる前に既存プロセスを kill し、
+その launchd が上がらなかった）。**動いているものを止めてから新しい起動方法を
+試さない。**
+
+以下は保留していた当時の記録:以下は保留していた当時の記録:
 
 
 
