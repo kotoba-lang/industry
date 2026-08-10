@@ -110,8 +110,62 @@
    `cidv1-raw(sha2-256(label))` を各 repo に置けば、**読みやすさを保ったまま
    distinct な実 CID** になる。ラベルがそのまま由来なので、値を magic にしない。"
 
+  :adr/migration-completed
+  "**2026-08-10 に 5 repo すべて完了。** 各 repo は pin を進めてテストを回し、
+   fixture を実 CID に替え、1 件を偽に戻して落ちることを確認してから landed。
+
+   | repo | 着地 | 実測した失敗 → 修正後 | mutation |
+   |---|---|---|---|
+   | code-graph | `9a30ab0` | 1 error → 0（16 tests / 58 assertions） | 2 failures + 2 errors |
+   | kotobase | `cd19cbb` | 2 failures + 2 errors → 0（83 / 2,549） | 2 failures + 2 errors |
+   | aiueos | `3dea605` | 10 failures + 2 errors → 0（416 / 1,206） | 2 failures |
+   | kototama | `88f42f5` | 8 failures + 6 errors → baseline の 6（172 / 1,165） | 2 errors |
+   | compiler(amu) | `2644eb9` | 0 → 0（931 / 7,331） | 1 error |
+
+   west pin: abi `448e1b4` / code-graph `93efd03` / kotobase `170cd42` /
+   aiueos `4ac56f9` / kototama `878a318` / amu `481e078`。
+
+   ## 予想と実測がずれた点
+
+   **122 件の fixture のうち、実際に `cid?` を通っていたのは一部だった。**
+   kotobase は 34 件の CID 風文字列のうち 24 件、compiler は 16 件のうち **1 件**。
+   残りは block key・error label・string-index のキーで、identity 検査を一度も
+   通っていない。**pin を進めて実測してから直す**方が、数えて直すより正確だった。
+
+   **aiueos の 12 失敗のうち 8 件は CID ではなく供給網ゲートだった。**
+   dep の SHA を変えると TCB inventory / SBOM / reproducibility が drift として
+   落ちる。`qualification/tcb-inventory.edn` は**手で維持する記録**で自動生成
+   ではないので、dep を進めるのは証拠を伴う意図的な行為になる —— 設計どおり。
+
+   ## テストが理由を取り違えていた 1 件（kototama）
+
+       (is (= :invalid-identity
+              (code (assoc-in valid [:identity :component-cid] \"bafycomponent\"))))
+
+   『admission が identity を束縛する』ように読めるが、`validate-identity!` は
+   **component-cid が CID であること**しか要求せず、値の一致は見ない。この
+   fixture は「復号できない」ので弾かれていた。実 CID にすると通る —— 正しい。
+   非 CID を渡す形に書き直し、**well-formed だが別の CID は受理される**ことを
+   第 2 の assertion で明示した。**偽の fixture は、テストが何を測っているかを
+   隠していた。**
+
+   ## 名前の衝突（aiueos）
+
+   helper を `cid` と名付けたら `execution_decision_test` の既存
+   `(def cid …)` と衝突し、以降の呼び出しが全部
+   `String cannot be cast to IFn` になった。`cid-of` に改名。
+   **順序ではなく名前で避けるべき衝突。**
+
+   ## 付随して分かったこと
+
+   **`kotoba-lang/compiler` は `kotoba-lang/amu` に改名済み**（push 時に GitHub が
+   リダイレクト）。west は既に `amu` / `orgs/kotoba-lang/amu` として登録していた。
+   ローカル checkout だけが旧名で残っている。なお `amu` はメタファ名なので、
+   ADR-2608040100 の規則により **README 冒頭の名乗り + `concept-vocabulary.edn`
+   登録**が要る（未確認）。"
+
   :adr/next
-  "- 5 repo の fixture 移行（122 件）→ abi pin 前進。1 repo ずつ、テストを回して。
+  "- ~~5 repo の fixture 移行（122 件）→ abi pin 前進~~ **完了（上記）**
    - `source-tree-cid` / `package-manifest-cid` は authority の宣言だけで実装が無い。
      使わないなら authority から落とすか `:status :not-implemented` を明記する
      （宣言だけの identity は、在ると誤読される）。
