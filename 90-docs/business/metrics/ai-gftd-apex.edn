@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 9829, "ai-gftd-chat-shell" 6},
+ {"magatama-sh1n5h1x" 9843, "ai-gftd-chat-shell" 6},
  :zone
- {:requests-7d 524266,
-  :pageviews-7d 11917,
-  :uniques-7d-sum 5192,
+ {:requests-7d 526916,
+  :pageviews-7d 11919,
+  :uniques-7d-sum 5199,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
   [{:path "/debug/pprof/", :requests 69}
-   {:path "/trace.axd", :requests 62}
-   {:path "/.vite/manifest.json", :requests 53}
-   {:path "/sa.json", :requests 52}
-   {:path "/.well-known/jwks.json", :requests 39}
+   {:path "/.vite/manifest.json", :requests 45}
+   {:path "/trace.axd", :requests 38}
    {:path "/frontend/.env", :requests 33}
    {:path "/mgrr.php", :requests 33}
-   {:path "/.aws/credentials", :requests 30}],
-  :status-mix {:server-error 15207, :ok 1506, :client-error 1482},
+   {:path "/sa.json", :requests 31}
+   {:path "/.aws/credentials", :requests 30}
+   {:path "/health", :requests 30}],
+  :status-mix {:server-error 15242, :ok 1348, :client-error 1314},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-10",
- :traffic-quality {:window "24h", :probe-4xx-pct 8, :error-5xx-pct 84},
+ :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 85},
  :top-paths
- "上位 page (24h, 2xx/3xx): /debug/pprof/ 69 · /trace.axd 62 · /.vite/manifest.json 53 · /sa.json 52 · /.well-known/jwks.json 39 | 4xx(probe) 8% · 5xx 84%",
+ "上位 page (24h, 2xx/3xx): /debug/pprof/ 69 · /.vite/manifest.json 45 · /trace.axd 38 · /frontend/.env 33 · /mgrr.php 33 | 4xx(probe) 7% · 5xx 85%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 524266 req/7d・5192 uniques(日次和)・うち4xx probe 8%(24h)、workers 9835 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 526916 req/7d・5199 uniques(日次和)・うち4xx probe 7%(24h)、workers 9849 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
