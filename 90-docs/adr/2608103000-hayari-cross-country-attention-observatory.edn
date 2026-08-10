@@ -1,0 +1,159 @@
+[{:db/id -1
+  :adr/id "adr-2608103000-hayari-cross-country-attention-observatory"
+  :adr/title "ADR-2608103000: 国・地域・年代ごとの人気コンテンツを測る observatory を起こす（hayari 流行）— 視聴者の世代は測らないと明記する"
+  :adr/status "accepted, implemented"
+  :adr/doc_type "adr"
+  :adr/date "2026-08-10"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "hayari-cross-country-attention-observatory"
+  :adr/tags "observatory, cloud-itonami, media, culture, coverage, honesty, wikimedia, wikidata"
+  :adr/related ["adr-2608081200-domain-observatory-runner"
+                "adr-2607203000-system-dynamics-all-entities"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["cloud-itonami/hayari の主題境界（何を測り、何を測らないか）"
+   "『視聴者の世代』は観測不能であり :uncomputable-until-measured として出力に書き出す、という決定"
+   "hayari の datom 面の属性（:source/dataset \"hayari\"）"]
+  :adr/last_verified "2026-08-10"
+  :adr/body
+  "# ADR-2608103000: hayari（流行）— 国・地域・作品年代ごとの注目を測る observatory
+
+## Context
+
+オーナーの問い（2026-08-10）:「全世界の国ごと、地域ごと、世代ごとに影響を与えた、
+人気のドラマやアニメ、コンテンツ、ニュースをまとめている、分析している repo はある?」
+
+CLAUDE.md の規則どおり、「無い」と結論する前に索引を引いた。`repo-search` を
+drama / anime / trend / popularity / culture / ranking / country / region /
+世代 / 人気 で、`concept-lookup` を アニメ / news / observatory で引き、west.yml
+4,151 project の名前も grep した。**該当は無かった。** 近いものはあったが、どれも
+軸が違った:
+
+- `com-etzhayyim-kawaraban`（瓦版）— 世界のニュース媒体の mirror。*何が報じられたか*
+  であって*何が見られたか*ではない
+- `cloud-itonami/yomi`（読み）— 瓦版を購読して intel 評価を発行する SOURCE / VOICE
+- `animeka` / `mangaka` / `dougaka` / `com-etzhayyim-minidrama` — すべて production 側
+- `com-etzhayyim-media-gamers` — 唯一「作品を観測している」が**ゲーム攻略に限定**
+
+一方で **器は既にあった**。`manifest/observatories.edn`（ADR-2608081200）に 22 の
+領域別 observatory が登録済みで、資本フロー・商品・広告供給網・確率予測は持っている。
+**文化／メディア消費の面だけが空いていた。**
+
+## Decision
+
+`cloud-itonami/hayari`（流行）を起こす。答える問いは 1 つに絞る:
+
+> いま、ある国の公衆の注意はどの作品に向いていて、それはどこの国の、いつの時代の
+> 作品か。
+
+### 測る軸と、測らない軸
+
+| 軸 | 出す | 出所 |
+|---|---|---|
+| 国 | ○ | Wikimedia per-country pageview（ISO 3166-1 alpha-2） |
+| 地域 | ○ | 国 → UN M49 region / sub-region |
+| 作品の種別 | ○ | Wikidata P31 → data/kinds.edn |
+| 作品の年代 | ○ | Wikidata P577 の最初の公開日 → 10 年区切り |
+| 原産国 | ○ | Wikidata P495（QID のまま保持し join key にする） |
+| **視聴者の世代** | **×** | **どの source も持っていない** |
+
+**この ADR の主要な決定は最後の行である。** オーナーの問いは「世代ごと」を含んで
+いたが、Wikimedia の per-country endpoint は集計済み・プライバシーフィルタ済みで
+閲覧者の年齢を持たず、Wikidata は作品を記述するもので視聴者を記述しない。作品の
+公開年代をバケットに分けて「世代」と呼ぶことは**できる**が、それは別のものを測って
+世代と名付けただけになる。ADR-2607203000 が禁じた「捏造したグローバル総計を測定値
+として提示する」「未計測の変換率を大きな pool に掛けて期待値を捏造する」と同じ形。
+
+したがって `:audience-generation :uncomputable-until-measured` を**毎回の出力に
+理由つきで書き出す**。README の注記ではなくデータにするのは、注記は集計時に落ちるが
+datom は落ちないから。作品側の年代（`:hayari/work-era`）は作品の性質なので出す。
+
+### カバレッジは「対象外」ではない
+
+2026-08-10 実測で、per-country endpoint の応答量は国ごとに桁が違う:
+US/IN 1000 件、DE 654、FR 449、BR 215、ID 86、KR 30、NG 12、EG は 404。これは
+Wikimedia のプライバシー閾値の結果であって、その国に文化が無いという意味ではない。
+
+- roster は既定で M49 の全 249 国。絞れるが既定では絞らない
+- データが返らなかった国は `:countries/no-data` に**名前で**残す
+- coverage entity を出力の 1 件目（`:db/id -1`）に置く
+
+## 実装して初めて分かったこと（3 件、すべて実測）
+
+ADR-2608081200 の教訓（『README も MATURITY.md も、これらが動くと書いてある』）に
+従い、**書いた後に実際に走らせた**。3 つの欠陥はどれも実行するまで見えなかった。
+
+### 1. 249 国に広げた瞬間、QID 解決が 48/50 → 1/874 に落ちた
+
+2 国では 48/50 が解決したのに、249 国では 1/874 になった。原因は MediaWiki
+api.php 側のスロットリング。**他のカウントはすべて健全に見えたまま**で、
+`kind: 0 classified` すら「そういう日もある」と読めてしまう。
+
+対処は 2 つで、後者が本質:
+
+- api.php 側の並列度を 2 に下げ、429 を Retry-After 尊重で再試行する
+- **失敗したバッチを空 map にしない。** 元の実装は失敗時に `{}` を返しており、
+  「この 50 件は Wikidata 項目を持たない」と**区別がつかなかった**。
+  `:qid/batch-failed` / `:enrichment/degraded?` を coverage に足し、degraded
+  なら stdout にも出す。Workflow 規約の『no silent caps』と同じ理由
+
+### 2. js/fetch にタイムアウトが無く、スロットルされた host で無限ハングした
+
+`js/fetch` は既定でタイムアウトを持たない。接続を拒否せず**停める** host に当たると
+collector は永久に待つ（実際に 1 回ハングした）。`AbortSignal.timeout` を入れた。
+
+### 3. (project, article) を作品の identity にしたのが間違っていた
+
+`The_Odyssey_(2026_film)`(en) と `La_Odisea_(película_de_2026)`(es) は同じ映画だが
+別作品として数えられ、13 か国と 6 か国に割れていた。QID で束ね直すと**同じ日の
+同じ観測が 34 か国**になる（en / es / de / ko / it / el ほかの言語版）。
+**過小評価は言語の境界を越えた作品にだけ効く** —— つまりこの observatory の主題
+そのものに効く。Wikidata QID は言語非依存なので、QID があればそれを identity にし、
+無ければ (project, article) に落ちる（過小にはなるが過大にはならない）。
+
+同時に、1 つの国の中で複数言語版が上位に入る場合を国単位で畳んだ。
+`:observed-in` は国を数えるべきで、記事を数えるべきではない。
+
+## 実測（2026-08-07 の観測、249 国 top 25）
+
+```
+countries: 249 requested / 105 with data / 144 no-data（名前で記録）
+rows:      935
+qid:       580/935 resolved · failed batches 0
+kind:      527 classified / 408 unclassified
+era:       113 dated / 822 undated（大半は :person で P577 を持たない）
+```
+
+最も多くの国で同時に観測された作品は `The Odyssey (2026 film)` で **34 か国**
+（:film/feature、2020 年代）。上記の欠陥 3 を直す前は同じデータが 13 と 6 に
+割れていた。種別分布は :person が最多で、:film/feature / :tv/series /
+:text/literary-work / :anime/film と続く。
+
+**`:person` が最多である点は隠さない。** 国別ランキング上位は作品より人物が多い。
+data/kinds.edn が :person と :event を意図的に含めているのは、それも『何が注目を
+集めたか』の実際の答えであり、observatory が事前にどちらが重要かを決めないため。
+
+## Consequences
+
+- 文化／メディア消費の面が観測可能になり、`:hayari/country-iso2` で他の面と、
+  `:hayari/origin-country-qid` で原産国と join できる
+- 「世代別」は**現時点では答えられない**ことが、prose ではなくデータとして残る。
+  将来 viewer 属性を持つ source（実在すれば）を足すときは、この属性を埋めることが
+  そのまま完了条件になる
+- 決定核（`core.cljc`）と effects（`collect.cljs`）を分けたので、判断はネットワーク
+  無しでテストできる（9 test / 37 assertion）。fixture は実 API の応答値を使う
+- `core.cljc` は Kotoba 移行の意味での決定核だが、まだ `.kotoba` ではない。
+  `{:ok v}` / `{:error {...}}` は恒久（explicit-errors は
+  :intentional-security-constraint）、map/vector 依存は backend gap であって様式
+  ではない、と README に明記した
+
+## 非目標
+
+- 国や作品を格付けしない。ランキングは観測された閲覧の順位であって、質・重要性・
+  正統性の順位ではない
+- 視聴者の属性を推定しない
+- 欠損を埋めない。QID が引けない記事、P31 が表に無い作品、公開日を持たない項目は
+  それぞれ coverage に数えて残す
+"}]

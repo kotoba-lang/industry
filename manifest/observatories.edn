@@ -443,7 +443,32 @@
                 実装していないという意味で、collector が落ちた結果ではない）"
    :evidence "2026-08-08 実測: deps.edn / bb.edn / ルート package.json いずれも無く、
               -main を持つファイルも無い"}
-  {:args ["--cycles" "1" "--log" "${REPO}/data/hirameki.datoms.kotoba.edn" "--dataset" "${REPO}/../hirameki-patents"], :expect :produces-datoms, :name "hirameki", :produces "data/hirameki.datoms.kotoba.edn", :evidence "2026-08-10 実測: 625 特許（harvest 618 + curated 7）/ 引用エッジ 2,448 / 未取得フロンティア 1,331、259 datoms、chain OK。3 cycle 回して 1 tx 追記 + 2 no-op（内容で冪等）", :change-rate-source "**corpus が伸びたときだけ datom が伸びる。**beat は内容で冪等なので、収集が止まっていれば何周回しても 0 件。change-rate は「harvest tick を回す頻度」であって観測対象の変化率ではない —— 上界も下界も実測していない", :output-gitignored true, :org "cloud-itonami", :change-rate-basis :prior, :change-rate 24, :runtime :clojure, :domain "世界の公開特許（解放クロック・出願人集中・引用フロンティア）", :main "hirameki.methods.autorun", :importance 18, :dataset-repo "cloud-itonami/hirameki-patents", :note "収集は別コマンド: `clojure -M -m hirameki.methods.harvest --ticks N --dataset ../hirameki-patents`。autorun は観測のみで取得しない —— 1 tick 1 外部リクエストを観測ループに埋めない"}]
+  {:args ["--cycles" "1" "--log" "${REPO}/data/hirameki.datoms.kotoba.edn" "--dataset" "${REPO}/../hirameki-patents"], :expect :produces-datoms, :name "hirameki", :produces "data/hirameki.datoms.kotoba.edn", :evidence "2026-08-10 実測: 625 特許（harvest 618 + curated 7）/ 引用エッジ 2,448 / 未取得フロンティア 1,331、259 datoms、chain OK。3 cycle 回して 1 tx 追記 + 2 no-op（内容で冪等）", :change-rate-source "**corpus が伸びたときだけ datom が伸びる。**beat は内容で冪等なので、収集が止まっていれば何周回しても 0 件。change-rate は「harvest tick を回す頻度」であって観測対象の変化率ではない —— 上界も下界も実測していない", :output-gitignored true, :org "cloud-itonami", :change-rate-basis :prior, :change-rate 24, :runtime :clojure, :domain "世界の公開特許（解放クロック・出願人集中・引用フロンティア）", :main "hirameki.methods.autorun", :importance 18, :dataset-repo "cloud-itonami/hirameki-patents", :note "収集は別コマンド: `clojure -M -m hirameki.methods.harvest --ticks N --dataset ../hirameki-patents`。autorun は観測のみで取得しない —— 1 tick 1 外部リクエストを観測ループに埋めない"}
+  ;; ── 2026-08-10 追加 ───────────────────────────────────────────────────
+  {:name "hayari" :org "cloud-itonami"
+   :domain "国・地域ごとの公衆の注目と、その作品の原産国・年代（文化／メディア消費）"
+   ;; 注目は日次で入れ替わる。source は日次粒度でしか出ないので、それより速く
+   ;; 測っても新しい値は得られない。
+   :change-rate 1.0          ; λ [1/day]
+   :change-rate-basis :measured
+   :change-rate-source "Wikimedia の per-country 集計は日次で確定する（2026-08-10 実測）"
+   :importance 20            ; [sec·day]
+   :runtime :nbb :main "src/hayari/collect.cljs"
+   ;; 既定は 2 日前・全 249 国・top 25。日付を固定しないのは、observatory-run が
+   ;; いつ起きても「その時点で確定している最新日」を測るため。
+   :args []
+   :produces "data/hayari.datoms.edn"
+   :output-gitignored true
+   :expect :produces-datoms
+   ;; ⚠ この actor は degraded で「成功」しうる。api.php にスロットルされると
+   ;; enrichment だけが欠けて他のカウントは健全に見える（実測 2026-08-10:
+   ;; QID 解決が 48/50 → 1/874 に落ちたのに他は正常に見えた）。判定は行数ではなく
+   ;; coverage entity の :enrichment/degraded? を見ること。
+   :evidence "2026-08-10 実測（観測日 2026-08-07、249 国 top 25）: 105 国からデータ、
+              935 rows、QID 580/935 解決、失敗バッチ 0、kind 527 分類、
+              era 113 判定。最大到達は The Odyssey (2026 film) の 34 か国。
+              決定核は 9 test / 37 assertion。
+              視聴者の世代は :uncomputable-until-measured（source が持たない）"}]
 
  ;; 登録していないが、同じ層に属すると分かっているもの。**「まだ測っていない」で
  ;; あって「対象外」ではない**（system dynamics の規則と同じ立場）。
