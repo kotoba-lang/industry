@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 24458, "kotobase-cf-wasm-staging" 55970},
+ {"net-kotobase" 24461, "kotobase-cf-wasm-staging" 55982},
  :zone
- {:requests-7d 75963,
-  :pageviews-7d 904,
-  :uniques-7d-sum 884,
+ {:requests-7d 75985,
+  :pageviews-7d 905,
+  :uniques-7d-sum 889,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -26,7 +26,7 @@
    {:path
     "/kura-phase0-b2/s3-kotobase/blocks/bafkreie5cj5tj2vomz53no5ti46ef62djziroqmhnzmgpadkave74ksayu",
     :requests 3}],
-  :status-mix {:client-error 580, :ok 247, :server-error 90},
+  :status-mix {:client-error 581, :ok 248, :server-error 90},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -42,9 +42,9 @@
  {:window "24h", :probe-4xx-pct 63, :error-5xx-pct 10},
  :top-paths
  "上位 page (24h, 2xx/3xx): /etzhayyim-xyz-farcaster-fnames 8 · /obsidian 5 · /_diag/health 4 · /annex-test/SHA256E-s18--64bcbec19d0edd1… 4 · /kura-phase0-b2/s3-kotobase/blocks/bafkr… 4 | 4xx(probe) 63% · 5xx 10%",
- :funnel {:visitors 2558, :signups 13, :checkouts 0},
+ :funnel {:visitors 2559, :signups 13, :checkouts 0},
  :signal
- "kotobase.net 実測 75963 req/7d・884 uniques(日次和)・うち4xx probe 63%(24h)、workers 80428 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 75985 req/7d・889 uniques(日次和)・うち4xx probe 63%(24h)、workers 80443 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -53,6 +53,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 1029},
+ {:visitors {:openai-ads 3, :organic 1030},
   :signups {:organic 10}, 
   :checkouts {}}}
