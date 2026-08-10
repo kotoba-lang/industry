@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 27253, "kotobase-cf-wasm-staging" 63113},
+ {"net-kotobase" 27429, "kotobase-cf-wasm-staging" 63648},
  :zone
- {:requests-7d 105854,
-  :pageviews-7d 1037,
-  :uniques-7d-sum 975,
+ {:requests-7d 106536,
+  :pageviews-7d 1047,
+  :uniques-7d-sum 978,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -49,9 +49,9 @@
  :traffic-quality {:window "24h", :probe-4xx-pct 44, :error-5xx-pct 6},
  :top-paths
  "上位 page (24h, 2xx/3xx): /bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7oz… 50 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 9 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 8 · /kura-phase0-b2/s3-kotobase/blocks/bafkr… 6 · /etzhayyim-xyz-farcaster-fnames/SHA256E-… 6 | 4xx(probe) 44% · 5xx 6%",
- :funnel {:visitors 2628, :signups 20, :checkouts 0},
+ :funnel {:visitors 2634, :signups 21, :checkouts 0},
  :signal
- "kotobase.net 実測 105854 req/7d・975 uniques(日次和)・うち4xx probe 44%(24h)、workers 90366 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 106536 req/7d・978 uniques(日次和)・うち4xx probe 44%(24h)、workers 91077 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 14,
   :submissions 3,
@@ -60,6 +60,6 @@
   :attempt-rate 0.21428571428571427,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 1099},
-  :signups {:organic 17}, 
+ {:visitors {:openai-ads 3, :organic 1105},
+  :signups {:organic 18}, 
   :checkouts {}}}

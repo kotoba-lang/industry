@@ -1,25 +1,25 @@
 {:health-status 200,
  :zone-name "murakumo.cloud",
- :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 174258},
+ :workers-invocations-7d {"ai-gftd-murakumo-2603241700" 175440},
  :zone
- {:requests-7d 108075,
-  :pageviews-7d 3417,
-  :uniques-7d-sum 713,
+ {:requests-7d 110193,
+  :pageviews-7d 3420,
+  :uniques-7d-sum 717,
   :zone "murakumo.cloud"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
-  [{:path "/api/v1/model-hosting/operations/fleet/promotions/next",
-    :requests 11306}
-   {:path "/api/v1/model-hosting/operations/scanner/jobs/next",
-    :requests 11304}
-   {:path "/infer/hwmetrics", :requests 8206}
-   {:path "/api/actions/jobs/claim", :requests 2407}
-   {:path "/x402/ingest", :requests 1236}
-   {:path "/api/actions/github", :requests 221}
-   {:path "/v1/chat/completions", :requests 173}
+  [{:path "/api/v1/model-hosting/operations/scanner/jobs/next",
+    :requests 12062}
+   {:path "/api/v1/model-hosting/operations/fleet/promotions/next",
+    :requests 12057}
+   {:path "/infer/hwmetrics", :requests 8204}
+   {:path "/api/actions/jobs/claim", :requests 2408}
+   {:path "/x402/ingest", :requests 1234}
+   {:path "/api/actions/github", :requests 247}
+   {:path "/v1/chat/completions", :requests 167}
    {:path "/infer/runs", :requests 87}],
-  :status-mix {:ok 35373, :client-error 60, :server-error 52},
+  :status-mix {:client-error 60, :ok 36896, :server-error 57},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -33,7 +33,7 @@
  :as-of "2026-08-10",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /api/v1/model-hosting/operations/fleet/p… 11306 · /api/v1/model-hosting/operations/scanner… 11304 · /infer/hwmetrics 8206 · /api/actions/jobs/claim 2407 · /x402/ingest 1236 | 4xx(probe) 0% · 5xx 0%",
+ "上位 page (24h, 2xx/3xx): /api/v1/model-hosting/operations/scanner… 12062 · /api/v1/model-hosting/operations/fleet/p… 12057 · /infer/hwmetrics 8204 · /api/actions/jobs/claim 2408 · /x402/ingest 1234 | 4xx(probe) 0% · 5xx 0%",
  :cost
  {:spot-ref
   {:spot-usd-per-hour 1.8,
@@ -48,4 +48,4 @@
   :fleet-tokens 73075,
   :runs-count 200},
  :signal
- "murakumo.cloud 実測 108075 req/7d・713 uniques(日次和)・うち4xx probe 0%(24h)、workers 174258 inv/7d、Stripe active subs 0"}
+ "murakumo.cloud 実測 110193 req/7d・717 uniques(日次和)・うち4xx probe 0%(24h)、workers 175440 inv/7d、Stripe active subs 0"}
