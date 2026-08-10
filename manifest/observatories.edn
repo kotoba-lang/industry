@@ -557,6 +557,21 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
               ⚠ **corpus は日次 run に含めない**（別エントリでも別 cadence でもない —
               現状は手動）。観測と同じく .gitignore 済み。
               テスト 30 件 / 133 assertion。
+
+              2026-08-10 の第 6 波（query 面への接続、pin c0942d76）:
+              **5 波にわたり全 datom が :source/dataset \"hayari\" を付けて
+              manifest/edn-query.cljs への所属を主張していたが、edn-query.cljs には
+              hayari が 1 件も無かった** —— 観測本体は .gitignore 対象なので面が読む
+              ものが存在せず、README も ADR も実行できない join を説明していた。
+              commit できる大きさの半分 data/hayari-summary.edn（(国,日) ごとに 1 entity
+              + 年別カバレッジ、実測 122 country-day / 78 KB）を切り出し、loader を
+              足した。:hayari.summary/country-iso2 は LEI 面の :company/jurisdiction の
+              先頭 2 文字と join できる（実際に join して確認済み: Netflix US-DE ×
+              Spider-Man 1,205,100 / 東京電力 JP × 及川光博 759,900 など）。
+              ⚠ **要約は snapshot であって feed ではない** —— 最後に collect を回して
+              commit を着地させた人の値で、cadence は未決。tracked file が在ることを
+              鮮度と読み違えないこと。
+              テスト 31 件 / 143 assertion。
               視聴者の世代は :uncomputable-until-measured（source が持たない）"}]
 
  ;; 登録していないが、同じ層に属すると分かっているもの。**「まだ測っていない」で
