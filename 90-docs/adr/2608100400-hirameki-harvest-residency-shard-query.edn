@@ -248,14 +248,66 @@ datoms shard を 1 つ削除 → 件数不一致 / inventor 属性を混入 → 
 空の corpus で通らないよう下限も入れた（100 特許超・1000 datom 超）——
 空で満足する gate は削除された corpus でも満足する。
 
-## 残っている穴
+## 現在地（2026-08-10 closing 時点、すべて実測）
 
-1. **収集がまだ operator マシンに居る。** 移送先は上の決定のとおり cloud-itonami の
-   Worker + Cron で、前提（Workers 面が稼働している）は実測で確認したが、**移植そのものは
-   未着手** —— tick loop を local git から GitHub API に書き直す必要がある。検査は fleet に出した。
-   **`:feeder` の検出を読む者が居ない**のも未解決（observatory-run の出力を誰が見るか）。
-2. **LaunchAgent の再起動生存は未検証**（plist は所定の場所にあり bootstrap 済み）。
-3. **CPC が無い**（USPTO ODP key が operator ステップ）。
-4. **content remote 未設定**（annex に入れるものが無いため）。
-5. **コンソール未 deploy。**
-6. **kotobase の ref 未着手**（consumer が無いうちは切らない）。"}]
+corpus **718 特許 / 7,885 datoms / 338 組織 / 11 管轄 / 671 件が存続期間超過**。
+main に着地済みで、pin は 3 つとも remote main と一致。
+
+| repo | main | 役割 |
+|---|---|---|
+| kotoba-lang/toshokan-patents | e26948e2 | lib のみ（純粋 codec = quad / 脚 = quad.fs） |
+| cloud-itonami/hirameki | 6d5a89d5 | actor（ループ・分析・ゲート・コンソール・Worker） |
+| cloud-itonami/hirameki-patents | 2f8370ec | corpus（shard・CID manifest・2 つの gate） |
+
+常駐 3 本（すべて launchd 下で無人完走を確認済み）:
+
+    com.gftd.hirameki-harvest   4h ごと・20 tick            収集
+    com.gftd.observatory-run    毎時（hirameki は 1h 間隔）  観測 + feeder 見張り
+    com.gftd.hirameki-mirror    日次 03:53                  B2 bundle + 復元ドリル
+
+検査は 2 面: operator（CLI 2 本）と murakumo fleet（jvm-test gate）。
+**書き手と検証者が別**になっている。耐久コピーは 2 つ（GitHub と B2 bundle）。
+
+## 検証（この closing で再実行）
+
+- toshokan-patents lib: 7 tests / 42 assertions、JVM と nbb 両方 green
+- hirameki actor: 62 tests / 285 assertions、0 failures
+- corpus gate: 2 tests / 4 assertions、0 failures（fleet が回すのと同じ経路）
+- query-check: 8 項目 ok
+- Worker: shadow-cljs release で dist/worker.js 179 KB。**デプロイと実行は未実施**
+
+すべての gate について「壊すと落ちる」ことを確認済み（corpus shard の 1 バイト改竄 /
+datoms shard 削除 / inventor 属性混入 / 台帳 21h 停止 / bundle 改竄 / router 削除 /
+存在しない hig トークン）。
+
+## 再開点
+
+**Worker のデプロイだけが credential 待ちで止まっている。**
+
+owner が fine-grained PAT を発行する（contents:write、対象は cloud-itonami/hirameki と
+hirameki-patents の 2 つだけ）。このセッションで使えた token は repo scope =
+全 repo 書き込みで、2 ファイルを書くために無人プロセスへ渡すには広すぎる。
+
+    cd orgs/cloud-itonami/hirameki
+    clojure -M:cljs -m shadow.cljs.devtools.cli release worker
+    npx wrangler secret put GITHUB_TOKEN --name cloud-itonami-hirameki-harvest
+    npx wrangler secret put RUN_TOKEN    --name cloud-itonami-hirameki-harvest
+    npx wrangler deploy
+    curl -X POST -H \"Authorization: Bearer $RUN_TOKEN\" \".../run?ticks=1\"
+
+通ったら operator 側の harvest を止めるか間隔を延ばす（両方が同じ 4 ファイルを
+書くので、片方は 409 で捨てられるだけ）。
+
+## 残っている穴（優先順）
+
+1. **Worker 未デプロイ** —— credential 待ち。通るまで収集は operator マシン 1 台に依存する。
+2. **feeder の検出を読む者が居ない。** 収集が止まれば gate は落ちるが、届ける経路が無い。
+3. **LaunchAgent の再起動生存が未検証。**
+4. **CPC が無い**（USPTO ODP key は operator ステップ。field 面は curated 7 件のみ）。
+5. **IPFS の CID は pin されていない**（verifiable であって fetchable ではない、と文書済み）。
+6. **コンソール未 deploy**（build も監査 100.00 も通るが sites plane に出していない）。
+7. **kotobase の ref 未着手**（consumer が無いうちは切らない）。
+8. **90-docs/observatory/observatory.datoms.edn が毎時 dirty になる。** tracked な
+   snapshot を observatory-run が書き換えるので、毎時 superproject の FF マージを塞ぐ。
+   私が ledger で作った問題と同型だが、こちらは私の変更前からの設計なので触っていない。
+"}]
