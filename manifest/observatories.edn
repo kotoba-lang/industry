@@ -471,7 +471,10 @@
    :budget-ms 480000
    :evidence "2026-08-10、observatory-run 経由の実測（この行の数字は standalone 実行では
               なく登録済み runner の出力）: ✓ produces-datoms exit=0 Δbytes=447531
-              units=891 63s。観測日 2026-08-08、249 国要求 / 101 国からデータ、
+              units=891 63s。観測日 2026-08-08、249 国要求 / 101 国が応答 /
+              **観測行を産んだのは 66 国**（残り 35 国は 200 を返したが閾値を超えた
+              記事が main page / search page だけだった。reach を語るときは
+              :countries/with-rows を引くこと）、
               887 datoms、QID 730 解決、kind 520 分類、era 121 判定、
               :enrichment/degraded? false。
               予算切り上げ経路も強制して確認済み（--budget-ms 3000 で 215 国 /
