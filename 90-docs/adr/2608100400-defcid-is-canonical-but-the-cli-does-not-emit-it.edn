@@ -129,6 +129,12 @@
      再宣言しない** —— それが今回直した drift の作り方そのもの。
    - `version-policy :release/language-profile` を 6 へ上げるか（= profile 6 を
      released と宣言し `:supported` に加える）はオーナー判断。
+   - **`compiler/resources/kotoba/lang/version-policy.edn` は kotoba-lang の写し
+     ですらなく、別スキーマの別ファイル**
+     （`:kotoba.lang.version-policy/current-profile 5`）。profile 番号の 4 つ目の
+     宣言であり、これも stale。しかも `vendor-drift` は **guest-grammar しか
+     検査していない**ので、`capability-catalog` と `version-policy` の写しは今も
+     未検査。別スライス。
    - ~~`:test-definition-cid` を改名する~~ **完了**（amu `3b45ae1`、
      `:test-kir-sha256`。テストは旧キーが不在であることも assert する）。
    - CLI が DefCID を出せるようになったら、`lang/code-identity-conformance` の
