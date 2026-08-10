@@ -273,11 +273,18 @@
                 names)
           replaced
           (mapv (fn [[n ls]]
-                  (cond
-                    (names-set n) [n (rmap n)]
-                    (contains? requested-by-path (block-path ls))
-                    (get requested-by-path (block-path ls))
-                    :else [n ls]))
+                  (let [path (block-path ls)
+                        canonical (canonical-path path)]
+                    (cond
+                      (names-set n) [n (rmap n)]
+                      ;; Repository transfers keep an old west block whose raw
+                      ;; path differs from the new rendered path. Resolve that
+                      ;; path through repos.edn's relocation map before matching
+                      ;; so --entry replaces the old block instead of appending a
+                      ;; second project for the same repository.
+                      (contains? requested-by-path canonical)
+                      (get requested-by-path canonical)
+                      :else [n ls])))
                 (:entries ex))
           ;; Replacement can collapse two stale blocks which already pointed at
           ;; the same checkout path. Keep exactly one canonical name/path pair.
