@@ -424,6 +424,25 @@ receipt の sha を見ずに直しにいくと、既に直っているものを�
 gate を緑にするには `manifest/projection-verify.cljs` の contract 方式へ寄せるか、
 `orgs/` が実在する場所で回す設計変更が要る。**未着手。**
 
+### 実ノードでの最終確認（2026-08-11、closing 時）
+
+`manifest/fleet-ci.edn` の最新判定:
+
+- **`itonami-regenerate-*` 31 本すべて PASS**（実ノード、tip ごとの判定）。
+  item 4 は名目ではなく実際に回っている。
+- `amu-jdk-free` PASS / `net-kotobase` PASS。
+- `root-repository-roles` は **失敗対象が移動した** —— `amu` は解消し、次に
+  `kotoba-lang/kotoba-kir`（`dag-cbor` / `io-multiformats` / `kotoba-hir` が
+  宣言漏れ）が出た。同じ IR 抽出由来の同型で、**修正して着地**
+  （`kotoba-lang/kotoba-kir` `c1ab9c7e`、`verify-repository-roles: OK deps=4`）+
+  pin 前進（`4d4ab97`）。
+- `root-itonami-org-id` / `root-permit-index` は既知の理由で赤のまま
+  （前者はデプロイ待ち、後者は入力が repo 外）。
+
+**この『直すと次が出る』形は劣化ではない。** 3 日間 CI が止まっていた間に
+複数 repo で宣言が実依存から離れており、gate は最初の 1 件しか報告しない。
+1 件直すごとに次が見える。**赤が動くのは検査が生きている証拠**である。
+
 ### 次の agent への resume point
 
 1. **本番 tick を `--dry-run` 無しで通す**（landing / commit status / CD が未検証）。
