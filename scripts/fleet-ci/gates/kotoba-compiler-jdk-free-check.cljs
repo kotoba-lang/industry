@@ -1,5 +1,5 @@
 #!/usr/bin/env nbb
-;; kotoba-compiler-jdk-free-check.cljs — kotoba-lang/compiler の hermetic gate。
+;; kotoba-compiler-jdk-free-check.cljs — kotoba-lang/amu の hermetic gate。
 ;;
 ;; **なぜ fleet に置くか。** 2 つの理由が重なっている。
 ;;
@@ -12,7 +12,7 @@
 ;;    step を足す経路が塞がっている（実測 2026-08-03）。fleet なら repo に
 ;;    ファイルを置くだけで登録できる。
 ;;
-;; **何を検査するか。** compiler ADR-0202 の JDK-free 経路の不変条件。検査ロジックは
+;; **何を検査するか。** Amu ADR-0202 の JDK-free 経路の不変条件。検査ロジックは
 ;; ここに複製せず、**repo 自身の verifier（`test/nbb/classpath.cljs`）を呼ぶ**
 ;; （fleet 側と repo 側で別実装を持つと、片方だけ通る状態が黙って生まれる）。
 ;;
@@ -33,13 +33,13 @@
 ;;     **その照合を CI の都合で緩めない。** `--hermetic-only` が明示的に除外し、
 ;;     除外した事実を出力に残す。
 ;;   - `clojure -M:test` / `npm ci` / browser matrix / wasm-tools / cargo を要する
-;;     compiler CI の大半。ノードに registry egress が無い。
+;;     Amu CI の大半。ノードに registry egress が無い。
 ;;   - `bin/kotoba` の dispatch shell 自体。`<root>/node_modules/nbb/cli.js` を
 ;;     spawn するが tarball は `git archive` なので node_modules が無い。
 ;;     dispatch の下にある解決経路（本命）は B/C が直接叩く。
 ;;
 ;; **したがって green の意味は「JDK-free 解決の不変条件が保たれている」であって
-;; 「compiler の CI が通った」ではない。**
+;; 「Amu の CI が通った」ではない。**
 ;;
 ;; ノード側で `npx nbb kotoba-compiler-jdk-free-check.cljs <dir>` として実行。
 

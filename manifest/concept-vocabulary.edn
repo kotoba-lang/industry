@@ -27,7 +27,12 @@
 ;; 概念を 1 つに畳むとどれかが消える。**別概念として並べ、同じ綴りを両方に
 ;; 持たせる** —— `console` で引いた人には両方出るのが正しい。
 
-{:visit-telemetry
+{:amu-compiler
+ {:label "Amu / Kotoba compiler"
+  :spellings ["amu" "compiler" "kotoba compiler" "コンパイラ" "編む"]
+  :note "kotoba-lang/amu is the compiler orchestrator (formerly kotoba-lang/compiler). The repository name is Amu; :compiler roles, kotoba.compiler namespaces, kotoba-compiler/1 artifact compatibility, and the bin/kotoba-compiler shim remain compatible."}
+
+ :visit-telemetry
  {:label "回遊 / アクセス解析（訪問者を特定せずに動線を測る）"
   :spellings ["回遊" "kaiyu" "visit telemetry" "access analytics" "アクセス解析"
               "dwell" "滞在時間" "route transition" "遷移" "動線" "pageview"

@@ -527,7 +527,7 @@
    :script "gates/cloud-itonami-sites-check.cljs"
    :script-args ["--min-checks" "27" "--min-reserved" "30"] :cd true}
 
-  ;; kotoba-lang/compiler の JDK-free 経路（compiler ADR-0202）。
+  ;; kotoba-lang/amu の JDK-free 経路（Amu ADR-0202）。
   ;;
   ;; **ここに置く理由は 2 つある。** ①ADR-2607300900 の決定（CI は Actions では
   ;; なく fleet）。kotoba-lang org の Actions は今日は動いているが、他 3 org は
@@ -545,14 +545,14 @@
   ;; ためで、**pin が動く頻度からしてこれは通常の腐り方**）。
   ;;
   ;; :cd false — この gate が green でも意味するのは「JDK-free の不変条件が
-  ;; 保たれている」だけで、compiler の CI が通ったことではない（browser matrix /
+  ;; 保たれている」だけで、Amu の CI が通ったことではない（browser matrix /
   ;; wasm-tools / cargo / clojure -M:test はノードの egress が無く載らない）。
   ;; 狭い slice を根拠に pin を前進させない。
   ;;
   ;; :include-ext [".edn" ".cljs"] — resolver 本体・その test・lock・deps.edn。
   ;; 実測 84 件なので :min-files 60 を床にする（filter が壊れて空 tree を
   ;; 「合格」にしないため）。
-  {:name "compiler" :id "compiler-jdk-free" :gate :nbb-script
+  {:name "amu" :id "amu-jdk-free" :gate :nbb-script
    :script "gates/kotoba-compiler-jdk-free-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 60 :cd false}
 
