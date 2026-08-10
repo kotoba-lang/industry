@@ -195,6 +195,82 @@ search page だけで、meta フィルタ後に 0 行になっていた —— *
 4 つ目は登録簿と本 ADR に記録する。歴史の蓄積は別の決定（どこに置くか）が要るので
 本 ADR では決めない。
 
+## 第 2 波（2026-08-10、pin f3768c29）— coverage と XMILE
+
+オーナー指示「成熟度と coverage を向上, また xmile で計算できるようにして」。
+
+### coverage — 広げた分はすべて「何を取りこぼしているか」を数えて決めた
+
+- **非記事の棄却を MediaWiki の namespace 番号に変えた。** タイトル接頭辞の表は
+  ラテン/日本語に偏っており、`Special:Search` は捕まえるのに **`특수:검색` /
+  `特殊:近期變更` / `Specialis:Quaerere` を通していた** —— これらは減衰の当てはめまで
+  作品として到達していた。`ns != 0` は MediaWiki 自身の答えで、全言語に同時に効く。
+- **list / disambiguation は P31 で別に落とす。** これらは **ns 0** で、タイトルも
+  普通の記事に見えるので、Wikidata にしか見えない。
+- **kinds 表を 21 → 44 種。** 未分類を生んだ P31 を頻度順に数えて選んだ（推測ではない）。
+  label は全件 live API で確認し、**1 件は推測が外れていた**（Q35252665 は
+  "Wikimedia" ではなく "MediaWiki" non-main namespace）。
+- **日付は P577 → P571 → P1191 → P580 の順に落とす。プールしない** ——
+  プールすると 2024 年の作品が 1963 年の franchise の日付になる。どれが答えたかを
+  `:hayari/dated-via` に残す。
+- **`--days N`** で窓を 1 回で取る。閾値を**どれか 1 日でも**超えた国が記録に入る。
+
+### 時系列 — 観測が互いを消さなくなった
+
+前の版は毎回上書きしており、**日が互いを消していた**ので変化が読めなかった。
+merge するようにした（同じ日は置換、新しい日は追加）。これに伴い registry の
+`:expect` を `:produces-datoms-idempotent` にした —— 同じ日の再 run が伸びないのは
+正常で、`:produces-datoms` のままだと**常時赤い gate になり無視される**。
+
+**ただし恒久的な年次履歴はまだ無い。** 出力は `.gitignore` 済み（observatory 族の
+既定）なので、履歴は走らせたマシンにしか無い。置き場所（DataLad dataset か
+`90-docs/observatory/` の投影か）は別の決定であり、ここでは決めない。MATURITY.md の
+R1 に未達として書いてある。
+
+### XMILE — 注目を stock として計算する
+
+```
+Attention(0)   = v0
+Decay          = Attention · decay_rate
+d/dt Attention = −Decay
+```
+
+**シミュレータは書いていない。** 方程式言語・検証器・Euler/RK4 は
+`kotoba-lang/org-oasis-open-xmile` が持ち、`dynamics.xmile` の docstring が再実装を
+名指しで禁じている。当てはめ（ln V の最小二乗）は決定核に置いたので、XMILE
+ライブラリ無しでテストできる。
+
+実測: `λ=0.5745 half-life=1.21d r²=0.968 MAPE=9.9% n=4`（Abdul_El-Sayed）、
+`λ=-0.0713 growing r²=0.824 MAPE=3.3% n=4`（杀人者的购物中心, :tv/series）。
+
+3 つの拒否を入れた:
+
+- **3 点未満は当てはめない。** 2 点なら直線は必ず完全に通り、r²=1 が
+  **持っていない確信のように読める**。
+- **λ が負なら `growing`。** 負の half-life は数字に見えて意味が無い。
+- **MAPE は in-sample と明記。** 当てはめた日を再現するかであって予測ではない。
+  出力ファイルの冒頭にも書く。
+
+### 成熟度
+
+`MATURITY.md` を 7 軸（ADR-2608052000）で自己採点し、`docs/operator-quickstart.md` に
+**実際に出た出力**（degraded 経路・失敗経路を含む）を貼った。
+テストは 21 件 / 89 assertion（決定核 16/71 + XMILE 結合 5/18）。
+
+**governed 軸は 0 のままで、それが正しい。** governed-actor は「主張する model」を
+封じ込めるための型で、hayari は主張しない —— 数と、その出所と、取りこぼしを出すだけ。
+ここに governor を付けるのは儀式になる。将来 hayari が解釈（「この作品は文化的に
+重要だ」）を発行するなら、その時に要る。
+
+### pin 退行を 1 件受けた（他セッション由来）
+
+`dc2b38f5f42`（別セッション）が hayari の pin を `f3768c29` → `428eb6c` へ**静かに
+巻き戻した**。tip 上で `west-pin-put` により前進させ直した（`9902a41c`）。
+CLAUDE.md が警告する pin 退行の実例で、**wholesale な west.yml commit の危険性**を
+改めて示している。同 commit は hirameki / hirameki-patents の pin も動かしており、
+その 2 件は `gh api compare` が 404 を返す（base commit が remote に無い）が、
+別セッションの進行中の作業なので触っていない。
+
 ## 登録済み runner での実測（これが landed の根拠）
 
 standalone で動くことは landed の根拠にしない —— 欠陥 4 と 5 はどちらも
