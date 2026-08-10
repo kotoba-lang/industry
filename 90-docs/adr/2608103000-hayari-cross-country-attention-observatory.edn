@@ -385,6 +385,59 @@ per-country endpoint は 1 か国あたり最大 1000 件返す。**古い作品
 **深い掃引の cadence が決まるまで、歴史の年は coverage 表が言うとおり疎なままである** ——
 MATURITY.md はそう書いてあり、そうでないかのようには書いていない。
 
+## 第 5 波（2026-08-10、pin a2e032f8）— コンテンツと entity を実際に取得する
+
+オーナー指示「では実際にコンテンツ, entity も取得」。
+
+観測は「ある国がこれを見た」までしか言わない。`src/hayari/corpus.cljs` が
+**それが何なのか**を取りに行く —— Wikipedia の冒頭抜粋と Wikidata の entity レコード。
+
+### 出力を 2 つに分けたのは、ライセンスが違うから
+
+| ファイル | 中身 | ライセンス |
+|---|---|---|
+| `data/hayari-content.edn` | 冒頭抜粋・説明・正規 URL・サムネ URL・リビジョン | **CC BY-SA 4.0**（帰属 + 継承） |
+| `data/hayari-entities.edn` | ラベル(en/ja)・説明(en/ja)・sitelink 数 | **CC0-1.0** |
+
+**ライセンスは 1 レコードごとに刻む。** README に 1 回書くだけでは、
+**誰かが corpus を抜粋した瞬間に条件が失われる** —— share-alike は後から
+復元できる細部ではない。
+
+### 取らないと決めた 4 つ（それぞれ実測した理由がある）
+
+- **全文を取らない。** summary endpoint が返すのは冒頭段落で、実測 167 文字
+  （長編映画）。全文を持つと **git checkout の中に Wikipedia の鏡**ができるうえ、
+  抜粋で答えられない問いが増えるわけでもない。
+- **画像の実体を取らない。** サムネの URL だけ。画像はファイルごとに別ライセンスで
+  CC BY-SA とは限らず、**bytes を持つとその問題をこの corpus に取り込む**。
+- **claims を再取得しない。** `props=claims` は 1 entity **109,873 バイト**（実測）、
+  `labels|descriptions` を en|ja に絞れば **438 バイト**。しかも必要な claim は
+  収集時に抽出済みで、**250 倍を払って手元にあるデータを取り直す**ことになる。
+- **300 言語の sitelink リストを保存しない。** 数だけ残す —— ここで立てている問いは
+  「どれだけ多くの言語版を持つか」だけ。
+
+### 取得順は注目の大きい順
+
+予算で打ち切られた run が**世界が実際に見ていたもの**を持っている状態になる。
+ただし **順序が良いことは欠けていないことを意味しない**ので、打ち切った分は
+`:content/skipped-budget` に数えて申告する。
+
+### 実測（2026-08-10）
+
+小: 25 記事 / 100 entity、失敗 0。
+大（deep-era の観測 10,309 datom を入力）: **596/600 記事**（4 失敗を DEGRADED と
+申告）+ **2,000 entity**、content 773 KB / entity 1.10 MB。
+
+第 4 波で埋めた 50〜70 年代の作品に、実際に本文が付いた:
+
+```
+1959 Doordarshan            India's state-owned public service broadcaster…
+1962 スパイダーマン          マーベル・コミックが出版するアメリカンコミック…
+1967 Trabzonspor            Turkish professional sports club…
+1968 Odissea (miniserie…)   sceneggiato televisivo co-prodotta…
+1969 Que la bête meure      film franco-italien réalisé par Claude Chabrol…
+```
+
 ## 登録済み runner での実測（これが landed の根拠）
 
 standalone で動くことは landed の根拠にしない —— 欠陥 4 と 5 はどちらも

@@ -539,6 +539,24 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
               日次の仕事は時系列であってカタログの厚みではない）。深い掃引の cadence が
               決まるまで歴史の年は疎なままで、MATURITY.md にそう書いてある。
               テスト 28 件 / 123 assertion。
+
+              2026-08-10 の第 5 波（コンテンツ + entity 取得、pin a2e032f8）:
+              `src/hayari/corpus.cljs` が Wikipedia の冒頭抜粋と Wikidata の
+              entity レコードを実際に取りに行く。**出力を 2 つに分けたのは
+              ライセンスが違うから** —— content は CC BY-SA 4.0（帰属 + 継承）、
+              entity は CC0-1.0。**ライセンスは 1 レコードごとに刻む**（README に
+              1 回書くだけでは抜粋された瞬間に条件が失われる）。
+              取らないと決めた 4 つ: 全文（抜粋は実測 167 文字。全文は git checkout に
+              Wikipedia の鏡を作る）/ 画像の実体（ファイルごとに別ライセンス。
+              サムネ URL のみ）/ claims の再取得（props=claims は 1 entity 109,873 バイト、
+              labels|descriptions を en|ja に絞れば 438 バイト。しかも必要な claim は
+              収集時に抽出済み）/ 300 言語の sitelink リスト（数だけ残す）。
+              取得順は注目の大きい順で、打ち切り分は :content/skipped-budget に申告する。
+              実測: 596/600 記事（4 失敗を DEGRADED と申告）+ 2,000 entity、
+              content 773 KB / entity 1.10 MB。50-70 年代の作品に実際に本文が付いた。
+              ⚠ **corpus は日次 run に含めない**（別エントリでも別 cadence でもない —
+              現状は手動）。観測と同じく .gitignore 済み。
+              テスト 30 件 / 133 assertion。
               視聴者の世代は :uncomputable-until-measured（source が持たない）"}]
 
  ;; 登録していないが、同じ層に属すると分かっているもの。**「まだ測っていない」で
