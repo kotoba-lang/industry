@@ -1,0 +1,13 @@
+;; observatory-runs.ledger.edn — **append-only のイベント列**。手編集禁止。
+;; observatory-run が実際に起動した actor を 1 行 1 run で追記する。
+;; スナップショット（observatory.datoms.edn）と役割が違う ——
+;; あちらは「今どうなっているか」、ここは「いつ何が起きたか」。
+;;
+;; :run/changed の列が伸びると λ（更新頻度）が実測できるようになる。
+;; 現在 λ が実測なのは 13 本中 1 本だけで、残りは宣言した prior。
+;; 設計: ADR-2608082600
+
+#:run{:observatory "hayari", :at "2026-08-10T04:12:30.286Z", :observed :known-broken, :exit 1, :duration-ms 6753, :changed false, :delta-bytes 0}
+#:run{:observatory "hayari", :at "2026-08-10T08:09:19.792Z", :observed :known-broken, :exit 124, :duration-ms 13534664, :changed false, :delta-bytes 0}
+#:run{:observatory "hayari", :at "2026-08-10T08:13:36.018Z", :observed :produces-datoms, :exit 0, :duration-ms 63012, :changed true, :delta-bytes 447531}
+#:run{:observatory "hirameki", :at "2026-08-10T08:28:42.275Z", :observed :produces-datoms, :exit 0, :duration-ms 982, :changed true, :delta-bytes 18680}
