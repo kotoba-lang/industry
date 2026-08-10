@@ -180,6 +180,43 @@ timeout が無ければ **round == height** なので、healthy な網の挙動�
 **新しいフィールドは `:inga.block/round` と提案の TC の 2 つだけ。**
 `:inga.nv/view` は意味が変わるが形は変わらない。
 
+## 結果（2026-08-11）—— 穴は閉じた
+
+D4 の 1〜4 段目を通過した。
+
+| 段 | 結果 |
+|---|---|
+| 1. inga の 363 tests | 緑（1552 assertions） |
+| 2. socket harness | pass（committed prefix 189、forgery 全拒否、equivocator 検出） |
+| 3. characterisation が落ちること | **削除して仕様に差し替えた** —— `survives-the-departure-of-the-witness-due-to-lead` |
+| 4. inga-node の devnet（7 プロセス、1 台 kill） | **PASS** |
+| 5. testnet で実際に witness を止める | **未了** |
+
+**設計より小さく済んだ点が 1 つある。** この ADR は「提案が TC を運び、wire と
+`attest` がそれを運ぶ」と書いたが、**証拠を block に載せる必要は無かった**:
+
+- certificate 付きで届いた block は、それを certify した quorum が live に
+  検証済みで、**certificate がその検証の記録**である。だから `sync` は
+  monotone な round 検査で足りる（厳密に再導出すると、正当に skip された
+  round を全部拒否して catch-up が壊れる）
+- live な提案は、提案者が全員に broadcast した new-view で**受け手自身が**
+  検証する。まだ見ていない replica は拒否し、提案者が再提案する（再送経路は
+  lost vote のために既に在る）
+
+**1 往復のコストで、偽造 TC を block 形式から完全に締め出せた。** 新しい
+フィールドは `:inga.block/round` の 1 つだけで、`attest` の署名 payload は
+変わらなかった。
+
+## テストの clock が間違っていた（記録）
+
+`departure-test` は 1ms 刻みで tick しており、base timeout 1000ms に一度も
+到達していなかった —— **一度も view が timeout せず、new-view が 1 通も
+飛んでいなかった**（計測: `pm-view` が tip の round と同じ、`nv@view-1` が 0）。
+つまりあの test は「正しい leadership でも直せない stall」を測っていた。
+3000ms 刻みに直して初めて、修正が自分を証明できるようになった。
+
+**動くはずのものが動かないとき、対象と同じくらい計測器を疑う。**
+
 ## Consequences
 
 - `wire.cljc` / `attest.cljc` / `resume` が round を運ぶ必要がある。

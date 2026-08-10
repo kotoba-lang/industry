@@ -82,7 +82,26 @@ is what would change the claim, not adding replicas.* **本 ADR はその split 
 ⚠ 実測した罠: **ノード上では素のホスト名が解決しない**（`ping benjamin` → Unknown
 host）。peer URL は tailscale IP か MagicDNS 名にする。
 
-### D4. 撤去は保留する —— 離脱で chain が止まる
+### D4. 撤去は保留する —— 離脱で chain が止まる（**2026-08-11 解除**）
+
+**この保留は解除された。** 欠陥は ADR-2608680000 で閉じ、実プロセスで確認済み:
+
+    ok   - 7 processes committed a submitted record
+    ok   - 6 of 7 kept committing with w3 dead
+    ok   - w3 restarted, resumed from its own disk and caught up
+         heads for devnet/a [cid-a x7]
+
+7 つの独立した OS プロセスが、実 socket・実 Ed25519・各自の鍵とディスクで、
+**1 台を kill されたまま commit を続け、再起動した 1 台を受け入れる**。
+`kotoba-lang/inga@f75d3db` / `kotoba-lang/inga-node@bc171a0`。
+
+残るのは ADR-2608680000 D4 の 5 段目 —— **testnet に deploy して、実際に
+witness を止めて観測すること**。`inga-replica` の inga pin は今日の変更より
+前（`451a276b`）なので、pin 前進 + chain 作り直し（D3）が要る。
+
+以下は保留していた当時の記録:
+
+
 
 **DO を外した先が、machine が 1 台再起動しただけで止まる chain では意味がない。**
 `inga-replica` の撤去は、次節の欠陥が直るまで行わない。
