@@ -1088,6 +1088,40 @@
 ;; 見えた。CLAUDE.md「握り潰した分は必ず stderr で報告する」に従い、
 ;; **corpus repo が checkout されていないことを警告する**。
 
+;; ---------- 国別の注目（category K — hayari、ADR-2608103000） ----------
+;; cloud-itonami/hayari の data/hayari-summary.edn。**raw の観測は repo 側で
+;; .gitignore されている**（1 日 900 行超で、日々伸びる）ので、面に載るのは
+;; commit されている要約 —— (国, 日) ごとに 1 entity と、1900 年からの
+;; 年別カバレッジ 1 entity。
+;;
+;; :hayari.summary/country-iso2 は ISO 3166-1 alpha-2 で、LEI 面の
+;; :company/jurisdiction の先頭 2 文字と join できる（あちらは US-DE のような
+;; 下位区分付きの値も持つ）。
+;;
+;; ⚠ この loader が無かった間、hayari は全 datom に :source/dataset "hayari" を
+;; 付けて**この面への所属を主張しながら、面は 1 件も読んでいなかった**。
+;; hirameki と同じく、checkout が無い時は黙って [] を返さず stderr で警告する
+;; —— count 0 は「観測が無い」ではなく「読めていない」。
+
+(defn hayari-entities [next-tempid!]
+  (let [f (io/file root "orgs" "cloud-itonami" "hayari" "data" "hayari-summary.edn")]
+    (if-not (.exists f)
+      (do (binding [*out* *err*]
+            (println (str "edn-query: WARNING hayari: "
+                          "orgs/cloud-itonami/hayari/data/hayari-summary.edn が無い — "
+                          "国別の注目は load されない（west update 未実行か、collect 未実行）。"
+                          "count 0 は「観測が無い」ではなく「読めていない」。")))
+          [])
+      (let [ents (try (slurp-edn (.getPath f))
+                      (catch :default e
+                        (binding [*out* *err*]
+                          (println (str "edn-query: WARNING hayari: 要約が読めない — " e)))
+                        nil))]
+        (if-not (sequential? ents)
+          []
+          (mapv (fn [m] (assoc m :db/id (next-tempid!) :source/file (str f))) ents))))))
+
+
 (defn hirameki-patents-entities [next-tempid!]
   (let [dir (io/file root "orgs" "cloud-itonami" "hirameki-patents" "80-data" "public")
         legacy (io/file root "orgs" "kotoba-lang" "toshokan-patents" "80-data" "public")]
@@ -1857,6 +1891,7 @@
         awai-tx (awai-yakuwari-entities next-tempid!)
         okugai-tx (okugai-inventory-entities next-tempid!)
         factory-tx (tsukuru-factory-entities next-tempid!)
+        hayari-tx (hayari-entities next-tempid!)
         all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
                                                      biz-tx canvas-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
@@ -1866,6 +1901,7 @@
                                                      company-tx property-tx relationship-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx accounts-tx innen-tx
                                                      awai-tx kakekomi-tx okugai-tx factory-tx
+                                                     hayari-tx
                                                      index-tx)))]
     ;; 1 本の巨大 transact でなく 50k ずつ流す。実測（2026-08-07）: 20 万 entity を
     ;; 1 本で流すとピーク 2.4 GB、50 万 entity を 50k ずつなら 3.4 GB —— 分割の方が
