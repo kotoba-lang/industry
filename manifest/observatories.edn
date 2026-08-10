@@ -472,7 +472,11 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
    :args []
    :produces "data/hayari.datoms.edn"
    :output-gitignored true
-   :expect :produces-datoms
+   ;; 2026-08-10 以降、観測は**上書きせず溶け込ませる**（同じ日は置換、新しい日は追加）。
+   ;; したがって新しい日の run では伸び、同じ日の再 run では伸びない —— これは
+   ;; :produces-datoms-idempotent の定義そのもの。:produces-datoms のままにすると
+   ;; 正常な再 run が毎回下振れ扱いになり、**常時赤い gate は無視されるようになる**。
+   :expect :produces-datoms-idempotent
    ;; ⚠ この actor は degraded で「成功」しうる。api.php にスロットルされると
    ;; enrichment だけが欠けて他のカウントは健全に見える（実測 2026-08-10:
    ;; QID 解決が 48/50 → 1/874 に落ちたのに他は正常に見えた）。判定は行数ではなく
@@ -492,7 +496,19 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
               :enrichment/degraded? false。
               予算切り上げ経路も強制して確認済み（--budget-ms 3000 で 215 国 /
               47 title を飛ばし、DEGRADED を申告して 55 datoms を書いて exit 0）。
-              決定核は 10 test / 41 assertion。
+              決定核は 16 test / 71 assertion、XMILE 層は 5 test / 18 assertion。
+
+              2026-08-10 の第 2 波（coverage + XMILE、pin f3768c29）:
+              非記事の棄却を **MediaWiki の namespace 番号**に変えた —— タイトル接頭辞の
+              表はラテン/日本語に偏っており、Special:Search は捕まえるのに 특수:검색 /
+              特殊:近期變更 / Specialis:Quaerere を通していた。list / disambiguation は
+              ns 0 なので P31 で別に落とす。kinds 表は未分類の実測順位から 21→44 種へ。
+              日付は P577→P571→P1191→P580 の順に落とす（プールしない。プールすると
+              2024 年の作品が 1963 年の franchise で日付される）。
+              `--days N` で窓を 1 回で取り、観測は蓄積する。
+              XMILE: 注目の減衰を org-oasis-open-xmile（RK4, dt 0.25）で回す
+              （実測: λ=0.5745 half-life=1.21d r²=0.968 MAPE=9.9% n=4）。
+              **3 点未満は当てはめを拒否する**（2 点なら r²=1 が必ず出る）。
               視聴者の世代は :uncomputable-until-measured（source が持たない）"}]
 
  ;; 登録していないが、同じ層に属すると分かっているもの。**「まだ測っていない」で
