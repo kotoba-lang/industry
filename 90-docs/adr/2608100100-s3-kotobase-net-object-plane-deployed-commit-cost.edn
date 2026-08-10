@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "ADR-2608100100"
-  :adr/title "s3.kotobase.net: object plane を初めて deploy した。書き込みは依然 CPU 上限を超える — 原因は本文ではなく commit"
+  :adr/title "s3.kotobase.net: object plane を deploy し、書き込み経路を同期 trampoline から外した（40.6s/1102 → 4.4s/200）"
   :adr/status "accepted"
   :adr/date "2026-08-10"
   :adr/last_verified "2026-08-10"
@@ -52,53 +52,30 @@
    `blobs/config` の fallback（R2 `STATE_BUCKET` の `objects/` prefix）で動く。"
 
   :adr/consequences
-  "## それでも s3.kotobase.net は annex remote として使えない
+  "## deploy だけでは直らなかった。もう一段あった
 
-   **deploy 後も PUT は Cloudflare 1102（Worker exceeded resource limits）で落ちる。**
-   これは object plane の失敗ではなく、object plane が解いていなかった別の問題:
+   object plane を live に出しても **PUT は Cloudflare 1102 で落ち続けた**。
+   本文 2 バイト・空の bucket でも 40.6 秒。**コストは本文にも bucket にも
+   依存しない** —— つまり payload ではない。read（LIST 3.3–4.4s、`/health` すら
+   3.0s：この shell は `/health` も `run-once` の中で答えるので hydrate を通る）と
+   write の非対称が、そのまま切り分けになった。原因と修正は `:adr/next` に書いた。
 
-   | 操作 | 実測 |
-   |---|---|
-   | `GET /health`（router がストアを触らずに答える） | **3.0s** |
-   | `GET /<bucket>?list-type=2` | 3.3–4.4s |
-   | `PUT` 24 バイト（既存 bucket） | **40s → 503 / 1102** |
-   | `PUT` 2 バイト（**新規 bucket、競合トラフィック無し**） | **40.6s → 503 / 1102** |
-
-   2 バイトを新しい bucket に書いても 40 秒かかる。**コストは本文にも bucket にも
-   依存しない。** `/health` すら 3s かかるのは、この shell が `/health` も
-   `run-once` の中の `router/handle` で答えるため hydrate を通るから。つまり
-   **hydrate ≈ 3s、commit ≈ 37s** で、上限を超えているのは commit 側である。
-
-   object plane はバイトを datom 面から外したが、**メタデータ 1 件の書き込みでも
-   共有 chain（`kotobase-protocols-v2`）を丸ごと hydrate → diff → commit →
-   head CAS する構造は変わっていない。** ADR-2608039970 の『バイトを datom 面に
-   載せない』は満たされたが、**書き込み 1 回のコストが状態全体に比例する**という
-   別の性質が残っている。
-
-   ## 途中で 3 回、観測を誤読しかけた（3 回とも測って訂正した）
+   ## 途中で 2 回、外形からの推論を対照実験が否定した
 
    1. **『データが消えている』** —— LIST の KeyCount が 24 → 7 → 9 → 19 と揺れた。
       新 code の read 側が legacy record を落としていると疑い、旧 version へ
       rollback して比較した（7 対 9）。
    2. **『read が head を進めている』** —— head CID が読むたびに変わった。read が
       commit していると結論しかけたが、**リクエストを一切送らない 45 秒でも head は
-      動いた** —— 対照実験で否定された。
-   3. **真因** —— `wrangler tail` に自分のリクエストでない PUT/HEAD が流れていた。
+      動いた**。
+   3. **真因** —— `wrangler tail` に自分のものでない PUT/HEAD が流れていた。
       **このセッションが 45 分前に起動した `git annex copy --to kotobase --jobs 2`
-      が生きていた。** KeyCount の揺れは、進行中の書き込みと colo ごとに異なる head
-      読みの合成。プロセスを止めてから測り直したのが上の表。
+      が生きていた。** KeyCount の揺れは、進行中の書き込みと colo ごとに異なる
+      head 読みの合成。プロセスを止めてから測り直した。
 
-   **外形からの推論を 2 回とも対照実験が否定した。** どちらも『それらしい』
-   仮説で、片方は data loss という重い結論だった。live surface を測るときは
-   『自分が唯一の client か』を最初に確かめる（`wrangler tail` は 1 回で答える）。
-
-   ## annex copy の実績
-
-   停止時点で **14,495 中 123 objects**（47 分、約 2.6 objects/分）。この速度なら
-   全量に 4 日かかる。**s3.kotobase.net は今日の状態では bulk custody に使えない。**
-   3 dataset の off-machine copy は依然 B2 の 403 に依存したままで、
-   `annex-custody-verify.cljs` は fnames について 7,704 files single-copy を報告する
-   （ADR-2608059100）。
+   どちらも『それらしい』仮説で、片方は data loss という重い結論だった。
+   **live surface を測るときは『自分が唯一の client か』を最初に確かめる**
+   （`wrangler tail` は 1 回で答える）。
 
    ## 共有 head を 3 つの Worker が持っている
 
@@ -107,35 +84,80 @@
    `network-awai/net-kotobase-cypher`（cypher.kotobase.net、2026-08-05 に分離）/
    本 Worker。**同じ graph の同じ head key を CAS する。** 今回の測定では
    cypher 側のトラフィックは観測されなかったので原因ではないが、
-   1 件の書き込みが 37 秒 CPU を使う状態でこれを共有しているのは、
-   将来の contention として記録しておく。"
+   書き込みが直列化される設計でこれを共有しているのは将来の contention として
+   記録しておく。"
 
   :adr/next
-  "**次の一手は『commit を状態全体に比例させない』こと。** 具体的な候補を、
-   安いものから:
+  "## 真因は commit ではなく、書き込み経路の point query だった（2026-08-10 追記）
 
-   1. **s3 を共有 admin graph から外し、bucket 単位の graph にする**
-      （`kotobase-protocols-worker.graph/for-request` は現在 s3 を shared graph に
-      送っている。atproto は既に per-DID graph を持つので、機構は在る）。
-      1 bucket の書き込みが他 surface の状態を hydrate しなくなる。
-   2. **legacy な inline `:bytes` record を chain から掃く。** objects.cljc は
-      『format addition であって migration ではない』と書いており正しいが、
-      掃かない限り古い bytes は毎回の hydrate に乗り続ける。
-   3. **fold**（`/_diag/health` は `should_fold false` / `novelty 18–46` と報告する）。
-      novelty は小さいので、重いのは base 側 —— fold は効かない見込み。
+   上の『commit ≈ 37s』は**測定としては正しいが、責任の所在を取り違えていた**。
+   `eng/commit!` は自身の docstring どおり O(|tx-data|) で、prolly-tree に触れない。
+   37 秒を使っていたのは、その手前で `diff->tx-data!` が変更のあった doc ごとに
+   呼ぶ **`doc-point-query`** で、これが `eng/hot-datoms` を **`async-get-fn` 無しの
+   arity** で呼んでいた —— すなわち同期 `with-blocks` retry trampoline。
+   `:components [eid]` は range を絞るが**ブロック walk は絞らない**（木の経路上の
+   interior node を辿り、miss のたびに scan 全体をやり直す）。
 
-   いずれも計測してから選ぶ。**37 秒がどこで使われているかを、まだ内訳で見て
-   いない** —— hydrate が 3s と分かっているだけで、commit の内訳（block 書き込み /
-   prolly 再ハッシュ / CAS retry）は未測定。ADR-2607178500 と同じ轍を踏まないよう、
-   次は推測ではなく `/_diag` を 1 本足すところから始める。
+   この repo は既にこの経路の代償を測って記録している: *5130-leaf snapshot が
+   300s CPU を超えた／`scan-prefix-async` なら 806ms*（gftdcojp/app-aozora#78、
+   ADR-2607120730）。`hydrate!` は最初から async を渡していたので read は 3–4s で
+   済み、**write だけが遅い**という非対称がそのまま症状だった。
+
+   ## 修正と実測（同一 endpoint・同一鍵・deploy 前後）
+
+   | 操作 | 前 | 後 |
+   |---|---|---|
+   | PUT 2 バイト（空 bucket） | 40.6s / 1102 | **4.4s / 200** |
+   | PUT 24 バイト | 40s / 1102 | 5.0s / 200 |
+   | GET | — | 5.7s / 200、**sha256 完全一致** |
+   | DELETE | 40s / 1102 | 8.6s / 204 |
+   | `git annex copy` | 2.6 obj/min | **8.4 (jobs=4) / 9.6 (jobs=8)** |
+
+   非 UTF-8 バイト（PNG signature + 0xFF 0xFE 0x00）を含む本文が sha256 一致で
+   往復する。object plane を通っている証拠でもある —— 旧経路は本文を
+   `TextDecoder` に通してから store していたので、これは原理的に壊れていた。
+
+   deploy: version 9c8711b5。net-kotobase main `641b080`。
+
+   ## 2 度目なので、レビューではなく検査にした
+
+   同じ欠落（engine scan を async reader 無しで呼ぶ）は `fold!` で一度起きて
+   修正されている（kotobase-protocols-worker#1）。**省略した arity は
+   『簡単な方』ではなく『遅い方』で、コンパイルも通り、返る行も正しい。**
+   見て気づく類のものではないので、`kotobase_store.cljs` の `eng/hot-datoms` /
+   `eng/fold!` 呼び出しを走査して `async-get-fn` を渡していない call site があれば
+   落ちる test を足した。**detector 自体が壊れていないことも同じ test 内で確かめる**
+   （合成した違反文字列を必ず検出すること）。
+
+   ⚠ **この gate の in-suite negative control は一度不成立になった** —— 実ファイルから
+   引数を外して走らせたが、その間に自分が別コマンドでファイルを復元してしまい、
+   gate は runtime に `fs` で読むので**直った方**を読んで通った。detector の
+   否定対照は nbb で直接（fixed → 0 件 / broken → 1 件）取り直した。
+   **『対照を走らせた』と『対照が成立した』は別**で、前者だけで gate を
+   有効と報告しかけた。
+
+   ## 残る天井: 1 graph の head CAS
+
+   jobs を 4 → 8 に倍にしても 8.4 → 9.6 obj/min にしかならない。**並列度で伸びない
+   ＝律速は 1 リクエストの往復ではなく、単一 graph の head CAS の直列化。**
+   14,495 objects なら約 25 時間（resume 可能なので実務上は許容範囲）。
+
+   次に効くのは **s3 を共有 admin graph から bucket 単位 graph へ分けること**
+   （`graph/for-request` は s3 を shared graph に送っている。atproto の per-DID
+   graph という前例がある）。ただし**これは dataset 間の競合を消すだけで、
+   1 bucket 内の並列度は上げない** —— そこを上げたいなら metadata 書き込みを
+   CAS 経路から外す設計が要る。どちらも着手前に測る。
 
    ## 残しているもの
 
-   - live は version a7cf453e（main の object plane）。**live と main は一致している。**
-   - 隔離ビルド root `/private/tmp/kotobase-deploy` は worktree 25 本。片付けは
-     `git worktree remove`（superproject の外なので west には影響しない）。
-   - engine 側に書いた object seam の実装は破棄した（main の設計が優先）。
-     写しは scratchpad の `superseded-seam/` に残してある。"
+   - live は version 9c8711b5、net-kotobase main `641b080` と一致。
+   - `xyz.farcaster.fnames` の annex copy を background で継続中
+     （jobs=6、log は scratchpad の `annex-copy-kotobase.log`）。完了後に
+     `annex-custody-verify.cljs --names xyz.farcaster.fnames` を回すこと ——
+     **1 ファイルの whereis を custody の証拠にしない**（ADR-2608059100）。
+   - directory.plc / software.diaspora.nodeinfo への kotobase remote 追加は未着手。
+   - engine 側に書いた object seam の実装は破棄（main の設計が優先）。写しは
+     scratchpad の `superseded-seam/`。"
 
   :adr/references
   "ADR-2608061200 (net-kotobase, object plane) / ADR-2608039970 (bytes は datom 面に載せない) /
