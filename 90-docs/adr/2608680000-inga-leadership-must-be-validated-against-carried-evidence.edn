@@ -125,6 +125,61 @@ migration を書くコストは、testnet の shadow 履歴の価値より高い
 `ensure-loaded!` の brick guard）で、3 つとも「実際に壊して観測する」以外の
 方法では見つからなかった。
 
+## 実装の現在地（2026-08-11）と、残り 1 手の設計
+
+**着地済み（挙動不変、363 tests + socket harness 緑）:**
+
+- `:inga.block/round` が block に載り、`canonical-block` が署名し、wire が運ぶ
+- `wire-carries-every-field-the-hash-covers` —— canonical form と wire encoder は
+  同じ項目を手で書いた 2 つのリストで、片方を伸ばすと drift する。各項目を変えて
+  往復させ「変更が生き残ったか」を訊く形の検査を置いた（round を wire から外すと
+  落ちることを確認済み）
+- 規則は `inga.consensus/proposed-by-its-leader?` に 1 つだけ。`propose` /
+  `handle-proposal` / `sync/validate-segment` が同じ述語を呼ぶ。**写しが 2 つある
+  ことが catch-up の回帰の原因だった**（laggard が segment を丸ごと拒否し、
+  28 から 33 へ追いつけなかった）
+- round は **親 block** から導く（`parent.round + 1`）。最初は justify の view から
+  導いていたが、**QC の view は votes が投じられた view で pacemaker が動くまで
+  進まない** —— 連続する 2 block が同じ round に落ち、同じ witness が両方の
+  leader になり、自分の `block-interval` に阻まれてどちらも提案しなかった。
+  実測: 全 replica が height 1 で投票して到達し、そこで静止、commit ゼロ
+
+timeout が無ければ **round == height** なので、healthy な網の挙動は height 鍵の
+頃と同一。**穴が閉じるのは skip を足す次の一手。**
+
+### 残り 1 手 —— round と view を同じカウンタにする
+
+**測って決めた（2026-08-11）。** `:inga.nv/view` の consumption は 5 箇所しかなく、
+すべて TC 形成と view 収束に集中している:
+
+| 場所 | 用途 |
+|---|---|
+| `pm/new-view` | `(:view state)` から作る |
+| `pm/timeout-certificate` | これで group 化し、全件一致を要求 |
+| `pm/on-timeout-certificate` | `tc.view + 1` へ入る |
+| `replica/handle-new-view` | `[:new-views view]` に格納 |
+| `replica/sync-view` | f+1 の証拠で局所 view を引き上げる |
+
+この 5 つが round について語れば、TC は **round を certify** することになり、
+`sync-view` は round を収束させ、`on-timeout-certificate` は次の round へ入る。
+どれも今ほしい意味そのもの。**別カウンタとして併存させる理由が無い。**
+
+したがって:
+
+1. **pacemaker の view を round とする。** 現在 `on-progress` は
+   `(inc (qc-view qc))` へ上げているが、これは view から view を導く循環。
+   **committed block の `:inga.block/round`** へ錨を移す —— chain に合意する
+   ことが round に合意することになる
+2. **提案は skip するとき TC を運ぶ。** entitlement は
+   `round == parent.round + 1`（無条件）または
+   `round == tc.round + 1` かつ TC が有効かつ `tc.round >= parent.round`
+3. **検証は運ばれた証拠に対して行う**（D1 のとおり）。TC を持っていない replica も、
+   提案が運んできた TC で検証できるので、局所状態の差は問題にならない
+4. wire と `attest` の署名 payload が提案の TC を運ぶ
+
+**新しいフィールドは `:inga.block/round` と提案の TC の 2 つだけ。**
+`:inga.nv/view` は意味が変わるが形は変わらない。
+
 ## Consequences
 
 - `wire.cljc` / `attest.cljc` / `resume` が round を運ぶ必要がある。
