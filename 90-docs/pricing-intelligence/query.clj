@@ -86,7 +86,9 @@
                   db)
              (sort-by first)
              (take 8))]
-  (println (format "  [%s] %-45s $%s-%s (%s)" clabel vname low high unit)))
+  ;; 通貨記号は :rec/unit が持っている。ここで "$" を前置しない —— 2026-08-10 に
+  ;; 追加した円建ての band が `$35000.0-150000.0 (¥/月 …)` と矛盾して表示された。
+  (println (format "  [%s] %-45s %s-%s (%s)" clabel vname low high unit)))
 
 (println "\n-- example 3: disclosure-tier breakdown across all observations (proves real aggregate query, not just lookup) --")
 (doseq [[tier n] (->> (d/q '[:find ?tier (count ?o)
