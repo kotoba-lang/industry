@@ -281,6 +281,29 @@ kotobase の `.well-known/x402` は現在、resource 一覧を **route handler �
    - **これは ADR-2608039000 の premise ではない。** bucket を消しても ref plane は不変で、失われるのは*観測できること*だけ。projection であって premise ではない。`/committed` は `source`（`object-store` / `replica-memory`）を返し、どちらが答えたかを黙らない。
    - live 実測: 同一 record を 3 回 submit + 別 seq 1 回 → `records 2`（旧コードは同条件で 16 を報告）。実 transact 1 本 → 2 → 3（以前は同じ transact が 2 件を作った）。`?ref=<graph>` の head の `cid` が transact の返した `commit` と一致 —— **B2 の head と inga の head を突き合わせられるようになった**（shadow の存在理由）。
    - 残り: authoritative へ進むには `->inga-record` の `prev` が nil であること（seq 0 からの backfill が無い）を解く必要がある。`inga.ref/head-of` は 0 から連続で歩くので、途中から mirror し始めた既存 graph は inga 面で head を解決できない。
+2b. **成熟度・安定性の実測（2026-08-10）と、そこで見つかった liveness 欠陥。**
+
+   耐久 log を入れたあと「安定しているか」を測ったところ、**chain が飢えていた**。
+
+   - **soak（9 分・27 サンプル）**: `records` は 3 のまま一度も減らず、4 replica は全サンプルで一致。耐久 log は安定。**しかし height が 9 分間まったく動かなかった。**
+   - **cron のみで 5.5 分**（手動 `/tick` を一切打たない）: view 7844 → 7850、4 replica 完全一致、**height 251 で凍結**、submit した record は `pending [1,1,1,1]` のまま。**健全に見えて何も commit しない。**
+   - **原因**: `replica_do/replica-opts` が `:params` を渡しておらず、`inga.pacemaker/default-params` の **base-timeout 1 秒**（最大 64 秒）が効いていた。一方この deployment を駆動する唯一の clock は **Cloudflare cron の 1 分**（最小粒度）。**どの tick も必ず view が期限切れの状態で到着する**ので、tick は毎回 view の timeout と new-view 送信に費やされ、leader が「自分が leader で、かつ tip の certificate を持っている」tick を一度も得られない。
+   - **なぜ今日まで見えなかったか**: 確認のたびに `/tick` を手で叩いており、その間隔が 1 秒より短かった。**速く叩けば view が切れる前に round が終わる。** ADR-2608048000 の初回検証も、本日の follow-up 2 の検証も、すべて手動 tick 付きで行っていた。
+   - **`tick-ms 250` が定義されて誰にも使われていなかった**（60000 で発火する cron の隣で）。**誰も配線しなかった意図の記録。**
+   - **修正**（`network-awai/net-kotobase@80de6a0`）: view budget を tick 間隔から導出する（`budget = 2 × tick`、`INGA_TICK_MS` で明示、既定 60000）。1 倍では「その budget を使うはずの tick で期限が切れる」＝同じ失敗の数字違いになる。
+   - **検証**: 19:07:50 に submit して 12 分間 pending [1,1,1,1] だった record が、修正 deploy 後 **手動 tick なしで** commit された —— 19:19:09 `records 3 / height 251 / pending [1,1,1,1]` → 19:19:55 **`records 4 / height 255 / pending [0,0,0,0]`**。
+
+2c. **`inga-replica` にテストを入れた（`network-awai/net-kotobase@7eaeb8f`、16 tests / 38 assertions）。**
+
+   **`inga` は 358 tests・1531 assertions で緑**、**`inga-replica` はテストが 1 本も無かった。** 今日見つかった欠陥は 3 件ともこちらにあり、3 件とも live worker を突いて見つけている。**proved library + unproved deployment は、唯一のテスト環境が本番という状態。**
+
+   - `network_test`: 4 つの `IngaReplica` を同一プロセスで走らせる（fake は platform だけ、replica も Ed25519 も wire の EDN も本物）。この repo の既知欠陥は全部「正しい部品どうしの配線」にあり、**inga の 358 tests はどれも合意を対象にしていないので 1 件も捕まえられない。**
+   - 3 つの回帰はいずれも**落ちることを確認済み**（`waitUntil` を外す / 条件付き put を外す / `advance!` の sink を外す / `:params` を外す）。
+   - **配線の罠 2 つ**: ①shadow-cljs は `:deps` 使用時に `shadow-cljs.edn` の `:source-paths` を**黙って無視**する —— 最初の実行は `Ran 0 tests, 0 failures` で**緑に見えた**。②height の**一致**を assert してはいけない。chained HotStuff を任意の瞬間に見れば leader が 1 つ先に居るのが健全で、健全な network で落ちるテストは無いより悪い。不変条件は「一致」ではなく「乖離しないこと」。
+   - **残る限界（正直に）**: `the-view-budget-must-exceed-the-tick-interval` は**設定に対する unit assertion であって live network の走行ではない**。`network_test` の他のテストは event loop の許す限り速く tick するので、**何も commit できない deployment に対して全部通っていた**。実時間で駆動する試験には**注入可能な clock** が要る（DO は `js/Date.now` を直接呼ぶ）。sleep で近似する版は 10 分走っても終わらず捨てた（view が毎 tick 切れると new-view の放送が指数的に増える）。**follow-up 2d。**
+
+2d. **DO の clock を注入可能にする、または DO alarm で駆動する。** 上の限界の解消。alarm なら cron の 1 分床を下回れるので `INGA_TICK_MS` を小さくでき、view budget も短くできる（＝障害からの復帰が速くなる）。`default-tick-ms` の docstring に override 経路を残してある。
+
 3. **x402 challenge の stock 語彙と deal state**（D5 の (1)(2)）。
 4. **kura を `IObjectStore` 面に接続**（D1）。DataLad/annex 経路から。
 5. **暗号 epoch 1 への移行**（D4）。4 binding の provision と legacy block の移行。
