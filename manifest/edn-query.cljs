@@ -1103,6 +1103,25 @@
 ;; hirameki と同じく、checkout が無い時は黙って [] を返さず stderr で警告する
 ;; —— count 0 は「観測が無い」ではなく「読めていない」。
 
+(defn hayari-top-entities
+  "The works each hayari country-day looked at most, as Wikidata records.
+
+  Without this the plane can see :hayari.summary/top-qid but cannot say what
+  the QID is. CC0-1.0, so a consumer inherits no share-alike obligation — the
+  CC BY-SA article extracts are deliberately NOT in the tracked slice."
+  [next-tempid!]
+  (let [f (io/file root "orgs" "cloud-itonami" "hayari" "data" "hayari-top-entities.edn")]
+    (if-not (.exists f)
+      []
+      (let [ents (try (slurp-edn (.getPath f))
+                      (catch :default e
+                        (binding [*out* *err*]
+                          (println (str "edn-query: WARNING hayari-top-entities: 読めない — " e)))
+                        nil))]
+        (if-not (sequential? ents)
+          []
+          (mapv (fn [m] (assoc m :db/id (next-tempid!) :source/file (str f))) ents))))))
+
 (defn hayari-entities [next-tempid!]
   (let [f (io/file root "orgs" "cloud-itonami" "hayari" "data" "hayari-summary.edn")]
     (if-not (.exists f)
@@ -1892,6 +1911,7 @@
         okugai-tx (okugai-inventory-entities next-tempid!)
         factory-tx (tsukuru-factory-entities next-tempid!)
         hayari-tx (hayari-entities next-tempid!)
+        hayari-ent-tx (hayari-top-entities next-tempid!)
         all-tx (into-array (map entity->js (concat adr-tx docs-tx manifest-tx foreign-adr-tx
                                                      biz-tx canvas-tx kj-tx rad-tx
                                                      journal-tx genome-tx datoms-tx
@@ -1901,7 +1921,7 @@
                                                      company-tx property-tx relationship-tx fleet-tx
                                                      yabai-tx tadori-tx patent-tx accounts-tx innen-tx
                                                      awai-tx kakekomi-tx okugai-tx factory-tx
-                                                     hayari-tx
+                                                     hayari-tx hayari-ent-tx
                                                      index-tx)))]
     ;; 1 本の巨大 transact でなく 50k ずつ流す。実測（2026-08-07）: 20 万 entity を
     ;; 1 本で流すとピーク 2.4 GB、50 万 entity を 50k ずつなら 3.4 GB —— 分割の方が
