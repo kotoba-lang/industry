@@ -329,4 +329,88 @@
  {:product/id :product/talentlms :product/name "TalentLMS"}
  {:product/id :product/trainual :product/name "Trainual"}
  {:product/id :product/coursebox :product/name "Coursebox"}
+
+ ;; --- 2026-08-08 の run が :obs/product で参照していたのに catalog に無かった 5 製品。
+ ;;     :product/jinjer で query.clj が落ちていた（isco-1212 と同じ原因）---
+ {:product/id :product/jinjer :product/name "jinjer"}
+ {:product/id :product/smarthr :product/name "SmartHR"}
+ {:product/id :product/kaonavi :product/name "カオナビ (kaonavi)"}
+ {:product/id :product/hrbrain :product/name "HRBrain"}
+ {:product/id :product/cloudflare-r2 :product/name "Cloudflare R2"}
+ ;; --- 2026-08-08 の rec/seq 157 が参照していたのに catalog に無かった vertical。
+ ;;     そのせいで query.clj が entid-strict で落ち、この面は 08-08 以降
+ ;;     DataScript に載らなくなっていた（実測 2026-08-10、origin/main で再現）。---
+ {:vertical/id :vertical/isco-1212 :vertical/code "1212" :vertical/code-system :code-system/isco-08
+  :vertical/name "Human resource managers" :vertical/cluster [:cluster/id :cluster/media-recruitment]
+  :vertical/repo "cloud-itonami-isco-1212" :vertical/pricing-shape "usage (per HR-advisor proposal)"}
+ ;; --- 2026-08-10 追加（ADR-2608102000 のベンチマーク対象 23 vertical）---
+ {:vertical/id :vertical/isic-0610 :vertical/code "0610" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Extraction of crude petroleum" :vertical/cluster [:cluster/id :cluster/utilities-etc]
+  :vertical/repo "cloud-itonami-isic-0610" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-2620 :vertical/code "2620" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Manufacture of computers and peripheral equipment" :vertical/cluster [:cluster/id :cluster/field-trade]
+  :vertical/repo "cloud-itonami-isic-2620" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-2910 :vertical/code "2910" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Manufacture of motor vehicles" :vertical/cluster [:cluster/id :cluster/field-trade]
+  :vertical/repo "cloud-itonami-isic-2910" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-3600 :vertical/code "3600" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Community Water Safety Operations" :vertical/cluster [:cluster/id :cluster/utilities-etc]
+  :vertical/repo "cloud-itonami-isic-3600" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-4210 :vertical/code "4210" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Construction of roads and railways" :vertical/cluster [:cluster/id :cluster/field-trade]
+  :vertical/repo "cloud-itonami-isic-4210" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-4630 :vertical/code "4630" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Wholesale of food, beverages and tobacco" :vertical/cluster [:cluster/id :cluster/field-trade]
+  :vertical/repo "cloud-itonami-isic-4630" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-5210 :vertical/code "5210" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Warehousing and storage (petroleum terminal / depot)" :vertical/cluster [:cluster/id :cluster/field-trade]
+  :vertical/repo "cloud-itonami-isic-5210" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-6201 :vertical/code "6201" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Computer programming activities (marketing ops gate)" :vertical/cluster [:cluster/id :cluster/telecom-retail]
+  :vertical/repo "cloud-itonami-isic-6201" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-6202 :vertical/code "6202" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Computer consultancy (support ops gate)" :vertical/cluster [:cluster/id :cluster/telecom-retail]
+  :vertical/repo "cloud-itonami-isic-6202" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-6311 :vertical/code "6311" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Data processing, hosting (market data)" :vertical/cluster [:cluster/id :cluster/telecom-retail]
+  :vertical/repo "cloud-itonami-isic-6311" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-6312 :vertical/code "6312" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Web portals and governed map POIs" :vertical/cluster [:cluster/id :cluster/telecom-retail]
+  :vertical/repo "cloud-itonami-isic-6312" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-6420 :vertical/code "6420" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Activities of holding companies" :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isic-6420" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-6612 :vertical/code "6612" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Security and commodity contracts brokerage" :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isic-6612" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-6622 :vertical/code "6622" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Activities of insurance agents and brokers" :vertical/cluster [:cluster/id :cluster/insurance]
+  :vertical/repo "cloud-itonami-isic-6622" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-6810 :vertical/code "6810" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Community real-estate agency" :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isic-6810" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-6910 :vertical/code "6910" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Legal activities (company formation)" :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isic-6910" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-6920 :vertical/code "6920" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Accounting, bookkeeping and auditing" :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isic-6920" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-7310 :vertical/code "7310" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Advertising" :vertical/cluster [:cluster/id :cluster/media-recruitment]
+  :vertical/repo "cloud-itonami-isic-7310" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-7820 :vertical/code "7820" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Temporary employment agency activities" :vertical/cluster [:cluster/id :cluster/media-recruitment]
+  :vertical/repo "cloud-itonami-isic-7820" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-8299 :vertical/code "8299" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Other business support service activities n.e.c." :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isic-8299" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-9200 :vertical/code "9200" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Gambling and betting activities" :vertical/cluster [:cluster/id :cluster/hospitality]
+  :vertical/repo "cloud-itonami-isic-9200" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-9411 :vertical/code "9411" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Activities of business and employers membership organizations" :vertical/cluster [:cluster/id :cluster/professional]
+  :vertical/repo "cloud-itonami-isic-9411" :vertical/pricing-shape "flat"}
+ {:vertical/id :vertical/isic-9522 :vertical/code "9522" :vertical/code-system :code-system/isic-rev5
+  :vertical/name "Repair of household appliances and home and garden equipment" :vertical/cluster [:cluster/id :cluster/field-trade]
+  :vertical/repo "cloud-itonami-isic-9522" :vertical/pricing-shape "flat"}
 ]
