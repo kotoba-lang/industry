@@ -469,7 +469,14 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
    :runtime :nbb :main "src/hayari/collect.cljs"
    ;; 既定は 2 日前・全 249 国・top 25。日付を固定しないのは、observatory-run が
    ;; いつ起きても「その時点で確定している最新日」を測るため。
-   :args []
+   ;;
+   ;; ⚠ `--summary-out` を checkout の外へ逃がすのが必須。data/hayari-summary.edn は
+   ;; **tracked**（query 面が読む唯一の commit 済みデータ）なので、既定のまま走らせると
+   ;; gate の 1 回ごとに west checkout が dirty になり、**以後 `west update` が hayari を
+   ;; skip して query 面が静かに固まる**（実測 2026-08-10: 1 回の run で
+   ;; `M data/hayari-summary.edn`）。gate の仕事は「collector が動くか」であって
+   ;; データを所有することではない —— データを所有するのは bin/tick.cljs の側。
+   :args ["--summary-out" "/tmp/hayari-registry-gate-summary.edn"]
    :produces "data/hayari.datoms.edn"
    :output-gitignored true
    ;; 2026-08-10 以降、観測は**上書きせず溶け込ませる**（同じ日は置換、新しい日は追加）。
