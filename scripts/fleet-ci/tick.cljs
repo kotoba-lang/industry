@@ -767,17 +767,21 @@
               (do
                 (fs/mkdirSync (path/join wt (path/dirname path)) #js {:recursive true})
                 (fs/writeFileSync (path/join wt path) content)
-                (git wt ["add" "--" path])
-                (let [c (git wt ["-c" "user.name=fleet-ci" "-c" "user.email=fleet-ci@murakumo"
-                                 "commit" "-q" "-m" message])]
-                  (if-not (zero? (:exit c))
-                    {:ok false :detail (str "commit failed: " (str/trim (:out c)))}
-                    (let [pu (git wt ["push" "--quiet" "origin" (str "HEAD:" branch)])]
-                      (if (zero? (:exit pu))
-                        {:ok true :detail (str "pushed to " branch)}
-                        {:ok false :detail (str "push rejected (someone else moved "
-                                                branch " — retry): "
-                                                (str/trim (:out pu)))})))))))))
+                ;; landing repo が sparse worktree でも、ledger 1 file だけは明示的に
+                ;; index へ載せる。通常の `git add` は skip-worktree 対象を拒否する。
+                (let [a (git wt ["add" "--sparse" "--" path])]
+                  (if-not (zero? (:exit a))
+                    {:ok false :detail (str "add failed: " (str/trim (:out a)))}
+                    (let [c (git wt ["-c" "user.name=fleet-ci" "-c" "user.email=fleet-ci@murakumo"
+                                     "commit" "-q" "-m" message])]
+                      (if-not (zero? (:exit c))
+                        {:ok false :detail (str "commit failed: " (str/trim (:out c)))}
+                        (let [pu (git wt ["push" "--quiet" "origin" (str "HEAD:" branch)])]
+                          (if (zero? (:exit pu))
+                            {:ok true :detail (str "pushed to " branch)}
+                            {:ok false :detail (str "push rejected (someone else moved "
+                                                    branch " — retry): "
+                                                    (str/trim (:out pu)))})))))))))))
       (finally
         (git d ["worktree" "remove" "--force" wt])
         (sh "rm" ["-rf" wt])))))
@@ -1089,7 +1093,8 @@
             tmp (fs/mkdtempSync (path/join (os/tmpdir) "fleet-ci-tick-"))
             db-file (path/join tmp "fleet-db.edn")
             _ (fs/writeFileSync db-file (gh-raw (:repo landing) (:branch landing) (:db landing)))
-            results (atom [])]
+            results (atom [])
+            landing-failed? (atom false)]
         (log "fleet CLI: kagami@" (sha12 kagami-sha) (path/basename fleet-bin))
         (doseq [[bi batch] (map-indexed vector batches)]
           (let [unassigned (filter :unassigned batch)
@@ -1206,11 +1211,14 @@
                     ;; not an error when there was deliberately nothing to run
                     (when (seq prepared)
                       (log "ERROR no receipt produced for batch" bi))
-                    (do
+                    (let [landing-result (when-not dry?
+                                           (append-receipt! landing (last lines)))
+                          landed? (or dry? (:ok landing-result))]
                       (when-not dry?
-                        (let [r (append-receipt! landing (last lines))]
-                          (log "receipt" (sha12 (:cid receipt))
-                               (if (:ok r) "landed" (str "LANDING FAILED " (:detail r))))))
+                        (log "receipt" (sha12 (:cid receipt))
+                             (if landed? "landed"
+                                 (str "LANDING FAILED " (:detail landing-result)))))
+                      (when-not landed? (reset! landing-failed? true))
                       (doseq [w prepared]
                         (let [oc (outcome-of w)
                               ok? (= :pass oc)
@@ -1220,10 +1228,12 @@
                                     (:detail (first (filter #(= k (:name %)) checks))))]
                           (swap! results conj (assoc w :outcome oc :cid (:cid receipt)
                                                      :detail det))
-                          (when-not dry?
+                          ;; receipt が無い pass を state に保存すると次の tick が
+                          ;; same tip を skip し、証跡が永久に欠ける。
+                          (when (and (not dry?) landed?)
                             (swap! state assoc-in [:repos (:id w)]
                                    {:sha (:tip w) :outcome oc :cid (:cid receipt) :at (now)})
-                            (save-state!)))))))))))
+                            (save-state!))))))))))
         ;; ---- Radicle: 落ちたものだけ issue を開く
         (let [rc (:rad cfg)
               failed (filter #(not= :pass (:outcome %)) @results)]
@@ -1257,7 +1267,10 @@
                   (let [r (advance-pin! landing (:name w) (:tip w))]
                     (log "CD pin-advance" (:name w) (if (:ok r) "OK" "FAILED") (:detail r))))))))
         (log "tick done —"
-             (pr-str (mapv (fn [r] [(:name r) (:outcome r)]) @results)))))))
+             (pr-str (mapv (fn [r] [(:name r) (:outcome r)]) @results)))
+        (when @landing-failed?
+          (throw (ex-info "one or more signed receipts failed to land; state was not advanced"
+                          {:fleet-ci/receipt-landing-failed true}))))))))
 
 ;; js/process.exit は try/finally を通らないので exit hook で必ず解放する。
 (.on js/process "exit" (fn [_] (release-lock!)))
