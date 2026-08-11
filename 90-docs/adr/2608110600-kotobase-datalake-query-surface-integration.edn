@@ -42,6 +42,7 @@
    "async parity: nbb で resolve-async を実 Promise 4 本に対して実行 => rounds 4 / bytes 1627 / rows 1 / chunks 1 read 2 skipped、resolve-sync と一致"
    "trampoline の実レンジ: [0 4]（先頭 PAR1）/ [2419 2427]（8 バイト tail）/ [897 2419]（footer）/ [319 412]（column chunk 1 本）"
    "west pin: verify-west-pins が新規 entry 9d6909a8a163 を main から到達可能と判定"
+   "fleet gate は登録済みだが、この closing 時点でまだ一度も実行されていない — manifest/fleet-ci.edn の最新 receipt は 2026-08-11T04:14:01Z で、gate 登録はその後。com.gftd.fleet-ci-tip-tick は常駐しているので次 tick で走る。**登録は実行の証拠ではない**"
    "egress 実測 2026-08-11: zebulun は github/maven/npm すべて接続不能、他 9 ノードは 3 つとも 200"
    "JVM 実測 2026-08-11: 6 ノードすべて `/usr/libexec/java_home` は NONE を返すが、keg-only の /opt/homebrew/opt/openjdk（26.0.1）が在り tick.cljs:543 がそこを JAVA_HOME に export している"]
 
