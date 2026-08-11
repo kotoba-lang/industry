@@ -1,0 +1,122 @@
+[{:db/id -1
+  :adr/id "adr-2608110800-closing-checklist-mechanized-and-dataset-monotonic-gate"
+  :adr/title "ADR-2608110800: closing チェックリストの機械化と、データセット縮小 gate — prose の手順は思い出した時だけ実行される"
+  :adr/status "accepted, implemented"
+  :adr/doc_type "adr"
+  :adr/date "2026-08-11"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "closing-checklist-mechanization"
+  :adr/tags "closing, gate, monotonic, west, honesty, process"
+  :adr/related ["adr-2608103000-hayari-cross-country-attention-observatory"
+                "adr-2608110300-hayari-tick-residency-and-alarm"
+                "adr-2607300900-ci-cd-murakumo-fleet"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["closing の完了条件を機械が検査する範囲と、検査しない範囲"
+   "commit 済みデータセットが縮んでいないことの検査"]
+  :adr/last_verified "2026-08-11"
+  :adr/body
+  "# ADR-2608110800: closing チェックリストの機械化と、データセット縮小 gate
+
+**status: accepted, implemented。** 実装は landed（be6ca2b / 61a1f34 / 後続）。
+
+## 動機 — 守られなかったのは意思ではなく手順
+
+CLAUDE.md の `closing` 節は 6 段の手順を prose で書いている。1 セッションの中で、
+その prose に既に書いてあるのに**思い出されなかった段が 4 つ**あった:
+
+| 逸脱 | 何が起きたか |
+|---|---|
+| west 登録漏れ | `hayari-data` を `:extra-projects` にだけ入れ west.yml に入れ忘れた |
+| ADR 本文の切断 | 未エスケープの引用符で `:adr/body` が途中で切れた（3 件、うち 1 件は別セッション由来） |
+| データセットの縮小 | 要約を raw から作り直し、5 日 122 country-day を 1 日 61 に置き換えて push した |
+| 共有 checkout への直接編集 | `manifest/edn-query.cljs` を本体で編集した（別セッションが正しく stash して救った） |
+
+どれも「やらないと決めた」のではない。**その時 prose を読み返さなかった**だけである。
+だから機械に読み返させる。
+
+## 決定 1 — `scripts/closing-check.cljs`
+
+5 件を 1 コマンドで走らせる: main 同期 / west 登録漏れ（`--blocking`）/ ADR・EDN の
+切断 / データセットの縮小 / west.yml が canonical。
+
+**走らなかった検査を、通った検査と同じに見せない。** script が無い・nbb が無い・
+timeout —— どれも FAIL として数える。検査が消えたのに closing が緑になるのが、
+一番静かな退行だから。
+
+**他セッションの worktree / branch / stash は報告するだけで落とさない。** closing は
+自分の作業物を片付ける手順であって、他人の WIP を判定する権限は無い。
+
+### west.yml の canonical 検査だけは範囲を絞る
+
+`gen-west-manifest --check` は「west.yml が、いまローカルにある子 checkout の HEAD
+から生成したものと一致するか」を答える。共有の operator checkout では子が pin より
+遅れているのが常態で、実測ではこの checkout で再生成すると **43 件の pin 退行**に
+なる（生成器はそれを検出して書き込みを拒否した）。つまりそこで赤いのは
+『west.yml が間違っている』ではなく『子が遅れている』であり、closing で直すもの
+ではない —— 直そうとして再生成するのが、まさに CLAUDE.md が禁じている罠である。
+
+したがって **その tree が manifest を触った時だけ**検査し、触っていなければ
+`--`（対象外）と表示する。**通ったとは言わない。**
+
+### 初回の実測で掘り当てたもの
+
+初回実行が `kotoba-lang/compiler` の blocking な fresh-checkout 破損を掘り当てた ——
+west.yml にも repos.edn にも居ないのに手元にだけ存在し、2 つの consumer が
+`:local/root` で参照していた。scaffold skill の完了ゲート（GitHub push だけでは
+完了ではない、west 登録まで終わらせる）が守られなかった跡である。main tip
+76d4d901 を pin して登録し、blocking は 0 になった。
+
+## 決定 2 — `scripts/dataset-monotonic-check.cljs` + `manifest/monotonic-datasets.edn`
+
+宣言した**軸の distinct 値**が baseline より減ったら落ちる。
+
+**なぜ行数ではなく軸か。** 行数は正当に減りうる（重複の除去、meta 行の棄却）。
+**観測した日が無かったことになる**のは正当に起きない。
+
+**なぜ検査が要るか。** 私が push した事故は、テストが通り、gate が緑で、ファイルは
+妥当な EDN のままだった。**壊れたようには見えず『その日はそれだけだった』ように
+見えた。** 縮小は構文では検出できない。
+
+実測（落ちない gate は劇場なので、落ちることを確かめた）:
+
+```
+無改変              → OK 78 件（vs HEAD）           exit 0
+要約を 1 日に縮める → shrank 80 → 1、消えた軸 79 件  exit 1
+解決しない ref      → no-baseline                    exit 1
+```
+
+### この検査自身が同じ日に 2 度沈黙した（重要）
+
+3 番目のケースが要るのは、この検査が実装中に 2 度「入力が見えないのに OK」と
+言ったからである:
+
+1. superproject で `git show origin/main:<path>` していた。宣言したパスは west 管理の
+   **子リポ**にあり superproject の git には無いので、常に空が返った
+2. 子リポの中で回すよう直しても、west の checkout に **`origin/main` は無い** ——
+   remote は manifest の remote 名（`cloud-itonami`）、ref は `manifest-rev` だけ
+
+どちらも「baseline が読めない」を「新規データセット」と読んで**必ず合格**した。
+78 日を 1 日に縮めた tree が PASS するのを実際に見るまで、この 2 つは見えなかった。
+
+したがって **baseline を解決できないこと自体を FAIL とする**。検査できなかった
+ことを、検査に通ったことと混同しない。baseline は決め打ちにせず探す
+（`--against` → `<remote>/<default>` → `HEAD`）。**`HEAD` を最後の候補に置くのは、
+それが実際の事故（作り直した要約を commit → push）を commit の時点で捕まえる
+baseline だから**である。
+
+## なぜ fleet gate ではなく operator 側なのか
+
+この検査は git の履歴を要る。fleet gate はノードに tree を配るだけで履歴を配らない。
+**west pin のサーバ側到達性検証が同じ理由で operator 側（tick.cljs）に置かれている**
+のと同型で、新しい判断ではなく既存の境界に従っただけである。
+
+## 非目標
+
+- **他セッションの WIP を判定しない。** 報告に留める
+- **子の pin 鮮度を closing で直さない。** それは west-pin-advance の担当で、
+  closing で再生成すると pin 退行を起こす
+- **新しい通知系を作らない。** exit code が答えである
+"}]
