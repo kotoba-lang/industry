@@ -925,4 +925,46 @@
    :script "gates/block-sizing-pad-alignment-check.cljs"
    :script-args ["--buckets" "1024,4096,16384,32768,65536,131072,262144"
                  "--max-overhead" "25"]
-   :include-ext [".cljc"] :min-files 20 :cd false}]}
+   :include-ext [".cljc"] :min-files 20 :cd false}
+
+  ;; ------------------------------------------------- datalake format libraries
+  ;; ADR-2608054000 P4 が開いたまま 6 日間、この 6 repo には CI が無かった。
+  ;; GitHub Actions は方針で無効（ADR-2607300900）、fleet gate には未登録 —
+  ;; つまり「止まっている」のではなく**誰も問いを立てていなかった**。その間に
+  ;; main へ入った 11 merge（GROUP BY / evolve / Parquet writer / snapshot /
+  ;; compaction / N-Triples ほか）は自動検査を一度も受けていない。
+  ;;
+  ;; ADR が保留した理由は「`clojure -M:test` が要求する maven 上の Clojure core が
+  ;; ノードで解決するか未確認」だった。**2026-08-11 に実測して解消した** —
+  ;; 6 repo すべてを実ノードへ配って走らせ、210 tests / 735 assertions が green:
+  ;;   columnar 36/115 ・ org-apache-parquet 34/163 ・ org-apache-arrow 40/130
+  ;;   org-apache-avro 14/32 ・ kotobase-lake 76/257 ・ org-ietf-csv 10/38
+  ;;
+  ;; 同時に、この登録が依存する前提を 2 つ実測した（定数で持たない — CLAUDE.md）:
+  ;;
+  ;; 1. **`:jvm` cap は正しい。** raw な ssh では `java` が PATH に無く
+  ;;    `/usr/libexec/java_home` も NONE を返すので「JVM が無い」と読めるが、
+  ;;    JDK は keg-only の `/opt/homebrew/opt/openjdk`（openjdk 26.0.1）に在り、
+  ;;    tick.cljs:543 が `JAVA_HOME` をそこへ export している。**gate 環境と
+  ;;    ssh 環境は別物**で、ssh で測ると capability 宣言を誤って疑う。
+  ;;
+  ;; 2. **zebulun は外向き HTTPS を全て失っている**（github / maven / npm とも
+  ;;    curl が接続不能。他 9 ノードは 3 つとも 200）。git 依存を持つ repo は
+  ;;    zebulun では classpath を組めない — 実測で org-apache-parquet が
+  ;;    `Failed to connect to github.com port 443` で落ちた。zebulun の
+  ;;    `:caps` は `#{}` なのでスケジューラは jvm 仕事を送らず、ここは安全。
+  ;;    **ただし zebulun は receipts 上、歴史的に jvm-test gate を回していた
+  ;;    ノードである**（test-kagami-murakumo-zebulun ほか）。egress 前提の
+  ;;    gate をこのノードに戻すなら先に疎通を直すこと。
+  ;;    fleet-ci README の「ノードは tailnet だけで外向き HTTPS が無い」は
+  ;;    **今は zebulun にだけ当たる**。全ノードの性質として引用しない。
+  ;;
+  ;; 落ちることの確認について: `:jvm-test` の gate 本体は各 repo の test suite
+  ;; なので、赤くする細工を gates.edn 側に持たない。上記 6 本はいずれも失敗を
+  ;; 報告する runner（cognitect test-runner、exit 非 0）で走ることを実測済み。
+  {:name "columnar" :gate :jvm-test :cd true}
+  {:name "org-apache-parquet" :gate :jvm-test :cd true}
+  {:name "org-apache-arrow" :gate :jvm-test :cd true}
+  {:name "org-apache-avro" :gate :jvm-test :cd true}
+  {:name "org-ietf-csv" :gate :jvm-test :cd true}
+  {:name "kotobase-lake" :gate :jvm-test :cd true}]}
