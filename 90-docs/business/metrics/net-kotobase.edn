@@ -1,18 +1,18 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 521498, "kotobase-cf-wasm-staging" 551773},
+ {"net-kotobase" 607574, "kotobase-cf-wasm-staging" 638391},
  :zone
- {:requests-7d 583687,
-  :pageviews-7d 891,
-  :uniques-7d-sum 859,
+ {:requests-7d 677444,
+  :pageviews-7d 895,
+  :uniques-7d-sum 863,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
   [{:path
     "/ipld/bafyreiadviqauc34ood2iinpzoasdcir73mnalqwtumytjwsvv6z5n54cy",
-    :requests 45}
+    :requests 53}
    {:path
     "/ipld/bafyreifxqbozebjlnsttx4alr43w6rnf6oizjnmctg7uvdng5ifl4osyza",
     :requests 39}
@@ -20,21 +20,21 @@
     "/ipld/bafyreiad74j7cws6mn5px57m2e5fg4ao2ovnretvzu6o5g2cgbly6u6b5u",
     :requests 32}
    {:path
-    "/ipld/bafyreiavm24x3j63ljkwonbvf7nu5dmjpfmzshkpzkqfykg65f3u6zdw4a",
-    :requests 31}
-   {:path
     "/ipld/bafyreigntjccswkjxk7guhekz776gdvabpkkz76eri7clogte64xfmirzy",
     :requests 30}
-   {:path
-    "/ipld/bafyreiglwml7hi5dtj456gxecvihrw34j42cavgimxxxsp5t4cenq7g7fy",
-    :requests 28}
    {:path
     "/ipld/bafyreihf7at4tfol4fgji5ey5w6uxgrpyylfyjss5yt7e3lajwsfxnxeee",
     :requests 23}
    {:path
+    "/ipld/bafyreihsauyxrklhnw42edkh2epfkmxzq7onpug72aslykk4xqh2dv4gki",
+    :requests 22}
+   {:path
     "/ipld/bafyreiduykinsfrweswf7h5chxvbfnmwiqnsxuoxybwg2jg2gynun2rzfi",
-    :requests 21}],
-  :status-mix {:ok 1824, :client-error 16, :server-error 7},
+    :requests 22}
+   {:path
+    "/ipld/bafyreiejb2d6qkor6p3x2zm5anyee3g4vxmftchmsja5rvsmvo6g2i77oq",
+    :requests 19}],
+  :status-mix {:ok 1661, :client-error 12, :server-error 9},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -46,20 +46,20 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-11",
- :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /ipld/bafyreiadviqauc34ood2iinpzoasdcir7… 45 · /ipld/bafyreifxqbozebjlnsttx4alr43w6rnf6… 39 · /ipld/bafyreiad74j7cws6mn5px57m2e5fg4ao2… 32 · /ipld/bafyreiavm24x3j63ljkwonbvf7nu5dmjp… 31 · /ipld/bafyreigntjccswkjxk7guhekz776gdvab… 30 | 4xx(probe) 1% · 5xx 0%",
- :funnel {:visitors 2657, :signups 21, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /ipld/bafyreiadviqauc34ood2iinpzoasdcir7… 53 · /ipld/bafyreifxqbozebjlnsttx4alr43w6rnf6… 39 · /ipld/bafyreiad74j7cws6mn5px57m2e5fg4ao2… 32 · /ipld/bafyreigntjccswkjxk7guhekz776gdvab… 30 · /ipld/bafyreihf7at4tfol4fgji5ey5w6uxgrpy… 23 | 4xx(probe) 1% · 5xx 1%",
+ :funnel {:visitors 2658, :signups 21, :checkouts 0},
  :signal
- "kotobase.net 実測 583687 req/7d・859 uniques(日次和)・うち4xx probe 1%(24h)、workers 1073271 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 677444 req/7d・863 uniques(日次和)・うち4xx probe 1%(24h)、workers 1245965 inv/7d、Stripe active subs 0",
  :x402
- {:challenges 15,
+ {:challenges 16,
   :submissions 3,
   :settlements 0,
   :rejections 3,
-  :attempt-rate 0.2,
+  :attempt-rate 0.1875,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 1128},
+ {:visitors {:openai-ads 3, :organic 1129},
   :signups {:organic 18}, 
   :checkouts {}}}
