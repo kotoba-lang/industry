@@ -103,7 +103,17 @@
     ;; owns its advise → govern → decide → effect boundary carries actor-.
     {:prefix "actor-"
      :role :governed-executable-actor
-     :execution :on-demand
+     ;; actor- identifies the governed execution boundary, not one residency
+     ;; class. A request-scoped researcher and a continuously monitoring
+     ;; operational actor are both actors; residency must come from evidence.
+     :execution :per-repo-evidence
+     :execution-source
+     {:primary {:file "README.edn" :attribute :repo/execution
+                :values #{:on-demand :resident}}
+      :fallback {:file "actor-manifest.jsonld"
+                 :attribute :heartbeatRequired
+                 :mapping {true :resident false :on-demand}}
+      :legacy-default :on-demand}
      :must [:declare-an-actor-identity
             :separate-advisor-from-governor
             :bound-effects
@@ -112,7 +122,8 @@
      :must-not [:hide-an-executable-actor-behind-a-bare-name
                 :hold-ambient-authority
                 :mint-a-new-actor-identity-on-repository-rename]
-     :examples ["actor-mikurabe" "actor-minidrama" "actor-utsushie"]
+     :examples ["actor-mikurabe" "actor-minidrama" "actor-utsushie"
+                "actor-bunken" "actor-crew" "actor-isekai"]
      ;; Historical reusable IPC substrate, not an executable actor. Keeping the
      ;; exception explicit prevents the prefix from silently asserting a false
      ;; execution contract; it should receive a subject-plane name separately.
