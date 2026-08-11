@@ -1,7 +1,7 @@
 [{:db/id -1
   :adr/id "adr-2608110300-hayari-tick-residency-and-alarm"
   :adr/title "ADR-2608110300: hayari tick の常駐先と、無人ループの警報 — 死んだループは自分の死を報告できない"
-  :adr/status "partially implemented: stages 1-2 landed 2026-08-11, stages 3-5 not started"
+  :adr/status "partially implemented: stages 1-4 landed 2026-08-11; stage 5 BLOCKED on an owner action (deploy keys disallowed in cloud-itonami)"
   :adr/doc_type "adr"
   :adr/date "2026-08-11"
   :adr/deciders ["Jun Kawasaki"]
@@ -219,9 +219,56 @@ hirameki-harvest / newsfeed-ingest / fleet-ci-tip-tick、うち 3 つが LOADED�
 |---|---|
 | 1. gate を作る | ✅ `scripts/fleet-ci/gates/hayari-tick-alive.cljs` + `gates.edn` |
 | 2. 落ちることを実測 | ✅ 6 分岐すべて exit code で確認 |
-| 3. 遷移通知を tip 側に | ⬜ 未着手 |
-| 4. plist を scripts/fleet-ci/ へ | ⬜ 未着手 |
-| 5. 常駐先を移す | ⬜ 未着手 |
+| 3. 遷移通知を operator 側に | ✅ `hayari-alarm.cljs` + plist、常駐済み |
+| 4. plist を scripts/fleet-ci/ へ | ✅ 移設先（ノード）を向いた plist を house に配置 |
+| 5. 常駐先を移す | 🚫 **オーナー操作待ちでブロック** |
+
+### 段階 5 がブロックされた理由（2026-08-11 実測）
+
+設計は「`cloud-itonami/hayari` だけに絞った write deploy key」を前提にしていた。
+**その前提が成立しない:**
+
+```
+POST repos/cloud-itonami/hayari/keys
+  → 422 「Deploy keys are disabled for this repository」
+GET  repos/cloud-itonami/hayari/keys → [] （読みは通る = 禁止されているのは作成だけ）
+token scopes: gist, read:org, repo  （admin:org が無い = org 設定を変えられない）
+```
+
+**回避しなかった。** ラップトップの汎用 token（repo scope、全 repo に届く）を
+ノードへ写せば今日にでも動くが、それは**この設計が避けるために存在する
+blast radius の拡大そのもの**である。無人性のために機密性を売ることになる。
+
+### ブロックを解くのに要るオーナー操作（どちらか一方）
+
+1. **`cloud-itonami` org の deploy key 作成を許可する**（org 設定の 1 トグル）。
+   その後は `bin/tick.cljs` を置く手順が全部自動で通る
+2. **`cloud-itonami/hayari` に絞った fine-grained PAT を作り kagi に入れる**
+   （contents:write）。API では作れないので web UI が要る
+
+### いま止まっている場所（再開点）
+
+ノード側は**鍵まで用意済み**で、登録だけが欠けている:
+
+```
+asher:~/.ssh/hayari_deploy(.pub)   生成済み・mode 600
+asher:~/.ssh/config.hayari         Host github-hayari の定義を書いた
+probe.cljs operator-hosts          #{} に戻した（下記）
+```
+
+### gate 容量を人質にしない
+
+asher を一度 rotation から外し（`:role :operator` で理由も記録した）、
+移設が止まったので**戻した**。`operator-hosts` の仕組みは残し、集合だけ空にしてある。
+**完了できない移設のために 9 slot 中 1 slot を失い続ける理由が無い。**
+credential が用意できたらホスト名を 1 つ入れ、probe を回し直すところから再開する。
+
+### 段階 1-4 で得られたもの（移設が止まっても残る）
+
+- ループが止まれば **gate が落ち、通知が 1 回鳴る**（遷移時のみ）
+- 判定は 1 箇所（gate）にあり、alarm は exit code を見るだけ —— 閾値が
+  2 箇所にあって片方だけ直る、が起きない
+- 常駐 plist が他の常駐と同じ場所に並び、棚卸しから漏れない
 
 段階 2 の実測（登録前に全分岐を確認した）:
 
