@@ -181,31 +181,48 @@
 (def ^:private cp-cache-path
   (path/join (os/homedir) ".gftd" "murakumo-classpath.edn"))
 
+(defn absolutize-classpath
+  "`clojure -Spath` が返す相対 entry を、その command を実行した checkout 基準の
+  絶対 path にする。placement shim は superproject root を cwd にして起動するため、
+  `src` のような相対 entry をそのまま渡すと murakumo namespace を読めない。"
+  [base cp]
+  (->> (str/split cp (js/RegExp. (if (= path/delimiter ";") ";" ":")))
+       (map (fn [entry]
+              (if (path/isAbsolute entry)
+                entry
+                (path/resolve base entry))))
+       (str/join path/delimiter)))
+
+(defn classpath-cache-key
+  "同じ deps.edn でも checkout が違えば相対 classpath の解決先が違うため、root も
+  cache identity に含める。"
+  [root st]
+  (when st
+    [(path/resolve root) (.-mtimeMs st) (.-size st)]))
+
 (defn murakumo-classpath
   "murakumo の解決済み classpath。`clojure -Spath` は実測で約 10 秒かかるので、
-  **deps.edn の mtime+size をキーに cache する** —— tick は 5 分ごとに走るので
-  毎回解決させない。deps.edn が変われば自動で作り直す。
+  **checkout root + deps.edn の mtime+size をキーに cache する** —— tick は 5 分
+  ごとに走るので毎回解決させない。root または deps.edn が変われば作り直す。
 
   `spawn-fn` は (fn [cmd args opts] → {:exit :out})。注入するのは、この ns が
   子プロセスの起動方法を持たないため（テストが clojure CLI に依存しない）。"
   [root spawn-fn]
-  (let [deps (path/join root murakumo-rel "deps.edn")
+  (let [murakumo-root (path/join root murakumo-rel)
+        deps (path/join murakumo-root "deps.edn")
         st (try (.statSync fs deps) (catch :default _ nil))
-        key* (when st (str (.-mtimeMs st) ":" (.-size st)))
+        key* (classpath-cache-key murakumo-root st)
         cached (try (reader/read-string (str (.readFileSync fs cp-cache-path "utf8")))
                     (catch :default _ nil))]
     (if (and key* cached (= key* (:key cached)) (string? (:cp cached)))
       (:cp cached)
       (let [{:keys [exit out]} (spawn-fn "clojure" ["-Spath"]
-                                         {:cwd (path/join root murakumo-rel)})
+                                         {:cwd murakumo-root})
             ;; -Spath は checkout 中の進捗を stderr に出すので最後の行だけ取る
             cp (when (zero? (or exit 1))
                  (last (remove str/blank? (str/split-lines (str out)))))]
         (when cp
-          (let [abs (-> cp
-                        (str/replace #"^src:resources:"
-                                     (str (path/join root murakumo-rel "src") ":"
-                                          (path/join root murakumo-rel "resources") ":")))]
+          (let [abs (absolutize-classpath murakumo-root cp)]
             (try (.mkdirSync fs (path/join (os/homedir) ".gftd") #js {:recursive true})
                  (.writeFileSync fs cp-cache-path (pr-str {:key key* :cp abs}))
                  (catch :default _ nil))
