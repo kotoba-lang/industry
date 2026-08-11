@@ -172,20 +172,27 @@ fallback は両方向で禁止する。native build が欠けていれば例外�
 （722 exports / 1,312 calls）で reference と一致する。**残っているのは backend の
 正しさではなく境界の形**である。
 
-### murakumo main は merge できない（2026-08-11 実測、owner 判断が要る）
+### merges API は保護 branch を通らない。PR は通る（2026-08-11、誤診の訂正）
 
-`kotoba-lang/murakumo` の branch protection は required status check
-`test` を **`app_id: 15368`（GitHub Actions）** で要求している。
-**Actions はワークスペース全体で撤去済み（ADR-2607300900）なので、この context を
-post できるものは存在しない。** 実測: main tip `ea87fec` を含め、直近の commit の
-status は**すべて空**（`state: pending`、contexts `[]`）。`enforce_admins: true`。
-fleet-ci が付ける context は `fleet-ci/murakumo/*` であって `test` ではない。
+`gh api repos/.../merges` が `kotoba-lang/murakumo` の main に対して 409
+`Required status check \"test\" is expected` を返した。私はこれを
+**「Actions 撤去済みなので誰もこの context を post できない = 構造的に merge 不能」**
+と読んだ。**誤りだった。**
 
-つまり **murakumo main への API merge は構造的に通らない**。PR #289 はこれで
-待ちになっている。解消には required check の付け替え（`test` を外す / fleet の
-context を要求する）が要り、**共有 repo の protection を弱める変更なので owner 判断**
-とした。fleet 側の context は今のところ 1 度も post されていないので、単純な
-差し替えでも通らない点に注意。
+実際:
+
+- **`kotoba-lang` org の Actions は有効のまま。** ADR-2607300900 の無効化 sweep が
+  covered したのは `com-junkawasaki` と `gftdcojp` であって、`kotoba-lang` ではない。
+  実測: `repos/kotoba-lang/murakumo/actions/permissions` は `enabled: true`、
+  workflow `CI` は `active`、直前の PR #288 は `test=SUCCESS` で merge されている。
+- **落ちるのは merges API という経路そのもの。** この endpoint は PR を作らないので
+  check が走る先が無い。**PR を開けば workflow が `pull_request` で走り、`test` が付き、
+  `gh pr merge` で通る。** PR #289 は実際にこの経路で merge した（`21cb384`）。
+- `strict: true` なので main が動いたら `gh pr update-branch` で追随してから merge する。
+
+**保護 branch を持つ repo では、merges API ではなく PR + `gh pr merge` を使う。**
+CLAUDE.md の「GitHub Actions は repo 単位で無効化してある」は org によって真偽が
+違う —— **無効化されている org の話を全 org の話として読まない。**
 
 ### 引き継ぎ — 次に効く順
 
@@ -213,5 +220,5 @@ context を要求する）が要り、**共有 repo の protection を弱める�
 - `com-junkawasaki/root` `e2e078f`: west pin 前進（2 件とも fast-forward 検証済み）
 - `kotoba-lang/murakumo` PR #289 `8711e19`: 35 cores / 722 exports / 1,312 calls、
   0 disagreements。変異（native の string 結果を摂動）で 1,312 中 794 が不一致として
-  報告されることを確認。**merge は上記の required check により保留**
+  報告されることを確認。merge 済み（`21cb384`、west pin 前進済み）
 "}]
