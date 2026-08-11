@@ -146,7 +146,44 @@ main に置いていない。合意ライブラリを失敗テスト付きで置
     w4 (wiped) h=0 blocks=7 out=3
     last-sync={offered:1, from:121, to:121, adopted:0, reason:does-not-attach}
 
-### 未解決 1### 未解決 1 —— catch-up: block を持っているのに採用しない
+### shadow head plane の配線を DO から外した（2026-08-11）
+
+**kotobase はもう inga-replica を呼ばない。** `net-kotobase@db346ee` +
+`84a0c3e7`、deploy 済み。
+
+置き換え先（fleet の `inga-node`）は **POST できない** —— tailnet 上に inbound
+経路が無く、開けるには Tailscale funnel の初回同意（admin console でのオーナー
+操作）が要る。実際に試して同意待ちで止まることを確認した。そこで**向きを
+反転**させた:
+
+    旧: kotobase --POST--> inga-replica Worker（DO witness）
+    新: kotobase --put--> 共有 object store <--fetch-- fleet
+
+fleet は外向き HTTPS を持つ（実測 200）ので、**どの witness も ingress も
+credential も公開アドレスも要らない**。止まった Worker への POST は失われるが
+**object は待つ** —— 可搬性のためだけでなく耐久性のためでもあった。
+
+外したもの: `INGA` service binding / `KOTOBASE_INGA_URL` / `inga-mode` の URL
+判定（fetch で届く plane ではなくなったので、誰も読まない文字列を条件にする
+だけになる）/ 「heads を inga-replica へ proxy する」という古いコメント。
+
+実測: 実 transact が 200 で通り（**書き込みは影響を受けない**）、
+`inga/pending/<graph>/000000000000.json` に record が積まれ、`cid` は transact
+が返した `commit` と一致。297 tests / 879 assertions 緑。旧挙動を固定していた
+2 件は**新挙動を同じ強さで検査する形に書き直した**（弱めていない）。
+
+### 次の設計点 —— poller の credential
+
+fleet 側の poller（`inga/pending/` を読んで自分に submit する）が入ると
+shadow が DO plane 抜きで完結し、`inga-replica` を実際に削除できる。
+
+**ただし poller は object store への読み取り credential を要する**ので、
+fleet の「ノードに秘密を配らない」不変条件と衝突する。選択肢は
+①公開読み取り経路を 1 本開ける（kotobase 側に `GET /inga/pending` を生やす）
+②operator 側で中継する。**未決定** —— ①なら node に秘密は要らず、公開する
+のは既に公開されている head record と同じ内容だけになる（有力）。
+
+### 未解決 1### 未解決 1### 未解決 1 —— catch-up: block を持っているのに採用しない
 
 simeon（cold start から参加）は接続もし、メッセージも受け、**block を 516 個
 持ち、投票を 515 集めている**。それでも `height 0` / `committed-height -1`。
