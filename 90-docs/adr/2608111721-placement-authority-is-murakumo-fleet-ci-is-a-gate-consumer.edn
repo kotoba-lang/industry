@@ -309,6 +309,88 @@ push しない、mirror が運ぶ』という規律を各 repo が持つこと�
 **その規律を書いた本人が破って両面が分岐した**ので、広げる前に mirror が黙って
 進まず落ちる設計であることを確かめる必要がある。
 
+## Closing record（2026-08-11）— 何が main に在り、次は何から
+
+### main に着地したもの（すべて server-side merge。私の open PR はゼロ）
+
+| repo | commit | 内容 |
+|---|---|---|
+| network-awai/cloud-itonami | `9a59474` | `.well-known` の SPA fall-through を 404 に / `did:web:itonami.cloud` を配る / nbb 検査 8 分岐（ADR-0044） |
+| com-junkawasaki/root | `70bfa04` | fleet gate section D（`.well-known` を毎 tip 検査）+ 常駐登録簿 + 棚卸し |
+| com-junkawasaki/root | `823ce08` | residency baseline 21→22（ratchet が新規未宣言常駐を検出） |
+| kotoba-lang/murakumo | `0e98f18` | task.plan の oracle i64 を `i64->host` に通す（nbb では require 時に死んでいた） |
+| com-junkawasaki/root | `8ed2728` | placement authority を murakumo.task.plan へ（決定 1・2・4） |
+| kotoba-lang/murakumo | `8365372` | placement の task 不変量を hoist（19.7s → 0.44s、配置は完全一致） |
+| com-junkawasaki/root | `a2888dc` | west murakumo pin を 8365372 へ（2 段目） |
+| com-junkawasaki/root | `1a2f936` | parity harness を oracle に向け直し、本 ADR の測定値を実測に揃える |
+
+### 本番で確認したこと（branch 上で通ったことと main に在ることを混同しない）
+
+```
+itonami.cloud/.well-known/did.json       200 application/json
+itonami.cloud/.well-known/zzz-nope.json  404 application/json
+itonami.cloud/.well-known/security.txt   200 text/plain      ← 回帰なし
+itonami.cloud/api/health · / · /{org}/{repo}                  ← 回帰なし
+residency-collect --check                OK（undeclared 22 = baseline / missing 0 / dead 0 / slot-breach 0）
+launchctl の exit 78・127                 10 本 → 0 本
+placement-parity --check                 OK（placed 101 = 101、cap 違反 0 = 0）
+tick --plan（本番）                       36 gate を 3 batch、placement 0.7s
+```
+
+**落ちることも確かめた検査**: `.well-known` guard を無効化したコピーで 2/8 失敗 + exit 1、
+fleet gate section D が同じ tree で 2/8 失敗 + exit 1、`:slot-breach` を attested ×
+rotation ノードの宣言で 1 件検出 + exit 1。**無改変で exit 0** も各々確認した。
+
+### 実行していない検査と、その理由
+
+- **murakumo の full suite の before/after 完全比較は取っていない。** 1 回完走させて
+  630 tests / 5622 assertions / 4〜5 failures を見て、担当 test
+  （`task-plan-kotoba-parity-test` 10 tests / 101 assertions 緑）と origin/main との
+  同一結果で「私の変更由来の失敗は無い」と判定した。両方を回して diff を取る試みは
+  10 分の timeout に当たり中断した —— **差分を取っていないことを記録しておく。**
+- **fleet gate の実 fleet 実行（tick 本体）は回していない。** `--plan` で止めた。
+  5 分ごとの CI 常駐が次の tip で実物を検証する。
+
+### 手順上の失敗を 2 つ記録する
+
+1. **同じ修正が 11 日前から未 merge の branch に在ったのに気づかなかった。**
+   `kotoba-lang/murakumo` の `agent/task-plan-i64-clean`（2026-07-31）と issue #265 が、
+   i64 の件を 11 箇所まで特定して offered の状態で置いてあった。私は独立に同じものを
+   書いて merge した。**この workspace の「『無い』と結論する前に索引を引く」規則は、
+   repo だけでなく未 merge の branch と open issue にも当たる** —— 触るファイルについて
+   GitHub 上の branch/issue を先に見れば防げた。issue #265 に landed 報告と supersede を
+   書いた（branch は他者のものなので削除していない）。
+2. **既存の失敗を「環境由来」と早く片付けた。** cljs の `test-task` で見た 4 errors を
+   float 精度と classpath のせいだと報告したが、実際は issue #265 の項目 2
+   （`task-id`/`expand` の `string substring indexes are out of bounds`）で、
+   **11 日前から filed されていた実バグ**だった。origin/main と同一という判定は
+   正しかったが、原因の帰属が誤っていた。
+
+### resume point（次の agent が最初に打つもの）
+
+1. **常駐登録簿の未宣言を減らす。** 22 → 18 は宣言を書くだけで届く ——
+   repo 側に plist が在るのに `residency.edn` が無いのが
+   `com.gftdcojp.itonami.{expiry-alert,kakuninya,mail-drain}`（`cloud-itonami/scripts/launchd/`）の 3 本、
+   `com.gftd.hayari-mirror` は plist 自体がどの repo にも無いので先に house 化する。
+   検査は `nbb scripts/residency-collect.cljs . --check`。
+2. **placement の退行検出を gate 化する。** `placement-parity.cljs --check` は実行に
+   murakumo の classpath（`clojure -Spath`）が要るので、fleet gate に載せるなら
+   `placement.cljs` の classpath cache と同じ経路を gate 側にも与える必要がある。
+   今は手で回す検査であり、常駐していない。
+3. **murakumo issue #265 の残り 2 件**（`expand`/`task-id` と `tunnel/connect-timeout-opt`）。
+   どちらも executor 経路で placement には無関係だが、`murakumo task run` を使いたい者は
+   先にここを踏む。
+
+### 保全した他者の作業（触っていない）
+
+- 共有 checkout の未コミット変更: `manifest/west.yml` の `loop-noren` pin、
+  `90-docs/observatory/observatory.datoms.edn`、
+  `orgs/kotoba-lang/murakumo` の `test/murakumo/infer_embed_test.cljc` / `infer_test.clj`
+- open PR 3 件（すべて他セッション由来）: root #1840 / cloud-itonami #511（DO-NOT-MERGE）/
+  murakumo #194
+- `kotoba-lang/murakumo` の branch `agent/task-plan-i64-clean`（内容は main に含まれるが他者のもの）
+- 他セッションの worktree 3 つ（`wt-root` / `root-native-page-table` / `root-hyakka-resident-20260810`）
+
 ## Consequences
 
 - (+) 『どちらに置くか』の議論が毎回やり直しにならない。判定が3問になった
