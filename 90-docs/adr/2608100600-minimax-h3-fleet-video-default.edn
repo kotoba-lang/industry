@@ -147,4 +147,69 @@ t2v を投げると artifact が `model:minimax-h3` を名乗り、真っ黒で�
   却下。ただし速度差は実在するので、既定の geometry を実測済みの 640×640 に
   下げることで折り合いをつけた。
 - **768×768 を既定にする。** 却下。352 s/step で 20 steps は約 2 時間、しかも
-  完走を確認していない。"}]
+  完走を確認していない。
+
+## 現在地（2026-08-11 closing）
+
+### default branch に着地済み
+
+| repo | commit | 内容 |
+|---|---|---|
+| `com-junkawasaki/root` | `1c5cb62` | 本 ADR |
+| `network-awai/cloud-murakumo` | `b572812` | spec: `minimax-h3` エントリ + `:default` |
+| `kotoba-lang/murakumo` | `2144f8f` | serving: `minimax` family / graph / `VIDEO_DEFAULT_MODEL` |
+| `gftdcojp/ai-gftd-ghosthacker-shiropico` | `8117119` | 設定 4 ファイルを JSON → EDN |
+
+### 検証したこと（と、していないこと）
+
+**した**: model 未指定・参照なしの t2v を live の
+`POST /v1/generation` に投げ、artifact が `model:minimax-h3` を名乗り、
+真っ黒でない mp4（mean luma 0x33）を返すことを確認。repo の
+`scripts/hunyuan3d-generation-api` と gad の deployed copy は sha256 一致
+（`62663a80…`）。EDN 4 ファイルは datascript に transact して query できることを確認、
+検査器は nil を 1 個入れて実際に落ちることを確認。
+
+**していない**: 既定 geometry（640×640/124f/20steps）での完走は未実測 —— 実測したのは
+175 frames の方（100.6 分）。124 frames なら短くなるはずだが、数字を持っていない。
+`:sec-per-clip 6038` は 175 frames の実測値であって既定の値ではない。
+
+### 未処理（優先順）
+
+1. **assets repo の gen2 除去が未実行**（`gftdcojp/ghosthacker-shiropico-assets`、
+   HEAD `58e115e` = 2026-06-21）。2026-08-03 に「本作のシロ/ピコではない」と決まった
+   11 枚がまだ生きている。**これが残る限り、次のエージェントは同じ顔を掴む** ——
+   実際にこのセッションで掴んだ。同じ superseded な spec が shiropico repo の
+   `assets/` にもスナップショットで残っている（root 版より古く、gen2 を canonical と
+   して指している）。
+2. **fleet gate: spec と serving の `:default` 一致検査。** 今回 7 日間の乖離を
+   見つけた根本原因で、これが無い限り再発する。`scripts/fleet-ci/gates.edn` に
+   1 行足し、`resources/murakumo.edn` の `:default` と deployed な
+   `VIDEO_DEFAULT_MODEL` を突き合わせる。
+3. **gad の disk が 92%（残り 63GB）。** H3 の重み ~42GB を足した結果。
+   `models/diffusion_models` だけで 127GB。`ltx-2.3`（22GB、i2v は `:broken`、
+   2026-07-16 以降 verified な用途なし）が最初の撤去候補。
+4. **shiropico の残り JSON 2 種** —— `catalog/ai-gftd-datasets.json` は
+   `tools/b2_catalog.py` の生成物、`shorts/youtube-uploads-ep02-05.json` は
+   アップロード記録。どちらも生成側を変える話。
+5. **seedance がシロの衣装をへそ出しにした**（v3、最終コマ）。仕様の
+   `:character/ng` が禁じる \"exposure\"。7+ レーティングの経路に content gate が
+   無いことの実例。
+
+### 再開するとき最初に打つもの
+
+```bash
+# 現在地の確認（fleet の既定が実際に何か）
+ssh gad 'grep ^VIDEO_DEFAULT_MODEL /home/gad/.murakumo/bin/hunyuan3d-generation-api'
+curl -sS https://murakumo.cloud/api/v1/generation/catalog | jq '.video'
+
+# 1 番（assets の gen2 除去）を進めるなら
+cd orgs/gftdcojp/ghosthacker-shiropico-assets && git log --oneline -3
+nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q \\
+  '[:find ?c :where [?e \"spec/kind\" \"ref-policy\"] [?e \"ref-policy/removed\" ?c]]'
+```
+
+ComfyUI は gad で 2 つ動いている: **8188 = 本番 farm（0.22.0、無改変）**、
+**8191 = H3 用（0.31.1、`/home/gad/ComfyUI-h3`、worktree + `models/` symlink +
+prod venv を `.pth` 継承）**。8191 を止めると `minimax-h3` は admission で
+fail-closed になり、既定の video 呼び出しが全て落ちる —— 止めるなら先に
+`:default` を戻すこと。"}]
