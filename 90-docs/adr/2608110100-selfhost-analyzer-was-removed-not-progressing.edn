@@ -94,7 +94,44 @@ string 入力 / bool 出力 / コレクション無しは、**native admission g
 なるべきで、ファイル冒頭にそう書いてある（ADR-2608650000「恒久と一時を混ぜない」）。
 `(if (or ...) true false)` も同様 — `or` が今なお `:i64` を返すため。
 
-### 5. 文書を現在地に合わせる
+### 5. 残り 4 slice も決定として着地させた（2026-08-11 同日）
+
+`kotoba-selfhost-contracts:kotoba/capability_admission_core.kotoba`（merged: 2657593）。
+effect algebra / minimal-policy / policy-check / admission-check。pure。
+
+**effect 集合は 6 bit の `:i64`** — `:effect-ops` が 6 個なので、集合は固定 universe の
+部分集合であり、bitmask はその厳密な表現。union は bit-or、宣言充足は mask 比較、
+minimal policy は inferred そのもの。全決定が word-typed に収まる（native gate 適合）。
+
+**`effect-bit` は index i → bit i。`:effect-ops` の並べ替えは wire 変更であって整形ではない。**
+これを検出するものは repo 内に他に無いので、authority test が bit 順を pin する。
+
+**移らなかったもの**: call graph を mask に畳む AST walk。これは collection 上の traversal
+＝機構であり、native gate が collection を取るまで host に残る。**「algebra が移った」を
+「inference が終わった」と記録しない** — それは本 ADR が正した誤りと同じ形になる。
+
+#### テストが設計の穴を見つけた
+
+初版の test は「minimal policy から 1 bit 落とすと **deny** される」と主張し、**test が
+正しく実装が間違っていた**。`:empty-intersection` は**空**の交差だけを deny するので、
+必要量の一部しか無い policy でも **admit され、scope が狭まった capability が handler に
+渡る**（`:handler-receives :concrete-post-intersection-capability`）。
+
+つまり **「admit された」と「必要な権限が揃っている」は別の問い**で、後者に答えるものが
+無かった。`authority-shortfall` / `authority-sufficient?` を追加した。
+
+#### backend gap を 2 つ実測（amu 76d4d90）
+
+**restricted-ESM（`:js`）backend は `bit-and` / `bit-xor` を持つが `bit-or` / `bit-not` を
+持たない**（`unsupported KIR operation`、`:kotoba-script` phase）。union は
+`a + b - (a & b)`（bitmask に対しては厳密に bit-or。4096 組全部で証明）、complement は
+universe に対する `bit-xor`（こちらは backend と無関係に意味的に正しい綴り）。
+**どちらも様式ではなく gap として source に明記**。upstream: kotoba-lang/amu#581。
+
+診断が op 名を出さず `:kotoba/internal-error` としか言わないため、per-op の bisect が
+必要だった（T3.1 が全 reject に code を求めている理由の実例）。
+
+### 6. 文書を現在地に合わせる
 
 `docs/lang/README.md` §Self-Hosting Track を書き換えた（merged: a95195d、PR #409）。
 実行される slice と seed 形状検証を表で分離し、撤去された analyzer が担当していた
@@ -102,9 +139,11 @@ string 入力 / bool 出力 / コレクション無しは、**native admission g
 
 ## Consequences
 
-- **self-hosting の現在地は「1 slice（op 分類）」であり、それ以上ではない。**
-  effect 推論・minimal-policy・policy-check・admission-check は**未実装**であって
-  進行中ではない。この 4 つが次の作業単位。
+- **self-hosting の現在地は 2 slice（op 分類 / capability admission）。**
+  残るのは **effect inference の traversal だけ**で、これは決定ではなく機構であり、
+  native gate が collection を取るまで host に残る（＝言語側の作業が先）。
+- **「admit された」を「権限が揃っている」と読まない。** 部分的な権限は admit される。
+  `authority-sufficient?` で別途問う。
 - `amu` は test-only 依存（ADR-reliability-t63）。`src/` は compiler を require しない。
 - **この種の誤りは「文書が古い」ではなく「後退が記録されなかった」として扱う。**
   大規模撤去（Rust crate 撤去のような）の際は、消えた**振る舞い**を名指しで
@@ -120,5 +159,21 @@ clojure -M:run check       ok profile=pure-product effects=#{}
 clojure -M:fuel-estimate   32 crude units (default budget 512)
 ```
 
-merged: kotoba-selfhost-contracts#2 (dddc82e) / kotoba-lang#409 (a95195d)
-west pins: ed823a9 / 3ddbcde"}]
+```
+clojure -M:test            23 tests / 284684 assertions / 0 failures
+clojure -M:run test        33/33 on :jvm-kir, :js, :wasm
+clojure -M:run check       ok profile=pure-product effects=#{}
+```
+
+変異検査（着地前に全て失敗を確認）:
+
+| 変異 | 結果 |
+|---|---|
+| `:effect-ops` の 2 要素を入れ替え（整形に見える） | 2 failures |
+| expiry を交差の後に検査 | 1 failure |
+| `effective-scope` から policy 項を削除（黙った過剰付与） | 145569 failures |
+
+merged: kotoba-selfhost-contracts#2 (dddc82e) / #3 (2657593)
+        kotoba-lang#409 (a95195d) / #410 (fbfa9e0)
+west pins: ed823a9 / 3ddbcde / 0cf1c57 / 9495324
+upstream: kotoba-lang/amu#581 (:js bit-or / bit-not)"}]
