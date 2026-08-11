@@ -614,6 +614,40 @@ GB  Paul_Heaton                   Paul Heaton       · English singer-songwriter
 14 日保持 / 690 country-days / 年 104 populated / 最古 1900 / entity 225 種
 ```
 
+## 第 9 波（2026-08-11）— 永続層、そして第 7 波の結論の訂正
+
+第 7 波で「観測は 2021-01-01 以降なら再取得できるので恒久的な置き場所は要らない」と
+結論した。**その測定は正しく、今も正しい。結論だけが狭かった。**
+
+**再取得できることは、保持されていることではない** —— 上流は endpoint も保持期間も
+約束しておらず、再取得は *今の答え* を返すので *あの日そう見えた* は再現できず、
+2021 より前は誰にも取れない。
+
+`cloud-itonami/hayari-data`（DataLad dataset、実体は git-annex 経由で
+s3.kotobase.net）を起こし、tick が毎日そこへ預けるようにした。詳細は
+**ADR-2608110400**。custody は主張ではなく実証した（drop → get で sha256 一致、
+さらに別 clone から取得）。
+
+## closing 時点の現在地（2026-08-11）
+
+| | |
+|---|---|
+| 観測 | 68 日 / 5,248 country-days / 1900-2026 の **127 年すべて populated** |
+| entity | 1,266 種（要約が名指しする作品） |
+| 永続 | hayari-data に 68 日、s3.kotobase.net に custody |
+| 常駐 | tick（15 分）+ alarm（30 分）、どちらも稼働中 |
+| 健全性 | healthy · consecutive-failures 0 |
+| テスト | 決定核 29/142・XMILE 5/18 |
+| backfill | 68 / 2,046 日（3%、残り約 3 週間で 2021-01-01 に到達し自然終了） |
+
+## 未決（再開点）
+
+1. **常時稼働ノードへの移設**（ADR-2608110300 段階 5）—— `cloud-itonami` が deploy key
+   の作成を許さず token に `admin:org` が無い。**オーナー操作 1 つで解ける**
+2. **深い掃引の cadence** —— tick は top 25 なので各年の厚みは薄いまま
+3. **独立した 2 プロバイダ** —— 現状 1 コピーで、増やしても同一プロバイダになる
+4. **XMILE の inflow / out-of-sample / dynamics 接続**、決定核の `.kotoba` 移行
+
 ## 登録済み runner での実測（これが landed の根拠）
 
 standalone で動くことは landed の根拠にしない —— 欠陥 4 と 5 はどちらも
