@@ -148,7 +148,7 @@
              :max-parallel (max 1 (min 2 (quot cores 4)))))))
 
 (defn edn-node [n]
-  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx zig zigv caps max-parallel detail loopback]} n]
+  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx zig zigv caps max-parallel detail loopback role]} n]
     (str "  {:host " (pr-str host)
          " :reachable? " (pr-str (boolean reachable?))
          (when os (str " :os " (pr-str os)))
@@ -164,6 +164,9 @@
          (when (and reachable? (= "no" loopback))
            (str "\n   :loopback? false"))
          (when reachable? (str "\n   :caps " (pr-str (or caps #{})) " :max-parallel " (or max-parallel 0)))
+         ;; caps 空だけでは「意図的に外した」と「壊れて到達不可」が区別できない。
+         ;; 外した理由を書かないと、後から読む人には故障に見える。
+         (when role (str " :role " (pr-str role)))
          (when detail (str "\n   :detail " (pr-str detail)))
          "}")))
 
