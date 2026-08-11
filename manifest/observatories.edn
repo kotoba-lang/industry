@@ -258,7 +258,7 @@
    ;; 実 fetch + 実 publish は別 alias（KOUHOU_ALLOW_LIVE_INGEST=1 clojure -M:live-ingest）。
    ;; **既定では起動しない** —— 外向き publish を毎時の無人 run に混ぜない。
    ;;
-   ;; 2026-08-11（ADR-2608110100）: **取り込みと発信が分離された。**
+   ;; 2026-08-11（ADR-2608110200）: **取り込みと発信が分離された。**
    ;; `KOUHOU_ALLOW_LIVE_INGEST=1 KOUHOU_PUBLISH=0 clojure -M:dev:live-ingest` は
    ;; phase 0（observe）で走り、data/{briefings,ledger,corpus} に canonical EDN を、
    ;; raw/ に取得した feed 本体（annex → s3.kotobase.net）を書いて、**app-aozora には
