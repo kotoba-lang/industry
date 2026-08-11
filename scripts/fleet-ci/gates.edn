@@ -81,6 +81,24 @@
   {:name "tech-ipfs-specs-ipns" :gate :jvm-test :cd true}
   {:name "kotoba-delta" :gate :nbb-test :classpath "src:test" :entry "run-tests.cljs" :cd true}
 
+  ;; kotoba-selfhost-contracts — the self-host decision slices (ADR-2608110100).
+  ;;
+  ;; This repo ships COMPILED artifacts (resources/kotoba/selfhost/oracle/*.kir.edn)
+  ;; that production loads, and the source they came from (kotoba/*.kotoba). The
+  ;; failure that only a gate can catch is drift between the two: editing a
+  ;; .kotoba and forgetting `clojure -M:test:gen` leaves production executing the
+  ;; OLD decision while every source-compiling test still passes. Locally that
+  ;; needs someone to remember; here it does not.
+  ;;
+  ;; No :include-ext — the tree is small and the drift test READS kotoba/*.kotoba
+  ;; off disk. Filtering to .edn would ship the artifacts without their source and
+  ;; the gate would fail for the wrong reason (`root-permit-index` is the standing
+  ;; example of a gate whose input is not in the tree it is given).
+  ;;
+  ;; :jvm-test needs the amu closure resolved from git, which needs node egress.
+  ;; Measured 2026-08-05: all 10 reachable nodes get 200 from github/maven/npm.
+  {:name "kotoba-selfhost-contracts" :gate :jvm-test :cd true}
+
   ;; hirameki-patents は**コードではなくデータ**の repo。gate が検査するのは
   ;; 「テストが通るか」ではなく「公開した corpus がバイトと問いの両方で健全か」——
   ;; shard の CIDv1 と件数合計（verify）、datom として transact して答えられるか、
