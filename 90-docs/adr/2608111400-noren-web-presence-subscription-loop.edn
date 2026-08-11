@@ -169,8 +169,42 @@ kaizen と 2 点だけ意図的に違う:
    tools.deps が比較できず classpath の構築ごと落ちていた（runner を変えても同じ）。
    最上位に 1 本 pin を置いて解消した
 
-残りは「依存を pin に揃える → 再ビルド → verify → deploy → KV に鍵 digest を投入 →
-loop から 1 件通す」。
+### 再開点（2026-08-11 closing 時点）
+
+**着地済み**（すべて default branch）:
+
+| repo | commit | 中身 |
+|---|---|---|
+| `kotoba-lang/noren` | `568d81c` | 判定の正本（適格性 / 診断 / 処方 / governor / 生成 / プラン / 発見） |
+| `cloud-itonami/loop-noren` | `6a10ab6` | orchestrator・永続化 4 面・常駐・discover |
+| `network-awai/cloud-itonami` | `c06c6bba6` | noren ingress（**未デプロイ**） |
+| `com-junkawasaki/root` | `d6c88e0deec` | west 登録・pin・この ADR |
+
+**次の 1 手**（この順でしか進まない）:
+
+1. `langchain` / `css` / `mail` / `drive` / `bonsai` / `kototama` の未コミット作業が
+   片付くのを待つ（**他セッションの WIP なので消さない**）。確認は
+   `git -C orgs/kotoba-lang/<dep> status --porcelain`
+2. `printf '%s\n' langchain css mail drive bonsai kototama | xargs west update --fetch smart`
+3. `cd orgs/network-awai/cloud-itonami && node ../../../scripts/resource-guard.mjs run build --
+   clojure -M:cljs:local -m shadow.cljs.devtools.cli release edge-api`
+   （`npx shadow-cljs` はこのマシンの npx が壊れているので使えない）
+4. `nbb scripts/verify-edge-bundle.cljs` → Pages deploy
+5. ingress 鍵を発行して KV `noren:cloud-itonami/loop-noren:ingress-key-sha256` に
+   digest を投入、operator copy を Keychain へ
+6. `NOREN_INGRESS_KEY=… nbb --classpath $CP bin/noren.cljs tick --submit` で 1 件通す
+   （classpath の実体は loop-noren の README。**この本文に生の二重引用符を書かない**
+   —— EDN の文字列がそこで閉じ、以降の本文が黙って消える。実際にこの closing で
+   1 度やった: `git diff` は +43/-3 で正常に見えるのに、reader が読む body だけが
+   5,119 文字短くなっていた）
+
+**murakumo が戻ったら**: `bin/noren.cljs llm-probe` → `discover`。常駐が毎日 09:20 に
+回るので、放っておいても次のパスで抽出まで進む（`:defer` は却下ではなく、同じ候補が
+対象に残る）。
+
+**残っている gap**（優先順）: ①ingress のデプロイ ②承認された提案を loop が読み戻して
+送る経路（read には tenant capability が要り、narrow key は持たない）③EC 事業者の
+発見経路（OSM に載らない）④価格の市場検証（`kotoba-lang/pricing-oracle`）。
 
 ### 1 周
 
@@ -296,7 +330,17 @@ etzhayyim actor の面には載せない。
   portable cljs suite 757 tests / 6427 assertions green。edge bundle は
   `import()` して handler を実際に呼び、KV binding 無しで 503 に fail closed する
   ことを確認（`verify-edge-bundle` は 7/7）
-- 未実行: JVM 側の全 suite（`test-jvm`）は 9 failures / 40 errors だが、
+- **JVM parity は実測**（2026-08-11、closing 時）: `noren` 17 tests / 116 assertions、
+  `loop-noren` 23 tests / 81 assertions、どちらも `clojure -M:test` で green。
+  loop-noren は最初 **1 本も走らなかった** —— nbb からしか使わない overpass /
+  commoncrawl の checkout を `:deps` に置いたせいで JVM の classpath 解決に入り、
+  その推移依存の壊れた `:local/root`（langchain-clj）で classpath 構築ごと落ちて
+  いた。`:nbb` alias へ移して解消。**「テストが赤い」ではなく「走っていないのに
+  走った気になれる」形**だったので closing で閉じた
+- **常駐を `--apply` で実走**（2026-08-11）: discover 20 件検査 → tick → commit →
+  annex copy 5 オブジェクト → verify（receipts 67 / identity ok）→ push
+  （`4e3e46e..ad838bc`）。custody は `--in kotobase` の実数で 14/14
+- 未実行: cloud-itonami の JVM 全 suite（`test-jvm`）は 9 failures / 40 errors だが、
   `kaiyu.core` 欠落を含め**この変更の前から赤い**（登録前の run にも同じ失敗が在る）。
   workspace の品質ゲートの正は portable cljs 側（CLAUDE.md）
 
