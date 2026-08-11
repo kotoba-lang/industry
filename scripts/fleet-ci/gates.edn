@@ -166,6 +166,31 @@
    :script "gates/vendored-kaiyu-parity.cljs" :script-args []
    :include-ext [".cljc"] :min-files 2 :cd true}
 
+  ;; :video の既定が、spec と「実際に応答しているもの」で一致しているかを見る。
+  ;;
+  ;; この 2 つは別リポジトリにある。cloud-murakumo の resources/murakumo.edn が
+  ;; `:default` を宣言し、実際に POST /v1/generation に答えるのは kotoba-lang/murakumo
+  ;; の scripts/hunyuan3d-generation-api の VIDEO_DEFAULT_MODEL という別の literal。
+  ;; **突き合わせるものが無かった。**
+  ;;
+  ;; 仮定の話ではない。ADR-2608036800(2026-08-03)は ltx-2.3 が status=done を返しながら
+  ;; 全フレーム真っ黒を出すのを見つけ、「壊れたモデルを既定に置くと model 未指定の
+  ;; 呼び出しが黙って空の動画を受け取る」と書いて既定を移した —— **spec だけを**。
+  ;; serving 側は 7 日間 "ltx-2.3" のままで、その間ずっと model 未指定の呼び出しは
+  ;; 壊れたモデルへ流れていた。**その ADR の下で、その ADR が防ぐはずの事故が続いた。**
+  ;; 見つけたのは 2026-08-10 の手作業(ADR-2608100600)で、検査ではない。
+  ;;
+  ;; per-model :status は、読む側が居て初めて意味を持つ。この gate がその読む側。
+  ;; ①spec の :default == serving の VIDEO_DEFAULT_MODEL ②その model が :models に居る
+  ;; ③:status が :broken でも :pending/:unverified でもない（既定とは「選ばなかった時に
+  ;; 来るもの」なので、誰かが実際に動かした model でなければならない）。
+  ;;
+  ;; 落ちることは確認済み: ①spec だけ変える ②spec+serving 両方を ltx-2.3 にする
+  ;; （= 実際に 7 日間 live だった状態の再現）③:models に無い名前、の 3 通りで FAIL。
+  {:name "cloud-murakumo" :gate :nbb-script
+   :script "gates/video-default-parity-check.cljs" :script-args []
+   :include-ext [".edn"] :min-files 50 :cd true}
+
   {:name "root" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs/adr" "--min" "1400"]
    :include-ext [".edn"] :min-files 1500 :cd false}
