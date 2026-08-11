@@ -32,8 +32,14 @@
 ;;      ts/rust leg, repository-security の npm audit）。ノードは tailnet だけに
 ;;      繋がっていて npm registry に届かない（tick.cljs `ship-git-deps!` が
 ;;      同じ理由で JVM 依存を operator 側から配っている）。
-;;   - live smoke（public-smoke / protocols-public-smoke）。kotobase.net への
-;;     egress がノードに無い。**operator 側には有る**ので、これは別経路の課題。
+;;   - ~~live smoke（public-smoke / protocols-public-smoke）。kotobase.net への
+;;     egress がノードに無い。~~ **この理由は間違いだった**（2026-08-11 訂正）。
+;;     2026-07-26 に zebulun 1 台で測った値を全ノードの性質として一般化していた。
+;;     judah / levi / simeon で測り直すと 3 台とも kotobase.net = 200 /
+;;     sparql.kotobase.net = 200。live 検査は gates.edn の
+;;     `net-kotobase-live-planes` gate として実在する。この誤った前提のせいで、
+;;     `/api/*` 全 8 経路と `/pins` が 502 を返していた期間、fleet 側に
+;;     それを見る目が 1 つも無かった（net-kotobase docs/adr/2608110600）。
 ;;   - deploy と b2-dr-drill。credential が要る = 「鍵はノードに配らない」
 ;;     （fleet-ci 不変条件 3）と両立しない。
 ;;

@@ -565,11 +565,16 @@
   ;; gftdcojp が 2026-07-26 に落ちたのと同じ症状で、ADR-2607300900 が決めた
   ;; 「Actions ではなく fleet」をこの org にも適用する。
   ;;
-  ;; gate が持ってこられるのは **hermetic な半分だけ**（ノードは tailnet のみで
-  ;; npm registry にも kotobase.net にも届かず、credential も持たない）:
+  ;; gate が持ってこられるのは **hermetic な半分だけ**:
   ;;   enterprise-isolation.yml 全体 / metadata.yml 全体 / worker.yml の syntax 半分 /
-  ;;   sdk.yml の python leg。持ってこられないもの（npm ci 系・live smoke・deploy・
+  ;;   sdk.yml の python leg。持ってこられないもの（npm ci 系・deploy・
   ;;   b2-dr-drill）は ADR-2608036600 に理由付きで列挙した。
+  ;;
+  ;; ⚠ **その列挙のうち「live smoke」の理由は間違いだった**（2026-08-11 訂正）。
+  ;; 「kotobase.net への egress がノードに無い」は 2026-07-26 に zebulun 1 台で
+  ;; 測った値の一般化で、judah / levi / simeon で測り直したところ 3 台とも
+  ;; kotobase.net = 200 / sparql.kotobase.net = 200 だった。live gate は下に足した。
+  ;; CLAUDE.md の「ノードの外向き HTTPS は実測して使う。定数で持たない」の実例。
   ;;
   ;; **green の意味は「hermetic subset が通った」であって「出荷可」ではない。**
   ;; 出荷判断は docs/MURAKUMO-CI.md の `murakumo-worker-check.cljc deploy-ready`
@@ -581,6 +586,29 @@
   {:name "net-kotobase" :gate :nbb-script
    :script "gates/net-kotobase-hermetic-check.cljs"
    :script-args ["--min-surfaces" "8" "--min-syntax" "20"] :cd true}
+
+  ;; net-kotobase の **production の面** が実際に答えるか（ADR-2608110700）。
+  ;;
+  ;; 上の hermetic gate は tree を検査する。だが**デプロイ成果物は commit 済みの
+  ;; バンドル**（kotobase-api-gateway/js/kotobase-worker.js）なので、tree が緑でも
+  ;; production がそれを動かしているとは限らない。2026-08-11、`/api/*` 全 8 経路と
+  ;; `/pins` が 502、`graph.sparql` が 404 を返している間、hermetic gate は緑で、
+  ;; `/health` も `ok: true` を返していた（しかも 502 を返しているその経路を
+  ;; `client_api_paths` として並べて）。tree を見る gate はこれを構造的に見つけられない。
+  ;;
+  ;; credential は持たない: その場で捨て鍵を生成して CACAO を自己署名する
+  ;; （kotobase は self-sovereign auth なので新しい did:key はそれだけで p2p
+  ;; テナント = 権限昇格にならない）。npm 依存も持たない（node:crypto + 最小 CBOR）。
+  ;; ノードから届かないときは **合格ではなく exit 92（skip）** で降りる。
+  ;;
+  ;; 検査済み（2026-08-11、CLAUDE.md「落ちる gate であることを確かめる」）:
+  ;;   無改変 → exit 0（15 checks）/ 1 箇所壊したコピー → exit 1 /
+  ;;   到達不可な base → exit 92。
+  ;;
+  ;; tree を一切読まないので :include-ext で最小限だけ運ぶ。
+  {:name "net-kotobase" :id "net-kotobase-live-planes" :gate :nbb-script
+   :script "gates/net-kotobase-live-planes.cljs"
+   :include-ext [".md"] :cd false}
 
   ;; network-awai/cloud-itonami の公開サイト面（`{org}.itonami.cloud/{repo}`、
   ;; ADR-2607301300 → ADR-2608057000）。
