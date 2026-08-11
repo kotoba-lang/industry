@@ -216,6 +216,24 @@
    決めた（ADR-2608110100）ので、`auth.itonami.cloud` を authn Worker に
    向けるのは重複であり RP の衝突でもある。**顧客が現れてから有効化する。**
 
+   - **可用性を外から測り始めた（gate 4 は開いたまま、理由が変わった）。**
+     共通 lib は `kotoba-lang/uptime`（`dd63825`、west 登録済み）—— **観測されて
+     いない窓は 100% ではなく `:unobserved`**、**prober 自身の失敗は `:down` では
+     なく `:inconclusive`**、**coverage が薄い窓の SLO は `:met` ではなく
+     `:cannot-say`**。10 tests / 41 assertions、観測ゼロを 1.0 にすると 2 件落ちる
+     ことも確認。
+     prober は blueprint 側（`scripts/probe.cljs` + `com.gftd.identity-probe`、
+     5 分間隔 launchd、`efbb3c9`）。**service の外から**測る —— 自分自身に
+     「動いているか」を聞く service は落ちている時に何も言わない。
+     実測 2026-08-11: 3 target × 15 観測、100% だが expected schedule の **1.4%**
+     なので `slo-verdict` は正しく `:cannot-say` / `:insufficient-coverage` を返す。
+   - **gate 4 が開いている理由は「何も測っていない」から「測ったものを publish
+     していない」に変わった。** 観測は operator マシンのローカルにしか無い
+     （追跡すると west checkout が恒久的に dirty になり他セッションの
+     `west update` を止めるため、意図的に untracked）。gate note にそう書いた ——
+     **直った問題を書いたままの gate note は、間違った理由で閉まり続け、
+     やがて間違った理由で開く。**
+
    ### まだのもの
 
    - **`AUTHN_USAGE_TOKEN` は未設定**なので `/v1/usage` は 404 のまま。記録は
