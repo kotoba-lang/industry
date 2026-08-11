@@ -205,6 +205,58 @@ asher は **publish 鍵を持つ常駐 writer** になっている（attested sl
 
 **gate 容量は 1 slot 減る。それが attested slot の実費である**と決定 6 が言っているとおり。
 
+### 3. placement を murakumo へ切り替えた（決定 1・2・4）— 代償を測ってから
+
+**parity は成立した**（`scripts/fleet-ci/placement-parity.cljs`、実 fleet で実測
+2026-08-11、101 gate × 8 gate-capable node、cost 実測 631 件）:
+
+| | placed | unschedulable | hosts | makespan | cap 違反 |
+|---|---|---|---|---|---|
+| fleet-ci（LPT） | 101 | 0 | 8 | 509s | 0 |
+| murakumo（cost 降順 + greedy） | 101 | 0 | 8 | **389s** | 0 |
+
+**「LPT は host 側の1手に還元できる」は正しかった。** `plan/assign` は tasks を
+与えられた順に fold して最も空いている eligible node へ置くので、cost 降順に
+並べ替えて渡せば LPT と同じ順序付けになる —— Kotoba object を1つも足していない。
+makespan は悪化どころか 24% 改善した（murakumo の `node-score` が fill-ratio を
+主にし、load1/mem を tie-break にするため）。
+
+**切り替えの前に murakumo 側のバグを 1 つ直す必要があった。** `murakumo.task.plan`
+は 11 箇所で oracle の i64 結果を素の `long` に渡しており、KIR が cljs で i64 を
+**BigInt** で返すため **nbb では require した瞬間に `default-opts` の評価で死んで
+いた**（`Cannot convert a BigInt value to a number`）。つまり `murakumo task
+plan/run/report` は nbb 上で1つも動いていなかった。JVM では Long なので通り、
+630 test / 5622 assertion は緑のままだった。`oracle/i64->host` はまさにこの変換の
+ために在り、tunnel / persist / component-authority は既に通していた —— この ns
+だけが例外。修正は kotoba-lang/murakumo `0e98f18`、west pin も前進済み。
+
+**⚠ 代償を隠さない: out-of-process 委譲は遅い。** 実測（cache 済み classpath）:
+
+```
+shim 起動のみ(0 task)   6.0s     ← nbb + kotoba.kir のロード
+ 1 gate                 7.9s
+ 3 gate                11.8s
+ 8 gate                17.6s
+20 gate                20.5s
+101 gate               95.2s     ← gates.edn 全件（上界）
+```
+
+**固定 6s + 約 1.2s/gate。in-process の LPT は実質 0ms だった。** 典型的な tick
+（変化した repo 1〜3 件）では +8〜12s で、その後に走る gate 自体が分単位なので
+比率としては小さい。しかし **101 件が動いた後の tick と `--plan` では 95s** かかる。
+
+**1 task あたり 1.2s は KIR 解釈としても遅すぎる。** 1 task の配置に必要な
+`o-record` 呼び出しは (候補ノード数 × `eligible?`) + `node-score` + `wave-of` +
+`slot-of` + `load-after-assign` 程度で、8 ノードなら 12 回前後。**1 回 100ms は
+oracle の call path 側の非効率を疑うべき数字**（`require-ready!` / `call-record`
+が毎回何かを作り直していないか）。これは murakumo 側の follow-up として残す ——
+placement の正しさとは独立で、直せば委譲のコストはほぼ消える。
+
+**それでも切り替えた理由**: 決定 1 はオーナー判断であり、placement の**質**は
+実測で退行していない（むしろ改善）。速度は実装の問題で、authority の置き場所の
+問題ではない。ただし**この数字を知らずに「移して速くなった」と読まれないよう**
+ここに残す。
+
 ## landed していないもの（順序つき）
 
 1. **`.well-known/*` の catch-all を塞ぎ、itonami.cloud の DID document を出す。**
@@ -214,10 +266,14 @@ asher は **publish 鍵を持つ常駐 writer** になっている（attested sl
    （ADR-2800002700 の反省をここで解く）
 3. **死んでいる 10 本の棚卸し**（last-exit 78 / 127）。消すか直すかを決める。
    『動いていない CI より無い CI の方がよい』（ADR-2607300900）と同じ理屈
-4. **placement の1本化の実装**（決定 1・2・4）。両実装に同じ batch を通して
-   assignments 一致を実測してから切り替える
+4. **oracle call path の高速化**（murakumo 側）。1 task 1.2s は placement の質とは
+   独立の実装問題で、直せば out-of-process 委譲のコストはほぼ消える
 5. **attested slot の常駐先の統一。** hayari は asher に landed したが、
    他の書き込み鍵持ち常駐はまだラップトップに居る
+6. **`murakumo task` CLI は nbb でまだ動かない。** `task.plan` は直ったが
+   `murakumo.tunnel` が `string substring indexes are out of bounds` で落ちる
+   （connect-timeout-opt、tunnel.cljc:111-122）。**別の破損**で executor 側なので
+   placement には影響しないが、`murakumo task run` を使いたい者は先にここを踏む
 
 ## 決めていないこと
 

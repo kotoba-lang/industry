@@ -1,1 +1,11 @@
-{:paths ["." "scripts/nbb_compat" "70-tools/bmc/src" "70-tools/bmc/test"]}
+;; nbb (ClojureScript-on-Node) の classpath。root から `nbb <script>` を叩くときの既定。
+;;
+;; `scripts/fleet-ci` が入っているのは、`tick.cljs` が `placement`（placement
+;; authority である murakumo.task.plan への委譲層、ADR-2608111721 決定 1）を
+;; require するため。**tick の起動方法を変えないためにここへ足した** —— plist と
+;; README の `nbb scripts/fleet-ci/tick.cljs …` はそのまま動く。
+;;
+;; ns 名が単一セグメント（`placement`）なのは、cljs が `-` を `_` に munge するので
+;; `fleet-ci.placement` だと `fleet_ci/placement.cljs` を探してしまい、実際のディレクトリ
+;; `scripts/fleet-ci/` と一致しないため。root scripts の慣習（`(ns closing-check)` 等）と同じ。
+{:paths ["." "scripts/nbb_compat" "scripts/fleet-ci" "70-tools/bmc/src" "70-tools/bmc/test"]}
