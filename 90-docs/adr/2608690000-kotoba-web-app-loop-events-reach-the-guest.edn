@@ -176,4 +176,38 @@ mock を実物に寄せることでしか防げない。
 
 driver は `amu/runtime/` に置いた（`browser-host.mjs` / `worker-host.mjs` / `wasi-host.mjs` と
 同じ「host runtime」の棚で、Playwright matrix が同じ repo にあるので 3 エンジンの証明が
-その場で取れる）。**2 つ目の consumer が現れたら切り出す。**"}]
+その場で取れる）。**2 つ目の consumer が現れたら切り出す。**
+
+## 着地（2026-08-11）
+
+| 何 | どこ |
+|---|---|
+| 実装 PR | `kotoba-lang/amu#589`（merge commit `e78241dca15000f6bb3976e97f493c70b0137dcf`） |
+| 実装 commit | `319505e197d39b9e78f7cfa7b2074b3a698a262f` |
+| CI | merged commit で **26/26 success**（`browser-matrix` は ubuntu-latest / windows-2025 とも pass、`safari` も pass） |
+| west pin | `76d05a13a1792d71b0a3497b196a9d6e3142c5db`（`scripts/west-pin-put.cljs amu <sha>`、806f5ce→e78241dc は ahead=2 / behind=0） |
+| この ADR | `04c133071d6acf3f7e7c6fbf14bf2872f220abff` |
+
+**手続き上の逸脱を 1 件記録する。** PR #589 は **CI 完了前にマージされた** —— merge は
+`10:24:33Z`、最後の check（`test (macos-14)`）の完了は `10:47:15Z`。最初に打った
+`gh pr merge` が（出力を確認しないまま）通っていたのに、その後「checks を待ってから
+マージする」と述べて待機していた。**結果としては同一 commit に対し 26/26 が success
+なので実害は無いが、順序は主張どおりではなかった。** 次回は `gh pr merge` の出力を
+確認してから待機に入る。
+
+## 引き継ぎ（open items）
+
+1. **`orgs/kotoba-lang/amu` の共有 checkout に別セッションの未コミット WIP がある**
+   （`deps.edn` / `deps-lock.edn` / `package.json` に `test-value-runtime-host`、
+   `runtime/browser-host.mjs`、`test/kotoba/compiler/aiueos_target_test.clj`）。
+   **本 ADR の変更も `runtime/browser-host.mjs` を触っている**ので、その WIP は
+   main の新しい内容と reconcile が要る。**触っていない**（他者の WIP）。
+2. **`dual-renderer-soft-performance-workload` は赤いまま。** 本変更とは無関係
+   （未改変 main でも 17.2s / budget 5s）。このマシンの負荷で wall-clock budget が
+   機能していないので、budget を上げるか計測方法を変えるかの判断が要る。
+3. **safari lane はこの loop を検査していない。** `safari` job は Playwright ではなく
+   `scripts/safari-webdriver.mjs` の独自ハーネスで、`browser.spec.mjs` を走らせない。
+   WebKit エンジン自体は Playwright の `webkit-desktop` で緑だが、**Safari 実機での
+   app loop は未証明**。
+4. 次の 1 手は上記「次にやること」の 1（`:document` ノード予算）。**約 7 行**という
+   実測値がそのまま UI の天井なので、ui-v2 より先に効く。"}]
