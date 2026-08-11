@@ -97,6 +97,26 @@
      :must [:expose-action-yml :pin-external-revisions :emit-check-result]
      :must-not [:own-domain-contract :hide-provider-neutral-core]
      :examples ["action-ux-kaizen"]}
+    ;; ── governed executable actors (owner directive 2026-08-11) ─────
+    ;; An executable actor must be discoverable from the repository name. A
+    ;; bare metaphor may still name the actor itself, but the repository that
+    ;; owns its advise → govern → decide → effect boundary carries actor-.
+    {:prefix "actor-"
+     :role :governed-executable-actor
+     :execution :on-demand
+     :must [:declare-an-actor-identity
+            :separate-advisor-from-governor
+            :bound-effects
+            :record-an-audit-trail
+            :state-source-and-consumer-boundaries]
+     :must-not [:hide-an-executable-actor-behind-a-bare-name
+                :hold-ambient-authority
+                :mint-a-new-actor-identity-on-repository-rename]
+     :examples ["actor-mikurabe" "actor-minidrama" "actor-utsushie"]
+     ;; Historical reusable IPC substrate, not an executable actor. Keeping the
+     ;; exception explicit prevents the prefix from silently asserting a false
+     ;; execution contract; it should receive a subject-plane name separately.
+     :legacy-non-conformant ["kotoba-lang/actor-ipc"]}
     ;; ── end-user applications (owner directive 2026-08-03,
     ;;    ADR-2608035000) ─────────────────────────────────────────────
     ;; The prefix was already in use by 19 repositories before it was ever
@@ -596,7 +616,7 @@
  :plane-order
  [{:plane :origin        :when "the subject is someone else's spec or product"
    :vocabulary :origin}
-  {:plane :role          :when "the repo's execution role is fixed (loop/app/capability/person/skill/action)"
+  {:plane :role          :when "the repo's execution role is fixed (actor/loop/app/capability/person/skill/action)"
    :vocabulary :name-prefix}
   {:plane :family        :when "it belongs to a set owned by one authority here"
    :vocabulary :product-family}
