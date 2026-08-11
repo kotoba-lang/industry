@@ -1,0 +1,85 @@
+{:schema "awai-stripe-atlas-onboarding-status/v1"
+ :record/type :evidence-decision-record
+ :recorded-on "2026-08-10"
+ :updated-on "2026-08-11"
+ :subject "AWAI Network, L.L.C."
+
+ :question
+ "Are Stripe Atlas incorporation and the associated Stripe Payments account fully complete?"
+
+ :answer :partially-complete
+
+ :status
+ {:atlas
+  {:incorporation :complete
+   :entity-type :delaware-llc
+   :incorporated-on "2026-07-20"
+   :registered-agent :active
+   :registered-agent-renews-on "2027-07-20"
+   :ein
+   {:status :issued
+    :masked "••-•••2338"
+    :stripe-account-sync :confirmed
+    :dashboard-status :setup-complete}}
+
+  :stripe-payments
+  {:activation :enabled
+   :activation-history :enabled-before-ein-issued
+   :onboarding-submission :blocked
+   :open-task-count 1
+   :requirements
+   [{:code :representative-residential-country-rejected
+     :status :currently-blocking
+     :due-on "2026-08-10"
+     :due-status :past-due
+     :displayed-impact :financial-account-transfers
+     :dashboard-message
+     "The account-status task requires the representative to provide a valid address."
+     :boundary
+     "Do not substitute the Delaware registered-agent address for a person's truthful residential address; escalate the Atlas/non-US-founder configuration to Stripe Support."}]}}
+
+ :decision
+ {:status :remediate-representative-address
+  :do-now
+  [:retain-truthful-identity-and-address-data
+   :ask-stripe-support-to-review-the-non-us-founder-representative-address-error]
+  :do-not
+  [:submit-a-placeholder-ein
+   :claim-the-registered-agent-address-as-a-personal-residence
+   :report-payments-onboarding-as-complete]
+  :completion-gates
+  [{:gate :ein-issued-by-irs-and-visible-in-atlas :status :complete}
+   {:gate :ein-automatically-added-to-stripe-account :status :complete}
+   {:gate :legal-name-and-ein-match-irs-records :status :complete
+    :evidence "The prior IRS mismatch is absent from the live account-status task list after the Atlas EIN sync."}
+   {:gate :representative-requirement-resolved-with-truthful-data :status :pending}
+   {:gate :final-confirmation-enabled-and-submitted :status :pending}]}
+
+ :evidence
+ [{:source :stripe-atlas-dashboard
+   :observed-on "2026-08-10"
+   :scope [:incorporation :ein-progress :registered-agent]
+   :authority :authenticated-live-ui}
+  {:source :stripe-payments-remediation-dashboard
+   :observed-on "2026-08-10"
+   :scope [:submission-state :irs-match-error :representative-address-error]
+   :authority :authenticated-live-ui}
+  {:source "https://docs.stripe.com/atlas/accept-payments"
+   :observed-on "2026-08-10"
+   :scope [:atlas-prefill :payments-before-ein :automatic-ein-sync]
+   :authority :stripe-official-documentation}
+  {:source :stripe-atlas-dashboard
+   :observed-on "2026-08-11"
+   :scope [:setup-complete :ein-issued :ein-visible]
+   :authority :authenticated-live-ui}
+  {:source :stripe-account-status-dashboard
+   :observed-on "2026-08-11"
+   :scope [:open-tasks :representative-address :displayed-impact]
+   :authority :authenticated-live-ui}]
+
+ :system-boundary
+ {:atlas-incorporation "Complete and independently evidenced by the Atlas dashboard."
+  :ein "IRS issuance and Atlas-to-Stripe synchronization are complete; only the masked last four digits are retained in this repository."
+  :payments "Payments activation and KYC/business-verification completion are separate from legal incorporation."
+  :api "The AWAI Stripe CLI profile required reauthentication, so no live API Account-object claim is made for this record."
+  :mcp "No Stripe MCP server was configured in the inspected Codex environment; dashboard evidence is not described as MCP evidence."}}
