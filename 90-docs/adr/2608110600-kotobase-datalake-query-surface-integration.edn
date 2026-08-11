@@ -1,0 +1,203 @@
+[{:db/id -1
+  :adr/id "ADR-2608110600"
+  :adr/doc_type "adr"
+  :adr/topic "kotobase-datalake-query-surface-integration"
+  :adr/title "datalake 面をサービスに繋ぐ — lake は 5 つ目の方言ではなく `:source` の供給者、そして同期スキャンを非同期ホストで走らせる trampoline"
+  :adr/status "accepted"
+  :adr/date "2026-08-11"
+  :adr/last_verified "2026-08-11"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/source-format "edn"
+
+  :adr/repos ["orgs/network-awai/net-kotobase-lake"
+              "orgs/kotoba-lang/kotobase-lake"
+              "orgs/kotoba-lang/columnar"
+              "orgs/kotoba-lang/org-apache-parquet"
+              "orgs/network-awai/net-kotobase"]
+
+  :adr/authoritative_for
+  ["datalake 面をサービス化する経路の設計判断（別 Worker / catalog は動かさない / 新方言を作らない）"
+   "同期 columnar スキャンを非同期ホストで走らせる方法（prefetch trampoline）とその実測値"
+   "format library 群の CI 空白（ADR-2608054000 P4）の解消と、その過程で実測した fleet の 2 つの事実"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/amends ["adr-2608054000-kotobase-datalake-remaining-gaps（P4 のうち format library 分を解消。P3/P5 は未着手のまま）"]
+  :adr/related
+  ["adr-2608054000-kotobase-datalake-remaining-gaps（残ギャップ台帳。本 ADR の出発点）"
+   "adr-2608042000-kotobase-lake-format-agnostic-object-catalog（catalog の設計）"
+   "adr-260726-kotobase-query-plane-is-one-ref（join 到達範囲 = ref 1 本。catalog を動かさない根拠）"
+   "adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog（byte を datom 面に載せない）"
+   "adr-2608051000（1 repo = 1 capability。別 Worker にする根拠）"
+   "adr-2608100100-s3-kotobase-net-object-plane-deployed-commit-cost（object plane の初回 deploy と head 共有の contention）"
+   "adr-2607310900（hydrate が応答時間の 92%）"]
+
+  :adr/decision-summary
+  "{:verdict :engine-was-complete-service-was-not, :landed [:fleet-ci-gates-6-repos :prefetch-trampoline :async-half :west-registration], :not-landed [:worker-shell :deployment :hostname], :design {:surface :not-a-new-dialect, :mechanism :supplies-source-to-existing-sparql-handler, :deployment :own-worker, :catalog :stays-on-tenant-ref}, :measured {:trampoline-rounds 4, :bytes 1627, :of 2427, :row-groups-read 1, :row-groups-pruned 2, :sync-async-parity true}, :fleet-facts {:jvm-cap :correct-but-only-inside-gate-env, :zebulun :all-egress-lost}, :ci {:before :none, :after :6-repos-jvm-test, :measured \"210 tests / 735 assertions on a real node\"}}"
+
+  :adr/verify
+  ["fleet gate 登録前の実測（実ノードへ配って実行）: columnar 36/115・org-apache-parquet 34/163・org-apache-arrow 40/130・org-apache-avro 14/32・kotobase-lake 76/257・org-ietf-csv 10/38 = 210 tests / 735 assertions、0 failure"
+   "net-kotobase-lake: clojure -M:test => Ran 4 tests containing 15 assertions, 0 failures 0 errors（JVM、実 pyarrow fixture）"
+   "async parity: nbb で resolve-async を実 Promise 4 本に対して実行 => rounds 4 / bytes 1627 / rows 1 / chunks 1 read 2 skipped、resolve-sync と一致"
+   "trampoline の実レンジ: [0 4]（先頭 PAR1）/ [2419 2427]（8 バイト tail）/ [897 2419]（footer）/ [319 412]（column chunk 1 本）"
+   "west pin: verify-west-pins が新規 entry 9d6909a8a163 を main から到達可能と判定"
+   "egress 実測 2026-08-11: zebulun は github/maven/npm すべて接続不能、他 9 ノードは 3 つとも 200"
+   "JVM 実測 2026-08-11: 6 ノードすべて `/usr/libexec/java_home` は NONE を返すが、keg-only の /opt/homebrew/opt/openjdk（26.0.1）が在り tick.cljs:543 がそこを JAVA_HOME に export している"]
+
+  :adr/body
+  "# ADR-2608110600: datalake 面をサービスに繋ぐ
+
+**Status**: accepted
+**Date**: 2026-08-11
+
+## Context
+
+オーナー質問（2026-08-11）「今の kotobase.net は datalake としても機能するかな?
+それとも分けた方がいいかな?」。同じ質問が 2026-08-04 にもあり、そのときの答えは
+「storage としては yes、分析クエリ面としては真ん中が無い」で、ADR-2608054000 が
+真ん中を埋めた。
+
+**今回調べて分かった現在地は『エンジンは完成しているが、サービスには載っていない』**
+だった。catalog・枝刈り・pushdown・GROUP BY・schema 進化・snapshot・compaction・
+writer はすべて着地済みで、`kotobase-lake` / `columnar` / parquet / arrow を
+require している Worker は **1 つも無い**。CI も無い（ADR-2608054000 の P4 が
+6 日間開いたまま）。
+
+## Decision 1 — lake は 5 つ目の方言ではない。既存 handler への `:source` 供給者である
+
+`kotobase.protocols.sparql/handle` は**既に prefetch 済みの `:source` を受け取る
+設計になっていた**。docstring がそう書いており、`scan-patterns` は public で、
+その理由まで書いてある —— *the prefetch is the DEPLOY SHELL's job*。
+
+したがって統合は「新しいクエリ面を作る」ことではなく「shell が parse し、
+prefetch し、既存 handler を呼ぶ」ことである。**新方言を足さないので、4 つの
+既存 surface と意味論が drift しない。**
+
+## Decision 2 — 実行は別 Worker に出す。catalog は動かさない
+
+方向が逆に見える 2 つの判断だが、根拠は 1 本ずつある。
+
+- **スキャンは head を要らない。** gate が開いた後は不変オブジェクトへの range
+  読みだけで、ref も CAS も hydrate も要らない。api-gateway 経路は応答時間の
+  92% を hydrate に使っている（ADR-2607310900）ので、そこに同居させると
+  **要らないコストを払うことになる**。加えて `kotobase-protocols-state` の同じ
+  head を既に 3 つの Worker が CAS しており、ADR-2608100100 がそれを将来の
+  contention として記録している。書き込みを要さない問いのために 4 つ目の writer を
+  足すのは逆方向。
+- **catalog は tenant の ref に置いたままにする。** catalog は機械が書き、量が多く、
+  人が join しない —— 別 DB に出したくなる性質が揃っている。しかし
+  `kotobase.core/open` は `:ref-name` を 1 つしか取らず、**join の到達範囲は
+  ちょうど ref 1 本**（ADR-260726）。catalog を動かせば「このオブジェクトを誰が
+  いつ何と主張して入れたか」と tenant データを**二度と join できない**。
+  deploy shell を分けることと data plane を分けることは別で、後者はしない
+  （`net-kotobase-cypher` が R2 binding について記録しているのと同じ規則）。
+
+## Decision 3 — 同期スキャンを非同期ホストで走らせるのは trampoline である
+
+**これが実際に欠けていた 1 個の部品だった。** `columnar` は同期で、これは意図的
+（`IColumnSource` が同期なので `IByteSource` も同期）。Worker の range 読みは
+Promise。`columnar.bytes` の docstring は逃げ道を名指ししている ——
+*the caller pre-fetches into `prefetched` and passes that* —— が、**一番難しい所を
+言っていない: どのレンジを prefetch すべきかは、スキャンが訊くまで分からない。**
+どの column chunk を読むかは projection と、枝刈りを生き延びた row group と、
+footer の中の統計に依存し、そのどれも footer を取って parse するまで分からない。
+
+`columnar.bytes/prefetched` は**短いバイト列を返さず `:columnar/missing-range` を
+投げる**。これがスキャンを再開可能な計算にする: 走らせ、miss を捕まえ、その 1 本を
+取り、もう一度走らせる。毎ラウンド必ず終わるか前ラウンドに無かったレンジを足すので
+収束する。`kotobase-r2/with-blocks` が missing block に対して使っているのと同じ形で、
+理由も同じ（非同期ストアの上の同期リーダーと、その継ぎ目としての型付き miss）。
+
+### なぜ「レンジを計算する」ではないのか
+
+footer を parse して枝刈り規則を適用すれば必要な chunk は導ける。それは
+`columnar.stats/skip?` を **`columnar` の外に複製する**ということで、複製は drift する。
+そして drift は最悪の方向に静かである: レンジを**少なく**取ればスキャンは throw する
+（うるさい）が、**古い枝刈り規則のコピー**で取ると本物の planner なら飛ばした chunk を
+読み、**答えは正しいまま range 読みの理由だけが消える**。trampoline は本物の planner に
+訊く。
+
+## 実測（実 pyarrow ファイル、`SELECT price WHERE price = 120`）
+
+| | |
+|---|---|
+| rounds | **4** — 先頭 `PAR1` / 8 バイト tail / それが指す footer / column chunk 1 本 |
+| ranges | `[0 4] [2419 2427] [897 2419] [319 412]` |
+| 取得 | **1,627 / 2,427 バイト** |
+| row group | **1 読み、2 枝刈り** |
+
+**33% という数字を成果として引用しない。** ファイルが 2.4 KB で footer が固定費
+だから小さいだけで、footer はファイルサイズと共に増えないので節約率は大きい
+ファイルほど上がる。**この測定が証明しているのは枝刈りが trampoline を生き延びた
+こと**（3 つのうち 2 つの row group は一度も取得されなかった）であって、33% ではない。
+
+`prefetch.cljc` は「いつループが止まるか」を全部持ち Promise を一切知らないので
+Worker 無しでテストできる。`r2.cljs` は Promise を知り他を知らない。**同期版が
+仕様**で、実ファイルのテストが付いているのはそちら。実 Promise 4 本で非同期版が
+同じ 4 rounds / 1,627 バイトになることを確認した。
+
+## 着地していないもの（正直に）
+
+- **Worker shell は設計のみで、書いていない。** `acquire/source-for` と hydrate 済み
+  catalog を綴じる層。一度書きかけたが、require していない名前空間を参照する
+  コンパイルの通らないコードだったので**捨てた**。
+- **deploy していない。hostname も取っていない。** `wrangler.jsonc` を意図的に
+  置いていない。**authorization gate 無しでオブジェクトのバイトを返す shell を
+  出すのは、何も出さないより悪い。**
+- **gate は `acquire/source-for` の中にあり、trampoline の毎ラウンド走る設計にする。**
+  1 回で済ませないのは、そのほうが安全だから —— 再試行の組み合わせのどれを取っても
+  「gate が拒否したはずの呼び手のためにレンジが取得される」状態が作れない。
+  datom 参照なので安くもある。
+- **P3（transport）と P5（クエリ到達範囲）は手つかず。** 4 MiB 天井、D5 の
+  server-side digest verify、REMOVE 未配線はそのまま。
+
+## CI 空白の解消（ADR-2608054000 P4 のうち format library 分）
+
+6 repo を `scripts/fleet-ci/gates.edn` に `:jvm-test` として登録した。ADR-2608054000 が
+保留していた理由は「`clojure -M:test` が要求する maven 上の Clojure core がノードで
+解決するか未確認」で、**実測して解消した**: 6 repo を実ノードに配って走らせ
+**210 tests / 735 assertions** が green。
+
+### その過程で実測した fleet の 2 つの事実（どちらも定数で持たない）
+
+1. **`:jvm` capability は正しい。ただし gate 環境の中でだけ。** 素の ssh では
+   `java` が PATH に無く `/usr/libexec/java_home` が NONE を返すので「このノードに
+   JVM は無い」と読める —— 実際 6 ノード全部がそう見えた。JDK は keg-only の
+   `/opt/homebrew/opt/openjdk`（26.0.1）に在り、`tick.cljs:543` が `JAVA_HOME` を
+   そこへ export している。**ssh で測ると capability 宣言を誤って疑う。**
+   私はこれを一度誤診して「全 jvm-test gate が実行不能」と結論しかけた。
+2. **zebulun は外向き HTTPS を全て失っている。** github / maven / npm とも curl が
+   接続不能で、他 9 ノードは 3 つとも 200。git 依存を持つ repo はそこで classpath を
+   組めない（org-apache-parquet が実際に `Failed to connect to github.com port 443` で
+   落ちた）。`:caps` が `#{}` なのでスケジューラは jvm 仕事を送らず今は安全だが、
+   **zebulun は receipts 上、歴史的に jvm-test gate を回していたノード**である。
+   fleet-ci README の「ノードは tailnet だけで外向き HTTPS が無い」は**今は
+   zebulun にだけ当たる** —— 全ノードの性質として引用しない。
+
+## この作業中に踏んだ自分の誤り（再発防止のため記録する）
+
+**`gen-west-manifest.cljs --help` を叩いた。** このスクリプトに `--help` は無く、
+未知フラグは無視されるので、これは `--check` 無しの**全面再生成**として走った ——
+CLAUDE.md が「wholesale 再生成 commit は禁止」と名指ししている操作を、共有 checkout に
+対して、しかも 120 秒を超えたので background で。
+
+**被害は無かった。`verify-remote!` が pin 退行を検出して書き込みを拒否した**
+（ai-gftd-cyber-drill / ai-gftd-dougaka / amu / artifact / bonsai ほかが behind）。
+`git status manifest/west.yml` は空のまま。**ガードが設計どおり効いた実例**として
+記録する。教訓は 2 つ: ①CLI の使い方は `--help` を叩いて調べない、ソースを読む
+（未知フラグが no-op として扱われる CLI では `--help` が破壊的操作になりうる）
+②危険な操作を background に送ると、止める機会も失う。"
+
+  :adr/next
+  "1. **Worker shell を書く。** `acquire/source-for` + hydrate 済み catalog + trampoline を
+      綴じ、`sparql/handle` に `:source` を渡す。gate はループ内。
+   2. **`test/async_parity_check.cljs` を `:nbb-script` gate として登録する。** 今は手で
+      走らせている。同期版は `:jvm-test` で守られたが、非同期版はまだ守られていない。
+   3. **deploy は workers.dev で先に証明してから hostname を付ける**
+      （`net-kotobase-cypher` の wrangler.jsonc が記録している順序。custom domain は
+      1 Worker のもので、最後に deploy した方が勝ち、どちらにも通知されない）。
+   4. **zebulun の egress を直すか、`:caps` に egress を明示する。** 今は `#{}` が
+      偶然守っているだけで、`:jvm` を足した瞬間に git 依存 gate が落ちる。
+   5. P3（4 MiB 天井の畳み方 / D5 digest verify / REMOVE）と P5（planner が
+      catalog と行を跨げない件）は ADR-2608054000 のまま未着手。"}]
