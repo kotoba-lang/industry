@@ -134,7 +134,7 @@ cockpit で、判断の実行は常駐側にある（cloud-murakumo の organism
 `git add` を `data` / `journal` / `raw` に限るのは、共有 checkout で別セッションが
 `src/` を編集している最中に常駐が回ると `-A` が他人の WIP を commit するため。
 
-### 承認キューへの経路は未提供（2026-08-11 実測）
+### 承認キューへの経路 —— ingress を作った（2026-08-11、未デプロイ）
 
 **cloud-itonami に effect を外から作る公開経路は無い。** `POST /api/{org}/{repo}/effects`
 は 502 で、`effectsOnRequestPost` は approve/reject 専用（routing shim も
@@ -143,10 +143,34 @@ cockpit で、判断の実行は常駐側にある（cloud-murakumo の organism
 144 行）と同型の **narrow ingress `POST /api/{org}/{repo}/noren`** が要る:
 per-tenant の提案専用鍵、`202 proposed` / `200 already-open`、承認は cockpit の人。
 
-client 側はその contract で書いてあり（`NOREN_INGRESS_KEY`）、404/502 は
-「未提供」として journal に残す —— **提案できなかったことを提案したことにしない。**
-server 側（`noren_ingress.cljc` + routing shim + `shadow-cljs release edge-api` +
-KV への鍵 digest 投入）は次の作業。
+**server 側を書いて main に入れた**（`cloud-itonami` `c06c6bba6`）:
+`src/cloud_itonami/noren.cljc`（domain）+ `edge/noren_ingress.cljc` +
+routing shim + `effects_endpoints` への handler 登録 + 7 tests/28 assertions。
+kaizen と 2 点だけ意図的に違う:
+
+- **effect の risk は `:external-send`。** 承認は第三者に届くことを認める行為で、
+  `:read-only` と書けばそれは嘘になる（kaizen は逆に、内容そのものが合意だった）
+- **測定軸を 1 つも名指ししない提案は 400 で拒否する。** loop の governor が既に
+  拒否しているが、その検査は呼び出し側に在る。何も測らずに事業者へ連絡することは
+  この loop が存在する理由そのものなので、受け取る側でも閉じる
+
+**承認しても送信しない。** 受信拒否リストと特定電子メール法 4 条の送信者表示と、
+その両方を再検査する governor は loop のノードに在る。edge が送ると
+『出してよいか』を決める場所が 2 つになり、必ずずれる。
+
+**まだデプロイしていない。** 理由は 2 つとも他人由来:
+
+1. `:local/root` 依存 6 本が west pin からずれており、うち 4 本に**他セッションの
+   未コミット作業**が入っている（langchain / css / mail / drive / bonsai / kototama）。
+   deploy 前フックが正しくブロックした —— ここでビルドした artifact は他人の WIP を
+   本番に載せることになる。**再ビルドした bundle も意図的に commit していない**
+2. その前に `shadow-cljs release edge-api` が**そもそも実行できなかった** ——
+   兄弟 repo が `isic-8291` を `:local/root` と `:git/sha` で別々に宣言しており
+   tools.deps が比較できず classpath の構築ごと落ちていた（runner を変えても同じ）。
+   最上位に 1 本 pin を置いて解消した
+
+残りは「依存を pin に揃える → 再ビルド → verify → deploy → KV に鍵 digest を投入 →
+loop から 1 件通す」。
 
 ### 1 周
 
@@ -268,7 +292,13 @@ etzhayyim actor の面には載せない。
   custody 確認（s3.kotobase.net、bucket `cloud-itonami-loop-noren`）
 - **常駐を install 済み**: `launchctl list` に `cloud.itonami.noren.resident`。
   dry-run で 5 段すべての argv を確認してから bootstrap した
-- 未実行: JVM 側（`clojure -M:test`）。第一 runtime は cljs なので nbb を正とした
+- `cloud-itonami`: noren domain 7 tests / 28 assertions green（JVM）、
+  portable cljs suite 757 tests / 6427 assertions green。edge bundle は
+  `import()` して handler を実際に呼び、KV binding 無しで 503 に fail closed する
+  ことを確認（`verify-edge-bundle` は 7/7）
+- 未実行: JVM 側の全 suite（`test-jvm`）は 9 failures / 40 errors だが、
+  `kaiyu.core` 欠落を含め**この変更の前から赤い**（登録前の run にも同じ失敗が在る）。
+  workspace の品質ゲートの正は portable cljs 側（CLAUDE.md）
 
 ### 実装中に実データが見つけた欠陥 3 件（いずれも直して landed）
 
