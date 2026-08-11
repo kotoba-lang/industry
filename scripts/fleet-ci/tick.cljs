@@ -113,13 +113,16 @@
 (defn sh
   "同期実行。-> {:exit n :out s}（throw しない）"
   ([cmd args] (sh cmd args nil))
-  ([cmd args {:keys [input timeout binary? env-extra] :as o}]
+  ([cmd args {:keys [input timeout binary? env-extra cwd] :as o}]
    (try
      (let [out (cp/execFileSync cmd (clj->js (vec args))
                                 (clj->js (cond-> {:maxBuffer (* 256 1024 1024)
                                                   :timeout (or timeout 600000)}
                                            (not binary?) (assoc :encoding "utf8")
                                            input (assoc :input input)
+                                           ;; placement の tools.deps 解決など、checkout
+                                           ;; 固有の command は呼び側の cwd を保つ。
+                                           cwd (assoc :cwd cwd)
                                            ;; token は env で子にだけ渡す（argv に出さない
                                            ;; = ps で見えない）
                                            env-extra (assoc :env (js/Object.assign

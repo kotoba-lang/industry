@@ -198,7 +198,9 @@
   cache identity に含める。"
   [root st]
   (when st
-    [(path/resolve root) (.-mtimeMs st) (.-size st)]))
+    ;; v2: subprocess wrapper が :cwd を伝播する。v1 cache は root の deps を
+    ;; murakumo のものとして保存し得たため、同じ checkout でも再利用しない。
+    [:v2 (path/resolve root) (.-mtimeMs st) (.-size st)]))
 
 (defn murakumo-classpath
   "murakumo の解決済み classpath。`clojure -Spath` は実測で約 10 秒かかるので、
