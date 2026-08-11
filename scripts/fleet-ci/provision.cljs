@@ -5,13 +5,14 @@
 ;; 14 repo の gate が事実上直列だった。CI として使うにはノード側 toolchain を
 ;; 増やす必要がある — その部分だけを冪等に行う（murakumo 本体の
 ;; `bb murakumo provision`（kotoba-server mesh node の設置）とは別物・非干渉。
-;; ここで入れるのは homebrew の clojure/openjdk/node だけで、常駐 agent は
+;; ここで入れるのは homebrew の clojure/openjdk/node/zig だけで、常駐 agent は
 ;; 一切増やさない = murakumo の「ノードには kotoba バイナリ2本以外置かない」
 ;; 方針と衝突しない）。
 ;;
 ;; 使い方:
 ;;   nbb scripts/fleet-ci/provision.cljs --hosts judah,simeon --need jvm
 ;;   nbb scripts/fleet-ci/provision.cljs --hosts benjamin --need jvm,node
+;;   nbb scripts/fleet-ci/provision.cljs --hosts judah,benjamin --need zig
 ;;   nbb scripts/fleet-ci/provision.cljs --from-nodes --need jvm   ;; nodes.edn の
 ;;       reachable かつ空き 8GB 以上で :jvm を持たないノードを対象にする
 ;;   nbb scripts/fleet-ci/provision.cljs ... --dry-run
@@ -66,22 +67,31 @@
     ["set -u"
      "export PATH=/opt/homebrew/bin:/usr/local/bin:$PATH"
      "export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1"
-     "command -v brew >/dev/null || { echo 'NO-BREW'; exit 3; }"]
+     "command -v brew >/dev/null || { echo 'NO-BREW'; exit 3; }"
+     (str "install_formula() { formula=\"$1\"; brew list \"$formula\" >/dev/null 2>&1"
+          " && { echo \"STEP $formula already-present\"; return 0; };"
+          " brew install --quiet \"$formula\"; rc=$?;"
+          " echo \"STEP $formula exit=$rc\"; [ \"$rc\" -eq 0 ] || exit \"$rc\"; }")]
     (when (contains? needs :jvm)
       ;; clojure formula は openjdk を依存として引くので clojure だけで足りる。
       ;; 既に入っていれば brew は no-op（冪等）。
       ["echo '--- clojure/openjdk'"
        ;; 失敗を黙って飲まない: 実測で clojure の install が一部ノードで落ちていたのに
        ;; openjdk だけ入って「provision 成功」に見えていた（|| で繋いだ結果 exit 0）。
-       "brew list clojure >/dev/null 2>&1 || brew install --quiet clojure; echo \"STEP clojure exit=$?\""
-       "brew list openjdk >/dev/null 2>&1 || brew install --quiet openjdk; echo \"STEP openjdk exit=$?\""])
+       "install_formula clojure"
+       "install_formula openjdk"])
     (when (contains? needs :node)
       ["echo '--- node'"
-       "brew list node >/dev/null 2>&1 || brew install --quiet node; echo \"STEP node exit=$?\""])
+       "install_formula node"])
+    (when (contains? needs :zig)
+      ["echo '--- zig'"
+       "install_formula zig"])
     ["echo '--- verify'"
      "echo clojure=$(command -v clojure)"
      "for j in /opt/homebrew/opt/openjdk /opt/homebrew/opt/openjdk@26; do [ -x \"$j/bin/java\" ] && echo javahome=$j && break; done"
      "echo node=$(command -v node)"
+     "echo zig=$(command -v zig)"
+     "echo zigv=$(zig version 2>/dev/null)"
      ;; 実際に JVM が起動するかまで確かめる（PATH に居るだけでは gate は通らない）
      "if [ -x /opt/homebrew/opt/openjdk/bin/java ]; then JAVA_HOME=/opt/homebrew/opt/openjdk /opt/homebrew/opt/openjdk/bin/java -version 2>&1 | head -1; fi"])))
 
@@ -99,7 +109,7 @@
                        (filter #(>= (or (:free-gb %) 0) 8))
                        (remove #(every? (:caps % #{}) needs))
                        (mapv :host)))
-                :else (do (println "usage: --hosts a,b | --from-nodes  [--need jvm,node] [--dry-run]")
+                :else (do (println "usage: --hosts a,b | --from-nodes  [--need jvm,node,zig] [--dry-run]")
                           (js/process.exit 2)))
         script (install-script needs)]
     (println "provision" (pr-str needs) "->" (str/join "," hosts))
@@ -114,7 +124,7 @@
                 ;; STEP 行・Error 行・verify 出力は必ず見せる（take-last だけだと
                 ;; brew の進捗表示に押し流されて失敗を見落とす）
                 (doseq [l (str/split-lines (str/trim out))]
-                  (when (re-find #"STEP |Error|error:|javahome=|clojure=|node=|openjdk version" l)
+                  (when (re-find #"STEP |Error|error:|javahome=|clojure=|node=|zig=|zigv=|openjdk version" l)
                     (println "   " l)))
                 (p/recur more))))
           (p/then (fn [_] (println "\ndone — now re-run: nbb scripts/fleet-ci/probe.cljs")))))))

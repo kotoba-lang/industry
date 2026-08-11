@@ -12,6 +12,7 @@
 ;;               → node cap :node 必須
 ;;   :nbb-script gates/ 配下の nbb script をノードに配って repo tree に対して回す
 ;;               → node cap :node 必須
+;;               :cap を明記した場合はその capability を要求する（例 :zig）
 ;;
 ;; org は west.yml の remote から解決するのでここには書かない（drift 防止）。
 {:policy "fleet-ci/tip-verify/v1"
@@ -594,6 +595,19 @@
   {:name "amu" :id "amu-jdk-free" :gate :nbb-script
    :script "gates/kotoba-compiler-jdk-free-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 60 :cd false}
+
+  ;; Amu Windows loader の cross-build qualification。Windows 実行を装わず、
+  ;; reviewed C source を明示的に qualified な Zig 0.15.2/0.16.0 Clang で
+  ;; x86-64 と Arm64 に各2回 buildし、byte identity と PE32+ machine field を
+  ;; repo 自身の verifier で見る。未知 version は fail-closed。
+  ;; :cap :zig により toolchain を実測登録した node にしか割り当てない。
+  ;; `.c` と `.cljs` の 76 tracked files を送り、70 を extraction floor にする。
+  ;; **落ちることを確認済み**（2026-08-11）: `_WIN32_WINNT` guard を外して
+  ;; 元の二重定義 defect に戻すと Zig/Clang -Werror で exit 1。無改変は local
+  ;; Zig 0.15.2 と judah/benjamin の Zig 0.16.0 の両方で exit 0。
+  {:name "amu" :id "amu-windows-loader-cross" :gate :nbb-script :cap :zig
+   :script "gates/amu-windows-loader-cross-check.cljs"
+   :include-ext [".c" ".cljs"] :min-files 70 :cd false}
 
   ;; etzhayyim/global-legislation-datoms の corpus 投影（ADR-2608041800）。
   ;; 世界の法令 95,194 件 + 依存辺 646,468 本を 42 シャードに投影したもので、
