@@ -203,6 +203,52 @@
      "repository-wide に production C loader の参照が 0。残す移行 fixture があれば legacy と機械判定される"
      "clock-v1 の後、同じ sealed host ABI で残り 8 capability を移す"]}]
 
+  :adr/addendum-2026-08-11-aiueos-authority-correction
+  {:status "accepted; supersedes the Linux-first production sequence in the preceding addendum"
+   :finding
+   "`kotoba-lang/aiueos` を先に引かなかったため、C-free OS substrate を新規に
+    設計しようとした。これは ADR-2608110100 が記録した『不在の証明に弱い証拠を
+    使う』誤りの再発である。authority を確認すると、aiueos ADR-0013 は既に
+    production bare-metal から C / libc / CRT / JVM / Linux / hosted supervisor /
+    foreign object を除く hard flip を決定し、compiler は既に
+    `x86_64-aiueos-user-v1` の C-free ELF64 user image と capability syscall
+    trampoline を持っていた。`aiueos.vm` / `aiueos.hvt` は VM/VMM 面、
+    `os/aiueos` は bare-metal OS 面である。`kotoba-lang/os` は移管された旧
+    application-OS 資料で、この native authority ではない。"
+   :decision
+   "effect native の production 経路は Linux hosted kexe/tender を置換する新経路
+    ではなく、既存 aiueos C-free user-process ABI を成熟させる。
+
+      Amu / kotoba-native
+        -> x86_64-aiueos-user-v1 ELF (C-free, RX + RW/NX)
+        -> aiueos CPL3 process
+        -> typed capability-handle syscall
+        -> aiueos capability broker / named provider
+
+    `tender-native` と C kexe-loader は hosted compatibility / regression reference に
+    降格し、その実行結果を production native qualification evidence に数えない。
+    provider transport を stdio text protocol として C loader に足さない。
+    clock-v1 は既存 user context の capability trampoline を typed request/result の
+    宣言順 pair-chainへ拡張し、aiueos kernel が capability ID・handle generation・
+    owner domain・rights・descriptor・全 range を再検査して provider へ渡す。"
+   :ownership
+   {:compiler ["amu" "kotoba-kir" "kotoba-verifier" "kotoba-native"]
+    :os-authority "kotoba-lang/aiueos"
+    :vm-evidence ["aiueos.vm" "aiueos.hvt" "QEMU/OVMF smoke"]
+    :hosted-reference "tender-native + legacy kexe-loader"
+    :not-authority ["kotoba-lang/os" "a newly invented Linux supervisor"]}
+   :revised-sequence
+   ["x86_64-aiueos-user-v1 の既存 package-user / syscall trampoline / process loader を基準として測る"
+    "clock-v1 request/result を user RW/NX arena の pair-chain として seal する"
+    "aiueos に typed capability syscall と clock provider dispatch を実装する"
+    "実 C-free UEFI→kernel→CPL3 process の QEMU semantic vectorを positive/negative で通す"
+    "receipt の c_sources/foreign_objects/imports/dynamic_dependencies が全て空であることを gate にする"
+    "同じ ABI を残り 8 capability と AArch64 user processへ広げる"]
+   :discarded-work
+   "2026-08-11 に作った generic Linux ET_EXEC bootstrap はローカルで AArch64 exit=42、
+    static/no-dynamic-executable まで実測したが、aiueos authority 発見後は production
+    変更として push/land しない。既存機能の再発明を成熟度と数えない。"}
+
   :adr/consequences
   "## 引き継ぎ先が触る repo と役割（混同しやすいので明示）
 
