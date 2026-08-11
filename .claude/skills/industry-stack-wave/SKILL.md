@@ -45,8 +45,17 @@ tick の ledger 最終行 `~/.gftd/industry-stack-wave-tick.ledger.edn` の
    - シナリオに **HARD hold ≥1**
    - `docs/samples/operator-console.html` 生成
    - `:render-html` alias + 必要なら jp-go-dds
+   - **`-main` は `:governor-hold` が 0 件なら書かずに throw する**
+     （HARD hold 要件を規約でなく build-time の不変条件にする。isic-2513 が先例）
 3. `main` に既に REAL があれば **検証のみ**で `:outcome :skipped-already-real`
 4. **push only**（merge / force-push / 新規 Actions 禁止）
+
+**決定性チェックの scratch は `mktemp -d` を使う。`/tmp/run1.html` のような
+固定パスを使わない。** wave は 20 本並列で走るので、固定パスは兄弟 agent と
+衝突する。実測 Wave 5: 20 本中 4 本が「決定性が無い」と誤検出した——中身は
+別 isic の console だった（isic-2022 が isic-5012 を、isic-4520 が isic-5120 を
+上書き）。全数 `mktemp -d` で再検証して byte 一致だったので成果物は無事だが、
+**偽陽性は「再現性が無い」という最も調べにくい形で出る。**
 
 ### 2. orchestrator が着地（直列）
 
