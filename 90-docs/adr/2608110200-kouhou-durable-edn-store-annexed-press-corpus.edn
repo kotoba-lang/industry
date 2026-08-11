@@ -1,5 +1,5 @@
 [{:db/id -1
-  :adr/id "ADR-2608110100"
+  :adr/id "ADR-2608110200"
   :adr/title "kouhou の press corpus を永続化する — canonical EDN は git、feed の bytes は annex で s3.kotobase.net"
   :adr/status "accepted"
   :adr/date "2026-08-11"
@@ -140,6 +140,32 @@
    test は**落ちる方**を assert する（2 ファイルのうち 1 バイト書き換えた方だけが
    `:mismatch` で返ること）。常に ok を返す検査器は、何も検査しない検査器と区別が
    付かない。
+
+   ## west.yml の entry が 3 秒後に revert された（lost update）
+
+   `40d0488` で kouhou を dataset 登録し pin を 8e34825 に進めた **3 秒後**、
+   fleet-ci の `db5aadc` が **merge 前に読んだ base から west.yml を書き**、
+   自分の 1 行（net-kotobase の pin 前進）に **kouhou の 4 行ロールバック**
+   （pin が 767a19b へ、`datalad: true` と `annex-remote` が消える）を巻き込んだ。
+
+   **wholesale 再生成ではない。lost update である。** `--entry` は当該 entry だけを
+   作り直すが、**書き出すのはファイル全体**なので、read と commit の間に landed した
+   他の entry は静かに消える。commit message は net-kotobase としか言わず diff は
+   4 行なので、**パイプラインの誰も報告しない**。`a23e7bd` で再適用し、その後 4 件の
+   west.yml commit を跨いで残っていることを確認した。
+
+   CLAUDE.md は既に『wholesale 再生成 commit は禁止』（事故 `90852b86`）と書いているが、
+   **`--entry` を使っていても窓は残る**。塞ぐなら書き込み側を optimistic lock に
+   する（GitHub API single-entry commit が構造的に conflict しないのはこのため）か、
+   生成器が書き出し直前に base の再読み込みと差分確認をする。**今回はやっていない。**
+
+   ## ADR 番号が衝突した
+
+   `ADR-2608110100` は同日 09:11 に別セッションが取っていた（「『書いてある』は
+   『在る』ではない」）。本 ADR は 10:12 に**同じ番号で landed し**、closing で
+   `ADR-2608110200` に改番した。`:adr/id` は datom 面の識別子なので、重複は
+   『2 entity が同じ id を主張する』状態を作る。**番号の採番に排他が無い**
+   （ファイル名の日時 prefix を各自が付ける）ので、並行セッションでは再発する。
 
    ## まだ無いもの（正直に）
 
