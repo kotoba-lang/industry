@@ -1,32 +1,34 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 18691,
-  "app-aozora-appview" 15942,
-  "app-aozora-spa" 8258},
+ {"app-aozora-pds" 15517,
+  "app-aozora-appview" 13143,
+  "app-aozora-spa" 6800},
  :zone
- {:requests-7d 1056141,
-  :pageviews-7d 6426,
-  :uniques-7d-sum 970,
+ {:requests-7d 907842,
+  :pageviews-7d 5579,
+  :uniques-7d-sum 804,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 945495}
-   {:path "/federation-pilot/did.json", :requests 132}
-   {:path "/minidrama-fedtest/did.json", :requests 83}
-   {:path "/xrpc/com.atproto.sync.getRepo", :requests 77}
+  [{:path "/v1/datoms", :requests 945978}
+   {:path "/federation-pilot/did.json", :requests 127}
+   {:path "/minidrama-fedtest/did.json", :requests 86}
+   {:path "/xrpc/com.atproto.sync.getRepo", :requests 81}
    {:path "/hito-diag-fed/did.json", :requests 72}
-   {:path "/hito-federates/did.json", :requests 65}
+   {:path "/hito-federates/did.json", :requests 70}
    {:path
     "/bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4eq3q5k2optwu446juce4",
-    :requests 62}
-   {:path "/hito-verify-clean/did.json", :requests 60}],
-  :status-mix {:client-error 14872, :ok 947321, :server-error 9352},
+    :requests 65}
+   {:path
+    "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
+    :requests 61}],
+  :status-mix {:client-error 15093, :ok 947848, :server-error 10034},
   :window "24h"},
- :as-of "2026-08-10",
+ :as-of "2026-08-11",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 945495 · /federation-pilot/did.json 132 · /minidrama-fedtest/did.json 83 · /xrpc/com.atproto.sync.getRepo 77 · /hito-diag-fed/did.json 72 | 4xx(probe) 2% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 945978 · /federation-pilot/did.json 127 · /minidrama-fedtest/did.json 86 · /xrpc/com.atproto.sync.getRepo 81 · /hito-diag-fed/did.json 72 | 4xx(probe) 2% · 5xx 1%",
  :signal
- "aozora.app 実測 1056141 req/7d・970 uniques(日次和)・うち4xx probe 2%(24h)、workers 42891 inv/7d"}
+ "aozora.app 実測 907842 req/7d・804 uniques(日次和)・うち4xx probe 2%(24h)、workers 35460 inv/7d"}
