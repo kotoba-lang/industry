@@ -39,7 +39,11 @@
             ["node:os" :as os]
             ["node:path" :as path]
             [cljs.reader :as reader]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            ;; placement authority は murakumo.task.plan（ADR-2608111721 決定 1）。
+            ;; この ns はもう配置を決めない —— `placement/assign` が murakumo へ
+            ;; 委譲する（EMA cost は入力の順序付けとして残る）。
+            [placement :as pl]))
 
 ;; ---------------------------------------------------------------------------
 ;; args / paths
@@ -702,64 +706,19 @@
 
 ;; ---------------------------------------------------------------------------
 ;; node 割り当て
-
-(defn slots
-  "cap を満たすノードから (host 反復) の slot 列を作る。JVM 可能ノードは JVM gate の
-  ために温存したいので、:node gate は非 JVM ノードを優先して埋める。"
-  [nodes cap]
-  (let [ns (filter #(and (:reachable? %) (contains? (set (:caps %)) cap)) nodes)
-        ns (if (= cap :node)
-             (sort-by #(if (contains? (set (:caps %)) :jvm) 1 0) ns)
-             ns)]
-    (vec (mapcat (fn [n] (repeat (:max-parallel n 1) n)) ns))))
-
-;; ---------------------------------------------------------------------------
-;; 負荷とコストの自動計算
 ;;
-;; 以前の assign は `(mod i (count slots))` の round-robin で、**ノードの空きも
-;; gate の重さも見ていなかった**。10 コアで暇なノードと、他用途（推論・マイニング）
-;; が張り付いているノードに同じ本数を配るので、遅いノードが batch 全体の完了時刻を
-;; 決めてしまう（batch は全 slot の完走を待つ）。
+;; **配置はここに無い。** ADR-2608111721 決定 1（オーナー判断 2026-08-11）で
+;; placement authority は `murakumo.task.plan`（`:task-plan` KIR に載った Kotoba の
+;; 決定核）に一本化した。この ns が持っていた LPT / slots / node-speed / EMA cost は
+;; `scripts/fleet-ci/placement.cljs` に移り、`placement/assign` が murakumo へ委譲する。
 ;;
-;; ここでは 2 つを実測して、makespan（最後の gate が終わる時刻）を縮める:
-;;   - ノードの空き容量: cores / free-gb / **live の load1**
-;;   - gate の重さ: 過去の実測時間の EMA（~/.gftd/fleet-ci-cost.edn）
-;; そのうえで LPT（重い順に、投入後の完了時刻が最小の slot へ）で並べる。
-;; LPT は makespan の古典的近似で、round-robin と違って「重い gate が同じ slot に
-;; 偶然固まる」ことが起きない。
-
-(def cost-path (path/join (os/homedir) ".gftd" "fleet-ci-cost.edn"))
-
-(def default-cost-s
-  ;; 実測が無い gate の初期値。桁が合っていればよい（LPT は順序しか使わない）。
-  {:jvm-test 600 :nbb-test 180 :nbb-script 120})
-
-(defn read-costs []
-  (try (reader/read-string (str (fs/readFileSync cost-path "utf8")))
-       (catch :default _ {})))
-
-(defn record-cost!
-  "batch の実測秒を、その batch の各 gate に EMA で反映する。
-
-  **これは上界であって gate 単体の時間ではない** — batch 内の gate は並列に走り、
-  batch の所要時間は最も遅い 1 本で決まる。LPT は相対的な重さしか使わないので
-  上界で足りる。絶対値として引用しないこと。"
-  [gate-ids elapsed-s]
-  (let [costs (read-costs)
-        upd (reduce (fn [m id]
-                      (let [{:keys [ema-s n] :or {ema-s elapsed-s n 0}} (get m id)]
-                        (assoc m id {:ema-s (js/Math.round (+ (* 0.7 ema-s) (* 0.3 elapsed-s)))
-                                     :n (inc n)
-                                     :bound :batch-upper})))
-                    costs gate-ids)]
-    (try (fs/mkdirSync (path/join (os/homedir) ".gftd") #js {:recursive true})
-         (fs/writeFileSync cost-path (str (pr-str upd) "\n"))
-         (catch :default _ nil))))
-
-(defn cost-of [costs w]
-  (or (:ema-s (get costs (keyword (or (:id w) (:name w)))))
-      (get default-cost-s (:gate w))
-      180))
+;; EMA cost は捨てていない —— **placement の決定器から入力の順序付け器へ降りた**。
+;; murakumo の `assign` は与えられた順に greedy least-filled で置くので、cost 降順で
+;; 渡せば LPT と同じ順序付けになる（実測 `placement-parity.cljs`: 101 gate × 8 node で
+;; placed / cap 制約 / unschedulable が一致、makespan は 509s → 389s）。
+;;
+;; 交換に得たのが murakumo の `admit`（満杯・張り付き・到達不能なノードを
+;; :saturated / :unreachable として**理由付きで報告する**）と `why-unschedulable`。
 
 (defn live-load
   "対象ノードの 1 分 load average を実測。取れなければ nil（= 未知として扱い、
@@ -772,68 +731,12 @@
       (when m (js/parseFloat (nth m 1))))
     (catch :default _ nil)))
 
-(defn node-speed
-  "ノードの相対処理能力。大きいほど速い。
-
-  load1 を引くのは、fleet のノードが CI 専用ではなく推論やマイニングと同居して
-  いるため（probe.cljs の :max-parallel のコメントが同じ前提を書いている）。
-  静的な cores だけで配ると、張り付いているノードに同じ本数が飛ぶ。"
-  [n load]
-  (let [cores (max 1 (:cores n 4))
-        busy (min (double cores) (or load 0.0))
-        free-cores (max 0.25 (- cores busy))
-        disk-ok? (>= (:free-gb n 0) 5)]
-    (* free-cores (if disk-ok? 1.0 0.25))))
-
 (defn assign
-  "work を batch に割る。1 batch = 全 slot を 1 周ぶん（= 同時に走る gate 群）。
-
-  round-robin ではなく **LPT**: 重い gate から順に、投入後の完了時刻が最小になる
-  slot へ置く。slot の完了時刻は (積まれたコストの合計 / そのノードの速度) で、
-  速度は cores・free-gb・live load1 から出す。"
+  "配置を murakumo に解かせる。ここは機構だけ（root の解決と子プロセス起動）。"
   [work nodes]
-  (let [costs (read-costs)
-        required-cap (fn [w] (or (:cap w)
-                                 (if (= :jvm-test (:gate w)) :jvm :node)))
-        by-cap (group-by required-cap work)
-        ;; live load は「これから使う候補ノード」だけ測る
-        hosts (into #{} (map :host) (filter #(and (:reachable? %) (seq (:caps %))) nodes))
-        loads (into {} (map (fn [h] [h (live-load h)])) hosts)
-        chunk
-        (fn [items slot-nodes]
-          (if (empty? slot-nodes)
-            (mapv (fn [w] (assoc w :unassigned true)) items)
-            (let [slots' (vec (map-indexed
-                               (fn [i n] {:idx i :node n
-                                          :speed (node-speed n (get loads (:host n)))
-                                          :load 0.0 :queue 0})
-                               slot-nodes))
-                  ;; 重い順（LPT）。同コストは名前順で決定的にする。
-                  ordered (sort-by (juxt (comp - #(cost-of costs %)) :name) items)]
-              (first
-               (reduce
-                (fn [[acc st] w]
-                  (let [c (cost-of costs w)
-                        ;; 投入後の完了時刻が最小の slot
-                        best (apply min-key
-                                    (fn [s] (/ (+ (:load s) c) (max 0.25 (:speed s))))
-                                    st)
-                        best (update best :load + c)
-                        best (update best :queue inc)]
-                    [(conj acc (assoc w :node (:node best)
-                                      :batch (dec (:queue best))
-                                      :est-cost-s c))
-                     ;; 選んだ slot を差し替えて戻す。`assoc … (count st)` は
-                     ;; remove 後の長さを超えるので範囲外になる（conj が正しい）。
-                     (conj (vec (remove #(= (:idx %) (:idx best)) st)) best)]))
-                [[] slots']
-                ordered)))))
-        assigned (vec (mapcat (fn [cap]
-                                (chunk (get by-cap cap) (slots nodes cap)))
-                              (sort (keys by-cap))))]
-    (when (seq loads)
-      (log "placement: " (str/join " " (map (fn [[h l]] (str h "=" (or l "?"))) (sort loads)))))
-    (->> assigned (group-by :batch) (sort-by key) (map second))))
+  (pl/assign work nodes {:root root
+                         :spawn-fn (fn [cmd args opts] (sh cmd args opts))
+                         :log-fn log}))
 
 ;; ---------------------------------------------------------------------------
 ;; landing（append-only receipt log / west.yml pin）— branch + PUT + server merge
@@ -1285,7 +1188,7 @@
                   (log "batch" bi "ci-verify exit" exit
                        (str "(" (js/Math.round (/ (- (js/Date.now) started) 1000)) "s)")))
                 ;; 次回の配分に効かせるため実測を残す（EMA、上界）。
-                (record-cost! (map #(keyword (or (:id %) (:name %))) prepared)
+                (pl/record-cost! (map #(keyword (or (:id %) (:name %))) prepared)
                               (js/Math.round (/ (- (js/Date.now) started) 1000)))
                 (doseq [l (str/split-lines (str/trim out))] (log "  |" l))
                 ;; 追記された receipt を読む
