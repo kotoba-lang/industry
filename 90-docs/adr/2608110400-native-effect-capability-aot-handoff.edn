@@ -158,6 +158,51 @@
      回っていない**。CI で守るなら `scripts/fleet-ci/gates.edn` に足す（ADR-2607300900:
      GitHub Actions は使わない）"
 
+  :adr/addenda
+  [{:date "2026-08-11"
+    :title "C loader を production native TCB から除く"
+    :decider "Jun Kawasaki"
+    :trigger
+    "オーナー判断:『C 依存もなくしたい、安全ではないので』。clock-v1 の最初の
+     実装で `tools/kexe_loader.c` に provider transport / nested codec を足しかけたが、
+     未 commit の段階で全差分を除去した。C の security boundary をさらに太らせる
+     方向は採らない。"
+    :decision
+    "この ADR の『実 native loader プロセス』を、C 製 kexe-loader の継続利用とは
+     解釈しない。production qualification の実行主体は、kotoba-object が直接生成する
+     standalone OS image と、検証済み Kotoba native tender に置き換える。
+
+     Linux は external linker / C compiler / libc を使わない ELF64 `ET_EXEC` とする。
+     kernel が RX/RW segment を直接 map して entry point へ入るため、runtime が動的に
+     code page を RW→RX に変えたり、関数 pointer へ cast したりしない。x86-64 と
+     AArch64 を同じ machine IR から生成する。macOS は Mach-O executable、Windows は
+     PE32+ image を同じ container-owner (`kotoba-object`) から生成する。
+
+     OS 操作は guest が呼べる一般 FFI / raw syscall にしない。tender-native が所有する
+     sealed host module の固定 operation とし、kotoba-verifier が module identity・引数・
+     memory range・effect grant を独立に再導出する。provider の意味は provider kit が
+     所有し、startup template や container encoder に clock/log 等の意味を埋め込まない。"
+    :safety-invariants
+    ["production artifact の build / link / execution に C source、C compiler、libc を要求しない"
+     "guest KIR に pointer arithmetic、任意 load/store、任意 syscall、任意 foreign import を公開しない"
+     "code は file image の RX segment、mutable arena は NX の RW segment。W+X segment を生成しない"
+     "pair/string/vector arena の全 access は overflow 前検査と capacity 検査を通す"
+     "Linux sandbox syscall は closed allowlist で、provider/guest entry より前に固定する"
+     "capability request/result は sealed descriptor と宣言順 pair-chain の双方を検証する"
+     "C loader でだけ通る semantic vector は native qualification evidence として数えない"]
+    :sequence
+    ["kotoba-object の既存 ELF executable / program-header encoder を使い、両 ISA の最小 standalone image を byte-for-byte 再現する"
+     "fuel・trap・bounded arena・closed syscall startup を fixed machine template として image に含める"
+     "clock-v1 の typed request/result codec と provider を sealed Kotoba host moduleとして通す"
+     "C loader と C compiler を PATH から除いた negative environment で runtime-boundary / semantic-vector を実行する"
+     "macOS Mach-O / Windows PE を同じ不変条件へ移し、最後に C loader source・source hash・sanitizer/fuzzer 専用経路を production gate から除く"]
+    :completion
+    ["native qualification evidence の executable は C-free image である"
+     "compiler/linker/libc 不在の環境で build と実行が green"
+     "ELF/Mach-O/PE の segment permissions mutation と syscall allowlist mutation が fail closed"
+     "repository-wide に production C loader の参照が 0。残す移行 fixture があれば legacy と機械判定される"
+     "clock-v1 の後、同じ sealed host ABI で残り 8 capability を移す"]}]
+
   :adr/consequences
   "## 引き継ぎ先が触る repo と役割（混同しやすいので明示）
 
