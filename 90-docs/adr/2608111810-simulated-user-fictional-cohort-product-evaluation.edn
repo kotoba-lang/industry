@@ -1,0 +1,49 @@
+[{:db/id -1
+  :adr/id "adr-2608111810-simulated-user-fictional-cohort-product-evaluation"
+  :adr/title "ADR-2608111810: simulated-user — 相関付き架空 cohort による製品評価を実在人物の模倣から分離する"
+  :adr/status "accepted"
+  :adr/date "2026-08-11"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["kotoba-lang/simulated-user の責務境界"
+   "架空 categorical persona DAG と Survey/Chatbot/Web/App 評価の R0 contract"
+   "実在人物・PII・説得・targeting・重大意思決定を拒否する安全境界"]
+  :adr/related
+  ["adr-2606111500-hakoniwa"
+   "https://arxiv.org/abs/2608.04205"
+   "https://eu.36kr.com/en/p/3932853833759876"]
+  :adr/decision-summary
+  "{:repo \"kotoba-lang/simulated-user\", :plane :subject, :runtime :portable-cljc, :persona-source #{:synthetic :authored-fictional}, :environments #{:survey :chatbot :web :app}, :formal-output :cohort-aggregate, :minimum-aggregate-size 5, :host-owned-authority #{:llm :network :browser :app}, :prohibited #{:pii :human-grounded :persuasion :political-targeting :credit-decision :employment-decision :insurance-decision :healthcare-decision :eligibility-decision}}"
+  :adr/body
+  "# Context
+
+36Kr の MatrAIx 紹介記事と原論文は、相関を保つ persona 属性、巨大な論理人口、Survey / AI Chatbot / Web / App の4評価環境という有用な構造を示した。一方、この workspace でそのまま実在人物の profile を LLM に演じさせると、`hakoniwa` が明示的に避けている実在人物監視、PII 再識別、個人への意思決定や説得へ境界が滑る。
+
+既存 repo は責務が異なる。`cloud-itonami/hakoniwa` は架空世界の forward simulation と防災・resilience の将来分布、`kotoba-lang/persona` は公開 alias と mail relay、`kotoba-lang/com-surveymonkey` は SurveyMonkey API compatibility、`kotoba-lang/shinka` は population optimization を所有する。製品を架空 cohort で評価する再利用 subject は存在しなかった。
+
+# Decision
+
+public Apache-2.0 repo `kotoba-lang/simulated-user` を subject 面に新設する。MatrAIx の dataset、prompt、task corpus、source code はコピーせず、次の bounded contract を portable `.cljc` で独自実装する。
+
+1. persona schema は明示的な topological order を持つ categorical dependency DAG とする。conditional weight により属性相関を表し、Cartesian product や83億 record を materialize しない。
+2. source は `:synthetic` または `:authored-fictional` のみ。name、email、phone、address、DID、account/user/person ID、government ID、device ID、precise location を dimension として受理しない。`:human-grounded` は R0 で拒否する。
+3. evaluation environment は `:survey` `:chatbot` `:web` `:app` の4つ。LLM、network、browser、app 操作は library が所有せず、`interact` capability を host から注入する。
+4. task purpose は `:product-evaluation` または `:research`、`:decision-impact` は常に `:none`。説得、政治 targeting、与信、雇用、保険、医療、eligibility decision は入力で拒否する。
+5. 正式な結果は cohort aggregate。5件未満は集約を拒否する。個別 trial は実行中の内部値であり、実在人物への予測として公開しない。
+6. 決定論的 RNG と同一 `.cljc` source により JVM / ClojureScript parity を保つ。
+
+# Consequences
+
+- 相関付き架空 persona の bounded sampling と4環境の共通 evaluation contract が得られる。
+- 大規模論理人口を DB に保存せず、必要な cohort だけ生成できる。
+- `hakoniwa` の resilience simulation、`persona` の identity alias と責務が混ざらない。
+- R0 は実在データに対する妥当性を主張しない。架空 cohort の出力を市場調査や人間評価の代替証拠として扱ってはならない。
+- 実装 PR #1 は JVM / ClojureScript とも 7 tests / 16 assertions green、default branch fresh clone でも再検証済み。
+
+# Rejected alternatives
+
+- `hakoniwa` に追加: 時系列世界 simulation と単一製品 interaction evaluation は state/authority/output が異なるため却下。
+- `persona` に追加: 本体識別子を隠す alias library に疑似ユーザー属性を入れると privacy invariant を壊すため却下。
+- Persona-8B 全件を mirror: データ由来・同意・再識別境界を検証しておらず、R0 に不要なため却下。
+- LLM adapter を内蔵: model/network authority と純粋な評価 contract が結合するため却下。"}]
