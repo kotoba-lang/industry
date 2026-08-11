@@ -99,6 +99,23 @@
   ;; Measured 2026-08-05: all 10 reachable nodes get 200 from github/maven/npm.
   {:name "kotoba-selfhost-contracts" :gate :jvm-test :cd true}
 
+  ;; Kotoba language Q9 Wave 1 / Tranche 1 soak. GitHub Actions is disabled;
+  ;; these ten independent repository-local oracle tests are the executable
+  ;; evidence consumed by kotoba-lang/scripts/collect-q9-soak.bb. Each tip
+  ;; change produces a signed append-only murakumo receipt. Keep :cd false:
+  ;; passing the pilot does not authorize consumer cutover or automatic pin
+  ;; movement; the Q9 soak gate remains the explicit authority boundary.
+  {:name "com-aadhaar" :gate :jvm-test :cd false}
+  {:name "com-aave" :gate :jvm-test :cd false}
+  {:name "com-abb-robotics" :gate :jvm-test :cd false}
+  {:name "com-accela" :gate :jvm-test :cd false}
+  {:name "com-accelbyte" :gate :jvm-test :cd false}
+  {:name "com-ach-network" :gate :jvm-test :cd false}
+  {:name "com-acorrd-standards" :gate :jvm-test :cd false}
+  {:name "com-acquia" :gate :jvm-test :cd false}
+  {:name "com-adobe" :gate :jvm-test :cd false}
+  {:name "com-aftership" :gate :jvm-test :cd false}
+
   ;; hirameki-patents は**コードではなくデータ**の repo。gate が検査するのは
   ;; 「テストが通るか」ではなく「公開した corpus がバイトと問いの両方で健全か」——
   ;; shard の CIDv1 と件数合計（verify）、datom として transact して答えられるか、
