@@ -131,7 +131,41 @@ universe に対する `bit-xor`（こちらは backend と無関係に意味的�
 診断が op 名を出さず `:kotoba/internal-error` としか言わないため、per-op の bisect が
 必要だった（T3.1 が全 reject に code を求めている理由の実例）。
 
-### 6. 文書を現在地に合わせる
+### 6. 決定を出荷し、呼び手と gate を付けた（同日）
+
+**着地した 2 つは、私が批判したのと同じ形をしていた** —— 事実表に読み手が無かったのと
+同様に、**決定に呼び手が無く**、しかも**何も出荷していなかった**（両テストとも test 時に
+source からコンパイルしていた）。
+
+| | |
+|---|---|
+| `resources/kotoba/selfhost/oracle/*.kir.edn` | 出荷物（production が load する） |
+| `kotoba.selfhost.oracle` | load して呼ぶ |
+| `kotoba.selfhost.analyzer` | **host 側 traversal**（op を畳んで mask にする） |
+| `kotoba selfhost analyze` | **外部 consumer**（kotoba-lang/kotoba#458） |
+
+`kotoba-kir` は **runtime 依存**、`amu` は test-only（production classpath に無い）。
+artifact が無ければ host 実装に fallback せず **throw する** —— 黙った fallback は
+「出荷した決定」が別物にすり替わる経路であり、この repo は一度それで analyzer を失っている。
+
+**gate が見えなかった失敗**: `.kotoba` を編集して `clojure -M:test:gen` を忘れると、
+**production は古い決定を実行し続けるのに、source からコンパイルする既存テストは全部通る**。
+一方向で無音。着地前に確認済み。
+
+### 7. gate を実ノードで緑にした
+
+**fleet-ci gates.edn に登録**（`scripts/fleet-ci/gates.edn`、GitHub Actions は使わない）。
+`:include-ext` を付けない —— drift test が `kotoba/*.kotoba` をディスクから読むので、
+`.edn` に絞ると **artifact だけ配って source を配らず、gate が別の理由で落ちる**
+（`root-permit-index` が標準的な実例）。
+
+実測 2026-08-11T07:24:12Z、node **judah**:
+`Ran 33 tests containing 284726 assertions. 0 failures` / receipt `51f6237acb1e` /
+signer `did:key:z6MkhKgm…`。**コードを書いたマシン以外で走ったのはこれが初めて**で、
+それが gate を「私の手元では通る」と区別する唯一の要素。初回は `--dry-run` なので
+`manifest/fleet-ci.edn` には行が落ちていない（定期 tick が次周で落とす）。
+
+### 8. 文書を現在地に合わせる
 
 `docs/lang/README.md` §Self-Hosting Track を書き換えた（merged: a95195d、PR #409）。
 実行される slice と seed 形状検証を表で分離し、撤去された analyzer が担当していた
@@ -139,7 +173,9 @@ universe に対する `bit-xor`（こちらは backend と無関係に意味的�
 
 ## Consequences
 
-- **self-hosting の現在地は 2 slice（op 分類 / capability admission）。**
+- **self-hosting の現在地は 2 slice、成熟度 `:m4`（gate 実測済み）/ `:m5`（外部 consumer あり）。**
+  追跡は `kotoba-lang/kotoba-lang` の `docs/lang/coverage.edn` `:selfhost` —— README が
+  以前から指していたが**存在しなかったキー**で、今回作った。
   残るのは **effect inference の traversal だけ**で、これは決定ではなく機構であり、
   native gate が collection を取るまで host に残る（＝言語側の作業が先）。
 - **「admit された」を「権限が揃っている」と読まない。** 部分的な権限は admit される。
@@ -176,4 +212,15 @@ clojure -M:run check       ok profile=pure-product effects=#{}
 merged: kotoba-selfhost-contracts#2 (dddc82e) / #3 (2657593)
         kotoba-lang#409 (a95195d) / #410 (fbfa9e0)
 west pins: ed823a9 / 3ddbcde / 0cf1c57 / 9495324
-upstream: kotoba-lang/amu#581 (:js bit-or / bit-not)"}]
+merged: kotoba-selfhost-contracts#4 (4f8e3af) / kotoba#458 (d4bf232)
+        kotoba-lang#412 (941eb11) / #413 (d3de604)
+fleet gate: gates.edn 1de58b9 — judah receipt 51f6237acb1e, 33 tests / 284726 assertions
+upstream: kotoba-lang/amu#581 (:js bit-or / bit-not)
+
+## 残り（正直に）
+
+- **effect inference の traversal は host のまま。** native gate が collection を
+  取るまで動かない —— この repo の作業ではなく言語側の作業。
+- **`:m6` 未達** —— artifact に version contract が無く、consumer は lib のように
+  決定を pin できない。
+- 初回 gate は `--dry-run` なので **receipt がまだ台帳に落ちていない**。"}]
