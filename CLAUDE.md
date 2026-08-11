@@ -220,7 +220,43 @@ GitHub Actions ではない。
 - **gate は「落ちること」を確かめてから landed とする。** 対象を 1 箇所壊したコピーで
   exit 1 になり、無改変で exit 0 になることを実際に見る。落ちない gate は劇場。
 
+### placement を決めるのは murakumo。fleet-ci は「何を検査するか」だけを持つ（2026-08-11、ADR-2608111721）
+
+**オーナー判断（2026-08-11）: placement authority は `murakumo.task.plan` に1本化する。**
+新しい配置ロジック・ノード在庫・入場判定を `scripts/fleet-ci/` に書き足さない。
+
+| 誰が | 何を所有するか |
+|---|---|
+| **murakumo**（`murakumo.task.plan` / `murakumo.fleet.inventory`、`:task-plan` / `:fleet-inventory` KIR 裏付け） | placement・在庫・入場（`admit`）・不能タスクの説明（`why-unschedulable`）・常駐の枠 |
+| **scripts/fleet-ci** | `gates.edn`（何を検査するか）・gate script・署名 receipt・commit status・west pin 前進 |
+
+fleet-ci が持ち続けるものは**全部 credential を要する operator 側の仕事**なので、
+不変条件3（ノードに credential を置かない）のとおりノードへ移さない。移るのは
+placement だけ。ADR-2607300900 の「CI/CD の正本は murakumo fleet であって GitHub
+Actions ではない」は変わらない —— 変わるのは**どう配るかを誰が決めるか**。
+
+**常駐スロットは 2 種で、混ぜない。**
+
+- `:slot/anonymous` — 鍵を持たない。10 ノードどこでも置く（gate・推論・ffmpeg・WASM guest）
+- `:slot/attested` — 書き込み鍵を持つ。**常時稼働の1台に固定し、台数を増やさない。
+  そのホストは `probe.cljs` の `operator-hosts` で gate rotation から外す** ——
+  さもないと repo から送られてきた gate コードを実行するマシンが publish 鍵を持つ
+
+鍵を発行するのは cloud-itonami（actor DID / CACAO / scope を絞った鍵）、**枠を割り当てて
+生存を見るのは murakumo**。常駐の機構は murakumo、常駐する権利は cloud-itonami、
+保管は kotobase —— 判定は 3 問（今夜この機械が眠って何が止まるか / 書き込み鍵を持つか /
+誰の名前で世に出るか）。
+
+**移行期の現在地（2026-08-11）**: 切り替えは未実施。両実装に同じ batch を通して
+assignments が一致することを実測してから切り替える。それまで下記の LPT が正本として
+動き続ける。cost EMA は捨てず、**placement の決定器から入力の順序付け器へ降りる**
+（`plan/assign` は与えられた順に greedy least-filled で置くので、LPT は「tasks を
+cost 降順に並べ替える」という host 側の 1 手に還元でき、Kotoba object を足す必要が無い）。
+
 ### job の配分は自動計算する（round-robin に戻さない）
+
+**⚠ この節は移行期の暫定実装を記述している。新しい配置ロジックの置き場は上記のとおり
+murakumo 側であって、ここではない。**
 
 `tick.cljs` の `assign` は **LPT（重い順に、投入後の完了時刻が最小の slot へ）**で、
 ノードの速度を `cores` / `free-gb` / **live の load1**（`sysctl -n vm.loadavg` を実測）から、

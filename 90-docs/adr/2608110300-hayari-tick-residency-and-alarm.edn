@@ -9,7 +9,8 @@
   :adr/tags "hayari, observatory, fleet-ci, residency, alerting, credentials, honesty"
   :adr/related ["adr-2608103000-hayari-cross-country-attention-observatory"
                 "adr-2608081200-domain-observatory-runner"
-                "adr-2607300900-ci-cd-murakumo-fleet"]
+                "adr-2607300900-ci-cd-murakumo-fleet"
+                "adr-2608111721-placement-authority-is-murakumo-fleet-ci-is-a-gate-consumer"]
   :adr/supersedes ""
   :adr/superseded_by ""
   :adr/authoritative true
@@ -20,7 +21,9 @@
   :adr/body
   "# ADR-2608110300: hayari tick の常駐先と警報
 
-**status: proposed。** これは設計であって、実装済みの記録ではない。
+**status: accepted, implemented。** 決定 A（警報 gate）と決定 B（常駐先の移設）は
+どちらも landed している。ただし決定 B は当初設計の deploy key 経路ではなく
+Radicle 経路で着地した —— 経緯は末尾の追記が正本。
 
 ## 出発点（実測、2026-08-11）
 
@@ -213,7 +216,8 @@ hirameki-harvest / newsfeed-ingest / fleet-ci-tip-tick、うち 3 つが LOADED�
 
 ## 実装状況（2026-08-11）
 
-**段階 1-2 は着地済み。3-5 は未着手。**
+**段階 1-5 すべて landed。** ただし段階 5 は当初設計の deploy key 経路ではなく
+Radicle 経路で着地した（末尾の追記が正本）。
 
 | 段階 | 状態 |
 |---|---|
@@ -221,12 +225,12 @@ hirameki-harvest / newsfeed-ingest / fleet-ci-tip-tick、うち 3 つが LOADED�
 | 2. 落ちることを実測 | ✅ 6 分岐すべて exit code で確認 |
 | 3. 遷移通知を operator 側に | ✅ `hayari-alarm.cljs` + plist、常駐済み |
 | 4. plist を scripts/fleet-ci/ へ | ✅ 移設先（ノード）を向いた plist を house に配置 |
-| 5. 常駐先を移す | 🚫 **オーナー操作待ちでブロック** |
+| 5. 常駐先を移す | ✅ asher（Radicle 経路。GitHub token は移さなかった） |
 
-### 段階 5 がブロックされた理由（2026-08-11 実測）
+### 段階 5 が deploy key 経路では通らなかった理由（2026-08-11 実測）
 
-設計は「`cloud-itonami/hayari` だけに絞った write deploy key」を前提にしていた。
-**その前提が成立しない:**
+設計は「`cloud-itonami/hayari` だけに絞った write deploy key」を前提にしていたが、
+**その前提が成立しなかった:**
 
 ```
 POST repos/cloud-itonami/hayari/keys
@@ -238,32 +242,24 @@ token scopes: gist, read:org, repo  （admin:org が無い = org 設定を変え
 **回避しなかった。** ラップトップの汎用 token（repo scope、全 repo に届く）を
 ノードへ写せば今日にでも動くが、それは**この設計が避けるために存在する
 blast radius の拡大そのもの**である。無人性のために機密性を売ることになる。
+org 設定の反転（org 全体で deploy key を許可する）も同じ取引なので選ばなかった。
 
-### ブロックを解くのに要るオーナー操作（どちらか一方）
+**代わりに Radicle 経路で通した**（末尾の追記が正本）。GitHub は純粋な mirror になり、
+asher が持つのは「この repo を publish する権利」だけになった。
 
-1. **`cloud-itonami` org の deploy key 作成を許可する**（org 設定の 1 トグル）。
-   その後は `bin/tick.cljs` を置く手順が全部自動で通る
-2. **`cloud-itonami/hayari` に絞った fine-grained PAT を作り kagi に入れる**
-   （contents:write）。API では作れないので web UI が要る
+### asher は attested slot なので gate rotation から外す
 
-### いま止まっている場所（再開点）
+`probe.cljs` の `operator-hosts` に `asher` が入っている。asher は publish 鍵を持つ
+常駐 writer なので、**gate コードを実行するマシンであってはならない** —— さもないと
+*repo から送られてきた gate コードを実行するマシンが publish 鍵を持つ* ことになり、
+不変条件 3 は条文だけ守って趣旨で負ける。
 
-ノード側は**鍵まで用意済み**で、登録だけが欠けている:
+一度は空に戻してあった（deploy key 経路が止まっていた間、完了できない移設のために
+gate 容量を人質に取らないため）。Radicle 経路で実際に attested になったので埋めた。
+**9 slot 中 1 slot を失う。それが常駐 writer を fleet に置く実費である。**
+この規則の一般形は ADR-2608111721 の決定 6（`:slot/attested`）。
 
-```
-asher:~/.ssh/hayari_deploy(.pub)   生成済み・mode 600
-asher:~/.ssh/config.hayari         Host github-hayari の定義を書いた
-probe.cljs operator-hosts          #{} に戻した（下記）
-```
-
-### gate 容量を人質にしない
-
-asher を一度 rotation から外し（`:role :operator` で理由も記録した）、
-移設が止まったので**戻した**。`operator-hosts` の仕組みは残し、集合だけ空にしてある。
-**完了できない移設のために 9 slot 中 1 slot を失い続ける理由が無い。**
-credential が用意できたらホスト名を 1 つ入れ、probe を回し直すところから再開する。
-
-### 段階 1-4 で得られたもの（移設が止まっても残る）
+### 段階 1-4 で得られたもの（移設と独立に残る）
 
 - ループが止まれば **gate が落ち、通知が 1 回鳴る**（遷移時のみ）
 - 判定は 1 箇所（gate）にあり、alarm は exit code を見るだけ —— 閾値が
