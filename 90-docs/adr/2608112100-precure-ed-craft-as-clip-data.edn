@@ -1,0 +1,103 @@
+[{:db/id -1
+  :adr/id "adr-2608112100-precure-ed-craft-as-clip-data"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-11"
+  :adr/last_verified "2026-08-11"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "vrm-dance-quality"
+  :adr/tags "net-babiniku, dance, vrm, choreography, camera, expression, co-scientist, quality-ladder, precure"
+  :adr/title "ADR-2608112100: アニメ ED の職人技のうち clip data として書けるものだけを取る — accent layer / storyboard camera / authored face を net-babiniku に着地"
+  :adr/repos ["orgs/network-awai/net-babiniku"]
+
+  :adr/authoritative_for
+  ["net-babiniku の dance clip contract に camera-track / expression-track / accent-track を持たせる決定"
+   "『Precure 品質』という目標を、この medium で表現できる craft とできない craft に切り分ける判断"
+   "smoothness 計測が意図的な accent を jitter と同一視していた問題の解き方（閾値は動かさず、宣言された窓だけ除外する）"]
+
+  :adr/context
+  "オーナー指示（2026-08-11）: YouTube の 速報 チャンネルの動画
+   https://www.youtube.com/watch?v=n8SYxK6buFI （CGWORLD.jp の記事を紹介するもの）を
+   参考に、net-babiniku で同じ quality の dance を生成し公開すること。
+
+   動画の主題は『名探偵プリキュア！』ED「なぜ？謎？！ANSWER」の作り込みで、原典は
+   CGWORLD の全3回のメイキング（335-meitanteiprecure01/02/03）。
+
+   この目標は既に子リポの ADR-0011 が『reference: the Precure opening dance sequence』
+   として設定済みで、VLM 3審制パネルで 1.43/10 と実測されている。ADR-0012 が
+   co-scientist loop と root-translation channel で Rung 2 の振付側を取った。
+   したがって今回の問いは『Precure 品質とは何か』ではなく（それは既に σ 付きの数値）、
+   **CGWORLD が実際に記述している craft のうち、どれがこの medium に載り、どれが載らないか**
+   だった。"
+
+  :adr/decision
+  "3つ取り、1つ取らない。
+
+   取る（clip data として書けるもの）:
+   1. accent layer — 『ステップは固定で、その上に1回だけの遊びが乗る』（アニメーション付け篇）。
+      cos² の bump を1本の bone/axis に、16分の位置へ。位相方向に wrap するので端で値も傾きも
+      0 になり、integer cycles が保証していた loop closure を壊さない。co-scientist に
+      :accent-punch 軸を追加し、**抑制**を報酬にした（1 loop に 2〜5 個が満点、それ以上は減点）。
+      毎拍の accent は遊びではなく単に大きい groove である。
+   2. storyboard camera — 演出篇はほぼ全部これ。ADR-0011 の Rung 2 が
+      camera-framing 2.00/10 のまま開けて残していた半分。framing は演者の身長比で書き、
+      実測した bounds に対して解決するので、1つの storyboard がどの avatar でも同じ絵になる。
+      valid-clip? が camera-track を**必須**にする（固定ミドルショットは戻れる場所であってはならない）。
+   3. authored face — 『1.5秒のカットに4表情』。表情はカットする（クロスフェードしない）。
+      clip が顔を持つ間は演技が主で、会話側の感情は消さず 30% に減衰させる。
+
+   取らない（この medium に載らないもの）:
+   モデリング＆リギング篇（1体18万ポリゴン、上まつ毛の分割、毛先の十字板ポリ、miRA、
+   指の太さの blend shape）。ここの avatar は第三者ライセンスの VRM で（ADR-0012 Act 4）、
+   humanoid profile に指 bone が無い。ADR-0011 の Rung 1 / Rung 4 の領域であって今回ではない。
+
+   新しい clip :dance/mystery-step（seed 20260814、fitness 0.8765、150bpm 8拍 3200ms、
+   128 key、accent 4 個うち1つは16分の11番目、7ショット、6つの表情キー）を CC0 で追加。"
+
+  :adr/consequences
+  "決定論的 ADR-0009 audit は overall 0.943（新 clip 単体 0.946、既存3 clip は小数3桁まで不変）。
+   dance_visual_probe は本番 https://babiniku.net で4 clip 全通過し、新しい2条件
+   （storyboard が camera を解決したことを runtime が申告する / eye が実際に動いた）も満たす。
+
+   証明の途中で2つの実在バグが出た。どちらも『camera を見る理由が無かった』ことの帰結:
+   - stage の camera が演者ではなく**小道具**を framing していた。実測した演者身長は 1.58m で
+     union bounds は常に全身を含んでいたのに、その**中心**が sample avatar の未スキンの
+     mech arm を含んでいたため、ADR-0011 の baseline スクリーンショットは全部見切れて
+     画面端に寄っていた。humanoid hips を水平のアンカーにした。
+   - dance_visual_probe が clip 一覧に4本目を持ちながら3本しか probe せず all-pass を報告していた。
+
+   VLM スコアは**主張しない**。9判定すべてが TypeError: fetch failed を返し、同じモデルへの
+   1枚だけの呼び出しも 120 秒で返らなかった。iteration 16 / 17 と同じ Ollama 飽和で3回目。
+   1.43/10 との比較はここでは行わない。ADR-0011 の Rung 4（リアルタイム browser VRM stage の
+   天井は 6〜7 で、9〜10 は事前レンダリングの video track に属する）は据え置き。"
+
+  :adr/body
+  "詳細・数値・追跡項目は子リポの正本 orgs/network-awai/net-babiniku/90-docs/adr/0015-precure-ed-craft-accents-storyboard-face.md。
+
+## smoothness 計測が accent を禁じていた件（横展開する価値のある発見）
+
+accent を入れた最初の run は population 全体で smoothness 0.000 を出した。これは accent 側の
+バグではない。この軸は loop 中の最大の速度コーナーを 1/96 step あたり 0.045 rad で正規化して
+おり、振幅 A・幅 w の cos² bump のコーナーは概ね A·2π²/w²·Δp² なので、A=0.4 で閾値を下回るには
+w ≥ 0.14（1拍以上）が要る。**つまりこの軸は『jitter を出すな』ではなく『accent を打つな』と
+言っていた。** アニメの踊りは、まさにこの禁じられているタイミング（キメ・溜め・オーバーシュート）
+で出来ている。
+
+明らかな対処は両方とも誤りだった。閾値を緩めれば jitter ガードを全域で失い、accent を広げれば
+それは2本目の groove になる。採った解は**閾値をそのままにして、clip が :accent-track で
+**宣言した**窓だけを除外する**こと。accent の形状は代わりに構造的に保証する（cos² は端で C¹、
+振幅と幅は normalize-genome が縛る）—— integer cycles が loop closure に対して既にやった手と同じ。
+
+一般化: **測定軸が『良い』と定義しているものが、実は『目標に必要な性質を禁止している』ことがある。**
+軸を緩めるのでも目標を諦めるのでもなく、意図した逸脱を**宣言可能にして測定から外し、
+別の（構造的な）保証に移す**のが正しい第三の道。
+
+## 参照
+
+- 動画: https://www.youtube.com/watch?v=n8SYxK6buFI （速報、2026-07-24）
+- CGWORLD: cgworld.jp/article/335-meitanteiprecure01.html（演出篇）/ 02（モデリング＆リギング篇）/ 03（アニメーション付け篇）
+- 子 ADR: 0011（quality ladder）/ 0012（co-scientist）/ 0015（本件）
+- merged: network-awai/net-babiniku 059b775e2d73aedf4d6e7afc7e6b36ce918dbce8
+- west pin: com-junkawasaki/root 4a66b913f8ff"}]
