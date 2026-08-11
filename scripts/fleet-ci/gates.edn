@@ -719,8 +719,10 @@
   ;; Amu の JDK-free native conformance。ADR-2608110900 の「fleet gate は JVM に
   ;; 依存させない」を守り、repo 自身の専用 script を呼ぶ。JVM tools を PATH で
   ;; trap したまま NBB compiler → sealed KEXE → 独立 extract-native → C loader の
-  ;; RW-to-RX mapping → host ISA 実行を一続きで検査する。cross-ISA encoder は下の
-  ;; Windows gate、parser memory-safety は次の fuzz gate が補完する。
+  ;; RW-to-RX mapping → host ISA 実行を scalar と recursive record の両方で検査する。
+  ;; 同じ recursive source を Windows KEXE に cross-compile/verify し、entryless
+  ;; library admission まで要求する。Windows loader 自体の cross-build は下の gate、
+  ;; parser memory-safety は次の fuzz gate が補完する。
   {:name "amu" :id "amu-native-conformance" :gate :nbb-script
    :script "gates/amu-native-conformance-check.cljs" :cd false}
 

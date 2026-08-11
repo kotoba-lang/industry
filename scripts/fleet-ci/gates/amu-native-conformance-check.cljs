@@ -13,21 +13,38 @@
   (js/process.exit code))
 
 (doseq [relative ["bin/kotoba" "scripts/jdk-free-native-conformance.cljs"
-                  "examples/structured.kotoba" "tools/kexe_loader.c"]]
+                  "scripts/windows-profile-conformance.cljs"
+                  "examples/structured.kotoba" "examples/nested-record.kotoba"
+                  "tools/kexe_loader.c"]]
   (when-not (fs/existsSync (path/join root relative))
     (die! 90 "missing after extract:" relative "— refusing to report pass")))
 
-(let [result (cp/spawnSync "npx" #js ["--yes" "nbb" "scripts/jdk-free-native-conformance.cljs"]
-                           #js {:cwd root :encoding "utf8" :maxBuffer 33554432
-                                :env js/process.env})
-      code (if (nil? (.-status result)) 1 (.-status result))
-      output (str (or (.-stdout result) "") (or (.-stderr result) ""))]
-  (println (str/join "\n" (take-last 20 (str/split-lines (str/trim output)))))
-  (when (.-error result)
-    (die! 91 "native conformance could not start:" (.. result -error -message)))
-  (when-not (zero? code)
-    (die! 1 "native conformance exited" code))
-  (when-not (re-find #"jdk-free-native: sealed (aarch64|x86_64) artifact independently extracted and executed under W\^X loader"
-                     output)
-    (die! 1 "native conformance emitted no complete runtime verdict"))
-  (println "OK — JDK-free compiler + independent extraction + real host ISA passed"))
+(defn- run-script! [script label]
+  (let [result (cp/spawnSync "npx" #js ["--yes" "nbb" script]
+                             #js {:cwd root :encoding "utf8" :maxBuffer 33554432
+                                  :env js/process.env})
+        code (if (nil? (.-status result)) 1 (.-status result))
+        output (str (or (.-stdout result) "") (or (.-stderr result) ""))]
+    (println (str/join "\n" (take-last 20 (str/split-lines (str/trim output)))))
+    (when (.-error result)
+      (die! 91 label "could not start:" (.. result -error -message)))
+    (when-not (zero? code)
+      (die! 1 label "exited" code))
+    output))
+
+(let [native-output (run-script! "scripts/jdk-free-native-conformance.cljs"
+                                 "native conformance")]
+  (when-not (re-find #"jdk-free-native: sealed (aarch64|x86_64) scalar and recursive-record artifacts independently extracted and executed under W\^X loader"
+                     native-output)
+    (die! 1 "native conformance emitted no scalar + recursive-record runtime verdict")))
+
+(let [windows-output (run-script! "scripts/windows-profile-conformance.cljs"
+                                  "Windows profile conformance")]
+  (when-not (re-find #"windows-profile: recursive-record (aarch64|x86_64) Windows KEXE verified"
+                     windows-output)
+    (die! 1 "Windows profile emitted no recursive-record KEXE verdict"))
+  (when-not (re-find #"windows-profile: entryless (aarch64|x86_64) Windows library verified"
+                     windows-output)
+    (die! 1 "Windows profile emitted no entryless-library verdict")))
+
+(println "OK — JDK-free scalar/recursive execution + Windows KEXE verification passed")
