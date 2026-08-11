@@ -117,11 +117,20 @@
   確認してから credential を置くこと（tick.cljs の slots は :caps で絞るので、
   probe を回し直して nodes.edn が更新されるまで古い caps が使われる）。
 
-  **いまは空。** 2026-08-11 に asher を入れて実際に外したが、移設が
-  `cloud-itonami` の org ポリシー（deploy key の作成が禁止、token に admin:org 無し）
-  で止まったため戻した —— **完了できない移設のために gate 容量を人質に取らない。**
-  credential が用意できた時にホスト名を 1 つ入れ、probe を回し直すところから再開する。"
-  #{})
+  この集合は ADR-2608111721 の `:slot/attested`（書き込み鍵を持つ常駐スロット）の
+  実装である。attested なホストは 1 台に固定し、台数を増やさない。
+
+  **asher（2026-08-11）**: hayari の収集 tick が Radicle 経路で移設され、
+  `~/.radicle/keys/radicle` と `com.gftd.hayari-collect` LaunchDaemon を持つ
+  （ADR-2608110300 の決定 B）。一度は空に戻してあった —— deploy key 経路が
+  org ポリシーで止まっていた間、完了できない移設のために gate 容量を人質に
+  取らないため。Radicle 経路で実際に attested になったので埋めた。
+
+  ⚠ **戻すときは nodes.edn を再生成するまで効かない、が逆向きには危険側に効く。**
+  ここを空にしただけでは古い caps が残るので外れて見えるが、次の probe で
+  そのホストが rotation に戻る。source が空で生成物が外している状態は、
+  幸運であって設計ではない（2026-08-11 に実際にこの状態だった）。"
+  #{"asher"})
 
 (defn classify
   "実測値 → gate 割り当てに使う capability。ディスク余力を cap の条件に含めるのは

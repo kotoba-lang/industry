@@ -1,0 +1,240 @@
+[{:db/id -1
+  :adr/id "adr-2608111721-placement-authority-is-murakumo-fleet-ci-is-a-gate-consumer"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/status "accepted"
+  :adr/date "2026-08-11"
+  :adr/last_verified "2026-08-11"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "cloud-plane-boundary-placement-authority"
+  :adr/tags "murakumo, cloud-itonami, kotobase, fleet-ci, residency, placement, publishing, authority"
+  :adr/title "ADR-2608111721: kotoba の cloud を3面に割る — placement と常駐の機構は murakumo に1本化し、fleet-ci は gate 定義だけを持つ consumer に降ろす。名前と承認は cloud-itonami、保管は kotobase"
+  :adr/repos ["orgs/kotoba-lang/murakumo" "orgs/network-awai/cloud-itonami" "orgs/network-awai/net-kotobase"]
+
+  :adr/authoritative_for
+  ["kotoba の cloud 実行面において、どの面が placement / 常駐 / 公開 / 保管 / authority を所有するか"
+   "placement 決定の単一正本は murakumo.task.plan（KIR 裏付けの純 core）であること。他の面は placement を再実装しない"
+   "scripts/fleet-ci の位置づけ: gate 定義（何を検査するか）と operator 側の credential 仕事だけを持ち、placement は持たない"
+   "常駐スロットの2種（:slot/anonymous と :slot/attested）と、attested なホストを gate rotation から外す規則"
+   "公開面の分担: itonami.cloud/{org}/{repo} は人間向け、murakumo.cloud/{org}/{repo} は機械向け KRP address。参照方向は itonami から murakumo へ"]
+
+  :adr/supersedes []
+  :adr/superseded_by []
+
+  :adr/related
+  ["adr-2607299960-dougaka-murakumo-compute-kotobase-storage（計算は murakumo、保管は kotobase。本 ADR はこれを面の一般規則に上げる）"
+   "adr-2800002700-ka-production-three-layer-split（オーナー指示『契約は loop、実際の常駐実行は murakumo、人間が管理するのは cloud-itonami-app』。本 ADR は -ka だけでなく全 actor に適用する）"
+   "adr-2608110300-hayari-tick-residency-and-alarm（fleet ノードに credential を置かない不変条件と、その帰結としての attested slot。同日に status を現在値へ整えた）"
+   "adr-2607300900-ci-cd-murakumo-fleet（CI/CD の正本を GitHub Actions から murakumo fleet へ移した決定。本 ADR はその中の placement 部分だけを murakumo repo 側へ移す）"
+   "adr-2607299300-murakumo-cloud-krp-org-repo-addressing-did-account（murakumo.cloud の KRP addressing。実測で live になった）"
+   "adr-2607301300-itonami-cloud-org-repo-site-publishing-rule（itonami.cloud の公開サイト面。/{org}/{repo} の catch-all を塞いだが .well-known は残っている）"
+   "90-docs/protocols/kotoba-resource-protocol.edn（KRP §4 の 8 rules。rule 8 が両公開面の 404 規律の根拠）"]
+
+  :adr/problem
+  "オーナーの問い（2026-08-11）は『kotoba での cloud としての実行環境、システムの公開、計算、常駐化などは murakumo と itonami のどちらにどう責任と権限を整理するのが良いか』。
+
+実測すると、この境界は既に3本の accepted ADR が引いていた（計算=murakumo / 保管=kotobase / 常駐実行=murakumo / 人間の管理面=cloud-itonami-app）。欠けていたのは決定ではなく、**その線が実装で守られていないことの発見**だった。
+
+### 1. 常駐は今どちらの面にも属していない — 1台のラップトップの launchd 名前空間に属している
+
+```
+このマシンに load 済み: 35 job / prefix 6 種
+  ai.gftd 15 · com.gftd 9 · com.murakumo 5 · com.gftdcojp.itonami 4 · jp.co.gftd 1 · com.network-awai 1
+うち 10 本が last-exit 78 / 127（設定エラー・コマンド不在）= 静かに死んでいる
+  ai.gftd.agent-daemon 78 · ai.gftd.llm 78 · ai.gftd.keiei 127
+  ai.gftd.litellm.jacob 127 · com.murakumo.verify-payments 78 ほか5本
+com.murakumo.infer-gateway も last-exit=1
+```
+
+登録簿は3箇所に散っている: root の `scripts/fleet-ci/*.plist`（9枚。うち6枚は **cloud-itonami の actor** — hayari / hirameki / observatory / newsfeed）、`orgs/network-awai/cloud-itonami/scripts/launchd/`（6枚）、fleet ノードの `/Library/LaunchDaemons`（asher 実測で murakumo 系 10 枚 + `com.gftdcojp.itonami.media-wasm-orchestrator`）。
+
+root が itonami actor の起動方法を知っているのは層違反である。ADR-2800002700 自身が Consequences の (−) でこの反省を先に書いていた（『channels.edn が producer の起動方法を知っている＝producer の CLI が変わると loop も変わる』）。
+
+### 2. スケジューラが2本あり、同じ10台を別々に測って別々に配っている
+
+| | scripts/fleet-ci（root, nbb） | murakumo.task.plan（KIR 裏付けの純 core） |
+|---|---|---|
+| 在庫 | `probe.cljs` → `nodes.edn` | `murakumo.fleet.inventory`（`:fleet-inventory` KIR）/ `task probe --out` |
+| 配置 | `assign`: cost EMA 重み付き LPT | `assign`: greedy least-filled + `node-score` |
+| 入場 | **無い** | `admit`: `:unreachable` / `:saturated` を理由付きで報告 |
+| 不能タスク | 概念が無い | `why-unschedulable` |
+
+`admit` の欠落は既に実害として記録されている: fleet-ci README は『満杯のノードは gate を走らせる前に殺す。tar が No space left で落ちるので、CI は赤にすらならず signal が一切出ない』と書いており、2026-07-30 に asher が実際にその状態だった。これはまさに admit の形をした穴である。
+
+### 3. 公開面は2本あるが、重複ではなく用途違いで、規則が無いだけ
+
+```
+murakumo.cloud/kotoba-lang/murakumo → 200 JSON {kotoba/address, collections:[components …]}
+itonami.cloud/cloud-itonami/inkan   → 200 HTML（サイト実体 + platform chrome 注入）
+どちらも /zzz-nope/qqq → 404（KRP §4 rule 8 を守っている）
+```
+
+実測は既に正しい形をしている。明文化されていないだけである。
+
+### 4. authority が逆さになっている
+
+```
+murakumo.cloud/.well-known/did.json → 200 application/json（did:web:murakumo.cloud）
+itonami.cloud/.well-known/did.json  → 200 text/html ← SPA catch-all に落ちている
+itonami.cloud/.well-known/zzz-nope.json → 200 text/html
+app.itonami.cloud/.well-known/did.json → 400 application/json
+```
+
+**鍵を持たないと ADR-2607299300 が自ら書いている murakumo.cloud は正しい DID document を配り、passkey から did:key から CACAO を本番稼働させている itonami.cloud は配っていない。** ADR-2607301300 が `/{org}/{repo}` について塞いだ catch-all が `.well-known/*` にそのまま残っている — 同じバグの同じクラスである。"
+
+  :adr/decision
+  "### 0. 軸は『murakumo か itonami か』ではなく、鍵・機構・名前
+
+**murakumo は「どこで何回走るか」の権限しか持たない。cloud-itonami は「その結果を誰の名前で世に出すか」の権限しか持たない。両者は互いの鍵を持たない。保管は kotobase。**
+
+| | murakumo | cloud-itonami | kotobase |
+|---|---|---|---|
+| 計算（推論・ffmpeg・WASM guest） | **正本** | — | — |
+| 常駐の**機構**（枠・配置・再試行・生存監視） | **正本** | — | — |
+| 常駐する**権利**（actor DID・CACAO・publish 鍵） | 持たない | **正本** | — |
+| 公開（人が読むサイト・アプリ面） | — | **正本** `/{org}/{repo}` | — |
+| 公開（機械が引く実行実体の address） | **正本** `/{org}/{repo}` | — | — |
+| 保管 | — | — | **正本** |
+| org authority（DID） | 自分の service DID のみ | actor DID / CACAO | org authority を集約 |
+| 人間の承認・閲覧面 | — | **cloud-itonami-app** | — |
+
+判定は3問で足りる。
+
+1. **今夜この機械が眠って何が止まるか。** 止まってよいなら murakumo fleet に置ける
+2. **この仕事は書き込み鍵を持つか。** 持つなら fleet ノードに配らない（不変条件3）
+3. **出た結果は誰の名前で世に出るか。** その名前の持ち主が cloud-itonami 側の authority
+
+### 1. placement の単一正本は `murakumo.task.plan`。fleet-ci は placement を持たない
+
+オーナー判断（2026-08-11、選択肢 A）。`scripts/fleet-ci/tick.cljs` の `slots` / `node-speed` / `assign` を撤去し、gate batch を `murakumo task run --tasks <batch>` に渡す。
+
+murakumo 側が既に持っているもの: `slots` / `admit` / `eligible?`（labels・roles・min-mem・exclude）/ `node-score` / `assign` / `retry-tasks` / `why-unschedulable` / `summary`。しかもこれらは **`:task-plan` KIR に載った Kotoba の決定核**で、host 側に残っているのは fold と map 組み立てだけ。fleet-ci 側の 130 行ほどの nbb 手書き placement より、この workspace 自身の決定核抽出の規律に沿っている。
+
+### 2. LPT は失わない。KIR の変更も要らない
+
+`plan/assign` は tasks を**与えられた順に** fold し、各 task を「最も空いている eligible node」へ置く greedy である。LPT とは『重い順に並べてから greedy』なので、**tasks を cost 降順に並べ替えるという host 側の1手**に還元される。
+
+したがって fleet-ci の EMA cost（`~/.gftd/fleet-ci-cost.edn`）は捨てず、**placement の決定器から入力の順序付け器へ降りる**。Kotoba object を1つも足さずに、cost 重み付き LPT と KIR 裏付けの placement が両立する。
+
+**この還元が成立することを確かめてから移すこと。** batch を両実装に通して assignments が一致することを実測する — 一致しない batch が出たら、それは cost 順以外の差（`admit` の有無、`eligible?` の解釈）なので、そこを名指しで直す。
+
+### 3. 交換に fleet-ci は `admit` を得る
+
+満杯・張り付き・到達不能なノードが `:saturated` / `:unreachable` として**理由付きで報告される**。今は probe の caps が空になることで結果的に外れるだけなので、『なぜ今日は8台しか回っていないのか』に答えるものが無い。沈黙が監査可能になる。
+
+### 4. 在庫も1本化する
+
+`probe.cljs` → `nodes.edn` は `murakumo.fleet.inventory`（`:fleet-inventory` KIR）と `murakumo task probe --out` の二重実装である。`nodes.edn` は murakumo inventory の projection にする（生成物である点は変わらない）。**二重実装のまま片方だけ直る、が起きないようにするのが目的**であって、ファイルを消すことが目的ではない。
+
+### 5. fleet-ci が保持し続けるもの
+
+`gates.edn`（104 entry、**何を検査するか**）/ gate script / 署名付き receipt / commit status の書き戻し / west pin の前進。
+
+**これらは全部 credential を要する operator 側の仕事**なので、不変条件3のとおりノードへ移さない。移るのは placement だけである。ADR-2607300900 の『CI/CD の正本は murakumo fleet であって GitHub Actions ではない』は変わらない — 変わるのは、その fleet に**どう配るかを誰が決めるか**である。
+
+### 6. 常駐スロットを2種に分ける
+
+| slot | 鍵 | 置き場 | 例 |
+|---|---|---|---|
+| `:slot/anonymous` | 持たない | 10 ノードどこでも。auction / LPT で置く | gate・推論・ffmpeg・WASM guest |
+| `:slot/attested` | 書き込み鍵を持つ | **常時稼働の1台に固定。台数を増やさない** | 収集 tick・publish・mirror |
+
+**attested なホストは gate rotation から外す**（`probe.cljs` の `operator-hosts`）。さもないと *repo から送られてきた gate コードを実行するマシンが publish 鍵を持つ* ことになり、不変条件3は条文だけ守って趣旨で負ける。
+
+鍵を発行するのは cloud-itonami（actor DID / CACAO / repo scope を絞った鍵）、**枠を割り当てて生存を見るのは murakumo**。これが『どちらに』の答えである — 常駐の機構は全部 murakumo、常駐する権利は全部 cloud-itonami。今はこの2つが同じ launchd 名前空間で混ざっている。
+
+### 7. 公開面の分担
+
+- **itonami.cloud/{org}/{repo}** — 人が読むサイト・アプリ面。`sites.edn` の宣言が正本、platform が chrome を注入する（ADR-2607301300）
+- **murakumo.cloud/{org}/{repo}** — 機械が引く実行実体の KRP address（`collections`: components / runs / models）
+- **参照方向は itonami から murakumo へ。** 人が読む面が走る実体を指す。逆にしない（機械向け面に人間向けの体裁を持たせると、chrome の正本が2つになる）
+- 両面とも未登録は 404。`.well-known/*` を含め、**catch-all に落とさない**
+
+### 8. org authority は kotobase に集約する
+
+実測で murakumo.cloud/{org}/{repo} は authority を `did:web:kotobase.net:org:<org>` に委譲している。ADR-2607299300 が決めた `did:web:murakumo.cloud` は murakumo 自身の service DID であって org authority ではないので、これは矛盾ではなく正しい実装である — **鍵を持たない面は org authority も持たない**方が、あの ADR 自身の論拠と一貫する。
+
+**itonami.cloud が DID document を配っていないことは欠陥である。** 鍵を持つ側が authority を publish していないので、いま authority の面だけが逆さになっている。"
+
+  :adr/body
+  "# ADR-2608111721: cloud の3面と placement authority
+
+**Status**: accepted
+**Date**: 2026-08-11
+**Deciders**: Jun Kawasaki（選択肢 A を採択: placement authority を murakumo に1本化し、fleet-ci は gate 定義だけを持つ consumer に降ろす）
+
+決定そのものは `:adr/decision` にある。以下は同じセッションで landed したものと、
+まだ landed していないものの区別。
+
+## この ADR と同時に landed したもの
+
+### 1. ADR-2608110300 の status を現在値へ整えた
+
+`:adr/status` は `accepted, implemented` だったのに、本文冒頭が『status: proposed。
+これは設計であって、実装済みの記録ではない』のまま残り、中盤の実装状況節は
+『段階 1-2 は着地済み。3-5 は未着手』と書きながら**自分の直後の表で 1-4 を ✅**に
+していた。さらに末尾の addendum では段階 5 が Radicle 経由で landed している。
+
+つまり1つの文書が3つの異なる現在地を主張していた。**文書は最新状態のみを表す**
+（ADR-2607257000）ので、経緯を消さずに現在値へ揃えた。deploy key 経路が org 設定で
+塞がっていた事実と、それを反転させずに Radicle を選んだ理由は残してある — 消したのは
+『いま BLOCKED である』『いま止まっている』という、もう真でない主張だけ。
+
+### 2. `probe.cljs` の `operator-hosts` を実測に合わせた
+
+これは doc の整えではなく、**ADR-2608110300 の決定が code で un-landed だった**もの。
+
+```
+probe.cljs operator-hosts  = #{}          ← source は「外していない」と言う
+nodes.edn  asher           = :caps #{} :max-parallel 0 :role :operator
+                                          ← 生成物は「外れている」と言う
+asher 実測                 = ~/.radicle/keys/radicle · ~/.ssh/hayari_deploy
+                             /Library/LaunchDaemons/com.gftd.hayari-collect.plist
+                             uptime 72 日
+```
+
+asher は **publish 鍵を持つ常駐 writer** になっている（attested slot）。`operator-hosts`
+が空のままなので、**次に誰かが `probe.cljs` を回した瞬間に asher が gate rotation へ
+戻り**、gate コードを実行するマシンが Radicle publish 鍵を持つ状態になる。
+いま外れて見えるのは `nodes.edn` が再生成されていないからで、これは幸運であって設計ではない。
+
+`operator-hosts` を `#{\"asher\"}` にした。docstring の『いまは空』の段は、なぜ空だったか
+（deploy key 経路が止まった間、完了できない移設のために gate 容量を人質にしない）と、
+なぜ今埋まったか（Radicle 経路で実際に attested になった）に書き換えた。
+
+**gate 容量は 1 slot 減る。それが attested slot の実費である**と決定 6 が言っているとおり。
+
+## landed していないもの（順序つき）
+
+1. **`.well-known/*` の catch-all を塞ぎ、itonami.cloud の DID document を出す。**
+   権限の面を先に立てないと、以降の『誰の名前で走るか』が書けない
+2. **常駐の登録簿を1つにする。** ただし root が起動方法を持つのではなく、
+   **各 repo が自分の常駐宣言を持ち、root と murakumo は集めるだけ**にする
+   （ADR-2800002700 の反省をここで解く）
+3. **死んでいる 10 本の棚卸し**（last-exit 78 / 127）。消すか直すかを決める。
+   『動いていない CI より無い CI の方がよい』（ADR-2607300900）と同じ理屈
+4. **placement の1本化の実装**（決定 1・2・4）。両実装に同じ batch を通して
+   assignments 一致を実測してから切り替える
+5. **attested slot の常駐先の統一。** hayari は asher に landed したが、
+   他の書き込み鍵持ち常駐はまだラップトップに居る
+
+## 決めていないこと
+
+**ADR-2608110300 の決定 B を他の actor へ広げるか（オーナー判断 B は未回答）。**
+hayari は Radicle 経路で asher へ移ったが、これを一般規則にすると『GitHub へ直接
+push しない、mirror が運ぶ』という規律を各 repo が持つことになる。hayari の実測では
+**その規律を書いた本人が破って両面が分岐した**ので、広げる前に mirror が黙って
+進まず落ちる設計であることを確かめる必要がある。
+
+## Consequences
+
+- (+) 『どちらに置くか』の議論が毎回やり直しにならない。判定が3問になった
+- (+) placement の決定核が1つになり、しかも KIR 裏付けの側が残る
+- (+) fleet-ci が `admit` を得るので、『なぜ今日は8台しか回っていないのか』に答えが出る
+- (+) attested / anonymous の区別により、可用性のために機密性を売る取引が構造的に見える
+- (−) 移行期は placement が2実装のまま並ぶ。一致を実測するまで切り替えないので、
+  その間 fleet-ci 側の LPT が正本として動き続ける
+- (−) gate 容量が 1 slot 減る（asher が attested）
+- (−) 常駐の登録簿はまだ3箇所にある。この ADR は所有者を決めたが、移設はしていない
+"}]
