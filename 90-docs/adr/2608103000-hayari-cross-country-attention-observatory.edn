@@ -519,7 +519,7 @@ DataLad dataset を作る前に、**過去日が再取得できるか**を測っ
 共有 west checkout ではなく**自前の clone** で動く（他セッションの branch 切替が
 未コミット作業を黙って巻き戻す、という workspace の禁止事項）。
 
-`deploy/com.gftd.hayari-tick.plist`、`StartInterval 900`。
+常駐は 2026-08-11 に **collect（asher）と mirror（laptop）へ割れた**（ADR-2608110300）。収集する機械は GitHub の鍵を持たず、Radicle 経由で publish する。plist は `deploy/` に 3 つ、topology は `deploy/README.md` が正本。`StartInterval 900` はどちらも変わらない。
 
 ### 自分で入れて自分で見つけた欠陥: 5 日 122 country-day を消して push した
 
