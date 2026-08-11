@@ -405,7 +405,7 @@ CI を直した直後、`manifest/fleet-ci.edn` の fail は 08-07 の **3 種**
 | `net-kotobase` | **既に上流で直っていた**。現 tip `93d176d`（別セッションの「the DO test went with its subject; gate is green again」）で gate 全体が OK |
 | `amu-jdk-free` | **既に上流で直っていた**。赤は sha `2644eb9` の判定で、現 tip `3b45ae11` では `LOCK-FRESH` |
 | `root-repository-roles` | **現 tip でも本当に赤**。`amu` の `:depends-on` が 8 本なのに実 production 依存は 13 本 —— #1835 の IR 抽出で入った `kotoba-hir`/`kotoba-object`/`kotoba-sema` と、以前から漏れていた `io-ipld`/`io-multiformats`。**修正して着地**（`kotoba-lang/amu` `c2ff8799`、`verify-repository-roles: OK deps=13`）+ pin 前進（`bbddac0`） |
-| `root-itonami-org-id` | **本当に赤**。intake が `(str/replace "." "-")` で順方向導出していた。**修正して着地**（`network-awai/cloud-itonami` `d8888896`）+ pin 前進（`e39ff47`）。ただし gate は **live** を見るので**デプロイするまで赤のまま** |
+| `root-itonami-org-id` | **本当に赤**。intake が `(str/replace \".\" \"-\")` で順方向導出していた。**修正して着地**（`network-awai/cloud-itonami` `d8888896`）+ pin 前進（`e39ff47`）。ただし gate は **live** を見るので**デプロイするまで赤のまま** |
 | `root-permit-index` | 射影が正本とずれていた。**再生成して着地**（`e7748f5`）。ただし下記のとおり fleet では緑にならない |
 | `root-observatory-registry` | 本当に赤。hayari の登録が `${REPO}` 起点でない `/tmp/…` を指し、台帳から hayari・hirameki が落ちている（`--only` の部分実行で全体を上書きした疑い）。observatory loop の持ち主の領域なので未着手 |
 | `test-cloud-itonami` | sites bundle 4 checks。pin を前進させたので次の tick で再評価される |

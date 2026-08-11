@@ -256,6 +256,26 @@
    :script-args ["--max-age-hours" "36" "--max-failures" "1"]
    :include-ext [".edn" ".cljs"] :min-files 2 :cd false}
 
+  ;; EDN 文書が「読めるのに中身が切れている」状態。
+  ;;
+  ;; 既存の docs-edn gate は `edn/read-string` が通ることを検査する。**切断された
+  ;; 文書は通る** —— 本文中のエスケープされていない `"` でそこから文字列が終わり、
+  ;; 残りは EDN のトークンとして読まれる。ファイルは妥当な EDN のまま、entity も
+  ;; 1 個のまま、本文だけが静かに短くなる。
+  ;;
+  ;; 実測 2026-08-11: 2,053 件の ADR は 1 件残らずパースに成功していたが、うち 1 件は
+  ;; 本文の約 80 行が脱落していた（`(str/replace "." "-")` のコード片が原因）。
+  ;; 同じ日に別セッションでも 2 回起きている —— **個人のミスではなく failure class**。
+  ;;
+  ;; 検査する不変条件: **entity map のキーは全て keyword**。文字列が途中で終わると
+  ;; 残りのテキストがキー位置にシンボルとして現れる（実測した指紋）。
+  ;;
+  ;; 登録前に 3 分岐を exit code で確認した: 壊れた tree=1 / 修復後=0 / 空 tree=1。
+  ;; 空を pass にしないのは、tree が届かなかったことを「切断は無い」と読ませないため。
+  {:name "root" :id "root-docs-edn-truncation" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/docs-edn-truncation-check.cljs" :script-args ["--min" "1500"]
+   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+
   {:name "root" :id "root-repository-roles" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/repository-roles-check.cljs" :script-args ["--min" "20"]
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
