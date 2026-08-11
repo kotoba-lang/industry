@@ -188,6 +188,34 @@
      安全側に落ちる**。新しい truthy な状態を足していたら、新語を教えていない
      全ての場所で人が黙ってサインインしていた。
 
+   - **決定 1 の事業 blueprint が公開された。**
+     `cloud-itonami/cloud-itonami-isic-6311-identity`（public / AGPL-3.0、
+     `3a2b954`）。`-6311` 本体は市場データで埋まっているので sub-blueprint 形
+     （先例 `-chainexplorer`）。**価格は `pricing.edn` という data、請求は
+     `cloud-itonami.identity.pricing/invoice` という純関数**で、service は
+     金額を一切知らない —— 価格改定が認証サービスの deploy を要求しない。
+     10 tests / 38 assertions。
+     不変条件のうち 5 つは「例外を出さずに請求が狂う道」を塞ぐもの:
+     計測していない次元は値付けできない（丸ごと拒否する。誰も数えていない
+     数字を見積もるのは見積もらないより悪い）／全ての金額はその件数を併記する
+     （辿れない金額は更新時に必ず争われる）／**計測していない月は 0 の月では
+     ない**（請求書上は同じに見え、意味は正反対）／無料枠は請求を生まない
+     （上限を持つ plan は従量単価を持たない）／gate が 1 つでも開いていれば
+     課金しない（`pricing/sellable?` が data から答える。今日は false）。
+   - **まだ何も販売していない。** 全 plan が `:status :proposed` で、決定 4 の
+     6 gate のうち 3 つ（カスタムドメイン・可用性宣言・identity service 向けの
+     規約）が未達。custody の開示は数字の隣に置いた —— 別の場所に置いた開示は
+     売っているものからずれる。
+
+   ### 実行順 3（カスタムドメイン）は今やらない
+
+   ADR-2608039950 は『何も使わない公開ホスト名を今作るのは、先回りの面を
+   増やす行為なので作らない』と定めており、有効化の引き金は**apex が増えた
+   ことではなく、その apex の session を読む app が実在すること**である。
+   itonami は自前の RP（`itonami.cloud`）で `app.itonami.cloud/auth` を持つと
+   決めた（ADR-2608110100）ので、`auth.itonami.cloud` を authn Worker に
+   向けるのは重複であり RP の衝突でもある。**顧客が現れてから有効化する。**
+
    ### まだのもの
 
    - **`AUTHN_USAGE_TOKEN` は未設定**なので `/v1/usage` は 404 のまま。記録は

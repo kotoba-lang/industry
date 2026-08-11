@@ -12,6 +12,7 @@
   ["飲食店・EC 事業者の公開面を発見 → 診断 → 処方 → 提案 → 月額課金まで繋ぐ loop の境界と repo 分割"
    "外部事業者への未依頼の接触に課す HARD 制約（特定電子メール法 3 条 1 項 4 号 / 4 条、主張の evidence 拘束、観測失敗と不在の区別）"
    "発見の自動化に LLM を使うときの境界（業種は OSM タグの宣言、LLM は原文からの抽出のみ、照合は決定論）"
+   "loop-noren の永続化 4 面（名簿 / journal / corpus receipt は git、raw bytes は annex → s3.kotobase.net）と常駐（LaunchAgent、cloud-itonami は承認面）"
    "この loop がどの org の面で売るか（cloud-itonami / itonami.cloud）と課金経路（既存 Stripe 請求面。新規経路を作らない）"]
   :adr/related ["ADR-2607132300" "ADR-2607299000" "ADR-2608082300" "ADR-2608110200" "ADR-2607172600"]
   :adr/supersedes []
@@ -98,6 +99,54 @@ murakumo-main → 原文にある文字列だけを抽出
 verify-extraction → 原文照合。verbatim で無いものは落とす
 DiscoveryGovernor → 受理 / 却下
 ```
+
+### 永続化 —— canonical EDN は git、bytes は annex（2026-08-11 追記）
+
+`kouhou`（ADR-2608110200）と同型の 4 面: 名簿 `data/prospects.edn` / journal
+`journal/<日>.edn` / corpus receipt `data/corpus/<日>.edn` は git、raw
+（読んだ本文・LLM の生返答・**診断した HTML そのもの**）は git-annex →
+`s3.kotobase.net`（bucket `cloud-itonami-loop-noren`）。
+
+- **receipt が join である。** 提案を見たら、それがどの本文のどの測定から出たかを
+  名指しでき digest で照合できる。claim は測定に拘束されているので、その測定の
+  入力が残っていなければ後から「本当にそう書いてあったか」を引けない
+- **journal に生返答を書かない。** 決定ログにモデルの出力が混ざると際限なく膨らむ。
+  journal は sha256 で参照する
+- **identity と custody は別の問い。** `verify-corpus` は drop された bytes を
+  `:absent` と数えて失敗にしない（drop できることが annex の理由）。custody は
+  `git annex find --in kotobase raw/` の行数が答える —— fsck の `ok` を custody の
+  数と読まない（kouhou の実測で 48 件中 10 件の欠落を見落とす）
+- canonical EDN（キー順に並べてから印字）にするのは、同じ値が同じバイト列に
+  ならないと receipt の digest が 2 通りになるため
+
+### 常駐 —— 判断の実行はノード、承認は cloud-itonami（2026-08-11 追記）
+
+`deploy/` の LaunchAgent（`cloud.itonami.noren.resident`、毎日 09:20）が
+`bin/resident.cljs` を 1 本だけ起こし、discover → tick → commit → annex copy →
+verify → push を**この順で**回す。順序が要るものを plist に割ると時刻の偶然で
+「まだ commit していない raw を copy する」が起きる。
+
+**Worker ではないのは、Common Crawl の range fetch も curl も git-annex も
+isolate では動かないから。** cloud-itonami が edge に持つのは承認キューと
+cockpit で、判断の実行は常駐側にある（cloud-murakumo の organism と同じ形）。
+常駐は latency と費用を変えるだけで**権限は変えない**。
+
+`git add` を `data` / `journal` / `raw` に限るのは、共有 checkout で別セッションが
+`src/` を編集している最中に常駐が回ると `-A` が他人の WIP を commit するため。
+
+### 承認キューへの経路は未提供（2026-08-11 実測）
+
+**cloud-itonami に effect を外から作る公開経路は無い。** `POST /api/{org}/{repo}/effects`
+は 502 で、`effectsOnRequestPost` は approve/reject 専用（routing shim も
+`effects/[id]/[action].js` だけ）。したがって提案を承認キューに載せるには、
+`kaizen` ingress（`kaiyu` が実際に使っている経路、`src/cloud_itonami/edge/kaizen_ingress.cljc`、
+144 行）と同型の **narrow ingress `POST /api/{org}/{repo}/noren`** が要る:
+per-tenant の提案専用鍵、`202 proposed` / `200 already-open`、承認は cockpit の人。
+
+client 側はその contract で書いてあり（`NOREN_INGRESS_KEY`）、404/502 は
+「未提供」として journal に残す —— **提案できなかったことを提案したことにしない。**
+server 側（`noren_ingress.cljc` + routing shim + `shadow-cljs release edge-api` +
+KV への鍵 digest 投入）は次の作業。
 
 ### 1 周
 
@@ -200,7 +249,7 @@ etzhayyim actor の面には載せない。
 
 - `kotoba-lang/noren`: 17 tests / 116 assertions green（nbb）。HARD rule 11 本すべて
   「実際に `:hold` になること」を 1 本ずつ壊して確認
-- `cloud-itonami/loop-noren`: 18 tests / 59 assertions green（nbb）
+- `cloud-itonami/loop-noren`: 23 tests / 81 assertions green（nbb）
 - **発見を実データで 1 周**（神楽坂 bbox）: OSM 387 element → candidate 31
   （website 無し 337 / チェーン 19 / 分類不能 0）。本文が取れた 16 件は
   モデル不在のため全件 `:defer`、取れなかった 4 件は `:no-page-text` で reject
@@ -214,6 +263,11 @@ etzhayyim actor の面には載せない。
   `:healthy` → `:repairable` に落ちる。落ちない gate は劇場
 - CLI 実 I/O: `bin/noren.cljs tick` を example.test に対して実行 → 取得失敗で
   `skip / fetch-failed`、journal に 1 行。`--submit` 無しでは外へ 1 バイトも出ない
+- **永続化を実データで確認**: discover 1 周で receipt 33 件・raw 12 オブジェクト。
+  `verify-corpus` が identity ok、`git annex find --in kotobase raw/` が 12/12 で
+  custody 確認（s3.kotobase.net、bucket `cloud-itonami-loop-noren`）
+- **常駐を install 済み**: `launchctl list` に `cloud.itonami.noren.resident`。
+  dry-run で 5 段すべての argv を確認してから bootstrap した
 - 未実行: JVM 側（`clojure -M:test`）。第一 runtime は cljs なので nbb を正とした
 
 ### 実装中に実データが見つけた欠陥 3 件（いずれも直して landed）
