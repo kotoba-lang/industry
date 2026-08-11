@@ -164,6 +164,55 @@
    ADR-2608040100 の規則により **README 冒頭の名乗り + `concept-vocabulary.edn`
    登録**が要る（未確認）。"
 
+  :adr/string-predicates
+  "## 【2026-08-11】string 述語を `:bool` にした。半分だけ着地している。
+
+   オーナー判断で 3 件とも『やる』。②から着手し、**言語側は landed、consumer の
+   移行は未了**という状態で止めた。
+
+   ### landed: kotoba-sema `171e23f`（west pin `0a1850c`）
+
+   `string=?` と `string-contains?` が `:bool` を返す。profile 5（compiler
+   ADR 0191）が `= < > <= >= not not= zero? pos? neg? empty? some?` を `:bool`
+   にしたときの取り残しで、**同じ frontend の中で後から入った
+   `string-index-contains` は `:bool`** だった。`:i64` に戻すと 1 failure + 2 errors。
+
+   **profile 6 に入れた。** `surface-status` に `:profile-introduced 6` の entry は
+   0 件、`version-policy` はまだ 5 を active としているので 6 は開いている。ここに
+   入れることで **6 に中身が生まれ**、空の profile を released 宣言してから次の
+   breaking change で 7 を切る事態を避けられる。
+
+   ### 未了: amu の移行（着手して止めた）
+
+   sema pin を進めて amu の全スイートを回すと **8 failures / 5 errors**:
+
+   | | |
+   |---|---|
+   | ERROR | bounded-string-search-and-case-fold-have-cross-target-conformance |
+   | ERROR | string-concat-produces-a-pool-handle-comparable-to-a-literal |
+   | ERROR | string-equal-compares-content-not-handle-identity |
+   | ERROR | **string-equality-remains-i64-through-recursive-reference-calls** |
+   | ERROR | typed-bounded-strings-remain-strings-through-checked-kir-and-web |
+   | FAIL | dual-backend-pilot-suite-green |
+   | FAIL | every-pure-product-case-passes-profile-admission |
+   | FAIL | **golden-digests-match-live-compile** |
+   | FAIL | suite-reports-profile-split |
+
+   4 番目は**名前が旧挙動を主張している** —— その前提ごと書き直す対象。
+   8 番目は **golden digest** で、KIR の型が変わったので動く。
+
+   **golden を理解せずに再生成しない。** それはこの ADR 系列がずっと直してきた
+   『canonical に見えて何も封じていない』の同型になる。次の担当は、まず digest が
+   何を含んでいて string 述語の型がどこに効いているかを読むこと。
+
+   conformance kit の移行だけは形が確定している（`string_contains_kit.kotoba` の
+   `(+ p q)` → `(+ (if p 1 0) (if q 1 0))`、ADR 0191 が『機械的』と呼ぶ移行そのもの)。
+
+   ### 今日の状態は壊れていない
+
+   amu は **sema の旧 pin のまま**なので、今日時点で赤いものは無い。言語の変更は
+   sema にあり、amu は移行が済んだ時点で pin を進めて採る。"
+
   :adr/next
   "- ~~5 repo の fixture 移行（122 件）→ abi pin 前進~~ **完了（上記）**
    - `source-tree-cid` / `package-manifest-cid` は authority の宣言だけで実装が無い。
