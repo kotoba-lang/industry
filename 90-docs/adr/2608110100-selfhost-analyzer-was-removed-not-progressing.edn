@@ -1,0 +1,124 @@
+[{:db/id -1
+  :adr/id "adr-2608110100-selfhost-analyzer-was-removed-not-progressing"
+  :adr/title "ADR-2608110100: self-host analyzer は「進行中」ではなく撤去済みだった — 分類の判断を .kotoba に戻し、事実表と決定の権限を分離する"
+  :adr/status "accepted, implemented"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-11"
+  :adr/last-verified "2026-08-11"
+  :adr/last_verified "2026-08-11"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "selfhost-analyzer-decision-restored"
+  :adr/tags "kotoba, selfhost, safe-analyzer, capability, effect, docs-honesty, cljc-migration"
+  :adr/related ["adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"
+                "adr-2607289500-kotoba-refactor-agent-handoff-and-capability-repo-cid"
+                "adr-2607072000-kotoba-rust-removal-cljc"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["kotoba self-hosting の 2026-08-11 時点の現在地（何が実行され、何が実行されないか）"
+   "safe_analyzer_facts.edn と safe_analyzer_core.kotoba の権限分離"
+   "effect と capability の区別を引用するときの出典"]
+  :adr/body
+  "# ADR-2608110100: self-host analyzer は撤去済みだった
+
+**Status**: accepted, implemented
+**Date**: 2026-08-11
+
+## Context
+
+「cljc から kotoba への refactor」を進める際、着手コストが最も低い作業として
+**既存 self-host analyzer の担当範囲拡大**を選んだ。根拠は 3 つの文書が一致して
+「analyzer は safe Kotoba component として動いており、effect 推論・policy check・
+minimal policy・admission check を担当し、native 実装と cross-check している」と
+書いていたことである:
+
+- `kotoba-lang/kotoba-lang/docs/lang/README.md` §Self-Hosting Track
+- `kotoba-lang/kotoba-lang/docs/adr/ADR-safe-capability-language.md` §0.1 / §476-477
+- 同 ADR の kotoba repo 側コピー
+
+**3 つとも誤りだった。** 実測（2026-08-11）:
+
+| 主張 | 実際 |
+|---|---|
+| `kotoba:crates/kotoba-clj/selfhost/safe_analyzer.kotoba` が動いている | **ファイルが存在しない**。Rust crate 撤去（ADR-2607072000）と一緒に消えた |
+| CLI gate `selfhost-inspect` / `safe-policy` / `safe-build` が covered slice を検査 | 検査しているのは **seed の形**（schema 名・owner・canonical-format）だけ |
+| 分類表が analyzer の入力 | `safe_analyzer_facts.edn` の 4 表（96 op）は **読み手がいなかった**。唯一の consumer `kotoba.selfhost.contracts` は op を 1 つも分類しない |
+
+つまり撤去が残したのは**事実表だけで、判断は消えていた**。そして文書は判断が
+在るかのように読めた。**これは進捗が遅れていたのではなく、後退が記録されていなかった。**
+
+## Decision
+
+### 1. 分類の判断を `.kotoba` に戻す
+
+`kotoba-selfhost-contracts:kotoba/safe_analyzer_core.kotoba`（merged: dddc82e）。
+`non-executable-form?` / `numeric-result-op?` / `effect-op?` /
+`user-call-excluded-op?` の 4 述語。pure（`effects=#{}`、capability ゼロ）。
+
+これは `ADR-safe-capability-language` §0.1 が定める測り方に従う —
+**self-hosting の進捗は「host の行数を減らす」ではなく「安全性判断の正本が
+Kotoba 側へ移った slice が増える」ことで測る。**
+
+### 2. 権限を 3 つに分け、崩さない
+
+| | 所有するもの |
+|---|---|
+| `safe_analyzer_facts.edn` | **どの** op がどの class に属するか（表） |
+| `kotoba/safe_analyzer_core.kotoba` | class に属するとは**何を意味するか**（判断） |
+| `safe_analyzer_core_test.clj` | 片方だけが動けないこと |
+
+**表を .kotoba に吸収しない**（CLJ consumer が表を読む）。**判断を CLJ に戻さない**
+（それが今回失った当のもの）。
+
+### 3. gate は 2 種で、落ちる理由が違うことを実測する
+
+- **semantic**: 4 表の和集合 + 表に無い名前を全述語に通し、EDN と厳密一致を要求
+- **structural**: 述語本体の `string=?` 比較数が表の要素数と一致することを**ソース文字列**で数える
+
+後者が要るのは、**どの表にも無い op を .kotoba が受理した場合、semantic 検査は
+入力として提示しないので構造的に見えない**から。着地前に両方の変異で確認済み:
+
+| 変異 | semantic | structural |
+|---|---|---|
+| EDN が名指しする entry を削除 | ✅ 落ちる | ✅ 落ちる |
+| どの表にも無い `kgraph-drop!` を追加 | ❌ 見えない | ✅ 落ちる |
+
+### 4. 形は一時制約であると明記する
+
+string 入力 / bool 出力 / コレクション無しは、**native admission gate
+（kotoba-kir の `only-native-word-typed-features?`）が今日受理する形**であって
+様式ではない。native が heap 表現を得たら 1 つの表値に対する集合メンバシップに
+なるべきで、ファイル冒頭にそう書いてある（ADR-2608650000「恒久と一時を混ぜない」）。
+`(if (or ...) true false)` も同様 — `or` が今なお `:i64` を返すため。
+
+### 5. 文書を現在地に合わせる
+
+`docs/lang/README.md` §Self-Hosting Track を書き換えた（merged: a95195d、PR #409）。
+実行される slice と seed 形状検証を表で分離し、撤去された analyzer が担当していた
+4 slice を**残作業**の側に移した。
+
+## Consequences
+
+- **self-hosting の現在地は「1 slice（op 分類）」であり、それ以上ではない。**
+  effect 推論・minimal-policy・policy-check・admission-check は**未実装**であって
+  進行中ではない。この 4 つが次の作業単位。
+- `amu` は test-only 依存（ADR-reliability-t63）。`src/` は compiler を require しない。
+- **この種の誤りは「文書が古い」ではなく「後退が記録されなかった」として扱う。**
+  大規模撤去（Rust crate 撤去のような）の際は、消えた**振る舞い**を名指しで
+  記録する。ファイルの行き先だけでは、表が残っていることが判断も残っている
+  ように読める。
+
+## Evidence
+
+```
+clojure -M:test            7 tests / 351 assertions / 0 failures
+clojure -M:run test        15/15 on :jvm-kir, :js, :wasm
+clojure -M:run check       ok profile=pure-product effects=#{}
+clojure -M:fuel-estimate   32 crude units (default budget 512)
+```
+
+merged: kotoba-selfhost-contracts#2 (dddc82e) / kotoba-lang#409 (a95195d)
+west pins: ed823a9 / 3ddbcde"}]
