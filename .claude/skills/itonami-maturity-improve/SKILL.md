@@ -52,6 +52,24 @@ tick が出すもの: `lane`（substrate / breadth）・対象 repo・**目標�
 **`:datoms-stale?` が true なら、この反復の仕事は「測り直し」**であって軸上げ
 ではない。§5 へ飛ぶ。
 
+**tick が `⚠ archived の掃き出しが読めない` と言ったら、先にそれを作り直す。**
+
+```bash
+nbb --classpath ".:scripts/nbb_compat" scripts/gen-archived-repos.cljs   # 約 2 分
+nbb --classpath ".:scripts/nbb_compat" scripts/gen-archived-repos.cljs --check   # 差分だけ見る
+```
+
+archived（GitHub で read-only）な repo は **この順位の常連**になる —— archived =
+開発が止まっている = 全軸が低い = 「伸びしろが最大」と読まれるのに、push は
+できない。実測 2026-08-11: fleet 最下位 3 本が全部 archived で、loop は 3 周
+連続で先頭 3 手を捨てた（ledger に 2 回 `:not-done` として報告されている）。
+tick は `manifest/archived-repos.edn` を読んで候補から落とすが、**掃き出しが
+無ければ落とせない**。`--check` が exit 1 なら作り直す（新しく archive された
+repo が候補に戻っている）。
+
+**これはスコアを変えない。** archived な repo は従来どおり測られ、datoms にも
+fleet 平均にも入る。変わるのは行き先だけ。
+
 ### 1. 対象と軸を確定する
 
 原則は tick の 1 位。**外してよいのは、外す理由を ledger に書けるときだけ**:

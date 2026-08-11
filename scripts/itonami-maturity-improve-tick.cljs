@@ -46,6 +46,7 @@
 (def root (or (aget (.-env js/process) "COM_JUNKAWASAKI_ROOT")
               (str home "/github/com-junkawasaki")))
 (def datoms-file (str root "/90-docs/system-dynamics/itonami-maturity.datoms.edn"))
+(def archived-file (str root "/manifest/archived-repos.edn"))
 (def ledger-file (str home "/.gftd/itonami-maturity-improve.ledger.edn"))
 
 ;; 計測値がこれより古ければ、次の 1 手は「作業」ではなく「測り直し」。
@@ -89,6 +90,28 @@
     (if (and (= 0 code) (seq (str/trim out)))
       (* 1000 (js/parseInt (str/trim out) 10))
       :unknown)))
+
+;; ── archived な repo は候補から外す（測定からは外さない）────────────────────
+;;
+;; **archived な repo はこの順位の常連になる。** archived = 開発が止まっている
+;; = 全軸が低い = 「伸びしろが最大」と読まれる。しかし GitHub 側が read-only
+;; なので push できず、その周はまるごと空振りする。
+;;
+;; 実測 2026-08-11: fleet 最下位 3 本（com-etzhayyim-gov_municipality /
+;; com-etzhayyim-infra_utility_connect / ai-gftd-kaisya）が**全部 archived**で、
+;; loop は 3 周連続で先頭 3 手を捨てた（ledger に 2 回 :not-done として報告
+;; されている）。さらに 445bp の帯に archived が 6 本控えており、**writable な
+;; 候補を上げるほど archived が上へ繰り上がる** —— 放置すると悪化する。
+;;
+;; **スコアは 1bp も動かさない。** archived な repo は従来どおり datoms にも
+;; fleet 平均にも入る。ここが変えるのは行き先だけ。fleet 平均から除く案は
+;; スコア意味論の変更なので、この修正には含めない（別の判断）。
+(def archived
+  (let [s (slurp* archived-file)
+        m (when s (try (edn/read-string s) (catch :default _ nil)))]
+    (when (seq (:archived m)) m)))
+
+(def archived-paths (set (:archived archived)))
 
 (def axes [:maturity/axis-substrate :maturity/axis-test :maturity/axis-governed
            :maturity/axis-ingest :maturity/axis-docs :maturity/axis-surface
@@ -288,10 +311,14 @@
         ;;
         ;; breadth は層の名前ではなく『substrate 以外すべて』の意味なので、
         ;; そう書く。
-        in-lane (filterv (if (= :substrate lane)
-                           #(= :substrate (:layer %))
-                           #(not= :substrate (:layer %)))
-                         rows)
+        in-lane* (filterv (if (= :substrate lane)
+                            #(= :substrate (:layer %))
+                            #(not= :substrate (:layer %)))
+                          rows)
+        ;; archived を候補から落とす。**落としたことを黙らない** —— 掃き出しが
+        ;; 無い/古いときに、この tick が黙って旧挙動へ戻ると、誰も気付かない。
+        dropped (filterv #(archived-paths (:repo %)) in-lane*)
+        in-lane (filterv #(not (archived-paths (:repo %))) in-lane*)
         ;; substrate 層は 17 本しかなく leverage に 10〜20 倍の段差がある。
         ;; cohort は 1,700 本超で ratio ≈ 1.0 の平坦地 —— **同じ順位付けでも
         ;; 意味の強さが違う**ので、それを出力に明記する。
@@ -318,6 +345,15 @@
                :ranked (mapv #(select-keys % [:repo :kind :layer :own :effective
                                               :fleet-gain :band :weakest])
                              ranked)
+               ;; 誰を候補から外したかを残す。次周が「なぜこの repo が
+               ;; 出てこないのか」を ledger だけで再構成できるようにする。
+               ;; 掃き出しが無い周は :archived-sweep :missing と書く ——
+               ;; 「除外 0 件」と「除外していない」を混ぜない。
+               :archived-sweep (if archived
+                                 {:generated-at (:generated-at archived)
+                                  :total (:archived-count archived)}
+                                 :missing)
+               :archived-excluded (mapv :repo dropped)
                :ranking-is-flat? flat?}]
 
     (log! "── 成熟度向上 tick ──")
@@ -337,6 +373,21 @@
     (log! "lane:" (name lane)
           "（これまでの substrate 比率" (.toFixed (* 100 observed-substrate-share) 1)
           "% / 床" (* 100 substrate-share-floor) "% / 実績" iterations "周）")
+    ;; 掃き出しが読めないときは**旧挙動に黙って戻らない**。archived が候補に
+    ;; 混ざるのはこの loop が 3 周連続で空振りした原因そのものなので、
+    ;; 「フィルタが効いていない」ことは順位より先に言う。
+    (if archived
+      (when (seq dropped)
+        (log! (str "archived を候補から除外: " (count dropped) " 本"
+                   "（掃き出し " (subs (str (:generated-at archived)) 0 10)
+                   " / 全 " (:archived-count archived) " 本）"))
+        (doseq [d (take 5 dropped)]
+          (log! (str "    ↳ " (:repo d) " own=" (some-> (:own d) (.toFixed 3))
+                     " — GitHub で read-only。push できないので候補から外した"))))
+      (log! (str "⚠ archived の掃き出しが読めない（" archived-file "）。"
+                 "**archived な repo が候補に混ざる** —— 指名されても push できず"
+                 "その周は空振りする。`nbb --classpath \".:scripts/nbb_compat\" "
+                 "scripts/gen-archived-repos.cljs` で作り直す")))
     (doseq [r ranked]
       (log! (str "  · " (:repo r) " [" (:kind r) "]"
                  "  own=" (some-> (:own r) (.toFixed 3))
