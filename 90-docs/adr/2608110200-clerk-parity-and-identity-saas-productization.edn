@@ -234,6 +234,49 @@
      **直った問題を書いたままの gate note は、間違った理由で閉まり続け、
      やがて間違った理由で開く。**
 
+   ## Closing（2026-08-11）
+
+   ### この session で default branch に着地したもの（全件 contained を実測）
+
+   | repo | commit | 中身 |
+   |---|---|---|
+   | `cloud-itonami/app-auth` | `7e06367` | TS/Svelte を撤去し cljs Worker。`app.itonami.cloud/auth` |
+   | `kotoba-lang/authenticator` | `291cfa3` | `auth.verify` / `auth.recovery` / `auth.adapters.webcrypto` |
+   | `network-awai/net-kotobase` | `3b03e4f` | 使用量計測 + TOTP/リカバリコード/step-up |
+   | `cloud-itonami/cloud-itonami-isic-6311-identity` | `efbb3c9` | 事業 blueprint（価格 = data）+ 外形 prober |
+   | `kotoba-lang/uptime` | `dd63825` | 観測 → 可用性 statement |
+
+   west pin: `43acad17`（net-kotobase）/ `f3d7d69`（authenticator）/ `b416124`
+   （blueprint）/ `03a9d2a`（uptime）/ `16d17d6`（app-auth）。
+   deploy: `itonami-app-auth` version `852340a4`、`kotobase-authn` version `1a7d174f`。
+
+   ### 検証（この session の合計）
+
+   - JVM: authn 42 tests / 273 assertions、app-auth 8 / 52、authenticator 38 / 177、
+     uptime 10 / 41、pricing 10 / 38 —— **failures 0**
+   - built-artifact smoke: app-auth 26 checks、authn usage 17、authn TOTP 26、
+     既存 apex 9 —— 全通過
+   - RFC parity: RFC 4226 Appendix D 10 ベクタ + RFC 6238 Appendix B SHA-1 6 ベクタ
+   - design-quality: app-auth sign-in 100.00 / authn sign-in 100.00（min 95）
+   - negative check: redirect 封じ込め・TOTP drift 窓・可用性の unobserved・
+     free tier の課金・gate の充足 —— **5 件すべて、壊すと実際に落ちることを確認**
+
+   ### 本番の最終実測（2026-08-11）
+
+   `app.itonami.cloud/auth` `/auth/health` `/auth/v1/session` = 200。
+   `authn.kotobase.net` `/health` `/sign-in` `/v1/session` = 200、
+   `/v1/totp` = 401（未サインイン。正）、`/v1/usage` = 404（fail-closed。正）。
+   prober は launchd で稼働し、観測は 15 → 30 に伸びた。
+
+   ### 次に着手する 1 つ（resume point）
+
+   **`AUTHN_USAGE_TOKEN` を置いて計測を読めるようにする。** 記録は動いているが
+   読み出し口が閉じており、『読めないデータは証拠ではない』という自分の基準に
+   照らして未達。long-lived な operator credential なので owner が決めて保管する:
+
+       cd orgs/network-awai/net-kotobase/authn && wrangler secret put AUTHN_USAGE_TOKEN
+       curl -H "authorization: Bearer <token>" https://authn.kotobase.net/v1/usage
+
    ### まだのもの
 
    - **`AUTHN_USAGE_TOKEN` は未設定**なので `/v1/usage` は 404 のまま。記録は
