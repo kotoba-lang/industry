@@ -102,14 +102,31 @@
 
 (defn- num [s] (let [n (js/parseInt (str s) 10)] (if (js/isNaN n) 0 n)))
 
+(def operator-hosts
+  "gate rotation から**明示的に外す**ホスト。
+
+  fleet の不変条件 3 は「ノードに credential を置かない」である。常駐 writer
+  （hayari tick 等）は git push のために credential を要するので、それを置く
+  マシンは gate を実行してはならない —— さもないと *repo から送られてきた
+  gate コードを実行するマシンが credential を持つ* ことになり、条文は守れても
+  趣旨で負ける。
+
+  外れたホストは gate 容量を 1 台分失う。それが常駐 writer を fleet に置く実費。
+
+  ⚠ ここに足すだけでは足りない。**そのホストで実際に gate が動いていないこと**を
+  確認してから credential を置くこと（tick.cljs の slots は :caps で絞るので、
+  probe を回し直して nodes.edn が更新されるまで古い caps が使われる）。"
+  #{"asher"})
+
 (defn classify
   "実測値 → gate 割り当てに使う capability。ディスク余力を cap の条件に含めるのは
   clojure の maven cache / tarball 展開が数 GB 食うため — 空き 1–2GB のノードに
   JVM gate を投げると途中で落ちて false fail になる（naphtali/issachar が実際に
   この状態）。"
-  [{:keys [reachable? javahome clojure npx zig curl tar] :as n}]
-  (if-not reachable?
-    (assoc n :caps #{} :max-parallel 0)
+  [{:keys [reachable? javahome clojure npx zig curl tar host] :as n}]
+  (if (or (not reachable?) (contains? operator-hosts host))
+    (assoc n :caps #{} :max-parallel 0
+           :role (if (contains? operator-hosts host) :operator :unreachable))
     (let [free (num (:freegb n))
           cores (num (:cores n))
           ;; loopback が無いノードは gate を回せない。JVM/node のどちらの

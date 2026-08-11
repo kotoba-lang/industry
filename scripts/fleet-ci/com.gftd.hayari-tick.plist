@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  hayari 流行 — 15 分ごとに 1 日ずつ backfill する常駐（ADR-2608103000 / 2608110300）。
+
+  **常駐先は常時稼働の operator ノード**（既定 asher）。ラップトップではない —
+  移設の目的は無人性であって正しさではない（データは再取得可能で、走らなかった日は
+  次に走った時に拾うので失われない）。
+
+  operator ノードは scripts/fleet-ci/probe.cljs の `operator-hosts` によって
+  **gate rotation から外してある**。credential を持つマシンが repo から送られてきた
+  gate コードを実行しない、という不変条件 3 の趣旨を守るため。
+
+    install:  scp scripts/fleet-ci/com.gftd.hayari-tick.plist asher:~/Library/LaunchAgents/
+              ssh asher launchctl load ~/Library/LaunchAgents/com.gftd.hayari-tick.plist
+    stop:     ssh asher launchctl unload ~/Library/LaunchAgents/com.gftd.hayari-tick.plist
+    watch:    ssh asher tail -f /tmp/hayari-tick.log
+
+  ⚠ このノードが持つ credential は **cloud-itonami/hayari だけに絞った deploy key**
+  （~/.ssh/hayari_deploy）。superproject への write は持たない —— pin 前進は
+  operator 側の別 resident に残す。
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>            <string>com.gftd.hayari-tick</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-lc</string>
+    <string>exec nbb "$HOME/.gftd/hayari-tick/bin/tick.cljs" --budget-ms 700000 --pin false</string>
+  </array>
+  <key>StartInterval</key>    <integer>900</integer>
+  <key>RunAtLoad</key>        <false/>
+  <key>StandardOutPath</key>  <string>/tmp/hayari-tick.log</string>
+  <key>StandardErrorPath</key><string>/tmp/hayari-tick.log</string>
+  <key>ProcessType</key>      <string>Background</string>
+  <key>AbandonProcessGroup</key><false/>
+</dict>
+</plist>
