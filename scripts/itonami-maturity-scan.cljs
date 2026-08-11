@@ -79,8 +79,23 @@
 (def skip-dirs #{".git" "node_modules" "target" ".shadow-cljs" ".cpcache"
                  "dist" "build" ".datalad" ".next" "vendor" ".venv" ".clj-kondo"})
 
+(defn- virtualenv?
+  "Python の仮想環境か。名前ではなく `pyvenv.cfg` の実在で判定する。
+
+   名前で弾くと取りこぼす: skip-dirs は完全一致なので `.venv` は消えるが
+   `.venv-tts` は残る。実測 2026-08-11、newscaster の `.venv-tts` は 27,560 files
+   あり、walk が src/ に着く前に 6000 の予算を使い切って **src=0 / test=0** と
+   測った（実体は src 109KB / test 33KB）。名前の変種を足し続けるより、
+   virtualenv が必ず持つ標準ファイルを見る方が漏れない。"
+  [dir]
+  (try (.existsSync fs (str dir "/pyvenv.cfg")) (catch :default _ false)))
+
 (defn- walk-files
-  "repo 相対 path の列。max-depth / max-entries で必ず打ち切る（暴走防止）。"
+  "repo 相対 path の列。max-depth / max-entries で必ず打ち切る（暴走防止）。
+
+   打ち切りは黙って起きてはならない —— truncated? な repo は src/test が 0 に
+   潰れ、『実装が無い repo』と見分けが付かなくなる。呼び出し側は必ず
+   :truncated? を報告すること。"
   [root max-depth max-entries]
   (let [out (atom [])
         truncated? (atom false)]
@@ -93,7 +108,8 @@
                           child (str dir "/" nm)
                           crel (if (= rel "") nm (str rel "/" nm))]
                       (if (.isDirectory e)
-                        (when-not (contains? skip-dirs nm) (go child (inc depth) crel))
+                        (when-not (or (contains? skip-dirs nm) (virtualenv? child))
+                          (go child (inc depth) crel))
                         (do (swap! out conj crel)
                             (when (>= (count @out) max-entries) (reset! truncated? true)))))))))]
       (go root 0 ""))
@@ -327,6 +343,16 @@
                   " absent=" (count (remove :repo/present? all))
                   " with-src=" (count (filter #(pos? (:src/file-count % 0)) all))
                   " with-tests=" (count (filter #(pos? (:test/file-count % 0)) all))
-                  " with-kotoba=" (count (filter #(pos? (:kotoba/file-count % 0)) all))))))
+                  " with-kotoba=" (count (filter #(pos? (:kotoba/file-count % 0)) all))))
+    ;; 打ち切った repo は src/test が 0 に潰れており、『実装が無い repo』と
+    ;; 区別が付かない。黙って通すと、その 0 がそのまま成熟度スコアになる。
+    (let [tr (filter :repo/files-truncated? all)]
+      (when (seq tr)
+        (binding [*print-fn* *print-err-fn*]
+          (println (str "WARNING: " (count tr)
+                        " repo で file walk を打ち切った —— これらの src/test は"
+                        " 0 に潰れており、実測値ではない:"))
+          (doseq [e tr]
+            (println (str "  " (:repo/path e) " (files>=" (:repo/file-count e) ")"))))))))
 
 (-main)
