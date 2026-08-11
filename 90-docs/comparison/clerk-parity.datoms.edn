@@ -26,11 +26,12 @@
   :source/dataset "clerk-parity"
   :parity/kind :coverage
   :parity/measured-on "2026-08-11"
+  :parity/updated "2026-08-11 — TOTP / リカバリコード / step-up が unwired から running へ（ADR-2608110200）"
   :parity/subject "authn.kotobase.net + kotoba-lang の認証ライブラリ群"
   :parity/baseline "Clerk（製品として）"
   :parity/total 36
-  :parity/running 13
-  :parity/unwired 9
+  :parity/running 16
+  :parity/unwired 6
   :parity/absent 14
   :parity/absent-deliberate 2
   :parity/caveat
@@ -90,21 +91,21 @@
  ;; ── 多要素 ─────────────────────────────────────────────────────────────────
  {:db/id -10 :source/dataset "clerk-parity" :parity/kind :feature
   :parity/id "mfa-policy" :parity/category :mfa :parity/feature "MFA ポリシー / step-up"
-  :parity/state :unwired :parity/clerk :yes
+  :parity/state :running :parity/clerk :yes
   :parity/substrate ["orgs/kotoba-lang/mfa" "orgs/kotoba-lang/authentication"]
   :parity/note "mfa は用途ごとに必要 factor を選ぶ substrate で、risk_planner / live_risk / orchestrator というリスクベース適応 MFA まで持つ。authentication.core/achieved-level が :none→:single-factor→:multi-factor→:phishing-resistant を既に判定する。authn が呼んでいない。"}
 
  {:db/id -11 :source/dataset "clerk-parity" :parity/kind :feature
   :parity/id "totp" :parity/category :mfa :parity/feature "TOTP（authenticator アプリ）"
-  :parity/state :unwired :parity/clerk :yes
-  :parity/substrate ["orgs/kotoba-lang/authenticator" "orgs/kotoba-lang/onetime"]
-  :parity/note "authenticator に auth/otp（TOTP/HOTP）・auth/base32・auth/uri（otpauth:// = QR 登録）が揃う。サーバ側検証に要るものは全部ここにある。"}
+  :parity/state :running :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/authenticator" "orgs/network-awai/net-kotobase"]
+  :parity/note "2026-08-11 稼働（ADR-2608110200）。判断は auth.verify（窓は step で数える／使用済み counter は二度通らない／表示の空白とハイフンを受ける）、計算は auth.adapters.webcrypto（RFC 4226・6238 の公表ベクタで検証）、secret は KEK 封筒。/v1/totp/enroll/begin|verify・/v1/totp/verify・/v1/totp/disable。"}
 
  {:db/id -12 :source/dataset "clerk-parity" :parity/kind :feature
   :parity/id "recovery-codes" :parity/category :mfa :parity/feature "リカバリコード"
-  :parity/state :unwired :parity/clerk :yes
-  :parity/substrate ["orgs/kotoba-lang/onetime"]
-  :parity/note "onetime が recovery code を明示的に対象に含む。onetime/adapters/authenticator.cljc が TOTP との橋。"}
+  :parity/state :running :parity/clerk :yes
+  :parity/substrate ["orgs/kotoba-lang/authenticator" "orgs/network-awai/net-kotobase"]
+  :parity/note "2026-08-11 稼働。登録と同じ手順で 10 本発行（後回しにすると電話しか入口が無い窓ができる）。digest しか保存せず、単回消費は Durable Object の delete が担う。"}
 
  {:db/id -13 :source/dataset "clerk-parity" :parity/kind :feature
   :parity/id "sms-second-factor" :parity/category :mfa :parity/feature "第 2 要素としての SMS"
