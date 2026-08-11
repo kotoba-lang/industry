@@ -24,7 +24,8 @@
     :else value))
 
 (def blob-attrs
-  #{:manifest.repos/rad-rids
+  #{:manifest.repos/datalad
+    :manifest.repos/rad-rids
     :manifest.repos/path-overrides})
 
 (defn migrate [entity from to]
