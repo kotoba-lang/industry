@@ -107,9 +107,16 @@
 
 (def node-by-host (into {} (map (juxt :host identity)) nodes))
 
-;; --- A. fleet-ci -----------------------------------------------------------
+;; --- A. fleet-ci の LPT（参照実装 / oracle）----------------------------------
+;;
+;; **`fci/assign` ではなく `fci/assign-lpt`。** production の `assign` は murakumo へ
+;; 委譲する（ADR-2608111721 決定 1 が landed した時点でそうなった）ので、そちらを
+;; 呼ぶと murakumo を murakumo と比べることになり、この harness の意味が消える。
+;; 実際 rename 直後にここが `assign` を呼んだまま残り、`:spawn-fn` 無しで
+;; `Cannot read properties of null` で落ちた —— **黙って緑にならず落ちたのは幸運**
+;; ではなく、`assign` が spawn-fn を必須にしているからである。
 
-(def fci-batches (fci/assign work nodes {:costs costs}))
+(def fci-batches (fci/assign-lpt work nodes {:costs costs}))
 
 (def fci-placements
   (vec (for [b fci-batches w b
