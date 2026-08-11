@@ -1,0 +1,148 @@
+[{:db/id -1
+  :adr/id "ADR-2608111900"
+  :adr/title "closing — kotobase.net の全面 502 と、4 repo の Rust 判定"
+  :adr/status "accepted"
+  :adr/date "2026-08-11"
+  :adr/deciders "Jun Kawasaki + Claude Opus 5"
+  :adr/supersedes ""
+  :adr/relates-to "net-kotobase docs/adr/2608110600（502 の実体）, ADR-2608110700（live gate）, ADR-2608110800（test gate、ADR-2608110900 が置換）, ADR-2608110900（JDK-free gate）, tender-component docs/adr/0011（Rust を残す判定）, ADR-2607072000（Rust は cljc へ）, ADR-2607300900（CI は murakumo fleet）"
+  :adr/body
+  "# closing: 2026-08-11
+
+「kotobase.net は graph BaaS として安定稼働しているか」から始まり、CI の
+determinism、Kotoba でのライブラリ実装、Rust 依存の棚卸しまで進んだ。9 repo に
+着地済み。本文は次の agent が会話履歴なしで再開できる粒度で書く。
+
+## 1. 発端 — 本番が落ちていた
+
+実測（05:00-05:15 UTC、使い捨て did:key、operator 資格情報なし）:
+`/api/*` 全 8 経路が 502（JS の TypeError が素通し）、`GET/POST /pins` が 502、
+`graph.sparql` が 404。**その間 `/health` は `ok:true` を返し、502 を返している
+その経路を `client_api_paths` として並べていた** —— 監視は緑のままだった。
+
+原因は 3 つとも別物だった:
+
+- **`client_api.cljc:161` の閉じ括弧 1 個。** 内側の `->` が閉じておらず、読み取りは
+  `(fn …).then()`、書き込みは promise が `env` 位置に入る。本番の 2 つのエラーが
+  この 1 個で両方説明できた。直した先に**同じ関数の 2 つ目のバグ**（gate の 401 が
+  上流応答と区別できず JSON 再パースされ 502 化）が露出。
+- **退役名前空間。** `pinList`/`pinCreate` は 2026-06-24 に k8s pod ごと退役した
+  `com.etzhayyim.apps.kotobase.*` に書き換えられていた。`graph.sparql` も同様で、
+  しかも**バックエンドは 2026-08-06 から実装済み**。`core_test` が古い書き換えを
+  固定していた —— テストがバックエンドではなく書き換えに同意していた。
+- **`/health` が scope を名乗っていなかった。**
+
+修正は 342→368 tests で着地。**新規テストは全て旧コードで落ちることを先に確認**した。
+
+## 2. CI —「検出」と「阻止」を分けた
+
+fleet gate を 3 本にした（net-kotobase）:
+
+| gate | 問い |
+|---|---|
+| hermetic | tree の lint |
+| **live-planes** | production が今答えるか（15 checks、捨て鍵で CACAO 自己署名、npm 依存なし） |
+| **bundle-freshness** | commit 済みバンドルがこの commit の source から作られたか |
+
+**gates.edn の「ノードに egress が無い」は古い前提だった** —— judah/levi/simeon の
+3 台とも kotobase.net = 200、npm/maven = 200、java 26.0.1。この誤りのせいで、
+502 が続いた期間 fleet 側に見る目が 1 つも無かった。
+
+**オーナー指示「java に依存しないように」で test gate を撤去した。** JDK-free 化は
+実測して**できないと分かった**: repo 側の Closure 依存は 1 箇所で除去できたが、
+nbb は Worker 経路で `nbb_core.js` 内部が落ち、スタックにアプリのフレームが無い。
+JDK-free な ClojureScript コンパイラはこの workspace に無い。仮に nbb で通しても
+**出荷されるのとは別の runtime** を検査することになる。そこで問いを変えた ——
+バンドルを作るには JVM が要るが、**作られたものが古いかを見るのに JVM は要らない**。
+
+**代償を明記する: merge 前に壊れたコードを止める目は、fleet に無い。**
+
+## 3. Kotoba で TOML reader を実装（`kotoba-lang/toml`）
+
+`check-metadata` の埋め込み python が `tomllib` を使っており、**fleet 5 ノード中
+4 台が python 3.9.6** —— gate の判定がノード依存だった（冒頭で見た赤/緑の揺れの正体）。
+
+判断核を `.kotoba` で書いた（43 cases）。**実データに当てて自作ライブラリのバグを
+3 つ発見**: `\"\"\"` の前置判定・閉じ引用符・`]` 判定がいずれも**固定オフセットで
+バイトを切って**おり、マルチバイトで trap した。規則を冒頭に明記した ——
+**固定オフセットで切らない。**
+
+**fuel の発見**: Kotoba モジュールは生涯 512 回の関数エントリしか持たず補充されない
+（`loop`/`recur` も自己呼び出し、ADR 0173 が zero-charge recur を claim しない）。
+実測で countdown は n=510 で返り n=600 で trap —— **510 反復が上限**。
+ツールチェーンの他の部分は既に budget を持っていたのに **JS 系 backend だけが
+捨てて 512 を焼いていた**ので、`kotoba-script` と `compiler` を直した（既定は不変）。
+`:budgets` が policy の許可キーに無く `malformed capability policy` で弾かれていた
+内部矛盾も直した。
+
+## 4. Rust 棚卸し — 4 repo
+
+| repo | Rust | 判定 |
+|---|---|---|
+| cloud-murakumo-studio | 89 行 + Cargo workspace | **全撤去**。`app.kotoba.edn` + `kotoba-lang/shell` の sidecar 契約へ |
+| common-crawl | ~1,400 行 | 判断を cljc へ。機構（rayon/parquet/gzip）は残置 |
+| app-browser | ~2,157 行 | **policy 1,171 行を全移植**、transport 986 行は残置 |
+| tender-component | ~3,720 行 | **移植しない判定**（ADR 0011） |
+
+**tender-component を残した理由**: ADR 0010 が**同一の閉じた契約の 2 つの独立実装**
+（Rust/Wasmtime と jco/Node）を qualify し、その一致から正しさを論じている。
+片方を cljc にしても第 3 の実装にはならず、qualification を壊す。
+
+**全部に共通させた規律: 期待値は Rust を読まずに走らせて取る。** これで
+「読んだら直してしまう」挙動を 5 つ捕まえた —— `.io` が `.iowa-` に部分一致、
+IPv6 でポートが残る、ページ予算が dedup より前、引用符無し href で走査を続ける、
+`ingest_result` が実は job を完了させる。**最後のものは私の最初の移植が実際に
+間違えていた。**
+
+## 5. 私が間違えた 2 箇所（記録として）
+
+- **「parquet に cljc の受け皿は無い」と索引を引かずに断言した。**実際には
+  `org-apache-parquet`（reader+writer）/ `org-apache-arrow` / `columnar` があり、
+  **セッション開始時の hook が両方を一覧に出していた**。訂正済み（common-crawl
+  `5ef8c45`）。実際の穴はもっと狭い: writer が PLAIN・非圧縮、rayon の受け皿は不明。
+- **`ingest-result` の初版**（上記）。
+
+## 6. 着地（全て default branch 上で検証済み）
+
+net-kotobase `24a7374` / toml `c665492` / compiler `8b7c193` /
+kotoba-script `4493639` / shell `0a36e94` / cloud-murakumo-studio `7f534db` /
+common-crawl `5ef8c45` / app-browser `eba94fe` / tender-component `8aa051f`。
+superproject: gate `c722756`、pin 群 `221d56a` まで。
+
+本番の最終確認（closing 時点）: `/api/db|q|datoms` 200、`/pins` 200
+`storage_mode: tenant-state`、`graph.sparql` は 404→400（バックエンドに到達）、
+認証境界 4 種すべて 401、protocols public-smoke exit 0。
+
+## 7. 次の agent への引き継ぎ
+
+**すぐ確認できるコマンド**:
+`nbb scripts/fleet-ci/gates/net-kotobase-live-planes.cljs .`（15 checks）
+
+**残っている宿題（優先順）**:
+
+1. **汎用 pin が `backend` モードに実装が無い。** llms.txt の quick start
+   （任意 CID を pin）は、自分のグラフに commit された CID しか pin できない。
+   502 が正直な 422 になっただけ。B2 モードを有効にするか backend に pin store を
+   持たせるかの**オーナー判断**。
+2. **nonce replay が backend モードで効いていない。** 同一 CACAO の 2 回使用を実測。
+   KV に CAS が無いので正しく直すには Durable Object が要る。
+3. **merge 前 gate が無い**（上記 2 節の代償）。
+4. **import 集合の食い違い**（tender-component）。`allowed_binding` と kototama の
+   `component-import->kototama-import` が共通 3・食い違い 11。drift test が現状を
+   pin 済み。どちらに寄せるかは**オーナー判断**。
+5. **common-crawl / app-browser の Rust 完全撤去**には parquet write の圧縮と
+   fan-out の受け皿が要る。
+6. **`accountCreate` は 404 のまま**（既知、登録自体は暗黙に成立）。
+7. **`.sh` 13 件・`.mjs` 17 件**の移行（CLAUDE.md は新規禁止）。
+8. **`ci.yml` の `cargo check` job** が削除済み crate を指している。token に
+   `workflow` scope が無く push できない —— **消せる人が消す必要がある**。
+9. **`orgs/kotoba-lang/murakumo-studio` は west 未登録の重複 checkout**。実体は
+   `cloud-murakumo-studio`（GitHub 旧名リダイレクト）。掃除対象。
+10. **Python SDK に `requires-python` が無い。** 現状 3.9 互換だが、宣言が無いので
+    3.11+ 構文を 1 行足せば tomllib と同じノード依存の非決定性が再発する。
+
+**私の worktree / branch / stash は全て削除済み**（触った 5 repo は
+`branches=-` / `worktrees=1`）。compiler・kotoba-script・net-kotobase に残る大量の
+branch と worktree、および superproject の 3 worktree は**他セッションのもので、
+触っていない**。
+"}]
