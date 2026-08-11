@@ -298,6 +298,50 @@
     作る。C reference の既存 paging/scheduler/syscall 実装は仕様 oracle として読むが、
     C-free Phase 表の working 列へ自動転記しない。"}
 
+  :adr/addendum-2026-08-11-fuel-and-two-page-closure
+  {:status "accepted; supersedes executed-slice/remaining/next in the dependency-consolidation addendum"
+   :finding
+   "full-map mutation の M 後 timeout は descriptor walk の非停止ではなかった。
+    native function-entry fuel は default 512 で、1 descriptor が find-page + load32 +
+    load64×2 を消費する。一方 `compile --fuel 4096` は成功しても、Amu CLI が
+    non-component compile-source へ値を渡さず、さらに kotoba-native ELF packager が
+    sealed artifact を読まず literal 512 を kernel context に書いていた。宣言・seal・
+    machine の 3 値が一致していなかった。"
+   :dependency-authority
+   {:kotoba-native "15b4a0e24ba2492d741d2f4b40aa7637598d8f84"
+    :amu "0ce084fdbba914633ceb927a9f6d8b22db16a88a"
+    :aiueos "8b4d77b713e07f1af97e573fd815cb6b9fa9f5c8"
+    :direction
+    "kotoba-native が ELF context encoding、Amu が CLI→sealed artifact、aiueos が
+     bounded workload と実 machine evidence を所有する。README/ADR 正本は順に
+     kotoba-native ADR-0030、Amu ADR-0245、aiueos ADR-0013。"}
+   :decision
+   "CLI は --fuel を compile-source build metadata として渡す。native packager は
+    :limits/:fuel と :fuel-abi/:initial の一致を要求して、その有限値を x86-64/AArch64
+    kernel image context にコピーする。aiueos は inline map 16 KiB、descriptor minimum
+    40 bytes から独立 ceiling 410 を持ち、fuel 4096 を seal する。verifier は receipt の
+    記述を信じず ELF RW segment の fuel word を読む。"
+   :executed-slice
+   {:allocator "2 distinct 4096-byte Conventional Memory pages; both derived from named [4 KiB, 1 GiB) authority and zeroed before publication"
+    :ownership "first page is immutable exclusion state for the second descriptor walk"
+    :positive "x86_64 Linux/KVM + OVMF: debug=MP, status=33"
+    :full-map-exhaustion "all type-7 descriptors mechanically rejected; complete real-map walk: debug=M, status=39"
+    :overlap-rejection "second candidate mechanically changed to the owned page; rejected before second authority derivation: debug=M, status=41"
+    :foreign-code "C sources/objects/CRT/linker/imports/dynamic dependencies empty"
+    :tests ["kotoba-native 139 tests / 1733 assertions"
+            "Amu CLI+aggregate focused 29 tests / 160 assertions"
+            "aiueos 431 tests / 1305 assertions"]}
+   :remaining
+   ["one-sequence scalar exclusion を persistent bounded bitmap/free-list にする"
+    "reclamation と stale/double-free rejection"
+    "新しい four-level page-table root を allocator pages から構築して activate する"
+    "mapping / W^X rejection / unmapping / invlpg の実 QEMU gate"
+    "scheduler / CPL3 / typed syscall / clock provider semantic vector"]
+   :next
+   "次は allocator の page 数を増やすこと自体ではなく、ownership state を boot sequence を
+    越えて問い合わせ・解放できる bounded representation にする。その state から page-table
+    root を割り当て、既存 CR3/invlpg intrinsics を初めて production path で使う。"}
+
   :adr/consequences
   "## 引き継ぎ先が触る repo と役割（混同しやすいので明示）
 
