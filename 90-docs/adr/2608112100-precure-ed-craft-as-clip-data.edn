@@ -68,9 +68,10 @@
      画面端に寄っていた。humanoid hips を水平のアンカーにした。
    - dance_visual_probe が clip 一覧に4本目を持ちながら3本しか probe せず all-pass を報告していた。
 
-   VLM スコアは**主張しない**。9判定すべてが TypeError: fetch failed を返し、同じモデルへの
-   1枚だけの呼び出しも 120 秒で返らなかった。iteration 16 / 17 と同じ Ollama 飽和で3回目。
-   1.43/10 との比較はここでは行わない。ADR-0011 の Rung 4（リアルタイム browser VRM stage の
+   VLM パネルは**動くようになり、実測した**（下記「訂正」）。同一 script / model / 同日・
+   本番の before/after、共通3 clip・各 n=9 で overall 2.00(σ0) → 2.22(σ0.44)。
+   **全軸が σ の内側なので改善は証明されていない** —— 記録するのは『退行が無く、パネルが
+   動くようになった』ことまで。ADR-0011 の Rung 4（リアルタイム browser VRM stage の
    天井は 6〜7 で、9〜10 は事前レンダリングの video track に属する）は据え置き。"
 
   :adr/body
@@ -94,10 +95,49 @@ w ≥ 0.14（1拍以上）が要る。**つまりこの軸は『jitter を出す
 軸を緩めるのでも目標を諦めるのでもなく、意図した逸脱を**宣言可能にして測定から外し、
 別の（構造的な）保証に移す**のが正しい第三の道。
 
+## 訂正 — 「Ollama 飽和で測定不能」は3回連続の誤診だった（2026-08-11）
+
+**本 ADR の初版、および子リポの ADR-0012 iteration 16 / 17 は、VLM パネルが動かない理由を
+『共有 Ollama の飽和』と記録した。3回とも誤りだった。**
+
+gemma4 は thinking model で、judge script が `think: false` を送っていなかった。画像4枚を
+文脈に入れると JSON の前に無制限の思考列を吐き、node の既定 fetch timeout 内に終わらない。
+出てくるのは裸の `TypeError: fetch failed` で、**これは『サーバが忙しくて返せない』と
+見分けがつかない**。load 53 の**アイドルな**サーバで実測: text のみ 6.7 秒 / 画像1枚
+thinking on は 120 秒で返らず / 同じ呼び出しで `think:false` なら約 10 秒。パネルは思考列を
+一度も使っていない。
+
+**教訓は Ollama の話ではない。既知の環境的制約にもっともらしく一致する症状は、
+最も捨てられにくい誤診である —— 驚きが無いから。** 切り分けの実験（同じサーバ・同じモデルで
+変数を1つ落とす）は最初から可能で、7秒で済んだ。
+
+修正後の実測（同一 script / model / 同日、本番 before/after、共通3 clip 各 n=9):
+
+| 軸 | before | after | Δ |
+|---|---|---|---|
+| character-rendering | 2.44 (σ0.53) | 2.89 (σ0.33) | +0.44 |
+| pose-expressiveness | 2.56 (σ0.53) | 2.33 (σ0.71) | −0.22 |
+| motion-dynamism | 1.78 (σ0.44) | 1.78 (σ0.67) | 0 |
+| scene-art | 1.89 (σ1.27) | 2.44 (σ0.88) | +0.56 |
+| color-composition | 3.00 (σ1.32) | 3.56 (σ0.88) | +0.56 |
+| camera-framing | 2.44 (σ0.73) | 2.89 (σ0.78) | +0.44 |
+| **overall** | **2.00 (σ0)** | **2.22 (σ0.44)** | **+0.22** |
+
+**全部 σ の内側で、改善は証明されていない。** 今回いじっていない rendering / scene-art /
+colour まで動いており、寄っただけの画角が画面占有率を上げた効果と区別できない。さらに
+judge 自身が3/4 clip で「カメラワークが固定または極めて緩やかなパンのみ」を主要ギャップに
+挙げている —— probe は 1.8 秒しか標本化しないので、**パネルはカットを見られないまま
+storyboard を採点している**。証拠の窓を1ループに広げるのが次の一手。
+
+judge が繰り返し名指しするのは Rung 2 ではなく **Rung 1**（セル分離した toon shading、
+強弱のある輪郭線、リムライト、髪のハイライト帯、背景の奥行き）。1.43 baseline 当時と
+同じ合意で、clip contract 側からは届かない。
+
 ## 参照
 
 - 動画: https://www.youtube.com/watch?v=n8SYxK6buFI （速報、2026-07-24）
 - CGWORLD: cgworld.jp/article/335-meitanteiprecure01.html（演出篇）/ 02（モデリング＆リギング篇）/ 03（アニメーション付け篇）
 - 子 ADR: 0011（quality ladder）/ 0012（co-scientist）/ 0015（本件）
 - merged: network-awai/net-babiniku 059b775e2d73aedf4d6e7afc7e6b36ce918dbce8
-- west pin: com-junkawasaki/root 4a66b913f8ff"}]
+- west pin: com-junkawasaki/root 4a66b913f8ff → 8b150588（judge 修正 1124c9d3）
+- scorecard: orgs/network-awai/net-babiniku/90-docs/anime-op/scorecard-2608111100-before.edn / -2608112000-after.edn"}]
