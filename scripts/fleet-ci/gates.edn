@@ -610,34 +610,35 @@
    :script "gates/net-kotobase-live-planes.cljs"
    :include-ext [".md"] :cd false}
 
-  ;; net-kotobase の API gateway テストスイートを**実際に回す**（ADR-2608110800）。
+  ;; net-kotobase の commit 済みバンドルが、その commit の source から作られたか
+  ;; （ADR-2608110900）。**JDK を要求しない。**
   ;;
-  ;; live gate（上）は壊れた production を**検出**するが、壊れたコードが merge
-  ;; されるのは止めない。2026-08-11 の `/api/*` 全滅は `client_api.cljc` の
-  ;; 閉じ括弧 1 個で、当時のテストはその関数を一度も呼んでいなかった。
-  ;; テストを足した今、それを**回す**ものが fleet に無ければ意味が半分になる。
+  ;; 初版（ADR-2608110800）はここでテストスイートを回していた（`npm ci && npm test`）。
+  ;; 実バグを実際に捕まえたが shadow-cljs = JVM が要り、オーナー指示
+  ;; （2026-08-11「java に依存しないようにしてほしい」）で置き換えた。
+  ;; JDK-free 化は実測で試して**できないと分かった**: repo 側の Closure 依存は
+  ;; `goog.typeOf` 1 箇所だけで除去できたが、nbb は Worker の経路で
+  ;; `nbb_core.js` 内部が落ち、スタックにアプリのフレームが 1 つも無い
+  ;; （= 直せる行が無い、SCI 側の限界）。この workspace に JDK-free な
+  ;; ClojureScript コンパイラは無い（repo-search / concept-lookup とも該当なし）。
+  ;; 仮に nbb で通しても**出荷されるのとは別の runtime** を検査したことになる。
   ;;
-  ;; hermetic gate の除外リストは `npm ci` 系を「ノードが npm registry に届かない」
-  ;; として外していたが、2026-08-11 実測で judah / levi / simeon とも
-  ;; registry.npmjs.org = 200 / repo1.maven.org = 200、java は PATH に無いだけで
-  ;; `/opt/homebrew/opt/openjdk` に 26.0.1 が在る（gate が自分で解決する）。
+  ;; そこで問いを変えた。バンドルを*作る*には JVM が要るが、**作られたものが
+  ;; 古いかどうかを見るのに JVM は要らない** —— sha256 で足りる。これはこの repo
+  ;; 固有の実リスクで、実際に起きている: 2026-08-10 に source 変更が main に入り、
+  ;; 再ビルドは翌 02:58 UTC の別 PR（#398）だった。その間 main の source と
+  ;; デプロイ可能な artifact は別物だった。
   ;;
-  ;; **tree 全体が要る。** テストは `net-kotobase/object-store-b2-s3` を
-  ;; `:local/root` の兄弟として解決するので、`kotobase-api-gateway-cljs/` だけ
-  ;; 配ると classpath が解決できず 1 件も走らない（実測。gate が明示的に検査する）。
-  ;; だから :include-ext を付けない（full tarball 3.2MB / max-ship 200MB）。
+  ;; **答えない問い**（黙って落とさない）: コードが正しいか。テストスイートは
+  ;; operator 側の `npm test` のまま。**merge 前に落とす目は現在 fleet に無い。**
+  ;; production 側は net-kotobase-live-planes が見る。
   ;;
-  ;; 合格条件は「0 failures」だけではなく **`--min-tests` を満たすこと**。
-  ;; classpath が壊れて 3 件だけ走り「0 failures」と言う状態を合格にしない。
-  ;;
-  ;; 検査済み（2026-08-11、judah で実測。ローカルではなく実ノード）:
-  ;;   pin 741fa65 の tree → exit 0（368 tests / 1812 assertions）/
-  ;;   **修正前の client_api.cljc に戻す → exit 1（10 failures, 1 error）**——
-  ;;   つまりこの gate は今回の障害を実際に捕まえる /
-  ;;   --min-tests 400 → exit 1 / tree 不在 → exit 90 / JVM 不在 → exit 91。
-  {:name "net-kotobase" :id "net-kotobase-gateway-tests" :gate :nbb-script
-   :script "gates/net-kotobase-gateway-tests.cljs"
-   :script-args ["--min-tests" "360"] :cd false}
+  ;; 検査済み（2026-08-11、judah 上で **java/javac/clojure/clj/shadow-cljs を
+  ;; 全部 stub に差し替えた PATH** で実測。stub は一度も呼ばれなかった）:
+  ;;   一致する tree → exit 0 / source を 1 行動かす → exit 1（両 digest を提示）/
+  ;;   verifier 不在 → exit 90。
+  {:name "net-kotobase" :id "net-kotobase-bundle-freshness" :gate :nbb-script
+   :script "gates/net-kotobase-bundle-freshness.cljs" :cd false}
 
   ;; network-awai/cloud-itonami の公開サイト面（`{org}.itonami.cloud/{repo}`、
   ;; ADR-2607301300 → ADR-2608057000）。
