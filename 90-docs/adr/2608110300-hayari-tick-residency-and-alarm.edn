@@ -1,7 +1,7 @@
 [{:db/id -1
   :adr/id "adr-2608110300-hayari-tick-residency-and-alarm"
   :adr/title "ADR-2608110300: hayari tick の常駐先と、無人ループの警報 — 死んだループは自分の死を報告できない"
-  :adr/status "proposed"
+  :adr/status "partially implemented: stages 1-2 landed 2026-08-11, stages 3-5 not started"
   :adr/doc_type "adr"
   :adr/date "2026-08-11"
   :adr/deciders ["Jun Kawasaki"]
@@ -128,7 +128,37 @@ hayari tick は `git push`（repo write）と `gh api`（pin 前進）をする�
 **credential の総量は増えない** —— ラップトップから 1 台へ移すだけで、
 持つマシンの数は 1 のまま。これが「10 台に配る」との決定的な違いである。
 
-### 移設に要るもの（未検証、実装時に実測すること）
+### ノード実測（2026-08-11）—— 「未検証」を潰した結果、候補が変わった
+
+上の草案は `asher` を候補に挙げたが、**測る前に書いていた**。実際に叩いた結果:
+
+| | asher（rotation 内） | zebulun（rotation 外） |
+|---|---|---|
+| uptime | **71 日** | 到達可 |
+| node / git | v26.4.0 / 2.50.1 | v26.4.0 / 2.50.1 |
+| nbb | **あり** | **なし** |
+| gh | **なし** | — |
+| GitHub egress | 200 | **接続失敗** |
+| Wikimedia egress | 200 | — |
+
+**`zebulun` の caps が空なのは「除外されている」からではなく、egress が無いから**である。
+したがって **常時稼働で外に出られるのは gate rotation の中のノードだけ**であり、
+「rotation 外の暇なマシンを operator にする」という素朴な案は成立しない。
+
+さらに 10 台とも `:reachable? true` で、**rotation から外す仕組みが存在しない** ——
+`probe.cljs` が capability を検出して `nodes.edn` を生成し、`tick.cljs` の `slots` が
+`:caps` で絞るだけなので、手で caps を空にしても次の probe が書き戻す。
+
+### したがって Path 1 には probe 側の小さな追加が要る
+
+**gate rotation から明示的に外す宣言**（例: `:role :operator` を probe が尊重し、
+`slots` が拾わない）。これが無いまま credential を置くと、**gate コードを実行する
+マシンが credential を持つ**ことになり、不変条件 3 が守ろうとしているものを
+実質的に壊す —— 条文ではなく趣旨で負ける。
+
+外した 1 台は 9 slot 中 1 slot 分の gate 容量を失う。それが移設の実費である。
+
+### 移設に要るもの（実測で確定した残り）
 
 1. `nbb` がノードに在るか（`:caps` に `:node` はあるが nbb は別）
 2. GitHub への push 経路 —— **repo scope を絞った deploy key**（`cloud-itonami/hayari`
@@ -159,6 +189,55 @@ hirameki-harvest / newsfeed-ingest / fleet-ci-tip-tick、うち 3 つが LOADED�
 4. plist を `scripts/fleet-ci/` へ移す（移設とは独立に正しい）
 5. **そこで初めて**常駐先を移す。ラップトップ側を unload、ノード側を load、
    1 tick を実測してから放置
+
+## 移設の必要性そのものを測り直す（2026-08-11 追記）
+
+「murakumo で安定させる」を検討する過程で、**そもそも何が不安定なのか**を測った。
+答えは **データは既に構造的に失われない**である:
+
+- 収集する日は「まだ持っていない最新の日」を毎回選ぶ。走らなかった分は次に走った時に
+  拾う —— **取りこぼしという状態が存在しない**
+- 2021-01-01 以降の全日はいつでも再取得できる（実測）。古くなって取れなくなる日は無い
+- 実測 88% 発火・最大 gap 24 分・60 分超の穴ゼロ・失敗 0
+
+つまり**ラップトップが停まって失われるのはデータではなく latency だけ**である。
+1 週間止まっても、再開後 1 日で 96 日ぶん取り戻す。
+
+さらに backfill が終われば定常状態は 1 日 1 日で、**1 日 15 分でも動けば追いつく** ——
+移設の便益は時間とともに小さくなる。
+
+**したがって murakumo 移設の正しい理由は「正しさ」ではなく「無人性」である。**
+ラップトップを開かなくても回り続けてほしい、という運用上の要求であって、
+データを守るための必須要件ではない。そう書いておかないと、後から読む人が
+「移設しないとデータが壊れる」と誤読する。
+
+## 実装状況（2026-08-11）
+
+**段階 1-2 は着地済み。3-5 は未着手。**
+
+| 段階 | 状態 |
+|---|---|
+| 1. gate を作る | ✅ `scripts/fleet-ci/gates/hayari-tick-alive.cljs` + `gates.edn` |
+| 2. 落ちることを実測 | ✅ 6 分岐すべて exit code で確認 |
+| 3. 遷移通知を tip 側に | ⬜ 未着手 |
+| 4. plist を scripts/fleet-ci/ へ | ⬜ 未着手 |
+| 5. 常駐先を移す | ⬜ 未着手 |
+
+段階 2 の実測（登録前に全分岐を確認した）:
+
+```
+現行データ      exit 0    心拍 40h 前     exit 1
+連続失敗 2      exit 1    連続失敗 1      exit 0（一過性として通す）
+health entity 無し exit 1  要約ファイル無し exit 1
+```
+
+**ファイルが無い場合を pass にしていない。** 証拠の不在は健全性の証拠ではなく、
+入力が消えたときに黙る gate は、まさにこの gate が捕まえるべき欠陥を自分が持つ
+ことになる。
+
+実装中に 1 つ落とし穴を踏んだので記録する: tick は UTC を 'Z' 無しで書き、
+**JS はサフィックス無しの `YYYY-MM-DDTHH:MM:SS` をローカル時刻として解釈する**。
+そのままだと JST 環境で心拍が 9 時間未来に見え、staleness 判定が永久に通る。
 
 ## 非目標
 
