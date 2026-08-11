@@ -1,0 +1,32 @@
+;; residency-baseline.edn — `scripts/residency-collect.cljs --check` の ratchet。
+;;
+;; **これは「許した」という記録ではなく「今日の実測値」である。** 未宣言の常駐が
+;; これより増えたら落とす。減ったらこの数を下げる。**永久に赤い gate は gate が
+;; 無いのと同じ**なので、既存の 21 本を理由に毎回落とすことはしない —— 増加だけを
+;; 捕まえる。docs-edn-only verify の「accepted baseline に無い新しい .md」と同じ作法。
+;;
+;; :missing / :dead / :slot-breach は baseline を持たない。あちらは「今は無い」を
+;; 守る回帰ガードで、1 本でも出たら落ちる（2026-08-11 時点でどれも 0）。
+;;
+;; 実測 2026-08-11（棚卸し後、ADR-2608111721 の第 2・第 3 項目）:
+;;
+;;   installed 29 / declared 8 / undeclared 21 / missing 0 / dead 0 / slot-breach 0
+;;
+;; 未宣言 21 本の内訳（すべてこのラップトップにしか plist が無い）:
+;;   ai.gftd.*                6  malak-trap-sync monitor murakumo recruit.press-signals
+;;                               yukkuri-renderer yukkuri-tunnel
+;;   com.murakumo.*           5  infer-gateway relay relay-tunnel verify-payments voicevox-engine
+;;   com.gftdcojp.itonami.*   4  expiry-alert kakuninya mail-drain state-snapshot
+;;   com.gftd.*               3  hayari-mirror playtest-coscientist shinshi-kaizen-tick
+;;   その他                    3  cloud.itonami.noren.resident
+;;                               com.network-awai.hyakka-knowledge-ingest
+;;                               jp.co.gftd.m365-archive-backup
+;;
+;; うち 4 本（com.gftdcojp.itonami.expiry-alert / kakuninya / mail-drain と
+;; hayari-mirror）は repo 側に plist が在るのに `residency.edn` が無いだけなので、
+;; 宣言を書けばすぐ減る。残りは plist ごとこの 1 台にしか存在しない。
+
+{:undeclared 21
+ :measured-at "2026-08-11"
+ :host :operator-laptop
+ :note "この数は下げるためにある。上げるときは理由を書くこと。"}
