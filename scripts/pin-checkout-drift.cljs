@@ -106,6 +106,15 @@
       ;; exit 1 = not an ancestor; anything else = git could not decide
       (if (= 1 (.-status e)) false nil))))
 
+(defn has-commit?
+  "Does `dir` actually hold the commit object `sha`?"
+  [dir sha]
+  (try
+    (cp/execFileSync "git" (clj->js ["-C" dir "cat-file" "-e" (str sha "^{commit}")])
+                     #js {:stdio "ignore"})
+    true
+    (catch :default _ false)))
+
 ;; ---------------------------------------------------------------- report
 
 (def projects (parse-west (fs/readFileSync west "utf8")))
@@ -125,16 +134,24 @@
 
 (println (str "checked out and differing from pin: " (count rows)))
 
+;; A checkout that never fetched the pin cannot be classified at all: git answers
+;; neither ancestry question, and folding that `nil` into `:diverged` reads as
+;; "genuinely forked, leave it alone". Measured 2026-08-11: 46 rows landed in the
+;; old combined bucket and 42 of them were plainly BEHIND once fetched — the scan
+;; was about to under-measure every one. Missing objects get their own bucket so
+;; "I don't know yet" is never printed as "nothing to do".
 (def classified
   (mapv (fn [{:keys [dir pin head] :as r}]
           (assoc r :rel (cond
+                          (not (has-commit? dir pin))      :unfetched
                           (= true (ancestor? dir head pin)) :behind
                           (= true (ancestor? dir pin head)) :ahead
-                          :else :diverged-or-unknown)))
+                          :else :diverged)))
         rows))
 
 (doseq [[k label] [[:behind "BEHIND pin (scan would under-measure these)"]
-                   [:diverged-or-unknown "DIVERGED / unresolvable"]
+                   [:unfetched "UNFETCHED pin — unclassified, may be hiding BEHIND (fetch, then re-run)"]
+                   [:diverged "DIVERGED (pin present, neither reachable)"]
                    [:ahead "ahead of pin (normal for self-committing actors — leave alone)"]]]
   (let [g (filterv #(= k (:rel %)) classified)]
     (println (str "\n── " label ": " (count g)))
@@ -144,8 +161,19 @@
     (when (and (= k :ahead) (> (count g) 10))
       (println (str "  … and " (- (count g) 10) " more")))))
 
+;; Fetch before sync: the unfetched rows cannot be ruled out as behind, and a
+;; sync list built while they are still unclassified is silently incomplete.
+;; `git fetch origin` is wrong here — west names each remote after its org
+;; (`kotoba-lang`, `network-awai`, …), so bare `origin` dies with "does not
+;; appear to be a git repository" and the row stays unclassified.
+(let [unfetched (filterv #(= :unfetched (:rel %)) classified)]
+  (when (seq unfetched)
+    (println "\nfetch these first, then re-run this script (they may be BEHIND):")
+    (println (str "  printf '%s\\n' " (str/join " " (map :path unfetched))
+                  " | xargs -P 6 -I{} git -C " root "/{} fetch --all --quiet"))))
+
 (let [behind (filterv #(= :behind (:rel %)) classified)]
   (when (seq behind)
-    (println "\nto sync just these to their pins:")
+    (println "\nto sync just these to their pins (west skips checkouts holding local WIP):")
     (println (str "  printf '%s\\n' " (str/join " " (map :name behind))
                   " | xargs west update --fetch smart"))))
