@@ -232,6 +232,30 @@
   ;; 対象子 repo は authority の :checked-repos から引く。全て public なので
   ;; ノードは token 無しで raw.githubusercontent から取れる（ノードに credential を
   ;; 置かない不変条件はそのまま）。
+  ;; hayari の無人ループが生きているか。
+  ;;
+  ;; **死んだループは自分の死を報告できない。** tick は健全性を commit 済み要約に
+  ;; 書くが、それは「動いているが失敗している」しか報告できない —— 起動しなくなれば
+  ;; :last-run-at はそのまま残り、他の数字も全部健全に見える。設置直後に実際に
+  ;; 起きた（west update が失敗し、pin だけ進んで query 面が 4 日遅れたまま座り、
+  ;; 痕跡は /tmp のログ 1 行だけだった）。古い心拍を古いと判定する主体がこれ。
+  ;;
+  ;; hayari は public なので **credential を要さない** —— repository-roles gate と
+  ;; 同じく、ノードに credential を置かない不変条件 3 を保ったまま置ける。
+  ;;
+  ;; 閾値の根拠: :last-run-at はニュースのある run でのみ進む（backfill 中は毎 tick、
+  ;; 完了後は日次）ので 36h 超は「暇だった」ではなく「止まった」。連続失敗は 1 回を
+  ;; 一過性として通す —— **常時赤い gate は gate が無いのと同じ**という登録簿の
+  ;; 既存の教訓をここでも守る。
+  ;;
+  ;; 6 分岐すべてを実測してから登録した（2026-08-11）: 現行データ=0、心拍 40h=1、
+  ;; 連続失敗 2=1、連続失敗 1=0、health entity 無し=1、要約ファイル無し=1。
+  ;; :min-files が 2 なのは data/ と gates/ の .edn/.cljs が届けば足りるため。
+  {:name "hayari" :id "hayari-tick-alive" :org "cloud-itonami" :gate :nbb-script
+   :script "gates/hayari-tick-alive.cljs"
+   :script-args ["--max-age-hours" "36" "--max-failures" "1"]
+   :include-ext [".edn" ".cljs"] :min-files 2 :cd false}
+
   {:name "root" :id "root-repository-roles" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/repository-roles-check.cljs" :script-args ["--min" "20"]
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
