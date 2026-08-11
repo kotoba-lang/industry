@@ -100,3 +100,30 @@
  :not-done "**rule を `:measured` で gate するかは決めていない。** そうすると上記 3 サイトの所見が window 1 本ぶん（babiniku は 08-17 まで）黙る。注釈付きの数字より沈黙を選ぶかは product の判断で、この skill の範囲外 —— 2026-08-11 の kotobase 回で dedup の意味論を人に残したのと同じ理由"
  :still-open "id が window を含むので同じ問いが毎日新しい id で再発火する件（本 ledger 直前の :structural）は未解決のまま。今日の babiniku は初回なので影響していないが、明日以降 08-06_2026-08-12 として再発火する"
  :note "Keychain は `net-babiniku TELEMETRY_REPORT_SECRET` / `net-kotobase KAIYU_REPORT_SECRET` / `cloud-itonami KAIYU_REPORT_SECRET` / `cloud-itonami KAIZEN_INGRESS_KEY` を service 名で 1 件ずつ狙い撃ち取得（総当たりなし）。read face への request は読み取りのみで、行を書いて collected-since を埋めるようなことはしていない"}
+{:status :woke, :window {:days 7, :from "2026-08-05", :to "2026-08-11"}, :site "babiniku.net", :issue-id "kaizen:babiniku.net:dead-end-chat:2026-08-05_2026-08-11", :severity "medium", :candidates 4, :fresh 2, :at "2026-08-11T14:05:29.861Z"}
+{:status :blocked-at-ingress
+ :at "2026-08-11"
+ :issue-id "kaizen:itonami.cloud:single-channel-direct:2026-08-05_2026-08-11"
+ :site "itonami.cloud"
+ :tenant {:org "network-awai" :repo "cloud-itonami"}
+ :severity :medium
+ :ingress {:response 503 :error "kaizen intake is not provisioned for this tenant"}
+ :verification "候補の数字を read face（GET /api/kaiyu?window_days=7、Bearer）に当てて確認。visits.rows = [{direct 4756} {search 10} {referral 8} {campaign 1}] で合計 4775 —— tick の evidence {:source \"direct\" :visits 4756 :total 4775} と完全一致。collected-since 2026-08-08 / state partial も本文の「根拠の範囲」行と一致（昨日 landed した coverage 表示が実データで効いていることの確認でもある）"
+ :fourth-day "**この問いは 4 日続けて filing できていない。** 08-08 は同じ 503、08-09 と 08-10 は tick が候補を出したがモデルの起動に失敗（ledger の :woke 行）。itonami.cloud は 4 サイトのうち唯一『自分の tenant に書く』サイトで、そこだけが書けない状態が続いている"
+ :blocker-is-not-cloudflare "**08-08 の記述を精密化する。** あの時は『permission classifier に拒否された』とだけ書いたが、今日 KV の read を実際に通したところ:
+ ①namespace e9857fe8617440e59f9720293dc53afd（title ITONAMI_DATA）は現在の account ai-gftd-cloud（4da88288…）に**在る**
+ ②OAuth token の scope に `workers_kv (write)` が**在る**
+ ③key `kaizen:network-awai/cloud-itonami:ingress-key-sha256` の GET は **404**（= 鍵が無いことの直接確認。08-08 は prefix list からの推定だった）
+ つまり Cloudflare 側の権限は足りている。止めているのは**手元の agent permission gate だけ**で、owner が :next のコマンドを 1 回叩けば通る"
+ :false-401 "最初の KV read は 401 を返し、同じコマンドの再実行で 404 になった（token refresh との race）。**401 を『scope が無い』と読むと誤診する** —— whoami と namespace list で裏を取ること"
+ :next "08-08 と同一。printf '%s' \"$(security find-generic-password -a cloud-itonami -s 'cloud-itonami KAIZEN_INGRESS_KEY' -w)\" | shasum -a 256 | awk '{print $1}' | tr -d '\\n' > /tmp/d.txt && npx wrangler kv key put 'kaizen:network-awai/cloud-itonami:ingress-key-sha256' --path /tmp/d.txt --namespace-id e9857fe8617440e59f9720293dc53afd --remote && rm -f /tmp/d.txt"
+ :instrument-fix "**filing が塞がっている間に、計器の側の嘘を 1 つ直した。** title は `Math/round` で 4756/4775 = 99.6% を『到達の **100%** が「direct」』と書いていた。丸めで消えた 19 件（search 10 / referral 8 / campaign 1）は、その finding 自身の問い『この入口が止まったときに残るものがあるか』の**答えそのもの**なので、title が問いを先回りして否定していた"
+ :fix {:repo "kotoba-lang/kaiyu"
+       :merged "2d8e4564a2efc604a1f47e3bdc6b8a587d6a1b6f"
+       :branch "agent/share-pct-floor"
+       :what "`share-pct` を足して floor する。floor は share を過大に言えないので、100% は tail が実際に空のときにしか出ない"
+       :tests "実測値そのもの（4756/4775 → 99%）と単一 source（40/40 → 100%）の 2 case。JVM / nbb 両方で 34 tests / 152 assertions green"
+       :west-pin "fab255fc1b60→2d8e4564a2ef（west-pin-put.cljs で単一 entry、root commit 00e64fdaa58。verify-west-pins.cljs が fast-forward を確認）"
+       :effect "実データで再確認: itonami.cloud 100%→**99%**、kotobase.net 99%→**98%**（324/328 = 98.78）。babiniku / shinshi は acquisition finding を持たないので不変"}
+ :not-done "①issue を提案できていない（503。**未着地として扱うこと**）②KV provisioning は実行していない —— agent permission gate に 2 回拒否された（08-08 と今日）。回避を試みていない ③今日 POST した body は修正前の『100%』の title だった。503 で何も書かれていないので、次に通ったときは 99% の title で入る（id は同じ）④dedup の構造問題（id が window を含むので同じ問いが毎日新しい id で再発火）は未着手のまま。itonami は一度も landed していないので今日は影響していないが、通った翌日から効いてくる"
+ :note "read face への request は読み取りのみ。Keychain は `cloud-itonami KAIYU_REPORT_SECRET` / `cloud-itonami KAIZEN_INGRESS_KEY` を service 名で 1 件ずつ狙い撃ち取得（総当たりなし）。wrangler の debug log に refresh token が平文で残るので、log は読んだが値は転記していない"}
