@@ -174,8 +174,49 @@
            "(host-only にするか、別ドメインへ移す)")))
 
 ;; ---------------------------------------------------------------------------
+;; D. `.well-known` が実体なしで 200 HTML を返さない（ADR-0044 / ADR-2608111721）
+;;
+;; **同じ surface の同じ規則の、別の入口。** B が見ているのは `/{org}/{repo}` の
+;; 未知 404 で、こちらは `/.well-known/*` の未知 404。実測 2026-08-11、B が緑の
+;; まま `/.well-known/did.json` と `/.well-known/zzz-nope.json` が **200 text/html**
+;; （`_redirects` の `/* /index.html 200` が拾った SPA）を返していた —— KRP §4 rule 8
+;; 違反が、B の管轄の隣に残っていた。
+;;
+;; **repo 側の検査をそのまま呼ぶ**（B と同じ理由。検査ロジックを gate に複製すると
+;; 片方だけ通る状態が黙って生まれる）。repo 側は `functions/_middleware.js` を実際に
+;; import し、`context.next()` を差し替えて上流の content-type を変える。
+;;
+;; 床が 8 なのは、この検査が守っているものが 8 分岐あるから —— **うち 3 つは回帰**
+;; （apex は HTML のまま / `/api/*` の JSON は無傷 / `/api/*` の html-leak は 502 のまま）
+;; で、guard を足したことで別の surface を壊していないことを見ている。減ったら落とす。
+
+(let [{:keys [rc out]} (run "npx" ["nbb" "test/well_known_guard_test.cljs"])
+      ok-count (count (re-seq #"(?m)^ok\s" (str out)))
+      failed (re-find #"(\d+) FAILED" (str out))]
+  (println "D well-known:" ok-count "checks ok, rc=" rc)
+  (cond
+    (str/includes? (str out) "harness error")
+    (do (println (tail out 10))
+        (fail! "well-known" "ハーネスが _middleware.js を import できない"))
+
+    failed
+    (do (println (tail out 20)) (fail! "well-known" (nth failed 1) "checks failed"))
+
+    (not (str/includes? (str out) "all pass"))
+    (do (println (tail out 20))
+        (fail! "well-known" "完了行が無い — 途中で死んでいる可能性"))
+
+    (< ok-count 8)
+    (do (println (tail out 12))
+        (fail! "well-known" ok-count "checks < 8 — 分岐が減っている"))
+
+    (not (zero? rc))
+    (do (println (tail out 10)) (fail! "well-known" "nbb exited" rc))))
+
+;; ---------------------------------------------------------------------------
 
 (if (seq @failures)
-  (die! 1 (count @failures) "of 3 sites checks failed:" (str/join ", " @failures))
+  (die! 1 (count @failures) "of 4 sites checks failed:" (str/join ", " @failures))
   (println "OK — sites registry is canonical, the built bundle enforces both the"
-           "path-mode and org-host rules, and no Domain-scoped cookie exists"))
+           "path-mode and org-host rules, .well-known does not fall through to the"
+           "SPA, and no Domain-scoped cookie exists"))
