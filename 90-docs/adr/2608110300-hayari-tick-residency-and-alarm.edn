@@ -1,7 +1,7 @@
 [{:db/id -1
   :adr/id "adr-2608110300-hayari-tick-residency-and-alarm"
   :adr/title "ADR-2608110300: hayari tick の常駐先と、無人ループの警報 — 死んだループは自分の死を報告できない"
-  :adr/status "partially implemented: stages 1-4 landed 2026-08-11; stage 5 BLOCKED on an owner action (deploy keys disallowed in cloud-itonami)"
+  :adr/status "accepted, implemented"
   :adr/doc_type "adr"
   :adr/date "2026-08-11"
   :adr/deciders ["Jun Kawasaki"]
@@ -293,4 +293,88 @@ health entity 無し exit 1  要約ファイル無し exit 1
 - **新しい通知インフラは作らない。** gate が赤くなるのが house の作法で、
   人間向けは既存の macOS 通知で足りる
 - **ノードに汎用 token を置かない。** 移すなら repo scope を絞った鍵だけ
+
+
+## 決定 B は実装された —— ただし deploy key ではなく Radicle 経由で（2026-08-11、追記）
+
+**この ADR は当初 stage 5 を『owner action 待ちで BLOCKED』として閉じていた。
+その診断は不完全だった。** GitHub への書き込み経路が塞がっていることは正しかったが、
+**この workspace には既に別の publish 面があり、それを見ていなかった**（「無い」と
+結論する前に索引を引く、という repo-wide の規則を、自分が満たしていなかった）。
+
+### 塞がっていたもの（実測）
+
+`cloud-itonami` の org 設定が **`deploy_keys_enabled_for_repositories: false`**。
+repo admin を持っていても deploy key は作れず、org 設定の変更には `admin:org` が要り、
+token は `gist, read:org, repo` しか持たない。installed な GitHub App（`claude`）は
+private key が手元に無いので installation token も鋳造できない。
+
+**org 設定は反転させなかった。** 単一 repo の可用性のために org 全体の鍵ポリシーを
+緩めるのは、この ADR が決定 B で退けた『可用性のために機密性を売る』取引そのもの。
+
+### 開いていたもの
+
+自前 Radicle seed **`gad`**（tailnet 100.82.98.110:8776）に **623 repo が実登録**されており、
+`scripts/rad-register.cljs` / `rad-delegate-add.cljs` という house tooling まで揃っていた。
+hayari を `rad:z5GnP9asXmnYf2i9TG2LcV2hvC2W` として登録し、asher の identity
+`did:key:z6MkpLHhLiKcjKxFf4g95LpgqBvrPwkoJoK8yaFV9nQMdYzm` を delegate に追加した。
+
+### 実装 — 台数ではなく経路を割る
+
+決定 B は『1 台へ移す』と書いていたが、実際に landed したのは **役割で割る**形:
+
+| | 機械 | 持つ鍵 | すること |
+|---|---|---|---|
+| collect | asher（72 日連続） | **自己発行の Radicle 鍵のみ** | 収集 → commit → `git push rad` |
+| mirror | laptop | 既存の GitHub token + S3 creds | rad/main → ff → GitHub、custody、pin 前進 |
+
+**GitHub token の blast radius は増えていない** —— 常時稼働機へ移すことへの反対理由
+そのものだった点である。asher の鍵が与えるのは『この repo を publish する権利』だけ。
+
+**書き手はちょうど 1 人**（asher）。mirror は ff しかせず、ff できない = 書き手が 2 人に
+なった、として落ちる。
+
+### 実測（両常駐だけで 1 周）
+
+```
+asher   collect → 2026-05-15 → push rad → Canonical refs/heads/main updated · Synced with 1 seed
+laptop  mirror: GitHub main now 729b08e2 · 1 new day(s): 2026-05-15
+        hayari persist: 1 日ぶんを預けた   ← s3.kotobase.net へ custody
+        pin: batching until 4
+```
+
+custody は 2026-05-14 まで連続（raw 71 → 76 件）。
+
+### 回してみるまで見えなかった 2 つの欠陥
+
+どちらも『もっともらしく何もしない』形で、テストでは緑に見えた:
+
+1. mirror が `ensure-clone` で先に `rad/main` へ reset していたため、差分を自分自身と
+   比べて **新しい日が常に 0**。2 日到着しているのに `nothing new` と報告した
+2. `persist` の `--data` 既定が単機 clone (`~/.gftd/hayari-tick`) を指しており、別 clone
+   から動く mirror は **1 日も預けずに成功と報告した**
+
+3. **設計者が自分の規則を破って両面を分岐させた。** mirror は ff しかしないので、
+   commit は必ず Radicle から入らなければならない。deploy の README を GitHub へ
+   直接 push した結果、asher の clone が `Not possible to fast-forward` で詰まり、
+   手で merge して押し直すまで両面が分岐したままになった。
+
+   **したがって規則は『GitHub へ直接 push しない』。** data だけでなくコード変更も
+   同じ経路（asher → `git push rad` → mirror が運ぶ）を通す。GitHub は純粋な mirror
+   であって、書き込み先ではない。この規則は `deploy/README.md` にも書いた ——
+   破ったのが規則を書いた本人だったので、prose だけでは足りないことの実例である
+   （mirror がここで**黙って進まず落ちる**のは、そのための設計）。
+
+### 常駐の機構（実測で決まった）
+
+asher には**ログインセッションが無い**（`who` が空）ので LaunchAgent は
+`bootstrap gui/$UID` が `Domain does not support specified action`、`crontab` は TCC で
+`Operation not permitted`。したがって `/Library/LaunchDaemons` に `UserName asher` で置く。
+
+### 残る非対称（正直に）
+
+**警報は依然 laptop にある。** collect が止まれば heartbeat が古くなり、mirror が
+止まれば GitHub が進まなくなるので、どちらも同じ gate で捕まる —— **ただし laptop が
+落ちれば警報も落ちる**。credential が laptop にしか無いことの帰結で、鍵の置き場が
+変わるまで構造的に解けない。収集そのものは laptop と無関係に進み続ける。
 "}]

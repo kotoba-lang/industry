@@ -100,8 +100,17 @@ git に入る**。1 日 0.6 MB × 2,046 日を git 履歴に積むところだ�
 
 ## 運用
 
-`bin/persist.cljs` を tick が毎回呼ぶ（新しい日だけ、冪等）。**custody に失敗しても
+`bin/persist.cljs` を **mirror が呼ぶ**（新しい日だけ、冪等）。**custody に失敗しても
 tick は止めない** —— 観測は取り直せるので、custody の失敗はデータの喪失ではなく遅延。
+
+**2026-08-11 に呼び出し元が変わった**（ADR-2608110300）。収集する機械（asher）は
+S3 の資格情報を持たないので、custody は資格情報のある側＝mirror が行う。raw は
+collect が `data/day-<day>.datoms.edn` に残し、mirror が scp で取り寄せる。
+
+**`--data` は必ず名指しする。** 既定は単機 clone (`~/.gftd/hayari-tick`) を指すので、
+別の clone から動く mirror がそれを読むと **1 日も預けずに「新しい日は無い」と報告する**。
+実測 2026-08-11、そう報告した（この ADR が繰り返し記録している『不在に見えるが
+不在ではない』の 3 例目 —— 今度は不在なのはファイルではなく、正しい入力の指定だった）。
 
 資格情報は `~/.gftd/hayari-s3-creds`（mode 600、2 行）から読む。kagi は
 **launchd 下で Keychain unlock prompt を出せない**ので常駐から使えず、plist は
