@@ -115,8 +115,13 @@
 
   ⚠ ここに足すだけでは足りない。**そのホストで実際に gate が動いていないこと**を
   確認してから credential を置くこと（tick.cljs の slots は :caps で絞るので、
-  probe を回し直して nodes.edn が更新されるまで古い caps が使われる）。"
-  #{"asher"})
+  probe を回し直して nodes.edn が更新されるまで古い caps が使われる）。
+
+  **いまは空。** 2026-08-11 に asher を入れて実際に外したが、移設が
+  `cloud-itonami` の org ポリシー（deploy key の作成が禁止、token に admin:org 無し）
+  で止まったため戻した —— **完了できない移設のために gate 容量を人質に取らない。**
+  credential が用意できた時にホスト名を 1 つ入れ、probe を回し直すところから再開する。"
+  #{})
 
 (defn classify
   "実測値 → gate 割り当てに使う capability。ディスク余力を cap の条件に含めるのは
