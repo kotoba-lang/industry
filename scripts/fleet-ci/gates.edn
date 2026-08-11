@@ -704,18 +704,25 @@
    :script "gates/cloud-itonami-sites-check.cljs"
    :script-args ["--min-checks" "27" "--min-reserved" "30"] :cd true}
 
-  ;; cloud-itonami の kotoba 決定核。実測 2026-08-12、**これらを走らせるものが
-  ;; 何も無かった** —— この repo の Actions は無効（`enabled: false`、最後の CI は
-  ;; 2026-08-04 で失敗）、fleet 側の entry は上の sites-check だけ。6 本の型付き
-  ;; core・その parity gate・native 実行・wasm 実行が、誰にも見られていなかった。
+  ;; **cloud-itonami に JVM gate は置けない。** 2026-08-12 に置こうとして、
+  ;; 実測で撤回した。理由は alias ではなく repo の deps.edn そのもの:
+  ;; **base の `:deps` が sibling `:local/root` を 116 個持っている**
+  ;; （`../../kotoba-lang/*`、`../../cloud-itonami/cloud-itonami-isic-*` …）。
+  ;; fleet は 1 repo の tree しか配らないので、alias を選ぶ前に classpath 解決が
+  ;; 落ちる:
   ;;
-  ;; `:test` は gate にできない —— fleet は 1 repo の tree しか配らないのに、
-  ;; `:test` は `../../kotoba-lang/kototama` 等の sibling を掴む。repo 側に git
-  ;; だけで解決する `:kernels` を用意してあり、`:alias` でそれを指す。
+  ;;   Error building classpath. Local lib io.github.kotoba-lang/stripe-ops
+  ;;   not found: .../kotoba-lang/stripe-ops
   ;;
-  ;; 46 tests / 3,638 assertions。ノードは JDK と cc を持つ（native 実行が要る）。
-  {:name "cloud-itonami" :id "cloud-itonami-kernels" :org "network-awai"
-   :gate :jvm-test :alias "kernels" :cd true}
+  ;; sibling を持たない `:kernels` alias（repo 側 68b7916、46 tests /
+  ;; 3,638 assertions）を足しても解けない —— alias の extra-deps が git だけでも、
+  ;; base の :deps が先に評価される。
+  ;;
+  ;; したがって cloud-itonami の 6 本の型付き core・parity gate・native 実行・
+  ;; wasm 実行は**今も何にも検査されていない**（Actions も無効、最後の run は
+  ;; 2026-08-04 で失敗）。解くには repo の base :deps を git 座標へ移すか、
+  ;; ノード側で west workspace を再現するか、gate を :nbb-script にして JVM を
+  ;; 使わない検査に絞るかのいずれかで、どれも別の変更。
 
   ;; kotoba-lang/amu の JDK-free 経路（Amu ADR-0202）。
   ;;
