@@ -2,7 +2,7 @@
 ;; probe.cljs — fleet-ci node capability probe (ADR-2607178000 の Phase B)。
 ;;
 ;; murakumo fleet の各 mac mini に SSH して CI gate を実行できる toolchain
-;; （JVM/clojure・node/npx）と余力（cores・空きディスク）を実測し、
+;; （JVM/clojure・node/npx・Zig）と余力（cores・空きディスク）を実測し、
 ;; scripts/fleet-ci/nodes.edn を生成する。tick.cljs はこの registry だけを見て
 ;; gate を割り当てるので、ノードの増減・provision は「probe を回し直す」だけで
 ;; 反映される（ノード名を runner にハードコードしない — ADR の
@@ -66,6 +66,8 @@
     "echo node=$(command -v node)"
     "echo nodev=$(node -v 2>/dev/null)"
     "echo npx=$(command -v npx)"
+    "echo zig=$(command -v zig)"
+    "echo zigv=$(zig version 2>/dev/null)"
     "echo curl=$(command -v curl)"
     "echo tar=$(command -v tar)"
     "echo git=$(command -v git)"]))
@@ -105,7 +107,7 @@
   clojure の maven cache / tarball 展開が数 GB 食うため — 空き 1–2GB のノードに
   JVM gate を投げると途中で落ちて false fail になる（naphtali/issachar が実際に
   この状態）。"
-  [{:keys [reachable? javahome clojure npx curl tar] :as n}]
+  [{:keys [reachable? javahome clojure npx zig curl tar] :as n}]
   (if-not reachable?
     (assoc n :caps #{} :max-parallel 0)
     (let [free (num (:freegb n))
@@ -116,17 +118,20 @@
           loopback? (= "yes" (:loopback n))
           base? (and (seq curl) (seq tar) loopback?)
           jvm? (and base? (seq javahome) (seq clojure) (>= free 8))
-          node? (and base? (seq npx) (>= free 5))]
+          node? (and base? (seq npx) (>= free 5))
+          ;; Zig gates are nbb-script gates, so the runner itself still needs
+          ;; npx/nbb in addition to the compiler it will invoke.
+          zig? (and base? (seq npx) (seq zig) (>= free 5))]
       (assoc n
              :cores cores
              :free-gb free
-             :caps (cond-> #{} jvm? (conj :jvm) node? (conj :node))
+             :caps (cond-> #{} jvm? (conj :jvm) node? (conj :node) zig? (conj :zig))
              ;; 1 gate ≒ 1 JVM + maven。10 コアで 2 本までに抑える（他の
              ;; fleet 用途 — 推論・マイニング — と同居している前提）。
              :max-parallel (max 1 (min 2 (quot cores 4)))))))
 
 (defn edn-node [n]
-  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx caps max-parallel detail loopback]} n]
+  (let [{:keys [host reachable? os cores free-gb javahome clojure node nodev npx zig zigv caps max-parallel detail loopback]} n]
     (str "  {:host " (pr-str host)
          " :reachable? " (pr-str (boolean reachable?))
          (when os (str " :os " (pr-str os)))
@@ -137,6 +142,8 @@
          (when (seq node) (str "\n   :node " (pr-str node)))
          (when (seq nodev) (str " :node-version " (pr-str nodev)))
          (when (seq npx) (str " :npx " (pr-str npx)))
+         (when (seq zig) (str "\n   :zig " (pr-str zig)))
+         (when (seq zigv) (str " :zig-version " (pr-str zigv)))
          (when (and reachable? (= "no" loopback))
            (str "\n   :loopback? false"))
          (when reachable? (str "\n   :caps " (pr-str (or caps #{})) " :max-parallel " (or max-parallel 0)))

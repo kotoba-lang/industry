@@ -766,7 +766,9 @@
   速度は cores・free-gb・live load1 から出す。"
   [work nodes]
   (let [costs (read-costs)
-        by-cap (group-by (fn [w] (if (= :jvm-test (:gate w)) :jvm :node)) work)
+        required-cap (fn [w] (or (:cap w)
+                                 (if (= :jvm-test (:gate w)) :jvm :node)))
+        by-cap (group-by required-cap work)
         ;; live load は「これから使う候補ノード」だけ測る
         hosts (into #{} (map :host) (filter #(and (:reachable? %) (seq (:caps %))) nodes))
         loads (into {} (map (fn [h] [h (live-load h)])) hosts)
@@ -799,8 +801,9 @@
                      (conj (vec (remove #(= (:idx %) (:idx best)) st)) best)]))
                 [[] slots']
                 ordered)))))
-        assigned (into (chunk (:jvm by-cap) (slots nodes :jvm))
-                       (chunk (:node by-cap) (slots nodes :node)))]
+        assigned (vec (mapcat (fn [cap]
+                                (chunk (get by-cap cap) (slots nodes cap)))
+                              (sort (keys by-cap))))]
     (when (seq loads)
       (log "placement: " (str/join " " (map (fn [[h l]] (str h "=" (or l "?"))) (sort loads)))))
     (->> assigned (group-by :batch) (sort-by key) (map second))))
