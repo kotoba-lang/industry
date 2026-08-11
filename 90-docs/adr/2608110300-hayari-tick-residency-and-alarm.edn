@@ -354,6 +354,17 @@ custody は 2026-05-14 まで連続（raw 71 → 76 件）。
 2. `persist` の `--data` 既定が単機 clone (`~/.gftd/hayari-tick`) を指しており、別 clone
    から動く mirror は **1 日も預けずに成功と報告した**
 
+3. **設計者が自分の規則を破って両面を分岐させた。** mirror は ff しかしないので、
+   commit は必ず Radicle から入らなければならない。deploy の README を GitHub へ
+   直接 push した結果、asher の clone が `Not possible to fast-forward` で詰まり、
+   手で merge して押し直すまで両面が分岐したままになった。
+
+   **したがって規則は『GitHub へ直接 push しない』。** data だけでなくコード変更も
+   同じ経路（asher → `git push rad` → mirror が運ぶ）を通す。GitHub は純粋な mirror
+   であって、書き込み先ではない。この規則は `deploy/README.md` にも書いた ——
+   破ったのが規則を書いた本人だったので、prose だけでは足りないことの実例である
+   （mirror がここで**黙って進まず落ちる**のは、そのための設計）。
+
 ### 常駐の機構（実測で決まった）
 
 asher には**ログインセッションが無い**（`who` が空）ので LaunchAgent は
