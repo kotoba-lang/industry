@@ -1,0 +1,176 @@
+[{:db/id -1
+  :adr/id "ADR-2608111400"
+  :adr/title "noren — 事業者の公開面を測って直し、cloud-itonami で月額で売る loop"
+  :adr/status "accepted"
+  :adr/date "2026-08-11"
+  :adr/last_verified "2026-08-11"
+  :adr/doc_type "adr"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "noren-web-presence-subscription-loop"
+  :adr/authoritative_for
+  ["飲食店・EC 事業者の公開面を発見 → 診断 → 処方 → 提案 → 月額課金まで繋ぐ loop の境界と repo 分割"
+   "外部事業者への未依頼の接触に課す HARD 制約（特定電子メール法 3 条 1 項 4 号 / 4 条、主張の evidence 拘束、観測失敗と不在の区別）"
+   "この loop がどの org の面で売るか（cloud-itonami / itonami.cloud）と課金経路（既存 Stripe 請求面。新規経路を作らない）"]
+  :adr/related ["ADR-2607132300" "ADR-2607299000" "ADR-2608082300" "ADR-2608110200" "ADR-2607172600"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/body
+  "# ADR-2608111400: noren — 事業者の公開面を測って直し、cloud-itonami で月額で売る loop
+
+**Status**: accepted **Date**: 2026-08-11 **Deciders**: Jun Kawasaki
+
+## Context
+
+オーナー質問（2026-08-11）「今の cloud-itonami の app, worker に press release,
+飲食店, ec サイトなどの情報収集して、品質が良くない内容を評価して、書き直す。
+またウェブサイトも品質が良くなければ、品質が良いウェブサイトを作成して、
+オーナーに営業、セールスして、月額でうる business loop は設計統合されている?」
+→ 調査の結果 **統合されていなかった**。指示は「ok, do it. cloud-itonami で売りたい」。
+
+### 部品は在って、結線が無かった
+
+| 段 | 実測（2026-08-11） |
+|---|---|
+| プレス収集 | `cloud-itonami/kouhou` は本物（RSS/RDF/Atom、registry 201 件、ADR-2608110200 で永続化）。ただし **whitelist が官公庁・独法・公益法人・官報限定**で民間は構造的に対象外 |
+| 飲食店・EC の発見 | `cloud-itonami-isic-5610` 等は**業種の業務 OS の設計図**であって実在店舗の名簿ではない。observatory 22 件も産業統計 |
+| サイト品質の評価 | **`kotoba-lang/design-quality` が既に在った**（HIG/WCAG 12 軸の決定論的スコアラ、純 cljc + CLI） |
+| 書き直し | kouhou の curate は faithful summary + PublicInfoGovernor で、目的が逆 |
+| サイト生成 | `sites.edn` / `build-sites.cljs` は**自社 repo の公開面**専用。UI 基盤 `jp-go-dds` は流用可 |
+| 営業 | `cloud-itonami/outreach` は Svelte/TS scaffold、`eigyo` は未移行の TS seed、`communicator` は policy-check が planned |
+| 月額課金 | `cloud-itonami-isic-5820`（SubscriptionGovernor + ASC606）+ itonami.cloud の Stripe 請求面。**この loop に未結線** |
+
+**最初の調査で『外部サイトの品質スコアラは無い』と誤答した。** `orgs/cloud-itonami/`
+配下だけを grep して結論しており、`kotoba-lang/design-quality` を見ていない。
+CLAUDE.md の『「無い」と結論する前に索引を引く』の違反で、`repo-search audit quality`
+1 回で見つかった。**この誤りのおかげで新規実装が 1 本減っている。**
+
+## Decision
+
+**新規は 2 repo だけ。** 既存（design-quality / jp-go-dds / crm / isic-5820 /
+itonami.cloud 請求面）はそのまま消費する。
+
+| repo | 面 | 持つもの |
+|---|---|---|
+| `kotoba-lang/noren` | subject（純 `.cljc` library） | prospect / diagnose / prescribe / governor / build / plan |
+| `cloud-itonami/loop-noren` | role（continuous orchestrator） | registry / loop（順序）/ letter（組み立て）/ CLI / journal |
+
+分割は `manifest/repository-rules.edn` の `loop-*` 契約に従う ——
+`:must-not [:own-domain-scoring-truth]`。採点も適格性も送信可否も `noren` にあり、
+loop は順序と I/O と 1 周の件数だけを持つ。
+
+**名前**: 暖簾（のれん）= 店が外に掛けている面。メタファ名なので README 冒頭で
+名乗り、`manifest/concept-vocabulary.edn` に登録した（名前が機能を示さない repo の
+入口を 2 本にする規約）。
+
+### 1 周
+
+```
+observe   prospect/eligible（ISIC gate / 特定電子メール法 3 条 1 項 4 号 / 観測の鮮度）
+evaluate  公開面を取得 → diagnose（design-quality の UI 12 軸 + presence 8 軸）
+decide    prescribe（測った軸だけの claim）→ letter → NorenGovernor
+act       :commit なら承認キューへ effect（:effect/requires-approval true。送信ではない）
+record    journal に 1 行。skip も hold も理由つきで残る
+```
+
+**1 周の提案は 1 件**（`max-per-tick`）。5 件積むとどれも読まれず、queue を
+読まれなくすることが測定を全部無駄にする唯一の方法である（`kaiyu-kaizen` と同じ）。
+
+### 診断は UI と presence を分けて、presence を重く置く
+
+`design-quality` の軸ベクタと同じ `{:id :title :weight :check}` の形で presence 軸
+（https / 連絡導線 / 所在地 / 電話 / 構造化データ / OGP / 営業時間 or 商品 / 更新性）を
+足し、重み正規化と finding 収集は上流の機構をそのまま借りる。配分は
+**UI 0.45 / presence 0.55** —— 綺麗だが電話番号も営業時間も無いページは UI 軸で
+高得点になるが、店の仕事を引き受けられていない。
+
+判定は `:healthy`(≥80) / `:repairable`(≥55) / `:rebuild` / `:absent`。
+閾値は library 側の定数で、loop から書き換えない（周ごとに基準が動くと提案が比較できない）。
+
+### 未依頼の接触に課す HARD 制約（NorenGovernor、11 本）
+
+この loop は**相手が頼んでいないのに相手のサイトを採点して連絡する**。許される形は狭い。
+
+1. `:prospect-ineligible` — 特定電子メール法 3 条 1 項 4 号（自らアドレスを公表している
+   団体・営業を営む個人）の形をしていない。**アドレスを知っているだけでは足りず、
+   どこで公表されていたか（URL）といつ見たかが要る** —— 根拠を持てない接触をしない
+2. `:suppressed` — 一度断られた相手（恒久）
+3. `:resend-too-soon` — 最短 60 日
+4. `:contact-limit-reached` — 生涯 2 回
+5. `:claim-without-evidence` — **claim は 1 文につき 1 つの軸 id を背負い、
+   その軸が evidence に無ければ止まる**。文面を LLM に書かせても、新しい売り文句を
+   足した瞬間に hold になる
+6. `:nothing-to-sell` — 診断が健全。用が無いのに接触しない
+7. `:no-measured-claim` — 主張できる測定結果が 1 件も無い
+8. `:unverified-absence` — **取得失敗を「サイトが無い」として言おうとしている。**
+   404/410 以外（接続エラー・タイムアウト・5xx）はこちらの観測の失敗であって
+   相手の事実ではない。実装中に実際に踏んだ欠陥で、初回の CLI 実行が
+   `error: fetch failed` の相手に『公開されているサイトを見つけられませんでした』を
+   提案していた
+9. `:sender-disclosure-missing` — 法 4 条の表示義務（名称・住所）
+10. `:opt-out-missing` — 本文に受信拒否の通知先
+11. `:asset-reuse` — 相手の画像・ロゴを生成物へ複製している
+
+**判定に必要な事実が渡されていない場合も HARD で止める** —— 検査に必要な材料が
+無いことは、検査に通ったことではない。接触履歴の欠落だけは SOFT（初回と
+渡し忘れを区別できないので、黙って初回にせず可視化する）。
+
+### 建てる面は貰った事実だけで建て、自分の基準を通る
+
+`noren.build` は営業時間も電話も住所もメニューも、brief に無ければ節ごと出さず
+`:missing` に積む。診断で `:hours` が落ちた店に想像した営業時間の載ったサイトを
+見せるのは提案ではなく事故になる。生成物は `noren.diagnose` にそのまま掛かり、
+テストが presence ≥ 90 / UI ≥ 80 / `:healthy` を要求する。
+
+### 売り場と課金
+
+**売るのは cloud-itonami（itonami.cloud）**（オーナー指示 2026-08-11）。
+プランは `noren.plan` に 2 本（守り 9,800 円 / 開き 19,800 円、税抜）。
+**決済経路は既存の itonami.cloud Stripe 請求面をそのまま使い、新しい経路を作らない。**
+`plan/activate` は請求面の識別子（`:subscription/external-ref`）が無い契約を
+active にしない —— 課金されていない契約を active と呼ぶと entitlement だけが先に開く。
+`entitled?` は解約後 `service-until` を過ぎたら false になり、**解約した店に loop が
+働き続けることを構造的に止める。**
+
+### etzhayyim の no-person-targeting との関係
+
+`outreach` / `eigyo` は etzhayyim 由来で、ADR-2607202800 の no-person-targeting が
+効く。この loop は **cloud-itonami / network-awai の面で走らせ、宛先は
+`:organization` / `:sole-trader` に限る**（個人宛は governor が HARD で止める）。
+etzhayyim actor の面には載せない。
+
+## Consequences
+
+- (+) 「品質が悪い」が測定になり、提案の全文が測定に拘束される。誇張を書く経路が
+  構造的に無い（claim は測定からしか増えない）
+- (+) 健全なサイトには何も出さない。全件に提案が出る loop は測っていないのと同じ
+- (+) 既存の design-quality / jp-go-dds / itonami.cloud 請求面をそのまま消費し、
+  新規は 2 repo・約 900 行に収まった
+- (−) **発見は自動化していない。** `data/sources.edn` の `:common-crawl` /
+  `:passive-dns` は `:enabled? false`。取得経路は既存 repo に在るが、
+  **ホスト名から業種を推測した瞬間にこの loop は推測を根拠に売り始める**ので、
+  ISIC を誰が宣言するかが決まるまで繋がない。当面は `:manual`
+- (−) **送信は実装していない。** 承認キューへ effect を積むところまで。
+  実行は cloud-itonami の承認を通る
+- (−) 文面は決定論的テンプレート 1 本。LLM で書き分けるなら差し替えるのは
+  `loop-noren.letter` だけで、governor がそのまま効く
+- (−) `noren.plan` の価格は市場検証されていない。`kotoba-lang/pricing-oracle` を
+  当てるのは follow-up
+
+## Verification（2026-08-11 実測）
+
+- `kotoba-lang/noren`: 9 tests / 67 assertions green（nbb）。HARD rule 11 本すべて
+  「実際に `:hold` になること」を 1 本ずつ壊して確認
+- `cloud-itonami/loop-noren`: 10 tests / 33 assertions green（nbb）
+- **gate が落ちることを確認**: `noren.build` の `app-css` を空にすると生成物の判定が
+  `:healthy` → `:repairable` に落ちる。落ちない gate は劇場
+- CLI 実 I/O: `bin/noren.cljs tick` を example.test に対して実行 → 取得失敗で
+  `skip / fetch-failed`、journal に 1 行。`--submit` 無しでは外へ 1 バイトも出ない
+- 未実行: JVM 側（`clojure -M:test`）。第一 runtime は cljs なので nbb を正とした
+
+## References
+
+ADR-2607132300（design-quality 3 層）/ ADR-2607299000（`loop-*` taxonomy）/
+ADR-2608082300（kaiyu-kaizen の 1 反復 1 件）/ ADR-2608110200（kouhou の press 永続化）/
+ADR-2607172600（isic-5820 CRM）/ ADR-2607202800（no-person-targeting）/
+特定電子メール法 3 条 1 項 4 号・同 4 条 / 特定商取引法 11 条"}]

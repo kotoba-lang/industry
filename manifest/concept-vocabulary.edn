@@ -216,4 +216,15 @@ kotoba-lang/toshokan-patents（Google Patents パーサ lib）。**閃き は名
 一定期間だけ独占として囲い、期間が切れたら公共に解放する。hirameki が測るのはその解放までの
 距離であって、侵害や FTO の判定ではない（G1）。旧 etzhayyim/com-etzhayyim-hirameki は
 2026-08-10 に cloud-itonami へ port 済み。"}
+ :web-presence
+ {:label "事業者の公開面 / 暖簾 (noren)"
+  :spellings ["noren" "暖簾" "のれん" "web presence" "公開面" "ホームページ" "サイト制作"
+              "site quality" "サイト品質" "見込み客" "prospect" "outreach" "営業"
+              "月額" "subscription" "飲食店" "restaurant" "EC" "ネットショップ"]
+  :note "kotoba-lang/noren（診断・処方・生成・governor・プラン、純 cljc）+
+cloud-itonami/loop-noren（orchestrator と I/O）。ADR-2608111400。**暖簾 は名前から機能が
+一文字も読めない**ので登録した —— kuro / kobo と同じ理由。暖簾＝店が外に掛けている面で、
+この loop が売るのはその面の月額。UI 品質の採点は kotoba-lang/design-quality が正本で
+noren は再実装しない（presence 軸だけを足す）。自社サイトのアクセス解析は別物
+（kotoba-lang/kaiyu）。"}
 }
