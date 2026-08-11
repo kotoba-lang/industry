@@ -448,7 +448,10 @@
     引かれて、OS 側を丸ごと新規に書くことになる。"
 
    :correction-2-not-greenfield
-   "`:typed-provider-syscall-abi` を白紙と読まない。C-free の typed syscall envelope は既に存在する。
+   "`:typed-provider-syscall-abi` を白紙と読まない。C-free の typed syscall envelope は
+    **設計され、いま書かれている最中**である（2026-08-11 21:20 に別セッションが
+    dispatcher 本体を書き換えているのを実測。下の :correction-2-landed-status を必ず先に読む —
+    この節は最初『既に存在する』と書いており、landed かどうかを確かめずに書いた誤りだった）。
 
     - `aiueos.value-runtime-dispatch` — 64 byte 正規化 request、caller identity は request ではなく
       trusted profile が持つ（request は自分の呼び出し元を主張できない）、capability table 4 KiB を
@@ -460,7 +463,44 @@
     - `aiueos.value-runtime-syscall-plan` — SYSCALL/SYSRET shim の admission（syscall 5・trusted domain・
       72 byte envelope window・canonical な user RIP/RSP）
 
-    2 本目の envelope を作らない。9 kit はこの envelope の descriptor / handle 規律に載せる。"
+    2 本目の envelope を作らない。9 kit はこの envelope の descriptor / handle 規律に載せる。
+    ただし **これに書き足すのも今はしない** —— 理由は次項。"
+
+   :correction-2-landed-status
+   "**上の envelope は aiueos の default branch に 1 バイトも無い。**
+    共有 checkout に置かれた、別セッションの未コミット作業である。2026-08-11 に実測:
+
+    | | 実測値 |
+    |---|---|
+    | aiueos origin/main tip | `994b19a` |
+    | 共有 checkout | `58c5d6f` の detached HEAD、main から 9 commit 遅れ、modified 4 + untracked 多数 |
+    | main 上の `os/aiueos/contracts/` | `boot-v1` / `murakumo-node-v1` / `usb-boot-v1` の **3 件だけ** |
+    | main 上の `value-*` | `.kotoba` も contract も verify script も **0 件** |
+    | main 上の `os/aiueos/scripts/aiueos/` | **存在しない**（7 本の verifier は全て未 landed） |
+    | `value-runtime-dispatch.kotoba` の mtime | **2026-08-11 21:20**（この測定の 1 分前） |
+
+    しかも in-flight である証拠がもう 1 つある。landed 済みの verifier 形式で
+    `verify_value_handle_plan` を実際に走らせると **落ちる** ——
+    `value-handle-plan.kotoba` に `(:export ...)` が無く、compiler の出す export が
+    `kotoba_aiueos_probe` になるため（期待は `kotoba_aiueos_value_handle_plan`）。
+    書きかけである。
+
+    したがって:
+
+    - **この envelope に log を書き足す作業を、いま別 agent が始めてはならない。**
+      共有 checkout 直接編集の禁止（CLAUDE.md 並行エージェント運用）に加えて、
+      設計そのものがまだ固まっていない
+    - **同じものを自分で作り直すのも禁止。** それが 2 本目の envelope になる
+    - 正しい順序は、**この作業が main に着地するのを待ってから** log を載せる。
+      着地の確認は `git ls-tree -r origin/main --name-only | grep value-runtime-dispatch` が
+      非空になること
+    - それまでに前へ進めるのは、**landed なものだけを使う作業**:
+      `capability-plan.kotoba` / `capability-mutation-plan.kotoba`（type 非依存の C-free
+      capability admission、main に在る）と、仕様 oracle としての C 側 `LOG_WRITE`
+
+    この項が存在する理由は ADR-2608110100（written is not existing）と同じ誤りを
+    この ADR 自身が犯したから —— envelope を『既に存在する』と書く前に、
+    default branch を引いていなかった。**ファイルが手元にあることは landed の証拠ではない。**"
 
    :still-open
    "この envelope が運ぶのは descriptor word（provider-local な 32-bit token 2 つ）であって、
@@ -483,9 +523,12 @@
     compiler 側に足すことを進捗と数えない。走る先の無い lowering が既に 1 本ある。"
 
    :next
-   "log を 1 本目にする。C oracle の LOG_WRITE を仕様として読み、C-free の value-runtime-dispatch
-    envelope に log の capability type と append-request / append-result の pair-chain codec を足す。
-    本文の禁止（provider transport を stdio text protocol として C loader に足さない）は維持する。"}
+   "log を 1 本目にする。ただし **着手の前提は、上記 ValueRuntime envelope が aiueos main に
+    着地していること**。着地後に、C oracle の LOG_WRITE を仕様として読み、その envelope に
+    log の capability type と append-request / append-result の pair-chain codec を足す。
+    本文の禁止（provider transport を stdio text protocol として C loader に足さない）は維持する。
+    未着地のうちに書き始めると、共有 checkout の直接編集か 2 本目の envelope の
+    どちらかになる。"}
 
   :adr/consequences
   "## 引き継ぎ先が触る repo と役割（混同しやすいので明示）
