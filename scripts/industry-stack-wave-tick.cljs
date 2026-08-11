@@ -103,11 +103,25 @@
       (js/parseInt (nth args (inc i)) 10)
       24)))
 
+(defn- real-checkout?
+  "west が管理する実 checkout だけを repo とみなす。
+
+  過去の wave が共有 `orgs/cloud-itonami/` の *中* に linked worktree を
+  残しており（実測 2026-08-12 に 14 件、`<repo>-wt-flagship-item2` 等）、
+  名前が `cloud-itonami-isic-` で始まるので repo として数えられていた。
+  linked worktree は `.git` が **ファイル**（gitdir ポインタ）、実 checkout は
+  `.git` が **ディレクトリ**。名前の `-wt-` 規約ではなくこの構造で判定する。"
+  [name]
+  (try
+    (.isDirectory (.statSync fs (.join path cloud-root name ".git")))
+    (catch :default _ false)))
+
 (defn- isic-dirs []
   (try
     (->> (.readdirSync fs cloud-root)
          (map str)
          (filter #(str/starts-with? % "cloud-itonami-isic-"))
+         (filter real-checkout?)
          sort
          vec)
     (catch :default _ [])))
@@ -127,7 +141,11 @@
   (let [{:keys [code out]} (sh "git" ["-C" repo-path "status" "--porcelain"])]
     (and (= 0 code) (seq (str/trim out)))))
 
-(defn- has-render? [repo-path]
+(defn- render-path? [n]
+  (or (str/ends-with? n "render_html.clj")
+      (str/ends-with? n "render_html.cljc")))
+
+(defn- has-render-in-worktree? [repo-path]
   (let [walk (fn walk [dir]
                (try
                  (let [ents (.readdirSync fs dir #js {:withFileTypes true})]
@@ -135,10 +153,7 @@
                            (let [n (.-name e)
                                  p (.join path dir n)]
                              (cond
-                               (and (.isFile e)
-                                    (or (str/ends-with? n "render_html.clj")
-                                        (str/ends-with? n "render_html.cljc")))
-                               true
+                               (and (.isFile e) (render-path? n)) true
                                (.isDirectory e)
                                (when-not (#{"node_modules" ".git" "target"} n)
                                  (walk p))
@@ -146,6 +161,34 @@
                          ents))
                  (catch :default _ false)))]
     (boolean (walk repo-path))))
+
+(defn- has-render-on-main?
+  "origin/main の tree を見る。ref が無ければ nil（不明）を返し、判定を
+  worktree 側に委ねる — false を返すと『無い』と誤って断定してしまう。"
+  [repo-path]
+  (let [{:keys [code out]} (sh "git" ["-C" repo-path "ls-tree" "-r"
+                                      "--name-only" "origin/main"])]
+    (when (= 0 code)
+      (boolean (some render-path? (str/split-lines out))))))
+
+(defn- has-render?
+  "worktree と origin/main の **どちらかに** あれば着地扱いにする。
+
+  どちらの面も単独では信用できない:
+  - working tree は west pin が遅れていると、既に main へ着地している
+    render_html を『無い』と報告する。実測 2026-08-12: isic-0124 は main に
+    24KB の render_html.clj があるのに local checkout が pin 手前 (d61a7e7)
+    で止まっており、pool が 226 から何周も動かず、同じ 24 本が毎周
+    再ピックされ続けていた（wave あたり 20 agent-slot の空振り）。
+  - local の origin/main ref も最後に fetch した時点の snapshot でしかなく、
+    merge 済みでも fetch していなければ遅れている。
+
+  union を取るのは、この tick の誤りのコストが非対称だからである:
+  着地済みを候補に残す誤りは 1 本あたり agent 1 体を空振りさせるが、
+  未着地を候補から外す誤りは次周で拾い直せる。"
+  [repo-path]
+  (boolean (or (has-render-in-worktree? repo-path)
+               (has-render-on-main? repo-path))))
 
 (defn- sector [name]
   (let [m (re-find #"cloud-itonami-isic-(\d+)" name)]
