@@ -139,6 +139,36 @@
   :adr/consequences
   "## 現在地（2026-08-11）
 
+   ### 着地したもの
+
+   - **決定 3 の計測が本番で動いている。** `authn.usage`（純粋: UTC の月・scope・
+     鍵の形・集計）+ `authn.usage-flow`（hash / put-once / bump / list）+
+     `durable/op-bump`（月が鍵に入っているので window を持たない原子的な加算）+
+     `GET /v1/usage`（fail-closed）。net-kotobase `9027a63`、Worker version
+     `77600d6e-3538-4374-86b4-53f4cf733c35`、west pin `468a013`。
+     課金の単位は**暦月あたりの distinct subject**で、put-once で重複排除する ——
+     それが最適化ではなく metric 本体であり、後から復元できない唯一の値。
+     subject は scope+month で salt して hash してあるので、usage 面は
+     『何人か』に答えられて『誰か』には答えられない。
+   - **上流の前提を外した。** `kotoba-lang/authenticator` に非同期 HMAC ホスト
+     向けの純粋な半分（`counter-bytes` / `counter-for` / `code-from-hmac`）を
+     公開（`699a375`、pin `b078ddf`）。authn は `nodejs_compat` を意図的に切って
+     いるので、これが無いと TOTP は**そもそも edge で計算できなかった**。
+   - smoke test が review より先に本物のバグを 1 件捕まえた: `op-bump` が最初
+     カウンタを top level に書いており、`op-list` は record の value slot しか
+     返さないので、**全ての月が検証回数 0 として請求に出るところだった**。
+   - smoke test は見えないものを主張しない: 並行加算の assertion は落とした ——
+     本物の Durable Object はプラットフォームがオブジェクト単位で直列化するが
+     Map スタブはしない。スタブに待ち行列を足せば「通る」が、それは自分の
+     エミュレーションを検査しているだけになる。
+
+   ### まだのもの
+
+   - **`AUTHN_USAGE_TOKEN` は未設定**なので `/v1/usage` は 404 のまま。記録は
+     動いており、読み出しは秘密を 1 つ置けば開く。**遡れないのは記録だけ**なので
+     この分割を採った。
+   - 決定 2 の実行順 1（TOTP + リカバリコード）は未着手。前提は外れている。
+
    - 比較 36 行は `90-docs/comparison/clerk-parity.datoms.edn` に datom として載り、
      `[?e \"source/dataset\" \"clerk-parity\"]` で引ける。keyword 値は datascript 側で
      裸文字列になるので、query では `\"unwired\"` のように**コロン無し**で書く
