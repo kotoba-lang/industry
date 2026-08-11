@@ -383,6 +383,45 @@
     pages を同じ ownership state から claim し、identity mapping を構築して CR3 を切り替え、
     W^X 違反・重複 mapping・unmap 後 access を別々の machine rejection にする。"}
 
+  :adr/addendum-2026-08-11-native-page-table-activation
+  {:status "accepted; supersedes the activation part of the ownership-and-root addendum"
+   :dependency-authority
+   {:kotoba-native "dd7fe0cf8972ef20bcc24894b7c7aaf9d086c1a6"
+    :amu "806f5cef7d5bc11ad8ec8514ad6121efc73be6c7"
+    :aiueos "994b19ad8ecbc12ee2ec7dbe3d3ec65aa3960167"
+    :aiueos-adr "ADR-0037"}
+   :finding
+   "zeroed page-table root と名付けた page は、entry を構築して CPU に渡すまでは paging
+    ownership の証拠ではない。また CR3 switch 後に、firmware map 下で導出した bounded
+    authority wrapper をそのまま table-byte readback に再利用することも未証明だった。"
+   :decision
+   "contiguous Conventional extent を 5 pages に拡張する。page 0 は boot-lifetime bitmap、
+    pages 1/2/3 は PML4/PDPT/PD、page 4 は release/reuse probe。Kotoba 自身が little-endian
+    entries を書き、512 個の 2 MiB PDE で first 1 GiB identity map を作る。links と代表 leaves
+    は CR3 switch 前に全て readback し、その後 PML4 を CR3 に load、CR3 readback、invlpg、
+    新 map 上での継続実行を machine evidence とする。"
+   :machine-evidence
+   {:positive "x86_64 Linux/KVM + OVMF: debug=MPRC, status=33"
+    :page-table-mutation "PML4 link の Present bit を clear: debug=M, status=47; CR3 write 前に拒否"
+    :cr3-mutation "valid tables のまま firmware CR3 を維持: debug=M, status=49"
+    :foreign-code "C sources/objects/CRT/linker/imports/dynamic dependencies empty"
+    :tests "aiueos 431 tests / 1305 assertions"}
+   :closed
+   ["allocator-owned PML4/PDPT/PD の population と pre-switch validation"
+    "first 1 GiB replacement identity map の CR3 activation"
+    "CR3 readback、invlpg、post-switch continued execution"
+    "table-invalid と CR3-not-switched の独立 mutation gate"]
+   :remaining
+   ["UEFI map 全体を index 化する bounded bitmap/free-list と zones"
+    "dynamic mapping/unmapping、supervisor/RW/NX policy、W^X、guard pages"
+    "現在の identity leaves は RW+executable なので W^X 達成とは数えない"
+    "exceptions / APIC / SMP、scheduler / CPL3 / typed syscall"
+    "clock を最初の native effect provider として semantic vector と empty-foreign-code receipt まで閉じる"]
+   :next
+   "次は activated と protected を混同しない。bootstrap identity map の広い RW+X permission を
+    分割し、text RX / data+stack RW+NX / guard unmapped を作る。各 permission violation と
+    unmap 後 access を独立した machine rejection にする。"}
+
   :adr/consequences
   "## 引き継ぎ先が触る repo と役割（混同しやすいので明示）
 
