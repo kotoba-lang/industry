@@ -86,6 +86,26 @@
 
 ;; ── 実行 ────────────────────────────────────────────────────────────────
 
+(defn- check-west-canonical
+  "**この tree が manifest を触った時だけ**検査する。
+
+  `--check` は「west.yml が、いまローカルにある子 checkout の HEAD から生成した
+  ものと一致するか」を答える。共有の operator checkout では子が pin より遅れて
+  いるのが常態で、実測 2026-08-11 には再生成が **43 件の pin 退行**を起こす
+  （生成器はそれを検出して書き込みを拒否した）。つまりここで赤いのは
+  『west.yml が間違っている』ではなく『子が遅れている』であり、**closing で
+  直すものではない**（直そうとして再生成するのが、まさに CLAUDE.md が禁じている
+  pin 退行の罠）。
+
+  したがって範囲を『自分が触った manifest』に絞る。触っていない時は検査せず、
+  **検査しなかったと表示する**（通ったとは言わない）。"
+  []
+  (let [dirty (str/trim (:out (run "git" ["status" "--porcelain" "--" "manifest/"])))]
+    (if (str/blank? dirty)
+      {:ok? true :skipped? true
+       :detail "対象外 — この tree は manifest を触っていない（子の pin 鮮度は closing の担当ではない）"}
+      (script-check "gen-west-manifest.cljs" ["--check"]))))
+
 (def checks
   (cond-> [["main 同期"            check-main-sync]
            ["west 登録漏れ"        #(script-check "west-orphan-audit.cljs" ["--blocking"])]
@@ -94,7 +114,7 @@
            ["データセットの縮小"   #(script-check "dataset-monotonic-check.cljs"
                                                   ["--root" root "--decl" (path/join self-dir ".." "manifest" "monotonic-datasets.edn")])]]
     (not quick?)
-    (conj ["west.yml が canonical" #(script-check "gen-west-manifest.cljs" ["--check"])])))
+    (conj ["west.yml が canonical" check-west-canonical])))
 
 (println (str "closing-check: " (count checks) " 件 · " root
               (when quick? " · --quick（west.yml の canonical 検査を省略）")))
@@ -103,7 +123,7 @@
   (doall
     (for [[label f] checks]
       (let [r (try (f) (catch :default e {:ok? false :detail (str "検査自体が落ちた: " (.-message e))}))]
-        (println (str (if (:ok? r) "  OK   " "  FAIL ") label
+        (println (str (cond (:skipped? r) "  --   " (:ok? r) "  OK   " :else "  FAIL ") label
                       (when (seq (:detail r)) (str ": " (:detail r)))))
         [label r]))))
 
@@ -113,7 +133,10 @@
 
 (println)
 (if (empty? failed)
-  (println (str "OK closing-check: " (count checks) " 件すべて通過。"
+  (println (str "OK closing-check: "
+                (count (remove (comp :skipped? second) results)) " 件通過"
+                (let [n (count (filter (comp :skipped? second) results))]
+                  (when (pos? n) (str " · " n " 件は対象外")))  "。"
                 "\n   残るのは機械にできない分 —— 正本 ADR の更新、PR の着地、"
                 "resume point の記録。"))
   (do (println (str "FAIL closing-check: " (count failed) " 件 — "
