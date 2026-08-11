@@ -11,6 +11,7 @@
   :adr/authoritative_for
   ["飲食店・EC 事業者の公開面を発見 → 診断 → 処方 → 提案 → 月額課金まで繋ぐ loop の境界と repo 分割"
    "外部事業者への未依頼の接触に課す HARD 制約（特定電子メール法 3 条 1 項 4 号 / 4 条、主張の evidence 拘束、観測失敗と不在の区別）"
+   "発見の自動化に LLM を使うときの境界（業種は OSM タグの宣言、LLM は原文からの抽出のみ、照合は決定論）"
    "この loop がどの org の面で売るか（cloud-itonami / itonami.cloud）と課金経路（既存 Stripe 請求面。新規経路を作らない）"]
   :adr/related ["ADR-2607132300" "ADR-2607299000" "ADR-2608082300" "ADR-2608110200" "ADR-2607172600"]
   :adr/supersedes []
@@ -62,6 +63,41 @@ loop は順序と I/O と 1 周の件数だけを持つ。
 **名前**: 暖簾（のれん）= 店が外に掛けている面。メタファ名なので README 冒頭で
 名乗り、`manifest/concept-vocabulary.edn` に登録した（名前が機能を示さない repo の
 入口を 2 本にする規約）。
+
+### 発見（2026-08-11 追記。初版は `:manual` のみだった）
+
+オーナー指示「発見の自動化まで含めてほしい, murakumo.cloud の llm を使ってほしい」。
+初版がここを空けていた理由（**ホスト名から業種を推測した瞬間に、この loop は推測を
+根拠に売り始める**）は消えていない。消したのは推測の方で、解き方は 2 つの分離:
+
+**1. 業種は OSM のタグから決める。** `amenity=restaurant` は誰かが現地を見て付けた
+宣言であって、こちらの推測ではない。タグ → ISIC は `noren.discovery/osm-tag->isic` に
+**表として**書き、導出しない。証拠は OSM の element id で、第三者が
+`https://www.openstreetmap.org/node/…` を開いて確かめられる。チェーン店舗
+（`brand:wikidata` 等）は candidate にしない —— `website` が本部を指すため。
+
+**2. LLM は抽出しかしない。判定しない。** murakumo-main が読むのは相手のページ本文で、
+返してよいのは**本文にそのまま在る文字列**だけ。`verify-extraction` が 1 つずつ原文に
+照合し、verbatim で見つからない主張は落とす（落とした値は `:dropped` に残す）。
+**したがって発見の健全性はモデルの性能に依存しない** —— 依存しているのは照合であって
+推論ではない。モデルの判断に属する項目（`:kind` / `:own-site?` / `:confidence`）だけは
+照合できないので、DiscoveryGovernor が閾値と HARD rule で受け止める。
+
+本文はまず Common Crawl から読む（`kotobase-commoncrawl-actor` の `commoncrawl.cdx`）。
+**まだ用があると決まっていない相手のサーバを叩かない**ため。CC に無いときだけ live を
+1 回取り、その際 **HTTP status を見る**（404 ページの本文を店の本文として扱わない）。
+
+モデルは `murakumo-main` alias で解決する（ADR-2607173100）。具体の model id は
+どこにも焼かない。リクエストの形は **endpoint の形**から決める —— alias が指す先は
+alias の持ち物であって、こちらが決めることではない。
+
+```
+OSM Overpass → タグ→業種（表）→ website 持ちの独立店だけ
+Common Crawl → 本文（無ければ live 1 回、status を見る）
+murakumo-main → 原文にある文字列だけを抽出
+verify-extraction → 原文照合。verbatim で無いものは落とす
+DiscoveryGovernor → 受理 / 却下
+```
 
 ### 1 周
 
@@ -146,10 +182,13 @@ etzhayyim actor の面には載せない。
 - (+) 健全なサイトには何も出さない。全件に提案が出る loop は測っていないのと同じ
 - (+) 既存の design-quality / jp-go-dds / itonami.cloud 請求面をそのまま消費し、
   新規は 2 repo・約 900 行に収まった
-- (−) **発見は自動化していない。** `data/sources.edn` の `:common-crawl` /
-  `:passive-dns` は `:enabled? false`。取得経路は既存 repo に在るが、
-  **ホスト名から業種を推測した瞬間にこの loop は推測を根拠に売り始める**ので、
-  ISIC を誰が宣言するかが決まるまで繋がない。当面は `:manual`
+- (+) 発見が自動で回る（OSM + Common Crawl + murakumo-main）。**新規実装は繋ぎだけ**で、
+  Overpass クライアント・CDX/WARC 取得・LLM 転送はいずれも既存 repo
+- (−) **passive DNS 経路は繋いでいない。** ドメインは取れるが、事業者と業種の
+  対応づけを誰も宣言していない。OSM 経路が解けたのは「人が現地で付けたタグ」という
+  宣言が在ったからで、passive DNS にそれは無い
+- (−) **EC 事業者は OSM に出てこない**（オンライン専業は POI ではない）。
+  4791/4799 の発見経路は未解決で、`:manual` と `:owner-inbound` のまま
 - (−) **送信は実装していない。** 承認キューへ effect を積むところまで。
   実行は cloud-itonami の承認を通る
 - (−) 文面は決定論的テンプレート 1 本。LLM で書き分けるなら差し替えるのは
@@ -159,14 +198,38 @@ etzhayyim actor の面には載せない。
 
 ## Verification（2026-08-11 実測）
 
-- `kotoba-lang/noren`: 9 tests / 67 assertions green（nbb）。HARD rule 11 本すべて
+- `kotoba-lang/noren`: 17 tests / 116 assertions green（nbb）。HARD rule 11 本すべて
   「実際に `:hold` になること」を 1 本ずつ壊して確認
-- `cloud-itonami/loop-noren`: 10 tests / 33 assertions green（nbb）
+- `cloud-itonami/loop-noren`: 18 tests / 59 assertions green（nbb）
+- **発見を実データで 1 周**（神楽坂 bbox）: OSM 387 element → candidate 31
+  （website 無し 337 / チェーン 19 / 分類不能 0）。本文が取れた 16 件は
+  モデル不在のため全件 `:defer`、取れなかった 4 件は `:no-page-text` で reject
+- **照合を実本文で確認**: 実際に取得した本文に対し、原文から採った文字列は通り、
+  もっともらしい捏造（`株式会社…ホールディングス` / `sales@…`）は 2 件とも落ちた
+- `murakumo-main` の alias 解決は実接続で確認（`infer.murakumo.cloud/v1/chat/completions`、
+  当時の実体 `qwen3.6-35b-a3b`）。**ただし推論そのものは未実行** ——
+  fleet の main が 40 分以上 `Loading model`(503) を返し続けたため。
+  復帰後に `bin/noren.cljs llm-probe` → `discover` で確かめる
 - **gate が落ちることを確認**: `noren.build` の `app-css` を空にすると生成物の判定が
   `:healthy` → `:repairable` に落ちる。落ちない gate は劇場
 - CLI 実 I/O: `bin/noren.cljs tick` を example.test に対して実行 → 取得失敗で
   `skip / fetch-failed`、journal に 1 行。`--submit` 無しでは外へ 1 バイトも出ない
 - 未実行: JVM 側（`clojure -M:test`）。第一 runtime は cljs なので nbb を正とした
+
+### 実装中に実データが見つけた欠陥 3 件（いずれも直して landed）
+
+1. **取得失敗を「サイトが無い」と言っていた** —— 初回の CLI 実行が、接続に失敗した
+   相手に『公開されているサイトを見つけられませんでした』を提案していた。404/410 以外は
+   こちらの観測の失敗であって相手の事実ではない（`:unverified-absence`）
+2. **チェーン店舗の本部サイトを候補にしていた** —— 神楽坂の website 持ち 50 件の上位が
+   スターバックス・モスバーガー・ドトールで、いずれも `website` が本部。OSM 自身の
+   `brand:wikidata` で弾ける（19 件）。LLM の `own-site?` でも弾けるが、
+   **タグで弾けるものに推論を払わない**
+3. **404 ページの本文を店の本文として読んでいた** —— OSM の website タグは古くなる。
+   live 取得が status を見ておらず、`Page not found` を本文として LLM に渡していた
+   （店名として「Page not」を抽出できてしまう）。`usable-page-text?` は
+   **status だけで**決める —— 内容から推測すると「404 と書いてある店のトップページ」を
+   誤って捨てる
 
 ## References
 
