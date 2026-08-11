@@ -1,0 +1,197 @@
+[{:db/id -1
+  :adr/id "ADR-2608110400"
+  :adr/title "effect を持つコードを native にするには gap は 3 つ、しかも名指しで書いてある — capability provider の native-aot 引き継ぎ（別 agent 向け）"
+  :adr/status "accepted"
+  :adr/date "2026-08-11"
+  :adr/last_verified "2026-08-11"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "native-effect-capability-aot"
+  :adr/tags ["kotoba" "native" "capability" "provider" "amu" "handoff" "evidence"]
+
+  :adr/authoritative-for
+  ["effect を持つ Kotoba コードを native 実行するために閉じる必要がある gap の集合"
+   "その作業を別 agent へ引き継ぐときの前提・順序・完了条件"
+   "2026-08-11 時点の native 経路の実測値（テスト数・受理面・性能）"]
+
+  :adr/related
+  ["2608650000" "2608061000" "2608052000" "2800004300" "2608110100"
+   "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"
+   "adr-2608049000-native-capability-boundary-and-production-tender"]
+
+  :adr/context
+  "オーナーの問い（2026-08-11）:「effect になるコードも native にするには?」
+   —— その直前の調査で、native になっているのは**純粋な決定核だけ**で、
+   capability kit 9 本すべてが `:native-aot :pending` であることを実測していた。
+
+   この ADR は **作業そのものを引き継ぐための正本**である。別 agent が会話履歴
+   なしで着手できる粒度で、現在地・不足・順序・落とし穴・完了条件を書く。
+
+   ## 現在地（2026-08-11、west pin で実測。すべて私が回した）
+
+   | repo | pin | tests / assertions | 失敗 |
+   |---|---|---|---|
+   | amu | `79e2976` | 956 / 7,537 | 0 |
+   | kotoba-native | `eeae985` | 120 / 1,405 | 0 |
+   | kotoba-kir | `6ac32ba` | 131 / 562 | 0 |
+   | kotoba-verifier | `7238e7b` | 40 / 242 | 0 |
+   | tender-native | `12c31f6` | 7 / 74 | 0 |
+   | aiueos | `634af93` | 425 / 1,256 | 0 |
+   | kototama | `0fcf11c`（**stale checkout**） | 172 / 1,164 | **6** |
+
+   加えて `clojure -M:native-conformance` が **T1.4 pure-native 16/16（aarch64）**、
+   murakumo の 33 cores を私が sweep して **aarch64 33/33・x86_64 33/33**（ADR-2608061000
+   の 33/33 を今日再現）。
+
+   **kototama の 6 失敗を『main が赤い』と読まないこと。** checkout が west pin
+   （`88f42f5`）より古く（main は `3d851fe`）、他セッションの未追跡 WIP があって
+   進められなかった。内訳は browser/Node inject honesty 5 件と TCB drift 1 件で、
+   後者は dep SHA を動かせば設計どおり反応するゲートである（ADR-2608110100 が
+   同じ形を記録している）。
+
+   ## なぜやる価値があるか（amu docs/performance.md、M4・7 サンプル・commit `d0d5bd8`）
+
+   Amu native は整数カーネルで **48.23 ns = Rust の 2.59x**、warmed Clojure より
+   1.64x 速く、ClojureScript より 9.64x 速い。プロセス実行時間 14.97 ms（Clojure
+   1,051 ms）、最大 RSS 1.30 MiB（Clojure 123.27 MiB、Rust 1.42 MiB）。
+   RSS は OS の per-process 最大常駐物理メモリであって retained heap ではない
+   —— native が小さいのは VM も GC ヒープも無いから。
+
+   **ただしこの数値に allocation / collection / string / capability / I/O は
+   含まれない。** つまり今の native は「effect の無いコードは速い」ことしか
+   示していない。この ADR の作業は、その主張を effect のある面へ延ばすもの。"
+
+  :adr/decision
+  "## 不足は 3 つ。推測ではなく、リポジトリが名指しで持っている
+
+   正本は `orgs/kotoba-lang/amu/resources/kotoba/lang/backend-provider-qualification-v1.edn`:
+
+   | backend | execution-status | gaps |
+   |---|---|---|
+   | **cljs** | **`:qualified`** | 無し（evidence 2 本をテスト名で保持） |
+   | wasmtime | `:pending` | 6 件（nested canonical request/result ABI・recursive schema component 表現・production provider components・component runtime semantic vectors・bounded WASI 0.3 async・wasmtime 43 以上） |
+   | **native** | `:pending` | **3 件（下記）** |
+
+   native の 3 件:
+
+   1. **`:typed-provider-syscall-abi`** —— kexe が provider を呼ぶ型付き syscall ABI。
+   2. **`:nested-request-result-host-codec`** —— 入れ子 request/result の host 側 codec。
+   3. **`:native-provider-semantic-vectors`** —— 9 capability の意味ベクタを native 実行で通した証拠。
+
+   cljs 側の evidence の形（同じ形で埋めること）:
+   `:runtime-boundary` = `kotoba.compiler.backend-cljs-test/real-nbb-round-trips-full-i64-provider-values`、
+   `:semantic-vectors` = `kotoba.compiler.backend-cljs-test/typed-provider-dispatch-runs-all-application-kit-contracts`。
+
+   ## gate は宣言では通らない（構造的に嘘を許さない）
+
+   `amu/src/kotoba/compiler/backend_qualification.clj` の不変条件:
+
+   - `:pending` は gap を**必ず名指し**し、evidence を**持ってはならない**
+   - `:qualified` は gap が**空**で、evidence が `#{:runtime-boundary :semantic-vectors}` **ちょうど**
+   - provider manifest の sha256（現在 `5d7599b5…e476e`）・capability-count（**9**）・
+     各 capability の wire id を `capability-catalog.edn` と突き合わせる
+
+   したがって `:native-aot :implemented` を kit の `:qualification` 行に書くだけでは
+   通らない。**gate を先に緩めるのも禁止**（下記の落とし穴 2 を参照）。
+
+   ## KIR gate が狭いのは原因ではなく帰結
+
+   `orgs/kotoba-lang/kotoba-kir/src/kotoba/kir.cljc` の
+   `only-native-word-typed-features?` が `typed-cap-call` に許すのは
+   `[:i64 :i64]` `[:string :string]` `[:option-i64 :option-i64]` `[:result-i64 :result-i64]`
+   の **4 組だけ**。一方 kit の型は入れ子である —— `clock-v1.edn` の result は
+   `[:variant :kotoba.clock/result [[:wall [:record …]] [:monotonic [:record …]] [:error [:record …]]]]`。
+
+   **gate を広げても codec が無ければ 1 本も動かない。** これは 2026-08-06 に実測済みの
+   誤りの鏡像で、ADR-2608061000 が『string 系は backend に lowering が無いと指示したが、
+   実際は emission に到達する前に 2 つの表で拒否されており、backend にいくら書いても
+   sweep は 1 本も動かなかった』と記録している。**どちらの側から始めるかを、測ってから決める。**
+
+   ## 順序（cljs が通った形をなぞる）
+
+   1. **kit 1 本で 1→2→3 を通す。** `clock` か `log` —— request/result が最も浅い。
+      **`llm` / `http` / `storage` を先にやらない。**
+   2. **新しい値表現を作らない。** 既にある aggregate ABI（宣言順の pair chain、
+      arena 4,096 セル、record フィールドは `:i64`/`:bool` の 1–128）の上に
+      variant of record を載せる。`string-contains?` / `keyword-name` が
+      **既存 callback への rewrite だけ**で入った定石（ABI bump も loader 変更も無し）。
+      それが不可能で ABI bump が要るなら、**bump 自体を先に ADR にする**。
+   3. **syscall ABI は tender-native が所有する。** 今そこに在るのは
+      host→guest（entry の引数と戻り値: `:bool` / `:string` / scalar record /
+      `:option-i64` / `:result-i64`）**だけ**で、provider 呼び出しは **guest→host** の
+      逆向き。同じものの拡張として設計しない。
+   4. **3 repo の closure を同時に動かす** —— `kotoba-kir`(admission) /
+      `kotoba-verifier`(独立再導出) / `kotoba-native`(lowering)。producer と verifier は
+      互いの metadata を信用しない設計なので、片方だけ広げると『admission は通るが
+      verify で落ちる』になる（ADR-2608061000 の `:bool` がまさにこれ）。
+   5. **semantic vectors を実 native loader プロセスで回して** evidence 2 本を埋め、
+      gate の native を `:qualified` にする。その後で残り 8 capability。
+
+   ## 落とし穴（すべて実測済み）
+
+   1. **pin は二段ある。ビルドを決めるのは `amu/deps.edn` であって west pin ではない。**
+      2026-08-11 時点で amu deps は kotoba-native `7f2120d`（main は `eeae985`、3 commit 差）、
+      kotoba-sema `bc4fa7f`（main は `171e23f`）。sema の遅れは **意図的**で、
+      amu ADR 0234 が『string-predicate migration を束ねない』と明記している。
+   2. **`:native-aot` を先に立てて後から実装する経路を取らない。** gate が pending/qualified の
+      非対称な不変条件を持っているのは、まさにそれを防ぐため。
+   3. **kit ファイルは 9 個あるが、provider-conformance manifest に載るのは 7 kit / 9 capability。**
+      `http-ingress-v1` と `stream-object-v1` は manifest 外。数を引用するとき混ぜない。
+   4. **`amu/docs/native-aot-baseline.md` を引用しない。** ADR 0063 で更新が止まっており
+      （ADR 系列は 0234 まで）、native を実際より低く見せる。現在地は
+      ①KIR の admission gate ②kit の `:qualification` 行 ③amu ADR 0219–0234 の 3 つから読む。
+   5. **『effect を native にする』と『native をアプリの既定ターゲットにする』は別。**
+      ADR 0234 自身が *does not make native the default application target* と書いている。
+      この作業は前者だけを主張する。
+
+   ## 完了条件
+
+   - 対象 kit の `:qualification` が `:native-aot :implemented`
+   - `backend-provider-qualification-v1.edn` の `:native` が `:qualified`、gaps 空、
+     evidence 2 本がテスト名で埋まっている
+   - semantic vector が**実 native loader プロセス**で実行されている（fixture 不可）
+   - **gate を壊して落ちることを見てから landed とする**（落ちない gate は劇場）
+   - `amu` の fleet gate は現在 `amu-jdk-free` の 1 本だけで、**native suite は fleet で
+     回っていない**。CI で守るなら `scripts/fleet-ci/gates.edn` に足す（ADR-2607300900:
+     GitHub Actions は使わない）"
+
+  :adr/consequences
+  "## 引き継ぎ先が触る repo と役割（混同しやすいので明示）
+
+   | repo | 層 | 所有 |
+   |---|---|---|
+   | `amu` | コンパイラ | `.kotoba` → 全ターゲット、policy admission、artifact/provenance、**qualification gate 本体** |
+   | `kotoba-native` | T2 backend | 検査済み KIR → x86-64/AArch64 機械語 + ELF64。`.kotoba` は構造的に 0 本 |
+   | `tender-native` | T3 runtime | kexe を capability gate 下で**実プロセス実行**。typed host boundary の所有者 |
+   | `kototama` | runtime | **Wasm/Component 側**の tender。native 経路ではない |
+   | `aiueos` | authority | grant を決め named provider を供給する capability OS |
+   | `provider` | T3 provider | `provider.clock/.http/.llm/.log/.state/.storage/.ui` と transport backing。**依存ゼロの leaf** |
+
+   依存方向は一方向: amu(+sema/hir/kir/verifier/native) → 成果物 →
+   {tender-native | kototama} が実行、grant は aiueos。`kototama → aiueos` であって逆は無い。
+
+   ## この ADR がやらないこと
+
+   - **sema pin 追随 + `surface-status.edn` の drift 解消は別件で未着手。**
+     `kotoba-sema` は 2026-08-11 に `171e23f` で string predicate を `:bool` に揃えたが、
+     amu は `bc4fa7f` を pin したまま、`kotoba-lang/lang/surface-status.edn` の
+     `:string-predicate-typing` は `:not-yet-implemented` のまま。**正本が 1 段遅れている。**
+     この ADR の作業とは独立に進められる。
+   - wasmtime backend の 6 gaps。native と同じ表に載っているが別作業。"
+
+  :adr/references
+  ["orgs/kotoba-lang/amu/resources/kotoba/lang/backend-provider-qualification-v1.edn"
+   "orgs/kotoba-lang/amu/resources/kotoba/lang/provider-conformance-v1.edn"
+   "orgs/kotoba-lang/amu/resources/kotoba/lang/capability-kits/*.edn"
+   "orgs/kotoba-lang/amu/src/kotoba/compiler/backend_qualification.clj"
+   "orgs/kotoba-lang/amu/docs/performance.md"
+   "orgs/kotoba-lang/amu/docs/adr/0234-entryless-native-bool-host-boundary.md"
+   "orgs/kotoba-lang/kotoba-kir/src/kotoba/kir.cljc (only-native-word-typed-features?)"
+   "orgs/kotoba-lang/kotoba-verifier (native-boundary-type? の独立再導出)"
+   "orgs/kotoba-lang/tender-native/README.md (typed host boundary の所有範囲)"
+   "orgs/kotoba-lang/provider/README.md"
+   "orgs/kotoba-lang/kotoba-lang/docs/agent-handoff-kotoba-refactor.md"
+   "scripts/fleet-ci/gates.edn (amu-jdk-free)"]}]
