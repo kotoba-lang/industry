@@ -77,6 +77,32 @@
 
 (defn die [msg] (log "FATAL" msg) (js/process.exit 1))
 
+(defn reject-input!
+  "Refuse ONE gate's input without taking the tick down with it.
+
+  The refusals this raises are all `the input for this gate is unusable` —
+  under the :min-files floor, over the argv ceiling, over :max-ship-mb, or an
+  archive that would not build. Every one of them is the right call for that
+  gate and none of them says anything about the other gates in the matrix.
+
+  They used to `die`. Measured 2026-08-11: amu's windows-loader gate hit its
+  :min-files floor on an older sha (67 files, floor 70) and the process exited,
+  so every work item after it in the run silently got no receipt at all — the
+  ledger simply had no row, which reads exactly like `not scheduled yet` rather
+  than `refused`. kotoba-selfhost-contracts was one of them, in the same batch,
+  already assigned to a node.
+
+  The refusal is kept — a gate whose input cannot be trusted must never run and
+  must never pass. What changes is its blast radius, and that it is reported as
+  an outcome instead of as the end of the run."
+  [msg]
+  (throw (ex-info msg {:fleet-ci/gate-input-rejected true})))
+
+(defn gate-input-rejection
+  "The message if `e` is a gate-input refusal, else nil (so it rethrows)."
+  [e]
+  (when (:fleet-ci/gate-input-rejected (ex-data e)) (ex-message e)))
+
 ;; ---------------------------------------------------------------------------
 ;; shell / gh
 
@@ -451,20 +477,21 @@
             n (count files)]
         (log "pathspec-filter" org-repo (sha12 sha) ":" n "files" (pr-str include-ext))
         (when (and min-files (< n min-files))
-          (die (str "filter found only " n " files for " org-repo
-                    " (expected >= " min-files ") — refusing to build a gate input that "
-                    "would trivially pass")))
+          (reject-input! (str "filter found only " n " files for " org-repo
+                              " (expected >= " min-files ") — refusing to build a gate input that "
+                              "would trivially pass")))
         ;; argv 長の上限が現実的な天井（実測 1,889 path で ~95KB、ARG_MAX の 1/10）。
         ;; 桁が変わる repo が出たら分割ではなく設計を見直す方が良いので、黙って
         ;; 壊れるのでなく先に落とす。
         (when (> n 20000)
-          (die (str n " matching files for " org-repo " — too many to pass as argv; "
-                    "narrow :include-ext or give the gate a subdirectory")))
+          (reject-input! (str n " matching files for " org-repo " — too many to pass as argv; "
+                              "narrow :include-ext or give the gate a subdirectory")))
         (fs/mkdirSync cache-dir #js {:recursive true})
         (let [{:keys [exit out]}
               (git m (into ["archive" "--format=tar.gz" "-o" f "--prefix=repo/" sha "--"] files)
                    {:timeout 1800000})]
-          (when-not (zero? exit) (die (str "git archive (filtered) failed: " (str/trim out)))))
+          (when-not (zero? exit)
+            (reject-input! (str "git archive (filtered) failed: " (str/trim out)))))
         f))))
 
 (defn full-tarball!
@@ -488,8 +515,8 @@
             (full-tarball! org-repo tip))
         mb (/ (.-size (fs/statSync f)) 1048576)]
     (when (> mb max-ship-mb)
-      (die (str name " gate input is " (js/Math.round mb) "MB (> " max-ship-mb
-                "MB) — add :include-ext to gates.edn so only the inspected paths are shipped")))
+      (reject-input! (str name " gate input is " (js/Math.round mb) "MB (> " max-ship-mb
+                          "MB) — add :include-ext to gates.edn so only the inspected paths are shipped")))
     f))
 
 ;; ---------------------------------------------------------------------------
@@ -1165,8 +1192,9 @@
               (log "WARN no capable node for" (:name u) "(gate" (:gate u) ") — skipped"))
             (when (seq batch)
               ;; gate ごとに tarball + script を用意
-              (let [prepared
+              (let [prepared-or-rejected
                     (vec (for [w batch]
+                           (try
                            (let [tgz (gate-input! w)
                                  ;; JVM gate はノード上で deps.edn を解決する。
                                  ;; ノードに外向き HTTPS が無いので、git 依存は
@@ -1211,7 +1239,22 @@
                                                         ;; :id 基準に直っていたが、operator 側のこの 1 箇所だけが
                                                         ;; :name のまま残っていた。
                                                         :out-file (path/join tmp (str "gate-" (:id w) "-"
-                                                                                      (sha7 (:tip w)) ".out"))})))))
+                                                                                      (sha7 (:tip w)) ".out"))})))
+                           (catch :default e
+                             (if-let [why (gate-input-rejection e)]
+                               (assoc w :input-rejected why)
+                               (throw e))))))
+                    rejected (filterv :input-rejected prepared-or-rejected)
+                    prepared (filterv (complement :input-rejected) prepared-or-rejected)
+                    _ (doseq [w rejected]
+                        (log "GATE-INPUT-REJECTED" (:id w) (sha7 (:tip w)) "—" (:input-rejected w))
+                        (swap! results conj (assoc w :outcome :input-rejected)))
+                    ;; every item in this batch was refused: there is nothing to
+                    ;; verify, and asking the fleet CLI to verify an empty repo
+                    ;; list would be a receipt over nothing. The refusals are
+                    ;; already in `results`, so the run still reports them.
+                    _ (when (empty? prepared)
+                        (log "batch" bi "— all" (count rejected) "work items refused their input; nothing to run"))
                     out-file (path/join tmp (str "receipts-" bi ".edn"))
                     _ (fs/writeFileSync out-file "")
                     args (concat ["nbb" "--classpath" (path/join kagami-dir "src") fleet-bin
@@ -1231,10 +1274,16 @@
                                            :runner "scripts/fleet-ci/tick.cljs"})
                                   "--gate" (str/join ";;" (map #(str (:gate-name %) "=" (:cmd %)) prepared))])
                     started (js/Date.now)
-                    {:keys [exit out]} (sh "npx" args {:timeout (+ 120000 (:gate-timeout-ms cfg))
-                                                       :input ""})]
-                (log "batch" bi "ci-verify exit" exit
-                     (str "(" (js/Math.round (/ (- (js/Date.now) started) 1000)) "s)"))
+                    ;; asking the fleet CLI to verify an empty repo list would
+                    ;; sign a receipt over nothing, which is the one outcome
+                    ;; worse than no receipt
+                    {:keys [exit out]} (if (empty? prepared)
+                                         {:exit 0 :out ""}
+                                         (sh "npx" args {:timeout (+ 120000 (:gate-timeout-ms cfg))
+                                                         :input ""}))]
+                (when (seq prepared)
+                  (log "batch" bi "ci-verify exit" exit
+                       (str "(" (js/Math.round (/ (- (js/Date.now) started) 1000)) "s)")))
                 ;; 次回の配分に効かせるため実測を残す（EMA、上界）。
                 (record-cost! (map #(keyword (or (:id %) (:name %))) prepared)
                               (js/Math.round (/ (- (js/Date.now) started) 1000)))
@@ -1248,7 +1297,9 @@
                                    (let [k (keyword (str "gate/" (:gate-name w)))]
                                      (:outcome (first (filter #(= k (:name %)) checks)))))]
                   (if-not receipt
-                    (log "ERROR no receipt produced for batch" bi)
+                    ;; not an error when there was deliberately nothing to run
+                    (when (seq prepared)
+                      (log "ERROR no receipt produced for batch" bi))
                     (do
                       (when-not dry?
                         (let [r (append-receipt! landing (last lines))]
