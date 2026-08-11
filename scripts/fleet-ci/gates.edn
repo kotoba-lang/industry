@@ -716,6 +716,22 @@
    :script "gates/kotoba-compiler-jdk-free-check.cljs"
    :include-ext [".edn" ".cljs"] :min-files 60 :cd false}
 
+  ;; Amu の JDK-free native conformance。ADR-2608110900 の「fleet gate は JVM に
+  ;; 依存させない」を守り、repo 自身の専用 script を呼ぶ。JVM tools を PATH で
+  ;; trap したまま NBB compiler → sealed KEXE → 独立 extract-native → C loader の
+  ;; RW-to-RX mapping → host ISA 実行を一続きで検査する。cross-ISA encoder は下の
+  ;; Windows gate、parser memory-safety は次の fuzz gate が補完する。
+  {:name "amu" :id "amu-native-conformance" :gate :nbb-script
+   :script "gates/amu-native-conformance-check.cljs" :cd false}
+
+  ;; native parser の sanitizer/fuzz gate。JVM suite は libFuzzer corpus を走らせない
+  ;; ので別 gate にする。repo 自身の scripts/fuzz-native.cljs を20,000件で呼び、
+  ;; wrapper は baseline SHA と summary の両方を要求する。空 corpus・stale baseline・
+  ;; sanitizer failure のいずれも pass にならない。macOS fleet では deterministic
+  ;; ASan/UBSan、Linux node が加われば同じ script が coverage-guided libFuzzer を使う。
+  {:name "amu" :id "amu-native-fuzz" :gate :nbb-script
+   :script "gates/amu-native-fuzz-check.cljs" :cd false}
+
   ;; Amu Windows loader の cross-build qualification。Windows 実行を装わず、
   ;; reviewed C source を明示的に qualified な Zig 0.15.2/0.16.0 Clang で
   ;; x86-64 と Arm64 に各2回 buildし、byte identity と PE32+ machine field を
