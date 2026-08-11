@@ -1,0 +1,162 @@
+[{:db/id -1
+  :adr/id "adr-2608111900-native-becomes-an-execution-path-when-verification-is-per-session"
+  :adr/title "ADR-2608111900: native が conformance target から execution path になる条件は「検証を呼び出しごとに払わないこと」だった — clj→kotoba の refactor は seam を 1 本置くだけで済む"
+  :adr/status "accepted, implemented"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-11"
+  :adr/last-verified "2026-08-11"
+  :adr/last_verified "2026-08-11"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "native-execution-path-and-minimal-clj-seam"
+  :adr/tags "kotoba, native, amu, tender-native, selfhost, cljc-migration, measurement"
+  :adr/related ["adr-2608110400-native-effect-capability-aot-handoff"
+                "adr-2608110200-native-collections-are-refused-not-missing"
+                "adr-2608110100-selfhost-analyzer-was-removed-not-progressing"
+                "adr-2608650000-kotoba-permanent-vs-temporary-constraints"
+                "adr-2607198300-kotoba-native-aot-no-jvm-node-rust"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["clj から kotoba へ移した決定を native で「実際に動かす」ための手順と、その各段の実測コスト"
+   "native 実行の per-call コストの内訳（2026-08-11、M4、aarch64-macos）"
+   "clj 側の変更を最小化する seam の置き場所"
+   "macOS で単体実行可能な native バイナリが出ない理由"]
+  :adr/body
+  "# ADR-2608111900: native が execution path になる条件
+
+**Status**: accepted, implemented
+**Date**: 2026-08-11
+
+## Context
+
+オーナーの問い（2026-08-11）:「clj から kotoba への refactor を進めてほしい。
+clj 側のコード変更を最小限に、kotoba cli / amu で native build して、実際に
+動作するようにするには?」
+
+ADR-2608110400 は native の gap を capability 側（`:typed-provider-syscall-abi` 等）
+として名指ししていた。しかし **effect を持たない純粋な決定核ですら、clj から
+呼べる形にはなっていなかった** —— その理由は capability でも KIR gate でもなく、
+**呼び出しのたびに artifact を検証し直していたこと**だった。
+
+## 実測（2026-08-11、M4 / aarch64-macos、`safe_analyzer_core`）
+
+CLI パイプラインは**そのまま通る**。`kotoba-selfhost-contracts` の決定核を
+amu で native にして実行し、正しい答えが返ることを確認した:
+
+```
+clojure -M:native-run compile <core>.kotoba --target aarch64 --output x.kexe   # 2m09s（JVM 起動込み）
+clojure -M:native-run keygen / public-key / trust-key / measure-runtime / trust-runtime / sign
+clojure -M:native-run run x.signed.kexe --entry 'non-executable-form?' ...
+#=> {:ok true :status :ok :result {... :result true}}    ns→true, alias→true, defn→false
+```
+
+問題は「動くか」ではなく**1 回いくらか**だった:
+
+| 経路 | per-call | 内訳 |
+|---|---|---|
+| KIR interpreter（JVM 内） | **1.9 ms** | — |
+| `nx/execute`（当時の唯一の native 経路） | **1,888〜2,296 ms** | うち `signing/verify` が **1,751 ms** |
+| loader プロセスだけ（staging 済み） | **21 ms** | 同一機の `/usr/bin/true` が **19.3 ms** |
+
+**`signing/verify` の 1.75 s はほぼ全部 `verifier/verify-artifact!`** で、19,273 word の
+sealed artifact を毎回構造検証していた。**プログラム自体はマイクロ秒で終わっており、
+loader が素の spawn に上乗せするのは約 2 ms。** つまり native は
+「artifact を読み直すのに、走らせるのの 1000 倍払う」状態だった。
+
+これは能力の不足ではない。**誰が clj から native を呼んでも同じ壁に当たる**ので、
+実際には誰も呼ばず、native は conformance target のまま据え置かれていた。
+
+## Decision
+
+### 1. 検証は artifact のロードごと、実行は呼び出しごと（tender-native）
+
+`execute` を `prepare` / `invoke` / `close!` に分けた（`1915ee1`。`execute` は
+3 つの合成なので既存 caller は無変更）。
+
+**償却してよいのは時間不変なものだけ** —— Ed25519 署名、`verify-artifact!`、
+loader バイナリの測定、target profile 一致。staged bytes は session が所有するので
+下から差し替えられない。**償却しないもの**は `invoke` が毎回再検査する ——
+有効期限 / not-before / 失効した signer / 失効した artifact / **その呼び出しの
+policy に対する capability admission**。閉じた session は「そこにある何か」を
+起動せず拒否する。
+
+結果: **3,600 ms → 47 ms**（この時点で残りはほぼ OS のプロセス生成）。
+
+### 2. reviewed loader source は cwd 依存をやめる（tender-native）
+
+`build-runtime!` は `tools/kexe_loader.c` を**プロセスの cwd 相対**で読んでいた。
+このファイルを持つのは amu だけなので、**cwd が amu でない host は
+`NoSuchFileException: tools/kexe_loader.c` で必ず落ちる**。他 repo の test suite が
+native を試そうとすると最初にここで死ぬ。`measure-runtime` に
+`:loader-source-dir`（次いで `KOTOBA_LOADER_SOURCE_DIR`、最後に従来の `tools/`）を
+足した。**digest gate は不変**なので、ディレクトリを指定しても別の loader は入らない。
+
+### 3. clj 側の変更は seam 1 本（kotoba-selfhost-contracts）
+
+`oracle/call` は既に**全 caller の唯一の通り道**だった（`analyzer.clj` は
+「決定を何ひとつ持たない host traversal」として書かれており、判断は全部 oracle 経由）。
+そこに `open-native!` / `close-native!` / `native?` を足しただけで、
+**`analyzer.clj` は 1 行も変えずに全決定が native ISA で走る。**
+
+これは偶然ではない —— ADR-2608110100 が「判断を .kotoba に戻す」ためにこの
+分離を作った。**同じ分離が、エンジンを差し替える場所も 1 箇所にしていた。**
+決定核を切り出す設計（ADR-2608650000）の利得は移植性だけではない。
+
+fallback は両方向で禁止する。native build が欠けていれば例外を投げる ——
+「静かに interpreter へ落ちる」は、この repo が analyzer を失ったのと同じ形。
+
+### 4. 3 列を縛る gate（`test-native/`、578 assertions）
+
+**EDN fact table == native ISA == reference interpreter** を、全 table の全 op ×
+全 predicate（class は意図的に重なるので、2 表に属する op が miscompile の最も
+見えにくい場所）+ どの表にも無い stranger + 各 core の `test-*` export で縛る。
+着地前に変異で確認した: 表の 1 語を書き換えると 5 つ中 2 つが落ち、
+`open-native!` が session を install しないようにすると「native が答えた」と
+主張するテストが落ちる。
+
+## Consequences
+
+### native を選ぶ基準は「1 回の呼び出しがどれだけ働くか」
+
+- **word in / word out の述語には native を使わない。** interpreter が 1.9 ms、
+  native session が 47 ms —— プロセス境界が計算より高い。この repo にとって native は
+  **qualification evidence**（「出荷した決定が、何にも解釈されずに同じ答えを出す」証明）
+  であって production の実行経路ではない。README にそう書いた。
+- **native が境界代を取り戻すのは、1 回の呼び出しが実際に働くとき。** amu の
+  `docs/performance.md` が測っている 48.23 ns の整数カーネルはその側。
+- **バッチ化で償却する道は今日は無い。** export 境界は collection を拒否する
+  （ADR-2608110200、これは安全性質であって未実装ではない）ので、決定核を
+  「1 呼び出しで 1 op」より粗くできない。
+
+### macOS には単体実行可能な native バイナリが出ない（実測）
+
+`compile --target aarch64-macos --artifact image` は**バイナリを書かない**
+（artifact EDN が出る）。`compiler/core.clj` で `:binary` を持つのは
+`x86_64-aiueos-uefi-v1` / `x86_64-aiueos-kernel-v1` / `aarch64-aiueos-kernel-v1` /
+`x86_64-aiueos-user-v1` の 4 target だけ。**macOS/Linux で native を走らせる経路は
+測定済み loader + `program.bin` の 1 本**であり、これは仕様であって欠陥ではないが、
+「native build = 実行ファイルが出る」と読むと必ず外す。
+
+### 引き継ぎ — 次に効く順
+
+1. **per-call の残りはプロセス生成そのもの**（同一機の `/usr/bin/true` が 19.3 ms）。
+   これ以上下げるには loader に session protocol（1 プロセスで複数 entry を回す）が要る。
+   `prepare`/`invoke` はその形をすでに前提にしている。
+2. **effect を持つコードの native 化は ADR-2608110400 の 3 gap のまま。** 本 ADR は
+   pure な決定核の経路を通しただけで、capability kit の `:native-aot` は 9 本とも
+   `:pending`。
+3. **同じ seam を他の repo に置ける。** 条件は「決定が 1 箇所の関数を通っていること」
+   だけで、`murakumo` の 33 cores のように既に切り出してある repo なら同型に載る。
+
+## Evidence
+
+- `kotoba-lang/tender-native` `1915ee1`（merge。`ab76044` = prepare/invoke、
+  `9114591` = loader source）: 13 tests / 105 assertions、変異 2 件で落ちることを確認
+- `kotoba-lang/kotoba-selfhost-contracts` `007c87f`（merge #6）:
+  `clojure -M:test` 34 tests / 284,730 assertions、
+  `clojure -M:test:native` **5 tests / 578 assertions, 0 failures**（aarch64-macos、2m17s）
+- `com-junkawasaki/root` `e2e078f`: west pin 前進（2 件とも fast-forward 検証済み）
+"}]
