@@ -704,6 +704,19 @@
    :script "gates/cloud-itonami-sites-check.cljs"
    :script-args ["--min-checks" "27" "--min-reserved" "30"] :cd true}
 
+  ;; cloud-itonami の kotoba 決定核。実測 2026-08-12、**これらを走らせるものが
+  ;; 何も無かった** —— この repo の Actions は無効（`enabled: false`、最後の CI は
+  ;; 2026-08-04 で失敗）、fleet 側の entry は上の sites-check だけ。6 本の型付き
+  ;; core・その parity gate・native 実行・wasm 実行が、誰にも見られていなかった。
+  ;;
+  ;; `:test` は gate にできない —— fleet は 1 repo の tree しか配らないのに、
+  ;; `:test` は `../../kotoba-lang/kototama` 等の sibling を掴む。repo 側に git
+  ;; だけで解決する `:kernels` を用意してあり、`:alias` でそれを指す。
+  ;;
+  ;; 46 tests / 3,638 assertions。ノードは JDK と cc を持つ（native 実行が要る）。
+  {:name "cloud-itonami" :id "cloud-itonami-kernels" :org "network-awai"
+   :gate :jvm-test :alias "kernels" :cd true}
+
   ;; kotoba-lang/amu の JDK-free 経路（Amu ADR-0202）。
   ;;
   ;; **ここに置く理由は 2 つある。** ①ADR-2607300900 の決定（CI は Actions では

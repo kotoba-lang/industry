@@ -552,8 +552,10 @@
 (defn gate-script
   "gate 1 本ぶんのノード側スクリプト。どの終了経路でも最後に
   `FLEET-CI-EXIT: <code>` を必ず出す（これが唯一の verdict 伝達路）。"
-  [{:keys [name gate classpath entry script script-args]} node sha script-body]
-  (let [d (remote-dir name sha)
+  [{:keys [name gate classpath entry script script-args] :as w} node sha script-body]
+  ;; `:alias` は data のキーなので destructure で clojure.core/alias を隠さない。
+  (let [alias-name (or (:alias w) "test")
+        d (remote-dir name sha)
         ;; JVM の依存解決（~/.gitlibs の git clone と maven）はノード内で共有なので、
         ;; 同一ノードで 2 本並列に走ると衝突する（実測: cognitect test-runner の
         ;; gitlibs clone が "destination path already exists and is not an empty
@@ -572,18 +574,25 @@
       (case gate
         :jvm-test
         [;; 展開失敗の false-pass を構造的に防ぐ（ADR-2607178000 addendum の事故）
+         ;;
+         ;; `:alias` は既定 "test"。**別 alias を許す理由**: fleet は 1 repo の
+         ;; tree しか配らないので、`:test` が sibling の `:local/root` を掴んで
+         ;; いる repo は :jvm-test の対象にできない。cloud-itonami の `:test` は
+         ;; `../../kotoba-lang/kototama` 等を参照しており、ノードには存在しない。
+         ;; git だけで解決する alias を repo 側に用意すれば gate にできる。
          "test -f deps.edn || fail 'deps.edn missing after extract' 90"
-         "grep -q ':test' deps.edn || fail 'no :test alias in deps.edn' 91"
+         (str "grep -q ':" alias-name "' deps.edn"
+              " || fail 'no :" alias-name " alias in deps.edn' 91")
          (str "export JAVA_HOME=" (or (:java-home node) "/opt/homebrew/opt/openjdk"))
          "export PATH=$JAVA_HOME/bin:$PATH"
          "java -version 2>&1 | head -1"
          (str "for i in $(seq 1 900); do mkdir " dep-lock " 2>/dev/null && break;"
               " [ -n \"$(find " dep-lock " -maxdepth 0 -mmin +20 2>/dev/null)\" ]"
               " && rmdir " dep-lock " 2>/dev/null; sleep 1; done")
-         "clojure -P -M:test >/dev/null 2>&1"
+         (str "clojure -P -M:" alias-name " >/dev/null 2>&1")
          (str "rmdir " dep-lock " 2>/dev/null || true")
          ;; **テストが実際に走ったことも assert する**: summary 行が無い / 0 件は fail。
-         "out=$(clojure -M:test 2>&1); code=$?"
+         (str "out=$(clojure -M:" alias-name " 2>&1); code=$?")
          "echo \"$out\" | tail -25"
          "echo \"$out\" | grep -qE 'Ran [0-9]+ tests' || fail 'no test summary in output — refusing to report a pass' 93"
          "echo \"$out\" | grep -qE 'Ran 0 tests' && fail 'zero tests ran' 94"
