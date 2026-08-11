@@ -207,19 +207,23 @@ asher は **publish 鍵を持つ常駐 writer** になっている（attested sl
 
 ### 3. placement を murakumo へ切り替えた（決定 1・2・4）— 代償を測ってから
 
-**parity は成立した**（`scripts/fleet-ci/placement-parity.cljs`、実 fleet で実測
-2026-08-11、101 gate × 8 gate-capable node、cost 実測 631 件）:
+**parity は成立した**（`scripts/fleet-ci/placement-parity.cljs`、実 fleet、
+101 gate × 8 gate-capable node）。**2 回測った** —— placed / unschedulable / cap 違反は
+どちらも一致し、makespan は 2 回で向きが入れ替わった:
 
-| | placed | unschedulable | hosts | makespan | cap 違反 |
+| 測定 | cost EMA 件数 | fleet-ci LPT | murakumo | placed | cap 違反 |
 |---|---|---|---|---|---|
-| fleet-ci（LPT） | 101 | 0 | 8 | 509s | 0 |
-| murakumo（cost 降順 + greedy） | 101 | 0 | 8 | **389s** | 0 |
+| 1 回目 | 631 | 509s | 389s | 101 = 101 | 0 = 0 |
+| 2 回目（hoist 後） | 670 | 282s | 310s | 101 = 101 | 0 = 0 |
+
+**したがって「murakumo の方が速い」とは言えない。** 1 回目だけを見て 24% 改善と
+書いていたが、makespan は live の cost EMA に依存するノイズの大きい指標で、2 回目は
+10% 悪化している。**正しい結論は「許容幅（20%）の中で同等」**であって、どちらかが
+優れているという主張は 2 回の測定からは出ない。
 
 **「LPT は host 側の1手に還元できる」は正しかった。** `plan/assign` は tasks を
 与えられた順に fold して最も空いている eligible node へ置くので、cost 降順に
 並べ替えて渡せば LPT と同じ順序付けになる —— Kotoba object を1つも足していない。
-makespan は悪化どころか 24% 改善した（murakumo の `node-score` が fill-ratio を
-主にし、load1/mem を tie-break にするため）。
 
 **切り替えの前に murakumo 側のバグを 1 つ直す必要があった。** `murakumo.task.plan`
 は 11 箇所で oracle の i64 結果を素の `long` に渡しており、KIR が cljs で i64 を
@@ -230,32 +234,56 @@ plan/run/report` は nbb 上で1つも動いていなかった。JVM では Long
 ために在り、tunnel / persist / component-authority は既に通していた —— この ns
 だけが例外。修正は kotoba-lang/murakumo `0e98f18`、west pin も前進済み。
 
-**⚠ 代償を隠さない: out-of-process 委譲は遅い。** 実測（cache 済み classpath）:
+### 4. 委譲は最初 遅かった。原因は KIR ではなく重複呼び出しだった（同日に解消）
+
+切り替え直後の実測（cold subprocess）は **1 gate 7.9s / 101 gate 95.2s**、つまり
+固定 6s + 約 1.2s/gate だった。in-process の LPT は実質 0ms なので、これは authority を
+out-of-process へ出した代償に見えた。
+
+**しかし原因は KIR インタプリタの速さではなく、同じ引数で同じ答えを何百回も
+計算させていたことだった。** 内訳:
 
 ```
-shim 起動のみ(0 task)   6.0s     ← nbb + kotoba.kir のロード
- 1 gate                 7.9s
- 3 gate                11.8s
- 8 gate                17.6s
-20 gate                20.5s
-101 gate               95.2s     ← gates.edn 全件（上界）
+oracle/call（自明な export）  1.5ms   ← 呼び出し機構は十分速い
+ir/execute 直呼び             0.6ms
+eligible?（record 引数）       3.9ms
+slots（record 引数）           6.0ms
 ```
 
-**固定 6s + 約 1.2s/gate。in-process の LPT は実質 0ms だった。** 典型的な tick
-（変化した repo 1〜3 件）では +8〜12s で、その後に走る gate 自体が分単位なので
-比率としては小さい。しかし **101 件が動いた後の tick と `--plan` では 95s** かかる。
+`slots` は **(node, opts) だけの関数で task を見ない**。にもかかわらず `node-score` が
+`sort-by` の keyfn なので **task ごとに全候補ノード分**呼ばれていた —— 101 task ×
+8 node = 808 回 × 6.0ms ≈ 6 秒。`eligible?` も eligibility fields だけの関数で、
+808 回のうち実際に異なる fields は 16 通りだけ（fleet の batch は placement を 2 種類しか
+持たない）≈ 2.6 秒が重複。
 
-**1 task あたり 1.2s は KIR 解釈としても遅すぎる。** 1 task の配置に必要な
-`o-record` 呼び出しは (候補ノード数 × `eligible?`) + `node-score` + `wave-of` +
-`slot-of` + `load-after-assign` 程度で、8 ノードなら 12 回前後。**1 回 100ms は
-oracle の call path 側の非効率を疑うべき数字**（`require-ready!` / `call-record`
-が毎回何かを作り直していないか）。これは murakumo 側の follow-up として残す ——
-placement の正しさとは独立で、直せば委譲のコストはほぼ消える。
+どちらも純関数なので fold の外へ出した（kotoba-lang/murakumo `8365372`、pin 前進済み。
+**決定核は 1 行も触っていない** —— host 側の memo だけ）。結果:
 
-**それでも切り替えた理由**: 決定 1 はオーナー判断であり、placement の**質**は
-実測で退行していない（むしろ改善）。速度は実装の問題で、authority の置き場所の
-問題ではない。ただし**この数字を知らずに「移して速くなった」と読まれないよう**
-ここに残す。
+```
+実 fleet の同一入力（101 task）      19,716ms → 437ms（45x）
+  assignments の digest（task-id / node / wave / slot）は **完全一致**
+tick --plan の placement（36 gate）  17s → 0.7s
+placement 単体（cold subprocess）    1 gate 653ms · 3 gate 621ms · 20 gate 666ms · 101 gate 791ms
+```
+
+**gate 数にほぼ依存しなくなった**（0.6〜0.8s、大半は nbb + kotoba.kir のロード）。
+
+**残る非対称を正直に書く**: in-process の LPT はこれでも 0ms なので、委譲はなお
+約 0.7s 高い。それは「別プロセスを起こす」ことの値段であって、authority をどこに置くかとは
+独立である。1 task あたりの KIR コスト（eligible? 3.9ms / slots 6.0ms）も下げていない ——
+落ちたのは重複だけ。
+
+⚠ **上の「固定 6s」と現在の「0.65s」を直接比べないこと。** 前者は cold な
+ファイルシステムキャッシュで `/usr/bin/time` 越しに測っており、後者は warm。
+比較できるのは**傾き**（1.2s/gate → ほぼ 0）であって切片ではない。
+
+### 5. parity harness は rename で一度壊れた（黙って緑にはならなかった）
+
+`assign` を委譲に、旧 LPT を `assign-lpt` に改名したとき、harness 側が `fci/assign` を
+呼んだまま残った —— つまり **murakumo を murakumo と比べる**状態。`assign` が
+`:spawn-fn` を必須にしているので `Cannot read properties of null` で落ち、偽の緑には
+ならなかった。harness は `assign-lpt`（oracle）を呼ぶよう直した。**production の関数名を
+変えるときは、それを oracle として使っている検査側も一緒に見る。**
 
 ## landed していないもの（順序つき）
 
@@ -266,11 +294,9 @@ placement の正しさとは独立で、直せば委譲のコストはほぼ消�
    （ADR-2800002700 の反省をここで解く）
 3. **死んでいる 10 本の棚卸し**（last-exit 78 / 127）。消すか直すかを決める。
    『動いていない CI より無い CI の方がよい』（ADR-2607300900）と同じ理屈
-4. **oracle call path の高速化**（murakumo 側）。1 task 1.2s は placement の質とは
-   独立の実装問題で、直せば out-of-process 委譲のコストはほぼ消える
-5. **attested slot の常駐先の統一。** hayari は asher に landed したが、
+4. **attested slot の常駐先の統一。** hayari は asher に landed したが、
    他の書き込み鍵持ち常駐はまだラップトップに居る
-6. **`murakumo task` CLI は nbb でまだ動かない。** `task.plan` は直ったが
+5. **`murakumo task` CLI は nbb でまだ動かない。** `task.plan` は直ったが
    `murakumo.tunnel` が `string substring indexes are out of bounds` で落ちる
    （connect-timeout-opt、tunnel.cljc:111-122）。**別の破損**で executor 側なので
    placement には影響しないが、`murakumo task run` を使いたい者は先にここを踏む
