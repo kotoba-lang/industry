@@ -1,7 +1,7 @@
 [{:db/id -1
   :adr/id "adr-2608110300-hayari-tick-residency-and-alarm"
   :adr/title "ADR-2608110300: hayari tick の常駐先と、無人ループの警報 — 死んだループは自分の死を報告できない"
-  :adr/status "proposed"
+  :adr/status "partially implemented: stages 1-2 landed 2026-08-11, stages 3-5 not started"
   :adr/doc_type "adr"
   :adr/date "2026-08-11"
   :adr/deciders ["Jun Kawasaki"]
@@ -210,6 +210,34 @@ hirameki-harvest / newsfeed-ingest / fleet-ci-tip-tick、うち 3 つが LOADED�
 ラップトップを開かなくても回り続けてほしい、という運用上の要求であって、
 データを守るための必須要件ではない。そう書いておかないと、後から読む人が
 「移設しないとデータが壊れる」と誤読する。
+
+## 実装状況（2026-08-11）
+
+**段階 1-2 は着地済み。3-5 は未着手。**
+
+| 段階 | 状態 |
+|---|---|
+| 1. gate を作る | ✅ `scripts/fleet-ci/gates/hayari-tick-alive.cljs` + `gates.edn` |
+| 2. 落ちることを実測 | ✅ 6 分岐すべて exit code で確認 |
+| 3. 遷移通知を tip 側に | ⬜ 未着手 |
+| 4. plist を scripts/fleet-ci/ へ | ⬜ 未着手 |
+| 5. 常駐先を移す | ⬜ 未着手 |
+
+段階 2 の実測（登録前に全分岐を確認した）:
+
+```
+現行データ      exit 0    心拍 40h 前     exit 1
+連続失敗 2      exit 1    連続失敗 1      exit 0（一過性として通す）
+health entity 無し exit 1  要約ファイル無し exit 1
+```
+
+**ファイルが無い場合を pass にしていない。** 証拠の不在は健全性の証拠ではなく、
+入力が消えたときに黙る gate は、まさにこの gate が捕まえるべき欠陥を自分が持つ
+ことになる。
+
+実装中に 1 つ落とし穴を踏んだので記録する: tick は UTC を 'Z' 無しで書き、
+**JS はサフィックス無しの `YYYY-MM-DDTHH:MM:SS` をローカル時刻として解釈する**。
+そのままだと JST 環境で心拍が 9 時間未来に見え、staleness 判定が永久に通る。
 
 ## 非目標
 
