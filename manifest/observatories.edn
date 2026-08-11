@@ -257,6 +257,18 @@
    :expect :runs-ok
    ;; 実 fetch + 実 publish は別 alias（KOUHOU_ALLOW_LIVE_INGEST=1 clojure -M:live-ingest）。
    ;; **既定では起動しない** —— 外向き publish を毎時の無人 run に混ぜない。
+   ;;
+   ;; 2026-08-11（ADR-2608110100）: **取り込みと発信が分離された。**
+   ;; `KOUHOU_ALLOW_LIVE_INGEST=1 KOUHOU_PUBLISH=0 clojure -M:dev:live-ingest` は
+   ;; phase 0（observe）で走り、data/{briefings,ledger,corpus} に canonical EDN を、
+   ;; raw/ に取得した feed 本体（annex → s3.kotobase.net）を書いて、**app-aozora には
+   ;; 何も送らない**。つまり「無人で取り込むが無人で発信はしない」が初めて表現できる。
+   ;; ここを毎時に足すかは別判断なので、**まだ足していない**（この行は可能性の記録で
+   ;; あって配線の記録ではない）。実測 1 パス: 53 source / 39 commit / 2 hold /
+   ;; 0 publish / 12 error、48 feed を archive。
+   ;;
+   ;; ⚠ 上の見出し「走るが、ディスクに書かないのが正常」は **:aliases の既定 run
+   ;; （offline sim）についてのみ正しい。** live alias は書く。
    :live-alias "live-ingest"
    :live-env {"KOUHOU_ALLOW_LIVE_INGEST" "1"}
    :evidence "2026-08-08 実測: gov-jp-press は commit、anon-blog は Governor が

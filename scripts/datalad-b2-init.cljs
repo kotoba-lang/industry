@@ -19,6 +19,31 @@
 ;;   B2_ENDPOINT=s3.us-west-004.backblazeb2.com \
 ;;     scripts/datalad-b2-init.cljs <dataset-dir> [remote-name]
 ;;
+;; ## B2 以外の S3 互換エンドポイントにも使う（2026-08-11）
+;;
+;; git-annex 側は `type=S3` の endpoint/bucket/鍵しか見ておらず、B2 固有の要素は
+;; 1 つも無い。**s3.kotobase.net（自前の object plane、ADR-2608100100）を remote に
+;; するのに別スクリプトは要らない** —— ADR-2608100100 が custody を取った 3 dataset の
+;; `kotobase` remote も、ここで作るのと同じ `type=S3 host=… signature=v4` である。
+;;
+;; ただし `B2_ENDPOINT=s3.kotobase.net` と書くのは、次に読む者に嘘を教える。
+;; そこで **ANNEX_* を第一の名前とし、B2_* は後方互換の別名**として残す:
+;;
+;;   ANNEX_KEY_ID / ANNEX_APP_KEY / ANNEX_BUCKET / ANNEX_ENDPOINT / ANNEX_FILEPREFIX
+;;
+;;   ANNEX_ENDPOINT=s3.kotobase.net ANNEX_BUCKET=cloud-itonami-kouhou \
+;;   ANNEX_REQUESTSTYLE=path \
+;;   ANNEX_KEY_ID=$(security find-generic-password -s cf:kotobase-protocols-worker \
+;;                    -a S3_ACCESS_KEY_ID -w) \
+;;   ANNEX_APP_KEY=$(security find-generic-password -s cf:kotobase-protocols-worker \
+;;                     -a S3_SECRET_ACCESS_KEY -w) \
+;;     scripts/datalad-b2-init.cljs orgs/cloud-itonami/kouhou kotobase
+;;
+;; **bucket は dataset ごとに分ける**（fileprefix で共有しない）。s3.kotobase.net は
+;; bucket 単位に chain を 1 本持ち、その head を CAS するので、bucket を共有した
+;; dataset 同士は書き込みで直列化して衝突する。ADR-2608100100 が per-bucket 化で
+;; PUT を 5.0s → 0.89s にしたのはこれ。逆に B2 直は素の PUT なので共有してよい。
+;;
 ;;   作成後の運用:
 ;;     cd <dataset-dir>
 ;;     cp big.safetensors .            ; データを置く
@@ -36,10 +61,17 @@
   (binding [*out* *err*] (apply println msg))
   (scripts.nbb-compat/exit 1))
 
+(defn env
+  "ANNEX_<k> を第一、B2_<k> を後方互換の別名として読む。"
+  [k]
+  (let [v (scripts.nbb-compat/getenv (str "ANNEX_" k))]
+    (if (str/blank? v) (scripts.nbb-compat/getenv (str "B2_" k)) v)))
+
 (defn env-or-die [k hint]
-  (let [v (scripts.nbb-compat/getenv k)]
+  (let [v (env k)]
     (when (str/blank? v)
-      (die (str k " is required" (when hint (str " (" hint ")")))))
+      (die (str "ANNEX_" k " (or B2_" k ") is required"
+                (when hint (str " (" hint ")")))))
     v))
 
 (defn need-tool [t]
@@ -51,12 +83,14 @@
   (when (str/blank? dataset-dir)
     (die "usage: datalad-b2-init.cljs <dataset-dir> [remote-name]"))
   (let [remote-name (or remote-name "b2")
-        key-id   (env-or-die "B2_KEY_ID"   nil)
-        app-key  (env-or-die "B2_APP_KEY"  nil)
-        bucket   (env-or-die "B2_BUCKET"   nil)
-        endpoint (env-or-die "B2_ENDPOINT" "例: s3.us-west-004.backblazeb2.com")
+        key-id   (env-or-die "KEY_ID"   nil)
+        app-key  (env-or-die "APP_KEY"  nil)
+        bucket   (env-or-die "BUCKET"   nil)
+        endpoint (env-or-die "ENDPOINT" "例: s3.us-west-004.backblazeb2.com / s3.kotobase.net")
         ;; 任意。既定はバケット直下だが、共有バケットでは必ず指定する（上記参照）。
-        fileprefix (scripts.nbb-compat/getenv "B2_FILEPREFIX")]
+        fileprefix (env "FILEPREFIX")
+        ;; 任意。s3.kotobase.net では "path" が必須（下記 initremote のコメント）。
+        requeststyle (env "REQUESTSTYLE")]
 
     (need-tool "datalad")
     (need-tool "git-annex")
@@ -108,7 +142,16 @@
                                ;; fileprefix=product-corpus/）。これが無いと全 dataset の
                                ;; キーがバケット直下に混ざり、どの dataset の実体かを
                                ;; バケット側から判別できなくなる。
-                               fileprefix (conj (str "fileprefix=" fileprefix)))
+                               ;; ANNEX_REQUESTSTYLE=path。既定の virtual-host style
+                               ;; （`<bucket>.<host>`）は **s3.kotobase.net では DNS が
+                               ;; 引けず落ちる** —— apex の 1 ホストしか存在しないため。
+                               ;; 実測 2026-08-11: 既定のまま initremote すると
+                               ;; `cloud-itonami-kouhou.s3.kotobase.net` を引きに行き
+                               ;; ConnectionFailure。ADR-2608100100 が custody を取った
+                               ;; 3 dataset も全て requeststyle=path で登録されている。
+                               ;; B2 は両方式に応答するので既定のままでよい。
+                               requeststyle (conj (str "requeststyle=" requeststyle))
+                               fileprefix   (conj (str "fileprefix=" fileprefix)))
                              {:dir dataset-dir :env annex-env :inherit true})
                   deref)]
           (when (pos? exit)
