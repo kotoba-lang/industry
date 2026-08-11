@@ -1,0 +1,170 @@
+[{:db/id -1
+  :adr/id "adr-2608110300-hayari-tick-residency-and-alarm"
+  :adr/title "ADR-2608110300: hayari tick の常駐先と、無人ループの警報 — 死んだループは自分の死を報告できない"
+  :adr/status "proposed"
+  :adr/doc_type "adr"
+  :adr/date "2026-08-11"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "hayari-tick-residency-and-alarm"
+  :adr/tags "hayari, observatory, fleet-ci, residency, alerting, credentials, honesty"
+  :adr/related ["adr-2608103000-hayari-cross-country-attention-observatory"
+                "adr-2608081200-domain-observatory-runner"
+                "adr-2607300900-ci-cd-murakumo-fleet"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative_for
+  ["hayari tick をどのマシンに常駐させるか、および fleet ノードに置かない理由"
+   "無人ループの健全性をどこで検査し、どこで人に見せるか"]
+  :adr/last_verified "2026-08-11"
+  :adr/body
+  "# ADR-2608110300: hayari tick の常駐先と警報
+
+**status: proposed。** これは設計であって、実装済みの記録ではない。
+
+## 出発点（実測、2026-08-11）
+
+tick は 15 分ごとに 1 日ずつ backfill し、安定して回っている:
+
+```
+発火 61 回 / 期待 69（88%）· 最大 gap 24 分 · 60 分超の穴なし
+:added-day 54 回 · 失敗系 1（修復済み）· consecutive-failures 0
+59 日保持 / 3,998 country-days / 1900-2026 の 127 年すべて populated
+backfill 3% 完了（残り 1,987 日 ≒ 3 週間）
+```
+
+**しかし常駐先は「オーナーのラップトップ」1 台**で、警報は存在しない。
+
+## 問題 1 — 死んだループは自分の死を報告できない
+
+前波で tick に健全性の自己申告を足した。それは正しいが**不十分**である:
+tick が起動しなくなれば health も更新されず、`:last-run-at` が古いままになる。
+**古い心拍を「古い」と判定する主体が別に要る。**
+
+これは設計上の非対称で、書き留めておく価値がある —— 自己申告は
+「動いているが結果が悪い」を報告できるが、「動いていない」は報告できない。
+
+## 問題 2 — 単一ラップトップ依存
+
+実測では 88% 発火・最大 gap 24 分と健全だが、**構造的には**旅行・スリープ・
+再起動でいつでも止まる。一方 fleet の `asher` は **71 日連続稼働**している
+（実測: `up 71 days`, node v26.4.0, 10 cores, free 9 GB）。
+
+## 決定 A — 警報は fleet-ci gate として実装する（新しい通知系を作らない）
+
+CLAUDE.md は明示している: 「新しい `.github/workflows/*.yml` を書かない。検査を
+足したいなら `scripts/fleet-ci/gates.edn` に 1 行足す」。実測でも、**この
+workspace には通知系がそもそも存在しない** —— fleet-ci の思想は
+『鳴らす』ではなく『gate が赤くなる』である。
+
+```clojure
+{:name \"hayari\" :id \"hayari-tick-alive\" :org \"cloud-itonami\" :gate :nbb-script
+ :script \"gates/hayari-tick-alive.cljs\"
+ :script-args [\"--max-age-hours\" \"36\" \"--max-failures\" \"1\"]
+ :include-ext [\".edn\" \".cljs\"] :min-files 3 :cd false}
+```
+
+gate が読むのは **commit 済みの `data/hayari-summary.edn` に載っている health
+entity**（前波で実装済み）。判定:
+
+| 条件 | 結果 |
+|---|---|
+| `:last-run-at` が 36 時間より古い | FAIL — ループが止まった |
+| `:consecutive-failures` > 1 | FAIL — 継続的に失敗している |
+| `:consecutive-failures` = 1 | PASS（一過性の失敗で人を起こさない） |
+| health entity 自体が無い | FAIL — 「健全」ではなく「観測できていない」 |
+
+**36 時間の根拠**: `:last-run-at` はニュースのある run でのみ進む。backfill 中は
+毎 tick、完了後は日次。したがって 36 時間より古いのは「暇だった」ではなく
+「止まった」である。この境界は backfill 完了後も有効なように選んである。
+
+**このマシンは credential を要さない。** hayari は public repo なので、gate は
+既存の repository-roles gate と同じく raw.githubusercontent から読める ——
+**fleet の不変条件 3「ノードに credential を置かない」を保ったまま**警報が置ける。
+
+### 人に見せる層
+
+gate が赤くなるだけでは、誰も見なければ意味がない。ただし**通知は tick 側に
+置いてはならない**（問題 1）。したがって:
+
+- 通知を出すのは **gate を走らせている側**（fleet-ci tip の tick.cljs、すでに常駐）
+- **状態遷移のときだけ**出す（healthy→unhealthy と、回復時に 1 回）。毎 tick 鳴らすと
+  警報疲れで無視されるようになり、**常時赤い gate は gate が無いのと同じ**という
+  登録簿の既存の教訓をそのまま踏む
+- 手段は macOS の `osascript display notification`。このマシンに実在する唯一の
+  人間向けチャネルである（実測: workspace に slack/mail 連携は無い）
+
+## 決定 B — writer は fleet ノードに置かない。常時稼働の operator マシンへ移す
+
+**fleet ノードへの分散は却下する。** 理由は 2 つあり、どちらも実測に基づく。
+
+### 1. fleet の不変条件と両立しない
+
+`gates.edn` は明示的に「ノードに credential を置かない不変条件」を持ち、
+**認証が要る仕事は operator 側に置くという前例が既にある** —— west pin の
+server-side 到達性検証は「GitHub API 認証を要し、ノードに credential を置かない
+不変条件 3 と両立しない」ため tick.cljs（operator 側）に置かれている。
+
+hayari tick は `git push`（repo write）と `gh api`（pin 前進）をする。
+**10 ノードに配れば、書き込み credential の blast radius が 10 倍になる** ——
+可用性のために機密性を売ることになる。
+
+### 2. そもそも分散に意味がない
+
+ボトルネックは計算ではない。1 tick は約 60 秒で、10 コアのノードを 10 台使う
+理由が無い。**解きたいのは可用性であって並列度ではない。**
+
+### したがって: 常時稼働の 1 台へ「引っ越す」
+
+分散ではなく移設。候補は `asher`（実測 71 日連続稼働、node v26.4.0）。
+
+| | いま | 提案 |
+|---|---|---|
+| 常駐先 | オーナーのラップトップ | 常時稼働の mac-mini 1 台 |
+| 台数 | 1 | 1（増やさない） |
+| credential | 既にある | 移す（増やさない） |
+| 発火率 | 88%（スリープ由来の遅れ） | スリープしない |
+
+**credential の総量は増えない** —— ラップトップから 1 台へ移すだけで、
+持つマシンの数は 1 のまま。これが「10 台に配る」との決定的な違いである。
+
+### 移設に要るもの（未検証、実装時に実測すること）
+
+1. `nbb` がノードに在るか（`:caps` に `:node` はあるが nbb は別）
+2. GitHub への push 経路 —— **repo scope を絞った deploy key**（`cloud-itonami/hayari`
+   のみ）。オーナーの汎用 token を移さない
+3. pin 前進の `gh api` —— superproject への write が要る。**これはノードに置かず、
+   pin だけラップトップ側の既存 resident（`observatory-run`、毎時 :11 に常駐済み）に
+   委ねる**選択肢がある。そうすれば移設先が持つ credential は hayari repo の
+   deploy key だけになる
+4. `~/.gftd/hayari-tick` clone の初期化
+5. plist を `scripts/fleet-ci/` へ移す —— 既存の常駐 plist
+   （`com.gftd.observatory-run.plist` 等）と**同じ場所に置く**。現在 plist は
+   hayari repo 側にあり、他の常駐と並んでいないので発見できない
+
+## いま守られていない house style（ついでに直す）
+
+`deploy/com.gftd.hayari-tick.plist` は hayari repo にあるが、この workspace の
+常駐 plist は `scripts/fleet-ci/` に集まっている（observatory-run /
+hirameki-harvest / newsfeed-ingest / fleet-ci-tip-tick、うち 3 つが LOADED）。
+**hayari だけ別の場所にあると、常駐の棚卸しから漏れる。**
+
+## 段階（この順で、各段階を実測してから次へ）
+
+1. **gate を先に作る**（決定 A）。移設前に警報を用意する —— 移設は止まるリスクを
+   持ち込む操作なので、止まったことが分かる状態を先に作る
+2. gate が**実際に落ちること**を確かめる（health を古くしたコピーで FAIL、
+   現行で PASS。落ちない gate は劇場）
+3. 遷移通知を tip 側に足す
+4. plist を `scripts/fleet-ci/` へ移す（移設とは独立に正しい）
+5. **そこで初めて**常駐先を移す。ラップトップ側を unload、ノード側を load、
+   1 tick を実測してから放置
+
+## 非目標
+
+- **fleet 10 台への分散はしない。** 可用性の問題であって並列度の問題ではなく、
+  credential の blast radius を 10 倍にする対価に見合わない
+- **新しい通知インフラは作らない。** gate が赤くなるのが house の作法で、
+  人間向けは既存の macOS 通知で足りる
+- **ノードに汎用 token を置かない。** 移すなら repo scope を絞った鍵だけ
+"}]
