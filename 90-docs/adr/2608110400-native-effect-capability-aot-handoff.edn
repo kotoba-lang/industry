@@ -417,10 +417,74 @@
     "現在の identity leaves は RW+executable なので W^X 達成とは数えない"
     "exceptions / APIC / SMP、scheduler / CPL3 / typed syscall"
     "clock を最初の native effect provider として semantic vector と empty-foreign-code receipt まで閉じる"]
-   :next
+  :next
    "次は activated と protected を混同しない。bootstrap identity map の広い RW+X permission を
     分割し、text RX / data+stack RW+NX / guard unmapped を作る。各 permission violation と
     unmap 後 access を独立した machine rejection にする。"}
+
+  :adr/addendum-2026-08-11-native-page-protection-and-bool-closure
+  {:status "accepted; supersedes remaining/next in the native-page-table-activation addendum and the unfinished string-predicate claim in consequences"
+   :dependency-authority
+   {:kotoba-gmir "8bafa66bbac8e96aff40ad53e03bcaf34aebdeb0"
+    :kotoba-native "4f73090e9f8d997c2652480a4c2614be4de54fb3"
+    :kotoba-sema "0f7ca17b849257416c5d494ec49e46444a1edd2b"
+    :kotoba-kir "e5684a44ee39c888f45d0a5bd38ca6fef9475219"
+    :kotoba-verifier "be5b568079447097f66ef285cb84ec7b4da607b6"
+    :kotoba-script "ee6a1b7a88b3a302ba46f2e106dd92666f427913"
+    :kotoba-wasm "94a39584ce55dfe345f1a0e59a716f5084397a65"
+    :amu "f5cf064366591ea729441b41143cc99e18e8239a"
+    :aiueos "ad73d07fdd35bb2ac6c7057fedf61a8a49bfe9e5"
+    :aiueos-adr "ADR-0038"}
+   :finding
+   "CR3 activation addendum の 512 個の 2 MiB leaf は first 1 GiB を広く
+    RW+executable にしており、activated ではあっても protected ではなかった。また
+    string predicate は sema の宣言だけが `:bool` でも、KIR evaluator、JavaScript emitter、
+    Wasm typed inference、Amu fixture/pin が 1/0 を返す限り本番経路の意味は閉じない。
+    どちらも『書いてある』permission/type と実行時の意味が一致するかを下流まで測る
+    同じ問題だった。"
+   :decision
+   "allocator extent を 6 pages にする。page 0 は ownership bitmap、pages 1/2/3 は
+    PML4/PDPT/PD、page 4 は first 2 MiB 用 4 KiB PT、page 5 は release/reuse probe。
+    guard page `0x100000` は non-present、kernel text `0x101000..0x109fff` は supervisor
+    RX、kernel context/state は `0x10a000` から RW+NX、残りの identity leaves も
+    supervisor RW+NX とする。CPUID で NX を確認し EFER.NXE と CR0.WP を set/readback
+    した後にだけ CR3 を切り替え、invlpg 後も実行を継続する。verifier は metadata を
+    信用せず ELF と opcode を読み、境界、CPUID/RDMSR/WRMSR、CR0/CR3、invlpg を再導出する。
+
+    string predicate は `string=?` / `string-contains?` を KIR evaluator、JavaScript、Wasm、
+    Amu conformance まで language boolean に統一する。machine ABI で word が必要な場所に
+    限って 0/1 へ encode し、言語意味を数値へ戻さない。"
+   :machine-evidence
+   {:positive "x86_64 Linux/KVM + OVMF: debug=MPRC, isa-debug-exit status=33"
+    :guard-present-mutation "guard PTE を present に変更: debug=M, status=47; CR3 write 前に独立拒否"
+    :text-writable-mutation "text PTE を writable に変更: debug=M, status=47; CR3 write 前に独立拒否"
+    :scope-honesty "2 mutations は pre-activation verifier rejection の証拠。handled CPU page fault や unmap 後 access fault の証拠ではない"
+    :elf-sha256 "38a2cc28c0dccfce692fe40cd0884d2eb21553668ce252734cbc127c49a43624"
+    :foreign-code "C sources/objects/CRT/linker/imports/dynamic dependencies empty"
+    :tests ["kotoba-gmir 13 tests / 79 assertions"
+            "kotoba-native 136 tests / 1735 assertions"
+            "kotoba-sema 5 tests / 24 assertions"
+            "kotoba-kir 134 tests / 575 assertions"
+            "kotoba-verifier 48 tests / 269 assertions"
+            "kotoba-script 62 tests / 219 assertions"
+            "kotoba-wasm 91 tests / 413 assertions"
+            "Amu 965 tests / 7635 assertions; focused bool 101 / 853; conformance 60 / 60"
+            "aiueos 431 tests / 1305 assertions"]}
+   :closed
+   ["bootstrap identity map の broad RW+X"
+    "kernel text RX / state RW+NX の exact 4 KiB boundary"
+    "guard page non-present、NXE、CR0.WP、CR3/invlpg の verifier closure"
+    "string predicate の sema-only half landing と Amu dependency/fixture drift"]
+   :remaining
+   ["C-free IDT と #PF handler による guard write / text write / NX execute の実 CPU fault probe"
+    "dynamic mapping/unmapping と unmap 後 access、TLB shootdown"
+    "UEFI map 全体を index 化する bounded allocator と zones"
+    "exceptions / APIC / SMP、scheduler / address spaces / CPL3 / typed syscall"
+    "log を最初の native effect provider として semantic vector と empty-foreign-code receipt まで閉じる"]
+   :next
+   "次は permission table を検査したことと CPU が違反を trap したことを混同しない。
+    C-free minimal IDT と #PF handler を入れ、guard write、text write、NX execute を別々の
+    fault receipt にする。その後、既に実在する LOG_WRITE oracle を typed provider 経路へ移す。"}
 
   :adr/addendum-2026-08-11-step1-substrate-measurement
   {:status "accepted; revises 順序 item 1 のキット選択と、:typed-provider-syscall-abi を白紙と読む枠組み"
@@ -547,11 +611,10 @@
 
    ## この ADR がやらないこと
 
-   - **sema pin 追随 + `surface-status.edn` の drift 解消は別件で未着手。**
-     `kotoba-sema` は 2026-08-11 に `171e23f` で string predicate を `:bool` に揃えたが、
-     amu は `bc4fa7f` を pin したまま、`kotoba-lang/lang/surface-status.edn` の
-     `:string-predicate-typing` は `:not-yet-implemented` のまま。**正本が 1 段遅れている。**
-     この ADR の作業とは独立に進められる。
+   - string predicate の `:bool` closure は
+     `:adr/addendum-2026-08-11-native-page-protection-and-bool-closure` で完了した。
+     sema の宣言だけでなく KIR / JavaScript / Wasm / Amu fixture・conformance と dependency
+     pin まで進めたため、ここに未着手事項として残さない。
    - wasmtime backend の 6 gaps。native と同じ表に載っているが別作業。"
 
   :adr/references
