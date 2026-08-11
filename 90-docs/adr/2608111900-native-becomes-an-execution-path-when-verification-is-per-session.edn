@@ -140,16 +140,68 @@ fallback は両方向で禁止する。native build が欠けていれば例外�
 測定済み loader + `program.bin` の 1 本**であり、これは仕様であって欠陥ではないが、
 「native build = 実行ファイルが出る」と読むと必ず外す。
 
+### murakumo で測った第 2 の corpus（2026-08-11、同日追記）
+
+同じ seam の形が `kotoba-lang/murakumo` にも既にあった（`murakumo.kotoba.oracle/call`、
+35 cores・1,043 exports）。そこで **acceptance ではなく execution** を測った
+（PR #289、`test-native/murakumo/kotoba_native_execution_test.clj`）:
+
+```
+35 cores, 722 of 1043 exports crossed the host boundary,
+1312 calls -- 1281 same value, 31 both refused, 0 disagreed   (aarch64, 3m43s)
+```
+
+- **これは differential test であって oracle test ではない。** native code と
+  reference interpreter に渡す KIR は**同一の `compile-source` 結果**なので、
+  不一致は native backend にのみ帰属する。shipped `*.kir.edn` の鮮度は別問題
+  （`kotoba_oracle_authority` が持つ）。
+- **「一致」を定義した。** 同じ値＝一致、**両方が拒否＝一致**（両者は失敗語彙を
+  共有しない —— guest fault は片方が JVM 例外、もう片方が supervisor `:trap`）。
+  ラベル一致を要求すると `digit-char(-1)` / `nat-str(-1)` の 31 件で落ちるが、
+  それは**両方が正しく拒否している**ケースであって意味論の情報が無い。
+  拒否せず値を返した側がある / 値が違う、が捕まえるべき失敗。
+- **越えられない 321 exports は core ごとに数える（skip しない）。**
+  `[:ref …]` / `[:record …]` の parameter で、ADR-2608110200 のとおり
+  **意図的な拒否**であって未実装ではない。
+- **production の native 経路は意図的に足していない。** seam は 1 本なので 10 行で
+  足せるが、**割に合う呼び出し（task_plan の placement / infer_plan /
+  infer_schedule）は、まさに `[:ref …]` を取る「越えられない 321」の側**にある。
+  今日 switch を足すと「誰も入れるべきでない switch」が増えるだけ。
+
+**この corpus が示したこと**: pure な決定核の native backend は、実務規模
+（722 exports / 1,312 calls）で reference と一致する。**残っているのは backend の
+正しさではなく境界の形**である。
+
+### murakumo main は merge できない（2026-08-11 実測、owner 判断が要る）
+
+`kotoba-lang/murakumo` の branch protection は required status check
+`test` を **`app_id: 15368`（GitHub Actions）** で要求している。
+**Actions はワークスペース全体で撤去済み（ADR-2607300900）なので、この context を
+post できるものは存在しない。** 実測: main tip `ea87fec` を含め、直近の commit の
+status は**すべて空**（`state: pending`、contexts `[]`）。`enforce_admins: true`。
+fleet-ci が付ける context は `fleet-ci/murakumo/*` であって `test` ではない。
+
+つまり **murakumo main への API merge は構造的に通らない**。PR #289 はこれで
+待ちになっている。解消には required check の付け替え（`test` を外す / fleet の
+context を要求する）が要り、**共有 repo の protection を弱める変更なので owner 判断**
+とした。fleet 側の context は今のところ 1 度も post されていないので、単純な
+差し替えでも通らない点に注意。
+
 ### 引き継ぎ — 次に効く順
 
-1. **per-call の残りはプロセス生成そのもの**（同一機の `/usr/bin/true` が 19.3 ms）。
-   これ以上下げるには loader に session protocol（1 プロセスで複数 entry を回す）が要る。
-   `prepare`/`invoke` はその形をすでに前提にしている。
+1. **loader の session protocol は、思ったより価値が低い**（2026-08-11 に自分の測定で
+   下方修正）。per-call の残りはプロセス生成そのもの（同一機の `/usr/bin/true` が
+   19.3 ms）だが、**プロセス境界が効くのは 1 回の呼び出しが軽いときだけで、
+   そこでは native を選ぶ理由が元々無い**。重い呼び出しでは 20〜50 ms は既に
+   償却されている。reviewed C loader は測定対象（TCB）なので、改修コストは
+   digest の更新を含めて安くない。**先に効くのは境界の形（下記 3）である。**
 2. **effect を持つコードの native 化は ADR-2608110400 の 3 gap のまま。** 本 ADR は
    pure な決定核の経路を通しただけで、capability kit の `:native-aot` は 9 本とも
    `:pending`。
-3. **同じ seam を他の repo に置ける。** 条件は「決定が 1 箇所の関数を通っていること」
-   だけで、`murakumo` の 33 cores のように既に切り出してある repo なら同型に載る。
+3. **境界の形が本命。** murakumo の測定が示したとおり、native backend の正しさは
+   実務規模で確認できた一方、**割に合う呼び出しは全て `[:ref …]` で越えられない**。
+   caller が構築・検証・検査・解放できる aggregate の host ABI（ADR-2608110200 が
+   「gate の 1 行で到達できる場所ではない」と書いているもの）が、次に効く 1 手。
 
 ## Evidence
 
@@ -159,4 +211,7 @@ fallback は両方向で禁止する。native build が欠けていれば例外�
   `clojure -M:test` 34 tests / 284,730 assertions、
   `clojure -M:test:native` **5 tests / 578 assertions, 0 failures**（aarch64-macos、2m17s）
 - `com-junkawasaki/root` `e2e078f`: west pin 前進（2 件とも fast-forward 検証済み）
+- `kotoba-lang/murakumo` PR #289 `8711e19`: 35 cores / 722 exports / 1,312 calls、
+  0 disagreements。変異（native の string 結果を摂動）で 1,312 中 794 が不一致として
+  報告されることを確認。**merge は上記の required check により保留**
 "}]
