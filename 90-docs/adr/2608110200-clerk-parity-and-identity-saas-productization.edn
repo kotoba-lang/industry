@@ -162,12 +162,39 @@
      Map スタブはしない。スタブに待ち行列を足せば「通る」が、それは自分の
      エミュレーションを検査しているだけになる。
 
+   - **決定 2 の実行順 1（TOTP + リカバリコード）が本番で動いている。**
+     共通 lib は `kotoba-lang/authenticator`（`auth.verify` / `auth.recovery` /
+     `auth.adapters.webcrypto`、`291cfa3`、pin `f3d7d69`）—— オーナー指示
+     「共通 lib 部分は kotoba-lang org」に従う。deployable 側は net-kotobase
+     `3b03e4f`、Worker version `1a7d174f-b68c-4611-a918-5fa064897587`、
+     west pin `43acad17`。
+     判断の置き場所は `onetime` ではなく `authenticator` にした ——
+     `onetime` は verification *flow* の枠組み（`IOneTime` port・レート制限・
+     単回消費）で TOTP の実装を持たず、そちらに書くと TOTP 実装が 2 つになる。
+   - **TOTP secret は KEK 封筒に入れた**（オーナー指示「より安全な方向で」）。
+     `custody/seal-secret!` は署名鍵と同じ封筒を使う —— この namespace が
+     『wrapping scheme が両者で drift しないため』に在る以上、その論拠は
+     署名鍵で止まらない。DEK 側の項目名が同一なので、**rotation sweep は
+     prefix を 1 つ足すだけでこの記録も回す**。
+   - **締め出しは構成上起きない**: 登録は本人がコードを出せて初めて完了する
+     （途中でやめた secret は何も gate しない）／step-up は passkey ブロックと
+     独立に走る（`navigator.credentials` が無い端末で email サインインした人も
+     証明できる）／`disable!` は counter も消す（残すと再登録した新しい secret の
+     コードが全部古い counter 以下として拒否され、登録できて入れなくなる）／
+     リカバリコードは登録と同じ手順で発行する（後回しにすると「電話しか入口が
+     無い窓」ができる）。
+   - pending session は `valid false` + `mfaRequired`。既存の consumer は
+     `valid false` を未サインインとして扱うので、**MFA を知らない consumer も
+     安全側に落ちる**。新しい truthy な状態を足していたら、新語を教えていない
+     全ての場所で人が黙ってサインインしていた。
+
    ### まだのもの
 
    - **`AUTHN_USAGE_TOKEN` は未設定**なので `/v1/usage` は 404 のまま。記録は
      動いており、読み出しは秘密を 1 つ置けば開く。**遡れないのは記録だけ**なので
      この分割を採った。
-   - 決定 2 の実行順 1（TOTP + リカバリコード）は未着手。前提は外れている。
+   - 実行順 3（カスタムドメイン）・4（MAU の読み出し）・5（SMS）・6（データ所在）
+     は未着手。事業面の blueprint repo（決定 1）もまだ作っていない。
 
    - 比較 36 行は `90-docs/comparison/clerk-parity.datoms.edn` に datom として載り、
      `[?e \"source/dataset\" \"clerk-parity\"]` で引ける。keyword 値は datascript 側で
