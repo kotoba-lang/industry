@@ -275,7 +275,7 @@
    照らして未達。long-lived な operator credential なので owner が決めて保管する:
 
        cd orgs/network-awai/net-kotobase/authn && wrangler secret put AUTHN_USAGE_TOKEN
-       curl -H "authorization: Bearer <token>" https://authn.kotobase.net/v1/usage
+       curl -H 'authorization: Bearer <token>' https://authn.kotobase.net/v1/usage
 
    ### まだのもの
 
