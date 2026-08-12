@@ -19,6 +19,7 @@ tip 変化を検出 → gate をノードへ fan-out → 署名 receipt を flee
 | `probe.cljs` | 各ノードに SSH して java/clojure/node/空き容量を実測 → `nodes.edn` |
 | `provision.cljs` | 足りないノードに homebrew で clojure/openjdk/node を入れる（冪等） |
 | `tick.cljs` | 本体（tip 検出 → gate 実行 → receipt → status → pin 前進） |
+| `tick-unit-test.cljs` | batch 内 git dependency dedupe と一時 worktree cleanup の回帰テスト |
 | `gates/docs-edn-check.cljs` | EDN-only ドキュメント repo 用の gate（ノードへ配って実行） |
 | `com.gftd.fleet-ci-tip-tick.plist` | 5 分間隔の LaunchAgent（install 手順はファイル冒頭のコメント） |
 | `sweep.edn` | **ディスク回収ポリシー（allowlist）**。1 行足せば対象が増える |
@@ -34,6 +35,9 @@ tip 変化を検出 → gate をノードへ fan-out → 署名 receipt を flee
 ```bash
 # 今何が回るのか（API を叩くだけ、gate は走らせない）
 nbb scripts/fleet-ci/tick.cljs --plan
+
+# runner 自身の副作用なし回帰テスト
+FLEET_CI_LIBRARY_MODE=1 nbb --classpath scripts/fleet-ci scripts/fleet-ci/tick-unit-test.cljs
 
 # 1 repo だけ手で回す（変化が無くても回る。landing/status/CD はしない）
 nbb scripts/fleet-ci/tick.cljs --only kagitaba --dry-run

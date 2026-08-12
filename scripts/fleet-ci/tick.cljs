@@ -33,7 +33,7 @@
 ;;   nbb scripts/fleet-ci/tick.cljs --plan            ;; 何を回すかだけ出して終わる
 ;;   nbb scripts/fleet-ci/tick.cljs --no-pr           ;; PR head の検証を止める（tip のみ）
 ;;   nbb scripts/fleet-ci/tick.cljs --pr-cap 3        ;; repo あたりの PR 検証上限（既定 10）
-(ns fleet-ci.tick
+(ns tick
   (:require ["node:child_process" :as cp]
             ["node:fs" :as fs]
             ["node:os" :as os]
@@ -643,19 +643,34 @@
   `~/.gitlibs/libs/<lib>/<sha>/` に展開する。ノードは何も取りに行かない —
   ソース tarball を ssh stdin で渡すのと同じ経路で、token も置かない。
 
-  推移的な依存も辿る（依存先の deps.edn を mirror から読んで再帰）。"
-  [host deps-text]
-  (loop [queue (git-deps-of deps-text) seen #{} shipped 0]
-    (if (empty? queue)
-      shipped
-      (let [{:keys [lib org repo sha] :as d} (first queue)
-            k [lib sha]]
-        (if (contains? seen k)
-          (recur (rest queue) seen shipped)
-          ;; $HOME は **リモートで**展開させる。ローカルの bash -c の二重引用符の
-          ;; 中に素で置くと手元で展開され、リモートに他人の HOME パスが渡る
-          ;; （実測: asher に `mkdir: /Users/junkawasaki: Permission denied`）。
-          (let [dest (str "\\$HOME/.gitlibs/libs/" lib "/" sha)
+  推移的な依存も辿る（依存先の deps.edn を mirror から読んで再帰）。
+
+  `ready` は tick 内で共有する atom {[host lib sha] child-deps}。同じ node に同じ pin
+  を使う gate が複数あっても、SSH 確認・mirror・archive 搬送は最初の1回だけにする。
+  child-deps は再び queue に入れるので、前回失敗した推移依存は必ず retry される。"
+  ([host deps-text] (ship-git-deps! host deps-text (atom {})))
+  ([host deps-text ready]
+   (loop [queue (git-deps-of deps-text) seen #{} shipped 0]
+     (if (empty? queue)
+       shipped
+       (let [{:keys [lib org repo sha]} (first queue)
+             k [lib sha]
+             ready-k [host lib sha]]
+         (cond
+           (contains? seen k)
+           (recur (rest queue) seen shipped)
+
+           ;; Calls are sequential inside one tick. A ready dependency came
+           ;; from an earlier completed traversal, so its transitive closure
+           ;; was already visited too.
+           (contains? @ready ready-k)
+           (recur (concat (rest queue) (get @ready ready-k)) (conj seen k) shipped)
+
+           :else
+           ;; $HOME は **リモートで**展開させる。ローカルの bash -c の二重引用符の
+           ;; 中に素で置くと手元で展開され、リモートに他人の HOME パスが渡る
+           ;; （実測: asher に `mkdir: /Users/junkawasaki: Permission denied`）。
+           (let [dest (str "\\$HOME/.gitlibs/libs/" lib "/" sha)
                 ;; **exit code は見ない**。Tailscale SSH + /usr/bin/login では
                 ;; リモートの終了ステータスが伝播せず必ず 0 になる（gate-command
                 ;; が sentinel を grep しているのと同じ理由）。最初の版はこれを
@@ -669,24 +684,36 @@
                        (catch :default e
                          (log "WARN dep mirror failed for" lib (sha7 sha) "—" (ex-message e))
                          nil))
-                next-deps (when m (git-deps-of (or (git-show m sha "deps.edn") "")))]
-            (when (and m (not present?))
-              (let [tgz (path/join cache-dir (str (str/replace lib "/" "-") "-" (sha12 sha) "-dep.tar.gz"))]
-                (when-not (fs/existsSync tgz)
-                  (let [{:keys [exit out]} (git m ["archive" "--format=tar.gz" "-o" tgz sha]
-                                                {:timeout 900000})]
-                    (when-not (zero? exit) (die (str "git archive failed for dep " lib ": " (str/trim out))))))
-                (let [{:keys [out]}
-                      (sh "bash" ["-c" (str "cat " tgz " | ssh -o BatchMode=yes -o ConnectTimeout=20 "
-                                            host " \"mkdir -p " dest " && tar xz -C " dest
-                                            " && test -f " dest "/deps.edn && echo FLEET-CI-DEP-OK\"")]
-                          {:timeout 600000})]
-                  ;; 同上 — 成功判定も出力の sentinel で行う
-                  (if (str/includes? (str out) "FLEET-CI-DEP-OK")
-                    (log "dep shipped" lib (sha7 sha) "->" host)
-                    (log "WARN dep ship failed" lib (sha7 sha) "—" (str/trim (str out)))))))
-            (recur (concat (rest queue) next-deps) (conj seen k)
-                   (if (and m (not present?)) (inc shipped) shipped))))))))
+                 next-deps (when m (git-deps-of (or (git-show m sha "deps.edn") "")))
+                 status
+                 (cond
+                   (nil? m) :unavailable
+                   present? :present
+                   :else
+                   (let [tgz (path/join cache-dir (str (str/replace lib "/" "-") "-"
+                                                        (sha12 sha) "-dep.tar.gz"))]
+                     (when-not (fs/existsSync tgz)
+                       (let [{:keys [exit out]} (git m ["archive" "--format=tar.gz" "-o" tgz sha]
+                                                     {:timeout 900000})]
+                         (when-not (zero? exit)
+                           (die (str "git archive failed for dep " lib ": " (str/trim out))))))
+                     (let [{:keys [out]}
+                           (sh "bash" ["-c" (str "cat " tgz
+                                                 " | ssh -o BatchMode=yes -o ConnectTimeout=20 "
+                                                 host " \"mkdir -p " dest " && tar xz -C " dest
+                                                 " && test -f " dest
+                                                 "/deps.edn && echo FLEET-CI-DEP-OK\"")]
+                               {:timeout 600000})]
+                       ;; 同上 — 成功判定も出力の sentinel で行う
+                       (if (str/includes? (str out) "FLEET-CI-DEP-OK")
+                         (do (log "dep shipped" lib (sha7 sha) "->" host) :shipped)
+                         (do (log "WARN dep ship failed" lib (sha7 sha) "—"
+                                  (str/trim (str out)))
+                             :failed)))))]
+             (when (contains? #{:present :shipped} status)
+               (swap! ready assoc ready-k (vec next-deps)))
+             (recur (concat (rest queue) next-deps) (conj seen k)
+                    (if (= :shipped status) (inc shipped) shipped)))))))))
 
 (defn gate-command
   "ci-verify の --gate に渡す 1 行コマンド。
@@ -753,6 +780,20 @@
 ;; ---------------------------------------------------------------------------
 ;; landing（append-only receipt log / west.yml pin）— branch + PUT + server merge
 
+(defn cleanup-worktree!
+  "使い捨て worktree を削除する。linked/sparse checkout の組合せで通常の
+  `worktree remove` が `.git is not a .git file` になっても、directory を消した後に
+  missing worktree metadata を即時 prune し、prunable entry を残さない。"
+  [repo-dir wt]
+  (let [removed (git repo-dir ["worktree" "remove" "--force" wt])]
+    (sh "rm" ["-rf" wt])
+    (when-not (zero? (:exit removed))
+      (let [pruned (git repo-dir ["worktree" "prune" "--expire" "now"])]
+        (when-not (zero? (:exit pruned))
+          (log "WARN worktree cleanup failed" wt "—"
+               (str/trim (str (:out removed) " " (:out pruned)))))))
+    nil))
+
 (defn put-file!
   "landing repo の path を content に置き換えて push する。
 
@@ -792,8 +833,7 @@
                                                     branch " — retry): "
                                                     (str/trim (:out pu)))})))))))))))
       (finally
-        (git d ["worktree" "remove" "--force" wt])
-        (sh "rm" ["-rf" wt])))))
+        (cleanup-worktree! d wt)))))
 
 (defn append-receipt!
   "receipt 1 行を manifest/fleet-ci.edn に追記（append-only）。409 は再取得して再試行。
@@ -1103,6 +1143,7 @@
             db-file (path/join tmp "fleet-db.edn")
             _ (fs/writeFileSync db-file (gh-raw (:repo landing) (:branch landing) (:db landing)))
             results (atom [])
+            git-deps-ready (atom {})
             landing-failed? (atom false)]
         (log "fleet CLI: kagami@" (sha12 kagami-sha) (path/basename fleet-bin))
         (doseq [[bi batch] (map-indexed vector batches)]
@@ -1130,7 +1171,8 @@
                                      (let [m (mirror! (:org-repo w))
                                            dtxt (git-show m (:tip w) "deps.edn")]
                                        (when dtxt
-                                         (ship-git-deps! (get-in w [:node :host]) dtxt))))
+                                         (ship-git-deps! (get-in w [:node :host])
+                                                         dtxt git-deps-ready))))
                                  body (when (:script w)
                                         (str (fs/readFileSync (path/join here (:script w)) "utf8")))
                                  sfile (path/join tmp (str "gate-" (:id w) ".bash-stdin"))
@@ -1283,5 +1325,6 @@
 
 ;; js/process.exit は try/finally を通らないので exit hook で必ず解放する。
 (.on js/process "exit" (fn [_] (release-lock!)))
-(acquire-lock!)
-(-main)
+(when-not (= "1" (.. js/process -env -FLEET_CI_LIBRARY_MODE))
+  (acquire-lock!)
+  (-main))
