@@ -5,6 +5,7 @@
 
 (ns tick-unit-test
   (:require [cljs.test :refer [deftest is run-tests]]
+            [clojure.string :as str]
             [tick :as tick]))
 
 (def dep-sha "1111111111111111111111111111111111111111")
@@ -28,9 +29,12 @@
 (deftest failed-dependency-shipping-is-not-cached
   (let [ready (atom {})
         shell-calls (atom 0)]
-    (with-redefs [tick/sh (fn [cmd _ & _]
+    ;; 1 回の ship につきシェルは 3 回（present 照合 / bundle 搬送 / archive
+    ;; fallback 搬送）。どれも sentinel を返さないので :failed になり、
+    ;; :failed は `ready` に載らない = 次の tick で必ず再試行される。
+    (with-redefs [tick/sh (fn [_ _ & _]
                             (swap! shell-calls inc)
-                            {:exit 0 :out (if (= cmd "ssh") "" "ship failed")})
+                            {:exit 0 :out "ship failed"})
                   tick/git (fn [& _] {:exit 0 :out ""})
                   tick/mirror! (fn [_] "/fake-mirror")
                   tick/ensure-sha! (fn [m _ _] m)
@@ -38,7 +42,7 @@
                   tick/log (fn [& _])]
       (tick/ship-git-deps! "judah" deps-text ready)
       (tick/ship-git-deps! "judah" deps-text ready)
-      (is (= 4 @shell-calls))
+      (is (= 6 @shell-calls))
       (is (empty? @ready)))))
 
 (deftest cached-parent-still-retries-a-failed-transitive-dependency
@@ -47,14 +51,16 @@
         child-sha "2222222222222222222222222222222222222222"
         child-deps (str "{:deps {io.github.example/child {:git/sha \""
                         child-sha "\"}}}")]
+    ;; present 照合も搬送も `bash -c` 経由になったので、cmd ではなく
+    ;; **コマンド文字列の中身**で区別する（sentinel を要求している方が照合）。
     (with-redefs [tick/sh (fn [cmd args & _]
                             (swap! calls conj [cmd args])
-                            {:exit 0
-                             :out (cond
-                                    (and (= cmd "ssh")
-                                         (some #(re-find #"shared" (str %)) args))
-                                    "FLEET-CI-DEP-PRESENT"
-                                    :else "ship failed")})
+                            (let [line (str/join " " (map str args))]
+                              {:exit 0
+                               :out (if (and (re-find #"shared" line)
+                                             (re-find #"FLEET-CI-DEP-PRESENT" line))
+                                      "FLEET-CI-DEP-PRESENT"
+                                      "ship failed")}))
                   tick/git (fn [& _] {:exit 0 :out ""})
                   tick/mirror! (fn [repo] repo)
                   tick/ensure-sha! (fn [m _ _] m)
@@ -63,8 +69,9 @@
                   tick/log (fn [& _])]
       (tick/ship-git-deps! "judah" deps-text ready)
       (tick/ship-git-deps! "judah" deps-text ready)
-      ;; parent: 1 presence check; child: presence + failed ship twice
-      (is (= 5 (count @calls)))
+      ;; parent: presence 1 回（2 回目は ready から）。
+      ;; child: 毎回 presence + bundle 搬送 + archive fallback 搬送 = 3 回。
+      (is (= 7 (count @calls)))
       (is (contains? @ready ["judah" "io.github.example/shared" dep-sha]))
       (is (not (contains? @ready ["judah" "io.github.example/child" child-sha]))))))
 

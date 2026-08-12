@@ -152,6 +152,67 @@
   (println (str "FAIL: " msg))
   (set! (.-exitCode js/process) 1))
 
+;; ---------------------------------------------------------------------------
+;; nbb.edn の :deps は deps.clj 経由で解決される —— つまり JVM が要る
+;;
+;; この gate は cljs しか検査しないのに JDK を要求する。理由は nbb の設計で、
+;; **cwd の `nbb.edn` に `:deps` があると nbb は deps.clj を呼んで解決する**
+;; （`--classpath` を明示しても、である）。com-cloudflare の nbb.edn は
+;; kotoba-kir を pin しており、これは我々が組む classpath と同じ pin なので
+;; 情報としては冗長だが、**人が `nbb test/...` を直に叩く経路の正本**なので
+;; repo から消すべきものではない。
+;;
+;; cwd を変えて nbb.edn を見せない、という逃げは効かない。実測 2026-08-13、
+;; scratch dir + 絶対 classpath で回すと entry が
+;; `Error: oracle case table not readable` で落ちる —— case 表は cwd 相対で
+;; 読まれる。**gate は repo root で回すしかない。**
+;;
+;; したがって JDK を PATH に用意する。ノードには openjdk が入っているが
+;; `/usr/bin/java` は macOS の stub（`Unable to locate a Java Runtime`）で、
+;; 非 login な ssh shell の PATH には本物が居ない。実測 2026-08-13、simeon で
+;; PATH に `/opt/homebrew/opt/openjdk/bin` を足すと 220 cases が緑になった。
+;;
+;; **これは検査を緩めていない。** JVM は依存解決にしか使われず、oracle は
+;; 最初から最後まで nbb（ClojureScript）で実行される —— 出力の
+;; `executing shipped KIR on node vXX` がその証拠。
+(defn- needs-jvm-resolution?
+  "repo root の nbb.edn が :deps を宣言しているか（= nbb が deps.clj を呼ぶか）。"
+  []
+  (some-> (slurp* (path/join root "nbb.edn")) (str/includes? ":deps")))
+
+(defn- java-runnable? [env]
+  (let [r (.spawnSync cp "java" #js ["-version"] #js {:encoding "utf8" :env env})]
+    (and (not (.-error r)) (zero? (or (.-status r) 1)))))
+
+(defn- jdk-bin
+  "ノードで実際に動く JDK の bin。決め打ちしないで順に測る。"
+  []
+  (let [candidates (cond-> []
+                     (.-JAVA_HOME (.-env js/process))
+                     (conj (path/join (.-JAVA_HOME (.-env js/process)) "bin"))
+                     true (into ["/opt/homebrew/opt/openjdk/bin"
+                                 "/usr/local/opt/openjdk/bin"])
+                     true (conj (let [r (.spawnSync cp "/usr/libexec/java_home" #js []
+                                                    #js {:encoding "utf8"})]
+                                  (when (zero? (or (.-status r) 1))
+                                    (path/join (str/trim (str (.-stdout r))) "bin")))))]
+    (first (filter #(and % (exists? (path/join % "java"))) candidates))))
+
+(def gate-env
+  (let [base (.-env js/process)]
+    (if-not (needs-jvm-resolution?)
+      base
+      (if (java-runnable? base)
+        base
+        (if-let [bin (jdk-bin)]
+          (do (println (str "nbb.edn declares :deps (deps.clj resolution needs a JVM); "
+                            "prepending " bin " to PATH"))
+              (js/Object.assign #js {} base
+                                #js {"PATH" (str bin ":" (.-PATH base))}))
+          (do (println "WARNING: nbb.edn declares :deps and no runnable JVM was found —"
+                       "nbb's deps.clj resolution will fail. Give this gate a :cap :jvm node.")
+              base))))))
+
 (defn- cases-in
   "How many cases the entry reports having run, or nil if it reported none.
 
@@ -206,7 +267,7 @@
                              ["npx" ["--yes" (str "nbb@" nbb-version)
                                      "--classpath" cp-str entry]])
             r (.spawnSync cp bin (clj->js bin-args)
-                          #js {:cwd root :encoding "utf8"})
+                          #js {:cwd root :encoding "utf8" :env gate-env})
             out (str (.-stdout r) (.-stderr r))
             status (.-status r)
             ran (cases-in out)
