@@ -1,0 +1,106 @@
+[{:db/id -1
+  :adr/id "ADR-2608122400"
+  :adr/title "41 orphan checkouts: 37 hold nothing, 4 hold something, 0 unknown"
+  :adr/status "accepted"
+  :adr/date "2026-08-12"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "## What was measured
+
+A rename usually removes the old west entry but leaves the old DIRECTORY on
+disk. West will never update or recreate those, so they drift quietly and are
+invisible to anything that reads `manifest/west.yml`. 39 were identified; the
+audit found 41, because one bare name in the list matched two on-disk
+directories.
+
+**Nothing was deleted.** This records what deleting would cost, so the decision
+can be made on evidence rather than on the word `orphan`.
+
+## Result
+
+- **37 SAFE** -- hold nothing that exists nowhere else
+- **4 HOLD WORK**
+- **0 UNKNOWN**
+
+Two facts hold across all 41, and both are stronger than expected:
+
+- **Zero unpushed commits anywhere.** Every local branch tip in every orphan --
+  including all 33 in `local-murakumo`, 9 in `cloud-murakumo`, 8 in `kawaraban`
+  -- was confirmed present server-side in the registered repository. The only
+  commits absent from GitHub are three stash commits.
+- **Every orphan HEAD is an ancestor of its registered repo's `main`**, 41 of
+  41, with `behind_by = 0`. None diverged.
+
+**All 41 pairs share a GitHub repository id**, so every one is a rename
+redirect. That had to be checked rather than assumed: a shared root commit is
+also what a FORK has, and two pairs elsewhere in this fleet turned out to be
+genuinely different repositories -- deleting either would have destroyed a real
+project.
+
+## The method matters, because the obvious one gives a false positive
+
+`git log --branches --not --remotes` is the natural way to ask for unpushed
+commits, and **it is wrong here**: most of these clones have zero
+remote-tracking refs, so that command reports their ENTIRE history as unpushed.
+Every branch tip and stash commit was instead tested two ways -- ancestry in the
+sibling's local object database, and existence server-side via
+`gh api repos/<registered>/commits/<sha>`.
+
+Dirty working trees were checked file by file with `shasum` rather than by
+count. All but one are build output (`.cpcache`, `.shadow-cljs`, `__pycache__`)
+or bytes identical to the sibling's worktree or the registered repo's `main`.
+
+## The four that hold something
+
+1. **`gftdcojp/local-murakumo`, `stash@{0}`** (`7d827047`, absent from GitHub).
+   `worker.cljs` +6/-2: `auth-ok?` extended to accept a second, separately
+   rotatable `BABINIKU_PROXY_TOKEN` beside `ANTHROPIC_PROXY_TOKEN`. Not present
+   in the registered checkout or on its `main`. The stash message itself says
+   drop-forbidden.
+2. **`gftdcojp/cloud-murakumo`, `stash@{0}`** (`32dfb542`, absent from GitHub).
+   `deps.edn` +3/-1: pins `ed25519` by `:git/url` + `:git/sha` instead of
+   `:local/root`. Registered checkout and remote `main` still carry the
+   `:local/root` form, so this never landed.
+3. **`gftdcojp/shinshi-growth-actor`, `stash@{0}`** (`10c5a441`, absent from
+   GitHub). Two untracked blobs -- an earlier `.cljc`/js-fetch variant targeting
+   `com.etzhayyim.apps.shinshi-growth.socialPost`. The registered repo has a
+   superseding `.clj` port, and the two commits the stash message names as
+   superseding it DO exist there. The verdict is conservative on purpose: the
+   bytes exist nowhere else, even though the author annotated them as broken.
+4. **`gftdcojp/ai-gftd-ongakuka`, untracked `artifacts/`** -- 164 MB, twelve
+   rendered audio files the registered sibling does not have. But the sibling
+   has the matching `*_input_params.json`, and the registered repo's
+   `.gitignore` excludes `artifacts/`, `*.wav`, `*.mp3` -- so this was never
+   meant for git and is regenerable output, not lost work.
+
+## Before deleting
+
+For 1-3, land or archive the stashes first, per `manifest/cleanup-workflow.edn`
+`:retirement`: export each to `.git/stash-archive-<date>/`, and **re-resolve the
+stash index by SHA at drop time**, since a concurrent session can shift
+`stash@{0}`. Items 1 and 2 are genuinely unlanded and need a decision on whether
+to port them onto the registered checkout; item 3 needs a maintainer to confirm
+the author's supersession note.
+
+For 4, decide whether 164 MB of regenerable audio is worth keeping. If it is, it
+belongs in B2/DataLad (skill `large-binary-datalad`), not in an orphan checkout.
+
+Two notes on the remaining 37: `gftdcojp/dougaka-actor` is **not a git
+repository at all** -- two log files from a crashed outer-loop run, 4 KB. And
+`gftdcojp/cloud-manimani` carries one stray unstaged DELETION of
+`src/cloud_manimani/xrpc.cljs`, a file that still exists on `main` and in the
+registered checkout, so the deletion is the local anomaly rather than the file.
+
+## Why this is worth a document rather than a cleanup
+
+The cheap version of this task is `rm -rf` on 41 directories, and it would have
+been almost right -- 37 of 41. The three stashes are the reason it is not: they
+are the only bytes in this set that exist nowhere else, they are individually
+small, and two of them are unlanded changes to authentication and dependency
+pinning. `git fsck --unreachable` can sometimes recover a dropped stash, but
+that is luck, not a plan.
+
+Recorded also because the same shape recurs: `manifest/cleanup-workflow.edn`
+already requires archiving before dropping, and the reason it exists is that
+confidence has previously been used as a substitute for checking."}]
