@@ -184,7 +184,28 @@ readiness を区別する。
   と監査に直接使える。
 - UI と transport は security semantics を再実装せず、Decision/Receipt の projection になる。
 - canonical schema、kernel、adapter、receipt migration の実装作業が必要になる。本 ADR と README
-  の着地は用語・設計の正本化であり、未移行 component の実装完了を意味しない。
+  の着地だけでは未移行 component の実装完了を意味しない。
+
+## Implementation status — R0 landed（2026-08-12）
+
+authority semantic ownerである `kotoba-lang/aiueos` に最初の実装sliceを着地した
+（PR #145、merge `f4c492a53ce81d212089ced5c1154f0975018d1e`）。superprojectの
+`aiueos` west pinとfleet-db projectionも同じSHAへ前進・reconcile済み。
+
+- `src/aiueos/authority.cljc`: pure CLJC `decide`、closed input、三値decision、assurance
+  step-up、shared approval、public policy、resource/audience/tenant/time/revocation/nonce拘束、
+  purpose-bound runtime capability specification、closed receipt。
+- `src/aiueos/broker.cljc`: `decide-authority`を追加。既存`verify-admission`がdenyなら即座に
+  canonical denyとし、identity/grantはcode admissionを上書きできない。effectはcallerから
+  受けず、admission済みmanifestの`:aiueos/effects`と`:aiueos/imports`からのみ導出する。
+- evidence: authorityと関連contract 82 tests / 330 assertions、execution 32 tests /
+  116 assertionsがgreen。repo全体lintは既存の`test/aiueos/hvt_test.cljc:346`未解決symbol
+  1件のためredであり、R0のgreen evidenceへ昇格させない。
+
+R0で**未着地**なのは、credential adapter（cookie/Passkey/CACAO→VerifiedPrincipal）、
+Kotobaseのimmutable basisからのpolicy/grant取得とreceipt append、payment Settlement→
+Entitlement Grant、UIのchallenge/step-up projection、canonical signed wire envelopeである。
+既存APIは壊しておらず、これらはadapter→kernel→projectionの順で段階移行する。
 
 ## One-line rule
 
