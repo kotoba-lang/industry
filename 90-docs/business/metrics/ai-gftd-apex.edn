@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6646, "ai-gftd-chat-shell" 1675},
+ {"magatama-sh1n5h1x" 6661, "ai-gftd-chat-shell" 1675},
  :zone
- {:requests-7d 495091,
-  :pageviews-7d 20166,
-  :uniques-7d-sum 4641,
+ {:requests-7d 497852,
+  :pageviews-7d 20173,
+  :uniques-7d-sum 4679,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/", :requests 2161}
-   {:path "/favicon.ico", :requests 240}
+  [{:path "/", :requests 2200}
+   {:path "/favicon.ico", :requests 245}
    {:path "/phpinfo.php", :requests 204}
    {:path "/_profiler/phpinfo", :requests 200}
    {:path "/admin/phpinfo.php", :requests 185}
    {:path "/test.php", :requests 182}
    {:path "/.env", :requests 181}
    {:path "/.env.example", :requests 166}],
-  :status-mix {:ok 7001, :server-error 16152, :client-error 2394},
+  :status-mix {:ok 7041, :server-error 16105, :client-error 2415},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -32,8 +32,8 @@
  :as-of "2026-08-12",
  :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 63},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 2161 · /favicon.ico 240 · /phpinfo.php 204 · /_profiler/phpinfo 200 · /admin/phpinfo.php 185 | 4xx(probe) 9% · 5xx 63%",
+ "上位 page (24h, 2xx/3xx): / 2200 · /favicon.ico 245 · /phpinfo.php 204 · /_profiler/phpinfo 200 · /admin/phpinfo.php 185 | 4xx(probe) 9% · 5xx 63%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 495091 req/7d・4641 uniques(日次和)・うち4xx probe 9%(24h)、workers 8321 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 497852 req/7d・4679 uniques(日次和)・うち4xx probe 9%(24h)、workers 8336 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
