@@ -1,0 +1,145 @@
+[{:db/id -1
+  :adr/id "ADR-2608124800"
+  :adr/title "Which detectors actually gate anything, and five that assert PASSED without measuring"
+  :adr/status "accepted"
+  :adr/date "2026-08-12"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related ["ADR-2608120600" "ADR-2608121000" "ADR-2608123000" "ADR-2607300900"]
+  :adr/body
+  "## The question
+
+This workspace has accumulated a great many verification scripts. **How many of
+them actually gate anything?** Four more were built today, and **none of the
+three ADRs recording them mentions `gates.edn` or fleet-ci at all** — they
+shipped without an answer to who runs them.
+
+## Five scripts assert a named security control and measure nothing
+
+`scripts/security-gate-{abac-audit,audit-trail-test,georestores-test,
+hsm-export-test,paging-test}.cljs`.
+
+Measured, and re-confirmed independently: **all five contain zero
+`process.exit` and zero `exitCode` assignments.** They print `PASSED` and return
+0 unconditionally.
+
+- One **computes sha256 by returning the literal string `deadbeef…` regardless
+  of input.**
+- One prints hardcoded page-out counts.
+- One hardcodes a Keychain rejection exit code **without ever invoking
+  `security`.**
+
+And they **name themselves G-004 through G-008**, asserting that key export,
+geo-restore, ABAC deny-by-default and audit trails are verified.
+
+**These are worse than unwired detectors, because their existence reads as
+coverage of named controls.** Nothing runs them today, and **wiring them would
+make the theatre load-bearing** — a gate that always passes is worse than no
+gate, because it occupies the slot where a real one would go.
+
+## Four wired gates are permanently red, which is the same silence in uniform
+
+`root-repository-roles` **0 pass / 867 fail**, `root-permit-index` 0/282,
+`root-observatory-registry` 0/269, `root-itonami-org-id` 0/268.
+
+**A standing red is indistinguishable from a new red.** 867 consecutive failures
+is not a signal anyone can act on. Only `root-permit-index` has a diagnosis —
+CLAUDE.md already records that its input is never in the shipped tree, so it is
+structurally impossible to green. **The other three have not been diagnosed.**
+
+## Most of today's detectors cannot be root gates, and that is structural
+
+CLAUDE.md's `root-permit-index` finding generalises: **a fleet gate ships only
+the target repo's own tree**, so anything reading `orgs/` can never be green
+there. That covers `verify-vendored-copies`, `verify-namespace-collisions`,
+`verify-duplicate-registrations`, `verify-require-graph`, `annex-custody-verify`,
+`west-orphan-audit`, `dataset-monotonic-check` and roughly a dozen migration
+audits. Two of them say so in their own headers.
+
+**So the answer for these is not `add a gates.edn line` — it is that they need a
+different home.** A local scheduled tick on a machine that has `orgs/`, which is
+what the uninstalled plists below were.
+
+Reading outside the repo entirely: `audit-gftd-scripts` inspects `$HOME/.gftd`,
+and **a fleet node's home is a different machine's**, so a node result would be
+meaningless. `annex-custody-verify` needs B2 credentials, which invariant 3
+forbids on nodes.
+
+**Gatable as-is, root-tree only**: `verify-adr-identity`, `closing-check`,
+`cross-repo-change-guard`, `verify-no-babashka`, the bmc test runner, and two
+fleet-ci unit tests that are pure logic with no I/O.
+
+One useful clarification about the constraint: *self-contained in one file*
+binds the **wrapper**, not the detector. The working gates here are thin
+wrappers that `execSync` the repo's own multi-file script out of the extracted
+tree, each dying loudly if the target is missing after extraction.
+
+## The cheapest recovery in the survey is an uninstalled plist
+
+Five launchd plists live in `scripts/` and **are not installed**. One of them,
+`com.gftd.tsukuru-maturity-tick`, is **the only caller of three verifiers**, and
+one of those guards something that has already been lost — ADR-2607252000
+records SHIRO and PICO ep01 assets **actually lost**, B2 unreachable and IPFS
+pins garbage-collected, **irreversibly**. The other two cover customer names and
+part numbers leaking through annexed **file paths** even where content is
+encrypted, and consent-tier datasets being silently merged.
+
+**Nothing was wrong with the check. The scheduler was never loaded.**
+
+## `root-rename-residue` is gated, and its required proof is missing
+
+It is the one detector from today that is wired, and it is well built — the
+wrapper refuses to report success unless the output carries an `N cases OK`
+summary with N at or above the fixture count, **specifically so a git-less
+environment running only the pure cases cannot go green.** 20 receipts, 0
+failures, and it is live in production inside `cleanup-land.cljs`.
+
+But CLAUDE.md's requirement — **break the target, see exit 1; unbreak it, see
+exit 0** — **is recorded nowhere.** The 21 fixture cases include negatives, which
+is evidence the *classifier* discriminates; **it is not evidence the *gate* goes
+red.** That demonstration is cheap and outstanding.
+
+## One correction to the brief that produced this survey
+
+I told the surveying agent that `audit-gftd-scripts` reports 3 live
+**shallow-fetch** violations. As run at survey time it reports 3 violations of
+kind **`:shell-script`**, and no shallow-fetch violations at all.
+
+**Both readings are correct at their own moment**: a sibling agent fixed the
+three shallow-fetch violations earlier the same day, taking the count from 6 to
+3 and leaving exactly the shell-script ones. The surveying agent measured after
+that fix and reported the discrepancy rather than reconciling it to my claim,
+which is the right behaviour — **it could not have known, and asserting my
+number would have been worse than contradicting it.**
+
+## Ranked by what each would have caught, and when
+
+1. **`verify-vendored-copies`** — weeks of live drift on payment-confirmation
+   paths, one copy missing the guard whose absence accepts an unconfirmed
+   payment as confirmed. Needs a home with `orgs/`.
+2. **`verify-require-graph`** — a deleted namespace broke 12 repos for 17 days.
+   Already paid once.
+3. **Install `com.gftd.tsukuru-maturity-tick`** — recovers three verifiers at
+   once, one guarding custody that has already cost irreversible asset loss.
+   Cheapest recovery here.
+4. **`verify-adr-identity`** — the one high-value detector that is root-only and
+   gatable today.
+5. **`audit-gftd-scripts`** — belongs in a SessionStart hook, because it is the
+   only thing that looks outside the repo at all.
+6. `verify-namespace-collisions`, `verify-duplicate-registrations` — real,
+   dated, ungatable in root.
+7. **Prove `root-rename-residue` can go red.**
+8. **Diagnose the four permanent reds**, then fix, re-home or retire each. A red
+   that never changes is as silent as no detector.
+9. **Delete or rewrite the five `security-gate-*` scripts.**
+
+## What could not be determined
+
+Whether the three undiagnosed permanent reds fail for the `root-permit-index`
+reason or for a genuine violation — that needs reading each failure detail.
+Whether `root-rename-residue` was manually demonstrated to fail before landing;
+**absence of a record is not proof it was not done.** And whether the five
+uninstalled plists were deliberately retired or silently dropped — CLAUDE.md
+skill descriptions reportedly still describe several of those loops as running
+every cycle, and **if the documentation says a loop runs while its scheduler is
+not installed, that gap is itself the finding.**"}]
