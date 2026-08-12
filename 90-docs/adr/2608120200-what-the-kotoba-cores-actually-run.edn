@@ -86,10 +86,17 @@ require している repo は 5 つ（`kotoba-selfhost-contracts` / `murakumo` /
 
 | 状態 | repo |
 |---|---|
-| production で実行 | kawaraban, cloud-itonami-app |
-| 実行されるが test/hook のみ | network-awai/cloud-itonami（kernels は毎 push、media は secondary）、crdt、shitsuke、jp-go-dds、mesh、commitment-ledger、tender-component |
-| CI でのみ compile | fsm, calendar, mokuroku, app-files |
-| **何も触っていない** | tashikame（host も test も無い）、network-awai の `cert_governor_app.kotoba`（`src`/`test` から参照ゼロ） |
+| production で実行 | kawaraban, cloud-itonami-app, com-cloudflare, aiueos, **calendar**, **crdt** |
+| **委譲したが本番経路が無い / 未接続** | tashikame（core の欠陥は 2026-08-12 に修正済み。host がまだ無い） |
+| **parity gate 止まりが妥当と実測** | mokuroku（catalog 13 件で node 上限）、app-files（同型。`bounded?` は 8 件） |
+| 実行されるが test/hook のみ | network-awai/cloud-itonami（kernels は毎 push、media は secondary）、shitsuke、jp-go-dds、mesh、commitment-ledger、tender-component |
+| CI でのみ compile | fsm（**委譲可と実測: 上限 32 に対し実アルファベット 3**） |
+| **何も触っていない** | network-awai の `cert_governor_app.kotoba`（`src`/`test` から参照ゼロ） |
+
+この表は 2026-08-12 に更新した。`calendar`（`d565658`）と `crdt`（`2843f54`）は
+同日 `cloud-itonami-app` と同じ seam で委譲し、`mokuroku` は**測ってから止めた** ——
+委譲できるかは型ではなく**値の大きさがドメインに比例して増えるか**で決まる
+（ADR-2608112100 の訂正節に数字付き）。
 
 ## Decision
 
