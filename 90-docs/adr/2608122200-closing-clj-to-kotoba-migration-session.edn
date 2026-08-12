@@ -669,6 +669,51 @@ Partial answers from the four, recorded so a resume starts from them:
   `require` the namespace. Worth carrying: a name like `kami.fsm` cannot be
   searched for by substring in a fleet this size.
 
+## Third close, 2026-08-12 evening
+
+### One half-finished thing, finished
+
+The B2 publication of `gftd-motion-actor`'s annexed content (ADR-2608124200) had
+reached *content verified in B2* — three copies each — but **the `git-annex`
+branch had not been pushed**, so a fresh clone could not find any of it. Pushed:
+`babf541..481b085`. HEAD unmoved, working tree clean before and after. **The
+bytes now survive the loss of this machine, which was the entire point.**
+
+### One repository exists and holds nothing
+
+`kotoba-lang/kotoba-server` was **created** (private, 0 KB, default `main`) by an
+agent stopped before it could populate or register it. It is **not in
+`manifest/west.yml`** and contains nothing.
+
+**Deliberately left in place rather than deleted.** It is empty, so there is
+nothing to lose, and the next step for it — restoring the deleted Rust source per
+ADR-2608124000 — is exactly why it was created. Deleting and recreating buys
+nothing. **But an empty unregistered repo is a half-state and will read as
+finished work to anyone who only sees the name**, which is why it is recorded
+here.
+
+### Nothing else landed from that batch
+
+The `x-internal-trust` bridge work merged **nothing** — every candidate repo's
+`main` still carries an older commit. The final detector measurement had
+completed one run matching the post-fix baseline and was starting its second when
+it stopped; **its own rule is that a single run during fleet mutation is not a
+measurement**, so nothing from it should be quoted.
+
+### Resume, in dependency order
+
+1. **Populate and register `kotoba-lang/kotoba-server`** — the repo exists;
+   recovering the source at the pinned commit and registering it via the
+   single-entry manifest path is what remains. ADR-2608124000 carries the
+   naming rationale and the argument that this does not reverse the no-Rust ADR.
+2. **`x-internal-trust` on the seven bridges plus murakumo's write path** — the
+   safe half of the ordering in ADR-2608124000. Harmless today because the header
+   is unread while the server secret is unset, and it is the precondition for the
+   server side ever becoming a one-variable decision.
+3. **Re-measure the detectors**, two agreeing runs.
+4. **Removing the stray `gftd-motion-actor` clone is now unblocked** — the content
+   is in B2 and the branch is published, which were the two preconditions.
+
 ## Resume point
 
 The five agents stopped at the previous close were **resumed from their
