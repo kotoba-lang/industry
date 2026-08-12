@@ -86,6 +86,22 @@
               [:git "/repo" ["worktree" "prune" "--expire" "now"]]]
              @calls)))))
 
+(deftest landing-worktree-checks-out-only-the-target-ledger
+  (let [calls (atom [])]
+    (with-redefs [tick/git (fn [dir args & _]
+                             (swap! calls conj [dir args])
+                             {:exit 0 :out ""})]
+      (is (:ok (tick/prepare-landing-worktree!
+                "/mirror" "/tmp/landing" "origin/main"
+                "manifest/fleet-ci.edn")))
+      (is (= [["/mirror" ["worktree" "add" "--detach" "--no-checkout"
+                            "--quiet" "/tmp/landing" "origin/main"]]
+              ["/tmp/landing" ["sparse-checkout" "init" "--no-cone"]]
+              ["/tmp/landing" ["sparse-checkout" "set" "--no-cone"
+                                "manifest/fleet-ci.edn"]]
+              ["/tmp/landing" ["read-tree" "-mu" "HEAD"]]]
+             @calls)))))
+
 (let [{:keys [fail error]} (run-tests 'tick-unit-test)]
   (when (pos? (+ fail error))
     (js/process.exit 1)))
