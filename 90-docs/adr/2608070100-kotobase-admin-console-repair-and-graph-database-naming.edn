@@ -7,11 +7,12 @@
   :adr/deciders ["Jun Kawasaki (+ Claude)"]
   :adr/authoritative true
   :adr/source-format "edn-only (ADR-2607171600)"
-  :adr/repos ["com-junkawasaki/root" "network-awai/net-kotobase"]
+  :adr/repos ["com-junkawasaki/root" "net-kotobase/control-plane"]
   :adr/related ["adr-2608011200-kotobase-tenant-audit-log-and-admin-console"
                 "adr-2608011300-kotobase-enterprise-sso-oidc"
                 "adr-260726-kotobase-query-plane-is-one-ref"
-                "adr-2607260940-d1-storage-mode-proxy-bridge"]
+                "adr-2607260940-d1-storage-mode-proxy-bridge"
+                "ADR-2608122300"]
   :adr/verification "kotobase-api-gateway-cljs: clojure -M:test 99 tests / 598 assertions / 0 failures(clean な origin/main では 4 failures —— 同じ 4 test 名。本 ADR の catalog 修正で解消)。clojure -M:site-test 37 tests / 280 assertions / 0 failures。kotobase-graph-database: npm run test:cljs 234 tests / 679 assertions / 0 failures。npx shadow-cljs release worker(両 repo) 0 warnings。新規 site test 5 本は未修正/未配線の origin/main に対して先に走らせ、chrome 系 6 assertion・query 系 7 assertion が落ちることを確認してから landed とした。live 実測 2026-08-06: graph-database.kotobase.net /_health 200 / backend.kotobase.net /_health 200 /kotobase.net /health 200 / /admin 401(未認証) / xrpc datomic.q,datomic.datoms,kg.ingest すべて 401(auth に到達 = proxy 成立、5xx ではない)。未検証: 認証済みの実画面(Chrome 拡張が未接続でオーナー確認待ち)。"
   :adr/known-gaps ["認証済み /admin の実画面は未確認。ブラウザ拡張が未接続だったため未認証の probe までしか到達していない。オーナーが /admin を再読み込みして、実数が出ること・Sign out が効くこと・query が走ることを確認する必要がある。"
                         "Worker script 名 kotobase-cf-wasm-staging は改名できないまま。KOTOBA_SEED / KOTOBASE_B2_KEY_ID / KOTOBASE_B2_APP_KEY が Cloudflare の中にしか無く、kagi の両 vault に不在。解除は (1) オーナーが 3 値を kagi に保管、または (2) B2 -> R2 binding 移行(binding は資格情報を要さないので B2 の 2 件が消える。KOTOBA_SEED は残るのでこれだけでは足りない)。"
@@ -20,7 +21,7 @@
                         "accountCreate は依然として退役名前空間へ proxy し 404 する。書き込みなのでローカルで答えるのは誤りと判断し本 ADR では触っていない。実利用者がいるかは未調査。"
                         "backend.kotobase.net を叩いている 5 repo(kotobase-client / kotobase-commoncrawl-actor / toshokan / toshokan-patents / apps-gftdcojp)は未移行。alias はそれらが移るまで外せない。"
                         "graph.sparql / graph.query / kg.query は宣言だけで実装が無い。console では意図的に出していない。"
-                        "clj-edge/ と worker/ に 5a6a55b の rename が置き去りにした tracked file が残っている(:legacy-pre-rename として catalog 済み、17 ファイル)。撤去は未着手。"]
+                        "解消済み(2026-08-12)。clj-edge/ と worker/ の tracked file 17 件は 3c99bd5 で削除し 0ba825a として main に merge した。:legacy-pre-rename provider も同時に撤去。当初この gap は rename の置き去りと記述していたが、出所は 08-05/08-06 の cleanup pass だった(本文『副産物』節の訂正を参照)。"]
   :adr/primary-sources ["live 実測 2026-08-06: kotobase-graph-database/src の NSID grep が ai.gftd.apps.kotobase.datomic と .kg の 2 族のみを返す(404 の直接証拠)"
                         "live 実測 2026-08-06: deployed /pricing が origin/main のビルド成果物と sha256 一致(5585ced24c389266) —— 本番 = main = west pin であることの確認"
                         "live 実測 2026-08-06: wrangler secret list が production script に KOTOBA_SEED / KOTOBASE_B2_KEY_ID / KOTOBASE_B2_APP_KEY の 3 件を報告"
@@ -43,6 +44,10 @@
 
 ADR-2608011200 が /admin をセッションの裏に入れて実データで埋めた回で、本 ADR はその直後に
 表面化した 2 つの欠陥の修正と、そこから派生した命名・配線・ブロッカーの記録である。
+
+対象 repo は現在 **`net-kotobase/control-plane`**(GitHub id 1258823862)。本文中の作業は
+すべて `network-awai/net-kotobase` という名前だった当時のもので、2026-08-12 に org ごと
+移管・改名された(対応表は ADR-2608122300)。旧パスは GitHub リダイレクトで解決する。
 
 ## 実測で確定した 2 つの根本原因
 
@@ -105,7 +110,7 @@ Deprecation/Sunset(2026-11-01)は card に明記した —— レスポンスヘ
 `backend` は *他の何かに対する関係* を言っていて、それ自体が何かを言っていない。しかも
 「1 つある」ように読めるが、edge は 3 つに proxy する(ここの graph database、
 `KOTOBASE_D1_URL` の Client API、`inga-replica` の head plane)。component の他の部分は
-2026-08-02 の 5a6a55b で既に capability 名になっており(ディレクトリ・R2 バケット・バンドル)、
+2026-08-04 の 5a6a55b で既に capability 名になっており(ディレクトリ・R2 バケット・バンドル)、
 **hostname だけが旧名のまま残り、しかもそれが他 repo から見える唯一の部分**だった。
 
 **決定: `graph-database.kotobase.net` を canonical、`backend.kotobase.net` を deprecated alias
@@ -149,10 +154,47 @@ secrets-location-map に制約と解除経路を記録した。
 `clojure -M:render-components` が例外で落ち、digest 台帳を再生成できず、clean な
 `origin/main` で `component_test` が 4 failure だった(ADR-2608011200 の verification が
 「既存 3 failure」と記録していたものの後継)。原因は `inga-replica` と
-`kotobase-index-prolly-standalone` が分類器に無く、さらに 5a6a55b の capability rename が
-`clj-edge/` と `worker/` に tracked file を置き去りにしていたこと。後者は
+`kotobase-index-prolly-standalone` が分類器に無く、さらに `clj-edge/` と `worker/` に
+どの component にも属さない tracked file が 17 件あったこと。後者は
 `:legacy-pre-rename` として **数えられる形**で残した —— 置き換えた component に畳み込むと
 取り残しが見えなくなる。
+
+**訂正(2026-08-12): この 17 件の出所は rename ではない。** 本 ADR は当初これを
+「5a6a55b の capability rename が置き去りにした」と書いていたが、実測すると誤りだった。
+rename は 2 本とも対象ディレクトリを **tracked 0 件まで空にしきっている**:
+
+| commit | 日付 | 移動 | tracked |
+|---|---|---|---|
+| `04e1514` | 08-03 | `worker/` → `kotobase-edge/` | 57 → 0 |
+| `5a6a55b` | 08-04 | `clj-edge/` → `kotobase-api-gateway-cljs/` | 136 → 0 |
+| `5a6a55b` | 08-04 | `kotobase-edge/` → `kotobase-api-gateway/` | 57 → 0 |
+
+ファイルを戻したのは、その **後の** 2 commit である:
+
+| commit | 日付 | subject | 効果 |
+|---|---|---|---|
+| `8f7fbaf` | 08-05 | `cleanup: land untracked WIP (1 files)` | `worker/` 0 → 1 |
+| `d96f18b` | 08-06 | `cleanup: land untracked WIP (16 files)` | `clj-edge/` 0 → 14、`worker/` 1 → 3 |
+
+どちらも「index が先に進んだせいで working tree に取り残され、`git status` が untracked と
+報告していたファイル」を、`git add` 一括の cleanup pass が **新しい仕事として commit した**
+ものだった。**この違いは対策を変える**: 「rename が取りこぼした」なら硬くすべきは rename だが、
+実際の故障は **cleanup pass が『放棄された残骸』と『未着地の作業』を区別できないこと** にある。
+
+なお `worker/` の移動先は `clj-edge/` ではない —— `clj-edge/`(136 files)と `worker/`(57 files)は
+08-03 以前から **並存する別ディレクトリ**で、`04e1514` は `clj-edge/` 配下を編集しただけである。
+rename の similarity も 100% ではない(`04e1514` の worker/ 由来 56 rename のうち R100 は 16 本、
+`5a6a55b` の clj-edge/ 由来 133 rename のうち R100 は 102 本、他に削除 3 件)。
+**「跡形なく空になった」ことは正しく、「無編集の 100% move だった」ことは正しくない** ——
+論拠として効くのは前者だけなので結論は変わらないが、根拠の数字は上のとおりに読むこと。
+
+**撤去は完了した(2026-08-12)。** `3c99bd5` が 17 件すべてを削除し、`0ba825a` として main に
+merge された。同じ commit で `:legacy-pre-rename` provider を生成器と component contract の
+両方から外し、未分類パスは生成器が throw するようにした —— 同じ名前に何かが再び着地したら
+黙って通さないため。17 件のうち 13 件は置き換え先と byte 一致、残る 4 件はいずれも旧版
+(DADS token bridge の前世代 `site_skin.cljc`、rename 前パスを引く `evidence.edn`、
+quota 導入前 4-arity の `native_control_test.cljs`、wrangler 4.99.0 を pin する
+`package-lock.json`)だった。
 
 ## 成熟度 — Neo4j Browser / Supabase Studio との比較(オーナーの問いへの回答)
 

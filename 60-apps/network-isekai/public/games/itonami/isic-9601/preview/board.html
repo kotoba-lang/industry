@@ -1,0 +1,334 @@
+<!doctype html>
+<meta charset=utf-8>
+<title>クリーニング営み — board capture</title>
+<style>/* クリーニング営み — preview stylesheet.
+ *
+ * Written to this workspace's `--hig-*` token contract (skill `kotoba-uiux`):
+ * every colour, size and radius below the token block is a `var(--hig-*)`,
+ * never a literal. The token block itself stands in for
+ * `jp-go-dds.tokens/bridge-css`, which is what will define these once the game
+ * is ported into network-isekai and can require the library. Keeping the
+ * contract here means the port swaps the definitions, not the rules.
+ *
+ * Note the gap the skill warns about: the real bridge carries the colour and
+ * type tokens but NOT `--hig-spacing-*`, `--hig-radius-*` or
+ * `--hig-text-*-size`. Those are defined locally here and must be added
+ * upstream (`hig->dads`) rather than re-derived, when this moves.
+ */
+
+:root {
+  --hig-color-bg:            #f4f5f7;
+  --hig-color-surface:       #ffffff;
+  --hig-color-surface-sunk:  #eceef1;
+  --hig-color-label:         #1a1c1e;
+  --hig-color-label-secondary: #5b6169;
+  --hig-color-separator:     #d5d9de;
+  --hig-color-accent:        #0017c1; /* デジタル庁ブルー */
+  --hig-color-accent-weak:   #e6e9fb;
+  --hig-color-success:       #197a4b;
+  --hig-color-success-weak:  #e3f3ea;
+  --hig-color-warn:          #8a5a00;
+  --hig-color-warn-weak:     #fdf1d9;
+  --hig-color-danger:        #b3271e;
+  --hig-color-danger-weak:   #fce8e6;
+  --hig-color-on-accent:     #ffffff;
+  --hig-hairline:            1px;
+
+  --hig-spacing-1: 4px;
+  --hig-spacing-2: 8px;
+  --hig-spacing-3: 12px;
+  --hig-spacing-4: 16px;
+  --hig-spacing-6: 24px;
+  --hig-spacing-8: 32px;
+
+  --hig-radius-s: 6px;
+  --hig-radius-m: 10px;
+  --hig-radius-l: 16px;
+
+  --hig-text-title-size:     1.5rem;
+  --hig-text-headline-size:  1rem;
+  --hig-text-subhead-size:   0.9375rem;
+  --hig-text-body-size:      0.9375rem;
+  --hig-text-caption-size:   0.75rem;
+  --hig-font-sans: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --hig-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+
+  --hig-tap-min: 44px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --hig-color-bg:            #111316;
+    --hig-color-surface:       #1c1f23;
+    --hig-color-surface-sunk:  #15181b;
+    --hig-color-label:         #eceef1;
+    --hig-color-label-secondary: #a2a9b2;
+    --hig-color-separator:     #333941;
+    --hig-color-accent:        #93a4ff;
+    --hig-color-accent-weak:   #1e2440;
+    --hig-color-success:       #7cd6a4;
+    --hig-color-success-weak:  #12291d;
+    --hig-color-warn:          #f0c064;
+    --hig-color-warn-weak:     #302506;
+    --hig-color-danger:        #ff9c93;
+    --hig-color-danger-weak:   #351613;
+    --hig-color-on-accent:     #0d1020;
+  }
+}
+
+:root[data-theme="dark"] {
+  --hig-color-bg:            #111316;
+  --hig-color-surface:       #1c1f23;
+  --hig-color-surface-sunk:  #15181b;
+  --hig-color-label:         #eceef1;
+  --hig-color-label-secondary: #a2a9b2;
+  --hig-color-separator:     #333941;
+  --hig-color-accent:        #93a4ff;
+  --hig-color-accent-weak:   #1e2440;
+  --hig-color-success:       #7cd6a4;
+  --hig-color-success-weak:  #12291d;
+  --hig-color-warn:          #f0c064;
+  --hig-color-warn-weak:     #302506;
+  --hig-color-danger:        #ff9c93;
+  --hig-color-danger-weak:   #351613;
+  --hig-color-on-accent:     #0d1020;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--hig-color-bg);
+  color: var(--hig-color-label);
+  font-family: var(--hig-font-sans);
+  font-size: var(--hig-text-body-size);
+  line-height: 1.6;
+}
+
+.wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--hig-spacing-6) var(--hig-spacing-4) var(--hig-spacing-8);
+}
+
+.top { margin-bottom: var(--hig-spacing-6); }
+.hig-title {
+  font-size: var(--hig-text-title-size);
+  margin: 0 0 var(--hig-spacing-2);
+  letter-spacing: 0.01em;
+}
+.hig-subhead {
+  font-size: var(--hig-text-subhead-size);
+  color: var(--hig-color-label-secondary);
+  margin: 0 0 var(--hig-spacing-3);
+}
+.hig-headline { font-size: var(--hig-text-headline-size); margin: 0; }
+.lede {
+  margin: 0;
+  padding: var(--hig-spacing-3) var(--hig-spacing-4);
+  background: var(--hig-color-accent-weak);
+  border-radius: var(--hig-radius-m);
+  font-size: var(--hig-text-caption-size);
+  line-height: 1.8;
+}
+code {
+  font-family: var(--hig-font-mono);
+  font-size: 0.92em;
+  background: var(--hig-color-surface-sunk);
+  padding: 0 var(--hig-spacing-1);
+  border-radius: var(--hig-radius-s);
+}
+
+/* ---- HUD ---- */
+.hud {
+  background: var(--hig-color-surface);
+  border: var(--hig-hairline) solid var(--hig-color-separator);
+  border-radius: var(--hig-radius-l);
+  padding: var(--hig-spacing-3) var(--hig-spacing-4);
+  margin-bottom: var(--hig-spacing-4);
+}
+.hud__row { display: flex; gap: var(--hig-spacing-4); flex-wrap: wrap; align-items: baseline; }
+.hud__row--thin {
+  margin-top: var(--hig-spacing-2);
+  padding-top: var(--hig-spacing-2);
+  border-top: var(--hig-hairline) solid var(--hig-color-separator);
+  font-size: var(--hig-text-caption-size);
+  justify-content: space-between;
+}
+.stat { display: flex; flex-direction: column; min-width: 84px; }
+.stat b { font-size: 1.25rem; font-variant-numeric: tabular-nums; letter-spacing: 0.06em; }
+.stat small { color: var(--hig-color-label-secondary); font-size: var(--hig-text-caption-size); }
+.cert { color: var(--hig-color-success); }
+.cert--bad { color: var(--hig-color-danger); font-weight: 700; }
+.q { color: var(--hig-color-label-secondary); }
+
+/* ---- stations ---- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--hig-spacing-3);
+  margin-bottom: var(--hig-spacing-4);
+}
+.card {
+  background: var(--hig-color-surface);
+  border: var(--hig-hairline) solid var(--hig-color-separator);
+  border-radius: var(--hig-radius-l);
+  padding: var(--hig-spacing-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hig-spacing-2);
+}
+.card--closed { opacity: 0.55; }
+.card--ready { border-color: var(--hig-color-accent); }
+.card__h { display: flex; justify-content: space-between; align-items: center; }
+.lv { font-size: var(--hig-text-caption-size); color: var(--hig-color-label-secondary); }
+
+.badges { display: flex; gap: var(--hig-spacing-1); flex-wrap: wrap; }
+.badge {
+  font-size: var(--hig-text-caption-size);
+  padding: 0 var(--hig-spacing-2);
+  border-radius: var(--hig-radius-s);
+  background: var(--hig-color-surface-sunk);
+  color: var(--hig-color-label-secondary);
+}
+.badge--auto { background: var(--hig-color-success-weak); color: var(--hig-color-success); }
+.badge--human { background: var(--hig-color-warn-weak); color: var(--hig-color-warn); font-weight: 700; }
+.badge--off { background: var(--hig-color-surface-sunk); }
+.badge--n { margin-inline-start: auto; }
+
+.gs { min-height: 92px; display: flex; flex-direction: column; gap: var(--hig-spacing-2); }
+.empty { margin: 0; color: var(--hig-color-label-secondary); }
+.g {
+  background: var(--hig-color-surface-sunk);
+  border-radius: var(--hig-radius-m);
+  padding: var(--hig-spacing-2);
+  font-size: var(--hig-text-caption-size);
+  line-height: 1.5;
+}
+.g--risk { outline: var(--hig-hairline) solid var(--hig-color-danger); }
+.g__top { display: flex; justify-content: space-between; gap: var(--hig-spacing-2); }
+.g__name { font-weight: 700; }
+.g__id { color: var(--hig-color-label-secondary); font-family: var(--hig-font-mono); }
+.g__meta { display: flex; gap: var(--hig-spacing-1); flex-wrap: wrap; margin-top: var(--hig-spacing-1); }
+.tag {
+  background: var(--hig-color-surface);
+  border-radius: var(--hig-radius-s);
+  padding: 0 var(--hig-spacing-1);
+}
+.tag--warn { color: var(--hig-color-warn); }
+.tag--bad { color: var(--hig-color-danger); font-weight: 700; }
+.g__label { color: var(--hig-color-label-secondary); margin-top: var(--hig-spacing-1); }
+.g__flag { color: var(--hig-color-danger); font-weight: 700; margin-top: var(--hig-spacing-1); }
+.bar {
+  height: 4px;
+  background: var(--hig-color-separator);
+  border-radius: var(--hig-radius-s);
+  overflow: hidden;
+  margin-top: var(--hig-spacing-2);
+}
+.bar i { display: block; height: 100%; background: var(--hig-color-accent); }
+
+/* ---- actions ---- */
+.acts { display: flex; gap: var(--hig-spacing-2); margin-top: auto; }
+.acts--wrap { flex-wrap: wrap; }
+.btn {
+  flex: 1 1 auto;
+  min-height: var(--hig-tap-min);
+  padding: 0 var(--hig-spacing-3);
+  border: var(--hig-hairline) solid var(--hig-color-separator);
+  border-radius: var(--hig-radius-m);
+  background: var(--hig-color-surface);
+  color: var(--hig-color-label);
+  font: inherit;
+  font-size: var(--hig-text-caption-size);
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--hig-color-accent); }
+.btn:focus-visible { outline: 2px solid var(--hig-color-accent); outline-offset: 2px; }
+.btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.btn--go { background: var(--hig-color-accent); color: var(--hig-color-on-accent); border-color: transparent; font-weight: 700; }
+.btn--buy { color: var(--hig-color-label-secondary); }
+
+.card--shop .note {
+  margin: 0;
+  font-size: var(--hig-text-caption-size);
+  color: var(--hig-color-label-secondary);
+  line-height: 1.7;
+}
+
+/* ---- ledger ---- */
+.card--log { margin-top: var(--hig-spacing-4); }
+.log { list-style: none; margin: 0; padding: 0; font-size: var(--hig-text-caption-size); }
+.log__i {
+  display: flex;
+  gap: var(--hig-spacing-2);
+  padding: var(--hig-spacing-1) 0;
+  border-top: var(--hig-hairline) solid var(--hig-color-separator);
+  font-family: var(--hig-font-mono);
+  overflow-wrap: anywhere;
+}
+.log__i:first-child { border-top: 0; }
+.log__t { color: var(--hig-color-label-secondary); flex: 0 0 auto; }
+.log__op { flex: 0 0 auto; }
+.log__i--hold { color: var(--hig-color-danger); }
+.log__i--manual { color: var(--hig-color-label-secondary); }
+.log__i--rejected { color: var(--hig-color-warn); }
+
+/* ---- banner ---- */
+.banner {
+  display: flex;
+  gap: var(--hig-spacing-3);
+  align-items: center;
+  padding: var(--hig-spacing-3) var(--hig-spacing-4);
+  border-radius: var(--hig-radius-m);
+  margin-bottom: var(--hig-spacing-3);
+  font-weight: 700;
+}
+.banner .btn { flex: 0 0 auto; }
+.banner--win { background: var(--hig-color-success-weak); color: var(--hig-color-success); }
+.banner--lose { background: var(--hig-color-danger-weak); color: var(--hig-color-danger); }
+
+.foot {
+  margin-top: var(--hig-spacing-6);
+  color: var(--hig-color-label-secondary);
+  font-size: var(--hig-text-caption-size);
+  line-height: 1.8;
+}
+.fine { opacity: 0.8; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* --- the 3D street ------------------------------------------------------- */
+/* The canvas is sized in CSS and its backing store in JS; `street/size` reads this box.
+   `display:block` matters — an inline canvas gets a text baseline gap underneath it. */
+#street-wrap { margin: 0 0 1rem; }
+#street-canvas {
+  display: block; width: 100%; height: min(58vh, 30rem);
+  border-radius: 14px; background: #87bdec; cursor: pointer;
+}
+.street__hud { display: flex; gap: 1.5rem; margin: .5rem 0 .75rem; }
+.street__list { list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .5rem; }
+.dist { display: grid; grid-template-columns: auto 1fr; gap: .1rem .5rem;
+  padding: .5rem .7rem; border-radius: 10px; cursor: pointer;
+  background: color-mix(in srgb, currentColor 6%, transparent); }
+.dist--locked { opacity: .45; cursor: default; }
+.dist__lock { grid-row: 1 / 3; align-self: center; }
+.dist__label { font-weight: 600; }
+.dist__isic, .dist__subject { font-size: .78rem; opacity: .7; }
+.dist__subject { grid-column: 2; }
+.shop__back { display: flex; align-items: center; gap: .75rem; margin-bottom: .75rem; }
+.shop__which { font-weight: 600; }
+.shop__isic { font-size: .78rem; opacity: .6; }
+</style>
+<main class='wrap'>
+  <header class='top'>
+    <h1 class='hig-title'>クリーニング営み</h1>
+    <p class='hig-subhead'>board capture — <code>window.__setState</code> / <code>render --view board</code></p>
+  </header>
+  <div id='shop'></div>
+</main>
+<script>(()=>{var ct=Object.defineProperty;var at=(e,t,n)=>t in e?ct(e,t,{enumerable:!0,configurable:!0,writable:!0,value:n}):e[t]=n;var we=(e,t,n)=>at(e,typeof t!="symbol"?t+"":t,n);function A(e){if(e==null||e instanceof Function)return e;let t=typeof e;return t==="string"?(n,r)=>o(n,e,r):t==="object"?(n,r)=>o(e,n,r):e}function _t(e,t,n,...r){if(r.length%2!==0)throw new Error("Illegal argument: assoc expects an odd number of arguments.");switch(N(e)){case F:e.set(t,n);for(let s=0;s<r.length;s+=2)e.set(r[s],r[s+1]);break;case G:case C:e[t]=n;for(let s=0;s<r.length;s+=2)e[r[s]]=r[s+1];break;default:throw new Error(`Illegal argument: assoc! expects a Map, Array, or Object as the first argument, but got ${typeof e}.`)}return e}function ke(e){switch(N(e)){case F:return new Map(e);case S:return new e.constructor(e);case G:return[...e];case C:return{...e};default:throw new Error(`Don't know how to copy object of type ${typeof e}.`)}}function K(e,t,n,...r){e||(e={});let s=ke(e);return _t(s,t,n,...r),s}var F=1,G=2,C=3,pe=4,S=5,$e=6;function Ae(e){return e.constructor===Object}function N(e){if(e!=null){if(Ae(e))return C;if(e instanceof Map)return F;if(e instanceof Set)return S;if(e instanceof Z)return pe;if(Array.isArray(e))return G;if(e instanceof X)return $e;if(e instanceof oe)return S;if(e instanceof Object)return C}}function je(e,t){for(let n of t)e.add(n);return e}function lt(...e){if(e.length===0)return Ge();let[t,...n]=e,r=t;switch(r==null&&(r=[]),N(r)){case S:je(r,n);break;case pe:r.unshift(...n.reverse());break;case G:r.push(...n);break;case F:for(let s of n)Array.isArray(s)?r.set(s[0],s[1]):f(s).forEach(i=>{r.set(i[0],i[1])});break;case C:for(let s of n)Array.isArray(s)?r[s[0]]=s[1]:Object.assign(r,s);break;default:throw new Error("Illegal argument: conj! expects a Set, Array, List, Map, or Object as the first argument.")}return r}function Me(...e){if(e.length===0)return Ge();let[t,...n]=e,r=t;r==null&&(r=vt());let s,i;switch(N(r)){case S:return r instanceof oe?je(new r.constructor(r),n):new r.constructor([...r,...n]);case pe:return new Z(...n.reverse(),...r);case G:return[...r,...n];case F:s=new Map(r);for(let a of n)Array.isArray(a)?s.set(a[0],a[1]):f(a).forEach(d=>{s.set(d[0],d[1])});return s;case $e:return w(function*(){yield*n,yield*r});case C:i={...r};for(let a of n)Array.isArray(a)?i[a[0]]=a[1]:Object.assign(i,a);return i;default:throw new Error("Illegal argument: conj expects a Set, Array, List, Map, or Object as the first argument.")}}function I(e,t){switch(N(e)){case S:case F:return e.has(t);case void 0:return!1;default:return t in e}}function v(e,t,n){if(e){var r=void 0;if(Array.isArray(e))r=e[t];else{let s=f(e),i=0;for(let a of s)if(i++==t){r=a;break}}if(r!==void 0)return r}return n}function o(e,t,n=void 0){if(e==null)return n;let r;if(Ae(e))return r=e[t],r===void 0?n:r;let s;switch(N(e)){case S:e.has(t)&&(r=t);break;case F:r=e.get(t);break;case G:r=e[t];break;default:if(s=e.get,s instanceof Function)try{r=e.get(t);break}catch{}r=e[t];break}return r!==void 0?r:n}function ft(e){return e==null||!!e[Symbol.iterator]}function f(e){if(e==null)return[];if(ft(e))return e;if(e instanceof Object)return Object.entries(e);throw new TypeError(`${e} is not iterable`)}var Ie=Symbol("Iterable"),dt=Symbol.iterator;function Re(e){return e[Symbol.iterator]()}var Ee=Re;function Qe(e){if(e==null)return e;let t=f(e);return t.length===0||t.size===0||t[Symbol.iterator]().next().done?null:t}function j(e){let[t]=f(e);return t}function se(e){let[t,n]=f(e);return n}var re=class{then(t,n){return t(this._deref())}},U=class extends re{constructor(n){super();we(this,"value");this.value=n}_deref(){return this.value}};function Se(e){e=f(e);let t;switch(N(e)){case G:return e[e.length-1];default:for(let n of e)t=n;return t}}function pt(e){return new U(e)}function Ke(e){return e instanceof U}function R(e,t,n){e=A(e);let r,s;if(arguments.length===2){let i=f(t)[Symbol.iterator](),a=i.next();a.done?s=e():s=a.value,r=i}else s=t,r=f(n);if(s instanceof U)return s.value;for(let i of r)if(s=e(s,i),s instanceof U){s=s.value;break}return s}var qt=!1;var X=class{constructor(t){this.gen=t,this.usages=0}[Symbol.iterator](){if(this.usages++,this.usages>=2&&qt)try{throw new Error}catch(t){console.warn("Re-use of lazy value",t.stack)}return this.gen()}};X.prototype[Ie]=!0;function w(e){return new X(e)}function q(e,...t){switch(e=A(e),t.length){case 0:return n=>(...r)=>{switch(r.length){case 0:return n();case 1:return n(r[0]);case 2:return n(r[0],e(r[1]));default:return n(r[0],e(...r.slice(1)))}};case 1:return w(function*(){for(let n of f(t[0]))yield e(n)});default:return w(function*(){let n=t.map(r=>Ee(f(r)));for(;;){let r=[];for(let s of n){let i=s.next();if(i.done)return;r.push(i.value)}yield e(...r)}})}}function ht(e){return t=>(...n)=>{switch(n.length){case 0:return t();case 1:return t(n[0]);case 2:{let r=n[0],s=n[1];return u(e(s))?t(r,s):r}}}}function M(e,t){return arguments.length===1?ht(e):(e=A(e),w(function*(){for(let n of f(t))u(e(n))&&(yield n)}))}function gt(e,t){e=A(e);let n=[],r=0;for(let s of f(t)){let i=e(r,s);u(i)&&n.push(i),r++}return n}function mt(e){return t=>{let n=-1;return(...r)=>{let s=r.length;if(s===0)return t();if(s===1)return t(r[0]);if(s===2){let i=r[0],a=r[1];n++;let d=e(n,a);return d==null?i:t(i,d)}}}}function Fe(e,t){return arguments.length===1?mt(e):gt(e,t)}function c(...e){return e.join("")}function ee(e){return!u(e)}var de=class extends re{constructor(t){super(),this.val=t,this._watches={},this._deref=()=>this.val,this._hasWatches=!1,this._reset_BANG_=n=>{let r=this.val;if(this.val=n,this._hasWatches)for(let s of Object.entries(this._watches)){let i=s[0],a=s[1];a(i,this,r,n)}return n},this._add_watch=(n,r)=>{this._watches[n]=r,this._hasWatches=!0},this._remove_watch=n=>{delete this._watches[n]}}};function qe(e){return new de(e)}function T(e){return e._deref()}function ie(e,t){e._reset_BANG_(t)}function O(e,t,n){return w(function*(){let r=e,s=t,i=n;t===void 0&&(r=0,s=e);let a=r||0;i=n??1;let d=i>=0;for(;s===void 0||d&&a<s||!d&&s<a;)yield a,a+=i})}function Ge(...e){return e}function E(...e){if(e.length===2){let[r,s]=e,i=f(s);if(Array.isArray(i)){let a=new Array(i.length);for(var t=0;t<i.length;t++)a[t]=r(i[t]);return a}else{var n=[];for(let a of i)n.push(r(a));return n}}return[...q(...e)]}function Q(e){return bt(e)?e:[...f(e)]}function B(e){return new Set(f(e))}var Ne=Symbol("IApply__apply");function D(e,...t){e=A(e);let n=t.slice(0,t.length-1),r=f(t[t.length-1]),s=e[Ne];return s?s(...n,r):e(...n,...r)}var Z=class extends Array{constructor(...t){super(),this.push(...t)}};function vt(...e){return new Z(...e)}function bt(e){return Array.isArray(e)}function Te(e){return w(function*(){for(let t of e)yield*f(t)})}function Oe(...e){return Te(e)}Oe[Ne]=e=>Te(e);function yt(...e){return w(function*(){let t=e.map(n=>Ee(f(n)));for(;;){let n=[];for(let r of t){let s=r.next();if(s.done)return;n.push(s.value)}yield*n}})}function xt(e){return t=>{let n=!1;return(...r)=>{switch(r.length){case 0:return t();case 1:return t(r[0]);case 2:if(n){let s=t(r[0],e);return Ke(s)?s:t(s,r[1])}else return n=!0,t(r[0],r[1])}}}}function Be(e,t){return arguments.length===1?xt(e):ue(1,yt(wt(e),t))}function z(...e){let t,n,r,s,i;switch(e.length){case 0:return[];case 1:return e[0];case 2:return Me(e[0]??[],...f(e[1]));case 3:return t=e[0],n=e[1],r=e[2],s=ke(t),i=(a,d)=>d===void 0?a:lt(a,d),Ve(n,i,s,r);default:throw TypeError(`Invalid arity call of into: ${e.length}`)}}function wt(...e){if(e.length==0||e.length>2)throw new Error(`Invalid arity: ${e.length}`);return{[Ie]:!0,[dt]:e.length==1?function*(){let t=e[0];for(;;)yield t}:function*(){let[t,n]=e;for(var r=0;r<t;r++)yield n}}}function kt(e){return Ke(e)?e:pt(e)}function $t(e){return t=>{let n=e;return(...r)=>{let s=r.length;if(s===0)return t();if(s===1){let i=r[0];return t(i)}if(s===2){let i=r[0],a=r[1],d=n,_=(n=n-1,n);return d>0&&(i=t(i,a)),_>0?i:kt(i)}}}}function he(e,t){return arguments.length===1?$t(e):w(function*(){let n=e-1;for(let r of f(t))if(n-->=0&&(yield r),n<0)return})}function At(e){return t=>{let n=e;return(...r)=>{let s=r.length;if(s===0)return t();if(s===1)return t(r[0]);if(s===2){let i=r[0],a=r[1],d=n;return n--,d>0?i:t(i,a)}}}}function ue(e,t){return arguments.length===1?At(e):w(function*(){let n=Re(f(t));for(let r=0;r<e;r++)n.next();yield*n})}function ce(e,t,n){let r=e;for(let s of t)r=o(r,s);return r===void 0?n:r}function ze(e,t){e=A(e);for(let n of f(t))if(!e(n))return!1;return!0}function jt(e){return t=>(...n)=>{let r=n.length;if(r===0)return t();if(r===1)return t(n[0]);if(r===2){let s=n[0],i=n[1],a=e(i);return a==null?s:t(s,a)}}}function ae(e,t){return e=A(e),arguments.length===1?jt(e):w(function*(){for(let n of f(t)){let r=e(n);u(r)&&(yield r)}})}function Le(e){return e=f(e),[...e].reverse()}function Mt(e,t){return arguments.length===1&&(t=e,e=void 0),e=A(e),t=f(t),[...t].sort(e||ge)}function Pe(e,t){e=A(e);for(let n of f(t)){let r=e(n);if(u(r))return r}}function g(e){if(!e)return 0;let t=e.length||e.size;if(typeof t=="number")return t;let n=0;for(let r of f(e))n++;return n}function Ce(e){return e!=null}function Ue(e){return!!e}function y(e){return e.length}function k(e,t,...n){return t==null?e:Math.max(e,t,...n)}function L(e,t,...n){return t==null?e:Math.min(e,t,...n)}function ge(e,t){if(e===t)return 0;{if(e==null)return-1;if(t==null)return 1;let n=typeof e,r=typeof t;if(n==="number"&&r==="number"||n==="string"&&r==="string")return e===t?0:e<t?-1:1;if(Array.isArray(e)&&Array.isArray(t)){if(e.length<t.length)return-1;if(e.length>t.length)return 1;for(let s=0;s<e.length;s++){let i=ge(e[s],t[s]);if(i!=0)return i}return 0}else throw new Error(`comparing ${n} to ${r}`)}}function u(e){return e!=null&&e!==!1}function Ye(e){return e?Object.keys(e):null}var an=Symbol("meta");function Ve(e,...t){switch(t.length){case 2:{let n=t[0],r=t[1];return Ve(e,n,n(),r)}default:{let n=t[0],r=t[1],s=t[2];n=e(n);let i=R(n,r,s);return n(i)}}}var oe=class e{constructor(t){t instanceof e||(t=Mt(t));let r=new Set(t);this._elts=[...r],this._set=r}add(t){if(this._set.has(t))return this;let n=this._elts,r=!1;for(let s=0;s<n.length;s++)if(ge(t,n[s])<=0){n.splice(s,0,t),r=!0;break}return r?this._set=new Set(n):(n.push(t),this._set.add(t)),this.size=n.length,this}delete(t){if(!this._set.has(t))return this;let n=this._elts,r=n.indexOf(t);return n.splice(r,1),this._set=new Set(n),this.size=n.length,this}has(t){return this._set.has(t)}keys(){return this.values()}values(){return this._elts[Symbol.iterator]()}entries(){return this._set.entries()}forEach(...t){return this.set.forEach(...t)}clear(){this._elts=[],this._set=new Set(this._elts)}[Symbol.iterator](){return this.keys()}};var H=[{hue:[.36,.55,.95],"never-auto":["actuation/apply-cleaning-process","actuation/return-garment"],"unlock-at":0,"auto-at-3":["garment/intake"],ops:["garment/intake","careplan/verify","certification/screen","actuation/apply-cleaning-process","actuation/return-garment"],en:"Washing and dry-cleaning",label:"\u30AF\u30EA\u30FC\u30CB\u30F3\u30B0",id:"isic-9601",at:[-933,-400],"never-auto-why":"\u5B9F\u969B\u306B\u8863\u985E\u3092\u51E6\u7406\u3057\u3001\u5BA2\u306B\u8FD4\u3059\u884C\u70BA",repo:"cloud-itonami-isic-9601",isic:"9601",subject:"\u8863\u985E"},{hue:[.3,.68,.52],"never-auto":["flag-safety-concern"],"unlock-at":1,"auto-at-3":["log-service-record","schedule-service-operation","coordinate-parts-order"],ops:["log-service-record","schedule-service-operation","coordinate-parts-order","flag-safety-concern"],en:"Maintenance and repair of motor vehicles",label:"\u6D17\u8ECA\u30FB\u6574\u5099",id:"isic-4520",at:[-311,-400],"never-auto-why":"roadworthiness \u306E\u5224\u65AD\u306B\u89E6\u308C\u308B",repo:"cloud-itonami-isic-4520",isic:"4520",subject:"\u81EA\u52D5\u8ECA"},{hue:[.92,.62,.42],"never-auto":["actuation/finalize-referral"],"unlock-at":2,"auto-at-3":["client/intake"],ops:["client/intake","serviceplan/verify","background-check/screen","actuation/finalize-referral"],en:"Other personal service activities n.e.c.",label:"\u30DA\u30C3\u30C8\u30B1\u30A2",id:"isic-9609",at:[311,-400],"never-auto-why":"\u5B9F\u5728\u306E\u4EBA\u7269\u3092\u4ED6\u4EBA\u306B\u5F15\u304D\u5408\u308F\u305B\u308B",repo:"cloud-itonami-isic-9609",isic:"9609",subject:"\u52D5\u7269"},{hue:[.45,.72,.86],"never-auto":["flag-safety-concern"],"unlock-at":3,"auto-at-3":["log-service-record","schedule-cleaning-operation","coordinate-supply-order"],ops:["log-service-record","schedule-cleaning-operation","coordinate-supply-order","flag-safety-concern"],en:"Community building cleaning operations",label:"\u5EFA\u7269\u6E05\u6383",id:"isic-8121",at:[933,-400],"never-auto-why":"\u4F5C\u696D\u54E1\u306E\u8EAB\u4F53\u306B\u95A2\u308F\u308B",repo:"cloud-itonami-isic-8121",isic:"8121",subject:"\u5EFA\u7269"},{hue:[.86,.72,.3],"never-auto":["flag-safety-concern"],"unlock-at":4,"auto-at-3":["log-service-record","schedule-service-operation","coordinate-supply-order"],ops:["log-service-record","schedule-service-operation","coordinate-supply-order","flag-safety-concern"],en:"Other building and industrial cleaning",label:"\u7523\u696D\u6E05\u6383",id:"isic-8129",at:[-1244,356],"never-auto-why":"hazmat / \u5BC6\u9589\u7A7A\u9593",repo:"cloud-itonami-isic-8129",isic:"8129",subject:"\u30D7\u30E9\u30F3\u30C8"},{hue:[.4,.5,.62],"never-auto":["flag-safety-concern"],"unlock-at":5,"auto-at-3":["log-system-record","schedule-maintenance","order-supplies"],ops:["log-system-record","schedule-maintenance","order-supplies","flag-safety-concern"],en:"Sewerage operations coordination",label:"\u4E0B\u6C34",id:"isic-3700",at:[-622,356],"never-auto-why":"\u516C\u8846\u885B\u751F",repo:"cloud-itonami-isic-3700",isic:"3700",subject:"\u6392\u6C34"},{hue:[.55,.66,.38],"never-auto":["dispute/request"],"unlock-at":6,"auto-at-3":["pickup/schedule","manifest/record"],ops:["pickup/schedule","manifest/record","dispute/request"],en:"Collection of non-hazardous waste",label:"\u5EC3\u68C4\u7269\u53CE\u96C6",id:"isic-3811",at:[0,356],"never-auto-why":"\u76F8\u624B\u306E\u3042\u308B\u7D1B\u4E89\u884C\u70BA",repo:"cloud-itonami-isic-3811",isic:"3811",subject:"\u3054\u307F"},{hue:[.72,.45,.72],"never-auto":["flag-contamination-concern"],"unlock-at":7,"auto-at-3":["log-remediation-record","schedule-remediation-operation","coordinate-disposal"],ops:["log-remediation-record","schedule-remediation-operation","coordinate-disposal","flag-contamination-concern"],en:"Remediation activities",label:"\u6C5A\u67D3\u6D44\u5316",id:"isic-3900",at:[622,356],"never-auto-why":"\u571F\u5730\u3068\u4F4F\u6C11\u306B\u95A2\u308F\u308B",repo:"cloud-itonami-isic-3900",isic:"3900",subject:"\u571F\u58CC"}];var dn=g(H),We=function(e){return j(M(function(t){return o(t,"id")===e},H))};var _e=function(){return{cleared:0,in:null,best:{}}};var pn=(()=>{let e=q(function(r){return v(o(r,"at"),0)},H),t=q(function(r){return v(o(r,"at"),1)},H),n=320;return[R(L,e)-n,R(L,t)-n,R(k,e)+n,R(k,t)+n]})();var Et={"isic-9601":{subject:"\u8863\u985E",cert:"\u6EB6\u5264\u53D6\u6271\u8CC7\u683C",conflict:"\u6D17\u6FEF\u8868\u793A",method:"\u51E6\u7406\u65B9\u6CD5","method-verb":"\u6D17\u3046",labels:{"garment/intake":"\u53D7\u4ED8","careplan/verify":"\u53D6\u6271\u65B9\u6CD5","certification/screen":"\u8CC7\u683C\u7167\u5408","actuation/apply-cleaning-process":"\u6D17\u6D44","actuation/return-garment":"\u8FD4\u5374"},processes:["dry-clean","wet-clean","tumble-dry","bleach","press"],kinds:[{desc:"\u30A6\u30FC\u30EB\u306E\u30B8\u30E3\u30B1\u30C3\u30C8",forbidden:["bleach","tumble-dry"]},{desc:"\u30B7\u30EB\u30AF\u306E\u30D6\u30E9\u30A6\u30B9",forbidden:["bleach","tumble-dry"]},{desc:"\u7DBF\u306E\u30B7\u30E3\u30C4",forbidden:[]},{desc:"\u30C0\u30A6\u30F3\u30B3\u30FC\u30C8",forbidden:["dry-clean"]},{desc:"\u30AB\u30B7\u30DF\u30E4\u306E\u30BB\u30FC\u30BF\u30FC",forbidden:["tumble-dry","wet-clean"]},{desc:"\u30EA\u30CD\u30F3\u306E\u30EF\u30F3\u30D4\u30FC\u30B9",forbidden:["bleach"]}]},"isic-4520":{subject:"\u81EA\u52D5\u8ECA",cert:"\u6574\u5099\u58EB\u8CC7\u683C",conflict:"\u6574\u5099\u8981\u9818",method:"\u4F5C\u696D\u5185\u5BB9","method-verb":"\u6D17\u3046",labels:{"log-service-record":"\u4F5C\u696D\u8A18\u9332","schedule-service-operation":"\u4F5C\u696D\u8A08\u753B","coordinate-parts-order":"\u90E8\u54C1\u624B\u914D","flag-safety-concern":"\u5B89\u5168\u6307\u6458"},processes:["high-pressure-wash","engine-degrease","undercarriage","wax","interior"],kinds:[{desc:"\u8EFD\u30C8\u30E9\u30C3\u30AF",forbidden:["engine-degrease"]},{desc:"\u96FB\u6C17\u81EA\u52D5\u8ECA",forbidden:["high-pressure-wash","engine-degrease"]},{desc:"\u65E7\u8ECA\u306E\u30BB\u30C0\u30F3",forbidden:["high-pressure-wash"]},{desc:"\u5546\u7528\u30D0\u30F3",forbidden:[]},{desc:"\u30AA\u30FC\u30D7\u30F3\u30AB\u30FC",forbidden:["high-pressure-wash","interior"]},{desc:"\u56DB\u8F2A\u99C6\u52D5\u8ECA",forbidden:["wax"]}]},"isic-9609":{subject:"\u52D5\u7269",cert:"\u52D5\u7269\u53D6\u6271\u8CAC\u4EFB\u8005",conflict:"\u5065\u5EB7\u8A18\u9332",method:"\u65BD\u8853\u5185\u5BB9","method-verb":"\u6D17\u3046",labels:{"client/intake":"\u53D7\u4ED8","serviceplan/verify":"\u65BD\u8853\u8A08\u753B","background-check/screen":"\u8CC7\u683C\u7167\u5408","actuation/finalize-referral":"\u7D39\u4ECB\u78BA\u5B9A"},processes:["full-groom","bath-only","clip","de-shed","medicated-bath"],kinds:[{desc:"\u9577\u6BDB\u306E\u732B",forbidden:["clip"]},{desc:"\u5B50\u72AC",forbidden:["medicated-bath","clip"]},{desc:"\u8001\u72AC",forbidden:["de-shed","medicated-bath"]},{desc:"\u77ED\u6BDB\u306E\u72AC",forbidden:[]},{desc:"\u76AE\u819A\u708E\u306E\u72AC",forbidden:["full-groom","de-shed"]},{desc:"\u3046\u3055\u304E",forbidden:["bath-only","medicated-bath"]}]},"isic-8121":{subject:"\u5EFA\u7269",cert:"\u4F5C\u696D\u4E3B\u4EFB\u8005",conflict:"\u5EFA\u6750\u4ED5\u69D8",method:"\u6E05\u6383\u65B9\u6CD5","method-verb":"\u6E05\u6383\u3059\u308B",labels:{"log-service-record":"\u4F5C\u696D\u8A18\u9332","schedule-cleaning-operation":"\u6E05\u6383\u8A08\u753B","coordinate-supply-order":"\u8CC7\u6750\u624B\u914D","flag-safety-concern":"\u5B89\u5168\u6307\u6458"},processes:["strip-and-wax","steam","acid-wash","dry-buff","pressure-wash"],kinds:[{desc:"\u5927\u7406\u77F3\u306E\u5E8A",forbidden:["acid-wash"]},{desc:"\u6728\u306E\u5E8A",forbidden:["steam","pressure-wash"]},{desc:"\u30B3\u30F3\u30AF\u30EA\u30FC\u30C8\u571F\u9593",forbidden:[]},{desc:"\u30AB\u30FC\u30DA\u30C3\u30C8\u968E\u6BB5",forbidden:["strip-and-wax","acid-wash"]},{desc:"\u30AC\u30E9\u30B9\u5916\u58C1",forbidden:["acid-wash","dry-buff"]},{desc:"\u30D3\u30CB\u30EB\u5E8A",forbidden:["acid-wash"]}]},"isic-8129":{subject:"\u30D7\u30E9\u30F3\u30C8",cert:"\u7279\u5225\u6559\u80B2\u4FEE\u4E86",conflict:"\u8A2D\u5099\u4ED5\u69D8",method:"\u6D17\u6D44\u65B9\u6CD5","method-verb":"\u6D17\u6D44\u3059\u308B",labels:{"log-service-record":"\u4F5C\u696D\u8A18\u9332","schedule-service-operation":"\u4F5C\u696D\u8A08\u753B","coordinate-supply-order":"\u8CC7\u6750\u624B\u914D","flag-safety-concern":"\u5B89\u5168\u6307\u6458"},processes:["chemical-clean","hydroblast","dry-ice","vacuum","solvent-flush"],kinds:[{desc:"\u71B1\u4EA4\u63DB\u5668",forbidden:["dry-ice"]},{desc:"\u8CAF\u8535\u30BF\u30F3\u30AF",forbidden:["hydroblast"]},{desc:"\u914D\u7BA1\u30E9\u30A4\u30F3",forbidden:["dry-ice","vacuum"]},{desc:"\u53CD\u5FDC\u69FD",forbidden:["solvent-flush"]},{desc:"\u96C6\u5875\u30C0\u30AF\u30C8",forbidden:["chemical-clean"]},{desc:"\u51B7\u5374\u5854",forbidden:[]}]},"isic-3700":{subject:"\u6392\u6C34",cert:"\u4E0B\u6C34\u9053\u7BA1\u7406\u6280\u58EB",conflict:"\u7BA1\u8DEF\u53F0\u5E33",method:"\u4F5C\u696D\u65B9\u6CD5","method-verb":"\u6D5A\u6E2B\u3059\u308B",labels:{"log-system-record":"\u7CFB\u7D71\u8A18\u9332","schedule-maintenance":"\u4FDD\u5B88\u8A08\u753B","order-supplies":"\u8CC7\u6750\u624B\u914D","flag-safety-concern":"\u5B89\u5168\u6307\u6458"},processes:["jetting","rodding","vacuum","cctv-survey","chemical-dose"],kinds:[{desc:"\u8001\u673D\u9676\u7BA1",forbidden:["jetting","rodding"]},{desc:"\u5408\u6D41\u7BA1\u6E20",forbidden:["chemical-dose"]},{desc:"\u5727\u9001\u7BA1",forbidden:["rodding"]},{desc:"\u30DE\u30F3\u30DB\u30FC\u30EB",forbidden:[]},{desc:"\u96E8\u6C34\u5410\u304D",forbidden:["chemical-dose","vacuum"]},{desc:"\u672C\u7BA1",forbidden:[]}]},"isic-3811":{subject:"\u3054\u307F",cert:"\u53CE\u96C6\u904B\u642C\u696D\u8A31\u53EF",conflict:"\u5206\u5225\u533A\u5206",method:"\u53CE\u96C6\u65B9\u6CD5","method-verb":"\u53CE\u96C6\u3059\u308B",labels:{"pickup/schedule":"\u53CE\u96C6\u8A08\u753B","manifest/record":"\u30DE\u30CB\u30D5\u30A7\u30B9\u30C8","dispute/request":"\u7570\u8B70\u7533\u7ACB"},processes:["compactor","roll-off","manual-load","bulk-lift","transfer"],kinds:[{desc:"\u4E8B\u696D\u7CFB\u4E00\u822C\u5EC3\u68C4\u7269",forbidden:[]},{desc:"\u304C\u308C\u304D\u985E",forbidden:["compactor","manual-load"]},{desc:"\u5EC3\u30D7\u30E9\u30B9\u30C1\u30C3\u30AF",forbidden:["bulk-lift"]},{desc:"\u526A\u5B9A\u679D",forbidden:["compactor"]},{desc:"\u53A8\u82A5",forbidden:["roll-off","bulk-lift"]},{desc:"\u7D19\u304F\u305A",forbidden:[]}]},"isic-3900":{subject:"\u571F\u58CC",cert:"\u4F5C\u696D\u74B0\u5883\u6E2C\u5B9A\u58EB",conflict:"\u6C5A\u67D3\u8ABF\u67FB",method:"\u6D44\u5316\u65B9\u6CD5","method-verb":"\u6D44\u5316\u3059\u308B",labels:{"log-remediation-record":"\u8ABF\u67FB\u8A18\u9332","schedule-remediation-operation":"\u6D44\u5316\u8A08\u753B","coordinate-disposal":"\u51E6\u5206\u624B\u914D","flag-contamination-concern":"\u6C5A\u67D3\u6307\u6458"},processes:["excavate","soil-wash","bioremediate","thermal","containment"],kinds:[{desc:"\u6CB9\u6C5A\u67D3\u571F",forbidden:["containment"]},{desc:"\u91CD\u91D1\u5C5E\u6C5A\u67D3\u571F",forbidden:["bioremediate","thermal"]},{desc:"\u63EE\u767A\u6027\u6709\u6A5F\u7269",forbidden:["excavate"]},{desc:"\u8FB2\u85AC\u6B8B\u7559\u571F",forbidden:["thermal"]},{desc:"\u57CB\u7ACB\u8DE1\u5730",forbidden:[]},{desc:"\u5730\u4E0B\u6C34\u6C5A\u67D3",forbidden:["excavate","soil-wash"]}]}},De={"garment/intake":"intake","log-service-record":"log","actuation/apply-cleaning-process":"clean","schedule-cleaning-operation":"schedule","actuation/finalize-referral":"finalize","flag-safety-concern":"flag","manifest/record":"verify","certification/screen":"screen","client/intake":"intake","coordinate-supply-order":"supply","log-remediation-record":"log","pickup/schedule":"intake","dispute/request":"flag","coordinate-disposal":"supply","flag-contamination-concern":"flag","careplan/verify":"verify","coordinate-parts-order":"supply","schedule-remediation-operation":"schedule","order-supplies":"supply","schedule-maintenance":"schedule","serviceplan/verify":"verify","log-system-record":"log","schedule-service-operation":"schedule","actuation/return-garment":"return","background-check/screen":"screen"},Qt={entry:5,verify:4,middle:4,act:7,settle:14},St={entry:40,verify:60,middle:90,act:140,settle:110},He=function(e,t){let n=L(1,e-1),r=e-2,s=e-1;return t===s?"settle":t===r?"act":t===n?"verify":t===0?"entry":"middle"},P=function(e){let t=We(e),n=o(Et,e);if(u((()=>{let r=t;if(u(r)){let s=n;return u(s)?ze(function(i){return I(De,i)},o(t,"ops")):s}else return r})())){let r=Q(o(t,"ops")),s=g(r),i=B(q(function(l){return c(l)},o(t,"never-auto"))),a=B(q(function(l){return c(l)},o(t,"auto-at-3"))),d=E(function(l){let J=v(r,l);return{key:o(De,J),op:J,label:o(o(n,"labels"),J,c(J)),"hard-human?":I(i,c(J))}},O(s)),_=E(function(l){return o(l,"key")},d),m=B(ae(function(l){if(u(I(a,c(o(l,"op")))))return o(l,"key")},d)),p=B(ae(function(l){return u(o(l,"hard-human?"))?null:o(l,"key")},d));return{stations:d,"conflict-label":o(n,"conflict"),"stage-after":z({},q(function(l){return[v(_,l),l+1<s?v(_,l+1):"done"]},O(s))),"phase-source":e==="isic-9601"?"transcribed":"game-staging",upgrade:K(z({},q(function(l){return[v(_,l),o(St,He(s,l))]},O(s))),"approver",220),label:o(t,"label"),id:e,"phase-table":(()=>{let l={};return l[0]={label:"read-only",writes:new Set([]),auto:new Set([])},l[1]={label:"assisted-intake",writes:new Set([j(_)]),auto:new Set([])},l[2]={label:"assisted-verify",writes:p,auto:new Set([])},l[3]={label:"supervised-auto",writes:B(_),auto:m},l})(),payout:z({},q(function(l){return[v(_,l),o(Qt,He(s,l))]},O(s))),"method-label":o(n,"method"),"evidence-required":E(function(l){return o(l,"label")},d),repo:o(t,"repo"),processes:o(n,"processes"),subject:o(n,"subject"),"cert-label":o(n,"cert"),"station-keys":_,kinds:o(n,"kinds")}}},hn=Q(M(function(e){return Ce(P(e))},q(function(e){return o(e,"id")},H)));var h=P("isic-9601");var Ze=function(e){return v(o(e,"station-keys"),L(1,g(o(e,"station-keys"))-1))},Kt=function(e){return v(o(e,"station-keys"),g(o(e,"station-keys"))-2)},Ft=function(e){return Se(o(e,"station-keys"))},Gt=function(e,t){let n=j(Fe(function(r,s){if(c(s)===c(t))return r},e));return u(n)?n:-1};var $=function(e){let t=o(e,"spec");return u(t)?t:h},An=o(h,"stations"),jn=o(h,"station-keys"),Nt=(()=>{let e=function(t){switch(arguments.length){case 1:return e.cljs$core$IFn$_invoke$arity$1(arguments[0]);case 2:return e.cljs$core$IFn$_invoke$arity$2(arguments[0],arguments[1]);default:throw new Error(c("Invalid arity: ",y(arguments)))}};return e.cljs$core$IFn$_invoke$arity$1=function(t){return Nt(h,t)},e.cljs$core$IFn$_invoke$arity$2=function(t,n){return j(M(function(r){return o(r,"key")===n},o(t,"stations")))},e.cljs$lang$maxFixedArity=2,e})(),Mn=o(h,"phase-table"),ve=3,et=.6,tt=(()=>{let e=function(t){switch(arguments.length){case 1:return e.cljs$core$IFn$_invoke$arity$1(arguments[0]);case 2:return e.cljs$core$IFn$_invoke$arity$2(arguments[0],arguments[1]);default:throw new Error(c("Invalid arity: ",y(arguments)))}};return e.cljs$core$IFn$_invoke$arity$1=function(t){return tt(h,t)},e.cljs$core$IFn$_invoke$arity$2=function(t,n){let r=o(t,"phase-table");return o(o(r,n,o(r,ve)),"auto")},e.cljs$lang$maxFixedArity=2,e})(),nt=(()=>{let e=function(t){switch(arguments.length){case 1:return e.cljs$core$IFn$_invoke$arity$1(arguments[0]);case 2:return e.cljs$core$IFn$_invoke$arity$2(arguments[0],arguments[1]);default:throw new Error(c("Invalid arity: ",y(arguments)))}};return e.cljs$core$IFn$_invoke$arity$1=function(t){return nt(h,t)},e.cljs$core$IFn$_invoke$arity$2=function(t,n){let r=o(t,"phase-table");return o(o(r,n,o(r,ve)),"writes")},e.cljs$lang$maxFixedArity=2,e})(),In=o(h,"processes"),Rn=o(h,"kinds");var me=(()=>{let e=function(t){switch(arguments.length){case 1:return e.cljs$core$IFn$_invoke$arity$1(arguments[0]);case 2:return e.cljs$core$IFn$_invoke$arity$2(arguments[0],arguments[1]);default:throw new Error(c("Invalid arity: ",y(arguments)))}};return e.cljs$core$IFn$_invoke$arity$1=function(t){return me(h,t)},e.cljs$core$IFn$_invoke$arity$2=function(t,n){let r=o(t,"station-keys"),s=g(r),i=Gt(r,n),a=s-1;return i===s-1?a:i===s-2?a-1:0},e.cljs$lang$maxFixedArity=2,e})(),rt=function(e){return Ue(Pe(function(t){return t===o(e,"proposed-process")},o(e,"forbidden")))},Tt=function(e,t,n){let r=$(e),s=c(t)===c(Kt(r)),i=c(t)===c(Ft(r)),a=(()=>{let _=s;return _||i})(),d=Ze(r);return u((()=>{let _=(()=>{let m=a;return u(m)?m:t===d})();return u(_)?ee(o(n,"cited?")):_})())?{rule:"no-spec-basis",detail:"\u516C\u5F0Fspec-basis\u306E\u5F15\u7528\u304C\u7121\u3044\u63D0\u6848\u306F\u30AF\u30EA\u30FC\u30CB\u30F3\u30B0\u696D\u904B\u55B6\u57FA\u6E96\u3068\u3057\u3066\u6271\u3048\u306A\u3044"}:u((()=>{let _=a;return u(_)?o(n,"evidence")<me(r,t):_})())?{rule:"evidence-incomplete",detail:c("\u5FC5\u8981\u66F8\u985E\u304C ",o(n,"evidence"),"/",me(r,t)," \u3057\u304B\u63C3\u3063\u3066\u3044\u306A\u3044")}:u((()=>{let _=s;return _&&rt(n)})())?{rule:"cleaning-process-forbidden-by-care-label",detail:c(o(n,"desc")," \u306E",o(r,"conflict-label"),"\u304C\u300C",o(n,"proposed-process"),"\u300D\u3092\u7981\u6B62\u3057\u3066\u3044\u308B")}:ee(o(e,"cert-current?"))?{rule:"certification-not-current",detail:c(o(r,"cert-label"),"\u304C\u6700\u65B0\u3067\u306A\u3044\u72B6\u614B\u3067\u306F\u63D0\u6848\u3092\u9032\u3081\u3089\u308C\u306A\u3044")}:u((()=>{let _=s;return _&&o(n,"cleaning-applied?")})())?{rule:"already-cleaned",detail:c(o(n,"id")," \u306F\u65E2\u306B\u51E6\u7406\u6E08\u307F")}:u((()=>{let _=i;return _&&o(n,"garment-returned?")})())?{rule:"already-returned",detail:c(o(n,"id")," \u306F\u65E2\u306B\u5B8C\u4E86\u6E08\u307F")}:null};var Ot=o(h,"upgrade"),Bt=function(e,t){let n=ce(e,["levels",t],0),r=o(o($(e),"upgrade"),t,o(Ot,t,100));return R(function(s,i){return s*1.6},r,O(n))|0},ot=function(e,t){let n=ce(e,["levels",t],1);return k(1,24/(2+n)|0)},En=o(h,"payout"),zt=40,ne=(()=>{let e=function(t){switch(arguments.length){case 1:return e.cljs$core$IFn$_invoke$arity$1(arguments[0]);case 2:return e.cljs$core$IFn$_invoke$arity$2(arguments[0],arguments[1]);default:throw new Error(c("Invalid arity: ",y(arguments)))}};return e.cljs$core$IFn$_invoke$arity$1=function(t){return ne(t,"isic-9601")},e.cljs$core$IFn$_invoke$arity$2=function(t,n){let r=(()=>{let s=P(n);return u(s)?s:h})();return{"cert-ticks":1200,ledger:[],returned:0,"next-id":1,queue:[],flow:"playing",garments:[],phase:1,cash:0,seed:t,levels:K(z({},q(function(s){return[s,1]},o(r,"station-keys"))),"approver",0),spec:r,"cert-current?":!0,commits:0,t:0,lives:3,district:o(r,"id")}},e.cljs$lang$maxFixedArity=2,e})();var Lt=(()=>{let e=function(t){switch(arguments.length){case 1:return e.cljs$core$IFn$_invoke$arity$1(arguments[0]);case 2:return e.cljs$core$IFn$_invoke$arity$2(arguments[0],arguments[1]);default:throw new Error(c("Invalid arity: ",y(arguments)))}};return e.cljs$core$IFn$_invoke$arity$1=function(t){return Lt(h,t)},e.cljs$core$IFn$_invoke$arity$2=function(t,n){return o(o(t,"stage-after"),n,"done")},e.cljs$lang$maxFixedArity=2,e})();var Xe=function(e,t){return(()=>{let n=o(t,"work");return u(n)?n:0})()>=ot(e,o(t,"stage"))};var Pt=function(e){let t=o(e,"phase");return{cash:120*t,commits:8*t}};var Ct=function(e){let t=ee(o(e,"cert-current?"));return t&&o(e,"cash")<90};var fe=function(e){return{"cert-ticks":o(e,"cert-ticks"),ledger:o(e,"ledger"),returned:o(e,"returned"),stations:E(function(t){let n=o(t,"key"),r=M(function(s){return o(s,"stage")===n},o(e,"garments"));return{ready:g(M(function(s){return Xe(e,s)},r)),key:n,garments:E(function(s){return{"cited?":o(s,"cited?"),desc:o(s,"desc"),"label-conflict?":rt(s),work:o(s,"work"),need:ot(e,n),evidence:o(s,"evidence"),process:o(s,"proposed-process"),risk:o(Tt(e,n,s),"rule"),forbidden:o(s,"forbidden"),id:o(s,"id"),confidence:o(s,"confidence"),"ready?":Xe(e,s)}},r),"auto?":I(tt($(e),o(e,"phase")),n),level:ce(e,["levels",n],1),label:o(t,"label"),"open?":I(nt($(e),o(e,"phase")),n),count:g(r),"rejectable?":c(n)===c(Ze($(e))),"hard-human?":o(t,"hard-human?")}},o($(e),"stations")),queue:g(o(e,"queue")),flow:u((()=>{let t=o(e,"flow")==="playing";return t&&Ct(e)})())?"stalled":o(e,"flow"),"district-label":o($(e),"label"),phase:o(e,"phase"),costs:z({},q(function(t){return[t,Bt(e,t)]},Ye(o($(e),"upgrade")))),cash:o(e,"cash"),levels:o(e,"levels"),"cert-current?":o(e,"cert-current?"),"phase-label":o(o(o($(e),"phase-table"),o(e,"phase")),"label"),commits:o(e,"commits"),t:o(e,"t"),lives:o(e,"lives"),target:zt,subject:o($(e),"subject"),"next-phase":o(e,"phase")<ve?Pt(e):null,district:o(e,"district")}};var Ut=[["\xD71",300],["\xD74",75],["\xD716",20]],b=function(e){return c(e).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")},x=function(e){return c(e)},Yt=function(e,t){return c(Math.round(100*(e/k(1,t))),"%")},Vt=function(e,t){let n=Q(t);return Q(ue(k(0,g(n)-e),n))},Wt=function(e){let t=o(e,"label-conflict?"),n=o(e,"risk");return c("<div class='g",u((()=>{let r=t;return u(r)?r:n})())?" g--risk":null,"'>","<div class='g__top'><span class='g__name'>",b(o(e,"desc")),"</span>","<span class='g__id'>",b(o(e,"id")),"</span></div>","<div class='g__meta'>","<span class='tag'>\u63D0\u6848 ",b(o(e,"process")),"</span>","<span class='tag'>\u66F8\u985E ",o(e,"evidence"),"/4</span>","<span class='tag",o(e,"confidence")<et?" tag--warn":null,"'>\u78BA\u5EA6 ",Math.round(100*o(e,"confidence")),"%</span>",u(o(e,"cited?"))?null:"<span class='tag tag--bad'>\u6839\u62E0\u306A\u3057</span>","</div>",u(Qe(o(e,"forbidden")))?c("<div class='g__label'>\u6D17\u6FEF\u8868\u793A \u7981\u6B62: ",b(D(c,Be(" / ",o(e,"forbidden")))),"</div>"):null,u(t)?"<div class='g__flag'>\u26A0 \u63D0\u6848\u304C\u6D17\u6FEF\u8868\u793A\u306B\u53CD\u3059\u308B \u2014 \u5DEE\u3057\u623B\u3055\u306A\u3044\u3068\u6D17\u6D44\u3067HOLD\u306B\u306A\u308B</div>":null,u(n)?c("<div class='g__flag'>\u26D4 ",b(x(n)),"</div>"):null,"<div class='bar'><i style='width:",Yt(o(e,"work"),o(e,"need")),"'></i></div>","</div>")},Dt=function(e,t){let n=o(e,"key");return c("<section class='card",u(o(e,"open?"))?null:" card--closed",o(e,"ready")>0?" card--ready":null,"'>","<header class='card__h'>","<h2 class='hig-headline'>",b(o(e,"label")),"</h2>","<span class='lv'>Lv.",o(e,"level"),"</span>","</header>","<div class='badges'>",u(o(e,"open?"))?null:"<span class='badge badge--off'>\u672A\u958B\u653E</span>",u(o(e,"hard-human?"))?"<span class='badge badge--human'>\u4EBA\u624B\u5FC5\u9808</span>":u(o(e,"auto?"))?"<span class='badge badge--auto'>\u81EA\u52D5</span>":"<span class='badge'>\u8981\u627F\u8A8D</span>","<span class='badge badge--n'>",o(e,"count")," \u70B9</span>","</div>","<div class='gs'>",o(e,"count")===0?"<p class='empty'>\u2014</p>":D(c,q(Wt,he(2,o(e,"garments")))),"</div>","<div class='acts'>","<button class='btn btn--go' data-act='tap' data-arg='",x(n),"'",u(o(e,"open?"))?null:" disabled",">\u627F\u8A8D</button>",u(o(e,"rejectable?"))?c("<button class='btn' data-act='reject' data-arg='",x(n),"'",u(o(e,"open?"))?null:" disabled",">\u5DEE\u3057\u623B\u3059</button>"):null,"<button class='btn btn--buy' data-act='buy' data-arg='",x(n),"'>\u5F37\u5316 \xA5",o(t,x(n)),"</button>","</div>","</section>")},Ht=function(e){return c("<div class='hud'>","<div class='hud__row'>","<span class='stat'><b>\xA5",o(e,"cash"),"</b><small>\u58F2\u4E0A</small></span>","<span class='stat'><b>","\u25CF".repeat(k(0,o(e,"lives"))),"\u25CB".repeat(k(0,3-o(e,"lives"))),"</b><small>\u9867\u5BA2\u306E\u4FE1\u983C</small></span>","<span class='stat'><b>",o(e,"returned"),"/",o(e,"target"),"</b><small>\u8FD4\u5374</small></span>","<span class='stat'><b>P",o(e,"phase"),"</b><small>",b(o(e,"phase-label")),"</small></span>","</div>","<div class='hud__row hud__row--thin'>","<span class='cert",u(o(e,"cert-current?"))?null:" cert--bad","'>",u(o(e,"cert-current?"))?c("\u6EB6\u5264\u53D6\u6271\u8CC7\u683C \u6709\u52B9 (",o(e,"cert-ticks"),")"):"\u6EB6\u5264\u53D6\u6271\u8CC7\u683C \u5931\u52B9 \u2014 \u5168\u5DE5\u7A0B\u304C HOLD","</span>","<span class='q'>\u5F85\u3061 ",o(e,"queue")," \u4EBA</span>","</div>","</div>")},Jt=function(e,t){let n=o(e,"next-phase");return c("<section class='card card--shop'>","<header class='card__h'><h2 class='hig-headline'>\u5E97\u306E\u904B\u55B6</h2></header>","<div class='acts acts--wrap'>","<button class='btn' data-act='take-in'>\u53D7\u4ED8\u3059\u308B</button>","<button class='btn",u(o(e,"cert-current?"))?null:" btn--go","' data-act='renew'>\u8CC7\u683C\u66F4\u65B0 \xA590</button>","<button class='btn btn--buy' data-act='buy' data-arg='approver'>\u627F\u8A8D\u8005\u3092\u96C7\u3046 \xA5",o(o(e,"costs"),"approver")," (",o(o(e,"levels"),"approver"),"\u4EBA)</button>",u(n)?c("<button class='btn btn--go' data-act='phase'>\u6BB5\u968E\u3092\u4E0A\u3052\u308B \xA5",o(n,"cash")," / \u5B9F\u7E3E",o(n,"commits"),"</button>"):"<span class='badge badge--auto'>\u6700\u7D42\u6BB5\u968E</span>","</div>","<div class='acts acts--wrap'>","<span class='badge'>\u901F\u5EA6</span>",D(c,q(function(r){return c("<button class='btn",se(r)===t?" btn--go":null,"' data-act='speed' data-arg='",se(r),"'>",j(r),"</button>")},Ut)),"</div>","<p class='note'>\u627F\u8A8D\u8005\u306F <b>\u53D6\u6271\u65B9\u6CD5</b> \u3068 <b>\u8CC7\u683C\u7167\u5408</b> \u3057\u304B\u634C\u3051\u307E\u305B\u3093\u3002","<b>\u6D17\u6D44</b> \u3068 <b>\u8FD4\u5374</b> \u306F phase 3 \u3067\u3082\u81EA\u52D5\u5316\u3055\u308C\u307E\u305B\u3093 \u2014 ","<code>laundry.phase</code> \u304C\u3069\u306E\u6BB5\u968E\u306E <code>:auto</code> \u306B\u3082\u5165\u308C\u3066\u3044\u306A\u3044\u304B\u3089\u3067\u3059\u3002</p>","</section>")},Xt=function(e){return c("<section class='card card--log'>","<header class='card__h'><h2 class='hig-headline'>\u76E3\u67FB\u53F0\u5E33</h2></header>","<ol class='log'>",D(c,q(function(t){return c("<li class='log__i log__i--",b(x(o(t,"disposition"))),"'>","<span class='log__t'>t",o(t,"t"),"</span> ","<span class='log__op'>",b(x(o(t,"op"))),"</span> ",b((()=>{let n=o(t,"detail");if(u(n))return n;{let r=u(o(t,"basis"))?x(o(t,"basis")):null;return u(r)?r:""}})()),"</li>")},Le(Vt(12,o(e,"ledger"))))),"</ol></section>")},Zt=function(e){return x(o(e,"flow"))==="victory"?"<div class='banner banner--win'>\u76E3\u67FB\u30AF\u30ED\u30FC\u30BA \u2014 40\u70B9\u3092\u898F\u7A0B\u3069\u304A\u308A\u8FD4\u5374\u3057\u307E\u3057\u305F<button class='btn' data-act='reset'>\u3082\u3046\u4E00\u5EA6</button></div>":x(o(e,"flow"))==="gameover"?"<div class='banner banner--lose'>\u4FE1\u983C\u3092\u5931\u3044\u307E\u3057\u305F \u2014 \u53F0\u5E33\u3092\u898B\u308C\u3070\u3001\u3069\u306E\u898F\u5247\u3067\u6B62\u307E\u3063\u305F\u304B\u6B8B\u3063\u3066\u3044\u307E\u3059<button class='btn' data-act='reset'>\u3082\u3046\u4E00\u5EA6</button></div>":x(o(e,"flow"))==="stalled"?"<div class='banner banner--lose'>\u884C\u304D\u8A70\u307E\u308A \u2014 \u8CC7\u683C\u5931\u52B9\u304B\u3064\u66F4\u65B0\u8CBB\u4E0D\u8DB3<button class='btn' data-act='reset'>\u3082\u3046\u4E00\u5EA6</button></div>":""},ye=(()=>{let e=function(t){switch(arguments.length){case 2:return e.cljs$core$IFn$_invoke$arity$2(arguments[0],arguments[1]);case 3:return e.cljs$core$IFn$_invoke$arity$3(arguments[0],arguments[1],arguments[2]);default:throw new Error(c("Invalid arity: ",y(arguments)))}};return e.cljs$core$IFn$_invoke$arity$2=function(t,n){return ye(t,n,300)},e.cljs$core$IFn$_invoke$arity$3=function(t,n,r){return c("<div class='shop__back'>","<button class='btn' data-act='to-street'>\u2190 \u55B6\u307F\u306E\u8857</button>","<span class='shop__which'>",b(o(t,"district-label")),"</span>","<span class='shop__isic'>",b(n),"</span>","</div>",Zt(t),Ht(t),"<div class='grid'>",D(c,q(function(s){return Dt(s,o(t,"costs"))},o(t,"stations"))),"</div>",Jt(t,r),Xt(t))},e.cljs$lang$maxFixedArity=3,e})();var tn=function(e,t){if(u(e)){let n=(()=>{let s=o(e,"district");if(u(s))return s;{let i=t;return u(i)?i:"isic-9601"}})(),r=(()=>{let s=P(n);return u(s)?s:P("isic-9601")})();return K(e,"spec",r,"district",o(r,"id"))}},nn=function(e,t,n){let r=o(n,"kind"),s=o(n,"version"),i=(()=>{let p=o(n,"district");return u(p)?p:"isic-9601"})(),a=(()=>{let p=o(n,"seed");return u(p)?p:20260808})(),d=(()=>{let p=o(n,"world");return u(p)?p:_e()})(),_=tn(o(n,"shop"),i);if(u((()=>{let p=r;return u(p)?c(r)!=="itonami-game/state":p})()))throw new Error(c("not an itonami game state: :kind ",r));if(u((()=>{let p=s;return u(p)?s!==1:p})()))throw new Error(c("unsupported state :version ",s));ie(e,{view:u(_)?"shop":"street",world:d,district:u(_)?o(_,"district"):i,st:(()=>{let p=_;return u(p)?p:ne(a,i)})(),speed:300,"frozen?":!0,seed:a}),t(!0);let m=fe(o(T(e),"st"));return{ok:!0,view:o(T(e),"view"),district:o(T(e),"district"),cash:o(m,"cash"),returned:o(m,"returned"),phase:o(m,"phase"),flow:c(o(m,"flow")),hud:c("\xA5",o(m,"cash")," ",o(m,"returned"),"/40 ","P",o(m,"phase"))}},st=function(e,t,n){return(()=>{try{return nn(e,t,n)}catch(r){return{ok:!1,reason:c((()=>{let s=r.message;return u(s)?s:r})())}}})()};var ut=qe({view:"shop",world:_e(),district:"isic-9601",st:ne(20260808,"isic-9601"),speed:300,"frozen?":!0}),it=qe(0),on=function(){let e=T(ut),t=o(e,"district"),n=o(e,"st"),r=o(e,"speed"),s=document.getElementById("shop");return s.innerHTML=ye(fe(n),t,r)},xe=(()=>{let e=function(t){switch(arguments.length){case 0:return e.cljs$core$IFn$_invoke$arity$0();case 1:return e.cljs$core$IFn$_invoke$arity$1(arguments[0]);default:throw new Error(c("Invalid arity: ",y(arguments)))}};return e.cljs$core$IFn$_invoke$arity$0=function(){return xe(!1)},e.cljs$core$IFn$_invoke$arity$1=function(t){let n=Date.now();if(u((()=>{let r=t;return u(r)?r:n-T(it)>=80})()))return ie(it,n),on()},e.cljs$lang$maxFixedArity=1,e})(),sn=function(){return window.__setState=function(e){return st(ut,xe,e)},xe(!0)};sn();})();
+</script>

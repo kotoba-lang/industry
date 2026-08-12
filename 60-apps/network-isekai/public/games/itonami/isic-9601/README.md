@@ -240,7 +240,10 @@ npm run render -- --view street        # WebGPU first, WebGL 2.0 fallback (needs
 npm run render -- --view street --backend webgpu
 npm run render -- --view street --backend webgl2
 npm run render -- --view street --width 1280 --height 720 --cleared 3
-npm run render -- --view street --orbit 40 --zoom 1.2 --fov 44   # camera (#1751)
+npm run render -- --view street --orbit 180 --zoom 1.2 --fov 40   # camera (#1751)
+npm run render -- --view street --eye 0,80,120 --target 0,2,0
+npm run render -- --view street --dry --orbit 90   # parse camera, print eye/target/fov, no Chromium
+npm run test:camera
 npm run accept:camera
 
 # board capture (#1752) — inject state, screenshot DOM shop board (no engine)
@@ -265,6 +268,19 @@ returned / phase appear in the HUD.
 **This is the WebGL 2.0 end-to-end check** CLAUDE.md's 3D rule asks for, in a form that
 runs without a screen. It is not a second renderer: no geometry, matrices, lighting or
 shading are authored in `bin/render_street.cljs`, only GL plumbing.
+
+Camera flags (#1751) aim that same IR — not a second view matrix:
+
+| flag | effect |
+|---|---|
+| `--orbit DEG` | add degrees to the default azimuth (180 looks from the back) |
+| `--zoom N` | `>1` pulls in, `<1` pushes out (fitted range /= zoom) |
+| `--fov DEG` | vertical FOV; also used for the fit |
+| `--eye X,Y,Z` | absolute eye (wins over orbit/zoom) |
+| `--target X,Y,Z` | absolute look-at (wins over the solved target) |
+
+An eye that lands underground (`y ≤ 0`) or inside the fit volume exits ≠ 0 with a clear
+message — there is no silent clamp on tiny zoom.
 
 Two limits, printed on every run: the **shadow pass is not run** (a 1×1 fully-lit depth
 texture is bound instead, so the image is the lit pass without shadowing), and the GPU is

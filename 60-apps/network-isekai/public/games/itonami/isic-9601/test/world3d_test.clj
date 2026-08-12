@@ -215,11 +215,37 @@
            (eye-range (w3/camera aspect {:fov 60.0}))))))
 
 (deftest absolute-eye-and-target-win-over-the-rig
-  (let [eye [12.0 40.0 -8.0]
+  ;; eye must sit outside the fit volume — [12 40 -8] is inside and is refused
+  (let [eye [12.0 40.0 -80.0]
         target [1.0 2.0 3.0]
         f (w3/render-ir fresh aspect {:eye eye :target target :orbit 90.0 :zoom 3.0})]
     (is (= eye (get-in f [:globals :eye])) "absolute :eye wins over orbit/zoom")
     (is (= target (get-in f [:globals :target])))))
+
+(deftest underground-eye-is-refused
+  (let [ex (try (w3/camera aspect {:eye [0.0 -1.0 50.0]})
+                (catch Exception e e))]
+    (is (instance? Exception ex))
+    (is (re-find #"underground" (ex-message ex)))
+    (is (= :underground (:reason (ex-data ex))))))
+
+(deftest eye-inside-fit-volume-is-refused
+  ;; extreme zoom pulls the rig into the fit sphere; silent 1e-6 clamp used to succeed
+  (let [ex (try (w3/camera aspect {:zoom 100.0})
+                (catch Exception e e))]
+    (is (instance? Exception ex))
+    (is (re-find #"fit volume" (ex-message ex)))
+    (is (= :inside-fit (:reason (ex-data ex)))))
+  (let [ex (try (w3/camera aspect {:eye [0.0 1.0 0.0]})
+                (catch Exception e e))]
+    (is (re-find #"fit volume" (ex-message ex)))
+    (is (= :inside-fit (:reason (ex-data ex))))))
+
+(deftest non-positive-zoom-is-refused-not-clamped
+  (let [ex (try (w3/camera aspect {:zoom 0.0})
+                (catch Exception e e))]
+    (is (re-find #":zoom" (ex-message ex)))
+    (is (= :bad-camera-number (:reason (ex-data ex))))))
 
 (deftest overridden-camera-still-projects-and-picks
   ;; ADR acceptance: pick/project agree on the overridden IR — reuse the shop loop
