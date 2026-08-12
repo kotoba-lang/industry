@@ -186,7 +186,7 @@ readiness を区別する。
 - canonical schema、kernel、adapter、receipt migration の実装作業が必要になる。本 ADR と README
   の着地だけでは未移行 component の実装完了を意味しない。
 
-## Implementation status — R0–R4 landed（2026-08-12）
+## Implementation status — R0–R5 landed（2026-08-12）
 
 authority semantic ownerである `kotoba-lang/aiueos` に最初の実装sliceを着地した
 （PR #145、merge `f4c492a53ce81d212089ced5c1154f0975018d1e`）。superprojectの
@@ -261,11 +261,26 @@ R4は `network-awai/net-kotobase` PR #421、merge
   `9286dc57-3394-4a1d-8f13-9234bded412b`、gateway Version ID
   `e5fddd97-5113-4e83-94cd-7e751dc43758`へdeployし、両healthと未認証audit 401をlive確認した。
 
-R4の `basis_cid` はcontent addressだが、canonical `/v2/query` が検証するpublic signed commit
-envelopeではない。従ってR4を「署名Grant検証」と表現してはならない。**未着地**なのは、signed
-authority frontierのprovisionとcanonical query、payment Settlement→Entitlement Grant、
-UIのchallenge/step-up projection、canonical signed wire envelope、audit以外のroute固有policy、
-receiptのtransparency-log anchorである。既存APIは壊さず段階移行する。
+R5は `network-awai/net-kotobase` PR #424、merge
+`701911e3b453b98dd348cc5de1331f240c2065e3` として着地した。R4が明示したsigned frontier gapを、
+server-selected latest headを新設せずに閉じるtenant単位migrationである。
+
+- `PUT /v1/authority/frontier` はtenant固有resourceのscoped CACAO、tenant自身または明示operator、
+  nonce未使用、`previous_basis_cid`一致を要求する。operator allowlistは空が既定である。
+- supplied signed commitをcanonical `/v2/query`で検証し、同じ `basis_cid` にboundした完全Grant
+  snapshotをtenantのsequenced、content-addressed、append-only IStore streamへ記録する。
+- concurrent stale eventは履歴に残すがactive pinにしない。rollback/replayは409である。
+- pin済みtenantはそのsnapshotをauthority sourceにし、empty basisはdeny、malformed/corrupt/read
+  failureはfail closedにする。pin未作成tenantだけがcompatibility projectionを使う。
+- graph author signature、tenant selection capability、decision receiptを別artifactとして保ち、
+  signer、selector、enforcerを同一概念へ潰さない。
+- evidence: gateway 404 tests / 1938 assertions、47 registered namespaces、93-input bundle manifest、
+  worker/entry release build、二回build SHA-256一致。本番gateway Version ID
+  `91c9b977-33e1-422c-a71e-b940abf5c732`。healthとunauthenticated provision 401をlive確認した。
+  operator allowlistとtenant pinは未設定であり、production tenant activationは0件である。
+
+**未着地**なのはpayment Settlement→Entitlement Grant、UI challenge/step-up projection、audit以外の
+route固有policy、receipt transparency-log anchorである。既存APIは壊さず段階移行する。
 
 ## One-line rule
 
