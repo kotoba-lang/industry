@@ -25,6 +25,12 @@ Reusable language or protocol artifacts leave Etzhayyim for `kotoba-lang`; opera
 
 The remaining `com-etzhayyim-*` actors and organism applications were reviewed and retained because their identity is specifically Tamaki/Etzhayyim rather than a shared library or a general business application.
 
+The final live GitHub inventory at session closure contains 75 Etzhayyim repositories: 68 active and 7 archived. The 68 active repositories comprise 33 normalized `actor-*` repositories, 12 retained legacy-name actor repositories, 20 organism applications, and the three core/meta repositories `tamaki`, `root`, and `architecture-framework`.
+
+The 12 retained legacy-name actors are `com-etzhayyim-abaki`, `com-etzhayyim-hibiki`, `com-etzhayyim-hirameki`, `com-etzhayyim-minori`, `com-etzhayyim-tawami`, `com-etzhayyim-tomoshibi`, `com-etzhayyim-torifune`, `com-etzhayyim-tsumugi`, `com-etzhayyim-umisachi`, `com-etzhayyim-wakai`, `com-etzhayyim-yoro`, and `com-etzhayyim-yudane`. The 20 retained applications are `com-etzhayyim-app-explorer`, `com-etzhayyim-app-hakkou`, `com-etzhayyim-app-kabi`, `com-etzhayyim-app-karma`, `com-etzhayyim-app-ki`, `com-etzhayyim-app-kinoko`, `com-etzhayyim-app-kiyome`, `com-etzhayyim-app-kobo`, `com-etzhayyim-app-koke`, `com-etzhayyim-app-mold-allergy`, `com-etzhayyim-app-omikuji`, `com-etzhayyim-app-open-ossekai`, `com-etzhayyim-app-organism`, `com-etzhayyim-app-organism-viz`, `com-etzhayyim-app-otakiage`, `com-etzhayyim-app-resources`, `com-etzhayyim-app-saikin`, `com-etzhayyim-app-seibutsu`, `com-etzhayyim-app-seigen-cue`, and `com-etzhayyim-app-shinka`.
+
+These 32 legacy-prefixed active repositories are not migration gaps. No additional repository is currently approved or identified for transfer from Etzhayyim to `cloud-itonami` or `kotoba-lang`. The 7 archived repositories are historical retention and lifecycle-policy work, not ownership-migration backlog.
+
 ### Kotobase boundary
 
 The externally operated Kotobase product/service plane belongs to `net-kotobase`. Portable Kotoba/Kotobase engine, storage, protocol, and client libraries remain in `kotoba-lang`. Broader AWAI company and operator repositories remain in `network-awai`.
@@ -55,6 +61,7 @@ The root manifest now declares the `net-kotobase` remote, group, organization/do
 - The nine-repository Kotobase organization move landed in root PR #2100 (`08c943b06603e3aaa7bf48650e8067e3ce01a02f`).
 - The final post-transfer control-plane pin advance landed in root PR #2101 (`a957eb96b1211d4b07d0bbcea3e2afc280c52771`), pinning `fabd8408eccbfd79958dea55eafd509ffae85383`.
 - At closure, each of the nine moved Kotobase project pins matched its canonical GitHub repository tip, and fleet-db matched the west projection.
+- A final live GitHub organization inventory reported 75 Etzhayyim repositories (68 active and 7 archived), with zero confirmed ownership-migration gaps.
 
 This is repository, naming, manifest, and fleet-placement evidence. It is not evidence that every production route, deployment, credential, or external integration was exercised after transfer; those remain service-specific verification work.
 
