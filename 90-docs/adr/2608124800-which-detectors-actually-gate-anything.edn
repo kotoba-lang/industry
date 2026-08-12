@@ -74,6 +74,40 @@ stamped with root's sha while measuring something else**, so re-running the same
 root sha on a different day gives a different verdict. It measures HEAD, not the
 pin, so **it is not attributable to any commit.**
 
+**CLOSED — green for the first time since 2026-08-03, and one of the four was
+the dependency rather than the declaration.**
+
+`provider` declared nothing wrong: `io-ipld` was in `:deps`, but **zero `src`
+namespaces reference it** — it appears in exactly one test, as an *independent
+oracle* checking our own canonical wire format. It is not shipped. **It was
+moved to the `:test` alias rather than added to the declaration**, beside
+another dependency already test-only for the same reason. Making the check agree
+with a mistake would have been the easier fix and the wrong one.
+
+The other three were stale declarations, each dependency confirmed as a real
+`src` require. One had drift **in both directions**: a commit swapped one
+dependency for another and never touched the declaration.
+
+**One judgement call, and the way it was handled is the point.** `dag-cbor` sits
+in `:deps` while no `src` namespace references cbor — it is a deliberate co-pin
+at the same sha another dependency already resolves, so two layers agree on the
+codec byte for byte instead of inheriting a transitive pin. **Deleting it would
+also have made the gate green, and would have quietly handed that choice away.**
+It was declared instead, with the reasoning in the commit — **reviewable rather
+than buried.**
+
+**The later assertions ran for the first time since 2026-08-03, and they pass.**
+Role direction, acyclicity and prefix declarations all executed and none failed;
+the three new edges are permitted without an exception. One non-failing note
+remains: a repo declaring an authority library while shipping no git deps has
+that claim **reported as unverified rather than as passed.**
+
+**Greenness here is still not a property of any commit.** The same root sha will
+give a different verdict tomorrow if any of those 23 repos moves — including
+going red again with no root commit involved. And it measures HEAD, **not the
+west pin**, so it says nothing about the tree this superproject actually builds
+against.
+
 ### `root-observatory-registry` — five of nine are the gate being stale
 
 A 2026-08-11 rename moved repo names to the role plane and added a `:repo` key,
