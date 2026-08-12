@@ -141,36 +141,15 @@
    一度ログの出現回数から推測して `:thread-kit` を誤って混ぜ、ratchet の逆方向検査に
    捕まった。要約から実体を起こしてはいけない、という同じ誤りを 1 日に 3 回やった。
 
-   #### 欠陥 A — cljs backend が定義しない補助を emit する
-
-   コンパイルは成功するのに emit された cljs が存在しないシンボルを呼び、nbb が
-   `Unable to resolve symbol` で落ちる。**backend が「できる」と言ってできない**類で、
-   拒否（できないと言う）とは性質が違う。
-
-   ```
-   i64-shift-left / i64-shift-right : shift-kit, shift-right-kit, thread-kit
-   u64-shift-right                  : when-let-u64-kit, loop-deep-kit
-   string-code-point-at             : string-code-point-kit
-   ```
-
-   `:kotoba-cljs` を 19 entry が主張しながら実行証拠がゼロだった間、**これは見えて
-   いなかった**。harness の存在理由そのもの。`cljs-emitted-but-unrunnable` に登記したが、
-   **縮む方向にしか動かしてはならない**（緑にするために足すのは禁止）。
-
-   #### 欠陥 B — 自分の登記が嘘だった
-
-   拒否 register を 14 件で書いたが実際は 18 件。**truncate された probe 出力の件数だけ見て
-   名前を写した**ため、件数と名前が食い違ったまま登記していた。実行して初めて突き合わされた。
-   register を要約行から起こしてはいけない。
-
    #### 現在の branch 状態
 
    `agent/cljs-parity-harness-wip` の tip は `31e6243`。3 回の実行で両 register を
    実測値に確定させてあり、残る赤は `:thread-kit` の divergence **1 件だけ**。
    その赤は欠陥の表明なので、消さずに残してある。merge するなら backend を直してから。
 
-   #### 実行の注意所要は約 60 cljs compile +
-   42 wasm32 compile + 42 nbb process で、10 分の上限を超えることがある。
+   #### 実行の注意
+
+   所要は約 60 cljs compile + 42 wasm32 compile + 42 nbb process で、10 分の上限を超えることがある。
    `resource-guard` は lock を待たず即 exit するので、待ち合わせを呼ぶ側で書くこと
    （1 回試して exit 0 を見ると空振りを成功と誤読する。実際 3 回誤読した）。
 
@@ -181,7 +160,8 @@
    for i in $(seq 1 60); do out=$(node <root>/scripts/resource-guard.mjs run build -- \\
      clojure -M:test 2>&1); echo \"$out\" | grep -q 'already running' && sleep 45 || break; done
    ```
-   通れば merge、不一致があれば**潰さずに名指しで記録**してから merge。
+   **緑にしてから merge すること。** 現時点の赤は `:thread-kit` の divergence 1 件で、
+   それは backend の欠陥なので register を足して消してはならない。
 
    ### 2. amu suite の 1 failure
 
