@@ -185,14 +185,37 @@
    :flag-safety-concern :flag
    :flag-contamination-concern :flag})
 
-(def base-payout
-  "What a committed act at position `i` of `n` pays. Front-loaded like a real deposit at
-  drop-off, with the last station settling the balance."
-  [5 4 4 7 14])
+(def role-payout
+  "What a committed act pays, by station role. Front-loaded like a real deposit at
+  drop-off, with settle collecting the balance.
 
-(def base-upgrade
-  "First-upgrade cost by station position."
-  [40 60 90 140 110])
+  Keyed by role rather than by position index: a positional table of length 5 underpays
+  settle on every 4-station district (it hands settle the act seat's 7). Same numbers the
+  laundry always had — entry/verify/middle/act/settle = 5/4/4/7/14 — applied through the
+  seats `logic/verify-station`, `act-station`, and `settle-station` name."
+  {:entry 5 :verify 4 :middle 4 :act 7 :settle 14})
+
+(def role-upgrade
+  "First-upgrade cost by station role. Same seats as `role-payout` — positional indexing
+  used to charge a 4-station settle the act seat's 140 instead of 110."
+  {:entry 40 :verify 60 :middle 90 :act 140 :settle 110})
+
+(defn- station-role
+  "Role of the station at index `i` in a chain of length `n`.
+
+  Mirrors `logic/verify-station` (index `(min 1 (dec n))`), `act-station` (`(- n 2)`), and
+  `settle-station` (last). When act and verify collide — the 3-station waste-collection
+  chain — act wins, so the irreversible seat keeps its payout and upgrade."
+  [n i]
+  (let [verify-i (min 1 (dec n))
+        act-i (- n 2)
+        settle-i (dec n)]
+    (cond
+      (= i settle-i) :settle
+      (= i act-i) :act
+      (= i verify-i) :verify
+      (zero? i) :entry
+      :else :middle)))
 
 (defn spec
   "The board for `district-id`. nil when there is no such district, or no presentation for
@@ -243,10 +266,10 @@
          ;; the last station is the one that settles; the one before it is the act
          :evidence-required (mapv (fn [s] (:label s)) stations)
          :payout (into {} (map (fn [i] [(nth keys' i)
-                                        (nth base-payout (min i (dec (count base-payout))))])
+                                        (get role-payout (station-role n i))])
                                (range n)))
          :upgrade (assoc (into {} (map (fn [i] [(nth keys' i)
-                                                (nth base-upgrade (min i (dec (count base-upgrade))))])
+                                                (get role-upgrade (station-role n i))])
                                        (range n)))
                          :approver 220)}))))
 
