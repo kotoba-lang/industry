@@ -212,13 +212,87 @@ follow (reads work, writes fail — resolve slugs through `gh api repos/<slug> -
 repo, reported not hidden (webgpu has 67 local branches, slides over 90).
 
 Skipped and always reported: credential-looking paths, build junk, files over 2 MB,
-git-annex/DataLad datasets. Executable bits preserved. Nothing is ever deleted — archive
-to `.git/stash-archive-<date>/` first, then add.
+git-annex/DataLad datasets, **rename residue (below)**. Executable bits preserved. Nothing
+is ever deleted — archive to `.git/stash-archive-<date>/` first, then add.
 
 **Deletions are never applied** — a ` D ` entry comes from a working tree that may be far
 behind, and replaying it can delete work someone else added. **Re-runs must be idempotent**
 since landing does not remove the local copy: compare local blob shas against the base tree
 and drop what already matches.
+
+### A renamed-away path is absent from `main` for exactly the reason a new path is
+
+SSoT: `:residue-gate` in the edn. Gate: `scripts/rename_residue.cljs`, entry point
+`residue-gate!` in `cleanup-land.cljs`, proof `nbb scripts/rename-residue-test.cljs`
+(offline; `--repo <dir> --base <ref>` runs it against a real checkout).
+
+`:additive` merges on one argument: *no path of this name exists on the default branch, so
+no existing line is rewritten*. A directory rename destroys that argument precisely. The
+moment `worker/` becomes `clj-edge/`, every old path stops existing on `main` — that is
+what a rename **means**. Any stale copy left in the shared checkout at the old address
+therefore satisfies `:additive` perfectly and gets committed, PR'd and merged as new work.
+
+Measured on `net-kotobase/control-plane` (found 2026-08-12):
+
+| commit | date | effect |
+|---|---|---|
+| `04e1514` | 08-03 | `worker/` → `kotobase-edge/`, 100 %-similarity renames, 48 → 0 tracked |
+| `5a6a55b` | 08-04 | `clj-edge/` → `kotobase-api-gateway-cljs/`, same, 136 → 0 |
+| `8f7fbaf` | 08-05 | **`cleanup: land untracked WIP (1 files)`** — `worker/` 0 → 1 |
+| `d96f18b` | 08-06 | **`cleanup: land untracked WIP (16 files)`** — `clj-edge/` 0 → 14 |
+
+Two cleanup passes put 17 files back under the old names, one and two days after the moves
+were made deliberately. `clj-edge/src/kotobase/site_skin.cljc` was byte-identical to the
+revision immediately *before* the commit that superseded its design — the old doctrine
+restored a week after it was argued out. `worker/src/edge-app.generated.mjs` is a build
+artifact: `.gitignore` can only name the live path
+(`kotobase-api-gateway/src/edge-app.generated.mjs`), so the copy at the pre-rename address
+was never excluded. Deleted again in `3c99bd5` (merge `0ba825a`). **The files were the
+symptom; the cleanup pass is the bug.**
+
+**What separates residue from WIP is history, not the disk.** On disk they are identical —
+untracked files with real content — and `git status` does not consult history. Three
+signals, cheapest first:
+
+1. the path itself is recorded as a **rename source** reachable from base;
+2. the content is **already in the object database** at that same path;
+3. an **ancestor directory was moved away wholesale** and has no live path on base.
+
+Signal 3 closes the `.gitignore` hole: a generated file is in nobody's history, so 1 and 2
+miss it, but it has a dead parent. Follow the rename chain forward (`worker/src/` →
+`kotobase-edge/src/` → `kotobase-api-gateway/src/`, two hops measured) and run
+`git check-ignore` on the corresponding live path. A file the repo declares it ignores at
+its live address is not WIP at its dead one.
+
+**Three verdicts. No silent-drop path** — a cleanup pass that quietly discarded files would
+be worse than the bug being fixed:
+
+| verdict | meaning | action |
+|---|---|---|
+| `:residue` | the bytes are already in this repo's object database, or the repo declares it ignores them | dropped from `:additive`, reported by name with the live path. Nothing is deleted from the working tree. |
+| `:suspect` | the path is dead but the content is **not** in history — possibly a real edit against a stale copy | demoted to `:review` (draft PR, human decides) |
+| `:wip` | neither | stays `:additive` |
+
+Under that split the incident is fully prevented: 17/17 classified `:residue` (16 by rename
+source, 1 by the ignore probe), nothing reaches `main`.
+
+**Which ref judges it.** Live paths come from the `base-blobs` tree cleanup-land already
+fetched from the GitHub API. The commit graph is read locally: `<remote>/<base>` when it
+resolves, otherwise `HEAD`. `HEAD` suffices because an untracked leftover at a pre-rename
+path can only exist in a checkout at or **after** the rename — before it, those paths are
+tracked, not untracked. The fallback is load-bearing, not decoration: measured 2026-08-12,
+only **43 of 121** `orgs/kotoba-lang/*` checkouts resolve `<remote>/main` (west fetches
+into `refs/west/*`), so a gate reading liveness from local refs alone would sit silent in
+two thirds of the fleet. If neither resolves, the gate **warns and skips** — never reports
+"no residue" for a question it could not ask.
+
+Cost: 3.8 s for the incident's 17 candidates (`renames-seen=496`; renames via
+`-M --diff-filter=R`, historical blobs via one `--raw` process instead of one
+`rev-parse` per commit). False positives measured by scattering 40 genuinely new files
+through live directories of that same rename-heavy repo: residue 0, suspect 0, wip 40.
+
+Never: treat "not on `main`" as proof a file is new; pass a skipped check off as a clean
+one; auto-exclude `:suspect` alongside `:residue`; delete anything from the working tree.
 
 ### DO-NOT-MERGE PR は「駐車場」であって判定ではない
 
