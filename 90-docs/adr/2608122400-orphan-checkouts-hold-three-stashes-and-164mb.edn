@@ -19,9 +19,46 @@ can be made on evidence rather than on the word `orphan`.
 
 ## Result
 
-- **37 SAFE** -- hold nothing that exists nowhere else
-- **4 HOLD WORK**
+- ~~37 SAFE~~ -> **32 SAFE**
+- ~~4 HOLD WORK~~ -> **9 HOLD WORK**
 - **0 UNKNOWN**
+
+**Corrected 2026-08-12, after the archiving pass.** The audit asked `git stash
+list` and answered correctly. It did not ask about `.git/stash-archive-*/`, and
+those are the OPPOSITE of a stash: they are patches that earlier cleanup passes
+deliberately exported so the work could not be lost. They are plain files under
+`.git/`, so no git command reports them and the audit never saw them.
+
+12 of the 37 carry archive directories; **5 carry at least one non-empty patch**,
+21 patches in total:
+
+| orphan | non-empty patches | bytes |
+|---|---|---|
+| `gftdcojp/ai-gftd-mangaka` | 6 | ~145 MB |
+| `gftdcojp/cloud-manimani` | 4 | 83,580 |
+| `gftdcojp/ai-gftd-dougaka` | 4 | 76,460 |
+| `kotoba-lang/kotoba-rad` | 4 | 25,756 |
+| `kotoba-lang/kotoba-git` | 3 | 17,955 |
+
+Four of the five registered siblings hold **zero** archives, so that content
+exists only in the orphan. The fifth looked like a duplicate -- `kotoba-git` and
+`bonsai` have archives at three matching relative paths -- but comparing by
+`(archive directory, filename)` rather than by filename alone shows all three
+**DIFFER**. Each checkout archived its own working state on those dates. So all
+five hold unique content.
+
+A first comparison here got this wrong in the safe direction and is worth
+recording: every one of those files is named `tracked-modifications.patch`, so
+matching on basename picked the same sibling file three times and reported three
+differences that were really one. Name collisions across dated directories make
+basename matching meaningless, and it fails loudly here only by luck.
+
+The remaining 7 of the 12 hold only `index.txt` files with no patch content, so
+their verdict is unchanged.
+
+**Deleting an orphan destroys its `.git/`, and with it any archive inside.** The
+mechanism that exists to make deletion recoverable is itself deleted by the
+deletion.
 
 Two facts hold across all 41, and both are stronger than expected:
 
@@ -134,6 +171,26 @@ names and resolve only through those redirects.
 Re-resolve each stash by SHA at drop time, since a concurrent session can shift
 `stash@{0}`. The archives above mean a drop is now recoverable, which it was
 not before.
+
+**And move the 21 archived patches somewhere that survives the deletion.**
+Copying them out is cheap and unblocks 5 of the 9; the 145 MB in
+`ai-gftd-mangaka` needs a size decision, and per the workspace rule on large
+binaries that belongs in B2/DataLad rather than in a `.git/` directory.
+
+## What this correction is an instance of
+
+Twice in one day a measurement was correct about the question it asked and wrong
+about the question that mattered. Earlier: a grep proved a token NAME was absent
+and was read as proving the CAPABILITY was absent, when the capability had
+landed under a different name. Here: `git stash list` proved there were no
+further STASHES and was read as proving there was nothing to lose, when what
+there was to lose had been deliberately moved out of the stash system precisely
+so it would not be lost.
+
+Both share a shape. The tool answers about its own domain, the conclusion is
+drawn about a wider one, and the gap is invisible because the measurement is
+accurate. What catches it is not a better tool -- it is asking, before quoting a
+number, what the number would have missed.
 
 For 4, decide whether 164 MB of regenerable audio is worth keeping. If it is, it
 belongs in B2/DataLad (skill `large-binary-datalad`), not in an orphan checkout.
