@@ -107,13 +107,39 @@
    **初回の全件実行は完了した（153 pass / 18 fail）。harness は動き、欠陥を 2 種類
    見つけた。**
 
-   #### 実測（2026-08-12、pure-product 60 case）
+   #### 実測（2026-08-12、pure-product 60 case、3 回回して確定）
 
    | | 件数 |
    |---|---|
    | `:cljs-kotoba-v1` が拒否（typed feature ゲート） | **18** |
-   | コンパイルは通るが nbb で実行できない | **6** |
+   | コンパイルは通るが nbb で実行できない | **5** |
+   | **コンパイルも実行も通り、答えが違う** | **1** |
    | KIR と一致 | **36** |
+
+   #### 最大の発見 — `:thread-kit` は 336 を返す（KIR と manifest は 36）
+
+   **落ちる欠陥ではなく、黙って違う答えを出す欠陥。** 旧 suite は KIR と wasm32 を
+   比べ、各々を manifest の literal と照合していたので、**cljs を何とも比べていない
+   構造上、これは見えようがなかった**。`:kotoba-cljs` を 19 entry が主張していた間、
+   その主張の中身がこれだった。
+
+   **これは register に載せていない。** `cljs-refused` は「主張していない仕事を断る
+   backend」、`cljs-emitted-but-unrunnable` は「主張した仕事ができない backend」で、
+   どちらも到達範囲の記述である。**仕事を主張し、完了し、違う数を返す**のは正しさの
+   欠陥で、register に入れれば suite は緑になり、次の読み手に「ここでは 336 が許容
+   される」と教えることになる。
+
+   したがって **branch は意図的に赤のまま**で、行を足して緑にしてはならない。
+   cljs backend を直すか、divergence を明示的に抱える判断をオーナーがするか、
+   どちらかが要る。
+
+   #### 実行不能な 5 件（別種）
+
+   emit された cljs が定義しないシンボルを呼び、nbb が `Unable to resolve symbol`
+   で落ちる。観測したシンボルは `i64-shift-left` `i64-shift-right` `u64-shift-right`
+   `string-code-point-at` の 4 つ。**どの case がどれを出したかは対応付けていない** ——
+   一度ログの出現回数から推測して `:thread-kit` を誤って混ぜ、ratchet の逆方向検査に
+   捕まった。要約から実体を起こしてはいけない、という同じ誤りを 1 日に 3 回やった。
 
    #### 欠陥 A — cljs backend が定義しない補助を emit する
 
@@ -137,9 +163,13 @@
    名前を写した**ため、件数と名前が食い違ったまま登記していた。実行して初めて突き合わされた。
    register を要約行から起こしてはいけない。
 
-   #### 未完
+   #### 現在の branch 状態
 
-   両 register を実測値に直した版での**再実行が未完**。所要は約 60 cljs compile +
+   `agent/cljs-parity-harness-wip` の tip は `31e6243`。3 回の実行で両 register を
+   実測値に確定させてあり、残る赤は `:thread-kit` の divergence **1 件だけ**。
+   その赤は欠陥の表明なので、消さずに残してある。merge するなら backend を直してから。
+
+   #### 実行の注意所要は約 60 cljs compile +
    42 wasm32 compile + 42 nbb process で、10 分の上限を超えることがある。
    `resource-guard` は lock を待たず即 exit するので、待ち合わせを呼ぶ側で書くこと
    （1 回試して exit 0 を見ると空振りを成功と誤読する。実際 3 回誤読した）。
