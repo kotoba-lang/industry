@@ -66,7 +66,8 @@ from the other direction.
 
 ## Rebuildability: the inputs are unusually good, bit-reproduction is impossible
 
-At the build commit the tree is complete — 37 workspace members, 41 source files
+At the build commit the tree is complete — **36** workspace members (33 crates +
+3 examples; an earlier count of 37 here was wrong), 41 source files
 in this crate — and the lockfile is **v4 with 1,056 packages, 1,020 from
 crates.io and `source = \"git+\"` appearing exactly ZERO times.** No git
 dependencies is the single best fact available: crates.io is immutable and
@@ -197,6 +198,44 @@ header to a server with the secret unset is a complete no-op, so all seven
 bridges and murakumo's write path can be updated and shipped harmlessly; only
 once every caller demonstrably sends it does enabling the server side become low
 risk. **The other order breaks everything at once.**
+
+## DONE: the source has an address
+
+**`kotoba-lang/kotoba-server`**, tip `c4dada2b`, registered as merge
+`eff53f23c3d` with `groups: [archived]` — so a default `west update` does not
+fetch it, since the group filter excludes that group.
+
+The recommendation was verified before it was executed rather than taken from
+this document. ADR-2607072000 makes three decisions — cljc as the default for
+NEW implementation, an explicit refusal of wholesale retroactive rewrites, and
+`kotoba-server` named as a gap deliberately not started pending a dedicated ADR
+with staged cutover and **rollback**. Preserving already-written source of an
+already-running binary is neither new implementation nor a rewrite, and since
+that third decision demands rollback, **which presupposes an identifiable
+artifact, preservation serves the policy.** Not a reversal.
+
+**Scope was established, not guessed**: the crate has **19 direct
+path-dependencies** on siblings and cannot build alone, so the whole workspace
+is preserved — 806 files, 13 MB, and **all 806 blobs match upstream git object
+hashes exactly.** One 39 MB crate was excluded after verifying it is not a
+member, not a path-dependency of any member, and absent from the lockfile.
+
+Registered through the sanctioned path: `repos.edn` edited surgically, then
+`gen-west-manifest.cljs --entry`. **`west.yml` was never hand-edited** and the
+diff is exactly 7 generated lines. Actions disabled on the new repo per the
+fleet-CI policy, and the preserved `.github/` sits under a subdirectory where
+GitHub cannot execute it.
+
+**Two corrections to my own account.** The workspace has **36** members, not 37.
+And I reported this repo as **empty (0 KB)** during a close — that was **stale
+GitHub size accounting after the initial push**; the content had landed, and
+re-checking rather than re-pushing is what established it. The tree reads 807
+blobs, 41 `.rs` files, 2,712 KB.
+
+**One decision left open deliberately: the repo is private.** Upstream
+`kotoba-lang/kotoba` is public, so this source is already public — but the README
+discusses the authentication weaknesses recorded in ADR-2608123600, and **making
+a repo public is outside standing authorization.** That is the owner's call.
 
 ## What could not be determined
 

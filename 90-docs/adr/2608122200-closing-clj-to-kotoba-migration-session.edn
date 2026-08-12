@@ -679,7 +679,23 @@ branch had not been pushed**, so a fresh clone could not find any of it. Pushed:
 `babf541..481b085`. HEAD unmoved, working tree clean before and after. **The
 bytes now survive the loss of this machine, which was the entire point.**
 
-### One repository exists and holds nothing
+### CORRECTED: the repository was not empty, and is now populated and registered
+
+I reported `kotoba-lang/kotoba-server` as empty at 0 KB. **That was stale GitHub
+size accounting after an initial push** — the content had already landed. It is
+now populated and registered (`c4dada2b`, merge `eff53f23c3d`,
+`groups: [archived]`), with the whole 806-file workspace preserved because the
+crate has 19 direct path-dependencies and cannot build alone.
+
+**The lesson is the one this session kept relearning**: I read a number from an
+API and drew a conclusion about the thing it describes. Re-checking rather than
+re-pushing is what caught it — and re-pushing would have been the natural
+response to `0 KB`.
+
+Left open deliberately: **the repo is private**, and making one public is
+outside standing authorization. See ADR-2608124000.
+
+### (original, now corrected) One repository exists and holds nothing
 
 `kotoba-lang/kotoba-server` was **created** (private, 0 KB, default `main`) by an
 agent stopped before it could populate or register it. It is **not in
