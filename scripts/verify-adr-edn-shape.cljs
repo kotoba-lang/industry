@@ -124,9 +124,18 @@
           ;; Drop `--tail` AND its value BY INDEX. Removing the value by
           ;; EQUALITY (the first draft) needs a sentinel default, and a stray
           ;; NUL in that sentinel made grep treat this file as binary.
+          ;;
+          ;; Guard `ti` for ABSENCE. `.indexOf` returns -1 when `--tail` was not
+          ;; passed, and `(inc -1)` is 0 — which excluded index 0, i.e. the file
+          ;; itself, so the plain `verify-adr-edn-shape.cljs <file.edn>` form
+          ;; this script's own usage line documents could never run: it printed
+          ;; that usage and exited 1 no matter what file it was handed.
+          ;; `--self-test` did not catch it because it calls `check` directly
+          ;; and never exercises this argument parsing. Measured 2026-08-13.
           file (first (keep-indexed (fn [k v]
                                       (when (and (not (str/starts-with? v "--"))
-                                                 (not= k (inc ti)))
+                                                 (not (and (nat-int? ti)
+                                                           (= k (inc ti)))))
                                         v))
                                     argv))]
       (if-not file
