@@ -120,8 +120,28 @@ advance leaves the fleet reading a stale tree** -- the exact failure this sessio
 spent the day fixing. The next agent must check for their results and advance
 pins.
 
-1. widen `verify-vendored-copies` to all header spellings and non-`src` vendor
-   dirs (superproject; at least 7 declared-vendored files are currently invisible)
+1. ~~widen `verify-vendored-copies`~~ -- **DONE, merge 2d9a2de.** 24 -> 31 files
+   across 4 orgs. No verdict changed for any of the 24 already reported, so
+   nothing was lost by widening. `grep -rl VENDORED` finds 32; the one the scan
+   correctly does NOT report is a file that merely DOCUMENTS the vendored copy
+   beside it -- header matching now starts at the VENDORED token so a
+   `copied from` sentence elsewhere cannot be read as a provenance claim.
+
+   Four of the newly-visible files (`cypher/`, `graphql/`) declare no pin and
+   put their provenance INSIDE the `ns` docstring, where the `start at the first
+   (ns` subtraction cannot reach -- so the header counts itself as drift. They
+   are permanently STALE by design (the namespace rename is deliberate,
+   ADR-2608039970) and the report now says so on the line rather than letting
+   the number read as code drift. `no pin declared` is also now distinct from
+   `pin unverifiable`: never named one is not the same as named one we could not
+   read.
+
+   Caveat the agent raised and I am keeping: CURRENT is measured against each
+   library's LOCAL CHECKOUT HEAD, which is only as fresh as the last
+   `west update`. Three libraries were behind their pins on disk; zero commits
+   touched any measured file in between, so the numbers hold at the pin too --
+   but that had to be checked, not assumed. Same class as the other three
+   checkout-vs-repo errors this session.
 2. ~~refresh `wasm-webcomponent/.../kami_host.cljc`~~ -- **DONE, merge 7d78c84,
    pin advanced.** Refreshed byte-for-byte to `dbc25ebc6`. Safe because the
    upstream change is purely additive 3D support: the `ns` requires are
@@ -160,6 +180,27 @@ pins.
    narrow scan said 5), real collisions back to 8 with correct owner sets. A repo
    that declares nothing keeps every tree -- unknown must read as `look`, not as
    `skip`.
+
+   **Still OPEN, and the obvious fix was measured and rejected.** The collision
+   detector still walks only directories named exactly `src`, so 21 `src-*`
+   trees holding 51 Clojure files are invisible to it -- among them
+   `wasm-webcomponent/src-cljs/vendor/kotoba/kami_host.cljc`, whose namespace
+   `kotoba.kami-host` is also defined in `kotoba-lang/kotoba/src/`.
+
+   I tried making the DECLARED roots the source of the list rather than a filter
+   over a `src`-named scan, which would have ended the naming question outright.
+   It regressed, measurably: some repos declare `:paths [\".\"]`
+   (`kami-genre-base-systems`' sub-projects), which makes the repo root a source
+   root and manufactures namespace paths that carry their own prefix --
+   `src/kotoba/lang/package_registry.cljc` appeared as a finding. Duplicate-
+   registration suppression also collapsed from 19 to 4, because newly-visible
+   trees added a third owner with a different root commit and broke the
+   all-owners-share-a-root test. Reverted rather than landed.
+
+   So the fix needs to reject `.` as a root and re-derive suppression per owner
+   pair rather than per namespace. Recording the failed attempt so the next
+   person does not spend the same hour discovering that declarations are not
+   uniformly usable as roots.
 
    Left undone, and named rather than silently absorbed: the three repos deviate
    from their own family convention. `plugin-host` and `project` scope their E2E
