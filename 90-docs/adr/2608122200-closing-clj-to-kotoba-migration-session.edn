@@ -120,11 +120,20 @@ advance leaves the fleet reading a stale tree** -- the exact failure this sessio
 spent the day fixing. The next agent must check for their results and advance
 pins.
 
-1. widen `verify-vendored-copies` to all header spellings and non-`src` vendor
-   dirs (superproject; at least 7 declared-vendored files are currently invisible)
+1. ~~widen `verify-vendored-copies` to all header spellings and non-`src` vendor
+   dirs~~ -- **DONE.** The walk now accepts `src-*` as well as `src` (21 extra
+   directories against 4,717 named `src`), and the header parser knows five
+   spellings instead of two: the two parenthesised forms it already had, plus
+   `<org>/<repo> @ <sha>` (no path -- inferred from where the copy sits under
+   its own source root), a two-line `copied file-for-file from` continuation,
+   and a docstring-embedded `copied from <repo>' <ns>` (repo and ns each in
+   backticks upstream), which names no org and no pin at all. 24 files across 3 orgs became 31 across 4; no verdict changed for
+   any of the 24. `wasm-webcomponent/src-cljs/kotoba/kami_ecs.cljs`, which
+   documents the vendored file next to it, is correctly still not counted.
 2. refresh `wasm-webcomponent/src-cljs/vendor/kotoba/kami_host.cljc` -- genuinely
-   stale, ~41 diff lines, 2 upstream commits, invisible to the detector on both
-   axes
+   stale, 41 diff lines, 2 upstream commits, and now VISIBLE to the detector:
+   it is pin-honest at `367b4a14` and missing `set-position3!`,
+   `set-velocity3!`, `get-z` -- the 3D additions -- against library HEAD
 3. investigate the three new `kami/ongaku/e2e/*` collisions across
    kami-ongaku-{notation,sampler,sequencer} (investigation only)
 4. ~~check `net-kotobase`'s `pay/core.cljc` + `pay/x402.cljc` for drift~~ --
