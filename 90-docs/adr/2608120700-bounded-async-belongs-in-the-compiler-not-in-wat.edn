@@ -75,10 +75,34 @@
    | `future.write` | `[future-write-<N>]<func>` | `(param i32 i32) (result i32)` |
    | 他 | `[future-read-/cancel-/drop-*]`, `[stream-*]` 同型 | 同ファイル 2236-2323 |
 
-   `<N>` は「その関数の何番目の future/stream か」、`<func>` は当該 interface の
-   関数名。**したがって『できない』ではなく『まだ綴りを当てられていない』が正しい。**
-   `cm32p2|<iface>@<ver>` に `[future-new-0]take` を置く形は
-   `is missing function` で拒否されており、正しい組み合わせは未確定。
+   `<N>` は「その関数の何番目の future/stream か（入れ子含め順に数える）」、
+   `<func>` は当該 interface の関数名。
+
+   ## 測定 5（2026-08-12）— 綴りの問題ではなかった。standard32 に面が無い
+
+   **`impl NameMangling for Standard` は `future_new` / `future_write` /
+   `future_read` / `*-cancel-*` / `*-drop-*` を全て `None` で返す**
+   （`validation.rs` v1.243.0, 1779-）。intrinsic を実装しているのは `Legacy`
+   だけである。
+
+   1 変数に絞って実測した（`kotoba.async-abi-prerequisite-test`）:
+
+   | module | `--reject-legacy-names` | 結果 |
+   |---|---|---|
+   | `cm32p2`-prefixed な regular import のみ | あり | **ACCEPTED** |
+   | 同上 + `[future-new-0]foo` | あり | **REJECTED**（intrinsic を名指し） |
+   | 同じ intrinsic、legacy 名 | なし | **ACCEPTED** |
+
+   上流 fixture（`crates/wit-component/tests/components/async-streams-and-futures`）
+   も同じ挙動で、legacy では通り `--reject-legacy-names` では拒否される。
+
+   **したがって『まだ綴りを当てられていない』も誤りで、正しくは
+   『この repo が使う mangling には intrinsic 面が存在しない』。**
+   ADR 0039 が standard32 を選んでいるので、これは設計上の分岐になる:
+
+   1. future/stream を要する provider だけ legacy 名にする（mangling が混在する）
+   2. wasm-tools に `Standard` 側の実装を入れる（上流貢献）
+   3. `component new` を通さず component binary を直接 emit する
 
    **加えて、私自身の probe の作りに誤りがあった**: `head -0` を挟んだ判定で
    2 つの署名を『ACCEPTED』と読んだが、どちらも実際は拒否されていた。
@@ -137,10 +161,9 @@
    compiler 側で `future<T>` / `stream<T>` の canonical built-in
    （`future.new` 等）を KIR から emit できるようにする。着手前に測ること:
 
-   - `[future-new-<N>]<func>` を受理させる module/name の正しい組み合わせ
-     （署名は確定済み。**`cm32p2|<iface>@<ver>` は拒否された**ので、
-     `crates/wit-component/src/validation.rs` の `prefixed_payload` が
-     `get_function` に何を渡しているかを読むのが次の一歩）
+   - **上の 3 択のどれを採るか（オーナー判断）。** 測定 5 で
+     『standard32 に intrinsic 面が無い』ことが確定したので、これは調査では
+     なく設計判断である。テストが upstream の追加を検出する形で pin 済み
    - bounded の意味 —— `component-model-v1.edn` の `:async` profile が既に
      `:requires [:declared-async-effect :cancellation :deadline :item-budget
      :byte-budget]` を宣言しているので、**5 つとも満たさないものを
