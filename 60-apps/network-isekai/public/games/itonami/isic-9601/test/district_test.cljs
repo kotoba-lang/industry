@@ -89,6 +89,38 @@
   (is! (= "isic-9601" (:district st)) "unknown district falls back to the laundry")
   (is! (seq (:stations (l/summary st))) "and the fallback board has stations"))
 
+(println "== payout and upgrade follow station role, not chain position ==")
+;; Positional tables of length 5 used to hand a 4-station settle the act seat's
+;; numbers (payout 7 / upgrade 140). Settle must keep 14 / 110 in every district.
+(let [laundry (d/spec "isic-9601")]
+  (is! (= (:payout laundry) l/station-payout)
+       "laundry payout still matches the reference map")
+  (is! (= (:upgrade laundry) l/upgrade-base)
+       "laundry upgrade still matches the reference map"))
+(doseq [id d/playable]
+  (let [s (d/spec id)
+        settle (l/settle-station s)
+        act (l/act-station s)
+        verify (l/verify-station s)
+        entry (l/first-station s)]
+    (is! (= (get (:payout s) settle) (get d/role-payout :settle))
+         (str id " settle " settle " pays " (get d/role-payout :settle)
+              ", got " (get (:payout s) settle)))
+    (is! (= (get (:upgrade s) settle) (get d/role-upgrade :settle))
+         (str id " settle " settle " upgrades for " (get d/role-upgrade :settle)
+              ", got " (get (:upgrade s) settle)))
+    (is! (= (get (:payout s) act) (get d/role-payout :act))
+         (str id " act " act " pays " (get d/role-payout :act)
+              ", got " (get (:payout s) act)))
+    (is! (= (get (:upgrade s) act) (get d/role-upgrade :act))
+         (str id " act " act " upgrades for " (get d/role-upgrade :act)
+              ", got " (get (:upgrade s) act)))
+    (when (not= (str verify) (str act))
+      (is! (= (get (:payout s) verify) (get d/role-payout :verify))
+           (str id " verify " verify " pays " (get d/role-payout :verify))))
+    (is! (= (get (:payout s) entry) (get d/role-payout :entry))
+         (str id " entry " entry " pays " (get d/role-payout :entry)))))
+
 (println)
 (println (str "checks: " @checks "  failures: " @failures))
 (when (pos? @failures) (js/process.exit 1))

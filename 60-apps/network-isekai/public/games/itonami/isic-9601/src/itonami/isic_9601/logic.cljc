@@ -282,8 +282,12 @@
   `:approver` is the one upgrade that buys automation: hiring a human
   approver lets the shop clear `:escalate` on the three assessment stations
   by itself. It deliberately does NOT touch `:clean`/`:return` -- those
-  escalate because of `high-stakes`, and no amount of cash changes that."
-  {:intake 40 :verify 60 :screen 90 :clean 140 :return 110 :approver 220})
+  escalate because of `high-stakes`, and no amount of cash changes that.
+
+  The laundry's map, kept for reference / fallback. Other districts read
+  `(:upgrade (spec-of st))`, which is role-keyed in `district/spec` so settle
+  and act keep their prices when the chain is shorter than five."
+  (:upgrade default-spec))
 
 (defn upgrade-cost [st k]
   (let [lvl (get-in st [:levels k] 0)
@@ -300,7 +304,9 @@
 
 (def station-payout
   "The laundry's per-station payouts, kept for reference. A running shop reads
-  `(:payout (spec-of st))`, which is the same numbers for 9601.
+  `(:payout (spec-of st))`, which is the same numbers for 9601 — and, for every
+  other district, the same *roles* (entry/verify/middle/act/settle) rather than
+  a truncated position table.
 
   Cash each committed station act earns, before the tier multiplier.
 
@@ -309,7 +315,7 @@
   decoration: `laundry.phase` opens the stations one tier at a time, so if
   only `:return` paid, phases 1 and 2 would have literally no income and the
   tier ladder could never be climbed."
-  {:intake 5 :verify 4 :screen 4 :clean 7 :return 14})
+  (:payout default-spec))
 
 ;; --------------------------------------------------------------------------
 ;; initial state
