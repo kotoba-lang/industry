@@ -140,6 +140,18 @@ The `:review` rule is not hypothetical. cloud-itonami's working tree was 1381 co
 behind `main`; applying its `legal/terms.md` would have reverted owner-approved public
 legal pages to a 2026-07-18 DRAFT.
 
+**`:additive`'s argument fails under a rename, and it fails silently.** "No such path
+exists on the default branch" is exactly what a rename makes true of the *old* path. On
+`net-kotobase/control-plane`, `worker/` moved on 08-03 and `clj-edge/` on 08-04; on 08-05
+and 08-06 two `cleanup: land untracked WIP` passes put 17 files back under those dead
+names, including a file byte-identical to the revision immediately before the commit that
+superseded its design, and a build artifact `.gitignore` could only exclude at its live
+path. `scripts/rename_residue.cljs` now classifies such candidates before they reach
+`:additive`: proven residue (bytes already in the object database, or ignored at the live
+path) is dropped and reported with its live path; a dead path holding content that is *not*
+in history is demoted to `:review` rather than dropped. Nothing is deleted from the working
+tree. Full argument and measurements: `:residue-gate` in the edn.
+
 **Write path is the GitHub git API** (blob → tree with `base_tree` → commit → ref), not a
 local worktree — at ~100-repo scale, per-repo full checkouts are impractical, and the
 shared checkout is often parked on a stale branch. Same server-side single-commit shape

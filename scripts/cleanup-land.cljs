@@ -43,7 +43,10 @@
 ;;   - credential らしきパス・大きすぎるファイルは skip し、必ず報告する（黙って
 ;;     落とさない）
 ;;   - git-annex / DataLad dataset は対象外
+;;   - **改名の残骸は :additive に入れない**（scripts/rename_residue.cljs）。詳細は
+;;     residue-gate! の docstring と manifest/cleanup-workflow.edn の :residue-gate。
 (require '[scripts.nbb-compat :refer [format]]
+         '[scripts.rename-residue :as residue]
          '[clojure.string :as str]
          '[clojure.java.shell :refer [sh]]
          '[clojure.java.io :as io]
@@ -379,6 +382,100 @@
           {landed true differs false} (group-by same? (filter on-base? paths))]
       [(vec (remove on-base? paths)) (vec landed) (vec differs)])))
 
+(defn- residue-gate!
+  "`:additive` から **改名の残骸**を外す。-> [additive' suspects residues]
+
+  ## なぜ drop-already-landed では足りないのか
+
+  `drop-already-landed` は **同じパス**が base tree に在るかを見る。ディレクトリ
+  改名はまさにその前提を壊す —— `worker/` が `clj-edge/` になった瞬間、旧パスは
+  base から消える。それが改名の定義である。だから共有 checkout に取り残された
+  古い写しは `:additive` の条件（「main のどの行も書き換えない」）を**完璧に**
+  満たし、`commit → PR → merge` の経路に乗る。
+
+  実測（`net-kotobase/control-plane`、2026-08-12 に発覚）:
+
+  | commit | 日付 | 起きたこと |
+  |---|---|---|
+  | `04e1514` | 08-03 | `worker/` → `kotobase-edge/`、100% 一致の改名。tracked 48 → 0 |
+  | `5a6a55b` | 08-04 | `clj-edge/` → `kotobase-api-gateway-cljs/`、同上。136 → 0 |
+  | `8f7fbaf` | 08-05 | **`cleanup: land untracked WIP (1 files)`** — `worker/` 0 → 1 |
+  | `d96f18b` | 08-06 | **`cleanup: land untracked WIP (16 files)`** — `clj-edge/` 0 → 14 |
+
+  2 回の cleanup が、1〜2 日前に意図して改名した先の**旧名で** 17 ファイルを
+  main に戻した。うち `clj-edge/src/kotobase/site_skin.cljc` は、その設計を
+  supersede した commit の**直前**の版と byte 一致 —— 議論して捨てた古い doctrine が
+  1 週間後に復活していた。17 本目 `worker/src/edge-app.generated.mjs` はビルド生成物で、
+  `.gitignore` は**生きているパス**（`kotobase-api-gateway/src/edge-app.generated.mjs`）
+  しか書けないので、改名前のアドレスに落ちていたそれは除外されなかった。
+  ファイルは `3c99bd5` で消したが、**症状はファイルで、バグはこの cleanup 経路**である。
+
+  ## 判定の分け方 —— 「黙って落とす」を作らない
+
+  cleanup が黙ってファイルを落とすのは、いま直しているバグより悪い。だから
+  証明できる側だけを外す:
+
+  - `:residue` → `:additive` から外し、名前の付いた skip クラスとして報告する。
+    **bytes は既にこの repo の object database に在る**（あるいは repo 自身が
+    ignore すると宣言している）ので、着地させないことで失われるものが無い。
+    `git show <commit>:<path>` は何年後でも同じ bytes を返す。ローカルの working
+    tree には一切触らない（安全床）。archive! は gate の前に呼ばれるので、
+    `.git/stash-archive-<date>/untracked-files.txt` にも残る。
+  - `:suspect` → `:review` へ降格。パスは死んでいるが**内容は history に無い**ので、
+    stale な写しに対する本物の編集かもしれない。draft PR を開いて人が決める
+    （base に同名が在って内容が違う時の既存の降格と同じ機構）。
+  - `:wip` → そのまま `:additive`。
+
+  ## どの ref で判定するか（west checkout の実測）
+
+  west は `refs/west/*` に fetch するので、多くの子 checkout には
+  remote-tracking ref が無い。実測 2026-08-12: `orgs/kotoba-lang/*` の 121
+  checkout のうち `<remote>/main` が解決したのは **43 (36%)**。ローカル ref だけを
+  見ると、この gate は fleet の 2/3 で**沈黙して素通りする**。
+
+  そこで 2 つに分ける:
+
+  - **生きているパスの集合**は呼び出し側が既に持っている `base-blobs`
+    （GitHub API で取った default branch の tree）を渡す。これが最も正確で、
+    追加コストはゼロ。
+  - **commit graph**（改名履歴と過去 blob）はローカルから読む。`<remote>/<base>`
+    が引ければそれ、無ければ `HEAD`。HEAD で足りる理由: 改名前のパスに untracked
+    の残骸が在りうるのは、その checkout が**改名以後**に居る場合だけである
+    （改名前なら、それらは untracked ではなく tracked だ）。
+
+  どちらも引けなければ gate は判定できない —— **判定できないことを『残骸ゼロ』
+  として静かに通さない**。警告を出して skip する（fail-open。cleanup は止めない）。"
+  [dir base additive base-map]
+  (let [remote (or (primary-remote dir) "origin")]
+    (if-let [{:keys [ref how]} (residue/resolve-baseref dir remote base)]
+      (let [_ (when (= how :head)
+                (println (format "  ⚠ residue gate: %s/%s が無いので HEAD の履歴で判定する（west は refs/west/* に fetch する）"
+                                 remote base)))
+            {:keys [results truncated? renames]}
+            (residue/scan dir ref additive
+                          (when (seq base-map) {:base-paths (set (keys base-map))}))
+            {:keys [residue suspect wip]} (residue/split-verdicts results)]
+        (when truncated?
+          (println (format "  ⚠ residue gate: 改名 log を %d commit で打切り。古い改名は見ていない。"
+                           residue/max-rename-commits)))
+        (when (seq residue)
+          (println (format "  skip rename-residue  %d 件（改名で死んだパス。bytes は object database に在るので失われない。renames-seen=%d）"
+                           (count residue) renames))
+          (doseq [r residue]
+            (println (format "      %s\n        %s → %s" (:path r)
+                             (get residue/residue-explanation (:reason r) (name (:reason r)))
+                             (or (:renamed-to r) (:mapped-path r) "?")))))
+        (when (seq suspect)
+          (println (format "  ⚠ 改名で死んだパスだが内容は history に無い: %d 件 → :review へ降格（auto-merge しない）"
+                           (count suspect)))
+          (doseq [r suspect]
+            (println (format "      %s\n        %s → %s" (:path r)
+                             (get residue/residue-explanation (:reason r) (name (:reason r)))
+                             (or (:renamed-to r) (:mapped-path r) "?")))))
+        [(mapv :path wip) (mapv :path suspect) (mapv :path residue)])
+      (do (println "  ⚠ residue gate 不可: 判定に使える rev が無い（remote ref も HEAD も解決しない）。改名残骸の検査を飛ばした。")
+          [additive [] []]))))
+
 (defn- server-commit!
   "base branch の tip の上に paths を載せた commit を作り、branch ref を作る。
   branch が既にあれば ref は作らず、その ref を commit へ更新する。
@@ -607,7 +704,8 @@
       ;; PR → merge」と表示したものが apply で :review に降格し、plan が嘘になる。
       (let [base-map (base-blobs slug base)
             [additive _ demoted] (drop-already-landed dir base-map additive)
-            tracked (vec (concat tracked demoted))]
+            [additive suspects _] (residue-gate! dir base additive base-map)
+            tracked (vec (concat tracked demoted suspects))]
         (when (seq demoted)
           (println (format "  ⚠ untracked だが %s に既存・内容差あり: %d 件 → :review（auto-merge しない）"
                            base (count demoted)))
@@ -618,9 +716,14 @@
             base-map (base-blobs slug base)
             [additive landed-additive demoted] (drop-already-landed dir base-map additive)
             [tracked landed-tracked tracked-differs] (drop-already-landed dir base-map tracked)
+            ;; 改名で死んだパスの残骸を :additive から外す（residue-gate! の
+            ;; docstring / manifest/cleanup-workflow.edn :residue-gate）。
+            ;; drop-already-landed の後に置くのは、同じパスが base に在る場合は
+            ;; そちらの既存判定の方が安く強いから。
+            [additive suspects _] (residue-gate! dir base additive base-map)
             ;; base に存在するのに untracked と報告されたものは :additive ではない。
             ;; :review へ落として auto-merge の対象から外す（PR #444 の再発防止）。
-            tracked (vec (concat tracked tracked-differs demoted))]
+            tracked (vec (concat tracked tracked-differs demoted suspects))]
         (println (format "  archived → %s" adir))
         (when (seq (concat landed-additive landed-tracked))
           (println (format "  already landed on %s（内容一致でスキップ）: %d 件"
@@ -640,7 +743,10 @@
                          "These files existed only in the shared west checkout — on no branch,\n"
                          "on no remote. A single `git checkout` there would have destroyed them.\n"
                          "Purely additive: none of these paths exist on " base ", so no existing\n"
-                         "line is rewritten. Landed by scripts/cleanup-land.cljs (skill\n"
+                         "line is rewritten. Checked against the base tree and against paths that\n"
+                         "a rename left behind (scripts/rename_residue.cljs), because a renamed-away\n"
+                         "path is absent from " base " for exactly the reason a new path is.\n"
+                         "Landed by scripts/cleanup-land.cljs (skill\n"
                          "git-cleanup-conflict); originals archived under\n"
                          ".git/stash-archive-" stamp "/ in the operator's checkout.\n\n"
                          "Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>")]
@@ -757,6 +863,7 @@
 
 (println (str "cleanup-land " (if apply? "APPLY" "DRY-RUN（--apply で実行）")))
 (println "分類: :additive=untracked のみ→merge / :review=tracked 変更→PR のみ / annex は対象外")
+(println "改名で死んだパスの残骸は :additive から外す（residue gate）。ローカルは無傷。")
 
 (def repos
   (->> (sh "find" "orgs" "-maxdepth" "3" "-name" ".git" "-type" "d")
