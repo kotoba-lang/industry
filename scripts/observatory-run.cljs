@@ -168,7 +168,18 @@
         (re-seq #"(?m)^    - name: (\S+)$" (slurp (abs "manifest" "west.yml")))))
 
 ;; ── 実行 ────────────────────────────────────────────────────────────────
-(defn- repo-dir [o] (abs "orgs" (:org o) (:name o)))
+;; **observatory の名前と repo の名前は別物**（2026-08-12）。前者は台帳・cadence・
+;; datoms の識別子で、`observatory-runs.ledger.edn` に履歴が積まれている。後者は
+;; west.yml の entry 名で、命名規則（role 面 `actor-*`）や org 移管で動く。実際
+;; 2026-08-11 の rename で etzhayyim の 5 本が `com-etzhayyim-*` → `actor-*` に
+;; 変わり（org も cloud-itonami / network-awai へ移った）、`:name` で west を
+;; 引いていたこの script は 5 本を「登録が無い」と落とし続けた。
+;;
+;; したがって **repo を指すのは `:repo`（省略時は `:name`）** とする。名前が動いても
+;; 台帳の連続性は切れない。逆に `:name` を repo に合わせて書き換えると、その
+;; observatory の観測史が 2 つの名前に割れる。
+(defn- west-name [o] (or (:repo o) (:name o)))
+(defn- repo-dir [o] (abs "orgs" (:org o) (west-name o)))
 
 (defn- expand
   "${REPO} を checkout の絶対パスに展開する。相対パスを禁じるための唯一の経路。"
@@ -313,15 +324,16 @@
    (for [o obs
          :when (or (nil? only) (only (:name o)))]
      (let [dir (repo-dir o)
-           in-west? (contains? west-names (:name o))
+           in-west? (contains? west-names (west-name o))
            present? (exists? ((.-join path-mod) dir ".git"))
            live? (boolean (and live (live (:name o)) (:live-alias o)))
-           base {:name (:name o) :org (:org o) :domain (:domain o)
+           base {:name (:name o) :org (:org o) :repo (west-name o) :domain (:domain o)
                  :expect (:expect o) :in-west in-west? :present present?
                  :blocked-by (:blocked-by o) :live live?}]
        (cond
          (not in-west?)
-         (do (println (str "  ✗ " (:name o) " — west.yml に登録が無い"))
+         (do (println (str "  ✗ " (:name o) " — west.yml に登録が無い（repo "
+                           (west-name o) "）"))
              (assoc base :observed :unregistered))
 
          (not present?)
@@ -390,7 +402,7 @@
   (cond-> {:db/id (- (inc i))
            :observatory/name (:name r)
            :observatory/org (:org r)
-           :observatory/repo (str "orgs/" (:org r) "/" (:name r))
+           :observatory/repo (str "orgs/" (:org r) "/" (or (:repo r) (:name r)))
            :observatory/domain (:domain r)
            :observatory/expect (:expect r)
            :observatory/observed (:observed r)
