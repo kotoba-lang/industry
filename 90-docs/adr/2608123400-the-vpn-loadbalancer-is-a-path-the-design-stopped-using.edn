@@ -74,11 +74,15 @@ is why the tunnel exists.
 
 ## Two pieces of drift found on the way
 
-- **The Worker source still teaches the abandoned path.** `app.ts` documents
-  `VPN_PROVISIONER_URL` in its header comment as the LoadBalancer-IP form over
-  plain HTTP, in two places, while the ADR records the secret being changed to
-  the tunnel hostname. The repo has since been rebranded, so **whoever
-  redeploys will read the comment, not the June ADR.**
+- ~~**The Worker source still teaches the abandoned path.**~~ -- **FIXED, merge
+  `f088a870303b3c4d78fe64120d4402a38e908fc2`.** The two places were
+  `appview/etzhayyim-vpn-portal/src/app.ts` and its `wrangler.jsonc`, both in
+  **`kotoba-lang/vpn`** (`gftdcojp/apps-gftdcojp` has no Worker source for this
+  app). Both now give the tunnel-hostname form and say why the LoadBalancer-IP
+  form is not it, citing this ADR and the June winddown. Corrected in the same
+  change that made the Worker refuse to call the provisioner without a
+  credential, because both are read by the same person at the same moment --
+  the one redeploying it.
 - `orgs/gftdcojp/ai-gftd-apps-gftdcojp/` is an untracked, non-west-registered
   duplicate clone at the same HEAD carrying byte-identical copies of these
   files. Worth retiring separately.

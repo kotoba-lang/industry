@@ -1199,4 +1199,45 @@
    :name "com-cloudflare" :gate :nbb-script
    :script "gates/kotoba-oracle-cljs.cljs"
    :script-args ["--entry" "test/cloudflare/oracle_cljs_gate.cljs" "--min" "200"]
-   :include-ext [".cljs" ".cljc" ".clj" ".edn"] :min-files 30 :cd false}]}
+   :include-ext [".cljs" ".cljc" ".clj" ".edn"] :min-files 30 :cd false}
+
+  ;; ── credential 経路の回帰 guard を実際に走らせる ────────────────────────
+  ;;
+  ;; ADR-2608122600 の sweep で最悪だった site は kotoba-lang/app-yorishiro で、
+  ;; `provider/{nuro,japanpost-enaiyo}/runner.ts` が `VAULT_URL ?? "http://vault:8200"`
+  ;; を既定に持ち、`X-Vault-Token` を **cleartext で誰も所有していない single-label
+  ;; ホスト**へ送り、その応答を無検査で銀行口座にして flow.ts が submit していた。
+  ;; merge 3d161b144ae7 が直し、34 本のテストを足した —— うち 10 本は runner の
+  ;; source を直接読む guard で、**再発を止めているのはその 10 本**。
+  ;;
+  ;; **が、それを走らせるものが 1 つも無かった。** この repo には gates.edn の
+  ;; entry も GitHub Actions も無く、guard は書かれた瞬間から誰にも読まれて
+  ;; いなかった。ADR-2608122000 と同じ形 —— 走っていない検査は緑でも赤でもない。
+  ;;
+  ;; gate 本体は repo 自身の vitest suite。`gates/yorishiro-provider-vault-check.cljs`
+  ;; が足すのは床だけで、検査ロジックは複製しない:
+  ;;   ① 8 個の必須 path が届いているか（:include-ext が壊れて provider/ を落とすと
+  ;;      vitest は「テストが無い」で終わる。それを合格と読ませない）
+  ;;   ② guard の describe block がまだ在るか（本数の床だけだと、guard を消して
+  ;;      別のテストを足せば 34 のまま緑になる。**guard の消失は guard の失敗より静か**）
+  ;;   ③ `Tests N (…)` の総数が --min 以上で、vitest が exit 0 か
+  ;;
+  ;; 落ちることを確認済み（2026-08-12、手元で実測。`npx` がこの laptop で壊れて
+  ;; いるので `nbb` を直接呼んだ。ノードでは npx が pin を解決する）:
+  ;;   - nuro/runner.ts に fix 前の defect を戻す → 4 guard が FAIL、exit 1
+  ;;   - guard describe を消して本数を 34 に保つ → exit 92
+  ;;   - provider/nuro/runner.ts を落とした tree → exit 90
+  ;; 無改変の 3d161b144ae7 では 34 tests / exit 0。
+  ;;
+  ;; :include-ext は 45 件（repo は全部で 72 件と小さい）。**.md が要る** ——
+  ;; README guard が deployment checklist を読むので、md を送らないと guard が
+  ;; 問いを立てられない。:min-files 30 はその床。
+  ;;
+  ;; **:cd false** —— この gate が見るのは provider/ だけで、appview/ と kotoba/ は
+  ;; 見ない。すぐ上の com-cloudflare entry と同じ理由で、repo 全体の suite では
+  ;; ないものを根拠に pin を進めない。緑が意味するのは「credential 経路の guard が
+  ;; 成立している」であって「repo が検証済み」ではない。
+  {:name "app-yorishiro" :gate :nbb-script
+   :script "gates/yorishiro-provider-vault-check.cljs"
+   :script-args ["--min" "34"]
+   :include-ext [".ts" ".json" ".md"] :min-files 30 :cd false}]}
