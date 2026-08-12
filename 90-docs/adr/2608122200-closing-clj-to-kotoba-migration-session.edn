@@ -346,6 +346,41 @@ owner decisions). `verify-duplicate-registrations --verify-remote`: 40 CONFIRMED
 untracked `orgs/` directories and a modified `observatory.datoms.edn` that
 predate this session. No stashes, no worktrees, no branches of mine remain.
 
+## An error that travelled through three artifacts
+
+Recorded because the mechanism is more useful than the facts it corrupted.
+
+An agent reported that `net-kotobase`'s pre-rename leftovers came from clean
+100%-similarity renames -- `worker/` to `clj-edge/`, 48 files to 0. I wrote that
+into the deletion commit message, then quoted the commit message into a brief
+for the next agent, who checked it and found two errors:
+
+- `04e1514` renamed `worker/` to **`kotobase-edge/`**, not to `clj-edge/`, and
+  the count was **57**, not 48. `clj-edge/` and `worker/` were separate
+  coexisting directories; `clj-edge/` was emptied a day later by a different
+  commit.
+- They were **not** 100%-similarity moves. 16 of 56 renames in one and 102 of
+  133 in the other are R100; the rest are R068-R099 rename-plus-edit. The
+  directories were emptied COMPLETELY, which is the part the argument rests on
+  -- so the conclusion stands and the supporting numbers do not.
+
+Nobody was careless. Each step trusted the step before it because the step
+before it was specific: exact SHAs, exact counts, a named similarity index.
+**Precision is not provenance.** A number carried forward without being
+re-derived is a citation, and citations propagate whatever they were given.
+
+The workspace already carries a rule from earlier today -- verify a parallel
+agent's output before quoting it -- and this happened anyway, because the
+quoting was three steps removed from the reading. The practical form is
+narrower: **when a brief hands an agent facts, say where each came from**, so
+`measured by me` and `reported to me` are distinguishable at the point of use.
+The agent who caught this did exactly that in reverse, checking the brief
+against the repository rather than against the brief's confidence.
+
+The corrected version is in ADR-2608070100 (merge `52f3a1dc5ac`). The wrong
+numbers remain in the `net-kotobase` deletion commit and in the west pin commit
+that quoted it; those are history and are left alone.
+
 ## Resume point
 
 Wait for the six agents, land each result, advance the pin for every child repo
