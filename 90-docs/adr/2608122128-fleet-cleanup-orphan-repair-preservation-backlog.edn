@@ -178,7 +178,7 @@ part of an ongoing split of the `orgs/network-awai/net-kotobase` monorepo into
 per-package repos under a `net-kotobase` org — `authn`, `commoncrawler`, `cypher`,
 `docs`, `engine`, `ipfs`, `lake` are already through, all west-registered.
 
-`engine`'s `deps.edn:171` carries `{:local/root "../kotobase-object-store-b2-s3"}`.
+`engine`'s `deps.edn:171` carries `{:local/root \"../kotobase-object-store-b2-s3\"}`.
 That was correct while `engine` was a directory inside the monorepo and the
 target was its sibling directory. Now that `engine` is its own repo, the relative
 path resolves to `orgs/net-kotobase/kotobase-object-store-b2-s3`, which does not
