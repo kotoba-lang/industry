@@ -1378,17 +1378,22 @@
   ;; **:cd false** —— この gate が言うのは「移行の置き去りが無い」だけで、repo が
   ;; 検証済みだとは言っていない。それを根拠に west pin を進めない。
   ;;
-  ;; 載っているのは **今日 green を実測できた 3 件だけ**。ADR-2608132400 が数えた
+  ;; 載せてよいのは **green を実測できた repo だけ**。ADR-2608132400 が数えた
   ;; 対象 97 repo（うち既知の欠陥 9 件）の残りは **owed** —— 赤いまま entry を足すと
   ;; 「入力の無い gate」を「直っていない gate」に置き換えるだけで、このワークスペースが
   ;; 259 tip × 298 receipt 払った失敗と同じ形になる。**修理された repo から足す。**
-  ;; 2026-08-13 時点で赤い 7 件: annotation / kami-app-quarry-walk /
-  ;; kami-usd-native / pbrt / replicator / rtx-native / tilemap。
-  ;; cartpole-math はこの列から外れた —— ADR-2608133600 が .cljc load path を復元して
-  ;; `e03723e9` で green を実測したので entry を足してある。**その gate の緑は
-  ;; `kami.cartpole-math` が戻ったことを意味しない** —— この gate は `.kotoba` の兄弟しか
-  ;; 見ないので、消費側 `kotoba-lang/webgpu` が実際に require している
-  ;; `src/kami/cartpole_math.cljc` は gate の視界の外にある。
+  ;;
+  ;; **2026-08-13 時点で既知の欠陥 9 件は全部 landed し、赤い列は空になった**
+  ;; （ADR-2608130900 が dsl-core / async、ADR-2608133600 が postfx / cartpole-math、
+  ;; ADR-2608134800 が残り 7 件）。下の 11 entry は 11 repo すべてが手元で EXIT=0 を
+  ;; 実測した状態で登録してある。
+  ;;
+  ;; **gate の緑は「この repo はもう安全」ではない。** この gate は `.kotoba` の兄弟しか
+  ;; 見ない。cartpole-math が実例で、消費側 `kotoba-lang/webgpu` が実際に require して
+  ;; いる `src/kami/cartpole_math.cljc` は `.kotoba` を伴わない削除だったので gate の
+  ;; 視界の外にあり、その repo で本当に webgpu を直したファイルを gate は一度も見て
+  ;; いない。残り 7 件については削除 commit を 1 件ずつ確認し、この第 2 類の削除が
+  ;; **無い**ことを実測した（ADR-2608134800）。
   {:name "postfx" :id "kotoba-provider-orphan-postfx" :gate :nbb-script
    :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
    :ship-self-bundle true :cd false}
@@ -1399,6 +1404,27 @@
    :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
    :ship-self-bundle true :cd false}
   {:name "cartpole-math" :id "kotoba-provider-orphan-cartpole-math" :gate :nbb-script
+   :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+   :ship-self-bundle true :cd false}
+  {:name "annotation" :id "kotoba-provider-orphan-annotation" :gate :nbb-script
+   :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+   :ship-self-bundle true :cd false}
+  {:name "kami-app-quarry-walk" :id "kotoba-provider-orphan-kami-app-quarry-walk" :gate :nbb-script
+   :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+   :ship-self-bundle true :cd false}
+  {:name "kami-usd-native" :id "kotoba-provider-orphan-kami-usd-native" :gate :nbb-script
+   :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+   :ship-self-bundle true :cd false}
+  {:name "pbrt" :id "kotoba-provider-orphan-pbrt" :gate :nbb-script
+   :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+   :ship-self-bundle true :cd false}
+  {:name "replicator" :id "kotoba-provider-orphan-replicator" :gate :nbb-script
+   :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+   :ship-self-bundle true :cd false}
+  {:name "rtx-native" :id "kotoba-provider-orphan-rtx-native" :gate :nbb-script
+   :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+   :ship-self-bundle true :cd false}
+  {:name "tilemap" :id "kotoba-provider-orphan-tilemap" :gate :nbb-script
    :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
    :ship-self-bundle true :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
