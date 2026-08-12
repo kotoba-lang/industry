@@ -126,6 +126,53 @@ It has **never once been green** across its entire lifetime, and unlike its
 neighbours it carries **no break/unbreak record** — so it has never been shown
 to discriminate at all.
 
+**Resolved 2026-08-12. It is green, and it has now been shown to discriminate.**
+
+All four classes were fixed in the order above, and none of the nine was fixed
+by deleting an invariant — the `:change-rate` / `:importance` / `:blocked-by` /
+`:unmeasured` discipline that only this gate checks is intact and is exercised
+by four of the sixteen demonstration cases.
+
+- **Invariant 5** now resolves the repo as `(or (:repo o) (:name o))`, which is
+  the contract the registry itself documents (`:repo` omitted means `:name` is
+  the repo name). Five violations vanish.
+- **The genuine gap** was `com-etzhayyim-rasen`, the one entry the rename left
+  without a `:repo`; its west project is `actor-rasen`, under the org the entry
+  already named.
+- **Invariant 4 was conflating two things.** What it exists to catch is a
+  *relative* path, which silently means a different place depending on where the
+  process started; an absolute path does not have that defect. It now rejects
+  relative paths as before, and requires an absolute path outside the repo to
+  carry `:args-outside-repo` with a reason — so the deliberate case is expressible
+  and an accidental write outside the repo is still caught. hayari declares it,
+  citing the concrete reason: the default target is tracked, so every run would
+  dirty the west checkout and `west update` would then skip the project.
+- **Invariant 11 was true, and its stated reason was false.** Measured:
+  `plutil -lint` returns OK for all ten plists, and the job the gate said could
+  not load was loaded with a PID from a file byte-identical to the flagged repo
+  copy. But a *conforming* XML parser is a different matter — expat rejects both
+  flagged files at exactly the offending lines and accepts the other eight. XML
+  1.0 section 2.5 forbids a double hyphen inside a comment, so the files really
+  are not well-formed; the harm is not that launchd ignores them but that no XML
+  tool other than Apple's deliberately lenient parser can read them. **The check
+  was kept, its rationale corrected, and the two comments fixed** — all ten now
+  satisfy both parsers.
+
+**The demonstration CLAUDE.md requires now exists**, in
+`scripts/fleet-ci/gates/observatory-registry-discriminate.cljs`: sixteen cases,
+each breaking one invariant in a throwaway copy, asserting a non-zero exit *and*
+that the violation reported is that invariant's own message — so a red caused by
+some other invariant cannot be mistaken for detection — then restoring and
+asserting exit 0. Baseline green, 16/16, harness exits 0. The record lives in
+the gate's own header so that editing an invariant surfaces it in the diff.
+
+**Writing the harness immediately paid for itself**: two cases first reported
+*broken but still green*, and both were faults in the breaking, not the gate —
+one replaced an occurrence of the key inside a comment and left the real key
+intact, the other renamed a tag to a string that still contained the substring
+being searched for. Reviewed by eye, both would have counted as demonstrations.
+**A check on a check is theatre by the same rule as the check itself.**
+
 ### `root-itonami-org-id` — it is correctly reporting an undeployed fix
 
 Six of eight domain pairs disagree with the rule. One root cause: the endpoint

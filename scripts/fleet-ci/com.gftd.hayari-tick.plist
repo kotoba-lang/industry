@@ -9,9 +9,12 @@
     stop:    launchctl unload ~/Library/LaunchAgents/com.gftd.hayari-tick.plist
     watch:   tail -f /tmp/hayari-tick.log
 
+  ⚠ XML コメントは `-` 2 連を含められない（XML 1.0 §2.5）。**以下、長オプションは
+  先頭の `-` 2 つを省いて書く** —— `pin false` は実際には `-` 2 つ + `pin false`。
+
   ⚠ **常時稼働ノードへの移設は ADR-2608110300 段階 5 でブロック中**（cloud-itonami が
   deploy key の作成を許さず、token に admin:org が無い）。移設時はここに
-  `--pin false` を足す —— ノードが持つ credential を hayari repo だけに絞り、
+  `pin false` を足す —— ノードが持つ credential を hayari repo だけに絞り、
   superproject への write（pin 前進）は operator 側に残すため。
   **その版をここに先に書いておくと、棚卸しが「動いていない構成」を読むことになる。**
   実際に一度そうなった（2026-08-11）ので、このファイルは常に現実を書く。
