@@ -45,7 +45,7 @@ cloud-itonami 行が引いていた「Terms/PrivacyはDRAFT、operator・DPAが�
 
 - **Selected:** cloud-itonamiを基盤にした高単価AI Revenue/Sales Pipeline offerの
   T1 founder-led validation。ただし外部勧誘はcommercial gate green後
-- **Run:** `runs/0021-cloud-itonami-commercial-gate-remeasure.md`（governor は 0020）
+- **Run:** `runs/0021-cloud-itonami-commercial-gate-remeasure.edn`（governor は 0020）
 - **Timebox:** 14日または20人時
 - **Cash at risk:** 最大¥300,000。広告費は¥0
 - **Offer hypothesis:** ¥20k診断（導入へ全額充当）→ ¥300k–¥500k導入

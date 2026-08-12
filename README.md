@@ -42,6 +42,6 @@ product-local な管理単位、credential は証明材料であり、どれも 
 
 用語、モデル、各層への投影、NIST CSF 2.0 との対応は次を正本とします。
 
-- [Authority model README](90-docs/architecture/authority/README.md)
+- [Authority model README](90-docs/architecture/authority/README.edn)
 - [ADR-2608120400: Principal–Intent–Decision–Receipt authority kernel](90-docs/adr/2608120400-authority-kernel-principal-intent-decision-receipt.edn)
 - [ADR-2607032500: kotoba : kotobase = Clojure : Datomic](90-docs/adr/2607032500-kotoba-kotobase-clojure-datomic-relationship.edn)

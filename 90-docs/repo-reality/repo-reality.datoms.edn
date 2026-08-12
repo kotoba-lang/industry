@@ -226,6 +226,15 @@
   :claim/self-caveat false,
   :claim/axis [:axis/evidence-linkage :axis/safety-enforcement]}
 
+ ;; ---- claim catalog: aiueos (extended 2026-08-10, weekly claim-discovery pass) ------------
+ {:claim/id :claim/aiueos-kotoba-object-rebuild-does-not-boot,
+  :claim/project :project/aiueos,
+  :claim/source "orgs/kotoba-lang/aiueos/os/aiueos/90-docs/adr/0035-the-rebuild-does-not-boot.md:1-5,24-40,58-63,90-94,107-109 (Status: accepted, 2026-08-09; extends ADR-0032/0033/0034); os/aiueos/scripts/reproduce-kotoba-kernel-object.sh:6",
+  :claim/text "ADR-0035 self-discloses that rebuilding the 16 previously-drift-flagged shipped kernel .kotoba objects at the CURRENT compiler (rather than the frozen one ADR-0032/0033/0034 pinned) produces a tree that builds clean and passes the multiboot gate, but traps with a #UD exception during UEFI boot -- dying after AIUEOS_INITRAMFS_OK and before the RSA-2048/SHA-256 signature admission marker, instead of the ~70 markers a good boot emits. The ADR's own Decision section states 'Do not land the rebuild': the broken tree is kept only on an unmerged branch, and 'origin/main stays at fd371d7 (ADR-0034), which boots.' Confirmed against the actual repo state: ADR-0035 still cites that fd371d7 pin verbatim, and scripts/reproduce-kotoba-kernel-object.sh is still pinned to compiler 0b16d9b6 exactly as ADR-0032 left it (unchanged since, matching the ADR's own 'remains the open item' framing) -- the ADR's claim of NOT landing the risky rebuild is still reflected in the cited pin and script, not merely asserted.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/doc-code-drift :axis/production-readiness]}
+
  ;; ---- claim catalog: kotoba (extended 2026-07-15) -----------------------------------------
  {:claim/id :claim/kotoba-maturity-m6,
   :claim/project :project/kotoba,
@@ -410,6 +419,15 @@
   :claim/self-caveat true,
   :claim/axis [:axis/functional-completeness :axis/doc-code-drift]}
 
+ ;; ---- claim catalog: kotoba-lang (extended 2026-08-10, weekly claim-discovery pass) -------
+ {:claim/id :claim/kotoba-lang-surface-status-one-residual-remaining,
+  :claim/project :project/kotoba-lang,
+  :claim/source "orgs/kotoba-lang/kotoba-lang/docs/adr/ADR-kotoba-compiler-native-boundary-v1.md:15-18,68 (Status: accepted, 2026-08-05); lang/surface-status.edn:3 (:as-of \"2026-08-05\"), 465,552 (:first-class-closure-values :missing [:linear-resource-result-families])",
+  :claim/text "ADR-kotoba-compiler-native-boundary-v1.md states in passing, as context for a separate compiler/native repo-split decision: 'surface-status の残件は :linear-resource-result-families 1件のみ' (the surface-status residual list is down to exactly one item, :linear-resource-result-families), and its own Non-goals section confirms the ADR does not resolve that one remaining item. This follows roughly 45 same-week commits (2026-08-03 through 2026-08-05, mostly titled 'docs: record/close X gap' or 'Record X maturity') each closing one surface feature's residual in lang/surface-status.edn. Confirmed against the actual current file: lang/surface-status.edn has exactly 17 `:missing [...]` entries across all tracked language features, and exactly ONE of them is non-empty -- line 552, under the :first-class-closure-values feature (line 465), reading `:missing [:linear-resource-result-families]`; all 16 other `:missing []` entries in the file are empty. The ADR's near-completion framing matches the file's own current state precisely, not an overclaim.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/functional-completeness :axis/evidence-linkage]}
+
  ;; ---- claim catalog: kotobase (extended 2026-07-15) ---------------------------------------
  {:claim/id :claim/kotobase-istore-seam,
   :claim/project :project/kotobase,
@@ -477,6 +495,15 @@
   :claim/self-reported-level "",
   :claim/self-caveat false,
   :claim/axis [:axis/safety-enforcement :axis/evidence-linkage]}
+
+ ;; ---- claim catalog: kotobase (extended 2026-08-10, weekly claim-discovery pass) ----------
+ {:claim/id :claim/kotobase-cid-multi-page-scheduler-not-implemented,
+  :claim/project :project/kotobase,
+  :claim/source "orgs/kotoba-lang/kotobase/docs/adr/2608090000-rust-free-cid-canonical-route.md:52-57,75-78; kotoba/cid_external_transaction_replay.kotoba (whole file); qualification/kotobase/cid_crypto_qualification_test.clj:610,714,736",
+  :claim/text "ADR-2608090000 (Accepted, 2026-08-09, three same-day PRs #34/#35/#36 landing on 2026-08-10) states the bounded, single-page CID transaction/graph replay (up to 128 CIDs / 65536 aggregate key bytes per page, up to 16 transactions/16 atoms per replay page) is qualified on both kotoba-native and kotoba-wasm with no Rust toolchain, but explicitly bounds the claim: 'Qualification of the global multi-page scheduler remains an open gate' and 'The global multi-page scheduler and unbounded replay remain false until page-DAG scheduling passes the same native/Wasm qualification.' Confirmed against actual source: kotoba/cid_external_transaction_replay.kotoba exists and qualification/kotobase/cid_crypto_qualification_test.clj's own test descriptions match the bounded-page semantics described ('a 129th local CID traps at the sealed page bound', 'the unchanged guest replays a provider-generated five-transaction page', 'the sealed page limit is executable, not only parser metadata') -- and a repo-wide search for any multi-page-scheduler / page-DAG-scheduling implementation (across .kotoba/.clj/.cljc) returns zero hits, matching the ADR's own 'remains an open gate' framing exactly.",
+  :claim/self-reported-level "",
+  :claim/self-caveat true,
+  :claim/axis [:axis/functional-completeness :axis/doc-code-drift]}
 
  ;; ---- claim catalog: kototama (extended 2026-07-15) ---------------------------------------
  {:claim/id :claim/kototama-r3-stable,

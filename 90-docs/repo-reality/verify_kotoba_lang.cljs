@@ -193,7 +193,35 @@
               kotoba-still-lacks-f64?
               {:score 1.0 :note "confirmed on BOTH sides: kotoba-lang's own q9-wave1-tranche-2.edn still states kotoba.runtime/wasm-binary lacks f64-* codegen, and kotoba's own current source independently agrees -- runtime.clj's wasm-valtypes map is still exactly {:i32 0x7f :i64 0x7e :f32 0x7d} (no :f64), and wasm_exec.clj's call-main docstring still says 'No :f64 case'. The cross-repo self-report and the referenced repo's own source have not diverged."}
               :else
-              {:score 0.6 :note "kotoba-lang's tranche record still claims the f64 gap, but kotoba's own current source no longer matches the expected 'no :f64 entry' / 'No :f64 case' text -- f64 codegen may have actually landed in kotoba since this claim was written; re-verify by hand before revising claim/self-caveat."})))}])
+              {:score 0.6 :note "kotoba-lang's tranche record still claims the f64 gap, but kotoba's own current source no longer matches the expected 'no :f64 entry' / 'No :f64 case' text -- f64 codegen may have actually landed in kotoba since this claim was written; re-verify by hand before revising claim/self-caveat."})))}
+
+   ;; ---- added 2026-08-10, weekly claim-discovery pass ----
+   {:claim :claim/kotoba-lang-surface-status-one-residual-remaining :axis :axis/functional-completeness :layer :lint
+    :fn (fn []
+          (if (exists? "lang/surface-status.edn")
+            (let [surf (slurp* "lang/surface-status.edn")
+                  missing-entries (re-seq #":missing \[[^\]]*\]" surf)
+                  non-empty (remove #(str/includes? % "[]") missing-entries)]
+              (cond
+                (empty? missing-entries)
+                {:score 0.3 :note "lang/surface-status.edn no longer has any ':missing [...]' entries in the expected shape -- the file's structure may have changed; re-verify by hand."}
+                (and (= 1 (count non-empty)) (has? (first non-empty) #"linear-resource-result-families"))
+                {:score 1.0 :note (str "confirmed: exactly " (count missing-entries) " ':missing [...]' entries exist across lang/surface-status.edn, and exactly one is non-empty -- '" (first non-empty) "' -- matching ADR-kotoba-compiler-native-boundary-v1.md's 'surface-status の残件は :linear-resource-result-families 1件のみ' framing precisely.")}
+                (zero? (count non-empty))
+                {:score 0.7 :note "improvement beyond the claim: every ':missing [...]' entry in surface-status.edn is now empty -- the single remaining residual (:linear-resource-result-families) appears to have closed since this claim was written; re-verify the ADR text and consider whether this claim should be marked resolved."}
+                :else
+                {:score 0.4 :note (str "surface-status.edn now has " (count non-empty) " non-empty ':missing' entries (not just :linear-resource-result-families) -- either new residuals were discovered or the ADR's 'residual list is down to one item' framing has gone stale; re-verify by hand: " (str/join " | " non-empty))}))
+            {:score 0.0 :note "lang/surface-status.edn no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   {:claim :claim/kotoba-lang-surface-status-one-residual-remaining :axis :axis/evidence-linkage :layer :evidence-link
+    :fn (fn []
+          (if (exists? "docs/adr/ADR-kotoba-compiler-native-boundary-v1.md")
+            (let [adr (slurp* "docs/adr/ADR-kotoba-compiler-native-boundary-v1.md")]
+              (if (and (has? adr #":linear-resource-result-families")
+                       (has? adr #"surface-status"))
+                {:score 1.0 :note "confirmed: ADR-kotoba-compiler-native-boundary-v1.md still names :linear-resource-result-families as the one unresolved surface-status residual in its Context, and its Non-goals section still says the ADR does not resolve it -- the ADR's own citation is internally consistent and still points at a real, current file location."}
+                {:score 0.4 :note "ADR-kotoba-compiler-native-boundary-v1.md no longer names :linear-resource-result-families / surface-status verbatim together -- wording may have changed or the item closed; re-verify by hand."}))
+            {:score 0.0 :note "docs/adr/ADR-kotoba-compiler-native-boundary-v1.md no longer exists -- claim's cited source file is gone; re-verify."}))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]
