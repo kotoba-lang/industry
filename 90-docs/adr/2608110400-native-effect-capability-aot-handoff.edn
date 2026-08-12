@@ -539,11 +539,70 @@
     "UEFI map 全体を index 化する bounded allocator と zones"
     "APIC / SMP、scheduler / address spaces / CPL3 / typed syscall"
     "log を最初の native effect provider として semantic vector と empty-foreign-code receipt まで閉じる"]
-   :next
+  :next
    "次は fault で止まれたことを例外処理全体の完成と読まない。専用 stack と保存済み frame を
     持つ recoverable exception path、#DF の fail-closed path を閉じてから、dynamic map/unmap と
     unmap 後 access の CPU receipt へ進む。並行して effect 本線は landed authority だけを使い、
     LOG_WRITE の typed provider 化を続ける。"}
+
+  :adr/addendum-2026-08-12-recoverable-page-fault-frame
+  {:status "accepted; closes the bounded recoverable-frame and software-selected dedicated-stack slice, but not #DF/TSS/IST"
+   :dependency-authority
+   {:kotoba-gmir "c849a94540821af95c89d07aa7c921ba30e330de"
+    :kotoba-sema "67e8fcf9eb4b5f0ef77663e60a4935f3c3d5f0f1"
+    :kotoba-kir "f9731652764be6fa450a20ed6b469c8e5d621754"
+    :kotoba-verifier "ad84ace7ac38cdc563c7de0785d4cdf0f72c9fc5"
+    :kotoba-native-executable "f36455660381d3050dd04a436f53b4c6a6fafbd7"
+    :kotoba-native-doc-tip "fc8e72712e1d45594c1302bd30592a729478b27e"
+    :amu "1de9dafe71c12b68233fb815d5cd36208a9b22a4"
+    :aiueos "b1f00e8b29f37fd44b486bf14a8f8124d2422c44"
+    :aiueos-adr "ADR-0040"}
+   :finding
+   "ADR-0039 の非復帰 handler は CPU が配送した CR2/error code を証明したが、保存済み
+    frame を壊さずに実行へ戻ること、handler の receipt work を通常 stack から分離すること、
+    不正な frame/stack 設定を probe 前に拒否することは未証明だった。また CPU の saved RIP は
+    probe 全体の先頭ではなく faulting store 自体を指すため、compiler が所有すべき境界は
+    probe 長ではなく正確な 4-byte store encoding だった。"
+   :decision
+   "allocator extent を 8 pages にする。page 6 は exception receipt frame、page 7 は
+    dedicated handler stack とし、distinct/nonzero/aligned な組だけを sealed operation で設定する。
+    handler は触る register を固定 RW+NX context scratch に保存し、receipt work を専用 stack で行い、
+    CPU が interrupted stack に作った frame の saved RIP だけを 4 bytes 前進させる。その後
+    interrupted stack と register を復元し、その CPU frame を通じて iretq する。guest に任意 handler、
+    stack pointer、store、RIP rewrite、iretq は公開しない。設定不正時は zero を返して fail closed にする。"
+   :machine-evidence
+   {:normal "debug=MPRCD, isa-debug-exit status=33"
+    :recoverable-guard-store "debug=MPRCDRE, status=33; R=CPU-frame handler receipt, E=iretq 後の Kotoba frame validation"
+    :frame-stack-alias-mutation "debug=M, status=49; IDT/probe installation 前に拒否"
+    :nonreturning-regressions ["guard G/status=51" "text W/status=53" "NX X/status=55"]
+    :positive-elf-sha256 "9ae5180a92f0fffe9e153a1440f8eda507c0f0c4d35f16c633ac3a609e5bbbd7"
+    :positive-elf-bytes 49520
+    :receipt "v5; C source/object、CRT、linker input、import、dynamic dependency は全て空; fuel 32768; allocator 8 pages"
+    :tests ["kotoba-gmir 13 tests / 80 assertions"
+            "kotoba-sema 7 tests / 35 assertions"
+            "kotoba-kir 134 tests / 575 assertions"
+            "kotoba-verifier 48 tests / 269 assertions"
+            "kotoba-native 139 tests / 1807 assertions"
+            "Amu 970 tests / 7658 assertions"
+            "aiueos 442 tests / 1396 assertions"]}
+   :bugs-caught-by-machine-gate
+   ["inline configuration template に誤って retq が入り、ABI を壊していた"
+    "最初の recovery は saved RIP を probe 全長だけ進めた。CPU frame が指した 4-byte faulting store だけを skip するよう修正した"]
+   :closed
+   ["既知の同 privilege guard-store 1 vector の exact CPU frame receipt と iretq 復帰"
+    "receipt work の allocator-owned dedicated software-selected stack"
+    "frame/stack alias と zero/misaligned configuration の fail-closed rejection"
+    "normal boot と既存非復帰 G/W/X receipt の regression closure"]
+   :remaining
+   ["hardware stack switching を伴う TSS/IST と #DF の distinct fail-closed path"
+    "common exception frames、nesting/reentrancy、per-CPU state、CPL3 return"
+    "dynamic mapping/unmapping と unmap 後 access、local/remote TLB invalidation"
+    "UEFI map 全体を index 化する bounded allocator と zones"
+    "APIC/SMP、scheduler/address spaces/typed syscall、log provider semantic vector"]
+   :next
+   "software-selected #PF stack を IST の証拠と読まない。minimal TSS と #DF IST gate を作り、
+    successful outcome を distinct fail-closed receipt だけに限定する。その後に dynamic map/unmap と
+    effect 本線の LOG_WRITE typed provider を、それぞれ独立した machine evidence で進める。"}
 
   :adr/addendum-2026-08-11-step1-substrate-measurement
   {:status "accepted; revises 順序 item 1 のキット選択と、:typed-provider-syscall-abi を白紙と読む枠組み"
