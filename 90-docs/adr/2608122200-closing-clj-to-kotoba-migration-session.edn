@@ -730,6 +730,53 @@ measurement**, so nothing from it should be quoted.
 4. **Removing the stray `gftd-motion-actor` clone is now unblocked** — the content
    is in B2 and the branch is published, which were the two preconditions.
 
+## Final close, 2026-08-13
+
+Three agents stopped mid-work. **Nothing was lost, and one of them had already
+finished the part that mattered.**
+
+### The custody rescue landed before the stop
+
+`ghosthacker-shiropico-assets` — the 42 objects that were at ONE copy — are
+**42/42 present in B2, probed key by key by exit code**, and the `git-annex`
+branch is on the remote. Six of the seven unpublished maps were already
+published; the seventh was pushed during this close. **The at-risk content is no
+longer at risk.**
+
+### I walked into the trap I had fixed an hour earlier
+
+Checking which repos had their branch published, I picked the remote with
+`git remote | head -1` — **the first alphabetically** — which for annex repos is
+`b2`, a special remote whose URL is the literal string `b2`. Every check came
+back **0 branches published**, and I nearly recorded that the rescue had not
+landed.
+
+**This is the exact defect I diagnosed and fixed in
+`verify-duplicate-registrations.cljs` today**, twice: first narrowing to GitHub
+remotes, then preferring `origin`. I fixed it in the detector and then made the
+same mistake by hand, in an ad-hoc loop, within the hour.
+
+**A fix in one script is not a fix in the habit.** The next ad-hoc `git remote |
+head -1` will be wrong the same way.
+
+### One genuine oddity, recorded rather than resolved
+
+One repo's `ls-remote` succeeds and shows both branches, while `push` to the
+same remote fails with *could not read from remote repository*. **Read works,
+write does not.** The map is published and the content is in B2, so nothing is
+pending — but the asymmetry is unexplained and would block a future push.
+
+### Two agents stopped before landing anything
+
+The factory-plane verifier fix had both floors firing and was moving to the
+remaining failure modes. The observatory-registry fix was reading the hook to
+learn exactly what it compares, and had noted that **main was advancing rapidly
+with different repos each time** — which is true and is why every branch in this
+session was cut fresh from `origin/main` and re-applied on conflict.
+
+Both are recorded with their diagnoses in ADR-2608124800, so the next attempt
+starts from the diagnosis rather than from the symptom.
+
 ## Resume point
 
 The five agents stopped at the previous close were **resumed from their
