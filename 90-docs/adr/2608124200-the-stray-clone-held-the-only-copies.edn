@@ -104,4 +104,46 @@ not read.
   prescribes for exactly this case. The shared checkout was never touched.
 - The branch was cut from the **real remote tip**, not the west pin, which was 5
   commits behind. That checkout is detached at the pin, its remote is not named
-  `origin`, and nothing was pushed from it."}]
+  `origin`, and nothing was pushed from it.
+
+## RESOLVED. Published, then retired — in that order
+
+**Published.** The B2 special remote is configured and real, and all five
+objects were confirmed present. Then the `git-annex` branch was pushed
+(`babf541..481b085`) — **without which the content is in B2 and no fresh clone
+can find it**, because the branch is what records where the objects live. Content
+and the map to it are two separate publications and both are required.
+
+**Then retired.** `orgs/gftdcojp/gftd-motion-actor` is removed, along with a
+second worktree at `/private/tmp/gma` whose `.git` was a symlink into the
+stray — **not recorded in the original audit, and deleting the stray blind would
+have left it dangling.**
+
+Three things in how it was checked are worth keeping:
+
+- **`whereis` reports CLAIMS, not presence.** The agent probed B2 directly for
+  each key rather than trusting the location log — which is exactly the right
+  instinct, and the same class as everything else recorded today: the tool
+  answers its own question correctly.
+- **`main-2` in the log WAS the stray itself.** So the three copies were
+  registered checkout, B2, and the doomed clone: deleting it took every object
+  **3 to 2, never to 1.** Reading `3 copies` without resolving which repository
+  each was would have made the deletion look safer than it was.
+- **The archives had to be checked before the delete, not after.** A bundle of
+  the annex branch lived inside both checkouts, and removing the stray destroys
+  the copy inside it. The surviving one was `git bundle verify`-ed first.
+
+`rm -rf` initially failed: **git-annex write-protects its objects.** The fix was
+a `chmod` scoped behind a path guard — a filesystem delete of a doomed clone, not
+`git annex drop`, and no gc or prune anywhere.
+
+### The location log overstated redundancy afterwards, and that is now closed
+
+Removing a clone from disk **does not retract its claim** — the location log is a
+distributed claim log, so `whereis` kept reporting 3 copies when the truth was 2.
+Left uncorrected that is a log which says the data is more redundant than it is,
+which is the worst direction for this particular record to be wrong in.
+
+`git annex dead 30a27285-…` retracts it, and the updated log was pushed
+(`481b085..c74f6bf`). **`whereis` now reports 2 copies**, which is the truth.
+HEAD unmoved, working tree clean throughout."}]
