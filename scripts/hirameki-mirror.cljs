@@ -174,8 +174,10 @@
          :mirror/stage :restore}))
 
 ;; HEAD が合っていても中身が壊れていることはある。corpus 自身の検証器を回す。
+;; alias は `:query` —— checks.clj が datascript を require する（2026-08-10）ので、
+;; 素の `-M` では classpath に無く、復元した corpus が健全でも必ず落ちる。
 (def verified?
-  (let [r (run "clojure" ["-M" "verify.clj"] {:cwd restore-dir :timeout 600000})]
+  (let [r (run "clojure" ["-M:query" "verify.clj"] {:cwd restore-dir :timeout 600000})]
     (when-not (zero? (:exit r))
       (println (:out r))
       (die! {:mirror/reason "復元した corpus が verify.clj を通らない"

@@ -234,7 +234,12 @@
                :run/gained gained :run/patents after-patents}))
       ;; publish 自身が単一ブロック超過を拒否するので、ここで CID を再検証する必要は
       ;; ないが、**検証器が通ることは確かめる** —— 拒否と検証は別のコードなので。
-      (let [v (run-in corpus-dir "clojure" ["-M" "verify.clj"] (* 10 60 1000))]
+      ;; **`:query` alias で呼ぶ。** verify.clj 自身の冒頭が `clojure -M:query verify.clj`
+      ;; と書いている —— checks.clj は 2026-08-10 に datascript を require するように
+      ;; なり（件数だけでなく「corpus が問いに答えるか」を検査するため）、素の `-M` は
+      ;; `Could not locate datascript/core__init.class` で落ちる。それが 2026-08-10 から
+      ;; 46h ぶん feeder を止め、hirameki を :feeder-stale にしていた。
+      (let [v (run-in corpus-dir "clojure" ["-M:query" "verify.clj"] (* 10 60 1000))]
         (when-not (zero? (:exit v))
           (println (:out v)) (println (:err v))
           (die! {:run/reason "verify.clj が失敗 — 成果物が manifest と一致しない"
