@@ -15,7 +15,7 @@
                 "adr-2607252000-authn-kotobase-net-identity-service"
                 "adr-2607267000-authn-authz-datom-store-schema-unification"
                 "2608039900"
-                "2608082000"
+                "90-docs/adr/2608082000-account-identity-word-id-persona-assurance.edn"
                 "adr-2607198300-kotoba-security-assurance-model"]
   :adr/authoritative_for ["Kotoba/Kotobase の identity・authentication・authorization・effect・grant・runtime capability の正規語彙"
                           "Principal × Intent × Effects × Grants × Policy × Context → Decision の唯一の authority 判定面"
@@ -186,7 +186,7 @@ readiness を区別する。
 - canonical schema、kernel、adapter、receipt migration の実装作業が必要になる。本 ADR と README
   の着地だけでは未移行 component の実装完了を意味しない。
 
-## Implementation status — R0–R3 landed（2026-08-12）
+## Implementation status — R0–R4 landed（2026-08-12）
 
 authority semantic ownerである `kotoba-lang/aiueos` に最初の実装sliceを着地した
 （PR #145、merge `f4c492a53ce81d212089ced5c1154f0975018d1e`）。superprojectの
@@ -244,10 +244,28 @@ R3は `network-awai/net-kotobase` PR #417、merge
   `420f380b-650e-4324-8258-9f76c010be68`へdeployし、health、未認証401、CORS expose header、
   public smokeをlive確認した。認証済みallow/428/403は実accountで未実測である。
 
-R3後も**未着地**なのは、compatibility grantではなくDatomic/Kotobase basisから取得する
-署名・失効可能なpolicy/grant、payment Settlement→Entitlement Grant、UIのchallenge/step-up
-projection、canonical signed wire envelope、audit以外のroute固有policy、receiptの
-transparency-log anchorである。既存APIは壊さず段階移行する。
+R4は `network-awai/net-kotobase` PR #421、merge
+`5d87987c43ab192c9970497d440fc4ef5e7ba3e3` として着地した。tenantの予約済み
+`__authority` Datomic databaseをaudit routeのGrant sourceにするmigration portである。
+
+- verified principal DIDとserver-owned permissionだけでgrant entityをqueryし、action、resource、
+  subject、tenantはedgeが再構成する。stored factやHTTP bodyはauthorityを拡張できない。
+- `revoked?`、`not-before`、`expires-at`をkernelが検査する。malformed rowはbasis全体を拒否し、
+  empty basisはdeny、query/storage failureは503で、Datomic modeからcompatibility grantへ戻らない。
+- graph readはqueryに使用した同一snapshotのcontent-addressed `basis_cid`を返す。Decision Receiptは
+  authority database名とそのCIDを記録する。
+- activationは `KOTOBASE_AUTHORITY_SOURCE=datomic` の明示switchである。authority graph未provision
+  のproductionでは未設定とし、既存API/認可挙動を維持した。
+- evidence: gateway 399 tests / 1925 assertions、46 registered namespaces、graph database 319 tests /
+  962 assertions、graph architecture gate、両release buildがgreen。本番graph Version ID
+  `9286dc57-3394-4a1d-8f13-9234bded412b`、gateway Version ID
+  `e5fddd97-5113-4e83-94cd-7e751dc43758`へdeployし、両healthと未認証audit 401をlive確認した。
+
+R4の `basis_cid` はcontent addressだが、canonical `/v2/query` が検証するpublic signed commit
+envelopeではない。従ってR4を「署名Grant検証」と表現してはならない。**未着地**なのは、signed
+authority frontierのprovisionとcanonical query、payment Settlement→Entitlement Grant、
+UIのchallenge/step-up projection、canonical signed wire envelope、audit以外のroute固有policy、
+receiptのtransparency-log anchorである。既存APIは壊さず段階移行する。
 
 ## One-line rule
 
