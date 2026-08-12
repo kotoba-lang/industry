@@ -223,6 +223,7 @@ one-shot 会計・host identity pin は、そこに 1 つも無い。
 | `crdt` の doc の entity | 4 | **5**（同上） |
 | `jp-go-dds` の `:document` member | 32 | **33** |
 | `jp-go-dds` の select option | 32 | **33** |
+| `shitsuke` の `[:map :keyword :string]` | 29 | **30**（64-node ADT 限界。31-entry map 限界ではない） |
 
 `fsm` が委譲でき `mokuroku` ができないのは、**player の alphabet が閉じた 3 event で
 domain と共に増えないから**であって、set かどうかではない。同じ理屈で `crdt` の
@@ -273,11 +274,12 @@ fleet が compiler を進めても赤くならない形にした（同 ADR が r
 | `com-cloudflare` | `eafc65a` | **上の実測 1 の修正。** pin を対で前進（cost は測って安かった）+ 両 runtime を同じ case 表で回す gate（220 case / 117 export、被覆強制）。west pin `a1e69d6` |
 | `jp-go-dds` | `0a02180` | 8 core を委譲。**cljs は意図的に対象外** —— 170 repo の consumer 全部に `kotoba-kir` + `kotoba-hir` + `security` を載せる対称性は買わない、という判断で seam を `.clj` にした。cljs 側は「規則が 2 実装のまま」であることを README と test で明示。west pin `671490c` |
 | `cloud-itonami-isic-6492` | `53c041c` | ADR-2608120200 が「host は在るが swap していない」と書いた repo。**定数が artifact から来る**ようになった（`confidence-floor-x100` は `oracle/call-i64` そのもの）。出荷物は Worker に classpath が無いので生成 `.cljc`。west pin `1879c48` |
+| `shitsuke` | `a5aa622` | HTML5 RAWTEXT breakout の**security 述語**が走るようになり、`shitsuke.hiccup` から `re-find` が消えた。64 KiB 超は窓（16384 char / 256 overlap）に割って**全窓を guest が判定**する。west pin `736a086` |
 | `mesh` | `9d546e6` | `node.clj` の `cond` に在った request 判断（`request-kind` / `answer?` / `outcome` / `status-for`）を委譲。route **表**は host 側に残り、core は「束縛済みか」の bool だけ受けるので、**route が 1 本でも 1 万本でも guest が見るのは同じ 4 スカラ**。west pin `80786dd` |
 | `tender-component` | `d985006` | 委譲しない判断と、その判断を守る gate。west pin `7d4285a` |
 | `fsm` | `91b65bf` | 別セッションが先に着地（本セッションは境界の実測のみ） |
 
-**11 repo に並列で当たって、委譲が landed したのは 8、明示的に「委譲しない」が
+**11 repo に並列で当たって、委譲が landed したのは 9、明示的に「委譲しない」が
 landed したのは 2、**そして **production の破れが 2 件見つかって両方閉じた。** 「移行が進む」は「委譲が増える」と同義ではない ——
 `inga` と `tender-component` の 2 件は、**移せない理由を測って gate にした**という
 形で前進している。
@@ -311,6 +313,23 @@ vendored palette 全体で）。「cljs consumer が無いなら無いと書く�
 guest の型が `\"\"` と欠落を同一視するので、委譲すると今日の `<a href=\"\">` が
 静かに `<button>` に化ける。host 側に残し、その向きで落ちる test を付けた。
 
+### 構造的に委譲できても、載せない方が正しいことがある
+
+`jp-go-dds` と `shitsuke` は独立に同じ判断に達した —— **境界を越えられる export でも、
+その呼び出し元が「load 時」や「browser の render 経路」なら委譲しない。**
+
+- `shitsuke` の tokens / hig export は全部 delegable だが、呼び出し元
+  `kotoba-ui.theme/theme-css` は **24 repo が依存する library の browser render
+  経路**で、うち 2 つは top-level `def`。委譲すると **design system を load すること
+  自体が「artifact を register 済みか」に依存**する。`rawtext-breakout?` は
+  その代償を払わない（cljs app は reagent で描き、`->html` を通らない）ので、
+  そこだけを委譲した。
+- `jp-go-dds` は同じ理由で cljs 側の seam 自体を置かなかった。
+
+**つまり委譲の可否は 3 面ある**: 値（domain と共に大きくなるか）・権限
+（capability を持つか）・**呼び出し位置**（load 時か、hot path か、deploy runtime に
+interpreter を載せられるか）。ADR-2608112100 は 1 面目だけを書いていた。
+
 ## Consequences
 
 - **`:stage/host-executes` は runtime を区別しない。** ADR-2608121700 の索引は
@@ -325,6 +344,30 @@ guest の型が `\"\"` と欠落を同一視するので、委譲すると今日
   port（UTF-8 バイト）の framing 差は
   `the-host-and-the-port-frame-non-ascii-differently` が両方の答えを書いて pin して
   ある —— どちらかが動けば落ちる。
+
+## Closing（2026-08-12）—— 未完のもの
+
+**2 つの調査が本文の締め切り時点でまだ走っている。** どちらも結果が出たら、この
+ADR の該当節を**書き換える**（追記ではなく。ADR-2607257000）。
+
+1. **`erasure` の委譲** —— 決定（`cauchy-entry` / `generator-entry` /
+   `locally-repairable?` / repair plan）は per-repair、GF 演算（`gf-mul` 等）は
+   **per-byte の機構**なので、後者を interpreter 経由にすると場所を間違える。
+   線をどこに引いたかと、`kotoba.kir/execute` の per-call コスト実測が要る
+   （`inga` は node で **1.35 ms/call**、cljc の規則は ~0.6 µs と測った）。
+2. **未監査の production 3 repo** —— `cloud-itonami-app` / `kawaraban` / `aiueos`。
+   ADR-2608120200 が「production で core を実行している 4 repo」と書いたうち、
+   `com-cloudflare` は本 ADR で破れが見つかり、残り 3 つは**まだ誰も cljs で
+   叩いていない**。`kawaraban` は `kototama.tender`（JVM/Chicory）、`aiueos` は
+   bare metal なので**そもそも cljs 経路が無い可能性が高い** —— その場合
+   「無い」と書くのが正しい成果であって、欠陥を作り出さない。
+
+**次の 1 手（この 2 つが片付いた後）**: 本 ADR の Decision 1 が要求する cljs gate は、
+今のところ **repo ローカルのコマンド**でしかない。`com-cloudflare` の
+`test/cloudflare/oracle_cljs_gate.cljs` は credential も network も要らない
+決定的な `:nbb-script` gate に向くが、**`scripts/fleet-ci/gates.edn` は superproject
+側にあり、まだ 1 件も登録していない**。登録するまでは「走っていない検査」であり、
+それは本 ADR が問題にしている当のものである。
 
 ## Evidence
 
@@ -352,6 +395,10 @@ guest の型が `\"\"` と欠落を同一視するので、委譲すると今日
 - `jp-go-dds` `0a02180`: JVM **115 tests / 2487 assertions**（旧 101/2097）、
   cljs **46 / 1460**（変更前と同一 —— interpreter が classpath に居ないことの確認）。
   変異 4 種すべて fail
+- `shitsuke` `a5aa622`: JVM **84 tests / 1132 assertions**（旧 77/510）、
+  cljs check **12/12**。変異 4 種すべて fail —— 出荷 artifact の `\"</\"` を
+  `\"<//\"` にすると **drift 1 件だけでなく 605 failures**（host の挙動が artifact に
+  従って変わったことの、substitution とは独立な証拠）
 - `cloud-itonami-isic-6492` `53c041c`: JVM **111 tests / 877 assertions**、
   cljs **49 / 599**、どちらも 0 failures。変異 5 種すべて fail —— うち 1 つは
   **ADR-2608120200 が「93 test 全部が緑のまま」と測った当のケース**（ceiling を
