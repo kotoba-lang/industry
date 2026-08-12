@@ -86,6 +86,38 @@ root commit を共有する）。fork も root を共有するので、これは
 捨てはしない。二重登録そのものは `scripts/verify-duplicate-registrations.cljs` が扱う ——
 実測 **35 repo が 75 path に登録**されており、全件が GitHub id 一致で確認済み（fork はゼロ）。
 
+## 8 件の内訳（2026-08-12 に全件を追った）
+
+| namespace | 状況 |
+|---|---|
+| `kami/fsm.cljc` `kami/gpu.cljc` `kami/input.cljc` | **別設計が 2 つ**。ADR-2608120800。削除では解けない |
+| `pay/core` `pay/facilitator` `pay/x402` `treasury/core` | **vendoring**（衝突ではない）。ADR-2608121000。課金経路で drift |
+| **`kotoba/lang/package_registry.cljc`** | 下記。**8 件中いちばん鋭い** |
+
+### `package_registry` —— 依存関係が確定しているので、必ず同居する
+
+`kotoba-lang/kotoba-lang` と `kotoba-lang/kotoba-core-contracts` の両方が
+`kotoba.lang.package-registry` を出しており、**前者が後者に依存している**。
+kami の 3 件は「同居しうる」だったが、これは**同居が確定**している。
+
+同じ設計の **2 通りの書き方**である（共有 10 関数: `resolve-record` `validate`
+`lookup` `normalize` `record-problems` `lock-from-requests` `record->lock-dep`
+`registry-key` `registry-version` `version-only-request?`）。
+`kotoba-lang` 側が 126 行の圧縮版（docstring 無し、`required` / `check-case`）、
+core-contracts 側が 251 行（docstring 付き、`record-required` / `record-optional`）。
+**戻り値も同一ではない** —— `record-problems` の非 map ケースは
+前者が `{:problem :registry/record-not-a-map}`、後者が `:value` 付き。
+
+**対象が何かが問題である。** これはパッケージ受理の kernel ——
+「name@version を実行可能入力にしない」「CID pin された lock を必ず出す」を担う。
+消費者は `kotoba/package_admission.clj`、`security/package_admission.clj`、
+`package-registry-ipfs`、core-contracts 自身の network 層。
+**classpath で勝った方が「何をロードしてよいか」の意味を決める。**
+
+ここでも決めない（どちらが正本かは owner 判断）。記録する目的は、
+**依存が確定しているのに 2 実装が載っている**という事実を、次に触る人が
+探し直さずに済むようにすること。
+
 ## Decision
 
 ### 1. 検出器を置く。一括修正はしない
