@@ -55,9 +55,23 @@ or bytes identical to the sibling's worktree or the registered repo's `main`.
 
 1. **`gftdcojp/local-murakumo`, `stash@{0}`** (`7d827047`, absent from GitHub).
    `worker.cljs` +6/-2: `auth-ok?` extended to accept a second, separately
-   rotatable `BABINIKU_PROXY_TOKEN` beside `ANTHROPIC_PROXY_TOKEN`. Not present
-   in the registered checkout or on its `main`. The stash message itself says
-   drop-forbidden.
+   rotatable `BABINIKU_PROXY_TOKEN` beside `ANTHROPIC_PROXY_TOKEN`. The stash
+   message itself says drop-forbidden.
+
+   **Correction (measured during archiving): `absent` is literally true and
+   materially misleading.** The token NAME appears nowhere in
+   `network-awai/local-murakumo` and `auth-ok?` no longer exists -- but the
+   CAPABILITY has landed under a different name. `authorize!` now accepts
+   `ANTHROPIC_PROXY_TOKEN` and an optional `ANTHROPIC_PROXY_TOKEN_2`, a second
+   separately rotatable token, through a pure decision namespace
+   `local-murakumo.messages-auth`, plus mk1 capability tokens (ADR-2608011400).
+
+   So the stash is plausibly FUNCTIONALLY SUPERSEDED, and what is unique to it
+   is the BabiNiku-specific token name rather than the idea. Read as originally
+   written, this entry would have sent someone to port a second-token mechanism
+   onto a file that already has one. A grep for the identifier answered
+   `is this string here`, not `is this capability here`, and only the second
+   question was the one being asked.
 2. **`gftdcojp/cloud-murakumo`, `stash@{0}`** (`32dfb542`, absent from GitHub).
    `deps.edn` +3/-1: pins `ed25519` by `:git/url` + `:git/sha` instead of
    `:local/root`. Registered checkout and remote `main` still carry the
@@ -74,14 +88,52 @@ or bytes identical to the sibling's worktree or the registered repo's `main`.
    `.gitignore` excludes `artifacts/`, `*.wav`, `*.mp3` -- so this was never
    meant for git and is regenerable output, not lost work.
 
+## Archiving: DONE for all three (2026-08-12)
+
+Each is exported to `.git/stash-archive-20260812/` in its own orphan checkout,
+with an `index.txt` carrying the verification transcript, the reapply command,
+the base commit and the disposition note -- so the next person needs nothing but
+the file. **Verified rather than asserted**: each patch was applied to a clean
+tree and the result hashed against the stashed blob; all four files match.
+
+Two things the archiving surfaced that the audit had not:
+
+- **Item 3's content is in `stash^3`** (the untracked-files parent), so a plain
+  `git stash show -p` shows NOTHING. The export is
+  `git diff <empty-tree> <sha>^3`. An archive taken the obvious way would have
+  been an empty file that looked like a successful archive.
+- **Item 2 has a `^3` too, but its tree is empty.** A zero-byte listing is kept
+  deliberately, so the emptiness is on the record rather than reading as a
+  missing file.
+
+The stashes were NOT dropped and no orphan directory was removed. Whether these
+changes get ported is still open, per the dispositions below.
+
+## Dispositions
+
+- **Item 1** -- likely superseded (see the correction above). The open question
+  is only whether the BabiNiku-specific token name is still wanted.
+- **Item 2** -- confirmed NOT landed. `main` still carries the `:local/root`
+  form. Two things for whoever ports it: the stash's `:git/url` names
+  `kotoba-lang/ed25519`, which is a rename REDIRECT to
+  `kotoba-lang/org-ietf-ed25519`; and the pinned sha `fdcefb9f` is real but
+  dated 2026-06-29, so the pin is about six weeks stale as written.
+- **Item 3** -- the author's supersession note CHECKS OUT. Both cited commits
+  exist in the registered successor and are reachable from `main` with
+  `behind_by = 0`. The stashed `aozora.cljc` is the earlier `.cljc`/js-fetch
+  variant and exists on no branch anywhere, which is exactly why it needed
+  archiving rather than trusting the note.
+
+Incidental: `gftdcojp/local-murakumo` and `gftdcojp/cloud-murakumo` are GitHub
+rename redirects to `network-awai/...`, and `gftdcojp/shinshi-growth-actor` to
+`cloud-itonami/...`. The orphan checkouts' `origin` URLs still carry the old org
+names and resolve only through those redirects.
+
 ## Before deleting
 
-For 1-3, land or archive the stashes first, per `manifest/cleanup-workflow.edn`
-`:retirement`: export each to `.git/stash-archive-<date>/`, and **re-resolve the
-stash index by SHA at drop time**, since a concurrent session can shift
-`stash@{0}`. Items 1 and 2 are genuinely unlanded and need a decision on whether
-to port them onto the registered checkout; item 3 needs a maintainer to confirm
-the author's supersession note.
+Re-resolve each stash by SHA at drop time, since a concurrent session can shift
+`stash@{0}`. The archives above mean a drop is now recoverable, which it was
+not before.
 
 For 4, decide whether 164 MB of regenerable audio is worth keeping. If it is, it
 belongs in B2/DataLad (skill `large-binary-datalad`), not in an orphan checkout.
