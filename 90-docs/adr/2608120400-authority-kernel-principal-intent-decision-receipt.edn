@@ -186,7 +186,7 @@ readiness を区別する。
 - canonical schema、kernel、adapter、receipt migration の実装作業が必要になる。本 ADR と README
   の着地だけでは未移行 component の実装完了を意味しない。
 
-## Implementation status — R0 + credential adapter R1 landed（2026-08-12）
+## Implementation status — R0 + R1 credential adapter + R2 enforcement landed（2026-08-12）
 
 authority semantic ownerである `kotoba-lang/aiueos` に最初の実装sliceを着地した
 （PR #145、merge `f4c492a53ce81d212089ced5c1154f0975018d1e`）。superprojectの
@@ -216,10 +216,21 @@ fast-forwardしたため、current pinはR1実装mergeを祖先として含む�
 - evidence: authn 43 tests / 283 assertions、gateway 385 tests / 1882 assertions、authnと
   gatewayのrelease build、87-input bundle manifest整合がgreen。
 
-R1後も**未着地**なのは、gateway→R0 decision kernel呼び出し、Kotobaseのimmutable basisからの
-policy/grant取得とreceipt append、payment Settlement→Entitlement Grant、UIのchallenge/step-up
-projection、canonical signed wire envelopeである。既存APIは壊さず、adapter→kernel→projection
-の順で段階移行する。
+R2は `network-awai/net-kotobase` PR #412、merge
+`c3317ba1b0e28bc9004d6908596cd89c66601f43` として着地した。audit read/exportを最初の
+実enforcement pointとしてR1 principal→R0 `decide`へ接続した。
+
+- server-owned route codeだけがeffectを宣言し、client bodyはeffect/grantを供給できない。
+- validated enterprise permissionをprincipal/tenant/action/resourceにboundしたcompatibility grantへ
+  投影する。personal viewerは移行中の既存tenant-local behaviorを保つ。
+- audit readはlow、audit exportはsubstantial assuranceを要求する。満たせる不足はboundedな
+  `AuthorityChallengeRequired`（HTTP 428）、grant欠如は403 denyであり、両者を混同しない。
+- R1 viewer→JS境界→R2 adapter→R0 kernelのroundtripを含む390 tests / 1900 assertions、
+  44 registered namespaces、worker/entry release build、88-input bundle manifestがgreen。
+
+R2後も**未着地**なのは、Kotobaseのimmutable basisからのpolicy/grant取得とreceipt append、
+payment Settlement→Entitlement Grant、UIのchallenge/step-up projection、canonical signed wire
+envelope、audit以外のroute固有policyである。既存APIは壊さず段階移行する。
 
 ## One-line rule
 
