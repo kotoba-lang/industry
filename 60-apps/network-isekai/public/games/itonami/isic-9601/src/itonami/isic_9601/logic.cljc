@@ -718,6 +718,14 @@
                     (update g :work (fn [w] (min (speed-of st (:stage g)) (inc (or w 0))))))
                   gs))))
 
+(defn stalled?
+  "Lapsed certification and cash below the ¥90 renewal fee — the shop cannot earn
+  (every op HARD-holds) and cannot recover. Distinct from `:gameover` (trust gone)
+  and `:victory` (audit closed): the run is soft-locked."
+  [st]
+  (and (not (:cert-current? st))
+       (< (:cash st) 90)))
+
 (defn tick
   "One step of shop time."
   [st]
@@ -743,6 +751,7 @@
       (cond
         (<= (:lives st) 0)                  (assoc st :flow :gameover)
         (>= (:returned st) victory-target)  (assoc st :flow :victory)
+        (stalled? st)                       (assoc st :flow :stalled)
         :else st))))
 
 (defn reduce-event
@@ -750,10 +759,14 @@
   `[:take-in]`, `[:buy k]`, `[:renew]` or `[:phase]`.
 
   Once `:flow` leaves `:playing` every event is a no-op -- a finished run does
-  not keep docking lives or earning cash."
+  not keep docking lives or earning cash. `:stalled` still accepts `:renew`
+  (escape if cash somehow appears) and `:reset`."
   [st ev]
-  (let [[kind arg] ev]
-    (if (and (not= (:flow st) :playing) (not= kind :reset))
+  (let [[kind arg] ev
+        playing? (= (:flow st) :playing)
+        stalled-ok? (and (= (:flow st) :stalled)
+                         (or (= kind :renew) (= kind :reset)))]
+    (if (and (not playing?) (not= kind :reset) (not stalled-ok?))
       st
       (cond
         (= kind :tick)    (tick st)
@@ -761,7 +774,11 @@
         (= kind :reject)  (reject st arg)
         (= kind :take-in) (take-in st true)
         (= kind :buy)     (buy st arg)
-        (= kind :renew)   (renew-certification st)
+        (= kind :renew)   (let [st' (renew-certification st)]
+                            ;; renew may clear the soft-lock; leave :stalled only while stuck
+                            (if (and (= (:flow st) :stalled) (not (stalled? st')))
+                              (assoc st' :flow :playing)
+                              st'))
         (= kind :phase)   (advance-phase st)
         ;; same district. The 1-arity `init` defaults to the laundry, so a reset in 洗車 or
         ;; 汚染浄化 quietly handed the player a different business.
@@ -794,7 +811,10 @@
    ;; survives a play-through.
    :costs (into {} (map (fn [k] [k (upgrade-cost st k)])
                         (keys (:upgrade (spec-of st)))))
-   :flow (:flow st)
+   ;; A state dumped before `:flow :stalled` existed may still be soft-locked while
+   ;; claiming `:playing`. Name the stall for hosts (CLI exit, HUD) without waiting
+   ;; for another tick.
+   :flow (if (and (= (:flow st) :playing) (stalled? st)) :stalled (:flow st))
      :ledger (:ledger st)
    :district (:district st)
    :district-label (:label (spec-of st))

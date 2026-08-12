@@ -19,10 +19,15 @@
   context, bind buffers, draw, read back.
 
   Usage:
-    nbb bin/kuriningu.cljs play   [--seed N] [--script \"tick*40 verify clean return\"] [--turns N]
-    nbb bin/kuriningu.cljs street [--cleared N]
+    nbb bin/kuriningu.cljs play   [--seed N] [--district ID] [--script \"...\"] [--turns N]
+                                  [--state FILE] [--dump FILE] [--format edn|json]
+    nbb bin/kuriningu.cljs street [--cleared N] [--format edn|json]
     nbb bin/kuriningu.cljs render [--out FILE] [--width N] [--height N] [--cleared N]
-                                  [--probe] [--backend webgl2]
+                                  [--state FILE] [--probe] [--backend webgl2]
+
+  `--dump` / `--state` carry the ADR-2608108000 envelope (`:itonami-game/state` v1) so a
+  played run can be handed to `bin/render.cljs --state`. `--format` is machine-readable
+  output; the default remains the human ANSI board.
 
   `render` needs the engine checked out (`west update --fetch smart webgpu render sprite2d`)
   and playwright; see README."
@@ -31,7 +36,8 @@
             [clojure.string :as str]
             [itonami.isic-9601.logic :as l]
             [itonami.isic-9601.world :as world]
-            [itonami.isic-9601.district :as district]))
+            [itonami.isic-9601.district :as district]
+            [itonami.isic-9601.state :as state]))
 
 ;; --------------------------------------------------------------------------
 ;; argv
@@ -119,8 +125,9 @@
                  (str (name (:op e))))))
     (when (not= (:flow sm) :playing)
       (println)
-      (println "  " (if (= (:flow sm) :victory)
-                      (green "監査クローズ — 規程どおり完了しました")
+      (println "  " (case (:flow sm)
+                      :victory (green "監査クローズ — 規程どおり完了しました")
+                      :stalled (red "行き詰まり — 資格失効かつ更新費 ¥90 未満 (flow :stalled)")
                       (red "信頼を失いました"))))
     sm))
 
@@ -210,64 +217,131 @@
         (l/reduce-event [:renew])
         (l/reduce-event [:phase]))))
 
+(defn- load-envelope!
+  "Read and validate a state file. Unknown `:version` / wrong `:kind` exit 2 with the
+  error message on stderr — agents must not silently play against the wrong shape."
+  [path]
+  (try
+    (state/parse (fs/readFileSync path "utf8"))
+    (catch :default e
+      (println (red (str "state " path ": " (or (.-message e) e))))
+      (js/process.exit 2))))
+
+(defn- write-dump! [path env]
+  (fs/mkdirSync (path/dirname (path/resolve path)) #js {:recursive true})
+  (fs/writeFileSync path (state/encode env)))
+
+(defn- emit-format!
+  "Machine-readable play/street output. Default (nil) keeps the human ANSI path."
+  [fmt value]
+  (case fmt
+    "edn"  (do (print (state/encode value)) (flush))
+    "json" (println (js/JSON.stringify (clj->js value)))
+    nil    nil
+    (do (println (red (str "unknown --format " (pr-str fmt) " (want edn|json)")))
+        (js/process.exit 2))))
+
+(defn- apply-script
+  [st0 district-id script]
+  (let [vocab (commands (district/spec district-id))]
+    (reduce (fn [st token]
+              (let [ev (get vocab token)]
+                (when-not ev
+                  (println (red (str "unknown command: " token)))
+                  (println (dimmed (str "  " district-id " knows: "
+                                        (str/join " " (sort (keys vocab))))))
+                  (js/process.exit 2))
+                (l/reduce-event st ev)))
+            st0
+            (mapcat expand (str/split (str/trim script) #"\s+")))))
+
+(defn- exit-code [sm]
+  (case (:flow sm)
+    :gameover 1
+    :stalled  3
+    0))
+
 (defn cmd-play []
-  (let [seed (int (num-opt "seed" 20260808))
-        district-id (opt "district" "isic-9601")
+  (let [state-path (opt "state")
+        dump-path (opt "dump")
+        fmt (opt "format")
+        loaded (when state-path (load-envelope! state-path))
+        seed (if loaded
+               (:seed loaded)
+               (int (num-opt "seed" 20260808)))
+        district-id (if loaded
+                      (:district loaded)
+                      (opt "district" "isic-9601"))
         script (opt "script")
-        turns (int (num-opt "turns" (if script 0 1500)))
+        ;; With --state or --script, default to zero further auto-turns: agents load a
+        ;; snapshot to inspect or to step with an explicit script, not to re-run auto.
+        turns (int (num-opt "turns" (if (or script loaded) 0 1500)))
         _ (when-not (district/spec district-id)
             (println (red (str "unknown district: " district-id)))
             (println (dimmed (str "  playable: " (str/join " " district/playable))))
             (js/process.exit 2))
-        st0 (l/init seed district-id)
+        st0 (if-let [shop (and loaded (:shop loaded))]
+              shop
+              (l/init seed district-id))
+        world0 (if loaded
+                 (or (:world loaded) (world/init))
+                 (world/init))
+        world0 (assoc world0 :in district-id)
         st (cond
-             script
-             (let [vocab (commands (district/spec district-id))]
-               (reduce (fn [st token]
-                         (let [ev (get vocab token)]
-                           (when-not ev
-                             (println (red (str "unknown command: " token)))
-                             (println (dimmed (str "  " district-id " knows: "
-                                                   (str/join " " (sort (keys vocab))))))
-                             (js/process.exit 2))
-                           (l/reduce-event st ev)))
-                       st0
-                       (mapcat expand (str/split (str/trim script) #"\s+"))))
-
-             :else
-             (reduce (fn [st _] (auto-turn st)) st0 (range turns)))
-        sm (print-shop! st)]
-    (println)
-    (println (dimmed (str "  " district-id "  seed " seed
-                          (if script (str "  script: " script) (str "  auto ×" turns))
-                          " — 同じ seed と同じ入力は同じ試合になります")))
-    (js/process.exit (if (= (:flow sm) :gameover) 1 0))))
+             script (apply-script st0 district-id script)
+             (pos? turns) (reduce (fn [st _] (auto-turn st)) st0 (range turns))
+             :else st0)
+        sm (l/summary st)
+        world (if (= (:flow sm) :victory)
+                (world/clear-district world0 district-id (:returned st))
+                world0)
+        env (state/wrap st world seed district-id)]
+    (when dump-path (write-dump! dump-path env))
+    (if fmt
+      (emit-format! fmt env)
+      (do (print-shop! st)
+          (println)
+          (println (dimmed (str "  " district-id "  seed " seed
+                                (when state-path (str "  state " state-path))
+                                (when dump-path (str "  dump " dump-path))
+                                (if script (str "  script: " script)
+                                    (if (pos? turns) (str "  auto ×" turns) "  (no further turns)"))
+                                " — 同じ seed と同じ入力は同じ試合になります")))))
+    (js/process.exit (exit-code sm))))
 
 ;; --------------------------------------------------------------------------
 ;; street
 ;; --------------------------------------------------------------------------
 
 (defn cmd-street []
-  (let [w (assoc (world/init) :cleared (int (num-opt "cleared" 0)))
+  (let [state-path (opt "state")
+        fmt (opt "format")
+        loaded (when state-path (load-envelope! state-path))
+        w (if loaded
+            (or (:world loaded) (world/init))
+            (assoc (world/init) :cleared (int (num-opt "cleared" 0))))
         s (world/status w)]
-    (println)
-    (println (bold "  営みの街") (dimmed (str "  開放 " (count (filter :unlocked? (:districts s)))
-                                              "/" (:total s)
-                                              "  自動化されない工程 " (:never-auto-total s) " 件")))
-    (println)
-    (doseq [d (:districts s)]
-      (println "  " (if (:unlocked? d) (green "●") (dimmed "🔒"))
-               (.padEnd (:label d) 12)
-               (dimmed (.padEnd (str "ISIC " (:isic d)) 11))
-               (.padEnd (str (:subject d) " を洗う") 14)
-               (if (district/spec (:id d)) (green "遊べる") (dimmed "マップのみ"))))
-    (println)
-    (println (dimmed "  どの店にも、どの段階でも自動化されない工程が必ずある:"))
-    (doseq [d (:districts s)]
-      (println "  " (dimmed (.padEnd (:label d) 12))
-               (yellow (str/join " " (:never-auto d)))
-               (dimmed (str "— " (:never-auto-why d)))))
-    (println)))
+    (if fmt
+      (emit-format! fmt (if loaded loaded {:world w :status s}))
+      (do
+        (println)
+        (println (bold "  営みの街") (dimmed (str "  開放 " (count (filter :unlocked? (:districts s)))
+                                                  "/" (:total s)
+                                                  "  自動化されない工程 " (:never-auto-total s) " 件")))
+        (println)
+        (doseq [d (:districts s)]
+          (println "  " (if (:unlocked? d) (green "●") (dimmed "🔒"))
+                   (.padEnd (:label d) 12)
+                   (dimmed (.padEnd (str "ISIC " (:isic d)) 11))
+                   (.padEnd (str (:subject d) " を洗う") 14)
+                   (if (district/spec (:id d)) (green "遊べる") (dimmed "マップのみ"))))
+        (println)
+        (println (dimmed "  どの店にも、どの段階でも自動化されない工程が必ずある:"))
+        (doseq [d (:districts s)]
+          (println "  " (dimmed (.padEnd (:label d) 12))
+                   (yellow (str/join " " (:never-auto d)))
+                   (dimmed (str "— " (:never-auto-why d)))))
+        (println)))))
 
 (defn cmd-render []
   (println)
@@ -282,8 +356,9 @@
   (println)
   (println (bold "  kuriningu") "— 「クリーニング営み」 command line")
   (println)
-  (println "    play    [--seed N] [--script \"...\"] [--turns N]   店を回す")
-  (println "    street  [--cleared N]                             営みの街を見る")
+  (println "    play    [--seed N] [--district ID] [--script \"...\"] [--turns N]")
+  (println "            [--state FILE] [--dump FILE] [--format edn|json]")
+  (println "    street  [--cleared N] [--state FILE] [--format edn|json]")
   (println "    render                                            → bin/render.cljs を案内")
   (println)
   (println (dimmed (str "  遊べる district: " (str/join " " district/playable))))
@@ -291,6 +366,7 @@
                         (str/join " " (sort (keys (commands (district/spec "isic-9601"))))))))
   (println (dimmed "  station は名前でも位置 (s1..sN) でも書けます — 位置なら district を跨げます"))
   (println (dimmed "  tick*40 のように *N で繰り返せます"))
+  (println (dimmed "  --dump/--state は {:kind :itonami-game/state :version 1 …} の EDN 封筒"))
   (println))
 
 (case command
