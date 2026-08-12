@@ -3,7 +3,7 @@
   :adr/title "effect を C-free native にする依存方向と aiueos 成熟度の引き継ぎ"
   :adr/status "accepted"
   :adr/date "2026-08-11"
-  :adr/last_verified "2026-08-11"
+  :adr/last_verified "2026-08-12"
   :adr/doc-type "adr"
   :adr/doc_type "adr"
   :adr/source-format "edn"
@@ -485,6 +485,65 @@
    "次は permission table を検査したことと CPU が違反を trap したことを混同しない。
     C-free minimal IDT と #PF handler を入れ、guard write、text write、NX execute を別々の
     fault receipt にする。その後、既に実在する LOG_WRITE oracle を typed provider 経路へ移す。"}
+
+  :adr/addendum-2026-08-12-c-free-page-fault-hardware-closure
+  {:status "accepted; closes the #PF item in the page-protection addendum"
+   :dependency-authority
+   {:kotoba-gmir "06bd297f3ff891c84749f1a2e8ef0d02c66e8057"
+    :kotoba-sema "8d4d2a1f6907d5258127cd9242baeb05ca38e3ad"
+    :kotoba-kir "7627875d6e072641a26492f076fafe51abf77604"
+    :kotoba-verifier "b801eb4effb9e299a32eda0b3cbbc9b7bc1e2f0c"
+    :kotoba-native "09880e60df46b1309868e9fa7a54e01d3db9079e"
+    :amu "87ed2088ffc155b83a8e8fbc65103ee8be9694ed"
+    :aiueos "79e04fb626739f1a48eef56d23a5688ea44bbe85"
+    :aiueos-adr "ADR-0039"}
+   :finding
+   "PTE の形と NXE/WP readback は、CPU が違反を #PF として配送した証拠ではない。
+    また最初の handler 追加で native text が従来の 9-page 境界を 1,271 bytes 超えた。
+    境界を黙って越えず build を fail closed にし、text を 10 pages、context を次の
+    `0x10b000` page へ明示的に移した。"
+   :decision
+   "Kotoba が allocator-owned page に IDT vector 14 の interrupt gate と IDTR を組み立てる。
+    backend は current CS、sealed #PF handler address、LIDT+SIDT exact readback と、
+    guard-write / text-write / NX-execute の 3 個の sealed probe だけを公開する。
+    guest に任意 pointer、store、call、handler address を公開しない。
+
+    handler は CPU が push した error code と CR2 を直接読み、G(non-present write)、
+    W(present RX write)、X(present NX instruction fetch) を分類する。probe image は各 1 故障
+    だけを含み、handler は debug marker と isa-debug-exit を出して非復帰とする。LIDT 後は
+    SIDT の base/limit が構築値と完全一致しなければ positive path を進めない。"
+   :machine-evidence
+   {:positive "x86_64 Linux/KVM + OVMF: debug=MPRCD, isa-debug-exit status=33"
+    :guard-write "debug=MPRCDG, status=51; CR2=0x100000 and error-code class=non-present write"
+    :text-write "debug=MPRCDW, status=53; CR2 in RX text and error-code class=present write"
+    :nx-execute "debug=MPRCDX, status=55; CR2=0x10b000 and error-code class=present instruction fetch"
+    :source-of-classification "CPU CR2 + CPU-pushed #PF error code; not verifier metadata"
+    :positive-elf-sha256 "1ef962ae430582bb0f0b18c46f21a3928d64c280b9863e9141ed9c52dc816af8"
+    :positive-elf-bytes 45424
+    :foreign-code "C sources/objects/CRT/linker/imports/dynamic dependencies empty"
+    :tests ["kotoba-gmir 13 tests / 80 assertions"
+            "kotoba-sema 6 tests / 33 assertions"
+            "kotoba-kir 134 tests / 575 assertions"
+            "kotoba-verifier 48 tests / 269 assertions"
+            "kotoba-native 139 tests / 1795 assertions"
+            "Amu 966 tests / 7643 assertions"
+            "aiueos 431 tests / 1305 assertions"]}
+   :closed
+   ["C-free IDT vector 14 construction and LIDT/SIDT readback"
+    "guard write / text write / NX execute の実 CPU #PF receipt"
+    "handler 内 CR2/error-code classification と非復帰 fault termination"
+    "native text growth の exact segment-boundary closure"]
+   :remaining
+   ["recoverable exception frame、dedicated exception stack、double-fault path"
+    "dynamic mapping/unmapping と unmap 後 access、local/remote TLB invalidation"
+    "UEFI map 全体を index 化する bounded allocator と zones"
+    "APIC / SMP、scheduler / address spaces / CPL3 / typed syscall"
+    "log を最初の native effect provider として semantic vector と empty-foreign-code receipt まで閉じる"]
+   :next
+   "次は fault で止まれたことを例外処理全体の完成と読まない。専用 stack と保存済み frame を
+    持つ recoverable exception path、#DF の fail-closed path を閉じてから、dynamic map/unmap と
+    unmap 後 access の CPU receipt へ進む。並行して effect 本線は landed authority だけを使い、
+    LOG_WRITE の typed provider 化を続ける。"}
 
   :adr/addendum-2026-08-11-step1-substrate-measurement
   {:status "accepted; revises 順序 item 1 のキット選択と、:typed-provider-syscall-abi を白紙と読む枠組み"
