@@ -39,7 +39,7 @@
 ;;
 ;; | 壊し方 | exit | 出力の最終行 |
 ;; |---|---|---|
-;; | 無改変（`:include-ext [".cljs"]` で絞った 355 ファイルの tree） | **0** | `FLEET-CI: rename-residue gate OK (21 cases)` |
+;; | 無改変（`:include-ext [".cljs"]` で絞った実 tree、350 ファイル） | **0** | `FLEET-CI: rename-residue gate OK (21 cases)` |
 ;; | `classify` の cond 冒頭に `true (out :wip :new-path {})` | **1** | `FLEET-CI: rename-residue-test failed`（`FAIL — 6 cases OK, 15 failures`） |
 ;; | 同上を `:residue` 側に倒す | **1** | 同上（`FAIL — 7 cases OK, 14 failures`） |
 ;; | test の git fixture ブロック（165–184 行）を削除 | **94** | `FLEET-CI: only 13 cases ran, expected at least 21 — the git fixture half probably did not run` |
@@ -58,10 +58,13 @@
 ;;   これがそのまま緑になる。床は理屈ではなく実際にそこで止めた。
 ;; - **argv の順序ミスは fail-closed。** flag を先に渡すと `"10"` が tree のパスになるが、
 ;;   結果は偽陽性の緑ではなく 90 の赤である。
-;; - **fleet が配る tree で緑になる。** `git archive` で `.cljs` だけ 355 ファイル
-;;   （`:min-files 300` の床すれすれ）に絞った tree でも 21 cases 通る。つまりこの gate は
+;; - **fleet が配る tree で緑になる。** `git archive` で `.cljs` だけに絞った tree
+;;   （3b0371f4 時点で 350 ファイル）でも 21 cases 通る。つまりこの gate は
 ;;   `root-permit-index` のような「入力が tree に無いので構造的に緑にならない」型ではない。
-;;   ただし床までの余裕は 55 ファイルしかない。
+;;   **ただし `:min-files 300` までの余裕は 50 本しかなく、この数は動く** —— 測定中の
+;;   同日に別セッションが security-gate-*.cljs 5 本を撤去して 355→350 になった。
+;;   .cljs を 50 本消す掃除は、gate を赤ではなく **tick 側の "refusing to build a
+;;   gate input" で消す**（別の沈黙）。数を引用するときは sha と一緒に引くこと。
 ;;
 ;; ## 閉じていない穴（正直に）
 ;;
