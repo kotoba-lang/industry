@@ -400,22 +400,27 @@
   {:name "chie" :org "kotoba-lang"
    :domain "AI エコシステム（モデル・研究機関・依存関係）"
    :runtime :clojure :main "chie.methods.autorun"
-   :args ["--cycles" "1"]
-   ;; 出力先は log-default（`*file*` から導く）で、起動できていないので**実測して
-   ;; いない**。当て推量のパスを書くと「測ったが 0」と「測っていない」が混ざるので
-   ;; nil のままにする。直したら実測して埋めること。
-   :produces nil
-   :expect :known-broken
-   ;; hakoniwa と**同じ壊れ方**。argv が `--cycles` しか見ておらず、seed は
-   ;; `*file*` から 4 段 getParentFile して導くので、引数では回避できない。
-   :blocked-by "-main の `here` が
-                `(-> *file* io/file .getParentFile .getParentFile .getParentFile .getParentFile)`
-                で null になり NPE (autorun.cljc:99)。argv は --cycles しか受け付けず
-                seed パスを外から渡せないので **引数では回避できない** ——
-                repo 側で seed パスを引数で受けるようにする必要がある。
-                seed 自体は data/ に在るので、直れば動く見込み"
-   :evidence "2026-08-08 実測: 依存（com-etzhayyim-kotoba-datom）は解決し、
-              落ちたのは -main の 1 行目"}
+   :args ["${REPO}/data/seed.edn" "${REPO}/data/chie.datoms.kotoba.edn" "--cycles" "1"]
+   :produces "data/chie.datoms.kotoba.edn"
+   :output-gitignored true
+   ;; **毎周無条件に伸びる**ので :produces-datoms。ただし冪等な仲間（inochi / rasen /
+   ;; busshi）とは理由が違う —— あちらは「変化しなかったので追記しない」、chie は
+   ;; 「変化していなくても追記する」。下の :next に is-idempotent 化の検討を残した。
+   :expect :produces-datoms
+   :change-rate 0.03
+   :change-rate-basis :prior
+   :change-rate-source "観測は offline seed の純関数（ns docstring: NO external I/O、live
+                        ingest は G7/Council-gated）。**実測でも裏が取れている** —— 1 周目と
+                        2 周目が同じ 643 datoms・同じ top-opening ai.lab.openai 5.800 を出した。
+                        したがって λ は AI エコシステムの変化率ではなく **seed の編集率**で、
+                        手で維持している seed なので月オーダーと置いた。live ingest が開いたら
+                        この値は無効になる（その時に測り直す）"
+   :importance 10
+   :evidence "2026-08-12 実測: 643 datoms/cycle、chain OK、exit 0。
+              2 周目は chain 2 まで伸び +43,864 B 追記（毎周伸びる = 冪等でない）。
+              異常入力（seed 不在 / パス未指定）は exit 2。
+              2026-08-08 に NPE で起動しなかった原因は kotoba-lang/chie#3 で解消
+              （seed / log を argv 受けに変更、pin b547b57）"}
 
   ;; ── clojure ではなく TypeScript。observation runner としては未成立 ────────
   ;; **「runner が無い」は誤りだった**（2026-08-07 までの登録）。実際には TS の
@@ -649,21 +654,53 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
   concept-lookup で探してから足す。登録簿の不在を不在の証拠に使わない。"
 
  ;; 次にやると効くこと（優先順）。skill `observatory-collect` が毎周ここを読む。
- ;; **repo 側の push 権が要るものは、この superproject のセッションからは着地
- ;; できない** —— 対象 org のセッションを別に立てる必要がある。
+ ;;
+ ;; ⚠ **`:needs :push-to-<org>` は「着地できない」を意味しない**（2026-08-12 訂正）。
+ ;;   この分類は west も credential も無いコンテナで書かれたもので、**権限の実測では
+ ;;   なく推測**だった。ローカルセッションの gh token（com-junkawasaki）は
+ ;;   `kotoba-lang/chie` と `cloud-itonami/hakoniwa` の両方に admin/push を持つ
+ ;;   （`gh api repos/<org>/<repo> --jq .permissions` で実測）。chie はこの経路で
+ ;;   実際に着地した（#3 → pin b547b57）。**着地を諦める前に権限を実測すること。**
  :next
- [{:target "chie" :fix "-main が seed パスを引数で受ける（hakoniwa と同じ 1 行の修正）"
-   :needs :push-to-kotoba-lang}
-  {:target "hakoniwa" :fix "-main の *file* 相対解決を argv 優先にする"
-   :needs :push-to-cloud-itonami}
+ [{:target "hakoniwa" :fix "-main の *file* 相対解決を argv 優先にする。
+                            **chie#3 が同じ壊れ方の直し方の実例**（seed / log を positional
+                            argv で受け、*file* 由来は nil-safe な既定値に降ろす）"
+   :needs :investigation :push-verified true}
   {:target "tadori" :fix "deps.edn を足して cheshire を宣言する"
-   :needs :push-to-cloud-itonami}
+   :needs :investigation}
   {:target "kaname" :fix "deps.edn に babashka/http-client を宣言する"
-   :needs :push-to-cloud-itonami}
+   :needs :investigation}
   {:target "kakaku" :fix "seed を repo に入れるか -main が引数で受ける"
-   :needs :push-to-cloud-itonami}
+   :needs :investigation}
   {:target "yabai" :fix "pipeline の入力パスを content/source/watchlist.jsonld に直す"
-   :needs :push-to-cloud-itonami}
+   :needs :investigation}
+  {:target "chie" :fix "変化していなくても毎周 643 datoms（43.9 KB）を追記する。
+                        inochi / rasen / busshi のように no-change なら追記しない形に
+                        できるか（できれば :produces-datoms-idempotent へ）。
+                        **動いてはいるので優先度は低い** —— 台帳の肥大だけが代償"
+   :needs :investigation}
+  ;; ⚠ **gate は 2026-08-12 時点で既に赤い**（違反 6、chie とは無関係）。CLAUDE.md が
+  ;;   warn しているとおり「常時赤い gate は無視されるので、gate が無いのと同じ」に
+  ;;   なりかけている。下の 3 行がその内訳。**1 反復 1 件**なので順に潰す。
+  {:target "com-etzhayyim-busshi / -masago / -mikurabe"
+   :fix "3 本とも west.yml に project 登録が無い（gate 違反 3 件）。**観測は取れていて
+         台帳にも載っている**ので、壊れているのではなく登録だけが欠けている。
+         west-pin-put ではなく gen-west-manifest.cljs --entry で新規登録する経路"
+   :needs :investigation}
+  {:target "hayari"
+   :fix ":args の \"/tmp/hayari-registry-gate-summary.edn\" が ${REPO} 起点でない（gate 違反 1 件）。
+         ${REPO} に移すと hayari 側が書けなくなるか要確認 —— 登録簿だけ直して壊さないこと"
+   :needs :investigation}
+  {:target "com.gftd.hayari-tick.plist / com.gftd.residency-alarm.plist"
+   :fix "XML コメント内の 2 連ハイフンが XML 仕様違反（gate 違反 2 件）。plist は落ちずに
+         『読まれない』ので、走っていないことに気付けない —— 実際に読まれているか
+         launchctl で確かめてから直す"
+   :needs :investigation}
+  {:target "hirameki"
+   :fix "feeder が 43h 停止（上限 12h）で run 全体が FAIL する唯一の下振れ。
+         90-docs/observatory/hirameki-harvest.ledger.edn を供給する側が止まっている。
+         2026-08-12 の時点で既に停止していた（この反復が壊したのではない）"
+   :needs :investigation}
   {:target "narashi" :fix "観測 heartbeat に当たる nbb task 名を repo 側で決める"
    :needs :owner-decision}
   {:target "meisai" :fix "source の登録（個人の明細なので owner 判断）"
