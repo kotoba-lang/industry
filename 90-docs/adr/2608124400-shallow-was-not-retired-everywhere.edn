@@ -206,6 +206,38 @@ same step.**
 Also worth removing: the byte copy of the root's `.git` at `/private/tmp` still
 holds the shallow frontier. **Fetching from it would re-import the grafts.**
 
+## A guard landed, and it does not use the obvious check
+
+`.claude/hooks/session-start-shallow-check.cljs`, registered as a SessionStart
+hook. Detection only, and the agent argued the other two options away rather
+than building all three: a **PreToolUse deny sees only this session's tool
+calls**, so it would have caught neither the unattributable ad-hoc command nor
+the weekly launchd job; and **a fleet gate cannot see this at all**, because
+`.git/shallow` is not a file in any tree — the same structural failure as
+`root-permit-index`, and worse, since the state is not under version control
+anywhere.
+
+**It keys on graft COUNT, not on `git rev-parse --is-shallow-repository`** —
+because that flag **returns true for an EMPTY shallow file whose history is
+complete and whose ancestry is correct.** Measured on git 2.50.1, and confirmed
+independently here: `is_repository_shallow()` sets the flag on a successful
+open, before reading a line. A guard keyed on the flag would cry wolf.
+
+It reproduced both the failure shape (three commands silently wrong, no error
+printed) and **the worktree vector**: a `--depth 2` fetch inside a `/tmp`
+throwaway worktree collapsed its parent from 30 commits to 2, with **zero
+reflog lines mentioning depth.**
+
+What it does not cover, stated: root and `orgs/<org>/<repo>` only, not fleet;
+**detection, not prevention** — it fires after the damage, shortening exposure
+from ten days to one session; and it names the state, not the culprit. A timed
+-out sweep that finds nothing **stays silent**, so coverage is lost quietly in
+that case.
+
+It also cross-checks `manifest/west.yml` and marks unregistered paths, because
+the generic *unshallow it* advice would otherwise have driven a pointless 5.4
+GiB fetch on the stale duplicate above.
+
 ## Will it recur? No scheduled job will redo it
 
 The root is clean — `is-shallow: false`, no shallow file, 25,092 commits — and

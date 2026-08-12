@@ -45,10 +45,32 @@ property that breaks this one — *not reachable by revokeDevice, which finds th
 key to remove by looking the device up* — **fifty lines above the function that
 deletes that row first.** No ADR mentioned `revokeDevice`.
 
-Reordering suffices: `wg set … peer <key> remove` is a **no-op on an absent
-peer**, so unbinding is idempotent. After the swap a failed delete leaves a row
-naming a peer that is gone — **visible in `listDevices`, over-counting rather
-than under-counting, repaired by retry.**
+**FIXED, merge `fd2622ca23ca`, pin advanced.** Now: read the device (ownership
+decided before any mutation), unbind, delete last — with a 503 and a named log
+line if the delete fails.
+
+**The idempotency the fix rests on was traced, not assumed.** `wg set … peer
+<key> remove` maps to a remove flag, and the kernel's `set_peer()` assigns
+success **before** the hashtable lookup, so an absent peer takes the early exit
+and returns 0. `wg` exits non-zero only when the ipc call itself fails, so
+wg-agent's checked run does not fire and its handler returns ok without ever
+consulting the peer list. The deployed path is that same in-tree kernel module.
+**Honest limit stated by the agent: macOS has no kernel WireGuard, so the exit
+status for an absent PEER is established from source, not from a live run.**
+
+**One deliberate non-fatal remains, and it is narrow.** A 422 from the agent
+means the key was refused by the same validator that guards an add — so it was
+never bound, there is nothing to unbind, and treating it as fatal would make
+such a row **permanently undeletable**. That row is exactly the residue
+`provisionDevice` leaves when it cannot withdraw a record, **which it leaves
+because this route can clear it.** Transport failure, 5xx and 403 are all fatal
+now.
+
+50 to 63 tests. Reverting only the source keeps 7 failures, with 6 of the new
+tests passing both ways as controls. The simulated failures are the three that
+matter — unbind refuses, exit node refuses the credential, delete refuses — and
+each asserts **what is left behind and that an ordinary retry finishes it**,
+not merely the status code.
 
 ## #2 is a fleet-wide chokepoint that RE-EXECUTES
 
