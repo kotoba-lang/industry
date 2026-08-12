@@ -47,13 +47,23 @@
          (filter #(str/ends-with? % ".edn"))
          (map #(path/join d %)))))
 
-(def target (path/join root sub))
-(def files (edn-files target))
+;; `--dir` はカンマ区切りで複数取れる。既定は 90-docs/adr のみで、既存の呼び出しは
+;; 挙動が変わらない。
+;;
+;; **なぜ広げるか。** この不変条件（entity map のキーは全て keyword）は ADR に固有の
+;; ものではなく、datom tx-data 全般に成り立つ。にもかかわらず gate は 90-docs/adr
+;; だけを見ており、prose を本文に持つ他の EDN —— `90-docs/business` の canvas-ledger、
+;; `90-docs/design-quality`、`manifest/` の各 catalog —— は同じ欠陥を同じように
+;; 静かに受け取れる状態だった。実測 2026-08-13 時点ではどれも clean だが、
+;; **見ていないから clean なのか、本当に clean なのかは区別できていなかった。**
+(def subs* (->> (str/split sub #",") (map str/trim) (remove str/blank?) vec))
+(def targets (mapv #(path/join root %) subs*))
+(def files (vec (mapcat edn-files targets)))
 
 (when (< (count files) min-files)
   ;; 絞り込みが壊れて 0 件 → trivially pass、を防ぐ床。
-  (println (str "FAIL docs-edn-truncation: " target " の .edn が " (count files)
-                " 件 — 下限 " min-files "。tree が届いていないのに合格させない"))
+  (println (str "FAIL docs-edn-truncation: " (str/join ", " targets) " の .edn が "
+                (count files) " 件 — 下限 " min-files "。tree が届いていないのに合格させない"))
   (js/process.exit 1))
 
 (def findings
