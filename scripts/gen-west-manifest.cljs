@@ -247,11 +247,27 @@
 
 (defn- block-path [ls] (some #(second (re-find #"^      path:\s*(\S+)" %)) ls))
 
+(defn- sync-generated-header
+  "Keep the generated manifest header (remotes/defaults/group-filter) canonical
+   during a minimal --entry update. A repository transfer can introduce a new
+   organization remote, so preserving the old prefix would emit entries whose
+   remote is undefined. Project blocks outside the requested entries remain
+   byte-for-byte unchanged."
+  [existing-content rendered-content]
+  (let [existing (split-blocks existing-content)
+        rendered (split-blocks rendered-content)]
+    (str (str/join "\n" (:prefix rendered)) "\n"
+         (str/join "\n" (mapcat second (:entries existing)))
+         (when (seq (:suffix existing))
+           (str "\n" (str/join "\n" (:suffix existing))))
+         "\n")))
+
 (defn- splice
   "existing の entry 群のうち names のものだけ rendered の block に差し替える。
    existing に無い名前は path 順の位置へ挿入。それ以外の行は byte 不変(最小 diff)。"
   [existing-content rendered-content names]
-  (let [ex (split-blocks existing-content)
+  (let [existing-content (sync-generated-header existing-content rendered-content)
+        ex (split-blocks existing-content)
         rmap (into {} (:entries (split-blocks rendered-content)))
         missing (remove rmap names)]
     (when (seq missing)
