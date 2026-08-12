@@ -32,10 +32,11 @@
     (is (< (eye-range zoomed) (* 0.6 (eye-range base))))))
 
 (deftest fov-and-absolute-eye
-  (let [f (w3/render-ir fresh aspect {:fov 33.0 :eye [5.0 30.0 40.0] :target [0.0 1.0 0.0]})]
+  ;; outside the fit volume (r ≈ 143 > fit-radius ≈ 67)
+  (let [f (w3/render-ir fresh aspect {:fov 33.0 :eye [0.0 80.0 120.0] :target [0.0 1.0 0.0]})]
     (is (ir/valid? f))
     (is (= 33.0 (get-in f [:globals :fov])))
-    (is (= [5.0 30.0 40.0] (get-in f [:globals :eye])))
+    (is (= [0.0 80.0 120.0] (get-in f [:globals :eye])))
     (is (= [0.0 1.0 0.0] (get-in f [:globals :target])))))
 
 (deftest pick-agrees-under-orbit-zoom-fov
@@ -47,5 +48,15 @@
             hit (pick/pick f p W H {:filter w3/shop-instance?})]
         (is (some? p) (:id d))
         (is (= (:id d) (get-in hit [:instance :district])) (:id d))))))
+
+(deftest underground-and-inside-fit-are-refused
+  (let [under (try (w3/camera aspect {:eye [0.0 -2.0 40.0]})
+                   (catch :default e e))
+        inside (try (w3/camera aspect {:zoom 50.0})
+                    (catch :default e e))]
+    (is (re-find #"underground" (ex-message under)))
+    (is (= :underground (:reason (ex-data under))))
+    (is (re-find #"fit volume" (ex-message inside)))
+    (is (= :inside-fit (:reason (ex-data inside))))))
 
 (run-tests 'camera-test)

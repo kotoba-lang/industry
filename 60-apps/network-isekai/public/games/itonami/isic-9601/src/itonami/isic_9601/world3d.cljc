@@ -217,6 +217,45 @@
   [opts]
   (boolean (and (map? opts) (seq opts))))
 
+(def fit-center
+  "Centre of the sphere `fit-radius` frames — the default look-at on the street."
+  [0.0 (:look-height camera-rig) 0.0])
+
+(defn- assert-pos!
+  "Zoom/fov must be finite and > 0. A tiny or non-positive zoom used to be silently
+  floored to `1e-6` and the frame still drew — that hid an agent aiming into the street."
+  [k v]
+  (let [x (double v)]
+    (when (or (not= x x) (not (pos? x)))
+      (throw (ex-info (str "camera " k " must be > 0 (got " (pr-str v) ")")
+                      {:key k :value v :reason :bad-camera-number})))
+    x))
+
+(defn assert-eye!
+  "Refuse an eye that is underground (y ≤ 0) or inside the fit volume (closer to the
+  street centre than `fit-radius`). Silent success is wrong here: the CLI would write a
+  PNG that looks like a bug, and the agent would think the aim landed.
+
+  Throws `ex-info` with `:reason` `:underground` or `:inside-fit`."
+  [eye]
+  (let [[x y z] eye
+        y (double y)
+        [cx cy cz] fit-center
+        dx (- (double x) cx)
+        dy (- y cy)
+        dz (- (double z) cz)
+        r (Math/sqrt (+ (* dx dx) (* dy dy) (* dz dz)))]
+    (when (<= y 0.0)
+      (throw (ex-info (str "camera eye is underground (y=" y "): " (pr-str eye)
+                           " — refuse rather than clamp")
+                      {:eye eye :reason :underground})))
+    (when (< r (double fit-radius))
+      (throw (ex-info (str "camera eye is inside the fit volume (range=" r
+                           " < fit-radius=" fit-radius "): " (pr-str eye)
+                           " — refuse rather than clamp; lower --zoom or move --eye outside the street")
+                      {:eye eye :reason :inside-fit :range r :fit-radius fit-radius})))
+    eye))
+
 (defn camera
   "eye/target (and the fov they were framed with) for this viewport aspect.
 
@@ -236,15 +275,17 @@
     :target absolute `[x y z]` — wins over the solved target
 
   Orbit/zoom/fov reshape the default rig first; absolute eye/target overlay afterwards so
-  an agent can say either 'spin 90°' or 'put me at these coordinates'."
+  an agent can say either 'spin 90°' or 'put me at these coordinates'.
+
+  The resulting eye is refused (thrown `ex-info`) when it would sit underground or inside
+  the fit volume — there is no silent clamp on tiny zoom (#1751)."
   ([] (camera (/ 9.0 16.0) nil))
   ([aspect] (camera aspect nil))
   ([aspect opts]
    (let [opts (if (camera-opts? opts) opts {})
-         fov (double (or (:fov opts) fov-deg))
+         fov (assert-pos! :fov (or (:fov opts) fov-deg))
          orbit-deg (double (or (:orbit opts) 0.0))
-         zoom (double (or (:zoom opts) 1.0))
-         zoom (if (< zoom 1e-6) 1e-6 zoom)
+         zoom (assert-pos! :zoom (or (:zoom opts) 1.0))
          range (/ (ir/fit-distance fit-radius fov aspect) zoom)
          th (* pitch-deg (/ Math/PI 180.0))
          azimuth (+ (:azimuth camera-rig) (* orbit-deg (/ Math/PI 180.0)))
@@ -253,7 +294,7 @@
                                     :distance (* range (Math/cos th))
                                     :height (* range (Math/sin th)))
                              [0.0 0.0])
-         eye (or (:eye opts) (:eye base))
+         eye (assert-eye! (or (:eye opts) (:eye base)))
          target (or (:target opts) (:target base))]
      {:eye eye :target target :fov fov})))
 
