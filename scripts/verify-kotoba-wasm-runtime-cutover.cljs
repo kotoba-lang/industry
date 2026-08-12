@@ -70,6 +70,20 @@
                         "orgs/kotoba-lang/kototama/deps.edn"
                         "orgs/kotoba-lang/aiueos/deps.edn"
                         "orgs/kotoba-lang/kotoba/deps.edn"]]
+  ;; The inventory and the scan list have to name the SAME paths, and nothing
+  ;; used to check that. When `kotoba-lang/compiler` was renamed to
+  ;; `kotoba-lang/amu`, the scan list moved and the inventory did not, and the
+  ;; two halves of the contract silently pointed at different repositories: the
+  ;; real deps.edn read as an un-frozen JVM dependency, while the frozen entry
+  ;; guarded a path this verifier never opens. The existing
+  ;; `legacy-path-missing` check did not catch it either, because a stale
+  ;; checkout of the OLD name was still on disk, so `existsSync` was true.
+  ;; A path in the inventory that is never scanned is a freeze with no subject.
+  (doseq [p (sort allowed)
+          :when (not (some #{p} dependency-files))]
+    (fail! (str "inventory-path-not-scanned:" p)
+           "frozen inventory names a dependency file this verifier never scans"
+           {:path p :scanned dependency-files}))
   (doseq [p dependency-files
           :let [text (read-text (inspect! p))]
           :when (or (str/includes? text "com.dylibso.chicory")

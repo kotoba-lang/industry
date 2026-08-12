@@ -17,8 +17,15 @@
 ;;
 ;;   NEW       直近の run で初めて現れた。名前と詳細を出す。
 ;;   RESOLVED  前は在って、今は無い。1 行で名前を出して、7 日で忘れる。
+;;   ACCEPTED  registry の `:accepted` に日付・理由・解除条件つきで宣言済み。
+;;             件数だけ。**standing には混ぜない** —— 「まだ誰も見ていない赤」と
+;;             「見た上で今は直さないと決めた赤」は別の事実で、混ぜると後者が
+;;             前者の顔をして残る (ADR-2608132600)。
 ;;   STANDING  それ以外。**列挙しない。** 件数と最古の経過日数だけ。
 ;;             もう言ったことを毎セッション言い直すのは、言っていないのと同じ。
+;;
+;; **acceptance が finding より長生きしたら大声で言う。** 直った finding の
+;; exemption が残ると、次に同じ key に着地したものを黙って免除する。
 ;;
 ;; **detector の初回 run は BASELINE として出す。** 初日は全部 new なので、
 ;; それを NEW と呼ぶのは逆側からの同じ誤報になる。
@@ -80,18 +87,23 @@
 (defn detector-report
   "1 detector 分の行。返り値 {:lines [..] :loud? bool}"
   [id {:keys [title last-run last-status last-note ok-runs findings resolved
-              interval-ms last-scanned]}]
+              interval-ms last-scanned accepted-keys accepted-stale]}]
   (let [now (js/Date.now)
+        accepted (set accepted-keys)
         ;; NEW の定義は「first-seen が直近 run の時刻と一致する」。時間窓では
         ;; なく run 単位にするのは、tick の間隔が detector ごとに違う (6h と 24h)
         ;; ので、固定の窓だと片方で取りこぼし片方で二重報告になるため。
-        new-ks (sort (for [[k v] findings :when (= (:first-seen v) last-run)] k))
+        new-ks (sort (for [[k v] findings
+                           :when (and (= (:first-seen v) last-run)
+                                      (not (accepted k)))] k))
         ;; RESOLVED も NEW と同じ「直近 run で起きたこと」だけを出す。state 側は
         ;; 7 日保持しているが、時間窓で出すと同じ解決を 7 日間毎セッション読ませる
         ;; ことになり、それは standing red を毎回読ませるのと同じ形の騒音になる。
         res-ks (sort (for [[k v] resolved :when (= (:resolved-at v) last-run)] k))
         standing (sort-by #(:first-seen (second %))
-                          (remove #(= (:first-seen (second %)) last-run) findings))
+                          (remove #(or (= (:first-seen (second %)) last-run)
+                                       (accepted (first %)))
+                                  findings))
         ;; 初回は「測れた run が 1 回目」で判定する。試行回数ではない ——
         ;; 走り出す前に死んだ 1 回目が baseline を消費すると、本当の初回測定が
         ;; 「NEW 13 件」の顔で出てくる (実際に踏んだ)。
@@ -119,10 +131,16 @@
                     (when last-scanned (str " scanned=" last-scanned)))]}
 
       :else
-      {:loud? (or (seq new-ks) (seq res-ks) stale-run?)
+      {:loud? (or (seq new-ks) (seq res-ks) stale-run? (seq accepted-stale))
        :lines
        (concat
          [head]
+         (when (seq accepted-stale)
+           [(str "  ⚠ STALE ACCEPTANCE " (count accepted-stale) " 件: "
+                 (str/join ", " accepted-stale)
+                 " —— registry で accept 済みだが detector はもう報告していない。"
+                 "manifest/orgs-detectors.edn の :accepted から消すこと"
+                 "(finding より長生きした免除は、次に同じ key に来たものを黙って免除する)")])
          (when stale-run?
            [(str "  ⚠ 最終 run が " (ms->human (age-ms last-run)) " 前 —— interval "
                  (ms->human interval-ms) " を大きく超えている。tick が動いていない疑い。")])
@@ -137,13 +155,16 @@
            [(str "  RESOLVED " (count res-ks) " 件: " (str/join ", " (take max-listed res-ks))
                  (when (> (count res-ks) max-listed)
                    (str " … 他 " (- (count res-ks) max-listed) " 件")))])
+         (when (seq accepted)
+           [(str "  accepted " (count accepted) " 件 (既知・日付と理由と解除条件は "
+                 "manifest/orgs-detectors.edn の :accepted)。**列挙しない**")])
          (when (seq standing)
            [(str "  standing " (count standing) " 件 (最古 "
                  (ms->human (age-ms (:first-seen (second (first standing)))))
                  " 前から)。**列挙しない** —— 詳細は "
                  "`nbb --classpath \".:scripts/nbb_compat\" scripts/"
                  (name id) ".cljs`")])
-         (when (and (empty? new-ks) (empty? res-ks) (empty? standing))
+         (when (and (empty? new-ks) (empty? res-ks) (empty? standing) (empty? accepted))
            [(str "  clean (" (ms->human (age-ms last-run)) "前に測定"
                  (when last-scanned (str ", scanned=" last-scanned)) ")")]))})))
 

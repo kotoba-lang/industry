@@ -87,10 +87,47 @@
             :unclassified (set/difference required classified)}))
   (let [implemented-fields (set (map second (re-seq #"fns\.([a-z0-9_]+)\s*=" browser-source)))
         implemented-ids (set (map #(keyword (str/replace % "_" "-")) implemented-fields))
-        node-only #{:transport-connect :tls-open :tls-server-end-point
-                    :transport-write :transport-read :transport-close
-                    :scram-sha256 :pg-cancel-register :pg-cancel :kagi-sign}
-        browser-callable (apply disj implemented-ids :llm-infer node-only)]
+        browser-status (fn [id] (:browser (merge default-row (get-in catalog [:imports id]))))
+        ;; `actor-host.js` is ONE file serving two hosts: the browser host and
+        ;; the Node actor host. `fns.<x> =` therefore does not mean "callable in
+        ;; a browser", and nothing in the file's syntax separates the two. This
+        ;; set is the discriminator, and it is hand-maintained, so it is checked
+        ;; below rather than trusted.
+        ;;
+        ;; 2026-08-13 (ADR-2608132600): it had rotted. The eleven pg wire/pool
+        ;; functions added on 2026-07-31 ("Node pg-pool/wire/scram inject
+        ;; fail-closed") were never added here, so 11 of the 17 ids this check
+        ;; reported were the list being stale rather than the hosts disagreeing.
+        ;; The six that remain are the real defect.
+        not-browser-callable
+        #{;; no synchronous network in a browser
+          :llm-infer
+          ;; intentional native boundary: the key, socket or credential must
+          ;; never enter a browser guest
+          :kagi-sign :transport-connect :tls-open :tls-server-end-point
+          :transport-write :transport-read :transport-close :scram-sha256
+          :pg-cancel-register :pg-cancel
+          ;; provider-gated: the function exists, but every path through it is
+          ;; behind an injected JVM-tender/Node provider (`wireP` / `poolP`),
+          ;; so in a browser it is fail-closed rather than available
+          :pg-open :pg-query :pg-simple-query
+          :pg-pool-open :pg-pool-acquire :pg-pool-query :pg-pool-release
+          :pg-pool-stats :pg-pool-health :pg-pool-drain :pg-pool-close}
+        browser-callable (apply disj implemented-ids not-browser-callable)]
+    ;; The exclusion list is the one hand-written thing in this verifier, so it
+    ;; gets its own two assertions. Without them a stale entry is invisible: it
+    ;; silently subtracts an id from the comparison, which is the direction that
+    ;; makes a check pass rather than fail.
+    (let [absent (set/difference not-browser-callable implemented-ids)]
+      (when (seq absent)
+        (fail! "exclusion-list-names-unimplemented"
+               "exclusion list names host functions actor-host.js no longer implements"
+               {:absent absent})))
+    (let [claimed (set (filter #(not= :no (browser-status %)) not-browser-callable))]
+      (when (seq claimed)
+        (fail! "exclusion-list-contradicts-matrix"
+               "matrix claims browser availability for an import this verifier excludes as not browser-callable"
+               {:ids (into (sorted-map) (map (juxt identity browser-status)) claimed)})))
     (when-not (= browser-linkable browser-callable)
       (fail! "matrix-vs-implementation" "browser matrix disagrees with implemented host functions"
              {:matrix-only (set/difference browser-linkable browser-callable)

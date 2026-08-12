@@ -36,9 +36,20 @@
    :status :deprecated-compat
    :exit-evidence "kotoba CLI delegates compile/run to the independent compiler and Wasm runtime without a JVM classpath"}
   {:id :compiler-clojure-bootstrap
-   :repo "orgs/kotoba-lang/compiler"
-   :dependency-file "orgs/kotoba-lang/compiler/deps.edn"
-   :implementation "orgs/kotoba-lang/compiler/src/kotoba/compiler/core.clj"
+   ;; 2026-08-13: `kotoba-lang/compiler` は `kotoba-lang/amu` へ rename 済み
+   ;; (GitHub repo id 1136866292 ではなく 1297097065 — `gh api repos/kotoba-lang/compiler`
+   ;; と `.../amu` が同一 id 1297097065 を返す)。**新しい JVM 依存を獲得したのでは
+   ;; なく、同じ bootstrap debt が repo の新しい名前の下にある**。したがってこれは
+   ;; inventory の拡大ではなく、同一 entry の宛先更新であり、凍結された件数 4 は
+   ;; 変わらない。旧 path の checkout もディスク上に残っているが、west.yml が
+   ;; 登録しているのは `orgs/kotoba-lang/amu`。
+   ;; 独立した裏付け: kotoba-lang の `src/kotoba/lang/grammar_authority.clj` が
+   ;; 「that repository was renamed and a checkout may still be under either name」
+   ;; と書き、`../amu` と `../compiler` の両方を mirror path に列挙している。
+   :repo "orgs/kotoba-lang/amu"
+   :renamed-from "orgs/kotoba-lang/compiler"
+   :dependency-file "orgs/kotoba-lang/amu/deps.edn"
+   :implementation "orgs/kotoba-lang/amu/src/kotoba/compiler/core.clj"
    :status :bootstrap-debt
    :exit-evidence "compiler release artifact builds Kotoba source to Wasm without Java or Clojure installed"}]
  :cutover/tranches
