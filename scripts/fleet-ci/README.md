@@ -55,6 +55,10 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.fleet-ci-tip-ti
 launchctl kickstart -p gui/$(id -u)/com.gftd.fleet-ci-tip-tick   # 1 回だけ手動起動
 ```
 
+Receipt landing uses a no-checkout sparse worktree containing only
+`manifest/fleet-ci.edn`. This keeps each optimistic-lock retry bounded to the
+append-only ledger instead of materializing the full superproject tree.
+
 ## ディスクを回収する（sweep）
 
 **満杯のノードは gate を走らせる前に殺す。** `tar` が "No space left on device" で

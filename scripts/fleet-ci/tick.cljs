@@ -794,6 +794,29 @@
                (str/trim (str (:out removed) " " (:out pruned)))))))
     nil))
 
+(defn prepare-landing-worktree!
+  "Create a disposable worktree containing only `target-path`.
+
+  `git worktree add` normally checks out the entire root tree before the
+  receipt ledger is touched. On the 4,000-project superproject that takes
+  minutes, widening the non-fast-forward race window on every retry. Start
+  without a checkout, install an exact non-cone sparse specification, then
+  materialize only the ledger path."
+  [repo-dir wt ref target-path]
+  (let [steps [[repo-dir ["worktree" "add" "--detach" "--no-checkout" "--quiet" wt ref]]
+               [wt ["sparse-checkout" "init" "--no-cone"]]
+               [wt ["sparse-checkout" "set" "--no-cone" target-path]]
+               [wt ["read-tree" "-mu" "HEAD"]]]]
+    (loop [[[dir args] & more] steps]
+      (if-not dir
+        {:ok true}
+        (let [r (git dir args)]
+          (if (zero? (:exit r))
+            (recur more)
+            {:ok false
+             :detail (str "landing worktree preparation failed at "
+                          (str/join " " args) ": " (str/trim (:out r)))}))))))
+
 (defn put-file!
   "landing repo の path を content に置き換えて push する。
 
@@ -811,9 +834,9 @@
                           (str "+refs/heads/" branch ":refs/remotes/origin/" branch)])]
         (if-not (zero? (:exit fetch))
           {:ok false :detail (str "fetch failed: " (str/trim (:out fetch)))}
-          (let [add (git d ["worktree" "add" "--detach" "--quiet" wt (str "origin/" branch)])]
-            (if-not (zero? (:exit add))
-              {:ok false :detail (str "worktree add failed: " (str/trim (:out add)))}
+          (let [prepared (prepare-landing-worktree! d wt (str "origin/" branch) path)]
+            (if-not (:ok prepared)
+              prepared
               (do
                 (fs/mkdirSync (path/join wt (path/dirname path)) #js {:recursive true})
                 (fs/writeFileSync (path/join wt path) content)
