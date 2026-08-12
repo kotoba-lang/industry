@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6814, "ai-gftd-chat-shell" 3338},
+ {"magatama-sh1n5h1x" 6827, "ai-gftd-chat-shell" 3338},
  :zone
- {:requests-7d 542752,
-  :pageviews-7d 24929,
-  :uniques-7d-sum 5066,
+ {:requests-7d 547947,
+  :pageviews-7d 24955,
+  :uniques-7d-sum 5077,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/php_version.php", :requests 115}
-   {:path "/application.yml", :requests 113}
-   {:path "/info.php", :requests 102}
-   {:path "/pinfo.php", :requests 100}
-   {:path "/nginx_status", :requests 83}
-   {:path "/my", :requests 67}
-   {:path "/gitea/", :requests 64}
-   {:path "/config.env", :requests 64}],
-  :status-mix {:server-error 15080, :client-error 825, :ok 3157},
+  [{:path "/my", :requests 67}
+   {:path "/signin", :requests 65}
+   {:path "/config.env", :requests 63}
+   {:path "/server-info", :requests 61}
+   {:path "/.well-known/jwks.json", :requests 61}
+   {:path "/debug/pprof/cmdline", :requests 56}
+   {:path "/api/env", :requests 53}
+   {:path "/application.yml", :requests 49}],
+  :status-mix {:client-error 739, :server-error 14509, :ok 2454},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-12",
- :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 79},
+ :traffic-quality {:window "24h", :probe-4xx-pct 4, :error-5xx-pct 82},
  :top-paths
- "上位 page (24h, 2xx/3xx): /php_version.php 115 · /application.yml 113 · /info.php 102 · /pinfo.php 100 · /nginx_status 83 | 4xx(probe) 4% · 5xx 79%",
+ "上位 page (24h, 2xx/3xx): /my 67 · /signin 65 · /config.env 63 · /server-info 61 · /.well-known/jwks.json 61 | 4xx(probe) 4% · 5xx 82%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 542752 req/7d・5066 uniques(日次和)・うち4xx probe 4%(24h)、workers 10152 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 547947 req/7d・5077 uniques(日次和)・うち4xx probe 4%(24h)、workers 10165 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
