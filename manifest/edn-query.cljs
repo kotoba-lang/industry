@@ -22,6 +22,11 @@
 ;;   nbb manifest/edn-query.cljs count
 ;;   nbb manifest/edn-query.cljs q '[:find ?id ?status :where
 ;;                                   [?e "adr/id" ?id] [?e "adr/status" ?status]]'
+;;   nbb manifest/edn-query.cljs q* '<q1>' '<q2>' ...
+;;                                       # 面を 1 回だけ組んで N 本流す。結果は
+;;                                       # 同じ順のベクタ 1 行。所要時間はロードが
+;;                                       # 支配するので、N 本を別プロセスで叩くと
+;;                                       # そのまま N 倍かかる
 ;;   nbb manifest/edn-query.cljs mcp     # 常駐 MCP server（stdio, JSON-RPC）
 ;;
 ;; MCP client の設定（この面を datalog を知らなくても聞けるようにする）:
@@ -737,7 +742,17 @@
   "存在するのに 0 entity しか生まなかったソースを stderr に報告する。
    このローダ群は shape 不一致を nil で握り潰す設計（1 ファイルの破損で面
    全体が落ちないため）だが、握り潰したまま黙っていると count が「全部載って
-   いる」ように読めてしまう。落としたものは必ず言う。"
+   いる」ように読めてしまう。落としたものは必ず言う。
+
+   **警告は `js/console.error` で書く。`(binding [*out* *err*] (println …))`
+   を使わないこと** —— nbb はこの binding を尊重せず、**stdout に出る**（実測
+   2026-08-13: `nbb -e '(binding [*out* *err*] (println \"x\"))' 2>/dev/null` が
+   x を表示する）。JVM Clojure の正しいイディオムがこのランタイムでは何もしない
+   ので、意図は正しいまま出力先だけが間違う。ここでそれをやると `q` / `q*` /
+   `count` の**機械可読な stdout に日本語の警告文が混ざり**、消費側の
+   `edn/read-string` が `Invalid symbol: edn-query:.` で落ちる。実際に
+   verify-tsukuru-factory-plane がこれで落ち、それは正しい挙動だった —— 旧版は
+   同じ状況で nil を返して 3 検査すべてを skip し PASS していた。"
   [label dirs]
   (when (seq dirs)
     (js/console.error
@@ -1115,8 +1130,8 @@
       []
       (let [ents (try (slurp-edn (.getPath f))
                       (catch :default e
-                        (binding [*out* *err*]
-                          (println (str "edn-query: WARNING hayari-top-entities: 読めない — " e)))
+                        (js/console.error
+                         (str "edn-query: WARNING hayari-top-entities: 読めない — " e))
                         nil))]
         (if-not (sequential? ents)
           []
@@ -1125,16 +1140,16 @@
 (defn hayari-entities [next-tempid!]
   (let [f (io/file root "orgs" "cloud-itonami" "hayari" "data" "hayari-summary.edn")]
     (if-not (.exists f)
-      (do (binding [*out* *err*]
-            (println (str "edn-query: WARNING hayari: "
-                          "orgs/cloud-itonami/hayari/data/hayari-summary.edn が無い — "
-                          "国別の注目は load されない（west update 未実行か、collect 未実行）。"
-                          "count 0 は「観測が無い」ではなく「読めていない」。")))
+      (do (js/console.error
+           (str "edn-query: WARNING hayari: "
+                "orgs/cloud-itonami/hayari/data/hayari-summary.edn が無い — "
+                "国別の注目は load されない（west update 未実行か、collect 未実行）。"
+                "count 0 は「観測が無い」ではなく「読めていない」。"))
           [])
       (let [ents (try (slurp-edn (.getPath f))
                       (catch :default e
-                        (binding [*out* *err*]
-                          (println (str "edn-query: WARNING hayari: 要約が読めない — " e)))
+                        (js/console.error
+                         (str "edn-query: WARNING hayari: 要約が読めない — " e))
                         nil))]
         (if-not (sequential? ents)
           []
@@ -1145,17 +1160,17 @@
   (let [dir (io/file root "orgs" "cloud-itonami" "hirameki-patents" "80-data" "public")
         legacy (io/file root "orgs" "kotoba-lang" "toshokan-patents" "80-data" "public")]
     (when (.exists legacy)
-      (binding [*out* *err*]
-        (println (str "edn-query: WARNING hirameki-patents: 旧パス "
-                      "orgs/kotoba-lang/toshokan-patents/80-data/public が残っている。"
-                      "corpus は cloud-itonami/hirameki-patents へ移った（ADR-2608100100）。"
-                      "旧パスは読まない。"))))
+      (js/console.error
+       (str "edn-query: WARNING hirameki-patents: 旧パス "
+            "orgs/kotoba-lang/toshokan-patents/80-data/public が残っている。"
+            "corpus は cloud-itonami/hirameki-patents へ移った（ADR-2608100100）。"
+            "旧パスは読まない。")))
     (if-not (.exists dir)
-      (do (binding [*out* *err*]
-            (println (str "edn-query: WARNING hirameki-patents: "
-                          "orgs/cloud-itonami/hirameki-patents/80-data/public が無い — "
-                          "特許は load されない（west update 未実行）。"
-                          "count 0 は「特許が無い」ではなく「読めていない」。")))
+      (do (js/console.error
+           (str "edn-query: WARNING hirameki-patents: "
+                "orgs/cloud-itonami/hirameki-patents/80-data/public が無い — "
+                "特許は load されない（west update 未実行）。"
+                "count 0 は「特許が無い」ではなく「読めていない」。"))
           [])
       (let [files (->> (.listFiles dir) (filter #(.endsWith (.getName %) ".journal.edn")) (sort-by #(.getName %)))
             skipped (atom [])
@@ -2172,7 +2187,7 @@
                    (recur)))))))
     (.on js/process.stdin "end" (fn [] (js/process.exit 0)))))
 
-(defn- run-cli [mode query-str]
+(defn- run-cli [mode queries]
   (let [{:keys [conn adr-count docs-count manifest-count foreign-adr-count biz-count
                 kj-count rad-count
                 etzhayyim-80-data-count proc-registry-count merged-kotoba-count working-doc-count
@@ -2202,19 +2217,29 @@
                         (str/join "," gleif-tiers)))
 
       "q"
-      (println (pr-str (js->clj (.q ds query-str (.db ds conn)))))
+      (println (pr-str (js->clj (.q ds (first queries) (.db ds conn)))))
+
+      ;; q* — 面を 1 回だけ組んで N 本のクエリを順に流し、結果を同じ順の
+      ;; ベクタで 1 行に出す。面のロードが所要時間の全てなので、3 本の
+      ;; 独立したクエリを持つ検証スクリプトは 3 プロセス起動すると 3 倍かかる
+      ;; （scripts/verify-tsukuru-factory-plane.cljs が実測でそうなっていた）。
+      ;; 呼び出し側は「結果の本数 = 投げたクエリの本数」を検査できるので、
+      ;; 空出力を「結果 0 件」と誤読する経路も塞げる。
+      "q*"
+      (let [db (.db ds conn)]
+        (println (pr-str (mapv #(js->clj (.q ds % db)) queries))))
 
       (do (println (str "usage: nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs "
-                        "[count | q '<datalog-query>' | mcp]"))
+                        "[count | q '<datalog-query>' | q* '<q1>' '<q2>' ... | mcp]"))
           (scripts.nbb-compat/exit 1)))))
 
 (defn -main [& args]
-  (let [[mode query-str] args]
+  (let [[mode & queries] args]
     ;; mcp モードは面をここでは組まない。握手には面が要らないので、client を
     ;; 数十秒待たせずに initialize / tools/list を返し、最初の query 系 tool 呼び出しで
     ;; 初めてロードする（plane! が 1 回だけ組む）。
     (if (= "mcp" mode)
       (mcp-serve!)
-      (run-cli mode query-str))))
+      (run-cli mode (vec queries)))))
 
 (apply -main *command-line-args*)

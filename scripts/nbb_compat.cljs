@@ -62,11 +62,19 @@
         ;; the cap and surface the real spawn error when one occurred.
         result (.spawnSync child-process (first command) (to-array (rest command))
                            (clj->js (merge {:encoding "utf8" :maxBuffer (* 64 1024 1024)} options)))
-        spawn-err (.-error result)]
+        spawn-err (.-error result)
+        ;; A child killed by a signal (OOM kill, timeout kill, SIGSEGV) also
+        ;; reports status:null, so it lands on the same synthetic exit 1 as a
+        ;; real failure — usually with EMPTY stderr, which reads as "it failed
+        ;; and said nothing". Report the signal so callers can name the cause.
+        signal (.-signal result)]
     {:exit (or (.-status result) 1)
+     :signal signal
      :out (or (.-stdout result) "")
      :err (cond-> (or (.-stderr result) "")
-            spawn-err (str "\n[nbb-compat/sh] " (.-message spawn-err)))}))
+            spawn-err (str "\n[nbb-compat/sh] " (.-message spawn-err))
+            signal (str "\n[nbb-compat/sh] killed by signal " signal
+                        " (exit status は null — 合成した exit 1 です)"))}))
 
 (defn exit [status] (.exit js/process status))
 (defn sleep!

@@ -15,9 +15,29 @@
 ;;
 ;;   nbb --classpath ".:scripts/nbb_compat" scripts/verify-tsukuru-factory-plane.cljs
 ;;
-;; コスト: 面を 3 回ロードするので **3 分前後**かかる（1 ロード約 55 秒）。
-;; edn-query.cljs は読み込むと -main が走ってしまうので require では共有できず、
-;; 検査ごとに子プロセスで q を叩いている。CI ではなく手で回す前提。
+;; ## この検査自身が「測らずに PASS する」のを止める 2 層（2026-08-13）
+;;
+;; 以前の版は **面のクエリが空を返すと 3 検査すべてを無言で skip して exit 0**
+;; していた（`edn/read-string ""` は例外を投げず nil を返し、各検査が
+;; `(when rows …)` で守られていたため、**nil が「失敗」ではなく「飛ばす」に
+;; なっていた**）。同日に削除された 5 本の `security-gate-*` と同じ形が、
+;; この workspace が回復させたい検査器の内側に居た。今は 2 層で塞ぐ:
+;;
+;;   1. `plane-q*` は空・解析不能・本数不一致・非コレクションを**必ず fail! する**。
+;;      nil を返す経路は全て失敗を記録済みであることが不変条件。
+;;   2. `assert-check!` が実行済み検査を数え、末尾で `expected-checks` に
+;;      満たなければ落ちる（**床**）。1 を将来の編集が壊しても、飛ばした検査は
+;;      「実行されていない」として赤くなる。
+;;
+;;   検証（実測 2026-08-13）: 何も出力せず exit 0 する stub を EDN_QUERY_SCRIPT に
+;;   指すと exit 1 / FAIL 2 件。壊れていない経路では exit 0。
+;;
+;; ## コスト
+;;
+;; 面のロードは 1 回だけ（`q*` モードで 3 本のクエリを 1 プロセスに流す）。
+;; 旧版は検査ごとに子プロセスを起こしていたので **3 回ロード**していた。
+;; 実測は下の「実測」節を参照 —— このマシンの load が 3 桁のときは 1 ロードでも
+;; 15 分級になるので、**6 時間 tick に載せる前に、そのホストの load で測り直す**。
 ;;
 ;; murakumo fleet gate には**入れていない**。ノードは tailnet だけに繋がっていて
 ;; npm 依存（datascript）が配られないため、`:nbb-script` gate では面を組めない
@@ -49,9 +69,30 @@
    ["manufacturer-registry-seed.edn" "tsukuru-registry-seed"   90]
    ["seed.edn"                       "tsukuru-seed"             3]])
 
+(def expected-checks 3)
+
 (def failures (atom []))
+(def checks-run (atom 0))
 (defn fail! [msg] (swap! failures conj msg))
 (defn ok [msg] (println (str "  ok   " msg)))
+
+(defn assert-check!
+  "検査 1 本を実行したことを記録してから本体を走らせる。`checks-run` が
+   `expected-checks` に届かなければ末尾で落ちるので、**検査を飛ばす経路は
+   黙って緑にならない**。"
+  [label f]
+  (swap! checks-run inc)
+  (f)
+  label)
+
+(defn- clip
+  "診断に載せる外部出力を、読める長さに切り詰める（空なら空と明示する）。"
+  [s limit]
+  (let [t (str/trim (str s))]
+    (cond
+      (str/blank? t) "(空)"
+      (> (count t) limit) (str (subs t 0 limit) " …[" (count t) " 文字を切り詰め]")
+      :else t)))
 
 (defn file-factory-dids
   "EDN ファイルを直接読み、:factory/did を持つ entity の did 集合を返す。
@@ -65,90 +106,169 @@
           (do (fail! (str fname ": トップレベルが vector ではない")) #{})
           (into #{} (keep :factory/did) (filter map? content)))))))
 
-(defn plane-q
-  "面に 1 クエリ投げて結果をパースする。面のロードに約 55 秒かかる。"
-  [label query]
-  (println (str "  ... " label " (面をロード中、約 55 秒)"))
-  (let [{:keys [exit out err]} (shell/sh "nbb" "--classpath" ".:scripts/nbb_compat"
-                                          query-script "q" query {:cwd root})]
-    (if-not (zero? exit)
-      (do (fail! (str label ": edn-query が exit " exit " — " (str/trim (str err)))) nil)
-      (try (edn/read-string (str/trim out))
-           (catch :default e
-             (fail! (str label ": 結果をパースできない — " (.-message e)))
-             nil)))))
+(defn plane-q*
+  "面を 1 回だけロードして `queries` を順に流し、同じ順の結果ベクタを返す。
+
+   **異常は全て失敗として記録する** —— 空出力・解析不能・nil・非コレクション・
+   本数不一致。この関数が nil を返すときは必ず fail! 済みであること、が
+   呼び出し側から見た不変条件（旧版はここで nil を返しながら何も記録せず、
+   全検査を skip したまま PASS していた）。"
+  [queries]
+  (println (str "  ... 面をロード中（1 回だけ / クエリ " (count queries) " 本）"))
+  (let [t0 (js/Date.now)
+        argv (concat ["nbb" "--classpath" ".:scripts/nbb_compat" query-script "q*"] queries)
+        {:keys [exit out err signal]} (apply shell/sh (concat argv [{:cwd root}]))
+        secs (/ (- (js/Date.now) t0) 1000.0)
+        ;; 失敗時にコマンドと両ストリームを必ず名指しする。旧版は err だけを
+        ;; 見せており、err が空なら「edn-query が exit 1 — 」とダッシュの後に
+        ;; 何も無い行を出して、自分の診断を捨てていた。
+        diag (str "cmd=" (clip (str/join " " argv) 200)
+                  " / exit=" exit
+                  (when signal (str " / **signal=" signal "**（プロセスが殺された。"
+                                    "面のロードは重いので OOM kill を疑う）"))
+                  " / stderr=" (clip err 600)
+                  " / stdout=" (clip out 300))]
+    (println (str "  ... ロード+クエリ " (.toFixed secs 1) " 秒"))
+    (cond
+      (not (zero? exit))
+      (do (fail! (str "面のクエリが exit " exit " — " diag)) nil)
+
+      (str/blank? (str out))
+      (do (fail! (str "面のクエリが exit 0 で**何も出力しなかった** — "
+                      "空出力は「結果 0 件」ではなく検査不能。" diag))
+          nil)
+
+      :else
+      (let [parsed (try (edn/read-string (str/trim out))
+                        (catch :default e
+                          (fail! (str "面のクエリ結果をパースできない — "
+                                      (.-message e) " / " diag))
+                          ::unparseable))]
+        (cond
+          (= ::unparseable parsed) nil
+
+          (not (sequential? parsed))
+          (do (fail! (str "面のクエリ結果が結果ベクタではない (" (pr-str (type parsed))
+                          ") — " diag))
+              nil)
+
+          (not= (count queries) (count parsed))
+          (do (fail! (str "面のクエリ結果が " (count parsed) " 本 ≠ 投げた "
+                          (count queries) " 本 — " diag))
+              nil)
+
+          (some nil? parsed)
+          (do (fail! (str "面のクエリ結果に nil の枠がある（" (count (filter nil? parsed))
+                          " 本）— 0 件と未実行は区別できない。" diag))
+              nil)
+
+          :else (vec parsed))))))
 
 (println "verify-tsukuru-factory-plane (ADR-2800003200 Phase 1)")
 (println (str "  対象: " query-script))
 (println)
 
-;; ── 検査 1/3: dataset ごとの件数が、ファイルを直接読んだ件数と一致するか ──
-;; 一致しなければ、行が落ちたか・タグが付いていないか・別 dataset に混ざったか。
-;; どれも「クエリは成功するのに答えが嘘」になる壊れ方。
-(println "[1/3] dataset の分割 (面 vs ファイル実体)")
-(let [file-dids (into {} (for [[fname dataset _] sources] [dataset (file-factory-dids fname)]))
-      rows (plane-q "factory/did × source/dataset"
-                    "[:find ?ds ?did :where [?e \"factory/did\" ?did] [?e \"source/dataset\" ?ds]]")
-      plane-dids (reduce (fn [m [ds did]] (update m ds (fnil conj #{}) did)) {} (or rows []))]
-  (when rows
-    (doseq [[_ dataset floor] sources]
-      (let [expect (get file-dids dataset #{})
-            got (get plane-dids dataset #{})]
-        (cond
-          (not= (count expect) (count got))
-          (fail! (str dataset ": 面 " (count got) " 件 ≠ ファイル " (count expect) " 件"
-                      " — 落ちた/混ざった did: "
-                      (str/join ", " (take 3 (concat (remove got expect) (remove expect got))))))
-          (< (count got) floor)
-          (fail! (str dataset ": " (count got) " 件は床 " floor " を下回る (静かな切り詰め?)"))
-          :else (ok (str dataset " = " (count got) " 件 (床 " floor ")")))))
-    ;; dataset を跨いで同じ did が現れないこと（タグの partition）
-    (let [overlaps (for [[_ d1 _] sources [_ d2 _] sources
-                         :when (neg? (compare d1 d2))
-                         :let [shared (set/intersection (get plane-dids d1 #{})
-                                                        (get plane-dids d2 #{}))]
-                         :when (seq shared)]
-                     (str d1 " ∩ " d2 " = " (count shared) " 件"))]
-      (if (seq overlaps)
-        (fail! (str "dataset が partition になっていない: " (str/join "; " overlaps)))
-        (ok "3 dataset は互いに素 (同じ工場が 2 つのタグを持たない)")))
-    ;; 同意していない候補が did:web を名乗らないこと。ここが崩れると
-    ;; 「未 onboard の企業が登録済みに見える」という、この dataset 最大の嘘になる。
-    (let [bad (filter #(str/starts-with? (str %) "did:web:") (get plane-dids "tsukuru-candidates" #{}))]
-      (if (seq bad)
-        (fail! (str "tsukuru-candidates に did:web が " (count bad) " 件 — 未同意の企業が"
-                    " onboarding 済みに見える: " (str/join ", " (take 3 bad))))
-        (ok "tsukuru-candidates に did:web は 0 件 (未同意を登録済みに見せない)")))))
+(def q-dataset-split
+  "[:find ?ds ?did :where [?e \"factory/did\" ?did] [?e \"source/dataset\" ?ds]]")
+(def q-capabilities
+  (str "[:find ?did :where [?e \"factory/capabilities\" \"industrial-robotics\"] "
+       "[?e \"factory/did\" ?did]]"))
+(def q-lei
+  (str "[:find ?ds ?did :where [?e \"factory/did\" ?did] [?e \"company/lei\" _] "
+       "[?e \"source/dataset\" ?ds]]"))
 
-;; ── 検査 2/3: 能力で工場を引けるか（cardinality-many が効いているか）──
-;; ds-schema に :db.cardinality/many を宣言し忘れると datascript は JS array を
-;; 1 つの値として持ち、この dataset の主目的（能力で工場を探す）が**0 件を返して
-;; 静かに壊れる**。壊れても例外は出ない。
-(println "[2/3] 能力による検索 (cardinality-many)")
-(let [rows (plane-q "factory/capabilities"
-                    "[:find ?did :where [?e \"factory/capabilities\" \"industrial-robotics\"] [?e \"factory/did\" ?did]]")]
-  (when rows
-    (if (empty? rows)
-      (fail! "factory/capabilities \"industrial-robotics\" が 0 件 — cardinality-many 未宣言の疑い")
-      (ok (str "能力 \"industrial-robotics\" で " (count rows) " 社ヒット")))))
+(let [results (plane-q* [q-dataset-split q-capabilities q-lei])
+      [split-rows cap-rows lei-rows] (or results [nil nil nil])]
 
-;; ── 検査 3/3: 結合キーを捏造していないか ──
-;; candidates.edn は LEI を持たない。誰かが「便利だから」と :company/lei を
-;; 合成したら、market-intel / cloud-itonami-lei との join が**嘘の同定**になる。
-;; Phase 1 は join を約束しない（ADR-2800003200）。
-(println "[3/3] 結合キーの捏造 (:company/lei)")
-(let [rows (plane-q "factory × company/lei"
-                    "[:find ?ds ?did :where [?e \"factory/did\" ?did] [?e \"company/lei\" _] [?e \"source/dataset\" ?ds]]")]
-  (when rows
-    (if (seq rows)
-      (fail! (str "factory entity に :company/lei が " (count rows) " 件 — LEI を持たない"
-                  " dataset に結合キーを合成している: " (str/join ", " (take 3 (map second rows)))))
-      (ok "factory entity に :company/lei は 0 件 (同定を捏造していない)"))))
+  (if-not results
+    (println "  面のクエリに失敗したため、3 検査は 1 つも実行されていない（下の FAIL を参照）")
+
+    (do
+      ;; ── 検査 1/3: dataset ごとの件数が、ファイルを直接読んだ件数と一致するか ──
+      ;; 一致しなければ、行が落ちたか・タグが付いていないか・別 dataset に混ざったか。
+      ;; どれも「クエリは成功するのに答えが嘘」になる壊れ方。
+      (println "[1/3] dataset の分割 (面 vs ファイル実体)")
+      (assert-check!
+       :dataset-split
+       (fn []
+         (let [file-dids (into {} (for [[fname dataset _] sources]
+                                    [dataset (file-factory-dids fname)]))
+               plane-dids (reduce (fn [m [ds did]] (update m ds (fnil conj #{}) did))
+                                  {} split-rows)]
+           (doseq [[_ dataset floor] sources]
+             (let [expect (get file-dids dataset #{})
+                   got (get plane-dids dataset #{})]
+               (cond
+                 (not= (count expect) (count got))
+                 (fail! (str dataset ": 面 " (count got) " 件 ≠ ファイル " (count expect) " 件"
+                             " — 落ちた/混ざった did: "
+                             (str/join ", " (take 3 (concat (remove got expect)
+                                                            (remove expect got))))))
+                 (< (count got) floor)
+                 (fail! (str dataset ": " (count got) " 件は床 " floor " を下回る (静かな切り詰め?)"))
+                 :else (ok (str dataset " = " (count got) " 件 (床 " floor ")")))))
+           ;; dataset を跨いで同じ did が現れないこと（タグの partition）
+           (let [overlaps (for [[_ d1 _] sources [_ d2 _] sources
+                                :when (neg? (compare d1 d2))
+                                :let [shared (set/intersection (get plane-dids d1 #{})
+                                                               (get plane-dids d2 #{}))]
+                                :when (seq shared)]
+                            (str d1 " ∩ " d2 " = " (count shared) " 件"))]
+             (if (seq overlaps)
+               (fail! (str "dataset が partition になっていない: " (str/join "; " overlaps)))
+               (ok "3 dataset は互いに素 (同じ工場が 2 つのタグを持たない)")))
+           ;; 同意していない候補が did:web を名乗らないこと。ここが崩れると
+           ;; 「未 onboard の企業が登録済みに見える」という、この dataset 最大の嘘になる。
+           (let [bad (filter #(str/starts-with? (str %) "did:web:")
+                             (get plane-dids "tsukuru-candidates" #{}))]
+             (if (seq bad)
+               (fail! (str "tsukuru-candidates に did:web が " (count bad) " 件 — 未同意の企業が"
+                           " onboarding 済みに見える: " (str/join ", " (take 3 bad))))
+               (ok "tsukuru-candidates に did:web は 0 件 (未同意を登録済みに見せない)"))))))
+
+      ;; ── 検査 2/3: 能力で工場を引けるか（cardinality-many が効いているか）──
+      ;; ds-schema に :db.cardinality/many を宣言し忘れると datascript は JS array を
+      ;; 1 つの値として持ち、この dataset の主目的（能力で工場を探す）が**0 件を返して
+      ;; 静かに壊れる**。壊れても例外は出ない。
+      ;; 宣言の在り処は manifest/edn-query.cljs の `ds-schema`（manifest/schema.edn は
+      ;; edn-datomize.cljs の生成物で、tsukuru の kotoba ファイルはそこを通らないため
+      ;; factory/* が入らない。手編集は禁止なので patent/applicant-norm・yakuwari/* と
+      ;; 同じくコード側に置く）。
+      (println "[2/3] 能力による検索 (cardinality-many)")
+      (assert-check!
+       :capabilities
+       (fn []
+         (if (empty? cap-rows)
+           (fail! (str "factory/capabilities \"industrial-robotics\" が 0 件 — "
+                       "manifest/edn-query.cljs の ds-schema に "
+                       "\"factory/capabilities\" の :db.cardinality/many 宣言が無い疑い"))
+           (ok (str "能力 \"industrial-robotics\" で " (count cap-rows) " 社ヒット")))))
+
+      ;; ── 検査 3/3: 結合キーを捏造していないか ──
+      ;; candidates.edn は LEI を持たない。誰かが「便利だから」と :company/lei を
+      ;; 合成したら、market-intel / cloud-itonami-lei との join が**嘘の同定**になる。
+      ;; Phase 1 は join を約束しない（ADR-2800003200）。
+      (println "[3/3] 結合キーの捏造 (:company/lei)")
+      (assert-check!
+       :fabricated-join-key
+       (fn []
+         (if (seq lei-rows)
+           (fail! (str "factory entity に :company/lei が " (count lei-rows) " 件 — LEI を持たない"
+                       " dataset に結合キーを合成している: "
+                       (str/join ", " (take 3 (map second lei-rows)))))
+           (ok "factory entity に :company/lei は 0 件 (同定を捏造していない)")))))))
+
+;; 床: 3 検査すべてが実際に走ったか。走っていなければ、それが PASS の理由に
+;; ならないよう**ここで落とす**。
+(when (not= expected-checks @checks-run)
+  (fail! (str "検査が " @checks-run "/" expected-checks
+              " しか実行されていない — 実行されなかった検査は「合格」ではない")))
 
 (println)
 (if (seq @failures)
   (do (println (str "FAIL (" (count @failures) " 件)"))
       (doseq [m @failures] (println (str "  - " m)))
       (compat/exit 1))
-  (do (println "PASS — 3 dataset は分割されたまま面に載っている")
+  (do (println (str "PASS — 3 dataset は分割されたまま面に載っている（検査 "
+                    @checks-run "/" expected-checks " 実行）"))
       (compat/exit 0)))
