@@ -1,0 +1,193 @@
+[{:db/id -1
+  :adr/id "adr-2608120400-authority-kernel-principal-intent-decision-receipt"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/title "ADR-2608120400: Principal–Intent–Decision–Receipt authority kernel"
+  :adr/topic "authority-kernel-principal-intent-decision-receipt"
+  :adr/status "accepted"
+  :adr/authoritative true
+  :adr/date "2026-08-12"
+  :adr/last_verified "2026-08-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/supersedes []
+  :adr/superseded_by []
+  :adr/related ["adr-2607032500-kotoba-kotobase-clojure-datomic-relationship"
+                "adr-2607252000-authn-kotobase-net-identity-service"
+                "adr-2607267000-authn-authz-datom-store-schema-unification"
+                "2608039900"
+                "2608082000"
+                "adr-2607198300-kotoba-security-assurance-model"]
+  :adr/authoritative_for ["Kotoba/Kotobase の identity・authentication・authorization・effect・grant・runtime capability の正規語彙"
+                          "Principal × Intent × Effects × Grants × Policy × Context → Decision の唯一の authority 判定面"
+                          "compiler/KIR・runtime/OS・UI・通信・web service・Kotobase・認証認可・決済への投影境界"
+                          "canonical Receipt と NIST CSF 2.0 mapping の適用範囲・非適合宣言"]
+  :adr/body "# ADR-2608120400: Principal–Intent–Decision–Receipt authority kernel
+
+**Status**: accepted
+**Date**: 2026-08-12
+**Deciders**: Jun Kawasaki
+
+## Context
+
+Kotoba/Kotobase には DID、account、viewer、actor、effect、capability、role、tenant、wallet、
+DataCap、plan entitlement、receipt など、security と authority を表す語が複数存在する。
+それぞれは必要な概念だが、同じ `capability` が静的 effect、署名可能な grant、runtime
+handle、商用 entitlement の意味で使われ、credential parser と policy decision も edge、
+service、UI、database ごとに重複し得る。
+
+一方、ADR-2607032500 は `kotoba : kotobase = Clojure : Datomic`、ADR-2607252000 は
+DID account と cookie/CACAO から単一 viewer への収束、ADR-2607267000 は authn/authz
+datom schema の統合、ADR-2608039900 は authority を attenuable value とすることを決めた。
+本 ADR はそれらを supersede せず、言語から決済までを通す一つの authority narrow waist
+として統合する。
+
+## Decision
+
+### D1. 正規語彙
+
+- **Entity**: 人、組織、service、agent、device などの存在。
+- **Identity**: entity に関する claim と binding の集合。
+- **Identifier**: DID、UUID、CID などの参照。identifier だけでは本人性を証明しない。
+- **Account**: product-local な契約、設定、回復、請求の管理容器。
+- **Credential**: identity や鍵支配を証明する材料。authorization そのものではない。
+- **Signer**: signature を生成した鍵の controller。principal と一致するとは限らない。
+- **Subject**: assertion/token が指す対象。
+- **VerifiedPrincipal**: 今回の decision を誰の権限として行うかを表す、credential 検証後の
+  正規化済み security subject。`principal` は原則を意味する `principle` ではない。
+- **Actor**: browser、agent、service、code など実際の実行主体。principal と分離して記録する。
+- **Tenant**: resource と policy の隔離境界。account の別名にしない。
+- **Intent**: action、resource、input/body CID、context を含む要求。
+- **Ability/Action**: intent と grant を照合する動詞。role や resource とは分離する。
+- **Role**: grant 群を管理上割り当てる名前。runtime capability ではない。
+- **Effect**: code が試み得る／必要とする作用の静的記述。authority ではない。
+- **Grant**: issuer、subject、action、resource、audience、expiry、limits を持つ、署名・保存・
+  委譲可能な authority 記述。
+- **Runtime Capability**: allow 後に broker が渡す、偽造困難で目的限定の handle。原則として
+  serializable な grant と同一にしない。
+- **Shared Authority**: quorum、threshold、共同承認など複数 principal の条件を満たす authority。
+  共有 password や共有 identity として実装しない。
+- **Policy**: bounded data として表す組織、deployment、resource の規則。
+- **Decision**: `:allow`、`:deny`、`:challenge` と reason、missing authority、step-up。
+- **Entitlement**: 契約・購入・plan 由来の利用資格。grant の供給源の一つ。
+- **Settlement**: provider で検証済みの外部決済事実。
+- **Receipt**: intent、principal、actor、code/policy/grant CID、decision、outcome、database
+  basis、provider、time を結ぶ immutable evidence。
+
+DoDAF の `Capability` は mission/business 上の達成可能性であり、runtime capability とは
+別 namespace とする。Filecoin DataCap は storage allocation に限定された grant、Ethereum
+の signer/account は transaction authorization の主体または credential adapter として、上記
+の一般モデルへ写像する。
+
+### D2. authority の唯一の判定面
+
+正規 interface は次とする。
+
+```text
+Decision = decide(Principal, Intent, Effects, Grants, Policy, Context)
+```
+
+effective authority は、認証済み principal と valid grants の積を、effect、deployment/resource
+policy、tenant、audience、time、nonce、separation-of-duties の交差で狭めたものとする。effect が
+grant を拡張すること、role 名だけで暗黙の ambient authority を得ることを禁止する。
+
+kernel は pure、deterministic、bounded とし、同じ canonical input と immutable basis は同じ
+decision を返す。policy は EDN/data であり、network 由来の任意 code を `eval` しない。
+Kotobase は Datalog で basis 上の事実を取得し、Kotoba `.cljc` kernel が判定する。
+
+### D3. credential と principal
+
+cookie、Passkey、CACAO、mTLS、wallet signature は trust edge で一度だけ検証し、
+`VerifiedPrincipal` に正規化する。内部 service は raw credential を再解釈しない。
+principal、actor、delegator、account、tenant は別 field とし、agent が人の authority で動く場合も
+provenance を失わない。公開 access は anonymous principal と空 grants で表現する。
+
+### D4. 多層への投影
+
+1. compiler は effect/resource/import/limit/code identity manifest を生成し、明白な
+   effect–grant 不整合を拒否する。
+2. KIR/runtime/OS は decision 済みの purpose-bound handle だけを provider に渡す。raw secret、
+   ambient filesystem/network/environment authority を code に渡さない。
+3. runtime provider は action/resource/audience/expiry/revocation/cost/fuel を再検査する。
+4. UI は Decision の reason、missing grant、step-up、approver、cost、destination、expiry、
+   code CID、revocation を描画するが、UI を enforcement point にしない。
+5. 通信 envelope は principal/subject、actor/code CID、audience、action、resource、body CID、
+   grant CIDs、nonce、issued/expires を持つ。wire canonical form は DAG-CBOR、EDN は projection。
+6. web service は HTTP parse → credential adapter → Intent → Decision → provider → Receipt とする。
+7. Kotobase は immutable basis で tenant/resource/action/policy/grant/revocation/idempotency/schema
+   invariant を最終検査し、secret でなく proof CID、decision、receipt を保存する。
+8. payment は signed webhook → verified Settlement fact → product Policy → Entitlement Grant →
+   runtime Capability とする。Stripe を billing truth とし、refund/cancel/chargeback は失効・期限
+   fact を append する。
+
+credential を edge で一度だけ解釈することは、compiler、runtime、OS、database、provider の
+defense in depth を除くことではない。削減するのは同義語と decision logic の重複であり、異なる
+trust boundary における再検査は残す。
+
+### D5. canonical Receipt
+
+成功と失敗の双方について、少なくとも以下を結ぶ receipt を生成する。
+
+```clojure
+{:receipt/intent-cid ...
+ :receipt/principal ...
+ :receipt/actor ...
+ :receipt/code-cid ...
+ :receipt/policy-cid ...
+ :receipt/grant-cids [...]
+ :receipt/decision :allow
+ :receipt/outcome ...
+ :receipt/basis ...
+ :receipt/provider ...
+ :receipt/at ...}
+```
+
+各 product の audit view、security event、payment view はこの record の projection とし、
+独立して意味の異なる audit truth を増やさない。credential、private key、bearer token、secret
+は append-only receipt/journal に書かない。
+
+### D6. NIST CSF 2.0 との関係
+
+この設計は GV.RR/GV.PO の責任・policy、ID.AM/ID.RA の inventory/risk、PR.AA-01..05 の
+identity/credential/access control、PR.DS の data security、PR.PS-04..05 の logs/platform
+integrity、DE.CM/DE.AE の monitoring/anomaly、RS.MI の revoke/quarantine、RC.RP の immutable
+basis/snapshot/replay を実装・検証しやすくする。
+
+ただし、言語 feature またはこの ADR の存在を NIST CSF 適合と表現してはならない。identity
+proofing、key custody/recovery、physical access、training、vendor risk、incident communication、
+legal/privacy、backup exercise、policy review は product、OS、運用、組織の control と evidence
+を別途必要とする。ADR-2607198300 に従い、model、local test、live evidence、production
+readiness を区別する。
+
+### D7. 移行と互換性
+
+- 新しい domain API と schema は `VerifiedPrincipal`、`Actor`、`AccountRef`、`TenantRef`、
+  `Intent`、`Effect`、`Grant`、`Decision`、`Receipt` を使う。
+- `viewer`、`accountDid`、`activeDid`、`actorDid`、role/route/plan permission は既存 wire/API の
+  compatibility adapter に限定し、kernel 内の新語彙にしない。
+- 既存 CACAO verifier、credential parser、policy dialect、receipt format を inventory し、挙動を
+  保ったまま adapter → canonical kernel → projection の順で収束させる。
+- migration 完了までは二重実行結果を比較できるが、二つの authority truth を永続化しない。
+
+## Invariants
+
+1. DID、account、credential、principal、actor を同一視しない。
+2. effect は authority を与えず、grant は runtime handle ではない。
+3. allow は action と resource の双方に束縛し、ambient authority を作らない。
+4. dynamic な expiry、revocation、tenant、resource、cost は実行直前と storage 境界で再検査する。
+5. decision と execution は canonical receipt で結び、secret は証跡に含めない。
+6. security claim は実装層と evidence scope を伴い、language feature から compliance を推論しない。
+
+## Consequences
+
+- identity provider、wallet、agent、service、payment provider を一つの判定モデルへ追加できる。
+- Clojure/EDN/Datalog の data orientation と Datomic の immutable basis が、再現可能な authorization
+  と監査に直接使える。
+- UI と transport は security semantics を再実装せず、Decision/Receipt の projection になる。
+- canonical schema、kernel、adapter、receipt migration の実装作業が必要になる。本 ADR と README
+  の着地は用語・設計の正本化であり、未移行 component の実装完了を意味しない。
+
+## One-line rule
+
+**Identity を特権にせず、VerifiedPrincipal と Intent を bounded data として判定し、Grant を
+Effect と Policy で狭め、許可時だけ runtime Capability を渡し、全結果を Receipt にする。**
+"}]
