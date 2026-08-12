@@ -197,10 +197,57 @@ pins.
    trees added a third owner with a different root commit and broke the
    all-owners-share-a-root test. Reverted rather than landed.
 
-   So the fix needs to reject `.` as a root and re-derive suppression per owner
-   pair rather than per namespace. Recording the failed attempt so the next
-   person does not spend the same hour discovering that declarations are not
-   uniformly usable as roots.
+   **CLOSED, merge `3d5a70ad627`. And my diagnosis of the regression above was
+   wrong.**
+
+   The declaration is now the list itself, with two guards -- both found by
+   measurement, neither by reasoning:
+
+   - **A declared root must lie inside the repo.** `net-kotobase` declares 28
+     roots that resolve through `../..` into OTHER repositories
+     (`orgs/kotoba-lang/pay/src`, `.../kotobase/src`). Taken at face value they
+     make `net-kotobase` an owner of `pay`'s files, and the extra owner brings
+     its own root commit. **That -- not the `same-upstream?` shape I blamed --
+     is the actual mechanism behind the 19 to 4 collapse.** I proposed
+     re-deriving suppression per owner pair; the real defect was upstream of
+     suppression entirely.
+   - **A declared root must not be the declaring directory.** `:paths [\".\"]`
+     is legitimate and documented where it appears: `kotoba-lang`'s own deps.edn
+     has it so `io/resource` finds `lang/cli.edn`, and the 20 `games/*` ones
+     have it for `clojure -M author.clj` on files that carry no `ns` form.
+
+   All five acceptance criteria hold, and the DIVERGENT list is byte-identical
+   to before -- same 8 namespaces, same owners, same shas -- while the scan grew
+   from 4,539 trees to 5,005 and from 14,867 namespace paths to 16,164.
+
+   `kotoba.kami-host` is now visible, and it is **divergent but NOT
+   co-classpath** (no closure reaches both owners), so it lives in `--all`. That
+   exposed a real hole: divergent-not-co-classpath findings appeared in **no
+   mode at all**, and they are 216 of 243. They now have their own `--all`
+   bucket.
+
+   `wasm-webcomponent` is the sharpest illustration of what the name filter cost:
+   what it has named `src` is shadow-cljs's `:esm` OUTPUT directory. The filter
+   did not merely miss two real source trees -- it selected the build product
+   and discarded both.
+
+   **One thing was implemented, measured, and deliberately reverted.** Per-owner-
+   pair suppression satisfies four of the five criteria and holds suppression at
+   19, but it drops `treasury/core.cljc` entirely. The reason is a finding about
+   the detector rather than a bug: among treasury's 7 owners, the ONLY pair any
+   closure reaches together is `gftdcojp/cloud-murakumo` and
+   `network-awai/cloud-murakumo` -- one repo at two paths. So the finding is
+   promoted by a relationship the script itself classifies as NOT a collision,
+   and survives suppression only because owners that took no part in promoting it
+   disagree about upstream. Per pair, the same pair decides both halves and it
+   vanishes. `Restrict same-upstream to co-classpath participants` suppresses it
+   too, so per-pair suppression and keeping treasury are mutually exclusive on
+   today's data.
+
+   That was written above `same-upstream?` in the source instead of being fixed
+   by tuning a number: **CO-CLASSPATH is not the axis that finds
+   `treasury/core.cljc`.** Catching it on purpose needs a second axis this script
+   does not have, and `verify-vendored-copies.cljs` is the likelier home for it.
 
    Left undone, and named rather than silently absorbed: the three repos deviate
    from their own family convention. `plugin-host` and `project` scope their E2E
