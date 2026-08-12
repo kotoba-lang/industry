@@ -97,6 +97,48 @@ are not isolated at all.** A worktree is not a sandbox for anything that writes
 to `.git`. That is very likely how the unattributed fetch reached the root, and
 it is the part worth carrying into practice rather than the date.
 
+### Observed directly, 2026-08-13, with the source repository identified
+
+The mechanism above was an inference when this ADR was written. It has since
+been caught in the act, in a different repository, where the evidence survives
+because nothing gc'd it away.
+
+`orgs/kotoba-lang/kototama` carried exactly one graft:
+`b2965762647d16aedd96edbeb7750a1fa4385b95`, an `Initial commit` whose tree is a
+single `README.md`. Three facts identify where it came from:
+
+- `gh api repos/kotoba-lang/kototama/commits/b296576…` returns **422, no commit
+  found** — it is not in kototama at all, and no kototama ref reaches it.
+- `orgs/kotoba-lang/kototama-cljc-contract` is **a linked worktree of kototama**
+  (its `.git` file points at `…/kototama/.git/worktrees/…`), detached at exactly
+  `b296576`.
+- `gh api repos/kotoba-lang/kototama-cljc-contract/commits/b296576…` **exists,
+  with `parents: []`.**
+
+So a shallow fetch of **one repository** wrote a graft into **another
+repository's** object store, through the shared `$GIT_COMMON_DIR`. This is the
+hazard, observed, rather than reconstructed from a frontier.
+
+Two consequences that generalise:
+
+**`fetch --unshallow origin` cannot repair it.** It exits 0, prints nothing, and
+leaves the shallow file byte-identical, because nothing in *kototama's* own
+history is missing. The repair has to name the repository the graft actually came
+from. A silent success is the worst available answer here, and it is the one the
+obvious command gives.
+
+**This particular graft truncated nothing.** It sits on a genuine root commit of
+a foreign repository, so kototama's ancestry answers were never wrong. That is
+luck, not a property of the mechanism: had the borrowed frontier been mid-history
+rather than at a root, kototama would have answered ancestry questions
+incorrectly with no outward sign. **A shared object store means the correctness
+of repo A's history can depend on how repo B was fetched.**
+
+The underlying anomaly — a repository registered as its own west project while
+existing on disk as a linked worktree of a *different* west project — is not
+repaired here. Restructuring a checkout is owner territory and belongs to the
+`git-cleanup-conflict` retirement flow.
+
 ## Ruled out, each checked against the ROOT specifically
 
 west (no `clone-depth`, no `.west` depth, root is not a west project); git config
