@@ -280,8 +280,40 @@ Whether the three undiagnosed permanent reds fail for the `root-permit-index`
 reason or for a genuine violation — that needs reading each failure detail.
 Whether `root-rename-residue` was manually demonstrated to fail before landing;
 **absence of a record is not proof it was not done** — moot as of 2026-08-12,
-since it has now been demonstrated and the demonstration left a trace. And whether the five
-uninstalled plists were deliberately retired or silently dropped — CLAUDE.md
-skill descriptions reportedly still describe several of those loops as running
-every cycle, and **if the documentation says a loop runs while its scheduler is
-not installed, that gap is itself the finding.**"}]
+since it has now been demonstrated and the demonstration left a trace. ## DETERMINED: silently dropped, and the documentation still says they run
+
+The five uninstalled plists were **not retired** — they were dropped, and this
+workspace's real retirement mechanism proves the difference. When
+`com.gftd.hayari-tick` was genuinely retired its plist was moved to an
+`_archive/` directory **and an ADR recorded the move**. Ten older plists sit in a
+dated launchd archive. **None of the five is in either.**
+
+Three ADRs affirmatively record three of them as installed, bootstrapped and
+kickstart-verified — and one **demonstrably worked**, repairing a seven-document
+backlog on 2026-08-08, one commit per document, exactly as designed. **No ADR
+records removing any of them and no logs survive for any of them.**
+
+**The larger finding is the documentation gap.** Six skills state that a resident
+loop calls them every cycle. **None is loaded**, and three of the six **have no
+plist anywhere** — not in the repo, not on the machine. The surviving plists also
+cite sibling jobs that do not exist.
+
+**So the documentation asserts a schedule that has not existed for days**, which
+is the same shape as this document's other findings, one layer up: a detector
+nobody runs reads as coverage; **a loop nobody runs reads as a routine.**
+
+**A caution against reinstalling them blind.** Three of the five launch an
+autonomous model loop with permission checks skipped, on 8-hour, 1-hour and
+6-hour intervals, one of them fanning out to two dozen parallel agents per wave,
+and they commit and push. **That is a materially different decision from
+installing a read-only monitor** and needs explicit consent. Exactly one of the
+five — a detection-only sync probe whose own header states it never writes to
+`main` — is the safe one.
+
+## What could not be determined
+
+Whether the three undiagnosed permanent reds fail for the `root-permit-index`
+reason or for a genuine violation — that needs reading each failure detail.
+Whether `root-rename-residue` was manually demonstrated to fail before landing;
+**absence of a record is not proof it was not done** — moot as of 2026-08-12,
+since it has now been demonstrated and the demonstration left a trace."}]
