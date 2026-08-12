@@ -42,12 +42,13 @@
 
  :suites
  [{:repo "orgs/kotoba-lang/langgraph"
-   :label "langgraph operator-quickstart claims"
-   ;; docs/operator-quickstart.md tells a host author four runtime facts
-   ;; that are not visible from the API. Prose rots silently, so each
-   ;; claim has an assertion — and each assertion is here, because an
-   ;; assertion that never bites rots just as silently as the prose.
-   ;; 全て 2026-08-06 に実際に赤くなるところを見た。
+   :label "langgraph runtime claims, superstep semantics, thread custody"
+   ;; 最初の 4 件は docs/operator-quickstart.md が host 作者に伝える 4 つの
+   ;; 実行時の事実（API からは見えない）を守る。prose は黙って腐るので各主張に
+   ;; assertion を付け、その assertion 自身がここに在る —— 噛まなくなった
+   ;; assertion は prose と同じ速さで腐るから。全て 2026-08-06 に赤くなるのを見た。
+   ;; 残り 12 件（2026-08-12）は quickstart とは無関係な、当時どのテストも
+   ;; 見ていなかった不変条件。区切りのコメントを参照。
    :cmd ["clojure" "-M:test"]
    :green-marker "0 failures, 0 errors"
    :mutations
@@ -78,7 +79,98 @@
      :find "                (map #(->ckpt (pull dbv '[*] %)))\n                (sort-by :step)\n                vec)"
      :replace "                (map #(->ckpt (pull dbv '[*] %)))\n                reverse\n                vec)"
      :must-fail ["checkpoint-history-is-readable-without-running-the-graph"
-                 "interrupt-and-resume-datomic"]}]}
+                 "interrupt-and-resume-datomic"]}
+
+    ;; ── 以下 12 件は 2026-08-12（成熟度 loop / axis-test）に追加 ────────────
+    ;; どれも当時の suite が**一度も見ていなかった**不変条件。それを主張だけで
+    ;; 言わないために、各 mutation を追加後の suite と**追加前の suite の両方**へ
+    ;; 当てて測った: 12 件とも新 suite だけが赤くなり、旧 suite は緑のままだった。
+    ;; 13 件目の候補（mermaid が CompiledGraph を unwrap すること）は逆の結果 ——
+    ;; agent-test/viz-smoke が既に赤くなったので、その test ごと採らなかった。
+
+    {:id :langgraph/fan-in-runs-twice
+     :why "扇入 —— 同じ superstep の 2 つのノードが同じ後続を指したとき、frontier が重複を潰さないと後続が 2 回走る。ノードは副作用を持つ（model 呼び出し・決済）ので、これは「遅くなる」ではなく「1 論理ステップに対して効果が 2 回」"
+     :file "src/langgraph/graph.cljc"
+     :find "              next-frontier (vec (distinct next-frontier))"
+     :replace "              next-frontier (vec next-frontier)"
+     :must-fail ["a-fan-in-node-runs-once-per-superstep-not-once-per-inbound-edge"]}
+
+    {:id :langgraph/interrupt-after-saves-the-old-frontier
+     :why "interrupt-after は「そのノードが走った後」に停める。保存する frontier を次のものではなく現在のものにすると、resume でそのノードがもう一度走る —— 人間がその結果を見ている間に、その処理を 2 度実行することになる"
+     :file "src/langgraph/graph.cljc"
+     :find "            (do (save! checkpointer thread-id\n                       {:step (inc step) :state state' :frontier next-frontier\n                        :status :interrupted})\n                {:state state' :events events' :status :interrupted\n                 :frontier next-frontier})"
+     :replace "            (do (save! checkpointer thread-id\n                       {:step (inc step) :state state' :frontier frontier\n                        :status :interrupted})\n                {:state state' :events events' :status :interrupted\n                 :frontier frontier})"
+     :must-fail ["interrupt-after-parks-past-the-node-that-tripped-it"]}
+
+    {:id :langgraph/path-map-not-applied
+     :why "path-map は router の語彙（\"continue\"/\"stop\"）を node 名へ翻訳する。翻訳を飛ばすと生の文字列が node 表に届き、END も END として認識されない"
+     :file "src/langgraph/graph.cljc"
+     :find "          out (if path-map (map #(get path-map % %) out) out)"
+     :replace "          out out"
+     :must-fail ["a-path-map-translates-router-output-and-may-name-end"]}
+
+    {:id :langgraph/non-map-update-replaces-state
+     :why "map 以外を返すノード（routing だけを決める guard、logging）の戻り値を新しい state として採ると、蓄積してきた channel が全部消える。しかも :done が返るので静かに壊れる"
+     :file "src/langgraph/graph.cljc"
+     :find "                       state' (if (map? updates)\n                                (apply-updates channels state updates)\n                                state)"
+     :replace "                       state' (if (map? updates)\n                                (apply-updates channels state updates)\n                                (or updates state))"
+     :must-fail ["a-node-that-returns-a-non-map-leaves-the-state-alone"]}
+
+    {:id :langgraph/no-entry-point-is-silent
+     :why "entry point を書き忘れた graph は frontier が空 —— loop の最初の分岐が :done を返す。何も走らなかった実行を成功として返すのは、投げるより悪い"
+     :file "src/langgraph/graph.cljc"
+     :find "        (when (empty? entry)\n          (throw (ex-info \"No entry point — call set-entry-point\" {})))"
+     :replace "        (when false\n          (throw (ex-info \"No entry point — call set-entry-point\" {})))"
+     :must-fail ["a-graph-with-no-entry-point-refuses-to-run"]}
+
+    {:id :langgraph/unknown-node-guard-removed
+     :why "存在しない node への edge（typo、消したノードに残った edge）を検出する guard。外すと nil を Runnable として呼ぶことになる"
+     :file "src/langgraph/graph.cljc"
+     :find "                       _ (when-not f (throw (ex-info \"Unknown node\" {:node node})))"
+     :replace "                       _ nil"
+     :must-fail ["an-edge-to-a-node-that-was-never-added-is-refused"]}
+
+    {:id :langgraph/every-channel-seeded-with-nil
+     :why ":default を宣言していない channel を nil で seed すると、「まだ誰も書いていない」と「誰かが nil を書いた」の区別が全 graph で消える"
+     :file "src/langgraph/graph.cljc"
+     :find "               (if (contains? spec :default) (assoc m k (:default spec)) m))"
+     :replace "               (assoc m k (:default spec)))"
+     :must-fail ["only-channels-that-declare-a-default-are-seeded"]}
+
+    {:id :langgraph/update-state-overwrites-what-the-human-saw
+     :why "datomic checkpointer は thread/step で 1 行を addressing する。人間の編集を同じ step に書くと upsert になり、**承認した時に人間が見せられていた state が消える**。監査が訊くのはまさにそれ。inc 1 つで、他に誰も見ていない"
+     :file "src/langgraph/graph.cljc"
+     :find "                                  :step (inc (:step latest))"
+     :replace "                                  :step (:step latest)"
+     :must-fail ["a-human-edit-does-not-overwrite-the-checkpoint-it-edits"]}
+
+    {:id :langgraph/list-checkpoints-ignores-thread
+     :why "thread の境界は where 節 1 本でしかない —— 落としても型も arity も文句を言わない。落ちると list-checkpoints が他人の thread の行を返す"
+     :file "src/langgraph/checkpoint.cljc"
+     :find "               es (q '[:find [?e ...]\n                       :in $ ?tid\n                       :where [?e :checkpoint/thread ?tid]]"
+     :replace "               es (q '[:find [?e ...]\n                       :in $ ?tid\n                       :where [?e :checkpoint/thread _]]"
+     :must-fail ["checkpoints-are-scoped-to-the-thread-that-wrote-them"]}
+
+    {:id :langgraph/get-latest-ignores-thread
+     :why "同上を -get-latest 側で。scope の無い max はその thread が到達していない step を指し、そこに行が無いので latest を取り違える"
+     :file "src/langgraph/checkpoint.cljc"
+     :find "               step (q '[:find (max ?s) .\n                         :in $ ?tid\n                         :where [?e :checkpoint/thread ?tid]\n                                [?e :checkpoint/step ?s]]"
+     :replace "               step (q '[:find (max ?s) .\n                         :in $ ?tid\n                         :where [?e :checkpoint/thread _]\n                                [?e :checkpoint/step ?s]]"
+     :must-fail ["checkpoints-are-scoped-to-the-thread-that-wrote-them"]}
+
+    {:id :langgraph/mermaid-id-not-sanitised
+     :why "node 名は Clojure の keyword なのでハイフンが普通（:call-model）。Mermaid の識別子ではないので、そのまま出すと図が壊れる。label は元の名前のままでなければならない（sanitise した名前では grep できない）"
+     :file "src/langgraph/viz.cljc"
+     :find "    :else (str/replace (name n) #\"[^A-Za-z0-9_]\" \"_\")))"
+     :replace "    :else (name n)))"
+     :must-fail ["node-ids-are-sanitised-and-labels-are-not"]}
+
+    {:id :langgraph/mermaid-drops-conditional-edges
+     :why "router は関数なので静的な図が言えるのは「分岐が在る」ことだけ。それを描かないと、conditional しか持たないノードが行き止まりに見える —— 実際とは逆"
+     :file "src/langgraph/viz.cljc"
+     :find "               (for [[from _] conditional]\n                 (str \"  \" (node-id from) \" -.->|condition| END\")))]"
+     :replace "               nil)]"
+     :must-fail ["a-conditional-edge-is-drawn-as-one"]}]}
 
   {:repo "orgs/kotoba-lang/prolly-tree"
    :label "prolly-tree inclusion proof"
