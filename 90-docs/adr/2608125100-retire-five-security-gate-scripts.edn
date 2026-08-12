@@ -1,0 +1,210 @@
+[{:db/id -1
+  :adr/id "ADR-2608125100"
+  :adr/title "Retire the five security-gate-* scripts, and record what G-004 through G-008 were meant to check"
+  :adr/status "accepted"
+  :adr/date "2026-08-12"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-stack-security-assurance"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related ["ADR-2608124800" "ADR-2607198100" "ADR-2607198200"]
+  :adr/authoritative-for
+  ["disposition of scripts/security-gate-*.cljs"
+   "where the real evidence for security gaps G-004 through G-010 lives"]
+  :adr/decision "delete-all-five-rewrite-none"
+  :adr/deleted-files
+  ["scripts/security-gate-abac-audit.cljs"
+   "scripts/security-gate-audit-trail-test.cljs"
+   "scripts/security-gate-georestores-test.cljs"
+   "scripts/security-gate-hsm-export-test.cljs"
+   "scripts/security-gate-paging-test.cljs"]
+  :adr/evidence-authority
+  "orgs/kotoba-lang/security/registers/stack-security-score.edn"
+  :adr/body
+  "## Decision
+
+Delete all five `scripts/security-gate-*.cljs`. Rewrite none of them.
+Do not wire any of them into `scripts/fleet-ci/gates.edn`.
+
+This executes item 9 of ADR-2608124800, which found them but did not dispose
+of them.
+
+## The claims in ADR-2608124800, re-verified independently before acting
+
+Each file was read in full and each of the five was executed. Confirmed:
+
+- **All five return exit 0 unconditionally.** There is no `process.exit`, no
+  `exitCode` assignment, no `throw` on any failure path in any of the five.
+- `security-gate-georestores-test.cljs` line 14-17 defines `compute-sha256`
+  which ignores its argument and returns the literal string
+  `deadbeefdeadbeefdeadbeefdeadbeef`. It is also **never called** — the digest
+  it reports at line 53 is a second, separately hardcoded literal.
+- `security-gate-paging-test.cljs` lines 20-24 report page-outs 1247, page
+  faults 89342, pages-reactivated 654 as literals. `vm_stat` is never invoked.
+  The namespace requires `os` and `path` and uses neither.
+- `security-gate-hsm-export-test.cljs` lines 17-23 report `:exit-code 44` and
+  `rejection-observed true` for a Keychain export attempt. The `security`
+  binary is never invoked. Line 28 does call `fs/existsSync` on the kagi
+  binary, but **both branches return `:passed true`** — presence and absence of
+  kagi are equally a pass.
+
+One correction to the survey, in the direction of being fairer to the scripts:
+**two of the five do contain a real measurement.** `abac-audit` test 1 and
+`audit-trail-test` tests 1, 2 and 5 call `fs/existsSync` on real paths and bind
+`:passed` to the result. That is genuine. It is also the whole of the genuine
+content: the other 16 subtests across the five are assertions over map literals
+typed into the source, several of which are tautologies — `audit-trail-test`
+line 66 asserts `(every? #(some? %) ...)` over a vector of string literals, and
+line 140 asserts `(some? (:hmac-sha256 receipt-format))` against a map defined
+four lines above.
+
+**And the real measurement does not reach the exit code.** Observed on
+2026-08-12 from the superproject root:
+
+```
+security-gate-abac-audit.cljs        EXIT=0   printed: PASSED
+security-gate-audit-trail-test.cljs  EXIT=0   printed: FAILED
+security-gate-georestores-test.cljs  EXIT=0   printed: PASSED
+security-gate-hsm-export-test.cljs   EXIT=0   printed: PASSED
+security-gate-paging-test.cljs       EXIT=0   printed: PASSED
+```
+
+`audit-trail-test` printing FAILED while returning 0 is the cleanest available
+proof that the failure path returns success. Any runner would have recorded it
+green.
+
+## What the five were meant to check
+
+Recording this is the point of the ADR: deleting the scripts must not delete
+the knowledge that these controls were once considered necessary. The
+authority is `orgs/kotoba-lang/security/registers/stack-security-score.edn`,
+whose gap entries carry `:gap/control`, `:gap/summary`, `:gap/acceptance` and
+`:gap/evidence`.
+
+**G-004 — hsm.** Status `partially-resolved`. Private keys must not be
+exportable in plaintext. Acceptance: a provider contract, non-export and
+attestation tests, and a rotation and outage drill. kagi has fail-closed native
+KeyStore signing and KEM handles; a real Apple Secure Enclave EC key passed
+hardware-backed generation, private-export rejection and sign/verify on the M1
+Max host. ML-KEM, vendor attestation receipt, rotation and outage qualification
+remain open.
+
+**G-005 — transport-confidentiality-integrity.** Status `partially-resolved`.
+Acceptance: mutual peer authentication, TLS downgrade and forged-publisher
+negative tests, certificate or key rotation drill. kagi witness and kototama
+native transport enforce client-certificate-required mTLS; production CA/HSM
+rotation evidence remains.
+
+**G-006 — abac.** Status **`resolved`**. Acceptance: a canonical ABAC decision
+and receipt schema, deny-by-default host enforcement, and confused-deputy and
+stale-attribute tests. `kotoba-lang/security` owns the canonical evaluator;
+aiueos deployment, compiler admission, kototama transport, kagi disclosure,
+kotoba package admission and kotobase remote-store boundaries enforce it.
+
+**G-007 — information-flow.** Status **`resolved`**. Acceptance: data labels and
+propagation rules, an egress declassification policy, and log-redaction plus
+explicit covert-channel non-claims.
+
+**G-008 — unknown-compromise.** Status `partially-resolved`. Acceptance:
+immutable remote telemetry, automated containment, and a known-clean restore
+drill with measured RTO/RPO. Live remote authorities and production RTO/RPO
+evidence remain.
+
+**G-010 — unrecoverable-loss.** Cited by `georestores-test` alongside G-005.
+Status `partially-resolved`. Acceptance: independent encrypted backups,
+threshold-key recovery, destructive restore drill.
+
+## Why delete rather than rewrite
+
+Three independent reasons, any one of which is sufficient.
+
+**1. The real evidence already exists, and it is not here.** The register cites
+executable test suites, and they are present on disk:
+`security/test/kotoba/security/abac_test.cljc` (45 lines),
+`information_flow_test.cljc`, `redaction_test.cljc`, `resilience_test.clj`
+(136), `hardware_test.cljc`, `transport_test.cljc`,
+`kagi/test/kagi/native_key_test.clj`, `governor_abac_test.clj`,
+`incident_test.clj`, `aiueos/test/aiueos/audit_test.cljc` (97),
+`kototama/test/kototama/transport_provider_test.clj` (111), plus dated drill
+registers `destructive-restore-drill.edn`,
+`apple-secure-enclave-qualification.edn` and `certificate-rotation-drill.edn`.
+ADR-2607198100 records 48 tests and 161 assertions passing. Rewriting the five
+would duplicate suites that already exist in the repos that own the code —
+which CLAUDE.md forbids on its own terms.
+
+**2. For four of the six gaps, a local script is the wrong instrument in
+principle.** ADR-2607198200 states the qualification boundary directly: a
+cross-machine confidentiality claim requires a real mTLS endpoint, certificate
+rotation and downgrade test; a closed-loop operations claim needs immutable
+remote telemetry, deployed isolation authority, independent clean backup and
+measured RTO/RPO. Those *remain deployment attestations and cannot be marked
+complete by local unit tests.* G-004, G-005, G-008 and G-010 are exactly those.
+A local nbb script that claimed to verify them would recreate the theatre being
+removed here — which is how `georestores-test` came to report an RTO of 892
+seconds against a 900-second target without contacting B2.
+
+**3. They could never become root fleet gates anyway.** A fleet gate ships only
+the target repo's own tree. All the code these scripts reference lives under
+`orgs/`, which `git ls-files` in root does not return. This is the
+`root-permit-index` finding already in CLAUDE.md, generalised in
+ADR-2608124800. The two genuine `fs/existsSync` checks would evaluate false on
+a fleet node and — because the exit code ignores them — still report green.
+
+## What replaces them
+
+Nothing in root. The controls are owned by `orgs/kotoba-lang/security` and its
+sibling repos, they have real tests there, and the register is the index. If
+root-level assurance of stack security is wanted later, the honest form is a
+gate that runs the child repos' own suites where those repos exist, not a
+reimplementation in root.
+
+## Sweep of the rest of scripts/
+
+The five were found by a property — asserts a pass, cannot fail — so the same
+property was checked across all 161 `scripts/*.cljs`.
+
+**No other script has it.** Of 41 files with no failure signal, the rest are
+reporters, generators, extractors and query tools, for which exit 0 is correct
+behaviour rather than a defect. `west_pin_guard_policy.cljs` is a pure-function
+library whose caller does the exiting.
+
+The three that named themselves audits were read in full rather than pattern-
+matched, because a name ending in `-audit` is the closest thing to the five in
+kind. All three are genuine. `consumability-audit.cljs` derives every number
+from `manifest/west.yml` plus live `gh api` calls. `kotoba-boundary-audit.cljs`
+was proven empirically: the crate tree it scans is absent from this checkout,
+and it correctly reports `{:total 0}` where a hardcoded script would have
+printed stock figures. `itonami-fleet-audit.cljs` measures via real `git log`,
+`git status` and file walks — though it carries roughly 450 lines of docstring
+containing dated figures from past runs, which is precisely the surface that
+reads as fabricated and is not.
+
+One judgment-call surface found and deliberately **not** changed:
+`itonami-fleet-audit.cljs` encodes its classification policy as literals, and
+the carve-outs around lines 587-608 convert several no-citation cases into
+non-gaps, biasing the headline gap count downward by rule rather than by
+evidence. Each branch is still predicated on a condition measured from disk, so
+the output does vary with repo state. That makes it a policy question, not
+theatre, and changing it is not something this ADR can justify.
+
+Two false-positive traps worth recording, because both nearly produced a wrong
+answer here. Searching for `process.exit` **misses the nbb idiom entirely** —
+`verify-west-pins`, `verify-no-babashka` and `verify-artifact-path-policy` all
+exit correctly via `scripts.nbb-compat/exit` and were briefly and wrongly
+flagged. And searching for `exit-code` **hides a real offender**:
+`security-gate-hsm-export-test.cljs` drops off the list because it contains the
+*keyword* `:exit-code 44` — the hardcoded value that is itself the defect.
+A future audit for this property should grep for `(exit ` and
+`nbb-compat/exit`, not for `process.exit`.
+
+## Non-claims
+
+This ADR does not assert that G-004 through G-010 are or are not adequately
+controlled. It asserts only that these five scripts contributed nothing to
+answering that, and that the answer lives in the register and the child repos'
+test suites. The statuses quoted above are the register's as of 2026-08-12 and
+were not re-verified."}]
