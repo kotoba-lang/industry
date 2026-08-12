@@ -111,6 +111,57 @@ twin を持たないため「どちらが走っているか」という問い自
   `:stage/host-executes` を 81 と報告した。code 拡張子に絞って 56 になった。
 - **checkout の無い west project は見えない**（`:kotoba/coverage` entity に記録）。
 
+## Closing（2026-08-12）—— このセッションで着地したものと、次の 1 手
+
+### 着地（すべて default branch。west pin も前進済み）
+
+| repo | commit | 何を閉じたか | 検証 |
+|---|---|---|---|
+| `com-cloudflare` | `4975784` | 出荷 KIR の drift gate を 1/9 → 9/9 | 94 tests / 537 assertions。出荷物を変異させて fail・無改変で pass |
+| `provider` | `b3ea0c7` | registry の digest 検査を 8/142 → 142/142 | 247 tests / 2523 assertions。wasm 1 byte 反転と source 削除の 2 変異で fail |
+| `crdt` | `acaa674` | register / orset / doc の parity（clock 以外は未縛りだった） | 34 tests / 4540 assertions。旧 suite が通る変異 3 種で fail |
+| `aiueos` | `e852781` | 全 core は「ビルドされるか、理由付きで申告されるか」 | 442 tests / 1396 assertions（5 failures は origin/main でも同じ既存 fail） |
+| `murakumo` | `d11d4c2`（PR #291） | 走れない parity が pass しなくなった | checkout 無しで 1 failure/3 assertions → 4 failures/6 assertions |
+| `inga` | `a9f2cc2` | compiler が書いた provenance record を読む | 368 tests / 1585 assertions。source 編集と wasm 変異の 2 種で fail |
+| `root` | `84b4252` | `west-pin-put.cljs` が短縮 sha を展開する | self-test 29 cases。全 4,162 pin が 40 桁に復帰 |
+
+**現 pin で再検証した**（closing 時点。他セッションが `crdt` と `aiueos` の pin を
+さらに進めているため）: `crdt` `2843f54` で 41 tests / 4574 assertions / 0 failures、
+`aiueos` `b1f00e8` で reachability gate 3 tests / 63 assertions / 0 failures。
+6 repo すべて、着地した commit は現 pin に含まれている（identical 4 / ahead 2）。
+
+### 次の 1 手（resume point）
+
+**`provider` の 95 本の provenance record を読む gate。** `inga` の
+`inga.kotoba-provenance-test` と同型で、`.wasm.provenance.edn` の
+`:source-sha256` を `src/*.kotoba` と、`:outputs :primary` を出荷 `.wasm` と
+突き合わせる。今日書いた `provider.wasm-package-registry-test` は registry の
+`:sha256` しか見ておらず、record を読んでいない。
+
+その次は索引の `:stage/artifact-unverified` 11 件（`cloud-itonami` の guardian 系 8、
+`cloud-itonami-isic-6310`、`gftdcojp/cloud-murakumo`、`aiueos`）。
+
+```bash
+nbb scripts/gen-kotoba-migration-index.cljs --check    # 索引の鮮度
+nbb --classpath \".:scripts/nbb_compat\" manifest/edn-query.cljs q
+  '[:find ?r ?a :where [?e \"source/dataset\" \"kotoba-migration\"]
+    [?e \"kotoba/stage\" \":stage/artifact-unverified\"]
+    [?e \"kotoba/repo\" ?r] [?e \"kotoba/artifacts\" ?a]]'
+```
+
+### このセッションで自分が壊して直したもの（次の人が同じ罠を踏まないように）
+
+1. **ADR の `:adr/body` に生の `\"` を書いて body を黙って切った。** 引用符が 4 つで
+   釣り合うと reader は落ちず、map に余分なキーが生えて本文が 7,443 字で切れる
+   （本来 12,761）。`manifest/docs-edn-only.cljs verify` は
+   `split-strings=1 → stray keys` として報告する。**1 entity 返ることは entity が
+   無傷である証拠ではない。**
+2. **`cd` を別行に書くと PreToolUse guard が repo を cwd（superproject）と誤認する。**
+   `cd X && git ...` と 1 行にする。誤認したまま commit すると、別セッションの
+   作業中ファイルを理由に止められる。
+3. **guard に弾かれた Bash 呼び出しは丸ごと実行されない。** `git commit && git push`
+   をまとめて書くと commit も走らない（作業は working tree に残る）。分けて呼ぶ。
+
 ## Consequences
 
 - 索引を引いた最初の日に、**今日書いた ADR-2608120200 の記述が 1 件誤っていることが
