@@ -428,6 +428,128 @@ The corrected version is in ADR-2608070100 (merge `52f3a1dc5ac`). The wrong
 numbers remain in the `net-kotobase` deletion commit and in the west pin commit
 that quoted it; those are history and are left alone.
 
+## Second closing, 2026-08-12 -- what is DONE and what is BLOCKED
+
+Fourteen agents ran after the first closing. Everything below either landed or
+is named here as unfinished; nothing is left implied.
+
+### Landed, with pins advanced
+
+`app-files` gate, `nexus-x402` header, `animeka` dep path, `net-kotobase`
+treasury NaN guard, `wasm-webcomponent` kami_host refresh, three `kami-ongaku`
+E2E namespace scopings, `kami-ongaku-project` dep bump, `net-kotobase` 17
+pre-rename leftovers, `etzhayyim/root` two claimable-host defaults.
+
+### Landed, pin NOT advanced -- BLOCKED
+
+**`kotoba-lang/vpn` merge `b9dfa224456f`.** The pin is still `3d2d269`. GitHub
+returned a secondary rate limit on `repos/*` while `gh api rate_limit` reported
+4,951 of 5,000 core remaining, so `verify-west-pins.cljs` could not run. **The
+pin was deliberately not advanced**: this workspace requires server-side
+verification of existence, default-branch reachability and forward motion, and
+advancing a pin that could not be verified would defeat the check rather than
+satisfy it. Retry when the secondary limit clears:
+
+    nbb scripts/verify-west-pins.cljs
+
+A guard is worth copying from that attempt. The first try interpolated `gh`'s
+403 JSON into a `perl -0pi -e` substitution as if it were a SHA. It failed only
+because the error text happened to contain characters perl could not parse --
+`manifest/west.yml` was untouched by luck. The retry validated the value against
+`[0-9a-f]*` before using it, and that guard is what stopped the second attempt
+cleanly. **Any script that takes a SHA from a command must check it looks like
+one.**
+
+### The cleanup pass that caused the leftovers is fixed -- merge `a4556402485`
+
+`:additive` is the one class `cleanup-land.cljs` auto-merges, and it merged on a
+single argument: no path of this name exists on the default branch, so no
+existing line can be rewritten. **A directory rename destroys that argument
+precisely** -- the moment `worker/` becomes something else, every old path stops
+existing on `main`. That is what a rename MEANS. A stale copy left at the old
+address therefore satisfies `:additive` perfectly, and the existing guard, which
+checks whether the same path is on base, is structurally blind to it.
+
+`scripts/rename_residue.cljs` asks history instead of the disk, since on disk
+residue and WIP are identical. Three signals: was this path a recorded rename
+SOURCE reachable from base; are these bytes already in the object database; was
+an ancestor directory moved away wholesale. The third handles the `.gitignore`
+case -- a generated file is in nobody's history, so the first two miss it, but
+following its dead parent forward through the rename chain (two hops in the real
+repo) reaches a live directory where `git check-ignore` excludes it. **A file the
+repo declares it ignores at its live address is not WIP at its dead one.**
+
+It excludes only the provable half, with no silent-drop path: `:residue` is
+dropped but reported by name WITH the live path (the bytes are still in the
+object database, so nothing is lost); `:suspect` -- path dead but content NOT in
+history, i.e. possibly a real edit against a stale copy -- is demoted to a draft
+PR rather than discarded; `:wip` is untouched. Working-tree files are never
+deleted.
+
+Proven against the real incident: the tree parked at `8f7fbaf^` with all 17
+leftovers restored classifies 17 residue, 0 suspect, 0 wip, and end-to-end the
+plan drops from 20 files to the 2 that are genuinely new plus 1 demoted to
+review. False-positive stress with 40 new files in live directories of the same
+496-rename repo gives 0 residue.
+
+Two things from it worth keeping beyond this fix:
+
+- **43 of 121 `orgs/kotoba-lang/*` checkouts do not resolve `<remote>/main`** --
+  west fetches into `refs/west/*`. A gate reading liveness from that ref would
+  have sat silent across a third of the fleet. Liveness now comes from the base
+  tree `cleanup-land` already fetches from the API.
+- Registered as fleet gate `root-rename-residue`, and confirmed red two ways
+  before landing. **This check's failure is invisible** -- a silent classifier
+  still exits 0, still prints a plan, still merges, and the only symptom arrives
+  after the next rename. It took six days to notice last time.
+
+Also settled: `manifest/cleanup-workflow.md` has **no generator**. It and the
+`.edn` have been hand-edited together in every commit that touches them, and the
+edn calls it `:reference-md`, not a projection.
+
+### Still running at close
+
+**`kotoba-lang/sdk-py`** -- `llm.cljc` POSTs `Bearer $ETZHAYYIM_LLM_KEY` to
+`levi.local`, and `mst_projector.cljc` POSTs query bodies to `simeon.local`.
+**The worst unfixed instance in the fleet at close.** If nothing landed, this is
+the first thing to pick up.
+
+### Three claims I passed to agents that were WRONG
+
+Recorded because in each case the agent measured rather than trusting me, and
+that is the behaviour to keep asking for:
+
+1. **`net-kotobase` has vendored copies in more than one source tree** -- it does
+   not; the second-tree hits were shadow-cljs analysis cache.
+2. **`worker/` was renamed to `clj-edge/`, 48 files, 100% similarity** -- it went
+   to `kotobase-edge/`, 57 files, and neither rename was uniformly R100. This one
+   originated in a commit message I wrote from an earlier agent's report, then
+   propagated into a brief. See the section above on how it travelled.
+3. **The `TODO_EXIT_NODE_IP` placeholder fails closed because of the
+   underscore** -- it does not. Measured three ways: httpx accepts and lowercases
+   it, `getaddrinfo` resolves underscore labels, and an end-to-end run against a
+   stub listener delivered the trust header and the peer key. What actually stops
+   it is that nothing answers for a DOTLESS name on the current search path,
+   which is environmental, not structural -- and a dotless name is exactly what a
+   search suffix completes (k8s uses `ndots:5`).
+
+Finding 3 also overturned the fix's premise: a ConfigMap in another repo ships
+the placeholder **verbatim as the value**, so `unset` was never the risk and a
+require-non-empty check would have passed on the only deployment that exists.
+The landed fix rejects the placeholder by name.
+
+### Two open findings nobody has decided
+
+- **`kotoba-lang/vpn` `provisioner/main.py:16` and `wg-agent/main.py:15`** gate
+  auth on `if SECRET and ...`, so an **unset secret disables authentication
+  entirely** on both ends. A genuine fail-open, arguably worse than the
+  placeholder, left alone because locking out a VPS-installed service deserves
+  its own decision. Current behaviour is pinned in a test so a change is
+  deliberate.
+- **266 of 4,165 west repos (6.4%) were never scanned** by the endpoint sweep --
+  not on disk. Heavily `cloud-itonami/actor-*` and `app-*`, which self-mint CACAO
+  against `kotobase.net`. Closing it needs `west update` on that group.
+
 ## Resume point
 
 Wait for the six agents, land each result, advance the pin for every child repo
