@@ -676,9 +676,41 @@
                 ;; が sentinel を grep しているのと同じ理由）。最初の版はこれを
                 ;; 忘れて `test -d` を exit で判定したので「常に present」と読み、
                 ;; 依存を 1 つも送らないまま成功したように見えていた。
+                ;; **present とは「その sha の checkout がそこに在る」ことで、
+                ;; 「その名前の dir が在る」ことではない**（2026-08-13）。
+                ;;
+                ;; 旧版は `test -d <dest>` だったが、これは 2 つの理由で壊れていた:
+                ;;
+                ;; ① **一度も真にならなかった。** `dest` は `\$HOME/...` で始まる。
+                ;;    この文字列を **argv 経由**でリモートに渡すと（ローカルの
+                ;;    shell を通らないので `\$` がそのまま残り）、リモートの sh は
+                ;;    `\$` を「$ のエスケープ」と読んで**リテラルの `$HOME`** に
+                ;;    する。つまり毎 tick 全依存を再送していた（実測 2026-08-13、
+                ;;    simeon に対して既存 dir で空文字列が返る）。下の ship 側は
+                ;;    ローカル `bash -c` の二重引用符を通るので正しく展開されて
+                ;;    いた —— 同じ文字列が経路によって別物になっていた。
+                ;; ② 名前だけでは中身を保証しない。`ship-git-deps!` が置くのは
+                ;;    `git archive` の展開で `.git` が無い。tools.deps は dir の
+                ;;    存在しか見ないので気付かないが、**JDK-free resolver は
+                ;;    `git rev-parse HEAD` で content-address を検証する**
+                ;;    （amu の `kotoba.compiler.nbb.classpath/head-sha`）。
+                ;;    実測 2026-08-13: simeon / judah とも amu の lock 19 件中
+                ;;    18 件がこの archive 形で、`amu-native-conformance` は
+                ;;    `{:phase :verify :expected "32ee84b2…" :actual nil}` で
+                ;;    28 回連続で落ちていた。**dir が在るせいで、その gate に
+                ;;    `:ship-git-deps true` を足しても直らない** —— 旧 present?
+                ;;    が偶然 false だったので毎回上書きされ、しかも上書きされる
+                ;;    たびに archive 形に戻っていた。
+                ;;
+                ;; したがって present? は sha を照合する。`bash -c` を通すのは
+                ;; `\$HOME` をリモートで展開させるため（① の再発防止）。
                 present? (str/includes?
-                          (str (:out (sh "ssh" ["-o" "BatchMode=yes" "-o" "ConnectTimeout=20" host
-                                                (str "test -d " dest " && echo FLEET-CI-DEP-PRESENT")])))
+                          (str (:out (sh "bash"
+                                         ["-c" (str "ssh -o BatchMode=yes -o ConnectTimeout=20 "
+                                                    host " \"git -C " dest
+                                                    " rev-parse HEAD 2>/dev/null | grep -qx " sha
+                                                    " && echo FLEET-CI-DEP-PRESENT\"")]
+                                         {:timeout 120000})))
                           "FLEET-CI-DEP-PRESENT")
                 m (try (ensure-sha! (mirror! (str org "/" repo)) (str org "/" repo) sha)
                        (catch :default e
@@ -690,26 +722,94 @@
                    (nil? m) :unavailable
                    present? :present
                    :else
-                   (let [tgz (path/join cache-dir (str (str/replace lib "/" "-") "-"
-                                                        (sha12 sha) "-dep.tar.gz"))]
-                     (when-not (fs/existsSync tgz)
-                       (let [{:keys [exit out]} (git m ["archive" "--format=tar.gz" "-o" tgz sha]
-                                                     {:timeout 900000})]
-                         (when-not (zero? exit)
-                           (die (str "git archive failed for dep " lib ": " (str/trim out))))))
-                     (let [{:keys [out]}
-                           (sh "bash" ["-c" (str "cat " tgz
-                                                 " | ssh -o BatchMode=yes -o ConnectTimeout=20 "
-                                                 host " \"mkdir -p " dest " && tar xz -C " dest
-                                                 " && test -f " dest
-                                                 "/deps.edn && echo FLEET-CI-DEP-OK\"")]
-                               {:timeout 600000})]
-                       ;; 同上 — 成功判定も出力の sentinel で行う
-                       (if (str/includes? (str out) "FLEET-CI-DEP-OK")
-                         (do (log "dep shipped" lib (sha7 sha) "->" host) :shipped)
-                         (do (log "WARN dep ship failed" lib (sha7 sha) "—"
-                                  (str/trim (str out)))
-                             :failed)))))]
+                   ;; **bundle を送って本物の checkout にする**（2026-08-13）。
+                   ;;
+                   ;; 送るものを `git archive` の tarball から `git bundle` に
+                   ;; 変えた。理由は上の present? の②で、`~/.gitlibs/libs/<lib>/<sha>`
+                   ;; という path には **2 つの契約が同居している**:
+                   ;;   - tools.deps（`clojure -Spath`）は dir の存在しか見ない
+                   ;;   - JDK-free resolver は `git rev-parse HEAD` が pin と
+                   ;;     一致することを見る（「commit の名前が付いた dir は、
+                   ;;     その commit を保持している証拠ではない」— amu の
+                   ;;     classpath ns の docstring）
+                   ;; tarball は前者しか満たさない。bundle なら **git 自身が
+                   ;; object を検証する**ので、両方を満たしたうえで検査が緩まない。
+                   ;;
+                   ;; ノードに外向き HTTPS があるかどうかに依存しない点は tarball
+                   ;; と同じ（実測 2026-08-13、simeon/judah とも github/maven/npm
+                   ;; へ 200 だが、それを前提にはしない）。token もノードに置かない。
+                   ;;
+                   ;; 展開は **その場で**行う（dir を消さない）。既に archive 形の
+                   ;; 中身が在る dir でも `git init` → `fetch` → `checkout -f` は
+                   ;; 同じ tree を書き直すだけなので、並行して読んでいる gate から
+                   ;; ファイルが消える瞬間が無い。
+                   ;;
+                   ;; bundle 経路が失敗したときは **今日と同じ tarball 経路に落ちる**。
+                   ;; この変更で「今動いている gate が壊れる」ことを構造的に無くす
+                   ;; ため —— 落ちたことは WARN で必ず名指しする（黙って劣化しない）。
+                   (let [slug (str (str/replace lib "/" "-") "-" (sha12 sha))
+                         bundle (path/join cache-dir (str slug "-dep.bundle"))
+                         pin-ref (str "refs/fleet-ci/pin/" sha)
+                         remote-bundle (str "/tmp/fleet-ci-dep-" slug ".bundle")
+                         ;; bundle は ref を要求する。mirror! の fetch refspec は
+                         ;; `+refs/heads/*:refs/heads/*` なので refs/fleet-ci/* は
+                         ;; prune されず、object も保持される。
+                         bundled?
+                         (or (fs/existsSync bundle)
+                             (and (zero? (:exit (git m ["update-ref" pin-ref sha])))
+                                  (let [{:keys [exit out]}
+                                        (git m ["bundle" "create" bundle pin-ref]
+                                             {:timeout 900000})]
+                                    (or (zero? exit)
+                                        (do (log "WARN dep bundle failed for" lib (sha7 sha)
+                                                 "—" (str/trim out))
+                                            false)))))
+                         ok?
+                         (when bundled?
+                           (let [{:keys [out]}
+                                 (sh "bash"
+                                     ["-c" (str "cat " bundle
+                                                " | ssh -o BatchMode=yes -o ConnectTimeout=20 "
+                                                host " \"cat > " remote-bundle
+                                                " && mkdir -p " dest
+                                                " && git init -q " dest
+                                                " && git -C " dest " fetch -q " remote-bundle
+                                                " " pin-ref ":" pin-ref
+                                                " && git -C " dest " checkout -q -f " sha
+                                                " && rm -f " remote-bundle
+                                                " && test \\$(git -C " dest
+                                                " rev-parse HEAD) = " sha
+                                                " && echo FLEET-CI-DEP-OK\"")]
+                                     {:timeout 900000})]
+                             (or (str/includes? (str out) "FLEET-CI-DEP-OK")
+                                 (do (log "WARN dep bundle ship failed for" lib (sha7 sha)
+                                          "on" host "— falling back to archive:"
+                                          (str/trim (str out)))
+                                     false))))]
+                     (if ok?
+                       (do (log "dep shipped (checkout)" lib (sha7 sha) "->" host) :shipped)
+                       ;; ---- fallback: 今日と同じ tarball 経路 ------------------
+                       (let [tgz (path/join cache-dir (str slug "-dep.tar.gz"))]
+                         (when-not (fs/existsSync tgz)
+                           (let [{:keys [exit out]} (git m ["archive" "--format=tar.gz" "-o" tgz sha]
+                                                         {:timeout 900000})]
+                             (when-not (zero? exit)
+                               (die (str "git archive failed for dep " lib ": " (str/trim out))))))
+                         (let [{:keys [out]}
+                               (sh "bash" ["-c" (str "cat " tgz
+                                                     " | ssh -o BatchMode=yes -o ConnectTimeout=20 "
+                                                     host " \"mkdir -p " dest " && tar xz -C " dest
+                                                     " && test -f " dest
+                                                     "/deps.edn && echo FLEET-CI-DEP-OK\"")]
+                                   {:timeout 600000})]
+                           ;; 同上 — 成功判定も出力の sentinel で行う
+                           (if (str/includes? (str out) "FLEET-CI-DEP-OK")
+                             (do (log "dep shipped (archive; NOT sha-verifiable)"
+                                      lib (sha7 sha) "->" host)
+                                 :shipped)
+                             (do (log "WARN dep ship failed" lib (sha7 sha) "—"
+                                      (str/trim (str out)))
+                                 :failed)))))))]
              (when (contains? #{:present :shipped} status)
                (swap! ready assoc ready-k (vec next-deps)))
              (recur (concat (rest queue) next-deps) (conj seen k)

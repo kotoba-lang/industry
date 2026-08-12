@@ -832,8 +832,20 @@
   ;; 同じ recursive source を Windows KEXE に cross-compile/verify し、entryless
   ;; library admission まで要求する。Windows loader 自体の cross-build は下の gate、
   ;; parser memory-safety は次の fuzz gate が補完する。
+  ;;
+  ;; :ship-git-deps true — この gate だけが `bin/kotoba` を**実際にコンパイル
+  ;; させる**（jdk-free gate は resolver が fail-closed することを見るだけで、
+  ;; 兄弟の fuzz / windows-loader は closure を要らない）。つまり amu の
+  ;; `deps-lock.edn` の 19 依存がノードに実在する必要がある。
+  ;;
+  ;; ⚠ **これ単独では直らない。** `ship-git-deps!` が `git archive` を置いていた
+  ;; 間は、`~/.gitlibs/libs/<lib>/<sha>` が `.git` を持たず、amu の JDK-free
+  ;; resolver（`git rev-parse HEAD` で pin を照合する）が
+  ;; `{:phase :verify :actual nil}` で必ず落ちた —— 28 run 連続で赤だった原因は
+  ;; 「依存が無い」ではなく「依存が checkout の形をしていない」。ADR-2608132000 で
+  ;; tick.cljs 側を bundle 送付（本物の checkout）に変え、その上でこの 1 行が効く。
   {:name "amu" :id "amu-native-conformance" :gate :nbb-script
-   :script "gates/amu-native-conformance-check.cljs" :cd false}
+   :script "gates/amu-native-conformance-check.cljs" :ship-git-deps true :cd false}
 
   ;; native parser の sanitizer/fuzz gate。JVM suite は libFuzzer corpus を走らせない
   ;; ので別 gate にする。repo 自身の scripts/fuzz-native.cljs を20,000件で呼び、
@@ -1268,9 +1280,24 @@
   ;; 他の委譲済み repo（calendar / cloud-itonami-app / shitsuke / kura /
   ;; erasure）は、それぞれの entry が case 数を申告するようになってから足す。
   ;; 上の 3 つ目の実測がそのまま「calendar は何が足りないか」の答えになっている。
+  ;; :ship-git-deps true — gate script が repo の deps.edn から classpath を
+  ;; 組むので、その実体が要る（ADR-2608132000）。無かったので 2 run とも
+  ;; `unresolved git deps (not in ~/.gitlibs and no sibling checkout):
+  ;; kotoba-kir, abi, compiler — ship-git-deps! should have placed these` で
+  ;; 落ちていた —— **受領がそのまま処置を名指ししていた**。
+  ;;
+  ;; amu-native-conformance と症状は似ているが**原因は別**（実測 2026-08-13）:
+  ;; こちらの 3 依存はノードに **ABSENT**（simeon/levi/joseph/benjamin は 3 件とも、
+  ;; judah は abi のみ在って archive 形）で、この gate script は `dep-dir` が
+  ;; dir の存在しか見ないので archive 形でも通る。つまり**こちらはこの 1 行で足りる**。
+  ;; :cap :jvm — **cljs の gate なのに JVM ノードを要求する。** この repo の
+  ;; `nbb.edn` が `:deps` を宣言しているので、nbb が deps.clj 経由で解決を試み、
+  ;; そこだけに JDK が要る（oracle 自体は最初から最後まで nbb で走る）。
+  ;; gate script が PATH に JDK を足すが、**そもそも JDK が入っていないノード**
+  ;; （naphtali / issachar / dan）に置かれたら足すものが無い。
   {:id "com-cloudflare-oracle-cljs"
-   :name "com-cloudflare" :gate :nbb-script
-   :script "gates/kotoba-oracle-cljs.cljs"
+   :name "com-cloudflare" :gate :nbb-script :cap :jvm
+   :script "gates/kotoba-oracle-cljs.cljs" :ship-git-deps true
    :script-args ["--entry" "test/cloudflare/oracle_cljs_gate.cljs" "--min" "200"]
    :include-ext [".cljs" ".cljc" ".clj" ".edn"] :min-files 30 :cd false}
 
