@@ -54,6 +54,22 @@
 (def fs (js/require "node:fs"))
 (def path-mod (js/require "node:path"))
 (def cp (js/require "node:child_process"))
+(def os-mod (js/require "node:os"))
+
+(defn- load1
+  "1 分平均ロード。**観測ごとに記録する。**
+
+   実測 2026-08-13: kawaraban / tashikame / watari の 3 本が同時に 600 秒で
+   SIGTERM され `:known-broken` として記録された。前回の観測ではそれぞれ
+   8.6 / 4.7 / 5.0 **秒**で exit 0 だった。3 本同時に 70〜130 倍遅くなったので
+   actor 側の退行に見えるが、そのときこのマシンの load average は **153** で、
+   9 本の agent が build と test を並列に回していた。
+
+   **観測はそのとき観測者が何をしていたかに依存する。** load を記録しなければ、
+   後から読む者はこの行を『その actor は壊れている』としか読めない。記録して
+   あれば『飽和したマシンで測った』と読める。同じ行、違う結論。"
+  []
+  (first (js->clj (os-mod.loadavg))))
 
 (def root (str/trim (:out (sh "git" "rev-parse" "--show-toplevel"))))
 
@@ -248,10 +264,18 @@
                        ;; JAVA_TOOL_OPTIONS の proxy banner が stdout を汚すので黙らせる。
                        {"JAVA_TOOL_OPTIONS" ""}
                        (when live? (:live-env o)))
+            l0 (load1)
             r (.spawnSync cp cmd (clj->js args)
                           (clj->js {:cwd dir :encoding "utf8" :timeout tmo
                                     :maxBuffer (* 64 1024 1024) :env env}))]
         {:exit (if (nil? (.-status r)) 124 (.-status r)) ; null = timeout/signal
+         ;; signal を落とさない。SIGTERM で殺されたのか、自分で非ゼロ終了したのかは
+         ;; 別の出来事で、exit だけを見ると区別できない（143 は 128+15 だが、
+         ;; その算術を読み手に要求しない）。
+         :signal (.-signal r)
+         :load1-before l0
+         :load1-after (load1)
+         :timeout-ms tmo
          :out (or (.-stdout r) "")
          :err (or (.-stderr r) "")}))))
 
@@ -413,6 +437,12 @@
     (contains? r :ok) (assoc :observatory/meets-expectation (:ok r))
     (contains? r :exit) (assoc :observatory/exit (:exit r))
     (contains? r :ms) (assoc :observatory/duration-ms (:ms r))
+    ;; 殺されたのか自分で落ちたのか、そしてそのとき機械が何をしていたか。
+    ;; 無いと、飽和したマシンで測った timeout が actor の欠陥として残る。
+    (some? (:signal r)) (assoc :observatory/killed-by-signal (:signal r))
+    (some? (:load1-before r)) (assoc :observatory/load1-before (:load1-before r))
+    (some? (:load1-after r)) (assoc :observatory/load1-after (:load1-after r))
+    (some? (:timeout-ms r)) (assoc :observatory/timeout-ms (:timeout-ms r))
     (contains? r :bytes-after) (assoc :observatory/output-bytes (:bytes-after r)
                                       :observatory/output-delta-bytes
                                       (- (:bytes-after r) (:bytes-before r 0))
