@@ -120,22 +120,54 @@ advance leaves the fleet reading a stale tree** -- the exact failure this sessio
 spent the day fixing. The next agent must check for their results and advance
 pins.
 
-1. ~~widen `verify-vendored-copies` to all header spellings and non-`src` vendor
-   dirs~~ -- **DONE.** The walk now accepts `src-*` as well as `src` (21 extra
-   directories against 4,717 named `src`), and the header parser knows five
-   spellings instead of two: the two parenthesised forms it already had, plus
-   `<org>/<repo> @ <sha>` (no path -- inferred from where the copy sits under
-   its own source root), a two-line `copied file-for-file from` continuation,
-   and a docstring-embedded `copied from <repo>' <ns>` (repo and ns each in
-   backticks upstream), which names no org and no pin at all. 24 files across 3 orgs became 31 across 4; no verdict changed for
-   any of the 24. `wasm-webcomponent/src-cljs/kotoba/kami_ecs.cljs`, which
-   documents the vendored file next to it, is correctly still not counted.
-2. refresh `wasm-webcomponent/src-cljs/vendor/kotoba/kami_host.cljc` -- genuinely
-   stale, 41 diff lines, 2 upstream commits, and now VISIBLE to the detector:
-   it is pin-honest at `367b4a14` and missing `set-position3!`,
-   `set-velocity3!`, `get-z` -- the 3D additions -- against library HEAD
-3. investigate the three new `kami/ongaku/e2e/*` collisions across
-   kami-ongaku-{notation,sampler,sequencer} (investigation only)
+1. widen `verify-vendored-copies` to all header spellings and non-`src` vendor
+   dirs (superproject; at least 7 declared-vendored files are currently invisible)
+2. ~~refresh `wasm-webcomponent/.../kami_host.cljc`~~ -- **DONE, merge 7d78c84,
+   pin advanced.** Refreshed byte-for-byte to `dbc25ebc6`. Safe because the
+   upstream change is purely additive 3D support: the `ns` requires are
+   unchanged, no new reader conditionals or capabilities, new vars sit in the
+   portable section, and extra keys in the WebAssembly import object are ignored
+   by a guest that does not declare them. 12/12 suites, 299 assertions, identical
+   before and after -- which proves nothing broke, NOT that the 3D works, since
+   no test covers the new surface; that was checked by hand against the rebuilt
+   artifact instead. A covering test would have to be nbb (CLAUDE.md forbids new
+   `.mjs`) and is larger than the refresh.
+
+   Two things found on the way. The old pin `367b4a141b94` was **not an ancestor
+   of kotoba's main** -- it sat on a side branch and only happened to have the
+   same content as what landed. A vendored header can name a commit off the
+   mainline and nothing notices. And the checked-in ESM artifact is **not
+   byte-reproducible**: rebuilding from UNMODIFIED source already moves 85 lines
+   of Closure symbol renaming, because shadow-cljs resolves ClojureScript from
+   Maven at build time while its own version is lock-pinned. Only 23 of the 86
+   changed lines are attributable to the change.
+3. ~~investigate the three new `kami/ongaku/e2e/*` collisions~~ -- **RESOLVED:
+   they were FALSE POSITIVES of my own widening, and the detector is now fixed.**
+
+   `test/e2e/src` is a source root by name and ships to nobody: it is reachable
+   only through each repo's own `:e2e` alias, and tools.deps does not export a
+   dependency's aliases. Measured with `clojure -Spath -A:e2e` in the one repo
+   depending on two of the three -- neither tree appears. The three files are
+   also not copies: pairwise line similarity is 0.08-0.30 and no exported var
+   name overlaps. They are three different programs that share a path.
+
+   The fix narrows by DECLARATION, not by depth: a source tree counts when the
+   repo's own `:paths` / `:source-paths` names it. `:extra-paths` is excluded on
+   purpose. Narrowing by depth instead would have lost
+   `net-kotobase/kotobase-api-gateway-cljs/src`, which is nested AND declared and
+   holds the copy this detector exists to find. Measured after the change:
+   ongaku entries 3 -> 0, `treasury/core.cljc` owners still 7 (the original
+   narrow scan said 5), real collisions back to 8 with correct owner sets. A repo
+   that declares nothing keeps every tree -- unknown must read as `look`, not as
+   `skip`.
+
+   Left undone, and named rather than silently absorbed: the three repos deviate
+   from their own family convention. `plugin-host` and `project` scope their E2E
+   namespaces (`kami/ongaku/<subject>/e2e/`), as does the `org-w3-webaudio`
+   harness all five cite as their model; `sampler` dropped the segment at 00:25
+   on 2026-07-13 and `sequencer` and `notation` copied its shape within the
+   hour. Renaming is mechanical and needs no pin changes, but it is three repos'
+   worth of churn for a naming inconsistency that now costs nothing.
 4. ~~check `net-kotobase`'s `pay/core.cljc` + `pay/x402.cljc` for drift~~ --
    **RESOLVED, benign, no change made.** All three vendored copies are
    pin-honest. `pay/core.cljc` and `treasury/core.cljc` are byte-current;
@@ -165,10 +197,64 @@ pins.
    gateway. The sibling `protocols-worker` reads the LIVE library through
    `../../../kotoba-lang/pay/src` in its `shadow-cljs.edn`, so one repo both
    vendors and does not vendor the same library, for different build units.
-5. investigate three self-shadowing namespaces (`kotobase/site_skin.cljc`,
-   `etzhayyim/{yoroshiku,bonsai}.cljc`)
-6. measure whether the three `:local/root` sites can be repointed from
-   `../compiler` to `../amu` (prerequisite for retiring the duplicate entry)
+5. ~~investigate three self-shadowing namespaces~~ -- **RESOLVED: all three are
+   nominal, nothing changed.** No two trees share a classpath.
+   `net-kotobase`'s `clj-edge/` holds no build file at all -- commit `5a6a55b`
+   renamed the whole directory to `kotobase-api-gateway-cljs/` (136 tracked
+   files before, 0 after, recorded as 100%-similarity renames), and a later
+   cleanup commit `d96f18b` re-landed 14 stale untracked leftovers of it. So the
+   `clj-edge` copy is byte-identical to the revision immediately BEFORE the
+   commit that superseded its doctrine -- the old design, resurrected by a
+   cleanup pass. This corrects ADR-2608070100, which catalogues the leftovers as
+   `:legacy-pre-rename` but attributes them to the rename; the rename was clean.
+
+   `etzhayyim-py/src` is a PYTHON source root (`pyproject.toml` declares
+   `packages = [\"src/etzhayyim\"]`) holding exactly 2 `.cljc` files out of 212 in
+   the tools tree -- and both are the colliding ones. They are independent ports
+   of the same `.py`, not copies of each other; the relationship is declared in a
+   header on the ported side.
+
+   Worth knowing even though it is not a runtime hazard: PR #3235 hardened
+   `yoroshiku` to require an explicit PDS instead of reading an ambient env var,
+   and touched ONLY the copy that is on no classpath. The reachable copy still
+   falls back to a hardcoded host. Maintenance is being spent on the dead file.
+
+   The refined detector (item 3) no longer reports these three, because neither
+   `clj-edge/src` nor `etzhayyim-py/src` is declared in any `:paths`. The
+   detector and the investigation now agree, which is the outcome to want.
+6. ~~measure whether the three `:local/root` sites can be repointed~~ --
+   **ALREADY DONE on origin/main. My premise came from stale checkouts.**
+
+   All three were repointed days ago: `kotoba/deps.edn` at `4dbd1dcf`
+   (2026-08-10), `kototama/deps.edn` at `72d1adb` (2026-08-11). The `../compiler`
+   text I quoted is real but exists only in the SHARED CHECKOUTS under `orgs/`,
+   which sit behind their own west pins (`kotoba` at `6f3e36e2` with 33 dirty
+   entries; `kototama` at `0fcf11cf`).
+
+   **This is the third time in one session that reading a checkout produced a
+   claim about a repository that was false.** The vendored detector read
+   checkouts and could not see a fix that had landed; `animeka`'s broken alias
+   resolved for whoever had a leftover directory; and here I derived a blocking
+   prerequisite from files that main had already fixed. `main`, the pin, and the
+   checkout are three different things, and the habit of checking which one you
+   are looking at has to be deliberate -- prose about it did not make it so.
+
+   The retirement question is therefore UNBLOCKED. The agent ran the decisive
+   test: both suites with the `compiler` directory DELETED outright -- kototama
+   173 tests / 1171 assertions green, kotoba 536 / 8580 green. Ancestry
+   re-confirmed both ways (`ahead_by: 56, behind_by: 0`, merge_base == the old
+   pin). A sweep of 982 `:local/root`-using `deps.edn` files in checked-out repos
+   found no other reference; most west projects are not on disk, so that is
+   strong evidence rather than proof.
+
+   Preserve if anyone revisits: `kototama` kept the COORDINATE
+   `io.github.kotoba-lang/compiler` on purpose while moving only the path,
+   because `kotoba` declares that key transitively and an override wins only on a
+   key match.
+
+   Separate loose end: `orgs/kotoba-lang/amu` is checked out at `8ff1030` with 5
+   modified files, ahead of its west pin. That is pin freshness, not this
+   question.
 
 Pin advance, for each child repo they touch:
 
@@ -181,11 +267,11 @@ Pin advance, for each child repo they touch:
   full_name is `kotoba-lang/amu`; the `compiler` pin is a strict ancestor 56
   commits behind main while the `amu` pin IS main; every script that names a path
   already names `amu`; a fleet-ci roles gate is already failing on the name
-  mismatch. NOT free: three `:local/root` sites (`kotoba/deps.edn`,
-  `kototama/deps.edn` x2) resolve to the doomed directory and must be repointed
-  in the same change -- see in-flight item 6. The ~104 deps.edn files spelling the
-  coordinate `io.github.kotoba-lang/compiler` do NOT block it; GitHub redirects
-  them.
+  mismatch. **The prerequisite I recorded as blocking this is already satisfied
+  on main** (see in-flight item 6) and both consumers were measured green with
+  the directory deleted, so this is now a decision with nothing in front of it.
+  The ~104 deps.edn files spelling the coordinate
+  `io.github.kotoba-lang/compiler` do NOT block it; GitHub redirects them.
 - **39 orphan checkouts.** On-disk only, unregistered. Not verified free of
   unpushed commits -- that is `git-cleanup-conflict` territory.
 - **`kotoba/lang/package_registry.cljc` divergence.** Bidirectional; 8 of 10
