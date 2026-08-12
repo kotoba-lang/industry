@@ -1382,8 +1382,13 @@
   ;; 対象 97 repo（うち既知の欠陥 9 件）の残りは **owed** —— 赤いまま entry を足すと
   ;; 「入力の無い gate」を「直っていない gate」に置き換えるだけで、このワークスペースが
   ;; 259 tip × 298 receipt 払った失敗と同じ形になる。**修理された repo から足す。**
-  ;; 2026-08-13 時点で赤い 8 件: annotation / cartpole-math / kami-app-quarry-walk /
+  ;; 2026-08-13 時点で赤い 7 件: annotation / kami-app-quarry-walk /
   ;; kami-usd-native / pbrt / replicator / rtx-native / tilemap。
+  ;; cartpole-math はこの列から外れた —— ADR-2608133600 が .cljc load path を復元して
+  ;; `e03723e9` で green を実測したので entry を足してある。**その gate の緑は
+  ;; `kami.cartpole-math` が戻ったことを意味しない** —— この gate は `.kotoba` の兄弟しか
+  ;; 見ないので、消費側 `kotoba-lang/webgpu` が実際に require している
+  ;; `src/kami/cartpole_math.cljc` は gate の視界の外にある。
   {:name "postfx" :id "kotoba-provider-orphan-postfx" :gate :nbb-script
    :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
    :ship-self-bundle true :cd false}
@@ -1391,6 +1396,9 @@
    :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
    :ship-self-bundle true :cd false}
   {:name "async" :id "kotoba-provider-orphan-async" :gate :nbb-script
+   :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+   :ship-self-bundle true :cd false}
+  {:name "cartpole-math" :id "kotoba-provider-orphan-cartpole-math" :gate :nbb-script
    :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
    :ship-self-bundle true :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
