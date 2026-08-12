@@ -1340,4 +1340,55 @@
   {:name "app-yorishiro" :gate :nbb-script
    :script "gates/yorishiro-provider-vault-check.cljs"
    :script-args ["--min" "34"]
-   :include-ext [".ts" ".json" ".md"] :min-files 30 :cd false}]}
+   :include-ext [".ts" ".json" ".md"] :min-files 30 :cd false}
+
+  ;; ────────────────────────────────────────────────────────────────────────
+  ;; kotoba-provider-orphan — **意図的にここに entry が無い**（ADR-2608132400）
+  ;;
+  ;; `gates/kotoba-provider-orphan-check.cljs` は書かれていて、実際に落ち、実際に
+  ;; 直ると緑になる（fixture の break/unbreak と、今日 repaired された dsl-core /
+  ;; async で実測）。だが **fleet gate にはできない。**
+  ;;
+  ;; 理由は placement でも policy でもなく入力である。この検査の規則は
+  ;;
+  ;;     この repo の履歴で src/ の .clj/.cljc/.cljs が削除されており、同じ path に
+  ;;     .kotoba が今あり、兄弟の Clojure source が残っていないなら FAIL
+  ;;
+  ;; で、第 1 項は **repo 自身の git 履歴**にしか無い。ところが tick.cljs が配るのは
+  ;; mirror からの `git archive --prefix=repo/ <sha>` で、その出力に `.git` は入らない
+  ;; （入れる option も無い）。実測 2026-08-13、壊した tip の tarball を展開して
+  ;; gate に渡すと:
+  ;;
+  ;;     FLEET-CI: no .git in …/repo — this gate reads the repo's own history and a
+  ;;     `git archive` tarball does not carry it. Refusing to report a pass.
+  ;;     EXIT=90
+  ;;
+  ;; ここに entry を足せば、その 90 が**永久に赤**として並ぶ。`root-permit-index` と
+  ;; 同じ形 ——「入力が無い gate は、落ちているのではなく問いを立てられていない」。
+  ;; 赤の理由が検査対象でなく配送なので、直しようもない。だから足さない。
+  ;;
+  ;; **root に置くのはさらに悪い。** superproject の tree に `orgs/` は入らない
+  ;; （`git ls-files orgs/kotoba-lang/postfx` は 0 件）ので、走査対象自体がゼロになる。
+  ;;
+  ;; **機構は今日 landed している。** ADR-2608132000（同日）は、`ship-git-deps!` が
+  ;; 置く**依存**が `git archive` 展開物で `.git` を持たないために
+  ;; `amu-native-conformance` が 28 run 連続で赤だったのを、**`git bundle` を送って
+  ;; 本物の checkout を作る**経路に変えて直した。gate 対象 repo 自身の tree に同じ
+  ;; ことをすれば（entry の `:ship-self-bundle true` 相当。mirror から
+  ;; `git bundle create` → ssh stdin → ノードで `git init && git fetch && checkout`）、
+  ;; この検査は
+  ;;
+  ;;     {:name "<provider>" :id "kotoba-provider-orphan" :gate :nbb-script
+  ;;      :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+  ;;      :include-ext [".kotoba" ".clj" ".cljc" ".cljs" ".edn"] :min-files 1 :cd false}
+  ;;
+  ;; として載る。**`:include-ext` に `.kotoba` を入れること** —— 2026-08-13 に実測した
+  ;; 罠で、`.kotoba` を 1 本しか持たない repo に `.kotoba` を送らない filter を掛けると、
+  ;; gate は手元で緑・fleet で赤になる（しかも「0 件だから合格」に化ける経路がある）。
+  ;; この gate はそれを床②(exit 91)で拒否する。
+  ;;
+  ;; 対象になる repo は **97**（checkout 済み 4,415 のうち src/ 配下に兄弟のない
+  ;; `.kotoba` を持つもの）。1 本 2–19 秒なので費用は問題にならない。それまでの間は
+  ;; workspace script として手と agent から回す。
+  ;; ────────────────────────────────────────────────────────────────────────
+  ]}
