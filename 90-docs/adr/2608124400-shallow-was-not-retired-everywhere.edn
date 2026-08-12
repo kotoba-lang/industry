@@ -113,12 +113,95 @@ the window — all `--depth` hits clone other repos elsewhere.
 consistent with a ~12,000-commit-deep frontier: invisible to everyday merge-base
 work. **That is why nobody noticed.**
 
+## The 5.5 GB repo should NOT be unshallowed. It is a stale duplicate.
+
+`orgs/gftdcojp/ai-gftd-apps-gftdcojp` is the **pre-rename path**.
+`manifest/repos.edn` carries the rename and GitHub confirms the redirect — both
+names resolve to one repository.
+
+**The registered path `orgs/gftdcojp/apps-gftdcojp` already has full history**:
+not shallow, 27,976 commits, zero WIP, same HEAD. So **the ancestry question is
+already answerable on this machine**, at the other path.
+
+The old path is worse than recorded: **HEAD is itself a graft**, so
+`rev-list --count HEAD` returns **1**. Depth 1 from the pin — it can answer no
+ancestry question at all. And **nothing reads it**: not in `west.yml`, not in
+`fleet-db.edn`, not in `fleet-ci.edn`, untracked in the superproject. The one
+tool doing local `merge-base --is-ancestor` iterates west projects only, so it
+never visits this path.
+
+**So the benefit of unshallowing is zero and the cost is 5.4 GiB.** The real
+opportunity is the reverse: **retiring the checkout frees ~11 GB.** Of its 39
+local branches, 10 tips are absent from the new checkout and **all 10 were
+verified present on GitHub**. The genuine blocker is 11 uncommitted files inside
+a **stale-locked** worktree — its lock names a process that is not running, last
+commit 2026-07-03 — and those are by definition not on GitHub. That retirement
+belongs in the `git-cleanup-conflict` `:retirement` flow, and involves another
+session's worktree.
+
+One thing that only *looks* like WIP: the 3 modified files at the old path are
+**byte-identical to the new path's `main`**, landed by a cleanup commit with the
+identical diffstat. They appear uncommitted solely because this checkout's HEAD
+is pinned at a graft predating that commit.
+
+**The stale temp pack is gone.** 580,004,872 bytes, verified orphaned five ways
+before removal — git itself called it garbage, it had **no `.idx`** so the pack
+loader could not reach it by construction, no process held it open, it was 24
+days old, and **its retry succeeded**: the interrupted fetch declared 113,157
+objects and a complete pack landed 32 minutes later with 196,797. No `gc`,
+`prune` or `repack` was run.
+
+## The worktree hazard is live in committed tooling
+
+One of the three violations below was **not** a scratch clone. It fetches
+`--depth 1` into a path created by `git worktree add`, and **linked worktrees
+share the shallow file with their parent repository** — so that scheduled job
+writes grafts into the parent's object store. **This is the exact mechanism this
+ADR identifies as how the superproject likely got re-shallowed, running weekly
+on a timer.**
+
 ## Two live violations, and an audit wired to nothing
 
-`nbb scripts/audit-gftd-scripts.cljs` reports **3 shallow-fetch violations under
-active launchd schedules** — one `--depth 1` and two `--depth 50`, none touching
-the root, all still violating ADR-2607211600. **That audit exists and is
-connected to nothing.**
+**All three are fixed** — the audit went 6 violations to 3, and the remaining 3
+are unrelated pre-existing items. Both launchd jobs are still loaded and
+scheduled; no plist was touched.
+
+**The shallow bought 174 KB.** The `--depth 50` clone was into a *persistent*
+path refreshed daily, not scratch. Unshallowed: 86 to 136 commits, 18 grafts to
+0, **7.9 seconds**, and the pack grew from 47.04 to 47.21 MiB. No
+B2/DataLad argument was needed; full history cost 0.17 MiB.
+
+**Two corrections to the brief, both worth more than the fix.**
+
+The playtest job's target repo is **not missing — it changed org**, and is
+checked out, not shallow, 855 commits. The script's hardcoded path is stale on
+both counts. And it does not fail: **`spawnSync` with a nonexistent `cwd`
+returns `status: nil`, the script ignores return values, so every command
+silently no-ops** and it prints one benign line and exits 0. The log's last four
+entries are exactly that line with nothing between them — **four consecutive
+weekly no-ops that read as healthy in `launchctl` and whose log line reads like a
+real outcome.** That is worse than an erroring job.
+
+**The other job has failed every run since it was created** — 21 log lines for 21
+expected daily runs, 20 HTTP 400 and one 502, never once succeeding. The cause is
+visible: it hardcodes a concrete model id against a legacy hostname, violating
+ADR-2607173100, **and the `murakumo-main` alias currently resolves that same
+model to a different endpoint.** Left alone deliberately: changing the LLM call
+on a job that auto-merges to `main` deserves an explicit decision.
+
+Verification limits stated rather than implied: the shinshi edit was exercised by
+running the real edited function, and the repo **stayed non-shallow** afterwards
+— but the script was deliberately not run end to end, because it commits, pushes
+and **auto-merges to `main` of a live repo**. The playtest depth-flag removal is
+**unexercised**, because its target directory does not exist so the fetch never
+executes.
+
+**`~/.gftd` is not a git repository, and 26 launchd plists point into it.** These
+are scheduled, they violated a repo-wide ADR for weeks, and nothing reviews them.
+They should be version-controlled and the audit should become a fleet-ci gate
+rather than a script someone remembers to run — but the plists carry absolute
+paths, so **relocating the files breaks 26 jobs unless the plists move in the
+same step.**
 
 Also worth removing: the byte copy of the root's `.git` at `/private/tmp` still
 holds the shallow frontier. **Fetching from it would re-import the grafts.**
