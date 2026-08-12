@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "adr-2608120200-what-the-kotoba-cores-actually-run"
-  :adr/title "ADR-2608120200: fleet 全体で .kotoba core を production で実行している repo は 2 つだけ —— 残りは cljc の twin が走っており、そのうち 5 件は既に危険な形になっている"
+  :adr/title "ADR-2608120200: fleet 全体で .kotoba core を production で実行している repo は 20 中 4 つ —— 残りは cljc の twin が走っており、危険な形だった 5 件は閉じた"
   :adr/status "accepted"
   :adr/doc_type "adr"
   :adr/doc-type "adr"
@@ -36,16 +36,20 @@ ADR-2608112100 は「core があり parity test があり host が呼んでい�
 
 ## 実測（2026-08-12）
 
-### production で Kotoba core を実行している repo は 2 つ
+### production で Kotoba core を実行している repo は 20 中 4 つ
 
 | repo | 実行経路 |
 |---|---|
 | `etzhayyim/com-etzhayyim-kawaraban` | `wasm_orchestrator.clj` が `kototama.tender` で 7 module 中 6 本を実行。**launchd plist で常駐**（本物の runtime path） |
 | `cloud-itonami/cloud-itonami-app` | `kotoba-oracle` が shipped KIR を実行（2026-08-11 に着地。ADR-2608112100） |
+| `kotoba-lang/com-cloudflare` | 9 core → 9 shipped KIR。`src/` の**公開 9 ns 全部**が `cloudflare.kotoba.oracle` の `oracle/call` を通す（`require-ready!` で fail-closed）。compiler は test-only（2026-08-12 実測） |
+| `kotoba-lang/aiueos` | 59 core のうち **57 が `.o` にコンパイルされ kernel ELF にリンクされる**（`build-uefi.sh` + `verify-kotoba-kernel-object.py` が symbol を検査）。fleet で最も強い実行形 —— 判断は boot した機械の上で走る（2026-08-12 実測） |
 
-**それ以外の 14 repo では、決定は cljc twin が下している。** `src/` から `kotoba.kir` を
-require している repo は fleet 全体で 3 つだけ（`kotoba-selfhost-contracts` /
-`murakumo` / `cloud-itonami-app`）。
+**それ以外の repo では、決定は cljc twin が下している。** `src/` から `kotoba.kir` を
+require している repo は 5 つ（`kotoba-selfhost-contracts` / `murakumo` /
+`cloud-itonami-app` / `com-cloudflare` / `provider`）だが、**`provider` の require は
+`kotoba.kir.value`（host↔guest の値コーデック）であって core 実行ではない** ——
+名前空間の prefix だけで実行と数えない。
 
 ### 危険な形になっているもの（優先順）
 
@@ -151,12 +155,44 @@ orchestrator は `Chain ID: 1`。
 - **調査で 1 点、私の側の誤りが出た。** subagent の報告は「crdt には core を compile する
   test が無い」だったが、`kotoba_conformance_test.clj` は実在した。**ファイルを自分で
   開いて気付いた** —— 並列調査の報告は裏取りしてから引用する。
-- 未調査: `com-cloudflare`(9 core / 9 KIR)、`kotoba-v2025`、`aiueos`、`provider`。
-  前者は shipped KIR を持つので murakumo 型と推測されるが、**推測であって実測ではない**。
+## 残り 4 repo の実測（2026-08-12、上の「未調査」を解消）
+
+**推測は 4 件中 1 件しか当たっていなかった。** `com-cloudflare` は予想どおり murakumo 型
+だったが、残り 3 つを一括りにしたのが誤りで、実際には**最強の実行形・実行ではないもの・
+そもそも対象外**の 3 種類だった。
+
+| repo | 実測 | 見つかった穴 |
+|---|---|---|
+| `com-cloudflare` | **production 実行**（上表に追加） | **出荷 KIR 全体の drift gate は `client_core` の 1 本だけだった。→ 閉じた** |
+| `aiueos` | **production 実行**（上表に追加）。57/59 が kernel ELF にリンク | `murakumo-join-plan` は**どの build script もコンパイルしない**。実行は `kotoba-lang/murakumo` の cross-repo parity test だけで、その test は sibling checkout (`../aiueos`) が無いと assertion 本体が `(when (.exists source-file))` で**丸ごと無音**になる（落ちるのは presence 検査 1 件のみ）。fleet はその repo の tree しか配らないので、fleet 上ではこの parity は常に空回りする |
+| `provider` | **decision core を持つ repo ではない。** `src/` の `kotoba.kir` は値コーデック。77 `.kotoba` は capability-kit の wasm package **ソース**で、出荷物は 142 `.wasm`。test は shipped `.wasm` を node の `WebAssembly` で実行して期待値を固定している | `.kotoba` は `(io/resource ...)` で**存在だけ**を検査していて、再コンパイルして `.wasm` と突き合わせるものが無い —— source を編集して wasm を再生成しなくても誰も落ちない（isic-6492 / network-awai と同じ形） |
+| `kotoba-v2025` | **対象外。** README が自ら legacy Rust reference と宣言（#12、2026-07-01）。31 `.kotoba` は全部 `_archive/251006/` の Rust 時代の設定・例で decision core ではない | 無し（移行対象ではない） |
+
+### com-cloudflare の drift gate（閉じた、`4975784`）
+
+出荷 KIR を 1 本しか縛っていなかったので、**production が読む当のファイルを書き換えても
+既存 suite が全部通った**。変異で証明: `resources/cloudflare/oracle/zones_path_core.kir.edn`
+の `dns-name-query-pair` を `"name"` → `"nome"` にし、`.kotoba` source は無改変のまま
+全 suite を回して **94 tests / 519 assertions / 0 failures**。
+
+`precompiled-kir-does-not-drift` を `gen/discover-artifacts` 駆動にして 9 本すべての
+出荷 KIR を source と全体一致で突き合わせるようにした。同じ変異で
+`kotoba/zones_path_core.kotoba KIR drift` として落ち、無改変では
+**94 tests / 537 assertions / 0 failures**。新しい `*_core.kotoba` を足して
+出荷物を作り忘れた場合も落ちる。
+
+**逆向きの変異（source を変えて出荷物を据え置く）は既存の parity test が捕まえていた** ——
+`zones_path` の `per_page` を 50→25 にすると 4 件落ちる。**穴は片側だけだった**ので、
+「parity test がある」ことを両方向の保証と読まないこと。
 
 ## Evidence
 
 - `kotoba-lang/crdt` `81d4250`: clock parity gate（22 tests / 1279 assertions、変異 2 件で fail）
-- 調査対象 16 repo。read-only subagent 4 本 + 手元での裏取り。実行の有無は
-  `src/` の `kotoba.kir` require / `ir/execute` / `kototama.tender` 呼び出しで判定した
+- `kotoba-lang/com-cloudflare` `4975784`: 9 本すべての出荷 KIR に drift gate
+  （94 tests / 537 assertions、出荷物を変異させて fail・無改変で pass を実測）。
+  west pin `03a7317b7dc` で前進
+- 調査対象 20 repo。最初の 16 は read-only subagent 4 本 + 手元での裏取り、
+  残り 4 は subagent を使わず全部自分で開いた。実行の有無は `src/` の
+  `kotoba.kir` require / `ir/execute` / `kototama.tender` 呼び出し、および
+  aiueos では build script の `.o` リンクで判定した
 "}]
