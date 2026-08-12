@@ -47,6 +47,77 @@ is not a signal anyone can act on. Only `root-permit-index` has a diagnosis —
 CLAUDE.md already records that its input is never in the shipped tree, so it is
 structurally impossible to green. **The other three have not been diagnosed.**
 
+## The four permanent reds, diagnosed — and the counts I quoted were misleading
+
+**`manifest/fleet-ci.edn` is a ROLLING WINDOW, not the full history.** Its
+earliest receipt is 2026-08-04; older versions in git hold receipts back to
+2026-07-16. So `0 pass / 867 fail` is a statement about the current window only,
+and for one of these four it materially misled me.
+
+### `root-repository-roles` — it WAS green, and the minute it broke is known
+
+**Last passed 2026-08-03T11:05:26Z. First failed one tick later**, a single
+clean pass-to-fail transition. So this gate **has been demonstrated to work in
+both directions in production** — stronger evidence than the break/unbreak note
+it lacks. It has been red for roughly **1,010** consecutive runs, not 867.
+
+**The verifier is fail-fast**, so a receipt only ever shows the FIRST violation
+and the true count has never been visible. Measured per-repo: **4 violations of
+23**, all one class — a child repo's declared `:depends-on` drifting behind its
+own `deps.edn`. The other 19 pass, so every later assertion in that verifier has
+simply never been reached since 2026-08-03.
+
+**The structural problem underneath is worse than the violations.** This gate is
+attached to `root` but **is not a function of root's tree** — it fetches HEAD
+for 23 repos over the network. **Root cannot make it green, and the receipt is
+stamped with root's sha while measuring something else**, so re-running the same
+root sha on a different day gives a different verdict. It measures HEAD, not the
+pin, so **it is not attributable to any commit.**
+
+### `root-observatory-registry` — five of nine are the gate being stale
+
+A 2026-08-11 rename moved repo names to the role plane and added a `:repo` key,
+**keeping `:name` as the ledger identity** — the registry documents the contract.
+The gate checks `:name` and has never heard of `:repo`. **It was right when
+written; the thing it guards changed under it.**
+
+One is a genuine registry gap. One flags **a deliberately documented
+requirement** — routing a summary outside the checkout is mandatory, and the
+invariant cannot express *this path must NOT be in the repo*. And two are
+genuine by the letter while **the harm they claim is falsified by measurement**:
+`plutil -lint` accepts all ten plists and the job the gate says cannot load **is
+loaded**.
+
+It has **never once been green** across its entire lifetime, and unlike its
+neighbours it carries **no break/unbreak record** — so it has never been shown
+to discriminate at all.
+
+### `root-itonami-org-id` — it is correctly reporting an undeployed fix
+
+Six of eight domain pairs disagree with the rule. One root cause: the endpoint
+re-exports a **checked-in compiled artifact**, and its source **was fixed on
+2026-08-10, two hours after the gate's first red** — with a docstring naming the
+bug — **and never rebuilt.** The gate has been right for two days.
+
+A caveat for whoever rebuilds: for two domains the rule's reversed form does not
+match the existing org names, so a correct intake will mint ids that disagree
+with two live orgs. That is an owner decision, not a gate bug.
+
+### `root-permit-index` — the recorded diagnosis holds, and is not the only cause
+
+Run **on a machine that does have the input**, it still fails: the committed
+projection is genuinely behind its sources. **Re-homing it alone would look like
+a completed fix and then stay red.**
+
+### What generalises
+
+**None of the four is a broken check in the `npx` sense** — no laptop-versus-node
+difference affected any verdict. Two of the four are attached to `root` while
+measuring something root does not contain, which is the same structural error as
+`root-permit-index` in a form that is easy to miss, because those two **do**
+produce a verdict rather than failing to run. A gate that answers about someone
+else's HEAD is not a gate on this repo; it is a monitor wearing a gate's badge.
+
 ## Most of today's detectors cannot be root gates, and that is structural
 
 CLAUDE.md's `root-permit-index` finding generalises: **a fleet gate ships only
@@ -157,8 +228,41 @@ number would have been worse than contradicting it.**
 3. **Install `com.gftd.tsukuru-maturity-tick`** — recovers three verifiers at
    once, one guarding custody that has already cost irreversible asset loss.
    Cheapest recovery here.
-4. **`verify-adr-identity`** — the one high-value detector that is root-only and
-   gatable today.
+4. ~~`verify-adr-identity`~~ — **GATED, merge `ccb47c1fa06`, and it was red.**
+
+   Two `:adr/id` collisions introduced 2026-08-08 had gone unnoticed for four
+   days, plus two ambiguous references pointing at one of them. **A prior session
+   had OBSERVED them and recorded them verbatim in its own close, and declined
+   to fix.** Fixed here by the rule *the later arrival moves*, which
+   independently agreed with where every existing citation points. 25 collisions
+   down to the 23 in the debt table, whose docstring says the table must never
+   grow — so *add it to the table* was never an available fix.
+
+   **A correction to my brief.** I said dropping `90-docs/adr` would make the
+   script report zero ADRs and exit 0. **It does not** — tested with the floor
+   disabled: it still exits 1, because a fourth check fires and all 23 debt-table
+   entries stop colliding. **The detector cannot pass vacuously on an empty
+   corpus.** The `:min-files` floor is still right to exist — it turns an obscure
+   23-line stale-debt spew into one legible line — but it is defence in depth,
+   not the only thing standing between the fleet and a vacuous pass.
+
+   **The two layers catch different mistakes**, which is why both are needed:
+   filtering to `.cljs` drops the ADRs and the floor stops it; filtering to
+   `.edn` drops **the detector itself**, which the floor passes and the gate
+   guard catches at exit 90. **That second row is not hypothetical** — the
+   fleet's own tick carries a comment recording it happening on 2026-07-29.
+
+   **Proven on real fleet hardware**, not this laptop: shipped to a node over
+   ssh and run through the production invocation shape. Fixed tree exit 0;
+   duplicate id injected exit 1; removed again exit 0; corpus missing exit 90;
+   detector missing exit 90. Locally it first hit the documented npm breakage —
+   **and the third floor caught that too**, refusing to report a pass for a run
+   that may not have scanned anything.
+
+   Limits stated: one node of ten, `tick.cljs` not run end to end (so signing,
+   status posting and scheduling are unexercised), and the `:min-files`
+   rejection shown arithmetically and by reading the code rather than by
+   executing the tarball filter.
 5. **`audit-gftd-scripts`** — belongs in a SessionStart hook, because it is the
    only thing that looks outside the repo at all.
 6. `verify-namespace-collisions`, `verify-duplicate-registrations` — real,
