@@ -107,6 +107,19 @@
 (defn block-field [block field]
   (second (re-find (re-pattern (str "(?m)^      " field ": (.+)$")) block)))
 
+(defn full-sha?
+  "A 40-character lowercase hex commit id — what a pin is supposed to be.
+
+  The reader tolerates abbreviations because the manifest has held one, but
+  this script must not create new ones. On 2026-08-12 it did: `gh pr merge`
+  prints a short sha, that short sha was passed straight through, and the entry
+  was written as `revision: d11d4c2`. Nothing downstream rejected it — an
+  abbreviation resolves fine today and stops resolving the day it becomes
+  ambiguous, in someone else's clone, with no way to tell which commit was
+  meant."
+  [s]
+  (boolean (and (string? s) (re-matches #"[0-9a-f]{40}" s))))
+
 (defn rewrite-revision
   "Replace the revision inside ONE entry's block. Returns the whole document, or nil
   when the entry is absent, ambiguous, or its pin does not match `expected`."
@@ -223,6 +236,18 @@
          ["short-sha does not truncate past the end"
           (short-sha "c90f782aceff" 40) "c90f782aceff"]
 
+         ;; The pin this script is allowed to WRITE is always the full id. It
+         ;; wrote `revision: d11d4c2` on 2026-08-12 because `gh pr merge` prints
+         ;; a short sha and the argument went through untouched.
+         ["a 40-hex id is a full sha" (full-sha? c40) true]
+         ["a 7-character abbreviation is not" (full-sha? "d11d4c2") false]
+         ["a 12-character abbreviation is not" (full-sha? "c90f782aceff") false]
+         ["uppercase is not" (full-sha? (str/upper-case c40)) false]
+         ["a 41-character string is not" (full-sha? (str c40 "c")) false]
+         ["a non-hex string of the right length is not"
+          (full-sha? (apply str (repeat 40 "z"))) false]
+         ["nil is not" (full-sha? nil) false]
+
          ;; A project whose name equals a remote name. This was a real defect:
          ;; every kotoba-lang and network-awai pin advance in this repo had to
          ;; be done by hand because entry-block reported "not found (or not
@@ -334,9 +359,29 @@
             (println "west-pin-put: could not read the entry's revision/path from the tip.")
             (io/exit 3))
         default-branch (gh "api" (str "repos/" repo) "--jq" ".default_branch")
-        new-sha (if (= "HEAD" new-arg)
+        ;; Resolve to the full 40-character id before anything compares or
+        ;; writes it. `gh pr merge` and `git log --oneline` both hand out short
+        ;; shas, and a pin written from one is a pin that cannot be resolved
+        ;; unambiguously later.
+        new-sha (cond
+                  (= "HEAD" new-arg)
                   (gh "api" (str "repos/" repo "/commits/" default-branch) "--jq" ".sha")
-                  new-arg)]
+
+                  (full-sha? new-arg) new-arg
+
+                  :else
+                  ;; `gh` aborts the process on a non-zero exit, which for an
+                  ;; unknown ref means a stack trace where a refusal belongs.
+                  (let [{:keys [exit out]} (sh "gh" "api"
+                                               (str "repos/" repo "/commits/" new-arg)
+                                               "--jq" ".sha")
+                        resolved (str/trim (or out ""))]
+                    (when-not (and (zero? exit) (full-sha? resolved))
+                      (println (str "  REFUSED: " new-arg " does not resolve to a commit in "
+                                    repo "."))
+                      (io/exit 3))
+                    (println (str "  expanded: " new-arg " -> " resolved))
+                    resolved))]
 
     (println (str "west-pin-put: " entry " (" repo ")"))
     (println (str "  tip pin : " (short-sha old-pin 12)))
@@ -367,7 +412,16 @@
                         "branch that may be rewritten, must not become a pin."))
           (io/exit 4))
 
-        (when-not (and (= "ahead" (:status fwd)) (zero? (:behind fwd)))
+        ;; `identical` here means the tip already points at this commit and only
+        ;; wrote it down badly — an abbreviation this script produced before it
+        ;; expanded its argument. Writing the full id is the repair, and it is
+        ;; not a pin move, so it does not have to be a fast-forward.
+        (when (and (= "identical" (:status fwd)) (not (full-sha? old-pin)))
+          (println (str "  normalizing: the tip's pin is the same commit written as an "
+                        "abbreviation.")))
+
+        (when-not (or (and (= "ahead" (:status fwd)) (zero? (:behind fwd)))
+                      (and (= "identical" (:status fwd)) (not (full-sha? old-pin))))
           (println (str "  REFUSED: this is not a fast-forward from the pin the tip has. "
                         "behind=" (:behind fwd) " means a silent pin regression; a "
                         "diverged status means a different lineage."))
