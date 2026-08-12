@@ -33,6 +33,40 @@
 
 (defn allow! [] (compat/exit 0))
 
+(defn upstream-ref
+  "この checkout の『上流の既定ブランチ』を `<remote>/<branch>` で返す。解決
+   できなければ nil。
+
+   **remote は `origin` とは限らない。** west が作る checkout は remote を org 名
+   で持つ（`network-awai` / `cloud-itonami` …）。実測 2026-08-13、`orgs/` 配下の
+   4,406 checkout のうち **2,824（64%）に `origin` remote が無い**。
+
+   それまでこの解決は `origin/main` → `refs/remotes/origin/HEAD` の 2 段で、
+   どちらも解決できなければ `(allow!)` していた。**分岐ガードにとってこれは
+   特に高くつく** —— このガードが存在する理由そのものが「遅れた base の上に
+   積んだ commit は後から救えない」ことであり、素通りした分岐は作業が終わって
+   から乖離として現れる。子リポで worktree を切るのは CLAUDE.md の推奨手順
+   なので、素通りしていたのは例外的な経路ではなく標準の経路だった。
+
+   remote が複数あるときは **URL に `github.com` を含むものを選ぶ**。
+   `git remote | head -1` はアルファベット順の先頭を返すので、annex repo では
+   `b2`（special remote）を選んでしまう。
+
+   `wrangler-deploy-main-sync-guard.cljs` / `git-push-main-sync-guard.cljs` と
+   同一の実装。4 本目が要るときは共有 ns へ抽出すること。"
+  [top]
+  (let [remotes (->> (or (git top "remote") "") str/split-lines
+                     (map str/trim) (remove str/blank?) vec)
+        gh? (fn [r] (some-> (git top "remote" "get-url" r) (str/includes? "github.com")))
+        ordered (concat (filter #{"origin"} remotes)
+                        (filter gh? (remove #{"origin"} remotes))
+                        (remove #{"origin"} remotes))]
+    (some (fn [r]
+            (or (when (git top "rev-parse" "--verify" "-q" (str r "/main")) (str r "/main"))
+                (some-> (git top "symbolic-ref" "-q" (str "refs/remotes/" r "/HEAD"))
+                        (str/replace #"^refs/remotes/" ""))))
+          ordered)))
+
 (defn deny! [reason]
   (println (json/generate-string
              {:hookSpecificOutput
@@ -79,18 +113,24 @@
           top  (git dir "rev-parse" "--show-toplevel")]
       (when (str/blank? top) (allow!))
 
-      (let [ref (if (git top "rev-parse" "--verify" "-q" "origin/main")
-                  "origin/main"
-                  (some-> (git top "symbolic-ref" "-q" "refs/remotes/origin/HEAD")
-                          (str/replace #"^refs/remotes/" "")))]
-        (when (str/blank? ref) (allow!))
+      (let [ref (upstream-ref top)]
+        (when (str/blank? ref)
+          ;; **黙って通さない。** ここに来るのは「遅れていない」ではなく
+          ;; 「判定できなかった」であり、両者を同じ無言の exit 0 で表すと、
+          ;; ガードが評価しなかったことが外から見えない。
+          (js/console.error
+           (str "branch-create-main-sync-guard: " top
+                " の upstream ref を解決できませんでした（remote: "
+                (or (git top "remote") "なし")
+                "）。**この分岐の base は検査されていません。**"))
+          (allow!))
 
-        ;; 分岐元を origin/<default> で明示していれば、ローカルが遅れていても
+        ;; 分岐元を <remote>/<default> で明示していれば、ローカルが遅れていても
         ;; base は正しい。推奨形なのでブロックしない。
         (when (str/includes? cmd ref) (allow!))
 
-        (let [branch (str/replace ref #"^origin/" "")]
-          (git top "fetch" "-q" "origin" branch)
+        (let [[remote branch] (str/split ref #"/" 2)]
+          (git top "fetch" "-q" remote branch)
           (let [raw    (git top "rev-list" "--count" (str "HEAD.." ref))
                 parsed (js/parseInt (or raw "0") 10)
                 behind (if (js/isNaN parsed) 0 parsed)]
@@ -100,10 +140,10 @@
                 (str "%s: 分岐を作ろうとしていますが、この checkout は %s より %d commits "
                      "遅れています。遅れた base の上に積んだ commit は後から同期しても "
                      "遅れたままで、着地時に乖離・pin 退行になります。"
-                     "先に同期するか: git fetch origin && git merge --ff-only %s "
+                     "先に同期するか: git fetch %s && git merge --ff-only %s "
                      "(FF 不可なら停止。rebase しない) — "
                      "あるいは分岐元を明示: git worktree add -b <branch> <path> %s。"
                      "Policy (CLAUDE.md): 分岐を作る前に、必ず local を remote に同期する。")
-                top ref behind ref ref)))))))
+                top ref behind remote ref ref)))))))
     (allow!))
   (catch :default _ (compat/exit 0)))

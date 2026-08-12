@@ -128,22 +128,42 @@
         (let [topdir (find-topdir top)]
           (when-not topdir (allow!))
           (let [pins (west-pins (str (fs/readFileSync (path/join topdir "manifest" "west.yml") "utf8")))
-                drift
-                (keep (fn [abs]
-                        (let [rel (path/relative topdir abs)]
-                          ;; topdir の外や、manifest に載っていない path は判定材料が無い。
-                          ;; 黙って pass させる代わりに、pin を持つものだけを見る。
-                          (when-let [pin (get pins rel)]
-                            (let [head  (git abs "rev-parse" "HEAD")
-                                  dirty (git abs "status" "--porcelain")]
-                              (cond
-                                (str/blank? head) nil
-                                (not= head pin)   {:rel rel :kind :stale
-                                                   :head (subs head 0 8) :pin (subs pin 0 8)}
-                                (not (str/blank? dirty))
-                                {:rel rel :kind :dirty
-                                 :files (count (str/split-lines dirty))})))))
-                      roots)]
+                classified
+                (map (fn [abs]
+                       (let [rel (path/relative topdir abs)
+                             inside? (not (str/starts-with? rel ".."))
+                             pin (get pins rel)]
+                         (cond
+                           ;; topdir の外の依存はこのガードの担当外（west が pin を
+                           ;; 持たないので比べる相手が無い）。判定不能ではなく圏外。
+                           (not inside?) nil
+                           ;; **workspace の中にあるのに manifest に載っていない依存。**
+                           ;; pin が無いので deny できないが、artifact には入る。
+                           ;; 黙って落とすと「検査して問題なし」と区別が付かない。
+                           (nil? pin) {:rel rel :kind :unpinned}
+                           :else
+                           (let [head  (git abs "rev-parse" "HEAD")
+                                 dirty (git abs "status" "--porcelain")]
+                             (cond
+                               (str/blank? head) {:rel rel :kind :unreadable}
+                               (not= head pin)   {:rel rel :kind :stale
+                                                  :head (subs head 0 8) :pin (subs pin 0 8)}
+                               (not (str/blank? dirty))
+                               {:rel rel :kind :dirty
+                                :files (count (str/split-lines dirty))})))))
+                     roots)
+                drift     (filter (comp #{:stale :dirty} :kind) classified)
+                unchecked (filter (comp #{:unpinned :unreadable} :kind) classified)]
+            ;; deny できない分は **必ず名指しで報告する**。ガードが「見たが問題なし」
+            ;; と「そもそも見られなかった」を同じ沈黙で表すのが、このクラスの欠陥。
+            (when (seq unchecked)
+              (js/console.error
+               (str "deploy-local-root-pin-guard: " top
+                    " の `:local/root` 依存 " (count unchecked)
+                    " 本を検査できませんでした（west.yml に pin が無い / HEAD が読めない）: "
+                    (str/join ", " (map (fn [{:keys [rel kind]}]
+                                          (str rel "(" (name kind) ")")) unchecked))
+                    "。**これらは artifact に入りますが、このデプロイでは検査されていません。**")))
             (when (seq drift)
               (deny!
                (compat/format
