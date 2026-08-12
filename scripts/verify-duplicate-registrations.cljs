@@ -14,10 +14,18 @@
 ;; for one upstream. The pins then drift, and a consumer that pins the old
 ;; coordinate gets a different commit from one that pins the new.
 ;;
-;; Measured 2026-08-12: 35 repositories were registered at 75 paths this way,
-;; including `kotoba-lang/compiler` + `kotoba-lang/amu` (one repo, GitHub id
-;; 1297097065) and `cloud-murakumo` under both `gftdcojp` and `network-awai`.
-;; Every one of the 35 was confirmed to be the same upstream, not a fork.
+;; Measured 2026-08-12: 42 candidate groups covering 85 checkouts, of which 40
+;; were confirmed one upstream by GitHub id -- including `kotoba-lang/compiler`
+;; + `kotoba-lang/amu` (one repo, id 1297097065) and `cloud-murakumo` under both
+;; `gftdcojp` and `network-awai`.
+;;
+;; The other TWO are the reason the candidate/confirmed distinction is not
+;; ceremony: `org-w3-svg` + `svgraph`, and `com-unity-ads` +
+;; `com-unity-api-services`, each share a root commit and are different
+;; repositories. Retiring either on the offline signal alone would have deleted
+;; a real project. An earlier note here said every candidate was confirmed and
+;; that no forks existed; that was wrong, and the two counterexamples were
+;; already on disk when it was written.
 ;;
 ;; ## How it decides, and what that costs
 ;;
@@ -27,10 +35,28 @@
 ;; repository id -- that is what turns a candidate into a finding, and it needs
 ;; network and `gh` auth. Without it the report says candidates and means it.
 ;;
+;; ## Three outcomes, because two would let it lie
+;;
+;; With `--verify-remote` a group is CONFIRMED (all remotes resolved, all to one
+;; id), REFUTED (all resolved, ids differ -- distinct repositories), or
+;; UNVERIFIABLE (a lookup failed). The third is not a variant of the second.
+;;
+;; This mattered concretely. `gh` exits non-zero on an expired token and on rate
+;; limiting, and the first version of this script read any non-zero exit as
+;; "no id". A group with an unresolved member simply fell out of the confirmed
+;; set, so a wholly broken `gh` produced "0 of those are CONFIRMED" and
+;; `--check --verify-remote` exited 0 -- reporting a clean fleet while 40 real
+;; duplicate registrations sat in front of it. A verifier that cannot reach its
+;; evidence must not be indistinguishable from one that looked and found
+;; nothing, so UNVERIFIABLE fails `--check` on its own and the failing slug and
+;; its error are printed.
+;;
 ;; Root commits are read with `git rev-list --max-parents=0`, so a repository
 ;; with several root commits (a subtree merge, say) contributes each of them;
-;; only the first is used, which can under-report. Under-reporting is the safe
-;; direction here.
+;; only the first is used, which can under-report. Measured 2026-08-12: 30
+;; checkouts have more than one root, and grouping by ANY shared root gives the
+;; identical 42 groups / 85 checkouts -- so the shortcut costs nothing in this
+;; fleet today, which is a fact about the fleet and not about the method.
 
 (ns verify-duplicate-registrations
   (:require ["node:fs" :as fs]
@@ -72,8 +98,32 @@
         (str/replace #"\.git$" "")
         (str/replace #"/$" ""))))
 
-(defn- github-id [slug]
-  (when slug (sh (str "gh api repos/" slug " --jq .id"))))
+(defn- github-id
+  "`{:id \"...\"}` or `{:error \"...\"}` -- never a bare nil.
+
+  The distinction is the whole point: a nil cannot say whether the repository
+  has no id or whether `gh` never answered, and collapsing those two is how the
+  earlier version reported a clean fleet during a rate limit."
+  [slug]
+  (if-not slug
+    {:error "checkout has no remote"}
+    (try {:id (str/trim (str (child/execSync (str "gh api repos/" slug " --jq .id")
+                                             #js {:encoding "utf8"
+                                                  :stdio #js ["ignore" "pipe" "pipe"]})))}
+         (catch :default e
+           {:error (or (some-> (.-stderr e) str str/trim str/split-lines first)
+                       (str/trim (str (.-message e))))}))))
+
+(defn- classify
+  "CONFIRMED / REFUTED / UNVERIFIABLE for one candidate group."
+  [members]
+  (let [looked (map #(assoc % :lookup (github-id (:slug %))) members)
+        errs (filter (comp :error :lookup) looked)
+        ids (distinct (keep (comp :id :lookup) looked))]
+    (cond
+      (seq errs) {:verdict :unverifiable :members looked :errors errs}
+      (= 1 (count ids)) {:verdict :confirmed :members looked :id (first ids)}
+      :else {:verdict :refuted :members looked :ids ids})))
 
 (defn -main []
   (let [dirs (checkouts)
@@ -84,34 +134,44 @@
         groups (->> (group-by :root rows)
                     (filter (fn [[_ v]] (> (count v) 1)))
                     (sort-by first))
-        confirmed (when verify-remote?
-                    (->> groups
-                         (keep (fn [[root members]]
-                                 (let [ids (map #(github-id (:slug %)) members)]
-                                   (when (and (every? some? ids)
-                                              (= 1 (count (distinct ids))))
-                                     [root members (first ids)]))))
-                         vec))]
+        verdicts (when verify-remote?
+                   (into {} (map (fn [[root members]] [root (classify members)])) groups))
+        by (fn [v] (filter #(= v (:verdict (verdicts (first %)))) groups))
+        confirmed (when verify-remote? (by :confirmed))
+        refuted (when verify-remote? (by :refuted))
+        unverifiable (when verify-remote? (by :unverifiable))]
     (println (str "scanned " (count dirs) " checkouts"))
     (println (str (count groups) " group(s) share a root commit, covering "
                   (reduce + (map (comp count second) groups)) " checkouts"))
     (when verify-remote?
-      (println (str (count confirmed) " of those are CONFIRMED one upstream "
-                    "(same GitHub repository id)")))
+      (println (str (count confirmed) " CONFIRMED one upstream (same GitHub id), "
+                    (count refuted) " REFUTED (different repositories), "
+                    (count unverifiable) " UNVERIFIABLE (a lookup failed)")))
     (println)
     (doseq [[root members] groups]
-      (println (str (if verify-remote?
-                      (if (some #(= root (first %)) confirmed) "CONFIRMED " "candidate ")
-                      "candidate ")
-                    (subs root 0 8)))
-      (doseq [{:keys [dir slug]} members]
-        (println (str "             " dir "  ->  " (or slug "?")))))
+      (let [{:keys [verdict]} (get verdicts root)]
+        (println (str (case verdict
+                        :confirmed "CONFIRMED    "
+                        :refuted "REFUTED      "
+                        :unverifiable "UNVERIFIABLE "
+                        "candidate    ")
+                      (subs root 0 8)))
+        (doseq [{:keys [dir slug lookup]} (or (:members (get verdicts root)) members)]
+          (println (str "             " dir "  ->  " (or slug "?")
+                        (when-let [id (:id lookup)] (str "  id=" id))
+                        (when-let [e (:error lookup)] (str "  LOOKUP FAILED: " e)))))))
     (println)
     (println (str "A shared root commit is also what a fork has. Without "
                   "--verify-remote these are candidates, not findings."))
+    (when (seq unverifiable)
+      (println (str (count unverifiable) " group(s) could not be verified at all. "
+                    "That is not the same as clean, and --check treats it as a "
+                    "failure: check `gh auth status` and rate limits.")))
     (println (str "Only checked-out repos were scanned; west manages more than "
                   "are on disk."))
-    (when (and check? (seq (if verify-remote? confirmed groups)))
+    (when (and check? (seq (if verify-remote?
+                             (concat confirmed unverifiable)
+                             groups)))
       (set! (.-exitCode js/process) 1))))
 
 (-main)
