@@ -1,0 +1,74 @@
+[{:db/id -1
+  :adr/id "ADR-2608133800"
+  :adr/title "1 つの repo が west に 2 回登録され、2 つの pin が 62 commit 離れている"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "`manifest/west.yml` に `compiler` と `amu` という 2 つの project がある。
+**GitHub 上では同一の repository である。**
+
+    $ gh api repos/kotoba-lang/compiler --jq '.id, .full_name'
+    1297097065   kotoba-lang/amu
+    $ gh api repos/kotoba-lang/amu      --jq '.id, .full_name'
+    1297097065   kotoba-lang/amu
+
+同じ id を、2 つの path に、**2 つの異なる pin で**登録している:
+
+| entry | pin | path |
+|---|---|---|
+| `compiler` | `806f5cef` | `orgs/kotoba-lang/compiler` |
+| `amu` | `e8864273` | `orgs/kotoba-lang/amu` |
+
+    $ gh api repos/kotoba-lang/amu/compare/806f5cef...e8864273
+    status=ahead  ahead_by=62  behind_by=0
+
+**62 commit 離れている。** どちらも到達可能で、どちらも「正しい pin」に見える。
+`west update` は同じ repo の checkout を 2 つ維持し、disk を歩く検査器は同じコードを
+2 回見る。`:local/root` で path を指す消費者は、**どちらの path を書いたかで
+62 commit 違うコンパイラを引く。**
+
+## これは孤立した事故ではない —— 支配的な形である
+
+同日の namespace 衝突調査（ADR-2608132700）が独立に測っている:
+
+> 28 co-classpath → **19 は 1 つの repo が 2 回 checkout されているもの** → 実際の衝突 9
+
+**co-classpath 衝突の 3 分の 2 が、コードの問題ではなく登録の問題だった。**
+`compiler`/`amu` はその 19 のうちの 1 つで、pin の乖離が最大級のものである。
+
+同じ形は今日 3 回別々に現れた: shallow 調査での `ai-gftd-apps-gftdcojp`
+（改名前の path が west 未登録のまま 50 graft の checkout として残存）、
+layer-deps の 7 findings（**org 移管で path が動き、`layers.edn` の exemption が
+west path をキーにしていた**）、そして bb→nbb の census（41 path が 35 repo）。
+
+**改名は GitHub が redirect で吸収するので、壊れない。壊れないまま二重化する。**
+
+## 波及（実測、この repo だけ）
+
+`CLAUDE.md` は `kotoba-lang/compiler` を **3 箇所**で live な path として参照している
+（1642 / 1726 / 1851 行）。`kotoba-wasm-runtime-cutover.edn` の凍結 inventory も
+旧名を指していた —— これは今日 ADR-2608132600 が直した。`grammar_authority.clj` は
+既に「この repo は改名されており checkout はどちらの名前の下にもあり得る」と書き、
+`../amu` と `../compiler` の両方を列挙している。**気付いていた場所と、気付いて
+いなかった場所が混在している。**
+
+## 直し方（未実施 —— owner 判断）
+
+正しい終状態は **entry 1 つ、名前は `amu`**（GitHub が redirect を持つので旧名の
+参照は壊れない）。ただし `compiler` entry の撤去は west が管理する checkout を
+1 つ減らす操作で、他セッションがその path を使っている可能性がある。
+`git-cleanup-conflict` の retirement flow に載せるべきもので、この記録の範囲外。
+
+**先にやるべきなのは検査**である。`scripts/verify-duplicate-registrations.cljs` は
+まさにこれを見つけるために在るが、**load 90 のこのマシンで 240 秒回して 1 行も
+出力せずに timeout した**（exit 124）。進捗を出さないので、走っているのか止まって
+いるのか外から分からない。**見つけるための道具が、見つける前に切れる。**
+
+## 記録しておく形
+
+**「redirect が効いているから壊れていない」は「登録が正しい」ではない。**
+GitHub の redirect は read を救うが、identity を 1 つに畳んではくれない。
+west にとって `compiler` と `amu` は別の project であり、別の pin を持ち、
+別の checkout を作る —— **同じ 1 つの repository に対して。**"}]
