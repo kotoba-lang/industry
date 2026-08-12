@@ -11,6 +11,29 @@
 (defn exists? [rel-path] (.existsSync fs (str root rel-path)))
 (defn has? [s re] (boolean (re-find re s)))
 
+(def ^:private skip-dirs
+  #{"node_modules" ".git" "target" ".cpcache" ".clj-kondo" ".lsp" ".shadow-cljs"})
+
+(defn list-source-files
+  "Recursively list relative paths under the kotobase root whose names end in one of
+   `exts` (e.g. [\".kotoba\" \".clj\" \".cljc\"]). Skips common non-source dirs so a
+   repo-wide claim check stays cheap and stable across local west checkouts / scratch clones."
+  [exts]
+  (let [abs-root root]
+    (if-not (.existsSync fs abs-root)
+      []
+      (letfn [(walk [dir prefix]
+                (->> (.readdirSync fs dir #js {:withFileTypes true})
+                     (mapcat (fn [e]
+                               (let [name (.-name e)
+                                     rel (if (str/blank? prefix) name (str prefix "/" name))]
+                                 (cond
+                                   (and (.isDirectory e) (contains? skip-dirs name)) []
+                                   (.isDirectory e) (walk (str dir "/" name) rel)
+                                   (some #(str/ends-with? name %) exts) [rel]
+                                   :else []))))))]
+        (vec (walk abs-root ""))))))
+
 (def run-id (str "repo-reality-kotobase-" (str/replace (.toISOString (js/Date.)) #"[-:]|\.\d+Z$" "")))
 (def now (.toISOString (js/Date.)))
 
@@ -139,7 +162,41 @@
               (if (and checks-present? retention-present?)
                 {:score 1.0 :note "confirmed: transparency_log.clj's verify-checkpoint still checks :transparency/key-epoch, :transparency/checkpoint-chain, :transparency/witness-threshold, and :transparency/rollback, and retention-decision still consults legal-holds -- the doc's description of fail-closed checkpoint verification and class-based retention with legal-hold override is genuinely wired, not aspirational."}
                 {:score 0.4 :note (str "transparency_log.clj no longer has the expected checkpoint-verification checks (found=" checks-present? ") and/or retention-decision/legal-holds wiring (found=" retention-present? ") -- module may have been refactored; re-verify by hand whether the doc's claims still hold.")}))
-            {:score 0.0 :note "src/kotobase/transparency_log.clj no longer exists -- claim's cited source file is gone; re-verify."}))}])
+            {:score 0.0 :note "src/kotobase/transparency_log.clj no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   ;; ---- added 2026-08-10, weekly claim-discovery pass ----
+   {:claim :claim/kotobase-cid-multi-page-scheduler-not-implemented :axis :axis/functional-completeness :layer :lint
+    :fn (fn []
+          (if (exists? "docs/adr/2608090000-rust-free-cid-canonical-route.md")
+            (let [adr (slurp* "docs/adr/2608090000-rust-free-cid-canonical-route.md")
+                  replay-exists? (exists? "kotoba/cid_external_transaction_replay.kotoba")
+                  test-exists? (exists? "qualification/kotobase/cid_crypto_qualification_test.clj")]
+              (cond
+                (not (has? adr #"multi-page scheduler remains an open gate"))
+                {:score 0.4 :note "ADR-2608090000 no longer states the global multi-page scheduler qualification remains an open gate verbatim -- either the scheduler landed (real progress -- re-verify) or the ADR text changed; re-verify by hand."}
+                (not replay-exists?)
+                {:score 0.3 :note "kotoba/cid_external_transaction_replay.kotoba no longer exists -- claim's cited source file is gone; re-verify."}
+                (not test-exists?)
+                {:score 0.3 :note "qualification/kotobase/cid_crypto_qualification_test.clj no longer exists -- claim's cited qualification test is gone; re-verify."}
+                :else
+                {:score 1.0 :note "confirmed: ADR-2608090000 still discloses the global multi-page scheduler as an open gate, and kotoba/cid_external_transaction_replay.kotoba plus its qualification test still exist implementing only the bounded single-page replay described -- the disclosed gap remains current."}))
+            {:score 0.0 :note "docs/adr/2608090000-rust-free-cid-canonical-route.md no longer exists -- claim's cited source file is gone; re-verify."}))}
+
+   {:claim :claim/kotobase-cid-multi-page-scheduler-not-implemented :axis :axis/doc-code-drift :layer :evidence-link
+    :fn (fn []
+          ;; Claim text asserts a repo-wide search across .kotoba/.clj/.cljc (not only
+          ;; kotoba/*.kotoba). Walk the same extensions from the repo root so a host-side
+          ;; .clj/.cljc scheduler would fail this check the same way a guest-side hit would.
+          (let [source-files (list-source-files [".kotoba" ".clj" ".cljc"])
+                scheduler-re #"(?i)multi-page.scheduler|page-dag.scheduling"
+                scheduler-hits (filter (fn [f] (has? (slurp* f) scheduler-re)) source-files)]
+            (cond
+              (empty? source-files)
+              {:score 0.0 :note "no .kotoba/.clj/.cljc source files found under the kotobase root -- claim's cited search scope is empty; re-verify checkout path."}
+              (empty? scheduler-hits)
+              {:score 1.0 :note (str "confirmed: repo-wide search across " (count source-files) " .kotoba/.clj/.cljc files found zero multi-page-scheduler / page-DAG-scheduling hits -- the ADR's disclosed gap (bounded single-page replay only, no global scheduler) matches the code, not an overclaim.")}
+              :else
+              {:score 0.5 :note (str "found a possible multi-page-scheduler reference in: " (str/join ", " scheduler-hits) " -- re-verify by hand whether this is a real implementation (would close the disclosed gap) or just a comment/TODO.")})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]
