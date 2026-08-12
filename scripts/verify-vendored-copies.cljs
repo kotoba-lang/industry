@@ -152,8 +152,34 @@
               (str "orgs/" source "/" (first (str/split lib-path #"/"))))]
     (when (fs/existsSync dir) dir)))
 
-(defn- upstream-body [dir rev lib-path]
-  (some-> (sh (str "git -C " dir " show " rev ":src/" lib-path)) body))
+(defn- upstream-candidates
+  "The paths the library file could be at, given what the header wrote.
+
+  Three spellings are in use and each puts something different in the parens:
+
+    (pay/core.cljc)          -> src/pay/core.cljc
+    (src/i18n/core.cljc)     -> src/i18n/core.cljc      (already rooted)
+    (core.cljc)              -> src/<lib>/core.cljc     (bare file name)
+
+  Building `\"src/\" + captured` unconditionally -- which is what this did at
+  first -- turns the second into `src/src/i18n/core.cljc` and the third into
+  `src/core.cljc`. Both miss, `git show` returns nothing, and the copy was
+  reported STALE. Four copies were labelled that way while being byte-identical
+  to HEAD. A scan that cannot tell `drifted` from `not looked at` is worse than
+  no scan, because the wrong label is the confident one."
+  [source lib-path]
+  (let [lib (if (str/includes? source "/")
+              (last (str/split source #"/"))
+              (first (str/split lib-path #"/")))]
+    (distinct
+     [(if (str/starts-with? lib-path "src/") lib-path (str "src/" lib-path))
+      (str "src/" lib "/" lib-path)
+      lib-path])))
+
+(defn- upstream-body [dir rev source lib-path]
+  (some (fn [candidate]
+          (some-> (sh (str "git -C " dir " show " rev ":" candidate)) body))
+        (upstream-candidates source lib-path)))
 
 (defn- def-names [text]
   (into #{} (map second) (re-seq #"(?m)^\(def[a-z-]*\s+([^\s\[(]+)" (or text ""))))
@@ -168,8 +194,8 @@
         results
         (for [{:keys [file org lib-path pin body] :as c} copies
               :let [dir (library-dir org lib-path)
-                    head-body (when dir (upstream-body dir "HEAD" lib-path))
-                    pin-body (when (and dir pin) (upstream-body dir pin lib-path))]]
+                    head-body (when dir (upstream-body dir "HEAD" org lib-path))
+                    pin-body (when (and dir pin) (upstream-body dir pin org lib-path))]]
           (assoc c
                  :library dir
                  :pin-honest? (when pin-body (= body pin-body))
@@ -178,19 +204,26 @@
                                  (sort (remove (def-names body) (def-names head-body))))
                  :extra-defs (when head-body
                                (sort (remove (def-names head-body) (def-names body))))))
-        stale (remove #(true? (:current? %)) results)
+        ;; A copy whose upstream could not be read is UNRESOLVED, not stale.
+        ;; Collapsing the two is what let four byte-identical copies be
+        ;; reported as drifted.
+        unresolved-body (filter #(nil? (:current? %)) results)
+        stale (filter #(false? (:current? %)) results)
         dishonest (filter #(false? (:pin-honest? %)) results)
         unresolved (remove :library results)]
     (println (str (count copies) " vendored file(s) found across "
                   (count (distinct (map #(second (str/split (:file %) #"/" 3)) copies)))
                   " org(s)"))
     (println (str (count (filter :current? results)) " current, "
-                  (count stale) " stale or unresolved, "
+                  (count stale) " stale, "
+                  (count unresolved-body) " UNRESOLVED (upstream file not found -- "
+                  "not a drift finding), "
                   (count dishonest) " do NOT match the commit their header claims"))
     (println)
     (doseq [{:keys [file library pin pin-honest? current? missing-defs extra-defs]} results]
       (println (str (cond (not library) "NO-LIBRARY "
                           (true? current?) "current    "
+                          (nil? current?) "UNRESOLVED "
                           :else "STALE      ")
                     file))
       (println (str "             library: " (or library "not checked out")
@@ -209,7 +242,7 @@
     (when (seq unresolved)
       (println (str (count unresolved) " could not be checked: the library repo is "
                     "not checked out here.")))
-    (when (and check? (or (seq dishonest) (seq stale)))
+    (when (and check? (or (seq dishonest) (seq stale) (seq unresolved-body)))
       (set! (.-exitCode js/process) 1))))
 
 (-main)

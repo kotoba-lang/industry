@@ -107,7 +107,7 @@ basis は同じ decision になり、再現・監査・time travel ができま�
 満たせる不足条件を機械可読に返します。UI はこの decision を描画しますが、UI 自体を
 enforcement point にはしません。
 
-### R0–R4 implementation（2026-08-12）
+### R0–R5 implementation（2026-08-12）
 
 authority の semantic owner である `kotoba-lang/aiueos` に、純粋CLJC kernel
 `aiueos.authority/decide` と既存broker統合 `aiueos.broker/decide-authority` が着地しました
@@ -178,10 +178,28 @@ assertionsとarchitecture gate、両release buildがgreenです。graph producti
 `9286dc57-3394-4a1d-8f13-9234bded412b`、gateway Version ID
 `e5fddd97-5113-4e83-94cd-7e751dc43758`へdeployし、両healthと未認証audit 401をlive確認しました。
 
-R4の `basis_cid` はcontent addressですが、canonical `/v2/query` が検証するpublic signed commit
-envelopeではありません。従ってR4を「署名Grant検証」とは呼びません。まだ未移行なのは、signed
-authority frontierのprovisionとcanonical query、payment settlementからentitlement grantへの変換、
-UIのchallenge描画、audit以外のroute固有policy、receiptのtransparency-log anchorです。
+R5では `network-awai/net-kotobase` PR #424（merge
+`701911e3b453b98dd348cc5de1331f240c2065e3`）で、signed authority frontierのtenant単位
+provisionとcanonical queryを着地しました。
+
+- tenant固有 `frontier:advance` scoped CACAOを検証し、actorはtenant自身または明示allowlist
+  operatorに限定する。allowlistは既定で空である。
+- callerが選んだsigned commit CIDをcanonical `/v2/query`で検証し、完全Grant snapshotと同一
+  `basis_cid`だけをtenantのcontent-addressed append-only control streamへ記録する。
+- `previous_basis_cid`、single-use nonce、sequenced foldによりrollback、replay、concurrent stale
+  advanceを拒否・可視化する。stale eventは証拠として残るがactive pinにならない。
+- pin済みtenantはsnapshotだけをGrant sourceにし、emptyはdeny、corrupt/unreadableは503である。
+  pin未作成tenantはcompatibility behaviorを維持し、global cutoverを行わない。
+- signed commitは「誰がimmutable graph factsをauthorしたか」、scoped CACAO/control eventは「誰が
+  tenant policyとして選択したか」、Decision Receiptは「どのbasisで判定したか」を別々に証明する。
+
+gateway 404 tests / 1938 assertions、47 registered namespaces、93-input bundle manifest、release
+buildと二回buildのSHA-256再現性がgreenです。本番gateway Version ID
+`91c9b977-33e1-422c-a71e-b940abf5c732`へdeployし、healthとunauthenticated provision 401をlive
+確認しました。operator allowlistとtenant pinは未設定で、tenant activationはまだ0件です。
+
+まだ未移行なのは、payment settlementからentitlement grantへの変換、UIのchallenge描画、
+audit以外のroute固有policy、receiptのtransparency-log anchorです。
 
 ## 各層への投影
 

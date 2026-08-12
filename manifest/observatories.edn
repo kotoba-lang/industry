@@ -140,7 +140,11 @@
   ;; 3 件とも seed から datom 集合を導き、前回と同じなら追記しない。**2 周目で
   ;; 伸びないのは正常**（実測: いずれも `appended=false (no-change)` を印字して
   ;; exit 0）。watari 系と混ぜて登録しないこと —— 混ぜると片方が必ず嘘になる。
-  {:name "com-etzhayyim-inochi" :org "etzhayyim"
+  ;; ⚠ 2026-08-11 の rename で **repo 名が observatory 名から離れた**（`com-etzhayyim-*`
+  ;;   → role 面の `actor-*`、org も cloud-itonami / network-awai へ移管）。
+  ;;   `:name` は台帳・cadence・datoms の識別子なので動かさず、repo の在処だけ
+  ;;   `:org` + `:repo` で指す。`:repo` 省略時は `:name` が repo 名として使われる。
+  {:name "com-etzhayyim-inochi" :org "etzhayyim" :repo "actor-inochi"
    :domain "生物圏（種・生息域・生態系サービス）"
    ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
    :change-rate 0.02          ; λ [1/day]
@@ -170,7 +174,7 @@
    :evidence "2026-08-08 実測: 583 datoms、chain {:ok true :length 1}、
               2 周目 appended=false (no-change)。38 KB"}
 
-  {:name "com-etzhayyim-busshi" :org "etzhayyim"
+  {:name "com-etzhayyim-busshi" :org "cloud-itonami" :repo "actor-busshi"
    :domain "商品・原材料（コモディティと供給クラス）"
    ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
    :change-rate 2.0          ; λ [1/day]
@@ -221,7 +225,7 @@
    :evidence "2026-08-08 実測: 15 forecast / 4 model、全 model skilled=True。
               引数無しでは -main の `here` が null で NPE"}
 
-  {:name "com-etzhayyim-masago" :org "etzhayyim"
+  {:name "com-etzhayyim-masago" :org "cloud-itonami" :repo "actor-masago"
    :domain "材料科学（結晶構造・物性・発見優先度）"
    ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
    :change-rate 0.03          ; λ [1/day]
@@ -287,7 +291,7 @@
    :expect :runs-ok
    :evidence "2026-08-08 実測: c1 supported / c2 unverifiable、低信頼度に warning"}
 
-  {:name "com-etzhayyim-mikurabe" :org "etzhayyim"
+  {:name "com-etzhayyim-mikurabe" :org "network-awai" :repo "actor-mikurabe"
    :domain "言説比較（同一事象に対する報じ方の差）"
    ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
    :change-rate 24.0          ; λ [1/day]
@@ -306,7 +310,7 @@
               (e) 媒体名指しは Council へ escalate。**承認だけでは publish されず、
               phase 2 の gate が開いていて初めて commit する**ことも確認した"}
 
-  {:name "com-etzhayyim-kawaraban" :org "etzhayyim"
+  {:name "com-etzhayyim-kawaraban" :org "cloud-itonami" :repo "actor-kawaraban"
    :domain "ニュースミラー（多国・多媒体のアーカイブ）"
    ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
    :change-rate 1436.0          ; λ [1/day]

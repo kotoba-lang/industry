@@ -1,28 +1,29 @@
 {:health-status 200,
  :zone-name "etzhayyim.com",
  :workers-invocations-7d
- {"etzhayyim-did-web" 9466, "etzhayyim-xrpc-proxy" 87},
+ {"etzhayyim-did-web" 9611, "etzhayyim-xrpc-proxy" 106},
  :zone
- {:requests-7d 46834,
-  :pageviews-7d 2039,
-  :uniques-7d-sum 1988,
+ {:requests-7d 48953,
+  :pageviews-7d 2160,
+  :uniques-7d-sum 2008,
   :zone "etzhayyim.com"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/robots.txt", :requests 25}
-   {:path "/system-dynamics", :requests 10}
-   {:path "/_shell/liquid-glass.css", :requests 4}
-   {:path "/actor/watari/did.json", :requests 3}
-   {:path "/organism/health.json", :requests 3}
-   {:path "/actor/mimamori/system-dynamics", :requests 3}
-   {:path "/actor/infra-utility-connect/did.json", :requests 3}
-   {:path "/actor/kyber/system-dynamics", :requests 3}],
-  :status-mix {:client-error 484, :server-error 6198, :ok 300},
+  [{:path "/robots.txt", :requests 19}
+   {:path "/system-dynamics", :requests 11}
+   {:path "/actor/kyber/system-dynamics", :requests 11}
+   {:path "/actor/yotei/did.json", :requests 9}
+   {:path "/actor/manabi/system-dynamics", :requests 9}
+   {:path "/actor/funadaiku/system-dynamics", :requests 8}
+   {:path "/actor/kawaraban/system-dynamics", :requests 8}
+   {:path "/*", :requests 8}],
+  :status-mix {:ok 388, :client-error 1206, :server-error 6111},
   :window "24h"},
  :as-of "2026-08-12",
- :traffic-quality {:window "24h", :probe-4xx-pct 7, :error-5xx-pct 89},
+ :traffic-quality
+ {:window "24h", :probe-4xx-pct 16, :error-5xx-pct 79},
  :top-paths
- "上位 page (24h, 2xx/3xx): /robots.txt 25 · /system-dynamics 10 · /_shell/liquid-glass.css 4 · /actor/watari/did.json 3 · /organism/health.json 3 | 4xx(probe) 7% · 5xx 89%",
+ "上位 page (24h, 2xx/3xx): /robots.txt 19 · /system-dynamics 11 · /actor/kyber/system-dynamics 11 · /actor/yotei/did.json 9 · /actor/manabi/system-dynamics 9 | 4xx(probe) 16% · 5xx 79%",
  :signal
- "etzhayyim.com 実測 46834 req/7d・1988 uniques(日次和)・うち4xx probe 7%(24h)、workers 9553 inv/7d"}
+ "etzhayyim.com 実測 48953 req/7d・2008 uniques(日次和)・うち4xx probe 16%(24h)、workers 9717 inv/7d"}

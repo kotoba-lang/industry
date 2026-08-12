@@ -34,6 +34,7 @@
    | 宣言された WASI import が pinned WIT に実在するかの検査 | **landed**（`kotoba.component.wasi-contract`） |
    | 合成後の world の権限 allowlist | **landed**（`assert-declared-wasi-imports!`、関数を持つ import だけを権限と見なす） |
    | async ABI の実測を機械が守る形に | **landed**（`kotoba.async-abi-prerequisite-test`） |
+   | **bounded async が塞がれている理由の特定** | **landed**（standard32 に intrinsic 面が無い。下記 5） |
    | **http provider** | **未着手。async profile に依存** |
    | `:wasmtime` backend の qualification | **`:pending` のまま。変えていない** |
 
@@ -73,12 +74,28 @@
      通ってから run で trap する**。
    - **intrinsic は在る**（`[future-new-<N>]<func>` = `(result i64)` 他）。
      当初『素の WAT から到達路が無い』と書いたのは誤りで、訂正済み。
-     **正しい module/name の組み合わせは未確定。**"
+
+   ## 5. 塞がれている理由が確定した — 綴りではなく面の不在
+
+   **`wit-component` は future/stream の intrinsic を legacy マングリングに
+   しか実装していない。** `impl NameMangling for Standard` は `future_new` /
+   `future_write` / `future_read` / 各 cancel・drop を全て `None` で返す
+   （`validation.rs` v1.243.0, 1779-）。1 変数に絞った実測:
+
+   | module | `--reject-legacy-names` | 結果 |
+   |---|---|---|
+   | `cm32p2`-prefixed な regular import のみ | あり | **ACCEPTED** |
+   | 同上 + `[future-new-0]foo` | あり | **REJECTED**（intrinsic を名指し） |
+   | 同じ intrinsic、legacy 名 | なし | **ACCEPTED** |
+
+   上流 fixture（`async-streams-and-futures`）も同じ挙動。**artifact の形は
+   正しく、この repo が全成果物で使う mangling に面が無い。**
+   ADR 0039 が standard32 を選んでいるので、ここから先は**設計判断**である。"
 
   :adr/consequences
   "## 検証（landed tip `8b748ce` で実行）
 
-   `clojure -M:test` → **181 tests / 1245 assertions / 0 failures**
+   `clojure -M:test` → **182 tests / 1249 assertions / 0 failures**
    （pinned wasmtime 47.0.3 を `.tools/wasmtime/wasmtime` に置いた worktree）。
 
    **落ちることを確かめた対照（4 種、すべて実測）**:
@@ -88,14 +105,17 @@
       迂回して直接走らせると `1700000000001`（ホスト時刻と 864 億 ms 違う）
    3. 契約を `outgoing-handler` に戻すと該当 2 capability を名指しで報告して落ちる
    4. 整形は **生成物 3 種が byte 同一**であることを捕獲・比較して確認
+   5. standard32 の build を legacy に差し替えると、intrinsic gap のテストが
+      **2 つの assertion で落ちる**（upstream が面を足した日に落ちる drift detector）
 
    ## 着地（すべて default branch 上で確認済み）
 
    - `kotoba-lang/kotoba-component` main: `277b9ea` → `8f3d279` → `08cedd2`
-     → `ccfd721` → **`8b748ce`**（現 tip）
-   - superproject main: ADR `c786eac` / `ac2fa8c` / `4dc3b19` / `98ecaf4`、
-     west pin `5a08b82` / `8b63bb8` / `1dca830` / `29878aa`
-   - west pin は `8b748ce`、`verify-west-pins` OK、共有 checkout も同期済み
+     → `ccfd721` → `8b748ce` → **`7045c8c`**（現 tip）
+   - superproject main: ADR `c786eac` / `ac2fa8c` / `4dc3b19` / `98ecaf4` /
+     `17615cb` / `f556030`、west pin `5a08b82` / `8b63bb8` / `1dca830` /
+     `29878aa` / `977470a`
+   - west pin は `7045c8c`、`verify-west-pins` OK、共有 checkout も同期済み
    - **私の worktree / branch / stash は全て削除済み**（0 件）
 
    ## 次の agent へ
@@ -105,11 +125,13 @@
 
    **残っている宿題（優先順）**:
 
-   1. **`[future-new-<N>]<func>` を受理させる module/name の組み合わせ。**
-      署名は確定（`(result i64)`）。`cm32p2|<iface>@<ver>` は
-      `is missing function` で拒否された。読むべきは
-      `wasm-tools` v1.243.0 の `crates/wit-component/src/validation.rs` の
-      `prefixed_payload` が `get_function` に何を渡しているか。
+   1. **【オーナー判断】standard32 に intrinsic 面が無い問題をどう解くか。**
+      調査は終わっている（上記 5）。3 択:
+      ①future/stream を要する provider だけ legacy 名にする（mangling が混在）
+      ②`wasm-tools` の `Standard` 側に実装を入れる（上流貢献）
+      ③`component new` を通さず component binary を直接 emit する。
+      **`kotoba.async-abi-prerequisite-test` が upstream の追加を検出する形で
+      pin してあるので、②を待つ判断も『放置』にはならない。**
    2. **bounded の 5 要件**（`:declared-async-effect :cancellation :deadline
       :item-budget :byte-budget`）。**全部満たさないものを async profile と
       呼ばない。**
@@ -126,6 +148,15 @@
 
    - **`head -0` を挟んだ判定で、拒否された 2 つの署名を『ACCEPTED』と読んだ。**
      出力を捨てる判定で合格を報告しかけた。
+   - **同じ『出力を捨てる判定』を、記録した翌ターンに再発させた。**
+     `wasm-tools ... | head -6 && echo ACCEPTED` で、失敗しているのに
+     成功と表示した（`head` が成功するため）。以降は `if <cmd>; then` で
+     exit status を見る形に直した。**一度直した種類の誤りが次の話題で
+     再発するという、CLAUDE.md 冒頭の記述そのもの。**
+   - **ADR 更新時に markdown 表のパイプをバックスラッシュでエスケープして EDN を壊した**
+     （EDN にその escape は無い）。パース検査で検出して修正 —— **そしてこの一文を書くときに
+     同じ escape をもう一度書いて、もう一度壊した。**
+     **生成物でない正本を機械で編集したら、その場で読み直す。**
    - **`verify-west-pins` の『pin 退行』を誤報した。** 実際は私の superproject
      checkout が古かっただけで、GitHub 側の pin は正しかった。
      `--ff-only` が worktree 側で走っていて本体が動いていなかったことに気づかず、
