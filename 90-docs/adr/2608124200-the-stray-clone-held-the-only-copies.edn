@@ -1,0 +1,107 @@
+[{:db/id -1
+  :adr/id "ADR-2608124200"
+  :adr/title "The stray clone held the only copies, and no remote ever had them"
+  :adr/status "accepted"
+  :adr/date "2026-08-12"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related ["ADR-2608122400" "ADR-2608123400"]
+  :adr/body
+  "## What looked like a misplaced directory
+
+`cloud-itonami/gftd-motion-actor` is registered at `orgs/cloud-itonami/` and a
+clone of it also sat at `orgs/gftdcojp/`. The obvious reading is a leftover from
+the org move: let west create the registered path, remove the stray.
+
+**The premise was incomplete — both paths already existed**, the registered one
+clean at its pin. Both slugs resolve to repository id `1298218954`, `fork:
+false`, no parent: a rename redirect, not a fork. So it really was one repo at
+two paths.
+
+## The stray held the only copies of the content
+
+Checked the way ADR-2608122400 prescribes — branch tips against the remote,
+never `git log --branches --not --remotes`, which is meaningless in checkouts
+that have no remote-tracking refs. Four branches exist server-side. **The
+`git-annex` branch does not.**
+
+Unique content: that branch, plus **5 annexed `.mp4` objects, 6.0 MB**. They
+were the only copies anywhere, for two compounding reasons:
+
+- **Annexed bytes never live in git objects**, and the branch that tracks them
+  is absent from GitHub.
+- **No B2 special remote was ever configured** — the branch's `uuid.log` names
+  exactly one repository, the stray itself, and there is **no `remote.log` at
+  all** — despite the west entry declaring `annex-remote: b2`. **The content was
+  never published.**
+
+And the registered sibling had **no `.git/annex` directory**, so all five of its
+committed symlinks were **dangling**. The repo looked complete and resolved to
+nothing.
+
+**These are intended content, not regenerable output.** `.gitattributes` routes
+every binary to annex by design and the pointers are committed on `main`. That
+is the opposite of ADR-2608122400's 164 MB case, where `.gitignore` excluded the
+files and the generation parameters survived in the sibling.
+
+**The cause is visible in the manifest**: `group-filter` carries `-datalad`, so
+this project is skipped by default `west update`, and its content only ever
+arrives through the explicit annex-get path — which had nothing to fetch.
+
+## What was done, and what deliberately was not
+
+Each object was verified by MD5 and byte length against its own MD5E key (5/5),
+copied into the registered checkout's annex store at identical key paths, and
+re-verified after the copy (5/5). **All five committed symlinks now resolve.**
+The `git-annex` branch was bundled (`git bundle verify`: complete history) with
+a transcript written to `.git/stash-archive-<date>/` in **both** checkouts —
+because deleting an orphan destroys any archive kept only inside it.
+
+**Nothing was deleted, and nothing was published.** The content now sits in two
+local checkouts and still in no remote. Publishing to B2 is the durable fix and
+needs credentials; **only after that is removing the stray safe.** Note that
+`cleanup-workflow.edn` already names `git-annex` under branches never to delete,
+and excludes annex datasets from the automated lander.
+
+## What this changes about the orphan audit
+
+ADR-2608122400 classified 41 orphans and found 4 holding work, all stashes. That
+audit asked about commits, working trees, stashes and branches. **It did not ask
+whether annexed content existed only locally**, and for a `-datalad` project
+that is precisely where the unique bytes live — outside git objects, in a branch
+that may never have been pushed.
+
+**A checkout can be byte-identical in git and still be the only place the data
+exists.** Any future orphan retirement must check `.git/annex` and the
+`git-annex` branch separately, and must not treat a clean `git status` as
+evidence of nothing to lose.
+
+## The VPN LoadBalancer pointer, landed the same pass
+
+ADR-2608123400 concluded that the LoadBalancer is a leftover the design stopped
+using. The owning repo's ADRs are **not silent, and one contradicts**: its
+active design ADR authored the port mapping deliberately and, in the same table,
+recorded the tunnel route that replaced it; its ledger still lists the load
+balancer as live and says to protect it, true on 2026-06-16 and never revised;
+a third records the cluster and its load balancers deleted on 2026-06-24. **No
+ADR anywhere discusses ClusterIP for this service.**
+
+The pointer was added by **editing the existing ADR rather than adding a file**:
+that repo's own `CLAUDE.md` carries a Phase 0 freeze forbidding new files under
+the numbered layer directories while explicitly permitting edits. `:last_verified`
+was deliberately not bumped — what was verified is the pointer, not the whole
+May ADR.
+
+The manifest itself was **not** changed: `service.yaml` is still
+`type: LoadBalancer`, and the precondition stands — the Worker secret may hold
+either URL form, its SHAPE must be checked before applying, and the value was
+not read.
+
+## Two operational notes worth keeping
+
+- That repo is **5.4 GiB**, roughly an hour to clone, so the change landed
+  through the server-side git API write path that `cleanup-workflow.edn`
+  prescribes for exactly this case. The shared checkout was never touched.
+- The branch was cut from the **real remote tip**, not the west pin, which was 5
+  commits behind. That checkout is detached at the pin, its remote is not named
+  `origin`, and nothing was pushed from it."}]
