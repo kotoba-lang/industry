@@ -105,6 +105,36 @@ pay pinned at edf58beb`）ので、**それを読んでライブラリ側の当�
 機械検査は書ける**。ヘッダが「Diff to check drift」と言っている diff を、実際に走らせる。
 検出器が無いことが、6 コピーが誰にも知られず離れていった理由そのもの。
 
+## 検出器を書いた（同日）—— そして書式を 1 つしか知らない scan は嘘をつく
+
+`scripts/verify-vendored-copies.cljs`。ヘッダの provenance を読み、
+**その copy が名乗る commit** と **ライブラリの HEAD** の両方と本文を突き合わせる
+（比較は最初の `(ns ` から始めるので、ヘッダ自身は drift に数えない）。
+
+**PIN-HONEST と CURRENT を分ける。** stale は必ずしも欠陥ではない
+（vendoring は意図的なスナップショット）。**自分の pin と一致しない copy は欠陥**である ——
+provenance がそれしか無いのに、それが嘘だから。
+
+実測: **24 file / 11 current / 13 stale / 1 が自分の pin と不一致**
+（`nexus-x402/src/pay/x402.cljc`。`8a77e516` を名乗るが中身は HEAD 相当）。
+
+**この 24 という数字に辿り着くまでに 2 回、少なく数えた。**
+
+1. 最初は `<repo>/src` しか歩かず **15 件**。`net-kotobase` の 3 件は
+   `kotobase-api-gateway-cljs/src` にあり、その中には本 ADR が「fleet 中で最悪」と
+   書いた treasury copy が含まれていた。**1 つのレイアウトしか知らない scan は、
+   そのレイアウトに従う copy だけを見つける。**
+2. 次にヘッダ書式が 1 種類だと仮定して **18 件**。実際には 2 種類あり
+   （`VENDORED from kotoba-lang (pay/core.cljc), pay pinned at <sha>` と
+   `VENDORED from kotoba-lang/treasury (treasury/core.cljc, ADR-…), pinned at commit <sha>`）、
+   後者を取りこぼしていた。**両方を受けて 24 件。**
+
+どちらも「見つからなかった」ではなく「**探し方が狭かった**」であり、
+検出器が緑であることを安心の根拠にする前に、何を歩いて何を読んでいるかを
+確かめる必要がある。
+
+gate には載せない（既知の stale が 13 件あるので常に赤くなる）。群が片付いてから。
+
 ## Consequences
 
 - **オーナー判断が要る点**（優先順）:
