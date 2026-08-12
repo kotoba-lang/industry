@@ -596,6 +596,44 @@ The landed fix rejects the placeholder by name.
   not on disk. Heavily `cloud-itonami/actor-*` and `app-*`, which self-mint CACAO
   against `kotobase.net`. Closing it needs `west update` on that group.
 
+## Final close -- five agents stopped mid-work, nothing lost
+
+A last batch of five was stopped before landing anything. **None had reached a
+commit**, so there is no partial state in any repository. Verified rather than
+assumed: no stray superproject worktrees, no remote branches created, and the
+one leftover child worktree (`agent/nomad-addr-env-scope` in `etzhayyim/root`)
+had zero uncommitted changes, zero commits ahead of `main`, and no remote
+counterpart -- it was removed. The other `/private/tmp` worktrees on this
+machine belong to other sessions and were left alone.
+
+Each had reached a useful partial answer, recorded here so the next attempt
+starts from it rather than from zero:
+
+- **vpn auth fail-open** -- had 19 passing tests for the provisioner side and was
+  about to write the `wg-agent` side, which has no tests at all.
+- **etzhayyim remaining endpoints** -- established that `benjamin.local` is the
+  **only** statement of the Nomad address anywhere in the repo (no `deps.toml`,
+  no other `:4646`), so there is no owned authority to route through. That
+  shapes the fix: as with the vpn placeholder, requiring the value may be the
+  only honest option.
+- **266 unscanned repos** -- the `west update` fetch was running. That work is
+  not wasted; whatever fetched stays on disk.
+- **detector re-measurement** -- the first detector reproduced its recorded
+  baseline **exactly**, which is the single most important of the four checks.
+- **kami collision brief** -- had located the prior mapping and was moving to
+  file contents.
+
+## Both blocked pins are still blocked
+
+`kotoba-lang/sdk-py` (merge `01fab5c46f7`, pin `6cd818b`) and `kotoba-lang/vpn`
+(merge `b9dfa224456`, pin `3d2d269`). Retried at final close; `repos/*` GETs
+still return 403 while `gh api rate_limit` still reports thousands remaining.
+Both merges are on their repos' `main`; only the manifest lags. First command
+on resume:
+
+    nbb scripts/advance-pins.cljs kotoba-lang <names-file> --execute
+    nbb scripts/verify-west-pins.cljs
+
 ## Resume point
 
 Wait for the six agents, land each result, advance the pin for every child repo
