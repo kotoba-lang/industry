@@ -93,6 +93,30 @@
       (not-empty (str/trim (str out)))
       (do (binding [*out* *err*] (println "  gh failed:" (str/trim (str err)))) nil))))
 
+(defn- gh-ref
+  "ref を引いて **{:state :found/:absent/:error, :sha s}** を返す。
+
+  なぜ gh-str ではだめか（2026-08-12 の実害）: gh-str は失敗も「無い」も同じ nil に
+  潰す。server-commit! はその nil を『commit が1つも無い新規 repo』と読んで
+  parents 無し・base_tree 無しのルートコミットを作る経路を持っているので、
+  **通信が失敗しただけで親無し commit が生える**。実測: secondary rate limit で
+  全 gh 呼び出しが 403 になった状態で --apply を回したところ、6 repo に
+  『No common ancestor』な branch ができた（tree は新規ファイルだけで repo の履歴を
+  1 つも含まない = 構造的に merge 不能）。しかも default branch と比較しない限り
+  見えない。:jq-scalar-is-not-json と同型の『失敗した照会を値として読む』誤り。
+
+  404 だけを :absent とし、それ以外の非ゼロ exit は :error として呼び出し側に
+  中断させる。gh は HTTP 状態を stderr に `(HTTP 404)` の形で書く。"
+  [slug ref]
+  (let [{:keys [out exit err]} (sh "gh" "api" (str "repos/" slug "/git/ref/" ref) "--jq" ".object.sha")
+        e (str err)]
+    (cond
+      (zero? exit)                  {:state :found :sha (not-empty (str/trim (str out)))}
+      (str/includes? e "(HTTP 404)") {:state :absent}
+      :else                          (do (binding [*out* *err*]
+                                           (println "  gh failed (ref lookup):" (str/trim e)))
+                                         {:state :error}))))
+
 (defn- gh-input!
   "巨大な body を持つ POST は argv 上限（macOS で ~1MB、base64 blob は容易に超える）
   に当たるので、必ず JSON ファイル経由で送る。"
@@ -485,10 +509,18 @@
   ;; ルートコミットを作る。placeholder repo（例 kotoba-lang/org-threejs: branch
   ;; init_placeholder に commit ゼロ、ファイルは全部 untracked）はこの経路でしか
   ;; 着地できない。
-  (let [base-sha (gh-str "api" (str "repos/" slug "/git/ref/heads/" base) "--jq" ".object.sha")
+  ;; ⚠ base の照会は「無い」と「引けなかった」を必ず分ける。潰すと、通信失敗が
+  ;; そのままルートコミット生成に化ける（gh-ref の docstring 参照）。
+  (let [{base-state :state base-sha :sha} (gh-ref slug (str "heads/" base))
         base-tree (when base-sha
                     (gh-str "api" (str "repos/" slug "/git/commits/" base-sha) "--jq" ".tree.sha"))]
-    (let [_ nil]
+    (if (or (= base-state :error)
+            ;; base はあるのに tree が引けなかった = 同じ罠。base_tree 無しで書くと
+            ;; 既存ファイルを1つも含まない tree になる。
+            (and base-sha (nil? base-tree)))
+      (do (println "  ⚠ base の照会に失敗したので中断（ローカルは無傷）。"
+                   "親無し commit を作らないための fail-closed。")
+          nil)
       (let [entries (keep (fn [p]
                             (when-let [sha (if three-way?
                                              (three-way-blob! slug dir base p)
@@ -505,17 +537,18 @@
                                           base-sha (assoc :parents [base-sha]))
                                         ".sha"))]
             (when commit-sha
-              ;; branch が未作成なら 404 が正常系。gh-str は失敗を stderr に出すので
-              ;; ここだけ静かに判定する（毎 repo で "Not Found" が出ると本物の
-              ;; エラーが埋もれる）。
-              (let [existing? (let [{:keys [out exit]} (sh "gh" "api" (str "repos/" slug "/git/ref/heads/" branch)
-                                                           "--jq" ".object.sha")]
-                                (when (zero? exit) (not-empty (str/trim (str out)))))
-                    ok (if existing?
-                         (gh-input! (str "repos/" slug "/git/refs/heads/" branch)
-                                    {:sha commit-sha :force true} ".object.sha")
-                         (gh-input! (str "repos/" slug "/git/refs")
-                                    {:ref (str "refs/heads/" branch) :sha commit-sha} ".object.sha"))]
+              ;; branch が未作成なら 404 が正常系。ただし「404 だから無い」と
+              ;; 「引けなかった」を潰さない —— 旧実装は exit≠0 を一律 :absent と読んで
+              ;; いたので、rate limit で照会が落ちると既存 branch に対して ref 作成を
+              ;; 投げ、`Reference already exists (HTTP 422)` で着地に失敗していた
+              ;; （2026-08-12 実測）。
+              (let [{br-state :state existing? :sha} (gh-ref slug (str "heads/" branch))
+                    ok (when (not= br-state :error)
+                         (if existing?
+                           (gh-input! (str "repos/" slug "/git/refs/heads/" branch)
+                                      {:sha commit-sha :force true} ".object.sha")
+                           (gh-input! (str "repos/" slug "/git/refs")
+                                      {:ref (str "refs/heads/" branch) :sha commit-sha} ".object.sha")))]
                 (when ok {:branch branch :commit commit-sha :files (count entries)})))))))))
 
 (defn- open-pr!
