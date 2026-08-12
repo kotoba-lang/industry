@@ -27,9 +27,11 @@
 ;;   3. **:known-broken と :runs-empty は :blocked-by を持つ。**
 ;;      壊れているものを「壊れている」と登録するだけで理由を書かないと、
 ;;      それは記録ではなく黙認になる
-;;   4. **:args のパスは ${REPO} 起点。** 相対パスの既定値に依存しないための
-;;      登録簿なのに、ここで相対パスを書いたら同じ罠を踏み直す
-;;   5. 登録された name が west.yml の project として実在する
+;;   4. **:args のパスは ${REPO} 起点か、絶対パス + :args-outside-repo（理由）。**
+;;      捕まえたいのは相対パス（起動場所で意味が変わる）。repo の外へ逃がすのが
+;;      必須な出力は実在する（hayari の --summary-out）ので、禁じずに理由を持たせる
+;;   5. 登録された repo が west.yml の project として実在する。
+;;      **見るのは (or :repo :name)** —— :name は台帳の識別子、:repo が在処
 ;;   6. 台帳が在るなら、登録された actor を 1 つも落としていない
 ;;      （部分実行の結果で全体の台帳が上書きされていないか）
 ;;   7. :unmeasured は :note を持つ（「対象外」と読ませないため）
@@ -37,6 +39,63 @@
 ;; ネットワーク: 不要。実行: 不要（登録簿の静的検査のみ）。
 ;;
 ;; 実行: `npx nbb observatory-registry-check.cljs <dir> [--min 10]`
+;;
+;; ─────────────────────────────────────────────────────────────────────────
+;; ## この gate が両方向に動くことの証明（2026-08-12）
+;;
+;; **不変条件を編集するなら、この節を一緒に読むこと。** 検査を足したら
+;; `observatory-registry-discriminate.cljs` にケースを 1 つ足し、赤くなることを
+;; 実際に見てから landed とする。**落ちない gate は劇場**（CLAUDE.md）。
+;;
+;; ### なぜここに記録があるか
+;;
+;; この gate は **生涯一度も green にならなかった**（0 pass / 274 fail、
+;; ADR-2608124800）。隣の gate と違って break/unbreak の記録も無く、
+;; **どちらの向きにも discriminate することが一度も示されていなかった。**
+;; 常時赤は常時緑と同じく無情報である —— 「今日も赤い」は誰も行動できない。
+;;
+;; 9 件の違反の内訳は 4 種類で、**gate 自身の誤りが 8 件を占めていた**:
+;;   - 5 件: 2026-08-11 の rename に不変条件 5 が追随していなかった（:repo 未対応）
+;;   - 1 件: 登録簿の本物の穴（com-etzhayyim-rasen に :repo が無い）
+;;   - 1 件: 不変条件 4 が「このパスは repo の**外**でなければならない」を表現できず、
+;;           意図的に文書化された要件を違反として報告していた
+;;   - 2 件: 不変条件 11 は真だが、**主張していた害が実測で偽だった**（下の 11 節）
+;;
+;; ### 実測（`nbb gates/observatory-registry-discriminate.cljs <tree>`）
+;;
+;;   baseline（無改変）                                    exit=0
+;;   inv 1  :runtime を落とす                              exit=1 → 戻して exit=0
+;;   inv 2  :expect を語彙外に                             exit=1 → 戻して exit=0
+;;   inv 3  :known-broken から :blocked-by を落とす         exit=1 → 戻して exit=0
+;;   inv 4  :args に相対パス                               exit=1 → 戻して exit=0
+;;   inv 4  repo 外の絶対パスから :args-outside-repo を落とす exit=1 → 戻して exit=0
+;;   inv 5  :repo を west.yml に無い名前に                  exit=1 → 戻して exit=0
+;;   inv 5  :repo を落として :name へ落ちる経路             exit=1 → 戻して exit=0
+;;   inv 6  台帳から登録済み actor を 1 件消す              exit=1 → 戻して exit=0
+;;   inv 7  :note の無い :unmeasured を足す                exit=1 → 戻して exit=0
+;;   inv 8  :inventory-note を落とす                       exit=1 → 戻して exit=0
+;;   inv 9  :next から :fix を落とす                       exit=1 → 戻して exit=0
+;;   inv 10 :change-rate-basis を語彙外に                   exit=1 → 戻して exit=0
+;;   inv 10 :change-rate を落とす                          exit=1 → 戻して exit=0
+;;   inv 10 :importance を落とす                           exit=1 → 戻して exit=0
+;;   inv 11 XML コメントに 2 連ハイフンを戻す               exit=1 → 戻して exit=0
+;;   inv 11 <plist> 要素を落とす                            exit=1 → 戻して exit=0
+;;   → cases 16 / 失敗 0、harness 自身も exit=0
+;;
+;; **各ケースは「赤くなった」だけでなく、その不変条件固有のメッセージが出たことも
+;; 主張する。** さもないと、別の不変条件が偶然落ちただけで「検出した」と読める。
+;;
+;; ### harness を書いて初めて分かったこと（2 件とも harness 側の誤り）
+;;
+;; 最初の実行は 16 中 2 ケースが「壊しても緑」と出た。どちらも **gate ではなく
+;; 壊し方が間違っていた** —— つまり「壊したつもりで壊れていなかった」:
+;;   - `:inventory-note` はコメント行にも現れるので、素朴な `replace-first` が
+;;     **コメントを潰して本体を無傷で残していた**
+;;   - `<plist` を `<plistDISABLED` に変えても、**部分文字列としては一致し続ける**
+;;
+;; **これは harness が要る理由そのものである。** 目視なら «壊した→赤い» を確かめた
+;; つもりで通っていた。壊れたことを機械に確認させないと、検査の検査もまた劇場になる。
+;; ─────────────────────────────────────────────────────────────────────────
 
 (ns fleet-ci.gates.observatory-registry-check
   (:require ["node:fs" :as fs]
@@ -97,18 +156,51 @@
       (v! n ": :expect " (:expect o) " なのに :blocked-by が無い"
           " — 理由を書かない登録は記録ではなく黙認"))
 
-    ;; 4. :args のパスは ${REPO} 起点
-    (doseq [a (:args o)]
-      (when (and (string? a)
-                 (not (str/starts-with? a "--"))
-                 (or (str/includes? a "/") (str/ends-with? a ".edn"))
-                 (not (str/starts-with? a "${REPO}")))
-        (v! n ": :args のパス " (pr-str a) " が ${REPO} 起点でない"
-            " — 相対パス依存を避けるための登録簿でそれをやると意味が無い")))
+    ;; 4. :args のパスは ${REPO} 起点か、**意図的に repo の外**だと宣言されているか。
+    ;;
+    ;; この不変条件が本当に捕まえたいのは **相対パス**（起動場所に依存して静かに
+    ;; 別の場所を読み書きする）であって、「${REPO} でない」ことそのものではない。
+    ;; 絶対パスにはその欠陥が無い —— どこから起動しても同じ場所を指す。
+    ;;
+    ;; そして登録簿には「repo の外へ逃がすのが**必須**」な出力が実在する（hayari の
+    ;; `--summary-out`）。既定の出力先 data/hayari-summary.edn は **tracked** なので、
+    ;; 既定のまま走らせると 1 run ごとに west checkout が dirty になり、以後
+    ;; `west update` がその project を skip して query 面が静かに固まる。
+    ;; つまりここで要るのは「このパスは repo の**中にあってはならない**」という、
+    ;; 元の不変条件が構文的に表現できなかった向きの要求である。
+    ;;
+    ;; 逃がすこと自体は禁じず、**理由を名前で持たせる**（:blocked-by / :note /
+    ;; :change-rate-source と同じ、この登録簿の一貫した作法）。宣言の無い絶対パスは
+    ;; 従来どおり違反 —— 事故で repo の外に書くのと、そう設計したのは別物。
+    (let [outside (:args-outside-repo o)]
+      (doseq [a (:args o)]
+        (when (and (string? a)
+                   (not (str/starts-with? a "--"))
+                   (or (str/includes? a "/") (str/ends-with? a ".edn"))
+                   (not (str/starts-with? a "${REPO}")))
+          (cond
+            ;; 相対パス —— 元からの違反。逃がす宣言があっても許さない
+            ;; （宣言が意味を持つのは「repo の外」であって「どこか」ではない）
+            (not (str/starts-with? a "/"))
+            (v! n ": :args のパス " (pr-str a) " が ${REPO} 起点でも絶対パスでもない"
+                " — 相対パス依存を避けるための登録簿でそれをやると意味が無い")
 
-    ;; 5. west.yml に実在するか
-    (when (and (seq west-names) (:name o) (not (contains? west-names (:name o))))
-      (v! n ": west.yml に project として登録が無い"))))
+            (str/blank? (str outside))
+            (v! n ": :args のパス " (pr-str a) " が repo の外を指しているのに"
+                " :args-outside-repo が無い"
+                " — 意図的に外へ逃がすなら理由を書くこと（事故で外に書くのと区別できない）")))))
+
+    ;; 5. west.yml に実在するか。
+    ;;
+    ;; ⚠ 見るのは **(or (:repo o) (:name o))**。2026-08-11 の rename で repo 名が
+    ;; observatory 名から離れ（`com-etzhayyim-*` → role 面の `actor-*`）、登録簿は
+    ;; `:name` を台帳・cadence・datoms の識別子として据え置いたまま、repo の在処を
+    ;; `:repo` で指す契約になった（manifest/observatories.edn 冒頭が明記:
+    ;; 「`:repo` 省略時は `:name` が repo 名として使われる」）。
+    ;; **`:name` だけを見ると、正しく登録された 5 件を「west に無い」と報告する。**
+    (let [repo-name (or (:repo o) (:name o))]
+      (when (and (seq west-names) repo-name (not (contains? west-names repo-name)))
+        (v! n ": west.yml に project として登録が無い（repo 名 " repo-name "）")))))
 
 ;; 7. :unmeasured は :note を持つ
 (doseq [u (:unmeasured reg)]
@@ -164,10 +256,35 @@
       :else (v! n ": :change-rate " (pr-str cr) " は数でも :uncomputable-until-measured でもない"))))
 
 ;; ── 11: plist が XML として妥当か ──────────────────────────────────────
-;; **壊れた plist は落ちるのではなく、launchd に読まれないだけ。**「設定したのに
-;; 一度も走っていない」という最も気付きにくい壊れ方をする。実測 2026-08-08、
-;; 初版の observatory-run.plist は XML コメント中に 2 連ハイフン（フラグ名）を
-;; 含んでいて不正だった。ここで機械に見せる。
+;; **この不変条件は正しいが、2026-08-12 まで書かれていた理由は誤りだった。**
+;;
+;; 旧文は「壊れた plist は落ちるのではなく launchd に読まれないだけ / 設定したのに
+;; 一度も走っていないという気付きにくい壊れ方をする」と書いていた。**測ったら偽。**
+;;
+;;   plutil -lint scripts/fleet-ci/*.plist   → 10/10 OK（2 連ハイフンを含む 2 件も）
+;;   launchctl list | grep residency         → 62161  1  com.gftd.residency-alarm
+;;   diff ~/Library/LaunchAgents/com.gftd.residency-alarm.plist <repo の同名> → 差分なし
+;;
+;; つまり **gate が「読まれない」と言っていた当のファイルは、バイト一致のまま
+;; 実際に load されて PID を持って動いていた。** Apple の CFPropertyList は意図的に
+;; 寛容で、コメント内の 2 連ハイフンを受け入れる。主張していた害は起きない。
+;;
+;; **ではなぜ残すか —— 準拠 XML パーサは本当に拒否するから。**
+;;
+;;   python3 -c "import xml.etree.ElementTree as ET; ET.parse('com.gftd.residency-alarm.plist')"
+;;     → xml.etree.ElementTree.ParseError: not well-formed (invalid token): line 5, column 43
+;;   同 com.gftd.hayari-tick.plist → line 14, column 5
+;;   同 com.gftd.observatory-run.plist → 正常に parse できる
+;;
+;; expat（準拠パーサ）は問題の行をピンポイントで拒否する。XML 1.0 §2.5 は
+;; コメント本体に `--` が現れてはならないと定めており、これらのファイルは
+;; **本当に well-formed XML ではない**。害は「launchd が読まない」ことではなく、
+;; **Apple の寛容なパーサ以外のどの XML ツールもこのファイルを扱えない**こと。
+;; 検査そのものは正しかった —— 間違っていたのは理由の方である。
+;;
+;; **不変条件の主張は、それが防ぐと称する害まで含めて検証すること。** 検査が
+;; 真であることと、書かれた理由が真であることは別物で、後者が偽のまま残ると
+;; 次に読む者は「launchd が読まない」を既知の事実として引用する（ADR-2608124800）。
 (let [plist-dir (p "scripts" "fleet-ci")]
   (when (exists? plist-dir)
     (doseq [f (vec (.readdirSync fs plist-dir))
@@ -184,8 +301,9 @@
           ;; コメント本体（開始 4 文字と終了 3 文字を除く）に "--" が在ってはならない
           (let [body (subs whole 4 (- (count whole) 3))]
             (when (str/includes? body "--")
-              (v! f ": XML コメントに 2 連ハイフンが入っている（XML 仕様違反）"
-                  " — plist は落ちずに『読まれない』ので、走っていないことに気付けない"))))
+              (v! f ": XML コメントに 2 連ハイフンが入っている（XML 1.0 §2.5 違反）"
+                  " — Apple の寛容なパーサは受け入れるが、準拠 XML パーサは拒否する"
+                  "（launchd に読まれなくなるわけではない。上のヘッダ参照）"))))
         (when-not (str/includes? txt "<plist")
           (v! f ": <plist> 要素が無い"))))))
 

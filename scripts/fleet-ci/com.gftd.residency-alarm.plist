@@ -2,7 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!-- 常駐の drift を遷移時に 1 回だけ知らせる（ADR-2608111721 の第 2 項目）。
 
-     判定は `scripts/residency-collect.cljs --check`、通知は
+     XML コメントは `-` 2 連を含められない（XML 1.0 §2.5）。**以下、長オプションは
+     先頭の `-` 2 つを省いて書く** —— `check` は実際には `-` 2 つ + `check`。
+
+     判定は `scripts/residency-collect.cljs check`、通知は
      `scripts/fleet-ci/residency-alarm.cljs`。閾値と drift の定義は collector 側
      だけにある（2 箇所にあって片方だけ直る、を避ける）。
 

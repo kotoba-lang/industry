@@ -554,6 +554,13 @@
   ;; ⚠ :include-ext に ".plist" が要る。この gate は launchd の plist が XML として
   ;;    妥当か（コメント中の 2 連ハイフン）も見るが、**ノードに配られない拡張子は
   ;;    検査対象が 0 件になり、黙って合格する**。検査を足したら配る tree も広げる。
+  ;; ⚠ **不変条件を編集する前に gate 本体のヘッダの「両方向に動くことの証明」節を
+  ;;    読むこと。** この gate は 2026-08-12 まで生涯一度も green にならず
+  ;;    （0 pass / 274 fail、ADR-2608124800）、break/unbreak の記録も無かった ——
+  ;;    つまり **どちらの向きにも discriminate することが示されていなかった**。
+  ;;    現在は 16 ケースの機械証明がある:
+  ;;      nbb scripts/fleet-ci/gates/observatory-registry-discriminate.cljs .
+  ;;    検査を足したらケースも足す。落ちない gate は劇場。
   {:name "root" :id "root-observatory-registry" :org "com-junkawasaki" :gate :nbb-script
    :script "gates/observatory-registry-check.cljs" :script-args ["--min" "10"]
    :include-ext [".edn" ".yml" ".cljs" ".plist"] :min-files 1500 :cd false}

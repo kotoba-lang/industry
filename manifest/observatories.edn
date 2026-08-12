@@ -159,7 +159,7 @@
    :evidence "2026-08-08 実測: 380 datoms、chain {:ok true :length 1}、
               2 周目 appended=false (no-change)。34 KB"}
 
-  {:name "com-etzhayyim-rasen" :org "etzhayyim"
+  {:name "com-etzhayyim-rasen" :org "etzhayyim" :repo "actor-rasen"
    :domain "遺伝（ゲノム・変異・形質）"
    ;; 観測頻度の入力。T* = sqrt(2·cost / (importance·λ))、cost は台帳の実測。
    :change-rate 0.03          ; λ [1/day]
@@ -498,6 +498,12 @@ gate が無いのと同じになる（実測 2026-08-10: 連続 2 回で下振�
    ;; `M data/hayari-summary.edn`）。gate の仕事は「collector が動くか」であって
    ;; データを所有することではない —— データを所有するのは bin/tick.cljs の側。
    :args ["--summary-out" "/tmp/hayari-registry-gate-summary.edn"]
+   ;; **この出力は repo の中にあってはならない**（上のコメントが理由）。登録簿の
+   ;; 作法どおり、逃がす判断を理由と一緒に名前で持つ —— gate の不変条件 4 は
+   ;; この宣言が無い絶対パスを違反として報告する（事故で外に書くのとの区別）。
+   :args-outside-repo "data/hayari-summary.edn は tracked。既定のまま走らせると run
+                       ごとに west checkout が dirty になり、以後 `west update` が
+                       hayari を skip して query 面が静かに固まる（2026-08-10 実測）"
    :produces "data/hayari.datoms.edn"
    :output-gitignored true
    ;; 2026-08-10 以降、観測は**上書きせず溶け込ませる**（同じ日は置換、新しい日は追加）。
