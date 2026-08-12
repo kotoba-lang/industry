@@ -1401,6 +1401,23 @@ BMC の `canvas-ledger.edn` と同型、1行1 EDN map、手編集禁止・追記
   `finally`でcloseし、残留掃除はrootの`npm run browser:cleanup`（60分超の
   `agent-browser-chrome-*`限定）を使う。superproject rootで無制限な`find .` / `du`を
   実行しない。
+
+  ⚠ **`browser:cleanup` が回収するのは disk であって CPU ではない。** 実装
+  （`resource-guard.mjs` の `cleanupBrowser`）は `os.tmpdir()` 直下の
+  `agent-browser-*` **ディレクトリを `fs.rmSync` するだけ**で、**プロセスは 1 つも
+  殺さない**。上の「`finally` で close し、残留掃除は cleanup を使う」という並びは
+  これを process reaper のように読ませるが、そうではない —— **close し損ねた
+  browser は、cleanup を何度回しても回り続ける。**
+
+  実測 2026-08-13: Chrome for Testing の GPU helper が **2 日 15 時間、それぞれ
+  CPU 105%** で回っており（load average 109 の主因）、一方 `os.tmpdir()` 配下の
+  `agent-browser-*` は **0 件**だった —— このマシンの probe browser は
+  `~/.agent-browser/browsers/` に profile を持つので、cleanup は**何も見つけずに
+  成功する**。「cleanup を回したから残留は無い」と読めるが、実際には測っていない。
+
+  **CPU を食っている probe を止める必要があるときは、`ps` で実測してから扱う。**
+  親が生きている browser は別セッションが使っている可能性があるので、勝手に
+  kill せずオーナーに報告する（孤児かどうかは `ps -o ppid=` で親を辿れば分かる）。
 - **Co-Scientist kaizen loop（2026-07-13追記）**: `:llm-judge` 層（主観採点、単一judge
   やLLM panelは「計測されないメトリクス＝劇場」になりうる — 実測: liquid-glass-ui等の
   4ライブラリを3-judge panelが clarity/deference/depth等で軒並み4.0–5.0/5と採点した裏で、
