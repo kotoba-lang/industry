@@ -101,6 +101,38 @@ host の `contains?` に戻すと delegation test が fail）。
 **production の呼び出し経路は再コンパイルできない**ので、この誤りは test の中では
 回避策で済んでいたが、delegation では致命的だった。現在は test で pin してある。
 
+## 委譲できない core がある —— 境界は「コレクションを持つかどうか」（2026-08-12 実測）
+
+完了条件（host が呼ぶこと）は、**どの core にも到達可能とは限らない。**
+
+`kotoba-lang/mokuroku` の `bounded.kotoba` を委譲しようとして実測した:
+
+| catalog の item 数 | 結果 |
+|---|---|
+| 12 | ok |
+| **13** | **`ADT value exceeds node limit`** |
+
+ファイルカタログが 13 件で拒否されるので、**この core は production 経路になれない。**
+`kotoba-lang/app-files` も同じ形だった（兄弟の `bounded?` が 8 件で打ち切る）。
+
+**規則はこうである: guest が保持するのが「1 つの判断ぶんのデータ」なら委譲できる。
+「コレクション」なら委譲できない。**
+
+委譲に成功した 5 つの core —— `policy` / `fleet_core` / `organism_worker`（cloud-itonami-app）、
+`model`（calendar）、`clock`（crdt）—— は**すべてスカラか、小さな固定 record** を取る。
+`bounded.kotoba` は `[:map :keyword item]` と `[:set :keyword]` を guest の中に持つ。
+これが差である。
+
+これは ADR-2608650000 の「決定核を切り出す」規律の**測られた境界**であり、
+`murakumo` の `infer_join_core.kotoba` が冒頭で
+\"partition-work / enrollment map assembly stay cljc (vectors/maps).\" と自ら宣言しているのと
+同じ線を、別の側から確認したものになる。
+
+**したがって `mokuroku` は委譲しない。** parity gate（この ADR で言う「第 1 歩」）が
+その core に対して取れる最大であり、それは後退ではなく**その core の性質**である。
+同じ理由で、コレクションを guest 側に持つ core を新しく書くときは、
+**それが parity gate 止まりになることを承知で書く**こと。
+
 ## Consequences
 
 - **`.kotoba` core を持つ他 repo は同じ状態にある可能性が高い** —— core があり、
