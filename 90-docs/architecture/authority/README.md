@@ -107,7 +107,7 @@ basis は同じ decision になり、再現・監査・time travel ができま�
 満たせる不足条件を機械可読に返します。UI はこの decision を描画しますが、UI 自体を
 enforcement point にはしません。
 
-### R0–R2 implementation（2026-08-12）
+### R0–R3 implementation（2026-08-12）
 
 authority の semantic owner である `kotoba-lang/aiueos` に、純粋CLJC kernel
 `aiueos.authority/decide` と既存broker統合 `aiueos.broker/decide-authority` が着地しました
@@ -142,10 +142,27 @@ R2では `network-awai/net-kotobase` PR #412（merge
 - 満たせるassurance不足だけをmachine-readable HTTP 428 challengeにし、grant欠如は403 denyにする。
 - allowはpurpose-bound runtime capability specificationを返す。
 
-gateway 390 tests / 1900 assertions、44 registered namespacesの実行、worker/entry release build、
-88-input bundle manifest整合を確認済みです。まだ未移行なのは、Kotobaseでのbasis-bound
-policy/grant検索とreceipt永続化、payment settlementからentitlement grantへの変換、
-UIのchallenge描画、audit以外のroute固有policyです。
+R3では `network-awai/net-kotobase` PR #417（merge
+`d4699c1aa2b0b23f3a9b30072d7bfbf4a88a63e9`）で、audit read/exportのdecision basisと
+Decision Receiptをdurable enforcementへ進めました。PR #418（merge
+`eba9e42f000825cf63503d4c9e74c537e11a894f`）はreceipt CID headerをbrowserへ公開します。
+
+- server-owned intent、policy、grantをcanonical DAG-CBORでencodeし、tenant-scoped KV上の
+  content-addressed CIDv1 blockとしてappendする。
+- 既存blockはCIDとbytesを再検証し、corruption/collisionは上書きせずfail closedにする。
+- 検証済みbasisからR0 kernelを実行し、allow/deny/challengeすべてのcanonical Decision Receiptを
+  protected audit readより前にdurable appendする。保存・integrity failureはHTTP 503である。
+- responseは `x-kotobase-authority-receipt-cid` を返し、CORS expose headerにも含める。
+- best-effort edge request logとfail-before-read authority receiptは別artifactとして明示する。
+
+gateway 394 tests / 1911 assertions、45 registered namespaces、89-input bundle manifest、gateway
+dry-run/predeploy checkがgreenです。本番Version ID
+`420f380b-650e-4324-8258-9f76c010be68`へdeployし、health、未認証401、CORS expose header、
+public smokeをlive確認しました。認証済みallow/428/403のreceipt CIDは実accountで未実測です。
+
+まだ未移行なのは、compatibility grantではなくDatomic/Kotobase basisから取得する署名・失効可能な
+policy/grant、payment settlementからentitlement grantへの変換、UIのchallenge描画、audit以外の
+route固有policy、receiptのtransparency-log anchorです。
 
 ## 各層への投影
 

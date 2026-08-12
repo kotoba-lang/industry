@@ -186,7 +186,7 @@ readiness を区別する。
 - canonical schema、kernel、adapter、receipt migration の実装作業が必要になる。本 ADR と README
   の着地だけでは未移行 component の実装完了を意味しない。
 
-## Implementation status — R0 + R1 credential adapter + R2 enforcement landed（2026-08-12）
+## Implementation status — R0–R3 landed（2026-08-12）
 
 authority semantic ownerである `kotoba-lang/aiueos` に最初の実装sliceを着地した
 （PR #145、merge `f4c492a53ce81d212089ced5c1154f0975018d1e`）。superprojectの
@@ -228,9 +228,26 @@ R2は `network-awai/net-kotobase` PR #412、merge
 - R1 viewer→JS境界→R2 adapter→R0 kernelのroundtripを含む390 tests / 1900 assertions、
   44 registered namespaces、worker/entry release build、88-input bundle manifestがgreen。
 
-R2後も**未着地**なのは、Kotobaseのimmutable basisからのpolicy/grant取得とreceipt append、
-payment Settlement→Entitlement Grant、UIのchallenge/step-up projection、canonical signed wire
-envelope、audit以外のroute固有policyである。既存APIは壊さず段階移行する。
+R3は `network-awai/net-kotobase` PR #417、merge
+`d4699c1aa2b0b23f3a9b30072d7bfbf4a88a63e9` として着地した。PR #418、merge
+`eba9e42f000825cf63503d4c9e74c537e11a894f` はreceipt CIDをbrowser CORS境界へ公開した。
+
+- audit routeのserver-owned intent、policy、grantをcanonical DAG-CBOR / CIDv1 blockにし、
+  tenant-scoped KV keyへappendする。既存blockはCID/bytesを再検証し、破損は上書きしない。
+- decisionは保存・検証済みのbasisから実行し、allow/deny/challenge全てのclosed
+  `aiueos.authority/receipt`をprotected audit readより前にdurable appendする。
+- storage/integrity failureは503でfail closedし、unreceipted allowを作らない。
+- success/428/403は `x-kotobase-authority-receipt-cid` を返す。best-effort edge request logと
+  fail-before-read authority receiptは異なるartifactで、後者もdatom-level read receiptではない。
+- evidence: 394 tests / 1911 assertions、45 registered namespaces、89-input bundle manifest、
+  gateway dry-run/predeploy checkがgreen。本番Version ID
+  `420f380b-650e-4324-8258-9f76c010be68`へdeployし、health、未認証401、CORS expose header、
+  public smokeをlive確認した。認証済みallow/428/403は実accountで未実測である。
+
+R3後も**未着地**なのは、compatibility grantではなくDatomic/Kotobase basisから取得する
+署名・失効可能なpolicy/grant、payment Settlement→Entitlement Grant、UIのchallenge/step-up
+projection、canonical signed wire envelope、audit以外のroute固有policy、receiptの
+transparency-log anchorである。既存APIは壊さず段階移行する。
 
 ## One-line rule
 
