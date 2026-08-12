@@ -636,6 +636,39 @@ skip a formality -- it produces a manifest entry that nobody ever verified,
 indistinguishable from one that was. The check exists precisely for the moment
 when it is inconvenient.
 
+## Close of the resumed batch
+
+Of the five agents resumed from their transcripts, **one finished and landed**
+(the vpn authorisation fix, ADR-2608122800 -- an unset secret was a tunnel
+takeover, not merely an auth bypass) and four were stopped again mid-work.
+
+**No repository holds partial state.** Verified: no child-repo worktrees left
+behind, no stray `/private/tmp` clones, no remote branches created, superproject
+clean apart from the pre-existing `observatory.datoms.edn`.
+
+One thing did need checking rather than assuming. A stopped agent's last words
+were that the shared `etzhayyim/root` checkout showed a deletion it wanted to
+confirm was not its own. It was not: `90-docs/baien/datasets` is a **submodule
+gitlink** (`160000`), one of several in that repo, none of which west populates.
+It survives a `west update` unchanged, which is how I confirmed it is structural
+rather than anything this session did. **An agent flagging a change it might
+have caused, instead of assuming it did not, is the behaviour that made that
+five-minute check possible.**
+
+Partial answers from the four, recorded so a resume starts from them:
+
+- **etzhayyim endpoints** -- cleanup was complete; only the checkout question
+  above remained.
+- **266-repo scan** -- had established that no compose file or k8s manifest
+  defines `vault` anywhere in the repo it was examining, and was moving to a
+  second site.
+- **detector re-measurement** -- confirmed `repos/*` GETs were working again and
+  was running `--verify-remote`, the one check the rate limit had blocked.
+- **kami collision brief** -- found the obvious greps too noisy because the
+  namespace segments are generic words, and was narrowing to files that actually
+  `require` the namespace. Worth carrying: a name like `kami.fsm` cannot be
+  searched for by substring in a fleet this size.
+
 ## Resume point
 
 The five agents stopped at the previous close were **resumed from their
