@@ -64,6 +64,28 @@
 `kami/scene.cljc`（`kami-contracts` と SDK）は **byte 単位で同一**なので divergent には
 入らない —— ただし衝突であることに変わりはなく、片方が動いた瞬間に上の群へ移る。
 
+## 訂正（2026-08-12 同日）: 27 のうち 19 は衝突ではなかった
+
+**「co-classpath 27 件」は水増しだった。** そのうち 19 件は *2 つの repo* ではなく
+**1 つの repo が 2 つの path に checkout されている**もので、衝突ではなく
+**二重登録**である:
+
+- `kotoba-lang/compiler` と `kotoba-lang/amu` は同じ GitHub repo（id 1297097065）
+- `gftdcojp/cloud-murakumo` と `network-awai/cloud-murakumo` も同じ repo（id 1285031835）
+
+改名しても GitHub がリダイレクトするので旧名は動き続け、**旧 entry を残したまま
+新 entry を足す**と 1 つの upstream に 2 つの path・2 つの pin が付く。
+共有している namespace は全部「衝突」に見えるが、実体は**同じ project の 2 つの commit**。
+
+**実際の衝突は 8 件**: `kami/fsm.cljc` `kami/gpu.cljc` `kami/input.cljc`（→ADR-2608120800）、
+`kotoba/lang/package_registry.cljc`、`pay/core.cljc` `pay/facilitator.cljc`
+`pay/x402.cljc`、`treasury/core.cljc`。
+
+検出器は root commit を見て両者を分けるようになった（同じ upstream の checkout は
+root commit を共有する）。fork も root を共有するので、これは**別バケツに落とすだけ**で
+捨てはしない。二重登録そのものは `scripts/verify-duplicate-registrations.cljs` が扱う ——
+実測 **35 repo が 75 path に登録**されており、全件が GitHub id 一致で確認済み（fork はゼロ）。
+
 ## Decision
 
 ### 1. 検出器を置く。一括修正はしない

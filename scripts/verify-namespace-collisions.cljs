@@ -42,6 +42,20 @@
 ;; report splits on CONTENT: same bytes is noise, different bytes is the
 ;; finding. A scaffolded family that starts to drift shows up on its own.
 ;;
+;; ## One repo checked out twice is not a collision
+;;
+;; A rename leaves the old west entry in place, so the same upstream repository
+;; can be checked out at two paths -- `kotoba-lang/compiler` and
+;; `kotoba-lang/amu` are one repo (GitHub id 1297097065), as are
+;; `gftdcojp/cloud-murakumo` and `network-awai/cloud-murakumo`. Every namespace
+;; they share then looks like a collision, and it is not: it is two commits of
+;; one project. Measured 2026-08-12, that accounted for 19 of what a naive
+;; count called 27 findings.
+;;
+;; Owners that share a root commit are therefore reported separately, as
+;; DUPLICATE REGISTRATION, and `scripts/verify-duplicate-registrations.cljs` is
+;; where that problem belongs.
+;;
 ;; ## What it cannot see
 ;;
 ;; Only repos that are checked out. west manages far more than are on disk, so
@@ -52,6 +66,7 @@
   (:require ["node:fs" :as fs]
             ["node:path" :as path]
             ["node:crypto" :as crypto]
+            ["node:child_process" :as child]
             [clojure.string :as str]))
 
 (def argv (vec (drop 2 js/process.argv)))
@@ -82,6 +97,20 @@
              acc
              (js->clj (fs/readdirSync current #js {:withFileTypes true}))))]
     (try (step dir "" []) (catch :default _ []))))
+
+(defn- sh [cmd]
+  (try (str/trim (str (child/execSync cmd #js {:encoding "utf8"
+                                               :stdio #js ["ignore" "pipe" "ignore"]})))
+       (catch :default _ nil)))
+
+(defn- root-commit
+  "First root commit of a checkout, or nil. Two checkouts of one repository
+  share it; so does a fork, which is why this only downgrades a finding to a
+  separate bucket rather than dropping it."
+  [dir]
+  (some-> (sh (str "git -C " dir " rev-list --max-parents=0 HEAD"))
+          (str/split #"\n")
+          first))
 
 (defn- sha256 [file]
   (try
@@ -159,6 +188,18 @@
         ;; One closure per repo, computed once. Each is small; recomputing them
         ;; per collision would be the difference between seconds and minutes.
         closures (into {} (map (fn [{:keys [repo]}] [repo (reachable edges repo)])) rs)
+        ;; repo -> root commit, so owners that are one upstream checked out
+        ;; twice can be separated from owners that are different projects.
+        roots (into {} (map (fn [{:keys [src]}]
+                              [(-> src path/dirname
+                                   (str/replace #"^orgs/" ""))
+                               (root-commit (path/dirname src))]))
+                    rs)
+        same-upstream?
+        (fn [owners]
+          (let [rs' (keep #(get roots (:repo %)) owners)]
+            (and (= (count rs') (count owners))
+                 (= 1 (count (distinct rs'))))))
         co-classpath?
         (fn [owners]
           (let [names (map :repo owners)]
@@ -175,23 +216,35 @@
                                {:ns ns-path
                                 :owners owners
                                 :divergent? (> (count (distinct (map :sha owners))) 1)}))
-                        (map (fn [c] (assoc c :co-classpath? (co-classpath? (:owners c)))))
+                        (map (fn [c] (assoc c
+                                            :co-classpath? (co-classpath? (:owners c))
+                                            :same-upstream? (same-upstream? (:owners c)))))
                         (sort-by :ns))
         divergent (filter :divergent? collisions)
         identical (remove :divergent? collisions)
-        reachable-divergent (filter :co-classpath? divergent)]
+        co (filter :co-classpath? divergent)
+        duplicate-registration (filter :same-upstream? co)
+        reachable-divergent (remove :same-upstream? co)]
     (println (str "scanned " (count rs) " checked-out repos, "
                   (count idx) " namespace paths"))
     (println (str "collisions: " (count divergent) " divergent, "
                   (count identical) " byte-identical"))
-    (println (str "of the divergent, " (count reachable-divergent)
-                  " are CO-CLASSPATH -- one owner depends on the other, or a"
-                  " third repo depends on both"))
+    (println (str "of the divergent, " (count co) " are CO-CLASSPATH -- one owner"
+                  " depends on the other, or a third repo depends on both"))
+    (println (str "  of those, " (count duplicate-registration)
+                  " are ONE repo checked out twice (see"
+                  " verify-duplicate-registrations.cljs), leaving "
+                  (count reachable-divergent) " real collisions"))
     (println)
     (doseq [{:keys [ns owners]} reachable-divergent]
       (println (str "DIVERGENT  " ns))
       (doseq [{:keys [repo sha]} owners]
         (println (str "             " (subs (or sha "????????") 0 8) "  " repo))))
+    (when (seq duplicate-registration)
+      (println)
+      (println (str "-- " (count duplicate-registration)
+                    " suppressed: same upstream, two checkouts --"))
+      (doseq [{:keys [ns]} duplicate-registration] (println (str "   " ns))))
     (when show-all?
       (println)
       (doseq [{:keys [ns owners co-classpath?]} identical]
