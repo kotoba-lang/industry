@@ -176,8 +176,26 @@
                  acc))))))
      {} (remove str/blank? (str/split-lines out)))))
 
+;; --findings additionally emits one machine-readable line per finding:
+;;
+;;   FINDING<TAB>severity<TAB>key<TAB>detail
+;;
+;; for scripts/orgs-detector-tick.cljs, which needs a stable identity per
+;; finding so it can distinguish a namespace that broke today from one that has
+;; been broken for weeks. severity `fail` is exactly what makes this script exit
+;; 1 (:kotoba-orphan); `warn` is the report-only :sibling-gap class, which is
+;; tracked so a NEW one is visible without ever gating on it. The flag changes
+;; nothing about what is measured or about the exit code.
+;;
+;; It is stripped before the flag map is built because the flags here are parsed
+;; positionally as pairs -- an odd argument count would throw.
 (defn -main [& args]
-  (let [flags (apply hash-map (map str args))
+  (let [findings? (boolean (some #{"--findings"} args))
+        args (remove #{"--findings"} args)
+        emit! (fn [severity k detail]
+                (when findings?
+                  (println (str "FINDING\t" severity "\t" k "\t" detail))))
+        flags (apply hash-map (map str args))
         root (or (get flags "--root") (.cwd js/process))
         min-repos (js/parseInt (or (get flags "--min-repos") "50"))
         files (scan-files root)
@@ -212,6 +230,18 @@
       (println (str "verify-require-graph: repo " (count repos)
                     " / provided ns " (count provided)
                     " / .kotoba のみ " (count kotoba-only)))
+      (when findings?
+        ;; 走査対象ゼロを合格にしない (--min-repos と同じ床の、tick 側から
+        ;; 読める形)。tick はこの行が無い/ゼロなら :ok と記録しない。
+        (println (str "SCANNED\t" (count repos) "\trepo(s) with a source root"))
+        (doseq [[ns g] (sort-by key (group-by :ns orphans))
+                :let [by (sort (distinct (map :by g)))]]
+          (emit! "fail" (str "kotoba-orphan:" ns)
+                 (str "referenced by " (count by) " repo(s): " (str/join ", " by))))
+        (doseq [[ns g] (sort-by key (group-by :ns siblings))
+                :let [by (sort (distinct (map :by g)))]]
+          (emit! "warn" (str "sibling-gap:" ns)
+                 (str "referenced by " (count by) " repo(s): " (str/join ", " by)))))
       (when (seq siblings)
         (println (str "\n報告のみ（fail させない）— 親ディレクトリは手元にあるが ns が無い: "
                       (count (distinct (map :ns siblings))) " 件"))

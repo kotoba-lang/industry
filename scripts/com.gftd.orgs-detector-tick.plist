@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.gftd.orgs-detector-tick — the scheduler for detectors that CANNOT be
+  fleet gates, because a fleet gate ships only the target repo's own tree and
+  they read `orgs/`.
+
+  =========================================================================
+  THIS IS NOT INSTALLED, AND THAT IS DELIBERATE.
+  =========================================================================
+
+  ADR-2608124800 counted five plists sitting in `scripts/` uninstalled, one of
+  them the only caller of three verifiers. So "another plist in scripts/" is
+  exactly the shape of the failure this whole change is about, and shipping a
+  sixth one silently would repeat it.
+
+  The difference is that this time the mechanism does not depend on the plist.
+  Run the tick by hand and the SessionStart hook reports it; never run it and
+  the hook says, in the first line of every session, that it has never run.
+  The scheduling decision is the owner's, and the honest statement of what
+  installing it would mean is below, in full, so that decision can be made from
+  this file alone.
+
+  ---------------------------------------------------------------------------
+  EXACTLY WHAT WOULD RUN
+  ---------------------------------------------------------------------------
+
+    /opt/homebrew/bin/nbb --classpath ".:scripts/nbb_compat" \
+      scripts/orgs-detector-tick.cljs
+
+  with WorkingDirectory /Users/junkawasaki/github/com-junkawasaki.
+
+  It reads `manifest/orgs-detectors.edn` and runs each detector whose own
+  `:interval-ms` has elapsed. As registered today that is two:
+
+    verify-vendored-copies   every  6h   measured  1m41s   34 vendored files
+    verify-require-graph     every 24h   measured  8m00s   3571 repos w/ src root
+
+  Worst case one firing does both: ~11 minutes at 29% of one core (it is
+  dominated by subprocesses, and this machine runs many concurrent agents).
+  Typical firing is the 6h one alone, ~2 minutes. `StartInterval` below is
+  hourly because the per-detector intervals do the real scheduling -- an hourly
+  wake that finds nothing due exits in well under a second.
+
+  ---------------------------------------------------------------------------
+  EXACTLY WHAT IT TOUCHES
+  ---------------------------------------------------------------------------
+
+  WRITES, only these, all outside every git checkout:
+
+    ~/.gftd/orgs-detector-tick/state.edn        the finding set + first-seen
+    ~/.gftd/orgs-detector-tick/state.edn.lock   one run at a time
+    ~/.gftd/orgs-detector-tick/tick.log         append-only run log
+
+  READS: `orgs/**` checkouts, `manifest/orgs-detectors.edn`, and for
+  verify-vendored-copies `git show`/`git log`/`git rev-list` inside already
+  checked-out library repos.
+
+  WRITES TO NO CHECKOUT, INCLUDING THIS ONE. It never fetches, never checks
+  out, never moves HEAD. Detectors run with GIT_ALLOW_PROTOCOL=none, so a
+  `git fetch`/`clone`/`push` inside one fails at the transport layer instead of
+  succeeding quietly, and with GIT_OPTIONAL_LOCKS=0 so read commands do not
+  refresh an index. That is transport hardening, not a sandbox: a local
+  `git checkout` or a stray write is held off by review at admission time, and
+  the tick's header says so rather than implying more.
+
+  NO NETWORK of its own, no credentials, no `gh`. Detectors that need those are
+  deliberately not in the registry -- see the registry header for which and why.
+
+  ---------------------------------------------------------------------------
+  WHAT INSTALLING IT CHANGES, AND WHAT IT DOES NOT
+  ---------------------------------------------------------------------------
+
+  It changes only how often the numbers are refreshed. It does not change what
+  is reported, where, or to whom: the SessionStart hook reads the same state
+  file either way, and reports a stale tick as loudly as a finding. If this is
+  never installed, the tick is a hand-run command whose results survive between
+  sessions -- which is already strictly better than the detectors' status quo
+  of being run by nobody.
+
+  ---------------------------------------------------------------------------
+  install / uninstall / run once
+  ---------------------------------------------------------------------------
+
+    cp scripts/com.gftd.orgs-detector-tick.plist ~/Library/LaunchAgents/
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.gftd.orgs-detector-tick.plist
+    launchctl bootout   gui/$(id -u)/com.gftd.orgs-detector-tick
+    launchctl kickstart -p gui/$(id -u)/com.gftd.orgs-detector-tick
+
+  ProcessType Standard, not Background: measured on this machine 2026-07-25, a
+  Background+Nice job got 0.09s of CPU in 15 minutes while other sessions held
+  the CPU. RunAtLoad false so installing it does not immediately start an
+  11-minute sweep.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.gftd.orgs-detector-tick</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/nbb</string>
+    <string>--classpath</string>
+    <string>.:scripts/nbb_compat</string>
+    <string>scripts/orgs-detector-tick.cljs</string>
+  </array>
+
+  <!-- nbb resolves `--classpath .` against the working directory, and the
+       detectors resolve `orgs/` against it too. -->
+  <key>WorkingDirectory</key>
+  <string>/Users/junkawasaki/github/com-junkawasaki</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>HOME</key>
+    <string>/Users/junkawasaki</string>
+  </dict>
+
+  <key>StartInterval</key>
+  <integer>3600</integer>
+  <key>RunAtLoad</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/junkawasaki/.gftd/orgs-detector-tick/launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/junkawasaki/.gftd/orgs-detector-tick/launchd.log</string>
+
+  <key>ProcessType</key>
+  <string>Standard</string>
+</dict>
+</plist>
