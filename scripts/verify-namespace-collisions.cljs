@@ -42,6 +42,67 @@
 ;; report splits on CONTENT: same bytes is noise, different bytes is the
 ;; finding. A scaffolded family that starts to drift shows up on its own.
 ;;
+;; ## The key is the namespace, and the extension is not part of it
+;;
+;; This once keyed on the relative path INCLUDING the extension, so
+;; `kami/backend/browser.cljc` in `kotoba-lang/host` and
+;; `kami/backend/browser.cljs` in `kami-engine-sdk` were two entries and no
+;; collision was reported. Both files declare `kami.backend.browser`. A build
+;; loads one of them.
+;;
+;; That gap hid the WORSE half of the problem rather than a marginal one.
+;; ClojureScript prefers `.cljs` over `.cljc` -- and Clojure `.clj` over `.cljc`
+;; -- REGARDLESS of classpath order. Every collision this script found before
+;; has a remedy in ordering; this class does not. `network-isekai`'s own
+;; `deps.edn` records having been bitten by exactly it, and ADR-2608123200 names
+;; `kami/backend/browser` as the live instance the detector could not see.
+;;
+;; ## But two extensions in ONE repo are how you write a namespace
+;;
+;; `foo.clj` beside `foo.cljs` is the ordinary platform split, and `foo.cljc`
+;; beside a platform file is the ordinary override. Measured 2026-08-12, 20
+;; namespaces are authored that way here -- `kotoba/signal/*` in `org-signal`,
+;; `mangaka/*` in `cloud-itonami/mangaka`, `kotobase/engine`. Collapsing
+;; extensions naively turns all 20 into findings, which is trading one blindness
+;; for another.
+;;
+;; So a repo is ONE owner of a namespace however many files it ships for it, and
+;; a collision is two owners. The extension only matters ACROSS repos, where
+;; nobody chose the pairing.
+;;
+;; ## What divergent means when the candidates are different files
+;;
+;; The obvious move is to give each owner a signature of what it ships -- the
+;; extension/content pairs -- and call the owners divergent when the signatures
+;; disagree. Under that rule two owners with different extensions are ALWAYS
+;; divergent, because their signatures cannot match.
+;;
+;; It was tried, and measurement says it is wrong. Files with different
+;; extensions ARE byte-identical here: `mangaka/runtime.clj` and
+;; `mangaka/runtime.cljc` in `cloud-itonami/mangaka` and `mangaka/runtime.cljc`
+;; in `ai-gftd-mangaka` are one sha across all three. Nothing about that is
+;; hazardous -- whichever one a build picks, it gets the same code -- and the
+;; signature rule reported it.
+;;
+;; So the byte test stays exactly as it was and only the GROUPING changes: a
+;; namespace is divergent when the files that could win do not all agree. That
+;; keeps one definition of divergent for every finding, and lets the extension
+;; question be answered by the same evidence rather than by a rule about
+;; filenames.
+;;
+;; Regrouping alone reclassifies five namespaces that were called byte-identical
+;; and were not safe. `cloud-itonami/mangaka` and `ai-gftd-mangaka` ship
+;; `mangaka/server.cljc` at one sha -- the agreement the old report saw -- and
+;; `cloud-itonami` also ships a `mangaka/server.clj` at a DIFFERENT sha. On the
+;; JVM that `.clj` wins over both `.cljc`s, so the content the two repos agree
+;; on is the content nobody loads. Comparing file to file said safe; comparing
+;; what each repo makes available for the namespace says otherwise.
+;;
+;; EXTENSION-SHADOWED marks the divergent findings where one repo's `.clj` or
+;; `.cljs` covers another repo's `.cljc`, because that is the subset ordering
+;; cannot fix. `.clj` against `.cljs` alone does not qualify -- those never
+;; compete, since neither platform can load the other's file.
+;;
 ;; ## One repo checked out twice is not a collision
 ;;
 ;; A rename leaves the old west entry in place, so the same upstream repository
@@ -325,7 +386,12 @@
        vec))
 
 (defn- index
-  "namespace path -> [{:repo :file :sha}]"
+  "relative file path (extension included) -> [{:repo :file :sha}]
+
+  Kept at file granularity because SELF-SHADOWING is a question about files:
+  one repo declaring two source trees that both hold `foo.cljc` is decided by
+  the order those trees enter the classpath. The cross-repo report regroups this
+  by namespace -- see `by-namespace`."
   [repos]
   (reduce
    (fn [acc {:keys [repo src]}]
@@ -336,6 +402,35 @@
              (walk src)))
    {}
    repos))
+
+(defn- ns-key
+  "The namespace a source file declares, as a path with the extension removed.
+
+  Only the extension. The underscore is NOT rewritten to a hyphen even though
+  the real namespace has it: `foo_bar.cljc` is loadable as `foo.bar` and a
+  literal `foo-bar.cljc` is loadable as nothing, so folding them would merge a
+  namespace with a file that cannot hold one and report a collision between a
+  thing and a non-thing."
+  [rel]
+  (or (some (fn [e] (when (str/ends-with? rel e) (subs rel 0 (- (count rel) (count e)))))
+            source-extensions)
+      rel))
+
+(defn- by-namespace
+  "namespace -> {repo -> [{:ext :sha :file}]}, over the whole file index.
+
+  A repo appears once per namespace however many files it ships for it. That is
+  the point: `foo.clj` beside `foo.cljs` in one repo is how the namespace is
+  authored, not a fight over it, and there are 20 such namespaces here."
+  [idx]
+  (reduce-kv
+   (fn [acc rel owners]
+     (let [k (ns-key rel)
+           ext (subs rel (count k))]
+       (reduce (fn [acc {:keys [repo file sha]}]
+                 (update-in acc [k repo] (fnil conj []) {:ext ext :file file :sha sha}))
+               acc owners)))
+   {} idx))
 
 (defn -main []
   (let [rs (repos)
@@ -363,64 +458,93 @@
         ;; source trees it declares, and `root-commit` forks a git per call.
         roots (into {} (map (fn [[repo root]] [repo (root-commit root)]))
                     (distinct (map (juxt :repo :root) rs)))
-        ;; Owners are counted per REPOSITORY, not per file. Now that a repo can
-        ;; contribute several source trees, one repo could otherwise appear
-        ;; twice in `owners` and satisfy "two of these are on one classpath" by
-        ;; itself -- a collision manufactured out of a single project.
+        ;; Owners are counted per REPOSITORY, not per file. A repo can contribute
+        ;; several source trees and, since the key became the namespace rather
+        ;; than the filename, several extensions -- either would otherwise let
+        ;; one repo appear twice in `owners` and satisfy "two of these are on one
+        ;; classpath" by itself, a collision manufactured out of a single
+        ;; project. `by-namespace` groups by repo for that reason, so everything
+        ;; downstream is handed repo NAMES.
         owner-repos (fn [owners] (vec (distinct (map :repo owners))))
         within-repo? (fn [owners] (= 1 (count (owner-repos owners))))
         co-classpath?
-        (fn [owners]
-          (let [names (owner-repos owners)]
-            (boolean
-             (and (> (count names) 1)
-                  (some (fn [[_ seen]]
-                          (>= (count (filter #(or (contains? seen %)
-                                                  (contains? seen (bare-name %)))
-                                             names))
-                              2))
-                        closures)))))
+        (fn [names]
+          (boolean
+           (and (> (count names) 1)
+                (some (fn [[_ seen]]
+                        (>= (count (filter #(or (contains? seen %)
+                                                (contains? seen (bare-name %)))
+                                           names))
+                            2))
+                      closures))))
         ;; Whether the owners are one repository checked out twice is asked of
         ;; the whole set, and it has to stay that way, though asking it per pair
         ;; of owners is the more obviously correct thing and was tried here.
-        ;; Measured 2026-08-12: the only pair of `treasury/core.cljc`'s seven
-        ;; owners that any closure reaches together is `gftdcojp/cloud-murakumo`
-        ;; with `network-awai/cloud-murakumo`, which is one repo at two paths.
-        ;; The other five are co-classpath with nobody. So this finding is
+        ;; Measured 2026-08-12: the only pair of `treasury/core`'s owners that
+        ;; any closure reaches together is `gftdcojp/cloud-murakumo` with
+        ;; `network-awai/cloud-murakumo`, which is one repo at two paths.
+        ;; The rest are co-classpath with nobody. So this finding is
         ;; promoted by a relationship the script itself calls not-a-collision,
         ;; and survives suppression only because owners that took no part in
         ;; promoting it disagree about upstream. Per-pair, both halves are
         ;; decided by the same pair, and the file ADR-2608121000 calls the worst
         ;; copy in the fleet stops being reported at all.
         ;;
-        ;; That is worth stating plainly rather than tuning away: seven repos
-        ;; ship this namespace with seven different contents, one of them
+        ;; That is worth stating plainly rather than tuning away: eight repos
+        ;; ship this namespace with six different contents, one of them
         ;; missing the guard on unconfirmed payments, and CO-CLASSPATH is not
         ;; the axis that finds it -- it is reported by accident. Ranking that
         ;; catches it on purpose needs a second axis this script does not have,
         ;; and `verify-vendored-copies.cljs` is the likelier home for it.
         same-upstream?
-        (fn [owners]
-          (let [names (owner-repos owners)
-                rs' (keep #(get roots %) names)]
+        (fn [names]
+          (let [rs' (keep #(get roots %) names)]
             (and (= (count rs') (count names))
                  (= 1 (count (distinct rs'))))))
-        collisions (->> idx
-                        (filter (fn [[_ owners]] (> (count owners) 1)))
-                        (map (fn [[ns-path owners]]
-                               {:ns ns-path
-                                :owners owners
-                                :divergent? (> (count (distinct (map :sha owners))) 1)}))
-                        (map (fn [c] (assoc c
-                                            :co-classpath? (co-classpath? (:owners c))
-                                            :same-upstream? (same-upstream? (:owners c))
-                                            :within-repo? (within-repo? (:owners c)))))
-                        (sort-by :ns))
-        ;; One repository carrying the same namespace in two of its own source
-        ;; trees. Not a cross-repo collision, but not nothing either: which file
-        ;; wins depends on the order the trees enter the classpath.
-        self-shadowing (filter #(and (:within-repo? %) (:divergent? %)) collisions)
-        cross (remove :within-repo? collisions)
+        ;; One repository carrying the same FILE in two of its own source trees.
+        ;; Not a cross-repo collision, but not nothing either: which one wins
+        ;; depends on the order the trees enter the classpath. Asked of the file
+        ;; index rather than the namespace one, because two extensions in one
+        ;; repo is authorship and not a shadow -- see `by-namespace`.
+        self-shadowing (->> idx
+                            (filter (fn [[_ owners]]
+                                      (and (> (count owners) 1)
+                                           (within-repo? owners)
+                                           (> (count (distinct (map :sha owners))) 1))))
+                            (map (fn [[rel owners]] {:ns rel :owners owners}))
+                            (sort-by :ns))
+        ;; A `.clj` or `.cljs` in one repo covering a `.cljc` in ANOTHER. This is
+        ;; the subset of collisions that classpath order cannot decide, since
+        ;; both compilers prefer the platform file over `.cljc` whatever the
+        ;; order. Within one repo it is just how the namespace is authored, so
+        ;; the two extensions have to come from different repos.
+        ext-shadowed?
+        (fn [by-repo]
+          (boolean
+           (some (fn [[repo files]]
+                   (and (some #(#{".clj" ".cljs"} (:ext %)) files)
+                        (some (fn [[other others]]
+                                (and (not= other repo)
+                                     (some #(= ".cljc" (:ext %)) others)))
+                              by-repo)))
+                 by-repo)))
+        cross (->> (by-namespace idx)
+                   (filter (fn [[_ by-repo]] (> (count by-repo) 1)))
+                   (map (fn [[nsp by-repo]]
+                          (let [names (vec (sort (keys by-repo)))
+                                files (mapcat (fn [r] (map #(assoc % :repo r) (get by-repo r)))
+                                              names)]
+                            {:ns nsp
+                             :names names
+                             :owners files
+                             ;; The byte test, unchanged. Only what it is asked
+                             ;; about changed: every file that could win the
+                             ;; namespace, rather than one filename at a time.
+                             :divergent? (> (count (distinct (map :sha files))) 1)
+                             :ext-shadowed? (ext-shadowed? by-repo)
+                             :co-classpath? (co-classpath? names)
+                             :same-upstream? (same-upstream? names)})))
+                   (sort-by :ns))
         divergent (filter :divergent? cross)
         identical (remove :divergent? cross)
         co (filter :co-classpath? divergent)
@@ -428,15 +552,24 @@
         reachable-divergent (remove :same-upstream? co)
         ;; Divergent, and no closure puts two owners together. Printed only
         ;; under --all, but printed: until now these appeared in no mode at all,
-        ;; and they are most of what is found -- 216 of 243. `kotoba/
-        ;; kami_host.cljc` is here rather than above, `kotoba-lang/kotoba`
+        ;; and they are most of what is found -- 253 of 281. `kotoba/
+        ;; kami_host` is here rather than above, `kotoba-lang/kotoba`
         ;; against a vendored copy in `wasm-webcomponent` that has drifted from
         ;; it, and nothing depends on both.
-        unreachable-divergent (remove :co-classpath? divergent)]
+        unreachable-divergent (remove :co-classpath? divergent)
+        ;; Owners are printed with the extension each ships, because the key no
+        ;; longer carries it and a reader would otherwise have no way to see
+        ;; that two owners are not even competing on the same file.
+        print-owners
+        (fn [owners]
+          (doseq [{:keys [repo sha ext]} owners]
+            (println (str "             " (subs (or sha "????????") 0 8) "  "
+                          repo "  " ext))))]
     (println (str "scanned " (count (distinct (map :repo rs))) " checked-out repos ("
-                  (count rs) " source trees), " (count idx) " namespace paths"))
+                  (count rs) " source trees), " (count idx) " file paths in "
+                  (count (by-namespace idx)) " namespaces"))
     (println (str "collisions: " (count divergent) " divergent, "
-                  (count identical) " byte-identical"))
+                  (count identical) " identical"))
     (println (str "of the divergent, " (count co) " are CO-CLASSPATH -- one owner"
                   " depends on the other, or a third repo depends on both"))
     (println (str "  of those, " (count duplicate-registration)
@@ -444,10 +577,12 @@
                   " verify-duplicate-registrations.cljs), leaving "
                   (count reachable-divergent) " real collisions"))
     (println)
-    (doseq [{:keys [ns owners]} reachable-divergent]
-      (println (str "DIVERGENT  " ns))
-      (doseq [{:keys [repo sha]} owners]
-        (println (str "             " (subs (or sha "????????") 0 8) "  " repo))))
+    (doseq [{:keys [ns owners ext-shadowed?]} reachable-divergent]
+      (println (str "DIVERGENT  " ns
+                    (when ext-shadowed?
+                      (str "  [EXTENSION-SHADOWED: another repo's platform file"
+                           " covers a .cljc here whatever the classpath order]"))))
+      (print-owners owners))
     (when (seq duplicate-registration)
       (println)
       (println (str "-- " (count duplicate-registration)
@@ -456,8 +591,9 @@
     (when (seq self-shadowing)
       (println)
       (println (str "-- " (count self-shadowing)
-                    " namespace(s) appear twice WITHIN one repo, with different"
-                    " content; which file wins depends on classpath order --"))
+                    " file(s) appear twice WITHIN one repo's source trees, with"
+                    " different content; which one wins depends on classpath"
+                    " order --"))
       (doseq [{:keys [ns owners]} self-shadowing]
         (println (str "   " ns))
         (doseq [{:keys [file sha]} owners]
@@ -467,13 +603,12 @@
       (println (str "-- " (count unreachable-divergent)
                     " divergent, but no closure puts two owners on one"
                     " classpath --"))
-      (doseq [{:keys [ns owners]} unreachable-divergent]
-        (println (str "divergent  " ns))
-        (doseq [{:keys [repo sha]} owners]
-          (println (str "             " (subs (or sha "????????") 0 8) "  " repo))))
+      (doseq [{:keys [ns owners ext-shadowed?]} unreachable-divergent]
+        (println (str "divergent  " ns (when ext-shadowed? "  [EXTENSION-SHADOWED]")))
+        (print-owners owners))
       (println)
-      (doseq [{:keys [ns owners co-classpath?]} identical]
-        (println (str "identical  " ns "  (" (count owners) " repos"
+      (doseq [{:keys [ns names co-classpath?]} identical]
+        (println (str "identical  " ns "  (" (count names) " repos"
                       (when co-classpath? ", co-classpath") ")"))))
     (println)
     (println (str "Only checked-out repos were scanned. A clean report means no "
