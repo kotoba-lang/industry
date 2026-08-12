@@ -65,10 +65,27 @@
 
  ;; 既存 repo の番号 dir 実績 (段階的平坦化対象、Phase 4)。新規追加のみ禁止。
  ;; verify-layer-deps.cljs --report の実測から生成 (2026-07-17)。
+ ;;
+ ;; ⚠ このリストのキーは **west path** であって repo の identity ではない。
+ ;; GitHub の org 移管・rename で path が動くと、免除は動かずに残り、同じ repo が
+ ;; 新しい path で違反として再登場する。**免除が消えたのではなく、宛先が変わった
+ ;; だけ**なのに、出てくる形は「番号 dir が新設された」と区別がつかない。
+ ;; 2026-08-13 の実測 (ADR-2608132600): 標準 red 7 件は全てこれで、1 件も新設では
+ ;; なかった。同一性は GitHub repo id で確認し、番号 dir の追加日は
+ ;; `git log --diff-filter=A` で 2026-04-08〜06-26 — layers.edn がリストを凍結した
+ ;; 2026-07-17 より前であることを確かめた。
+ ;;
+ ;;   gftdcojp/app-aozora   → network-awai/app-aozora    (gh id 1275051908)
+ ;;   gftdcojp/club-shinshi → network-awai/club-shinshi  (gh id 1281275923)
+ ;;   etzhayyim/com-etzhayyim-kenchi → cloud-itonami/kenchi (gh id 1282142295)
+ ;;
+ ;; path を書き換えるときは gh id が一致することを必ず確認する。一致しないなら
+ ;; それは移管ではなく **新しい repo への免除の拡大**で、このリストがやってはい
+ ;; けないこと。
  :manifest.layers/grandfathered-internal-dirs
- ["orgs/etzhayyim/com-etzhayyim-kenchi"
-  "orgs/gftdcojp/app-aozora"
-  "orgs/gftdcojp/club-shinshi"]
+ ["orgs/cloud-itonami/kenchi"
+  "orgs/network-awai/app-aozora"
+  "orgs/network-awai/club-shinshi"]
 
  ;; 参照ルール (ADR-2607171100 D3)
  :manifest.layers/reference-rules
@@ -79,6 +96,15 @@
   :vendoring :forbidden}
 
  ;; freeze 対象 (Phase 0): 番号 dir 配下への新規追加を CI guard で拒否。
+ ;;
+ ;; `ai-gftd-apps-gftdcojp` は 2026-08 までに `apps-gftdcojp` へ rename されている
+ ;; (gh id 1136866292 が両方に解決する)。west.yml が登録しているのは新しい path
+ ;; だけだが、**古い path の checkout がディスク上に残っている** (2026-07-20 の tip、
+ ;; west 未登録の orphan)。verify-layer-deps は west ではなくディスクを歩くので、
+ ;; 片方だけを書くと必ずもう片方が違反として出る。両方を書き、orphan の掃除は
+ ;; ADR-2608122128 の orphan repair 側で扱う (掃除が済んだら下の行を消す)。
  :manifest.layers/frozen-legacy-roots
  ["orgs/etzhayyim/root"
+  "orgs/gftdcojp/apps-gftdcojp"
+  ;; ↓ west 未登録の orphan checkout。同一 upstream (gh id 1136866292)。
   "orgs/gftdcojp/ai-gftd-apps-gftdcojp"]}

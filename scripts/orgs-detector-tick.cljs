@@ -37,8 +37,23 @@
 ;;
 ;;   NEW        first seen in the most recent run. Named, with detail.
 ;;   RESOLVED   present before, absent now. Named once, then dropped.
+;;   ACCEPTED   declared known in the registry's `:accepted` map, with a date, a
+;;              reason and what would clear it. Counted, never enumerated.
 ;;   STANDING   everything else. One line with a count and the oldest age.
 ;;              Never enumerated. It has already been said.
+;;
+;; ACCEPTED exists because the triage of 2026-08-13 (ADR-2608132600) hit a state
+;; the three classes could not express: a finding that is CORRECT, understood,
+;; and deliberately not being fixed yet. With only three classes it decays into
+;; STANDING, and STANDING is the class this whole design says is
+;; indistinguishable from silence -- so a decision to accept would have been
+;; recorded nowhere and would read, a month later, exactly like a defect nobody
+;; had looked at. Acceptance is therefore a registry entry a human writes, not a
+;; state the tick can enter on its own.
+;;
+;; An acceptance whose finding has gone away is reported LOUDLY as a stale
+;; acceptance. An exemption that outlives its subject is how an allowlist
+;; quietly grows into a blanket.
 ;;
 ;; The first run of a detector is reported as a BASELINE, not as N new findings:
 ;; on day one everything is new, and shouting it would be the same false alarm
@@ -171,9 +186,13 @@
                           :detail-changed}}
      prev-resolved  {key {:detail :first-seen :resolved-at}}
      cur            [{:severity :key :detail}]
+     accepted       #{key} -- declared known in the registry
 
-   Returns {:findings :resolved :new-keys :resolved-keys}."
-  [prev-findings prev-resolved cur now]
+   Returns {:findings :resolved :new-keys :resolved-keys :accepted-keys
+            :accepted-stale}."
+  ([prev-findings prev-resolved cur now]
+   (merge-findings prev-findings prev-resolved cur now #{}))
+  ([prev-findings prev-resolved cur now accepted]
   (let [cur-by-key (into {} (map (juxt :key identity)) cur)
         findings
         (into {}
@@ -214,8 +233,17 @@
                                   :resolved-at now}])))]
     {:findings findings
      :resolved resolved
-     :new-keys (vec (sort (remove prev-findings (keys cur-by-key))))
-     :resolved-keys (vec (sort gone))}))
+     ;; An accepted key is never NEW. It was named, dated and justified by a
+     ;; human in the registry, so announcing it as newly discovered would be
+     ;; false -- and it is the announcement that costs attention.
+     :new-keys (vec (sort (remove #(or (prev-findings %) (accepted %))
+                                  (keys cur-by-key))))
+     :resolved-keys (vec (sort gone))
+     :accepted-keys (vec (sort (filter cur-by-key accepted)))
+     ;; Accepted, but the detector no longer reports it. Either it was fixed and
+     ;; the acceptance was left behind, or the detector stopped being able to
+     ;; see it. Both are reasons to delete the entry, and neither is silent.
+     :accepted-stale (vec (sort (remove cur-by-key accepted)))})))
 
 ;; ───────────────────────── admission ─────────────────────────
 
@@ -225,9 +253,21 @@
    Skipping a malformed entry quietly is how a registry ends up half-live with
    nobody able to say which half."
   [entries]
-  (let [problems
+  (let [accepted-ok?
+        (fn [e]
+          (let [a (:accepted e)]
+            (or (nil? a)
+                (and (map? a)
+                     (every? (fn [[k v]]
+                               (and (string? k) (map? v)
+                                    (string? (:since v)) (seq (:since v))
+                                    (string? (:why v)) (seq (:why v))
+                                    (string? (:clears-when v)) (seq (:clears-when v))))
+                             a)))))
+        problems
         (for [e entries
               [pred msg] [[(keyword? (:id e))                    ":id must be a keyword"]
+                          [(accepted-ok? e)                      ":accepted must map finding-key -> {:since :why :clears-when}, all non-empty strings -- an exemption with no date, no reason and no exit is not a decision"]
                           [(seq (:argv e))                       ":argv missing"]
                           [(= :protocol (:findings e))           ":findings must be :protocol"]
                           [(string? (:evidence e))               ":evidence regex missing (a run with no evidence must not be recordable as clean)"]
@@ -350,7 +390,24 @@
       (when-not (= 33 (:scanned p)) (fail "SCANNED parse"))
       (when-not (= [{:severity "fail" :key "k1" :detail "detail here"}] (:findings p))
         (fail "FINDING parse")))
-    (println "SELF-TEST OK — 12 assertions: new/standing/resolved/returning/detail-change/parse")
+    ;; ACCEPTED. The point is that an accepted finding is neither shouted as new
+    ;; nor buried in STANDING, and that an acceptance outliving its finding is
+    ;; loud rather than convenient.
+    (let [a1 (merge-findings {} {} [{:severity "fail" :key "x" :detail "d"}
+                                    {:severity "fail" :key "y" :detail "d"}]
+                             t0 #{"x"})]
+      (when-not (= ["y"] (:new-keys a1)) (fail "an accepted finding is not announced as new"))
+      (when-not (= ["x"] (:accepted-keys a1)) (fail "an accepted finding that is present is ACCEPTED"))
+      (when-not (= [] (:accepted-stale a1)) (fail "x is present, so its acceptance is not stale"))
+      (when-not (contains? (:findings a1) "x")
+        (fail "an accepted finding is still tracked -- accepting is not deleting"))
+      ;; the finding goes away; the acceptance must not go quiet with it
+      (let [a2 (merge-findings (:findings a1) (:resolved a1)
+                               [{:severity "fail" :key "y" :detail "d"}] t1 #{"x"})]
+        (when-not (= ["x"] (:accepted-stale a2)) (fail "an acceptance whose finding is gone is stale"))
+        (when-not (= ["x"] (:resolved-keys a2)) (fail "x also resolved"))
+        (when-not (= [] (:accepted-keys a2)) (fail "x is absent, so it is not a present acceptance"))))
+    (println "SELF-TEST OK — 19 assertions: new/standing/resolved/returning/detail-change/parse/accepted/stale-acceptance")
     (js/process.exit 0)))
 
 ;; ───────────────────────── main ─────────────────────────
@@ -428,13 +485,26 @@
                                                  :last-note (:note r)
                                                  :title (:title e)
                                                  :runs (inc (or (:runs p) 0))})))
-                          (let [m (merge-findings (or (:findings p) {}) (or (:resolved p) {})
-                                                  (:findings parsed) now)]
+                          (let [accepted (set (keys (:accepted e)))
+                                m (merge-findings (or (:findings p) {}) (or (:resolved p) {})
+                                                  (:findings parsed) now accepted)]
                             (doseq [nk (:new-keys m)]
                               (log! "  NEW      " nk " — " (get-in m [:findings nk :detail])))
                             (doseq [rk (:resolved-keys m)]
                               (log! "  RESOLVED " rk))
+                            (when (seq (:accepted-keys m))
+                              (log! "  ACCEPTED " (count (:accepted-keys m))
+                                    "— declared known in the registry:"
+                                    (str/join ", " (:accepted-keys m))))
+                            (doseq [sk (:accepted-stale m)]
+                              (log! "  ⚠ STALE ACCEPTANCE" sk
+                                    "— accepted on" (get-in e [:accepted sk :since])
+                                    "but this run does not report it. Delete the"
+                                    ":accepted entry; an exemption that outlived its"
+                                    "finding exempts whatever lands on that key next."))
                             (assoc acc k {:title (:title e)
+                                          :accepted-keys (:accepted-keys m)
+                                          :accepted-stale (:accepted-stale m)
                                           :last-run now
                                           :last-status :ok
                                           :last-exit (:exit r)

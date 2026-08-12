@@ -42,6 +42,27 @@
 ;;   :measured      what was actually observed when the entry was added, so the
 ;;                  interval and timeout are traceable to a measurement rather
 ;;                  than to a guess.
+;;   :accepted      OPTIONAL. finding-key -> {:since :why :clears-when}, all
+;;                  three non-empty strings, enforced by admission. A finding
+;;                  listed here is CORRECT and deliberately not being fixed yet;
+;;                  the tick reports it as ACCEPTED, never as NEW, and never
+;;                  inside the STANDING count.
+;;
+;;                  It exists because the 2026-08-13 triage (ADR-2608132600)
+;;                  needed a state the three classes could not express. Without
+;;                  it, "we looked at this, we understand it, and the fix is a
+;;                  decision someone else has to make" decays into STANDING --
+;;                  the class this whole design calls indistinguishable from
+;;                  silence. The decision would then be recorded nowhere, and a
+;;                  month later would read exactly like a defect nobody opened.
+;;
+;;                  Two things keep it from becoming a way to make reds go away.
+;;                  (1) Admission rejects an entry with no date, no reason or no
+;;                  exit condition, so accepting costs as much writing as fixing
+;;                  a small thing. (2) An acceptance whose finding has gone away
+;;                  is reported LOUDLY as a stale acceptance, in the tick log and
+;;                  at session start -- an exemption that outlives its subject
+;;                  exempts whatever lands on that key next.
 ;;
 ;; ## Invariants this home holds itself to
 ;;
@@ -170,8 +191,21 @@
               also already found real breakage: the Phase-1 dedup worklist
               (90-docs/2607171100-phase1-dedup-worklist.csv, row 210) records
               cloud-itonami-isic-855 with a :local/root one directory too high, credited to
-              this script. The seven standing violations it reports today are numbered
-              directories re-created inside three app repos after layers.edn froze the list."
+              this script.
+              ⚠ 2026-08-13 correction (ADR-2608132600): this line previously said the seven
+              standing violations were `numbered directories re-created inside three app repos
+              after layers.edn froze the list`. That was wrong, and it is the failure mode this
+              registry's `:why` field is supposed to prevent -- a plausible story written from
+              the finding text rather than from the repos. All seven directories were added
+              between 2026-04-08 and 2026-06-26, BEFORE layers.edn froze the list on 2026-07-17
+              (`git log --diff-filter=A`). They reappeared because layers.edn keys its exemption
+              lists on WEST PATH, and three GitHub org-transfers and one rename moved the paths
+              while the exemptions stayed: gftdcojp/app-aozora -> network-awai/app-aozora
+              (gh id 1275051908), gftdcojp/club-shinshi -> network-awai/club-shinshi (1281275923),
+              gftdcojp/ai-gftd-apps-gftdcojp -> gftdcojp/apps-gftdcojp (1136866292). Fixed in
+              layers.edn; 7 -> 0. What this detector actually guards against is therefore two
+              things, and only the first was written down: a violating :local/root edge, and an
+              exemption list whose keys have drifted off the repos they exempt."
    :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
               "{{repo}}/scripts/verify-layer-deps.cljs" "--report" "--findings"]
    :cwd      :root
@@ -208,6 +242,65 @@
    :interval-ms 21600000                 ; 6h
    :timeout-ms  300000                   ; 5m
    :writes   :none
+   ;; Both findings are CORRECT and are accepted, not fixed. ADR-2608132600.
+   ;;
+   ;; Authority was established first, and not by reading the file's own claim to
+   ;; be an SSoT. `kotoba-lang/src/kotoba/lang/grammar_authority.clj` declares
+   ;; `lang/host-parity.edn` the authority and names its copies
+   ;; (`resources/kotoba/lang/host-parity.edn`,
+   ;; `../kotoba/resources/kotoba/lang/host-parity.edn`) as vendored mirrors --
+   ;; an independent mechanism in a third file, written for a different reason.
+   ;; So: the catalogue is the authority for what is ALLOWED; the two
+   ;; implementations are ground truth for what EXISTS; where they disagree the
+   ;; catalogue is what moves. Measured while doing this: the `../kotoba` mirror
+   ;; has already drifted (sha 0cfe8556 vs 69d66b3b), and grammar_authority's own
+   ;; docstring says host-parity in kotoba was surveyed but never checked.
+   ;;
+   ;; Why accepted rather than fixed. Correcting the catalogue is a three-repo
+   ;; edit to a capability surface that re-baselines counts the file itself
+   ;; guards (`browser-linkable-count-changed`, `:honest-gaps
+   ;; :global-browser-parity-10-of-59`), retires a conformance case, and has to
+   ;; carry a drifted fourth copy along with it. Landing that blind is how a
+   ;; half-fix gets recorded as a fix. The residual is small and exactly named
+   ;; below, which is the deliverable.
+   :accepted
+   {"import-sets-drifted"
+    {:since "2026-08-13"
+     :why "Real 3-way drift, understood and enumerated. 9 imports exist in kototama's
+           contract.cljc that the catalogue does not declare (:http-fetch :cbor-encode
+           :json-encode :json-extract-field :http-post-headers, all five also in the
+           browser host since 2026-07-25 commit 498e149; plus :http-get-stream
+           :object-get-stream :object-put-block :object-compare-and-set-ref, JVM-only).
+           10 imports are declared with :component-link status and are not actor:host
+           :import/id entries at all (:http-open/write/read/close :http-get :db-open/
+           write/read/close/exchange). The dangerous half is the first: the catalogue's
+           :unlisted-import-default is {:browser :no}, so a guest author reading the
+           authority believes cbor-encode is browser-absent when the browser host
+           implements it unconditionally. That is disclosure owed, not a capability to
+           be widened, but writing it changes :required-imports 59 -> 68 and the
+           :honest-gaps baseline."
+     :clears-when "kotoba-lang PR declaring the 9 and reclassifying the 10, with both
+                   vendored mirrors re-synced (resources/ and ../kotoba/resources/, the
+                   latter already drifted), west pin advanced, and this verifier's
+                   `(= 10 (count browser-linkable))` qualification updated in the same
+                   change."}
+    "matrix-vs-implementation"
+    {:since "2026-08-13"
+     :why "Real, and reduced from 17 ids to 6 on 2026-08-13 by fixing this verifier's own
+           stale model -- 11 of the 17 were pg wire/pool functions added to actor-host.js
+           on 2026-07-31 that the verifier's hand-written not-browser-callable set never
+           learned about. The 6 that remain are the hosts genuinely disagreeing:
+           :matrix-only #{:http-get} is the catalogue claiming browser :inject, and
+           carrying a conformance case :http-get-browser-inject-available expecting
+           :available, for an import actor-host.js does not implement at all -- it is not
+           even in IMPORT_SURFACE. :implementation-only is the same 5 undeclared imports
+           as above. An overclaimed browser capability is the exact lie the catalogue's
+           own note forbids (`guests must not assume an import is ambient just because it
+           compiles`), which is why this is accepted with a named exit and not left
+           unwritten."
+     :clears-when "Same kotoba-lang PR: :http-get browser :inject -> :no (or the browser
+                   host implements http_get), the conformance case retired or inverted,
+                   and the 5 codec/http imports declared."}}
    :measured "2026-08-13 on this machine at load ~133: 11.7s wall, 0.77s of it user CPU --
               nbb start-up and scheduling, not work; it reads three files. 59 declared host
               imports across those three files, exit 1, 2 findings (import-sets-drifted,
