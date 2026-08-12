@@ -8,16 +8,35 @@
 ;;
 ;; 使い方:  nbb scripts/verify-layer-deps.cljs            ; 全 org スキャン
 ;;          nbb scripts/verify-layer-deps.cljs --report   ; violation でも exit 0(レポートのみ)
+;;          nbb scripts/verify-layer-deps.cljs --findings ; 機械可読な finding も出す
 ;;
 ;; layer 解決は layers.edn の :naming glob。どの glob にも合わない repo は
 ;; :layer-unknown として DAG 検査対象外(件数のみ報告)。
+;;
+;; ## fleet gate にはできない
+;;
+;; この検査は `orgs/` 配下の全 repo を歩く。murakumo fleet gate が配るのは対象
+;; repo 自身の tree だけなので、ノード上では空の workspace を歩いて 0 件 =
+;; 合格になる。したがって `manifest/orgs-detectors.edn` に登録し、`orgs/` を
+;; 実際に持つこのマシンの tick で回す。
+;;
+;; ## --findings が出すもの
+;;
+;;   FINDING<TAB>severity<TAB>key<TAB>detail   violation 1 件につき 1 行
+;;   SCANNED<TAB>n<TAB>unit                    証拠行(n=0 は :inconclusive 扱い)
+;;
+;; key は **構造的な識別子**(kind + repo + 対象)であって、件数などの動く数を
+;; 含めない。含めると同じ violation が毎回 resolved かつ new として報告される。
+;; --findings を付けなければ出力は従来とバイト同一。
 (require '[clojure.edn :as edn]
          '[clojure.string :as str]
          '["fs" :as fs]
          '["path" :as node-path]
          '["child_process" :as cp])
 
-(def report-only? (some #{"--report"} (into [] (.slice js/process.argv 2))))
+(def argv (into [] (.slice js/process.argv 2)))
+(def report-only? (some #{"--report"} argv))
+(def findings? (some #{"--findings"} argv))
 
 (def root (str/trim (str (.execSync cp "git rev-parse --show-toplevel"))))
 (def layers-file (or (.. js/process -env -LAYERS_EDN)
@@ -125,5 +144,20 @@
   (println "OK: no layer violations")
   (do (println (count @violations) "violation(s):")
       (doseq [v @violations] (println " " (pr-str v)))))
+
+(defn- finding-key
+  "violation の安定な識別子。kind と repo と『どこが』だけで作り、件数や
+   layer 名のような後から変わりうる注釈を混ぜない。"
+  [{:keys [kind repo dir target]}]
+  (str (name kind) ":" repo ":" (or dir target)))
+
+(when findings?
+  ;; 証拠行を先に出す。何も歩かなかった run を clean として記録させないための床。
+  ;; 数えるのは「実際に走査した repo ディレクトリ」で、orgs/ が無い場所で走れば
+  ;; 0 になり、tick 側が :inconclusive として扱う。
+  (println (str "SCANNED\t" (:repos @stats) "\trepo director(ies) under orgs/"))
+  (doseq [v @violations]
+    (println (str "FINDING\tfail\t" (finding-key v) "\t" (pr-str v)))))
+
 (when (and (seq @violations) (not report-only?))
   (.exit js/process 1))
