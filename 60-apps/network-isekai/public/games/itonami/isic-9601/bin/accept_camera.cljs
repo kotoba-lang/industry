@@ -5,8 +5,9 @@
     npm run accept:camera
 
   Checks the library (orbit/zoom/fov/eye land on `:globals`), that underground / inside-fit
-  eyes are refused, and that `bin/render.cljs` dry-parses good flags and rejects bad ones.
-  Does not require Chromium — pixel draw is still the `render` CLI's job; this gate is about aiming."
+  eyes are refused, and that the street path (`bin/render.cljs` → `bin/render_street.cljs`)
+  dry-parses good flags and rejects bad ones. Does not require Chromium — pixel draw is
+  still the `render` CLI's job; this gate is about aiming."
   (:require ["node:fs" :as fs]
             ["node:path" :as path]
             ["node:child_process" :as cp]
@@ -38,6 +39,7 @@
                 (map vector a b)))))
 
 (defn- spawn-render [& args]
+  ;; Thin dispatcher forwards argv to render_street (camera / --dry live there).
   (cp/spawnSync "npx" (clj->js (into ["nbb" "--classpath" cp-str "bin/render.cljs"] args))
                 #js {:cwd here :encoding "utf8"}))
 
