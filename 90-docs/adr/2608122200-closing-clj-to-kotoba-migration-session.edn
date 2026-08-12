@@ -623,20 +623,27 @@ starts from it rather than from zero:
 - **kami collision brief** -- had located the prior mapping and was moving to
   file contents.
 
-## Both blocked pins are still blocked
+## Both blocked pins: CLEARED, merge `002f78641ca`
 
-`kotoba-lang/sdk-py` (merge `01fab5c46f7`, pin `6cd818b`) and `kotoba-lang/vpn`
-(merge `b9dfa224456`, pin `3d2d269`). Retried at final close; `repos/*` GETs
-still return 403 while `gh api rate_limit` still reports thousands remaining.
-Both merges are on their repos' `main`; only the manifest lags. First command
-on resume:
+`kotoba-lang/sdk-py` to `01fab5c46f7` and `kotoba-lang/vpn` to `b9dfa224456`,
+both verified fast-forward, both checkouts synced. The secondary rate limit
+lifted on its own; nothing was done to it beyond waiting and re-probing the
+endpoint that actually mattered rather than the meter.
 
-    nbb scripts/advance-pins.cljs kotoba-lang <names-file> --execute
-    nbb scripts/verify-west-pins.cljs
+**The decision to leave them blocked was the right one and is worth keeping as
+precedent.** Advancing a pin that `verify-west-pins` cannot check does not
+"skip a formality" -- it produces a manifest entry that nobody ever verified,
+indistinguishable from one that was. The check exists precisely for the moment
+when it is inconvenient.
 
 ## Resume point
 
-Wait for the six agents, land each result, advance the pin for every child repo
-touched, and re-run the three detectors. Beyond that the migration's
-decision-free surface is largely exhausted -- what remains is the owner-decision
-list above."}]
+The five agents stopped at the previous close were **resumed from their
+transcripts** rather than restarted, so each continues from the partial answer
+recorded above rather than re-deriving it. Land each result, advance the pin for
+every child repo touched, and re-run the detectors.
+
+Beyond that the migration's decision-free surface is exhausted -- what remains
+is the owner-decision list above, plus the two findings nobody has decided (the
+vpn authentication fail-open, and the 266 repos the endpoint sweep could not
+reach)."}]
