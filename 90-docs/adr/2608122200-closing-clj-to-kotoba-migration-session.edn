@@ -1,0 +1,192 @@
+[{:db/id -1
+  :adr/id "ADR-2608122200"
+  :adr/title "Closing: the clj->kotoba migration session, and what it found on the way"
+  :adr/status "accepted"
+  :adr/date "2026-08-12"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "## What this records
+
+A closing transaction for the session that advanced the clj->kotoba refactor.
+It exists so the next agent can resume without the conversation. Read the
+`in flight` section first -- six background agents were launched minutes before
+this was written and their work is NOT accounted for below.
+
+## The migration work that landed
+
+The task began as `make the kotoba CLI + amu native build actually work`. The
+blocker was not that native did not work -- it did -- but that every call
+re-verified the artifact, so `nx/execute` cost 1.9-3.6 s. Splitting it into
+`prepare` / `invoke` / `close!` in `kototama.native.executor` (tender-native
+ab76044, 1915ee1) brought it to 47 ms per call, with `admit-validity!`
+re-checking expiry, not-before, and revoked signers per invoke so the split
+does not buy speed by dropping a check.
+
+On top of that, a delegation seam was proven across five repos: an
+`oracle.cljc` that loads a shipped `*.kir.edn` and executes an export, with no
+fallback, plus a test-only generator and two gates (drift, delegation). The
+reference implementation is `cloud-itonami-app`'s `kotoba_oracle.cljc`
+(98a57c6); calendar, crdt, fsm and app-files reuse the template.
+
+### The boundary, measured rather than assumed
+
+Delegation is bounded by the interpreter's ADT node limit, not by whether a
+value is a collection. `mokuroku` refuses 13 catalog items; `fsm` accepts 32
+events over an alphabet of 3. The axis is whether the value's SIZE GROWS WITH
+THE DOMAIN. An earlier note in this series said `a collection cannot be
+delegated`; that was too strong and is corrected here.
+
+Value shapes at `ir/execute`, measured by running the guests: records cross as
+`[schema field ...]` in declared order; variants as `[schema case-tag payload]`;
+a typed set as `[[:set :keyword] [items...]]` -- NOT a Clojure set; `[:option
+:string]` as `[[:option :string] true \"x\"]`; `:document` as `[\"vector\"
+[[\"i64\" 50] ...]]`.
+
+### Defects the seams exposed
+
+Writing an oracle forces someone to state what a function means, and that is
+where the bugs were:
+
+- `calendar/model.cljc` `overlaps?` accepted zero-duration intervals (fixed,
+  d565658)
+- `app-files` declared a confinement rule and never enforced it -- `BrowseSource
+  -fetch` returned rows outside the granted directory (fixed 4d4a7bd, bound to
+  its core by a gate 6572f6c)
+- `net-kotobase` treasury: `js/parseInt` returned NaN on an unparseable block
+  header, NaN propagated, and a payment that was never confirmed was accepted
+  as confirmed -- the Worker returned success where it owed a 402 (fixed
+  dfa1143, with a test failing 5 assertions against the old copy and a
+  finite-head positive control that passes against both)
+- `nexus-x402`: a vendored header named `8a77e516` while the content was
+  `848158de` (fixed 6ca13bf, comments only)
+- `animeka`: a `:dev` alias `:local/root` named `orgs/kotoba-lang/
+  murakumo-generation`, which west never creates -- it resolved only for whoever
+  had the pre-rename directory as a leftover checkout (fixed 0c14939)
+
+## The gate discipline worth carrying forward
+
+`app-files`' gate states, per case, the directory each row is IN -- authored,
+never computed with the implementation's own `parent-of`. Deriving it would
+make the gate a mirror of the implementation: it would agree with ANY
+implementation, including a wrong one. Written down, it fails when the real rule
+stops recovering from a raw path what the author says the path means. Proven in
+three directions (guest always-true: 14 failures; always-false: 12; host
+replaced by `starts-with?`: 6, on exactly the descendant and root cases).
+
+## Three fleet detectors, and the errors in them
+
+`scripts/verify-{namespace-collisions,duplicate-registrations,vendored-copies}
+.cljs` were built this session. An independent verification pass reproduced all
+three and found real defects in two. Both have one shape: a report that reads as
+an all-clear when the check did not run.
+
+- `--check --verify-remote` FAILED OPEN. `gh` exits non-zero on an expired token
+  and on rate limiting; `github-id` read every failure as nil, so a broken `gh`
+  produced `0 CONFIRMED` and exit 0 -- a clean fleet reported in front of 40 real
+  duplicate registrations. Now three outcomes: CONFIRMED / REFUTED / UNVERIFIABLE,
+  with UNVERIFIABLE failing `--check` on its own. Measured with a `gh` on PATH
+  that exits 1: old exits 0, new exits 1.
+- `verify-namespace-collisions` walked only `<repo>/src` -- the THIRD instance of
+  one error this session. 3,528 -> 3,837 repos (4,828 source trees), 8 -> 11 real
+  collisions. The owner sets were wrong where it mattered most: `treasury/
+  core.cljc` listed 5 owners with 7 on disk, `pay/x402.cljc` 4 with 6, and both
+  missing copies included the one another ADR calls the worst in the fleet.
+
+The narrow-scan error recurred three times in one day, each time in a different
+script, twice after being corrected. Prose does not prevent it. What did catch
+it was running an independent verification pass over the detectors themselves.
+
+Also corrected: the claim that every duplicate-registration candidate was
+confirmed one upstream with no forks. Two candidates are DIFFERENT repositories
+sharing a root commit (`org-w3-svg` + `svgraph`; `com-unity-ads` +
+`com-unity-api-services`). Retiring either on the offline signal would have
+deleted a real project. Both were on disk when that claim was written.
+
+## Duplicate registrations: 35 -> 1
+
+The premise changed under measurement. Resolving all 4,162 west entries through
+the GitHub API by repository id (strictly stronger than the on-disk scan) leaves
+exactly ONE repository registered at two paths: `kotoba-lang/compiler` +
+`kotoba-lang/amu`, id 1297097065. A rename campaign is actively draining the
+rest. The other 39 root-commit groups are ORPHAN CHECKOUTS -- directories left
+by renames whose west entry is already gone. West will never recreate them.
+
+## In flight -- NOT accounted for above
+
+Six agents were launched immediately before this closing and are still running.
+Each may land a merge in a child repo. **A child merge without a west pin
+advance leaves the fleet reading a stale tree** -- the exact failure this session
+spent the day fixing. The next agent must check for their results and advance
+pins.
+
+1. widen `verify-vendored-copies` to all header spellings and non-`src` vendor
+   dirs (superproject; at least 7 declared-vendored files are currently invisible)
+2. refresh `wasm-webcomponent/src-cljs/vendor/kotoba/kami_host.cljc` -- genuinely
+   stale, ~41 diff lines, 2 upstream commits, invisible to the detector on both
+   axes
+3. investigate the three new `kami/ongaku/e2e/*` collisions across
+   kami-ongaku-{notation,sampler,sequencer} (investigation only)
+4. check `net-kotobase`'s `pay/core.cljc` + `pay/x402.cljc` for drift -- pinned at
+   `edf58be`, never checked; the treasury copy in the same repo hid a payment
+   defect
+5. investigate three self-shadowing namespaces (`kotobase/site_skin.cljc`,
+   `etzhayyim/{yoroshiku,bonsai}.cljc`)
+6. measure whether the three `:local/root` sites can be repointed from
+   `../compiler` to `../amu` (prerequisite for retiring the duplicate entry)
+
+Pin advance, for each child repo they touch:
+
+    nbb scripts/advance-pins.cljs <org> <file-with-repo-name> --execute
+    nbb scripts/verify-west-pins.cljs
+
+## Open owner decisions -- recorded, not decided
+
+- **Retire the `compiler` west entry.** Evidence is one-sided: canonical
+  full_name is `kotoba-lang/amu`; the `compiler` pin is a strict ancestor 56
+  commits behind main while the `amu` pin IS main; every script that names a path
+  already names `amu`; a fleet-ci roles gate is already failing on the name
+  mismatch. NOT free: three `:local/root` sites (`kotoba/deps.edn`,
+  `kototama/deps.edn` x2) resolve to the doomed directory and must be repointed
+  in the same change -- see in-flight item 6. The ~104 deps.edn files spelling the
+  coordinate `io.github.kotoba-lang/compiler` do NOT block it; GitHub redirects
+  them.
+- **39 orphan checkouts.** On-disk only, unregistered. Not verified free of
+  unpushed commits -- that is `git-cleanup-conflict` territory.
+- **`kotoba/lang/package_registry.cljc` divergence.** Bidirectional; 8 of 10
+  shared functions are on the acceptance path. Taking core-contracts wholesale
+  drops the `definition-cids` check and every definition-pinned package fails
+  `:definition/not-locked`; the reverse drops registry-layer checks that
+  `verify-lock` re-catches -- the failure MOVES rather than disappears. One
+  acceptance-visible difference: an invalid registry with empty requests returns
+  `ok? true` on one side.
+- **`kami.{fsm,gpu,input}` collisions** between `kami-engine-sdk` and
+  `fsm`/`gpu`/`host`.
+- **`kami-contracts`: abandoned or authority.** README and behaviour say opposite
+  things and nothing in the tree adjudicates. CI red for a month (failing in the
+  authority mechanism itself), zero `deps.edn` references, `kami.scene` an
+  unmodified pre-split copy still citing an `ARCHITECTURE.md` section that does
+  not exist here -- yet the superproject ledger names it authority and a repo in
+  another org hand-copied it saying it will follow. Cost is asymmetric: deleting
+  it orphans an untested cross-org promise.
+- **network-awai's dormant `cert_governor_app` and `media` groups.** The framing
+  `wasm dormant, JVM live` was wrong: the whole media subtree publishes nothing.
+  `cert_governor` is NOT a port of the production rule -- production gives the
+  advisor no disposition channel and the component's containment is LOOSER. All
+  three external tools ARE installed as pinned. One wiring line is the blocker.
+
+## Verification state
+
+`verify-west-pins.cljs` passed on every pin advance this session (each reported
+fast-forward). `verify-namespace-collisions --check` exits 1 (11 collisions, all
+owner decisions). `verify-duplicate-registrations --verify-remote`: 40 CONFIRMED
+/ 2 REFUTED / 0 UNVERIFIABLE. Superproject clean apart from pre-existing
+untracked `orgs/` directories and a modified `observatory.datoms.edn` that
+predate this session. No stashes, no worktrees, no branches of mine remain.
+
+## Resume point
+
+Wait for the six agents, land each result, advance the pin for every child repo
+touched, and re-run the three detectors. Beyond that the migration's
+decision-free surface is largely exhausted -- what remains is the owner-decision
+list above."}]
