@@ -107,6 +107,24 @@ basis は同じ decision になり、再現・監査・time travel ができま�
 満たせる不足条件を機械可読に返します。UI はこの decision を描画しますが、UI 自体を
 enforcement point にはしません。
 
+### R0 implementation（2026-08-12）
+
+authority の semantic owner である `kotoba-lang/aiueos` に、純粋CLJC kernel
+`aiueos.authority/decide` と既存broker統合 `aiueos.broker/decide-authority` が着地しました
+（aiueos `f4c492a53ce81d212089ced5c1154f0975018d1e`、PR #145）。
+
+- closed EDN inputでprincipal、actor、intent、effect、grant、policy、contextを分離する。
+- `:allow` / `:deny` / `:challenge`を返し、許可時はruntime handleそのものではなく、host
+  brokerがhandle化するpurpose-bound capability specificationを返す。
+- 既存のcode/capability admissionを必ず先に実行し、そのdenyをidentity、role、payment、
+  別grantで昇格できない。
+- effectはcaller入力から受け取らず、admission済みmanifestのimports/effectsからのみ導く。
+- canonical receiptはclosed shapeで、raw credential/private key/bearer tokenのfieldを持たない。
+
+これはR0 kernelとbroker接続の着地です。cookie/Passkey/CACAOから`VerifiedPrincipal`への
+adapter、Kotobaseでのbasis-bound policy/grant検索とreceipt永続化、payment settlementから
+entitlement grantへの変換、UIのchallenge描画はまだこのkernelへ移行していません。
+
 ## 各層への投影
 
 | 層 | 責務 |
