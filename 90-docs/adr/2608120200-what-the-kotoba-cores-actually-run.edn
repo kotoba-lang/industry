@@ -147,11 +147,9 @@ orchestrator は `Chain ID: 1`。
 
 ## Consequences
 
-- **`crdt` は今日から縛られている**（`81d4250`）。`kotoba-conformance-test` は 4 module が
-  link して `main` が 42 を返すことしか見ておらず、**両実装を同じ入力で走らせたものは
-  何も無かった**。`clock` について 22 tests / 1279 assertions で一致を確認し、
-  変異 2 種（receive rule の `+1` 削除で 161 件、`before?` を `<=` に広げて 131 件）で
-  落ちることを確認した。`register` / `orset` / `doc` は未縛り。
+- **`crdt` は 4 primitive とも縛られている**（`81d4250` で clock、`acaa674` で残り 3 つ）。
+  `kotoba-conformance-test` は 4 module が link して `main` が 42 を返すことしか見ておらず、
+  **両実装を同じ入力で走らせたものは何も無かった**。現在 34 tests / 4540 assertions。
 - **調査で 1 点、私の側の誤りが出た。** subagent の報告は「crdt には core を compile する
   test が無い」だったが、`kotoba_conformance_test.clj` は実在した。**ファイルを自分で
   開いて気付いた** —— 並列調査の報告は裏取りしてから引用する。
@@ -164,7 +162,7 @@ orchestrator は `Chain ID: 1`。
 | repo | 実測 | 見つかった穴 |
 |---|---|---|
 | `com-cloudflare` | **production 実行**（上表に追加） | **出荷 KIR 全体の drift gate は `client_core` の 1 本だけだった。→ 閉じた** |
-| `aiueos` | **production 実行**（上表に追加）。57/59 が kernel ELF にリンク | `murakumo-join-plan` は**どの build script もコンパイルしない**。実行は `kotoba-lang/murakumo` の cross-repo parity test だけで、その test は sibling checkout (`../aiueos`) が無いと assertion 本体が `(when (.exists source-file))` で**丸ごと無音**になる（落ちるのは presence 検査 1 件のみ）。fleet はその repo の tree しか配らないので、fleet 上ではこの parity は常に空回りする |
+| `aiueos` | **production 実行**（上表に追加）。57/59 が kernel ELF にリンク | **閉じた** `e852781`（aiueos）+ `d11d4c2`（murakumo）。`murakumo-join-plan` はどの build script もコンパイルせず、その唯一の実行経路である cross-repo parity test は sibling checkout が無いと**無音で緑**だった。→ 下記 |
 | `provider` | **decision core を持つ repo ではない。** `src/` の `kotoba.kir` は値コーデック。77 `.kotoba` は capability-kit の wasm package **ソース**で、出荷物は 142 `.wasm`。test は shipped `.wasm` を node の `WebAssembly` で実行して期待値を固定している | **半分閉じた** `b3ea0c7`。registry の `:sha256` を実バイトと突き合わせていたのは 142 行のうち 8 行だけだった。**source→wasm 方向は閉じていない**（下記） |
 | `kotoba-v2025` | **対象外。** README が自ら legacy Rust reference と宣言（#12、2026-07-01）。31 `.kotoba` は全部 `_archive/251006/` の Rust 時代の設定・例で decision core ではない | 無し（移行対象ではない） |
 
@@ -172,7 +170,7 @@ orchestrator は `Chain ID: 1`。
 
 出荷 KIR を 1 本しか縛っていなかったので、**production が読む当のファイルを書き換えても
 既存 suite が全部通った**。変異で証明: `resources/cloudflare/oracle/zones_path_core.kir.edn`
-の `dns-name-query-pair` を `"name"` → `"nome"` にし、`.kotoba` source は無改変のまま
+の `dns-name-query-pair` を `\"name\"` → `\"nome\"` にし、`.kotoba` source は無改変のまま
 全 suite を回して **94 tests / 519 assertions / 0 failures**。
 
 `precompiled-kir-does-not-drift` を `gen/discover-artifacts` 駆動にして 9 本すべての
@@ -207,6 +205,59 @@ fleet の compiler pin `806f5ce` で実測すると、source を宣言してい�
 閉じるには先に **1 行につき builder commit を記録する**必要がある。今日それを
 recompile gate として書くと、compiler pin が動くたびに赤くなる劇場になる。
 
+### aiueos の「誰もコンパイルしない core」（閉じた、`e852781` + `d11d4c2`）
+
+2 つの穴が重なっていた。
+
+**1. 走らない parity は緑だった**（murakumo `d11d4c2`）。`aiueos-join-plan-parity-test` の
+3 つの test は assertion を丸ごと `(when (.exists source-file) ...)` に入れていた。
+sibling checkout が無い機械 —— **fleet ノードは 1 repo の tree しか受け取らない** ——
+では **0 assertion で pass** し、赤くなるのは presence 検査 1 件だけ。実測: `AIUEOS_ROOT`
+を存在しない場所に向けると **旧 1 failure / 3 assertions**、**新 4 failures / 6 assertions**。
+実 checkout では 5 tests / 780 assertions / 0 failures で不変。**答えられなかった問いの数と
+赤の数が一致する**ようにしただけで、gate 自体は強くなっていない。
+
+**2. どの build もコンパイルしない core を、誰も申告していなかった**（aiueos `e852781`）。
+`os/aiueos/kotoba/*.kotoba` 59 本のうち 57 は `build-uefi.sh` が `.o` にして kernel ELF に
+リンクし、`user-smoke` は user ELF として image に載る。`murakumo-join-plan` だけがどこからも
+ビルドされない。**それ自体は妥当な状態**（node の自己登録判断に kernel 内の呼び手は無い）
+だが、**リンクされるはずのものが黙ってリンクされていない状態と見分けが付かない**。
+`aiueos.kotoba-object-reachability-test` は「全 source はビルドされるか、理由付きで
+`not-built-here` に載っているか」を要求する。変異 2 種で確認: 誰もビルドしない source を
+足すと名前を挙げて落ち、**既にビルドされている object を `not-built-here` に書くと
+「drop the entry」で落ちる**（申告リストが飾りに腐るのを防ぐ）。40 文字未満の理由も落ちる。
+
+問いは意図的に弱い —— **「build script に名前があること」は「実行されていること」ではない**
+（`build-multiboot.sh` は 10 本しかリンクせず、外す理由を comment で書いている）。
+弱い方の問いにしたのは、**その答えが事故で no になってはいけない**のがこちらだから。
+
+### crdt の残り 3 primitive（閉じた、`acaa674`）
+
+`clock` だけが縛られていた。`register` / `orset` / `doc` に parity namespace を足した
+（34 tests / 4540 assertions、旧 22 / 1279）。駆動は 3 つとも同じ形 —— **操作を data にして
+両実装に同じ interpreter で流し、caller が観測できるものだけを比べる**（membership・
+field 値・勝った register）。guest の内部状態は一切デコードしない。
+
+**それぞれ、旧 suite が通る変異で証明した**（conformance module は Kotoba 側を literal と
+突き合わせるので、単純な誤りは既に捕まる。捕まらないのは**両実装の食い違い**）:
+
+| primitive | 変異 | 旧 suite | 新 |
+|---|---|---|---|
+| register | `(if (not (before? right left)) …)` —— **stamp が等しい時だけ**原実装と違う | 全緑 | 144 failures |
+| orset | `merge-tags-from` の歩幅 `(+ index 2)` —— tag を 1 つ飛ばしに merge | 全緑 | 3 failures |
+| doc | `merge-fields-from` の歩幅 `(+ index 2)` —— entity を 1 つ飛ばしに merge | 全緑 | **最初は新 suite も通した** |
+
+3 つ目は書いた test の穴だった。script の merge が全部「既に大半を共有している replica 同士」
+だったので、entry を飛ばしても観測可能な損失が出ない。**state-based merge が存在する理由の
+ケース**（長く offline だった replica が entity を複数まとめて受け取る / field を複数まとめて
+受け取る）を 2 本足して、両方の変異が落ちるようにした。
+
+**私の property 主張が 1 つ間違っていて、実装の方が正しかった。** `merge-register` は
+stamp が等しいとき順序に依存する（`before?` が両方向 false なので左が残る）。これは
+clock の一意性不変条件が透けているだけで、この層の欠陥ではない。主張を消さずに
+**tie の挙動を pin した** —— どちらかが右を優先し始めたら、同じ 2 write を逆順で見た
+replica が収束しなくなり、他に気付くものが無い。
+
 ## Evidence
 
 - `kotoba-lang/crdt` `81d4250`: clock parity gate（22 tests / 1279 assertions、変異 2 件で fail）
@@ -217,6 +268,17 @@ recompile gate として書くと、compiler pin が動くたびに赤くなる�
   （247 tests / 2523 assertions、wasm の 1 byte 反転と source 削除の 2 変異で fail）。
   west pin `d54c6a8616e` で前進。source→wasm 再現性の実測は
   `806f5ce` で 35 一致 / 29 不一致 / 7 compile 不能（71 行中）
+- `kotoba-lang/crdt` `acaa674`: register / orset / doc の parity
+  （34 tests / 4540 assertions。旧 suite が通る変異 3 種で fail を実測）。west pin `c12606b22a1`
+- `kotoba-lang/aiueos` `e852781`: core reachability gate（442 tests / 1396 assertions。
+  5 failures は origin/main でも同じ TCB inventory / jar digest の既存 fail）。west pin `f12698a19b2`
+- `kotoba-lang/murakumo` `d11d4c2`（PR #291）: 走らない parity が pass しなくなった。
+  west pin `1ec538f2e79`。**この repo の `main` は Actions の `test` check を必須にしており
+  （murakumo ADR-260811 が意図的にそう決めている）、他 3 repo と違って API の直接 merge が
+  通らない。** org 全体で Actions を止めた ADR-2607300900 の例外にあたる
+- `com-junkawasaki/root` `84b4252`: `west-pin-put.cljs` が短縮 sha を展開するようになった。
+  今日この script 自身が `revision: d11d4c2` を書いており（`gh pr merge` の出力をそのまま
+  渡した）、`f12698a`/`113b302` で全 4,162 pin が 40 桁に戻っている
 - 調査対象 20 repo。最初の 16 は read-only subagent 4 本 + 手元での裏取り、
   残り 4 は subagent を使わず全部自分で開いた。実行の有無は `src/` の
   `kotoba.kir` require / `ir/execute` / `kototama.tender` 呼び出し、および
