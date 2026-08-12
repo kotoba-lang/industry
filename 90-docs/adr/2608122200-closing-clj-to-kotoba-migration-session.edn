@@ -507,12 +507,58 @@ Also settled: `manifest/cleanup-workflow.md` has **no generator**. It and the
 `.edn` have been hand-edited together in every commit that touches them, and the
 edn calls it `:reference-md`, not a projection.
 
-### Still running at close
+### `sdk-py` landed too -- merge `01fab5c46f7`. Pin BLOCKED, same limit as vpn.
 
-**`kotoba-lang/sdk-py`** -- `llm.cljc` POSTs `Bearer $ETZHAYYIM_LLM_KEY` to
-`levi.local`, and `mst_projector.cljc` POSTs query bodies to `simeon.local`.
-**The worst unfixed instance in the fleet at close.** If nothing landed, this is
-the first thing to pick up.
+The credential disclosure was confirmed, not merely inferred: with a canary key
+and the transport stubbed, `chat` sent `authorization: Bearer <canary>` to
+`http://levi.local:4000/v1/chat/completions`. The second site was confirmed
+narrower exactly as suspected -- `default-request` hardcodes only
+`content-type`, and the stub signature has no header slot at all, so what leaks
+is query bodies and a trusted reply.
+
+**`levi` and `simeon` are murakumo mac-mini fleet nodes** (`scripts/fleet-ci/
+nodes.edn`) -- private LAN/tailnet hosts. That reframes the class: these are not
+typos, they are a developer's real machine names shipped as library defaults.
+
+The fix requires both endpoints and refuses rather than substituting an owned
+one, for two reasons worth keeping. There is no public endpoint serving a
+LiteLLM proxy on :4000 or an mst-projector on :8765, so any owned name would be
+an INVENTED address. And for `llm.cljc` an owned default would not close the hole
+anyway -- `ETZHAYYIM_LLM_KEY` belongs to the operator's proxy, so sending it
+anywhere WE picked still discloses it.
+
+The existing env reads were kept and none was added. They are this SDK's
+pre-existing, README-documented configuration channel and the only input these
+zero-arg functions have -- not an ambient read quietly introduced to replace the
+removed constant, which is the thing #3235 stripped from yoroshiku's twin. The
+distinction matters and the commit states it.
+
+**The caller check is the part worth carrying forward.** No production caller
+depended on the default, but **nine pre-existing tests did, silently** -- they
+queried without ever naming a host and passed against the `simeon.local`
+fallback. One of them, `test-400-error`, started passing for the WRONG reason
+once the endpoint became required, because a config error is also a
+`::mst-projector-error`. A test suite can encode a dependency on a bad default
+so quietly that removing the default is what reveals it.
+
+17 tests / 47 assertions baseline; 7 failures against unfixed source; 25 / 92
+green after.
+
+### Both remaining pins are BLOCKED on the same thing
+
+`kotoba-lang/sdk-py` (`01fab5c46f7`, pin at `6cd818b`) and `kotoba-lang/vpn`
+(`b9dfa224456`, pin at `3d2d269`). Advance both when the limit clears:
+
+    nbb scripts/advance-pins.cljs kotoba-lang <names-file> --execute
+    nbb scripts/verify-west-pins.cljs
+
+**The limit is a SECONDARY rate limit, and `gh api rate_limit` does not report
+it.** Measured at close: `rate_limit` said 4,879 of 5,000 core remaining while
+`gh api repos/kotoba-lang/sdk-py` returned HTTP 403 `API rate limit exceeded`.
+So the endpoint that exists to tell you whether you are rate limited will tell
+you that you are not. Probe the actual endpoint you need instead of trusting the
+meter -- the same shape as every other measurement error recorded here: the tool
+answered its own question correctly and a wider conclusion was drawn from it.
 
 ### Three claims I passed to agents that were WRONG
 
