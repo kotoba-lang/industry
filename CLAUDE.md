@@ -379,9 +379,27 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
   ```
 
   大容量バイナリを含む heavy project（旧 `manifest/repos.edn` `:heavy`）も
-  含め、2026-07-21 にオーナー判断で全 unshallow 済み。disk/帯域コストより
+  含め、2026-07-21 にオーナー判断で全 unshallow する決定をした。disk/帯域コストより
   ancestry の正しさを優先する。恒久的な disk 対策は shallow ではなく
   B2 + DataLad への移行（skill `large-binary-datalad`）。
+
+  **ただしその unshallow は完了していない**（ADR-2608124400。この節は
+  2026-08-12 まで「全 unshallow 済み」と完了形で書いていたが、事実ではなかった）。
+  shallow のまま残っている子リポがあり、**superproject root 自身も retirement の
+  後に ad-hoc な `--depth` fetch で shallow 化されていた**（実行者は特定できて
+  いない。west ではないことは実測済み）。**shallow clone の ancestry 回答は
+  間違っていて、しかも権威があるように見える** — 実測では「その commit は stale な
+  side branch からしか到達できない」と答えたが、実際は `main` の 643 commit 手前に
+  在った。したがって下記「マージ / ancestry 判定」がローカル解決を勧めるのは
+  **full 履歴が実在する repo でだけ**正しい。判定を出す前に確かめる:
+
+  ```bash
+  git rev-parse --is-shallow-repository   # true なら、その repo の ancestry 判定を信用しない
+  git fetch --unshallow                   # 直す
+  ```
+
+  ⚠ **`git fetch` の `--dry-run` は preview ではない** — ref 更新を飛ばすだけで
+  fetch 自体は実行される（`--dry-run --unshallow` が実際に unshallow を完了させた）。
 
 - **マージ / ancestry 判定（full 履歴なら通常は素直に解決する）。**
   `merge-base` / `--is-ancestor` / `rev-list --count` はローカルでそのまま
@@ -807,7 +825,9 @@ fork がそちらを実行許可として拾い、指示範囲を超えて実装
 モデル重み/wasm/動画/画像データセット等の大容量バイナリを git 履歴に直接
 コミットしない方針、DataLad + git-annex + Backblaze B2 special remote での
 扱いは skill `large-binary-datalad` を参照（最優先事項）。**既存の重い project
-の shallow 運用は 2026-07-21 に廃止し full history 化した**（ADR-2607211600）。
+の shallow 運用は 2026-07-21 に廃止した**（ADR-2607211600）。**ただし実際の
+unshallow は未完了で、重い repo が shallow のまま残っている**（ADR-2608124400。
+上記「Git operations」節の確認手順を参照）。
 disk/帯域を抑えたい大容量バイナリは shallow ではなく B2 + DataLad へ移行する
 （`m365-archive` が先行例）。
 
