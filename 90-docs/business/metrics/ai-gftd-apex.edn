@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6686, "ai-gftd-chat-shell" 2221},
+ {"magatama-sh1n5h1x" 6695, "ai-gftd-chat-shell" 2398},
  :zone
- {:requests-7d 501205,
-  :pageviews-7d 21050,
-  :uniques-7d-sum 4704,
+ {:requests-7d 504662,
+  :pageviews-7d 21648,
+  :uniques-7d-sum 4739,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/", :requests 2203}
-   {:path "/favicon.ico", :requests 243}
-   {:path "/_profiler/phpinfo", :requests 200}
-   {:path "/admin/phpinfo.php", :requests 185}
-   {:path "/test.php", :requests 182}
-   {:path "/.env", :requests 182}
-   {:path "/phpinfo.php", :requests 180}
-   {:path "/.env.example", :requests 166}],
-  :status-mix {:ok 7072, :server-error 15912, :client-error 2352},
+  [{:path "/php_version.php", :requests 194}
+   {:path "/info.php", :requests 186}
+   {:path "/pinfo.php", :requests 176}
+   {:path "/nginx_status", :requests 120}
+   {:path "/.vite/manifest.json", :requests 78}
+   {:path "/application.yml", :requests 70}
+   {:path "/config.env", :requests 69}
+   {:path "/gitea/", :requests 64}],
+  :status-mix {:server-error 16050, :ok 3812, :client-error 1273},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-12",
- :traffic-quality {:window "24h", :probe-4xx-pct 9, :error-5xx-pct 63},
+ :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 76},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 2203 · /favicon.ico 243 · /_profiler/phpinfo 200 · /admin/phpinfo.php 185 · /test.php 182 | 4xx(probe) 9% · 5xx 63%",
+ "上位 page (24h, 2xx/3xx): /php_version.php 194 · /info.php 186 · /pinfo.php 176 · /nginx_status 120 · /.vite/manifest.json 78 | 4xx(probe) 6% · 5xx 76%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 501205 req/7d・4704 uniques(日次和)・うち4xx probe 9%(24h)、workers 8907 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 504662 req/7d・4739 uniques(日次和)・うち4xx probe 6%(24h)、workers 9093 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}
