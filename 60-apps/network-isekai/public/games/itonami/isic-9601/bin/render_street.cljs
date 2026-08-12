@@ -36,7 +36,7 @@
                         [--cleared N] [--state FILE] [--engine DIR]
                         [--eye X,Y,Z] [--target X,Y,Z]
                         [--orbit DEG] [--zoom N] [--fov DEG]
-                        [--dry]
+                        [--dry] [--annotate] [--pick X,Y]
 
   `--state FILE` reads an `:itonami-game/state` v1 envelope (from `play --dump`) and draws
   that street progress — unlocked shops match the played run, not a fresh `(world/init)`.
@@ -46,7 +46,13 @@
   absolute coordinates (and win when both styles are passed). An eye that lands underground
   or inside the fit volume exits ≠ 0 — there is no silent clamp.
 
-  `--dry` parses flags, builds the IR, prints eye/target/fov, and exits without Chromium."
+  `--dry` parses flags, builds the IR, prints eye/target/fov, and exits without Chromium.
+
+  `--annotate` (#1753) burns `index:district` at `kami.webgpu.pick/project` coordinates —
+  not a second projection. `--pick X,Y` prints EDN
+  `{:index :district :kind :point :t}` (or `nil`) from an unfiltered `pick/pick` and exits
+  without Chromium unless `--annotate` also asks for a PNG. Shop-only tap filters stay off
+  this path."
   (:require ["node:fs" :as fs]
             ["node:http" :as http]
             ["node:child_process" :as cp]
@@ -56,6 +62,7 @@
             [itonami.isic-9601.world :as world]
             [itonami.isic-9601.world3d :as w3]
             [itonami.isic-9601.state :as state]
+            [itonami.isic-9601.inspect :as inspect]
             [kami.webgpu.geometry :as geom]
             [kami.webgpu.submission :as sub]))
 
@@ -76,6 +83,21 @@
       (let [parts (str/split s #",")]
         (when (not= 3 (count parts))
           (println (str "--" k " wants X,Y,Z (got " (pr-str s) ")"))
+          (js/process.exit 2))
+        (let [v (mapv js/parseFloat parts)]
+          (when (some js/isNaN v)
+            (println (str "--" k " wants numbers (got " (pr-str s) ")"))
+            (js/process.exit 2))
+          v)))))
+
+(defn- vec2-opt
+  "Parse `--pick X,Y`. Wrong arity or NaN exits 2."
+  [k]
+  (let [s (opt k nil)]
+    (when s
+      (let [parts (str/split s #",")]
+        (when (not= 2 (count parts))
+          (println (str "--" k " wants X,Y (got " (pr-str s) ")"))
           (js/process.exit 2))
         (let [v (mapv js/parseFloat parts)]
           (when (some js/isNaN v)
@@ -164,10 +186,27 @@
       (println (or (ex-message e) (.-message e) (str e)))
       (js/process.exit 2))))
 
+(def pick-xy (when (has-opt? "pick") (vec2-opt "pick")))
+(def annotate? (has-opt? "annotate"))
+(def labels
+  "Screen labels for `--annotate`. Coordinates are `pick/project` of each district
+  instance's box centre — the burn path must not re-derive them."
+  (when annotate? (inspect/annotate-labels ir W H)))
+
+(when pick-xy
+  ;; Unfiltered: road returns road; sky miss returns nil. No shop-only tap filter.
+  (println (pr-str (inspect/pick-at ir pick-xy W H)))
+  (when-not annotate?
+    (js/process.exit 0)))
+
 (when (has-opt? "dry")
   (println (str "eye " (pr-str (get-in ir [:globals :eye]))))
   (println (str "target " (pr-str (get-in ir [:globals :target]))))
   (println (str "fov " (pr-str (get-in ir [:globals :fov]))))
+  (when annotate?
+    (println (str "labels " (count labels)))
+    (doseq [lab (take 3 labels)]
+      (println (str "  " (:text lab) " @ " (pr-str [(:x lab) (:y lab)])))))
   (js/process.exit 0))
 
 (def mesh (geom/box 1.0 1.0 1.0))
@@ -354,6 +393,29 @@
     (.listen srv port "127.0.0.1")
     srv))
 
+(def annotate-js
+  "Burn labels onto a PNG in the page. Positions are the CLI's `pick/project` numbers —
+  the browser only paints; it does not re-project."
+  "async (pngUrl, labels, W, H) => {
+  const img = new Image();
+  await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = pngUrl; });
+  const c = Object.assign(document.createElement('canvas'), {width: W, height: H});
+  const g = c.getContext('2d');
+  g.drawImage(img, 0, 0);
+  g.font = 'bold 13px monospace';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  for (const L of labels) {
+    const t = L.text, x = L.x, y = L.y;
+    g.lineWidth = 3;
+    g.strokeStyle = 'rgba(0,0,0,0.85)';
+    g.strokeText(t, x, y);
+    g.fillStyle = '#fff8e7';
+    g.fillText(t, x, y);
+  }
+  return c.toDataURL('image/png');
+}")
+
 (defn -main []
   (println (str "  engine  " engine-root))
   (println (str "  backend " backend (when (= backend "auto") "  (WebGPU first, WebGL 2.0 fallback)")))
@@ -364,6 +426,8 @@
   (println (str "  frame   " (count (:instances ir)) " instances · " W "x" H
                 " · eye " (pr-str (get-in ir [:globals :eye]))
                 " · fov " (pr-str (get-in ir [:globals :fov]))))
+  (when annotate?
+    (println (str "  annotate " (count labels) " labels (pick/project)")))
   (p/let [srv (serve!)
           pw (js/import "playwright")
           browser (.launch (.-chromium pw)
@@ -403,9 +467,18 @@
                                                           :fov (get-in ir [:globals :fov])
                                                           :vert (glsl "lit.vert")
                                                           :frag (glsl "lit.frag")}) ")")))
+          drawn (js->clj raw :keywordize-keys true)
+          ;; Burn annotate labels after the GPU pass so both backends share one overlay path.
+          png (if (and annotate? (:ok drawn) (:png drawn))
+                (.evaluate page (str "(" annotate-js ")")
+                           (:png drawn)
+                           (clj->js (mapv (fn [l] #js {:text (:text l) :x (:x l) :y (:y l)})
+                                          labels))
+                           W H)
+                (:png drawn))
           _ (.close browser)
           _ (.close srv)]
-    (let [r (js->clj raw :keywordize-keys true)]
+    (let [r (assoc drawn :png png)]
       (println (str "  used    " used))
       (when (:stages r)
         (println (str "  stages  " (str/join " → " (:stages r)))))
@@ -427,6 +500,8 @@
           (println (str "  draw    error=" (:glError r) "  bindings=" (:blocks r)))
           (println (str "  pixels  " (:nonSkyPixels r) " non-background · "
                         (:distinctColors r) " distinct colours"))
+          (when annotate?
+            (println (str "  labels  " (count labels) " burned via pick/project")))
           (println (str "  wrote   " abs))
           (println "  note    shadow pass not run (1x1 lit depth texture bound); lit pass only")
           (when (zero? (:nonSkyPixels r))

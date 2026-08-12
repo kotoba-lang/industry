@@ -8,12 +8,14 @@
     street PNG. Needs `orgs/kotoba-lang/webgpu` (+ render) checked out.
     Street argv includes camera flags (#1751): `--eye/--target/--orbit/--zoom/--fov`
     and `--dry` (parse + print IR, no Chromium). Underground / inside-fit eyes exit 2.
+    Also `#1753`: `--annotate` (burn `index:district` via `pick/project`) and
+    `--pick X,Y` (unfiltered EDN hit or nil; no Chromium unless annotating).
   * `--view board` → `bin/render_board.cljs` — inject envelope via
     `window.__setState`, screenshot the DOM shop board. No engine required.
 
   The split exists so board capture does not load kami/engine namespaces that
   fail when the west checkout is absent. All argv is forwarded to the chosen
-  path — including camera refusal / `--dry` on street."
+  path — including camera refusal / `--dry` / annotate / pick on street."
   (:require ["node:child_process" :as cp]
             ["node:path" :as path]
             ["node:fs" :as fs]
