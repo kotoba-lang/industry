@@ -115,8 +115,8 @@ host の `contains?` に戻すと delegation test が fail）。
 ファイルカタログが 13 件で拒否されるので、**この core は production 経路になれない。**
 `kotoba-lang/app-files` も同じ形だった（兄弟の `bounded?` が 8 件で打ち切る）。
 
-**規則はこうである: guest が保持するのが「1 つの判断ぶんのデータ」なら委譲できる。
-「コレクション」なら委譲できない。**
+**規則はこうである（下の訂正も読むこと）: 効いているのは interpreter の node 上限で、
+問われるのは「その値の大きさがドメインに比例して増えるか」である。**
 
 委譲に成功した 5 つの core —— `policy` / `fleet_core` / `organism_worker`（cloud-itonami-app）、
 `model`（calendar）、`clock`（crdt）—— は**すべてスカラか、小さな固定 record** を取る。
@@ -127,6 +127,31 @@ host の `contains?` に戻すと delegation test が fail）。
 `murakumo` の `infer_join_core.kotoba` が冒頭で
 \"partition-work / enrollment map assembly stay cljc (vectors/maps).\" と自ら宣言しているのと
 同じ線を、別の側から確認したものになる。
+
+### 訂正: 「コレクションなら不可」は強すぎた（同日、`fsm` を測って）
+
+最初この節を「コレクションを持つなら委譲できない」と書いた。**それは型の話にしてしまっており、
+誤りである。** `kotoba-lang/fsm` の `advance-player-v1` は `events [:set :keyword]` を取る ——
+コレクションである。測ると:
+
+| event set の大きさ | 結果 |
+|---|---|
+| 32 | ok |
+| **33** | 拒否 |
+
+そして **この FSM の実アルファベットは 3**（`:jumping` / `:moving` / `:still`）で閉じている。
+10 倍の余裕があり、**`fsm` は委譲できる。**
+
+差は型ではなく**増え方**である:
+
+| core | guest が持つもの | 大きさ | 委譲 |
+|---|---|---|---|
+| `mokuroku/bounded` | カタログの item | **利用者のファイル数に比例** | 13 で拒否 → **不可** |
+| `fsm/advance-player-v1` | 入力イベントの集合 | **閉じたアルファベット 3** | 上限 32 → **可** |
+| `clock` / `model` / `policy` | スカラ・小さな固定 record | 定数 | 可 |
+
+**問うべきは「コレクションか」ではなく「その大きさがドメインに比例して増えるか」。**
+閉じた語彙は、たとえ集合であっても、1 つの判断ぶんのデータである。
 
 **したがって `mokuroku` は委譲しない。** parity gate（この ADR で言う「第 1 歩」）が
 その core に対して取れる最大であり、それは後退ではなく**その core の性質**である。
