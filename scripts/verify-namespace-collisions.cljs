@@ -54,7 +54,18 @@
 ;;
 ;; Owners that share a root commit are therefore reported separately, as
 ;; DUPLICATE REGISTRATION, and `scripts/verify-duplicate-registrations.cljs` is
-;; where that problem belongs.
+;; where that problem belongs. It is decided over the whole owner set, which is
+;; the weaker of the two available tests and is kept deliberately -- see
+;; `same-upstream?` for what asking it per pair of owners costs.
+;;
+;; ## A source root is what a repo declares, not what it is called
+;;
+;; Which trees to read was once answered by the name `src`, and narrowing it to
+;; declared trees was bolted on as a filter over that guess. An intersection
+;; cannot be wider than either side, so `src-cljs` was dropped for its name
+;; however plainly it was declared -- 21 such trees, 51 files. The declaration
+;; is the list now. `source-roots` documents what a declared root still has to
+;; satisfy, and both conditions were found by measurement, not by reasoning.
 ;;
 ;; ## What it cannot see
 ;;
@@ -145,7 +156,20 @@
   Deliberately excludes `:extra-paths`. An alias-only tree is on the classpath
   only for whoever invokes that alias in that repo: tools.deps does not export
   a dependency's aliases, so a consumer can never inherit one. That distinction
-  is the whole point -- see the caller."
+  is the whole point -- see the caller.
+
+  Also drops a root that IS the directory declaring it -- `:paths [\".\"]`. Such
+  a root is on the classpath here for resources or for a script, never for a
+  package tree, and both repos that say so document it: `kotoba-lang/kotoba-lang`
+  keeps `.` because `kotoba.launcher` reads `lang/cli.edn` through `io/resource`
+  and dropping it cost 66 load errors, and the twenty `games/*/deps.edn` under
+  `kami-genre-base-systems` keep it so `clojure -M author.clj` resolves -- those
+  files carry no `ns` form at all. Honouring `.` as a namespace root instead
+  re-derives every namespace WITH the real tree's own name still on the front,
+  so `src/kotoba/lang/package_registry.cljc` appears beside the true
+  `kotoba/lang/package_registry.cljc`; because `kotoba-lang` and
+  `kotoba-core-contracts` both declare `.`, those phantoms even collide with
+  each other and read as a second, independent finding for one file."
   [repo-dir]
   (letfn [(files [cur depth acc]
             (if (> depth 6)
@@ -174,8 +198,10 @@
                          dir (path/dirname f)]
                      (into acc
                            (for [[_ body] m
-                                 [_ p] (re-seq #"\"([^\"]+)\"" body)]
-                             (path/normalize (path/join dir p))))))
+                                 [_ p] (re-seq #"\"([^\"]+)\"" body)
+                                 :let [abs (path/normalize (path/join dir p))]
+                                 :when (not= abs (path/normalize dir))]
+                             abs))))
                  #{} fs')]
       (when (seq fs') roots))))
 
@@ -191,6 +217,17 @@
 
 (defn- src-dirs
   "Every directory named `src` under `root`, to a bounded depth.
+
+  This is the FALLBACK, used only for a repo that declares no `:paths` anywhere
+  -- see `source-roots`. For everyone else the declaration is the list, because
+  a source root is whatever a repo says it is and nothing about the word `src`
+  makes a directory one. Guessing by name missed 21 `src-*` trees holding 51
+  Clojure files, among them `wasm-webcomponent/src-cljs/vendor/kotoba/
+  kami_host.cljc`, a vendored copy of `kotoba-lang/kotoba`'s `kotoba.kami-host`
+  that has since drifted from it. That repo is worth the whole example: what it
+  has named `src` is shadow-cljs's OUTPUT directory, so filtering by the name
+  did not merely miss a tree, it selected the build product and discarded the
+  two source trees the config actually names.
 
   Not just `<root>/src`. The first version of this scan looked only at the top
   level, and the cost was not hypothetical: of 4,148 checkouts it entered 3,528
@@ -222,6 +259,32 @@
                            (catch :default _ [])))))]
     (step root 0 [])))
 
+(defn- source-roots
+  "The directories `root` puts on a classpath: what it DECLARES, if it declares
+  anything, and otherwise every tree named `src` that it has.
+
+  A declared root has to survive two checks beyond existing and being a
+  directory, and both are load-bearing.
+
+  It must lie inside the repo. Nested shadow-cljs configs here reach sideways
+  with `../..` -- `net-kotobase` names 28 roots that resolve into OTHER repos,
+  `kotoba-lang/pay/src` and `kotoba-lang/kotobase/src` among them, because a
+  worker builds against sibling checkouts. Taking those at face value would
+  make `net-kotobase` an owner of `kotoba-lang/pay`'s files, so `pay/core.cljc`
+  would be reported as shipped twice by two repos when one file is on disk. It
+  also breaks the opposite way: the extra owner arrives with its own root
+  commit, and every DUPLICATE REGISTRATION pair it lands in stops looking like
+  one upstream.
+
+  And it must not be the directory that declared it -- see
+  `declared-source-roots` for why `:paths [\".\"]` is a resource root here and
+  never a package tree."
+  [root]
+  (let [declared (declared-source-roots root)
+        inside? (fn [p] (str/starts-with? p (str root "/")))
+        dir? (fn [p] (try (.isDirectory (fs/statSync p)) (catch :default _ false)))]
+    (filter dir? (if declared (filter inside? declared) (src-dirs root)))))
+
 (defn- repos
   "One entry per (repo, src root). A repo with several source trees appears
   several times, and `:repo` stays the repository so downstream grouping still
@@ -237,31 +300,28 @@
                         (filter #(.isDirectory %))
                         (map #(str "orgs/" org-name "/" (.-name %)))))))
        (mapcat (fn [root]
-                 ;; Walking every `src` dir was the fix for a scan that saw only
-                 ;; `<repo>/src`. It over-corrected: `test/e2e/src` is a source
-                 ;; root by name and ships to nobody, and three repos in the
-                 ;; kami-ongaku family were reported as colliding on
+                 ;; A tree counts when the repo DECLARES it. That rule arrived
+                 ;; as a filter over directories named `src`, to stop
+                 ;; `test/e2e/src` being read as a source root: three repos in
+                 ;; the kami-ongaku family were reported as colliding on
                  ;; `kami/ongaku/e2e/*` when no build can put two of those trees
                  ;; on one classpath -- each is reachable only through its own
                  ;; `:e2e` alias, and tools.deps does not export a dependency's
                  ;; aliases. Measured with `clojure -Spath -A:e2e` in the one
                  ;; repo depending on two of them: neither tree appears.
                  ;;
-                 ;; So a tree counts when the repo DECLARES it, not when it is
-                 ;; spelled `src`. The narrowing is by `:paths` membership, not
-                 ;; by depth -- `net-kotobase/kotobase-api-gateway-cljs/src` is
-                 ;; nested AND declared, and it holds the copy this detector
-                 ;; exists to find. Narrowing by depth would lose it again.
-                 (let [declared (declared-source-roots root)
-                       found (src-dirs root)]
-                   (map (fn [src] {:repo (str/replace root #"^orgs/" "")
-                                   :root root
-                                   :src src})
-                        ;; A repo that declares nothing keeps every tree: unknown
-                        ;; must read as "look", not as "skip".
-                        (if declared
-                          (filter #(contains? declared (path/normalize %)) found)
-                          found)))))
+                 ;; The rule was right and the filter was the wrong shape for
+                 ;; it. An intersection with `src`-named directories can only
+                 ;; ever be as wide as the guess, so a declared `src-cljs` was
+                 ;; dropped for its name however plainly it was declared. The
+                 ;; declaration is now the list itself and the name test is
+                 ;; gone; `source-roots` says what a declared root still has to
+                 ;; satisfy. `kami/ongaku/e2e/*` stays out for the reason it
+                 ;; always should have -- nobody declares those trees.
+                 (map (fn [src] {:repo (str/replace root #"^orgs/" "")
+                                 :root root
+                                 :src src})
+                      (source-roots root))))
        vec))
 
 (defn- index
@@ -299,19 +359,16 @@
                        (distinct (map :repo rs)))
         ;; repo -> root commit, so owners that are one upstream checked out
         ;; twice can be separated from owners that are different projects.
-        roots (into {} (map (fn [{:keys [repo root]}] [repo (root-commit root)])) rs)
+        ;; Deduplicated first: a repo contributes one checkout however many
+        ;; source trees it declares, and `root-commit` forks a git per call.
+        roots (into {} (map (fn [[repo root]] [repo (root-commit root)]))
+                    (distinct (map (juxt :repo :root) rs)))
         ;; Owners are counted per REPOSITORY, not per file. Now that a repo can
         ;; contribute several source trees, one repo could otherwise appear
         ;; twice in `owners` and satisfy "two of these are on one classpath" by
         ;; itself -- a collision manufactured out of a single project.
-        owner-repos (fn [owners] (distinct (map :repo owners)))
+        owner-repos (fn [owners] (vec (distinct (map :repo owners))))
         within-repo? (fn [owners] (= 1 (count (owner-repos owners))))
-        same-upstream?
-        (fn [owners]
-          (let [names (owner-repos owners)
-                rs' (keep #(get roots %) names)]
-            (and (= (count rs') (count names))
-                 (= 1 (count (distinct rs'))))))
         co-classpath?
         (fn [owners]
           (let [names (owner-repos owners)]
@@ -323,6 +380,31 @@
                                              names))
                               2))
                         closures)))))
+        ;; Whether the owners are one repository checked out twice is asked of
+        ;; the whole set, and it has to stay that way, though asking it per pair
+        ;; of owners is the more obviously correct thing and was tried here.
+        ;; Measured 2026-08-12: the only pair of `treasury/core.cljc`'s seven
+        ;; owners that any closure reaches together is `gftdcojp/cloud-murakumo`
+        ;; with `network-awai/cloud-murakumo`, which is one repo at two paths.
+        ;; The other five are co-classpath with nobody. So this finding is
+        ;; promoted by a relationship the script itself calls not-a-collision,
+        ;; and survives suppression only because owners that took no part in
+        ;; promoting it disagree about upstream. Per-pair, both halves are
+        ;; decided by the same pair, and the file ADR-2608121000 calls the worst
+        ;; copy in the fleet stops being reported at all.
+        ;;
+        ;; That is worth stating plainly rather than tuning away: seven repos
+        ;; ship this namespace with seven different contents, one of them
+        ;; missing the guard on unconfirmed payments, and CO-CLASSPATH is not
+        ;; the axis that finds it -- it is reported by accident. Ranking that
+        ;; catches it on purpose needs a second axis this script does not have,
+        ;; and `verify-vendored-copies.cljs` is the likelier home for it.
+        same-upstream?
+        (fn [owners]
+          (let [names (owner-repos owners)
+                rs' (keep #(get roots %) names)]
+            (and (= (count rs') (count names))
+                 (= 1 (count (distinct rs'))))))
         collisions (->> idx
                         (filter (fn [[_ owners]] (> (count owners) 1)))
                         (map (fn [[ns-path owners]]
@@ -343,7 +425,14 @@
         identical (remove :divergent? cross)
         co (filter :co-classpath? divergent)
         duplicate-registration (filter :same-upstream? co)
-        reachable-divergent (remove :same-upstream? co)]
+        reachable-divergent (remove :same-upstream? co)
+        ;; Divergent, and no closure puts two owners together. Printed only
+        ;; under --all, but printed: until now these appeared in no mode at all,
+        ;; and they are most of what is found -- 216 of 243. `kotoba/
+        ;; kami_host.cljc` is here rather than above, `kotoba-lang/kotoba`
+        ;; against a vendored copy in `wasm-webcomponent` that has drifted from
+        ;; it, and nothing depends on both.
+        unreachable-divergent (remove :co-classpath? divergent)]
     (println (str "scanned " (count (distinct (map :repo rs))) " checked-out repos ("
                   (count rs) " source trees), " (count idx) " namespace paths"))
     (println (str "collisions: " (count divergent) " divergent, "
@@ -374,6 +463,14 @@
         (doseq [{:keys [file sha]} owners]
           (println (str "     " (subs (or sha "????????") 0 8) "  " file)))))
     (when show-all?
+      (println)
+      (println (str "-- " (count unreachable-divergent)
+                    " divergent, but no closure puts two owners on one"
+                    " classpath --"))
+      (doseq [{:keys [ns owners]} unreachable-divergent]
+        (println (str "divergent  " ns))
+        (doseq [{:keys [repo sha]} owners]
+          (println (str "             " (subs (or sha "????????") 0 8) "  " repo))))
       (println)
       (doseq [{:keys [ns owners co-classpath?]} identical]
         (println (str "identical  " ns "  (" (count owners) " repos"
