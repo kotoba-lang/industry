@@ -63,12 +63,37 @@
    `wasm-tools validate --features all` も通る。**完成したように見える artifact が
    できる。**
 
-   ## したがって compiler 側から始める
+   ## 測定 4（2026-08-12 追記、上の記述を訂正する）— intrinsic は在る
+
+   **本 ADR は当初『素の WAT からは到達路が無い』と書いた。これは強すぎる。**
+   `wit-component` は future/stream の canonical built-in を core import として
+   受け付ける（`crates/wit-component/src/validation.rs`、v1.243.0）:
+
+   | intrinsic | 名前 | core 署名 |
+   |---|---|---|
+   | `future.new` | `[future-new-<N>]<func>` | `(result i64)` |
+   | `future.write` | `[future-write-<N>]<func>` | `(param i32 i32) (result i32)` |
+   | 他 | `[future-read-/cancel-/drop-*]`, `[stream-*]` 同型 | 同ファイル 2236-2323 |
+
+   `<N>` は「その関数の何番目の future/stream か」、`<func>` は当該 interface の
+   関数名。**したがって『できない』ではなく『まだ綴りを当てられていない』が正しい。**
+   `cm32p2|<iface>@<ver>` に `[future-new-0]take` を置く形は
+   `is missing function` で拒否されており、正しい組み合わせは未確定。
+
+   **加えて、私自身の probe の作りに誤りがあった**: `head -0` を挟んだ判定で
+   2 つの署名を『ACCEPTED』と読んだが、どちらも実際は拒否されていた。
+   **出力を捨てる判定で合格を報告しかけた** —— 測定の作法として記録する。
+
+   ## それでも compiler 側から始める（理由が変わる）
+
+   理由は「不可能だから」ではなく、**intrinsic を KIR から emit するのは
+   どのみち compiler の仕事**であり、9 capability ぶんを手書き WAT で持つのは
+   `clock` 1 本ですら 100 行あった実績から見て維持できないから。
 
    `wasi:http/client@0.3.0` の `send` は `request` resource を取り
    `result<response, error-code>` を返す。`request.new` は `option<stream<u8>>` と
-   `future<result<...>>` を要求する。**測定 3 により、これを手書き WAT で満たす
-   道は無い。** 実際、測定 1 で効いた sync lowering の近道は `send` には届かず、
+   `future<result<...>>` を要求する。測定 1 で効いた sync lowering の近道は
+   `send` には届かず、
    妥当な 3 つの sync 署名（`(param i32 i32)` / `(param i32)(result i64)` /
    `(param i32 i32)(result i32)`）はいずれも
    `failed to resolve import cm32p2|wasi:http/client@0.3::send` で拒否された
@@ -112,9 +137,10 @@
    compiler 側で `future<T>` / `stream<T>` の canonical built-in
    （`future.new` 等）を KIR から emit できるようにする。着手前に測ること:
 
-   - `wit-component` がこれらの intrinsic を core import としてどう綴るか
-     （**本 ADR では特定できていない。** 素の WAT からは到達路が無いとしか
-     言えていない）
+   - `[future-new-<N>]<func>` を受理させる module/name の正しい組み合わせ
+     （署名は確定済み。**`cm32p2|<iface>@<ver>` は拒否された**ので、
+     `crates/wit-component/src/validation.rs` の `prefixed_payload` が
+     `get_function` に何を渡しているかを読むのが次の一歩）
    - bounded の意味 —— `component-model-v1.edn` の `:async` profile が既に
      `:requires [:declared-async-effect :cancellation :deadline :item-budget
      :byte-budget]` を宣言しているので、**5 つとも満たさないものを
