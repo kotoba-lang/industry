@@ -513,17 +513,86 @@
         (when-not (zero? exit) (die (str "git archive failed for " org-repo "@" sha ": " (str/trim out))))))
     f))
 
+(defn self-pin-ref
+  "bundle が運ぶ ref 名。dep 側（ship-git-deps!）と同じ規則にしてある —
+  `mirror!` の fetch refspec は `+refs/heads/*:refs/heads/*` なので
+  `refs/fleet-ci/*` は prune されず、object も保持される。"
+  [sha]
+  (str "refs/fleet-ci/pin/" sha))
+
+(defn self-bundle!
+  "**gate 対象 repo 自身**を `git bundle` として用意する（entry の `:ship-self-bundle true`）。
+
+  既定の配送は `git archive` の tarball で、**その出力に `.git` は入らない**（入れる
+  option も無い）。したがって「この repo の履歴」を入力にする gate は、既定の経路では
+  ノード上で問いを立てられない —— 実測 ADR-2608132400、`kotoba-provider-orphan-check`
+  は展開 tree に `.git` が無いことを検出して exit 90 で拒否する。
+
+  これは新機構ではない。**同じ日に依存側で landed した経路の適用範囲を 1 つ広げただけ**
+  である（ADR-2608132000）: `ship-git-deps!` は `~/.gitlibs/libs/<lib>/<sha>` に
+  `git archive` の展開物を置いていたため、amu の JDK-free resolver の
+  `git rev-parse HEAD` が nil を返し、`amu-native-conformance` が 28 run 連続で赤だった。
+  直し方は bundle を送ってノードで本物の checkout を作ることで、
+  **object の検証は git 自身がやる**（`bundle` は不完全な prerequisite を拒否する）。
+
+  ここで送るのは `<mirror>` の `refs/fleet-ci/pin/<sha>` から到達可能な全 object、
+  つまり **full history** である。それがこの経路の目的物なので絞り込めない ——
+  `:include-ext` との併用は `gate-input!` が拒否する（下記）。"
+  [org-repo sha]
+  (let [f (path/join cache-dir (str (str/replace org-repo "/" "-") "-" (sha12 sha) "-self.bundle"))]
+    (when-not (fs/existsSync f)
+      (fs/mkdirSync cache-dir #js {:recursive true})
+      (let [m (ensure-sha! (mirror! org-repo) org-repo sha)
+            pin-ref (self-pin-ref sha)]
+        (when-not (zero? (:exit (git m ["update-ref" pin-ref sha])))
+          (reject-input! (str "could not create " pin-ref " in the mirror of " org-repo
+                              " — :ship-self-bundle needs a named ref to bundle")))
+        (let [{:keys [exit out]} (git m ["bundle" "create" f pin-ref] {:timeout 1800000})]
+          (when-not (zero? exit)
+            ;; tarball 経路へ黙って落ちない。落ちれば `.git` の無い tree が届き、
+            ;; 履歴を読む gate は exit 90 を返す —— 配送の失敗が検査の失敗に化ける。
+            (reject-input! (str "git bundle create failed for " org-repo "@" (sha7 sha)
+                                ": " (str/trim out)))))))
+    f))
+
 (defn gate-input!
-  "gate に渡す tarball。:include-ext があれば絞り込み版、無ければ全体。
+  "gate に渡す入力ファイル。
+
+  - `:ship-self-bundle true` … repo 自身の **git bundle**（履歴つき）
+  - `:include-ext` あり       … 絞り込み tarball
+  - どちらも無し             … repo 全体の tarball（既定。今日までと同じ）
+
   ノードへ送るサイズに上限を掛ける。"
-  [{:keys [org-repo tip include-ext min-files name]}]
-  (let [f (if (seq include-ext)
+  [{:keys [org-repo tip include-ext min-files name ship-self-bundle]}]
+  (let [f (cond
+            ship-self-bundle
+            (do
+              ;; **filter と bundle は両立しない。** bundle は「その commit から
+              ;; 到達可能な object 全部」であって tree の部分集合ではないので、
+              ;; `:include-ext` を書いても効かない。黙って無視すると、entry を書いた
+              ;; 人は「絞って送っている」と読み続ける —— このワークスペースが
+              ;; 繰り返し踏んできた形（no-op な設定が正しく見える）なので、拒否する。
+              ;; 履歴を読む gate は tree 全体を必要とするので、絞る要求自体が誤り。
+              (when (or (seq include-ext) min-files)
+                (reject-input!
+                 (str name ": :ship-self-bundle cannot be combined with :include-ext/:min-files"
+                      " — a git bundle carries the whole repository (that is the point: the gate"
+                      " reads history), so the filter would silently do nothing. Drop them;"
+                      " the gate's own --min floor is what guards against an unread tree.")))
+              (self-bundle! org-repo tip))
+
+            (seq include-ext)
             (filtered-tarball! org-repo tip {:include-ext include-ext :min-files min-files})
-            (full-tarball! org-repo tip))
+
+            :else (full-tarball! org-repo tip))
         mb (/ (.-size (fs/statSync f)) 1048576)]
     (when (> mb max-ship-mb)
-      (reject-input! (str name " gate input is " (js/Math.round mb) "MB (> " max-ship-mb
-                          "MB) — add :include-ext to gates.edn so only the inspected paths are shipped")))
+      (reject-input! (str name " gate input is " (js/Math.round mb) "MB (> " max-ship-mb "MB) — "
+                          (if ship-self-bundle
+                            (str ":ship-self-bundle ships full history, which for a repo this size"
+                                 " is too much to push over ssh each tick; this gate needs a"
+                                 " different delivery, not a bigger ceiling")
+                            "add :include-ext to gates.edn so only the inspected paths are shipped"))))
     f))
 
 ;; ---------------------------------------------------------------------------
@@ -821,9 +890,28 @@
   ② gate script を ssh stdin で流して実行
   ③ **verdict は出力の sentinel を operator 側で grep して決める**
      （ssh の exit code は Tailscale SSH + /usr/bin/login で必ず 0 になるため）"
-  [{:keys [tarball script-file host name sha out-file]}]
+  [{:keys [tarball script-file host name sha out-file bundle?]}]
   (let [d (remote-dir name sha)
-        ssh-opts "-o BatchMode=yes -o ConnectTimeout=20"]
+        ssh-opts "-o BatchMode=yes -o ConnectTimeout=20"
+        ;; bundle 経路の受け側。**展開先 dir の中に置く**ので、失敗して残っても
+        ;; 次の prune（下の find）と次回の `rm -rf <d>` が確実に回収する。
+        ;; tracked ではないので `git ls-files` を汚さない。
+        rb (str d "/.fleet-ci-self.bundle")
+        place (if bundle?
+                ;; :ship-self-bundle — ノード側で **本物の checkout** を作る。
+                ;; 手順は ship-git-deps! が依存に対してやっているものと同じ
+                ;; （ADR-2608132000）: init → fetch(bundle) → checkout -f → sha 照合。
+                ;; sha 照合まで入れるのは、`.git` が在るだけでは「その commit を
+                ;; 保持している証拠」にならないため。照合が落ちれば
+                ;; FLEET-CI-EXTRACT-OK が出ず、gate は走らずに exit 90 になる。
+                (str " cat > " rb
+                     " && git init -q " d
+                     " && git -C " d " fetch -q " rb " " (self-pin-ref sha) ":" (self-pin-ref sha)
+                     " && git -C " d " checkout -q -f " sha
+                     " && rm -f " rb
+                     " && git -C " d " rev-parse HEAD | grep -qx " sha)
+                ;; 既定（今日までと同じ）。tarball は --prefix=repo/ 付きなので strip 1。
+                (str " tar xz -C " d " --strip-components=1"))]
     (str "cat " tarball " | ssh " ssh-opts " " host
          ;; 保持は **分** で切る。`-mtime +1`（1 日）だと回収が生産に追いつかない:
          ;; 実測 2026-07-30、asher の /tmp/fleet-ci は 474 dir / 20GB まで育ち
@@ -834,7 +922,7 @@
          ;; gate timeout は 30 分なので 120 分は 4 倍の余裕があり、走っている
          ;; gate の dir を消す危険は無い。保持量は 24 時間分から 2 時間分に下がる。
          " \"find " remote-base " -maxdepth 1 -mindepth 1 -type d -mmin +120 -exec rm -rf {} + 2>/dev/null;"
-         " rm -rf " d "; mkdir -p " d "; tar xz -C " d " --strip-components=1"
+         " rm -rf " d "; mkdir -p " d ";" place
          " && echo FLEET-CI-EXTRACT-OK\" > " out-file ".extract 2>&1; "
          "grep -q FLEET-CI-EXTRACT-OK " out-file ".extract"
          " || { tail -5 " out-file ".extract; echo 'FLEET-CI: extract failed on " host "'; exit 90; }; "
@@ -1307,6 +1395,9 @@
                                     :cmd (gate-command {:tarball tgz :script-file sfile
                                                         :host (get-in w [:node :host])
                                                         :name (:id w) :sha (:tip w)
+                                                        ;; 履歴を読む gate だけが true。
+                                                        ;; 既定は今日までと同じ tarball 経路。
+                                                        :bundle? (boolean (:ship-self-bundle w))
                                                         ;; gate のノード側出力をここに残す
                                                         ;; （verdict の grep 対象 + 失敗時の調査用）
                                                         ;;

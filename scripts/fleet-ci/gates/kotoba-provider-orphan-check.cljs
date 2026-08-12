@@ -28,26 +28,29 @@
   tree だけで済ませる仮説は、**測ったら成り立たなかった**。区別できるのは履歴だけ
   —— 置き換えたのか、新しく書いたのか。
 
-  ## この gate が今 fleet に載っていない理由（重要・実測）
+  ## fleet に載る条件 —— entry に `:ship-self-bundle true` が要る（実測）
 
-  **fleet は `.git` を配らない。** `scripts/fleet-ci/tick.cljs` は対象 tip を
-  mirror からの `git archive --format=tar.gz --prefix=repo/ <sha>` で固め、それを
-  ssh stdin でノードへ流す（`full-tarball!` / `filtered-tarball!`）。`git archive`
-  の出力に `.git` は入らない —— 入れる option も無い。したがってノード上の展開
-  ディレクトリには履歴が無く、**この gate の入力そのものが tree に存在しない。**
+  **既定の配送では履歴が届かない。** `scripts/fleet-ci/tick.cljs` の既定は対象 tip を
+  mirror から `git archive --format=tar.gz --prefix=repo/ <sha>` で固めて ssh stdin で
+  流す経路（`full-tarball!` / `filtered-tarball!`）で、**`git archive` の出力に `.git` は
+  入らない**（入れる option も無い）。ADR-2608132400 はこれを理由に entry を足さなかった。
 
-  それを承知で `gates.edn` に載せると `root-permit-index` と同じ形になる ——
-  「入力が無い gate は、落ちているのではなく問いを立てられていない」。だから
-  載せていない。詳細は ADR-2608132400。
+  **2026-08-13、tick.cljs に `:ship-self-bundle` が入って解決した**（ADR-2608134200）。
+  true の entry は mirror からの `git bundle` で配られ、ノード側で `git init` →
+  `fetch` → `checkout -f` → sha 照合して**本物の checkout** になる。ADR-2608132000 が
+  `ship-git-deps!` で**依存**に対して landed させた経路を、gate 対象 repo 自身に
+  広げたもの。実測（同日、benjamin / judah / simeon）:
 
-  **直し方の機構は既にある。** ADR-2608132000（同日）は、`ship-git-deps!` が
-  ノードに置く**依存**が `git archive` の展開物で `.git` を持たないために
-  `amu-native-conformance` が 28 run 連続で赤だったのを、**`git bundle` を送って
-  本物の checkout を作る**ことで直した。gate 対象 repo 自身の tree に同じことを
-  すれば（entry の `:ship-self-bundle true` 相当）、この gate は載る。
+      :ship-self-bundle true  → EXIT 1  src/kotoba/rtx_native.kotoba を名指し
+      既定（tarball）          → EXIT 90 no .git in /tmp/fleet-ci/…
 
-  そのため **`.git` が無い tree では緑を返さず exit 90 で落ちる**（下の床①）。
-  もし将来これを gates.edn に載せた人が居ても、静かな false-green にはならず
+  **`:include-ext` を併記しないこと。** bundle は tree の部分集合ではないので filter は
+  効かない（`gate-input!` が併記を拒否する）。逆に言えば、ADR-2608132400 が警告した
+  「`.kotoba` を送らない filter のせいで手元は緑・fleet は赤」は、この経路では
+  構造的に起こらない —— bundle が全ファイルを運ぶ。
+
+  そして **`.git` が無い tree では緑を返さず exit 90 で落ちる**（下の床①）。
+  `:ship-self-bundle` を書き忘れた entry は静かな false-green にならず、
   「履歴がここに無い」と名指しで赤くなる。
 
   ## 床（何も測っていないのに PASSED と言わないため）
