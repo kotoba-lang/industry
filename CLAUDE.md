@@ -630,6 +630,15 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
   詳細は ADR-2607011345。plain git（commit/push、west 不使用）だけなら
   superproject 内側の worktree でも問題ない。
 
+  **worktree が隔離するのは working tree であって object store ではない。**
+  linked worktree は `$GIT_COMMON_DIR` を元リポジトリと共有するので、
+  **`/tmp` に作った「使い捨て」worktree の中で `--depth` 付き fetch をすると、
+  superproject 本体が shallow になる**（`.git/shallow` は共有される）。
+  実測 2026-08-12: root が shallow になっていた最有力経路がこれで、
+  痕跡はどのログにも残っていなかった（**ref を動かさない depth fetch は
+  reflog に entry を書かない**ため）。**worktree は `.git` に書くものに対する
+  sandbox ではない。** 詳細は ADR-2608124400。
+
   共有 checkout（west 管理パス）には直接 commit/push しない。worktree 経由で
   main に着地させたあと、共有 checkout 側は `git fetch` と（内容一致を `shasum`
   で確認した上での）重複ファイルの削除だけで追従させる。

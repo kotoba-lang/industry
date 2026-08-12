@@ -160,7 +160,39 @@ temporary workspaces, never into `orgs/`.
 **So these unshallows will stick.** What re-shallowed the root on 2026-08-11 is
 therefore *not* west, and remains unexplained.
 
-## The other 11, deliberately not touched
+## Remediation: 9 of the 10 remaining are done
+
+Unshallowed, ~740 MB total, 51 s for the largest: `kotodama`, `kotoba-code`,
+`hil`, `tamaki`, `kotoba-topology`, `kototama`, `ai-gftd-yukkuri`,
+`kotoba-v2025`, and `etzhayyim/root` (20 grafts, 10,122 -> 10,183 commits, 54 ->
+47 roots).
+
+**Safety confirmed rather than assumed.** Every repo's fetch refspec was checked
+first: all map **only** into `refs/remotes/origin/*`, none writes `refs/heads/*`.
+Combined with detached HEAD everywhere (normal at a west pin), **no local branch
+and no HEAD could move.** `git status --porcelain` was hashed before and after
+each and is byte-identical — including `etzhayyim/root`'s pre-existing WIP, which
+survived. `-c gc.auto=0` was passed on every fetch, since `fetch` can trigger
+auto-gc.
+
+**`gftdcojp/ai-gftd-apps-gftdcojp` (50 grafts, 5.5 GB) was skipped**, for four
+reasons rather than size alone: it is ~90% of the remaining liability; it has a
+**locked** agent worktree plus a second on a live branch, i.e. concurrent
+sessions; it carries a **580 MB stale `tmp_pack_` from 19 July**, which is direct
+evidence that a large fetch here has already died mid-flight; and it has
+uncommitted WIP. A failed 5.5 GB fetch leaves more of the same.
+
+Two honest residuals, both real rather than graft artifacts. `kototama` keeps
+**one graft** whose commit is reachable from no ref — the orphaned detached HEAD
+of another session's linked worktree, left rather than disturbed; its own history
+is now genuinely full. And `etzhayyim/root` shows 47 roots with **zero** grafts,
+which is expected for a monorepo that absorbed many former submodule histories.
+
+Two orphan shallow gitdirs remain with no checkout (submodule-era leftovers,
+both carrying the now-banned `-clj` suffix). **No checkout means no ancestry
+answer can come from them**, so unshallowing them buys nothing.
+
+## The original list of 11
 
 Remediating all of them would pull roughly **7 GB**, dominated by one 5.5 GB
 repo. They are recorded here rather than fixed, so the decision is visible:
