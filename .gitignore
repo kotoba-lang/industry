@@ -4274,3 +4274,8 @@ orgs/personal/research/genomics/high-iq-japanese-gwas/.venv-audit/
 # 他セッションの `git merge --ff-only` を塞ぐ（2026-08-10 に実際にそうなった）。
 # observatory.datoms.edn（スナップショット）は従来どおり tracked。
 90-docs/observatory/*.ledger.edn
+
+# scripts/verify-duplicate-registrations.cljs caches GitHub repository ids for
+# names its org listing says do not exist, so a rerun costs ~10 gh invocations
+# instead of ~37. Local measurement cache, not source.
+.cache/
