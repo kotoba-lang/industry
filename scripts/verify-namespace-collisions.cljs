@@ -145,6 +145,28 @@
 (def show-all? (some #{"--all"} argv))
 (def check? (some #{"--check"} argv))
 
+;; --findings additionally emits one machine-readable line per finding:
+;;
+;;   FINDING<TAB>severity<TAB>key<TAB>detail
+;;
+;; for scripts/orgs-detector-tick.cljs, which needs a stable identity per
+;; finding so it can tell a collision that appeared today from one that has
+;; stood for weeks. This check cannot be a fleet-CI gate -- a gate is shipped
+;; only the target repo's own tree and this question is about two repos at
+;; once -- so the registry in manifest/orgs-detectors.edn is where it runs.
+;;
+;; severity `fail` is exactly the set --check exits 1 on (the co-classpath
+;; divergent collisions). `warn` is report-only: EXTENSION-SHADOWED namespaces
+;; that no closure puts on one classpath cannot bite today, but they are the
+;; class ordering cannot fix if a dependency is ever added, so a NEW one should
+;; be visible without ever gating on it. Self-shadowing files are `warn` for
+;; the same reason -- one repo, decided by the order its own trees are declared.
+;;
+;; The flag changes nothing about what is measured, what is printed, or the
+;; exit code. It is matched by set membership like --all and --check, so no
+;; positional parsing can be disturbed by it.
+(def findings? (some #{"--findings"} argv))
+
 (def source-extensions #{".clj" ".cljc" ".cljs"})
 
 (defn- source-file? [name]
@@ -613,6 +635,26 @@
     (println)
     (println (str "Only checked-out repos were scanned. A clean report means no "
                   "collisions among these, not that none exist."))
+    (when findings?
+      ;; Zero scanned repos is not a clean run (the tick refuses to record :ok
+      ;; without this line reading > 0). It is the same floor --check has no
+      ;; way to express: a scan that entered no directory finds no collisions.
+      (println (str "SCANNED\t" (count (distinct (map :repo rs)))
+                    "\tchecked-out repo(s)"))
+      (doseq [{:keys [ns names]} reachable-divergent]
+        (println (str "FINDING\tfail\tcollision:" ns
+                      "\tshipped with different content by " (count names)
+                      " co-classpath repo(s): " (str/join ", " names))))
+      (doseq [{:keys [ns names]} (filter :ext-shadowed? unreachable-divergent)]
+        (println (str "FINDING\twarn\text-shadow:" ns
+                      "\tone repo's platform file covers another's .cljc"
+                      " whatever the order; no closure holds both today: "
+                      (str/join ", " names))))
+      (doseq [{:keys [ns owners]} self-shadowing]
+        (println (str "FINDING\twarn\tself-shadow:" ns
+                      "\tsame path in " (count owners)
+                      " source trees of one repo, different content: "
+                      (str/join ", " (map :file owners))))))
     (when (and check? (seq reachable-divergent))
       (println)
       (println (str "verify-namespace-collisions: " (count reachable-divergent)

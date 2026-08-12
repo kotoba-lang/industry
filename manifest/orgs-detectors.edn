@@ -370,4 +370,36 @@
               load 157 is a real cost, and a consent-tier partition changes on human
               timescales. It reads EDN files and spawns exactly one child,
               `nbb manifest/edn-query.cljs q*`, which has no write call anywhere; no
-              network, no writes."}]}
+              network, no writes."}
+
+  {:id       :verify-namespace-collisions
+   :title    "namespaces two repositories both ship"
+   :why      "ADR-2608131700, 2026-08-13: two repos shipping one namespace means a build
+              silently gets whichever the classpath reaches first, and the loser's code
+              is dead while still looking live. Measured on this machine that day:
+              `authentication.adapters.external-factors` does not compile at all on
+              cloud-itonami/local-itonami's real classpath -- `No such var:
+              oidc/verify-once` -- because org-openid-oidc's `oidc.core` sits ahead of
+              kotoba-lang/oidc's and the two share no names. Nothing reported it. The
+              same run found `kotoba.lang.package-registry` shipped by two repos with
+              ten shared names and divergent bodies, one of which drops the
+              :dep/definition-cids that stops a republish swapping a definition body.
+              It cannot be a fleet gate: a gate is shipped only the target repo's own
+              tree, and this question is about two trees at once."
+   :argv     ["nbb" "{{repo}}/scripts/verify-namespace-collisions.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000                 ; 24h -- as expensive as verify-require-graph
+   :timeout-ms  3600000                  ; 60m -- 2.6x the slowest measured run
+   :writes   :none
+   :measured "2026-08-13 on this machine, twice: 22.8m and 14.1m wall for the same corpus
+              (the spread is other agents on this machine, not the corpus), 4045
+              checked-out repos / 5438 source trees / 16406 file paths. 9 fail findings
+              (co-classpath divergent) and 10 warn (EXTENSION-SHADOWED with no closure
+              holding both). No --all: the 253 divergent-but-unreachable and 1544
+              identical namespaces are scaffold families and would be 1500 standing
+              lines. --findings was proved additive on a 3-repo fixture: output
+              byte-identical without the flag, and identical with it once the FINDING
+              and SCANNED lines are removed; --check still exits 1 either way."}]}
+
