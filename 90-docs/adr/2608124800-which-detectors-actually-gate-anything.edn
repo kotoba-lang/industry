@@ -94,10 +94,43 @@ summary with N at or above the fixture count, **specifically so a git-less
 environment running only the pure cases cannot go green.** 20 receipts, 0
 failures, and it is live in production inside `cleanup-land.cljs`.
 
-But CLAUDE.md's requirement — **break the target, see exit 1; unbreak it, see
-exit 0** — **is recorded nowhere.** The 21 fixture cases include negatives, which
+CLAUDE.md's requirement — **break the target, see exit 1; unbreak it, see
+exit 0** — was recorded nowhere. The 21 fixture cases include negatives, which
 is evidence the *classifier* discriminates; **it is not evidence the *gate* goes
-red.** That demonstration is cheap and outstanding.
+red.**
+
+**Done 2026-08-12. The record lives in the wrapper's own header comment**
+(`scripts/fleet-ci/gates/rename-residue-check.cljs`), as a table of break ->
+exit code -> message, because that puts it next to the floors it exercises: a
+diff that lowers `min-cases` or deletes a floor now carries the line naming that
+floor's exit code. Summary of what was measured, each by actually breaking a
+copy of the tree and running the gate in the fleet's own `<dir>`-first shape:
+
+- collapsing `classify` to a single verdict — either direction — **exits 1**;
+- deleting the git-fixture half **exits 94**, and the underlying test in that
+  run **exited 0 printing `PASS — 13 cases OK`** — the floor is what stopped it,
+  not the test;
+- deleting the summary `println` **exits 93**;
+- removing any of the three required paths **exits 90**, each naming which;
+- putting a flag before `<dir>` **exits 90** — the argv hazard fails closed here
+  rather than producing a false green.
+
+The floors are distinguishable from one another. Two further findings: the gate
+is **green on a tree filtered to `.cljs` only** (355 files, `:min-files 300` —
+55 of margin), so unlike `root-permit-index` it is not structurally unable to
+pass on a shipped tree; and **a forged summary line still passes** — a test
+entry reduced to `(println \"PASS — 21 cases OK, 0 failures\")` reports green,
+since `N` is a floor and not a cross-check. That is outside what these floors
+claim: they close *environment* failures, and an edit to the test body is closed
+by diff review, not by the gate.
+
+**Limit of the demonstration**: it ran on this laptop, where npm 11.12.1
+misparses `npx --yes nbb --classpath X file.cljs` (measured: the argument is
+resolved as `github:scripts/…`, `npm ERR! code 128`), so a PATH shim calling
+`nbb` directly stood in for `npx`. It establishes that the gate's *decision
+logic* goes red and green as claimed; it does **not** establish that the npx
+invocation path works on a node, nor the converse. Node-side evidence is the
+receipt.
 
 ## One correction to the brief that produced this survey
 
@@ -128,7 +161,9 @@ number would have been worse than contradicting it.**
    only thing that looks outside the repo at all.
 6. `verify-namespace-collisions`, `verify-duplicate-registrations` — real,
    dated, ungatable in root.
-7. **Prove `root-rename-residue` can go red.**
+7. ~~Prove `root-rename-residue` can go red.~~ **Done 2026-08-12**; the record
+   is in the wrapper header, and the one hole it does not close (a forged
+   summary line) is named there.
 8. **Diagnose the four permanent reds**, then fix, re-home or retire each. A red
    that never changes is as silent as no detector.
 9. **Delete or rewrite the five `security-gate-*` scripts.**
@@ -138,7 +173,8 @@ number would have been worse than contradicting it.**
 Whether the three undiagnosed permanent reds fail for the `root-permit-index`
 reason or for a genuine violation — that needs reading each failure detail.
 Whether `root-rename-residue` was manually demonstrated to fail before landing;
-**absence of a record is not proof it was not done.** And whether the five
+**absence of a record is not proof it was not done** — moot as of 2026-08-12,
+since it has now been demonstrated and the demonstration left a trace. And whether the five
 uninstalled plists were deliberately retired or silently dropped — CLAUDE.md
 skill descriptions reportedly still describe several of those loops as running
 every cycle, and **if the documentation says a loop runs while its scheduler is
