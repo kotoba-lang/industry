@@ -107,7 +107,7 @@ basis は同じ decision になり、再現・監査・time travel ができま�
 満たせる不足条件を機械可読に返します。UI はこの decision を描画しますが、UI 自体を
 enforcement point にはしません。
 
-### R0–R3 implementation（2026-08-12）
+### R0–R4 implementation（2026-08-12）
 
 authority の semantic owner である `kotoba-lang/aiueos` に、純粋CLJC kernel
 `aiueos.authority/decide` と既存broker統合 `aiueos.broker/decide-authority` が着地しました
@@ -160,9 +160,28 @@ dry-run/predeploy checkがgreenです。本番Version ID
 `420f380b-650e-4324-8258-9f76c010be68`へdeployし、health、未認証401、CORS expose header、
 public smokeをlive確認しました。認証済みallow/428/403のreceipt CIDは実accountで未実測です。
 
-まだ未移行なのは、compatibility grantではなくDatomic/Kotobase basisから取得する署名・失効可能な
-policy/grant、payment settlementからentitlement grantへの変換、UIのchallenge描画、audit以外の
-route固有policy、receiptのtransparency-log anchorです。
+R4では `network-awai/net-kotobase` PR #421（merge
+`5d87987c43ab192c9970497d440fc4ef5e7ba3e3`）で、tenantの予約済み `__authority` Datomic
+databaseをaudit routeのGrant sourceとして選べるmigration portを着地しました。
+
+- verified principal DIDとserver-owned permissionだけでgrant entityをqueryし、action、resource、
+  subject、tenantはedgeが再構成する。stored factやHTTP bodyは権限を拡張できない。
+- `revoked?`、`not-before`、`expires-at`をkernelが再検査する。malformed rowはbasis全体を拒否し、
+  empty basisはdeny、query/storage failureは503で、Datomic modeからcompatibility grantへ戻らない。
+- graph readはqueryに使った同一snapshotのcontent-addressed `basis_cid`を返し、Decision Receiptは
+  authority database名とそのCIDを記録する。
+- activationは `KOTOBASE_AUTHORITY_SOURCE=datomic` の明示switchである。authority graph未provision
+  のproductionでは未設定のままとし、既存API/認可挙動を維持した。
+
+gateway 399 tests / 1925 assertions、46 registered namespaces、graph database 319 tests / 962
+assertionsとarchitecture gate、両release buildがgreenです。graph production Version ID
+`9286dc57-3394-4a1d-8f13-9234bded412b`、gateway Version ID
+`e5fddd97-5113-4e83-94cd-7e751dc43758`へdeployし、両healthと未認証audit 401をlive確認しました。
+
+R4の `basis_cid` はcontent addressですが、canonical `/v2/query` が検証するpublic signed commit
+envelopeではありません。従ってR4を「署名Grant検証」とは呼びません。まだ未移行なのは、signed
+authority frontierのprovisionとcanonical query、payment settlementからentitlement grantへの変換、
+UIのchallenge描画、audit以外のroute固有policy、receiptのtransparency-log anchorです。
 
 ## 各層への投影
 
