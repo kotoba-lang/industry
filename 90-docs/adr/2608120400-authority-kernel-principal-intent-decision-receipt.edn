@@ -203,8 +203,9 @@ authority semantic ownerである `kotoba-lang/aiueos` に最初の実装slice�
   1件のためredであり、R0のgreen evidenceへ昇格させない。
 
 R1は `network-awai/net-kotobase` PR #410、merge
-`4fed6101c74fbde11a10e385daac13aa76ce44d2` として着地し、superprojectのwest pinと
-fleet-db projectionも同じSHAへ前進した。
+`4fed6101c74fbde11a10e385daac13aa76ce44d2` として着地した。その後のmain前進を含む
+`6fb6b70f378f1402cef2d8bb5d3124a223d3588a` へsuperprojectのwest pinとfleet-db projectionを
+fast-forwardしたため、current pinはR1実装mergeを祖先として含む。
 
 - authn sessionはnormalized authn method、assurance、MFA enrollmentを保持し、closedな
   credential-free principal projectionを返す。Passkeyはhigh、low method + TOTPは
