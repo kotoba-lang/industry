@@ -198,7 +198,7 @@ orchestrator は `Chain ID: 1`。
 **source→wasm 方向は閉じていない。しかもそれは「まだやっていない」ではなく、
 今の記録では原理的にできない。** registry は `:builder :kotoba-compiler/v1` と
 **道具の名前**を書くが**版**を書かず、provider の ADR-0171 / 0209 の再現手順は
-`:git/sha "<compiler pin>"` という**プレースホルダのまま**で埋められていない。
+`:git/sha \"<compiler pin>\"` という**プレースホルダのまま**で埋められていない。
 fleet の compiler pin `806f5ce` で実測すると、source を宣言している `:wasm-module`
 71 行のうち **35 が byte 一致、29 が不一致、7 はもうコンパイルできない**。
 
