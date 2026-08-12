@@ -211,7 +211,9 @@ it does not compile.
 | `src/itonami/isic_9601/world.cljc` | the street: district registry, unlock ladder, and the 2D sprite render-IR |
 | `src/itonami/isic_9601/world3d.cljc` | the authoritative view: the canonical `kami.webgpu` render-IR |
 | `bin/kuriningu.cljs` | CLI — `play` / `street` (pure game, no engine needed) |
-| `bin/render.cljs` | CLI — the 3D street through real WebGL 2.0, to a PNG |
+| `bin/render.cljs` | CLI dispatcher — street / board capture |
+| `bin/render_street.cljs` | street PNG + camera / `--annotate` / `--pick` (#1753) |
+| `src/itonami/isic_9601/inspect.cljc` | annotate labels + unfiltered pick EDN over `kami.webgpu.pick` |
 | `test/world3d_test.clj` | 16 tests / 530 assertions, JVM, against the real `kami.webgpu.ir` + `pick` |
 | `test/world_ir_test.clj` | 17 tests / 102 assertions, JVM, against the real `kotoba.sprite2d.layout` |
 | `test/parity.cljs` + `test/parity_probe.cljs` + `test/parity_dump.clj` | 14,244 floats, JVM engine vs squint engine, three frames |
@@ -243,8 +245,12 @@ npm run render -- --view street --width 1280 --height 720 --cleared 3
 npm run render -- --view street --orbit 180 --zoom 1.2 --fov 40   # camera (#1751)
 npm run render -- --view street --eye 0,80,120 --target 0,2,0
 npm run render -- --view street --dry --orbit 90   # parse camera, print eye/target/fov, no Chromium
+npm run render -- --view street --annotate --out preview/street-annotated.png   # #1753
+npm run render -- --view street --pick 450,800     # EDN hit or nil (unfiltered; no Chromium)
 npm run test:camera
 npm run accept:camera
+npm run test:annotate
+npm run accept:annotate
 
 # board capture (#1752) — inject state, screenshot DOM shop board (no engine)
 npm run play -- --seed 20260808 --script "tick*20 intake renew" --dump /tmp/shop.edn --format edn
@@ -281,6 +287,25 @@ Camera flags (#1751) aim that same IR — not a second view matrix:
 
 An eye that lands underground (`y ≤ 0`) or inside the fit volume exits ≠ 0 with a clear
 message — there is no silent clamp on tiny zoom.
+
+### Annotate / pick (#1753)
+
+Agents name what they see without inventing a second projection:
+
+| flag | effect |
+|---|---|
+| `--annotate` | burn `index:district` onto the PNG at `kami.webgpu.pick/project` of each district instance's box centre |
+| `--pick X,Y` | print EDN `{:index :district :kind :point :t}` (or `nil`) from an **unfiltered** `pick/pick`, then exit (no Chromium unless `--annotate` also asks for a PNG) |
+
+`--pick` is inspection: empty sky is `nil`, the road is the road. The shop-only `:filter`
+used by `street/tap->district` stays on the tap path. Label coordinates and pick agree —
+picking at a burned label returns the instance that label names.
+
+```bash
+npm run render -- --view street --annotate --orbit 40 --out /tmp/street-ann.png
+npm run render -- --view street --pick 195.01,880.25   # → {:index 101 :district "isic-9601" …}
+npm run accept:annotate
+```
 
 Two limits, printed on every run: the **shadow pass is not run** (a 1×1 fully-lit depth
 texture is bound instead, so the image is the lit pass without shadowing), and the GPU is
