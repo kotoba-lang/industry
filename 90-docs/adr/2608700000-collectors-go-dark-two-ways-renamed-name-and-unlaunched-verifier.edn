@@ -95,7 +95,7 @@ corpus は publish 時に journal から導出されるので、次の publish �
 | 5 本が復旧した | 実際に 5 本とも走らせた。5/5 が期待どおり（inochi +35,294B / busshi +20,732B / masago +60,412B / mikurabe・kawaraban runs-ok）。24/24 が評価可能 |
 | assignee キーが読み戻せる | 新テストが**旧コードで実際に落ちる**ことを確認（1 failure / 1 error）→ 修正後 63 tests / 302 assertions 全緑 |
 | alias が正しい | `-M:query` で classpath エラーが消え、内容の失敗（上記）に変わった |
-| **republish 後に verify が緑になる** | **未確認**。2026-08-12 16:00 JST 開始の実 harvest がまだ走っている。次の判定は launchd の 17:37 JST 実行、または `90-docs/observatory/hirameki-harvest.ledger.edn` の `:ok true` |
+| **republish 後に verify が緑になる** | **確認済み**（2026-08-12 16:37 JST）。実 harvest 20 tick → 950 特許 → republish → `verify.clj OK（bytes / CID / ブロック上限 / 件数合計）`、台帳が `:ok true :corpus :pushed :actor :pushed`。corpus の当該キーは `:us-atomic-energy-commission-aec` に直り、`(aec)` 形は 0 件。observatory も `:feeder-stale` → `produces-datoms`（exit 0、Δ18,708B）で期待を満たした |
 
 ## 帰結
 
