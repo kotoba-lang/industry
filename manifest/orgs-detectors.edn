@@ -70,6 +70,47 @@
 ;;   - `audit-gftd-scripts` reads `$HOME/.gftd`, which is correct here and
 ;;     meaningless on a node -- but it is cheap and ADR-2608124800 ranks it as a
 ;;     SessionStart hook, which is a better fit than a 6-hour tick.
+;;
+;; ## The 2026-08-13 sweep of `scripts/verify-*.cljs`, and what it ruled out
+;;
+;; Thirteen scripts under `scripts/verify-*.cljs` mention `orgs/`. Four are
+;; registered below. The other nine, with the class each falls in:
+;;
+;;   - `verify-duplicate-registrations` -- **`gh` class.** It calls
+;;     `gh api repos/<slug>` once per candidate group to confirm two paths are
+;;     one upstream by GitHub id. Rate-limited, one token shared with every
+;;     concurrent agent session.
+;;   - `verify-namespace-collisions` -- **not swept.** A sibling session was
+;;     working on it on 2026-08-13; registering it concurrently would have
+;;     pinned an argv that was being changed underneath.
+;;   - `verify-repository-roles` -- **already hosted.** It is the fleet gate
+;;     `root-repository-roles`, diagnosed and returned to green by
+;;     ADR-2608124800. It needs no second home.
+;;   - `verify-parity-probes` -- **already hosted, and it does not read
+;;     `orgs/`.** It is the fleet gate `root-parity-probe-policy`; the string
+;;     `orgs/` appears in it only inside a regex that matches the TEXT of a
+;;     probe, and in the header prose. Its only input is
+;;     `90-docs/maturity/engine-parity.datoms.edn`, which is in root's own tree.
+;;   - `verify-no-babashka` -- **does not read `orgs/` either**, for the same
+;;     reason: `--root orgs` appears in its usage comment, and its default root
+;;     is `.`. ADR-2608124800 already classes it root-tree-only and gatable
+;;     as-is, so what it is missing is a `gates.edn` line, not a registry entry.
+;;     Measured here anyway, because pointing it at `orgs/` was the obvious
+;;     thing to try: `--root orgs --allow-zero` ran for roughly 38 minutes on
+;;     this machine without producing a line and was killed. It reads every file
+;;     in the tree **in full** to test for a `bb` shebang, so its cost is
+;;     dominated by the size of the artefacts it is not looking for.
+;;   - `verify-clj-everywhere` -- **not a detector.** It is a test-suite
+;;     orchestrator: four audits and then `clojure -M:test` in five repos. It
+;;     emits no per-finding output to key on, it resolves Maven dependencies
+;;     over HTTPS, and it writes to `~/.m2`, so `:writes :none` would be false.
+;;   - `verify-kotoba-pages` -- **needs a real browser.** It drives Playwright
+;;     against `file://` pages. CLAUDE.md's resource governor caps concurrent
+;;     browser probes, and this machine's many parallel sessions already
+;;     contend for OS focus; a browser launched unattended on a schedule is a
+;;     materially different thing from a file-reading monitor.
+;;   - `verify-vendored-copies`, `verify-require-graph` -- registered below
+;;     since 2026-08-12.
 
 {:schema 1
 
@@ -117,4 +158,123 @@
               concurrent agents), 3571 repos with a source root, exit 1: 2 orphan
               namespaces that gate, 97 report-only sibling gaps that do not.
               24h rather than 6h because a .kotoba migration lands on human timescales
-              and four idle 9-minute sweeps a day is a real cost on a shared machine."}]}
+              and four idle 9-minute sweeps a day is a real cost on a shared machine."}
+
+  {:id       :verify-layer-deps
+   :title    "deps.edn :local/root edges against the layer DAG in manifest/layers.edn"
+   :why      "manifest/layers.edn declares a dependency DAG over the workspace's layers and
+              this is the only thing that checks it. ADR-2607289600 records the state it is
+              guarding against, measured: the layer plane is `定義のみ` -- west.yml has zero
+              `layer-*` groups and gen-west-manifest.cljs does not read layers.edn -- so a
+              violating :local/root edge is caught by NOTHING else in the pipeline. It has
+              also already found real breakage: the Phase-1 dedup worklist
+              (90-docs/2607171100-phase1-dedup-worklist.csv, row 210) records
+              cloud-itonami-isic-855 with a :local/root one directory too high, credited to
+              this script. The seven standing violations it reports today are numbered
+              directories re-created inside three app repos after layers.edn froze the list."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-layer-deps.cljs" "--report" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 21600000                 ; 6h
+   :timeout-ms  900000                   ; 15m -- 7x the worst measured runtime
+   :writes   :none
+   :measured "2026-08-13 on this machine, twice, and the spread is the point. At load ~1
+              (10 cores): 26.5s wall. At load 133: 2m06s wall for the same work, 10.1s of it
+              user CPU -- it is waiting, not computing. Both runs: 4,415 repo directories
+              under orgs/, 3,489 deps.edn parsed, 2,978 :local/root edges, 7 violations, all
+              :internal-numbered-dir. exit 0 with --report (exit 1 without it). Reads only
+              readdirSync/readFileSync plus one `git rev-parse --show-toplevel`; no network,
+              no writes. The 15m timeout is sized against the CONTENDED number, because this
+              machine's load has been measured at 187 while this entry was being written."}
+
+  {:id       :verify-kotoba-host-parity
+   :title    "the declared host-import set vs the two implementations that must match it"
+   :why      "The catalogue in kotoba-lang/lang/host-parity.edn, kototama's contract.cljc and
+              wasm-webcomponent's actor-host.js are three copies of one fact -- which host
+              imports a .kotoba guest may call -- in three repos, and only this script
+              compares them. It is red right now with TWO violations, and the second one was
+              invisible until 2026-08-13: every check called process.exit(1) on the spot, so
+              a run only ever showed the first. That is the fail-fast blindness
+              ADR-2608124800 measured on root-repository-roles, where every later assertion
+              had gone unexecuted since 2026-08-03 with nobody able to see it. The checks are
+              independent, so they now all run."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-kotoba-host-parity.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 21600000                 ; 6h
+   :timeout-ms  300000                   ; 5m
+   :writes   :none
+   :measured "2026-08-13 on this machine at load ~133: 11.7s wall, 0.77s of it user CPU --
+              nbb start-up and scheduling, not work; it reads three files. 59 declared host
+              imports across those three files, exit 1, 2 findings (import-sets-drifted,
+              matrix-vs-implementation). Three readFileSync calls; no subprocess, no network,
+              no writes. The 5m timeout is 25x the measured wall time and is sized for
+              start-up under contention rather than for the work."}
+
+  {:id       :verify-kotoba-wasm-runtime-cutover
+   :title    "JVM/Chicory dependencies that appear outside the frozen legacy inventory"
+   :why      "ADR-2607198300 makes 'the shipped artefact does not depend on a JVM, Node or
+              Rust host' a repo-wide rule, and 90-docs/migration/kotoba-wasm-runtime-cutover.edn
+              is the frozen list of the exceptions that are allowed to remain. Nothing else
+              compares that list against the four deps.edn files it freezes, and those files
+              live under orgs/, so no fleet gate can. It is red today: amu/deps.edn carries a
+              JVM/runtime dependency that the inventory does not cover -- a new one would
+              land the same way, silently, because the contract is prose until something
+              reads it."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-kotoba-wasm-runtime-cutover.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 21600000                 ; 6h
+   :timeout-ms  300000                   ; 5m
+   :writes   :none
+   :measured "2026-08-13 on this machine at load ~133: 6.0s wall, 0.82s user CPU. 10
+              contract/dependency paths resolved, exit 1, 1 finding
+              (jvm-dep-not-frozen:orgs/kotoba-lang/amu/deps.edn). readFileSync/existsSync
+              only; no subprocess, no network, no writes. Same timeout reasoning as
+              host-parity: the 5m is for start-up under contention, not for the work."}
+
+  {:id       :verify-tsukuru-factory-plane
+   :title    "tsukuru's three factory datasets staying partitioned by CONSENT, not by realism"
+   :why      "The three datasets differ by what each company agreed to -- research references
+              with no consent, example seeds, and R0 worked examples -- and every way that
+              distinction breaks is silent: a tag collapses, rows drop, a did:web leaks into
+              the unconsented set, and Datalog keeps answering. The largest possible lie here
+              is an un-onboarded company appearing as registered. It is also the detector
+              that most recently WAS the failure it guards against: until 2026-08-13 an empty
+              plane query made it skip all three checks and exit 0, the same shape as the five
+              retired security-gate-* scripts, inside the verifier itself (ADR-2608130600).
+              Its only scheduled caller is scripts/tsukuru-maturity-tick.cljs, driven by
+              com.gftd.tsukuru-maturity-tick -- one of the five plists ADR-2608124800 found
+              was never installed. Registering it here gives it a home WITHOUT installing
+              that plist, which also launches an autonomous model loop that commits and
+              pushes; the ADR is explicit that those are different decisions."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-tsukuru-factory-plane.cljs" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000                 ; 24h -- see :measured
+   :timeout-ms  5400000                  ; 90m -- 4.9x the worst measured runtime
+   :writes   :none
+   :measured "2026-08-13 on this machine, twice. Standalone at load 157-187 on 10 cores:
+              18m21s wall, of which 1093.4s is the single plane load + 3 queries, 256s user
+              CPU. Through the tick itself at load ~110-157: 822s (13m42s), exit 0,
+              scanned=2221, 0 findings -- so the timeout is 6.6x the tick measurement and
+              4.9x the worst standalone one. exit 0, 0 findings,
+              SCANNED 2,221 factory entities (candidates 2,119 / registry-seed 99 / seed 3,
+              each above its floor; 3 datasets disjoint; 0 did:web in candidates; 0
+              fabricated :company/lei). The script's own header records ~295s on a quiet
+              host, so the load term dominates by 3.7x -- that spread is why it says to
+              re-measure on the host before scheduling it, and why the timeout is sized on
+              the LOADED number. 24h rather than 6h for the same reason
+              verify-require-graph is: 256s of CPU four times a day on a machine already at
+              load 157 is a real cost, and a consent-tier partition changes on human
+              timescales. It reads EDN files and spawns exactly one child,
+              `nbb manifest/edn-query.cljs q*`, which has no write call anywhere; no
+              network, no writes."}]}
