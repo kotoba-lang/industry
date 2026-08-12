@@ -28,7 +28,11 @@
     what the check is for; it is not a statement about any particular driver.
 
   Usage:
-    nbb bin/render.cljs [--out FILE] [--width N] [--height N] [--cleared N] [--engine DIR]"
+    nbb bin/render.cljs [--out FILE] [--width N] [--height N] [--cleared N]
+                        [--state FILE] [--engine DIR]
+
+  `--state FILE` reads an `:itonami-game/state` v1 envelope (from `play --dump`) and draws
+  that street progress — unlocked shops match the played run, not a fresh `(world/init)`."
   (:require ["node:fs" :as fs]
             ["node:http" :as http]
             ["node:child_process" :as cp]
@@ -37,6 +41,7 @@
             [promesa.core :as p]
             [itonami.isic-9601.world :as world]
             [itonami.isic-9601.world3d :as w3]
+            [itonami.isic-9601.state :as state]
             [kami.webgpu.geometry :as geom]
             [kami.webgpu.submission :as sub]))
 
@@ -54,7 +59,7 @@
 (def W (int (num-opt "width" 900)))
 (def H (int (num-opt "height" 1600)))
 (def out (opt "out" (path/join here "preview/street.png")))
-(def cleared (int (num-opt "cleared" 0)))
+(def state-path (opt "state" nil))
 (def backend
   "`auto` (default), `webgpu`, or `webgl2`. Both read the SAME packed instances and the SAME 60-float
   globals block — `fixtures/lit-shader.wgsl` and `fixtures/glsl/lit.*` declare an identical
@@ -65,6 +70,22 @@
   ;; resolved from this script, not from the working directory — see preview/build.cljs
   (or (opt "engine" nil)
       (path/resolve here "../../../../../../orgs/kotoba-lang")))
+
+(defn- load-world
+  "Street progress for this frame. `--state` wins over `--cleared` so a dump cannot be
+  quietly ignored by a leftover flag."
+  []
+  (if state-path
+    (try
+      (let [env (state/parse (fs/readFileSync state-path "utf8"))]
+        (or (:world env) (world/init)))
+      (catch :default e
+        (println (str "state " state-path ": " (or (.-message e) e)))
+        (js/process.exit 2)))
+    (assoc (world/init) :cleared (int (num-opt "cleared" 0)))))
+
+(def world-state (load-world))
+(def cleared (int (or (:cleared world-state) 0)))
 
 (defn- fixture [& parts]
   (let [p (apply path/join engine-root "webgpu" "fixtures" parts)]
@@ -81,7 +102,7 @@
 ;; the frame, entirely from the engine
 ;; --------------------------------------------------------------------------
 
-(def ir (w3/render-ir (assoc (world/init) :cleared cleared) (/ (double W) (double H))))
+(def ir (w3/render-ir world-state (/ (double W) (double H))))
 (def mesh (geom/box 1.0 1.0 1.0))
 
 (def payload
@@ -269,6 +290,8 @@
 (defn -main []
   (println (str "  engine  " engine-root))
   (println (str "  backend " backend (when (= backend "auto") "  (WebGPU first, WebGL 2.0 fallback)")))
+  (println (str "  world   cleared=" cleared
+                (when state-path (str "  state=" state-path))))
   (println (str "  frame   " (count (:instances ir)) " instances · " W "x" H
                 " · eye " (pr-str (get-in ir [:globals :eye]))))
   (p/let [srv (serve!)
