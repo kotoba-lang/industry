@@ -9,8 +9,12 @@
 
   Usage:
     nbb bin/render.cljs --view board --state FILE [--out FILE] [--width N] [--height N]
+                        [--baseline FILE] [--diff-out FILE] [--threshold N]
 
-  Acceptance: the injected cash / returned / phase must appear in the HUD."
+  Acceptance: the injected cash / returned / phase must appear in the HUD.
+
+  `--baseline FILE` (#1754) diffs the screenshot against FILE and prints EDN
+  `{:changed-pixels :max-delta :regions}` plus a diff PNG — same contract as street."
   (:require ["node:fs" :as fs]
             ["node:http" :as http]
             ["node:child_process" :as cp]
@@ -19,7 +23,8 @@
             [clojure.string :as str]
             [promesa.core :as p]
             [itonami.isic-9601.state :as state]
-            [itonami.isic-9601.logic :as l]))
+            [itonami.isic-9601.logic :as l]
+            [diff-core :as diff]))
 
 (def argv (vec *command-line-args*))
 (defn opt [k default]
@@ -31,6 +36,9 @@
 (def W (int (num-opt "width" 900)))
 (def H (int (num-opt "height" 1600)))
 (def out (opt "out" (path/join here "preview/board.png")))
+(def baseline-path (opt "baseline" nil))
+(def diff-out-path (opt "diff-out" nil))
+(def diff-threshold (int (num-opt "threshold" 0)))
 (def state-path (opt "state" nil))
 (def port 8732)
 
@@ -164,6 +172,24 @@
             (js/process.exit 5))
           (println (str "  wrote   " abs))
           (println "  note    board capture is DOM screenshot; no WebGL/engine required")
-          (println "  ok      injected state visible in HUD"))))))
+          (println "  ok      injected state visible in HUD")
+          (when baseline-path
+            (when-not (fs/existsSync baseline-path)
+              (println (str "  FAILED  --baseline missing: " baseline-path))
+              (js/process.exit 2))
+            (try
+              (let [stats (diff/compare-files baseline-path abs diff-threshold true)
+                    dpath (path/resolve here
+                                        (or diff-out-path
+                                            (str abs ".diff.png")))
+                    edn (diff/summarize stats)]
+                (diff/write-png! dpath (:width stats) (:height stats) (:diff-data stats))
+                (println (str "  baseline " baseline-path
+                              "  threshold=" diff-threshold))
+                (println (str "  diff     " dpath))
+                (println (pr-str edn)))
+              (catch :default e
+                (println (str "  FAILED  baseline diff: " (or (.-message e) e)))
+                (js/process.exit 6)))))))))
 
 (-main)

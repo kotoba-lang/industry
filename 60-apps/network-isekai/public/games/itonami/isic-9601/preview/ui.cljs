@@ -149,7 +149,7 @@
                                (when-let [id (street/tap->district canvas e)]
                                  (enter! id))))
           (.addEventListener js/window "resize"
-                             (fn [_] (when (= (:view @app) "street") (render! true)))))))))
+                             (fn [_] (when (= (:view @app) "street") (render! true))))))))
   ;; a re-armed timeout rather than setInterval, so a speed change takes
   ;; effect on the next tick instead of needing the timer torn down.
   ;; `:frozen?` (set by __setState) stops the clock so a capture stays put.

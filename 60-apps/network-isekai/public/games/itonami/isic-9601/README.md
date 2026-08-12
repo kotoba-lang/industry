@@ -212,7 +212,10 @@ it does not compile.
 | `src/itonami/isic_9601/world3d.cljc` | the authoritative view: the canonical `kami.webgpu` render-IR |
 | `bin/kuriningu.cljs` | CLI — `play` / `street` (pure game, no engine needed) |
 | `bin/render.cljs` | CLI dispatcher — street / board capture |
-| `bin/render_street.cljs` | street PNG + camera / `--annotate` / `--pick` (#1753) |
+| `bin/render_street.cljs` | street PNG + camera / `--annotate` / `--pick` (#1753) / `--baseline` (#1754) |
+| `bin/diff_core.cljs` | RGBA compare + PNG I/O for `--baseline` (nbb only; not under squint) |
+| `bin/accept_visual.cljs` | golden re-render gate (#1754); red/green proof in docstring |
+| `goldens/` | street cleared 0/3/8 + one board; `THRESHOLD.edn` measurement |
 | `src/itonami/isic_9601/inspect.cljc` | annotate labels + unfiltered pick EDN over `kami.webgpu.pick` |
 | `test/world3d_test.clj` | 16 tests / 530 assertions, JVM, against the real `kami.webgpu.ir` + `pick` |
 | `test/world_ir_test.clj` | 17 tests / 102 assertions, JVM, against the real `kotoba.sprite2d.layout` |
@@ -256,6 +259,12 @@ npm run accept:annotate
 npm run play -- --seed 20260808 --script "tick*20 intake renew" --dump /tmp/shop.edn --format edn
 npm run render -- --view board --state /tmp/shop.edn --out preview/board.png
 npm run accept:board
+
+# visual regression (#1754) — diff + small golden set
+npm run test:diff
+npm run accept:visual
+npm run render -- --view street --backend webgl2 --width 360 --height 640 --cleared 0 \
+  --out /tmp/now.png --baseline goldens/street-cleared-0.png --diff-out /tmp/now.diff.png
 ```
 
 `play` drives `logic/reduce-event`, the same reducer the browser preview and the future
@@ -306,6 +315,29 @@ npm run render -- --view street --annotate --orbit 40 --out /tmp/street-ann.png
 npm run render -- --view street --pick 195.01,880.25   # → {:index 101 :district "isic-9601" …}
 npm run accept:annotate
 ```
+
+### Image diff / goldens (#1754)
+
+`--baseline FILE` (street and board) writes a diff PNG and prints one EDN line
+`{:changed-pixels n :max-delta d :regions [[x y w h] …]}`. Pixel math lives in
+`bin/diff_core.cljs` (kept out of `src/` so squint never compiles it). Identical inputs
+yield zero changed pixels; a one-instance colour change yields a region covering that
+instance.
+
+A **small** golden set lives in `goldens/` — street at `cleared` 0/3/8 (360×640, WebGL2)
+and one board (`board-state.edn` + PNG). Do not grow this into per-district / per-camera
+frames (CLAUDE.md large-binary rule).
+
+```bash
+npm run test:diff        # synthetic buffers, no Chromium
+npm run accept:visual    # re-render each golden + --baseline; must exit 0
+```
+
+Threshold is **measured** in `goldens/THRESHOLD.edn` (2026-08-12: SwiftShader/WebGL2 and
+DOM board re-renders → `max-delta 0`, chosen threshold `0`). That stability is a property
+of this container, not of WebGL. The accept docstring records a red run (one shopfront hue
+changed, grep-proven) and a green run on the unmodified tree — the gate is not registered
+on faith.
 
 Two limits, printed on every run: the **shadow pass is not run** (a 1×1 fully-lit depth
 texture is bound instead, so the image is the lit pass without shadowing), and the GPU is
