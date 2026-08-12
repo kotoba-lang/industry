@@ -1,6 +1,6 @@
 [{:db/id -1
   :adr/id "adr-2608120200-what-the-kotoba-cores-actually-run"
-  :adr/title "ADR-2608120200: fleet 全体で .kotoba core を production で実行している repo は 20 中 4 つ —— 残りは cljc の twin が走っており、危険な形だった 5 件は閉じた"
+  :adr/title "ADR-2608120200: fleet 全体で .kotoba core を production で実行している repo は 23 中 4 つ —— 残りは cljc の twin が走っており、危険な形だった 5 件は閉じた"
   :adr/status "accepted"
   :adr/doc_type "adr"
   :adr/doc-type "adr"
@@ -36,7 +36,7 @@ ADR-2608112100 は「core があり parity test があり host が呼んでい�
 
 ## 実測（2026-08-12）
 
-### production で Kotoba core を実行している repo は 20 中 4 つ
+### production で Kotoba core を実行している repo は 23 中 4 つ
 
 | repo | 実行経路 |
 |---|---|
@@ -205,6 +205,24 @@ fleet の compiler pin `806f5ce` で実測すると、source を宣言してい�
 閉じるには先に **1 行につき builder commit を記録する**必要がある。今日それを
 recompile gate として書くと、compiler pin が動くたびに赤くなる劇場になる。
 
+**訂正（2026-08-12、`inga` の調査中）: 「閉じられない」と書いたのは半分言い過ぎだった。**
+`kotoba.compiler.provenance`（`:kotoba.provenance/v1`）は **compile 結果すべてに
+`:provenance` を付けており**、そこには `:source-sha256` と `:outputs :primary
+{:sha256 :size}` が入る。`:wasm-component/v1` も対象なので **provider の 52 component
+行も含めて使える**。`inga` は既にこれを `kotoba/*.wasm.provenance.edn` として
+出荷物の隣に checked in している。
+
+つまり provider に足りないのは 2 つのうち 1 つだけである:
+
+| 問い | 必要なもの | 今日できるか |
+|---|---|---|
+| **出荷物は、記録された source から出たものか** | provenance record（compiler が既に書く） | **できる** |
+| **今この source を compile すると同じ bytes が出るか** | builder commit | できない |
+
+前者は再現性ではないが、**source を編集して出荷物を据え置く**という provider の実際の
+穴はこちらで閉じる。後者だけが commit の記録を待つ。**「無い」と言う前に索引を引く**
+規則が、repo だけでなく**既に在る仕組み**にも当たった例。
+
 ### aiueos の「誰もコンパイルしない core」（閉じた、`e852781` + `d11d4c2`）
 
 2 つの穴が重なっていた。
@@ -258,6 +276,41 @@ clock の一意性不変条件が透けているだけで、この層の欠陥�
 **tie の挙動を pin した** —— どちらかが右を優先し始めたら、同じ 2 write を逆順で見た
 replica が収束しなくなり、他に気付くものが無い。
 
+### 調査後に core を持った 3 repo（2026-08-12 実測、20 → 23）
+
+`kura` / `inga` / `erasure` は最初の 16 repo 調査の**後**に決定核を持った（west pin は
+`3d4411e8` / `7bc32beb` / `751b50dd` で前進済み）。同じ方法で測った。
+
+| repo | core | 出荷物 | 実行 |
+|---|---|---|---|
+| `kura` | 3（`kura` / `order` / `placement`） | 無し | **cljc twin が production。** parity test が source を live compile して突き合わせる（71 tests / 979 assertions） |
+| `erasure` | 1（`erasure_core`） | 無し | 同上（39 tests / 3048 assertions） |
+| `inga` | 2（`fuel` / `quorum`） | **`.wasm` + `.wasm.provenance.edn`** | cljc twin が production。cljs suite が**出荷 wasm を実際に instantiate** して matrix で突き合わせる |
+
+**出荷物を持たない 2 つには drift の余地が無い** —— parity test が source をその場で
+compile するので、`.kotoba` を編集すれば必ず結果に出る。com-cloudflare / provider /
+network-awai で見た穴は、**成果物を checked in する repo だけが持つ**。
+
+### inga の provenance（閉じた、`a9f2cc2`）
+
+`inga` は出荷物を持つので、その穴も持っていた —— ただし**閉じるための材料も持っていた**。
+compiler が書いた `:source-sha256` / 出力 digest が隣に checked in されていて、
+**どちらも今日時点で正しい。誰も読んでいなかった。**
+
+既存の cljs suite は出荷 `.wasm` を instantiate して cljc と突き合わせるが、
+**`.kotoba` を読まない**（あの 2 ファイルで `.kotoba` が出てくるのは docstring だけ）。
+実測: `kotoba/quorum.kotoba` に comment を 1 行足して binary を据え置くと、
+JVM suite は **364 tests / 1556 assertions / 0 failures** で通り、cljs 側も
+**構造的に気付けない**（試験対象の binary は無改変で、cljc とはなお一致する）。
+
+`inga.kotoba-provenance-test` が record を実バイトと突き合わせる。同じ変異で
+ファイル名と再コンパイル手順を挙げて落ち、wasm の 1 byte 反転では出力 digest で落ちる。
+無改変で **368 tests / 1585 assertions / 0 failures**。
+
+**再現性は主張していない。** record が示すのは「出荷 bytes は、記録された source の
+隣に記録された digest のものである」までで、**今その source を compile して同じ bytes が
+出るか**は別問題（`:compiler` は `\"kotoba-compiler/1\"` という道具名で commit ではない）。
+
 ## Evidence
 
 - `kotoba-lang/crdt` `81d4250`: clock parity gate（22 tests / 1279 assertions、変異 2 件で fail）
@@ -279,7 +332,12 @@ replica が収束しなくなり、他に気付くものが無い。
 - `com-junkawasaki/root` `84b4252`: `west-pin-put.cljs` が短縮 sha を展開するようになった。
   今日この script 自身が `revision: d11d4c2` を書いており（`gh pr merge` の出力をそのまま
   渡した）、`f12698a`/`113b302` で全 4,162 pin が 40 桁に戻っている
-- 調査対象 20 repo。最初の 16 は read-only subagent 4 本 + 手元での裏取り、
+- `kotoba-lang/inga` `a9f2cc2`: provenance record を実バイトと突き合わせる gate
+  （368 tests / 1585 assertions。source 編集と wasm 1 byte 反転の 2 変異で fail）。
+  west pin `1681569b074`
+- `kura` `084e461` / `erasure` `8abcb0f`: 出荷物を持たないので drift の余地無し。
+  suite は tip で緑（71/979、39/3048）。pin は既に tip
+- 調査対象 23 repo。最初の 16 は read-only subagent 4 本 + 手元での裏取り、
   残り 4 は subagent を使わず全部自分で開いた。実行の有無は `src/` の
   `kotoba.kir` require / `ir/execute` / `kototama.tender` 呼び出し、および
   aiueos では build script の `.o` リンクで判定した
