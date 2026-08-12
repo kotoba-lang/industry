@@ -1,0 +1,118 @@
+[{:db/id -1
+  :adr/id "adr-2608120400-the-design-system-tranche-is-blocked-on-a-missing-emitter"
+  :adr/title "ADR-2608120400: design-system の cljc ライブラリ群が委譲できないのは判断の先送りではなく、typed core から Clojure/ClojureScript ソースを出す emitter が無いから"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-12"
+  :adr/last-verified "2026-08-12"
+  :adr/last_verified "2026-08-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "design-system-delegation-blocker"
+  :adr/tags "kotoba, cljc-migration, design-system, emitter, jp-go-dds, shitsuke, backend-gap"
+  :adr/related ["adr-2608112100-a-kotoba-core-with-a-parity-test-is-not-done"
+                "adr-2608120200-what-the-kotoba-cores-actually-run"
+                "adr-2608650000-kotoba-permanent-vs-temporary-constraints"
+                "2607270100"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["jp-go-dds / shitsuke など cljc design-system ライブラリが host 委譲していない理由"
+   "cljs / js emitter が typed value について今日受け付ける範囲（2026-08-12 実測）"
+   "この tranche の委譲を解除する条件"]
+  :adr/body
+  "# ADR-2608120400: 止めているのは emitter の不在であって、判断ではない
+
+**Status**: accepted
+**Date**: 2026-08-12
+
+## Context
+
+ADR-2608112100 は「`.kotoba` core を書いて parity test を付けた時点は完了ではない。
+完了条件は host が呼んでいること」と決めた。`cloud-itonami-app` はそれを満たした
+（shipped KIR を `kotoba-oracle` 経由で実行）。
+
+**design-system 系の cljc ライブラリでは、同じことを 2 回先送りした。** 理由を
+「約 170 repo が消費するライブラリに runtime 依存を足す判断だから」と書いたが、
+それは判断の説明であって、**代替がある/ないの実測ではなかった。** 測った。
+
+## 実測（2026-08-12、amu `8ff1030`。jp-go-dds の pin より新しい）
+
+### emitter が受ける範囲
+
+| 対象 | `:cljs-kotoba-v1`（Clojure ソースを出す target） |
+|---|---|
+| 型注釈なしの legacy module | **ok**（11,197 chars） |
+| `[n :i64] :i64` | **ok**（11,166 chars） |
+| `[s :string] :bool` | **REFUSED** — *typed values currently require the kotoba-script web target…* |
+
+つまり cljs emitter は **`:i64` までは追いついていて、typed な string/bool/record/
+document に追いついていない。** 一方 **`:js-kotoba-v1`（kotoba-script の restricted
+ESM）は同じ core を通す** —— `dark_mirror.kotoba`（`:document` と `:string` を使う）で
+61,606 chars を出した。`:wasm32-kotoba-v1` も通る（4,376 bytes）。
+
+**エラーメッセージが名指しする「kotoba-script web target」は `:js-kotoba-v1` である。**
+`:cljs-kotoba-v1` はそれとは別の、Clojure ソースを出す古い target で、typed value に
+追随していない。この 2 つを同じものと読むと結論を誤る。
+
+### なぜそれが効くか — 消費者の内訳
+
+`jp-go-dds` を require しているファイル: **`.clj` 233 / `.cljc` 56 / `.cljs` 10**。
+cljs 側の実体は Cloudflare Worker 3 本（`kekkai` / `yotei` / `nexus-x402`）、
+service worker 1 本、ブラウザ SPA 2 本（`kami-app-daw` / `-nle`）。
+
+したがって:
+
+- **ESM artifact は cljs/Worker 側なら serve できるが、JVM 側（233 ファイル）は serve できない。**
+- **KIR interpreter はどこでも動くが、Worker とブラウザのバンドルにインタプリタが乗る。**
+  `kotoba-kir` の閉包自体は軽い（9 ファイル / 304K / 推移依存は `security` 1 本）が、
+  軽いことと edge バンドルに載せてよいことは別。
+- **`:cljs-kotoba-v1` が typed value を通せば話は終わる** —— core からホスト実装を
+  *生成* でき、authority は 1 つ、runtime 依存はゼロ、バンドルコストもゼロになる。
+
+**単一の artifact で両方のホストを賄う道が、今日は無い。**
+
+## Decision
+
+### 1. この tranche は「先送り」ではなく「emitter 待ち」として記録する
+
+`jp-go-dds` / `shitsuke` / `css` / `html` / `liquid-glass-ui` / `kotoba-ui` は
+**parity-bound のまま置く**。ADR-2608112100 の基準では未完了であり、そう書く ——
+ただし理由は「判断していない」ではなく **`:cljs-kotoba-v1` が typed value を拒否する**
+という測定値である。
+
+### 2. これは一時制約であって設計の天井ではない（ADR-2608650000 の分類）
+
+`lang/surface-status.edn` は typed document 等の `:implementation` に `:kotoba-cljs` を
+含めており、言語側は cljs backend がこれらを実装していると宣言している。
+`:cljs-kotoba-v1` target の拒否はその宣言に追いついていない **backend の穴**であって、
+`:intentional-security-constraint` でも `:intentional-semantic-simplification` でもない。
+**恒久の設計判断として引用しない。**
+
+### 3. 解除条件を書いておく
+
+**`:cljs-kotoba-v1` が typed string/bool/record/document を通した時点で、この tranche は
+委譲ではなく生成へ進む** —— core から `.cljc` を emit して checked in し、host はそれを
+require する。authority は 1 つ、interpreter は runtime に無い。
+それまでに増やしてよいのは parity gate であって runtime 依存ではない。
+
+## Consequences
+
+- **cljs 消費者を持たない cljc ライブラリはこの制約に当たらない。** `crdt` / `calendar` /
+  `mokuroku` / `fsm` / `tashikame` を parity-bound で止めているのは同じ理由ではなく、
+  単に順序の問題。そこは KIR 委譲が今日でも取れる。
+- **ESM 経路は捨てない。** Worker 専用・ブラウザ専用の consumer なら
+  `:js-kotoba-v1` の artifact を直接使う設計が今日成立する。jp-go-dds が両側から
+  使われていることが、この repo に限ってそれを塞いでいる。
+- **測っていないもの**: `:cljs-kotoba-v1` に typed value を通すのに何が要るか（compiler 側の
+  作業量）は見ていない。ここで確定したのは「今日は通らない」ことと「それが唯一の
+  構造的な塞ぎである」ことだけ。
+
+## Evidence
+
+- amu `8ff1030` で 4 target × 3 種のソースを compile した実測（上表）
+- 消費者内訳は `grep -rl jp-go-dds orgs/*/*/src` の拡張子別集計
+- `kotoba-kir` の依存閉包は `deps.edn` 実読（`security` 1 本のみ）
+"}]
