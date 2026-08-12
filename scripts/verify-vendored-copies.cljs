@@ -82,6 +82,22 @@
 (def check? (some #{"--check"} argv))
 (def show-diff? (some #{"--diff"} argv))
 
+;; --findings additionally emits one machine-readable line per finding:
+;;
+;;   FINDING<TAB>severity<TAB>key<TAB>detail
+;;
+;; for scripts/orgs-detector-tick.cljs, which needs stable per-finding identity
+;; so it can tell a finding that appeared today from one that has been true for
+;; weeks. The identity has to come from here rather than from a regex over this
+;; prose: the detector knows which of its lines are findings, and a reader
+;; guessing from the report would silently mis-key it the first time the wording
+;; changed. Adding the flag changes nothing about what is measured or about the
+;; exit code -- without it, output is byte-identical to before.
+(def findings? (some #{"--findings"} argv))
+
+(defn- emit-finding! [severity key detail]
+  (println (str "FINDING\t" severity "\t" key "\t" detail)))
+
 (defn- sh [cmd]
   (try (str (child/execSync cmd #js {:encoding "utf8"
                                      :stdio #js ["ignore" "pipe" "ignore"]
@@ -384,6 +400,29 @@
     (when (seq unresolved)
       (println (str (count unresolved) " could not be checked: the library repo is "
                     "not checked out here.")))
+    (when findings?
+      ;; The evidence line first: a run that scanned nothing must not be
+      ;; recordable as clean. The tick refuses to call a detector :ok unless
+      ;; this line is present and non-zero.
+      (println (str "SCANNED\t" (count copies) "\tvendored file(s)"))
+      (doseq [{:keys [file pin]} dishonest]
+        (emit-finding! "fail" (str "pin-dishonest:" file)
+                       (str "content does not match the commit its own header claims"
+                            (when pin (str " (" (subs pin 0 (min 8 (count pin))) ")")))))
+      ;; A copy is reported once, under the worst thing true of it: a
+      ;; pin-dishonest copy is also stale, and emitting both would make one
+      ;; defect look like two and make the resolved/standing counts wrong.
+      (doseq [{:keys [file drift behind upstream-path]}
+              (remove (set dishonest) stale)]
+        (emit-finding! "fail" (str "stale:" file)
+                       (str "drift vs HEAD: " (or drift "?") " line(s)"
+                            (when behind (str "; " behind " upstream commit(s) to "
+                                              upstream-path " since the pin")))))
+      (doseq [{:keys [file library]} unresolved-body]
+        (emit-finding! "fail" (str "unresolved:" file)
+                       (if library
+                         "upstream file not found at HEAD -- provenance unverifiable"
+                         "library repo not checked out here -- provenance unverifiable"))))
     (when (and check? (or (seq dishonest) (seq stale) (seq unresolved-body)))
       (set! (.-exitCode js/process) 1))))
 

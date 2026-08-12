@@ -1,0 +1,120 @@
+;; manifest/orgs-detectors.edn — the registry of detectors that CANNOT be fleet
+;; gates, and therefore run on this machine instead.
+;;
+;; ## Why this file exists
+;;
+;; ADR-2608124800 measured that roughly twenty verification scripts in this
+;; workspace cannot be murakumo fleet gates, for a structural reason CLAUDE.md
+;; already records: **a fleet gate ships only the target repo's own tree**, so a
+;; detector that reads `orgs/` finds an empty workspace on a node and can never
+;; go green there. `root-permit-index` has been 0 pass / 282 fail for exactly
+;; this reason. Two of the detectors say so in their own headers.
+;;
+;; So the answer for them is not a `gates.edn` line. It is a home on a machine
+;; that actually has `orgs/`. `scripts/orgs-detector-tick.cljs` is that home and
+;; this file is what it runs.
+;;
+;; ## What an entry must declare, and why each field is mandatory
+;;
+;;   :id            keyword, stable. Findings are keyed under it forever.
+;;   :title         one line, shown to a human at session start.
+;;   :why           what it would have caught, with a date. An entry that cannot
+;;                  answer this is a detector nobody has justified running.
+;;   :argv          the command. `{{repo}}` is substituted with the checkout
+;;                  holding the tick script, `{{root}}` with the orgs-bearing
+;;                  checkout. They differ when the tick runs from a worktree.
+;;   :cwd           :root (the orgs-bearing checkout) or :repo.
+;;   :findings      :protocol -- the detector prints FINDING<TAB>sev<TAB>key<TAB>detail
+;;                  lines. This is the only supported mode, deliberately: a tick
+;;                  that regex-scraped prose reports would mis-key findings the
+;;                  first time a message was reworded, and silently report every
+;;                  standing finding as new.
+;;   :evidence      regex that MUST appear in the output for the run to be
+;;                  recorded :ok. This is the anti-theatre floor. ADR-2608124800
+;;                  found five scripts that print PASSED without measuring; a
+;;                  detector that dies after two lines must be recorded
+;;                  :inconclusive, never clean. `SCANNED\t0\t...` fails it too.
+;;   :interval-ms   minimum age before re-running. Per detector, because the
+;;                  measured runtimes differ by 5x.
+;;   :timeout-ms    hard kill. No entry may omit it.
+;;   :writes        MUST be :none. The tick refuses to run an entry that does
+;;                  not declare it. See the invariants below.
+;;   :measured      what was actually observed when the entry was added, so the
+;;                  interval and timeout are traceable to a measurement rather
+;;                  than to a guess.
+;;
+;; ## Invariants this home holds itself to
+;;
+;;   1. It reads `orgs/` checkouts. It NEVER writes to one, never fetches, never
+;;      checks out, never moves HEAD anywhere. Detectors are admitted on
+;;      `:writes :none`, reviewed by a human before being added here, and are
+;;      run with `GIT_ALLOW_PROTOCOL=none` so any `git fetch`/`clone`/`push`
+;;      inside a detector fails at the transport layer rather than succeeding
+;;      quietly. See the tick's header for what that env var does and does not
+;;      cover, stated honestly.
+;;   2. It writes NOTHING into any git checkout, including the superproject.
+;;      State lives under `~/.gftd/orgs-detector-tick/`. A tick that dirtied the
+;;      shared checkout would trip the stash-churn failure CLAUDE.md documents.
+;;   3. It is a monitor, not a gate: exit 0 even with findings. The gate is the
+;;      individual detector, run by a human or by a hook.
+;;
+;; ## What this home cannot host, stated rather than implied
+;;
+;;   - `annex-custody-verify` needs B2 credentials. It can run here (the keys
+;;     are on this machine, not on a fleet node) but NOT under launchd: launchd
+;;     cannot answer a Keychain unlock prompt, the wall recorded in
+;;     ADR-2607178000. It belongs in the hand-run set, and putting it here on a
+;;     schedule would produce a permanent :inconclusive -- another standing red.
+;;   - Anything needing `gh` is rate-limited and shares one token with every
+;;     concurrent agent session on this machine. Not scheduled here.
+;;   - `audit-gftd-scripts` reads `$HOME/.gftd`, which is correct here and
+;;     meaningless on a node -- but it is cheap and ADR-2608124800 ranks it as a
+;;     SessionStart hook, which is a better fit than a 6-hour tick.
+
+{:schema 1
+
+ :detectors
+ [{:id       :verify-vendored-copies
+   :title    "vendored copies vs the upstream they name"
+   :why      "ADR-2608121000, 2026-08-12: six repos vendor pay/* and treasury/core.cljc
+              into their own src/ because their CI checks out one repo with no west
+              workspace. Each copy's header says `diff against upstream to check drift`
+              and nothing performed that diff. Several had drifted for weeks on paths
+              that decide whether a payment happened -- one was missing the guard whose
+              own fix comment says its absence lets an unconfirmed payment be accepted
+              as confirmed. The instruction to check was addressed to a person."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-vendored-copies.cljs" "--check" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 21600000                 ; 6h
+   :timeout-ms  900000                   ; 15m -- 8x the measured runtime
+   :writes   :none
+   :measured "2026-08-12 on this machine: 1m41s wall, 34 vendored files, exit 1 with
+              --check, 13 stale (7 of them on pay/x402 and treasury/core -- the payment
+              paths). Only `git show`/`git log`/`git rev-list` against already
+              checked-out repos; no network."}
+
+  {:id       :verify-require-graph
+   :title    "namespaces migrated to .kotoba with the callers left behind"
+   :why      "ADR-2608071000, 2026-07-21: kotoba-lang/dsl-core deleted
+              src/kotoba/dsl/problem.cljc for problem.kotoba and updated no consumer.
+              kotoba.dsl.problem stopped loading on JVM, nbb and ClojureScript, and
+              12 checked-out repos stayed broken for 17 days with nobody noticing --
+              src/ execution paths, not just tests. Nobody noticed because every CI
+              looked only at its own repo: dsl-core's own tests were green."
+   :argv     ["nbb" "--classpath" "{{repo}}:{{repo}}/scripts/nbb_compat"
+              "{{repo}}/scripts/verify-require-graph.cljs" "--root" "{{root}}" "--findings"]
+   :cwd      :root
+   :findings :protocol
+   :evidence "SCANNED\t[1-9][0-9]*\t"
+   :interval-ms 86400000                 ; 24h -- see :measured; this one is expensive
+   :timeout-ms  2700000                  ; 45m -- 5x the measured runtime
+   :writes   :none
+   :measured "2026-08-12 on this machine: 8m0s under the tick (8m48s standalone; 29% CPU --
+              it is dominated by per-repo subprocesses, and this machine runs many
+              concurrent agents), 3571 repos with a source root, exit 1: 2 orphan
+              namespaces that gate, 97 report-only sibling gaps that do not.
+              24h rather than 6h because a .kotoba migration lands on human timescales
+              and four idle 9-minute sweeps a day is a real cost on a shared machine."}]}
