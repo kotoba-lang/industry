@@ -1,0 +1,112 @@
+[{:db/id -1
+  :adr/id "ADR-2608124400"
+  :adr/title "Shallow was not retired everywhere, and the superproject was re-shallowed yesterday"
+  :adr/status "accepted"
+  :adr/date "2026-08-12"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/related ["ADR-2607211600" "ADR-2608124000"]
+  :adr/body
+  "## The claim that was false
+
+CLAUDE.md records that shallow clones were retired 2026-07-21 (ADR-2607211600,
+reversing the earlier shallow-by-default) and that **everything was
+unshallowed**. That is stated as completed history, and work today relied on it.
+
+**It is not true.** A scan of every checkout — 4,407 `.git` directories plus 7
+`.git`-file pointers, keyed on the `shallow` marker file, which is definitive
+for both layouts — found **11 shallow child repos, plus the superproject root
+itself**, plus two orphan shallow gitdirs with no checkout.
+
+## Why it mattered today
+
+`orgs/kotoba-lang/kotoba` was one of them: 24 grafts, 4 false root commits, an
+apparent history beginning 2026-07-14, and only 234 commits reachable.
+
+**It is the one repo where ancestry questions keep being asked**, because it
+holds the deleted `kotoba-server` source (ADR-2608124000). An investigation
+concluded from that clone that the deployed build commit was reachable only from
+a stale side branch; the GitHub API said it is on `main`'s history, 643 commits
+back. **The local answer was wrong and looked authoritative.**
+
+Unshallowed, it now reproduces the API exactly and locally:
+
+- 234 -> **1,487 commits**, 4 false roots -> **1 true root**
+- `merge-base --is-ancestor <build> origin/main` -> **yes**
+- distance to `origin/main`: **643** — the ADR's server-side figure
+- deletion commit: ancestor, **584** back — also matching
+- `branch -r --contains <build>`: **57 branches including `origin/main`**, not a
+  stale side branch
+- path-limited `git log -- crates/kotoba-server` works again; the crate is there
+  at the build commit, 52 files
+
+**The question ADR-2608124000 had to route through the API is now answerable on
+this machine.**
+
+## The superproject was re-shallowed YESTERDAY
+
+`.git/shallow` in the superproject root carried **10 grafts** and its mtime is
+**2026-08-11 18:50** — three weeks *after* the retirement. **That is not 2026-07-21
+residue; something re-shallowed it recently.** The root is not a west project,
+so west did not do it, and what did was not determined.
+
+It is now unshallowed: **12,077 -> 25,062 commits, 10 grafts -> 6 true root
+commits.** (A concurrent session moved `origin/main` mid-fetch, producing a ref
+lock warning; the unshallow itself completed.)
+
+This one matters beyond ancestry hygiene: **the superproject is where pin
+verification, merge-base and fast-forward checks are performed.** Those are the
+operations ADR-2607211600 retired shallow to protect.
+
+## Re-shallowing risk from west: measured clear
+
+`manifest/west.yml` has **zero** occurrences of `clone-depth` or `depth`,
+`.west/config` has no depth setting, and no `remote.*.depth` exists in git
+config. `gen-west-manifest.cljs` documents that the `clone-depth` emission
+machinery was **removed 2026-07-25 precisely because it silently reintroduced
+`clone-depth: 1`**. The surviving `--depth 1` calls all clone into throwaway
+temporary workspaces, never into `orgs/`.
+
+**So these unshallows will stick.** What re-shallowed the root on 2026-08-11 is
+therefore *not* west, and remains unexplained.
+
+## The other 11, deliberately not touched
+
+Remediating all of them would pull roughly **7 GB**, dominated by one 5.5 GB
+repo. They are recorded here rather than fixed, so the decision is visible:
+
+`gftdcojp/ai-gftd-apps-gftdcojp` (50 grafts, 5.5 GB) · `etzhayyim/root` (20,
+596 MB) · `kotoba-lang/kotoba-v2025` · `gftdcojp/ai-gftd-yukkuri` ·
+`kotoba-lang/kototama` · `kotoba-lang/kotoba-topology` · `etzhayyim/tamaki` ·
+`kotoba-lang/hil` · `kotodama` · `kotoba-code`.
+
+## `git fetch --dry-run --unshallow` is not a preview
+
+Reported honestly by the agent that hit it: **`--dry-run` skips ref updates but
+still performs the fetch.** Running it downloaded the full history and removed
+the `shallow` file — the intended operation happened through a command expected
+to be inert.
+
+The outcome was correct and nothing was at risk, but the lesson generalises:
+**`--dry-run` on `fetch` is not read-only.** That checkout had 33 lines of
+uncommitted WIP and a detached HEAD, so it was worth knowing before rather than
+after.
+
+## The gitdir defect: diagnosed, deliberately left
+
+`orgs/kotoba-lang/kotoba`'s `.git` is a file pointing at a leftover **submodule**
+gitdir under the repo's **old org path**. **It is functionally correct**, which
+the first check got wrong: `core.worktree` is not in `config` but in
+`config.worktree`, enabled by `extensions.worktreeConfig`, and points forward to
+the current checkout. Both links are relative and at equal depth. The only
+functional symptom is `git worktree list` reporting the gitdir path.
+
+A move would be mechanically clean — no alternates, no linked worktrees, no
+gitlink, no `.gitmodules`, and the old path does not exist. **It was still not
+done**, because the benefit is cosmetic while the risk lands on 9 untracked,
+nowhere-backed-up source files in a repo with a detached HEAD and an apparently
+active session, and the operation is **non-atomic across two locations** — between
+the move and the pointer rewrite the checkout is broken.
+
+Precondition if it is ever wanted: land or archive the WIP, confirm no live
+session, then move and rewrite in one scripted step."}]
