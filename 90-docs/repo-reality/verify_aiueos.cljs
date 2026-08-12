@@ -295,7 +295,7 @@
                 (not (has? script #"0b16d9b6"))
                 {:score 0.5 :note "reproduce-kotoba-kernel-object.sh no longer pins compiler 0b16d9b6 -- the pin may have advanced (would be real progress toward closing ADR-0032's open item, IF the boot failure was actually fixed first); re-verify whether the ADR-0035 boot regression was resolved before raising this score."}
                 :else
-                {:score 1.0 :note "confirmed: ADR-0035 still states 'Do not land the rebuild' and 'origin/main stays at fd371d7 (ADR-0034), which boots', and reproduce-kotoba-kernel-object.sh is still pinned to compiler 0b16d9b6 exactly as ADR-0032 left it -- the disclosed boot-blocking regression is still open and is still correctly kept off main."}))
+                {:score 1.0 :note "confirmed: ADR-0035 still states 'Do not land the rebuild' and 'origin/main stays at fd371d7 (ADR-0034), which boots', and reproduce-kotoba-kernel-object.sh is still pinned to compiler 0b16d9b6 exactly as ADR-0032 left it -- the disclosed boot-blocking regression is still open, and the cited pin + script still match that decision."}))
             {:score 0.0 :note "os/aiueos/90-docs/adr/0035-the-rebuild-does-not-boot.md no longer exists -- claim's cited source file is gone; re-verify."}))}
 
    {:claim :claim/aiueos-kotoba-object-rebuild-does-not-boot :axis :axis/production-readiness :layer :lint

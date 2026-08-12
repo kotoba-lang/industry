@@ -11,6 +11,29 @@
 (defn exists? [rel-path] (.existsSync fs (str root rel-path)))
 (defn has? [s re] (boolean (re-find re s)))
 
+(def ^:private skip-dirs
+  #{"node_modules" ".git" "target" ".cpcache" ".clj-kondo" ".lsp" ".shadow-cljs"})
+
+(defn list-source-files
+  "Recursively list relative paths under the kotobase root whose names end in one of
+   `exts` (e.g. [\".kotoba\" \".clj\" \".cljc\"]). Skips common non-source dirs so a
+   repo-wide claim check stays cheap and stable across local west checkouts / scratch clones."
+  [exts]
+  (let [abs-root root]
+    (if-not (.existsSync fs abs-root)
+      []
+      (letfn [(walk [dir prefix]
+                (->> (.readdirSync fs dir #js {:withFileTypes true})
+                     (mapcat (fn [e]
+                               (let [name (.-name e)
+                                     rel (if (str/blank? prefix) name (str prefix "/" name))]
+                                 (cond
+                                   (and (.isDirectory e) (contains? skip-dirs name)) []
+                                   (.isDirectory e) (walk (str dir "/" name) rel)
+                                   (some #(str/ends-with? name %) exts) [rel]
+                                   :else []))))))]
+        (vec (walk abs-root ""))))))
+
 (def run-id (str "repo-reality-kotobase-" (str/replace (.toISOString (js/Date.)) #"[-:]|\.\d+Z$" "")))
 (def now (.toISOString (js/Date.)))
 
@@ -161,15 +184,19 @@
 
    {:claim :claim/kotobase-cid-multi-page-scheduler-not-implemented :axis :axis/doc-code-drift :layer :evidence-link
     :fn (fn []
-          (if (exists? "kotoba")
-            (let [kotoba-files (->> (.readdirSync fs (str root "kotoba"))
-                                     (filter #(str/ends-with? % ".kotoba")))
-                  scheduler-hits (filter (fn [f] (has? (slurp* (str "kotoba/" f)) #"(?i)multi-page.scheduler|page-dag.scheduling"))
-                                          kotoba-files)]
-              (if (empty? scheduler-hits)
-                {:score 1.0 :note (str "confirmed: none of the " (count kotoba-files) " .kotoba guest files under kotoba/ reference a multi-page scheduler or page-DAG scheduling implementation -- the ADR's disclosed gap (bounded single-page replay only, no global scheduler) matches the code, not an overclaim.")}
-                {:score 0.5 :note (str "found a possible multi-page-scheduler reference in: " (str/join ", " scheduler-hits) " -- re-verify by hand whether this is a real implementation (would close the disclosed gap) or just a comment/TODO.")}))
-            {:score 0.0 :note "kotoba/ directory no longer exists in this repo -- claim's cited source location is gone; re-verify."}))}])
+          ;; Claim text asserts a repo-wide search across .kotoba/.clj/.cljc (not only
+          ;; kotoba/*.kotoba). Walk the same extensions from the repo root so a host-side
+          ;; .clj/.cljc scheduler would fail this check the same way a guest-side hit would.
+          (let [source-files (list-source-files [".kotoba" ".clj" ".cljc"])
+                scheduler-re #"(?i)multi-page.scheduler|page-dag.scheduling"
+                scheduler-hits (filter (fn [f] (has? (slurp* f) scheduler-re)) source-files)]
+            (cond
+              (empty? source-files)
+              {:score 0.0 :note "no .kotoba/.clj/.cljc source files found under the kotobase root -- claim's cited search scope is empty; re-verify checkout path."}
+              (empty? scheduler-hits)
+              {:score 1.0 :note (str "confirmed: repo-wide search across " (count source-files) " .kotoba/.clj/.cljc files found zero multi-page-scheduler / page-DAG-scheduling hits -- the ADR's disclosed gap (bounded single-page replay only, no global scheduler) matches the code, not an overclaim.")}
+              :else
+              {:score 0.5 :note (str "found a possible multi-page-scheduler reference in: " (str/join ", " scheduler-hits) " -- re-verify by hand whether this is a real implementation (would close the disclosed gap) or just a comment/TODO.")})))}])
 
 (defn -main []
   (binding [*print-namespace-maps* false]
