@@ -934,10 +934,31 @@
    :script "gates/nbb-cross-runtime.cljs" :ship-git-deps true
    :include-ext [".cljs" ".cljc" ".clj" ".edn" ".json"] :min-files 5 :cd true}
 
+  ;; `.kotoba` は **この repo の唯一の production source** なので :include-ext に
+  ;; 要る（ADR-2608131200）。この gate は 2026-08-05 から 4 回すべて赤で、一度も
+  ;; 緑になっていない。原因は repo でも workflow でもなく、この 1 行だった:
+  ;; filter が `.yml .edn .clj .cljc` だけを配るのに対し、gapki の `src/` は
+  ;; `association_facts.kotoba` の 1 本しか無い（ci.yml の
+  ;; 「Enforce Kotoba production source authority」step が clj/cljc/cljs を
+  ;; **禁止して** kotoba 1 本を要求している）。つまり filter は、その repo が
+  ;; 規約として持たないと決めた拡張子だけを選んでいた。
+  ;;
+  ;; ノード側で実測（2026-08-12 の receipt が残した /tmp/fleet-ci-ws-ymPrc3、
+  ;; simeon）: 配られた tree は 11 ファイルで `src/` が存在せず、
+  ;; `clojure -M:test` が `src/association_facts.kotoba (No such file or
+  ;; directory)` で落ちていた。`:min-files 5` は yml+edn で満たされるので床にも
+  ;; 掛からない。
+  ;;
+  ;; **両方向を確認済み**（2026-08-13、手元で filter を再現した 2 本の tree）:
+  ;;   `.yml .edn .clj .cljc` のみ → `FAIL ci.yml`、exit 1（fleet と同じ指紋）
+  ;;   `.kotoba` を足す           → `OK — all workflows passed`、exit 0
+  ;;
+  ;; 教訓は「ローカルで緑」も「fleet で緑」ではないということ。full tree に対して
+  ;; 手元で回すと通ってしまい、赤の原因は tree の中身ではなく **配り方**にあった。
   {:name "cloud-itonami-assoc-0126-idn-gapki" :id "gh-workflow-assoc-gapki"
    :gate :nbb-script
    :script "gates/github_workflow_run.cljs" :script-args ["--run-workflows"]
-   :include-ext [".yml" ".edn" ".clj" ".cljc"] :min-files 5 :cd false}
+   :include-ext [".yml" ".edn" ".clj" ".cljc" ".kotoba"] :min-files 5 :cd false}
 
   ;; ---------------------------------------------------------------------
   ;; flagship の item 4（夜間再生成）— murakumo で回す（ADR-2608102000）。
