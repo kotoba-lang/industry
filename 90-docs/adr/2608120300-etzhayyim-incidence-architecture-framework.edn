@@ -1,0 +1,86 @@
+[{:db/id -1
+  :adr/id "adr-2608120300-etzhayyim-incidence-architecture-framework"
+  :adr/title "ADR-2608120300: Etzhayyim Architecture Framework は individual を識別子ではなく incidence の商として構成する"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-12"
+  :adr/last-verified "2026-08-12"
+  :adr/last_verified "2026-08-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "etzhayyim-incidence-architecture-framework"
+  :adr/tags "etzhayyim, architecture-framework, incidence-theory, individual, did, authentication, dodaf"
+  :adr/related ["adr-2608120200-what-the-kotoba-cores-actually-run"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["Etzhayyim Architecture Framework の individual と identity の分離"
+   "DID authentication と Kotoba execution admission の境界"
+   "incidence basis から複数 view を導出する規則"]
+  :adr/body
+  "# ADR-2608120300: individual は DID ではなく incidence の商である
+
+**Status**: accepted
+**Date**: 2026-08-12
+
+## Context
+
+Kotoba/Kotobase には DID/CACAO を使う実装があるが、2026-08-12 時点の current source では、
+Kotoba の全プログラムが DID 認証を経なければ実行できないという言語意味論にはなっていない。
+compiler/KIR は capability と effect を扱い、host/runtime は必要な境界で CACAO や DID adapter を
+組み合わせる。Kotobase の canonical write plane はより強く DID/CACAO に依存する。この差を
+消して「DID が individual そのもの」とすると、匿名の pure computation、鍵の rotation、複数 DID、
+session principal、authorization、実行証跡が一つの概念に潰れる。
+
+DoDAF v2 の data-centric な考え方は採るが、固定された図面集合を正本にはしない。Etzhayyim では
+architecture の最小正本を incidence basis とし、すべての view を同じ basis から投影する。
+
+## Decision
+
+### 1. Incidence basis
+
+architecture basis は node、incidence、context、evidence からなる有限な typed relation とする。
+incidence は source、relation、target、context、evidence を持つ。個別 view は別モデルではなく、
+この basis に対する query/projection である。
+
+### 2. Individual construction
+
+individual は raw ID、DID、account、key ではない。同一 scope の incidence graph に対する
+deterministic partition refinement が作る observational equivalence class、すなわち quotient の
+一要素として構成する。比較は basis CID と quotient signature を組にして行い、異なる basis 間の
+同一性を暗黙に推論しない。統合には明示的な correspondence incidence と証拠が要る。
+
+### 3. Identity and execution gates
+
+DID は individual への claim/binding の一種であり、individual の定義ではない。次の gate は分離する。
+
+1. individual validity: incidence basis と quotient が妥当か
+2. authentication: challenge/proof が DID または別 credential に結び付くか
+3. authorization: authenticated principal が requested capability/effect を持つか
+4. execution conformance: KIR/runtime が admitted effects、receipt、basis CID を守るか
+
+pure/anonymous evaluation は 2 と 3 を要求しなくてよい。外部 effect を持つ execution は 1〜4 を
+すべて満たさなければならない。これにより DID 認証を runtime の必須前提に誤って昇格させず、
+effectful execution だけを fail-closed にできる。
+
+### 4. View families
+
+R0 は DoDAF-like な AV、IV、TV、CV、OV、ExV、DIV、PV、StdV を同じ incidence basis から返す。
+名称は互換的な会話の入口であり、Etzhayyim の正本は view ではなく basis/query/receipt である。
+
+## Implementation
+
+公開 repo `etzhayyim/architecture-framework` を作成した。CLJC の R0 は finite basis validation、
+scope closure、bisimulation quotient、DID binding、authentication/authorization/execution の分離、
+DoDAF-like view projection を実装する。ontology と決定 ADR は EDN で機械可読にした。
+
+## Consequences
+
+- DID の鍵 rotation や複数 credential を、individual の消滅・重複と扱わずに済む。
+- 同じ incidence pattern だけで異なる世界の個体を同一視しない。basis CID が境界になる。
+- 認証済みであっても無権限の effect は拒否され、権限があっても不正な execution receipt は拒否される。
+- R0 の quotient は有限グラフ上の構造的同値であり、時間発展・確率的 incidence・無限構造の完全な
+  incidence theory ではない。それらは basis/version/receipt を壊さず後続段階で拡張する。
+"}]
