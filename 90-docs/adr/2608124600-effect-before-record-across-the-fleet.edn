@@ -122,6 +122,44 @@ YouTube accepted logs `:publish-failed` — **an actively wrong record.**
 bytes are committed, and discard it.** Persisting that one string converts an
 unnameable orphan into a resumable job.
 
+**FIXED — three merges, pins advanced.** All three had checkout == west pin ==
+`origin/main`, so no three-way drift for once.
+
+**The newscaster case was not an ordering fix**, and establishing that mattered.
+`upload!` collapsed **four** outcomes into `nil` — file missing, the service
+refusing, transport dying mid-flight, and a 2xx with no id. Once the response is
+kept the record follows correctly. Only a 4xx is now a determinate rejection;
+transport and 5xx and no-id are **held as indeterminate, never recorded as
+failed.** The ordering half was separate and real: nothing recorded intent, so an
+attempt marker now precedes the effect.
+
+**The tests caught the agent's own first fix having the same defect one level
+down.** It released the upload session as soon as the PUT returned — **while the
+durable record still lacked the id.** The session now carries the id in an
+`uploaded` state and is released only after persist. That is the shape repeating
+inside its own repair, and only a retry test surfaced it.
+
+**And a weak assertion nearly passed against the broken implementation**:
+`.indexOf` returns `-1` for an effect that was never called, so an
+ordering check comparing positions succeeded when neither call happened.
+Tightened to assert the call occurred **before** asserting where it occurred.
+**An ordering test that does not first assert existence is not an ordering
+test.**
+
+Coverage was not uniform and is stated per repo: one had a real suite, one had
+23 tests, and **one had no test setup at all** — no runner, no config, no
+dependency. Its before/after is against a faithful transcription rather than the
+literal old file, because the logic lived in a self-executing script that cannot
+be required; it was extracted to make it testable.
+
+**One decision left open deliberately.** `public` remains the default in the
+syndication publisher. It is defensible under that repo's stated model — the
+work is already public — and **changing a publish default silently changes what
+operators get, which is a product call rather than an ordering defect.** The
+ordering fix removes the compounding half, since the retry no longer duplicates,
+and the effective value is now printed before the upload rather than only in a
+dry run.
+
 ## What the sweep refuted, which matters as much
 
 A flagged **unconditional AWS credential leak** — an access-key pair returned on
