@@ -187,6 +187,32 @@ auth.aozora.app/static/auth.js  200
 何も赤を報告しない。本件の範囲外なので直さず、auth 用に scope した
 `:auth-test` build を分けた。
 
+## 着地点（2026-08-12 closing、次の agent 向け）
+
+| 何 | どこ |
+|---|---|
+| 実装 | `network-awai/app-aozora-engine` main `71c5434e3e6b`（merge commit）。ディレクトリは `auth/` |
+| ADR + pin 前進 | `com-junkawasaki/root` main `a32df58bde7a`。pin `5207381fa548 → 71c5434e3e6b`（fast-forward 検証済み） |
+| 稼働中の Worker | `app-aozora-auth` version `e3ca2c7e-7b29-48d7-b104-2ba9f4c0dd57` |
+| branch / worktree / stash | すべて撤去済み。open PR なし（サーバ側 merge API で着地させたため） |
+
+**deploy 済みコードと main の一致の根拠**は挙動実測:
+`/login → 302`・`/nope → 404` は、commit に含まれる「legacy redirect と 404 を
+config gate より前へ動かす」修正がなければ両方 503 になる。
+（byte 一致の再ビルド比較はしていない。）
+
+live 実測（2026-08-12、closing 時点）:
+
+```
+auth.aozora.app/                200    auth.aozora.app/login   302 → /sign-in
+auth.aozora.app/sign-in         200    auth.aozora.app/nope    404
+auth.aozora.app/sign-up         200    auth.gftd.ai/sign-in    200  （意図どおり無変更）
+auth.aozora.app/manage          200    pds.aozora.app/oauth/authorize 400（hand-off OFF のまま）
+auth.aozora.app/oauth/authorize 200
+```
+
+共有 checkout `orgs/network-awai/app-aozora-engine` は pin に同期済み（`west update`）。
+
 ## 次の一手（順序が重要）
 
 ```bash
