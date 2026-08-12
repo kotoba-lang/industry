@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6741, "ai-gftd-chat-shell" 2745},
+ {"magatama-sh1n5h1x" 6751, "ai-gftd-chat-shell" 2745},
  :zone
- {:requests-7d 515863,
-  :pageviews-7d 22775,
-  :uniques-7d-sum 4822,
+ {:requests-7d 520588,
+  :pageviews-7d 23343,
+  :uniques-7d-sum 4868,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
   [{:path "/php_version.php", :requests 195}
    {:path "/pinfo.php", :requests 176}
-   {:path "/nginx_status", :requests 97}
-   {:path "/.well-known/jwks.json", :requests 80}
-   {:path "/application.yml", :requests 78}
-   {:path "/my", :requests 74}
-   {:path "/.ssh/id_ecdsa", :requests 72}
-   {:path "/config.env", :requests 71}],
-  :status-mix {:client-error 1282, :server-error 15797, :ok 3634},
+   {:path "/nginx_status", :requests 87}
+   {:path "/application.yml", :requests 79}
+   {:path "/server-info", :requests 67}
+   {:path "/my", :requests 67}
+   {:path "/gitea/", :requests 64}
+   {:path "/fpm-status", :requests 64}],
+  :status-mix {:client-error 1259, :server-error 15697, :ok 3269},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,10 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-12",
- :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 76},
+ :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 78},
  :top-paths
- "上位 page (24h, 2xx/3xx): /php_version.php 195 · /pinfo.php 176 · /nginx_status 97 · /.well-known/jwks.json 80 · /application.yml 78 | 4xx(probe) 6% · 5xx 76%",
+ "上位 page (24h, 2xx/3xx): /php_version.php 195 · /pinfo.php 176 · /nginx_status 87 · /application.yml 79 · /server-info 67 | 4xx(probe) 6% · 5xx 78%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 515863 req/7d・4822 uniques(日次和)・うち4xx probe 6%(24h)、workers 9486 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 520588 req/7d・4868 uniques(日次和)・うち4xx probe 6%(24h)、workers 9496 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}

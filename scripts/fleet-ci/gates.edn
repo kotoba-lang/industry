@@ -231,6 +231,32 @@
    :script "gates/docs-edn-check.cljs" :script-args ["--sub" "90-docs/adr" "--min" "1400"]
    :include-ext [".edn"] :min-files 1500 :cd false}
 
+  ;; superproject の ADR identity gate。**:id が必要**（:name は org / tip 解決に
+  ;; 使う repo 名のままにする必要があるので、識別子を分ける）。
+  ;;
+  ;; 検証内容: `:adr/id` がちょうど 1 つの文書に解決すること。隣の docs-edn-check が
+  ;; 見るのは「各 ADR が EDN として読めるか」で、**2 つのファイルが同じ id を名乗って
+  ;; いても両方とも読める**ので緑のまま通る。id の一意性はそこの死角にある。
+  ;;
+  ;; 実害は実測済み: 2026-08-07 に `:adr/id "2608080000"` が 2 つの ADR に解決し、
+  ;; その id への `:adr/related` 参照が何を指すか決まらなくなった。さらに 08-08 に
+  ;; 2 件増え（2608082000 / 2608089000）、気づかれるまで 4 日かかった。この間
+  ;; 検査は 1 つも無い。ADR-2608124800 の棚卸しでは、`orgs/` を読まないために
+  ;; **構造的な障害なしに今日 gate にできる**数少ない verifier として最上位。
+  ;;
+  ;; :include-ext は検査対象（ADR = .edn）と **検出器自身（.cljs）の両方**が要る。
+  ;; gate はロジックを複製せず scripts/verify-adr-identity.cljs を呼ぶので、
+  ;; .cljs が無い tree では正本に届かない（gate 側が存在を確認して exit 90）。
+  ;;
+  ;; :min-files 1500 は「絞り込みが壊れて 90-docs/adr が落ちた tree を検査して
+  ;; 『衝突 0 件 = 合格』にする」のを防ぐ床。tick.cljs は tarball を作る**前に**
+  ;; reject するので、gate は起動すらしない。gate 側の存在確認と verifier 側の
+  ;; --min と合わせて 3 重。
+  {:id "root-adr-identity"
+   :name "root" :org "com-junkawasaki" :gate :nbb-script
+   :script "gates/adr-identity-check.cljs" :script-args ["--min" "1400"]
+   :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
+
   ;; superproject の parity 台帳 gate。**:id が必要**（:name は org / tip 解決に使う
   ;; repo 名のままにする必要があるため）。
   ;;
