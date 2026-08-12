@@ -212,22 +212,50 @@
   "The sphere the camera must frame: the furthest shopfront plus its own bulk."
   (+ street-radius 9.0))
 
+(defn- camera-opts?
+  "Truthy only when the caller passed a real override map (not nil / empty)."
+  [opts]
+  (boolean (and (map? opts) (seq opts))))
+
 (defn camera
-  "eye/target for the street at this viewport aspect (width/height).
+  "eye/target (and the fov they were framed with) for this viewport aspect.
 
   `ir/fit-distance` gives the RANGE at which the street fits — the straight-line distance
   from the target. A rig states its ground distance and its height separately, so the range
   is split between them by `pitch-deg`; handing the range straight to `:distance` and
   picking a height independently is how you end up with a camera that is both too far away
-  and too low, which is what the first CLI render looked like."
-  ([] (camera (/ 9.0 16.0)))
-  ([aspect]
-   (let [range (ir/fit-distance fit-radius fov-deg aspect)
-         th (* pitch-deg (/ Math/PI 180.0))]
-     (ir/rig->camera (assoc camera-rig
-                            :distance (* range (Math/cos th))
-                            :height (* range (Math/sin th)))
-                     [0.0 0.0]))))
+  and too low, which is what the first CLI render looked like.
+
+  Optional `opts` lets an agent aim the same IR the executor and `kami.webgpu.pick` read
+  (ADR-2608108000 / #1751). Keys, all optional:
+
+    :orbit  degrees added to the default azimuth (180 looks at the street from the back)
+    :zoom   factor > 0; values > 1 pull in (range /= zoom), < 1 push out
+    :fov    vertical field of view in degrees (also used for the fit)
+    :eye    absolute `[x y z]` — wins over the solved eye
+    :target absolute `[x y z]` — wins over the solved target
+
+  Orbit/zoom/fov reshape the default rig first; absolute eye/target overlay afterwards so
+  an agent can say either 'spin 90°' or 'put me at these coordinates'."
+  ([] (camera (/ 9.0 16.0) nil))
+  ([aspect] (camera aspect nil))
+  ([aspect opts]
+   (let [opts (if (camera-opts? opts) opts {})
+         fov (double (or (:fov opts) fov-deg))
+         orbit-deg (double (or (:orbit opts) 0.0))
+         zoom (double (or (:zoom opts) 1.0))
+         zoom (if (< zoom 1e-6) 1e-6 zoom)
+         range (/ (ir/fit-distance fit-radius fov aspect) zoom)
+         th (* pitch-deg (/ Math/PI 180.0))
+         azimuth (+ (:azimuth camera-rig) (* orbit-deg (/ Math/PI 180.0)))
+         base (ir/rig->camera (assoc camera-rig
+                                    :azimuth azimuth
+                                    :distance (* range (Math/cos th))
+                                    :height (* range (Math/sin th)))
+                             [0.0 0.0])
+         eye (or (:eye opts) (:eye base))
+         target (or (:target opts) (:target base))]
+     {:eye eye :target target :fov fov})))
 
 (defn instances
   "Every box in the street, scenery first so shopfronts sort later in the vector (order is
@@ -247,19 +275,24 @@
   `kami.webgpu.pick` reads the same key — a frame that leaves it implicit is a frame whose
   picking silently depends on a default staying put. The aspect argument is required for
   the same class of reason: a scene that does not know its viewport cannot promise to fit
-  in it."
-  ([w] (render-ir w (/ 9.0 16.0)))
-  ([w aspect]
-  (let [{:keys [eye target]} (camera aspect)]
-    {:globals {:sky {:horizon [0.53 0.74 0.93]
-                     :sun-dir [0.35 -0.86 0.36]
-                     :sun [1.0 0.97 0.90]}
-               :eye eye
-               :target target
-               :fov fov-deg
-               :near 0.5
-               :far 4000.0}
-     :instances (instances w)})))
+  in it.
+
+  Optional `opts` is the same camera override map `camera` accepts — CLI `render --orbit`
+  etc. land here so the packed globals, the WebGL page path, and `pick/project` share one
+  eye/target/fov."
+  ([w] (render-ir w (/ 9.0 16.0) nil))
+  ([w aspect] (render-ir w aspect nil))
+  ([w aspect opts]
+   (let [{:keys [eye target fov]} (camera aspect opts)]
+     {:globals {:sky {:horizon [0.53 0.74 0.93]
+                      :sun-dir [0.35 -0.86 0.36]
+                      :sun [1.0 0.97 0.90]}
+                :eye eye
+                :target target
+                :fov fov
+                :near 0.5
+                :far 4000.0}
+      :instances (instances w)})))
 
 (def shop-kinds
   "The parts of a building a tap should resolve to. Roads, ground, trees and the player
