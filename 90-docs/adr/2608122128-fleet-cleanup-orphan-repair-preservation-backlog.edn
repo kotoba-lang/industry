@@ -166,8 +166,39 @@ Not run: repo test suites. Nothing in this session changed executable logic
 except two `deps.edn` path retargets, whose correctness is structural (the target
 paths exist under west) rather than behavioural.
 
+## Open at close — a second instance of Decision 2, in flight
+
+Re-running the audit at close time returned `local-root-broken: 1` again, on a
+NEW edge: `orgs/net-kotobase/kotobase-object-store-b2-s3`, `dir=false west=false`,
+1 consumer. Diagnosed, deliberately not fixed.
+
+`orgs/net-kotobase/engine` was created at 19:20 today by another live session
+(tip: *Merge pull request #1 from network-awai/codex/transfer-to-net-kotobase*),
+part of an ongoing split of the `orgs/network-awai/net-kotobase` monorepo into
+per-package repos under a `net-kotobase` org — `authn`, `commoncrawler`, `cypher`,
+`docs`, `engine`, `ipfs`, `lake` are already through, all west-registered.
+
+`engine`'s `deps.edn:171` carries `{:local/root "../kotobase-object-store-b2-s3"}`.
+That was correct while `engine` was a directory inside the monorepo and the
+target was its sibling directory. Now that `engine` is its own repo, the relative
+path resolves to `orgs/net-kotobase/kotobase-object-store-b2-s3`, which does not
+exist: `kotobase-object-store-b2-s3` is **still a subdirectory** of
+`orgs/network-awai/net-kotobase` and has not been split out. It is not a repo of
+its own, so it cannot simply be registered — it has to be extracted first, or the
+dep retargeted at the monorepo path.
+
+Not repaired here because the migration is still running; editing those
+`deps.edn` files now would race the session performing it. This is the same
+failure Decision 2 describes, which means that rule now has predictive value
+rather than only retrospective: **every repo split must audit relative
+`:local/root` depth in both directions before the split is called done.**
+
 ## Resume point
 
+0. `orgs/net-kotobase/engine` -> `kotobase-object-store-b2-s3` (above). Owner of
+   the net-kotobase split should either extract that package into its own repo
+   and register it, or retarget the dep. Re-check with
+   `nbb scripts/west-orphan-audit.cljs --blocking`.
 1. Fix the `parents: 0` fallback in `scripts/cleanup-land.cljs` (Decision 3).
 2. Work the 26 dispositioned preservation PRs — each carries its own
    measurements and recommended verdict as a comment. 12 are
