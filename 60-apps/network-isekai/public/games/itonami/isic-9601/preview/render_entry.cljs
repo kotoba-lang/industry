@@ -35,9 +35,12 @@
         cleared (.-cleared opts)
         ;; Resolved camera from the CLI (same IR `bin/render.cljs` packed). Absent on
         ;; older callers — fall back to the default fit so the page path stays usable.
+        ;; Read JS arrays by index — squint has no `js->clj` (see preview/squint_shim.mjs).
+        ->v3 (fn [a]
+               (when a [(aget a 0) (aget a 1) (aget a 2)]))
         cam (cond-> {}
-              (.-eye opts) (assoc :eye (js->clj (.-eye opts)))
-              (.-target opts) (assoc :target (js->clj (.-target opts)))
+              (.-eye opts) (assoc :eye (->v3 (.-eye opts)))
+              (.-target opts) (assoc :target (->v3 (.-target opts)))
               (number? (.-fov opts)) (assoc :fov (.-fov opts)))
         glsl {:vert (.-vert opts) :frag (.-frag opts)}
         canvas (js/document.createElement "canvas")]
