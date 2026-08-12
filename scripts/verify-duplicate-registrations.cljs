@@ -106,14 +106,33 @@
 
   A non-GitHub remote also came back as `Not Found (HTTP 404)`, which reads as
   `the repository is missing` rather than `this remote is not GitHub`. Now such
-  a remote is skipped when a GitHub one exists."
+  a remote is skipped when a GitHub one exists.
+
+  **`origin` is preferred, and that is not cosmetic.** The b2 fix narrowed the
+  candidate set to GitHub remotes but kept taking the FIRST alphabetically, so
+  the class of error survived in smaller form. Measured across 4,414 checkouts:
+  8 have GitHub remotes naming different repositories, 7 of which are rename
+  aliases resolving to one id and are harmless. The eighth is not —
+  `ai-gftd-apps-gftdcojp` carries a `kotoba-upstream` remote pointing at an
+  entirely different repository, and `kotoba-upstream` sorts before `origin`.
+
+  **The consequence is worse than a wrong label.** That checkout is currently
+  shallow, so it forms no group and the error is latent. Unshallow it and its
+  true root becomes the other repository's, it groups with that repository's
+  checkout, and the group is reported CONFIRMED `one repo checked out twice` on
+  **the wrong id** — inviting the retirement of a west entry for a repo that is
+  not a duplicate. Repos are being unshallowed as a matter of policy, so that is
+  a scheduled collision, not a hypothetical."
   [dir]
   (let [names (some-> (sh (str "git -C " dir " remote")) (str/split #"\n"))
         urls (keep (fn [n]
                      (when-not (str/blank? n)
                        (sh (str "git -C " dir " remote get-url " (str/trim n)))))
                    (or names []))]
-    (when-let [url (first (filter #(re-find #"github\.com[:/]" %) urls))]
+    (when-let [url (or (some (fn [[n u]] (when (and (= "origin" (str/trim n))
+                                                    (re-find #"github\.com[:/]" u)) u))
+                             (map vector (or names []) urls))
+                       (first (filter #(re-find #"github\.com[:/]" %) urls)))]
       (-> url
           (str/replace #"^.*github\.com[:/]" "")
           (str/replace #"\.git$" "")
