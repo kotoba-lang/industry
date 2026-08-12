@@ -225,11 +225,31 @@ weekly no-ops that read as healthy in `launchctl` and whose log line reads like 
 real outcome.** That is worse than an erroring job.
 
 **The other job has failed every run since it was created** — 21 log lines for 21
-expected daily runs, 20 HTTP 400 and one 502, never once succeeding. The cause is
-visible: it hardcodes a concrete model id against a legacy hostname, violating
-ADR-2607173100, **and the `murakumo-main` alias currently resolves that same
-model to a different endpoint.** Left alone deliberately: changing the LLM call
-on a job that auto-merges to `main` deserves an explicit decision.
+expected daily runs, 20 HTTP 400 and one 502, never once succeeding.
+
+**CORRECTION (2026-08-13): the cause recorded here was wrong.** This paragraph
+said the job hardcoded a concrete model id against a legacy hostname, violating
+ADR-2607173100, and that the `murakumo-main` alias resolved that model to a
+different endpoint. That reading came from the code, not from the wire. Measured:
+the legacy hostname returns **200** for a well-formed request, and **both**
+endpoints returned the identical 400:
+
+    {\"error\":{\"code\":400,\"message\":\"Expected 'messages' to be an array\"}}
+
+The request body was built with `#js {…}`, which is **shallow**. `:messages`
+stayed a ClojureScript vector, so `JSON.stringify` serialised its internals —
+`{\"G\":null,\"I\":1,\"shift\":5,\"root\":{…}}`. **Every request since day one was
+malformed**, and the script threw away the server's explanation, logging only
+`\"LLM HTTP \" status`. The answer was in the response body twenty times.
+
+The ADR-2607173100 violation is real and was fixed too, but it was not why the
+job failed. **A defect that is visible in the source is not thereby the defect
+that is firing** — and discarding the error text is what let a wrong diagnosis
+stand for three weeks.
+
+A third defect was hiding behind the second: well-formed but non-streaming
+requests hit a Cloudflare edge **524 at ~128 s**. With `stream: true` the same
+request returns 200, first byte at 17.9 s, complete at 47.0 s.
 
 Verification limits stated rather than implied: the shinshi edit was exercised by
 running the real edited function, and the repo **stayed non-shallow** afterwards
@@ -238,12 +258,30 @@ and **auto-merges to `main` of a live repo**. The playtest depth-flag removal is
 **unexercised**, because its target directory does not exist so the fetch never
 executes.
 
-**`~/.gftd` is not a git repository, and 26 launchd plists point into it.** These
-are scheduled, they violated a repo-wide ADR for weeks, and nothing reviews them.
-They should be version-controlled and the audit should become a fleet-ci gate
-rather than a script someone remembers to run — but the plists carry absolute
-paths, so **relocating the files breaks 26 jobs unless the plists move in the
-same step.**
+**CORRECTED (2026-08-13).** This section said `~/.gftd` is not a git repository
+and that **26** launchd plists point into it, so relocating the scripts would
+break 26 jobs unless the plists moved in the same step. Both halves are now
+wrong, and the count was wrong when written.
+
+**The count.** 25 plists match the string `.gftd`, but **13 of those match only
+through their own Label** (`com.gftd.*`), which points at nothing. **12 reference
+the directory**, and of those only **five actually execute code from it**. The
+rest write a log there or read one credential path — nothing that merely writes a
+log needs to move. Matching a string is not counting a dependency.
+
+**The blocker.** Relocation was never necessary. `~/.gftd` is now under version
+control **in place**, with the git directory held outside the work tree at
+`~/.gftd-vcs.git` and a deny-by-default `.gitignore`. No plist was touched and no
+absolute path changed. Keeping the git dir outside also avoids altering git
+*discovery* for `fleet-ci-cache`'s deliberately git-less trees, which an in-place
+`.git` would have done.
+
+**What remains, for an owner.** `~/.gftd-vcs.git` **has no remote** — the history
+protecting those scripts lives on the same disk as the scripts. And
+`scripts/audit-gftd-scripts.cljs` is still wired to nothing; it works (three
+violations today, all `.sh`, one live under a loaded job), but registering it in
+the orgs-detector tick would install a standing red, so the three files want a
+decision first. A fleet gate cannot substitute: `~/.gftd` is in no repo's tree.
 
 Also worth removing: the byte copy of the root's `.git` at `/private/tmp` still
 holds the shallow frontier. **Fetching from it would re-import the grafts.**

@@ -300,6 +300,22 @@ sha256 と実ファイルを突き合わせる**。Actions 経路は committed �
    誤解してヘルプを吐く。judah（npm 11.17.0）と simeon（10.9.8）では正常。
    **「ローカルで赤」は「fleet で赤」ではない。** 切り分けは `nbb` を直接呼ぶか、
    `ssh <node> 'npx --yes nbb …'` で実ノードに当てる。
+4. **逆向きも起きる —— 「ローカルで緑」は「fleet で緑」ではない。** fleet が配るのは
+   repo の tree そのままではなく、**`:include-ext` で拡張子を絞った tree** である。
+   実測 2026-08-13: `gh-workflow-assoc-gapki` は手元の完全な tree で緑、fleet で赤。
+   `:include-ext` が `.yml .edn .clj .cljc` だったのに対し、その repo の production
+   source は `src/association_facts.kotoba` **1 本きり**で、ノードに配られた 11 ファイル
+   に `src/` が無かった（`clojure -M:test` が `association_facts.kotoba (No such file or
+   directory)`）。**再現するのは tree ではなく、絞り込みの結果である。**
+   ローカルで gate を回すときは `:include-ext` を当ててから回す。
+
+**gate は「fleet で 1 度緑になる」まで landed としない。** 実測 2026-08-13、赤い
+8 gate のうち**両方向を見せたことがあるのは 2 つだけ**で、残る 6 つは landing 以来
+一度も緑になっていない（`root-permit-index` 300 回、`root-itonami-org-id` 286 回）。
+landing 前の break/unbreak は手元か stub に対して行われており、**手元で discriminate
+することと、ノードの配られた tree で discriminate することは別の主張**である。
+「落ちない gate は劇場」の対偶も同じく成り立つ —— **一度も緑にならない gate も、
+誰も行動できないという意味で同じだけ無内容**。
 
 **直したら pin も前進させる。** 子リポの main を直しても、west pin が手前にあると
 gate は古い tip を見続ける（実測: `amu` / `cloud-itonami` とも修正 commit の手前で
