@@ -39,6 +39,38 @@
 
 (defn allow! [] (compat/exit 0))
 
+(defn upstream-ref
+  "この checkout の『上流の既定ブランチ』を `<remote>/<branch>` で返す。解決
+   できなければ nil。
+
+   **remote は `origin` とは限らない。** west が作る checkout は remote を org 名
+   で持つ（`network-awai` / `cloud-itonami` …）。実測 2026-08-13、`orgs/` 配下の
+   4,406 checkout のうち **2,824（64%）に `origin` remote が無い**。
+
+   それまでこの関数の中身は `origin/main` → `refs/remotes/origin/HEAD` の 2 段で、
+   どちらも解決できなければ呼び出し側が `(allow!)` していた。つまり
+   **ワークスペースの 3 分の 2 に対して、本番デプロイのガードは黙って素通り
+   していた。** 実例 2026-08-13: `network-awai/nexus-x402` と
+   `network-awai/club-shinshi-app` の本番デプロイ 2 件は、どちらもこのガードに
+   **評価すらされていない**（remote 名が `network-awai`）。
+
+   remote が複数あるときは **URL に `github.com` を含むものを選ぶ**。
+   `git remote | head -1` はアルファベット順の先頭を返すので、annex repo では
+   `b2`（special remote）を選んでしまう —— この誤りはこの workspace で
+   3 回起きており、うち 2 回は同じ script を直した後に手で再現している。"
+  [top]
+  (let [remotes (->> (or (git top "remote") "") str/split-lines
+                     (map str/trim) (remove str/blank?) vec)
+        gh? (fn [r] (some-> (git top "remote" "get-url" r) (str/includes? "github.com")))
+        ordered (concat (filter #{"origin"} remotes)
+                        (filter gh? (remove #{"origin"} remotes))
+                        (remove #{"origin"} remotes))]
+    (some (fn [r]
+            (or (when (git top "rev-parse" "--verify" "-q" (str r "/main")) (str r "/main"))
+                (some-> (git top "symbolic-ref" "-q" (str "refs/remotes/" r "/HEAD"))
+                        (str/replace #"^refs/remotes/" ""))))
+          ordered)))
+
 (defn deny! [reason]
   (println (json/generate-string
             {:hookSpecificOutput
@@ -96,12 +128,18 @@
           top (git dir "rev-parse" "--show-toplevel")]
       (when (str/blank? top) (allow!))
 
-      (let [ref (if (git top "rev-parse" "--verify" "-q" "origin/main")
-                  "origin/main"
-                  (some-> (git top "symbolic-ref" "-q" "refs/remotes/origin/HEAD")
-                          (str/replace #"^refs/remotes/" "")))]
-        (when (str/blank? ref) (allow!))
-        (git top "fetch" "-q" "origin" (str/replace ref #"^origin/" ""))
+      (let [ref (upstream-ref top)]
+        (when (str/blank? ref)
+          ;; **黙って通さない。** ここに来るのは「遅れていない」ではなく
+          ;; 「判定できなかった」であり、両者を同じ exit 0 で表すと、
+          ;; ガードが評価しなかったことが外から見えない。
+          (js/console.error
+           (str "wrangler-deploy-main-sync-guard: " top
+                " の upstream ref を解決できませんでした（remote: "
+                (or (git top "remote") "なし")
+                "）。**このデプロイは検査されていません。**"))
+          (allow!))
+        (git top "fetch" "-q" (first (str/split ref #"/")) (second (str/split ref #"/")))
         (let [raw    (git top "rev-list" "--count" (str "HEAD.." ref))
               parsed (js/parseInt (or raw "0") 10)
               behind (if (js/isNaN parsed) 0 parsed)]
