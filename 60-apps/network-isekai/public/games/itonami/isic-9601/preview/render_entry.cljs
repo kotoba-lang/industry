@@ -33,13 +33,21 @@
   (let [w (.-width opts)
         h (.-height opts)
         cleared (.-cleared opts)
+        ;; Resolved camera from the CLI (same IR `bin/render.cljs` packed). Absent on
+        ;; older callers — fall back to the default fit so the page path stays usable.
+        cam (cond-> {}
+              (.-eye opts) (assoc :eye (js->clj (.-eye opts)))
+              (.-target opts) (assoc :target (js->clj (.-target opts)))
+              (number? (.-fov opts)) (assoc :fov (.-fov opts)))
         glsl {:vert (.-vert opts) :frag (.-frag opts)}
         canvas (js/document.createElement "canvas")]
     (set! (.-width canvas) w)
     (set! (.-height canvas) h)
     (try
       (let [handle (gl/create! canvas glsl)
-            ir (w3/render-ir (assoc (world/init) :cleared cleared) (/ (double w) (double h)))
+            ir (w3/render-ir (assoc (world/init) :cleared cleared)
+                             (/ (double w) (double h))
+                             (when (seq cam) cam))
             drawn (gl/draw! handle ir w h)
             ctx (:ctx handle)
             px (js/Uint8Array. (* w h 4))

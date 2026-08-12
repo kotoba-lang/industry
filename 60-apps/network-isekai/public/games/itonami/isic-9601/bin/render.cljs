@@ -30,9 +30,15 @@
   Usage:
     nbb bin/render.cljs [--out FILE] [--width N] [--height N] [--cleared N]
                         [--state FILE] [--engine DIR]
+                        [--eye X,Y,Z] [--target X,Y,Z]
+                        [--orbit DEG] [--zoom N] [--fov DEG]
 
   `--state FILE` reads an `:itonami-game/state` v1 envelope (from `play --dump`) and draws
-  that street progress — unlocked shops match the played run, not a fresh `(world/init)`."
+  that street progress — unlocked shops match the played run, not a fresh `(world/init)`.
+
+  Camera flags (#1751) reshape the same IR `kami.webgpu.pick` reads — not a second view
+  matrix. `--orbit` / `--zoom` / `--fov` adjust the default fit; `--eye` / `--target` set
+  absolute coordinates (and win when both styles are passed)."
   (:require ["node:fs" :as fs]
             ["node:http" :as http]
             ["node:child_process" :as cp]
@@ -50,6 +56,24 @@
   (let [i (.indexOf (into-array argv) (str "--" k))]
     (if (neg? i) default (nth argv (inc i) default))))
 (defn num-opt [k d] (js/parseFloat (opt k (str d))))
+(defn has-opt? [k]
+  (not (neg? (.indexOf (into-array argv) (str "--" k)))))
+
+(defn- vec3-opt
+  "Parse `--eye X,Y,Z` / `--target X,Y,Z`. Wrong arity exits 2 — a silent fallback to the
+  default camera would let an agent think it aimed and then look at the wrong street."
+  [k]
+  (let [s (opt k nil)]
+    (when s
+      (let [parts (str/split s #",")]
+        (when (not= 3 (count parts))
+          (println (str "--" k " wants X,Y,Z (got " (pr-str s) ")"))
+          (js/process.exit 2))
+        (let [v (mapv js/parseFloat parts)]
+          (when (some js/isNaN v)
+            (println (str "--" k " wants numbers (got " (pr-str s) ")"))
+            (js/process.exit 2))
+          v)))))
 
 (def here
   "This package's directory, resolved from the script's own path rather than the working
@@ -84,8 +108,29 @@
         (js/process.exit 2)))
     (assoc (world/init) :cleared (int (num-opt "cleared" 0)))))
 
+(defn- load-camera-opts
+  "CLI camera overrides → the map `world3d/render-ir` accepts. Absent flags leave the
+  default fit alone so a bare `render` still matches the golden framing."
+  []
+  (cond-> {}
+    (has-opt? "eye") (assoc :eye (vec3-opt "eye"))
+    (has-opt? "target") (assoc :target (vec3-opt "target"))
+    (has-opt? "orbit") (assoc :orbit (num-opt "orbit" 0))
+    (has-opt? "zoom") (assoc :zoom (num-opt "zoom" 1))
+    (has-opt? "fov") (assoc :fov (num-opt "fov" w3/fov-deg))))
+
 (def world-state (load-world))
 (def cleared (int (or (:cleared world-state) 0)))
+(def cam-opts (load-camera-opts))
+(when (and (has-opt? "zoom") (or (js/isNaN (:zoom cam-opts)) (<= (:zoom cam-opts) 0)))
+  (println "--zoom wants a number > 0")
+  (js/process.exit 2))
+(when (and (has-opt? "fov") (or (js/isNaN (:fov cam-opts)) (<= (:fov cam-opts) 0)))
+  (println "--fov wants a number > 0")
+  (js/process.exit 2))
+(when (and (has-opt? "orbit") (js/isNaN (:orbit cam-opts)))
+  (println "--orbit wants a number (degrees)")
+  (js/process.exit 2))
 
 (defn- fixture [& parts]
   (let [p (apply path/join engine-root "webgpu" "fixtures" parts)]
@@ -102,7 +147,8 @@
 ;; the frame, entirely from the engine
 ;; --------------------------------------------------------------------------
 
-(def ir (w3/render-ir world-state (/ (double W) (double H))))
+(def ir (w3/render-ir world-state (/ (double W) (double H))
+                      (when (seq cam-opts) cam-opts)))
 (def mesh (geom/box 1.0 1.0 1.0))
 
 (def payload
@@ -292,8 +338,11 @@
   (println (str "  backend " backend (when (= backend "auto") "  (WebGPU first, WebGL 2.0 fallback)")))
   (println (str "  world   cleared=" cleared
                 (when state-path (str "  state=" state-path))))
+  (when (seq cam-opts)
+    (println (str "  camera  " (pr-str cam-opts))))
   (println (str "  frame   " (count (:instances ir)) " instances · " W "x" H
-                " · eye " (pr-str (get-in ir [:globals :eye]))))
+                " · eye " (pr-str (get-in ir [:globals :eye]))
+                " · fov " (pr-str (get-in ir [:globals :fov]))))
   (p/let [srv (serve!)
           pw (js/import "playwright")
           browser (.launch (.-chromium pw)
@@ -319,12 +368,18 @@
               (println (str "  fallback WebGPU → WebGL 2.0: " (:reason gpu-r)))
               (when (:stages gpu-r)
                 (println (str "           got as far as " (str/join " → " (:stages gpu-r))))))
+          ;; WebGL path rebuilds the IR inside the page; hand it the SAME eye/target/fov
+          ;; this process already solved so `--orbit` cannot mean one thing for packed
+          ;; globals and another for the fallback draw.
           raw (if (= used "webgpu")
                 gpu-raw
                 (.evaluate page
                            (str webgl-bundle
                                 ";window.__render(" (js/JSON.stringify
                                                      #js {:width W :height H :cleared cleared
+                                                          :eye (clj->js (get-in ir [:globals :eye]))
+                                                          :target (clj->js (get-in ir [:globals :target]))
+                                                          :fov (get-in ir [:globals :fov])
                                                           :vert (glsl "lit.vert")
                                                           :frag (glsl "lit.frag")}) ")")))
           _ (.close browser)

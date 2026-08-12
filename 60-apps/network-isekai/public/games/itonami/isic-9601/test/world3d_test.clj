@@ -168,4 +168,80 @@
 (deftest the-frame-is-deterministic
   ;; nothing reads a clock or a random source, so the same street draws the same way
   (is (= (w3/render-ir fresh aspect) (w3/render-ir fresh aspect)))
-  (is (= (w3/render-ir fresh aspect) frame)))
+  (is (= (w3/render-ir fresh aspect) frame))
+  (is (= frame (w3/render-ir fresh aspect nil))
+      "nil camera opts is the default framing — CLI with no flags must not drift"))
+
+;; --------------------------------------------------------------------------
+;; camera overrides (#1751) — same IR pick/project reads
+;; --------------------------------------------------------------------------
+
+(defn- eye-xz
+  "Ground-plane bearing of the eye from the origin (the street target)."
+  [cam]
+  (let [[x _ z] (:eye cam)]
+    (Math/atan2 (double z) (double x))))
+
+(defn- eye-range [cam]
+  (let [[x y z] (:eye cam)]
+    (Math/sqrt (double (+ (* x x) (* y y) (* z z))))))
+
+(deftest orbit-spins-the-default-rig
+  ;; 180° puts the eye on the opposite side of the street — the point of the flag.
+  ;; Default azimuth is π/2 (eye on +z); +180° lands on -z.
+  (let [base (w3/camera aspect)
+        spun (w3/camera aspect {:orbit 180.0})
+        delta (Math/abs (- (eye-xz spun) (eye-xz base)))
+        ;; wrap to [0, π]; expect ~π
+        delta (min delta (- (* 2.0 Math/PI) delta))]
+    (is (> delta 2.5) (str "orbit 180 should flip azimuth, got delta=" delta))
+    (is (> (Math/abs (- (nth (:eye spun) 2) (nth (:eye base) 2))) 1.0)
+        "orbit 180 flips eye z across the origin")
+    (is (< (Math/abs (- (eye-range spun) (eye-range base))) 1e-6)
+        "orbit alone does not change distance")))
+
+(deftest zoom-pulls-the-eye-in
+  (let [base (eye-range (w3/camera aspect))
+        close (eye-range (w3/camera aspect {:zoom 2.0}))
+        far (eye-range (w3/camera aspect {:zoom 0.5}))]
+    (is (< close (* base 0.6)) "zoom 2 is roughly half the range")
+    (is (> far (* base 1.5)) "zoom 0.5 pushes out")))
+
+(deftest fov-override-is-stated-on-the-frame
+  (let [f (w3/render-ir fresh aspect {:fov 30.0})]
+    (is (= 30.0 (get-in f [:globals :fov])))
+    ;; narrower lens backs the eye off so the street still fits
+    (is (> (eye-range (w3/camera aspect {:fov 30.0}))
+           (eye-range (w3/camera aspect {:fov 60.0}))))))
+
+(deftest absolute-eye-and-target-win-over-the-rig
+  (let [eye [12.0 40.0 -8.0]
+        target [1.0 2.0 3.0]
+        f (w3/render-ir fresh aspect {:eye eye :target target :orbit 90.0 :zoom 3.0})]
+    (is (= eye (get-in f [:globals :eye])) "absolute :eye wins over orbit/zoom")
+    (is (= target (get-in f [:globals :target])))))
+
+(deftest overridden-camera-still-projects-and-picks
+  ;; ADR acceptance: pick/project agree on the overridden IR — reuse the shop loop
+  (let [f (w3/render-ir fresh aspect {:orbit 35.0 :zoom 1.2 :fov 42.0})]
+    (is (ir/valid? f))
+    (doseq [d world/districts]
+      (let [b (body-for f (:id d))
+            c (:center (pick/instance-box b))
+            p (pick/project f c W H)
+            hit (when p (pick/pick f p W H {:filter w3/shop-instance?}))]
+        (is (some? p) (str (:id d) " still projects under the override"))
+        (is (= (:id d) (get-in hit [:instance :district]))
+            (str "pick at projected " (:id d) " returns that district, not a neighbour"))))))
+
+(deftest absolute-eye-looking-at-a-shop-picks-that-shop
+  ;; agent says "look at this building from here" — the IR must answer the same pixel
+  (let [b (body-for frame "isic-9601")
+        c (:center (pick/instance-box b))
+        eye [(nth c 0) (+ (nth c 1) 25.0) (+ (nth c 2) 40.0)]
+        f (w3/render-ir fresh aspect {:eye eye :target c :fov 40.0})
+        p (pick/project f c W H)
+        hit (pick/pick f p W H {:filter w3/shop-instance?})]
+    (is (and p (< 0 (nth p 0) W) (< 0 (nth p 1) H))
+        "chosen shop is on screen")
+    (is (= "isic-9601" (get-in hit [:instance :district])))))
