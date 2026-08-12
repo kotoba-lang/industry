@@ -333,8 +333,12 @@
   ;;
   ;; 登録前に 3 分岐を exit code で確認した: 壊れた tree=1 / 修復後=0 / 空 tree=1。
   ;; 空を pass にしないのは、tree が届かなかったことを「切断は無い」と読ませないため。
+  ;; --dir はカンマ区切り。ADR 以外の prose を持つ EDN も同じ不変条件で見る
+  ;; （キーが全て keyword）—— 2026-08-13 まで 90-docs/adr しか見ていなかった。
   {:name "root" :id "root-docs-edn-truncation" :org "com-junkawasaki" :gate :nbb-script
-   :script "gates/docs-edn-truncation-check.cljs" :script-args ["--min" "1500"]
+   :script "gates/docs-edn-truncation-check.cljs"
+   :script-args ["--min" "1500"
+                 "--dir" "90-docs/adr,90-docs/business,90-docs/design-quality,90-docs/task-graphs,90-docs/regulatory,90-docs/observatory,90-docs/concept,90-docs/surface,manifest"]
    :include-ext [".edn" ".cljs"] :min-files 1500 :cd false}
 
   {:name "root" :id "root-repository-roles" :org "com-junkawasaki" :gate :nbb-script
