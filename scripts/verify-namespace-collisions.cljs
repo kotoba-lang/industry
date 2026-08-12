@@ -136,6 +136,49 @@
                        (re-seq #":local/root\s+\"([^\"]+)\"" text))]
         (into #{} (concat (map #(str/replace % #"\.git$" "") git) local))))))
 
+(defn- declared-source-roots
+  "Directories a repo actually SHIPS, from top-level `:paths` / `:source-paths`.
+
+  `nil` means the repo declares nothing anywhere, and the caller should then
+  include every source tree it can find rather than none.
+
+  Deliberately excludes `:extra-paths`. An alias-only tree is on the classpath
+  only for whoever invokes that alias in that repo: tools.deps does not export
+  a dependency's aliases, so a consumer can never inherit one. That distinction
+  is the whole point -- see the caller."
+  [repo-dir]
+  (letfn [(files [cur depth acc]
+            (if (> depth 6)
+              acc
+              (reduce (fn [acc e]
+                        (let [n (.-name e) full (path/join cur n)]
+                          (cond
+                            (and (not (.isDirectory e))
+                                 (#{"deps.edn" "shadow-cljs.edn"} n)) (conj acc full)
+                            (not (.isDirectory e)) acc
+                            (str/starts-with? n ".") acc
+                            (#{"node_modules" "target" "out" "dist"} n) acc
+                            :else (files full (inc depth) acc))))
+                      acc
+                      (try (js->clj (fs/readdirSync cur #js {:withFileTypes true}))
+                           (catch :default _ [])))))]
+    (let [fs' (files repo-dir 0 [])
+          roots (reduce
+                 (fn [acc f]
+                   (let [text (try (str (fs/readFileSync f "utf8")) (catch :default _ ""))
+                         ;; `:extra-paths` does not contain the substring
+                         ;; `:paths` -- there is no colon before `paths` in it --
+                         ;; so a literal search cannot pick aliases up by accident.
+                         m (concat (re-seq #":paths\s*\[([^\]]*)\]" text)
+                                   (re-seq #":source-paths\s*\[([^\]]*)\]" text))
+                         dir (path/dirname f)]
+                     (into acc
+                           (for [[_ body] m
+                                 [_ p] (re-seq #"\"([^\"]+)\"" body)]
+                             (path/normalize (path/join dir p))))))
+                 #{} fs')]
+      (when (seq fs') roots))))
+
 (defn- reachable
   "Transitive closure of `start` over `edges`, bounded so a cycle terminates."
   [edges start]
@@ -194,10 +237,31 @@
                         (filter #(.isDirectory %))
                         (map #(str "orgs/" org-name "/" (.-name %)))))))
        (mapcat (fn [root]
-                 (map (fn [src] {:repo (str/replace root #"^orgs/" "")
-                                 :root root
-                                 :src src})
-                      (src-dirs root))))
+                 ;; Walking every `src` dir was the fix for a scan that saw only
+                 ;; `<repo>/src`. It over-corrected: `test/e2e/src` is a source
+                 ;; root by name and ships to nobody, and three repos in the
+                 ;; kami-ongaku family were reported as colliding on
+                 ;; `kami/ongaku/e2e/*` when no build can put two of those trees
+                 ;; on one classpath -- each is reachable only through its own
+                 ;; `:e2e` alias, and tools.deps does not export a dependency's
+                 ;; aliases. Measured with `clojure -Spath -A:e2e` in the one
+                 ;; repo depending on two of them: neither tree appears.
+                 ;;
+                 ;; So a tree counts when the repo DECLARES it, not when it is
+                 ;; spelled `src`. The narrowing is by `:paths` membership, not
+                 ;; by depth -- `net-kotobase/kotobase-api-gateway-cljs/src` is
+                 ;; nested AND declared, and it holds the copy this detector
+                 ;; exists to find. Narrowing by depth would lose it again.
+                 (let [declared (declared-source-roots root)
+                       found (src-dirs root)]
+                   (map (fn [src] {:repo (str/replace root #"^orgs/" "")
+                                   :root root
+                                   :src src})
+                        ;; A repo that declares nothing keeps every tree: unknown
+                        ;; must read as "look", not as "skip".
+                        (if declared
+                          (filter #(contains? declared (path/normalize %)) found)
+                          found)))))
        vec))
 
 (defn- index

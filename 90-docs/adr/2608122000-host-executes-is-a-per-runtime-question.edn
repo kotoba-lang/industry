@@ -21,7 +21,8 @@
   :adr/authoritative true
   :adr/authoritative-for
   ["委譲した decision core の完了条件に runtime が入ること"
-   "KIR entry boundary の host↔guest 変換で実測済みの 2 つの非対称"
+   "KIR entry boundary で実測済みの 3 つの runtime 非対称（cljs）"
+   "機構と判断の線を per-call コストで引くこと"
    "compiler pin と kotoba-kir pin を動かすことが言語移行である理由"
    "KIR seam を与えてよい core と与えてはいけない core の境界（authority 面）"]
   :adr/body
@@ -109,6 +110,60 @@ calendar の seam はそれを写さなかった。**JVM では `(long n)` と `
 「JVM で動いたから委譲できた」と書いていたら、**その日から deploy 先で落ちる
 delegation を landed と記録するところだった**。
 
+### 5. `cloud-itonami-app` —— **ADR-2608112100 の参照実装が、cljs では build すら
+できなかった**
+
+この ADR の主張が最も強く出た 1 件。`b17e0c6`（2026-08-11、ADR-2608112100 の
+reference implementation）が `fleet-core.cljc` を委譲したが、それを require する
+`services/app-edge` は **Cloudflare Worker = ClojureScript の面**である。
+`366d88b` で実測:
+
+```
+npx shadow-cljs release entry
+  => The required namespace \"kotoba.kir\" is not available
+```
+
+**Worker が build できない。** `services/app-edge/deps.edn` に interpreter が
+入っていなかった —— root の `deps.edn` の comment が「`kotoba.kir` は test の外に
+1 件も無い」と主張しており、**2026-08-08 には真で、2026-08-11 から偽**だった。
+最後の deploy は委譲より前なので **live は壊れてはおらず古い**。
+**次の deploy が最初にそれに気付く回だった。**
+
+app-edge 自身の parity gate も `no classpath on this runtime — register-kir! first`
+で落ちる（`read-artifact` が `:cljs` で無条件に throw し、`register-kir!` は在るのに
+誰も呼んでいなかった）。
+
+**非対称 2 も在り、しかも黙って誤答する側だった。** seam に i64 変換が
+**1 つも無く**、`:i64` field を持つ record が 3 つ（`:ao/intent-check` /
+`:approval/tally` / `:bot/accounts`）、host はそこに `(count …)` を渡していた。
+より悪いのは戻り方向で、`bot/status` と `bot/account-disposition` は `:i64` の結果を
+`{0 :connect 1 :use 2 :ask}` で引く —— **cljs では毎回 miss し、全 Bot が `:idle`、
+全 provider が `:connect`** と答える。throw しないので誰も気付かない。
+
+修正と gate を着地させた（`33c2a43`）。6 core・76 case の表を JVM と nbb の両方で
+回し、`uncovered` は artifact の `:exports` から読むので新しい export が未実行のまま
+landing できない。変異: **`i64` を恒等にすると cljs 12 FAIL / JVM は 76 case 全緑、
+`i64-value` を恒等にすると cljs 33 FAIL / JVM は全緑。**
+
+### 4. `erasure` —— 3 つ目の非対称。`[:set :i64]` は cljs で**まったく動かない**
+
+上の 2 つは変換の問題（host 側で直せる）。これは**interpreter 側の欠陥**で、
+seam をどう書いても回避できない。
+
+`kotoba.kir.value/compare-typed-values` は `:i64` を `cljs.core/compare` に渡すが、
+**ClojureScript の `compare` は 2 つの `js/BigInt` を比較できない**。
+`typed-set-contains` は比較するので、**要素 1 個の set でも guest の中で trap する**
+（`Cannot compare 5 to 4`）。同じ probe の同じ runtime で、**スカラの `:i64`
+export は正常に動く**。
+
+実測 pin: compiler `45f0e5e3` / kir `fa2fbb58`。`[:set :i64]` は 32 要素まで受け
+33 で `typed-set-item-limit`、`:bool` の結果は正常に渡る。
+
+これに当たったのは `lrc/locally-repairable` の「cover のうち欠損はちょうど 1 つ」で、
+**`:clj` だけ委譲すれば動いた** —— が、それは規則を 2 箇所に置いて片方を検査しない
+ことなので、**委譲しなかった**。`erasure.set-boundary-test` が**両 runtime で**この
+性質を pin しており、**pin が直った日に赤くなって、次に動かせる委譲の名前を告げる。**
+
 ## Decision
 
 ### 1. 委譲の完了条件に runtime を入れる
@@ -189,6 +244,23 @@ test の書き換え**を伴う。**pin bump ではなく言語移行として�
 **「同じ JVM で 2 回 compile した結果が一致する」ことを検査する test** を足した ——
 gensym カウンタは compile 間で進むので、これが正しい問いである。将来 gensym を
 出す pin に動いたら、drift gate が恒久ノイズになる代わりにこの test が落ちる。
+
+### 4.5 機構と判断の線は測れる —— `erasure` の実測
+
+「per-byte の機構は委譲しない」は今日まで定性的な線だった。同一 JVM で両側を測った:
+
+| | interpreted | host | 比 |
+|---|---|---|---|
+| `gf-mul` | 9,351,654 ns | 1,355 ns | **約 7,000×** |
+| `gf-inv` | 140,414,652 ns | 549 ns | **約 250,000×** |
+
+絶対値は load average ~300 の下なので膨らんでいる —— **比が値**で、3〜5 桁である。
+GF 演算は **1 byte × 1 係数につき 1 回**走る（k=16 の 1 MiB stripe で約 16.7M 回）。
+
+**動いたのは layout につき 1 回問われるもの**: k=16/g=6 の生成行列を埋める
+`cauchy-entry` **96 回**を、seam の generation-keyed memo 越しに 1 度だけ。
+`inga` が測った **1.35 ms/call**（node）と合わせて、**per-call が ms 単位である以上、
+per-byte の呼び出しは委譲の対象になり得ない**と数字で言える。
 
 ### 5. 委譲してよいかは size ではなく authority で決まる面がある
 
@@ -274,13 +346,17 @@ fleet が compiler を進めても赤くならない形にした（同 ADR が r
 | `com-cloudflare` | `eafc65a` | **上の実測 1 の修正。** pin を対で前進（cost は測って安かった）+ 両 runtime を同じ case 表で回す gate（220 case / 117 export、被覆強制）。west pin `a1e69d6` |
 | `jp-go-dds` | `0a02180` | 8 core を委譲。**cljs は意図的に対象外** —— 170 repo の consumer 全部に `kotoba-kir` + `kotoba-hir` + `security` を載せる対称性は買わない、という判断で seam を `.clj` にした。cljs 側は「規則が 2 実装のまま」であることを README と test で明示。west pin `671490c` |
 | `cloud-itonami-isic-6492` | `53c041c` | ADR-2608120200 が「host は在るが swap していない」と書いた repo。**定数が artifact から来る**ようになった（`confidence-floor-x100` は `oracle/call-i64` そのもの）。出荷物は Worker に classpath が無いので生成 `.cljc`。west pin `1879c48` |
+| `cloud-itonami-app` | `33c2a43` | **Worker が build できない**状態の修正 + 6 core / 76 case の両 runtime gate。west pin `8f5ae90` |
+| `murakumo` | `af55e45` | `deps.edn` と `nbb.edn` が **同じ artifact に別の interpreter を pin していた**（`d58972da` / `7ad08c4e`）。収束させて CLI が動くようになった。west pin `69ba891` |
+| `erasure` | `74a1a3e` | LRC の **layout 判断 14 export**（`cauchy-entry` / `generator-entry` / `role-of` / `local-repair-reads` 等）を委譲。GF 演算は per-byte 機構なので host、`locally-repairable` は下記の cljs 欠陥のため据え置き。west pin `26cc239` |
 | `shitsuke` | `a5aa622` | HTML5 RAWTEXT breakout の**security 述語**が走るようになり、`shitsuke.hiccup` から `re-find` が消えた。64 KiB 超は窓（16384 char / 256 overlap）に割って**全窓を guest が判定**する。west pin `736a086` |
 | `mesh` | `9d546e6` | `node.clj` の `cond` に在った request 判断（`request-kind` / `answer?` / `outcome` / `status-for`）を委譲。route **表**は host 側に残り、core は「束縛済みか」の bool だけ受けるので、**route が 1 本でも 1 万本でも guest が見るのは同じ 4 スカラ**。west pin `80786dd` |
 | `tender-component` | `d985006` | 委譲しない判断と、その判断を守る gate。west pin `7d4285a` |
 | `fsm` | `91b65bf` | 別セッションが先に着地（本セッションは境界の実測のみ） |
 
-**11 repo に並列で当たって、委譲が landed したのは 9、明示的に「委譲しない」が
-landed したのは 2、**そして **production の破れが 2 件見つかって両方閉じた。** 「移行が進む」は「委譲が増える」と同義ではない ——
+**11 repo に並列で当たって、委譲が landed したのは 10、明示的に「委譲しない」が
+landed したのは 2、**そして **production の破れが 4 件見つかって全部閉じた**
+（`com-cloudflare` / `calendar` / `cloud-itonami-app` / `murakumo`）。 「移行が進む」は「委譲が増える」と同義ではない ——
 `inga` と `tender-component` の 2 件は、**移せない理由を測って gate にした**という
 形で前進している。
 
@@ -345,29 +421,44 @@ interpreter を載せられるか）。ADR-2608112100 は 1 面目だけを書�
   `the-host-and-the-port-frame-non-ascii-differently` が両方の答えを書いて pin して
   ある —— どちらかが動けば落ちる。
 
-## Closing（2026-08-12）—— 未完のもの
+## Closing（2026-08-12）—— 監査は完了した
 
-**2 つの調査が本文の締め切り時点でまだ走っている。** どちらも結果が出たら、この
-ADR の該当節を**書き換える**（追記ではなく。ADR-2607257000）。
+**ADR-2608120200 が「production で core を実行している」と挙げた 4 repo は、全部
+測り終えた。うち 3 つに破れが在り、3 つとも閉じた。**
 
-1. **`erasure` の委譲** —— 決定（`cauchy-entry` / `generator-entry` /
-   `locally-repairable?` / repair plan）は per-repair、GF 演算（`gf-mul` 等）は
-   **per-byte の機構**なので、後者を interpreter 経由にすると場所を間違える。
-   線をどこに引いたかと、`kotoba.kir/execute` の per-call コスト実測が要る
-   （`inga` は node で **1.35 ms/call**、cljc の規則は ~0.6 µs と測った）。
-2. **未監査の production 3 repo** —— `cloud-itonami-app` / `kawaraban` / `aiueos`。
-   ADR-2608120200 が「production で core を実行している 4 repo」と書いたうち、
-   `com-cloudflare` は本 ADR で破れが見つかり、残り 3 つは**まだ誰も cljs で
-   叩いていない**。`kawaraban` は `kototama.tender`（JVM/Chicory）、`aiueos` は
-   bare metal なので**そもそも cljs 経路が無い可能性が高い** —— その場合
-   「無い」と書くのが正しい成果であって、欠陥を作り出さない。
+| repo | cljs は runtime か | 結果 |
+|---|---|---|
+| `com-cloudflare` | **はい**（Worker） | 破れ。閉じた `eafc65a` |
+| `cloud-itonami-app` | **はい**（app-edge Worker） | 破れ（build 不能 + 黙った誤答）。閉じた `33c2a43` |
+| `com-etzhayyim-kawaraban` | **いいえ** | 対象外。core は `.wasm` を `kototama.tender`（JVM/Chicory）が実行。launchd が nbb を起動するが、それは `clojure -M:wasm-orchestrator` を呼ぶだけの scheduler で、guest 値は cljs 境界を渡らない |
+| `aiueos` | **いいえ** | 対象外。78 core が `.o` になり kernel ELF に link される。`.cljs` は build / flash / QEMU smoke script |
 
-**次の 1 手（この 2 つが片付いた後）**: 本 ADR の Decision 1 が要求する cljs gate は、
-今のところ **repo ローカルのコマンド**でしかない。`com-cloudflare` の
-`test/cloudflare/oracle_cljs_gate.cljs` は credential も network も要らない
-決定的な `:nbb-script` gate に向くが、**`scripts/fleet-ci/gates.edn` は superproject
-側にあり、まだ 1 件も登録していない**。登録するまでは「走っていない検査」であり、
-それは本 ADR が問題にしている当のものである。
+**「無い」と書けたことが 2 件ある** —— これは欠陥が無かったという結果であって、
+探し足りなかったのではない。判定は require と実行経路を追って行った。
+
+副次的に 2 件:
+
+- **`murakumo`**: `deps.edn` が `d58972da`、**`nbb.edn` が `7ad08c4e`** を pin して
+  いた —— **同じ artifact を 2 つの reader が読み、古い方に例の `(integer? start)`
+  が在る**。`nbb src/murakumo/task.cljs plan` は ns load で落ちていた。1 行の収束で
+  CLI が動くようになった（`af55e45`、PR #292。`test` check は SUCCESS）
+- **`kura`**: pin `fa2fbb58` は古い guard を持ち、`signing-tail` は nbb で実際に
+  落ちる —— **が seam から到達しない**。到達する 2 つはどちらも `signing-bytes` の
+  helper で、その `signing-bytes` は**まさにこの理由で委譲しなかった**もの。
+  委譲済み 7 export は触れない。**測って「大丈夫」と言えた形**
+
+## 次の 1 手（未着手）
+
+本 ADR の Decision 1 が要求する cljs gate は、いまも **repo ローカルのコマンド**で
+しかない。`com-cloudflare` の `oracle_cljs_gate.cljs`、`cloud-itonami-app` の
+`bin/test-oracle-cljs`、`calendar` の `cljs-boundary-check.cljs` はいずれも
+credential も network も要らない決定的な `:nbb-script` gate に向くが、
+**`scripts/fleet-ci/gates.edn` には 1 件も登録していない。**
+登録するまでは「走っていない検査」であり、それは本 ADR が問題にしている当のもの。
+
+**もう 1 つ**: `cloud-itonami-app` の `:work-transitions` と `:approval` は出荷されて
+いるのに **`src/` のどの namespace も呼んでいない**。今それを実行しているのは
+新しい case 表だけである。
 
 ## Evidence
 
@@ -395,6 +486,10 @@ ADR の該当節を**書き換える**（追記ではなく。ADR-2607257000）�
 - `jp-go-dds` `0a02180`: JVM **115 tests / 2487 assertions**（旧 101/2097）、
   cljs **46 / 1460**（変更前と同一 —— interpreter が classpath に居ないことの確認）。
   変異 4 種すべて fail
+- `erasure` `74a1a3e`: JVM **49 tests / 3108 assertions**（旧 39/3048）、
+  cljs **22 / 248**、どちらも 0 failures。変異 3 種すべて fail ——
+  出荷 KIR の `285`→`283` では drift に加えて**変異した係数が host に届いている
+  failure が 2 件**出る（delegation の独立な証拠）
 - `shitsuke` `a5aa622`: JVM **84 tests / 1132 assertions**（旧 77/510）、
   cljs check **12/12**。変異 4 種すべて fail —— 出荷 artifact の `\"</\"` を
   `\"<//\"` にすると **drift 1 件だけでなく 605 failures**（host の挙動が artifact に

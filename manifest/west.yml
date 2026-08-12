@@ -16,13 +16,15 @@ manifest:
       url-base: git@github.com:jk-luxury
     - name: kotoba-lang
       url-base: git@github.com:kotoba-lang
+    - name: net-kotobase
+      url-base: git@github.com:net-kotobase
     - name: network-awai
       url-base: git@github.com:network-awai
 
   defaults:
     revision: main
 
-  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, +jk-luxury, +cloud-itonami, +network-awai, -datalad, -archived]
+  group-filter: [+com-junkawasaki, +kotoba-lang, +gftdcojp, +etzhayyim, +jk-luxury, +cloud-itonami, +network-awai, +net-kotobase, -datalad, -archived]
 
   projects:
     - name: aburi
@@ -223,7 +225,7 @@ manifest:
         rad-rid: rad:zCJJKo7FEwJMwGMWk4kQYVzeChTd
     - name: cloud-itonami-app
       remote: cloud-itonami
-      revision: 4125a1ef5479cda43a36bd42f4529e140fc23dd6
+      revision: 33c2a4362de1667f389d35838f52d0261c7e931a
       path: orgs/cloud-itonami/cloud-itonami-app
       groups: [cloud-itonami]
     - name: cloud-itonami-assoc-0126-idn-gapki
@@ -9997,7 +9999,7 @@ manifest:
         rad-rid: rad:z3Qg1AMUx2rhgVZoiXLfRziDFeXZZ
     - name: hayari
       remote: cloud-itonami
-      revision: 8b1a3ce9401063cf8c44dc72159c8452a4f2d6da
+      revision: 429e9fd642d68263e22b64bbb13afa71294e5420
       path: orgs/cloud-itonami/hayari
       groups: [cloud-itonami]
     - name: hayari-data
@@ -11397,6 +11399,23 @@ manifest:
       revision: 2e87a6ba258f3a7cc70bbea188ee1f9bbf59fede
       path: orgs/kotoba-lang/worklaw
       groups: [kotoba-lang]
+    - name: authn
+      remote: net-kotobase
+      revision: 5e74aa8bb68e8de998ca5ff3d0e30514b120c282
+      path: orgs/net-kotobase/authn
+      groups: [net-kotobase]
+    - name: net-kotobase-docs
+      remote: net-kotobase
+      repo-path: docs
+      revision: ed67ae74dac6ffb372a45974072eb4b805a5dc62
+      path: orgs/net-kotobase/docs
+      groups: [net-kotobase]
+    - name: net-kotobase-engine
+      remote: net-kotobase
+      repo-path: engine
+      revision: 6a4df5a4d4cb10660941a2268f425ac7424468fc
+      path: orgs/net-kotobase/engine
+      groups: [net-kotobase]
     - name: loop-consumability
       remote: network-awai
       revision: d57117a50aa312e3f46a13f107ed7340539e5791
@@ -14719,16 +14738,16 @@ manifest:
       revision: 362e27210cf19cd90a980c9601193f1eb10f9090
       path: orgs/kotoba-lang/org-xiph-ogg
       groups: [kotoba-lang]
-    - name: net-kotobase-cypher
-      remote: network-awai
-      revision: 13d3e795e0d74b79d2f5aac5b9d3c00172a0fab4
-      path: orgs/network-awai/net-kotobase-cypher
-      groups: [network-awai]
-    - name: net-kotobase-lake
-      remote: network-awai
-      revision: 9d6909a8a1639bb329373285d328989734b1b141
-      path: orgs/network-awai/net-kotobase-lake
-      groups: [network-awai]
+    - name: cypher
+      remote: net-kotobase
+      revision: fe7496fd2df4c530bdade10f4bb3263621c62e60
+      path: orgs/net-kotobase/cypher
+      groups: [net-kotobase]
+    - name: lake
+      remote: net-kotobase
+      revision: 7f8de5323eda2bd2893d26d74861d490ebc8bb13
+      path: orgs/net-kotobase/lake
+      groups: [net-kotobase]
     - name: network-awai-apex
       remote: network-awai
       revision: 06f86c79aaab530e1c174b577c038a2f5f7b2c48
@@ -23160,7 +23179,7 @@ manifest:
         rad-rid: rad:z318khJBaWuzDbxq3nGoyEVbK1adU
     - name: amu
       remote: kotoba-lang
-      revision: b0095427fdc1b52153b285e6443591f2196c20a6
+      revision: 488cd12cf2bc3013f7de37dbe2dcdbe432efef5a
       path: orgs/kotoba-lang/amu
       groups: [kotoba-lang]
       userdata:
@@ -23583,7 +23602,7 @@ manifest:
       groups: [kotoba-lang]
     - name: erasure
       remote: kotoba-lang
-      revision: 8abcb0f0295295c88825a9ce20650c81482be773
+      revision: 74a1a3e9d30776cb27c8788aac97d2a474c536e0
       path: orgs/kotoba-lang/erasure
       groups: [kotoba-lang]
     - name: erc20
@@ -25186,7 +25205,7 @@ manifest:
       groups: [kotoba-lang]
     - name: kotoba-wasm
       remote: kotoba-lang
-      revision: 94a39584ce55dfe345f1a0e59a716f5084397a65
+      revision: 28248e2bfa093eefeb37f0e13d33672e647eaee2
       path: orgs/kotoba-lang/kotoba-wasm
       groups: [kotoba-lang]
     - name: kotoba-worker-demo
@@ -25222,11 +25241,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z4sBVBPosrMtr8avVwVAYES1aSYP
-    - name: kotobase-commoncrawl-actor
-      remote: kotoba-lang
-      revision: 5616bc5f2001ba043e640d1beb7ead2da6d7d0a2
-      path: orgs/kotoba-lang/kotobase-commoncrawl-actor
-      groups: [kotoba-lang]
+    - name: commoncrawl-actor
+      remote: net-kotobase
+      revision: 64cbdc7d3bd311a0ed5ff0cb8c34f4d4a564fc03
+      path: orgs/net-kotobase/commoncrawl-actor
+      groups: [net-kotobase]
       userdata:
         rad-rid: rad:zajDfG3Xm5KUaxw4f9usKGrSVfN2
     - name: kotobase-engine
@@ -25914,7 +25933,7 @@ manifest:
         rad-rid: rad:z41q1Wzo5B6VGzvvLJ57hv8bu883z
     - name: murakumo
       remote: kotoba-lang
-      revision: d11d4c2a9413438accb4a2d3af6ca776ca255b81
+      revision: af55e45ed3de1534f3bfaed0555048bbf3731d71
       path: orgs/kotoba-lang/murakumo
       groups: [kotoba-lang]
       userdata:
@@ -25980,11 +25999,11 @@ manifest:
       groups: [kotoba-lang]
       userdata:
         rad-rid: rad:z22t7Ew57BsyqWUALLzGoXhVSutwQ
-    - name: net-kotobase-commoncrawler
-      remote: kotoba-lang
-      revision: a7ec9d3bcc838bb26b0aea07358be190073bea63
-      path: orgs/kotoba-lang/net-kotobase-commoncrawler
-      groups: [kotoba-lang]
+    - name: commoncrawler
+      remote: net-kotobase
+      revision: 41b0c1087ec9e904b89ca0469773727c8208183e
+      path: orgs/net-kotobase/commoncrawler
+      groups: [net-kotobase]
     - name: netcap
       remote: kotoba-lang
       revision: 925bea913343d7e95f53b0154b8add9c71eea4d5
@@ -27055,7 +27074,7 @@ manifest:
         rad-rid: rad:zNEEFzdQfZmUu67JE47SGbGeJVpU
     - name: provider
       remote: kotoba-lang
-      revision: b3ea0c742f66e8ca4890004b53bf242a30799c85
+      revision: 4cd79cc5364d3d615b8937ca183e2d8aecc6244b
       path: orgs/kotoba-lang/provider
       groups: [kotoba-lang]
     - name: provider-postgres
@@ -27925,7 +27944,7 @@ manifest:
         rad-rid: rad:z2bP45KyCheMTKt8KZTHVZVqeeQvN
     - name: wasm-webcomponent
       remote: kotoba-lang
-      revision: 1c353beaa8eb34d82511c81354f70cf63cf3f46e
+      revision: 7d78c84f881013b5c95e6c7204706020ff28ee3f
       path: orgs/kotoba-lang/wasm-webcomponent
       groups: [kotoba-lang]
       userdata:
@@ -28142,7 +28161,7 @@ manifest:
       groups: [network-awai]
     - name: cloud-murakumo
       remote: network-awai
-      revision: b572812beb675c9974f3d4d03ac4af4e45761d62
+      revision: c67af868690bcb37cd35104f6a940d4b2850d971
       path: orgs/network-awai/cloud-murakumo
       groups: [network-awai]
     - name: cloud-murakumo-market-analyst
@@ -28216,17 +28235,16 @@ manifest:
       revision: 722b38f1a738d44ab73f391d61e0e14de61d718a
       path: orgs/network-awai/net-isekai-gen
       groups: [network-awai]
-    - name: net-kotobase
-      remote: network-awai
-      revision: d86f299774fc2b0d39f57179f2dcfd53e4026a54
-      path: orgs/network-awai/net-kotobase
-      groups: [network-awai]
-      submodules: true
-    - name: net-kotobase-ipfs
-      remote: network-awai
-      revision: b5c5cc9e414676891540b9d862b81f4376385fda
-      path: orgs/network-awai/net-kotobase-ipfs
-      groups: [network-awai]
+    - name: control-plane
+      remote: net-kotobase
+      revision: fabd8408eccbfd79958dea55eafd509ffae85383
+      path: orgs/net-kotobase/control-plane
+      groups: [net-kotobase]
+    - name: ipfs
+      remote: net-kotobase
+      revision: b3583ddbf93fd1daaae40e092635c74adb19c0ec
+      path: orgs/net-kotobase/ipfs
+      groups: [net-kotobase]
     - name: network-isekai
       remote: network-awai
       revision: fcca73598242507a61f310f2243030702a105e79
