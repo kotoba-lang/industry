@@ -30,6 +30,37 @@
 (defn- simple-args? [xs]
   (every? #(or (string? %) (number? %)) xs))
 
+(defn- tokenize
+  "Split one shell command line into argv, honouring single and double quotes.
+
+  `babashka.process/shell` accepts EITHER a pre-split argv OR a single string
+  that it tokenizes itself, and `(shell \"cmd arg\")` is by far the commoner
+  spelling in the bb.edn files being converted. The generated runner spawns
+  with `:shell false` and uses `(first argv)` as the executable, so emitting
+  that single string unsplit produced `:cmd [\"echo hi\"]` — an attempt to exec
+  a binary literally named `echo hi`.
+
+  It failed silently: `spawnSync` on a missing executable returns
+  `status: nil`, the runner does `(or (.-status r) 1)`, and the spawn error is
+  discarded — so the task exited 1 having printed nothing at all. Measured
+  2026-08-13 against the unmodified generator.
+
+  Deliberately not a shell: no globbing, no substitution, no pipes. Those never
+  survived the conversion anyway, because the runner does not use a shell."
+  [s]
+  (loop [cs (seq s) cur nil out [] quote nil]
+    (if-not cs
+      (cond-> out cur (conj (apply str cur)))
+      (let [c (first cs) r (next cs)]
+        (cond
+          quote (if (= c quote)
+                  (recur r (or cur []) out nil)
+                  (recur r (conj (or cur []) c) out quote))
+          (or (= c \") (= c \')) (recur r (or cur []) out c)
+          (or (= c \space) (= c \tab))
+          (recur r nil (cond-> out cur (conj (apply str cur))) nil)
+          :else (recur r (conj (or cur []) c) out nil))))))
+
 (defn- form->cmd
   "Return {:cmd [..] :pass-args? bool} or nil."
   [form]
@@ -39,7 +70,13 @@
     (let [args (rest form)
           args (if (map? (first args)) (rest args) args)]
       (when (simple-args? args)
-        {:cmd (mapv str args) :pass-args? false}))
+        (let [strs (mapv str args)]
+          ;; One argument that contains whitespace is a command LINE, not an
+          ;; executable name -- see tokenize's docstring.
+          {:cmd (if (and (= 1 (count strs)) (re-find #"\s" (first strs)))
+                  (tokenize (first strs))
+                  strs)
+           :pass-args? false})))
     (and (seq? form) (= 'clojure (first form)))
     (let [args (rest form)]
       (when (simple-args? args)
@@ -112,6 +149,15 @@
 (defn- sh [argv]
   (let [r (.spawnSync cp (first argv) (to-array (rest argv))
                       #js {:encoding \"utf8\" :stdio \"inherit\" :shell false})]
+    ;; A child that never started, and one killed by a signal, BOTH report
+    ;; status:null and land on the synthetic exit 1 -- with nothing printed,
+    ;; because stdio is inherited and there was no child to write anything.
+    ;; Say which it was: an exit 1 with no output is indistinguishable from a
+    ;; command that ran and failed quietly.
+    (when-let [e (.-error r)]
+      (js/console.error \"run-task: could not start\" (pr-str argv) \"--\" (.-message e)))
+    (when-let [sig (.-signal r)]
+      (js/console.error \"run-task:\" (pr-str (first argv)) \"killed by signal\" sig))
     (or (.-status r) 1)))
 
 (def tasks-path (.join path (.dirname path *file*) \"tasks.edn\"))
@@ -125,8 +171,10 @@
 (defn- run-one [task rest-args]
   (let [t (resolve-task task)]
     (when-not t
-      (binding [*out* *err*] (println \"unknown task:\" task)
-        (println \"known:\" (str/join \", \" (map name (sort (keys tasks))))))
+      ;; js/console.error, NOT (binding [*out* *err*] (println …)) -- nbb does
+      ;; not honour that binding and the text lands on stdout (ADR-2608130600).
+      (js/console.error \"unknown task:\" task)
+      (js/console.error \"known:\" (str/join \", \" (map name (sort (keys tasks)))))
       (.exit js/process 2))
     (cond
       (:runs t)
@@ -139,7 +187,7 @@
                    (vec (:cmd t)))]
         (sh argv))
       :else
-      (do (binding [*out* *err*] (println \"bad task entry\" task t))
+      (do (js/console.error \"bad task entry\" task t)
           (.exit js/process 2)))))
 
 (let [args (vec *command-line-args*)
@@ -148,9 +196,8 @@
       task (first args)
       rest-args (vec (rest args))]
   (when-not task
-    (binding [*out* *err*]
-      (println \"usage: nbb scripts/run-task.cljs <task> [args…]\")
-      (println \"tasks:\" (str/join \", \" (map name (sort (keys tasks))))))
+    (js/console.error \"usage: nbb scripts/run-task.cljs <task> [args…]\")
+    (js/console.error \"tasks:\" (str/join \", \" (map name (sort (keys tasks)))))
     (.exit js/process 2))
   (.exit js/process (or (run-one task rest-args) 0)))
 ")
