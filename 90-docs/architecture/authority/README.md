@@ -107,7 +107,7 @@ basis は同じ decision になり、再現・監査・time travel ができま�
 満たせる不足条件を機械可読に返します。UI はこの decision を描画しますが、UI 自体を
 enforcement point にはしません。
 
-### R0 implementation（2026-08-12）
+### R0–R1 implementation（2026-08-12）
 
 authority の semantic owner である `kotoba-lang/aiueos` に、純粋CLJC kernel
 `aiueos.authority/decide` と既存broker統合 `aiueos.broker/decide-authority` が着地しました
@@ -121,9 +121,21 @@ authority の semantic owner である `kotoba-lang/aiueos` に、純粋CLJC ker
 - effectはcaller入力から受け取らず、admission済みmanifestのimports/effectsからのみ導く。
 - canonical receiptはclosed shapeで、raw credential/private key/bearer tokenのfieldを持たない。
 
-これはR0 kernelとbroker接続の着地です。cookie/Passkey/CACAOから`VerifiedPrincipal`への
+R1では `network-awai/net-kotobase` PR #410（merge
+`4fed6101c74fbde11a10e385daac13aa76ce44d2`）に credential adapter が着地しました。
+
+- authn は Passkey、email、OAuth/OIDC、CACAO、service token、legacy session を、raw
+  credential を含まない closed `principal` wire projectionへ正規化する。
+- gateway は nested actor/account/tenant を既に検証済みのviewerへ再bindingし、unknown field、
+  method、assurance、identity disagreementをfail closedにする。
+- direct CACAO/JWT と authn service binding は同じnamespaced principal constructorへ収束する。
+- assuranceは Passkey=`high`、low method + TOTP=`substantial`、legacy=`low`。旧sessionを
+  logoutせずstep-up可能な縮退として扱う。
+
+authn 43 tests / 283 assertions、gateway 385 tests / 1882 assertions、両release build、
+87-input bundle manifest整合を確認済みです。まだ未移行なのは、gatewayからR0 kernelを呼ぶ
 adapter、Kotobaseでのbasis-bound policy/grant検索とreceipt永続化、payment settlementから
-entitlement grantへの変換、UIのchallenge描画はまだこのkernelへ移行していません。
+entitlement grantへの変換、UIのchallenge描画です。
 
 ## 各層への投影
 

@@ -186,7 +186,7 @@ readiness を区別する。
 - canonical schema、kernel、adapter、receipt migration の実装作業が必要になる。本 ADR と README
   の着地だけでは未移行 component の実装完了を意味しない。
 
-## Implementation status — R0 landed（2026-08-12）
+## Implementation status — R0 + credential adapter R1 landed（2026-08-12）
 
 authority semantic ownerである `kotoba-lang/aiueos` に最初の実装sliceを着地した
 （PR #145、merge `f4c492a53ce81d212089ced5c1154f0975018d1e`）。superprojectの
@@ -202,10 +202,23 @@ authority semantic ownerである `kotoba-lang/aiueos` に最初の実装slice�
   116 assertionsがgreen。repo全体lintは既存の`test/aiueos/hvt_test.cljc:346`未解決symbol
   1件のためredであり、R0のgreen evidenceへ昇格させない。
 
-R0で**未着地**なのは、credential adapter（cookie/Passkey/CACAO→VerifiedPrincipal）、
-Kotobaseのimmutable basisからのpolicy/grant取得とreceipt append、payment Settlement→
-Entitlement Grant、UIのchallenge/step-up projection、canonical signed wire envelopeである。
-既存APIは壊しておらず、これらはadapter→kernel→projectionの順で段階移行する。
+R1は `network-awai/net-kotobase` PR #410、merge
+`4fed6101c74fbde11a10e385daac13aa76ce44d2` として着地し、superprojectのwest pinと
+fleet-db projectionも同じSHAへ前進した。
+
+- authn sessionはnormalized authn method、assurance、MFA enrollmentを保持し、closedな
+  credential-free principal projectionを返す。Passkeyはhigh、low method + TOTPは
+  substantial、旧sessionはlegacy-session / lowである。
+- gatewayはprincipalのid/account/tenant/kindを検証済みviewerへbindingし、unknown field、
+  method、assurance、identity disagreementをfail closedにする。
+- service binding経由とdirect CACAO/JWT経由は同じcanonical principal constructorへ収束する。
+- evidence: authn 43 tests / 283 assertions、gateway 385 tests / 1882 assertions、authnと
+  gatewayのrelease build、87-input bundle manifest整合がgreen。
+
+R1後も**未着地**なのは、gateway→R0 decision kernel呼び出し、Kotobaseのimmutable basisからの
+policy/grant取得とreceipt append、payment Settlement→Entitlement Grant、UIのchallenge/step-up
+projection、canonical signed wire envelopeである。既存APIは壊さず、adapter→kernel→projection
+の順で段階移行する。
 
 ## One-line rule
 
