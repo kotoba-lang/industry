@@ -14,6 +14,18 @@
 ;;               → node cap :node 必須
 ;;               :cap を明記した場合はその capability を要求する（例 :zig）
 ;;
+;; 配送（ノードに何を置くか）
+;;   既定             mirror からの `git archive` tarball（`.git` は入らない）
+;;   :include-ext     その拡張子だけを詰めた tarball（`:min-files` が床）
+;;   :ship-self-bundle true
+;;                    mirror からの **git bundle**。ノードで git init → fetch →
+;;                    checkout -f → sha 照合して**履歴つきの本物の checkout** を作る。
+;;                    **repo 自身の git 履歴を読む gate だけが指定する**（ADR-2608134200）。
+;;                    `:include-ext` / `:min-files` とは併用できない（bundle は tree の
+;;                    部分集合ではないので filter が効かず、書いても no-op になるため
+;;                    `gate-input!` が拒否する）。full history を毎回送るので、
+;;                    大きい repo では 200MB の天井に当たる。
+;;
 ;; org は west.yml の remote から解決するのでここには書かない（drift 防止）。
 {:policy "fleet-ci/tip-verify/v1"
  :gate-timeout-ms 1800000            ;; 1 gate 30 分（clojure の初回 maven 解決を含む）
@@ -1343,52 +1355,43 @@
    :include-ext [".ts" ".json" ".md"] :min-files 30 :cd false}
 
   ;; ────────────────────────────────────────────────────────────────────────
-  ;; kotoba-provider-orphan — **意図的にここに entry が無い**（ADR-2608132400）
+  ;; kotoba-provider-orphan（ADR-2608134200。ADR-2608132400 の「載せられない」を撤回）
   ;;
-  ;; `gates/kotoba-provider-orphan-check.cljs` は書かれていて、実際に落ち、実際に
-  ;; 直ると緑になる（fixture の break/unbreak と、今日 repaired された dsl-core /
-  ;; async で実測）。だが **fleet gate にはできない。**
+  ;; 規則: **この repo 自身の履歴**で src/ の .clj/.cljc/.cljs が削除されており、
+  ;; 同じ path に .kotoba が今あり、兄弟の Clojure source が残っていないなら FAIL。
   ;;
-  ;; 理由は placement でも policy でもなく入力である。この検査の規則は
+  ;; 第 1 項が repo の git 履歴にしか無いので、既定の配送（mirror からの
+  ;; `git archive --prefix=repo/`）では**ノード上に入力が存在しない** —— `git archive`
+  ;; の出力に `.git` は入らない。ADR-2608132400 はそれを理由に entry を足さなかった。
   ;;
-  ;;     この repo の履歴で src/ の .clj/.cljc/.cljs が削除されており、同じ path に
-  ;;     .kotoba が今あり、兄弟の Clojure source が残っていないなら FAIL
+  ;; **`:ship-self-bundle true` がその入力を配る。** tick.cljs が mirror から
+  ;; `git bundle create` して ssh stdin で送り、ノードで `git init` → `fetch` →
+  ;; `checkout -f` → sha 照合して**本物の checkout**を作る（ADR-2608132000 が
+  ;; `ship-git-deps!` で依存に対して landed させた経路の、対象 repo 自身への適用）。
   ;;
-  ;; で、第 1 項は **repo 自身の git 履歴**にしか無い。ところが tick.cljs が配るのは
-  ;; mirror からの `git archive --prefix=repo/ <sha>` で、その出力に `.git` は入らない
-  ;; （入れる option も無い）。実測 2026-08-13、壊した tip の tarball を展開して
-  ;; gate に渡すと:
+  ;; **`:include-ext` を書かないこと。** bundle は tree の部分集合ではないので
+  ;; filter は効かない。両方書いた entry は `gate-input!` が拒否する（黙って
+  ;; 無視すると「絞って送っている」と読めてしまうため）。`.kotoba` は bundle が
+  ;; 全部運ぶので、ADR-2608132400 が警告した「.kotoba を送らない filter で
+  ;; 手元は緑・fleet は赤」は構造的に起こらない。
   ;;
-  ;;     FLEET-CI: no .git in …/repo — this gate reads the repo's own history and a
-  ;;     `git archive` tarball does not carry it. Refusing to report a pass.
-  ;;     EXIT=90
+  ;; **:cd false** —— この gate が言うのは「移行の置き去りが無い」だけで、repo が
+  ;; 検証済みだとは言っていない。それを根拠に west pin を進めない。
   ;;
-  ;; ここに entry を足せば、その 90 が**永久に赤**として並ぶ。`root-permit-index` と
-  ;; 同じ形 ——「入力が無い gate は、落ちているのではなく問いを立てられていない」。
-  ;; 赤の理由が検査対象でなく配送なので、直しようもない。だから足さない。
-  ;;
-  ;; **root に置くのはさらに悪い。** superproject の tree に `orgs/` は入らない
-  ;; （`git ls-files orgs/kotoba-lang/postfx` は 0 件）ので、走査対象自体がゼロになる。
-  ;;
-  ;; **機構は今日 landed している。** ADR-2608132000（同日）は、`ship-git-deps!` が
-  ;; 置く**依存**が `git archive` 展開物で `.git` を持たないために
-  ;; `amu-native-conformance` が 28 run 連続で赤だったのを、**`git bundle` を送って
-  ;; 本物の checkout を作る**経路に変えて直した。gate 対象 repo 自身の tree に同じ
-  ;; ことをすれば（entry の `:ship-self-bundle true` 相当。mirror から
-  ;; `git bundle create` → ssh stdin → ノードで `git init && git fetch && checkout`）、
-  ;; この検査は
-  ;;
-  ;;     {:name "<provider>" :id "kotoba-provider-orphan" :gate :nbb-script
-  ;;      :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
-  ;;      :include-ext [".kotoba" ".clj" ".cljc" ".cljs" ".edn"] :min-files 1 :cd false}
-  ;;
-  ;; として載る。**`:include-ext` に `.kotoba` を入れること** —— 2026-08-13 に実測した
-  ;; 罠で、`.kotoba` を 1 本しか持たない repo に `.kotoba` を送らない filter を掛けると、
-  ;; gate は手元で緑・fleet で赤になる（しかも「0 件だから合格」に化ける経路がある）。
-  ;; この gate はそれを床②(exit 91)で拒否する。
-  ;;
-  ;; 対象になる repo は **97**（checkout 済み 4,415 のうち src/ 配下に兄弟のない
-  ;; `.kotoba` を持つもの）。1 本 2–19 秒なので費用は問題にならない。それまでの間は
-  ;; workspace script として手と agent から回す。
+  ;; 載っているのは **今日 green を実測できた 3 件だけ**。ADR-2608132400 が数えた
+  ;; 対象 97 repo（うち既知の欠陥 9 件）の残りは **owed** —— 赤いまま entry を足すと
+  ;; 「入力の無い gate」を「直っていない gate」に置き換えるだけで、このワークスペースが
+  ;; 259 tip × 298 receipt 払った失敗と同じ形になる。**修理された repo から足す。**
+  ;; 2026-08-13 時点で赤い 8 件: annotation / cartpole-math / kami-app-quarry-walk /
+  ;; kami-usd-native / pbrt / replicator / rtx-native / tilemap。
+  {:name "postfx" :id "kotoba-provider-orphan-postfx" :gate :nbb-script
+   :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+   :ship-self-bundle true :cd false}
+  {:name "dsl-core" :id "kotoba-provider-orphan-dsl-core" :gate :nbb-script
+   :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+   :ship-self-bundle true :cd false}
+  {:name "async" :id "kotoba-provider-orphan-async" :gate :nbb-script
+   :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
+   :ship-self-bundle true :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
   ]}
