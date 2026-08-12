@@ -1142,4 +1142,41 @@
   {:name "org-apache-arrow" :gate :jvm-test :cd true}
   {:name "org-apache-avro" :gate :jvm-test :cd true}
   {:name "org-ietf-csv" :gate :jvm-test :cd true}
-  {:name "kotobase-lake" :gate :jvm-test :cd true}]}
+  {:name "kotobase-lake" :gate :jvm-test :cd true}
+
+  ;; ── 委譲した decision core を ClojureScript で実行する gate ──────────────
+  ;;
+  ;; ADR-2608122000。`.kotoba` core を委譲した repo は shipped artifact を
+  ;; `kotoba.kir` で実行するが、host↔guest の非対称が 3 つあり、**どれも JVM
+  ;; suite が緑のまま cljs でだけ落ちる**。2026-08-12 に 4 repo が実際に壊れて
+  ;; いた（うち 2 つは「production で core を実行している」と記録されていた）。
+  ;;
+  ;; 各 repo は修正と一緒に cljs gate を持ったが、**それは人が思い出して打つ
+  ;; コマンドでしかなかった**。走っていない検査は緑でも赤でもない、というのが
+  ;; その ADR の主題なので、ここに載せるまで仕事は終わっていない。
+  ;;
+  ;; gate 本体は repo 自身のもの。`gates/kotoba-oracle-cljs.cljs` が足すのは
+  ;; classpath（repo の deps.edn が pin する interpreter を使う）と**床**だけ:
+  ;; exit 0 に加えて「N cases 走った」という申告を要求し、N < :min なら落とす。
+  ;; exit 0 単独は証拠にならない —— artifact の load に失敗した gate も、case 表が
+  ;; 空になった gate も、0 で抜ける。
+  ;;
+  ;; 落ちることを確認済み（2026-08-12、手元で実測。`--nbb` は npx がこの
+  ;; laptop で壊れているための検証用 escape で、ノードでは pin を解決する）:
+  ;;   - seam の i64 変換を外す → repo の gate が 6 case で throw、exit 1
+  ;;   - `--min 300`（実測 220）→ 「floor is 300」で fail
+  ;;   - count 行を出さない entry（calendar の現行 gate）→ pass を拒否
+  ;; 無改変では 220 cases / 0 failures で OK。
+  ;;
+  ;; **com-cloudflare にはこれが最初の fleet gate である**（jvm-test の entry も
+  ;; まだ無い）。この gate は cljs 面しか見ないので `:cd false` —— repo 全体の
+  ;; suite ではないものを根拠に pin を進めない。
+  ;;
+  ;; 他の委譲済み repo（calendar / cloud-itonami-app / shitsuke / kura /
+  ;; erasure）は、それぞれの entry が case 数を申告するようになってから足す。
+  ;; 上の 3 つ目の実測がそのまま「calendar は何が足りないか」の答えになっている。
+  {:id "com-cloudflare-oracle-cljs"
+   :name "com-cloudflare" :gate :nbb-script
+   :script "gates/kotoba-oracle-cljs.cljs"
+   :script-args ["--entry" "test/cloudflare/oracle_cljs_gate.cljs" "--min" "200"]
+   :include-ext [".cljs" ".cljc" ".clj" ".edn"] :min-files 30 :cd false}]}
