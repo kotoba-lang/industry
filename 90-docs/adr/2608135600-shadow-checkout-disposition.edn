@@ -1,0 +1,269 @@
+[{:db/id -1,
+  :adr/id "ADR-2608135600",
+  :adr/title "249 の shadow checkout の disposition —— 223 は今すぐ撤去でき、25 は先に drain、1 は shallow で判定不能",
+  :adr/status "accepted",
+  :adr/date "2026-08-13",
+  :adr/supersedes "",
+  :adr/superseded-by "",
+  :adr/body "ADR-2608134000 は `orgs/` の 4,414 checkout のうち **249 が west.yml に無く、その 249 が
+全部「既に declared な path に checkout されている同じ repository」**であることを測った。
+撤去はしていない —— それは owner の判断であり `git-cleanup-conflict` の retirement flow に
+載るものだからである。
+
+**この ADR はその判断を安くするための材料であって、撤去の記録ではない。**
+1 件も削除・移動・変更していない。検査器が撃つ git は rev-parse / status / stash list /
+worktree list / for-each-ref / rev-list --count だけで、`fetch` は 1 度も撃っていない
+（`--depth` fetch は worktree が親と `.git/shallow` を共有するので、この workspace には
+**別 repo の shallow fetch が他方の object store に graft を書いた実測例**がある。
+ADR-2608124400）。
+
+検査器: `scripts/shadow-checkout-disposition.cljs`。実測 2026-08-13、load1 は各行に併記。
+
+## 1. 三分類
+
+| 判定 | 件数 | disk |
+|---|---|---|
+| **safe-to-retire**（固有物なし / worktree なし / not shallow / 全 tip が published） | **223** | **15.85 GiB** |
+| **needs-draining**（何かが他所に無い、または誰かが読んでいる） | **25** | 3.51 GiB |
+| **cannot-assess**（shallow —— ancestry の答えが信用できない） | **1** | 12.26 GiB |
+| 合計 | 249 | 31.62 GiB |
+
+**「retire すれば 31.6 GiB 空く」とは書かない。** いま安全に撤去できるのは
+**223 件 15.85 GiB** で、残り 15.77 GiB のうち 12.26 GiB は archetype 1 件が占め、
+それは shallow なので**そもそも判定していない**。
+
+分布は org に偏る: etzhayyim 203 / gftdcojp 17 / cloud-itonami 12 / network-awai 9 /
+kotoba-lang 8。etzhayyim だけで 81% —— この org が丸ごと改名・移管を通った側である。
+
+HEAD の一致は 24 件、**違うものが 225 件**（ADR-2608134000 の数と一致）。
+
+## 2. twin の同定 —— GitHub repository **id**
+
+名前では引かない。**shadow は remote に古い slug を持ち、declared な twin は新しい slug を
+持つ**ので、slug で突き合わせると 249 件中 **0 件**しか当たらない。そして bare な名前を鍵に
+すると、同じ主題の検査器が `kotoba-lang/svgraph` と `com-junkawasaki/svgraph` という
+**別々の 2 repo を 1 件の重複として報告した**（ADR-2608134000 §4d）。
+
+id は 249 件全部で解決し、249 件全部が declared な west entry に当たった。**孤児はゼロ。**
+
+### 独立した裏取り —— `manifest/repos.edn` の `:path-overrides`
+
+repos.edn は 463 組の旧 path → 新 path を既に持っている。249 のうち **192 がそこに載って
+おり、191 が id 由来の twin と一致した。**
+
+食い違いは 1 件だけで、**そこでは repos.edn の方が古い**:
+
+    orgs/gftdcojp/ai-gftd-ghosthacker-shiropico
+      repos.edn :path-overrides → orgs/gftdcojp/ghosthacker-shiropico   （west.yml にも disk にも無い）
+      id 1285918569           → orgs/com-junkawasaki/ghosthacker-shiropico （declared）
+
+改名は記録されたが、その後の **org 移管**が記録されていない。`:path-overrides` は
+rename ledger であって identity ではない —— **1 段の改名しか覚えていないので、2 段目で
+黙って外れる。** id は外れない。
+
+残り 57 件は `:path-overrides` に無い。これは repos.edn が間違っているのではなく、
+**そもそも west 経路を通っていない改名**（GitHub 側で名前が変わり、west には新名で
+登録され、古い checkout は誰の帳簿にも載らなかった）である。
+
+## 3. containment をどこで訊くか —— west checkout には `refs/remotes/*` が無い
+
+最初に書いた検査器は `git rev-list --count <tip> --not --remotes` を使い、
+**249 件全部を「固有の作業を持つ」と報告した。** 嘘である。原因は west の clone の形で、
+west は pin された revision を FETCH_HEAD に取って `manifest-rev` という合成 branch を
+指すだけなので、**`refs/heads/*` を mirror しない**。実測: **249 件のうち 155 件が
+`refs/remotes/` 配下に 1 本も ref を持たない。** その anchor に対しては、全部が unique に見える。
+
+**tip の一致検査でないだけでは足りない** —— anchor が空なら、containment 検査も
+tip 一致検査と同じ偽陽性を出す。
+
+そこで anchor を **declared な twin の object store** に置いた。twin は west が現在も
+更新している同じ repository である。`git -C <twin> rev-list --count <tip> --not --all` が 0 なら、
+その tip が名指す commit は全部 twin の ref から到達できる。そこから先は既存の不変条件が繋ぐ:
+
+    tip が twin から到達可能
+      → twin の HEAD はその west pin
+      → verify-west-pins は upstream default branch から到達可能な pin しか通さない
+      → その tip は GitHub に在る
+
+正直な限界を 3 つ、各行に持たせた（隠さず記録する）:
+
+- **shallow clone は ancestry を間違えるうえに、権威があるように見える。** shallow は
+  :cannot-assess にする。**twin が shallow の場合も同じ**（ancestry を訊いているのは
+  twin だから）。実測: shadow 側 shallow 1 件、**twin 側 shallow 0 件**。
+  なお `git rev-parse --is-shallow-repository` は **`.git/shallow` が空でも true** を返すので、
+  本当の信号は graft 数であり、両方を記録している。
+- twin はローカルの写しなので、**twin に無い = GitHub に無い、ではない。**
+  `object absent from twin` として記録し、保守的な側（needs-draining）に倒す。
+- HEAD も branch と一緒に検査する。**どの branch も名指していない detached HEAD** は、
+  branch 走査だけなら取りこぼす状態そのものだからである。実測でも
+  `cloud-manimani` の HEAD が +10 commit で引っかかった（branch は全部 clean）。
+
+## 4. needs-draining の 25 件 —— 何が固有なのか
+
+| 何を持っているか | 件数 |
+|---|---|
+| uncommitted な変更 | 12 |
+| untracked file | 8 |
+| stash | 5 |
+| linked worktree | 3 |
+| published でない tip | 4 |
+| （content は clean だが）誰かがその path を読んでいる | 3 |
+
+大きいもの・危ないものを名指しで:
+
+- `orgs/network-awai/net-kotobase` — **linked worktree 8 本**、twin に無い tip 3 本
+  （`agent/datomic-client-maturity-v2` / `agent/datomic-hosting` /
+  `preserve/detached-8b36030`）。843 MiB
+- `orgs/etzhayyim/software.diaspora.nodeinfo` — untracked **377 件** + 変更 4 件。358 MiB
+- `orgs/network-awai/aozora-yoro-ui` — uncommitted **400 件**（HEAD は twin と同一）
+- `orgs/gftdcojp/ai-gftd-mangaka` — uncommitted 157 件
+- `orgs/gftdcojp/cloud-manimani` — HEAD が twin のどの ref からも到達できない +10 commit
+- `orgs/gftdcojp/animeka-actor` — `rescue/wip-20260718` が +1 commit。**名前が「rescue」なのに
+  救出先が shadow である**
+- stash を持つ 5 件: `local-murakumo` / `cloud-murakumo` / `ai-gftd-yukkuri` /
+  `shinshi-growth-actor` / archetype
+
+content は clean なのに**読まれているせいで**降格した 3 件:
+`etzhayyim/com-etzhayyim-minidrama` / `etzhayyim/global-legislation-datoms` /
+`etzhayyim/com-etzhayyim-app-open-kyber`。次節。
+
+## 5. shadow path を**読んでいる**もの —— 12 path
+
+「古い」と「読まれている」は別の問題である。**読まれている path を消すと呼び出し側が壊れる。**
+`manifest/` `scripts/` `.claude/`（`worktrees/` は除外）`70-tools/` `~/.gftd`
+`~/Library/LaunchAgents` を走査した（1,130 ファイル）。
+
+**launchd job が 4 本、shadow を指している。`launchctl list` で 4 本とも load 済み、
+うち 1 本は PID を持って走っている。**
+
+| plist | 状態 | 指している shadow |
+|---|---|---|
+| `com.gftd.murakumo-actions-runner` | **PID 14631 で稼働中** | `orgs/gftdcojp/cloud-murakumo`（WorkingDirectory） |
+| `com.minidrama.outer-loop` | loaded, last exit 0 | `orgs/etzhayyim/com-etzhayyim-minidrama`（WorkingDirectory + StandardOut/ErrorPath）、`orgs/gftdcojp/ai-gftd-dougaka`（`DOUGAKA_DIR`） |
+| `com.dougaka.outer-loop` | loaded, last exit 1 | `orgs/gftdcojp/ai-gftd-dougaka`（`DOUGAKA_ENGINE_DIR`） |
+| `com.gftdcojp.itonami.expiry-alert` | loaded, last exit 1 | `orgs/kotoba-lang/kotoba-git` と `orgs/kotoba-lang/kotoba-rad`（`--classpath` の `../kotoba-lang/...`） |
+
+superproject 側の script も 4 本読んでいる:
+
+    scripts/artificial-organism-health.cljs:8,107   orgs/gftdcojp/cloud-murakumo/public/health/ に書き出す
+    scripts/verify-fabric-wasm.mjs:9,10,12         ai-gftd-yukkuri / -dougaka / -mangaka
+    scripts/compliance-fact-query.cljs:42,43        etzhayyim/global-legislation-datoms の schema と data
+    scripts/gen-itonami-industry-scorecard.cljs:67  com-etzhayyim-app-open-kyber の isic-packs
+    manifest/public-runtime-owners.json:8,9         api.murakumo.cloud / app.itonami.cloud の owner を local-murakumo に
+    manifest/layers.edn:110                         archetype を layer の一員として
+
+**`manifest/repo-taxonomy.edn` / `repo-maturity.edn` / `repos.edn` / `kotoba-boundaries.edn`
+はこの列に数えない。** あれらは全 repo path を列挙する生成物で、shadow を消しても壊れるのは
+**行の正しさであって呼び出し側ではない**。repos.edn は特に、当の rename ledger である。
+
+## 6. build は 2 本だけ割れる —— しかも両方 shadow の内側
+
+3,094 本の `:local/root` 辺を解決した。shadow に着地するのは **2 本だけ**:
+
+    orgs/gftdcojp/ai-gftd-mangaka/clj/deps.edn:47  ->  orgs/gftdcojp/cloud-murakumo
+    orgs/gftdcojp/ai-gftd-mangaka/clj/deps.edn:68  ->  orgs/gftdcojp/cloud-murakumo
+
+**消費者 `ai-gftd-mangaka` 自身が shadow である。** つまりこの辺は west が declare している
+どの repo の disposition も変えない —— **2 つは一緒に退役する**、それだけ。
+
+ADR-2608134000 は「0 本」と書いた。差は解決の仕方で、あちらは正規化した path を
+shadow の集合と突き合わせ、こちらは各 `deps.edn` の位置から相対 path を解決した。
+**2 本の方が正しい。**
+
+そして declared な側は既に直っている —— 同じ行が twin ではこう書かれている:
+
+    orgs/cloud-itonami/mangaka/clj/deps.edn:48
+      gftdcojp/cloud-murakumo {:local/root \"../../../network-awai/cloud-murakumo\"}
+
+**declared な twin 同士は declared な twin を指し、shadow 同士は shadow を指す。**
+改名のときに片方だけが直り、もう片方は直された世界を一度も見ていない。
+
+## 7. archetype の現在地 —— `orgs/gftdcojp/ai-gftd-apps-gftdcojp`
+
+「前にこう報告された」ではなく、いま測った:
+
+- **shallow、graft 50 本** → **:cannot-assess**。この 1 件だけが shallow である
+- 12.26 GiB（249 件の disk の 39%）
+- HEAD は detached `7ba47a93`、twin `orgs/gftdcojp/apps-gftdcojp`（id 1136866292）と同一
+- **stash 6 本** —— `wip-before-docs-edn` / `cleanup-worktree-20260625-*` 4 本 /
+  `pre-pull-sync b5cb4932a23`
+- local branch **39 本**。うち **10 本の tip が twin の object store に存在しない**
+  （`agent/fix-broken-prepush-hook` `agent/restore-dropped-july-adrs`
+  `agent/retire-dead-yoro-mitama-infra` `agent/retire-rw-lgpool-mangaka-llm`
+  `chore/extract-shinshi-remove-dedicated` `codex/cyber-drill-split`
+  `codex/split-magatama-host-sdk` `feat/vendor-clj-migration-phase1-cont`
+  `fix/animeka-audio-loudnorm-14lufs` `subrepo/60-apps/ai-gftd-project-kotoba`）
+- uncommitted 3 件、全部 email-relay worker（`50-infra/cloudflare/workers/email-relay/`
+  の `worker.ts` / `wrangler.jsonc` / `test/integration.test.ts`）
+- **linked worktree 2 本**
+
+### 危険なもの —— 報告のみ、修理していない
+
+    .git/worktrees/agent-a597ae295a0c01da8/locked:
+      \"claude agent agent-a597ae295a0c01da8 (pid 77835 start Mon Jul  6 07:02:59 2026)\"
+    $ ps -p 77835  →  NOT RUNNING
+
+**lock が名指している process は 5 週間以上前に死んでいる。** worktree 実体
+（`.claude/worktrees/agent-a597ae295a0c01da8`）は存在し、working tree に削除
+（`50-infra/vultr/geth-private/contracts/lib/*` 等）を抱えている。
+`git worktree prune` は locked を飛ばすので、**この lock は誰も外さない限り永久に残る。**
+外さない —— それは owner の判断である。
+
+もう 1 本の worktree は superproject の**外**（`~/github/com-junkawasaki-worktrees/gftd-apps-kotobase`、
+branch `codex/kotobase-d1-platform`）に在り、lock されておらず実体もある。
+
+## 8. 撤去するなら、この順序で
+
+**この ADR は撤去を実行しない。** 実行するときの順序だけ、証拠から導ける範囲で:
+
+1. **223 件（safe-to-retire）** —— `manifest/cleanup-workflow.edn` の `:retirement` に従い、
+   **消す前に必ず `.git/stash-archive-<date>/` へ退避**する。「landed だと確信している」は
+   archive を省略する理由にならない（この workspace は 2026-07-04 に一度それをやっている）。
+   大きい順に `etzhayyim/directory.plc`(6.76 GiB) / `global-accounts-datoms`(3.79) /
+   `uk.gov.legislation`(1.55) / `jp.go.e-gov.elaws`(1.28) / `xyz.farcaster.fnames`(0.89) の
+   5 件だけで 14.3 GiB、**223 件の 90%** を占める。
+2. **25 件（needs-draining）** —— 固有物を先に着地させる。読まれている 12 path は
+   **caller を twin へ向け直してから**。launchd の 4 本は plist を書き換えて `launchctl
+   kickstart` が要るので、これは file 操作ではなく運用操作である。
+3. **1 件（archetype）** —— `git fetch --unshallow` して初めて ancestry を訊ける。
+   locked worktree は先に owner が判断する。**shallow のまま「6 stash と 10 tip がある」と
+   読んで、それが全部かのように扱わない** —— shallow が答えているのは「分からない」である。
+
+## 9. これを撤去すると何が直るか
+
+build は直らない（割れているのは 2 本、しかも shadow の内側）。**直るのは測定である。**
+`orgs/` を歩く検出器 —— namespace 衝突・layer 依存・bb→nbb census・concept 索引 —— は
+いま同じコードを 2 回数えており、**225 件では 2 回のうち片方が誰も更新していない過去の姿**である。
+ADR-2608132700 の「28 の co-classpath 衝突のうち 19 は 1 repo の二重 checkout」という
+見出しは、この歪みがそのまま出たものだった。**223 件を退役させれば、その歪みは
+検出器ごとに直すのではなく一度に消える。**
+
+## 10. 検査器のコストと、綺麗に見えてはいけないもの
+
+| 実行 | gh 起動 | 所要 | load1 |
+|---|---|---|---|
+| 全数 + du + reader scan + deps 辺 | 0（listing cache 温） | 約 8 分 | 76–102 |
+| org listing の cache 冷 | 9 | +75 s | — |
+
+- **gh は 8 org の `--paginate` listing だけ**（`.cache/org-listings.edn`、TTL 7 日）。
+  listing に無い名前だけが per-repo GET に落ち、それは
+  `.cache/duplicate-registrations.edn`（TTL 30 日）を `verify-duplicate-registrations`
+  と共有する。共有 token を守るのは budget であって遠慮ではない。
+- **予算切れは綺麗な run ではない。** `--budget` を超えるか lookup が backoff 後も失敗すると、
+  その行は UNRESOLVED として**列挙され**、summary がそう言い、exit code は **2**
+  （0=綺麗 / 1=検出 のどちらでもない）。`gh api rate_limit` は **secondary limit を報告しない**
+  ので、backoff は広告された残量ではなく**エラー本文**を見る。
+- 今回の run も **exit 2** で終わっている —— archetype 1 件が :cannot-assess だからである。
+  **「249 件全部を見た」と「249 件全部に答えられた」は別のことで、exit code はその区別を持つ。**
+- 1 checkout あたり `sh` 1 回に約 10 本の git read を束ねている（node の spawn が
+  以前の disk scan で 1,250 subprocess / 175 秒を支配していたため）。
+- **`.claude/worktrees` を除外する。** superproject の写しが数十個入っており、
+  除外しないと reader の hit が 710 → 18,805 になって本物が全部埋まる。
+
+## 11. 一般化
+
+**「その checkout に固有のものがあるか」は、どこに訊くかを決めるまで問いになっていない。**
+最初の実装は正しい問い（tip 一致ではなく ancestry）を、**空の anchor に向かって**訊いた。
+返ってきた「249 件全部が固有」は、形としては答えだが中身は「anchor が無い」だった。
+`--is-shallow-repository` が空の `.git/shallow` に true を返すのと同じ形である ——
+**機構は「無い」を「はい」と綴ることがある**"}]
