@@ -1,0 +1,203 @@
+[{:db/id -1
+  :adr/id "ADR-2608120900"
+  :adr/title "言語 authority の検査は、宣言されていたが走っていなかった — 7 本を実行可能にした closing"
+  :adr/status "accepted, implemented"
+  :adr/date "2026-08-12"
+  :adr/last-verified "2026-08-12"
+  :adr/last_verified "2026-08-12"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/source-format "edn"
+  :adr/authoritative true
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-lang-authority-enforcement"
+  :adr/tags ["kotoba-lang" "surface-status" "guest-grammar" "conformance" "closing" "evidence"]
+
+  :adr/related ["adr-2608110400-native-effect-capability-aot-handoff"
+                "adr-2608650000-kotoba-permanent-vs-temporary-constraints"
+                "adr-2608110100-written-is-not-existing"
+                "adr-2607279200-kotoba-clojure-shaped-safety-elaboration-migration"]
+
+  :adr/authoritative-for
+  ["2026-08-12 に kotoba-lang の authority に入った検査と、その実測値"
+   "`:classification-rule` の各要件が現在どの検査で強制されているか"
+   "conformance backend のうち runner を持つもの／持たないもの"
+   "未着地のまま保全した cljs parity harness の位置と再開条件"]
+
+  :adr/context
+  "オーナーの問い（2026-08-12）:「kotoba native がちゃんと安全に effect, capability を
+   持つようになっている?」から始まり、native 側の作業が別セッションの未着地 WIP に
+   ブロックされたため、**同じ形の問題が言語 authority 自身にないか**へ移った。
+
+   結論から言うと、あった。`lang/surface-status.edn` の `:classification-rule` は
+   要件を宣言していたが、**その多くは誰も検査していなかった**。しかも検査コードが
+   存在する箇所ですら、2 つの独立したバグで到達不能だった。
+
+   この ADR は closing の正本であり、次の agent が会話履歴なしで再開できる粒度で
+   書く。個々の判断の理由は各 commit message と `surface-status.edn` の該当
+   エントリに残してあり、ここでは重複させない。"
+
+  :adr/decision
+  "## 何が landed したか（すべて default branch にあり、west pin も前進済み）
+
+   | repo | commit | 内容 |
+   |---|---|---|
+   | kotoba-lang | `f06712e` | `:string-predicate-typing` を `:not-yet-implemented` → `:implemented-partial`。8 probe × 5 target を再実測 |
+   | kotoba-lang | `f5add69` | security constraint が名指しする form は `:forbidden-heads` に在ることを強制（`:forbidden/security-surface-not-forbidden`） |
+   | kotoba-sema | `3c2f8ba` | guest-grammar を再 vendoring。compiler が実際に読むのはこちら |
+   | kotoba-lang | `6db8205` | security constraint は実在する ADR を引くことを強制（`:security/constraint-missing-adr` / `:security/adr-path-unresolved`） |
+   | kotoba-lang | `d9f4736` | parity 監査の自己訂正（コンパイル失敗は suite を落とす） |
+   | kotoba-lang | `e1b8b45` | host backend に runner が無いことの記録 |
+   | kotoba-lang | `df7d35b` | `:host-clj` runner。6 case すべて実行 |
+   | kotoba-lang | `1816e91` | `:host-cljs` runner（nbb）。6 case すべて実行 |
+
+   superproject 側は ADR-2608110400 への 2 度の amendment（`4869fa1` / `55c8b59`）と、
+   上記に対応する west pin 前進（`acef426` `309682b` `07d398d` `601a0aa` `1f16b4c`
+   `9ae9d3d` `3545934` `1cd9996`）。
+
+   ## 実行可能にした検査（すべて「落ちること」を先に確認済み）
+
+   1. `:forbidden/security-surface-not-forbidden` — 発火時に `#{reset! swap!}` ちょうど
+   2. `:security/constraint-missing-adr` — 発火時に 7 件ちょうど
+   3. `:security/adr-path-unresolved` — 存在しないパスで発火
+   4. `:portable/claim-without-conformance` — 登記から 1 件外して発火
+   5. `:portable/conformance-debt-stale` — 偽の行を足して発火
+   6. `:portable/unknown-implementation-token` — `:made-up-backend` で発火
+   7. `conformance-evidence-present?` — でっち上げキーが `false` を返すことを確認
+
+   ## 実測値（すべて自分で回した）
+
+   - `:not-yet-implemented` の surface entry: **0 件**（39 entry を再分類）
+   - security constraint 7 件: 8 probe すべて fail-closed
+   - portable claim 18 件のうち **10 件が conformance link を持たない**（ratchet 登記済み）
+   - `:implementation` の token 10 個は、実在する 2 つの backend 語彙と**共通ゼロ**
+   - authority manifest 37 case のうち **31 が result assertion に到達**
+   - `:host-clj` 6 case・`:host-cljs` 6 case とも全実行・全一致
+   - pure-product 60 case のうち **42 が cljs にコンパイル可・18 が拒否**
+
+   ## 見つけた実害
+
+   - `conformance-evidence-present?` は `or` の中に常に真な `.isDirectory` を持ち、
+     **述語が定数 true**。`:portable/missing-evidence` はどんな入力でも出せなかった
+   - `portable-without-evidence` の `keep` は `when` 2 つの逐次で、**最初の戻り値が捨てられて**
+     いた。それを出すはずだった唯一の entry がまさに捨てられる枝に入っていた
+   - `:no-ambient-mutation` が名指しする `reset!` / `swap!` が `:forbidden-heads` に無く、
+     compiler は「lowering が無い」という一般の理由でしか拒否していなかった。
+     `ADR-safe-capability-language` の S1 は最初から両者を denied と列挙しており、
+     **文法が自分の ADR から外れていた**
+   - `:namespace-extension-priority` の `:function` が `\"main\"`（entry は `run` を定義）、
+     `:clj` が `11`（Clojure のローダは `2` を返す）。**一度も実行されていなかったので
+     誰も気付かなかった**。`:cljs 11` は正しく、そこから対称性で写された誤りだった
+
+   ## 自分が 2 回間違えた記録
+
+   同じ `:evidence-audit` を同日 2 回訂正した。①「コンパイル失敗は何も assert しない」
+   → 誤り（`compile-source` が自前で `is` を持つ）②「2 case は `:kotoba` expect が無い
+   （case の欠陥）」→ 誤り（runner が無いだけで、`.clj` entry が Kotoba 結果を持たないのは
+   検査対象そのもの）。どちらも**呼び出し側だけを読んで結論した**。記録は消さず併記してある。"
+
+  :adr/consequences
+  "## 未着地・未検証（次の agent が最初に触る場所）
+
+   ### 1. cljs parity harness — 保全済み、merge 前に再実行が要る
+
+   **branch `kotoba-lang/amu` の `agent/cljs-parity-harness-wip`。**
+   `run-cljs` と `lang-conformance-cljs-parity-test`。
+
+   **初回の全件実行は完了した（153 pass / 18 fail）。harness は動き、欠陥を 2 種類
+   見つけた。**
+
+   #### 実測（2026-08-12、pure-product 60 case）
+
+   | | 件数 |
+   |---|---|
+   | `:cljs-kotoba-v1` が拒否（typed feature ゲート） | **18** |
+   | コンパイルは通るが nbb で実行できない | **6** |
+   | KIR と一致 | **36** |
+
+   #### 欠陥 A — cljs backend が定義しない補助を emit する
+
+   コンパイルは成功するのに emit された cljs が存在しないシンボルを呼び、nbb が
+   `Unable to resolve symbol` で落ちる。**backend が「できる」と言ってできない**類で、
+   拒否（できないと言う）とは性質が違う。
+
+   ```
+   i64-shift-left / i64-shift-right : shift-kit, shift-right-kit, thread-kit
+   u64-shift-right                  : when-let-u64-kit, loop-deep-kit
+   string-code-point-at             : string-code-point-kit
+   ```
+
+   `:kotoba-cljs` を 19 entry が主張しながら実行証拠がゼロだった間、**これは見えて
+   いなかった**。harness の存在理由そのもの。`cljs-emitted-but-unrunnable` に登記したが、
+   **縮む方向にしか動かしてはならない**（緑にするために足すのは禁止）。
+
+   #### 欠陥 B — 自分の登記が嘘だった
+
+   拒否 register を 14 件で書いたが実際は 18 件。**truncate された probe 出力の件数だけ見て
+   名前を写した**ため、件数と名前が食い違ったまま登記していた。実行して初めて突き合わされた。
+   register を要約行から起こしてはいけない。
+
+   #### 未完
+
+   両 register を実測値に直した版での**再実行が未完**。所要は約 60 cljs compile +
+   42 wasm32 compile + 42 nbb process で、10 分の上限を超えることがある。
+   `resource-guard` は lock を待たず即 exit するので、待ち合わせを呼ぶ側で書くこと
+   （1 回試して exit 0 を見ると空振りを成功と誤読する。実際 3 回誤読した）。
+
+   再開手順:
+   ```
+   git fetch && git checkout agent/cljs-parity-harness-wip
+   # guard の lock 解放を内側で待つこと。1 回試して諦めると空振りを成功と誤読する
+   for i in $(seq 1 60); do out=$(node <root>/scripts/resource-guard.mjs run build -- \\
+     clojure -M:test 2>&1); echo \"$out\" | grep -q 'already running' && sleep 45 || break; done
+   ```
+   通れば merge、不一致があれば**潰さずに名指しで記録**してから merge。
+
+   ### 2. amu suite の 1 failure
+
+   `agent/cljs-parity-harness-wip` の base 時点で 970 tests / 7,658 assertions 中 1 failure。
+   **自分の変更由来かどうか切り分けていない**（全 suite が 10 分超）。parity を測るときに
+   同時に切り分ける。
+
+   ### 3. オーナー判断待ち — `:implementation` の語彙
+
+   `:implementation` の 10 token は、`kotoba-kir` の `compatibility-targets` とも
+   `lang/conformance/manifest.edn` の `:backends` とも**共通しない第 3 の名前空間**。
+   どちらに寄せるか（target id に置き換える / 独自名のまま対応表を持つ）は authority の
+   設計判断なので決めていない。`:implementation-vocabulary :open-decision` に記録済みで、
+   token 集合は凍結してあるので**黙って増えることはない**。
+
+   ### 4. ratchet 登記に載っている債務
+
+   - `:conformance-link-debt` 10 件（conformance link を持たない portable claim）
+   - `bounded-admission` の 9 limit のうち **7 つが ADR 未決定**（`:adr-gap` に記録）
+   - `:inline-expression-compile` の `:clj` / `:cljs` expect は host backend を要求しないため
+     どちらの runner にも掛からない
+   - `:compiler-admit` と `:native-x86_64` / `:native-aarch64` の runner 有無は**未調査**
+
+   ### 5. native effect（この session の出発点）
+
+   ADR-2608110400 のとおり、**別セッションが aiueos の C-free typed syscall envelope を
+   書いている最中**で、着地するまで log capability には着手できない。着手ゲート:
+   `gh api repos/kotoba-lang/aiueos/contents/os/aiueos/kotoba/value-runtime-dispatch.kotoba`
+   が 404 を返さなくなること。2026-08-12 時点で依然 404。
+
+   ## 運用上の教訓（次も踏む）
+
+   - **`resource-guard` は lock を待たない。** 1 回試して exit 0 を見ると「走った」と誤読する。
+     待ち合わせは呼ぶ側が書く
+   - **`cd` が子リポに残ったまま `git worktree add` すると superproject のつもりで子リポの
+     worktree ができる。** 4 回踏んだ。root worktree を作る前に `cd <root>` を明示する
+   - **共有 checkout は他セッションの WIP と古い pin を含む。** 調査結果は必ず
+     clean な `origin/main` worktree で再現してから結論する"
+
+  :adr/references
+  ["orgs/kotoba-lang/kotoba-lang/lang/surface-status.edn"
+   "orgs/kotoba-lang/kotoba-lang/lang/guest-grammar.edn"
+   "orgs/kotoba-lang/kotoba-lang/src/kotoba/lang/grammar_authority.clj"
+   "orgs/kotoba-lang/kotoba-lang/test/kotoba/lang/host_clj_conformance_test.clj"
+   "orgs/kotoba-lang/kotoba-lang/test/kotoba/lang/host_cljs_conformance_test.clj"
+   "orgs/kotoba-lang/kotoba-lang/scripts/host_cljs_conformance.cljs"
+   "orgs/kotoba-lang/kotoba-lang/lang/conformance/manifest.edn"
+   "orgs/kotoba-lang/amu/src/kotoba/compiler/lang_conformance.clj (branch agent/cljs-parity-harness-wip)"
+   "90-docs/adr/2608110400-native-effect-capability-aot-handoff.edn"]}]
