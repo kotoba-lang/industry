@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 9488,
-  :pageviews-7d 4646,
-  :uniques-7d-sum 574,
+ {:requests-7d 9509,
+  :pageviews-7d 4658,
+  :uniques-7d-sum 578,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 99}
+  [{:path "/", :requests 88}
    {:path "/assets", :requests 49}
    {:path "/assets.html", :requests 48}
    {:path "/feed/fork-stats.edn", :requests 25}
-   {:path "/robots.txt", :requests 21}
-   {:path "/js/app.js", :requests 11}
+   {:path "/robots.txt", :requests 19}
    {:path "/api/liveops", :requests 10}
+   {:path "/kototama/kototama_bg.wasm", :requests 8}
    {:path "/api/analytics", :requests 8}],
-  :status-mix {:ok 1585, :server-error 151, :client-error 7},
+  :status-mix {:ok 1475, :server-error 152, :client-error 7},
   :channel-mix
-  {:channel 379, :probe 1023, :unclassified 183, :ok-total 1585},
+  {:channel 356, :probe 1022, :unclassified 97, :ok-total 1475},
   :window "24h"},
  :as-of "2026-08-12",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 9},
  :top-paths
- "上位 page (24h, 2xx/3xx・channel-allowlist済): / 99 · /assets 49 · /assets.html 48 · /feed/fork-stats.edn 25 · /robots.txt 21 | 4xx(probe) 0% · 5xx 9% · probe(200-fallback) 65% · unclassified 12%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): / 88 · /assets 49 · /assets.html 48 · /feed/fork-stats.edn 25 · /robots.txt 19 | 4xx(probe) 0% · 5xx 9% · probe(200-fallback) 69% · unclassified 7%",
  :signal
- "isekai.network 実測 9488 req/7d・574 uniques(日次和)・うち4xx probe 0%(24h)",
+ "isekai.network 実測 9509 req/7d・578 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}
