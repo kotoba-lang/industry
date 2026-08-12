@@ -87,7 +87,33 @@ Worth noting: `webgl` requires `kotoba.gpu` — a THIRD copy that owns its
 implementation rather than re-exporting, so it survives either resolution. A
 pre-paid hedge against exactly this decision.
 
-### `kami.input` — the cheap one
+### `kami.input` — DONE, merge `6f4fe820cf9e`, pin advanced
+
+Deleted from the SDK. The consumer counts were re-derived by require form and
+held exactly: host 13 vars with 4 live consumers, SDK 4 vars with only its own
+contract test, zero shared. Two traps in the raw grep, both excluded by eye:
+`:input/keys` keywords inside a string, and `with-axis-scale` in docstrings.
+
+**One claim below was contradicted in the deletion's favour.** The brief inferred
+`the SDK wins in isekai` from a reproduced dependency shape. isekai's SHIPPED
+BUNDLE says otherwise — `public/js/sekaiju.js` contains host's `stick_axes`,
+`axes_from_held` and `wire_BANG_`, and **zero** occurrences of the SDK's four
+names. Nothing running today lost an implementation. **The artifact settled what
+the classpath simulation could not.**
+
+The contract test's `kami.input` portion was deleted rather than repointed at
+`host`: `host`'s `deps.edn` already depends on the SDK, so an SDK-to-host
+dependency closes a cycle. `host/test/kami/input_test.clj` covers the surviving
+namespace more deeply than the four dropped tests did.
+
+SDK 99 tests / 416 assertions to 95 / 407 — exactly the four deftests removed.
+**The consumer suites are controls, not proof**: `host` pins the SDK by
+`:git/sha` so it is unaffected until that pin moves, and `kami-app-isekai` does
+not depend on the SDK at all. `network-isekai` is the only classpath that
+changes immediately, **and its suite still cannot run** for the same missing
+`:local/root` recorded below.
+
+### `kami.input` — the analysis
 
 Zero shared names. The `host` version has four live consumers across two apps.
 **The SDK version has one consumer anywhere: the SDK's own contract test.**
@@ -144,10 +170,25 @@ makes isekai's workaround permanent.
   `org-threejs` is not checked out. The isekai orderings above are from a
   reproduced dependency shape, high-confidence but **not measured on the real
   graph**. The `webgpu` orderings are real.
-- **`ADR-0040` / `clj-wgsl-ledger`**, which the SDK's docstrings cite to justify
-  themselves, resolves to nothing — no such file, no name match in 4,100 repos.
-  ADR-2608120800's open question about a future CLJ-to-WASM path **rests on a
-  citation that cannot be resolved.**
+- ~~`ADR-0040` / `clj-wgsl-ledger` resolves to nothing~~ — **WRONG, corrected
+  2026-08-12.** `clj-wgsl-ledger` **does** resolve: it is not a repo, which is
+  why a repo search missed it. It is a superproject document,
+  `90-docs/migration/clj-wgsl-ledger.edn`, and it carries a row
+  `:crate \"kami-input\"` with the note *input action maps to CLJC; native
+  capture stays Rust* and a gate naming `input_axes_from_held`. The SDK
+  docstring paraphrases it almost verbatim.
+
+  **So the reservation was real** — but it reserves *a pure CLJC binding layer*,
+  and `host`'s copy IS that layer, gate name included (`axes-from-held` matches
+  `input_axes_from_held`). The reservation argues for keeping host's file, not
+  the SDK's. Only the `ADR-0040` half still fails to resolve: kami-engine's 0040
+  is a different subject entirely.
+
+  Two lessons rather than one. **`repo-search` searches repositories, so a
+  citation naming a document inside the superproject will read as unresolvable**
+  — and `does not resolve` was stated when `was not found by the tool I used`
+  was the honest claim. That is the same shape as the other measurement errors
+  recorded across today's ADRs: the tool answered its own question correctly.
 - No build was run; breakage is from the require graph and var existence, not
   execution.
 
