@@ -55,11 +55,17 @@
     (js/process.stdout.write line)))
 
 (defn sh
-  "Run a command. Returns {:code n :out s}. Never throws — a probe that blows up
-  must record :unknown rather than take the tick down with it."
+  "Run a command. Returns {:code n :out s :timeout? bool}. Never throws — a probe
+  that blows up must record :unknown rather than take the tick down with it.
+
+  `:timeout?` is reported separately because a killed process and a failed one
+  are indistinguishable from the exit code alone: Node reports both as
+  `status` nil -> code 1, with whatever partial stdout had accumulated. Reading
+  that partial output as a verdict is how a slow machine turns into a
+  `:regressed` (see probe-script)."
   [dir cmd args & [{:keys [timeout-ms env]}]]
   (try
-    {:code 0
+    {:code 0 :timeout? false
      :out (str (.execFileSync cp cmd (clj->js args)
                               (clj->js (cond-> {:cwd dir :encoding "utf8"
                                                 :stdio ["ignore" "pipe" "pipe"]
@@ -68,6 +74,10 @@
                                          env (assoc :env (merge (js->clj js/process.env) env))))))}
     (catch :default e
       {:code (or (.-status e) 1)
+       ;; execFileSync surfaces a timeout kill as code "ETIMEDOUT" and/or a
+       ;; signal (SIGTERM) with a null status — never as a real exit code.
+       :timeout? (boolean (or (= "ETIMEDOUT" (.-code e))
+                              (and (nil? (.-status e)) (some? (.-signal e)))))
        :out (str (some-> (.-stdout e) str) (some-> (.-stderr e) str))})))
 
 ;; ───────────────────────── probes ─────────────────────────
@@ -139,8 +149,8 @@
 (defn- probe-script
   "Run one of the repo's verify scripts. Exit 0 is the guarantee still holding."
   [id script extra]
-  (let [{:keys [code out]} (sh root "nbb" (concat ["--classpath" ".:scripts/nbb_compat" script] extra)
-                               {:timeout-ms 900000})]
+  (let [{:keys [code out timeout?]} (sh root "nbb" (concat ["--classpath" ".:scripts/nbb_compat" script] extra)
+                                       {:timeout-ms 900000})]
     {:probe id
      ;; An ENVIRONMENT failure is :unknown, not :regressed. A missing script, an
      ;; unresolvable npm module, an absent checkout — none of those are evidence
@@ -150,19 +160,34 @@
      ;; root had been emptied, so the factory-plane probe could not load
      ;; datascript and this classified it :regressed. The plane was fine; the
      ;; machine was not.
+     ;; A TIMEOUT is also :unknown. The probe was killed mid-run, so its partial
+     ;; stdout is not a verdict — treating it as one is the same cry-wolf failure
+     ;; the paragraph above describes, in the one shape that recurs on schedule.
+     ;; Measured 2026-08-13: the factory-plane check took 46.3 min wall clock
+     ;; against this 900s budget on a machine sitting at load 100–157, so it was
+     ;; killed and classified :regressed every firing while the plane was fine.
+     ;; Loading the plane once instead of three times (2026-08-13) cuts it, but
+     ;; the fit is load-dependent, not structural — so the misclassification has
+     ;; to be closed here as well as made faster there.
      :state (cond (zero? code) :ok
+                  timeout? :unknown
                   (some #(str/includes? out %)
                         ["no such file" "Cannot find module" "ENOENT"
                          "not checked out" "command not found"]) :unknown
                   :else :regressed)
-     :note (let [t (str/trim out)] (subs t (max 0 (- (count t) 200))))}))
+     :note (let [t (str/trim out)
+                 tail (subs t (max 0 (- (count t) 200)))]
+             (if timeout? (str "TIMEOUT (900s) — 未完了。末尾: " tail) tail))}))
 
 (defn probe-guarantees []
   (cond-> [(probe-script :artifact-custody "scripts/annex-custody-verify.cljs"
                          ["--names" "tsukuru-manufacturing-artifacts" "--sample" "2"])
            (probe-script :artifact-path-policy "scripts/verify-artifact-path-policy.cljs"
                          ["--names" "tsukuru-manufacturing-artifacts"])]
-    ;; The factory-plane check loads the whole datom plane three times (~3 min).
+    ;; The factory-plane check loads the whole datom plane ONCE (it used to load
+    ;; it three times, one child process per assertion). The load is the whole
+    ;; cost, so this is a 3x cut — but the absolute number is set by the host's
+    ;; load, not by this script: ~1 min on an idle machine, 15 min+ at load 80.
     ;; Skippable so an operator can get a fast answer, but ON by default: a
     ;; guarantee nobody re-runs is the one that rots.
     (not skip-slow?)
