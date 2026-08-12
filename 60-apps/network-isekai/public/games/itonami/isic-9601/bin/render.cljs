@@ -32,13 +32,17 @@
                         [--state FILE] [--engine DIR]
                         [--eye X,Y,Z] [--target X,Y,Z]
                         [--orbit DEG] [--zoom N] [--fov DEG]
+                        [--dry]
 
   `--state FILE` reads an `:itonami-game/state` v1 envelope (from `play --dump`) and draws
   that street progress — unlocked shops match the played run, not a fresh `(world/init)`.
 
   Camera flags (#1751) reshape the same IR `kami.webgpu.pick` reads — not a second view
   matrix. `--orbit` / `--zoom` / `--fov` adjust the default fit; `--eye` / `--target` set
-  absolute coordinates (and win when both styles are passed)."
+  absolute coordinates (and win when both styles are passed). An eye that lands underground
+  or inside the fit volume exits ≠ 0 — there is no silent clamp.
+
+  `--dry` parses flags, builds the IR, prints eye/target/fov, and exits without Chromium."
   (:require ["node:fs" :as fs]
             ["node:http" :as http]
             ["node:child_process" :as cp]
@@ -147,8 +151,21 @@
 ;; the frame, entirely from the engine
 ;; --------------------------------------------------------------------------
 
-(def ir (w3/render-ir world-state (/ (double W) (double H))
-                      (when (seq cam-opts) cam-opts)))
+(def ir
+  (try
+    (w3/render-ir world-state (/ (double W) (double H))
+                  (when (seq cam-opts) cam-opts))
+    (catch :default e
+      ;; underground / inside-fit / bad zoom — print the library's message, exit 2
+      (println (or (ex-message e) (.-message e) (str e)))
+      (js/process.exit 2))))
+
+(when (has-opt? "dry")
+  (println (str "eye " (pr-str (get-in ir [:globals :eye]))))
+  (println (str "target " (pr-str (get-in ir [:globals :target]))))
+  (println (str "fov " (pr-str (get-in ir [:globals :fov]))))
+  (js/process.exit 0))
+
 (def mesh (geom/box 1.0 1.0 1.0))
 
 (def payload

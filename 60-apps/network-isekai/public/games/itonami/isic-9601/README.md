@@ -240,6 +240,11 @@ npm run render                         # WebGPU first, WebGL 2.0 fallback
 npm run render -- --backend webgpu     # WebGPU only, report the failure
 npm run render -- --backend webgl2     # WebGL 2.0 only
 npm run render -- --width 1280 --height 720 --cleared 3
+npm run render -- --orbit 180 --zoom 1.2 --fov 40
+npm run render -- --eye 0,80,120 --target 0,2,0
+npm run render -- --dry --orbit 90     # parse camera, print eye/target/fov, no Chromium
+npm run test:camera
+npm run accept:camera
 ```
 
 `play` drives `logic/reduce-event`, the same reducer the browser preview and the future
@@ -253,6 +258,19 @@ phase buy-*`, with `tick*40` for repeats.
 **This is the WebGL 2.0 end-to-end check** CLAUDE.md's 3D rule asks for, in a form that
 runs without a screen. It is not a second renderer: no geometry, matrices, lighting or
 shading are authored in `bin/render.cljs`, only GL plumbing.
+
+Camera flags (#1751) aim that same IR — not a second view matrix:
+
+| flag | effect |
+|---|---|
+| `--orbit DEG` | add degrees to the default azimuth (180 looks from the back) |
+| `--zoom N` | `>1` pulls in, `<1` pushes out (fitted range /= zoom) |
+| `--fov DEG` | vertical FOV; also used for the fit |
+| `--eye X,Y,Z` | absolute eye (wins over orbit/zoom) |
+| `--target X,Y,Z` | absolute look-at (wins over the solved target) |
+
+An eye that lands underground (`y ≤ 0`) or inside the fit volume exits ≠ 0 with a clear
+message — there is no silent clamp on tiny zoom.
 
 Two limits, printed on every run: the **shadow pass is not run** (a 1×1 fully-lit depth
 texture is bound instead, so the image is the lit pass without shadowing), and the GPU is
