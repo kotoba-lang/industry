@@ -712,6 +712,52 @@
     未着地のうちに書き始めると、共有 checkout の直接編集か 2 本目の envelope の
     どちらかになる。"}
 
+  :adr/addendum-2026-08-12-double-fault-ist-session-close
+  {:status "accepted handoff; compiler substrate landed; aiueos #DF implementation not accepted"
+   :trigger
+   "recoverable C-free #PF の次として minimal TSS + #DF IST を進め、closing session のため
+    landed / measured / failed を同じ基準点から確定する。"
+   :landed
+   {:kotoba-gmir "fda4408; sealed #DF handler/configure/load/probe; 13 tests / 80 assertions"
+    :kotoba-sema "b419c89; admission; 8 / 37"
+    :kotoba-kir "6d08e3c; admission closure; 134 / 575"
+    :kotoba-verifier "1ecea86; independent arity/admission; 48 / 269"
+    :kotoba-native "5d58b2e; emission/readback + protected-text boundary 0x10c000→0x110000; 139 / 1823"
+    :amu "2424db4; dependency closure; focused aggregate 4 / 45"
+    :aiueos-adr "ADR-0036 at 544a581; implementation は main に入れていない"}
+   :measurement-correction
+   "最初の native image は emitted text 57,870 bytes が固定 data segment 0x10c000 と衝突した。
+    data / recovery context / NX probe を 0x110000 へ移した後、aiueos の通常 C-free boot は
+    allocator 11 pages で通った。ただしこれは未 merge prototype 上の測定であり、main の
+    capability として数えない。Amu 970 tests / 7658 assertions は最初の closure で測った値で、
+    最終 2424db4 では full suite を再実行していない。focused 4 / 45 を full green と書かない。"
+   :failed-gate
+   "#DF mutation は pre-probe marker MPRCD まで到達した後、handler marker/receipt 無しで
+    triple fault reset した。TSS delivery、IST1 frame、vector 8 recovery は未成立。aiueos prototype は
+    agent/native-double-fault-ist commit 9c74c73 に『Do not merge or pin』として保存した。"
+   :structural-finding
+   "prototype は lgdt/ltr 後に CS を reload しない。firmware の CS=0x38 が cache に残る一方、
+    replacement GDT の limit は 39 (=0x27)、code selector は 0x08、TSS は 0x18 である。
+    その後 kernel-read-cs で得た 0x38 を #PF/#DF IDT gate に書くため、exception delivery の
+    selector が新 GDT 範囲外になる。最初の delivery 失敗と、同じ selector を使う #DF delivery
+    失敗が triple fault の実測を説明する。さらに same-CPL IST frame を IST-top-48 とする仮定も
+    未証明である。"
+   :decision
+   "compiler operation は admission・独立 verification・emission・mutation test が閉じているので保持する。
+    aiueos 実装は merge/pin しない。次は (a) firmware selector 0x38 の descriptor を保存して GDT を
+    拡張するか、(b) sealed far control transfer で CS を 0x08 へ reload してから IDT を作るかを選ぶ。
+    所有状態が明瞭になる (b) を優先するが、segment transition 自体の machine gate が通るまで採用しない。
+    guest KIR に raw lgdt/ltr/far-jump/iretq や任意 descriptor write は公開しない。"
+   :resume-gate
+   ["通常 C-free boot green"
+    "sealed probe が IST1 上の vector 8 handler receipt を残して復帰"
+    "IST index / TSS descriptor / gate selector / expected frame の各 mutation が独立に fail closed"
+    "QEMU diagnostic に triple-fault reset が無い"
+    "exact dependency closure で Amu full suite と aiueos verifier/build/smoke を再実行"]
+   :lesson
+   "operation が書いてあることは OS capability が在ることではない。compiler の green と machine の
+    receipt を別の仕事として数える。"}
+
   :adr/consequences
   "## 引き継ぎ先が触る repo と役割（混同しやすいので明示）
 
