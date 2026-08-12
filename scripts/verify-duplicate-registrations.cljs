@@ -90,13 +90,34 @@
                  (str/split #"\n"))))
 
 (defn- remote-slug
-  "owner/name for the checkout's first remote, or nil."
+  "owner/name for the checkout's first GITHUB remote, or nil.
+
+  Not the first remote. `git remote` lists alphabetically, and a checkout with a
+  git-annex / DataLad special remote named `b2` puts that first -- so the URL was
+  literally `b2`, which the github regex leaves unmangled, and `gh api repos/b2`
+  404s. Measured 2026-08-12: all 8 UNVERIFIABLE groups were exactly this, and
+  resolving each by hand through its real remote showed **every one is a single
+  GitHub id** -- 8 confirmed duplicate registrations the script could not see.
+
+  The direction was fail-SAFE, not fail-open: it said UNVERIFIABLE and `--check`
+  failed, as designed. But it also meant `--check --verify-remote` could never
+  exit 0 while any B2-annexed dataset was on disk, so the blind spot was
+  load-bearing in the other direction too.
+
+  A non-GitHub remote also came back as `Not Found (HTTP 404)`, which reads as
+  `the repository is missing` rather than `this remote is not GitHub`. Now such
+  a remote is skipped when a GitHub one exists."
   [dir]
-  (when-let [url (sh (str "git -C " dir " remote get-url $(git -C " dir " remote | head -1)"))]
-    (-> url
-        (str/replace #"^.*github\.com[:/]" "")
-        (str/replace #"\.git$" "")
-        (str/replace #"/$" ""))))
+  (let [names (some-> (sh (str "git -C " dir " remote")) (str/split #"\n"))
+        urls (keep (fn [n]
+                     (when-not (str/blank? n)
+                       (sh (str "git -C " dir " remote get-url " (str/trim n)))))
+                   (or names []))]
+    (when-let [url (first (filter #(re-find #"github\.com[:/]" %) urls))]
+      (-> url
+          (str/replace #"^.*github\.com[:/]" "")
+          (str/replace #"\.git$" "")
+          (str/replace #"/$" "")))))
 
 (defn- github-id
   "`{:id \"...\"}` or `{:error \"...\"}` -- never a bare nil.
