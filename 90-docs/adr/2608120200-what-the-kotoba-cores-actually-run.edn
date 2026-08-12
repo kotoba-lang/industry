@@ -1,0 +1,128 @@
+[{:db/id -1
+  :adr/id "adr-2608120200-what-the-kotoba-cores-actually-run"
+  :adr/title "ADR-2608120200: fleet 全体で .kotoba core を production で実行している repo は 2 つだけ —— 残りは cljc の twin が走っており、そのうち 5 件は既に危険な形になっている"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-12"
+  :adr/last-verified "2026-08-12"
+  :adr/last_verified "2026-08-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-core-execution-survey"
+  :adr/tags "kotoba, cljc-migration, survey, decision-core, drift, oracle"
+  :adr/related ["adr-2608112100-a-kotoba-core-with-a-parity-test-is-not-done"
+                "adr-2608111900-native-becomes-an-execution-path-when-verification-is-per-session"
+                "adr-2608110100-selfhost-analyzer-was-removed-not-progressing"
+                "adr-2608650000-kotoba-permanent-vs-temporary-constraints"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["2026-08-12 時点で、どの repo の .kotoba core が実際に実行されているか"
+   "cljc twin と core が乖離している具体的な箇所（優先順つき）"
+   "移行の次の 1 手をどこに打つべきか"]
+  :adr/body
+  "# ADR-2608120200: .kotoba core は、ほとんどどこでも走っていない
+
+**Status**: accepted
+**Date**: 2026-08-12
+
+## Context
+
+ADR-2608112100 は「core があり parity test があり host が呼んでいない repo が他にも
+ある可能性が高い」と書いた。**16 repo を実測した**（read-only subagent 4 本で並列走査、
+その後こちらで裏取り）。予測は当たっていたが、状態は予測より悪い。
+
+## 実測（2026-08-12）
+
+### production で Kotoba core を実行している repo は 2 つ
+
+| repo | 実行経路 |
+|---|---|
+| `etzhayyim/com-etzhayyim-kawaraban` | `wasm_orchestrator.clj` が `kototama.tender` で 7 module 中 6 本を実行。**launchd plist で常駐**（本物の runtime path） |
+| `cloud-itonami/cloud-itonami-app` | `kotoba-oracle` が shipped KIR を実行（2026-08-11 に着地。ADR-2608112100） |
+
+**それ以外の 14 repo では、決定は cljc twin が下している。** `src/` から `kotoba.kir` を
+require している repo は fleet 全体で 3 つだけ（`kotoba-selfhost-contracts` /
+`murakumo` / `cloud-itonami-app`）。
+
+### 危険な形になっているもの（優先順）
+
+1. **`kotoba-lang/app-files`: 誰も実行しない security predicate。**
+   `bounded_validate.kotoba` の `confined?`（全 entry の `:parent` が付与された `:dir` と
+   一致することを検査）に **cljc の対応物が無く、host も呼んでいない**。
+   つまり **この閉じ込め検査は runtime に存在しない**。他の項目は「二重実装」だが、
+   これは「実装が 1 つあり、それが動いていない」。
+
+2. **`cloud-itonami/cloud-itonami-isic-6492`: 定数がインライン化されている。**
+   `.kotoba` 側は `def` を持てないので `confidence-floor-x100 60` /
+   `affordability-ceiling-x100 43` を**本文に直接書いてある**。cljc 側の定数を変えても
+   core には届かない。`gate_kotoba.clj` という host は在るが、docstring が自ら
+   「その swap は **していない**」と書いている。
+
+3. **`com-etzhayyim-kawaraban`: 同じ判断の写しが 3 つ。**
+   `.kotoba`（実行される）+ `cacao.clj`/`aozora.clj`（純 JVM twin）+
+   `wasm_orchestrator.clj` 内に再実装された payload 整形（docstring が
+   「**手で同期を保っている**」と明言）。**production で走っているのは 1 番目**なので、
+   他 2 つがずれても誰も気付かない側に居る。
+
+4. **`kotoba-lang/calendar`: データモデルが乖離済み。**
+   `.kotoba` の event は `:start`/`:end` が `:i64`、`.cljc` は
+   `:calendar/start`/`:calendar/end` が ISO-8601 文字列。**もはや同じものの 2 実装ですらない。**
+
+5. **`network-awai/cloud-itonami`: bundle → parts → wasm の整合を誰も検査していない。**
+   19 kernel は `.kotoba-bundle` から `scripts/split-kotoba-kernels.bb` で生成され、
+   `.wasm` は `emit-kernel-wasm.sh` で出る。**この 2 本はどの task/CI/hook からも参照されて
+   いない**（前者は ADR-2607173000 が退役させた `bb` script）。
+   `wasm-host-test` は `.wasm` と `.cljc` の一致を毎 push 検査していて価値があるが、
+   **bundle を編集して再生成しなければ、どこも落ちない。**
+
+### 分類（16 repo）
+
+| 状態 | repo |
+|---|---|
+| production で実行 | kawaraban, cloud-itonami-app |
+| 実行されるが test/hook のみ | network-awai/cloud-itonami（kernels は毎 push、media は secondary）、crdt、shitsuke、jp-go-dds、mesh、commitment-ledger、tender-component |
+| CI でのみ compile | fsm, calendar, mokuroku, app-files |
+| **何も触っていない** | tashikame（host も test も無い）、network-awai の `cert_governor_app.kotoba`（`src`/`test` から参照ゼロ） |
+
+## Decision
+
+### 1. 「実行されているか」を repo の状態として記録する
+
+`.kotoba` を持つ repo は、README か ADR に **今それが走っているか**を書く。
+「移行した」は ADR-2608112100 のとおり host が呼んでいることを意味する。
+書けない repo は書けないという事実が残る。
+
+### 2. 次の 1 手は「多く移す」ではなく「危険な 5 件を潰す」
+
+上の 1〜5 は移行の遅れではなく**現在の欠陥**である。特に 1 は移行の話ですらない
+（検査が存在しない）。**新しい core を増やす前にここを閉じる。**
+
+### 3. 定数を持てない core には、定数の gate を付ける
+
+`.kotoba` が `def` を持てないために値をインライン化した箇所（isic-6492）は、
+**cljc 側の定数と core のリテラルが一致することを検査するテスト**を持つ。
+これは jp-go-dds の `fleet_core.kotoba` が既に取っている形（「cljc の `schema` var が
+唯一の読み出し口で、parity test がこのリテラルを等しく保つ」）と同じ。
+
+## Consequences
+
+- **`crdt` は今日から縛られている**（`81d4250`）。`kotoba-conformance-test` は 4 module が
+  link して `main` が 42 を返すことしか見ておらず、**両実装を同じ入力で走らせたものは
+  何も無かった**。`clock` について 22 tests / 1279 assertions で一致を確認し、
+  変異 2 種（receive rule の `+1` 削除で 161 件、`before?` を `<=` に広げて 131 件）で
+  落ちることを確認した。`register` / `orset` / `doc` は未縛り。
+- **調査で 1 点、私の側の誤りが出た。** subagent の報告は「crdt には core を compile する
+  test が無い」だったが、`kotoba_conformance_test.clj` は実在した。**ファイルを自分で
+  開いて気付いた** —— 並列調査の報告は裏取りしてから引用する。
+- 未調査: `com-cloudflare`(9 core / 9 KIR)、`kotoba-v2025`、`aiueos`、`provider`。
+  前者は shipped KIR を持つので murakumo 型と推測されるが、**推測であって実測ではない**。
+
+## Evidence
+
+- `kotoba-lang/crdt` `81d4250`: clock parity gate（22 tests / 1279 assertions、変異 2 件で fail）
+- 調査対象 16 repo。read-only subagent 4 本 + 手元での裏取り。実行の有無は
+  `src/` の `kotoba.kir` require / `ir/execute` / `kototama.tender` 呼び出しで判定した
+"}]
