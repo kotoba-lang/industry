@@ -145,3 +145,25 @@
  :why-still-not-fixed "**dedup の意味論は 08-11 に人へ渡した設計判断で、今日もそのまま返す。** 08-11 が挙げた選択肢は (a) open な間は (site, finding) で dedup し evidence を更新 (b) ingress 側が同じ (site, finding) の open な activity に already-open を返す。どちらも人の queue の見え方を変える。加えて **tick 側で ledger を見て抑制する** という第 3 案も考えたが、ledger には close の signal が無いため『重複の抑制』が『恒久的な沈黙』に化ける —— 人が issue を閉じた後も条件が続いていれば二度と鳴らない。これも同じ理由で人の判断。cloud-itonami.kaizen の ns docstring は id 設計の理由を『毎時走る loop が同じ issue を 168 回開かないため』と書いており、window をまたぐ再発火は**仕様として未定義**であって実装バグではない（＝勝手に決めてよい類ではない）"
  :cost-now-concrete "**08-11・08-12 と 2 周続けて、モデルを起こした反復の成果が『重複なので出さない』になっている。** 08-09/08-10 に重複が積まれなかったのは loop が壊れていたからで、loop が直った今は毎日 1 反復がこれに消える。決定を待つコストが抽象的でなくなった"
  :note "read face への request は読み取りのみ（行を書いて collected-since を埋めるようなことはしていない）。Keychain は `net-babiniku TELEMETRY_REPORT_SECRET` / `cloud-itonami KAIZEN_INGRESS_KEY` を service 名で 1 件ずつ狙い撃ち取得（総当たりなし）。ingress へは POST を 1 度も送っていない"}
+{:status :proposed
+ :at "2026-08-13"
+ :site "kotobase.net"
+ :tenant {:org "network-awai" :repo "net-kotobase"}
+ :issue-id "kaizen:kotobase.net:transitions-empty-while-collecting:2026-08-06_2026-08-12"
+ :severity :high
+ :response "202 proposed"
+ :handed-candidate "single-channel-direct（medium）。**これは提案していない** —— 同じ問いは 2026-08-08 に 202 で着地済み（id …:2026-08-02_2026-08-08）。kotobase.net で 08-11 に続く 2 度目の重複、loop 全体では 08-11・08-12 に続く 3 周連続。判断は 08-11/08-12 と同じで、理由も同じ"
+ :verification "手渡された候補の数字を read face（GET /api/kaiyu?window_days=7、Bearer）に当てて確認。`visits.rows` = [{direct 569} {search 6}] で evidence {:source \"direct\" :visits 569 :total 575} と完全一致。`collected-since` \"2026-08-07\" / `state` \"partial\" も一致し、08-11 に入れた「根拠の範囲」行が正しく出ていた。share-pct も floor(569/575)=98 で 08-08 の floor 修正どおり"
+ :what-changed "**3 周続けて『重複なので出さない』で終わらせる代わりに、同じ read face の応答の中に、計器が見られていない条件があるのを見つけた。** kotobase.net の `transitions` は `collected-since` 2026-08-07 で 0 行。同じ日に始まり同じ応答で返ってくる `visits` は 575 件を数えている。`measurement-findings` の空行規則は `:measured` の section しか見ないので、この 6 日間ずっと無言だった —— その間 `dead-end-findings` と `reach-findings` は空の section を読み続けていた（2/4 の site 規則が暗転していた）"
+ :fix {:repo "kotoba-lang/kaiyu"
+       :merged "7b41aeb3abcd16da594ded22fde864859b260640"
+       :branch "agent/empty-while-collecting（着地後に local/remote とも削除、worktree も撤去）"
+       :rule "`:partial` + 0 行 + **同じ日以降に収集を始めた sibling が行を持つ** → `<section>-empty-while-collecting`（:high）。sibling の span がこの section の span に含まれるときだけ witness と認めるので、『collector が若いから空』では説明が付かなくなる。より早く始めた sibling は除外する（その行が全部この section の起動前かもしれない）"
+       :severity-choice "**`:blocked` にしなかった。** counts では「誰も回遊していない」と「辺が emit されていない」を分けられない。`:blocked` は short-circuit して site 所見を消すので、確証の無い断定で検証済みの single-channel-direct を黙らせることになる。`:high` なら両方残り、順位だけが変わる"
+       :witness-determinism "witness は section 名でソートして選ぶ。map の反復順に任せると JVM と nbb で引用する section が変わりうる —— 証跡は再現しないと証跡ではない"
+       :tests "4 件追加（実データの形 / 若い collector は空でよい / 早く始めた sibling は witness にならない / :not-measured はこの規則の管轄外）。**規則を外すと 5 assertion が落ち、戻すと 0 になることを実際に見た。** 落ちない test は劇場（CLAUDE.md）。JVM `clojure -M:test` と nbb 両方で 38 tests / 161 assertions green"
+       :ab-on-live-data "4 site の read face に対して修正前後で tick を回して差分を取った。**変わったのは kotobase.net だけ**（findings 1→2、top が新 finding）。shinshi.club（blocked）/ babiniku.net（dead-end-chat）/ itonami.cloud（99% direct）は 1 文字も動かず。ノイズを撒いていないことは推測ではなく実測"
+       :west-pin "2d8e4564a2ef→7b41aeb3abcd（`west-pin-put.cljs` の single-entry。dry-run で main 到達性と ahead=2/behind=0 を確認 → root commit 9541147d4f04、diff は west.yml の 1 行のみ）"}
+ :outcome "**修正した計器が、その場で新しい問いを出した。** 手渡された候補（medium・3 度目の重複）ではなく、一度も提案されたことのない :high が top になり、202 で着地。3 周続いた重複の連鎖は、dedup の意味論を決めずに切れた —— ただし下記のとおり**切れたのは kotobase.net だけ**で、原因は消えていない"
+ :not-done "①**dedup の構造問題は 4 周連続で未着手**（id が window を含むので同じ問いが毎日新しい id で再発火する）。08-11/08-12 が人に渡した選択肢 (a)(b) はそのまま。今日それを迂回できたのは『たまたま別の、より重い問いが見つかったから』であって、明日 kotobase.net が同じ形に戻らない保証は無く、他 3 site には何も効いていない ②08-08 に landed した issue が今も open かは**確認していない** —— narrow ingress key は POST 専用（GET は 405）で、queue の読み取りは cockpit の CACAO 認証が要る ③`kagami reconcile` で fleet-db へ吸収していない。reconcile は scope 外の drift も巻き込むので、1 行の pin 前進の副作用でやる操作ではない（08-05 に退行を焼き込んだ実例がある）。08-08 の pin 前進でも同様に見送られている ④witness の evidence は `:witness-rows 2` と出る —— visits の**行数**（direct と search の 2 種）であって 575 件ではない。規則の論理には十分だが、読み手に伝わる重さは実際より軽い。section の形に依存する合計を測定規則へ持ち込むことになるので今日は変えていない"
+ :note "read face への request は読み取りのみ。Keychain は `net-kotobase KAIYU_REPORT_SECRET` / `cloud-itonami KAIZEN_INGRESS_KEY` を service 名で 1 件ずつ狙い撃ち取得（総当たりなし）。ingress への POST は 1 通だけ"}
