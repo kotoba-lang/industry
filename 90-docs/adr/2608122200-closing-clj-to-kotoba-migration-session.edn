@@ -127,9 +127,35 @@ pins.
    axes
 3. investigate the three new `kami/ongaku/e2e/*` collisions across
    kami-ongaku-{notation,sampler,sequencer} (investigation only)
-4. check `net-kotobase`'s `pay/core.cljc` + `pay/x402.cljc` for drift -- pinned at
-   `edf58be`, never checked; the treasury copy in the same repo hid a payment
-   defect
+4. ~~check `net-kotobase`'s `pay/core.cljc` + `pay/x402.cljc` for drift~~ --
+   **RESOLVED, benign, no change made.** All three vendored copies are
+   pin-honest. `pay/core.cljc` and `treasury/core.cljc` are byte-current;
+   `pay/x402.cljc` is stale by exactly one strictly-additive commit (`848158d`,
+   0 lines removed, +6 symbols, `ns` form byte-identical) that adds a v2 API
+   nothing in the repo calls -- `grep` for all six new names returns zero hits.
+   Every symbol the gateway actually calls is byte-identical to library HEAD.
+
+   It also fails CLOSED where it matters: a v2-shaped payload has no top-level
+   `:scheme`, so the vendored v1 `payload-errors` yields
+   `:x402/scheme-mismatch` and `authorize` returns 402. A v2-only buyer is
+   turned away with a 402 it is owed and is never served for free -- and that
+   coverage gap is identical at library HEAD, so it is a protocol gap for this
+   consumer, not drift. Refreshing would add 58 lines of unreachable API and
+   correct no behaviour, which is a change that cannot be defended.
+
+   Two corrections to the brief I gave that agent. First, my claim that
+   `net-kotobase` has vendored `pay`/`treasury` copies in more than one source
+   tree was WRONG -- there is exactly one copy of each, in
+   `kotobase-api-gateway-cljs/src/`. The `clj-edge` hits are shadow-cljs
+   analysis cache (`.cache.transit.json`), not copies. The `7 owners on disk`
+   figure is 7 REPOSITORIES fleet-wide, not 7 copies in this repo; the widened
+   collision detector is consistent with that and needs no correction.
+
+   Second, and worth carrying: the header's justification for vendoring at all
+   (`CI checks out one repo with no west workspace`) is true only of the
+   gateway. The sibling `protocols-worker` reads the LIVE library through
+   `../../../kotoba-lang/pay/src` in its `shadow-cljs.edn`, so one repo both
+   vendors and does not vendor the same library, for different build units.
 5. investigate three self-shadowing namespaces (`kotobase/site_skin.cljc`,
    `etzhayyim/{yoroshiku,bonsai}.cljc`)
 6. measure whether the three `:local/root` sites can be repointed from
