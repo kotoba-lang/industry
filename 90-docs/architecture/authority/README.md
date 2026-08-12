@@ -107,7 +107,7 @@ basis は同じ decision になり、再現・監査・time travel ができま�
 満たせる不足条件を機械可読に返します。UI はこの decision を描画しますが、UI 自体を
 enforcement point にはしません。
 
-### R0–R1 implementation（2026-08-12）
+### R0–R2 implementation（2026-08-12）
 
 authority の semantic owner である `kotoba-lang/aiueos` に、純粋CLJC kernel
 `aiueos.authority/decide` と既存broker統合 `aiueos.broker/decide-authority` が着地しました
@@ -132,10 +132,20 @@ R1では `network-awai/net-kotobase` PR #410（merge
 - assuranceは Passkey=`high`、low method + TOTP=`substantial`、legacy=`low`。旧sessionを
   logoutせずstep-up可能な縮退として扱う。
 
-authn 43 tests / 283 assertions、gateway 385 tests / 1882 assertions、両release build、
-87-input bundle manifest整合を確認済みです。まだ未移行なのは、gatewayからR0 kernelを呼ぶ
-adapter、Kotobaseでのbasis-bound policy/grant検索とreceipt永続化、payment settlementから
-entitlement grantへの変換、UIのchallenge描画です。
+R2では `network-awai/net-kotobase` PR #412（merge
+`c3317ba1b0e28bc9004d6908596cd89c66601f43`）で、R1 principalからR0 kernelへの最初の
+実enforcement pointをaudit read/exportへ接続しました。
+
+- route codeだけがeffectを宣言し、client bodyからeffect/grantを受け取らない。
+- validated enterprise permissionをtenant-bound compatibility grantへ投影する。
+- audit readはlow、exportはsubstantial assuranceを要求する。
+- 満たせるassurance不足だけをmachine-readable HTTP 428 challengeにし、grant欠如は403 denyにする。
+- allowはpurpose-bound runtime capability specificationを返す。
+
+gateway 390 tests / 1900 assertions、44 registered namespacesの実行、worker/entry release build、
+88-input bundle manifest整合を確認済みです。まだ未移行なのは、Kotobaseでのbasis-bound
+policy/grant検索とreceipt永続化、payment settlementからentitlement grantへの変換、
+UIのchallenge描画、audit以外のroute固有policyです。
 
 ## 各層への投影
 
