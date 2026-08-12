@@ -107,6 +107,40 @@ require している repo は fleet 全体で 3 つだけ（`kotoba-selfhost-con
 これは jp-go-dds の `fleet_core.kotoba` が既に取っている形（「cljc の `schema` var が
 唯一の読み出し口で、parity test がこのリテラルを等しく保つ」）と同じ。
 
+## 経過（2026-08-12、5 件のうち 4 件を閉じた）
+
+| # | 件 | 結果 |
+|---|---|---|
+| 1 | app-files の閉じ込め検査 | **閉** `4d4a7bd`。`fs/browse` の seam で強制するようにした。core は抽象モデル上の bounded profile なので**実行主体にはできない**（entry に `:parent` が無い / id が `:keyword` / 兄弟の `bounded?` が 8 件で打ち切る）。同じ性質を実データ側で強制し、test が両者を縛る |
+| 2 | isic-6492 の定数インライン | **閉** `d3a129a`。定数 2 つに対し**インライン箇所は 3 つ**（3 つ目は kernel より古く関数名も共有しないので名前ベースでは届かない）+ **散文コピー 3 箇所**。今日は一致。**`.kotoba` 側のドリフトは完全に不可視だった** —— ceiling を変えても 93 test 全部が green（既存 suite は committed な `.wasm` を叩くため） |
+| 3 | kawaraban の 3 コピー | **閉（ただし latent な乖離を 1 件発見）** `622dd26`。下記 |
+| 4 | calendar のデータモデル乖離 | **閉、かつ本物のバグだった** `7b98dbc`。表現の違いではなく**規則の食い違い**で、走っているのは誤っている側だった |
+| 5 | network-awai の bundle→parts 無検査 | **閉** `0a6def0`。今日は**正確に一致**（5 kernel / 9,298 定義）。順序規則は推測と食い違い、**同じ名前が複数の part に現れてよい**（part は依存閉包を持つ。2,932 名前中 1,067 が 2 part 以上）—— 主張すべきは「少なくとも 1 つ、かつ全コピー一致」 |
+
+### kawaraban で見つかった latent な乖離（未修正、pin 済み）
+
+`kawaraban.cacao/siwe-message` は SIWE の `Chain ID:` 行を issuer から `iss-chain-id` で導く。
+`wasm_orchestrator/siwe-message` は **`\"Chain ID: 1\"` を直書き**している。後者の docstring は
+「`kawaraban.cacao/siwe-message` から verbatim に移植」と書いているが、**これは偽**。
+
+区別する入力: `:iss \"did:pkh:eip155:137:0xdeadbeef\"` → cacao.clj は `Chain ID: 137`、
+orchestrator は `Chain ID: 1`。
+
+**今日の実害は無い**（両経路の `:did` は必ず `did-key` 由来で `did:key:z…` のみ。
+`iss-chain-id` はその場合ちょうど `\"1\"` を返す）。ただし **SIWE 本文は Ed25519 署名が
+覆う当のバイト列**なので、`did:pkh` / `did:web` issuer を採用した瞬間に、
+**同じ grant に対して 2 経路が異なる文に署名する**。production code は変更せず、
+両側の挙動を characterization test で固定した（どちらかが動けば落ちる）。
+加えて「mintable な identity は必ず `did:key`」という到達可能性の不変条件も test にした ——
+それが乖離を latent に保っている当のものなので、真でなくなれば大きな音で落ちる。
+
+### 既存 test の穴（同上で発見）
+
+`wasm.cacao-wire-encode-test` は module を **kotoba-lang/kototama から転記した 264 byte 配列**と
+比べている。したがって **`kawaraban.cacao` 側のドリフトは見えない**。変異で証明済み ——
+`->wire` を壊しても既存 suite は全部 green のままだった。新しい gate は module を
+`kawaraban.cacao` 自身の `->wire` と突き合わせる。
+
 ## Consequences
 
 - **`crdt` は今日から縛られている**（`81d4250`）。`kotoba-conformance-test` は 4 module が
