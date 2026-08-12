@@ -25,6 +25,41 @@
 
 (defn allow! [] (compat/exit 0))
 
+(defn upstream-ref
+  "この checkout の『上流の既定ブランチ』を `<remote>/<branch>` で返す。解決
+   できなければ nil。
+
+   **remote は `origin` とは限らない。** west が作る checkout は remote を org 名
+   で持つ（`network-awai` / `cloud-itonami` …）。実測 2026-08-13、`orgs/` 配下の
+   4,406 checkout のうち **2,824（64%）に `origin` remote が無い**。
+
+   それまでこの解決は `origin/main` → `refs/remotes/origin/HEAD` の 2 段で、
+   どちらも解決できなければ `(allow!)` していた。つまり**ワークスペースの
+   3 分の 2 の子リポで、遅れた main への push が黙って素通りしていた。**
+
+   remote が複数あるときは **URL に `github.com` を含むものを選ぶ**。
+   `git remote | head -1` はアルファベット順の先頭を返すので、annex repo では
+   `b2`（special remote）を選んでしまう —— この誤りはこの workspace で
+   3 回起きている。実測 2026-08-13 の fixture では、`b2` を選ぶと
+   「0 behind」、正しい remote を選ぶと「1 behind」で判定が逆になった。
+
+   `wrangler-deploy-main-sync-guard.cljs` / `branch-create-main-sync-guard.cljs`
+   と同一の実装。**3 本目なので、次に 4 本目が要るときは共有 ns へ抽出する**
+   （今インライン置きなのは、これらの hook が settings.json から `--classpath`
+   無しで起動され、require 失敗が try/catch の外で hook ごと落とすため）。"
+  [top]
+  (let [remotes (->> (or (git top "remote") "") str/split-lines
+                     (map str/trim) (remove str/blank?) vec)
+        gh? (fn [r] (some-> (git top "remote" "get-url" r) (str/includes? "github.com")))
+        ordered (concat (filter #{"origin"} remotes)
+                        (filter gh? (remove #{"origin"} remotes))
+                        (remove #{"origin"} remotes))]
+    (some (fn [r]
+            (or (when (git top "rev-parse" "--verify" "-q" (str r "/main")) (str r "/main"))
+                (some-> (git top "symbolic-ref" "-q" (str "refs/remotes/" r "/HEAD"))
+                        (str/replace #"^refs/remotes/" ""))))
+          ordered)))
+
 (defn deny! [reason]
   (println (json/generate-string
              {:hookSpecificOutput
@@ -100,28 +135,34 @@
           top  (git dir "rev-parse" "--show-toplevel")]
       (when (str/blank? top) (allow!))
 
-      ;; 比較先: origin/main があれば優先、無ければ origin/HEAD の指す既定ブランチ。
-      (let [ref (if (git top "rev-parse" "--verify" "-q" "origin/main")
-                  "origin/main"
-                  (some-> (git top "symbolic-ref" "-q" "refs/remotes/origin/HEAD")
-                          (str/replace #"^refs/remotes/" "")))]
-        (when (str/blank? ref) (allow!))
-        (let [branch (str/replace ref #"^origin/" "")
+      ;; 比較先: remote 名は origin とは限らない（upstream-ref の docstring 参照）。
+      (let [ref (upstream-ref top)]
+        (when (str/blank? ref)
+          ;; **黙って通さない。** ここに来るのは「遅れていない」ではなく
+          ;; 「判定できなかった」であり、両者を同じ無言の exit 0 で表すと、
+          ;; ガードが評価しなかったことが外から見えない。
+          (js/console.error
+           (str "git-push-main-sync-guard: " top
+                " の upstream ref を解決できませんでした（remote: "
+                (or (git top "remote") "なし")
+                "）。**この push は検査されていません。**"))
+          (allow!))
+        (let [[remote branch] (str/split ref #"/" 2)
               dst    (pushed-dst cmd dir)]
           ;; 既定ブランチ(main)への push でなければ許可する。
           (when (not= dst branch) (allow!))
           ;; main への push のみ、遅れていれば deny。
-          (git top "fetch" "-q" "origin" branch)
+          (git top "fetch" "-q" remote branch)
           (let [raw    (git top "rev-list" "--count" (str "HEAD.." ref))
                 parsed (js/parseInt (or raw "0") 10)
                 behind (if (js/isNaN parsed) 0 parsed)]
             (when (pos? behind)
               (deny!
                 (compat/format (str "%s: %s への push が %s より %d commits 遅れています。先に同期してから push してください。"
-                                    "Run: git fetch origin && git merge --ff-only %s "
-                                    "(FF 不可なら merge / rebase で乖離を解消)。"
+                                    "Run: git fetch %s && git merge --ff-only %s "
+                                    "(FF 不可なら乖離。rebase しない — CLAUDE.md の方針に従って解消)。"
                                     "Policy (CLAUDE.md): main に乖離を作らない。"
                                     "(feature/reconcile ブランチへの push はブロックしません)")
-                               top branch ref behind ref)))))))
+                               top branch ref behind remote ref)))))))
     (allow!))
   (catch :default _ (compat/exit 0)))

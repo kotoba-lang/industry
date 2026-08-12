@@ -37,6 +37,33 @@
                                      :additionalContext msg}}))
    (compat/exit 0)))
 
+(defn upstream-ref
+  "この checkout の『上流の既定ブランチ』を `<remote>/<branch>` で返す。解決
+   できなければ nil。
+
+   **remote は `origin` とは限らない。** west が作る checkout は remote を org 名
+   で持つ。実測 2026-08-13、`orgs/` 配下の 4,406 checkout のうち
+   **2,824（64%）に `origin` remote が無い**。この hook はセッションの cwd で
+   走るので、子リポで開いたセッションでは `origin/main` も
+   `refs/remotes/origin/HEAD` も解決せず、**乖離が何 commit あっても
+   何も表示しないまま終わっていた**（ahead/behind ゼロと見分けが付かない）。
+
+   remote が複数あるときは URL に `github.com` を含むものを選ぶ。
+   `git remote | head -1` はアルファベット順の先頭で、annex repo では `b2` を
+   引く（実測 2026-08-13: 該当 15 checkout）。"
+  [top]
+  (let [remotes (->> (or (git top "remote") "") str/split-lines
+                     (map str/trim) (remove str/blank?) vec)
+        gh? (fn [r] (some-> (git top "remote" "get-url" r) (str/includes? "github.com")))
+        ordered (concat (filter #{"origin"} remotes)
+                        (filter gh? (remove #{"origin"} remotes))
+                        (remove #{"origin"} remotes))]
+    (some (fn [r]
+            (or (when (git top "rev-parse" "--verify" "-q" (str r "/main")) (str r "/main"))
+                (some-> (git top "symbolic-ref" "-q" (str "refs/remotes/" r "/HEAD"))
+                        (str/replace #"^refs/remotes/" ""))))
+          ordered)))
+
 (try
   (let [dir  "."
         top  (git dir "rev-parse" "--show-toplevel")]
@@ -48,12 +75,17 @@
       ;; 既定ブランチを fetch(full history — shallow は使わない。ADR-2606241600 は
       ;; ADR-2607211600 で reverse 済み: --depth 1 は fetch のたびに新しい graft を作り、
       ;; ここでの merge-base 前提の ahead/behind 判定を誤検出させる原因だった)。
-      (git top "fetch" "-q" "origin" "main")
-      (let [ref (if (git top "rev-parse" "--verify" "-q" "origin/main")
-                  "origin/main"
-                  (some-> (git top "symbolic-ref" "-q" "refs/remotes/origin/HEAD")
-                          (str/replace #"^refs/remotes/" "")))]
-        (when (str/blank? ref) (done!))
+      (let [ref (upstream-ref top)]
+        (when (str/blank? ref)
+          ;; **黙って終わらない。** ここは「乖離なし」ではなく「測れなかった」。
+          ;; stderr は settings.json の登録が `2>/dev/null` で捨てるので、
+          ;; 言うなら systemMessage で言うしかない。
+          (done! (str "git 乖離チェック: " top
+                      " の upstream ref を解決できませんでした（remote: "
+                      (or (git top "remote") "なし")
+                      "）。**このセッションの ahead/behind は測れていません。**")))
+        (let [[remote branch0] (str/split ref #"/" 2)]
+          (git top "fetch" "-q" remote branch0))
 
         (let [raw    (git top "rev-list" "--left-right" "--count" (str ref "..." branch))
               [b a]  (some-> raw (str/split #"\s+"))
