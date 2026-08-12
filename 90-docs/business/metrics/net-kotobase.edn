@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 1825854, "kotobase-cf-wasm-staging" 1858118},
+ {"net-kotobase" 1848413, "kotobase-cf-wasm-staging" 1881277},
  :zone
- {:requests-7d 1912369,
-  :pageviews-7d 1412,
-  :uniques-7d-sum 1002,
+ {:requests-7d 1937436,
+  :pageviews-7d 1522,
+  :uniques-7d-sum 1016,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -34,7 +34,7 @@
    {:path
     "/ipld/bafyreia5jnkpmde3j4cuuxomkasr2x3xqrphcgun4bjkprpu2am5x7a2ve",
     :requests 18}],
-  :status-mix {:ok 1907, :server-error 1},
+  :status-mix {:ok 1837, :server-error 1},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -49,9 +49,9 @@
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
  "上位 page (24h, 2xx/3xx): /ipld/bafyreihifalqagccl5tfnlzrc3r4z6l35… 98 · /ipld/bafyreic5d2ndjckatncq2lym4se2v62p2… 33 · /ipld/bafyreigxw5skntn7h3ubqwz6cuatjd2ln… 26 · /ipld/bafyreifb6e2p3zibqpnnbigleeta6aytl… 21 · /ipld/bafyreicemqccpm47hsavtoiakcmmbd4vl… 20 | 4xx(probe) 0% · 5xx 0%",
- :funnel {:visitors 2881, :signups 23, :checkouts 0},
+ :funnel {:visitors 2890, :signups 24, :checkouts 0},
  :signal
- "kotobase.net 実測 1912369 req/7d・1002 uniques(日次和)・うち4xx probe 0%(24h)、workers 3683972 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 1937436 req/7d・1016 uniques(日次和)・うち4xx probe 0%(24h)、workers 3729690 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 16,
   :submissions 3,
@@ -60,6 +60,6 @@
   :attempt-rate 0.1875,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 1352},
-  :signups {:organic 20}, 
+ {:visitors {:openai-ads 3, :organic 1361},
+  :signups {:organic 21}, 
   :checkouts {}}}
