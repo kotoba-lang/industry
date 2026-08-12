@@ -236,10 +236,17 @@ npm run play                           # 1500 turns of the reference strategy
 npm run play -- --script "tick*30 verify screen clean return"   # scripted
 npm run play -- --seed 7 --turns 800
 
-npm run render                         # WebGPU first, WebGL 2.0 fallback
-npm run render -- --backend webgpu     # WebGPU only, report the failure
-npm run render -- --backend webgl2     # WebGL 2.0 only
-npm run render -- --width 1280 --height 720 --cleared 3
+npm run render -- --view street        # WebGPU first, WebGL 2.0 fallback (needs engine)
+npm run render -- --view street --backend webgpu
+npm run render -- --view street --backend webgl2
+npm run render -- --view street --width 1280 --height 720 --cleared 3
+npm run render -- --view street --orbit 40 --zoom 1.2 --fov 44   # camera (#1751)
+npm run accept:camera
+
+# board capture (#1752) — inject state, screenshot DOM shop board (no engine)
+npm run play -- --seed 20260808 --script "tick*20 intake renew" --dump /tmp/shop.edn --format edn
+npm run render -- --view board --state /tmp/shop.edn --out preview/board.png
+npm run accept:board
 ```
 
 `play` drives `logic/reduce-event`, the same reducer the browser preview and the future
@@ -247,12 +254,17 @@ guest run, so a scripted run is an executable description of a real game rather 
 simulation of one. `--script` accepts `tick intake verify screen clean return reject renew
 phase buy-*`, with `tick*40` for repeats.
 
-`render` builds the canonical render-IR, packs it with the engine's own
+`--view board` opens `window.__setState` on an engine-free page built from
+`preview/board_entry.cljs`, force-repaints (the `render!` throttle would otherwise keep the
+previous board), freezes ticks, and writes a PNG. The ADR check is that the injected cash /
+returned / phase appear in the HUD.
+
+`--view street` (default) builds the canonical render-IR, packs it with the engine's own
 `submission/pack-instances` and `pack-globals`, and draws it in headless Chromium through
 `webgpu/fixtures/glsl/lit.{vert,frag}` — the GLSL the WebGL 2.0 backend actually uses.
 **This is the WebGL 2.0 end-to-end check** CLAUDE.md's 3D rule asks for, in a form that
 runs without a screen. It is not a second renderer: no geometry, matrices, lighting or
-shading are authored in `bin/render.cljs`, only GL plumbing.
+shading are authored in `bin/render_street.cljs`, only GL plumbing.
 
 Two limits, printed on every run: the **shadow pass is not run** (a 1×1 fully-lit depth
 texture is bound instead, so the image is the lit pass without shadowing), and the GPU is

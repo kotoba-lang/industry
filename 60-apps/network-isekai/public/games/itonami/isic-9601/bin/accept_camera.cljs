@@ -4,9 +4,10 @@
   Run from the package root (needs webgpu + render on the classpath, same as `npm run render`):
     npm run accept:camera
 
-  Checks the library (orbit/zoom/fov/eye land on `:globals`) and that `bin/render.cljs`
-  parses the flags into the same numbers. Does not require Chromium — pixel draw is still
-  the `render` CLI's job; this gate is about aiming."
+  Checks the library (orbit/zoom/fov/eye land on `:globals`) and that the street path
+  (`bin/render.cljs` → `bin/render_street.cljs`) parses the flags into the same numbers.
+  Does not require Chromium — pixel draw is still the `render` CLI's job; this gate is
+  about aiming."
   (:require ["node:fs" :as fs]
             ["node:path" :as path]
             ["node:child_process" :as cp]
@@ -86,9 +87,8 @@
 
 (println "== CLI: render parses camera flags into the same eye (dry — no Chromium)")
 ;; Probe by requiring the same helpers through a tiny nbb eval rather than launching
-;; Playwright. Flag parsing lives in render.cljs next to (-main); exercise it by
-;; re-implementing the public contract world3d already pinned above, and checking
-;; `render --help`-less argv rejection for bad --eye.
+;; Playwright. Flag parsing lives in render_street.cljs (street path); the thin
+;; `render.cljs` dispatcher forwards argv. Exercise rejection for bad --eye.
 (let [r (cp/spawnSync "npx" #js ["nbb" "--classpath" cp-str "bin/render.cljs"
                                  "--eye" "1,2" "--out" "/tmp/itonami-cam-bad.png"]
                       #js {:cwd here :encoding "utf8"})

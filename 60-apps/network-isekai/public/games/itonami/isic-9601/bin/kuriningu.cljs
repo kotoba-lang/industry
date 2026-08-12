@@ -345,9 +345,11 @@
 
 (defn cmd-render []
   (println)
-  (println "  3D レンダは engine の checkout が要るので別スクリプトです:")
-  (println (bold "    nbb bin/render.cljs --out preview/street.png"))
-  (println (dimmed "  (play / street は engine 無しで動くので、依存を分けてあります)"))
+  (println "  描画は `bin/render.cljs` です:")
+  (println (bold "    nbb bin/render.cljs --view street --out preview/street.png"))
+  (println (dimmed "      3D 街 — engine checkout (webgpu/render) が要る"))
+  (println (bold "    nbb bin/render.cljs --view board --state FILE --out preview/board.png"))
+  (println (dimmed "      店の board — window.__setState で注入して DOM を撮る (#1752); engine 不要"))
   (println))
 
 ;; --------------------------------------------------------------------------
@@ -359,7 +361,7 @@
   (println "    play    [--seed N] [--district ID] [--script \"...\"] [--turns N]")
   (println "            [--state FILE] [--dump FILE] [--format edn|json]")
   (println "    street  [--cleared N] [--state FILE] [--format edn|json]")
-  (println "    render                                            → bin/render.cljs を案内")
+  (println "    render  → bin/render.cljs --view street|board を案内")
   (println)
   (println (dimmed (str "  遊べる district: " (str/join " " district/playable))))
   (println (dimmed (str "  play の script 語彙 (isic-9601): "
