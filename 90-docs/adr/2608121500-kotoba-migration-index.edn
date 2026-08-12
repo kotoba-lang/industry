@@ -1,0 +1,119 @@
+[{:db/id -1
+  :adr/id "adr-2608121500-kotoba-migration-index"
+  :adr/title "ADR-2608121500: .kotoba 移行の状態は手で書かず生成する —— 移行面は 1,187 repo あり、手で測れていたのは 23 だった"
+  :adr/status "accepted"
+  :adr/doc_type "adr"
+  :adr/doc-type "adr"
+  :adr/source-format "edn"
+  :adr/date "2026-08-12"
+  :adr/last-verified "2026-08-12"
+  :adr/last_verified "2026-08-12"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "kotoba-migration-index"
+  :adr/tags "kotoba, migration, index, datoms, coverage, generated"
+  :adr/related ["adr-2608120200-what-the-kotoba-cores-actually-run"
+                "adr-2608112100-a-kotoba-core-with-a-parity-test-is-not-done"
+                "adr-2608039980-concept-index"]
+  :adr/supersedes ""
+  :adr/superseded_by ""
+  :adr/authoritative true
+  :adr/authoritative-for
+  ["`.kotoba` を持つ repo がどの段階に居るかの数え方と、その索引の在り処"
+   "決定核（移行対象）と schema 宣言（移行対象ではない）の区別の付け方"
+   "出荷物が source から出たことを誰も検査していない repo の一覧の出し方"]
+  :adr/body
+  "# ADR-2608121500: 移行の状態は観測から生成する
+
+**Status**: accepted
+**Date**: 2026-08-12
+
+## Context
+
+ADR-2608120200 は 23 repo を手で測り、「production で `.kotoba` core を実行して
+いるのは 4 つ」と書いた。**同じ日に数えたら、`.kotoba` を持つ repo は 1,187 あった。**
+
+記録は移行面の 2% しか覆っておらず、散文なので query もできず、次に誰かが測り直す
+まで古びていく。concept 索引・surface 索引が学んだのと同じ結論になる ——
+**手で書いた索引は、対象が動く速さより速く腐る。**
+
+## Decision
+
+### 1. 索引は生成物にする
+
+- 生成器: `scripts/gen-kotoba-migration-index.cljs`
+- 出力: `90-docs/kotoba-migration/kotoba-migration.datoms.edn`（`:source/dataset
+  \"kotoba-migration\"`。`:kotoba/repo` は `repo-taxonomy` の `:repo/path` と join できる）
+- 手書きは語彙だけ: `manifest/kotoba-migration-vocabulary.edn`
+
+`--check` で STALE を検出する（west.yml と同じ「生成物は手で編集しない」規律）。
+
+### 2. checkout ではなく **pin** を読む
+
+`git ls-tree <pin>` / `git grep <pin>` で west.yml が pin している tree を見る。
+ローカル checkout は pin より遅れていることがあり、そこを見た索引は fleet の状態
+ではなく**そのマシンの状態**を語る。実測 2026-08-12: 最初の実装は checkout を読んで
+おり、同じ日に main へ着地した inga の commit を持っていなかったため
+`:stage/artifact-verified` を 0 と報告した。pin へ切り替えると 17 になった。
+
+pin が手元に無い repo（fetch していない）は checkout に落ち、**どちらを見たかを
+`:kotoba/observed-at` に残す**（実測: 1,127 が `:pin`、59 が `:checkout`）。
+
+### 3. 役割はディレクトリで宣言する。名前から推測しない
+
+| 役割 | ディレクトリ | 数 |
+|---|---|---|
+| `:decision-core` | `src` `kotoba` `wasm` `os` `fabric` | **157** |
+| `:schema-module` | `schema` | **1,017** |
+| その他 | `resources`(package-source) / `lang` / `examples` / `test` / `_archive` | 13 |
+
+**`.kotoba` を持つ repo が 1,187 いることと、移行中の repo が 1,187 いることは
+違う話**で、前者しか数えられない状態では後者を誰も答えられなかった。1,017 は
+`com-<vendor>` 系 origin 面 repo が外部仕様の shape を宣言しているもので、cljc の
+twin を持たないため「どちらが走っているか」という問い自体が立たない。
+
+一致しないものは `:unclassified` として**数える**（実測 3 件）。
+
+### 4. 段階は 5 つ。強い方から順に判定する
+
+| stage | 意味 | 数 |
+|---|---|---|
+| `:stage/host-executes` | 非 test のコードが core を実行する経路に触れている | 56 |
+| `:stage/artifact-verified` | 出荷物があり、全部に provenance record が在るか、名前で分かる gate が在る | 17 |
+| **`:stage/artifact-unverified`** | **出荷物があり、source から出たことを検査するものが無い** | **11** |
+| `:stage/gated-in-test` | test だけが core を compile / 実行する | 75 |
+| `:stage/source-only` | 上のいずれでもない | 1,028 |
+
+**`:stage/artifact-unverified` がこの索引の主目的である。** この形は 2026-08-12 の
+1 セッションで 3 回続けて実際の欠陥だった（com-cloudflare の出荷 KIR 9 本中 gate は
+1 本 / provider の registry 142 行中 8 行 / inga の provenance record 2 本を誰も
+読んでいない）。3 回とも**探して見つけた**のであって、一覧が在ったわけではない。
+
+## この索引が言えないこと
+
+**索引は所在を答える。gate の質は採点しない。**
+
+- **`:kotoba/artifacts` は同じディレクトリの兄弟しか数えない。** 出荷物を別の
+  ディレクトリに置く形（com-cloudflare の `resources/cloudflare/oracle/*.kir.edn`、
+  provider の `wasm-packages/*.wasm`）は 0 と出る。**0 は「成果物が無い」ではない。**
+  緩い方の数を `:kotoba/artifacts-anywhere` に併記してある。
+- **`:kotoba/named-artifact-gate?` はファイル名しか見ない。** `drift|provenance|
+  digest|registry` を名前に持つ test が在るかどうかで、中身は読まない。
+- **手で走らせる script は gate と数えない。** aiueos は `.o` を 63 本 checked in し
+  provenance record は 1 本なので `:stage/artifact-unverified` に出る。
+  `reproduce-kotoba-kernel-object.sh` は byte 比較を実際に行うが、どの test/CI からも
+  呼ばれていない ——「走っていない検査は緑でも赤でもない」（ADR-2608120200）。
+- **散文は実行ではない。** 最初の実装は README の `compile-source` という語に当たって
+  `:stage/host-executes` を 81 と報告した。code 拡張子に絞って 56 になった。
+- **checkout の無い west project は見えない**（`:kotoba/coverage` entity に記録）。
+
+## Consequences
+
+- 索引を引いた最初の日に、**今日書いた ADR-2608120200 の記述が 1 件誤っていることが
+  出た。** provider は `.wasm.provenance.edn` を **95 本 tracked で持っている**
+  （`366f534` 以降）。「builder を記録していないので source→artifact を閉じられない」と
+  書いたのは二重に誤りで、記録は既に在り、**誰も読んでいない**だけだった。
+  ADR-2608120200 側を訂正した。今日私が書いた `wasm-package-registry-test` も
+  読んでいない —— **次の 1 手はそこ。**
+- 生成には約 2 分かかる（1,187 repo に対して git を 2 回ずつ）。CI で毎回回すものでは
+  なく、移行が動いたときに回して差分を landing する。
+"}]

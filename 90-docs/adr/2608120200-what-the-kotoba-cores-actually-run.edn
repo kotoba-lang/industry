@@ -223,6 +223,21 @@ recompile gate として書くと、compiler pin が動くたびに赤くなる�
 穴はこちらで閉じる。後者だけが commit の記録を待つ。**「無い」と言う前に索引を引く**
 規則が、repo だけでなく**既に在る仕組み**にも当たった例。
 
+**再訂正（同日、ADR-2608121500 の索引を初めて引いたとき）: まだ足りなかった。**
+provider は provenance record を「使える」のではなく **既に 95 本 tracked で持って
+いる**（`366f534`「compiler-AOT process/entropy/git pure bounds」以降。143 wasm 中 95）。
+つまり 2 回とも誤りで、正しい記述は 1 行である:
+
+> **provider の出荷物には source digest の記録が既に在り、誰も読んでいない。**
+
+これは `inga` が今日直したのと**同じ形**であり、今日私が書いた
+`provider.wasm-package-registry-test` も読んでいない（registry の `:sha256` は見るが、
+`.wasm.provenance.edn` は見ない）。**次の 1 手はそこ。**
+
+同じ誤りを 2 回続けた理由は 1 つで、**どちらのときも provider の tree を数えていない**
+—— 1 回目は registry の `:builder` フィールドだけを見て、2 回目は compiler 側の実装を
+見て「使える」と書いた。索引はこれを 1 コマンドで出した。
+
 ### aiueos の「誰もコンパイルしない core」（閉じた、`e852781` + `d11d4c2`）
 
 2 つの穴が重なっていた。
