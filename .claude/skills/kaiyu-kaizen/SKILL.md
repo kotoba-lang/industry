@@ -38,7 +38,30 @@ nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
    本当に直すべきものが自分の手元にあることが多い（beacon・read face・migration）
    ので、**提案の前にまず現物を確認する**。
 
-3. **提案を投げる。**
+3. **投げる前に、同じ問いが既に提案済みでないか ledger で確かめる。**
+
+   **ingress は window をまたぐ重複を止めない。** dedup の鍵は id で、id は
+   `kaizen:<site>:<finding>:<window>` —— window を含む。だから同じ問いが翌日
+   新しい id で再発火し、**`200 already-open` ではなく `202 proposed` が返る**。
+   止まったように見えないまま queue に 2 通目が積まれる。
+
+   ```bash
+   grep -n "kaizen:<site>:<finding>:" 90-docs/kaizen/kaiyu-kaizen.ledger.edn
+   ```
+
+   prefix（window を除いた 3 節）で引き、当たった entry の `:status` を見る:
+
+   - `:status :proposed` が 1 件でもある → **提案しない。** 問いの文言が同じなら、
+     人が答えるべき内容も同じで、2 通目は queue の深さを増やすだけ。
+     `:status :not-proposed-duplicate-question` で記録してその周は終わり
+   - `:not-proposed-duplicate-question` だけ、または 0 件 → 次へ
+
+   **これは重複を数える guard であって、dedup の意味論の決定ではない。**
+   後者（open な間は (site, finding) で dedup して evidence を更新するか、
+   ingress 側が already-open を返すか）は人に渡してある設計判断で、
+   ここで勝手に決めない。
+
+4. **提案を投げる。**
 
    ```bash
    KEY=$(security find-generic-password -a cloud-itonami \
@@ -49,12 +72,18 @@ nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
         https://itonami.cloud/api/<org>/<repo>/kaizen
    ```
 
-   - `202 proposed` … 新しく提案された
-   - `200 already-open` … **正常**。同じ window の同じ問いは 1 件だけ。
-     これが返ったら、その周はそこで終わり（別の候補に乗り換えない —— それは
-     「出せるものを出す」であって「いちばん答えるべき問い」ではない）
+   - `202 proposed` … 新しく提案された。**重複していないことの証拠ではない**
+     （上記のとおり id が違えば重複でも 202 が返る）
+   - `200 already-open` … 同じ **id** が既に open。これが返ったら、その周は
+     そこで終わり（別の候補に乗り換えない —— それは「出せるものを出す」であって
+     「いちばん答えるべき問い」ではない）
 
-4. **証跡を 1 行残す。** `90-docs/kaizen/kaiyu-kaizen.ledger.edn` に追記
+   **POST は取り消せない。** ingress の `allowedMethods` は `["POST","OPTIONS"]`
+   だけで、narrow key に withdraw も close も無い（queue の読み書きは cockpit の
+   CACAO 認証が要る）。誤って積んだ 1 通は、人が cockpit で閉じるまで残る ——
+   だから step 3 は POST の後ではなく前にやる。
+
+5. **証跡を 1 行残す。** `90-docs/kaizen/kaiyu-kaizen.ledger.edn` に追記
    （loop が起こした場合は loop 側が書く。手で回したときはここで書く）。
 
 ## やらないこと
@@ -71,5 +100,9 @@ nbb --classpath ".:scripts/nbb_compat:orgs/kotoba-lang/kaiyu/src" \
 
 - 提案の id は **tick が出したものをそのまま使う**（`kaizen:<site>:<finding>:<window>`）。
   作り直すと重複排除が壊れる
+- **ledger を読むのは POST の前**（step 3）。証跡を書く段（step 5）で初めて読むと、
+  重複だと分かるのが投げた後になる。2026-08-13 に実際にそうなった —— 直前の
+  3 周が手で守っていた「同じ問いは 2 度出さない」は ledger の散文にしか無く、
+  手順に書かれていなかったので、読む順番が変わった 1 周で破れた
 - secret は Keychain から**1 件だけ狙い撃ちで**読む（総当たり禁止、CLAUDE.md 安全床⑦）
 - 読めなかったサイトを「問題が無い」とも「問題がある」とも書かない

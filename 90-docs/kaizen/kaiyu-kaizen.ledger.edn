@@ -167,3 +167,22 @@
  :outcome "**修正した計器が、その場で新しい問いを出した。** 手渡された候補（medium・3 度目の重複）ではなく、一度も提案されたことのない :high が top になり、202 で着地。3 周続いた重複の連鎖は、dedup の意味論を決めずに切れた —— ただし下記のとおり**切れたのは kotobase.net だけ**で、原因は消えていない"
  :not-done "①**dedup の構造問題は 4 周連続で未着手**（id が window を含むので同じ問いが毎日新しい id で再発火する）。08-11/08-12 が人に渡した選択肢 (a)(b) はそのまま。今日それを迂回できたのは『たまたま別の、より重い問いが見つかったから』であって、明日 kotobase.net が同じ形に戻らない保証は無く、他 3 site には何も効いていない ②08-08 に landed した issue が今も open かは**確認していない** —— narrow ingress key は POST 専用（GET は 405）で、queue の読み取りは cockpit の CACAO 認証が要る ③`kagami reconcile` で fleet-db へ吸収していない。reconcile は scope 外の drift も巻き込むので、1 行の pin 前進の副作用でやる操作ではない（08-05 に退行を焼き込んだ実例がある）。08-08 の pin 前進でも同様に見送られている ④witness の evidence は `:witness-rows 2` と出る —— visits の**行数**（direct と search の 2 種）であって 575 件ではない。規則の論理には十分だが、読み手に伝わる重さは実際より軽い。section の形に依存する合計を測定規則へ持ち込むことになるので今日は変えていない"
  :note "read face への request は読み取りのみ。Keychain は `net-kotobase KAIYU_REPORT_SECRET` / `cloud-itonami KAIZEN_INGRESS_KEY` を service 名で 1 件ずつ狙い撃ち取得（総当たりなし）。ingress への POST は 1 通だけ"}
+{:status :proposed-duplicate-in-error
+ :at "2026-08-13"
+ :site "kotobase.net"
+ :tenant {:org "network-awai" :repo "net-kotobase"}
+ :issue-id "kaizen:kotobase.net:single-channel-direct:2026-08-06_2026-08-12"
+ :severity :medium
+ :response "202 proposed"
+ :verification "候補の数字を read face（GET /api/kaiyu?window_days=7、Bearer）に当てて確認。`visits.rows` = [{direct 600} {search 7} {social 1}] で evidence {:source \"direct\" :visits 600 :total 608} と完全一致。`collected-since` \"2026-08-07\" / `state` \"partial\" も一致し、issue 本文の「根拠の範囲」行も正しく出ていた。**数字の確認そのものは正しく、そこは問題ではなかった**"
+ :error "**重複を提案した。** 同じ問い（site=kotobase.net / finding=single-channel-direct）は 2026-08-08 に 202 で着地済み（id …:2026-08-02_2026-08-08）。08-11・08-12・08-13 の 3 周が「重複なので出さない」と判断してきたものを、4 周目の今日そのまま投げた。ingress は id で dedup し、id は window を含むので、**重複でも `200 already-open` ではなく `202 proposed` が返る** —— 止まったように見えないまま queue に 2 通目が積まれた"
+ :why "**手順を読む順番。** SKILL.md の step 3 は POST に直行し、dedup の記述は『`200 already-open` … 同じ window の同じ問いは 1 件だけ』の 1 行だけだった。これは真だが不十分で、しかも『ingress が守ってくれる』と読める。直前 3 周が守っていた『window をまたぐ同じ問いは出さない』は **ledger の散文にしか無く**、ledger を読むのは証跡を書く step 4 —— つまり **投げた後**。3 周それが持ったのは、たまたま各 agent が先に ledger を読んだから。**手順に書かれていない規律は、読む順番が変わった 1 周で破れる**"
+ :not-withdrawable "**取り消せない。** 今日実測: GET は 405 で body に `allowedMethods [\"POST\" \"OPTIONS\"]`、OPTIONS は 204。narrow ingress key に withdraw も close も無く、queue の読み書きは cockpit の CACAO 認証が要る（この skill は approve しない = その鍵を持たない）。**この 1 通は人が cockpit で閉じるまで残る**"
+ :fix {:file ".claude/skills/kaiyu-kaizen/SKILL.md"
+       :change "POST の前に ledger を引く step を新設（旧 step 3 は step 4 へ繰り下げ）。id から window を落とした prefix `kaizen:<site>:<finding>:` で grep し、当たった entry に `:status :proposed` が 1 件でもあれば提案しない"
+       :also "`202 proposed` の説明を『新しく提案された』から『**重複していないことの証拠ではない**』へ訂正。POST が取り消せないこと（allowedMethods は実測値）と、だから ledger を読むのは後ではなく前であることを手順本文に明記。不変条件にも 1 項追加した"
+       :tested "guard が両方向に効くことを実データで確認。**positive**: 今日の候補の prefix で引くと line 14 が当たり、その entry は `{:status :proposed … :ingress {:response 202 :status \"proposed\"}}` —— **step 3 を踏んでいれば今日の POST は止まっていた**。**negative**: 一度も提案されていない finding（dwell-not-measured）は 0 件で素通りする"
+       :not-semantics "**dedup の意味論は決めていない。** 08-11/08-12 が人に渡した選択肢 (a)(b) はそのまま —— 足したのは『重複を数えてから投げる』という手順であって『重複とは何か』の定義ではない。ledger には close の signal が無いので、**この guard も 08-12 が指摘した『抑制が恒久的な沈黙に化ける』危険をそのまま持つ**: 人が issue を閉じた後も条件が続いていれば、guard は鳴らない側に倒れる。そこは (a)(b) の決定でしか直らない"}
+ :observation "**同じ日の earlier round が提案した :high は、もう鳴っていない。** transitions が 0 行から 8 行になっていた（home→blog / contact / developers / obsidian / pricing / resources / support / why-kotobase 各 1、`collected-since` は 2026-08-07 のまま）。そのため finding-count が 2→1 に戻り、single-channel-direct が再び top になった。**なぜ辺が出るようになったかは分からない** —— issue が効いたのか別経路の変更かは確かめていないし、この skill は原因を書かない"
+ :not-done "①**dedup の構造問題は 5 周連続で未着手**。今日はそれが初めて実害を出した回 ②誤って積んだ 1 通を取り下げていない（上記のとおり不可能） ③08-08 の 1 通と今日の 1 通が今も open かは**確認していない**（queue を読む鍵が無い） ④tick / kaiyu 側は 1 行も触っていない —— 直したのは手順書だけ ⑤west pin を動かしていないので `kagami reconcile` は今日は該当なし"
+ :note "read face への request は読み取りのみ。Keychain は `net-kotobase KAIYU_REPORT_SECRET` / `cloud-itonami KAIZEN_INGRESS_KEY` を service 名で 1 件ずつ狙い撃ち取得（総当たりなし）。ingress への POST は 1 通（それが本 entry の error）。GET / OPTIONS の probe は method 確認のみで queue を変更しない"}
