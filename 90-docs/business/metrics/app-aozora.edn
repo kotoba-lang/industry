@@ -1,38 +1,40 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 15868,
-  "app-aozora-appview" 15465,
-  "app-aozora-spa" 7568},
+ {"app-aozora-pds" 16002,
+  "app-aozora-appview" 15546,
+  "app-aozora-spa" 7578},
  :zone
- {:requests-7d 1018987,
-  :pageviews-7d 6308,
-  :uniques-7d-sum 873,
+ {:requests-7d 1025430,
+  :pageviews-7d 6322,
+  :uniques-7d-sum 876,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/v1/datoms", :requests 898121}
-   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4808}
+  [{:path "/v1/datoms", :requests 895658}
+   {:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4765}
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 208}
+    :requests 199}
    {:path
     "/bafyreicy2go3fqwsoh7zup3asioqghz3qykjuednggzcmpaacu7fpao2sm",
-    :requests 204}
+    :requests 193}
+   {:path
+    "/kotobase-cf-wasm-testnet/ipns/bafyreiakzellpfgz56bjomeaenvnvmh67rrarfdsmlhogqgotll3pxuiie.json",
+    :requests 126}
    {:path
     "/bafyreigp3coa2pmkafmy455aqod25hw4mfveinmsz4oqyptnph6xz5v5ri",
-    :requests 98}
+    :requests 111}
+   {:path "/federation-pilot/did.json", :requests 93}
    {:path
     "/bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4eq3q5k2optwu446juce4",
-    :requests 90}
-   {:path "/federation-pilot/did.json", :requests 88}
-   {:path "/hito-federates/did.json", :requests 61}],
-  :status-mix {:client-error 9814, :ok 905694, :server-error 5413},
+    :requests 79}],
+  :status-mix {:client-error 9537, :ok 903571, :server-error 5546},
   :window "24h"},
  :as-of "2026-08-12",
  :traffic-quality {:window "24h", :probe-4xx-pct 1, :error-5xx-pct 1},
  :top-paths
- "上位 page (24h, 2xx/3xx): /v1/datoms 898121 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4808 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 208 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 204 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 98 | 4xx(probe) 1% · 5xx 1%",
+ "上位 page (24h, 2xx/3xx): /v1/datoms 895658 · /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4765 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 199 · /bafyreicy2go3fqwsoh7zup3asioqghz3qykjue… 193 · /kotobase-cf-wasm-testnet/ipns/bafyreiak… 126 | 4xx(probe) 1% · 5xx 1%",
  :signal
- "aozora.app 実測 1018987 req/7d・873 uniques(日次和)・うち4xx probe 1%(24h)、workers 38901 inv/7d"}
+ "aozora.app 実測 1025430 req/7d・876 uniques(日次和)・うち4xx probe 1%(24h)、workers 39126 inv/7d"}
