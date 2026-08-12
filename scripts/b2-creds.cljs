@@ -75,9 +75,17 @@
       missing (filter #(str/blank? (vals %)) fields)
       json?  (some #{"--json"} *command-line-args*)]
   (when (seq missing)
-    (binding [*out* *err*]
-      (println (str "b2-creds: 解決できない項目: " (str/join ", " (map name missing))
-                    " (order=" (str/join "→" (map name (:order cred [:env :1password :keychain]))) ")")))
+    ;; js/console.error であって (binding [*out* *err*] (println …)) ではない。
+    ;; nbb は *out* の束縛を無視して stdout に書く（ADR-2608130600、実測:
+    ;; `nbb -e '(binding [*out* *err*] (println "x"))' 2>/dev/null` が x を出す）。
+    ;; このスクリプトの stdout は機械可読で、消費側は 3 本とも exit で分岐する:
+    ;;   manifest/west_annex.cljs   … JSON.parse、失敗時は err を表示
+    ;;   scripts/hirameki-mirror.cljs … JSON.parse、失敗時は err を receipt に書く
+    ;;   scripts/newsfeed-ingest.cljs … `export K='V'` 行を正規表現で拾う
+    ;; 束縛のままだと前 2 者が表示する err が**空文字**になり、B2 鍵が解決できない
+    ;; 理由が operator にもレシートにも残らない（実測 2026-08-13）。
+    (js/console.error (str "b2-creds: 解決できない項目: " (str/join ", " (map name missing))
+                           " (order=" (str/join "→" (map name (:order cred [:env :1password :keychain]))) ")"))
     (scripts.nbb-compat/exit 1))
   (let [out {"B2_KEY_ID" (:key-id vals)
              "B2_APP_KEY" (:app-key vals)
