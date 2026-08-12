@@ -285,7 +285,7 @@
     (str ";; .kotoba 移行の索引 —— **生成物。手で編集しない**\n"
          ";; 再生成: nbb scripts/gen-kotoba-migration-index.cljs\n"
          ";; 語彙:   manifest/kotoba-migration-vocabulary.edn（こちらは手書き）\n"
-         ";; 設計:   ADR-2608120200 / ADR-2608121500\n;;\n"
+         ";; 設計:   ADR-2608120200 / ADR-2608121700\n;;\n"
          ";; 2026-08-12、ADR-2608120200 は 23 repo を手で測った。同じ日に数えたら\n"
          ";; `.kotoba` を持つ checkout 済み repo は " (count rows) " あった。\n"
          ";; **手で書いた移行状況は、移行が進むより速く古びる。**\n;;\n"

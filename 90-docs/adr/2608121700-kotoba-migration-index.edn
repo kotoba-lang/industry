@@ -1,6 +1,6 @@
 [{:db/id -1
-  :adr/id "adr-2608121500-kotoba-migration-index"
-  :adr/title "ADR-2608121500: .kotoba 移行の状態は手で書かず生成する —— 移行面は 1,187 repo あり、手で測れていたのは 23 だった"
+  :adr/id "adr-2608121700-kotoba-migration-index"
+  :adr/title "ADR-2608121700: .kotoba 移行の状態は手で書かず生成する —— 移行面は 1,187 repo あり、手で測れていたのは 23 だった"
   :adr/status "accepted"
   :adr/doc_type "adr"
   :adr/doc-type "adr"
@@ -13,7 +13,8 @@
   :adr/tags "kotoba, migration, index, datoms, coverage, generated"
   :adr/related ["adr-2608120200-what-the-kotoba-cores-actually-run"
                 "adr-2608112100-a-kotoba-core-with-a-parity-test-is-not-done"
-                "adr-2608039980-concept-index"]
+                "adr-2608039980-concept-index"
+                "adr-2608121500-parity-tests-do-not-exercise-the-shipped-artifact"]
   :adr/supersedes ""
   :adr/superseded_by ""
   :adr/authoritative true
@@ -22,7 +23,7 @@
    "決定核（移行対象）と schema 宣言（移行対象ではない）の区別の付け方"
    "出荷物が source から出たことを誰も検査していない repo の一覧の出し方"]
   :adr/body
-  "# ADR-2608121500: 移行の状態は観測から生成する
+  "# ADR-2608121700: 移行の状態は観測から生成する
 
 **Status**: accepted
 **Date**: 2026-08-12
@@ -87,6 +88,10 @@ twin を持たないため「どちらが走っているか」という問い自
 1 セッションで 3 回続けて実際の欠陥だった（com-cloudflare の出荷 KIR 9 本中 gate は
 1 本 / provider の registry 142 行中 8 行 / inga の provenance record 2 本を誰も
 読んでいない）。3 回とも**探して見つけた**のであって、一覧が在ったわけではない。
+
+同じ日に別セッションが murakumo で同じ形を独立に見つけている（ADR-2608121500:
+「35 本の parity test は 1 本も出荷 artifact を触らない」）。**同じ欠陥を 2 人が
+別々に探し当てているうちは、一覧が無いということ。**
 
 ## この索引が言えないこと
 
