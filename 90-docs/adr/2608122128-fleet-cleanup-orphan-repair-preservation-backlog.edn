@@ -199,7 +199,21 @@ rather than only retrospective: **every repo split must audit relative
    the net-kotobase split should either extract that package into its own repo
    and register it, or retarget the dep. Re-check with
    `nbb scripts/west-orphan-audit.cljs --blocking`.
-1. Fix the `parents: 0` fallback in `scripts/cleanup-land.cljs` (Decision 3).
+1. ~~Fix the `parents: 0` fallback in `scripts/cleanup-land.cljs`~~ **DONE**
+   (root#2128, merged 2026-08-12). `gh-ref` now returns
+   `{:state :found/:absent/:error}` and treats only `(HTTP 404)` as absent;
+   `server-commit!` aborts the repo on `:error`, and also when `base-sha`
+   resolved but its tree did not — the same trap one call later, which would
+   have written a tree containing none of the repo's existing files. The
+   branch-existence check had the identical collapsed test, which is what
+   produced the run's `Reference already exists (HTTP 422)` errors.
+   Verified by fault injection (a `gh` shim failing only `git/ref/heads/*`
+   with 403, everything else passing through): the run aborts with the
+   fail-closed message and the target repo's branch list is unchanged. The
+   `404 -> root commit` path for genuinely empty placeholder repos is
+   unchanged by inspection, not by test — exercising it would require faking a
+   404 against a repo that has commits, i.e. manufacturing the exact artifact
+   the fix prevents.
 2. Work the 26 dispositioned preservation PRs — each carries its own
    measurements and recommended verdict as a comment. 12 are
    `close-stale-revert-risk`, 14 `needs-review`.
