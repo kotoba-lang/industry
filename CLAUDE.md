@@ -710,6 +710,33 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
 実測（2026-08-04、この規則が生まれたセッション）: agent が 1 セッションで
 「無い」と 3 回結論し、**3 回とも間違っていた**。
 
+### 同じ誤りは repo の *中* でも起きる —— sparse cone（2026-08-13 追記）
+
+**この superproject は cone-mode sparse checkout である。** cone の外のファイルは
+`ls` にも `find` にも映らず、`git ls-files -v` では **`S`（skip-worktree）** が付く。
+**`origin/main` には在る。手元に無いだけである。**
+
+実測 2026-08-13、同じバグが**両方向に 1 回ずつ**出た:
+
+- `manifest/docs-edn-only.cljs` の baseline が sparse な worktree から生成され、
+  cone 外の `.md` **6 件が「新規」として 1 週間報告され**、baseline に追記された。
+- その 1 週間後、**私はその 6 件を「もう存在しないから baseline から削れ」と指示した。**
+  6 件は `origin/main` に無傷で在り、**指示どおり削っていれば ratchet から本物の
+  6 エントリが消えていた。**
+
+1 回目の対策は docstring への注意書き（「full checkout から再生成せよ」）だった。
+**効かない —— 誤った答えを出す実行は docstring を読まない。** 現在は
+`git ls-files --cached --others --exclude-standard` で git に訊く。
+
+**`.edn` 側の穴の方が大きかった**: `parse-errors=0` が **2,505 中 2,340 ファイル**に
+対して印字されていた（残り 165 は cone 外で読めていない）。**読めなかったものを
+0 件として数えていた。** 今は `edn=<scanned>/<listed>` を出し、読めない分が在れば
+**exit 2**（0 でも 1 でもない = 「答えられなかった」）で終わる。
+
+**規則: 手元に無いファイルについて何かを結論する前に、`git ls-files -v` と
+`git cat-file -e origin/main:<path>` を引く。** cone 外・stale checkout・
+未 checkout の west project —— **3 つとも「`ls` に映らない」で同じ顔をする。**
+
 | 結論した内容 | 実際 |
 |---|---|
 | 「semantic-code は kotoba repo にある」 | #429 で `kotoba-lang/codebase` に切り出し済み |
