@@ -35,6 +35,7 @@
 ;;   nbb scripts/fleet-ci/tick.cljs --pr-cap 3        ;; repo あたりの PR 検証上限（既定 10）
 (ns tick
   (:require ["node:child_process" :as cp]
+            ["node:crypto" :as crypto]
             ["node:fs" :as fs]
             ["node:os" :as os]
             ["node:path" :as path]
@@ -254,6 +255,86 @@
   で衝突して checks map で潰し合う。superproject は不変条件が増えていく対象
   なので、1 gate/repo の制約はここで外しておく。"
   [r] (or (:id r) (:name r)))
+
+;; ---------------------------------------------------------------------------
+;; gate declaration identity（ADR-2608137000）
+;;
+;; trigger は「対象 repo の tip が動いたか」だけだった（:trigger :tip-change）。
+;; それは **検査される側**が動いたことの正しい合図であって、**検査する側**が
+;; 動いたことは一切見ていない。gates.edn の宣言や gate script を直しても、
+;; 対象 repo が休んでいる限り tick はその gate を二度と回さない —— 直した gate は
+;; 直す前の赤を永久に表示し続け、しかもそれが古い判定であることを言うものが無い。
+;;
+;; 実測 2026-08-13: `gh-workflow-assoc-gapki` は :include-ext に ".kotoba" を
+;; 足して直った（それが欠陥の全部だった）が、対象 repo
+;; cloud-itonami-assoc-0126-idn-gapki の tip は 2026-08-11 の e261787 から動いて
+;; おらず、最後の receipt は修正の前日のもの。「gate は fleet で一度 green を
+;; 見るまで landed としない」という規則が、この経路では構造的に果たせない。
+;;
+;; 直し方は最小にする: state に **その gate 自身の宣言の hash** を並べて持ち、
+;; tip と同じ扱いで比較する。tip か宣言のどちらかが動いたら回す。
+;;
+;; 範囲を意図的に狭くしてある:
+;;   * hash は **その entry 1 件**（+ :script が名指しするファイルの中身）だけを
+;;     見る。gates.edn は毎日編集されるので、ファイル全体の hash にすると
+;;     1 行の編集で 125 repo が再配置される —— それは元の問題より悪い。
+;;   * key の並び順は宣言の一部ではないので sorted-map に正規化してから pr-str
+;;     する（entry を書き換えずに並べ替えただけで再実行しない）。
+;;   * コメントは reader が捨てるので hash に入らない（コメントだけの編集では
+;;     再実行しない）。
+;;   * cfg の global key（:policy / :gate-timeout-ms / :landing …）は入れない。
+;;     それらを変えると全 gate の意味が変わるが、そこで 125 repo を一斉に回す
+;;     判断は tick が黙ってするものではない（--all が明示的にある）。
+;;   * 共有 script（gates/github_workflow_run.cljs は 3 gate が使う）を編集すると
+;;     その script を使う gate だけが回る。これは正しい範囲で、有界。
+
+(def derived-keys
+  "tick が work item に足す key。**宣言の一部ではない**ので hash から外す。
+
+  ここを外し忘れると :tip が hash に混ざり、毎 tick 全 gate の spec-hash が動く
+  = 毎 tick 125 repo 再配置、という最悪形になる。下の unit test
+  `derived-keys-do-not-leak-into-the-declaration-hash` がそれを見張っている。"
+  #{:org-repo :tip :pin :last-sha :changed? :spec-hash :last-spec :pr :node
+    :gate-name :cmd :tarball :script-file :sha :out-file :bundle? :outcome
+    :cid :detail :input-rejected})
+
+(defn canonical-decl
+  "gate 宣言の決定的な文字列表現。key の並び順は宣言の一部ではない。"
+  [r]
+  (pr-str (into (sorted-map) (apply dissoc r derived-keys))))
+
+(defn decl-hash
+  "gates.edn の 1 entry だけの hash（script の中身は含まない）。
+  gate-spec-drift.cljs が履歴を歩くときにも使う。"
+  [r]
+  (subs (-> (crypto/createHash "sha256") (.update (canonical-decl r)) (.digest "hex")) 0 16))
+
+(defn gate-spec-hash
+  "gate の宣言 + それが名指しする script の中身の hash。
+  script が読めないときは nil を混ぜる（読めないこと自体は tick の別経路が落とす）。"
+  [r]
+  (let [body (when (:script r)
+               (try (str (fs/readFileSync (path/join here (:script r)) "utf8"))
+                    (catch :default _ nil)))]
+    (subs (-> (crypto/createHash "sha256")
+              (.update (canonical-decl r))
+              (.update " ")
+              (.update (str body))
+              (.digest "hex"))
+          0 16)))
+
+(defn work-changed?
+  "この work item を回すべきか。
+
+  `last-spec` が nil のときは **回さない**。これが移行の全部で、既存 state の
+  1,583 entry には spec-hash が無いから —— nil を「変わった」と読むと導入した
+  tick が 125 repo 全部を一斉に配置する。nil は下の backfill が現在の hash で
+  埋め、以後の編集からが検出対象になる。埋めた時点で赤かった gate（= 既に
+  drift していたもの）は黙って現行扱いになるので、その母集団は
+  gate-spec-drift.cljs が git 履歴から別に数える。"
+  [{:keys [tip last-sha spec-hash last-spec]}]
+  (boolean (and tip (or (not= tip last-sha)
+                        (and last-spec (not= spec-hash last-spec))))))
 
 (defn replace-revision
   "west.yml の当該 entry の revision 行だけを差し替える（最小 diff）。
@@ -1262,11 +1343,14 @@
                               org-repo (str org "/" nm)
                               tip (tip-of org-repo)
                               pin (get-in west [:projects nm :revision])
-                              last-sha (get-in @state [:repos id :sha])]]
-                    (assoc r :org org :org-repo org-repo :tip tip :pin pin
-                           :id id
-                           :last-sha last-sha
-                           :changed? (and tip (not= tip last-sha)))))
+                              last-sha (get-in @state [:repos id :sha])
+                              spec (gate-spec-hash r)
+                              last-spec (get-in @state [:repos id :spec-hash])]]
+                    (let [w (assoc r :org org :org-repo org-repo :tip tip :pin pin
+                                   :id id
+                                   :last-sha last-sha
+                                   :spec-hash spec :last-spec last-spec)]
+                      (assoc w :changed? (work-changed? w)))))
         ;; ---- PR head の検証。tip だけを見ていると「壊れたものが main に入った
         ;; 後で赤を教える」CI にしかならず、merge を止められない。PR head も
         ;; 同じ gate に通す（ADR-2607255500 :not-done の :pr-head-verification）。
@@ -1297,11 +1381,14 @@
                    :when org-repo
                    {:keys [number head]} (take pr-cap (get prs-by-repo org-repo))
                    :let [id (str (gate-id r) "#pr" number)
-                         last-sha (get-in @state [:repos id :sha])]]
-               (assoc r :org org :org-repo org-repo :tip head :pin nil
-                      :id id :pr number :cd false
-                      :last-sha last-sha
-                      :changed? (not= head last-sha))))
+                         last-sha (get-in @state [:repos id :sha])
+                         spec (gate-spec-hash r)
+                         last-spec (get-in @state [:repos id :spec-hash])]]
+               (let [w (assoc r :org org :org-repo org-repo :tip head :pin nil
+                              :id id :pr number :cd false
+                              :last-sha last-sha
+                              :spec-hash spec :last-spec last-spec)]
+                 (assoc w :changed? (work-changed? w)))))
         work (into work pr-work)
         missing (filter #(nil? (:tip %)) work)
         todo (cond
@@ -1309,6 +1396,21 @@
                only (remove #(nil? (:tip %)) work)
                :else (filter :changed? work))]
     (doseq [m missing] (log "WARN no tip resolved (skipped):" (:name m) (:org-repo m)))
+    ;; spec-hash の backfill（一度きり）。既に判定を持っている entry に現在の
+    ;; 宣言 hash を書き込むだけで、**何も回さない**。これをやらないと
+    ;; work-changed? の nil ガードが永久に効いたままになり、新しい trigger が
+    ;; 一度も発火しない。dry-run / plan では state を触らない。
+    (when-not (or dry? plan?)
+      (let [backfill (for [w work
+                           :when (and (nil? (:last-spec w))
+                                      (get-in @state [:repos (:id w) :sha]))]
+                       w)]
+        (when (seq backfill)
+          (doseq [w backfill]
+            (swap! state assoc-in [:repos (:id w) :spec-hash] (:spec-hash w)))
+          (save-state!)
+          (log "spec-hash backfilled for" (count backfill)
+               "existing state entries (no gate was re-run for this)"))))
     (log "tick:" (count repos) "covered,"
          (count (remove :pr work)) "tip +" (count (filter :pr work)) "PR head,"
          (count todo) "to verify (" (count (filter :pr todo)) "of them PR);"
@@ -1497,7 +1599,8 @@
                           ;; same tip を skip し、証跡が永久に欠ける。
                           (when (and (not dry?) landed?)
                             (swap! state assoc-in [:repos (:id w)]
-                                   {:sha (:tip w) :outcome oc :cid (:cid receipt) :at (now)})
+                                   {:sha (:tip w) :spec-hash (:spec-hash w)
+                                    :outcome oc :cid (:cid receipt) :at (now)})
                             (save-state!))))))))))
         ;; ---- Radicle: 落ちたものだけ issue を開く
         (let [rc (:rad cfg)
