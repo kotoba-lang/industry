@@ -159,16 +159,58 @@ truncated として分離し、集計で別に数える。
 同型の落とし穴をもう 1 つ踏んでいる: **qwen だけ古い ollama で測った初回結果**。
 0.30.7 と 0.32.9 の数字を並べれば runtime の差がモデルの差に見える。破棄して測り直した。
 
+## Decision 8 — 評価用に立てた 2 本目の ollama が常駐推論を落とした
+
+closing で片付けたつもりの側で **judah の本番推論が `Compute error` で止まっていた**。
+原因は自分の teardown が不完全だったこと:
+
+```
+pkill -f 'ollama-0329/ollama serve'     # 当たらない
+```
+
+`cd /tmp/ollama-0329 && ./ollama serve` で起動したプロセスの argv は
+**`./ollama serve`** なので、ディレクトリ名を含むパターンに一致しない。
+ディレクトリを `rm -rf` してもプロセスは生き続け、その runner
+（`/private/tmp/ollama-0329/llama-server`）が 10 GB を掴んだままだった。
+16 GB の機械に 10 GB のモデルが 2 本居る状態になり、常駐側が確保できずに落ちていた
+（実測: `Pages free` 3,749 ページ = 61 MB）。PID 指定で 2 本殺したら復旧
+（32.7 tok/s、`6*7` に `42` を返す）。
+
+**評価のために本番ノードへ 2 本目の serving を立てるときは、閉じるのを
+`pkill` のパターンに頼らない。`ps aux | grep llama-server` で runner ごと見て
+PID で殺し、その後に本番側で 1 回実際に推論させて確かめる。**
+「消したつもり」と「消えた」は別の主張である。
+
+## 隣接して観測した gap（本 ADR の範囲外、未着手）
+
+fleet 全 10 台の ollama を見たときに、ADR-2608139600 が言う
+「推論は LaunchDaemon で常駐する」がまだ全台では成立していない:
+
+| ノード | 観測 |
+|---|---|
+| `asher` | plist は在るが `launchctl` に `com.murakumo.ollama` が無く、serve プロセスも無い |
+| `zebulun` | daemon はロード済み・serve プロセスも在るが、`127.0.0.1:11434` が応答しない |
+| `benjamin` | **plist が無い**。serve は動いているが ad-hoc（0.30.6）なので再起動で消える |
+
+いずれも本 ADR の測定で触ったノードではない（触ったのは judah のみ）。
+決定を変えるものではないので ADR-2608139600 は書き換えていないが、
+「10 台に常駐している」を前提に読むと外れる。
+
 ## 再現手順
 
-計測 harness は `scratchpad/bench/`（`tasks.cljs` に 15 問、`bench.cljs` が
-speed / tasks / needle、`ctxprobe.py` が文脈上限）。nbb で回す:
+計測 harness は **`scripts/model-eval/`**（`tasks.cljs` に 15 問、`bench.cljs` が
+`speed` / `tasks` / `needle` / `ctx`）。ノードの ollama は localhost 固定なので
+トンネル越しに叩く:
 
 ```
-BENCH_ENDPOINT=http://127.0.0.1:11500 nbb --classpath . bench.cljs tasks <model>
+ssh -N -L 11435:127.0.0.1:11434 judah &
+nbb --classpath . bench.cljs tasks <model>
 THINK=on ONLY=lru-cache,semver nbb --classpath . bench.cljs tasks <model>
+nbb --classpath . bench.cljs ctx <model>
 ```
 
-judah の `/tmp/ollama-0329` は評価用の使い捨てで、常駐 serving とは別ポート・別プロセス。
-評価が終わったら消してよい（モデル blob だけは `~/.ollama/models` を共有している）。
+本 ADR の数字は judah の `/tmp/ollama-0329`（0.32.9、ポート 11500、使い捨て）で
+取った。そのサーバとモデル blob は撤去済みで、judah は 0.30.7 / `qwen35-iq2` のみ
+という測定前の状態に戻っている。再評価するときは 0.32.3 以上を同じやり方で
+立て直す（Decision 8 の閉じ方に従うこと）。
 "}]
