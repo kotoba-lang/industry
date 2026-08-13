@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-08-13T00:56:18.643Z",
+ :asOf "2026-08-13T01:57:06.127Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,9 +9,9 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 23868,
-  :pageviews-7d 18736,
-  :uniques-7d-sum 450,
+ {:requests-7d 24049,
+  :pageviews-7d 18895,
+  :uniques-7d-sum 454,
   :zone "itonami.cloud"},
  :agentRuns7d 174,
  :sources [:cloudflare :health :emitter :itonami-free-path],
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-08-13T00:56:19.483Z",
+  :asOf "2026-08-13T01:57:07.028Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -148,7 +148,7 @@
    {:path "/cloud-itonami-isic-6612/", :requests 90}
    {:path "/cloud-itonami-isic-4921/", :requests 89}
    {:path "/cloud-itonami-isic-851/", :requests 89}],
-  :status-mix {:server-error 4132, :ok 4874, :client-error 191},
+  :status-mix {:server-error 4134, :ok 4881, :client-error 195},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
@@ -201,7 +201,7 @@
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 23868 req/7d・450 uniques(日次和)・うち4xx probe 2%(24h)",
+ "itonami.cloud 実測 24049 req/7d・454 uniques(日次和)・うち4xx probe 2%(24h)",
  :tenants
  {:active 5,
   :external-paid 0,
