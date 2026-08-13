@@ -28,9 +28,22 @@
 ;; 持たせる** —— `console` で引いた人には両方出るのが正しい。
 
 {:amu-compiler
- {:label "Amu / Kotoba compiler"
-  :spellings ["amu" "compiler" "kotoba compiler" "コンパイラ" "編む"]
-  :note "kotoba-lang/amu is the compiler orchestrator (formerly kotoba-lang/compiler). The repository name is Amu; :compiler roles, kotoba.compiler namespaces, kotoba-compiler/1 artifact compatibility, and the bin/kotoba-compiler shim remain compatible."}
+ {:label "Amu / Kotoba compiler（編む）"
+  :spellings ["amu" "compiler" "kotoba compiler" "コンパイラ" "編む"
+              "weave" "project link" "プロジェクトリンク"]
+  :note "kotoba-lang/amu is the compiler orchestrator (formerly kotoba-lang/compiler). 編む = 言葉を一つの反物にする。プロジェクト閉グラフ（複数 .kotoba を一台の機にかける）もここ。実行時に import を provider へ結ぶのは kototama（ADR-2608139980）。:compiler roles, kotoba.compiler namespaces, kotoba-compiler/1 artifact compatibility, and the bin/kotoba-compiler shim remain compatible."}
+
+ :kototama-runtime
+ {:label "Kototama / 言霊（実行と実行時 link）"
+  :spellings ["kototama" "言霊" "runtime" "host" "execution" "tender"
+              "実行時リンク" "runtime link"]
+  :note "kotoba-lang/kototama が T3 の存在。成果物を宿し、aiueos が貸した named provider にだけ結ぶ。Solo5 の tender は役割語であって製品名ではない。宿は tender-native（native、ns kototama.native.executor）/ tender-component（Component engine）/ wasm-webcomponent（browser）。kotodama は別 runtime（ADR-2607050900）。索引: ADR-2608139980。"}
+
+ :amu-backend
+ {:label "amu の綾 / T2 backend（存在ではない）"
+  :spellings ["kotoba-native" "kotoba-wasm" "kotoba-script" "kotoba-component"
+              "backend" "綾" "aya" "native backend" "wasm backend"]
+  :note "T2 は amu が織る柄。kotoba-native = KIR→x86_64/aarch64/ELF、kotoba-wasm = KIR→core Wasm、kotoba-component = Component 仕立て、kotoba-script = restricted JS。走らせない、grant しない。実行は kototama。"}
 
  :visit-telemetry
  {:label "回遊 / アクセス解析（訪問者を特定せずに動線を測る）"
@@ -184,12 +197,13 @@ cloud-itonami-isco-5411（ISCO 5411、ns=firestation。装備 readiness とシ�
 2026-08-07 rename）。座＝中世の職人・商人の自治結社、座法に従い座衆が縄張りを侵さず働く。"}
 
  :tender-placement
- {:label "tender の配置と貸借 / 差配 (sahai)"
+ {:label "実行の配置と貸借 / 差配 (sahai)"
   :spellings ["placement" "lease" "multi-tenant" "budget" "checkpoint"
-              "epoch fencing" "fleet" "差配" "sahai" "配置" "貸借"]
+              "epoch fencing" "fleet" "差配" "sahai" "配置" "貸借" "tender"]
   :note "kotoba-lang/sahai（旧 kotoba-lang/fleet、2026-08-07 rename）。durable T6 placement —
-どの tender をどこに、どれだけの予算で、いつまで置くか。差配人＝借家の割り当てを取り仕切る人。
-実行そのものは kototama の tender。永続 EDN の :kototama.fleet/* キーは互換のため据え置き。"}
+どの実行をどこに、どれだけの予算で、いつまで置くか。差配人＝借家の割り当てを取り仕切る人。
+実行そのものは kototama（言霊）。tender は Solo5 役割語で製品名ではない（ADR-2608139980）。
+永続 EDN の :kototama.fleet/* キーは互換のため据え置き。"}
 
  :vcs-plane
  {:label "repo の pin と統治 / 鏡 (kagami)"

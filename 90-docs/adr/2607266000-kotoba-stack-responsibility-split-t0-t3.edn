@@ -70,7 +70,10 @@ T4 は既存 `kotoba-lang/security` (effect/capability/key-lifecycle/evidence-pl
 supply-chain) と `ed25519` と `aiueos` で足りるため**新規 repo を作らない**。
 T5 は本 ADR の対象外 (aiueos ADR-0013 の bare-metal profile が扱う)。
 T6 は新規 `kotoba-lang/fleet` が reusable placement library / CLI / packaging を所有する。
-`murakumo` は binary・配置設定・ops 面、`kototama` は T3 tender のままとする。
+`murakumo` は binary・配置設定・ops 面、`kototama` は T3 実行（host / 実行時 link）
+のままとする。Solo5 由来の *tender* は役割語であって製品名ではない
+（ADR-2608139980）。`tender-native` / `tender-component` は kototama の宿であり、
+独立した存在ではない。
 
 ### 2. T0-T3 で 11 repo を切り出す (Phase A 完了)
 
@@ -289,12 +292,24 @@ fleet CLI command と systemd packaging も `fleet` 側へ移した。kototama �
 3. 実装・単体テスト・qualification は owner repo に置き、consumer には
    integration / conformance だけを残す。履歴は現状表へ追記せず git に持たせる。
 
+## 2026-08-13 — 製品名の現在地（ADR-2608139980）
+
+repo 分割と依存方向はこの ADR のまま。変わったのは名乗りだけ。
+
+- T3 の存在名は **kototama**。`tender-*` は kototama の宿（GitHub 名は歴史的 alias）。
+- T2 backend（`kotoba-wasm` / `kotoba-native` / `kotoba-script` / `kotoba-component`）
+  は **amu の綾**。存在名を持たない。
+- linker は二つ: プロジェクト閉グラフは amu、実行時 import 結合は kototama。
+- IR / verifier / provider / abi は吸収しない。
+
 ## References
 
 - ADR-2607252500 (Wasm Component-first、aiueos 二層化。本 ADR は T0-T3 側の実装。
   決定 4 に本 ADR 由来の but 節を追記済み)
 - ADR-2607022400 (Solo5 tender 語彙。Mewz 却下理由が AOT に当たらない点は
-  ADR-2607252500 が実質的に上書き済み)
+  ADR-2607252500 が実質的に上書き済み。製品名としての tender は
+  ADR-2608139980 が外す)
+- ADR-2608139980 (amu は編む、kototama は結ぶ)
 - aiueos ADR-0011 (link-time capability enforcement — 未 grant の import は
   リンク不能。二面出力の native 側でも同じ機構が構造的に効く)
 - `kotoba-lang/kotoba-script` (先行事例: KIR のみを受理し言語意味論を持たない backend)
