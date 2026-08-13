@@ -311,6 +311,46 @@
        (filter #(str/ends-with? (str %) ext))
        (sort-by str)))
 
+(defn git-listed-under-90-docs
+  "Files under 90-docs with extension `ext`, repo-relative, as GIT sees them.
+
+  `verify!` used to enumerate with `file-seq` over the working tree, and that is
+  not the same question. A sparse checkout leaves the file in the index with the
+  skip-worktree bit set and simply does not write it to disk, so `file-seq`
+  reports it as ABSENT with no indication that it is only unseen -- the partial
+  view does not report that it is partial.
+
+  Measured 2026-08-13 from a cone-mode sparse worktree: 70 of 76 `.md` and 2,340
+  of 2,505 `.edn` were visible. All six missing `.md` were present in
+  `origin/main`; none had been deleted, converted or moved. They were reported
+  as `BASELINE IS STALE ... these .md files are gone`, and pruning them -- the
+  obvious reading of that message -- would have deleted six true entries from
+  the ratchet, which is the one thing the baseline exists to prevent.
+
+  This is the second time in this file, from the same cause and in the opposite
+  direction. Those same six were reported as NEW for a week (2026-07-31 →
+  2026-08-08) because the baseline itself was captured from a sparse worktree.
+  The remedy taken then was a prose warning in `known-md-files` to regenerate
+  only from a full checkout. A prose warning cannot be executed by the run that
+  is about to get the wrong answer, and this run got it.
+
+  `git ls-files` reads the index, so it is unaffected by which paths the cone
+  happens to include; `--others --exclude-standard` adds files that are on disk
+  but not yet committed, which is how a newly written `.md` is still caught."
+  [ext]
+  (let [{:keys [exit out err]}
+        (shell/sh "git" "-C" root "ls-files" "--cached" "--others"
+                  "--exclude-standard" "--" "90-docs")]
+    (when-not (zero? exit)
+      (throw (ex-info (str "git ls-files failed: " (str/trim (str err))) {})))
+    (->> (str/split-lines out)
+         (map str/trim)
+         (remove str/blank?)
+         (filter #(str/ends-with? % ext))
+         distinct
+         sort
+         vec)))
+
 (defn migrate-adr-file!
   "1 ADR: md があれば edn に取り込み、edn を tx-data 化し、md を削除。"
   [md-or-edn dry-run? report]
@@ -515,15 +555,26 @@
   known-parse-errors, and asserted in the same two directions: a file here that no longer
   exists must be removed from the list.
 
-  **Regenerate this list only from a FULL checkout.** Six files were missing from the
-  original capture and reported as NEW for a week (2026-07-31 → 2026-08-08), which is
-  the one thing this list exists to prevent. All six were already committed when the
-  baseline was written -- verified with `git cat-file -e <baseline-commit>:<path>` --
-  so they were not new; they were never seen. The likely cause is a sparse worktree,
-  and the same trap was hit again on 2026-08-08 while investigating this: the very
-  same command reported md=34 from a sparse worktree and md=76 from the full checkout.
-  A partial view does not report that it is partial, so a baseline taken from one
-  silently converts pre-existing files into permanent false alarms."
+  This list is compared against `git ls-files`, not against the working tree, so a
+  sparse checkout no longer changes the answer. That was not always so, and the
+  history is the reason the enumeration moved:
+
+  Six files were missing from the original capture and reported as NEW for a week
+  (2026-07-31 → 2026-08-08). All six were already committed when the baseline was
+  written -- verified with `git cat-file -e <baseline-commit>:<path>` -- so they were
+  not new; they were never seen. The cause was a sparse worktree: the same command
+  reported md=34 from one and md=76 from the full checkout. They were added here on
+  2026-08-08 (e5606cf2d47).
+
+  On 2026-08-13 the SAME six were reported by the opposite check, `BASELINE IS STALE
+  ... these .md files are gone`, from a cone-mode sparse worktree in which
+  90-docs/kura, /religious-community, /security-gates and /security sit outside the
+  cone. Each was still present in `origin/main`. Acting on that message would have
+  pruned six true entries.
+
+  The remedy after the first occurrence was a prose instruction here to regenerate
+  only from a full checkout. It did not hold, because the run that is about to get
+  the wrong answer is not the reader of the instruction. What holds is asking git."
   [
    "90-docs/business/cloud-itonami-5820-crm-go-to-market.md"
    "90-docs/kura/README.md"
@@ -670,9 +721,19 @@
    - source-format が md-migrated / edn+md-merged ではない
    失敗時 exit 1。"
   []
-  (let [docs-root (io/file root "90-docs")
-        md-left (list-files docs-root ".md")
-        edns (list-files docs-root ".edn")
+  (let [;; Enumerated from git, not from the working tree -- see
+        ;; `git-listed-under-90-docs`. Paths are repo-relative, which is also the
+        ;; form the baselines are written in.
+        md-left (git-listed-under-90-docs ".md")
+        edn-listed (git-listed-under-90-docs ".edn")
+        abs (fn [rel] (str root "/" rel))
+        ;; The .md baseline can be answered from the index alone. The .edn checks
+        ;; cannot: they read file CONTENT, and content that is not in this working
+        ;; tree cannot be parsed. Split the two rather than quietly scanning
+        ;; whichever subset happens to be present.
+        on-disk? (fn [rel] (.exists (io/file (abs rel))))
+        edns (filterv on-disk? edn-listed)
+        unreadable (vec (remove on-disk? edn-listed))
         path-md-re #"90-docs/[A-Za-z0-9_./+-]+\.md\b"
         ;; 値としての source-format だけを弾く（ADR 本文で歴史語彙として触れるのは可）
         bad-sf-re #":(?:adr|doc)/source-format\s+\"(?:md-migrated|edn\+md-merged)\""
@@ -686,7 +747,7 @@
       ;; parse error masked them for that file, so every parse fix surfaced
       ;; "new" md-path and source-format hits that had been there all along and
       ;; the totals understated the real work.
-      (let [raw (slurp f)]
+      (let [raw (slurp (abs f))]
         (when (re-find path-md-re raw)
           (swap! path-md-hits conj (str f)))
         (when (re-find bad-sf-re raw)
@@ -701,8 +762,11 @@
               (swap! split-strings conj [(str f) ks])))
           (catch :default e
             (swap! parse-errors conj [(str f) (ex-message e)])))))
-    (println (format "verify: md=%s edn=%s parse-errors=%s not-tx=%s split-strings=%s path-md-refs=%s source-format-residue=%s"
-                     (count md-left) (count edns)
+    ;; `edn=` is stated as scanned/listed. When those differ, every count after it
+    ;; on this line describes a subset, and a `parse-errors=0` over a subset reads
+    ;; exactly like a `parse-errors=0` over the whole corpus.
+    (println (format "verify: md=%s edn=%s/%s parse-errors=%s not-tx=%s split-strings=%s path-md-refs=%s source-format-residue=%s"
+                     (count md-left) (count edns) (count edn-listed)
                      (count @parse-errors) (count @not-tx)
                      (count @split-strings)
                      (count @path-md-hits) (count @sf-hits)))
@@ -787,7 +851,39 @@
       (when (seq gone-md)
         (println "=== BASELINE IS STALE — these .md files are gone, remove them from known-md-files ===")
         (doseq [f gone-md] (println " " f)))
-      (if (and (not hard-fail?) (empty? new-errors) (empty? fixed))
+      (when (seq unreadable)
+        (println (str "=== " (count unreadable) " .edn ARE IN GIT BUT NOT IN THIS WORKING TREE ==="))
+        (println "  This checkout does not contain them, so their content was not read.")
+        (println "  Fix: git sparse-checkout add 90-docs   (or run from a full checkout)")
+        (doseq [f (take 10 unreadable)] (println " " f))
+        (when (< 10 (count unreadable))
+          (println (str "  … and " (- (count unreadable) 10) " more"))))
+      (cond
+        ;; A definite defect outranks an incomplete corpus: the .md baseline and
+        ;; every check that DID run are answered from what was actually seen, so a
+        ;; hit is real regardless of what was missing.
+        (or hard-fail? (seq new-errors) (seq fixed))
+        (do (println "verify: FAIL")
+            (nc/exit 1)
+            1)
+
+        ;; Neither pass nor fail. The parse / split-string / path-ref checks read
+        ;; file content, and content absent from this tree was not examined -- so
+        ;; "nothing else is wrong" is not something this run is entitled to say.
+        ;; Exit 2 so that it cannot be read as either of the answers it does not
+        ;; have; ADR-2608136000's rule is that a check which could not perform its
+        ;; measurement must not return the value of one that performed it and
+        ;; found nothing.
+        (seq unreadable)
+        (do (println (str "verify: CANNOT ANSWER — " (count unreadable) " of "
+                          (count edn-listed) " .edn under 90-docs were not readable here."))
+            (println "  The .md baseline IS answered (it is read from the index, not the")
+            (println "  working tree) and it found nothing new. Refusing to report a pass")
+            (println "  on the content checks, which saw only part of the corpus.")
+            (nc/exit 2)
+            2)
+
+        :else
         (do (println (str "verify: OK — no NEW breakage ("
                           (count known) " known-unparseable and "
                           (count known-md) " un-migrated .md accepted as baselines; "
@@ -795,10 +891,7 @@
             (println "  Neither baseline is approval: ADR-2607171600's EDN-only migration")
             (println "  is unfinished, and those files are unreadable to every query over")
             (println "  this plane. What OK means is that nothing got worse.")
-            0)
-        (do (println "verify: FAIL")
-            (nc/exit 1)
-            1)))))
+            0)))))
 
 (defn write-policy-adr! [dry-run?]
   (let [path (io/file root "90-docs" "adr" "2607171600-docs-adr-edn-only-datascript.edn")
