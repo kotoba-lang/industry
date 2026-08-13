@@ -186,4 +186,85 @@ snapshot → tx 着地 → candles → bridge → Merkle root。次に効くの�
 4. **準備金証明**（collateral の非負を不変条件にすれば、merkle-sum の葉 sum を collateral にするだけで root が準備金証明になる）
 5. sequencer chain は authority nil のまま
 
-分類 3（単に未実装）は変わらず: TWAP / scale / amend / cancel-all、fee tier / builder / referral、sub-account / agent wallet、WebSocket、user fills 履歴、multi-market、oracle の stake 加重、清算の自動駆動。"}]
+分類 3（単に未実装）は変わらず: TWAP / scale / amend / cancel-all、fee tier / builder / referral、sub-account / agent wallet、WebSocket、user fills 履歴、multi-market、oracle の stake 加重、清算の自動駆動。
+
+## 改訂 2026-08-13 —— 上の 5 件のうち 3 件と、分類 3 の 2 件が閉じた
+
+**閉じたものは torihiki main に着地済みだが、まだ deploy されていない**（下記の
+fork の節を読むこと）。socket だけは符号化に触らないので deploy 済み。
+
+| 前回の残件 | 現在地 |
+|---|---|
+| 2. 出金の出口 | **閉じた**（torihiki `4d59b1ee`）。`:withdrawals` の請求権が leaf。escrow を持つ者に inclusion proof を渡せる。請求権の葉が amount を sum に持つので、**出金では root の合計が動かない** —— 合計を下げるのは settle だけで、実際に誰かに払うのも settle だけ |
+| 3. `:bridge-authority` が root に無い | **閉じた**（torihiki `f43481c9`）。`:oracle-publishers` も一緒に。設定の違う 2 replica が同じ root を出しながら誰が mint できるかで食い違う状態を解消 |
+| 4. 準備金証明 | **閉じた**（torihiki `dfd438d1`）。台帳の予告どおり非負性が前提で、`clearing/settle-deficit` が不良債権を負の collateral から正の `:deficit` へ移す。葉 sum が collateral、root の sum が `commit/reserves` |
+| 1. block store と head ref | **未着手**。CID から bytes を引く先は今も Durable Object storage。`inga.ref` と provider は未接続 |
+| 5. sequencer chain の authority nil | **未着手** |
+
+分類 3 のうち 2 件:
+
+- **清算の自動駆動 — 閉じた**（torihiki `04b6abe3`）。`apply-block` が transaction の
+  あと全市場を sorted order で sweep する。**準備金証明を入れた今、keeper 依存は
+  矛盾でもあった** —— 誰かが起きている間だけ信用できる数は attestation ではない。
+  同時に、mark の無い市場への `:liquidate` が `throw` して chain を止められた穴も
+  塞いだ（`apply-block` の docstring が自分で禁じている「1 transaction で全 validator が
+  同じ場所で止まる」に該当していた）。
+- **WebSocket 購読 — 閉じた**（torihiki-node `544859a0` + `c94b56cc`、terminal `9d8df4c`）。
+  deploy 済み。
+
+## socket は latency の最大単独項だった
+
+端末の 1500 ms polling は、実測 end-to-end 約 2,600 ms のうち平均 750 ms を占めていた。
+ブロックは ~336 ms 間隔なので、**ページは見ている chain より 4 倍遅く、height の
+約 7 割を一度も観測していなかった。**
+
+**最初の実装は commit で起こしていて、置き換えた poll より遅かった。** live A/B で
+中央値 625 ms の負け。chained HotStuff は 3 ラウンド遅れて commit するので
+`committed` は `height` より約 2 ブロック後ろで、`/head` が報告し端末が表示するのは
+`height` の方だった。tip で起こすよう直して測り直した:
+
+```
+                        commit で起こす      tip で起こす
+  poll がどれだけ遅いか   中央値 -625 ms      中央値 +529 ms
+                        p90    -186 ms      p90    +1370 ms
+  push が見た height          69                 86
+  poll が一度も見なかった      42                 60
+```
+
+**この教訓を一般化しておく: 置き換えた相手に対して測っていなければ、この回帰は
+気付かれずに landed していた。**「push は poll より速いに決まっている」は
+測定ではない。
+
+## 残る latency —— ここから先は Cloudflare を出ないと動かない
+
+socket が消したのは待ち時間であって、合意そのものではない。残りの内訳（実測）:
+
+| 区間 | 実測 | 効く手 |
+|---|---|---|
+| ブロック間隔 | 336–420 ms | 20 ms にするには配送が 1 ms 未満である必要。DO 間 HTTP は数十 ms |
+| commit 深さ | 3 ラウンド | Jolteon / DiemBFT 型の 2-chain commit で 1 ラウンド分 |
+| pacemaker deadline | 980 ms | ブロック間隔の 3 倍。詰められる |
+| 端末の反映 | **解消** | socket |
+
+ADR-2608025400 の実測（`NET_DELAY=20` で committed blocks が 0）が効いてくる。
+**Hyperliquid の ~0.07 s は同一 DC の co-location でしか出ない** —— HL 自身が
+validator を co-locate しているのは同じ制約への同じ答え。
+
+## 未 deploy の fork —— 次に触る人が最初に読むこと
+
+torihiki main の 3 件（governance leaf / `:deficit` / `:withdrawals`）は**すべて
+state 符号化を変える**。両側の replica は同一 state に対して別の root を計算し、
+それは root が捕まえるために在る divergence bug とまったく同じ形。
+
+- **torihiki-node は `torihiki` を `fa3a8e0c` で pin している。** pin を進めた瞬間が fork
+- 1.26M ブロックの履歴は旧符号化で certificate が付いているので、**rolling upgrade は
+  成立しない**。genesis からやり直すのが正しい形
+- devnet で collateral は unbacked、つまり捨てるものが無い今が一番安い瞬間で、
+  金を入れる直前という正しいタイミングでもある
+- parity の現在地: flat `3f9a3f3f…` / state `6c887796…`（JVM と nbb で一致）
+- テスト: 191 tests / 547 assertions, 0 failures（着手時 173/499）
+
+## 分類 3 の残り
+
+TWAP / scale / amend / cancel-all、fee tier / builder / referral、sub-account /
+agent wallet、user fills 履歴、multi-market の実運用、oracle の stake 加重。"}]
