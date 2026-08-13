@@ -195,10 +195,44 @@ rather than only retrospective: **every repo split must audit relative
 
 ## Resume point
 
-0. `orgs/net-kotobase/engine` -> `kotobase-object-store-b2-s3` (above). Owner of
-   the net-kotobase split should either extract that package into its own repo
-   and register it, or retarget the dep. Re-check with
-   `nbb scripts/west-orphan-audit.cljs --blocking`.
+0. ~~`orgs/net-kotobase/engine` -> `kotobase-object-store-b2-s3`~~ **DONE**
+   (net-kotobase/engine#2, root#2139; `local-root-broken: 0`, exit 0).
+
+   **The diagnosis above was partly wrong and is corrected here.** There was no
+   stalled split. `network-awai/net-kotobase` was **renamed** to
+   `net-kotobase/control-plane` — same repo, new org and name — so the package
+   and two of its three apparent consumers still sit inside it and resolve
+   correctly as siblings. Only `engine`, which genuinely did become its own
+   repo, had a dangling `../`. The audit's `consumers=1` was right; the claim of
+   three broken consumers came from grepping for the package name and counting
+   hits **without resolving each `../` against the file's own directory**.
+   Resolve before counting.
+
+   Fixed as a pinned git dep with `:deps/root` rather than a re-pointed relative
+   path, because the other six dependencies in that file are already
+   `:git/url` + `:git/sha` — the `:local/root` was the lone leftover. That also
+   removes the path-depth fragility instead of moving it one directory over.
+
+   Two defects in the tooling surfaced while doing it, both now fixed:
+
+   - **`west-orphan-audit` counted paths mentioned in `;;` comments as real
+     dependencies** (it regexed raw text). After repairing the dep and writing a
+     comment explaining what it used to be, the audit kept reporting the same
+     edge — the explanation of the fix re-triggered the alarm it described. A
+     check that goes red when you document a change teaches people not to
+     document changes. `strip-edn-comments` now respects string literals so a
+     path containing `;` still parses; verified on 5 cases plus a live negative
+     control.
+   - **`west-pin-put engine` resolves to `kotoba-lang/engine`, not
+     `net-kotobase/engine`.** West entry names are not repo names: the correct
+     entry is `net-kotobase-engine` (`repo-path: engine`). The wrong call was a
+     no-op by luck, not by design. Check `path:` in west.yml before advancing a
+     pin by name.
+
+   Known coverage gap, documented not fixed: the audit scans only
+   `orgs/<org>/<repo>/deps.edn`, so nested package `deps.edn` inside
+   monorepo-shaped repos (`control-plane`) are never scanned. They resolve
+   correctly today, so this is missing coverage rather than a missed break.
 1. ~~Fix the `parents: 0` fallback in `scripts/cleanup-land.cljs`~~ **DONE**
    (root#2128, merged 2026-08-12). `gh-ref` now returns
    `{:state :found/:absent/:error}` and treats only `(HTTP 404)` as absent;
