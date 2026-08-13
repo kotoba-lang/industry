@@ -33,9 +33,9 @@ compiler という前提で、linker と関連 repo をその宇宙に揃える�
 
 ADR-2607266000 の **repo 分割と依存方向は維持する**。変えるのは製品面の名前と、
 「誰がどの結びを持つか」。コードを kototama へ物理マージして checkable な
-依存方向を消さない。`tender-component` の Rust micro-TCB を kototama core に
-戻さない（同 ADR 決定 4）。`wasm-webcomponent` を kototama に再吸収しない
-（他 repo が採用できるように抽出した、ADR-2607061630）。
+依存方向を消さない。`kototama-component`（旧 `tender-component`）の Rust
+micro-TCB を kototama core に戻さない（同 ADR 決定 4）。`wasm-webcomponent`
+を kototama に再吸収しない（他 repo が採用できるように抽出した、ADR-2607061630）。
 
 ## 存在として名前を持つもの
 
@@ -70,15 +70,15 @@ murakumo   叢雲        どこに置くか（配置。grant しない）
 
 ## T3 — kototama の宿（畳むが、repo は残す）
 
-製品面では全部 kototama。GitHub 名 `tender-*` は歴史的 alias で、west 改名は
-別 pass（deps.edn 座標が多数ある）。adapter は kototama を依存し、kototama core
-は adapter を同梱しない。
+製品面では全部 kototama。GitHub / west 名は 2026-08-13 に改名した
+（repository id 不変、旧名は GitHub redirect）。adapter は kototama を依存し、
+kototama core は adapter を同梱しない。
 
 | repo | kototama の中での役割 |
 |---|---|
 | `kototama` | 契約、admission、budget、実行の境界。製品入口 |
-| `tender-native` | native の宿。ns は既に `kototama.native.executor` |
-| `tender-component` | Component engine の宿（Wasmtime micro-TCB はここに隔離） |
+| `kototama-native`（旧 `tender-native`） | native の宿。ns は既に `kototama.native.executor` |
+| `kototama-component`（旧 `tender-component`） | Component engine の宿（Wasmtime micro-TCB はここに隔離） |
 | `wasm-webcomponent` | ブラウザの宿。抽出済みの採用ライブラリのまま |
 
 `provider` 族は言霊が結ぶ先であり、kototama に同梱しない。
@@ -120,9 +120,11 @@ aiueos の grant と provider。逆流させない。
 ## この ADR で着地するもの / しないもの
 
 着地: 本 ADR、概念索引、対象 README の名乗り、kototama の host 表、
-ADR-2607266000 の製品名の現在地。
+ADR-2607266000 の製品名の現在地。2026-08-13 追記: GitHub / west 改名
+`tender-native` → `kototama-native`、`tender-component` → `kototama-component`
+（id 1312673399 / 1312921812）。旧 URL は redirect。
 
-しない: GitHub repo 改名、`tender-*` の tree を kototama へコピー、
-`wasm-webcomponent` の再吸収、`musubi` 新設。west 改名は deps 座標の
-sweep が別 pass。
+しない: `tender-*` の tree を kototama へコピー、`wasm-webcomponent` の再吸収、
+`musubi` 新設。fleet-db への改名吸収は west.yml 先行のあと reconcile で行う
+（ADR-2608040190）。本 pass では 1437 pin の一括吸収を混ぜない。
 "}]
