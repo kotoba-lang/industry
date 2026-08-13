@@ -1428,4 +1428,30 @@
    :script "gates/kotoba-provider-orphan-check.cljs" :script-args ["--min" "1"]
    :ship-self-bundle true :cd false}
   ;; ────────────────────────────────────────────────────────────────────────
+  ;; babashka facade — a task registry that shells back out to the retired `bb` binary
+  ;; (ADR-2607173000 retired it; ADR-2608135000 converted the last four). Registered PER REPO,
+  ;; not on the superproject, and that is the whole point: the fleet ships a repo's OWN tree, and
+  ;; the superproject's tree contains ZERO scripts/tasks.edn — every registry lives in a west
+  ;; child. A root-level gate would report "0 facades" forever without ever having looked at one,
+  ;; which is the failure ADR-2608130800 already names (a gate that cannot pose its question).
+  ;;
+  ;; Only repos MEASURED green on 2026-08-13 are listed. Two are knowingly absent and are owed:
+  ;;   etzhayyim/root         3 surviving bb.edn under 50-infra/app-aozora-repo,
+  ;;                          50-infra/etzhayyim-atproto-pds-clj and 70-tools/coverage-scan
+  ;;   network-awai/cloud-itonami  scripts/split-kotoba-kernels.bb, which needs a source port
+  ;;                          (babashka.fs + absolute *file*), not a task rename
+  ;; Adding either now would land a gate red on arrival, which this workspace already has enough
+  ;; of; fix first, then register.
+  {:name "webgpu" :id "babashka-facade-webgpu" :org "kotoba-lang" :gate :nbb-script
+   :script "gates/babashka-facade-check.cljs" :script-args ["--min-tasks" "1"]
+   :include-ext [".edn" ".bb"] :min-files 1 :cd false}
+  {:name "kami-isekai-assets" :id "babashka-facade-kami-isekai-assets" :org "kotoba-lang"
+   :gate :nbb-script
+   :script "gates/babashka-facade-check.cljs" :script-args ["--min-tasks" "2"]
+   :include-ext [".edn" ".bb"] :min-files 1 :cd false}
+  {:name "com-etzhayyim-tomoshibi" :id "babashka-facade-tomoshibi" :org "etzhayyim"
+   :gate :nbb-script
+   :script "gates/babashka-facade-check.cljs" :script-args ["--min-tasks" "3"]
+   :include-ext [".edn" ".bb"] :min-files 1 :cd false}
+  ;; ────────────────────────────────────────────────────────────────────────
   ]}

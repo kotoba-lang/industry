@@ -1,6 +1,7 @@
 (ns gitoffice-test
   "Round-trip + invariant tests for the GitOffice Phase 0 converters.
-   Run: bb test  (from this dir)."
+   Run: nbb scripts/run-task.cljs test  (from this dir; see scripts/tasks.edn, which runs
+   these under the JVM because they name clojure.lang.ExceptionInfo)."
   (:require [clojure.test :refer [deftest is testing run-tests]]
             [gitoffice :as g]))
 

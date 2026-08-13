@@ -23,7 +23,7 @@ GitHub 風 PR の前提条件である「文書 = 要素粒度 datom」への変
 | `gitmerge_test.clj` | Phase 3 マージ + 衝突 + 並行挿入テスト |
 | `gitpolicy.cljc` | **merge gate**: 必須承認 / stale 失効 / 必須レビュアー / required CI + land-pr（doc e §5-6） |
 | `gitpolicy_test.clj` | merge gate + land-pr テスト |
-| `bb.edn` | `bb test` タスク（全モジュールを実行） |
+| `scripts/tasks.edn` + `scripts/run-task.cljs` | `nbb scripts/run-task.cljs test` タスク（全モジュールを実行）。bb.edn から変換（ADR-2608135000） |
 
 ### 変換器（実コードで検証済）
 
@@ -40,7 +40,7 @@ GitHub 風 PR の前提条件である「文書 = 要素粒度 datom」への変
 
 ```bash
 cd docs/gftd-office/p1-gitoffice
-bb test
+nbb scripts/run-task.cljs test
 # gitoffice 13/40 ; gitdiff 7/22 ; gitmerge 8/25 ; gitpolicy 8/28 ; 0 failures, 0 errors
 ```
 
@@ -96,7 +96,7 @@ p0 由来の `v-one`（`some` ベース）は **格納された boolean `false` 
 
 | 実装 | 場所 | 役割 | 検証 |
 |---|---|---|---|
-| 参照 (.cljc) | `docs/gftd-office/p1-gitoffice/` | 仕様 + bb テスト | `bb test`（36 tests/115 assert） |
+| 参照 (.cljc) | `docs/gftd-office/p1-gitoffice/` | 仕様 + テスト | `nbb scripts/run-task.cljs test`（36 tests/115 assert） |
 | kotoba CLJS | `kotoba/crates/kotoba-wasm/web/cljs/src/kotoba/gitoffice*.{cljc,cljs}` | 本番（ブラウザ wasm node 駆動 + ESM export） | `shadow-cljs release` **0 warnings** + 同 36 bb tests |
 | Python edge | `etzhayyim/root/60-apps/etzhayyim-project-{docs,sheets}/lg/.../gitoffice_normalize.py` | 既存 FastAPI アプリの edge で blob⇄datom | pytest（docs 7 / sheets 5）+ **既存回帰なし** |
 

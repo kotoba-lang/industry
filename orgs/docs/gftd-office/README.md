@@ -23,7 +23,7 @@
 
 doc e の **Phase 0**（選択肢 1=正規化）は参照実装で実証済み:
 [`p1-gitoffice/`](./p1-gitoffice/README.md) — blob⇄要素粒度 datom 変換 + revision 橋渡し +
-issue/pr/review/comment ⇄ datoms（`bb test` → 13 tests / 40 assertions / 0 fail）。
+issue/pr/review/comment ⇄ datoms（`nbb scripts/run-task.cljs test` → 13 tests / 40 assertions / 0 fail）。
 
 ## 実装順の推奨
 
@@ -42,7 +42,7 @@ doc a Phase 1-2 + doc b Phase 0-1 の**ロジック層**を kotoba CLJS ツリ�
 |---|---|
 | `kotoba/crates/kotoba-wasm/web/cljs/src/kotoba/office.cljc` | 組織前提オフィスの datom 変換 + `transact/commit/datomicQ` 駆動（CLJS）+ v_edn コーデック |
 | `kotoba/crates/kotoba-wasm/web/cljs/src/kotoba/cacao.cljc` | grant→CACAO payload + `siwe_message` byte 一致再現 + 注入式署名 |
-| `…/cljs/src/kotoba/office_test.clj` | bb テスト（wire round-trip + siwe byte 一致）。`bb --classpath src -e "(require 'kotoba.office-test)(kotoba.office-test/-main)"` → 7 tests / 21 assertions / 0 fail |
+| `…/cljs/src/kotoba/office_test.clj` | bb テスト（wire round-trip + siwe byte 一致）。`nbb --classpath src -e "(require 'kotoba.office-test)(kotoba.office-test/-main)"` → 7 tests / 21 assertions / 0 fail |
 | `…/cljs/shadow-cljs.edn` | `storeDocument`/`loadDocument`/`storeOrg`/`storeGrant`/`grantToCacaoB64` を ESM export 追加 |
 
 ### CACAO の wasm-bindgen 露出（実装・実機検証済）
