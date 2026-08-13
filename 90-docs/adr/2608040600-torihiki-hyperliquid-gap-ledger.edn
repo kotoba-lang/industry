@@ -339,6 +339,43 @@ tick から 60 秒ごとに自問する（button 式の修復は、誰も見て�
 再起動 + 統一コードでの replay によるもので、`adopted` は全台 null。
 次に同じことが起きたときのためのもの。
 
+## 未解決の欠陥（2026-08-13 実測、再現する）—— spot 市場が上場されない
+
+`:list-market` transaction が **mempool に入ったまま block に入らない。**
+拒否もされず、nonce も消費しない。
+
+```
+  POST /markets → listed [{market 3, nonce 31}]
+  /head:  pending 2、txs-in-chain 2、last-error null
+  bridge next-nonce 31 のまま（30 分以上）
+  refused カウンタは一切動かない
+```
+
+**測って反証した仮説（記録として残す）:**
+
+1. **nonce の推測** —— 実在した別の欠陥で、修正済み（`lastFaucetNonce` が
+   送信で進み、認証失敗は nonce を消費しないので永久の gap を作っていた）。
+   修正後 faucet は nonce 13 で着地する。**これは原因ではない**
+2. **leader にしか mempool が無い** —— w1/w2/w3/w4 の全てに送った。どれも同じ
+3. **未知の拒否理由が符号化で throw する** —— `encode-rejections` は
+   `(get reason-codes reason 0)` で既定値を持つので throw しない。ただし
+   **5 つの理由が code 0 に潰れていた**のは実バグで、別途修正した（`6ba627a7`）
+4. **入れ子の `:spec` が wire を通れない** —— fee tier の amend が同じ症状を
+   出したとき分割して通ったが、**同時に deploy 世代も変わっていた**ので
+   分割が効いたとは言えない
+
+**確定していること:** 他の transaction は着地する（faucet・bond・spot 注文・
+市場の amend）。この 1 種類だけが滞留する。`why-not-proposing` は w1 について
+`my-turn false` を持続的に返す（`leader-of-next` が 18 秒間 w2 のまま —— 高さが
+進んでいるなら回るはずで、これ自体が次に見るべき手がかり）。
+
+**次の実験:** w1 の `next-height` が実際に進んでいるかを `why-not-proposing`
+と `last-proposal.height` の両方で同時に読む。回っていないなら leader 選出が
+固まっており、それは「1 種類の tx だけ落ちる」より広い障害を意味する。
+
+engine 側の spot は完成していてテストが通っている（274 tests）。**live に
+出ていないのはこの 1 点。**
+
 ## 分類 3 の残り
 
 TWAP / scale / amend / cancel-all、fee tier / builder / referral、sub-account /
