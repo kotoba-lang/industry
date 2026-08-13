@@ -1,14 +1,14 @@
 {:health-status 200,
  :zone-name "isekai.network",
  :zone
- {:requests-7d 9500,
-  :pageviews-7d 4556,
-  :uniques-7d-sum 544,
+ {:requests-7d 9506,
+  :pageviews-7d 4558,
+  :uniques-7d-sum 545,
   :zone "isekai.network"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 84}
+  [{:path "/", :requests 82}
    {:path "/robots.txt", :requests 33}
    {:path "/feed/fork-stats.edn", :requests 24}
    {:path "/api/liveops", :requests 14}
@@ -16,14 +16,14 @@
    {:path "/api/analytics", :requests 13}
    {:path "/api/scores", :requests 8}
    {:path "/gftd/shiro-pico", :requests 4}],
-  :status-mix {:ok 1556, :server-error 3, :client-error 5},
+  :status-mix {:ok 1555, :server-error 3, :client-error 5},
   :channel-mix
-  {:channel 239, :probe 1256, :unclassified 61, :ok-total 1556},
+  {:channel 237, :probe 1256, :unclassified 62, :ok-total 1555},
   :window "24h"},
  :as-of "2026-08-13",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx・channel-allowlist済): / 84 · /robots.txt 33 · /feed/fork-stats.edn 24 · /api/liveops 14 · /js/app.js 13 | 4xx(probe) 0% · 5xx 0% · probe(200-fallback) 81% · unclassified 4%",
+ "上位 page (24h, 2xx/3xx・channel-allowlist済): / 82 · /robots.txt 33 · /feed/fork-stats.edn 24 · /api/liveops 14 · /js/app.js 13 | 4xx(probe) 0% · 5xx 0% · probe(200-fallback) 81% · unclassified 4%",
  :signal
- "isekai.network 実測 9500 req/7d・544 uniques(日次和)・うち4xx probe 0%(24h)",
+ "isekai.network 実測 9506 req/7d・545 uniques(日次和)・うち4xx probe 0%(24h)",
  :fork {:fork-origin-ratio 0, :viral-coefficient 0, :weekly 0}}

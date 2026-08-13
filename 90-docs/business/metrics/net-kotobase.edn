@@ -1,11 +1,11 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 1971508, "kotobase-cf-wasm-staging" 2005289},
+ {"net-kotobase" 1974165, "kotobase-cf-wasm-staging" 2007525},
  :zone
- {:requests-7d 2067065,
-  :pageviews-7d 1446,
-  :uniques-7d-sum 983,
+ {:requests-7d 2070435,
+  :pageviews-7d 1453,
+  :uniques-7d-sum 988,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
@@ -34,7 +34,7 @@
    {:path
     "/ipld/bafyreibwj5houzpspeicpbeurq7uhslajovyusrcxu6fmrgwhmco5ynkl4",
     :requests 16}],
-  :status-mix {:ok 1718, :client-error 3, :server-error 1},
+  :status-mix {:ok 1749, :client-error 3},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -48,10 +48,10 @@
  :as-of "2026-08-13",
  :traffic-quality {:window "24h", :probe-4xx-pct 0, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /ipld/bafyreihifalqagccl5tfnlzrc3r4z6l35… 98 · /ipld/bafyreic5d2ndjckatncq2lym4se2v62p2… 33 · /ipld/bafyreicemqccpm47hsavtoiakcmmbd4vl… 20 · /ipld/bafyreigi4vp2jzj45ldn3on43fkvp27wl… 18 · /ipld/bafyreih4akflt2lqdqq62rhlzpjgmzj5h… 18 | 4xx(probe) 0% · 5xx 0%",
- :funnel {:visitors 2955, :signups 25, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /ipld/bafyreihifalqagccl5tfnlzrc3r4z6l35… 98 · /ipld/bafyreic5d2ndjckatncq2lym4se2v62p2… 33 · /ipld/bafyreicemqccpm47hsavtoiakcmmbd4vl… 20 · /ipld/bafyreigi4vp2jzj45ldn3on43fkvp27wl… 18 · /ipld/bafyreih4akflt2lqdqq62rhlzpjgmzj5h… 18 | 4xx(probe) 0%",
+ :funnel {:visitors 2960, :signups 25, :checkouts 0},
  :signal
- "kotobase.net 実測 2067065 req/7d・983 uniques(日次和)・うち4xx probe 0%(24h)、workers 3976797 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 2070435 req/7d・988 uniques(日次和)・うち4xx probe 0%(24h)、workers 3981690 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 18,
   :submissions 3,
@@ -60,6 +60,6 @@
   :attempt-rate 0.16666666666666666,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 1427},
+ {:visitors {:openai-ads 3, :organic 1432},
   :signups {:organic 22}, 
   :checkouts {}}}
