@@ -119,9 +119,18 @@ gate から落ちる。だから `temperature` / `top_p` の clamp を
 | decision core 3 本（route / options / session） | `inference` `ce04bcb` | `test-inference-ce04bcb-murakumo-judah` OK（49 tests / 331 assertions） |
 | engine kernel（dot / sum-of-squares / inv-rms / max-element / clamp × 2） | `inference` `1b9d602` | `test-inference-1b9d602-murakumo-judah` OK（57 / 361） |
 | softmax（exp-shifted / softmax-denominator）と silu | `inference` `817e33d` | `test-inference-817e33d-murakumo-levi` OK（60 / 379） |
+| `POST /api/chat`（ollama_chat_core: role と、会話が終わってよい role） | `inference` `ad53430` | `test-inference-ad53430-murakumo-judah` OK（66 / 434） |
+| OpenAI `/v1/chat/completions` + `/v1/models`（openai_chat_core） | `inference` `fc41669` | この tip 単独では未 gate —— batch が切られる前に tip が進んだ。**中身は 92714c6 の run に含まれて緑**（tip 駆動 CI は現 tip を走らせる） |
+| memory budget（LRU eviction）と compound `keep_alive` | `inference` `92714c6` | `test-inference-92714c6-murakumo-judah` OK（77 / 534） |
+| 固定プローブ外の生成を実測して maturity に記録 | `inference` `19e3402` | `test-inference-19e3402-murakumo-judah` OK（77 / 534） |
 | fleet gate（gates.edn の inference 行、:gate :jvm-test / :cd true） | `scripts/fleet-ci/gates.edn` | 3 tip 連続で緑、別ノード 2 台（judah / levi）で実行 |
 
-west pin は `817e33d` まで前進済み（毎回 `verify-west-pins.cljs` で fast-forward を確認）。
+west pin は `19e3402` まで前進済み（毎回 `verify-west-pins.cljs` で fast-forward を確認）。
+gate は 2 ノード（judah / levi）で計 5 tip 分緑。
+
+**別途 landed（この ADR の範囲外だが同じセッション）**: ADR-2608139800（言語 authority
+文書の両方向 drift）/ ADR-2608140000（engine は 7 月に直っており、文書が 41 日ズレていた
+——実測して `cloud-murakumo-studio` README `8adf2df` を訂正）。
 
 ### 着地していないもの — bytes 読み取り
 
