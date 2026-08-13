@@ -20,6 +20,16 @@
   ⚠ この runner は **claim した job を実行する** = repo を clone して
   allowlist されたコマンドを回す。allowlist は runner 側（actions-runner.mjs の
   actionCatalog）にあり、control plane の応答では注入できない。
+
+  path について（2026-08-13、ADR-2608138600）: ここは
+  `orgs/network-awai/cloud-murakumo` = **west が宣言している path**。
+  2026-08-05〜2026-08-13 は `orgs/gftdcojp/cloud-murakumo` を指していたが、
+  あれは west 未登録の shadow（同じ repository id 1285031835 の重複 checkout）で、
+  撤去されれば runner が止まる。両 slug は `gh api repos/<slug>` で同じ id を返す
+  ——**rename ledger ではなく id で確かめること**。
+  runner 自身は cwd に依存しない（`node:` 組み込みのみを import し、
+  actionCatalog の `cwd` は clone 先の temp dir 相対）。WorkingDirectory は
+  「撤去されない path を指す」という意味しか持たない。
 -->
 <plist version="1.0">
 <dict>
@@ -29,10 +39,10 @@
     <string>/bin/sh</string>
     <string>-c</string>
     <!-- token はファイルから読んで env に入れる。argv には載せない（ps 露出）。 -->
-    <string>export MURAKUMO_ACTIONS_RUNNER_TOKEN="$(cat $HOME/.gftd/murakumo-actions-runner-token)"; export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; exec node /Users/junkawasaki/github/com-junkawasaki/orgs/gftdcojp/cloud-murakumo/scripts/actions-runner.mjs</string>
+    <string>export MURAKUMO_ACTIONS_RUNNER_TOKEN="$(cat $HOME/.gftd/murakumo-actions-runner-token)"; export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin; exec node /Users/junkawasaki/github/com-junkawasaki/orgs/network-awai/cloud-murakumo/scripts/actions-runner.mjs</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/junkawasaki/github/com-junkawasaki/orgs/gftdcojp/cloud-murakumo</string>
+  <string>/Users/junkawasaki/github/com-junkawasaki/orgs/network-awai/cloud-murakumo</string>
   <key>EnvironmentVariables</key>
   <dict>
     <!-- 5 秒間隔だと空 queue でも control plane を叩き続ける。30 秒で十分。 -->
