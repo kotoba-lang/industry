@@ -261,8 +261,36 @@
     (catch :default _
       abs)))
 
+(defn strip-edn-comments
+  "行コメント（`;` 以降）を落とす。文字列リテラルの中の `;` は残す。
+
+  なぜ要るか（2026-08-13 実測）: :local/root の走査は生テキストに正規表現を当てて
+  いたので、**コメントに書かれたパスを本物の依存として数えていた**。壊れた
+  `:local/root` を git dep に直し、その経緯を `;; これは以前 {:local/root \"../x\"}
+  だった` と説明として書き添えたところ、直したはずの blocking edge が消えず、
+  同じ 1 件を報告し続けた —— 修正の説明そのものが警報を再点火していた。
+  ドキュメントを書くと検査が赤くなる仕掛けは、ドキュメントを書かせない方向に効く。"
+  [text]
+  (->> (str/split-lines text)
+       (map (fn [line]
+              (loop [i 0 in-str? false]
+                (cond
+                  (>= i (count line)) line
+                  :else
+                  (let [c (nth line i)]
+                    (cond
+                      (and in-str? (= c \\)) (recur (+ i 2) true)
+                      (= c \")               (recur (inc i) (not in-str?))
+                      (and (not in-str?) (= c \;)) (subs line 0 i)
+                      :else                  (recur (inc i) in-str?)))))))
+       (str/join "\n")))
+
 (defn scan-local-root-deps
-  "orgs/*/*/deps.edn の :local/root を走査し、未存在 or west 未登録を列挙。"
+  "orgs/*/*/deps.edn の :local/root を走査し、未存在 or west 未登録を列挙。
+
+  ⚠ 走査するのは **project 直下の deps.edn だけ**。monorepo 的に
+  `orgs/<org>/<repo>/<package>/deps.edn` を持つ repo（例 net-kotobase/control-plane）の
+  入れ子 deps.edn は対象外なので、そこの :local/root は検出されない。"
   [west]
   (let [orgs-root (node-path.join root "orgs")
         hits (atom [])]
@@ -270,7 +298,9 @@
             repo (list-dirs org)
             :let [deps (node-path.join repo "deps.edn")]
             :when (exists? deps)
-            :let [text (or (read-text deps) "")]
+            ;; コメントを落としてから走査する。落とさないと、修正の経緯を書いた
+            ;; コメントが依存として数えられる（strip-edn-comments の docstring 参照）。
+            :let [text (strip-edn-comments (or (read-text deps) ""))]
             :when (str/includes? text ":local/root")]
       (doseq [[_ target-rel] (re-seq #":local/root\s+\"([^\"]+)\"" text)]
         (let [abs (node-path.resolve repo target-rel)
