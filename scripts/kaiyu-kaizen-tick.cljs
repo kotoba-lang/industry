@@ -72,6 +72,19 @@
     :keychain "net-kotobase KAIYU_REPORT_SECRET"
     :header "authorization-bearer"
     :live-since "2026-08-07"
+    ;; Declared, not guessed: `kotobase.kaiyu-store` returns
+    ;; `:dwell (kaiyu/section win [] nil)` as a literal constant, and its own ns
+    ;; docstring says why — 「Dwell is not measured here.」 The site is generated
+    ;; build-time from the kotoba-ui authoring namespaces and serves no client
+    ;; script, so there is no beacon that could be broken. Without this the
+    ;; diagnosis asks a three-way question whose three answers are all wrong,
+    ;; nobody can close it, and the `:blocked` short-circuit hides every site
+    ;; rule for this site — from the window ending 2026-08-13, the first one
+    ;; whose `from` reached `:live-since`, the acquisition finding that had been
+    ;; top in all five recorded rounds before it stopped being evaluated. A
+    ;; declaration the read face contradicts is itself `:blocked`, so this
+    ;; cannot quietly outlive what it describes.
+    :uninstrumented #{:dwell}
     :shape :kotobase}
    {:site "itonami.cloud"
     :tenant {:org "network-awai" :repo "cloud-itonami"}
@@ -176,11 +189,17 @@
                                       :window win
                                       :vocabulary (vocabulary-of sections)
                                       :site-live-since (:live-since site)
+                                      :uninstrumented (:uninstrumented site)
                                       :sections sections})
               top (dx/top-finding diagnosis)]
+          ;; `:uninstrumented` rides along even when empty. A section this loop
+          ;; has agreed not to ask about must be visible in the same breath as
+          ;; the finding count, or a reader counts 1 finding and reads silence
+          ;; on the rest as health.
           (cond-> {:site (:site site)
                    :tenant (:tenant site)
                    :status (if (:blocked? diagnosis) :measurement-blocked :ok)
+                   :uninstrumented (vec (sort (map name (:uninstrumented diagnosis))))
                    :finding-count (count (:findings diagnosis))}
             top (assoc :top (select-keys top [:id :severity :title :question :evidence])
                        :issue (dx/->issue diagnosis top))))))
@@ -193,9 +212,11 @@
     (println (js/JSON.stringify (clj->js {:window win :results results :candidates candidates}) nil 2))
     (do
       (println (str "kaiyu-kaizen-tick: window " (:from win) "〜" (:to win)))
-      (doseq [{:keys [site status finding-count top]} results]
+      (doseq [{:keys [site status finding-count top uninstrumented]} results]
         (println (str "  " site "  " (name status)
                       (when finding-count (str "  findings=" finding-count))
+                      (when (seq uninstrumented)
+                        (str "  未計測(宣言)=" (str/join "," uninstrumented)))
                       (when top (str "\n      → [" (name (:severity top)) "] " (:title top))))))
       (println (str "candidates: " (count candidates)))))
   (js/process.exit 0))
