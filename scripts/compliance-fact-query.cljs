@@ -38,9 +38,13 @@
   [{:label "cloud-itonami-iso3166-jpn statute.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-iso3166-jpn/schema/statute.edn"
     :data "orgs/cloud-itonami/cloud-itonami-iso3166-jpn/data/datascript-tx.edn"}
-   {:label "etzhayyim/global-legislation-datoms legal-source"
-    :schema "orgs/etzhayyim/global-legislation-datoms/schema/legislation.edn"
-    :data "orgs/etzhayyim/global-legislation-datoms/data/datascript-tx.edn"}
+   ;; 2026-08-13 (ADR-2608137200): repointed from the west-UNDECLARED duplicate
+   ;; checkout `orgs/etzhayyim/global-legislation-datoms` to the declared path.
+   ;; Same GitHub repository (id 1296249072); both schema and data files were
+   ;; byte-identical at the time of the move.
+   {:label "kotoba-lang/global-legislation-datoms legal-source"
+    :schema "orgs/kotoba-lang/global-legislation-datoms/schema/legislation.edn"
+    :data "orgs/kotoba-lang/global-legislation-datoms/data/datascript-tx.edn"}
    {:label "cloud-itonami-municipality-jpn-tokyo ordinance.facts"
     :schema "orgs/cloud-itonami/cloud-itonami-municipality-jpn-tokyo/schema/ordinance.edn"
     :data "orgs/cloud-itonami/cloud-itonami-municipality-jpn-tokyo/data/datascript-tx.edn"}

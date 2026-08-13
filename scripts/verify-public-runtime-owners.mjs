@@ -29,9 +29,19 @@ for (const path of tracked) {
   }
 }
 
+// The commercial-hosting orgs. This was a single `orgs/gftdcojp/` prefix until
+// 2026-08-13 (ADR-2608137200): the repos that serve these hosts were transferred
+// out of gftdcojp, so the rule asserted an org that no longer owned anything and
+// only stayed quiet because every stale path failed the existsSync skip below.
+// The invariant that matters is unchanged — a public custom domain is never
+// owned out of `orgs/kotoba-lang/` (enforced against tracked files above too).
+const PUBLIC_OWNER_ORGS = ["orgs/gftdcojp/", "orgs/network-awai/", "orgs/net-kotobase/"];
+
 const errors = [];
 for (const [host, owner] of Object.entries(owners)) {
-  if (!owner.startsWith("orgs/gftdcojp/")) errors.push(`${host}: public owner must be in gftdcojp: ${owner}`);
+  if (!PUBLIC_OWNER_ORGS.some((o) => owner.startsWith(o))) {
+    errors.push(`${host}: public owner must be in ${PUBLIC_OWNER_ORGS.join("/")}: ${owner}`);
+  }
   if (!fs.existsSync(owner)) continue; // thin root CI; full west workspace verifies contents
   const actual = declarations.get(host) ?? [];
   if (!actual.includes(owner)) errors.push(`${host}: owner does not declare custom domain (${owner})`);
