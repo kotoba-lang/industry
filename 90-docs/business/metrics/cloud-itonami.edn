@@ -1,7 +1,7 @@
 {:bottleneck "run Stripe checkout via /isco-1212/",
  :freeClaimUrl "/isco-1212/",
  :health-status 200,
- :asOf "2026-08-13T02:57:14.666Z",
+ :asOf "2026-08-13T03:57:25.916Z",
  :freeClaim "/isco-1212/",
  :zone-name "itonami.cloud",
  :productSurfaceHint
@@ -9,8 +9,8 @@
   :note
   "scores.productSurface should be 6340/6340 when free path is live"},
  :zone
- {:requests-7d 24312,
-  :pageviews-7d 19100,
+ {:requests-7d 24541,
+  :pageviews-7d 19305,
   :uniques-7d-sum 473,
   :zone "itonami.cloud"},
  :agentRuns7d 170,
@@ -41,7 +41,7 @@
  {:bottleneck
   "free path live — first paid Checkout at /isco-1212/ (hyp/itonami-smb-pay)",
   :freeClaimUrl "/isco-1212/",
-  :asOf "2026-08-13T02:57:15.568Z",
+  :asOf "2026-08-13T03:57:26.834Z",
   :freeClaim "/isco-1212/",
   :nextOwnerActions
   [{:freeClaimUrl "/isco-1212/",
@@ -141,14 +141,14 @@
  :paths
  {:ok
   [{:path "/auth/health", :requests 264}
-   {:path "/", :requests 112}
-   {:path "/cloud-itonami-isic-0610/", :requests 91}
+   {:path "/", :requests 109}
+   {:path "/cloud-itonami-isic-0610/", :requests 92}
+   {:path "/cloud-itonami-isic-6810/", :requests 91}
+   {:path "/cloud-itonami-isic-6612/", :requests 91}
    {:path "/cloud-itonami-isic-7810/", :requests 91}
-   {:path "/cloud-itonami-isic-6810/", :requests 90}
-   {:path "/cloud-itonami-isic-6612/", :requests 90}
-   {:path "/cloud-itonami-isic-4921/", :requests 89}
-   {:path "/cloud-itonami-isic-851/", :requests 89}],
-  :status-mix {:server-error 4135, :ok 4890, :client-error 211},
+   {:path "/cloud-itonami-isic-4921/", :requests 90}
+   {:path "/cloud-itonami-isic-851/", :requests 90}],
+  :status-mix {:server-error 4184, :ok 4933, :client-error 221},
   :window "24h"},
  :source "itonami-data-kv-list",
  :note
@@ -191,7 +191,7 @@
  :ok true,
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 45},
  :top-paths
- "上位 page (24h, 2xx/3xx): /auth/health 264 · / 112 · /cloud-itonami-isic-0610/ 91 · /cloud-itonami-isic-7810/ 91 · /cloud-itonami-isic-6810/ 90 | 4xx(probe) 2% · 5xx 45%",
+ "上位 page (24h, 2xx/3xx): /auth/health 264 · / 109 · /cloud-itonami-isic-0610/ 92 · /cloud-itonami-isic-6810/ 91 · /cloud-itonami-isic-6612/ 91 | 4xx(probe) 2% · 5xx 45%",
  :freeClaimDocs "/docs/free-path.md",
  :funnel
  {:trials 5,
@@ -201,7 +201,7 @@
   :paid 0},
  :version "0.1.953",
  :signal
- "itonami.cloud 実測 24312 req/7d・473 uniques(日次和)・うち4xx probe 2%(24h)",
+ "itonami.cloud 実測 24541 req/7d・473 uniques(日次和)・うち4xx probe 2%(24h)",
  :tenants
  {:active 5,
   :external-paid 0,
