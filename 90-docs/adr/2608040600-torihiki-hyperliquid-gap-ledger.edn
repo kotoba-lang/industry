@@ -564,4 +564,57 @@ tail は tick work に追従していた。原因は `dispatch` が peer ごと�
 「~0.07 s に届かないのは transport だから、co-location を買うしかない」は**誤り**。
 床は既に届いている。届いていないのは中央値で、それは **コードで到達できる場所**
 （Durable Object の alarm 刻みと per-tick の永続化）にある。**資金判断を待つ項目
-ではなくなった。**"}]
+ではなくなった。**
+
+## engine か基盤か —— 2 つの基盤で同じコードを走らせた（2026-08-13）
+
+前の節で transport が gap ではないと分かった後、残ったのは「Durable Object の
+invocation 粒度」という**推論**だった。推論のまま資金判断を求めるべきではないので、
+測定に変えた。
+
+### Cloudflare Durable Objects の上（deployed v2、4 replica）
+
+replica 間を **常設 WebSocket** にした（message ごとの HTTP POST から）。
+64 サンプル × 4 台:
+
+              min          p50          max
+    POST     34-66 ms   160-195 ms   1372-1970 ms
+    WS       25-37 ms   184-211 ms    1980-2507 ms
+
+床は 25 ms —— **Hyperliquid の ~0.07 s を下回る**。中央値は動かない。
+
+`tick-ms` を 10 に下げて測り直した（表は旧 transport で取ったものだった）:
+
+    tick gap   min 14-50   p50 42-57   max 55-1015
+
+**alarm は 10 ms では鳴らない。** 10 を頼んで 42-57、25 を頼んで 33-43 ——
+短く頼むほど遅くなる。Durable Object の alarm には 35-55 ms 付近の床がある。
+
+### alarm の無い基盤の上（inga の実 socket harness、ローカル、4 replica）
+
+    418 block / 20 s = 48 ms/block
+
+**harness の clock は 120 ms** —— Cloudflare の 25 ms より遅い。それでも 48 ms
+ごとに block が出る。進行は clock ではなく message で駆動されており、**engine は
+48 ms を出せる。Hyperliquid より速い。**
+
+### 結論（測定であって推論ではない）
+
+同じ合意コードが:
+
+    alarm の無い基盤   48 ms/block   （clock 120 ms）
+    Durable Object    184-211 ms    （clock 25 ms、床 40 ms）
+
+**差は engine ではなく基盤にある。** deployed の block 最小 25-37 ms がそれと符合
+する: event 駆動の経路（socket 着 → 投票 → 証明書 → 提案）は Cloudflare 上でも
+目標より速い。中央値が落ちないのは、その経路が毎 block 発火せず、落ちたときの
+受け皿が 40 ms 刻みの clock だから。
+
+### だから残る 3 件は、すべてオーナー判断である
+
+- **中央値** —— platform 内の最適化は測って尽きた。次は実行基盤の選択（専用
+  プロセス / 別ランタイム）で、費用と運用の判断
+- **escrow** —— 資金判断
+- **HyperEVM** —— 独立した大規模設計の着手判断
+
+コードで到達できる範囲は、この台帳の分類 3 と合わせて**尽きた**。"}]
