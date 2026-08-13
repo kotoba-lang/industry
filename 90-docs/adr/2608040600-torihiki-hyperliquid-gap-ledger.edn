@@ -455,4 +455,73 @@ harness があるので測定はできる。deploy が通らないうちに合�
 
 ## 分類 3 の残り
 
-**無い。** 上の表がその一覧で、全て実装済み。"}]
+**無い。** 上の表がその一覧で、全て実装済み。
+
+## 「reset が効く、原因は未解明」を閉じた（2026-08-13 実測）
+
+前回この台帳に残した一行 ——「deploy を重ねると mempool の tx が block に入らなく
+なり、4 台の `/reset` で必ず回復する。なぜ提案に入らないのかは掴めていない」——
+の答え。**運用の癖ではなく、3 つの欠陥で、うち 2 つは計器そのものだった。**
+
+### 計器が嘘をついていた（2 つ）
+
+`why-not-proposing` は `:qcs` と `:votes` を `block-hash` で引いていた。replica は
+それらを **CID** で鍵付けする（`:hash-fn` は `block-cid`）。だから正常に commit
+している chain でも `tip-certified false` / `votes-for-tip 0` と読めた。**この読み
+を症状だと思って 2 度、無い票を探しに行った。**
+
+`propose` は断るとき `[state []]` を返して何も言わなかった。だから Worker は
+「誰の番か」を外から組み立て、**高さ**で決めた —— inga は **round** で決める。
+view が高さより先に走った後では別の replica を指す。計器は、提案していない replica
+について `blocked-by nothing, would-propose true` と表示していた。**証拠つきの誤答
+で、答えが無いより悪い。**
+
+### 本体: replay が過去の view で戻ってきていた
+
+`propose` が理由を喋り出した直後の読み（deployed v2、再起動直後）:
+
+    w1  not-my-round               height 6800  round 7530  leads w3  view 6703
+    w2  not-my-round               height 6800  round 7530  leads w3  view 6703
+    w3  no-certificate-for-the-tip height 6794  round 6795  leads w4  view 6703
+
+全員が「次は round 7530、率いるのは w3」で一致し、全員が 800 view 足りず、その w3
+は 6 block 遅れていた。leadership は round で回る。`replay` は chain・証明書・
+投票済みの高さを復元しながら **view だけ新品の pacemaker のまま**にしていた ——
+block の中の証明書は「親を certify した view」しか言わず、`pm/on-qc` は view を
+動かさない。
+
+**`/reset` が効いたのは、round もろとも 0 に戻して view と round を噛み合わせ直して
+いたからだった。** 魔法ではなかった。
+
+block の round は証明書と同じ意味で証拠である（その block を adopt して投票した以上、
+quorum はその view にいた）。そこまで view を上げる（単調）。
+
+### 一緒に直した 2 つ
+
+- **未証明の末尾で segment 全体を捨てない。** chained HotStuff では証明書は次の
+  block に載るので、どの segment も末尾は構造上未証明。「持っている分を全部渡す」
+  peer は必ず未証明の末尾を含み、証明済みの前半ごと捨てられていた。全体拒否は
+  主張していた安全性を最初から買えていない —— **peer は前半だけを送ることが常に
+  できる**。
+- **署名に失敗した票で高さを使い切らない。** ただし最初の版は広すぎて、署名を
+  dispatch に委ねるこの deployment（WebCrypto は非同期なので `sign-fn` を持たない）
+  を止めた。`could-not-sign` が tick ごとに増え、元の bug より強く止まった。
+  **測って、絞って、戻した。** 署名関数を持っていて何も返らないのが失敗であり、
+  持たないのは失敗ではない。
+
+### 実地の検証
+
+修正を載せた後、**`/reset` を一度も打たずに** 6793 で固まっていた chain が自力で
+回復した（6800 → 6878 → 6918、4 台が揃って前進）。e2e PASS。その状態で **もう一度
+deploy して貫通した**（7437 → 7446、4 台とも cv117）。e2e 2 回 PASS。
+
+残る窓: deploy 直後の 1 回だけ、再起動中に submit した tx が 1 本落ちる。恒久的な
+停止ではなく、次の実行で通る。
+
+gate はいずれも実装を外すと落ちることを確認済み:
+`the-certified-prefix-survives-a-bad-tail` /
+`a-vote-that-cannot-be-signed-does-not-spend-the-height` /
+`a-replica-that-signs-elsewhere-still-votes` /
+`a-replica-that-does-not-propose-says-which-condition-said-no` /
+`a-replay-does-not-come-back-behind-its-own-tip`。
+socket harness は forgery 0・equivocator 検出のまま pass。"}]
