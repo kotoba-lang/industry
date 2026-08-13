@@ -404,6 +404,48 @@ nonce 推測（実在したが別の欠陥）/ leader にしか mempool が無�
 提案が採用されない / 未知の拒否理由が符号化で throw / 入れ子の spec が wire を
 通れない —— **5 つとも測って否定した。**
 
+## transport —— コードで縮む分は縮めた（2026-08-13、inga `c014edc0`）
+
+**3-chain commit を 2-chain にした。finality が 1 ラウンド短くなる。**
+
+安全性の議論: 3-chain 則は「最も高い QC に lock する」だけの view change を
+安全にするために在る —— round が失敗した証拠が運ばれないなら、replica は
+「正当に飛ばした leader」と「歴史を書き換える leader」を区別できないので、
+3 つ目の block を待つ。**inga はその証拠を運んでいる**: `entitled-round` は親の
+1 つ先の round しか与えず、それより先を主張する提案は飛ばした round の
+new-view quorum を示せない限り拒否される。だから `round(b0)+1` の `b1` は
+競合枝がその round で生きている間に誰も作れなかった block —— 3 つ目の link が
+代役をしていた性質そのもの。Jolteon の規則に同じ前提から辿り着いた。
+
+実 socket の harness（`inga/script/network.cljs`、Byzantine validator と forger
+を内包）で測った:
+
+```
+             tip   committed        安全検査
+  3-chain    128       126     pass（forgery 0、equivocator 検出）
+  2-chain    128       127     pass（同上）
+  NET_DELAY 0 / 20 / 60 の 3 点すべてで差は 2 → 1
+```
+
+既定は `:three-chain` のまま。`:commit-rule :two-chain` を渡した replica だけが
+使う —— view change の検査を緩めた deployment には戻れる先が要る。
+
+**live には載っていない**（deploy 経路が塞がっている）。
+
+## 次に効く候補（測定から始められる）
+
+**投票の宛先。** `inga.replica` は投票を `:to :all` で全 replica に配る。
+HotStuff は次の leader にだけ送る —— 1 round あたりの message が n 分の 1 に
+なり、この harness は round-trip 律速なので直接効く。
+
+**ただし小さい変更ではない**: inga は各 replica が受け取った投票から自分で
+証明書を組む（`/head` の `tip-certificate origin: fold-vote` がそれ）。
+leader だけに送るなら、証明書は leader が組んで次の提案に載せる形に変わる。
+**証明書の組み立て経路そのものを作り替える。**
+
+harness があるので測定はできる。deploy が通らないうちに合意層をこれ以上
+動かすかは、実測できる範囲と出荷できる範囲のどちらを優先するかの判断。
+
 ## 残る差（コードではないもの）
 
 - **transport の床** —— isolate 間 HTTP が数十 ms。~0.07 s は同一 DC の
