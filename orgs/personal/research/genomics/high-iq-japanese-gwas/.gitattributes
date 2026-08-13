@@ -71,3 +71,9 @@ audit/run-2026-08-13/README.md                      annex.largefiles=nothing
 # plaintext tree are deliberately NOT in this repository.
 audit/run-2026-08-13/lock-submission/*.txt          annex.largefiles=nothing
 audit/run-2026-08-13/lock-submission/*.md           annex.largefiles=nothing
+
+# Reconstruction source for the second run, same reasoning as audit/code/**:
+# the attestation claims the reconstruction used independently implemented
+# code, and a reader cannot check that claim against an annex symlink. Python
+# source only, no restricted rows.
+audit/run-2026-08-13/code/**                        annex.largefiles=nothing
