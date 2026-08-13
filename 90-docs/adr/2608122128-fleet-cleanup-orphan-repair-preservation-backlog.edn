@@ -126,6 +126,84 @@ not sufficient. A policy read of the content is required before `:merge`. The
 script's idea — deriving `shadow-cljs.edn` `:source-paths` from `clojure -Spath`
 rather than a hand-duplicated list — is sound and should be ported to nbb.
 
+## Decision 6 — the disposition ladder is for snapshots; read the commits before applying it
+
+The 26 preservation PRs were dispositioned by a numeric ladder (base drift /
+file overlap with main / deletion count). Executing those verdicts exposed that
+the ladder answers only one question — *would merging this revert content?* —
+and says nothing about *what this PR is*.
+
+Three of the twelve I had marked `close-stale-revert-risk` had to be retracted:
+
+- `kotoba-lang/tender-component#14` carries **9 authored commits**
+  (`feat: host structured HTTP capabilities`, `feat: admit loopback storage
+  providers`, `fix: return typed empty LLM output errors`). That is history
+  existing nowhere else, not a working-tree snapshot. The runbook already warns
+  that *abandoned experiments, deliberate forks and force-pushed histories all
+  look alike*; so do rescued features, unless the commits are read.
+- `kotoba-lang/murakumo#194` is `+363/-0`. A PR that removes no lines cannot
+  silently revert; the worst case is a visible conflict. Staleness alone (303
+  commits) is a reason to re-cut, never to discard.
+- `etzhayyim/root#3392` has overlap 0 and never belonged in the bucket.
+
+**Rule**: before applying a `:close-*` verdict, check the commit count and
+messages. One squashed tool commit is a snapshot and the ladder governs it.
+Multiple authored commits are work, and the ladder does not.
+
+Closed after archiving: 9 genuine snapshots (`cofog#2`, `kotoba#455`,
+`cloud-itonami#511`, `cloud-murakumo#45`, `shell#24`, `kotobase-server#32`,
+`grammar#11`, `amu#604`, `kotobase-protocols#17`). Head branches left intact;
+diffs and metadata in `.git/stash-archive-20260813/preservation-prs-closed/`.
+
+## Decision 7 — individually mergeable PRs can still share an invariant
+
+`kotoba-kir#52` and `kotoba-verifier#28` each measured ideal: base current, zero
+overlap, `MERGEABLE`, titled *tests green*, and their only deletions were a
+renamed `deftest` and a reworded assertion string, both replaced in the same
+hunk. Every signal said merge.
+
+They are two thirds of one feature, "KEXE export copy ABI v1". The third is
+`kotoba-native#55`, which emits the
+`:marshal {:format :kotoba.kexe-export/copy-v1 :ownership :invocation-copy
+:maximum-items 16384}` metadata in the aarch64 and x86_64 backends — and it is
+`CONFLICTING`.
+
+`only-native-word-typed-features?` is the gate that stops the IR handing native
+backends shapes they cannot emit. Merging the two admission PRs while the
+backend PR is stuck would **admit programs the backends cannot marshal** —
+admission running ahead of capability, which is the exact invariant that gate
+holds.
+
+**Rule**: capability lands before admission. `kotoba-native#55` first, then
+`kotoba-verifier#28` and `kotoba-kir#52`. The reverse order is unsafe; this
+order never is, because capability landing early admits nothing new. Recorded on
+all three PRs. This generalises: a per-PR mergeability check cannot see an
+invariant that spans repos, so a feature split across repos needs its landing
+order stated somewhere a merger will look.
+
+## Decision 8 — a tiny diff is not a safe diff when the line is an annex pointer
+
+`kotoba-lang/newsfeed#1` is `+1/-1`. The removed line is a git-annex symlink
+target, i.e. which ~1.4 MB object a tracked file resolves to — not code. The
+deletion-count rule would have waved it through as near-trivial.
+`cleanup-land` already treats annex content as out of scope and `:retirement`
+lists git-annex under never-delete, so the correct instrument is
+`git-annex fsck` plus a `numcopies` check, not a diff review. **Judge a diff by
+what the line means, not by how many there are.**
+
+## Decision 9 — closing does not converge the queue
+
+Nine preservation PRs were closed during this session; **three new ones were
+created during the same session** by other cleanup runs (`kotobase-server#33`,
+`kotobase-peer#107`, `cloud-itonami-app#72`). Net −6 against a 28-item backlog.
+
+This is the regeneration effect written into every disposition comment, now
+measured rather than predicted: `cleanup-land` never deletes local WIP, so while
+a shared west checkout's working tree stays unreconciled, an equivalent PR is
+recreated on the next run. **Dispositioning alone cannot converge this queue.**
+Convergence requires acting on the working trees — commit, ignore, or reconcile
+with `main` — which is owner work, not cleanup work.
+
 ## Retirement performed
 
 17 worktrees -> 4-5 (fluctuating; other sessions create their own), 19 local
@@ -248,12 +326,21 @@ rather than only retrospective: **every repo split must audit relative
    unchanged by inspection, not by test — exercising it would require faking a
    404 against a repo that has commits, i.e. manufacturing the exact artifact
    the fix prevents.
-2. Work the 26 dispositioned preservation PRs — each carries its own
-   measurements and recommended verdict as a comment. 12 are
-   `close-stale-revert-risk`, 14 `needs-review`.
-3. A `:close-*` disposition does not settle a PR: `cleanup-land` never deletes
-   local WIP, so unless the shared checkout's working tree is committed, ignored,
-   or reconciled with main, the next run recreates the same PR. Every comment
-   says so, otherwise a resurrected PR gets counted as fresh backlog.
+2. Preservation PRs: 28 -> 21 open. 9 snapshots closed after archiving; 3
+   verdicts retracted (Decision 6). The remaining 21 need owner judgement, not
+   more measurement. Highest value first:
+   - **`kotoba-native#55` -> `kotoba-verifier#28` -> `kotoba-kir#52`** in that
+     order (Decision 7). `#55` is `CONFLICTING` and needs a fresh branch from
+     current `origin/main` with its diff replayed — not a rebase.
+   - `tender-component#14` — 9 authored commits; check only the 1 file main has
+     also moved, not the whole diff.
+   - `murakumo#194` — pure additive, 303 behind; replay onto current `main`
+     rather than merge.
+   - `newsfeed#1` — annex pointer; `git-annex fsck`, not diff review.
+3. **Reconcile the shared west checkouts' working trees.** This is the only
+   thing that converges the preservation queue (Decision 9, measured: 9 closed,
+   3 born, same session). Per repo: commit the WIP, add it to
+   `.git/info/exclude`, or bring the tree in line with `main`. Owner work —
+   cleanup cannot decide which of the three a given working tree deserves.
 4. Owner-only: unarchive the two archived repos to clear 31 stuck PRs.
 "}]
