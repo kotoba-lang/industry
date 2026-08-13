@@ -1,0 +1,92 @@
+KAWASAKI PHASE 5C - INDEPENDENT RECONSTRUCTION COMPLETION BLOCK
+Generated (UTC): 2026-08-13T12:11:15Z
+
+INPUT INTEGRITY
+  Package A files hash-verified : 57/57 MATCH, 0 MISMATCH, 0 MISSING
+
+ARTIFACTS COMPLETED (8/8)
+  FIG1          L1  Manhattan + QQ recalculated from DS_GWAS_CURRENT
+  FIG2          L2  Population frequency and East Asian LD loci
+  FIG3          L2  Cross-population directional analysis
+  FIG4          L2  PGS validation
+  SUPPFIG_S1    L3  ROC visual reassembly
+  TABLE1        L2  Top variants
+  TABLE2        L2  PGS performance, 2A fixed / 2B optimized
+  SUPPTABLE_S1  L2  Integrated variant annotation
+
+CLAIM COVERAGE
+  Required claims in matrix : 91
+  Produced                  : 91
+  Not produced              : 0
+
+INDEPENDENT VERIFICATION SUMMARY
+  FIG1  362,797 valid variants (0 excluded); lambda_GC = 1.0536825577
+        1 genome-wide significant, 27 suggestive
+  TABLE1 independent ranking reproduces the checkpoint's 10 variants, in order,
+        with matching rsIDs, alleles and significance labels; beta and SE agree
+        exactly at 3 decimals
+  FIG2  all 17 population-enrichment categories recomputed from the EAS/EUR
+        ratio agree with the checkpoint; 17 leads + 9 members = 26
+  FIG3  every statistic in both figure-source tables re-derived independently:
+        concordance exact, Clopper-Pearson to 5.0e-07, binomial P to 2.0e-04
+        relative, one-sided normal P to 1.2e-06 relative, cross-table consistent
+        Optional genome-wide rerun: lead counts agree to within +5/+2/-2/+9/+7
+        across the five LD settings; directional Z agrees to 0.97%-4.8%
+  FIG4  all 12 Panel A summary metrics reproduce exactly from the 91 case scores;
+        all 1,218 density rows (600 KDE + 600 control + 18 histogram) reproduce
+        to 5.0e-11; all 7 Panel B tiers reproduce exactly; the optimized
+        threshold is independently confirmed as the unique scan-wide R2 maximum
+  TABLE2 display rounding reproduces the checkpoint for all 7 rows
+  SUPPFIG_S1 both panel rasters hash-verified, crop containment confirmed, ROC
+        registration calibrated independently from each panel's chance diagonal
+  SUPPTABLE_S1 reconstructed table is byte-identical to DS_TABLE_S1_CURRENT, the
+        payload checkpoint (SHA-256 equal); lead/member mapping and categories
+        verified. This is reproduction of the checkpoint, NOT agreement with the
+        submitted table, which the input package does not contain
+
+RECONSTRUCTION LEVEL CEILING
+  Of the 91 claims, 6 are L1, 80 are L2, 5 are L3. Only the six FIG1 claims are
+  independent recalculation from analysis-ready data. The 80 L2 claims verify
+  derivation from the provider checkpoint only -- an error upstream of that
+  checkpoint is reproduced faithfully and cannot be detected here. Completing
+  all 91 claims is not confirmation that the underlying analysis is correct.
+
+CORROBORATION BY A SECOND INDEPENDENT RECONSTRUCTION
+  A separately written reconstruction of the same claim set, from the same
+  method contracts, agrees on 90 of 91 claim values. The one substantive
+  difference is SUPPTABLE_S1_CATEGORY_COUNTS, a difference in reading the scope
+  of the claim rather than in computation; both values are returned. Two of the
+  findings below were surfaced only by that cross-check.
+
+NOT CLAIMED
+  PRSice2 rerun from 41,528 individual control genotypes
+  Model-level ROC recalculation (Supplementary Figure S1 is L3)
+  End-to-end provider GWAS rerun
+  Agreement between DS_TABLE_S1_CURRENT and the submitted Supplementary Table S1
+
+OPEN FINDINGS
+  FIG1  DS_GWAS_CURRENT carries 27 variants at P < 1e-5 while Table S1 retains
+        26; the absent one is rs376128944, whose exclusion the Table S1 notes
+        document but M01 does not instruct. No claim value is affected; the
+        rendered Manhattan shows 27 points below the suggestive line.
+  SUPPTABLE_S1  checkpoint currency versus the submitted table is not testable
+        from the input package. For reference the payload carries
+        EAS_EUR_Fold_Difference = 38.6 for rs146572333.
+
+DISCLOSURES
+  See 05_METHOD_DEVIATION_LOG.tsv (22 entries) and
+  08_AI_ASSISTANCE_LOG.tsv. One limited individual-data exposure is recorded
+  there and in 09_VERIFIER_ATTESTATION.md.
+  One defect in a supplied input file is reported upstream: rows 2-7 of
+  figure4_aggregate_source.tsv carry 19 fields against a 20-field header.
+  The M03 label spelling differs in case from the checkpoints; the emitted
+  labels follow the checkpoint capitalization. Declared in the deviation log.
+
+ADDITIONS BEYOND THE REQUIRED RETURN TREE
+  10_RECONSTRUCTION_CODE/  all reconstruction source, so the independence claim
+                           can be audited directly rather than taken on trust.
+
+RESULT LOCK
+  Package B was not requested, accessed or used.
+  This archive must be hash-locked with the custodian before any answer-key
+  comparison.
