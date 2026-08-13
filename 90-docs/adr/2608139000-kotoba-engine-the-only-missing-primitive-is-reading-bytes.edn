@@ -82,8 +82,24 @@ gate から落ちる。だから `temperature` / `top_p` の clamp を
 ### 4. まだ Kotoba に持って来ないもの
 
 - **mmap / ファイル IO / スレッド** —— capability の話であり、`kotoba/host` の領分。
-- **softmax** —— `f64-exp-bounded` の domain を測っていない。`max-element`（安定化に
-  必要な部分）だけ入れて、exp は host に残した。**測っていないものを入れない。**
+- ~~**softmax**~~ —— **測ったので入れた**（同日）。この節は当初「`f64-exp-bounded` の
+  domain を測っていないから入れない」と書いていた。測った結果 `exp(-100)` =
+  3.72e-44 / `exp(100)` = 2.69e43 で、**「bounded」という名前に反して double の
+  実用域が全部使える**。`exp-shifted` / `softmax-denominator` / `silu` を追加した
+  （softmax は vector を返さず、host が持つ宛先バッファに合わせてスカラ 2 つに分解）。
+  test が exp の値域を**範囲**で pin してある（絶対誤差だと underflow して 0 に
+  なっても通ってしまう）。
+
+**逆に、測って「入れられない」と分かったもの**（推測ではなく実測）:
+
+- **RoPE** —— `f64-sin-bounded` / `f64-cos-bounded` は ±1000 で厳密、1e7 で
+  `f64-bounded-angle-domain` を投げる。RoPE の角度は position / theta^(2i/d) で、
+  除数が 1 のとき position そのもの —— このモデルの context は 262144 なので
+  1000 を大きく超える。host 側で mod 2π に畳めば通るが、それは「範囲縮約を
+  どこに置くか」という決定であって算術の 1 行ではないので、ここでは決めない。
+- **gelu_pytorch_tanh**（Gemma4 の gated MLP 活性化） —— **`f64-tanh` が存在しない**
+  （`operation has no admitted lowering`、実測）。SiLU は exp だけで書けるので
+  移せて、GELU は移せない。この差は測るまで分からなかった。
 - **量子化ブロックの dequantise** —— 上記 1 待ち。演算（nibble 展開の shift/mask、
   scale の f64 乗算）は既に全部在るので、**入力の読み方だけが足りない**。
 
