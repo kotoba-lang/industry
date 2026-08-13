@@ -29,7 +29,13 @@
 ;;
 ;; 入力: `manifest/checkout-consequence.edn`(生成物)。
 ;;   生成は `nbb scripts/checkout-staleness.cljs --write-consequence`。
-;;   このファイルが無ければ **何も出さずに exit 0**(fail-open)。
+;;   **このファイルが無いときは「測れなかった」と言って exit 0 する**
+;;   (fail-open だが、無言ではない)。初版は無言で exit 0 しており、
+;;   **健全な session と区別が付かなかった** —— ADR-2608136000 が同じ日に
+;;   14 例数えた欠陥そのもので、この hook がその 15 例目になりかけた。
+;;   実測 2026-08-13: この入力は tracked で origin/main に 162 KB で在り
+;;   sparse cone の中にあるのに、working tree から消えていた
+;;   (`git status` は ` D`)。hook は何も言わず、復元したら 16 件を報告した。
 ;;
 ;; 手動実行: `nbb .claude/hooks/session-start-checkout-staleness.cljs [<dir>]`
 
@@ -182,7 +188,22 @@
         f    (.join path root "manifest" "checkout-consequence.edn")
         data (when (exists? f)
                (try (edn/read-string (slurp* f)) (catch :default _ nil)))]
-    (when-not (map? data) (done!))
+    ;; **「測って問題が無かった」と「測れなかった」を同じ沈黙にしない。**
+    ;; ADR-2608136000 が 1 日で 14 例数えた欠陥がこれで、この hook 自身が
+    ;; その 15 例目になりかけた —— 実測 2026-08-13、`manifest/checkout-consequence.edn`
+    ;; が working tree から消えていた（tracked、origin/main には 162 KB で在り、
+    ;; sparse cone 内、`git status` は ` D`）。hook は静かに exit 0 し、
+    ;; **健全な session と区別が付かなかった。** 復元したら 16 件を報告した。
+    (when-not (map? data)
+      (done! (str "⚠ checkout staleness: **測定できませんでした**（合格ではありません）。\n"
+                  "  入力 " (.join path "manifest" "checkout-consequence.edn")
+                  (if (exists? f) " が読めません（EDN が壊れている?）。" " がありません。")
+                  "\n\n"
+                  "  これは tracked file です。working tree から消えているだけの可能性が高い:\n"
+                  "    git status --porcelain manifest/checkout-consequence.edn\n"
+                  "    git checkout -- manifest/checkout-consequence.edn\n"
+                  "  それでも無ければ再生成する:\n"
+                  "    nbb scripts/checkout-staleness.cljs\n")))
 
     (let [entries (->> (:entries data)
                        (map (fn [e] {:path* (:path e) :readers (count (:readers e))}))
