@@ -172,6 +172,29 @@
   {:name "cloud-itonami-gftd-sculpt-actor" :gate :jvm-test :cd true}
   {:name "cloud-itonami-gftd-voice-actor" :gate :jvm-test :cd true}
 
+  ;; network-awai/cloud-itonami の kotoba kernel gates（ADR-2608135800）。
+  ;;
+  ;; **`:alias "kernels"` が要る。** この repo の `:test` は
+  ;; `../../kotoba-lang/kototama` 等を掴んでいるのでノードでは解決しない ——
+  ;; まさに上の `gate-script` の comment が例に挙げている repo である。
+  ;; `:kernels` は 2026-08-13 まで「Everything below resolves from git」と
+  ;; 名乗りながら base `:deps` の 107 個の `:local/root` を引き継いでいて
+  ;; **どの alias でも classpath が組めなかった**。`:replace-deps` /
+  ;; `:replace-paths` にして、sibling ゼロの bare `git archive` tree で
+  ;; 46 tests / 3638 assertions / 0 fail / 0 error を実測した。
+  ;;
+  ;; native / wasm 実行 test を含むのでノードに `cc` と `node` が要る
+  ;; （無いと skip ではなく fail する。それは test 側の設計判断）。
+  ;;
+  ;; `:id` が要る —— 下の sites gate と `:name` が同じなので、明示しないと
+  ;; gate-id が衝突して片方が消える（実測 2026-08-13: 最初 `:id` 無しで足したら
+  ;; sites gate だけが走り、こちらは receipt に 1 行も出なかった。
+  ;; `gate-id` の docstring がまさにこの症状を書いている）。
+  ;;
+  ;; `:cd false` —— これは検査であって配送ではない。
+  {:name "cloud-itonami" :id "cloud-itonami-kernels"
+   :gate :jvm-test :alias "kernels" :cd false}
+
   ;; :include-ext = ノードへ送る tree を必要な path だけに絞る（trees+blobs API 経由）。
   ;; この repo の full tarball は 1.6GB（assets/動画・画像）で、EDN を parse するだけの
   ;; gate に毎回転送するのは論外。:min-files は「絞り込みが壊れて 0 件 → trivially pass」を
@@ -802,11 +825,19 @@
   ;; 3,638 assertions）を足しても解けない —— alias の extra-deps が git だけでも、
   ;; base の :deps が先に評価される。
   ;;
-  ;; したがって cloud-itonami の 6 本の型付き core・parity gate・native 実行・
-  ;; wasm 実行は**今も何にも検査されていない**（Actions も無効、最後の run は
-  ;; 2026-08-04 で失敗）。解くには repo の base :deps を git 座標へ移すか、
-  ;; ノード側で west workspace を再現するか、gate を :nbb-script にして JVM を
-  ;; 使わない検査に絞るかのいずれかで、どれも別の変更。
+  ;; ⚠ **ここから先は 2026-08-13 に解決した。上の `cloud-itonami-kernels` entry が
+  ;; 後継。** 当時の診断（base の :local/root が先に評価されるので落ちる）は
+  ;; 正しく、誤っていたのは**そこから先の見立て**である。当時挙げた解法は 3 つとも
+  ;; 重い変更（base を git 座標へ移す / ノードで west workspace を再現する /
+  ;; :nbb-script に閉じる）だったので撤回になったが、**4 つ目があった:
+  ;; `:extra-deps` ではなく `:replace-deps` にする。** base を git 座標へ「翻訳」
+  ;; する必要は無かった —— `:kernels` が到達する 9 namespace が実際に要求する
+  ;; sibling は**ゼロ**で、正しい base は空集合だったからである。
+  ;;
+  ;; 件数も訂正する: 当時 116 と書いたが reader で数えると base 107 / alias 7 で、
+  ;; 差は `;;` コメント行 12 件を grep が拾ったもの（結論は変わらない）。
+  ;;
+  ;; 詳細と bare archive tree での実測は superproject ADR-2608135800。
 
   ;; kotoba-lang/amu の JDK-free 経路（Amu ADR-0202）。
   ;;
