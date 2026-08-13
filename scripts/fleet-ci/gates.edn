@@ -111,6 +111,28 @@
   ;; Measured 2026-08-05: all 10 reachable nodes get 200 from github/maven/npm.
   {:name "kotoba-selfhost-contracts" :gate :jvm-test :cd true}
 
+  ;; inference — the Ollama-compatible surface's decision cores (ADR-2608130700).
+  ;;
+  ;; Exactly the same drift shape as kotoba-selfhost-contracts above, for the
+  ;; same reason: production loads resources/kotodama/oracle/*.kir.edn and the
+  ;; source it came from is kotoba/*_core.kotoba. Editing a core and forgetting
+  ;; `clojure -M:test:gen` leaves the server executing the OLD decision while
+  ;; the semantics tests — which read the shipped artifact — keep passing. That
+  ;; specific failure is invisible to every test except the authority check, and
+  ;; the authority check only runs if something runs it.
+  ;;
+  ;; No :include-ext, for the same reason as above: the parity test READS
+  ;; kotoba/*_core.kotoba off disk and recompiles it. Filtering to .edn would
+  ;; ship the artifacts without their source and the gate would fail for the
+  ;; wrong reason.
+  ;;
+  ;; :jvm-test resolves num/torch/kotoba-kir/amu from git, so the node needs
+  ;; outward HTTPS. Do not read that as a property of the fleet — egress is not
+  ;; uniform (measured 2026-08-13: one node answered 000 for npm while eight
+  ;; answered 200). If this gate starts failing on one node only, measure that
+  ;; node before changing the gate.
+  {:name "inference" :gate :jvm-test :cd true}
+
   ;; Kotoba language Q9 Wave 1 / Tranche 1 soak. GitHub Actions is disabled;
   ;; these ten independent repository-local oracle tests are the executable
   ;; evidence consumed by kotoba-lang/scripts/collect-q9-soak.bb. Each tip
