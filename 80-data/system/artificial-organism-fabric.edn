@@ -19,30 +19,37 @@
    :repos ["orgs/kotoba-lang/aiueos" "orgs/kotoba-lang/kototama"]
    :provides [:capability-decision :policy-audit :wasm-host]}
   {:layer/id :compute
-   :repos ["orgs/kotoba-lang/murakumo" "orgs/gftdcojp/cloud-murakumo"]
+   :repos ["orgs/kotoba-lang/murakumo" "orgs/network-awai/cloud-murakumo"]
    :provides [:placement :llm-kaizen :distributed-worker :run-ledger]}
   {:layer/id :storage
    :repos ["orgs/kotoba-lang/kotobase" "orgs/kotoba-lang/kotobase-peer"
            "orgs/kotoba-lang/kotobase-protocols" "orgs/kotoba-lang/bonsai"
-           "orgs/kotoba-lang/nekko" "orgs/gftdcojp/net-kotobase"]
+           "orgs/kotoba-lang/nekko" "orgs/net-kotobase/control-plane"]
    :provides [:datoms :content-addressed-objects :git-projection :actor-journal]}
   {:layer/id :settlement
-   :repos ["orgs/kotoba-lang/engi" "orgs/gftdcojp/nexus-x402"]
+   :repos ["orgs/kotoba-lang/engi" "orgs/network-awai/nexus-x402"]
    :provides [:mutual-credit :x402 :receipt :spend-policy]}
   {:layer/id :social
-   :repos ["orgs/gftdcojp/app-aozora"]
+   :repos ["orgs/network-awai/app-aozora"]
    :provides [:actor-account :pds :social-post :appview]}]
 
+ ;; 2026-08-13 (ADR-2608137200): every :repo below was the pre-rename /
+ ;; pre-org-transfer path. 9 of them did not exist on disk at all and 4 pointed
+ ;; at a west-UNDECLARED duplicate checkout, so `:repo/exists? false` was the
+ ;; normal reading of this file. Each right-hand side is the `path:` west
+ ;; declares for the SAME GitHub repository id -- the mapping was taken from the
+ ;; id, never from name similarity. `:org` is left as recorded: it names the
+ ;; business owner of the product, not the GitHub org that now holds the repo.
  :products
- [{:product/id :itonami :org :gftdcojp :repo "orgs/gftdcojp/cloud-itonami"}
-  {:product/id :manimani :org :gftdcojp :repo "orgs/gftdcojp/local-manimani"}
-  {:product/id :isekai :org :gftdcojp :repo "orgs/gftdcojp/network-isekai"}
-  {:product/id :shinshi :org :jk-luxury :repo "orgs/jk-luxury/club-shinshi"}
-  {:product/id :yukkuri :org :gftdcojp :repo "orgs/gftdcojp/ai-gftd-yukkuri"}
-  {:product/id :dougaka :org :gftdcojp :repo "orgs/gftdcojp/ai-gftd-dougaka"}
-  {:product/id :animeka :org :gftdcojp :repo "orgs/gftdcojp/ai-gftd-animeka"}
-  {:product/id :mangaka :org :gftdcojp :repo "orgs/gftdcojp/ai-gftd-mangaka"}
-  {:product/id :babiniku :org :jk-luxury :repo "orgs/jk-luxury/net-babiniku"}]
+ [{:product/id :itonami :org :gftdcojp :repo "orgs/network-awai/cloud-itonami"}
+  {:product/id :manimani :org :gftdcojp :repo "orgs/network-awai/local-manimani"}
+  {:product/id :isekai :org :gftdcojp :repo "orgs/network-awai/network-isekai"}
+  {:product/id :shinshi :org :jk-luxury :repo "orgs/network-awai/club-shinshi"}
+  {:product/id :yukkuri :org :gftdcojp :repo "orgs/cloud-itonami/yukkuri"}
+  {:product/id :dougaka :org :gftdcojp :repo "orgs/cloud-itonami/ai-gftd-dougaka"}
+  {:product/id :animeka :org :gftdcojp :repo "orgs/cloud-itonami/animeka"}
+  {:product/id :mangaka :org :gftdcojp :repo "orgs/cloud-itonami/mangaka"}
+  {:product/id :babiniku :org :jk-luxury :repo "orgs/network-awai/net-babiniku"}]
 
  :flow
  [{:from :kotoba-source :to :compiler :contract :compile}

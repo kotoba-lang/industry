@@ -5,7 +5,14 @@
 
 (def topology-path "80-data/system/artificial-organism-fabric.edn")
 (def output-path "80-data/system/artificial-organism-health.edn")
-(def public-output-path "orgs/gftdcojp/cloud-murakumo/public/health/fabric.json")
+;; NOTE (2026-08-13, ADR-2608137200): this used to write into
+;; `orgs/gftdcojp/cloud-murakumo`, a west-UNDECLARED duplicate checkout of the
+;; same GitHub repository (id 1285031835) that west declares at
+;; `orgs/network-awai/cloud-murakumo`. The old path publishes nothing — it is a
+;; leftover of the org transfer. Keep the directory derived from the file path
+;; so the two can never drift apart again.
+(def public-output-dir "orgs/network-awai/cloud-murakumo/public/health")
+(def public-output-path (str public-output-dir "/fabric.json"))
 (def release-receipt-path "80-data/system/cloud-murakumo-release.json")
 
 (defn sh [& args]
@@ -104,7 +111,7 @@
                                    "head" (:sha ci-state)
                                    "canaryRef" (:canaryRef ci-state)}}]
     (spit output-path (str (pr-str report) "\n"))
-    (.mkdirSync (js/require "fs") "orgs/gftdcojp/cloud-murakumo/public/health" #js {:recursive true})
+    (.mkdirSync (js/require "fs") public-output-dir #js {:recursive true})
     (spit public-output-path (str (.stringify js/JSON (clj->js public-report) nil 2) "\n"))
     (println (str "artificial-organism fabric: " (name (:health/status report))
                   ", repos=" (count repos) ", missing=" (count missing)

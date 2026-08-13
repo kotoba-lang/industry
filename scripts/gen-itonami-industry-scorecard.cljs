@@ -22,8 +22,11 @@
 ;;     同じ SSoT を読む —— 公開面ごとに別の数を出さないため。
 ;;   orgs/cloud-itonami/org-un-isic/data/classes/*.json
 ;;     UN ISIC **Rev.4** の 428 class。coverage の分母はここだけから採る。
-;;   orgs/etzhayyim/com-etzhayyim-app-open-kyber/industry-packs/isic-packs.kotoba.edn
+;;   orgs/cloud-itonami/app-open-kyber/industry-packs/isic-packs.kotoba.edn
 ;;     section A–U の名称（`:isic.pack/scope :section` の 21 件）。
+;;     2026-08-13 (ADR-2608137200) に west 未登録の重複 checkout
+;;     `orgs/etzhayyim/com-etzhayyim-app-open-kyber` から登録済み path へ
+;;     向け直した（同一 repo, gh id 1305937636、pack ファイルは byte 一致）。
 ;;
 ;; ## 捏造しないために決めたこと
 ;;
@@ -64,7 +67,7 @@
 (def maturity-path "90-docs/system-dynamics/itonami-maturity.datoms.edn")
 (def registry-path "orgs/kotoba-lang/industry/resources/kotoba/industry/registry.edn")
 (def classes-dir "orgs/cloud-itonami/org-un-isic/data/classes")
-(def packs-path "orgs/etzhayyim/com-etzhayyim-app-open-kyber/industry-packs/isic-packs.kotoba.edn")
+(def packs-path "orgs/cloud-itonami/app-open-kyber/industry-packs/isic-packs.kotoba.edn")
 (def section-authority
   "orgs/cloud-itonami/org-un-isic/kotoba/src/types.ts sectionForDivision (ISIC Rev.4)")
 
