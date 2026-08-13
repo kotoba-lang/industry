@@ -1,7 +1,7 @@
 (ns office-test
   "P0 round-trip tests: document / org(+DID) / grant <-> datoms, plus an access-DAG check.
-   Run:  bb --classpath . -e \"(require 'office-test)(System/exit (office-test/-main))\"
-   or:   bb test   (see bb.edn)"
+   Run:  nbb scripts/run-task.cljs test   (see scripts/tasks.edn; bb was retired by
+         ADR-2607173000 and this file's bb.edn went with it in ADR-2608135000)"
   (:require [office :as o]
             [clojure.test :refer [deftest is run-tests]]))
 
