@@ -127,8 +127,15 @@
 
 ;; ---------- 分類 ----------
 
+;; `identity` は拡張子を固定しない。`identity\.(edn|json|yaml|yml)$` と書いていた版は
+;; 2026-08-13 に破れた: kotoba-lang/toshokan-patents の
+;; `scripts/.kotobase-ingest-toshokan-patents-identity.hex` は語尾が `-identity.hex` で
+;; あって `identity.<ext>` ではなく、`.hex` も拡張子列に無く、`.*secret.*` にも
+;; `.*credential.*` にも当たらなかった。dry-run はこれを :additive（PR → **merge**）に
+;; 計上しており、対象 repo は **public** だった。
+;; skip は誤検知しても名前付きで報告されるだけで復旧可能、公開は不可逆——網は広く取る。
 (def ^:private credential-re
-  #"(?i)(^|/)(\.env($|\.)|.*\.(pem|key|p12|pfx|jks|keystore|jwk)$|id_(rsa|ed25519)|identity\.(edn|json|yaml|yml)$|.*secret.*|.*credential.*|\.kagi/|\.npmrc$|\.netrc$)")
+  #"(?i)(^|/)(\.env($|\.)|.*\.(pem|key|p12|pfx|jks|keystore|jwk|hex)$|id_(rsa|ed25519)|.*identity.*|.*(seed|privkey|keypair).*|.*secret.*|.*credential.*|\.kagi/|\.npmrc$|\.netrc$)")
 
 ;; パス名だけの判定は実際に破れた（2026-07-26）。actor の identity.json は
 ;; `identity\.edn$` にも `.*secret.*` にも当たらず、private-b64 を含んだまま
@@ -138,12 +145,22 @@
 (def ^:private secret-content-re
   #"(?i)(private[-_](b64|key|pem|jwk)|BEGIN [A-Z ]*PRIVATE KEY|secret[-_]key|mnemonic)")
 
+;; ラベルの付いた鍵素材しか撃てない網は、**生の鍵**を素通しする（2026-08-13 実測）。
+;; 64 文字の hex 1 行だけのファイルは `private-b64` とも `BEGIN … PRIVATE KEY` とも
+;; 名乗らない。ファイル全体がひとつの高エントロピー token であることを形で捕える。
+;; 全体一致に限るので、hex/base64 を *含む* 正当な source は巻き込まない。
+(def ^:private bare-key-re
+  #"(?s)\A\s*(?:0x)?(?:[0-9a-fA-F]{32,}|[A-Za-z0-9+/_-]{40,}={0,2})\s*\z")
+
 (defn- secret-content?
-  "中身に鍵素材のマーカーがあるか。読めなければ false（fail-open にはしない —
-   読めないファイルは size/パス側の網で拾う）。"
+  "中身に鍵素材のマーカーがあるか、あるいはファイル全体が生の鍵そのものか。
+   読めなければ false（fail-open にはしない — 読めないファイルは size/パス側の網で拾う）。"
   [f]
   (try
-    (boolean (re-find secret-content-re (.toString (.readFileSync node-fs (.getPath f)) "utf8")))
+    (let [s (.toString (.readFileSync node-fs (.getPath f)) "utf8")]
+      (boolean (or (re-find secret-content-re s)
+                   ;; 生鍵は短い。長い文書を総なめしない。
+                   (and (< (count s) 4096) (re-find bare-key-re s)))))
     (catch :default _ false)))
 
 (def ^:private junk-re
