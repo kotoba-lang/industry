@@ -4,7 +4,8 @@
 ;;     scripts/fleet-ci/tick-unit-test.cljs
 
 (ns tick-unit-test
-  (:require [cljs.test :refer [deftest is run-tests]]
+  (:require [cljs.reader]
+            [cljs.test :refer [deftest is run-tests]]
             [clojure.string :as str]
             [tick :as tick]))
 
@@ -108,6 +109,67 @@
                                 "manifest/fleet-ci.edn"]]
               ["/tmp/landing" ["read-tree" "-mu" "HEAD"]]]
              @calls)))))
+
+;; --- gate declaration identity（ADR-2608137000）--------------------------------
+
+(deftest a-moved-tip-still-triggers-exactly-as-before
+  ;; 既定の trigger を壊していないこと。spec-hash が両側にあっても、tip が
+  ;; 動いていなければ回さない / 動いていれば回す。
+  (is (true? (tick/work-changed? {:tip "b" :last-sha "a" :spec-hash "h" :last-spec "h"})))
+  (is (false? (tick/work-changed? {:tip "a" :last-sha "a" :spec-hash "h" :last-spec "h"})))
+  ;; tip が解決できていない item は回さない（従来どおり missing に落ちる）
+  (is (false? (tick/work-changed? {:tip nil :last-sha nil :spec-hash "h" :last-spec "g"})))
+  ;; 一度も回っていない gate は従来どおり回る
+  (is (true? (tick/work-changed? {:tip "a" :last-sha nil :spec-hash "h" :last-spec nil}))))
+
+(deftest a-repaired-declaration-triggers-even-when-the-tip-is-dormant
+  ;; これが新しい trigger。gh-workflow-assoc-gapki の形。
+  (is (true? (tick/work-changed? {:tip "a" :last-sha "a" :spec-hash "new" :last-spec "old"}))))
+
+(deftest a-state-entry-without-a-spec-hash-does-not-trigger
+  ;; 移行の安全弁。1,583 entry が spec-hash を持たないので、nil を「変わった」と
+  ;; 読むと導入した tick が全 repo を一斉に配置する。
+  (is (false? (tick/work-changed? {:tip "a" :last-sha "a" :spec-hash "new" :last-spec nil}))))
+
+(deftest key-order-and-comments-are-not-part-of-the-declaration
+  (is (= (tick/decl-hash {:name "x" :gate :jvm-test :cd true})
+         (tick/decl-hash {:cd true :gate :jvm-test :name "x"})))
+  ;; reader がコメントを捨てるので、コメントだけの編集は hash に出ない
+  (is (= (tick/decl-hash (cljs.reader/read-string "{:name \"x\" :gate :jvm-test}"))
+         (tick/decl-hash (cljs.reader/read-string ";; why\n{:name \"x\" ;; inline\n :gate :jvm-test}")))))
+
+(deftest editing-one-gate-does-not-move-another-gates-hash
+  ;; gates.edn は毎日編集される。1 行の編集で 125 repo が再配置されたら、
+  ;; それは元の問題より悪い。
+  (let [a {:name "a" :gate :jvm-test}
+        b {:name "b" :gate :jvm-test}]
+    (is (not= (tick/decl-hash a) (tick/decl-hash (assoc a :min-files 5))))
+    (is (= (tick/decl-hash b) (tick/decl-hash b)))))
+
+(deftest derived-keys-do-not-leak-into-the-declaration-hash
+  ;; 最悪形の見張り: :tip が hash に混ざると毎 tick 全 gate の spec-hash が動き、
+  ;; 毎 tick 125 repo が再配置される。宣言そのものと、tick が work item にした
+  ;; あとの map は、同じ hash でなければならない。
+  ;; :org は gates.edn に書ける宣言側の key なので decl に含める（tick が
+  ;; west から補うこともあるが、補った値は宣言と同じでなければならない）。
+  (let [decl {:name "x" :org "o" :gate :nbb-script :script nil :min-files 5}
+        as-work (merge decl {:org-repo "o/x" :tip "aaa" :pin "bbb"
+                             :last-sha "ccc" :changed? true :spec-hash "zz"
+                             :last-spec "yy" :node {:host "judah"}
+                             :gate-name "test-x-aaa" :outcome :pass :cid "c"})]
+    (is (= (tick/decl-hash decl) (tick/decl-hash as-work)))
+    ;; :org は宣言側の key（gates.edn に書ける）なので残る — 消えていないことも見る
+    (is (not= (tick/decl-hash decl) (tick/decl-hash (assoc decl :org "other"))))))
+
+(deftest the-gapki-repair-is-the-kind-of-edit-that-now-triggers
+  ;; :include-ext に ".kotoba" を足すこと自体が再実行の合図になる。
+  (let [before {:name "cloud-itonami-assoc-0126-idn-gapki" :id "gh-workflow-assoc-gapki"
+                :include-ext [".yml" ".edn" ".clj" ".cljc"]}
+        after  (assoc before :include-ext [".yml" ".edn" ".clj" ".cljc" ".kotoba"])]
+    (is (not= (tick/decl-hash before) (tick/decl-hash after)))
+    (is (true? (tick/work-changed? {:tip "e261787" :last-sha "e261787"
+                                    :spec-hash (tick/decl-hash after)
+                                    :last-spec (tick/decl-hash before)})))))
 
 (let [{:keys [fail error]} (run-tests 'tick-unit-test)]
   (when (pos? (+ fail error))
