@@ -1,18 +1,18 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 1976642, "kotobase-cf-wasm-staging" 2014085},
+ {"net-kotobase" 1976982, "kotobase-cf-wasm-staging" 2014699},
  :zone
- {:requests-7d 2079221,
-  :pageviews-7d 1520,
-  :uniques-7d-sum 1060,
+ {:requests-7d 2080186,
+  :pageviews-7d 1527,
+  :uniques-7d-sum 1068,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
   [{:path
     "/bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7ozvqjidfdwsj3ht6cxjaqe",
-    :requests 98}
+    :requests 97}
    {:path
     "/ipld/bafyreidwhslls6m2lqjenllrnsb6ug2m7jmjdl7ralyipyb7oau7f3hxfu",
     :requests 36}
@@ -33,8 +33,8 @@
     :requests 16}
    {:path
     "/cloud-itonami-hayari-data/SHA256E-s596186-S52428800-C1--0b5999f62235fd7c897a4557c4f4c2bf106a5e452b0179337169b920c6a35b7c.edn",
-    :requests 15}],
-  :status-mix {:ok 1657, :server-error 2, :client-error 34},
+    :requests 14}],
+  :status-mix {:ok 1653, :server-error 2, :client-error 34},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -48,10 +48,10 @@
  :as-of "2026-08-13",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7oz… 98 · /ipld/bafyreidwhslls6m2lqjenllrnsb6ug2m7… 36 · /ipld/bafyreic7j3n4gulvz2qifgkao72jd72jd… 35 · /ipld/bafyreiavv6gz3yb6kkiivupipd4i7bnpe… 30 · /ipld/bafyreidhyto6jmczwhqp5zhtnkuwkqp4y… 18 | 4xx(probe) 2% · 5xx 0%",
- :funnel {:visitors 2998, :signups 25, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7oz… 97 · /ipld/bafyreidwhslls6m2lqjenllrnsb6ug2m7… 36 · /ipld/bafyreic7j3n4gulvz2qifgkao72jd72jd… 35 · /ipld/bafyreiavv6gz3yb6kkiivupipd4i7bnpe… 30 · /ipld/bafyreidhyto6jmczwhqp5zhtnkuwkqp4y… 18 | 4xx(probe) 2% · 5xx 0%",
+ :funnel {:visitors 3003, :signups 25, :checkouts 0},
  :signal
- "kotobase.net 実測 2079221 req/7d・1060 uniques(日次和)・うち4xx probe 2%(24h)、workers 3990727 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 2080186 req/7d・1068 uniques(日次和)・うち4xx probe 2%(24h)、workers 3991681 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 18,
   :submissions 3,
@@ -60,6 +60,6 @@
   :attempt-rate 0.16666666666666666,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 1471},
+ {:visitors {:openai-ads 3, :organic 1476},
   :signups {:organic 22}, 
   :checkouts {}}}
