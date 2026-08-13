@@ -10,12 +10,14 @@
     and `--dry` (parse + print IR, no Chromium). Underground / inside-fit eyes exit 2.
     Also `#1753`: `--annotate` (burn `index:district` via `pick/project`) and
     `--pick X,Y` (unfiltered EDN hit or nil; no Chromium unless annotating).
+    Also `#1754`: `--baseline FILE` (+ `--diff-out` / `--threshold`) → diff PNG + EDN.
   * `--view board` → `bin/render_board.cljs` — inject envelope via
     `window.__setState`, screenshot the DOM shop board. No engine required.
+    Board also accepts `--baseline` / `--diff-out` / `--threshold` (#1754).
 
   The split exists so board capture does not load kami/engine namespaces that
   fail when the west checkout is absent. All argv is forwarded to the chosen
-  path — including camera refusal / `--dry` / annotate / pick on street."
+  path — including camera refusal / `--dry` / annotate / pick / baseline on street."
   (:require ["node:child_process" :as cp]
             ["node:path" :as path]
             ["node:fs" :as fs]
@@ -34,7 +36,8 @@
   (let [root (path/resolve here "../../../../../../orgs/kotoba-lang")
         webgpu (path/join root "webgpu/src")
         render (path/join root "render/src")]
-    (str "src:" webgpu ":" render)))
+    ;; `bin` hosts `diff-core` (#1754) — kept out of `src/` so squint never compiles it.
+    (str "src:bin:" webgpu ":" render)))
 
 (defn- run! [script classpath]
   (let [nbb (path/join here "node_modules/.bin/nbb")
@@ -48,7 +51,7 @@
 
 (case view
   "board"  (do (println "  render --view board  (DOM shop board, no WebGL engine)")
-               (run! "bin/render_board.cljs" "src"))
+               (run! "bin/render_board.cljs" "src:bin"))
   "street" (do (println "  render --view street (WebGL/WebGPU, needs engine checkout)")
                (run! "bin/render_street.cljs" (engine-classpath)))
   (do (println (str "unknown --view " (pr-str view) " (want street|board)"))

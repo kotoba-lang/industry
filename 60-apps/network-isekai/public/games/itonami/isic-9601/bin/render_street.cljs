@@ -37,6 +37,7 @@
                         [--eye X,Y,Z] [--target X,Y,Z]
                         [--orbit DEG] [--zoom N] [--fov DEG]
                         [--dry] [--annotate] [--pick X,Y]
+                        [--baseline FILE] [--diff-out FILE] [--threshold N]
 
   `--state FILE` reads an `:itonami-game/state` v1 envelope (from `play --dump`) and draws
   that street progress — unlocked shops match the played run, not a fresh `(world/init)`.
@@ -52,7 +53,13 @@
   not a second projection. `--pick X,Y` prints EDN
   `{:index :district :kind :point :t}` (or `nil`) from an unfiltered `pick/pick` and exits
   without Chromium unless `--annotate` also asks for a PNG. Shop-only tap filters stay off
-  this path."
+  this path.
+
+  `--baseline FILE` (#1754) after writing `--out`, diffs against FILE and writes a diff PNG
+  plus one EDN line `{:changed-pixels n :max-delta d :regions [[x y w h] …]}`.
+  `--threshold N` is the inclusive quiet-band (default 0). `--diff-out` defaults to
+  `<out>.diff.png`. Comparison itself always exits 0 when it runs; the accept gate decides
+  pass/fail from the EDN."
   (:require ["node:fs" :as fs]
             ["node:http" :as http]
             ["node:child_process" :as cp]
@@ -63,6 +70,7 @@
             [itonami.isic-9601.world3d :as w3]
             [itonami.isic-9601.state :as state]
             [itonami.isic-9601.inspect :as inspect]
+            [diff-core :as diff]
             [kami.webgpu.geometry :as geom]
             [kami.webgpu.submission :as sub]))
 
@@ -113,6 +121,10 @@
 (def W (int (num-opt "width" 900)))
 (def H (int (num-opt "height" 1600)))
 (def out (opt "out" (path/join here "preview/street.png")))
+(def baseline-path (opt "baseline" nil))
+(def diff-out-path
+  (opt "diff-out" nil))
+(def diff-threshold (int (num-opt "threshold" 0)))
 (def state-path (opt "state" nil))
 (def backend
   "`auto` (default), `webgpu`, or `webgl2`. Both read the SAME packed instances and the SAME 60-float
@@ -506,6 +518,25 @@
           (println "  note    shadow pass not run (1x1 lit depth texture bound); lit pass only")
           (when (zero? (:nonSkyPixels r))
             (println "  FAILED  nothing was drawn — the frame is a flat background")
-            (js/process.exit 5)))))))
+            (js/process.exit 5))
+          (when baseline-path
+            (when-not (fs/existsSync baseline-path)
+              (println (str "  FAILED  --baseline missing: " baseline-path))
+              (js/process.exit 2))
+            (try
+              (let [stats (diff/compare-files baseline-path abs diff-threshold true)
+                    dpath (path/resolve here
+                                        (or diff-out-path
+                                            (str abs ".diff.png")))
+                    edn (diff/summarize stats)]
+                (diff/write-png! dpath (:width stats) (:height stats) (:diff-data stats))
+                (println (str "  baseline " baseline-path
+                              "  threshold=" diff-threshold))
+                (println (str "  diff     " dpath))
+                ;; One EDN line for agents / accept gates to parse.
+                (println (pr-str edn)))
+              (catch :default e
+                (println (str "  FAILED  baseline diff: " (or (.-message e) e)))
+                (js/process.exit 6)))))))))
 
 (-main)
