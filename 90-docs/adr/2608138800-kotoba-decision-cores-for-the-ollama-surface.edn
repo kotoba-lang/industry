@@ -1,5 +1,5 @@
 [{:db/id -1
-  :adr/id "ADR-2608130700"
+  :adr/id "ADR-2608138800"
   :adr/title "ollama 互換 inference の「決定」を Kotoba に移す — host は transport だけを持つ"
   :adr/status "accepted"
   :adr/date "2026-08-13"
@@ -101,12 +101,21 @@ fallback を置くと、レビューされていない 2 つ目の policy が黙
 
 - **bytes**（GGUF・tensor・socket・JSON）: 恒久。datom 面に byte を載せないのと同じ
   理由で、決定核に byte を通さない。
-- **`temperature` / `top_p` の clamp**: **一時**。compiler pin `e78241d` では
-  `+` / `<` に f64 の admitted lowering が無い（実測 2026-08-13:
-  `(< v 0.0)` は `expected i64, got f64`、`f64+` は `operation has no admitted
-  lowering`）。backend gap であって設計境界ではない —— `application-language.edn`
-  の `:backend-qualification` が「利用できない backend は実装の穴であって、
-  仕様された安全な機能を取り除く理由ではない」と書いている。f64 演算が来たら移す。
+- **`temperature` / `top_p` の clamp**: **移した**（2026-08-13 同日、
+  `kotoba/kernel_math_core.kotoba` の `clamp-unit` / `clamp-non-negative`）。
+  ここには当初「compiler pin `e78241d` では f64 に admitted lowering が無い」と
+  書いていた。**その記述は誤りだった。** 実測した拒否
+  （`(< v 0.0)` → `expected i64, got f64`、`f64+` → `operation has no admitted
+  lowering`）は本物だが、**どちらの名前も存在しない**だけである。`<` は i64 の
+  比較で、`f64+` という演算は無い。正しくは `f64-lt` / `f64-add` で、amu の
+  frontend は `f64-add/sub/mul/div/min/max/neg/abs/sqrt`・`f64-eq/lt/le/gt/ge`・
+  `i64-to-f64-rounded`・`f64-to-i64-truncating`・bounded exp/log/trig を持つ
+  `f64-operations` 表を持っている（amu `e8864273` で実測、全部 compile して
+  正しく実行する）。同じ誤りが `kotoba-lang/murakumo` の `windows_core.kotoba`
+  にも 2026-08-11 から在り、そちらも訂正した（murakumo PR #296）。
+  **本当の制約は別にある**: `kotoba.kir/only-native-word-typed-features?` が
+  f64 を拒否するので、この core に clamp を置くと core 全体が native gate から
+  落ちる。だから float は別 core に置いた。詳細は ADR-2608139000。
 - **duration 文字列（`\"5m\"`）の解析**: 走査は決定核の仕事ではない。host が秒へ
   正規化してから policy を訊く。
 - **`/api/chat`**: 未実装のまま。chat template は「role → prefix/suffix」の
