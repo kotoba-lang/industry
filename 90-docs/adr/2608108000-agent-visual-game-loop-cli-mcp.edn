@@ -4,9 +4,9 @@
   :adr/source-format "edn"
   :adr/topic "agent-visual-game-loop-cli-mcp"
   :adr/title "ADR-2608108000: ゲームの状態・描画・比較を CLI と MCP から扱えるようにし、AI agent が目で見て開発・debug できるようにする"
-  :adr/status "proposed"
+  :adr/status "partially-implemented"
   :adr/date "2026-08-08"
-  :adr/last_verified "2026-08-08"
+  :adr/last_verified "2026-08-13"
   :adr/deciders ["Jun Kawasaki"]
   :adr/authoritative true
   :adr/supersedes []
@@ -152,19 +152,29 @@ MCP 側に持たせない**。
 
 ## 段取り
 
-| # | issue | 何を | 検証 |
-|---|---|---|---|
-| 1 | #1749 | 状態 EDN の封筒 + `--dump` / `--state` | round-trip: dump→load→dump が同一。script 再生と一致 |
-| 2 | #1750 | `--format edn\\|json` | 既存の ANSI 出力が**バイト単位で**変わらないこと |
-| 3 | #1751 | camera flags | `pick/project` と一致（`world3d_test` の既存 assertion を再利用） |
-| 4 | #1752 | board screenshot（状態注入） | 注入した状態が HUD に出ること |
-| 5 | #1753 | annotate / `--pick` | 焼いた座標で `pick` すると同じ instance が返る |
-| 6 | #1754 | diff + golden + gate | **1 instance 色替えで落ちること**を先に見る |
-| 7 | #1755 | `itonami-game-mcp` package | `kotodama.mcp-contract` の検証を通ること |
+| # | issue | 何を | 検証 | 着地 (2026-08-13 実測) |
+|---|---|---|---|---|
+| 1 | #1749 | 状態 EDN の封筒 + `--dump` / `--state` | round-trip: dump→load→dump が同一。script 再生と一致 | **landed** PR #2088 (`394dcf47084`) |
+| 2 | #1750 | `--format edn\\|json` | 既存の ANSI 出力が**バイト単位で**変わらないこと | **landed** with #1749 (`--format` in same PR) |
+| 3 | #1751 | camera flags | `pick/project` と一致（`world3d_test` の既存 assertion を再利用） | **landed** PR #2092 + ground-refusal #2105 |
+| 4 | #1752 | board screenshot（状態注入） | 注入した状態が HUD に出ること | **landed** PR #2106 (supersedes conflicted #2091); `npm run accept:board` → ACCEPT OK on `origin/main` 2026-08-13 |
+| 5 | #1753 | annotate / `--pick` | 焼いた座標で `pick` すると同じ instance が返る | **landed** PR #2117 (`b58730ed0fb`) |
+| 6 | #1754 | diff + golden + gate | **1 instance 色替えで落ちること**を先に見る | **landed** PR #2122 |
+| 7 | #1755 | `itonami-game-mcp` package | `kotodama.mcp-contract` の検証を通ること | **open** — no PR on main as of 2026-08-13 |
 
 tracking: #1748
 
-**1 が全部の前提。** 2〜7 はどれも「状態を名前で渡せる」ことの上にしか乗らない。
+**1 が全部の前提。** 2〜6 は main に着地済み。残る resume point は **#1755 MCP package** だけ。
+
+### #1752 closing note (このセッション)
+
+- 初回 PR #2091 (`cursor/itonami-board-capture-bccd`) は #2092 camera と
+  `bin/render.cljs` 全面 rewrite で衝突 → close（rebase 禁止）。
+- 後継 PR #2106 が camera を `render_street.cljs` に残したまま board を replay して
+  merge (`cf03d006dc2`)。正本の着地は #2106 であり #2091 ではない。
+- 検証再実行 (2026-08-13, tip `origin/main`): `npm run accept:board` → ACCEPT OK
+  （HUD ¥4321 / victory banner / isic-4520 labels / double-inject A→B）。
+  `pngjs` は #1754 由来の依存 — `npm install` 後に通る。
 
 ## この計画が意図的にやらないこと
 
@@ -198,7 +208,7 @@ git に置き続けてよいか判断する** —— 増えるようなら CLAUD
 着手前に 1 本で確かめる。"
 
   :adr/consequences
-  "状態 EDN が全体の前提。これが landed するまで他の 6 項目は着手しても宙に浮く。
-   MCP の image content が agent 経路で実際に届くかは未検証で、届かないなら
-   MCP 層の価値は「型が付く」に縮む。着手前に確認すること。
+  "状態 EDN (#1749) と CLI 視覚経路 (#1751–#1754) は 2026-08-13 時点で main に着地済み。
+   残るのは #1755 MCP package。MCP の image content が agent 経路で実際に届くかは
+   未検証で、届かないなら MCP 層の価値は「型が付く」に縮む — 着手前に 1 本で確かめること。
    golden 画像を git に置き続けるかは枚数と更新頻度で判断（増えるなら B2 + DataLad）。"}]
