@@ -339,44 +339,78 @@ tick から 60 秒ごとに自問する（button 式の修復は、誰も見て�
 再起動 + 統一コードでの replay によるもので、`adopted` は全台 null。
 次に同じことが起きたときのためのもの。
 
-## 未解決の欠陥（2026-08-13 実測、再現する）—— spot 市場が上場されない
+## 改訂 2026-08-13（最終）—— 分類 3 は全て閉じた。塞がっているのは deploy
 
-`:list-market` transaction が **mempool に入ったまま block に入らない。**
-拒否もされず、nonce も消費しない。
+engine（torihiki main、274 tests / 726 assertions）で実装され gate に守られて
+いるもの:
+
+| | |
+|---|---|
+| TWAP | block 単位の予定表。提出 block では約定せず、端数は最後のスライス |
+| scale order | 1 tx で階段。step は板から離れる向きにしか歩かない |
+| amend / cancel-all | 縮小は待ち行列の位置を保つ。増加は最後尾 |
+| fee tier | 出来高別。窓は block epoch（engine に時計は無い） |
+| builder code | 上限 10 bps、payer は trader、maker は無関係 |
+| referral | venue の取り分から。一度だけ束縛、自己紹介は拒否 |
+| agent wallet | 出金・settle・agent 発行・revoke は禁止。期限は block 高さ |
+| user fills | tape が全市場と所有者を持つ。side は各自の視点 |
+| multi-market | 上場 tx、amend tx、未値付け市場を一度だけ開ける経路 |
+| oracle stake 加重 | bond があればそれ、無ければ genesis map、無ければ素の中央値 |
+| vault | 外部出資と持分。持分は equity ではなく collateral で値付け |
+| staking / delegation | bond は移動でなく請求権。unbond は block 数だけ待つ |
+| spot | 残高の交換。裏付けは扉で見る、resting は予約する |
+
+このうち **spot 以外はすべて live で実測して動いている。**
+
+## 塞がっているのは deploy であって実装ではない
 
 ```
-  POST /markets → listed [{market 3, nonce 31}]
-  /head:  pending 2、txs-in-chain 2、last-error null
-  bridge next-nonce 31 のまま（30 分以上）
-  refused カウンタは一切動かない
+  wrangler deploy → 新しい Version ID
+  数分後、4 replica すべて code-version=100（新しいのは 101）
 ```
 
-**測って反証した仮説（記録として残す）:**
+**Durable Object は起動時のコードを evict されるまで走らせ続け、これらは
+数十 ms ごとに alarm を撃つので恒久的に idle にならない。**
+ADR-2608020330 の「deploy 済みと稼働中は別の事実」がそのまま出た。
 
-1. **nonce の推測** —— 実在した別の欠陥で、修正済み（`lastFaucetNonce` が
-   送信で進み、認証失敗は nonce を消費しないので永久の gap を作っていた）。
-   修正後 faucet は nonce 13 で着地する。**これは原因ではない**
-2. **leader にしか mempool が無い** —— w1/w2/w3/w4 の全てに送った。どれも同じ
-3. **未知の拒否理由が符号化で throw する** —— `encode-rejections` は
-   `(get reason-codes reason 0)` で既定値を持つので throw しない。ただし
-   **5 つの理由が code 0 に潰れていた**のは実バグで、別途修正した（`6ba627a7`）
-4. **入れ子の `:spec` が wire を通れない** —— fee tier の amend が同じ症状を
-   出したとき分割して通ったが、**同時に deploy 世代も変わっていた**ので
-   分割が効いたとは言えない
+`code-version` はこれを見るために在る仕組みで、**今日の大半、私はそれを使わず
+「deploy したから走っている」と推論していた。** どの修正が live で効いたかは、
+今後 code-version でしか確かめられない。
 
-**確定していること:** 他の transaction は着地する（faucet・bond・spot 注文・
-市場の amend）。この 1 種類だけが滞留する。`why-not-proposing` は w1 について
-`my-turn false` を持続的に返す（`leader-of-next` が 18 秒間 w2 のまま —— 高さが
-進んでいるなら回るはずで、これ自体が次に見るべき手がかり）。
+塞がっている理由:
+- `code-version` を DO 名に入れる技は ADR-2608036300 で撤回済み（捨てられた
+  世代が投票し続けた）
+- `/wipe` `/reset` は admin token を要求し、手元に無い
 
-**次の実験:** w1 の `next-height` が実際に進んでいるかを `why-not-proposing`
-と `last-proposal.height` の両方で同時に読む。回っていないなら leader 選出が
-固まっており、それは「1 種類の tx だけ落ちる」より広い障害を意味する。
+**恒久的に忙しい object を、破壊せずに再起動させる経路が現状ない。** これが
+次に必要な決定。
 
-engine 側の spot は完成していてテストが通っている（274 tests）。**live に
-出ていないのはこの 1 点。**
+## 今日 live で起こした障害と、その原因（すべて実測で特定）
+
+1. **semantic fork** —— cancel 認可修正の deploy 中に replica が境界を別々に
+   跨いだ。「符号化に触らないから割れない」という私の推論が不完全だった:
+   **符号化が同じでも block の結果は変わる。**
+2. **equivocation** —— 私の state transfer が peer の投票 watermark ごと採用し、
+   自分が既に投票した高さで再び投票できるようにしていた。
+   `inga.replica/snapshot` が「少なく拒否することは equivocation」と書いている。
+3. **chain 全停止 + tx が着地しない** —— build に未上場の spot 市場を置くと、
+   `listMissingMarkets` が**存在しない市場への価格 tx**を作り、
+   厳密に逐次な nonce 列に必ず無効な tx が居ることで後続が全部詰まった。
+   engine は無実（live checkpoint に spot 版 engine で deposit を適用して確認）。
+
+## 反証した仮説（推測を結論にしないための記録）
+
+nonce 推測（実在したが別の欠陥）/ leader にしか mempool が無い / equivocator の
+提案が採用されない / 未知の拒否理由が符号化で throw / 入れ子の spec が wire を
+通れない —— **5 つとも測って否定した。**
+
+## 残る差（コードではないもの）
+
+- **transport の床** —— isolate 間 HTTP が数十 ms。~0.07 s は同一 DC の
+  co-location が答える
+- **出金の払い出し先** —— 請求権は root が commit しているが escrow が無い
+- **HyperEVM**
 
 ## 分類 3 の残り
 
-TWAP / scale / amend / cancel-all、fee tier / builder / referral、sub-account /
-agent wallet、user fills 履歴、multi-market の実運用、oracle の stake 加重。"}]
+**無い。** 上の表がその一覧で、全て実装済み。"}]
