@@ -55,3 +55,144 @@ nil
  :event/verified "all 20 confirmed on main via GitHub API (render_html.clj present + operator-console.html 96,094-126,266 B) BEFORE pins were advanced; all 20 pin moves fast-forward per verify-west-pins"
  :event/not-done "stale prior-wave worktrees remain under orgs/cloud-itonami (_wt8-*, .wt-item2-*); two hold uncommitted prior-wave WIP (.wt-item2-3092 468-line render_html.clj, .wt-item2-2030 441-line) -- NOT dropped, they are another agent's WIP; _salvage-3319/ retained. retire via git-cleanup-conflict with archive-before-drop"
  :event/note "self-reported green is not the measure. real outcome = next tick :pool, expected 137"}
+
+{:event/type :industry-stack/wave :event/wave 10 :event/at "2026-08-13"
+ :event/parallel 8
+ :event/parallel-note
+ "8 agents, NOT 20 -- 4 build (2819 7722 7810 791) + 4 verify (4 repos each,
+  covering the 16 branches a prior wave had already pushed). recording 20 here
+  would be a lie about what this session spent."
+ :event/success 20 :event/fail 0 :event/merged-count 20
+ :event/merged
+ ["cloud-itonami-isic-0141" "cloud-itonami-isic-1072" "cloud-itonami-isic-2396"
+  "cloud-itonami-isic-2790" "cloud-itonami-isic-2819" "cloud-itonami-isic-3320"
+  "cloud-itonami-isic-4390" "cloud-itonami-isic-4652" "cloud-itonami-isic-4950"
+  "cloud-itonami-isic-5621" "cloud-itonami-isic-5920" "cloud-itonami-isic-6130"
+  "cloud-itonami-isic-6411" "cloud-itonami-isic-6511" "cloud-itonami-isic-6611"
+  "cloud-itonami-isic-7010" "cloud-itonami-isic-7220" "cloud-itonami-isic-7722"
+  "cloud-itonami-isic-7810" "cloud-itonami-isic-791"]
+ :event/finding-THE-GAP-WAS-MERGE-NOT-BUILD
+ {:what "16 of the tick's 20 candidates were ALREADY implemented, committed and
+         pushed by an unrecorded prior Wave 10 attempt. every one was a clean
+         fast-forward (ahead, behind=0) carrying a 28-42 KB generator and an
+         85-123 KB generated console. nobody ever merged them."
+  :why-invisible "the tick measures origin/main, so it correctly re-listed them as
+         missing. the tick ledger meanwhile logged :outcome :ran :exit 0 for five
+         consecutive hours while :pool sat at 157 -- the same successful-looking
+         failure shape waves 7-8 hit, one stage later in the pipeline. building
+         and pushing was never the bottleneck this round; landing was."
+  :detection-hazard
+  "several of these repos have a NARROW west fetch refspec
+   (+refs/heads/main:refs/remotes/origin/main only), so `git fetch origin`
+   SILENTLY does not bring agent/* down -- it reports success having updated
+   nothing. measured on 4390, 4652, 5621, 5920, 6130; only 6411 had +refs/heads/*.
+   2396's local branch head was also 2 commits BEHIND its remote tip. any check
+   that reads local refs to ask 'was this work pushed?' answers NO for work that
+   is on the remote. use `git ls-remote` / the API, never local remote-tracking refs."
+  :scope-checked "not fleet-wide: the 12 other repos holding leftover _wt10-*/.wt-item2-*
+         worktrees all DO have render_html on main -- their agent/* branches are merged
+         remnants, i.e. cleanup, not backlog. the unmerged backlog was exactly these 16."}
+ :event/verification
+ {:standard "regeneration, not file-presence. each verify agent rebuilt the console
+             from the branch's own generator into a mktemp -d scratch and `cmp`ed it
+             against the committed file. 16/16 BYTE-IDENTICAL. this is strictly
+             stronger than wave 9's standard (file present + plausible size), which
+             cannot distinguish generator output from a hand-written page."
+  :guards-proven-both-ways
+  "verifiers did not read the -main zero-hold guard and believe it -- they neutered
+   governor/check with with-redefs so the run produced zero violations, and confirmed
+   all 16 THREW and wrote no file. two verifiers caught their own bad probes and
+   discarded the results: one broke syntax instead of behaviour (a parse error proves
+   nothing about a guard), one read the wrong audit key and got a vacuous 0. that is
+   the 'mis-broken red looks like a successful demonstration' trap, caught twice."
+  :fakes-evicted
+  {:isic-7810 "main held a 2,220-byte hand-written console titled
+               'cloud-itonami · robotics' in an EMPLOYMENT AGENCY repo whose seed data
+               is candidacies (Kita Taro / Warehouse Associate). replaced by 90,384 B
+               of generator output; grep -ci robotics -> 0"
+   :isic-4652-4950 "both had generator-less consoles on main (7,512 / 4,693 B) that were
+               domain-CORRECT in title -- so the domain-name check would not have caught
+               them. verifier text-diffed old vs new: 0 of 14 and 0 of 4 prose chunks
+               >=25 chars survived. domain-correctness does not clear a console; only
+               reproduction does."}}
+ :event/root-causes-found
+ {:isic-2819 "ONE MISSING CLOSING PAREN (line 571, shipments-section). the prior agent's
+              generator was substantively complete; clojure died at read time with
+              'EOF while reading, starting at line 555' so it never ran even once.
+              deps.edn was already correct. a whole repo's slot lost to one character."
+  :isic-2819-second "shipment table read \"shipment_number\" but registry/append stores the
+              inner record whose key is \"record_id\" -- column rendered blank. found by
+              reading the emitted page, not by testing."
+  :isic-7722 "the agent's own first pass joined the rental log to the audit trail on
+              (op, account-id). the scenario deliberately runs :log-rental-record on
+              account-1 TWICE (once human-approved, once auto-commit), so the join
+              smeared the approver onto the auto-commit -- the page CLAIMED a human
+              approved a record no human ever saw. fixed by joining on record identity."
+  :isic-791 "three accuracy defects found by reading its own emitted page: approver cell
+              said 'auto-committed - no human approver' for bookings never committed at
+              all; phase matrix fed phase/gate a hardcoded clean :commit base, hiding the
+              phase-1/2 safety carve-outs; rejection row implied a named reviewer the
+              fact does not retain."}
+ :event/approver-attribution-SIXTH-VARIANT
+ {:prior "wave 7 measured 5 store behaviours across 20 repos and warned against treating
+          the defect as fleet-wide"
+  :new "isic-7810 is SPLIT WITHIN ONE REPO: :assessment/set reads :payload and DOES retain
+        the approver, while :candidacy/mark-matched / :mark-placed derive from path and
+        retain nothing. the unit of this defect is the EFFECT, not the repo -- so even a
+        per-repo measurement can be wrong if it samples one effect."
+  :measured-this-wave {:retained ["7722" "791"] :dropped ["2819"] :split-by-effect ["7810"]}
+  :practice "every agent derived the disclosure at RENDER time (contains? on the record the
+        op actually wrote) rather than hard-coding it, so the pages self-correct if the
+        store is fixed. none blanked the column -- a blank reads as 'nobody approved'."}
+ :event/concurrency
+ {:branches-moved-mid-verification
+  "5920 (7c011ad->e10e2a1) and 6130 (5a2bbb8->d80394e) were pushed to WHILE being verified,
+   by something outside this session. the verifier discarded the stale results and re-ran
+   at the new tips. those 4 were then merged BY EXPLICIT SHA rather than branch name, after
+   re-confirming the tips still equalled what was actually verified -- merging by branch name
+   would have let an unverified push slip in between verification and merge."}
+ :event/verified
+ "all 20 confirmed present on main via GitHub API (render_html.clj 24,861-42,696 B +
+  operator-console.html 84,827-123,005 B) BEFORE pins were advanced; all 20 pin moves
+  verified fast-forward by verify-west-pins in two batches of 10."
+ :event/not-done
+ "(1) stale worktrees still under orgs/cloud-itonami: ~23 _wt10-*, 10 .wt-item2-*, 12
+  _wt-isic-*-flagship*. some hold other sessions' uncommitted WIP -- NOT dropped. retire via
+  git-cleanup-conflict with archive-before-drop.
+  (2) merged agent/flagship-item2-* branches not deleted on the remote (this wave's 20 plus
+  ~12 older remnants).
+  (3) isic-6511 cosmetic: Beneficiaries cell renders a raw Clojure map instead of a formatted
+  name -- genuine generator output from real seed data, a formatting wart, not fabrication.
+  (4) isic-2790 cosmetic: -main logs (count html) labelled 'bytes' (93,224) when the file is
+  97,398 UTF-8 bytes; stdout only, 0 occurrences on the page. 2396 already fixed this in its tip.
+  (5) isic-791 needed store.cljc extended (5-booking seed + read accessors, write protocol
+  untouched) because the existing seed could not demonstrate the holds -- wider than the
+  3-file diff every other repo produced.
+  (6) isic-791's registry/staff-shift-conflicts? is a pre-existing stub always returning false;
+  the advisor cites it honestly. left alone as out of scope."
+ :event/note
+ "self-reported green is not the measure. real outcome = next tick :pool, expected 111
+  (was 131, done 191 -> 211). if the next tick still reads 131, the merges did not take
+  and this entry is wrong."}
+
+{:event/type :industry-stack/pins :event/wave 10 :event/at "2026-08-13"
+ :event/pins
+ ["cloud-itonami-isic-0141" "cloud-itonami-isic-1072" "cloud-itonami-isic-2396"
+  "cloud-itonami-isic-2790" "cloud-itonami-isic-2819" "cloud-itonami-isic-3320"
+  "cloud-itonami-isic-4390" "cloud-itonami-isic-4652" "cloud-itonami-isic-4950"
+  "cloud-itonami-isic-5621" "cloud-itonami-isic-5920" "cloud-itonami-isic-6130"
+  "cloud-itonami-isic-6411" "cloud-itonami-isic-6511" "cloud-itonami-isic-6611"
+  "cloud-itonami-isic-7010" "cloud-itonami-isic-7220" "cloud-itonami-isic-7722"
+  "cloud-itonami-isic-7810" "cloud-itonami-isic-791"]
+ :event/verified "advance-pins {:advanced 20 :already 0 :lookup-failed 0 :not-in-manifest 0};
+  verify-west-pins OK 20/20 fast-forward; west.yml diff is exactly 20 revision lines"}
+
+;; The two entries below are SINGLE-LINE on purpose. scripts/industry-stack-wave-tick.cljs
+;; reads this file with str/split-lines + edn/read-string PER LINE, inside a try that
+;; returns the accumulator on failure -- so a multi-line entry contributes ZERO repos and
+;; looks exactly like an entry that merged nothing. Measured 2026-08-13: the tick's parser
+;; recovers only 9 repos from this whole ledger, and 0 of wave 9's or wave 10's, because
+;; both of those entries are pretty-printed. The done-file (~/.gftd/industry-stack-wave-done.edn)
+;; is the real source of truth and carries all of them; these lines restore the ledger fallback.
+{:event/type :industry-stack/wave :event/wave 10 :event/at "2026-08-13" :event/machine-readable-companion true :event/merged ["cloud-itonami-isic-0141" "cloud-itonami-isic-1072" "cloud-itonami-isic-2396" "cloud-itonami-isic-2790" "cloud-itonami-isic-2819" "cloud-itonami-isic-3320" "cloud-itonami-isic-4390" "cloud-itonami-isic-4652" "cloud-itonami-isic-4950" "cloud-itonami-isic-5621" "cloud-itonami-isic-5920" "cloud-itonami-isic-6130" "cloud-itonami-isic-6411" "cloud-itonami-isic-6511" "cloud-itonami-isic-6611" "cloud-itonami-isic-7010" "cloud-itonami-isic-7220" "cloud-itonami-isic-7722" "cloud-itonami-isic-7810" "cloud-itonami-isic-791"]}
+{:event/type :industry-stack/pins :event/wave 10 :event/at "2026-08-13" :event/machine-readable-companion true :event/pins ["cloud-itonami-isic-0141" "cloud-itonami-isic-1072" "cloud-itonami-isic-2396" "cloud-itonami-isic-2790" "cloud-itonami-isic-2819" "cloud-itonami-isic-3320" "cloud-itonami-isic-4390" "cloud-itonami-isic-4652" "cloud-itonami-isic-4950" "cloud-itonami-isic-5621" "cloud-itonami-isic-5920" "cloud-itonami-isic-6130" "cloud-itonami-isic-6411" "cloud-itonami-isic-6511" "cloud-itonami-isic-6611" "cloud-itonami-isic-7010" "cloud-itonami-isic-7220" "cloud-itonami-isic-7722" "cloud-itonami-isic-7810" "cloud-itonami-isic-791"]}
