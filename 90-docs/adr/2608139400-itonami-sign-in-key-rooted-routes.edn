@@ -1,0 +1,149 @@
+[{:db/id -1
+  :adr/id "ADR-2608139400"
+  :adr/title "itonami のサインインは鍵が根 — email / SSO は見える・外せる経路にする"
+  :adr/status "accepted"
+  :adr/date "2026-08-13"
+  :adr/repo "orgs/cloud-itonami/app-auth"
+  :adr/supersedes ""
+  :adr/superseded-by ""
+  :adr/body
+  "## Context
+
+オーナー指示（2026-08-13）:「cloud-itonami のログインに 1password or bitwarden,
+apple keychain, google password などの安全な key 管理のみを使うようにしたい」。
+適用範囲を確認したところ:「key を中心に復旧経路と別ログイン経路として email,
+sso などを繋げられるようにしたい」。
+
+つまり要求は「email / SSO の廃止」ではなく **鍵を根に据えた上で、email / SSO を
+そこにぶら下がる経路として扱えるようにすること**。
+
+### 実測した現在地（3 面）
+
+| 面 | repo | 役割 |
+|---|---|---|
+| `itonami.cloud/signin/` | `network-awai/cloud-itonami` | 登録（custody）。パスキー登録 + サーバ保管 Ed25519（KEK 包み） |
+| `auth.itonami.cloud` | `cloud-itonami/app-auth` | サインイン。パスキー assertion + email / SSO |
+| デスクトップ | `cloud-itonami/cloud-itonami-app` | `email_login.clj`（ADR-0012）+ `passkey.clj` |
+
+**パスキー経路自体は既に要求どおりだった** —— WebAuthn（RP `itonami.cloud`）で、
+鍵が 1Password / Bitwarden / iCloud キーチェーン / Google パスワードマネージャーの
+どれに入っていてもよい。登録面も既に鍵中心で、`account.cljc` は
+`recovery-posture`（`:none` / `:single-device` / `:single-synced` / `:multiple`）・
+`revocation-problems` の `:last-credential`・`attach-email` / `detach-email` を
+持ち、`email-login-outcome` は `:enrolled`（= 有効な credential を持つ）口座に
+しかリンクを送らない。`detach-email` の docstring は『メールは根ではないので
+0 本でも本人はパスキーで入れる。ここで拒むと〈経路は根である〉と言っていることに
+なる』と明示している。
+
+**壊れていたのは「繋いだ後」だった。**
+
+## Decision
+
+`cloud-itonami/app-auth` に 3 点を入れる。判断は `viewer.cljc`（pure、JVM で検査）、
+機構は Durable Object。
+
+### 1. 経路を見えるようにする — 逆引き索引
+
+`AuthStore` は `identity:<provider>:<digest> -> did` の**一方向**しか持たず、
+サインインが必要とする全てを答える一方で**所有者が行動できることを何も答えない**
+（ある DID にどの経路が付いているかを問う手段が無い）。結果、連携は作れるが
+列挙できなかった。`/v1/methods` は「この配備がどの provider の binding を持つか」
+を答えるだけで「この口座が何を連携済みか」は答えていなかった。
+
+`did-identity:<did>:<key>` を**リンクと同じ object turn で**書く。理由は
+`op-session-put` が索引を内側で書くのと同じ ——『索引を伴わないレコードは管理面が
+見られないレコードであり、見えない経路は経路が無いより悪い』。`GET /v1/methods`
+がセッションごとの連携一覧（provider・masked label・linkedAt）を返す。
+
+索引が無かった時代の連携は、**次回そこからサインインしたときに自己修復**する。
+移行バッチにしないのは、それが『新形状を読むコードより先に走らねばならず、その間は
+実在する経路をゼロと報告する』ため（登録面の `adopt-legacy-credential` と同じ手）。
+
+### 2. 経路を外せるようにする
+
+`POST /v1/methods/unlink`。forward record と索引を atomic に削除し、判定は
+**保存レコード側の `did`** で行う（呼び出し側の主張ではない）。『無い』と
+『あなたのではない』は同じ応答 —— 出し分けると、任意のセッション保持者が
+推測した鍵の帰属を確認できてしまう（email 経路の鍵は既知アドレスの digest）。
+
+**最後の 1 本でも外せる。** 鍵が根で経路は根ではないから。拒めば『経路は根である』
+と言うことになる（登録面の `detach-email` と同じ線、`revocation-problems` が
+拒むのは最後のパスキーだけ）。
+
+### 3. 経路が経路を増やせないようにする
+
+`federated/start!` と `email-start!` は `valid` なら DID を渡していた。つまり
+**email で入った `single-factor` セッションが別の経路を連携できた** ——
+受信箱を 10 分押さえれば、本人が作っておらず、（1 の索引が無いので）見ることも
+外すこともできない連携を残せた。
+
+`viewer/key-rooted?` = `valid` かつ `acr` が `phishing-resistant`（パスキー自身が
+認証したセッション）。single-factor は依然サインインでき、アプリに到達し、
+native-app token も持つ —— 変えられないのは『鍵が何に応答するか』だけ。
+Worker 側（理由を言える）とストア側（迂回できない）の二重で強制。
+
+### 付随して直した 2 件（触った箇所）
+
+- `--hig-color-red` / `--hig-color-green` は DADS に定義が無く（bridge にも
+  無い、`--hig-palette-*` が正）、**エラーが成功と同じ色で描かれていた**。
+  『測れなかった検査が、測って問題が無かった検査と同じ値を返す』の UI 版。
+- `test/worker_smoke.cljs` に `.catch` が無く、**case が例外で落ちると
+  ok を数行出して要約を出さず exit 0** だった。新ケースを故意に壊した実測で
+  踏んだ。ABORTED と明示して exit 1 する。
+
+## Verification
+
+- `clojure -M:test` — 14 tests / 106 assertions、0 failures
+- `nbb test/worker_smoke.cljs` — ビルド済み `js/auth-worker.js`（`wrangler deploy`
+  が上げる当のファイル）+ 実 `AuthStore` クラスに対して green
+- **discriminate 確認（5 箇所を故意に壊し、名指しのテストだけが赤くなることを
+  実際に見た）**: ①`key-rooted?` が acr を無視 ②`routes-view` の sort 削除
+  ③mask 幅が入力長に比例 ④unlink が single-factor を通す ⑤リンク時に索引を
+  書かない。①〜③は JVM、④⑤は再ビルドして smoke。復旧で全て green
+- 本番デプロイ後、`/v1/methods` が新形状・unlink が 401 を **30/30** で返すことを確認
+
+⚠ **デプロイ直後の数分は新旧が混在した**（同一 colo NRT で ~5%）。
+`wrangler deployments list` は 100% 新バージョンを示しており、warm isolate の
+循環待ちだった。40/40 → 30/30 新版に収束。**deploy 直後 1 回の probe を
+『反映済み』の証拠にしない。**
+
+## Landed
+
+- `cloud-itonami/app-auth` main — `b3a023229eb27d36bf0415cb47f76ada62275121`
+- 本番 `auth.itonami.cloud` — version `4fc55f24-21fe-4c3c-be34-6eacb2218c1a`
+- west pin 前進 — superproject main `8e490d57a59e5cff5b838253f167cc8775bbd28e`
+  （`scripts/west-pin-put.cljs` の single-entry commit。74bc3c8 -> b3a0232 が
+  pure fast-forward であることをサーバ側で検証済み）
+- ADR（この文書）
+
+## Gaps（未実装。papered over しない）
+
+1. **復旧はリンクまでで、新しい鍵までは届かない。** この Worker は KEK を持たない
+   設計なので登録できず（`config/enrolment-url`、二重 custody を避けるための
+   意図的な欠落）、サインイン済み画面から `itonami.cloud/signin/` へ誘導するだけ。
+   「email で戻る → その場で予備パスキーを作る」を 1 画面で閉じるには登録面側の
+   作業が要る。**優先度 高** —— 端末を全て失った人の経路がここで途切れる。
+2. **SSO の連携先はサインイン面にしか無い。** `network-awai/cloud-itonami` の
+   `account.cljc` は `:account/emails` を持つが provider の等価物が無く、
+   `recovery-posture` / `recoverable?` は SSO を数えない。つまり登録面が出す
+   「復旧可能か」の判定に SSO 連携が反映されない。**優先度 中** —— account
+   モデルの変更を伴うのでオーナー判断が要る。
+3. **本番は SSO 4 つとも `configured: false`**（client secret 未投入）。実際に
+   使える経路はパスキーと email だけ。塞いだ昇格経路のうち到達可能だったのは
+   email → 別 email の連携。
+4. **デスクトップ `cloud-itonami-app` の `email_login.clj` は未監査。**
+   ADR-0012『email は session の証明であって身元の根ではない』と同じ線に見えるが、
+   今回は実装を読んでいない。
+
+## Resume point
+
+```bash
+# 1 を進めるなら: 登録面が既存セッションで 2 本目を受けられるか
+ls orgs/network-awai/cloud-itonami/functions/api/credentials/   # add/index/rename/revoke は在る
+grep -n 'defn ' orgs/network-awai/cloud-itonami/src/cloud_itonami/edge/email_login.cljc
+
+# 現状の再確認
+curl -sS https://auth.itonami.cloud/v1/methods | python3 -m json.tool
+cd orgs/cloud-itonami/app-auth && clojure -M:test && npm run build && npx nbb test/worker_smoke.cljs
+```
+"}]
