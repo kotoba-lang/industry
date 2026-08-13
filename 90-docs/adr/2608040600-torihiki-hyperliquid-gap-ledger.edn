@@ -448,8 +448,8 @@ harness があるので測定はできる。deploy が通らないうちに合�
 
 ## 残る差（コードではないもの）
 
-- **transport の床** —— isolate 間 HTTP が数十 ms。~0.07 s は同一 DC の
-  co-location が答える
+- ~~**transport の床** —— isolate 間 HTTP が数十 ms。~0.07 s は同一 DC の
+  co-location が答える~~ **測ったら違った。下の節を見よ。**
 - **出金の払い出し先** —— 請求権は root が commit しているが escrow が無い
 - **HyperEVM**
 
@@ -524,4 +524,44 @@ gate はいずれも実装を外すと落ちることを確認済み:
 `a-replica-that-signs-elsewhere-still-votes` /
 `a-replica-that-does-not-propose-says-which-condition-said-no` /
 `a-replay-does-not-come-back-behind-its-own-tip`。
-socket harness は forgery 0・equivocator 検出のまま pass。"}]
+socket harness は forgery 0・equivocator 検出のまま pass。
+
+## transport は gap ではなかった（2026-08-13 実測）
+
+この台帳は「残る差（コードではないもの）」の筆頭に transport を置き、`tick-ms` の表も
+「Hyperliquid の ~0.07 s までの残りの距離は transport にある。co-location が答える」で
+締めていた。**その一文は測られていなかった** —— timing していない費用に、見てもいない
+分散に対して、対策の名前だけが付いていた。
+
+### object の内側から測った RTT
+
+    w1 NRT   w2 KIX   w3 NRT   w4 NRT
+
+    同一 colo (NRT↔NRT)  min 2-4 ms   p50 3-18 ms
+    NRT↔KIX (w2 のみ)    min 8-14 ms  p50 24-36 ms
+
+co-location は確かに不完全（w2 だけ大阪）だが、**床は数十 ms ではなく 2-4 ms**。
+colo は object 自身の outbound request から取る —— 入ってくる request の `cf.colo` は
+「呼んだ側に一番近い edge」で、測定者の laptop のことになる。
+
+### block の 185 ms の内訳
+
+    tick gap   min 25   p50 29    max 1960
+    tick work  min  0   p50  0    max 1922
+    block      min 54   p50 247   max 1960
+
+**block の最小は 54 ms** —— 床は既に Hyperliquid と同水準にある。差は中央値と tail で、
+tail は tick work に追従していた。原因は `dispatch` が peer ごとの `fetch` を
+`Promise.all` で待ち、tick がそれを待って終わること ——
+**自分の時計が一番遅い replica の速度で動いていた。**
+
+待ちに上限（40 ms、送信は止めない）を入れて tick work の max は 1922 → 40 になった。
+**ただし block の中央値は動いていない**（180-290 ms）。残る犯人は tick gap の tail
+（max 370-1547 ms）で、配送ではなく **alarm の刻みと tick あたりの storage 仕事**。
+
+### 台帳としての訂正
+
+「~0.07 s に届かないのは transport だから、co-location を買うしかない」は**誤り**。
+床は既に届いている。届いていないのは中央値で、それは **コードで到達できる場所**
+（Durable Object の alarm 刻みと per-tick の永続化）にある。**資金判断を待つ項目
+ではなくなった。**"}]
