@@ -1,22 +1,22 @@
 {:health-status 200,
  :zone-name "aozora.app",
  :workers-invocations-7d
- {"app-aozora-pds" 15167,
-  "app-aozora-appview" 14194,
-  "app-aozora-spa" 6541},
+ {"app-aozora-pds" 15241,
+  "app-aozora-appview" 14249,
+  "app-aozora-spa" 6586},
  :zone
- {:requests-7d 952603,
-  :pageviews-7d 5422,
-  :uniques-7d-sum 870,
+ {:requests-7d 958627,
+  :pageviews-7d 5467,
+  :uniques-7d-sum 874,
   :zone "aozora.app"},
  :sources [:cloudflare :health],
  :paths
  {:ok
-  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4906}
+  [{:path "/xrpc/ai.gftd.apps.kotobase.datomic.datoms", :requests 4931}
    {:path
     "/bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcjzwgrv2xvkwweurdvdwgi",
-    :requests 180}
-   {:path "/federation-pilot/did.json", :requests 138}
+    :requests 186}
+   {:path "/federation-pilot/did.json", :requests 137}
    {:path
     "/kotobase-cf-wasm-testnet/ipns/bafyreiakzellpfgz56bjomeaenvnvmh67rrarfdsmlhogqgotll3pxuiie.json",
     :requests 126}
@@ -26,14 +26,14 @@
    {:path
     "/bafyreihj3yfdvcnk576i7orwvtxtmrbvzmswy4eq3q5k2optwu446juce4",
     :requests 73}
-   {:path "/robots.txt", :requests 72}
-   {:path "/minidrama-fedtest/did.json", :requests 66}],
-  :status-mix {:ok 7557, :client-error 9882, :server-error 5737},
+   {:path "/robots.txt", :requests 73}
+   {:path "/minidrama-fedtest/did.json", :requests 65}],
+  :status-mix {:ok 7608, :client-error 9831, :server-error 5756},
   :window "24h"},
  :as-of "2026-08-13",
  :traffic-quality
- {:window "24h", :probe-4xx-pct 43, :error-5xx-pct 25},
+ {:window "24h", :probe-4xx-pct 42, :error-5xx-pct 25},
  :top-paths
- "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4906 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 180 · /federation-pilot/did.json 138 · /kotobase-cf-wasm-testnet/ipns/bafyreiak… 126 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 82 | 4xx(probe) 43% · 5xx 25%",
+ "上位 page (24h, 2xx/3xx): /xrpc/ai.gftd.apps.kotobase.datomic.dato… 4931 · /bafyreiatj6goj2p25yej6jv2ibfbyniy7u2lcj… 186 · /federation-pilot/did.json 137 · /kotobase-cf-wasm-testnet/ipns/bafyreiak… 126 · /bafyreigp3coa2pmkafmy455aqod25hw4mfvein… 82 | 4xx(probe) 42% · 5xx 25%",
  :signal
- "aozora.app 実測 952603 req/7d・870 uniques(日次和)・うち4xx probe 43%(24h)、workers 35902 inv/7d"}
+ "aozora.app 実測 958627 req/7d・874 uniques(日次和)・うち4xx probe 42%(24h)、workers 36076 inv/7d"}
