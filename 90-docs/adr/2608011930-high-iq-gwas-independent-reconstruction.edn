@@ -1,13 +1,13 @@
 [{:db/id -1
   :adr/id "adr-2608011930-high-iq-gwas-independent-reconstruction"
-  :adr/title "ADR-2608011930: 高 IQ 日本人 GWAS — 投稿一式の集約と Package A 独立再構成（91/91 完了、lock 前で停止）"
+  :adr/title "ADR-2608011930: 高 IQ 日本人 GWAS — Package A 独立再構成 2 系統（90/91 一致、hash 確定・custodian 送付待ち）"
   :adr/status "accepted"
   :adr/doc_type "adr"
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-08-01"
-  :adr/last-verified "2026-08-01"
-  :adr/last_verified "2026-08-01"
+  :adr/last-verified "2026-08-13"
+  :adr/last_verified "2026-08-13"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "high-iq-gwas-independent-reconstruction"
@@ -15,6 +15,7 @@
   ["高 IQ 日本人 GWAS 投稿一式と Package A v1.1 の保管場所と取扱い規則"
    "独立再構成（Phase 5C）の進捗・所見・resume point"
    "この監査が立証する独立性の種類と、立証しないもの"
+   "2 系統の独立再構成の相互検証結果と、未決着の 1 件"
    "制限データを外部 AI サービスに露出させた事実の開示"]
   :adr/related
   ["adr-2607171600-docs-edn-only"
@@ -25,7 +26,8 @@
    "6e6b71b97c3 一致判定基準の事前規定（計算前に単独コミット）"
    "87f339d20e9 FIG1 (L1) + 入力ハッシュ監査"
    "754580a14d5 LD 連鎖 TABLE1/FIG2/SuppTable S1/FIG3"
-   "ffb372d0b54 PGS 連鎖 FIG4/TABLE2/SuppFig S1 — 91/91 到達"]
+   "ffb372d0b54 PGS 連鎖 FIG4/TABLE2/SuppFig S1 — 91/91 到達（第 1 系統）"
+   "3a56b32663a 第 2 系統の独立再構成 — 90/91 一致・検証報告書・lock 提出物"]
   :adr/body
   "# ADR-2608011930: 高 IQ 日本人 GWAS — 集約と独立再構成
 
@@ -86,44 +88,96 @@ OUTPUTS_WITHHELD.tsv` に 91 claim があり全て `expected_value = WITHHELD`�
 
 **「91/91 完了」を「全結果を検証した」と読み替えてはならない。**
 
-## Status（2026-08-01 時点）
+## Status（2026-08-13 時点）
+
+**同じ claim set を、方法契約のみから独立に再構成したものが 2 系統ある。**
+第 1 系統は 2026-08-01（`audit/return/`）、第 2 系統は 2026-08-13
+（`audit/run-2026-08-13/`）。両者の claim 値を突き合わせて **91 件中 90 件が一致**。
+2 系統を回すこと自体が協力者の 2026-08-03 の依頼（答え合わせだけでは AI 特有の
+エラーを排除できない）への回答である。
 
 ### 完了
 
-- 投稿一式 + Package A を無改変で集約。57 ファイルの SHA-256 全件 OK
-- 日本語参考訳 3 点（MS 508 行 / SI 265 行 / Cover 98 行）。数式は Word 数式
-  オブジェクトのため復元せず〔数式は原文参照〕と明示（MS 3・SI 3 箇所）
+- 投稿一式 + Package A を無改変で集約。57 ファイルの SHA-256 全件 OK（両系統）
+- 日本語参考訳 3 点（MS 508 行 / SI 265 行 / Cover 98 行）
 - 一致判定基準を**計算前に単独コミット**（順序を履歴に残すため）
-- 入力ハッシュ監査 25/25 MATCH
-- **91/91 claim 確定**（過不足なし）。検証 105 件中 103 PASS
+- **両系統とも 91/91 claim 確定。** 第 2 系統は追加 1 件を含め 92 値を返却
+- **暗号化アーカイブと lock 対象ハッシュを確定**（第 2 系統）:
+  `bbc7e003f4e3c0e3c9fb59cd37ce571f968cc2cf848f03ec2d6a775697a2c90c`。
+  7z / AES-256 + header encryption、25 MB。展開して 71 ファイル全件が
+  SHA-256 一致で復元すること、誤パスフレーズが拒否されること、
+  パスフレーズ無しでファイル名も読めないことを実測で確認済み
+- 日本語の検証報告書（7 ページ PDF）を作成し repo に着地
 
-### 所見
+### 2 系統の相互検証
+
+| | |
+|---|---|
+| 一致 | 90 / 91 |
+| 不一致 | 1 件のみ（`SUPPTABLE_S1_CATEGORY_COUNTS`） |
+
+不一致は計算差ではなく **claim の読み方の差**。第 2 系統は全 26 行を数えて
+8/12/6、第 1 系統は lead 17 行のみで 5/7/5。第 2 系統は claim matrix の内部証拠
+3 点（①lead のみと読むと `FIG2_CATEGORY_COUNTS` の完全な重複になる ②matrix は
+一貫して「集計対象を第 1、照合先を第 2」に置く ③8+12+6 = 26 = 同じ群の
+`SUPPTABLE_S1_ROW_COUNT`）から全 26 行を採用し、lead のみの値も別 claim として
+併せて返却している。**custodian は再計算なしに差し替えられる。**
+
+**相互検証は形式的確認に留まらず、単独では出なかった 2 件を表面化させた** —
+第 2 系統の FIG1 示唆変異の不一致（F-01 と同一事象を独立に再現）と、
+カテゴリラベルの大小文字を無記録で checkpoint に合わせていた事実（F-05 の再発）。
+どちらも第 2 系統の deviation log に記録済み。
+
+### 所見（F-01〜F-05、第 1 系統）
 
 - **F-01** 事後除外バリアント `rs376128944` が `DS_GWAS_CURRENT` に
-  `PASS_DIRECTLY_GENOTYPED` のまま残る。除外は原稿 prose と Table S1 の
-  Notes 欄（`rs75790544` が WDHD1 の置換リード）にしかなく、method contract に
-  機械可読な指示がない。契約に従う再構成者は 27 件を得る（原稿は 26 retained）
+  `PASS_DIRECTLY_GENOTYPED` のまま残る。契約に従う再構成者は 27 件を得る
+  （原稿は 26 retained）。**第 2 系統が独立に完全再現**（27 対 26、差分は同一変異）
 - **F-03（最重要）** `DS_TABLE_S1_CURRENT` が投稿版と一致しない。rs146572333 の
   `EAS_EUR_Fold_Difference` が payload 38.6（真値 38.6515970515970516 の切り捨て）、
-  投稿版 38.7（正しい四捨五入）。`Notes` も payload 側が旧版。
-  **古いのは論文ではなく package の checkpoint**
-- **F-02** 打ち切り値（`<0.0001` / `>100`）の規則が M03 に無い
-- **F-04** `DS_FIG3_PANEL_A` の二項 P が 4 有効数字のみ（claim matrix は full
-  precision を要求、同ファイルの CP 境界は小数 6 桁）
+  投稿版 38.7。**古いのは論文ではなく package の checkpoint**。
+  ⚠ **この所見は Package A の外の資料（投稿版補足表）との比較で得たものであり、
+  code-independent の作業範囲内では検証できない。** 第 2 系統は投稿版を
+  意図的に開かなかったため（lock 前に開けば盲検性が壊れる）、この所見を
+  裏付けも反証もしていない。第 2 系統のバイト一致が示すのは payload checkpoint の
+  忠実な再現であって投稿版との一致ではない
+- **F-02** 打ち切り値（`<0.0001` / `>100`）の規則が M03 に無い。**両系統とも
+  独立に「打ち切り境界として扱う」判断に到達**
+- **F-04** `DS_FIG3_PANEL_A` の二項 P が 4 有効数字のみ。**両系統が独立に検出**
 - **F-05** カテゴリラベルの大小文字が M03 と checkpoint で不一致。**実害あり** —
-  M03 の綴りでグループ化すると中央カテゴリが黙って 0 件になり Figure 2 が壊れる
+  M03 の綴りでグループ化すると中央カテゴリが黙って 0 件になる
+
+### 第 2 系統が追加で記録した所見
+
+- **入力ファイルの欠陥（上流報告）** `figure4_aggregate_source.tsv` の 2–7 行目が
+  20 列ヘッダに対し 19 列（出所文字列が `control_pgs_sd_raw` 列に落ちる）。
+  返却値は 20 列を持つ最適化行から読んでいるため結果に影響なし
+- **FIG3 の同順位診断** 任意実施のゲノムワイド再計算で lead 数が ±2〜9 ずれ
+  符号も一定しなかった原因は、European P の大量の同順位である —
+  European P を持つ 308,213 変異に対し相異なる値は 28,996 しかなく、
+  **300,114 行（97.4%）が同値群に属する**。lead 選択が同順位解決順に依存する
+  ため、このずれは系統的な手法誤りではない
 
 ### 未完了（resume point、オーナー実施）
 
-1. **F-03 を custodian と解決する。** lock 後に発覚すると `RESULT_LOCK_PROTOCOL`
+1. **`09_VERIFIER_ATTESTATION.md` に署名**（意図的に未署名。共著者本人の署名欄）
+2. **ハッシュ・completion block・署名済み attestation を custodian へ送付。**
+   ⚠ **Package A には custodian の連絡先が記載されていない** — 宛先の指定が要る。
+   送付物は `audit/run-2026-08-13/lock-submission/` の 3 点。
+   アーカイブ本体とパスフレーズはハッシュとは**別チャネル**で送る
+3. custodian がハッシュを記録した時点で lock 成立 → **そこで初めて Package B を
+   開いて答え合わせ**（現時点で照合は一度も行われていない）
+4. **F-03 を custodian と解決する。** lock 後に発覚すると `RESULT_LOCK_PROTOCOL`
    により Round 2（新アーカイブ・新ハッシュ）が必要になる
-2. `09_VERIFIER_ATTESTATION.md` に署名（意図的に未署名）
-3. AES-256 暗号化アーカイブ作成と SHA-256 記録 —
-   **パスフレーズを要するため自動化していない**
-4. ハッシュ・completion block・署名済み attestation を custodian へ送付
+5. `SUPPTABLE_S1_CATEGORY_COUNTS` の読み方を確定する（上記のとおり両値を返却済み）
+
+**旧 resume point のうち「暗号化アーカイブ作成と SHA-256 記録 — パスフレーズを
+要するため自動化していない」は解消した。** パスフレーズを生成してキーチェーンに
+格納し、キーチェーンから読み戻した値でアーカイブが開くことを確認してから確定する
+経路にしたため、パスフレーズはコマンド履歴・ログ・報告書のいずれにも現れない。
 
 返却ツリー内の `SHA256SUMS.txt` は**平文目録**であって result lock ではない。
-lock は手順 3 の暗号化アーカイブの SHA-256。
+lock は暗号化アーカイブの SHA-256。
 
 ## Consequences
 
@@ -150,6 +204,21 @@ AI/cloud service」は**無条件には署名できない**。`08_AI_ASSISTANCE_
 **いずれも commit 前のスモークテストで検知したため、実際の漏洩は発生していない。**
 教訓: ポリシーの正しさと実際に stage された形式は別物であり、
 **stage 内容そのものを検査して初めて確認になる。**
+
+**第 2 系統で同じ検査が逆向きに効いた（2026-08-13）。** 第 1 系統では plain
+`git add` が `annex.largefiles` を参照せず 64 ファイルを平文 blob として stage
+した。第 2 系統では**同じ repo で逆が起きた** — plain `git add` が
+`annex.largefiles` を適用し、検証報告書 PDF と監査証跡 TSV を annex ポインタとして
+commit した（`/annex/objects/MD5E-s1718242--….pdf` の 1 行）。検知したのは
+committed blob の SHA-256 が手元と一致せず TSV が 1 行になっていたためで、
+`.gitattributes` に `audit/run-2026-08-13/` の carve-out を足して commit し直した。
+
+**同一コマンドが 2 回の作業で正反対の結果を出している。** したがって
+「plain `git add` は annex 設定を無視する / 尊重する」のどちらも前提にできない。
+唯一有効なのは元の教訓そのもの —— **stage された blob を実際に読むこと。**
+annex 化が正しい既定である一方、レビュー対象の成果物には不適切である
+（`audit/code/**` の carve-out と同じ理由: レビュアーは annex symlink に対して
+主張を確認できない）。
 
 ### 実装スタック
 
