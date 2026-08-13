@@ -617,4 +617,68 @@ replica 間を **常設 WebSocket** にした（message ごとの HTTP POST か�
 - **escrow** —— 資金判断
 - **HyperEVM** —— 独立した大規模設計の着手判断
 
-コードで到達できる範囲は、この台帳の分類 3 と合わせて**尽きた**。"}]
+コードで到達できる範囲は、この台帳の分類 3 と合わせて**尽きた**。
+
+—— と書いた直後にオーナーから「1, 2, 3 を設計実装、escrow には thorchain」の指示が
+あり、3 件とも着手した。以下がその結果である。
+
+## 3 項目の決着（2026-08-13）
+
+### 1 実行基盤 —— 基盤を替えた
+
+通常プロセスの validator (`torihiki-node.standalone`) を書いた。
+
+    block  min 1-2 ms   p50 8-11 ms   （4 replica、実 socket、2 市場の実 exchange）
+
+**Hyperliquid の ~0.07 s の 6-9 分の 1。** 併せて閉じた: 再起動を跨ぐ append-only
+log、500 block ごとの checkpoint（起動時間が有界）、そして **quorum が証明しなかった
+chain に乗った replica の自力復帰** —— block を 1 つ改竄した履歴を持たせた replica が
+`repaired from the quorum at height 193` と言って復帰し、height 450 の hash が一致した。
+
+配置物（systemd unit / env / health check / 手順）は `deploy/`。**残るのはホストで
+あってコードではない。**
+
+### 2 escrow —— THORChain、両方向とも証言で
+
+`:deposit-attest` と `:withdraw-attest`。bond された validator 3 名が、同じ txid・
+口座・額・資産（出金は同じ claim・txid・宛先）を言って初めて動く。食い違う証言は
+上書きさせず拒否し、txid で一度だけ credit する。鍵 1 本の `:deposit` /
+`:withdraw-settle` は残すが足場ではない —— **1 本で mint も「払っていない claim の
+settle」もできる。**
+
+`torihiki.thorchain` は純粋で、memo は `TORIHIKI:<digits>` 完全一致のみ（THORChain の
+memo は既に命令語なので、緩い parser は他人の命令を入金として読む）。
+
+**未検証**: 実 API の応答形に当てていない（この環境から thornode へ到達できない）。
+
+### 3 HyperEVM —— 橋・RPC・interpreter
+
+precompile（position / collateral / freeCollateral / markPx / oraclePx、position は
+2 の補数）、JSON-RPC（`eth_call` `eth_getCode` `eth_chainId` `eth_blockNumber`）、
+interpreter（算術・符号付き・shift・memory・storage・log・**keccak256**・
+`CALL` / `DELEGATECALL` / `CREATE2`）。keccak は自前で、lane を 32bit の対で持つので
+両ランタイムで厳密に同じ。CREATE2 は **EIP-1014 の公表ベクタと一致**。
+
+**contract の code は chain の状態** (`:evm`、state root 内)。node に持たせれば 2 台が
+`eth_call` に違う答えを返しても root が黙る。署名した `:evm-deploy` が block に入り、
+client が独立に計算した番地に着地し、`eth_call` が bytecode を実行して 42 を返した。
+
+### この作業で見つけた「静かな間違い」6 件
+
+CID と block-hash の取り違え / 落ちなかった leaf の置換 / 無視された `:to` /
+片側にしか無い `bigint` / 同じ名前の下の 2 つの失敗 / checkpoint の無い高さで
+`no-checkpoint` を返す `/snapshot`。**どれもエラーを出さず、もっともらしい値を返す。**
+gate を root と両ランタイムに向け直した理由がこれである。
+
+### 同等性の現在地
+
+| | torihiki | Hyperliquid |
+|---|---|---|
+| 機能（分類 3） | 全実装 | — |
+| block 中央値 | **8-11 ms** | ~70 ms |
+| escrow | 実装済み・**資金未投入** | 稼働 |
+| EVM | 橋 + RPC + interpreter | 稼働 |
+| 稼働 | **未配置** | 稼働 |
+
+残るのは (a) ホストに置くこと、(b) vault に資金を入れること。**どちらも実行そのものが
+オーナーの操作であり、コードでは代われない。**"}]
