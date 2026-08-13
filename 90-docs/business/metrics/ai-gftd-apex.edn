@@ -1,24 +1,24 @@
 {:health-status 200,
  :zone-name "gftd.ai",
  :workers-invocations-7d
- {"magatama-sh1n5h1x" 6309, "ai-gftd-chat-shell" 3511},
+ {"magatama-sh1n5h1x" 6317, "ai-gftd-chat-shell" 3511},
  :zone
- {:requests-7d 493450,
-  :pageviews-7d 24797,
-  :uniques-7d-sum 4904,
+ {:requests-7d 495492,
+  :pageviews-7d 25046,
+  :uniques-7d-sum 4941,
   :zone "gftd.ai"},
  :sources [:cloudflare :stripe :health],
  :paths
  {:ok
-  [{:path "/", :requests 1570}
-   {:path "/favicon.ico", :requests 219}
+  [{:path "/", :requests 1547}
+   {:path "/favicon.ico", :requests 218}
    {:path "/ssl/server.key", :requests 83}
-   {:path "/.aws/config", :requests 76}
-   {:path "/.continue/config.json", :requests 55}
-   {:path "/firebase-credentials.json", :requests 52}
-   {:path "/server-status", :requests 51}
-   {:path "/firebase-admin.json", :requests 50}],
-  :status-mix {:ok 4633, :server-error 14135, :client-error 1205},
+   {:path "/.aws/config", :requests 68}
+   {:path "/host.key", :requests 57}
+   {:path "/.boto", :requests 57}
+   {:path "/server/.env", :requests 57}
+   {:path "/.continue/config.json", :requests 55}],
+  :status-mix {:ok 5113, :server-error 14160, :client-error 21895},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -30,10 +30,11 @@
   :charges-total 90,
   :last-charge-epoch 1604224274},
  :as-of "2026-08-13",
- :traffic-quality {:window "24h", :probe-4xx-pct 6, :error-5xx-pct 71},
+ :traffic-quality
+ {:window "24h", :probe-4xx-pct 53, :error-5xx-pct 34},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 1570 · /favicon.ico 219 · /ssl/server.key 83 · /.aws/config 76 · /.continue/config.json 55 | 4xx(probe) 6% · 5xx 71%",
+ "上位 page (24h, 2xx/3xx): / 1547 · /favicon.ico 218 · /ssl/server.key 83 · /.aws/config 68 · /host.key 57 | 4xx(probe) 53% · 5xx 34%",
  :conversion {:pct 0},
  :signal
- "gftd.ai 実測 493450 req/7d・4904 uniques(日次和)・うち4xx probe 6%(24h)、workers 9820 inv/7d、Stripe active subs 0",
+ "gftd.ai 実測 495492 req/7d・4941 uniques(日次和)・うち4xx probe 53%(24h)、workers 9828 inv/7d、Stripe active subs 0",
  :subscription {:free 0, :plus 0, :conversion-pct 0}}

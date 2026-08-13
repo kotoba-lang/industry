@@ -1,29 +1,29 @@
 {:health-status 200,
  :zone-name "shinshi.club",
  :zone
- {:requests-7d 7508,
-  :pageviews-7d 4036,
-  :uniques-7d-sum 1228,
+ {:requests-7d 7522,
+  :pageviews-7d 4039,
+  :uniques-7d-sum 1235,
   :zone "shinshi.club"},
  :sources [:cloudflare :health :emitter],
  :paths
  {:ok
-  [{:path "/", :requests 74}
+  [{:path "/", :requests 71}
    {:path "/sitemap.xml", :requests 32}
    {:path "/api/funnel", :requests 24}
-   {:path "/robots.txt", :requests 23}
+   {:path "/robots.txt", :requests 22}
+   {:path "/auth/session", :requests 13}
    {:path "/app.css", :requests 13}
-   {:path "/js/app.js", :requests 13}
-   {:path "/auth/session", :requests 12}
-   {:path "/i18n/en.json", :requests 12}],
-  :status-mix {:ok 248, :client-error 78},
+   {:path "/i18n/en.json", :requests 13}
+   {:path "/js/app.js", :requests 13}],
+  :status-mix {:ok 230, :client-error 75},
   :window "24h"},
  :source "shinshi.d1:pv_daily+chat_event_daily+pay_run",
  :window "7d",
  :as-of "2026-08-13",
- :traffic-quality {:window "24h", :probe-4xx-pct 24, :error-5xx-pct 0},
+ :traffic-quality {:window "24h", :probe-4xx-pct 25, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): / 74 · /sitemap.xml 32 · /api/funnel 24 · /robots.txt 23 · /app.css 13 | 4xx(probe) 24%",
+ "上位 page (24h, 2xx/3xx): / 71 · /sitemap.xml 32 · /api/funnel 24 · /robots.txt 22 · /auth/session 13 | 4xx(probe) 25%",
  :funnel {:visitors 347, :chatters 0, :scenes 0, :paying 0},
  :signal
- "shinshi.club 実測 7508 req/7d・1228 uniques(日次和)・うち4xx probe 24%(24h)"}
+ "shinshi.club 実測 7522 req/7d・1235 uniques(日次和)・うち4xx probe 25%(24h)"}
