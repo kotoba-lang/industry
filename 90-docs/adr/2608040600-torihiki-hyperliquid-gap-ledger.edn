@@ -250,19 +250,94 @@ ADR-2608025400 の実測（`NET_DELAY=20` で committed blocks が 0）が効い
 **Hyperliquid の ~0.07 s は同一 DC の co-location でしか出ない** —— HL 自身が
 validator を co-locate しているのは同じ制約への同じ答え。
 
-## 未 deploy の fork —— 次に触る人が最初に読むこと
+## 改訂 2026-08-13（後半）—— 「fork するので genesis reset が要る」は誤りだった
 
-torihiki main の 3 件（governance leaf / `:deficit` / `:withdrawals`）は**すべて
-state 符号化を変える**。両側の replica は同一 state に対して別の root を計算し、
-それは root が捕まえるために在る divergence bug とまったく同じ形。
+この台帳は直前の改訂でこう書いていた: torihiki main の 3 件（governance leaf /
+`:deficit` / `:withdrawals`）はすべて state 符号化を変え、両側の replica は
+同一 state に別の root を計算するので **rolling upgrade は成立せず、genesis から
+やり直すのが正しい形**。数時間、破壊的操作の承認待ちとして扱っていた。
 
-- **torihiki-node は `torihiki` を `fa3a8e0c` で pin している。** pin を進めた瞬間が fork
-- 1.26M ブロックの履歴は旧符号化で certificate が付いているので、**rolling upgrade は
-  成立しない**。genesis からやり直すのが正しい形
-- devnet で collateral は unbacked、つまり捨てるものが無い今が一番安い瞬間で、
-  金を入れる直前という正しいタイミングでもある
-- parity の現在地: flat `3f9a3f3f…` / state `6c887796…`（JVM と nbb で一致）
-- テスト: 191 tests / 547 assertions, 0 failures（着手時 173/499）
+**誤りだった。実装を読めば分かることを、読まずに推論していた。**
+
+block は `height / parent-hash / proposals / proposer / ts`
+（`inga.consensus/canonical-block`）がすべてで、**state root を運ばない**。
+`inga.consensus` は root に一度も言及せず、`inga.replica/state-root` は
+**報告のため**に machine state から都度計算される。
+**合意は transaction を並べるだけで、それを実行して何ができたかを比較しない。**
+
+だから符号化変更はただの deploy だった。実測（deploy 後、同一 height）:
+
+```
+  w1 h=1289730 root=60ed7b82ed  cv=100
+  w2 h=1289730 root=60ed7b82ed  cv=100
+  w3 h=1289730 root=60ed7b82ed  cv=100
+  w4 h=1289731 root=ae5da1bc2a  cv=100   ← 1 block 先、期待どおり
+```
+
+**教訓は「合意層が何を比較していないか」を確かめずに、最も破壊的な選択肢を
+既定にしていたこと。** 同じ session で起きた semantic fork（cancel 認可修正の
+deploy 中に replica が境界を別々に跨いだ）も、この区別が付いていなかった
+ことの帰結: **符号化が同じでも block の結果は変わりうる**（それは起きた）し、
+**符号化が違っても合意は割れない**（それは起きなかった）。
+
+## live になったもの（torihiki-node `d567068b`）
+
+準備金証明 / 出金の請求権 / governance が root の下 / 不良債権が `:deficit` /
+清算が block 駆動 / cancel-all / amend。`/reserves` を新設。
+
+live 実測 2 件。**準備金は bridge が credit したときだけ動く**:
+
+```
+  before   total 0          accounts 0    ← 自己 mint は not-the-bridge で拒否
+  faucet   ok, amount 10000000, bridge 29766895614364
+  after    total 10000000   accounts 1
+  totals   10000000 x 4                   ← 4 replica 一致
+```
+
+**出金は請求権を立て、総額を動かさない**:
+
+```
+  funded     total 20000000
+  withdraw   4000000
+  after      total 20000000, pending-withdrawals count 1 amount 4000000
+  collateral 6000000
+```
+
+担保は口座を出て、請求権がその額を持ち、誰も払われていないので総額は不変。
+下がるのは settle だけ。
+
+## latency の現在地（実測、1 点 45 秒、4 replica 通期サンプル）
+
+```
+  tick   interval   blocks/s   catching-up   equivocators   split roots
+   200     462 ms      2.17         0%            none          none
+   100     345 ms      2.89         0%            none          none
+    50     259 ms      3.86         0%            none          none
+    25     185 ms      5.40         0%            none          none   ← 採用
+    10     126 ms      7.96         0%            none          none
+     5    STOPPED      0.00       6.5%            none          none
+```
+
+**崖であって坂ではない。** 5 で chain は遅くならず止まった（67 秒で 0 ブロック）。
+その間どの replica もエラーを出さず equivocate せず root でも食い違わない ——
+**沈黙以外の症状が無い。** ADR-2608025400 が反対側から測ったのと同じ形。
+
+10 ではなく 25 を採った。10 は健全に測れたが、症状が沈黙だけの崖の 1 歩手前で、
+`witnesses` の docstring が余裕ゼロの代償を既に記録している。
+**測定上の最良値を採ることは、同じ間違いを別の変数で繰り返すこと。**
+
+残る Hyperliquid の ~0.07 s との距離は定数ではなく transport（isolate 間 HTTP、
+数十 ms）で、co-location が答える。
+
+## state transfer（torihiki-node `d4ca1990`）
+
+分岐した replica は合意では直せない —— `inga.sync` が運ぶのは block で、
+食い違っているのは「適用して何ができたか」。全 peer の snapshot をこちらで
+restore してこちらで root を計算し、quorum が一致したときだけ採用する。
+tick から 60 秒ごとに自問する（button 式の修復は、誰も見ていない間ずっと
+壊れたまま）。**この機構は今回の分岐を直していない** —— 収束は deploy 由来の
+再起動 + 統一コードでの replay によるもので、`adopted` は全台 null。
+次に同じことが起きたときのためのもの。
 
 ## 分類 3 の残り
 
