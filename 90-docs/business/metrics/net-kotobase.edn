@@ -1,18 +1,18 @@
 {:health-status 200,
  :zone-name "kotobase.net",
  :workers-invocations-7d
- {"net-kotobase" 1975627, "kotobase-cf-wasm-staging" 2011377},
+ {"net-kotobase" 1975837, "kotobase-cf-wasm-staging" 2011992},
  :zone
- {:requests-7d 2075737,
-  :pageviews-7d 1491,
-  :uniques-7d-sum 1037,
+ {:requests-7d 2076545,
+  :pageviews-7d 1495,
+  :uniques-7d-sum 1047,
   :zone "kotobase.net"},
  :sources [:cloudflare :stripe :health :emitter],
  :paths
  {:ok
   [{:path
     "/bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7ozvqjidfdwsj3ht6cxjaqe",
-    :requests 99}
+    :requests 98}
    {:path
     "/ipld/bafyreidwhslls6m2lqjenllrnsb6ug2m7jmjdl7ralyipyb7oau7f3hxfu",
     :requests 36}
@@ -24,7 +24,7 @@
     :requests 30}
    {:path
     "/cloud-itonami-hayari-data/SHA256E-s596186-S52428800-C1--0b5999f62235fd7c897a4557c4f4c2bf106a5e452b0179337169b920c6a35b7c.edn",
-    :requests 30}
+    :requests 21}
    {:path
     "/ipld/bafyreidhyto6jmczwhqp5zhtnkuwkqp4yj66j2ax2lojp6opx7urgygdee",
     :requests 18}
@@ -34,7 +34,7 @@
    {:path
     "/ipld/bafyreih4akflt2lqdqq62rhlzpjgmzj5hlx4c4hk5hm5apkszmp75rd7a4",
     :requests 16}],
-  :status-mix {:client-error 35, :ok 1697, :server-error 2},
+  :status-mix {:ok 1664, :server-error 2, :client-error 34},
   :window "24h"},
  :stripe
  {:active-subscriptions 0,
@@ -48,10 +48,10 @@
  :as-of "2026-08-13",
  :traffic-quality {:window "24h", :probe-4xx-pct 2, :error-5xx-pct 0},
  :top-paths
- "上位 page (24h, 2xx/3xx): /bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7oz… 99 · /ipld/bafyreidwhslls6m2lqjenllrnsb6ug2m7… 36 · /ipld/bafyreic7j3n4gulvz2qifgkao72jd72jd… 35 · /ipld/bafyreiavv6gz3yb6kkiivupipd4i7bnpe… 30 · /cloud-itonami-hayari-data/SHA256E-s5961… 30 | 4xx(probe) 2% · 5xx 0%",
- :funnel {:visitors 2983, :signups 25, :checkouts 0},
+ "上位 page (24h, 2xx/3xx): /bafyreiap3zbtwdb4ng5ir57lmr6rpio6ajh7oz… 98 · /ipld/bafyreidwhslls6m2lqjenllrnsb6ug2m7… 36 · /ipld/bafyreic7j3n4gulvz2qifgkao72jd72jd… 35 · /ipld/bafyreiavv6gz3yb6kkiivupipd4i7bnpe… 30 · /cloud-itonami-hayari-data/SHA256E-s5961… 21 | 4xx(probe) 2% · 5xx 0%",
+ :funnel {:visitors 2985, :signups 25, :checkouts 0},
  :signal
- "kotobase.net 実測 2075737 req/7d・1037 uniques(日次和)・うち4xx probe 2%(24h)、workers 3987004 inv/7d、Stripe active subs 0",
+ "kotobase.net 実測 2076545 req/7d・1047 uniques(日次和)・うち4xx probe 2%(24h)、workers 3987829 inv/7d、Stripe active subs 0",
  :x402
  {:challenges 18,
   :submissions 3,
@@ -60,6 +60,6 @@
   :attempt-rate 0.16666666666666666,
   :settlement-rate 0},
  :by-source
- {:visitors {:openai-ads 3, :organic 1455},
+ {:visitors {:openai-ads 3, :organic 1457},
   :signups {:organic 22}, 
   :checkouts {}}}
