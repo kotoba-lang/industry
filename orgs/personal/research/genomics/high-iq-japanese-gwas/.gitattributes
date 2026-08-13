@@ -49,3 +49,25 @@ audit/return/KAWASAKI_PHASE5C_INDEPENDENT_RETURN/*.txt   annex.largefiles=nothin
 # means a future individual-level file cannot reach plain git by accident.
 audit/return/KAWASAKI_PHASE5C_INDEPENDENT_RETURN/02_ARTIFACT_FILES/**   annex.largefiles=anything
 audit/return/KAWASAKI_PHASE5C_INDEPENDENT_RETURN/03_SOURCE_TABLES/**   annex.largefiles=anything
+
+# Second code-independent reconstruction (2026-08-13). Same reasoning as the
+# audit/return/ top-level carve-out above: the verification report, claim
+# values, input hash audit, deviation log and AI assistance log are the audit
+# trail, and hold hashes, counts, aggregate statistics and prose only. The
+# report in particular must stay in plain git for the same reason audit/code/**
+# does -- a reader cannot check a verification claim against an annex symlink.
+# The staged files were scanned against all 91 pseudonymous case identifiers
+# before commit, with zero hits.
+#
+# These are single-level globs. Anything added in a SUBDIRECTORY of this path
+# stays annexed by the inherited default, so a future individual-level file
+# cannot reach plain git by accident.
+audit/run-2026-08-13/*.tsv                          annex.largefiles=nothing
+audit/run-2026-08-13/*.pdf                          annex.largefiles=nothing
+audit/run-2026-08-13/README.md                      annex.largefiles=nothing
+
+# Result-lock submission: the archive hash, completion block and attestation.
+# These carry no restricted rows and no passphrase; the archive itself and its
+# plaintext tree are deliberately NOT in this repository.
+audit/run-2026-08-13/lock-submission/*.txt          annex.largefiles=nothing
+audit/run-2026-08-13/lock-submission/*.md           annex.largefiles=nothing
