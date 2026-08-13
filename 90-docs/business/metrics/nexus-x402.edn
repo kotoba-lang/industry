@@ -1,11 +1,11 @@
 {:as-of "2026-08-13",
  :sources [:cloudflare :health :emitter],
- :workers-invocations-7d {"nexus-x402" 4391},
+ :workers-invocations-7d {"nexus-x402" 4423},
  :health-status 200,
  :catalog
  {:x402Version 1,
   :service "nexus-x402",
-  :count 5,
+  :count 6,
   :items
   [{:seller "kotobase",
     :method "GET",
@@ -53,6 +53,18 @@
      :network "base",
      :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
     :description nil}
+   {:seller "murakumo",
+    :method "POST",
+    :path-prefix "/x402/v1/infer-memory",
+    :gateway
+    "https://x402.nexus/gateway/murakumo/x402/v1/infer-memory…",
+    :price
+    {:usd "0.01",
+     :micros "10000",
+     :asset "USDC",
+     :network "base",
+     :payTo "0xA00366234D29d4F882088048c0B2fa0dB7302D4E"},
+    :description nil}
    {:seller "shinshi",
     :method "GET",
     :path-prefix "/x402/premium/",
@@ -77,4 +89,4 @@
      :service-gmv-usd 0.07,
      :repeat-buyer-revenue-usd 0.07,
      :repeat-buyer-revenue-share 1}}}}, 
- :signal "workers 4391 inv/7d"}
+ :signal "workers 4423 inv/7d"}
