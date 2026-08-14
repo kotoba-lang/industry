@@ -1049,6 +1049,16 @@ CertGovernor）。
     これらは「文書」ではなく**測定・イベント列**（時系列そのものが値）または**署名付き
     VCS プレーン**で、上書きすると時系列分析や quorum モデルが壊れる。
 
+## L2 graph CID と kotobase archive Location は同じ bytes でも CID 文字列が分かれうる（repo-wide mandatory、2026-08-14、ADR-2608148200）
+
+**公開 identity は hasher が付けた CID（オブジェクト自身の codec）。kotobase `PUT /ipfs/:cid` は raw CIDv1 だけを受ける。** codec が raw でないオブジェクトを archive するときは、同じ bytes の raw CID を Location として PUT する。identity の CID 文字列を PUT しない（400 `not-raw-sha256`）。
+
+- L2 graph CID は `chain.core/commit!`（ADR-2608145400）。protocol は hash しない。
+- overlay（CreateLink）は親 CID を変えない。merkle put は親 CID を変えるが graph CID は動かない。
+- `:kotoba.graph/cid` は identity。`:kotoba.graph/head` は naming（IPNS）。session kgraph の datoms は公開 resource ではない。
+- lock の `:kotoba.*` に archive 専用の raw CID を載せない。Location は protocol 外の記録（例 `:graph {:raw-cid …}`）。
+- document が raw なら identity と Location の文字列は一致してよい。dag-cbor commit では一致しない。それをバグにしない。
+
 ## kotobase の Datalog join は ref 1本までしか届かない（repo-wide mandatory、2026-07-26、ADR-260726-kotobase-query-plane-is-one-ref）
 
 **`kotobase.core/open` は `:ref-name` を1つしか取らず、`q` / `query` / `pull` /

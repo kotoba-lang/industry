@@ -222,6 +222,16 @@ on-disk フォーマットとして据え置き（kagami が旧 fleet.* 経路�
 mokuroku は app-* catalog kernel（Finder 形の viewer）、daichou は agent receipt、
 chobo は請求 EAVT、toukibo は法務局の語なので使わない。索引: ADR-2608147300。"}
 
+ :graph-cid
+ {:label "L2 graph identity / chain CID"
+  :spellings ["graph CID" ":kotoba.graph/cid" "L2 CID" "chain.core/commit!"
+              "graph-cid" "action log CID"]
+  :note "hasher が付けた CID が identity（典型は dag-cbor bafy…）。kotobase
+PUT /ipfs/:cid は raw 専用なので Location は同じ bytes の raw CID（bafkrei…）
+でありうる。2 つの identity ではない。:kotoba.graph/head は IPNS 名（naming）。
+session kgraph の datoms は公開 resource ではない。索引: ADR-2608145400 /
+ADR-2608148200。"}
+
  :vcs-plane
  {:label "repo の pin と統治 / 鏡 (kagami)"
   :spellings ["vcs plane" "pin" "west" "manifest" "fleet-db" "reconcile"
