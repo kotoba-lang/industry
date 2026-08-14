@@ -79,7 +79,11 @@ cloud-itonami 行が引いていた「Terms/PrivacyはDRAFT、operator・DPAが�
   （旧記載¥980はsuperseded。詳細と検出経緯はCOMMERCIAL-GO-NO-GO.md「価格の確定」）。
   原価モデル上gross margin約88%。run 0031/0032 (2026-08-14): `/legal/terms/` `/legal/privacy/`
   `/legal/dpa` は live 200 だが **DRAFT / UNAPPROVED**。counsel packet は更新済み、**承認 return は無い**。
-  残 `[CONFIRM:` は税（live ¥19,800）、CCPA、Art. 28、SCC、under-16。pricing ADRのratifyとStripe Product/Price照合は未了。Worker境界のmock E2Eはcheckout metadata、署名、
+  残 `[CONFIRM:` は税（live ¥19,800）、CCPA、Art. 28、SCC、under-16。
+  run 0033 (2026-08-14): live `/pricing` は AuraDB Free / Professional / VDC に
+  対応し、課金 SKU は Secure Managed **¥19,800/mo**（Professional 2 GB 帯）。
+  Business Critical は未提供。¥2,980 は live 価格として未掲載。Stripe Price ID は
+  変更していない。Worker境界のmock E2Eはcheckout metadata、署名、
   entitlement、解約、5分replay制限、out-of-order eventを検証済み。ただし
   real Stripe test-modeおよび外部需要の証拠ではない。
 
@@ -91,7 +95,9 @@ qualified reply、実入金を優先して更新する。
 run 0031 served the in-repo DRAFT legal pages from `net-kotobase/control-plane`
 (not `network-awai/net-kotobase`). run 0032 filled owner decisions and measured
 facts into those drafts and refreshed `legal/counsel-review-packet.md`.
-**Counsel approval was not obtained.** Commercial go stays no-go.
+**Counsel approval was not obtained.** run 0033 published the Aura-comparable
+ladder on `/pricing` (Worker `62977810-2eb5-4dd1-85be-c5d486c91c48`); live
+charge remains ¥19,800. **Commercial go stays no-go.** Score stays 58/100.
 
 ## Session note — 2026-08-08
 

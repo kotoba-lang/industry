@@ -67,7 +67,7 @@ ratify 記録は net-kotobase repo 側にあり未検証（下記「Session cons
 | Product | Contracting boundary | Product-specific boundary | Decision |
 |---|---|---|---|
 | cloud-itonami | AWAI/Gftd Japan の収納代行は ADR + 公開 Terms で確定。**登記・税務のみ赤** | terms/privacy/DPA は承認済み・公開済み。ただし 24h で 5xx 28%（有料導線に載せる品質ではない） | **conditional**（red 1 + yellow 3 + 品質。前版 no-go から前進） |
-| net-kotobase | Gftd Japan K.K.（Corporate Number 1011101086505、国内法人）が operator。**外国会社登記の論点は構造的に無い** | **価格は owner 確定（¥2,980/月、2026-08-08）だが未公開。** run 0031 (2026-08-14): `/legal/terms/` `/legal/privacy/` `/legal/dpa` は live 200。本文は in-repo drafts で、**依然 DRAFT / UNAPPROVED TEMPLATE**（counsel 承認ではない。DPA は offered/executed ではない）。`noindex`、sitemap 非掲載、`[CONFIRM:` マーカー残。commercial go は動かない。`/pricing` と Stripe 照合はこの run では再実測していない | **no-go** |
+| net-kotobase | Gftd Japan K.K.（Corporate Number 1011101086505、国内法人）が operator。**外国会社登記の論点は構造的に無い** | **課金中の live 価格は Secure Managed ¥19,800/月**（run 0033、Aura Professional 2 GB 帯）。owner 確定の Developer ¥2,980/月は **未公開のまま**。run 0031/0032: `/legal/terms/` `/legal/privacy/` `/legal/dpa` は live 200 だが **DRAFT / UNAPPROVED TEMPLATE**。`noindex`、sitemap 非掲載、`[CONFIRM:` マーカー残。Stripe Price ID は 0033 でも未変更。commercial go は動かない | **no-go** |
 | club-shinshi | operator・決済条件の確定が必要 | adult specialist review、age assurance、refund/tax/payoutが赤 | **no-go**（SPA のため legal surface は HTTP で再実測不能 — run 0022） |
 | net-babiniku | PSP/crypto railの契約証跡なし | monetization proposal自体がhard hold | **no-go**（未再実測） |
 
