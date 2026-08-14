@@ -15,7 +15,8 @@
    "live HTTP は routing v1 が書く op だけ。kad 所有の signer も DHT node もこの process では作らない"
    "tick 1 = naming lookup-live / publish-live（GET/PUT /ipns/{k51}）"
    "tick 2 = govern fail-closed overlay。拒否は action log に届かない"
-   "次 tick = transport 代数（sockets 無し）。live は :blocked-until :dht-node-transport"]
+   "tick 3 = transport 代数（sockets 無し）。live は :blocked-until :dht-node-transport"
+   "次 tick = session 代数。docs は mux-and-head.md。session.md は作らない"]
   :source/dataset "adr"
   :adr/body
   "8 面の docs は揃っている。欠けていたのは「壊したら赤くなる代数」と「spec が書く HTTP 継ぎ目」。点数を足す仕事ではない。影を直接動かさない（ADR-2608080000 と同型）。
@@ -29,7 +30,7 @@
 
 WIP=1。1 tick = 1 面の 1 軸（algebra か live）。live を上げてよいのは routing v1 が文書化している op だけ。
 
-## 観測表（tick 2 後）
+## 観測表（tick 3 後）
 
 | 面 | algebra | live | 備考 |
 |---|---|---|---|
@@ -39,8 +40,8 @@ WIP=1。1 tick = 1 面の 1 軸（algebra か live）。live を上げてよい�
 | discovery | ready | ready | `discover/lookup-live` `advertise-live` |
 | content-protocol | ready | n/a | `graph` 代数 |
 | authorization | ready | n/a | tick 2。`govern/write-overlay`。`ca72b830` |
-| transport | pending | blocked | **次 tick** は algebra だけ。live は `:dht-node-transport` |
-| session | pending | blocked | transport 待ち |
+| transport | ready | blocked | tick 3。`transport/hop` `attach` `dial-live`。`6d3af5ab`。live は `:dht-node-transport` |
+| session | pending | blocked | **次 tick** は algebra。docs は `mux-and-head.md`。live は transport の DHT node 待ち |
 
 ## tick 1
 
@@ -50,11 +51,16 @@ WIP=1。1 tick = 1 面の 1 軸（algebra か live）。live を上げてよい�
 
 `kotoba.protocol.govern/write-overlay`。既定 `decide` は署名を検証しない（crypto は cacao）。自 graph の depth-1 自己 mint は allow。他人の chain は `:foreign-chain`。host 文字列は `:not-a-key`。`governor-fn` nil は deny（allow にしない）。拒否した intent の action log は増えない。親 CID も動かない。
 
+## tick 3
+
+`kotoba.protocol.transport`。hop は multiaddr + capability。`:identity?` は常に false。`ipfs://` / `ipns://` / `https://` を addr にすると `:not-a-multiaddr`。`attach` が CID / peer を書き換えると mismatch。`gateway` は location 投影で CID は動かない。`dial-live` は常に `:not-a-dht-node`。sockets は開かない。この process を DHT node と名乗らない。
+
 ## 置かないもの
 
-kad 所有の provide signer。この process を DHT node と名乗ること。IPNI 専用 repo。UnixFS path を identity に戻すこと。`:algebra :ready` を README の長さで買うこと。transport の sockets。
+kad 所有の provide signer。この process を DHT node と名乗ること。IPNI 専用 repo。UnixFS path を identity に戻すこと。`:algebra :ready` を README の長さで買うこと。transport の sockets。`session.md` / `authorization.md`（docs は `mux-and-head.md` / `who-may-write.md`）。
 
 ## 改訂履歴
 
 2026-08-14: accepted。tick 1 landed `kotoba-protocol@1a7ed667`。
-2026-08-14: tick 2 landed `kotoba-protocol@ca72b830`。次は transport 代数（sockets 無し）。"}]
+2026-08-14: tick 2 landed `kotoba-protocol@ca72b830`。次は transport 代数（sockets 無し）。
+2026-08-14: tick 3 landed `kotoba-protocol@6d3af5ab`。次は session 代数（`mux-and-head.md`）。"}]
