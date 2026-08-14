@@ -42,13 +42,15 @@ Update channel:
 ipns://k51qzi5uqu5dj6z20sjzztyay81591voe6yofukl0ylsmug9euf934z1g04erd
 ```
 
-Sequence 1 (live GET 2026-08-14T12:53Z) still resolves to the previous snapshot `ipfs://bafkreiey52hai5obtqeg5w2ix63orset4o74kxljif2gwdkxt5upre2wsi`。Sequence 2 PUT 200 onto the current CID; GET Cache-Control `max-age=3600` tracks the spec default 1-hour record TTL so the pointer cannot be GET-verified onto #82 until that TTL expires. Later records from this publisher use a 5-minute TTL.
+Sequence 2 origin GET-verified 2026-08-14T13:02:53Z (`delegated-ipfs.dev`, `cf-cache-status: MISS`) value `/ipfs/bafkreig4jyeaynm47icfmqj3m5ya7iep2o7c4vk34pwpafm7tnf4tfimny`。Default URL without a cache-bust query may still serve sequence 1 until ~13:47Z (`Cache-Control: max-age=3600` from 12:47Z)。Later records from this publisher use a 5-minute TTL.
 
 ## Landed
 
-- App merge (IPNS): https://github.com/cloud-itonami/cloud-itonami-app/commit/93c11d2a7a168a6810ba9adfff1221a13bbc2d66
+- App merge (IPNS publisher): https://github.com/cloud-itonami/cloud-itonami-app/commit/93c11d2a7a168a6810ba9adfff1221a13bbc2d66
 - PR: https://github.com/cloud-itonami/cloud-itonami-app/pull/83
-- West pin: https://github.com/com-junkawasaki/root/commit/64ac56e677c1168e4cd06fe8ff5dd679ba1cd667
+- App merge (sequence 2 lock): https://github.com/cloud-itonami/cloud-itonami-app/commit/fba7bd868bbbbd71c80da22f3d6e1570048ddeae
+- PR: https://github.com/cloud-itonami/cloud-itonami-app/pull/84
+- West pin: https://github.com/com-junkawasaki/root/commit/3347b80097192c8f412f3db5fb0b1f608a8d3fd6
 - Earlier archive Location: https://github.com/cloud-itonami/cloud-itonami-app/commit/4eef13c
 - Earlier compute: https://github.com/cloud-itonami/cloud-itonami-app/commit/5c196db84a4cd88645b63985c7a90469f3f57389
 
@@ -65,21 +67,21 @@ Live archive Location (2026-08-14): PUT 201 → GET 200。Worker `KOTOBASE_ARCHI
 - `:kotoba.graph/cid` の publish
 - auth host の移動
 - Storage-backed `GET /ipns/` on kotobase.net
-- Sequence N の GET-verify が lock CID と一致すること（sequence 1 TTL 待ち）
 
 ## Verification
 
 `bundle_test`: 5 tests / 21 assertions / 0 fail。
 `latest_test`: 10 tests / 30 assertions / 0 fail。injected router、disposable seed。
 Live archive: GET 200 / 806249 bytes。
-Live IPNS: GET `delegated-ipfs.dev/routing/v1/ipns/{k51}` 200、sequence 1。kotobase `/ipns/` 410。
+Live IPNS origin GET `delegated-ipfs.dev/routing/v1/ipns/{k51}?fresh=…` 200、sequence 2、value は lock CID。kotobase `/ipns/` 410。
 
 ## Resume
 
-sequence 1 の TTL 後（12:47Z から約 1h）に `clojure -M -m cloud.itonami.app.latest` を回し、GET-verify が lock CID と一致するまで。その後 `:kotoba.graph/cid`。auth host は動かさない。
+`:kotoba.graph/cid`。Do not republish IPNS until the lock CID changes — sequence 2 already points at it. Do not move the auth host.
 
 ## 改訂履歴
 
 2026-08-14: accepted。closing 記録。
 2026-08-14: Location live（PUT 201 / GET 200 / no-transform）。
-2026-08-14: IPNS latest 着地（app #83 / pin 64ac56e）。sequence 1 は前 snapshot。sequence 2 PUT 200、GET は 1h TTL cache。"}]
+2026-08-14: IPNS latest 着地（app #83 / pin 64ac56e）。sequence 1 は前 snapshot。sequence 2 PUT 200、GET は 1h TTL cache。
+2026-08-14: sequence 2 origin GET-verify（app #84 / pin 3347b80）。lock CID と一致。"}]
