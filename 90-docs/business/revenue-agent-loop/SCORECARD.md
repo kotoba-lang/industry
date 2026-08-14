@@ -54,7 +54,9 @@ cloud-itonami 行が引いていた「Terms/PrivacyはDRAFT、operator・DPAが�
 - **Operator:** Gftd Japan K.K.
 - **Next:** Beekle 公式フォーム（https://beekle.jp/contact、種別=開発パートナー・協業）を
   人間の Chrome で 1 通送信。Turnstile が自動化 Chrome では描画されず未送信。
-  返信 0 のまま 100 件に拡げない。Laboro/Enison は Beekle 送信成功後に限る
+  返信 0 のまま 100 件に拡げない。Laboro/Enison は Beekle 送信成功後に限る。
+  2026-08-14 session close: PR #2170 で run 0025 一式は main 着地済み。
+  Automations の next-form reminder はエディタに載せた。Gmail 未接続。
 
 ## Known evidence
 
