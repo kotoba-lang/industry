@@ -23,7 +23,7 @@ Keychain の service 名と同じ扱い）。実値は `op read` / `bin/kagi get
 | Cloudflare アカウント鍵、`CLOUDFLARE_GLOBAL_API_KEY`、R2、wrangler OAuth の限界、kotobase-protocols-worker、net-babiniku、**Workers for Platforms への secret 投入方法** | `references/cloudflare.md` |
 | kagi の vault 実体・unlock・**2 つある vault**・`kagi push/pull`・端末登録 | `references/kagi-vault.md` |
 | `MURAKUMO_*` 全般（mk1 署名鍵 / ノード面 service token / generation caller gate / chat gate / critic / x402 ingest） | `references/murakumo.md` |
-| Ed25519・X25519・secp256k1 の seed と委任 chain（艦隊共有 / marketplace / cloud-itonami ops / owner / Radicle / Sepolia） | `references/identity-seeds.md` |
+| Ed25519・X25519・secp256k1 の seed と委任 chain（艦隊共有 / marketplace / cloud-itonami ops / owner / Radicle / Sepolia / x402 Base payer） | `references/identity-seeds.md` |
 | Resend、GoDaddy DNS、受信メール本文の age 鍵 | `references/email-and-dns.md` |
 | kotobase の**読み戻せない** 3 secret、`KOTOBASE_ARCHIVE_TOKEN` | `references/kotobase.md` |
 | fal.ai / Seedance、Cloudflare RealtimeKit（kaigi） | `references/third-party-api.md` |
