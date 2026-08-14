@@ -79,7 +79,7 @@
       sk)))
 
 (def sk (load-or-create-identity!))
-(def c (client/make-client {:endpoint "https://backend.kotobase.net"
+(def c (client/make-client {:endpoint "https://kotobase.net"
                              :operator-did "did:web:kotobase.net"
                              :secret-key sk}))
 (def db-name "cloud-itonami-lei-catalog")
@@ -166,10 +166,31 @@
           (js/Promise.resolve #js [])
           repos))
 
+(defn select-repos
+  "Optionally restrict a repair run to a comma-separated list supplied in
+  INGEST_REPOS.  The normal no-env invocation still folds the complete
+  catalog.  Reject unknown names so a typo cannot silently produce a
+  misleading successful partial run."
+  [repos]
+  (if-let [raw (not-empty (aget js/process.env "INGEST_REPOS"))]
+    (let [requested (->> (str/split raw #",")
+                         (map str/trim)
+                         (remove empty?)
+                         distinct
+                         vec)
+          known (set repos)
+          unknown (remove known requested)]
+      (when (seq unknown)
+        (throw (js/Error. (str "INGEST_REPOS contains unknown repositories: "
+                               (str/join "," unknown)))))
+      requested)
+    repos))
+
 (defn -main []
   (println "ingest identity did:" (:did c))
-  (let [repos (list-repos)]
-    (println "repo count:" (count repos))
+  (let [all-repos (list-repos)
+        repos (select-repos all-repos)]
+    (println "repo count:" (count repos) "catalog total:" (count all-repos))
     (-> (run-sequential repos)
         (.then (fn [results]
                  (let [results (js->clj results :keywordize-keys true)
