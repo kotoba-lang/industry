@@ -1,0 +1,77 @@
+[{:db/id -1
+  :adr/id "ADR-2608145100"
+  :adr/title "公開 resource identity は ipfs://{cidv1} と ipns://{k51}。path は identity ではない"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/last_verified "2026-08-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "cid-ref-no-unixfs"
+  :adr/repos ["orgs/kotoba-lang/kotoba-protocol"]
+  :adr/related ["90-docs/adr/2607071500-kotoba-lang-kotoba-protocol-atprotocol-layering.edn"
+                "90-docs/adr/2608140500-ipfs-ipns-subdomain-execution-origin.edn"
+                "90-docs/adr/2607289500-identity-is-the-cid-of-the-semantic-definition.edn"
+                "90-docs/adr/2608080100-kotoba-lang-ui-is-a-single-page-app.edn"
+                "90-docs/adr/2608057000-org-is-a-host-not-a-path-segment.edn"
+                "90-docs/protocols/kotoba-resource-protocol.edn"]
+  :adr/supersedes "ADR-2607071500 embed-url の ipfs://{cid}[/path] 文法、および Addendum 6 の UnixFS directory mount（Service Worker virtual filesystem）follow-up"
+  :adr/authoritative_for
+  ["公開 resource URI: ipfs://{cidv1-base32} と ipns://{k51} の 2 形だけ"
+   "path / query / fragment / CIDv0 は公開 identity に入れない"
+   "IPLD link はノード内の CID であって URI path ではない"
+   "HTTPS gateway は L4 projection（git remote 相当）であって canonical ではない"
+   "kotoba.protocol.ref がこの文法の正本"]
+  :source/dataset "adr"
+  :adr/body
+  "公開 content identity を UnixFS のウェブサイト互換（`ipfs://{cid}/index.html`）から外し、git / nix / holochain / unison と同じ切る方にする。path は selector であり identity ではない。
+
+## Status
+accepted — 2026-08-14。実装は `kotoba-lang/kotoba-protocol` の `kotoba.protocol.ref`。
+
+## Decision
+
+公開 URI はちょうど 2 形:
+
+```
+ipfs://{cidv1}
+ipns://{k51}
+```
+
+リンクは IPLD（ノード内の CID、tag 42）。leaf は既に自分の CID を持つ。host が DAG を歩くなら、歩いた先の CID を名指す。`ipfs://{root}/a/b` を公開 identity にしない。
+
+HTTPS は retrieval location（L4）。`https://{gateway}/ipfs/{cid}` と `{cid}.ipfs.itonami.cloud` は同じ CID の投影であって、2 つ目の identity ではない。gateway の `/ipfs/{cid}` は「この block を取れ」という HTTP namespace であり、UnixFS directory walk ではない。
+
+## 取ったもの（UnixFS は取らない）
+
+| モデル | 不変 identity | 可変 name | path を公開 URI に入れるか |
+|---|---|---|---|
+| git | blob/commit SHA | ref | 入れない。`HEAD:README.md` は selector。blob は独自 SHA |
+| nix | store hash | flake.lock / output | 入れない |
+| holochain | action/entry hash | DNA/role | 入れない |
+| unison | term hash | namespace 内の local name | 入れない |
+| この protocol | CIDv1 | 鍵由来 IPNS | 入れない |
+
+UnixFS の `/index.html`、origin-isolation subdomain の path、相対 HTML リンクは website-compat であり、content addressing の要件ではない。ADR-2608140500 の `{cid}.ipfs.itonami.cloud/{unixfs-path}` は gateway の実行 origin 投影として残ってよいが、protocol の canonical ではない。
+
+## 語彙
+
+- `:kotoba.app/embed-url` — `ipfs://{cidv1}` \\| `ipns://{k51}` \\| unverifiable `https://…`
+- `:kotoba.app/bundle-cid` — 公開 resource の CID。dir root ではない
+- `:kotoba.app/entry` — IPLD map key / unison alias。URI path ではない。文字列 `\"index.html\"` を map key にすることは可。それを `ipfs://cid/index.html` に符号化することは不可
+- `:kotoba.app/id` — reverse-dns の local name（unison の term name 相当）
+- `:kotoba.app/latest` — 鍵由来 IPNS（git ref 相当）
+
+CIDv0 (`Qm…`) は `vocab/cid?` の歴史的 L0 形として残す。公開 URI ラベルには使わない。
+
+SPA の view は fragment（`#checkout`）であり protocol path ではない（ADR-2608080100）。fragment を `ipfs://` に付けても identity ではない — `ref/parse` は `:fragment-not-identity` で拒否する。
+
+## 拒否するもの
+
+org/project/site UUID、worker/env 名、per-app router（`/s` `/browse` `/studio` `/def`）を content identity にしない。それらは discovery か CLI UX。cloud-itonami `/s/{uuid}` と kotoba CLI `/browse/{ns}` は follow-up（名前空間の投影であって、この ADR が直す正本ではない）。
+
+## 検証
+
+`kotoba-protocol` の `clojure -M:test`: path 付き `ipfs://cid/index.html` は `:path-not-identity`。path 無し round-trip と gateway URL（trailing path 無し）が通る。`bundle-cid-consistent?` は従来どおり同一 CID を要求する。
+
+## 改訂履歴
+
+2026-08-14: accepted。UnixFS を公開 identity のモデルから外す。"}]

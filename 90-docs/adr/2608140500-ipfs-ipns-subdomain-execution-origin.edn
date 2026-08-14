@@ -12,10 +12,11 @@
   :adr/repos ["orgs/net-kotobase/ipfs"]
   :adr/related ["90-docs/adr/2607072000-gftdcojp-net-kotobase-ipfs-gateway-split.edn"
                 "90-docs/adr/2608057000-org-is-a-host-not-a-path-segment.edn"
+                "90-docs/adr/2608145100-public-resource-identity-is-cid-and-ipns.edn"
                 "90-docs/protocols/kotoba-resource-protocol.edn"]
   :adr/authoritative_for
-  ["実行 origin: https://{cidv1b32}.ipfs.itonami.cloud/{unixfs-path}"
-   "可変 head: https://{ipns-id-b36}.ipns.itonami.cloud/{unixfs-path}"
+  ["実行 origin のホスト形: https://{cidv1b32}.ipfs.itonami.cloud （CID が origin。path は identity ではない — ADR-2608145100）"
+   "可変 head のホスト形: https://{ipns-id-b36}.ipns.itonami.cloud"
    "bytes retrieval: https://ipfs.kotobase.net/ipfs/{cid} と /ipns/{name}（HTML を出さない）"
    "人向け URL は {org}.itonami.cloud/{repo} のまま"]
   :adr/body "# ADR-2608140500: IPFS/IPNS subdomain execution origins
@@ -30,8 +31,8 @@ accepted — 2026-08-14（Worker 着地・helper 301・両 wildcard TLS・raw or
 | 面 | 形 | 返すもの |
 |---|---|---|
 | bytes | `ipfs.kotobase.net/ipfs/{cid}` `/ipns/{name}` | CAR / raw / octet-stream。`text/html` は落とす |
-| origin | `{cidv1b32}.ipfs.itonami.cloud/{path}` | UnixFS 展開。`text/html` 可。CID ごとに origin |
-| origin | `{k51…}.ipns.itonami.cloud/{path}` | 同じ。mutable。短い cache |
+| origin | `{cidv1b32}.ipfs.itonami.cloud` | 実行 origin。CID がホスト。`text/html` 可。path は identity ではない（ADR-2608145100） |
+| origin | `{k51…}.ipns.itonami.cloud` | 同じ。mutable。短い cache |
 | helper | `ipfs.itonami.cloud/ipfs/{cid}/…` | 301 だけ。HTML を出さない |
 
 `cloud.app` は NXDOMAIN なので使わない。`{cid}.itonami.cloud` は org ホストと衝突するので使わない。`app.itonami.cloud` は fleet-dispatch のまま。
@@ -56,8 +57,11 @@ CIDv1 base32 ホストは 64 文字 CN を超えうるので、ホストごと�
 - wildcard cert `*.ipfs.itonami.cloud` / `*.ipns.itonami.cloud` とも active（Google Trust Services）
 - `{bafybei…}.ipfs.itonami.cloud/` UnixFS HTML 200 `text/html`（hello-world directory）
 
+canonical identity は `ipfs://{cid}` / `ipns://{k51}`（ADR-2608145100）。この ADR が所有するのは HTTPS 実行 origin のホスト形だけ。`/{unixfs-path}` は website-compat の gateway 投影であり、protocol の公開 URI ではない。
+
 ## 残すもの
 
 - PSL に `ipfs.itonami.cloud` / `ipns.itonami.cloud` を載せるのは第三者 HTML を広く載せる段階
 - DNSLink の subdomain 符号化は未実装
+- origin Worker が UnixFS を展開している事実は 2026-08-14 時点の観測。protocol がそれを要求するわけではない
 "}]
