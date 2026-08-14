@@ -94,6 +94,32 @@ HotStuff の replica は後の view で同じ height に投票し直す —— �
 - 誤って生成された証拠の失効規則を設けるか、証拠に有効期限/世代を持たせる
 - validator 7 台にして 1 台の永久排除を吸収できるようにする（§2）
 
+## 1d. 再構築後のきれいな観測（次の起点）
+
+13 件入りで `/reset` して立て直したところ **equivocators は 0** —— 修正後は
+生成されない。これで equivocation の件は閉じた。
+
+その状態で高さ 1031 で止まる。**これがいちばん読みやすい停止**なので記録する:
+
+    w2  h 1031  view 1039  no-certificate-for-the-tip  tip-cert false 票 1
+        last-proposal 1030 → locked-elsewhere
+    w4  h 1030  view 1050  no-certificate-for-the-tip  tip-cert false 票 1
+        last-proposal 1031 → no-parent
+
+読み取れること:
+
+- view と height の乖離は 8〜20。pacemaker 系の修正（2/3/6/7）は保たれている。
+  以前の 500〜600 とは別物。
+- 1030 と 1031 で**分岐している**。w4 は 1031 の parent を持たない
+  (`no-parent`)、w2 は 1030 を lock 規則で拒否 (`locked-elsewhere`)。
+- 票がどちらも 1。つまり誰も相手の枝に票を足せない。
+
+**次はここから。** lock 衝突は安全側の拒否なので、まず「どちらの枝が生き残る
+べきか」を determine する規則が正しく動いているかを見ること。`no-parent` が
+出ている以上、sync が枝を運べていない可能性が高い —— §1 の harness に
+『2 つの枝が並立し、どちらも quorum に届かない』条件を足せば、これも本番外で
+再現できるはずである。
+
 **教訓として残す価値があるのは、救済機構が本物の Byzantine 証拠を作り得たこと。**
 安全側の機構（equivocation slashing）と liveness 側の機構（未証明 tip からの
 建て直し）は、同じ『同じ height に別の block』という観測を共有している。両者を
