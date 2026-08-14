@@ -9,8 +9,13 @@
 ;;
 ;; Usage:
 ;;   nbb scripts/provision-resend-dns.cljs              # dry-run (default)
-;;   nbb scripts/provision-resend-dns.cljs --execute    # apply
+;;   nbb scripts/provision-resend-dns.cljs --execute    # apply (creates only)
 ;;   nbb scripts/provision-resend-dns.cljs --only shinshi.club[,...]
+;;   nbb scripts/provision-resend-dns.cljs --execute --update-conflicts
+;;       ^ also rewrites an already-published SPF/DMARC string to the value in
+;;         this file. Needed to move the DMARC policy ramp (none -> quarantine
+;;         -> reject); withheld by default because overwriting a live policy is
+;;         a deliverability decision, not reconciliation.
 ;;
 ;; Credentials (targeted reads, never printed):
 ;;   Resend      keychain service=gftd.resend account=API_KEY
@@ -51,7 +56,14 @@
 ;; kotobase.net Email Routing catch-all already delivers to worker:kotobase-mail.
 (def dmarc-rua "dmarc@kotobase.net")
 (def dmarc-inbox-zone "kotobase.net")
-(def dmarc-value (str "v=DMARC1; p=none; rua=mailto:" dmarc-rua))
+
+;; DMARC policy ramp: none -> quarantine -> reject. Raising this is a real
+;; deliverability decision, not a cleanup — anything sending as these domains
+;; without aligned SPF/DKIM starts getting quarantined the moment it lands.
+;; Changing it here only produces a *conflict* report; you must pass
+;; --update-conflicts to actually move a policy that is already published.
+(def dmarc-policy "quarantine")
+(def dmarc-value (str "v=DMARC1; p=" dmarc-policy "; rua=mailto:" dmarc-rua))
 
 ;; ---------------------------------------------------------------- helpers
 
@@ -182,6 +194,7 @@
 (defn -main []
   (let [argv     (vec (drop 2 (js->clj (.-argv process))))
         execute? (some #{"--execute"} argv)
+        update-conflicts? (some #{"--update-conflicts"} argv)
         only     (when-let [i (.indexOf argv "--only")]
                    (when (>= i 0) (set (str/split (get argv (inc i) "") #","))))
         rs-key   (keychain "gftd.resend" "API_KEY")
@@ -265,28 +278,49 @@
              (if-not execute?
                (do (println "\n(dry-run — pass --execute to apply)")
                    (process/exit (if (or (pos? n-create) (pos? n-conf)) 2 0)))
-               ;; apply: creates only. Conflicts are reported, never overwritten
-               ;; blind — an existing SPF/DMARC string is someone's decision.
+               ;; apply: creates always. Conflicts are only overwritten when the
+               ;; caller says so — an existing SPF/DMARC string is someone's
+               ;; decision, and a DMARC policy in particular is a live
+               ;; deliverability setting, not drift to be tidied away.
                (-> (js/Promise.all
                     (clj->js
-                     (for [{:keys [zone create]} plans, d create]
-                       (-> (cf-req cf-key "POST"
-                                   (str "/zones/" (zone-ids zone) "/dns_records")
-                                   (cond-> {:type (:type d) :name (:name d)
-                                            :content (:content d) :ttl 1}
-                                     (:priority d) (assoc :priority (:priority d))))
-                           (.then (fn [r]
-                                    (println (str (if (:success r) "  OK   " "  FAIL ")
-                                                  zone " " (:type d) " " (:name d)
-                                                  (when-not (:success r)
-                                                    (str "  " (pr-str (:errors r))))))
-                                    (:success r)))))))
+                     (concat
+                      (for [{:keys [zone create]} plans, d create]
+                        (-> (cf-req cf-key "POST"
+                                    (str "/zones/" (zone-ids zone) "/dns_records")
+                                    (cond-> {:type (:type d) :name (:name d)
+                                             :content (:content d) :ttl 1}
+                                      (:priority d) (assoc :priority (:priority d))))
+                            (.then (fn [r]
+                                     (println (str (if (:success r) "  OK   " "  FAIL ")
+                                                   zone " " (:type d) " " (:name d)
+                                                   (when-not (:success r)
+                                                     (str "  " (pr-str (:errors r))))))
+                                     (:success r)))))
+                      (when update-conflicts?
+                        (for [{:keys [zone conflict]} plans, d conflict]
+                          (-> (cf-req cf-key "PATCH"
+                                      (str "/zones/" (zone-ids zone) "/dns_records/"
+                                           (get-in d [:existing :id]))
+                                      {:content (:content d)})
+                              (.then (fn [r]
+                                       (println (str (if (:success r) "  UPD  " "  FAIL ")
+                                                     zone " " (:type d) " " (:name d)
+                                                     "  " (norm (get-in d [:existing :content]))
+                                                     " -> " (norm (:content d))
+                                                     (when-not (:success r)
+                                                       (str "  " (pr-str (:errors r))))))
+                                       (:success r)))))))))
                    (.then (fn [results]
                             (let [results (js->clj results)
                                   bad (count (remove true? results))]
                               (println (str "\napplied=" (- (count results) bad)
                                             " failed=" bad
-                                            " conflicts-left=" n-conf))
+                                            ;; conflicts we chose not to touch —
+                                            ;; zero once --update-conflicts ran,
+                                            ;; otherwise they are still drift.
+                                            " conflicts-left="
+                                            (if update-conflicts? 0 n-conf)))
                               (process/exit (if (pos? bad) 1 0))))))))))
         (.catch (fn [e] (die! (str "error: " e)))))))
 
