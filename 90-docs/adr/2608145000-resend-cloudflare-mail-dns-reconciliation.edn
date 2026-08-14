@@ -102,18 +102,38 @@ Email Routing。ダッシュボードの色は方式の違いを写している�
   手元にありながら「資格情報が無い」と結論しかけた。
 - **作成前に `dig` を打つと、その NXDOMAIN が 30 分キャッシュされる**
   （SOA minimum 1800）。作成直後に public resolver が空を返すのは伝播の失敗では
-  なくネガティブキャッシュで、**権威 NS に直接引けば区別できる**。
-  この区別をしないと、成功した書き込みを失敗と誤読する。
+  なくネガティブキャッシュである。
+  ⚠ **その区別に「権威 NS へ直接引く」を使ってはいけない。** この環境から
+  `dig @everton.ns.cloudflare.com` は、Cloudflare API 上に確実に存在する
+  レコードに対しても空を返した（一度だけ成功したのは偶然で、それを根拠に
+  「権威は応答している」と書きかけた）。**判定に使える面は 2 つだけ** ——
+  設定の正本は **Cloudflare API**、送信者が見る値は **public resolver 複数**。
+  両者が一致したときに初めて完了と言える。
+
+## Resend MCP —— ダッシュボード操作だと思っていたものが API だった
+
+`https://mcp.resend.com/mcp`（公式ホスト、`Authorization: Bearer <API key>` が
+そのまま通る）を local scope で登録した。**リポジトリの `.mcp.json` には入れない**
+—— header にトークンを書くので、commit されるファイルに置くと鍵が漏れる。
+
+これで**残件だと書いた「ダッシュボードでしかできない」作業が消えた**:
+`update-domain` の `capabilities.receiving: \"disabled\"` で
+`mail.kotobase.net` / `mail.itonami.cloud` の Resend 受信を停止し、
+**両者は `partially_failed` から `verified` になった**。
+
+教訓は前節と同型 —— **「API が無い」も、確かめずに書けば古い実測と同じ嘘になる。**
+本 ADR は初版でこれを残件に挙げていたが、MCP のツール表を 1 回引けば済んだ。
 
 ## 残件
 
-- **Resend 側で `mail.kotobase.net` / `mail.itonami.cloud` の inbound を切る**
-  （API が無くダッシュボード操作。切るまで両者は `partially_failed` のまま
-  表示されるが、これは表示であって欠陥ではない）。
 - **`mail.kotobase.net` 宛が Worker に届くかは未実測。** Cloudflare Email Routing の
   catch-all がサブドメイン宛を拾うか、`itonami` のように明示ルールが要るかは
   実際にメールを 1 通通して確かめる必要がある。**MX を足したことは
   「受信できる」ことの証明ではない。**
+- **新規 3 ドメインの SPF 行が `pending`。** DNS は public resolver 3 種で解決
+  済み、レコードの内容は verified な `mail.murakumo.cloud` と同一。
+  Resend/SES 側の非同期検証待ちと見ているが、**「DNS は正しいのだから通るはず」は
+  観測ではない** —— verified を見るまで完了としない。
 - `email.gftd.co.jp` の DMARC は未実施 —— `gftd.co.jp` は GoDaddy がゾーンを
   持っており、この Cloudflare token では書けない。
 - 全ゾーン `p=none`（観測モード）。rua のレポートを見てから `p=quarantine` へ
