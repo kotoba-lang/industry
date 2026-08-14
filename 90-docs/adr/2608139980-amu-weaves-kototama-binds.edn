@@ -125,6 +125,31 @@ ADR-2607266000 の製品名の現在地。2026-08-13 追記: GitHub / west 改�
 （id 1312673399 / 1312921812）。旧 URL は redirect。
 
 しない: `tender-*` の tree を kototama へコピー、`wasm-webcomponent` の再吸収、
-`musubi` 新設。fleet-db への改名吸収は west.yml 先行のあと reconcile で行う
-（ADR-2608040190）。本 pass では 1437 pin の一括吸収を混ぜない。
+`musubi` 新設。Clojure 役割語 `tender-native-available?` / `kototama.tender` と
+T2 backend 名は改名しない。
+
+## 現在地（2026-08-14 closing）
+
+default branch に着地済み（サーバ側 merge、PR 経由ではない）:
+
+- GitHub rename + west.yml 名: `b3e337798dbc`
+- fleet-db 改名吸収（changed 1438 / added 3 / removed 2）: `6abf2be66aa`
+- signed fleet-head seq 32: `c71df5ccf7e8`
+- hayari など後続 absorb + re-sign: seq 33 `d6413a3e06e` … seq 37 `59ceb04fe710`
+  （value `ee610d9120dc`、signer `did:key:z6MkgaYKLVojxB2iUV13jubQoivUbHM34bBkSXLVo7iY633p`）
+- 共有 checkout に `kototama-native` `e52b41a` / `kototama-component` `d336ff7`
+
+未完:
+
+- 共有 checkout の `orgs/kotoba-lang/tender-native`（`1915ee1`）と
+  `tender-component`（`d985006`）は pin SHA と不一致のため未削除
+- 2026-08-14 14:00 JST の `kagami reconcile --check` は
+  `DRIFT {:changed 60}`。tidy tick の床は changed>20 で停止。次 agent は
+  各 pin を GitHub compare で FF 確認してから flagless `kagami reconcile`、
+  続けて `--kagi fleet-owner-root --out manifest/fleet-head.edn`
+- `/loop さらに整えて` の watcher / 45m heartbeat はこの closing で停止した
+
+resume: worktree を superproject の外に切り、
+`git show origin/main:manifest/west.yml` を入力に `--check`。changed≤20 かつ
+全て FF なら absorb+再署名。60 件を FF 未確認のまま書かない。
 "}]
