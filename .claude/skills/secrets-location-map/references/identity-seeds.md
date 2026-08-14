@@ -156,6 +156,22 @@
   PoW faucet 由来の testnet 資金のみ保持（実価値なし）。**mainnet では絶対に使わない** —
   faucet 経由で公開された address であり、実資金用の鍵はこれとは別に発行する。
   取得: `bin/kagi get SWAP_SEPOLIA_TESTNET_KEY`。
+
+## x402 Base payer (2026-08-14)
+
+- **`X402_BASE_PAYER_KEY`（kagi vault、compartment `personal`、
+  `KAGI_HOME=$HOME/.kagi`）** — Base **mainnet** 用の secp256k1 秘密鍵
+  （32-byte hex、`0x` 無し）。address は
+  `0xb201E44B2317aFFd4c2C20aa15a636cC35e8dd19`（公開値）。
+  GLEIF joined-tier listing など family `payTo`
+  `0xA00366234D29d4F882088048c0B2fa0dB7302D4E` への x402
+  `transaction`-scheme dogfood 専用。**treasury ではない**（第2の収納先を
+  作らない）。Safe owner `0xe255d685…` とも別。Sepolia の
+  `SWAP_SEPOLIA_TESTNET_KEY` を mainnet に流用しないための新規発行。
+  取得: `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get X402_BASE_PAYER_KEY`。
+  発行時 Base 残高は ETH 0 / USDC 0 — 送金前にこの address へ gas ETH と
+  少なくとも 0.001 USDC を入れる。
+
 - **0x Swap API キーは存在しない**（2026-07-26 時点で確認済み）。`swap.aggregator` の
   `:zero-ex-v2` adapter が `:verified? false` のままなのはこれが理由 — キーを取得したら
   `swap/bin/verify_live.cljs` を実行して live 検証し、フラグを立てる。LI.FI 側は
