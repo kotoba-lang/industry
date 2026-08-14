@@ -681,4 +681,156 @@ gate を root と両ランタイムに向け直した理由がこれである。
 | 稼働 | **未配置** | 稼働 |
 
 残るのは (a) ホストに置くこと、(b) vault に資金を入れること。**どちらも実行そのものが
-オーナーの操作であり、コードでは代われない。**"}]
+オーナーの操作であり、コードでは代われない。**"}
+ {:db/id -2
+  :adr/id "ADR-2608141900"
+  :adr/title "torihiki ⊖ Hyperliquid — gap 台帳 追記（2026-08-14 実測、前回の数字の訂正を含む）"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/tags ["kotoba-lang" "torihiki" "hyperliquid" "gap-ledger" "escrow" "consensus"]
+  :adr/body
+  "## まず、前の entry の数字を訂正する
+
+ADR-2608040600 の末尾の表は torihiki の block 中央値を **8-11 ms** と書き、
+Hyperliquid の ~70 ms と並べていた。**あの数字は止まった chain で測ったもので、
+比較として成立していない。**
+
+止まった Durable Object は仕事をしていないので RTT が短い。負荷が乗った状態で
+測り直すと `/clock` が 42-50 ms、`/msg` が 24-56 ms で、1 block はおよそ 2 往復
+なので **~90 ms** が実体だった。8-11 ms は『速い』の証拠ではなく『動いていない』
+の証拠だったことになる。
+
+台帳が答えるべき問いそのものについて、台帳が誤っていた。訂正を先頭に置くのは
+そのためである。
+
+## escrow —— 実装済みから、稼働して実証済みへ
+
+前回は『実装済み・資金未投入・実 API に未検証』だった。今回変わった点。
+
+THORChain の REST は **Cloudflare の bot challenge の裏**にあり、Worker からも
+普通の shell からも `Just a moment` しか返らない（Workers 固有の制限ではない）。
+到達不能は前回の推測どおりだったが、理由は名前解決ではなく bot 判定だった。
+
+そこで観測を**発生元の chain 側**に移した。ETH の入金は THORChain Router への
+call であり、Router の `Deposit(address,address,uint256,string)` が vault / asset /
+amount / memo を全部持つ。topic は repo の keccak から導出し、**実 log と一致**する
+ことを確認した（Router 0xD37B...7146）。
+
+live chain で通した経路:
+
+    Ethereum log → deposits-from-logs → scaled-amount → attest!
+                 → bonded quorum 3/4 → credit
+
+**2,500,000 micro-USDC (2.50 USDC) が 8 秒で着地し、4 通目の attestation では
+増えなかった（exactly-once）。** 他人の実 deposit に対しては memo を正しく decode
+した上で `memo-is-not-ours` で拒否する（実 log で確認）。
+
+実 log を読んで見つかった実バグ 3 件:
+
+1. **金額が i53 に収まらない。** DAI 50,000 は 5x10^22。無変換だと
+   `torihiki.fixed` が `apply-block` の中で throw する —— 拒否ではなく合意層の
+   クラッシュ。読み方自体も runtime で割れていた（JVM は例外、JS は
+   5.0000000000000004e22）。
+2. **asset の allowlist が無かった。** Router は公開契約なので誰でも任意の
+   ERC-20 を memo 付きで送れる。allowlist が無ければ今朝作った token が額面で
+   担保になる。decimals も設定から来る必要がある（推測は 10^12 倍の誤入金）。
+3. **test helper が cljs で何も検証していなかった。** `(int c)` は ClojureScript
+   では NaN（文字型が無い）。memo が全部 NaN になり、JVM では緑、nbb では中身の
+   無い corpus を読んでいた。
+
+3 は parity gate の穴でもあった。`script/tests-on-nbb.cljs` を追加し、**328 tests /
+850 assertions が両 runtime で緑**になることを担保した（従来の loads-on-nbb は
+『読めるか』しか見ないので、この層は捕まえられない）。
+
+**まだ資金は入っていない。** 入金先 vault は THORChain の churn で数日ごとに
+変わり、その一覧を取る API に到達できないので、`THOR_VAULT` は観測由来の
+allowlist（設定に記録済み、根拠と限界も併記）。実入金の前に、その時点の
+inbound address が list にあることの確認が要る。
+
+## 合意層 —— 10 件の実バグ
+
+前回の台帳は consensus を差分として扱っていない。今回、**deploy された chain が
+高さ 26,110 で完全に固着した**ことをきっかけに 10 件が出た。すべて実測起点で、
+inga 394 tests 緑。
+
+1. `propose` が **tip** の certificate を要求 —— 提案が quorum に届かない瞬間に
+   永久停止（HotStuff の leader は highest QC を延長する）
+2. `proposable-round` が proposer 自身の view まで飛び、round が私的な番号になる
+3. skip の根拠が『ちょうど round-1 の new-view quorum』。round は height 付近、
+   new-view は view 付近に居るので、**壊れているときにだけ使えない**
+4. `vote-on-tip` が 1 view 1 票の枠を古い tip で使い切る
+5. `on-tick` の timeout 分岐が return し、**leader が一度も propose を訊かれない**
+6. 再構築閾値 4 view が短すぎ、**高さが下がっていた**（10 block 消失）
+7. **backoff が失敗でリセットされる** —— timeout certificate は view 失敗の証拠
+   なのに `failures` を 0 に戻す。止まると毎 view TC ができるので backoff が
+   永久に効かない（実測: view が毎秒 0.62 の完全な定速、10 分間減速なし）
+8. checkpoint が取引所全体を **storage 操作 1 回**で書き、育つと platform の
+   timeout を超える
+9. `:new-views` が無制限に増える（Durable Object は memory 上限のある長寿命
+   プロセス）
+10. `high-qc-block` が certificate を持たない block を返す —— `propose` はそこまで
+    chain を切り詰めてから拒否する。毎 round 捨てて何も作らない
+
+**8 が特に重い。** 実機から捕獲した文言:
+
+    Durable Object storage operation exceeded timeout which caused object to be reset.
+
+これで replica が reset され、4 台中 3 台になり、quorum 3 では余裕がゼロなので
+次に 1 台遅れると chain が止まる。**3 回起きて、3 回とも consensus の停止に
+見えていた。** state と履歴を別々の write に分けて解消した。
+
+途中で**自分の修正 7 と 3 が打ち消し合う回帰**も出した（backoff を効かせると
+new-view が溜まらず skip 根拠が枯れる）。特定して、skip の根拠を量への依存から
+切り離した。`vote-on-tip` を timeout 分岐へ移す案は departure spec を壊したので
+revert しており、入っていない。
+
+## 残る限界は、コードではなく基盤
+
+もう一つの捕獲:
+
+    Durable Object is overloaded. Requests queued for too long.
+
+論理バグでも storage timeout でもない。**DO は単一スレッドで、処理できる速度を
+超えて要求が届いていた。** 既存の tick 表が反対側から同じ現象を記録している ——
+`tick-ms 5` で chain は遅くなるのではなく停止し、どの replica も何も報告しなかった。
+その表は今回の 10 件より前に取られたもので、**修正は block 生成速度を上げた**ため、
+tick 25 が確保していた余裕は使い切られていた。50 に戻した。
+
+構造として:
+
+- DO は単一スレッド、DO 間 RTT は実測 ~45 ms
+- validator 4 台・quorum 3 なので、**1 台が応答不能になった瞬間に余裕がゼロ**
+- その基盤上で replica は断続的に応答不能になる
+
+**4 台はこの基盤には少なすぎる。** 7 台（quorum 5、2 台の障害を許容）にすれば
+断続的な応答不能を吸収できる。これは『Cloudflare のまま』という判断と両立する
+構造的な次の一手であり、genesis validator set の変更なので新チェーンになる。
+
+## 同等性の現在地（前 entry の表を差し替える）
+
+| | torihiki | Hyperliquid |
+|---|---|---|
+| 機能（分類 3） | 全実装 | — |
+| block 中央値 | **~90 ms**（訂正） | ~70 ms |
+| 持続稼働 | **不可** —— 断続的に replica が応答不能 | 稼働 |
+| escrow | **稼働・経路実証済み・実資金は未投入** | 稼働 |
+| EVM | 橋 + RPC + interpreter | 稼働 |
+| market 数 | **4** | 数百 |
+| 実取引量 | **ゼロ** | 実流動性 |
+| validator | **4（quorum 3、余裕ゼロ）** | 成熟した構成 |
+| ecosystem | **無し** | 確立 |
+
+**同等ではない。** 板・流動性・market 数・ecosystem のどの軸でも比較を行って
+おらず、行える段階にない。今回進んだのは escrow と合意層の土台であって、
+運用上の同等性ではない。
+
+この台帳がこれまで『同等性の現在地』を機能面と block 時間だけで書いてきたことも、
+今回の訂正の対象に含める —— **機能が揃っていることと venue として成立している
+ことは別の主張であり、前者だけを並べた表は後者を示唆してしまう。**
+
+## 次に意味のある順序
+
+1. validator 7 台（基盤の断続的な応答不能を吸収する。新 genesis）
+2. それが 1 時間停止せず走ることの確認
+3. 実 vault への少額入金（その時点の inbound address の確認が先）
+4. **そこで初めて**板・流動性・market 数の話"}]
