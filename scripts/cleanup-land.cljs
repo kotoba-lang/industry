@@ -255,6 +255,17 @@
     (some-> (gitc dir "remote" "get-url" r) str/trim
             (as-> u (second (re-find #"github\.com[:/](.+?)(?:\.git)?$" u))))))
 
+;; 複数の checkout が同じ upstream slug へ解決することがある（repo 改名 + 旧 path が
+;; ローカルに残るとこうなる）。それぞれが別の untracked を持っていると、**2 本目の
+;; commit が 1 本目を上書きする** —— どちらもレビューされないまま。実測 2026-08-14:
+;; orgs/etzhayyim/com-etzhayyim-busshi と orgs/cloud-itonami/actor-busshi が
+;; ともに cloud-itonami/actor-busshi へ解決し、両方が data/（observatory の観測台帳）
+;; を着地させる計画になっていた。同様に orgs/kotoba-lang/compiler は
+;; kotoba-lang/amu へ解決する（GitHub の改名リダイレクト）。
+;; 先に claim した checkout だけを通し、2 本目以降は名前の付いた skip として報告する
+;; （黙って落とさない。どちらを採るかは人間の判断）。
+(def ^:private slug-claims (atom {}))
+
 (defn- canonical-repo
   "raw slug -> `{:slug <GitHub 上の現在名> :archived <true|false|nil>}`。
   **着地対象がある repo にだけ呼ぶこと**。planning 段階で全 repo に対して呼ぶと
@@ -752,7 +763,11 @@
                  ;; repo を作って ok」）。dry-run では作らない。
                  (when apply?
                    (println (format "\n%s  (remote 無し → 作成する)" dir))
-                   (create-remote! dir))))]
+                   (create-remote! dir))))
+        ;; 最初にこの slug へ到達した checkout が claim する。2 本目以降は下の
+        ;; cond で slug-collision として弾かれる（自分自身は not= で素通り）。
+        _ (when (and slug (not (contains? @slug-claims slug)))
+            (swap! slug-claims assoc slug dir))]
   (println (format "\n%s  (%s)" dir (or slug raw-slug "no-remote")))
   (when (seq deleted)
     (println (format "  skip deleted        %d 件（削除は main に適用しない）: %s"
@@ -772,6 +787,12 @@
         ;; 行を印字するだけでは summary が additive=N に混ぜてしまい、
         ;; 「飛ばした」と「合格した」が出力で区別できなくなる（ADR-2608136000）。
         :archived-skip)
+
+    ;; 同じ slug を別の checkout が既に claim している。着地させると先に着地した
+    ;; 内容を上書きするので通さない（上の slug-claims のコメント参照）。
+    (and slug (get @slug-claims slug) (not= (get @slug-claims slug) dir))
+    (println (format "  → skip slug-collision（%s は既に %s が着地対象として claim 済み。着地対象 %d 件は報告のみ — どちらの写しを採るかは人間の判断）"
+                     slug (get @slug-claims slug) (+ (count additive) (count tracked))))
 
     (and (nil? slug) (nil? raw-slug))
     (println "  → remote が無いので着地先が無い。報告のみ。")
