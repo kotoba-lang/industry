@@ -158,7 +158,7 @@ but session already has repos from owner(s) [com-junkawasaki]
 green判定は次の参照が一つのrunに揃った時だけ行う。
 
 - 最終版Terms / Privacy / DPAのcommit — **充足**（run 0018/0019、live 200 で確認）
-- counsel reviewの日時・対象version（助言内容そのものは機密でよい）— **未充足**
+- counsel reviewの日時・対象version（助言内容そのものは機密でよい）— **未充足**（run 0032: `legal/counsel-review-packet.md` を 2026-08-14 に更新し live DRAFT に owner 決定と実装事実を書いた。**承認の return evidence は無い。agent は counsel を代行しない**）
 - ratified price、Stripe Product/Priceとの照合結果 — **未充足**（公開 pricing ページ無し）
 - test-mode E2E event IDsを秘匿化した検証記録 — **未充足**（`sk_test_…` 不在）
 - ownerのlive販売承認、support/refund担当 — **未充足**
