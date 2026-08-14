@@ -1,0 +1,66 @@
+[{:db/id -1
+  :adr/id "ADR-2608147400"
+  :adr/title "cloud-itonami-app の workspace document は raw CIDv1（ipfs://bafkrei…）"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/last_verified "2026-08-14"
+  :adr/deciders ["Jun Kawasaki"]
+  :adr/topic "app-bundle-cid"
+  :adr/repos ["orgs/cloud-itonami/cloud-itonami-app"]
+  :adr/related ["90-docs/adr/2608145100-public-resource-identity-is-cid-and-ipns.edn"
+                "90-docs/adr/2608140500-ipfs-ipns-subdomain-execution-origin.edn"
+                "90-docs/adr/2608145400-protocol-l2-graph-cid.edn"]
+  :adr/authoritative_for
+  ["desktop app content identity is CIDv1 raw sha2-256 of one page-html document"
+   "auth.itonami.cloud remains the ceremony Name, not a CID"
+   "archive PUT is Location; 401 means Location is not live"]
+  :source/dataset "adr"
+  :adr/body
+  "cloud-itonami-app の公開 identity を hostname / `#/signin` ではなく raw CID にする。protocol は ADR-2608145100。この ADR はその最初の app 実装の着地記録。
+
+## Status
+accepted — 2026-08-14。実装は `cloud-itonami/cloud-itonami-app` の ADR-0047。
+
+## Identity of the landed tree
+
+```
+ipfs://bafkreiey52hai5obtqeg5w2ix63orset4o74kxljif2gwdkxt5upre2wsi
+```
+
+801,104 bytes。`:kotoba.app/id` `cloud.itonami.app`。kind `appview`。
+
+## Landed
+
+- App merge: https://github.com/cloud-itonami/cloud-itonami-app/commit/5c196db84a4cd88645b63985c7a90469f3f57389
+- Feature: `fe032f805217f813ee40cb280a9244d6793e9f27`
+- West pin: https://github.com/com-junkawasaki/root/commit/c04a934a8d0a702c5a22f5ede4db4cc6ba960154 (`cloud-itonami-app` → `5c196db`)
+
+## Implemented
+
+`cloud.itonami.app.bundle` が unauthenticated な `page-html` を凍結し、CIDv1 raw sha2-256 を付け、`kotoba.protocol.app` manifest を組む。lock は `resources/cloud/itonami/app/kotoba.app.edn`。HTML blob は commit しない。
+
+## Not implemented
+
+- Live archive Location。`PUT https://kotobase.net/ipfs/{cid}` は 401 unauthorized（kagi `KOTOBASE_ARCHIVE_TOKEN` は在る。Worker が拒否。GET は 404）。
+- IPNS `:kotoba.app/latest`
+- `:kotoba.graph/cid` の publish
+- auth host の移動
+
+## Verification
+
+`bundle_test`: 5 tests / 21 assertions / 0 fail。ネットワーク無し。
+
+## Resume
+
+Worker secret と kagi item が同じ値になったら、2 手順（cwd が違う）:
+
+1. superproject 根から kagi の 1 item を読む（値は印字しない）:
+   `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get KOTOBASE_ARCHIVE_TOKEN`
+2. `cloud-itonami-app` の checkout で `KOTOBASE_ARCHIVE_TOKEN` を渡して
+   `clojure -M -m cloud.itonami.app.bundle put`
+
+GET-verify のあと lock に `:published` を書く。それが終わってから IPNS latest。
+
+## 改訂履歴
+
+2026-08-14: accepted。closing 記録。"}]
