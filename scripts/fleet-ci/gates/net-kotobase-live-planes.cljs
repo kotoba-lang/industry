@@ -158,15 +158,22 @@
   (println (str "  ok   " label (when detail (str " :: " detail)))))
 
 (defn- fetch-text [url opts]
-  (-> (js/fetch url (clj->js (merge {:signal (js/AbortSignal.timeout 20000)} opts)))
-      (.then (fn [r] (-> (.text r) (.then (fn [t] {:status (.-status r) :body t})))))
-      (.catch (fn [e] {:status 0 :body (or (.-message e) "network error")}))))
+  (let [started (js/performance.now)]
+    (-> (js/fetch url (clj->js (merge {:signal (js/AbortSignal.timeout 20000)} opts)))
+        (.then (fn [r]
+                 (-> (.text r)
+                     (.then (fn [t] {:status (.-status r)
+                                     :body t
+                                     :elapsed-ms (js/Math.round (- (js/performance.now) started))})))))
+        (.catch (fn [e] {:status 0
+                         :body (or (.-message e) "network error")
+                         :elapsed-ms (js/Math.round (- (js/performance.now) started))})))))
 
 (defn- expect!
   "One check: `pred` over {:status :body}."
   [label url opts want pred]
   (-> (fetch-text url opts)
-      (.then (fn [{:keys [status body] :as res}]
+      (.then (fn [{:keys [status body elapsed-ms] :as res}]
                (let [snippet (subs body 0 (min 160 (count body)))]
                  (cond
                    ;; The exact shape of the 2026-08-11 outage: an unhandled JS
@@ -174,7 +181,7 @@
                    ;; failure names itself instead of just "wrong status".
                    (str/includes? body "is not a function")
                    (fail! label (str "raw JS TypeError leaked: " snippet))
-                   (pred res) (pass! label (str "HTTP " status))
+                   (pred res) (pass! label (str "HTTP " status " / " elapsed-ms "ms"))
                    :else (fail! label (str "expected " want ", got HTTP " status " " snippet)))
                  res)))))
 
@@ -221,6 +228,20 @@
                          (json-post (doto (auth) (aset "x-datomic-db-name" "fleet-probe"))
                                     {:index "eavt" :limit 1})
                          "200" (status= 200)))
+        ;; 2b. SQL must be an executable backend surface, not only an advertised
+        ;; lexicon entry. The throwaway tenant's empty graph is enough to prove
+        ;; auth, graph derivation, routing, parsing, and bounded execution.
+        (.then #(expect! "kg-query/sql"
+                         (str base "/xrpc/ai.gftd.apps.kotobase.kg.query")
+                         (json-post (auth)
+                                    {:lang "sql"
+                                     :db_name "fleet-probe"
+                                     :query "SELECT COUNT(*) AS n FROM datoms"})
+                         "200 + SQL result"
+                         (fn [{:keys [status body]}]
+                           (and (= status 200)
+                                (str/includes? body "\"language\":\"sql\"")
+                                (str/includes? body "\"rows\":[[0]]")))))
         ;; 3. PSA answers — must not be a 502 for a tenant holding nothing
         (.then #(expect! "psa/list" (str base "/pins")
                          {:method "GET" :headers (auth)} "200" (status= 200)))
