@@ -54,9 +54,50 @@ harness 自身のバグも 2 つ潰した: :votes だけ削って :voted を残�
 済み」と信じて救済が発火しない。tip の票が 0 だと救済が成功しても quorum に届かない。
 
 **deploy 後の実機（cv166）はこの形ではなくなった** —— tip は certified で票 3。
-残るのは別の形で、not-my-round（leader が提案しない）と locked-elsewhere
-（HotStuff の lock 規則が拒否 = 分岐が存在する）。**次はここから。** lock 衝突は
-安全側の拒否なので、どの分岐が生き残るべきかを見るところから始めること。
+そこから追うと、真因は lock ではなく **equivocation の誤検出**だった。
+
+## 1b. view change を equivocation と呼んでいた（cv167-168 で修正）
+
+実機で `equivocators [w1 w2 w3 w4]` —— 正直に合意している 4 台全部が、互いに
+対する証拠を持っていた。state root は 4 台とも一致していて、何も fork していない。
+
+`detect-equivocation` は (witness, height) でグループ化し view を見ていなかった。
+HotStuff の replica は後の view で同じ height に投票し直す —— それが view change
+であり、round が certify されなかった後に leader が highest QC の上に建て直すとき
+まさにこれが起きる。**止まった chain を救う仕組みが、それを断罪する証拠を製造して
+いた。**
+
+3 箇所を揃える必要があった:
+
+- `detect-equivocation` —— (witness, height, view) で判定
+- `verify-equivocation-evidence` —— 検証側が古い規則だと、記録済みの証拠から
+  断罪し続ける
+- `equivocators` —— `:equivocations` を生で読んでいたので、規則を直しても
+  既に持っている証拠は効いたまま。構造部分を再適用して落とす
+
+実機で equivocators は 3 → 1 に減った。
+
+## 1c. 残る 1 件は本物（未解決）
+
+**w2 は補正後の規則でも equivocator。** w2 自身もそう見ている。修正 1 が境界を
+持つ前（`stall-views` 4）の truncate-and-republish が、同一 view 内で同じ height に
+異なる block を出していた —— つまり**実際に equivocation を起こしていた**。
+`stall-views` 32 と `max-drop` 4 でこの生成は止めたが、**既に発生した証拠は状態に
+残る。**
+
+結果として使える replica は 3 台、quorum は 3 で余裕ゼロ。w2 は遅れており貢献
+できない。
+
+**次はここから。** 選択肢:
+
+- w2 を reset して再参加させる（ただし peer 側が証拠を保持している）
+- 誤って生成された証拠の失効規則を設けるか、証拠に有効期限/世代を持たせる
+- validator 7 台にして 1 台の永久排除を吸収できるようにする（§2）
+
+**教訓として残す価値があるのは、救済機構が本物の Byzantine 証拠を作り得たこと。**
+安全側の機構（equivocation slashing）と liveness 側の機構（未証明 tip からの
+建て直し）は、同じ『同じ height に別の block』という観測を共有している。両者を
+分けるのは view であり、片方だけが view を見ていると、正直な救済が永久追放になる。
 
 **着手前にやるべきこと。** 再現 harness。この期間に 4 通り書いて**すべて失敗
 した**（harness 側が毎回回復してしまう）。実機を harness 代わりにする方法は
