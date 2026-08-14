@@ -5,7 +5,7 @@
   :adr/doc-type "adr"
   :adr/source-format "edn"
   :adr/date "2026-08-04"
-  :adr/last-verified "2026-08-04"
+  :adr/last-verified "2026-08-14"
   :adr/authoritative true
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "kotobase-ipld-ipns-filecoin-review-and-name-binding"
@@ -33,7 +33,8 @@
                 "adr-2608039970-kotobase-base-is-the-datom-plane-not-datalog"
                 "adr-2608045000-kotobase-capability-topology-peer-retirement"
                 "adr-2607032430-kotobase-log-structured-write-path"
-                "adr-2607051000-kotobase-ciphertext-over-cid-persistence"]
+                "adr-2607051000-kotobase-ciphertext-over-cid-persistence"
+                "adr-2608147900-value-interval-cuts-landed"]
   :adr/body
   "## Context
 
@@ -131,10 +132,14 @@ leaf key は pr-str [blind(s) blind(p) blind(o)]。blind は HMAC-SHA256 なの�
 
 - 良い影響: キーが一様分布になり、boundary? のチャンク境界分布が理想的になる。
   平均 fanout 256、100 万 triple で深さ 3 程度。prefix seek は数ブロックで済む。
-- 決定的な影響: 順序保存性が無い。scan-prefix は完全一致 component の prefix しか
-  引けない。kotobase-engine の datomic/index-range は属性の全 AVET 行を取得して
-  復号してから memory で filter しており、AVET インデックスが実質「属性ごとの
-  全件テーブル」に退化している。
+- 決定的な影響: HMAC covering key は順序保存性が無い。scan-prefix は完全一致
+  component の prefix しか引けない。production cursor の値区間は POS 属性 prefix
+  + decrypt + in-range? であり、HMAC 上で値 prune してはならない。
+- 2026-08-14（ADR-2608147900）: 順序保存キーを持つ面では値区間を木の中で切る。
+  hot in-memory の datomic/index-range は全 AVET 行 + memory filter ではなく
+  datalog.query/query-range（[lo, hi)）を使う。capability-bench の range-scan は
+  prolly-tree/scan-range。lake は columnar stats + HTTP/R2 byte-range。HMAC 経路の
+  コストは変わらない。平文キーの別インデックスは依然として将来設計。
 - prolly-tree の chunk_by には上限が無い。境界確率 1/256 の幾何分布なので約 2% の
   leaf が 1000 entry を超える。ブロックサイズの分散が大きく、キャッシュ効率と
   部分取得を悪くする。
@@ -143,7 +148,8 @@ leaf key は pr-str [blind(s) blind(p) blind(o)]。blind は HMAC-SHA256 なの�
 
 決定: 順序保存暗号は採らない（漏洩が桁違いに増える）。範囲検索が必要な属性は、
 その属性が機密でないことを明示的に宣言したうえで平文キーの別インデックスを
-持つ経路を将来設計する。それまで index-range のコストは仕様として文書化する。
+持つ経路を将来設計する。hot の index-range コストを「仕様として文書化する」だけに
+留める判断は 2026-08-14 に supersede した（query-range に切った。HMAC 面は文書のまま）。
 
 ## 所見 5 — 暗号: 設計と検証は水準以上。ただし記述の粒度が実態より弱い
 
@@ -315,4 +321,10 @@ open / async-open に述語（例 #(contains? known-issuers %)）を渡すこと
 - kotobase の datom 面は IPLD の上では無理をしていない。無理をしているのは
   IPNS を ref 面に据えた点と、prolly-tree を差分更新に使っていない点の 2 つで、
   どちらも代替実装が既に workspace 内に存在する。
-- Filecoin は durability と監査の面で使う。actor model を hot path に持ち込まない。"}]
+- Filecoin は durability と監査の面で使う。actor model を hot path に持ち込まない。
+
+## 改訂履歴
+
+- 2026-08-14: 所見 4 の「index-range は全 AVET + memory filter、コストは文書化する」
+  を現在値に合わせた。hot 面は query-range / scan-range / lake byte-range が着地。
+  HMAC covering key は順序保存にしない決定は維持。詳細は ADR-2608147900。"}]
