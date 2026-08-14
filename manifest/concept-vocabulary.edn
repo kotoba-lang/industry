@@ -39,6 +39,12 @@
               "実行時リンク" "runtime link"]
   :note "kotoba-lang/kototama が T3 の存在。成果物を宿し、aiueos が貸した named provider にだけ結ぶ。Solo5 の tender は役割語であって製品名ではない。宿は kototama-native（旧 tender-native、ns kototama.native.executor）/ kototama-component（旧 tender-component）/ wasm-webcomponent（browser）。kotodama は別 runtime（ADR-2607050900）。索引: ADR-2608139980。"}
 
+ :kotoba-vm
+ {:label "kotoba-vm（IPLD actor invocation kernel）"
+  :spellings ["kotoba-vm" "fvm" "filecoin vm" "filecoin virtual machine"
+              "invocation kernel" "actor vm" "ipld syscall"]
+  :note "kotoba-lang/kotoba-vm が FVM 型の Machine/Kernel/syscalls。合意は inga、純関数の actor は codebase.actor、Wasm host は kototama、Filecoin クライアントは io-filecoin、ハードウェア記述は kotoba-lang/machine。歴史的な etzhayyim Rust Pregel の同名 crate は別物。索引: ADR-2608147100。"}
+
  :amu-backend
  {:label "amu の綾 / T2 backend（存在ではない）"
   :spellings ["kotoba-native" "kotoba-wasm" "kotoba-script" "kotoba-component"
