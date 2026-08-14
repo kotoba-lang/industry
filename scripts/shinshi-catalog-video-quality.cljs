@@ -18,14 +18,18 @@
 (def cp (js/require "node:child_process"))
 (def process (js/require "node:process"))
 
-(def argv
-  (let [all (vec (js->clj (.-argv process)))
-        i (or (last (keep-indexed (fn [idx s]
-                                    (when (str/ends-with? (str s) "shinshi-catalog-video-quality.cljs")
-                                      idx))
-                                  all))
-              1)]
-    (vec (drop (inc i) all))))
+;; loop.cljs は deploy 先を quality.cljs という短名で呼ぶ。長名だけを見ると
+;; 自分の .cljs を file-arg に取り、ffprobe が「Invalid data」で unanswered を吐く。
+;; 名前ではなく「最後の .cljs = 自分」で切る。
+(defn- parse-args [all]
+  (let [self? (fn [s]
+                (let [b (.basename path (str s))]
+                  (or (contains? #{"shinshi-catalog-video-quality.cljs" "quality.cljs"} b)
+                      (str/ends-with? b ".cljs"))))
+        i (last (keep-indexed (fn [idx s] (when (self? s) idx)) all))]
+    (vec (drop (inc (or i 1)) all))))
+
+(def argv (parse-args (vec (js->clj (.-argv process)))))
 (def json? (boolean (some #{"--json"} argv)))
 (def self-test? (boolean (some #{"--self-test"} argv)))
 (def file-arg (first (remove #(str/starts-with? % "--") argv)))
@@ -157,7 +161,20 @@
     (when (:reason m) (println (str "REASON\t" (:reason m)))))
   (println (js/JSON.stringify (clj->js m))))
 
+(defn- argv-test! []
+  ;; 実測した壊れ方: deploy 名 quality.cljs で file-arg が script 自身になった。
+  (doseq [script ["/Users/x/.gftd/shinshi-catalog-video/quality.cljs"
+                  "/repo/scripts/shinshi-catalog-video-quality.cljs"]]
+    (let [got (parse-args ["node" "/opt/homebrew/bin/nbb" script "/tmp/a.mp4" "--json"])]
+      (when-not (= ["/tmp/a.mp4" "--json"] got)
+        (println (str "SELF-TEST FAIL: argv " script " -> " (pr-str got)))
+        (.exit process 1))
+      (when (str/ends-with? (str (first (remove #(str/starts-with? % "--") got))) ".cljs")
+        (println "SELF-TEST FAIL: file-arg resolved to the script itself")
+        (.exit process 1)))))
+
 (defn- self-test! []
+  (argv-test!)
   (let [empty-p (.join path (.tmpdir os) "shinshi-quality-empty.mp4")]
     (.writeFileSync fs empty-p (js/Buffer.from #js []))
     (let [bad (score-file empty-p)
@@ -171,7 +188,7 @@
       (when (and good (not (:pass good)))
         (println "SELF-TEST FAIL: known good clip must pass")
         (.exit process 1))
-      (println (str "SELF-TEST OK empty-fail=" bad-ok
+      (println (str "SELF-TEST OK argv=ok empty-fail=" bad-ok
                     (when good (str " good-verdict=" (name (:verdict good))))))
       (.exit process 0))))
 
