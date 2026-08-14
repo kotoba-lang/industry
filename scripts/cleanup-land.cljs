@@ -255,12 +255,35 @@
     (some-> (gitc dir "remote" "get-url" r) str/trim
             (as-> u (second (re-find #"github\.com[:/](.+?)(?:\.git)?$" u))))))
 
-(defn- canonical-slug
-  "raw slug -> GitHub 上の現在名。**着地対象がある repo にだけ呼ぶこと**。
-  planning 段階で全 repo に対して呼ぶと ~700 回の API 往復になり、実測で
-  25 分経っても plan が終わらなかった（かつ rate limit を無駄に消費する）。"
+(defn- canonical-repo
+  "raw slug -> `{:slug <GitHub 上の現在名> :archived <true|false|nil>}`。
+  **着地対象がある repo にだけ呼ぶこと**。planning 段階で全 repo に対して呼ぶと
+  ~700 回の API 往復になり、実測で 25 分経っても plan が終わらなかった（かつ
+  rate limit を無駄に消費する）。
+
+  `archived` を**同じ 1 回の呼び出しで**取るのは、archived repo が read-only で
+  blob/tree/commit/ref の作成も PR の close も **403** を返すからである（実測
+  2026-08-14: `PATCH repos/gftdcojp/241001-lifescience-web/pulls/559` →
+  `403 Repository was archived so is read-only`）。オーナー判断 2026-08-14
+  「archive repo は対象外でいいよ」。**この判定のために往復を増やさない** —
+  full_name を引く既存の 1 回に tab 区切りで相乗りさせる。
+
+  実測 2026-08-14: fleet の archived repo 43 件のうち **38 件が west 登録 + local
+  checkout 済み**なので、survey も land もそれらを歩く。prose の除外規則だけでは
+  効かないため、ここで機械的に落とす。
+
+  ⚠ 引けなかったときは `:archived nil`（= 判定不能）を返し、**false を返さない**。
+  不明を「archived でない」と同じ値にすると、答えられなかったことが合格として
+  蓄積する（ADR-2608136000）。呼び出し側は nil を従来どおり進めてよい —— そこで
+  archived だったなら書き込みが 403 で**大きな音を立てて**落ちる。"
   [raw]
-  (when raw (or (gh-str "api" (str "repos/" raw) "--jq" ".full_name") raw)))
+  (when raw
+    (let [out (gh-str "api" (str "repos/" raw) "--jq"
+                      ".full_name + \"\\t\" + (.archived|tostring)")
+          [fname arch] (some-> out (str/split #"\t"))]
+      (if fname
+        {:slug fname :archived (case arch "true" true "false" false nil)}
+        {:slug raw :archived nil}))))
 
 (defn- default-branch [dir]
   (or (when-let [r (primary-remote dir)]
@@ -719,9 +742,12 @@
         ;; `.cpcache` しか untracked が無いというだけで no-remote 表示。この誤表示は
         ;; 「所見」に見えて失敗に見えないので、バックログの実態を誤読させる）。
         raw-slug slug
+        canon (when (and raw-slug (or (seq additive) (seq tracked) branch-work?))
+                (canonical-repo raw-slug))
+        archived? (:archived canon)
         slug (when (or (seq additive) (seq tracked) branch-work?)
                (if raw-slug
-                 (canonical-slug raw-slug)
+                 (:slug canon)
                  ;; remote が無いなら作る（オーナー指示 2026-07-25「remote がなければ
                  ;; repo を作って ok」）。dry-run では作らない。
                  (when apply?
@@ -735,6 +761,18 @@
     (println (format "  skip %-18s %d 件: %s" (name k) (count v)
                      (str/join ", " (take 4 v)))))
   (cond
+    ;; archived repo は read-only（blob/tree/commit/ref も PR close も 403）。
+    ;; オーナー判断 2026-08-14「archive repo は対象外でいいよ」。黙って落とさず
+    ;; 名前の付いた skip として件数ごと報告する —— backlog から外すのであって
+    ;; 「WIP が無い」と主張するのではない。
+    archived?
+    (do (println (format "  → skip archived-repo（GitHub 上で archived = read-only。着地対象 %d 件は報告のみ）"
+                         (+ (count additive) (count tracked))))
+        ;; 呼び出し側の集計に「着地した」と数えさせないための戻り値。
+        ;; 行を印字するだけでは summary が additive=N に混ぜてしまい、
+        ;; 「飛ばした」と「合格した」が出力で区別できなくなる（ADR-2608136000）。
+        :archived-skip)
+
     (and (nil? slug) (nil? raw-slug))
     (println "  → remote が無いので着地先が無い。報告のみ。")
 
@@ -936,12 +974,21 @@
 (def dropped (- (count plans) (count selected)))
 
 (println (format "\n対象 %d repo（--max により %d repo を打切り）" (count selected) dropped))
-(doseq [p selected] (land-repo! p))
+(def outcomes (mapv (fn [p] [p (land-repo! p)]) selected))
+(def archived-skipped (filterv #(= (second %) :archived-skip) outcomes))
+(def acted (mapv first (remove #(= (second %) :archived-skip) outcomes)))
 
 (println (format "\n完了: %d repo 処理 / additive=%d repo / review=%d repo"
-                 (count selected)
-                 (count (filter #(seq (:additive %)) selected))
-                 (count (filter #(seq (:tracked %)) selected))))
+                 (count acted)
+                 (count (filter #(seq (:additive %)) acted))
+                 (count (filter #(seq (:tracked %)) acted))))
+(when (seq archived-skipped)
+  ;; 別枠で数える。混ぜると backlog が減らないように見え続ける（cleanup-workflow.edn
+  ;; :preservation-pr-disposition と同じ理由）。件数は残置であって消滅ではない。
+  (println (format "skip archived-repo: %d repo / 着地対象 %d 件を残置（GitHub 上で read-only。オーナー判断 2026-08-14「archive repo は対象外」）"
+                   (count archived-skipped)
+                   (reduce + (for [[p _] archived-skipped]
+                               (+ (count (:additive p)) (count (:tracked p))))))))
 (when (pos? dropped)
   (println (format "⚠ --max で %d repo を処理していない。再実行して残りを処理すること。" dropped)))
 (println "※ ローカルの WIP は一切削除していない（archive + 着地のみ）。")
