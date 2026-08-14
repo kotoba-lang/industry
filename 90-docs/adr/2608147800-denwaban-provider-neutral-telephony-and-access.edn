@@ -1,0 +1,103 @@
+[{:db/id -1
+  :adr/id "adr-2608147800-denwaban-provider-neutral-telephony-and-access"
+  :adr/title "denwaban の電話基盤を provider-neutral にし、PSTN/通話制御と Starlink/eSIM の IP access を分離する"
+  :adr/status "accepted"
+  :adr/date "2026-08-14"
+  :adr/last-verified "2026-08-14"
+  :adr/topic "actor-design"
+  :adr/source-format "edn"
+  :adr/doc-type "adr"
+  :adr/doc_type "adr"
+  :adr/authoritative true
+  :adr/supersedes []
+  :adr/superseded-by []
+  :adr/related
+  ["adr-2606271930-denwaban-voice-reception-auto-booking-actor"
+   "adr-2607300300-esim-voice-reception-card-issuing-integrated-design"
+   "adr-2608034000-msisdn-numbering-origination-integrated-design"
+   "orgs/cloud-itonami/denwaban"
+   "orgs/cloud-itonami/cloud-itonami-app"]
+  :adr/authoritative-for
+  ["denwaban の telephony provider admission contract"
+   "PSTN/番号/通話制御 provider と fiber/cellular eSIM/Starlink IP access の二層分離"
+   "telephony provider の failover を new-call-only とする境界"
+   "2026-08-14 時点の候補 provider/access 比較と初期選定順"]
+  :adr/sources
+  ["https://www.twilio.com/docs/voice/media-streams"
+   "https://www.twilio.com/docs/phone-numbers/regulatory/getting-started"
+   "https://developers.telnyx.com/docs/voice/programmable-voice/media-streaming"
+   "https://telnyx.com/phone-numbers/japan"
+   "https://developer.vonage.com/en/voice/voice-api/concepts/websockets"
+   "https://docs.aws.amazon.com/connect/latest/adminguide/connect-tokyo-region.html"
+   "https://aws.amazon.com/connect/sla/"
+   "https://starlink.com/jp/business"
+   "https://www.starlink.com/business/direct-to-cell"
+   "https://developers.soracom.io/en/docs/air/esim-profiles/"]
+  :adr/body "# Context
+
+ADR-2606271930 は、着信 -> STT -> dialog -> TTS -> booking を denwaban に束ねる判断を確定した。一方、当時の本文は telephony 面を `twilio-compat` 一次としており、電話 provider と Starlink/eSIM のような接続回線を同じ代替候補として読める余地があった。
+
+2026-08-14 の実装では `cloud-itonami/denwaban` に provider-neutral な transport admission が入り、Twilio は architecture ではなく adapter 候補になった。本 ADR は ADR-2606271930 の音声統合判断を置き換えず、その §2 telephony transport 部分を精緻化する。両者が衝突する場合、この ADR を telephony/access 選定の正本とする。
+
+# Decision
+
+## D1. 二層を分離する
+
+```
+Japanese number / PSTN / SIP provider
+                  |
+       bidirectional voice media
+                  |
+              denwaban
+       STT -> dialog -> TTS -> booking
+                  |
+        IP access to provider edge
+     fiber | cellular eSIM | Starlink
+```
+
+上層は電話番号、PSTN/SIP ingress、call events、authenticated webhook、双方向 media、hangup を供給する telephony provider である。下層は provider edge まで packet を運ぶ IP access である。Starlink と eSIM は下層であり、それだけでは日本の着信番号、通話制御、認証 webhook、双方向 call media を提供しない。したがって Twilio/Telnyx/Vonage/Amazon Connect と Starlink/SORACOM を同じ slot で比較・選択しない。
+
+## D2. admission contract を capability で固定する
+
+telephony adapter は `:inbound-pstn`, `:bidirectional-media`, `:call-events`, `:webhook-auth`, `:hangup` の全てを示さなければならない。access path は `:ip-egress` を示さなければならない。双方とも `:admission :approved` と現在観測した `:health :ready` が必要である。不足・未知は楽観選択せず hold にする。provider 名は session plan に `telephony-provider` として注入し、Twilio を固定値にしない。
+
+## D3. failover は new-call-only
+
+確立済み PSTN call が別 carrier に透明移行するとは主張しない。既存 call は bounded apology / transfer / hangup policy に従う。新規 call だけを carrier forwarding、SIP trunk policy、または別途保有する standby number で次 provider に送る。番号そのものの冗長化は provider adapter の切替とは別設計であり、BYOC/SIP、carrier-neutral routing、または dual-number の検証を要する。
+
+## D4. 候補比較と初期選定順
+
+| option | この設計での役割 | AI audio path | 日本適合 | 判断 |
+|---|---|---|---|---|
+| Twilio Programmable Voice | CPaaS/PSTN | bidirectional Media Streams over WebSocket、stream request 署名検証 | 日本番号は種別ごとの regulatory bundle が必要 | 初期 primary 候補。ecosystem は強いが architecture に固定しない |
+| Telnyx | carrier/CPaaS/SIP | bidirectional RTP/media over WebSocket | Japan number/local calling coverage を公開 | 初期 standby 候補。Twilio と異なる carrier/SIP orientation を持つ |
+| Vonage Voice API | CPaaS | full-duplex WebSocket、JWT/custom auth、event fallback | 発注時に日本番号の inventory/type を再確認 | 第3 adapter 候補。workspace に `com-vonage` mirror がある |
+| Amazon Connect | managed contact center | live customer audio via Kinesis、managed agentic voice も提供 | Tokyo は 050/03/06/0120/0800 を business documents 条件で扱う | human/managed fallback 候補。99.99% service commitment。ただし Murakumo-local loop には重い |
+| Starlink Priority | IP access/backhaul | WSS/SIP/WebRTC packet を運ぶ | 日本提供、Priority は 99.9% network-availability SLA | 地理的に異なる backup access。PSTN provider ではない |
+| au Starlink Direct | handset-side access | 利用可能な data 上の voice application | KDDI の日本向け経路 | caller-side dead-zone reach。programmable DID ではない |
+| SORACOM eSIM | cellular IP access | provider edge までの data path | Japan profile はあるが公開 eSIM matrix の voice capability は空欄 | terrestrial backup access。telephone ingress に分類しない |
+
+初期構成は Twilio primary + Telnyx standby を adapter admission の後に採る。Vonage は第3 adapter、Amazon Connect は managed/human fallback とする。access は固定回線 primary、cellular eSIM backup、Starlink を地理的に異なる backup とする。ただし provider inventory、価格、番号種別、規制書類、実測 latency/jitter/loss は外部状態なので activation 直前に再検証し、コード定数にしない。
+
+# Consequences
+
+- provider 障害と access 回線障害を別々に観測・切替できる。
+- Twilio 固有 API の変更が denwaban の session/dialog contract に漏れない。
+- eSIM vendor や Starlink を追加しても電話番号・PSTN 冗長化が自動的に得られるとは扱わない。
+- standby provider を置くには、別番号または carrier/SIP routing の運用設計と live canary が別途必要になる。
+- Amazon Connect の SLA は service commitment であり、denwaban 全体の end-to-end 可用性証明ではない。
+
+# Implementation evidence
+
+- `cloud-itonami/denwaban` PR #1、merge `576748bb888810cc4f62a4e2ddfcce5d68ed84c5` に `denwaban.transport`、session provider injection、比較文書、tests が入った。
+- child suite は 38 tests / 111 assertions、0 failures / 0 errors。
+- negative mutation は IP-access を telephony として誤受理させ、同 suite が exit 1 / 5 assertion failures になったため、層分離 gate が欠陥を捕捉することを確認した。
+- superproject の `denwaban` pin と genpon revision は同 merge に前進し、root PR #2187、merge `58980007469118c07e5b3369db583fee1126c4b6` で reconcile 済み。
+
+# Evidence boundary and activation gates
+
+これは設計・pure admission・fixture test の証拠であり、番号購入、credential 設定、本番 deploy、実着信、録音保持、provider 間 live failover の証拠ではない。ADR-2606271930 の G1-G8、特に consent-first、no-secret-recording、no-robocall、G7 outward-gated を継承する。`run-session` は R0/G7 で raise し続け、`can-answer-calls` を production-ready に昇格させない。
+
+次の live gate は、(1) 日本番号と regulatory admission の再確認、(2) 各 adapter webhook signature の fixture/negative test、(3) consent announcement と transient transcript、(4) latency/jitter/loss と STT/TTS turn latency の canary、(5) provider/access を別々に落とす failure drill、(6) established-call と new-call の挙動差の証拠である。
+
+**Twilio は初期選択肢であって設計そのものではない。Starlink/eSIM は packet access であって電話 provider ではない。live activation は未実施で、R0/G7 remains closed.**"}]
