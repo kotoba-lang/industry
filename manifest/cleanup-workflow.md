@@ -476,6 +476,20 @@ Prevention lives in `CLAUDE.md` § 並行エージェント運用 (worktree-per-
 accumulation); this section is the recovery path. Verified in practice 2026-07-02:
 20 stashes + 8 branches drained, 2 genuinely unlanded items rescued.
 
+0. **This whole flow is blind to gitignored content, and so is every survey that feeds
+   it.** Step 2 judges a *diff*, step 3 archives `git diff` patches plus the `stash^3`
+   untracked list, and `scripts/cleanup.cljs` ranks a checkout by dirty/untracked/stash/
+   branch — all of it from `git status`, whose whole job is to hide ignored paths.
+   Nothing below can see, judge or archive a gitignored file. Measured 2026-08-13
+   (ADR-2608138400): of 249 shadow checkouts, 4 that `git status` called safe-to-retire
+   held gitignored content present in no commit and in no twin —
+   `com-etzhayyim-kawaraban/.kawaraban/` carries an actor Ed25519 identity in 157 bytes.
+   **When the thing being retired is a CHECKOUT rather than a stash, run
+   `scripts/shadow-ignored-content-survey.cljs` first and archive what it names by
+   copying the files — `git diff` cannot express them.** The warning cleanup.cljs already
+   prints (untracked work vanishes the moment `git checkout` runs in a shared tree)
+   applies verbatim to ignored work, which it never prints.
+
 1. **Snapshot by SHA first.** Concurrent sessions push/pop stashes, so indices shift.
    Record `git stash list --format='%H %gs'` once, and before every drop re-resolve the
    SHA to its current index.

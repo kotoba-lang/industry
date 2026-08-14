@@ -19,18 +19,34 @@ ADR-2608124400）。
 
 検査器: `scripts/shadow-checkout-disposition.cljs`。実測 2026-08-13、load1 は各行に併記。
 
-## 1. 三分類
+## 1. 三分類（⚠ 2026-08-13 に ADR-2608138400 が訂正した）
 
-| 判定 | 件数 | disk |
-|---|---|---|
-| **safe-to-retire**（固有物なし / worktree なし / not shallow / 全 tip が published） | **223** | **15.85 GiB** |
-| **needs-draining**（何かが他所に無い、または誰かが読んでいる） | **25** | 3.51 GiB |
-| **cannot-assess**（shallow —— ancestry の答えが信用できない） | **1** | 12.26 GiB |
-| 合計 | 249 | 31.62 GiB |
+**この節の判定は `git status` の面だけを見ていた。`git status` は gitignore された
+状態を見ない —— 隠すことがそれの仕事である。** したがって下表の 223 は**上限**、
+25 は**下限**だった。実測して訂正したのが ADR-2608138400
+（検査器 `scripts/shadow-ignored-content-survey.cljs`、dataset
+`90-docs/adr/2608138400-shadow-ignored-content.datoms.edn`、
+`:source/dataset \"shadow-ignored\"`、`:shadow/dir` でこの ADR の datoms と join できる）。
+
+| 判定 | git status のみ | **現在地（gitignore を含む）** | disk |
+|---|---|---|---|
+| **safe-to-retire**（固有物なし / worktree なし / not shallow / 全 tip が published） | 223 / 15.85 GiB | **219** | **15.80 GiB** |
+| **needs-draining**（何かが他所に無い、または誰かが読んでいる） | 25 / 3.51 GiB | **29** | **3.56 GiB** |
+| **cannot-assess**（shallow —— ancestry の答えが信用できない） | 1 / 12.26 GiB | 1 | 12.26 GiB |
+| 合計 | 249 | 249 | 31.62 GiB |
+
+移った 4 件は `network-awai/aozora-appview` / `etzhayyim/com-etzhayyim-kawaraban` /
+`-rasen` / `-inochi`。**4 件とも twin が改名後の repo で、コードは新しい path へ移り、
+runtime が書く state だけが古い path に溜まり続けていた。** ignore された
+`.kawaraban/identity.edn`（157 B）は twin に存在しない —— minidrama で見つかった
+actor 鍵の pattern は 1 件ではなく **4 checkout に在る**。
 
 **「retire すれば 31.6 GiB 空く」とは書かない。** いま安全に撤去できるのは
-**223 件 15.85 GiB** で、残り 15.77 GiB のうち 12.26 GiB は archetype 1 件が占め、
+**219 件 15.80 GiB** で、残り 15.82 GiB のうち 12.26 GiB は archetype 1 件が占め、
 それは shallow なので**そもそも判定していない**。
+
+**`:shadow/verdict` を単独で読まない。** 訂正後の判定は `shadow-ignored` dataset の
+`:shadow/verdict-revised` に在る。
 
 分布は org に偏る: etzhayyim 203 / gftdcojp 17 / cloud-itonami 12 / network-awai 9 /
 kotoba-lang 8。etzhayyim だけで 81% —— この org が丸ごと改名・移管を通った側である。
@@ -216,9 +232,14 @@ branch `codex/kotobase-d1-platform`）に在り、lock されておらず実体�
 
 **この ADR は撤去を実行しない。** 実行するときの順序だけ、証拠から導ける範囲で:
 
-1. **223 件（safe-to-retire）** —— `manifest/cleanup-workflow.edn` の `:retirement` に従い、
+1. **219 件（safe-to-retire、ADR-2608138400 で 223 から訂正）** ——
+   `manifest/cleanup-workflow.edn` の `:retirement` に従い、
    **消す前に必ず `.git/stash-archive-<date>/` へ退避**する。「landed だと確信している」は
    archive を省略する理由にならない（この workspace は 2026-07-04 に一度それをやっている）。
+   ⚠ **`:retirement` の archive は `git diff` patch なので、gitignore されたファイルを
+   1 バイトも保存できない。** checkout を退役させるときは
+   `scripts/shadow-ignored-content-survey.cljs` を先に通し、そこが名指した path を
+   **ファイルとして copy** して退避する（ADR-2608138400 §9）。
    大きい順に `etzhayyim/directory.plc`(6.76 GiB) / `global-accounts-datoms`(3.79) /
    `uk.gov.legislation`(1.55) / `jp.go.e-gov.elaws`(1.28) / `xyz.farcaster.fnames`(0.89) の
    5 件だけで 14.3 GiB、**223 件の 90%** を占める。
