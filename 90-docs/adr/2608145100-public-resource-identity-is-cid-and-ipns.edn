@@ -12,7 +12,8 @@
                 "90-docs/adr/2607289500-identity-is-the-cid-of-the-semantic-definition.edn"
                 "90-docs/adr/2608080100-kotoba-lang-ui-is-a-single-page-app.edn"
                 "90-docs/adr/2608057000-org-is-a-host-not-a-path-segment.edn"
-                "90-docs/protocols/kotoba-resource-protocol.edn"]
+                "90-docs/protocols/kotoba-resource-protocol.edn"
+                "90-docs/adr/2608148200-graph-cid-identity-vs-archive-location.edn"]
   :adr/supersedes "ADR-2607071500 embed-url の ipfs://{cid}[/path] 文法、および Addendum 6 の UnixFS directory mount（Service Worker virtual filesystem）follow-up"
   :adr/authoritative_for
   ["公開 resource URI: ipfs://{cidv1-base32} と ipns://{k51} の 2 形だけ"
@@ -38,7 +39,7 @@ ipns://{k51}
 
 リンクは IPLD（ノード内の CID、tag 42）。leaf は既に自分の CID を持つ。host が DAG を歩くなら、歩いた先の CID を名指す。`ipfs://{root}/a/b` を公開 identity にしない。
 
-HTTPS は retrieval location（L4）。`https://{gateway}/ipfs/{cid}` と `{cid}.ipfs.itonami.cloud` は同じ CID の投影であって、2 つ目の identity ではない。gateway の `/ipfs/{cid}` は「この block を取れ」という HTTP namespace であり、UnixFS directory walk ではない。
+HTTPS は retrieval location（L4）。`https://{gateway}/ipfs/{cid}` と `{cid}.ipfs.itonami.cloud` は同じ CID の投影であって、2 つ目の identity ではない。gateway の `/ipfs/{cid}` は「この block を取れ」という HTTP namespace であり、UnixFS directory walk ではない。kotobase archive が raw 専用のとき、path の CID 文字列は hasher identity と分かれうる — 同じ bytes の raw CID であり、別の content ではない（ADR-2608148200）。
 
 ## 取ったもの（UnixFS は取らない）
 
@@ -74,4 +75,5 @@ org/project/site UUID、worker/env 名、per-app router（`/s` `/browse` `/studi
 
 ## 改訂履歴
 
-2026-08-14: accepted。UnixFS を公開 identity のモデルから外す。"}]
+2026-08-14: accepted。UnixFS を公開 identity のモデルから外す。
+2026-08-14: archive Location の CID 文字列が identity と分かれうることは ADR-2608148200。"}]
