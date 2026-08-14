@@ -77,9 +77,9 @@ cloud-itonami 行が引いていた「Terms/PrivacyはDRAFT、operator・DPAが�
   7810はproduct score 4。
 - net-kotobase: Gftd Japanがoperator。**Standardは2026-08-08にowner確定で¥2,980/mo**
   （旧記載¥980はsuperseded。詳細と検出経緯はCOMMERCIAL-GO-NO-GO.md「価格の確定」）。
-  原価モデル上gross margin約88%。run 0031 (2026-08-14): `/legal/terms/` `/legal/privacy/`
-  `/legal/dpa` は live 200 だが **DRAFT / UNAPPROVED**（counsel 前、commercial no-go のまま）。
-  `[CONFIRM:` 残。pricing ADRのratifyとStripe Product/Price照合は未了。Worker境界のmock E2Eはcheckout metadata、署名、
+  原価モデル上gross margin約88%。run 0031/0032 (2026-08-14): `/legal/terms/` `/legal/privacy/`
+  `/legal/dpa` は live 200 だが **DRAFT / UNAPPROVED**。counsel packet は更新済み、**承認 return は無い**。
+  残 `[CONFIRM:` は税（live ¥19,800）、CCPA、Art. 28、SCC、under-16。pricing ADRのratifyとStripe Product/Price照合は未了。Worker境界のmock E2Eはcheckout metadata、署名、
   entitlement、解約、5分replay制限、out-of-order eventを検証済み。ただし
   real Stripe test-modeおよび外部需要の証拠ではない。
 
@@ -89,8 +89,9 @@ qualified reply、実入金を優先して更新する。
 ## Session note — 2026-08-14
 
 run 0031 served the in-repo DRAFT legal pages from `net-kotobase/control-plane`
-(not `network-awai/net-kotobase`). Live 200 does not mean privacy is counsel-final
-or that Stripe test-mode E2E is done. Commercial go stays no-go.
+(not `network-awai/net-kotobase`). run 0032 filled owner decisions and measured
+facts into those drafts and refreshed `legal/counsel-review-packet.md`.
+**Counsel approval was not obtained.** Commercial go stays no-go.
 
 ## Session note — 2026-08-08
 
