@@ -6,14 +6,15 @@
   :adr/last_verified "2026-08-14"
   :adr/deciders ["Jun Kawasaki"]
   :adr/topic "app-bundle-cid"
-  :adr/repos ["orgs/cloud-itonami/cloud-itonami-app"]
+  :adr/repos ["orgs/cloud-itonami/cloud-itonami-app"
+              "orgs/net-kotobase/control-plane"]
   :adr/related ["90-docs/adr/2608145100-public-resource-identity-is-cid-and-ipns.edn"
                 "90-docs/adr/2608140500-ipfs-ipns-subdomain-execution-origin.edn"
                 "90-docs/adr/2608145400-protocol-l2-graph-cid.edn"]
   :adr/authoritative_for
   ["desktop app content identity is CIDv1 raw sha2-256 of one page-html document"
    "auth.itonami.cloud remains the ceremony Name, not a CID"
-   "archive PUT is Location; 401 means Location is not live"]
+   "archive Location is https://kotobase.net/ipfs/{cid} after GET-verified PUT"]
   :source/dataset "adr"
   :adr/body
   "cloud-itonami-app の公開 identity を hostname / `#/signin` ではなく raw CID にする。protocol は ADR-2608145100。この ADR はその最初の app 実装の着地記録。
@@ -29,19 +30,23 @@ ipfs://bafkreiey52hai5obtqeg5w2ix63orset4o74kxljif2gwdkxt5upre2wsi
 
 801,104 bytes。`:kotoba.app/id` `cloud.itonami.app`。kind `appview`。
 
+Location: `https://kotobase.net/ipfs/bafkreiey52hai5obtqeg5w2ix63orset4o74kxljif2gwdkxt5upre2wsi`
+
 ## Landed
 
 - App merge: https://github.com/cloud-itonami/cloud-itonami-app/commit/5c196db84a4cd88645b63985c7a90469f3f57389
 - Feature: `fe032f805217f813ee40cb280a9244d6793e9f27`
-- West pin: https://github.com/com-junkawasaki/root/commit/c04a934a8d0a702c5a22f5ede4db4cc6ba960154 (`cloud-itonami-app` → `5c196db`)
+- Closing ADR: https://github.com/cloud-itonami/cloud-itonami-app/pull/77
+- West pin (compute): https://github.com/com-junkawasaki/root/commit/c04a934a8d0a702c5a22f5ede4db4cc6ba960154
 
 ## Implemented
 
 `cloud.itonami.app.bundle` が unauthenticated な `page-html` を凍結し、CIDv1 raw sha2-256 を付け、`kotoba.protocol.app` manifest を組む。lock は `resources/cloud/itonami/app/kotoba.app.edn`。HTML blob は commit しない。
 
+Live archive Location (2026-08-14): PUT 201 → GET 200、Java HttpClient で byte-equal。Worker `KOTOBASE_ARCHIVE_TOKEN_2` が kagi `KOTOBASE_ARCHIVE_TOKEN` を受理（primary は残した）。archive GET の Cache-Control に `no-transform`（Cloudflare Web Analytics の HTML 注入を止める）。
+
 ## Not implemented
 
-- Live archive Location。`PUT https://kotobase.net/ipfs/{cid}` は 401 unauthorized（kagi `KOTOBASE_ARCHIVE_TOKEN` は在る。Worker が拒否。GET は 404）。
 - IPNS `:kotoba.app/latest`
 - `:kotoba.graph/cid` の publish
 - auth host の移動
@@ -49,18 +54,13 @@ ipfs://bafkreiey52hai5obtqeg5w2ix63orset4o74kxljif2gwdkxt5upre2wsi
 ## Verification
 
 `bundle_test`: 5 tests / 21 assertions / 0 fail。ネットワーク無し。
+Live: PUT 201 / GET 200 / 801104 bytes equal。
 
 ## Resume
 
-Worker secret と kagi item が同じ値になったら、2 手順（cwd が違う）:
-
-1. superproject 根から kagi の 1 item を読む（値は印字しない）:
-   `KAGI_HOME=$HOME/.kagi orgs/kotoba-lang/kagi/bin/kagi get KOTOBASE_ARCHIVE_TOKEN`
-2. `cloud-itonami-app` の checkout で `KOTOBASE_ARCHIVE_TOKEN` を渡して
-   `clojure -M -m cloud.itonami.app.bundle put`
-
-GET-verify のあと lock に `:published` を書く。それが終わってから IPNS latest。
+IPNS `:kotoba.app/latest` をこの CID に向ける。auth host は動かさない。
 
 ## 改訂履歴
 
-2026-08-14: accepted。closing 記録。"}]
+2026-08-14: accepted。closing 記録。
+2026-08-14: Location live（PUT 201 / GET 200 / no-transform）。"}]
