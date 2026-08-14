@@ -143,13 +143,14 @@ default branch に着地済み（サーバ側 merge、PR 経由ではない）:
 
 - 共有 checkout の `orgs/kotoba-lang/tender-native`（`1915ee1`）と
   `tender-component`（`d985006`）は pin SHA と不一致のため未削除
-- 2026-08-14 14:00 JST の `kagami reconcile --check` は
-  `DRIFT {:changed 60}`。tidy tick の床は changed>20 で停止。次 agent は
-  各 pin を GitHub compare で FF 確認してから flagless `kagami reconcile`、
-  続けて `--kagi fleet-owner-root --out manifest/fleet-head.edn`
+- 2026-08-14 14:00 JST の `kagami reconcile --check` は `DRIFT {:changed 60}`。
+  これは loop tidy tick（changed>20 で停止）の対象外。次は 1438 件吸収と同じ
+  dedicated catch-up: 60 pin を全部 GitHub compare で FF 確認してから
+  flagless `kagami reconcile`、続けて
+  `--kagi fleet-owner-root --out manifest/fleet-head.edn`。1 件でも behind なら書かない
 - `/loop さらに整えて` の watcher / 45m heartbeat はこの closing で停止した
 
 resume: worktree を superproject の外に切り、
-`git show origin/main:manifest/west.yml` を入力に `--check`。changed≤20 かつ
-全て FF なら absorb+再署名。60 件を FF 未確認のまま書かない。
+`git show origin/main:manifest/west.yml` を入力に `--check`。60 件（またはその時点の
+changed 集合）を FF 確認してから 1 回 absorb+再署名。FF 未確認のまま書かない。
 "}]
