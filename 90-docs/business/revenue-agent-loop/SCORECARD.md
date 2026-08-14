@@ -43,21 +43,18 @@ cloud-itonami 行が引いていた「Terms/PrivacyはDRAFT、operator・DPAが�
 
 ## Current selection
 
-- **Selected:** cloud-itonamiを基盤にした高単価AI Revenue/Sales Pipeline offerの
-  T1 founder-led validation。ただし外部勧誘はcommercial gate green後
-- **Run:** `runs/0021-cloud-itonami-commercial-gate-remeasure.edn`（governor は 0020）
+- **Selected:** net-kotobase — AI agent / GraphRAG durable-memory セグメントの
+  named accounts。有料勧誘はしない。30分の課題ヒアリング + 14日無償 alpha のみ
+- **Run:** `runs/0025-net-kotobase-named-accounts-discovery.edn`
 - **Timebox:** 14日または20人時
-- **Cash at risk:** 最大¥300,000。広告費は¥0
-- **Offer hypothesis:** ¥20k診断（導入へ全額充当）→ ¥300k–¥500k導入
-  → ¥80k/月運用
-- **T1 evidence gate:** 100 named accounts、最大200個別contact、qualified discovery
-  5件、proposal 3件、非owner実入金1件
-- **Score:** 新offerは外部conversion未観測のため未採点。5820 priorは61/100
-- **Operator:** AWAI Network, L.L.C.（owner confirmed）
-- **Next:** commercial gateの残り（登記・税務のcounsel advice、`sk_test_…`発行、
-  返金・解約条件、support accountable owner）を閉じ、T1 runを開始できるbuyer
-  segmentと100 named-account母集団を一つ選ぶ。うちagentが完遂できるのは
-  `sk_test_…`発行後のtest-mode E2E証跡のみ
+- **Cash at risk:** ¥0。広告費は¥0
+- **Offer hypothesis:** DESIGN-PARTNER-OFFER の first message（販売ではない）
+- **T1 evidence gate:** 100 named accounts が目標。本 run は検証済み公開経路 10 件
+- **Score:** 56/100（discovery のみ。paid pitch は red のまま）
+- **Operator:** Gftd Japan K.K.
+- **Next:** Beekle 公式フォーム（https://beekle.jp/contact、種別=開発パートナー・協業）を
+  人間の Chrome で 1 通送信。Turnstile が自動化 Chrome では描画されず未送信。
+  返信 0 のまま 100 件に拡げない。Laboro/Enison は Beekle 送信成功後に限る
 
 ## Known evidence
 
