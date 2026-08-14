@@ -281,9 +281,22 @@ weaker half.**
 
 ## Consequences
 
-1. Item 1 (approval lifetime) is the follow-up to ADR-0044 and should be its own ADR in
-   `cloud-itonami-app/docs/adr/`, with the direction epoch, the hashed refusal key, and
-   the saturation marker as named requirements.
+1. **Item 1 (approval lifetime) is DONE**, landed 2026-08-14 as
+   `cloud-itonami-app` ADR-0046 (`abf546a`). The direction epoch is implemented:
+   `send!` advances it, an approval card records the direction it was raised under, and
+   `bot_core.kotoba/request-standing` decides where a held request stands from three
+   scalars. It fixed a measured defect — a second message replaced the run while the card
+   stayed undecided, so the Bot reported `waiting-approval` for the rest of the
+   conversation and rendered a button whose only outcome was 承認待ちの操作がありません。
+
+   **The hashed refusal key and the saturation marker were deliberately NOT built**, and
+   this ADR's original wording asking for them was wrong to name them as requirements
+   without checking reachability. Rejecting a held write clears the run, so nothing
+   re-proposes inside one direction; in a later direction the refusal correctly would not
+   hold; and routines and handoffs are refused by `may-start?` / `may-fire?` while a run
+   is held. There is no path, and a check that cannot discriminate is theatre. ADR-0046
+   records the condition under which it becomes reachable — a direction running
+   concurrently with the person answering, or a rejection that stops clearing the run.
 2. Item 2 (classification + `allowedPurpose`) is a `.kotoba` decision core candidate under
    the ADR-2608650000 rules: scalars in, bool out, `[:result T E]` instead of throw, and a
    parity test against the cljc caller.
