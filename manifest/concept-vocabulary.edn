@@ -211,12 +211,24 @@ cloud-itonami-isco-5411（ISCO 5411、ns=firestation。装備 readiness とシ�
 実行そのものは kototama（言霊）。tender は Solo5 役割語で製品名ではない（ADR-2608139980）。
 永続 EDN の :kototama.fleet/* キーは互換のため据え置き。"}
 
+ :genpon
+ {:label "pin 登録簿 / 原本 (genpon)"
+  :spellings ["genpon" "原本" "pin registry" "pin 登録簿" "fleet-db"
+              "fleet-db.edn" "登録簿"]
+  :note "superproject の manifest/fleet-db.edn（+ append-only ledger）が pin 登録簿。
+kotoba-lang/kagami（鏡）が west.yml に映す対象であって、kagami 自身ではない。
+子 repo を新しく作らない — 写しの隣に原本を置く。:fleet/repos キーとファイル名は
+on-disk フォーマットとして据え置き（kagami が旧 fleet.* 経路を残したのと同型）。
+mokuroku は app-* catalog kernel（Finder 形の viewer）、daichou は agent receipt、
+chobo は請求 EAVT、toukibo は法務局の語なので使わない。索引: ADR-2608147300。"}
+
  :vcs-plane
  {:label "repo の pin と統治 / 鏡 (kagami)"
   :spellings ["vcs plane" "pin" "west" "manifest" "fleet-db" "reconcile"
-              "fleet" "鏡" "kagami" "台帳"]
-  :note "kotoba-lang/kagami（ns は 2026-08-07 に fleet.* → kagami.*）。manifest/fleet-db.edn を
-west.yml に映す鏡。機械でも agent でもなく repo の登録簿なので、fleet を名乗る根拠が最も薄かった。
+              "fleet" "鏡" "kagami" "台帳" "genpon" "原本"]
+  :note "kotoba-lang/kagami（ns は 2026-08-07 に fleet.* → kagami.*）が鏡。
+映す対象は原本 genpon（manifest/fleet-db.edn）。機械でも agent でもなく
+repo の登録簿なので、fleet を名乗る根拠が最も薄かった。
 データ側の :fleet/repos キーは 4,124 entity の on-disk フォーマットなので据え置き。"}
 
  :machine-fleet

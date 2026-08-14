@@ -43,7 +43,7 @@ west を動かす worktree の作り方は、Skill ツールで `west-pin-advanc
   `printf ... | west update` は**引数ゼロ = 全 project 更新**になる）。
 - **`west update` は pin 鮮度を答えない。** west.yml に既に書かれた pin へ
   checkout を合わせるだけで、GitHub 側の新しい commit は見ない。
-- **`kagami sync` の前に `kagami reconcile` を通す。** 遅れた fleet-db に対して
+- **`kagami sync` の前に `kagami reconcile` を通す。** 遅れた原本 (genpon / fleet-db.edn) に対して
   sync すると checkout が pin より**後ろへ**動く。reconcile の入力 west.yml は
   必ず `origin/main` のものにする。
 - **manifest の書き込み（reconcile / sync / pin 前進）を共有 checkout でやらない。**
@@ -373,11 +373,12 @@ pin が止まっていた）。修正 → `advance-pins.cljs` → `verify-west-p
 固定する）に寄せるか、`orgs/` が実在する場所で回す。**入力が無い gate は、
 落ちているのではなく問いを立てられていない。**
 
-## fleet-db — west 後継 VCS プレーン（ADR-2607160005、2026-07-16）
+## genpon（原本）— pin 登録簿 / west 後継 VCS プレーン（ADR-2607160005、2026-07-16）
 
-- **`manifest/fleet-db.edn`（+ append-only `fleet-db.ledger.edn`）が west.yml の
-  上流の正本になりつつある（Phase 1.5 dual-write 吸収期）。** west.yml は
-  fleet-db の projection。pin 前進の推奨経路は署名付き
+- **話される名前は原本 (genpon)。** on-disk は `manifest/fleet-db.edn`
+  （+ append-only `fleet-db.ledger.edn`）。west.yml はその写し（kagami が映す）。
+  ファイル名と `:fleet/repos` は据え置き（ADR-2608147300）。Phase 1.5 dual-write
+  吸収期。pin 前進の推奨経路は署名付き
   `kagami pin-advance` / quorum `kagami govern`（実装:
   **`orgs/kotoba-lang/kagami`**、policy は `manifest/fleet-keys.edn`）。
   ⚠ **この repo は 2026-08 以前に `kotoba-fleet-vcs` から `kagami`（鏡）に改名されている。**
