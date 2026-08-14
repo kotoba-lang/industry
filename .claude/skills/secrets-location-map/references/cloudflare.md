@@ -6,11 +6,29 @@
   越しの API トークンではなく、ローカルの wrangler セッションで完結）。
   `CLOUDFLARE_API_TOKEN`（Zone Analytics Read 等の狭いスコープ）は用途別に
   `wrangler secret put` で個別プロジェクトへ投入するもので、これとは別物。
-  - ⚠ **DNS レコードを書ける資格情報は、2026-08-05 時点でこの環境から到達できない。**
-    以前ここには「DNS 編集用の zone token は keychain `gftd.cf`（DNS read/write
-    確認済み 2026-07-17）」と書いてあったが、**実測でその item は存在しない**
-    （`security find-generic-password -s gftd.cf` → NOT FOUND、kagi の
-    `gftd.cf` / `CLOUDFLARE_DNS_TOKEN` / `CLOUDFLARE_API_TOKEN` も no such item）。
+  - ✅ **DNS を読み書きできる資格情報は keychain `gftd.cf` / `API_TOKEN`**
+    （2026-08-14 実測。この鍵で 26 レコードを 6 ゾーンに作成、ADR-2608145000）。
+    ```bash
+    CF="$(security find-generic-password -s gftd.cf -w)"
+    curl -sS "https://api.cloudflare.com/client/v4/zones/$ZID/dns_records" \
+      -H "Authorization: Bearer $CF"
+    ```
+    ⚠ **`GET /user/tokens/verify` はこの token で `1000 Invalid API Token` を返すが、
+    token は生きている。** verify は user-owned token 用のエンドポイントで、
+    account-scoped token では権限不足になる。**verify の失敗を「鍵が死んでいる」と
+    読まないこと** — 判定は実際に使う endpoint（`/zones/{id}/dns_records`）で行う。
+    2026-08-14 にこれで 5 分溶かした。
+  - ⚠ **2026-08-05 版のこの節は「`gftd.cf` は実測で存在しない」と書いていたが誤り。**
+    2026-08-14 に `security find-generic-password -s gftd.cf` は PRESENT を返す。
+    当時 `-a API_TOKEN` を付けずに引いたか、別ユーザ context で引いた可能性が高い。
+    **「NOT FOUND だった」という過去の実測を、現在の不在の証拠として引用しない。**
+  - ⚠ **kagi vault はこのセッションから読めない状態がある。** 2026-08-14 実測、
+    documented かつ確実に存在する `itonami-mail-age` すら `no such item` を返した。
+    つまり **kagi の `no such item` は不在の証拠にならない**（unlock されていない
+    ときも同じ文字列を返す）。判定する前に、存在が確実な item で vault の
+    到達性そのものを確かめること。
+  - （旧記述、参考）kagi の `gftd.cf` / `CLOUDFLARE_DNS_TOKEN` / `CLOUDFLARE_API_TOKEN`
+    は no such item。
     - **wrangler の OAuth token では DNS API に読みも書きも通らない。** scope 一覧に
       `zone (read)` はあるが `dns_records` は含まれず、`GET /zones/{id}/dns_records`
       も `POST` も **`10000 Authentication error`** を返す（同じ token で
