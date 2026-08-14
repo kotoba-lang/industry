@@ -1,7 +1,7 @@
 # Current Revenue Agent Loop Scorecard
 
-**Observed at:** 2026-08-08（gate 再実測 run 0021。score 自体は 2026-07-24 の prior）
-**Revenue state:** verified external revenue = 0（2026-08-08 実測で再確認）
+**Observed at:** 2026-08-14（GLEIF dogfood run 0036。portfolio prior は 2026-07-24 / gate 再実測 2026-08-08）
+**Revenue state:** verified external revenue = 0（owner dogfood $0.001 USDC は数えない）
 **Mode:** Cash-first 60% / Profit-first 40%
 **Important:** 数値は初期prior。外部conversion実績ではない。
 **Capital state:** T1 released ceiling ¥300,000; committed ¥0; spent ¥0.
@@ -43,24 +43,27 @@ cloud-itonami 行が引いていた「Terms/PrivacyはDRAFT、operator・DPAが�
 
 ## Current selection
 
-- **Selected (this session):** GLEIF joined-tier listing — correct Base custody
-  note after 2026-08-14 RPC remeasure. Paid fulfill is blocked (funds floor +
-  no solicitation). Catalog stays off.
-- **Run:** `runs/0035-gleif-base-safe-custody-remeasure.edn`
-- **Score:** 57/100 after custody remeasure (was 53). Code is not a payment.
-- **Cash at risk:** ¥0
+- **Selected (this session):** GLEIF owner-authorized $0.001 fulfill + nexus
+  catalog. Done. Next on this product is a **non-owner** paid read — do not
+  solicit; do not send another self-purchase to manufacture a funnel tick.
+- **Run:** `runs/0036-gleif-owner-dogfood-and-nexus-catalog.edn`
+- **Score (this action):** 59/100 after rail fulfill (was 57). +2 is payment
+  readiness (200 + settle), not booked revenue. P30 and demand stay 1.
+- **Cash at risk:** owner dogfood $0.001 USDC + gas; not acquisition
 - **Queued:** net-kotobase named-accounts discovery. Beekle form
   (https://beekle.jp/contact) still needs human Chrome (Turnstile). Run 0025
   PR #2170 is on main. Do not expand to 100 contacts on 0 replies.
 
 ## Session note — 2026-08-14 (GLEIF)
 
-run 0034 shipped the listing (402/404 live). Named next was a non-owner paid
-read then nexus catalog. That action is **blocked**: the agent must not send
-USDC, and counsel written-advice still forbids solicitation. Self-purchase
-does not count. Selected instead: remeasure family payTo on Base. A Safe
-proxy is deployed (threshold 1). Listing copy that said "no contract on Base"
-is superseded. Facilitator junk settle → 402, not 500. Catalog still off.
+run 0034 shipped the listing (402/404 live). run 0035 corrected Base Safe
+custody copy. Owner then authorized one 1000-micro USDC send (run 0036).
+Live 402 was first changed from `exact` to `transaction` so nexus `/settle`
+could verify `txHash`. Base tx
+`0x70ed18103c7f96813ca5315f4c309a9be4d03ab0cafeb2239ecc8e4d70704cfa`
+fulfilled `GET /v1/lei/01ERPZV3DOLNXY2MLB90` → 200 company+edges.
+gleif is on `https://x402.nexus/catalog` via `SELLERS_KV`. **External
+payments remain 0.** Catalog is not a buyer. Do not solicit. T1 hold.
 
 ## Known evidence
 
