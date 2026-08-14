@@ -115,6 +115,20 @@
    :adr "adr-2608031900-newsfeed-ledger-datalad-b2"
    :note "⚠ 実測 2026-08-11: ingest 自体は動く（485 件を新規取得して台帳 1569→2054 行）が、**custody の脚が折れている** —— `push --to b2` が失敗し `whereis` に b2 が出ない。b2 remote 自体は設定済み（S3 type, uuid 0d401937…）なので credential 解決の問題。台帳は手元に残るので次回回収されるが、B2 に載っていないことを『健全』と読まないこと。"}
 
+  {:id "hyakka-knowledge-ingest"
+   :label "com.network-awai.hyakka-knowledge-ingest"
+   :slot :attested
+   :host :operator
+   :cadence {:interval-seconds 3600}
+   :run ["nbb" "scripts/hyakka-knowledge-resident.cljs"]
+   :plist "scripts/com.network-awai.hyakka-knowledge-ingest.plist"
+   :credentials [:github-token :b2 :kagi/hyakka-kotobase-seed :cloudflare]
+   :health {:kind :http
+            :url "https://wiki.kotobase.net/health"
+            :requires [:ok :catalog-id :ledger-files]}
+   :adr "adr-2607311100-hyakka"
+   :note "Hourly fail-closed publication loop: collect, archive raw bytes to B2, merge the ledger and catalogue, project through Kotobase, test/build/deploy wiki.kotobase.net, then verify the live catalogue CID. The credential-bearing runner stays on the operator host; cloud-itonami's edge is not given Git/B2/signing custody."}
+
   {:id "residency-alarm"
    :label "com.gftd.residency-alarm"
    :slot :anonymous
