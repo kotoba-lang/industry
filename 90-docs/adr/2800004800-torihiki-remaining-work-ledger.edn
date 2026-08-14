@@ -33,8 +33,30 @@ ecosystem 無し。ここに書くのはその手前の技術的な残務であ�
 ない witness が 1 台落ちても chain は止まってはならない）が落ちた。7 台中 6 台
 居て高さが動かない。**revert 済み、入っていない。**
 
-**残る問い。** 『止まった chain の救済』と『1 台障害への耐性』を同じ tick 構造で
-両立させる方法。パッチではなく tick 構造の設計問題として扱うこと。
+**解決済み（同日追記）。** 範囲を絞れば両立した —— timeout 分岐で `vote-on-tip`
+を呼ぶのは『tip に certificate が無く、かつこの replica がその height で一度も
+投票していない』場合だけにする。既に投票した replica は既に数えられており、票の
+再送は通常分岐の仕事。無条件版が departure spec を壊したのは毎 timeout で再送して
+いたためだった。inga 395 tests 緑。
+
+**再現 harness も 5 回目でできた** —— `the-deployed-stall-reproduced`。下の 5 条件
+では足りず、6 つ目が要る:
+
+  6. どの pacemaker も certificate を保持していないこと
+
+new-view は high-qc を運び handle-new-view が畳むので、1 台でも持っていれば
+timeout 自体が certificate を配って回復してしまう。過去 4 回の harness はこの扉を
+開けたままだった。加えて clock が backoff を追い越す必要がある（base-timeout
+1000ms が 6 回倍化して 64 秒まで伸びるので、3 秒しか回さない harness は通常分岐に
+戻ってしまう）。
+
+harness 自身のバグも 2 つ潰した: :votes だけ削って :voted を残すと全員が「投票
+済み」と信じて救済が発火しない。tip の票が 0 だと救済が成功しても quorum に届かない。
+
+**deploy 後の実機（cv166）はこの形ではなくなった** —— tip は certified で票 3。
+残るのは別の形で、not-my-round（leader が提案しない）と locked-elsewhere
+（HotStuff の lock 規則が拒否 = 分岐が存在する）。**次はここから。** lock 衝突は
+安全側の拒否なので、どの分岐が生き残るべきかを見るところから始めること。
 
 **着手前にやるべきこと。** 再現 harness。この期間に 4 通り書いて**すべて失敗
 した**（harness 側が毎回回復してしまう）。実機を harness 代わりにする方法は
