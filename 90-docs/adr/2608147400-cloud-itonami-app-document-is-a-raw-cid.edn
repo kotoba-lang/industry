@@ -10,11 +10,13 @@
               "orgs/net-kotobase/control-plane"]
   :adr/related ["90-docs/adr/2608145100-public-resource-identity-is-cid-and-ipns.edn"
                 "90-docs/adr/2608140500-ipfs-ipns-subdomain-execution-origin.edn"
-                "90-docs/adr/2608145400-protocol-l2-graph-cid.edn"]
+                "90-docs/adr/2608145400-protocol-l2-graph-cid.edn"
+                "90-docs/adr/2608130000-kotobase-storage-only-gateway.edn"]
   :adr/authoritative_for
   ["desktop app content identity is CIDv1 raw sha2-256 of one page-html document"
    "auth.itonami.cloud remains the ceremony Name, not a CID"
-   "archive Location is https://kotobase.net/ipfs/{cid} after GET-verified PUT"]
+   "archive Location is https://kotobase.net/ipfs/{cid} after GET-verified PUT"
+   "update channel is ipns://k51… via delegated DHT; kotobase GET /ipns/ stays 410"]
   :source/dataset "adr"
   :adr/body
   "cloud-itonami-app の公開 identity を hostname / `#/signin` ではなく raw CID にする。protocol は ADR-2608145100。この ADR はその最初の app 実装の着地記録。
@@ -24,43 +26,60 @@ accepted — 2026-08-14。実装は `cloud-itonami/cloud-itonami-app` の ADR-00
 
 ## Identity of the landed tree
 
+Snapshot (GET-verified archive, app #82):
+
 ```
-ipfs://bafkreiey52hai5obtqeg5w2ix63orset4o74kxljif2gwdkxt5upre2wsi
+ipfs://bafkreig4jyeaynm47icfmqj3m5ya7iep2o7c4vk34pwpafm7tnf4tfimny
 ```
 
-801,104 bytes。`:kotoba.app/id` `cloud.itonami.app`。kind `appview`。
+806,249 bytes。`:kotoba.app/id` `cloud.itonami.app`。kind `appview`。
 
-Location: `https://kotobase.net/ipfs/bafkreiey52hai5obtqeg5w2ix63orset4o74kxljif2gwdkxt5upre2wsi`
+Location: `https://kotobase.net/ipfs/bafkreig4jyeaynm47icfmqj3m5ya7iep2o7c4vk34pwpafm7tnf4tfimny`
+
+Update channel:
+
+```
+ipns://k51qzi5uqu5dj6z20sjzztyay81591voe6yofukl0ylsmug9euf934z1g04erd
+```
+
+Sequence 1 (live GET 2026-08-14T12:53Z) still resolves to the previous snapshot `ipfs://bafkreiey52hai5obtqeg5w2ix63orset4o74kxljif2gwdkxt5upre2wsi`。Sequence 2 PUT 200 onto the current CID; GET Cache-Control `max-age=3600` tracks the spec default 1-hour record TTL so the pointer cannot be GET-verified onto #82 until that TTL expires. Later records from this publisher use a 5-minute TTL.
 
 ## Landed
 
-- App merge: https://github.com/cloud-itonami/cloud-itonami-app/commit/5c196db84a4cd88645b63985c7a90469f3f57389
-- Feature: `fe032f805217f813ee40cb280a9244d6793e9f27`
-- Closing ADR: https://github.com/cloud-itonami/cloud-itonami-app/pull/77
-- West pin (compute): https://github.com/com-junkawasaki/root/commit/c04a934a8d0a702c5a22f5ede4db4cc6ba960154
+- App merge (IPNS): https://github.com/cloud-itonami/cloud-itonami-app/commit/93c11d2a7a168a6810ba9adfff1221a13bbc2d66
+- PR: https://github.com/cloud-itonami/cloud-itonami-app/pull/83
+- West pin: https://github.com/com-junkawasaki/root/commit/64ac56e677c1168e4cd06fe8ff5dd679ba1cd667
+- Earlier archive Location: https://github.com/cloud-itonami/cloud-itonami-app/commit/4eef13c
+- Earlier compute: https://github.com/cloud-itonami/cloud-itonami-app/commit/5c196db84a4cd88645b63985c7a90469f3f57389
 
 ## Implemented
 
 `cloud.itonami.app.bundle` が unauthenticated な `page-html` を凍結し、CIDv1 raw sha2-256 を付け、`kotoba.protocol.app` manifest を組む。lock は `resources/cloud/itonami/app/kotoba.app.edn`。HTML blob は commit しない。
 
-Live archive Location (2026-08-14): PUT 201 → GET 200、Java HttpClient で byte-equal。Worker `KOTOBASE_ARCHIVE_TOKEN_2` が kagi `KOTOBASE_ARCHIVE_TOKEN` を受理（primary は残した）。archive GET の Cache-Control に `no-transform`（Cloudflare Web Analytics の HTML 注入を止める）。
+Live archive Location (2026-08-14): PUT 201 → GET 200。Worker `KOTOBASE_ARCHIVE_TOKEN_2` が kagi `KOTOBASE_ARCHIVE_TOKEN` を受理（primary は残した）。archive GET の Cache-Control に `no-transform`。
+
+`cloud.itonami.app.latest` が実 IPNS Record (`ipns.record`) に署名し `kad.routing` で delegated DHT へ出す。seed は kagi `cloud-itonami-app-latest`（compartment `personal`）。HTTPS Location は `GET /ipfs/{cid}` のまま。kotobase `GET /ipns/` は 410（ADR-2608130000）。P2P proxy は戻さない。
 
 ## Not implemented
 
-- IPNS `:kotoba.app/latest`
 - `:kotoba.graph/cid` の publish
 - auth host の移動
+- Storage-backed `GET /ipns/` on kotobase.net
+- Sequence N の GET-verify が lock CID と一致すること（sequence 1 TTL 待ち）
 
 ## Verification
 
-`bundle_test`: 5 tests / 21 assertions / 0 fail。ネットワーク無し。
-Live: PUT 201 / GET 200 / 801104 bytes equal。
+`bundle_test`: 5 tests / 21 assertions / 0 fail。
+`latest_test`: 10 tests / 30 assertions / 0 fail。injected router、disposable seed。
+Live archive: GET 200 / 806249 bytes。
+Live IPNS: GET `delegated-ipfs.dev/routing/v1/ipns/{k51}` 200、sequence 1。kotobase `/ipns/` 410。
 
 ## Resume
 
-IPNS `:kotoba.app/latest` をこの CID に向ける。auth host は動かさない。
+sequence 1 の TTL 後（12:47Z から約 1h）に `clojure -M -m cloud.itonami.app.latest` を回し、GET-verify が lock CID と一致するまで。その後 `:kotoba.graph/cid`。auth host は動かさない。
 
 ## 改訂履歴
 
 2026-08-14: accepted。closing 記録。
-2026-08-14: Location live（PUT 201 / GET 200 / no-transform）。"}]
+2026-08-14: Location live（PUT 201 / GET 200 / no-transform）。
+2026-08-14: IPNS latest 着地（app #83 / pin 64ac56e）。sequence 1 は前 snapshot。sequence 2 PUT 200、GET は 1h TTL cache。"}]
